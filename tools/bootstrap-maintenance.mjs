@@ -70,7 +70,13 @@ export function preflightBootstrap({args=requested,platform=process.platform,app
   need(sha256(fs.readFileSync(path.join(repoRoot,rel)))===sha256(bytes),
    'BOOTSTRAP_PINNED_FILE_DRIFT');
  }
- execFileSync(node,['--test',...testFiles],{cwd:repoRoot,windowsHide:true,timeout:120000,stdio:'ignore'});
+ try {
+  execFileSync(node,['--test',...testFiles],{cwd:repoRoot,windowsHide:true,timeout:120000,stdio:'pipe'});
+ } catch(error) {
+  throw Object.assign(Error('BOOTSTRAP_SELF_TEST_FAILED'),{
+   code:'BOOTSTRAP_SELF_TEST_FAILED',testExitStatus:error.status??null
+  });
+ }
  return {sourceSha:args[1],startup,node,gh};
 }
 
@@ -99,5 +105,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
       startup:'ZGMINI_PC_MAINTENANCE.vbs',controllerUntouched:true,
       next:'VERIFY_PROCESS_AND_GITHUB_REQUEST_RESULT'}));
   }catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:e?.code??'BOOTSTRAP_ENVIRONMENT_ERROR',
+    testExitStatus:e?.testExitStatus??null,
     instruction:'INSPECT_PARTIAL_BOOTSTRAP_BEFORE_ANY_RETRY'}));process.exitCode=1;}
 }

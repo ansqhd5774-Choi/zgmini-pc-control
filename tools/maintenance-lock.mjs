@@ -8,7 +8,7 @@ const need=(x,c)=>{if(!x)throw Object.assign(Error(c),{code:c});};
 const names=new Set(['receiver','controller-install']);
 export function acquireMaintenanceLock(root,name){
  need(names.has(name),'MAINTENANCE_LOCK_NAME');
- need(path.isAbsolute(root)&&path.resolve(root)!==path.parse(root).root&&fs.existsSync(root),'MAINTENANCE_LOCK_ROOT');
+ need(path.isAbsolute(root)&&path.resolve(root)!==path.parse(path.resolve(root)).root&&fs.existsSync(root),'MAINTENANCE_LOCK_ROOT');
  const leaseRoot=path.join(root,'leases');fs.mkdirSync(leaseRoot,{recursive:true});
  const dir=path.join(leaseRoot,name);
  try{fs.mkdirSync(dir);}catch(error){

@@ -32,4 +32,5 @@ test('lock release verifies its nonce; never removes another owner',()=>{
 test('arbitrary lock name and broad path are denied',()=>{
  const root=fixture();assert.throws(()=>acquireMaintenanceLock(root,'core'),{code:'MAINTENANCE_LOCK_NAME'});
  assert.throws(()=>acquireMaintenanceLock('/', 'receiver'),{code:'MAINTENANCE_LOCK_ROOT'});
+ assert.throws(()=>acquireMaintenanceLock(path.parse(path.resolve(root)).root,'receiver'),{code:'MAINTENANCE_LOCK_ROOT'});
 });
