@@ -1,4 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {execFileSync,spawn} from 'node:child_process';import {need,digest,writeJson} from './common.mjs';
+import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
 export function protectedState(dataRoot,{queryTask}={}){
  const output={files:{},tasks:{}};
@@ -22,6 +23,7 @@ export async function runOperation(request,context){
  const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml}=context;
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask}),providerCalls:0,d1Writes:0,sqliteOpened:false};
+ if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
  if(request.operation==='core-conflict-proof'){
   const isolated=path.join(workspace,'core-fixture');fs.mkdirSync(path.join(isolated,'pc-writer'),{recursive:true});
   const f=path.join(isolated,'pc-writer','local-cycle.lock');fs.writeFileSync(f,'fixture-owner');
