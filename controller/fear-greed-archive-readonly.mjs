@@ -6,10 +6,74 @@ import { DatabaseSync } from 'node:sqlite';
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const CORE_TASK = 'ZGMINI-PC-Local-Core';
 const MAX_LAUNCHER_BYTES = 131072;
+const MAX_LEDGER_BYTES = 65536;
+const MAX_SIDECAR_FILES = 64;
+const MAX_LEDGER_FILES = 12;
+const LEDGER_NAME = /^(?=[a-z0-9_.-]{1,100}\.json$)(?=.*(?:archive|last-run|status|ledger|checkpoint))[a-z0-9_.-]+\.json$/i;
 const ALLOWED_ROOTS = ['e:\\zgmini\\data\\pc-writer\\', 'e:\\zgmini\\projects\\'];
 const safeIso = value => typeof value==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value ? value : null;
 const safeStatus = value => typeof value==='string' && /^[A-Z_a-z]{1,32}$/.test(value) ? value : null;
+const safeCode = value => typeof value==='string' && /^[A-Z][A-Z0-9_:-]{0,79}$/.test(value) ? value : null;
 const safeStoredAt = value => Number.isSafeInteger(value)&&value>0 ? value : null;
+
+// A bounded, read-only look at dedicated sidecar evidence. A file's existence
+// or a reported PASS is never proof that a process executed independently.
+function sidecarTrace(dataRoot) {
+  const directory = path.join(dataRoot, 'pc-writer', 'archive-sidecar-r7');
+  let info;
+  try { info = fs.lstatSync(directory); }
+  catch(error) { return {evidence:'NOT_FOUND',reason:error?.code==='ENOENT'?'SIDECAR_DIRECTORY_MISSING':'DIRECTORY_NOT_READABLE'}; }
+  if (info.isSymbolicLink() || !info.isDirectory()) return {evidence:'UNKNOWN',reason:'UNSAFE_SIDECAR_DIRECTORY'};
+  let entries;
+  try { entries=fs.readdirSync(directory, {withFileTypes:true}); }
+  catch { return {evidence:'UNKNOWN',reason:'DIRECTORY_NOT_READABLE'}; }
+  if (entries.length>MAX_SIDECAR_FILES) return {evidence:'UNKNOWN',reason:'DIRECTORY_ENTRY_LIMIT'};
+  const names=entries.filter(entry=>entry.isFile() && !entry.isSymbolicLink() && LEDGER_NAME.test(entry.name)).map(entry=>entry.name).sort();
+  if (!names.length) return {evidence:'NOT_FOUND',reason:'LEDGER_NOT_FOUND'};
+  if (names.length>MAX_LEDGER_FILES) return {evidence:'UNKNOWN',reason:'LEDGER_FILE_LIMIT'};
+  const candidates=[];
+  for (const name of names) {
+    const file=path.join(directory,name);
+    let stat;
+    try { stat=fs.lstatSync(file); }
+    catch { candidates.push({name,evidence:'NOT_READABLE'});continue; }
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size>MAX_LEDGER_BYTES || stat.size<2) {
+      candidates.push({name,evidence:'INVALID_FILE_TYPE_OR_SIZE'});continue;
+    }
+    try {
+      const bytes=fs.readFileSync(file);
+      if (bytes.length>MAX_LEDGER_BYTES) { candidates.push({name,evidence:'TOO_LARGE'});continue; }
+      const data=JSON.parse(bytes.toString('utf8'));
+      if (!data || typeof data!=='object' || Array.isArray(data)) throw Error('INVALID_LEDGER');
+      const fields=[data,data.result,data.archive,data.lastRun].filter(v=>v && typeof v==='object' && !Array.isArray(v));
+      const firstValid=(key,validator)=>fields.map(o=>validator(o[key])).find(v=>v!==null)??null;
+      const reportedStatus=firstValid('status',safeCode);
+      const code=firstValid('code',safeCode);
+      const firstFail=firstValid('firstFail',safeCode);
+      const lastPass=firstValid('lastPass',safeCode);
+      const reason=firstValid('reason',safeCode);
+      const at=['finishedAt','startedAt','checkedAt','at','timestamp'].map(key=>firstValid(key,safeIso)).find(v=>v!==null)??null;
+      candidates.push({name,evidence:'UNATTESTED_LEDGER',sha256:hash(bytes),modifiedAt:stat.mtime.toISOString(),
+        reportedStatus,code,lastPass,firstFail,reason,at});
+    } catch { candidates.push({name,evidence:'INVALID_LEDGER'}); }
+  }
+  return {evidence:'OBSERVED_UNATTESTED',candidates};
+}
+
+function archiveAlignment(local) {
+  if (local?.status!=='READ') return {status:'UNKNOWN'};
+  const current=local.currentPublic;
+  const originalAt=local.original?.latest?.lastAt;
+  const checkAt=local.checks?.latest?.lastAt;
+  const currentAt=current?.observedAt, storedAt=current?.storedAt;
+  const currentObservedMs=currentAt?Date.parse(currentAt):NaN;
+  const originalMs=originalAt?Date.parse(originalAt):NaN;
+  const checkMs=checkAt?Date.parse(checkAt):NaN;
+  const gaps={currentObservedNewerThanOriginal:Number.isFinite(currentObservedMs)&&Number.isFinite(originalMs)?currentObservedMs>originalMs:null,
+    currentStoredNewerThanCheck:Number.isFinite(storedAt)&&Number.isFinite(checkMs)?storedAt>checkMs:null};
+  return {status:Object.values(gaps).some(v=>v===true)?'HISTORY_DIVERGENCE':'NO_DIVERGENCE_CONFIRMED',...gaps,
+    cause:'UNKNOWN'};
+}
 
 function xmlString(value) {
   if (!Buffer.isBuffer(value)) return String(value ?? '');
@@ -123,6 +187,7 @@ export function inspectFearGreedArchive(dataRoot,{queryTask}={}) {
   const local=readDb(dataRoot);
   const complete=local.status==='READ';
   return {status:complete?'PASS':'BLOCKED',code:complete?'FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS':`FEAR_GREED_${local.status}`,
-    task,local,sqliteOpened:local.sqliteOpened,operationalWrites:0,providerCalls:0,d1Writes:0,
+    task,local,archiveTrace:{alignment:archiveAlignment(local),sidecar:sidecarTrace(dataRoot)},
+    sqliteOpened:local.sqliteOpened,operationalWrites:0,providerCalls:0,d1Writes:0,
     scope:'READ_ONLY_NO_PROVIDER_NO_PUBLICATION'};
 }
