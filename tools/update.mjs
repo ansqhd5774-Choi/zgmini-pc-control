@@ -37,15 +37,44 @@ const recordDir=path.join(maintenanceRoot,'ledger');
 const safeId=x=>{need(/^pc-[a-z0-9-]{8,76}$/.test(x??''),'MAINTENANCE_REQUEST_ID');return x;};
 const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
 
-// The process must not inherit the Runner Actions job. On Windows also verify
-// its ancestry via CIM before using taskkill /T against the supervisor tree.
+// The process must not inherit the Runner Actions job. An approved Startup
+// origin proof is required: walking beyond the long-lived receiver to an
+// already exited WScript would be unknowable and could reuse a stale PID.
 function verifyIndependent(supervisorPid) {
  need(process.platform==='win32','WINDOWS_PC_REQUIRED');
  need(!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,'MAINTENANCE_PROCESS_NOT_INDEPENDENT');
  const checker=path.join(maintenanceRoot,'tools/maintenance-ancestry.vbs');
  need(fs.existsSync(checker),'MAINTENANCE_ANCESTRY_CHECK_MISSING');
- const result=execFileSync('cscript.exe',['//NoLogo','//B',checker,
-  String(process.pid),String(supervisorPid)],{windowsHide:true,encoding:'utf8',timeout:12000}).trim();
+ const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
+ need(installed.schema==='ZGMINI_PC_MAINTENANCE_INSTALL_V1'&&validSha(installed.sourceSha)&&
+  /^[a-f0-9]{64}$/.test(installed.startupSha256??''),'MAINTENANCE_ORIGIN_UNKNOWN');
+ const expected=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
+  'tools/maintenance-ancestry.vbs'];
+ need(Object.keys(installed.files??{}).length===expected.length,'MAINTENANCE_SELF_DRIFT');
+ for(const rel of expected){
+  need(/^[a-f0-9]{64}$/.test(installed.files[rel]??'')&&
+   sha256(fs.readFileSync(path.join(maintenanceRoot,rel)))===installed.files[rel],'MAINTENANCE_SELF_DRIFT');
+ }
+ const appData=process.env.APPDATA;
+ need(typeof appData==='string'&&path.isAbsolute(appData),'MAINTENANCE_ORIGIN_UNKNOWN');
+ const startup=path.join(appData,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
+ need(sha256(fs.readFileSync(startup))===installed.startupSha256,'MAINTENANCE_ORIGIN_UNKNOWN');
+ const owner=json(path.join(maintenanceRoot,'leases/receiver/owner.json'));
+ need(Number.isSafeInteger(owner.pid)&&owner.pid>0&&/^[0-9a-f-]{36}$/.test(owner.nonce??'')&&
+  Math.abs(owner.bootAt-(Date.now()-os.uptime()*1000))<10000,'MAINTENANCE_ORIGIN_UNKNOWN');
+ const proof=json(path.join(maintenanceRoot,'receivers',owner.nonce+'.json'));
+ need(proof.schema==='ZGMINI_PC_RECEIVER_ORIGIN_V1'&&
+  proof.sourceSha===installed.sourceSha&&proof.startupSha256===installed.startupSha256&&
+  proof.pid===owner.pid&&proof.nonce===owner.nonce&&proof.bootAt===owner.bootAt&&
+  /^[0-9]{14}\.[0-9]{6}[+-][0-9]{3}$/.test(proof.created??'')&&
+  /^[0-9]{1,9}$/.test(proof.session??'')&&/^S-1-[0-9-]{4,100}$/.test(proof.sid??''),
+  'MAINTENANCE_ORIGIN_UNKNOWN');
+ let result='UNKNOWN';
+ try{result=execFileSync('cscript.exe',['//NoLogo','//B',checker,'VERIFY',
+  String(process.pid),String(supervisorPid),String(owner.pid),proof.created,proof.session,proof.sid],
+  {windowsHide:true,encoding:'utf8',timeout:12000,maxBuffer:4096}).trim();}
+ catch{throw Object.assign(Error('MAINTENANCE_PROCESS_NOT_INDEPENDENT'),{code:'MAINTENANCE_PROCESS_NOT_INDEPENDENT'});}
  need(result==='INDEPENDENT','MAINTENANCE_PROCESS_NOT_INDEPENDENT');
 }
 
