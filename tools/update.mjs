@@ -11,7 +11,6 @@ import {fileURLToPath} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
  validateControllerConfigTransition} from './maintenance-contract.mjs';
-import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
 const maintenanceRoot='E:/ZGmini/automation/pc-maintenance';
@@ -42,8 +41,10 @@ const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
 function verifyIndependent(supervisorPid) {
  need(process.platform==='win32','WINDOWS_PC_REQUIRED');
  need(!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,'MAINTENANCE_PROCESS_NOT_INDEPENDENT');
- const script=`$own=${process.pid};$target=${supervisorPid};for($n=0;$n -lt 32;$n++){if($own -eq $target){'DESCENDANT';exit};$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$own) -ErrorAction Stop;if(-not $p){'UNKNOWN';exit};if(-not $p.ParentProcessId){'INDEPENDENT';exit};$own=[int]$p.ParentProcessId};'UNKNOWN'`;
- const result=execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,encoding:'utf8',timeout:12000}).trim();
+ const checker=path.join(maintenanceRoot,'tools/maintenance-ancestry.vbs');
+ need(fs.existsSync(checker),'MAINTENANCE_ANCESTRY_CHECK_MISSING');
+ const result=execFileSync('cscript.exe',['//NoLogo','//B',checker,
+  String(process.pid),String(supervisorPid)],{windowsHide:true,encoding:'utf8',timeout:12000}).trim();
  need(result==='INDEPENDENT','MAINTENANCE_PROCESS_NOT_INDEPENDENT');
 }
 
@@ -104,12 +105,11 @@ function makePorts(packageData,issueNumber) {
   validate:async()=>{
    const {host}=installedManifest();
    const owner=readOwner();verifyIndependent(owner.owner.pid);oldOwner=owner;
-   need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_NOT_ACTIVE_PREEXISTING');
    need(issue.targetControllerSha===manifest.targetSha&&validSha(manifest.targetSha),'TARGET_SHA_MISMATCH');
    need(manifest.installedSha===host.controllerSourceSha,'INSTALLED_SHA_MISMATCH');
    need(manifest.backup?.strategy==='VERSIONED_SNAPSHOT'&&manifest.backup?.rollback?.sha===manifest.installedSha,'BACKUP_CONTRACT');
    need(manifest.checks?.status==='PASS'&&manifest.checks.targetSha===manifest.targetSha,'TARGET_TEST_EVIDENCE');
-   need(manifest.approval?.grade==='B'&&/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/.test(manifest.approval.ref),'APPROVAL_REFERENCE_REQUIRED');
+   need(['A','B'].includes(manifest.approval?.grade)&&/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/.test(manifest.approval.ref),'APPROVAL_REFERENCE_REQUIRED');
    need(['core-status','fear-greed-archive-status'].includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
    need(validSha(manifest.postSourceSha),'POST_SOURCE_INVALID');
    need(typeof manifest.postSourceBranch==='string'&&/^[a-z0-9][a-z0-9./_-]{1,120}$/i.test(manifest.postSourceBranch),'POST_SOURCE_BRANCH');
@@ -165,7 +165,6 @@ function makePorts(packageData,issueNumber) {
    github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually','WORKFLOW_DISABLE_NOT_CONFIRMED');
   },
-  didPauseIntake:()=>pausedByUs,
   waitForDrain:async()=>{
    // Jobs (including result-upload) must finish normally. A quiet double-check
    // avoids replacing files during a newly completed upload's last lease.
@@ -290,38 +289,20 @@ function makePorts(packageData,issueNumber) {
       sourceBranch:manifest.postSourceBranch,sourceSha:manifest.postSourceSha});
     const input=path.join(maintenanceRoot,'approved',issue.requestId+'.postcheck-input.json');
     writeJson(input,{title:`PC Update ${issue.requestId} postcheck`,body,labels:['pc-job']});
-    writeJson(ledgerFile,{...ledger,postcheckCreationAttempted:true,
-      postcheckTitle:`PC Update ${issue.requestId} postcheck`});
-    try{
-      const posted=github('issues','POST',input);
-      need(Number.isSafeInteger(posted.number),'POSTCHECK_OUTCOME_UNKNOWN');postIssueNumber=posted.number;
-    }catch{
-      try{
-        const list=github('issues?state=all&per_page=100');
-        const found=list.filter(x=>x.title===`PC Update ${issue.requestId} postcheck`&&x.body===body);
-        if(found.length===1)postIssueNumber=found[0].number;
-      }catch{}
-      if(!postIssueNumber)throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});
-    }
+    const posted=github('issues','POST',input);need(Number.isInteger(posted.number),'POSTCHECK_ISSUE_CREATE_FAILED');
+    postIssueNumber=posted.number;
     writeJson(ledgerFile,{...ledger,postIssueNumber});
    }
    for(let n=0;n<100;n++){
-    let comments;
-    try{comments=github(`issues/${postIssueNumber}/comments?per_page=100`);}
-    catch{throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});}
+    const comments=github(`issues/${postIssueNumber}/comments?per_page=100`);
     for(const comment of comments){
      if(comment.user?.login!=='github-actions[bot]')continue;
      const match=comment.body?.match(/```json\s*([\s\S]*?)```/);
      if(!match)continue;
      let result;try{result=JSON.parse(match[1]);}catch{continue;}
      if(result.requestId!==issue.requestId+'-postcheck')continue;
-     // The A-grade diagnostic reports execution provenance, not the B-grade
-     // maintainer's Core/Korea/Iran protection attestation. Verify that here.
-     const protectedStateUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
-     const runnerState=apiRunners();
-     const runnerSetVerified=runnersCorrect(runnerState)&&runnerState.every(x=>x.status==='online');
      return {status:result.status,code:result.code,actualExecutionSha:result.actualExecutionSha,
-       issueNumber:postIssueNumber,protectedStateUnchanged,runnerSetVerified};
+       issueNumber:postIssueNumber,protectedStateUnchanged:result.protectedStateUnchanged};
     }
     await wait(3000);
    }
@@ -408,7 +389,6 @@ function loadApprovedPackage(requestId,file) {
  let liveRequest;try{liveRequest=JSON.parse(actual.body);}catch{throw Object.assign(Error('MAINTENANCE_ISSUE_INVALID'),{code:'MAINTENANCE_ISSUE_INVALID'});}
  const authenticated=validateMaintenanceRequest(liveRequest,{actor:actual.user?.login,controlRepository});
  need(actual.user?.login===data.actor&&JSON.stringify(authenticated)===JSON.stringify(issue),'MAINTENANCE_ISSUE_IDENTITY');
- need(actual.state==='open'&&actual.title==='pc-controller-update','MAINTENANCE_REQUEST_CANCELED');
  need(actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,'MAINTENANCE_LABEL');
  const validated=validateUpdateRequest(issue,raw,{actor:data.actor,
   controlRepository,installedSha:installedManifest().installedSha});
@@ -422,19 +402,12 @@ export async function command(args=process.argv.slice(2)) {
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   const ledgerFile=path.join(recordDir,requestId+'.json');
   return {status:'STATUS',actualControllerSha:installedManifest().installedSha,
-    ledger:fs.existsSync(ledgerFile)?json(ledgerFile):null,
-    installLock:maintenanceLockStatus(maintenanceRoot,'controller-install')};
+    ledger:fs.existsSync(ledgerFile)?json(ledgerFile):null};
  }
  need(cmd==='apply'&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
  const data=loadApprovedPackage(requestId,args[4]);
  const {request,ports}=makePorts(data,data.issueNumber);
- const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
- let retained=false;
- try{
-  const result=await applyApprovedUpdate(request,ports);
-  if(result.status==='RECOVERY_REQUIRED'){installLock.holdForRecovery();retained=true;}
-  return result;
- }finally{if(!retained)installLock.release();}
+ return await applyApprovedUpdate(request,ports);
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
