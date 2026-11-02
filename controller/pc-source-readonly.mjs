@@ -82,7 +82,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  const safeFiles=files.map(({path,sha256})=>({path,sha256}));
  const result={status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',
   evidenceLevel:'STATIC_LAUNCHER_TRACE_ONLY',runtimeSourceVerified:false,
-  coreTaskAction:{commandFile:path.basename(action.command),scriptFiles:candidatePaths(action.arguments).map(path.basename).slice(0,8)},
+  coreTaskAction:{commandFile:path.basename(action.command),scriptFiles:candidatePaths(action.arguments).map(p=>path.basename(p)).slice(0,8)},
   tracedLaunchers:safeFiles,sourceResolved:!!sourceRoot,
   sourceRoot:sourceRoot?relative(sourceRoot):null,
   sourceHead:null,trackedDirty:null,requiredFiles:[],providerCalls:0,d1Writes:0,sqliteOpened:false};
