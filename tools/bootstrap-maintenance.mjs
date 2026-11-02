@@ -12,12 +12,12 @@ const maintenanceRoot='E:/ZGmini/automation/pc-maintenance';
 const controlRoot='E:/ZGmini/automation/pc-control';
 const sourceFiles=[
   'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
-  'tools/maintenance-agent.mjs','tools/update.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
   'tools/maintenance-ancestry.vbs'
 ];
 const testFiles=[
   'tests/maintenance-contract.test.mjs','tests/maintenance-apply.test.mjs',
-  'tests/maintenance-agent.test.mjs'
+  'tests/maintenance-agent.test.mjs','tests/maintenance-lock.test.mjs'
 ];
 const sha256=b=>createHash('sha256').update(b).digest('hex');
 const need=(x,code)=>{if(!x)throw Object.assign(Error(code),{code});};

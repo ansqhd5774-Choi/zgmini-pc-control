@@ -9,6 +9,7 @@ import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 
 import {validateMaintenanceRequest,validateUpdateRequest} from "./maintenance-contract.mjs";
+import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 const ISSUE_TITLE="pc-controller-update";
@@ -179,8 +180,9 @@ export function createMaintenanceAgent({
   ghBinary="C:/Program Files/GitHub CLI/gh.exe",nodeBinary=process.execPath,
   leaseRoot=FIXED_LEASE_ROOT,leaseAttempts=120,leaseWaitMs=500,
   updateScript=path.join(path.dirname(fileURLToPath(import.meta.url)),"update.mjs"),
+  verifyInstalledSource=()=>{},
   installedShaFromStatus=result=>result?.actualControllerSha,
-  ghTimeoutMs=20_000,updateTimeoutMs=10*60_000,
+  ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
 }={}){
   const root=assertTrustedRoot(stateDir);
@@ -206,6 +208,9 @@ export function createMaintenanceAgent({
     catch{throw coded(code);}
   }
   async function updater(args){
+    // Check the immutable installed maintainer files again at the point of use:
+    // the long-lived receiver must never execute a drifted updater.
+    verifyInstalledSource();
     return exec(nodeBinary,[updateScript,...args],updateTimeoutMs,safeUpdaterEnv());
   }
   async function updaterStatus(id){
@@ -448,7 +453,18 @@ export function createMaintenanceAgent({
     try{status=await updaterStatus(entry.requestId);}
     catch{return entry;}
     const current=status?.ledger?.result??status?.result??status?.ledger;
-    if(!current||!TERMINAL.has(current.status))return entry;
+    if(!current||!TERMINAL.has(current.status)){
+      const elapsed=Date.now()-Date.parse(entry.createdAt);
+      const noInstallEvidence=!current&&!status?.installLock?.held;
+      // Crash between Issue claim and updater invocation leaves no updater
+      // ledger. Surface UNKNOWN after a grace period; NEVER install again.
+      if((noInstallEvidence&&elapsed>120000)||(current&&elapsed>3600000)){
+        const result=normalizedResult(request,{status:'UNKNOWN',firstFail:'UPDATE_OUTCOME_UNKNOWN',
+          actualControllerSha:status?.actualControllerSha},'UPDATE_OUTCOME_UNKNOWN');
+        return persistResult(entry,result);
+      }
+      return entry;
+    }
     const result=normalizedResult(request,{...current,
       actualControllerSha:current.actualControllerSha??status.actualControllerSha},current.code);
     return persistResult(entry,result);
@@ -491,6 +507,11 @@ export function createMaintenanceAgent({
     try{
       approvedBytes=await manifestBytes(request);
       const preflight=await updaterStatus(request.requestId);
+      if(preflight?.installLock?.held){
+        return {status:preflight.installLock.recoveryRequired?'AUTOMATION_BLOCKED':'QUEUED',
+          code:preflight.installLock.recoveryRequired?'MAINTENANCE_RECOVERY_HOLD':'MAINTENANCE_INSTALL_IN_PROGRESS',
+          requestId:request.requestId};
+      }
       const installedSha=installedShaFromStatus(preflight);
       if(!isSha(installedSha))throw coded("INSTALLED_CONTROLLER_SHA_UNVERIFIED");
       approved=validateUpdateRequest(request,approvedBytes,{
@@ -560,27 +581,41 @@ export function createMaintenanceAgent({
   return {pollOnce,processIssue,loadLedger,updaterStatus};
 }
 
+function verifyInstalledTools(root){
+  const installed=JSON.parse(fs.readFileSync(path.join(root,"MAINTENANCE_INSTALL.json"),"utf8"));
+  const expected=["tools/maintenance-contract.mjs","tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs","tools/maintenance-lock.mjs","tools/update.mjs",
+    "tools/maintenance-ancestry.vbs"];
+  if(installed.schema!=="ZGMINI_PC_MAINTENANCE_INSTALL_V1"
+    ||Object.keys(installed.files??{}).length!==expected.length)throw coded("MAINTENANCE_SELF_MANIFEST_INVALID");
+  for(const [rel,hash] of Object.entries(installed.files)){
+    if(!expected.includes(rel)||!(/^[a-f0-9]{64}$/).test(hash)
+      ||sha256(fs.readFileSync(path.join(root,rel)))!==hash)throw coded("MAINTENANCE_SELF_DRIFT");
+  }
+}
+
 export async function main(args=process.argv.slice(2)){
   const mode=args.length===1&&["--once","--poll"].includes(args[0])?args[0]:null;
   if(!mode)throw coded("MAINTENANCE_USAGE_INVALID");
   const root=assertTrustedRoot(process.env.ZGMINI_PC_MAINTENANCE_ROOT);
-  const installed=JSON.parse(fs.readFileSync(path.join(root,"MAINTENANCE_INSTALL.json"),"utf8"));
-  if(installed.schema!=="ZGMINI_PC_MAINTENANCE_INSTALL_V1"
-   ||Object.keys(installed.files??{}).length!==5)throw coded("MAINTENANCE_SELF_MANIFEST_INVALID");
-  for(const [rel,hash] of Object.entries(installed.files)){
-    if(!["tools/maintenance-contract.mjs","tools/maintenance-apply.mjs",
-       "tools/maintenance-agent.mjs","tools/update.mjs",
-       "tools/maintenance-ancestry.vbs"].includes(rel)
-      ||sha256(fs.readFileSync(path.join(root,rel)))!==hash){
-      throw coded("MAINTENANCE_SELF_DRIFT");
-    }
-  }
-  const agent=createMaintenanceAgent({stateDir:process.env.ZGMINI_PC_MAINTENANCE_ROOT});
-  do{
-    await agent.pollOnce();
-    if(mode==="--once")break;
-    await new Promise(resolve=>setTimeout(resolve,60_000));
-  }while(true);
+  verifyInstalledTools(root);
+  let lease;
+  try{lease=acquireMaintenanceLock(root,'receiver');}
+  catch(error){if(error?.code==='MAINTENANCE_LOCK_BUSY_OR_RECOVERY_REQUIRED')return;throw error;}
+  try{
+    const agent=createMaintenanceAgent({stateDir:root,verifyInstalledSource:()=>verifyInstalledTools(root)});
+    do{
+      try{await agent.pollOnce();}
+      catch(error){
+        if(mode==='--once')throw error;
+        // A temporary GitHub outage must not permanently terminate the user
+        // Startup receiver. Fixed next-poll delay, no automatic job retry.
+        process.stderr.write('MAINTENANCE_POLL_WAIT: '+safeCode(error?.code??error?.message)+'\n');
+      }
+      if(mode==='--once')break;
+      await new Promise(resolve=>setTimeout(resolve,60_000));
+    }while(true);
+  }finally{lease.release();}
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){

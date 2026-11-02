@@ -70,7 +70,8 @@ export async function applyApprovedUpdate(request, port) {
     await record('POSTCHECK_PENDING');
     const post=await port.postcheck(request);
     if(post?.status!=='PASS'||post?.actualExecutionSha!==request.targetSha||
-      post?.protectedStateUnchanged!==true||post?.runnerSetVerified!==true) throw fail('POSTCHECK_NOT_VERIFIED');
+      post?.protectedStateUnchanged!==true||post?.runnerSetVerified!==true||
+      post?.postSourceVerified!==true) throw fail('POSTCHECK_NOT_VERIFIED');
     await record('PASS',{status:'PASS',code:'APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED',actualInstalledSha:request.targetSha,postcheck:post,
       protectedStateUnchanged:true,workflowEnabled:true});
     return {...ledger};

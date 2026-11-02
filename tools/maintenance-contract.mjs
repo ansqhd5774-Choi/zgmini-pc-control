@@ -232,6 +232,7 @@ export function newUpdateLedger(validated){
     fingerprint:requestFingerprint(validated),
     installedSha:validated.manifest.installedSha,targetSha:validated.manifest.targetSha,
     postOperation:validated.manifest.postOperation,
+    postSourceSha:validated.manifest.postSourceSha,
     manifestSha256:validated.manifest.checks.manifestSha256,
     phase:"READY",lastPass:"REQUEST_VALIDATED",firstFail:null,
     protectedBeforeSha256:null,backupSha256:null,
@@ -289,9 +290,10 @@ export function transitionLedger(ledger,event,evidence={}){
     return next(ledger,{phase:"APPLIED",lastPass:"INSTALLED_SHA_VERIFIED"});
   }
   if(event==="POSTCHECK_PASS"&&ledger.phase==="APPLIED"){
-    requireEvidence(evidence,["status","actualExecutionSha","postOperation"]);
+    requireEvidence(evidence,["status","actualExecutionSha","postOperation","requestedSourceSha"]);
     if(evidence.status!=="PASS"||evidence.actualExecutionSha!==ledger.targetSha
-      ||evidence.postOperation!==ledger.postOperation){
+      ||evidence.postOperation!==ledger.postOperation
+      ||evidence.requestedSourceSha!==ledger.postSourceSha){
       return rollbackRequired(ledger,"UPDATE_POSTCHECK_FAILED");
     }
     return next(ledger,{phase:"POSTCHECK_VERIFIED",lastPass:"POSTCHECK_VERIFIED"});

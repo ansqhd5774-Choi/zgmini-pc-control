@@ -208,12 +208,28 @@ test("complete evidence-backed update transition commits only after postcheck",(
   state=transitionLedger(state,"APPLY_PASS",{actualInstalledSha:NEXT,protectedAfterSha256:HASH_A});
   assert.equal(state.phase,"APPLIED");
   state=transitionLedger(state,"POSTCHECK_PASS",{
-    status:"PASS",actualExecutionSha:NEXT,postOperation:"core-status",
+    status:"PASS",actualExecutionSha:NEXT,postOperation:"core-status",requestedSourceSha:POST,
   });
   assert.equal(state.phase,"POSTCHECK_VERIFIED");
   state=transitionLedger(state,"COMMIT",{});
   assert.equal(state.phase,"COMMITTED");
   assert.equal(state.lastPass,"UPDATE_COMMITTED");
+});
+
+test("an independent public diagnostic SHA cannot be confused with the controller SHA",()=>{
+  const validated=admitted(fixture());
+  let state=newUpdateLedger(validated);
+  state=transitionLedger(state,"PREFLIGHT_PASS",{
+    installedSha:OLD,manifestSha256:validated.manifest.checks.manifestSha256,
+    protectedBeforeSha256:HASH_A,
+  });
+  state=transitionLedger(state,"BACKUP_PASS",{backupSha256:HASH_B,rollbackSha:OLD});
+  state=transitionLedger(state,"APPLY_PASS",{actualInstalledSha:NEXT,protectedAfterSha256:HASH_A});
+  const result=transitionLedger(state,"POSTCHECK_PASS",{
+    status:"PASS",actualExecutionSha:NEXT,postOperation:"core-status",requestedSourceSha:OLD,
+  });
+  assert.equal(result.phase,"ROLLBACK_REQUIRED");
+  assert.equal(result.firstFail,"UPDATE_POSTCHECK_FAILED");
 });
 
 test("attempted early commit and out-of-order state changes are blocked",()=>{
