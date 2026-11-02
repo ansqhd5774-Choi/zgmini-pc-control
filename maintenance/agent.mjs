@@ -17,7 +17,7 @@ for(const name of ['agent.mjs','contract.mjs','processor.mjs']){
  }
 }
 const {processUpdate}=await import('./processor.mjs');
-const {CONTROL_REPOSITORY,UPDATE_LABEL}=await import('./contract.mjs');
+const {CONTROL_REPOSITORY,UPDATE_LABEL,verifyOperationPolicy}=await import('./contract.mjs');
 const control='E:/ZGmini/automation/pc-control';
 const repo='E:/ZGmini/projects/zgmini-pc-control';
 const gh='C:/Program Files/GitHub CLI/gh.exe';
@@ -79,6 +79,8 @@ function inspectChanges(request){
  catch{throw Object.assign(Error('TARGET_NOT_IN_CONTROL_MAIN'),{code:'TARGET_NOT_IN_CONTROL_MAIN'});}
  const resultMutations=git(['diff','--name-status','--no-renames','--diff-filter=DMR',request.installedSha,request.targetSha,'--','results/']);
  need(!resultMutations.trim(),'EXISTING_REPORTS_MODIFIED');
+ const configAt=sha=>JSON.parse(git(['show',sha+':config/operations.json']));
+ verifyOperationPolicy(configAt(request.installedSha),configAt(request.targetSha));
  const lines=git(['diff','--name-status','--no-renames',request.installedSha,request.targetSha,'--','.',':(exclude)results/**']).trim().split(/\r?\n/).filter(Boolean);
  need(lines.length<=100,'CONTROL_CODE_DIFF_TOO_LARGE');
  return lines.map(line=>{
@@ -91,28 +93,66 @@ function inspectChanges(request){
 }
 function isIdle(){
  try{
+  if(!workflowEnabled())return {ok:false,code:'CONTROL_WORKFLOW_NOT_ACTIVE'};
   if(runners().some(x=>x.status!=='online'||x.busy))return {ok:false,code:'RUNNER_OFFLINE_OR_BUSY'};
   if(api('actions/runs?status=in_progress&per_page=1')?.total_count>0||api('actions/runs?status=queued&per_page=1')?.total_count>0)return {ok:false,code:'CONTROL_ACTIONS_BUSY'};
   if(fs.readdirSync(path.join(control,'leases')).some(x=>x!=='supervisor'))return {ok:false,code:'CONTROL_LEASES_BUSY'};
   return {ok:true};
  }catch{return {ok:false,code:'IDLE_EVIDENCE_UNAVAILABLE'};}
 }
-function auditApplied(request,record){
+function deferredUpdateReceipt(request,record){
+ const after=Date.parse(record.appliedAt??'');
+ if(!Number.isFinite(after))return false;
+ const candidates=fs.readdirSync(control).filter(name=>/^UPDATE_RESULT_\d{13}\.json$/.test(name));
+ for(const name of candidates){
+  const at=Number(name.match(/\d{13}/)?.[0]);
+  if(at<after-2000||at>Date.now()+5000)continue;
+  try{
+   const receipt=JSON.parse(fs.readFileSync(path.join(control,name),'utf8'));
+   if(receipt.status==='CONTROLLER_UPDATED_SIX_RECONNECTED'&&
+    receipt.controlSourceSha===request.targetSha&&receipt.backupVerified===true&&
+    receipt.protectedStateUnchanged===true&&receipt.workflowReenabled===false)
+    return true;
+  }catch{/* Unreadable receipt is not evidence of completion. */}
+ }
+ return false;
+}
+function auditApplied(request,record,{expectWorkflowEnabled=true,
+ allowRecoveryResume=true}={}){
  const installed=readHost(),items=runners();
  // After reconnection, legitimate queued work may make a Runner busy immediately.
  const six=items.length===6&&items.every(x=>x.status==='online');
  const protectedOk=!!record.protectedBeforeSha256&&record.protectedBeforeSha256===installed.protectedSha;
- const enabled=workflowEnabled();
- return {verified:installed.sha===request.targetSha&&installed.manifestValid&&six&&protectedOk&&enabled,
+ let enabled=workflowEnabled();
+ const sound=installed.sha===request.targetSha&&installed.manifestValid&&six&&protectedOk;
+ // A completed updater receipt proves that the agent may recover only the
+ // deferred intake step after a crash. Never rerun the updater or unlock jobs.
+ if(!enabled&&sound&&allowRecoveryResume&&record.phase==='APPLYING'&&
+  deferredUpdateReceipt(request,record)){
+  api('actions/workflows/pc-job.yml/enable','PUT');enabled=workflowEnabled();
+ }
+ return {verified:sound&&(expectWorkflowEnabled?enabled:!enabled),
   actualInstalledSha:installed.sha,runnerCount:six?6:null,protectedStateUnchanged:protectedOk,workflowEnabled:enabled};
 }
 function apply(request,record){
+ const updater=path.join(repo,'tools/update.mjs');
+ need(/^[a-f0-9]{64}$/.test(settings.updateToolSha256)&&
+  digest(fs.readFileSync(updater))===settings.updateToolSha256,
+  'UPDATE_TOOL_HASH_NOT_APPROVED');
  need(isIdle().ok,'RUNNER_IDLE_GATE_CHANGED');
- const output=execFileSync(node,[path.join(repo,'tools/update.mjs')],{cwd:repo,windowsHide:true,
-   env:{...process.env,ZGMINI_CONTROL_UPDATE_TARGET_SHA:request.targetSha},
+ const output=execFileSync(node,[updater],{cwd:repo,windowsHide:true,
+   env:{...process.env,ZGMINI_CONTROL_UPDATE_TARGET_SHA:request.targetSha,
+    ZGMINI_CONTROL_MAINTENANCE_DEFER_REENABLE:'1'},
    timeout:240000,maxBuffer:100000,encoding:'utf8'});
  const receipt=JSON.parse(output.trim());
- need(receipt.status==='CONTROLLER_UPDATED_SIX_RECONNECTED'&&receipt.controlSourceSha===request.targetSha&&receipt.protectedStateUnchanged===true,'UPDATE_RECEIPT_INVALID');
+ need(receipt.status==='CONTROLLER_UPDATED_SIX_RECONNECTED'&&
+  receipt.controlSourceSha===request.targetSha&&
+  receipt.protectedStateUnchanged===true&&receipt.backupVerified===true&&
+  receipt.workflowReenabled===false,'UPDATE_RECEIPT_INVALID');
+ const held=auditApplied(request,record,{expectWorkflowEnabled:false,
+  allowRecoveryResume:false});
+ need(held.verified,'UPDATE_PRE_RESUME_AUDIT_FAILED');
+ api('actions/workflows/pc-job.yml/enable','PUT');
  const audited=auditApplied(request,record);
  return {...audited,backup:receipt.backup??null,code:'CONTROLLER_UPDATED_SIX_RECONNECTED'};
 }
