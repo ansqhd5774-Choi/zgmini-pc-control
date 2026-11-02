@@ -3,6 +3,7 @@ import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
+import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
 export function protectedState(dataRoot,{queryTask}={}){
  const output={files:{},tasks:{}};
@@ -30,6 +31,12 @@ export async function runOperation(request,context){
  if(request.operation==='alpaca-quota-readonly')return inspectAlpacaQuotaReadonly(dataRoot);
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
+ if(request.operation==='employment-r6-candidate-stage-readonly'){
+  const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
+  if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
+    candidateExecuted:false,sqliteOpened:false,providerCalls:0,d1Writes:0};
+  return inspectEmploymentR6Candidate(request,{host,workspace});
+ }
  if(request.operation==='core-conflict-proof'){
   const isolated=path.join(workspace,'core-fixture');fs.mkdirSync(path.join(isolated,'pc-writer'),{recursive:true});
   const f=path.join(isolated,'pc-writer','local-cycle.lock');fs.writeFileSync(f,'fixture-owner');
