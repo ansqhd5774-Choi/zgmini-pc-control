@@ -11,6 +11,7 @@ try{
  const sourceSha=process.env.ZGMINI_CONTROL_UPDATE_TARGET_SHA||g(['rev-parse','HEAD']).trim();
  need(/^[a-f0-9]{40}$/.test(sourceSha)&&g(['cat-file','-t',sourceSha]).trim()==='commit','CONTROL_TARGET_COMMIT');
  const targetFiles=g(['ls-tree','-r','--name-only',sourceSha]).trim().split(/\r?\n/).filter(x=>x.startsWith('controller/')||x==='config/operations.json');
+ need(targetFiles.length>0&&targetFiles.every(x=>/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(x)),'CONTROLLER_TARGET_PATH_NOT_ALLOWED');
  const staged=new Map(targetFiles.map(rel=>[rel,execFileSync('git',['show',sourceSha+':'+rel],{cwd:repo,windowsHide:true})]));
  const hostBefore=JSON.parse(fs.readFileSync(path.join(root,'host.json')));
  need(Object.keys(hostBefore.controllerFiles).every(rel=>staged.has(rel)),'CONTROLLER_FILE_REMOVAL_NOT_APPROVED');
@@ -24,8 +25,18 @@ try{
  for(const [rel,expected] of Object.entries(backed.controllerFiles))need(sha(fs.readFileSync(path.join(backup,rel)))===expected,'BACKUP_FILE_VERIFICATION_FAILED');
  backupVerified=true;
  api('actions/workflows/pc-job.yml/disable',['--method','PUT']);disabled=true;
- need(api('actions/runs?status=in_progress&per_page=30').total_count===0&&api('actions/runs?status=queued&per_page=30').total_count===0,'CONTROL_JOBS_PENDING_STOP');
- need(fs.readdirSync(path.join(root,'leases')).every(x=>x==='supervisor'),'JOB_LEASE_PRESENT_STOP');
+ let drained=false;
+ for(let i=0;i<60;i++){
+  const active=api('actions/runs?status=in_progress&per_page=1').total_count;
+  const queued=api('actions/runs?status=queued&per_page=1').total_count;
+  const leases=fs.readdirSync(path.join(root,'leases')).every(x=>x==='supervisor');
+  const seats=api('actions/runners').runners;
+  if(active===0&&queued===0&&leases&&seats.length===6&&seats.every(x=>x.status==='online'&&!x.busy)){
+   drained=true;break;
+  }
+  await new Promise(resolve=>setTimeout(resolve,1500));
+ }
+ need(drained,'CONTROL_DRAIN_TIMEOUT_STOP');
  const before=protectedState('E:/ZGmini/data',{queryTask:nativeTaskXml}),state=JSON.parse(fs.readFileSync(path.join(root,'SUPERVISOR_STATUS.json'))),owner=JSON.parse(fs.readFileSync(path.join(root,'leases/supervisor/owner.json')));
  need(state.pid===owner.pid&&Date.now()-Date.parse(state.at)<45000,'SUPERVISOR_IDENTITY_STALE');
  need(sha(fs.readFileSync(path.join(root,'host.json')))===sha(fs.readFileSync(path.join(backup,'host.json'))),'CONTROLLER_DRIFT_DURING_DRAIN');
