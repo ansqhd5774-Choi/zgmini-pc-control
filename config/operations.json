@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_PC_OPERATIONS_V1",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "allowedActors": ["ansqhd5774-Choi"],
+  "seats": 6,
+  "operations": {
+    "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy"},
+    "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
+    "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
+    "failure-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
+    "timeout-proof": {"grade":"A","timeoutSeconds":5,"resource":"light"}
+  },
+  "mutationsEnabled": false,
+  "maxHeavyJobs": 1,
+  "minimumFreeMiBForHeavy": 1536,
+  "artifactUploadEnabled": false,
+  "cacheEnabled": false,
+  "maxReportBytes": 32768,
+  "maxAutomaticRetries": 0
+}

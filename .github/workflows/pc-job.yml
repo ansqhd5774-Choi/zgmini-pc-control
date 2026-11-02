@@ -1,0 +1,26 @@
+name: ZGMINI PC Job
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: pc-request-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  approved-pc-job:
+    if: github.repository == 'ansqhd5774-Choi/zgmini-pc-control' && github.event.repository.private == true && github.actor == 'ansqhd5774-Choi' && contains(github.event.issue.labels.*.name, 'pc-job')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Execute fixed host allowlist entry
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\entry.mjs"'
+      - name: Upload sanitized TXT JSON and issue result
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\upload.mjs"'
