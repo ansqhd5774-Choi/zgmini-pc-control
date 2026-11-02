@@ -77,8 +77,10 @@ function inspectChanges(request){
  need(git(['cat-file','-t',request.targetSha]).trim()==='commit','TARGET_NOT_A_COMMIT');
  try{git(['merge-base','--is-ancestor',request.targetSha,'refs/remotes/origin/main']);}
  catch{throw Object.assign(Error('TARGET_NOT_IN_CONTROL_MAIN'),{code:'TARGET_NOT_IN_CONTROL_MAIN'});}
- const lines=git(['diff','--name-status','--no-renames',request.installedSha,request.targetSha]).trim().split(/\r?\n/).filter(Boolean);
- need(lines.length<=400,'CONTROL_DIFF_TOO_LARGE');
+ const resultMutations=git(['diff','--name-status','--no-renames','--diff-filter=DMR',request.installedSha,request.targetSha,'--','results/']);
+ need(!resultMutations.trim(),'EXISTING_REPORTS_MODIFIED');
+ const lines=git(['diff','--name-status','--no-renames',request.installedSha,request.targetSha,'--','.',':(exclude)results/**']).trim().split(/\r?\n/).filter(Boolean);
+ need(lines.length<=100,'CONTROL_CODE_DIFF_TOO_LARGE');
  return lines.map(line=>{
   const m=/^([AMD])\t([^\t\r\n]+)$/.exec(line);need(m,'CONTROL_DIFF_UNEXPECTED');
   const [_,status,file]=m;
