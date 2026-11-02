@@ -9,7 +9,7 @@ const MAX_LAUNCHER_BYTES = 131072;
 const MAX_LEDGER_BYTES = 65536;
 const MAX_SIDECAR_FILES = 64;
 const MAX_LEDGER_FILES = 12;
-const LEDGER_NAME = /^(?=[a-z0-9_.-]{1,100}\.json$)(?=.*(?:archive|last-run|status|ledger|checkpoint))[a-z0-9_.-]+\.json$/i;
+const LEDGER_NAME = /^(?=[a-z0-9_.-]{1,100}\.json$)(?=.*(?:last-run|status|ledger|checkpoint|result|report))[a-z0-9_.-]+\.json$/i;
 const ALLOWED_ROOTS = ['e:\\zgmini\\data\\pc-writer\\', 'e:\\zgmini\\projects\\'];
 const safeIso = value => typeof value==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value ? value : null;
 const safeStatus = value => typeof value==='string' && /^[A-Z_a-z]{1,32}$/.test(value) ? value : null;
@@ -71,7 +71,7 @@ function archiveAlignment(local) {
   const checkMs=checkAt?Date.parse(checkAt):NaN;
   const gaps={currentObservedNewerThanOriginal:Number.isFinite(currentObservedMs)&&Number.isFinite(originalMs)?currentObservedMs>originalMs:null,
     currentStoredNewerThanCheck:Number.isFinite(storedAt)&&Number.isFinite(checkMs)?storedAt>checkMs:null};
-  return {status:Object.values(gaps).some(v=>v===true)?'HISTORY_DIVERGENCE':'NO_DIVERGENCE_CONFIRMED',...gaps,
+  return {status:Object.values(gaps).some(v=>v===true)?'HISTORY_DIVERGENCE':Object.values(gaps).some(v=>v===null)?'UNKNOWN':'NO_DIVERGENCE_CONFIRMED',...gaps,
     cause:'UNKNOWN'};
 }
 
