@@ -16,6 +16,25 @@ const safeStatus = value => typeof value==='string' && /^[A-Z_a-z]{1,32}$/.test(
 const safeCode = value => typeof value==='string' && /^[A-Z][A-Z0-9_:-]{0,79}$/.test(value) ? value : null;
 const safeStoredAt = value => Number.isSafeInteger(value)&&value>0 ? value : null;
 
+function publicationLedgerTrace(dataRoot) {
+  // Existing global writer evidence; not proof of a specific archive publish.
+  const file=path.join(dataRoot,'pc-writer','local-publication-ledger.json');
+  let stat;
+  try { stat=fs.lstatSync(file); }
+  catch(error) { return {evidence:error?.code==='ENOENT'?'NOT_FOUND':'UNKNOWN'}; }
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size<2 || stat.size>MAX_LEDGER_BYTES)
+    return {evidence:'UNKNOWN',reason:'INVALID_FILE_TYPE_OR_SIZE'};
+  try {
+    const bytes=fs.readFileSync(file);
+    if (bytes.length>MAX_LEDGER_BYTES) return {evidence:'UNKNOWN',reason:'TOO_LARGE'};
+    const data=JSON.parse(bytes.toString('utf8'));
+    if (!data || typeof data!=='object' || Array.isArray(data)) throw Error('INVALID');
+    return {evidence:'UNATTESTED_LEDGER',reportedStatus:safeCode(data.status),
+      at:Number.isSafeInteger(data.at)&&data.at>0?new Date(data.at).toISOString():null,
+      modifiedAt:stat.mtime.toISOString(),sha256:hash(bytes),scope:'GLOBAL_PUBLICATION_ONLY'};
+  } catch { return {evidence:'UNKNOWN',reason:'INVALID_LEDGER'}; }
+}
+
 // A bounded, read-only look at dedicated sidecar evidence. A file's existence
 // or a reported PASS is never proof that a process executed independently.
 function sidecarTrace(dataRoot) {
@@ -187,7 +206,7 @@ export function inspectFearGreedArchive(dataRoot,{queryTask}={}) {
   const local=readDb(dataRoot);
   const complete=local.status==='READ';
   return {status:complete?'PASS':'BLOCKED',code:complete?'FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS':`FEAR_GREED_${local.status}`,
-    task,local,archiveTrace:{alignment:archiveAlignment(local),sidecar:sidecarTrace(dataRoot)},
+    task,local,archiveTrace:{alignment:archiveAlignment(local),sidecar:sidecarTrace(dataRoot),publicationLedger:publicationLedgerTrace(dataRoot)},
     sqliteOpened:local.sqliteOpened,operationalWrites:0,providerCalls:0,d1Writes:0,
     scope:'READ_ONLY_NO_PROVIDER_NO_PUBLICATION'};
 }
