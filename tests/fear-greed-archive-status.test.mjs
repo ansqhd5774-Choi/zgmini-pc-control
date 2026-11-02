@@ -117,3 +117,22 @@ test('directory symlink and symlinked ledger cannot read outside the dedicated s
  assert.equal(a.archiveTrace.sidecar.evidence,'UNKNOWN');
  assert.doesNotMatch(JSON.stringify(a),/DO_NOT_READ/);
 });
+
+test('configuration JSON is not treated as a sidecar execution ledger',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-config.json'),JSON.stringify({status:'PASS',token:'PRIVATE_CONFIG'}));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
+ assert.equal(r.archiveTrace.sidecar.reason,'LEDGER_NOT_FOUND');
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_CONFIG/);
+});
+
+test('approved unchanged and below-cadence reasons stay observations, not root-cause PASS',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-status.json'),JSON.stringify({status:'UNCHANGED',reason:'UNCHANGED_SOURCE_OBSERVATION'}));
+ fs.writeFileSync(path.join(directory,'archive-result.json'),JSON.stringify({status:'UNCHANGED',reason:'BELOW_APPROVED_15M_CADENCE'}));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.sidecar.candidates.length,2);
+ assert.deepEqual(r.archiveTrace.sidecar.candidates.map(x=>x.reason).sort(),['BELOW_APPROVED_15M_CADENCE','UNCHANGED_SOURCE_OBSERVATION']);
+ assert.equal(r.archiveTrace.alignment.cause,'UNKNOWN');
+});
