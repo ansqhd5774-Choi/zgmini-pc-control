@@ -29,4 +29,4 @@
 
 - 2026-11-03 KST: 기존 6개 Offline 확인 → watchdog이 종료된 Supervisor lease 보관 → 기존 source `c491d95f…`로 6개 Online 복구.
 - [Issue #38](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/38): 실제 `core-status` PASS, JSON/TXT/댓글 자동 회수. `protectedStateUnchanged=true`, 운영/Provider/D1 쓰기 0.
-- 새 watchdog의 종료 후 WScript 재기동 검증은 별도 결과로 기록한다. 재부팅·로그인 전 서비스 동작을 검증한 것으로 확대하지 않는다.
+- 2026-11-03 03:11 KST: 새 watchdog PID 30248만 종료하는 시험 후 WScript가 PID 19524로 자동 재기동했다. Supervisor PID 38716과 Runner 6개 Online을 유지했고 보호 해시 불변을 재확인했다. 재부팅·로그인 전 서비스 동작을 검증한 것으로 확대하지 않는다.
