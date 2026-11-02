@@ -76,6 +76,42 @@ export function manifestFingerprint(files){
   return {files:normalized,sha256:sha256(JSON.stringify(normalized))};
 }
 
+/** Exact approved source changes must not mutate the six-seat controller's
+ * operating policy. Even B-grade read-only diagnosis approval does not grant
+ * permission to change existing operations, providers or write controls. */
+export function validateControllerConfigTransition(previous,next){
+  const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+  if(!object(previous)||!object(next)||!object(previous.operations)||
+    !object(next.operations))throw Error('CONTROLLER_CONFIG_INVALID');
+  if(previous.seats!==6||next.seats!==6||
+    previous.mutationsEnabled!==false||next.mutationsEnabled!==false){
+    throw Error('CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED');
+  }
+  const protectedKeys=x=>Object.keys(x).filter(key=>key!=='operations').sort();
+  const keys=protectedKeys(previous);
+  if(JSON.stringify(keys)!==JSON.stringify(protectedKeys(next))||
+    keys.some(key=>JSON.stringify(previous[key])!==JSON.stringify(next[key]))){
+    throw Error('CONTROLLER_CONFIG_PROTECTED_POLICY_CHANGED');
+  }
+  for(const [name,definition] of Object.entries(previous.operations)){
+    if(!Object.hasOwn(next.operations,name)||
+      JSON.stringify(definition)!==JSON.stringify(next.operations[name])){
+      throw Error('CONTROLLER_EXISTING_OPERATION_CHANGED');
+    }
+  }
+  for(const [name,definition] of Object.entries(next.operations)){
+    if(Object.hasOwn(previous.operations,name))continue;
+    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!object(definition)||
+      Object.keys(definition).sort().join(',')!=='grade,resource,timeoutSeconds'||
+      definition.grade!=='A'||definition.resource!=='light'||
+      !Number.isSafeInteger(definition.timeoutSeconds)||
+      definition.timeoutSeconds<1||definition.timeoutSeconds>90){
+      throw Error('CONTROLLER_NEW_OPERATION_NOT_READONLY_A');
+    }
+  }
+  return true;
+}
+
 /**
  * Accept a maintenance request ONLY with independent, locally trusted context.
  * approvedTargets is an installation-time immutable SHA allowlist, not a value
