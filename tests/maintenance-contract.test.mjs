@@ -5,6 +5,7 @@ import {test} from "node:test";
 import {
   CONTROL_ACTOR,CONTROL_REPOSITORY,MAINTENANCE_ISSUE_SCHEMA,UPDATE_SCHEMA,
   manifestFingerprint,validateMaintenanceRequest,validateUpdateRequest,
+  validateControllerConfigTransition,
   requestFingerprint,dedupeUpdateRequest,newUpdateLedger,transitionLedger,
 } from "../tools/maintenance-contract.mjs";
 
@@ -43,6 +44,25 @@ function fixture(){
 }
 const repin=(f)=>{f.bytes=Buffer.from(JSON.stringify(f.manifest)+"\n");f.issue.approvalManifestSha256=digest(f.bytes);return f;};
 const admitted=f=>validateUpdateRequest(f.issue,f.bytes,f.context);
+
+test('B-readonly manifest cannot change existing operations, six seats or protected settings',()=>{
+  const previous={schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:CONTROL_REPOSITORY,
+    sourceRepository:'ansqhd5774-Choi/zgmini',allowedActors:[CONTROL_ACTOR],
+    seats:6,mutationsEnabled:false,maxHeavyJobs:1,artifactUploadEnabled:false,
+    operations:{'core-status':{grade:'A',timeoutSeconds:60,resource:'light'}}};
+  const next=clone(previous);next.operations['fear-greed-archive-status']={grade:'A',timeoutSeconds:60,resource:'light'};
+  assert.equal(validateControllerConfigTransition(previous,next),true);
+  const fewer=clone(next);fewer.seats=1;
+  assert.throws(()=>validateControllerConfigTransition(previous,fewer),/CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED/);
+  const writing=clone(next);writing.mutationsEnabled=true;
+  assert.throws(()=>validateControllerConfigTransition(previous,writing),/CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED/);
+  const elevated=clone(next);elevated.operations['core-status'].grade='B';
+  assert.throws(()=>validateControllerConfigTransition(previous,elevated),/CONTROLLER_EXISTING_OPERATION_CHANGED/);
+  const provider=clone(next);provider.sourceRepository='unapproved/provider';
+  assert.throws(()=>validateControllerConfigTransition(previous,provider),/CONTROLLER_CONFIG_PROTECTED_POLICY_CHANGED/);
+  const newElevated=clone(next);newElevated.operations['fear-greed-archive-status'].grade='B';
+  assert.throws(()=>validateControllerConfigTransition(previous,newElevated),/CONTROLLER_NEW_OPERATION_NOT_READONLY_A/);
+});
 
 test("valid 7-key Issue, pinned B-grade manifest and normalized path order",()=>{
   const f=fixture(),v=admitted(f);
