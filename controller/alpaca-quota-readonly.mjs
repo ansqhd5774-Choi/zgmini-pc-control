@@ -7,7 +7,7 @@ const WARNING_AT=120;
 const MAX_LEDGER_BYTES=32_768;
 const SCOPE='READ_ONLY_NO_PROVIDER_NO_SQLITE_NO_PUBLICATION';
 
-const result=(status,code,details={})=>({status,code,scope:SCOPE,accountWide30Percent:'UNVERIFIED',
+const result=(status,code,details={})=>({status,code,scope:SCOPE,accountWide30Percent:'UNVERIFIED',baseAgreement:'UNVERIFIED',
  operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,...details});
 
 function readLedger(dataRoot){
@@ -23,8 +23,20 @@ function readLedger(dataRoot){
  try{stat=fs.lstatSync(file);}catch(error){return {error:error?.code==='ENOENT'?'ALPACA_LEDGER_ABSENT':'ALPACA_LEDGER_UNREADABLE'};}
  if(!stat.isFile()||stat.isSymbolicLink())return {error:'ALPACA_LEDGER_UNSAFE_FILE'};
  if(stat.size<=0||stat.size>MAX_LEDGER_BYTES)return {error:'ALPACA_LEDGER_SIZE_INVALID'};
+ let content,fd;
+ try{
+  fd=fs.openSync(file,'r');
+  const opened=fs.fstatSync(fd);
+  if(!opened.isFile()||opened.size<=0||opened.size>MAX_LEDGER_BYTES)return {error:'ALPACA_LEDGER_SIZE_INVALID'};
+  if(stat.ino&&opened.ino&&stat.ino!==opened.ino)return {error:'ALPACA_LEDGER_CHANGED_DURING_READ'};
+  const bytes=Buffer.alloc(opened.size);let offset=0;
+  while(offset<bytes.length){const n=fs.readSync(fd,bytes,offset,bytes.length-offset,offset);if(n<=0)break;offset+=n;}
+  if(offset!==bytes.length)return {error:'ALPACA_LEDGER_SHORT_READ'};
+  content=bytes.toString('utf8');
+ }catch{return {error:'ALPACA_LEDGER_UNREADABLE'};}
+ finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}
  let value;
- try{value=JSON.parse(fs.readFileSync(file,'utf8'));}catch{return {error:'ALPACA_LEDGER_INVALID'};}
+ try{value=JSON.parse(content);}catch{return {error:'ALPACA_LEDGER_INVALID'};}
  if(!value||value.version!==1||!Array.isArray(value.requestTimes)||
     !value.requestTimes.every(x=>Number.isSafeInteger(x)&&x>=0)||
     (value.lastRemoteLimit!=null&&(!Number.isSafeInteger(value.lastRemoteLimit)||value.lastRemoteLimit<=0))||
