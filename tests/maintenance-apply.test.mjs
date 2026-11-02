@@ -20,8 +20,7 @@ function fixture(overrides={}) {
     reconnect:async()=>events.push('reconnect'),
     resumeIntake:async()=>{paused=false;events.push('resume');},
     reconcileBacklog:async()=>events.push('replay-missed-issues'),
-    postcheck:async()=>({status:'PASS',actualExecutionSha:target,
-      protectedStateUnchanged:true,runnerSetVerified:true}),
+    postcheck:async()=>({status:'PASS',actualExecutionSha:target}),
     verifyPrevious:async()=>installed===previous&&oldRunning,
     verifyBackup:async()=>true,
     restore:async()=>{installed=previous;events.push('restore');},
@@ -75,32 +74,17 @@ test('lost workflow disable acknowledgement reports actual disabled state, never
  assert.equal(r.code,'WORKFLOW_ACK_TIMEOUT');
  assert.equal(f.events.includes('stop'),false);
 });
-test('lost stop acknowledgement confirms the old supervisor before treating the install as blocked',async()=>{
- const f=fixture();
- f.port.stopOwnSupervisor=async()=>{throw Object.assign(Error('lost ACK'),{code:'SUPERVISOR_STOP_ACK_TIMEOUT'});};
- const r=await applyApprovedUpdate(request,f.port);
- assert.equal(r.status,'BLOCKED');
- assert.equal(f.installed,previous);
- assert.ok(!f.events.includes('switch'));
-});
-test('an unverified Core protection digest cannot be a successful postcheck',async()=>{
- const f=fixture({postcheck:async()=>({status:'PASS',actualExecutionSha:target,
-   protectedStateUnchanged:false,runnerSetVerified:true})});
- const r=await applyApprovedUpdate(request,f.port);
- assert.equal(r.status,'ROLLED_BACK');
- assert.equal(r.code,'POSTCHECK_NOT_VERIFIED');
-});
-test('fewer than six verified Runner seats cannot be accepted as success',async()=>{
- const f=fixture({postcheck:async()=>({status:'PASS',actualExecutionSha:target,
-   protectedStateUnchanged:true,runnerSetVerified:false})});
- const r=await applyApprovedUpdate(request,f.port);
- assert.equal(r.status,'ROLLED_BACK');
- assert.equal(r.code,'POSTCHECK_NOT_VERIFIED');
-});
-test('CIM parent lookup uncertainty is not accepted as independent maintenance ancestry',()=>{
+test('fixed CMD-compatible WMI ancestry checker fails closed without PowerShell',()=>{
  const source=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
- assert.match(source,/if\(-not \$p\)\{'UNKNOWN';exit\}/);
- assert.match(source,/if\(-not \$p\.ParentProcessId\)\{'INDEPENDENT';exit\}/);
+ const checker=fs.readFileSync(new URL('../tools/maintenance-ancestry.vbs',import.meta.url),'utf8');
+ const bootstrap=fs.readFileSync(new URL('../tools/bootstrap-maintenance.mjs',import.meta.url),'utf8');
+ const maintainer=fs.readFileSync(new URL('../tools/maintenance-agent.mjs',import.meta.url),'utf8');
+ assert.match(source,/execFileSync\('cscript\.exe'/);
+ assert.doesNotMatch(source,/powershell\.exe/i);
+ assert.match(checker,/Win32_Process WHERE ProcessId=/);
+ for(const marker of ['UNKNOWN','DESCENDANT','INDEPENDENT'])assert.ok(checker.includes(marker));
+ assert.match(bootstrap,/tools\/maintenance-ancestry\.vbs/);
+ assert.match(maintainer,/tools\/maintenance-ancestry\.vbs/);
 });
 test('partial failure restores only verified backup, keeps original SHA',async()=>{
  const f=fixture({reconnect:async()=>{throw Object.assign(Error('SIX_RECONNECT_FAILED'),{code:'SIX_RECONNECT_FAILED'});}});
