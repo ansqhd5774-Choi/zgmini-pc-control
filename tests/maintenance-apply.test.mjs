@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {applyApprovedUpdate} from '../tools/maintenance-apply.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
@@ -24,7 +25,7 @@ function fixture(overrides={}) {
     verifyBackup:async()=>true,
     restore:async()=>{installed=previous;events.push('restore');},
     reconnectPrevious:async()=>{oldRunning=true;events.push('reconnectPrevious');},
-    inspectAfterUncertain:async()=>({installedSha:installed}),
+    inspectAfterUncertain:async()=>({installedSha:installed,workflowState:paused?'disabled_manually':'active'}),
     ...overrides
   };
   return {port,events,records,get installed(){return installed;},get paused(){return paused;}};
@@ -61,6 +62,22 @@ test('SHA and permission validation happens before intake pause',async()=>{
 test('long running existing job fails closed, without stopping supervisor',async()=>{
  const f=fixture({waitForDrain:async()=>{throw Object.assign(Error('DRAIN_TIMEOUT'),{code:'DRAIN_TIMEOUT'});}});
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'BLOCKED');assert.equal(r.code,'DRAIN_TIMEOUT');assert.ok(!f.events.includes('stop'));
+});
+test('lost workflow disable acknowledgement reports actual disabled state, never false BLOCKED success',async()=>{
+ const f=fixture();
+ f.port.pauseIntake=async()=>{await (async()=>{f.events.push('pause-no-ack');})();
+   throw Object.assign(Error('lost ACK'),{code:'WORKFLOW_ACK_TIMEOUT'});};
+ f.port.inspectAfterUncertain=async()=>({installedSha:previous,workflowState:'disabled_manually'});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.workflowEnabled,false);
+ assert.equal(r.code,'WORKFLOW_ACK_TIMEOUT');
+ assert.equal(f.events.includes('stop'),false);
+});
+test('CIM parent lookup uncertainty is not accepted as independent maintenance ancestry',()=>{
+ const source=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.match(source,/if\(-not \$p\)\{'UNKNOWN';exit\}/);
+ assert.match(source,/if\(-not \$p\.ParentProcessId\)\{'INDEPENDENT';exit\}/);
 });
 test('partial failure restores only verified backup, keeps original SHA',async()=>{
  const f=fixture({reconnect:async()=>{throw Object.assign(Error('SIX_RECONNECT_FAILED'),{code:'SIX_RECONNECT_FAILED'});}});
