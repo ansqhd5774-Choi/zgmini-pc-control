@@ -612,7 +612,7 @@ export function attestReceiverOrigin(root,owner,{platform=process.platform,
     throw coded('MAINTENANCE_ORIGIN_UNKNOWN');
   const script=path.join(root,'tools/maintenance-ancestry.vbs');
   let result;
-  try{result=String(cscript(['//NoLogo','//B',script,'CAPTURE',String(owner.pid)])).trim();}
+  try{result=String(cscript(['//NoLogo',script,'CAPTURE',String(owner.pid)])).trim();}
   catch{throw coded('MAINTENANCE_ORIGIN_UNKNOWN');}
   const matches=/^ATTESTED\|([0-9]{14}\.[0-9]{6}[+-][0-9]{3})\|([0-9]{1,9})\|(S-1-[0-9-]{4,100})$/.exec(result);
   if(!matches||owner.pid!==process.pid||!/^[0-9a-f-]{36}$/.test(owner.nonce??''))

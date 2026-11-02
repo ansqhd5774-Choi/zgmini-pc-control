@@ -71,7 +71,7 @@ function verifyIndependent(supervisorPid) {
   /^[0-9]{1,9}$/.test(proof.session??'')&&/^S-1-[0-9-]{4,100}$/.test(proof.sid??''),
   'MAINTENANCE_ORIGIN_UNKNOWN');
  let result='UNKNOWN';
- try{result=execFileSync('cscript.exe',['//NoLogo','//B',checker,'VERIFY',
+ try{result=execFileSync('cscript.exe',['//NoLogo',checker,'VERIFY',
   String(process.pid),String(supervisorPid),String(owner.pid),proof.created,proof.session,proof.sid],
   {windowsHide:true,encoding:'utf8',timeout:12000,maxBuffer:4096}).trim();}
  catch{throw Object.assign(Error('MAINTENANCE_PROCESS_NOT_INDEPENDENT'),{code:'MAINTENANCE_PROCESS_NOT_INDEPENDENT'});}

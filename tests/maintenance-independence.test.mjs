@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {attestReceiverOrigin} from '../tools/maintenance-agent.mjs';
 
 const digest=x=>createHash('sha256').update(x).digest('hex');
@@ -29,8 +30,8 @@ const confirmed=()=>`ATTESTED|${date}|1|${ownerSid}\n`;
 test('fixed Startup proof binds receiver lease nonce, PID, boot and WMI creation identity',()=>{
  const f=rootFixture();
  const result=attestReceiverOrigin(f.root,f.owner,{platform:'win32',appData:f.appData,cscript:args=>{
-   assert.deepEqual(args.slice(0,2),['//NoLogo','//B']);
-   assert.deepEqual(args.slice(3),['CAPTURE',String(process.pid)]);
+   assert.deepEqual(args.slice(0,1),['//NoLogo']);
+   assert.deepEqual(args.slice(2),['CAPTURE',String(process.pid)]);
    return confirmed();
  }});
  assert.equal(result.pid,process.pid);
@@ -38,6 +39,15 @@ test('fixed Startup proof binds receiver lease nonce, PID, boot and WMI creation
  assert.equal(result.created,date);
  assert.equal(result.sid,ownerSid);
  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.root,'receivers',f.owner.nonce+'.json'))),result);
+});
+
+test('Windows WSH proof output is visible with the production host flags', {skip:process.platform!=='win32'},()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-wsh-output-'));
+ const script=path.join(dir,'echo.vbs');fs.writeFileSync(script,'WScript.Echo "PROOF_OUTPUT_VISIBLE"\r\n');
+ const output=execFileSync(path.join(process.env.SystemRoot,'System32/cscript.exe'),['//NoLogo',script],{encoding:'utf8',windowsHide:true,timeout:10000});
+ assert.equal(output.trim(),'PROOF_OUTPUT_VISIBLE');
+ for(const rel of ['../tools/maintenance-agent.mjs','../tools/update.mjs'])
+  assert.equal(fs.readFileSync(new URL(rel,import.meta.url),'utf8').includes("'//B'"),false);
 });
 
 test('no WMI witness never manufactures a positive origin proof',()=>{
