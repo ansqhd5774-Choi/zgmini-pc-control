@@ -23,7 +23,7 @@ const sha256=b=>createHash('sha256').update(b).digest('hex');
 const need=(x,code)=>{if(!x)throw Object.assign(Error(code),{code});};
 const requested=process.argv.slice(2);
 
-function startupVbs() {
+export function startupVbs() {
   const runtime='E:\\ZGmini\\runtime\\node.exe';
   const script='E:\\ZGmini\\automation\\pc-maintenance\\tools\\maintenance-agent.mjs';
   const home='E:\\ZGmini\\automation\\pc-maintenance';
@@ -35,6 +35,17 @@ function startupVbs() {
     'WshShell.Run Chr(34) & "'+runtime+'" & Chr(34) & " " & Chr(34) & "'+script+'" & Chr(34) & " --poll", 0, True',
     ''
   ].join('\r\n');
+}
+
+export function launchStartup(startup) {
+ // Ask the interactive Windows shell to launch WScript. A short-lived
+ // bootstrap Node must not become the ancestry anchor for the receiver.
+ const expected=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
+ need(path.resolve(startup)===path.resolve(expected),'BOOTSTRAP_STARTUP_PATH');
+ const systemRoot=process.env.SystemRoot||'C:\\Windows';
+ const child=spawn(path.join(systemRoot,'explorer.exe'),[startup],{windowsHide:true,detached:true,stdio:'ignore'});
+ need(Number.isSafeInteger(child.pid)&&child.pid>0,'BOOTSTRAP_STARTUP_SPAWN_FAILED');
+ child.unref();
 }
 
 export function preflightBootstrap({args=requested,platform=process.platform,appData=process.env.APPDATA}={}){
@@ -103,9 +114,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     }
     fs.writeFileSync(plan.startup,startupVbs(),{flag:'wx'});
     // WScript waits for receiver termination; bootstrap must not wait too.
-    const child=spawn('wscript.exe',[plan.startup],{windowsHide:true,detached:true,stdio:'ignore'});
-    need(Number.isSafeInteger(child.pid)&&child.pid>0,'BOOTSTRAP_STARTUP_SPAWN_FAILED');
-    child.unref();
+    launchStartup(plan.startup);
     console.log(JSON.stringify({status:'BOOTSTRAP_STARTED',sourceSha:plan.sourceSha,
       startup:'ZGMINI_PC_MAINTENANCE.vbs',controllerUntouched:true,
       next:'VERIFY_PROCESS_AND_GITHUB_REQUEST_RESULT'}));

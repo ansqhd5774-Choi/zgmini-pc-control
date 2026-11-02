@@ -635,8 +635,7 @@ export async function main(args=process.argv.slice(2)){
   try{lease=acquireMaintenanceLock(root,'receiver');}
   catch(error){if(error?.code==='MAINTENANCE_LOCK_BUSY_OR_RECOVERY_REQUIRED')return;throw error;}
   try{
-    try{attestReceiverOrigin(root,lease.owner);}
-    catch(error){process.stderr.write('MAINTENANCE_ORIGIN_UNKNOWN\n');}
+    attestReceiverOrigin(root,lease.owner);
     const agent=createMaintenanceAgent({stateDir:root,verifyInstalledSource:()=>verifyInstalledTools(root)});
     do{
       try{await agent.pollOnce();}

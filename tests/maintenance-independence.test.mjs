@@ -79,6 +79,9 @@ test('simulated WMI process graph rejects orphan, PID reuse, Runner descendants 
  // Receiver's historical WScript (PID 9) is dead; it is beyond the trusted
  // receiver anchor and must not be queried during a post-attestation update.
  assert.equal(classify({13:{parent:11,created:9},11:{parent:9,created:5,approved:true}},args),'INDEPENDENT');
+ // Equal timestamps are not evidence of PID reuse by themselves. The trusted
+ // receiver identity/proof and the live fixed WScript anchor remain required.
+ assert.equal(classify({13:{parent:11,created:5},11:{parent:9,created:5,approved:true}},args),'INDEPENDENT');
  assert.equal(classify({13:{parent:11,created:9},11:{parent:9,created:5,approved:false}},args),'UNKNOWN');
  assert.equal(classify({13:{parent:11,created:9},11:{parent:9,created:10,approved:true}},args),'UNKNOWN');
  // Parent PID reused 1 microsecond later, WITHIN the same second.
@@ -103,5 +106,6 @@ test('source statically requires positive attestation, timestamp and second stop
  assert.match(checker,/If ownPid=supervisorPid Then WScript\.Echo "DESCENDANT"/);
  assert.match(checker,/If Not explorerFound Then Unknown/);
  assert.match(bootstrap,/, 0, True/);
- assert.match(bootstrap,/spawn\('wscript\.exe'/);
+ assert.match(bootstrap,/explorer\.exe/);
+ assert.match(bootstrap,/launchStartup\(plan\.startup\)/);
 });
