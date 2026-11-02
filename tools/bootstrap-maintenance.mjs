@@ -57,7 +57,8 @@ try{
  for(const [name,bytes] of source)fs.writeFileSync(path.join(root,name),bytes,{flag:'wx'});
  fs.mkdirSync(path.join(root,'ledger'));
  const config={schema:'ZGMINI_PC_MAINTENANCE_BOOTSTRAP_V1',controlRepository:remote,sourceSha,
-  approvedBootstrapTargetSha:sourceSha,files:Object.fromEntries([...source].map(([name,bytes])=>[name,sha(bytes)])),
+  approvedBootstrapTargetSha:sourceSha,updateToolSha256:sha(updater),
+  files:Object.fromEntries([...source].map(([name,bytes])=>[name,sha(bytes)])),
   installedAt:new Date().toISOString(),maxRunners:6};
  fs.writeFileSync(path.join(root,'config.json'),JSON.stringify(config,null,2)+'\n',{flag:'wx'});
  phase='CREATE_ONLY_OWN_TASK';
