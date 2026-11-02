@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 const repoRoot=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -30,7 +30,9 @@ function startupVbs() {
   return [
     'Set WshShell = CreateObject("WScript.Shell")',
     'WshShell.Environment("PROCESS")("ZGMINI_PC_MAINTENANCE_ROOT") = "'+home+'"',
-    'WshShell.Run Chr(34) & "'+runtime+'" & Chr(34) & " " & Chr(34) & "'+script+'" & Chr(34) & " --poll", 0, False',
+    // A waiting WScript is the receiver's live origin witness. Bootstrap
+    // must start this script asynchronously to avoid waiting for shutdown.
+    'WshShell.Run Chr(34) & "'+runtime+'" & Chr(34) & " " & Chr(34) & "'+script+'" & Chr(34) & " --poll", 0, True',
     ''
   ].join('\r\n');
 }
@@ -91,6 +93,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     }
     for(const name of ['ledger','approved','requests','reports'])fs.mkdirSync(path.join(maintenanceRoot,name),{recursive:true});
     const manifest={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha:plan.sourceSha,
+      startupSha256:sha256(Buffer.from(startupVbs(),'utf8')),
       files:Object.fromEntries(sourceFiles.map(rel=>[rel,sha256(fs.readFileSync(path.join(maintenanceRoot,rel)))])),
       controllerRootUnchanged:true,runnerRegistrationsUntouched:true,installedAt:new Date().toISOString()};
     fs.writeFileSync(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx'});
@@ -99,8 +102,10 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
       execFileSync(plan.gh,['label','create','pc-maintenance','--repo','ansqhd5774-Choi/zgmini-pc-control','--color','0052CC','--description','Approved independent Controller maintenance queue'],{windowsHide:true,stdio:'ignore',timeout:30000});
     }
     fs.writeFileSync(plan.startup,startupVbs(),{flag:'wx'});
-    // Calling the independent Startup VBS is the only new process here.
-    execFileSync('wscript.exe',[plan.startup],{windowsHide:true,timeout:10000});
+    // WScript waits for receiver termination; bootstrap must not wait too.
+    const child=spawn('wscript.exe',[plan.startup],{windowsHide:true,detached:true,stdio:'ignore'});
+    need(Number.isSafeInteger(child.pid)&&child.pid>0,'BOOTSTRAP_STARTUP_SPAWN_FAILED');
+    child.unref();
     console.log(JSON.stringify({status:'BOOTSTRAP_STARTED',sourceSha:plan.sourceSha,
       startup:'ZGMINI_PC_MAINTENANCE.vbs',controllerUntouched:true,
       next:'VERIFY_PROCESS_AND_GITHUB_REQUEST_RESULT'}));
