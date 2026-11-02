@@ -10,7 +10,7 @@
 - B급 운영 변경·새 executable 승인/설치·DB/D1/게시/배포/삭제는 별도 승인 계약이 필요하다. C급 관리자·보안·시스템 설정은 사용자 직접 수행한다.
 - Core/Korea/Iran의 task, 운영 source, 기존 lock/SQLite/공급처 호출 한도는 변경하지 않는다. controller lease가 Core lock을 대체하지 않는다. 일반 pc-job의 B급 운영 쓰기는 비활성이다. 별도의 승인 manifest를 사용하는 독립 유지보수기의 Controller 갱신은 실PC 검증됐으며, 기존 승인 범위에서 재사용한다.
 - 6개 일반챗의 독립 A급 작업을 수신하되 무거운 작업은 메모리·전용 lease를 확인해 기다린다. 이 대기를 수집 장애로 보고하지 않는다.
-- 재시도는 자동0회다. 중복 requestId는 기존 결과를 재사용하고 내용 변경을 거부한다. timeout/불확실한 결과를 무조건 재실행하지 않는다.
+- 같은 작업 요청의 자동 재실행은 0회다. 중복 requestId는 기존 결과를 재사용하고 내용 변경을 거부한다. timeout/불확실한 결과를 무조건 재실행하지 않는다. 상태 조회·멱등 업로드 회수·승인된 watchdog 프로세스 복구는 작업 재실행과 구분하고 각 계약을 따른다.
 - 무료 운영: 모든 job은 자체 Runner만 사용한다. 유료 hosted runner/서버/Artifact/cache를 켜지 않는다. 결과는 용량 제한된 private TXT/JSON과 Issue 댓글로 회수한다. API/저장소 자체 제한까지 무제한이라 주장하지 않는다.
 - token/키/원자료/전체 config/환경변수/개인정보를 로그·결과·commit에 넣지 않는다. runner 등록 token은 메모리에서만 전달하고 공식 runner의 credential 파일을 열거나 업로드하지 않는다.
 - 구현/모의 검사/등록/Online/실제 Actions 실행/결과 회수/자연 재연결을 별개로 검증한다. AUTOMATION_BLOCKED와 RUNTIME_FAILED를 구분한다.
