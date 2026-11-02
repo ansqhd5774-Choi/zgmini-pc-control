@@ -40,7 +40,9 @@ export function inspectAlpacaQuotaReadonly(dataRoot,{now=Date.now()}={}){
  const {error,value}=readLedger(dataRoot);
  if(error)return result('BLOCKED',error);
  if(value.requestTimes.some(x=>x>now+1_000))return result('BLOCKED','ALPACA_CLOCK_DRIFT');
- const count=value.requestTimes.filter(x=>x>=now-WINDOW_MS&&x<=now).length;
+ // Match the live reservation guard: up to 1s future skew is accepted and
+ // still counts toward the cap, rather than being treated as a free slot.
+ const count=value.requestTimes.filter(x=>x>=now-WINDOW_MS).length;
  const windowState=count>HARD_CAP?'OVER_LIMIT':count===HARD_CAP?'LIMIT_REACHED':
   count>=WARNING_AT?'WARNING':'AVAILABLE';
  const reset=value.lastRemoteResetAt;
