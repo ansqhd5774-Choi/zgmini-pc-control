@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+test('sanitized worker environment uses explicit Windows system tool path',()=>{const source=fs.readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');assert.match(source,/execFileSync\(path\.join\(process\.env\.SystemRoot\|\|'C:\/Windows','System32','schtasks\.exe'\)/);assert.doesNotMatch(source,/execFileSync\('schtasks\.exe'/);});

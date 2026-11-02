@@ -1,5 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
-import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,nativeTaskXml} from './operations.mjs';
+import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml} from './operations.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,fixture=false}={}){
  need(Number.isInteger(seat)&&seat>=1&&seat<=policy.seats,'SEAT_NOT_ALLOWED');need(/^\d{1,20}$/.test(String(runId)),'RUN_ID');
@@ -12,7 +12,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   if(fs.existsSync(ledger)){const prior=JSON.parse(fs.readFileSync(ledger));need(prior.payloadSha===payloadSha,'DUPLICATE_REQUEST_PAYLOAD_CHANGED');report.status='PASS';report.code='DUPLICATE_REUSED_NO_EXECUTION';report.prior=prior.report;report.lastPass='PRIOR_RESULT_VERIFIED';return finalize();}
   releaseRequest=exclusive(path.join(root,'leases'),'request-'+request.requestId);releaseSeat=exclusive(path.join(root,'leases'),'seat-'+seat);
   if(policy.operations[request.operation].resource==='heavy')releaseResource=exclusive(path.join(root,'leases'),'heavy');
-  before=protectedState(host.dataRoot,{queryTask});report.lastPass='PROTECTED_STATE_SNAPSHOT';
+  before=protectedState(host.dataRoot,{queryTask});report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
   writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
@@ -29,9 +29,9 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   const after=protectedState(host.dataRoot,{queryTask});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
   need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
   report.actualExecutionSha=report.result?.actualExecutionSha??host.controllerSourceSha;
-  report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??null;
+  report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??report.pcOperationalApprovedSha;
   report.next=report.status==='PASS'?'READ_RESULT_NO_REPEAT':report.status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST':'INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY';
-  writeJson(ledger,{payloadSha,report});
+  report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
  }catch(error){report.status='BLOCKED';report.code=errorCode(error);report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';}
  finally{releaseResource?.();releaseSeat?.();releaseRequest?.();}
  return finalize();
