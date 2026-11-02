@@ -64,7 +64,10 @@ test('missing, malformed, oversize and symlinked ledger fail closed',()=>fixture
  assert.equal(inspectAlpacaQuotaReadonly(dir,{now}).code,'ALPACA_LEDGER_SIZE_INVALID');
  fs.unlinkSync(file);
  const target=path.join(dir,'untrusted.json');fs.writeFileSync(target,JSON.stringify(fresh()));
- fs.symlinkSync(target,file);
+ try{fs.symlinkSync(target,file);}catch(error){
+  if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code))return;
+  throw error;
+ }
  assert.equal(inspectAlpacaQuotaReadonly(dir,{now}).code,'ALPACA_LEDGER_UNSAFE_FILE');
 }));
 
@@ -86,6 +89,7 @@ test('extra credentials and raw values never escape the sanitized result',()=>fi
  save({...fresh({times:[now]}),apiKey:'PRIVATE_KEY_DO_NOT_PRINT',rawUrl:'https://example.test/?token=PRIVATE_TOKEN'});
  const result=inspectAlpacaQuotaReadonly(dir,{now});
  assert.equal(result.status,'PASS');
+ assert.equal(result.baseAgreement,'UNVERIFIED');
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_KEY_DO_NOT_PRINT|PRIVATE_TOKEN|pc-writer/);
  assert.equal(fs.existsSync(file),true);
 }));
