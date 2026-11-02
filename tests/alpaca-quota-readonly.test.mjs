@@ -36,6 +36,14 @@ test('only recent 60 seconds count; no live traffic never establishes account PA
  assert.equal(inspectAlpacaQuotaReadonly(dir,{now}).quota.requestEvidence,'NO_LIVE_TRAFFIC_EVIDENCE');
 }));
 
+test('accepted 500ms future clock skew still occupies a reservation slot',()=>fixture(({dir,save})=>{
+ save(fresh({times:[...Array(139).fill(now-30_000),now+500]}));
+ const observed=inspectAlpacaQuotaReadonly(dir,{now});
+ assert.equal(observed.quota.recentReservations,140);
+ assert.equal(observed.quota.windowState,'LIMIT_REACHED');
+ assert.equal(observed.quota.decision,'STOP');
+}));
+
 test('stored remote limit of 200 and remaining 60 is a stop hint, not proven header',()=>fixture(({dir,save})=>{
  save(fresh({times:[now],limit:200,remaining:60,reset:now+30_000,status:429}));
  const observed=inspectAlpacaQuotaReadonly(dir,{now});
