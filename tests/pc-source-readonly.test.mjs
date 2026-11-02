@@ -29,6 +29,8 @@ test('read-only Core task trace resolves Git HEAD, dirty names and required file
  const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,git,
   read:p=>{read.push(p);return fs.readFileSync(p);}});
  assert.equal(result.status,'PASS');assert.equal(result.sourceResolved,true);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.evidenceLevel,'STATIC_LAUNCHER_TRACE_ONLY');
  assert.equal(result.sourceHead,'a'.repeat(40));
  assert.deepEqual(result.trackedDirty,['scripts/pc-writer/run-local.mjs']);
  assert.equal(result.sourceRoot,'projects/pilot');
@@ -56,4 +58,12 @@ test('outside-root script references and unknown launchers do not access arbitra
 test('task XML returns only fixed action fields; decoded arguments are not executed',()=>{
  const action=taskAction('<Task><Command>wscript.exe</Command><Arguments>&quot;run.vbs&quot; &amp; whoami</Arguments></Task>');
  assert.deepEqual(action,{command:'wscript.exe',arguments:'"run.vbs" & whoami',workingDirectory:''});
+});
+
+test('Windows UTF-16LE Task XML buffers retain the real launcher path',()=>{
+ const xml='<Task><Actions><Exec><Command>E:\\ZGmini\\automation\\core.vbs</Command><Arguments>&quot;E:\\ZGmini\\projects\\core.cmd&quot;</Arguments></Exec></Actions></Task>';
+ const expected=taskAction(xml);
+ assert.deepEqual(taskAction(Buffer.from(xml,'utf16le')),expected);
+ assert.deepEqual(taskAction(Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(xml,'utf16le')])),expected);
+ assert.deepEqual(taskAction(Buffer.from(xml,'utf8')),expected);
 });
