@@ -68,3 +68,118 @@ test('host runner executes fixed diagnosis and preserves protected operational s
  assert.equal(r.report.operationalWrites,0);
  assert.equal(digest(fs.readFileSync(f.dbFile)),before);
 });
+
+test('sidecar evidence absent remains UNKNOWN even while the read-only query passes',()=>{
+ const f=fixture(),r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.status,'PASS');
+ assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
+ assert.equal(r.archiveTrace.alignment.status,'HISTORY_DIVERGENCE');
+ assert.equal(r.archiveTrace.alignment.cause,'UNKNOWN');
+});
+
+test('sidecar status is sanitized, not mistaken for authenticated process evidence',()=>{
+ const f=fixture(),before=digest(fs.readFileSync(f.dbFile));
+ const directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ const payload={status:'PASS',code:'ARCHIVE_COMPLETED',lastPass:'WRITE_COMPLETED',firstFail:'NONE',finishedAt:'2026-11-02T12:55:00.000Z',
+  token:'SECRET_TOKEN_EXAMPLE',data:{privateInputs:'DO_NOT_DISCLOSE'},reason:'AKIAABCDEFGHIJKLMNOP'};
+ fs.writeFileSync(path.join(directory,'archive-last-run.json'),JSON.stringify(payload));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const candidate=r.archiveTrace.sidecar.candidates[0];
+ assert.equal(r.archiveTrace.sidecar.evidence,'OBSERVED_UNATTESTED');
+ assert.equal(candidate.evidence,'UNATTESTED_LEDGER');
+ assert.equal(candidate.reportedStatus,'PASS');
+ assert.equal(candidate.reason,null);
+ assert.equal(r.archiveTrace.alignment.cause,'UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE|DO_NOT_DISCLOSE|AKIAABCDEFGHIJKLMNOP/);
+ assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+});
+
+test('unrecognized uppercase ledger fields are suppressed even when they match a code-shaped regex',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ const secrets=['AKIAABCDEFGHIJKLMNOP','GH_PAT_SECRET_0123456789','SENSITIVE:UPPERCASE_TOKEN'];
+ fs.writeFileSync(path.join(directory,'archive-status.json'),JSON.stringify({
+  status:secrets[0],code:secrets[1],reason:secrets[2],lastPass:secrets[0],firstFail:secrets[1],
+ }));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const item=r.archiveTrace.sidecar.candidates[0];
+ for (const key of ['reportedStatus','code','reason','lastPass','firstFail']) assert.equal(item[key],null);
+ for (const secret of secrets) assert.equal(JSON.stringify(r).includes(secret),false);
+});
+
+test('corrupt and oversized sidecar ledgers are bounded without leaking content',()=>{
+ const f=fixture();
+ const directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-status.json'),'{broken:SECRET_TOKEN_EXAMPLE');
+ fs.writeFileSync(path.join(directory,'archive-ledger.json'),'x'.repeat(65537));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const candidates=r.archiveTrace.sidecar.candidates;
+ assert.equal(candidates.length,2);
+ assert.deepEqual(candidates.map(x=>x.evidence).sort(),['INVALID_FILE_TYPE_OR_SIZE','INVALID_LEDGER'].sort());
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE/);
+});
+
+test('sidecar directory symlink cannot read outside the dedicated sidecar root',()=>{
+ const f=fixture();
+ const outside=path.join(f.root,'outside');fs.mkdirSync(outside);
+ fs.writeFileSync(path.join(outside,'archive-last-run.json'),JSON.stringify({status:'PASS',token:'DO_NOT_READ'}));
+ const directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');
+ fs.symlinkSync(outside,directory,'dir');
+ const a=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(a.archiveTrace.sidecar.reason,'UNSAFE_SIDECAR_DIRECTORY');
+ assert.equal(a.archiveTrace.sidecar.evidence,'UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(a),/DO_NOT_READ/);
+});
+
+test('individual sidecar ledger symlink is identified as unsafe, not silently reported absent',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ const outside=path.join(f.root,'archive-status-outside.json');
+ fs.writeFileSync(outside,JSON.stringify({status:'PASS',reason:'PRIVATE_LEDGER_VALUE'}));
+ fs.symlinkSync(outside,path.join(directory,'archive-status.json'));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.sidecar.candidates.length,1);
+ assert.equal(r.archiveTrace.sidecar.candidates[0].evidence,'INVALID_FILE_TYPE_OR_SIZE');
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_LEDGER_VALUE/);
+});
+
+test('ancestor pc-writer symlink escaping the data root is refused before reading ledger data',()=>{
+ const f=fixture(false),base=path.join(f.dataRoot,'pc-writer');
+ const outside=path.join(f.root,'relocated-pc-writer');
+ fs.renameSync(base,outside);
+ fs.mkdirSync(path.join(outside,'archive-sidecar-r7'));
+ fs.writeFileSync(path.join(outside,'archive-sidecar-r7','archive-last-run.json'),JSON.stringify({status:'PASS',reason:'PRIVATE_LEDGER_VALUE'}));
+ fs.symlinkSync(outside,base,'dir');
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.sidecar.evidence,'UNKNOWN');
+ assert.equal(r.archiveTrace.sidecar.reason,'UNSAFE_REAL_PATH');
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_LEDGER_VALUE/);
+});
+
+test('configuration JSON is not treated as a sidecar execution ledger',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-config.json'),JSON.stringify({status:'PASS',token:'PRIVATE_CONFIG'}));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
+ assert.equal(r.archiveTrace.sidecar.reason,'LEDGER_NOT_FOUND');
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_CONFIG/);
+});
+
+test('approved unchanged and below-cadence reasons stay observations, not root-cause PASS',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-status.json'),JSON.stringify({status:'UNCHANGED',reason:'UNCHANGED_SOURCE_OBSERVATION'}));
+ fs.writeFileSync(path.join(directory,'archive-result.json'),JSON.stringify({status:'UNCHANGED',reason:'BELOW_APPROVED_15M_CADENCE'}));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.sidecar.candidates.length,2);
+ assert.deepEqual(r.archiveTrace.sidecar.candidates.map(x=>x.reason).sort(),['BELOW_APPROVED_15M_CADENCE','UNCHANGED_SOURCE_OBSERVATION']);
+ assert.equal(r.archiveTrace.alignment.cause,'UNKNOWN');
+});
+
+test('existing global publication ledger is sanitized and never equated to archive publication',()=>{
+ const f=fixture(),file=path.join(f.dataRoot,'pc-writer','local-publication-ledger.json');
+ fs.writeFileSync(file,JSON.stringify({status:'VERIFIED',at:1793623200000,source:'a'.repeat(40),apiToken:'SECRET_TOKEN_EXAMPLE'}));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.publicationLedger.evidence,'UNATTESTED_LEDGER');
+ assert.equal(r.archiveTrace.publicationLedger.reportedStatus,'VERIFIED');
+ assert.equal(r.archiveTrace.publicationLedger.scope,'GLOBAL_PUBLICATION_ONLY');
+ assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE/);
+});
