@@ -67,3 +67,13 @@ test('Windows UTF-16LE Task XML buffers retain the real launcher path',()=>{
  assert.deepEqual(taskAction(Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(xml,'utf16le')])),expected);
  assert.deepEqual(taskAction(Buffer.from(xml,'utf8')),expected);
 });
+
+test('Core Task Arguments with script paths are summarized without treating array index as a suffix',t=>{
+ const f=fixture(t);
+ const xml='<Task><Actions><Exec><Command>start.cmd</Command><Arguments>&quot;launch.vbs&quot; --publish</Arguments></Exec></Actions></Task>';
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:xml,git:()=>''});
+ assert.equal(result.status,'PASS');
+ assert.deepEqual(result.coreTaskAction.scriptFiles,['launch.vbs']);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+});
