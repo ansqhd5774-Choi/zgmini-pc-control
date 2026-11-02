@@ -10,6 +10,7 @@
     "pc-source-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "fear-greed-archive-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "alpaca-quota-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "market-calendar-er1-saved-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy","minimumFreeMiB":384},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
