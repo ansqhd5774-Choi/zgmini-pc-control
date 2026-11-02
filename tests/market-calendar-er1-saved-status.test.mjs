@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { inspectER1SavedInput } from
   '../controller/market-calendar-er1-saved-readonly.mjs';
 
@@ -103,5 +104,58 @@ test('missing directory is a scoped input blocker, not a controller failure', ()
       'ER1_SAVED_INPUT_MISSING');
     assert.equal(inspectER1SavedInput('relative-data-root').code,
       'ER1_DATA_ROOT_NOT_APPROVED');
+  } finally { f.cleanup(); }
+});
+
+test('missing approved roster is reported without changing saved-day PASS', () => {
+  const f = fixture();
+  try {
+    for (const d of days) f.write(d, [{ symbol: 'PRIVATE', eps: 0, revenue: 0 }]);
+    const r = inspectER1SavedInput(f.root);
+    assert.equal(r.status, 'PASS');
+    assert.equal(r.roster.status, 'MISSING');
+    assert.equal(r.roster.exists, false);
+    assert.equal(r.roster.sha256, null);
+    assert.equal(r.eligibilityVerified, false);
+    assert.equal(r.roster.eligibilityVerified, false);
+  } finally { f.cleanup(); }
+});
+
+test('roster raw bytes are hashed, only approved metadata counts leave PC', () => {
+  const f = fixture();
+  try {
+    const roster = {
+      version: 1, method: 'ER1_INDEPENDENTLY_APPROVED_ELIGIBLE_ISSUERS_R1',
+      asOf: '2026-11-02', universeReviewed: true,
+      approvalReference: 'PRIVATE-APPROVAL-123',
+      expectedEligibleIssuers: 2,
+      members: [{ earningsSymbol: 'SECRET-A', actual: 12.5 },
+        { earningsSymbol: 'SECRET-B', actual: 0 }],
+    };
+    const raw = Buffer.from(JSON.stringify(roster) + '\n', 'utf8');
+    fs.writeFileSync(path.join(f.dir, '..', 'er1-approved-issuers.json'), raw);
+    const r = inspectER1SavedInput(f.root);
+    assert.equal(r.roster.status, 'PRESENT_METADATA');
+    assert.equal(r.roster.sha256,
+      createHash('sha256').update(raw).digest('hex'));
+    assert.equal(r.roster.bytes, raw.byteLength);
+    assert.equal(r.roster.metadataContractValid, true);
+    assert.equal(r.roster.expectedEligibleIssuers, 2);
+    assert.equal(r.roster.memberCount, 2);
+    assert.equal(r.roster.eligibilityVerified, false);
+    assert.doesNotMatch(JSON.stringify(r), /SECRET-A|SECRET-B|PRIVATE-APPROVAL/);
+  } finally { f.cleanup(); }
+});
+
+test('invalid roster metadata never means approved eligibility', () => {
+  const f = fixture();
+  try {
+    const file = path.join(f.dir, '..', 'er1-approved-issuers.json');
+    fs.writeFileSync(file, JSON.stringify({ version: 1, members: [] }));
+    const r = inspectER1SavedInput(f.root);
+    assert.equal(r.roster.status, 'INVALID_METADATA');
+    assert.equal(r.roster.metadataContractValid, false);
+    assert.equal(r.roster.memberCount, 0);
+    assert.equal(r.roster.eligibilityVerified, false);
   } finally { f.cleanup(); }
 });

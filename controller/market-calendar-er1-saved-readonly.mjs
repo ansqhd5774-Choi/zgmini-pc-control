@@ -2,12 +2,15 @@
 // arbitrary path argument, or raw EPS/revenue/ticker is exposed to the caller.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const DAYS = Object.freeze([
   '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30',
 ]);
 const AS_OF = '2026-11-02'; // Historical, approved batch; do not auto-rebase.
 const MAX_DAY_BYTES = 2_000_000;
+const MAX_ROSTER_BYTES = 8_000_000;
+const APPROVED_ROSTER_METHOD = 'ER1_INDEPENDENTLY_APPROVED_ELIGIBLE_ISSUERS_R1';
 const TICKER = /^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
 const GROUPS = ['pre', 'after', 'notSupplied'];
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -19,6 +22,61 @@ function safeDirectory(dir) {
     const info = fs.lstatSync(dir);
     return info.isDirectory() && !info.isSymbolicLink();
   } catch { return false; }
+}
+
+/** Only fixed, non-sensitive roster metadata; does not inspect eligibility. */
+export function inspectER1ApprovedRoster(dataRoot) {
+  const result = {
+    status: 'MISSING', exists: false, sha256: null,
+    bytes: null, version: null, methodMatches: false,
+    asOfMatches: false, universeReviewedClaim: false,
+    approvalReferencePresent: false, expectedEligibleIssuers: null,
+    memberCount: null, metadataContractValid: false,
+    eligibilityVerified: false,
+  };
+  if (typeof dataRoot !== 'string' || !path.isAbsolute(dataRoot)) {
+    result.status = 'PATH_NOT_APPROVED'; return result;
+  }
+  const pcHome = path.join(dataRoot, 'pc-writer');
+  const input = path.join(pcHome, 'er1-input');
+  if (![dataRoot, pcHome, input].every(safeDirectory)) return result;
+  const file = path.join(input, 'er1-approved-issuers.json');
+  let stat;
+  try { stat = fs.lstatSync(file); } catch { return result; }
+  result.exists = true;
+  if (!stat.isFile() || stat.isSymbolicLink() ||
+      stat.size < 20 || stat.size > MAX_ROSTER_BYTES) {
+    result.status = 'INVALID_FILE'; return result;
+  }
+  result.bytes = stat.size;
+  let raw;
+  try { raw = fs.readFileSync(file); }
+  catch { result.status = 'UNREADABLE'; return result; }
+  if (raw.byteLength !== stat.size || raw.byteLength > MAX_ROSTER_BYTES) {
+    result.status = 'CHANGED_DURING_READ'; return result;
+  }
+  result.sha256 = createHash('sha256').update(raw).digest('hex');
+  let roster;
+  try { roster = JSON.parse(raw.toString('utf8')); }
+  catch { result.status = 'INVALID_JSON'; return result; }
+  if (!roster || typeof roster !== 'object' || Array.isArray(roster)) {
+    result.status = 'INVALID_METADATA'; return result;
+  }
+  result.version = Number.isInteger(roster.version) ? roster.version : null;
+  result.methodMatches = roster.method === APPROVED_ROSTER_METHOD;
+  result.asOfMatches = roster.asOf === AS_OF;
+  result.universeReviewedClaim = roster.universeReviewed === true;
+  result.approvalReferencePresent = typeof roster.approvalReference === 'string' &&
+    roster.approvalReference.trim().length >= 8;
+  result.expectedEligibleIssuers = Number.isInteger(roster.expectedEligibleIssuers) &&
+    roster.expectedEligibleIssuers >= 1 ? roster.expectedEligibleIssuers : null;
+  result.memberCount = Array.isArray(roster.members) ? roster.members.length : null;
+  result.metadataContractValid = result.version === 1 && result.methodMatches &&
+    result.asOfMatches && result.universeReviewedClaim &&
+    result.approvalReferencePresent && result.memberCount !== null &&
+    result.expectedEligibleIssuers !== null;
+  result.status = result.metadataContractValid ? 'PRESENT_METADATA' : 'INVALID_METADATA';
+  return result;
 }
 
 // Whole-day structural/conflicting input is quarantined. Malformed individual
@@ -82,6 +140,7 @@ export function inspectER1SavedInput(dataRoot) {
   if (typeof dataRoot !== 'string' || !path.isAbsolute(dataRoot)) {
     result.code = 'ER1_DATA_ROOT_NOT_APPROVED'; return result;
   }
+  result.roster = inspectER1ApprovedRoster(dataRoot);
   const pcHome = path.join(dataRoot, 'pc-writer');
   const input = path.join(pcHome, 'er1-input');
   const days = path.join(input, 'days');
