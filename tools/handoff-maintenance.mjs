@@ -22,11 +22,16 @@ export async function main(args=process.argv.slice(2)){
  git(['merge-base','--is-ancestor',target,'HEAD']);
  need(git(['branch','--show-current']).toString().trim()==='main','HANDOFF_MAIN_REQUIRED');
  const approval=read(path.join(repo,'approvals/maintenance-handoffs',target+'.json'));
- need(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V1'&&approval.targetSha===target&&approval.approved===true&&approval.scope==='STOPPED_RECEIVER_IN_PLACE_ONLY','HANDOFF_APPROVAL_REQUIRED');
+ need(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V1'&&approval.targetSha===target&&approval.approved===true&&['STOPPED_RECEIVER_IN_PLACE_ONLY','COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'].includes(approval.scope),'HANDOFF_APPROVAL_REQUIRED');
  const before=read(root+'/MAINTENANCE_INSTALL.json');
  need(before.sourceSha===approval.installedSha,'HANDOFF_INSTALLED_SHA_MISMATCH');
  need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
- const priorOwner=owner();requireStopped(priorOwner);
+ const priorOwner=owner();
+ if(priorOwner&&alive(priorOwner.pid)===true&&before.capabilities?.cooperativeStop===true&&approval.scope==='COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'){
+  fs.writeFileSync(root+'/STOP_REQUEST.json',JSON.stringify({schema:'ZGMINI_MAINTENANCE_STOP_V1',pid:priorOwner.pid,nonce:priorOwner.nonce,sourceSha:before.sourceSha}),{flag:'wx'});
+  for(let n=0;n<90&&alive(priorOwner.pid)!==false;n++)await new Promise(r=>setTimeout(r,1000));
+ }
+ requireStopped(owner());
  const startup=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
  const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});
  need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'HANDOFF_MEDIUM_TOKEN_REQUIRED');
@@ -55,7 +60,7 @@ export async function main(args=process.argv.slice(2)){
  try{
   requireStopped(owner());need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
   for(const rel of files)fs.writeFileSync(path.join(root,rel),bytes[rel]);
-  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(files.map(p=>[p,sha(bytes[p])])),updatedAt:new Date().toISOString()};
+  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(files.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   fs.writeFileSync(startup,startupBytes);
   launchStartup(startup);

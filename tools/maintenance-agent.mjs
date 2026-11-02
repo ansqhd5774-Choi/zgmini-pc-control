@@ -626,6 +626,15 @@ export function attestReceiverOrigin(root,owner,{platform=process.platform,
   return evidence;
 }
 
+export function cooperativeStopRequested(root,owner){
+ const file=path.join(root,'STOP_REQUEST.json');
+ if(!fs.existsSync(file)||fs.existsSync(path.join(root,'leases/controller-install')))return false;
+ let request;try{request=JSON.parse(fs.readFileSync(file,'utf8'));}catch{return false;}
+ const installed=JSON.parse(fs.readFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),'utf8'));
+ if(request.schema!=='ZGMINI_MAINTENANCE_STOP_V1'||request.pid!==owner.pid||request.nonce!==owner.nonce||request.sourceSha!==installed.sourceSha)return false;
+ fs.renameSync(file,path.join(root,'STOP_HANDLED-'+owner.nonce+'.json'));return true;
+}
+
 export async function main(args=process.argv.slice(2)){
   const mode=args.length===1&&["--once","--poll"].includes(args[0])?args[0]:null;
   if(!mode)throw coded("MAINTENANCE_USAGE_INVALID");
@@ -638,14 +647,16 @@ export async function main(args=process.argv.slice(2)){
     attestReceiverOrigin(root,lease.owner);
     const agent=createMaintenanceAgent({stateDir:root,verifyInstalledSource:()=>verifyInstalledTools(root)});
     do{
-      try{await agent.pollOnce();}
+      if(cooperativeStopRequested(root,lease.owner))break;
+      try{const results=await agent.pollOnce();atomicReplace(path.join(root,'RECEIVER_STATUS.json'),JSON.stringify({at:new Date().toISOString(),pid:process.pid,status:'LISTENING',results})+'\n');}
       catch(error){
         if(mode==='--once')throw error;
         // A temporary GitHub outage must not permanently terminate the user
         // Startup receiver. Fixed next-poll delay, no automatic job retry.
         process.stderr.write('MAINTENANCE_POLL_WAIT: '+safeCode(error?.code??error?.message)+'\n');
+        atomicReplace(path.join(root,'RECEIVER_STATUS.json'),JSON.stringify({at:new Date().toISOString(),pid:process.pid,status:'POLL_WAIT',code:safeCode(error?.code??error?.message)})+'\n');
       }
-      if(mode==='--once')break;
+      if(mode==='--once'||cooperativeStopRequested(root,lease.owner))break;
       await new Promise(resolve=>setTimeout(resolve,60_000));
     }while(true);
   }finally{lease.release();}

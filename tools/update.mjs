@@ -36,6 +36,9 @@ const hostPath=path.join(controlRoot,'host.json');
 const recordDir=path.join(maintenanceRoot,'ledger');
 const safeId=x=>{need(/^pc-[a-z0-9-]{8,76}$/.test(x??''),'MAINTENANCE_REQUEST_ID');return x;};
 const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
+export function reconnectState({now,deadline,matched,online}){
+ return matched&&online?'PASS':now<deadline?'WAIT':'TIMEOUT';
+}
 
 // The process must not inherit the Runner Actions job. An approved Startup
 // origin proof is required: walking beyond the long-lived receiver to an
@@ -166,6 +169,19 @@ function makePorts(packageData,issueNumber) {
  const apiRunners=()=>github('actions/runners?per_page=100').runners;
  const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
  const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
+ const waitForReconnect=async(pid,sourceSha,code)=>{
+  const deadline=Date.now()+600000;
+  for(;;){
+   const status=fs.existsSync(path.join(controlRoot,'SUPERVISOR_STATUS.json'))?json(path.join(controlRoot,'SUPERVISOR_STATUS.json')):null;
+   const rows=apiRunners();
+   const matched=status?.pid===pid&&status.sourceSha===sourceSha&&Date.now()-Date.parse(status.at)<45000&&status.children?.length===6;
+   const state=reconnectState({now:Date.now(),deadline,matched,online:runnersCorrect(rows)&&rows.every(x=>x.status==='online')});
+   writeJson(path.join(maintenanceRoot,'reconnect',request.requestId+'.json'),{at:new Date().toISOString(),state,supervisorPid:pid,sourceSha,onlineCount:rows.filter(x=>x.status==='online').length,deadline:new Date(deadline).toISOString()});
+   if(state==='PASS')return;
+   if(state==='TIMEOUT')throw Object.assign(Error(code),{code});
+   await wait(3000);
+  }
+ };
  const result={request,ports:{
   fingerprint:x=>sha256(JSON.stringify({issue,manifest,targetSha:x.targetSha})),
   read:async id=>fs.existsSync(path.join(recordDir,id+'.json'))?json(path.join(recordDir,id+'.json')):null,
@@ -277,15 +293,8 @@ function makePorts(packageData,issueNumber) {
    need(fs.existsSync(lease)&&!fs.existsSync(prior),'SUPERVISOR_LEASE_UNEXPECTED');
    fs.renameSync(lease,prior);
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
-   for(let n=0;n<40;n++){
-    const status=fs.existsSync(path.join(controlRoot,'SUPERVISOR_STATUS.json'))?json(path.join(controlRoot,'SUPERVISOR_STATUS.json')):null;
-    if(status?.pid===child.pid&&status.sourceSha===manifest.targetSha&&Date.now()-Date.parse(status.at)<30000&&
-      status.children?.length===6&&runnersCorrect(apiRunners())&&apiRunners().every(x=>x.status==='online')){
-      need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');return;
-    }
-    await wait(1500);
-   }
-   throw Object.assign(Error('SIX_RUNNERS_RECONNECT_NOT_VERIFIED'),{code:'SIX_RUNNERS_RECONNECT_NOT_VERIFIED'});
+   await waitForReconnect(child.pid,manifest.targetSha,'SIX_RUNNERS_RECONNECT_NOT_VERIFIED');
+   need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
   },
   resumeIntake:async()=>{
    need(installedManifest().installedSha===manifest.targetSha||installedManifest().installedSha===manifest.installedSha,'INTAKE_SHA_UNKNOWN');
@@ -451,12 +460,7 @@ function makePorts(packageData,issueNumber) {
     fs.renameSync(path.join(controlRoot,'leases/supervisor'),path.join(backupRoot,'rollback-supervisor-lease'));
    }
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
-   for(let n=0;n<40;n++){
-    const s=fs.existsSync(path.join(controlRoot,'SUPERVISOR_STATUS.json'))?json(path.join(controlRoot,'SUPERVISOR_STATUS.json')):null;
-    if(s?.pid===child.pid&&s.sourceSha===manifest.installedSha&&runnersCorrect(apiRunners())&&apiRunners().every(x=>x.status==='online'))return;
-    await wait(1500);
-   }
-   throw Object.assign(Error('ROLLBACK_RECONNECT_FAILED'),{code:'ROLLBACK_RECONNECT_FAILED'});
+   await waitForReconnect(child.pid,manifest.installedSha,'ROLLBACK_RECONNECT_FAILED');
   },
   verifyPrevious:async({installedSha,requireRunning})=>{
    if(installedManifest().installedSha!==installedSha)return false;

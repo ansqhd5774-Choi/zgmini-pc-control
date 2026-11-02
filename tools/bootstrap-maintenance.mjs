@@ -106,7 +106,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     const manifest={schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha:plan.sourceSha,
       startupSha256:sha256(Buffer.from(startupVbs(),'utf8')),
       files:Object.fromEntries(sourceFiles.map(rel=>[rel,sha256(fs.readFileSync(path.join(maintenanceRoot,rel)))])),
-      controllerRootUnchanged:true,runnerRegistrationsUntouched:true,installedAt:new Date().toISOString()};
+      controllerRootUnchanged:true,runnerRegistrationsUntouched:true,capabilities:{cooperativeStop:true},installedAt:new Date().toISOString()};
     fs.writeFileSync(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'),JSON.stringify(manifest,null,2)+'\n',{flag:'wx'});
     const labels=JSON.parse(execFileSync(plan.gh,['label','list','--repo','ansqhd5774-Choi/zgmini-pc-control','--json','name','--limit','100'],{windowsHide:true,encoding:'utf8',timeout:30000}));
     if(!labels.some(x=>x.name==='pc-maintenance')){
