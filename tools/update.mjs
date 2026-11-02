@@ -15,11 +15,7 @@ try{
  const hostBefore=JSON.parse(fs.readFileSync(path.join(root,'host.json')));
  need(Object.keys(hostBefore.controllerFiles).every(rel=>staged.has(rel)),'CONTROLLER_FILE_REMOVAL_NOT_APPROVED');
  const runners=api('actions/runners').runners;need(runners.length===6&&runners.every(x=>!x.busy&&/^zgmini-pc-0[1-6]$/.test(x.name)),'RUNNERS_NOT_IDLE');
- api('actions/workflows/pc-job.yml/disable',['--method','PUT']);disabled=true;
- need(api('actions/runs?status=in_progress&per_page=30').total_count===0&&api('actions/runs?status=queued&per_page=30').total_count===0,'CONTROL_JOBS_PENDING_STOP');
- need(fs.readdirSync(path.join(root,'leases')).every(x=>x==='supervisor'),'JOB_LEASE_PRESENT_STOP');
- const before=protectedState('E:/ZGmini/data',{queryTask:nativeTaskXml}),state=JSON.parse(fs.readFileSync(path.join(root,'SUPERVISOR_STATUS.json'))),owner=JSON.parse(fs.readFileSync(path.join(root,'leases/supervisor/owner.json')));
- need(state.pid===owner.pid&&Date.now()-Date.parse(state.at)<45000,'SUPERVISOR_IDENTITY_STALE');
+ // Validate a restorable hash-bound backup BEFORE interrupting request intake.
  const backup=path.join(root,'backups','controller-'+Date.now());backupName=path.basename(backup);
  fs.mkdirSync(backup,{recursive:true});for(const rel of ['controller','config'])fs.cpSync(path.join(root,rel),path.join(backup,rel),{recursive:true});fs.copyFileSync(path.join(root,'host.json'),path.join(backup,'host.json'));
  const host=JSON.parse(fs.readFileSync(path.join(root,'host.json')));for(const [rel,expected] of Object.entries(host.controllerFiles))need(sha(fs.readFileSync(path.join(root,rel)))===expected,'CURRENT_CONTROLLER_DRIFT');
@@ -27,6 +23,12 @@ try{
  need(sha(fs.readFileSync(path.join(backup,'host.json')))===sha(fs.readFileSync(path.join(root,'host.json'))),'BACKUP_HOST_DRIFT');
  for(const [rel,expected] of Object.entries(backed.controllerFiles))need(sha(fs.readFileSync(path.join(backup,rel)))===expected,'BACKUP_FILE_VERIFICATION_FAILED');
  backupVerified=true;
+ api('actions/workflows/pc-job.yml/disable',['--method','PUT']);disabled=true;
+ need(api('actions/runs?status=in_progress&per_page=30').total_count===0&&api('actions/runs?status=queued&per_page=30').total_count===0,'CONTROL_JOBS_PENDING_STOP');
+ need(fs.readdirSync(path.join(root,'leases')).every(x=>x==='supervisor'),'JOB_LEASE_PRESENT_STOP');
+ const before=protectedState('E:/ZGmini/data',{queryTask:nativeTaskXml}),state=JSON.parse(fs.readFileSync(path.join(root,'SUPERVISOR_STATUS.json'))),owner=JSON.parse(fs.readFileSync(path.join(root,'leases/supervisor/owner.json')));
+ need(state.pid===owner.pid&&Date.now()-Date.parse(state.at)<45000,'SUPERVISOR_IDENTITY_STALE');
+ need(sha(fs.readFileSync(path.join(root,'host.json')))===sha(fs.readFileSync(path.join(backup,'host.json'))),'CONTROLLER_DRIFT_DURING_DRAIN');
  execFileSync('taskkill.exe',['/PID',String(state.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
  for(let i=0;i<10;i++){let alive=true;try{process.kill(state.pid,0);}catch{alive=false;}if(!alive)break;await new Promise(r=>setTimeout(r,500));if(i===9)throw Object.assign(Error('SUPERVISOR_STILL_PRESENT'),{code:'SUPERVISOR_STILL_PRESENT'});}
  let offlineObserved=false,offlineCount=0;for(let i=0;i<10;i++){const a=api('actions/runners').runners;offlineCount=a.filter(x=>x.status==='offline').length;if(offlineCount){offlineObserved=true;break;}await new Promise(r=>setTimeout(r,1000));}
