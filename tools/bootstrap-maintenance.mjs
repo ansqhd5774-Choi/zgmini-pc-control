@@ -49,10 +49,27 @@ export function preflightBootstrap({args=requested,platform=process.platform,app
   need(metadata.nameWithOwner==='ansqhd5774-Choi/zgmini-pc-control'&&metadata.isPrivate===true,'BOOTSTRAP_PRIVATE_REPO_REQUIRED');
  const g=args=>execFileSync('git',args,{cwd:repoRoot,windowsHide:true,encoding:'utf8',timeout:30000}).trim();
  need(g(['status','--porcelain'])==='','BOOTSTRAP_CHECKOUT_DIRTY');
- need(g(['rev-parse','HEAD'])===args[1]&&g(['rev-parse','--abbrev-ref','HEAD'])==='main','BOOTSTRAP_SOURCE_SHA_OR_BRANCH');
+ const head=g(['rev-parse','HEAD']);
+ need(g(['rev-parse','--abbrev-ref','HEAD'])==='main','BOOTSTRAP_SOURCE_BRANCH');
+ need(g(['cat-file','-t',args[1]])==='commit','BOOTSTRAP_APPROVED_COMMIT_MISSING');
+ try{g(['merge-base','--is-ancestor',args[1],head]);}
+ catch{need(false,'BOOTSTRAP_SOURCE_NOT_MAIN_ANCESTOR');}
+ // A running six-seat controller can append result commits to main between
+ // approval and this one-time installation. Preserve the exact approved code
+ // SHA while allowing only NEW immutable report files after that commit.
+ const delta=g(['diff','--name-status','--no-renames',args[1],head,'--'])
+  .split(/\r?\n/).filter(Boolean);
+ need(delta.every(line=>/^A\tresults\/[a-zA-Z0-9._-]+\.(?:json|txt)$/.test(line)),
+  'BOOTSTRAP_UNAPPROVED_CODE_DRIFT');
  const groups=execFileSync('whoami.exe',['/groups'],{windowsHide:true,encoding:'utf8'});
  need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'BOOTSTRAP_MEDIUM_TOKEN_REQUIRED');
- for(const rel of [...sourceFiles,...testFiles])need(fs.existsSync(path.join(repoRoot,rel)),'BOOTSTRAP_FILE_MISSING');
+ for(const rel of ['tools/bootstrap-maintenance.mjs',...sourceFiles,...testFiles]){
+  need(fs.existsSync(path.join(repoRoot,rel)),'BOOTSTRAP_FILE_MISSING');
+  const bytes=execFileSync('git',['show',args[1]+':'+rel],
+   {cwd:repoRoot,windowsHide:true,timeout:30000,maxBuffer:2_000_000});
+  need(sha256(fs.readFileSync(path.join(repoRoot,rel)))===sha256(bytes),
+   'BOOTSTRAP_PINNED_FILE_DRIFT');
+ }
  execFileSync(node,['--test',...testFiles],{cwd:repoRoot,windowsHide:true,timeout:120000,stdio:'ignore'});
  return {sourceSha:args[1],startup,node,gh};
 }
