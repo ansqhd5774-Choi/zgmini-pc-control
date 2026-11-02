@@ -1,7 +1,7 @@
 name: ZGMINI PC Job
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
 permissions:
   contents: write
   issues: write
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   approved-pc-job:
-    if: github.repository == 'ansqhd5774-Choi/zgmini-pc-control' && github.event.repository.private == true && github.actor == 'ansqhd5774-Choi' && contains(github.event.issue.labels.*.name, 'pc-job')
+    if: github.repository == 'ansqhd5774-Choi/zgmini-pc-control' && github.event.repository.private == true && github.actor == 'ansqhd5774-Choi' && contains(github.event.issue.labels.*.name, 'pc-job') && (github.event.action == 'opened' || (github.event.action == 'labeled' && github.event.label.name == 'pc-job-replay'))
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 8
     defaults:

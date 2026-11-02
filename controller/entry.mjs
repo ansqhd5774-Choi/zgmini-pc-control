@@ -6,7 +6,7 @@ const pointer=path.join(root,'reports',`${runId}-${attempt}-${seat}.json`);fs.mk
 try{
  for(const [rel,sha] of Object.entries(host.controllerFiles))need(digest(fs.readFileSync(path.join(root,rel)))===sha,'CONTROLLER_SOURCE_DRIFT');
  need(process.env.GITHUB_REPOSITORY===policy.controlRepository&&event.repository?.private===true,'CONTROL_REPOSITORY_OR_VISIBILITY');
- need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');need(process.env.GITHUB_EVENT_NAME==='issues'&&event.action==='opened','EVENT_NOT_ALLOWED');
+ need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');need(process.env.GITHUB_EVENT_NAME==='issues'&&(event.action==='opened'||(event.action==='labeled'&&event.label?.name==='pc-job-replay')),'EVENT_NOT_ALLOWED');
  need(event.issue?.labels?.some(x=>x.name==='pc-job'),'REQUEST_LABEL_REQUIRED');need(!event.issue.pull_request,'PULL_REQUEST_NOT_ALLOWED');
  const raw=JSON.parse(event.issue.body);const result=await executeJob(raw,{root,policy,host,seat,runId,attempt});
  writeJson(pointer,{...result,issueNumber:event.issue.number});console.log(JSON.stringify(result.report));process.exitCode=result.report.status==='FAIL'?1:0;

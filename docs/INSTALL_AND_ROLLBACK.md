@@ -37,6 +37,8 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\update.mjs
 
 ## 중지·롤백
 
+Controller 자동 업데이트용 독립 유지보수 Task 설계 및 최초 연결·상태 복구 절차는 [CONTROLLER_UPDATE_AUTOMATION.md](CONTROLLER_UPDATE_AUTOMATION.md)에 기록한다. 최초 PC 설치가 검증되지 않은 단계에서는 새 기능을 사용 가능한 것으로 간주하지 않는다.
+
 새 PC 작업 접수만 멈추려면 GitHub 제어 저장소 → Actions → **ZGMINI PC Job** → Disable workflow. CLI 대체는 다음과 같다.
 
 ```cmd

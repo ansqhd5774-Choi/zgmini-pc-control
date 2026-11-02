@@ -25,6 +25,8 @@ ZGMINI ChatGPT 프로젝트 공통 지침에도 자동 요청 경로를 저장�
 
 ## 중지·복구
 
+**Controller 자동 업데이트:** [분리된 PC 유지보수 경로](docs/CONTROLLER_UPDATE_AUTOMATION.md)는 일반 6개 Runner를 업데이트 중 자기 종료하지 않도록 설계됐다. **최초 별도 Task 설치가 실제 검증되기 전에는 `AUTOMATION_BLOCKED`**이며, GitHub main에 코드가 있다는 사실만으로 설치 성공으로 보고하지 않는다. 승인 명세 없는 `pc-controller-update` 요청이나 임의 명령은 허용되지 않는다.
+
 먼저 GitHub Actions에서 `ZGMINI PC Job` workflow를 비활성화하면 새 요청 수신이 멈춘다. 실행 중인 job은 결과를 먼저 확인한다. 기존 Core 프로세스나 lock은 건드리지 않는다.
 
 PC 부팅 후 자동 연결 방식, 사용자 최초 설정, 전용 supervisor와 Startup 해제 방법은 `docs/INSTALLATION_RESULT.md`의 실제 설치 방식을 따른다. 기존 CMD 수동 경로는 폐기하지 않는다.
