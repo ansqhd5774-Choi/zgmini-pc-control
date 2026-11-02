@@ -140,6 +140,16 @@ test('unknown and extremely long sidecar failure values do not escape the saniti
  assert.doesNotMatch(JSON.stringify(r),/SECRET_INPUT_|INTERNAL_PRIVATE_FAILURE/);
 });
 
+test('unrecognized sidecar code still yields only a bounded diagnostic category',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'last-run.json'),JSON.stringify({status:'BLOCKED',code:'ARCHIVE_D1_READBACK_BLOCKED'}));
+ const item=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask}).archiveTrace.sidecar.candidates[0];
+ assert.equal(item.code,null);
+ assert.deepEqual(item.failureHints.categories,['PUBLICATION']);
+ assert.equal(item.failureHints.hasError,false);
+ assert.equal(item.failureHints.hasReason,false);
+});
+
 test('corrupt and oversized sidecar ledgers are bounded without leaking content',()=>{
  const f=fixture();
  const directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
