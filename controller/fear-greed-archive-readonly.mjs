@@ -13,8 +13,31 @@ const LEDGER_NAME = /^(?=[a-z0-9_.-]{1,100}\.json$)(?=.*(?:last-run|status|ledge
 const ALLOWED_ROOTS = ['e:\\zgmini\\data\\pc-writer\\', 'e:\\zgmini\\projects\\'];
 const safeIso = value => typeof value==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value ? value : null;
 const safeStatus = value => typeof value==='string' && /^[A-Z_a-z]{1,32}$/.test(value) ? value : null;
-const safeCode = value => typeof value==='string' && /^[A-Z][A-Z0-9_:-]{0,79}$/.test(value) ? value : null;
+// Ledger values are untrusted: a shape check alone can pass credential-like strings.
+const KNOWN_LEDGER_STATUSES = new Set([
+  'PASS','FAIL','FAILED','ERROR','BLOCKED','SKIPPED','UNCHANGED','RUNNING','STARTED',
+  'COMPLETE','COMPLETED','VERIFIED','PENDING','UNKNOWN','SUCCESS','SUCCEEDED',
+  'READ','READY','PARTIAL','STOPPED','NOT_FOUND','NO_DATA',
+]);
+const KNOWN_LEDGER_CODES = new Set([
+  'NONE','ARCHIVE_COMPLETED','WRITE_COMPLETED','READ_COMPLETED','UPLOAD_COMPLETED',
+  'PUBLISH_COMPLETED','NO_NEW_OBSERVATION','NO_CHANGE','NO_DATA',
+  'UNCHANGED_SOURCE_OBSERVATION','BELOW_APPROVED_15M_CADENCE',
+  'LEDGER_NOT_FOUND','INVALID_LEDGER','STATE_UNKNOWN','EXECUTION_TIMEOUT',
+  'SOURCE_UNAVAILABLE','READ_FAILED','WRITE_FAILED','UPLOAD_FAILED','PUBLISH_FAILED',
+]);
+const safeLedgerStatus = value => typeof value==='string' && KNOWN_LEDGER_STATUSES.has(value) ? value : null;
+const safeLedgerCode = value => typeof value==='string' && KNOWN_LEDGER_CODES.has(value) ? value : null;
 const safeStoredAt = value => Number.isSafeInteger(value)&&value>0 ? value : null;
+
+function isInsideRealRoot(root, candidate) {
+  try {
+    const base=fs.realpathSync.native(root);
+    const resolved=fs.realpathSync.native(candidate);
+    const relative=path.relative(base,resolved);
+    return relative!=='' && relative!=='..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+  } catch { return false; }
+}
 
 function publicationLedgerTrace(dataRoot) {
   // Existing global writer evidence; not proof of a specific archive publish.
@@ -24,12 +47,13 @@ function publicationLedgerTrace(dataRoot) {
   catch(error) { return {evidence:error?.code==='ENOENT'?'NOT_FOUND':'UNKNOWN'}; }
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size<2 || stat.size>MAX_LEDGER_BYTES)
     return {evidence:'UNKNOWN',reason:'INVALID_FILE_TYPE_OR_SIZE'};
+  if (!isInsideRealRoot(dataRoot,file)) return {evidence:'UNKNOWN',reason:'UNSAFE_REAL_PATH'};
   try {
     const bytes=fs.readFileSync(file);
     if (bytes.length>MAX_LEDGER_BYTES) return {evidence:'UNKNOWN',reason:'TOO_LARGE'};
     const data=JSON.parse(bytes.toString('utf8'));
     if (!data || typeof data!=='object' || Array.isArray(data)) throw Error('INVALID');
-    return {evidence:'UNATTESTED_LEDGER',reportedStatus:safeCode(data.status),
+    return {evidence:'UNATTESTED_LEDGER',reportedStatus:safeLedgerStatus(data.status),
       at:Number.isSafeInteger(data.at)&&data.at>0?new Date(data.at).toISOString():null,
       modifiedAt:stat.mtime.toISOString(),sha256:hash(bytes),scope:'GLOBAL_PUBLICATION_ONLY'};
   } catch { return {evidence:'UNKNOWN',reason:'INVALID_LEDGER'}; }
@@ -41,13 +65,14 @@ function sidecarTrace(dataRoot) {
   const directory = path.join(dataRoot, 'pc-writer', 'archive-sidecar-r7');
   let info;
   try { info = fs.lstatSync(directory); }
-  catch(error) { return {evidence:'NOT_FOUND',reason:error?.code==='ENOENT'?'SIDECAR_DIRECTORY_MISSING':'DIRECTORY_NOT_READABLE'}; }
+  catch(error) { return {evidence:error?.code==='ENOENT'?'NOT_FOUND':'UNKNOWN',reason:error?.code==='ENOENT'?'SIDECAR_DIRECTORY_MISSING':'DIRECTORY_NOT_READABLE'}; }
   if (info.isSymbolicLink() || !info.isDirectory()) return {evidence:'UNKNOWN',reason:'UNSAFE_SIDECAR_DIRECTORY'};
+  if (!isInsideRealRoot(dataRoot,directory)) return {evidence:'UNKNOWN',reason:'UNSAFE_REAL_PATH'};
   let entries;
   try { entries=fs.readdirSync(directory, {withFileTypes:true}); }
   catch { return {evidence:'UNKNOWN',reason:'DIRECTORY_NOT_READABLE'}; }
   if (entries.length>MAX_SIDECAR_FILES) return {evidence:'UNKNOWN',reason:'DIRECTORY_ENTRY_LIMIT'};
-  const names=entries.filter(entry=>entry.isFile() && !entry.isSymbolicLink() && LEDGER_NAME.test(entry.name)).map(entry=>entry.name).sort();
+  const names=entries.filter(entry=>LEDGER_NAME.test(entry.name)).map(entry=>entry.name).sort();
   if (!names.length) return {evidence:'NOT_FOUND',reason:'LEDGER_NOT_FOUND'};
   if (names.length>MAX_LEDGER_FILES) return {evidence:'UNKNOWN',reason:'LEDGER_FILE_LIMIT'};
   const candidates=[];
@@ -59,6 +84,7 @@ function sidecarTrace(dataRoot) {
     if (!stat.isFile() || stat.isSymbolicLink() || stat.size>MAX_LEDGER_BYTES || stat.size<2) {
       candidates.push({name,evidence:'INVALID_FILE_TYPE_OR_SIZE'});continue;
     }
+    if (!isInsideRealRoot(directory,file)) { candidates.push({name,evidence:'UNSAFE_REAL_PATH'});continue; }
     try {
       const bytes=fs.readFileSync(file);
       if (bytes.length>MAX_LEDGER_BYTES) { candidates.push({name,evidence:'TOO_LARGE'});continue; }
@@ -66,11 +92,11 @@ function sidecarTrace(dataRoot) {
       if (!data || typeof data!=='object' || Array.isArray(data)) throw Error('INVALID_LEDGER');
       const fields=[data,data.result,data.archive,data.lastRun].filter(v=>v && typeof v==='object' && !Array.isArray(v));
       const firstValid=(key,validator)=>fields.map(o=>validator(o[key])).find(v=>v!==null)??null;
-      const reportedStatus=firstValid('status',safeCode);
-      const code=firstValid('code',safeCode);
-      const firstFail=firstValid('firstFail',safeCode);
-      const lastPass=firstValid('lastPass',safeCode);
-      const reason=firstValid('reason',safeCode);
+      const reportedStatus=firstValid('status',safeLedgerStatus);
+      const code=firstValid('code',safeLedgerCode);
+      const firstFail=firstValid('firstFail',safeLedgerCode);
+      const lastPass=firstValid('lastPass',safeLedgerCode);
+      const reason=firstValid('reason',safeLedgerCode);
       const at=['finishedAt','startedAt','checkedAt','at','timestamp'].map(key=>firstValid(key,safeIso)).find(v=>v!==null)??null;
       candidates.push({name,evidence:'UNATTESTED_LEDGER',sha256:hash(bytes),modifiedAt:stat.mtime.toISOString(),
         reportedStatus,code,lastPass,firstFail,reason,at});
@@ -90,7 +116,7 @@ function archiveAlignment(local) {
   const checkMs=checkAt?Date.parse(checkAt):NaN;
   const gaps={currentObservedNewerThanOriginal:Number.isFinite(currentObservedMs)&&Number.isFinite(originalMs)?currentObservedMs>originalMs:null,
     currentStoredNewerThanCheck:Number.isFinite(storedAt)&&Number.isFinite(checkMs)?storedAt>checkMs:null};
-  return {status:Object.values(gaps).some(v=>v===true)?'HISTORY_DIVERGENCE':Object.values(gaps).some(v=>v===null)?'UNKNOWN':'NO_DIVERGENCE_CONFIRMED',...gaps,
+  return {status:Object.values(gaps).some(v=>v===true)?'HISTORY_DIVERGENCE':Object.values(gaps).some(v=>v===null)?'UNKNOWN':'NO_NEWER_CURRENT_IN_LATEST_SNAPSHOTS',...gaps,
     cause:'UNKNOWN'};
 }
 
