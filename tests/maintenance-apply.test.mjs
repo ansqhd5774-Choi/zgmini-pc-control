@@ -86,6 +86,14 @@ test('fixed CMD-compatible WMI ancestry checker fails closed without PowerShell'
  assert.match(bootstrap,/tools\/maintenance-ancestry\.vbs/);
  assert.match(maintainer,/tools\/maintenance-ancestry\.vbs/);
 });
+test('one-time bootstrap keeps immutable approved code across report-only main advances',()=>{
+ const source=fs.readFileSync(new URL('../tools/bootstrap-maintenance.mjs',import.meta.url),'utf8');
+ assert.match(source,/BOOTSTRAP_UNAPPROVED_CODE_DRIFT/);
+ assert.match(source,/merge-base.*--is-ancestor/);
+ assert.match(source,/results\\\/\[a-zA-Z0-9\._-\]/);
+ assert.match(source,/BOOTSTRAP_PINNED_FILE_DRIFT/);
+ assert.doesNotMatch(source,/g\(\['rev-parse','HEAD'\]\)===args\[1\]/);
+});
 test('partial failure restores only verified backup, keeps original SHA',async()=>{
  const f=fixture({reconnect:async()=>{throw Object.assign(Error('SIX_RECONNECT_FAILED'),{code:'SIX_RECONNECT_FAILED'});}});
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'ROLLED_BACK');assert.equal(r.code,'SIX_RECONNECT_FAILED');
