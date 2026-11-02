@@ -43,13 +43,13 @@ export async function runOperation(request,context){
  }
  if(request.operation==='theme-common-tests'){
   const approved=host.approvedSources?.[request.sourceSha];need(approved,'SOURCE_NOT_APPROVED_FOR_EXECUTION');need(approved.branch===request.sourceBranch,'APPROVED_SOURCE_BRANCH_MISMATCH');
-  if(os.freemem()/1048576<policy.minimumFreeMiBForHeavy)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',retry:'RESUME_WITH_NEW_REQUEST_WHEN_RESOURCE_CHANGES',candidateExecuted:false};
+  if(os.freemem()/1048576<(policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy))return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',retry:'RESUME_WITH_NEW_REQUEST_WHEN_RESOURCE_CHANGES',candidateExecuted:false};
   const manifest=JSON.parse(fs.readFileSync(path.join(approved.root,'manifest.json')));need(digest(JSON.stringify(manifest.files))===approved.manifestSha256,'APPROVED_MANIFEST_DRIFT');
   const source=path.join(workspace,'source');fs.mkdirSync(source);
   for(const [relative,sha] of Object.entries(manifest.files)){const bytes=fs.readFileSync(path.join(approved.root,'source',relative));need(digest(bytes)===sha,'APPROVED_SOURCE_FILE_DRIFT');const dest=path.join(source,relative);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,bytes,{flag:'wx'});}
   const tmp=path.join(workspace,'tmp'),home=path.join(workspace,'home');fs.mkdirSync(tmp);fs.mkdirSync(home);
   const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:tmp,TMP:tmp,USERPROFILE:home,HOME:home,CI:'true',ZGMINI_DATA_ROOT:path.join(tmp,'fixture-data')};
-  const args=['--test',...approved.tests];
+  const args=['--max-old-space-size=128','--test','--test-concurrency=1',...approved.tests];
   const run=await new Promise(resolve=>{const child=spawn(process.execPath,args,{cwd:source,env,windowsHide:true,stdio:['ignore','pipe','pipe']});let text='',truncated=false;
    const add=b=>{if(text.length<131072)text+=b.toString();else truncated=true;};child.stdout.on('data',add);child.stderr.on('data',add);child.on('error',()=>resolve({code:-1,text:'',truncated}));child.on('exit',code=>resolve({code,text,truncated}));});
   const stats=run.text.split(/\r?\n/).filter(x=>/^.?\s*(tests|pass|fail|cancelled|skipped|todo) \d+$/.test(x)).slice(-8);

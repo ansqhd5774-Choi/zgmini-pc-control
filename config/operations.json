@@ -8,7 +8,7 @@
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
-    "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy"},
+    "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy","minimumFreeMiB":384},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
     "failure-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
