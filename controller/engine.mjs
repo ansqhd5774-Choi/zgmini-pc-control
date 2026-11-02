@@ -24,7 +24,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   });
   report.lastPass='ALLOWLISTED_WORKER_STARTED';report.exitCode=childResult.code;
   if(childResult.timedOut){report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';}
-  else if(fs.existsSync(output)){const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
+  else if(fs.existsSync(output)){const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result,sqliteOpened:result.sqliteOpened===true});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
   else{report.status='FAIL';report.code='WORKER_RESULT_MISSING';report.firstFail='RESULT_FILE';}
   const after=protectedState(host.dataRoot,{queryTask});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
   need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
