@@ -106,6 +106,40 @@ test('unrecognized uppercase ledger fields are suppressed even when they match a
  for (const secret of secrets) assert.equal(JSON.stringify(r).includes(secret),false);
 });
 
+test('blocked sidecar failure exposes only bounded categories, never raw error or secret',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ const secret='GH_PAT_SECRET_0123456789';
+ fs.writeFileSync(path.join(directory,'last-run.json'),JSON.stringify({
+  status:'BLOCKED',stage:'ARCHIVE_SOURCE_VALIDATION',
+  error:{code:'PC_LOCAL_CYCLE_LOCK_BUSY',message:`locked ${secret}`},
+  reason:`local cycle lock still busy, auth ${secret}`,
+  token:secret,
+ }));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const item=r.archiveTrace.sidecar.candidates[0];
+ assert.equal(item.reportedStatus,'BLOCKED');
+ assert.equal(item.code,null);
+ assert.equal(item.failureHints.evidence,'UNATTESTED_CATEGORICAL_HINTS');
+ assert.equal(item.failureHints.hasStage,true);
+ assert.equal(item.failureHints.hasError,true);
+ assert.equal(item.failureHints.hasReason,true);
+ assert.deepEqual(item.failureHints.categories,['SOURCE_OR_APPROVAL','LOCK_OR_LEASE']);
+ assert.doesNotMatch(JSON.stringify(r),/GH_PAT_SECRET_0123456789|PC_LOCAL_CYCLE_LOCK_BUSY|ARCHIVE_SOURCE_VALIDATION/);
+});
+
+test('unknown and extremely long sidecar failure values do not escape the sanitizer',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:'INTERNAL_PRIVATE_FAILURE',message:'SECRET_INPUT_'.repeat(500),
+ }));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const hints=r.archiveTrace.sidecar.candidates[0].failureHints;
+ assert.deepEqual(hints.categories,['UNCLASSIFIED']);
+ assert.equal(hints.hasError,true);
+ assert.equal(hints.hasReason,true);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_INPUT_|INTERNAL_PRIVATE_FAILURE/);
+});
+
 test('corrupt and oversized sidecar ledgers are bounded without leaking content',()=>{
  const f=fixture();
  const directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
