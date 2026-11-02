@@ -1,5 +1,9 @@
 # 설치 및 실제 실행 증거
 
+## 2026-11-03 Runner 연결 복구
+
+6개 Offline 상태를 실제 확인한 뒤 기존 Controller `c491d95f…`를 교체하지 않고 독립 watchdog과 WScript guardian을 적용했다. 종료된 Supervisor의 전용 lease는 증거를 보관한 채 복구했고, 6개 Online 및 [Issue #38](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/38)의 Core 읽기 전용 PASS와 TXT/JSON/댓글 회수를 확인했다. 새 watchdog 자체 종료 후에도 WScript가 재기동했고, Core/Korea/Iran 및 운영 승인 source 보호 해시는 불변이었다. 관련 테스트 4/4 PASS. 상세 규칙·제한은 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. 독립 유지보수기 PR #37의 적용·Controller 업데이트 성공과는 별개다.
+
 ## 구축 기준
 
 - 비공개 제어 저장소 생성 및 전용 Runner6개 분리 설치: 2026-11-02 사용자 승인.
