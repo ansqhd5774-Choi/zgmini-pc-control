@@ -17,8 +17,18 @@ const sourceFiles=[
 function xmlDecode(value){
  return value.replace(/&(amp|quot|apos|lt|gt);/g,(_,kind)=>({amp:'&',quot:'"',apos:"'",lt:'<',gt:'>'})[kind]);
 }
+function xmlText(xml){
+ if(!Buffer.isBuffer(xml))return String(xml);
+ if(xml.length>=2){
+  if(xml[0]===0xff&&xml[1]===0xfe)return xml.toString('utf16le').replace(/^\uFEFF/,'');
+  if(xml[0]===0xfe&&xml[1]===0xff)return Buffer.from(xml).swap16().toString('utf16le').replace(/^\uFEFF/,'');
+ }
+ // schtasks /XML may return BOM-less UTF-16LE on Windows.
+ if(xml.length>=4&&xml[1]===0&&xml[3]===0)return xml.toString('utf16le');
+ return xml.toString('utf8').replace(/^\uFEFF/,'');
+}
 export function taskAction(xml){
- const value=String(xml);
+ const value=xmlText(xml);
  const get=tag=>xmlDecode(value.match(new RegExp(`<${tag}>([^<]*)<\\/${tag}>`,'i'))?.[1]??'');
  return {command:get('Command'),arguments:get('Arguments'),workingDirectory:get('WorkingDirectory')};
 }
@@ -71,6 +81,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  }
  const safeFiles=files.map(({path,sha256})=>({path,sha256}));
  const result={status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',
+  evidenceLevel:'STATIC_LAUNCHER_TRACE_ONLY',runtimeSourceVerified:false,
   coreTaskAction:{commandFile:path.basename(action.command),scriptFiles:candidatePaths(action.arguments).map(path.basename).slice(0,8)},
   tracedLaunchers:safeFiles,sourceResolved:!!sourceRoot,
   sourceRoot:sourceRoot?relative(sourceRoot):null,
