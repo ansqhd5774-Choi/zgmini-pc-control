@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_BOOTSTRAP_STATUS_V1",
+  "status": "AUTOMATION_BLOCKED",
+  "code": "INDEPENDENT_PC_MAINTENANCE_RECEIVER_NOT_VERIFIED",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "installedControllerShaLastObserved": "c491d95fdb594a729f08deff68d86e04c18a9544",
+  "installedControllerShaObservedAt": "2026-11-02T13:44:50.791Z",
+  "fearGreedPrMergeSha": "b77a333db9d3445394ff4267949a79b6054126cf",
+  "codeImplemented": true,
+  "localSimulationCompleted": true,
+  "firstPcBootstrapVerified": false,
+  "githubOnlyApprovedUpdateVerified": false,
+  "sixRunnersReconnectedAfterUpdateVerified": false,
+  "fearGreedArchiveStatusRunVerified": false,
+  "protectedCoreMutationCount": 0,
+  "next": "ONE_TIME_INDEPENDENT_USER_STARTUP_BOOTSTRAP_AND_REAL_REQUEST_EVIDENCE"
+}

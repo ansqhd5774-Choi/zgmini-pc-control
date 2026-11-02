@@ -48,3 +48,7 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 ## 비용과 결과 보관
 
 hosted Runner/Artifact/cache를 사용하지 않는다. 결과는 private 저장소의 작은 TXT/JSON 파일과 Issue 댓글에 자동 회수한다. 결과 파일 저장이 충돌하면 bounded retry 후에도 댓글에 결과를 남긴다. GitHub 자체 API·저장 한도와 PC 자원은 존재하므로 무제한·영구무료를 보장하지 않는다.
+
+## Controller 자동 갱신 요청 — 최초 연결 이후에만
+
+기존 A급 `pc-job` 7필드 요청과 별도로, 승인된 Controller 자체 갱신은 [CONTROLLER_AUTO_UPDATE.md](CONTROLLER_AUTO_UPDATE.md)의 `pc-maintenance` Issue와 raw-byte SHA-256으로 고정된 승인 manifest를 사용한다. Runner 내부에서 `tools/update.mjs`를 호출하거나 일반 작업 Issue에 임의 명령을 넣지 않는다. 최초 유지보수기 연결 상태가 검증되지 않았다면 `AUTOMATION_BLOCKED`로 분류하고 사용자에게 매번 CMD 실행을 부탁하지 않는다. 병합·Online만으로 설치 성공을 선언하지 않는다.

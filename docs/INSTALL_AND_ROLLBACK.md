@@ -52,3 +52,7 @@ controller 롤백은 `backups/controller-*`에 보존된 정확한 controller/co
 ## 비용
 
 모든 job은 self-hosted다. Artifact/cache/hosted runner/server 생성은 없다. 결과 JSON/TXT는 private Git 파일과 Issue 댓글에 저장한다. 이 구조에 유료 Artifact 업로드를 자동 fallback으로 추가하지 않는다. GitHub API/저장소 서비스 한도·PC 전력/자원은 존재하므로 무제한을 보장하지 않는다.
+
+## 독립 유지보수기 최초 연결 (미완료, 기존 수동 경로 보존)
+
+Controller 갱신을 자동 요청하기 위한 **별도** 현재 사용자 Startup 수신기가 필요하다. [CONTROLLER_AUTO_UPDATE.md](CONTROLLER_AUTO_UPDATE.md)의 정확한 SHA 검증과 1회 부트스트랩 계약을 따른다. 기존 `tools/update.mjs`를 GitHub Actions의 6 Runner 프로세스 트리 안에서 실행하면 자기 작업 종료·busy 검사에 충돌하므로 금지한다. 최초 연결 전에는 `AUTOMATION_BLOCKED`; 별도 유지보수기를 시작한 것만으로 실제 자동 갱신 PASS가 아니다.

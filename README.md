@@ -28,3 +28,7 @@ ZGMINI ChatGPT 프로젝트 공통 지침에도 자동 요청 경로를 저장�
 먼저 GitHub Actions에서 `ZGMINI PC Job` workflow를 비활성화하면 새 요청 수신이 멈춘다. 실행 중인 job은 결과를 먼저 확인한다. 기존 Core 프로세스나 lock은 건드리지 않는다.
 
 PC 부팅 후 자동 연결 방식, 사용자 최초 설정, 전용 supervisor와 Startup 해제 방법은 `docs/INSTALLATION_RESULT.md`의 실제 설치 방식을 따른다. 기존 CMD 수동 경로는 폐기하지 않는다.
+
+## 승인된 Controller 자동 갱신 — 아직 최초 연결 전
+
+별도 유지보수 프로세스·B급 승인 manifest·요청 원장·백업·6 Runner 재연결 절차의 개발 계약은 [Controller 자동 업데이트](docs/CONTROLLER_AUTO_UPDATE.md)에 정리했다. **코드가 main에 있어도 PC 자동 갱신이 설치·완료됐다는 뜻은 아니다.** 최초 독립 Startup 유지보수기 연결 후 GitHub Issue만으로 실제 업데이트 및 `fear-greed-archive-status` 실행 결과가 회수되어야 완료다. 기존 `pc-job`에 updater 명령을 보내지 않는다.
