@@ -17,7 +17,9 @@
 
 ## 운영 상태
 
-구현·실PC 등록·Actions 실행·결과 회수 검증은 `docs/INSTALLATION_RESULT.md`에 실제 증거로 기록한다. 이 파일의 존재만으로 설치 완료가 아니다.
+**2026-11-02: A급 자동 실행 기반 실PC 검증 완료.** Runner6개 Online, 6좌석 실제 동시 실행, 고정 테스트18개, Core 읽기 전용 조회, TXT/JSON·댓글 자동 회수, 오류·timeout·중복 차단, 전용 listener 재시작/재연결을 확인했다. 세부 증거는 [docs/INSTALLATION_RESULT.md](docs/INSTALLATION_RESULT.md), 설치·중지는 [docs/INSTALL_AND_ROLLBACK.md](docs/INSTALL_AND_ROLLBACK.md)를 따른다.
+
+ZGMINI ChatGPT 프로젝트 공통 지침에도 자동 요청 경로를 저장하고 기존 지침 전체 보존·저장값 일치를 확인했다. **ZGMINI 프로젝트 안의 새 일반챗**에서 GitHub 도구와 이 지침을 사용한다. 프로젝트 밖 새 대화에 권한/지침이 자동 주입됐다고 주장하지 않는다.
 
 승인된 공통 테스트 source: `a735e4edff07409f952dcb6cd09a03791a95c094` (`codex/theme-fear-greed-integration-20261025`). 실제 host manifest와 같을 때만 실행한다. 새 작업 코드는 별도의 executable 승인/설치 검증 없이 PC에서 자동 실행하지 않는다.
 

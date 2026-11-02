@@ -8,6 +8,8 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 
 > ZGMINI PC 검사·진단이 필요하면 먼저 `ansqhd5774-Choi/zgmini-pc-control`의 `docs/GENERAL_CHAT_START.md`를 읽고 허용된 A급 작업을 직접 요청하고 결과까지 확인하라. 사용자가 승인한 범위의 단순 검사마다 재승인이나 CMD 수동 실행을 요구하지 마라.
 
+2026-11-02 실제 ZGMINI 프로젝트 설정에 이 자동 시작 절차를 추가해 저장했고, 기존 지침7509자를 보존한 총7917자 저장값을 다시 열어 확인했다. 이 프로젝트의 새 일반챗은 위 연결 절차를 사용자에게 다시 요구하지 않는다.
+
 프로젝트 밖의 새 일반챗이 이 저장소를 자동으로 알고 있다고 가정하지 않는다. GitHub 도구 미연결이면 연결이 필요한 범위만 안내한다. Runner 설치만으로 모든 대화에 지침·권한이 자동 주입되지는 않는다.
 
 ## 실행 방법 — GitHub Issue 도구만으로 가능
@@ -25,6 +27,8 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 
 5. Issue 댓글을 제한적으로 확인한다. 실행 시작부터 결과까지 보통 수초~수분이며 queued/offline은 실행 실패가 아니다. 같은 요청을 새로 만들지 않는다.
 6. 결과 댓글의 Actions URL, TXT·JSON 파일 또는 댓글 내 JSON/TXT를 읽는다. fetch_issue_comments/fetch_file/fetch_workflow_run_jobs/fetch_workflow_job_logs 등 현재 사용 가능한 GitHub 도구를 쓴다.
+
+현재 연결 도구에서 실제 검증한 인수 이름은 create_issue의 `repository_full_name`, fetch_issue_comments의 `repo_full_name`+`issue_number`, fetch_file의 `repository_full_name`+`path`+`ref`다. 도구 schema가 바뀌면 실제 schema가 우선이다. 단순 Actions conclusion만 보지 말고 JSON의 status/code를 확인한다.
 7. PASS이면 해당 실제 증거를 인용한다. FAIL/BLOCKED이면 code/lastPass/firstFail/actualExecutionSha를 근거로 영향 범위를 한정한다. 새 증거나 수정 없이 동일 실패를 재요청하지 않는다.
 
 ## 허용 작업
