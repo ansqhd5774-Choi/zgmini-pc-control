@@ -91,11 +91,25 @@ export async function applyApprovedUpdate(request, port) {
       // An intact preflight failure can leave it enabled only if verified.
       let safe=false;
       try {safe=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});} catch {}
-      if(safe && paused) {try {await port.resumeIntake();paused=false;} catch {safe=false;}}
+      // pauseIntake() can disable the workflow and then lose its API ACK,
+      // leaving paused=false in this coordinator. Never infer active intake
+      // merely from an unchanged controller or from our local Boolean.
+      let observed;
+      try {observed=await port.inspectAfterUncertain({...ledger});} catch {}
+      let workflowState=observed?.workflowState;
+      if(safe && paused && workflowState==='disabled_manually') {
+        try {await port.resumeIntake();paused=false;
+          observed=await port.inspectAfterUncertain({...ledger});
+          workflowState=observed?.workflowState;
+        } catch {safe=false;}
+      }
+      if(safe && paused && workflowState==='active')paused=false;
+      if(workflowState!=='active')safe=false;
       if(safe && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{safe=false;}}
       const status=safe?'BLOCKED':'RECOVERY_REQUIRED';
       await record(status,{status,code:reason,firstFail,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
-        workflowEnabled:safe&&!paused});
+        workflowEnabled:workflowState==='active'?true:workflowState==='disabled_manually'?false:null,
+        observed});
       return {...ledger};
     }
     // Never restore from an unverified snapshot, even if an earlier copy succeeded.
