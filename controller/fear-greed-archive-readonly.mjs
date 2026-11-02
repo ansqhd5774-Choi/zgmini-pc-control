@@ -32,17 +32,17 @@ const safeStoredAt = value => Number.isSafeInteger(value)&&value>0 ? value : nul
 
 // Stage/error hints expose categories only. The sidecar ledger is untrusted, so
 // its original messages, arbitrary codes and field names must never be returned.
-const FAILURE_HINT_FIELDS = ['stage','step','firstFail','reason','error','errorCode','message','blockedBy'];
+const FAILURE_HINT_FIELDS = ['stage','step','code','lastPass','firstFail','reason','error','errorCode','message','blockedBy'];
 const FAILURE_CATEGORIES = [
-  ['LOCK_OR_LEASE', /(?:LOCK|LEASE|BUSY|CONCURRENT|CONFLICT)/],
-  ['SOURCE_OR_APPROVAL', /(?:SOURCE|APPROV|SHA|DRIFT|VERSION)/],
-  ['DATABASE', /(?:SQLITE|DATABASE|\bDB\b)/],
-  ['FILE_OR_PATH', /(?:ENOENT|FILE|PATH|DIRECTORY|MISSING)/],
-  ['PUBLICATION', /(?:PUBLISH|UPLOAD|REMOTE|D1|READBACK|WRANGLER)/],
-  ['AUTHENTICATION', /(?:AUTH|CREDENTIAL|TOKEN|PERMISSION|FORBIDDEN)/],
-  ['TIMEOUT', /(?:TIMEOUT|TIMED_OUT|DEADLINE)/],
-  ['OBSERVATION_OR_CADENCE', /(?:OBSERV|CURRENT|CHECK|CADENCE|UNCHANGED|NO_NEW)/],
-  ['PROCESS', /(?:PROCESS|SPAWN|EXIT|COMMAND|TASK)/],
+  ['LOCK_OR_LEASE', ['LOCK','LOCKED','LEASE','BUSY','CONCURRENT','CONFLICT']],
+  ['SOURCE_OR_APPROVAL', ['SOURCE','APPROVAL','APPROVED','SHA','DRIFT','VERSION']],
+  ['DATABASE', ['SQLITE','DATABASE','DB']],
+  ['FILE_OR_PATH', ['ENOENT','FILE','PATH','DIRECTORY','MISSING']],
+  ['PUBLICATION', ['PUBLISH','PUBLICATION','UPLOAD','REMOTE','D1','READBACK','WRANGLER']],
+  ['AUTHENTICATION', ['AUTH','AUTHENTICATION','CREDENTIAL','TOKEN','PERMISSION','FORBIDDEN']],
+  ['TIMEOUT', ['TIMEOUT','DEADLINE']],
+  ['OBSERVATION_OR_CADENCE', ['OBSERVATION','OBSERVED','CURRENT','CHECK','CHECKS','CADENCE','UNCHANGED']],
+  ['PROCESS', ['PROCESS','SPAWN','EXIT','COMMAND','TASK']],
 ];
 
 function failureHints(fields) {
@@ -50,8 +50,9 @@ function failureHints(fields) {
   const classify = value => {
     if (value && typeof value==='object' && !Array.isArray(value)) value=value.code??value.message;
     if (typeof value!=='string' || value.length>4096) return null;
-    const upper=value.toUpperCase();
-    return FAILURE_CATEGORIES.find(([,pattern])=>pattern.test(upper))?.[0]??'UNCLASSIFIED';
+    // Whole tokens only: `BLOCKED` must never match the `LOCK` hint.
+    const tokens=new Set(value.toUpperCase().split(/[^A-Z0-9]+/));
+    return FAILURE_CATEGORIES.find(([,words])=>words.some(word=>tokens.has(word)))?.[0]??'UNCLASSIFIED';
   };
   const present=FAILURE_HINT_FIELDS.filter(key=>getValue(key)!==undefined);
   const classifications=[...new Set(present.map(key=>classify(getValue(key))).filter(Boolean))];
