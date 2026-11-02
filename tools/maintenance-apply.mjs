@@ -79,7 +79,7 @@ export async function applyApprovedUpdate(request, port) {
     const firstFail=ledger.phase,reason=codeOf(error);
     // A network timeout while a postcheck may still be running is not evidence
     // of diagnostic failure. In particular, do not stop its active Runner.
-    if((ledger.phase==='POSTCHECK_PENDING' && reason==='POSTCHECK_OUTCOME_UNKNOWN') ||
+    if((ledger.phase==='POSTCHECK_PENDING' && ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason)) ||
       (ledger.phase==='INTAKE_RESUMED' && reason.startsWith('BACKLOG_'))) {
       await record('RECOVERY_REQUIRED',{status:'RECOVERY_REQUIRED',code:reason,firstFail,
         actualInstalledSha:null,intakePaused:paused,next:reason==='BACKLOG_REPLAY_OUTCOME_UNKNOWN'

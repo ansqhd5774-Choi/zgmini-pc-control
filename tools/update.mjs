@@ -39,6 +39,21 @@ const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
 export function reconnectState({now,deadline,matched,online}){
  return matched&&online?'PASS':now<deadline?'WAIT':'TIMEOUT';
 }
+export function freshListenerCount(root,startedAt){
+ let count=0;
+ for(let seat=1;seat<=6;seat++){
+  const dir=path.join(root,'runners',String(seat).padStart(2,'0'),'_diag');
+  if(!fs.existsSync(dir))continue;
+  const logs=fs.readdirSync(dir).filter(p=>/^Runner_[0-9]{8}-[0-9]{6}-utc\.log$/.test(p)).map(p=>({p:path.join(dir,p),stat:fs.statSync(path.join(dir,p))})).sort((a,b)=>b.stat.birthtimeMs-a.stat.birthtimeMs);
+  const log=logs[0];if(!log||log.stat.birthtimeMs<startedAt-2000)continue;
+  const fd=fs.openSync(log.p,'r');let bytes;
+  try{const size=fs.fstatSync(fd).size;bytes=Buffer.alloc(Math.min(size,65536));fs.readSync(fd,bytes,0,bytes.length,Math.max(0,size-bytes.length));}finally{fs.closeSync(fd);}
+  const text=bytes.toString('utf8'),positive=Math.max(text.lastIndexOf('Listening for Jobs'),text.lastIndexOf('Runner reconnected.'));
+  const conflict=Math.max(text.lastIndexOf('A session for this runner already exists.'),text.lastIndexOf('Runner listener exit'));
+  if(positive>=0&&positive>conflict)count++;
+ }
+ return count;
+}
 
 // The process must not inherit the Runner Actions job. An approved Startup
 // origin proof is required: walking beyond the long-lived receiver to an
@@ -165,19 +180,21 @@ function makePorts(packageData,issueNumber) {
  const backupRoot=path.join(controlRoot,'backups','controller-update-'+request.requestId);
  const stageRoot=path.join(backupRoot,'stage');
  const snapshotRoot=path.join(backupRoot,'snapshot');
- let plannedFiles=[],protectedBefore,oldOwner,pausedByUs=false,postIssueNumber;
+ let plannedFiles=[],protectedBefore,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
  const apiRunners=()=>github('actions/runners?per_page=100').runners;
  const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
  const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
  const waitForReconnect=async(pid,sourceSha,code)=>{
   const deadline=Date.now()+600000;
+  let stable=0;
   for(;;){
    const status=fs.existsSync(path.join(controlRoot,'SUPERVISOR_STATUS.json'))?json(path.join(controlRoot,'SUPERVISOR_STATUS.json')):null;
    const rows=apiRunners();
-   const matched=status?.pid===pid&&status.sourceSha===sourceSha&&Date.now()-Date.parse(status.at)<45000&&status.children?.length===6;
+   const listeners=freshListenerCount(controlRoot,reconnectStartedAt);
+   const matched=status?.pid===pid&&status.sourceSha===sourceSha&&Date.now()-Date.parse(status.at)<45000&&status.children?.length===6&&listeners===6;
    const state=reconnectState({now:Date.now(),deadline,matched,online:runnersCorrect(rows)&&rows.every(x=>x.status==='online')});
-   writeJson(path.join(maintenanceRoot,'reconnect',request.requestId+'.json'),{at:new Date().toISOString(),state,supervisorPid:pid,sourceSha,onlineCount:rows.filter(x=>x.status==='online').length,deadline:new Date(deadline).toISOString()});
-   if(state==='PASS')return;
+   writeJson(path.join(maintenanceRoot,'reconnect',request.requestId+'.json'),{at:new Date().toISOString(),state,supervisorPid:pid,sourceSha,freshListeners:listeners,onlineCount:rows.filter(x=>x.status==='online').length,deadline:new Date(deadline).toISOString()});
+   if(state==='PASS'){if(++stable>=2)return;}else stable=0;
    if(state==='TIMEOUT')throw Object.assign(Error(code),{code});
    await wait(3000);
   }
@@ -292,6 +309,7 @@ function makePorts(packageData,issueNumber) {
    const prior=path.join(backupRoot,'previous-supervisor-lease');
    need(fs.existsSync(lease)&&!fs.existsSync(prior),'SUPERVISOR_LEASE_UNEXPECTED');
    fs.renameSync(lease,prior);
+   reconnectStartedAt=Date.now();
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
    await waitForReconnect(child.pid,manifest.targetSha,'SIX_RUNNERS_RECONNECT_NOT_VERIFIED');
    need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
@@ -390,6 +408,7 @@ function makePorts(packageData,issueNumber) {
      if(!match)continue;
      let result;try{result=JSON.parse(match[1]);}catch{continue;}
      if(result.requestId!==issue.requestId+'-postcheck')continue;
+     if(result.status==='PASS')await waitForReconnect(readOwner().owner.pid,manifest.targetSha,'RUNNER_RECONNECT_OUTCOME_UNKNOWN');
      // The A-grade diagnostic reports execution provenance, not the B-grade
      // maintainer's Core/Korea/Iran protection attestation. Verify that here.
      const protectedStateUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
@@ -459,6 +478,7 @@ function makePorts(packageData,issueNumber) {
     need(!alive,'SUPERVISOR_LEASE_OWNER_ACTIVE');
     fs.renameSync(path.join(controlRoot,'leases/supervisor'),path.join(backupRoot,'rollback-supervisor-lease'));
    }
+   reconnectStartedAt=Date.now();
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
    await waitForReconnect(child.pid,manifest.installedSha,'ROLLBACK_RECONNECT_FAILED');
   },

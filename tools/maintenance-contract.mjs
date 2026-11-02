@@ -27,7 +27,10 @@ const CHECK_KEYS=["targetSha","status","manifestSha256"];
 const BACKUP_KEYS=["strategy","rollback"];
 const ROLLBACK_KEYS=["kind","sha"];
 const FILE_KEYS=["path","sha256"];
-const FILE_SET=new Set(INSTALLABLE_FILES);
+// The approval pins every deployed file and the updater checks the exact Git
+// diff. New readonly adapters must not require replacing this maintainer just
+// to append another filename. Keep paths confined to controller modules.
+const installablePath=p=>p==='config/operations.json'||(typeof p==='string'&&/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(p));
 const PURPOSE_SCOPE=Object.freeze({
   "fear-greed-archive-status":"FEAR_GREED_ARCHIVE_READONLY",
   "employment-r6-readonly-adapter":"EMPLOYMENT_R6_READONLY_RUNNER",
@@ -63,13 +66,13 @@ function requireDigest(value,code){return requireString(value,SHA256,code);}
 
 /** Deterministic manifest hash; paths are validated and sorted before use. */
 export function manifestFingerprint(files){
-  if(!Array.isArray(files)||files.length<1||files.length>INSTALLABLE_FILES.length){
+  if(!Array.isArray(files)||files.length<1){
     throw Error("UPDATE_FILE_MANIFEST_INVALID");
   }
   const seen=new Set();
   const normalized=files.map(file=>{
     requireKeys(file,FILE_KEYS,"UPDATE_FILE_ENTRY_INVALID");
-    if(!FILE_SET.has(file.path)||seen.has(file.path))throw Error("UPDATE_FILE_PATH_NOT_ALLOWED");
+    if(!installablePath(file.path)||seen.has(file.path))throw Error("UPDATE_FILE_PATH_NOT_ALLOWED");
     seen.add(file.path);
     return {path:file.path,sha256:requireDigest(file.sha256,"UPDATE_FILE_SHA256_INVALID")};
   }).sort((a,b)=>a.path.localeCompare(b.path));

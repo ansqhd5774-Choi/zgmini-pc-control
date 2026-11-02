@@ -75,6 +75,15 @@ test("valid 7-key Issue, pinned B-grade manifest and normalized path order",()=>
   assert.match(requestFingerprint(v),/^[a-f0-9]{64}$/);
 });
 
+test("new readonly module names use the exact approved manifest without maintainer filename edits",()=>{
+ const f=fixture();f.manifest.allowFiles.push({path:'controller/employment-r6-readonly.mjs',sha256:'d'.repeat(64)});f.manifest.checks.manifestSha256=manifestFingerprint(f.manifest.allowFiles).sha256;repin(f);
+ const accepted=admitted(f);assert.ok(accepted.manifest.allowFiles.some(x=>x.path==='controller/employment-r6-readonly.mjs'));
+ const changed=fixture();changed.manifest.allowFiles.push({path:'controller/new-diagnostic.mjs',sha256:'d'.repeat(64)});changed.manifest.checks.manifestSha256=manifestFingerprint(changed.manifest.allowFiles).sha256;repin(changed);
+ changed.manifest.allowFiles.at(-1).sha256='e'.repeat(64);
+ changed.bytes=Buffer.from(JSON.stringify(changed.manifest)+'\n');
+ assert.throws(()=>admitted(changed),/MANIFEST|CHECKS|HASH/);
+});
+
 test("Issue fails closed on extra or missing keys",()=>{
   const f=fixture();f.issue.command="cmd /c whoami";
   assert.throws(()=>validateMaintenanceRequest(f.issue,f.context),/UPDATE_ISSUE_FIELDS_INVALID/);
