@@ -40,7 +40,7 @@
 
 **GitHub에 코드를 병합해도 PC 유지보수 프로세스는 자동 생기지 않는다.** 현재 PC에 독립 접수 진입점이 없으므로 최초 상태는 `AUTOMATION_BLOCKED`다. 이 한 번의 부트스트랩은 기존 A급 `pc-job`에 임의 명령을 싣는 방식으로 우회하지 않는다.
 
-1. 로컬 실행 담당자는 현재 PC의 private 제어 저장소 `E:\ZGmini\projects\zgmini-pc-control`을 정규 `main` fast-forward로 동기화하고 **적용할 정확한40자 SHA**를 확인한다. 기존 `E:\ZGmini\automation\pc-control`의 controller/Runner는 건드리지 않는다.
+1. 로컬 실행 담당자는 현재 PC의 private 제어 저장소 `E:\ZGmini\projects\zgmini-pc-control`을 정규 `main` fast-forward로 동기화하고 **승인된 정확한 40자 SHA**를 확인한다. 이후 `main`에 새 결과 TXT/JSON만 추가된 경우 그 승인 SHA를 그대로 사용할 수 있지만, 다른 코드·설정 변경이 있으면 부트스트랩을 차단한다. 해당 SHA의 부트스트랩/실행기/테스트 파일과 현재 worktree의 해시가 정확히 일치해야 한다. 기존 `E:\ZGmini\automation\pc-control`의 controller/Runner는 건드리지 않는다.
 2. 신규 파일의 Git blob 해시와 이 저장소 Node 테스트(`tests/maintenance-{contract,apply,agent}.test.mjs`) PASS를 대조한다. 새 도구 실행 자체는 B급 최초 설치 승인 범위이며, 관리자 권한 없이 현재 사용자 로그인 Startup 한 항목만 추가한다.
 3. 현재 사용자 medium token에서 **한 번만** 실행한다. `SOURCE_SHA`는 1단계에서 확인한 실제 커밋 SHA로 대체한다.
 
