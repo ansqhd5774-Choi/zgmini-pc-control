@@ -23,17 +23,9 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\install.mj
 
 1회 실행. 정상 기대값은 `SIX_RUNNERS_CONFIGURED_STARTUP_INSTALLED`이며 **이 값만으로 Actions 실제 실행 성공은 아니다**. 설치기는 공식 runner ZIP의 GitHub SHA256을 검증하고 일반 사용자 권한·기존 작업 XML/config 불변을 확인한다. 관리자 token이거나 부분 설치·경로 충돌·SHA 불일치면 STOP하고 상태를 먼저 조사한다. `--replace`, 기존 Core 강제 종료·잠금 삭제·DB 초기화로 통과시키지 않는다.
 
-## 검증된 controller 업데이트
+## 검증된 Controller 업데이트
 
-새 코드의 검사·승인 및 private main 반영을 확인한 뒤:
-
-```cmd
-E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\update.mjs
-```
-
-이 도구는 **새 전용 제어 workflow만** 일시 정지하고 모든 job·좌석 lease가 끝났는지 확인한다. 자체 supervisor PID/nonce/최근 상태를 검증한 뒤 자체 프로세스 트리만 중지한다. 이전 controller/host/자체 lease를 백업하고 새로운 manifest와 함께 적용한다. 기존 runner 등록 자격증명을 재사용해6개를 재연결한 뒤 제어 workflow를 다시 활성화한다. Core/Korea/Iran 및 다른 프로젝트 runner는 중지하지 않는다.
-
-`UPDATE_STOP`이면 추가 재실행 금지. 정확한 code와 `controlWorkflowDisabled`를 확인한다. 불확실한 controller 상태에서 workflow를 자동으로 다시 켜지 않는다. 결과·원자료는 보존한다.
+현재 정본은 [CONTROLLER_AUTO_UPDATE.md](CONTROLLER_AUTO_UPDATE.md)다. [Issue #44](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/44)에서 독립 유지보수기의 GitHub 요청 → 실제 갱신 → 진단 및 결과 회수를 검증했다. 기존의 인수 없는 `node tools/update.mjs` 직접 실행 안내는 대체됐다. 일반 pc-job에서 자기 Runner를 교체하지 않는다. 승인 manifest와 별도 pc-maintenance 요청을 사용한다.
 
 ## 중지·롤백
 
@@ -53,6 +45,6 @@ controller 롤백은 `backups/controller-*`에 보존된 정확한 controller/co
 
 모든 job은 self-hosted다. Artifact/cache/hosted runner/server 생성은 없다. 결과 JSON/TXT는 private Git 파일과 Issue 댓글에 저장한다. 이 구조에 유료 Artifact 업로드를 자동 fallback으로 추가하지 않는다. GitHub API/저장소 서비스 한도·PC 전력/자원은 존재하므로 무제한을 보장하지 않는다.
 
-## 독립 유지보수기 최초 연결 (미완료, 기존 수동 경로 보존)
+## 독립 유지보수기 최초 연결 이력 (현재 연결·갱신 검증 완료)
 
-Controller 갱신을 자동 요청하기 위한 **별도** 현재 사용자 Startup 수신기가 필요하다. [CONTROLLER_AUTO_UPDATE.md](CONTROLLER_AUTO_UPDATE.md)의 정확한 SHA 검증과 1회 부트스트랩 계약을 따른다. 기존 `tools/update.mjs`를 GitHub Actions의 6 Runner 프로세스 트리 안에서 실행하면 자기 작업 종료·busy 검사에 충돌하므로 금지한다. 최초 연결 전에는 `AUTOMATION_BLOCKED`; 별도 유지보수기를 시작한 것만으로 실제 자동 갱신 PASS가 아니다.
+Controller 갱신을 자동 요청하기 위한 **별도** 현재 사용자 Startup 수신기가 필요하다. [CONTROLLER_AUTO_UPDATE.md](CONTROLLER_AUTO_UPDATE.md)의 정확한 SHA 검증과 1회 부트스트랩 계약을 따른다. 기존 `tools/update.mjs`를 GitHub Actions의 6 Runner 프로세스 트리 안에서 실행하면 자기 작업 종료·busy 검사에 충돌하므로 금지한다. 과거 최초 연결 전 상태는 AUTOMATION_BLOCKED였으나 현재는 #44/#45의 실제 PASS로 대체됐다. 기존 설치를 반복하지 않으며, 과정별 성공과 실패 이력은 보존한다.

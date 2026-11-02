@@ -1,5 +1,9 @@
 # 설치 및 실제 실행 증거
 
+## 2026-11-03 독립 유지보수기·실제 자동 업데이트 완료
+
+[업데이트 #44](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/44)에서 c491d95f → b77a333 Controller 자동 갱신, 새 Listener 6개 연결, Core 보호 및 [Fear & Greed 진단 #45](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/45) PASS와 TXT/JSON/댓글 회수를 확인했다. 유지보수기 source는 c96d4ac이며, 현재 상태와 과거 실패 구분은 [PC_AUTOMATION_RUNTIME_20261103.json](PC_AUTOMATION_RUNTIME_20261103.json)을 따른다. Windows 회귀/계약 테스트 86개 PASS. 기록 누락 데이터 복구·DB/D1 쓰기·공급자 재수집·사이트 배포는 실행하지 않았다.
+
 ## 2026-11-03 Runner 연결 복구
 
 6개 Offline 상태를 실제 확인한 뒤 기존 Controller `c491d95f…`를 교체하지 않고 독립 watchdog과 WScript guardian을 적용했다. 종료된 Supervisor의 전용 lease는 증거를 보관한 채 복구했고, 6개 Online 및 [Issue #38](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/38)의 Core 읽기 전용 PASS와 TXT/JSON/댓글 회수를 확인했다. 새 watchdog 자체 종료 후에도 WScript가 재기동했고, Core/Korea/Iran 및 운영 승인 source 보호 해시는 불변이었다. 관련 테스트 4/4 PASS. 상세 규칙·제한은 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. 독립 유지보수기 PR #37의 적용·Controller 업데이트 성공과는 별개다.

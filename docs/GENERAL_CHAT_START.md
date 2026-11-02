@@ -1,5 +1,7 @@
 # 새 일반챗의 자동 작업 시작
 
+공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), 실PC 완료 증거는 [PC_AUTOMATION_RUNTIME_20261103.json](PC_AUTOMATION_RUNTIME_20261103.json)이다. 기존 설치·인계·자동 업데이트를 미완료로 되돌려 처음부터 반복하지 않는다.
+
 Runner 연결 장애와 복구는 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 독립 유지보수기 갱신과 Runner 연결 복구를 구분한다.
 
 이 문서는 사용자에게 매번 CMD를 전달하지 않고 GitHub 요청→PC 자동 실행→결과 읽기를 이어가기 위한 진입점이다.
@@ -36,6 +38,7 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 ## 허용 작업
 
 - runner-smoke: 자체 CMD→Node 경로 및 읽기 전용 상태.
+- fear-greed-archive-status: 실PC 설치·실행 검증된 Core SQLite 관측·검증 기록 및 실행 경로 읽기 전용 진단.
 - core-status: 기존 task XML hash·config의 승인 SHA·checkpoint 상태만 요약. 원자료/키/전체 config는 미출력.
 - source-audit: GitHub source SHA·branch HEAD 읽기 전용 대조. 후보 코드를 실행하지 않음.
 - theme-common-tests: 설치 시 검증한 불변 source의 고정 공통 테스트. 승인 source 목록은 README 상태를 확인. 일반 request의 임의 SHA를 실행하지 않음.

@@ -1,6 +1,6 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
-상태 (2026-11-03 KST): **독립 유지보수기 `c2458c73e129358813e9099a3eb8e5e77a82d87d`의 실PC 설치·프로세스 실행은 로컬 작업자가 확인. 그러나 프로세스 출처·독립성은 `UNKNOWN`; GitHub-only Controller 업데이트, 갱신 후 6 Runner 재연결, `fear-greed-archive-status` 실PC 진단은 아직 미검증.** [Issue #33](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/33)의 최신 실PC 증거와 [Draft PR #37](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/37)을 구분한다. 기존 설치·Startup·원장은 재실행·삭제하지 않는다.
+상태 (2026-11-03 KST): **실PC PASS.** [업데이트 #44](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/44) → Controller `b77a333…` → 새 Listener 6개 → [진단 #45](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/45) PASS → TXT/JSON/댓글 회수 완료. 유지보수기 source는 `c96d4ac…`이며 [실측 정본](PC_AUTOMATION_RUNTIME_20261103.json)을 참조한다. 아래의 과거 최초 연결 기록은 재설치 지시가 아니다.
 
 ## 정체성과 승인 경계
 
@@ -40,13 +40,13 @@
 
 ## 최초 연결 이력 — 재설치 금지
 
-2026-11-03 로컬 담당자가 유지보수기 `c2458c73…`의 설치와 실행을 확인했다. 아래 절차는 **미설치 당시 승인된 최초 1회 설치 계약의 역사적 기록**으로 보존하며, 현재 PC에서 다시 실행하라는 뜻이 아니다. 설치 확인과 프로세스 독립성 PASS는 별개다. `MAINTENANCE_PROCESS_NOT_INDEPENDENT` 또는 출처 증거 불충분인 동안 새 `pc-maintenance` Issue를 생성하지 않는다. 새 executable/Startup을 적용하는 PR #37은 draft·B 승인 보류이고, in-place 인계는 실제 Windows 독립성 검사·파일별 해시·스냅샷 복구가 검증되기 전에는 차단한다.
+2026-11-03 로컬 담당자가 유지보수기 `c2458c73…`의 설치와 실행을 확인했다. 아래 절차는 **미설치 당시 승인된 최초 1회 설치 계약의 역사적 기록**으로 보존하며, 현재 PC에서 다시 실행하라는 뜻이 아니다. 설치 확인과 프로세스 독립성 PASS는 별개다. `MAINTENANCE_PROCESS_NOT_INDEPENDENT` 또는 출처 증거 불충분인 동안 새 `pc-maintenance` Issue를 생성하지 않는다. PR #37은 병합됐고, 후속 Windows 출력·인증·재연결 보완 및 정상 종료 인계를 거쳐 현재 실PC 갱신이 완료됐다. 최초 c245 실행의 UNKNOWN은 과거 이력으로 보존하며 현재 상태에 적용하지 않는다.
 
 동일 범위의 A급 `pc-job` 기존 증거([Issue #38](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/38), [Issue #39](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/39))를 반복 요청하지 않는다. `PASS / CORE_READONLY_DIAGNOSIS`, 실제 Controller SHA `c491d95fdb594a729f08deff68d86e04c18a9544`, Core/Korea/Iran task hash 불변은 **Controller 업데이트 PASS가 아니다**. 업데이트 전 새로 필요한 PC 진입점은 설치된 독립 유지보수기의 출처·부모 체인 read-only 검증이며, 허용목록 우회나 `pc-job`의 임의 명령은 금지한다.
 
 ## 과거 최초 연결 절차 — 미설치 당시 1회만, 운영자로 제한
 
-**GitHub에 코드를 병합해도 PC 유지보수 프로세스는 자동 생기지 않는다.** 현재 PC에 독립 접수 진입점이 없으므로 최초 상태는 `AUTOMATION_BLOCKED`다. 이 한 번의 부트스트랩은 기존 A급 `pc-job`에 임의 명령을 싣는 방식으로 우회하지 않는다.
+**GitHub에 코드를 병합해도 PC 유지보수 프로세스는 자동 생기지 않는다.** 당시 독립 접수 진입점 부재는 `AUTOMATION_BLOCKED`였으며, 현재는 위 실PC PASS 증거로 대체됐다. 이 한 번의 부트스트랩은 기존 A급 `pc-job`에 임의 명령을 싣는 방식으로 우회하지 않는다.
 
 1. 로컬 실행 담당자는 현재 PC의 private 제어 저장소 `E:\ZGmini\projects\zgmini-pc-control`을 정규 `main` fast-forward로 동기화하고 **승인된 정확한 40자 SHA**를 확인한다. 이후 `main`에 신규 결과 TXT/JSON만 추가됐다면 해당 승인 SHA를 그대로 사용할 수 있지만, 코드·설정 변경이 있으면 부트스트랩을 차단한다. 해당 SHA의 부트스트랩/실행기/테스트 파일과 현재 worktree의 해시가 일치해야 한다. 기존 `E:\ZGmini\automation\pc-control`의 controller/Runner는 건드리지 않는다.
 2. 신규 파일의 Git blob 해시와 이 저장소 Node 테스트(`tests/maintenance-{contract,apply,agent,lock}.test.mjs`) PASS를 대조한다. 새 도구 실행 자체는 B급 최초 설치 승인 범위이며, 관리자 권한 없이 현재 사용자 로그인 Startup 한 항목만 추가한다.
@@ -71,4 +71,15 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\bootstrap-
 
 ## 최초 Fear & Greed 진단 후속
 
-PR #28의 `fear-greed-archive-status`는 GitHub 코드와 격리 테스트만 확인되었다. 최초 부트스트랩 후 **실제** 승인 업데이트 결과가 PASS가 되면 새 controller의 고정 진단을 한 번 실행한다. PC SQLite 아카이브와 Core Task XML/승인 실행기 연결은 읽기 전용이고, 관측 누락의 원인은 결과 증거만으로 판정한다. 데이터 복구·재수집·재게시·D1은 승인 범위 밖이다.
+PR #28의 `fear-greed-archive-status`는 실제 업데이트 #44의 자동 사후 진단 #45에서 PASS했고 결과가 회수됐다. 같은 source·환경의 유효한 이 결과는 재사용한다. PC SQLite 아카이브와 Core Task XML/승인 실행기 연결은 읽기 전용이고, 관측 누락의 원인은 결과 증거만으로 판정한다. 데이터 복구·재수집·재게시·D1은 승인 범위 밖이다.
+
+## 검증된 Windows 실행·인계 규칙
+
+- Startup은 기다리는 WScript에서 Node를 실행하며, Explorer를 통해 시작해 임시 bootstrap 부모 종료와 분리한다. 출처는 살아 있는 WScript·생성 시각·동일 사용자/세션과 source/Startup 해시로 증명한다.
+- WSH 증명 출력에는 `cscript //NoLogo`를 사용한다. `//B`는 실제 Windows에서 증명 출력을 비워 버려 제거됐으며 Windows 회귀시험이 있다.
+- Startup의 GitHub CLI는 해당 Windows 사용자 보안 저장소 인증을 사용한다. 다른 도구에서의 인증 성공만으로 대체하지 않는다. 토큰을 CMD·파일·로그에 담지 않는다.
+- `tools/handoff-maintenance.mjs --source-sha <승인된 SHA>`는 승인 파일·해시·백업을 확인하고 기존 수신기의 협조 종료 또는 종료 입증 후 전환한다. 살아 있는 수신기를 강제 종료하거나 원장을 지우지 않는다.
+- 수신기는 `RECEIVER_STATUS.json`에 폴링 상태와 오류 코드를 남긴다. 승인된 `STOP_REQUEST.json`은 PID·nonce·source와 일치하고 갱신 작업이 없을 때만 정상 종료시킨다.
+- 재연결은 최대 10분의 bounded 대기이며 GitHub Online뿐 아니라 새 Listener 로그 6개와 연속된 상태 확인이 필요하다. 오래된 서버 세션과 일시 Offline을 즉시 실패로 판정하지 않는다.
+- 새 읽기 전용 모듈은 `controller/<소문자-이름>.mjs`와 정확한 승인 manifest·Git diff·파일 해시로 추가한다. 파일명을 유지보수기에 매번 하드코딩하지 않는다. 범용 목적은 `pc-controller-maintenance`, 승인 scope는 `PC_CONTROL_CONTROLLER_UPDATE`다. 기존 operation·6좌석·운영 쓰기 비활성 정책은 보존한다.
+- 새 모듈의 실제 실행 성공은 Controller 갱신/기존 Core 사후 검사와 별개다. 새 operation 자체의 결과도 확인한다.

@@ -1,0 +1,69 @@
+{
+  "schema": "ZGMINI_PC_AUTOMATION_RUNTIME_V1",
+  "status": "PASS",
+  "code": "GITHUB_UPDATE_DIAGNOSTIC_AND_RESULT_RETRIEVAL_VERIFIED",
+  "observedAt": "2026-11-02T19:32:00.738Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "installedControllerSha": "b77a333db9d3445394ff4267949a79b6054126cf",
+  "installedMaintenanceSha": "c96d4ac0fd2fefeee28118decd9698b4b18636e3",
+  "maintenanceIssue": 44,
+  "diagnosticIssue": 45,
+  "diagnosticRun": 41510318443,
+  "runners": [
+    {
+      "name": "zgmini-pc-01",
+      "status": "online"
+    },
+    {
+      "name": "zgmini-pc-02",
+      "status": "online"
+    },
+    {
+      "name": "zgmini-pc-03",
+      "status": "online"
+    },
+    {
+      "name": "zgmini-pc-04",
+      "status": "online"
+    },
+    {
+      "name": "zgmini-pc-05",
+      "status": "online"
+    },
+    {
+      "name": "zgmini-pc-06",
+      "status": "online"
+    }
+  ],
+  "protectedStateUnchanged": true,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "automaticResults": [
+    "JSON",
+    "TXT",
+    "Issue comment"
+  ],
+  "testCount": 86,
+  "tests": "PASS",
+  "loginRequired": true,
+  "rebootTested": false,
+  "previousAttempts": [
+    {
+      "issue": 41,
+      "outcome": "ROLLED_BACK_VERIFIED_LATE"
+    },
+    {
+      "issue": 42,
+      "outcome": "ROLLED_BACK"
+    }
+  ],
+  "fearGreedArchive": {
+    "scope": "CORE_SQLITE_FEED_SNAPSHOTS_READONLY",
+    "latestObservationDate": "2026-10-30",
+    "latestCheckDate": "2026-11-01",
+    "observationPointCount": 1,
+    "verifiedCheckPointCount": 1,
+    "recordingRepairPerformed": false
+  }
+}
