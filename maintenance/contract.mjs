@@ -63,3 +63,35 @@ export function verifyChanges(request,actualChanges){
  for(const [path,hash] of wanted)required(actual.get(path)===hash,'UPDATE_CHANGED_FILE_HASH');
  return true;
 }
+
+/** A-grade changes may add a fixed read-only operation, never change an
+ * existing operation, open a write capability, or alter a protected policy. */
+export function verifyOperationPolicy(before,after){
+ const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+ required(obj(before)&&obj(after)&&obj(before.operations)&&obj(after.operations),
+  'UPDATE_CONFIG_POLICY_INVALID');
+ required(before.seats===6&&after.seats===6&&
+  before.mutationsEnabled===false&&after.mutationsEnabled===false,
+  'UPDATE_CONFIG_WRITE_OR_SEAT_CHANGE');
+ const keys=Object.keys(before).filter(x=>x!=='operations').sort();
+ const afterKeys=Object.keys(after).filter(x=>x!=='operations').sort();
+ required(JSON.stringify(keys)===JSON.stringify(afterKeys),
+  'UPDATE_CONFIG_TOP_LEVEL_FIELDS_CHANGED');
+ for(const key of keys)required(JSON.stringify(before[key])===JSON.stringify(after[key]),
+  'UPDATE_CONFIG_PROTECTED_FIELD_CHANGED');
+ for(const [name,operation] of Object.entries(before.operations)){
+  required(Object.hasOwn(after.operations,name)&&
+   JSON.stringify(operation)===JSON.stringify(after.operations[name]),
+   'UPDATE_EXISTING_OPERATION_CHANGED');
+ }
+ for(const [name,operation] of Object.entries(after.operations)){
+  if(Object.hasOwn(before.operations,name))continue;
+  required(/^[a-z][a-z0-9-]{2,60}$/.test(name)&&obj(operation)&&
+   Object.keys(operation).sort().join(',')==='grade,resource,timeoutSeconds'&&
+   operation.grade==='A'&&operation.resource==='light'&&
+   Number.isSafeInteger(operation.timeoutSeconds)&&
+   operation.timeoutSeconds>=1&&operation.timeoutSeconds<=90,
+   'UPDATE_NEW_OPERATION_NOT_READONLY_A');
+ }
+ return true;
+}
