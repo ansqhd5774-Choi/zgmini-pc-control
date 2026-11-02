@@ -10,6 +10,7 @@
 - 원본 A급 `pc-job` Issue의 7필드 계약은 그대로 둔다. `controller-update`를 그 안에 추가하지 않는다. 임의 CMD/SQL/다운로드 URL/경로를 받지 않는다.
 - 신규 `pc-maintenance` Issue는 **갱신 요청**일 뿐 자동 승인 근거가 아니다. 별도 B급 승인 manifest의 raw SHA-256과 실제 설치 SHA, merged PR, Git 이력과 변경 파일별 해시를 모두 확인한다.
 - 일반 A급 호환 보강은 승인된 기존 Controller 파일·기존 operation 이름만 갱신 가능하다. 새 실행 파일 또는 operation 등록은 명시적 B 승인 manifest가 필요하다. 운영 source·DB/D1·게시·스케줄은 이 경로로 갱신할 수 없다.
+- **B급 읽기 전용 승인도 기존 Controller 운영정책 변경 승인이 아니다.** 6좌석, `mutationsEnabled=false`, 기존 operation 정의, actor/source 및 공통 설정 필드는 이전 설치값과 완전히 같아야 한다. 추가 operation은 제한된 A급/light 진단만 허용한다.
 
 ## 통신 구조
 
@@ -57,6 +58,7 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\bootstrap-
 - `MAINTENANCE_PROCESS_NOT_INDEPENDENT`, 설치 SHA/목표 SHA/파일 해시 불일치, 기존 Runner busy·업로드 lease 존재, B 승인 부족, workflow가 기존에 비활성, Supervisor PID·owner 불일치: 설치 전 STOP.
 - 전환 이후 6개 재연결 또는 고정 진단이 검증된 FAIL이면 버전 스냅샷을 먼저 검증하고 기존 source로만 롤백. 복구된 결과는 `ROLLED_BACK`이며 업데이트 성공으로 보고하지 않는다.
 - 통신 timeout으로 사후 진단이 **아직 실행 중일 수 있으면** 해당 Runner를 중지하지 않는다. `RECOVERY_REQUIRED`로 기록하고 원장·실제 설치 SHA·Issue 댓글부터 대조한다. 동일 requestId 자동 재실행은 금지한다.
+- Workflow disable 직후 승인 확인 응답이 유실될 수 있으므로, 실제 Workflow 상태를 다시 조회한다. 상태가 비활성 또는 불확실하면 `BLOCKED/workflowEnabled=true`로 잘못 보고하지 않고 `RECOVERY_REQUIRED`로 남긴다. 부모 프로세스 정보 조회 실패도 독립 유지보수 실행 성공으로 간주하지 않는다.
 - 검증되지 않은 백업, 부분 설치, 실행기 소유자 불확실성에는 workflow를 비활성으로 유지한다. 기존 Core 예약/lock/SQLite/D1을 종료·삭제·초기화하지 않는다.
 
 ## 최초 Fear & Greed 진단 후속
