@@ -507,6 +507,11 @@ export function createMaintenanceAgent({
     try{
       approvedBytes=await manifestBytes(request);
       const preflight=await updaterStatus(request.requestId);
+      if(preflight?.installedReadbackCode||preflight?.ledgerReadbackCode||
+        preflight?.lockReadbackCode)throw coded('UPDATE_STATUS_RECOVERY_REQUIRED');
+      if(preflight?.ledger)throw coded('UPDATE_EXISTING_LEDGER_RECONCILE_FIRST');
+      if(typeof preflight?.installLock?.held!=='boolean')
+        throw coded('UPDATE_LOCK_STATUS_UNVERIFIED');
       if(preflight?.installLock?.held){
         return {status:preflight.installLock.recoveryRequired?'AUTOMATION_BLOCKED':'QUEUED',
           code:preflight.installLock.recoveryRequired?'MAINTENANCE_RECOVERY_HOLD':'MAINTENANCE_INSTALL_IN_PROGRESS',

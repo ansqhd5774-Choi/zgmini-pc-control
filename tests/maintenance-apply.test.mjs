@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {applyApprovedUpdate} from '../tools/maintenance-apply.mjs';
+import {readMaintenanceRecoveryStatus} from '../tools/update.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
@@ -39,6 +40,38 @@ test('approved out-of-process update waits for drain and verifies actual new SHA
  assert.ok(f.events.indexOf('backup')<f.events.indexOf('switch'));
  assert.ok(f.events.indexOf('reconnect')<f.events.indexOf('resume'));
  assert.ok(f.events.indexOf('resume')<f.events.indexOf('replay-missed-issues'));
+});
+test('partial host.json corruption still returns original request ledger and recovery lock',()=>{
+ const ledger={requestId:request.requestId,status:'RECOVERY_REQUIRED',phase:'SWITCHED'};
+ const state=readMaintenanceRecoveryStatus(request.requestId,{
+  readInstalled:()=>{throw Error('host missing after switch');},
+  readLedger:()=>ledger,readLock:()=>({held:true,recoveryRequired:true}),
+ });
+ assert.equal(state.status,'STATUS');
+ assert.equal(state.actualControllerSha,null);
+ assert.equal(state.installedReadbackCode,'INSTALLED_MANIFEST_UNAVAILABLE');
+ assert.deepEqual(state.ledger,ledger);
+ assert.equal(state.installLock.recoveryRequired,true);
+});
+test('unreadable install lock fails closed while preserving verified SHA and ledger',()=>{
+ const ledger={requestId:request.requestId,status:'RUNNING'};
+ const state=readMaintenanceRecoveryStatus(request.requestId,{
+  readInstalled:()=>previous,readLedger:()=>ledger,
+  readLock:()=>{throw Error('lock unreadable');},
+ });
+ assert.equal(state.actualControllerSha,previous);
+ assert.deepEqual(state.ledger,ledger);
+ assert.equal(state.lockReadbackCode,'UPDATE_LOCK_UNAVAILABLE');
+ assert.deepEqual(state.installLock,{held:true,recoveryRequired:true});
+});
+test('unreadable request ledger is not disguised as no prior request',()=>{
+ const state=readMaintenanceRecoveryStatus(request.requestId,{
+  readInstalled:()=>previous,
+  readLedger:()=>{throw Error('ledger parse failure');},
+  readLock:()=>({held:false}),
+ });
+ assert.equal(state.ledger,null);
+ assert.equal(state.ledgerReadbackCode,'UPDATE_LEDGER_UNAVAILABLE');
 });
 test('same requestId returns stored evidence and never installs twice',async()=>{
  const f=fixture();await applyApprovedUpdate(request,f.port);const previousEvents=f.events.length;

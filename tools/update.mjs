@@ -415,15 +415,38 @@ function loadApprovedPackage(requestId,file) {
  return {...data,issue:validated.request,manifest:validated.manifest};
 }
 
+// Recovery-status reads must survive a partially switched/missing host.json.
+// Never infer a successful install from the journal alone. An unreadable lock
+// is treated as a held recovery lock so the receiver cannot start another job.
+export function readMaintenanceRecoveryStatus(requestId,{
+ readInstalled=()=>installedManifest().installedSha,
+ readLedger=()=>{const file=path.join(recordDir,requestId+'.json');return fs.existsSync(file)?json(file):null;},
+ readLock=()=>maintenanceLockStatus(maintenanceRoot,'controller-install'),
+}={}){
+ let actualControllerSha=null,installedReadbackCode=null,ledger=null,ledgerReadbackCode=null,
+   installLock={held:true,recoveryRequired:true},lockReadbackCode=null;
+ try{
+  const sha=readInstalled();
+  if(validSha(sha))actualControllerSha=sha;
+  else installedReadbackCode='INSTALLED_SHA_UNVERIFIED';
+ }catch{installedReadbackCode='INSTALLED_MANIFEST_UNAVAILABLE';}
+ try{ledger=readLedger();}
+ catch{ledgerReadbackCode='UPDATE_LEDGER_UNAVAILABLE';}
+ try{
+  const observed=readLock();
+  if(!observed||typeof observed.held!=='boolean')throw Error('invalid lock status');
+  installLock=observed;
+ }catch{lockReadbackCode='UPDATE_LOCK_UNAVAILABLE';}
+ return {status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
+  installLock,lockReadbackCode};
+}
+
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
  if(cmd==='status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
-  const ledgerFile=path.join(recordDir,requestId+'.json');
-  return {status:'STATUS',actualControllerSha:installedManifest().installedSha,
-    ledger:fs.existsSync(ledgerFile)?json(ledgerFile):null,
-    installLock:maintenanceLockStatus(maintenanceRoot,'controller-install')};
+  return readMaintenanceRecoveryStatus(requestId);
  }
  need(cmd==='apply'&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
  const data=loadApprovedPackage(requestId,args[4]);

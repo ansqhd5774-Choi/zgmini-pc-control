@@ -42,8 +42,8 @@ function sampleRequest(){
 function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   title="pc-controller-update",issuePatch={},manifestPatch={},
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
-  uploadFailure=null,uploadAfterCommitError=null,installLock=null,
-  verifyInstalledSource=()=>{}}={}){
+  uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
+  verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -119,7 +119,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     if(args[1]==="status"){
       stats.statusQueries++;
       return {stdout:JSON.stringify({status:"STATUS",actualControllerSha:INSTALLED,
-        ledger:stats.applies?afterTimeout:null,installLock})};
+        ledger:stats.applies?afterTimeout:preexistingLedger,installLock,...statusFaults})};
     }
     if(args[1]==="apply"){
       stats.applies++;
@@ -177,6 +177,20 @@ test("an active global install lease keeps another request queued without claimi
  assert.equal(result[0].code,"MAINTENANCE_INSTALL_IN_PROGRESS");
  assert.equal(f.stats.applies,0);
  assert.equal(f.agent.loadLedger(REQUEST_ID),null);
+});
+test("unreadable updater journal cannot be treated as a new request",async t=>{
+ const f=fixture(t,{statusFaults:{ledgerReadbackCode:'UPDATE_LEDGER_UNAVAILABLE'}});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'BLOCKED');
+ assert.equal(result[0].code,'UPDATE_STATUS_RECOVERY_REQUIRED');
+ assert.equal(f.stats.applies,0);
+});
+test("pre-existing updater ledger without receiver claim requires reconciliation",async t=>{
+ const f=fixture(t,{preexistingLedger:{status:'RUNNING',requestId:REQUEST_ID}});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'BLOCKED');
+ assert.equal(result[0].code,'UPDATE_EXISTING_LEDGER_RECONCILE_FIRST');
+ assert.equal(f.stats.applies,0);
 });
 test("drifted immutable updater source never reaches an executable process",async t=>{
  const f=fixture(t,{verifyInstalledSource:()=>{throw Error('MAINTENANCE_SELF_DRIFT');}});
