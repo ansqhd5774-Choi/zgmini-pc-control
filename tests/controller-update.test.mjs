@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {processUpdate} from '../maintenance/processor.mjs';
-import {digest,verifyChanges} from '../maintenance/contract.mjs';
+import {digest,verifyChanges,verifyOperationPolicy} from '../maintenance/contract.mjs';
 
 const oldSha='c491d95fdb594a729f08deff68d86e04c18a9544',newSha='b77a333db9d3445394ff4267949a79b6054126cf';
 const a=digest('controller module v2');
@@ -83,4 +83,36 @@ test('fixed standalone task and GitHub replay adapter keep normal Runner jobs in
  assert.match(workflow,/types: \[opened, labeled\]/);
  assert.match(workflow,/github\.event\.label\.name == 'pc-job-replay'/);
  assert.match(entry,/event\.label\?\.name==='pc-job-replay'/);
+});
+
+test('A-readonly controller approval cannot change write policy, existing operations or protected keys',()=>{
+ const before={schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+  sourceRepository:'ansqhd5774-Choi/zgmini',allowedActors:['ansqhd5774-Choi'],
+  seats:6,mutationsEnabled:false,maxHeavyJobs:1,artifactUploadEnabled:false,
+  operations:{'source-audit':{grade:'A',timeoutSeconds:60,resource:'light'}}};
+ const after=structuredClone(before);
+ after.operations['fear-greed-archive-status']={grade:'A',timeoutSeconds:60,resource:'light'};
+ assert.equal(verifyOperationPolicy(before,after),true);
+ const writing=structuredClone(after);writing.mutationsEnabled=true;
+ assert.throws(()=>verifyOperationPolicy(before,writing),/UPDATE_CONFIG_WRITE_OR_SEAT_CHANGE/);
+ const existingChanged=structuredClone(after);existingChanged.operations['source-audit'].timeoutSeconds=90;
+ assert.throws(()=>verifyOperationPolicy(before,existingChanged),/UPDATE_EXISTING_OPERATION_CHANGED/);
+ const elevated=structuredClone(after);elevated.operations['fear-greed-archive-status'].grade='B';
+ assert.throws(()=>verifyOperationPolicy(before,elevated),/UPDATE_NEW_OPERATION_NOT_READONLY_A/);
+ const supplier=structuredClone(after);supplier.sourceRepository='unauthorized/supplier';
+ assert.throws(()=>verifyOperationPolicy(before,supplier),/UPDATE_CONFIG_PROTECTED_FIELD_CHANGED/);
+});
+
+test('bootstrap pins updater and maintenance path defers intake until independent audit',()=>{
+ const bootstrap=fs.readFileSync(new URL('../tools/bootstrap-maintenance.mjs',import.meta.url),'utf8');
+ const agent=fs.readFileSync(new URL('../maintenance/agent.mjs',import.meta.url),'utf8');
+ const update=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.match(bootstrap,/updateToolSha256:sha\(updater\)/);
+ assert.match(agent,/digest\(fs\.readFileSync\(updater\)\)===settings\.updateToolSha256/);
+ assert.match(update,/CONTROLLER_UPDATER_RUNNER_CONTEXT_FORBIDDEN/);
+ assert.match(agent,/ZGMINI_CONTROL_MAINTENANCE_DEFER_REENABLE:'1'/);
+ assert.match(update,/if\(!managedIntake\)/);
+ assert.ok(agent.indexOf("'UPDATE_PRE_RESUME_AUDIT_FAILED'")<
+  agent.indexOf("api('actions/workflows/pc-job.yml/enable','PUT')",agent.indexOf('function apply')));
+ assert.match(agent,/deferredUpdateReceipt\(request,record\)/);
 });
