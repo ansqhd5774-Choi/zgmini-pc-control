@@ -32,7 +32,14 @@ function candidatePaths(text){
 /** Injectable dependencies keep fixture tests independent from a real Windows PC. */
 export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  realpath=p=>fs.realpathSync.native(p),read=p=>fs.readFileSync(p),
- git=(cwd,args)=>execFileSync('git',['-c','core.fsmonitor=false','-c','core.untrackedCache=false','-C',cwd,...args],{windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8'})}={}){
+ git=(cwd,args)=>{
+  // The isolated Runner child has a Node-only PATH. Use only fixed Git install locations.
+  const binary=process.platform==='win32'?
+   ['C:\\Program Files\\Git\\cmd\\git.exe','C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(fs.existsSync):'git';
+  if(!binary)throw Error('PC_SOURCE_GIT_UNAVAILABLE');
+  return execFileSync(binary,['-c','core.fsmonitor=false','-c','core.untrackedCache=false','-C',cwd,...args],
+   {windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8'});
+ }}={}){
  const base=path.dirname(realpath(dataRoot)),root=path.resolve(base);
  const inside=p=>p.toLowerCase().startsWith((root+path.sep).toLowerCase());
  const relative=p=>path.relative(root,p).replaceAll('\\','/');
