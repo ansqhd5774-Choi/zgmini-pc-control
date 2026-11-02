@@ -9,7 +9,7 @@
 - PR #28 Fear & Greed 진단의 병합 SHA: `b77a333db9d3445394ff4267949a79b6054126cf`. **최신 main SHA와 같다고 가정하지 않는다.** 최초 승인 파일은 `approvals/controller-updates/b77a333db9d3445394ff4267949a79b6054126cf.json`.
 - 원본 A급 `pc-job` Issue의 7필드 계약은 그대로 둔다. `controller-update`를 그 안에 추가하지 않는다. 임의 CMD/SQL/다운로드 URL/경로를 받지 않는다.
 - 신규 `pc-maintenance` Issue는 **갱신 요청**일 뿐 자동 승인 근거가 아니다. 별도 B급 승인 manifest의 raw SHA-256과 실제 설치 SHA, merged PR, Git 이력과 변경 파일별 해시를 모두 확인한다.
-- 일반 A급 호환 보강은 승인된 기존 Controller 파일·기존 operation 이름만 갱신 가능하다. 새 실행 파일 또는 operation 등록은 명시적 B 승인 manifest가 필요하다. 운영 source·DB/D1·게시·스케줄은 이 경로로 갱신할 수 없다.
+- Controller 실행 파일 갱신은 현재 계약상 **모두 명시적 B급 승인 manifest**가 필요하다. 운영 source·DB/D1·게시·스케줄은 이 경로로 갱신할 수 없다.
 - **B급 읽기 전용 승인도 기존 Controller 운영정책 변경 승인이 아니다.** 6좌석, `mutationsEnabled=false`, 기존 operation 정의, actor/source 및 공통 설정 필드는 이전 설치값과 완전히 같아야 한다. 추가 operation은 제한된 A급/light 진단만 허용한다.
 
 ## 통신 구조
@@ -36,12 +36,14 @@
 7. manifest의 사후 고정 A급 검사 Issue를 단 한 번 만들고 `status/code/actualExecutionSha/lastPass/firstFail`을 자동 회수한다. `PASS`이며 실제 SHA가 목표 SHA와 같아야 업데이트 PASS. 결과는 별도 TXT/JSON과 `pc-maintenance` Issue 댓글로 회수한다.
 8. 같은 `requestId`는 원장을 재사용하고, 통신 timeout·부분 전환은 실제 설치 SHA·원장·프로세스 상태를 먼저 조사한다. 원본 데이터/기존 Core lock/운영 DB/D1은 복구 대상이 아니다.
 
+유지보수기 수신기와 갱신 실행기는 각각 독립적인 원자적 lease를 사용한다. 긴 갱신 중에도 승인된 5개 유지보수 모듈의 설치 파일 SHA-256을 실행 직전에 다시 검증한다. 설치 결과가 불확실할 때 install lease를 복구 대기 상태로 유지하므로 다른 요청이 같은 Controller를 교체하지 않는다. 임의 자동 잠금 삭제·재설치는 금지한다.
+
 ## 최초 연결 — 1회만, 운영자로 제한
 
 **GitHub에 코드를 병합해도 PC 유지보수 프로세스는 자동 생기지 않는다.** 현재 PC에 독립 접수 진입점이 없으므로 최초 상태는 `AUTOMATION_BLOCKED`다. 이 한 번의 부트스트랩은 기존 A급 `pc-job`에 임의 명령을 싣는 방식으로 우회하지 않는다.
 
 1. 로컬 실행 담당자는 현재 PC의 private 제어 저장소 `E:\ZGmini\projects\zgmini-pc-control`을 정규 `main` fast-forward로 동기화하고 **적용할 정확한40자 SHA**를 확인한다. 기존 `E:\ZGmini\automation\pc-control`의 controller/Runner는 건드리지 않는다.
-2. 신규 파일의 Git blob 해시와 이 저장소 Node 테스트(`tests/maintenance-{contract,apply,agent}.test.mjs`) PASS를 대조한다. 새 도구 실행 자체는 B급 최초 설치 승인 범위이며, 관리자 권한 없이 현재 사용자 로그인 Startup 한 항목만 추가한다.
+2. 신규 파일의 Git blob 해시와 이 저장소 Node 테스트(`tests/maintenance-{contract,apply,agent,lock}.test.mjs`) PASS를 대조한다. 새 도구 실행 자체는 B급 최초 설치 승인 범위이며, 관리자 권한 없이 현재 사용자 로그인 Startup 한 항목만 추가한다.
 3. 현재 사용자 medium token에서 **한 번만** 실행한다. `SOURCE_SHA`는 1단계에서 확인한 실제 커밋 SHA로 대체한다.
 
 ```cmd

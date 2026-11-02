@@ -172,9 +172,8 @@ export function validateUpdateRequest(issue,manifestBytes,{
   const manifest=manifestFingerprint(raw.allowFiles);
   if(!Object.hasOwn(PURPOSE_SCOPE,raw.purpose))throw Error("UPDATE_PURPOSE_NOT_ALLOWED");
   requireKeys(raw.approval,APPROVAL_KEYS,"UPDATE_APPROVAL_FIELDS_INVALID");
-  if(!["A","B"].includes(raw.approval.grade)
+  if(raw.approval.grade!=="B"
     ||raw.approval.scope!==PURPOSE_SCOPE[raw.purpose]
-    ||(raw.approval.grade==="A"&&raw.purpose!=="pc-controller-safety-fix")
     ||!/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/.test(raw.approval.ref)){
     throw Error("UPDATE_B_APPROVAL_REQUIRED");
   }

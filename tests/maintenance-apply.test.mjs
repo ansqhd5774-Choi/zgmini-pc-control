@@ -20,7 +20,8 @@ function fixture(overrides={}) {
     reconnect:async()=>events.push('reconnect'),
     resumeIntake:async()=>{paused=false;events.push('resume');},
     reconcileBacklog:async()=>events.push('replay-missed-issues'),
-    postcheck:async()=>({status:'PASS',actualExecutionSha:target}),
+    postcheck:async()=>({status:'PASS',actualExecutionSha:target,
+      protectedStateUnchanged:true,runnerSetVerified:true}),
     verifyPrevious:async()=>installed===previous&&oldRunning,
     verifyBackup:async()=>true,
     restore:async()=>{installed=previous;events.push('restore');},
@@ -73,6 +74,28 @@ test('lost workflow disable acknowledgement reports actual disabled state, never
  assert.equal(r.workflowEnabled,false);
  assert.equal(r.code,'WORKFLOW_ACK_TIMEOUT');
  assert.equal(f.events.includes('stop'),false);
+});
+test('lost stop acknowledgement confirms the old supervisor before treating the install as blocked',async()=>{
+ const f=fixture();
+ f.port.stopOwnSupervisor=async()=>{throw Object.assign(Error('lost ACK'),{code:'SUPERVISOR_STOP_ACK_TIMEOUT'});};
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(f.installed,previous);
+ assert.ok(!f.events.includes('switch'));
+});
+test('an unverified Core protection digest cannot be a successful postcheck',async()=>{
+ const f=fixture({postcheck:async()=>({status:'PASS',actualExecutionSha:target,
+   protectedStateUnchanged:false,runnerSetVerified:true})});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'ROLLED_BACK');
+ assert.equal(r.code,'POSTCHECK_NOT_VERIFIED');
+});
+test('fewer than six verified Runner seats cannot be accepted as success',async()=>{
+ const f=fixture({postcheck:async()=>({status:'PASS',actualExecutionSha:target,
+   protectedStateUnchanged:true,runnerSetVerified:false})});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'ROLLED_BACK');
+ assert.equal(r.code,'POSTCHECK_NOT_VERIFIED');
 });
 test('CIM parent lookup uncertainty is not accepted as independent maintenance ancestry',()=>{
  const source=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');

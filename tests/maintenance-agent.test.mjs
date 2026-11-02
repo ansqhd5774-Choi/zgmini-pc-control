@@ -42,7 +42,8 @@ function sampleRequest(){
 function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   title="pc-controller-update",issuePatch={},manifestPatch={},
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
-  uploadFailure=null,uploadAfterCommitError=null}={}){
+  uploadFailure=null,uploadAfterCommitError=null,installLock=null,
+  verifyInstalledSource=()=>{}}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -118,7 +119,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     if(args[1]==="status"){
       stats.statusQueries++;
       return {stdout:JSON.stringify({status:"STATUS",actualControllerSha:INSTALLED,
-        ledger:stats.applies?afterTimeout:null})};
+        ledger:stats.applies?afterTimeout:null,installLock})};
     }
     if(args[1]==="apply"){
       stats.applies++;
@@ -137,7 +138,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
     throw Error("unexpected updater command");
   };
   const agent=createMaintenanceAgent({stateDir:root,leaseRoot,
-    leaseAttempts:1,leaseWaitMs:0,execFileImpl:fakeExec});
+    leaseAttempts:1,leaseWaitMs:0,execFileImpl:fakeExec,verifyInstalledSource});
   return {root,leaseRoot,agent,stats,remote,calls,issue,request,manifest,rawManifest,fakeExec};
 }
 
@@ -167,6 +168,34 @@ test("authorized private-repo issue starts one standalone updater and persists r
   assert.equal(f.stats.applies,1);
   assert.equal(f.stats.comments,1);
   assert.equal(f.stats.uploadWrites,2);
+});
+
+test("an active global install lease keeps another request queued without claiming it",async t=>{
+ const f=fixture(t,{installLock:{held:true,recoveryRequired:false,ownerPid:999}});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,"QUEUED");
+ assert.equal(result[0].code,"MAINTENANCE_INSTALL_IN_PROGRESS");
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.agent.loadLedger(REQUEST_ID),null);
+});
+test("drifted immutable updater source never reaches an executable process",async t=>{
+ const f=fixture(t,{verifyInstalledSource:()=>{throw Error('MAINTENANCE_SELF_DRIFT');}});
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'BLOCKED');
+ assert.equal(f.stats.applies,0);
+ assert.equal(f.stats.statusQueries,0);
+ assert.equal(f.calls.some(x=>x.file===process.execPath),false);
+});
+test("crash after claim but before updater ledger becomes visible UNKNOWN, never re-installs",async t=>{
+ const f=fixture(t),fingerprint=digest(JSON.stringify(f.request));
+ const ledger={schema:'ZGMINI_PC_MAINTENANCE_LEDGER_V1',requestId:REQUEST_ID,issueNumber:72,
+   actor:ACTOR,fingerprint,bodyDigest:digest(f.issue.body),status:'RUNNING',
+   createdAt:new Date(Date.now()-300000).toISOString(),result:null};
+ const file=path.join(f.root,'requests',digest(REQUEST_ID)+'.json');
+ fs.writeFileSync(file,JSON.stringify(ledger)+'\n');
+ const result=await f.agent.pollOnce();
+ assert.equal(result[0].status,'UNKNOWN');assert.equal(f.stats.applies,0);
+ assert.equal(f.agent.loadLedger(REQUEST_ID).result.code,'UPDATE_OUTCOME_UNKNOWN');
 });
 
 test("public repository blocks all issue or updater access",async t=>{

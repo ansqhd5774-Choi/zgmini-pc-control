@@ -49,13 +49,13 @@ export async function applyApprovedUpdate(request, port) {
     await port.stage(request);
     await record('STAGED');
     // Intake is paused BEFORE draining. Accepted Issues remain durable on GitHub.
-    await port.pauseIntake();paused=true;
+    paused=true;await port.pauseIntake();
     await record('INTAKE_PAUSED');
     await port.waitForDrain();
     await record('DRAINED');
     await port.backup();backup=true;
     await record('BACKED_UP');
-    await port.stopOwnSupervisor();supervisorStopped=true;
+    supervisorStopped=true;await port.stopOwnSupervisor();
     await record('SUPERVISOR_STOPPED');
     await port.switchVersion();switched=true;
     await record('SWITCHED');
@@ -69,7 +69,8 @@ export async function applyApprovedUpdate(request, port) {
     await record('BACKLOG_RECONCILED');
     await record('POSTCHECK_PENDING');
     const post=await port.postcheck(request);
-    if(post?.status!=='PASS'||post?.actualExecutionSha!==request.targetSha) throw fail('POSTCHECK_NOT_VERIFIED');
+    if(post?.status!=='PASS'||post?.actualExecutionSha!==request.targetSha||
+      post?.protectedStateUnchanged!==true||post?.runnerSetVerified!==true) throw fail('POSTCHECK_NOT_VERIFIED');
     await record('PASS',{status:'PASS',code:'APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED',actualInstalledSha:request.targetSha,postcheck:post,
       protectedStateUnchanged:true,workflowEnabled:true});
     return {...ledger};
@@ -86,11 +87,12 @@ export async function applyApprovedUpdate(request, port) {
       return {...ledger};
     }
     // If code was only staged, the installed controller is untouched.
-    if(!supervisorStopped&&!switched) {
+    let oldStillRunning=false;
+    if(!switched){try{oldStillRunning=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});}catch{}}
+    if(!switched && (!supervisorStopped || oldStillRunning)) {
       // Intake is deliberately not enabled when drain/state is uncertain.
       // An intact preflight failure can leave it enabled only if verified.
-      let safe=false;
-      try {safe=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});} catch {}
+      let safe=oldStillRunning;
       // pauseIntake() can disable the workflow and then lose its API ACK,
       // leaving paused=false in this coordinator. Never infer active intake
       // merely from an unchanged controller or from our local Boolean.
@@ -98,7 +100,8 @@ export async function applyApprovedUpdate(request, port) {
       try {observed=await port.inspectAfterUncertain({...ledger});} catch {}
       let workflowState=observed?.workflowState;
       if(safe && paused && workflowState==='disabled_manually') {
-        try {await port.resumeIntake();paused=false;
+        if(port.didPauseIntake && !port.didPauseIntake())safe=false;
+        else try {await port.resumeIntake();paused=false;
           observed=await port.inspectAfterUncertain({...ledger});
           workflowState=observed?.workflowState;
         } catch {safe=false;}
