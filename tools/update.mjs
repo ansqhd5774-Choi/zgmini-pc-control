@@ -5,7 +5,12 @@ const g=args=>execFileSync('git',args,{cwd:repo,windowsHide:true,encoding:'utf8'
 const need=(x,c)=>{if(!x)throw Object.assign(Error(c),{code:c});},sha=b=>createHash('sha256').update(b).digest('hex');
 let disabled=false,backupVerified=false,backupName=null;
 try{
+ need(!process.env.GITHUB_RUN_ID&&!process.env.RUNNER_NAME&&!process.env.RUNNER_TRACKING_ID,
+  'CONTROLLER_UPDATER_RUNNER_CONTEXT_FORBIDDEN');
  need(g(['status','--porcelain']).trim()==='','CONTROL_DIRTY');
+ const managedIntake=process.env.ZGMINI_CONTROL_MAINTENANCE_DEFER_REENABLE==='1';
+ need(!process.env.ZGMINI_CONTROL_MAINTENANCE_DEFER_REENABLE||managedIntake,
+  'CONTROL_INTAKE_MODE_NOT_APPROVED');
  // Only the separate, installed maintenance agent supplies this optional pin.
  // The original one-shot manual use remains HEAD-based for compatibility.
  const sourceSha=process.env.ZGMINI_CONTROL_UPDATE_TARGET_SHA||g(['rev-parse','HEAD']).trim();
@@ -49,6 +54,6 @@ try{
  const child=spawn(process.execPath,[path.join(root,'controller/supervisor.mjs')],{cwd:root,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
  let afterRunners;for(let i=0;i<20;i++){afterRunners=api('actions/runners').runners;if(afterRunners.length===6&&afterRunners.every(x=>x.status==='online'))break;await new Promise(r=>setTimeout(r,1500));}
  need(afterRunners.every(x=>x.status==='online'),'RECONNECT_NOT_CONFIRMED');const after=protectedState('E:/ZGmini/data',{queryTask:nativeTaskXml});need(JSON.stringify(before)===JSON.stringify(after),'PROTECTED_STATE_DRIFT');
- api('actions/workflows/pc-job.yml/enable',['--method','PUT']);disabled=false;
- const report={status:'CONTROLLER_UPDATED_SIX_RECONNECTED',at:new Date().toISOString(),controlSourceSha:sourceSha,backup:backupName,backupVerified,offlineObserved,offlineCountObserved:offlineCount,onlineAfter:afterRunners.length,oldSupervisorPid:state.pid,newSupervisorPid:child.pid,existingCoreStopped:false,protectedStateUnchanged:true,beforeSha256:sha(JSON.stringify(before)),afterSha256:sha(JSON.stringify(after)),registrationCredentialsReused:true,workflowReenabled:true};fs.writeFileSync(path.join(root,'UPDATE_RESULT_'+Date.now()+'.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+ if(!managedIntake){api('actions/workflows/pc-job.yml/enable',['--method','PUT']);disabled=false;}
+ const report={status:'CONTROLLER_UPDATED_SIX_RECONNECTED',at:new Date().toISOString(),controlSourceSha:sourceSha,backup:backupName,backupVerified,offlineObserved,offlineCountObserved:offlineCount,onlineAfter:afterRunners.length,oldSupervisorPid:state.pid,newSupervisorPid:child.pid,existingCoreStopped:false,protectedStateUnchanged:true,beforeSha256:sha(JSON.stringify(before)),afterSha256:sha(JSON.stringify(after)),registrationCredentialsReused:true,workflowReenabled:!managedIntake};fs.writeFileSync(path.join(root,'UPDATE_RESULT_'+Date.now()+'.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }catch(error){console.error(JSON.stringify({status:'UPDATE_STOP',code:/^[A-Z0-9_]+$/.test(error.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',backup:backupName,backupVerified,controlWorkflowDisabled:disabled,instruction:'INSPECT_BEFORE_RETRY_NO_CORE_CHANGES'}));process.exitCode=1;}
