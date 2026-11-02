@@ -9,7 +9,8 @@ import {createHash} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
-import {validateUpdateRequest,validateMaintenanceRequest} from './maintenance-contract.mjs';
+import {validateUpdateRequest,validateMaintenanceRequest,
+ validateControllerConfigTransition} from './maintenance-contract.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
 const maintenanceRoot='E:/ZGmini/automation/pc-maintenance';
@@ -40,7 +41,7 @@ const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
 function verifyIndependent(supervisorPid) {
  need(process.platform==='win32','WINDOWS_PC_REQUIRED');
  need(!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME&&!process.env.GITHUB_RUN_ID,'MAINTENANCE_PROCESS_NOT_INDEPENDENT');
- const script=`$own=${process.pid};$target=${supervisorPid};for($n=0;$n -lt 32;$n++){if($own -eq $target){'DESCENDANT';exit};$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$own) -ErrorAction Stop;if(-not $p -or -not $p.ParentProcessId){'INDEPENDENT';exit};$own=[int]$p.ParentProcessId};'UNKNOWN'`;
+ const script=`$own=${process.pid};$target=${supervisorPid};for($n=0;$n -lt 32;$n++){if($own -eq $target){'DESCENDANT';exit};$p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$own) -ErrorAction Stop;if(-not $p){'UNKNOWN';exit};if(-not $p.ParentProcessId){'INDEPENDENT';exit};$own=[int]$p.ParentProcessId};'UNKNOWN'`;
  const result=execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,encoding:'utf8',timeout:12000}).trim();
  need(result==='INDEPENDENT','MAINTENANCE_PROCESS_NOT_INDEPENDENT');
 }
@@ -127,7 +128,7 @@ function makePorts(packageData,issueNumber) {
    const newInstallables=listing.filter(rel=>!Object.hasOwn(host.controllerFiles,rel));
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
-   need(nextOperations.mutationsEnabled===false,'CONTROLLER_MUTATIONS_NOT_ALLOWED');
+    validateControllerConfigTransition(oldOperations,nextOperations);
    if(manifest.approval.grade==='A') {
      need(newInstallables.length===0,'NEW_EXECUTABLE_REQUIRES_B_APPROVAL');
      need(JSON.stringify(Object.keys(oldOperations.operations).sort())===JSON.stringify(Object.keys(nextOperations.operations).sort()),'NEW_OPERATION_REQUIRES_B_APPROVAL');
