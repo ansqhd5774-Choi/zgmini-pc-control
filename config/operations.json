@@ -7,6 +7,7 @@
   "operations": {
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "pc-source-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "fear-greed-archive-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "alpaca-quota-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
