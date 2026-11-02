@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {applyApprovedUpdate} from '../tools/maintenance-apply.mjs';
-import {readMaintenanceRecoveryStatus} from '../tools/update.mjs';
+import {readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
+  closeLatestPause,backlogIssueInPause} from '../tools/update.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
@@ -52,6 +53,34 @@ test('partial host.json corruption still returns original request ledger and rec
  assert.equal(state.installedReadbackCode,'INSTALLED_MANIFEST_UNAVAILABLE');
  assert.deepEqual(state.ledger,ledger);
  assert.equal(state.installLock.recoveryRequired,true);
+});
+test('rollback creates a second durable pause window and replays issues from both windows',()=>{
+ const first='2026-11-02T10:00:00.000Z',firstResume='2026-11-02T10:02:00.000Z';
+ let state={schema:'ZGMINI_PC_BACKLOG_V1',requestId:request.requestId,
+   pausedAt:first,resumedAt:null,replays:{},windows:[{pausedAt:first,resumedAt:null}]};
+ state=closeLatestPause(state,firstResume);
+ state=openRollbackPause(state,'2026-11-02T10:04:00.000Z');
+ assert.equal(backlogPauseWindows(state).length,2);
+ assert.equal(backlogPauseWindows(state)[1].resumedAt,null);
+ assert.throws(()=>openRollbackPause(state,'2026-11-02T10:05:00.000Z'),
+   /BACKLOG_PRIOR_PAUSE_OPEN/);
+ state=closeLatestPause(state,'2026-11-02T10:06:00.000Z');
+ const issue=when=>({created_at:when,user:{login:'ansqhd5774-Choi'},
+   labels:[{name:'pc-job'}],title:'Approved PC request'});
+ const firstIssue=issue('2026-11-02T10:01:00.000Z');
+ const rollbackIssue=issue('2026-11-02T10:05:00.000Z');
+ const between=issue('2026-11-02T10:03:00.000Z');
+ const windows=backlogPauseWindows(state);
+ assert.equal(windows.some(w=>backlogIssueInPause(firstIssue,w)),true);
+ assert.equal(windows.some(w=>backlogIssueInPause(rollbackIssue,w)),true);
+ assert.equal(windows.some(w=>backlogIssueInPause(between,w)),false);
+ assert.equal(state.resumedAt,firstResume);
+});
+test('invalid or unclosed backlog window is fail-closed before replay',()=>{
+ const legacy={schema:'ZGMINI_PC_BACKLOG_V1',pausedAt:'2026-11-02T10:00:00Z',resumedAt:null};
+ assert.equal(backlogPauseWindows(legacy).length,1);
+ assert.throws(()=>closeLatestPause(legacy,'2026-11-02T09:00:00Z'),/BACKLOG_RESUME_TIME_INVALID/);
+ assert.throws(()=>backlogPauseWindows({...legacy,windows:[]}),/BACKLOG_WINDOWS_INVALID/);
 });
 test('unreadable install lock fails closed while preserving verified SHA and ledger',()=>{
  const ledger={requestId:request.requestId,status:'RUNNING'};

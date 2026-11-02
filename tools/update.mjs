@@ -71,6 +71,46 @@ function installedManifest() {
  return {host,installedSha};
 }
 
+// GitHub does not replay Issue `opened` events while a workflow is disabled.
+// A failed postcheck may pause intake a SECOND time during rollback. Preserve
+// every pause interval; never silently replace the first successful replay.
+export function backlogPauseWindows(state){
+ need(state?.schema==='ZGMINI_PC_BACKLOG_V1','BACKLOG_STATE_INVALID');
+ const windows=Array.isArray(state.windows)?state.windows:
+  [{pausedAt:state.pausedAt,resumedAt:state.resumedAt}];
+ need(windows.length>=1&&windows.length<=8,'BACKLOG_WINDOWS_INVALID');
+ for(const window of windows){
+  const start=Date.parse(window?.pausedAt??''),end=window?.resumedAt==null?null:Date.parse(window.resumedAt);
+  need(Number.isFinite(start)&&(end===null||(Number.isFinite(end)&&end>=start)),
+   'BACKLOG_WINDOW_INVALID');
+ }
+ return windows;
+}
+export function openRollbackPause(state,time){
+ const windows=backlogPauseWindows(state);
+ need(windows.every(w=>w.resumedAt),'BACKLOG_PRIOR_PAUSE_OPEN');
+ need(Number.isFinite(Date.parse(time)),'BACKLOG_PAUSE_TIME_INVALID');
+ return {...state,windows:[...windows,{pausedAt:time,resumedAt:null}]};
+}
+export function closeLatestPause(state,time){
+ const windows=backlogPauseWindows(state).map(w=>({...w}));
+ const open=windows.filter(w=>!w.resumedAt);
+ need(open.length===1,'BACKLOG_OPEN_WINDOW_NOT_UNIQUE');
+ const next=windows.at(-1);
+ need(!next.resumedAt&&Number.isFinite(Date.parse(time))&&Date.parse(time)>=Date.parse(next.pausedAt),
+  'BACKLOG_RESUME_TIME_INVALID');
+ next.resumedAt=time;
+ return {...state,windows,resumedAt:state.resumedAt??time};
+}
+export function backlogIssueInPause(entry,window){
+ const created=Date.parse(entry?.created_at??''),start=Date.parse(window.pausedAt)-2000,
+   end=Date.parse(window.resumedAt??'');
+ return !entry?.pull_request&&entry?.user?.login==='ansqhd5774-Choi'&&
+   entry?.labels?.some(x=>x.name==='pc-job')&&Number.isFinite(created)&&
+   created>=start&&created<=end&&
+   !String(entry?.title??'').startsWith('Maintenance replay ');
+}
+
 function protectedSnapshot() {
  // Existing Core task XML hashes + PC writer config hashes, read-only.
  const dataRoot='E:/ZGmini/data',out={files:{},tasks:{}};
@@ -156,8 +196,9 @@ function makePorts(packageData,issueNumber) {
   },
   pauseIntake:async()=>{
    need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_NOT_ACTIVE_PREEXISTING');
+   const at=new Date().toISOString();
    writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId:request.requestId,
-     pausedAt:new Date().toISOString(),resumedAt:null,replays:{}});
+     pausedAt:at,resumedAt:null,replays:{},windows:[{pausedAt:at,resumedAt:null}]});
    github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually','WORKFLOW_DISABLE_NOT_CONFIRMED');
   },
@@ -223,31 +264,31 @@ function makePorts(packageData,issueNumber) {
    need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_ENABLE_NOT_CONFIRMED');
    if(fs.existsSync(backlogFile)){
      const backlog=json(backlogFile);
-     if(!backlog.resumedAt)writeJson(backlogFile,{...backlog,resumedAt:new Date().toISOString()});
+     writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
    }
   },
   reconcileBacklog:async()=>{
    need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
    let state=json(backlogFile);
-   need(state.schema==='ZGMINI_PC_BACKLOG_V1'&&state.resumedAt&&state.pausedAt,'BACKLOG_STATE_INVALID');
+   const windows=backlogPauseWindows(state);
+   need(windows.every(w=>w.resumedAt),'BACKLOG_WINDOW_NOT_CLOSED');
    // A workflow disabled on an Issue `opened` event does not replay it when
    // enabled again. Find the durable original Issues in that exact window.
-   const from=Date.parse(state.pausedAt)-2000,to=Date.parse(state.resumedAt);
-   need(Number.isFinite(from)&&Number.isFinite(to)&&to>=from,'BACKLOG_TIME_INVALID');
-   const candidates=[];
-   for(let page=1;page<=20;page++){
-     const list=github(`issues?state=all&since=${encodeURIComponent(new Date(from).toISOString())}&per_page=100&page=${page}`);
-     need(Array.isArray(list),'BACKLOG_LIST_INVALID');
-     for(const entry of list){
-       const created=Date.parse(entry.created_at);
-       if(!entry.pull_request&&entry.user?.login==='ansqhd5774-Choi'&&
-         entry.labels?.some(x=>x.name==='pc-job')&&created>=from&&created<=to&&
-         !String(entry.title??'').startsWith('Maintenance replay '))candidates.push(entry);
+   const candidates=new Map();
+   for(const window of windows){
+     const from=Date.parse(window.pausedAt)-2000,to=Date.parse(window.resumedAt);
+     need(Number.isFinite(from)&&Number.isFinite(to)&&to>=from,'BACKLOG_TIME_INVALID');
+     for(let page=1;page<=20;page++){
+       const list=github(`issues?state=all&since=${encodeURIComponent(new Date(from).toISOString())}&per_page=100&page=${page}`);
+       need(Array.isArray(list),'BACKLOG_LIST_INVALID');
+       for(const entry of list){
+         if(backlogIssueInPause(entry,window))candidates.set(entry.number,entry);
+       }
+       if(list.length<100)break;
+       need(page<20,'BACKLOG_LIST_TRUNCATED');
      }
-     if(list.length<100)break;
-     need(page<20,'BACKLOG_LIST_TRUNCATED');
    }
-   for(const original of candidates.sort((a,b)=>a.number-b.number)){
+   for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
      const key=String(original.number);
      if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
      if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
@@ -335,7 +376,14 @@ function makePorts(packageData,issueNumber) {
   restore:async()=>{
    // A postcheck may have failed after the new listener came online. Stop its
    // tree only AFTER pausing intake and observing zero jobs/uploads again.
-   if(!pausedByUs){github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;}
+   if(!pausedByUs){
+     // Durable pause record BEFORE disabling; an API acknowledgement may be
+     // lost even when the disable succeeded. The second window is replayed
+     // after the verified rollback reconnects the original six Runners.
+     need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
+     writeJson(backlogFile,openRollbackPause(json(backlogFile),new Date().toISOString()));
+     github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
+   }
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually','ROLLBACK_WORKFLOW_NOT_DISABLED');
    let stable=0;
    for(let n=0;n<180;n++){
