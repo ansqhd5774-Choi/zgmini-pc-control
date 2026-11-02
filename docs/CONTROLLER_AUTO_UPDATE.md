@@ -1,6 +1,6 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
-상태: **개발·격리 모의검사 단계. 최초 실PC 연결 및 GitHub-only 업데이트는 아직 미검증.**
+상태 (2026-11-03 KST): **독립 유지보수기 `c2458c73e129358813e9099a3eb8e5e77a82d87d`의 실PC 설치·프로세스 실행은 로컬 작업자가 확인. 그러나 프로세스 출처·독립성은 `UNKNOWN`; GitHub-only Controller 업데이트, 갱신 후 6 Runner 재연결, `fear-greed-archive-status` 실PC 진단은 아직 미검증.** [Issue #33](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/33)의 최신 실PC 증거와 [Draft PR #37](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/37)을 구분한다. 기존 설치·Startup·원장은 재실행·삭제하지 않는다.
 
 ## 정체성과 승인 경계
 
@@ -38,7 +38,13 @@
 
 유지보수기 수신기와 갱신 실행기는 각각 독립적인 원자적 lease를 사용한다. 긴 갱신 중에도 승인된 6개 유지보수 파일(고정 WMI 진단 VBS 포함)의 설치 SHA-256을 실행 직전에 다시 검증한다. 설치 결과가 불확실할 때 install lease를 복구 대기 상태로 유지하므로 다른 요청이 같은 Controller를 교체하지 않는다. 임의 자동 잠금 삭제·재설치는 금지한다.
 
-## 최초 연결 — 1회만, 운영자로 제한
+## 최초 연결 이력 — 재설치 금지
+
+2026-11-03 로컬 담당자가 유지보수기 `c2458c73…`의 설치와 실행을 확인했다. 아래 절차는 **미설치 당시 승인된 최초 1회 설치 계약의 역사적 기록**으로 보존하며, 현재 PC에서 다시 실행하라는 뜻이 아니다. 설치 확인과 프로세스 독립성 PASS는 별개다. `MAINTENANCE_PROCESS_NOT_INDEPENDENT` 또는 출처 증거 불충분인 동안 새 `pc-maintenance` Issue를 생성하지 않는다. 새 executable/Startup을 적용하는 PR #37은 draft·B 승인 보류이고, in-place 인계는 실제 Windows 독립성 검사·파일별 해시·스냅샷 복구가 검증되기 전에는 차단한다.
+
+동일 범위의 A급 `pc-job` 기존 증거([Issue #38](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/38), [Issue #39](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/39))를 반복 요청하지 않는다. `PASS / CORE_READONLY_DIAGNOSIS`, 실제 Controller SHA `c491d95fdb594a729f08deff68d86e04c18a9544`, Core/Korea/Iran task hash 불변은 **Controller 업데이트 PASS가 아니다**. 업데이트 전 새로 필요한 PC 진입점은 설치된 독립 유지보수기의 출처·부모 체인 read-only 검증이며, 허용목록 우회나 `pc-job`의 임의 명령은 금지한다.
+
+## 과거 최초 연결 절차 — 미설치 당시 1회만, 운영자로 제한
 
 **GitHub에 코드를 병합해도 PC 유지보수 프로세스는 자동 생기지 않는다.** 현재 PC에 독립 접수 진입점이 없으므로 최초 상태는 `AUTOMATION_BLOCKED`다. 이 한 번의 부트스트랩은 기존 A급 `pc-job`에 임의 명령을 싣는 방식으로 우회하지 않는다.
 
