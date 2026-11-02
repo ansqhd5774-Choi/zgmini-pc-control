@@ -136,3 +136,14 @@ test('approved unchanged and below-cadence reasons stay observations, not root-c
  assert.deepEqual(r.archiveTrace.sidecar.candidates.map(x=>x.reason).sort(),['BELOW_APPROVED_15M_CADENCE','UNCHANGED_SOURCE_OBSERVATION']);
  assert.equal(r.archiveTrace.alignment.cause,'UNKNOWN');
 });
+
+test('existing global publication ledger is sanitized and never equated to archive publication',()=>{
+ const f=fixture(),file=path.join(f.dataRoot,'pc-writer','local-publication-ledger.json');
+ fs.writeFileSync(file,JSON.stringify({status:'VERIFIED',at:1793623200000,source:'a'.repeat(40),apiToken:'SECRET_TOKEN_EXAMPLE'}));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ assert.equal(r.archiveTrace.publicationLedger.evidence,'UNATTESTED_LEDGER');
+ assert.equal(r.archiveTrace.publicationLedger.reportedStatus,'VERIFIED');
+ assert.equal(r.archiveTrace.publicationLedger.scope,'GLOBAL_PUBLICATION_ONLY');
+ assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE/);
+});
