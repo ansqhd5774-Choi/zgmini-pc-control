@@ -1,60 +1,156 @@
-' ZGMINI fixed, read-only Windows WMI process ancestry check.
-' Args: the maintainer updater Node PID, existing Runner supervisor PID.
-' Any missing process, WMI error or ambiguous ancestry returns UNKNOWN.
+' ZGMINI read-only Windows WMI proof. All missing/mismatched data fails closed.
+' CAPTURE receiverPID: prove that a live login Startup WScript spawned it.
+' VERIFY updaterPID supervisorPID receiverPID creationDate sessionId ownerSID:
+'   stop at the positively attested receiver, never infer from a dead parent.
 Option Explicit
 On Error Resume Next
 
-If WScript.Arguments.Count <> 2 Then
-  WScript.Echo "UNKNOWN"
-  WScript.Quit 2
-End If
-If Not IsNumeric(WScript.Arguments(0)) Or Not IsNumeric(WScript.Arguments(1)) Then
-  WScript.Echo "UNKNOWN"
-  WScript.Quit 2
+Sub Unknown()
+ WScript.Echo "UNKNOWN"
+ WScript.Quit 2
+End Sub
+
+Function ValidPid(v)
+ ValidPid = False
+ If Not IsNumeric(v) Then Exit Function
+ Err.Clear
+ Dim n
+ n = CLng(v)
+ If Err.Number <> 0 Then Exit Function
+ ValidPid = (n > 0)
+End Function
+
+Function Proc(pid)
+ Dim rows,item
+ Err.Clear
+ Set rows = svc.ExecQuery("SELECT ProcessId,ParentProcessId,CreationDate,ExecutablePath,CommandLine,SessionId FROM Win32_Process WHERE ProcessId=" & CStr(pid))
+ If Err.Number <> 0 Then Set Proc=Nothing : Exit Function
+ If rows.Count <> 1 Or Err.Number <> 0 Then Set Proc=Nothing : Exit Function
+ For Each item In rows
+  Set Proc=item
+ Next
+ If Err.Number <> 0 Then Set Proc=Nothing
+End Function
+
+Function SidOf(item)
+ Dim sid,rc
+ sid=""
+ Err.Clear
+ rc=item.GetOwnerSid(sid)
+ If Err.Number <> 0 Or rc <> 0 Then SidOf="" : Exit Function
+ SidOf=CStr(sid)
+End Function
+
+Function Born(item)
+ Err.Clear
+ Born=CStr(item.CreationDate)
+ If Err.Number <> 0 Then Born="" : Exit Function
+ Dim re
+ Set re=New RegExp
+ re.Pattern="^[0-9]{14}\.[0-9]{6}[+-][0-9]{3}$"
+ If Not re.Test(Born) Or Err.Number <> 0 Then Born=""
+End Function
+
+Function Later(parentBorn,childBorn)
+ ' DMTF timestamps use microseconds and timezone offsets. Comparing only
+ ' seconds may accept a recycled PID within the SAME second. A different
+ ' offset cannot be ordered by lexical comparison: fail closed instead.
+ Later=True
+ If Len(parentBorn)<>25 Or Len(childBorn)<>25 Then Exit Function
+ If Right(parentBorn,4)<>Right(childBorn,4) Then Exit Function
+ Later=(Left(parentBorn,21)>Left(childBorn,21))
+End Function
+
+Function Named(item, name)
+ Dim actual
+ actual=LCase(Replace(CStr(item.ExecutablePath),"/","\"))
+ Named=(Right(actual,Len(name))=LCase(name))
+End Function
+
+Function ApprovedReceiver(item)
+ Dim cmd,bin
+ cmd=LCase(CStr(item.CommandLine))
+ bin=LCase(Replace(CStr(item.ExecutablePath),"/","\"))
+ ApprovedReceiver=(bin="e:\zgmini\runtime\node.exe" _
+   And InStr(cmd,"e:\zgmini\automation\pc-maintenance\tools\maintenance-agent.mjs")>0 _
+   And InStr(cmd,"--poll")>0)
+End Function
+
+Dim svc
+Err.Clear
+Set svc=GetObject("winmgmts:\\.\root\cimv2")
+If Err.Number <> 0 Then Unknown
+
+If WScript.Arguments.Count=2 And UCase(CStr(WScript.Arguments(0)))="CAPTURE" Then
+ Dim receiver,launcher,ancestor,ownerSid,created,session,originPath
+ Dim ancestorPid,childCreated,parentCreated,n,explorerFound
+ If Not ValidPid(WScript.Arguments(1)) Then Unknown
+ Set receiver=Proc(CLng(WScript.Arguments(1)))
+ If receiver Is Nothing Then Unknown
+ If Not ApprovedReceiver(receiver) Then Unknown
+ created=Born(receiver)
+ ownerSid=SidOf(receiver)
+ session=CStr(receiver.SessionId)
+ If created="" Or ownerSid="" Or Not ValidPid(receiver.ParentProcessId) Then Unknown
+ Set launcher=Proc(CLng(receiver.ParentProcessId))
+ If launcher Is Nothing Then Unknown
+ originPath=LCase(CreateObject("WScript.Shell").ExpandEnvironmentStrings("%APPDATA%")) & "\microsoft\windows\start menu\programs\startup\zgmini_pc_maintenance.vbs"
+ If Not Named(launcher,"\wscript.exe") Then Unknown
+ If InStr(LCase(CStr(launcher.CommandLine)),originPath)=0 Then Unknown
+ If SidOf(launcher)<>ownerSid Or CStr(launcher.SessionId)<>session Then Unknown
+ If Born(launcher)="" Or Later(Born(launcher),created) Then Unknown
+ ' Trace the WScript to a same-owner interactive Explorer before that ancestry
+ ' disappears. A Runner intermediary and PID reuse are both disqualifying.
+ ancestorPid=CLng(launcher.ParentProcessId)
+ childCreated=Born(launcher)
+ explorerFound=False
+ For n=1 To 32
+  If Not ValidPid(ancestorPid) Then Unknown
+  Set ancestor=Proc(ancestorPid)
+  If ancestor Is Nothing Then Unknown
+  parentCreated=Born(ancestor)
+  If parentCreated="" Or Later(parentCreated,childCreated) Then Unknown
+  If CStr(ancestor.SessionId)<>session Or SidOf(ancestor)<>ownerSid Then Unknown
+  If Named(ancestor,"\runner.listener.exe") Or Named(ancestor,"\runner.worker.exe") Then Unknown
+  If Named(ancestor,"\explorer.exe") Then explorerFound=True : Exit For
+  ancestorPid=CLng(ancestor.ParentProcessId)
+  childCreated=parentCreated
+ Next
+ If Not explorerFound Then Unknown
+ WScript.Echo "ATTESTED|" & created & "|" & session & "|" & ownerSid
+ WScript.Quit 0
 End If
 
-Dim ownPid, targetPid, svc, rows, item, parentPid, stepNo
-ownPid = CLng(WScript.Arguments(0))
-targetPid = CLng(WScript.Arguments(1))
-If Err.Number <> 0 Or ownPid <= 0 Or targetPid <= 0 Then
-  WScript.Echo "UNKNOWN"
-  WScript.Quit 2
+If WScript.Arguments.Count=7 And UCase(CStr(WScript.Arguments(0)))="VERIFY" Then
+ Dim ownPid,supervisorPid,receiverPid,expectedBorn,expectedSession,expectedSid
+ Dim item,parent,parentPid,bornCurrent,bornParent,i
+ If Not ValidPid(WScript.Arguments(1)) Or Not ValidPid(WScript.Arguments(2)) Or Not ValidPid(WScript.Arguments(3)) Then Unknown
+ ownPid=CLng(WScript.Arguments(1))
+ supervisorPid=CLng(WScript.Arguments(2))
+ receiverPid=CLng(WScript.Arguments(3))
+ expectedBorn=CStr(WScript.Arguments(4))
+ expectedSession=CStr(WScript.Arguments(5))
+ expectedSid=CStr(WScript.Arguments(6))
+ If Len(expectedBorn)<14 Or Len(expectedSid)<8 Then Unknown
+ For i=1 To 32
+  If ownPid=supervisorPid Then WScript.Echo "DESCENDANT" : WScript.Quit 0
+  Set item=Proc(ownPid)
+  If item Is Nothing Then Unknown
+  bornCurrent=Born(item)
+  If bornCurrent="" Then Unknown
+  If ownPid=receiverPid Then
+   If Not ApprovedReceiver(item) Then Unknown
+   If bornCurrent<>expectedBorn Or CStr(item.SessionId)<>expectedSession Or SidOf(item)<>expectedSid Then Unknown
+   WScript.Echo "INDEPENDENT"
+   WScript.Quit 0
+  End If
+  parentPid=CLng(item.ParentProcessId)
+  If Not ValidPid(parentPid) Then Unknown
+  Set parent=Proc(parentPid)
+  If parent Is Nothing Then Unknown
+  bornParent=Born(parent)
+  If bornParent="" Or Later(bornParent,bornCurrent) Then Unknown
+  ownPid=parentPid
+ Next
 End If
-
-Set svc = GetObject("winmgmts:\\.\root\cimv2")
-If Err.Number <> 0 Then
-  WScript.Echo "UNKNOWN"
-  WScript.Quit 2
-End If
-
-For stepNo = 1 To 32
-  If ownPid = targetPid Then
-    WScript.Echo "DESCENDANT"
-    WScript.Quit 0
-  End If
-  Err.Clear
-  Set rows = svc.ExecQuery("SELECT ProcessId,ParentProcessId FROM Win32_Process WHERE ProcessId=" & CStr(ownPid))
-  If Err.Number <> 0 Then
-    WScript.Echo "UNKNOWN"
-    WScript.Quit 2
-  End If
-  If rows.Count <> 1 Or Err.Number <> 0 Then
-    WScript.Echo "UNKNOWN"
-    WScript.Quit 2
-  End If
-  For Each item In rows
-    parentPid = CLng(item.ParentProcessId)
-  Next
-  If Err.Number <> 0 Then
-    WScript.Echo "UNKNOWN"
-    WScript.Quit 2
-  End If
-  If parentPid = 0 Then
-    WScript.Echo "INDEPENDENT"
-    WScript.Quit 0
-  End If
-  ownPid = parentPid
-Next
-
-WScript.Echo "UNKNOWN"
-WScript.Quit 2
+Unknown

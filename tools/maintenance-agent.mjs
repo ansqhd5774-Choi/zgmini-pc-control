@@ -2,7 +2,7 @@
 // Independent, pull-only PC maintainer. Never imported by the Core supervisor.
 // GitHub Issues are requests, not executable commands or approval manifests.
 import crypto from "node:crypto";
-import {execFile as nodeExecFile} from "node:child_process";
+import {execFile as nodeExecFile,execFileSync} from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -599,6 +599,33 @@ function verifyInstalledTools(root){
   }
 }
 
+export function attestReceiverOrigin(root,owner,{platform=process.platform,
+  appData=process.env.APPDATA,
+  cscript=(args)=>execFileSync('cscript.exe',args,{windowsHide:true,
+    encoding:'utf8',timeout:12000,maxBuffer:4096})}={}){
+  if(platform!=='win32'||typeof appData!=='string'||!path.isAbsolute(appData))
+    throw coded('MAINTENANCE_ORIGIN_UNKNOWN');
+  const manifest=JSON.parse(fs.readFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),'utf8'));
+  const startup=path.join(appData,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
+  if(!/^[a-f0-9]{64}$/.test(manifest.startupSha256??'')||
+    sha256(fs.readFileSync(startup))!==manifest.startupSha256)
+    throw coded('MAINTENANCE_ORIGIN_UNKNOWN');
+  const script=path.join(root,'tools/maintenance-ancestry.vbs');
+  let result;
+  try{result=String(cscript(['//NoLogo','//B',script,'CAPTURE',String(owner.pid)])).trim();}
+  catch{throw coded('MAINTENANCE_ORIGIN_UNKNOWN');}
+  const matches=/^ATTESTED\|([0-9]{14}\.[0-9]{6}[+-][0-9]{3})\|([0-9]{1,9})\|(S-1-[0-9-]{4,100})$/.exec(result);
+  if(!matches||owner.pid!==process.pid||!/^[0-9a-f-]{36}$/.test(owner.nonce??''))
+    throw coded('MAINTENANCE_ORIGIN_UNKNOWN');
+  const evidence={schema:'ZGMINI_PC_RECEIVER_ORIGIN_V1',sourceSha:manifest.sourceSha,
+    startupSha256:manifest.startupSha256,pid:owner.pid,nonce:owner.nonce,
+    bootAt:owner.bootAt,created:matches[1],session:matches[2],sid:matches[3],
+    attestedAt:new Date().toISOString()};
+  const dir=path.join(root,'receivers');fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,owner.nonce+'.json'),JSON.stringify(evidence)+'\n',{flag:'wx',mode:0o600});
+  return evidence;
+}
+
 export async function main(args=process.argv.slice(2)){
   const mode=args.length===1&&["--once","--poll"].includes(args[0])?args[0]:null;
   if(!mode)throw coded("MAINTENANCE_USAGE_INVALID");
@@ -608,6 +635,7 @@ export async function main(args=process.argv.slice(2)){
   try{lease=acquireMaintenanceLock(root,'receiver');}
   catch(error){if(error?.code==='MAINTENANCE_LOCK_BUSY_OR_RECOVERY_REQUIRED')return;throw error;}
   try{
+    attestReceiverOrigin(root,lease.owner);
     const agent=createMaintenanceAgent({stateDir:root,verifyInstalledSource:()=>verifyInstalledTools(root)});
     do{
       try{await agent.pollOnce();}

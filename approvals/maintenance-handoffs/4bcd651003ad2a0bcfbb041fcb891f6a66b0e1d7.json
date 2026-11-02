@@ -1,0 +1,29 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "c2458c73e129358813e9099a3eb8e5e77a82d87d",
+  "targetSha": "4bcd651003ad2a0bcfbb041fcb891f6a66b0e1d7",
+  "approved": true,
+  "scope": "STOPPED_RECEIVER_IN_PLACE_ONLY",
+  "approvalBasis": "2026-11-03 user instruction: complete maintenance handoff, real GitHub update, diagnosis and result retrieval",
+  "files": {
+    "tools/maintenance-contract.mjs": "3b52f5a0ff5706a718a0a366fd64f88e9e6fcc1f476727c39136c29b5d84245b",
+    "tools/maintenance-apply.mjs": "f951373ab2ef034d793f6234e244fa0281a3a996bcde9a73d90e03216efd2bf9",
+    "tools/maintenance-agent.mjs": "df3a6793d1269eb2d7f021171437c6d8fe0688e4b73d85868bf7a23dd3428e99",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "c0428a6eb6f88412ffefc00bf0797a33ef38e135af17ab8007f4d0407fc2619c",
+    "tools/maintenance-ancestry.vbs": "2b5b79a8e848c26221703cf63c0bd8543cb03e6ded44d7766eb5a99a982ddaf5",
+    "tools/bootstrap-maintenance.mjs": "1eb3f0977cba49c25c18cab3d4be510cc049fb785ac0799dd109fd622370eba4",
+    "tools/handoff-maintenance.mjs": "7c9548a6ea8407290b17a4bcc7727550ff3cc7e6e7de9c3aeb3c206f287b62b6"
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Core",
+    "Korea",
+    "Iran",
+    "Runner registrations",
+    "SQLite",
+    "D1",
+    "request ledgers"
+  ]
+}
