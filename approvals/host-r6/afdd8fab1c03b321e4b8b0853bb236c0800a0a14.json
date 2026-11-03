@@ -1,0 +1,33 @@
+{
+  "schema": "ZGMINI_R6_HOST_B_APPLY_V1",
+  "scope": "PC_CONTROL_HOST_R6_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/employment-1y-reader-r1",
+  "sourceSha": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+  "sourceManifestSha256": "42afb8fe4f0ecdeb551256ec897bb99b1e850420dd0f5bc7b74ec03db2f46c81",
+  "installedControllerSha": "85147ca761bc8ae9d845ad072ebd84a30377df4e",
+  "hostOriginalSha256": "b9cbbab6a091d67db6022df4c0f68bce38f57c568677f2181fabd49ce7f872ea",
+  "proposedSha256": "ee066974c2a3f3e19cb5e91e982b7cee83f61c9ca4277b9998b9b462b669e405",
+  "hostPath": "E:/ZGmini/automation/pc-control/host.json",
+  "candidatePath": "E:/ZGmini/data/employment-r6-candidate-isolated-20261103/EMPLOYMENT_R6_CANDIDATE.sqlite",
+  "candidateSha256": "ad8fcb8e2db72319475742414e72847cf97f388f09a5984601726d0d8ad32622",
+  "stageBundle": "E:/ZGmini/automation/pc-control/source-bundles/r6-bundle-afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+  "backupDirectory": "E:/ZGmini/automation/pc-control/backups/r6-host-pc-ff66458f-5d9a-4e74-b9ac-8043aa07f289",
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/114",
+    "scope": "PC_CONTROL_HOST_R6_ONLY"
+  },
+  "checks": {
+    "status": "PASS",
+    "sourceManifestSha256": "42afb8fe4f0ecdeb551256ec897bb99b1e850420dd0f5bc7b74ec03db2f46c81",
+    "fileCount": 16
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_HOST_SHA256",
+      "sha256": "b9cbbab6a091d67db6022df4c0f68bce38f57c568677f2181fabd49ce7f872ea"
+    }
+  }
+}
