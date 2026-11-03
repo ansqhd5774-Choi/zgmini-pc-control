@@ -28,6 +28,7 @@ jobs:
       - name: Checkout private B contract
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          clean: false
           persist-credentials: false
       - name: Checkout public publisher main independently
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -36,6 +37,7 @@ jobs:
           ref: main
           fetch-depth: 0
           path: publisher
+          clean: false
           persist-credentials: false
       - name: Verify explicit B approval and run one pinned sidecar
         env:
