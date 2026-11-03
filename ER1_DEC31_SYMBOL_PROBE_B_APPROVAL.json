@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_ER1_DEC31_SYMBOL_PROBE_APPROVAL_V1",
+  "scope": "PC_PRIVATE_EXISTING_EARNINGSAPI_SYMBOL_PROBE_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/zgmini-gpt-workspace-20261025",
+  "sourceSha": "744f95cf8d422fd37d7d736464d39d535b5f7e86",
+  "sourceFile": "scripts/pc-writer/market-calendar-dec31-symbol-probe.mjs",
+  "sourceFileSha256": "74b5c7c39620e0b2779dda8da7a5296101425513b10d5b2099f69213cdaa639b",
+  "symbols": ["BOX", "COST", "ORCL"],
+  "start": "2026-12-01",
+  "end": "2026-12-31",
+  "maxProviderRequests": 3,
+  "maxAutomaticRetries": 0,
+  "allowCoreReadOnly": false,
+  "allowCoreWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowChangesToExisting14DayFeed": false,
+  "allowPublicRawData": false
+}
