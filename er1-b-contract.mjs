@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 export const CONTROL_REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const SOURCE_REPO='ansqhd5774-Choi/zgmini';
 export const ACTOR='ansqhd5774-Choi';
-export const ER1_SOURCE_SHA='e2179295e456a3963e09d82ae282e4ba6848352c';
+export const ER1_SOURCE_SHA='611b3dccf361ce66e78daf0b4108396de7c9101e';
 export const ISSUE_LABEL='pc-er1-approved';
 export const ISSUE_TITLE='pc-er1-approved-one-shot';
 export const OPERATION='er1-saved-score-and-d1-publish-once';
