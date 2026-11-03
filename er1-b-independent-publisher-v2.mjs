@@ -7,7 +7,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
-export const ER1_SHA='e2179295e456a3963e09d82ae282e4ba6848352c';
+export const ER1_SHA='611b3dccf361ce66e78daf0b4108396de7c9101e';
 export const ER1_PUBLIC_KEY='market-calendar:earnings-er1-score-public';
 export const READER_HEADER='ZGMINI-ER1-97';
 export const READER_URL='https://zgmini.kr/api/earnings-calendar-display?start=2026-11-03&end=2026-11-03';
@@ -20,9 +20,9 @@ export const ER1_V2_PRIVATE_FILES=Object.freeze([
  'tools/market-calendar-er1/ER1_PC_OPERATION_V2_ONCE.mjs',
 ]);
 export const ER1_V2_SOURCE_HASHES=Object.freeze({
- 'lib/market-calendar-er1-earnings-score.mjs':'35247642b8c1c7d0efb12e35719fd981386e29da7b32c1138cde92873f916974',
+ 'lib/market-calendar-er1-earnings-score.mjs':'82645cef87dcea9b5039e057e66b2106ca312c55bd61c98b6c4495136e9dd691',
  'lib/market-calendar-er1-public-display.mjs':'710d5fcc30b2506090c04310d4e3cbad12a936e1916eb7ac392c7ead84a0f008',
- 'scripts/pc-writer/market-calendar-er1-saved-score.mjs':'7034185bfeb4237d26d52e7eaa5f65ae21f2b258bf322e8d12669f84aa27eed6',
+ 'scripts/pc-writer/market-calendar-er1-saved-score.mjs':'5c12291439aedce442837f351cde3907e95ad029f3787237901e912bc2abb34b',
  'scripts/pc-writer/d1.mjs':'267fb175386fa007bd74b255d922fba9ee6fe71ffe953f94970beb8ba9d9ff87',
  'scripts/pc-writer/d1-transient.mjs':'f912c335675481f8646380feaebb6241ec0d877b78dbd6fa165e208fdc6d457e',
  'scripts/pc-writer/d1-diagnostics.mjs':'2e9ea54661c51d86798800e532edb10c6796694d3049844ef8b283b7ad6dfe5f',
