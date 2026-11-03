@@ -113,8 +113,13 @@ export function inspectR17Windows(){
   // Require a configured source path AND explicit local-cycle entrypoint.
   const task=execFileSync('schtasks.exe',
    ['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
-   {encoding:'buffer',windowsHide:true,timeout:10000,maxBuffer:262144});
-  const xml=task[1]===0?task.toString('utf16le'):task.toString('utf8');
+   {windowsHide:true,timeout:10000,maxBuffer:262144});
+  const xml=task[0]===255&&task[1]===254?
+   task.toString('utf16le').replace(/^\uFEFF/,''):
+   task[0]===254&&task[1]===255?
+   Buffer.from(task).swap16().toString('utf16le').replace(/^\uFEFF/,''):
+   task.length>=4&&task[1]===0&&task[3]===0?
+   task.toString('utf16le'):task.toString('utf8').replace(/^\uFEFF/,'');
   const wd=xml.match(/<WorkingDirectory>([^<]+)<\/WorkingDirectory>/i)?.[1]??'';
   const args=xml.match(/<Arguments>([^<]+)<\/Arguments>/i)?.[1]??'';
   evidence.taskLinked=path.win32.normalize(wd).toLowerCase()===
