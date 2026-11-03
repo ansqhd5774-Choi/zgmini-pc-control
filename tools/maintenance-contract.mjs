@@ -26,6 +26,34 @@ export const R6_HOST_SCOPE="PC_CONTROL_HOST_R6_ONLY";
 export const R6_HOST_SOURCE_SHA="afdd8fab1c03b321e4b8b0853bb236c0800a0a14";
 export const R6_HOST_SOURCE_MANIFEST_SHA256="42afb8fe4f0ecdeb551256ec897bb99b1e850420dd0f5bc7b74ec03db2f46c81";
 export const R6_HOST_CANDIDATE_SHA256="ad8fcb8e2db72319475742414e72847cf97f388f09a5984601726d0d8ad32622";
+
+/** The existing Controller recovery runbook is not a host B recovery path.
+ * Classify only from freshly read live evidence and persisted BEFORE proofs.
+ * The caller cannot infer installation PASS from a released/held lock alone. */
+export function classifyR6HostRecovery(s){
+ const fail=(code)=>({status:'RECOVERY_REQUIRED',code,action:'INSPECT_NO_MUTATION'});
+ if(s.ledgerStatus!=='RECOVERY_REQUIRED'||s.installLeaseHeld!==true
+   ||s.markerMatches!==true||s.ownerDead!==true)return fail('R6_RECOVERY_OWNER_OR_LEDGER_UNVERIFIED');
+ if(s.protectedSame!==true||s.dbIdentitySame!==true)
+  return fail('R6_RECOVERY_PROTECTED_OR_DB_IDENTITY_DRIFT');
+ if(!['active','disabled_manually'].includes(s.workflowState))
+  return fail('R6_RECOVERY_WORKFLOW_STATE_UNKNOWN');
+ if((s.workflowState==='disabled_manually'||s.pauseAttempted===true)
+   &&s.backlogExists!==true)
+  return fail('R6_RECOVERY_PAUSE_WITHOUT_VERIFIED_BACKLOG');
+ if(s.hostSha256===s.originalSha256)
+  return {status:'ELIGIBLE',code:'R6_RECOVERY_ORIGINAL_HOST_VERIFIED',
+   action:'RECONCILE_INTAKE',hostOutcome:s.rollbackMarkerValid?'ROLLED_BACK':'ORIGINAL_READBACK_NO_APPLY_PASS'};
+ if(s.hostSha256!==s.proposedSha256)return fail('R6_RECOVERY_HOST_SHA_UNKNOWN');
+ if(s.appliedMarkerValid===true)
+  return {status:'ELIGIBLE',code:'R6_RECOVERY_APPLIED_MARKER_VERIFIED',
+   action:'RECONCILE_INTAKE',hostOutcome:'APPLIED'};
+ if(s.backupSha256===s.originalSha256&&s.journalValid===true
+   &&s.workflowState==='disabled_manually')
+  return {status:'ELIGIBLE',code:'R6_RECOVERY_ROLLBACK_BYTES_VERIFIED',
+   action:'ROLLBACK_HOST',hostOutcome:null};
+ return fail('R6_RECOVERY_BACKUP_OR_JOURNAL_NOT_VERIFIED');
+}
 const R6_HOST_MANIFEST_KEYS=["schema","scope","sourceRepository","sourceBranch",
   "sourceSha","sourceManifestSha256","installedControllerSha",
   "hostOriginalSha256","proposedSha256","hostPath","candidatePath",
