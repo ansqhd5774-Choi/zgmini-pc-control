@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "code": "SIX_SUPERVISOR_OWNED_LISTENERS_RECONNECTED",
+  "oldSupervisorPid": 31028,
+  "newSupervisorPid": 536,
+  "oldListenerCount": 6,
+  "runnersOnline": 6,
+  "leaseArchived": true,
+  "controllerSha": "e38c6acd1643e284df157905ce77838298163dbc",
+  "protectedStateUnchanged": true,
+  "controllerFilesUnchanged": true,
+  "providerCalls": 0,
+  "dbD1Writes": 0,
+  "featureOperationsExecuted": 0,
+  "at": "2026-11-03T14:40:12.650Z"
+}
