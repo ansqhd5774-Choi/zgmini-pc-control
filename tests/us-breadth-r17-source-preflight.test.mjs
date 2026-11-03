@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
+import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,diagnoseR17PatchContexts,decodeR17Launcher,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
 
 const valid=()=>({
  head:R17_APPROVED,dirty:false,hashes:{...R17_BASE_FILES},
@@ -25,6 +25,26 @@ test('patch failure diagnostics are bounded codes and never return stderr',()=>{
  assert.equal(report.status,'BLOCKED');
  assert.equal(report.diagnostics.patchCheck,'PATCH_CONTEXT_MISMATCH');
  assert.equal(JSON.stringify(report).includes('TOKEN=NEVER_RETURN'),false);
+});
+test('patch diagnosis returns only five-hunk positions and match booleans, even with CRLF',()=>{
+ const patch='diff --git a/scripts/pc-writer/local-cycle.mjs b/scripts/pc-writer/local-cycle.mjs\n'
+  +'--- a/scripts/pc-writer/local-cycle.mjs\n+++ b/scripts/pc-writer/local-cycle.mjs\n'
+  +'@@ -2,2 +2,3 @@\n two\n-three\n+added\n';
+ const good=diagnoseR17PatchContexts(patch,{'scripts/pc-writer/local-cycle.mjs':'one\r\ntwo\r\nthree\r\n'});
+ assert.deepEqual(good,[{file:'cycle',hunk:'2',oldContextMatches:true}]);
+ const bad=diagnoseR17PatchContexts(patch,{'scripts/pc-writer/local-cycle.mjs':'SECRET\ntwo\nother\n'});
+ assert.deepEqual(bad,[{file:'cycle',hunk:'2',oldContextMatches:false}]);
+ assert.equal(JSON.stringify(bad).includes('SECRET'),false);
+});
+test('VBS decoder accepts BOM UTF-16LE and UTF-16BE without altering bytes',()=>{
+ const script='shell.Run "local-cycle.mjs", 0, True';
+ const le=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(script,'utf16le')]);
+ const be=Buffer.concat([Buffer.from([0xfe,0xff]),Buffer.from(script,'utf16le').swap16()]);
+ assert.equal(decodeR17Launcher(le),script);
+ assert.equal(decodeR17Launcher(be),script);
+ assert.equal(decodeR17Launcher(Buffer.from(script,'utf8')),script);
+ assert.equal(decodeR17Launcher(Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),Buffer.from(script)])),script);
+ assert.deepEqual(Array.from(le.subarray(0,2)),[0xff,0xfe]);
 });
 test('Task-chain diagnostics expose only fixed booleans without changing admission',()=>{
  const action={command:'C:\\Windows\\System32\\wscript.exe',arguments:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs'};
