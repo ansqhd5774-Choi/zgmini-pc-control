@@ -28,8 +28,42 @@ export const R17_VBS_CHAIN=Object.freeze([
  {path:'data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs',
   sha256:'bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01'},
 ]);
-const decoded=bytes=>bytes.length>3&&bytes[1]===0&&bytes[3]===0?
- bytes.toString('utf16le'):bytes.toString('utf8');
+export function decodeR17Launcher(bytes){
+ if(bytes.length>=2&&bytes[0]===0xff&&bytes[1]===0xfe)
+  return bytes.subarray(2).toString('utf16le');
+ if(bytes.length>=2&&bytes[0]===0xfe&&bytes[1]===0xff){
+  const body=Buffer.from(bytes.subarray(2));
+  if(body.length%2!==0)return '';
+  return body.swap16().toString('utf16le');
+ }
+ if(bytes.length>=3&&bytes[0]===0xef&&bytes[1]===0xbb&&bytes[2]===0xbf)
+  return bytes.subarray(3).toString('utf8');
+ if(bytes.length>3&&bytes[1]===0&&bytes[3]===0)return bytes.toString('utf16le');
+ return bytes.toString('utf8');
+}
+
+// Fixed patch-location predicates only; no protected PC source text escapes.
+export function diagnoseR17PatchContexts(patchText,sourceByPath){
+ const sections=patchText.split(/(?=^diff --git )/m).filter(Boolean);
+ return sections.flatMap(section=>{
+  const name=section.match(/^diff --git a\/(\S+) b\/\S+/)?.[1];
+  if(!Object.hasOwn(R17_BASE_FILES,name))return [];
+  const source=sourceByPath[name];
+  const src=typeof source==='string'?source.replace(/\r\n/g,'\n').split('\n'):[];
+  return section.split(/(?=^@@ )/m).slice(1).map(hunk=>{
+   const parts=hunk.split('\n');
+   const old=parts.slice(1).filter(line=>line.startsWith(' ')||line.startsWith('-'))
+    .map(line=>line.slice(1));
+   let exact=false;
+   if(old.length>0)for(let at=0;at<=src.length-old.length;at++){
+    if(old.every((line,i)=>src[at+i]===line)){exact=true;break;}
+   }
+   return {file:name==='scripts/pc-writer/local-cycle.mjs'?'cycle':'publication',
+    hunk:parts[0].match(/^@@\s+-(\d+)/)?.[1]??'UNKNOWN',
+    oldContextMatches:exact};
+  });
+ });
+}
 export function assessR17TaskChain({action,launchers}={}){
  const first=R17_VBS_CHAIN[0],second=R17_VBS_CHAIN[1];
  if(!action||!Array.isArray(launchers)||launchers.length!==2)return false;
@@ -101,6 +135,7 @@ export function summarizeR17Probe(evidence){
   reasons:['R17_PREFLIGHT_INTERRUPTED:'+at],stoppedAt:at}:
   {...report,diagnostics:{patchCheck:evidence?.patchApplies===true?'PASS':
     evidence?.patchFailureCode??'UNVERIFIED',
+   patchContexts:evidence?.patchContexts??null,
    taskChain:evidence?.taskLinked===true?'PASS':evidence?.taskChecks??null}};
 }
 
@@ -149,7 +184,7 @@ export function inspectR17Windows(){
  if(process.platform!=='win32')return {status:'BLOCKED',code:'WINDOWS_REQUIRED'};
  // Exact PR #957 two-file patch travels inside this approved controller module.
  const evidence={head:null,dirty:null,hashes:{},present:{},
-  patchHash:null,patchApplies:false,patchFailureCode:null,quotaContract:false,
+  patchHash:null,patchApplies:false,patchFailureCode:null,patchContexts:null,quotaContract:false,
   taskLinked:false,taskChecks:null,stoppedAt:null};
  let step='SOURCE_ROOT';
  try{
@@ -178,7 +213,12 @@ export function inspectR17Windows(){
   evidence.patchHash=digest(patchBytes);
   if(evidence.patchHash===R17_PATCH_SHA){
    try{git(root,['apply','--check','--whitespace=error','-'],patchBytes);evidence.patchApplies=true;}
-   catch(error){evidence.patchFailureCode=classifyR17PatchFailure(error);}
+   catch(error){
+    evidence.patchFailureCode=classifyR17PatchFailure(error);
+    evidence.patchContexts=diagnoseR17PatchContexts(R17_PATCH_TEXT,
+     Object.fromEntries(Object.keys(R17_BASE_FILES).slice(0,2).map(name=>
+      [name,textAt(root,name).toString('utf8')])));
+   }
   }
   // Only the exact observed VBS chain is admitted. Neither a Task working
   // directory nor a historical checkout by itself establishes live source.
@@ -190,7 +230,7 @@ export function inspectR17Windows(){
   step='VBS_CHAIN';
   const launchers=R17_VBS_CHAIN.map(item=>{
    const bytes=textAt('E:\\ZGmini',item.path,65536);
-   return {sha256:digest(bytes),text:decoded(bytes)};
+   return {sha256:digest(bytes),text:decodeR17Launcher(bytes)};
   });
   evidence.taskChecks=diagnoseR17TaskChain({action,launchers});
   evidence.taskLinked=assessR17TaskChain({action,launchers});
