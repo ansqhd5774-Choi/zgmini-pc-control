@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_ER1_PC_B_RESULT_V1",
+  "requestId": "pc-er1-0fc0da7a-6fab-446a-a9dc-1b09901263fb",
+  "status": "STATE_UNKNOWN",
+  "code": "ER1_B_REPORT_REQUEST_MISMATCH",
+  "d1Writes": "UNKNOWN",
+  "operationalWrites": "UNKNOWN",
+  "providerCalls": 0,
+  "rawEarningsExported": false
+}

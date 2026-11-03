@@ -10,7 +10,8 @@ import {execFileSync,spawn} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- validateControllerConfigTransition,controllerAdmissionForPurpose,
+validateControllerConfigTransition,controllerAdmissionForPurpose,
+ readAllMaintenancePages,validateInfrastructureDelta,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
@@ -122,6 +123,15 @@ function readOwner() {
  need(status.mode==='LISTENING'&&status.children?.length===6,'SUPERVISOR_NOT_HEALTHY');
  return {owner,status};
 }
+function verifyRecoveryOperator(supervisorPid=0){
+ need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'RECOVERY_OPERATOR_REQUIRED');
+ const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
+ for(const [rel,expected]of Object.entries(installed.files??{})){
+  need(/^tools\/[a-z0-9.-]+$/.test(rel)&&sha256(fs.readFileSync(path.join(maintenanceRoot,rel)))===expected,'MAINTENANCE_SELF_DRIFT');
+ }
+ const result=execFileSync('cscript.exe',['//NoLogo',path.join(maintenanceRoot,'tools/maintenance-ancestry.vbs'),'OPERATOR',String(process.pid),String(supervisorPid)],{encoding:'utf8',windowsHide:true,timeout:12000,maxBuffer:4096}).trim();
+ need(result==='INDEPENDENT_OPERATOR','RECOVERY_OPERATOR_NOT_INDEPENDENT');
+}
 
 const hashFiles=(root,files)=>Object.fromEntries(files.map(rel=>[rel,sha256(fs.readFileSync(path.join(root,rel)))]));
 function installedManifest() {
@@ -188,7 +198,7 @@ function protectedSnapshot() {
  return out;
 }
 
-function makePorts(packageData,issueNumber) {
+export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const {issue,manifest}=packageData,request={requestId:issue.requestId,chatId:issue.chatId,
   installedSha:manifest.installedSha,targetSha:manifest.targetSha,postOperation:manifest.postOperation};
  const ledgerFile=path.join(recordDir,request.requestId+'.json');
@@ -241,7 +251,12 @@ function makePorts(packageData,issueNumber) {
    const diff=git(['diff','--name-only',manifest.installedSha,manifest.targetSha,'--']).trim().split(/\r?\n/).filter(Boolean);
    // tools/docs/tests/reports are not deployed into the six Runner host. Changes
    // to a live workflow or executable script still require a different approval.
-   need(!diff.some(p=>p.startsWith('.github/')||p.startsWith('scripts/')),'UNAPPROVED_INFRA_CHANGE');
+   validateInfrastructureDelta(diff,manifest.infrastructureEvidence,rel=>git(['show',manifest.targetSha+':'+rel],{encoding:null}));
+   if(manifest.infrastructureEvidence){
+    const infraPr=github('pulls/'+manifest.infrastructureEvidence.approvalRef.split('/').pop());
+    need(infraPr.merged===true&&validSha(infraPr.merge_commit_sha),'INFRA_APPROVAL_PR_NOT_MERGED');
+    git(['merge-base','--is-ancestor',infraPr.merge_commit_sha,manifest.targetSha]);
+   }
    const changed=diff.filter(p=>p.startsWith('controller/')||p.startsWith('config/')).sort();
    const declared=manifest.allowFiles?.map(x=>x.path).sort();
    need(Array.isArray(declared)&&JSON.stringify(changed)===JSON.stringify(declared),'ALLOWFILE_DIFF_MISMATCH');
@@ -301,6 +316,7 @@ function makePorts(packageData,issueNumber) {
    const host=json(path.join(snapshotRoot,'host.json'));
    need(Object.entries(host.controllerFiles).every(([rel,d])=>sha256(fs.readFileSync(path.join(snapshotRoot,rel)))===d),'BACKUP_VERIFY_FAILED');
    need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
+   writeJson(path.join(backupRoot,'PROTECTED_BEFORE.json'),protectedBefore);
   },
   stopOwnSupervisor:async()=>{
    const current=readOwner();need(current.owner.pid===oldOwner.owner.pid&&current.owner.nonce===oldOwner.owner.nonce,'SUPERVISOR_OWNER_CHANGED');
@@ -364,7 +380,7 @@ function makePorts(packageData,issueNumber) {
      const key=String(original.number);
      if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
      if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
-     const comments=github(`issues/${original.number}/comments?per_page=100`);
+     const comments=readAllMaintenancePages(page=>github(`issues/${original.number}/comments?per_page=100&page=${page}`));
      if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
        state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);continue;
      }
@@ -406,7 +422,7 @@ function makePorts(packageData,issueNumber) {
       need(Number.isSafeInteger(posted.number),'POSTCHECK_OUTCOME_UNKNOWN');postIssueNumber=posted.number;
     }catch{
       try{
-        const list=github('issues?state=all&per_page=100');
+        const list=readAllMaintenancePages(page=>github(`issues?state=all&per_page=100&page=${page}`));
         const found=list.filter(x=>x.title===`PC Update ${issue.requestId} postcheck`&&x.body===body);
         if(found.length===1)postIssueNumber=found[0].number;
       }catch{}
@@ -416,7 +432,7 @@ function makePorts(packageData,issueNumber) {
    }
    for(let n=0;n<100;n++){
     let comments;
-    try{comments=github(`issues/${postIssueNumber}/comments?per_page=100`);}
+    try{comments=readAllMaintenancePages(page=>github(`issues/${postIssueNumber}/comments?per_page=100&page=${page}`));}
     catch{throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});}
     for(const comment of comments){
      if(comment.user?.login!=='github-actions[bot]')continue;
@@ -470,7 +486,7 @@ function makePorts(packageData,issueNumber) {
    if(fs.existsSync(ownerFile)){
     const owner=json(ownerFile);let alive=true;try{process.kill(owner.pid,0);}catch{alive=false;}
     if(alive){
-      const current=readOwner();verifyIndependent(current.owner.pid);
+      const current=readOwner();if(recoveryOperator)verifyRecoveryOperator(current.owner.pid);else verifyIndependent(current.owner.pid);
       need(current.status.sourceSha===manifest.targetSha,'ROLLBACK_SUPERVISOR_SOURCE_UNKNOWN');
       execFileSync('taskkill.exe',['/PID',String(current.owner.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:15000});
       let stopped=false;
@@ -506,13 +522,24 @@ function makePorts(packageData,issueNumber) {
    }
    return JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore??protectedSnapshot());
   },
+  prepareRecovery:async()=>{
+   need(recoveryOperator,'RECOVERY_OPERATOR_REQUIRED');verifyRecoveryOperator();
+   need(fs.existsSync(path.join(backupRoot,'PROTECTED_BEFORE.json')),'RECOVERY_PROTECTION_BASELINE_MISSING');
+   protectedBefore=json(path.join(backupRoot,'PROTECTED_BEFORE.json'));
+   need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
+   const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
+   const wf=github('actions/workflows/pc-job.yml').state;
+   if(windows.some(w=>!w.resumedAt)){
+    need(wf==='disabled_manually','RECOVERY_PAUSE_STATE_UNKNOWN');pausedByUs=true;
+   }else need(wf==='active','RECOVERY_WORKFLOW_STATE_UNKNOWN');
+  },
   inspectAfterUncertain:async()=>({actualControllerSha:installedManifest().installedSha,
    workflowState:github('actions/workflows/pc-job.yml').state,runners:apiRunners().map(x=>({name:x.name,status:x.status,busy:x.busy}))})
  }};
  return result;
 }
 
-function loadApprovedPackage(requestId,file) {
+export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
  const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
  need(path.resolve(file)===path.resolve(expected),'APPROVAL_FILE_PATH');
  const data=json(expected),{issue,manifest,manifestRawBase64}=data;
@@ -528,7 +555,7 @@ function loadApprovedPackage(requestId,file) {
  need(actual.state==='open'&&actual.title==='pc-controller-update','MAINTENANCE_REQUEST_CANCELED');
  need(actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,'MAINTENANCE_LABEL');
  const validated=validateUpdateRequest(issue,raw,{actor:data.actor,
-  controlRepository,installedSha:installedManifest().installedSha});
+  controlRepository,installedSha:recovery?manifest.installedSha:installedManifest().installedSha});
  return {...data,issue:validated.request,manifest:validated.manifest};
 }
 
@@ -1400,14 +1427,18 @@ export async function command(args=process.argv.slice(2)) {
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readMaintenanceRecoveryStatus(requestId);
  }
- need(cmd==='apply'&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
- const data=loadApprovedPackage(requestId,args[4]);
- const {request,ports}=makePorts(data,data.issueNumber);
+ need(['apply','preflight'].includes(cmd)&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
+ let data,request,ports;
+ try{
+ data=loadApprovedPackage(requestId,args[4]);
+ ({request,ports}=makePorts(data,data.issueNumber));
  // Read-only prerequisite checks before taking the shared installation lease.
  // They are repeated by validate under the lease to prevent a stale preflight
  // from granting permission to stop or switch a changed process.
  readOwner();
  installedManifest();
+ }catch(error){error.failureStage='PRE_INSTALL';throw error;}
+ if(cmd==='preflight')return {status:'PASS',code:'PRE_INSTALL_READONLY_VERIFIED',actualControllerSha:installedManifest().installedSha,requestId,installAttempted:false};
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
  let retained=false;
  try{
@@ -1419,5 +1450,6 @@ export async function command(args=process.argv.slice(2)) {
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
- catch(error){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',actualControllerSha:null}));process.exitCode=1;}
+ catch(error){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',failureStage:error.failureStage==='PRE_INSTALL'?'PRE_INSTALL':'UNVERIFIED',actualControllerSha:null}));process.exitCode=1;}
 }
+

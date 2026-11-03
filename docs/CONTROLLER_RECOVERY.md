@@ -46,6 +46,16 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 
 ## 실패 예방
 
+### 부분 전환 중단의 명시적 rollback
+
+`tools/controller-rollback-recovery.mjs`는 설치 전 취소와 다른 고정 경로 복구 도구다. 기존 실패 요청을 재실행하지 않으며 원본 ledger를 덮어쓰지 않는다. BACKED_UP/SUPERVISOR_STOPPED/SWITCHED/RECONNECTED 단계만 대상으로 한다. POSTCHECK_PENDING 이후는 기존 결과 확인으로 돌리고 rollback하지 않는다.
+
+실행에는 `approvals/maintenance-recoveries/<기존요청ID>.rollback.json`의 커밋된 `ZGMINI_PC_ROLLBACK_APPROVAL_V1` 명세가 필요하다. approved, requestId, sourceSha, toolSha256, ledgerSha256, ownerSha256, markerSha256, snapshotHostSha256, protectionSha256과 files를 고정한다. files는 복구 도구/update/maintenance-apply/maintenance-contract/maintenance-lock 5개 파일의 path·sha256이다. Git source와 실제 바이트를 모두 대조한다. 기존 요청의 승인 manifest·요청자·열린 Issue도 재검증한다.
+
+기존 소유자 종료, 별도 복구 예약, Windows 로그인 사용자 독립 계보, 저장된 PROTECTED_BEFORE.json, 현재 보호 상태, 백업 바이트 검증을 모두 통과해야 복구한다. 과거 백업에 보호 기준이 없으면 소급 생성하지 않는다. 복구 시작 전에 실패하면 자체 복구 예약만 해제하고 원래 설치 잠금은 보존한다. 복구를 시작한 뒤 실패하면 복구 예약·원래 잠금과 별도 결과를 보존한다. 검증된 이전 Supervisor·6좌석·보호 상태·접수 재개·backlog 회수 후에만 ROLLED_BACK으로 판정하고 원래 설치 lease를 보관한다.
+
+고정 실행 형식은 `node tools/controller-rollback-recovery.mjs --request-id <원래ID> --source-sha <정확한도구SHA>`다. 담당자가 승인 명세를 채운다. 일반 pc-job 허용목록에 등록된 기능이 아니며, 도구 안전 거부를 우회하는 경로가 아니다. 이번 변경의 복구 시나리오는 격리 시험이며 실제 운영 rollback 완료 증거로 취급하지 않는다.
+
 유지보수기 자체 인계에서는 새 파일/해시/권한/기존 origin proof를 먼저 검증한 뒤 협조 종료를 요청한다. 이미 시작 시 CAPTURE된 수신기는 exact PID·생성시각·SID·세션을 현재 IDENTIFY와 대조한다. 오래된 Explorer 부모 계보를 다시 요구하지 않되 저장 origin proof가 없거나 현재 identity가 다르면 중단한다. IDENTIFY만으로 새 수신기의 origin을 만들 수 없다. 신규 수신기는 기존 전체 CAPTURE 검증을 유지한다.
 
 - update는 Supervisor owner/status와 현재 설치 바이트를 공유 install lease 획득 전에 읽기 전용 확인한다. 실제 validate에서도 재검증한다.

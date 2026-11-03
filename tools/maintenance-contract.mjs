@@ -110,6 +110,7 @@ const CHECK_KEYS=["targetSha","status","manifestSha256"];
 const BACKUP_KEYS=["strategy","rollback"];
 const ROLLBACK_KEYS=["kind","sha"];
 const FILE_KEYS=["path","sha256"];
+const optionalManifestKeys=raw=>[...MANIFEST_KEYS,...['infrastructureEvidence'].filter(k=>Object.hasOwn(raw,k))];
 // The approval pins every deployed file and the updater checks the exact Git
 // diff. New readonly adapters must not require replacing this maintainer just
 // to append another filename. Keep paths confined to controller modules.
@@ -135,6 +136,14 @@ const UUID="[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{
 const REQUEST_ID=new RegExp("^pc-(?:update-)?"+UUID+"$");
 const CHAT_ID=new RegExp("^chat-"+UUID+"$");
 const sha256=value=>createHash("sha256").update(value).digest("hex");
+export function readAllMaintenancePages(readPage,{maxPages=100}={}){
+ const out=[];
+ for(let page=1;page<=maxPages;page++){
+  const rows=readPage(page);if(!Array.isArray(rows))throw Error('PAGINATION_RESPONSE_INVALID');
+  out.push(...rows);if(rows.length<100)return out;
+ }
+ throw Error('PAGINATION_INCOMPLETE');
+}
 
 function requireKeys(object,expected,code){
   if(!object||typeof object!=="object"||Array.isArray(object))throw Error(code);
@@ -341,7 +350,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
   let raw;
   try{raw=JSON.parse(manifestBytes.toString());}
   catch{throw Error("UPDATE_MANIFEST_JSON_INVALID");}
-  requireKeys(raw,MANIFEST_KEYS,"UPDATE_MANIFEST_FIELDS_INVALID");
+  requireKeys(raw,optionalManifestKeys(raw),"UPDATE_MANIFEST_FIELDS_INVALID");
   if(raw.schema!==UPDATE_SCHEMA)throw Error("UPDATE_SCHEMA_NOT_SUPPORTED");
   requireSha(raw.installedSha,"UPDATE_INSTALLED_SHA_INVALID");
   requireSha(raw.targetSha,"UPDATE_TARGET_SHA_INVALID");
@@ -383,6 +392,17 @@ export function validateUpdateRequest(issue,manifestBytes,{
     ||!(/^(?:main|codex\/[a-z0-9][a-z0-9./_-]{2,100})$/.test(raw.postSourceBranch))
     ||raw.postSourceBranch.includes(".."))throw Error("UPDATE_POST_SOURCE_BRANCH_INVALID");
   requireSha(raw.postSourceSha,"UPDATE_POST_SOURCE_SHA_INVALID");
+  if(raw.infrastructureEvidence){
+    const e=raw.infrastructureEvidence;
+    requireKeys(e,['schema','approvalRef','files'],'UPDATE_INFRA_FIELDS_INVALID');
+    if(e.schema!=='ZGMINI_NON_DEPLOYED_INFRA_ACK_V1'||!/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/.test(e.approvalRef)||!Array.isArray(e.files)||!e.files.length)
+      throw Error('UPDATE_INFRA_EVIDENCE_INVALID');
+    const seen=new Set();for(const f of e.files){
+      requireKeys(f,FILE_KEYS,'UPDATE_INFRA_FILE_INVALID');
+      if(!/^(\.github|scripts)\/[a-zA-Z0-9_./-]+$/.test(f.path)||f.path.split('/').some(x=>x==='..'||x==='.')||seen.has(f.path))throw Error('UPDATE_INFRA_FILE_INVALID');
+      requireDigest(f.sha256,'UPDATE_INFRA_HASH_INVALID');seen.add(f.path);
+    }
+  }
   const normalized=Object.freeze({
     schema:UPDATE_SCHEMA,installedSha:raw.installedSha,
     targetSha:raw.targetSha,allowFiles:manifest.files.map(file=>Object.freeze(file)),
@@ -391,6 +411,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
     backup:Object.freeze({strategy:"VERSIONED_SNAPSHOT",rollback:Object.freeze({...raw.backup.rollback})}),
     postOperation:raw.postOperation,postSourceBranch:raw.postSourceBranch,
     postSourceSha:raw.postSourceSha,
+    ...(raw.infrastructureEvidence?{infrastructureEvidence:structuredClone(raw.infrastructureEvidence)}:{}),
   });
   return Object.freeze({request,manifest:normalized});
 }
@@ -399,8 +420,15 @@ export function requestFingerprint(validated){
   // A caller must pass the normalized pair from validateUpdateRequest().
   requireKeys(validated,["request","manifest"],"UPDATE_VALIDATED_PAIR_REQUIRED");
   requireKeys(validated.request,ISSUE_KEYS,"UPDATE_ISSUE_FIELDS_INVALID");
-  requireKeys(validated.manifest,MANIFEST_KEYS,"UPDATE_MANIFEST_FIELDS_INVALID");
+  requireKeys(validated.manifest,optionalManifestKeys(validated.manifest),"UPDATE_MANIFEST_FIELDS_INVALID");
   return sha256(JSON.stringify(validated));
+}
+export function validateInfrastructureDelta(paths,evidence,readBytes){
+ const changed=paths.filter(p=>p.startsWith('.github/')||p.startsWith('scripts/')).sort();
+ if(!changed.length&&!evidence)return true;
+ if(!evidence||JSON.stringify(changed)!==JSON.stringify(evidence.files.map(f=>f.path).sort()))throw Error('UNAPPROVED_INFRA_CHANGE');
+ for(const f of evidence.files)if(sha256(readBytes(f.path))!==f.sha256)throw Error('UPDATE_INFRA_HASH_MISMATCH');
+ return true;
 }
 
 /** Pure idempotency lookup against ONE existing request-ledger record. */
@@ -499,3 +527,4 @@ export function transitionLedger(ledger,event,evidence={}){
   }
   throw Error("UPDATE_TRANSITION_NOT_ALLOWED");
 }
+

@@ -143,3 +143,33 @@ export async function applyApprovedUpdate(request, port) {
     return {...ledger};
   }
 }
+
+// Explicit recovery action. Never resumes installation or overwrites the failed
+// update journal. The caller owns a separate recovery reservation and report.
+export async function reconcileInterruptedRollback(original,port,persist){
+ const phase=original.status==='RECOVERY_REQUIRED'?original.firstFail:original.phase;
+ const out={schema:'ZGMINI_PC_ROLLBACK_RECONCILIATION_V1',requestId:original.requestId,
+  status:'RECOVERY_REQUIRED',originalStatus:original.status,originalPhase:phase,
+  actualInstalledSha:null,originalRequestRetried:false};
+ const record=async(code,patch={})=>{Object.assign(out,{code,...patch,at:new Date().toISOString()});await persist({...out});};
+ if(['POSTCHECK_PENDING','INTAKE_RESUMED','BACKLOG_RECONCILED'].includes(phase)){
+  await record('RECOVERY_WAIT_EXISTING_RESULT');return out;
+ }
+ if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED'].includes(phase)||!['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
+  await record('RECOVERY_PHASE_NOT_ROLLBACK_ELIGIBLE');return out;
+ }
+ try{
+  await port.prepareRecovery();
+  if(await port.verifyBackup(original.installedShaBefore)!==true)throw fail('RECOVERY_BACKUP_NOT_VERIFIED');
+  await record('RECOVERY_BACKUP_VERIFIED');
+  await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
+  await port.restore();await record('RECOVERY_FILES_RESTORED');
+  await port.reconnectPrevious();
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
+  await port.resumeIntake();
+  if(port.reconcileBacklog)await port.reconcileBacklog();
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_FINAL_READBACK_FAILED');
+  await record('INTERRUPTED_ROLLBACK_VERIFIED',{status:'ROLLED_BACK',actualInstalledSha:original.installedShaBefore,protectedStateUnchanged:true});
+ }catch(error){await record(codeOf(error),{status:'RECOVERY_REQUIRED'});}
+ return out;
+}

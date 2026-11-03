@@ -1,0 +1,43 @@
+{
+  "schema": "ZGMINI_PREINSTALL_FAILURE_REPAIR_V1",
+  "status": "PASS",
+  "observedAt": "2026-11-03T14:48:51.731Z",
+  "maintenanceSourceSha": "904b7e39e007f55980a748be45126da52fbd514a",
+  "requestId": "pc-update-5b3ba1fd-54fb-487b-bc95-2d5aeef03af5",
+  "issueNumber": 123,
+  "postIssueNumber": 124,
+  "controllerSha": "090ca40a6fe874734754678264887fe527f5bc65",
+  "reproducedPreInstallCode": "SUPERVISOR_NOT_HEALTHY",
+  "supervisorRecovery": {
+    "status": "PASS",
+    "code": "SIX_SUPERVISOR_OWNED_LISTENERS_RECONNECTED",
+    "oldSupervisorPid": 31028,
+    "newSupervisorPid": 536,
+    "oldListenerCount": 6,
+    "runnersOnline": 6,
+    "leaseArchived": true,
+    "controllerSha": "e38c6acd1643e284df157905ce77838298163dbc",
+    "protectedStateUnchanged": true,
+    "controllerFilesUnchanged": true,
+    "providerCalls": 0,
+    "dbD1Writes": 0,
+    "featureOperationsExecuted": 0,
+    "at": "2026-11-03T14:40:12.650Z"
+  },
+  "actualUpdateStatus": "PASS",
+  "lastPass": "PASS",
+  "installedFilesVerified": true,
+  "protectedStateUnchanged": true,
+  "runnersOnline": 6,
+  "automationState": "HEALTHY",
+  "installLockHeld": false,
+  "dbD1Writes": 0,
+  "providerCalls": 0,
+  "publicDeployments": 0,
+  "tests": {
+    "mainSuitePassed": 147,
+    "followupAgentStatusPassed": 37
+  },
+  "original118and120Failures": "PRESERVED_NOT_RETRIED; historical child error bytes unavailable",
+  "remainingER1": "business binding diagnosis, approved D1 posting, reader deployment not performed"
+}

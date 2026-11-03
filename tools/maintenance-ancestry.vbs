@@ -96,6 +96,33 @@ If WScript.Arguments.Count=2 And UCase(CStr(WScript.Arguments(0)))="IDENTIFY" Th
  WScript.Quit 0
 End If
 
+If WScript.Arguments.Count=3 And UCase(CStr(WScript.Arguments(0)))="OPERATOR" Then
+ Dim operatorPid,forbiddenPid,operatorItem,operatorSid,operatorSession,operatorBorn,operatorNext,k
+ If Not ValidPid(WScript.Arguments(1)) Then Unknown
+ If Not IsNumeric(WScript.Arguments(2)) Then Unknown
+ operatorPid=CLng(WScript.Arguments(1))
+ forbiddenPid=CLng(WScript.Arguments(2))
+ Set operatorItem=Proc(operatorPid)
+ If operatorItem Is Nothing Then Unknown
+ operatorSid=SidOf(operatorItem)
+ operatorSession=CStr(operatorItem.SessionId)
+ operatorBorn=Born(operatorItem)
+ If operatorSid="" Or operatorBorn="" Then Unknown
+ For k=1 To 32
+  If CLng(operatorItem.ProcessId)=forbiddenPid Then Unknown
+  If Named(operatorItem,"\runner.listener.exe") Or Named(operatorItem,"\runner.worker.exe") Then Unknown
+  If CStr(operatorItem.SessionId)<>operatorSession Or SidOf(operatorItem)<>operatorSid Then Unknown
+  If Born(operatorItem)="" Or Later(Born(operatorItem),operatorBorn) Then Unknown
+  If Named(operatorItem,"\explorer.exe") Then WScript.Echo "INDEPENDENT_OPERATOR" : WScript.Quit 0
+  operatorNext=operatorItem.ParentProcessId
+  operatorBorn=Born(operatorItem)
+  If Not ValidPid(operatorNext) Then Unknown
+  Set operatorItem=Proc(CLng(operatorNext))
+  If operatorItem Is Nothing Then Unknown
+ Next
+ Unknown
+End If
+
 If WScript.Arguments.Count=2 And UCase(CStr(WScript.Arguments(0)))="CAPTURE" Then
  Dim receiver,launcher,ancestor,ownerSid,created,session,originPath
  Dim ancestorPid,childCreated,parentCreated,n,explorerFound

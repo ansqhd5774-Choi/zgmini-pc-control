@@ -2,10 +2,21 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {summarizeAutomation} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
- supervisorFresh:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
+ supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
+
+test('online runners without six owned supervisor children are not healthy',()=>{
+ assert.equal(summarizeAutomation({...healthy(),supervisorChildrenVerified:false}).runtimeState,'UNVERIFIED');
+});
 test('healthy Runtime does not claim chat request submission permission',()=>{
  const r=summarizeAutomation(healthy());assert.equal(r.runtimeState,'HEALTHY');
  assert.equal(r.intakeToolPermission,'NOT_TESTED_BY_PC_STATUS');assert.equal(r.updateSuccessProven,false);
+});
+test('healthy Controller with dead maintainer is not healthy whole automation',()=>{
+ const r=summarizeAutomation(healthy());assert.equal(r.controllerState,'HEALTHY');
+ assert.equal(r.maintenanceState,'UNVERIFIED');assert.equal(r.automationState,'PARTIAL_OR_UNVERIFIED');
+ const full=summarizeAutomation({...healthy(),maintenanceFilesVerified:true,receiverIdentityVerified:true,receiverFresh:true,receiverListening:true});
+ assert.equal(full.automationState,'HEALTHY');
+ assert.equal(summarizeAutomation({...healthy(),maintenanceFilesVerified:true,receiverIdentityVerified:true,receiverFresh:false,receiverListening:true}).maintenanceState,'UNVERIFIED');
 });
 test('historical recovery journal without live lock does not block all work',()=>{
  const r=summarizeAutomation({...healthy(),ledger:{status:'RECOVERY_REQUIRED'}});
