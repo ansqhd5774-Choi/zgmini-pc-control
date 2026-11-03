@@ -28,7 +28,9 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   else{report.status='FAIL';report.code='WORKER_RESULT_MISSING';report.firstFail='RESULT_FILE';}
   const after=protectedState(host.dataRoot,{queryTask});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
   need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
-  report.actualExecutionSha=report.result?.actualExecutionSha??host.controllerSourceSha;
+  report.actualExecutionSha=request.operation==='employment-r6-candidate-stage-readonly'
+    ?(report.result?.actualExecutionSha??null)
+    :(report.result?.actualExecutionSha??host.controllerSourceSha);
   report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??report.pcOperationalApprovedSha;
   report.next=report.status==='PASS'?'READ_RESULT_NO_REPEAT':report.status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST':'INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY';
   report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
