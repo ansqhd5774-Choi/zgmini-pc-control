@@ -73,7 +73,7 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\bootstrap-
 
 ## 최초 Fear & Greed 진단 후속
 
-PR #28의 `fear-greed-archive-status`는 실제 업데이트 #44의 자동 사후 진단 #45에서 PASS했고 결과가 회수됐다. 같은 source·환경의 유효한 이 결과는 재사용한다. PC SQLite 아카이브와 Core Task XML/승인 실행기 연결은 읽기 전용이고, 관측 누락의 원인은 결과 증거만으로 판정한다. 데이터 복구·재수집·재게시·D1은 승인 범위 밖이다.
+PR #28의 `fear-greed-archive-status`는 실제 업데이트 #44의 자동 사후 진단 #45에서 PASS했고 결과가 회수됐다. 같은 source·환경의 유효한 이 결과는 재사용한다. 이 사후 진단에서 PC SQLite 아카이브와 Core Task XML/승인 실행기 연결은 읽기 전용이고, 관측 누락의 원인은 결과 증거만으로 판정한다. 데이터 복구·재수집·재게시·D1 쓰기는 이 진단의 범위 밖이며, 다른 업무의 별도 승인까지 금지하는 공통 제한이 아니다.
 
 ## 검증된 Windows 실행·인계 규칙
 

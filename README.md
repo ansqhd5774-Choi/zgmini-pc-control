@@ -12,7 +12,7 @@
 
 일반챗 → `pc-job` Issue JSON → GitHub Actions → 전용 Runner 6개 → 고정 host entry → TXT/JSON·Issue 댓글.
 
-- 기존 공개 zgmini·Core/Korea/Iran·SQLite·D1·자동배포는 이 저장소가 변경하지 않는다.
+- 자동화 인프라 작업만으로 기존 공개 zgmini·Core/Korea/Iran·SQLite·D1·자동배포를 변경하지 않는다. 별도로 승인된 업무의 게시·배포 등은 해당 업무 계약과 검증된 실행 경로를 따른다.
 - Runner별 `_work`, job workspace, TEMP, 결과 및 request 원장을 분리한다.
 - 독립 A급 진단은 병렬 가능하며 heavy 테스트는 별도 lease와 메모리 gate를 사용한다.
 - 임의 CMD/스크립트/테스트 파일/작업 경로를 요청 인수로 받지 않는다.
