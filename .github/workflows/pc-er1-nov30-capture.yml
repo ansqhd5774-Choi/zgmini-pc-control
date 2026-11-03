@@ -1,0 +1,53 @@
+# Single specifically authorized PC-private November 2026 earnings calendar capture.
+# Does not change Core, source install, scheduler, D1, Cloudflare or existing 14-day feed.
+name: ZGMINI ER1 November 30 Private Capture
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-er1-nov30-one-shot
+  cancel-in-progress: false
+jobs:
+  capture:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-nov30-capture-one-shot' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-nov30-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout event-immutable private admission entry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout approved immutable public collector
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 11a971cb5d3514c2d1e1798def58465fb8a74035
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Run reviewed bounded one-shot without GitHub token
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-entry.mjs"'
+      - name: Recover sanitized result as issue comment
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-entry.mjs" --upload'
