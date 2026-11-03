@@ -36,6 +36,7 @@ const PURPOSE_SCOPE=Object.freeze({
   "employment-r6-readonly-adapter":"EMPLOYMENT_R6_READONLY_RUNNER",
   "pc-controller-safety-fix":"PC_CONTROL_CONTROLLER_UPDATE",
   "pc-controller-maintenance":"PC_CONTROL_CONTROLLER_UPDATE",
+  "pc-controller-heavy-readonly":"PC_CONTROL_HEAVY_READONLY_UPDATE",
 });
 const REPORTABLE_FAILURES=new Set([
   "RESOURCE_WAIT_MEMORY","RESOURCE_WAIT_LOCK","LEASE_BUSY","APPROVAL_NOT_FOUND",
@@ -82,7 +83,14 @@ export function manifestFingerprint(files){
 /** Exact approved source changes must not mutate the six-seat controller's
  * operating policy. Even B-grade read-only diagnosis approval does not grant
  * permission to change existing operations, providers or write controls. */
-export function validateControllerConfigTransition(previous,next){
+export function controllerAdmissionForPurpose(purpose){
+  if(purpose==='pc-controller-heavy-readonly')return {resourceProfile:'HEAVY_READONLY_240_1536'};
+  // Historical R6 manifests retain their exact, narrow scope. New features use
+  // the resource profile above, never a new hardcoded operation-name exception.
+  if(purpose==='employment-r6-readonly-adapter')return {resourceProfile:'LEGACY_R6_ONLY'};
+  return {resourceProfile:'LIGHT_READONLY_90'};
+}
+export function validateControllerConfigTransition(previous,next,{resourceProfile='LIGHT_READONLY_90'}={}){
   const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
   if(!object(previous)||!object(next)||!object(previous.operations)||
     !object(next.operations))throw Error('CONTROLLER_CONFIG_INVALID');
@@ -109,14 +117,13 @@ export function validateControllerConfigTransition(previous,next){
       &&definition.grade==='A'&&definition.resource==='light'
       &&Number.isSafeInteger(definition.timeoutSeconds)
       &&definition.timeoutSeconds>=1&&definition.timeoutSeconds<=90;
-    // Explicit, fixed R6 exception: one heavy, bounded, read-only operation.
-    // All other new operations continue to require the A/light contract.
-    const allowedR6=name==='employment-r6-candidate-stage-readonly'
-      &&object(definition)
+    const heavyShape=object(definition)
       &&Object.keys(definition).sort().join(',')==='grade,minimumFreeMiB,resource,timeoutSeconds'
       &&definition.grade==='A'&&definition.resource==='heavy'
       &&definition.timeoutSeconds===240&&definition.minimumFreeMiB===1536;
-    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!(allowedLight||allowedR6)){
+    const approvedHeavy=heavyShape&&(resourceProfile==='HEAVY_READONLY_240_1536'||
+      (resourceProfile==='LEGACY_R6_ONLY'&&name==='employment-r6-candidate-stage-readonly'));
+    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!(allowedLight||approvedHeavy)){
       throw Error('CONTROLLER_NEW_OPERATION_NOT_READONLY_A');
     }
   }

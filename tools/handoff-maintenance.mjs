@@ -117,6 +117,21 @@ export async function main(args=process.argv.slice(2)){
  try{priorProof=read(root+'/receivers/'+priorOwner.nonce+'.json');}
  catch{need(false,'HANDOFF_RECEIVER_ORIGIN_NOT_PROVEN');}
  requireReceiverOrigin(priorOwner,priorProof,before);
+ // Validate replacement bytes and token BEFORE asking the receiver to stop.
+ // A missing file, dirty checkout or elevated operator must leave it running.
+ const startup=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
+ const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});
+ need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'HANDOFF_MEDIUM_TOKEN_REQUIRED');
+ const bytes={};
+ for(const rel of [...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs']){
+  bytes[rel]=git(['show',target+':'+rel]);
+  need(sha(bytes[rel])===approval.files[rel],'HANDOFF_SOURCE_HASH_MISMATCH');
+  need(sha(fs.readFileSync(path.join(repo,rel)))===approval.files[rel],'HANDOFF_CHECKOUT_SOURCE_DRIFT');
+ }
+ const {startupVbs,launchStartup}=await import(pathToFileURL(path.join(repo,'tools/bootstrap-maintenance.mjs')));
+ const startupBytes=Buffer.from(startupVbs());
+ const record=root+'/handoff-'+target+'.json',backup=root+'/backups/handoff-'+target;
+ need(!fs.existsSync(record)&&!fs.existsSync(backup),'HANDOFF_ALREADY_ATTEMPTED');
  const priorAlive=alive(priorOwner.pid);
  need(priorAlive!==null,'HANDOFF_RECEIVER_NOT_PROVEN_STOPPED');
  if(priorAlive===true){
@@ -132,19 +147,6 @@ export async function main(args=process.argv.slice(2)){
   for(let n=0;n<90&&alive(priorOwner.pid)!==false;n++)await new Promise(r=>setTimeout(r,1000));
  }
  requirePriorStopped(priorOwner);
- const startup=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
- const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});
- need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'HANDOFF_MEDIUM_TOKEN_REQUIRED');
- const bytes={};
- for(const rel of [...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs']){
-  bytes[rel]=git(['show',target+':'+rel]);
-  need(sha(bytes[rel])===approval.files[rel],'HANDOFF_SOURCE_HASH_MISMATCH');
-  need(sha(fs.readFileSync(path.join(repo,rel)))===approval.files[rel],'HANDOFF_CHECKOUT_SOURCE_DRIFT');
- }
- const {startupVbs,launchStartup}=await import(pathToFileURL(path.join(repo,'tools/bootstrap-maintenance.mjs')));
- const startupBytes=Buffer.from(startupVbs());
- const record=root+'/handoff-'+target+'.json',backup=root+'/backups/handoff-'+target;
- need(!fs.existsSync(record)&&!fs.existsSync(backup),'HANDOFF_ALREADY_ATTEMPTED');
  // Exact byte snapshots; recovery restores only these approved maintenance files.
  fs.mkdirSync(backup,{recursive:true});
  const snapshot={};

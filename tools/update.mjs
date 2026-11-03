@@ -10,7 +10,7 @@ import {execFileSync,spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- validateControllerConfigTransition} from './maintenance-contract.mjs';
+ validateControllerConfigTransition,controllerAdmissionForPurpose} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
@@ -235,7 +235,7 @@ function makePorts(packageData,issueNumber) {
    need(listing.length>=5&&listing.every(p=>/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p)),'TARGET_TREE_PATH');
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
-   validateControllerConfigTransition(oldOperations,nextOperations);
+   validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
    for(const item of manifest.allowFiles){
     need(/^[a-f0-9]{64}$/.test(item.sha256),'ALLOWFILE_HASH');
     need(sha256(git(['show',manifest.targetSha+':'+item.path],{encoding:null}))===item.sha256,'ALLOWFILE_HASH_MISMATCH');

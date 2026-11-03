@@ -5,7 +5,7 @@ import {test} from "node:test";
 import {
   CONTROL_ACTOR,CONTROL_REPOSITORY,MAINTENANCE_ISSUE_SCHEMA,UPDATE_SCHEMA,
   manifestFingerprint,validateMaintenanceRequest,validateUpdateRequest,
-  validateControllerConfigTransition,
+  validateControllerConfigTransition,controllerAdmissionForPurpose,
   requestFingerprint,dedupeUpdateRequest,newUpdateLedger,transitionLedger,
 } from "../tools/maintenance-contract.mjs";
 
@@ -286,7 +286,7 @@ test("arbitrary uppercase exception text cannot leak through the ledger failure 
   assert.doesNotMatch(JSON.stringify(bad),/PRIVATE_CUSTOMER_SECRET_TOKEN/);
 });
 
-test("single R6 A/heavy exception preserves all other A/light admission gates",()=>{
+test("legacy R6 manifest keeps its narrow scope while default remains light",()=>{
   const previous={schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:CONTROL_REPOSITORY,
     sourceRepository:'ansqhd5774-Choi/zgmini',allowedActors:[CONTROL_ACTOR],
     seats:6,mutationsEnabled:false,maxHeavyJobs:1,
@@ -296,7 +296,9 @@ test("single R6 A/heavy exception preserves all other A/light admission gates",(
   const name='employment-r6-candidate-stage-readonly';
   const policy={grade:'A',resource:'heavy',timeoutSeconds:240,minimumFreeMiB:1536};
   next.operations[name]=policy;
-  assert.equal(validateControllerConfigTransition(previous,next),true);
+  const legacy=controllerAdmissionForPurpose('employment-r6-readonly-adapter');
+  assert.equal(validateControllerConfigTransition(previous,next,legacy),true);
+  assert.throws(()=>validateControllerConfigTransition(previous,next),/CONTROLLER_NEW_OPERATION_NOT_READONLY_A/);
   const cases=[
     ['other name',other=>{other.operations['employment-r6-candidate-stage']={...policy};delete other.operations[name];}],
     ['wrong grade',other=>{other.operations[name].grade='B';}],
@@ -311,7 +313,7 @@ test("single R6 A/heavy exception preserves all other A/light admission gates",(
   ];
   for(const [label,change] of cases){
     const altered=clone(next);change(altered);
-    assert.throws(()=>validateControllerConfigTransition(previous,altered),
+    assert.throws(()=>validateControllerConfigTransition(previous,altered,legacy),
       /CONTROLLER_NEW_OPERATION_NOT_READONLY_A/,label);
   }
   const writes=clone(next);writes.mutationsEnabled=true;
@@ -323,4 +325,27 @@ test("single R6 A/heavy exception preserves all other A/light admission gates",(
   const mutateExisting=clone(next);mutateExisting.operations['core-status'].timeoutSeconds=90;
   assert.throws(()=>validateControllerConfigTransition(previous,mutateExisting),
     /CONTROLLER_EXISTING_OPERATION_CHANGED/);
+});
+
+test('common signed heavy purpose accepts multiple feature names without changing shared safety policy',()=>{
+ const previous={seats:6,mutationsEnabled:false,maxHeavyJobs:1,minimumFreeMiBForHeavy:1536,
+  operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60}}};
+ const next=clone(previous);
+ for(const name of ['theme-history-readonly','market-snapshot-audit','employment-r6-candidate-stage-readonly'])
+  next.operations[name]={grade:'A',resource:'heavy',timeoutSeconds:240,minimumFreeMiB:1536};
+ const profile=controllerAdmissionForPurpose('pc-controller-heavy-readonly');
+ assert.equal(validateControllerConfigTransition(previous,next,profile),true);
+ for(const patch of [{grade:'B'},{timeoutSeconds:241},{minimumFreeMiB:1024},{command:'shell'}]){
+  const bad=clone(next);Object.assign(bad.operations['theme-history-readonly'],patch);
+  assert.throws(()=>validateControllerConfigTransition(previous,bad,profile),/CONTROLLER_NEW_OPERATION_NOT_READONLY_A/);
+ }
+ const bad=clone(next);bad.maxHeavyJobs=2;
+ assert.throws(()=>validateControllerConfigTransition(previous,bad,profile),/CONTROLLER_CONFIG_PROTECTED_POLICY_CHANGED/);
+});
+test('common heavy purpose requires its exact B scope and raw manifest pin',()=>{
+ const f=fixture();f.manifest.purpose='pc-controller-heavy-readonly';
+ f.manifest.approval.scope='PC_CONTROL_HEAVY_READONLY_UPDATE';repin(f);
+ assert.equal(admitted(f).manifest.purpose,'pc-controller-heavy-readonly');
+ f.manifest.approval.scope='PC_CONTROL_CONTROLLER_UPDATE';repin(f);
+ assert.throws(()=>admitted(f),/UPDATE_B_APPROVAL_REQUIRED/);
 });

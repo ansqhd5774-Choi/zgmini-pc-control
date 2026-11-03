@@ -12,7 +12,13 @@
 - 원본 A급 `pc-job` Issue의 7필드 계약은 그대로 둔다. `controller-update`를 그 안에 추가하지 않는다. 임의 CMD/SQL/다운로드 URL/경로를 받지 않는다.
 - 신규 `pc-maintenance` Issue는 **갱신 요청**일 뿐 자동 승인 근거가 아니다. 별도 B급 승인 manifest의 raw SHA-256과 실제 설치 SHA, merged PR, Git 이력과 변경 파일별 해시를 모두 확인한다.
 - Controller 실행 파일 갱신은 현재 계약상 **모두 명시적 B급 승인 manifest**가 필요하다. 운영 source·DB/D1·게시·스케줄은 이 경로로 갱신할 수 없다.
-- **B급 읽기 전용 승인도 기존 Controller 운영정책 변경 승인이 아니다.** 6좌석, `mutationsEnabled=false`, 기존 operation 정의, actor/source 및 공통 설정 필드는 이전 설치값과 완전히 같아야 한다. 추가 operation은 제한된 A급/light 진단만 허용한다.
+- **기존 안전 정책은 유지한다.** 6좌석, `mutationsEnabled=false`, 기존 operation 정의, actor/source 및 공통 설정 필드는 이전 설치값과 완전히 같아야 한다. 기본 갱신은 A/light·90초 이하만 허용한다. 중량 읽기 전용 등록은 기능명별 새 예외 대신 아래 공통 승인 프로필을 사용한다. 현재 설치 버전의 지원 여부는 실제 파일로 확인한다.
+
+## 공통 자원 프로필
+
+새 heavy 등록은 manifest의 purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`를 사용한다. 요청 envelope에 임의 권한 필드를 추가하지 않는다. 이 프로필은 A/heavy·240초·최소 가용 1536MiB의 기존 검증된 자원 계약을 재사용하며, 동시 heavy 수·actor·기존 operation·쓰기 비활성 정책을 변경하지 않는다. 여러 기능명을 같은 프로필로 검증하므로 기능을 추가할 때마다 유지보수기 코드를 바꾸지 않는다. 다른 자원 등급은 별도의 공통 프로필 검증 대상이며 임의 숫자를 허용하지 않는다.
+
+기존 `employment-r6-readonly-adapter` 목적의 manifest는 과거 한정 계약 호환으로 보존한다. 이를 신규 기능의 공통 승인으로 사용하지 않는다. 실행기 등록은 정확한 소스/파일 해시/테스트/승인 manifest를 계속 요구하며, 프로필 승인만으로 임의 모듈을 실행하지 않는다.
 
 ## 통신 구조
 
