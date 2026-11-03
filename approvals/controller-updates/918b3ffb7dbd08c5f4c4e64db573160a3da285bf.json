@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "bf5c9b278d6beb609598c973e12dd5ba55a11013",
+  "targetSha": "918b3ffb7dbd08c5f4c4e64db573160a3da285bf",
+  "allowFiles": [
+    {
+      "path": "controller/fear-greed-archive-readonly.mjs",
+      "sha256": "2b17ba6f86825111a7f50170e0e5fdbbfc56449e7810cae723eb18f4eb5a21bf"
+    }
+  ],
+  "purpose": "fear-greed-archive-status",
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/78",
+    "scope": "FEAR_GREED_ARCHIVE_READONLY"
+  },
+  "checks": {
+    "targetSha": "918b3ffb7dbd08c5f4c4e64db573160a3da285bf",
+    "status": "PASS",
+    "manifestSha256": "6c8b487ca6bbfc3983f9673a94a5125faea57fd0f0c5d6c2a6b1640e3ae97b89"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "bf5c9b278d6beb609598c973e12dd5ba55a11013"
+    }
+  },
+  "postOperation": "fear-greed-archive-status",
+  "postSourceBranch": "codex/usa-fear-greed-change-only-r10-20261101",
+  "postSourceSha": "22cd306670e0d58f2e150387e576ede9eb74551e"
+}
