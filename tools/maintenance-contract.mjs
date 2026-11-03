@@ -18,6 +18,21 @@ const ISSUE_KEYS=[
   "schema","requestId","chatId","operation","controlRepository",
   "targetControllerSha","approvalManifestSha256",
 ];
+// Independent B-grade host registration. The ordinary controller-update issue
+// and its eleven-field manifest remain unchanged.
+export const R6_HOST_OPERATION="employment-r6-host-register";
+export const R6_HOST_SCHEMA="ZGMINI_R6_HOST_B_APPLY_V1";
+export const R6_HOST_SCOPE="PC_CONTROL_HOST_R6_ONLY";
+export const R6_HOST_SOURCE_SHA="afdd8fab1c03b321e4b8b0853bb236c0800a0a14";
+export const R6_HOST_SOURCE_MANIFEST_SHA256="42afb8fe4f0ecdeb551256ec897bb99b1e850420dd0f5bc7b74ec03db2f46c81";
+export const R6_HOST_CANDIDATE_SHA256="ad8fcb8e2db72319475742414e72847cf97f388f09a5984601726d0d8ad32622";
+const R6_HOST_MANIFEST_KEYS=["schema","scope","sourceRepository","sourceBranch",
+  "sourceSha","sourceManifestSha256","installedControllerSha",
+  "hostOriginalSha256","proposedSha256","hostPath","candidatePath",
+  "candidateSha256","stageBundle","backupDirectory","approval","checks","backup"];
+const R6_HOST_CHECK_KEYS=["status","sourceManifestSha256","fileCount"];
+const R6_HOST_BACKUP_KEYS=["strategy","rollback"];
+const R6_HOST_ROLLBACK_KEYS=["kind","sha256"];
 const MANIFEST_KEYS=[
   "schema","installedSha","targetSha","allowFiles","purpose","approval",
   "checks","backup","postOperation","postSourceBranch","postSourceSha",
@@ -151,6 +166,92 @@ export function validateMaintenanceRequest(request,{
   requireSha(request.targetControllerSha,"UPDATE_TARGET_SHA_INVALID");
   requireDigest(request.approvalManifestSha256,"UPDATE_MANIFEST_PIN_INVALID");
   return Object.freeze({...request});
+}
+
+/** Strict pre-admission for the single, pinned R6 host B request. The seven
+ * Issue keys deliberately match controller-update but the operation differs;
+ * this function cannot authorize a Controller switch or arbitrary commands. */
+export function validateR6HostIssueEnvelope(request,{
+  controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+}={}){
+  if(controlRepository!==CONTROL_REPOSITORY||request?.controlRepository!==CONTROL_REPOSITORY)
+    throw Error("R6_HOST_CONTROL_REPOSITORY_NOT_ALLOWED");
+  if(actor!==CONTROL_ACTOR||!Array.isArray(allowedActors)
+    ||!allowedActors.includes(CONTROL_ACTOR))throw Error("R6_HOST_ACTOR_NOT_ALLOWED");
+  requireKeys(request,ISSUE_KEYS,"R6_HOST_ISSUE_FIELDS_INVALID");
+  if(request.schema!==MAINTENANCE_ISSUE_SCHEMA)throw Error("R6_HOST_ISSUE_SCHEMA_INVALID");
+  requireString(request.requestId,REQUEST_ID,"R6_HOST_REQUEST_ID_INVALID");
+  requireString(request.chatId,CHAT_ID,"R6_HOST_CHAT_ID_INVALID");
+  if(request.operation!==R6_HOST_OPERATION)throw Error("R6_HOST_OPERATION_NOT_ALLOWED");
+  requireSha(request.targetControllerSha,"R6_HOST_TARGET_CONTROLLER_SHA_INVALID");
+  requireDigest(request.approvalManifestSha256,"R6_HOST_MANIFEST_PIN_INVALID");
+  return Object.freeze({...request});
+}
+
+/** Validate a GitHub-main approved manifest's *raw bytes*, then pin it to the
+ * live installed Controller SHA supplied independently by the maintainer.
+ * Windows ownership, active lease, source readback, PR merge status and host
+ * byte CAS MUST still be verified by the B-grade updater at execution time. */
+export function validateR6HostRegistrationRequest(request,manifestBytes,{
+  controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+  installedSha=null,
+}={}){
+  const approvedRequest=validateR6HostIssueEnvelope(request,
+    {controlRepository,actor,allowedActors});
+  if(!SHA40.test(String(installedSha??""))||installedSha!==approvedRequest.targetControllerSha)
+    throw Error("R6_HOST_INSTALLED_CONTROLLER_SHA_DRIFT");
+  if(!(typeof manifestBytes==="string"||Buffer.isBuffer(manifestBytes)))
+    throw Error("R6_HOST_MANIFEST_BYTES_REQUIRED");
+  const bytes=Buffer.isBuffer(manifestBytes)?manifestBytes:Buffer.from(manifestBytes,"utf8");
+  if(bytes.length===0||bytes.length>32768)throw Error("R6_HOST_MANIFEST_TOO_LARGE");
+  if(sha256(bytes)!==approvedRequest.approvalManifestSha256)
+    throw Error("R6_HOST_MANIFEST_PIN_MISMATCH");
+  let manifest;
+  try{manifest=JSON.parse(bytes.toString("utf8"));}
+  catch{throw Error("R6_HOST_MANIFEST_JSON_INVALID");}
+  requireKeys(manifest,R6_HOST_MANIFEST_KEYS,"R6_HOST_MANIFEST_FIELDS_INVALID");
+  if(manifest.schema!==R6_HOST_SCHEMA||manifest.scope!==R6_HOST_SCOPE)
+    throw Error("R6_HOST_MANIFEST_SCHEMA_OR_SCOPE_INVALID");
+  if(manifest.sourceRepository!=="ansqhd5774-Choi/zgmini"
+    ||manifest.sourceBranch!=="codex/employment-1y-reader-r1"
+    ||manifest.sourceSha!==R6_HOST_SOURCE_SHA
+    ||manifest.sourceManifestSha256!==R6_HOST_SOURCE_MANIFEST_SHA256)
+    throw Error("R6_HOST_SOURCE_PIN_MISMATCH");
+  if(manifest.installedControllerSha!==installedSha)
+    throw Error("R6_HOST_INSTALLED_CONTROLLER_SHA_DRIFT");
+  requireDigest(manifest.hostOriginalSha256,"R6_HOST_ORIGINAL_SHA_INVALID");
+  requireDigest(manifest.proposedSha256,"R6_HOST_PROPOSED_SHA_INVALID");
+  if(manifest.hostOriginalSha256===manifest.proposedSha256)
+    throw Error("R6_HOST_NO_EFFECT_OR_INVALID_PROPOSAL");
+  if(manifest.candidateSha256!==R6_HOST_CANDIDATE_SHA256)
+    throw Error("R6_HOST_CANDIDATE_SHA_MISMATCH");
+  const fixedHost="E:/ZGmini/automation/pc-control/host.json";
+  const fixedCandidate="E:/ZGmini/data/employment-r6-candidate-isolated-20261103/EMPLOYMENT_R6_CANDIDATE.sqlite";
+  const fixedStage=`E:/ZGmini/automation/pc-control/source-bundles/r6-bundle-${R6_HOST_SOURCE_SHA}`;
+  const fixedBackup=`E:/ZGmini/automation/pc-control/backups/r6-host-${approvedRequest.requestId}`;
+  if(manifest.hostPath!==fixedHost||manifest.candidatePath!==fixedCandidate
+    ||manifest.stageBundle!==fixedStage||manifest.backupDirectory!==fixedBackup)
+    throw Error("R6_HOST_PATH_SCOPE_INVALID");
+  requireKeys(manifest.approval,APPROVAL_KEYS,"R6_HOST_APPROVAL_FIELDS_INVALID");
+  if(manifest.approval.grade!=="B"||manifest.approval.scope!==R6_HOST_SCOPE
+    ||!/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/.test(manifest.approval.ref))
+    throw Error("R6_HOST_B_APPROVAL_REQUIRED");
+  requireKeys(manifest.checks,R6_HOST_CHECK_KEYS,"R6_HOST_CHECKS_FIELDS_INVALID");
+  if(manifest.checks.status!=="PASS"||manifest.checks.fileCount!==16
+    ||manifest.checks.sourceManifestSha256!==R6_HOST_SOURCE_MANIFEST_SHA256)
+    throw Error("R6_HOST_SOURCE_CHECKS_NOT_VERIFIED");
+  requireKeys(manifest.backup,R6_HOST_BACKUP_KEYS,"R6_HOST_BACKUP_FIELDS_INVALID");
+  requireKeys(manifest.backup.rollback,R6_HOST_ROLLBACK_KEYS,"R6_HOST_ROLLBACK_FIELDS_INVALID");
+  if(manifest.backup.strategy!=="VERSIONED_SNAPSHOT"
+    ||manifest.backup.rollback.kind!=="RESTORE_HOST_SHA256"
+    ||manifest.backup.rollback.sha256!==manifest.hostOriginalSha256)
+    throw Error("R6_HOST_ROLLBACK_CONTRACT_INVALID");
+  return Object.freeze({request:approvedRequest,manifest:Object.freeze({
+    ...manifest,approval:Object.freeze({...manifest.approval}),
+    checks:Object.freeze({...manifest.checks}),
+    backup:Object.freeze({...manifest.backup,
+      rollback:Object.freeze({...manifest.backup.rollback})}),
+  })});
 }
 
 /**
