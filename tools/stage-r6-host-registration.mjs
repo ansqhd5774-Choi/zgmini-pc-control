@@ -101,21 +101,50 @@ function buildR6HostOverlay({installedHost,sourceFiles,manifestBytes,
 
   const stageBundle=path.join(stageRoot,'r6-bundle-'+sourceSha);
   requireWithin(stageRoot,stageBundle,'R6_STAGE_PATH_ESCAPE');
-  if(fs.existsSync(stageBundle))stop('R6_STAGE_ALREADY_EXISTS');
-  // Existing installed bundle paths never enter the write loop.
-  fs.mkdirSync(stageBundle,{recursive:false});
-  fs.mkdirSync(path.join(stageBundle,'source'));
-  requireRealDirectory(stageBundle,'R6_STAGE_CREATED_ALIAS');
-  for(const rel of R6_SOURCE_FILES){
-    const dest=path.join(stageBundle,'source',rel);
-    requireWithin(path.join(stageBundle,'source'),dest,'R6_SOURCE_STAGE_ESCAPE');
-    fs.mkdirSync(path.dirname(dest),{recursive:true});
-    requireRealDirectory(path.dirname(dest),'R6_SOURCE_PARENT_ALIAS');
-    fs.writeFileSync(dest,sourceFiles[rel],{flag:'wx'});
-    if(hash(fs.readFileSync(dest))!==manifestFiles[rel])stop('R6_STAGE_FILE_READBACK_MISMATCH');
+  if(fs.existsSync(stageBundle)){
+    // A prior B attempt may have stopped after sealing source but before its
+    // host CAS. Reuse only a complete, byte-identical, non-junction bundle;
+    // never execute or overwrite unknown or partially staged contents.
+    requireRealDirectory(stageBundle,'R6_EXISTING_STAGE_ALIAS');
+    requireRealDirectory(path.join(stageBundle,'source'),'R6_EXISTING_SOURCE_ALIAS');
+    const files=[];
+    const walk=dir=>{
+      for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+        const name=path.join(dir,entry.name);
+        if(entry.isSymbolicLink())stop('R6_EXISTING_STAGE_ALIAS');
+        if(entry.isDirectory()){
+          requireRealDirectory(name,'R6_EXISTING_STAGE_ALIAS');walk(name);
+        }else if(entry.isFile())files.push(path.relative(stageBundle,name).replace(/\\/g,'/'));
+        else stop('R6_EXISTING_STAGE_NON_REGULAR');
+      }
+    };
+    walk(stageBundle);
+    const expected=['manifest.json',...R6_SOURCE_FILES.map(rel=>'source/'+rel)].sort();
+    if(!sameEntries(files,expected))stop('R6_EXISTING_STAGE_FILES_CHANGED');
+    if(!fs.readFileSync(path.join(stageBundle,'manifest.json')).equals(manifestBytes))
+      stop('R6_EXISTING_MANIFEST_DRIFT');
+    for(const rel of R6_SOURCE_FILES){
+      const dest=path.join(stageBundle,'source',rel);
+      if(!fs.readFileSync(dest).equals(sourceFiles[rel])
+        ||hash(fs.readFileSync(dest))!==manifestFiles[rel])
+        stop('R6_EXISTING_SOURCE_DRIFT');
+    }
+  }else{
+    // Existing installed bundle paths never enter the write loop.
+    fs.mkdirSync(stageBundle,{recursive:false});
+    fs.mkdirSync(path.join(stageBundle,'source'));
+    requireRealDirectory(stageBundle,'R6_STAGE_CREATED_ALIAS');
+    for(const rel of R6_SOURCE_FILES){
+      const dest=path.join(stageBundle,'source',rel);
+      requireWithin(path.join(stageBundle,'source'),dest,'R6_SOURCE_STAGE_ESCAPE');
+      fs.mkdirSync(path.dirname(dest),{recursive:true});
+      requireRealDirectory(path.dirname(dest),'R6_SOURCE_PARENT_ALIAS');
+      fs.writeFileSync(dest,sourceFiles[rel],{flag:'wx'});
+      if(hash(fs.readFileSync(dest))!==manifestFiles[rel])stop('R6_STAGE_FILE_READBACK_MISMATCH');
+    }
+    // The runner's R6 validator checks the SHA-256 of these exact bytes.
+    fs.writeFileSync(path.join(stageBundle,'manifest.json'),manifestBytes,{flag:'wx'});
   }
-  // The runner's R6 validator checks the SHA-256 of these exact bytes.
-  fs.writeFileSync(path.join(stageBundle,'manifest.json'),manifestBytes,{flag:'wx'});
   const rawManifestHash=hash(fs.readFileSync(path.join(stageBundle,'manifest.json')));
 
   // Preserve existing approvedSources, controllerFiles, seat/operation settings.
