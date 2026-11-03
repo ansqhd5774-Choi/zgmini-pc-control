@@ -104,11 +104,19 @@ export function validateControllerConfigTransition(previous,next){
   }
   for(const [name,definition] of Object.entries(next.operations)){
     if(Object.hasOwn(previous.operations,name))continue;
-    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!object(definition)||
-      Object.keys(definition).sort().join(',')!=='grade,resource,timeoutSeconds'||
-      definition.grade!=='A'||definition.resource!=='light'||
-      !Number.isSafeInteger(definition.timeoutSeconds)||
-      definition.timeoutSeconds<1||definition.timeoutSeconds>90){
+    const allowedLight=object(definition)
+      &&Object.keys(definition).sort().join(',')==='grade,resource,timeoutSeconds'
+      &&definition.grade==='A'&&definition.resource==='light'
+      &&Number.isSafeInteger(definition.timeoutSeconds)
+      &&definition.timeoutSeconds>=1&&definition.timeoutSeconds<=90;
+    // Explicit, fixed R6 exception: one heavy, bounded, read-only operation.
+    // All other new operations continue to require the A/light contract.
+    const allowedR6=name==='employment-r6-candidate-stage-readonly'
+      &&object(definition)
+      &&Object.keys(definition).sort().join(',')==='grade,minimumFreeMiB,resource,timeoutSeconds'
+      &&definition.grade==='A'&&definition.resource==='heavy'
+      &&definition.timeoutSeconds===240&&definition.minimumFreeMiB===1536;
+    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!(allowedLight||allowedR6)){
       throw Error('CONTROLLER_NEW_OPERATION_NOT_READONLY_A');
     }
   }

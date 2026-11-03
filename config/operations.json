@@ -18,7 +18,8 @@
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
     "failure-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
-    "timeout-proof": {"grade":"A","timeoutSeconds":5,"resource":"light"}
+    "timeout-proof": {"grade":"A","timeoutSeconds":5,"resource":"light"},
+    "employment-r6-candidate-stage-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536}
   },
   "mutationsEnabled": false,
   "maxHeavyJobs": 1,
