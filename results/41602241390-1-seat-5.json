@@ -1,0 +1,246 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-41602241390-1-seat-5",
+  "requestId": "pc-update-b4d22705-4bfd-44ba-bf55-e9b5eab0fa84-postcheck",
+  "startedAt": "2026-11-03T08:18:04.515Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "cafe339993dd2468e2c21f6322687e9dae62d6d0",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "22cd306670e0d58f2e150387e576ede9eb74551e",
+  "sourceBranch": "codex/usa-fear-greed-change-only-r10-20261101",
+  "operation": "fear-greed-archive-status",
+  "seat": 5,
+  "status": "PASS",
+  "code": "FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-e56745b1-e0bf-40e4-b917-a1fce563d446",
+  "pcOperationalApprovedSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS",
+    "task": {
+      "hasExecAction": true,
+      "commandBase": "wscript.exe",
+      "actionSha256": "c80e02f58b1e118189cd7d2c63df56a3d0b1fb94a793f6dfe62041714fab0f3a",
+      "referencedScripts": [
+        {
+          "relativePath": "ZGmini/data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+          "exists": true,
+          "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+          "references": {
+            "archiveRun": true,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+          "exists": true,
+          "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+          "exists": true,
+          "sha256": "04770152c01d4584fe3ee1b0166fc718718656b95cb3639680a6f23fe75191de",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+          "exists": true,
+          "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        }
+      ]
+    },
+    "local": {
+      "sqliteOpened": true,
+      "status": "READ",
+      "currentPublic": {
+        "status": "verified",
+        "score": 22.7285714285714,
+        "observedAt": "2026-11-03T01:00:00.000Z",
+        "storedAt": 1793692807730
+      },
+      "original": {
+        "status": "READ",
+        "days": 1,
+        "pointCount": 1,
+        "latest": {
+          "date": "2026-10-30",
+          "count": 1,
+          "lastAt": "2026-10-30T23:59:48.000Z",
+          "storedAt": 1793443731294
+        },
+        "recentDates": [
+          {
+            "date": "2026-10-30",
+            "count": 1,
+            "lastAt": "2026-10-30T23:59:48.000Z",
+            "storedAt": 1793443731294
+          }
+        ]
+      },
+      "checks": {
+        "status": "READ",
+        "days": 1,
+        "pointCount": 1,
+        "latest": {
+          "date": "2026-11-01",
+          "count": 1,
+          "lastAt": "2026-11-01T11:30:08.551Z",
+          "storedAt": 1793532608551
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-01",
+            "count": 1,
+            "lastAt": "2026-11-01T11:30:08.551Z",
+            "storedAt": 1793532608551
+          }
+        ]
+      },
+      "composite": {
+        "status": "READ",
+        "days": 1,
+        "pointCount": 1,
+        "latest": {
+          "date": "2026-10-31",
+          "count": 1,
+          "lastAt": "2026-10-31T10:45:07.750Z",
+          "storedAt": 1793443507750
+        },
+        "recentDates": [
+          {
+            "date": "2026-10-31",
+            "count": 1,
+            "lastAt": "2026-10-31T10:45:07.750Z",
+            "storedAt": 1793443507750
+          }
+        ]
+      }
+    },
+    "archiveTrace": {
+      "alignment": {
+        "status": "HISTORY_DIVERGENCE",
+        "currentObservedNewerThanOriginal": true,
+        "currentStoredNewerThanCheck": true,
+        "cause": "UNKNOWN"
+      },
+      "sidecar": {
+        "evidence": "OBSERVED_UNATTESTED",
+        "candidates": [
+          {
+            "name": "last-run.json",
+            "evidence": "UNATTESTED_LEDGER",
+            "sha256": "e5db21772066a2e67b1ab6afab4fb882291001a9c96bc84be251d450aecd4048",
+            "modifiedAt": "2026-11-03T08:17:10.994Z",
+            "reportedStatus": "BLOCKED",
+            "code": null,
+            "lastPass": null,
+            "firstFail": null,
+            "reason": null,
+            "at": "2026-11-03T08:17:10.858Z",
+            "failureHints": {
+              "evidence": "UNATTESTED_CATEGORICAL_HINTS",
+              "hasStage": false,
+              "hasError": false,
+              "hasReason": true,
+              "categories": [
+                "SOURCE_OR_APPROVAL"
+              ],
+              "reportedBlockSubtype": "UNKNOWN"
+            },
+            "reportedShaRelation": {
+              "evidence": "UNATTESTED_LEDGER_FIELDS",
+              "actualPresent": false,
+              "approvedPresent": false,
+              "relation": "UNKNOWN"
+            }
+          }
+        ]
+      },
+      "sidecarSourceGate": {
+        "evidence": "UNATTESTED_STATIC_SOURCE_AND_LEDGER",
+        "scriptStatus": [
+          {
+            "file": "archive-run.mjs",
+            "status": "MATCH",
+            "modifiedAfterLedger": false
+          },
+          {
+            "file": "run-original-then-archive.vbs",
+            "status": "MATCH",
+            "modifiedAfterLedger": false
+          }
+        ],
+        "ledgerStatus": "READ",
+        "sameLedgerSnapshot": true,
+        "reasonShape": "STRING",
+        "reasonConcepts": [
+          "SOURCE",
+          "SHA"
+        ],
+        "matchingErrorSite": "NONE",
+        "matchedScript": null,
+        "siteLine": null,
+        "gatePatternCategories": [
+          "ARCHIVE_LAUNCH_REFERENCE",
+          "CLEAN_TREE_REFERENCE",
+          "GIT_REFERENCE"
+        ],
+        "matchedGateCategories": [],
+        "operationalWrites": 0,
+        "providerCalls": 0,
+        "d1Writes": 0
+      },
+      "publicationLedger": {
+        "evidence": "UNATTESTED_LEDGER",
+        "reportedStatus": "VERIFIED",
+        "at": "2026-11-03T08:16:26.734Z",
+        "modifiedAt": "2026-11-03T08:16:26.735Z",
+        "sha256": "2c1a256e88b7e2ddaf74dd4d2557fccb8be4abfea1548f508a3697b813a66a90",
+        "scope": "GLOBAL_PUBLICATION_ONLY"
+      }
+    },
+    "sqliteOpened": true,
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "scope": "READ_ONLY_NO_PROVIDER_NO_PUBLICATION"
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "protectedAfterSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "actualExecutionSha": "cafe339993dd2468e2c21f6322687e9dae62d6d0",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-03T08:18:05.167Z",
+  "durationMs": 652
+}

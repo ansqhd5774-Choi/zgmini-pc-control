@@ -3,6 +3,7 @@ import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
+import {inspectR17Windows} from './us-breadth-r17-preflight.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
@@ -31,6 +32,7 @@ export async function runOperation(request,context){
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
  if(request.operation==='alpaca-quota-readonly')return inspectAlpacaQuotaReadonly(dataRoot);
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
+ if(request.operation==='us-breadth-r17-preflight')return inspectR17Windows();
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
