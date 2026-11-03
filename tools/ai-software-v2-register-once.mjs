@@ -21,6 +21,14 @@ export const DATA_ROOT=String.raw`E:\ZGmini\data`;
 export const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
 export const LEDGER=String.raw`E:\ZGmini\automation\ai-software-v2-registration`;
 export const RESERVATION='results/ai-software-v2-register-once-reservation.json';
+// The approved V2 source was checked out on Windows with CRLF conversion.
+// Hashes below were compared against that exact source checkout and PC bytes.
+const ACTIVE_V2=Object.freeze({
+ sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',
+ version:'0b1ed5d35888b0e0',
+ cliSha256:'7dcca351145966ece41a4ee19f948e3362cc3b13a593031f672535c6405bbf39',
+ registrySha256:'0e592dc1a414ebb40be635c371af551580155a51bfc6e7c45d6c227885dc963c',
+});
 const EXPECTED_LOGIN='ansqhd5774-Choi';
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
@@ -142,6 +150,48 @@ function readActiveConfiguredDiagnostic(home){
    activeCliSha256:hash(cli),activeRegistrySha256:hash(registry)};
  }catch{return {activeRuntimeProbe:'READ_ONLY_PROBE_UNAVAILABLE'};}
 }
+export function validateActiveUpgradeReceipt(receipt,oldVersion,activeVersion){
+ requireCheck(receipt?.status==='CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED'&&
+  receipt.sourceSha===ACTIVE_V2.sourceSha&&receipt.oldVersion===oldVersion&&
+  receipt.newVersion===activeVersion&&receipt.newVersion===ACTIVE_V2.version&&
+  receipt.installedManifest&&Object.getPrototypeOf(receipt.installedManifest)===Object.prototype,
+  'AI_V2_ACTIVE_UPGRADE_RECEIPT_DENIED');
+ const entries=validatedManifestEntries(receipt.installedManifest);
+ requireCheck(hash(JSON.stringify(receipt.installedManifest)).slice(0,16)===activeVersion&&
+  receipt.installedManifest['scripts/pc-writer/theme-config-tool.mjs']===ACTIVE_V2.cliSha256&&
+  receipt.installedManifest['scripts/pc-writer/theme-config-registry.mjs']===ACTIVE_V2.registrySha256,
+  'AI_V2_ACTIVE_UPGRADE_MANIFEST_DENIED');
+ return entries;
+}
+function verifiedActiveCommonTool(home,oldVersion,active){
+ requireCheck(active.activeRuntimeProbe==='LINKED'&&
+  active.activeToolVersion===ACTIVE_V2.version&&
+  active.activeCliRegisterMarker===true&&active.activeRegistryV2Marker===true&&
+  active.activeCliSha256===ACTIVE_V2.cliSha256&&
+  active.activeRegistrySha256===ACTIVE_V2.registrySha256,
+  'AI_V2_ACTIVE_SOURCE_BYTES_DENIED');
+ const receipts=fs.readdirSync(home).filter(name=>
+  /^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\.json$/.test(name)).sort();
+ requireCheck(receipts.length>0&&receipts.length<=12,'AI_V2_ACTIVE_UPGRADE_RECEIPT_MISSING');
+ let verified=null;
+ for(const name of receipts){
+  let receipt;try{receipt=JSON.parse(requireFile(path.join(home,name),{maxBytes:100_000}).toString('utf8'));}catch{continue;}
+  try{verified=validateActiveUpgradeReceipt(receipt,oldVersion,active.activeToolVersion);break;}catch{}
+ }
+ requireCheck(Boolean(verified),'AI_V2_ACTIVE_UPGRADE_RECEIPT_UNVERIFIED');
+ const root=requireDirectory(path.join(home,'versions',active.activeToolVersion));
+ for(const [relative,sha] of verified){
+  const file=path.resolve(root,...relative.split('/'));
+  requireCheck(file.toLowerCase().startsWith(root.toLowerCase()+path.sep)&&
+   fs.realpathSync.native(file).toLowerCase().startsWith(root.toLowerCase()+path.sep),
+   'AI_V2_ACTIVE_PATH_ESCAPE');
+  requireCheck(hash(requireFile(file,{maxBytes:2_000_000}))===sha,
+   'AI_V2_ACTIVE_MANIFEST_FILE_DRIFT');
+ }
+ requireFile(NODE,{maxBytes:200_000_000});
+ return {cli:path.join(root,'scripts','pc-writer','theme-config-tool.mjs'),
+  installSourceSha:ACTIVE_V2.sourceSha,version:active.activeToolVersion};
+}
 function assertCheckout({workspace,env}){
  requireCheck(process.platform==='win32'&&typeof workspace==='string'&&
   path.win32.isAbsolute(workspace)&&SHA40.test(env?.GITHUB_SHA??''),
@@ -205,14 +255,16 @@ function installedCommonTool(){
  const flags=inspectInstalledCapability(fs.readFileSync(cli,'utf8'),
   fs.readFileSync(path.join(root,...registryRelative.split('/')),'utf8'));
  if(!flags.cliRegisterMarker||!flags.registryV2Marker){
-  const err=new Error('AI_V2_COMMON_V2_CAPABILITY_MISSING');
-  err.code='AI_V2_COMMON_V2_CAPABILITY_MISSING';
-  err.diagnostic={installedToolSourceSha:install.sourceSha,
-   installedToolVersion:install.version,
-   cliManifestSha256:install.manifest[cliRelative],
-   registryManifestSha256:install.manifest[registryRelative],...flags,
-   ...readActiveConfiguredDiagnostic(home)};
-  throw err;
+  const active=readActiveConfiguredDiagnostic(home);
+  try{return verifiedActiveCommonTool(home,install.version,active)}catch(e){
+   const err=new Error(e?.code??'AI_V2_COMMON_V2_CAPABILITY_MISSING');
+   err.code=/^AI_V2_[A-Z0-9_]+$/.test(e?.code??'')?e.code:'AI_V2_COMMON_V2_CAPABILITY_MISSING';
+   err.diagnostic={installedToolSourceSha:install.sourceSha,
+    installedToolVersion:install.version,
+    cliManifestSha256:install.manifest[cliRelative],
+    registryManifestSha256:install.manifest[registryRelative],...flags,...active};
+   throw err;
+  }
  }
  requireFile(NODE,{maxBytes:200_000_000});
  return {cli,installSourceSha:install.sourceSha,version:install.version};
