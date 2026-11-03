@@ -108,6 +108,10 @@ function staticQuotaContract(root){
   /withAlpacaLock/.test(ledgerText)&&
   /alpacaReserve/.test(ledgerText);
 }
+export function isTrackedSourceDirty(status){
+ return typeof status==='string'?status.trim().length>0:null;
+}
+
 /**
  * Live PC invocation is deliberate and read-only. This code cannot be called
  * through existing pc-job or pc-maintenance contracts; a separate reviewed,
@@ -127,7 +131,7 @@ export function inspectR17Windows(){
   step='GIT_HEAD';
   evidence.head=git(root,['rev-parse','--verify','HEAD']).trim().toLowerCase();
   step='GIT_STATUS';
-  evidence.dirty=git(root,['status','--porcelain','--untracked-files=no']).trim()==='';
+  evidence.dirty=isTrackedSourceDirty(git(root,['status','--porcelain','--untracked-files=no']));
   step='BASE_FILE_HASHES';
   for(const name of Object.keys(R17_BASE_FILES))
    evidence.hashes[name]=digest(textAt(root,name));
