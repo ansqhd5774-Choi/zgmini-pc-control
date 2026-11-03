@@ -104,39 +104,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
    }
   }
  }catch{} // Missing/malformed historical checkpoint is not a fresh runtime failure.
- if(!sourceRoot){
-  // Historical 2026-10-31 Core checkout from the approved E: storage runbook.
-  // Inspect exactly this candidate, not arbitrary project folders. Its presence
-  // alone never proves the current registered Core launcher executes it.
-  const historical=path.join(root,'projects','zgmini-earnings-history-pc-release');
-  try{
-   const real=realpath(historical);
-   if(inside(real)&&exists(path.join(real,'.git'))&&
-      exists(path.join(real,'scripts','pc-writer','local-cycle.mjs'))){
-    const candidate={
-     evidenceLevel:'HISTORICAL_CHECKOUT_CANDIDATE_ONLY',
-     sourceRoot:relative(real),sourceHead:null,trackedDirty:null,requiredFiles:[],
-    };
-    try{
-     const head=git(real,['rev-parse','HEAD']).trim();
-     if(/^[0-9a-f]{40}$/.test(head))candidate.sourceHead=head;
-     const dirty=git(real,['status','--porcelain','--untracked-files=no']);
-     candidate.trackedDirty=dirty.split(/\r?\n/).filter(Boolean).map(x=>x.slice(3)).slice(0,30);
-    }catch{} // Cannot infer a current runtime SHA from Git failure.
-    for(const name of sourceFiles){
-     const file=path.join(real,...name.split('/'));
-     let safe=null;try{safe=realpath(file);}catch{}
-     const existsInside=!!safe&&inside(safe)&&exists(safe);
-     candidate.requiredFiles.push({
-      path:name,exists:existsInside,
-      sha256:existsInside&&fs.statSync(safe).size<=1048576?sha256(read(safe)):null,
-     });
-    }
-    result.historicalCheckoutCandidate=candidate;
-   }
-  }catch{}
-  return result;
- }
+ if(!sourceRoot)return result;
 
  try{
   result.sourceHead=git(sourceRoot,['rev-parse','HEAD']).trim();
