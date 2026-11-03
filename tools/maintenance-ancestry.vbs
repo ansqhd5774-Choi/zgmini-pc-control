@@ -81,6 +81,21 @@ Err.Clear
 Set svc=GetObject("winmgmts:\\.\root\cimv2")
 If Err.Number <> 0 Then Unknown
 
+If WScript.Arguments.Count=2 And UCase(CStr(WScript.Arguments(0)))="IDENTIFY" Then
+ Dim existing,existingBorn,existingSid
+ If Not ValidPid(WScript.Arguments(1)) Then Unknown
+ Set existing=Proc(CLng(WScript.Arguments(1)))
+ If existing Is Nothing Then Unknown
+ If Not ApprovedReceiver(existing) Then Unknown
+ existingBorn=Born(existing)
+ existingSid=SidOf(existing)
+ If existingBorn="" Or existingSid="" Then Unknown
+ ' Identity only. The caller must match a previously captured origin proof.
+ ' This mode must NEVER establish the origin of a new receiver.
+ WScript.Echo "IDENTIFIED|" & existingBorn & "|" & CStr(existing.SessionId) & "|" & existingSid
+ WScript.Quit 0
+End If
+
 If WScript.Arguments.Count=2 And UCase(CStr(WScript.Arguments(0)))="CAPTURE" Then
  Dim receiver,launcher,ancestor,ownerSid,created,session,originPath
  Dim ancestorPid,childCreated,parentCreated,n,explorerFound

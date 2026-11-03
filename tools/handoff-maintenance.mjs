@@ -42,6 +42,11 @@ export function requireNewReceiverOrigin(prior,priorProof,current,proof,installe
    &&currentAfter?.pid===current.pid&&currentAfter?.nonce===current.nonce,
    'HANDOFF_NEW_RECEIVER_NOT_PROVEN');
 }
+export function requireCurrentReceiverIdentity(prior,proof,installed,identity){
+ requireReceiverOrigin(prior,proof,installed);
+ need(typeof identity==='string'&&identity.trim()===`IDENTIFIED|${proof.created}|${proof.session}|${proof.sid}`,
+   'HANDOFF_RECEIVER_IDENTITY_NOT_PROVEN');
+}
 // Reserve the empty receiver lease directory atomically only after its former
 // process is proven dead. A recovery marker prevents stale-lease reclamation if
 // this operator exits before the exact files and startup have been switched.
@@ -137,12 +142,15 @@ export async function main(args=process.argv.slice(2)){
  if(priorAlive===true){
   need(before.capabilities?.cooperativeStop===true
     &&approval.scope==='COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE','HANDOFF_RECEIVER_NOT_PROVEN_STOPPED');
-  let capture=null;
-  try{capture=execFileSync('C:/Windows/System32/cscript.exe',
-    ['//NoLogo',root+'/tools/maintenance-ancestry.vbs','CAPTURE',String(priorOwner.pid)],
+  let identity=null;
+  // New pinned helper is hash-verified above. It checks only the current
+  // receiver identity against its original startup proof. Explorer ancestry
+  // may legitimately have vanished since that proof was captured.
+  try{identity=execFileSync('C:/Windows/System32/cscript.exe',
+    ['//NoLogo',path.join(repo,'tools/maintenance-ancestry.vbs'),'IDENTIFY',String(priorOwner.pid)],
     {encoding:'utf8',windowsHide:true});}
-  catch{need(false,'HANDOFF_RECEIVER_ORIGIN_NOT_PROVEN');}
-  requireReceiverOrigin(priorOwner,priorProof,before,capture);
+  catch{need(false,'HANDOFF_RECEIVER_IDENTITY_NOT_PROVEN');}
+  requireCurrentReceiverIdentity(priorOwner,priorProof,before,identity);
   fs.writeFileSync(root+'/STOP_REQUEST.json',JSON.stringify({schema:'ZGMINI_MAINTENANCE_STOP_V1',pid:priorOwner.pid,nonce:priorOwner.nonce,sourceSha:before.sourceSha}),{flag:'wx'});
   for(let n=0;n<90&&alive(priorOwner.pid)!==false;n++)await new Promise(r=>setTimeout(r,1000));
  }

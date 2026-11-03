@@ -1,12 +1,19 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
-import {requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,reserveReceiverSlot,reservationFailureStatus,rollbackStatus}from'../tools/handoff-maintenance.mjs';
+import {requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus}from'../tools/handoff-maintenance.mjs';
 import {acquireMaintenanceLock}from'../tools/maintenance-lock.mjs';
 const prior={pid:123,nonce:'11111111-2222-3333-4444-555555555555',bootAt:1700000000000};
 const installed={sourceSha:'a'.repeat(40),startupSha256:'b'.repeat(64)};
 const proof={schema:'ZGMINI_PC_RECEIVER_ORIGIN_V1',pid:123,nonce:prior.nonce,
  bootAt:prior.bootAt,sourceSha:installed.sourceSha,startupSha256:installed.startupSha256,
  created:'20261103072233.123456+540',session:1,sid:'S-1-5-21-123456-789012'};
+test('existing receiver uses captured origin plus exact current identity without rewalking retired parent',()=>{
+ const identity=`IDENTIFIED|${proof.created}|${proof.session}|${proof.sid}`;
+ assert.doesNotThrow(()=>requireCurrentReceiverIdentity(prior,proof,installed,identity));
+ for(const bad of ['UNKNOWN',identity.replace('.123456','.123457'),identity.replace('|1|','|2|'),identity.replace(proof.sid,'S-1-5-21-999')])
+  assert.throws(()=>requireCurrentReceiverIdentity(prior,proof,installed,bad),/HANDOFF_RECEIVER_IDENTITY_NOT_PROVEN/);
+ assert.throws(()=>requireCurrentReceiverIdentity(prior,null,installed,identity),/HANDOFF_RECEIVER_ORIGIN_NOT_PROVEN/);
+});
 test('missing, invalid, active and uncertain receiver ownership fail closed',()=>{
  for(const item of [null,undefined,{}, {pid:0,nonce:prior.nonce},{pid:123},
    {...prior,nonce:'../forged'}])assert.throws(()=>requireStopped(item,()=>false),/NOT_PROVEN_STOPPED/);

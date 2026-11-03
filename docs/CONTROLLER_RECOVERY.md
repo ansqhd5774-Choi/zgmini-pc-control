@@ -46,6 +46,8 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 
 ## 실패 예방
 
+유지보수기 자체 인계에서는 새 파일/해시/권한/기존 origin proof를 먼저 검증한 뒤 협조 종료를 요청한다. 이미 시작 시 CAPTURE된 수신기는 exact PID·생성시각·SID·세션을 현재 IDENTIFY와 대조한다. 오래된 Explorer 부모 계보를 다시 요구하지 않되 저장 origin proof가 없거나 현재 identity가 다르면 중단한다. IDENTIFY만으로 새 수신기의 origin을 만들 수 없다. 신규 수신기는 기존 전체 CAPTURE 검증을 유지한다.
+
 - update는 Supervisor owner/status와 현재 설치 바이트를 공유 install lease 획득 전에 읽기 전용 확인한다. 실제 validate에서도 재검증한다.
 - intake pause를 시도하지 않은 실패에서 존재하지 않는 backlog를 요구하지 않는다. pause를 시도했다면 통신 ACK 실패를 포함해 원장을 반드시 대조한다.
 - 상태머신은 failureOperation과 원래 code를 함께 남긴다. ENOENT만으로 대상 경로나 원인을 확정하지 않는다.
