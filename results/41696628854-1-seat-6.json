@@ -1,0 +1,60 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-41696628854-1-seat-6",
+  "requestId": "pc-2d10bf39-d122-41e4-995d-95d4c88e5d7d",
+  "startedAt": "2026-11-03T18:44:20.665Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "93eff5bd5ab296bb5b3edba7200d659b1ab3dae4",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "65f6812e353d682d7da68ffb65636a55336c7340",
+  "sourceBranch": "main",
+  "operation": "us-breadth-r17-preflight",
+  "seat": 6,
+  "status": "BLOCKED",
+  "code": "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-61d276d6-7407-4635-9d4e-20748f4dece1",
+  "pcOperationalApprovedSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "exitCode": 0,
+  "result": {
+    "status": "BLOCKED",
+    "code": "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+    "reasons": [
+      "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+      "LOCAL_ALPACA_GUARD_UNVERIFIED",
+      "CORE_TASK_SOURCE_LINK_UNVERIFIED"
+    ],
+    "sourceHead": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+    "checkedExistingFiles": 3,
+    "checkedNewFiles": 3,
+    "runtimeSourceVerified": false,
+    "canInstall": false,
+    "providerCalls": 0,
+    "sqliteWrites": 0,
+    "d1Writes": 0,
+    "diagnostics": {
+      "patchCheck": "PATCH_CONTEXT_MISMATCH",
+      "taskChain": {
+        "commandWscript": true,
+        "expectedLauncherArgument": true,
+        "firstLauncherHash": true,
+        "secondLauncherHash": true,
+        "firstHop": true,
+        "secondHop": false
+      }
+    }
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "protectedAfterSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "actualExecutionSha": "93eff5bd5ab296bb5b3edba7200d659b1ab3dae4",
+  "next": "RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST",
+  "finishedAt": "2026-11-03T18:44:22.553Z",
+  "durationMs": 1888
+}
