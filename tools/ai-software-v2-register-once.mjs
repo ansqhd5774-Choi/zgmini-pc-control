@@ -173,12 +173,23 @@ function verifiedActiveCommonTool(home,oldVersion,active){
  const receipts=fs.readdirSync(home).filter(name=>
   /^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\.json$/.test(name)).sort();
  requireCheck(receipts.length>0&&receipts.length<=12,'AI_V2_ACTIVE_UPGRADE_RECEIPT_MISSING');
- let verified=null;
+ let verified=null,receiptProbe='NO_MATCHING_UPGRADE_RECEIPT';
  for(const name of receipts){
   let receipt;try{receipt=JSON.parse(requireFile(path.join(home,name),{maxBytes:100_000}).toString('utf8'));}catch{continue;}
-  try{verified=validateActiveUpgradeReceipt(receipt,oldVersion,active.activeToolVersion);break;}catch{}
+  receiptProbe=[
+   receipt?.status==='CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED'?'STATUS_OK':'STATUS_DIFFERENT',
+   receipt?.sourceSha===ACTIVE_V2.sourceSha?'SOURCE_OK':'SOURCE_DIFFERENT',
+   receipt?.oldVersion===oldVersion?'OLD_VERSION_OK':'OLD_VERSION_DIFFERENT',
+   receipt?.newVersion===active.activeToolVersion?'ACTIVE_VERSION_OK':'ACTIVE_VERSION_DIFFERENT',
+   receipt?.installedManifest&&typeof receipt.installedManifest==='object'?'MANIFEST_PRESENT':'MANIFEST_MISSING',
+  ].join('_');
+  try{verified=validateActiveUpgradeReceipt(receipt,oldVersion,active.activeToolVersion);break;}
+  catch(e){if(/^AI_V2_[A-Z0-9_]+$/.test(e?.code??''))receiptProbe+='_'+e.code;}
  }
- requireCheck(Boolean(verified),'AI_V2_ACTIVE_UPGRADE_RECEIPT_UNVERIFIED');
+ if(!verified){const error=new Error('AI_V2_ACTIVE_UPGRADE_RECEIPT_UNVERIFIED');
+  error.code='AI_V2_ACTIVE_UPGRADE_RECEIPT_UNVERIFIED';
+  error.diagnostic={activeReceiptCount:receipts.length,activeReceiptProbe:receiptProbe};
+  throw error;}
  const root=requireDirectory(path.join(home,'versions',active.activeToolVersion));
  for(const [relative,sha] of verified){
   const file=path.resolve(root,...relative.split('/'));
@@ -262,7 +273,7 @@ function installedCommonTool(){
    err.diagnostic={installedToolSourceSha:install.sourceSha,
     installedToolVersion:install.version,
     cliManifestSha256:install.manifest[cliRelative],
-    registryManifestSha256:install.manifest[registryRelative],...flags,...active};
+    registryManifestSha256:install.manifest[registryRelative],...flags,...active,...(e?.diagnostic??{})};
    throw err;
   }
  }
@@ -409,6 +420,8 @@ async function uploadReport(event,env){
   activeRegistryV2Marker:typeof report.activeRegistryV2Marker==='boolean'?report.activeRegistryV2Marker:null,
   activeCliSha256:SHA64.test(report.activeCliSha256??'')?report.activeCliSha256:null,
   activeRegistrySha256:SHA64.test(report.activeRegistrySha256??'')?report.activeRegistrySha256:null,
+  activeReceiptCount:Number.isSafeInteger(report.activeReceiptCount)?report.activeReceiptCount:null,
+  activeReceiptProbe:/^[A-Z0-9_]{1,260}$/.test(report.activeReceiptProbe??'')?report.activeReceiptProbe:null,
   providerCalls:0,d1Writes:0,schedulerWrites:0,publicWrites:0,
   registered:report.status==='PASS',next:report.status==='PASS'?'PRIVATE_PLAN_AND_STORED_CYCLE':
    'INSPECT_PC_REGISTRATION_BEFORE_ANY_RETRY'};
