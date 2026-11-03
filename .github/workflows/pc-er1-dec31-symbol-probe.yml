@@ -1,0 +1,56 @@
+# Owner-authorized single isolated symbol API probe, never a full calendar backfill.
+name: ZGMINI ER1 December Symbol Probe
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-er1-dec31-symbol-probe-one-shot
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-dec31-symbol-probe-one-shot' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout immutable control approval
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout pinned reviewed symbol probe
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 744f95cf8d422fd37d7d736464d39d535b5f7e86
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Execute three-call PC-private probe without GitHub token
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-symbol-probe-entry.mjs"'
+      - name: Upload sanitized outcome only
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-symbol-probe-entry.mjs" --upload'
