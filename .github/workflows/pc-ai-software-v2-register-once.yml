@@ -1,0 +1,54 @@
+# One reviewed B-grade private-registration attempt. No generic pc-job mutation.
+name: ZGMINI AI Software V2 Register Private Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Global create-only attempt reservation + sanitized TXT/JSON.
+  issues: write # Sanitized outcome posted to the approved Issue.
+concurrency:
+  group: zgmini-ai-software-v2-registration-private-once
+  cancel-in-progress: false
+jobs:
+  ai-software-register-b-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-ai-software-v2-register-approved-once'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout exact event control commit without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: ai-v2-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout fixed approved AI software V2 data-only source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 7e29fd7a4035951006b2515bb1f0561942704b60
+          path: ai-v2-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: One approved private staging and common registration attempt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\ai-v2-control\tools\ai-software-v2-register-once.mjs" --execute'
+      - name: Recover bounded and sanitized result to private Issue and files
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\ai-v2-control\tools\ai-software-v2-register-once.mjs" --report'
