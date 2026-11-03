@@ -1,5 +1,9 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+## 2026-11-03 공통 장애 보완 운영 적용 증거
+
+유지보수기 source `aabc345b86c5aa4c6af23c57b2d1eedca876b4a7`의 정상 종료/인계와 신규 receiver origin을 실Windows에서 확인했다. 공통 자원 프로필, 설치 전 실패 예방, 현재/과거 잠금 분리 코드가 실제 설치 파일 해시와 일치한다. Controller `e38c6acd…` 바이트·Core/Korea/Iran 보호 해시 불변, Runner6개 Online을 확인했다. [원본 증거](../results/COMMON_MAINTENANCE_HARDENING_20261103.json). 이 기록은 당시 실측이며 현재 설치 상태를 영구 고정하지 않는다. R17/R6/ER1 기능 설치·실행·D1 게시 성공을 뜻하지 않는다. 아래 #44와 c96d 기록은 이전 성공 이력이다.
+
 여러 담당자의 변경이 누적된 적용은 [공용 적용 대기열 운영 방침](CONTROLLER_APPLY_QUEUE.md)을 먼저 따른다. 정확한 통합 manifest 또는 순차 적용으로 조정하며, 개별 승인·파일 해시·기존 설치 보호 검사는 그대로 유지한다.
 
 상태 (2026-11-03 KST): **실PC PASS.** [업데이트 #44](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/44) → Controller `b77a333…` → 새 Listener 6개 → [진단 #45](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/45) PASS → TXT/JSON/댓글 회수 완료. 유지보수기 source는 `c96d4ac…`이며 [실측 정본](PC_AUTOMATION_RUNTIME_20261103.json)을 참조한다. 아래의 과거 최초 연결 기록은 재설치 지시가 아니다.
@@ -12,7 +16,13 @@
 - 원본 A급 `pc-job` Issue의 7필드 계약은 그대로 둔다. `controller-update`를 그 안에 추가하지 않는다. 임의 CMD/SQL/다운로드 URL/경로를 받지 않는다.
 - 신규 `pc-maintenance` Issue는 **갱신 요청**일 뿐 자동 승인 근거가 아니다. 별도 B급 승인 manifest의 raw SHA-256과 실제 설치 SHA, merged PR, Git 이력과 변경 파일별 해시를 모두 확인한다.
 - Controller 실행 파일 갱신은 현재 계약상 **모두 명시적 B급 승인 manifest**가 필요하다. 운영 source·DB/D1·게시·스케줄은 이 경로로 갱신할 수 없다.
-- **B급 읽기 전용 승인도 기존 Controller 운영정책 변경 승인이 아니다.** 6좌석, `mutationsEnabled=false`, 기존 operation 정의, actor/source 및 공통 설정 필드는 이전 설치값과 완전히 같아야 한다. 추가 operation은 제한된 A급/light 진단만 허용한다.
+- **기존 안전 정책은 유지한다.** 6좌석, `mutationsEnabled=false`, 기존 operation 정의, actor/source 및 공통 설정 필드는 이전 설치값과 완전히 같아야 한다. 기본 갱신은 A/light·90초 이하만 허용한다. 중량 읽기 전용 등록은 기능명별 새 예외 대신 아래 공통 승인 프로필을 사용한다. 현재 설치 버전의 지원 여부는 실제 파일로 확인한다.
+
+## 공통 자원 프로필
+
+새 heavy 등록은 manifest의 purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`를 사용한다. 요청 envelope에 임의 권한 필드를 추가하지 않는다. 이 프로필은 A/heavy·240초·최소 가용 1536MiB의 기존 검증된 자원 계약을 재사용하며, 동시 heavy 수·actor·기존 operation·쓰기 비활성 정책을 변경하지 않는다. 여러 기능명을 같은 프로필로 검증하므로 기능을 추가할 때마다 유지보수기 코드를 바꾸지 않는다. 다른 자원 등급은 별도의 공통 프로필 검증 대상이며 임의 숫자를 허용하지 않는다.
+
+기존 `employment-r6-readonly-adapter` 목적의 manifest는 과거 한정 계약 호환으로 보존한다. 이를 신규 기능의 공통 승인으로 사용하지 않는다. 실행기 등록은 정확한 소스/파일 해시/테스트/승인 manifest를 계속 요구하며, 프로필 승인만으로 임의 모듈을 실행하지 않는다.
 
 ## 통신 구조
 
@@ -73,7 +83,7 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\bootstrap-
 
 ## 최초 Fear & Greed 진단 후속
 
-PR #28의 `fear-greed-archive-status`는 실제 업데이트 #44의 자동 사후 진단 #45에서 PASS했고 결과가 회수됐다. 같은 source·환경의 유효한 이 결과는 재사용한다. PC SQLite 아카이브와 Core Task XML/승인 실행기 연결은 읽기 전용이고, 관측 누락의 원인은 결과 증거만으로 판정한다. 데이터 복구·재수집·재게시·D1은 승인 범위 밖이다.
+PR #28의 `fear-greed-archive-status`는 실제 업데이트 #44의 자동 사후 진단 #45에서 PASS했고 결과가 회수됐다. 같은 source·환경의 유효한 이 결과는 재사용한다. 이 사후 진단에서 PC SQLite 아카이브와 Core Task XML/승인 실행기 연결은 읽기 전용이고, 관측 누락의 원인은 결과 증거만으로 판정한다. 데이터 복구·재수집·재게시·D1 쓰기는 이 진단의 범위 밖이며, 다른 업무의 별도 승인까지 금지하는 공통 제한이 아니다.
 
 ## 검증된 Windows 실행·인계 규칙
 

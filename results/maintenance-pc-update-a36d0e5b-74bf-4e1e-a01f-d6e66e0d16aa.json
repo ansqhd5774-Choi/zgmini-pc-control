@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-a36d0e5b-74bf-4e1e-a01f-d6e66e0d16aa",
+  "targetControllerSha": "786b24587cd2b8890cacc6d9f4c1ce77f67180fd",
+  "status": "UNKNOWN",
+  "code": "ENOENT",
+  "lastPass": "RECOVERY_REQUIRED",
+  "firstFail": "RECEIVED",
+  "actualControllerSha": "e38c6acd1643e284df157905ce77838298163dbc",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": true
+}

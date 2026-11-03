@@ -7,8 +7,13 @@ const hash = (value) => createHash('sha256').update(value).digest('hex');
 const CORE_TASK = 'ZGMINI-PC-Local-Core';
 const MAX_LAUNCHER_BYTES = 131072;
 const MAX_LEDGER_BYTES = 65536;
+const MAX_SIDECAR_SOURCE_BYTES = 131072;
 const MAX_SIDECAR_FILES = 64;
 const MAX_LEDGER_FILES = 12;
+const SIDECAR_SOURCE_EXPECTED = Object.freeze({
+  'archive-run.mjs': '04770152c01d4584fe3ee1b0166fc718718656b95cb3639680a6f23fe75191de',
+  'run-original-then-archive.vbs': '9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c',
+});
 const LEDGER_NAME = /^(?=[a-z0-9_.-]{1,100}\.json$)(?=.*(?:last-run|status|ledger|checkpoint|result|report))[a-z0-9_.-]+\.json$/i;
 const ALLOWED_ROOTS = ['e:\\zgmini\\data\\pc-writer\\', 'e:\\zgmini\\projects\\'];
 const safeIso = value => typeof value==='string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value ? value : null;
@@ -44,6 +49,25 @@ const FAILURE_CATEGORIES = [
   ['OBSERVATION_OR_CADENCE', ['OBSERVATION','OBSERVED','CURRENT','CHECK','CHECKS','CADENCE','UNCHANGED']],
   ['PROCESS', ['PROCESS','SPAWN','EXIT','COMMAND','TASK']],
 ];
+// These are unverified labels inferred from the sidecar ledger, not operating
+// system errors or proof that an approved source SHA was actually executed.
+const REPORTED_BLOCK_SUBTYPES = [
+  ['SOURCE_SHA_MISMATCH', ['SOURCE_SHA_MISMATCH','SOURCE_SHA_DRIFT','SOURCE_REVISION_MISMATCH','EXECUTED_SOURCE_SHA_MISMATCH']],
+  ['APPROVAL_MISSING', ['APPROVAL_MISSING','MISSING_APPROVAL','SOURCE_NOT_APPROVED','UNAPPROVED_SOURCE']],
+  ['APPROVAL_MISMATCH', ['APPROVAL_MISMATCH','APPROVAL_SHA_MISMATCH','APPROVED_SOURCE_SHA_MISMATCH']],
+  ['SOURCE_UNAVAILABLE', ['SOURCE_UNAVAILABLE','SOURCE_NOT_FOUND','SOURCE_CHECKOUT_MISSING']],
+];
+const safeSha40 = value => typeof value==='string' && /^[0-9a-f]{40}$/i.test(value) ? value.toLowerCase() : null;
+function reportedShaRelation(fields) {
+  const select = keys => {
+    const values=[...new Set(fields.flatMap(o=>keys.map(k=>safeSha40(o[k]))).filter(Boolean))];
+    return {present:values.length>0, sha:values.length===1?values[0]:null, conflict:values.length>1};
+  };
+  const actual=select(['actualSourceSha','executedSourceSha']);
+  const approved=select(['approvedSourceSha','expectedSourceSha']);
+  return {evidence:'UNATTESTED_LEDGER_FIELDS',actualPresent:actual.present,approvedPresent:approved.present,
+    relation:actual.conflict||approved.conflict?'CONFLICTING_FIELDS':!actual.sha||!approved.sha?'UNKNOWN':actual.sha===approved.sha?'MATCH':'MISMATCH'};
+}
 
 function failureHints(fields) {
   const getValue = key => fields.map(o=>o[key]).find(v=>v!==undefined&&v!==null);
@@ -56,10 +80,18 @@ function failureHints(fields) {
   };
   const present=FAILURE_HINT_FIELDS.filter(key=>getValue(key)!==undefined);
   const classifications=[...new Set(present.map(key=>classify(getValue(key))).filter(Boolean))];
+  const specific=[...new Set(present.flatMap(key=>{
+    let value=getValue(key);
+    if (value && typeof value==='object' && !Array.isArray(value)) value=value.code??value.message;
+    if (typeof value!=='string' || value.length>4096) return [];
+    const normalized=value.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean).join('_');
+    return REPORTED_BLOCK_SUBTYPES.filter(([,phrases])=>phrases.some(phrase=>
+      normalized===phrase||normalized.startsWith(phrase+'_')||normalized.endsWith('_'+phrase)||normalized.includes('_'+phrase+'_'))).map(([label])=>label);
+  }))];
   return {evidence:'UNATTESTED_CATEGORICAL_HINTS',hasStage:present.includes('stage')||present.includes('step'),
     hasError:present.some(key=>['error','errorCode','message'].includes(key)),
     hasReason:present.includes('reason')||present.includes('blockedBy'),
-    categories:classifications.slice(0,5)};
+    categories:classifications.slice(0,5),reportedBlockSubtype:specific.length===1?specific[0]:'UNKNOWN'};
 }
 
 function isInsideRealRoot(root, candidate) {
@@ -131,10 +163,121 @@ function sidecarTrace(dataRoot) {
       const reason=firstValid('reason',safeLedgerCode);
       const at=['finishedAt','startedAt','checkedAt','at','timestamp'].map(key=>firstValid(key,safeIso)).find(v=>v!==null)??null;
       candidates.push({name,evidence:'UNATTESTED_LEDGER',sha256:hash(bytes),modifiedAt:stat.mtime.toISOString(),
-        reportedStatus,code,lastPass,firstFail,reason,at,failureHints:failureHints(fields)});
+        reportedStatus,code,lastPass,firstFail,reason,at,failureHints:failureHints(fields),
+        reportedShaRelation:reportedShaRelation(fields)});
     } catch { candidates.push({name,evidence:'INVALID_LEDGER'}); }
   }
   return {evidence:'OBSERVED_UNATTESTED',candidates};
+}
+
+// The installed Sidecar is PC-only; do not publish its source or failure text.
+// Inspect two previously hashed fixed scripts and one bounded ledger in memory.
+// Explicit error-raising statements are static clues, never proof of execution.
+export function inspectSidecarSourceGate(dataRoot, {
+  expectedHashes = SIDECAR_SOURCE_EXPECTED, priorSidecar = null,
+} = {}) {
+  const output={evidence:'UNATTESTED_STATIC_SOURCE_AND_LEDGER',
+    scriptStatus:[],ledgerStatus:'UNKNOWN',sameLedgerSnapshot:null,
+    reasonShape:'NOT_CHECKED',reasonConcepts:[],
+    matchingErrorSite:'NOT_CHECKED',matchedScript:null,siteLine:null,
+    gatePatternCategories:[],matchedGateCategories:[],operationalWrites:0,providerCalls:0,d1Writes:0};
+  const directory=path.join(dataRoot,'pc-writer','archive-sidecar-r7');
+  let stat;
+  try{stat=fs.lstatSync(directory);}catch(error){return {...output,ledgerStatus:error?.code==='ENOENT'?'DIRECTORY_MISSING':'DIRECTORY_NOT_READABLE'};}
+  if(!stat.isDirectory()||stat.isSymbolicLink()||!isInsideRealRoot(dataRoot,directory))
+    return {...output,ledgerStatus:'UNSAFE_DIRECTORY'};
+  const readBounded=(name,maximum)=>{
+    const file=path.join(directory,name);
+    let info;
+    try{info=fs.lstatSync(file);}catch(error){return {status:error?.code==='ENOENT'?'MISSING':'NOT_READABLE'};}
+    if(!info.isFile()||info.isSymbolicLink()||!isInsideRealRoot(directory,file))
+      return {status:'UNSAFE'};
+    if(info.size<2||info.size>maximum)return {status:'INVALID_SIZE'};
+    try{
+      const bytes=fs.readFileSync(file);
+      if(bytes.length<2||bytes.length>maximum)return {status:'INVALID_SIZE'};
+      return {status:'READ',bytes,modifiedMs:info.mtimeMs};
+    }catch{return {status:'NOT_READABLE'};}
+  };
+  const ledger=readBounded('last-run.json',MAX_LEDGER_BYTES);
+  output.ledgerStatus=ledger.status;
+  if(ledger.status!=='READ')return output;
+  const old=priorSidecar?.candidates?.find(x=>x.name==='last-run.json');
+  output.sameLedgerSnapshot=old?.sha256?hash(ledger.bytes)===old.sha256:null;
+  if(output.sameLedgerSnapshot===false){
+    output.ledgerStatus='CHANGED_DURING_DIAGNOSIS';return output;
+  }
+  let data;
+  try{
+    data=JSON.parse(ledger.bytes.toString('utf8'));
+    if(!data||typeof data!=='object'||Array.isArray(data))throw Error('INVALID');
+  }catch{output.ledgerStatus='INVALID_JSON';return output;}
+  output.ledgerStatus='READ';
+  const fields=[data,data.result,data.archive,data.lastRun].filter(v=>v&&typeof v==='object'&&!Array.isArray(v));
+  const raw=fields.flatMap(o=>[o.reason,o.blockedBy]).find(v=>v!==undefined&&v!==null);
+  let reason=null;
+  if(typeof raw==='string'){output.reasonShape='STRING';reason=raw;}
+  else if(raw&&typeof raw==='object'&&!Array.isArray(raw)){
+    output.reasonShape='OBJECT';reason=typeof raw.code==='string'?raw.code:raw.message;
+  }else output.reasonShape='MISSING';
+  if(typeof reason==='string'&&reason.length>4096){output.reasonShape='OVERSIZE';reason=null;}
+  if(typeof reason==='string'){
+    const tokens=new Set(reason.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean));
+    const concepts=['SOURCE','APPROVAL','APPROVED','CONFIG','GIT','HEAD','SHA','DIRTY',
+      'BRANCH','MISMATCH','MISSING','UNAVAILABLE','DRIFT','REPO','PATH',
+      'CHECKOUT','WORKTREE','ARCHIVE','LOCK','PERMISSION','CLEAN'];
+    output.reasonConcepts=concepts.filter(word=>tokens.has(word)).slice(0,12);
+  }
+  const sites=[],gates=new Set();
+  for(const name of Object.keys(SIDECAR_SOURCE_EXPECTED)){
+    const file=readBounded(name,MAX_SIDECAR_SOURCE_BYTES);
+    const item={file:name,status:file.status};
+    if(file.status!=='READ'){output.scriptStatus.push(item);continue;}
+    item.status=hash(file.bytes)===expectedHashes[name]?'MATCH':'CHANGED';
+    item.modifiedAfterLedger=file.modifiedMs>ledger.modifiedMs;
+    output.scriptStatus.push(item);
+    if(item.status!=='MATCH'||item.modifiedAfterLedger)continue;
+    // Windows Script Host source may be UTF-16; decoding is in-memory only.
+    const source=xmlString(file.bytes);
+    if(source.includes('\uFFFD'))continue;
+    if(/(?:config\.source|approvedSourceSha|sourceSha)/i.test(source))gates.add('SOURCE_APPROVAL_REFERENCE');
+    if(/(?:rev-parse|git\.exe|execFileSync\(['"]git)/i.test(source))gates.add('GIT_REFERENCE');
+    if(/(?:diff\s+--quiet|status\s+--porcelain|dirty)/i.test(source))gates.add('CLEAN_TREE_REFERENCE');
+    if(/(?:archive-core\.mjs|archive-run\.mjs)/i.test(source))gates.add('ARCHIVE_LAUNCH_REFERENCE');
+    if(typeof reason!=='string'||!reason.length)continue;
+    // Only explicit JS throw Error / VBS Err.Raise statements count. Comments,
+    // logs, constants and other quoted literals cannot establish error sites.
+    const lines=source.split(/\r?\n/);
+    for(let index=0;index<lines.length;index++){
+      const line=lines[index];
+      let matched=false;
+      if(name.endsWith('.mjs')){
+        const thrown=line.match(/^\s*throw\s+(?:new\s+)?Error\s*\(\s*(['"])([^'"\r\n]{2,160})\1\s*\)/);
+        matched=thrown?.[2]===reason;
+      }else if(name.endsWith('.vbs')){
+        // Err.Raise(number, source, description): only the third argument is
+        // the failure description; a matching source label is insufficient.
+        const raised=line.match(/^\s*(?:Call\s+)?Err\.Raise\s+[^,\r\n]{1,64},\s*[^,\r\n]{0,160},\s*(['"])([^'"\r\n]{2,160})\1(?:\s*,|\s*$)/i);
+        matched=raised?.[2]===reason;
+      }
+      if(!matched)continue;
+      const nearby=lines.slice(Math.max(0,index-3),Math.min(lines.length,index+4)).join('\n');
+      const categories=[];
+      if(/(?:config\.source|approvedSourceSha|sourceSha)/i.test(nearby))categories.push('SOURCE_APPROVAL_REFERENCE');
+      if(/(?:rev-parse|git\.exe|execFileSync\(['"]git)/i.test(nearby))categories.push('GIT_REFERENCE');
+      if(/(?:diff\s+--quiet|status\s+--porcelain|dirty)/i.test(nearby))categories.push('CLEAN_TREE_REFERENCE');
+      sites.push({name,line:index+1,categories});
+      if(sites.length>32)break;
+    }
+  }
+  if(output.scriptStatus.some(x=>x.status!=='MATCH'||x.modifiedAfterLedger)){
+    output.matchingErrorSite='NOT_CHECKED';return output;
+  }
+  output.gatePatternCategories=[...gates].sort();
+  output.matchingErrorSite=sites.length===1?'UNIQUE':sites.length>1?'MULTIPLE':'NONE';
+  if(sites.length===1){output.matchedScript=sites[0].name;output.siteLine=sites[0].line;
+    output.matchedGateCategories=sites[0].categories;}
+  return output;
 }
 
 function archiveAlignment(local) {
@@ -263,8 +406,11 @@ export function inspectFearGreedArchive(dataRoot,{queryTask}={}) {
   catch { task = {status:'TASK_READ_FAILED'}; }
   const local=readDb(dataRoot);
   const complete=local.status==='READ';
+  const sidecar=sidecarTrace(dataRoot);
   return {status:complete?'PASS':'BLOCKED',code:complete?'FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS':`FEAR_GREED_${local.status}`,
-    task,local,archiveTrace:{alignment:archiveAlignment(local),sidecar:sidecarTrace(dataRoot),publicationLedger:publicationLedgerTrace(dataRoot)},
+    task,local,archiveTrace:{alignment:archiveAlignment(local),sidecar,
+      sidecarSourceGate:inspectSidecarSourceGate(dataRoot,{priorSidecar:sidecar}),
+      publicationLedger:publicationLedgerTrace(dataRoot)},
     sqliteOpened:local.sqliteOpened,operationalWrites:0,providerCalls:0,d1Writes:0,
     scope:'READ_ONLY_NO_PROVIDER_NO_PUBLICATION'};
 }

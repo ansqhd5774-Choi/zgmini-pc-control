@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "c96d4ac0fd2fefeee28118decd9698b4b18636e3",
+  "targetSha": "034ee76b88e3f1848c32d2d689520d2c3926daec",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-03 user instruction: leave individual tool rejection aside; resolve common automation failures, including common maintenance policy and prevention deployment",
+  "files": {
+    "tools/maintenance-contract.mjs": "66cf5fbcc150b7620b665f96c70c60597598daa583a8916809fbf11e4a4cd3b3",
+    "tools/maintenance-apply.mjs": "9f51e57b7acb63aafc00cc4c1704cebcc6635080e3a481e8f8b692cae0bf67bd",
+    "tools/maintenance-agent.mjs": "101866e5838bdc3e75a3947224c194a49ff4b46f72c67ceb37aaca4adb8dbc75",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "266ef1ea16ff221371cd9568f413ea6d5b92303bdd36758125004aa8bfeaa048",
+    "tools/maintenance-ancestry.vbs": "2b5b79a8e848c26221703cf63c0bd8543cb03e6ded44d7766eb5a99a982ddaf5",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "138bba01d45c60859e0011d25191aa83165421edae18cee94a41b84dc245ea13"
+  },
+  "checks": {
+    "command": "node --test maintenance contract/apply/agent/handoff/lock/recovery and automation status suites",
+    "passed": 117,
+    "failed": 0,
+    "platform": "Windows Node"
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Controller installed source and files",
+    "Core/Korea/Iran tasks",
+    "SQLite/D1",
+    "Runner registrations",
+    "request ledgers"
+  ],
+  "scopeNote": "Maintenance receiver only. No R17/R6/ER1 operation execution or Controller module installation."
+}

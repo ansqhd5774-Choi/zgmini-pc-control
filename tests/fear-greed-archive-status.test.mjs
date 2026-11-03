@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectFearGreedArchive} from '../controller/fear-greed-archive-readonly.mjs';
+import {inspectFearGreedArchive,inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
 import {executeJob} from '../controller/engine.mjs';
 
 const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
@@ -94,6 +94,132 @@ test('sidecar status is sanitized, not mistaken for authenticated process eviden
  assert.equal(digest(fs.readFileSync(f.dbFile)),before);
 });
 
+test('fixed Sidecar scripts map an exact error literal to an unverified location without exposing code',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const source="const s=config.source;\nthrow new Error('PC_SOURCE_GATE_BLOCKED');\n";
+ const wrapper='WScript.Echo "archive-run.mjs"\n';
+ fs.writeFileSync(path.join(dir,'archive-run.mjs'),source);
+ fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),wrapper);
+ const prior=new Date(Date.now()-30000);
+ fs.utimesSync(path.join(dir,'archive-run.mjs'),prior,prior);
+ fs.utimesSync(path.join(dir,'run-original-then-archive.vbs'),prior,prior);
+ const secret='TOKEN_SHOULD_NEVER_LEAK';
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({status:'BLOCKED',reason:'PC_SOURCE_GATE_BLOCKED',token:secret}));
+ const before=digest(fs.readFileSync(f.dbFile));
+ const p=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{
+  'archive-run.mjs':digest(source),'run-original-then-archive.vbs':digest(wrapper),
+ }});
+ assert.equal(p.ledgerStatus,'READ');
+ assert.equal(p.reasonShape,'STRING');
+ assert.ok(p.reasonConcepts.includes('SOURCE'));
+ assert.equal(p.matchingErrorSite,'UNIQUE');
+ assert.equal(p.matchedScript,'archive-run.mjs');
+ assert.equal(p.siteLine,2);
+ assert.deepEqual(p.scriptStatus.map(x=>x.status),['MATCH','MATCH']);
+ assert.ok(p.gatePatternCategories.includes('SOURCE_APPROVAL_REFERENCE'));
+ assert.ok(p.matchedGateCategories.includes('SOURCE_APPROVAL_REFERENCE'));
+ assert.equal(p.operationalWrites,0);assert.equal(p.providerCalls,0);assert.equal(p.d1Writes,0);
+ assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+ assert.doesNotMatch(JSON.stringify(p),/PC_SOURCE_GATE_BLOCKED|TOKEN_SHOULD_NEVER_LEAK|config\.source/);
+});
+
+test('a changed Sidecar script fails closed without attributing an unknown reason',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ fs.writeFileSync(path.join(dir,'archive-run.mjs'),"throw new Error('SECRET_DYNAMIC')\n");
+ fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),'WScript.Quit 0\n');
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({status:'BLOCKED',reason:'SECRET_DYNAMIC'}));
+ const r=inspectSidecarSourceGate(f.dataRoot);
+ assert.deepEqual(r.scriptStatus.map(x=>x.status),['CHANGED','CHANGED']);
+ assert.equal(r.matchingErrorSite,'NOT_CHECKED');
+ assert.deepEqual(r.gatePatternCategories,[]);
+ assert.deepEqual(r.matchedGateCategories,[]);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_DYNAMIC/);
+});
+
+test('dynamic Sidecar reason remains unmatched, with concepts only from fixed dictionary',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const js='const sourceSha=config.source;\nconst error=new Error(value);\n';
+ const vbs='WScript.Echo "archive-run.mjs"\n';
+ fs.writeFileSync(path.join(dir,'archive-run.mjs'),js);
+ fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),vbs);
+ const past=new Date(Date.now()-30000);
+ for(const name of ['archive-run.mjs','run-original-then-archive.vbs'])fs.utimesSync(path.join(dir,name),past,past);
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:{code:'SOURCE_APPROVAL_MISMATCH_DYNAMIC'},token:'GH_PAT_DO_NOT_EXPOSE'}));
+ const r=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{'archive-run.mjs':digest(js),'run-original-then-archive.vbs':digest(vbs)}});
+ assert.equal(r.reasonShape,'OBJECT');
+ assert.equal(r.matchingErrorSite,'NONE');
+ assert.deepEqual(r.reasonConcepts,['SOURCE','APPROVAL','MISMATCH']);
+ assert.doesNotMatch(JSON.stringify(r),/GH_PAT_DO_NOT_EXPOSE|SOURCE_APPROVAL_MISMATCH_DYNAMIC/);
+});
+
+test('Sidecar source symlink and oversized script are rejected without external reads',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const outside=path.join(f.root,'private.mjs');
+ fs.writeFileSync(outside,"throw Error('SECRET_OUTSIDE_ROOT')");
+ fs.symlinkSync(outside,path.join(dir,'archive-run.mjs'));
+ fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),'x'.repeat(131073));
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_FAILURE'}));
+ const r=inspectSidecarSourceGate(f.dataRoot);
+ assert.deepEqual(r.scriptStatus.map(x=>x.status),['UNSAFE','INVALID_SIZE']);
+ assert.equal(r.matchingErrorSite,'NOT_CHECKED');
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_OUTSIDE_ROOT|SOURCE_FAILURE/);
+});
+
+test('source modified after ledger is never paired with older error context',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const js="throw Error('SOURCE_MISMATCH')",vbs='WScript.Echo "archive-run.mjs"';
+ for(const [name,body] of [['archive-run.mjs',js],['run-original-then-archive.vbs',vbs]])fs.writeFileSync(path.join(dir,name),body);
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_MISMATCH'}));
+ const future=new Date(Date.now()+30000);
+ fs.utimesSync(path.join(dir,'archive-run.mjs'),future,future);
+ const r=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{'archive-run.mjs':digest(js),'run-original-then-archive.vbs':digest(vbs)}});
+ assert.equal(r.scriptStatus[0].modifiedAfterLedger,true);
+ assert.equal(r.matchingErrorSite,'NOT_CHECKED');
+ assert.deepEqual(r.gatePatternCategories,[]);
+});
+
+test('UTF-16 Windows Sidecar wrapper is inspected in memory with no raw text output',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const js='const archive=true;\n',vbs=Buffer.from('\uFEFFErr.Raise 1001, "ArchiveSidecar", "SOURCE_BLOCKED_CODE"\r\n','utf16le');
+ fs.writeFileSync(path.join(dir,'archive-run.mjs'),js);
+ fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),vbs);
+ const past=new Date(Date.now()-30000);
+ for(const name of ['archive-run.mjs','run-original-then-archive.vbs'])fs.utimesSync(path.join(dir,name),past,past);
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_BLOCKED_CODE',private:'SECRET_WRAPPER'}));
+ const r=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{'archive-run.mjs':digest(js),'run-original-then-archive.vbs':digest(vbs)}});
+ assert.equal(r.matchingErrorSite,'UNIQUE');
+ assert.equal(r.matchedScript,'run-original-then-archive.vbs');
+ assert.equal(r.siteLine,1);
+ assert.doesNotMatch(JSON.stringify(r),/SOURCE_BLOCKED_CODE|SECRET_WRAPPER/);
+});
+
+test('Sidecar quoted reason in Echo, comment and constant is not misreported as failure site',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const js='// throw Error(\'SOURCE_GATE_BLOCKED\')\nconst hint="SOURCE_GATE_BLOCKED";\nconsole.log("SOURCE_GATE_BLOCKED");\n';
+ const vbs='WScript.Echo "SOURCE_GATE_BLOCKED"\r\n';
+ for(const [name,body] of [['archive-run.mjs',js],['run-original-then-archive.vbs',vbs]])fs.writeFileSync(path.join(dir,name),body);
+ const past=new Date(Date.now()-30000);
+ for(const name of ['archive-run.mjs','run-original-then-archive.vbs'])fs.utimesSync(path.join(dir,name),past,past);
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_GATE_BLOCKED'}));
+ const r=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{'archive-run.mjs':digest(js),'run-original-then-archive.vbs':digest(vbs)}});
+ assert.equal(r.matchingErrorSite,'NONE');
+ assert.equal(r.siteLine,null);
+ assert.deepEqual(r.matchedGateCategories,[]);
+ assert.doesNotMatch(JSON.stringify(r),/SOURCE_GATE_BLOCKED/);
+});
+
+test('Sidecar VBS Err.Raise source label is never mistaken for the third-argument description',()=>{
+ const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
+ const js='const archive=true;\n',vbs='Err.Raise 77, "SOURCE_GATE_BLOCKED", "Different error"\r\n';
+ for(const [name,body] of [['archive-run.mjs',js],['run-original-then-archive.vbs',vbs]])fs.writeFileSync(path.join(dir,name),body);
+ const past=new Date(Date.now()-30000);
+ for(const name of ['archive-run.mjs','run-original-then-archive.vbs'])fs.utimesSync(path.join(dir,name),past,past);
+ fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_GATE_BLOCKED'}));
+ const r=inspectSidecarSourceGate(f.dataRoot,{expectedHashes:{'archive-run.mjs':digest(js),'run-original-then-archive.vbs':digest(vbs)}});
+ assert.equal(r.matchingErrorSite,'NONE');
+ assert.equal(r.siteLine,null);
+});
+
 test('unrecognized uppercase ledger fields are suppressed even when they match a code-shaped regex',()=>{
  const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
  const secrets=['AKIAABCDEFGHIJKLMNOP','GH_PAT_SECRET_0123456789','SENSITIVE:UPPERCASE_TOKEN'];
@@ -125,6 +251,52 @@ test('blocked sidecar failure exposes only bounded categories, never raw error o
  assert.equal(item.failureHints.hasReason,true);
  assert.deepEqual(item.failureHints.categories,['SOURCE_OR_APPROVAL','LOCK_OR_LEASE']);
  assert.doesNotMatch(JSON.stringify(r),/GH_PAT_SECRET_0123456789|PC_LOCAL_CYCLE_LOCK_BUSY|ARCHIVE_SOURCE_VALIDATION/);
+});
+
+test('sidecar reports bounded SHA/approval subtype and unverified SHA relation without leaking the SHA',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ const actual='a'.repeat(40), approved='b'.repeat(40),secret='GH_PAT_PRIVATE_CREDENTIAL';
+ fs.writeFileSync(path.join(directory,'last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:`SOURCE_SHA_MISMATCH; ${secret}`,
+  actualSourceSha:actual,approvedSourceSha:approved,token:secret,
+ }));
+ const before=digest(fs.readFileSync(f.dbFile));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const item=r.archiveTrace.sidecar.candidates[0];
+ assert.equal(item.failureHints.reportedBlockSubtype,'SOURCE_SHA_MISMATCH');
+ assert.deepEqual(item.reportedShaRelation,{evidence:'UNATTESTED_LEDGER_FIELDS',actualPresent:true,approvedPresent:true,relation:'MISMATCH'});
+ assert.doesNotMatch(JSON.stringify(r),/GH_PAT_PRIVATE_CREDENTIAL|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/);
+ assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+});
+
+test('SHA relation reports MATCH only as unverified sidecar evidence, unknown for invalid or missing SHA',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:'MISSING_APPROVAL',result:{executedSourceSha:'c'.repeat(40),expectedSourceSha:'C'.repeat(40)},
+ }));
+ fs.writeFileSync(path.join(directory,'archive-status.json'),JSON.stringify({
+  status:'BLOCKED',reason:{code:'APPROVAL_SHA_MISMATCH',message:'private content'},
+  actualSourceSha:'d'.repeat(39),approvedSourceSha:'e'.repeat(40),
+ }));
+ const items=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask}).archiveTrace.sidecar.candidates;
+ assert.equal(items[0].failureHints.reportedBlockSubtype,'APPROVAL_MISSING');
+ assert.equal(items[0].reportedShaRelation.relation,'MATCH');
+ assert.equal(items[1].failureHints.reportedBlockSubtype,'APPROVAL_MISMATCH');
+ assert.equal(items[1].reportedShaRelation.relation,'UNKNOWN');
+ assert.equal(items[1].reportedShaRelation.actualPresent,false);
+});
+
+test('conflicting declared SHA fields are not silently treated as a match',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:'SOURCE SHA unknown',actualSourceSha:'a'.repeat(40),
+  executedSourceSha:'b'.repeat(40),approvedSourceSha:'a'.repeat(40),otherSourceSha:'c'.repeat(40),
+ }));
+ const item=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask}).archiveTrace.sidecar.candidates[0];
+ assert.equal(item.reportedShaRelation.relation,'CONFLICTING_FIELDS');
+ assert.equal(item.failureHints.reportedBlockSubtype,'UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(item),/a{40}|b{40}|c{40}/);
 });
 
 test('unknown and extremely long sidecar failure values do not escape the sanitizer',()=>{

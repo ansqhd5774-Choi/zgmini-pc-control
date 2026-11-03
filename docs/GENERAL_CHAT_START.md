@@ -1,14 +1,24 @@
 # 새 일반챗의 자동 작업 시작
 
+2026-11-03 통합 개정: 공통 정본 2절에 현재 상태/접수 실패 분류, 3절에 단계별 복구·재개, 5절에 기능 공통 복구 상시 승인, 6·8절에 대기 해제·관측시각·완료 구분을 포함한다. 이전 사본만으로 과거 차단을 반복하지 않는다.
+
+사용자가 작업 전에 전달할 짧은 지침은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)다. 현재 상태와 접수 문제는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)로 분류한다. 요약을 읽은 것만으로 최신 정본·실제 상태 확인을 대체하지 않는다.
+
 공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), 실PC 완료 증거는 [PC_AUTOMATION_RUNTIME_20261103.json](PC_AUTOMATION_RUNTIME_20261103.json)이다. 기존 설치·인계·자동 업데이트를 미완료로 되돌려 처음부터 반복하지 않는다.
 
 다른 담당자의 변경이 공용 설치에 섞여 있으면 [적용 대기열 운영 방침](CONTROLLER_APPLY_QUEUE.md)에 따라 단일 조정 원장에 등록한다. 실제 설치 SHA와 각 변경의 승인·의존성을 적용 담당 한 명이 정리한다. 통합 또는 순차 적용을 정하고, 대기 보고에는 선행 항목·담당·다음 실행 조건을 명시한다. 독립 개발·검토는 계속한다.
 
 Runner 연결 장애와 복구는 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 독립 유지보수기 갱신과 Runner 연결 복구를 구분한다.
 
+Controller 설치 잠금·RECOVERY_REQUIRED는 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)를 따른다. 기존 요청의 단계/소유자/실제 바이트/부작용을 확인한 뒤 지원되는 복구 도구를 사용하고 결과 회수·재개까지 담당한다. 진단 PASS나 잠금 보관을 업데이트 PASS로 보고하지 않는다.
+
 이 문서는 사용자에게 매번 CMD를 전달하지 않고 GitHub 요청→PC 자동 실행→결과 읽기를 이어가기 위한 진입점이다.
 
+작업 방향을 정하기 전에 #68의 해당 항목과 원본 실PC 결과에서 다른 담당자의 유효한 경로·SHA·해시 증거를 재사용한다. 새 BLOCKER에는 실행 코드/승인 계약의 필수 조건과 실제 미충족 증거를 제시한다. 독립 실행에 무관한 Core 전체 계보·폴더 탐색 오류를 선행 조건으로 확대하지 않는다. 상세 판단·정정 기준은 공통 정본 2절을 따른다.
+
 ## 필요한 최초 연결
+
+반복 작업의 승인 판단은 [공통 정본 5절](PC_AUTOMATION_STANDARD.md#5-상시-승인과-안전한-업데이트)을 따른다. 사용자는 승인된 업무에 필수인 진단·격리 복원·source/호스트 등록·최소 실행 정책·Controller 갱신·유지보수기 정책 인계를 기능 구분 없이 상시 승인했다. 기능명 변경이나 신규 모듈 등록을 이유로 재승인을 요구하지 않는다. 구체적인 적용 manifest와 필수 검증은 유지하고, 게시·배포 등 본 업무의 효과는 해당 업무 승인과 대조한다.
 
 GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 한다. 새 대화가 이 지침을 자동으로 읽도록 ZGMINI 프로젝트 공통 지침에 다음 문장을 한 번 등록한다.
 

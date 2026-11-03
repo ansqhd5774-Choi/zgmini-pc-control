@@ -39,36 +39,37 @@ export async function applyApprovedUpdate(request, port) {
     code:'IN_PROGRESS',updatedAt:new Date().toISOString()};
   const record=async (phase,patch={})=>{ledger.phase=phase;ledger.lastPass=phase;Object.assign(ledger,patch);ledger.updatedAt=new Date().toISOString();await port.persist({...ledger});};
   await record('RECEIVED');
-  let paused=false,backup=false,supervisorStopped=false,switched=false;
+  let paused=false,backup=false,supervisorStopped=false,switched=false,intakeAttempted=false;
+  let failureOperation='inspect';
   try {
     const before=await port.inspect();
     if(before.insideRunnerTree || before.githubActions) throw fail('MAINTENANCE_PROCESS_NOT_INDEPENDENT');
     if(before.installedSha!==request.installedSha) throw fail('INSTALLED_SHA_MISMATCH');
-    await port.validate(request,before);
+    failureOperation='validate';await port.validate(request,before);
     await record('VALIDATED');
-    await port.stage(request);
+    failureOperation='stage';await port.stage(request);
     await record('STAGED');
     // Intake is paused BEFORE draining. Accepted Issues remain durable on GitHub.
-    paused=true;await port.pauseIntake();
+    failureOperation='pauseIntake';intakeAttempted=true;paused=true;await port.pauseIntake();
     await record('INTAKE_PAUSED');
-    await port.waitForDrain();
+    failureOperation='waitForDrain';await port.waitForDrain();
     await record('DRAINED');
-    await port.backup();backup=true;
+    failureOperation='backup';await port.backup();backup=true;
     await record('BACKED_UP');
-    supervisorStopped=true;await port.stopOwnSupervisor();
+    failureOperation='stopOwnSupervisor';supervisorStopped=true;await port.stopOwnSupervisor();
     await record('SUPERVISOR_STOPPED');
-    await port.switchVersion();switched=true;
+    failureOperation='switchVersion';await port.switchVersion();switched=true;
     await record('SWITCHED');
-    await port.reconnect();
+    failureOperation='reconnect';await port.reconnect();
     await record('RECONNECTED');
-    await port.resumeIntake();paused=false;
+    failureOperation='resumeIntake';await port.resumeIntake();paused=false;
     await record('INTAKE_RESUMED');
     // GitHub does not replay Issues opened while a workflow is disabled.
     // Reconcile the durable Issue queue before declaring this update complete.
-    if(port.reconcileBacklog)await port.reconcileBacklog(request);
+    failureOperation='reconcileBacklog';if(port.reconcileBacklog)await port.reconcileBacklog(request);
     await record('BACKLOG_RECONCILED');
     await record('POSTCHECK_PENDING');
-    const post=await port.postcheck(request);
+    failureOperation='postcheck';const post=await port.postcheck(request);
     if(post?.status!=='PASS'||post?.actualExecutionSha!==request.targetSha||
       post?.protectedStateUnchanged!==true||post?.runnerSetVerified!==true||
       post?.postSourceVerified!==true) throw fail('POSTCHECK_NOT_VERIFIED');
@@ -77,6 +78,7 @@ export async function applyApprovedUpdate(request, port) {
     return {...ledger};
   } catch(error) {
     const firstFail=ledger.phase,reason=codeOf(error);
+    ledger.failureOperation=failureOperation;
     // A network timeout while a postcheck may still be running is not evidence
     // of diagnostic failure. In particular, do not stop its active Runner.
     if((ledger.phase==='POSTCHECK_PENDING' && ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason)) ||
@@ -109,7 +111,10 @@ export async function applyApprovedUpdate(request, port) {
       }
       if(safe && paused && workflowState==='active')paused=false;
       if(workflowState!=='active')safe=false;
-      if(safe && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{safe=false;}}
+      // Before pauseIntake was even attempted there is no backlog to replay.
+      // Requiring a nonexistent pause journal turns harmless validation failures
+      // into permanent shared recovery locks.
+      if(safe && intakeAttempted && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{safe=false;}}
       const status=safe?'BLOCKED':'RECOVERY_REQUIRED';
       await record(status,{status,code:reason,firstFail,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
         workflowEnabled:workflowState==='active'?true:workflowState==='disabled_manually'?false:null,

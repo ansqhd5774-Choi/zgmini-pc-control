@@ -122,6 +122,13 @@ test('SHA and permission validation happens before intake pause',async()=>{
  const f=fixture({validate:async()=>{throw Object.assign(Error('UNAPPROVED_CHANGE'),{code:'UNAPPROVED_CHANGE'});}});
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'BLOCKED');assert.equal(r.code,'UNAPPROVED_CHANGE');assert.ok(!f.events.includes('pause'));
 });
+test('missing backlog before any pause cannot turn validation failure into recovery lock',async()=>{
+ const f=fixture({validate:async()=>{throw Object.assign(Error('missing prerequisite'),{code:'ENOENT'});},
+  reconcileBacklog:async()=>{throw Object.assign(Error('no pause ever'),{code:'BACKLOG_STATE_MISSING'});}});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');assert.equal(r.code,'ENOENT');assert.equal(r.failureOperation,'validate');
+ assert.equal(f.events.includes('pause'),false);
+});
 test('long running existing job fails closed, without stopping supervisor',async()=>{
  const f=fixture({waitForDrain:async()=>{throw Object.assign(Error('DRAIN_TIMEOUT'),{code:'DRAIN_TIMEOUT'});}});
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'BLOCKED');assert.equal(r.code,'DRAIN_TIMEOUT');assert.ok(!f.events.includes('stop'));

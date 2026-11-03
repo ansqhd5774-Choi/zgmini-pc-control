@@ -10,7 +10,7 @@ import {execFileSync,spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- validateControllerConfigTransition} from './maintenance-contract.mjs';
+ validateControllerConfigTransition,controllerAdmissionForPurpose} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
@@ -97,6 +97,8 @@ function verifyIndependent(supervisorPid) {
 }
 
 function readOwner() {
+ need(fs.existsSync(path.join(controlRoot,'leases/supervisor/owner.json')),'SUPERVISOR_OWNER_MISSING');
+ need(fs.existsSync(path.join(controlRoot,'SUPERVISOR_STATUS.json')),'SUPERVISOR_STATUS_MISSING');
  const owner=json(path.join(controlRoot,'leases/supervisor/owner.json'));
  const status=json(path.join(controlRoot,'SUPERVISOR_STATUS.json'));
  need(Number.isSafeInteger(owner.pid)&&owner.pid>0&&owner.pid===status.pid,'SUPERVISOR_IDENTITY_MISMATCH');
@@ -233,7 +235,7 @@ function makePorts(packageData,issueNumber) {
    need(listing.length>=5&&listing.every(p=>/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p)),'TARGET_TREE_PATH');
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
-   validateControllerConfigTransition(oldOperations,nextOperations);
+   validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
    for(const item of manifest.allowFiles){
     need(/^[a-f0-9]{64}$/.test(item.sha256),'ALLOWFILE_HASH');
     need(sha256(git(['show',manifest.targetSha+':'+item.path],{encoding:null}))===item.sha256,'ALLOWFILE_HASH_MISMATCH');
@@ -538,8 +540,25 @@ export function readMaintenanceRecoveryStatus(requestId,{
   if(!observed||typeof observed.held!=='boolean')throw Error('invalid lock status');
   installLock=observed;
  }catch{lockReadbackCode='UPDATE_LOCK_UNAVAILABLE';}
- return {status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
+ const state={status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
   installLock,lockReadbackCode};
+ return {...state,guidance:maintenanceNextAction(state)};
+}
+
+// Current lock observation wins over a historical failed request. Never infer
+// that an absent lock proves recovery/installation success; reuse its evidence.
+export function maintenanceNextAction(s){
+ if(s.lockReadbackCode||s.installedReadbackCode||s.ledgerReadbackCode)
+  return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_FAILED_READBACK',blockScope:'SHARED_INSTALL_ONLY'};
+ if(s.installLock?.held){
+  return {state:s.installLock.recoveryRequired?'RECOVERY_REQUIRED':'INSTALL_LEASE_HELD',
+   next:s.installLock.recoveryRequired?'USE_CONTROLLER_RECOVERY_RUNBOOK':'OBSERVE_EXISTING_OWNER_NO_DUPLICATE_REQUEST',
+   blockScope:'SHARED_INSTALL_ONLY'};
+ }
+ return {state:'NO_ACTIVE_INSTALL_LEASE',
+  next:s.ledger?.status==='RECOVERY_REQUIRED'?'REUSE_ARCHIVE_EVIDENCE_AND_VERIFY_CURRENT_RUNTIME':'VERIFY_TARGET_MANIFEST_AND_CURRENT_RUNTIME',
+  blockScope:'NONE_FROM_INSTALL_LEASE',
+  updateSuccessProven:false};
 }
 
 export async function command(args=process.argv.slice(2)) {
@@ -552,6 +571,11 @@ export async function command(args=process.argv.slice(2)) {
  need(cmd==='apply'&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
  const data=loadApprovedPackage(requestId,args[4]);
  const {request,ports}=makePorts(data,data.issueNumber);
+ // Read-only prerequisite checks before taking the shared installation lease.
+ // They are repeated by validate under the lease to prevent a stale preflight
+ // from granting permission to stop or switch a changed process.
+ readOwner();
+ installedManifest();
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
  let retained=false;
  try{

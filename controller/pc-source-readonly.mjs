@@ -47,8 +47,10 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
   const binary=process.platform==='win32'?
    ['C:\\Program Files\\Git\\cmd\\git.exe','C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(fs.existsSync):'git';
   if(!binary)throw Error('PC_SOURCE_GIT_UNAVAILABLE');
-  return execFileSync(binary,['-c','core.fsmonitor=false','-c','core.untrackedCache=false','-C',cwd,...args],
-   {windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8'});
+  return execFileSync(binary,['--no-optional-locks','-c','core.fsmonitor=false',
+   '-c','core.untrackedCache=false','-C',cwd,...args],
+   {windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8',
+    env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
  }}={}){
  const base=path.dirname(realpath(dataRoot)),root=path.resolve(base);
  const inside=p=>p.toLowerCase().startsWith((root+path.sep).toLowerCase());
@@ -86,7 +88,83 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
   tracedLaunchers:safeFiles,sourceResolved:!!sourceRoot,
   sourceRoot:sourceRoot?relative(sourceRoot):null,
   sourceHead:null,trackedDirty:null,requiredFiles:[],providerCalls:0,d1Writes:0,sqliteOpened:false};
- if(!sourceRoot)return result;
+
+ // The already-running Writer records Git rev-parse HEAD in a fixed checkpoint.
+ // Report only bounded status metadata; never return the file's other fields.
+ const writerFile=path.join(root,'data','pc-writer','local-writer-last-run.json');
+ try{
+  const real=realpath(writerFile);
+  if(inside(real)&&exists(real)&&fs.statSync(real).size<=131072){
+   const saved=JSON.parse(read(real).toString('utf8'));
+   if(typeof saved?.source==='string'&&/^[0-9a-f]{40}$/.test(saved.source)){
+    result.lastWriterEvidence={
+     evidenceLevel:'STORED_WRITER_RUNTIME_CHECKPOINT',
+     sourceHead:saved.source,
+     at:typeof saved.at==='string'&&Number.isFinite(Date.parse(saved.at))?saved.at:null,
+     status:typeof saved.status==='string'&&/^[A-Z0-9_]{1,80}$/.test(saved.status)?saved.status:null,
+    };
+   }
+  }
+ }catch{} // Missing/malformed historical checkpoint is not a fresh runtime failure.
+ // A historical path verified by the 2026-10-31 PC Core runbook.
+ // Check it only when the current launcher chain did not resolve a checkout.
+ // A matching Git HEAD is NOT proof that the current Core Task executes it.
+ if(!sourceRoot){
+  const historical=path.join(root,'projects','zgmini-earnings-history-pc-release');
+  try{
+   const real=realpath(historical);
+   if(inside(real)&&fs.statSync(real).isDirectory()){
+    const gitMark=realpath(path.join(real,'.git'));
+    if(!inside(gitMark))throw Error('GIT_MARK_OUTSIDE_ROOT');
+    const markStat=fs.statSync(gitMark);
+    if(markStat.isFile()){
+     if(markStat.size>2048)throw Error('GIT_MARK_TOO_LARGE');
+     const text=read(gitMark).toString('utf8').trim();
+     const ref=/^gitdir:\s*(.+)$/i.exec(text);
+     if(!ref)throw Error('GIT_MARK_INVALID');
+     const dir=realpath(path.resolve(real,ref[1]));
+     if(!inside(dir)||!fs.statSync(dir).isDirectory())throw Error('GIT_DIR_OUTSIDE_ROOT');
+    }else if(!markStat.isDirectory())throw Error('GIT_MARK_INVALID');
+    const sourceFile=realpath(path.join(real,'scripts','pc-writer','local-cycle.mjs'));
+    if(!inside(sourceFile)||!fs.statSync(sourceFile).isFile())throw Error('NOT_A_WRITER_CHECKOUT');
+    const candidate={
+     evidenceLevel:'HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME',
+     sourceRoot:relative(real),gitVerified:false,head:null,trackedDirty:null,
+     matchesWriterCheckpoint:null,requiredFiles:[],
+    };
+    try{
+     const head=git(real,['rev-parse','--verify','HEAD']).trim();
+     const status=git(real,['status','--porcelain','--untracked-files=no']);
+     if(/^[a-f0-9]{40}$/i.test(head)&&typeof status==='string'){
+      candidate.gitVerified=true;candidate.head=head.toLowerCase();
+      candidate.trackedDirty=status.trim().length>0;
+      if(result.lastWriterEvidence){
+       candidate.matchesWriterCheckpoint=
+        candidate.head===result.lastWriterEvidence.sourceHead;
+      }
+     }
+    }catch{} // Unreadable Git evidence must remain unverified.
+    for(const name of sourceFiles){
+     const filename=path.join(real,...name.split('/'));
+     let file=null;
+     try{file=realpath(filename);}catch{}
+     const safe=!!file&&inside(file)&&exists(file);
+     let present=false,hash=null;
+     if(safe){
+      try{
+       const stat=fs.statSync(file);
+       present=stat.isFile();
+       if(present&&stat.size<=1048576)hash=sha256(read(file));
+      }catch{}
+     }
+     candidate.requiredFiles.push({path:name,exists:present,sha256:hash});
+    }
+    result.historicalCheckoutCandidate=candidate;
+   }
+  }catch{} // Missing, escaped or invalid historical checkout: no inferred source.
+  return result;
+ }
+
  try{
   result.sourceHead=git(sourceRoot,['rev-parse','HEAD']).trim();
   const dirty=git(sourceRoot,['status','--porcelain','--untracked-files=no']);
