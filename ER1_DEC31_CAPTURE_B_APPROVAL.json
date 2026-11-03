@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_ER1_DEC31_CAPTURE_APPROVAL_V1",
+  "scope": "PC_PRIVATE_CALENDAR_DATES_2026_12_01_THROUGH_2026_12_31_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/zgmini-gpt-workspace-20261025",
+  "sourceSha": "462941884db7ad2ebb25a7e5872296d074a10c23",
+  "sourceFile": "scripts/pc-writer/market-calendar-dec31-forward-capture.mjs",
+  "sourceFileSha256": "746f9071d45555c02bfbf39fcfce9c81707431fe4c6cc180d9e97fb86733f03c",
+  "start": "2026-12-01",
+  "end": "2026-12-31",
+  "maxProviderRequests": 31,
+  "maxAutomaticRetries": 0,
+  "allowCoreReadOnly": true,
+  "allowCoreWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowChangesToExisting14DayFeed": false,
+  "allowPublicRawData": false
+}

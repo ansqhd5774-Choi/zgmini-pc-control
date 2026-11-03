@@ -28,6 +28,7 @@ test('empty save is missing, 20 excluded and 31 explicitly unregistered',()=>wit
   assert.equal(found.gscpi21.status,'MISSING');
   assert.equal(found.sce31.status,'NOT_REGISTERED');
   assert.equal(found.excluded20.status,'EXCLUDED_BY_USER');
+  assert.equal(found.manufacturing30.status,'NOT_EVALUATED_IN_21_READONLY');
   assert.equal(found.status,'PASS');
 }));
 

@@ -1,14 +1,14 @@
 # 새 일반챗의 자동 작업 시작
 
-2026-11-03 통합 개정: 공통 정본 2절에 현재 상태/접수 실패 분류, 3절에 단계별 복구·재개, 5절에 기능 공통 복구 상시 승인, 6·8절에 대기 해제·관측시각·완료 구분을 포함한다. 이전 사본만으로 과거 차단을 반복하지 않는다.
+2026-11-04 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
 
 사용자가 작업 전에 전달할 짧은 지침은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)다. 현재 상태와 접수 문제는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)로 분류한다. 요약을 읽은 것만으로 최신 정본·실제 상태 확인을 대체하지 않는다.
 
-공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), 실PC 완료 증거는 [PC_AUTOMATION_RUNTIME_20261103.json](PC_AUTOMATION_RUNTIME_20261103.json)이다. 기존 설치·인계·자동 업데이트를 미완료로 되돌려 처음부터 반복하지 않는다.
+공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md)다. 기존 Runtime 증거는 필요한 대상·시각·source 범위에서 내부 전제로 재사용하고 현재 업무를 실행한다. 정상 업무마다 과거 설치·복구를 다시 확인하거나 이를 ‘가장 중요한 진전’으로 반복 보고하지 않는다. 보고는 이번 수행·검증·실제 미해결 조건·다음 행동에 한정한다.
 
 다른 담당자의 변경이 공용 설치에 섞여 있으면 [적용 대기열 운영 방침](CONTROLLER_APPLY_QUEUE.md)에 따라 단일 조정 원장에 등록한다. 실제 설치 SHA와 각 변경의 승인·의존성을 적용 담당 한 명이 정리한다. 통합 또는 순차 적용을 정하고, 대기 보고에는 선행 항목·담당·다음 실행 조건을 명시한다. 독립 개발·검토는 계속한다.
 
-Runner 연결 장애와 복구는 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 독립 유지보수기 갱신과 Runner 연결 복구를 구분한다.
+실제 Runner 연결 장애가 있을 때 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 정상 업무의 필수 시작 절차로 복구 검사를 추가하지 않는다.
 
 Controller 설치 잠금·RECOVERY_REQUIRED는 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)를 따른다. 기존 요청의 단계/소유자/실제 바이트/부작용을 확인한 뒤 지원되는 복구 도구를 사용하고 결과 회수·재개까지 담당한다. 진단 PASS나 잠금 보관을 업데이트 PASS로 보고하지 않는다.
 

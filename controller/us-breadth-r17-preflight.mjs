@@ -68,6 +68,14 @@ export function assessR17Evidence(e){
   runtimeSourceVerified:false,canInstall:false,providerCalls:0,sqliteWrites:0,d1Writes:0};
 }
 
+/** Interrupted probe is a single bounded unknown, not multiple observed failures. */
+export function summarizeR17Probe(evidence){
+ const report=assessR17Evidence(evidence);
+ const at=evidence?.stoppedAt;
+ return at?{...report,code:'R17_PREFLIGHT_INTERRUPTED',
+  reasons:['R17_PREFLIGHT_INTERRUPTED:'+at],stoppedAt:at}:report;
+}
+
 function textAt(root,name,cap=262144){
  const file=path.join(root,...name.split('/'));
  const actual=fs.realpathSync.native(file);
@@ -79,7 +87,8 @@ function textAt(root,name,cap=262144){
 }
 function git(root,args,input=null){
  const binary=gitBinary();if(!binary)throw Error('GIT_UNAVAILABLE');
- return execFileSync(binary,['--no-optional-locks','-C',root,...args],
+ return execFileSync(binary,['--no-optional-locks','-c','core.fsmonitor=false',
+   '-c','core.untrackedCache=false','-C',root,...args],
   {encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:65536,
    env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'},
    input:input??undefined});
@@ -99,6 +108,10 @@ function staticQuotaContract(root){
   /withAlpacaLock/.test(ledgerText)&&
   /alpacaReserve/.test(ledgerText);
 }
+export function isTrackedSourceDirty(status){
+ return typeof status==='string'?status.trim().length>0:null;
+}
+
 /**
  * Live PC invocation is deliberate and read-only. This code cannot be called
  * through existing pc-job or pc-maintenance contracts; a separate reviewed,
@@ -108,22 +121,29 @@ export function inspectR17Windows(){
  if(process.platform!=='win32')return {status:'BLOCKED',code:'WINDOWS_REQUIRED'};
  // Exact PR #957 two-file patch travels inside this approved controller module.
  const evidence={head:null,dirty:null,hashes:{},present:{},
-  patchHash:null,patchApplies:false,quotaContract:false,taskLinked:false};
+  patchHash:null,patchApplies:false,quotaContract:false,taskLinked:false,stoppedAt:null};
+ let step='SOURCE_ROOT';
  try{
   const root=fs.realpathSync.native(R17_ROOT);
   if(path.win32.normalize(root).toLowerCase()!==
      path.win32.normalize(R17_ROOT).toLowerCase())
    throw Error('UNEXPECTED_SOURCE_JUNCTION');
+  step='GIT_HEAD';
   evidence.head=git(root,['rev-parse','--verify','HEAD']).trim().toLowerCase();
-  evidence.dirty=git(root,['status','--porcelain','--untracked-files=no']).trim()==='';
+  step='GIT_STATUS';
+  evidence.dirty=isTrackedSourceDirty(git(root,['status','--porcelain','--untracked-files=no']));
+  step='BASE_FILE_HASHES';
   for(const name of Object.keys(R17_BASE_FILES))
    evidence.hashes[name]=digest(textAt(root,name));
+  step='NEW_FILE_COLLISIONS';
   for(const name of R17_MISSING){
    const file=path.join(root,...name.split('/'));
    try{fs.lstatSync(file);evidence.present[name]=true;}
    catch(error){evidence.present[name]=error?.code==='ENOENT'?false:null;}
   }
+  step='QUOTA_CONTRACT';
   evidence.quotaContract=staticQuotaContract(root);
+  step='PATCH_HASH';
   const patchBytes=Buffer.from(R17_PATCH_TEXT,'utf8');
   if(patchBytes.length>65536)throw Error('PATCH_TOO_LARGE');
   evidence.patchHash=digest(patchBytes);
@@ -133,15 +153,20 @@ export function inspectR17Windows(){
   }
   // Only the exact observed VBS chain is admitted. Neither a Task working
   // directory nor a historical checkout by itself establishes live source.
+  step='CORE_TASK_XML';
   const task=execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),
    ['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
    {windowsHide:true,timeout:10000,maxBuffer:262144});
   const action=taskAction(task);
+  step='VBS_CHAIN';
   const launchers=R17_VBS_CHAIN.map(item=>{
    const bytes=textAt('E:\\ZGmini',item.path,65536);
    return {sha256:digest(bytes),text:decoded(bytes)};
   });
   evidence.taskLinked=assessR17TaskChain({action,launchers});
- }catch{/* Never disclose paths, source, credentials, command outputs or raw errors. */}
- return assessR17Evidence(evidence);
+  step=null;
+ }catch{/* Never disclose command outputs, paths or secrets. */
+  evidence.stoppedAt=step;
+ }
+ return summarizeR17Probe(evidence);
 }

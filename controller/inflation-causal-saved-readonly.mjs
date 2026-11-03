@@ -75,7 +75,8 @@ export function inspectInflationCausalSaved(dataRoot) {
     excluded20:{status:'EXCLUDED_BY_USER'},
     gscpi21:{status:'MISSING'},
     sce31:{status:'NOT_REGISTERED'},
-    manufacturing30:{status:'DEFERRED_UNTIL_21_31'},
+    // #30 is an independent study candidate, not gated on #21/#31.
+    manufacturing30:{status:'NOT_EVALUATED_IN_21_READONLY'},
     providerCalls:0,dbWrites:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
   if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot)){
     output.status='BLOCKED';output.code='DATA_ROOT_NOT_ABSOLUTE';return output;

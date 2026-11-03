@@ -5,12 +5,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- validateControllerConfigTransition,controllerAdmissionForPurpose,readAllMaintenancePages,validateInfrastructureDelta} from './maintenance-contract.mjs';
+validateControllerConfigTransition,controllerAdmissionForPurpose,
+ readAllMaintenancePages,validateInfrastructureDelta,
+ validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
+ decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
+ R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
+ R6_HOST_CANDIDATE_SHA256} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
@@ -36,6 +41,16 @@ const hostPath=path.join(controlRoot,'host.json');
 const recordDir=path.join(maintenanceRoot,'ledger');
 const safeId=x=>{need(/^pc-[a-z0-9-]{8,76}$/.test(x??''),'MAINTENANCE_REQUEST_ID');return x;};
 const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
+const R6_HOST_TITLE='pc-r6-host-register';
+const R6_SOURCE_MANIFEST_PATH='drafts/employment-r6/source-manifest.json';
+const R6_STAGE_TOOL_HASH='66400ce7eca77997b92b1b42e72f409c0e9fdb6154599fd61d93e7825cca2a0a';
+const R6_APPLY_TOOL_HASH='ab79308af8010cf04091fb440c04c70f725679fbc50f1ade9149a5e666682be1';
+const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
+const r6FileIdentity=file=>{const s=fs.statSync(file,{bigint:true});
+ need(s.isFile(),'R6_HOST_DB_NOT_REGULAR');
+ return {realpath:fs.realpathSync(file),dev:String(s.dev),ino:String(s.ino),
+  size:String(s.size),mtimeNs:String(s.mtimeNs)};
+};
 export function reconnectState({now,deadline,matched,online}){
  return matched&&online?'PASS':now<deadline?'WAIT':'TIMEOUT';
 }
@@ -587,9 +602,827 @@ export function maintenanceNextAction(s){
   updateSuccessProven:false};
 }
 
+// The host-only R6 B path reuses this *installed* maintainer and its install
+// lease. No general pc-job argument, arbitrary command, or mutable downloaded
+// executable is permitted. The two source helpers are copied from reviewed
+// Git blobs only after exact SHA-256 verification.
+function readR6GitHubBytes(repository,relative,ref){
+ need(repository===controlRepository||repository==='ansqhd5774-Choi/zgmini',
+  'R6_HOST_SOURCE_REPOSITORY_NOT_ALLOWED');
+ need(/^[a-z0-9][a-z0-9./_-]{1,150}$/i.test(relative)&&!relative.includes('..'),
+  'R6_HOST_SOURCE_PATH_INVALID');
+ need(ref==='main'||ref===R6_HOST_SOURCE_SHA,'R6_HOST_SOURCE_REF_INVALID');
+ const route=`repos/${repository}/contents/${relative}?ref=${ref}`;
+ const response=execFileSync(gh,['api',route],{
+  windowsHide:true,encoding:'utf8',timeout:60000,maxBuffer:4e6});
+ let file;try{file=JSON.parse(response);}catch{need(false,'R6_HOST_SOURCE_API_INVALID');}
+ need(file?.type==='file'&&file.encoding==='base64'
+   &&typeof file.content==='string'&&file.content.length<=500000,
+   'R6_HOST_SOURCE_API_INVALID');
+ const compact=file.content.replace(/\s/g,'');
+ need(/^[A-Za-z0-9+/]*={0,2}$/.test(compact),'R6_HOST_SOURCE_BASE64_INVALID');
+ return Buffer.from(compact,'base64');
+}
+
+function loadApprovedR6HostPackage(requestId,file){
+ const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
+ need(path.resolve(file)===path.resolve(expected),'R6_HOST_APPROVAL_FILE_PATH');
+ const data=json(expected),{issue,manifestRawBase64}=data;
+ need(issue?.requestId===requestId&&issue.operation==='employment-r6-host-register'
+   &&issue.controlRepository===controlRepository,'R6_HOST_MAINTENANCE_REQUEST_MISMATCH');
+ need(data.actor==='ansqhd5774-Choi'&&Number.isSafeInteger(data.issueNumber),
+   'R6_HOST_MAINTENANCE_ACTOR_NOT_APPROVED');
+ const raw=Buffer.from(manifestRawBase64??'','base64');
+ need(raw.length>0&&raw.length<=32768&&sha256(raw)===issue.approvalManifestSha256,
+   'R6_HOST_APPROVAL_MANIFEST_DRIFT');
+ const actual=github('issues/'+data.issueNumber);
+ let actualBody;try{actualBody=JSON.parse(actual.body);}catch{need(false,'R6_HOST_ISSUE_READBACK_INVALID');}
+ const authenticated=validateR6HostIssueEnvelope(actualBody,{
+  actor:actual.user?.login,controlRepository});
+ need(JSON.stringify(authenticated)===JSON.stringify(issue)
+   &&actual.user?.login===data.actor
+   &&actual.state==='open'&&actual.title===R6_HOST_TITLE
+   &&actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,
+   'R6_HOST_ISSUE_IDENTITY_DRIFT');
+ const {manifest}=validateR6HostRegistrationRequest(issue,raw,{
+  actor:data.actor,controlRepository,installedSha:installedManifest().installedSha});
+ need(data.manifest&&JSON.stringify(data.manifest)===JSON.stringify(JSON.parse(raw)),
+   'R6_HOST_APPROVED_PACKAGE_CHANGED');
+ return {...data,issue:authenticated,manifest};
+}
+
+async function importPinnedR6HostHelpers(requestId){
+ const items=[
+  ['stage-r6-host-registration.mjs',R6_STAGE_TOOL_HASH],
+  ['apply-r6-host-overlay-b.mjs',R6_APPLY_TOOL_HASH],
+ ];
+ need(git(['status','--porcelain']).trim()==='','R6_HOST_CONTROL_CHECKOUT_DIRTY');
+ git(['fetch','--no-tags','origin','main']);
+ const root=path.join(maintenanceRoot,'approved','host-r6-modules-'+requestId);
+ need(!fs.existsSync(root),'R6_HOST_MODULES_ALREADY_STAGED');
+ fs.mkdirSync(root);
+ for(const [filename,digest] of items){
+  const source=git(['show','refs/remotes/origin/main:tools/'+filename],{encoding:null});
+  need(sha256(source)===digest,'R6_HOST_MODULE_SOURCE_DRIFT');
+  const dest=path.join(root,filename);
+  fs.writeFileSync(dest,source,{flag:'wx'});
+  need(sha256(fs.readFileSync(dest))===digest,'R6_HOST_MODULE_READBACK_FAILED');
+ }
+ // These modules only import built-in Node modules and their verified sibling.
+ const staged=await import(pathToFileURL(path.join(root,items[0][0])).href);
+ const applied=await import(pathToFileURL(path.join(root,items[1][0])).href);
+ need(typeof staged.draftR6HostRegistration==='function'
+   &&typeof applied.applyPreparedR6HostB==='function','R6_HOST_MODULE_EXPORT_INVALID');
+ return {staged,applied};
+}
+
+function readR6HostStatus(requestId){
+ const current=readMaintenanceRecoveryStatus(requestId);
+ const backup=path.join(controlRoot,'backups','r6-host-'+requestId);
+ let hostSha256=null,hostReadbackCode=null;
+ try{hostSha256=sha256(fs.readFileSync(hostPath));}
+ catch{hostReadbackCode='R6_HOST_BYTES_UNAVAILABLE';}
+ const guidance=current.installLock?.held&&current.installLock.recoveryRequired
+  ?{state:'RECOVERY_REQUIRED',next:'INSPECT_R6_HOST_BACKUP_JOURNAL_AND_INTAKE_NO_CONTROLLER_ABORT',blockScope:'SHARED_HOST_APPLY_ONLY'}
+  :current.guidance;
+ let recovery=null;
+ if(current.ledger?.status==='RECOVERY_REQUIRED'){
+  try{
+   const completion=path.join(maintenanceRoot,'recovery','host-r6-'+requestId+'.json');
+   const archive=path.join(maintenanceRoot,'recovery','host-r6-'+requestId+'.lease');
+   const done=fs.existsSync(completion)?json(completion):null;
+   recovery=done?.schema==='ZGMINI_R6_HOST_RECOVERY_V1'
+    &&done.requestId===requestId&&done.status==='RECOVERY_COMPLETED'
+    &&done.leaseArchive===archive&&fs.existsSync(archive)
+    &&current.installLock?.held===false
+    ?{status:'ARCHIVED_RECOVERY_EVIDENCE',code:done.code,
+      historicalHostOutcome:done.hostOutcome,archiveVerified:true,
+      currentRuntimeVerified:false}
+    :readR6HostRecoveryEvidence(requestId,current.ledger,hostSha256,current.installLock);
+  }
+  catch{recovery={status:'STATE_UNKNOWN',code:'R6_HOST_RECOVERY_INSPECTION_FAILED',
+   next:'READ_ONLY_RECONCILE_R6_HOST_EVIDENCE_NO_MUTATION'};}
+ }
+ return {...current,guidance,hostSha256,hostReadbackCode,recovery,
+  backupExists:fs.existsSync(backup),
+  appliedMarker:fs.existsSync(path.join(backup,'APPLIED.json')),
+  rollbackMarker:fs.existsSync(path.join(backup,'ROLLED_BACK.json'))};
+}
+
+function readR6HostRecoveryEvidence(requestId,ledger,hostSha256,installLock){
+ const leaseDir=path.join(maintenanceRoot,'leases/controller-install');
+ const backupDir=path.join(controlRoot,'backups','r6-host-'+requestId);
+ const safeRead=file=>{try{return json(file);}catch{return null;}};
+ const owner=safeRead(path.join(leaseDir,'owner.json'));
+ const marker=safeRead(path.join(leaseDir,'RECOVERY_REQUIRED.json'));
+ const markerMatches=Boolean(owner&&marker&&owner.nonce===marker.nonce
+   &&owner.pid===marker.requestOwnerPid&&owner.nonce===ledger.leaseOwnerNonce
+   &&owner.pid===ledger.leaseOwnerPid);
+ let ownerDead=false;
+ if(Number.isSafeInteger(owner?.pid)&&owner.pid>0){
+  try{process.kill(owner.pid,0);}catch(e){if(e?.code==='ESRCH')ownerDead=true;}
+ }
+ let protectedSame=false,dbIdentitySame=false;
+ try{protectedSame=sha256(Buffer.from(JSON.stringify(protectedSnapshot())))===ledger.protectedBeforeSha256;}
+ catch{/* deny recovery without a comparable protected-before snapshot */}
+ try{
+  dbIdentitySame=JSON.stringify(r6FileIdentity(ledger.coreBefore.realpath))===JSON.stringify(ledger.coreBefore)
+   &&JSON.stringify(r6FileIdentity(ledger.candidateBefore.realpath))===JSON.stringify(ledger.candidateBefore);
+ }catch{/* unknown identity is never safe to reconcile */}
+ let backupSha256=null;
+ try{
+  const f=path.join(backupDir,'HOST_BEFORE.bytes'),stat=fs.lstatSync(f);
+  if(stat.isFile()&&!stat.isSymbolicLink())backupSha256=sha256(fs.readFileSync(f));
+ }catch{/* backup can be absent before a host switch */}
+ const journal=safeRead(path.join(backupDir,'HOST_B_APPLY_JOURNAL.json'));
+ const applied=safeRead(path.join(backupDir,'APPLIED.json'));
+ const rolledBack=safeRead(path.join(backupDir,'ROLLED_BACK.json'));
+ const journalValid=journal?.schema==='R6_B_JOURNAL_V1'&&journal?.state==='PREPARED'
+   &&journal.beforeSha256===ledger.hostOriginalSha256
+   &&journal.targetSha256===ledger.hostProposedSha256;
+ const appliedMarkerValid=applied?.status==='APPLIED'
+   &&applied.newHostSha256===ledger.hostProposedSha256;
+ const rollbackMarkerValid=rolledBack?.status==='ROLLED_BACK'
+   &&sha256(fs.readFileSync(hostPath))===ledger.hostOriginalSha256;
+ const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+ let backlogExists=false;
+ try{if(fs.existsSync(backlogFile)){
+  const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
+  backlogExists=backlog.requestId===requestId
+   &&(!ledger.pauseAttempted||windows[0].pausedAt===ledger.pauseStartedAt);
+ }}catch{/* malformed backlog cannot authorize workflow resume */}
+ let workflowState='UNKNOWN';
+ try{workflowState=github('actions/workflows/pc-job.yml').state;}catch{/* offline readback is UNKNOWN */}
+ const decision=classifyR6HostRecovery({ledgerStatus:ledger.status,
+  installLeaseHeld:installLock?.held===true&&installLock?.recoveryRequired===true,
+  markerMatches,ownerDead,protectedSame,dbIdentitySame,
+  workflowState,backlogExists,pauseAttempted:ledger.pauseAttempted===true,hostSha256,
+  originalSha256:ledger.hostOriginalSha256,proposedSha256:ledger.hostProposedSha256,
+  backupSha256,journalValid,appliedMarkerValid,rollbackMarkerValid});
+ return {observedAt:new Date().toISOString(),...decision,hostSha256,
+  workflowState,backlogExists,ownerDead,markerMatches,protectedSame,dbIdentitySame,
+  backupReadbackVerified:backupSha256===ledger.hostOriginalSha256,
+  journalValid,appliedMarkerValid,rollbackMarkerValid};
+}
+
+
+function replayR6Backlog(requestId,backlogFile){
+ let state=json(backlogFile);
+ const windows=backlogPauseWindows(state);
+ need(state.requestId===requestId,'R6_HOST_BACKLOG_REQUEST_ID_DRIFT');
+ const ledger=json(path.join(recordDir,requestId+'.json'));
+ need(ledger.pauseAttempted===true&&windows[0].pausedAt===ledger.pauseStartedAt,
+  'R6_HOST_BACKLOG_START_DRIFT');
+ need(windows.length>0&&windows.every(w=>w.resumedAt),'R6_HOST_BACKLOG_WINDOW_UNCLOSED');
+ const candidates=new Map();
+ for(const window of windows){
+  const from=Date.parse(window.pausedAt)-2000,to=Date.parse(window.resumedAt);
+  need(Number.isFinite(from)&&Number.isFinite(to)&&to>=from,'R6_HOST_BACKLOG_TIME_INVALID');
+  for(let page=1;page<=20;page++){
+   const list=github(`issues?state=all&since=${encodeURIComponent(new Date(from).toISOString())}&per_page=100&page=${page}`);
+   need(Array.isArray(list),'R6_HOST_BACKLOG_LIST_INVALID');
+   for(const issue of list)if(backlogIssueInPause(issue,window))candidates.set(issue.number,issue);
+   if(list.length<100)break;
+   need(page<20,'R6_HOST_BACKLOG_LIST_TRUNCATED');
+  }
+ }
+ for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
+  const key=String(original.number);
+  if(['DONE','SKIPPED_RESULT_PRESENT'].includes(state.replays[key]?.status))continue;
+  const marker=`Maintenance replay ${requestId} original #${original.number}`;
+  if(state.replays[key]?.status==='POSTING'){
+   // The POST ACK may have been lost. Discover an exact previously accepted
+   // request before changing the journal; NEVER submit a second candidate.
+   const matches=[];
+   for(const window of windows){
+    const since=new Date(Date.parse(window.pausedAt)-2000).toISOString();
+    for(let page=1;page<=20;page++){
+     const rows=github(`issues?state=all&since=${encodeURIComponent(since)}&per_page=100&page=${page}`);
+     need(Array.isArray(rows),'R6_HOST_REPLAY_READBACK_UNAVAILABLE');
+     for(const found of rows)if(found.title===marker&&found.body===original.body
+       &&found.user?.login==='ansqhd5774-Choi'
+       &&found.labels?.some(x=>x.name==='pc-job')&&!found.pull_request)
+       matches.push(found.number);
+     if(rows.length<100)break;
+     need(page<20,'R6_HOST_REPLAY_SEARCH_TRUNCATED');
+    }
+   }
+   const unique=[...new Set(matches)];
+   need(unique.length===1,'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+   state.replays[key]={status:'DONE',originalRequestId:state.replays[key].originalRequestId,
+    replayIssueNumber:unique[0],recoveredFromLostAcknowledgement:true};
+   writeJson(backlogFile,state);
+   continue;
+  }
+  need(!state.replays[key],'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+  const comments=github(`issues/${original.number}/comments?per_page=100`);
+  if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
+   state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};
+   writeJson(backlogFile,state);
+   continue;
+  }
+  let body;try{body=JSON.parse(original.body);}catch{need(false,'R6_HOST_BACKLOG_ORIGINAL_BODY_INVALID');}
+  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
+  need(Object.keys(body).sort().join(',')===keys.sort().join(',')
+    &&body.schema==='ZGMINI_PC_JOB_V1'&&/^[a-z0-9-]{8,80}$/.test(body.requestId),
+    'R6_HOST_BACKLOG_ORIGINAL_REQUEST_INVALID');
+  state.replays[key]={status:'POSTING',originalRequestId:body.requestId};
+  writeJson(backlogFile,state);
+  const input=path.join(maintenanceRoot,'approved',requestId+'.replay-'+original.number+'.json');
+  writeJson(input,{title:marker,body:original.body,labels:['pc-job']});
+  let repost;
+  try{repost=github('issues','POST',input);}
+  catch{need(false,'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');}
+  need(Number.isSafeInteger(repost.number),'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+  state.replays[key]={status:'DONE',originalRequestId:body.requestId,replayIssueNumber:repost.number};
+  writeJson(backlogFile,state);
+  const notification=`<!-- zgmini-pc-backlog-replay:${requestId}:${original.number} -->\n`+
+   `This request arrived during a verified maintenance pause. Equivalent fixed request: #${repost.number}.`;
+  const commentInput=path.join(maintenanceRoot,'approved',requestId+'.replay-comment-'+original.number+'.json');
+  writeJson(commentInput,{body:notification});
+  try{github(`issues/${original.number}/comments`,'POST',commentInput);}catch{/* durable replay ledger */}
+ }
+}
+
+async function applyR6HostOnly(requestId,packageFile){
+ const {issue,manifest,issueNumber}=loadApprovedR6HostPackage(requestId,packageFile);
+ const ledgerFile=path.join(recordDir,requestId+'.json');
+ const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+ need(!fs.existsSync(ledgerFile),'R6_HOST_EXISTING_LEDGER_RECONCILE_FIRST');
+ need(!fs.existsSync(manifest.backupDirectory),'R6_HOST_BACKUP_ALREADY_EXISTS');
+ need(process.platform==='win32','R6_HOST_WINDOWS_REQUIRED');
+ const {owner}=readOwner();
+ verifyIndependent(owner.pid);
+ const installed=installedManifest();
+ need(installed.installedSha===manifest.installedControllerSha,
+  'R6_HOST_CONTROLLER_NOT_INSTALLED');
+ const policy=json(path.join(controlRoot,'config/operations.json'));
+ const r6Op=policy.operations?.['employment-r6-candidate-stage-readonly'];
+ need(r6Op?.grade==='A'&&r6Op.resource==='heavy'
+   &&r6Op.timeoutSeconds===240&&r6Op.minimumFreeMiB===1536,
+   'R6_HOST_CONTROLLER_OPERATION_NOT_INSTALLED');
+ const pr=github('pulls/'+manifest.approval.ref.split('/').pop());
+ need(pr.merged===true&&validSha(pr.merge_commit_sha),'R6_HOST_APPROVAL_PR_NOT_MERGED');
+ git(['fetch','--no-tags','origin','main']);
+ need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,'refs/remotes/origin/main']).trim()==='',
+  'R6_HOST_APPROVAL_PR_NOT_ON_MAIN');
+ const beforeHost=fs.readFileSync(hostPath);
+ need(sha256(beforeHost)===manifest.hostOriginalSha256,'R6_HOST_ORIGINAL_BYTES_CHANGED');
+ const originalProtected=protectedSnapshot();
+ const protectedBeforeSha256=sha256(Buffer.from(JSON.stringify(originalProtected)));
+ const candidateBytes=fs.readFileSync(manifest.candidatePath);
+ need(sha256(candidateBytes)===R6_HOST_CANDIDATE_SHA256,
+  'R6_HOST_CANDIDATE_BYTES_CHANGED');
+ const coreBefore=r6FileIdentity(path.join(installed.host.dataRoot,'pc-writer/storage/core.sqlite'));
+ const candidateBefore=r6FileIdentity(manifest.candidatePath);
+ need(coreBefore.realpath!==candidateBefore.realpath
+   &&!(coreBefore.dev===candidateBefore.dev&&coreBefore.ino===candidateBefore.ino),
+   'R6_HOST_DB_IDENTITY_ALIAS');
+ const lock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
+ let retained=false,paused=false,result=null;
+ const save=fields=>{
+  // Preserve the BEFORE proof across every phase. An uncertain post-swap
+  // recovery must never reconstruct pre-mutation identity from current bytes.
+  const previous=fs.existsSync(ledgerFile)?json(ledgerFile):{};
+  writeJson(ledgerFile,{...previous,schema:'ZGMINI_R6_HOST_B_LEDGER_V1',
+   requestId,issueNumber,targetControllerSha:issue.targetControllerSha,...fields});
+ };
+ try{
+ try{
+  save({status:'RUNNING',phase:'LEASE_ACQUIRED',firstFail:null,lastPass:'B_CONTRACT_VERIFIED',
+   hostOriginalSha256:manifest.hostOriginalSha256,hostProposedSha256:manifest.proposedSha256,
+   protectedBeforeSha256,coreBefore,candidateBefore,
+   leaseOwnerNonce:lock.owner.nonce,leaseOwnerPid:lock.owner.pid,
+   workflowInitiallyActive:true});
+  const modules=await importPinnedR6HostHelpers(requestId);
+  const rawManifest=readR6GitHubBytes(controlRepository,R6_SOURCE_MANIFEST_PATH,'main');
+  need(sha256(rawManifest)===R6_HOST_SOURCE_MANIFEST_SHA256,
+   'R6_HOST_SOURCE_MANIFEST_DRIFT');
+  const sourceManifest=JSON.parse(rawManifest.toString('utf8'));
+  const files={};
+  for(const rel of modules.staged.R6_SOURCE_FILES){
+   const bytes=readR6GitHubBytes('ansqhd5774-Choi/zgmini',rel,R6_HOST_SOURCE_SHA);
+   need(sha256(bytes)===sourceManifest.files?.[rel],'R6_HOST_SOURCE_BYTES_DRIFT');
+   files[rel]=bytes;
+  }
+  need(github('actions/workflows/pc-job.yml').state==='active',
+   'R6_HOST_WORKFLOW_NOT_ACTIVE_PREEXISTING');
+  const at=new Date().toISOString();
+  writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+   pausedAt:at,resumedAt:null,replays:{},windows:[{pausedAt:at,resumedAt:null}]});
+  save({status:'RUNNING',phase:'PAUSE_ATTEMPTED',pauseAttempted:true,pauseStartedAt:at,
+   lastPass:'SOURCE_BYTES_VERIFIED'});
+  // Mark the attempt before the network call: an ACK can be lost after GitHub
+  // has already disabled intake. Always reconcile its actual state on error.
+  paused=true;
+  try{github('actions/workflows/pc-job.yml/disable','PUT');}
+  catch{need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+    'R6_HOST_WORKFLOW_DISABLE_OUTCOME_UNKNOWN');}
+  need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+   'R6_HOST_WORKFLOW_DISABLE_NOT_CONFIRMED');
+  let quiet=0;
+  for(let n=0;n<180;n++){
+   const rows=github('actions/runners?per_page=100').runners;
+   need(Array.isArray(rows)&&rows.length===6
+     &&requiredRunners.every(name=>rows.some(row=>row.name===name)),
+     'R6_HOST_RUNNER_SET_DRIFT');
+   const active=['in_progress','queued','waiting'].reduce((sum,status)=>
+     sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
+   const leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
+   if(rows.every(x=>x.status==='online'&&!x.busy)&&active===0&&leases.length===0){
+    if(++quiet>=2)break;
+   }else quiet=0;
+   need(n<179,'R6_HOST_DRAIN_WAIT_TIMEOUT');
+   await wait(3000);
+  }
+  save({status:'RUNNING',phase:'DRAIN_VERIFIED',lastPass:'WORKFLOW_PAUSED_AND_DRAINED'});
+  const stageRoot=path.dirname(manifest.stageBundle);
+  const approvedStageRoot=path.join(controlRoot,'source-bundles');
+  need(path.resolve(stageRoot)===path.resolve(approvedStageRoot),
+   'R6_HOST_STAGE_ROOT_OUTSIDE_CONTROL');
+  if(!fs.existsSync(stageRoot))fs.mkdirSync(stageRoot);
+  const proposal=modules.staged.draftR6HostRegistration({
+   installedHost:installed.host,sourceFiles:files,manifestBytes:rawManifest,
+   sourceSha:R6_HOST_SOURCE_SHA,candidatePath:manifest.candidatePath,stageRoot});
+  need(sameR6WindowsPath(proposal.stageBundle,manifest.stageBundle)
+   &&proposal.manifestSha256===manifest.sourceManifestSha256
+   &&proposal.existingApprovalsPreserved,'R6_HOST_SOURCE_STAGE_SCOPE_CHANGED');
+  need(sha256(Buffer.from(JSON.stringify(proposal.proposedHost,null,2)+'\n'))===manifest.proposedSha256,
+   'R6_HOST_PROPOSAL_SHA_CHANGED');
+  save({status:'RUNNING',phase:'BUNDLE_STAGED',lastPass:'R6_SOURCE_16_FILE_READBACK_VERIFIED'});
+  const runtimeProbe=()=>{
+   const current=readOwner();
+   need(current.owner.pid===owner.pid&&current.owner.nonce===owner.nonce,
+    'R6_HOST_SUPERVISOR_OWNER_CHANGED');
+   verifyIndependent(current.owner.pid);
+   need(sha256(fs.readFileSync(manifest.candidatePath))===manifest.candidateSha256,
+    'R6_HOST_CANDIDATE_BYTES_CHANGED');
+   const liveLease=json(path.join(maintenanceRoot,'leases/controller-install/owner.json'));
+   const owned=liveLease.pid===process.pid&&liveLease.nonce===lock.owner.nonce;
+   const rows=github('actions/runners?per_page=100').runners;
+   const active=['in_progress','queued','waiting'].reduce((sum,status)=>
+     sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
+   return {controlRepository,workflowState:github('actions/workflows/pc-job.yml').state,
+    installLeaseHeldByThisOperator:owned,inFlightPcJobs:active,
+    uploadsPending:fs.existsSync(path.join(controlRoot,'leases/result-upload'))?1:0,
+    runners:rows.map(row=>({name:row.name,online:row.status==='online',busy:row.busy})),
+    observedAt:new Date().toISOString()};
+  };
+  const applied=modules.applied.applyPreparedR6HostB({
+   approval:{schema:manifest.schema,scope:manifest.scope,sourceSha:manifest.sourceSha,
+    sourceManifestSha256:manifest.sourceManifestSha256,
+    installedControllerSha:manifest.installedControllerSha,hostSha256:manifest.hostOriginalSha256,
+    proposedHostSha256:manifest.proposedSha256,hostPath:manifest.hostPath,
+    candidatePath:manifest.candidatePath,stageBundle:proposal.stageBundle,
+    backupDirectory:manifest.backupDirectory},
+   proposedHost:proposal.proposedHost,runtimeProbe,
+   // verifyIndependent performed the actual Windows WMI origin check above;
+   // these are NOT fields accepted from the external Issue or manifest.
+   windowsProvenance:{verified:true,sameUserAndSession:true,maintainerIndependent:true}});
+  need(JSON.stringify(protectedSnapshot())===JSON.stringify(originalProtected),
+   'R6_HOST_PROTECTED_OPERATION_CHANGED');
+  if(applied.status==='RECOVERY_REQUIRED'){
+   result={status:'RECOVERY_REQUIRED',code:applied.code,lastPass:'BUNDLE_STAGED',
+    firstFail:applied.code,actualControllerSha:installed.installedSha};
+   save({status:'RECOVERY_REQUIRED',phase:'ROLLBACK_UNVERIFIED',result});
+   lock.holdForRecovery();retained=true;
+   return result;
+  }
+  const expectedSha=applied.status==='APPLIED'
+   ?manifest.proposedSha256:manifest.hostOriginalSha256;
+  need(sha256(fs.readFileSync(hostPath))===expectedSha,'R6_HOST_POST_APPLY_CAS_FAILED');
+  result={status:applied.status==='APPLIED'?'PASS':'ROLLED_BACK',
+   code:applied.status==='APPLIED'?'R6_HOST_APPLIED':applied.code,
+   lastPass:applied.status==='APPLIED'?'HOST_B_READBACK_VERIFIED':'HOST_B_ROLLBACK_VERIFIED',
+   firstFail:applied.status==='APPLIED'?null:applied.code,
+   actualControllerSha:installed.installedSha,protectedStateUnchanged:true};
+  save({status:'RUNNING',phase:applied.status,lastPass:result.lastPass});
+ }catch(error){
+  const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'R6_HOST_RUNTIME_PREFLIGHT_FAILED';
+  const journal=fs.existsSync(path.join(manifest.backupDirectory,'HOST_B_APPLY_JOURNAL.json'));
+  let protectedUnchanged=false,hostUnchanged=false;
+  try{protectedUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(originalProtected);}
+  catch{/* unknown means protection cannot be attested */}
+  try{hostUnchanged=sha256(fs.readFileSync(hostPath))===manifest.hostOriginalSha256;}
+  catch{/* unknown host bytes cannot be dismissed */}
+  // The B primitive creates its backup directory before its journal. A crash
+  // in that interval is partial staging, never a harmless clean preflight.
+  const backupPartial=fs.existsSync(manifest.backupDirectory);
+  const needsRecovery=journal||backupPartial||!protectedUnchanged||!hostUnchanged;
+  const stagePartial=fs.existsSync(path.join(maintenanceRoot,'approved','host-r6-modules-'+requestId))
+    ||fs.existsSync(manifest.stageBundle);
+  result={status:needsRecovery?'RECOVERY_REQUIRED':'BLOCKED',code,
+   lastPass:hostUnchanged?'HOST_BYTES_UNCHANGED':'B_CONTRACT_VERIFIED',
+   firstFail:code,actualControllerSha:installed.installedSha,
+   protectedStateUnchanged:protectedUnchanged};
+  save({status:result.status,phase:needsRecovery?'RECOVERY_REQUIRED'
+    :stagePartial?'STAGING_PARTIAL_HOST_UNCHANGED':'PRE_APPLY_BLOCKED',result});
+  if(needsRecovery){lock.holdForRecovery();retained=true;return result;}
+ }
+ // A terminal host result does not excuse abandoning requests received during
+ // the disabled workflow interval. Never replay one with unknown POST outcome.
+ if(paused&&!retained){
+  try{
+   github('actions/workflows/pc-job.yml/enable','PUT');
+   need(github('actions/workflows/pc-job.yml').state==='active',
+    'R6_HOST_WORKFLOW_ENABLE_NOT_CONFIRMED');
+   const backlog=json(backlogFile);
+   writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
+   replayR6Backlog(requestId,backlogFile);
+   result.workflowEnabled=true;
+   save({status:result.status,phase:'TERMINAL',result});
+  }catch(error){
+   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'R6_HOST_BACKLOG_OR_WORKFLOW_UNKNOWN';
+   let workflowEnabled=null;
+   try{workflowEnabled=github('actions/workflows/pc-job.yml').state==='active';}
+   catch{/* network outcome unknown: retain lease for supported recovery */}
+   result={...result,status:'RECOVERY_REQUIRED',code,firstFail:code,
+    workflowEnabled};
+   save({status:'RECOVERY_REQUIRED',phase:'INTAKE_RECONCILIATION_REQUIRED',result});
+   lock.holdForRecovery();retained=true;
+  }
+ }
+ return result;
+ }finally{if(!retained)lock.release();}
+}
+
+// Exceptional operator-only B recovery. The existing Controller recovery
+// program only supports its own controller-update journal; this path preserves
+// the original R6 request and lease while reconciling exactly that host.
+function recoverR6HostOnly(requestId,packageFile,mode){
+ need(['reconcile-intake','rollback-host'].includes(mode),'R6_RECOVERY_MODE_NOT_ALLOWED');
+ need(process.platform==='win32','R6_RECOVERY_WINDOWS_REQUIRED');
+ const {manifest,issueNumber}=loadApprovedR6HostPackage(requestId,packageFile);
+ const owner=readOwner();verifyIndependent(owner.owner.pid);
+ const recordDirPath=path.join(maintenanceRoot,'recovery');
+ const recordFile=path.join(recordDirPath,'host-r6-'+requestId+'.json');
+ const archive=path.join(recordDirPath,'host-r6-'+requestId+'.lease');
+ const previous=fs.existsSync(recordFile)?json(recordFile):null;
+ const phases=['PREPARED','HOST_ROLLED_BACK','PENDING_PRESERVED','ARCHIVE_PREPARED','RECOVERY_COMPLETED'];
+ need(!previous||(previous.schema==='ZGMINI_R6_HOST_RECOVERY_V1'
+  &&previous.requestId===requestId&&previous.issueNumber===issueNumber
+  &&previous.mode===mode&&previous.originalHostSha256===manifest.hostOriginalSha256
+  &&previous.proposedHostSha256===manifest.proposedSha256
+  &&phases.includes(previous.status)),'R6_RECOVERY_PRIOR_PHASE_REQUIRES_INSPECTION');
+ const status=readR6HostStatus(requestId),decision=status.recovery;
+ const leaseDir=path.join(maintenanceRoot,'leases/controller-install');
+ // The archive and completion record may both have been committed before the
+ // final GitHub acknowledgement disappeared. Recover the result by readback;
+ // never acquire a new claim or re-run the host/intake changes in this case.
+ if(previous?.status==='RECOVERY_COMPLETED'&&!fs.existsSync(leaseDir)){
+  const ledger=status.ledger;
+  let archiveVerified=false,ownerMarkerMatches=false,protectedSame=false,
+   dbIdentitySame=false,backlogVerified=false,workflowActive=false;
+  try{
+   const stat=fs.lstatSync(archive);
+   archiveVerified=stat.isDirectory()&&!stat.isSymbolicLink()
+    &&previous.leaseArchive===archive;
+   const originalOwner=json(path.join(archive,'owner.json')),
+    originalMarker=json(path.join(archive,'RECOVERY_REQUIRED.json'));
+   ownerMarkerMatches=originalOwner.pid===ledger.leaseOwnerPid
+    &&originalOwner.nonce===ledger.leaseOwnerNonce
+    &&originalMarker.requestOwnerPid===originalOwner.pid
+    &&originalMarker.nonce===originalOwner.nonce;
+   protectedSame=sha256(Buffer.from(JSON.stringify(protectedSnapshot())))===
+    ledger.protectedBeforeSha256;
+   dbIdentitySame=JSON.stringify(r6FileIdentity(ledger.coreBefore.realpath))===
+    JSON.stringify(ledger.coreBefore)
+    &&JSON.stringify(r6FileIdentity(ledger.candidateBefore.realpath))===
+      JSON.stringify(ledger.candidateBefore);
+   const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+   if(ledger.pauseAttempted===true){
+    const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
+    backlogVerified=backlog.requestId===requestId
+     &&windows[0].pausedAt===ledger.pauseStartedAt
+     &&windows.every(window=>window.resumedAt)
+     &&Object.values(backlog.replays??{}).every(item=>
+       ['DONE','SKIPPED_RESULT_PRESENT'].includes(item.status));
+   }else backlogVerified=true;
+   workflowActive=github('actions/workflows/pc-job.yml').state==='active';
+  }catch{/* Missing or changed evidence must not acknowledge a completed recovery. */}
+  need(verifyR6HistoricCompletion({status:decision?.status,
+    recordStatus:previous.status,archiveVerified,originalLeaseAbsent:true,
+    ownerMarkerMatches,protectedSame,dbIdentitySame,backlogVerified,
+    workflowActive,hostOutcome:previous.hostOutcome,
+    hostSha256:status.hostSha256,originalSha256:manifest.hostOriginalSha256,
+    proposedSha256:manifest.proposedSha256}),
+   'R6_RECOVERY_ARCHIVED_COMPLETION_UNVERIFIED');
+  return {status:'HISTORICAL_COMPLETE',code:'R6_RECOVERY_ALREADY_COMPLETED',
+   requestId,hostOutcome:previous.hostOutcome,workflowEnabled:true,
+   protectedStateUnchanged:true,originalRequestRetried:false,
+   readOnlyResultRecovered:true};
+ }
+ const archivedFinish=Boolean(previous?.status==='ARCHIVE_PREPARED'
+  &&!fs.existsSync(leaseDir)&&fs.existsSync(archive));
+ const reentry=decideR6RecoveryReentry({mode,previous,decision,
+  hostSha256:status.hostSha256,originalSha256:manifest.hostOriginalSha256,
+  proposedSha256:manifest.proposedSha256,archivedFinish});
+ const resumedRollback=reentry.resumedRollback===true;
+ need(status.ledger?.status==='RECOVERY_REQUIRED'
+  &&(decision?.status==='ELIGIBLE'||archivedFinish),
+  decision?.code??'R6_RECOVERY_EVIDENCE_NOT_ELIGIBLE');
+ need(reentry.allowed===true,reentry.code??'R6_RECOVERY_MODE_DOES_NOT_MATCH_ACTUAL_HOST');
+ const seatRows=github('actions/runners?per_page=100').runners;
+ need(Array.isArray(seatRows)&&seatRows.length===6&&requiredRunners.every(name=>
+  seatRows.some(x=>x.name===name&&x.status==='online'&&!x.busy)),
+  'R6_RECOVERY_RUNNERS_NOT_IDLE');
+ const active=['in_progress','queued','waiting'].reduce((sum,state)=>sum+
+  (github(`actions/workflows/pc-job.yml/runs?status=${state}&per_page=1`).total_count||0),0);
+ need(active===0,'R6_RECOVERY_PC_JOB_IN_FLIGHT');
+ // Reconciliation/rollback is an exceptional B write, not an automatic
+ // retransmission of the original request. Pin this incident's raw evidence
+ // in a separately committed technical recovery manifest before taking lease.
+ const leaseEvidencePath=archivedFinish?archive:leaseDir;
+ const initialLeaseEvidence={owner:fs.readFileSync(path.join(leaseEvidencePath,'owner.json')),
+  marker:fs.readFileSync(path.join(leaseEvidencePath,'RECOVERY_REQUIRED.json')),
+  ledger:fs.readFileSync(path.join(recordDir,requestId+'.json'))};
+ const recoveryApprovalPath='approvals/host-r6-recoveries/'+requestId+'.json';
+ git(['fetch','--no-tags','origin','main']);
+ let recoveryApproval,recoveryApprovalRaw;
+ try{recoveryApprovalRaw=git(['show','refs/remotes/origin/main:'+recoveryApprovalPath]);
+  recoveryApproval=JSON.parse(recoveryApprovalRaw);}
+ catch{need(false,'R6_RECOVERY_APPROVAL_NOT_FOUND_OR_INVALID');}
+ const keys=['schema','approved','mode','requestId','issueNumber','installedControllerSha',
+  'maintainerSourceSha','originalManifestSha256','ledgerSha256',
+  'leaseOwnerSha256','leaseMarkerSha256','hostOriginalSha256','hostProposedSha256'];
+ need(Object.keys(recoveryApproval).sort().join(',')===keys.sort().join(',')
+  &&recoveryApproval.schema==='ZGMINI_R6_HOST_RECOVERY_APPROVAL_V1'
+  &&recoveryApproval.approved===true&&recoveryApproval.mode===mode
+  &&recoveryApproval.requestId===requestId&&recoveryApproval.issueNumber===issueNumber
+  &&recoveryApproval.installedControllerSha===manifest.installedControllerSha
+  &&recoveryApproval.maintainerSourceSha===json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json')).sourceSha,
+  'R6_RECOVERY_APPROVAL_MISMATCH');
+ // The approval is tied to raw signed Issue and exact local pre-failure data;
+ // never accept a reconstructed JSON object as the original byte hash.
+ need(recoveryApproval.originalManifestSha256===
+   json(path.join(maintenanceRoot,'approved',requestId+'.json')).issue.approvalManifestSha256
+   &&recoveryApproval.ledgerSha256===sha256(initialLeaseEvidence.ledger)
+   &&recoveryApproval.leaseOwnerSha256===sha256(initialLeaseEvidence.owner)
+   &&recoveryApproval.leaseMarkerSha256===sha256(initialLeaseEvidence.marker)
+   &&recoveryApproval.hostOriginalSha256===manifest.hostOriginalSha256
+   &&recoveryApproval.hostProposedSha256===manifest.proposedSha256,
+  'R6_RECOVERY_APPROVAL_EVIDENCE_DRIFT');
+ // All Controller/R6 host recoveries share the same fixed atomic reservation.
+ const claimDir=path.join(maintenanceRoot,'leases/controller-recovery');
+ const claimRecord=path.join(claimDir,'owner.json');
+ const claimProof={requestId,mode,ledgerSha256:sha256(initialLeaseEvidence.ledger),
+  leaseOwnerSha256:sha256(initialLeaseEvidence.owner),
+  leaseMarkerSha256:sha256(initialLeaseEvidence.marker),
+  approvalSha256:sha256(recoveryApprovalRaw)};
+ try{fs.mkdirSync(claimDir);}catch(error){
+  if(error?.code!=='EEXIST')throw error;
+  // Reclaim only a fully pinned, dead claim for THIS incident. Keep the old
+  // directory as evidence, and let any competing Controller claim win the
+  // atomic mkdir race rather than deleting or replacing its reservation.
+  let stale;
+  try{stale=json(claimRecord);}catch{need(false,'R6_RECOVERY_CLAIM_OWNER_UNVERIFIED');}
+  need(sameR6RecoveryClaim(stale,claimProof),
+   'R6_RECOVERY_CLAIM_NOT_SAME_VERIFIED_REQUEST');
+  let dead=false;
+  try{process.kill(stale.pid,0);}catch(e){if(e?.code==='ESRCH')dead=true;}
+  need(dead,'R6_RECOVERY_CLAIM_OWNER_NOT_PROVEN_DEAD');
+  const retained=path.join(recordDirPath,'host-r6-'+requestId+'.claim-'+stale.nonce);
+  need(!fs.existsSync(retained),'R6_RECOVERY_CLAIM_ALREADY_RETAINED');
+  fs.mkdirSync(recordDirPath,{recursive:true});
+  fs.renameSync(claimDir,retained);
+  fs.mkdirSync(claimDir); // EEXIST means another recovery won; fail closed.
+ }
+ const claimNonce=randomUUID();
+ try{fs.writeFileSync(claimRecord,JSON.stringify({requestId,pid:process.pid,
+  nonce:claimNonce,at:new Date().toISOString(),...claimProof})+'\n',{flag:'wx'});}
+ catch{try{fs.rmdirSync(claimDir);}catch{}throw Object.assign(Error('R6_RECOVERY_CLAIM_WRITE_FAILED'),
+  {code:'R6_RECOVERY_CLAIM_WRITE_FAILED'});}
+ let retainClaim=false;
+ const leaseCas=()=>need(fs.readFileSync(path.join(leaseEvidencePath,'owner.json')).equals(initialLeaseEvidence.owner)
+  &&fs.readFileSync(path.join(leaseEvidencePath,'RECOVERY_REQUIRED.json')).equals(initialLeaseEvidence.marker)
+  &&fs.readFileSync(path.join(recordDir,requestId+'.json')).equals(initialLeaseEvidence.ledger),
+  'R6_RECOVERY_ORIGINAL_LEASE_OR_LEDGER_CHANGED');
+ const saveRecovery=fields=>{
+  const prior=fs.existsSync(recordFile)?json(recordFile):null;
+  if(prior){
+   need(prior.schema==='ZGMINI_R6_HOST_RECOVERY_V1'
+    &&prior.requestId===requestId&&prior.mode===mode
+    &&prior.originalHostSha256===manifest.hostOriginalSha256
+    &&prior.proposedHostSha256===manifest.proposedSha256
+    &&phases.includes(prior.status),'R6_RECOVERY_RECORD_DRIFT');
+   if(phases.indexOf(prior.status)>=phases.indexOf(fields.status))return prior;
+  }
+  const next={schema:'ZGMINI_R6_HOST_RECOVERY_V1',requestId,issueNumber,mode,
+   originalHostSha256:manifest.hostOriginalSha256,
+   proposedHostSha256:manifest.proposedSha256,...prior,
+   at:new Date().toISOString(),...fields};
+  writeJson(recordFile,next);
+  return next;
+ };
+ try{
+  const prior=fs.existsSync(recordFile)?json(recordFile):null;
+  need(JSON.stringify(prior)===JSON.stringify(previous),
+   'R6_RECOVERY_PRIOR_PHASE_CHANGED');
+  leaseCas();
+  if(archivedFinish){
+   // The lease rename may have succeeded before the completion journal was
+   // acknowledged. Never rename a second time or repeat backlog mutations.
+   need(previous?.workflowEnabled===true
+    &&['APPLIED','ROLLED_BACK','ORIGINAL_READBACK_NO_APPLY_PASS'].includes(previous.hostOutcome)
+    &&github('actions/workflows/pc-job.yml').state==='active'
+    &&status.recovery?.protectedSame===true&&status.recovery?.dbIdentitySame===true
+    &&status.hostSha256===(previous.hostOutcome==='APPLIED'
+      ?manifest.proposedSha256:manifest.hostOriginalSha256),
+    'R6_RECOVERY_ARCHIVED_FINISH_PROOF_FAILED');
+   const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+   if(status.ledger?.pauseAttempted){
+    need(fs.existsSync(backlogFile),'R6_RECOVERY_ARCHIVED_BACKLOG_MISSING');
+    const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
+    need(backlog.requestId===requestId
+     &&windows[0].pausedAt===status.ledger.pauseStartedAt
+     &&windows.every(w=>w.resumedAt)
+     &&Object.values(backlog.replays??{}).every(x=>['DONE','SKIPPED_RESULT_PRESENT'].includes(x.status)),
+     'R6_RECOVERY_ARCHIVED_BACKLOG_UNVERIFIED');
+   }
+   saveRecovery({status:'RECOVERY_COMPLETED',code:'R6_RECOVERY_LEASE_ARCHIVED',
+    hostOutcome:previous.hostOutcome,workflowEnabled:true,leaseArchive:archive});
+   retainClaim=false;
+   return {status:'RECOVERY_COMPLETED',code:'R6_RECOVERY_LEASE_ARCHIVED',
+    requestId,hostOutcome:previous.hostOutcome,workflowEnabled:true,
+    protectedStateUnchanged:true,originalRequestRetried:false,
+    recoveredFromLostArchiveAcknowledgement:true};
+  }
+  const same=readR6HostStatus(requestId).recovery;
+  need(same?.status==='ELIGIBLE'&&same.action===decision.action
+    &&same.hostSha256===decision.hostSha256
+    &&same.ownerDead&&same.markerMatches&&same.protectedSame&&same.dbIdentitySame,
+    'R6_RECOVERY_EVIDENCE_DRIFT');
+  if(previous&&phases.indexOf(previous.status)>=phases.indexOf('HOST_ROLLED_BACK')){
+   need(mode!=='rollback-host'||resumedRollback,
+    'R6_RECOVERY_REPORTED_ROLLBACK_HOST_DRIFT');
+  }
+  saveRecovery({status:'PREPARED',code:'R6_RECOVERY_PRECHECK_VERIFIED',
+   preHostSha256:previous?.preHostSha256??status.hostSha256});
+  if(reentry.operation==='ROLLBACK_HOST'){
+   const backupFile=path.join(manifest.backupDirectory,'HOST_BEFORE.bytes');
+   const before=fs.readFileSync(backupFile);
+   need(sha256(before)===manifest.hostOriginalSha256
+     &&sha256(fs.readFileSync(hostPath))===manifest.proposedSha256,
+     'R6_RECOVERY_ROLLBACK_CAS_CHANGED');
+   leaseCas();
+   need(sha256(Buffer.from(JSON.stringify(protectedSnapshot())))===
+    status.ledger.protectedBeforeSha256
+    &&JSON.stringify(r6FileIdentity(status.ledger.coreBefore.realpath))===
+      JSON.stringify(status.ledger.coreBefore)
+    &&JSON.stringify(r6FileIdentity(status.ledger.candidateBefore.realpath))===
+      JSON.stringify(status.ledger.candidateBefore),
+    'R6_RECOVERY_ROLLBACK_PROTECTED_CAS_CHANGED');
+   const tmp=path.join(path.dirname(hostPath),'.r6-recovery-'+requestId+'.tmp');
+   if(fs.existsSync(tmp)){
+    const s=fs.lstatSync(tmp);
+    need(s.isFile()&&!s.isSymbolicLink()&&s.nlink===1
+     &&sha256(fs.readFileSync(tmp))===manifest.hostOriginalSha256,
+     'R6_RECOVERY_ROLLBACK_TEMP_DRIFT');
+   }else{
+    const fd=fs.openSync(tmp,'wx');
+    try{fs.writeFileSync(fd,before);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+   }
+   need(sha256(fs.readFileSync(hostPath))===manifest.proposedSha256,
+    'R6_RECOVERY_HOST_CHANGED_DURING_RESTORE');
+   retainClaim=true; // Host mutation has begun; never auto-clear on failure.
+   fs.renameSync(tmp,hostPath);
+   need(sha256(fs.readFileSync(hostPath))===manifest.hostOriginalSha256,
+    'R6_RECOVERY_ROLLBACK_READBACK_FAILED');
+   const marker=path.join(manifest.backupDirectory,'ROLLED_BACK.json');
+   if(!fs.existsSync(marker))fs.writeFileSync(marker,
+    JSON.stringify({status:'ROLLED_BACK',reason:'R6_HOST_RECOVERY_VERIFIED'})+'\n',{flag:'wx'});
+   saveRecovery({status:'HOST_ROLLED_BACK',code:'R6_HOST_ORIGINAL_BYTES_VERIFIED'});
+  }else if(resumedRollback){
+   // A crash after the atomic host rename but before the rollback marker is
+   // harmless only when PREPARED proved the proposed bytes and current live
+   // bytes, journal, backup, DB and protected state all match the same request.
+   const marker=path.join(manifest.backupDirectory,'ROLLED_BACK.json');
+   if(!fs.existsSync(marker)){
+    retainClaim=true;
+    fs.writeFileSync(marker,JSON.stringify({status:'ROLLED_BACK',
+     reason:'R6_HOST_RECOVERY_VERIFIED'})+'\n',{flag:'wx'});
+   }
+   saveRecovery({status:'HOST_ROLLED_BACK',code:'R6_HOST_ORIGINAL_BYTES_VERIFIED'});
+  }
+  // A crash after writing .tmp but before host CAS leaves a future B attempt
+  // blocked. Preserve that exact old-owner temp as evidence; never unlink it.
+  const pending=path.join(path.dirname(hostPath),
+   '.r6-b-pending-'+manifest.hostOriginalSha256.slice(0,16)+'.tmp');
+  const retained=path.join(manifest.backupDirectory,'PENDING_TEMP_PRESERVED.bytes');
+  need(!(fs.existsSync(pending)&&fs.existsSync(retained)),
+   'R6_RECOVERY_PENDING_ARCHIVE_CONFLICT');
+  if(fs.existsSync(pending)){
+   const stat=fs.lstatSync(pending);
+   need(stat.isFile()&&!stat.isSymbolicLink(),'R6_RECOVERY_PENDING_NOT_REGULAR');
+   need(!fs.existsSync(retained),'R6_RECOVERY_PENDING_ARCHIVE_ALREADY_EXISTS');
+   if(!fs.existsSync(manifest.backupDirectory))fs.mkdirSync(manifest.backupDirectory);
+   const pendingSha=sha256(fs.readFileSync(pending));
+   retainClaim=true;
+   fs.renameSync(pending,retained);
+   need(sha256(fs.readFileSync(retained))===pendingSha,
+    'R6_RECOVERY_PENDING_PRESERVATION_UNVERIFIED');
+   saveRecovery({status:'PENDING_PRESERVED',code:'R6_HOST_PENDING_TEMP_ARCHIVED',
+    pendingSha256:pendingSha});
+  }else if(fs.existsSync(retained)){
+   const s=fs.lstatSync(retained);
+   need(s.isFile()&&!s.isSymbolicLink()&&s.nlink===1,
+    'R6_RECOVERY_PRESERVED_PENDING_NOT_REGULAR');
+   const pendingSha=sha256(fs.readFileSync(retained));
+   need((previous?.pendingSha256===pendingSha
+     ||['PREPARED','HOST_ROLLED_BACK'].includes(previous?.status)
+       &&pendingSha===manifest.proposedSha256),
+    'R6_RECOVERY_PRESERVED_PENDING_SHA_DRIFT');
+   saveRecovery({status:'PENDING_PRESERVED',code:'R6_HOST_PENDING_TEMP_ARCHIVED',
+    pendingSha256:pendingSha});
+  }else if(previous?.status==='PENDING_PRESERVED'){
+   need(false,'R6_RECOVERY_PRESERVED_PENDING_MISSING');
+  }
+  const workflow=github('actions/workflows/pc-job.yml').state;
+  need(['disabled_manually','active'].includes(workflow),'R6_RECOVERY_INTAKE_STATE_UNKNOWN');
+  retainClaim=true; // Enable ACK can be lost; never report a safe no-op.
+  if(workflow==='disabled_manually'){
+   try{github('actions/workflows/pc-job.yml/enable','PUT');}
+   catch{need(github('actions/workflows/pc-job.yml').state==='active',
+     'R6_RECOVERY_ENABLE_OUTCOME_UNKNOWN');}
+  }
+  need(github('actions/workflows/pc-job.yml').state==='active',
+   'R6_RECOVERY_WORKFLOW_NOT_ACTIVE');
+  const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+  if(fs.existsSync(backlogFile)){
+   const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
+   if(windows.at(-1).resumedAt===null)
+    writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
+   replayR6Backlog(requestId,backlogFile);
+  }
+  const after=readR6HostStatus(requestId).recovery;
+  need(after?.status==='ELIGIBLE'&&after.action==='RECONCILE_INTAKE'
+   &&after.workflowState==='active'&&after.protectedSame&&after.dbIdentitySame,
+   'R6_RECOVERY_POSTCHECK_NOT_VERIFIED');
+  need(fs.existsSync(leaseDir),'R6_RECOVERY_ORIGINAL_LEASE_MISSING');
+  need(!fs.existsSync(archive),'R6_RECOVERY_ARCHIVE_ALREADY_EXISTS');
+  saveRecovery({status:'ARCHIVE_PREPARED',code:'R6_RECOVERY_INTAKE_BACKLOG_VERIFIED',
+   hostOutcome:after.hostOutcome,workflowEnabled:true});
+  // Capture again immediately before renaming the exact old lease. No cleanup
+  // of the journal/backup/staged source, which remain evidence and rollback.
+  leaseCas();
+  const freshOwner=readOwner();verifyIndependent(freshOwner.owner.pid);
+  const freshRunners=github('actions/runners?per_page=100').runners;
+  need(Array.isArray(freshRunners)&&freshRunners.length===6
+   &&requiredRunners.every(name=>freshRunners.some(x=>x.name===name&&x.status==='online')),
+   'R6_RECOVERY_FINAL_RUNNER_SET_UNVERIFIED');
+  need(readR6HostStatus(requestId).recovery?.ownerDead===true,
+   'R6_RECOVERY_ORIGINAL_OWNER_REAPPEARED');
+  fs.renameSync(leaseDir,archive);
+  saveRecovery({status:'RECOVERY_COMPLETED',code:'R6_RECOVERY_LEASE_ARCHIVED',
+   hostOutcome:after.hostOutcome,workflowEnabled:true,leaseArchive:archive});
+  retainClaim=false;
+  const messageFile=path.join(recordDirPath,'host-r6-'+requestId+'.comment.json');
+  writeJson(messageFile,{body:`R6 host B recovery result: RECOVERY_COMPLETED / ${after.hostOutcome}\n`+
+   `ORIGINAL_REQUEST: ${requestId}\nWORKFLOW_ENABLED: true\n`+
+   `LEASE_ARCHIVED: true\nPROTECTED_STATE_UNCHANGED: true\n`+
+   `PC_RUN_NOT_RETRIED: true`});
+  try{github('issues/'+issueNumber+'/comments','POST',messageFile);}catch{/* remote upload pending; never repeat mutation */}
+  return {status:'RECOVERY_COMPLETED',code:'R6_RECOVERY_LEASE_ARCHIVED',
+   requestId,hostOutcome:after.hostOutcome,workflowEnabled:true,
+   protectedStateUnchanged:true,originalRequestRetried:false};
+ }finally{
+  if(!retainClaim){
+   need(json(claimRecord).nonce===claimNonce,'R6_RECOVERY_CLAIM_OWNER_CHANGED');
+   fs.unlinkSync(claimRecord);fs.rmdirSync(claimDir);
+  }
+ }
+}
+
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
+ if(cmd==='host-r6-status'){
+  need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
+  return readR6HostStatus(requestId);
+ }
+ if(cmd==='host-r6-recover'){
+  need(args.length===7&&args[1]==='--request-id'&&args[3]==='--manifest-file'
+   &&args[5]==='--mode','MAINTENANCE_ARGS');
+  return recoverR6HostOnly(requestId,args[4],args[6]);
+ }
+ if(cmd==='host-r6-apply'){
+  need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
+  try{return await applyR6HostOnly(requestId,args[4]);}
+  catch(error){
+   // A failed read-only preflight occurs before a host journal/lease exists.
+   // Do not turn an ambiguous partial apply into a harmless BLOCKED result.
+   const state=readR6HostStatus(requestId);
+   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'R6_HOST_PREFLIGHT_UNKNOWN';
+   const uncertain=Boolean(state.ledger||state.backupExists||state.installLock?.held);
+   let workflowEnabled=null;
+   try{workflowEnabled=github('actions/workflows/pc-job.yml').state==='active';}
+   catch{/* not observed; never infer from absence of an install lease */}
+   return {status:uncertain?'UNKNOWN':'BLOCKED',
+    code:uncertain?'R6_HOST_OUTCOME_UNKNOWN':code,
+    firstFail:uncertain?'R6_HOST_OUTCOME_UNKNOWN':code,
+    actualControllerSha:state.actualControllerSha,workflowEnabled};
+  }
+ }
  if(cmd==='status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readMaintenanceRecoveryStatus(requestId);
@@ -619,3 +1452,4 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
  catch(error){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',failureStage:error.failureStage==='PRE_INSTALL'?'PRE_INSTALL':'UNVERIFIED',actualControllerSha:null}));process.exitCode=1;}
 }
+

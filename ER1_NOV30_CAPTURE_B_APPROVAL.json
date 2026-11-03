@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_ER1_NOV30_CAPTURE_APPROVAL_V1",
+  "scope": "PC_PRIVATE_CALENDAR_DATES_2026_11_01_THROUGH_2026_11_30_ONLY",
+  "userInstruction": "2026-11-30까지 데이터 확보",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "11a971cb5d3514c2d1e1798def58465fb8a74035",
+  "sourceFile": "scripts/pc-writer/market-calendar-nov30-forward-capture.mjs",
+  "sourceFileSha256": "af087611406ca5e343b7e0c27c529524e36445fee27518537100a6badf31d39b",
+  "privatePCPath": "E:\\ZGmini\\data\\pc-writer\\er1-input\\nov30-forward-days",
+  "start": "2026-11-01",
+  "end": "2026-11-30",
+  "maxProviderRequests": 30,
+  "maxAutomaticRetries": 0,
+  "allowCoreReadOnly": true,
+  "allowCoreWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowChangesToExisting14DayFeed": false,
+  "allowPublicRawData": false,
+  "onUncertainExecution": "STOP_AND_INSPECT_EXISTING_SAVED_STATE"
+}
