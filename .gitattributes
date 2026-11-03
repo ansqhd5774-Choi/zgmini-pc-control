@@ -1,2 +1,3 @@
 *.mjs text eol=lf
 *.vbs text eol=lf
+approval/ER1_PC_OPERATION_APPROVAL.json text eol=lf
