@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assessR17Evidence,assessR17TaskChain,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA} from '../controller/us-breadth-r17-preflight.mjs';
+import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA} from '../controller/us-breadth-r17-preflight.mjs';
 
 const valid=()=>({
  head:R17_APPROVED,dirty:false,hashes:{...R17_BASE_FILES},
@@ -82,4 +82,23 @@ test('static WScript chain rejects swapped VBS bytes, unrelated task and missing
  assert.equal(assessR17TaskChain({action:{...action,arguments:'"C:\\fake\\other.vbs"'},launchers:clean}),false);
  assert.equal(assessR17TaskChain({action,launchers:[{...clean[0],sha256:'0'.repeat(64)},clean[1]]}),false);
  assert.equal(assessR17TaskChain({action,launchers:[clean[0],{...clean[1],text:'archive-core.mjs'}]}),false);
+});
+
+test('a prematurely interrupted read-only preflight reports only its real stopped step',()=>{
+ const e=valid();e.stoppedAt='GIT_STATUS';
+ e.dirty=null;e.patchApplies=false;e.quotaContract=false;e.taskLinked=false;
+ const result=summarizeR17Probe(e);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R17_PREFLIGHT_INTERRUPTED');
+ assert.deepEqual(result.reasons,['R17_PREFLIGHT_INTERRUPTED:GIT_STATUS']);
+ assert.equal(result.stoppedAt,'GIT_STATUS');
+ assert.equal(result.canInstall,false);
+});
+test('confirmed independent patch or quota failures remain strict blockers',()=>{
+ const e=valid();e.patchApplies=false;e.quotaContract=false;
+ const result=summarizeR17Probe(e);
+ assert.equal(result.status,'BLOCKED');
+ assert.ok(result.reasons.includes('PR957_CONTEXT_CONFLICT_OR_UNVERIFIED'));
+ assert.ok(result.reasons.includes('LOCAL_ALPACA_GUARD_UNVERIFIED'));
+ assert.equal(result.canInstall,false);
 });
