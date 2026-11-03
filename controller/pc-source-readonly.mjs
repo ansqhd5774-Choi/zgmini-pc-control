@@ -47,8 +47,10 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
   const binary=process.platform==='win32'?
    ['C:\\Program Files\\Git\\cmd\\git.exe','C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(fs.existsSync):'git';
   if(!binary)throw Error('PC_SOURCE_GIT_UNAVAILABLE');
-  return execFileSync(binary,['-c','core.fsmonitor=false','-c','core.untrackedCache=false','-C',cwd,...args],
-   {windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8'});
+  return execFileSync(binary,['--no-optional-locks','-c','core.fsmonitor=false',
+   '-c','core.untrackedCache=false','-C',cwd,...args],
+   {windowsHide:true,timeout:10000,maxBuffer:65536,encoding:'utf8',
+    env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
  }}={}){
  const base=path.dirname(realpath(dataRoot)),root=path.resolve(base);
  const inside=p=>p.toLowerCase().startsWith((root+path.sep).toLowerCase());
