@@ -41,7 +41,7 @@ const safeId=x=>{need(/^pc-[a-z0-9-]{8,76}$/.test(x??''),'MAINTENANCE_REQUEST_ID
 const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
 const R6_HOST_TITLE='pc-r6-host-register';
 const R6_SOURCE_MANIFEST_PATH='drafts/employment-r6/source-manifest.json';
-const R6_STAGE_TOOL_HASH='5f0459ded35785c82784aa538d62ed89e0848f06f71093940706a60279d74a47';
+const R6_STAGE_TOOL_HASH='66400ce7eca77997b92b1b42e72f409c0e9fdb6154599fd61d93e7825cca2a0a';
 const R6_APPLY_TOOL_HASH='ab79308af8010cf04091fb440c04c70f725679fbc50f1ade9149a5e666682be1';
 const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
 export function reconnectState({now,deadline,matched,online}){
