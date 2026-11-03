@@ -1,0 +1,93 @@
+{
+  "schema": "ZGMINI_R6_REGISTRATION_PREP_V1",
+  "status": "DRAFT_NOT_INSTALLABLE",
+  "preparedDateKst": "2026-11-03",
+  "purpose": "Employment R6 29-indicator read-only Core plus isolated candidate calculation",
+  "source": {
+    "repository": "ansqhd5774-Choi/zgmini",
+    "branch": "codex/employment-1y-reader-r1",
+    "sha": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+    "entrypoint": "scripts/pc-writer/employment-r6-runner-stage.mjs",
+    "fileCount": 16,
+    "manifestDraftPath": "drafts/employment-r6/source-manifest.json",
+    "manifestRawSha256": "42afb8fe4f0ecdeb551256ec897bb99b1e850420dd0f5bc7b74ec03db2f46c81"
+  },
+  "candidate": {
+    "pcAbsolutePath": "E:\\ZGmini\\data\\employment-r6-candidate-isolated-20261103\\EMPLOYMENT_R6_CANDIDATE.sqlite",
+    "sha256": "ad8fcb8e2db72319475742414e72847cf97f388f09a5984601726d0d8ad32622",
+    "byteCount": 20111360,
+    "originalEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6601294862",
+    "note": "Previously restored in an isolated location; revalidate realpath and alias against Core immediately before live registration."
+  },
+  "controllerUpdate": {
+    "lastObservedInstalledSha": "e38c6acd1643e284df157905ce77838298163dbc",
+    "prerequisiteTargetSha": "786b24587cd2b8890cacc6d9f4c1ce77f67180fd",
+    "proposedTargetSha": "a00020684a8986780db29390aeb7b85a6e2640ab",
+    "proposedApprovalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/92",
+    "requiredPurpose": "pc-controller-heavy-readonly",
+    "requiredApprovalScope": "PC_CONTROL_HEAVY_READONLY_UPDATE",
+    "operation": "employment-r6-candidate-stage-readonly",
+    "operationPolicy": {
+      "grade": "A",
+      "resource": "heavy",
+      "timeoutSeconds": 240,
+      "minimumFreeMiB": 1536
+    },
+    "allowFiles": [
+      {
+        "path": "config/operations.json",
+        "sha256": "d6f5c3b3487617a030234f47910c0b375188b7d00691ebb69cc03deafd9a941e"
+      },
+      {
+        "path": "controller/employment-r6-candidate-readonly.mjs",
+        "sha256": "85b375b087c53db35dabc2eaaf34a2afd2983e59483440a7225409ff3e52497d"
+      },
+      {
+        "path": "controller/engine.mjs",
+        "sha256": "636483792db4f126b835f1d71d24ec6c90ba2329a3b4429c31e9c6fb86bb1c55"
+      },
+      {
+        "path": "controller/operations.mjs",
+        "sha256": "eda95323c7e04718f244bdf858b30f91a4d41ae17a6515348f12c7ad41619b1e"
+      }
+    ],
+    "allowFileFingerprintSha256": "07d97fd7b6a9103efbaa1e677fa1a872b466c560188bebd37659d7eacf96ad4d",
+    "baselineCondition": "Must use verified active installed SHA at installation time. This draft is pinned to the R17 target for comparison only.",
+    "approvedInstallManifestPath": null
+  },
+  "hostRegistration": {
+    "sourceRegistryKey": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+    "approvedSourceFields": [
+      "root",
+      "branch",
+      "entrypoint",
+      "manifestSha256"
+    ],
+    "sourceBundleRootAbsolutePath": null,
+    "requiredExistingCorePath": "E:\\ZGmini\\data\\pc-writer\\storage\\core.sqlite",
+    "candidatePathHostKey": "employmentR6CandidatePath",
+    "installedHostOriginalRawSha256": null,
+    "preserveExistingApprovedSources": true,
+    "preserveCoreAndCandidateBytes": true,
+    "preserveCoreKoreaIranTasks": true,
+    "hostWriteAdapter": "NOT_YET_APPROVED_OR_WINDOWS_VERIFIED",
+    "note": "Current Controller update carries existing approvedSources unchanged; host overlay requires a distinct approved B registration path, not a pc-job workaround."
+  },
+  "gates": {
+    "reusableEvidence": [
+      "source-audit issue #113 PASS",
+      "isolated candidate restore PASS",
+      "source bundle 16/16 verified"
+    ],
+    "maintainerCommonHeavyPolicy": "PASS_AT_2026-11-03T11:55:46Z",
+    "r17ControllerActualInstall": "NOT_VERIFIED",
+    "installedControllerAndLeaseFreshAtApply": "PENDING",
+    "hostOverlayAbsoluteRootAndOriginalHash": "PENDING",
+    "hostOverlayBWindowsAtomicBackupRollback": "PENDING",
+    "r6ControllerBManifestExactWindowsCheck": "PENDING",
+    "onePcReadOnlyR6Job": "NOT_RUN",
+    "pcCoreCandidate29IndicatorResult": "NOT_RUN",
+    "publication": "NOT_STARTED"
+  },
+  "doNotExecute": true
+}

@@ -10,6 +10,7 @@ import {R6_SOURCE_FILES,R6_EXACT_SOURCE_SHA,R6_CANONICAL_MANIFEST_SHA256}
 
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const SHA256=/^[a-f0-9]{64}$/;
+export const windowsSafePathKey=value=>path.win32.normalize(value).replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();
 const ENTRY='scripts/pc-writer/employment-r6-runner-stage.mjs';
 const SEATS=Array.from({length:6},(_,i)=>`zgmini-pc-0${i+1}`);
 const fail=code=>{throw Object.assign(new Error(code),{code});};
@@ -113,7 +114,8 @@ function doApply({approval,proposedHost,runtimeProbe,windowsProvenance},
 
   if(fs.existsSync(approval.backupDirectory))fail('R6_B_BACKUP_EXISTS');
   const backupParent=fs.realpathSync(path.dirname(approval.backupDirectory));
-  if(path.dirname(approval.backupDirectory)!==backupParent)fail('R6_B_BACKUP_PARENT_ALIAS');
+  if(windowsSafePathKey(path.dirname(approval.backupDirectory))!==windowsSafePathKey(backupParent))
+    fail('R6_B_BACKUP_PARENT_ALIAS');
   const pending=path.join(path.dirname(hostPath),
     `.r6-b-pending-${approval.hostSha256.slice(0,16)}.tmp`);
   if(fs.existsSync(pending))fail('R6_B_PENDING_TEMP_EXISTS');

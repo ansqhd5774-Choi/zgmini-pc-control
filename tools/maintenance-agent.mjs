@@ -8,11 +8,13 @@ import os from "node:os";
 import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 
-import {validateMaintenanceRequest,validateUpdateRequest} from "./maintenance-contract.mjs";
+import {validateMaintenanceRequest,validateUpdateRequest,
+  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 const ISSUE_TITLE="pc-controller-update";
+const R6_HOST_ISSUE_TITLE="pc-r6-host-register";
 const ISSUE_LABEL="pc-maintenance";
 const ALLOWED_ACTORS=Object.freeze(["ansqhd5774-Choi"]);
 const SHA40=/^[a-f0-9]{40}$/;
@@ -39,7 +41,6 @@ function defaultExecFile(file,args,options={}){
     });
   });
 }
-
 function safeUpdaterEnv(source=process.env){
   // The updater is an out-of-band Windows process, never an Actions job.
   // GitHub auth, service tokens, NODE_OPTIONS and arbitrary host env are withheld.
@@ -222,8 +223,9 @@ export function createMaintenanceAgent({
     verifyInstalledSource();
     return exec(nodeBinary,[updateScript,...args],updateTimeoutMs,safeUpdaterEnv());
   }
-  async function updaterStatus(id){
-    try{return parseJsonOutput(await updater(["status","--request-id",id]),"UPDATE_STATUS_INVALID");}
+  async function updaterStatus(id,operation="controller-update"){
+    const subcommand=operation==="employment-r6-host-register"?"host-r6-status":"status";
+    try{return parseJsonOutput(await updater([subcommand,"--request-id",id]),"UPDATE_STATUS_INVALID");}
     catch{throw coded("UPDATE_STATUS_UNAVAILABLE");}
   }
   async function acquireUploadLease(){
@@ -278,7 +280,10 @@ export function createMaintenanceAgent({
       "--json","number,title,state,body,author,labels,comments"],"GITHUB_ISSUE_READ_FAILED");
   }
   async function manifestBytes(request){
-    const resource=`repos/${repo}/contents/approvals/controller-updates/${request.targetControllerSha}.json?ref=main`;
+    const approvedPath=request.operation==="employment-r6-host-register"
+      ?"approvals/host-r6/afdd8fab1c03b321e4b8b0853bb236c0800a0a14.json"
+      :`approvals/controller-updates/${request.targetControllerSha}.json`;
+    const resource=`repos/${repo}/contents/${approvedPath}?ref=main`;
     const data=await githubJson(["api",resource],"APPROVAL_MANIFEST_READ_FAILED");
     if(data?.encoding!=="base64"||data?.type!=="file"
       ||typeof data.content!=="string"||data.content.length>MAX_MANIFEST_BYTES*2){
@@ -459,7 +464,7 @@ export function createMaintenanceAgent({
   }
   async function reconcileRunning(entry,request){
     let status;
-    try{status=await updaterStatus(entry.requestId);}
+    try{status=await updaterStatus(entry.requestId,request.operation);}
     catch{return entry;}
     const current=status?.ledger?.result??status?.result??status?.ledger;
     if(!current||!TERMINAL.has(current.status)){
@@ -479,14 +484,20 @@ export function createMaintenanceAgent({
     return persistResult(entry,result);
   }
   async function processIssue(issue){
-    if(!issueIsTrusted(issue,{allowedActors,title,label}))return {status:"IGNORED",issueNumber:issue?.number};
+    if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE].includes(issue?.title)
+      ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
+      return {status:"IGNORED",issueNumber:issue?.number};
     if(typeof issue.body!=="string"||Buffer.byteLength(issue.body)>MAX_BODY_BYTES){
       return {status:"BLOCKED",code:"ISSUE_BODY_INVALID",issueNumber:issue.number};
     }
     let request;
     try{
-      request=validateMaintenanceRequest(parseIssueBody(issue.body),{
-        actor:issue.author.login,allowedActors,controlRepository:repo});
+      const parsed=parseIssueBody(issue.body);
+      request=parsed.operation==="employment-r6-host-register"
+        ?validateR6HostIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
+        :validateMaintenanceRequest(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo});
+      if((request.operation==="employment-r6-host-register")!==(issue.title===R6_HOST_ISSUE_TITLE))
+        throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
     }catch{
       return {status:"BLOCKED",code:"ISSUE_CONTRACT_INVALID",issueNumber:issue.number};
     }
@@ -515,7 +526,7 @@ export function createMaintenanceAgent({
     let approvedBytes,approved;
     try{
       approvedBytes=await manifestBytes(request);
-      const preflight=await updaterStatus(request.requestId);
+      const preflight=await updaterStatus(request.requestId,request.operation);
       if(preflight?.installedReadbackCode||preflight?.ledgerReadbackCode||
         preflight?.lockReadbackCode)throw coded('UPDATE_STATUS_RECOVERY_REQUIRED');
       if(preflight?.ledger)throw coded('UPDATE_EXISTING_LEDGER_RECONCILE_FIRST');
@@ -528,10 +539,10 @@ export function createMaintenanceAgent({
       }
       const installedSha=installedShaFromStatus(preflight);
       if(!isSha(installedSha))throw coded("INSTALLED_CONTROLLER_SHA_UNVERIFIED");
-      approved=validateUpdateRequest(request,approvedBytes,{
-        actor:issue.author.login,allowedActors,controlRepository:repo,
-        installedSha,
-      });
+      const args={actor:issue.author.login,allowedActors,controlRepository:repo,installedSha};
+      approved=request.operation==="employment-r6-host-register"
+        ?validateR6HostRegistrationRequest(request,approvedBytes,args)
+        :validateUpdateRequest(request,approvedBytes,args);
     }catch(error){
       const code=safeCode(error?.code??error?.message);
       const blocked=claim(request,issue,fingerprint,bodyDigest);
@@ -557,13 +568,14 @@ export function createMaintenanceAgent({
     if(!held.created)return {status:"RUNNING",code:"DUPLICATE_REQUEST_SUPPRESSED"};
     let result;
     try{
-      const executed=parseJsonOutput(await updater(["apply","--request-id",request.requestId,
+      const command=request.operation==="employment-r6-host-register"?"host-r6-apply":"apply";
+      const executed=parseJsonOutput(await updater([command,"--request-id",request.requestId,
         "--manifest-file",packageFile]),"UPDATE_OUTPUT_INVALID");
       result=normalizedResult(request,executed,executed.code);
     }catch(error){
       // Never retry an ambiguous apply. Query the independent updater ledger.
       let status=null;
-      try{status=await updaterStatus(request.requestId);}catch{/* unknown outcome */}
+      try{status=await updaterStatus(request.requestId,request.operation);}catch{/* unknown outcome */}
       const current=status?.ledger?.result??status?.result??status?.ledger;
       result=current&&TERMINAL.has(current.status)
         ?normalizedResult(request,{...current,
@@ -676,3 +688,5 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
     process.exitCode=2;
   });
 }
+
+
