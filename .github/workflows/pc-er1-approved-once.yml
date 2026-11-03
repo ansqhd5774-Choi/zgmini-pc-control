@@ -1,0 +1,60 @@
+# Independently approved ER1 B one-shot. Exact immutable control/public sources.
+name: ZGMINI ER1 Approved B One Shot
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-er1-approved-one-shot
+  cancel-in-progress: false
+jobs:
+  er1-b-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-approved-one-shot' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    env:
+      # Must be replaced with a reviewed immutable commit containing this adapter,
+      # operator source and APPROVED_B manifest. Never float to main at execution.
+      ER1_APPROVED_CONTROL_SHA: f5f880abce0ce93e68db690b4b994317b28417a9
+      ER1_APPROVED_SOURCE_SHA: 611b3dccf361ce66e78daf0b4108396de7c9101e
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout reviewed private ER1 B adapter with no persisted token
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ env.ER1_APPROVED_CONTROL_SHA }}
+          path: er1-control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout exact approved public ER1 source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 611b3dccf361ce66e78daf0b4108396de7c9101e
+          path: er1-source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Execute independently approved fixed ER1 B host entry
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          # Only the admission entry uses this for atomic GitHub reservation.
+          # The approved scorer child receives a separate token-free env.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\er1-control\er1-b-entry.mjs"'
+      - name: Recover sanitized TXT JSON and post issue comment
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\er1-control\er1-b-upload.mjs"'
