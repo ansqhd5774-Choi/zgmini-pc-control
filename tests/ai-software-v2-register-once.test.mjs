@@ -6,7 +6,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {
  CONTROL_REPO,SOURCE_SHA,REQUEST_SCHEMA,REQUEST_SCOPE,REQUEST_TITLE,FILES,
- validateRequest,checkedSourceFiles,
+ validateRequest,checkedSourceFiles,validatedManifestEntries,
 } from '../tools/ai-software-v2-register-once.mjs';
 
 function approvedIssue(){
@@ -71,4 +71,24 @@ test('approval source contains exactly three allowed input files',()=>{
   'theme-evidence/ai-software-selection.json',
   'theme-evidence/ai-software-aum.json']);
  assert.ok(Object.values(FILES).every(s=>/^[a-f0-9]{64}$/.test(s)));
+});
+
+test('installed dependency closure permits verified root and nested files',()=>{
+ const entries=validatedManifestEntries({
+  'package.json':'f'.repeat(64),
+  'scripts/pc-writer/theme-config-tool.mjs':'a'.repeat(64),
+  'scripts/pc-writer/theme-config-registry.mjs':'b'.repeat(64),
+ });
+ assert.equal(entries.length,3);
+});
+
+test('installed manifest rejects traversal, absolute paths, malformed hashes',()=>{
+ for(const invalid of ['../secret','scripts/../secret','C:/file','/absolute','scripts//bad','./file']){
+  assert.throws(()=>validatedManifestEntries({[invalid]:'a'.repeat(64),
+   'scripts/pc-writer/theme-config-tool.mjs':'a'.repeat(64),
+   'scripts/pc-writer/theme-config-registry.mjs':'b'.repeat(64)}),/AI_V2_INSTALLED_FILE_LIST_DENIED/);
+ }
+ assert.throws(()=>validatedManifestEntries({'package.json':'0',
+  'scripts/pc-writer/theme-config-tool.mjs':'a'.repeat(64),
+  'scripts/pc-writer/theme-config-registry.mjs':'b'.repeat(64)}),/AI_V2_INSTALLED_FILE_LIST_DENIED/);
 });
