@@ -6,7 +6,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {
  CONTROL_REPO,SOURCE_SHA,REQUEST_SCHEMA,REQUEST_SCOPE,REQUEST_TITLE,FILES,
- validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,
+ validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,inspectScheduledLauncher,
 } from '../tools/ai-software-v2-register-once.mjs';
 
 function approvedIssue(){
@@ -99,4 +99,22 @@ test('installed V2 capability diagnostic returns only safe booleans',()=>{
    cliRegisterMarker:true,registryV2Marker:true});
  assert.deepEqual(inspectInstalledCapability('old register syntax','old V1'),{
   cliRegisterMarker:false,registryV2Marker:false});
+});
+
+test('read-only active launcher inspection detects the version actually scheduled',()=>{
+ const home='E:\\ZGmini\\data\\pc-writer\\theme-config-tool',version='0b1ed5d35888b0e0';
+ const runner=path.win32.join(home,'versions',version,'scripts','pc-writer','theme-config-tool.mjs');
+ const cmd=['@echo off','setlocal EnableExtensions DisableDelayedExpansion',
+  'set "ZGMINI_DATA_ROOT=E:\\ZGmini\\data"',
+  `"E:\\ZGmini\\runtime\\node.exe" "${runner}" --scheduled >>"${path.win32.join(home,'SCHEDULE_HISTORY.log')}" 2>&1`,
+  'set "RESULT=%ERRORLEVEL%"','exit /b %RESULT%',''].join('\r\n');
+ const xml=`<Command>${path.win32.join(home,'THEME_SCHEDULED.vbs')}</Command>`;
+ const vbs=`WScript.Quit shell.Run("${path.win32.join(home,'THEME_SCHEDULED.cmd')}")`;
+ assert.deepEqual(inspectScheduledLauncher(cmd,home,xml,vbs),{
+  activeRuntimeProbe:'LINKED',activeToolVersion:version,
+  activeCommandMatches:true,activeTaskMatches:true,activeVbsMatches:true});
+ assert.equal(inspectScheduledLauncher(cmd.replace('--scheduled','--bad'),home,xml,vbs).activeRuntimeProbe,
+  'LINKAGE_UNVERIFIED');
+ assert.equal(inspectScheduledLauncher('untrusted path',home,xml,vbs).activeRuntimeProbe,
+  'LAUNCHER_PATH_UNRECOGNIZED');
 });
