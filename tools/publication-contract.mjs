@@ -19,6 +19,15 @@ const OPS=Object.freeze({
     snapshotKey:'detail:earnings-bea-unit-profit:v1',
     approvalScope:'BEA_UNIT_PROFIT_SINGLE_KEY_D1_ONCE',
     provider:'FRED_CSV',
+    sourceFiles:Object.freeze([
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_PROFIT_R1_ONCE.mjs',
+      'scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs',
+      'scripts/pc-writer/d1.mjs',
+      'scripts/pc-writer/d1-transient.mjs',
+      'scripts/pc-writer/d1-diagnostics.mjs',
+      'lib/market-score/earnings-bea-unit-profit-source-r1.mjs',
+      'worker/earnings-bea-unit-profit-r1.mjs',
+    ]),
   }),
   'census-qfr-margin-once':Object.freeze({
     script:'scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs',
@@ -26,6 +35,18 @@ const OPS=Object.freeze({
     snapshotKey:'detail:earnings-recession-indicators:census-qfr-mfg-margin:v1',
     approvalScope:'CENSUS_QFR_MARGIN_SINGLE_KEY_D1_ONCE',
     provider:'STORED_SQLITE_ONLY',
+    sourceFiles:Object.freeze([
+      'scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs',
+      'scripts/pc-writer/EARNINGS_CENSUS_QFR_R2_SQLITE_APPEND.mjs',
+      'scripts/pc-writer/EARNINGS_CENSUS_QFR_R3_STORED_PREVIEW_READONLY.mjs',
+      'scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_PROJECTION_DRAFT_READONLY.mjs',
+      'scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs',
+      'scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs',
+      'scripts/pc-writer/d1.mjs',
+      'scripts/pc-writer/d1-transient.mjs',
+      'scripts/pc-writer/d1-diagnostics.mjs',
+      'worker/earnings-companion-c-qfr-r1.mjs',
+    ]),
   }),
 });
 
@@ -63,13 +84,17 @@ export function validatePublicationApproval(request,bytes){
   let approval;
   try{approval=JSON.parse(bytes.toString());}catch{throw Error('PUBLICATION_MANIFEST_JSON_INVALID');}
   exact(approval,['schema','requestId','operation','sourceRepository','publisherSha',
-    'operationalSha','snapshotKey','approval','execution'],'PUBLICATION_MANIFEST_FIELDS_INVALID');
+    'operationalSha','snapshotKey','publisherFiles','approval','execution'],
+    'PUBLICATION_MANIFEST_FIELDS_INVALID');
   const spec=operationSpec(request.operation);
   if(approval.schema!==APPROVAL_SCHEMA||approval.requestId!==request.requestId
     ||approval.operation!==request.operation||approval.sourceRepository!==SOURCE_REPOSITORY
     ||approval.snapshotKey!==spec.snapshotKey)throw Error('PUBLICATION_MANIFEST_SCOPE_MISMATCH');
   required(approval.publisherSha,SHA40,'PUBLICATION_PUBLISHER_SHA_INVALID');
   required(approval.operationalSha,SHA40,'PUBLICATION_OPERATIONAL_SHA_INVALID');
+  exact(approval.publisherFiles,spec.sourceFiles,'PUBLICATION_SOURCE_FILES_INVALID');
+  for(const name of spec.sourceFiles)
+    required(approval.publisherFiles[name],SHA256,'PUBLICATION_SOURCE_DIGEST_INVALID');
   exact(approval.approval,['grade','scope','actor','issueNumber'],'PUBLICATION_APPROVAL_FIELDS_INVALID');
   if(approval.approval.grade!=='B'||approval.approval.scope!==spec.approvalScope
     ||approval.approval.actor!==ACTOR||!Number.isSafeInteger(approval.approval.issueNumber)
@@ -81,6 +106,13 @@ export function validatePublicationApproval(request,bytes){
     throw Error('PUBLICATION_EXECUTION_SCOPE_INVALID');
   return Object.freeze({request,approval:Object.freeze(approval),
     invocation:Object.freeze({script:spec.script,flags:spec.flags,snapshotKey:spec.snapshotKey})});
+}
+
+export function validatePublisherFileDigests(validated,actual){
+  exact(actual,Object.keys(validated.approval.publisherFiles),'PUBLICATION_ACTUAL_FILES_INVALID');
+  for(const [name,expected] of Object.entries(validated.approval.publisherFiles))
+    if(actual[name]!==expected)throw Error('PUBLICATION_SOURCE_FILE_DRIFT');
+  return true;
 }
 
 export function validateBApprovalComment(validated,comments){

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256,operationSpec,validatePublicationRequest,validatePublicationApproval,
   validateBApprovalComment,validateSourceCheckpoints,classifyPublicationLedger,
-  validatePublicationReadback,CONTROL_REPOSITORY,SOURCE_REPOSITORY,
+  validatePublicationReadback,validatePublisherFileDigests,CONTROL_REPOSITORY,SOURCE_REPOSITORY,
   ACTOR,REQUEST_SCHEMA,APPROVAL_SCHEMA} from '../tools/publication-contract.mjs';
 
 const UUID='4d352dc8-7cf5-4b49-bb8f-39398dc9be51';
@@ -12,6 +12,7 @@ const fixture=(operation='census-qfr-margin-once')=>{
  const approval={schema:APPROVAL_SCHEMA,requestId:REQUEST_ID,operation,
    sourceRepository:SOURCE_REPOSITORY,publisherSha:'a'.repeat(40),
    operationalSha:'b'.repeat(40),snapshotKey:spec.snapshotKey,
+   publisherFiles:Object.fromEntries(spec.sourceFiles.map(name=>[name,'c'.repeat(64)])),
    approval:{grade:'B',scope:spec.approvalScope,actor:ACTOR,issueNumber:84},
    execution:{mode:'ONCE',maxAutomaticRetries:0,maxD1Keys:1,provider:spec.provider}};
  const bytes=JSON.stringify(approval);
@@ -59,6 +60,21 @@ test('wrong target key, source repository, source SHA, grade and operation scope
  for(const edit of [x=>x.approval.grade='A',x=>x.approval.scope='ALL_D1']){
   const f=fixture();edit(f.approval);repin(f);
   assert.throws(()=>admitted(f),/PUBLICATION_B_APPROVAL_MISSING/);}
+});
+test('BEA library files and fixed QFR import graph require exact approved bytes',()=>{
+ for(const operation of ['bea-unit-profit-once','census-qfr-margin-once']){
+  const v=admitted(fixture(operation));
+  assert.equal(validatePublisherFileDigests(v,v.approval.publisherFiles),true);
+  const file=Object.keys(v.approval.publisherFiles).find(x=>x.startsWith('lib/'))
+    ??Object.keys(v.approval.publisherFiles)[0];
+  const corrupted={...v.approval.publisherFiles,[file]:'d'.repeat(64)};
+  assert.throws(()=>validatePublisherFileDigests(v,corrupted),/PUBLICATION_SOURCE_FILE_DRIFT/);
+  const missing={...v.approval.publisherFiles};delete missing[file];
+  assert.throws(()=>validatePublisherFileDigests(v,missing),/PUBLICATION_ACTUAL_FILES_INVALID/);
+ }
+ const f=fixture('bea-unit-profit-once');
+ delete f.approval.publisherFiles['lib/market-score/earnings-bea-unit-profit-source-r1.mjs'];
+ repin(f);assert.throws(()=>admitted(f),/PUBLICATION_SOURCE_FILES_INVALID/);
 });
 test('one write, no retries, one-shot, fixed provider contract only',()=>{
  for(const edit of [x=>x.execution.maxD1Keys=2,x=>x.execution.maxAutomaticRetries=1,
