@@ -5,7 +5,7 @@
 ## 현재 상태
 
 - 구현: 별도 Issue 계약, 별도 self-hosted Windows CMD workflow, 공식 `actions/checkout`의 전체 commit SHA 고정, **private 제어 소스+public ER1 소스 각각 exact SHA checkout**, raw-byte 승인 manifest, SHA 파일 목록 검산, 독립 V2 Publisher·Operator, 선행 read-only preflight, GitHub 공용 단회 예약+로컬 lease, 요청별 TXT·JSON·Issue 댓글 업로드.
-- 로컬 시험: `node --test tests/*.test.mjs` — **28/28 PASS** (V1 기존 보호 16 + 독립 publisher 9 + V2 workflow glue 3).
+- 로컬 시험: `node --test tests/*.test.mjs` — **29/29 PASS** (V1 기존 보호 16 + 독립 publisher 10 + V2 workflow glue 3).
 - **설치/등록/실행: 0회.** 실제 PC Runner/운영 Source/SQLite/D1/Cloudflare 변경 없음.
 - **바로 실행 불가:** workflow private checkout SHA에 승인값 대신 placeholder가 있으며 승인 manifest는 `PENDING_B`다. Production Reader #959 미배포, PC config D1 binding fingerprint 미승인, 실제 Windows/D1 검증 없음. 기존 Controller 설치나 PC host-entry 설치를 요구하지 않는다.
 
@@ -15,7 +15,7 @@
 - `er1-b-contract.mjs`: JSON 7필드만 허용. Issue가 전달하는 명령·경로·SQL·URL·코드·임의 옵션 없음. wire request V1 유지, raw B manifest SHA만으로 V2 승인 식별.
 - `er1-b-contract-v2.mjs`: 새 승인 schema `ER1_PC_OPERATION_APPROVAL_V2`와 별도 scope, 정확한 e217 공개 소스 6개+private V2 모듈 2개 SHA256을 묶는다. 기존 Core-chain 오퍼레이터는 실행 허용목록에서 제거한다.
 - `er1-b-entry.mjs`: workflow CLI에서 **V2_EDITION만 선택**하고 Git HEAD·추적 파일·원문 manifest·8개 해시를 검증한 후 private control V2 오퍼레이터+독립 게시 모듈을 격리된 public checkout에 복사한다. Core 등록 작업이나 실제 프로젝트 파일에는 checkout/pull/copy를 하지 않는다.
-- `operator/ER1_PC_OPERATION_V2_ONCE.mjs`: Core `local-cycle.mjs` task chain/운영 HEAD에 의존하지 않는 단회 저장 산식·게시 운영자. 승인 config.source 및 계정/DB binding fingerprint, 정확한 D1 클라이언트·2 의존파일 SHA, Reader 공개 헤더, 만료까지 최소 10분 남은 기존 사용자 Wrangler OAuth만 사용한다. 토큰 재발급·출력·키 파일 변경 금지. 한 공개 key에 대해서만 동일 body 무쓰기 또는 단일 D1 upsert→정확한 readback을 허용한다. 쓰기 결과가 불명확하면 `STATE_UNKNOWN`으로 중단하고 자동 재실행하지 않는다.
+- `operator/ER1_PC_OPERATION_V2_ONCE.mjs`: Core `local-cycle.mjs` task chain/운영 HEAD에 의존하지 않는 단회 저장 산식·게시 운영자. 승인 config.source 및 계정/DB binding fingerprint, 정확한 D1 클라이언트·2 의존파일 SHA, Reader 공개 헤더, 만료까지 최소 10분 남은 기존 사용자 Wrangler OAuth만 사용한다. 토큰 재발급·출력·키 파일 변경 금지. 한 공개 key에 대해서만 동일 body 무쓰기 또는 신규 1건의 D1 create-only insert→정확한 readback을 허용한다. 서로 다른 기존 본문은 보존하고 STOP한다. 쓰기 결과가 불명확하면 `STATE_UNKNOWN`으로 중단하고 자동 재실행하지 않는다.
 - **공용 원샷 예약:** 읽기 전용 preflight 통과 후 `results/er1-b-global-once.json`을 GitHub Contents API의 **create-only** 요청으로 한 번 등록한다. 이미 존재·충돌·응답 불명확이면 B 계산/게시를 실행하지 않는다. 서로 다른 물리 PC에 Runner가 등록된 경우에도 GitHub 공통 저장소에서 중복 시도를 차단한다.
 - 로컬 추가 보호: PC의 `E:\ZGmini\automation\er1-one-shot\ER1_B_ONE_SHOT_ATTEMPTED.json`을 `wx`로 한 번 생성. 결과 불명확·실패 시 자동 재실행 금지. 실행 중 `ER1_B_ONE_SHOT.lock` 사용. Core/Korea/Iran lock은 변경하지 않음.
 - `er1-b-upload.mjs`: 결과 회수 단계에서만 GitHub 토큰 사용. 비밀·원자료 없는 요약 필드를 **요청별 불변** `ER1_B_WORKFLOW_RESULT_<requestId>.json`에 저장하고, `results/er1-b-<requestId>.{json,txt}` 및 Issue 댓글로 게시. 과거 BLOCKED 결과가 다른 요청의 업로드를 막지 않음.
@@ -34,4 +34,4 @@
 
 ## 테스트 범위
 
-actor/private/label/Runner 식별, 요청 필드 외 명령·경로 차단, B manifest raw SHA·shape, 공개 6개+D1 3개+private 2개 핀 계약, 정확한 private/public Git checkout SHA·dirty 차단, private V2 staging, GitHub 글로벌 예약/로컬 중복 방지, OAuth expiry STOP, Reader gate STOP, 0/1건 D1 write·readback, D1 outcome unknown, token 차단, 요청별 결과 회수 등 **Linux Node fixture 28/28**. 실제 Windows PC Runtime·Production D1·사이트 검증은 아니다.
+actor/private/label/Runner 식별, 요청 필드 외 명령·경로 차단, B manifest raw SHA·shape, 공개 6개+D1 3개+private 2개 핀 계약, 정확한 private/public Git checkout SHA·dirty 차단, private V2 staging, GitHub 글로벌 예약/로컬 중복 방지, OAuth expiry STOP, Reader gate STOP, 0/1건 D1 write·readback, 기존 다른 본문 보존, D1 outcome unknown, token 차단, 요청별 결과 회수 등 **Linux Node fixture 29/29**. 실제 Windows PC Runtime·Production D1·사이트 검증은 아니다.

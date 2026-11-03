@@ -170,16 +170,12 @@ export async function publishIndependentER1Once({
   const old=(await remote.query(binding.core,lookup,[ER1_PUBLIC_KEY])).results?.[0]??null;
   if(old){
    if(old.body===body)return {status:'ER1_ALREADY_PUBLISHED',dbWrites:0,sha256:digest};
-   let previous;try{previous=JSON.parse(old.body)}catch{stop('ER1_B_V2_EXISTING_DATA_UNKNOWN_STOP')}
-   if(!validation.validateER1PublicDisplay(previous,{now}))
-    stop('ER1_B_V2_EXISTING_DATA_UNKNOWN_STOP');
-   if(previous.asOf>=derived.asOf)
-    stop('ER1_B_V2_SAVED_NOT_NEWER_STOP');
+   stop('ER1_B_V2_EXISTING_DIFFERENT_BODY_STOP');
   }
   const at=Date.now();
   writeStarted=true;
   await remote.request(binding.core,[{sql:
-   "INSERT INTO public_feed_snapshots_v1(kind,feed_key,snapshot_key,body,stored_at) VALUES('output',?,'current',?,?) ON CONFLICT(kind,feed_key,snapshot_key) DO UPDATE SET body=excluded.body,stored_at=excluded.stored_at WHERE excluded.stored_at>public_feed_snapshots_v1.stored_at",
+   "INSERT INTO public_feed_snapshots_v1(kind,feed_key,snapshot_key,body,stored_at) VALUES('output',?,'current',?,?) ON CONFLICT(kind,feed_key,snapshot_key) DO NOTHING",
    params:[ER1_PUBLIC_KEY,body,at]}]);
   const seen=(await remote.query(binding.core,lookup,[ER1_PUBLIC_KEY])).results?.[0]??null;
   if(seen?.body!==body||seen?.stored_at!==at)

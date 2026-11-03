@@ -23,7 +23,7 @@ const manifest={schema:'ER1_PC_OPERATION_APPROVAL_V2',status:'APPROVED_B',
  allowSchemaChanges:false,allowCredentialRefresh:false,
  allowIndependentPublisherV2:true,sourceSha256:{...ER1_V2_SOURCE_HASHES,
   'tools/market-calendar-er1/ER1_B_INDEPENDENT_PUBLISHER_V2.mjs':
-   'eed8247e26932c1f40398d16614e5a46230d9329d8f486bd507cd70d09f91862',
+   '720d014b655999df733a6dd79db65e51139d83d545a201b7f842d3191b0d4de2',
   'tools/market-calendar-er1/ER1_PC_OPERATION_V2_ONCE.mjs':
    '9f66cc60bbda7c31b3c94f995b609be3516b6c8ef2e2eb56e640f55e02c3213b'},
  pcHome:String.raw`E:\ZGmini\data\pc-writer`,dataRoot:String.raw`E:\ZGmini\data`,
@@ -87,7 +87,16 @@ test('identical public key avoids write',async()=>{
    request:async()=>{writes++}})});
  assert.equal(result.status,'ER1_ALREADY_PUBLISHED');assert.equal(writes,0);
 });
-test('single target D1 upsert followed by exact readback',async()=>{
+test('different existing D1 snapshot is preserved; no overwrite',async()=>{
+ const dir=fixture();let writes=0;
+ await assert.rejects(()=>publishIndependentER1Once({sourceRoot:dir,pcHome:dir,
+  manifest,globalLedgerReserved:true,sourceVerifier:pass,oauthInspector:pass,
+  validatorFactory:async()=>validator,readerGate:gate,
+  remoteFactory:async()=>({query:async()=>({results:[{body:'{"status":"OTHER"}'}]}),
+   request:async()=>{writes++}})}),/ER1_B_V2_EXISTING_DIFFERENT_BODY_STOP/);
+ assert.equal(writes,0);
+});
+test('create-only D1 insert followed by exact readback',async()=>{
  const dir=fixture();let written=null,writes=0,reads=0;
  const result=await publishIndependentER1Once({sourceRoot:dir,pcHome:dir,manifest,
   globalLedgerReserved:true,sourceVerifier:pass,oauthInspector:pass,
@@ -99,6 +108,7 @@ test('single target D1 upsert followed by exact readback',async()=>{
   },request:async(db,batch)=>{
    writes++;assert.equal(db,config.core);assert.equal(batch.length,1);
    assert.match(batch[0].sql,/INSERT INTO public_feed_snapshots_v1/);
+  assert.match(batch[0].sql,/ON CONFLICT\(kind,feed_key,snapshot_key\) DO NOTHING/);
    assert.equal(batch[0].params[0],ER1_PUBLIC_KEY);
    written={body:batch[0].params[1],stored_at:batch[0].params[2]};
   }})});
