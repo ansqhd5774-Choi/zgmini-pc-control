@@ -93,6 +93,19 @@ function gitValue(git,folder,args){
  return execFileSync(git,['-c','core.fsmonitor=false','-C',folder,...args],{
   encoding:'utf8',windowsHide:true,timeout:12000,maxBuffer:8192}).trim();
 }
+// Installed bundles are dependency closures; do not assume a fixed folder list,
+// module count, or extension. Enforce containment and every installed byte hash.
+export function validatedManifestEntries(manifest){
+ requireCheck(manifest&&typeof manifest==='object'&&!Array.isArray(manifest),
+  'AI_V2_INSTALL_MANIFEST_INVALID');
+ const entries=Object.entries(manifest);
+ requireCheck(entries.length>=3&&entries.length<=300&&entries.every(([relative,sha])=>
+  typeof relative==='string'&&relative.length<=220&&
+  /^[a-zA-Z0-9][a-zA-Z0-9/_.-]+$/.test(relative)&&
+  !relative.split('/').some(p=>!p||p==='.'||p==='..')&&SHA64.test(sha)),
+  'AI_V2_INSTALLED_FILE_LIST_DENIED');
+ return entries;
+}
 function assertCheckout({workspace,env}){
  requireCheck(process.platform==='win32'&&typeof workspace==='string'&&
   path.win32.isAbsolute(workspace)&&SHA40.test(env?.GITHUB_SHA??''),
@@ -139,13 +152,13 @@ function installedCommonTool(){
   path.win32.normalize(install.home??'').toLowerCase()===path.win32.normalize(home).toLowerCase()&&
   install.manifest&&typeof install.manifest==='object','AI_V2_INSTALL_MANIFEST_INVALID');
  const root=requireDirectory(path.join(home,'versions',install.version));
- const entries=Object.entries(install.manifest);
- requireCheck(entries.length>=15&&entries.length<=120&&entries.every(([relative,sha])=>
-  /^(scripts|worker|config|examples|docs)\/[a-zA-Z0-9/_-]+(?:\.[a-zA-Z0-9_-]+)+$/.test(relative)&&
-  !relative.split('/').some(p=>p==='..'||p==='.')&&SHA64.test(sha)),
-  'AI_V2_INSTALLED_FILE_LIST_DENIED');
+ const entries=validatedManifestEntries(install.manifest);
  for(const [relative,sha] of entries){
-  const file=path.join(root,...relative.split('/'));
+  const file=path.resolve(root,...relative.split('/'));
+  requireCheck(file.toLowerCase().startsWith(root.toLowerCase()+path.sep),
+   'AI_V2_INSTALLED_PATH_ESCAPE');
+  requireCheck(fs.realpathSync.native(file).toLowerCase().startsWith(root.toLowerCase()+path.sep),
+   'AI_V2_INSTALLED_REALPATH_ESCAPE');
   requireCheck(hash(requireFile(file,{maxBytes:2_000_000}))===sha,'AI_V2_INSTALLED_FILE_HASH_MISMATCH');
  }
  const cliRelative='scripts/pc-writer/theme-config-tool.mjs';
