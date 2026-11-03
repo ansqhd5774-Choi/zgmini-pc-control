@@ -540,8 +540,25 @@ export function readMaintenanceRecoveryStatus(requestId,{
   if(!observed||typeof observed.held!=='boolean')throw Error('invalid lock status');
   installLock=observed;
  }catch{lockReadbackCode='UPDATE_LOCK_UNAVAILABLE';}
- return {status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
+ const state={status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
   installLock,lockReadbackCode};
+ return {...state,guidance:maintenanceNextAction(state)};
+}
+
+// Current lock observation wins over a historical failed request. Never infer
+// that an absent lock proves recovery/installation success; reuse its evidence.
+export function maintenanceNextAction(s){
+ if(s.lockReadbackCode||s.installedReadbackCode||s.ledgerReadbackCode)
+  return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_FAILED_READBACK',blockScope:'SHARED_INSTALL_ONLY'};
+ if(s.installLock?.held){
+  return {state:s.installLock.recoveryRequired?'RECOVERY_REQUIRED':'INSTALL_LEASE_HELD',
+   next:s.installLock.recoveryRequired?'USE_CONTROLLER_RECOVERY_RUNBOOK':'OBSERVE_EXISTING_OWNER_NO_DUPLICATE_REQUEST',
+   blockScope:'SHARED_INSTALL_ONLY'};
+ }
+ return {state:'NO_ACTIVE_INSTALL_LEASE',
+  next:s.ledger?.status==='RECOVERY_REQUIRED'?'REUSE_ARCHIVE_EVIDENCE_AND_VERIFY_CURRENT_RUNTIME':'VERIFY_TARGET_MANIFEST_AND_CURRENT_RUNTIME',
+  blockScope:'NONE_FROM_INSTALL_LEASE',
+  updateSuccessProven:false};
 }
 
 export async function command(args=process.argv.slice(2)) {

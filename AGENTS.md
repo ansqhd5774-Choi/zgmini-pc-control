@@ -2,6 +2,7 @@
 
 - 공통 정본: `docs/PC_AUTOMATION_STANDARD.md`. 현재 설치 관측과 실제 성공 근거: `docs/CONTROLLER_AUTO_UPDATE_STATUS.json`, `docs/PC_AUTOMATION_RUNTIME_20261103.json`. 새 일반챗은 과거 미완료 보고로 돌아가지 말고 해당 증거와 현재 상태를 구분한다.
 - 공유 설치 복구: `docs/CONTROLLER_RECOVERY.md`. RECOVERY_REQUIRED는 단일 복구 담당이 상태 판정→검증된 복구→결과 회수→재개까지 처리한다. 설치 전 취소·부분 적용 rollback·통신 불명확을 구분하고 실제 지원 도구와 원본 요청을 사용한다.
+- 작업 전 요약: `docs/GENERAL_CHAT_PREWORK.md`. 상태/접수 판정: `docs/AUTOMATION_STATUS_AND_ADMISSION.md`. 과거 실패를 현재 활성 잠금으로 오인하거나 외부 도구 안전 거부를 PC 장애로 확대하지 않는다. 거부된 행동을 다른 도구로 우회하지 않는다.
 - 실행 범위·증거 재사용·BLOCKER 판단은 공통 정본 2절을 따른다. 다른 담당자의 유효한 실PC 결과를 원본 링크와 적용 범위로 재사용하고, 현재 실행에 무관한 전체 경로 진단을 새 선행 조건으로 만들지 않는다. 잘못된 조건은 원래 대기열에서 정정한다.
 - 공용 적용 조정: `docs/CONTROLLER_APPLY_QUEUE.md`. 기능 개발은 병렬로 유지하되 Controller·유지보수기 적용은 단일 조정 원장과 적용 담당 한 명으로 순서를 정한다. 승인된 누적 변경을 정확한 manifest로 묶거나 순차 적용하고, 서로 다른 담당자를 무기한 기다리지 않는다. 기존 PC lease·승인 검사는 그대로 유지한다.
 

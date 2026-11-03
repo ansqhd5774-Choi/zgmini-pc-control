@@ -10,6 +10,8 @@
 
 GitHub 도구의 실제 읽기·쓰기 접근 가능성을 확인한다. 도구 미연결을 PC 장애로 판단하거나, Runner 설치만으로 새 대화에 도구 권한이 생겼다고 가정하지 않는다.
 
+작업 전 전달용 요약은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md), 현재 상태 조회와 접수 실패 분류는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)를 따른다. Runtime 건강·현재 잠금·과거 원장·요청 도구 권한을 별도 상태로 판단한다. 외부 도구 안전 검사 거부는 원문 사유를 확보하며 차단 행동을 다른 도구로 우회하지 않는다.
+
 현재 작업의 목적·전용 브랜치·승인 범위와 유효한 완료 증거를 유지한다. 과거 SHA·PID·설치 상태를 현재값으로 가정하지 않는다. 제어 저장소 최신 SHA, 실제 Controller 설치 SHA, 유지보수기 source SHA, 검사 대상 source SHA를 구분한다.
 
 ## 2. 일반 작업 실행
