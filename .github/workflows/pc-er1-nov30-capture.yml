@@ -18,7 +18,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       github.event.issue.title == 'pc-er1-nov30-capture-one-shot' &&
-      contains(github.event.issue.labels.*.name, 'pc-er1-nov30-approved')
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 8
     defaults:
