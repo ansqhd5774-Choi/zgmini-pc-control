@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {createMaintenanceAgent} from '../tools/maintenance-agent.mjs';
 import {windowsSafePathKey} from '../tools/apply-r6-host-overlay-b.mjs';
+import {R6_SOURCE_FILES,simulateR6HostRegistrationFixture}
+  from '../tools/stage-r6-host-registration.mjs';
 import {
   validateR6HostIssueEnvelope,
   validateR6HostRegistrationRequest,
@@ -148,6 +150,36 @@ test('approved host B manifest must produce a changed host with a rollback targe
   const bytes=Buffer.from(JSON.stringify(manifest({proposedSha256:HOST_ORIGINAL}))+'\n');
   assert.throws(()=>validateR6HostRegistrationRequest(envelope(bytes),bytes,CONTEXT),
     /R6_HOST_NO_EFFECT_OR_INVALID_PROPOSAL/);
+});
+
+test('a sealed, byte-identical R6 source bundle may be reused but no drift is overwritten',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'r6-sealed-stage-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const dataRoot=path.join(root,'data'),stageRoot=path.join(root,'source-bundles');
+  const coreDir=path.join(dataRoot,'pc-writer','storage');
+  fs.mkdirSync(coreDir,{recursive:true});fs.mkdirSync(stageRoot);
+  fs.writeFileSync(path.join(coreDir,'core.sqlite'),'core');
+  const candidatePath=path.join(root,'EMPLOYMENT_R6_CANDIDATE.sqlite');
+  fs.writeFileSync(candidatePath,'candidate');
+  const sourceFiles=Object.fromEntries(R6_SOURCE_FILES.map((rel,i)=>
+    [rel,Buffer.from(`fixture-source-${i}`)]));
+  const manifestBytes=Buffer.from(JSON.stringify({
+    schema:'ZGMINI_R6_SOURCE_BUNDLE_DRAFT_V1',sourceRepository:'ansqhd5774-Choi/zgmini',
+    sourceSha:R6_HOST_SOURCE_SHA,sourceBranch:'codex/employment-1y-reader-r1',
+    entrypoint:'scripts/pc-writer/employment-r6-runner-stage.mjs',
+    files:Object.fromEntries(Object.entries(sourceFiles).map(([rel,bytes])=>[rel,sha256(bytes)])),
+  })+'\n');
+  const input={installedHost:{schema:'ZGMINI_PC_HOST_V1',dataRoot,
+    controllerSourceSha:CONTROLLER,approvedSources:{}},sourceFiles,manifestBytes,
+    sourceSha:R6_HOST_SOURCE_SHA,candidatePath,stageRoot};
+  const first=simulateR6HostRegistrationFixture(input);
+  const second=simulateR6HostRegistrationFixture(input);
+  assert.deepEqual(second.proposedHost,first.proposedHost);
+  assert.equal(second.stageBundle,first.stageBundle);
+  const extra=path.join(first.stageBundle,'not-approved.txt');
+  fs.writeFileSync(extra,'foreign');
+  assert.throws(()=>simulateR6HostRegistrationFixture(input),/R6_EXISTING_STAGE_FILES_CHANGED/);
+  assert.equal(fs.readFileSync(extra,'utf8'),'foreign');
 });
 
 function maintainerFixture(t,{outcome='PASS',applyLosesReply=false}={}){
