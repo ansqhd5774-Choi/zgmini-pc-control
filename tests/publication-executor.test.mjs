@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {parsePublisherLog,nextLedgerPhase} from '../tools/publication-executor.mjs';
+import {parsePublisherLog,nextLedgerPhase,millisecondsToNextUtcSecond,
+  publicationCheckpointReport} from '../tools/publication-executor.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const source=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -28,6 +29,25 @@ test('QFR exact stored checkpoint is validated and only identical prior is reusa
  assert.throws(()=>parsePublisherLog(raw.replace('SOURCE_STORED_AT=1793112733108',
    'SOURCE_STORED_AT=0'),'census-qfr-margin-once'),/PUBLICATION_RESULT_CHECKPOINT_INVALID/);
 });
+test('second-resolution result files cannot share a dry-run/apply UTC second',()=>{
+ assert.equal(millisecondsToNextUtcSecond(1793112733000),1050);
+ assert.equal(millisecondsToNextUtcSecond(1793112733900),150);
+ assert.equal(millisecondsToNextUtcSecond(1793112733999),51);
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/setTimeout\(resolve,millisecondsToNextUtcSecond\(fenceAt\)\)/);
+ assert.match(executor,/const fenceAt=Date\.now\(\)/);
+});
+test('BEA already-stored attempt timestamp is not claimed as D1 checkpoint',()=>{
+ const evidence={d1Result:'ALREADY_STORED',sourceStoredAt:1793112733108};
+ assert.deepEqual(publicationCheckpointReport('bea-unit-profit-once',evidence),{
+  sourceStoredAt:null,attemptedSourceStoredAt:1793112733108,
+  sourceStoredAtEvidence:'ATTEMPTED_ONLY'});
+ assert.deepEqual(publicationCheckpointReport('census-qfr-margin-once',evidence),{
+  sourceStoredAt:1793112733108,attemptedSourceStoredAt:1793112733108,
+  sourceStoredAtEvidence:'D1_READBACK_VERIFIED'});
+ assert.equal(publicationCheckpointReport('bea-unit-profit-once',
+  {...evidence,d1Result:'READBACK_VERIFIED'}).sourceStoredAt,1793112733108);
+});
 test('operation state transitions fail closed on ambiguous apply or timeout',()=>{
  const initial={requestId:'pc-publication-fixture',fingerprint:'a'.repeat(64),phase:'READY'};
  const preflight=nextLedgerPhase(initial,'PREFLIGHT_PASS');
@@ -48,6 +68,7 @@ test('static workflow stays gated and cannot overwrite existing A or maintenance
  assert.match(yml,/cancel-in-progress: false/);
  assert.match(yml,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-publication'\)/);
  assert.match(yml,/publication-executor\.mjs/);
+ assert.equal((yml.match(/clean: false/g)||[]).length,2);
  assert.doesNotMatch(yml,/pc-job\.yml|pc-maintenance/);
  const executor=source('tools/publication-executor.mjs');
  assert.match(executor,/fs\.mkdirSync\(active\)/);
