@@ -7,6 +7,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {taskAction} from '../controller/pc-source-readonly.mjs';
 
 export const R17_ROOT='E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release';
 export const R17_APPROVED='a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e';
@@ -21,7 +22,27 @@ export const R17_MISSING=Object.freeze([
  'scripts/pc-writer/us-breadth-provisional-publication.mjs',
  'lib/market-breadth/us-provisional-r1.mjs',
 ]);
-const HEX=/^[0-9a-f]{64}$/;
+export const R17_VBS_CHAIN=Object.freeze([
+ {path:'data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs',
+  sha256:'9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c'},
+ {path:'data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs',
+  sha256:'bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01'},
+]);
+const decoded=bytes=>bytes.length>3&&bytes[1]===0&&bytes[3]===0?
+ bytes.toString('utf16le'):bytes.toString('utf8');
+export function assessR17TaskChain({action,launchers}={}){
+ const first=R17_VBS_CHAIN[0],second=R17_VBS_CHAIN[1];
+ if(!action||!Array.isArray(launchers)||launchers.length!==2)return false;
+ if(!/[/\\]wscript\.exe$/i.test(action.command??''))return false;
+ const arg=(action.arguments??'').trim().replace(/^"|"$/g,'');
+ const normalized=path.win32.normalize(arg).toLowerCase();
+ if(!normalized.endsWith(path.win32.normalize(first.path.replaceAll('/', '\\')).toLowerCase()))return false;
+ if(launchers[0]?.sha256!==first.sha256||launchers[1]?.sha256!==second.sha256)return false;
+ // Static chain only, never proof of which executable version is running.
+ const firstText=launchers[0]?.text??'',secondText=launchers[1]?.text??'';
+ return /run-local-core\.vbs/i.test(firstText)&&/local-cycle\.mjs/i.test(secondText);
+}
+
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const gitBinary=()=>['C:\\Program Files\\Git\\cmd\\git.exe',
  'C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(fs.existsSync);
@@ -110,21 +131,17 @@ export function inspectR17Windows(){
    try{git(root,['apply','--check','--whitespace=error',patch]);evidence.patchApplies=true;}
    catch{/* Real context conflicts are blockers; never force a patch. */}
   }
-  // XML is read-only; WorkingDirectory alone does not prove the running Node.
-  // Require a configured source path AND explicit local-cycle entrypoint.
+  // Only the exact observed VBS chain is admitted. Neither a Task working
+  // directory nor a historical checkout by itself establishes live source.
   const task=execFileSync('schtasks.exe',
    ['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
    {windowsHide:true,timeout:10000,maxBuffer:262144});
-  const xml=task[0]===255&&task[1]===254?
-   task.toString('utf16le').replace(/^\uFEFF/,''):
-   task[0]===254&&task[1]===255?
-   Buffer.from(task).swap16().toString('utf16le').replace(/^\uFEFF/,''):
-   task.length>=4&&task[1]===0&&task[3]===0?
-   task.toString('utf16le'):task.toString('utf8').replace(/^\uFEFF/,'');
-  const wd=xml.match(/<WorkingDirectory>([^<]+)<\/WorkingDirectory>/i)?.[1]??'';
-  const args=xml.match(/<Arguments>([^<]+)<\/Arguments>/i)?.[1]??'';
-  evidence.taskLinked=path.win32.normalize(wd).toLowerCase()===
-   path.win32.normalize(root).toLowerCase()&&/local-cycle\.mjs/i.test(args);
+  const action=taskAction(task);
+  const launchers=R17_VBS_CHAIN.map(item=>{
+   const bytes=textAt('E:\\ZGmini',item.path,65536);
+   return {sha256:digest(bytes),text:decoded(bytes)};
+  });
+  evidence.taskLinked=assessR17TaskChain({action,launchers});
  }catch{/* Never disclose paths, source, credentials, command outputs or raw errors. */}
  return assessR17Evidence(evidence);
 }
