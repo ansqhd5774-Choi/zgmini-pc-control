@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_ER1_CONTROLLER_PATCH_TEST_V1",
+  "installedSha": "d10bac71a0a36208fd4a96513a9f5fcf06d82905",
+  "targetSha": "eb511e94f85be2b339929cbc4c0b3cd49e8f7d7a",
+  "sourceFixPr": 64,
+  "rosterRemovalPr": 69,
+  "rosterRemovalMergeSha": "bf5c9b278d6beb609598c973e12dd5ba55a11013",
+  "fixtureEnvironment": "Linux Node v24.22.1",
+  "tests": {
+    "pcSourceReadonly": 5,
+    "er1SavedInputReadonly": 6,
+    "total": 11,
+    "pass": 11,
+    "fail": 0
+  },
+  "changedOperationalControllerFiles": ["controller/pc-source-readonly.mjs"],
+  "approvedRosterPresentInTarget": false,
+  "actualWindowsControllerUpdated": false,
+  "operationalWrites": 0,
+  "d1Writes": 0
+}
