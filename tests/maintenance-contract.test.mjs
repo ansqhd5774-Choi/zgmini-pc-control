@@ -285,3 +285,42 @@ test("arbitrary uppercase exception text cannot leak through the ledger failure 
   assert.equal(bad.firstFail,"UPDATE_FAILURE_UNCLASSIFIED");
   assert.doesNotMatch(JSON.stringify(bad),/PRIVATE_CUSTOMER_SECRET_TOKEN/);
 });
+
+test("single R6 A/heavy exception preserves all other A/light admission gates",()=>{
+  const previous={schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:CONTROL_REPOSITORY,
+    sourceRepository:'ansqhd5774-Choi/zgmini',allowedActors:[CONTROL_ACTOR],
+    seats:6,mutationsEnabled:false,maxHeavyJobs:1,
+    minimumFreeMiBForHeavy:1536,artifactUploadEnabled:false,
+    operations:{'core-status':{grade:'A',timeoutSeconds:60,resource:'light'}}};
+  const next=clone(previous);
+  const name='employment-r6-candidate-stage-readonly';
+  const policy={grade:'A',resource:'heavy',timeoutSeconds:240,minimumFreeMiB:1536};
+  next.operations[name]=policy;
+  assert.equal(validateControllerConfigTransition(previous,next),true);
+  const cases=[
+    ['other name',other=>{other.operations['employment-r6-candidate-stage']={...policy};delete other.operations[name];}],
+    ['wrong grade',other=>{other.operations[name].grade='B';}],
+    ['light downgrade',other=>{other.operations[name].resource='light';}],
+    ['longer timeout',other=>{other.operations[name].timeoutSeconds=241;}],
+    ['shorter timeout',other=>{other.operations[name].timeoutSeconds=239;}],
+    ['lower memory gate',other=>{other.operations[name].minimumFreeMiB=1024;}],
+    ['higher memory gate',other=>{other.operations[name].minimumFreeMiB=2048;}],
+    ['missing memory gate',other=>{delete other.operations[name].minimumFreeMiB;}],
+    ['extra executable argument',other=>{other.operations[name].command='anything';}],
+    ['second unapproved heavy operation',other=>{other.operations['other-readonly']={...policy};}],
+  ];
+  for(const [label,change] of cases){
+    const altered=clone(next);change(altered);
+    assert.throws(()=>validateControllerConfigTransition(previous,altered),
+      /CONTROLLER_NEW_OPERATION_NOT_READONLY_A/,label);
+  }
+  const writes=clone(next);writes.mutationsEnabled=true;
+  assert.throws(()=>validateControllerConfigTransition(previous,writes),
+    /CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED/);
+  const bypass=clone(next);bypass.maxHeavyJobs=2;
+  assert.throws(()=>validateControllerConfigTransition(previous,bypass),
+    /CONTROLLER_CONFIG_PROTECTED_POLICY_CHANGED/);
+  const mutateExisting=clone(next);mutateExisting.operations['core-status'].timeoutSeconds=90;
+  assert.throws(()=>validateControllerConfigTransition(previous,mutateExisting),
+    /CONTROLLER_EXISTING_OPERATION_CHANGED/);
+});
