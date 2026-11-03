@@ -60,8 +60,8 @@ export function assessR17Evidence(e){
  if(e?.patchApplies!==true)reasons.push('PR957_CONTEXT_CONFLICT_OR_UNVERIFIED');
  if(e?.quotaContract!==true)reasons.push('LOCAL_ALPACA_GUARD_UNVERIFIED');
  if(e?.taskLinked!==true)reasons.push('CORE_TASK_SOURCE_LINK_UNVERIFIED');
- return {status:reasons.length?'BLOCKED':'STATIC_PREFLIGHT_PASS',
-  code:reasons[0]??'STATIC_PREFLIGHT_ONLY_NOT_B_APPROVAL',
+ return {status:reasons.length?'BLOCKED':'PASS',
+  code:reasons[0]??'R17_STATIC_PREFLIGHT_PASS_NOT_INSTALL_APPROVAL',
   reasons,sourceHead:e?.head??null,
   checkedExistingFiles:Object.keys(R17_BASE_FILES).length,
   checkedNewFiles:R17_MISSING.length,
@@ -133,7 +133,7 @@ export function inspectR17Windows(){
   }
   // Only the exact observed VBS chain is admitted. Neither a Task working
   // directory nor a historical checkout by itself establishes live source.
-  const task=execFileSync('schtasks.exe',
+  const task=execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),
    ['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
    {windowsHide:true,timeout:10000,maxBuffer:262144});
   const action=taskAction(task);
@@ -149,5 +149,5 @@ export function inspectR17Windows(){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const result=inspectR17Windows();
  process.stdout.write(JSON.stringify(result)+'\n');
- if(result.status!=='STATIC_PREFLIGHT_PASS')process.exitCode=2;
+ if(result.status!=='PASS')process.exitCode=2;
 }
