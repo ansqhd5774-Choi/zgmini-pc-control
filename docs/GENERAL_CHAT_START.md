@@ -2,6 +2,8 @@
 
 공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), 실PC 완료 증거는 [PC_AUTOMATION_RUNTIME_20261103.json](PC_AUTOMATION_RUNTIME_20261103.json)이다. 기존 설치·인계·자동 업데이트를 미완료로 되돌려 처음부터 반복하지 않는다.
 
+다른 담당자의 변경이 공용 설치에 섞여 있으면 [적용 대기열 운영 방침](CONTROLLER_APPLY_QUEUE.md)에 따라 단일 조정 원장에 등록한다. 실제 설치 SHA와 각 변경의 승인·의존성을 적용 담당 한 명이 정리한다. 통합 또는 순차 적용을 정하고, 대기 보고에는 선행 항목·담당·다음 실행 조건을 명시한다. 독립 개발·검토는 계속한다.
+
 Runner 연결 장애와 복구는 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 독립 유지보수기 갱신과 Runner 연결 복구를 구분한다.
 
 이 문서는 사용자에게 매번 CMD를 전달하지 않고 GitHub 요청→PC 자동 실행→결과 읽기를 이어가기 위한 진입점이다.

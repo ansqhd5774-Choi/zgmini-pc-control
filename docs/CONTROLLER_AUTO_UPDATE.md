@@ -1,5 +1,7 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+여러 담당자의 변경이 누적된 적용은 [공용 적용 대기열 운영 방침](CONTROLLER_APPLY_QUEUE.md)을 먼저 따른다. 정확한 통합 manifest 또는 순차 적용으로 조정하며, 개별 승인·파일 해시·기존 설치 보호 검사는 그대로 유지한다.
+
 상태 (2026-11-03 KST): **실PC PASS.** [업데이트 #44](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/44) → Controller `b77a333…` → 새 Listener 6개 → [진단 #45](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/45) PASS → TXT/JSON/댓글 회수 완료. 유지보수기 source는 `c96d4ac…`이며 [실측 정본](PC_AUTOMATION_RUNTIME_20261103.json)을 참조한다. 아래의 과거 최초 연결 기록은 재설치 지시가 아니다.
 
 ## 정체성과 승인 경계
