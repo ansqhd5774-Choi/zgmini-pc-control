@@ -266,6 +266,10 @@ async function main(){
   const eventPath=process.env.GITHUB_EVENT_PATH;
   if(!eventPath||!path.isAbsolute(eventPath))fail('ER1_B_EVENT_PATH_STOP');
   const event=JSON.parse(fs.readFileSync(eventPath,'utf8'));
+  // Keep the validated request id even if preflight refuses the B operation.
+  // The sanitized uploader must report the real first failure, not a missing file.
+  const request=validateIssue(event,process.env);
+  response={...response,requestId:request.requestId};
   // Production CLI selects only the separately approved independent V2 lane.
   // V1 default on exported fixture helpers remains for non-operational tests.
   const {sourceRoot}=prepareCheckoutWorkspace({event,edition:V2_EDITION});
