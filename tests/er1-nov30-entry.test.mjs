@@ -9,7 +9,7 @@ const request={schema:'ZGMINI_ER1_NOV30_CAPTURE_V1',
   sourceSha:'11a971cb5d3514c2d1e1798def58465fb8a74035',
   from:'2026-11-01',through:'2026-11-30'};
 const event={action:'opened',issue:{user:{login:'ansqhd5774-Choi'},
-  title:'pc-er1-nov30-capture-one-shot',labels:[{name:'pc-er1-nov30-approved'}],
+  title:'pc-er1-nov30-capture-one-shot',labels:[{name:'pc-er1-approved'}],
   body:JSON.stringify(request)}};
 const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
   GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened'};
