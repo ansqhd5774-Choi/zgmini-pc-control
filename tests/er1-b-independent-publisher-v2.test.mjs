@@ -27,7 +27,7 @@ const manifest={schema:'ER1_PC_OPERATION_APPROVAL_V2',status:'APPROVED_B',
  allowSchemaChanges:false,allowCredentialRefresh:false,
  allowIndependentPublisherV2:true,sourceSha256:{...ER1_V2_SOURCE_HASHES,
   'tools/market-calendar-er1/ER1_B_INDEPENDENT_PUBLISHER_V2.mjs':
-   '35ed435fa9f0ca03972e20d71e241523dab35b0f9bac4edf0f8c542a71fc1f3e',
+   'f53e32ba375344d40d4af920e4e90ee860b27353aa5f518289dc3507a4204477',
   'tools/market-calendar-er1/ER1_PC_OPERATION_V2_ONCE.mjs':
    'bda8ae3d8b69ca3862c6bee231eb0c2baf89f52ff3061cb0f87445c80f6c965d'},
  pcHome:String.raw`E:\ZGmini\data\pc-writer`,dataRoot:String.raw`E:\ZGmini\data`,
@@ -60,10 +60,11 @@ test('D1-first mode is required in signed B manifest',()=>{
 test('legacy FHS/R43 active Reader is required; header absence alone cannot pass',async()=>{
  const legacyHeaders={'x-zgmini-fhs-r3-reader':'ZGMINI-FHS-R3',
   'x-zgmini-r43-reader':'ZGMINI-R43-MARKET-IMPORTANCE',
-  'content-type':'text/html; charset=utf-8'};
- const fetchResponse=extra=>async(_url,opts)=>{
+  'content-type':'text/html; charset=utf-8','x-display-count':'1'};
+ const fetchResponse=(extra={},html='<div class=mc-importance aria-label="중요도 3">★★★</div>')=>async(_url,opts)=>{
   assert.equal(opts.cache,'no-store');assert.equal(opts.redirect,'error');
-  return {status:200,headers:{get:key=>({...legacyHeaders,...extra})[key]??null}};
+  return {status:200,headers:{get:key=>({...legacyHeaders,...extra})[key]??null},
+   text:async()=>html};
  };
  assert.equal(await verifyV2LegacyReader({fetchImpl:fetchResponse({})}),true);
  await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({
@@ -71,6 +72,9 @@ test('legacy FHS/R43 active Reader is required; header absence alone cannot pass
  await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({
   'x-zgmini-r43-reader':'MISSING'})}),/LEGACY_READER_GATE_STOP/);
  await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:async()=>({status:204,headers:{get:()=>null}})}),/LEGACY_READER_GATE_STOP/);
+ await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({'x-display-count':'0'},'')}),/LEGACY_READER_EMPTY_STOP/);
+ await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({},'')}),/LEGACY_READER_EMPTY_STOP/);
+ await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({},'<div>empty calendar</div>')}),/LEGACY_READER_EMPTY_STOP/);
 });
 test('source hash cannot be weakened in manifest',()=>{
  assert.throws(()=>validateV2Approval({...manifest,sourceSha256:{

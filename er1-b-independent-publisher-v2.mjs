@@ -131,6 +131,17 @@ export async function verifyV2LegacyReader({fetchImpl=fetch}={}){
   response.headers?.get('x-zgmini-earnings-grade-reader')!==null||
   !/^text\/html(?:;|$)/i.test(response.headers?.get('content-type')??''))
   stop('ER1_B_V2_LEGACY_READER_GATE_STOP');
+ // A 200/HTML response with legacy headers can still be an empty calendar.
+ // Do not mistake an empty row set for proof that existing stars render.
+ const countRaw=response.headers?.get('x-display-count');
+ const count=Number(countRaw);
+ if(!/^[1-9][0-9]*$/.test(countRaw??'')||
+    !Number.isSafeInteger(count)||count>5000)
+  stop('ER1_B_V2_LEGACY_READER_EMPTY_STOP');
+ let html;
+ try{html=await response.text()}catch{stop('ER1_B_V2_READER_PROBE_UNAVAILABLE_STOP')}
+ if(typeof html!=='string'||!html.includes('mc-importance')||!html.includes('★'))
+  stop('ER1_B_V2_LEGACY_READER_EMPTY_STOP');
  return true;
 }
 
