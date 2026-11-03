@@ -1,0 +1,55 @@
+name: ZGMINI ER1 December Derived ER1 Score D1 Publish V2
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-er1-dec31-derived-score-v2-one-shot
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-dec31-derived-score-v2-one-shot' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 15
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout pinned owner-approved control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout pinned reviewed public publisher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 85dcfe8e9e6f622ee8f8ddb8be563a72fbcfc44d
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Publish sanitized December HTML from PC saved rows
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-derived-score-v2-entry.mjs"'
+      - name: Post bounded nonsecret results
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-derived-score-v2-entry.mjs" --upload'
