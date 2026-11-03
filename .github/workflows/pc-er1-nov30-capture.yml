@@ -21,6 +21,12 @@ jobs:
       contains(github.event.issue.labels.*.name, 'pc-er1-approved')
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 8
+    env:
+      # Preserve exact reviewed source bytes despite Windows Git autocrlf.
+      # Scoped to this job; never changes PC or global Git settings.
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
     defaults:
       run:
         shell: cmd
