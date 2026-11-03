@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-0a370d48-6fb2-4565-9928-856624060f69",
+  "targetControllerSha": "090ca40a6fe874734754678264887fe527f5bc65",
+  "status": "BLOCKED",
+  "code": "CONTROL_DIRTY",
+  "lastPass": "BLOCKED",
+  "firstFail": "RECEIVED",
+  "actualControllerSha": "e38c6acd1643e284df157905ce77838298163dbc",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": true
+}
