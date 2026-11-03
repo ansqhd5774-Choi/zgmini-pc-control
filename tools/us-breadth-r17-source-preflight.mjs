@@ -99,7 +99,8 @@ export function inspectR17Windows(){
    evidence.hashes[name]=digest(textAt(root,name));
   for(const name of R17_MISSING){
    const file=path.join(root,...name.split('/'));
-   evidence.present[name]=fs.existsSync(file);
+   try{fs.lstatSync(file);evidence.present[name]=true;}
+   catch(error){evidence.present[name]=error?.code==='ENOENT'?false:null;}
   }
   evidence.quotaContract=staticQuotaContract(root);
   const patchBytes=fs.readFileSync(patch);
