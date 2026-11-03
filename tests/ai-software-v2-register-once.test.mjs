@@ -6,7 +6,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {
  CONTROL_REPO,SOURCE_SHA,REQUEST_SCHEMA,REQUEST_SCOPE,REQUEST_TITLE,FILES,
- validateRequest,checkedSourceFiles,validatedManifestEntries,
+ validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,
 } from '../tools/ai-software-v2-register-once.mjs';
 
 function approvedIssue(){
@@ -91,4 +91,12 @@ test('installed manifest rejects traversal, absolute paths, malformed hashes',()
  assert.throws(()=>validatedManifestEntries({'package.json':'0',
   'scripts/pc-writer/theme-config-tool.mjs':'a'.repeat(64),
   'scripts/pc-writer/theme-config-registry.mjs':'b'.repeat(64)}),/AI_V2_INSTALLED_FILE_LIST_DENIED/);
+});
+
+test('installed V2 capability diagnostic returns only safe booleans',()=>{
+ assert.deepEqual(inspectInstalledCapability("if(mode==='--register'){}",
+  "const schema='ZGMINI_THEME_CONFIG_V2';"),{
+   cliRegisterMarker:true,registryV2Marker:true});
+ assert.deepEqual(inspectInstalledCapability('old register syntax','old V1'),{
+  cliRegisterMarker:false,registryV2Marker:false});
 });

@@ -106,6 +106,10 @@ export function validatedManifestEntries(manifest){
   'AI_V2_INSTALLED_FILE_LIST_DENIED');
  return entries;
 }
+export function inspectInstalledCapability(cliText,registryText){
+ return {cliRegisterMarker:cliText.includes("mode==='--register'"),
+  registryV2Marker:registryText.includes('ZGMINI_THEME_CONFIG_V2')};
+}
 function assertCheckout({workspace,env}){
  requireCheck(process.platform==='win32'&&typeof workspace==='string'&&
   path.win32.isAbsolute(workspace)&&SHA40.test(env?.GITHUB_SHA??''),
@@ -166,9 +170,17 @@ function installedCommonTool(){
  requireCheck(entries.some(([r])=>r===cliRelative)&&entries.some(([r])=>r===registryRelative),
   'AI_V2_COMMON_REGISTER_TOOL_MISSING');
  const cli=path.join(root,...cliRelative.split('/'));
- requireCheck(fs.readFileSync(cli,'utf8').includes("mode==='--register'")&&
-  fs.readFileSync(path.join(root,...registryRelative.split('/')),'utf8')
-   .includes('ZGMINI_THEME_CONFIG_V2'),'AI_V2_COMMON_V2_CAPABILITY_MISSING');
+ const flags=inspectInstalledCapability(fs.readFileSync(cli,'utf8'),
+  fs.readFileSync(path.join(root,...registryRelative.split('/')),'utf8'));
+ if(!flags.cliRegisterMarker||!flags.registryV2Marker){
+  const err=new Error('AI_V2_COMMON_V2_CAPABILITY_MISSING');
+  err.code='AI_V2_COMMON_V2_CAPABILITY_MISSING';
+  err.diagnostic={installedToolSourceSha:install.sourceSha,
+   installedToolVersion:install.version,
+   cliManifestSha256:install.manifest[cliRelative],
+   registryManifestSha256:install.manifest[registryRelative],...flags};
+  throw err;
+ }
  requireFile(NODE,{maxBytes:200_000_000});
  return {cli,installSourceSha:install.sourceSha,version:install.version};
 }
@@ -275,7 +287,7 @@ async function execute(event,env){
    registrationStatus:registration,installedToolSourceSha:tool.installSourceSha,
    installedToolVersion:tool.version,registered:true});
  }catch(e){return resultStatus(begun?'STATE_UNKNOWN':'BLOCKED',safeCode(e),request,
-   {registered:'UNKNOWN',requiresInspection:begun})}
+   {registered:'UNKNOWN',requiresInspection:begun,...(e?.diagnostic??{})})}
 }
 
 async function writeLocalResult(report){
@@ -299,6 +311,10 @@ async function uploadReport(event,env){
   registrationStatus:/^[A-Z_]+$/.test(report.registrationStatus??'')?report.registrationStatus:null,
   installedToolSourceSha:SHA40.test(report.installedToolSourceSha??'')?report.installedToolSourceSha:null,
   installedToolVersion:/^[a-f0-9]{16}$/.test(report.installedToolVersion??'')?report.installedToolVersion:null,
+  cliManifestSha256:SHA64.test(report.cliManifestSha256??'')?report.cliManifestSha256:null,
+  registryManifestSha256:SHA64.test(report.registryManifestSha256??'')?report.registryManifestSha256:null,
+  cliRegisterMarker:typeof report.cliRegisterMarker==='boolean'?report.cliRegisterMarker:null,
+  registryV2Marker:typeof report.registryV2Marker==='boolean'?report.registryV2Marker:null,
   providerCalls:0,d1Writes:0,schedulerWrites:0,publicWrites:0,
   registered:report.status==='PASS',next:report.status==='PASS'?'PRIVATE_PLAN_AND_STORED_CYCLE':
    'INSPECT_PC_REGISTRATION_BEFORE_ANY_RETRY'};
