@@ -89,6 +89,9 @@ function observe(requestId){
  const issue=github('issues/'+ledger.issueNumber);let body;try{body=JSON.parse(issue.body);}catch{}
  const identityVerified=ledger.requestId===requestId&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&
   /^[0-9a-f-]{36}$/.test(owner.nonce??'')&&marker.nonce===owner.nonce&&marker.requestOwnerPid===owner.pid&&
+  Number.isFinite(Date.parse(ledger.updatedAt))&&Number.isFinite(Date.parse(marker.at))&&
+  Math.abs(Date.parse(marker.at)-Date.parse(ledger.updatedAt))<5000&&
+  Number.isFinite(Date.parse(owner.at))&&Date.parse(owner.at)<=Date.parse(marker.at)&&
   issue.user?.login==='ansqhd5774-Choi'&&issue.title==='pc-controller-update'&&
   body?.requestId===requestId&&body?.targetControllerSha===ledger.targetSha;
  const rows=github('actions/runners?per_page=100').runners;
