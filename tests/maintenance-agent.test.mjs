@@ -407,6 +407,13 @@ test("ambiguous timeout without verifiable status becomes UNKNOWN and never reru
   assert.equal(f.stats.applies,1);
 });
 
+test('child pre-install rejection is recovered from stdout without repeating apply',async t=>{
+ const error=Object.assign(Error('child failed'),{stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY',failureStage:'PRE_INSTALL'})});
+ const f=fixture(t,{applyError:error});const r=await f.agent.pollOnce();
+ assert.equal(r[0].code,'SUPERVISOR_NOT_HEALTHY');assert.equal(r[0].status,'BLOCKED');
+ await f.agent.pollOnce();assert.equal(f.stats.applies,1);
+});
+
 test("timed-out comment is observed by marker; retry never posts duplicate comment",async t=>{
   const f=fixture(t,{commentError:Object.assign(Error("network timeout"),{code:"ETIMEDOUT"})});
   const first=await f.agent.pollOnce();
