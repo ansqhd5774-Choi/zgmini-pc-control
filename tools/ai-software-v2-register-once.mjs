@@ -150,9 +150,10 @@ function readActiveConfiguredDiagnostic(home){
    activeCliSha256:hash(cli),activeRegistrySha256:hash(registry)};
  }catch{return {activeRuntimeProbe:'READ_ONLY_PROBE_UNAVAILABLE'};}
 }
-export function validateActiveUpgradeReceipt(receipt,oldVersion,activeVersion){
+export function validateActiveUpgradeReceipt(receipt,_legacyInstallVersion,activeVersion){
  requireCheck(receipt?.status==='CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED'&&
-  receipt.sourceSha===ACTIVE_V2.sourceSha&&receipt.oldVersion===oldVersion&&
+  receipt.sourceSha===ACTIVE_V2.sourceSha&&/^[a-f0-9]{16}$/.test(receipt.oldVersion??'')&&
+  receipt.oldVersion!==activeVersion&&
   receipt.newVersion===activeVersion&&receipt.newVersion===ACTIVE_V2.version&&
   receipt.installedManifest&&Object.getPrototypeOf(receipt.installedManifest)===Object.prototype,
   'AI_V2_ACTIVE_UPGRADE_RECEIPT_DENIED');
