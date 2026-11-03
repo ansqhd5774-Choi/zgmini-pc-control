@@ -79,6 +79,21 @@ export function sameR6RecoveryClaim(claim,proof){
   &&/^[0-9a-f-]{36}$/.test(claim.nonce??'')
   &&Object.entries(proof).every(([key,value])=>claim[key]===value));
 }
+/** Read-only acknowledgement of an already archived recovery. It MUST NOT
+ * authorize another archive, host restore, intake replay, or claim removal. */
+export function verifyR6HistoricCompletion(x){
+ if(x?.status!=='ARCHIVED_RECOVERY_EVIDENCE'
+  ||x.recordStatus!=='RECOVERY_COMPLETED'||x.archiveVerified!==true
+  ||x.originalLeaseAbsent!==true||x.ownerMarkerMatches!==true
+  ||x.protectedSame!==true
+  ||x.dbIdentitySame!==true||x.workflowActive!==true
+  ||x.backlogVerified!==true)return false;
+ const expected=x.hostOutcome==='APPLIED'?x.proposedSha256:
+  ['ROLLED_BACK','ORIGINAL_READBACK_NO_APPLY_PASS'].includes(x.hostOutcome)
+   ?x.originalSha256:null;
+ return typeof expected==='string'&&/^[a-f0-9]{64}$/.test(expected)
+  &&x.hostSha256===expected;
+}
 const R6_HOST_MANIFEST_KEYS=["schema","scope","sourceRepository","sourceBranch",
   "sourceSha","sourceManifestSha256","installedControllerSha",
   "hostOriginalSha256","proposedSha256","hostPath","candidatePath",
