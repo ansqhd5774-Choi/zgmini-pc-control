@@ -594,14 +594,18 @@ export async function command(args=process.argv.slice(2)) {
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readMaintenanceRecoveryStatus(requestId);
  }
- need(cmd==='apply'&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
- const data=loadApprovedPackage(requestId,args[4]);
- const {request,ports}=makePorts(data,data.issueNumber);
+ need(['apply','preflight'].includes(cmd)&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
+ let data,request,ports;
+ try{
+ data=loadApprovedPackage(requestId,args[4]);
+ ({request,ports}=makePorts(data,data.issueNumber));
  // Read-only prerequisite checks before taking the shared installation lease.
  // They are repeated by validate under the lease to prevent a stale preflight
  // from granting permission to stop or switch a changed process.
  readOwner();
  installedManifest();
+ }catch(error){error.failureStage='PRE_INSTALL';throw error;}
+ if(cmd==='preflight')return {status:'PASS',code:'PRE_INSTALL_READONLY_VERIFIED',actualControllerSha:installedManifest().installedSha,requestId,installAttempted:false};
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
  let retained=false;
  try{
@@ -613,5 +617,5 @@ export async function command(args=process.argv.slice(2)) {
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
- catch(error){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',actualControllerSha:null}));process.exitCode=1;}
+ catch(error){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',failureStage:error.failureStage==='PRE_INSTALL'?'PRE_INSTALL':'UNVERIFIED',actualControllerSha:null}));process.exitCode=1;}
 }

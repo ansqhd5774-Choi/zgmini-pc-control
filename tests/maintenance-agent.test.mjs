@@ -5,7 +5,20 @@ import os from "node:os";
 import path from "node:path";
 import {test} from "node:test";
 
-import {createMaintenanceAgent} from "../tools/maintenance-agent.mjs";
+import {createMaintenanceAgent,failedUpdaterResult} from "../tools/maintenance-agent.mjs";
+
+test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
+ const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
+  {stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY',failureStage:'PRE_INSTALL'})},
+  {ledger:null,installLock:{held:false},actualControllerSha:'a'.repeat(40)});
+ assert.equal(r.status,'BLOCKED');assert.equal(r.code,'SUPERVISOR_NOT_HEALTHY');assert.equal(r.actualControllerSha,'a'.repeat(40));
+});
+test('unknown stage never claims untouched install and never copies arbitrary stdout',()=>{
+ const r=failedUpdaterResult({requestId:'fixture'}, {stdout:'sensitive arbitrary text'}, {ledger:null,installLock:{held:false}});
+ assert.equal(r.status,'UNKNOWN');assert.equal(r.code,'UPDATE_OUTCOME_UNKNOWN');assert.ok(!JSON.stringify(r).includes('sensitive'));
+ const exact=failedUpdaterResult({requestId:'fixture'},{stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY'})},{ledger:null,installLock:{held:false}});
+ assert.equal(exact.status,'UNKNOWN');assert.equal(exact.code,'SUPERVISOR_NOT_HEALTHY');
+});
 import {manifestFingerprint} from "../tools/maintenance-contract.mjs";
 
 const REPO="ansqhd5774-Choi/zgmini-pc-control";

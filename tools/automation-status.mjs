@@ -14,7 +14,7 @@ const live=pid=>{if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.k
 export function summarizeAutomation(s){
  const base=maintenanceNextAction(s);
  const healthy=s.controllerFilesVerified===true&&s.supervisorAlive===true&&s.supervisorIdentityVerified===true&&
-  s.supervisorFresh===true&&s.runnerSetOnline===true&&s.workflowState==='active';
+  s.supervisorFresh===true&&s.supervisorChildrenVerified===true&&s.runnerSetOnline===true&&s.workflowState==='active';
  return {...base,runtimeState:healthy?'HEALTHY':'UNVERIFIED',
   controllerState:healthy?'HEALTHY':'UNVERIFIED',
   maintenanceState:s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'UNVERIFIED',
@@ -60,6 +60,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   controllerFilesVerified:verified===true,supervisorAlive:live(owner?.pid),
   supervisorIdentityVerified:Boolean(owner?.nonce&&owner.pid===supervisor?.pid&&supervisor.sourceSha===host?.controllerSourceSha),
   supervisorFresh:Date.now()-Date.parse(supervisor?.at??'')>=0&&Date.now()-Date.parse(supervisor?.at??'')<45000,
+  supervisorChildrenVerified:supervisor?.mode==='LISTENING'&&supervisor?.children?.length===6&&Array.from({length:6},(_,i)=>i+1).every(seat=>supervisor.children.filter(c=>c.seat===seat&&c.alive===true&&live(c.pid)===true).length===1),
   runnerSetOnline:rows?.length===6&&Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1)).every(n=>rows.some(r=>r.name===n&&r.status==='online')),
   workflowState:workflow,installedOperations:operations};
  Object.assign(state,{maintenanceFilesVerified:maintenanceVerified===true,

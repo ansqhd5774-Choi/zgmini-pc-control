@@ -132,6 +132,15 @@ function issueIsTrusted(issue,{allowedActors,title,label}){
 }
 
 function commentMarker(id){return `<!-- zgmini-pc-maintenance-result:${id} -->`;}
+export function failedUpdaterResult(request,error,status){
+ let output=null;try{output=parseJsonOutput(error?.stdout,'UPDATE_OUTPUT_INVALID');}catch{}
+ const exact=output?.status==='AUTOMATION_BLOCKED'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(output?.code??'');
+ const untouched=exact&&output.failureStage==='PRE_INSTALL'&&status?.ledger===null&&
+  status?.installLock?.held===false&&!status?.ledgerReadbackCode&&!status?.lockReadbackCode&&!status?.installedReadbackCode;
+ return normalizedResult(request,{status:untouched?'BLOCKED':'UNKNOWN',
+  firstFail:exact?output.code:'UPDATE_OUTCOME_UNKNOWN',actualControllerSha:status?.actualControllerSha,
+  lastPass:untouched?'PRE_INSTALL_REJECTED':'NONE'},exact?output.code:'UPDATE_OUTCOME_UNKNOWN');
+}
 function normalizedResult(request,result,code){
   const from=result&&typeof result==="object"?result:{};
   const status=from.status==="PASS"?"SUCCEEDED"
@@ -551,7 +560,7 @@ export function createMaintenanceAgent({
       const executed=parseJsonOutput(await updater(["apply","--request-id",request.requestId,
         "--manifest-file",packageFile]),"UPDATE_OUTPUT_INVALID");
       result=normalizedResult(request,executed,executed.code);
-    }catch{
+    }catch(error){
       // Never retry an ambiguous apply. Query the independent updater ledger.
       let status=null;
       try{status=await updaterStatus(request.requestId);}catch{/* unknown outcome */}
@@ -559,8 +568,7 @@ export function createMaintenanceAgent({
       result=current&&TERMINAL.has(current.status)
         ?normalizedResult(request,{...current,
           actualControllerSha:current.actualControllerSha??status.actualControllerSha},current.code)
-        :normalizedResult(request,{status:"UNKNOWN",firstFail:"UPDATE_OUTCOME_UNKNOWN"},
-          "UPDATE_OUTCOME_UNKNOWN");
+        :failedUpdaterResult(request,error,status);
     }
     const stored=await deliverReports(persistResult(held.entry,result));
     await commentOnceAndRecord(stored);
