@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_ER1_DEC31_HTML_PUBLISH_APPROVAL_V3",
+  "scope": "PC_SAVED_DEC2026_HTML_ONLY_D1_KEY_ONE_SHOT",
+  "approvedBy": "ansqhd5774-Choi",
+  "approvedRequest": "사이트에 게시하고 산식 반영해서 별표 반영까지 완료해라",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/market-calendar-dec2026-publisher-root-v2",
+  "sourceSha": "044e085f6c51803e55ef26d8ba80e5632ef473cc",
+  "sourceFile": "scripts/pc-writer/market-calendar-dec31-publish.mjs",
+  "sourceFileSha256": "0b75ea36e56c549b13c49c3d507fd6a173b35714425052809b4d18184e709661",
+  "expectedEvents": 38,
+  "outputKey": "market-calendar:earnings-dec2026-display-html",
+  "allowProviderCalls": false,
+  "allowExistingFeedWrites": false,
+  "allowRawVendorPublic": false,
+  "allowFormulaChanges": false,
+  "allowSchedulerChanges": false,
+  "allowDirectDeployment": false,
+  "allowDedicatedD1OutputWrite": true,
+  "verifiedPcEvidenceIssues": [
+    190,
+    191
+  ],
+  "change": "exact approved Writer checkout SHA and independent one-key lock; reuse already saved HTML"
+}
