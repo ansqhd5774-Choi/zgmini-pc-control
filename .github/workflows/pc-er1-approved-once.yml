@@ -23,7 +23,7 @@ jobs:
     env:
       # Must be replaced with a reviewed immutable commit containing this adapter,
       # operator source and APPROVED_B manifest. Never float to main at execution.
-      ER1_APPROVED_CONTROL_SHA: f5f880abce0ce93e68db690b4b994317b28417a9
+      ER1_APPROVED_CONTROL_SHA: 118a47d1281741f8a60bf7bcf8b62c5cd03c2123
       ER1_APPROVED_SOURCE_SHA: 611b3dccf361ce66e78daf0b4108396de7c9101e
     defaults:
       run:
