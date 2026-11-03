@@ -24,7 +24,7 @@ jobs:
       # Must be replaced with a reviewed immutable commit containing this adapter,
       # operator source and APPROVED_B manifest. Never float to main at execution.
       ER1_APPROVED_CONTROL_SHA: REPLACE_WITH_APPROVED_CONTROL_SOURCE_SHA
-      ER1_APPROVED_SOURCE_SHA: e2179295e456a3963e09d82ae282e4ba6848352c
+      ER1_APPROVED_SOURCE_SHA: 611b3dccf361ce66e78daf0b4108396de7c9101e
     defaults:
       run:
         shell: cmd
@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ansqhd5774-Choi/zgmini
-          ref: e2179295e456a3963e09d82ae282e4ba6848352c
+          ref: 611b3dccf361ce66e78daf0b4108396de7c9101e
           path: er1-source
           persist-credentials: false
           fetch-depth: 1
