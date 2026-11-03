@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-ff66458f-5d9a-4e74-b9ac-8043aa07f289",
+  "targetControllerSha": "85147ca761bc8ae9d845ad072ebd84a30377df4e",
+  "status": "SUCCEEDED",
+  "code": "R6_HOST_APPLIED",
+  "lastPass": "HOST_B_READBACK_VERIFIED",
+  "firstFail": "NONE",
+  "actualControllerSha": "85147ca761bc8ae9d845ad072ebd84a30377df4e",
+  "recoverySha": null,
+  "protectedStateUnchanged": true,
+  "workflowEnabled": true
+}
