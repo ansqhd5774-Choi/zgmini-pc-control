@@ -25,6 +25,10 @@ watchdog이 기존 승인 Controller로 새 Supervisor와 좌석을 재생성하
 
 ## 적용 증거
 
+- 실제 복구·업데이트 완료: [정규 설치 #123](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/123), [자동 사후 진단 #124](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/124). 결과는 SUCCEEDED / APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED 및 PASS / CORE_READONLY_DIAGNOSIS다. 실제 Controller=090ca40a6fe874734754678264887fe527f5bc65, 유지보수기=904b7e39e007f55980a748be45126da52fbd514a, 6개 Online, 보호 해시 동일, 활성 install lease 없음. 이 관측을 영구 현재값으로 가정하지 않는다.
+- #122는 복구 증거 JSON의 미커밋 상태로 CONTROL_DIRTY가 정확히 반환됐다. 해당 결과를 저장·checkout clean 확인 후 새 #123으로 진행했다. 검사를 제거하거나 원래 요청을 재실행하지 않았다.
+- results/INSTALL_FAILURE_120_REPAIR_20261103.json에 최종 실제 증거를 기록했다. ER1 읽기 전용 모듈 설치까지 완료했으며 업무별 결합 지문 진단·D1 게시·Reader 배포는 해당 담당자의 다음 단계다. R17 대기나 #106 복구로 되돌리지 않는다.
+
 - 오류 전달 수정 source: 904b7e39e007f55980a748be45126da52fbd514a. 독립 유지보수기 실PC 인계 PASS.
 - Windows 관련 12개 시험 파일 147/147 PASS. 후속 전체 경로 회귀시험 추가 후 agent/status 37/37 PASS.
 - 실제 복구 완료 여부는 results/COMMON_SUPERVISOR_RECOVERY_20261103.json의 관측 상태를 따른다. 코드 병합이나 로컬 좌석 시작만으로 GitHub 재연결 완료를 주장하지 않는다.
