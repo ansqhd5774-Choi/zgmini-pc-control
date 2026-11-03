@@ -86,7 +86,26 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
   tracedLaunchers:safeFiles,sourceResolved:!!sourceRoot,
   sourceRoot:sourceRoot?relative(sourceRoot):null,
   sourceHead:null,trackedDirty:null,requiredFiles:[],providerCalls:0,d1Writes:0,sqliteOpened:false};
+
+ // The already-running Writer records Git rev-parse HEAD in a fixed checkpoint.
+ // Report only bounded status metadata; never return the file's other fields.
+ const writerFile=path.join(root,'data','pc-writer','local-writer-last-run.json');
+ try{
+  const real=realpath(writerFile);
+  if(inside(real)&&exists(real)&&fs.statSync(real).size<=131072){
+   const saved=JSON.parse(read(real).toString('utf8'));
+   if(typeof saved?.source==='string'&&/^[0-9a-f]{40}$/.test(saved.source)){
+    result.lastWriterEvidence={
+     evidenceLevel:'STORED_WRITER_RUNTIME_CHECKPOINT',
+     sourceHead:saved.source,
+     at:typeof saved.at==='string'&&Number.isFinite(Date.parse(saved.at))?saved.at:null,
+     status:typeof saved.status==='string'&&/^[A-Z0-9_]{1,80}$/.test(saved.status)?saved.status:null,
+    };
+   }
+  }
+ }catch{} // Missing/malformed historical checkpoint is not a fresh runtime failure.
  if(!sourceRoot)return result;
+
  try{
   result.sourceHead=git(sourceRoot,['rev-parse','HEAD']).trim();
   const dirty=git(sourceRoot,['status','--porcelain','--untracked-files=no']);

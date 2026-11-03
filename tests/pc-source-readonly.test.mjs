@@ -77,3 +77,29 @@ test('Core Task Arguments with script paths are summarized without treating arra
  assert.equal(result.providerCalls,0);
  assert.equal(result.d1Writes,0);
 });
+
+test('bounded Writer checkpoint extracts runtime-reported Git SHA without leaking unrelated metadata',t=>{
+ const f=fixture(t),head='b'.repeat(40);
+ f.put('data/pc-writer/local-writer-last-run.json',
+  JSON.stringify({source:head,at:'2026-11-03T04:00:00Z',status:'VERIFIED',
+   credentials:'SECRET_NEVER_DISCLOSED',providerRows:['PRIVATE']}));
+ f.put('start.cmd','rem no project reference');
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:()=>{throw Error('No checkout was resolved');}});
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.deepEqual(result.lastWriterEvidence,{
+  evidenceLevel:'STORED_WRITER_RUNTIME_CHECKPOINT',
+  sourceHead:head,at:'2026-11-03T04:00:00Z',status:'VERIFIED',
+ });
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_NEVER_DISCLOSED|PRIVATE/);
+});
+
+test('malformed Writer checkpoint does not become invented runtime evidence',t=>{
+ const f=fixture(t);
+ f.put('start.cmd','rem no project reference');
+ f.put('data/pc-writer/local-writer-last-run.json','not-json');
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task});
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.lastWriterEvidence,undefined);
+});
