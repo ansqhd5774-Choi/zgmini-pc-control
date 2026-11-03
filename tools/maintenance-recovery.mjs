@@ -112,6 +112,13 @@ export function main(args=process.argv.slice(2)){
  g(['merge-base','--is-ancestor',source,'HEAD']);
  const pinned=g(['show',source+':tools/maintenance-recovery.mjs']);
  need(digest(pinned)===digest(fs.readFileSync(fileURLToPath(import.meta.url))),'RECOVERY_SOURCE_DRIFT');
+ if(!fs.existsSync(path.join(root,'leases/controller-install'))){
+  const result={schema:'ZGMINI_PC_RECOVERY_RESULT_V1',requestId:id,sourceSha:source,
+   status:'NO_ACTIVE_INSTALL_LEASE',code:'REUSE_EXISTING_RECOVERY_EVIDENCE',changed:false,
+   next:'CHECK_ORIGINAL_ISSUE_AND_ARCHIVE_RESULT_NOT_A_NEW_RECOVERY_OR_UPDATE_PASS'};
+  if(mode==='inspect')return result;
+  need(false,'RECOVERY_ALREADY_RELEASED_NO_RETRY');
+ }
  const before=observe(id),decision=classifyRecovery(before.state);
  let result={schema:'ZGMINI_PC_RECOVERY_RESULT_V1',requestId:id,sourceSha:source,...decision,
   actualControllerSha:before.state.actualSha,operationalWrites:0};

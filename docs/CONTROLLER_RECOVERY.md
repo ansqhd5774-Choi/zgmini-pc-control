@@ -53,6 +53,8 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 
 ## 재개와 인수인계
 
+원래 잠금이 이미 없거나 다른 담당자가 복구했다면 `NO_ACTIVE_INSTALL_LEASE`와 기존 보관 결과를 대조한다. 이를 새 복구 성공으로 보고하거나 도구를 다시 적용하지 않는다. #106은 2026-11-03T10:54:42Z의 사용자 실PC 보관 결과가 Issue 댓글에 등록됐고, 이후 새 Supervisor/정상 watchdog 상태를 확인했다. 이 과거 성공을 현재 모든 lease가 없다는 보장으로 사용하지 않는다.
+
 1. 원래 실패 요청은 terminal 이력으로 보존하고 recovery 결과를 연결한다.
 2. 실패 원인을 수정하고 현재 실제 설치 SHA에서 대상까지의 diff·manifest를 다시 검증한다.
 3. 복구/정상 실행 확인 후 새 고유 요청 ID로 승인된 갱신을 한 번 제출한다. 새 요청에 원래 실패/복구 링크를 남긴다.
