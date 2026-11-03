@@ -20,6 +20,7 @@ import {
   classifyR6HostRecovery,
   decideR6RecoveryReentry,
   sameR6RecoveryClaim,
+  verifyR6HistoricCompletion,
 } from '../tools/maintenance-contract.mjs';
 
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -61,6 +62,19 @@ test('dead recovery claim is reclaimable only with exact original evidence hashe
   assert.equal(sameR6RecoveryClaim({...claim,ledgerSha256:HOST_PROPOSED},proof),false);
   assert.equal(sameR6RecoveryClaim({...claim,requestId:'pc-unrelated'},proof),false);
   assert.equal(sameR6RecoveryClaim({...claim,pid:-1},proof),false);
+});
+
+test('R6 completed archive acknowledgement is read-only and rejects evidence drift',()=>{
+  const proof={status:'ARCHIVED_RECOVERY_EVIDENCE',recordStatus:'RECOVERY_COMPLETED',
+    archiveVerified:true,originalLeaseAbsent:true,ownerMarkerMatches:true,
+    protectedSame:true,dbIdentitySame:true,workflowActive:true,
+    backlogVerified:true,hostOutcome:'ROLLED_BACK',hostSha256:HOST_ORIGINAL,
+    originalSha256:HOST_ORIGINAL,proposedSha256:HOST_PROPOSED};
+  assert.equal(verifyR6HistoricCompletion(proof),true);
+  assert.equal(verifyR6HistoricCompletion({...proof,hostSha256:HOST_PROPOSED}),false);
+  assert.equal(verifyR6HistoricCompletion({...proof,backlogVerified:false}),false);
+  assert.equal(verifyR6HistoricCompletion({...proof,ownerMarkerMatches:false}),false);
+  assert.equal(verifyR6HistoricCompletion({...proof,recordStatus:'ARCHIVE_PREPARED'}),false);
 });
 
 test('R6 B backup path compares Windows separator aliases without accepting a different target',()=>{
