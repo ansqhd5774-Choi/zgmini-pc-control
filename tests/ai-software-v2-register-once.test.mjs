@@ -6,7 +6,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {
  CONTROL_REPO,SOURCE_SHA,REQUEST_SCHEMA,REQUEST_SCOPE,REQUEST_TITLE,FILES,
- validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,inspectScheduledLauncher,
+ validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,inspectScheduledLauncher,validateActiveUpgradeReceipt,
 } from '../tools/ai-software-v2-register-once.mjs';
 
 function approvedIssue(){
@@ -117,4 +117,15 @@ test('read-only active launcher inspection detects the version actually schedule
   'LINKAGE_UNVERIFIED');
  assert.equal(inspectScheduledLauncher('untrusted path',home,xml,vbs).activeRuntimeProbe,
   'LAUNCHER_PATH_UNRECOGNIZED');
+});
+
+test('active V2 upgrade receipt rejects unapproved source, manifest and version',()=>{
+ const old='facf62ed21bd5631',active='0b1ed5d35888b0e0';
+ for(const x of [
+  {sourceSha:'0'.repeat(40),oldVersion:old,newVersion:active,installedManifest:{}},
+  {sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',oldVersion:'0'.repeat(16),newVersion:active,installedManifest:{}},
+  {sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',oldVersion:old,newVersion:active,installedManifest:{'scripts/pc-writer/theme-config-tool.mjs':'0'.repeat(64)}},
+ ]){
+  assert.throws(()=>validateActiveUpgradeReceipt({status:'CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED',...x},old,active),/AI_V2_/);
+ }
 });
