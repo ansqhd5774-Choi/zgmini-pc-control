@@ -44,6 +44,25 @@ const FAILURE_CATEGORIES = [
   ['OBSERVATION_OR_CADENCE', ['OBSERVATION','OBSERVED','CURRENT','CHECK','CHECKS','CADENCE','UNCHANGED']],
   ['PROCESS', ['PROCESS','SPAWN','EXIT','COMMAND','TASK']],
 ];
+// These are unverified labels inferred from the sidecar ledger, not operating
+// system errors or proof that an approved source SHA was actually executed.
+const REPORTED_BLOCK_SUBTYPES = [
+  ['SOURCE_SHA_MISMATCH', ['SOURCE_SHA_MISMATCH','SOURCE_SHA_DRIFT','SOURCE_REVISION_MISMATCH','EXECUTED_SOURCE_SHA_MISMATCH']],
+  ['APPROVAL_MISSING', ['APPROVAL_MISSING','MISSING_APPROVAL','SOURCE_NOT_APPROVED','UNAPPROVED_SOURCE']],
+  ['APPROVAL_MISMATCH', ['APPROVAL_MISMATCH','APPROVAL_SHA_MISMATCH','APPROVED_SOURCE_SHA_MISMATCH']],
+  ['SOURCE_UNAVAILABLE', ['SOURCE_UNAVAILABLE','SOURCE_NOT_FOUND','SOURCE_CHECKOUT_MISSING']],
+];
+const safeSha40 = value => typeof value==='string' && /^[0-9a-f]{40}$/i.test(value) ? value.toLowerCase() : null;
+function reportedShaRelation(fields) {
+  const select = keys => {
+    const values=[...new Set(fields.flatMap(o=>keys.map(k=>safeSha40(o[k]))).filter(Boolean))];
+    return {present:values.length>0, sha:values.length===1?values[0]:null, conflict:values.length>1};
+  };
+  const actual=select(['actualSourceSha','executedSourceSha']);
+  const approved=select(['approvedSourceSha','expectedSourceSha']);
+  return {evidence:'UNATTESTED_LEDGER_FIELDS',actualPresent:actual.present,approvedPresent:approved.present,
+    relation:actual.conflict||approved.conflict?'CONFLICTING_FIELDS':!actual.sha||!approved.sha?'UNKNOWN':actual.sha===approved.sha?'MATCH':'MISMATCH'};
+}
 
 function failureHints(fields) {
   const getValue = key => fields.map(o=>o[key]).find(v=>v!==undefined&&v!==null);
@@ -56,10 +75,18 @@ function failureHints(fields) {
   };
   const present=FAILURE_HINT_FIELDS.filter(key=>getValue(key)!==undefined);
   const classifications=[...new Set(present.map(key=>classify(getValue(key))).filter(Boolean))];
+  const specific=[...new Set(present.flatMap(key=>{
+    let value=getValue(key);
+    if (value && typeof value==='object' && !Array.isArray(value)) value=value.code??value.message;
+    if (typeof value!=='string' || value.length>4096) return [];
+    const normalized=value.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean).join('_');
+    return REPORTED_BLOCK_SUBTYPES.filter(([,phrases])=>phrases.some(phrase=>
+      normalized===phrase||normalized.startsWith(phrase+'_')||normalized.endsWith('_'+phrase)||normalized.includes('_'+phrase+'_'))).map(([label])=>label);
+  }))];
   return {evidence:'UNATTESTED_CATEGORICAL_HINTS',hasStage:present.includes('stage')||present.includes('step'),
     hasError:present.some(key=>['error','errorCode','message'].includes(key)),
     hasReason:present.includes('reason')||present.includes('blockedBy'),
-    categories:classifications.slice(0,5)};
+    categories:classifications.slice(0,5),reportedBlockSubtype:specific.length===1?specific[0]:'UNKNOWN'};
 }
 
 function isInsideRealRoot(root, candidate) {
@@ -131,7 +158,8 @@ function sidecarTrace(dataRoot) {
       const reason=firstValid('reason',safeLedgerCode);
       const at=['finishedAt','startedAt','checkedAt','at','timestamp'].map(key=>firstValid(key,safeIso)).find(v=>v!==null)??null;
       candidates.push({name,evidence:'UNATTESTED_LEDGER',sha256:hash(bytes),modifiedAt:stat.mtime.toISOString(),
-        reportedStatus,code,lastPass,firstFail,reason,at,failureHints:failureHints(fields)});
+        reportedStatus,code,lastPass,firstFail,reason,at,failureHints:failureHints(fields),
+        reportedShaRelation:reportedShaRelation(fields)});
     } catch { candidates.push({name,evidence:'INVALID_LEDGER'}); }
   }
   return {evidence:'OBSERVED_UNATTESTED',candidates};
