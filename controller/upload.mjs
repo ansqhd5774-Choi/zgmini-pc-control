@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages} from './common.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));
 const token=process.env.GITHUB_TOKEN;need(token,'REPORT_AUTH_MISSING');need(process.env.GITHUB_REPOSITORY===policy.controlRepository,'REPORT_REPOSITORY');
 const seat=process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1],runId=process.env.GITHUB_RUN_ID,attempt=process.env.GITHUB_RUN_ATTEMPT||'1';
@@ -25,7 +25,8 @@ for(const [extension,content] of [['json',json],['txt',txt]]){
 }
 const marker=`<!-- zgmini-pc-result:${runId}:${attempt}:${seat} -->`,runUrl=`https://github.com/${policy.controlRepository}/actions/runs/${runId}`;
 const body=`${marker}\n**${report.status} — ${report.code}**\n\n실행: ${runUrl}\n\n${files.map(x=>'- '+x).join('\n')}\n\nJSON 결과:\n\n\`\`\`json\n${json}\`\`\`\n\nTXT 결과:\n\n\`\`\`text\n${txt}\`\`\`\n`;
-let comments=await api(`issues/${pointer.issueNumber}/comments?per_page=100`);need(comments.status===200,'REPORT_COMMENTS_LOOKUP_FAILED');
-if(!comments.data.some(x=>x.body?.includes(marker))){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await api(`issues/${pointer.issueNumber}/comments?per_page=100`);need(comments.status===200&&comments.data.some(x=>x.body?.includes(marker)),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
+const allComments=()=>readAllPages(async page=>{const r=await api(`issues/${pointer.issueNumber}/comments?per_page=100&page=${page}`);need(r.status===200,'REPORT_COMMENTS_LOOKUP_FAILED');return r.data;});
+let comments=await allComments();
+if(!comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker))){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await allComments();need(comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker)),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
 console.log(JSON.stringify({status:'REPORT_UPLOADED',issueNumber:pointer.issueNumber,resultFiles:files.length,artifactBytes:0,runUrl}));
 }finally{releaseUpload();}

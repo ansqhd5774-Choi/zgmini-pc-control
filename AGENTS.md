@@ -1,5 +1,7 @@
 # ZGMINI PC 자동 실행 공통 기준
 
+- 공통 실패 보완: `docs/COMMON_FAILURE_HARDENING_20261103.md`. 실패 중복 조회를 PASS로 바꾸지 않고, 종료 불명확은 STATE_UNKNOWN으로 격리한다. Controller와 유지보수기 정상 상태를 구분하며 부분 전환 복구는 정확한 승인/백업 계약으로 수행한다.
+
 - 공통 정본: `docs/PC_AUTOMATION_STANDARD.md`. 현재 설치 관측과 실제 성공 근거: `docs/CONTROLLER_AUTO_UPDATE_STATUS.json`, `docs/PC_AUTOMATION_RUNTIME_20261103.json`. 새 일반챗은 과거 미완료 보고로 돌아가지 말고 해당 증거와 현재 상태를 구분한다.
 - 공유 설치 복구: `docs/CONTROLLER_RECOVERY.md`. RECOVERY_REQUIRED는 단일 복구 담당이 상태 판정→검증된 복구→결과 회수→재개까지 처리한다. 설치 전 취소·부분 적용 rollback·통신 불명확을 구분하고 실제 지원 도구와 원본 요청을 사용한다.
 - 작업 전 요약: `docs/GENERAL_CHAT_PREWORK.md`. 상태/접수 판정: `docs/AUTOMATION_STATUS_AND_ADMISSION.md`. 과거 실패를 현재 활성 잠금으로 오인하거나 외부 도구 안전 거부를 PC 장애로 확대하지 않는다. 거부된 행동을 다른 도구로 우회하지 않는다.

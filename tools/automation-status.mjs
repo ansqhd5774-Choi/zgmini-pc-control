@@ -16,6 +16,9 @@ export function summarizeAutomation(s){
  const healthy=s.controllerFilesVerified===true&&s.supervisorAlive===true&&s.supervisorIdentityVerified===true&&
   s.supervisorFresh===true&&s.runnerSetOnline===true&&s.workflowState==='active';
  return {...base,runtimeState:healthy?'HEALTHY':'UNVERIFIED',
+  controllerState:healthy?'HEALTHY':'UNVERIFIED',
+  maintenanceState:s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'UNVERIFIED',
+  automationState:healthy&&s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
   installedOperations:s.installedOperations??[],
   next:base.state==='NO_ACTIVE_INSTALL_LEASE'&&!healthy?'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE':base.next,
   intakeToolPermission:'NOT_TESTED_BY_PC_STATUS',
@@ -28,6 +31,12 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
  const codes=[];const observe=(label,f)=>{try{return f();}catch{codes.push(label);return null;}};
  const host=observe('CONTROLLER_MANIFEST_UNAVAILABLE',()=>read(control+'/host.json'));
  const installed=observe('MAINTENANCE_MANIFEST_UNAVAILABLE',()=>read(maintenance+'/MAINTENANCE_INSTALL.json'));
+ const maintenanceVerified=observe('MAINTENANCE_FILES_UNVERIFIED',()=>{
+  const expected=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
+  return Object.keys(installed?.files??{}).length===expected.length&&expected.every(p=>hash(fs.readFileSync(path.join(maintenance,p)))===installed.files[p]);
+ });
+ const receiver=observe('RECEIVER_STATUS_UNAVAILABLE',()=>read(maintenance+'/RECEIVER_STATUS.json'));
+ const receiverOwner=observe('RECEIVER_OWNER_UNAVAILABLE',()=>read(maintenance+'/leases/receiver/owner.json'));
  const verified=observe('CONTROLLER_FILES_UNVERIFIED',()=>{
   need(Object.keys(host?.controllerFiles??{}).length>=5,'FILES_MISSING');
   return Object.entries(host.controllerFiles).every(([p,h])=>{
@@ -53,10 +62,15 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   supervisorFresh:Date.now()-Date.parse(supervisor?.at??'')>=0&&Date.now()-Date.parse(supervisor?.at??'')<45000,
   runnerSetOnline:rows?.length===6&&Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1)).every(n=>rows.some(r=>r.name===n&&r.status==='online')),
   workflowState:workflow,installedOperations:operations};
+ Object.assign(state,{maintenanceFilesVerified:maintenanceVerified===true,
+  receiverIdentityVerified:Boolean(receiverOwner?.nonce&&receiver?.pid===receiverOwner.pid&&live(receiverOwner.pid)===true),
+  receiverFresh:Date.now()-Date.parse(receiver?.at??'')>=0&&Date.now()-Date.parse(receiver?.at??'')<180000,
+  receiverListening:receiver?.status==='LISTENING'});
  return {schema:'ZGMINI_PC_AUTOMATION_STATUS_V1',observedAt:new Date().toISOString(),
   freshnessSeconds:45,collectorSource:'tools/automation-status.mjs',...summarizeAutomation(state),
   actualControllerSha:state.actualControllerSha,maintenanceSourceSha:installed?.sourceSha??null,
   installLock:state.installLock,workflowState:workflow,
+  receiverObservedAt:receiver?.at??null,receiverStatus:receiver?.status??null,maintenanceFilesVerified:state.maintenanceFilesVerified,
   runners:rows?.map(x=>({name:x.name,status:x.status,busy:x.busy}))??null,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
   diagnostics:codes,operationalWrites:0,providerCalls:0,dbD1Writes:0};

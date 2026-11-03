@@ -22,3 +22,11 @@ export function validateRequest(request,policy){
 export function under(root,relative){const resolved=path.resolve(root,relative);need(resolved.startsWith(path.resolve(root)+path.sep),'PATH_OUTSIDE_JOB');return resolved;}
 export function writeJson(file,value){const tmp=file+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(value,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);}
 export function errorCode(error){return /^[A-Z0-9_]{1,100}$/.test(error?.code??'')?error.code:'INTERNAL_EXECUTION_ERROR';}
+export async function readAllPages(readPage,{maxPages=100}={}){
+ const out=[];
+ for(let page=1;page<=maxPages;page++){
+  const rows=await readPage(page);need(Array.isArray(rows),'PAGINATION_RESPONSE_INVALID');out.push(...rows);
+  if(rows.length<100)return out;
+ }
+ need(false,'PAGINATION_INCOMPLETE');
+}

@@ -4,6 +4,8 @@
 
 ## 1. 목적과 정본
 
+공통 실패 처리 보완은 [COMMON_FAILURE_HARDENING_20261103.md](COMMON_FAILURE_HARDENING_20261103.md)를 함께 적용한다. 중복 실패 상태 보존, 종료 불명확 시 자원 격리, 부분 전환 rollback, 별도 인프라 변경 검증, 전체 댓글 회수, Controller/유지보수기 상태 분리를 포함한다.
+
 승인된 작업을 일반챗의 GitHub 요청 → PC 실행 → TXT·JSON·댓글 회수 → 분석 → 후속 작업까지 처리한다. 사용자에게 매번 CMD 실행과 파일 전달을 요구하지 않는다.
 
 제어 저장소는 `ansqhd5774-Choi/zgmini-pc-control`, 기준 브랜치는 `main`이다. 먼저 `AGENTS.md`, `README.md`, `docs/GENERAL_CHAT_START.md`를 읽는다. 연결 장애는 `docs/RUNNER_RECOVERY.md`, 업데이트는 `docs/CONTROLLER_AUTO_UPDATE.md`, 여러 작업의 공용 적용은 `docs/CONTROLLER_APPLY_QUEUE.md`를 필요한 범위에서 참조한다.
