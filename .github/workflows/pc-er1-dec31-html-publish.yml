@@ -46,10 +46,10 @@ jobs:
       - name: Publish sanitized December HTML from PC saved rows
         env:
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\control\\er1-dec31-html-publish-entry.mjs"'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-html-publish-entry.mjs"'
       - name: Post bounded nonsecret results
         if: always()
         env:
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\control\\er1-dec31-html-publish-entry.mjs" --upload'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-dec31-html-publish-entry.mjs" --upload'
