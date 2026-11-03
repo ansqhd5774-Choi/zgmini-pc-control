@@ -257,7 +257,7 @@ test('dedicated B workflow uses official pinned checkout, self-hosted CMD, no ev
  assert.match(yaml,/concurrency:[\s\S]*?cancel-in-progress: false/);
  assert.match(yaml,/actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/g);
  assert.match(yaml,/persist-credentials: false/g);
- assert.match(yaml,/ref: e2179295e456a3963e09d82ae282e4ba6848352c/);
+ assert.match(yaml,/ref: 611b3dccf361ce66e78daf0b4108396de7c9101e/);
  assert.doesNotMatch(yaml,/\$\{\{\s*github\.event\.issue\.body\s*\}\}/);
  assert.match(yaml,/"%GITHUB_WORKSPACE%\\er1-control\\er1-b-entry\.mjs"/);
  assert.match(yaml,/"%GITHUB_WORKSPACE%\\er1-control\\er1-b-upload\.mjs"/);
