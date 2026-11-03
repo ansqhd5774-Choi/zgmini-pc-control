@@ -12,7 +12,7 @@ import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
  validateControllerConfigTransition,controllerAdmissionForPurpose,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
- decideR6RecoveryReentry,sameR6RecoveryClaim,
+ decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  R6_HOST_CANDIDATE_SHA256} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
@@ -1039,6 +1039,52 @@ function recoverR6HostOnly(requestId,packageFile,mode){
   &&phases.includes(previous.status)),'R6_RECOVERY_PRIOR_PHASE_REQUIRES_INSPECTION');
  const status=readR6HostStatus(requestId),decision=status.recovery;
  const leaseDir=path.join(maintenanceRoot,'leases/controller-install');
+ // The archive and completion record may both have been committed before the
+ // final GitHub acknowledgement disappeared. Recover the result by readback;
+ // never acquire a new claim or re-run the host/intake changes in this case.
+ if(previous?.status==='RECOVERY_COMPLETED'&&!fs.existsSync(leaseDir)){
+  const ledger=status.ledger;
+  let archiveVerified=false,ownerMarkerMatches=false,protectedSame=false,
+   dbIdentitySame=false,backlogVerified=false,workflowActive=false;
+  try{
+   const stat=fs.lstatSync(archive);
+   archiveVerified=stat.isDirectory()&&!stat.isSymbolicLink()
+    &&previous.leaseArchive===archive;
+   const originalOwner=json(path.join(archive,'owner.json')),
+    originalMarker=json(path.join(archive,'RECOVERY_REQUIRED.json'));
+   ownerMarkerMatches=originalOwner.pid===ledger.leaseOwnerPid
+    &&originalOwner.nonce===ledger.leaseOwnerNonce
+    &&originalMarker.requestOwnerPid===originalOwner.pid
+    &&originalMarker.nonce===originalOwner.nonce;
+   protectedSame=sha256(Buffer.from(JSON.stringify(protectedSnapshot())))===
+    ledger.protectedBeforeSha256;
+   dbIdentitySame=JSON.stringify(r6FileIdentity(ledger.coreBefore.realpath))===
+    JSON.stringify(ledger.coreBefore)
+    &&JSON.stringify(r6FileIdentity(ledger.candidateBefore.realpath))===
+      JSON.stringify(ledger.candidateBefore);
+   const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+   if(ledger.pauseAttempted===true){
+    const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
+    backlogVerified=backlog.requestId===requestId
+     &&windows[0].pausedAt===ledger.pauseStartedAt
+     &&windows.every(window=>window.resumedAt)
+     &&Object.values(backlog.replays??{}).every(item=>
+       ['DONE','SKIPPED_RESULT_PRESENT'].includes(item.status));
+   }else backlogVerified=true;
+   workflowActive=github('actions/workflows/pc-job.yml').state==='active';
+  }catch{/* Missing or changed evidence must not acknowledge a completed recovery. */}
+  need(verifyR6HistoricCompletion({status:decision?.status,
+    recordStatus:previous.status,archiveVerified,originalLeaseAbsent:true,
+    ownerMarkerMatches,protectedSame,dbIdentitySame,backlogVerified,
+    workflowActive,hostOutcome:previous.hostOutcome,
+    hostSha256:status.hostSha256,originalSha256:manifest.hostOriginalSha256,
+    proposedSha256:manifest.proposedSha256}),
+   'R6_RECOVERY_ARCHIVED_COMPLETION_UNVERIFIED');
+  return {status:'HISTORICAL_COMPLETE',code:'R6_RECOVERY_ALREADY_COMPLETED',
+   requestId,hostOutcome:previous.hostOutcome,workflowEnabled:true,
+   protectedStateUnchanged:true,originalRequestRetried:false,
+   readOnlyResultRecovered:true};
+ }
  const archivedFinish=Boolean(previous?.status==='ARCHIVE_PREPARED'
   &&!fs.existsSync(leaseDir)&&fs.existsSync(archive));
  const reentry=decideR6RecoveryReentry({mode,previous,decision,
