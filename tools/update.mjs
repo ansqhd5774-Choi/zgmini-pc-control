@@ -97,6 +97,8 @@ function verifyIndependent(supervisorPid) {
 }
 
 function readOwner() {
+ need(fs.existsSync(path.join(controlRoot,'leases/supervisor/owner.json')),'SUPERVISOR_OWNER_MISSING');
+ need(fs.existsSync(path.join(controlRoot,'SUPERVISOR_STATUS.json')),'SUPERVISOR_STATUS_MISSING');
  const owner=json(path.join(controlRoot,'leases/supervisor/owner.json'));
  const status=json(path.join(controlRoot,'SUPERVISOR_STATUS.json'));
  need(Number.isSafeInteger(owner.pid)&&owner.pid>0&&owner.pid===status.pid,'SUPERVISOR_IDENTITY_MISMATCH');
@@ -552,6 +554,11 @@ export async function command(args=process.argv.slice(2)) {
  need(cmd==='apply'&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
  const data=loadApprovedPackage(requestId,args[4]);
  const {request,ports}=makePorts(data,data.issueNumber);
+ // Read-only prerequisite checks before taking the shared installation lease.
+ // They are repeated by validate under the lease to prevent a stale preflight
+ // from granting permission to stop or switch a changed process.
+ readOwner();
+ installedManifest();
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
  let retained=false;
  try{

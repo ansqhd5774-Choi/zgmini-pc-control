@@ -28,6 +28,8 @@ GitHub 도구의 실제 읽기·쓰기 접근 가능성을 확인한다. 도구 
 
 ## 3. 연결 장애와 자동 복구
 
+공유 Controller 설치 실패와 RECOVERY_REQUIRED는 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)의 단계별 판정·고정 도구·복구 명세·보관·재개 절차를 따른다. #68의 단일 복구 담당이 다음 행동까지 소유한다. 단순 대기·반복 요청·잠금 임의 삭제로 대체하지 않는다. 무부작용 취소와 부분 적용 rollback, 사후 진단 결과 회수를 구분한다. 공통 상시 승인 범위의 진단·복구 명세 준비는 기능별로 재승인받지 않는다.
+
 Runner Online, 실제 작업 PASS, Controller 자동 업데이트 성공은 별개다. Offline·대기 상태에서 Issue를 반복 생성하지 않는다. Supervisor·watchdog·WScript guardian의 실제 생존과 heartbeat·원장을 확인한다. 오래된 상태 파일이나 PID 존재만으로 정상 판정하지 않는다.
 
 기존 감시·복구 계약을 재사용하고, 유지보수·복구 보류·진행 중 작업과 경쟁해 재시작하지 않는다. 종료가 입증된 제어 전용 lease만 승인된 절차로 보관·인계한다. Core 잠금 삭제, 전체 node.exe 종료, 무조건 재설치는 금지한다.
