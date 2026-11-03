@@ -1,5 +1,7 @@
 # ZGMINI PC 자동 실행 공통 기준
 
+- 승인 범위의 manifest·해시·누적 diff·실행 명세·검증 자료는 현재 담당자가 완성하고 다음 지원 행동까지 수행한다. 미작성 자료·브랜치 분기·과거 대기 보고만으로 중단하지 않는다. 공용 담당 미지정·실제 경합 없음이면 원장에 등록해 조정을 맡고, 기존 담당 변경은 명시적으로 인계한다. 실제 접근 거부·활성 경합·범위 밖 결정·검증 실패의 영향 단계만 중단하며 안전 검사는 우회하지 않는다.
+
 - 공통 실패 보완: `docs/COMMON_FAILURE_HARDENING_20261103.md`. 실패 중복 조회를 PASS로 바꾸지 않고, 종료 불명확은 STATE_UNKNOWN으로 격리한다. Controller와 유지보수기 정상 상태를 구분하며 부분 전환 복구는 정확한 승인/백업 계약으로 수행한다.
 
 - 공통 정본: `docs/PC_AUTOMATION_STANDARD.md`. 현재 설치 관측과 실제 성공 근거: `docs/CONTROLLER_AUTO_UPDATE_STATUS.json`, `docs/PC_AUTOMATION_RUNTIME_20261103.json`. 새 일반챗은 과거 미완료 보고로 돌아가지 말고 해당 증거와 현재 상태를 구분한다.
