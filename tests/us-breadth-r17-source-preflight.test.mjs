@@ -1,11 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA} from '../controller/us-breadth-r17-preflight.mjs';
+import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
 
 const valid=()=>({
  head:R17_APPROVED,dirty:false,hashes:{...R17_BASE_FILES},
  present:Object.fromEntries(R17_MISSING.map(f=>[f,false])),
  patchHash:R17_PATCH_SHA,patchApplies:true,quotaContract:true,taskLinked:true,
+});
+test('Git porcelain clean and dirty statuses keep fail-closed semantics',()=>{
+ assert.equal(isTrackedSourceDirty(''),false);
+ assert.equal(isTrackedSourceDirty('   '),false);
+ assert.equal(isTrackedSourceDirty(' M scripts/pc-writer/local-cycle.mjs'),true);
+ assert.equal(isTrackedSourceDirty(null),null);
+ assert.equal(assessR17Evidence({...valid(),dirty:isTrackedSourceDirty('')}).status,'PASS');
+ assert.ok(assessR17Evidence({...valid(),dirty:isTrackedSourceDirty(' M tracked')}).reasons.includes('OPERATING_SOURCE_DIRTY_OR_UNVERIFIED'));
+ assert.ok(assessR17Evidence({...valid(),dirty:isTrackedSourceDirty(null)}).reasons.includes('OPERATING_SOURCE_DIRTY_OR_UNVERIFIED'));
 });
 test('R17 exact contract is only static preflight, never install approval',()=>{
  const r=assessR17Evidence(valid());
