@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_ER1_PC_B_RESULT_V1",
+  "requestId": "pc-er1-cc91b55d-7e3a-4b2d-a17a-4058fdd0a17d",
+  "status": "PASS",
+  "code": "ER1_D1_PUBLISHED_AND_READBACK",
+  "d1Writes": 1,
+  "operationalWrites": 1,
+  "providerCalls": 0,
+  "rawEarningsExported": false
+}
