@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_ER1_DEC31_HTML_PUBLISH_APPROVAL_V1",
+  "scope": "PC_SAVED_DEC2026_HTML_ONLY_D1_KEY_ONE_SHOT",
+  "approvedBy": "ansqhd5774-Choi",
+  "approvedRequest": "사이트에 게시하고 산식 반영해서 별표 반영까지 완료해라",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/market-calendar-dec2026-publish-20261104",
+  "sourceSha": "385ec21c485da41f98a9648fdec045fec6f0d403",
+  "sourceFile": "scripts/pc-writer/market-calendar-dec31-publish.mjs",
+  "sourceFileSha256": "0d08533dca95baa666f2c4323735871c94b3d7462ccb83fe7dbd4b417aa5cad7",
+  "expectedEvents": 38,
+  "input": "EXISTING_PC_PRIVATE_DEC31_SYMBOL_PROBE_AND_BATCH_A_ONLY",
+  "outputKey": "market-calendar:earnings-dec2026-display-html",
+  "allowProviderCalls": false,
+  "allowExistingFeedWrites": false,
+  "allowRawVendorPublic": false,
+  "allowFormulaChanges": false,
+  "allowSchedulerChanges": false,
+  "allowDirectDeployment": false,
+  "allowDedicatedD1OutputWrite": true
+}
