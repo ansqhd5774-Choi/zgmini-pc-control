@@ -10,3 +10,12 @@
 6. 상태 조회는 controllerState·maintenanceState·automationState를 분리한다. Controller 정상만으로 유지보수기의 파일/프로세스/heartbeat/수신 상태가 정상이라고 보고하지 않는다. HEALTHY도 현재 채팅의 외부 도구 접수 권한을 보장하지 않는다.
 
 검증: Windows Node에서 관련 14개 테스트 파일 155/155 PASS. 실제 fixture 자식·손자 프로세스 timeout 검사 포함. 실제 운영 rollback 및 업무별 수집·게시·배포는 실행하지 않았다. PC 설치 여부는 별도 Runtime 결과를 따른다.
+
+## 실제 적용 상태
+
+- 공통 코드 커밋: `8e6573950614dcebc6e9f3d78c73793817d10971`.
+- 유지보수기 6개 runtime 파일은 해당 source로 실제 인계 PASS. 새 독립 프로세스/파일 해시/Windows origin을 검증했다.
+- 기존 Controller `e38c6acd1643e284df157905ce77838298163dbc` 및 파일은 그대로다. 따라서 controller/engine·common·upload 수정은 코드/시험 완료이며 PC 미설치다. 다음 승인된 공용 Controller 적용의 정확한 diff·manifest에 포함해야 한다. 이 문서만으로 적용됐다고 보고하지 않는다.
+- 부분 rollback 도구는 승인 명세를 요구하는 checkout 고정 도구다. 실제 장애에 실행하지 않았다. 정식 허용목록에 자동 등록됐다고 취급하지 않는다.
+- Runtime 증거: `results/COMMON_FAILURE_HARDENING_RUNTIME_20261103.json`. Runner 6개 Online, 보호 해시 동일, 공급자/DB/D1 쓰기 0건.
+- R17 담당의 외부 도구 접수 거부는 별도다. 다른 도구로 해당 요청을 우회 제출하지 않았다.
