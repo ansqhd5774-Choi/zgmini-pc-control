@@ -3,6 +3,7 @@ import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
+import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
 export function protectedState(dataRoot,{queryTask}={}){
  const output={files:{},tasks:{}};
@@ -30,6 +31,7 @@ export async function runOperation(request,context){
  if(request.operation==='alpaca-quota-readonly')return inspectAlpacaQuotaReadonly(dataRoot);
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
+ if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
  if(request.operation==='core-conflict-proof'){
   const isolated=path.join(workspace,'core-fixture');fs.mkdirSync(path.join(isolated,'pc-writer'),{recursive:true});
   const f=path.join(isolated,'pc-writer','local-cycle.lock');fs.writeFileSync(f,'fixture-owner');
