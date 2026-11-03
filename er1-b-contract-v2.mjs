@@ -11,7 +11,7 @@ export const V2_SOURCE_FILES=Object.freeze([...V2_PUBLIC_FILES,...ER1_V2_PRIVATE
 export const V2_CANDIDATE='tools/market-calendar-er1/ER1_PC_OPERATION_V2_ONCE.mjs';
 export const V2_ADAPTER='tools/market-calendar-er1/ER1_B_INDEPENDENT_PUBLISHER_V2.mjs';
 const V2_PRIVATE_DIGESTS=Object.freeze({
- [V2_ADAPTER]:'f53e32ba375344d40d4af920e4e90ee860b27353aa5f518289dc3507a4204477',
+ [V2_ADAPTER]:'4f6889bbe0c077052a107a3068289cfb9718c8f88fa8ea70d8b5d47d9aef1982',
  [V2_CANDIDATE]:'bda8ae3d8b69ca3862c6bee231eb0c2baf89f52ff3061cb0f87445c80f6c965d',
 });
 const digestPattern=/^[a-f0-9]{64}$/;

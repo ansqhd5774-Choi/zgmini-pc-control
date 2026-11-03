@@ -10,7 +10,7 @@ import {pathToFileURL} from 'node:url';
 export const ER1_SHA='e2179295e456a3963e09d82ae282e4ba6848352c';
 export const ER1_PUBLIC_KEY='market-calendar:earnings-er1-score-public';
 export const READER_HEADER='ZGMINI-ER1-97';
-export const READER_URL='https://zgmini.kr/api/earnings-calendar-display?start=2026-11-02&end=2026-11-02';
+export const READER_URL='https://zgmini.kr/api/earnings-calendar-display?start=2026-11-03&end=2026-11-03';
 export const D1_FIRST_GATE='D1_FIRST_LEGACY_READER_GATE';
 const LEGACY_FHS_HEADER='ZGMINI-FHS-R3';
 const LEGACY_R43_HEADER='ZGMINI-R43-MARKET-IMPORTANCE';
