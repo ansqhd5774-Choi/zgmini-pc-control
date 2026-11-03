@@ -77,3 +77,63 @@ test('Core Task Arguments with script paths are summarized without treating arra
  assert.equal(result.providerCalls,0);
  assert.equal(result.d1Writes,0);
 });
+
+test('bounded Writer checkpoint extracts runtime-reported Git SHA without leaking unrelated metadata',t=>{
+ const f=fixture(t),head='b'.repeat(40);
+ f.put('data/pc-writer/local-writer-last-run.json',
+  JSON.stringify({source:head,at:'2026-11-03T04:00:00Z',status:'VERIFIED',
+   credentials:'SECRET_NEVER_DISCLOSED',providerRows:['PRIVATE']}));
+ f.put('start.cmd','rem no project reference');
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:()=>{throw Error('No checkout was resolved');}});
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.deepEqual(result.lastWriterEvidence,{
+  evidenceLevel:'STORED_WRITER_RUNTIME_CHECKPOINT',
+  sourceHead:head,at:'2026-11-03T04:00:00Z',status:'VERIFIED',
+ });
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_NEVER_DISCLOSED|PRIVATE/);
+});
+
+test('historical project checkout is a candidate only, not proven Core task execution',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release';
+ f.put('start.cmd','rem actual task launcher does not identify project source');
+ f.put(p+'/.git','gitdir: fake');
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/run-local.mjs','export {}');
+ const head='a'.repeat(40),calls=[];
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:(cwd,args)=>{
+   calls.push({cwd,args});
+   assert.equal(cwd,path.join(f.root,p));
+   return args[0]==='rev-parse'?head+'\n':' M scripts/pc-writer/run-local.mjs\n';
+  }});
+ assert.equal(result.status,'PASS');
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.sourceRoot,null);
+ assert.equal(result.sourceHead,null);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.historicalCheckoutCandidate.evidenceLevel,
+  'HISTORICAL_CHECKOUT_CANDIDATE_ONLY');
+ assert.equal(result.historicalCheckoutCandidate.sourceRoot,p);
+ assert.equal(result.historicalCheckoutCandidate.sourceHead,head);
+ assert.deepEqual(result.historicalCheckoutCandidate.trackedDirty,
+  ['scripts/pc-writer/run-local.mjs']);
+ assert.equal(result.historicalCheckoutCandidate.requiredFiles
+  .find(f=>f.path==='scripts/pc-writer/local-cycle.mjs').exists,true);
+ assert.equal(result.historicalCheckoutCandidate.requiredFiles
+  .find(f=>f.path==='scripts/pc-writer/us-breadth-provisional-cycle.mjs').exists,false);
+ assert.equal(calls.length,2);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+});
+
+test('malformed Writer checkpoint and absent historical checkout do not become invented source evidence',t=>{
+ const f=fixture(t);
+ f.put('start.cmd','rem no project reference');
+ f.put('data/pc-writer/local-writer-last-run.json','not-json');
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task});
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.lastWriterEvidence,undefined);
+ assert.equal(result.historicalCheckoutCandidate,undefined);
+});
