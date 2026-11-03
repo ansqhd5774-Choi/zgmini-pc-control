@@ -37,11 +37,14 @@ function readJson(file,maxBytes=MAX_JSON_BYTES) {
 function verifySeries(source) {
   if(source?.source!=='NY_FED_GSCPI'||!Array.isArray(source.rows)||source.rows.length<180)
     return {status:'INVALID_SCHEMA'};
-  let previous='';
+  let previous='',previousIndex=null;
   for(const row of source.rows) {
+    const date=row?.observationDate??'';
+    const index=MONTH.test(date)?Number(date.slice(0,4))*12+Number(date.slice(5,7)):null;
     if(!MONTH.test(row?.observationDate??'')||row.observationDate<=previous||
+      (previousIndex!==null&&index!==previousIndex+1)||
       typeof row.value!=='number'||!Number.isFinite(row.value))return {status:'INVALID_ROWS'};
-    previous=row.observationDate;
+    previous=row.observationDate;previousIndex=index;
   }
   return {status:'VALID_PARSED',count:source.rows.length,
     firstMonth:source.rows[0].observationDate.slice(0,7),
@@ -57,7 +60,10 @@ function inspectRaw(file) {
     if(!after||before.ino!==after.ino||before.size!==after.size||
       before.mtimeMs!==after.mtimeMs||bytes.length!==before.size)return {status:'UNSTABLE'};
     const magic=bytes.subarray(0,8).toString('hex');
-    if(magic!=='d0cf11e0a1b11ae1'&&!magic.startsWith('504b0304'))return {status:'INVALID_FORMAT'};
+    if((magic==='d0cf11e0a1b11ae1'&&bytes.length<512)||
+      (magic.startsWith('504b0304')&&bytes.length<64)||
+      (magic!=='d0cf11e0a1b11ae1'&&!magic.startsWith('504b0304')))
+      return {status:'INVALID_FORMAT'};
     return {status:'VALID_RAW_CONTAINER',bytes:bytes.length,
       format:magic==='d0cf11e0a1b11ae1'?'OLE_BIFF':'OOXML_ZIP',
       sha256:createHash('sha256').update(bytes).digest('hex')};
@@ -97,7 +103,7 @@ export function inspectInflationCausalSaved(dataRoot) {
   output.gscpi21={
     status:parsed.status==='MISSING'&&raw.status==='MISSING'?'MISSING':
       validation.status==='VALID_PARSED'&&raw.status==='VALID_RAW_CONTAINER'&&
-      manifestRecord?.status==='STORED'?'SAVED_ARTIFACTS_VERIFIED':
+      manifestRecord?.status==='STORED'?'SAVED_STRUCTURE_VERIFIED':
       validation.status==='VALID_PARSED'?'PARTIAL_SAVED':'NOT_VERIFIED',
     parsedStatus:validation.status,rawStatus:raw.status,
     manifestStatus:manifestRecord?.status==='STORED'?'STORED':manifest.status,
@@ -107,7 +113,7 @@ export function inspectInflationCausalSaved(dataRoot) {
     lastMonth:validation.lastMonth??null,rawFormat:raw.format??null,
     rawBytes:raw.bytes??null,inputsPresent,
     fileModifiedAt:parsed.fileModifiedAt??null,
-    historyMode:'CURRENT_VINTAGE_ONLY',
+    historyMode:'CURRENT_VINTAGE_ONLY',rawToParsedEqualityVerified:false,
   };
   return output;
 }
