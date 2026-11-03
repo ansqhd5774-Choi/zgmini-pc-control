@@ -103,3 +103,54 @@ test('malformed Writer checkpoint does not become invented runtime evidence',t=>
  assert.equal(result.sourceResolved,false);
  assert.equal(result.lastWriterEvidence,undefined);
 });
+
+test('fixed historical checkout reports HEAD and Writer agreement as candidate only',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release';
+ const sha='c'.repeat(40);
+ f.put('start.cmd','rem Core wrapper has no direct checkout reference');
+ const mark=path.join(f.root,p,'.git');
+ fs.mkdirSync(mark,{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/run-local.mjs','export {}');
+ f.put('data/pc-writer/local-writer-last-run.json',
+  JSON.stringify({source:sha,at:'2026-11-03T08:00:00Z',status:'VERIFIED',
+   secret:'UNSAFE_SECRET_VALUE'}));
+ const seen=[];
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:(cwd,args)=>{
+   seen.push(args);
+   assert.equal(cwd,path.join(f.root,p));
+   return args[0]==='rev-parse'?sha+'\n':'';
+  }});
+ assert.equal(result.status,'PASS');
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.sourceHead,null);
+ assert.equal(result.historicalCheckoutCandidate.evidenceLevel,
+  'HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME');
+ assert.equal(result.historicalCheckoutCandidate.sourceRoot,p);
+ assert.equal(result.historicalCheckoutCandidate.head,sha);
+ assert.equal(result.historicalCheckoutCandidate.gitVerified,true);
+ assert.equal(result.historicalCheckoutCandidate.trackedDirty,false);
+ assert.equal(result.historicalCheckoutCandidate.matchesWriterCheckpoint,true);
+ assert.equal(result.historicalCheckoutCandidate.requiredFiles
+  .find(x=>x.path==='scripts/pc-writer/us-breadth-provisional-cycle.mjs').exists,false);
+ assert.equal(seen.length,2);
+ assert.doesNotMatch(JSON.stringify(result),/UNSAFE_SECRET_VALUE/);
+ assert.equal(result.providerCalls,0);assert.equal(result.d1Writes,0);
+});
+
+test('escaped Git pointer cannot be used to read a historical checkout',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release';
+ f.put('start.cmd','rem no active repo reference');
+ const external=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-pc-source-outside-'));
+ t.after(()=>fs.rmSync(external,{recursive:true,force:true}));
+ f.put(p+'/.git','gitdir: '+external);
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:()=>{throw Error('GIT_MUST_NOT_RUN')}});
+ assert.equal(result.status,'PASS');
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.historicalCheckoutCandidate,undefined);
+ assert.equal(result.runtimeSourceVerified,false);
+});
