@@ -1,5 +1,7 @@
 # 새 일반챗의 자동 작업 시작
 
+2026-11-03 통합 개정: 공통 정본 2절에 현재 상태/접수 실패 분류, 3절에 단계별 복구·재개, 5절에 기능 공통 복구 상시 승인, 6·8절에 대기 해제·관측시각·완료 구분을 포함한다. 이전 사본만으로 과거 차단을 반복하지 않는다.
+
 사용자가 작업 전에 전달할 짧은 지침은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)다. 현재 상태와 접수 문제는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)로 분류한다. 요약을 읽은 것만으로 최신 정본·실제 상태 확인을 대체하지 않는다.
 
 공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), 실PC 완료 증거는 [PC_AUTOMATION_RUNTIME_20261103.json](PC_AUTOMATION_RUNTIME_20261103.json)이다. 기존 설치·인계·자동 업데이트를 미완료로 되돌려 처음부터 반복하지 않는다.
