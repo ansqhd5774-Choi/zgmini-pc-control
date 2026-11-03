@@ -12,6 +12,8 @@ Runner 연결 장애와 복구는 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 �
 
 ## 필요한 최초 연결
 
+반복 작업의 승인 판단은 [공통 정본 5절](PC_AUTOMATION_STANDARD.md#5-상시-승인과-안전한-업데이트)을 따른다. 기존 상시 승인 계약의 대상·행동·보호 범위가 일치하면 재승인 없이 진행한다. 새 쓰기·권한 확대 등 계약 밖 변경만 확인하며, 실제 manifest·정책 적용과 필수 검증은 생략하지 않는다.
+
 GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 한다. 새 대화가 이 지침을 자동으로 읽도록 ZGMINI 프로젝트 공통 지침에 다음 문장을 한 번 등록한다.
 
 > ZGMINI PC 검사·진단이 필요하면 먼저 `ansqhd5774-Choi/zgmini-pc-control`의 `docs/GENERAL_CHAT_START.md`를 읽고 허용된 A급 작업을 직접 요청하고 결과까지 확인하라. 사용자가 승인한 범위의 단순 검사마다 재승인이나 CMD 수동 실행을 요구하지 마라.
