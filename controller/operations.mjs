@@ -7,6 +7,7 @@ import {inspectR17Windows} from './us-breadth-r17-preflight.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
+import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
 export function protectedState(dataRoot,{queryTask}={}){
  const output={files:{},tasks:{}};
@@ -37,6 +38,7 @@ export async function runOperation(request,context){
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
+ if(request.operation==='employment-r6-host-cas-readonly')return inspectEmploymentR6HostCas({host});
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
   if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
