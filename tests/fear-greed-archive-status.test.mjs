@@ -127,6 +127,52 @@ test('blocked sidecar failure exposes only bounded categories, never raw error o
  assert.doesNotMatch(JSON.stringify(r),/GH_PAT_SECRET_0123456789|PC_LOCAL_CYCLE_LOCK_BUSY|ARCHIVE_SOURCE_VALIDATION/);
 });
 
+test('sidecar reports bounded SHA/approval subtype and unverified SHA relation without leaking the SHA',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ const actual='a'.repeat(40), approved='b'.repeat(40),secret='GH_PAT_PRIVATE_CREDENTIAL';
+ fs.writeFileSync(path.join(directory,'last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:`SOURCE_SHA_MISMATCH; ${secret}`,
+  actualSourceSha:actual,approvedSourceSha:approved,token:secret,
+ }));
+ const before=digest(fs.readFileSync(f.dbFile));
+ const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
+ const item=r.archiveTrace.sidecar.candidates[0];
+ assert.equal(item.failureHints.reportedBlockSubtype,'SOURCE_SHA_MISMATCH');
+ assert.deepEqual(item.reportedShaRelation,{evidence:'UNATTESTED_LEDGER_FIELDS',actualPresent:true,approvedPresent:true,relation:'MISMATCH'});
+ assert.doesNotMatch(JSON.stringify(r),/GH_PAT_PRIVATE_CREDENTIAL|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/);
+ assert.equal(digest(fs.readFileSync(f.dbFile)),before);
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+});
+
+test('SHA relation reports MATCH only as unverified sidecar evidence, unknown for invalid or missing SHA',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:'MISSING_APPROVAL',result:{executedSourceSha:'c'.repeat(40),expectedSourceSha:'C'.repeat(40)},
+ }));
+ fs.writeFileSync(path.join(directory,'archive-status.json'),JSON.stringify({
+  status:'BLOCKED',reason:{code:'APPROVAL_SHA_MISMATCH',message:'private content'},
+  actualSourceSha:'d'.repeat(39),approvedSourceSha:'e'.repeat(40),
+ }));
+ const items=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask}).archiveTrace.sidecar.candidates;
+ assert.equal(items[0].failureHints.reportedBlockSubtype,'APPROVAL_MISSING');
+ assert.equal(items[0].reportedShaRelation.relation,'MATCH');
+ assert.equal(items[1].failureHints.reportedBlockSubtype,'APPROVAL_MISMATCH');
+ assert.equal(items[1].reportedShaRelation.relation,'UNKNOWN');
+ assert.equal(items[1].reportedShaRelation.actualPresent,false);
+});
+
+test('conflicting declared SHA fields are not silently treated as a match',()=>{
+ const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
+ fs.writeFileSync(path.join(directory,'archive-last-run.json'),JSON.stringify({
+  status:'BLOCKED',reason:'SOURCE SHA unknown',actualSourceSha:'a'.repeat(40),
+  executedSourceSha:'b'.repeat(40),approvedSourceSha:'a'.repeat(40),otherSourceSha:'c'.repeat(40),
+ }));
+ const item=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask}).archiveTrace.sidecar.candidates[0];
+ assert.equal(item.reportedShaRelation.relation,'CONFLICTING_FIELDS');
+ assert.equal(item.failureHints.reportedBlockSubtype,'UNKNOWN');
+ assert.doesNotMatch(JSON.stringify(item),/a{40}|b{40}|c{40}/);
+});
+
 test('unknown and extremely long sidecar failure values do not escape the sanitizer',()=>{
  const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
  fs.writeFileSync(path.join(directory,'last-run.json'),JSON.stringify({
