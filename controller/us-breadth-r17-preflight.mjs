@@ -43,6 +43,31 @@ export function assessR17TaskChain({action,launchers}={}){
  return /run-local-core\.vbs/i.test(firstText)&&/local-cycle\.mjs/i.test(secondText);
 }
 
+// Fixed, non-sensitive predicates only; never return Task XML or VBS text.
+export function diagnoseR17TaskChain({action,launchers}={}){
+ const first=R17_VBS_CHAIN[0],second=R17_VBS_CHAIN[1];
+ const arg=(action?.arguments??'').trim().replace(/^"|"$/g,'');
+ const normalized=path.win32.normalize(arg).toLowerCase();
+ return {
+  commandWscript:/[/\\]wscript\.exe$/i.test(action?.command??''),
+  expectedLauncherArgument:normalized.endsWith(path.win32.normalize(first.path.replaceAll('/', '\\')).toLowerCase()),
+  firstLauncherHash:launchers?.[0]?.sha256===first.sha256,
+  secondLauncherHash:launchers?.[1]?.sha256===second.sha256,
+  firstHop: /run-local-core\.vbs/i.test(launchers?.[0]?.text??''),
+  secondHop:/local-cycle\.mjs/i.test(launchers?.[1]?.text??''),
+ };
+}
+
+export function classifyR17PatchFailure(error){
+ const message=String(error?.stderr??error?.message??'').toLowerCase();
+ if(/patch does not apply|while searching for|failed to apply/.test(message))return 'PATCH_CONTEXT_MISMATCH';
+ if(/corrupt patch|unrecognized input|invalid patch/.test(message))return 'PATCH_FORMAT_INVALID';
+ if(/no such file|does not exist/.test(message))return 'PATCH_BASE_FILE_MISSING';
+ if(/whitespace error/.test(message))return 'PATCH_WHITESPACE_REJECTED';
+ if(error?.code==='ETIMEDOUT')return 'PATCH_CHECK_TIMEOUT';
+ return 'PATCH_CHECK_FAILED_UNCLASSIFIED';
+}
+
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const gitBinary=()=>['C:\\Program Files\\Git\\cmd\\git.exe',
  'C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(fs.existsSync);
@@ -73,7 +98,10 @@ export function summarizeR17Probe(evidence){
  const report=assessR17Evidence(evidence);
  const at=evidence?.stoppedAt;
  return at?{...report,code:'R17_PREFLIGHT_INTERRUPTED',
-  reasons:['R17_PREFLIGHT_INTERRUPTED:'+at],stoppedAt:at}:report;
+  reasons:['R17_PREFLIGHT_INTERRUPTED:'+at],stoppedAt:at}:
+  {...report,diagnostics:{patchCheck:evidence?.patchApplies===true?'PASS':
+    evidence?.patchFailureCode??'UNVERIFIED',
+   taskChain:evidence?.taskLinked===true?'PASS':evidence?.taskChecks??null}};
 }
 
 function textAt(root,name,cap=262144){
@@ -121,7 +149,8 @@ export function inspectR17Windows(){
  if(process.platform!=='win32')return {status:'BLOCKED',code:'WINDOWS_REQUIRED'};
  // Exact PR #957 two-file patch travels inside this approved controller module.
  const evidence={head:null,dirty:null,hashes:{},present:{},
-  patchHash:null,patchApplies:false,quotaContract:false,taskLinked:false,stoppedAt:null};
+  patchHash:null,patchApplies:false,patchFailureCode:null,quotaContract:false,
+  taskLinked:false,taskChecks:null,stoppedAt:null};
  let step='SOURCE_ROOT';
  try{
   const root=fs.realpathSync.native(R17_ROOT);
@@ -149,7 +178,7 @@ export function inspectR17Windows(){
   evidence.patchHash=digest(patchBytes);
   if(evidence.patchHash===R17_PATCH_SHA){
    try{git(root,['apply','--check','--whitespace=error','-'],patchBytes);evidence.patchApplies=true;}
-   catch{/* Real context conflicts are blockers; never force a patch. */}
+   catch(error){evidence.patchFailureCode=classifyR17PatchFailure(error);}
   }
   // Only the exact observed VBS chain is admitted. Neither a Task working
   // directory nor a historical checkout by itself establishes live source.
@@ -163,6 +192,7 @@ export function inspectR17Windows(){
    const bytes=textAt('E:\\ZGmini',item.path,65536);
    return {sha256:digest(bytes),text:decoded(bytes)};
   });
+  evidence.taskChecks=diagnoseR17TaskChain({action,launchers});
   evidence.taskLinked=assessR17TaskChain({action,launchers});
   step=null;
  }catch{/* Never disclose command outputs, paths or secrets. */
