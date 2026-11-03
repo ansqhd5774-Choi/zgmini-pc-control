@@ -206,7 +206,7 @@ export async function executeOnce({event,env=process.env,root=HOST_ROOT,
    const mod=await import(pathToFileURL(candidatePath).href);
    await mod.preflight({manifest});
   });
-  await fixedPreflight({manifest}); // Read-only source, D1 SHA, Reader gate.
+  await fixedPreflight({manifest}); // Read-only source, D1 SHA, legacy Reader gate.
 
   // A persisted, create-only GitHub control ledger makes one-shot global even
   // if the six registered Runner labels map to different physical machines.

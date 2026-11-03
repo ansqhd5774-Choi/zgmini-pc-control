@@ -11,6 +11,9 @@ export const ER1_SHA='e2179295e456a3963e09d82ae282e4ba6848352c';
 export const ER1_PUBLIC_KEY='market-calendar:earnings-er1-score-public';
 export const READER_HEADER='ZGMINI-ER1-97';
 export const READER_URL='https://zgmini.kr/api/earnings-calendar-display?start=2026-11-02&end=2026-11-02';
+export const D1_FIRST_GATE='D1_FIRST_LEGACY_READER_GATE';
+const LEGACY_FHS_HEADER='ZGMINI-FHS-R3';
+const LEGACY_R43_HEADER='ZGMINI-R43-MARKET-IMPORTANCE';
 export const ER1_B_V2_APPROVAL='ER1_PC_OPERATION_APPROVAL_V2';
 export const ER1_V2_PRIVATE_FILES=Object.freeze([
  'tools/market-calendar-er1/ER1_B_INDEPENDENT_PUBLISHER_V2.mjs',
@@ -42,7 +45,10 @@ export function validateV2Approval(manifest){
    manifest.status!=='APPROVED_B'||manifest.approvedScope!=='ER1_INDEPENDENT_SAVED_SCORE_AND_D1_ONE_SHOT'||
    manifest.candidateSourceSha!==ER1_SHA||
    !SHA40.test(manifest.pcConfigSourceSha)||!SHA64.test(manifest.pcBindingSha256)||
+   !SHA40.test(manifest.legacyProductionSha)||
+   manifest.legacyProductionRoute!=='zgmini.kr/api/earnings-calendar-display'||
    manifest.readerHeader!==READER_HEADER||manifest.probeUrl!==READER_URL||
+   manifest.prePublishReaderGate!==D1_FIRST_GATE||
    manifest.publicKey!==ER1_PUBLIC_KEY||manifest.runCount!==1||
    manifest.allowCoreChanges!==false||manifest.allowProviderRequests!==false||
    manifest.allowSchemaChanges!==false||manifest.allowCredentialRefresh!==false||
@@ -109,15 +115,22 @@ export function inspectWranglerOAuth({
  return true;
 }
 
-/** Reader deployment is required before first D1 connection. */
-export async function verifyV2Reader({fetchImpl=fetch}={}){
+/** D1-first: require the still-active legacy FHS/R43 Reader before any D1 write.
+ * An absent ER1 header alone never passes this guard. The exact Cloudflare
+ * deployment/route must also be attested outside this request before B approval.
+ */
+export async function verifyV2LegacyReader({fetchImpl=fetch}={}){
  let response;
  try{response=await fetchImpl(READER_URL,{method:'GET',redirect:'error',
+  cache:'no-store',headers:{'cache-control':'no-cache'},
   signal:AbortSignal.timeout(12000)})}
  catch{stop('ER1_B_V2_READER_PROBE_UNAVAILABLE_STOP')}
- if((!response.ok&&response.status!==204)||
-  response.headers?.get('x-zgmini-earnings-grade-reader')!==READER_HEADER)
-  stop('ER1_B_V2_READER_NOT_DEPLOYED_STOP');
+ if(response.status!==200||
+  response.headers?.get('x-zgmini-fhs-r3-reader')!==LEGACY_FHS_HEADER||
+  response.headers?.get('x-zgmini-r43-reader')!==LEGACY_R43_HEADER||
+  response.headers?.get('x-zgmini-earnings-grade-reader')!==null||
+  !/^text\/html(?:;|$)/i.test(response.headers?.get('content-type')??''))
+  stop('ER1_B_V2_LEGACY_READER_GATE_STOP');
  return true;
 }
 
@@ -127,7 +140,7 @@ export async function verifyV2Reader({fetchImpl=fetch}={}){
  * The calling global ledger must be reserved before this function can write.
  */
 export async function publishIndependentER1Once({
- sourceRoot,pcHome,manifest,now=Date.now(),readerGate=verifyV2Reader,
+ sourceRoot,pcHome,manifest,now=Date.now(),readerGate=verifyV2LegacyReader,
  remoteFactory,validatorFactory,credentialFile,sourceVerifier=verifyV2SourceFiles,
  oauthInspector=inspectWranglerOAuth,fsImpl=fs,
  globalLedgerReserved=false,
@@ -151,7 +164,8 @@ export async function publishIndependentER1Once({
   stop('ER1_B_V2_PAYLOAD_SIZE_STOP');
  const digest=hash(body);
  oauthInspector({file:credentialFile,now});
- if(await readerGate()!==true)stop('ER1_B_V2_READER_NOT_DEPLOYED_STOP');
+ // Re-probe just before D1 access to reduce Reader deployment race exposure.
+ if(await readerGate()!==true)stop('ER1_B_V2_LEGACY_READER_GATE_STOP');
  const lockPath=path.join(pcHome,'er1-input','er1-independent-publish.lock');
  let lock;
  try{lock=fsImpl.openSync(lockPath,'wx')}

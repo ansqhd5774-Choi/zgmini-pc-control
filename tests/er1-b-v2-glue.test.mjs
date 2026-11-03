@@ -13,7 +13,8 @@ const own=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const fixed=JSON.parse(fs.readFileSync(path.join(own,'approval',
  'ER1_INDEPENDENT_PUBLISHER_V2_PENDING.json'),'utf8'));
 const manifest={...fixed,status:'APPROVED_B',
- pcConfigSourceSha:'a'.repeat(40),pcBindingSha256:'b'.repeat(64)};
+ pcConfigSourceSha:'a'.repeat(40),pcBindingSha256:'b'.repeat(64),
+ legacyProductionSha:'d'.repeat(40)};
 const approval=Buffer.from(JSON.stringify(manifest));
 const uuid='34585fa0-987f-432d-bacd-4f03c3c0e1ef';
 const requestId='pc-er1-'+uuid;

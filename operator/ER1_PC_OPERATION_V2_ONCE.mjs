@@ -11,7 +11,7 @@ import {fileURLToPath} from 'node:url';
 import {runER1SavedScore} from '../../scripts/pc-writer/market-calendar-er1-saved-score.mjs';
 import {
  validateV2Approval,validateV2ConfigBinding,verifyV2SourceFiles,
- inspectWranglerOAuth,verifyV2Reader,publishIndependentER1Once,
+ inspectWranglerOAuth,verifyV2LegacyReader,publishIndependentER1Once,
 } from './ER1_B_INDEPENDENT_PUBLISHER_V2.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
@@ -57,7 +57,7 @@ export function verifyParentReservation({manifest,markerFile=MARKER,manifestFile
  return true;
 }
 
-export async function preflight({manifest,readerGate=verifyV2Reader}={}){
+export async function preflight({manifest,readerGate=verifyV2LegacyReader}={}){
  validateV2Approval(manifest);
  guardedPc();
  verifyV2SourceFiles(ROOT,manifest);
@@ -66,7 +66,7 @@ export async function preflight({manifest,readerGate=verifyV2Reader}={}){
  inspectWranglerOAuth(); // Expiry >= 10min, no refresh or secret output.
  if(fs.existsSync(path.join(PC_HOME,'er1-input','er1-public-display.json')))
   stop('ER1_B_V2_DERIVED_EXISTS_REVIEW_STOP');
- if(await readerGate()!==true)stop('ER1_B_V2_READER_NOT_DEPLOYED_STOP');
+ if(await readerGate()!==true)stop('ER1_B_V2_LEGACY_READER_GATE_STOP');
  return true;
 }
 

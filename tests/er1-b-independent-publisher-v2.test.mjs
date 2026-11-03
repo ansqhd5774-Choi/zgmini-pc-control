@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {
- ER1_SHA,ER1_PUBLIC_KEY,READER_HEADER,READER_URL,ER1_V2_SOURCE_HASHES,
+ ER1_SHA,ER1_PUBLIC_KEY,READER_HEADER,READER_URL,D1_FIRST_GATE,
+ verifyV2LegacyReader,ER1_V2_SOURCE_HASHES,
  bindingFingerprint,validateV2Approval,validateV2ConfigBinding,
  inspectWranglerOAuth,verifyV2SourceFiles,publishIndependentER1Once,
 } from '../er1-b-independent-publisher-v2.mjs';
@@ -18,14 +19,17 @@ const manifest={schema:'ER1_PC_OPERATION_APPROVAL_V2',status:'APPROVED_B',
  approvedScope:'ER1_INDEPENDENT_SAVED_SCORE_AND_D1_ONE_SHOT',
  candidateSourceSha:ER1_SHA,pcConfigSourceSha:sha,
  pcBindingSha256:bindingFingerprint(config),readerHeader:READER_HEADER,
+ prePublishReaderGate:D1_FIRST_GATE,
+ legacyProductionSha:'c'.repeat(40),
+ legacyProductionRoute:'zgmini.kr/api/earnings-calendar-display',
  probeUrl:READER_URL,publicKey:ER1_PUBLIC_KEY,runCount:1,
  allowCoreChanges:false,allowProviderRequests:false,
  allowSchemaChanges:false,allowCredentialRefresh:false,
  allowIndependentPublisherV2:true,sourceSha256:{...ER1_V2_SOURCE_HASHES,
   'tools/market-calendar-er1/ER1_B_INDEPENDENT_PUBLISHER_V2.mjs':
-   '720d014b655999df733a6dd79db65e51139d83d545a201b7f842d3191b0d4de2',
+   '35ed435fa9f0ca03972e20d71e241523dab35b0f9bac4edf0f8c542a71fc1f3e',
   'tools/market-calendar-er1/ER1_PC_OPERATION_V2_ONCE.mjs':
-   '9f66cc60bbda7c31b3c94f995b609be3516b6c8ef2e2eb56e640f55e02c3213b'},
+   'bda8ae3d8b69ca3862c6bee231eb0c2baf89f52ff3061cb0f87445c80f6c965d'},
  pcHome:String.raw`E:\ZGmini\data\pc-writer`,dataRoot:String.raw`E:\ZGmini\data`,
  controlLedgerPath:'results/er1-b-global-once.json',allowControlLedgerWrite:true};
 const derived={asOf:'2026-10-30',recordCount:838,star3Count:29};
@@ -48,6 +52,26 @@ test.after(()=>{for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true})
 test('not approved manifest is blocked',()=>{
  assert.throws(()=>validateV2Approval({...manifest,status:'PENDING_B'}),/ER1_B_V2_APPROVAL/);
 });
+test('D1-first mode is required in signed B manifest',()=>{
+ assert.throws(()=>validateV2Approval({...manifest,prePublishReaderGate:'READER_FIRST'}),/ER1_B_V2_APPROVAL/);
+ assert.throws(()=>validateV2Approval({...manifest,legacyProductionSha:'UNVERIFIED'}),/ER1_B_V2_APPROVAL/);
+ assert.throws(()=>validateV2Approval({...manifest,legacyProductionRoute:'WRONG_ROUTE'}),/ER1_B_V2_APPROVAL/);
+});
+test('legacy FHS/R43 active Reader is required; header absence alone cannot pass',async()=>{
+ const legacyHeaders={'x-zgmini-fhs-r3-reader':'ZGMINI-FHS-R3',
+  'x-zgmini-r43-reader':'ZGMINI-R43-MARKET-IMPORTANCE',
+  'content-type':'text/html; charset=utf-8'};
+ const fetchResponse=extra=>async(_url,opts)=>{
+  assert.equal(opts.cache,'no-store');assert.equal(opts.redirect,'error');
+  return {status:200,headers:{get:key=>({...legacyHeaders,...extra})[key]??null}};
+ };
+ assert.equal(await verifyV2LegacyReader({fetchImpl:fetchResponse({})}),true);
+ await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({
+  'x-zgmini-earnings-grade-reader':READER_HEADER})}),/LEGACY_READER_GATE_STOP/);
+ await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:fetchResponse({
+  'x-zgmini-r43-reader':'MISSING'})}),/LEGACY_READER_GATE_STOP/);
+ await assert.rejects(()=>verifyV2LegacyReader({fetchImpl:async()=>({status:204,headers:{get:()=>null}})}),/LEGACY_READER_GATE_STOP/);
+});
 test('source hash cannot be weakened in manifest',()=>{
  assert.throws(()=>validateV2Approval({...manifest,sourceSha256:{
   ...manifest.sourceSha256,'scripts/pc-writer/d1.mjs':'0'.repeat(64)}}),/ER1_B_V2_APPROVAL/);
@@ -69,13 +93,13 @@ test('no pinned D1 file is fail closed',()=>{
  const dir=fixture();
  assert.throws(()=>verifyV2SourceFiles(dir,manifest),/PINNED_FILE_MISSING/);
 });
-test('global reservation is mandatory; Reader gate failure does not connect/write',async()=>{
+test('global reservation is mandatory; legacy Reader gate failure does not connect/write',async()=>{
  const dir=fixture();let remoteCalled=false;
  const args={sourceRoot:dir,pcHome:dir,manifest,
   sourceVerifier:pass,oauthInspector:pass,validatorFactory:async()=>validator,
   readerGate:async()=>false,remoteFactory:async()=>{remoteCalled=true;throw Error('NOT_WANTED')}};
  await assert.rejects(()=>publishIndependentER1Once(args),/GLOBAL_LEDGER_REQUIRED/);
- await assert.rejects(()=>publishIndependentER1Once({...args,globalLedgerReserved:true}),/READER_NOT_DEPLOYED/);
+ await assert.rejects(()=>publishIndependentER1Once({...args,globalLedgerReserved:true}),/LEGACY_READER_GATE_STOP/);
  assert.equal(remoteCalled,false);
 });
 test('identical public key avoids write',async()=>{
