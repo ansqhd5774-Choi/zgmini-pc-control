@@ -1,4 +1,4 @@
-# ZGMINI ER1 B 원샷 Runner — **비설치 로컬 시안**
+# ZGMINI ER1 B 원샷 Runner — 승인 manifest·등록 전 검증 기록
 
 이 디렉터리는 원래 `pc-job` A급 Runner나 `pc-maintenance` Controller 업데이트의 권한을 확대하지 않고, **별도 승인된 단회 B급 ER1 게시**를 처리하는 소스 시안이다.
 
@@ -6,8 +6,8 @@
 
 - 구현: 별도 Issue 계약, 별도 self-hosted Windows CMD workflow, 공식 `actions/checkout`의 전체 commit SHA 고정, **private 제어 소스+public ER1 소스 각각 exact SHA checkout**, raw-byte 승인 manifest, SHA 파일 목록 검산, 독립 V2 Publisher·Operator, 선행 read-only preflight, GitHub 공용 단회 예약+로컬 lease, 요청별 TXT·JSON·Issue 댓글 업로드.
 - 로컬 시험: `node --test tests/*.test.mjs` — **31/31 PASS** (V1 기존 보호 16 + 독립 publisher 12 + V2 workflow glue 3).
-- **설치/등록/실행: 0회.** 실제 PC Runner/운영 Source/SQLite/D1/Cloudflare 변경 없음.
-- **바로 실행 불가:** workflow private checkout SHA에 승인값 대신 placeholder가 있으며 승인 manifest는 `PENDING_B`다. PC 결합 지문(#125)과 2026-11-03 당시 Production Reader SHA/route는 관측했으나 B 실행 직전 재검증 필요, 실제 Windows/D1 검증 없음. Reader #959는 D1 신규 key 사전 저장·readback PASS 전에는 미배포로 유지한다.
+- 등록·실행은 별도 운영 증거로 판정한다. 이 문서의 source·test PASS만으로 PC 실행·D1 게시 성공을 선언하지 않는다.
+- **실행 게이트:** 사용자 B 승인으로 `APPROVED_B` manifest와 immutable private/public SHA를 작성했다. workflow의 `main` 등록·실제 Windows/D1 결과는 별도 확인해야 하며, PC 결합 지문(#125)과 당시 Production Reader SHA/route도 실행 직전에 재검증한다. Reader #959는 신규 key 저장·readback PASS 전 미배포로 유지한다.
 
 ## 기존 보호 계약과 분리
 
@@ -22,8 +22,8 @@
 
 ## 최초 사용 전 필수 조건 (준비 전 STOP)
 
-1. **새 B 승인**: private 제어 저장소의 최소 PR에서 V2 edition/entry/operator/publisher/approval과 workflow를 검토한다. 승인된 exact 40자리 control commit SHA를 workflow placeholder에 고정한다. 원본 Core-chain `operator/ER1_PC_OPERATION_ONCE.mjs`는 V2 경로에서 사용하지 않는다. 새 Windows host-entry 설치 없이 기존 self-hosted Runner checkout 작업공간 사용.
-2. `approval/ER1_INDEPENDENT_PUBLISHER_V2_PENDING.json`은 미승인 템플릿이다. PC 기존 `config.source` exact 승인 SHA와 `account/core/history` **비공개 결합 해시**를 승인 관리자가 기존 설정에서 검산한 뒤 `APPROVED_B`로 서명·검토하고, 정확한 bytes를 private checkout의 고정 `approval/ER1_PC_OPERATION_APPROVAL.json`으로 배치한다. 비공개 DB ID와 credential을 GitHub/로그에 쓰지 않는다. config binding 해시 불명이면 STOP. PC Core HEAD 추적을 새로운 필수 A 설치 진단으로 만들지는 않는다.
+1. **B 승인·exact pin**: 2026-11-04 사용자 B급 단회 게시 승인 후 V2 edition/entry/operator/publisher/approval을 검증했다. 승인 파일을 포함하는 immutable control SHA `f5f880abce0ce93e68db690b4b994317b28417a9`를 workflow에 고정한다. `operator/ER1_PC_OPERATION_ONCE.mjs`는 V2 경로에서 사용하지 않는다. 기존 self-hosted Runner checkout만 사용한다.
+2. `approval/ER1_INDEPENDENT_PUBLISHER_V2_PENDING.json`은 역사적 미승인 템플릿으로 보존한다. 실PC #125 증거의 config.source와 비공개 결합 지문을 고정한 `approval/ER1_PC_OPERATION_APPROVAL.json`을 별도로 작성·검증했다. 승인 파일 raw SHA256은 요청 본문에 고정한다. 비공개 DB ID와 credential을 GitHub/로그에 쓰지 않는다. config binding 해시 불명이면 STOP. PC Core HEAD 추적을 새로운 필수 A 설치 진단으로 만들지는 않는다.
 3. D1 클라이언트 `d1.mjs`, `d1-transient.mjs`, `d1-diagnostics.mjs`는 public 611b3dcc checkout에 있는 exact SHA로만 연결한다. 기존 Wrangler OAuth가 10분 안에 만료되거나 없으면 **preflight STOP**, 자동 refresh/재로그인 금지. 점수 기준 97은 유지하고 동일 발행사 중복 보정(611b3dcc)을 반영이며 고정 발행사 명부 없음.
 4. **D1-first 선행 검증**: Cloudflare 실제 Production API의 route/binding·배포 ID·exact source SHA를 조회하여 그 배포에서 신규 ER1 feed key를 읽지 않음을 확인하고, 승인 manifest에 검증된 `legacyProductionSha`, `legacyProductionRoute`, `prePublishReaderGate=D1_FIRST_LEGACY_READER_GATE`를 고정한다. 실행 직전 실제 `zgmini.kr` GET에서 기존 FHS/R43 헤더 둘 다 존재, ER1 Reader 헤더 부재, `x-display-count` 양수, HTML 본문에 실제 별점 요소가 있는지 확인한다. 2026-11-02는 실제 `display-count:0`·본문 0바이트라 자동 Gate가 STOP하므로, **11-03 282건/별점 요소 282개를 직접 관측해 승인 probe URL을 2026-11-03으로 조정**했다. 이 고정 날짜가 실제 배포 시점에 더는 유효하지 않다면 STOP 후 새로운 유효 표본으로 재승인해야 한다. 헤더 검사만으로 배포 SHA/route를 검증했다고 주장하지 않는다. 검증이 불가능하거나 다른 배포가 진행 중이면 STOP.
 5. **실행 순서**: 해당 신규 D1 공개 key의 기존 다른 본문을 덮어쓰지 않는 0/1회 게시 → 원격 exact readback 확인 → 그 후에만 별도 승인 절차로 [Reader PR #959](https://github.com/ansqhd5774-Choi/zgmini/pull/959)를 병합/배포 → 배포 SHA, `x-zgmini-earnings-grade-reader: ZGMINI-ER1-97`, API/PC·모바일 별점·결측/필터 검증. 게시 실패/UNKNOWN이면 Reader 배포 금지.
