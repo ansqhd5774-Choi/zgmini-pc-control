@@ -7,10 +7,13 @@ import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
- validateControllerConfigTransition,controllerAdmissionForPurpose} from './maintenance-contract.mjs';
+ validateControllerConfigTransition,controllerAdmissionForPurpose,
+ validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,
+ R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
+ R6_HOST_CANDIDATE_SHA256} from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
@@ -36,6 +39,11 @@ const hostPath=path.join(controlRoot,'host.json');
 const recordDir=path.join(maintenanceRoot,'ledger');
 const safeId=x=>{need(/^pc-[a-z0-9-]{8,76}$/.test(x??''),'MAINTENANCE_REQUEST_ID');return x;};
 const validSha=x=>/^[a-f0-9]{40}$/.test(x??'');
+const R6_HOST_TITLE='pc-r6-host-register';
+const R6_SOURCE_MANIFEST_PATH='drafts/employment-r6/source-manifest.json';
+const R6_STAGE_TOOL_HASH='5f0459ded35785c82784aa538d62ed89e0848f06f71093940706a60279d74a47';
+const R6_APPLY_TOOL_HASH='ab79308af8010cf04091fb440c04c70f725679fbc50f1ade9149a5e666682be1';
+const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
 export function reconnectState({now,deadline,matched,online}){
  return matched&&online?'PASS':now<deadline?'WAIT':'TIMEOUT';
 }
@@ -561,9 +569,351 @@ export function maintenanceNextAction(s){
   updateSuccessProven:false};
 }
 
+// The host-only R6 B path reuses this *installed* maintainer and its install
+// lease. No general pc-job argument, arbitrary command, or mutable downloaded
+// executable is permitted. The two source helpers are copied from reviewed
+// Git blobs only after exact SHA-256 verification.
+function readR6GitHubBytes(repository,relative,ref){
+ need(repository===controlRepository||repository==='ansqhd5774-Choi/zgmini',
+  'R6_HOST_SOURCE_REPOSITORY_NOT_ALLOWED');
+ need(/^[a-z0-9][a-z0-9./_-]{1,150}$/i.test(relative)&&!relative.includes('..'),
+  'R6_HOST_SOURCE_PATH_INVALID');
+ need(ref==='main'||ref===R6_HOST_SOURCE_SHA,'R6_HOST_SOURCE_REF_INVALID');
+ const route=`repos/${repository}/contents/${relative}?ref=${ref}`;
+ const response=execFileSync(gh,['api',route],{
+  windowsHide:true,encoding:'utf8',timeout:60000,maxBuffer:4e6});
+ let file;try{file=JSON.parse(response);}catch{need(false,'R6_HOST_SOURCE_API_INVALID');}
+ need(file?.type==='file'&&file.encoding==='base64'
+   &&typeof file.content==='string'&&file.content.length<=500000,
+   'R6_HOST_SOURCE_API_INVALID');
+ const compact=file.content.replace(/\s/g,'');
+ need(/^[A-Za-z0-9+/]*={0,2}$/.test(compact),'R6_HOST_SOURCE_BASE64_INVALID');
+ return Buffer.from(compact,'base64');
+}
+
+function loadApprovedR6HostPackage(requestId,file){
+ const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
+ need(path.resolve(file)===path.resolve(expected),'R6_HOST_APPROVAL_FILE_PATH');
+ const data=json(expected),{issue,manifestRawBase64}=data;
+ need(issue?.requestId===requestId&&issue.operation==='employment-r6-host-register'
+   &&issue.controlRepository===controlRepository,'R6_HOST_MAINTENANCE_REQUEST_MISMATCH');
+ need(data.actor==='ansqhd5774-Choi'&&Number.isSafeInteger(data.issueNumber),
+   'R6_HOST_MAINTENANCE_ACTOR_NOT_APPROVED');
+ const raw=Buffer.from(manifestRawBase64??'','base64');
+ need(raw.length>0&&raw.length<=32768&&sha256(raw)===issue.approvalManifestSha256,
+   'R6_HOST_APPROVAL_MANIFEST_DRIFT');
+ const actual=github('issues/'+data.issueNumber);
+ let actualBody;try{actualBody=JSON.parse(actual.body);}catch{need(false,'R6_HOST_ISSUE_READBACK_INVALID');}
+ const authenticated=validateR6HostIssueEnvelope(actualBody,{
+  actor:actual.user?.login,controlRepository});
+ need(JSON.stringify(authenticated)===JSON.stringify(issue)
+   &&actual.user?.login===data.actor
+   &&actual.state==='open'&&actual.title===R6_HOST_TITLE
+   &&actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,
+   'R6_HOST_ISSUE_IDENTITY_DRIFT');
+ const {manifest}=validateR6HostRegistrationRequest(issue,raw,{
+  actor:data.actor,controlRepository,installedSha:installedManifest().installedSha});
+ need(data.manifest&&JSON.stringify(data.manifest)===JSON.stringify(JSON.parse(raw)),
+   'R6_HOST_APPROVED_PACKAGE_CHANGED');
+ return {...data,issue:authenticated,manifest};
+}
+
+async function importPinnedR6HostHelpers(requestId){
+ const items=[
+  ['stage-r6-host-registration.mjs',R6_STAGE_TOOL_HASH],
+  ['apply-r6-host-overlay-b.mjs',R6_APPLY_TOOL_HASH],
+ ];
+ need(git(['status','--porcelain']).trim()==='','R6_HOST_CONTROL_CHECKOUT_DIRTY');
+ git(['fetch','--no-tags','origin','main']);
+ const root=path.join(maintenanceRoot,'approved','host-r6-modules-'+requestId);
+ need(!fs.existsSync(root),'R6_HOST_MODULES_ALREADY_STAGED');
+ fs.mkdirSync(root);
+ for(const [filename,digest] of items){
+  const source=git(['show','refs/remotes/origin/main:tools/'+filename],{encoding:null});
+  need(sha256(source)===digest,'R6_HOST_MODULE_SOURCE_DRIFT');
+  const dest=path.join(root,filename);
+  fs.writeFileSync(dest,source,{flag:'wx'});
+  need(sha256(fs.readFileSync(dest))===digest,'R6_HOST_MODULE_READBACK_FAILED');
+ }
+ // These modules only import built-in Node modules and their verified sibling.
+ const staged=await import(pathToFileURL(path.join(root,items[0][0])).href);
+ const applied=await import(pathToFileURL(path.join(root,items[1][0])).href);
+ need(typeof staged.draftR6HostRegistration==='function'
+   &&typeof applied.applyPreparedR6HostB==='function','R6_HOST_MODULE_EXPORT_INVALID');
+ return {staged,applied};
+}
+
+function readR6HostStatus(requestId){
+ const current=readMaintenanceRecoveryStatus(requestId);
+ const backup=path.join(controlRoot,'backups','r6-host-'+requestId);
+ let hostSha256=null,hostReadbackCode=null;
+ try{hostSha256=sha256(fs.readFileSync(hostPath));}
+ catch{hostReadbackCode='R6_HOST_BYTES_UNAVAILABLE';}
+ return {...current,hostSha256,hostReadbackCode,
+  backupExists:fs.existsSync(backup),
+  appliedMarker:fs.existsSync(path.join(backup,'APPLIED.json')),
+  rollbackMarker:fs.existsSync(path.join(backup,'ROLLED_BACK.json'))};
+}
+
+function replayR6Backlog(requestId,backlogFile){
+ let state=json(backlogFile);
+ const windows=backlogPauseWindows(state);
+ need(windows.length>0&&windows.every(w=>w.resumedAt),'R6_HOST_BACKLOG_WINDOW_UNCLOSED');
+ const candidates=new Map();
+ for(const window of windows){
+  const from=Date.parse(window.pausedAt)-2000,to=Date.parse(window.resumedAt);
+  need(Number.isFinite(from)&&Number.isFinite(to)&&to>=from,'R6_HOST_BACKLOG_TIME_INVALID');
+  for(let page=1;page<=20;page++){
+   const list=github(`issues?state=all&since=${encodeURIComponent(new Date(from).toISOString())}&per_page=100&page=${page}`);
+   need(Array.isArray(list),'R6_HOST_BACKLOG_LIST_INVALID');
+   for(const issue of list)if(backlogIssueInPause(issue,window))candidates.set(issue.number,issue);
+   if(list.length<100)break;
+   need(page<20,'R6_HOST_BACKLOG_LIST_TRUNCATED');
+  }
+ }
+ for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
+  const key=String(original.number);
+  if(['DONE','SKIPPED_RESULT_PRESENT'].includes(state.replays[key]?.status))continue;
+  need(!state.replays[key],'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+  const comments=github(`issues/${original.number}/comments?per_page=100`);
+  if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
+   state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};
+   writeJson(backlogFile,state);
+   continue;
+  }
+  let body;try{body=JSON.parse(original.body);}catch{need(false,'R6_HOST_BACKLOG_ORIGINAL_BODY_INVALID');}
+  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
+  need(Object.keys(body).sort().join(',')===keys.sort().join(',')
+    &&body.schema==='ZGMINI_PC_JOB_V1'&&/^[a-z0-9-]{8,80}$/.test(body.requestId),
+    'R6_HOST_BACKLOG_ORIGINAL_REQUEST_INVALID');
+  const marker=`Maintenance replay ${requestId} original #${original.number}`;
+  state.replays[key]={status:'POSTING',originalRequestId:body.requestId};
+  writeJson(backlogFile,state);
+  const input=path.join(maintenanceRoot,'approved',requestId+'.replay-'+original.number+'.json');
+  writeJson(input,{title:marker,body:original.body,labels:['pc-job']});
+  let repost;
+  try{repost=github('issues','POST',input);}
+  catch{need(false,'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');}
+  need(Number.isSafeInteger(repost.number),'R6_HOST_BACKLOG_REPLAY_OUTCOME_UNKNOWN');
+  state.replays[key]={status:'DONE',originalRequestId:body.requestId,replayIssueNumber:repost.number};
+  writeJson(backlogFile,state);
+  const notification=`<!-- zgmini-pc-backlog-replay:${requestId}:${original.number} -->\n`+
+   `This request arrived during a verified maintenance pause. Equivalent fixed request: #${repost.number}.`;
+  const commentInput=path.join(maintenanceRoot,'approved',requestId+'.replay-comment-'+original.number+'.json');
+  writeJson(commentInput,{body:notification});
+  try{github(`issues/${original.number}/comments`,'POST',commentInput);}catch{/* durable replay ledger */}
+ }
+}
+
+async function applyR6HostOnly(requestId,packageFile){
+ const {issue,manifest,issueNumber}=loadApprovedR6HostPackage(requestId,packageFile);
+ const ledgerFile=path.join(recordDir,requestId+'.json');
+ const backlogFile=path.join(maintenanceRoot,'backlog',requestId+'.json');
+ need(!fs.existsSync(ledgerFile),'R6_HOST_EXISTING_LEDGER_RECONCILE_FIRST');
+ need(!fs.existsSync(manifest.backupDirectory),'R6_HOST_BACKUP_ALREADY_EXISTS');
+ need(process.platform==='win32','R6_HOST_WINDOWS_REQUIRED');
+ const {owner}=readOwner();
+ verifyIndependent(owner.pid);
+ const installed=installedManifest();
+ need(installed.installedSha===manifest.installedControllerSha,
+  'R6_HOST_CONTROLLER_NOT_INSTALLED');
+ const policy=json(path.join(controlRoot,'config/operations.json'));
+ const r6Op=policy.operations?.['employment-r6-candidate-stage-readonly'];
+ need(r6Op?.grade==='A'&&r6Op.resource==='heavy'
+   &&r6Op.timeoutSeconds===240&&r6Op.minimumFreeMiB===1536,
+   'R6_HOST_CONTROLLER_OPERATION_NOT_INSTALLED');
+ const pr=github('pulls/'+manifest.approval.ref.split('/').pop());
+ need(pr.merged===true&&validSha(pr.merge_commit_sha),'R6_HOST_APPROVAL_PR_NOT_MERGED');
+ git(['fetch','--no-tags','origin','main']);
+ need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,'refs/remotes/origin/main']).trim()==='',
+  'R6_HOST_APPROVAL_PR_NOT_ON_MAIN');
+ const beforeHost=fs.readFileSync(hostPath);
+ need(sha256(beforeHost)===manifest.hostOriginalSha256,'R6_HOST_ORIGINAL_BYTES_CHANGED');
+ const originalProtected=protectedSnapshot();
+ const candidateBytes=fs.readFileSync(manifest.candidatePath);
+ need(sha256(candidateBytes)===R6_HOST_CANDIDATE_SHA256,
+  'R6_HOST_CANDIDATE_BYTES_CHANGED');
+ const lock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
+ let retained=false,paused=false,result=null;
+ const save=(fields)=>writeJson(ledgerFile,{
+  schema:'ZGMINI_R6_HOST_B_LEDGER_V1',requestId,issueNumber,
+  targetControllerSha:issue.targetControllerSha,...fields});
+ try{
+ try{
+  save({status:'RUNNING',phase:'LEASE_ACQUIRED',firstFail:null,lastPass:'B_CONTRACT_VERIFIED'});
+  const modules=await importPinnedR6HostHelpers(requestId);
+  const rawManifest=readR6GitHubBytes(controlRepository,R6_SOURCE_MANIFEST_PATH,'main');
+  need(sha256(rawManifest)===R6_HOST_SOURCE_MANIFEST_SHA256,
+   'R6_HOST_SOURCE_MANIFEST_DRIFT');
+  const sourceManifest=JSON.parse(rawManifest.toString('utf8'));
+  const files={};
+  for(const rel of modules.staged.R6_SOURCE_FILES){
+   const bytes=readR6GitHubBytes('ansqhd5774-Choi/zgmini',rel,R6_HOST_SOURCE_SHA);
+   need(sha256(bytes)===sourceManifest.files?.[rel],'R6_HOST_SOURCE_BYTES_DRIFT');
+   files[rel]=bytes;
+  }
+  need(github('actions/workflows/pc-job.yml').state==='active',
+   'R6_HOST_WORKFLOW_NOT_ACTIVE_PREEXISTING');
+  const at=new Date().toISOString();
+  writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId,
+   pausedAt:at,resumedAt:null,replays:{},windows:[{pausedAt:at,resumedAt:null}]});
+  save({status:'RUNNING',phase:'PAUSE_ATTEMPTED',lastPass:'SOURCE_BYTES_VERIFIED'});
+  // Mark the attempt before the network call: an ACK can be lost after GitHub
+  // has already disabled intake. Always reconcile its actual state on error.
+  paused=true;
+  try{github('actions/workflows/pc-job.yml/disable','PUT');}
+  catch{need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+    'R6_HOST_WORKFLOW_DISABLE_OUTCOME_UNKNOWN');}
+  need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+   'R6_HOST_WORKFLOW_DISABLE_NOT_CONFIRMED');
+  let quiet=0;
+  for(let n=0;n<180;n++){
+   const rows=github('actions/runners?per_page=100').runners;
+   need(Array.isArray(rows)&&rows.length===6
+     &&requiredRunners.every(name=>rows.some(row=>row.name===name)),
+     'R6_HOST_RUNNER_SET_DRIFT');
+   const active=['in_progress','queued','waiting'].reduce((sum,status)=>
+     sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
+   const leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
+   if(rows.every(x=>x.status==='online'&&!x.busy)&&active===0&&leases.length===0){
+    if(++quiet>=2)break;
+   }else quiet=0;
+   need(n<179,'R6_HOST_DRAIN_WAIT_TIMEOUT');
+   await wait(3000);
+  }
+  save({status:'RUNNING',phase:'DRAIN_VERIFIED',lastPass:'WORKFLOW_PAUSED_AND_DRAINED'});
+  const stageRoot=path.dirname(manifest.stageBundle);
+  const approvedStageRoot=path.join(controlRoot,'source-bundles');
+  need(path.resolve(stageRoot)===path.resolve(approvedStageRoot),
+   'R6_HOST_STAGE_ROOT_OUTSIDE_CONTROL');
+  if(!fs.existsSync(stageRoot))fs.mkdirSync(stageRoot);
+  const proposal=modules.staged.draftR6HostRegistration({
+   installedHost:installed.host,sourceFiles:files,manifestBytes:rawManifest,
+   sourceSha:R6_HOST_SOURCE_SHA,candidatePath:manifest.candidatePath,stageRoot});
+  need(sameR6WindowsPath(proposal.stageBundle,manifest.stageBundle)
+   &&proposal.manifestSha256===manifest.sourceManifestSha256
+   &&proposal.existingApprovalsPreserved,'R6_HOST_SOURCE_STAGE_SCOPE_CHANGED');
+  need(sha256(Buffer.from(JSON.stringify(proposal.proposedHost,null,2)+'\n'))===manifest.proposedSha256,
+   'R6_HOST_PROPOSAL_SHA_CHANGED');
+  save({status:'RUNNING',phase:'BUNDLE_STAGED',lastPass:'R6_SOURCE_16_FILE_READBACK_VERIFIED'});
+  const runtimeProbe=()=>{
+   const current=readOwner();
+   need(current.owner.pid===owner.pid&&current.owner.nonce===owner.nonce,
+    'R6_HOST_SUPERVISOR_OWNER_CHANGED');
+   verifyIndependent(current.owner.pid);
+   need(sha256(fs.readFileSync(manifest.candidatePath))===manifest.candidateSha256,
+    'R6_HOST_CANDIDATE_BYTES_CHANGED');
+   const liveLease=json(path.join(maintenanceRoot,'leases/controller-install/owner.json'));
+   const owned=liveLease.pid===process.pid&&liveLease.nonce===lock.owner.nonce;
+   const rows=github('actions/runners?per_page=100').runners;
+   const active=['in_progress','queued','waiting'].reduce((sum,status)=>
+     sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
+   return {controlRepository,workflowState:github('actions/workflows/pc-job.yml').state,
+    installLeaseHeldByThisOperator:owned,inFlightPcJobs:active,
+    uploadsPending:fs.existsSync(path.join(controlRoot,'leases/result-upload'))?1:0,
+    runners:rows.map(row=>({name:row.name,online:row.status==='online',busy:row.busy})),
+    observedAt:new Date().toISOString()};
+  };
+  const applied=modules.applied.applyPreparedR6HostB({
+   approval:{schema:manifest.schema,scope:manifest.scope,sourceSha:manifest.sourceSha,
+    sourceManifestSha256:manifest.sourceManifestSha256,
+    installedControllerSha:manifest.installedControllerSha,hostSha256:manifest.hostOriginalSha256,
+    proposedHostSha256:manifest.proposedSha256,hostPath:manifest.hostPath,
+    candidatePath:manifest.candidatePath,stageBundle:proposal.stageBundle,
+    backupDirectory:manifest.backupDirectory},
+   proposedHost:proposal.proposedHost,runtimeProbe,
+   // verifyIndependent performed the actual Windows WMI origin check above;
+   // these are NOT fields accepted from the external Issue or manifest.
+   windowsProvenance:{verified:true,sameUserAndSession:true,maintainerIndependent:true}});
+  need(JSON.stringify(protectedSnapshot())===JSON.stringify(originalProtected),
+   'R6_HOST_PROTECTED_OPERATION_CHANGED');
+  if(applied.status==='RECOVERY_REQUIRED'){
+   result={status:'RECOVERY_REQUIRED',code:applied.code,lastPass:'BUNDLE_STAGED',
+    firstFail:applied.code,actualControllerSha:installed.installedSha};
+   save({status:'RECOVERY_REQUIRED',phase:'ROLLBACK_UNVERIFIED',result});
+   lock.holdForRecovery();retained=true;
+   return result;
+  }
+  const expectedSha=applied.status==='APPLIED'
+   ?manifest.proposedSha256:manifest.hostOriginalSha256;
+  need(sha256(fs.readFileSync(hostPath))===expectedSha,'R6_HOST_POST_APPLY_CAS_FAILED');
+  result={status:applied.status==='APPLIED'?'PASS':'ROLLED_BACK',
+   code:applied.status==='APPLIED'?'R6_HOST_APPLIED':applied.code,
+   lastPass:applied.status==='APPLIED'?'HOST_B_READBACK_VERIFIED':'HOST_B_ROLLBACK_VERIFIED',
+   firstFail:applied.status==='APPLIED'?null:applied.code,
+   actualControllerSha:installed.installedSha,protectedStateUnchanged:true};
+  save({status:'RUNNING',phase:applied.status,lastPass:result.lastPass});
+ }catch(error){
+  const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'R6_HOST_RUNTIME_PREFLIGHT_FAILED';
+  const journal=fs.existsSync(path.join(manifest.backupDirectory,'HOST_B_APPLY_JOURNAL.json'));
+  let protectedUnchanged=false,hostUnchanged=false;
+  try{protectedUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(originalProtected);}
+  catch{/* unknown means protection cannot be attested */}
+  try{hostUnchanged=sha256(fs.readFileSync(hostPath))===manifest.hostOriginalSha256;}
+  catch{/* unknown host bytes cannot be dismissed */}
+  const needsRecovery=journal||!protectedUnchanged||!hostUnchanged;
+  const stagePartial=fs.existsSync(path.join(maintenanceRoot,'approved','host-r6-modules-'+requestId))
+    ||fs.existsSync(manifest.stageBundle);
+  result={status:needsRecovery?'RECOVERY_REQUIRED':'BLOCKED',code,
+   lastPass:hostUnchanged?'HOST_BYTES_UNCHANGED':'B_CONTRACT_VERIFIED',
+   firstFail:code,actualControllerSha:installed.installedSha,
+   protectedStateUnchanged:protectedUnchanged};
+  save({status:result.status,phase:needsRecovery?'RECOVERY_REQUIRED'
+    :stagePartial?'STAGING_PARTIAL_HOST_UNCHANGED':'PRE_APPLY_BLOCKED',result});
+  if(needsRecovery){lock.holdForRecovery();retained=true;return result;}
+ }
+ // A terminal host result does not excuse abandoning requests received during
+ // the disabled workflow interval. Never replay one with unknown POST outcome.
+ if(paused&&!retained){
+  try{
+   github('actions/workflows/pc-job.yml/enable','PUT');
+   need(github('actions/workflows/pc-job.yml').state==='active',
+    'R6_HOST_WORKFLOW_ENABLE_NOT_CONFIRMED');
+   const backlog=json(backlogFile);
+   writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
+   replayR6Backlog(requestId,backlogFile);
+   result.workflowEnabled=true;
+   save({status:result.status,phase:'TERMINAL',result});
+  }catch(error){
+   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'R6_HOST_BACKLOG_OR_WORKFLOW_UNKNOWN';
+   let workflowEnabled=null;
+   try{workflowEnabled=github('actions/workflows/pc-job.yml').state==='active';}
+   catch{/* network outcome unknown: retain lease for supported recovery */}
+   result={...result,status:'RECOVERY_REQUIRED',code,firstFail:code,
+    workflowEnabled};
+   save({status:'RECOVERY_REQUIRED',phase:'INTAKE_RECONCILIATION_REQUIRED',result});
+   lock.holdForRecovery();retained=true;
+  }
+ }
+ return result;
+ }finally{if(!retained)lock.release();}
+}
+
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
+ if(cmd==='host-r6-status'){
+  need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
+  return readR6HostStatus(requestId);
+ }
+ if(cmd==='host-r6-apply'){
+  need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
+  try{return await applyR6HostOnly(requestId,args[4]);}
+  catch(error){
+   // A failed read-only preflight occurs before a host journal/lease exists.
+   // Do not turn an ambiguous partial apply into a harmless BLOCKED result.
+   const state=readR6HostStatus(requestId);
+   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'R6_HOST_PREFLIGHT_UNKNOWN';
+   const uncertain=Boolean(state.ledger||state.backupExists||state.installLock?.held);
+   let workflowEnabled=null;
+   try{workflowEnabled=github('actions/workflows/pc-job.yml').state==='active';}
+   catch{/* not observed; never infer from absence of an install lease */}
+   return {status:uncertain?'UNKNOWN':'BLOCKED',
+    code:uncertain?'R6_HOST_OUTCOME_UNKNOWN':code,
+    firstFail:uncertain?'R6_HOST_OUTCOME_UNKNOWN':code,
+    actualControllerSha:state.actualControllerSha,workflowEnabled};
+  }
+ }
  if(cmd==='status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readMaintenanceRecoveryStatus(requestId);
