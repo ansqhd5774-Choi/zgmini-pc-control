@@ -34,12 +34,14 @@ test('empty save is missing, 20 excluded and 31 explicitly unregistered',()=>wit
 test('checks 345 valid GSCPI months, OLE raw and existing checkpoint without exposing values',()=>withFixture(({root,home,supply})=>{
   const rows=makeRows();
   fs.writeFileSync(path.join(supply,'gscpi.json'),JSON.stringify({source:'NY_FED_GSCPI',rows}));
-  fs.writeFileSync(path.join(supply,'gscpi.xlsx'),Buffer.from('d0cf11e0a1b11ae101020304','hex'));
+  fs.writeFileSync(path.join(supply,'gscpi.xlsx'),Buffer.concat([
+    Buffer.from('d0cf11e0a1b11ae1','hex'),Buffer.alloc(504)]));
   fs.writeFileSync(path.join(supply,'extra-manifest.json'),JSON.stringify([{id:'gscpi',status:'STORED'}]));
   fs.writeFileSync(path.join(supply,'inputs.json'),'{}');
   fs.writeFileSync(path.join(home,'local-supply-r10-collection.json'),JSON.stringify({status:'COLLECTED',checkedAt:Date.UTC(2026,9,10)}));
   const found=inspectInflationCausalSaved(root);
-  assert.equal(found.gscpi21.status,'SAVED_ARTIFACTS_VERIFIED');
+  assert.equal(found.gscpi21.status,'SAVED_STRUCTURE_VERIFIED');
+  assert.equal(found.gscpi21.rawToParsedEqualityVerified,false);
   assert.equal(found.gscpi21.rowCount,345);
   assert.equal(found.gscpi21.firstMonth,'1998-01');
   assert.equal(found.gscpi21.lastMonth,'2026-09');
