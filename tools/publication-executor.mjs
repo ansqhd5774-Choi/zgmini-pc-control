@@ -43,6 +43,21 @@ export function parsePublisherLog(text,operation){
   return Object.freeze({status:'PASS',d1Result:rows.D1_RESULT,sourceVersion,sourceStoredAt});
 }
 
+export function millisecondsToNextUtcSecond(now){
+  if(!Number.isSafeInteger(now)||now<0)throw Error('PUBLICATION_CLOCK_INVALID');
+  return 1000-(now%1000)+50;
+}
+
+export function publicationCheckpointReport(operation,evidence){
+  // BEA's identical-source shortcut retains the older D1 payload timestamp.
+  // The attempt's fresh retrieval timestamp is NOT a verified D1 timestamp.
+  const attemptedOnly=operation==='bea-unit-profit-once'
+    &&evidence.d1Result==='ALREADY_STORED';
+  return {sourceStoredAt:attemptedOnly?null:evidence.sourceStoredAt,
+    attemptedSourceStoredAt:evidence.sourceStoredAt,
+    sourceStoredAtEvidence:attemptedOnly?'ATTEMPTED_ONLY':'D1_READBACK_VERIFIED'};
+}
+
 export function nextLedgerPhase(before,event,{code:reason=null}={}){
   if(!before||typeof before!=='object')throw Error('PUBLICATION_LEDGER_INVALID');
   if(before.phase==='READY'&&event==='PREFLIGHT_PASS')return {...before,phase:'PREFLIGHT_VERIFIED',updatedAt:now()};
@@ -228,7 +243,7 @@ async function execute(){
     // Both pinned publishers use second-resolution, exclusive result filenames.
     // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
     const fenceAt=Date.now();
-    await new Promise(resolve=>setTimeout(resolve,1000-(fenceAt%1000)+50));
+    await new Promise(resolve=>setTimeout(resolve,millisecondsToNextUtcSecond(fenceAt)));
     phase=nextLedgerPhase(phase,'PREFLIGHT_PASS');writeAtomic(ledgerPath,phase);
     const outputDir=request.operation==='bea-unit-profit-once'?logDirectory:
       path.join(publisherRoot,'scripts','pc-writer');
@@ -244,7 +259,8 @@ async function execute(){
     phase=nextLedgerPhase(phase,'READBACK_PASS');writeAtomic(ledgerPath,phase);
     report={...report,status:'PASS',code:'PUBLICATION_SINGLE_KEY_READBACK_VERIFIED',
       d1Result:evidence.d1Result,sourceVersion:evidence.sourceVersion,
-      sourceStoredAt:evidence.sourceStoredAt,d1Writes:evidence.d1Result==='READBACK_VERIFIED'?1:0,
+      ...publicationCheckpointReport(request.operation,evidence),
+      d1Writes:evidence.d1Result==='READBACK_VERIFIED'?1:0,
       providerCalls:request.operation==='bea-unit-profit-once'?2:0};
     // Only a fully verified operation releases its lease; archive owner evidence.
     fs.renameSync(active,path.join(SAFE_ROOT,'leases','complete-'+request.requestId));
