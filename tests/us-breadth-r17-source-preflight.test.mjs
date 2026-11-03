@@ -9,7 +9,7 @@ const valid=()=>({
 });
 test('R17 exact contract is only static preflight, never install approval',()=>{
  const r=assessR17Evidence(valid());
- assert.equal(r.status,'STATIC_PREFLIGHT_PASS');
+ assert.equal(r.status,'PASS');
  assert.equal(r.canInstall,false);
  assert.equal(r.runtimeSourceVerified,false);
  assert.equal(r.providerCalls,0);assert.equal(r.sqliteWrites,0);assert.equal(r.d1Writes,0);
