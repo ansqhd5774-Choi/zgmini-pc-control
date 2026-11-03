@@ -110,6 +110,38 @@ export function inspectInstalledCapability(cliText,registryText){
  return {cliRegisterMarker:cliText.includes("mode==='--register'"),
   registryV2Marker:registryText.includes('ZGMINI_THEME_CONFIG_V2')};
 }
+// The immutable INSTALL_RESULT can describe the original V1 bundle while
+// THEME_SCHEDULED.cmd has already been switched to a staged V2 bundle.
+// Diagnostic only: do not execute an unmanifested active candidate.
+export function inspectScheduledLauncher(script,home,taskXml,vbsText){
+ const matches=[...script.matchAll(/versions\\([a-f0-9]{16})\\scripts\\pc-writer\\theme-config-tool\.mjs/g)];
+ if(matches.length!==1)return {activeRuntimeProbe:'LAUNCHER_PATH_UNRECOGNIZED'};
+ const version=matches[0][1];
+ const runner=path.win32.join(home,'versions',version,'scripts','pc-writer','theme-config-tool.mjs');
+ const expected=`"E:\\ZGmini\\runtime\\node.exe" "${runner}" --scheduled >>"${path.win32.join(home,'SCHEDULE_HISTORY.log')}" 2>&1`;
+ const commandMatch=script.split(/\r?\n/).includes(expected);
+ const taskMatches=typeof taskXml==='string'&&taskXml.includes(path.win32.join(home,'THEME_SCHEDULED.vbs'));
+ const vbsMatches=typeof vbsText==='string'&&vbsText.includes(path.win32.join(home,'THEME_SCHEDULED.cmd'));
+ return {activeRuntimeProbe:commandMatch&&taskMatches&&vbsMatches?'LINKED':'LINKAGE_UNVERIFIED',
+  activeToolVersion:version,activeCommandMatches:commandMatch,activeTaskMatches:taskMatches,activeVbsMatches:vbsMatches};
+}
+function readActiveConfiguredDiagnostic(home){
+ try{
+  const cmd=fs.readFileSync(path.join(home,'THEME_SCHEDULED.cmd'),'utf8');
+  const vbs=fs.readFileSync(path.join(home,'THEME_SCHEDULED.vbs'),'utf8');
+  const xml=execFileSync('schtasks.exe',['/Query','/TN','ZGMINI-PC-Configured-Themes','/XML'],
+   {encoding:'utf8',windowsHide:true,stdio:['ignore','pipe','pipe']});
+  const active=inspectScheduledLauncher(cmd,home,xml,vbs);
+  if(active.activeRuntimeProbe!=='LINKED')return active;
+  const versionRoot=requireDirectory(path.join(home,'versions',active.activeToolVersion));
+  const cli=requireFile(path.join(versionRoot,'scripts','pc-writer','theme-config-tool.mjs'),{maxBytes:2_000_000});
+  const registry=requireFile(path.join(versionRoot,'scripts','pc-writer','theme-config-registry.mjs'),{maxBytes:2_000_000});
+  const flags=inspectInstalledCapability(cli.toString('utf8'),registry.toString('utf8'));
+  return {...active,activeCliRegisterMarker:flags.cliRegisterMarker,
+   activeRegistryV2Marker:flags.registryV2Marker,
+   activeCliSha256:hash(cli),activeRegistrySha256:hash(registry)};
+ }catch{return {activeRuntimeProbe:'READ_ONLY_PROBE_UNAVAILABLE'};}
+}
 function assertCheckout({workspace,env}){
  requireCheck(process.platform==='win32'&&typeof workspace==='string'&&
   path.win32.isAbsolute(workspace)&&SHA40.test(env?.GITHUB_SHA??''),
@@ -178,7 +210,8 @@ function installedCommonTool(){
   err.diagnostic={installedToolSourceSha:install.sourceSha,
    installedToolVersion:install.version,
    cliManifestSha256:install.manifest[cliRelative],
-   registryManifestSha256:install.manifest[registryRelative],...flags};
+   registryManifestSha256:install.manifest[registryRelative],...flags,
+   ...readActiveConfiguredDiagnostic(home)};
   throw err;
  }
  requireFile(NODE,{maxBytes:200_000_000});
@@ -315,6 +348,15 @@ async function uploadReport(event,env){
   registryManifestSha256:SHA64.test(report.registryManifestSha256??'')?report.registryManifestSha256:null,
   cliRegisterMarker:typeof report.cliRegisterMarker==='boolean'?report.cliRegisterMarker:null,
   registryV2Marker:typeof report.registryV2Marker==='boolean'?report.registryV2Marker:null,
+  activeRuntimeProbe:/^(LINKED|LINKAGE_UNVERIFIED|LAUNCHER_PATH_UNRECOGNIZED|READ_ONLY_PROBE_UNAVAILABLE)$/.test(report.activeRuntimeProbe??'')?report.activeRuntimeProbe:null,
+  activeToolVersion:/^[a-f0-9]{16}$/.test(report.activeToolVersion??'')?report.activeToolVersion:null,
+  activeCommandMatches:typeof report.activeCommandMatches==='boolean'?report.activeCommandMatches:null,
+  activeTaskMatches:typeof report.activeTaskMatches==='boolean'?report.activeTaskMatches:null,
+  activeVbsMatches:typeof report.activeVbsMatches==='boolean'?report.activeVbsMatches:null,
+  activeCliRegisterMarker:typeof report.activeCliRegisterMarker==='boolean'?report.activeCliRegisterMarker:null,
+  activeRegistryV2Marker:typeof report.activeRegistryV2Marker==='boolean'?report.activeRegistryV2Marker:null,
+  activeCliSha256:SHA64.test(report.activeCliSha256??'')?report.activeCliSha256:null,
+  activeRegistrySha256:SHA64.test(report.activeRegistrySha256??'')?report.activeRegistrySha256:null,
   providerCalls:0,d1Writes:0,schedulerWrites:0,publicWrites:0,
   registered:report.status==='PASS',next:report.status==='PASS'?'PRIVATE_PLAN_AND_STORED_CYCLE':
    'INSPECT_PC_REGISTRATION_BEFORE_ANY_RETRY'};
