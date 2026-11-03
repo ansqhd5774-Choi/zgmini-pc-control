@@ -54,6 +54,31 @@ export function classifyR6HostRecovery(s){
    action:'ROLLBACK_HOST',hostOutcome:null};
  return fail('R6_RECOVERY_BACKUP_OR_JOURNAL_NOT_VERIFIED');
 }
+/** Decide whether the original B recovery may advance after a process crash.
+ * The caller must separately verify raw manifest/lease/ledger bytes, owner
+ * death, Controller origin, protected state, DB identity and current host SHA. */
+export function decideR6RecoveryReentry({mode,previous,decision,hostSha256,
+ originalSha256,proposedSha256,archivedFinish=false}){
+ const fail=()=>({allowed:false,code:'R6_RECOVERY_MODE_DOES_NOT_MATCH_ACTUAL_HOST'});
+ if(!['rollback-host','reconcile-intake'].includes(mode))return fail();
+ if(archivedFinish)return {allowed:true,operation:'FINALIZE_ARCHIVE',resumedRollback:false};
+ if(decision?.status!=='ELIGIBLE')return fail();
+ if(mode==='reconcile-intake')return decision.action==='RECONCILE_INTAKE'
+  ?{allowed:true,operation:'RECONCILE_INTAKE',resumedRollback:false}:fail();
+ if(decision.action==='ROLLBACK_HOST')return {allowed:true,
+  operation:'ROLLBACK_HOST',resumedRollback:false};
+ if(previous?.preHostSha256===proposedSha256
+  &&hostSha256===originalSha256&&decision.action==='RECONCILE_INTAKE'
+  &&decision.journalValid===true&&decision.backupReadbackVerified===true)
+  return {allowed:true,operation:'RECONCILE_INTAKE',resumedRollback:true};
+ return fail();
+}
+/** Exact same-request reservation match; PID liveness is checked separately. */
+export function sameR6RecoveryClaim(claim,proof){
+ return Boolean(claim&&proof&&Number.isSafeInteger(claim.pid)&&claim.pid>0
+  &&/^[0-9a-f-]{36}$/.test(claim.nonce??'')
+  &&Object.entries(proof).every(([key,value])=>claim[key]===value));
+}
 const R6_HOST_MANIFEST_KEYS=["schema","scope","sourceRepository","sourceBranch",
   "sourceSha","sourceManifestSha256","installedControllerSha",
   "hostOriginalSha256","proposedSha256","hostPath","candidatePath",
