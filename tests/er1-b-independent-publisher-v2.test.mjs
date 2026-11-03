@@ -27,7 +27,7 @@ const manifest={schema:'ER1_PC_OPERATION_APPROVAL_V2',status:'APPROVED_B',
  allowSchemaChanges:false,allowCredentialRefresh:false,
  allowIndependentPublisherV2:true,sourceSha256:{...ER1_V2_SOURCE_HASHES,
   'tools/market-calendar-er1/ER1_B_INDEPENDENT_PUBLISHER_V2.mjs':
-   '4f6889bbe0c077052a107a3068289cfb9718c8f88fa8ea70d8b5d47d9aef1982',
+   'c8f1e3bee0c8fae510a591380d8b93b92c50c3e880235254cff8278c00014dcc',
   'tools/market-calendar-er1/ER1_PC_OPERATION_V2_ONCE.mjs':
    'bda8ae3d8b69ca3862c6bee231eb0c2baf89f52ff3061cb0f87445c80f6c965d'},
  pcHome:String.raw`E:\ZGmini\data\pc-writer`,dataRoot:String.raw`E:\ZGmini\data`,
