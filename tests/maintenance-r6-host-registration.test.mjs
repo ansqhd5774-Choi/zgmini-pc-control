@@ -17,6 +17,7 @@ import {
   R6_HOST_SOURCE_SHA,
   R6_HOST_SOURCE_MANIFEST_SHA256,
   R6_HOST_CANDIDATE_SHA256,
+  classifyR6HostRecovery,
 } from '../tools/maintenance-contract.mjs';
 
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -180,6 +181,40 @@ test('a sealed, byte-identical R6 source bundle may be reused but no drift is ov
   fs.writeFileSync(extra,'foreign');
   assert.throws(()=>simulateR6HostRegistrationFixture(input),/R6_EXISTING_STAGE_FILES_CHANGED/);
   assert.equal(fs.readFileSync(extra,'utf8'),'foreign');
+});
+
+test('R6 retained-lease recovery distinguishes no-effect, committed, rollback, and unknown states',()=>{
+  const base={ledgerStatus:'RECOVERY_REQUIRED',installLeaseHeld:true,markerMatches:true,
+    ownerDead:true,protectedSame:true,dbIdentitySame:true,
+    workflowState:'disabled_manually',backlogExists:true,
+    originalSha256:HOST_ORIGINAL,proposedSha256:HOST_PROPOSED,
+    hostSha256:HOST_ORIGINAL,backupSha256:null,journalValid:false,
+    appliedMarkerValid:false,rollbackMarkerValid:false};
+  assert.deepEqual(classifyR6HostRecovery(base),{
+    status:'ELIGIBLE',code:'R6_RECOVERY_ORIGINAL_HOST_VERIFIED',
+    action:'RECONCILE_INTAKE',hostOutcome:'ORIGINAL_READBACK_NO_APPLY_PASS'});
+  assert.equal(classifyR6HostRecovery({...base,hostSha256:HOST_PROPOSED,
+    appliedMarkerValid:true}).hostOutcome,'APPLIED');
+  assert.equal(classifyR6HostRecovery({...base,hostSha256:HOST_PROPOSED,
+    backupSha256:HOST_ORIGINAL,journalValid:true}).action,'ROLLBACK_HOST');
+  assert.equal(classifyR6HostRecovery({...base,hostSha256:'3'.repeat(64)}).status,
+    'RECOVERY_REQUIRED');
+  assert.equal(classifyR6HostRecovery({...base,hostSha256:HOST_PROPOSED,
+    backupSha256:HOST_ORIGINAL,journalValid:true,workflowState:'active'}).status,
+    'RECOVERY_REQUIRED');
+  assert.equal(classifyR6HostRecovery({...base,ownerDead:false}).status,
+    'RECOVERY_REQUIRED');
+  assert.equal(classifyR6HostRecovery({...base,protectedSame:false}).status,
+    'RECOVERY_REQUIRED');
+  assert.equal(classifyR6HostRecovery({...base,dbIdentitySame:false}).status,
+    'RECOVERY_REQUIRED');
+  assert.equal(classifyR6HostRecovery({...base,backlogExists:false}).status,
+    'RECOVERY_REQUIRED');
+  assert.equal(classifyR6HostRecovery({...base,workflowState:'active',
+    pauseAttempted:true,backlogExists:false}).code,
+    'R6_RECOVERY_PAUSE_WITHOUT_VERIFIED_BACKLOG');
+  assert.equal(classifyR6HostRecovery({...base,workflowState:'active',
+    pauseAttempted:true,backlogExists:true}).action,'RECONCILE_INTAKE');
 });
 
 function maintainerFixture(t,{outcome='PASS',applyLosesReply=false}={}){
