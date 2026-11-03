@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
+import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
 
 const valid=()=>({
  head:R17_APPROVED,dirty:false,hashes:{...R17_BASE_FILES},
@@ -15,6 +15,27 @@ test('Git porcelain clean and dirty statuses keep fail-closed semantics',()=>{
  assert.equal(assessR17Evidence({...valid(),dirty:isTrackedSourceDirty('')}).status,'PASS');
  assert.ok(assessR17Evidence({...valid(),dirty:isTrackedSourceDirty(' M tracked')}).reasons.includes('OPERATING_SOURCE_DIRTY_OR_UNVERIFIED'));
  assert.ok(assessR17Evidence({...valid(),dirty:isTrackedSourceDirty(null)}).reasons.includes('OPERATING_SOURCE_DIRTY_OR_UNVERIFIED'));
+});
+test('patch failure diagnostics are bounded codes and never return stderr',()=>{
+ const error={stderr:Buffer.from('error: patch failed: scripts/pc-writer/local-cycle.mjs:23\nerror: patch does not apply\nTOKEN=NEVER_RETURN')};
+ assert.equal(classifyR17PatchFailure(error),'PATCH_CONTEXT_MISMATCH');
+ assert.equal(classifyR17PatchFailure({stderr:Buffer.from('error: corrupt patch at line 8')}),'PATCH_FORMAT_INVALID');
+ assert.equal(classifyR17PatchFailure({code:'ETIMEDOUT'}),'PATCH_CHECK_TIMEOUT');
+ const report=summarizeR17Probe({...valid(),patchApplies:false,patchFailureCode:classifyR17PatchFailure(error)});
+ assert.equal(report.status,'BLOCKED');
+ assert.equal(report.diagnostics.patchCheck,'PATCH_CONTEXT_MISMATCH');
+ assert.equal(JSON.stringify(report).includes('TOKEN=NEVER_RETURN'),false);
+});
+test('Task-chain diagnostics expose only fixed booleans without changing admission',()=>{
+ const action={command:'C:\\Windows\\System32\\wscript.exe',arguments:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs'};
+ const launchers=[{sha256:R17_VBS_CHAIN[0].sha256,text:'run-local-core.vbs'},
+  {sha256:R17_VBS_CHAIN[1].sha256,text:'local-cycle.mjs'}];
+ const checks=diagnoseR17TaskChain({action,launchers});
+ assert.deepEqual(Object.values(checks),Array(6).fill(true));
+ assert.equal(assessR17TaskChain({action,launchers}),true);
+ const bad=diagnoseR17TaskChain({action:{...action,command:'cmd.exe'},launchers});
+ assert.equal(bad.commandWscript,false);
+ assert.equal(assessR17TaskChain({action:{...action,command:'cmd.exe'},launchers}),false);
 });
 test('R17 exact contract is only static preflight, never install approval',()=>{
  const r=assessR17Evidence(valid());
