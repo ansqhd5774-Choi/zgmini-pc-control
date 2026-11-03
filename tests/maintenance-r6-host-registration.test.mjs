@@ -18,6 +18,8 @@ import {
   R6_HOST_SOURCE_MANIFEST_SHA256,
   R6_HOST_CANDIDATE_SHA256,
   classifyR6HostRecovery,
+  decideR6RecoveryReentry,
+  sameR6RecoveryClaim,
 } from '../tools/maintenance-contract.mjs';
 
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -29,6 +31,37 @@ const HOST_ORIGINAL='1'.repeat(64);
 const HOST_PROPOSED='2'.repeat(64);
 const CONTEXT={controlRepository:REPO,actor:'ansqhd5774-Choi',
   allowedActors:['ansqhd5774-Choi'],installedSha:CONTROLLER};
+
+test('R6 B crash after restored host resumes intake without a second rollback',()=>{
+  const pre={mode:'rollback-host',previous:{status:'PREPARED',preHostSha256:HOST_PROPOSED},
+    originalSha256:HOST_ORIGINAL,proposedSha256:HOST_PROPOSED,hostSha256:HOST_ORIGINAL,
+    decision:{status:'ELIGIBLE',action:'RECONCILE_INTAKE',journalValid:true,
+      backupReadbackVerified:true}};
+  assert.deepEqual(decideR6RecoveryReentry(pre),{allowed:true,
+    operation:'RECONCILE_INTAKE',resumedRollback:true});
+  assert.equal(decideR6RecoveryReentry({...pre,decision:{...pre.decision,journalValid:false}}).allowed,false);
+  assert.equal(decideR6RecoveryReentry({...pre,previous:{status:'PREPARED'}}).allowed,false);
+});
+
+test('R6 B crash after lease archive cannot trigger a second lease rename',()=>{
+  const x={mode:'rollback-host',previous:{status:'ARCHIVE_PREPARED'},
+    originalSha256:HOST_ORIGINAL,proposedSha256:HOST_PROPOSED,hostSha256:HOST_ORIGINAL,
+    archivedFinish:true,decision:{status:'RECOVERY_REQUIRED',action:'INSPECT_NO_MUTATION'}};
+  assert.deepEqual(decideR6RecoveryReentry(x),{allowed:true,
+    operation:'FINALIZE_ARCHIVE',resumedRollback:false});
+  assert.equal(decideR6RecoveryReentry({...x,archivedFinish:false}).allowed,false);
+});
+
+test('dead recovery claim is reclaimable only with exact original evidence hashes',()=>{
+  const proof={requestId:REQUEST_ID,mode:'rollback-host',ledgerSha256:HOST_ORIGINAL,
+    leaseOwnerSha256:HOST_PROPOSED,leaseMarkerSha256:HOST_ORIGINAL,
+    approvalSha256:HOST_PROPOSED};
+  const claim={...proof,pid:9123,nonce:'12345678-1234-4123-8123-123456789abc'};
+  assert.equal(sameR6RecoveryClaim(claim,proof),true);
+  assert.equal(sameR6RecoveryClaim({...claim,ledgerSha256:HOST_PROPOSED},proof),false);
+  assert.equal(sameR6RecoveryClaim({...claim,requestId:'pc-unrelated'},proof),false);
+  assert.equal(sameR6RecoveryClaim({...claim,pid:-1},proof),false);
+});
 
 test('R6 B backup path compares Windows separator aliases without accepting a different target',()=>{
   const slash='E:/ZGmini/automation/pc-control/backups';
