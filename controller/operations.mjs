@@ -3,7 +3,7 @@ import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
-import {inspectR17Windows} from '../tools/us-breadth-r17-source-preflight.mjs';
+import {inspectR17Windows} from './us-breadth-r17-preflight.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
 export function protectedState(dataRoot,{queryTask}={}){
