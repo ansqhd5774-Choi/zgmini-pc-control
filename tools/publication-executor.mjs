@@ -225,6 +225,10 @@ async function execute(){
     const preflight=await runFixedChild(script,['--dry-run'],childEnv,PREFLIGHT_TIMEOUT_MS);
     if(preflight.exitCode!==0||preflight.timedOut||preflight.truncated)
       throw Error('PUBLICATION_PREFLIGHT_FAILED');
+    // Both pinned publishers use second-resolution, exclusive result filenames.
+    // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
+    const fenceAt=Date.now();
+    await new Promise(resolve=>setTimeout(resolve,1000-(fenceAt%1000)+50));
     phase=nextLedgerPhase(phase,'PREFLIGHT_PASS');writeAtomic(ledgerPath,phase);
     const outputDir=request.operation==='bea-unit-profit-once'?logDirectory:
       path.join(publisherRoot,'scripts','pc-writer');
