@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_COMMON_MAINTENANCE_HARDENING_EVIDENCE_V1",
+  "observedAt": "2026-11-03T11:55:46.091Z",
+  "status": "PASS",
+  "maintenanceSourceSha": "aabc345b86c5aa4c6af23c57b2d1eedca876b4a7",
+  "maintenanceFilesVerified": true,
+  "newReceiverOriginVerified": true,
+  "controllerSourceSha": "e38c6acd1643e284df157905ce77838298163dbc",
+  "controllerFilesUnchanged": true,
+  "coreKoreaIranProtectionUnchanged": true,
+  "runnerCount": 6,
+  "runnersOnline": true,
+  "runtimeState": "HEALTHY",
+  "commonHeavyProfileVerified": true,
+  "defaultLightPolicyRejectsHeavy": true,
+  "historicalFailureNotActiveLock": true,
+  "realControllerInstallationAttempted": false,
+  "featureOperationsExecuted": 0,
+  "providerCalls": 0,
+  "dbD1Writes": 0,
+  "tests": {
+    "platform": "Windows Node",
+    "passed": 118,
+    "failed": 0
+  },
+  "individualToolRejection": "DEFERRED_NOT_BYPASSED"
+}

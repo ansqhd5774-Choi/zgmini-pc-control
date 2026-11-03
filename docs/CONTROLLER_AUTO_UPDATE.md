@@ -1,5 +1,9 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+## 2026-11-03 공통 장애 보완 운영 적용 증거
+
+유지보수기 source `aabc345b86c5aa4c6af23c57b2d1eedca876b4a7`의 정상 종료/인계와 신규 receiver origin을 실Windows에서 확인했다. 공통 자원 프로필, 설치 전 실패 예방, 현재/과거 잠금 분리 코드가 실제 설치 파일 해시와 일치한다. Controller `e38c6acd…` 바이트·Core/Korea/Iran 보호 해시 불변, Runner6개 Online을 확인했다. [원본 증거](../results/COMMON_MAINTENANCE_HARDENING_20261103.json). 이 기록은 당시 실측이며 현재 설치 상태를 영구 고정하지 않는다. R17/R6/ER1 기능 설치·실행·D1 게시 성공을 뜻하지 않는다. 아래 #44와 c96d 기록은 이전 성공 이력이다.
+
 여러 담당자의 변경이 누적된 적용은 [공용 적용 대기열 운영 방침](CONTROLLER_APPLY_QUEUE.md)을 먼저 따른다. 정확한 통합 manifest 또는 순차 적용으로 조정하며, 개별 승인·파일 해시·기존 설치 보호 검사는 그대로 유지한다.
 
 상태 (2026-11-03 KST): **실PC PASS.** [업데이트 #44](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/44) → Controller `b77a333…` → 새 Listener 6개 → [진단 #45](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/45) PASS → TXT/JSON/댓글 회수 완료. 유지보수기 source는 `c96d4ac…`이며 [실측 정본](PC_AUTOMATION_RUNTIME_20261103.json)을 참조한다. 아래의 과거 최초 연결 기록은 재설치 지시가 아니다.
