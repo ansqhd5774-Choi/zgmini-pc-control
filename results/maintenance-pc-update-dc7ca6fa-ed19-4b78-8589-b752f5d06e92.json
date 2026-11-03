@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-dc7ca6fa-ed19-4b78-8589-b752f5d06e92",
+  "targetControllerSha": "ca06b1fa2b33b6d16268123914516f255fb24d4a",
+  "status": "SUCCEEDED",
+  "code": "APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED",
+  "lastPass": "PASS",
+  "firstFail": "NONE",
+  "actualControllerSha": "ca06b1fa2b33b6d16268123914516f255fb24d4a",
+  "recoverySha": null,
+  "protectedStateUnchanged": true,
+  "workflowEnabled": true
+}
