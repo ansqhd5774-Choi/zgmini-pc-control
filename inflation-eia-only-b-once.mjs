@@ -8,17 +8,18 @@ import {fileURLToPath} from 'node:url';
 
 export const CONTROL_REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const SOURCE_REPO='ansqhd5774-Choi/zgmini';
-export const SOURCE_SHA='4a3426c53836c019f93536064d94367f680eb742';
+export const SOURCE_SHA='ff04b60fec5d6ece19cd3842eadcbf04965d230b';
 export const TITLE='pc-inflation-eia-only-approved-once';
 export const APPROVAL='INFLATION_EIA_ONLY_B_APPROVAL.json';
 export const RESULT='INFLATION_EIA_ONLY_RESULT.json';
 export const WRITER=String.raw`E:\ZGmini\data\pc-writer`;
 export const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
-export const MARKER_ROOT=String.raw`E:\ZGmini\data\pc-writer\inflation-eia-only-once-guard`;
+// Separate approved correction attempt; previous one-shot marker remains intact.
+export const MARKER_ROOT=String.raw`E:\ZGmini\data\pc-writer\inflation-eia-only-units-r2-once-guard`;
 export const SCRIPT='scripts/pc-writer/inflation-eia-only-once.mjs';
 export const FILE_HASHES=Object.freeze({
   [SCRIPT]:'d74b554ea94d2ba86f39c101c0a1e6272fceb10d811572cb389e2cca37f53bc0',
-  'scripts/inflation-causal-gas-electric.mjs':'dd4242131f9eb99d876a777fcf72b20a6d625362149b05847a5b8639f7aed9d1',
+  'scripts/inflation-causal-gas-electric.mjs':'79a6f38ccec3015bf8d4378a98b69e41dd7d58fcc0cf560c543fb653c0ce1513',
 });
 const COMMIT_SHA=/^[0-9a-f]{40}$/;
 const FILE_SHA=/^[0-9a-f]{64}$/;
