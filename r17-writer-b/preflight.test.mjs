@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateEvent,validateManifest,applyTwoFilePatch,buildCandidateOverlay,digest,BASE,PATCH_HASH,
+import {validateEvent,validateManifest,applyTwoFilePatch,buildCandidateOverlay,overlayFromPatchedBytes,digest,BASE,PATCH_HASH,
   OLD,ADDED,FIVE,OLD_HASHES} from './contract.mjs';
 import {verifyImports,runReadOnly} from './entry.mjs';
 
@@ -143,6 +143,30 @@ test('PR old full files are not required: 2 old targets derive only from a23 pat
   const bad={...newFiles,[ADDED[0]]:Buffer.from('unapproved bytes')};
   assert.throws(()=>buildCandidateOverlay({originals:{[p1]:'a\nb\n',[p2]:'x\n'},
     patchBytes:Buffer.from(patch),newFiles:bad,newSha256}),/R17_B_CANDIDATE_SHA_STOP/);
+});
+
+test('mixed-EOL logical-line validation does not mutate installed bytes',()=>{
+ const untouched=Buffer.from('a\r\nb\n');
+ const normalized=untouched.toString('utf8').replace(/\r\n/g,'\n');
+ const validated=applyTwoFilePatch(Buffer.from(patch),{
+   [p1]:normalized,[p2]:'x\n',
+ });
+ assert.equal(validated[p1],'a\nB\n');
+ assert.equal(untouched.toString('utf8'),'a\r\nb\n');
+ const patchedOld={
+   [p1]:Buffer.from('a\r\nB\n'),
+   [p2]:Buffer.from('y\n'),
+ };
+ const newFiles=Object.fromEntries(ADDED.map(p=>[p,Buffer.from('export {};\n')]));
+ const newSha256=Object.fromEntries(ADDED.map(p=>[p,digest(newFiles[p])]));
+ const result=overlayFromPatchedBytes({patchedOld,newFiles,newSha256});
+ assert(result.overlay.get(p1).equals(patchedOld[p1]));
+ assert.equal(result.oldTargetSha256[p1],digest(patchedOld[p1]));
+ assert.equal(result.overlay.size,5);
+ assert.throws(()=>overlayFromPatchedBytes({
+   patchedOld:{[p1]:'untrusted string',[p2]:patchedOld[p2]},
+   newFiles,newSha256,
+ }),/R17_B_PATCH_TARGET_MISMATCH_STOP/);
 });
 
 test('relative import closure accepts overlay and rejects missing deps',()=>{
