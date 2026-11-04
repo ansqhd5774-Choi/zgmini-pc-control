@@ -64,6 +64,64 @@ const R54_B_GUARD_ORIGINALS=Object.freeze([
  Object.freeze({path:'scripts/pc-writer/theme-ten-r80-rebase-once.mjs',
   old:'78541f9d6f097b3009afee626488a0e164a6f9837e450d57745c958d748455f2'}),
 ]);
+// V3 is a separate, still-unissued 9-path B proposal. It must never be
+// substituted for the installed V2 six-file contract or applied by that
+// helper. Every entry is pinned here because update.mjs may only import
+// modules already present in the independently installed maintainer.
+export const R54_B_V3_FIXED_SOURCE_TRANSITIONS=Object.freeze([
+ {path:'scripts/pc-writer/r54-source-lease.mjs',old:null,
+  next:'297eda7b8b028d74c1525d83b095e28f3cf2f56f1ff9bf569f73fd74636f29c6'},
+ {path:'scripts/pc-writer/theme-ten-r78-repair-and-retry.mjs',
+  old:'8e6548196fc253701a141a4a60f812eec3c07f77b8f2ed300fe39215a48fa1d3',
+  next:'0b688e3477e9155567e9d93d98dd0baf3a77f5419ed903c56aaf3624ffcf424c'},
+ {path:'scripts/pc-writer/theme-ten-r80-rebase-once.mjs',
+  old:'78541f9d6f097b3009afee626488a0e164a6f9837e450d57745c958d748455f2',
+  next:'cf9883b512e4528ce2e29fcf7c95b2c9a7125802932454656df81bad97abf3c3'},
+ {path:'scripts/pc-writer/theme-nine-r54-public-connect.mjs',
+  old:'c6e4699d62bdef991911561623e37c205fd8bb6e5aa69907c3e93e36908fd31e',
+  interim:'a16c97ff9e29210a367a076d1a16a5e883a299b737ad588989ddfe95cbecd201',
+  next:'2bebba925eb367de5e15fb9ed62161b01243b76e1cdfb9a804246b1cb0c13f5d'},
+ {path:'scripts/pc-writer/theme-nine-r51-stage-current.mjs',
+  old:'fe079b1e2e5d2f824f6e0ff251bd2a01677fe1a477072c619b614402fbd90ae4',
+  next:'5a50761756be6081c71df7aa30869ed43547fbb867e476b7c581072939c27560'},
+ {path:'scripts/pc-writer/theme-nine-r51-provisional-overlay.mjs',
+  old:'dfc326e2738c1b8b82451510104ac6ad502e2a9876e0a3a76d939c412e907bb7',
+  next:'7378d04bccea4c68ab93ce3b1b829b5bc0a742db49b88d1e7530482c4ea8b6cc'},
+ {path:'scripts/pc-writer/theme-nine-r54-public-record.mjs',
+  old:'f2a688da40d7b5ee90ed2a27a40af05b9c63116284930f1cc26041064737d012',
+  next:'85686106412b2c4a5af51ce5de6b844729bad02441cf9bab1e51ae369a3a4a27'},
+ {path:'scripts/pc-writer/theme-nine-r48-d1-publication.mjs',
+  old:'7a10fe41710dbc1a21c9f3e343c538cd96b6c5695b683f04dce48af85ede6e7e',
+  next:'fc55ee3a2c998a4dfa7c5edd9230a68fab3954dd745b39bbe39a6177363bf45a'},
+ {path:'worker/theme-nine-r37-public.mjs',
+  old:'e6768dd37ebe65b9015aeb37b4a088c568ab839f085936cec8305c56ea36ce33',
+  next:'30326c94c7b6f0963329cc00f7a3649c906f8e884d6915a4da38005281bcfd85'},
+].map(x=>Object.freeze(x)));
+
+/** Pure nine-path baseline and staging policy. This is NOT B admission or
+ * permission to mutate source; a fixed native host must attest every byte. */
+export function inspectR54Bv3SourceTransition({originalRows,candidateRows,
+ taskPauseCount=0,taskRestoreCount=0}={}){
+ const pins=R54_B_V3_FIXED_SOURCE_TRANSITIONS;
+ const exact=(rows,field)=>Array.isArray(rows)&&rows.length===pins.length&&
+  pins.every((x,i)=>rows[i]?.path===x.path&&rows[i]?.sha256===x[field]);
+ need(taskPauseCount===0&&taskRestoreCount===0,
+  'R54_B_V3_NO_TASK_MUTATION_AT_PREFLIGHT');
+ need(exact(originalRows,'old'),'R54_B_V3_ORIGINAL_NINE_SHA_DRIFT');
+ need(exact(candidateRows,'next'),'R54_B_V3_CANDIDATE_NINE_SHA_DRIFT');
+ const guarded=pins.find(x=>x.interim);
+ need(guarded?.path==='scripts/pc-writer/theme-nine-r54-public-connect.mjs'
+  &&guarded.interim!==guarded.old&&guarded.interim!==guarded.next,
+  'R54_B_V3_INTERIM_GUARD_INVALID');
+ return Object.freeze({status:'V3_SOURCE_PLAN_VALIDATED_NOT_INSTALLABLE',
+  fixedPaths:pins.length,writerPaths:6,guardPaths:3,
+  taskDisableLimit:1,taskRestoreLimit:1,
+  phases:['SOURCE_BASELINE','TASK_XML_BACKUP','TASK_DISABLE',
+   'NATURAL_DRAIN_AND_EXCLUSIVE_OS_FREEZE','INSTALL_GUARD_HELPER_AND_R78_R80',
+   'CONNECTOR_ORIGINAL_TO_INTERIM','SIX_WRITER_CAS_TO_FINAL',
+   'VERIFY_NINE_FINAL','RESTORE_TASK_OR_HOLD_FOR_RECOVERY'],
+  hasTrustedStartFreeze:false,canInstall:false});
+}
 
 /** Read-only, pinned 6+3 baseline; never follows any source reparse point.
  * A mismatch is not fixed by copying an old source or resetting a checkout.
@@ -1911,6 +1969,7 @@ export async function command(args=process.argv.slice(2)) {
   return {status:'BLOCKED',code:'R54_B_TASK_START_RACE_UNPROTECTED',
    lastPass:'R54_B_ADMISSION_AND_MANIFEST_VERIFIED',
    firstFail:'R54_B_TASK_START_RACE_UNPROTECTED',
+   v3NineSourceTransactionEnabled:false,
    readOnlyObservation:observed?.status??'UNAVAILABLE',
    readOnlyObservationError:observationFailure,
    actualControllerSha:installedManifest().installedSha,installAttempted:false,
