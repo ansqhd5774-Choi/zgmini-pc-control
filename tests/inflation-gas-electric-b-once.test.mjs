@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   validateRequest,validateChildResult,summarizePartialResult,configuredProviderKeys,
-  verifyApproval,verifySource,
+  verifyApproval,verifySource,isPinnedSourceCommit,
   TITLE,SOURCE_SHA,SOURCE_REPO,SOURCE_FILE_HASHES,WRITER,APPROVAL,CONTROL_REPO,
 } from './inflation-gas-electric-b-once.mjs';
 
@@ -82,6 +82,7 @@ test('manifest rejects any Core, D1, scheduler, or provider-cap escalation',()=>
 });
 test('source pin is 40 hexadecimal chars and placeholder cannot remain',()=>{
   assert.match(SOURCE_SHA,/^[0-9a-f]{40}$/);
+  assert.equal(isPinnedSourceCommit(),true,'exact Git commit must satisfy the same runtime guard');
   for(const h of Object.values(SOURCE_FILE_HASHES))assert.match(h,/^[0-9a-f]{64}$/);
 });
 test('source SHA gate denies absent checkout on Linux test fixture',()=>{
