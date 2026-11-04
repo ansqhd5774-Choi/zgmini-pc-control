@@ -11,7 +11,7 @@ const OWNER = 'ansqhd5774-Choi';
 const PUBLIC_REPO = 'ansqhd5774-Choi/zgmini';
 // Exact reviewed source in public draft PR #968, not an implicit main checkout.
 // Production invocation remains gated on public source/Reader publication.
-const SOURCE_SHA = '88cb3e6848b6ee17bedff5c42c54b1a8a264f0ee';
+const SOURCE_SHA = '7a923cb6df7d7ddc9e17145ecd98da60c04a805a';
 const SCRIPT_SHA256 = '70b425b919e502eb35e45fd12d82af22acace6721b3fc687e3b3a9dfd5ec6539';
 const SOURCE_SCRIPT = path.join('scripts', 'pc-writer', 'market-calendar-nov30-publish.mjs');
 const TITLE = 'pc-er1-nov30-html-publish-one-shot';
