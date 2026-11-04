@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
-const PROBE_SHA='695af641ac786a4fb8f5db65d13aba8557192cbc77b46c5e68d2e02d64482e9f';
+const PROBE_SHA='4280dad8d5d785bf2d6db3558ff344eb6f45edb2877e7894e89f94a45b273450';
 const FIXTURE_SHA='22261ee72d757c9372ed9e0b806e27e4ad65ad9c1d5e274fa82f8e914755fa1d';
 const ID=/^pc-r17-probe-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const CHAT=/^chat-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
