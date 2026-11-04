@@ -10,6 +10,7 @@ import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
+import {inspectThemeNineR54Evidence} from './theme-nine-r54-evidence-readonly.mjs';
 const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
 export function protectedState(dataRoot,{queryTask}={}){
  const output={files:{},tasks:{}};
@@ -41,6 +42,11 @@ export async function runOperation(request,context){
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
  if(request.operation==='asset-r10-source-readonly')return inspectAssetR10SourceBytes(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
+ if(request.operation==='theme-nine-r54-evidence-readonly'){
+  const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
+  if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',operationalWrites:0,providerCalls:0,d1Writes:0};
+  return inspectThemeNineR54Evidence(dataRoot);
+ }
  if(request.operation==='employment-r6-host-cas-readonly')return inspectEmploymentR6HostCas({host});
  if(request.operation==='employment-r6-wal-memory-preflight')return inspectEmploymentR6WalMemoryPreflight({host});
  if(request.operation==='employment-r6-candidate-stage-readonly'){

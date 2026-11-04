@@ -16,6 +16,7 @@
     "asset-r10-publication-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "asset-r10-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "theme-nine-r54-evidence-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536},
     "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy","minimumFreeMiB":384},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
