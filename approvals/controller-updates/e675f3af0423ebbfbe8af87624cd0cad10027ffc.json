@@ -1,0 +1,122 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "6406ff105c8646a4af5e59d98a42e77022437ea4",
+  "targetSha": "e675f3af0423ebbfbe8af87624cd0cad10027ffc",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "41619e5300168635506abf2284212183ab52163d6e9a35448c51b0dfb06c2eb6"
+    },
+    {
+      "path": "controller/asset-r10-source-readonly.mjs",
+      "sha256": "6f393b6c4ca9a6a0c3b09ad51b2f8009bf4204b1bdae9a3e952b2afc0fb0ea64"
+    },
+    {
+      "path": "controller/common.mjs",
+      "sha256": "78b70602ac56249d98b0a93f71761dfebb08a667a6600f121ad59bf0e682f629"
+    },
+    {
+      "path": "controller/employment-r6-candidate-readonly.mjs",
+      "sha256": "182f6914baeae61c5ee4e6eac6598d5c8a98a73bc241f7f403ef1df06b8412b4"
+    },
+    {
+      "path": "controller/employment-r6-wal-memory-readonly.mjs",
+      "sha256": "2c9912247f4ff5ff28370e5ed1f933e2300247cbc39148cdc70b0eea9a2b5177"
+    },
+    {
+      "path": "controller/engine.mjs",
+      "sha256": "35bef57032f3f823ddb65da6d36c9c228458f2ee563496195fd28d84fe81ee77"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "2ff0648edb816eb94ef6fe622d0bd70a9dac363d0b3b4603da6f6682b2533000"
+    },
+    {
+      "path": "controller/upload.mjs",
+      "sha256": "cfd599b529ce52072299841b1e2d738a40979dbfb2fd059255d12f6def5e964c"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/230",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "e675f3af0423ebbfbe8af87624cd0cad10027ffc",
+    "status": "PASS",
+    "manifestSha256": "a78e5b0ab33b6d11a739842ac4f5e55cd10ade08c9d27ac9a51cf203dc4af85d"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "6406ff105c8646a4af5e59d98a42e77022437ea4"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "65f6812e353d682d7da68ffb65636a55336c7340",
+  "infrastructureEvidence": {
+    "schema": "ZGMINI_NON_DEPLOYED_INFRA_ACK_V1",
+    "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/237",
+    "files": [
+      {
+        "path": ".github/workflows/pc-ai-software-v2-register-once.yml",
+        "sha256": "a874ebada958c2efb91c85b91c7652c0abcd6cfb7db153259500b29c4f4ba2ac"
+      },
+      {
+        "path": ".github/workflows/pc-er1-approved-once.yml",
+        "sha256": "d5acad0b8dfa0da24b851eb7bb01025769f0e582029444f9772cb3f86919f4b2"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-capture.yml",
+        "sha256": "c627ec35fdf51f244218748d15eb33c7307e83020734cc80d5e7a12a62685517"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-derived-score-v1.yml",
+        "sha256": "fc07a27c7febcba635aecf6ab4d01889ed0ef5a49cd554b16ddaa466f4cb4576"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-derived-score-v2.yml",
+        "sha256": "c721b92c8a5a2dea5ff7eb255cbbd982153d8787b8159789a2a83f93bb98a52d"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-html-publish-v2.yml",
+        "sha256": "d8c56740b1eaf555deca3556f395ce5814ddf1cdea04b4d5b5842ed5d6508fdf"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-html-publish-v3.yml",
+        "sha256": "2c592e7d43a4afbc42774b837b78509ddd391149bbc6bca9e313fc3e70e02a61"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-html-publish.yml",
+        "sha256": "ac90c4303b7e82ed0e0596b32434e88b434f4b8eea30c8cc83e417ed60932b12"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-symbol-batch-a.yml",
+        "sha256": "bbbe72b99b7061cfdb16325a4e0367c6fc12d0de46dcd045bed008aa62a2ab2f"
+      },
+      {
+        "path": ".github/workflows/pc-er1-dec31-symbol-probe.yml",
+        "sha256": "e4cd0cdffa14ba5897b143a7f1e526c22defb068ee8480ba65bf34138387f401"
+      },
+      {
+        "path": ".github/workflows/pc-er1-nov30-capture.yml",
+        "sha256": "4b1cebacaadb896b378c9725ebbf91f18f594c8c5bb7404be868f508841b8d1a"
+      },
+      {
+        "path": ".github/workflows/pc-er1-nov30-html-publish.yml",
+        "sha256": "501752e38f3ded3b78239a577f544dcde93de2ddc6a38751c45bec7bbef7be02"
+      },
+      {
+        "path": ".github/workflows/pc-inflation-19-inventory-b-once.yml",
+        "sha256": "c194e596a75cd8f434184649deb49c411a196365a9254b4f49f165de348be62a"
+      },
+      {
+        "path": ".github/workflows/pc-inflation-sce31-approved-once.yml",
+        "sha256": "313c748bbf57a2d11a9ad91e8d7652832ce577d4a7e53c67cb1c9048daea2d81"
+      }
+    ]
+  }
+}
