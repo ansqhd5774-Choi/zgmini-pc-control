@@ -1,0 +1,36 @@
+{
+  "schema": "ZGMINI_R10_SOURCE_B_APPROVAL_V1",
+  "status": "DRAFT_PENDING_LIVE_PC_PROVENANCE_AND_REMOTE_ROLLBACK",
+  "approvedScope": "ASSET_R10_TWO_RUNTIME_SOURCE_FILES_ONLY",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "candidateSourceCommit": "c3683e5d8e2ff4658022064866658dab81222270",
+  "originalPcSourceSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "targetPcSourceSha": null,
+  "pcRepo": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "pcHome": "E:\\ZGmini\\data\\pc-writer",
+  "candidateFilesSha256": {
+    "lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs": "226579820995d4ab90c36bf0f8d966994ccea481e47d36902c31efc8479e9fae",
+    "worker/asset-bubble-r10-raw-r1.mjs": "d962a8ac9e4941e02e2155d0c0f4324f1f1d6d3f07122c40e69caebed0d155a7"
+  },
+  "originalFilesSha256": {
+    "lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs": null,
+    "worker/asset-bubble-r10-raw-r1.mjs": null
+  },
+  "originalConfigSha256": null,
+  "rollbackBundleSha256": null,
+  "runtimeProvenanceSha256": null,
+  "runCount": 1,
+  "allowSourceFileChanges": [
+    "lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs",
+    "worker/asset-bubble-r10-raw-r1.mjs"
+  ],
+  "allowConfigSourceChange": true,
+  "allowGitVersionChange": true,
+  "allowTaskChanges": false,
+  "allowSchemaChanges": false,
+  "allowProviderCalls": false,
+  "allowSqliteWrites": false,
+  "allowD1Writes": false,
+  "controlReservationPath": "results/r10-source-b-global-once.json"
+}
