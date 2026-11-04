@@ -117,3 +117,28 @@ test('rejects changed evidence and refuses to write an approved manifest',()=>{
     /RECOVERY_PROPOSAL_NOT_UNAPPROVED/);
   assert.equal(fs.existsSync(path.join(baseDir,'approvals')),false);
 });
+
+test('disk-full during temp write removes partial file and never publishes proposal',()=>{
+  const baseDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-proposal-'));
+  const plan=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
+    ...evidence(),toolSha256});
+  const writeTempFile=(fd,bytes)=>{
+    fs.writeFileSync(fd,bytes.subarray(0,15));
+    throw Object.assign(new Error('simulated disk full'),{code:'ENOSPC'});
+  };
+  assert.throws(()=>persistUnapprovedRecoveryProposal({plan,readEvidence:evidence,baseDir,writeTempFile}),
+    /simulated disk full/);
+  assert.deepEqual(fs.readdirSync(path.join(baseDir,'recovery-proposals')),[]);
+  assert.equal(fs.existsSync(path.join(baseDir,'approvals')),false);
+});
+
+test('failed temp fsync removes temp and leaves no permanent proposal',()=>{
+  const baseDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-proposal-'));
+  const plan=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
+    ...evidence(),toolSha256});
+  const syncTempFile=()=>{throw Object.assign(new Error('simulated E drive sync failure'),{code:'EIO'});};
+  assert.throws(()=>persistUnapprovedRecoveryProposal({plan,readEvidence:evidence,baseDir,syncTempFile}),
+    /simulated E drive sync failure/);
+  assert.deepEqual(fs.readdirSync(path.join(baseDir,'recovery-proposals')),[]);
+  assert.equal(fs.existsSync(path.join(baseDir,'approvals')),false);
+});
