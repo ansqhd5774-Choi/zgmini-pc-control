@@ -54,17 +54,23 @@ function file(root,rel){
 function artifact(target,type,next){return `${target}.R54_B_${type}_${next.slice(0,12)}`;}
 function readHash(filePath){return digest(fs.readFileSync(filePath));}
 const JOURNAL_SCHEMA='ZGMINI_R54_SIXFILE_B_JOURNAL_V1';
-function journalFile(journalRoot,requestId){
+function journalFile(journalRoot,requestId,installedRoot){
  assert(typeof requestId==='string'&&/^pc-[a-z0-9-]{8,76}$/.test(requestId),
   'R54_B_REQUEST_ID_REQUIRED');
  assert(typeof journalRoot==='string'&&path.isAbsolute(journalRoot),
   'R54_B_JOURNAL_ROOT_REQUIRED');
  const root=fs.realpathSync.native(journalRoot);
  assert(fs.statSync(root).isDirectory(),'R54_B_JOURNAL_ROOT_INVALID');
+ if(installedRoot!==undefined){
+  const installed=fs.realpathSync.native(installedRoot).toLowerCase();
+  const actual=root.toLowerCase();
+  assert(actual!==installed&&!actual.startsWith(installed+path.sep.toLowerCase()),
+   'R54_B_JOURNAL_INSIDE_SOURCE_DENIED');
+ }
  return path.join(root,`R54_B_SIXFILE_${requestId}.jsonl`);
 }
-function journalLastState(journalRoot,requestId){
- const journal=journalFile(journalRoot,requestId);
+function journalLastState(journalRoot,requestId,installedRoot){
+ const journal=journalFile(journalRoot,requestId,installedRoot);
  if(!fs.existsSync(journal))return null;
  assert(!fs.lstatSync(journal).isSymbolicLink(),'R54_B_JOURNAL_REDIRECT_DENIED');
  const bytes=fs.readFileSync(journal);
@@ -121,7 +127,7 @@ export function preflight({installedRoot,candidateRoot,manifest,gate,
   Number.isFinite(Date.parse(gate.observedAt))&&
   Math.abs(Date.now()-Date.parse(gate.observedAt))<60000,
   'R54_B_RUNTIME_GATE_REQUIRED');
- const journalPhase=journalLastState(journalRoot,requestId);
+ const journalPhase=journalLastState(journalRoot,requestId,installedRoot);
  const rows=sourceRows({installedRoot,candidateRoot});
  assert(journalPhase===null||journalPhase==='SUCCEEDED'&&
   rows.every(x=>x.oldHash===x.next),
@@ -154,7 +160,7 @@ export function applyApprovedSix({installedRoot,candidateRoot,manifest,gate,
  const check=preflight({installedRoot,candidateRoot,manifest,gate,journalRoot,requestId});
  if(check.status==='ALREADY_INSTALLED')return {status:'ALREADY_INSTALLED',changed:0};
  const rows=check.rows;
- const fd=fs.openSync(journalFile(journalRoot,requestId),'wx',0o600);
+ const fd=fs.openSync(journalFile(journalRoot,requestId,installedRoot),'wx',0o600);
  let seq=0;
  const record=(phase,file=null)=>{
   fs.writeSync(fd,JSON.stringify({schema:JOURNAL_SCHEMA,seq:seq++,phase,file})+'\n');
@@ -200,7 +206,10 @@ export function applyApprovedSix({installedRoot,candidateRoot,manifest,gate,
    record('FILE_APPLIED',x.path);
   }
  }catch(error){
-  record('SWAP_INTERRUPTED');
+  // Recovery must never depend on the journal remaining writable.
+  // A full disk or fsync error can occur at precisely this phase.
+  let journalUncertain=false;
+  try{record('SWAP_INTERRUPTED')}catch{journalUncertain=true}
   const notRestored=[];
   for(const x of [...started].reverse()){
    try{
@@ -210,10 +219,15 @@ export function applyApprovedSix({installedRoot,candidateRoot,manifest,gate,
    }catch{notRestored.push(x.path)}
   }
   if(notRestored.length){
-   record('RECOVERY_REQUIRED');
+   try{record('RECOVERY_REQUIRED')}catch{/* retained for external reconciliation */}
    fail('R54_B_RESTORE_REQUIRED');
   }
-  record('ROLLED_BACK_VERIFIED');
+  if(journalUncertain){
+   try{record('RECOVERY_REQUIRED')}catch{/* ledger may be incomplete */}
+   fail('R54_B_JOURNAL_RECOVERY_REQUIRED');
+  }
+  try{record('ROLLED_BACK_VERIFIED')}
+  catch{fail('R54_B_JOURNAL_RECOVERY_REQUIRED')}
   throw error;
  }
  record('SUCCEEDED');
