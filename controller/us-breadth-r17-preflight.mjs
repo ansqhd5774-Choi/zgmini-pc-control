@@ -64,6 +64,83 @@ export function diagnoseR17PatchContexts(patchText,sourceByPath){
   });
  });
 }
+
+// This *diagnostic* cannot admit a Writer installation or amend an existing hunk.
+// It returns only three fixed, bounded excerpts after the approved PC source
+// identity and immutable file hashes have been established. Never print a
+// suspicious excerpt partially: one suspect line suppresses all code output.
+const R17_CONTEXT_TARGETS=Object.freeze([
+ {file:'scripts/pc-writer/local-cycle.mjs',hunk:'185',anchor:/^\s*const report=\{at:new Date\(\)\.toISOString\(\),lane,collectionExit:/,before:1,after:1},
+ {file:'scripts/pc-writer/run-local.mjs',hunk:'72',anchor:/^\s*report\.usBreadth\s*=\s*await prepareUsBreadth\(/,before:1,after:2},
+ {file:'scripts/pc-writer/run-local.mjs',hunk:'228',anchor:/^\s*report\.usBreadth\.publication\s*=\s*await publishUsBreadth\(/,before:1,after:2},
+]);
+const SENSITIVE_R17_CONTEXT=/(?:secret|password|passwd|token|authorization|oauth|bearer|credential|api[_-]?key|private[_-]?key|access[_-]?key|session[_-]?id|account[_-]?id|client[_-]?secret|process\.env|sk-|ghp_|github_pat_|AKIA[0-9A-Z]{12})|https?:\/\/|\bwww\.|(?:\.env\b)|[\u0000-\u0008\u000b\u000c\u000e-\u001f]/i;
+export function verifiedR17Source(e){
+ return e?.head===R17_APPROVED&&e?.dirty===false&&e?.patchHash===R17_PATCH_SHA&&
+  Object.entries(R17_BASE_FILES).every(([name,sha])=>e?.hashes?.[name]===sha)&&
+  R17_MISSING.every(name=>e?.present?.[name]===false);
+}
+export function diagnoseR17RestrictedContexts(sourceByPath,evidence){
+ if(!verifiedR17Source(evidence))return {status:'SOURCE_UNVERIFIED',excerpts:[]};
+ const excerpts=[];
+ for(const target of R17_CONTEXT_TARGETS){
+  const source=sourceByPath?.[target.file];
+  if(typeof source!=='string'||source.length>1048576)
+   return {status:'CONTEXT_SOURCE_UNAVAILABLE',excerpts:[]};
+  const lines=source.replace(/\r\n/g,'\n').split('\n');
+  const matches=[];
+  for(let i=0;i<lines.length;i++)if(target.anchor.test(lines[i]))matches.push(i);
+  if(matches.length!==1)return {status:'CONTEXT_ANCHOR_NOT_UNIQUE',excerpts:[]};
+  const index=matches[0];
+  const from=index-target.before,to=index+target.after+1;
+  if(from<0||to>lines.length)return {status:'CONTEXT_OUT_OF_BOUNDS',excerpts:[]};
+  const selected=lines.slice(from,to);
+  if(selected.length<3||selected.length>8)return {status:'CONTEXT_LINE_COUNT_INVALID',excerpts:[]};
+  const excerpt=selected.join('\n');
+  if(SENSITIVE_R17_CONTEXT.test(excerpt))return {status:'SENSITIVE_CONTEXT_SUPPRESSED',excerpts:[]};
+  if(excerpt.length>800)return {status:'CONTEXT_TOO_LONG',excerpts:[]};
+  excerpts.push({file:target.file.endsWith('local-cycle.mjs')?'cycle':'publication',
+   hunk:target.hunk,startLine:from+1,lineCount:selected.length,text:excerpt});
+ }
+ const result={status:'THREE_EXCERPTS_READONLY',excerpts};
+ if(JSON.stringify(result).length>2500)return {status:'CONTEXT_TOTAL_TOO_LONG',excerpts:[]};
+ return result;
+}
+
+// One extra, fixed-name dispatcher hop. A string reference is *not* runtime
+// proof and never changes the strict Task-chain admission predicate below.
+const R17_DISPATCH_ALLOWLIST=Object.freeze([
+ {name:'local-cycle.mjs',scope:'source',path:'scripts/pc-writer/local-cycle.mjs',sha256:R17_BASE_FILES['scripts/pc-writer/local-cycle.mjs']},
+ {name:'run-local.mjs',scope:'source',path:'scripts/pc-writer/run-local.mjs',sha256:R17_BASE_FILES['scripts/pc-writer/run-local.mjs']},
+ {name:'quota-runner.mjs',scope:'source',path:'scripts/pc-writer/quota-runner.mjs',sha256:null},
+ {name:'ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs',scope:'data',path:'data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs',sha256:'4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1'},
+]);
+export function diagnoseR17SingleDispatcher({action,launchers,evidence,readAllowed}={}){
+ const blocked={status:'DISPATCH_UNVERIFIED',singleHop:null};
+ if(!verifiedR17Source(evidence)||typeof readAllowed!=='function')return blocked;
+ const checks=diagnoseR17TaskChain({action,launchers});
+ if(!checks.commandWscript||!checks.expectedLauncherArgument||
+    !checks.firstLauncherHash||!checks.secondLauncherHash||!checks.firstHop)return blocked;
+ const second=launchers?.[1]?.text;
+ if(typeof second!=='string'||second.length>65536)return blocked;
+ const lines=second.split(/\r?\n/).filter(line=>
+  !/^\s*(?:'|rem\s)/i.test(line)&&/\bnode(?:\.exe)?\b/i.test(line));
+ const found=R17_DISPATCH_ALLOWLIST.filter(item=>{
+  const filename=new RegExp(`(?:^|[^A-Za-z0-9_.-])${item.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?![A-Za-z0-9_.-])`,'i');
+  return lines.some(line=>filename.test(line));
+ });
+ if(found.length!==1)return {status:'DISPATCH_TARGET_NOT_UNIQUE',singleHop:null};
+ const item=found[0];
+ try{
+  const bytes=readAllowed(item.scope,item.path);
+  if(!Buffer.isBuffer(bytes)||bytes.length<1||bytes.length>1048576)return blocked;
+  const observed=digest(bytes);
+  const verified=typeof item.sha256==='string'&&observed===item.sha256;
+  return {status:verified?'DISPATCH_STATIC_HASH_MATCH':'DISPATCH_STATIC_UNVERIFIED',
+   singleHop:{name:item.name,sha256:observed,pinnedHashMatches:verified,
+    referencesLocalCycle:/local-cycle\.mjs/i.test(decodeR17Launcher(bytes))}};
+ }catch{return blocked;}
+}
 export function assessR17TaskChain({action,launchers}={}){
  const first=R17_VBS_CHAIN[0],second=R17_VBS_CHAIN[1];
  if(!action||!Array.isArray(launchers)||launchers.length!==2)return false;
@@ -133,10 +210,18 @@ export function summarizeR17Probe(evidence){
  const at=evidence?.stoppedAt;
  return at?{...report,code:'R17_PREFLIGHT_INTERRUPTED',
   reasons:['R17_PREFLIGHT_INTERRUPTED:'+at],stoppedAt:at}:
-  {...report,diagnostics:{patchCheck:evidence?.patchApplies===true?'PASS':
+  enforceR17ReportSize({...report,diagnostics:{patchCheck:evidence?.patchApplies===true?'PASS':
     evidence?.patchFailureCode??'UNVERIFIED',
    patchContexts:evidence?.patchContexts??null,
-   taskChain:evidence?.taskLinked===true?'PASS':evidence?.taskChecks??null}};
+   restrictedContexts:evidence?.restrictedContexts??null,
+   taskChain:evidence?.taskLinked===true?'PASS':evidence?.taskChecks??null,
+   singleDispatcher:evidence?.singleDispatcher??null}});
+}
+function enforceR17ReportSize(report){
+ if(JSON.stringify(report).length>2500&&report.diagnostics?.restrictedContexts?.excerpts?.length){
+  report.diagnostics.restrictedContexts={status:'CONTEXT_TOTAL_TOO_LONG',excerpts:[]};
+ }
+ return report;
 }
 
 function textAt(root,name,cap=262144){
@@ -184,8 +269,9 @@ export function inspectR17Windows(){
  if(process.platform!=='win32')return {status:'BLOCKED',code:'WINDOWS_REQUIRED'};
  // Exact PR #957 two-file patch travels inside this approved controller module.
  const evidence={head:null,dirty:null,hashes:{},present:{},
-  patchHash:null,patchApplies:false,patchFailureCode:null,patchContexts:null,quotaContract:false,
-  taskLinked:false,taskChecks:null,stoppedAt:null};
+  patchHash:null,patchApplies:false,patchFailureCode:null,patchContexts:null,
+  restrictedContexts:null,quotaContract:false,taskLinked:false,taskChecks:null,
+  singleDispatcher:null,stoppedAt:null};
  let step='SOURCE_ROOT';
  try{
   const root=fs.realpathSync.native(R17_ROOT);
@@ -215,9 +301,10 @@ export function inspectR17Windows(){
    try{git(root,['apply','--check','--whitespace=error','-'],patchBytes);evidence.patchApplies=true;}
    catch(error){
     evidence.patchFailureCode=classifyR17PatchFailure(error);
-    evidence.patchContexts=diagnoseR17PatchContexts(R17_PATCH_TEXT,
-     Object.fromEntries(Object.keys(R17_BASE_FILES).slice(0,2).map(name=>
-      [name,textAt(root,name).toString('utf8')])));
+    const src=Object.fromEntries(Object.keys(R17_BASE_FILES).slice(0,2).map(name=>
+     [name,textAt(root,name).toString('utf8')]));
+    evidence.patchContexts=diagnoseR17PatchContexts(R17_PATCH_TEXT,src);
+    evidence.restrictedContexts=diagnoseR17RestrictedContexts(src,evidence);
    }
   }
   // Only the exact observed VBS chain is admitted. Neither a Task working
@@ -234,6 +321,8 @@ export function inspectR17Windows(){
   });
   evidence.taskChecks=diagnoseR17TaskChain({action,launchers});
   evidence.taskLinked=assessR17TaskChain({action,launchers});
+  evidence.singleDispatcher=diagnoseR17SingleDispatcher({action,launchers,evidence,
+   readAllowed:(scope,file)=>textAt(scope==='source'?root:'E:\\ZGmini',file,1048576)});
   step=null;
  }catch{/* Never disclose command outputs, paths or secrets. */
   evidence.stoppedAt=step;
