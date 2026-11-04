@@ -92,7 +92,7 @@ test('explicitly saves only an unapproved proposal in a separate atomic artifact
   assert.doesNotMatch(JSON.stringify(result),/E:\/ZGmini|SENSITIVE_VALUE/);
 });
 
-test('an existing proposal is never overwritten even when a second attempt has changed input',()=>{
+test('an existing proposal is never overwritten by a second invocation',()=>{
   const baseDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-proposal-'));
   const plan=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
     ...evidence(),toolSha256});
