@@ -8,10 +8,12 @@ const commitEnv={
   GIT_COMMITTER_NAME:'ZGMINI R17 Approved PC Writer',GIT_COMMITTER_EMAIL:'r17-writer-b@localhost',
   GIT_AUTHOR_DATE:'2026-11-05T00:00:00Z',GIT_COMMITTER_DATE:'2026-11-05T00:00:00Z',
 };
-export function commitExactOverlay({stage,base,overlay,expectedSha256,expectedDiff,run,runRaw}){
+const REQUEST_REF=/^refs\/heads\/r17-writer-b\/pc-r17-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+export function commitExactOverlay({stage,base,overlay,expectedSha256,expectedDiff,requestRef,run,runRaw}){
   const stop=(code)=>{throw Object.assign(new Error(code),{code});};
   if(!SHA40.test(base)||!(overlay instanceof Map)||
-     overlay.size!==Object.keys(expectedSha256).length)stop('R17_B_OVERLAY_SCOPE_STOP');
+     overlay.size!==Object.keys(expectedSha256).length||!REQUEST_REF.test(requestRef??''))
+    stop('R17_B_OVERLAY_SCOPE_STOP');
   for(const [file,bytes] of overlay){
     if(!Object.hasOwn(expectedSha256,file)||!Buffer.isBuffer(bytes)||
       sha(bytes)!==expectedSha256[file])stop('R17_B_OVERLAY_HASH_STOP');
@@ -36,5 +38,13 @@ export function commitExactOverlay({stage,base,overlay,expectedSha256,expectedDi
     if(sha(runRaw(stage,['show',`${commit}:${file}`]))!==hash)
       stop('R17_B_OVERLAY_READBACK_STOP');
   }
-  return {sha:commit,diff};
+  // Git upload-pack advertises only reachable refs by default. An
+  // unreferenced commit SHA can fail remote fetch with 'not our ref'.
+  // Publish the verified child commit under the unique request-scoped ref in
+  // the ISOLATED staging repo (never mutate a live source ref here).
+  run(stage,'update-ref',requestRef,commit);
+  if(run(stage,'rev-parse','--verify',requestRef)!==commit||
+    runRaw(stage,['cat-file','-t',requestRef]).toString('utf8').trim()!=='commit')
+    stop('R17_B_STAGE_REF_READBACK_STOP');
+  return {sha:commit,diff,sourceRef:requestRef};
 }
