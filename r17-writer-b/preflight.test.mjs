@@ -103,6 +103,35 @@ test('Windows CRLF source is matched exactly and its original EOL is retained',(
   }),/R17_B_PATCH_CONTEXT_STOP/);
 });
 
+test('parser reports bounded hunk and EOL reasons without source contents',()=>{
+  assert.throws(()=>applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'a\r\nb\n',[p2]:'x\n',
+  }),error=>{
+    assert.equal(error.code,'R17_B_PATCH_CONTEXT_STOP');
+    assert.deepEqual(error.diagnostic,{
+      file:'local-cycle',hunkOldStart:null,reason:'MIXED_EOL',matchCount:null,
+    });
+    assert(!JSON.stringify(error.diagnostic).includes('a\\r'));
+    return true;
+  });
+  assert.throws(()=>applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'a\nwrong\n',[p2]:'x\n',
+  }),error=>{
+    assert.deepEqual(error.diagnostic,{
+      file:'local-cycle',hunkOldStart:1,reason:'NO_MATCH',matchCount:0,
+    });
+    return true;
+  });
+  assert.throws(()=>applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'prelude\na\nb\nprelude\na\nb\n',[p2]:'x\n',
+  }),error=>{
+    assert.deepEqual(error.diagnostic,{
+      file:'local-cycle',hunkOldStart:1,reason:'MULTIPLE_MATCH',matchCount:2,
+    });
+    return true;
+  });
+});
+
 test('PR old full files are not required: 2 old targets derive only from a23 patch',()=>{
   const newFiles=Object.fromEntries(ADDED.map(p=>[p,Buffer.from('export const fresh = true;\n')]));
   const newSha256=Object.fromEntries(ADDED.map(p=>[p,digest(newFiles[p])]));
@@ -219,6 +248,24 @@ test('FULL R17 B preflight fixture PASS without operational mutation and no OLD 
   assert.equal(called.filter(x=>x.startsWith('read-candidate:')).length,3);
   assert(called.includes('read-private-patch'));
   assert(called.includes('git-apply-check'));
+});
+
+test('native Git check runs before parser mismatch and remains fail-closed',()=>{
+  const {opts,called}=fullFixture();
+  const priorRead=opts.readPcFile,priorHash=opts.hash;
+  const mixed=Buffer.from('a\r\nb\n');
+  opts.readPcFile=(root,p)=>p===p1?mixed:priorRead(root,p);
+  opts.hash=bytes=>Buffer.from(bytes).equals(mixed)?OLD_HASHES[p1]:priorHash(bytes);
+  assert.throws(()=>runReadOnly(opts),error=>{
+    assert.equal(error.code,'R17_B_PATCH_CONTEXT_STOP');
+    assert.deepEqual(error.diagnostic,{
+      file:'local-cycle',hunkOldStart:null,reason:'MIXED_EOL',
+      matchCount:null,nativeGitApplyCheck:'PASS',
+    });
+    return true;
+  });
+  assert(called.indexOf('git-apply-check')>called.indexOf('read-private-patch'));
+  assert.equal(called.filter(x=>x==='git-apply-check').length,1);
 });
 
 test('preflight refuses an already present newly approved file before package execution',()=>{
