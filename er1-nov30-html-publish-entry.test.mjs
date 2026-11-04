@@ -42,7 +42,7 @@ test('only exact owner, label, issue title, approved source and period admitted'
   } }, env), /NOV30_HTML_REQUEST_CONTRACT_STOP/);
 });
 
-test('immutable approval is limited to one November HTML D1 key and zero supplier', () => {
+test('immutable approval is limited to both November half-month HTML D1 keys and zero supplier', () => {
   validateApproval(approved);
   for (const field of ['allowProviderCalls', 'allowExistingFeedWrites', 'allowRawVendorPublic',
     'allowFormulaChanges', 'allowSchedulerChanges', 'allowDirectDeployment']) {
@@ -51,7 +51,7 @@ test('immutable approval is limited to one November HTML D1 key and zero supplie
   }
   assert.throws(() => validateApproval({ ...approved, expectedEvents: 3050 }),
     /NOV30_HTML_APPROVAL_SCOPE_STOP/);
-  assert.throws(() => validateApproval({ ...approved, outputKey: 'market-calendar:earnings-display-html' }),
+  assert.throws(() => validateApproval({ ...approved, outputKeys: ['market-calendar:earnings-display-html'] }),
     /NOV30_HTML_APPROVAL_SCOPE_STOP/);
   assert.throws(() => validateApproval({ ...approved, maxAutomaticRetries: 1 }),
     /NOV30_HTML_APPROVAL_SCOPE_STOP/);
@@ -60,22 +60,27 @@ test('immutable approval is limited to one November HTML D1 key and zero supplie
 const digest = 'a'.repeat(64);
 const pass = {
   schema: 'ZGMINI_NOV30_HTML_PUBLISH_V1', status: 'PASS',
-  code: 'NOV30_PUBLISH_D1_VERIFIED', eventCount: 3051,
+  code: 'NOV30_PUBLISH_D1_BOTH_VERIFIED', eventCount: 3051,
   coreReusedDayCount: 16, privateReusedDayCount: 14,
   d1Writes: 1, providerCalls: 0, coreWrites: 0, schedulerWrites: 0,
   existingFeedWrites: 0, rawRowsPublic: 0,
-  localHtmlSha256: digest, d1ReadbackSha256: digest,
+  publicationBatchId: 'c'.repeat(64),
+  localHtmlSha256H1: digest, localHtmlSha256H2: 'b'.repeat(64),
+  d1ReadbackSha256H1: digest, d1ReadbackSha256H2: 'b'.repeat(64),
 };
 
-test('only complete 30-day/3051-row no-GET no-raw D1 readback can pass', () => {
+test('only complete 30-day/3051-row no-GET/no-raw both-key D1 readback can pass', () => {
   assert.equal(validateChildReport(pass).eventCount, 3051);
-  assert.equal(validateChildReport({ ...pass, code: 'NOV30_PUBLISH_D1_ALREADY_MATCHED',
+  assert.equal(validateChildReport({ ...pass, d1Writes: 2 }).status, 'PASS');
+  assert.equal(validateChildReport({ ...pass, code: 'NOV30_PUBLISH_D1_BOTH_ALREADY_MATCHED',
     d1Writes: 0 }).status, 'PASS');
   for (const invalid of [
     { eventCount: 3050 }, { coreReusedDayCount: 15 }, { providerCalls: 1 },
     { existingFeedWrites: 1 }, { coreWrites: 1 }, { schedulerWrites: 1 },
-    { rawRowsPublic: 1 }, { d1Writes: 2 },
-    { d1ReadbackSha256: 'b'.repeat(64) }, { localHtmlSha256: null },
+    { rawRowsPublic: 1 }, { d1Writes: 3 },
+    { d1ReadbackSha256H1: 'b'.repeat(64) }, { localHtmlSha256H2: null },
+    { publicationBatchId: null },
+    { d1Writes: 0 },
     { code: 'NOV30_PUBLISH_UNVERIFIED' },
   ]) assert.throws(() => validateChildReport({ ...pass, ...invalid }),
     /NOV30_HTML_CHILD_(REPORT_CONTRACT|PASS_INCOMPLETE)_STOP/);
