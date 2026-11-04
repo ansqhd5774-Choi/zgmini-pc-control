@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {acquireInstallClaim,releaseInstallClaim} from './r17-b-claim.mjs';
+import {acquireInstallLock,createInstallJournal,acquireInstallClaim,releaseInstallClaim} from './r17-b-claim.mjs';
 
 function fixture(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'r17-b-claim-test-'));
@@ -11,6 +11,31 @@ function fixture(){
 }
 const A='pc-r17-550e8400-e29b-41d4-a716-446655440000';
 const B='pc-r17-550e8400-e29b-41d4-a716-446655440001';
+
+test('prevalidation-only held lock creates no journal and request can be admitted later',()=>{
+  const dirs=fixture();const pending=acquireInstallLock({...dirs,requestId:A});
+  assert.equal(fs.existsSync(pending.journalDir),false);
+  assert.throws(()=>acquireInstallLock({...dirs,requestId:B}),
+    /R17_B_SHARED_INSTALL_BUSY_NOOP_STOP/);
+  assert.equal(fs.existsSync(path.join(dirs.journalRoot,B)),false);
+  releaseInstallClaim({fd:pending.fd,sharedLock:dirs.sharedLock,requestId:A,retain:false});
+  const afterPrecheck=acquireInstallLock({...dirs,requestId:A});
+  const journal=createInstallJournal({...dirs,requestId:A,fd:afterPrecheck.fd});
+  assert.equal(fs.existsSync(journal.journalFile),true);
+  releaseInstallClaim({fd:afterPrecheck.fd,sharedLock:dirs.sharedLock,requestId:A,retain:false});
+});
+
+test('cannot claim a journal without holding the exact request lock',()=>{
+  const dirs=fixture();const pending=acquireInstallLock({...dirs,requestId:A});
+  assert.throws(()=>createInstallJournal({...dirs,requestId:B,fd:pending.fd}),
+    /R17_B_SHARED_LOCK_DRIFT_STOP/);
+  assert.equal(fs.existsSync(path.join(dirs.journalRoot,B)),false);
+  const journal=createInstallJournal({...dirs,requestId:A,fd:pending.fd});
+  assert.equal(fs.existsSync(journal.hooksDir),true);
+  assert.throws(()=>createInstallJournal({...dirs,requestId:A,fd:pending.fd}),
+    /R17_B_REQUEST_ALREADY_CLAIMED_STOP/);
+  releaseInstallClaim({fd:pending.fd,sharedLock:dirs.sharedLock,requestId:A,retain:false});
+});
 
 test('other B job holds shared lock: losing requestId remains unconsumed',()=>{
   const dirs=fixture();

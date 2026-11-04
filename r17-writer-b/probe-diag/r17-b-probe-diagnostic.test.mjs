@@ -14,7 +14,7 @@ const BODY={schema:'ZGMINI_R17_B_PROBE_DIAG_REQUEST_V1',
   requestId:REQUEST_ID,chatId:CHAT_ID,
   operation:'r17-probe-diagnostic-readonly-once',
   controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
-  expectedProbeSha256:'4280dad8d5d785bf2d6db3558ff344eb6f45edb2877e7894e89f94a45b273450',
+  expectedProbeSha256:'7050dc256e8165827e5a4296dc3d3e2d18408c94508bdf8b51975f5499c95a13',
   expectedFixtureSha256:'22261ee72d757c9372ed9e0b806e27e4ad65ad9c1d5e274fa82f8e914755fa1d'};
 const env=()=>({GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
   GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened',

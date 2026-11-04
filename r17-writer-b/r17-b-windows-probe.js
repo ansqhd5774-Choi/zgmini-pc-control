@@ -7,29 +7,74 @@
     var service = new ActiveXObject('Schedule.Service');
     service.Connect();
     var task = service.GetFolder('\\').GetTask('ZGMINI-PC-Local-Core');
-    var instances = task.GetInstances(0).Count;
-    var related = 0;
+    var runningTasks = task.GetInstances(0);
+    var instances = runningTasks.Count;
+    var coreEngines = {};
     var unknown = 0;
-    var wmi = GetObject('winmgmts:root\\cimv2');
-    var processes = wmi.ExecQuery("SELECT ProcessId,CommandLine FROM Win32_Process WHERE Name='node.exe' OR Name='cmd.exe' OR Name='cscript.exe' OR Name='wscript.exe'");
-    var iterator = new Enumerator(processes);
-    for (; !iterator.atEnd(); iterator.moveNext()) {
-      var process = iterator.item();
-      // Accessible process CommandLine must be inspectable. The Core task can
-      // spawn child Node/CMD, so do not infer drain from Task.State alone.
-      if (process.CommandLine === null || typeof process.CommandLine === 'undefined') {
+    for (var n = 1; n <= instances; n += 1) {
+      // A running Core instance provides an exact process-tree anchor.
+      var enginePid = 0;
+      try { enginePid = Number(runningTasks.Item(n).EnginePID); } catch (engineError) { }
+      if (!isFinite(enginePid) || enginePid < 1) {
+        // The task instance is already an explicit drain blocker. Missing
+        // EnginePID must not prevent us from pausing future triggers.
         unknown += 1;
         continue;
       }
-      var command = String(process.CommandLine).toLowerCase();
-      // No E: prefix requirement: C: compatibility junctions, VBS dispatchers,
-      // and legacy paths may point at the same Core process. Over-detection
-      // safely delays installation; under-detection would race live Core.
-      if (command.indexOf('local-cycle.mjs') !== -1 ||
-          command.indexOf('run-local.mjs') !== -1 ||
-          (command.indexOf('zgmini') !== -1 &&
-           (command.indexOf('pc-core') !== -1 || command.indexOf('pc-writer') !== -1))) {
-        related += 1;
+      coreEngines[String(enginePid)] = true;
+    }
+    var related = 0;
+    var wmi = GetObject('winmgmts:root\\cimv2');
+    // Include parent process records so an inaccessible CommandLine from an
+    // unrelated Runner cannot block Core. Only task-linked/known-Core process
+    // trees are treated as Core; a genuinely ambiguous Core descendant blocks.
+    var processes = wmi.ExecQuery('SELECT ProcessId,ParentProcessId,Name,CommandLine FROM Win32_Process');
+    var records = [];
+    var byPid = {};
+    var iterator = new Enumerator(processes);
+    for (; !iterator.atEnd(); iterator.moveNext()) {
+      var process = iterator.item();
+      var pid = Number(process.ProcessId);
+      var parentPid = process.ParentProcessId === null ||
+        typeof process.ParentProcessId === 'undefined' ? NaN : Number(process.ParentProcessId);
+      var name = String(process.Name || '').toLowerCase();
+      var missing = process.CommandLine === null ||
+        typeof process.CommandLine === 'undefined' ||
+        String(process.CommandLine).replace(/\s/g, '') === '';
+      var command = missing ? '' : String(process.CommandLine).toLowerCase();
+      var relevantName = name === 'node.exe' || name === 'cmd.exe' ||
+        name === 'cscript.exe' || name === 'wscript.exe';
+      // Exact Core entrypoints are retained, irrespective of C: junction vs E:.
+      // A generic 'zgmini pc-writer' command belongs to many independent jobs.
+      var isCore = command.indexOf('local-cycle.mjs') !== -1 ||
+        command.indexOf('run-local.mjs') !== -1;
+      var record = {pid:pid, parent:parentPid, missing:missing,
+        relevant:relevantName, core:isCore};
+      records.push(record);
+      if (isFinite(pid) && pid > 0) byPid[String(pid)] = record;
+      if (isCore) related += 1;
+    }
+    for (var i = 0; i < records.length; i += 1) {
+      var rec = records[i];
+      if (!rec.relevant || !rec.missing) continue;
+      // If a protected-process PID/parent is absent, its ownership cannot be
+      // established, so retain fail-closed behavior for that specific record.
+      if (!isFinite(rec.pid) || rec.pid < 1 ||
+          !isFinite(rec.parent) || rec.parent < 0) {
+        unknown += 1;
+        continue;
+      }
+      var seen = {};
+      var current = rec.pid;
+      for (var depth = 0; depth < records.length + 1; depth += 1) {
+        if (coreEngines[String(current)]) { unknown += 1; break; }
+        if (seen[String(current)]) break;
+        seen[String(current)] = true;
+        var ancestor = byPid[String(current)];
+        if (!ancestor) break;
+        if (ancestor.core) { unknown += 1; break; }
+        if (!isFinite(ancestor.parent) || ancestor.parent <= 0) break;
+        current = ancestor.parent;
       }
     }
     // Windows Script Host may expose JScript's 5.7-compatible surface even

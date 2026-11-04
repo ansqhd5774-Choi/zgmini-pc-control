@@ -90,7 +90,7 @@ export function validateBefore(b){
     /^[A-Za-z][A-Za-z0-9_./-]{0,100}$/.test(b.originalBranch)&&
     !b.originalBranch.startsWith('r17-writer-b/')&&
     b.coreTaskXmlSha256===CORE_XML_HASH&&b.taskEnabled===true&&
-    b.coreIdle===true&&sameMap(b.existingSha256,BEFORE)&&
+    sameMap(b.existingSha256,BEFORE)&&
     Array.isArray(b.absent)&&b.absent.length===3&&
     Object.keys(TARGET).filter(p=>!Object.hasOwn(BEFORE,p)).every(p=>b.absent.includes(p)),
     'R17_B_BASELINE_DRIFT_STOP');
@@ -107,7 +107,9 @@ export function validatePrepared(c,requestId){
 
 /**
  * Exact-once transaction with injected tightly scoped IO. The IO driver must:
- * - use create-new O_EXCL journal for claim() BEFORE any operational mutation;
+ * - acquire an exclusive shared lock before read-only inspect/validation;
+ * - use create-new O_EXCL journal for claim() AFTER read-only validation and
+ *   BEFORE any operational mutation, under that same held lock;
  * - prepare new Git commit in isolated objects/index, never touching live source;
  * - implement bounded waitForDrain() and never remove a lock / terminate a process;
  * - reject any unexpected HEAD/dirty state during switch/rollback;
@@ -126,10 +128,12 @@ export async function performApprovedInstall(authorized,io,{maxDrainMs=180_000}=
   let before=null,prepared=null;
   const progress=async(phase)=>{result.phase=phase;await io.journal(phase);};
   try{
-    // Fail closed if claim/journal fails: request cannot be retried blindly.
+    // A failing read-only preflight must not consume the one-shot journal.
+    // Holding the shared mutex across both steps closes the claim TOCTOU gap.
+    await io.acquireSharedLock(authorized.requestId);
+    before=await io.inspectBefore();validateBefore(before);
     await io.claim(authorized.requestId);claimed=true;
     await progress('CLAIMED');
-    before=await io.inspectBefore();validateBefore(before);
     await io.saveBaseline(before);await progress('BASELINE_SAVED');
     prepared=await io.prepareIsolatedCommit(before);validatePrepared(prepared,authorized.requestId);
     await progress('PREPARED');
