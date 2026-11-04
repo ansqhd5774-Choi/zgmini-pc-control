@@ -82,17 +82,21 @@ export function inspectResults(summary,market,html){
  const inlineStart=html.indexOf('수집 원자료 19개');
  const firstResearch=html.indexOf('data-research-input="research-1"');
  const lastResearch=html.indexOf('data-research-input="research-31"');
- const inline=htmlTitle&&htmlSection&&inlineStart>=0&&firstResearch>inlineStart&&lastResearch>firstResearch;
+ const criterionPresent=html.includes('원유 가격이 상승하면 에너지 원가 압력이 커질 수 있음');
+ const columnLabels=['>기준</th>','>이전</th>','>현재</th>'].every(label=>html.includes(label));
+ const inline=htmlTitle&&htmlSection&&inlineStart>=0&&firstResearch>inlineStart&&lastResearch>firstResearch&&criterionPresent&&columnLabels;
  return {status:inline?'PASS':'PARTIAL',
   code:inline?'INFL19_PUBLIC_INLINE_19_AND_FOUR_API_VERIFIED':'INFL19_PUBLIC_INLINE_RESEARCH_NOT_VERIFIED',
   ready:summary.indicators.length,existingScoreRows:inflation.indicators.length,
   sourceVersion:summary.sourceVersion,publicHtmlResearchTitle:htmlTitle,
-  publicHtmlExistingSection:htmlSection,publicHtmlInlineResearch:inline};
+  publicHtmlExistingSection:htmlSection,publicHtmlInlineResearch:inline,
+  publicHtmlCriterion:criterionPresent,publicHtmlColumnLabels:columnLabels};
 }
 export async function execute(env=process.env){
  let result={schema:SCHEMA,status:'BLOCKED',code:'INFL19_PUBLIC_NOT_STARTED',ready:null,
   existingScoreRows:null,sourceVersion:null,publicHtmlResearchTitle:false,
-  publicHtmlExistingSection:false,publicHtmlInlineResearch:false,providerCalls:0,dbWrites:0,coreWrites:0,d1Writes:0};
+  publicHtmlExistingSection:false,publicHtmlInlineResearch:false,
+  publicHtmlCriterion:false,publicHtmlColumnLabels:false,providerCalls:0,dbWrites:0,coreWrites:0,d1Writes:0};
  let issue;
  try{
   const event=JSON.parse(read(env.GITHUB_EVENT_PATH)),req=validate(event,env);
