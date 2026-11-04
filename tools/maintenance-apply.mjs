@@ -33,6 +33,10 @@ export function maintenanceFailureCode(error,operation='inspect'){
  *   switchVersion(), reconnect(), resumeIntake(), postcheck(request),
  *   verifyBackup(), restore(), reconnectPrevious(), verifyPrevious(),
  *   inspectAfterUncertain(journal), listCurrentJobs().
+ * Optional verifyPrevalidationUntouched({installedSha}) may return true only
+ * after a fresh, read-only source/owner/protected-state proof. It must not
+ * release or archive any lease: the owning outer maintainer releases its own
+ * controller-install lease after this coordinator returns BLOCKED.
  *
  * inspectAfterUncertain never performs an install. Its result is evidence only.
  */
@@ -106,12 +110,23 @@ export async function applyApprovedUpdate(request, port) {
       return {...ledger};
     }
     // If code was only staged, the installed controller is untouched.
+    const prevalidationOnly=ledger.phase==='RECEIVED'&&
+      ['inspect','validate'].includes(failureOperation)&&
+      !intakeAttempted&&!paused&&!backup&&!supervisorStopped&&!switched;
+    let prevalidationUntouched=false;
+    if(prevalidationOnly&&port.verifyPrevalidationUntouched){
+      try {prevalidationUntouched=await port.verifyPrevalidationUntouched({
+        installedSha:request.installedSha})===true;} catch {}
+    }
     let oldStillRunning=false;
-    if(!switched){try{oldStillRunning=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});}catch{}}
+    // A positive scoped no-effect proof is already sufficient here. Avoid
+    // a second broad Runner-idle probe that can fail solely because another
+    // approved A task started while this request was being classified.
+    if(!switched&&!prevalidationUntouched){try{oldStillRunning=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});}catch{}}
     if(!switched && (!supervisorStopped || oldStillRunning)) {
       // Intake is deliberately not enabled when drain/state is uncertain.
       // An intact preflight failure can leave it enabled only if verified.
-      let safe=oldStillRunning;
+      let safe=oldStillRunning||prevalidationUntouched;
       // pauseIntake() can disable the workflow and then lose its API ACK,
       // leaving paused=false in this coordinator. Never infer active intake
       // merely from an unchanged controller or from our local Boolean.
@@ -132,7 +147,8 @@ export async function applyApprovedUpdate(request, port) {
       // into permanent shared recovery locks.
       if(safe && intakeAttempted && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{safe=false;}}
       const status=safe?'BLOCKED':'RECOVERY_REQUIRED';
-      await record(status,{status,code:reason,firstFail,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
+      const substate=safe&&prevalidationUntouched?'PREVALIDATION_UNTOUCHED_VERIFIED':undefined;
+      await record(status,{status,code:reason,firstFail,substate,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
         workflowEnabled:workflowState==='active'?true:workflowState==='disabled_manually'?false:null,
         observed});
       return {...ledger};
