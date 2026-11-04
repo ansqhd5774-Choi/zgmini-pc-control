@@ -82,7 +82,7 @@ export function inspectResults(summary,market,html){
  const inlineStart=html.indexOf('수집 원자료 19개');
  const firstResearch=html.indexOf('data-research-input="research-1"');
  const lastResearch=html.indexOf('data-research-input="research-31"');
- const criterionPresent=html.includes('원유 가격이 상승하면 에너지 원가 압력이 커질 수 있음');
+ const criterionPresent=html.includes('원유↑ · 에너지원가↑');
  const columnLabels=['>기준</th>','>이전</th>','>현재</th>'].every(label=>html.includes(label));
  const inline=htmlTitle&&htmlSection&&inlineStart>=0&&firstResearch>inlineStart&&lastResearch>firstResearch&&criterionPresent&&columnLabels;
  return {status:inline?'PASS':'PARTIAL',
