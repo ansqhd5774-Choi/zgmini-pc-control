@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_R54_READINESS_B_APPROVAL_V1",
+  "grade": "B",
+  "scope": "FIXED_R54_READONLY_TASK_MEMORY_CANDIDATE_DATES_ONCE",
+  "approvalBasis": "docs/PC_AUTOMATION_STANDARD.md#5 + existing-ten-theme R54 recovery current-stage diagnostic",
+  "dataRoot": "E:\\ZGmini\\data",
+  "timeoutSeconds": 120,
+  "maxProviderRequests": 0,
+  "maxAutomaticRetries": 0,
+  "pcDataWrites": false,
+  "databaseWrites": false,
+  "d1Writes": false,
+  "schedulerWrites": false,
+  "scriptSha256": "603294aed7aa6104d6921f7a5b576ec6e3c94a7b62b44337d4ac36c14cc4bedf"
+}
