@@ -1,15 +1,11 @@
 {
   "schema": "ZGMINI_PC_UPDATE_V1",
-  "installedSha": "6406ff105c8646a4af5e59d98a42e77022437ea4",
+  "installedSha": "14940aa112494b1cea09ff5c7250f4af86a4ce6a",
   "targetSha": "e675f3af0423ebbfbe8af87624cd0cad10027ffc",
   "allowFiles": [
     {
       "path": "config/operations.json",
       "sha256": "41619e5300168635506abf2284212183ab52163d6e9a35448c51b0dfb06c2eb6"
-    },
-    {
-      "path": "controller/asset-r10-source-readonly.mjs",
-      "sha256": "6f393b6c4ca9a6a0c3b09ad51b2f8009bf4204b1bdae9a3e952b2afc0fb0ea64"
     },
     {
       "path": "controller/common.mjs",
@@ -45,13 +41,13 @@
   "checks": {
     "targetSha": "e675f3af0423ebbfbe8af87624cd0cad10027ffc",
     "status": "PASS",
-    "manifestSha256": "a78e5b0ab33b6d11a739842ac4f5e55cd10ade08c9d27ac9a51cf203dc4af85d"
+    "manifestSha256": "633c14f074485ca1d7ec59fa6bed4c238dbdb71fe1b1ce00197a7d71ba8802a2"
   },
   "backup": {
     "strategy": "VERSIONED_SNAPSHOT",
     "rollback": {
       "kind": "RESTORE_INSTALLED_SHA",
-      "sha": "6406ff105c8646a4af5e59d98a42e77022437ea4"
+      "sha": "14940aa112494b1cea09ff5c7250f4af86a4ce6a"
     }
   },
   "postOperation": "core-status",
