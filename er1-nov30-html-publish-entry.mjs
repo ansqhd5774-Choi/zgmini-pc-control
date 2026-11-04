@@ -9,9 +9,9 @@ import { fileURLToPath } from 'node:url';
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
 const PUBLIC_REPO = 'ansqhd5774-Choi/zgmini';
-// Exact reviewed source in public draft PR #968, not an implicit main checkout.
-// Production invocation remains gated on public source/Reader publication.
-const SOURCE_SHA = 'ede216310526148e3d40cd81d5964945672a8f8b';
+// Exact reviewed-and-merged main commit for public PR #968.
+// Production invocation remains gated on the documented B execution contract.
+const SOURCE_SHA = 'f8c7ba3f2ec407d01b9b2b57ce2c8e28b52dbac8';
 const SCRIPT_SHA256 = '2d463f68ff19d387e23018cc5a9c24dfec04fe0be0ef7f0ee1f28712305a88c0';
 const SOURCE_SCRIPT = path.join('scripts', 'pc-writer', 'market-calendar-nov30-publish.mjs');
 const TITLE = 'pc-er1-nov30-html-publish-one-shot';
