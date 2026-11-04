@@ -29,6 +29,25 @@ const REPORT_CODES=new Set([
   'R17_B_IMPORT_RESOLUTION_STOP','R17_B_IMPORT_BUDGET_STOP','R17_B_SOURCE_FILE_STOP',
 ]);
 const codeOf=e=>REPORT_CODES.has(e?.code)?e.code:'R17_B_UNEXPECTED_STOP';
+const safeImportDiagnostic=error=>{
+ const d=error?.diagnostic;
+ const safePath=p=>typeof p==='string'&&p.length>=1&&p.length<=180&&
+   /^(?:scripts|lib|worker)\/[A-Za-z0-9_./-]+$/.test(p);
+ if(error?.code!=='R17_B_IMPORT_RESOLUTION_STOP'||!d||
+   !['OVERLAY','PC_BASE'].includes(d.sourceKind)||
+   !['MISSING','ESCAPE','READ_FAILURE','INVALID_BUFFER'].includes(d.reason)||
+   !safePath(d.sourcePath)||!safePath(d.dependencyPath))
+   return null;
+ return {sourceKind:d.sourceKind,sourcePath:d.sourcePath,
+   dependencyPath:d.dependencyPath,reason:d.reason};
+};
+function importStop(sourcePath,dependencyPath,reason,sourceKind){
+ const error=Object.assign(new Error('R17_B_IMPORT_RESOLUTION_STOP'),{
+   code:'R17_B_IMPORT_RESOLUTION_STOP',
+   diagnostic:{sourceKind,sourcePath,dependencyPath,reason},
+ });
+ throw error;
+}
 const safePatchDiagnostic=error=>{
   const d=error?.diagnostic;
   if(error?.code!=='R17_B_PATCH_CONTEXT_STOP'||!d||
@@ -63,20 +82,26 @@ export function verifyImports(pcRoot,overlaid,readBase,{maxFiles=500}={}){
     if(++examined>maxFiles)stop('R17_B_IMPORT_BUDGET_STOP');
     seen.add(file);
     let buf;
-    try{buf=overlaid.get(file)??readBase(pcRoot,file)}catch{stop('R17_B_IMPORT_RESOLUTION_STOP')}
+    const sourceKind=overlaid.has(file)?'OVERLAY':'PC_BASE';
+    try{buf=overlaid.get(file)??readBase(pcRoot,file)}
+    catch{importStop(file,file,'READ_FAILURE',sourceKind)}
     if(!Buffer.isBuffer(buf)||buf.length>2_000_000)
-      stop('R17_B_IMPORT_RESOLUTION_STOP');
+      importStop(file,file,'INVALID_BUFFER',sourceKind);
     if(!/\.(?:mjs|cjs|js|ts|tsx)$/.test(file))continue;
     const src=buf.toString('utf8');
     const pattern=/(?:\bfrom\s*|\bimport\s*(?:\(|\s)|\brequire\s*\()\s*['"](\.[^'"]+)['"]/g;
+    // JSDoc's import('./types') is type metadata, never a runtime module.
+    const jsdoc=[...src.matchAll(/\/\*\*[\s\S]*?\*\//g)]
+      .map(m=>[m.index,m.index+m[0].length]);
     for(const match of src.matchAll(pattern)){
+      if(jsdoc.some(([first,last])=>match.index>=first&&match.index<last))continue;
       const base=path.posix.dirname(file),candidate=path.posix.normalize(path.posix.join(base,match[1]));
       if(candidate==='..'||candidate.startsWith('../')||path.posix.isAbsolute(candidate))
-        stop('R17_B_IMPORT_RESOLUTION_STOP');
+        importStop(file,candidate,'ESCAPE',sourceKind);
       const variants=/\.[a-z]+$/i.test(candidate)?[candidate]:
         [candidate+'.mjs',candidate+'.js',candidate+'.ts',candidate+'.tsx',candidate+'/index.mjs'];
       const resolved=variants.find(v=>overlaid.has(v)||readBase(pcRoot,v,true));
-      if(!resolved)stop('R17_B_IMPORT_RESOLUTION_STOP');
+      if(!resolved)importStop(file,candidate,'MISSING',sourceKind);
       queue.push(resolved);
     }
   }
@@ -227,7 +252,7 @@ function main(){
       taskXml:()=>execFileSync(SCHTASKS,['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
         {windowsHide:true,timeout:15_000,maxBuffer:100_000,env:safeEnv(env)}),
     });
-  }catch(error){const diagnostic=safePatchDiagnostic(error);
+  }catch(error){const diagnostic=safePatchDiagnostic(error)??safeImportDiagnostic(error);
     report={requestId,runId:env.GITHUB_RUN_ID,
       status:'BLOCKED',code:codeOf(error),
       ...(diagnostic?{diagnostic}:{}),
