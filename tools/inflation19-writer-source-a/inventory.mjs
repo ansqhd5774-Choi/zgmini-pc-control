@@ -15,7 +15,8 @@ export const FILES=Object.freeze([
  'scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs',
  'scripts/pc-writer/inflation-causal-public-auto-publication-r1.test.mjs',
 ]);
-const TASK_SCRIPTS=/\\scripts\\pc-writer\\(?:run-local|local-cycle)\.mjs$/i;
+const TASK_SCRIPTS=/\\scripts\\pc-writer\\(?:run-local|local-cycle|quota-runner|collect-local)\.mjs$/i;
+const APPROVED_SOURCE_ENTRY=/\\scripts\\pc-writer\\(?:run-local|local-cycle)\.mjs$/i;
 const GIT_CANDIDATES=[String.raw`C:\Program Files\Git\cmd\git.exe`,
  String.raw`C:\Program Files (x86)\Git\cmd\git.exe`];
 const SHA40=/^[a-f0-9]{40}$/;
@@ -50,6 +51,16 @@ function literalLocalVbsPath(p){
   stop('INFL19_A_LAUNCHER_PATH_DENIED');
  return n;
 }
+function literalLocalWriterScript(p){
+ if(typeof p!=='string'||p.length>512||!/^[ce]:\\/i.test(p))
+  stop('INFL19_A_ORIGIN_SCRIPT_DENIED');
+ const parts=p.slice(3).split('\\');
+ if(parts.some(s=>!s||s==='.'||s==='..'||/[\/<>:"|?*\x00-\x1f]/.test(s)||/[. ]$/.test(s)))
+  stop('INFL19_A_ORIGIN_SCRIPT_DENIED');
+ const n=canonicalWindows(p);
+ if(!TASK_SCRIPTS.test(n))stop('INFL19_A_ORIGIN_SCRIPT_DENIED');
+ return n;
+}
 export function approvedWriterVbsPath(p){
  const n=literalLocalVbsPath(p);
  if(!n.startsWith(WRITER_VBS_ROOT+'\\'))
@@ -59,8 +70,8 @@ export function approvedWriterVbsPath(p){
 
 export function sourceRootFromRealScript(real){
  const p=canonicalWindows(real);
- if(!TASK_SCRIPTS.test(p))stop('INFL19_A_SCRIPT_NOT_WRITER');
- const suffix=/\\scripts\\pc-writer\\(?:run-local|local-cycle)\.mjs$/i.exec(p)[0];
+ if(!APPROVED_SOURCE_ENTRY.test(p))stop('INFL19_A_SCRIPT_NOT_WRITER');
+ const suffix=APPROVED_SOURCE_ENTRY.exec(p)[0];
  const root=p.slice(0,-suffix.length);
  if(!root.startsWith('e:\\zgmini\\projects\\')||
     root==='e:\\zgmini\\projects' || /\\\.(?:\\|$)/.test(root)||
@@ -149,10 +160,40 @@ export function parseApprovedCoreVbs(bytes){
  return invocation[1];
 }
 
+// R38 identity-only fallback, documented by market-calendar R34/R59. This
+// extracts static file references; it never interprets or runs VBS statements.
+function decodedVbs(bytes,max){
+ bounded(bytes,max,'INFL19_A_ORIGIN_BYTES_DENIED');
+ if(bytes[0]===0xff&&bytes[1]===0xfe)return bytes.subarray(2).toString('utf16le');
+ if(bytes[0]===0xfe&&bytes[1]===0xff)stop('INFL19_A_VBS_ENCODING_DENIED');
+ if(bytes.length>=3&&bytes[0]===0xef&&bytes[1]===0xbb&&bytes[2]===0xbf)
+  return bytes.subarray(3).toString('utf8');
+ if(bytes.length>3&&bytes[1]===0&&bytes[3]===0)return bytes.toString('utf16le');
+ return bytes.toString('utf8');
+}
+export function parseR38OriginPath(wrapper){
+ const text=decodedVbs(wrapper,16_384);
+ const marker=[...text.matchAll(/\bZGMINI_R38_WRAPPER_V1\b/g)];
+ if(marker.length!==1)stop('INFL19_A_R38_MARKER_DENIED');
+ const origins=[...text.matchAll(/^[ \t]*origin[ \t]*=[ \t]*"((?:[^"\r\n]|"")*)"[ \t]*(?:\x27[^\r\n]*)?$/gim)];
+ if(origins.length!==1)stop('INFL19_A_R38_ORIGIN_AMBIGUOUS');
+ const raw=origins[0][1].replaceAll('""','"');
+ literalLocalVbsPath(raw);
+ return raw;
+}
+export function parseR38OriginScript(origin){
+ const text=decodedVbs(origin,65_536);
+ const matches=[...text.matchAll(/([ce]:\\[^"'\r\n<>]*?\.mjs)/gi)];
+ const distinct=[...new Set(matches.map(m=>m[1].toLowerCase()))];
+ if(distinct.length!==1)stop('INFL19_A_ORIGIN_SCRIPT_AMBIGUOUS');
+ literalLocalWriterScript(matches[0][1]);
+ return matches[0][1];
+}
+
 export function inventoryReadOnly({taskXml,resolveRealPath,readConfig,gitRoot,gitHead,
- targetFilesDirty,readTarget,readTargetExists,readLauncher}={}){
+ targetFilesDirty,readTarget,readTargetExists,readLauncher,readOrigin}={}){
  if([taskXml,resolveRealPath,readConfig,gitRoot,gitHead,targetFilesDirty,
-     readTarget,readTargetExists,readLauncher].some(x=>typeof x!=='function'))
+     readTarget,readTargetExists,readLauncher,readOrigin].some(x=>typeof x!=='function'))
   stop('INFL19_A_DEPENDENCY_DENIED');
  const action=parseCoreTaskXml(taskXml());
  const config=readConfig(PC_DATA);
@@ -173,10 +214,28 @@ export function inventoryReadOnly({taskXml,resolveRealPath,readConfig,gitRoot,gi
   const launcher=bounded(readLauncher(action.launcher),16_384,'INFL19_A_LAUNCHER_BYTES_DENIED');
   try{script=parseApprovedCoreVbs(launcher)}catch(e){
    if(e?.code!=='INFL19_A_LAUNCHER_FORMAT_UNSUPPORTED')throw e;
-   return {schema:SCHEMA,status:'BLOCKED',code:e.code,
-    configApprovedSha:config.source,taskXmlSha256:action.taskXmlSha256,
-    actionExe:action.actionExe,launcherSha256:digest(launcher),
-    providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
+   try{
+    const originPath=parseR38OriginPath(launcher);
+    approvedWriterVbsPath(canonicalWindows(resolveRealPath(originPath)));
+    const origin=bounded(readOrigin(originPath),65_536,'INFL19_A_ORIGIN_BYTES_DENIED');
+    const staticReference=parseR38OriginScript(origin);
+    // R34/R59 establish a static reference and a marker, not an exact,
+    // audited VBS execution grammar. A comment or alternate Shell.Run could
+    // otherwise produce a false PASS. Never promote this to source identity.
+    return {schema:SCHEMA,status:'BLOCKED',code:'INFL19_A_R38_DISPATCH_UNVERIFIED',
+     taskXmlSha256:action.taskXmlSha256,actionExe:action.actionExe,
+     launcherSha256:digest(launcher),originSha256:digest(origin),
+     staticScriptBasename:path.win32.basename(staticReference).toLowerCase(),
+     staticEvidence:'REFERENCE_ONLY_NOT_EXECUTION_PROVEN',
+     providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
+   }catch(r38Error){
+    const code=r38Error?.code==='INFL19_A_R38_MARKER_DENIED'?e.code:
+     (r38Error?.code??'INFL19_A_LAUNCHER_FORMAT_UNSUPPORTED');
+    return {schema:SCHEMA,status:'BLOCKED',code,
+     configApprovedSha:config.source,taskXmlSha256:action.taskXmlSha256,
+     actionExe:action.actionExe,launcherSha256:digest(launcher),
+     providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
+   }
   }
  }
  const sourceRoot=sourceRootFromRealScript(resolveRealPath(script));
@@ -259,6 +318,12 @@ function main(){
     const st=fs.lstatSync(full);
     if(!st.isFile()||st.isSymbolicLink())stop('INFL19_A_LAUNCHER_NOT_REGULAR');
     return bounded(fs.readFileSync(full),16_384,'INFL19_A_LAUNCHER_BYTES_DENIED');
+   },
+   readOrigin:full=>{
+    const st=fs.lstatSync(full);
+    if(!st.isFile()||st.isSymbolicLink()||st.size<=0||st.size>65_536)
+     stop('INFL19_A_ORIGIN_NOT_REGULAR');
+    return bounded(fs.readFileSync(full),65_536,'INFL19_A_ORIGIN_BYTES_DENIED');
    },
    readTargetExists:(root,rel)=>{
     try{fs.lstatSync(path.win32.join(root,...rel.split('/')));return true}

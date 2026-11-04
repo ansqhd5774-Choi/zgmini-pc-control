@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {canonicalWindows,approvedWriterVbsPath,sourceRootFromRealScript,
- parseCoreTaskXml,parseApprovedCoreVbs,
+ parseCoreTaskXml,parseApprovedCoreVbs,parseR38OriginPath,parseR38OriginScript,
  launcherArgumentShape,sanitizedBlock,
  inventoryReadOnly,FILES,SCHEMA} from './inventory.mjs';
 
@@ -11,8 +11,13 @@ const SOURCE='a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e';
 const CORE_VBS=String.raw`E:\ZGmini\data\pc-writer\run-local-core.vbs`;
 const ALT_VBS=String.raw`E:\ZGmini\data\pc-writer\launchers\approved-core-alternate.vbs`;
 const COMPAT_VBS=String.raw`C:\ZGmini\data\pc-writer\launchers\approved-core-alternate.vbs`;
+const R38_ORIGIN=String.raw`E:\ZGmini\data\pc-writer\archive-sidecar-r7\run-original-then-archive.vbs`;
 const vbs=()=>Buffer.from('Set shell = CreateObject("WScript.Shell")\r\n'+
  'WScript.Quit shell.Run("""E:\\ZGmini\\runtime\\node.exe"" ""'+SCRIPT+'"" --publish", 0, True)\r\n');
+const r38=()=>Buffer.from("' ZGMINI_R38_WRAPPER_V1\r\n"+
+ `origin = "${R38_ORIGIN}"\r\n`+
+ "Set shell = CreateObject(\"WScript.Shell\")\r\n"+
+ 'WScript.Quit shell.Run(origin, 0, True)\r\n');
 const xml=(script=SCRIPT,command=String.raw`E:\ZGmini\runtime\node.exe`)=>Buffer.from(
  `<?xml version="1.0"?><Task><Actions><Exec><Command>${command}</Command>`+
  `<Arguments>"${script}"</Arguments></Exec></Actions></Task>`);
@@ -21,6 +26,7 @@ function fixture(overrides={}){
   readConfig:()=>({source:SOURCE}),gitRoot:()=>ROOT,gitHead:()=>SOURCE,
   targetFilesDirty:()=>false,
   readLauncher:()=>vbs(),
+  readOrigin:()=>vbs(),
   readTargetExists:(_root,rel)=>rel===FILES[0],
   readTarget:()=>Buffer.from('approved existing run-local source')};
  return {...deps,...overrides};
@@ -118,6 +124,78 @@ test('alternate VBS with malicious content is blocked without executing',()=>{
  assert.equal(r.code,'INFL19_A_LAUNCHER_FORMAT_UNSUPPORTED');
  assert.match(r.launcherSha256,/^[a-f0-9]{64}$/);
  assert.equal(JSON.stringify(r).includes('malicious'),false);
+});
+
+test('R38 wrapper with one approved origin stays BLOCKED without dispatch proof',()=>{
+ assert.equal(parseR38OriginPath(r38()),R38_ORIGIN);
+ assert.equal(parseR38OriginScript(vbs()),SCRIPT);
+ let originReads=0;
+ const r=inventoryReadOnly(fixture({taskXml:()=>xml(ALT_VBS,
+  String.raw`C:\Windows\System32\wscript.exe`),
+  resolveRealPath:p=>p===ALT_VBS?ALT_VBS:p===R38_ORIGIN?R38_ORIGIN:SCRIPT,
+  readLauncher:()=>r38(),readOrigin:()=>{originReads++;return vbs()}}));
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'INFL19_A_R38_DISPATCH_UNVERIFIED');
+ assert.equal(r.staticScriptBasename,'local-cycle.mjs');
+ assert.equal(r.staticEvidence,'REFERENCE_ONLY_NOT_EXECUTION_PROVEN');
+ assert.equal('sourceRoot' in r,false);
+ assert.equal('configApprovedSha' in r,false);
+ assert.match(r.originSha256,/^[a-f0-9]{64}$/);
+ assert.equal(originReads,1);
+ assert.equal(JSON.stringify(r).includes('run-original-then-archive'),false);
+});
+
+test('R38 origin outside E Writer realpath is blocked before reading',()=>{
+ let originReads=0;
+ const r=inventoryReadOnly(fixture({taskXml:()=>xml(ALT_VBS,
+  String.raw`C:\Windows\System32\wscript.exe`),
+  resolveRealPath:p=>p===ALT_VBS?ALT_VBS:p===R38_ORIGIN?
+   String.raw`E:\ZGmini\data\outside\origin.vbs`:SCRIPT,
+  readLauncher:()=>r38(),readOrigin:()=>{originReads++;return vbs()}}));
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'INFL19_A_LAUNCHER_PATH_DENIED');
+ assert.equal(originReads,0);
+ assert.equal(JSON.stringify(r).includes('outside'),false);
+});
+
+test('R38 origin rejects unknown, multiple, and non-Writer script references',()=>{
+ const other=String.raw`E:\ZGmini\projects\test\scripts\outside.mjs`;
+ const badFiles=[
+  Buffer.from(`shell.Run "${other}"`),
+  Buffer.from(`shell.Run "${SCRIPT}"\r\nshell.Run "${other}"`),
+  Buffer.from('shell.Run "unresolved-relative.mjs"'),
+ ];
+ for(const source of badFiles){
+  let error;
+  try{parseR38OriginScript(source)}catch(e){error=e}
+  assert.ok(['INFL19_A_ORIGIN_SCRIPT_DENIED',
+   'INFL19_A_ORIGIN_SCRIPT_AMBIGUOUS'].includes(error?.code));
+ }
+ const badOrigin=Buffer.from("' ZGMINI_R38_WRAPPER_V1\r\n"+
+  `origin = "${R38_ORIGIN}"\r\norigin = "${R38_ORIGIN}"`);
+ assert.throws(()=>parseR38OriginPath(badOrigin),/INFL19_A_R38_ORIGIN_AMBIGUOUS/);
+ const malicious=inventoryReadOnly(fixture({taskXml:()=>xml(ALT_VBS,
+  String.raw`C:\Windows\System32\wscript.exe`),
+  resolveRealPath:p=>p===ALT_VBS?ALT_VBS:p===R38_ORIGIN?R38_ORIGIN:SCRIPT,
+  readLauncher:()=>r38(),readOrigin:()=>Buffer.from(`shell.Run "${SCRIPT}"\r\nshell.Run "${other}"`)}));
+ assert.equal(malicious.status,'BLOCKED');
+ assert.equal(malicious.code,'INFL19_A_ORIGIN_SCRIPT_AMBIGUOUS');
+ assert.equal(malicious.pcSourceWrites,0);
+ assert.equal(JSON.stringify(malicious).includes('outside.mjs'),false);
+});
+
+test('comment-only Writer path plus alternate launcher cannot produce PASS',()=>{
+ const deceptive=Buffer.from(`' approved path ${SCRIPT}\r\n`+
+  'Set shell = CreateObject("WScript.Shell")\r\n'+
+  'WScript.Quit shell.Run("cmd.exe /c some-other-task.cmd", 0, True)\r\n');
+ const r=inventoryReadOnly(fixture({taskXml:()=>xml(ALT_VBS,
+  String.raw`C:\Windows\System32\wscript.exe`),
+  resolveRealPath:p=>p===ALT_VBS?ALT_VBS:p===R38_ORIGIN?R38_ORIGIN:SCRIPT,
+  readLauncher:()=>r38(),readOrigin:()=>deceptive}));
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'INFL19_A_R38_DISPATCH_UNVERIFIED');
+ assert.equal('sourceRoot' in r,false);
+ assert.equal(JSON.stringify(r).includes('some-other-task'),false);
 });
 
 test('nonstandard dispatcher stops with only launcher hash, without exposing content',()=>{
