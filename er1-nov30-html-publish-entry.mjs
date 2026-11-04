@@ -21,6 +21,7 @@ const ONCE_DIR = String.raw`E:\ZGmini\automation\er1-nov30-html-publish`;
 const APPROVAL_NAME = 'ER1_NOV30_HTML_PUBLISH_B_APPROVAL.json';
 const RESULT_NAME = 'ER1_NOV30_HTML_PUBLISH_RESULT.json';
 const REPORT_SCHEMA = 'ZGMINI_NOV30_HTML_PUBLISH_V1';
+const UUID_V4 = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const stop = code => { throw Error(code); };
 const errorCode = error => /^NOV30_HTML_[A-Z0-9_]+$/.test(error?.message ?? '')
@@ -48,8 +49,8 @@ export function validateRequest(event, env) {
       request.operation !== 'publish-saved-november-2026-html-only' ||
       request.sourceSha !== SOURCE_SHA ||
       request.from !== '2026-11-01' || request.through !== '2026-11-30' ||
-      !/^pc-nov30-html-[0-9a-f-]{36}$/.test(request.requestId) ||
-      !/^chat-[0-9a-f-]{36}$/.test(request.chatId)) {
+      !new RegExp('^pc-nov30-html-' + UUID_V4 + '$').test(request.requestId) ||
+      !new RegExp('^chat-' + UUID_V4 + '$').test(request.chatId)) {
     stop('NOV30_HTML_REQUEST_CONTRACT_STOP');
   }
   return request;
@@ -144,8 +145,10 @@ export function validateChildReport(child) {
     d1Writes: child.d1Writes, providerCalls: child.providerCalls,
     coreWrites: child.coreWrites, schedulerWrites: child.schedulerWrites,
     existingFeedWrites: child.existingFeedWrites, rawRowsPublic: child.rawRowsPublic,
-    localHtmlSha256: child.localHtmlSha256 ?? null,
-    d1ReadbackSha256: child.d1ReadbackSha256 ?? null,
+    localHtmlSha256: /^[a-f0-9]{64}$/.test(child.localHtmlSha256 ?? '')
+      ? child.localHtmlSha256 : null,
+    d1ReadbackSha256: /^[a-f0-9]{64}$/.test(child.d1ReadbackSha256 ?? '')
+      ? child.d1ReadbackSha256 : null,
   };
 }
 
@@ -178,6 +181,9 @@ export function execute({ env = process.env } = {}) {
       encoding: 'utf8', maxBuffer: 8192, env: safeEnv(env), shell: false,
     });
     if (fs.existsSync(childOutput)) {
+      const stat = fs.lstatSync(childOutput);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 8192)
+        stop('NOV30_HTML_CHILD_REPORT_FILE_STOP');
       report = { ...validateChildReport(JSON.parse(fs.readFileSync(childOutput, 'utf8'))),
         requestId: request.requestId };
     }
