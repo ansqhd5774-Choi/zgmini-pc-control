@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_THEME_R54_EVIDENCE_B_APPROVAL_V1",
+  "grade": "B",
+  "purpose": "theme-r54-one-shot-raw-evidence",
+  "scope": "FIXED_PRIVATE_R54_MANIFEST_RAW_READONLY_ONCE",
+  "approvalBasis": "docs/PC_AUTOMATION_STANDARD.md#5 + user-directed existing-ten-theme R54 raw evidence verification",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "sourceCommit": "77c6cc43a2450f34a7cfe81f39040807e727f1cf",
+  "adapterSha256": "13027dcc945d06e63f3445b11bed30ec7e65dd3bf16c2728b63034e50f31e46c",
+  "scriptSha256": "3f1a16c61ee022aec49198d33b4f26c74e4ce6a2987a7edf96181ba861e5f96d",
+  "dataRoot": "E:\\ZGmini\\data",
+  "minimumFreeMiB": 1536,
+  "timeoutSeconds": 240,
+  "maxProviderRequests": 0,
+  "maxAutomaticRetries": 0,
+  "coreWrites": false,
+  "dbWrites": false,
+  "d1Writes": false,
+  "schedulerWrites": false
+}
