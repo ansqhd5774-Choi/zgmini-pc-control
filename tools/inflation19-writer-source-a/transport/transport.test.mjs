@@ -30,6 +30,12 @@ const raw={schema:'ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1',
  configMatchesHead:true,targetFilesDirty:false,
  taskXmlSha256:'b'.repeat(64),actionExe:'wscript.exe',files:hashes,
  providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
+const blockedAction={schema:'ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1',
+ status:'BLOCKED',code:'INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',
+ taskXmlSha256:'c'.repeat(64),actionExe:'wscript.exe',
+ launcherArgumentShape:'VBS_WITH_FLAGS',
+ taskXml:'RAW_XML_DENIED',arguments:'RAW_ARGS_DENIED',token:'SECRET_DENIED',
+ providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
 const copy=v=>structuredClone(v);
 
 test('fixed owner, label, one-shot UUID and immutable source pin are required',()=>{
@@ -75,6 +81,24 @@ test('nonzero child exit cannot be transformed into a PASS',t=>{
  const r=executeInventory({event,env,resultDir:tmp,scriptPath:'/tmp/fixed-inventory.mjs',
   spawn:()=>({status:1,stdout:JSON.stringify(raw)})});
  assert.equal(r.result.status,'BLOCKED');
+});
+
+test('nonzero BLOCKED child preserves exactly three safe action details',t=>{
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'infl19-readonly-'));
+ t.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+ const r=executeInventory({event,env,resultDir:tmp,scriptPath:'/tmp/fixed-inventory.mjs',
+  spawn:()=>({status:1,stdout:JSON.stringify(blockedAction)})});
+ assert.equal(r.result.status,'BLOCKED');
+ assert.equal(r.result.code,'INFL19_A_SCRIPT_REFERENCE_UNRESOLVED');
+ assert.equal(r.result.taskXmlSha256,'c'.repeat(64));
+ assert.equal(r.result.actionExe,'wscript.exe');
+ assert.equal(r.result.launcherArgumentShape,'VBS_WITH_FLAGS');
+ assert.equal('taskXml' in r.result,false);
+ assert.equal('arguments' in r.result,false);
+ assert.equal('token' in r.result,false);
+ const invalid=safeResult({...blockedAction,launcherArgumentShape:'RAW_ARGS_DENIED'},
+  {requestId:id,chatId:chat});
+ assert.equal('taskXmlSha256' in invalid,false);
 });
 
 test('uploader posts bounded JSON TXT and one comment without PC writes',async()=>{
@@ -128,6 +152,32 @@ test('missing report TXT preserves unknown state instead of false',async()=>{
  assert.equal(r.status,'BLOCKED');
  assert.match(received,/CONFIG_MATCHES_HEAD=UNKNOWN/);
  assert.match(received,/TARGET_FILES_DIRTY=UNKNOWN/);
+});
+
+test('uploader BLOCKED TXT and JSON expose only whitelisted action shape',async()=>{
+ const reports=[];
+ const fake=async (url,opt)=>{
+  if(opt.method==='GET')return {status:200,json:async()=>[]};
+  if(opt.method==='PUT')reports.push({url,body:Buffer.from(
+   JSON.parse(opt.body).content,'base64').toString('utf8')});
+  return {status:201};
+ };
+ const report=safeResult(blockedAction,{requestId:id,chatId:chat});
+ const answer=await uploadReport({event,env,readReport:()=>JSON.stringify(report),apiFetch:fake});
+ assert.equal(answer.status,'BLOCKED');
+ assert.equal(reports.length,2);
+ const txt=reports.find(x=>x.url.endsWith('.txt')).body;
+ const json=JSON.parse(reports.find(x=>x.url.endsWith('.json')).body);
+ assert.match(txt,/TASK_XML_SHA256=c{64}/);
+ assert.match(txt,/ACTION_EXE=wscript\.exe/);
+ assert.match(txt,/LAUNCHER_ARGUMENT_SHAPE=VBS_WITH_FLAGS/);
+ assert.match(txt,/CONFIG_MATCHES_HEAD=UNKNOWN/);
+ assert.match(txt,/TARGET_FILES_DIRTY=UNKNOWN/);
+ assert.equal(json.launcherArgumentShape,'VBS_WITH_FLAGS');
+ for(const denied of ['RAW_XML_DENIED','RAW_ARGS_DENIED','SECRET_DENIED']){
+  assert.doesNotMatch(txt,new RegExp(denied));
+  assert.doesNotMatch(JSON.stringify(json),new RegExp(denied));
+ }
 });
 
 test('missing prior comment state stops before any outbound result mutation',async()=>{

@@ -16,7 +16,8 @@ function sanitized(raw,request){
  if(raw?.schema!==RESULT_SCHEMA||raw?.requestId!==request.requestId||
     raw?.chatId!==request.chatId)return safeResult({},request);
  // Strip unrecognized fields and prohibit accepting a fabricated PASS.
- const version=raw.status==='PASS_READONLY'?'ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1':null;
+ const version=['PASS_READONLY','BLOCKED'].includes(raw.status)?
+  'ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1':null;
  const code=raw.status==='PASS_READONLY'?'INFL19_A_SOURCE_IDENTITY_OBSERVED':raw.code;
  return safeResult({...raw,schema:version,code},request);
 }
@@ -29,6 +30,11 @@ function txt(result){
   `TARGET_FILES_DIRTY=${typeof result.targetFilesDirty==='boolean'?String(result.targetFilesDirty):'UNKNOWN'}`,
   'PC_SOURCE_WRITES=0','D1_WRITES=0','PROVIDER_CALLS=0',
   'RETRY=NO_REEXECUTE_READBACK_ONLY'];
+ if(result.status==='BLOCKED'&&result.taskXmlSha256){
+  lines.push(`TASK_XML_SHA256=${result.taskXmlSha256}`,
+   `ACTION_EXE=${result.actionExe}`,
+   `LAUNCHER_ARGUMENT_SHAPE=${result.launcherArgumentShape}`);
+ }
  for(const [name,v] of Object.entries(result.files??{}))
   lines.push(`FILE_${name.replace(/[^a-z0-9]/gi,'_')}=${v.status}:${v.sha256??'-'}`);
  return lines.join('\n')+'\n';

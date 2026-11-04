@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {canonicalWindows,sourceRootFromRealScript,parseCoreTaskXml,parseApprovedCoreVbs,
+ launcherArgumentShape,sanitizedBlock,
  inventoryReadOnly,FILES,SCHEMA} from './inventory.mjs';
 
 const SCRIPT=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
@@ -110,4 +111,30 @@ test('unsafe source state and missing entry do not pass',()=>{
   /INFL19_A_WRITER_ENTRY_MISSING/);
  assert.throws(()=>inventoryReadOnly(fixture({gitRoot:()=>String.raw`e:\zgmini\projects`})),
   /INFL19_A_NOT_CHECKOUT_ROOT/);
+});
+
+test('unresolved action reports only allowlisted executable and argument shape',()=>{
+ const raw=xml(String.raw`E:\ZGmini\automation\private-dispatch.vbs`,
+  String.raw`C:\Windows\System32\cscript.exe`);
+ let error;
+ try{parseCoreTaskXml(raw)}catch(e){error=e}
+ const report=sanitizedBlock(error);
+ assert.equal(report.code,'INFL19_A_SCRIPT_REFERENCE_UNRESOLVED');
+ assert.equal(report.actionExe,'cscript.exe');
+ assert.equal(report.launcherArgumentShape,'QUOTED_VBS_PATH');
+ assert.match(report.taskXmlSha256,/^[a-f0-9]{64}$/);
+ assert.equal(JSON.stringify(report).includes('private-dispatch'),false);
+ assert.equal(report.pcSourceWrites,0);
+});
+
+test('nonallowlisted executable is redacted, command switches classified only',()=>{
+ assert.equal(launcherArgumentShape('/d /c "E:\\secret\\launcher.cmd"'),'CMD_SWITCH');
+ const raw=xml(String.raw`E:\ZGmini\automation\secret.cmd`,
+  String.raw`C:\Windows\System32\unknown-secret.exe`);
+ let error;
+ try{parseCoreTaskXml(raw)}catch(e){error=e}
+ const report=sanitizedBlock(error);
+ assert.equal(report.actionExe,'OTHER');
+ assert.equal(report.launcherArgumentShape,'QUOTED_CMD_PATH');
+ assert.equal(JSON.stringify(report).includes('unknown-secret'),false);
 });
