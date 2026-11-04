@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 const OWNER='ansqhd5774-Choi',CONTROL=OWNER+'/zgmini-pc-control';
 const SOURCE_SHA='a646050a74c691ac6550ededdc9b7fc695c19848';
 const BATCH_SCRIPT='scripts/pc-writer/market-calendar-nov30-er1-batch20-once.mjs';
-const BATCH_HASH='415c8ab86ac24e673c80ad7e759070ddc90b94cc6830c912c3f114c61b05044c';
+const BATCH_HASH='cb73b5d280bc00c6fb131bfc76d2515e72c7460f6d274266fbb96b23fcff79ed';
 const BASE_SCRIPT='scripts/pc-writer/market-calendar-nov30-er1-probe-publish.mjs';
 const BASE_HASH='56480419432a9be8b9ae7bc945e4448f6876913268604bd65d09dae1d8912412';
 const APPROVAL='ER1_NOV30_BATCH20_RECOVERY_B_APPROVAL.json';
