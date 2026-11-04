@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {
- TARGET_REQUEST,BASE_SHA,BASE_HASHES,EXPECTED_TASK_HASH,
+ TARGET_REQUEST,BASE_SHA,BASE_HASHES,EXPECTED_TASK_HASH,HISTORICAL_PROTECTED_SHA,
  applyFixedPatch,classifyEvidence,summarizeEvidence,
 } from '../controller/r17-268-postcancel-readonly.mjs';
 
@@ -35,7 +35,8 @@ function completeFixture(){
   targetSha256:{},configSource:BASE_SHA,taskHash:EXPECTED_TASK_HASH,
   preflight:{requestId:TARGET_REQUEST,terminal:true},
   operatingSourceIdentified:true,runtimeSourceVerified:true,process:{verified:true,active:false},
-  lease:{verified:true,active:false},configBaselineMatched:true,checkpointsBaselineMatched:true};
+  lease:{verified:true,active:false},protectedStateSha256:HISTORICAL_PROTECTED_SHA,
+  checkpointsObserved:true,requestSideEffectsVerifiedAbsent:true};
 }
 
 test('exactly two context-verified files are patched in memory; originals unchanged',()=>{
@@ -62,18 +63,19 @@ test('mismatched patch context, missing file, duplicate file, and trailing text 
 
 test('complete no-drift evidence is the only NO_CHANGE_CONFIRMED',()=>{
  assert.equal(classifyEvidence(completeFixture()).status,'NO_CHANGE_CONFIRMED');
- assert.equal(classifyEvidence({...completeFixture(),checkpointsBaselineMatched:false}).status,'INSUFFICIENT_EVIDENCE');
+ assert.equal(classifyEvidence({...completeFixture(),checkpointsObserved:false}).status,'INSUFFICIENT_EVIDENCE');
  assert.equal(classifyEvidence({...completeFixture(),runtimeSourceVerified:false}).status,'INSUFFICIENT_EVIDENCE');
  assert.equal(classifyEvidence({...completeFixture(),preflight:{requestId:TARGET_REQUEST,terminal:false}}).status,'INSUFFICIENT_EVIDENCE');
- assert.equal(classifyEvidence({...completeFixture(),configBaselineMatched:false}).status,'INSUFFICIENT_EVIDENCE');
+ assert.equal(classifyEvidence({...completeFixture(),protectedStateSha256:null}).status,'INSUFFICIENT_EVIDENCE');
+ assert.equal(classifyEvidence({...completeFixture(),requestSideEffectsVerifiedAbsent:false}).status,'INSUFFICIENT_EVIDENCE');
 });
 
 test('the currently available PC evidence cannot justify a no-change or resume PASS',()=>{
  const evidence={...completeFixture(),
-  // #268 has no terminal request-scoped ledger or pre-run checkpoint digest.
+  // #268 has no terminal request-scoped ledger or proof of side-effect absence.
   preflight:{requestId:TARGET_REQUEST,terminal:false,lastStep:null},
-  configBaselineMatched:false,
-  checkpointsBaselineMatched:false,
+  protectedStateSha256:null,
+  requestSideEffectsVerifiedAbsent:false,
   // The installed source tracer proves only static launcher provenance.
   runtimeSourceVerified:false,
   // No matching process or dedicated lease is not verified negative proof.
@@ -85,12 +87,31 @@ test('the currently available PC evidence cannot justify a no-change or resume P
  assert.equal(result.code,'R17_268_EVIDENCE_INSUFFICIENT_BLOCKED');
  assert.equal(result.assessment,'INSUFFICIENT_EVIDENCE');
  assert.equal(result.assessmentCode,'R17_268_LAST_STEP_OR_BASELINE_UNVERIFIED');
- assert.ok(result.missingEvidence.includes('CONFIG_CONTENT_BASELINE_UNVERIFIED'));
- assert.ok(result.missingEvidence.includes('CHECKPOINT_BASELINE_UNVERIFIED'));
+ assert.ok(result.missingEvidence.includes('PROTECTED_STATE_BASELINE_UNVERIFIED'));
+ assert.ok(result.missingEvidence.includes('REQUEST_SIDE_EFFECTS_UNVERIFIED'));
  assert.ok(result.missingEvidence.includes('PROCESS_ABSENCE_UNVERIFIED'));
  assert.ok(result.missingEvidence.includes('REQUEST_TERMINAL_UNVERIFIED'));
  assert.deepEqual(result.sourceComparison.map(x=>x.comparison),['BEFORE','BEFORE']);
  assert.equal(result.operationalWrites,0);
+});
+
+test('normal scheduled checkpoint changes are observed, not attributed to #268',()=>{
+ const first={...completeFixture(),checkpointEvidence:{cycle:{sha256:'a'.repeat(64)}}};
+ const second={...completeFixture(),checkpointEvidence:{cycle:{sha256:'b'.repeat(64)}}};
+ assert.equal(classifyEvidence(first).status,'NO_CHANGE_CONFIRMED');
+ assert.equal(classifyEvidence(second).status,'NO_CHANGE_CONFIRMED');
+ const report=summarizeEvidence(second);
+ assert.equal(report.checkpointChangeAttribution,'UNKNOWN');
+ assert.deepEqual(report.checkpointEvidence,second.checkpointEvidence);
+ assert.equal(report.protectedStateEvidence.matched,true);
+});
+
+test('protected aggregate drift cannot be confused with a matching old config source pin',()=>{
+ const result=summarizeEvidence({...completeFixture(),protectedStateSha256:'e'.repeat(64)});
+ assert.equal(result.assessment,'CHANGED');
+ assert.equal(result.assessmentCode,'R17_268_PROTECTED_STATE_DRIFT_UNATTRIBUTED');
+ assert.equal(result.attributedTo268,false);
+ assert.equal(result.protectedStateEvidence.matched,false);
 });
 
 test('source comparison does not attribute approved patch bytes to cancelled request',()=>{
@@ -138,6 +159,7 @@ test('dispatcher has one-shot ID gate; published policy remains A/readonly',()=>
  const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.match(dispatcher,/request\.requestId!==ONE_SHOT_DIAGNOSTIC_ID/);
  assert.match(dispatcher,/inspectR17PostCancel\(dataRoot,/);
+ assert.match(dispatcher,/digest\(JSON\.stringify\(protectedState\(dataRoot,\{queryTask\}\)\)\)/);
  assert.deepEqual(policy.operations['r17-268-postcancel-readonly'],{grade:'A',timeoutSeconds:90,resource:'light'});
  assert.equal(policy.mutationsEnabled,false);
 });
