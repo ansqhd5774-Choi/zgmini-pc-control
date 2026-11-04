@@ -35,7 +35,7 @@ function completeFixture(){
   targetSha256:{},configSource:BASE_SHA,taskHash:EXPECTED_TASK_HASH,
   preflight:{requestId:TARGET_REQUEST,terminal:true},
   operatingSourceIdentified:true,runtimeSourceVerified:true,process:{verified:true,active:false},
-  lease:{verified:true,active:false},checkpointsBaselineMatched:true};
+  lease:{verified:true,active:false},configBaselineMatched:true,checkpointsBaselineMatched:true};
 }
 
 test('exactly two context-verified files are patched in memory; originals unchanged',()=>{
@@ -65,12 +65,14 @@ test('complete no-drift evidence is the only NO_CHANGE_CONFIRMED',()=>{
  assert.equal(classifyEvidence({...completeFixture(),checkpointsBaselineMatched:false}).status,'INSUFFICIENT_EVIDENCE');
  assert.equal(classifyEvidence({...completeFixture(),runtimeSourceVerified:false}).status,'INSUFFICIENT_EVIDENCE');
  assert.equal(classifyEvidence({...completeFixture(),preflight:{requestId:TARGET_REQUEST,terminal:false}}).status,'INSUFFICIENT_EVIDENCE');
+ assert.equal(classifyEvidence({...completeFixture(),configBaselineMatched:false}).status,'INSUFFICIENT_EVIDENCE');
 });
 
 test('the currently available PC evidence cannot justify a no-change or resume PASS',()=>{
  const evidence={...completeFixture(),
   // #268 has no terminal request-scoped ledger or pre-run checkpoint digest.
   preflight:{requestId:TARGET_REQUEST,terminal:false,lastStep:null},
+  configBaselineMatched:false,
   checkpointsBaselineMatched:false,
   // The installed source tracer proves only static launcher provenance.
   runtimeSourceVerified:false,
@@ -83,7 +85,24 @@ test('the currently available PC evidence cannot justify a no-change or resume P
  assert.equal(result.code,'R17_268_EVIDENCE_INSUFFICIENT_BLOCKED');
  assert.equal(result.assessment,'INSUFFICIENT_EVIDENCE');
  assert.equal(result.assessmentCode,'R17_268_LAST_STEP_OR_BASELINE_UNVERIFIED');
+ assert.ok(result.missingEvidence.includes('CONFIG_CONTENT_BASELINE_UNVERIFIED'));
+ assert.ok(result.missingEvidence.includes('CHECKPOINT_BASELINE_UNVERIFIED'));
+ assert.ok(result.missingEvidence.includes('PROCESS_ABSENCE_UNVERIFIED'));
+ assert.ok(result.missingEvidence.includes('REQUEST_TERMINAL_UNVERIFIED'));
+ assert.deepEqual(result.sourceComparison.map(x=>x.comparison),['BEFORE','BEFORE']);
  assert.equal(result.operationalWrites,0);
+});
+
+test('source comparison does not attribute approved patch bytes to cancelled request',()=>{
+ const file='scripts/pc-writer/run-local.mjs',sha='a'.repeat(64);
+ const observed={...completeFixture(),targetSha256:{[file]:sha},
+  sources:{...completeFixture().sources,[file]:{sha256:sha}}};
+ const report=summarizeEvidence(observed);
+ assert.equal(report.assessment,'CHANGED');
+ assert.equal(report.status,'BLOCKED');
+ const row=report.sourceComparison.find(x=>x.file===file);
+ assert.equal(row.comparison,'APPROVED_PATCH');
+ assert.equal(row.attributedTo268,false);
 });
 
 test('active execution or lease blocks any clean-state admission',()=>{
