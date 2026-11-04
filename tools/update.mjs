@@ -11,7 +11,8 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
- readAllMaintenancePages,validateInfrastructureDelta,
+  readAllMaintenancePages,validateInfrastructureDelta,
+  CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
@@ -144,6 +145,18 @@ function installedManifest() {
  return {host,installedSha};
 }
 
+// No-effect classification requires a complete, stable file inventory, not
+// merely valid digests for an attacker-truncated host.controllerFiles subset.
+// Scope this to prevalidation proof; older installed manifests remain readable.
+export function prevalidationInventory(host){
+ const files=host?.controllerFiles;
+ if(!files||typeof files!=='object'||Array.isArray(files)||
+   Object.keys(files).length<INSTALLABLE_FILES.length||
+   INSTALLABLE_FILES.some(rel=>!/^[a-f0-9]{64}$/.test(files[rel]??'')))
+   return null;
+ return Object.fromEntries(Object.entries(files).sort(([a],[b])=>a.localeCompare(b)));
+}
+
 // GitHub does not replay Issue `opened` events while a workflow is disabled.
 // A failed postcheck may pause intake a SECOND time during rollback. Preserve
 // every pause interval; never silently replace the first successful replay.
@@ -206,7 +219,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const backupRoot=path.join(controlRoot,'backups','controller-update-'+request.requestId);
  const stageRoot=path.join(backupRoot,'stage');
  const snapshotRoot=path.join(backupRoot,'snapshot');
- let plannedFiles=[],protectedBefore,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
+ let plannedFiles=[],protectedBefore,prevalidationBaseline,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
  const apiRunners=()=>github('actions/runners?per_page=100').runners;
  const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
  const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
@@ -229,6 +242,34 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   fingerprint:x=>sha256(JSON.stringify({issue,manifest,targetSha:x.targetSha})),
   read:async id=>fs.existsSync(path.join(recordDir,id+'.json'))?json(path.join(recordDir,id+'.json')):null,
   persist:async x=>writeJson(ledgerFile,{...x,issueNumber,postIssueNumber}),
+  // Capture a read-only baseline BEFORE acquiring the install lease, while
+  // immutable source/owner/protected-state evidence is available. This does
+  // not change Core tasks, supervisor processes or the intake workflow.
+  capturePrevalidationBaseline:async()=>{
+   const current=installedManifest(),{owner,status}=readOwner();
+   need(current.installedSha===manifest.installedSha&&status.sourceSha===manifest.installedSha,
+    'PREVALIDATION_SOURCE_MISMATCH');
+   const files=prevalidationInventory(current.host);
+   need(files!==null,'PREVALIDATION_FILES_INCOMPLETE');
+   prevalidationBaseline={installedSha:current.installedSha,ownerPid:owner.pid,
+    ownerNonce:owner.nonce,files,protected:protectedSnapshot()};
+  },
+  // A prevalidation exception has not reached stage/pause/stop/switch. A
+  // busy independent A Runner is NOT a controller mutation and must not make
+  // an otherwise proven no-effect failure retain an install-wide recovery
+  // lease. Still require live original supervisor identity, pinned file bytes,
+  // unchanged Core protection and a freshly read active intake workflow.
+  verifyPrevalidationUntouched:async({installedSha})=>{
+   if(!prevalidationBaseline||prevalidationBaseline.installedSha!==installedSha)return false;
+   const current=installedManifest(),{owner,status}=readOwner();
+   const files=prevalidationInventory(current.host);
+   if(files===null||JSON.stringify(files)!==JSON.stringify(prevalidationBaseline.files))return false;
+   if(current.installedSha!==installedSha||status.sourceSha!==installedSha||
+     owner.pid!==prevalidationBaseline.ownerPid||owner.nonce!==prevalidationBaseline.ownerNonce)return false;
+   try {process.kill(owner.pid,0);} catch {return false;}
+   if(JSON.stringify(protectedSnapshot())!==JSON.stringify(prevalidationBaseline.protected))return false;
+   return github('actions/workflows/pc-job.yml').state==='active';
+  },
   inspect:async()=>({installedSha:installedManifest().installedSha,
    insideRunnerTree:false,githubActions:Boolean(process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME)}),
   validate:async()=>{
@@ -240,10 +281,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    need(manifest.backup?.strategy==='VERSIONED_SNAPSHOT'&&manifest.backup?.rollback?.sha===manifest.installedSha,'BACKUP_CONTRACT');
    need(manifest.checks?.status==='PASS'&&manifest.checks.targetSha===manifest.targetSha,'TARGET_TEST_EVIDENCE');
    need(manifest.approval?.grade==='B'&&/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/.test(manifest.approval.ref),'APPROVAL_REFERENCE_REQUIRED');
-   need(['core-status','fear-greed-archive-status'].includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
+    need(CONTROLLER_POST_OPERATIONS.includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
    need(validSha(manifest.postSourceSha),'POST_SOURCE_INVALID');
    need(typeof manifest.postSourceBranch==='string'&&/^[a-z0-9][a-z0-9./_-]{1,120}$/i.test(manifest.postSourceBranch),'POST_SOURCE_BRANCH');
-   need(git(['status','--porcelain']).trim()==='','CONTROL_DIRTY');
+    // The target is staged from immutable `git show <sha>:<path>` bytes.
+    // Do not block on unrelated docs, local evidence or other draft work.
+    // Changes to installable, workflow or approval paths still fail closed.
+    need(git(['status','--porcelain','--untracked-files=all','--',
+      ...CONTROL_UPDATE_SENSITIVE_PATHS]).trim()==='','CONTROL_DIRTY');
    git(['fetch','--no-tags','origin','main']);
    need(git(['cat-file','-t',manifest.targetSha]).trim()==='commit','TARGET_NOT_COMMIT');
    need(git(['merge-base','--is-ancestor',manifest.targetSha,'refs/remotes/origin/main']).trim()==='','TARGET_NOT_ON_MAIN');
@@ -265,6 +310,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
    validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
+    need(nextOperations.operations?.[manifest.postOperation]?.grade==='A'&&
+      nextOperations.operations[manifest.postOperation].resource==='light',
+    'POST_OPERATION_NOT_INSTALLED_READONLY');
    for(const item of manifest.allowFiles){
     need(/^[a-f0-9]{64}$/.test(item.sha256),'ALLOWFILE_HASH');
     need(sha256(git(['show',manifest.targetSha+':'+item.path],{encoding:null}))===item.sha256,'ALLOWFILE_HASH_MISMATCH');
@@ -1437,6 +1485,7 @@ export async function command(args=process.argv.slice(2)) {
  // from granting permission to stop or switch a changed process.
  readOwner();
  installedManifest();
+ await ports.capturePrevalidationBaseline();
  }catch(error){error.failureStage='PRE_INSTALL';throw error;}
  if(cmd==='preflight')return {status:'PASS',code:'PRE_INSTALL_READONLY_VERIFIED',actualControllerSha:installedManifest().installedSha,requestId,installAttempted:false};
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
