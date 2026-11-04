@@ -2,7 +2,7 @@
   "schema": "ZGMINI_ER1_NOV30_HTML_PUBLISH_APPROVAL_V1",
   "scope": "PC_SAVED_NOV2026_HTML_ONLY_D1_TWO_KEYS_ONE_SHOT",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "sourceSha": "ede216310526148e3d40cd81d5964945672a8f8b",
+  "sourceSha": "f8c7ba3f2ec407d01b9b2b57ce2c8e28b52dbac8",
   "sourceFile": "scripts/pc-writer/market-calendar-nov30-publish.mjs",
   "sourceFileSha256": "2d463f68ff19d387e23018cc5a9c24dfec04fe0be0ef7f0ee1f28712305a88c0",
   "expectedEvents": 3051,
