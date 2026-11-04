@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_ER1_NOV30_SAVED15_READONLY_A_CONTRACT_V1",
+  "approvalState": "APPROVED_A_READONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "a646050a74c691ac6550ededdc9b7fc695c19848",
+  "sourceFile": "scripts/pc-writer/market-calendar-nov30-er1-saved15-readonly.mjs",
+  "sourceFileSha256": "3b1c1dad731e69374405e3cf5b188c2f3cf8d6267fb7a47598302c7acc91b721",
+  "dependentSourceFile": "scripts/pc-writer/market-calendar-nov30-er1-probe-publish.mjs",
+  "dependentSourceSha256": "56480419432a9be8b9ae7bc945e4448f6876913268604bd65d09dae1d8912412",
+  "previousRuntimeIssue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/369#issuecomment-6641948842",
+  "asOf": "2026-11-04",
+  "maxProviderRequests": 0,
+  "allowPrivateDataWrites": false,
+  "allowD1Writes": false,
+  "allowCoreWrites": false,
+  "allowExistingFeedWrites": false,
+  "allowSchedulerChanges": false,
+  "allowDirectDeployment": false,
+  "outputOnlySanitizedAggregates": true
+}

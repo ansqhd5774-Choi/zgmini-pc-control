@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {validateApproval,validateRequest} from '../er1-nov30-batch20-recovery-entry.mjs';
+import {issueArtifactNames,validateApproval,validateRequest} from '../er1-nov30-batch20-recovery-entry.mjs';
 
 const folder=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source='a646050a74c691ac6550ededdc9b7fc695c19848';
@@ -53,10 +53,19 @@ test('workflow binds the same source commit and distinct #363 marker',()=>{
  assert.ok(workflow.includes('ref: $'+'{{ github.sha }}'));
  assert.ok(workflow.includes('shell: cmd'));
  assert.ok(workflow.includes('timeout-minutes: 8'));
- assert.ok(entry.includes('E:\\\\ZGmini\\\\automation\\\\er1-nov30-batch20-recovery'));
+ assert.ok(entry.includes('E:\\\\ZGmini\\\\automation\\\\er1-nov30-batch20-recovery-replay1'));
  assert.ok(!entry.includes('er1-nov30-actual-pilot\\\\ONE_SHOT_STARTED'));
  assert.ok(entry.includes(approval.batchSourceSha256));
  assert.ok(entry.includes(approval.dependentSourceSha256));
  assert.ok(entry.includes(source));
  assert.ok(!workflow.includes('schedule:'));
+});
+test('a new issue cannot consume stale output from a previous PC request',()=>{
+ const first=issueArtifactNames(394);
+ const next=issueArtifactNames(398);
+ assert.notEqual(first.child,next.child);
+ assert.notEqual(first.report,next.report);
+ assert.match(next.child,/398\.json$/);
+ assert.match(next.report,/398\.json$/);
+ assert.throws(()=>issueArtifactNames(0),/NOV30_BATCH20_ISSUE_NUMBER_STOP/);
 });

@@ -16,7 +16,7 @@ const APPROVAL='ER1_NOV30_BATCH20_RECOVERY_B_APPROVAL.json';
 const REPORT='ER1_NOV30_BATCH20_RECOVERY_RESULT.json';
 const ISSUE_TITLE='pc-er1-nov30-batch20-recovery-once';
 const NODE='E:\\ZGmini\\runtime\\node.exe';
-const MARKER_DIR='E:\\ZGmini\\automation\\er1-nov30-batch20-recovery';
+const MARKER_DIR='E:\\ZGmini\\automation\\er1-nov30-batch20-recovery-replay1';
 const UUID='[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const stop=code=>{throw Error(code)};
 const codeOf=e=>/^NOV30_BATCH20_[A-Z0-9_]+$/.test(String(e?.message))?
@@ -92,17 +92,26 @@ const cleanEnv=env=>Object.fromEntries([
  'SystemRoot','WINDIR','PATH','Path','PATHEXT','ComSpec','APPDATA',
  'LOCALAPPDATA','TEMP','TMP'
 ].filter(k=>typeof env[k]==='string').map(k=>[k,env[k]]));
+export function issueArtifactNames(issueNumber){
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<1)
+  stop('NOV30_BATCH20_ISSUE_NUMBER_STOP');
+ return {child:'nov30-batch20-private-child-'+issueNumber+'.json',
+  report:REPORT.replace(/\.json$/,'-'+issueNumber+'.json')};
+}
 export function execute({env=process.env}={}){
  let report={schema:'ZGMINI_NOV30_ER1_BATCH20_V1',status:'BLOCKED',
   code:'NOV30_BATCH20_NOT_STARTED',pilotOnly:true,candidateLimit:20,
   providerRequestLimit:17,providerCalls:0,d1Writes:0,coreWrites:0,
   schedulerWrites:0,existingFeedWrites:0,star3Count:0,highestScore:null};
+ let reportFile=path.join(env.GITHUB_WORKSPACE??'',REPORT);
  try{
   if(process.platform!=='win32')stop('NOV30_BATCH20_WINDOWS_ONLY');
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   const request=validateRequest(event,env);
   if(!env.GITHUB_WORKSPACE||!path.isAbsolute(env.GITHUB_WORKSPACE))
    stop('NOV30_BATCH20_WORKSPACE_STOP');
+  const names=issueArtifactNames(event.issue.number);
+  reportFile=path.join(env.GITHUB_WORKSPACE,names.report);
   verifyManifest(env.GITHUB_WORKSPACE);
   const source=verifySource(env.GITHUB_WORKSPACE);
   if(!fs.existsSync(NODE))stop('NOV30_BATCH20_NODE_MISSING');
@@ -112,7 +121,7 @@ export function execute({env=process.env}={}){
    stop('NOV30_BATCH20_ALREADY_ATTEMPTED')}
   try{fs.writeFileSync(fd,JSON.stringify({requestId:request.requestId,
    sourceSha:SOURCE_SHA,at:new Date().toISOString()}))}finally{fs.closeSync(fd)}
-  const output=path.join(env.GITHUB_WORKSPACE,'nov30-batch20-private-child.json');
+  const output=path.join(env.GITHUB_WORKSPACE,names.child);
   const child=spawnSync(NODE,[source,output],{
    cwd:path.dirname(source),windowsHide:true,timeout:270000,
    encoding:'utf8',maxBuffer:8192,env:cleanEnv(env),shell:false
@@ -135,7 +144,7 @@ export function execute({env=process.env}={}){
    report.status='STATE_UNKNOWN';report.code='NOV30_BATCH20_EFFECT_VIOLATION';
   }
  }catch(e){report.code=codeOf(e)}
- try{fs.writeFileSync(path.join(env.GITHUB_WORKSPACE,REPORT),
+ try{fs.writeFileSync(reportFile,
   JSON.stringify(report)+'\n',{flag:'wx'})}
  catch{process.stderr.write('NOV30_BATCH20_RESULT_SAVE_STOP\n')}
  console.log('NOV30_BATCH20='+report.status+' CODE='+report.code+
@@ -144,10 +153,11 @@ export function execute({env=process.env}={}){
  if(report.status!=='PASS')process.exitCode=1;
 }
 export async function upload({env=process.env,fetcher=fetch}={}){
- const file=path.join(env.GITHUB_WORKSPACE,REPORT);
+ const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
+ const file=path.join(env.GITHUB_WORKSPACE,
+  issueArtifactNames(event.issue.number).report);
  if(!fs.existsSync(file))return;
  const report=JSON.parse(fs.readFileSync(file,'utf8'));
- const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
  if(!env.GITHUB_TOKEN||!Number.isInteger(event.issue.number)||
   env.GITHUB_REPOSITORY!==CONTROL)return;
  const fence=String.fromCharCode(96).repeat(3);
