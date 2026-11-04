@@ -54,6 +54,120 @@ const R54_TASK_NAME='ZGMINI-PC-Theme-Nine-R54-Public';
 const R54_TASK_ACTION='E:\\ZGmini\\data\\pc-writer\\theme-nine-r54\\scripts\\pc-writer\\THEME_NINE_R54_PUBLIC_CYCLE.cmd';
 const R54_TASK_ACTION_SHA256='0dea186a956dbc1471a4063e8c64dd5a230549477860e699bbb450a06d4360f4';
 const R54_TASK_EXCEPTION='ONE_TIME_R54_TASK_PAUSE_RESTORE_B';
+const R54_B_SOURCE_LEASE_DIR='E:/ZGmini/data/pc-writer/theme-nine-r54/R54_B_SOURCE_EXCLUSIVE.lock';
+const R54_B_LEASE_SCHEMA='ZGMINI_R54_SOURCE_EXCLUSIVE_V1';
+const R54_B_WRITER_ROOT='E:/ZGmini/data/pc-writer/theme-nine-r54';
+const R54_B_GUARD_ORIGINALS=Object.freeze([
+ Object.freeze({path:'scripts/pc-writer/r54-source-lease.mjs',old:null}),
+ Object.freeze({path:'scripts/pc-writer/theme-ten-r78-repair-and-retry.mjs',
+  old:'8e6548196fc253701a141a4a60f812eec3c07f77b8f2ed300fe39215a48fa1d3'}),
+ Object.freeze({path:'scripts/pc-writer/theme-ten-r80-rebase-once.mjs',
+  old:'78541f9d6f097b3009afee626488a0e164a6f9837e450d57745c958d748455f2'}),
+]);
+
+/** Read-only, pinned 6+3 baseline; never follows any source reparse point.
+ * A mismatch is not fixed by copying an old source or resetting a checkout.
+ * This inventory is diagnostic only; it is not an operator freeze attestation. */
+export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={}){
+ need(typeof root==='string'&&path.isAbsolute(root),
+  'R54_B_SOURCE_ROOT_INVALID');
+ // A reparse/symlink root must not become trusted merely because realpath()
+ // resolves to ordinary files. Reject the requested path before resolution.
+ need(!fsImpl.lstatSync(root).isSymbolicLink(),
+  'R54_B_SOURCE_ROOT_REDIRECT');
+ const base=fsImpl.realpathSync.native(root);
+ need(fsImpl.statSync(base).isDirectory()&&
+  !fsImpl.lstatSync(base).isSymbolicLink(),
+  'R54_B_SOURCE_ROOT_REDIRECT');
+ const rows=[...R54_B_SOURCE_FILES.map(x=>({path:x.path,old:x.old})),
+  ...R54_B_GUARD_ORIGINALS];
+ const out=[];
+ for(const spec of rows){
+  need(spec.path.split('/').every(x=>/^[\w.-]+$/.test(x)&&x!=='.'&&x!=='..'),
+   'R54_B_SOURCE_RELATIVE_DENIED');
+  const target=path.join(base,...spec.path.split('/'));
+  let current=base,missing=false;
+  for(const part of spec.path.split('/')){
+   current=path.join(current,part);
+   try{need(!fsImpl.lstatSync(current).isSymbolicLink(),
+     'R54_B_SOURCE_REPARSE_DENIED');}
+   catch(error){
+    if(error?.code==='ENOENT'&&spec.old===null&&current===target){
+     missing=true;break;
+    }
+    throw error;
+   }
+  }
+  if(spec.old===null){
+   need(missing,'R54_B_GUARD_HELPER_UNEXPECTEDLY_PRESENT');
+   out.push({path:spec.path,actual:null});
+   continue;
+  }
+  const real=fsImpl.realpathSync.native(target);
+  need(real.toLowerCase().startsWith(base.toLowerCase()+path.sep.toLowerCase())&&
+   fsImpl.statSync(real).isFile(),'R54_B_SOURCE_PATH_OUTSIDE');
+  const actual=sha256(fsImpl.readFileSync(real));
+  need(actual===spec.old,'R54_B_ORIGINAL_SOURCE_SHA_DRIFT');
+  out.push({path:spec.path,actual});
+ }
+ // The existing source lock must not be abandoned by an unknown owner.
+ const lockDir=path.join(base,path.basename(R54_B_SOURCE_LEASE_DIR));
+ need(!fsImpl.existsSync(lockDir),'R54_B_EXISTING_SOURCE_LEASE_RECONCILE');
+ return {status:'R54_B_ORIGINAL_NINE_SHA_VERIFIED',root:base,
+  files:out,sourceChanges:0,taskChanges:0};
+}
+
+/** One atomic NTFS arbiter, shared with the guarded R54 connector/R78/R80.
+ * This function never steals a stale lock or deletes another owner's bytes.
+ * Test-only fs/path overrides must NEVER come from an Issue or manifest. */
+export function acquireR54BSourceLease({leaseDir=R54_B_SOURCE_LEASE_DIR,
+ fsImpl=fs,pid=process.pid,nonce=randomUUID(),now=new Date().toISOString()}={}){
+ need(typeof leaseDir==='string'&&path.isAbsolute(leaseDir)&&
+  typeof nonce==='string'&&/^[a-f0-9-]{36}$/i.test(nonce)&&
+  Number.isSafeInteger(pid)&&pid>0,'R54_B_SOURCE_LEASE_ARGS');
+ const parent=path.dirname(leaseDir);
+ need(fsImpl.statSync(parent).isDirectory()&&
+  !fsImpl.lstatSync(parent).isSymbolicLink(),
+  'R54_B_SOURCE_LEASE_PARENT_UNSAFE');
+ try{fsImpl.mkdirSync(leaseDir,{recursive:false});}
+ catch(error){
+  if(error?.code==='EEXIST')return Object.freeze({status:'BUSY',owned:false});
+  throw Object.assign(Error('R54_B_SOURCE_LEASE_ACQUIRE_UNKNOWN',{cause:error}),
+   {code:'R54_B_SOURCE_LEASE_ACQUIRE_UNKNOWN'});
+ }
+ const owner=path.join(leaseDir,'OWNER.json');
+ const record=JSON.stringify({schema:R54_B_LEASE_SCHEMA,pid,nonce,at:now})+'\n';
+ let fd;
+ try{
+  fd=fsImpl.openSync(owner,'wx',0o600);
+  fsImpl.writeFileSync(fd,record);
+  fsImpl.fsyncSync(fd);
+ }catch(error){
+  // mkdir might already be visible. Keep it for explicit reconciliation.
+  throw Object.assign(Error('R54_B_SOURCE_LEASE_OWNER_UNKNOWN',{cause:error}),
+   {code:'R54_B_SOURCE_LEASE_OWNER_UNKNOWN'});
+ }finally{if(fd!==undefined)fsImpl.closeSync(fd);}
+ let released=false;
+ const owned=()=>{
+  if(released)return false;
+  try{return fsImpl.readFileSync(owner,'utf8')===record;}
+  catch{return false;}
+ };
+ const release=()=>{
+  need(!released&&owned(),'R54_B_SOURCE_LEASE_OWNER_DRIFT');
+  try{
+   fsImpl.unlinkSync(owner);
+   fsImpl.rmdirSync(leaseDir);
+   released=true;
+  }catch(error){
+   throw Object.assign(Error('R54_B_SOURCE_LEASE_RELEASE_UNKNOWN',{cause:error}),
+    {code:'R54_B_SOURCE_LEASE_RELEASE_UNKNOWN'});
+  }
+  return true;
+ };
+ return Object.freeze({status:'ACQUIRED',owned:true,owner,leaseDir,
+  nonce,assertHeld:owned,release});
+}
 /** Pure, read-only gate: a synthetic proof may exercise tests but is never
  * accepted from a GitHub issue/manifest. The trusted Windows provider must
  * independently establish and hold this freeze until the B transaction ends.
