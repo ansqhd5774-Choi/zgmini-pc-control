@@ -6,17 +6,17 @@
 
 위험도와 공유 자원 범위로 검사를 선택한다. 독립 A급 조회나 일반 작업의 결과 회수에는 전체 Runner 유휴·Controller 교체 검사·전역 dirty 검사를 요구하지 않는다. 승인된 설정/adapter 등록은 실제 영향 파일과 계약을 집중 검증한다. **Controller 실행 파일을 교체할 때만** 해당 drain·보호 백업·실제 설치 SHA·6 fresh Runner·사후 검사 계약을 적용한다. 현재 설치된 실행기가 더 엄격하면 정규 개선·설치 전까지 그 검사를 우회하지 않는다.
 
-### 검토 중인 설치 효율 개선(미설치)
+### 소스 병합 완료, 실제 운영 적용 미검증
 
 | 개선 | 의도 | 현재 적용 상태 |
 |---|---|---|
-| 비설치 파일 dirty 제외 | 현재 영향받는 Controller/config·workflow/scripts·승인 경로만 설치 충돌 검사 | Draft #321, 운영 미설치 |
-| 단계별 실패 코드 | `failureOperation`과 안전한 stage 코드로 원인을 국소화 | Draft #321, 운영 미설치 |
-| SHA 간 누적 diff 계획 | 정확한 목표 바이트로 승인 초안 생성, 승인 자체는 아님 | Draft #321, 운영 미설치 |
-| 사후 A 목록 중앙화 | `core-status`·`source-audit`·`fear-greed-archive-status` 계약 일치 | Draft #321, 운영 미설치 |
-| 1024MiB moderate 후보 | 신규 읽기 작업만 별도 승인과 실측 후 등록 | Draft #321, 운영 미설치 |
+| 비설치 파일 dirty 제외 | Controller/config·workflow·승인 경로만 checkout 충돌 검사. 목표 SHA의 scripts 변경은 별도 인프라 승인 검사 | #327 병합, PC 미적용 |
+| 단계별 실패 코드 | `failureOperation`과 안전한 stage 코드로 원인을 국소화 | #327 병합, PC 미적용 |
+| SHA 간 누적 diff 계획 | 정확한 목표 바이트·삭제 파일 구분 및 승인 초안 생성, 승인 자체는 아님 | #327 병합, source 도구 |
+| 사후 A 목록 중앙화 | `core-status`·`source-audit`·`fear-greed-archive-status` 계약 일치 | #327 병합, PC 미적용 |
+| 1024MiB moderate 후보 | 신규 읽기 작업만 별도 승인과 Windows 실측 후 등록 | #327 source 후보, 운영 미활성 |
 
-[Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)는 prevalidation 단계의 무변경을 실측으로 증명할 때에만 `BLOCKED`/`PREVALIDATION_UNTOUCHED_VERIFIED`로 분류하는 추가 보완안이다. 현재 코드가 `RECOVERY_REQUIRED`를 내보낸 상황을 문서만으로 재분류하거나 lease를 직접 지우지 않는다. 두 Draft의 테스트 성공·코드 병합·유지보수기 인계·Windows 실설치·Runtime 반영을 분리해 판정한다.
+이전 [Draft #321](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/321)·[Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)를 선별 통합한 [PR #327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/327)의 병합 SHA는 `eafc71b99a43a27a3e891e2de990dc26b42c2dd5`다. 새 사전검증 무변경 분류는 필수 설치 파일 9개·동일 owner/nonce·보호 상태·현재 SHA·Workflow 재조회를 요구한다. staging 실패나 무변경 불명확 상태는 계속 `RECOVERY_REQUIRED`다. **이 병합은 실제 유지보수기 인계나 Controller 설치 PASS가 아니며**, 과거 #319 결과를 소급 변경하지 않는다.
 
 ## 2026-11-03 공통 장애 보완 운영 적용 증거
 
