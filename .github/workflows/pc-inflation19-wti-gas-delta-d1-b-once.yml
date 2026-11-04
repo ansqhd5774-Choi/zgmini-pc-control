@@ -1,0 +1,55 @@
+# Candidate only. Move to .github/workflows after review, pin current main, and set approval manifest approved=true.
+name: ZGMINI Inflation WTI Gas D1 B One-Shot Candidate
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-inflation19-wti-gas-d1-b-once
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-inflation19-wti-gas-delta-d1-b-once'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 9
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout immutable control request and manifest
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout approved publisher source - enforce exact SHA in receiver
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: main
+          path: source
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Apply pinned WTI and gas stored 19 projection through existing CAS D1 writer
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\infl19-d1-publish-candidate\inflation19-delta-b-receiver.mjs"'
+      - name: Return sanitized one-shot result
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\infl19-d1-publish-candidate\inflation19-delta-b-receiver.mjs" --upload'
