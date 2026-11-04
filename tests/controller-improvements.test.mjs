@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,
   controllerAdmissionForPurpose,validateControllerConfigTransition,
@@ -79,4 +84,36 @@ test('planner fails closed on unknown paths, duplicates, missing target blobs, a
    /CONTROLLER_PLAN_TARGET_FILE_UNAVAILABLE/);
  assert.throws(()=>planFromGit(['--installed-sha',old,'--target-sha','not-sha']),
    /CONTROLLER_PLAN_SHA_INVALID/);
+});
+
+test('real Git fixture ignores unrelated dirty files yet pins executable changes to exact commits',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-controller-plan-'));
+ const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
+ try{
+  git('init','-q');git('config','user.name','Fixture');git('config','user.email','fixture@example.invalid');
+  fs.mkdirSync(path.join(root,'controller'));
+  fs.writeFileSync(path.join(root,'controller','check.mjs'),'export const check=1;\n');
+  git('add','controller/check.mjs');git('commit','-qm','initial');
+  const installedSha=git('rev-parse','HEAD');
+
+  fs.mkdirSync(path.join(root,'results'));
+  fs.writeFileSync(path.join(root,'results','last.json'),'{"status":"old"}\n');
+  const sensitive=['controller','config','.github/workflows','scripts','approvals/controller-updates'];
+  assert.equal(git('status','--porcelain','--untracked-files=all','--',...sensitive),'');
+  fs.writeFileSync(path.join(root,'controller','check.mjs'),'export const check=2;\n');
+  assert.match(git('status','--porcelain','--untracked-files=all','--',...sensitive),
+    /controller\/check\.mjs/);
+
+  git('add','controller/check.mjs');git('commit','-qm','controlled change');
+  const targetSha=git('rev-parse','HEAD');
+  git('update-ref','refs/remotes/origin/main',targetSha);
+  const script=fileURLToPath(new URL('../tools/controller-update-plan.mjs',import.meta.url));
+  const output=execFileSync(process.execPath,[script,'--installed-sha',installedSha,
+    '--target-sha',targetSha],{cwd:root,encoding:'utf8'});
+  const result=JSON.parse(output);
+  assert.equal(result.status,'DRAFT_NOT_APPROVED');
+  assert.deepEqual(result.allowFiles.map(x=>x.path),['controller/check.mjs']);
+  assert.equal(result.allowFiles[0].sha256,digest(Buffer.from('export const check=2;\n')));
+  assert.equal(result.requiresFreshRemoteAndLivePCCheck,true);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
