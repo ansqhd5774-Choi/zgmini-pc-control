@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectER1NovemberAvailability} from '../market-calendar-er1-nov30-availability-readonly.mjs';
+import {inspectER1NovemberAvailability} from '../controller/market-calendar-er1-nov30-availability-readonly.mjs';
 
 function makeFixture(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-er1-nov-'));
