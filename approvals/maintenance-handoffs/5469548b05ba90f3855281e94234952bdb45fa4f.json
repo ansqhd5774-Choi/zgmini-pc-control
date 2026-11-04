@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "dbe072206a599f7ac3c4eb9d86afd89cd4fdbd54",
+  "targetSha": "5469548b05ba90f3855281e94234952bdb45fa4f",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User standing approval in AGENTS.md and docs/PC_AUTOMATION_STANDARD.md §5, explicit 2026-11-05 instruction to continue the #319 five-improvement PC maintenance handoff; Windows 2026-11-05 read-only receipt confirmed installed source and no active controller-install lease.",
+  "files": {
+    "tools/maintenance-contract.mjs": "e566c55af5a52ce15615689bfd58420fb52dd61cd7fc678ff3929d6071985a69",
+    "tools/maintenance-apply.mjs": "ebaaddd47d21693c634d99034850116c09c12bf59cdfeb0ce837e8c14a468ef8",
+    "tools/maintenance-agent.mjs": "051b19d3b83bbaf1e8c20a55bcff4c2295b84998e063cc752a271869fbb96c2d",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "9cc254927c4c74fa8fc8d4a78eebf49b3ec42c17230019ea31b8da3f6a832a6b",
+    "tools/maintenance-ancestry.vbs": "3ea49faa5845b982408e9d534d97830748c38ba63bdf5440af26f352b3cf458d",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "87632af5854a5e11d9b0c3455ff0bd14c56e8c46589fcca3cd5a160351471863"
+  },
+  "checks": {
+    "command": "PR #327 isolated Node fixture tests (106/106) and recovery-plan tests (4/4); independent current GitHub target 8-file raw SHA-256 and installed-vs-target 3-file diff cross-check",
+    "passed": 110,
+    "failed": 0,
+    "platform": "Linux Node + GitHub source byte verification; Windows receiver update and runtime tests NOT YET RUN"
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Controller installed source and files",
+    "Core/Korea/Iran tasks",
+    "SQLite/D1",
+    "Runner registrations",
+    "request ledgers"
+  ],
+  "scopeNote": "Only 8 pinned independent maintainer tool bytes; exactly maintenance-contract.mjs, maintenance-apply.mjs and update.mjs differ from installed dbe07220. Windows operator must verify current MAINTENANCE_INSTALL.json bytes, cooperativeStop capability, WMI receiver identity, medium-token and lease immediately before the single in-place handoff. Does not authorize any Controller, Core, DB/D1 or scheduler change, or original #319 request replay. Source approval is not a claim of Windows installation."
+}
