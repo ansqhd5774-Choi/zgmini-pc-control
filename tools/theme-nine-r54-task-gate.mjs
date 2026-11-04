@@ -69,14 +69,16 @@ export async function runApprovedR54TaskTransition({authorization,ports,
   xml:originalBytes,enabled:baseline.enabled,
   definitionDigest:baseline.definitionDigest,
   actionPath:R54_TASK_ACTION,actionSha256:R54_TASK_ACTION_SHA256});
- assert(saved?.writtenAndReadback===true&&saved.xmlSha256===originalHash&&
-  saved.initialEnabled===baseline.enabled,
+ assert((saved?.writtenAndReadback===true&&saved.initialEnabled===baseline.enabled
+   ||saved?.durableXmlBackupReadback===true&&saved.enabled===baseline.enabled)
+   &&saved.xmlSha256===originalHash,
   'R54_TASK_BASELINE_NOT_DURABLE');
 
  if(baseline.enabled){
   const changed=await ports.disable(R54_TASK_NAME);
   // Unknown/ambiguous disable results are not retried or guessed.
-  assert(changed?.success===true,'R54_TASK_DISABLE_OUTCOME_UNKNOWN');
+  assert(changed?.success===true||changed?.enabled===false,
+   'R54_TASK_DISABLE_OUTCOME_UNKNOWN');
  }
  let drained=false;
  for(let n=0;n<maxDrainChecks;n++){
@@ -139,8 +141,10 @@ export async function runApprovedR54TaskTransition({authorization,ports,
   'R54_TASK_HOLD_DISABLED_BEFORE_RESTORE');
  const restored=await ports.restore({taskName:R54_TASK_NAME,
    enabled:baseline.enabled,originalXml:originalBytes,
-   expectedXmlSha256:originalHash});
- assert(restored?.success===true,'R54_TASK_RESTORE_OUTCOME_UNKNOWN');
+   expectedXmlSha256:originalHash,writerSixHashVerified:nextVerified||oldVerified});
+ assert(restored?.success===true||restored?.enabled===baseline.enabled&&
+  restored?.definitionDigest===baseline.definitionDigest,
+  'R54_TASK_RESTORE_OUTCOME_UNKNOWN');
  const after=await ports.inspect();
  assert(sameTask(after)&&after.enabled===baseline.enabled&&
   after.definitionDigest===baseline.definitionDigest&&
