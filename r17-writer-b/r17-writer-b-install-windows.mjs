@@ -15,7 +15,7 @@ import {
 } from './r17-writer-b-install-core.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from './r17-b-xml.mjs';
 import {commitExactOverlay} from './r17-b-git-stage.mjs';
-import {acquireInstallClaim,releaseInstallClaim} from './r17-b-claim.mjs';
+import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from './r17-b-claim.mjs';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST=path.join(ROOT,'approval','R17_WRITER_B_INSTALL_APPROVAL.json');
@@ -187,11 +187,16 @@ function makeAdapter(authorized){
   let originalConfig=null,originalXml=null,originalComparable=null,prepared=null;
   let lockFd=null;
   const adapter={
-    async claim(id){
+    async acquireSharedLock(id){
       check(id===authorized.requestId,'R17_B_REQUEST_ID_STOP');
-      const claim=acquireInstallClaim({journalRoot:JOURNAL_ROOT,requestId:id,
+      const lock=acquireInstallLock({journalRoot:JOURNAL_ROOT,requestId:id,
         sharedLock:SHARED_INSTALL_LOCK});
-      lockFd=claim.fd;
+      lockFd=lock.fd;
+    },
+    async claim(id){
+      check(id===authorized.requestId&&lockFd!==null,'R17_B_REQUEST_ID_STOP');
+      const claim=createInstallJournal({journalRoot:JOURNAL_ROOT,requestId:id,
+        sharedLock:SHARED_INSTALL_LOCK,fd:lockFd});
       verifiedEmptyHooksDir=claim.hooksDir;
     },
     async journal(phase,error){
@@ -243,10 +248,11 @@ function makeAdapter(authorized){
       check(readConfig().raw.equals(originalConfig),'R17_B_PRE_DISABLE_CONFIG_DRIFT_STOP');
       check(taskXmlComparable(taskXml().xml)===originalComparable,
         'R17_B_PRE_DISABLE_TASK_DRIFT_STOP');
+      // Pausing the schedule prevents new starts. An already running Core
+      // must finish naturally in waitForDrain(), not block this first step.
+      // The strict no-process/no-lock check remains immediately before switch.
       const immediate=probeTask();
-      check(immediate.enabled===true&&immediate.state!==4&&immediate.instances===0&&
-        immediate.relatedProcesses===0&&immediate.unknownProcessLines===0&&!fs.existsSync(LOCK),
-        'R17_B_CORE_NOT_IDLE_BEFORE_DISABLE_STOP');
+      check(immediate.enabled===true,'R17_B_CORE_NOT_ENABLED_BEFORE_DISABLE_STOP');
       command('schtasks.exe',['/Change','/TN',CORE_TASK,'/Disable']);
     },
     async assertCoreDisabled(){
