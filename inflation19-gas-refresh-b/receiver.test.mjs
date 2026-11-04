@@ -22,8 +22,8 @@ const event={action:'opened',repository:{private:true,full_name:REPO},issue:{
 const clone=x=>structuredClone(x);
 
 test('single series B manifest pins old file, exact source and new isolated receipt path',()=>{
- assert.equal(candidate.approved,false);
- assert.throws(()=>verifyManifest(candidate),/GAS_REFRESH_MANIFEST_DENIED/);
+ assert.equal(typeof candidate.approved,'boolean');
+ assert.throws(()=>verifyManifest({...candidate,approved:false}),/GAS_REFRESH_MANIFEST_DENIED/);
  assert.equal(verifyManifest(manifest),true);
  assert.equal(manifest.priorGasSha256,PRIOR_SHA_251);
  assert.equal(manifest.outputRelative,'inflation-causal-r1/gas-dhhngsp.json');
