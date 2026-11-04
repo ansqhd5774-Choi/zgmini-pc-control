@@ -4,15 +4,16 @@ import fs from 'node:fs';
 import {applyApprovedUpdate,maintenanceFailureCode} from '../tools/maintenance-apply.mjs';
 import {readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
+import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
 test('no-effect proof rejects an incomplete, substituted or absent installed file inventory',()=>{
- const h='0'.repeat(64),files=Object.fromEntries([
-  'config/operations.json','controller/entry.mjs','controller/engine.mjs',
-  'controller/supervisor.mjs','controller/worker.mjs'].map(x=>[x,h]));
- assert.deepEqual(Object.keys(prevalidationInventory({controllerFiles:files})).length,5);
+ const h='0'.repeat(64),files=Object.fromEntries(INSTALLABLE_FILES.map(x=>[x,h]));
+ assert.equal(INSTALLABLE_FILES.length,9);
+ assert.deepEqual(Object.keys(prevalidationInventory({controllerFiles:files})).length,9);
  assert.equal(prevalidationInventory({controllerFiles:{...files,'controller/entry.mjs':undefined}}),null);
+ assert.equal(prevalidationInventory({controllerFiles:{...files,'controller/upload.mjs':undefined}}),null);
  assert.equal(prevalidationInventory({controllerFiles:{'controller/entry.mjs':h}}),null);
  assert.equal(prevalidationInventory({}),null);
 });

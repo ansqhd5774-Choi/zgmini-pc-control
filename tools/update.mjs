@@ -12,7 +12,7 @@ import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
-  CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,
+  CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
@@ -150,10 +150,9 @@ function installedManifest() {
 // Scope this to prevalidation proof; older installed manifests remain readable.
 export function prevalidationInventory(host){
  const files=host?.controllerFiles;
- const required=['config/operations.json','controller/entry.mjs',
-  'controller/engine.mjs','controller/supervisor.mjs','controller/worker.mjs'];
  if(!files||typeof files!=='object'||Array.isArray(files)||
-   Object.keys(files).length<5||required.some(rel=>!/^[a-f0-9]{64}$/.test(files[rel]??'')))
+   Object.keys(files).length<INSTALLABLE_FILES.length||
+   INSTALLABLE_FILES.some(rel=>!/^[a-f0-9]{64}$/.test(files[rel]??'')))
    return null;
  return Object.fromEntries(Object.entries(files).sort(([a],[b])=>a.localeCompare(b)));
 }
