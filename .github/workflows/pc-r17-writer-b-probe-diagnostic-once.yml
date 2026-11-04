@@ -1,0 +1,52 @@
+# A-grade owner-only read-only diagnosis of previously failed R17 cscript probe.
+# NO B-grade installer call, no Task/source/config writes, no automatic retry.
+name: ZGMINI R17 Windows Probe Readonly Diagnostic Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write # One bounded sanitized private Issue comment, no source writes.
+concurrency:
+  group: zgmini-r17-writer-probe-diag-readonly-once
+  cancel-in-progress: false
+jobs:
+  r17-probe-a-readonly:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-r17-writer-probe-diagnostic' &&
+      contains(github.event.issue.labels.*.name, 'pc-r17-writer-b-probe-diag') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 3
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      R17_CONTROL_SHA: ${{ github.sha }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout exact private diagnostic files without persisted credentials
+        id: checkout-control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r17-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Diagnose only fixed cscript NoLogo fixture and original probe stdout
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\probe-diag\r17-b-probe-diagnostic.mjs" --diagnose > "%RUNNER_TEMP%\r17-b-probe-diag-result.json"'
+      - name: Recover sanitized read-only evidence to owner private Issue
+        if: always() && steps.checkout-control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\probe-diag\r17-b-probe-diagnostic.mjs" --report'
