@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import {
-  validateRequest,SOURCE_SHA,TITLE,LABEL,
+  validateRequest,SOURCE_SHA,TITLE,
 } from './inflation-sce31-b-once.mjs';
 const request={schema:'ZGMINI_INFLATION_SCE31_ONCE_V1',
   requestId:'pc-sce31-4a84e176-321f-4e0e-9a75-8b1cd9b39118',
@@ -11,7 +11,7 @@ const request={schema:'ZGMINI_INFLATION_SCE31_ONCE_V1',
 const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
   GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened'};
 const event={action:'opened',repository:{private:true},issue:{user:{login:'ansqhd5774-Choi'},
-  title:TITLE,labels:[{name:LABEL}],body:JSON.stringify(request)}};
+  title:TITLE,body:JSON.stringify(request)}};
 
 test('exact request, private repo, approved actor and pinned source admitted',()=>{
   assert.deepEqual(validateRequest(event,env),request);
@@ -24,10 +24,10 @@ test('extra fields cannot inject source, target or command',()=>{
       /SCE31_REQUEST_CONTRACT_DENIED/);
   }
 });
-test('public repo, wrong actor, label or replayed event rejected',()=>{
+test('public repo, wrong actor, title or replayed event rejected',()=>{
   for(const [e,v] of [[{...event,repository:{private:false}},env],
     [event,{...env,GITHUB_ACTOR:'evil'}],
-    [{...event,issue:{...event.issue,labels:[]}},env],
+    [{...event,issue:{...event.issue,title:'another-job'}},env],
     [{...event,action:'edited'},env]])
     assert.throws(()=>validateRequest(e,v),/SCE31_ACTOR_OR_ISSUE_DENIED/);
 });
