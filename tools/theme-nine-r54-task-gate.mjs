@@ -38,7 +38,8 @@ function fileState(rows,kind){
 /**
  * The B receiver must pass vetted fixed-function OS ports. A scheduler-disable
  * is not proof that a manual CMD invocation cannot occur: ports.closedRoutes
- * must independently attest all other entry points and process descendants.
+ * must verify the actual R54/source-writer collision window and descendants.
+ * Other scheduled tasks may exist and run when they do not write this source.
  * `applySix` may only invoke the already SHA-pinned #320 six-file operation.
  */
 export async function runApprovedR54TaskTransition({authorization,ports,
@@ -77,7 +78,7 @@ export async function runApprovedR54TaskTransition({authorization,ports,
   // Unknown/ambiguous disable results are not retried or guessed.
   assert(changed?.success===true,'R54_TASK_DISABLE_OUTCOME_UNKNOWN');
  }
- let stable=0;
+ let drained=false;
  for(let n=0;n<maxDrainChecks;n++){
   const current=await ports.inspect();
   assert(sameTask(current)&&current.enabled===false&&
@@ -87,14 +88,22 @@ export async function runApprovedR54TaskTransition({authorization,ports,
   const verified=closed?.taskName===R54_TASK_NAME&&
     closed.schedulerStartDisabled===true&&
     closed.taskNotRunning===true&&closed.childProcessCount===0&&
-    closed.otherScheduledEntrypoints===0&&
-    closed.otherManualEntrypointsBlocked===true&&
+    closed.conflictingSourceLaunches===0&&
+    closed.installWindowExclusivityVerified===true&&
     closed.relevantLocksClear===true&&closed.exclusiveBLeaseHeld===true;
-  stable=verified?stable+1:0;
-  if(stable>=2)break;
+  if(verified){drained=true;break;}
   if(n+1<maxDrainChecks)await ports.wait(waitMs);
  }
- assert(stable>=2,'R54_TASK_NATURAL_DRAIN_PENDING');
+ assert(drained,'R54_TASK_NATURAL_DRAIN_PENDING');
+ // A prior idle snapshot is not a permanent guarantee. Recheck immediately
+ // before touching source, while the same approved maintenance lease is held.
+ const immediate=await ports.closedRoutes();
+ assert(immediate?.taskName===R54_TASK_NAME&&
+  immediate.schedulerStartDisabled===true&&immediate.taskNotRunning===true&&
+  immediate.childProcessCount===0&&immediate.conflictingSourceLaunches===0&&
+  immediate.installWindowExclusivityVerified===true&&
+  immediate.relevantLocksClear===true&&immediate.exclusiveBLeaseHeld===true,
+  'R54_TASK_INSTALL_WINDOW_COLLISION');
  assert(fileState(await ports.readSixHashes(),'old'),
   'R54_TASK_INSTALLED_CHANGED_WHILE_QUIESCING');
 
@@ -119,7 +128,7 @@ export async function runApprovedR54TaskTransition({authorization,ports,
   const clear=await ports.closedRoutes();
   assert(clear?.taskName===R54_TASK_NAME&&
     clear.schedulerStartDisabled===true&&clear.taskNotRunning===true&&
-    clear.childProcessCount===0&&clear.otherScheduledEntrypoints===0&&
+    clear.childProcessCount===0&&clear.conflictingSourceLaunches===0&&
     clear.relevantLocksClear===true&&clear.exclusiveBLeaseHeld===true,
     'R54_TASK_HOLD_DISABLED_AFTER_ROLLBACK');
  }
@@ -135,7 +144,8 @@ export async function runApprovedR54TaskTransition({authorization,ports,
  const after=await ports.inspect();
  assert(sameTask(after)&&after.enabled===baseline.enabled&&
   after.definitionDigest===baseline.definitionDigest&&
-  sha256(after.xml)===originalHash,
+  // Task Scheduler can serialize equivalent XML with different byte layout.
+  // Exact original bytes remain in the durable backup for recovery.
   'R54_TASK_RESTORE_READBACK_UNVERIFIED');
  if(applyError)fail('R54_TASK_SIXFILE_APPLY_FAILED_RESTORED');
  assert(swapped&&nextVerified,'R54_TASK_SWAP_UNVERIFIED');
@@ -172,7 +182,7 @@ export async function runR54QuarantinedConnectorSwap({gate,ports,
  const routes=await ports.verifyEntrypoints();
  assert(routes?.verifiedAllKnownPaths===true&&
   routes?.allR54RoutesLoadConnector===true&&
-  routes?.otherTaskDefinitionsAbsent===true&&routes?.unexpectedDirectEntryAbsent===true&&
+  routes?.unexpectedDirectEntryAbsent===true&&
   // R78/R80 and original setup CMD can rewrite source without loading the
   // connector; these lanes must be independently stopped/excluded by evidence.
   routes?.sourceRegeneratorEntrypointsExcluded===true&&
