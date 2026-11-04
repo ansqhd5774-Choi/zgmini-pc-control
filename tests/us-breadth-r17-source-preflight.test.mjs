@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,diagnoseR17PatchContexts,decodeR17Launcher,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
+import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,diagnoseR17PatchContexts,diagnoseR17RestrictedContexts,diagnoseR17SingleDispatcher,verifiedR17Source,decodeR17Launcher,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
 
 const valid=()=>({
  head:R17_APPROVED,dirty:false,hashes:{...R17_BASE_FILES},
@@ -35,6 +35,75 @@ test('patch diagnosis returns only five-hunk positions and match booleans, even 
  const bad=diagnoseR17PatchContexts(patch,{'scripts/pc-writer/local-cycle.mjs':'SECRET\ntwo\nother\n'});
  assert.deepEqual(bad,[{file:'cycle',hunk:'2',oldContextMatches:false}]);
  assert.equal(JSON.stringify(bad).includes('SECRET'),false);
+});
+const contextFixture=()=>({
+ 'scripts/pc-writer/local-cycle.mjs':[
+  'const prior=1;',
+  " const report={at:new Date().toISOString(),lane,collectionExit:collection.status,extra:'SAFE'};",
+  ' save(report);',
+ ].join('\r\n'),
+ 'scripts/pc-writer/run-local.mjs':[
+  ' await attemptOutput(report,\'us-breadth\',async()=>{',
+  '  report.usBreadth=await prepareUsBreadth(core,{now:new Date(now)});',
+  ' });',
+  ' const marketReady=true;',
+  ' if(report.usBreadth?.prepared)await attemptOutput(report,\'us-breadth-publication\',async()=>{',
+  '   report.usBreadth.publication=await publishUsBreadth(remote,config.core,report.usBreadth,{now});',
+  ' });',
+  ' else report.usBreadth={publication:\'SKIPPED_NOT_READY\'};',
+ ].join('\r\n'),
+});
+test('three fixed contexts emit only verified bounded non-sensitive excerpts',()=>{
+ const src=contextFixture();
+ assert.equal(verifiedR17Source(valid()),true);
+ const got=diagnoseR17RestrictedContexts(src,valid());
+ assert.equal(got.status,'THREE_EXCERPTS_READONLY');
+ assert.deepEqual(got.excerpts.map(x=>[x.file,x.hunk,x.lineCount]),
+  [['cycle','185',3],['publication','72',4],['publication','228',4]]);
+ assert.ok(got.excerpts.every(x=>!x.text.includes('\r')));
+ assert.ok(JSON.stringify(got).length<=2500);
+ assert.equal(got.excerpts.some(x=>x.text.includes('safe')),false);
+});
+test('restricted contexts fail closed on unapproved head/hash, secrets, ambiguity and oversize',()=>{
+ const src=contextFixture();
+ const wrong={...valid(),head:'0'.repeat(40)};
+ assert.deepEqual(diagnoseR17RestrictedContexts(src,wrong),{status:'SOURCE_UNVERIFIED',excerpts:[]});
+ const modified={...valid(),hashes:{...R17_BASE_FILES}};
+ modified.hashes['scripts/pc-writer/run-local.mjs']='f'.repeat(64);
+ assert.deepEqual(diagnoseR17RestrictedContexts(src,modified),{status:'SOURCE_UNVERIFIED',excerpts:[]});
+ const exposed={...src,'scripts/pc-writer/run-local.mjs':src['scripts/pc-writer/run-local.mjs'].replace('const marketReady=true;',"const password='NEVER_EMIT_THIS';")};
+ const withheld=diagnoseR17RestrictedContexts(exposed,valid());
+ assert.equal(withheld.status,'SENSITIVE_CONTEXT_SUPPRESSED');
+ assert.equal(JSON.stringify(withheld).includes('NEVER_EMIT_THIS'),false);
+ const dup={...src,'scripts/pc-writer/local-cycle.mjs':src['scripts/pc-writer/local-cycle.mjs']+"\n const report={at:new Date().toISOString(),lane,collectionExit:other};"};
+ assert.equal(diagnoseR17RestrictedContexts(dup,valid()).status,'CONTEXT_ANCHOR_NOT_UNIQUE');
+ const long={...src,'scripts/pc-writer/local-cycle.mjs':src['scripts/pc-writer/local-cycle.mjs'].replace('extra:', 'x'.repeat(900)+'extra:')};
+ assert.equal(diagnoseR17RestrictedContexts(long,valid()).status,'CONTEXT_TOO_LONG');
+});
+test('dispatcher diagnosis returns one allowlisted static name and hash, never Task/VBS text',()=>{
+ const action={command:'C:\\Windows\\System32\\wscript.exe',
+  arguments:'"E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs"'};
+ const launchers=[
+  {sha256:R17_VBS_CHAIN[0].sha256,text:'shell.Run "run-local-core.vbs"'},
+  {sha256:R17_VBS_CHAIN[1].sha256,text:'shell.Run "node.exe quota-runner.mjs", 0, True'},
+ ];
+ const got=diagnoseR17SingleDispatcher({action,launchers,evidence:valid(),readAllowed:(scope,name)=>{
+  assert.equal(scope,'source');assert.equal(name,'scripts/pc-writer/quota-runner.mjs');
+  return Buffer.from('node.exe local-cycle.mjs');
+ }});
+ assert.equal(got.status,'DISPATCH_STATIC_UNVERIFIED');
+ assert.equal(got.singleHop.name,'quota-runner.mjs');
+ assert.equal(got.singleHop.referencesLocalCycle,true);
+ assert.equal(got.singleHop.pinnedHashMatches,false);
+ assert.equal(/E:\\ZGmini|shell\.Run|password/i.test(JSON.stringify(got)),false);
+ assert.equal(assessR17TaskChain({action,launchers}),false);
+ assert.deepEqual(diagnoseR17SingleDispatcher({action,launchers,evidence:{...valid(),dirty:true},readAllowed:()=>Buffer.from('x')}),
+  {status:'DISPATCH_UNVERIFIED',singleHop:null});
+ const ambiguous=[launchers[0],{...launchers[1],text:'shell.Run "node.exe quota-runner.mjs run-local.mjs"'}];
+ assert.equal(diagnoseR17SingleDispatcher({action,launchers:ambiguous,evidence:valid(),readAllowed:()=>Buffer.from('x')}).status,
+  'DISPATCH_TARGET_NOT_UNIQUE');
+ const commentOnly=[launchers[0],{...launchers[1],text:"' node.exe quota-runner.mjs"}];
+ assert.equal(diagnoseR17SingleDispatcher({action,launchers:commentOnly,evidence:valid(),readAllowed:()=>Buffer.from('x')}).singleHop,null);
 });
 test('VBS decoder accepts BOM UTF-16LE and UTF-16BE without altering bytes',()=>{
  const script='shell.Run "local-cycle.mjs", 0, True';
