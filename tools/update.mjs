@@ -17,7 +17,10 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
- R6_HOST_CANDIDATE_SHA256} from './maintenance-contract.mjs';
+ R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
+ validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
+ R54_B_SOURCE_FILES}
+  from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
@@ -47,6 +50,42 @@ const R6_HOST_TITLE='pc-r6-host-register';
 const R6_SOURCE_MANIFEST_PATH='drafts/employment-r6/source-manifest.json';
 const R6_STAGE_TOOL_HASH='66400ce7eca77997b92b1b42e72f409c0e9fdb6154599fd61d93e7825cca2a0a';
 const R6_APPLY_TOOL_HASH='ab79308af8010cf04091fb440c04c70f725679fbc50f1ade9149a5e666682be1';
+const R54_TASK_NAME='ZGMINI-PC-Theme-Nine-R54-Public';
+const R54_TASK_ACTION='E:\\ZGmini\\data\\pc-writer\\theme-nine-r54\\scripts\\pc-writer\\THEME_NINE_R54_PUBLIC_CYCLE.cmd';
+const R54_TASK_ACTION_SHA256='0dea186a956dbc1471a4063e8c64dd5a230549477860e699bbb450a06d4360f4';
+const R54_TASK_EXCEPTION='ONE_TIME_R54_TASK_PAUSE_RESTORE_B';
+/** Pure, read-only gate: a synthetic proof may exercise tests but is never
+ * accepted from a GitHub issue/manifest. The trusted Windows provider must
+ * independently establish and hold this freeze until the B transaction ends.
+ * No such provider is installed in this draft; r54-b-apply stays BLOCKED. */
+export function r54BStartFreezeReady(proof={}){
+ const {authorization,baseline,closedRoutes,sourceRows,observedAt}=proof??{};
+ const norm=x=>typeof x==='string'?x.replace(/\//g,'\\').toLowerCase():'';
+ if(authorization?.grade!=='B'||authorization.scope!==R54_TASK_EXCEPTION
+  ||authorization.taskName!==R54_TASK_NAME||authorization.singleUse!==true
+  ||authorization.preserveTaskDefinition!==true
+  ||authorization.allowForceTermination!==false
+  ||authorization.allowOtherTaskChanges!==false)return false;
+ if(baseline?.name!==R54_TASK_NAME
+  ||norm(baseline.actionPath)!==norm(R54_TASK_ACTION)
+  ||baseline.actionSha256!==R54_TASK_ACTION_SHA256
+  ||baseline.enabled!==false
+  ||!/^[a-f0-9]{64}$/.test(baseline.definitionDigest??'')
+  ||baseline.durableXmlBackupReadback!==true)return false;
+ if(closedRoutes?.taskName!==R54_TASK_NAME
+  ||closedRoutes.schedulerStartDisabled!==true
+  ||closedRoutes.taskNotRunning!==true||closedRoutes.childProcessCount!==0
+  ||closedRoutes.otherScheduledEntrypoints!==0
+  ||closedRoutes.otherManualEntrypointsBlocked!==true
+  ||closedRoutes.relevantLocksClear!==true
+  ||closedRoutes.exclusiveBLeaseHeld!==true
+  ||closedRoutes.twoStablePassesVerified!==true)return false;
+ if(!Array.isArray(sourceRows)||sourceRows.length!==R54_B_SOURCE_FILES.length
+  ||!R54_B_SOURCE_FILES.every((pin,i)=>sourceRows[i]?.path===pin.path
+    &&sourceRows[i]?.actual===pin.old))return false;
+ return typeof observedAt==='string'&&Number.isFinite(Date.parse(observedAt))
+  &&Math.abs(Date.now()-Date.parse(observedAt))<60000;
+}
 const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
 const r6FileIdentity=file=>{const s=fs.statSync(file,{bigint:true});
  need(s.isFile(),'R6_HOST_DB_NOT_REGULAR');
@@ -1473,6 +1512,54 @@ function recoverR6HostOnly(requestId,packageFile,mode){
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
+ if(cmd==='r54-b-status'){
+  need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
+  // Existing independent install lock and original controller remain untouched.
+  // A Writer runtime reservation is NOT implemented in this source draft.
+  return {...readMaintenanceRecoveryStatus(requestId),
+   writerSourceApplyEnabled:false,code:'R54_B_TASK_START_RACE_UNPROTECTED'};
+ }
+ if(cmd==='r54-b-apply'){
+  need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file',
+   'MAINTENANCE_ARGS');
+  // Admission is still independently rechecked against the GitHub Issue and
+  // installed Controller manifest. No file modifications precede this check.
+  const approvedPath=path.join(maintenanceRoot,'approved',requestId+'.json');
+  need(path.resolve(args[4])===path.resolve(approvedPath),'R54_B_APPROVAL_FILE_PATH');
+  const pkg=json(approvedPath),issue=pkg.issue;
+  need(issue?.requestId===requestId&&issue.operation===R54_B_OPERATION
+   &&pkg.actor==='ansqhd5774-Choi'&&Number.isSafeInteger(pkg.issueNumber),
+   'R54_B_PACKAGE_IDENTITY');
+  const actual=github('issues/'+pkg.issueNumber);
+  need(actual.state==='open'&&actual.title===R54_B_ISSUE_TITLE
+   &&actual.user?.login==='ansqhd5774-Choi'
+   &&actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,
+   'R54_B_ISSUE_CANCELED');
+  const approvedIssue=validateR54BIssueEnvelope(JSON.parse(actual.body),{
+   actor:actual.user.login,controlRepository});
+  need(JSON.stringify(approvedIssue)===JSON.stringify(issue),'R54_B_ISSUE_IDENTITY');
+  const raw=Buffer.from(pkg.manifestRawBase64??'','base64');
+  validateR54BManifestRequest(approvedIssue,raw,{
+   actor:pkg.actor,controlRepository,installedSha:installedManifest().installedSha});
+  // Actual R54 task has no installed, trusted OS provider that verifies a
+  // durable one-time disable, manual-CMD start block and common B lease.
+  // The only data available here is a GitHub Issue, never acceptable as a
+  // runtime freeze proof. This is intentionally null and cannot be supplied
+  // via Issue body or manifest. Do not call the six-file CAS applier.
+  const trustedRuntimeFreezeProof=null;
+  if(!r54BStartFreezeReady(trustedRuntimeFreezeProof)){
+  return {status:'BLOCKED',code:'R54_B_TASK_START_RACE_UNPROTECTED',
+   lastPass:'R54_B_ADMISSION_AND_MANIFEST_VERIFIED',
+   firstFail:'R54_B_TASK_START_RACE_UNPROTECTED',
+   actualControllerSha:installedManifest().installedSha,installAttempted:false,
+   writerFilesChanged:0,controllerWrites:0,taskWrites:0,
+   providerCalls:0,d1Writes:0,protectedStateUnchanged:true};
+  }
+  // A future B revision must provide the complete trusted OS-backed
+  // disable/drain/CAS/rollback/restore transaction before enabling apply.
+  throw Object.assign(Error('R54_B_TRUSTED_RUNTIME_NOT_IMPLEMENTED'),
+   {code:'R54_B_TRUSTED_RUNTIME_NOT_IMPLEMENTED'});
+ }
  if(cmd==='host-r6-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readR6HostStatus(requestId);
