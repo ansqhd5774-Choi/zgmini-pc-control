@@ -102,7 +102,7 @@ Windows 미검증이면 운영 적용과 읽기 전용/임시 폴더 시험을 �
 
 업무 승인·실행기의 기술 지원·도구 권한은 별개다. 필요한 경로를 검증·등록한 뒤 사용하며 일반 A급 pc-job에 B급 쓰기를 우회 삽입하지 않는다. 단회 경로도 기존 공통 모듈 재사용 가능성을 먼저 확인한다.
 
-중량 읽기 전용 기능은 기능별 예외 대신 공통 자원 프로필을 쓴다. **현재 신규 공통 heavy 등록 계약**은 A/heavy·240초·최소 가용 1536MiB, purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`다. 기존 기능별 승인값(예: 별도 384MiB 테스트)은 소급 변경하지 않는다. 기본 light가 heavy를 자동 허용하지 않는다. 1024MiB 완화 프로필은 Draft PR #321의 미검증 후보로, Windows 실측·최대 동시작업/메모리 여유·운영 설치 승인이 없으면 활성 정책으로 쓰지 않는다. 보안·쓰기 제한은 자원 프로필 완화와 무관하게 유지한다.
+중량 읽기 전용 기능은 기능별 예외 대신 공통 자원 프로필을 쓴다. **현재 신규 공통 heavy 등록 계약**은 A/heavy·240초·최소 가용 1536MiB, purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`다. 기존 기능별 승인값(예: 별도 384MiB 테스트)은 소급 변경하지 않는다. 기본 light가 heavy를 자동 허용하지 않는다. 1024MiB 완화 프로필은 PR #327로 source만 병합된 미검증 후보로, Windows 실측·최대 동시작업/메모리 여유·운영 설치 승인이 없으면 활성 정책으로 쓰지 않는다. 보안·쓰기 제한은 자원 프로필 완화와 무관하게 유지한다.
 
 업데이트는 실제 설치 SHA와 목표 SHA의 **실제 누적 diff**·변경별 승인·해시를 대조한다. 파일 수를 추정하거나 과거 후보 목록을 고정하지 않는다. 읽기 전용 diff 계획기로 manifest 초안을 만들 수 있지만 최종 범위·승인은 실제 값과 대조한다. main 병합만으로 PC 적용 승인을 대신하지 않는다. `ALLOWFILE_DIFF_MISMATCH`는 실제 차이를 해결하고 검사를 제거하지 않는다. 승인된 호환 변경은 정확한 통합 manifest로 묶거나 순차 적용하고 미승인 변경은 검증된 경로로 분리한다. manifest 원본 바이트 해시를 사용한다. dirty 확인은 기본적으로 실제 변경/보호 파일에 국한하되, 영향을 줄 수 있는 겹침은 보존·격리한다. 이를 근거로 미승인 파일을 무시하거나 덮어쓰지 않는다.
 
@@ -116,7 +116,7 @@ Controller **실제 교체**는 검증된 독립 유지보수기에 `pc-maintena
 4. **검사 범위와 사후 A 목록 일치:** 관련 집중 테스트와 고정 사후 operation(`core-status`, `source-audit`, `fear-greed-archive-status`)만 중복 없이 연결하되 실제 새 기능의 실행 결과도 따로 확인한다.
 5. **실측 기반 중량 자원 프로필:** 현재 1536MiB heavy를 유지하며 1024MiB moderate 후보는 독립 B manifest·Windows 실측·Core 안전 검증 후에만 신규 읽기 작업에 적용한다.
 
-위 구현은 [Draft #321](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/321) 및 [Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)에서 검토 중이다. **문서 개정은 이 코드의 merge·PC 설치·운영 활성화 증거가 아니다.** 후속 구현은 충돌을 해결한 정확한 diff·회귀시험·B 승인·실PC 적용 증거로 별도 판정한다. 기존 정상 A 업무를 해당 Draft 완료까지 대기시키지 않는다.
+위 구현은 이전 [Draft #321](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/321)·[Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)의 코드·테스트를 선별 통합하여 [PR #327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/327)에서 **2026-11-05 source 병합 완료**(SHA `eafc71b99a43a27a3e891e2de990dc26b42c2dd5`)했다. 격리 Node 영향 테스트 106건과 복구 계획기 4건 PASS이며, **PC 유지보수기 인계·Windows 실제 실행·운영 활성화는 아직 검증되지 않았다.** 후속 적용은 실제 설치 SHA·정확한 manifest·관련 Windows 검증·승인된 정규 인계 결과로 별도 판정한다. 기존 정상 A 업무를 이 인계 완료까지 대기시키지 않는다.
 
 유지보수기 자체 인계는 현재 설치에 맞는 별도 검증 경로를 쓴다. 기존 프로세스 증거를 소급 생성하지 않고 정상 종료 또는 종료 입증 후 인계한다. 정책 변경 의존성은 필요한 업무에만 적용한다. 업데이트/인계 때 Startup 환경의 실제 GitHub 인증을 확인하며 기존 계정·공식 보안 저장소를 사용한다. 토큰을 명령행·파일·로그·Issue에 노출하지 않는다.
 
