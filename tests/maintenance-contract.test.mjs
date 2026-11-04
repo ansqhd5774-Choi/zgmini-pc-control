@@ -349,3 +349,14 @@ test('common heavy purpose requires its exact B scope and raw manifest pin',()=>
  f.manifest.approval.scope='PC_CONTROL_CONTROLLER_UPDATE';repin(f);
  assert.throws(()=>admitted(f),/UPDATE_B_APPROVAL_REQUIRED/);
 });
+
+test('moderate readonly is a distinct B approval scope, not a generic resource bypass',()=>{
+ const f=fixture();f.manifest.purpose='pc-controller-moderate-readonly';
+ f.manifest.approval.scope='PC_CONTROL_MODERATE_READONLY_UPDATE';repin(f);
+ assert.equal(admitted(f).manifest.purpose,'pc-controller-moderate-readonly');
+ const wrong=fixture();wrong.manifest.purpose='pc-controller-moderate-readonly';
+ wrong.manifest.approval.scope='PC_CONTROL_HEAVY_READONLY_UPDATE';repin(wrong);
+ assert.throws(()=>admitted(wrong),/UPDATE_B_APPROVAL_REQUIRED/);
+ const post=fixture();post.manifest.postOperation='source-audit';repin(post);
+ assert.equal(admitted(post).manifest.postOperation,'source-audit');
+});

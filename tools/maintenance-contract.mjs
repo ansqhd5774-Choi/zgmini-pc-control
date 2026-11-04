@@ -13,6 +13,15 @@ export const INSTALLABLE_FILES=Object.freeze([
   "controller/operations.mjs","controller/supervisor.mjs",
   "controller/upload.mjs","controller/worker.mjs",
 ]);
+// The dirty-check covers files read in-place by this Controller installation.
+// Unrelated local scripts are excluded. Scripts changed between pinned Git
+// SHAs still pass the independent infrastructure-diff approval gate.
+export const CONTROL_UPDATE_SENSITIVE_PATHS=Object.freeze([
+  'controller','config','.github/workflows','approvals/controller-updates',
+]);
+export const CONTROLLER_POST_OPERATIONS=Object.freeze([
+  'core-status','source-audit','fear-greed-archive-status',
+]);
 
 const ISSUE_KEYS=[
   "schema","requestId","chatId","operation","controlRepository",
@@ -121,6 +130,7 @@ const PURPOSE_SCOPE=Object.freeze({
   "pc-controller-safety-fix":"PC_CONTROL_CONTROLLER_UPDATE",
   "pc-controller-maintenance":"PC_CONTROL_CONTROLLER_UPDATE",
   "pc-controller-heavy-readonly":"PC_CONTROL_HEAVY_READONLY_UPDATE",
+  "pc-controller-moderate-readonly":"PC_CONTROL_MODERATE_READONLY_UPDATE",
 });
 const REPORTABLE_FAILURES=new Set([
   "RESOURCE_WAIT_MEMORY","RESOURCE_WAIT_LOCK","LEASE_BUSY","APPROVAL_NOT_FOUND",
@@ -177,6 +187,7 @@ export function manifestFingerprint(files){
  * permission to change existing operations, providers or write controls. */
 export function controllerAdmissionForPurpose(purpose){
   if(purpose==='pc-controller-heavy-readonly')return {resourceProfile:'HEAVY_READONLY_240_1536'};
+  if(purpose==='pc-controller-moderate-readonly')return {resourceProfile:'MODERATE_READONLY_180_1024'};
   // Historical R6 manifests retain their exact, narrow scope. New features use
   // the resource profile above, never a new hardcoded operation-name exception.
   if(purpose==='employment-r6-readonly-adapter')return {resourceProfile:'LEGACY_R6_ONLY'};
@@ -213,9 +224,19 @@ export function validateControllerConfigTransition(previous,next,{resourceProfil
       &&Object.keys(definition).sort().join(',')==='grade,minimumFreeMiB,resource,timeoutSeconds'
       &&definition.grade==='A'&&definition.resource==='heavy'
       &&definition.timeoutSeconds===240&&definition.minimumFreeMiB===1536;
+    // Uses the existing exclusive heavy lease (maxHeavyJobs remains one).
+    // The smaller memory gate is opt-in through an exact B-grade purpose;
+    // it is never enabled for existing operations or by ordinary pc-job input.
+    const moderateShape=object(definition)
+      &&Object.keys(definition).sort().join(',')==='grade,minimumFreeMiB,resource,timeoutSeconds'
+      &&definition.grade==='A'&&definition.resource==='heavy'
+      &&Number.isSafeInteger(definition.timeoutSeconds)
+      &&definition.timeoutSeconds>=91&&definition.timeoutSeconds<=180
+      &&definition.minimumFreeMiB===1024;
     const approvedHeavy=heavyShape&&(resourceProfile==='HEAVY_READONLY_240_1536'||
       (resourceProfile==='LEGACY_R6_ONLY'&&name==='employment-r6-candidate-stage-readonly'));
-    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!(allowedLight||approvedHeavy)){
+    const approvedModerate=moderateShape&&resourceProfile==='MODERATE_READONLY_180_1024';
+    if(!/^[a-z][a-z0-9-]{2,60}$/.test(name)||!(allowedLight||approvedHeavy||approvedModerate)){
       throw Error('CONTROLLER_NEW_OPERATION_NOT_READONLY_A');
     }
   }
@@ -385,7 +406,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
     ||raw.backup.rollback.sha!==raw.installedSha){
     throw Error("UPDATE_ROLLBACK_NOT_VERIFIED");
   }
-  if(!["core-status","source-audit","fear-greed-archive-status"].includes(raw.postOperation)){
+   if(!CONTROLLER_POST_OPERATIONS.includes(raw.postOperation)){
     throw Error("UPDATE_POST_OPERATION_NOT_ALLOWED");
   }
   if(typeof raw.postSourceBranch!=="string"

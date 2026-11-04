@@ -1,12 +1,127 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {applyApprovedUpdate} from '../tools/maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceFailureCode} from '../tools/maintenance-apply.mjs';
 import {readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
-  closeLatestPause,backlogIssueInPause} from '../tools/update.mjs';
+  closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
+test('no-effect proof rejects an incomplete, substituted or absent installed file inventory',()=>{
+ const h='0'.repeat(64),files=Object.fromEntries([
+  'config/operations.json','controller/entry.mjs','controller/engine.mjs',
+  'controller/supervisor.mjs','controller/worker.mjs'].map(x=>[x,h]));
+ assert.deepEqual(Object.keys(prevalidationInventory({controllerFiles:files})).length,5);
+ assert.equal(prevalidationInventory({controllerFiles:{...files,'controller/entry.mjs':undefined}}),null);
+ assert.equal(prevalidationInventory({controllerFiles:{'controller/entry.mjs':h}}),null);
+ assert.equal(prevalidationInventory({}),null);
+});
+test('uncoded preflight exception reports a precise safe stage and leaves Controller untouched',async()=>{
+ const f=fixture({inspect:async()=>{throw Error('private path and arbitrary details must stay private');}});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'UPDATE_INSPECT_FAILED');
+ assert.equal(r.firstFail,'RECEIVED');
+ assert.equal(r.failureOperation,'inspect');
+ // A legacy success path does not claim a specialized no-effect proof.
+ assert.equal(r.substate,undefined);
+ assert.equal(f.installed,previous);
+ assert.equal(f.paused,false);
+ assert.ok(!f.events.includes('stage'));
+ assert.ok(!JSON.stringify(r).includes('private path'));
+});
+test('known errors remain exact; system errno is safely tied to the failing stage',()=>{
+ assert.equal(maintenanceFailureCode({code:'SUPERVISOR_NOT_HEALTHY'},'validate'),'SUPERVISOR_NOT_HEALTHY');
+ assert.equal(maintenanceFailureCode({code:'ENOENT'},'validate'),'UPDATE_VALIDATE_ENOENT');
+ assert.equal(maintenanceFailureCode(Error('token=do-not-log'),'postcheck'),'UPDATE_POSTCHECK_FAILED');
+});
+test('bounded no-effect proof can release an otherwise overly strict busy-Runner prevalidation block',async()=>{
+ const f=fixture({
+  validate:async()=>{throw Object.assign(Error('prevalidation failed'),{code:'ALLOWFILE_HASH_MISMATCH'});},
+  verifyPrevious:async()=>false, // old health check treats a busy unrelated runner as unsafe
+  verifyPrevalidationUntouched:async()=>true, // live original, Core digest and active workflow were read back
+ });
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.substate,'PREVALIDATION_UNTOUCHED_VERIFIED');
+ assert.equal(r.code,'ALLOWFILE_HASH_MISMATCH');
+ assert.equal(r.firstFail,'RECEIVED');
+ assert.equal(r.failureOperation,'validate');
+ assert.equal(r.workflowEnabled,true);
+ assert.equal(f.events.includes('stage'),false);
+});
+test('no-effect prevalidation remains recovery-required if fresh installed SHA disagrees',async()=>{
+ const f=fixture({validate:async()=>{throw Error('rejected before stage');},
+  verifyPrevious:async()=>false,verifyPrevalidationUntouched:async()=>true,
+  inspectAfterUncertain:async()=>({actualControllerSha:target,workflowState:'active'})});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.substate,undefined);
+ assert.equal(r.observed.actualControllerSha,target);
+});
+test('no-effect prevalidation requires independently readable installed SHA',async()=>{
+ const f=fixture({validate:async()=>{throw Error('rejected before stage');},
+  verifyPrevious:async()=>false,verifyPrevalidationUntouched:async()=>true,
+  inspectAfterUncertain:async()=>({workflowState:'active'})});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+});
+test('no-effect assertion cannot override an absent proof or a disabled workflow',async()=>{
+ const noProof=fixture({inspect:async()=>{throw Error('inspect failed');},
+  verifyPrevious:async()=>false,verifyPrevalidationUntouched:async()=>false});
+ const a=await applyApprovedUpdate(request,noProof.port);
+ assert.equal(a.status,'RECOVERY_REQUIRED');
+ assert.equal(a.substate,undefined);
+ assert.equal(a.firstFail,'RECEIVED');
+ const disabled=fixture({inspect:async()=>{throw Error('inspect failed');},
+  verifyPrevious:async()=>false,verifyPrevalidationUntouched:async()=>true,
+  inspectAfterUncertain:async()=>({installedSha:previous,workflowState:'disabled_manually'})});
+ const b=await applyApprovedUpdate(request,disabled.port);
+ assert.equal(b.status,'RECOVERY_REQUIRED');
+ assert.equal(b.substate,undefined);
+ assert.equal(b.workflowEnabled,false);
+});
+test('failed or throwing proof does not turn a recovery requirement into BLOCKED',async()=>{
+ for(const proof of [async()=>{throw Error('readback failed');},async()=>null]){
+  const f=fixture({inspect:async()=>{throw Error('no effect but unverified');},
+   verifyPrevious:async()=>false,verifyPrevalidationUntouched:proof});
+  const r=await applyApprovedUpdate(request,f.port);
+  assert.equal(r.status,'RECOVERY_REQUIRED');
+  assert.equal(r.substate,undefined);
+ }
+});
+test('stage-entry failure cannot be downgraded by a false untouched-proof callback',async()=>{
+ let proofCalls=0,stageCalls=0;
+ const f=fixture({
+  stage:async()=>{stageCalls++;throw Object.assign(Error('partial stage write'),{code:'ENOSPC'});},
+  verifyPrevious:async()=>false,
+  verifyPrevalidationUntouched:async()=>{proofCalls++;return true;},
+ });
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(stageCalls,1);
+ assert.equal(proofCalls,0);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.substate,undefined);
+ assert.equal(r.firstFail,'VALIDATED');
+ assert.equal(r.failureOperation,'stage');
+ assert.equal(r.code,'UPDATE_STAGE_ENOSPC');
+});
+test('prevalidation-only exception never changes stored failure into a new top-level status',async()=>{
+ const f=fixture({validate:async()=>{throw Object.assign(Error('invalid digest'),{code:'ALLOWFILE_HASH_MISMATCH'});},
+  verifyPrevalidationUntouched:async()=>true});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.substate,'PREVALIDATION_UNTOUCHED_VERIFIED');
+ assert.ok(!f.events.includes('stage'));
+ assert.ok(!f.events.includes('pause'));
+ const source=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.match(source,/await ports\.capturePrevalidationBaseline\(\);/);
+ assert.match(source,/verifyPrevalidationUntouched:async/);
+ assert.match(source,/prevalidationBaseline\.ownerNonce/);
+ assert.match(source,/protectedSnapshot\(\)/);
+ assert.match(source,/if\(result\.status==='RECOVERY_REQUIRED'\)\{installLock\.holdForRecovery\(\)/);
+ assert.match(source,/if\(!retained\)installLock\.release\(\)/);
+});
 function fixture(overrides={}) {
   const events=[],records=new Map();let installed=previous,paused=false,oldRunning=true;
   const port={
@@ -28,7 +143,7 @@ function fixture(overrides={}) {
     verifyBackup:async()=>true,
     restore:async()=>{installed=previous;events.push('restore');},
     reconnectPrevious:async()=>{oldRunning=true;events.push('reconnectPrevious');},
-    inspectAfterUncertain:async()=>({installedSha:installed,workflowState:paused?'disabled_manually':'active'}),
+    inspectAfterUncertain:async()=>({actualControllerSha:installed,workflowState:paused?'disabled_manually':'active'}),
     ...overrides
   };
   return {port,events,records,get installed(){return installed;},get paused(){return paused;}};
@@ -126,7 +241,7 @@ test('missing backlog before any pause cannot turn validation failure into recov
  const f=fixture({validate:async()=>{throw Object.assign(Error('missing prerequisite'),{code:'ENOENT'});},
   reconcileBacklog:async()=>{throw Object.assign(Error('no pause ever'),{code:'BACKLOG_STATE_MISSING'});}});
  const r=await applyApprovedUpdate(request,f.port);
- assert.equal(r.status,'BLOCKED');assert.equal(r.code,'ENOENT');assert.equal(r.failureOperation,'validate');
+ assert.equal(r.status,'BLOCKED');assert.equal(r.code,'UPDATE_VALIDATE_ENOENT');assert.equal(r.failureOperation,'validate');
  assert.equal(f.events.includes('pause'),false);
 });
 test('long running existing job fails closed, without stopping supervisor',async()=>{
