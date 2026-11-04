@@ -1,7 +1,8 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml} from './operations.mjs';
+import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
-export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,fixture=false,terminateTree=null,terminationGraceMs=5000}={}){
+export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,fixture=false,terminateTree=null,terminationGraceMs=5000,fixtureFreeMiB=null,fixtureMemoryWaitMs=20,fixtureMemoryPollMs=2}={}){
  need(Number.isInteger(seat)&&seat>=1&&seat<=policy.seats,'SEAT_NOT_ALLOWED');need(/^\d{1,20}$/.test(String(runId)),'RUN_ID');
  const workspaceId=`run-${runId}-${attempt}-seat-${seat}`,workspace=path.join(root,'jobs',workspaceId);fs.mkdirSync(workspace,{recursive:true});
  const start=Date.now(),report={schema:'ZGMINI_PC_RESULT_V1',jobId:workspaceId,requestId:typeof raw?.requestId==='string'&&/^[a-z0-9-]{8,80}$/.test(raw.requestId)?raw.requestId:null,startedAt:new Date(start).toISOString(),controlRepository:policy.controlRepository,controlSourceSha:host.controllerSourceSha,sourceRepository:policy.sourceRepository,requestedSourceSha:/^[a-f0-9]{40}$/.test(raw?.sourceSha??'')?raw.sourceSha:null,sourceBranch:typeof raw?.sourceBranch==='string'&&/^[a-zA-Z0-9_./-]{1,160}$/.test(raw.sourceBranch)?raw.sourceBranch:null,operation:Object.hasOwn(policy.operations,raw?.operation)?raw.operation:'NOT_ALLOWED',seat,status:'BLOCKED',code:'PREFLIGHT_NOT_COMPLETED',lastPass:'REQUEST_RECEIVED',firstFail:null,operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,controlWorkspaceWrites:true};
@@ -10,7 +11,20 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   const request=validateRequest(raw,policy);report.chatId=request.chatId;const payloadSha=digest(JSON.stringify(request));
   const ledgerRoot=path.join(root,'ledger');fs.mkdirSync(ledgerRoot,{recursive:true});ledger=path.join(ledgerRoot,request.requestId+'.json');
   if(fs.existsSync(ledger)){const prior=JSON.parse(fs.readFileSync(ledger));need(prior.payloadSha===payloadSha,'DUPLICATE_REQUEST_PAYLOAD_CHANGED');need(['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(prior.report?.status),'PRIOR_RESULT_INVALID');Object.assign(report,{status:prior.report.status,code:prior.report.code,lastPass:prior.report.lastPass,firstFail:prior.report.firstFail,actualExecutionSha:prior.report.actualExecutionSha,protectedStateUnchanged:prior.report.protectedStateUnchanged});report.reused=true;report.reuseCode='DUPLICATE_REUSED_NO_EXECUTION';report.prior=prior.report;return finalize();}
-  releaseRequest=exclusive(path.join(root,'leases'),'request-'+request.requestId);releaseSeat=exclusive(path.join(root,'leases'),'seat-'+seat);
+  releaseRequest=exclusive(path.join(root,'leases'),'request-'+request.requestId);
+  const minimumFreeMiB=memoryAdmissionMinimum(policy,request.operation);
+  if(minimumFreeMiB!==null){
+   report.memoryAdmission=await waitForMemoryAdmission({minimumFreeMiB,
+    ...(fixture?{timeoutMs:fixtureMemoryWaitMs,intervalMs:fixtureMemoryPollMs,
+     ...(typeof fixtureFreeMiB==='function'?{readFreeMiB:fixtureFreeMiB}:{})}:{})});
+   if(!report.memoryAdmission.admitted){
+    Object.assign(report,{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',lastPass:'MEMORY_ADMISSION_SAMPLED',firstFail:'MEMORY_ADMISSION',
+     next:'MEMORY_WAIT_EXPIRED_NEW_REQUEST_ONLY',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY'});
+    report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;
+    writeJson(ledger,{payloadSha,report});return finalize();
+   }
+  }
+  releaseSeat=exclusive(path.join(root,'leases'),'seat-'+seat);
   if(policy.operations[request.operation].resource==='heavy')releaseResource=exclusive(path.join(root,'leases'),'heavy');
   before=protectedState(host.dataRoot,{queryTask});report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
