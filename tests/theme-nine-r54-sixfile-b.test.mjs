@@ -5,12 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {FILES,R54_B_SCHEMA,preflight,applyApprovedSix,
+import {FILES,R54_B_SCHEMA,R54_B_TASK_EXCEPTION,preflight,applyApprovedSix,
  readR54RecoveryJournalStatus} from '../tools/theme-nine-r54-sixfile-b.mjs';
 
 const approved=()=>({schema:R54_B_SCHEMA,status:'APPROVED_B',
  scope:'R54_FIXED_SIXFILE_SOURCE_ONLY',runCount:1,noProviderCalls:true,
- noD1Writes:true,noTaskChanges:true,noControllerChanges:true,files:FILES});
+ noD1Writes:true,taskStateException:R54_B_TASK_EXCEPTION,
+ noControllerChanges:true,files:FILES});
 const validGate=()=>({publisherConsentVerified:true,taskIdleVerified:true,
  maintenanceLeaseVerified:true,activeR54ProcessAbsent:true,
  sourceRootVerified:true,scoreReplayApproved:true,
@@ -40,6 +41,7 @@ test('B approval contract cannot be broadened to additional files or writes',()=
   {...approved(),scope:'ALL_WRITER_FILES'},
   {...approved(),noProviderCalls:false},
   {...approved(),noD1Writes:false},
+  {...approved(),taskStateException:{...R54_B_TASK_EXCEPTION,noOtherTaskChanges:false}},
   {...approved(),runCount:2},
   {...approved(),files:[...FILES,{path:'data.sqlite',old:'a'.repeat(64),next:'b'.repeat(64)}]},
  ];
@@ -47,6 +49,8 @@ test('B approval contract cannot be broadened to additional files or writes',()=
   assert.throws(()=>preflight({manifest,gate:validGate()}),
    /R54_B_MANIFEST_SCOPE_DENIED/);
  }
+ assert.throws(()=>preflight({manifest:{...approved(),noTaskChanges:true},
+  gate:validGate()}),/R54_B_MANIFEST_FIELDS_DENIED/);
 });
 
 test('B operation refuses missing verified runtime lease/consent before filesystem access',()=>{

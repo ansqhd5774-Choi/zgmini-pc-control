@@ -6,7 +6,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
-export const R54_B_SCHEMA='ZGMINI_R54_SIXFILE_SOURCE_B_PROTOTYPE_V1';
+export const R54_B_SCHEMA='ZGMINI_R54_SIXFILE_B_ONE_TIME_TASK_HOLD_V2';
+// The authorized Task pause/restore belongs to the independent B host.
+// This six-file source applier itself must still perform zero Task writes.
+export const R54_B_TASK_EXCEPTION=Object.freeze({
+ mode:'DISABLE_RESTORE_SAME_TASK_ONCE',
+ taskName:'ZGMINI-PC-Theme-Nine-R54-Public',
+ preserveOriginalXml:true,
+ preserveOriginalEnabledState:true,
+ waitForNaturalExit:true,
+ noForceTermination:true,
+ noOtherTaskChanges:true,
+ restoreOnlyAfterSixFileIntegrity:true,
+ noAutomaticRetry:true,
+});
 export const FILES=Object.freeze([
  Object.freeze({path:'scripts/pc-writer/theme-nine-r54-public-connect.mjs',
   old:'c6e4699d62bdef991911561623e37c205fd8bb6e5aa69907c3e93e36908fd31e',
@@ -115,10 +128,16 @@ function sourceRows({installedRoot,candidateRoot}){
 /** Read-only; caller must supply the exact approved B manifest and lease proof. */
 export function preflight({installedRoot,candidateRoot,manifest,gate,
  journalRoot,requestId}={}){
+ const expectedManifestKeys=['schema','status','scope','runCount',
+  'noProviderCalls','noD1Writes','taskStateException','noControllerChanges','files'];
+ assert(manifest&&Object.keys(manifest).length===expectedManifestKeys.length&&
+  expectedManifestKeys.every(key=>Object.hasOwn(manifest,key)),
+  'R54_B_MANIFEST_FIELDS_DENIED');
  assert(manifest?.schema===R54_B_SCHEMA&&manifest?.status==='APPROVED_B'&&
   manifest.scope==='R54_FIXED_SIXFILE_SOURCE_ONLY'&&manifest.runCount===1&&
   manifest.noProviderCalls===true&&manifest.noD1Writes===true&&
-  manifest.noTaskChanges===true&&manifest.noControllerChanges===true&&
+  eq(manifest.taskStateException,R54_B_TASK_EXCEPTION)&&
+  manifest.noControllerChanges===true&&
   eq(manifest.files,FILES),'R54_B_MANIFEST_SCOPE_DENIED');
  assert(gate?.publisherConsentVerified===true&&gate?.taskIdleVerified===true&&
   gate?.maintenanceLeaseVerified===true&&gate?.activeR54ProcessAbsent===true&&
