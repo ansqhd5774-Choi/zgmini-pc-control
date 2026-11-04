@@ -26,6 +26,7 @@ jobs:
         shell: cmd
     env:
       R17_CONTROL_SHA: 90d2afc3cc062d289d23f4cdf0bf3656e2fcce7d
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: core.autocrlf
       GIT_CONFIG_VALUE_0: 'false'
