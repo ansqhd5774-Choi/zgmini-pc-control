@@ -67,6 +67,25 @@ test('complete no-drift evidence is the only NO_CHANGE_CONFIRMED',()=>{
  assert.equal(classifyEvidence({...completeFixture(),preflight:{requestId:TARGET_REQUEST,terminal:false}}).status,'INSUFFICIENT_EVIDENCE');
 });
 
+test('the currently available PC evidence cannot justify a no-change or resume PASS',()=>{
+ const evidence={...completeFixture(),
+  // #268 has no terminal request-scoped ledger or pre-run checkpoint digest.
+  preflight:{requestId:TARGET_REQUEST,terminal:false,lastStep:null},
+  checkpointsBaselineMatched:false,
+  // The installed source tracer proves only static launcher provenance.
+  runtimeSourceVerified:false,
+  // No matching process or dedicated lease is not verified negative proof.
+  process:{verified:false,active:false,matchingProcessCount:0},
+  lease:{verified:false,active:null},
+ };
+ const result=summarizeEvidence(evidence);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R17_268_EVIDENCE_INSUFFICIENT_BLOCKED');
+ assert.equal(result.assessment,'INSUFFICIENT_EVIDENCE');
+ assert.equal(result.assessmentCode,'R17_268_LAST_STEP_OR_BASELINE_UNVERIFIED');
+ assert.equal(result.operationalWrites,0);
+});
+
 test('active execution or lease blocks any clean-state admission',()=>{
  const changed={...completeFixture(),configSource:'f'.repeat(40),process:{verified:true,active:true}};
  assert.deepEqual(classifyEvidence(changed),{status:'INSUFFICIENT_EVIDENCE',code:'R17_268_ACTIVE_PROCESS_STOP'});
