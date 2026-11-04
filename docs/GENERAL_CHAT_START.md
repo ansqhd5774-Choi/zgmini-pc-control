@@ -1,6 +1,6 @@
 # 새 일반챗의 자동 작업 시작
 
-2026-11-04 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
+2026-11-05 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
 
 사용자가 작업 전에 전달할 짧은 지침은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)다. 현재 상태와 접수 문제는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)로 분류한다. 요약을 읽은 것만으로 최신 정본·실제 상태 확인을 대체하지 않는다.
 
@@ -13,6 +13,9 @@
 실제 Runner 연결 장애가 있을 때 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 정상 업무의 필수 시작 절차로 복구 검사를 추가하지 않는다.
 
 Controller 설치 잠금·RECOVERY_REQUIRED는 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)를 따른다. 기존 요청의 단계/소유자/실제 바이트/부작용을 확인한 뒤 지원되는 복구 도구를 사용하고 결과 회수·재개까지 담당한다. 진단 PASS나 잠금 보관을 업데이트 PASS로 보고하지 않는다.
+
+2026-11-05 KST #319 설치 잠금은 공식 `ABORTED_UNTOUCHED`로 보관 완료됐다. #319 자체는 Controller 설치 성공을 뜻하지 않으며 이력은 [복구 지침](CONTROLLER_RECOVERY.md)에 있다. 일반 A급 조회·독립 Reader에는 #319 상태나 6개 Runner 전원 유휴를 반복 선행 조건으로 삼지 않는다. 실제 Controller 교체는 여전히 검증된 독립 유지보수기와 B manifest·원본 보호가 필요하다. PR #327 개선 코드는 `main`에 병합됐으며, 2026-11-05 KST 실제 PC에서 **유지보수기 자체 인계 PASS**(`5469548b05ba90f3855281e94234952bdb45fa4f`, 새 Receiver 출처 검증)를 확인했다. **그 유지보수기 인계만으로 Controller 설치·6 Runner 재연결·운영 정책 활성화를 판정하지 않는다**.
+이후 별도 정규 B 요청 [#345](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/345#issuecomment-6640249328)에서 Controller `69c830275bd3fec75b17c8a98c46d689447fb1a7` 실제 설치가 `SUCCEEDED`로 검증됐고 보호 상태·Workflow 활성 상태가 유지됐다. [#346](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/346)·[#347](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/347) A급 진단 PASS는 각각 해당 시점의 실행 증거다. 승인되어 제거된 이란 R13 예약은 [PR #342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/342)의 `APPROVED_RETIRED_ABSENT`를 적용하며, 임의 복원하거나 독립 A급 작업의 전역 차단 조건으로 삼지 않는다. Core·Korea 보호는 유지한다. 현재 운영을 확인할 때는 과거 SHA·상태를 최신값으로 고정하지 않는다.
 
 이 문서는 사용자에게 매번 CMD를 전달하지 않고 GitHub 요청→PC 자동 실행→결과 읽기를 이어가기 위한 진입점이다.
 

@@ -1,6 +1,6 @@
 # ZGMINI — 일반챗·CMD·PC Runner 공통 작업 지침
 
-2026-11-04 개정 정본. 이전의 동일 목적 지침을 대체한다. 현재 업무·승인·완료 증거는 보존하며 처음부터 재시작하지 않는다. 이번 개정은 작업·보고 기준의 정리이며 실행기 권한이나 운영 환경을 변경하지 않는다.
+2026-11-05 개정 정본. 이전의 동일 목적 지침을 대체한다. 현재 업무·승인·완료 증거는 보존하며 처음부터 재시작하지 않는다. 이번 개정은 #319의 실제 복구 결과와 위험도별 검증·병렬 처리 기준을 반영한 **운영 지침**이다. 문서 반영만으로 실행기 코드가 설치·활성화됐다고 주장하지 않는다.
 
 ## 1. 목적과 정본
 
@@ -16,6 +16,17 @@
 
 마지막 유효 완료 지점과 다음 필수 실행을 정하고 그 실행에 필요한 입력·설치 모듈·경로·승인만 확인한다. 기존 공통 등록기·수집기·계산기·게시기·adapter를 우선 재사용한다. 설정으로 가능한 일을 새 Controller 설치·기능별 CMD·예약 복제로 확대하지 않는다. 기술적 근거 없이 기능·테마·ETF 수량 상한이나 목표 개수를 추가하지 않는다.
 
+**업무 효과를 기준으로 검증 범위를 분리한다.** 작업이 Controller 파일을 교체하지 않으면 Controller 설치 Gate를 전제하지 않는다.
+
+| 변경 범위 | 꼭 필요한 검사 | 선행 조건으로 만들지 않을 검사 |
+|---|---|---|
+| 조회·결과 회수·독립 A급 실행 | 해당 operation 설치 여부·고유 ID·대상 결과·필요 자원 | 전체 Controller 재설치, 모든 Runner 유휴, Core 전체 진단 |
+| 승인된 adapter/허용목록·설정 등록 | 실제 영향 파일·호환 계약·승인 manifest·관련 집중 테스트 | 무관한 파일의 dirty 상태, 다른 기능 전체 테스트 |
+| Controller 실행 파일 교체·독립 유지보수기 인계 | 실제 설치 SHA→목표 SHA 누적 diff·원본 바이트/승인·보호 백업·전환 직전 drain·재연결/사후검사 | 동일 증거의 무조건 재수집, 다른 프로젝트의 무관한 진단 |
+| Core/DB/게시/DNS 등 운영 변경 | 해당 업무의 별도 승인·변경 영향·저장/Runtime 검증 | Controller 갱신 절차를 공통 배포 Gate로 전파 |
+
+관련 테스트는 변경된 파일·의존 계약부터 실행한다. 공용 권한·상태머신·복구·배포 핵심 변경이면 영향받는 통합/회귀 검사를 확대한다. 전체 회귀 검사는 별도 품질 점검으로 분리할 수 있으나 모든 일반 업무의 완료 Gate나 신규 상시 예약으로 자동 추가하지 않는다. 검사를 줄이기 위해 assertion을 삭제하거나 이전의 실제 실패를 PASS로 바꾸지 않는다.
+
 기존 실PC·Provider·DB/checkpoint·공개 화면 증거는 원본 링크·관측 시각·대상·source/설정의 유효 범위를 대조해 재사용한다. 유효한 Runtime 성공을 현재 도구의 source 접근 실패만으로 취소하지 않는다. 관련 source·설정·환경이 바뀌면 영향 범위만 재검증한다.
 
 정상 업무마다 전체 Controller 건강 검사를 실행하지 않는다. 설치·자원 확인이 필요하거나 실제 오류·불명확 상태가 있으면 지원되는 읽기 전용 수단을 사용한다. tools/automation-status.mjs가 일반 pc-job에 설치됐다고 가정하지 않는다. 상태의 관측 시각·유효기간, 설치 파일·Supervisor 관리 좌석·Runner·활성 lease·요청 원장을 구분한다. heartbeat·GitHub Online만으로 관리 관계나 설치 성공을 증명하지 않는다.
@@ -27,6 +38,8 @@
 승인 범위의 manifest·해시·누적 diff·실행 명세·검증 자료는 현재 담당자가 완성한다. 실제 설치 SHA와 목표 SHA의 변경별 승인·최종 바이트를 대조한다. 과거 후보 파일 수를 고정하지 않는다. 자료 미작성·브랜치 분기·과거 대기만으로 중단하지 않고 실제 충돌을 안전하게 해결해 정규 실행·결과 회수까지 진행한다.
 
 BLOCKER는 현재 필수 실행을 실제로 막는 접근 거부·활성 자원 충돌·승인 범위 밖 결정·검증 실패 등으로 한정한다. 필수 조건의 코드/계약 근거·미충족 증거·영향 단계를 명시한다. 직접 해결할 준비 작업은 수행하고 무관한 문제는 NON_BLOCKING/DEFERRED로 분리한다. 호출하지 않는 Core 전체 계보·전체 폴더 탐색을 독립 게시기의 선행 조건으로 요구하지 않는다. 잘못된 조건은 원래 원장에서 정정한다.
+
+정확한 resource/lane이 겹치지 않는 다른 대화·Runner·수집/Reader 작업은 계속한다. 공유 Controller 교체만 단일 적용 담당과 설치 lease로 직렬화한다. 읽기 전용 사전 검사에 6개 Runner **전원 유휴**를 전역 선행 조건으로 강제하지 않는다. 현재 설치된 유지보수기의 더 엄격한 검사와 다를 경우 문서만으로 실행기를 우회·패치하지 않고 실제 차이를 개선 대상으로 기록한다.
 
 ### 단계 종료와 다음 실행
 
@@ -49,6 +62,7 @@ BLOCKER는 현재 필수 실행을 실제로 막는 접근 거부·활성 자원
 | Issue 존재·PC 미접수 | receiver·설치 모듈·활성 lease·요청 원장을 확인한다. |
 | PC 실행 실패 | 원래 오류 코드·실패 단계·부작용에 맞춰 해당 범위만 복구한다. |
 | 결과 전달 실패 | 기존 결과·원장·댓글을 회수하며 계산·설치를 재실행하지 않는다. |
+| 사전검사에서 안전하게 거부되고 운영 쓰기 없음이 증명됨 | 원본 설치·업무는 보존하고 해당 입력만 수정한다. 개정 후보의 `BLOCKED`/`PREVALIDATION_UNTOUCHED_VERIFIED` 지원 여부를 확인하며, 미지원 버전의 `RECOVERY_REQUIRED`를 임의 재분류하지 않는다. |
 
 상세 접수 분류는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md), 연결 복구는 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md), 설치 잠금·부분 전환은 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)를 따른다. 원장 없는 UNKNOWN·관리 좌석 불일치는 [설치 전 실패 진단](INSTALL_FAILURE_120_20261103.md), 중복 결과·종료 불명확·댓글 회수는 [공통 실패 보완](COMMON_FAILURE_HARDENING_20261103.md)을 필요한 범위에서 참조한다.
 
@@ -88,11 +102,22 @@ Windows 미검증이면 운영 적용과 읽기 전용/임시 폴더 시험을 �
 
 업무 승인·실행기의 기술 지원·도구 권한은 별개다. 필요한 경로를 검증·등록한 뒤 사용하며 일반 A급 pc-job에 B급 쓰기를 우회 삽입하지 않는다. 단회 경로도 기존 공통 모듈 재사용 가능성을 먼저 확인한다.
 
-중량 읽기 전용 기능은 기능별 예외 대신 공통 자원 프로필을 쓴다. 현재 A/heavy·240초·최소 가용1536MiB, purpose=pc-controller-heavy-readonly, B scope=PC_CONTROL_HEAVY_READONLY_UPDATE다. 기본 light가 heavy를 자동 허용하지 않는다. 이는 기능 수 제한이 아닌 자원 정책이며 구 한정 계약은 호환 범위에서만 유지한다.
+중량 읽기 전용 기능은 기능별 예외 대신 공통 자원 프로필을 쓴다. **현재 신규 공통 heavy 등록 계약**은 A/heavy·240초·최소 가용 1536MiB, purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`다. 기존 기능별 승인값(예: 별도 384MiB 테스트)은 소급 변경하지 않는다. 기본 light가 heavy를 자동 허용하지 않는다. 1024MiB 완화 프로필은 PR #327로 source만 병합된 미검증 후보로, Windows 실측·최대 동시작업/메모리 여유·운영 설치 승인이 없으면 활성 정책으로 쓰지 않는다. 보안·쓰기 제한은 자원 프로필 완화와 무관하게 유지한다.
 
-업데이트는 실제 설치 SHA와 목표 SHA의 누적 diff·변경별 승인·해시를 대조한다. main 병합만으로 PC 적용 승인을 대신하지 않는다. ALLOWFILE_DIFF_MISMATCH는 실제 차이를 해결하고 검사를 제거하지 않는다. 승인된 호환 변경은 정확한 통합 manifest로 묶거나 순차 적용하고 미승인 변경은 검증된 경로로 분리한다. manifest 원본 바이트 해시를 사용한다.
+업데이트는 실제 설치 SHA와 목표 SHA의 **실제 누적 diff**·변경별 승인·해시를 대조한다. 파일 수를 추정하거나 과거 후보 목록을 고정하지 않는다. 읽기 전용 diff 계획기로 manifest 초안을 만들 수 있지만 최종 범위·승인은 실제 값과 대조한다. main 병합만으로 PC 적용 승인을 대신하지 않는다. `ALLOWFILE_DIFF_MISMATCH`는 실제 차이를 해결하고 검사를 제거하지 않는다. 승인된 호환 변경은 정확한 통합 manifest로 묶거나 순차 적용하고 미승인 변경은 검증된 경로로 분리한다. manifest 원본 바이트 해시를 사용한다. dirty 확인은 기본적으로 실제 변경/보호 파일에 국한하되, 영향을 줄 수 있는 겹침은 보존·격리한다. 이를 근거로 미승인 파일을 무시하거나 덮어쓰지 않는다.
 
-Controller 갱신은 검증된 독립 유지보수기에 pc-maintenance로 요청한다. 일반 Runner가 자신을 교체하지 않는다. 기존 job·업로드 종료 대기 → 요청 보존 → 검산한 백업 → 승인 파일 적용 → 6 Runner fresh 재연결 → 보호 검사 → 사후 진단 → TXT/JSON/댓글 회수를 확인한다. 완료된 동일 진단은 재사용하고 유지보수 중 접수/backlog도 유실·중복 없이 회수한다.
+Controller **실제 교체**는 검증된 독립 유지보수기에 `pc-maintenance`로 요청한다. 일반 Runner가 자신을 교체하지 않는다. 변경·승인·보호 파일의 사전검사는 독립 읽기 단계로 수행한다. 교체가 확정된 직후 해당 전환에 필요한 기존 job·업로드 drain → 요청 보존 → 검산한 백업 → 승인 파일 적용 → 6 Runner fresh 재연결 → 보호 검사 → 사후 고정 A급 진단 → TXT/JSON/댓글 회수를 확인한다. 전원 유휴·6좌석 새 연결은 **교체 시점과 교체 결과**에 묶인 검사이지 모든 일반 작업의 시작 조건이 아니다. 사후 진단은 manifest의 고정 목록을 한 번 실행하고 이미 유효한 동일 결과는 재사용한다. 유지보수 중 접수/backlog도 유실·중복 없이 회수한다.
+
+### Controller 설치 효율 개선 5개 — 지침과 구현 상태 구분
+
+1. **영향 파일만 dirty 검사:** 설치·workflow·승인·실행 파일은 엄격히 검산하고 무관한 문서·결과·테스트의 수정은 전역 차단 조건에서 제외한다.
+2. **사전검증 결과 정밀 분류:** 실패한 operation/code를 기록한다. 변경 전·실제 운영 상태·intake 활성·보호 파일이 그대로임을 새 읽기 전용 증거로 확인한 경우에만 `BLOCKED`/`PREVALIDATION_UNTOUCHED_VERIFIED`로 판정한다. stage·pause·전환 **도중 실패하거나 부작용이 불명확한 경우**는 계속 `RECOVERY_REQUIRED`다.
+3. **누적 변경 자동 계획:** 설치 SHA부터 목표 SHA까지 변경 목록·목표 파일 해시·별도 유지보수기 의존성을 읽기 전용으로 생성한다. 초안은 승인이 아니며 미승인 파일을 자동 포함하지 않는다.
+4. **검사 범위와 사후 A 목록 일치:** 관련 집중 테스트와 고정 사후 operation(`core-status`, `source-audit`, `fear-greed-archive-status`)만 중복 없이 연결하되 실제 새 기능의 실행 결과도 따로 확인한다.
+5. **실측 기반 중량 자원 프로필:** 현재 1536MiB heavy를 유지하며 1024MiB moderate 후보는 독립 B manifest·Windows 실측·Core 안전 검증 후에만 신규 읽기 작업에 적용한다.
+
+위 구현은 이전 [Draft #321](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/321)·[Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)의 코드·테스트를 선별 통합하여 [PR #327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/327)에서 **2026-11-05 source 병합 완료**(SHA `eafc71b99a43a27a3e891e2de990dc26b42c2dd5`)했다. 격리 Node 영향 테스트 106건과 복구 계획기 4건 PASS이며, **2026-11-05 KST 실PC 유지보수기 자체 인계는 이전 설치 `dbe072206a599f7ac3c4eb9d86afd89cd4fdbd54`에서 승인 대상 `5469548b05ba90f3855281e94234952bdb45fa4f`로 `PASS`였고, `STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED` 및 새 Receiver 확인이 기록됐다.** 사용자 제공 원본 결과 TXT SHA-256: `dd49073588aa114c463ad7ed80ddcefd1a4001c89b7cfab91010f18e385a7f5f`. 이는 **유지보수기 자체 교체 증거만** 해당하며, Controller 새 설치·6 Runner 재연결·1024MiB 완화 정책 운영 활성화는 입증하지 않는다. 후속 Controller 적용은 정확한 B manifest·해시·전환/복구 보호·관련 Windows 사후 검증을 별도로 따른다. 기존 정상 A 업무를 Controller 교체 완료까지 불필요하게 대기시키지 않는다.
+별도 정규 B 요청 [#345](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/345#issuecomment-6640249328)에서는 2026-11-05 KST Controller 목표·실제 SHA가 모두 `69c830275bd3fec75b17c8a98c46d689447fb1a7`이고 `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, 보호 상태 유지·Workflow 활성 상태가 확인됐다. [#346](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/346)·[#347](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/347)에서 설치 후 서로 다른 좌석의 A급 진단 PASS 및 #347의 Core 실행 전진을 확인했다. 이는 앞 문단의 **유지보수기 자체 인계와 분리된 후속 Controller 설치 증거**이며, 모든 향후 운영 상태·A 6개와 B 실패의 동시 통합 검증·1024MiB 정책 활성화를 뜻하지 않는다. 이미 유효한 실제 Runtime 결과는 해당 관측 시점과 대상 범위에서 재사용한다.
 
 유지보수기 자체 인계는 현재 설치에 맞는 별도 검증 경로를 쓴다. 기존 프로세스 증거를 소급 생성하지 않고 정상 종료 또는 종료 입증 후 인계한다. 정책 변경 의존성은 필요한 업무에만 적용한다. 업데이트/인계 때 Startup 환경의 실제 GitHub 인증을 확인하며 기존 계정·공식 보안 저장소를 사용한다. 토큰을 명령행·파일·로그·Issue에 노출하지 않는다.
 
@@ -109,6 +134,7 @@ Controller 갱신은 검증된 독립 유지보수기에 pc-maintenance로 요�
 승인 범위의 최소 변경을 수행하고 사용자 수정·다른 작업자의 미커밋 변경을 보존한다. 자동 stash/reset/clean/rebase·강제 push·이력 재작성을 하지 않는다. commit은 해당 파일만 선택하고 git add . / git add -A를 사용하지 않는다.
 
 자동화 보완을 이유로 Core/Korea/Iran·다른 프로젝트 Runner·운영 source·원자료/산식·SQLite/D1·수집/게시 주기·예약·배포/DNS를 임의 변경하지 않는다. 별도 승인된 업무 변경만 해당 범위에서 수행한다. 기능·진단·과거 설치의 제한에는 대상과 시점을 명시한다.
+사용자가 승인하여 제거한 `ZGMINI-PC-Iran-Progress-R13` 예약은 [PR #342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/342) 이후 `APPROVED_RETIRED_ABSENT`로 검사하는 예외다. Core·Korea 예약 XML의 기존 보호는 유지하되, 이란 예약이 없다는 사실만으로 무조건 전역 차단하지 않는다. 승인 없는 자동 재등록·복원은 금지하며 승인 상태와 실제 상태가 어긋날 때만 해당 범위를 진단한다.
 
 비밀정보·토큰·인증 헤더·개인정보·전체 원자료/환경변수를 요청·로그·commit·결과에 넣지 않는다. 유료 서비스·자동결제를 추가하지 않고 API·저장소·PC 자원까지 무제한이라고 보장하지 않는다.
 
@@ -125,3 +151,14 @@ Controller 갱신은 검증된 독립 유지보수기에 pc-maintenance로 요�
 기본 보고는 ‘이번 수행 / 검증 결과 / 중요한 미해결 사항 / 다음 행동’을 한국어로 짧게 작성한다. 대기 중 상태가 같으면 같은 내용을 반복 통지하지 않는다. 사용자가 상태를 요청하면 마지막 확인 시각·기존 요청 ID·다음 확인 조건만 필요한 범위로 답한다. PR·테스트 진척은 필수 운영 단계의 진척과 구분한다. 미해결 사항은 정확한 단계·범위·증거·담당·다음 지원 행동·해제 조건을 적는다. 승인된 다음 행동이 가능하면 보고만 하고 멈추지 않는다.
 
 공통 규칙은 이 정본에 유지하고 시작 문서는 이를 요약한다. 다른 브랜치는 정본 참조와 작업별 차이·증거만 남긴다. 과거 장애 사례·SHA·실행 기록은 근거 문서로 보존하되 정상 업무의 시작 절차나 매번 보고할 성과로 고정하지 않는다. 옛 지침에는 대체 위치를 표시하고 과거 실행·승인 증거는 삭제하지 않는다.
+
+### 운영 원칙을 뒷받침하는 공개 사례
+
+- [Google SRE — Canarying Releases](https://sre.google/workbook/canarying-releases/): 작은 변경과 자동 배포·위험에 비례하는 검증. 단일 PC Controller에 대규모 카나리 기반 시설을 새로 강제하지 않는다.
+- [Microsoft — Safe deployment practices](https://learn.microsoft.com/en-us/devops/operate/safe-deployment-practices): 작은 배포·단계별 노출 및 수동 반복 감소 원칙을 채택하되 PC 전용 다중 배포 환경은 만들지 않는다.
+- [GitHub — Deployment concurrency](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments): 동일 그룹의 쓰기 충돌만 직렬화한다는 원칙을 공용 설치 lane에 적용한다.
+- [GitHub — Merge queue 운영 사례](https://github.blog/engineering/engineering-principles/how-github-uses-merge-queue-to-ship-hundreds-of-changes-every-day/): 서로 무관한 변경이 하나의 문제로 전부 대기하지 않도록 범위와 담당을 구분한다.
+- [Shopify — 선택적 테스트](https://shopify.engineering/spark-joy-by-running-fewer-tests): 관련 테스트 우선, 놓친 회귀에 대비한 별도 전체 검사는 유지한다.
+- [Stripe — Idempotency](https://stripe.com/blog/idempotency): 요청 ID와 저장 결과를 먼저 확인하고 결과 불명확 시 무조건 재요청하지 않는다.
+
+이는 공개된 기업 원칙을 ZGMINI의 규모에 맞게 적용한 설계 판단이다. 외부 기업의 다중 리전·전사 배포 플랫폼을 그대로 복제하거나 추가 유료 인프라를 필수화하지 않는다.

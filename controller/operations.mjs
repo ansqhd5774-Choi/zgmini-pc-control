@@ -1,9 +1,10 @@
-import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {execFileSync,spawn} from 'node:child_process';import {need,digest,writeJson} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {execFileSync,spawn,spawnSync} from 'node:child_process';import {TextDecoder} from 'node:util';import {need,digest,writeJson} from './common.mjs';
 import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
-import {inspectR17Windows} from './us-breadth-r17-preflight.mjs';
+import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
+import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectER1NovemberAvailability} from './market-calendar-er1-nov30-availability-readonly.mjs';
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
@@ -13,14 +14,43 @@ import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.m
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
 import {inspectThemeNineR54Evidence} from './theme-nine-r54-evidence-readonly.mjs';
-const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
-export function protectedState(dataRoot,{queryTask}={}){
+const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
+const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
+const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
+const decodeTaskOutput=bytes=>new TextDecoder('euc-kr').decode(bytes);
+export function attestRetiredIranAbsence({exact,inventory}){
+ // Never treat a bare nonzero schtasks exit as evidence of absence:
+ // access denial, scheduler failures, and name drift must remain blocking.
+ need(exact&&!exact.error&&!exact.signal,'RETIRED_IRAN_QUERY_UNCERTAIN');
+ need(exact.status!==0,'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
+ need(exact.status===1&&taskNotFound(decodeTaskOutput(exact.stderr??Buffer.alloc(0))),
+  'RETIRED_IRAN_QUERY_UNCERTAIN');
+ need(inventory&&!inventory.error&&!inventory.signal&&inventory.status===0,
+  'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ const names=decodeTaskOutput(inventory.stdout??Buffer.alloc(0)).split(/\r?\n/)
+  .map(line=>line.match(/^\s*"([^"]+)"\s*,/)?.[1]??null).filter(Boolean);
+ need(names.length>0,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ need(!names.some(name=>/ZGMINI-PC-Iran/i.test(name)),'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
+ return 'APPROVED_RETIRED_ABSENT';
+}
+export function nativeRetiredIranEvidence(){
+ const schtasks=path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe');
+ const opt={windowsHide:true,timeout:15000,maxBuffer:4000000};
+ return attestRetiredIranAbsence({
+  exact:spawnSync(schtasks,['/Query','/TN',retiredIranTask,'/XML'],opt),
+  inventory:spawnSync(schtasks,['/Query','/FO','CSV','/NH'],opt)
+ });
+}
+export function protectedState(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
  const output={files:{},tasks:{}};
  for(const name of ['config.json','quota-runner.cmd','run-local.cmd']){const f=path.join(dataRoot,'pc-writer',name);if(fs.existsSync(f))output.files[name]=digest(fs.readFileSync(f));}
- if(queryTask)for(const task of tasks)output.tasks[task]=digest(queryTask(task));
+ if(queryTask){
+  for(const task of activeTasks)output.tasks[task]=digest(queryTask(task));
+  output.tasks[retiredIranTask]=retiredTaskEvidence();
+ }
  return output;
 }
-export function readCore(dataRoot,{queryTask}={}){
+export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
  for(const file of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json']){
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
@@ -28,17 +58,28 @@ export function readCore(dataRoot,{queryTask}={}){
   out.checkpoints[file]={exists:true,modifiedAt:s.mtime.toISOString(),bytes:s.size,status:typeof data.status==='string'&&/^[A-Z0-9_:-]{1,80}$/.test(data.status)?data.status:null};
  }
  const config=path.join(root,'config.json');if(fs.existsSync(config)){const c=JSON.parse(fs.readFileSync(config));const x=c.source;out.approvedSourceSha=[x?.sha,x?.commit,x?.commitSha,x,c.sourceSha].find(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v))??null;}
- if(queryTask)for(const task of tasks)out.taskXmlHashes[task]=digest(queryTask(task));
+ if(queryTask){
+  for(const task of activeTasks)out.taskXmlHashes[task]=digest(queryTask(task));
+  out.taskXmlHashes[retiredIranTask]=retiredTaskEvidence();
+ }
  return out;
 }
 export function nativeTaskXml(task){return execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),['/Query','/TN',task,'/XML'],{windowsHide:true,timeout:12000,maxBuffer:262144});}
 export async function runOperation(request,context){
- const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml}=context;
+ const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence}=context;
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
- if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask}),providerCalls:0,d1Writes:0,sqliteOpened:false};
+ if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask,retiredTaskEvidence}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
  if(request.operation==='alpaca-quota-readonly')return inspectAlpacaQuotaReadonly(dataRoot);
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
+ if(request.operation==='r17-268-postcancel-readonly'){
+  if(request.requestId!==ONE_SHOT_DIAGNOSTIC_ID)return {status:'BLOCKED',code:'R17_268_ONE_SHOT_REQUEST_ID_STOP',providerCalls:0,d1Writes:0,operationalWrites:0};
+  let coreTaskXml=null,sourceTrace=null,protectedStateSha256=null;
+  try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
+  if(coreTaskXml)try{sourceTrace=inspectPcSource({dataRoot,coreTaskXml});}catch{}
+  try{protectedStateSha256=digest(JSON.stringify(protectedState(dataRoot,{queryTask,retiredTaskEvidence})));}catch{}
+  return inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText:R17_PATCH_TEXT,protectedStateSha256});
+ }
  if(request.operation==='us-breadth-r17-preflight')return inspectR17Windows();
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
@@ -94,4 +135,5 @@ export async function runOperation(request,context){
  }
  throw Object.assign(new Error('OPERATION_NOT_ALLOWED'),{code:'OPERATION_NOT_ALLOWED'});
 }
+
 

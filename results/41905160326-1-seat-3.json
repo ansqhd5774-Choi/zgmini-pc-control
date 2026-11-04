@@ -1,0 +1,135 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-41905160326-1-seat-3",
+  "requestId": "pc-9a847b47-9ebd-4c1a-9883-028fc0c2ed97",
+  "startedAt": "2026-11-04T20:17:46.695Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "708ed262d9425e45c0009c6470a8c7b11ac33884",
+  "sourceBranch": "main",
+  "operation": "r17-268-postcancel-readonly",
+  "seat": 3,
+  "status": "BLOCKED",
+  "code": "R17_268_OPERATIONAL_CHANGE_BLOCKED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-d55a5a29-7cf7-455e-940d-456e3337784b",
+  "pcOperationalApprovedSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "exitCode": 0,
+  "result": {
+    "schema": "ZGMINI_R17_268_POSTCANCEL_READONLY_V1",
+    "requestId": "pc-r17-28dde04f-ad24-4603-89d3-801f874852f1",
+    "oldRunId": "41786730527",
+    "status": "BLOCKED",
+    "code": "R17_268_OPERATIONAL_CHANGE_BLOCKED",
+    "assessment": "CHANGED",
+    "assessmentCode": "R17_268_PROTECTED_STATE_DRIFT_UNATTRIBUTED",
+    "attributedTo268": false,
+    "source": {
+      "scripts/pc-writer/local-cycle.mjs": {
+        "sha256": "9c3fc7788907a2f8756b7ff82c372124a2e26253557b7db8a93eb6c8428eadee",
+        "exists": true
+      },
+      "scripts/pc-writer/run-local.mjs": {
+        "sha256": "4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502",
+        "exists": true
+      }
+    },
+    "sourceComparison": [
+      {
+        "file": "scripts/pc-writer/local-cycle.mjs",
+        "beforeSha256": "9c3fc7788907a2f8756b7ff82c372124a2e26253557b7db8a93eb6c8428eadee",
+        "observedSha256": "9c3fc7788907a2f8756b7ff82c372124a2e26253557b7db8a93eb6c8428eadee",
+        "patchTargetSha256": null,
+        "comparison": "BEFORE",
+        "attributedTo268": false
+      },
+      {
+        "file": "scripts/pc-writer/run-local.mjs",
+        "beforeSha256": "4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502",
+        "observedSha256": "4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502",
+        "patchTargetSha256": null,
+        "comparison": "BEFORE",
+        "attributedTo268": false
+      }
+    ],
+    "missingEvidence": [],
+    "expectedPatchedSha256": null,
+    "taskSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "expectedTaskSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "configSourceSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+    "preflight": {
+      "requestId": "pc-r17-28dde04f-ad24-4603-89d3-801f874852f1",
+      "terminal": false,
+      "status": "UNKNOWN",
+      "code": null,
+      "lastStep": null,
+      "source": "R17_DEDICATED_PREFLIGHT_RESULT"
+    },
+    "process": {
+      "verified": false,
+      "active": null,
+      "code": "WMI_UNAVAILABLE"
+    },
+    "lease": {
+      "verified": false,
+      "active": null,
+      "code": "NO_DEDICATED_REQUEST_LEASE_EVIDENCE"
+    },
+    "operatingSourceIdentified": false,
+    "protectedStateEvidence": {
+      "historicalBeforeSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+      "historicalAfterSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+      "observedSha256": "fefd376c2ef4336a1474769f3968764e9217cc37269c3d5f7a6706a19124d143",
+      "matched": false,
+      "comparisonScope": "CONFIG_COMMANDS_AND_THREE_TASKS_ONLY"
+    },
+    "checkpointEvidence": {
+      "local-cycle-last-run.json": {
+        "exists": true,
+        "sha256": "b22ee567d270ff2dae09ff82157a6df58ee556db88dc4e9f8029dcdf61a73089",
+        "modifiedAt": "2026-11-04T20:12:10.248Z",
+        "status": "COMPLETE"
+      },
+      "local-collection-last-run.json": {
+        "exists": true,
+        "sha256": "183509b27bee0d765ea37f4c6abd745314d1495cee99eb775c4dfe9229fe9dc8",
+        "modifiedAt": "2026-11-04T20:15:17.192Z",
+        "status": "COMPLETE"
+      },
+      "local-writer-last-run.json": {
+        "exists": true,
+        "sha256": "0be2aec33e99d42f9c0e7c13706f717e0e4b2e50dd9accff49c57ffc64826a6a",
+        "modifiedAt": "2026-11-04T20:06:58.548Z",
+        "status": "VERIFIED"
+      }
+    },
+    "checkpointChangeAttribution": "UNKNOWN",
+    "requestSideEffectsVerifiedAbsent": false,
+    "providerCalls": 0,
+    "dbD1Writes": 0,
+    "operationalWrites": 0,
+    "configSha256": "19c2abfbb5367c4435733b61c226c7c81a692e3e4800cf64a64bf0539adacf55",
+    "sourceEvidenceLevel": "HISTORICAL_OR_UNVERIFIED",
+    "diagnostics": [
+      "PATCH_TARGET_UNVERIFIED"
+    ],
+    "lastPCStep": "UNVERIFIED_NO_REQUEST_SCOPED_LEDGER",
+    "pcSourceWrites": 0,
+    "configWrites": 0,
+    "taskWrites": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "fefd376c2ef4336a1474769f3968764e9217cc37269c3d5f7a6706a19124d143",
+  "protectedAfterSha256": "fefd376c2ef4336a1474769f3968764e9217cc37269c3d5f7a6706a19124d143",
+  "actualExecutionSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "next": "RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST",
+  "finishedAt": "2026-11-04T20:18:02.894Z",
+  "durationMs": 16199
+}

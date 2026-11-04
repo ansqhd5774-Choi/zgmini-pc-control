@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-c842b5ba-0747-4d5d-85ad-8d3d9ffa4984",
+  "targetControllerSha": "dd3d2f0ce0d8e389268be4cb9592cf9bc2c370eb",
+  "status": "BLOCKED",
+  "code": "UPDATE_ENVIRONMENT_ERROR",
+  "lastPass": "PRE_INSTALL_REJECTED",
+  "firstFail": "UPDATE_ENVIRONMENT_ERROR",
+  "actualControllerSha": "14940aa112494b1cea09ff5c7250f4af86a4ce6a",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": false
+}

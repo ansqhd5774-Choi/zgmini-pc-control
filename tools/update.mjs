@@ -6,12 +6,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
-import {execFileSync,spawn} from 'node:child_process';
+import {execFileSync,spawn,spawnSync} from 'node:child_process';
+import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {applyApprovedUpdate} from './maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
- readAllMaintenancePages,validateInfrastructureDelta,
+  readAllMaintenancePages,validateInfrastructureDelta,
+  CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
@@ -144,6 +146,18 @@ function installedManifest() {
  return {host,installedSha};
 }
 
+// No-effect classification requires a complete, stable file inventory, not
+// merely valid digests for an attacker-truncated host.controllerFiles subset.
+// Scope this to prevalidation proof; older installed manifests remain readable.
+export function prevalidationInventory(host){
+ const files=host?.controllerFiles;
+ if(!files||typeof files!=='object'||Array.isArray(files)||
+   Object.keys(files).length<INSTALLABLE_FILES.length||
+   INSTALLABLE_FILES.some(rel=>!/^[a-f0-9]{64}$/.test(files[rel]??'')))
+   return null;
+ return Object.fromEntries(Object.entries(files).sort(([a],[b])=>a.localeCompare(b)));
+}
+
 // GitHub does not replay Issue `opened` events while a workflow is disabled.
 // A failed postcheck may pause intake a SECOND time during rollback. Preserve
 // every pause interval; never silently replace the first successful replay.
@@ -184,6 +198,33 @@ export function backlogIssueInPause(entry,window){
    !String(entry?.title??'').startsWith('Maintenance replay ');
 }
 
+const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
+const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
+const decodeTaskOutput=bytes=>new TextDecoder('euc-kr').decode(bytes);
+const taskMissingError=bytes=>[decodeTaskOutput(bytes),Buffer.from(bytes).toString('utf8')].some(taskNotFound);
+export function confirmRetiredIranAbsent({exact,inventory}){
+ // An intentionally removed task is a protected state, not a missing guard.
+ // A nonzero exit alone could mean ACCESS_DENIED. Fail closed on uncertainty.
+ need(exact&&!exact.error&&!exact.signal,'RETIRED_IRAN_QUERY_UNCERTAIN');
+ need(exact.status!==0,'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
+ need(exact.status===1&&taskMissingError(exact.stderr??Buffer.alloc(0)),
+  'RETIRED_IRAN_QUERY_UNCERTAIN');
+ need(inventory&&!inventory.error&&!inventory.signal&&inventory.status===0,
+  'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ const names=decodeTaskOutput(inventory.stdout??Buffer.alloc(0)).split(/\r?\n/)
+  .map(line=>line.match(/^\s*"([^"]+)"\s*,/)?.[1]??null).filter(Boolean);
+ need(names.length>0,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ need(!names.some(name=>/ZGMINI-PC-Iran/i.test(name)),'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
+ return 'APPROVED_RETIRED_ABSENT';
+}
+function retiredIranEvidence(schtasks){
+ const opt={windowsHide:true,timeout:15000,maxBuffer:4000000};
+ const exact=spawnSync(schtasks,['/Query','/TN',retiredIranTask,'/XML'],opt);
+ // Inventory is mandatory even when the direct query failed: reject name drift
+ // and distinguish a genuine absence from an untrustworthy query environment.
+ const inventory=spawnSync(schtasks,['/Query','/FO','CSV','/NH'],opt);
+ return confirmRetiredIranAbsent({exact,inventory});
+}
 function protectedSnapshot() {
  // Existing Core task XML hashes + PC writer config hashes, read-only.
  const dataRoot='E:/ZGmini/data',out={files:{},tasks:{}};
@@ -192,9 +233,10 @@ function protectedSnapshot() {
   if(fs.existsSync(f))out.files[name]=sha256(fs.readFileSync(f));
  }
  const schtasks=path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe');
- for(const name of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13']) {
+ for(const name of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']) {
   out.tasks[name]=sha256(execFileSync(schtasks,['/Query','/TN',name,'/XML'],{windowsHide:true,timeout:15000}));
  }
+ out.tasks[retiredIranTask]=retiredIranEvidence(schtasks);
  return out;
 }
 
@@ -206,7 +248,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const backupRoot=path.join(controlRoot,'backups','controller-update-'+request.requestId);
  const stageRoot=path.join(backupRoot,'stage');
  const snapshotRoot=path.join(backupRoot,'snapshot');
- let plannedFiles=[],protectedBefore,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
+ let plannedFiles=[],protectedBefore,prevalidationBaseline,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
  const apiRunners=()=>github('actions/runners?per_page=100').runners;
  const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
  const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
@@ -229,6 +271,34 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   fingerprint:x=>sha256(JSON.stringify({issue,manifest,targetSha:x.targetSha})),
   read:async id=>fs.existsSync(path.join(recordDir,id+'.json'))?json(path.join(recordDir,id+'.json')):null,
   persist:async x=>writeJson(ledgerFile,{...x,issueNumber,postIssueNumber}),
+  // Capture a read-only baseline BEFORE acquiring the install lease, while
+  // immutable source/owner/protected-state evidence is available. This does
+  // not change Core tasks, supervisor processes or the intake workflow.
+  capturePrevalidationBaseline:async()=>{
+   const current=installedManifest(),{owner,status}=readOwner();
+   need(current.installedSha===manifest.installedSha&&status.sourceSha===manifest.installedSha,
+    'PREVALIDATION_SOURCE_MISMATCH');
+   const files=prevalidationInventory(current.host);
+   need(files!==null,'PREVALIDATION_FILES_INCOMPLETE');
+   prevalidationBaseline={installedSha:current.installedSha,ownerPid:owner.pid,
+    ownerNonce:owner.nonce,files,protected:protectedSnapshot()};
+  },
+  // A prevalidation exception has not reached stage/pause/stop/switch. A
+  // busy independent A Runner is NOT a controller mutation and must not make
+  // an otherwise proven no-effect failure retain an install-wide recovery
+  // lease. Still require live original supervisor identity, pinned file bytes,
+  // unchanged Core protection and a freshly read active intake workflow.
+  verifyPrevalidationUntouched:async({installedSha})=>{
+   if(!prevalidationBaseline||prevalidationBaseline.installedSha!==installedSha)return false;
+   const current=installedManifest(),{owner,status}=readOwner();
+   const files=prevalidationInventory(current.host);
+   if(files===null||JSON.stringify(files)!==JSON.stringify(prevalidationBaseline.files))return false;
+   if(current.installedSha!==installedSha||status.sourceSha!==installedSha||
+     owner.pid!==prevalidationBaseline.ownerPid||owner.nonce!==prevalidationBaseline.ownerNonce)return false;
+   try {process.kill(owner.pid,0);} catch {return false;}
+   if(JSON.stringify(protectedSnapshot())!==JSON.stringify(prevalidationBaseline.protected))return false;
+   return github('actions/workflows/pc-job.yml').state==='active';
+  },
   inspect:async()=>({installedSha:installedManifest().installedSha,
    insideRunnerTree:false,githubActions:Boolean(process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME)}),
   validate:async()=>{
@@ -240,10 +310,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    need(manifest.backup?.strategy==='VERSIONED_SNAPSHOT'&&manifest.backup?.rollback?.sha===manifest.installedSha,'BACKUP_CONTRACT');
    need(manifest.checks?.status==='PASS'&&manifest.checks.targetSha===manifest.targetSha,'TARGET_TEST_EVIDENCE');
    need(manifest.approval?.grade==='B'&&/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/.test(manifest.approval.ref),'APPROVAL_REFERENCE_REQUIRED');
-   need(['core-status','fear-greed-archive-status'].includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
+    need(CONTROLLER_POST_OPERATIONS.includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
    need(validSha(manifest.postSourceSha),'POST_SOURCE_INVALID');
    need(typeof manifest.postSourceBranch==='string'&&/^[a-z0-9][a-z0-9./_-]{1,120}$/i.test(manifest.postSourceBranch),'POST_SOURCE_BRANCH');
-   need(git(['status','--porcelain']).trim()==='','CONTROL_DIRTY');
+    // The target is staged from immutable `git show <sha>:<path>` bytes.
+    // Do not block on unrelated docs, local evidence or other draft work.
+    // Changes to installable, workflow or approval paths still fail closed.
+    need(git(['status','--porcelain','--untracked-files=all','--',
+      ...CONTROL_UPDATE_SENSITIVE_PATHS]).trim()==='','CONTROL_DIRTY');
    git(['fetch','--no-tags','origin','main']);
    need(git(['cat-file','-t',manifest.targetSha]).trim()==='commit','TARGET_NOT_COMMIT');
    need(git(['merge-base','--is-ancestor',manifest.targetSha,'refs/remotes/origin/main']).trim()==='','TARGET_NOT_ON_MAIN');
@@ -265,6 +339,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
    validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
+    need(nextOperations.operations?.[manifest.postOperation]?.grade==='A'&&
+      nextOperations.operations[manifest.postOperation].resource==='light',
+    'POST_OPERATION_NOT_INSTALLED_READONLY');
    for(const item of manifest.allowFiles){
     need(/^[a-f0-9]{64}$/.test(item.sha256),'ALLOWFILE_HASH');
     need(sha256(git(['show',manifest.targetSha+':'+item.path],{encoding:null}))===item.sha256,'ALLOWFILE_HASH_MISMATCH');
@@ -1428,16 +1505,17 @@ export async function command(args=process.argv.slice(2)) {
   return readMaintenanceRecoveryStatus(requestId);
  }
  need(['apply','preflight'].includes(cmd)&&args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file','MAINTENANCE_ARGS');
- let data,request,ports;
+ let data,request,ports,preInstallOperation='loadApprovedPackage';
  try{
  data=loadApprovedPackage(requestId,args[4]);
- ({request,ports}=makePorts(data,data.issueNumber));
+ preInstallOperation='makePorts';({request,ports}=makePorts(data,data.issueNumber));
  // Read-only prerequisite checks before taking the shared installation lease.
  // They are repeated by validate under the lease to prevent a stale preflight
  // from granting permission to stop or switch a changed process.
- readOwner();
- installedManifest();
- }catch(error){error.failureStage='PRE_INSTALL';throw error;}
+ preInstallOperation='readOwner';readOwner();
+ preInstallOperation='installedManifest';installedManifest();
+ preInstallOperation='capturePrevalidationBaseline';await ports.capturePrevalidationBaseline();
+ }catch(error){error.failureStage='PRE_INSTALL';error.failureOperation=preInstallOperation;throw error;}
  if(cmd==='preflight')return {status:'PASS',code:'PRE_INSTALL_READONLY_VERIFIED',actualControllerSha:installedManifest().installedSha,requestId,installAttempted:false};
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
  let retained=false;
@@ -1450,6 +1528,7 @@ export async function command(args=process.argv.slice(2)) {
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
- catch(error){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'UPDATE_ENVIRONMENT_ERROR',failureStage:error.failureStage==='PRE_INSTALL'?'PRE_INSTALL':'UNVERIFIED',actualControllerSha:null}));process.exitCode=1;}
+ catch(error){console.log(JSON.stringify(maintenanceCliFailureReport(error)));process.exitCode=1;}
 }
+
 
