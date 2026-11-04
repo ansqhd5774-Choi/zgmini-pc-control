@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_INFLATION_EIA_ONLY_B_APPROVAL_V1",
+  "scope": "EIA_INDUSTRIAL_US_PRIVATE_ONCE",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "4a3426c53836c019f93536064d94367f680eb742",
+  "writerHome": "E:\\ZGmini\\data\\pc-writer",
+  "outputRelative": "inflation-causal-r1/electricity-industrial-eia.json",
+  "maxProviderRequests": 2,
+  "maxAutomaticRetries": 0,
+  "allowFredCalls": false,
+  "allowCoreWrites": false,
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowPublicRawData": false,
+  "sourceFileHashes": {
+    "scripts/pc-writer/inflation-eia-only-once.mjs": "d74b554ea94d2ba86f39c101c0a1e6272fceb10d811572cb389e2cca37f53bc0",
+    "scripts/inflation-causal-gas-electric.mjs": "dd4242131f9eb99d876a777fcf72b20a6d625362149b05847a5b8639f7aed9d1"
+  }
+}
