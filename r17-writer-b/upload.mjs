@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {validateEvent,OLD,stop,REPO} from './contract.mjs';
+import {validateEvent,OLD,OLD_HASHES,stop,REPO} from './contract.mjs';
 
 const RESULT_ROOT=String.raw`E:\ZGmini\automation\r17-writer-b-preflight`;
 const SHA64=/^[a-f0-9]{64}$/;
@@ -46,7 +46,8 @@ export function sanitizeReport(raw,expectedRequestId){
   source.candidateHashesMatched===3&&source.patchMatched===true&&
   source.configPinMatched===true&&source.taskXmlMatched===true&&
   source.installedHeadMatched===true&&
-  OLD.every(p=>SHA64.test(source.oldTargetSha256?.[p]??''));
+  OLD.every(p=>SHA64.test(source.oldTargetSha256?.[p]??'')&&
+    source.oldTargetSha256[p]!==OLD_HASHES[p]);
  const status=validPass?'PASS':source.status==='BLOCKED'?'BLOCKED':'STATE_UNKNOWN';
  const code=status==='PASS'?'R17_B_PREFLIGHT_PASS':
   status==='BLOCKED'&&CODE.test(source.code??'')?source.code:'R17_B_REPORT_UNVERIFIED';

@@ -157,6 +157,19 @@ export function runReadOnly({event,env,controlRoot,candidateRoot,taskXml,readPcF
     throw error;
   }
   const {overlay,oldTargetSha256}=candidate;
+  // The approved patch changes both OLD files. A Git exit code of zero alone
+  // is insufficient: applying from an inherited parent worktree can skip paths.
+  // Compare actual logical bytes against the independently parsed patch.
+  const normalized=Object.fromEntries(OLD.map(p=>[p,originals[p].replace(/\r\n/g,'\n')]));
+  const expected=buildCandidateOverlay({originals:normalized,patchBytes:patch,
+    newFiles,newSha256:manifest.newSha256});
+  for(const p of OLD){
+    const actual=overlay?.get(p);
+    if(!Buffer.isBuffer(actual)||oldTargetSha256?.[p]!==digest(actual)||
+       oldTargetSha256[p]===manifest.beforeSha256[p]||
+       actual.toString('utf8').replace(/\r\n/g,'\n')!==expected.overlay.get(p).toString('utf8'))
+      stop('R17_B_PATCH_TARGET_MISMATCH_STOP');
+  }
   const imports=verifyImports(pcRoot,overlay,(root,p,probe=false)=>{
     if(probe){try{const st=fs.lstatSync(path.join(root,...p.split('/')));return st.isFile()&&!st.isSymbolicLink()}catch{return false}}
     return regular(root,p);
@@ -197,10 +210,23 @@ function nativeOverlayInIsolatedWorkspace({workspace,originalBuffers,newFiles,ne
     const approved=path.join(workspace,'r17-control','r17-writer-b',
       'approval','R17_A23_REBASE.patch');
     try{
+      // Isolate Git discovery from any surviving .git in GITHUB_WORKSPACE.
+      // The repository exists only in the request-local disposable scratch.
+      gitCmd(scratch,['init','--quiet'],env);
+      const top=fs.realpathSync.native(gitCmd(scratch,['rev-parse','--show-toplevel'],env));
+      if(top.toLowerCase()!==target.toLowerCase())
+        stop('R17_B_PATCH_TARGET_MISMATCH_STOP');
       gitCmd(scratch,['apply','--check','--whitespace=error',approved],env);
       gitCmd(scratch,['apply','--whitespace=error',approved],env);
-    }catch{stop('R17_B_PATCH_APPLY_STOP')}
+      gitCmd(scratch,['apply','--reverse','--check','--whitespace=error',approved],env);
+    }catch(error){
+      if(error?.code==='R17_B_PATCH_TARGET_MISMATCH_STOP')throw error;
+      stop('R17_B_PATCH_APPLY_STOP');
+    }
     const patchedOld=Object.fromEntries(OLD.map(p=>[p,regular(scratch,p)]));
+    for(const p of OLD)
+      if(digest(patchedOld[p])===digest(originalBuffers[p]))
+        stop('R17_B_PATCH_TARGET_MISMATCH_STOP');
     return overlayFromPatchedBytes({patchedOld,newFiles,newSha256});
   }finally{
     // scratch is a validated, newly created, request-local leaf directory.

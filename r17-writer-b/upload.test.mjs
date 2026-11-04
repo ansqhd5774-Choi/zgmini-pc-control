@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sanitizeReport,uploadReport} from './upload.mjs';
-import {OLD,REPO,OWNER} from './contract.mjs';
+import {OLD,OLD_HASHES,REPO,OWNER} from './contract.mjs';
 
 const uid='a62d8a8e-eafb-4a30-898e-8b4b70bbc5c1';
 const requestId='pc-r17-'+uid;
@@ -34,6 +34,14 @@ test('only full read-only evidence can be reported PASS',()=>{
  const bad=sanitizeReport({...valid,oldTargetSha256:{[OLD[0]]:sha}},requestId);
  assert.equal(bad.status,'STATE_UNKNOWN');
  assert.equal(bad.code,'R17_B_REPORT_UNVERIFIED');
+});
+
+test('the unchanged original target hashes can never be uploaded as PASS',()=>{
+ const unchanged={...valid,oldTargetSha256:{...OLD_HASHES}};
+ const result=sanitizeReport(unchanged,requestId);
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'R17_B_REPORT_UNVERIFIED');
+ assert.equal(result.oldTargetSha256,undefined);
 });
 
 test('bounded parser reason survives upload while raw material is rejected',async()=>{

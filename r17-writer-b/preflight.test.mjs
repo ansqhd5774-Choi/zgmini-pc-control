@@ -312,6 +312,30 @@ test('native Git check runs before parser mismatch and remains fail-closed',()=>
   assert.equal(called.filter(x=>x==='git-apply-check').length,1);
 });
 
+test('a no-op Git apply candidate cannot produce a preflight PASS',()=>{
+  const {opts}=fullFixture();
+  opts.makeOverlay=inputs=>{
+    const candidate=buildCandidateOverlay(inputs);
+    for(const name of OLD)candidate.overlay.set(name,inputs.originalBuffers[name]);
+    candidate.oldTargetSha256=Object.fromEntries(OLD.map(name=>
+      [name,digest(inputs.originalBuffers[name])]));
+    return candidate;
+  };
+  assert.throws(()=>runReadOnly(opts),/R17_B_PATCH_TARGET_MISMATCH_STOP/);
+});
+
+test('a changed but logically wrong native target cannot produce PASS',()=>{
+  const {opts}=fullFixture();
+  opts.makeOverlay=inputs=>{
+    const candidate=buildCandidateOverlay(inputs);
+    const corrupted=Buffer.from('different but not approved patch result\n');
+    candidate.overlay.set(p1,corrupted);
+    candidate.oldTargetSha256[p1]=digest(corrupted);
+    return candidate;
+  };
+  assert.throws(()=>runReadOnly(opts),/R17_B_PATCH_TARGET_MISMATCH_STOP/);
+});
+
 test('preflight refuses an already present newly approved file before package execution',()=>{
   const {opts,called}=fullFixture();
   opts.inspectAbsence=()=>false;
