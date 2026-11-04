@@ -27,8 +27,8 @@ function regular(file,max=100000){
  if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>max)stop('INFL19_PUBLISH_FILE_DENIED');
  return fs.readFileSync(file);
 }
-export function verifyRequest(event,env){
- if(process.platform!=='win32'||env.GITHUB_REPOSITORY!==REPO||
+export function verifyRequest(event,env,{platform=process.platform}={}){
+ if(platform!=='win32'||env.GITHUB_REPOSITORY!==REPO||
   env.GITHUB_ACTOR!=='ansqhd5774-Choi'||env.GITHUB_EVENT_NAME!=='issues'||
   env.GITHUB_EVENT_ACTION!=='opened'||env.GITHUB_RUN_ATTEMPT!=='1'||
   event?.action!=='opened'||event?.repository?.private!==true||
