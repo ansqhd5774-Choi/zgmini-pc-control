@@ -1,0 +1,59 @@
+name: ZGMINI R17 Writer B Read-Only Preflight
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: r17-b-readonly-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  r17-writer-fivefile-readonly-preflight:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-r17-writer-fivefile-preflight' &&
+      contains(github.event.issue.labels.*.name, 'pc-r17-writer-b-preflight')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    env:
+      R17_CONTROL_SHA: 90d2afc3cc062d289d23f4cdf0bf3656e2fcce7d
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+
+    steps:
+      - name: Checkout exact reviewed private control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: 90d2afc3cc062d289d23f4cdf0bf3656e2fcce7d
+          path: r17-control
+          persist-credentials: false
+          clean: true
+
+      - name: Checkout exact public R17 provisional candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 81c8ee543c164fc16c8c760d504b113428d01d4a
+          path: r17-source
+          persist-credentials: false
+          clean: true
+
+      - name: Read-only PC source and five-file preflight
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\entry.mjs"'
+
+      - name: Recover sanitized bounded preflight TXT JSON and issue result
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\upload.mjs"'
