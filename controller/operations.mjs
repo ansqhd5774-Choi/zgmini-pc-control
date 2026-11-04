@@ -40,10 +40,11 @@ export async function runOperation(request,context){
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='r17-268-postcancel-readonly'){
   if(request.requestId!==ONE_SHOT_DIAGNOSTIC_ID)return {status:'BLOCKED',code:'R17_268_ONE_SHOT_REQUEST_ID_STOP',providerCalls:0,d1Writes:0,operationalWrites:0};
-  let coreTaskXml=null,sourceTrace=null;
+  let coreTaskXml=null,sourceTrace=null,protectedStateSha256=null;
   try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
   if(coreTaskXml)try{sourceTrace=inspectPcSource({dataRoot,coreTaskXml});}catch{}
-  return inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText:R17_PATCH_TEXT});
+  try{protectedStateSha256=digest(JSON.stringify(protectedState(dataRoot,{queryTask})));}catch{}
+  return inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText:R17_PATCH_TEXT,protectedStateSha256});
  }
  if(request.operation==='us-breadth-r17-preflight')return inspectR17Windows();
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
