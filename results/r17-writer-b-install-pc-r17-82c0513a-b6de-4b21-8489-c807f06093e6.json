@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_INSTALL_RESULT_V1",
+  "requestId": "pc-r17-82c0513a-b6de-4b21-8489-c807f06093e6",
+  "status": "R17_B_INSTALL_STOP",
+  "phase": "CLAIMED",
+  "code": "R17_B_WINDOWS_PROBE_FORMAT_STOP",
+  "sourceSha": null,
+  "runId": "41921386128",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
