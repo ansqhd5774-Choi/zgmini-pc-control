@@ -14,11 +14,12 @@ export const REQUEST_LABEL='pc-r10-source-b-approved';
 export const REQUEST_OPERATION='r10-two-source-files-approved-once';
 export const REQUEST_SCHEMA='ZGMINI_R10_SOURCE_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_R10_SOURCE_B_APPROVAL_V1';
+// Pin raw Git blob bytes from SOURCE_COMMIT. Export without checkout filters.
 export const R10_B_FILES=Object.freeze({
  'lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs':
-  '226579820995d4ab90c36bf0f8d966994ccea481e47d36902c31efc8479e9fae',
+  '3b0c92881994375d84f95203126c60dec363a5bb48cf659d551b034d2a2958c9',
  'worker/asset-bubble-r10-raw-r1.mjs':
-  'd962a8ac9e4941e02e2155d0c0f4324f1f1d6d3f07122c40e69caebed0d155a7',
+  '9c651ec732e6b5e94822c279b5baebd47f2502e42082c6779021b14e5894b6ac',
 });
 export const PATHS=Object.freeze(Object.keys(R10_B_FILES));
 const SHA40=/^[0-9a-f]{40}$/;
