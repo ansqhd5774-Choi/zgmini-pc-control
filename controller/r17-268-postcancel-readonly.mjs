@@ -16,6 +16,8 @@ export const BASE_HASHES=Object.freeze({
  'scripts/pc-writer/run-local.mjs':'4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502',
 });
 export const EXPECTED_TASK_HASH='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028';
+// Same Controller snapshot contract on both sides of #268; independent of R17 source/checkpoints.
+export const HISTORICAL_PROTECTED_SHA='349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf';
 const RESULT_ROOT=String.raw`E:\ZGmini\automation\r17-writer-b-preflight`;
 const NAMES=Object.keys(BASE_HASHES);
 const SHA40=/^[a-f0-9]{40}$/;
@@ -92,12 +94,14 @@ export function classifyEvidence(e){
  if(changes.length)return {status:'CHANGED',code:'R17_268_SOURCE_CHANGE_OBSERVED',changes,attributedTo268:false};
  if(e.configSource&&e.configSource!==BASE_SHA)return {status:'CHANGED',code:'R17_268_CONFIG_PIN_CHANGED',attributedTo268:false};
  if(e.taskHash&&e.taskHash!==EXPECTED_TASK_HASH)return {status:'CHANGED',code:'R17_268_TASK_CHANGED',attributedTo268:false};
+ if(e.protectedStateSha256&&e.protectedStateSha256!==HISTORICAL_PROTECTED_SHA)
+  return {status:'CHANGED',code:'R17_268_PROTECTED_STATE_DRIFT_UNATTRIBUTED',attributedTo268:false};
  const complete=NAMES.every(n=>e.sources?.[n]?.sha256===BASE_HASHES[n])&&
   e.configSource===BASE_SHA&&e.taskHash===EXPECTED_TASK_HASH&&
   e.preflight?.requestId===TARGET_REQUEST&&e.preflight?.terminal===true&&
   e.operatingSourceIdentified===true&&e.runtimeSourceVerified===true&&e.process?.verified===true&&e.process.active===false&&
-  e.lease?.verified===true&&e.lease.active===false&&e.configBaselineMatched===true&&
-  e.checkpointsBaselineMatched===true;
+  e.lease?.verified===true&&e.lease.active===false&&e.protectedStateSha256===HISTORICAL_PROTECTED_SHA&&
+  e.checkpointsObserved===true&&e.requestSideEffectsVerifiedAbsent===true;
  return complete?{status:'NO_CHANGE_CONFIRMED',code:'R17_268_OPERATIONAL_STATE_UNCHANGED'}:
   {status:'INSUFFICIENT_EVIDENCE',code:'R17_268_LAST_STEP_OR_BASELINE_UNVERIFIED'};
 }
@@ -121,13 +125,14 @@ export function summarizeEvidence(e){
   [e.preflight?.requestId!==TARGET_REQUEST||e.preflight?.terminal!==true,'REQUEST_TERMINAL_UNVERIFIED'],
   [sourceComparison.some(x=>x.comparison==='UNVERIFIED'),'SOURCE_FILE_UNVERIFIED'],
   [e.configSource!==BASE_SHA,'CONFIG_SOURCE_PIN_UNVERIFIED'],
-  [e.configBaselineMatched!==true,'CONFIG_CONTENT_BASELINE_UNVERIFIED'],
+  [e.protectedStateSha256!==HISTORICAL_PROTECTED_SHA,'PROTECTED_STATE_BASELINE_UNVERIFIED'],
   [e.taskHash!==EXPECTED_TASK_HASH,'CORE_TASK_BASELINE_UNVERIFIED'],
   [e.operatingSourceIdentified!==true,'OPERATING_SOURCE_PATH_UNVERIFIED'],
   [e.runtimeSourceVerified!==true,'RUNTIME_SOURCE_UNVERIFIED'],
   [e.process?.verified!==true||e.process.active!==false,'PROCESS_ABSENCE_UNVERIFIED'],
   [e.lease?.verified!==true||e.lease.active!==false,'LEASE_ABSENCE_UNVERIFIED'],
-  [e.checkpointsBaselineMatched!==true,'CHECKPOINT_BASELINE_UNVERIFIED'],
+  [e.checkpointsObserved!==true,'CHECKPOINT_OBSERVATION_UNVERIFIED'],
+  [e.requestSideEffectsVerifiedAbsent!==true,'REQUEST_SIDE_EFFECTS_UNVERIFIED'],
  ].filter(([needed])=>needed).map(([,reason])=>reason);
  return {schema:'ZGMINI_R17_268_POSTCANCEL_READONLY_V1',requestId:TARGET_REQUEST,
   oldRunId:TARGET_RUN,status:admission,code:admissionCode,
@@ -137,7 +142,12 @@ export function summarizeEvidence(e){
   configSourceSha:e.configSource??null,preflight:e.preflight??null,
   process:e.process??{verified:false},lease:e.lease??{verified:false},
   operatingSourceIdentified:e.operatingSourceIdentified===true,
-  checkpointEvidence:e.checkpointEvidence??null,
+  protectedStateEvidence:{historicalBeforeSha256:HISTORICAL_PROTECTED_SHA,
+   historicalAfterSha256:HISTORICAL_PROTECTED_SHA,observedSha256:e.protectedStateSha256??null,
+   matched:e.protectedStateSha256===HISTORICAL_PROTECTED_SHA,
+   comparisonScope:'CONFIG_COMMANDS_AND_THREE_TASKS_ONLY'},
+  checkpointEvidence:e.checkpointEvidence??null,checkpointChangeAttribution:'UNKNOWN',
+  requestSideEffectsVerifiedAbsent:e.requestSideEffectsVerifiedAbsent===true,
   providerCalls:0,dbD1Writes:0,operationalWrites:0};
 }
 
@@ -227,7 +237,7 @@ function readApprovedGitOriginal(name){
 }
 
 /** Run only through a fixed, installed A-grade operation. No paths from Issue JSON. */
-export function inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText,readOriginal}={}){
+export function inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText,readOriginal,protectedStateSha256}={}){
  if(process.platform!=='win32')return {status:'INSUFFICIENT_EVIDENCE',code:'WINDOWS_PC_REQUIRED',requestId:TARGET_REQUEST};
  const errors=[],sources={},sourceBytes={};
  if(typeof dataRoot!=='string'||path.resolve(dataRoot).toLowerCase()!==path.join(ROOT,'data').toLowerCase())
@@ -261,8 +271,10 @@ export function inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText
   operatingSourceIdentified:sourceTrace?.sourceResolved===true&&
    sourceTrace?.sourceRoot==='projects/zgmini-earnings-history-pc-release',
   runtimeSourceVerified:sourceTrace?.runtimeSourceVerified===true&&sourceTrace?.sourceHead===BASE_SHA,
-   configBaselineMatched:false, // The pre-#268 full config.json hash was not captured.
-  checkpointsBaselineMatched:false, // No reliable pre-#268 checkpoint baseline is currently established.
+  protectedStateSha256, // Runtime digest of the exact Controller protectedState() contract.
+  checkpointsObserved:Object.values(checkpoints).every(x=>x.exists===true&&typeof x.sha256==='string'&&
+   typeof x.modifiedAt==='string'),
+  requestSideEffectsVerifiedAbsent:false, // No #268 request-scoped terminal/writes ledger is verified.
   checkpointEvidence:checkpoints});
  return {...result,configSha256:config.sha256,
   sourceEvidenceLevel:sourceTrace?.sourceResolved===true?'CORE_TASK_STATIC_LAUNCHER':'HISTORICAL_OR_UNVERIFIED',
