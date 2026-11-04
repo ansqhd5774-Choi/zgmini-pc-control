@@ -12,6 +12,9 @@ const TICKER=/^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
 const MAX_DAY_BYTES=2_000_000;
 const MAX_SCORES_BYTES=300_000;
 const MAX_SYMBOL_HISTORY_BYTES=2_500_000;
+// Bounded A/light (60 s): at most 128 known-archive entries, 16 MiB read.
+const MAX_ACTUAL_ARCHIVE_ENTRIES=128;
+const MAX_ACTUAL_ARCHIVE_BYTES=16_000_000;
 const KNOWN_ACTUAL_DIRS=Object.freeze(['dec31-symbol-probe','dec31-symbol-batch-a']);
 
 function safeDir(dir){try{const stat=fs.lstatSync(dir);return stat.isDirectory()&&!stat.isSymbolicLink()}catch{return false}}
@@ -84,12 +87,15 @@ function scoreIndex(input){
 
 function knownActualFiles(input,novSymbols,asOf){
   const archives=new Set();
-  let candidateHistoricalMatches=0,actualInputFiles=0,invalidActualFiles=0;
+  const historicalMatches=new Set();
+  let actualInputFiles=0,invalidActualFiles=0,entriesSeen=0,bytesRead=0;
   for(const dir of KNOWN_ACTUAL_DIRS){
     const folder=path.join(input,dir);
     if(!safeDir(folder))continue;
     let files;try{files=fs.readdirSync(folder,{withFileTypes:true})}catch{continue}
-    if(files.length>2000){invalidActualFiles++;continue}
+    entriesSeen+=files.length;
+    if(entriesSeen>MAX_ACTUAL_ARCHIVE_ENTRIES)
+      throw Error('ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP');
     for(const entry of files){
       if(!entry.isFile()||!TICKER.test(entry.name.replace(/\.json$/,''))||
         !entry.name.endsWith('.json'))continue;
@@ -97,6 +103,9 @@ function knownActualFiles(input,novSymbols,asOf){
       const file=path.join(folder,entry.name);
       actualInputFiles++;
       if(!safeFile(file,MAX_SYMBOL_HISTORY_BYTES)){invalidActualFiles++;continue}
+      bytesRead+=fs.lstatSync(file).size;
+      if(bytesRead>MAX_ACTUAL_ARCHIVE_BYTES)
+        throw Error('ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP');
       let payload;try{payload=JSON.parse(fs.readFileSync(file,'utf8'))}catch{invalidActualFiles++;continue}
       if(!Array.isArray(payload?.body)||payload.body.length>1000){invalidActualFiles++;continue}
       archives.add(symbol);
@@ -104,11 +113,11 @@ function knownActualFiles(input,novSymbols,asOf){
         validDate(row.date)&&row.date<asOf&&
         (typeof row.eps==='number'&&Number.isFinite(row.eps)||
         typeof row.revenue==='number'&&Number.isFinite(row.revenue)&&row.revenue>=0)))
-        candidateHistoricalMatches++;
+        historicalMatches.add(symbol);
     }
   }
   return {knownActualArchiveSymbols:archives.size,actualInputFiles,
-    candidateHistoricalMatches,invalidActualFiles};
+    candidateHistoricalMatches:historicalMatches.size,invalidActualFiles};
 }
 
 // The `dataRoot` value comes solely from the Controller's configured root.
@@ -168,9 +177,15 @@ export function inspectER1NovemberAvailability(dataRoot,{clock=Date.now,openDb}=
     report.priorScoreAsOf=scored.asOf??null;
     for(const ticker of tickerSet)if(scored.symbols.has(ticker))report.priorScoreJoinSymbols++;
     Object.assign(report,knownActualFiles(input,tickerSet,new Date(clock()).toISOString().slice(0,10)));
-    report.status=report.verifiedDayCount?'PASS':'BLOCKED';
-    report.code=report.verifiedDayCount===30&&report.invalidVendorRows===0?
-      'ER1_NOV30_AVAILABILITY_READONLY':'ER1_NOV30_AVAILABILITY_PARTIAL';
+    const complete=report.verifiedDayCount===30&&report.invalidVendorRows===0&&
+      report.missingDayCount===0&&report.invalidDayCount===0;
+    report.status=complete?'PASS':report.verifiedDayCount?'PARTIAL':'BLOCKED';
+    report.code=complete?'ER1_NOV30_AVAILABILITY_READONLY':
+      'ER1_NOV30_AVAILABILITY_PARTIAL';
+  }catch(error){
+    report.status='BLOCKED';
+    report.code=error?.message==='ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP'?
+      error.message:'ER1_NOV30_AVAILABILITY_UNEXPECTED_STOP';
   }finally{try{db?.close()}catch{}}
   return report;
 }
