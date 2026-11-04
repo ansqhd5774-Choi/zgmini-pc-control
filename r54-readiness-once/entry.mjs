@@ -25,6 +25,101 @@ const fail=s=>{throw Object.assign(new Error(s),{code:s});};
 const permitted=s=>typeof s==='string'&&/^R54_READINESS_[A-Z0-9_]{2,70}$/.test(s);
 const isoDay=s=>typeof s==='string'&&/^20\d\d-\d\d-\d\d$/.test(s)&&
  !Number.isNaN(Date.parse(s+'T00:00:00Z'))&&new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+const safeStatus=s=>typeof s==='string'&&s.length<=80&&
+ (/^(WAIT_|STOP_|PRIVATE_|SOURCE_|R47_|THEME_NINE_R47_|R48_)[A-Z0-9_:-]{1,70}$/.test(s)||
+  ['PASS','READY','BLOCKED','FAILED','PENDING','UNAVAILABLE'].includes(s))?s:null;
+const sameReal=(a,b)=>process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
+
+function inspectFile(p,maxBytes){
+ try{
+  const st=fs.lstatSync(p);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>maxBytes)
+   return {status:'DENIED'};
+  if(!sameReal(fs.realpathSync.native(p),path.resolve(p)))return {status:'DENIED'};
+  const bytes=fs.readFileSync(p);
+  return {status:'READ',sha256:sha(bytes),bytes:bytes.length,
+   modifiedAt:st.mtime.toISOString(),buffer:bytes};
+ }catch{return {status:'UNAVAILABLE'};}
+}
+function publicMeta(observed){
+ const {buffer,...result}=observed;
+ return result;
+}
+function checkedDirectory(dir,list){
+ const st=fs.lstatSync(dir);
+ if(!st.isDirectory()||st.isSymbolicLink())fail('R54_READINESS_DIRECTORY_UNSAFE');
+ if(!sameReal(fs.realpathSync.native(dir),path.resolve(dir)))
+  fail('R54_READINESS_DIRECTORY_UNSAFE');
+ const names=list(dir);
+ if(names.length>8192)fail('R54_READINESS_DIRECTORY_TOO_LARGE');
+ return names;
+}
+function inspectRecent(dir,pattern,list,parse){
+ try{
+  const files=checkedDirectory(dir,list).filter(n=>pattern.test(n));
+  const dated=files.map(n=>{
+   try{const st=fs.lstatSync(path.join(dir,n));return {name:n,time:st.mtimeMs};}
+   catch{return null;}
+  }).filter(Boolean).sort((a,b)=>b.time-a.time).slice(0,3);
+  return {status:'READ',files:dated.map(({name})=>{
+   const observed=inspectFile(path.join(dir,name),131072);
+   if(observed.status!=='READ')return publicMeta(observed);
+   let detail=null;
+   try{detail=parse(observed.buffer.toString('utf8'));}catch{}
+   return {...publicMeta(observed),detail};
+  })};
+ }catch{return {status:'UNAVAILABLE'};}
+}
+function inspectSourceLineage(dataRoot,list){
+ const protectedRoot=path.resolve(dataRoot);
+ const inside=relative=>{
+  const p=path.resolve(protectedRoot,relative);
+  if(!p.startsWith(protectedRoot+path.sep))fail('R54_READINESS_PATH_DENIED');
+  return p;
+ };
+ const installed={};
+ for(const [key,relative] of [
+  ['r47Cmd','pc-writer/theme-nine-r48/THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd'],
+  ['r54Cmd','pc-writer/theme-nine-r54/scripts/pc-writer/THEME_NINE_R54_PUBLIC_CYCLE.cmd'],
+  ['r54Connect','pc-writer/theme-nine-r54/scripts/pc-writer/theme-nine-r54-public-connect.mjs']]){
+  installed[key]=publicMeta(inspectFile(inside(relative),1048576));
+ }
+ const manifests={};
+ for(const [key,relative] of [
+  ['r23','themes/legacy-nine-r23/raw-manifest.json'],
+  ['r35','themes/legacy-nine-r35-delta/raw-manifest.json']]){
+  const observed=inspectFile(inside(relative),2097152);
+  const summary=publicMeta(observed);
+  if(observed.status==='READ'){
+   try{
+    const data=JSON.parse(observed.buffer.toString('utf8'));
+    if(!Array.isArray(data.files)||data.files.length>8192)throw Error('INVALID_FILES');
+    const spyDates=data.files.filter(f=>f?.symbol==='SPY')
+     .map(f=>f?.lastVerifiedNYDay).filter(isoDay).sort();
+    summary.pageCount=data.files.length;
+    summary.latestSpyDay=spyDates.at(-1)??null;
+   }catch{summary.metadata='UNPARSEABLE';}
+  }
+  manifests[key]=summary;
+ }
+ const recentRuns={
+  r47:inspectRecent(inside('pc-writer/theme-nine-r48'),
+   /^THEME_NINE_R47_RECURRING_PRIVATE_UPDATE_\d+_\d+\.json$/,list,body=>{
+    const v=JSON.parse(body);
+    return {status:safeStatus(v?.status),stage:safeStatus(v?.stage),
+     collectionStatus:safeStatus(v?.collection?.status),
+     benchmarkDate:isoDay(v?.benchmarkDate)?v.benchmarkDate:null,
+     targetClosedNYDay:isoDay(v?.freshness?.targetClosedNYDay)?v.freshness.targetClosedNYDay:null,
+     lastVerifiedSpyNYDay:isoDay(v?.freshness?.lastVerifiedSpyNYDay)?v.freshness.lastVerifiedSpyNYDay:null};
+   }),
+  r54:inspectRecent(inside('pc-writer/theme-nine-r54/logs'),
+   /^THEME_NINE_R54_CYCLE_\d+_\d+\.txt$/,list,body=>({
+    result:(body.match(/RESULT=(EXECUTED_CHECK_JSON_STATUS|STOP_OR_PENDING_REVIEW_TXT)/g)||[]).at(-1)??null,
+    errors:[...new Set(body.match(/THEME_NINE_R54_[A-Z0-9_]{3,65}/g)||[])].slice(-4)
+   }))
+ };
+ return {installed,manifests,recentRuns};
+}
 
 function fileBytes(p,max){
  const st=fs.lstatSync(p);
@@ -65,7 +160,7 @@ function approvalCheck(base){
  const p=path.join(base,'control',APPROVAL);
  const a=JSON.parse(fileBytes(p,4096).toString('utf8'));
  if(a.schema!=='ZGMINI_R54_READINESS_B_APPROVAL_V1'||a.grade!=='B'||
-  a.scope!=='FIXED_R54_READONLY_TASK_MEMORY_CANDIDATE_DATES_ONCE'||
+  a.scope!=='FIXED_R54_READONLY_TASK_MEMORY_CANDIDATE_DATES_LINEAGE_ONCE'||
   a.dataRoot!==DATA_ROOT||a.timeoutSeconds!==120||
   a.maxProviderRequests!==0||a.maxAutomaticRetries!==0||
   a.pcDataWrites!==false||a.databaseWrites!==false||a.d1Writes!==false||
@@ -100,7 +195,7 @@ export function inspect({taskQuery=task=>execFileSync('schtasks.exe',
    saved[key]={status:'READ',candidateCount:dates.length,latestDates:[...new Set(dates)].sort().slice(-6)};
   }catch(e){saved[key]={status:e?.code==='R54_READINESS_DIRECTORY_TOO_LARGE'?'LIMIT':'UNAVAILABLE'};}
  }
- return {freeMiB,tasks,candidates:saved};
+ return {freeMiB,tasks,candidates:saved,sourceLineage:inspectSourceLineage(dataRoot,list)};
 }
 const name=n=>`R54_READINESS_${n}.json`;
 const resultBase=env=>({schema:SCHEMA,status:'BLOCKED',code:'R54_READINESS_NOT_STARTED',
