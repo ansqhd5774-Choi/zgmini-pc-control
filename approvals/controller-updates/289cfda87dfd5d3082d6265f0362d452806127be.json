@@ -1,0 +1,33 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "targetSha": "289cfda87dfd5d3082d6265f0362d452806127be",
+  "allowFiles": [
+    {
+      "path": "controller/market-calendar-er1-nov30-availability-readonly.mjs",
+      "sha256": "c3b3fbe0fe696c6082d8022b7fc89ca90f19c2d9739e8cb6c33c726045d87275"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/414",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "289cfda87dfd5d3082d6265f0362d452806127be",
+    "status": "PASS",
+    "manifestSha256": "26c13e2c20f9a87374b2316e10e68a0735a0e364d8830e6ef4dd5f301c04776b"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "69c830275bd3fec75b17c8a98c46d689447fb1a7"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "708ed262d9425e45c0009c6470a8c7b11ac33884"
+}

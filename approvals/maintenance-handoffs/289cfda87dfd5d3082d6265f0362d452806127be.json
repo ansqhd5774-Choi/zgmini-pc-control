@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "targetSha": "289cfda87dfd5d3082d6265f0362d452806127be",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-05 user authorization to fix excessive PC Controller admission and section 5 standing approval of essential maintenance policy handoff. Exact merged scope-only PR #416 changes tools/maintenance-contract.mjs and tools/update.mjs; A diagnostic PR #414 merged. Last successful maintenance source 69c830275bd3fec75b17c8a98c46d689447fb1a7 from #345 is historical and must be verified on PC before attempting handoff.",
+  "files": {
+    "tools/maintenance-contract.mjs": "c87754e566aa66b1f692d8dea31a89b9822965ee3225ebba68ca78f4daa19829",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "051b19d3b83bbaf1e8c20a55bcff4c2295b84998e063cc752a271869fbb96c2d",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "ce1f9bf5fb8928568d6379bb58c6c2faac95000d7eee46f19e48580a9dc5386f",
+    "tools/maintenance-ancestry.vbs": "3ea49faa5845b982408e9d534d97830748c38ba63bdf5440af26f352b3cf458d",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "87632af5854a5e11d9b0c3455ff0bd14c56e8c46589fcca3cd5a160351471863"
+  },
+  "checks": {
+    "command": "PR #416 focused Node tests 29/29 PASS; exact target Git blob bytes and SHA-256 for all eight pinned tool files verified; independent live Windows handoff still pending",
+    "passed": 29,
+    "failed": 0,
+    "platform": "Linux isolated Node test and immutable Git source bytes; PC Windows operator proof required"
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Installed Controller source and files",
+    "Core and Korea scheduled tasks and protected hashes",
+    "Retired Iran R13 absence; no task recreation",
+    "SQLite/D1 and private PC source data",
+    "Runner registrations, requests and ledgers"
+  ],
+  "scopeNote": "Six installed maintenance files change only maintenance-contract.mjs and update.mjs. No Controller file, Core/DB/D1, workflow, scheduler, writer or source collector install is authorized by this manifest. The independent Windows medium-token operator must verify current installed maintenance SHA, clean exact main, receiver ancestry, no install lease, original eight hashes, cooperative stop, safe snapshot/rollback and new receiver before PASS. No GitHub Runner/shell substitute."
+}
