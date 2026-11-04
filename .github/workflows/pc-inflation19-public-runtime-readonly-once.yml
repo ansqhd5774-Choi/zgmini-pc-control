@@ -29,6 +29,8 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
+      - name: Run isolated size guards and 19-plus-4 contract tests
+        run: '"E:\\ZGmini\\runtime\\node.exe" --test "%GITHUB_WORKSPACE%\\inflation19-public-runtime-readonly-once.test.mjs"'
       - name: GET public saved-only API and HTML with zero writes
         env:
           GITHUB_EVENT_ACTION: ${{ github.event.action }}
