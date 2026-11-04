@@ -15,7 +15,7 @@ export const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
 export const ENTRY='scripts/pc-writer/inflation-causal-public-preview-r1.mjs';
 export const HASHES=Object.freeze({
  [ENTRY]:'28112fc8029c0dfde460d2f79edc813f0ae803905a4bdc131120682db766c075',
- 'lib/inflation-causal-public-catalog.mjs':'81470d3ed03528403f8da51c8e71622a26352ce4b05c34fe356427c5c7cea4d2',
+ 'lib/inflation-causal-public-catalog.mjs':'db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5',
  'worker/inflation-causal-public-r1.mjs':'86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f',
 });
 const UUID='[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}';
