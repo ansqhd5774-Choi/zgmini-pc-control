@@ -54,6 +54,7 @@ const contextFixture=()=>({
   '   report.usBreadth.publication=await publishUsBreadth(remote,config.core,report.usBreadth,{now});',
   ' });',
   ' else report.usBreadth={publication:\'SKIPPED_NOT_READY\'};',
+  ...Array.from({length:9},(_,i)=>`// fixture publication tail ${i}`),
  ].join('\r\n'),
 });
 test('three fixed contexts emit only verified bounded non-sensitive excerpts',()=>{
@@ -62,10 +63,22 @@ test('three fixed contexts emit only verified bounded non-sensitive excerpts',()
  const got=diagnoseR17RestrictedContexts(src,valid());
  assert.equal(got.status,'THREE_EXCERPTS_READONLY');
  assert.deepEqual(got.excerpts.map(x=>[x.file,x.hunk,x.lineCount]),
-  [['cycle','185',3],['publication','72',4],['publication','228',4]]);
+  [['cycle','185',3],['publication','72',4],['publication','228',8]]);
  assert.ok(got.excerpts.every(x=>!x.text.includes('\r')));
  assert.ok(JSON.stringify(got).length<=2500);
  assert.equal(got.excerpts.some(x=>x.text.includes('safe')),false);
+});
+test('third context reads bounded follow-on lines and suppresses secrets discovered there',()=>{
+ const files=contextFixture();
+ const third=diagnoseR17RestrictedContexts(files,valid()).excerpts[2];
+ assert.equal(third.lineCount,8);
+ assert.match(third.text,/fixture publication tail 3/);
+ const changed={...files,'scripts/pc-writer/run-local.mjs':
+  files['scripts/pc-writer/run-local.mjs'].replace('// fixture publication tail 2',
+   'const password=NEVER_EMIT_THIS;')};
+ const suppressed=diagnoseR17RestrictedContexts(changed,valid());
+ assert.equal(suppressed.status,'SENSITIVE_CONTEXT_SUPPRESSED');
+ assert.ok(!JSON.stringify(suppressed).includes('NEVER_EMIT_THIS'));
 });
 test('bounded three-excerpt readback survives the fixed diagnostics envelope',()=>{
  const evidence={...valid(),patchApplies:false,patchFailureCode:'PATCH_CONTEXT_MISMATCH',
@@ -120,7 +133,7 @@ test('fuzzy relative alignment retains bounded context when patch old lines are 
  const changed=diagnoseR17RestrictedContexts(asSource(),valid());
  assert.equal(changed.status,'THREE_EXCERPTS_READONLY');
  assert.deepEqual(changed.excerpts.map(x=>x.method),Array(3).fill('FUZZY_RELATIVE_LINES'));
- assert.ok(changed.excerpts.every(x=>x.matchedLines>=2&&x.lineCount>=3&&x.lineCount<=6));
+ assert.ok(changed.excerpts.every(x=>x.matchedLines>=2&&x.lineCount>=3&&x.lineCount<=8));
  // Delete a line inside the second hunk: its subsequent context shifts by one.
  rows[publication].splice(72,1);
  const deleted=diagnoseR17RestrictedContexts(asSource(),valid());
