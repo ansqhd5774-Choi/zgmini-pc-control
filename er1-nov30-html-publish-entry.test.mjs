@@ -36,6 +36,10 @@ test('only exact owner, label, issue title, approved source and period admitted'
   assert.throws(() => validateRequest({ ...event, issue: {
     ...event.issue, body: event.issue.body.replace('saved-november', 'fetch-november'),
   } }, env), /NOV30_HTML_REQUEST_CONTRACT_STOP/);
+  assert.throws(() => validateRequest({ ...event, issue: {
+    ...event.issue, body: event.issue.body.replace(
+      '12345678-1234-4234-8234-123456789abc', '------------------------------------'),
+  } }, env), /NOV30_HTML_REQUEST_CONTRACT_STOP/);
 });
 
 test('immutable approval is limited to one November HTML D1 key and zero supplier', () => {
