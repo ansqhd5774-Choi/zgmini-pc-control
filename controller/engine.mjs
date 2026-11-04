@@ -1,8 +1,8 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
-import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml} from './operations.mjs';
+import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
-export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,fixture=false,terminateTree=null,terminationGraceMs=5000,fixtureFreeMiB=null,fixtureMemoryWaitMs=20,fixtureMemoryPollMs=2}={}){
+export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence,fixture=false,terminateTree=null,terminationGraceMs=5000,fixtureFreeMiB=null,fixtureMemoryWaitMs=20,fixtureMemoryPollMs=2}={}){
  need(Number.isInteger(seat)&&seat>=1&&seat<=policy.seats,'SEAT_NOT_ALLOWED');need(/^\d{1,20}$/.test(String(runId)),'RUN_ID');
  const workspaceId=`run-${runId}-${attempt}-seat-${seat}`,workspace=path.join(root,'jobs',workspaceId);fs.mkdirSync(workspace,{recursive:true});
  const start=Date.now(),report={schema:'ZGMINI_PC_RESULT_V1',jobId:workspaceId,requestId:typeof raw?.requestId==='string'&&/^[a-z0-9-]{8,80}$/.test(raw.requestId)?raw.requestId:null,startedAt:new Date(start).toISOString(),controlRepository:policy.controlRepository,controlSourceSha:host.controllerSourceSha,sourceRepository:policy.sourceRepository,requestedSourceSha:/^[a-f0-9]{40}$/.test(raw?.sourceSha??'')?raw.sourceSha:null,sourceBranch:typeof raw?.sourceBranch==='string'&&/^[a-zA-Z0-9_./-]{1,160}$/.test(raw.sourceBranch)?raw.sourceBranch:null,operation:Object.hasOwn(policy.operations,raw?.operation)?raw.operation:'NOT_ALLOWED',seat,status:'BLOCKED',code:'PREFLIGHT_NOT_COMPLETED',lastPass:'REQUEST_RECEIVED',firstFail:null,operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,controlWorkspaceWrites:true};
@@ -30,12 +30,13 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   }
   preflightOperation='SEAT_LEASE';releaseSeat=exclusive(path.join(root,'leases'),'seat-'+seat);
   if(policy.operations[request.operation].resource==='heavy'){preflightOperation='RESOURCE_LEASE';releaseResource=exclusive(path.join(root,'leases'),'heavy');}
-  preflightOperation='PROTECTED_STATE_SNAPSHOT';try{before=protectedState(host.dataRoot,{queryTask:task=>{
+  preflightOperation='PROTECTED_STATE_SNAPSHOT';try{before=protectedState(host.dataRoot,{retiredTaskEvidence,queryTask:task=>{
    try{return queryTask(task);}catch{throw Object.assign(new Error('PROTECTED_TASK_XML_QUERY_FAILED'),{code:'PROTECTED_TASK_XML_QUERY_FAILED',safeTaskName:task});}
   }});}
-  catch(error){Object.assign(report,{phase:'PREVALIDATION',failureOperation:'PROTECTED_STATE_SNAPSHOT',mutationStarted:false,
-   affectedScope:'OWN_REQUEST_ONLY',nextAction:'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
-   ...(typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}
+  catch(error){const retiredIranFailure=String(error?.code??'').startsWith('RETIRED_IRAN_');
+   Object.assign(report,{phase:'PREVALIDATION',failureOperation:'PROTECTED_STATE_SNAPSHOT',mutationStarted:false,
+    affectedScope:'OWN_REQUEST_ONLY',nextAction:retiredIranFailure?'VERIFY_APPROVED_RETIRED_IRAN_STATE_NO_RETRY':'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
+    ...(retiredIranFailure?{failedProtectedTask:'ZGMINI-PC-Iran-Progress-R13'}:typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}
   preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
   preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
@@ -52,7 +53,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   else if(childResult.timedOut){report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';}
   else if(fs.existsSync(output)){preflightOperation='WORKER_RESULT_PARSE';const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result,sqliteOpened:result.sqliteOpened===true});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
   else{report.status='FAIL';report.code='WORKER_RESULT_MISSING';report.firstFail='RESULT_FILE';}
-  preflightOperation='POSTCHECK';const after=protectedState(host.dataRoot,{queryTask});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
+  preflightOperation='POSTCHECK';const after=protectedState(host.dataRoot,{queryTask,retiredTaskEvidence});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
   need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
   report.actualExecutionSha=request.operation==='employment-r6-candidate-stage-readonly'
     ?(report.result?.actualExecutionSha??null)
