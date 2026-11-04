@@ -43,8 +43,11 @@ test('rejects an ineligible or uncertain recovery',()=>{
 
 test('rejects eight unrelated true checks, missing checks and unapproved substitutions',()=>{
   const valid=inspection();
+  const inherited=Object.create(valid.checks);
+  for(let i=0;i<8;i++)inherited['UNRELATED_'+i]=true;
   for(const checks of [
     Object.fromEntries(Array.from({length:8},(_,i)=>['CHECK_'+i,true])),
+    inherited,
     Object.fromEntries(requiredChecks.slice(1).map(key=>[key,true])),
     {...valid.checks,ORIGINAL_BYTES:true,UNRELATED_CHECK:true},
     {...valid.checks,REQUEST_IDENTITY:false},
