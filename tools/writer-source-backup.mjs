@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const safeName = name => /^[a-zA-Z0-9_./-]+\.mjs$/.test(name)
@@ -45,4 +46,51 @@ export function createWriterSourceBackup({sourceRoot, backupRoot, expectedFiles}
   }
   return {backupRoot:backup, files:Object.fromEntries(entries),
     manifestSha256:digest(JSON.stringify(entries.sort(([a], [b]) => a.localeCompare(b))))};
+}
+
+/** Independently restore a pinned bundle. Paths must be chosen by the trusted port. */
+export async function verifyWriterRecoveryBundle({bundleFile, restoreRoot,
+  bundleSha256, originalSha, targetSha, targetFiles}) {
+  const entries = Object.entries(targetFiles ?? {});
+  if (!path.isAbsolute(bundleFile) || !path.isAbsolute(restoreRoot)
+    || !/^[a-f0-9]{64}$/.test(bundleSha256) || originalSha === targetSha
+    || ![originalSha,targetSha].every(sha => /^[a-f0-9]{40}$/.test(sha))
+    || entries.length < 1 || entries.length > 64
+    || entries.some(([name, hash]) => !safeName(name) || !/^[a-f0-9]{64}$/.test(hash))) {
+    throw Error('WRITER_BUNDLE_CONTRACT_INVALID');
+  }
+  const file = fs.realpathSync.native(bundleFile);
+  if (!fs.lstatSync(bundleFile).isFile()) throw Error('WRITER_BUNDLE_PATH_UNSAFE');
+  const verifyDigest = async () => {
+    const hash = createHash('sha256');
+    for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+    if (hash.digest('hex') !== bundleSha256) throw Error('WRITER_BUNDLE_HASH_MISMATCH');
+  };
+  await verifyDigest();
+  fs.mkdirSync(restoreRoot);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/i.test(key)));
+  Object.assign(env,{GIT_CONFIG_NOSYSTEM:'1',
+    GIT_CONFIG_GLOBAL:path.join(restoreRoot,'no-global-config'),GIT_TERMINAL_PROMPT:'0'});
+  const git = args => execFileSync('git',['--no-replace-objects',...args],{
+    cwd:restoreRoot,env,windowsHide:true,timeout:120_000,maxBuffer:4_194_304,
+    stdio:['ignore','pipe','pipe'],
+  });
+  git(['init','--bare','--template=','--quiet']);
+  git(['fetch','--quiet','--no-tags',file,
+    'refs/heads/writer-original:refs/heads/writer-original',
+    'refs/heads/writer-candidate:refs/heads/writer-candidate']);
+  const head = ref => git(['rev-parse',ref]).toString().trim();
+  if (head('refs/heads/writer-original') !== originalSha
+    || head('refs/heads/writer-candidate') !== targetSha) throw Error('WRITER_BUNDLE_REF_MISMATCH');
+  git(['fsck','--connectivity-only','--no-reflogs']);
+  git(['merge-base','--is-ancestor',originalSha,targetSha]);
+  const changed = git(['diff','--name-only','-z',originalSha,targetSha]).toString().split('\0').filter(Boolean).sort();
+  if (JSON.stringify(changed) !== JSON.stringify(entries.map(([name]) => name).sort())) {
+    throw Error('WRITER_BUNDLE_DIFF_MISMATCH');
+  }
+  for (const [name, hash] of entries) {
+    if (digest(git(['show',targetSha+':'+name])) !== hash) throw Error('WRITER_BUNDLE_TARGET_HASH_MISMATCH');
+  }
+  await verifyDigest();
+  return {originalSha,targetSha,bundleSha256,independentlyRestored:true,connectivityVerified:true};
 }
