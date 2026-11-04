@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "5469548b05ba90f3855281e94234952bdb45fa4f",
+  "targetSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User-approved continued R17 Controller reliability work, standing approval in AGENTS.md and docs/PC_AUTOMATION_STANDARD.md section 5. PR #342 merged as exact main commit 69c830275bd3fec75b17c8a98c46d689447fb1a7; 2026-11-04 18:54:31Z read-only Windows proof found intentionally retired ZGMINI-PC-Iran-Progress-R13 absent and Core/Korea present. Installed maintenance source 5469548b05ba90f3855281e94234952bdb45fa4f observed during #339/PC probe. Approval applies to exact eight tool bytes and controlled operator-only receiver handoff; Windows recheck mandatory.",
+  "files": {
+    "tools/maintenance-contract.mjs": "e566c55af5a52ce15615689bfd58420fb52dd61cd7fc678ff3929d6071985a69",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "051b19d3b83bbaf1e8c20a55bcff4c2295b84998e063cc752a271869fbb96c2d",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "e05833ca01213779c13df022704aa359dc8c55168f7b1a1c89e0af36be2a0d27",
+    "tools/maintenance-ancestry.vbs": "3ea49faa5845b982408e9d534d97830748c38ba63bdf5440af26f352b3cf458d",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "87632af5854a5e11d9b0c3455ff0bd14c56e8c46589fcca3cd5a160351471863"
+  },
+  "checks": {
+    "command": "PR #342 source tests: Node eight focused suites 126/126 PASS; direct GitHub target commit raw base64 file bytes SHA-256 8/8 computed, SHA implementation self-test and six prior manifest digest matches; Windows handoff/runtime not yet executed",
+    "passed": 126,
+    "failed": 0,
+    "platform": "Linux Node isolated fixture and GitHub exact raw bytes; Windows operator and PC runtime pending"
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Controller installed source and files",
+    "Core and Korea scheduled tasks and protected hashes",
+    "Approved retired absence of Iran R13 scheduled task; no recreation",
+    "SQLite/D1 and PC operating data",
+    "Runner registrations and request ledgers"
+  ],
+  "scopeNote": "Only eight pinned independent maintenance-tool bytes. Relative to existing maintainer SHA 5469548..., the six installed maintenance files change only maintenance-apply.mjs and update.mjs; contract, agent, lock, and ancestry stay byte-identical. Bootstrap and handoff tools are verified but not installed as one of the six. Requires clean main, medium-token Windows operator, cooperative receiver stop/origin proof, no active controller-install lease, exact current receipt/source bytes, safe backup and fresh receiver origin. Does not authorize original #339 replay, Iran re-creation, Controller install, Core/DB/D1 changes, or 1024MiB memory profile activation."
+}
