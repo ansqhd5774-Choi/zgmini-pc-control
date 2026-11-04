@@ -1,0 +1,29 @@
+{
+  "schema": "ZGMINI_INFLATION_19_PREVIEW_B_APPROVAL_V1",
+  "scope": "INFLATION_19_PRIVATE_READONLY_PREVIEW",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "49e71407f5a4978debc604a53a866f1a9527c35a",
+  "writerHome": "E:\\ZGmini\\data\\pc-writer",
+  "maxProviderRequests": 0,
+  "maxAutomaticRetries": 0,
+  "coreWrites": false,
+  "dbWrites": false,
+  "d1Writes": false,
+  "schedulerWrites": false,
+  "sourceFileHashes": {
+    "scripts/pc-writer/inflation-causal-public-preview-r1.mjs": "28112fc8029c0dfde460d2f79edc813f0ae803905a4bdc131120682db766c075",
+    "lib/inflation-causal-public-catalog.mjs": "81470d3ed03528403f8da51c8e71622a26352ce4b05c34fe356427c5c7cea4d2",
+    "worker/inflation-causal-public-r1.mjs": "86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f"
+  },
+  "output": {
+    "report": "INFL19_PUBLIC_PREVIEW_<issueNumber>.json",
+    "summaryOnly": true,
+    "rawValues": false
+  },
+  "effect": {
+    "PC": "READ_ONLY",
+    "D1": "NONE",
+    "site": "NONE",
+    "existingR2": "UNCHANGED"
+  }
+}
