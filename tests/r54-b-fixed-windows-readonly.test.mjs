@@ -6,8 +6,8 @@ import {
 
 const CSV='Node,CommandLine,ExecutablePath,Name,ParentProcessId,ProcessId\r\n'+
  'PC,C:\\Windows\\explorer.exe,C:\\Windows\\explorer.exe,explorer.exe,0,1200\r\n';
-const fakeSource=()=>({status:'R54_B_ORIGINAL_NINE_SHA_VERIFIED',
- files:Array.from({length:9},(_,i)=>({path:`p${i}`,actual:'0'.repeat(64)}))});
+const fakeSource=()=>({status:'R54_B_ORIGINAL_SIX_SHA_VERIFIED',
+ files:Array.from({length:6},(_,i)=>({path:`p${i}`,actual:'0'.repeat(64)}))});
 const fakeTask=()=>({xmlSha256:'a'.repeat(64),definitionDigest:'b'.repeat(64),enabled:true});
 
 function makeProbe(processCsv=CSV){
