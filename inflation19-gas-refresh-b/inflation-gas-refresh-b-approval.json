@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_INFLATION_GAS_REFRESH_B_V1",
+  "approved": true,
+  "scope": "GAS_DHHNGSP_SINGLE_REFRESH_B",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "de262f47003e3c32fb685cf2c9b1e3edb1ec1b19",
+  "writerHome": "E:\\ZGmini\\data\\pc-writer",
+  "outputRelative": "inflation-causal-r1/gas-dhhngsp.json",
+  "expectedLatestObservation": "2026-11-03",
+  "expectedValueForLatest": 2.63,
+  "priorGasSha256": "115f6445f7849d17d66645ab91f85c00db9a7b274bbfca48285818ddbd06549f",
+  "markerRoot": "E:\\ZGmini\\data\\pc-writer\\inflation-gas-refresh-20261105-guard",
+  "maxProviderRequests": 1,
+  "maxAutomaticRetries": 0,
+  "allowCoreWrites": false,
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowRawPublic": false,
+  "sourceFileHashes": {
+    "scripts/inflation-causal-gas-electric.mjs": "3f729b8637337f86088d85f3e37c7921477681066c05422a6bcebd91d6a2c541",
+    "scripts/pc-writer/quota-fetch.mjs": "c0b05af49be44989096d5d48286837af1fa02570efa256fab7a219b85271b478",
+    "scripts/pc-writer/quota-ledger.mjs": "24aa7558917dfed86e3661a8b58bfaaf2642dcc26d98d1a39f7a5ab3b37bb1aa",
+    "scripts/pc-writer/quota-policy.mjs": "0308da3589feabcf6c628a1d2a543f82f4fe7a39909e54cb68e0b50a645c0ede"
+  }
+}
