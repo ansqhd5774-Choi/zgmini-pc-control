@@ -1,0 +1,69 @@
+# One-shot B-approved R54 score/private replay; uses the existing Windows runner.
+# No Controller, CMD, scheduler, price API, SQL or D1 writes.
+name: ZGMINI Theme R54 Score Replay Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-theme-r54-score-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  r54-score-once:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-theme-r54-score-replay-once' &&
+      !contains(github.event.issue.labels.*.name, 'pc-job') &&
+      !contains(github.event.issue.labels.*.name, 'pc-maintenance')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout exact issue-event control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          clean: true
+          fetch-depth: 1
+
+      - name: Checkout reviewed immutable raw-verification adapter
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: 77c6cc43a2450f34a7cfe81f39040807e727f1cf
+          path: adapter
+          persist-credentials: false
+          clean: true
+          fetch-depth: 1
+
+      - name: Checkout immutable approved R54 replay logic
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 5ee597cc6c0da9f38ab54c8aeb46b89f60a1ef36
+          path: source
+          persist-credentials: false
+          clean: true
+          fetch-depth: 1
+
+      - name: Verify R47 replay and R54 eligibility in memory
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\r54-score-once\entry.mjs"'
+
+      - name: Return only issue-bound bounded metadata
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\r54-score-once\entry.mjs" --upload'
