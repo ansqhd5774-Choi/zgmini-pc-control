@@ -104,3 +104,26 @@ test('scheduled-task snapshot failure is attributed before worker execution with
  assert.equal(r.report.operationalWrites,0);assert.equal(fs.existsSync(path.join(r.workspace,'input.json')),false);
  assert.equal(JSON.stringify(r.report).includes('private PC path'),false);
 });
+test('malformed existing request ledger identifies the exact prevalidation operation without a worker',async()=>{
+ const c=setup(),q=request('runner-smoke','memory-request-6000');
+ fs.mkdirSync(path.join(c.root,'ledger'),{recursive:true});
+ fs.writeFileSync(path.join(c.root,'ledger',q.requestId+'.json'),'{private PC path');
+ const r=await executeJob(q,c);
+ assert.equal(r.report.status,'BLOCKED');assert.equal(r.report.code,'REQUEST_LEDGER_PARSE_FAILED');
+ assert.equal(r.report.phase,'PREVALIDATION');assert.equal(r.report.failureOperation,'REQUEST_LEDGER');
+ assert.equal(r.report.mutationStarted,false);assert.equal(r.report.affectedScope,'OWN_REQUEST_ONLY');
+ assert.equal(fs.existsSync(path.join(c.root,'leases','request-'+q.requestId)),false);
+ assert.equal(fs.existsSync(path.join(r.workspace,'input.json')),false);
+ assert.equal(JSON.stringify(r.report).includes('private PC path'),false);
+});
+test('invalid Core config identifies read failure without exposing config bytes or starting a worker',async()=>{
+ const c=setup(),q=request('runner-smoke','memory-request-6001');
+ fs.writeFileSync(path.join(c.host.dataRoot,'pc-writer','config.json'),'{private config');
+ const r=await executeJob(q,c);
+ assert.equal(r.report.status,'BLOCKED');assert.equal(r.report.code,'CORE_CONFIG_PARSE_FAILED');
+ assert.equal(r.report.phase,'PREVALIDATION');assert.equal(r.report.failureOperation,'CORE_STATE_READ');
+ assert.equal(r.report.mutationStarted,false);assert.equal(r.report.operationalWrites,0);
+ assert.equal(fs.existsSync(path.join(c.root,'leases','request-'+q.requestId)),false);
+ assert.equal(fs.existsSync(path.join(r.workspace,'input.json')),false);
+ assert.equal(JSON.stringify(r.report).includes('private config'),false);
+});
