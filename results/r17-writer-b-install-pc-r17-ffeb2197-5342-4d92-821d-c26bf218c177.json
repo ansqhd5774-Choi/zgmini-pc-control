@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_INSTALL_RESULT_V1",
+  "requestId": "pc-r17-ffeb2197-5342-4d92-821d-c26bf218c177",
+  "status": "R17_B_INSTALL_STOP",
+  "phase": "BASELINE_SAVED",
+  "code": "R17_B_COMMAND_STOP",
+  "sourceSha": null,
+  "runId": "41928883276",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
