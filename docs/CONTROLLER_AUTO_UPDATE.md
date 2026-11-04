@@ -20,6 +20,16 @@
 
 ## 공통 자원 프로필
 
+### 설치 절차 간소화 후보 (운영 설치 전 검증 필수)
+
+- `tools/controller-update-plan.mjs --installed-sha <40자> --target-sha <40자>`는 Git의 고정 커밋 사이 변경을 **읽기 전용**으로 분류하고 Controller/config와 workflow/scripts의 목표 파일 SHA-256을 출력한다. 승인 manifest·GitHub Issue·PC 변경은 생성하지 않는다. `origin/main`은 로컬 확인만 하므로 승인·제출 전 최신 원격·실PC 설치 SHA를 다시 대조한다. 승인하지 않은 누적 변경을 자동 포함시키지 않는다.
+- 유지보수기 source를 별도로 검증·인계한 후에는 checkout 청결도 검사 범위를 Controller/config·workflow/scripts·Controller 승인 파일로 제한한다. 문서·테스트·결과 보고 등 비설치 파일의 변경은 차단 사유가 아니다. 반면 대상 Git SHA, 실제 설치 SHA, 승인·해시, 실행 중인 source 파일의 독립 설치 해시는 계속 전부 검증한다.
+- 유지보수기 계약과 PC 업데이트 실행기 양쪽의 사후 A 검사 허용 목록은 `core-status`, `source-audit`, `fear-greed-archive-status`로 통일한다. 실제 설치된 A/light operation인지 확인한다. 일반 진단 PASS는 새 기능 자체의 Runtime 검증을 대체하지 않는다.
+- 별도 B scope `PC_CONTROL_MODERATE_READONLY_UPDATE` / purpose `pc-controller-moderate-readonly`는 **후보 정책**이다. A/heavy 공유 단일 lease를 유지하고 새 읽기 전용 operation에만 91~180초·최소 여유 1024MiB를 허용한다. 기존 A/light·heavy 및 보호 키를 바꾸지 않는다. 운영 사용 전 실제 Windows 자원 여유·동시 Core 안전성·정확한 manifest 검증이 필요하며 이 문서만으로 활성화하지 않는다.
+- 설치 전 오류가 발생하면 외부 exception 원문이나 경로를 공개하지 않고 고정 `failureOperation`과 안전한 단계별 code를 남긴다. 검증된 무변경 실패만 BLOCKED이며 상태 미확정·부분 적용은 RECOVERY_REQUIRED를 유지한다.
+
+위 개선안은 별도 승인·시험·유지보수기 인계와 #68 공용 설치 순서를 따른다. 기존 #319 RECOVERY_REQUIRED를 자동으로 해제하거나 원본 요청을 재실행하지 않는다.
+
 새 heavy 등록은 manifest의 purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`를 사용한다. 요청 envelope에 임의 권한 필드를 추가하지 않는다. 이 프로필은 A/heavy·240초·최소 가용 1536MiB의 기존 검증된 자원 계약을 재사용하며, 동시 heavy 수·actor·기존 operation·쓰기 비활성 정책을 변경하지 않는다. 여러 기능명을 같은 프로필로 검증하므로 기능을 추가할 때마다 유지보수기 코드를 바꾸지 않는다. 다른 자원 등급은 별도의 공통 프로필 검증 대상이며 임의 숫자를 허용하지 않는다.
 
 기존 `employment-r6-readonly-adapter` 목적의 manifest는 과거 한정 계약 호환으로 보존한다. 이를 신규 기능의 공통 승인으로 사용하지 않는다. 실행기 등록은 정확한 소스/파일 해시/테스트/승인 manifest를 계속 요구하며, 프로필 승인만으로 임의 모듈을 실행하지 않는다.
