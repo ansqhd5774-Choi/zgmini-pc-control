@@ -73,7 +73,9 @@ export function diagnoseR17PatchContexts(patchText,sourceByPath){
 const R17_CONTEXT_TARGETS=Object.freeze([
  {file:'scripts/pc-writer/local-cycle.mjs',hunk:'185',anchors:[/^\s*const\s+report\s*=/],focus:/\bconst\s+report\s*=/,before:1,after:1},
  {file:'scripts/pc-writer/run-local.mjs',hunk:'72',anchors:[/^\s*const\s+marketReady\s*=/],focus:/\breport\.usBreadth\s*=/,before:1,after:2},
- {file:'scripts/pc-writer/run-local.mjs',hunk:'228',anchors:[/^\s*\/\/\s*Explicit allowlist\b/,/^\s*for\s*\(\s*const\s*\{\s*id\s*,\s*status\s*\}\s*of\s*report\.projections/,/^\s*if\s*\(\s*report\.usBreadth/,/^\s*report\.usBreadth\.publication\s*=/],focus:/\breport\.usBreadth\.publication\s*=/,before:1,after:2},
+ // Read forward past the observed market lease release. Never insert at this
+ // diagnostic location; it is solely a bounded source/closure readback.
+ {file:'scripts/pc-writer/run-local.mjs',hunk:'228',anchors:[/^\s*\/\/\s*Explicit allowlist\b/,/^\s*for\s*\(\s*const\s*\{\s*id\s*,\s*status\s*\}\s*of\s*report\.projections/,/^\s*if\s*\(\s*report\.usBreadth/,/^\s*report\.usBreadth\.publication\s*=/],focus:/\breport\.usBreadth\.publication\s*=/,before:0,after:7},
 ]);
 const SENSITIVE_R17_CONTEXT=/(?:secret|password|passwd|token|authorization|oauth|bearer|credential|api[_-]?key|private[_-]?key|access[_-]?key|session[_-]?id|account[_-]?id|client[_-]?secret|process\.env|sk-|ghp_|github_pat_|AKIA[0-9A-Z]{12})|https?:\/\/|\bwww\.|(?:\.env\b)|[\u0000-\u0008\u000b\u000c\u000e-\u001f]/i;
 const R17_CONTEXT_MAX_DRIFT=180;
