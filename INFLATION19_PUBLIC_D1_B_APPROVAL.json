@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_INFLATION_19_PUBLIC_D1_APPROVAL_V1",
+  "scope": "USER_APPROVED_PC_STORED_19_RESEARCH_INPUTS_PUBLIC_D1_ONE_KEY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "fe2410e7d1fa95aba51f4c7aba0ac3b62c1aadb5",
+  "publisherPath": "scripts/pc-writer/inflation-causal-public-publish-r1.mjs",
+  "publisherSha256": "5449d755a476c52343924b6fbf1fb55a92a48c63972d8451035fff20b0846198",
+  "approvedHome": "E:\\ZGmini\\data\\pc-writer",
+  "key": "detail:inflation-causal-public-19:r1",
+  "maxProviderRequests": 0,
+  "maxD1Writes": 1,
+  "maxAutomaticRetries": 0,
+  "allowCoreWrites": false,
+  "allowScoreWrites": false,
+  "allowSchedulerWrites": false,
+  "allowDirectDeploy": false,
+  "output": "PRIVATE_SANITIZED_GITHUB_ISSUE_COMMENT_ONLY",
+  "retention": "ONE_SHOT_MARKER_NO_AUTOMATIC_RETRY"
+}
