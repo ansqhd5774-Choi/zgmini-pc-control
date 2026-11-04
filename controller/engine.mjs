@@ -30,7 +30,13 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   }
   releaseSeat=exclusive(path.join(root,'leases'),'seat-'+seat);
   if(policy.operations[request.operation].resource==='heavy')releaseResource=exclusive(path.join(root,'leases'),'heavy');
-  before=protectedState(host.dataRoot,{queryTask});report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
+  try{before=protectedState(host.dataRoot,{queryTask:task=>{
+   try{return queryTask(task);}catch{throw Object.assign(new Error('PROTECTED_TASK_XML_QUERY_FAILED'),{code:'PROTECTED_TASK_XML_QUERY_FAILED',safeTaskName:task});}
+  }});}
+  catch(error){Object.assign(report,{phase:'PREVALIDATION',failureOperation:'PROTECTED_STATE_SNAPSHOT',mutationStarted:false,
+   affectedScope:'OWN_REQUEST_ONLY',nextAction:'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
+   ...(typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}
+  report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
   writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
