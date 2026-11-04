@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {analyzeCscriptResult,authorizeDiagnostic,runReadOnlyDiagnostic,
+import {analyzeCscriptResult,analyzeCoreTaskXml,authorizeDiagnostic,runReadOnlyDiagnostic,
   sanitizeDiagnosticResult,commentDiagnostic,readSafeResult}
 from './r17-b-probe-diagnostic.mjs';
 
@@ -29,6 +29,7 @@ const event=()=>({action:'opened',
     body:JSON.stringify(BODY)}});
 const normal='{"ok":true,"enabled":true,"state":3,"instances":0,"relatedProcesses":0,"unknownProcessLines":0}\r\n';
 const result=(stdout,status=0,stderr='')=>({status,stdout:Buffer.from(stdout),stderr:Buffer.from(stderr)});
+const taskXml='<Task><Settings><Enabled>true</Enabled><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy></Settings></Task>';
 
 test('owner-only private A issue exactly gated, fixed probe digest',()=>{
   assert.equal(authorizeDiagnostic(event(),env()).requestId,REQUEST_ID);
@@ -78,9 +79,28 @@ test('nonzero code and WSH error probe structure remain classified, never PASS',
   assert.doesNotMatch(JSON.stringify(bad),/UNSAFE-WMI/);
 });
 
+test('Core Task XML read-only output contains only count, shape and digest comparison',()=>{
+  const valid=analyzeCoreTaskXml(result(taskXml));
+  assert.equal(valid.shape,'EXPECTED_SETTINGS_ENABLED');
+  assert.equal(valid.settingsCount,1);
+  assert.equal(valid.enabledCount,1);
+  assert.equal(valid.digestMatched,false); // Fixture cannot impersonate pinned PC Task XML.
+  assert.doesNotMatch(JSON.stringify(valid),/MultipleInstancesPolicy|<Task>|<Settings>/);
+  const missing=analyzeCoreTaskXml(result('<Task><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy></Settings></Task>'));
+  assert.equal(missing.shape,'ENABLED_ABSENT');
+  assert.equal(missing.enabledCount,0);
+  const duplicated=analyzeCoreTaskXml(result('<Task><Settings><Enabled>true</Enabled><Enabled>false</Enabled></Settings></Task>'));
+  assert.equal(duplicated.shape,'ENABLED_DUPLICATE');
+  assert.equal(analyzeCoreTaskXml(result('<Task/>')).shape,'SETTINGS_COUNT_INVALID');
+  const failed=analyzeCoreTaskXml(result('PRIVATE-ERROR',1,'PRIVATE-ERROR'));
+  assert.equal(failed.shape,'QUERY_FAILED');
+  assert.doesNotMatch(JSON.stringify(failed),/PRIVATE-ERROR/);
+});
+
 test('mock executes exactly fixture + original probe via fixed single argv lane',()=>{
   const called=[];
   const raw=runReadOnlyDiagnostic({event:event(),env:env(),scriptRoot:ROOT,
+    runTaskXml:()=>result(taskXml),
     runCscript:(exe,script)=>{
       called.push({exe,script});
       return script.endsWith('echo-fixture.js')?
@@ -92,18 +112,21 @@ test('mock executes exactly fixture + original probe via fixed single argv lane'
   assert.equal(raw.status,'DIAGNOSTIC_COMPLETE');
   assert.equal(raw.fixture.shape,'FIXTURE_MAGIC_MATCH');
   assert.equal(raw.probe.shape,'EXPECTED_SUCCESS');
+  assert.equal(raw.taskXml.shape,'EXPECTED_SETTINGS_ENABLED');
   assert.equal(raw.installReruns,0);
   assert.equal(raw.sourceWrites,0);
   assert.equal(raw.taskWrites,0);
   assert.equal(raw.configWrites,0);
   const safe=sanitizeDiagnosticResult(raw,REQUEST_ID,env().GITHUB_RUN_ID);
   assert.equal(safe.status,'DIAGNOSTIC_COMPLETE');
+  assert.equal(safe.taskXml.enabledCount,1);
   assert.throws(()=>runReadOnlyDiagnostic({event:event(),env:env(),
     scriptRoot:'/nonexistent',runCscript:()=>result(normal)}));
 });
 
 test('comment only once, never posts raw bytes or secrets and no other method',async()=>{
   const valid=runReadOnlyDiagnostic({event:event(),env:env(),scriptRoot:ROOT,
+    runTaskXml:()=>result(taskXml),
     runCscript:(_exe,script)=>script.endsWith('echo-fixture.js')?
       result('R17_B_WSH_OK\r\n'):result(normal)});
   let postBody,postCount=0;
