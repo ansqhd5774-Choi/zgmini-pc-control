@@ -67,15 +67,16 @@ test('B writer source change requires an independent runtime re-probe callback',
 test('append-only B journal rejects incomplete, altered, and nonsequential records',t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'r54-b-journal-fixture-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
- const journal=path.join(root,'R54_B_SIXFILE_SOURCE_JOURNAL_V1.jsonl');
+ const id='pc-r54-journal-fixture-01';
+ const journal=path.join(root,`R54_B_SIXFILE_${id}.jsonl`);
  const entry=(seq,phase)=>JSON.stringify({schema:'ZGMINI_R54_SIXFILE_B_JOURNAL_V1',
   seq,phase,file:null});
- assert.equal(readR54RecoveryJournalStatus(root),null);
+ assert.equal(readR54RecoveryJournalStatus(root,id),null);
  fs.writeFileSync(journal,entry(0,'STAGING'));
- assert.throws(()=>readR54RecoveryJournalStatus(root),/R54_B_JOURNAL_INCOMPLETE/);
+ assert.throws(()=>readR54RecoveryJournalStatus(root,id),/R54_B_JOURNAL_INCOMPLETE/);
  fs.writeFileSync(journal,entry(0,'STAGING')+'\n'+entry(2,'SUCCEEDED')+'\n');
- assert.throws(()=>readR54RecoveryJournalStatus(root),/R54_B_JOURNAL_INVALID/);
+ assert.throws(()=>readR54RecoveryJournalStatus(root,id),/R54_B_JOURNAL_INVALID/);
  fs.writeFileSync(journal,entry(0,'STAGING')+'\n'+entry(1,'ROLLED_BACK_VERIFIED')+'\n');
- assert.equal(readR54RecoveryJournalStatus(root),'ROLLED_BACK_VERIFIED');
+ assert.equal(readR54RecoveryJournalStatus(root,id),'ROLLED_BACK_VERIFIED');
 });
 
