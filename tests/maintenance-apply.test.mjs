@@ -95,7 +95,6 @@ test('stage-entry failure cannot be downgraded by a false untouched-proof callba
  let proofCalls=0,stageCalls=0;
  const f=fixture({
   stage:async()=>{stageCalls++;throw Object.assign(Error('partial stage write'),{code:'ENOSPC'});},
-  verifyPrevious:async()=>false,
   verifyPrevalidationUntouched:async()=>{proofCalls++;return true;},
  });
  const r=await applyApprovedUpdate(request,f.port);

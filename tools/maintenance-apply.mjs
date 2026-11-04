@@ -126,7 +126,9 @@ export async function applyApprovedUpdate(request, port) {
     if(!switched && (!supervisorStopped || oldStillRunning)) {
       // Intake is deliberately not enabled when drain/state is uncertain.
       // An intact preflight failure can leave it enabled only if verified.
-      let safe=oldStillRunning||prevalidationUntouched;
+      // A partially written staging tree is not a verified no-effect
+      // prevalidation, even if the previous Supervisor is still alive.
+      let safe=failureOperation!=='stage'&&(oldStillRunning||prevalidationUntouched);
       // pauseIntake() can disable the workflow and then lose its API ACK,
       // leaving paused=false in this coordinator. Never infer active intake
       // merely from an unchanged controller or from our local Boolean.
