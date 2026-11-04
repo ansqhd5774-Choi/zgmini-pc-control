@@ -32,16 +32,18 @@
         related += 1;
       }
     }
-    WScript.Echo(JSON.stringify({
-      ok: true,
-      enabled: Boolean(task.Enabled),
-      state: Number(task.State),
-      instances: Number(instances),
-      relatedProcesses: related,
-      unknownProcessLines: unknown
-    }));
+    // Windows Script Host may expose JScript's 5.7-compatible surface even
+    // when the installed engine reports 5.8. Use no built-in JSON serializer.
+    // Every interpolated value is a number or boolean; no WMI command line,
+    // user-controlled string, task path or secret is ever echoed.
+    WScript.Echo('{"ok":true,"enabled":' + (task.Enabled ? 'true' : 'false') +
+      ',"state":' + Number(task.State) +
+      ',"instances":' + Number(instances) +
+      ',"relatedProcesses":' + related +
+      ',"unknownProcessLines":' + unknown + '}');
   } catch (error) {
-    WScript.Echo(JSON.stringify({ok: false, code: 'R17_B_WINDOWS_PROBE_STOP'}));
+    // This fallback must also work without the JSON global.
+    WScript.Echo('{"ok":false,"code":"R17_B_WINDOWS_PROBE_STOP"}');
     WScript.Quit(2);
   }
 }());
