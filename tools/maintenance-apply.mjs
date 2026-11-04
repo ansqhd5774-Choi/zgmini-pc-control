@@ -18,6 +18,38 @@ const OPERATIONS=Object.freeze({inspect:'INSPECT',validate:'VALIDATE',stage:'STA
   reconnect:'RECONNECT',resumeIntake:'RESUME_INTAKE',
   reconcileBacklog:'BACKLOG',postcheck:'POSTCHECK'});
 const ERRNOS=new Set(['ENOENT','EACCES','EPERM','EBUSY','ENOSPC','ETIMEDOUT']);
+// Fixed, path-free failure context for approved Controller updates.
+// Conservative scope is intentional: an uncertain readback is never labelled
+// as a verified no-effect failure.
+function failureDetails({status,failureOperation,intakeAttempted,backup,supervisorStopped,switched,nextAction}){
+  const mutationStarted=failureOperation==='stage'||intakeAttempted||backup||supervisorStopped||switched;
+  let affectedScope='REQUEST_ONLY';
+  if(switched||supervisorStopped)affectedScope='CONTROLLER_RUNTIME_AND_INTAKE';
+  else if(intakeAttempted)affectedScope='SHARED_INTAKE';
+  else if(failureOperation==='stage')affectedScope='INSTALL_STAGING';
+  else if(status==='RECOVERY_REQUIRED')affectedScope='CONTROLLER_STATE_UNVERIFIED';
+  return {failureOperation,mutationStarted:!!mutationStarted,affectedScope,
+    nextAction:nextAction??(status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST'
+      :status==='ROLLED_BACK'?'VERIFY_ROLLBACK_BEFORE_NEW_REQUEST'
+      :'RECONCILE_ACTUAL_INSTALL_AND_LEASE_NO_AUTOMATIC_RETRY')};
+}
+const PRE_INSTALL_OPERATIONS=new Set(['loadApprovedPackage','makePorts','readOwner',
+  'installedManifest','capturePrevalidationBaseline']);
+export function maintenanceCliFailureReport(error){
+  const preInstall=error?.failureStage==='PRE_INSTALL';
+  const code=typeof error?.code==='string'&&/^[A-Z][A-Z0-9_]{1,79}$/.test(error.code)
+    ?error.code:'UPDATE_ENVIRONMENT_ERROR';
+  return {status:'AUTOMATION_BLOCKED',code,failureStage:preInstall?'PRE_INSTALL':'UNVERIFIED',
+    phase:preInstall?'PRE_INSTALL':'UNVERIFIED',
+    failureOperation:preInstall&&PRE_INSTALL_OPERATIONS.has(error?.failureOperation)
+      ?error.failureOperation:'unverified',
+    // Null means the execution outcome cannot be proven, not that a mutation happened.
+    mutationStarted:preInstall?false:null,
+    affectedScope:preInstall?'REQUEST_ONLY':'CONTROLLER_STATE_UNVERIFIED',
+    nextAction:preInstall?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST'
+      :'RECONCILE_ACTUAL_INSTALL_AND_LEASE_NO_AUTOMATIC_RETRY',
+    actualControllerSha:null};
+}
 export function maintenanceFailureCode(error,operation='inspect'){
   const stage=OPERATIONS[operation]??'UNKNOWN_STAGE';
   const code=error?.code;
@@ -48,7 +80,11 @@ export async function applyApprovedUpdate(request, port) {
     // A previous attempt might have succeeded before a network/PC timeout.
     // Reconcile the actual install/process/ledger first; NEVER re-run blindly.
     const observed = await port.inspectAfterUncertain(old);
-    const recovered = {...old,status:'RECOVERY_REQUIRED',code:'INTERRUPTED_INSTALL_REQUIRES_RECONCILIATION',observed,lastPass:old.phase,firstFail:old.phase};
+    const recovered = {...old,status:'RECOVERY_REQUIRED',code:'INTERRUPTED_INSTALL_REQUIRES_RECONCILIATION',
+      observed,lastPass:old.phase,firstFail:old.phase,
+      failureOperation:'inspectAfterUncertain',mutationStarted:true,
+      affectedScope:'CONTROLLER_STATE_UNVERIFIED',
+      nextAction:'RECONCILE_EXISTING_STATE_NO_AUTOMATIC_RETRY'};
     await port.persist(recovered);
     return recovered;
   }
@@ -98,15 +134,17 @@ export async function applyApprovedUpdate(request, port) {
     return {...ledger};
   } catch(error) {
     const firstFail=ledger.phase,reason=maintenanceFailureCode(error,failureOperation);
-    ledger.failureOperation=failureOperation;
+    const details=(status,nextAction)=>failureDetails({status,failureOperation,
+      intakeAttempted,backup,supervisorStopped,switched,nextAction});
     // A network timeout while a postcheck may still be running is not evidence
     // of diagnostic failure. In particular, do not stop its active Runner.
     if((ledger.phase==='POSTCHECK_PENDING' && ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason)) ||
       (ledger.phase==='INTAKE_RESUMED' && reason.startsWith('BACKLOG_'))) {
+      const nextAction=reason==='BACKLOG_REPLAY_OUTCOME_UNKNOWN'
+        ?'RECONCILE_QUEUED_ISSUES_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY'
+        :'RECONCILE_POSTCHECK_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY';
       await record('RECOVERY_REQUIRED',{status:'RECOVERY_REQUIRED',code:reason,firstFail,
-        actualInstalledSha:null,intakePaused:paused,next:reason==='BACKLOG_REPLAY_OUTCOME_UNKNOWN'
-          ?'RECONCILE_QUEUED_ISSUES_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY'
-          :'RECONCILE_POSTCHECK_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY'});
+        actualInstalledSha:null,intakePaused:paused,next:nextAction,...details('RECOVERY_REQUIRED',nextAction)});
       return {...ledger};
     }
     // If code was only staged, the installed controller is untouched.
@@ -155,7 +193,7 @@ export async function applyApprovedUpdate(request, port) {
       const substate=safe&&prevalidationUntouched?'PREVALIDATION_UNTOUCHED_VERIFIED':undefined;
       await record(status,{status,code:reason,firstFail,substate,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
         workflowEnabled:workflowState==='active'?true:workflowState==='disabled_manually'?false:null,
-        observed});
+        observed,...details(status)});
       return {...ledger};
     }
     // Never restore from an unverified snapshot, even if an earlier copy succeeded.
@@ -176,7 +214,8 @@ export async function applyApprovedUpdate(request, port) {
     const status=restored&&backlogVerified?'ROLLED_BACK':'RECOVERY_REQUIRED';
     await record(status,{status,code:backlogVerified?reason:'BACKLOG_OR_RECOVERY_NOT_VERIFIED',firstFail,
       actualInstalledSha:restored?request.installedSha:null,intakePaused:paused,
-      recoverySha:restored?request.installedSha:null,protectedStateUnchanged:restored,workflowEnabled:restored&&!paused});
+      recoverySha:restored?request.installedSha:null,protectedStateUnchanged:restored,workflowEnabled:restored&&!paused,
+      ...details(status)});
     return {...ledger};
   }
 }
