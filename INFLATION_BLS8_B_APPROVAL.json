@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_INFLATION_BLS8_B_APPROVAL_V1",
+  "scope": "BLS8_PC_PRIVATE_ONCE",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "17e176454dcf62d5096981b4e2d7f2d112232605",
+  "writerHome": "E:\\ZGmini\\data\\pc-writer",
+  "outputRelative": "inflation-causal-r1/bls-ppi8.json",
+  "sourceFileHashes": {
+    "scripts/pc-writer/inflation-bls8-once.mjs": "3495bc11056d2fbd410122d878a4991e917f35782d542d4c10c91411e448f298",
+    "scripts/inflation-causal-bls8.mjs": "061524721b92aa72d3bf8e63baf96b3335a0a1822ad12449e8d0006e776f59c9"
+  },
+  "maxProviderRequests": 1,
+  "maxAutomaticRetries": 0,
+  "allowCoreWrites": false,
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowPublicRawData": false
+}
