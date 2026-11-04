@@ -30,6 +30,18 @@ const sameSet=(actual,expected)=>Array.isArray(actual)&&actual.length===expected
 export const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function stop(code){throw Object.assign(new Error(code),{code});}
 
+// Bounded diagnosis only. Never serialize source lines, patch text, or file contents.
+function patchContextStop(file,hunkOldStart,reason,matchCount){
+  const error=Object.assign(new Error('R17_B_PATCH_CONTEXT_STOP'),{
+    code:'R17_B_PATCH_CONTEXT_STOP',
+    diagnostic:{
+      file:file===OLD[0]?'local-cycle':'run-local',
+      hunkOldStart,reason,matchCount,
+    },
+  });
+  throw error;
+}
+
 export function validateEvent(event,env){
   if(env?.GITHUB_REPOSITORY!==REPO||env?.GITHUB_ACTOR!==OWNER||
     env?.GITHUB_EVENT_NAME!=='issues'||env?.GITHUB_EVENT_ACTION!=='opened'||
@@ -94,7 +106,8 @@ export function applyTwoFilePatch(rawPatch,originals){
     // apply --check handles that checkout convention; validate against LF
     // patch context without altering the source file's original EOL style.
     const hasCRLF=original.includes('\r\n');
-    if(hasCRLF&&/(^|[^\r])\n/.test(original))stop('R17_B_PATCH_CONTEXT_STOP');
+    if(hasCRLF&&/(^|[^\r])\n/.test(original))
+      patchContextStop(head[1],null,'MIXED_EOL',null);
     const eol=hasCRLF?'\r\n':'\n';
     const source=original.replace(/\r\n/g,'\n').split('\n');
     const output=[];
@@ -133,7 +146,9 @@ export function applyTwoFilePatch(rawPatch,originals){
           if(matchAt(k))matches.push(k);
           if(matches.length>1)break;
         }
-        if(matches.length!==1)stop('R17_B_PATCH_CONTEXT_STOP');
+        if(matches.length!==1)
+          patchContextStop(head[1],oldStart+1,
+            matches.length?'MULTIPLE_MATCH':'NO_MATCH',Math.min(matches.length,2));
         found=matches[0];
       }
       output.push(...source.slice(cursor,found),...after);
