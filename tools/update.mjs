@@ -225,10 +225,8 @@ export function acquireR54BSourceLease({leaseDir=R54_B_SOURCE_LEASE_DIR,
  return Object.freeze({status:'ACQUIRED',owned:true,owner,leaseDir,
   nonce,assertHeld:owned,release});
 }
-/** Pure, read-only gate: a synthetic proof may exercise tests but is never
- * accepted from a GitHub issue/manifest. The trusted Windows provider must
- * independently establish and hold this freeze until the B transaction ends.
- * No such provider is installed in this draft; r54-b-apply stays BLOCKED. */
+/** Legacy read-only proof fixture. This is not used to authorize the live
+ * B transaction, which performs its own fixed Windows checks before swaps. */
 export function r54BStartFreezeReady(proof={}){
  const {authorization,baseline,closedRoutes,sourceRows,observedAt}=proof??{};
  const norm=x=>typeof x==='string'?x.replace(/\//g,'\\').toLowerCase():'';
@@ -256,10 +254,10 @@ export function r54BStartFreezeReady(proof={}){
  return typeof observedAt==='string'&&Number.isFinite(Date.parse(observedAt))
   &&Math.abs(Date.now()-Date.parse(observedAt))<60000;
 }
-// The following Windows adapter is deliberately NOT wired to r54-b-apply.
-// It can only manage the one pinned R54 Task after a durable source snapshot.
-// There is no trustworthy protection yet for manual CMD or R78/R80 writers.
-// Never represent Task Disable as equivalent to a complete Writer freeze.
+// The Windows Task adapter is wired through runR54BApprovedOneShot and can
+// only manage one pinned R54 Task after durable backup. Task Disable itself
+// is not interpreted as a global Writer freeze; six-file CAS and a live
+// bounded process scan remain mandatory.
 export function inspectR54TaskXml(raw,actionBytes){
  need(Buffer.isBuffer(raw)&&raw.length>0&&raw.length<65536,
   'R54_TASK_XML_BYTES_INVALID');
@@ -298,8 +296,7 @@ export function inspectR54TaskXml(raw,actionBytes){
   definitionDigest:sha256(Buffer.from(canonical,'utf8'))};
 }
 
-/** Fixed-vector Windows schtasks port; shell=false, exactly one Task name.
- * This function is never invoked from the active R54 B command in this draft. */
+/** Fixed-vector Windows schtasks port; shell=false, exactly one Task name. */
 export function r54FixedSchtasks(args,{platform=process.platform,
  systemRoot=process.env.SystemRoot,spawnTask=spawnSync}={}){
  need(platform==='win32'&&typeof systemRoot==='string'
@@ -529,6 +526,335 @@ export function createR54WindowsTaskAdapter({requestId,authorization,
   return after;
  };
  return Object.freeze({inspect,saveBaseline,disable,restore});
+}
+
+const R54_B_SOURCE_COMMIT='99ddea206a5d07c029c85e980779bef712c8a4cc';
+const R54_B_CANDIDATE_REPOSITORY='ansqhd5774-Choi/zgmini';
+
+/** Downloads only the six approved pinned blobs, never a mutable branch or
+ * arbitrary Issue-provided path. No Writer/source or Task changes here. */
+export function fetchR54BPinnedCandidateBytes({readRemote=(rel)=>{
+ const route=`repos/${R54_B_CANDIDATE_REPOSITORY}/contents/${rel}?ref=${R54_B_SOURCE_COMMIT}`;
+ const out=execFileSync(gh,['api',route],{encoding:'utf8',windowsHide:true,
+  timeout:45000,maxBuffer:2*1024*1024});
+ const obj=JSON.parse(out);
+ need(obj?.type==='file'&&obj.encoding==='base64'&&
+  typeof obj.content==='string'&&obj.size>0&&obj.size<2*1024*1024,
+  'R54_B_CANDIDATE_SOURCE_RESPONSE_INVALID');
+ return Buffer.from(obj.content.replace(/\s/g,''),'base64');
+}}={}){
+ const blobs=new Map();
+ for(const spec of R54_B_SOURCE_FILES){
+  const value=readRemote(spec.path);
+  need(Buffer.isBuffer(value)&&sha256(value)===spec.next,
+   'R54_B_CANDIDATE_SOURCE_SHA_DRIFT');
+  blobs.set(spec.path,value);
+ }
+ return blobs;
+}
+
+/** Source-only B transaction primitive: connector absent while the five
+ * support files move. The host must first disable the one R54 Task, naturally
+ * drain its processes, and keep its own source lease during this function.
+ * Every backup is durable outside the Writer tree, and no blind retry occurs.
+ * Injectable specs/hooks are for isolated fixture tests, never Issue fields. */
+export async function applyR54BPinnedSixConnectorLast({installedRoot,
+ backupRoot,requestId,candidateBytes,verifyWindow,files=R54_B_SOURCE_FILES}={}){
+ need(/^pc-[a-z0-9-]{8,76}$/.test(requestId??'')&&
+  typeof installedRoot==='string'&&path.isAbsolute(installedRoot)&&
+  typeof backupRoot==='string'&&path.isAbsolute(backupRoot)&&
+  typeof verifyWindow==='function'&&candidateBytes instanceof Map&&
+  Array.isArray(files)&&files.length===6,
+  'R54_B_FIXED_SOURCE_ARGUMENTS');
+ const root=fs.realpathSync.native(installedRoot);
+ need(!fs.lstatSync(installedRoot).isSymbolicLink()&&
+  fs.statSync(root).isDirectory(),'R54_B_SOURCE_ROOT_REDIRECT');
+ const safeBackupParent=fs.realpathSync.native(path.dirname(backupRoot));
+ need(!safeBackupParent.toLowerCase().startsWith(root.toLowerCase()+path.sep.toLowerCase())
+  &&safeBackupParent.toLowerCase()!==root.toLowerCase(),
+  'R54_B_BACKUP_INSIDE_WRITER_DENIED');
+ const connector=files.find(x=>x.path==='scripts/pc-writer/theme-nine-r54-public-connect.mjs');
+ need(connector&&files.filter(x=>x.path===connector.path).length===1&&
+  new Set(files.map(x=>x.path)).size===6,'R54_B_CONNECTOR_FIXED_SCOPE');
+ const rows=files.map(spec=>{
+  need(/^[a-f0-9]{64}$/.test(spec.old)&&/^[a-f0-9]{64}$/.test(spec.next)&&
+   spec.path.split('/').every(x=>/^[\w.-]+$/.test(x)&&x!=='.'&&x!=='..'),
+   'R54_B_SOURCE_PATH_DENIED');
+  const file=path.join(root,...spec.path.split('/'));
+  let p=root;
+  for(const segment of spec.path.split('/')){
+   p=path.join(p,segment);
+   need(!fs.lstatSync(p).isSymbolicLink(),'R54_B_SOURCE_REPARSE_DENIED');
+  }
+  need(sha256(fs.readFileSync(file))===spec.old,
+   'R54_B_INSTALLED_SOURCE_SHA_DRIFT');
+  const bytes=candidateBytes.get(spec.path);
+  need(Buffer.isBuffer(bytes)&&sha256(bytes)===spec.next,
+   'R54_B_CANDIDATE_SOURCE_SHA_DRIFT');
+  const backup=path.join(backupRoot,...spec.path.split('/'));
+  const stage=file+'.R54_B_'+requestId+'.stage';
+  const parked=file+'.R54_B_'+requestId+'.old';
+  need(!fs.existsSync(stage)&&!fs.existsSync(parked)&&
+   !fs.existsSync(backup),'R54_B_SOURCE_PRIOR_ATTEMPT_RECONCILE');
+  return {...spec,file,backup,stage,parked,bytes};
+ });
+ need(!fs.existsSync(backupRoot),'R54_B_BACKUP_ALREADY_EXISTS');
+ fs.mkdirSync(backupRoot,{recursive:true});
+ const journal=path.join(backupRoot,'JOURNAL.jsonl');
+ const fd=fs.openSync(journal,'wx',0o600);
+ let seq=0,mutationStarted=false;
+ const record=(phase,rel=null)=>{
+  fs.writeSync(fd,JSON.stringify({schema:'R54_B_SIXFILE_CONNECTOR_LAST_V1',
+   requestId,seq:seq++,phase,file:rel})+'\n');fs.fsyncSync(fd);
+ };
+ const saveExact=(target,bytes)=>{
+  fs.mkdirSync(path.dirname(target),{recursive:true});
+  const fileFd=fs.openSync(target,'wx',0o600);
+  try{fs.writeFileSync(fileFd,bytes);fs.fsyncSync(fileFd);}
+  finally{fs.closeSync(fileFd);}
+  need(sha256(fs.readFileSync(target))===sha256(bytes),
+   'R54_B_DURABLE_BYTES_READBACK_FAILED');
+ };
+ const actual=row=>fs.existsSync(row.file)?sha256(fs.readFileSync(row.file)):null;
+ const allState=hashField=>rows.every(x=>actual(x)===x[hashField]);
+ try{
+  record('PREPARING');
+  for(const row of rows){
+   saveExact(row.backup,fs.readFileSync(row.file));
+   need(sha256(fs.readFileSync(row.backup))===row.old,'R54_B_BACKUP_SHA_DRIFT');
+   saveExact(row.stage,row.bytes);
+  }
+  record('STAGED_AND_BACKED_UP');
+  need(await verifyWindow()===true,'R54_B_SOURCE_COLLISION_BEFORE_SWAP');
+  need(allState('old'),'R54_B_CAS_ORIGINAL_CHANGED');
+  const move=async row=>{
+   need(await verifyWindow()===true,'R54_B_SOURCE_COLLISION_DURING_SWAP');
+   need(actual(row)===row.old,'R54_B_CAS_CHANGED_DURING_SWAP');
+   record('SWAP_ATTEMPT',row.path);
+   mutationStarted=true;
+   fs.renameSync(row.file,row.parked);
+   fs.renameSync(row.stage,row.file);
+   need(actual(row)===row.next,'R54_B_FILE_READBACK_FAILED');
+   record('FILE_APPLIED',row.path);
+  };
+  // Quarantine the connector BEFORE touching the five support files.
+  const c=rows.find(x=>x.path===connector.path);
+  record('CONNECTOR_QUARANTINE_ATTEMPT',c.path);
+  mutationStarted=true;
+  fs.renameSync(c.file,c.parked);
+  need(!fs.existsSync(c.file)&&sha256(fs.readFileSync(c.parked))===c.old,
+   'R54_B_CONNECTOR_QUARANTINE_UNCERTAIN');
+  record('CONNECTOR_QUARANTINED',c.path);
+  for(const row of rows.filter(x=>x!==c))await move(row);
+  need(await verifyWindow()===true,'R54_B_SOURCE_COLLISION_BEFORE_CONNECTOR');
+  record('CONNECTOR_INSTALL_ATTEMPT',c.path);
+  fs.renameSync(c.stage,c.file);
+  need(allState('next'),'R54_B_FINAL_SIX_SHA_INVALID');
+  record('SIX_SOURCE_VERIFIED');
+  // Original bytes remain safely in backupRoot; remove only exact own
+  // parked sidecars after all six new hashes have been verified.
+  for(const row of rows){
+   need(sha256(fs.readFileSync(row.parked))===row.old,
+    'R54_B_PARKED_ORIGINAL_SHA_DRIFT');
+   fs.unlinkSync(row.parked);
+  }
+  record('SUCCEEDED');
+  return {status:'SIX_FILE_SOURCE_APPLIED_SHA_VERIFIED',changed:6,
+   backupRoot,journal,sourceIntegrityVerified:true};
+ }catch(error){
+  if(mutationStarted){
+   try{record('ROLLBACK_STARTED');}catch{/* preserve original failure */}
+   let unknown=false;
+   // Hide the connector FIRST, so no new R54 reader can see mixed support
+   // files during reverse repair. Connector is restored LAST.
+   const c=rows.find(x=>x.path===connector.path);
+   try{
+    const state=actual(c);
+    if(state===c.next)fs.renameSync(c.file,
+     c.file+'.R54_B_'+requestId+'.rejected');
+    else if(state===c.old){
+     need(!fs.existsSync(c.parked),'R54_B_CONNECTOR_PARK_CONFLICT');
+     fs.renameSync(c.file,c.parked);
+    }else need(state===null,'R54_B_CONNECTOR_UNKNOWN_BYTES');
+    need(!fs.existsSync(c.file),'R54_B_CONNECTOR_STILL_EXPOSED');
+   }catch{unknown=true;}
+   for(const row of [...rows.filter(x=>x!==c)].reverse()){
+    try{
+     const current=actual(row);
+     if(current===row.old)continue;
+     if(current!==null&&current!==row.next){unknown=true;continue;}
+     need(sha256(fs.readFileSync(row.backup))===row.old,
+      'R54_B_BACKUP_SHA_DRIFT');
+     if(current===row.next)fs.renameSync(row.file,
+      row.file+'.R54_B_'+requestId+'.rejected');
+     fs.copyFileSync(row.backup,row.file,fs.constants.COPYFILE_EXCL);
+     if(actual(row)!==row.old)unknown=true;
+    }catch{unknown=true;}
+   }
+   try{
+    if(!unknown){
+     need(sha256(fs.readFileSync(c.backup))===c.old,
+      'R54_B_CONNECTOR_BACKUP_SHA_DRIFT');
+     fs.copyFileSync(c.backup,c.file,fs.constants.COPYFILE_EXCL);
+     need(actual(c)===c.old,'R54_B_CONNECTOR_ROLLBACK_SHA_DRIFT');
+    }
+   }catch{unknown=true;}
+   if(unknown||!allState('old')){
+    try{record('RECOVERY_REQUIRED');}catch{}
+    throw Object.assign(Error('R54_B_MIXED_SOURCE_RECOVERY_REQUIRED'),
+     {code:'R54_B_MIXED_SOURCE_RECOVERY_REQUIRED',cause:error});
+   }
+   try{record('ROLLED_BACK_VERIFIED');}
+   catch{throw Object.assign(Error('R54_B_JOURNAL_RECOVERY_REQUIRED'),
+    {code:'R54_B_JOURNAL_RECOVERY_REQUIRED',cause:error});}
+  }
+  throw error;
+ }finally{fs.closeSync(fd);}
+}
+
+/** Production-only fixed Windows process observation (no arbitrary command).
+ * The installed maintenance-ancestry.vbs uses WMI, not removed wmic.exe. */
+export function scanR54BActiveWindowsProcesses({platform=process.platform,
+ systemRoot=process.env.SystemRoot,run=spawnSync}={}){
+ need(platform==='win32'&&typeof systemRoot==='string'&&
+  /^[a-z]:\\windows$/i.test(systemRoot),'R54_B_WINDOWS_WMI_REQUIRED');
+ const output=run(path.win32.join(systemRoot,'System32','cscript.exe'),
+  ['//NoLogo',path.win32.join(maintenanceRoot,'tools','maintenance-ancestry.vbs'),
+   'R54_SCAN'],{shell:false,windowsHide:true,encoding:null,
+   timeout:20000,maxBuffer:4*1024*1024});
+ need(output?.status===0&&!output?.error&&!output?.signal&&
+  Buffer.isBuffer(output.stdout),'R54_B_WMI_READ_FAILED');
+ return parseR54BScopedWmiSnapshot(output.stdout);
+}
+
+/** Actual one-shot B host path. This function is called only after the normal
+ * trusted Issue+manifest admission in command('r54-b-apply'). No Issue can
+ * choose files, a Task, OS commands, commit, or retry count. */
+export async function runR54BApprovedOneShot({requestId,
+ taskFactory=createR54WindowsTaskAdapter,
+ sourceScan=scanR54BActiveWindowsProcesses,
+ loadCandidates=fetchR54BPinnedCandidateBytes,
+ acquireInstall=()=>acquireMaintenanceLock(maintenanceRoot,'controller-install'),
+ acquireWriter=()=>acquireR54BSourceLease(),
+ writerRoot=R54_B_WRITER_ROOT,
+ backupBase=path.join(maintenanceRoot,'ledger'),
+ pause=wait,
+ applyFiles=applyR54BPinnedSixConnectorLast,
+ inspectOriginal=inspectR54BOriginalSource,
+ readPinnedHashes=()=>R54_B_SOURCE_FILES.map(x=>sha256(fs.readFileSync(
+  path.join(writerRoot,...x.path.split('/')))))}={}){
+ need(/^pc-[a-z0-9-]{8,76}$/.test(requestId??''),
+  'R54_B_REQUEST_ID_INVALID');
+ // Read-only preparation occurs before any maintenance/Task/source write.
+ const backupRoot=path.join(backupBase,'R54_B_'+requestId);
+ let candidateBytes,installLease;
+ try{
+  candidateBytes=loadCandidates();
+  const baselineSource=inspectOriginal({root:writerRoot});
+  need(baselineSource.files.length===6,'R54_B_SIX_ORIGINALS_REQUIRED');
+  need(!fs.existsSync(backupRoot),'R54_B_PREVIOUS_ATTEMPT_RECONCILE');
+  installLease=acquireInstall();
+ }catch(error){
+  // Downloads and the six-source inventory are read-only. An unavailable
+  // private GitHub blob must not be escalated into an imaginary partial swap.
+  const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:
+   /^[A-Z0-9_]+$/.test(error?.message??'')?error.message:
+   'R54_B_READONLY_PREPARATION_FAILED';
+  return {status:'BLOCKED',code,taskWrites:0,writerFilesChanged:0,
+   controllerWrites:0,providerCalls:0,d1Writes:0,
+   protectedStateUnchanged:true,noAutomaticRetry:true};
+ }
+ let writerLease=null,task=null,taskBaseline=null,taskDisabled=false;
+ let taskDisableAttempted=false,taskRestoreAttempted=false;
+ let recover=false,writerChanged=false,restored=false;
+ try{
+  writerLease=acquireWriter();
+  need(writerLease.status==='ACQUIRED'&&writerLease.assertHeld(),
+   'R54_B_SOURCE_LEASE_BUSY');
+  task=taskFactory({requestId,authorization:{grade:'B',
+   scope:R54_TASK_EXCEPTION,taskName:R54_TASK_NAME,singleUse:true,
+   preserveTaskDefinition:true,allowForceTermination:false,
+   allowOtherTaskChanges:false}});
+  taskBaseline=task.saveBaseline();
+  need(taskBaseline.durableXmlBackupReadback===true&&
+   taskBaseline.name===R54_TASK_NAME,'R54_B_TASK_BASELINE_NOT_DURABLE');
+  taskDisableAttempted=true;
+  task.disable();taskDisabled=true;
+  const windowClear=()=>{
+   const current=task.inspect();
+   if(current.enabled!==false||current.definitionDigest!==taskBaseline.definitionDigest)
+    return false;
+   if(!writerLease.assertHeld())return false;
+   return sourceScan().active.length===0;
+  };
+  let drained=false;
+  for(let n=0;n<60;n++){
+   if(windowClear()){drained=true;break;}
+   if(n<59)await pause(1000);
+  }
+  need(drained,'R54_B_NATURAL_DRAIN_PENDING');
+  // The applier checks the entire six-file CAS again and checks the same
+  // live collision window before every rename, not merely a stale snapshot.
+  const result=await applyFiles({installedRoot:writerRoot,backupRoot,requestId,
+   candidateBytes,verifyWindow:windowClear});
+  need(result.status==='SIX_FILE_SOURCE_APPLIED_SHA_VERIFIED',
+   'R54_B_SIX_SOURCE_NOT_VERIFIED');
+  writerChanged=true;
+  const final=readPinnedHashes().every((x,i)=>x===R54_B_SOURCE_FILES[i].next);
+  need(final,'R54_B_SIX_FINAL_READBACK_DRIFT');
+  taskRestoreAttempted=true;
+  const after=task.restore({writerSixHashVerified:true});
+  need(after.enabled===taskBaseline.enabled&&
+   after.definitionDigest===taskBaseline.definitionDigest,
+   'R54_B_TASK_RESTORE_UNVERIFIED');
+  restored=true;
+  return {status:'SUCCEEDED',code:'R54_B_SIXFILE_TASK_RESTORED',
+   writerFilesChanged:6,taskChanged:taskBaseline.enabled,
+   taskDefinitionPreserved:true,taskRestored:true,
+   providerCalls:0,d1Writes:0,controllerWrites:0,
+   candidatesFromCommit:R54_B_SOURCE_COMMIT};
+ }catch(error){
+  // Restore the original Task only when the source is conclusively all old
+  // or all new. A mixed/unknown source must remain stopped for recovery.
+  let old=false,newer=false;
+  try{
+   const checks=readPinnedHashes();
+   old=checks.every((x,i)=>x===R54_B_SOURCE_FILES[i].old);
+   newer=checks.every((x,i)=>x===R54_B_SOURCE_FILES[i].next);
+  }catch{/* missing connector, partial rename, or inaccessible source */}
+  if(taskDisableAttempted&&!taskDisabled){
+   // An interrupted schtasks /Disable may have succeeded despite an error.
+   // Observe its actual state; do not retry or guess the Task mutation.
+   try{
+    const current=task.inspect();
+    if(current.enabled===taskBaseline.enabled&&
+     current.definitionDigest===taskBaseline.definitionDigest)restored=true;
+    else recover=true;
+   }catch{recover=true;}
+  }
+  if(taskDisabled&&taskBaseline&&(old||newer)&&
+   !restored&&!taskRestoreAttempted){
+   try{taskRestoreAttempted=true;task.restore({writerSixHashVerified:true});
+    restored=true;}
+   catch{recover=true;}
+  }
+  if(taskDisableAttempted&&!restored)recover=true;
+  const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:
+   /^[A-Z0-9_]+$/.test(error?.message??'')?error.message:
+   'R54_B_ONE_SHOT_EXECUTION_FAILED';
+  return {status:recover?'RECOVERY_REQUIRED':'BLOCKED',code,
+   writerFilesChanged:writerChanged?6:old?0:null,
+   taskRestored:restored,sourceOldVerified:old,sourceNewVerified:newer,
+   providerCalls:0,d1Writes:0,controllerWrites:0,
+   noAutomaticRetry:true};
+ }finally{
+  if(recover){
+   try{installLease.holdForRecovery();}catch{}
+  }else{
+   if(writerLease?.status==='ACQUIRED')writerLease.release();
+   installLease.release();
+  }
+ }
 }
 const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
 const r6FileIdentity=file=>{const s=fs.statSync(file,{bigint:true});
@@ -1958,10 +2284,17 @@ export async function command(args=process.argv.slice(2)) {
  const cmd=args[0],requestId=safeId(args[2]);
  if(cmd==='r54-b-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
-  // Existing independent install lock and original controller remain untouched.
-  // A Writer runtime reservation is NOT implemented in this source draft.
+  // Status is read-only and may include a prior one-shot backup/journal.
+  const backupRoot=path.join(maintenanceRoot,'ledger','R54_B_'+requestId);
+  let phase=null;
+  try{
+   const lines=fs.readFileSync(path.join(backupRoot,'JOURNAL.jsonl'),'utf8')
+    .trimEnd().split('\n');
+   phase=JSON.parse(lines.at(-1)).phase;
+  }catch{/* no source journal yet, or recovery read needed */}
   return {...readMaintenanceRecoveryStatus(requestId),
-   writerSourceApplyEnabled:false,code:'R54_B_TASK_START_RACE_UNPROTECTED'};
+   writerSourceApplyEnabled:true,r54BJournalPhase:phase,
+   r54BBackupExists:fs.existsSync(backupRoot)};
  }
  if(cmd==='r54-b-apply'){
   need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file',
@@ -1985,36 +2318,10 @@ export async function command(args=process.argv.slice(2)) {
   const raw=Buffer.from(pkg.manifestRawBase64??'','base64');
   validateR54BManifestRequest(approvedIssue,raw,{
    actor:pkg.actor,controlRepository,installedSha:installedManifest().installedSha});
-  // Only this fixed native Windows probe is callable. It supplies a durable
-  // *read-only observation*, not an operator freeze or a source-start gate.
-  // Probe errors are diagnostic, never permission to bypass the missing B
-  // transaction or to retry a Task/source mutation.
-  let observed=null,observationFailure=null;
-  try{observed=observeR54BWindowsReadOnly();}
-  catch(error){
-   observationFailure=/^[A-Z0-9_]+$/.test(error?.code??'')
-    ?error.code:'R54_B_FIXED_HOST_OBSERVATION_UNKNOWN';
-  }
-  // A Task disable and two stable process polls do not stop a later manual
-  // or indirect unguarded R54/R78/R80/R81 launch. This can only be replaced
-  // by a held, authenticated Win32 start-fence / full V3 CAS+recovery adapter.
-  // Never construct a proof from Issue, manifest or observed boolean fields.
-  const trustedRuntimeFreezeProof=null;
-  if(!r54BStartFreezeReady(trustedRuntimeFreezeProof)){
-  return {status:'BLOCKED',code:'R54_B_TASK_START_RACE_UNPROTECTED',
-   lastPass:'R54_B_ADMISSION_AND_MANIFEST_VERIFIED',
-   firstFail:'R54_B_TASK_START_RACE_UNPROTECTED',
-   v3NineSourceTransactionEnabled:false,
-   readOnlyObservation:observed?.status??'UNAVAILABLE',
-   readOnlyObservationError:observationFailure,
-   actualControllerSha:installedManifest().installedSha,installAttempted:false,
-   writerFilesChanged:0,controllerWrites:0,taskWrites:0,
-   providerCalls:0,d1Writes:0,protectedStateUnchanged:true};
-  }
-  // A future B revision must provide the complete trusted OS-backed
-  // disable/drain/CAS/rollback/restore transaction before enabling apply.
-  throw Object.assign(Error('R54_B_TRUSTED_RUNTIME_NOT_IMPLEMENTED'),
-   {code:'R54_B_TRUSTED_RUNTIME_NOT_IMPLEMENTED'});
+  // The validated B Issue is the only entry. No caller-specified source,
+  // Task, command, additional file, or retry parameter reaches the host.
+  const result=await runR54BApprovedOneShot({requestId});
+  return {...result,actualControllerSha:installedManifest().installedSha};
  }
  if(cmd==='host-r6-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
