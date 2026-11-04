@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-r17-b6c4b27f-9c11-49ed-acfb-25fbaf9ac5a0",
+  "status": "PASS",
+  "code": "R17_B_PREFLIGHT_PASS",
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "pcSourceWrites": 0,
+  "operationalConfigWrites": 0,
+  "taskWrites": 0,
+  "oldTargetSha256": {
+    "scripts/pc-writer/local-cycle.mjs": "185f93e27f9be28362417402b99da07431699ed4f96a0ca37dde29982c675be7",
+    "scripts/pc-writer/run-local.mjs": "922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a"
+  },
+  "verifiedImportFiles": 163,
+  "runId": "41913469543"
+}
