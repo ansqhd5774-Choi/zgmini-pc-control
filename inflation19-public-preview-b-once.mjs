@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 export const REPO='ansqhd5774-Choi/zgmini-pc-control';
-export const SOURCE_SHA='d8c530804a88c731b4b081a9d774b5a744f4e32f';
+export const SOURCE_SHA='480ff36b9431d563b9836f44f093c3f606b7ddf7';
 export const TITLE='pc-inflation19-public-preview-readonly-once';
 export const SCHEMA='ZGMINI_INFLATION_19_PUBLIC_PREVIEW_V1';
 export const APPROVAL='INFLATION19_PUBLIC_PREVIEW_B_APPROVAL.json';
@@ -14,7 +14,7 @@ export const WRITER=String.raw`E:\ZGmini\data\pc-writer`;
 export const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
 export const ENTRY='scripts/pc-writer/inflation-causal-public-preview-r1.mjs';
 export const HASHES=Object.freeze({
- [ENTRY]:'fbb00dd59769d30eb800f64fb7c663a036384657d719c2317c0a11782f48a3dd',
+ [ENTRY]:'bc458372f86faf061306ae50e2bc806534f80e4458e45dc7901a3e09cfab86cc',
  'lib/inflation-causal-public-catalog.mjs':'db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5',
  'worker/inflation-causal-public-r1.mjs':'86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f',
 });
