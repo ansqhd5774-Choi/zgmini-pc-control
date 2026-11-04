@@ -38,10 +38,14 @@ test('fixed request only accepts owner, one-shot issue and exact schema',()=>{
  assert.throws(()=>validateRequest({...issue,issue:{...issue.issue,
   body:JSON.stringify(badBody)}},env),/NOV30_PILOT_REQUEST_CONTRACT_STOP/);
 });
-test('draft approval is deliberately execution blocked',()=>{
- assert.equal(approval.approvalState,'DRAFT_PENDING_B_EXECUTION_APPROVAL');
- assert.throws(()=>validateApproval(approval),/NOV30_PILOT_APPROVAL_SCOPE_STOP/);
- const active={...approval,approvalState:'APPROVED_B_ONE_SHOT'};
+test('fixed B approval is narrowly valid and rejects any enlarged effect',()=>{
+ assert.equal(approval.approvalState,'APPROVED_B_ONE_SHOT');
+ assert.equal(validateApproval(approval),true);
+ const active={...approval};
+ assert.throws(()=>validateApproval({...active,approvalState:'DRAFT_PENDING_B_EXECUTION_APPROVAL'}),
+  /NOV30_PILOT_APPROVAL_SCOPE_STOP/);
+ assert.throws(()=>validateApproval({...active,approvalEffect:'ALLOW_D1'}),
+  /NOV30_PILOT_APPROVAL_SCOPE_STOP/);
  assert.equal(validateApproval(active),true);
  assert.throws(()=>validateApproval({...active,maxProviderRequests:4}),
   /NOV30_PILOT_APPROVAL_SCOPE_STOP/);
