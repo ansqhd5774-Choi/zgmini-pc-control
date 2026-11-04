@@ -6,7 +6,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
  need(Number.isInteger(seat)&&seat>=1&&seat<=policy.seats,'SEAT_NOT_ALLOWED');need(/^\d{1,20}$/.test(String(runId)),'RUN_ID');
  const workspaceId=`run-${runId}-${attempt}-seat-${seat}`,workspace=path.join(root,'jobs',workspaceId);fs.mkdirSync(workspace,{recursive:true});
  const start=Date.now(),report={schema:'ZGMINI_PC_RESULT_V1',jobId:workspaceId,requestId:typeof raw?.requestId==='string'&&/^[a-z0-9-]{8,80}$/.test(raw.requestId)?raw.requestId:null,startedAt:new Date(start).toISOString(),controlRepository:policy.controlRepository,controlSourceSha:host.controllerSourceSha,sourceRepository:policy.sourceRepository,requestedSourceSha:/^[a-f0-9]{40}$/.test(raw?.sourceSha??'')?raw.sourceSha:null,sourceBranch:typeof raw?.sourceBranch==='string'&&/^[a-zA-Z0-9_./-]{1,160}$/.test(raw.sourceBranch)?raw.sourceBranch:null,operation:Object.hasOwn(policy.operations,raw?.operation)?raw.operation:'NOT_ALLOWED',seat,status:'BLOCKED',code:'PREFLIGHT_NOT_COMPLETED',lastPass:'REQUEST_RECEIVED',firstFail:null,operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,controlWorkspaceWrites:true};
- let releaseSeat,releaseRequest,releaseResource,ledger,before,uncertainChild=false;
+ let releaseSeat,releaseRequest,releaseResource,releaseMemoryWait,ledger,before,uncertainChild=false;
  try{
   const request=validateRequest(raw,policy);report.chatId=request.chatId;const payloadSha=digest(JSON.stringify(request));
   const ledgerRoot=path.join(root,'ledger');fs.mkdirSync(ledgerRoot,{recursive:true});ledger=path.join(ledgerRoot,request.requestId+'.json');
@@ -15,11 +15,15 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   const minimumFreeMiB=memoryAdmissionMinimum(policy,request.operation);
   if(minimumFreeMiB!==null){
    report.memoryAdmission=await waitForMemoryAdmission({minimumFreeMiB,
+    onWaitBegin:()=>{try{releaseMemoryWait=exclusive(path.join(root,'leases'),'heavy-memory-wait');}
+     catch(error){if(error.code==='LEASE_BUSY')throw Object.assign(new Error('MEMORY_WAIT_ALREADY_ACTIVE'),{code:'MEMORY_WAIT_ALREADY_ACTIVE'});throw error;}},
     ...(fixture?{timeoutMs:fixtureMemoryWaitMs,intervalMs:fixtureMemoryPollMs,
      ...(typeof fixtureFreeMiB==='function'?{readFreeMiB:fixtureFreeMiB}:{})}:{})});
+   releaseMemoryWait?.();releaseMemoryWait=undefined;
    if(!report.memoryAdmission.admitted){
-    Object.assign(report,{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',lastPass:'MEMORY_ADMISSION_SAMPLED',firstFail:'MEMORY_ADMISSION',
-     next:'MEMORY_WAIT_EXPIRED_NEW_REQUEST_ONLY',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY'});
+    Object.assign(report,{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',phase:'PREVALIDATION',failureOperation:'MEMORY_ADMISSION',
+     lastPass:'MEMORY_ADMISSION_SAMPLED',firstFail:'MEMORY_ADMISSION',next:'MEMORY_WAIT_EXPIRED_NEW_REQUEST_ONLY',
+     nextAction:'WAIT_FOR_MEMORY_THEN_NEW_REQUEST',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY'});
     report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;
     writeJson(ledger,{payloadSha,report});return finalize();
    }
@@ -49,8 +53,10 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??report.pcOperationalApprovedSha;
   report.next??=report.status==='PASS'?'READ_RESULT_NO_REPEAT':report.status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST':'INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY';
   report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
- }catch(error){report.status='BLOCKED';report.code=errorCode(error);report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';}
- finally{if(uncertainChild){report.resourceLeasesRetained=true;const marker=path.join(workspace,'RECOVERY_REQUIRED.json');writeJson(marker,{requestId:report.requestId,workerPid:report.workerPid,reason:'WORKER_TERMINATION_UNVERIFIED'});}else{releaseResource?.();releaseSeat?.();releaseRequest?.();}}
+ }catch(error){report.status='BLOCKED';report.code=errorCode(error);report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';
+  if(report.code==='MEMORY_WAIT_ALREADY_ACTIVE')Object.assign(report,{phase:'PREVALIDATION',failureOperation:'MEMORY_WAIT_LEASE_ACQUIRE',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY',nextAction:'WAIT_FOR_EXISTING_MEMORY_WAITER_NO_LOCK_DELETION',firstFail:'MEMORY_ADMISSION'});
+ }
+ finally{if(uncertainChild){report.resourceLeasesRetained=true;const marker=path.join(workspace,'RECOVERY_REQUIRED.json');writeJson(marker,{requestId:report.requestId,workerPid:report.workerPid,reason:'WORKER_TERMINATION_UNVERIFIED'});}else{releaseMemoryWait?.();releaseResource?.();releaseSeat?.();releaseRequest?.();}}
  return finalize();
  function finalize(){report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;const file=path.join(workspace,'RESULT.json');writeJson(file,report);fs.writeFileSync(path.join(workspace,'RESULT.txt'),Object.entries(report).filter(([k])=>k!=='result'&&k!=='prior').map(([k,v])=>`${k}=${typeof v==='object'?JSON.stringify(v):v}`).join('\r\n')+'\r\n');return {report,file,workspace};}
 }
