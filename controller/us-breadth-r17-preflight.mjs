@@ -12,6 +12,7 @@ export const R17_ROOT='E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release'
 export const R17_APPROVED='a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e';
 export const R17_PATCH_SHA='7db5c51e4b8c99ec3254af4dbf1c63965ae27035c783ab8775805a10589da401';
 const R17_PATCH_TEXT="diff --git a/scripts/pc-writer/local-cycle.mjs b/scripts/pc-writer/local-cycle.mjs\n--- a/scripts/pc-writer/local-cycle.mjs\n+++ b/scripts/pc-writer/local-cycle.mjs\n@@ -23,6 +23,29 @@ if(fs.existsSync(file)){\n fs.writeFileSync(file,JSON.stringify({pid:process.pid,at:Date.now()}),{flag:'wx'});\n try{\n  const lane=process.argv.includes('--korea')?'korea':'core';\n+ let usProvisional=null;\n+ let usProvisionalEarlyPublication=null;\n+ if(lane==='core'){\n+  // The existing Core task runs every five minutes; collect the completed\n+  // 15-minute IEX slot before potentially long general collection/publication.\n+  // The R17 collector owns its slot deduplication and never touches R1 history.\n+  const provisional=spawnSync(process.execPath,[path.join(here,'us-breadth-provisional-cycle.mjs')],\n+   {windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:5*60000});\n+  try{usProvisional=JSON.parse(provisional.stdout.toString());}\n+  catch{usProvisional={status:'EXECUTION_NOT_VERIFIED',exit:provisional.status??null};}\n+  // The existing Writer publishes the completed IEX slot immediately, before\n+  // potentially long Core collection/projections. Both paths remain inside\n+  // the existing Core lock and registered Task; no new scheduler is created.\n+  if(process.argv.includes('--publish')&&\n+    ['LOCAL_READY','ALREADY_ATTEMPTED_THIS_SLOT','FAILED_PREVIOUS_PROVISIONAL_PRESERVED'].includes(usProvisional.status)){\n+   const early=spawnSync(process.execPath,[path.join(here,'run-local.mjs'),'--publish','--us-provisional-only'],\n+    {windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:2*60000});\n+   try{usProvisionalEarlyPublication=JSON.parse(early.stdout.toString());}\n+   catch{usProvisionalEarlyPublication={status:'EXECUTION_NOT_VERIFIED'};}\n+   usProvisionalEarlyPublication.exit=early.status??null;\n+   if(early.error)usProvisionalEarlyPublication.error=early.error.code??'EXECUTION_FAILED';\n+  }\n+ }\n  const collection=spawnSync(process.execPath,[path.join(here,'collect-local.mjs'),...(lane==='korea'?['--korea']:[])],{windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:30*60000});\n  try{updateDataAlert(base,{key:'collection',failed:collection.status!==0});}catch{console.warn('LOCAL_DATA_ALERT_RECORD_FAILED');}\n  // A provider failure retains stored good data; publication still reads local storage.\n@@ -185,7 +208,7 @@ try{\n   sectors:sectorFearGreedR3Report?.sectors??null,\n   error:sectorFearGreedR3Report?.error??(sectorFearGreedR3?.error?.code??null),\n  }:{nonBlocking:true,status:'SKIPPED_KOREA_LANE'};\n- const report={at:new Date().toISOString(),lane,collectionExit:collection.status,collectionStatus:collectionReport?.status??null,supplyR10,alpacaIncremental,sp500Shadow,sectorFearGreed,researchBreadthR10V9Shadow,publicationExit:publication.status,publishRequested,publishSkipped,publicationPolicy,progressive,researchProspective,researchFundFlowProspective,researchBreadthProspective,researchEarningsR5OfficialRefresh,researchEarningsRiskProvisionalR23,researchEarningsR5Prospective,status:publication.status===0?(publicationPolicy.collectionDegraded?'COMPLETE_WITH_COLLECTION_GAPS':'COMPLETE'):'PUBLICATION_NOT_VERIFIED'};\n+ const report={at:new Date().toISOString(),lane,collectionExit:collection.status,collectionStatus:collectionReport?.status??null,supplyR10,alpacaIncremental,sp500Shadow,usProvisional,usProvisionalEarlyPublication,sectorFearGreed,researchBreadthR10V9Shadow,publicationExit:publication.status,publishRequested,publishSkipped,publicationPolicy,progressive,researchProspective,researchFundFlowProspective,researchBreadthProspective,researchEarningsR5OfficialRefresh,researchEarningsRiskProvisionalR23,researchEarningsR5Prospective,status:publication.status===0?(publicationPolicy.collectionDegraded?'COMPLETE_WITH_COLLECTION_GAPS':'COMPLETE'):'PUBLICATION_NOT_VERIFIED'};\n  save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));\n  if(publishRequested)try{updateDataAlert(base,{key:'publication',failed:publication.status!==0});}catch{console.warn('LOCAL_DATA_ALERT_RECORD_FAILED');}\n  if(publication.status!==0)process.exitCode=1;\ndiff --git a/scripts/pc-writer/run-local.mjs b/scripts/pc-writer/run-local.mjs\n--- a/scripts/pc-writer/run-local.mjs\n+++ b/scripts/pc-writer/run-local.mjs\n@@ -38,6 +38,37 @@ if(publish){\n  if(blocked)throw Error(blocked.status);\n  execFileSync('git',['diff','--quiet','HEAD','--','worker','lib','scripts/pc-writer'],{cwd:root,stdio:'pipe',windowsHide:true});\n }\n+// A bounded, provisional-only invocation of the already approved Writer.\n+// It shares the normal source/config/clean checks above, but does not wait for\n+// Core SQLite projections, market publication, or the shared market lease.\n+// Only the independent IEX D1 key may be written; the normal Writer ledger is\n+// deliberately left to the full run-local invocation.\n+if(process.argv.includes('--us-provisional-only')){\n+ const report={at:new Date().toISOString(),source,lane:'US_IEX_PROVISIONAL_EARLY',status:'NOT_ATTEMPTED'};\n+ try{\n+  if(!publish)throw Error('US_PROVISIONAL_PUBLISH_FLAG_REQUIRED');\n+  const {prepareUsProvisional,publishUsProvisional}=await import('./us-breadth-provisional-publication.mjs');\n+  const prepared=prepareUsProvisional(base);\n+  report.inputStatus=prepared.status;\n+  if(prepared.prepared){\n+   const provisionalRemote=client(config,()=>credential(root),{onDiagnostic:diagnostic=>\n+    appendD1Diagnostic(base,{runAt:report.at,source},diagnostic)});\n+   report.publication=await publishUsProvisional(provisionalRemote,config.core,prepared);\n+   report.status=['VERIFIED','ALREADY_VERIFIED'].includes(report.publication.status)?'VERIFIED':report.publication.status;\n+   report.slotEndUtc=prepared.body.slotEndUtc;\n+   report.observedCount=prepared.body.observedCount;\n+   report.missingCount=prepared.body.missingCount;\n+  }else report.status='SKIPPED_NOT_READY';\n+ }catch(error){\n+  report.status='FAILED';\n+  report.error=/^[A-Z][A-Z0-9_]{1,100}$/.test(error?.message??'')?error.message:'US_PROVISIONAL_EARLY_PUBLICATION_FAILED';\n+  process.exitCode=1;\n+ }\n+ report.completedAt=new Date().toISOString();\n+ save(path.join(base,'local-us-breadth-provisional-early-last-run.json'),report);\n+ fs.writeSync(1,JSON.stringify(report)+'\\n');\n+ process.exit(process.exitCode??0);\n+}\n const seed=read(path.join(base,'local-seed-progress.json'));\n if(!Object.keys(seed).length||Object.values(seed).some(x=>!x.complete))throw Error('LOCAL_SEED_INCOMPLETE');\n const core=localDatabase(path.join(base,'storage','core.sqlite'));\n@@ -72,6 +103,11 @@ try{\n   const {prepareUsBreadth}=await import('./market-breadth-us-r1.mjs');\n   report.usBreadth=await prepareUsBreadth(core,{now:new Date(now)});\n  });\n+ // Separate IEX provisional sidecar. The calculation lane never calls Alpaca.\n+ await attemptOutput(report,'us-breadth-provisional-calculation',async()=>{\n+  const {prepareUsProvisional}=await import('./us-breadth-provisional-publication.mjs');\n+  report.usProvisional=prepareUsProvisional(base,{now});\n+ });\n  const marketReady=await attemptOutput(report,'market',async()=>{\n  const body=await calculateMarket(root,core,now);\n  // Reuse the published daily score history already read for the overall chart.\n@@ -228,6 +264,11 @@ try{\n    report.usBreadth.publication=await publishUsBreadth(remote,config.core,report.usBreadth,{now});\n   });\n   else report.usBreadth={...(report.usBreadth??{status:'UNAVAILABLE'}),publication:'SKIPPED_NOT_READY'};\n+  if(report.usProvisional?.prepared)await attemptOutput(report,'us-breadth-provisional-publication',async()=>{\n+   const {publishUsProvisional}=await import('./us-breadth-provisional-publication.mjs');\n+   report.usProvisional.publication=await publishUsProvisional(remote,config.core,report.usProvisional,{now});\n+  });\n+  else report.usProvisional={...(report.usProvisional??{status:'UNAVAILABLE'}),publication:'SKIPPED_NOT_READY'};\n   // Explicit allowlist: publish display outputs only, never provider input/history rows.\n   for(const {id,status} of report.projections){\n    if(status!=='LOCAL_READY')continue;\n";
+export {R17_PATCH_TEXT}; // Test fixture only; never included in PC diagnostic output.
 export const R17_BASE_FILES=Object.freeze({
  'scripts/pc-writer/local-cycle.mjs':'9c3fc7788907a2f8756b7ff82c372124a2e26253557b7db8a93eb6c8428eadee',
  'scripts/pc-writer/run-local.mjs':'4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502',
@@ -70,11 +71,61 @@ export function diagnoseR17PatchContexts(patchText,sourceByPath){
 // identity and immutable file hashes have been established. Never print a
 // suspicious excerpt partially: one suspect line suppresses all code output.
 const R17_CONTEXT_TARGETS=Object.freeze([
- {file:'scripts/pc-writer/local-cycle.mjs',hunk:'185',anchor:/^\s*const report=\{at:new Date\(\)\.toISOString\(\),lane,collectionExit:/,before:1,after:1},
- {file:'scripts/pc-writer/run-local.mjs',hunk:'72',anchor:/^\s*report\.usBreadth\s*=\s*await prepareUsBreadth\(/,before:1,after:2},
- {file:'scripts/pc-writer/run-local.mjs',hunk:'228',anchor:/^\s*report\.usBreadth\.publication\s*=\s*await publishUsBreadth\(/,before:1,after:2},
+ {file:'scripts/pc-writer/local-cycle.mjs',hunk:'185',anchors:[/^\s*const\s+report\s*=/],focus:/\bconst\s+report\s*=/,before:1,after:1},
+ {file:'scripts/pc-writer/run-local.mjs',hunk:'72',anchors:[/^\s*const\s+marketReady\s*=/],focus:/\breport\.usBreadth\s*=/,before:1,after:2},
+ {file:'scripts/pc-writer/run-local.mjs',hunk:'228',anchors:[/^\s*\/\/\s*Explicit allowlist\b/,/^\s*for\s*\(\s*const\s*\{\s*id\s*,\s*status\s*\}\s*of\s*report\.projections/,/^\s*if\s*\(\s*report\.usBreadth/,/^\s*report\.usBreadth\.publication\s*=/],focus:/\breport\.usBreadth\.publication\s*=/,before:1,after:2},
 ]);
 const SENSITIVE_R17_CONTEXT=/(?:secret|password|passwd|token|authorization|oauth|bearer|credential|api[_-]?key|private[_-]?key|access[_-]?key|session[_-]?id|account[_-]?id|client[_-]?secret|process\.env|sk-|ghp_|github_pat_|AKIA[0-9A-Z]{12})|https?:\/\/|\bwww\.|(?:\.env\b)|[\u0000-\u0008\u000b\u000c\u000e-\u001f]/i;
+const R17_CONTEXT_MAX_DRIFT=180;
+function locateR17OldHunk(target){
+ const section=R17_PATCH_TEXT.split(/(?=^diff --git )/m).find(x=>
+  x.startsWith(`diff --git a/${target.file} `));
+ const hunk=section?.split(/(?=^@@ )/m).slice(1).find(x=>
+  x.startsWith(`@@ -${target.hunk},`)||x.startsWith(`@@ -${target.hunk} `));
+ if(!hunk)return null;
+ const parts=hunk.split('\n'),start=Number(parts[0].match(/^@@\s+-(\d+)/)?.[1]);
+ const old=parts.slice(1).filter(line=>line.startsWith(' ')||line.startsWith('-'))
+  .map(line=>({text:line.slice(1).trimEnd(),kind:line[0]}));
+ return Number.isInteger(start)&&old.length>=2?{expected:start-1,old}:null;
+}
+function locateR17Fuzzy(lines,target){
+ const hunk=locateR17OldHunk(target);
+ if(!hunk)return null;
+ const candidates=[];
+ const from=Math.max(0,hunk.expected-R17_CONTEXT_MAX_DRIFT);
+ const to=Math.min(lines.length-hunk.old.length,hunk.expected+R17_CONTEXT_MAX_DRIFT);
+ for(let at=from;at<=to;at++){
+  const matched=[];
+  for(let i=0;i<hunk.old.length;i++){
+   const entry=hunk.old[i];
+   if(entry.text.trim().length>=2&&entry.text===lines[at+i].trimEnd())matched.push(i);
+  }
+  if(matched.length>=2&&matched.some(i=>hunk.old[i].text.trim().length>=12))
+   candidates.push({at,count:matched.length,distance:Math.abs(at-hunk.expected)});
+ }
+ if(!candidates.length)return null;
+ const max=Math.max(...candidates.map(x=>x.count));
+ const maximal=candidates.filter(x=>x.count===max);
+ const nearest=Math.min(...maximal.map(x=>x.distance));
+ const final=maximal.filter(x=>x.distance===nearest);
+ if(final.length!==1)return null;
+ const offset=hunk.old.findIndex(x=>target.focus.test(x.text));
+ const focus=offset>=0?offset:Math.floor(hunk.old.length/2);
+ return {index:final[0].at+focus,method:'FUZZY_RELATIVE_LINES',matched:final[0].count};
+}
+function locateR17Structural(lines,target){
+ const old=locateR17OldHunk(target);
+ if(!old)return null;
+ for(const anchor of target.anchors){
+  const candidates=[];
+  for(let i=0;i<lines.length;i++)
+   if(anchor.test(lines[i])&&Math.abs(i-old.expected)<=R17_CONTEXT_MAX_DRIFT)
+    candidates.push(i);
+  if(candidates.length===1)return {index:candidates[0],method:'STRUCTURAL_ANCHOR',matched:0};
+  if(candidates.length>1)return null;
+ }
+ return null;
+}
 export function verifiedR17Source(e){
  return e?.head===R17_APPROVED&&e?.dirty===false&&e?.patchHash===R17_PATCH_SHA&&
   Object.entries(R17_BASE_FILES).every(([name,sha])=>e?.hashes?.[name]===sha)&&
@@ -88,10 +139,9 @@ export function diagnoseR17RestrictedContexts(sourceByPath,evidence){
   if(typeof source!=='string'||source.length>1048576)
    return {status:'CONTEXT_SOURCE_UNAVAILABLE',excerpts:[]};
   const lines=source.replace(/\r\n/g,'\n').split('\n');
-  const matches=[];
-  for(let i=0;i<lines.length;i++)if(target.anchor.test(lines[i]))matches.push(i);
-  if(matches.length!==1)return {status:'CONTEXT_ANCHOR_NOT_UNIQUE',excerpts:[]};
-  const index=matches[0];
+  const location=locateR17Fuzzy(lines,target)??locateR17Structural(lines,target);
+  if(!location)return {status:'CONTEXT_LOCATION_UNVERIFIED',failedHunk:target.hunk,excerpts:[]};
+  const index=location.index;
   const from=index-target.before,to=index+target.after+1;
   if(from<0||to>lines.length)return {status:'CONTEXT_OUT_OF_BOUNDS',excerpts:[]};
   const selected=lines.slice(from,to);
@@ -100,7 +150,8 @@ export function diagnoseR17RestrictedContexts(sourceByPath,evidence){
   if(SENSITIVE_R17_CONTEXT.test(excerpt))return {status:'SENSITIVE_CONTEXT_SUPPRESSED',excerpts:[]};
   if(excerpt.length>800)return {status:'CONTEXT_TOO_LONG',excerpts:[]};
   excerpts.push({file:target.file.endsWith('local-cycle.mjs')?'cycle':'publication',
-   hunk:target.hunk,startLine:from+1,lineCount:selected.length,text:excerpt});
+   hunk:target.hunk,startLine:from+1,lineCount:selected.length,
+   method:location.method,matchedLines:location.matched,text:excerpt});
  }
  const result={status:'THREE_EXCERPTS_READONLY',excerpts};
  if(JSON.stringify(result).length>2500)return {status:'CONTEXT_TOTAL_TOO_LONG',excerpts:[]};
@@ -115,6 +166,24 @@ const R17_DISPATCH_ALLOWLIST=Object.freeze([
  {name:'quota-runner.mjs',scope:'source',path:'scripts/pc-writer/quota-runner.mjs',sha256:null},
  {name:'ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs',scope:'data',path:'data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs',sha256:'4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1'},
 ]);
+function boundedR17NodeBasenames(second){
+ if(SENSITIVE_R17_CONTEXT.test(second))return [];
+ const names=new Set();
+ for(const line of second.split(/\r?\n/)){
+  if(/^\s*(?:'|rem\s)/i.test(line)||!(/\bnode(?:\.exe)?\b/i.test(line)))continue;
+  if(/[%$<>|&^`]/.test(line))return [];
+  const matches=[...line.matchAll(/(?:^|[\\/\s"'])(([A-Za-z][A-Za-z0-9_.-]{0,79})\.(?:mjs|cmd))\b/gi)];
+  if(matches.length>2)return [];
+  for(const m of matches){
+   const name=m[1];
+   if(!/^[a-z][a-z0-9_.-]{0,79}\.(?:mjs|cmd)$/i.test(name)||
+      SENSITIVE_R17_CONTEXT.test(name))return [];
+   names.add(name);
+   if(names.size>2)return [];
+  }
+ }
+ return [...names].sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+}
 export function diagnoseR17SingleDispatcher({action,launchers,evidence,readAllowed}={}){
  const blocked={status:'DISPATCH_UNVERIFIED',singleHop:null};
  if(!verifiedR17Source(evidence)||typeof readAllowed!=='function')return blocked;
@@ -125,11 +194,15 @@ export function diagnoseR17SingleDispatcher({action,launchers,evidence,readAllow
  if(typeof second!=='string'||second.length>65536)return blocked;
  const lines=second.split(/\r?\n/).filter(line=>
   !/^\s*(?:'|rem\s)/i.test(line)&&/\bnode(?:\.exe)?\b/i.test(line));
+ const nodeCandidates=boundedR17NodeBasenames(second);
  const found=R17_DISPATCH_ALLOWLIST.filter(item=>{
   const filename=new RegExp(`(?:^|[^A-Za-z0-9_.-])${item.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?![A-Za-z0-9_.-])`,'i');
   return lines.some(line=>filename.test(line));
  });
- if(found.length!==1)return {status:'DISPATCH_TARGET_NOT_UNIQUE',singleHop:null};
+ if(SENSITIVE_R17_CONTEXT.test(second)||lines.some(line=>/[%$<>|&^`]/.test(line)))
+  return {status:'DISPATCH_UNSAFE_TEXT',singleHop:null,nodeCandidates:[]};
+ if(found.length!==1)return {status:found.length?'DISPATCH_TARGET_NOT_UNIQUE':'DISPATCH_TARGET_NOT_ALLOWLISTED',
+  singleHop:null,nodeCandidates};
  const item=found[0];
  try{
   const bytes=readAllowed(item.scope,item.path);
