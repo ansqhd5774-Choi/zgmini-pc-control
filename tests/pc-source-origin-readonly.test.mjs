@@ -166,12 +166,26 @@ test('invalid or missing config SHA never selects a candidate',()=>{
  assert.doesNotMatch(JSON.stringify(result),/SECRET|not_a_sha/);
 });
 
-test('excess directory count marks inventory truncated and prevents selection',()=>{
- const f=fixture();f.repos.push(f.addRepo('A',SHA_A));
+test('more than 64 unrelated folders do not hide the approved checkout',()=>{
+ const f=fixture();f.repos.push(f.addRepo('zgmini-approved',SHA_A));
  for(let i=0;i<65;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+i));
  const result=f.inspect();
+ assert.equal(result.inventoryTruncated,false);
+ assert.equal(result.candidateCount,1);
+ assert.equal(result.configMatchingCandidate,'projects/zgmini-approved');
+ assert.equal(result.operationalWrites,0);
+});
+
+test('candidate traversal remains bounded and incomplete inventories are not promoted',()=>{
+ const f=fixture();f.repos.push(f.addRepo('A',SHA_A));
+ for(let i=0;i<150;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+i));
+ const result=f.inspect();
  assert.equal(result.inventoryTruncated,true);
+ assert.ok(result.candidateCount<=130);
+ assert.equal(result.configMatchCount,1);
  assert.equal(result.configMatchingCandidate,null);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.operationalWrites,0);
 });
 
 test('git read failure yields candidate without trusted HEAD',()=>{
