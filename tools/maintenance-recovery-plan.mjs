@@ -30,7 +30,7 @@ export function makeRecoveryPlan({requestId,sourceSha,inspection,
     inspection?.status==='ABORT_UNTOUCHED_ELIGIBLE'&&inspection?.code==='PREVALIDATION_ABORT_VERIFIED'&&
     inspection?.operationalWrites===0&&
     Object.keys(inspection?.checks??{}).length===REQUIRED_CHECKS.length&&
-    REQUIRED_CHECKS.every(key=>inspection.checks[key]===true),
+    REQUIRED_CHECKS.every(key=>Object.hasOwn(inspection.checks,key)&&inspection.checks[key]===true),
     'RECOVERY_PLAN_NOT_ELIGIBLE');
   let ledger;
   try{ledger=JSON.parse(ledgerBytes.toString('utf8'));}
