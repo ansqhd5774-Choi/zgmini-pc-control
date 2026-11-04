@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {FILES,R54_B_SCHEMA,preflight,applyApprovedSix,
  readR54RecoveryJournalStatus} from '../tools/theme-nine-r54-sixfile-b.mjs';
 
@@ -71,6 +73,8 @@ test('append-only B journal rejects incomplete, altered, and nonsequential recor
  const journal=path.join(root,`R54_B_SIXFILE_${id}.jsonl`);
  const entry=(seq,phase)=>JSON.stringify({schema:'ZGMINI_R54_SIXFILE_B_JOURNAL_V1',
   seq,phase,file:null});
+ assert.throws(()=>readR54RecoveryJournalStatus(root,id,root),
+  /R54_B_JOURNAL_INSIDE_SOURCE_DENIED/);
  assert.equal(readR54RecoveryJournalStatus(root,id),null);
  fs.writeFileSync(journal,entry(0,'STAGING'));
  assert.throws(()=>readR54RecoveryJournalStatus(root,id),/R54_B_JOURNAL_INCOMPLETE/);
@@ -78,5 +82,52 @@ test('append-only B journal rejects incomplete, altered, and nonsequential recor
  assert.throws(()=>readR54RecoveryJournalStatus(root,id),/R54_B_JOURNAL_INVALID/);
  fs.writeFileSync(journal,entry(0,'STAGING')+'\n'+entry(1,'ROLLED_BACK_VERIFIED')+'\n');
  assert.equal(readR54RecoveryJournalStatus(root,id),'ROLLED_BACK_VERIFIED');
+});
+
+test('injected journal ENOSPC during swap catch restores originals and returns recovery-required',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'r54-b-failcatch-fixture-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const installedRoot=path.join(root,'installed'),candidateRoot=path.join(root,'candidate');
+ const journalRoot=path.join(root,'ledger');
+ for(const p of [installedRoot,candidateRoot,journalRoot])fs.mkdirSync(p);
+ const digest=value=>createHash('sha256').update(value).digest('hex');
+ let source=fs.readFileSync(fileURLToPath(new URL('../tools/theme-nine-r54-sixfile-b.mjs',
+  import.meta.url)),'utf8');
+ const oldBytes=[],nextBytes=[];
+ for(const [i,spec] of FILES.entries()){
+  const old=Buffer.from(`R54-test-old-${i}`),next=Buffer.from(`R54-test-new-${i}`);
+  source=source.replace(spec.old,digest(old)).replace(spec.next,digest(next));
+  oldBytes.push(old);nextBytes.push(next);
+  for(const [folder,bytes] of [[installedRoot,old],[candidateRoot,next]]){
+   const target=path.join(folder,spec.path);
+   fs.mkdirSync(path.dirname(target),{recursive:true});
+   fs.writeFileSync(target,bytes);
+  }
+ }
+ const modulePath=path.join(root,'fixture-module.mjs');
+ fs.writeFileSync(modulePath,source);
+ const mod=await import(pathToFileURL(modulePath).href);
+ const requestId='pc-r54-journal-enospc-01';
+ const args={installedRoot,candidateRoot,journalRoot,requestId,
+  manifest:{...approved(),files:mod.FILES},gate:validGate(),
+  runtimeProbe:()=>validGate()};
+ const nativeWrite=fs.writeSync;
+ let n=0,journalFailed=false;
+ fs.writeSync=function(fd,data,...rest){
+  if(!journalFailed&&typeof data==='string'&&data.includes('"phase":"SWAP_INTERRUPTED"')){
+   journalFailed=true;
+   throw Object.assign(new Error('INJECTED_ENOSPC'),{code:'ENOSPC'});
+  }
+  return nativeWrite.call(this,fd,data,...rest);
+ };
+ try{
+  assert.throws(()=>mod.applyApprovedSix({...args,beforeSwap:()=>{
+   if(++n===2)throw new Error('INJECTED_SECOND_SWAP_FAILURE');
+  }}),/R54_B_JOURNAL_RECOVERY_REQUIRED/);
+ }finally{fs.writeSync=nativeWrite}
+ assert.equal(journalFailed,true);
+ for(const [i,spec] of mod.FILES.entries())
+  assert.deepEqual(fs.readFileSync(path.join(installedRoot,spec.path)),oldBytes[i]);
+ assert.throws(()=>mod.preflight(args),/R54_B_PRIOR_JOURNAL_REQUIRES_RECONCILIATION|R54_B_JOURNAL_INVALID/);
 });
 
