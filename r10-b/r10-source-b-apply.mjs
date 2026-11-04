@@ -45,11 +45,19 @@ export async function preflightR10B({request,approvalBytes,port,now=Date.now(),l
   probe?.tasksUnmodified!==true||
   !SHA64.test(probe?.protectedSnapshotSha256??''))
   stop('R10_B_PROTECTED_BASELINE_STOP');
- // No local-only orphan commit may be used as an unverified rollback.
+ // An independently restored, manifest-pinned bundle can establish both trees
+ // when the deployed commit is unavailable remotely. The trusted port supplies
+ // this proof from a fresh isolated restore, never from the request body.
+ const bundle=probe.verifiedRecoveryBundle;
+ const restoredBundle=bundle?.independentlyRestored===true&&
+  bundle.connectivityVerified===true&&
+  bundle.bundleSha256===manifest.rollbackBundleSha256&&
+  bundle.originalSha===ORIGINAL_PC_SOURCE&&
+  bundle.targetSha===manifest.targetPcSourceSha;
+ const remoteTrees=probe.originalRemoteRetrievable===true&&probe.targetRemoteRetrievable===true;
  if(probe?.originalGitObjectVerified!==true||
-  probe?.originalRemoteRetrievable!==true||
+  (!remoteTrees&&!restoredBundle)||
   probe?.targetGitObjectVerified!==true||
-  probe?.targetRemoteRetrievable!==true||
   probe?.targetDescendsOriginal!==true||
   probe?.targetSourceSha!==manifest.targetPcSourceSha||
   probe?.candidateSourceCommit!==SOURCE_COMMIT||

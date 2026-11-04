@@ -112,6 +112,22 @@ test('preflight blocks local-only orphan rollback and static/historical-only Cor
   /R10_B_LIVE_CORE_PROVENANCE_STOP/);
 });
 
+test('offline source trees require independently restored bundle bound to both SHAs and approval',async()=>{
+ const {bytes,r,m}=packed(),{port,probe}=portFor(m,{overrides:{
+  originalRemoteRetrievable:false,targetRemoteRetrievable:false,
+ }});
+ const check=()=>preflightR10B({request:r,approvalBytes:bytes,port});
+ const proof={independentlyRestored:true,connectivityVerified:true,
+  originalSha:ORIGINAL_PC_SOURCE,targetSha:m.targetPcSourceSha,
+  bundleSha256:m.rollbackBundleSha256};
+ for(const drift of [{bundleSha256:SHA64},{targetSha:ORIGINAL_PC_SOURCE},{connectivityVerified:false}]){
+  probe.verifiedRecoveryBundle={...proof,...drift};
+  await assert.rejects(check,/R10_B_GIT_ROLLBACK_OR_DEPENDENCY_STOP/);
+ }
+ probe.verifiedRecoveryBundle=proof;
+ assert.equal((await check()).status,'READY_FOR_INDEPENDENT_B_ONLY');
+});
+
 test('Core cycle/lock, dirty checkout, config, dependencies and extra diff fail closed',async()=>{
  const {bytes,r,m}=packed(),{port,probe}=portFor(m);
  for(const [key,value,code] of [
