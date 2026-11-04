@@ -65,6 +65,22 @@ test('failed or throwing proof does not turn a recovery requirement into BLOCKED
   assert.equal(r.substate,undefined);
  }
 });
+test('stage-entry failure cannot be downgraded by a false untouched-proof callback',async()=>{
+ let proofCalls=0,stageCalls=0;
+ const f=fixture({
+  stage:async()=>{stageCalls++;throw Object.assign(Error('partial stage write'),{code:'ENOSPC'});},
+  verifyPrevious:async()=>false,
+  verifyPrevalidationUntouched:async()=>{proofCalls++;return true;},
+ });
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(stageCalls,1);
+ assert.equal(proofCalls,0);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.substate,undefined);
+ assert.equal(r.firstFail,'VALIDATED');
+ assert.equal(r.failureOperation,'stage');
+ assert.equal(r.code,'UPDATE_STAGE_ENOSPC');
+});
 test('prevalidation-only exception never changes stored failure into a new top-level status',async()=>{
  const f=fixture({validate:async()=>{throw Object.assign(Error('invalid digest'),{code:'ALLOWFILE_HASH_MISMATCH'});},
   verifyPrevalidationUntouched:async()=>true});
