@@ -31,21 +31,38 @@ export function validate(event,env){
   stop('INFL19_PUBLIC_REQUEST_CONTRACT_DENIED');
  return r;
 }
-async function getFixed(pathname,{max=130000,html=false}={}){
- const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),15000);
+export async function readLimitedBody(response,max,label){
+ const expected=Number(response.headers.get('content-length'));
+ const reject=()=>stop('INFL19_PUBLIC_'+label+'_BODY_LIMIT');
+ if(Number.isFinite(expected)&&expected>max)reject();
+ const reader=response.body?.getReader?.();
+ if(!reader){const data=Buffer.from(await response.arrayBuffer());if(data.length>max)reject();return data.toString('utf8');}
+ const parts=[];let size=0;
+ try{
+  for(;;){
+   const {done,value}=await reader.read();if(done)break;
+   size+=value.byteLength;
+   if(size>max){await reader.cancel();reject()}
+   parts.push(Buffer.from(value));
+  }
+ }finally{reader.releaseLock()}
+ return Buffer.concat(parts,size).toString('utf8');
+}
+async function getFixed(pathname,{max=130000,html=false,label='UNKNOWN'}={}){
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),20000);
  try{
   const url='https://zgmini.kr'+pathname;
   const r=await fetch(url,{method:'GET',redirect:'manual',signal:ctrl.signal,
    headers:{accept:html?'text/html':'application/json'},cache:'no-store'});
-  if(r.status!==200)stop('INFL19_PUBLIC_HTTP_NOT_200');
+  if(r.status!==200)stop('INFL19_PUBLIC_'+label+'_HTTP_NOT_200');
   const contentType=r.headers.get('content-type')??'';
-  if(!contentType.includes(html?'text/html':'application/json'))stop('INFL19_PUBLIC_CONTENT_TYPE_INVALID');
-  const buffer=await r.arrayBuffer();if(buffer.byteLength>max)stop('INFL19_PUBLIC_BODY_TOO_LARGE');
-  return {body:new TextDecoder('utf-8').decode(buffer),status:r.status,
-   cache:r.headers.get('cf-cache-status')??null};
+  if(!contentType.includes(html?'text/html':'application/json'))
+   stop('INFL19_PUBLIC_'+label+'_CONTENT_TYPE_INVALID');
+  const body=await readLimitedBody(r,max,label);
+  return {body,status:r.status,cache:r.headers.get('cf-cache-status')??null};
  }catch(e){
   if(/^(?:INFL19_|PUBLIC_)/.test(e?.message??''))throw e;
-  stop('INFL19_PUBLIC_NETWORK_UNAVAILABLE');
+  stop('INFL19_PUBLIC_'+label+'_NETWORK_UNAVAILABLE');
  }finally{clearTimeout(timer)}
 }
 export function inspectResults(summary,market,html){
@@ -78,9 +95,9 @@ export async function execute(env=process.env){
   issue=event.issue.number;
   result={...result,issueNumber:issue,requestId:req.requestId,runId:String(env.GITHUB_RUN_ID??'')};
   const [a,b,c]=await Promise.all([
-   getFixed('/api/inflation-causal-inputs',{max:120000}),
-   getFixed('/api/market-score',{max:250000}),
-   getFixed('/economic-indicators/inflation/',{max:2500000,html:true}),
+   getFixed('/api/inflation-causal-inputs',{max:524288,label:'INPUTS'}),
+   getFixed('/api/market-score',{max:3145728,label:'SCORE'}),
+   getFixed('/economic-indicators/inflation/',{max:10485760,html:true,label:'HTML'}),
   ]);
   let summary,market;
   try{summary=JSON.parse(a.body);market=JSON.parse(b.body)}
