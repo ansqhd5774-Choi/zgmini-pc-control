@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {FILES,R54_B_SCHEMA,preflight} from '../tools/theme-nine-r54-sixfile-b.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {FILES,R54_B_SCHEMA,preflight,applyApprovedSix,
+ readR54RecoveryJournalStatus} from '../tools/theme-nine-r54-sixfile-b.mjs';
 
 const approved=()=>({schema:R54_B_SCHEMA,status:'APPROVED_B',
  scope:'R54_FIXED_SIXFILE_SOURCE_ONLY',runCount:1,noProviderCalls:true,
@@ -54,3 +58,24 @@ test('B operation refuses missing verified runtime lease/consent before filesyst
    /R54_B_RUNTIME_GATE_REQUIRED/);
  }
 });
+
+test('B writer source change requires an independent runtime re-probe callback',()=>{
+ assert.throws(()=>applyApprovedSix({manifest:approved(),gate:validGate()}),
+  /R54_B_RUNTIME_REPROBE_REQUIRED/);
+});
+
+test('append-only B journal rejects incomplete, altered, and nonsequential records',t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'r54-b-journal-fixture-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const journal=path.join(root,'R54_B_SIXFILE_SOURCE_JOURNAL_V1.jsonl');
+ const entry=(seq,phase)=>JSON.stringify({schema:'ZGMINI_R54_SIXFILE_B_JOURNAL_V1',
+  seq,phase,file:null});
+ assert.equal(readR54RecoveryJournalStatus(root),null);
+ fs.writeFileSync(journal,entry(0,'STAGING'));
+ assert.throws(()=>readR54RecoveryJournalStatus(root),/R54_B_JOURNAL_INCOMPLETE/);
+ fs.writeFileSync(journal,entry(0,'STAGING')+'\n'+entry(2,'SUCCEEDED')+'\n');
+ assert.throws(()=>readR54RecoveryJournalStatus(root),/R54_B_JOURNAL_INVALID/);
+ fs.writeFileSync(journal,entry(0,'STAGING')+'\n'+entry(1,'ROLLED_BACK_VERIFIED')+'\n');
+ assert.equal(readR54RecoveryJournalStatus(root),'ROLLED_BACK_VERIFIED');
+});
+
