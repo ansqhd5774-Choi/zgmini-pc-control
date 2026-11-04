@@ -1,0 +1,124 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-41778047902-1-seat-6",
+  "requestId": "pc-725ee901-22ec-4411-9372-d135e9b343c2",
+  "startedAt": "2026-11-04T05:14:42.788Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "ebc4066de81dfcae5df97416d332f362295bb2ab",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "f8c7ba3f2ec407d01b9b2b57ce2c8e28b52dbac8",
+  "sourceBranch": "main",
+  "operation": "us-breadth-r17-preflight",
+  "seat": 6,
+  "status": "BLOCKED",
+  "code": "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-61d276d6-7407-4635-9d4e-20748f4dece1",
+  "pcOperationalApprovedSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "exitCode": 0,
+  "result": {
+    "status": "BLOCKED",
+    "code": "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+    "reasons": [
+      "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+      "LOCAL_ALPACA_GUARD_UNVERIFIED",
+      "CORE_TASK_SOURCE_LINK_UNVERIFIED"
+    ],
+    "sourceHead": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+    "checkedExistingFiles": 3,
+    "checkedNewFiles": 3,
+    "runtimeSourceVerified": false,
+    "canInstall": false,
+    "providerCalls": 0,
+    "sqliteWrites": 0,
+    "d1Writes": 0,
+    "diagnostics": {
+      "patchCheck": "PATCH_CONTEXT_MISMATCH",
+      "patchContexts": [
+        {
+          "file": "cycle",
+          "hunk": "23",
+          "oldContextMatches": true
+        },
+        {
+          "file": "cycle",
+          "hunk": "185",
+          "oldContextMatches": false
+        },
+        {
+          "file": "publication",
+          "hunk": "38",
+          "oldContextMatches": true
+        },
+        {
+          "file": "publication",
+          "hunk": "72",
+          "oldContextMatches": false
+        },
+        {
+          "file": "publication",
+          "hunk": "228",
+          "oldContextMatches": false
+        }
+      ],
+      "restrictedContexts": {
+        "status": "THREE_EXCERPTS_READONLY",
+        "excerpts": [
+          {
+            "file": "cycle",
+            "hunk": "185",
+            "startLine": 173,
+            "lineCount": 3,
+            "method": "FUZZY_RELATIVE_LINES",
+            "matchedLines": 6,
+            "text": " }:{nonBlocking:true,status:'SKIPPED_KOREA_LANE'};\n const report={at:new Date().toISOString(),lane,collectionExit:collection.status,collectionStatus:collectionReport?.status??null,supplyR10,alpacaIncremental,sectorFearGreed,researchBreadthR10V9Shadow,publicationExit:publication.status,publishRequested,publishSkipped,publicationPolicy,progressive,researchProspective,researchFundFlowProspective,researchBreadthProspective,researchEarningsR5OfficialRefresh,researchEarningsR5Prospective,status:publication.status===0?(publicationPolicy.collectionDegraded?'COMPLETE_WITH_COLLECTION_GAPS':'COMPLETE'):'PUBLICATION_NOT_VERIFIED'};\n save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));"
+          },
+          {
+            "file": "publication",
+            "hunk": "72",
+            "startLine": 66,
+            "lineCount": 4,
+            "method": "FUZZY_RELATIVE_LINES",
+            "matchedLines": 3,
+            "text": " const {projectionWriter}=await import('../../worker/projection-runtime-r52.mjs');\n const {PUBLIC_PROJECTION_KEYS}=await import('../../worker/market-public-projection-store.mjs');\n const now=Date.now();\n const marketReady=await attemptOutput(report,'market',async()=>{"
+          },
+          {
+            "file": "publication",
+            "hunk": "228",
+            "startLine": 195,
+            "lineCount": 8,
+            "method": "FUZZY_RELATIVE_LINES",
+            "matchedLines": 3,
+            "text": "   report.market={...report.market,...(previous>now?{status:'REMOTE_NEWER_PRESERVED',storedAt:previous}:await publishMarket(remote,config.core,read(path.join(base,'local-market-result.json')),now,lease,previous,path.join(base,'local-market-ledger.json')))};\n  }finally{await releaseMarket(remote,config.core,lease);}\n  });\n  // Explicit allowlist: publish display outputs only, never provider input/history rows.\n  for(const {id,status} of report.projections){\n   if(status!=='LOCAL_READY')continue;\n   await attemptOutput(report,'projection-publication:'+id,async()=>{\n   const row=await core.prepare('SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=?').bind(PUBLIC_PROJECTION_KEYS[id]).first();"
+          }
+        ]
+      },
+      "taskChain": {
+        "commandWscript": true,
+        "expectedLauncherArgument": true,
+        "firstLauncherHash": true,
+        "secondLauncherHash": true,
+        "firstHop": true,
+        "secondHop": false
+      },
+      "singleDispatcher": {
+        "status": "DISPATCH_UNSAFE_TEXT",
+        "singleHop": null,
+        "nodeCandidates": []
+      }
+    }
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "protectedAfterSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "actualExecutionSha": "ebc4066de81dfcae5df97416d332f362295bb2ab",
+  "next": "RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST",
+  "finishedAt": "2026-11-04T05:14:46.075Z",
+  "durationMs": 3287
+}
