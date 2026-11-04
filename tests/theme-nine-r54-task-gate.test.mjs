@@ -11,7 +11,9 @@ const approval={grade:'B',scope:R54_TASK_EXCEPTION,taskName:R54_TASK_NAME,
  singleUse:true,preserveTaskDefinition:true,
  allowForceTermination:false,allowOtherTaskChanges:false};
 const hashes=FILES.map(x=>({...x}));
-function fixture({enabled=true,drainBusy=0,blockManual=true,swapMode='success',restoreOK=true}={}){
+function fixture({enabled=true,drainBusy=0,blockManual=true,
+ conflictingSourceLaunches=0,unrelatedTaskCount=0,
+ swapMode='success',restoreOK=true}={}){
  const state={enabled,initialEnabled:enabled,phase:'old',drainBusy,
   disableCalls:0,restoreCalls:0,applies:0,waits:0,kills:0,readbacks:0};
  const xml=Buffer.from('<Task><Action>R54</Action></Task>');
@@ -29,7 +31,8 @@ function fixture({enabled=true,drainBusy=0,blockManual=true,swapMode='success',r
    if(busy)state.drainBusy--;
    return {taskName:R54_TASK_NAME,schedulerStartDisabled:!state.enabled,
      taskNotRunning:!busy,childProcessCount:busy?2:0,
-     otherScheduledEntrypoints:0,otherManualEntrypointsBlocked:blockManual,
+     conflictingSourceLaunches,unrelatedTaskCount,
+     installWindowExclusivityVerified:blockManual,
      relevantLocksClear:!busy,exclusiveBLeaseHeld:true}},
   readSixHashes:async()=>hashes.map(x=>({...x,actual:x[state.phase]})),
   restore:async({taskName,enabled:original,expectedXmlSha256})=>{
@@ -64,7 +67,23 @@ test('one-time B gate disables only R54, applies six, verifies and restores exac
 test('drains active task and child processes naturally; never kills or duplicates apply',async()=>{
  const {state,ports,applySix}=fixture({drainBusy:3});
  await runApprovedR54TaskTransition({authorization:approval,ports,applySix,waitMs:0});
- assert.equal(state.waits,4);assert.equal(state.applies,1);assert.equal(state.kills,0);
+ assert.equal(state.waits,3);assert.equal(state.applies,1);assert.equal(state.kills,0);
+});
+
+test('unrelated scheduled tasks do not block a collision-free R54 transaction',async()=>{
+ const f=fixture({unrelatedTaskCount:11});
+ const result=await runApprovedR54TaskTransition({authorization:approval,
+  ports:f.ports,applySix:f.applySix,waitMs:0});
+ assert.equal(result.status,'R54_SIXFILE_AND_TASK_RESTORED_VERIFIED');
+ assert.equal(f.state.applies,1);
+});
+
+test('actual competing source writer prevents the swap despite idle R54 Task',async()=>{
+ const f=fixture({conflictingSourceLaunches:1});
+ await assert.rejects(runApprovedR54TaskTransition({authorization:approval,
+  ports:f.ports,applySix:f.applySix,maxDrainChecks:2,waitMs:0}),
+  {code:'R54_TASK_NATURAL_DRAIN_PENDING'});
+ assert.equal(f.state.applies,0);
 });
 
 test('pre-existing disabled task remains disabled after swap',async()=>{
@@ -146,7 +165,7 @@ function connectorFixture({bypass=false,regenerator=false,failSwap=false,failRol
  };
  const ports={
   verifyEntrypoints:async()=>({verifiedAllKnownPaths:true,
-    allR54RoutesLoadConnector:!bypass,otherTaskDefinitionsAbsent:true,
+    allR54RoutesLoadConnector:!bypass,
     unexpectedDirectEntryAbsent:true,sourceRegeneratorEntrypointsExcluded:!regenerator,
     otherSourceWriterProcessesAbsent:true}),
   readSixHashes:async()=>rows(),
