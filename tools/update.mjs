@@ -207,7 +207,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const backupRoot=path.join(controlRoot,'backups','controller-update-'+request.requestId);
  const stageRoot=path.join(backupRoot,'stage');
  const snapshotRoot=path.join(backupRoot,'snapshot');
- let plannedFiles=[],protectedBefore,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
+ let plannedFiles=[],protectedBefore,prevalidationBaseline,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
  const apiRunners=()=>github('actions/runners?per_page=100').runners;
  const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
  const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
@@ -230,6 +230,30 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   fingerprint:x=>sha256(JSON.stringify({issue,manifest,targetSha:x.targetSha})),
   read:async id=>fs.existsSync(path.join(recordDir,id+'.json'))?json(path.join(recordDir,id+'.json')):null,
   persist:async x=>writeJson(ledgerFile,{...x,issueNumber,postIssueNumber}),
+  // Capture a read-only baseline BEFORE acquiring the install lease, while
+  // immutable source/owner/protected-state evidence is available. This does
+  // not change Core tasks, supervisor processes or the intake workflow.
+  capturePrevalidationBaseline:async()=>{
+   const current=installedManifest(),{owner,status}=readOwner();
+   need(current.installedSha===manifest.installedSha&&status.sourceSha===manifest.installedSha,
+    'PREVALIDATION_SOURCE_MISMATCH');
+   prevalidationBaseline={installedSha:current.installedSha,ownerPid:owner.pid,
+    ownerNonce:owner.nonce,protected:protectedSnapshot()};
+  },
+  // A prevalidation exception has not reached stage/pause/stop/switch. A
+  // busy independent A Runner is NOT a controller mutation and must not make
+  // an otherwise proven no-effect failure retain an install-wide recovery
+  // lease. Still require live original supervisor identity, pinned file bytes,
+  // unchanged Core protection and a freshly read active intake workflow.
+  verifyPrevalidationUntouched:async({installedSha})=>{
+   if(!prevalidationBaseline||prevalidationBaseline.installedSha!==installedSha)return false;
+   const current=installedManifest(),{owner,status}=readOwner();
+   if(current.installedSha!==installedSha||status.sourceSha!==installedSha||
+     owner.pid!==prevalidationBaseline.ownerPid||owner.nonce!==prevalidationBaseline.ownerNonce)return false;
+   try {process.kill(owner.pid,0);} catch {return false;}
+   if(JSON.stringify(protectedSnapshot())!==JSON.stringify(prevalidationBaseline.protected))return false;
+   return github('actions/workflows/pc-job.yml').state==='active';
+  },
   inspect:async()=>({installedSha:installedManifest().installedSha,
    insideRunnerTree:false,githubActions:Boolean(process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME)}),
   validate:async()=>{
@@ -1445,6 +1469,7 @@ export async function command(args=process.argv.slice(2)) {
  // from granting permission to stop or switch a changed process.
  readOwner();
  installedManifest();
+ await ports.capturePrevalidationBaseline();
  }catch(error){error.failureStage='PRE_INSTALL';throw error;}
  if(cmd==='preflight')return {status:'PASS',code:'PRE_INSTALL_READONLY_VERIFIED',actualControllerSha:installedManifest().installedSha,requestId,installAttempted:false};
  const installLock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
