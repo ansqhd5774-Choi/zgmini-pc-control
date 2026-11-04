@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_RESULT_V1",
+  "requestId": "pc-aaeaf2ea-11f5-4837-9fee-a1a585b507da",
+  "chatId": "chat-472a6bde-300d-41d0-b6c4-fb4b70476cca",
+  "status": "BLOCKED",
+  "code": "INFL19_A_SCRIPT_REFERENCE_UNRESOLVED",
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "pcSourceWrites": 0,
+  "configWrites": 0,
+  "taskWrites": 0,
+  "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "actionExe": "wscript.exe",
+  "launcherArgumentShape": "QUOTED_VBS_PATH"
+}
