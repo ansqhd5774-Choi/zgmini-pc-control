@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-r17-d4a9fd9f-a316-435b-99d0-c750440eb9d9",
+  "status": "BLOCKED",
+  "code": "R17_B_IMPORT_RESOLUTION_STOP",
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "pcSourceWrites": 0,
+  "operationalConfigWrites": 0,
+  "taskWrites": 0,
+  "runId": "41910709350"
+}
