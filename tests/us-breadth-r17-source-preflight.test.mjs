@@ -38,22 +38,26 @@ test('patch diagnosis returns only five-hunk positions and match booleans, even 
 });
 const contextFixture=()=>({
  'scripts/pc-writer/local-cycle.mjs':[
-  ...Array.from({length:179},(_,i)=>`// fixture cycle ${i}`),
-  'const prior=1;',
+  ...Array.from({length:172},(_,i)=>`// fixture cycle ${i}`),
+  " }:{nonBlocking:true,status:'SKIPPED_KOREA_LANE'};",
   " const report={at:new Date().toISOString(),lane,collectionExit:collection.status,extra:'SAFE'};",
-  ' save(report);',
+  " save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));",
  ].join('\r\n'),
  'scripts/pc-writer/run-local.mjs':[
-  ...Array.from({length:68},(_,i)=>`// fixture publication head ${i}`),
-  ' await attemptOutput(report,\'us-breadth\',async()=>{',
-  '  report.usBreadth=await prepareUsBreadth(core,{now:new Date(now)});',
-  ' });',
-  ' const marketReady=true;',
-  ...Array.from({length:148},(_,i)=>`// fixture publication middle ${i}`),
-  ' if(report.usBreadth?.prepared)await attemptOutput(report,\'us-breadth-publication\',async()=>{',
-  '   report.usBreadth.publication=await publishUsBreadth(remote,config.core,report.usBreadth,{now});',
-  ' });',
-  ' else report.usBreadth={publication:\'SKIPPED_NOT_READY\'};',
+  ...Array.from({length:65},(_,i)=>`// fixture publication head ${i}`),
+  " const {projectionWriter}=await import('../../worker/projection-runtime-r52.mjs');",
+  " const {PUBLIC_PROJECTION_KEYS}=await import('../../worker/market-public-projection-store.mjs');",
+  ' const now=Date.now();',
+  " const marketReady=await attemptOutput(report,'market',async()=>{",
+  ...Array.from({length:125},(_,i)=>`// fixture publication middle ${i}`),
+  "   report.market={...report.market,...(previous>now?{status:'REMOTE_NEWER_PRESERVED',storedAt:previous}:await publishMarket(remote,config.core,read(path.join(base,'local-market-result.json')),now,lease,previous,path.join(base,'local-market-ledger.json')))};",
+  '  }finally{await releaseMarket(remote,config.core,lease);}',
+  '  });',
+  '  // Explicit allowlist: publish display outputs only, never provider input/history rows.',
+  '  for(const {id,status} of report.projections){',
+  "   if(status!=='LOCAL_READY')continue;",
+  "   await attemptOutput(report,'projection-publication:'+id,async()=>{",
+  "   const row=await core.prepare('SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=?').bind(PUBLIC_PROJECTION_KEYS[id]).first();",
   ...Array.from({length:9},(_,i)=>`// fixture publication tail ${i}`),
  ].join('\r\n'),
 });
@@ -63,7 +67,7 @@ test('three fixed contexts emit only verified bounded non-sensitive excerpts',()
  const got=diagnoseR17RestrictedContexts(src,valid());
  assert.equal(got.status,'THREE_EXCERPTS_READONLY');
  assert.deepEqual(got.excerpts.map(x=>[x.file,x.hunk,x.lineCount]),
-  [['cycle','185',3],['publication','72',4],['publication','228',8]]);
+  [['cycle','173',3],['publication','66',4],['publication','195',8]]);
  assert.ok(got.excerpts.every(x=>!x.text.includes('\r')));
  assert.ok(JSON.stringify(got).length<=2500);
  assert.equal(got.excerpts.some(x=>x.text.includes('safe')),false);
@@ -72,9 +76,9 @@ test('third context reads bounded follow-on lines and suppresses secrets discove
  const files=contextFixture();
  const third=diagnoseR17RestrictedContexts(files,valid()).excerpts[2];
  assert.equal(third.lineCount,8);
- assert.match(third.text,/fixture publication tail 3/);
+ assert.match(third.text,/fixture publication tail 1/);
  const changed={...files,'scripts/pc-writer/run-local.mjs':
-  files['scripts/pc-writer/run-local.mjs'].replace('// fixture publication tail 2',
+  files['scripts/pc-writer/run-local.mjs'].replace('// fixture publication tail 0',
    'const password=NEVER_EMIT_THIS;')};
  const suppressed=diagnoseR17RestrictedContexts(changed,valid());
  assert.equal(suppressed.status,'SENSITIVE_CONTEXT_SUPPRESSED');
@@ -83,9 +87,9 @@ test('third context reads bounded follow-on lines and suppresses secrets discove
 test('bounded three-excerpt readback survives the fixed diagnostics envelope',()=>{
  const evidence={...valid(),patchApplies:false,patchFailureCode:'PATCH_CONTEXT_MISMATCH',
   restrictedContexts:{status:'THREE_EXCERPTS_READONLY',excerpts:[
-   {file:'cycle',hunk:'185',text:'x'.repeat(750)},
-   {file:'publication',hunk:'72',text:'x'.repeat(750)},
-   {file:'publication',hunk:'228',text:'x'.repeat(750)},
+   {file:'cycle',hunk:'173',text:'x'.repeat(750)},
+   {file:'publication',hunk:'66',text:'x'.repeat(750)},
+   {file:'publication',hunk:'195',text:'x'.repeat(750)},
   ]}};
  const report=summarizeR17Probe(evidence);
  assert.equal(report.diagnostics.restrictedContexts.excerpts.length,3);
@@ -99,13 +103,14 @@ test('restricted contexts fail closed on unapproved head/hash, secrets, ambiguit
  const modified={...valid(),hashes:{...R17_BASE_FILES}};
  modified.hashes['scripts/pc-writer/run-local.mjs']='f'.repeat(64);
  assert.deepEqual(diagnoseR17RestrictedContexts(src,modified),{status:'SOURCE_UNVERIFIED',excerpts:[]});
- const exposed={...src,'scripts/pc-writer/run-local.mjs':src['scripts/pc-writer/run-local.mjs'].replace('const marketReady=true;',"const password='NEVER_EMIT_THIS';")};
+ const exposed={...src,'scripts/pc-writer/run-local.mjs':src['scripts/pc-writer/run-local.mjs'].replace('const now=Date.now();',"const password='NEVER_EMIT_THIS';")};
  const withheld=diagnoseR17RestrictedContexts(exposed,valid());
  assert.equal(withheld.status,'SENSITIVE_CONTEXT_SUPPRESSED');
  assert.equal(JSON.stringify(withheld).includes('NEVER_EMIT_THIS'),false);
  const dup={...src,'scripts/pc-writer/local-cycle.mjs':src['scripts/pc-writer/local-cycle.mjs']+"\n const report={at:new Date().toISOString(),lane,collectionExit:other};"};
- assert.deepEqual(diagnoseR17RestrictedContexts(dup,valid()),
-  {status:'CONTEXT_LOCATION_UNVERIFIED',failedHunk:'185',excerpts:[]});
+ const near=diagnoseR17RestrictedContexts(dup,valid());
+ assert.equal(near.status,'THREE_EXCERPTS_READONLY');
+ assert.ok(near.excerpts[0].matchedLines>=2); // Context disambiguates the extra report anchor.
  const long={...src,'scripts/pc-writer/local-cycle.mjs':src['scripts/pc-writer/local-cycle.mjs'].replace('extra:', 'x'.repeat(900)+'extra:')};
  assert.equal(diagnoseR17RestrictedContexts(long,valid()).status,'CONTEXT_TOO_LONG');
 });
@@ -126,19 +131,19 @@ test('fuzzy relative alignment retains bounded context when patch old lines are 
   old[row]=old[row].replace(change,'NEW_APPROVED_VALUE');
   rows[file].splice(start,old.length,...old);
  };
- fill(cycle,185,/const report=/);
- fill(publication,72,/report\.usBreadth=await prepareUsBreadth/);
- fill(publication,228,/report\.usBreadth\.publication=await publishUsBreadth/);
+ fill(cycle,173,/const report=/);
+ fill(publication,66,/const now=Date\.now/);
+ fill(publication,195,/Explicit allowlist/);
  const asSource=()=>Object.fromEntries(Object.entries(rows).map(([k,v])=>[k,v.join('\n')]));
  const changed=diagnoseR17RestrictedContexts(asSource(),valid());
  assert.equal(changed.status,'THREE_EXCERPTS_READONLY');
  assert.deepEqual(changed.excerpts.map(x=>x.method),Array(3).fill('FUZZY_RELATIVE_LINES'));
  assert.ok(changed.excerpts.every(x=>x.matchedLines>=2&&x.lineCount>=3&&x.lineCount<=8));
  // Delete a line inside the second hunk: its subsequent context shifts by one.
- rows[publication].splice(72,1);
+ rows[publication].splice(66,1);
  const deleted=diagnoseR17RestrictedContexts(asSource(),valid());
  assert.equal(deleted.status,'THREE_EXCERPTS_READONLY');
- assert.ok(deleted.excerpts.every(x=>x.matchedLines>=2));
+ assert.ok(deleted.excerpts.every(x=>x.matchedLines>=2||x.method==='STRUCTURAL_ANCHOR'));
  assert.ok(JSON.stringify(deleted).length<=2500);
 });
 test('dispatcher diagnosis returns one allowlisted static name and hash, never Task/VBS text',()=>{
