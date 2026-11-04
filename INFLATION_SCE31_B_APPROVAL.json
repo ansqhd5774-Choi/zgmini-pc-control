@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_INFLATION_SCE31_B_APPROVAL_V1",
+  "scope": "SCE31_PC_PRIVATE_ONE_SHOT",
+  "purpose": "Collect the official NY Fed SCE one-year median once into the isolated PC-private archive with hash and readback",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/inflation-21-31-official-collector-20261104",
+  "sourceSha": "f0f70b2bdc091e6f2db7ddac71324b7bdb53dbbd",
+  "sourceFileHashes": {
+    "scripts/pc-writer/inflation-sce31-once.mjs": "934d18754a263a8c752269eda02e8ad497f25445f566c4b1ee52e25482f3ec95",
+    "scripts/inflation-sce-collector.mjs": "823a1d33f9b019efdfdb1fce645cb57a7dd536f08baf0a3ffc7c1ad5acc9eaf4",
+    "scripts/inflation-sce-source.mjs": "5110a6bbda7a31462df012e4f2e116f4e6e7790098a645ba02bb777d21d2e47d"
+  },
+  "provider": "NYFED",
+  "sourceUrl": "https://www.newyorkfed.org/medialibrary/interactives/sce/sce/downloads/data/frbny-sce-data.xlsx",
+  "writerHome": "E:\\ZGmini\\data\\pc-writer",
+  "outputRelative": "inflation-causal/sce31",
+  "maxProviderRequests": 3,
+  "maxAutomaticRetries": 0,
+  "allowQuotaLedgerWrites": true,
+  "allowCoreWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowPublicRawData": false,
+  "recovery": "If result is absent or unknown, inspect marker and saved latest.json read-only; never repeat provider call blindly"
+}
