@@ -1,4 +1,4 @@
-// Candidate A-grade, read-only PC diagnostic. Not installed or registered.
+// A-grade, read-only PC diagnostic; extends the existing registered operation.
 // No provider/network, publication, query mutations, or raw ticker/metric output.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +16,12 @@ const MAX_SYMBOL_HISTORY_BYTES=2_500_000;
 const MAX_ACTUAL_ARCHIVE_ENTRIES=128;
 const MAX_ACTUAL_ARCHIVE_BYTES=16_000_000;
 const KNOWN_ACTUAL_DIRS=Object.freeze(['dec31-symbol-probe','dec31-symbol-batch-a']);
+// A diagnostic only inspects file metadata here. Reading actual rows and
+// deciding ER1 scoreability belongs to the approved PC collector/scorer.
+const ER1_CACHE_DIRS=Object.freeze([
+  'nov30-er1-full','nov30-er1-batch20','nov30-er1-probe',
+  'dec31-symbol-probe','dec31-symbol-batch-a'
+]);
 
 function safeDir(dir){try{const stat=fs.lstatSync(dir);return stat.isDirectory()&&!stat.isSymbolicLink()}catch{return false}}
 function safeFile(file,limit){try{const s=fs.lstatSync(file);return s.isFile()&&!s.isSymbolicLink()&&s.size>1&&s.size<=limit}catch{return false}}
@@ -89,13 +95,14 @@ function knownActualFiles(input,novSymbols,asOf){
   const archives=new Set();
   const historicalMatches=new Set();
   let actualInputFiles=0,invalidActualFiles=0,entriesSeen=0,bytesRead=0;
+  let inspectionPartial=false;
   for(const dir of KNOWN_ACTUAL_DIRS){
     const folder=path.join(input,dir);
     if(!safeDir(folder))continue;
     let files;try{files=fs.readdirSync(folder,{withFileTypes:true})}catch{continue}
+    const remaining=MAX_ACTUAL_ARCHIVE_ENTRIES-entriesSeen;
+    if(files.length>remaining){files=files.slice(0,Math.max(remaining,0));inspectionPartial=true}
     entriesSeen+=files.length;
-    if(entriesSeen>MAX_ACTUAL_ARCHIVE_ENTRIES)
-      throw Error('ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP');
     for(const entry of files){
       if(!entry.isFile()||!TICKER.test(entry.name.replace(/\.json$/,''))||
         !entry.name.endsWith('.json'))continue;
@@ -103,9 +110,9 @@ function knownActualFiles(input,novSymbols,asOf){
       const file=path.join(folder,entry.name);
       actualInputFiles++;
       if(!safeFile(file,MAX_SYMBOL_HISTORY_BYTES)){invalidActualFiles++;continue}
-      bytesRead+=fs.lstatSync(file).size;
-      if(bytesRead>MAX_ACTUAL_ARCHIVE_BYTES)
-        throw Error('ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP');
+      const size=fs.lstatSync(file).size;
+      if(bytesRead+size>MAX_ACTUAL_ARCHIVE_BYTES){inspectionPartial=true;break}
+      bytesRead+=size;
       let payload;try{payload=JSON.parse(fs.readFileSync(file,'utf8'))}catch{invalidActualFiles++;continue}
       if(!Array.isArray(payload?.body)||payload.body.length>1000){invalidActualFiles++;continue}
       archives.add(symbol);
@@ -115,9 +122,31 @@ function knownActualFiles(input,novSymbols,asOf){
         typeof row.revenue==='number'&&Number.isFinite(row.revenue)&&row.revenue>=0)))
         historicalMatches.add(symbol);
     }
+    if(inspectionPartial)break;
   }
   return {knownActualArchiveSymbols:archives.size,actualInputFiles,
-    candidateHistoricalMatches:historicalMatches.size,invalidActualFiles};
+    candidateHistoricalMatches:historicalMatches.size,invalidActualFiles,
+    actualArchiveInspectionPartial:inspectionPartial};
+}
+
+function inspectFutureCandidateCache(input,symbols){
+  const folders=ER1_CACHE_DIRS.map(name=>path.join(input,name))
+    .filter(safeDir);
+  let cached=0,invalid=0,missing=0;
+  for(const symbol of symbols){
+    let present=false,validMetadata=false;
+    for(const folder of folders){
+      const file=path.join(folder,symbol+'.json');
+      if(!fs.existsSync(file))continue;
+      present=true;
+      if(safeFile(file,MAX_SYMBOL_HISTORY_BYTES)){validMetadata=true;break}
+    }
+    if(validMetadata)cached++;
+    else if(present)invalid++;
+    else missing++;
+  }
+  return {futureCachedFileSymbols:cached,futureInvalidFileSymbols:invalid,
+    futureMissingFileSymbols:missing};
 }
 
 // The `dataRoot` value comes solely from the Controller's configured root.
@@ -132,6 +161,10 @@ export function inspectER1NovemberAvailability(dataRoot,{clock=Date.now,openDb}=
     priorScoreAsOf:null,priorScoreJoinSymbols:0,
     knownActualArchiveSymbols:0,actualInputFiles:0,
     candidateHistoricalMatches:0,invalidActualFiles:0,
+    actualArchiveInspectionPartial:false,
+    futureCandidateAsOfUtc:null,futureCandidateSymbols:0,
+    futureCachedFileSymbols:0,futureInvalidFileSymbols:0,
+    futureMissingFileSymbols:0,futureActualContentsVerified:false,
     actualEligibilityVerified:false,scoreCalculationPerformed:false,
     calendarIsNotActualHistory:true,sqliteOpened:false,
     providerCalls:0,dbWrites:0,d1Writes:0,operationalWrites:0};
@@ -153,6 +186,9 @@ export function inspectER1NovemberAvailability(dataRoot,{clock=Date.now,openDb}=
   }
   try{
     const tickerSet=new Set();
+    const asOf=new Date(clock()).toISOString().slice(0,10);
+    const futureSymbols=new Set();
+    report.futureCandidateAsOfUtc=asOf;
     for(const day of DAYS){
       const privateResult=loadPrivate(path.join(privateDir,day+'.json'),day);
       const coreResult=privateResult.kind==='READ'?null:loadCore(db,day);
@@ -169,14 +205,20 @@ export function inspectER1NovemberAvailability(dataRoot,{clock=Date.now,openDb}=
       else report.coreReusedDayCount++;
       report.calendarEventRows+=selected.valid+selected.invalid;
       report.invalidVendorRows+=selected.invalid;
-      for(const symbol of selected.symbols)tickerSet.add(symbol);
+      for(const symbol of selected.symbols){
+        tickerSet.add(symbol);
+        // Same predicate as the ER1 November future-only collector.
+        if(day>asOf)futureSymbols.add(symbol);
+      }
     }
     report.uniqueScheduledSymbols=tickerSet.size;
+    report.futureCandidateSymbols=futureSymbols.size;
+    Object.assign(report,inspectFutureCandidateCache(input,futureSymbols));
     const scored=scoreIndex(input);
     report.priorScoreSnapshotState=scored.state;
     report.priorScoreAsOf=scored.asOf??null;
     for(const ticker of tickerSet)if(scored.symbols.has(ticker))report.priorScoreJoinSymbols++;
-    Object.assign(report,knownActualFiles(input,tickerSet,new Date(clock()).toISOString().slice(0,10)));
+    Object.assign(report,knownActualFiles(input,tickerSet,asOf));
     const complete=report.verifiedDayCount===30&&report.invalidVendorRows===0&&
       report.missingDayCount===0&&report.invalidDayCount===0;
     report.status=complete?'PASS':report.verifiedDayCount?'PARTIAL':'BLOCKED';
@@ -184,8 +226,7 @@ export function inspectER1NovemberAvailability(dataRoot,{clock=Date.now,openDb}=
       'ER1_NOV30_AVAILABILITY_PARTIAL';
   }catch(error){
     report.status='BLOCKED';
-    report.code=error?.message==='ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP'?
-      error.message:'ER1_NOV30_AVAILABILITY_UNEXPECTED_STOP';
+    report.code='ER1_NOV30_AVAILABILITY_UNEXPECTED_STOP';
   }finally{try{db?.close()}catch{}}
   return report;
 }
