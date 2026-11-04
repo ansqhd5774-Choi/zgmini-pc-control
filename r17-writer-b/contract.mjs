@@ -96,28 +96,43 @@ export function applyTwoFilePatch(rawPatch,originals){
     let i=lines.findIndex(x=>/^@@ -/.test(x));
     if(i<0||!lines.some(x=>x===`--- a/${head[1]}`)||!lines.some(x=>x===`+++ b/${head[1]}`))
       stop('R17_B_PATCH_HEADER_STOP');
+    let declaredDelta=0;
     while(i<lines.length&&/^@@ -/.test(lines[i])){
       const h=/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(lines[i]);
       if(!h)stop('R17_B_PATCH_HUNK_STOP');
       const oldStart=Number(h[1])-1,newStart=Number(h[3])-1;
-      if(oldStart<cursor||oldStart>source.length||newStart!==output.length+(oldStart-cursor))
+      if(oldStart<0||oldStart>source.length||newStart!==oldStart+declaredDelta)
         stop('R17_B_PATCH_OFFSET_STOP');
-      output.push(...source.slice(cursor,oldStart));cursor=oldStart;
-      let consumed=0,produced=0; i++;
+      const before=[],after=[]; i++;
       while(i<lines.length&&!/^@@ -/.test(lines[i])&&!/^diff --git /.test(lines[i])){
         const l=lines[i];
         if(l==='')break;
         const op=l[0],data=l.slice(1);
-        if(op===' '||op==='-'){
-          if(source[cursor]!==data)stop('R17_B_PATCH_CONTEXT_STOP');
-          cursor++;consumed++;
-        }
-        if(op===' '||op==='+'){output.push(data);produced++;}
+        if(op===' '||op==='-')before.push(data);
+        if(op===' '||op==='+')after.push(data);
         if(!' +-'.includes(op))stop('R17_B_PATCH_LINE_STOP');
         i++;
       }
-      if(consumed!==Number(h[2]??1)||produced!==Number(h[4]??1))
+      if(before.length!==Number(h[2]??1)||after.length!==Number(h[4]??1)||!before.length)
         stop('R17_B_PATCH_HUNK_COUNT_STOP');
+      // Git apply --check accepts shifted hunk positions when the entire old
+      // context still matches. Require one unique, exact match within a bounded
+      // displacement; never accept fuzz, omitted context or wrong base bytes.
+      const matchAt=k=>k>=cursor&&k+before.length<=source.length&&
+        before.every((line,j)=>source[k+j]===line);
+      let found=oldStart;
+      if(!matchAt(found)){
+        const matches=[];
+        for(let k=Math.max(cursor,oldStart-250);k<=Math.min(source.length-before.length,oldStart+250);k++){
+          if(matchAt(k))matches.push(k);
+          if(matches.length>1)break;
+        }
+        if(matches.length!==1)stop('R17_B_PATCH_CONTEXT_STOP');
+        found=matches[0];
+      }
+      output.push(...source.slice(cursor,found),...after);
+      cursor=found+before.length;
+      declaredDelta+=after.length-before.length;
     }
     output.push(...source.slice(cursor));
     outputs[head[1]]=output.join('\n');
