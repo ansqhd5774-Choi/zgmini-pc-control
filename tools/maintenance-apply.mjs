@@ -8,7 +8,23 @@ export const UPDATE_PHASES = Object.freeze([
 ]);
 
 const fail = code => Object.assign(new Error(code), {code});
-const codeOf = error => /^[A-Z0-9_]{1,80}$/.test(error?.code ?? '') ? error.code : 'UPDATE_UNEXPECTED_FAILURE';
+// Preserve fixed error codes, but never leak arbitrary exception text/paths.
+// An uncoded filesystem/child-process exception should still identify its
+// exact update phase so a harmless pre-install failure can be investigated
+// without guessing which mutating step ran.
+const OPERATIONS=Object.freeze({inspect:'INSPECT',validate:'VALIDATE',stage:'STAGE',
+  pauseIntake:'PAUSE_INTAKE',waitForDrain:'DRAIN',backup:'BACKUP',
+  stopOwnSupervisor:'SUPERVISOR_STOP',switchVersion:'SWITCH',
+  reconnect:'RECONNECT',resumeIntake:'RESUME_INTAKE',
+  reconcileBacklog:'BACKLOG',postcheck:'POSTCHECK'});
+const ERRNOS=new Set(['ENOENT','EACCES','EPERM','EBUSY','ENOSPC','ETIMEDOUT']);
+export function maintenanceFailureCode(error,operation='inspect'){
+  const stage=OPERATIONS[operation]??'UNKNOWN_STAGE';
+  const code=error?.code;
+  if(ERRNOS.has(code))return `UPDATE_${stage}_${code}`;
+  if(typeof code==='string'&&/^[A-Z][A-Z0-9_]{0,79}$/.test(code))return code;
+  return `UPDATE_${stage}_FAILED`;
+}
 
 /**
  * Port contract:
@@ -77,7 +93,7 @@ export async function applyApprovedUpdate(request, port) {
       protectedStateUnchanged:true,workflowEnabled:true});
     return {...ledger};
   } catch(error) {
-    const firstFail=ledger.phase,reason=codeOf(error);
+    const firstFail=ledger.phase,reason=maintenanceFailureCode(error,failureOperation);
     ledger.failureOperation=failureOperation;
     // A network timeout while a postcheck may still be running is not evidence
     // of diagnostic failure. In particular, do not stop its active Runner.
@@ -170,6 +186,6 @@ export async function reconcileInterruptedRollback(original,port,persist){
   if(port.reconcileBacklog)await port.reconcileBacklog();
   if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_FINAL_READBACK_FAILED');
   await record('INTERRUPTED_ROLLBACK_VERIFIED',{status:'ROLLED_BACK',actualInstalledSha:original.installedShaBefore,protectedStateUnchanged:true});
- }catch(error){await record(codeOf(error),{status:'RECOVERY_REQUIRED'});}
+  }catch(error){await record(maintenanceFailureCode(error,'reconcileBacklog'),{status:'RECOVERY_REQUIRED'});}
  return out;
 }
