@@ -1,0 +1,36 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_PREFLIGHT_APPROVAL_V1",
+  "status": "APPROVED_B_PREFLIGHT_ONLY",
+  "scope": "R17_WRITER_5FILE_PREFLIGHT_ONLY",
+  "installedHeadSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "approvedConfigSourceSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "candidateSourceSha": "81c8ee543c164fc16c8c760d504b113428d01d4a",
+  "patchSha256": "728a4887bd4c81c52b01f1a8f5de6b506dd009a37d68b1d9269cd7c19ec7c706",
+  "coreTaskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "existingFiles": [
+    "scripts/pc-writer/local-cycle.mjs",
+    "scripts/pc-writer/run-local.mjs"
+  ],
+  "absentFiles": [
+    "scripts/pc-writer/us-breadth-provisional-cycle.mjs",
+    "scripts/pc-writer/us-breadth-provisional-publication.mjs",
+    "lib/market-breadth/us-provisional-r1.mjs"
+  ],
+  "beforeSha256": {
+    "scripts/pc-writer/local-cycle.mjs": "9c3fc7788907a2f8756b7ff82c372124a2e26253557b7db8a93eb6c8428eadee",
+    "scripts/pc-writer/run-local.mjs": "4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502"
+  },
+  "newSha256": {
+    "scripts/pc-writer/us-breadth-provisional-cycle.mjs": "c181952f9198dfa99641b3f392ff4c1b280e9766cc8da471a2c78464b9ee7626",
+    "scripts/pc-writer/us-breadth-provisional-publication.mjs": "1ea555e324b6c6b9226841ba05bb5ce41ca1865ab302c19eadc39e995c8d4d26",
+    "lib/market-breadth/us-provisional-r1.mjs": "08e8d31a969b43842a2a69051a716e30db57947c85560b538252fba004e4f2b2"
+  },
+  "pcDataRoot": "E:\\ZGmini\\data\\pc-writer",
+  "pcSourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "allowOperationalWrites": false,
+  "allowProviderCalls": false,
+  "allowD1Writes": false,
+  "allowConfigChanges": false,
+  "allowTaskChanges": false,
+  "runCount": 1
+}
