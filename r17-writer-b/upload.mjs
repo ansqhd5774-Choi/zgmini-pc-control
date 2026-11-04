@@ -9,6 +9,19 @@ const RESULT_ROOT=String.raw`E:\ZGmini\automation\r17-writer-b-preflight`;
 const SHA64=/^[a-f0-9]{64}$/;
 const CODE=/^R17_B_[A-Z0-9_]{1,75}$/;
 const simple=(x)=>typeof x==='string'&&x.length<96?x:'UNKNOWN';
+// Allow only the bounded fail-closed parser diagnostic, never source bytes.
+function safePatchDiagnostic(raw){
+ const d=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:null;
+ if(!d||Object.keys(d).length!==5||
+   !['local-cycle','run-local'].includes(d.file)||
+   !['MIXED_EOL','NO_MATCH','MULTIPLE_MATCH'].includes(d.reason)||
+   !(d.hunkOldStart===null||
+     (Number.isSafeInteger(d.hunkOldStart)&&d.hunkOldStart>=1&&d.hunkOldStart<=10_000))||
+   ![null,0,2].includes(d.matchCount)||d.nativeGitApplyCheck!=='PASS')
+   return null;
+ return {file:d.file,hunkOldStart:d.hunkOldStart,reason:d.reason,
+  matchCount:d.matchCount,nativeGitApplyCheck:'PASS'};
+}
 
 export function sanitizeReport(raw,expectedRequestId){
  const source=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
@@ -25,8 +38,11 @@ export function sanitizeReport(raw,expectedRequestId){
  const status=validPass?'PASS':source.status==='BLOCKED'?'BLOCKED':'STATE_UNKNOWN';
  const code=status==='PASS'?'R17_B_PREFLIGHT_PASS':
   status==='BLOCKED'&&CODE.test(source.code??'')?source.code:'R17_B_REPORT_UNVERIFIED';
+ const diagnostic=status==='BLOCKED'&&code==='R17_B_PATCH_CONTEXT_STOP'?
+   safePatchDiagnostic(source.diagnostic):null;
  return {schema:'ZGMINI_R17_WRITER_B_PREFLIGHT_RESULT_V1',requestId:expectedRequestId,
-  status,code,providerCalls:0,d1Writes:0,pcSourceWrites:0,
+  status,code,...(diagnostic?{diagnostic}:{}),
+  providerCalls:0,d1Writes:0,pcSourceWrites:0,
   operationalConfigWrites:0,taskWrites:0,
   ...(validPass?{oldTargetSha256:Object.fromEntries(OLD.map(p=>[p,source.oldTargetSha256[p]])),
    verifiedImportFiles:Number.isSafeInteger(source.verifiedImportFiles)?source.verifiedImportFiles:null}:{}),
@@ -43,7 +59,12 @@ export async function uploadReport({event,env,readReport,apiFetch=fetch}={}){
  const json=JSON.stringify(result,null,2)+'\n';
  const txt=`REQUEST_ID=${result.requestId}\nSTATUS=${result.status}\nCODE=${result.code}\n`+
   `RUN_ID=${simple(result.runId)}\nPROVIDER_CALLS=0\nD1_WRITES=0\n`+
-  'PC_SOURCE_WRITES=0\nCONFIG_WRITES=0\nTASK_WRITES=0\nRETRY=NO_REEXECUTE_READBACK_ONLY\n';
+  'PC_SOURCE_WRITES=0\nCONFIG_WRITES=0\nTASK_WRITES=0\n'+
+  (result.diagnostic?
+    `PATCH_FILE=${result.diagnostic.file}\nPATCH_HUNK=${result.diagnostic.hunkOldStart??'NA'}\n`+
+    `PATCH_REASON=${result.diagnostic.reason}\nPATCH_MATCH_COUNT=${result.diagnostic.matchCount??'NA'}\n`+
+    'NATIVE_GIT_APPLY_CHECK=PASS\n':'')+
+  'RETRY=NO_REEXECUTE_READBACK_ONLY\n';
  const headers={accept:'application/vnd.github+json',authorization:`Bearer ${token}`,
   'x-github-api-version':'2022-11-28','content-type':'application/json',
   'user-agent':'zgmini-r17-writer-b-preflight'};
