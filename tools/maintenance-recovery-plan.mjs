@@ -2,7 +2,7 @@
 // This does not approve a recovery, release a lease, or install anything.
 import fs from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
@@ -67,10 +67,68 @@ export async function planFromStableEvidence({requestId,sourceSha,readEvidence,i
   return makeRecoveryPlan({requestId,sourceSha,inspection,toolSha256,...before});
 }
 
+// Opt-in, non-authorizing artifact only. The official recovery command still
+// requires a separately reviewed, committed approved:true manifest under
+// approvals/ and rechecks current bytes before touching its install lease.
+export function persistUnapprovedRecoveryProposal({plan,readEvidence,baseDir,
+  writeTempFile=fs.writeFileSync,syncTempFile=fs.fsyncSync}){
+  const d=plan?.approvalDraft;
+  requireTrue(plan?.schema==='ZGMINI_PC_RECOVERY_PLAN_V1'&&plan.status==='PROPOSAL_ONLY'&&
+    plan.operation==='ABORT_UNTOUCHED'&&isId(plan.requestId)&&isSha(plan.sourceSha)&&
+    d?.schema==='ZGMINI_PC_RECOVERY_APPROVAL_V1'&&d.approved===false&&
+    d.operation==='ABORT_UNTOUCHED'&&d.requestId===plan.requestId&&d.sourceSha===plan.sourceSha&&
+    Number.isSafeInteger(d.issueNumber)&&d.issueNumber>0&&isSha(d.installedSha)&&
+    ['toolSha256','ledgerSha256','ownerSha256','markerSha256'].every(key=>/^[a-f0-9]{64}$/.test(d[key]??'')),
+    'RECOVERY_PROPOSAL_NOT_UNAPPROVED');
+  requireTrue(typeof readEvidence==='function'&&typeof baseDir==='string',
+    'RECOVERY_PROPOSAL_INPUT_INVALID');
+  const fresh=readEvidence(plan.requestId);
+  for(const [bytesKey,hashKey] of [['ledgerBytes','ledgerSha256'],['ownerBytes','ownerSha256'],['markerBytes','markerSha256']]){
+    requireTrue(Buffer.isBuffer(fresh?.[bytesKey])&&digest(fresh[bytesKey])===d[hashKey],
+      'RECOVERY_PROPOSAL_EVIDENCE_CHANGED');
+  }
+  // Persist an explicit allowlist only: neither raw lease bytes, owner PID,
+  // nonce nor machine paths can be copied into this file from caller input.
+  const artifact={schema:'ZGMINI_PC_UNAPPROVED_RECOVERY_PROPOSAL_V1',status:'PROPOSAL_ONLY',
+    requestId:plan.requestId,sourceSha:plan.sourceSha,operation:'ABORT_UNTOUCHED',
+    approvalDraft:{schema:d.schema,approved:false,operation:'ABORT_UNTOUCHED',
+      requestId:d.requestId,issueNumber:d.issueNumber,sourceSha:d.sourceSha,
+      installedSha:d.installedSha,toolSha256:d.toolSha256,ledgerSha256:d.ledgerSha256,
+      ownerSha256:d.ownerSha256,markerSha256:d.markerSha256}};
+  const filename=plan.requestId+'.unapproved.json';
+  const dir=path.join(baseDir,'recovery-proposals');
+  try{fs.mkdirSync(dir);}catch(error){if(error.code!=='EEXIST')throw error;}
+  requireTrue(fs.statSync(dir).isDirectory()&&!fs.lstatSync(dir).isSymbolicLink(),
+    'RECOVERY_PROPOSAL_DIRECTORY_UNSAFE');
+  const destination=path.join(dir,filename),temp=path.join(dir,'.'+filename+'.'+randomUUID()+'.tmp');
+  const bytes=Buffer.from(JSON.stringify(artifact,null,2)+'\n');
+  const fd=fs.openSync(temp,'wx',0o600);
+  try{
+    try{writeTempFile(fd,bytes);syncTempFile(fd);}finally{fs.closeSync(fd);}
+    requireTrue(fs.readFileSync(temp).equals(bytes),'RECOVERY_PROPOSAL_TEMP_MISMATCH');
+    // Same-directory hard link publishes fully written bytes and must fail if
+    // a proposal for this request ID already exists. Never use rename over it.
+    try{fs.linkSync(temp,destination);}catch(error){
+      if(error.code==='EEXIST')throw fail('RECOVERY_PROPOSAL_ALREADY_EXISTS');
+      throw fail('RECOVERY_PROPOSAL_ATOMIC_PUBLISH_FAILED');
+    }
+  }finally{
+    // Also clean partial temp files when write/fsync/readback fails BEFORE
+    // hard-link publication. A failed write must never leave an approval-like
+    // candidate for an operator to mistake as complete.
+    try{fs.unlinkSync(temp);}catch(error){if(error.code!=='ENOENT')throw error;}
+  }
+  return {schema:'ZGMINI_PC_UNAPPROVED_RECOVERY_RESULT_V1',status:'PROPOSAL_ONLY',
+    code:'UNAPPROVED_PROPOSAL_WRITTEN',requestId:plan.requestId,sourceSha:plan.sourceSha,
+    proposalRelPath:'recovery-proposals/'+filename,proposalSha256:digest(bytes),
+    proposalWrites:1,operationalWrites:0,approved:false};
+}
+
 async function runCli(args=process.argv.slice(2)){
   requireTrue(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,
     'RECOVERY_OPERATOR_WINDOWS_REQUIRED');
-  requireTrue(args.length===4&&args[0]==='--request-id'&&args[2]==='--source-sha',
+  requireTrue((args.length===4||args.length===5)&&args[0]==='--request-id'&&args[2]==='--source-sha'&&
+    (args.length===4||args[4]==='--write-unapproved-proposal'),
     'RECOVERY_PLAN_USAGE');
   const [,requestId,,sourceSha]=args;
   requireTrue(isId(requestId)&&isSha(sourceSha),'RECOVERY_PLAN_IDENTITY_INVALID');
@@ -88,8 +146,9 @@ async function runCli(args=process.argv.slice(2)){
     ownerBytes:fs.readFileSync(path.join(base,'leases/controller-install/owner.json')),
     markerBytes:fs.readFileSync(path.join(base,'leases/controller-install/RECOVERY_REQUIRED.json')),
   });
-  return planFromStableEvidence({requestId,sourceSha,readEvidence,toolSha256,
+  const plan=await planFromStableEvidence({requestId,sourceSha,readEvidence,toolSha256,
     inspect:(id,sha)=>officialRecovery.main(['inspect','--request-id',id,'--source-sha',sha])});
+  return args.length===5?persistUnapprovedRecoveryProposal({plan,readEvidence,baseDir:base}):plan;
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
