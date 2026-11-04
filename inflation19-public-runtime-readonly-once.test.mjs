@@ -5,7 +5,7 @@ const ids=['1','3','4','5','6','7','8','9','10','11','12','13','14','18','19','2
 const base={schemaVersion:'inflation-causal-public-19-r1-v1',sourceVersion:EXPECTED_SOURCE,status:'READY',score:null,
  indicators:ids.map(id=>({id,status:'READY',value:0,previousValue:1,observationDate:'2026-09-01',history:[]}))};
 const market={domains:[{id:'inflation',indicators:[1,2,3,4]}]};
-const html='물가 구성 지표 / 물가 관련 수집 원자료';
+const html='<h2>물가 관련 지표 (원자료 19개 · 기존 평가 0개)</h2><span>ECONOMIC INDICATORS</span><tr>수집 원자료 19개 · 연구용</tr><tr data-research-input="research-1"></tr><tr data-research-input="research-31"></tr>';
 test('19 distinct ready inputs and original 4 independent rows remain',()=>{
  const r=inspectResults(base,market,html);assert.equal(r.status,'PASS');assert.equal(r.ready,19);assert.equal(r.existingScoreRows,4);
 });
@@ -17,6 +17,7 @@ test('fail closed if missing input, wrong lineage or changed original score rows
 });
 test('HTTP alone is not browser confirmation when HTML markers missing',()=>{
  assert.equal(inspectResults(base,market,'no title').status,'PARTIAL');
+ assert.equal(inspectResults(base,market,html.replace('data-research-input="research-1"','data-stale-row="research-1"')).status,'PARTIAL');
 });
 
 test('bounded body rejects misleading content length and oversized streamed data',async()=>{
