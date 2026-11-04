@@ -11,6 +11,12 @@ const isSha=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const isId=x=>typeof x==='string'&&/^pc-[a-z0-9-]{8,76}$/.test(x);
 const fail=code=>Object.assign(new Error(code),{code});
 const requireTrue=(test,code)=>{if(!test)throw fail(code);};
+// Must match the fixed recovery evidence contract in maintenance-recovery.mjs.
+// Eight arbitrary true values cannot establish an untouched installation.
+const REQUIRED_CHECKS=Object.freeze([
+  'REQUEST_IDENTITY','DEAD_INSTALL_OWNER','PREVALIDATION_ONLY','ORIGINAL_BYTES',
+  'NO_UPDATE_ARTIFACTS','NO_PAUSE','RUNNERS_IDLE','MAINTAINER_BYTES',
+]);
 
 // The approved manifest must be reviewed and committed separately. Do not
 // propagate raw lease bytes or owner identity into the plan/report.
@@ -22,8 +28,9 @@ export function makeRecoveryPlan({requestId,sourceSha,inspection,
     'RECOVERY_PLAN_EVIDENCE_INVALID');
   requireTrue(inspection?.requestId===requestId&&inspection?.sourceSha===sourceSha&&
     inspection?.status==='ABORT_UNTOUCHED_ELIGIBLE'&&inspection?.code==='PREVALIDATION_ABORT_VERIFIED'&&
-    inspection?.operationalWrites===0&&Object.keys(inspection?.checks??{}).length===8&&
-    Object.values(inspection.checks).every(value=>value===true),
+    inspection?.operationalWrites===0&&
+    Object.keys(inspection?.checks??{}).length===REQUIRED_CHECKS.length&&
+    REQUIRED_CHECKS.every(key=>inspection.checks[key]===true),
     'RECOVERY_PLAN_NOT_ELIGIBLE');
   let ledger;
   try{ledger=JSON.parse(ledgerBytes.toString('utf8'));}
