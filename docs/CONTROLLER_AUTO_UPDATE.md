@@ -1,5 +1,23 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+## 2026-11-05 위험도별 적용 기준 및 #319 복구
+
+[원본 #319](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319)의 2026-11-04 사전검증 실패는 공식 독립 Windows 복구 도구로 `ABORTED_UNTOUCHED`/`DEAD_PREVALIDATION_LEASE_ARCHIVED`까지 검증됐다. 기존 Controller `14940aa112494b1cea09ff5c7250f4af86a4ce6a`의 바이트를 바꾸거나 원본 요청을 재실행하지 않았으며 Core/DB/D1 쓰기도 0건이었다. [복구 결과 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319#issuecomment-6635620932). **설치 실패 잠금의 복구이지 신규 Controller 설치 성공은 아니다.** 복구 이후 Supervisor 소유자·heartbeat·필요 Runner 증거는 실제 조회로 별도 확인한다.
+
+위험도와 공유 자원 범위로 검사를 선택한다. 독립 A급 조회나 일반 작업의 결과 회수에는 전체 Runner 유휴·Controller 교체 검사·전역 dirty 검사를 요구하지 않는다. 승인된 설정/adapter 등록은 실제 영향 파일과 계약을 집중 검증한다. **Controller 실행 파일을 교체할 때만** 해당 drain·보호 백업·실제 설치 SHA·6 fresh Runner·사후 검사 계약을 적용한다. 현재 설치된 실행기가 더 엄격하면 정규 개선·설치 전까지 그 검사를 우회하지 않는다.
+
+### 검토 중인 설치 효율 개선(미설치)
+
+| 개선 | 의도 | 현재 적용 상태 |
+|---|---|---|
+| 비설치 파일 dirty 제외 | 현재 영향받는 Controller/config·workflow/scripts·승인 경로만 설치 충돌 검사 | Draft #321, 운영 미설치 |
+| 단계별 실패 코드 | `failureOperation`과 안전한 stage 코드로 원인을 국소화 | Draft #321, 운영 미설치 |
+| SHA 간 누적 diff 계획 | 정확한 목표 바이트로 승인 초안 생성, 승인 자체는 아님 | Draft #321, 운영 미설치 |
+| 사후 A 목록 중앙화 | `core-status`·`source-audit`·`fear-greed-archive-status` 계약 일치 | Draft #321, 운영 미설치 |
+| 1024MiB moderate 후보 | 신규 읽기 작업만 별도 승인과 실측 후 등록 | Draft #321, 운영 미설치 |
+
+[Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)는 prevalidation 단계의 무변경을 실측으로 증명할 때에만 `BLOCKED`/`PREVALIDATION_UNTOUCHED_VERIFIED`로 분류하는 추가 보완안이다. 현재 코드가 `RECOVERY_REQUIRED`를 내보낸 상황을 문서만으로 재분류하거나 lease를 직접 지우지 않는다. 두 Draft의 테스트 성공·코드 병합·유지보수기 인계·Windows 실설치·Runtime 반영을 분리해 판정한다.
+
 ## 2026-11-03 공통 장애 보완 운영 적용 증거
 
 유지보수기 source `aabc345b86c5aa4c6af23c57b2d1eedca876b4a7`의 정상 종료/인계와 신규 receiver origin을 실Windows에서 확인했다. 공통 자원 프로필, 설치 전 실패 예방, 현재/과거 잠금 분리 코드가 실제 설치 파일 해시와 일치한다. Controller `e38c6acd…` 바이트·Core/Korea/Iran 보호 해시 불변, Runner6개 Online을 확인했다. [원본 증거](../results/COMMON_MAINTENANCE_HARDENING_20261103.json). 이 기록은 당시 실측이며 현재 설치 상태를 영구 고정하지 않는다. R17/R6/ER1 기능 설치·실행·D1 게시 성공을 뜻하지 않는다. 아래 #44와 c96d 기록은 이전 성공 이력이다.
@@ -20,7 +38,7 @@
 
 ## 공통 자원 프로필
 
-새 heavy 등록은 manifest의 purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`를 사용한다. 요청 envelope에 임의 권한 필드를 추가하지 않는다. 이 프로필은 A/heavy·240초·최소 가용 1536MiB의 기존 검증된 자원 계약을 재사용하며, 동시 heavy 수·actor·기존 operation·쓰기 비활성 정책을 변경하지 않는다. 여러 기능명을 같은 프로필로 검증하므로 기능을 추가할 때마다 유지보수기 코드를 바꾸지 않는다. 다른 자원 등급은 별도의 공통 프로필 검증 대상이며 임의 숫자를 허용하지 않는다.
+새 heavy 등록은 manifest의 purpose=`pc-controller-heavy-readonly`, B scope=`PC_CONTROL_HEAVY_READONLY_UPDATE`를 사용한다. 요청 envelope에 임의 권한 필드를 추가하지 않는다. 이 프로필은 A/heavy·240초·최소 가용 1536MiB의 **현재 검증된** 자원 계약을 재사용하며, 동시 heavy 수·actor·기존 operation·쓰기 비활성 정책을 변경하지 않는다. 여러 기능명을 같은 프로필로 검증하므로 기능을 추가할 때마다 유지보수기 코드를 바꾸지 않는다. 다른 자원 등급은 별도의 공통 프로필 검증 대상이며 임의 숫자를 허용하지 않는다. 위 moderate 후보를 기존 heavy에 소급 적용하지 않는다.
 
 기존 `employment-r6-readonly-adapter` 목적의 manifest는 과거 한정 계약 호환으로 보존한다. 이를 신규 기능의 공통 승인으로 사용하지 않는다. 실행기 등록은 정확한 소스/파일 해시/테스트/승인 manifest를 계속 요구하며, 프로필 승인만으로 임의 모듈을 실행하지 않는다.
 
@@ -75,7 +93,7 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\bootstrap-
 
 ## STOP 기준과 롤백
 
-- `MAINTENANCE_PROCESS_NOT_INDEPENDENT`, 설치 SHA/목표 SHA/파일 해시 불일치, 기존 Runner busy·업로드 lease 존재, B 승인 부족, workflow가 기존에 비활성, Supervisor PID·owner 불일치: 설치 전 STOP.
+- `MAINTENANCE_PROCESS_NOT_INDEPENDENT`, 설치 SHA/목표 SHA/파일 해시 불일치, **실제 교체 직전** 기존 Runner busy·업로드 lease 존재, B 승인 부족, workflow가 기존에 비활성, Supervisor PID·owner 불일치: 해당 Controller 설치 단계 STOP. Runner busy는 독립 A급 조회·소스 계획·읽기 전용 사전검사의 전역 차단 조건이 아니다. 현재 실행기의 더 엄격한 판단은 검증된 새 버전 설치 전까지 우회하지 않는다.
 - 전환 이후 6개 재연결 또는 고정 진단이 검증된 FAIL이면 버전 스냅샷을 먼저 검증하고 기존 source로만 롤백. 복구된 결과는 `ROLLED_BACK`이며 업데이트 성공으로 보고하지 않는다.
 - 통신 timeout으로 사후 진단이 **아직 실행 중일 수 있으면** 해당 Runner를 중지하지 않는다. `RECOVERY_REQUIRED`로 기록하고 원장·실제 설치 SHA·Issue 댓글부터 대조한다. 동일 requestId 자동 재실행은 금지한다.
 - Workflow disable 직후 승인 확인 응답이 유실될 수 있으므로, 실제 Workflow 상태를 다시 조회한다. 상태가 비활성 또는 불확실하면 `BLOCKED/workflowEnabled=true`로 잘못 보고하지 않고 `RECOVERY_REQUIRED`로 남긴다. 부모 프로세스 정보 조회 실패도 독립 유지보수 실행 성공으로 간주하지 않는다.
