@@ -7,6 +7,13 @@ import {fileURLToPath} from 'node:url';
 import {RESULT_SCHEMA,validateEvent,stop,CODE} from './contract.mjs';
 
 const MAX_BYTES=32_768;
+const INVENTORY_SCHEMA='ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1';
+const BLOCKED_ACTIONS=new Set(['node.exe','wscript.exe','cscript.exe','cmd.exe','OTHER']);
+const BLOCKED_ARGUMENT_SHAPES=new Set(['UNSUPPORTED_SIZE','EMPTY','QUOTED_VBS_PATH',
+ 'BARE_VBS_PATH','QUOTED_CMD_PATH','CMD_SWITCH','VBS_WITH_FLAGS',
+ 'CMD_WITH_FLAGS','MJS_REFERENCE_UNMATCHED','OTHER']);
+const ACTION_UNRESOLVED_CODES=new Set(['INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',
+ 'INFL19_A_TASK_ACTION_AMBIGUOUS']);
 const filename=(id,issueNumber)=>
  `ZGMINI_INFL19_WRITER_SOURCE_${issueNumber}_${id}.json`;
 export const resultPath=(temp,id,issueNumber)=>{
@@ -20,7 +27,7 @@ const minimalEnv=env=>Object.fromEntries(['SystemRoot','WINDIR','PATH','Path','P
 
 export function safeResult(raw,request){
  const d=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
- const pass=d.schema==='ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1'&&
+ const pass=d.schema===INVENTORY_SCHEMA&&
   d.status==='PASS_READONLY'&&d.code==='INFL19_A_SOURCE_IDENTITY_OBSERVED'&&
   d.providerCalls===0&&d.d1Writes===0&&d.pcSourceWrites===0&&
   d.configWrites===0&&d.taskWrites===0&&
@@ -38,7 +45,16 @@ export function safeResult(raw,request){
  const base={schema:RESULT_SCHEMA,requestId:request.requestId,chatId:request.chatId,
   status:pass?'PASS_READONLY':'BLOCKED',code,providerCalls:0,d1Writes:0,
   pcSourceWrites:0,configWrites:0,taskWrites:0};
- if(!pass)return base;
+ if(!pass){
+  const safeAction=d.schema===INVENTORY_SCHEMA&&d.status==='BLOCKED'&&
+   ACTION_UNRESOLVED_CODES.has(code)&&d.providerCalls===0&&d.d1Writes===0&&
+   d.pcSourceWrites===0&&d.configWrites===0&&d.taskWrites===0&&
+   /^[a-f0-9]{64}$/.test(d.taskXmlSha256??'')&&
+   BLOCKED_ACTIONS.has(d.actionExe)&&
+   BLOCKED_ARGUMENT_SHAPES.has(d.launcherArgumentShape);
+  return safeAction?{...base,taskXmlSha256:d.taskXmlSha256,
+   actionExe:d.actionExe,launcherArgumentShape:d.launcherArgumentShape}:base;
+ }
  const expected=['scripts/pc-writer/run-local.mjs',
   'scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs',
   'scripts/pc-writer/inflation-causal-public-auto-publication-r1.test.mjs'];
@@ -77,8 +93,10 @@ export function executeInventory({event,env,spawn=spawnSync,
    raw={status:'BLOCKED',code:'INFL19_A_RUNNER_STOP'};
   else{
    raw=JSON.parse(run.stdout);
-   if(run.status!==0)raw={status:'BLOCKED',code:
-     typeof raw?.code==='string'?raw.code:'INFL19_A_RUNNER_STOP'};
+   // A normal inventory BLOCKED exits nonzero; preserve only its strictly
+   // whitelisted action metadata, never any raw Task XML or launcher args.
+   if(run.status!==0&&raw?.status!=='BLOCKED')
+    raw={status:'BLOCKED',code:'INFL19_A_RUNNER_STOP'};
   }
  }catch{raw={status:'BLOCKED',code:'INFL19_A_RUNNER_STOP'}}
  const result=safeResult(raw,request);

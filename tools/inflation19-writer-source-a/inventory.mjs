@@ -65,6 +65,30 @@ function xmlTag(block,tag){
  return xmlText(matches[0][1]);
 }
 
+const SAFE_ACTION_NAMES=new Set(['node.exe','wscript.exe','cscript.exe','cmd.exe']);
+export function launcherArgumentShape(args){
+ if(typeof args!=='string'||args.length>4096)return 'UNSUPPORTED_SIZE';
+ const s=args.trim();
+ if(!s)return 'EMPTY';
+ if(/^"[a-z]:\\[^"\r\n]+\.vbs"$/i.test(s))return 'QUOTED_VBS_PATH';
+ if(/^[a-z]:\\[^\s"'\r\n]+\.vbs$/i.test(s))return 'BARE_VBS_PATH';
+ if(/^"[a-z]:\\[^"\r\n]+\.(?:cmd|bat)"$/i.test(s))return 'QUOTED_CMD_PATH';
+ if(/^\/(?:d\s+\/)?c(?:\s|$)/i.test(s))return 'CMD_SWITCH';
+ if(/\.vbs(?:\b|["'])/i.test(s))return 'VBS_WITH_FLAGS';
+ if(/\.(?:cmd|bat)(?:\b|["'])/i.test(s))return 'CMD_WITH_FLAGS';
+ if(/\.mjs(?:\b|["'])/i.test(s))return 'MJS_REFERENCE_UNMATCHED';
+ return 'OTHER';
+}
+const sanitizedAction=(raw,exe,args)=>({
+ taskXmlSha256:digest(raw),
+ actionExe:SAFE_ACTION_NAMES.has(exe)?exe:'OTHER',
+ launcherArgumentShape:launcherArgumentShape(args),
+});
+function unresolvedAction(code,details){
+ const err=Object.assign(new Error(code),{code,safeDetails:details});
+ throw err;
+}
+
 // Extract the documented direct Node or install-local.mjs-generated WScript
 // action. Any other dispatcher/launcher requires separate human inspection.
 export function parseCoreTaskXml(raw){
@@ -80,12 +104,13 @@ export function parseCoreTaskXml(raw){
   .map(m=>path.win32.normalize(m[0].trim()));
  const scripts=[...new Set(refs.map(s=>s.toLowerCase()))];
  const actionExe=path.win32.basename(cmd).toLowerCase();
+ const details=sanitizedAction(raw,actionExe,args);
  if(scripts.length===1&&actionExe==='node.exe')
   return {kind:'direct-mjs',script:refs[0],taskXmlSha256:digest(raw),actionExe};
- if(scripts.length>1)stop('INFL19_A_TASK_ACTION_AMBIGUOUS');
- if(actionExe!=='wscript.exe')stop('INFL19_A_SCRIPT_REFERENCE_UNRESOLVED');
+ if(scripts.length>1)unresolvedAction('INFL19_A_TASK_ACTION_AMBIGUOUS',details);
+ if(actionExe!=='wscript.exe')unresolvedAction('INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',details);
  const m=/^"([a-z]:\\[^"\r\n]+\\run-local-core\.vbs)"$/i.exec(args.trim());
- if(!m)stop('INFL19_A_SCRIPT_REFERENCE_UNRESOLVED');
+ if(!m)unresolvedAction('INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',details);
  return {kind:'vbs',launcher:m[1],taskXmlSha256:digest(raw),actionExe};
 }
 
@@ -155,6 +180,20 @@ const minimalEnv=env=>({...Object.fromEntries(['SystemRoot','WINDIR','PATH','Pat
  .map(k=>[k,env[k]])),
  // `git status` must not refresh/write the operational .git/index.
  GIT_OPTIONAL_LOCKS:'0'});
+
+export function sanitizedBlock(error){
+ const code=/^INFL19_A_[A-Z_]+$/.test(error?.code??'')?error.code:'INFL19_A_UNEXPECTED_STOP';
+ const d=error?.safeDetails;
+ const details=d&&typeof d==='object'&&/^[a-f0-9]{64}$/.test(d.taskXmlSha256??'')&&
+  ['node.exe','wscript.exe','cscript.exe','cmd.exe','OTHER'].includes(d.actionExe)&&
+  ['UNSUPPORTED_SIZE','EMPTY','QUOTED_VBS_PATH','BARE_VBS_PATH','QUOTED_CMD_PATH',
+   'CMD_SWITCH','VBS_WITH_FLAGS','CMD_WITH_FLAGS','MJS_REFERENCE_UNMATCHED',
+   'OTHER'].includes(d.launcherArgumentShape)?d:null;
+ return {schema:SCHEMA,status:'BLOCKED',code,
+  ...(details?{taskXmlSha256:details.taskXmlSha256,actionExe:details.actionExe,
+   launcherArgumentShape:details.launcherArgumentShape}:{}),
+  providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
+}
 function gitCommand(root,args){
  const bin=GIT_CANDIDATES.find(f=>fs.existsSync(f));
  if(!bin)stop('INFL19_A_GIT_UNAVAILABLE');
@@ -199,9 +238,7 @@ function main(){
   process.stdout.write(JSON.stringify(report)+'\n');
  }catch(e){
   // Exclude raw exceptions: paths, Git stderr, config, and tokens must not leak.
-  const code=/^INFL19_A_[A-Z_]+$/.test(e?.code??'')?e.code:'INFL19_A_UNEXPECTED_STOP';
-  process.stdout.write(JSON.stringify({schema:SCHEMA,status:'BLOCKED',code,
-   providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0})+'\n');
+  process.stdout.write(JSON.stringify(sanitizedBlock(e))+'\n');
   process.exitCode=1;
  }
 }
