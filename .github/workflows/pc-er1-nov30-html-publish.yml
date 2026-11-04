@@ -1,0 +1,57 @@
+# Single B-grade operator-triggered publisher for already saved 2026-11 inputs.
+# Does not collect provider data, modify Core/scheduler or overwrite other feeds.
+name: ZGMINI ER1 November HTML-only D1 Publish
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-er1-nov30-html-publish-one-shot
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-nov30-html-publish-one-shot' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 15
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout event-immutable private admission control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout pinned reviewed public November HTML publisher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 88cb3e6848b6ee17bedff5c42c54b1a8a264f0ee
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Publish local saved November HTML only
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-html-publish-entry.mjs"'
+      - name: Report bounded safe result to original issue
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-html-publish-entry.mjs" --upload'
