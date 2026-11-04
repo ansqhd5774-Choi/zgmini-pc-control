@@ -70,19 +70,23 @@ export function inspectPcSourceOrigin({dataRoot,fsOps=fs,pathOps=path,git=defaul
 
  // Enumerate only direct children of E:\ZGmini\projects and its legacy folder.
  const parents=[projects,pathOps.join(projects,'legacy')];
- const dirs=[];
- for(const parent of parents){
-  const safe=safeReal(parent);
-  if(!safe||!stat(safe)?.isDirectory())continue;
-  dirs.push(safe);
+ const verifiedParents=parents.map(safeReal).filter(safe=>safe&&stat(safe)?.isDirectory());
+ const dirs=[...verifiedParents];
+ for(const safe of verifiedParents){
   let entries;
   try{entries=fsOps.readdirSync(safe,{withFileTypes:true})}
   catch{continue;}
-  if(entries.length>LIMIT_PER_DIR){output.inventoryTruncated=true;continue;}
-  for(const entry of entries){
-   if(!entry.isDirectory()||entry.isSymbolicLink?.())continue;
-   const child=safeReal(pathOps.join(safe,entry.name));
-   if(child&&stat(child)?.isDirectory())dirs.push(child);
+  const directories=entries.filter(entry=>entry.isDirectory()&&!entry.isSymbolicLink?.())
+   .sort((a,b)=>a.name.localeCompare(b.name,'en'));
+  // Process bounded batches instead of skipping every checkout when the parent
+  // contains more than LIMIT_PER_DIR unrelated entries.
+  for(let offset=0;offset<directories.length;offset+=LIMIT_PER_DIR){
+   for(const entry of directories.slice(offset,offset+LIMIT_PER_DIR)){
+    if(dirs.length>=MAX_CANDIDATES){output.inventoryTruncated=true;break;}
+    const child=safeReal(pathOps.join(safe,entry.name));
+    if(child&&stat(child)?.isDirectory())dirs.push(child);
+   }
+   if(output.inventoryTruncated)break;
   }
  }
  const distinct=[...new Set(dirs.map(s=>s.toLowerCase()))];
