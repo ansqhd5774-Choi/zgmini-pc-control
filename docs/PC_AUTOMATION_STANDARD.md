@@ -117,6 +117,7 @@ Controller **실제 교체**는 검증된 독립 유지보수기에 `pc-maintena
 5. **실측 기반 중량 자원 프로필:** 현재 1536MiB heavy를 유지하며 1024MiB moderate 후보는 독립 B manifest·Windows 실측·Core 안전 검증 후에만 신규 읽기 작업에 적용한다.
 
 위 구현은 이전 [Draft #321](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/321)·[Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)의 코드·테스트를 선별 통합하여 [PR #327](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/327)에서 **2026-11-05 source 병합 완료**(SHA `eafc71b99a43a27a3e891e2de990dc26b42c2dd5`)했다. 격리 Node 영향 테스트 106건과 복구 계획기 4건 PASS이며, **2026-11-05 KST 실PC 유지보수기 자체 인계는 이전 설치 `dbe072206a599f7ac3c4eb9d86afd89cd4fdbd54`에서 승인 대상 `5469548b05ba90f3855281e94234952bdb45fa4f`로 `PASS`였고, `STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED` 및 새 Receiver 확인이 기록됐다.** 사용자 제공 원본 결과 TXT SHA-256: `dd49073588aa114c463ad7ed80ddcefd1a4001c89b7cfab91010f18e385a7f5f`. 이는 **유지보수기 자체 교체 증거만** 해당하며, Controller 새 설치·6 Runner 재연결·1024MiB 완화 정책 운영 활성화는 입증하지 않는다. 후속 Controller 적용은 정확한 B manifest·해시·전환/복구 보호·관련 Windows 사후 검증을 별도로 따른다. 기존 정상 A 업무를 Controller 교체 완료까지 불필요하게 대기시키지 않는다.
+별도 정규 B 요청 [#345](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/345#issuecomment-6640249328)에서는 2026-11-05 KST Controller 목표·실제 SHA가 모두 `69c830275bd3fec75b17c8a98c46d689447fb1a7`이고 `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, 보호 상태 유지·Workflow 활성 상태가 확인됐다. [#346](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/346)·[#347](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/347)에서 설치 후 서로 다른 좌석의 A급 진단 PASS 및 #347의 Core 실행 전진을 확인했다. 이는 앞 문단의 **유지보수기 자체 인계와 분리된 후속 Controller 설치 증거**이며, 모든 향후 운영 상태·A 6개와 B 실패의 동시 통합 검증·1024MiB 정책 활성화를 뜻하지 않는다. 이미 유효한 실제 Runtime 결과는 해당 관측 시점과 대상 범위에서 재사용한다.
 
 유지보수기 자체 인계는 현재 설치에 맞는 별도 검증 경로를 쓴다. 기존 프로세스 증거를 소급 생성하지 않고 정상 종료 또는 종료 입증 후 인계한다. 정책 변경 의존성은 필요한 업무에만 적용한다. 업데이트/인계 때 Startup 환경의 실제 GitHub 인증을 확인하며 기존 계정·공식 보안 저장소를 사용한다. 토큰을 명령행·파일·로그·Issue에 노출하지 않는다.
 
@@ -133,6 +134,7 @@ Controller **실제 교체**는 검증된 독립 유지보수기에 `pc-maintena
 승인 범위의 최소 변경을 수행하고 사용자 수정·다른 작업자의 미커밋 변경을 보존한다. 자동 stash/reset/clean/rebase·강제 push·이력 재작성을 하지 않는다. commit은 해당 파일만 선택하고 git add . / git add -A를 사용하지 않는다.
 
 자동화 보완을 이유로 Core/Korea/Iran·다른 프로젝트 Runner·운영 source·원자료/산식·SQLite/D1·수집/게시 주기·예약·배포/DNS를 임의 변경하지 않는다. 별도 승인된 업무 변경만 해당 범위에서 수행한다. 기능·진단·과거 설치의 제한에는 대상과 시점을 명시한다.
+사용자가 승인하여 제거한 `ZGMINI-PC-Iran-Progress-R13` 예약은 [PR #342](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/342) 이후 `APPROVED_RETIRED_ABSENT`로 검사하는 예외다. Core·Korea 예약 XML의 기존 보호는 유지하되, 이란 예약이 없다는 사실만으로 무조건 전역 차단하지 않는다. 승인 없는 자동 재등록·복원은 금지하며 승인 상태와 실제 상태가 어긋날 때만 해당 범위를 진단한다.
 
 비밀정보·토큰·인증 헤더·개인정보·전체 원자료/환경변수를 요청·로그·commit·결과에 넣지 않는다. 유료 서비스·자동결제를 추가하지 않고 API·저장소·PC 자원까지 무제한이라고 보장하지 않는다.
 
