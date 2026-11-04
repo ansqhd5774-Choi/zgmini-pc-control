@@ -47,6 +47,8 @@ export function validateRequest(event,env){
 export function validateApproval(value){
  if(value?.schema!=='ZGMINI_ER1_NOV30_ACTUAL_PILOT_APPROVAL_V1'||
   value.approvalState!=='APPROVED_B_ONE_SHOT'||
+  value.approvalBasis!=='2026-11-05 user approved November ER1 actual EPS/revenue small-volume PC private collection and continuation; PC_AUTOMATION_STANDARD section 5'||
+  value.approvalEffect!=='MAX_3_PROVIDER_GET_PC_PRIVATE_RAW_AND_PREVIEW_NO_D1_NO_DEPLOY'||
   value.scope!=='PC_PRIVATE_2026_11_FUTURE_3_SYMBOL_ACTUAL_PILOT_ONLY'||
   value.sourceRepository!=='ansqhd5774-Choi/zgmini'||
   value.sourceBranch!==SOURCE_BRANCH||value.sourceSha!==SOURCE_SHA||
