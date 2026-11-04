@@ -55,6 +55,15 @@ test('pinned Task XML and existing CMD bytes are parsed without altering the Tas
   /R54_TASK_ACTION_SOURCE_DRIFT/);
 });
 
+test('same Task with XML indentation/declaration formatting remains equivalent',()=>{
+ const original=inspectR54TaskXml(taskXml(true),actionBytes);
+ const reserialized=Buffer.from('<Task>\n <Settings>\n  <Enabled>false</Enabled>\n </Settings>\n'
+  +'<Actions><Exec><Command>'+action+'</Command></Exec></Actions>\n</Task>');
+ const observed=inspectR54TaskXml(reserialized,actionBytes);
+ assert.equal(observed.definitionDigest,original.definitionDigest);
+ assert.notEqual(observed.xmlSha256,original.xmlSha256);
+});
+
 test('one pinned Task: persist verified XML backup, disable, then restore original bytes',t=>{
  const {adapter,commands,root}=sandbox(t,true);
  const baseline=adapter.saveBaseline();
