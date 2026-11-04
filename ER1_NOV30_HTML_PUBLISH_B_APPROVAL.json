@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_ER1_NOV30_HTML_PUBLISH_APPROVAL_V1",
+  "scope": "PC_SAVED_NOV2026_HTML_ONLY_D1_KEY_ONE_SHOT",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "88cb3e6848b6ee17bedff5c42c54b1a8a264f0ee",
+  "sourceFile": "scripts/pc-writer/market-calendar-nov30-publish.mjs",
+  "sourceFileSha256": "70b425b919e502eb35e45fd12d82af22acace6721b3fc687e3b3a9dfd5ec6539",
+  "expectedEvents": 3051,
+  "expectedDates": 30,
+  "outputKey": "market-calendar:earnings-nov2026-display-html",
+  "allowProviderCalls": false,
+  "allowExistingFeedWrites": false,
+  "allowRawVendorPublic": false,
+  "allowFormulaChanges": false,
+  "allowSchedulerChanges": false,
+  "allowDirectDeployment": false,
+  "maxAutomaticRetries": 0
+}
