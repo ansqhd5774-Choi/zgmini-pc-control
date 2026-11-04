@@ -1,12 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {applyApprovedUpdate} from '../tools/maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceFailureCode} from '../tools/maintenance-apply.mjs';
 import {readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause} from '../tools/update.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
+test('uncoded preflight exception reports a precise safe stage and leaves Controller untouched',async()=>{
+ const f=fixture({inspect:async()=>{throw Error('private path and arbitrary details must stay private');}});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'UPDATE_INSPECT_FAILED');
+ assert.equal(r.firstFail,'RECEIVED');
+ assert.equal(r.failureOperation,'inspect');
+ assert.equal(f.installed,previous);
+ assert.equal(f.paused,false);
+ assert.ok(!f.events.includes('stage'));
+ assert.ok(!JSON.stringify(r).includes('private path'));
+});
+test('known errors remain exact; system errno is safely tied to the failing stage',()=>{
+ assert.equal(maintenanceFailureCode({code:'SUPERVISOR_NOT_HEALTHY'},'validate'),'SUPERVISOR_NOT_HEALTHY');
+ assert.equal(maintenanceFailureCode({code:'ENOENT'},'validate'),'UPDATE_VALIDATE_ENOENT');
+ assert.equal(maintenanceFailureCode(Error('token=do-not-log'),'postcheck'),'UPDATE_POSTCHECK_FAILED');
+});
 function fixture(overrides={}) {
   const events=[],records=new Map();let installed=previous,paused=false,oldRunning=true;
   const port={
@@ -126,7 +143,7 @@ test('missing backlog before any pause cannot turn validation failure into recov
  const f=fixture({validate:async()=>{throw Object.assign(Error('missing prerequisite'),{code:'ENOENT'});},
   reconcileBacklog:async()=>{throw Object.assign(Error('no pause ever'),{code:'BACKLOG_STATE_MISSING'});}});
  const r=await applyApprovedUpdate(request,f.port);
- assert.equal(r.status,'BLOCKED');assert.equal(r.code,'ENOENT');assert.equal(r.failureOperation,'validate');
+ assert.equal(r.status,'BLOCKED');assert.equal(r.code,'UPDATE_VALIDATE_ENOENT');assert.equal(r.failureOperation,'validate');
  assert.equal(f.events.includes('pause'),false);
 });
 test('long running existing job fails closed, without stopping supervisor',async()=>{
