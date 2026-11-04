@@ -1,0 +1,95 @@
+{
+  "schema": "ZGMINI_QA_SOURCE_REGISTRY_R1",
+  "checkedAtKst": "2026-11-05",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "sourceSha": "708ed262d9425e45c0009c6470a8c7b11ac33884",
+  "sitemapBlobSha": "1d99b50e268416d94d12a997a7b4ce48604b1904",
+  "sourceOnly": true,
+  "coverage": "36 URL paths, not all provider series; runtime and observation freshness unverified",
+  "groups": {
+    "home": [
+      "/"
+    ],
+    "riskIndex": [
+      "/risk-indicators/"
+    ],
+    "riskDetail": [
+      "/inflation/",
+      "/recession/",
+      "/stagflation-risk/",
+      "/credit-risk/",
+      "/earnings-recession/",
+      "/asset-bubble/",
+      "/debt-risk/",
+      "/supply-shock/"
+    ],
+    "economicIndex": [
+      "/economic-indicators/"
+    ],
+    "economicDetail": [
+      "/economic-indicators/inflation/",
+      "/economic-indicators/employment/",
+      "/economic-indicators/rates/",
+      "/economic-indicators/credit/",
+      "/economic-indicators/growth/",
+      "/economic-indicators/consumption/",
+      "/economic-indicators/earnings/",
+      "/economic-indicators/liquidity/",
+      "/economic-indicators/fund-flows/",
+      "/economic-indicators/breadth/",
+      "/economic-indicators/dollar-fx/",
+      "/economic-indicators/commodities/"
+    ],
+    "otherDynamic": [
+      "/outbreak/",
+      "/fear-greed/korea/",
+      "/fear-greed/usa/",
+      "/sector-fear-greed/",
+      "/theme-fear-greed/",
+      "/market-calendar/"
+    ],
+    "staticGuides": [
+      "/about/",
+      "/usage/",
+      "/data-sources/",
+      "/investment-notice/",
+      "/guides/fear-greed-buying/",
+      "/guides/cpi-pce-release/",
+      "/guides/fomc/"
+    ]
+  },
+  "publicApi": {
+    "economic": [
+      "/api/market-score",
+      "/api/inflation-causal-inputs"
+    ],
+    "risk": [
+      "/api/inflation-detail",
+      "/api/recession-detail",
+      "/api/stagflation-risk-detail",
+      "/api/credit-risk-detail",
+      "/api/earnings-recession-detail",
+      "/api/asset-bubble-detail",
+      "/api/debt-risk-detail",
+      "/api/supply-shock-detail"
+    ],
+    "other": [
+      "/api/indicators/korea-funds",
+      "/api/fear-greed",
+      "/api/fear-greed/observations",
+      "/api/sector-fear-greed",
+      "/api/theme-fear-greed",
+      "/api/theme-configured",
+      "/api/release-calendar",
+      "/api/rate-sentiment",
+      "/api/iran-progress",
+      "/api/outbreak-news/iran/analysis-r1"
+    ]
+  },
+  "caveats": [
+    "Presentation catalog is not a series/provider inventory",
+    "29 employment R6 display entries do not prove live feed",
+    "Source presence or sitemap lastmod is not runtime or freshness evidence"
+  ]
+}
