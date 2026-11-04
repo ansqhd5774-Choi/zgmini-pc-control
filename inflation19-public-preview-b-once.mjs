@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 export const REPO='ansqhd5774-Choi/zgmini-pc-control';
-export const SOURCE_SHA='49e71407f5a4978debc604a53a866f1a9527c35a';
+export const SOURCE_SHA='a86229cecd483f39afb501d32ae23e3128134e4e';
 export const TITLE='pc-inflation19-public-preview-readonly-once';
 export const SCHEMA='ZGMINI_INFLATION_19_PUBLIC_PREVIEW_V1';
 export const APPROVAL='INFLATION19_PUBLIC_PREVIEW_B_APPROVAL.json';
@@ -14,7 +14,7 @@ export const WRITER=String.raw`E:\ZGmini\data\pc-writer`;
 export const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
 export const ENTRY='scripts/pc-writer/inflation-causal-public-preview-r1.mjs';
 export const HASHES=Object.freeze({
- [ENTRY]:'28112fc8029c0dfde460d2f79edc813f0ae803905a4bdc131120682db766c075',
+ [ENTRY]:'34a62afc6ae4aa7f654cfd51405282a0b628fc82a8c69538f1bcae49766b0bed',
  'lib/inflation-causal-public-catalog.mjs':'db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5',
  'worker/inflation-causal-public-r1.mjs':'86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f',
 });
@@ -104,11 +104,15 @@ export function execute(env=process.env){
   if(child.error||child.signal){report.status='STATE_UNKNOWN';report.code='INFLPRE_CHILD_STATE_UNKNOWN'}
   else{
    let result;try{result=JSON.parse(child.stdout.trim())}catch{stop('INFLPRE_CHILD_JSON_INVALID')}
-   if(child.status!==0&&result.status!=='PENDING')stop('INFLPRE_CHILD_EXIT_FAILED');
-   validatePreview(result);
+   if(child.status!==0&&result.status==='BLOCKED'){
+    report={...report,status:'BLOCKED',code:/^(?:INFL19_|INFLATION_CAUSAL_PUBLIC_)[A-Z0-9_]{2,80}$/.test(result.code??'')?result.code:'INFLPRE_CHILD_BLOCKED',firstFail:'PC_SOURCE_PREVIEW',lastPass:'SOURCE_HASH_VERIFIED'};
+   }else{
+    if(child.status!==0&&result.status!=='PENDING')stop('INFLPRE_CHILD_EXIT_FAILED');
+    validatePreview(result);
    report={...report,status:result.status==='PENDING'?'PARTIAL':'PASS',
     code:result.code,ready:result.ready,missing:result.missing,latest:result.latest,
     sourceVersion:result.sourceVersion??null,lastPass:'SOURCE_HASH_VERIFIED'};
+   }
   }
  }catch(e){report={...report,status:'BLOCKED',
   code:/^INFLPRE_[A-Z0-9_]{3,80}$/.test(e?.message??'')?e.message:'INFLPRE_UNEXPECTED',
