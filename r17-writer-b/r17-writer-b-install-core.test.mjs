@@ -50,7 +50,8 @@ function mockIo({failAt,dirty=false,alreadyInstalled=false,drainRunning=false}={
     async saveBaseline(){fatal('backup');state.history.push('backup');},
     async prepareIsolatedCommit(){fatal('prepare');state.history.push('prepare');return {
       sha:NEW,parent:BASE,cleanCommit:true,targetSha256:TARGET,diff:DIFF,
-      patchSha256:PATCH_HASH,candidateSourceSha:CANDIDATE,branch:`r17-writer-b/${RID}`};},
+      patchSha256:PATCH_HASH,candidateSourceSha:CANDIDATE,
+      branch:`r17-writer-b/${RID}`,sourceRef:`refs/heads/r17-writer-b/${RID}`};},
     async disableCoreTask(){state.taskEnabled=false;state.history.push('disable');fatal('disable');},
     async assertCoreDisabled(){if(state.taskEnabled)throw new Error('Core is enabled');},
     async waitForDrain({maxDrainMs}){assert.equal(maxDrainMs,180000);
