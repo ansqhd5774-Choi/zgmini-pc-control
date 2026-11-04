@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 
 export const REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const TITLE='pc-inflation19-public-d1-publish-once';
@@ -104,6 +104,14 @@ export async function execute(env=process.env){
    pre.data.providerCalls!==0||pre.data.dbWrites!==0||pre.data.d1Writes!==0||
    !/^INFL19_PRESENTATION_[a-f0-9]{64}$/.test(pre.data.sourceVersion??''))
    stop('INFL19_PUBLISH_PREFLIGHT_NOT_READY');
+  // Validate the same approved PC operational SHA and the clean main publisher
+  // BEFORE consuming the one-shot marker or attempting any D1 mutation.
+  const gateModule=await import(pathToFileURL(path.join(source.root,
+   'scripts','pc-writer','EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs')).href);
+  const config=JSON.parse(regular(path.join(HOME,'config.json'),100000));
+  gateModule.validateD1DualSource({config,
+   publisher:gateModule.inspectD1Source(source.root,{publisher:true}),
+   operational:gateModule.inspectD1Source(operational)});
   report={...report,ready:19,sourceVersion:pre.data.sourceVersion,
    sourceStoredAt:pre.data.sourceStoredAt,lastPass:'PC_19_AND_PUBLIC_ROUTE'};
   fs.mkdirSync(path.dirname(MARKER),{recursive:true});
