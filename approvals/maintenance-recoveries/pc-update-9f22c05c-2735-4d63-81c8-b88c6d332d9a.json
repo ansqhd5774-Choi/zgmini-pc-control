@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_RECOVERY_APPROVAL_V1",
+  "approved": true,
+  "operation": "ABORT_UNTOUCHED",
+  "requestId": "pc-update-9f22c05c-2735-4d63-81c8-b88c6d332d9a",
+  "issueNumber": 319,
+  "sourceSha": "dbe072206a599f7ac3c4eb9d86afd89cd4fdbd54",
+  "installedSha": "14940aa112494b1cea09ff5c7250f4af86a4ce6a",
+  "toolSha256": "c4fe12152936110bc9b13c16df43b0c88b4d2f05c809a7aa5363b66da7e87df0",
+  "ledgerSha256": "478f3b04629dd08da9159a7194ba7af62fc706ae749f31d809f64c365d9b922c",
+  "ownerSha256": "d02943a67fb65e3bbbfd1269642d2d7d40469b5d0f6251f1832707ce7ef78cc7",
+  "markerSha256": "c38e025d5b281ab8c2fab393e96db1a7742a703291ed681d0ad7ac2a7e5a8f88"
+}
