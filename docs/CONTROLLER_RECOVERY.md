@@ -1,5 +1,12 @@
 # 공용 Controller 실패 예방·복구·재개
 
+## #319 실제 복구 사례(2026-11-05 확인)
+
+- 원본 [#319](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319) `pc-update-9f22c05c-2735-4d63-81c8-b88c6d332d9a`는 **설치 완료가 아닌 사전검증 중단**이었다. 공식 Windows 독립 도구의 복구 전 `inspect`는 `ABORT_UNTOUCHED_ELIGIBLE`, 8/8 true, `operationalWrites=0`을 기록했다.
+- 첫 공식 실행의 `RECOVERY_APPROVAL_UNCOMMITTED`는 승인 JSON의 Git blob과 Windows CRLF 체크아웃 바이트 불일치로 발생할 수 있는 사전검사 오류였다. `.gitattributes`의 `approvals/maintenance-recoveries/*.json text eol=lf`를 [PR #324](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/324)로 반영하고, 새 분리 worktree에서 원본 바이트 일치·fresh inspect를 통과한 **새 단회 실행**을 수행했다. 첫 실패 CMD를 그대로 반복하지 않았다.
+- [복구 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319#issuecomment-6635620932): `ABORTED_UNTOUCHED` / `DEAD_PREVALIDATION_LEASE_ARCHIVED`, UTC `2026-11-04T16:10:25.084Z`, archive `pc-update-9f22c05c-2735-4d63-81c8-b88c6d332d9a-91e60677-9b52-4535-bf4a-95bdace558c7.lease`. 기존 Controller SHA `14940aa112494b1cea09ff5c7250f4af86a4ce6a`, `controllerChanged=false`, `originalRequestRetried=false`, `coreDbD1Writes=0`, `reportUpload=VERIFIED`.
+- 이전 설치 lease는 보관됐지만 새로운 Controller 버전 설치·복구 후 Supervisor heartbeat/owner·6 Runner 신선도 검증은 **별도 단계**다. 당시 원본 update 결과와 복구 결과를 합쳐 설치 PASS로 표시하지 않는다. 다른 정상 업무가 #319 과거 이력을 매번 재검사하게 하지 않는다.
+
 ## 목적과 담당
 
 모든 기능에 적용하는 공통 절차다. #68의 단일 복구 담당이 기존 실패 Issue와 requestId를 소유하고 상태·도구·해제 조건·후속 담당을 기록한다. 단순히 다른 담당자 대기라고 보고하지 않는다. 진단·개발·이미 가능한 읽기 전용 작업은 계속하고 공유 설치만 보류한다.
@@ -17,6 +24,7 @@
 | 전환/부분 적용 | 기존 maintenance-apply의 검증 백업 복원 경로 확인, 실제 파일·프로세스·원장 대조 | ROLLED_BACK와 기존 버전 실행/보호/접수 검증 |
 | 사후 진단/업로드 불명확 | 기존 Issue·postIssueNumber·원장·저장 결과 회수 | 실제 결과 확정. 실행 중 진단을 종료하거나 중복 요청하지 않음 |
 | 증거 누락/변경/다른 설치 소유자 | RECOVERY_REQUIRED와 정확한 실패 체크 기록 | 부족한 체크만 확보. 임의 잠금 삭제 금지 |
+| 새 실행기에서 사전검사 실패 후 변경 없음이 바이트·owner·intake·보호 상태로 입증 | `BLOCKED`/`PREVALIDATION_UNTOUCHED_VERIFIED`로 국소화, 원래 입력 수정 | 설치 lease 해제는 정확한 실행기 계약에 따라서만. 부분 변경/미입증은 `RECOVERY_REQUIRED` |
 
 기존 자동 rollback이 실패한 부분 적용은 abort-untouched 대상이 아니다. 임의 파일 복사나 잠금 해제를 하지 않고 해당 실제 단계에 맞는 검증된 복구 구현을 보완한다. 표는 지원하지 않는 상태를 성공으로 바꾸는 권한이 아니다.
 
@@ -43,6 +51,8 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 도구는 별도 원자적 복구 예약을 확보하고 증거/소유자 종료를 다시 확인한 다음 controller-install 디렉터리를 recovery 아래로 통째로 보관한다. Core 잠금이나 다른 lease는 이동하지 않는다. PREPARED/complete 기록과 원본 원장을 남기며 결과는 기존 실패 Issue에 자동 회수한다. 업로드만 실패하면 로컬 결과를 회수하며 복구를 반복하지 않는다. 예약이 남았거나 결과가 불명확하면 원본과 보관 위치부터 확인한다.
 
 `ABORTED_UNTOUCHED`는 이전 설치 시도를 부작용 없이 취소하고 잠금을 보관했다는 뜻이다. Controller 업데이트 성공·Supervisor 정상·다음 요청 승인 완료를 뜻하지 않는다. 기존 watchdog의 정상 복구 후 fresh Supervisor heartbeat·정확한 소유자·6 Runner를 확인한다. watchdog도 실제 오류라면 원래 오류를 수정하며 전체 node 종료로 해결하지 않는다.
+
+이 기준은 모든 A급 작업을 중단시키는 전역 자원 Gate가 아니다. 6개 Runner 전원 유휴·drain은 실제 Controller 교체 또는 현재 설치된 복구 실행기의 명시적 검사에 한정한다. 단순 조회·독립 수집/Reader·결과 회수는 경합 자원이 없으면 계속한다. 사전검증 무변경 증명 기능은 [Draft #322](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/322)의 검토안으로, 현행 PC에 설치되기 전까지 위 표를 사용해 **기존 상태를 임의 수정하지 않는다.**
 
 ## 실패 예방
 

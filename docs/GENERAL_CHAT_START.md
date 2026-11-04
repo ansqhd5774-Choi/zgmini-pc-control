@@ -1,6 +1,6 @@
 # 새 일반챗의 자동 작업 시작
 
-2026-11-04 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
+2026-11-05 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
 
 사용자가 작업 전에 전달할 짧은 지침은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)다. 현재 상태와 접수 문제는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)로 분류한다. 요약을 읽은 것만으로 최신 정본·실제 상태 확인을 대체하지 않는다.
 
@@ -13,6 +13,8 @@
 실제 Runner 연결 장애가 있을 때 [RUNNER_RECOVERY.md](RUNNER_RECOVERY.md)를 따른다. Offline 상태에서 요청을 반복 생성하지 않는다. 정상 업무의 필수 시작 절차로 복구 검사를 추가하지 않는다.
 
 Controller 설치 잠금·RECOVERY_REQUIRED는 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)를 따른다. 기존 요청의 단계/소유자/실제 바이트/부작용을 확인한 뒤 지원되는 복구 도구를 사용하고 결과 회수·재개까지 담당한다. 진단 PASS나 잠금 보관을 업데이트 PASS로 보고하지 않는다.
+
+2026-11-04 #319 설치 잠금은 공식 `ABORTED_UNTOUCHED`로 보관 완료됐다. 새 Controller 설치가 완료된 것은 아니며 이력은 [복구 지침](CONTROLLER_RECOVERY.md)에 있다. 일반 A급 조회·독립 Reader에는 #319 상태나 6개 Runner 전원 유휴를 반복 선행 조건으로 삼지 않는다. 실제 Controller 교체는 여전히 검증된 독립 유지보수기와 B manifest·원본 보호가 필요하며, Draft #321/#322 미설치 코드를 적용됐다고 간주하지 않는다.
 
 이 문서는 사용자에게 매번 CMD를 전달하지 않고 GitHub 요청→PC 자동 실행→결과 읽기를 이어가기 위한 진입점이다.
 
