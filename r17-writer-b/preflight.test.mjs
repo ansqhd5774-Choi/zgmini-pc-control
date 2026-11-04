@@ -78,6 +78,20 @@ test('two-file patch is verified in-memory against precise old bytes',()=>{
   assert.throws(()=>applyTwoFilePatch(Buffer.from(patch.replaceAll(p1,'scripts/pc-writer/unknown.mjs')),{[p1]:'a\nb\n',[p2]:'x\n'}),/R17_B_PATCH_FILESET_STOP/);
 });
 
+test('shifted Git hunk positions require unique exact original context',()=>{
+  const got=applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'prelude\na\nb\n',[p2]:'heading\nx\n',
+  });
+  assert.equal(got[p1],'prelude\na\nB\n');
+  assert.equal(got[p2],'heading\ny\n');
+  assert.throws(()=>applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'prelude\na\nb\nprelude\na\nb\n',[p2]:'heading\nx\n',
+  }),/R17_B_PATCH_CONTEXT_STOP/);
+  assert.throws(()=>applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'prelude\na\nnot-the-original\n',[p2]:'heading\nx\n',
+  }),/R17_B_PATCH_CONTEXT_STOP/);
+});
+
 test('PR old full files are not required: 2 old targets derive only from a23 patch',()=>{
   const newFiles=Object.fromEntries(ADDED.map(p=>[p,Buffer.from('export const fresh = true;\n')]));
   const newSha256=Object.fromEntries(ADDED.map(p=>[p,digest(newFiles[p])]));
