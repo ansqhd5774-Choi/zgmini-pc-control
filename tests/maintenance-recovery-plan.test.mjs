@@ -12,9 +12,13 @@ const evidence=()=>({
   ownerBytes:Buffer.from('{"pid":1234,"nonce":"SENSITIVE_VALUE"}'),
   markerBytes:Buffer.from('{"requestOwnerPid":1234,"nonce":"SENSITIVE_VALUE"}'),
 });
+const requiredChecks=[
+  'REQUEST_IDENTITY','DEAD_INSTALL_OWNER','PREVALIDATION_ONLY','ORIGINAL_BYTES',
+  'NO_UPDATE_ARTIFACTS','NO_PAUSE','RUNNERS_IDLE','MAINTAINER_BYTES',
+];
 const inspection=()=>({requestId:id,sourceSha:source,status:'ABORT_UNTOUCHED_ELIGIBLE',
   code:'PREVALIDATION_ABORT_VERIFIED',operationalWrites:0,actualControllerSha:installed,
-  checks:Object.fromEntries(Array.from({length:8},(_,i)=>['CHECK_'+i,true]))});
+  checks:Object.fromEntries(requiredChecks.map(key=>[key,true]))});
 
 test('proposes a precise but unapproved manifest without exposing private bytes',()=>{
   const result=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
@@ -30,10 +34,25 @@ test('proposes a precise but unapproved manifest without exposing private bytes'
 
 test('rejects an ineligible or uncertain recovery',()=>{
   for(const patch of [{status:'RECOVERY_REQUIRED'},{operationalWrites:null},
-    {checks:{...inspection().checks,CHECK_0:false}},{actualControllerSha:'b'.repeat(40)}]){
+    {checks:{...inspection().checks,ORIGINAL_BYTES:false}},{actualControllerSha:'b'.repeat(40)}]){
     assert.throws(()=>makeRecoveryPlan({requestId:id,sourceSha:source,
       inspection:{...inspection(),...patch},...evidence(),toolSha256}),
       /RECOVERY_PLAN_(NOT_ELIGIBLE|LEDGER_MISMATCH)/);
+  }
+});
+
+test('rejects eight unrelated true checks, missing checks and unapproved substitutions',()=>{
+  const valid=inspection();
+  for(const checks of [
+    Object.fromEntries(Array.from({length:8},(_,i)=>['CHECK_'+i,true])),
+    Object.fromEntries(requiredChecks.slice(1).map(key=>[key,true])),
+    {...valid.checks,ORIGINAL_BYTES:true,UNRELATED_CHECK:true},
+    {...valid.checks,REQUEST_IDENTITY:false},
+    Object.fromEntries([...requiredChecks.slice(1),'UNRELATED_CHECK'].map(key=>[key,true])),
+  ]){
+    assert.throws(()=>makeRecoveryPlan({requestId:id,sourceSha:source,
+      inspection:{...valid,checks},...evidence(),toolSha256}),
+    /RECOVERY_PLAN_NOT_ELIGIBLE/);
   }
 });
 
