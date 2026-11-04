@@ -100,7 +100,8 @@ export function validatePrepared(c,requestId){
   requireThat(object(c)&&SHA40.test(c.sha??'')&&c.sha!==BASE&&c.parent===BASE&&
     c.cleanCommit===true&&sameMap(c.targetSha256,TARGET)&&sameDiff(c.diff)&&
     c.patchSha256===PATCH_HASH&&c.candidateSourceSha===CANDIDATE&&
-    ID.test(requestId??'')&&c.branch===`r17-writer-b/${requestId}`,
+    ID.test(requestId??'')&&c.branch===`r17-writer-b/${requestId}`&&
+    c.sourceRef===`refs/heads/${c.branch}`,
     'R17_B_PREPARED_TREE_STOP');
 }
 
