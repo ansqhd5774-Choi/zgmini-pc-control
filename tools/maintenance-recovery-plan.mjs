@@ -70,7 +70,8 @@ export async function planFromStableEvidence({requestId,sourceSha,readEvidence,i
 // Opt-in, non-authorizing artifact only. The official recovery command still
 // requires a separately reviewed, committed approved:true manifest under
 // approvals/ and rechecks current bytes before touching its install lease.
-export function persistUnapprovedRecoveryProposal({plan,readEvidence,baseDir}){
+export function persistUnapprovedRecoveryProposal({plan,readEvidence,baseDir,
+  writeTempFile=fs.writeFileSync,syncTempFile=fs.fsyncSync}){
   const d=plan?.approvalDraft;
   requireTrue(plan?.schema==='ZGMINI_PC_RECOVERY_PLAN_V1'&&plan.status==='PROPOSAL_ONLY'&&
     plan.operation==='ABORT_UNTOUCHED'&&isId(plan.requestId)&&isSha(plan.sourceSha)&&
@@ -102,15 +103,21 @@ export function persistUnapprovedRecoveryProposal({plan,readEvidence,baseDir}){
   const destination=path.join(dir,filename),temp=path.join(dir,'.'+filename+'.'+randomUUID()+'.tmp');
   const bytes=Buffer.from(JSON.stringify(artifact,null,2)+'\n');
   const fd=fs.openSync(temp,'wx',0o600);
-  try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   try{
+    try{writeTempFile(fd,bytes);syncTempFile(fd);}finally{fs.closeSync(fd);}
+    requireTrue(fs.readFileSync(temp).equals(bytes),'RECOVERY_PROPOSAL_TEMP_MISMATCH');
     // Same-directory hard link publishes fully written bytes and must fail if
     // a proposal for this request ID already exists. Never use rename over it.
     try{fs.linkSync(temp,destination);}catch(error){
       if(error.code==='EEXIST')throw fail('RECOVERY_PROPOSAL_ALREADY_EXISTS');
       throw fail('RECOVERY_PROPOSAL_ATOMIC_PUBLISH_FAILED');
     }
-  }finally{fs.unlinkSync(temp);}
+  }finally{
+    // Also clean partial temp files when write/fsync/readback fails BEFORE
+    // hard-link publication. A failed write must never leave an approval-like
+    // candidate for an operator to mistake as complete.
+    try{fs.unlinkSync(temp);}catch(error){if(error.code!=='ENOENT')throw error;}
+  }
   return {schema:'ZGMINI_PC_UNAPPROVED_RECOVERY_RESULT_V1',status:'PROPOSAL_ONLY',
     code:'UNAPPROVED_PROPOSAL_WRITTEN',requestId:plan.requestId,sourceSha:plan.sourceSha,
     proposalRelPath:'recovery-proposals/'+filename,proposalSha256:digest(bytes),
