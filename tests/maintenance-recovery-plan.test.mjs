@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {makeRecoveryPlan,planFromStableEvidence} from '../tools/maintenance-recovery-plan.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {makeRecoveryPlan,planFromStableEvidence,persistUnapprovedRecoveryProposal} from '../tools/maintenance-recovery-plan.mjs';
 
 const id='pc-update-9f22c05c-2735-4d63-81c8-b88c6d332d9a';
 const source='dbe072206a599f7ac3c4eb9d86afd89cd4fdbd54';
@@ -71,4 +74,46 @@ test('allows stable double read with an official inspect result',async()=>{
     readEvidence:evidence,inspect:async()=>inspection()});
   assert.equal(result.approvalDraft.approved,false);
   assert.equal(result.operationalWrites,0);
+});
+
+test('explicitly saves only an unapproved proposal in a separate atomic artifact',()=>{
+  const baseDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-proposal-'));
+  const plan=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
+    ...evidence(),toolSha256});
+  plan.ownerBytes='SENSITIVE_VALUE';plan.approvalDraft.internalPath='E:/PRIVATE';
+  const result=persistUnapprovedRecoveryProposal({plan,readEvidence:evidence,baseDir});
+  assert.equal(result.status,'PROPOSAL_ONLY');assert.equal(result.approved,false);
+  assert.equal(result.operationalWrites,0);assert.equal(result.proposalWrites,1);
+  assert.match(result.proposalRelPath,/^recovery-proposals\//);
+  const artifact=fs.readFileSync(path.join(baseDir,result.proposalRelPath),'utf8');
+  assert.equal(JSON.parse(artifact).approvalDraft.approved,false);
+  assert.doesNotMatch(artifact,/SENSITIVE_VALUE|DO_NOT_PRINT|E:\/PRIVATE|"pid"|"nonce"/);
+  assert.equal(fs.existsSync(path.join(baseDir,'approvals')),false);
+  assert.doesNotMatch(JSON.stringify(result),/E:\/ZGmini|SENSITIVE_VALUE/);
+});
+
+test('an existing proposal is never overwritten even when a second attempt has changed input',()=>{
+  const baseDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-proposal-'));
+  const plan=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
+    ...evidence(),toolSha256});
+  const first=persistUnapprovedRecoveryProposal({plan,readEvidence:evidence,baseDir});
+  const destination=path.join(baseDir,first.proposalRelPath),saved=fs.readFileSync(destination);
+  assert.throws(()=>persistUnapprovedRecoveryProposal({plan,readEvidence:evidence,baseDir}),
+    /RECOVERY_PROPOSAL_ALREADY_EXISTS/);
+  assert.ok(fs.readFileSync(destination).equals(saved));
+  assert.deepEqual(fs.readdirSync(path.dirname(destination)),[path.basename(destination)]);
+});
+
+test('rejects changed evidence and refuses to write an approved manifest',()=>{
+  const baseDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-proposal-'));
+  const plan=makeRecoveryPlan({requestId:id,sourceSha:source,inspection:inspection(),
+    ...evidence(),toolSha256});
+  assert.throws(()=>persistUnapprovedRecoveryProposal({plan,baseDir,
+    readEvidence:()=>({...evidence(),ownerBytes:Buffer.from('DIFFERENT_OWNER')})}),
+  /RECOVERY_PROPOSAL_EVIDENCE_CHANGED/);
+  assert.equal(fs.existsSync(path.join(baseDir,'recovery-proposals')),false);
+  const unsafe={...plan,approvalDraft:{...plan.approvalDraft,approved:true}};
+  assert.throws(()=>persistUnapprovedRecoveryProposal({plan:unsafe,baseDir,readEvidence:evidence}),
+    /RECOVERY_PROPOSAL_NOT_UNAPPROVED/);
+  assert.equal(fs.existsSync(path.join(baseDir,'approvals')),false);
 });
