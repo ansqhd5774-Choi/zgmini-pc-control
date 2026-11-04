@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_THEME_R54_SCORE_REPLAY_B_APPROVAL_V1",
+  "grade": "B",
+  "scope": "PRIVATE_R54_SCORE_REPLAY_NO_WRITE_ONCE",
+  "publicSha": "5ee597cc6c0da9f38ab54c8aeb46b89f60a1ef36",
+  "adapterSha": "77c6cc43a2450f34a7cfe81f39040807e727f1cf",
+  "adapterBytesSha256": "13027dcc945d06e63f3445b11bed30ec7e65dd3bf16c2728b63034e50f31e46c",
+  "scriptSha256": "90141ba0a5a45396ddca057611f3cbacee3f75c7abb6e6850afcf10c8c72902c",
+  "dataRoot": "E:\\ZGmini\\data",
+  "minimumFreeMiB": 1536,
+  "timeoutSeconds": 240,
+  "maxProviderRequests": 0,
+  "maxPublicBaseGets": 1,
+  "maxAutomaticRetries": 0,
+  "pcDataWrites": false,
+  "sqliteWrites": false,
+  "d1Writes": false,
+  "schedulerWrites": false
+}
