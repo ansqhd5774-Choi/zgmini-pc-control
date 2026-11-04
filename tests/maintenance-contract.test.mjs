@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {test} from "node:test";
+import fs from 'node:fs';
 
 import {
   CONTROL_ACTOR,CONTROL_REPOSITORY,MAINTENANCE_ISSUE_SCHEMA,UPDATE_SCHEMA,
   manifestFingerprint,validateMaintenanceRequest,validateUpdateRequest,
   validateControllerConfigTransition,controllerAdmissionForPurpose,
   requestFingerprint,dedupeUpdateRequest,newUpdateLedger,transitionLedger,
+  validateInfrastructureDelta,validateControllerOnlyInstallDelta,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -44,6 +46,57 @@ function fixture(){
 }
 const repin=(f)=>{f.bytes=Buffer.from(JSON.stringify(f.manifest)+"\n");f.issue.approvalManifestSha256=digest(f.bytes);return f;};
 const admitted=f=>validateUpdateRequest(f.issue,f.bytes,f.context);
+
+test('previous full-repo infrastructure gate blocks unrelated merged workflows, selective mode admits exact A-only installed diff',()=>{
+  const changed=['.github/workflows/pc-er1-nov30-batch20.yml',
+    '.github/workflows/pc-inflation-gas-refresh-approved-once.yml',
+    'controller/market-calendar-er1-nov30-availability-readonly.mjs'];
+  const allowFiles=[{path:changed[2],sha256:HASH_A}];
+  assert.throws(()=>validateInfrastructureDelta(changed,null,()=>Buffer.alloc(0)),
+    /UNAPPROVED_INFRA_CHANGE/);
+  assert.equal(validateControllerOnlyInstallDelta(changed,allowFiles),true);
+  // The allowFiles comparison is *not* relaxed for selected Controller bytes.
+  assert.throws(()=>validateControllerOnlyInstallDelta(changed,[]),
+    /ALLOWFILE_DIFF_MISMATCH/);
+  assert.throws(()=>validateControllerOnlyInstallDelta([...changed,
+    'controller/engine.mjs'],allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
+  assert.throws(()=>validateControllerOnlyInstallDelta([...changed,
+    '.github/workflows/pc-job.yml'],allowFiles),
+    /CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED/);
+  assert.throws(()=>validateControllerOnlyInstallDelta(['../evil'],allowFiles),
+    /CONTROLLER_ONLY_DIFF_INVALID/);
+});
+
+test('scope-only Controller B manifest is explicit and rejects wrong grade, profile, or mixed infrastructure acceptance',()=>{
+  const f=fixture();f.manifest.purpose='pc-controller-maintenance';
+  f.manifest.approval.scope='PC_CONTROL_CONTROLLER_UPDATE';
+  f.manifest.controllerOnlyInstall=true;repin(f);
+  assert.equal(admitted(f).manifest.controllerOnlyInstall,true);
+  for(const wrong of [false,'true',null]){
+    const x=fixture();x.manifest.purpose='pc-controller-maintenance';
+    x.manifest.approval.scope='PC_CONTROL_CONTROLLER_UPDATE';
+    x.manifest.controllerOnlyInstall=wrong;repin(x);
+    assert.throws(()=>admitted(x),/CONTROLLER_ONLY_INSTALL_SCOPE_INVALID/);
+  }
+  const heavy=fixture();heavy.manifest.controllerOnlyInstall=true;repin(heavy);
+  assert.throws(()=>admitted(heavy),/CONTROLLER_ONLY_INSTALL_SCOPE_INVALID/);
+  const both=fixture();both.manifest.purpose='pc-controller-maintenance';
+  both.manifest.approval.scope='PC_CONTROL_CONTROLLER_UPDATE';
+  both.manifest.controllerOnlyInstall=true;
+  both.manifest.infrastructureEvidence={schema:'ZGMINI_NON_DEPLOYED_INFRA_ACK_V1',
+    approvalRef:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/414',
+    files:[{path:'.github/workflows/other.yml',sha256:HASH_A}]};repin(both);
+  assert.throws(()=>admitted(both),/CONTROLLER_ONLY_INSTALL_SCOPE_INVALID/);
+});
+
+test('regular maintenance updater uses scoped gate without modifying backup, rollback or six Runner transitions',()=>{
+  const updater=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+  assert.match(updater,/manifest\.controllerOnlyInstall===true[\s\S]*?validateControllerOnlyInstallDelta\(diff,manifest\.allowFiles\)/);
+  assert.match(updater,/else\s+validateInfrastructureDelta\(diff,manifest\.infrastructureEvidence/);
+  assert.match(updater,/VERSIONED_SNAPSHOT/);
+  assert.match(updater,/waitForReconnect/);
+  assert.match(updater,/protectedSnapshot\(\)/);
+});
 
 test('B-readonly manifest cannot change existing operations, six seats or protected settings',()=>{
   const previous={schema:'ZGMINI_PC_OPERATIONS_V1',controlRepository:CONTROL_REPOSITORY,
@@ -360,3 +413,4 @@ test('moderate readonly is a distinct B approval scope, not a generic resource b
  const post=fixture();post.manifest.postOperation='source-audit';repin(post);
  assert.equal(admitted(post).manifest.postOperation,'source-audit');
 });
+

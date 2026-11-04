@@ -13,6 +13,7 @@ import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-app
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
+  validateControllerOnlyInstallDelta,
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
@@ -325,7 +326,11 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const diff=git(['diff','--name-only',manifest.installedSha,manifest.targetSha,'--']).trim().split(/\r?\n/).filter(Boolean);
    // tools/docs/tests/reports are not deployed into the six Runner host. Changes
    // to a live workflow or executable script still require a different approval.
-   validateInfrastructureDelta(diff,manifest.infrastructureEvidence,rel=>git(['show',manifest.targetSha+':'+rel],{encoding:null}));
+   if(manifest.controllerOnlyInstall===true)
+    validateControllerOnlyInstallDelta(diff,manifest.allowFiles);
+   else
+    validateInfrastructureDelta(diff,manifest.infrastructureEvidence,
+     rel=>git(['show',manifest.targetSha+':'+rel],{encoding:null}));
    if(manifest.infrastructureEvidence){
     const infraPr=github('pulls/'+manifest.infrastructureEvidence.approvalRef.split('/').pop());
     need(infraPr.merged===true&&validSha(infraPr.merge_commit_sha),'INFRA_APPROVAL_PR_NOT_MERGED');
@@ -1530,5 +1535,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
  catch(error){console.log(JSON.stringify(maintenanceCliFailureReport(error)));process.exitCode=1;}
 }
+
 
 

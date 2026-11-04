@@ -119,7 +119,8 @@ const CHECK_KEYS=["targetSha","status","manifestSha256"];
 const BACKUP_KEYS=["strategy","rollback"];
 const ROLLBACK_KEYS=["kind","sha"];
 const FILE_KEYS=["path","sha256"];
-const optionalManifestKeys=raw=>[...MANIFEST_KEYS,...['infrastructureEvidence'].filter(k=>Object.hasOwn(raw,k))];
+const optionalManifestKeys=raw=>[...MANIFEST_KEYS,...
+  ['infrastructureEvidence','controllerOnlyInstall'].filter(k=>Object.hasOwn(raw,k))];
 // The approval pins every deployed file and the updater checks the exact Git
 // diff. New readonly adapters must not require replacing this maintainer just
 // to append another filename. Keep paths confined to controller modules.
@@ -409,6 +410,14 @@ export function validateUpdateRequest(issue,manifestBytes,{
    if(!CONTROLLER_POST_OPERATIONS.includes(raw.postOperation)){
     throw Error("UPDATE_POST_OPERATION_NOT_ALLOWED");
   }
+  // Explicit opt-in: installing only controller/config bytes must not require
+  // re-approval of independently merged workflows not staged by this updater.
+  // Never allow this exception for host/heavy profiles or an infra approval.
+  if(Object.hasOwn(raw,'controllerOnlyInstall')&&
+    (raw.controllerOnlyInstall!==true||
+     raw.purpose!=='pc-controller-maintenance'||
+     Object.hasOwn(raw,'infrastructureEvidence')))
+    throw Error('CONTROLLER_ONLY_INSTALL_SCOPE_INVALID');
   if(typeof raw.postSourceBranch!=="string"
     ||!(/^(?:main|codex\/[a-z0-9][a-z0-9./_-]{2,100})$/.test(raw.postSourceBranch))
     ||raw.postSourceBranch.includes(".."))throw Error("UPDATE_POST_SOURCE_BRANCH_INVALID");
@@ -432,6 +441,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
     backup:Object.freeze({strategy:"VERSIONED_SNAPSHOT",rollback:Object.freeze({...raw.backup.rollback})}),
     postOperation:raw.postOperation,postSourceBranch:raw.postSourceBranch,
     postSourceSha:raw.postSourceSha,
+    ...(raw.controllerOnlyInstall===true?{controllerOnlyInstall:true}:{}),
     ...(raw.infrastructureEvidence?{infrastructureEvidence:structuredClone(raw.infrastructureEvidence)}:{}),
   });
   return Object.freeze({request,manifest:normalized});
@@ -449,6 +459,26 @@ export function validateInfrastructureDelta(paths,evidence,readBytes){
  if(!changed.length&&!evidence)return true;
  if(!evidence||JSON.stringify(changed)!==JSON.stringify(evidence.files.map(f=>f.path).sort()))throw Error('UNAPPROVED_INFRA_CHANGE');
  for(const f of evidence.files)if(sha256(readBytes(f.path))!==f.sha256)throw Error('UPDATE_INFRA_HASH_MISMATCH');
+ return true;
+}
+
+// For an *explicitly* approved controller/config-only install, compare every
+// actual installed changed path to the exact allowFiles manifest. All unrelated
+// workflows/scripts were already merged into GitHub and are not staged by the
+// PC updater; requiring their combined B approval again is not a safety check
+// on this installation. A change to the live pc-job intake workflow is still
+// outside this limited contract and must be handled by the infrastructure lane.
+export function validateControllerOnlyInstallDelta(paths,allowFiles){
+ if(!Array.isArray(paths)||!Array.isArray(allowFiles)||
+  paths.some(p=>typeof p!=='string'||p.includes('..')))
+  throw Error('CONTROLLER_ONLY_DIFF_INVALID');
+ if(paths.includes('.github/workflows/pc-job.yml'))
+  throw Error('CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED');
+ const installed=paths.filter(p=>p.startsWith('controller/')||
+  p.startsWith('config/')).sort();
+ const declared=allowFiles.map(f=>f.path).sort();
+ if(JSON.stringify(installed)!==JSON.stringify(declared))
+  throw Error('ALLOWFILE_DIFF_MISMATCH');
  return true;
 }
 
@@ -548,4 +578,5 @@ export function transitionLedger(ledger,event,evidence={}){
   }
   throw Error("UPDATE_TRANSITION_NOT_ALLOWED");
 }
+
 
