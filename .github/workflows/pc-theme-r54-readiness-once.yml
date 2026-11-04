@@ -1,0 +1,49 @@
+# Fixed issue-bound, read-only R54 readiness diagnostics. No Controller calls,
+# task scheduler changes, data collector, pricing API, SQLite or D1 access.
+name: ZGMINI Theme R54 Readiness Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-theme-r54-readiness-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  r54-readiness-once:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-theme-r54-readiness-readonly-once' &&
+      !contains(github.event.issue.labels.*.name, 'pc-job') &&
+      !contains(github.event.issue.labels.*.name, 'pc-maintenance')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 2
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout exact issue-event reviewed control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          clean: true
+          fetch-depth: 1
+
+      - name: Observe fixed Windows task, memory and candidate-date metadata
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\r54-readiness-once\entry.mjs"'
+
+      - name: Return sanitized issue-bound result
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\r54-readiness-once\entry.mjs" --upload'
