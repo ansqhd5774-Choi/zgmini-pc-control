@@ -63,6 +63,11 @@ test('30/30 November calendar 3051 is not confused with historical actuals or sc
     // Same historical ticker in two archives is one scheduled issuer.
     assert.equal(r.candidateHistoricalMatches,1);
     assert.equal(r.actualEligibilityVerified,false);
+    assert.equal(r.futureCandidateAsOfUtc,'2026-11-04');
+    assert.equal(r.futureCandidateSymbols,2643);
+    assert.equal(r.futureCachedFileSymbols,0);
+    assert.equal(r.futureMissingFileSymbols,2643);
+    assert.equal(r.futureActualContentsVerified,false);
     assert.equal(r.scoreCalculationPerformed,false);
     assert.equal(r.providerCalls,0);
     assert.equal(r.dbWrites,0);
@@ -115,17 +120,55 @@ test('30/30 days with an invalid vendor event is PARTIAL, never PASS',()=>{
   }finally{f.cleanup()}
 });
 
-test('unbounded actual archive entries stop with an explicit bounded-scan code',()=>{
+test('oversized unrelated old actual archive stays bounded without blocking future candidate counts',()=>{
   const f=makeFixture();
   try{
+    for(let day=1;day<=30;day++){
+      const date=`2026-11-${String(day).padStart(2,'0')}`;
+      savePrivate(f.privateDir,date,payload(date,[`T${day}`]));
+    }
     const known=path.join(f.input,'dec31-symbol-probe');fs.mkdirSync(known);
     for(let i=1;i<=129;i++)fs.writeFileSync(path.join(known,`T${i}.json`),
       JSON.stringify({body:[{symbol:`T${i}`,date:'2026-08-01',eps:1,revenue:1}]}));
-    const r=inspectER1NovemberAvailability(f.root);
-    assert.equal(r.status,'BLOCKED');
-    assert.equal(r.code,'ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP');
+    const r=inspectER1NovemberAvailability(f.root,{clock:()=>Date.parse('2026-11-04T04:00:00Z')});
+    assert.equal(r.status,'PASS');
+    assert.equal(r.code,'ER1_NOV30_AVAILABILITY_READONLY');
+    assert.equal(r.actualArchiveInspectionPartial,true);
+    assert.equal(r.futureCandidateSymbols,26);
+    assert.equal(r.futureCachedFileSymbols,26);
+    assert.equal(r.futureMissingFileSymbols,0);
     assert.equal(r.providerCalls,0);
     assert.equal(r.dbWrites,0);
+    assert.equal(r.d1Writes,0);
+  }finally{f.cleanup()}
+});
+
+test('future-only November candidate count deduplicates and separates cached, malformed and missing files',()=>{
+  const f=makeFixture();
+  try{
+    for(let day=1;day<=30;day++){
+      const date=`2026-11-${String(day).padStart(2,'0')}`;
+      const symbols=day===4?['PAST']:day===6?['FUTURE1','FUTURE2']:
+        day===7?['FUTURE1','FUTURE3']:[];
+      savePrivate(f.privateDir,date,payload(date,symbols));
+    }
+    const full=path.join(f.input,'nov30-er1-full');fs.mkdirSync(full);
+    fs.writeFileSync(path.join(full,'FUTURE1.json'),'{}');
+    fs.writeFileSync(path.join(full,'FUTURE2.json'),'x');
+    const pilot=path.join(f.input,'nov30-er1-batch20');fs.mkdirSync(pilot);
+    // A properly sized existing archive is reusable metadata, not verified history.
+    fs.writeFileSync(path.join(pilot,'FUTURE2.json'),JSON.stringify({
+      body:[{symbol:'FUTURE2',date:'2026-08-01',eps:1,revenue:2}],
+      storedAt:'2026-11-04T00:00:00Z'}));
+    const r=inspectER1NovemberAvailability(f.root,{clock:()=>Date.parse('2026-11-05T00:00:00Z')});
+    assert.equal(r.status,'PASS');
+    assert.equal(r.futureCandidateAsOfUtc,'2026-11-05');
+    assert.equal(r.futureCandidateSymbols,3);
+    assert.equal(r.futureCachedFileSymbols,2);
+    assert.equal(r.futureInvalidFileSymbols,0);
+    assert.equal(r.futureMissingFileSymbols,1);
+    assert.equal(r.futureActualContentsVerified,false);
+    assert.equal(r.providerCalls,0);
     assert.equal(r.d1Writes,0);
   }finally{f.cleanup()}
 });
