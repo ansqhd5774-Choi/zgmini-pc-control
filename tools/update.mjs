@@ -11,7 +11,8 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
- readAllMaintenancePages,validateInfrastructureDelta,
+  readAllMaintenancePages,validateInfrastructureDelta,
+  CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
@@ -240,10 +241,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    need(manifest.backup?.strategy==='VERSIONED_SNAPSHOT'&&manifest.backup?.rollback?.sha===manifest.installedSha,'BACKUP_CONTRACT');
    need(manifest.checks?.status==='PASS'&&manifest.checks.targetSha===manifest.targetSha,'TARGET_TEST_EVIDENCE');
    need(manifest.approval?.grade==='B'&&/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/\d+$/.test(manifest.approval.ref),'APPROVAL_REFERENCE_REQUIRED');
-   need(['core-status','fear-greed-archive-status'].includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
+    need(CONTROLLER_POST_OPERATIONS.includes(manifest.postOperation),'POST_OPERATION_NOT_APPROVED');
    need(validSha(manifest.postSourceSha),'POST_SOURCE_INVALID');
    need(typeof manifest.postSourceBranch==='string'&&/^[a-z0-9][a-z0-9./_-]{1,120}$/i.test(manifest.postSourceBranch),'POST_SOURCE_BRANCH');
-   need(git(['status','--porcelain']).trim()==='','CONTROL_DIRTY');
+    // The target is staged from immutable `git show <sha>:<path>` bytes.
+    // Do not block on unrelated docs, local evidence or other draft work.
+    // Changes to installable, workflow or approval paths still fail closed.
+    need(git(['status','--porcelain','--untracked-files=all','--',
+      ...CONTROL_UPDATE_SENSITIVE_PATHS]).trim()==='','CONTROL_DIRTY');
    git(['fetch','--no-tags','origin','main']);
    need(git(['cat-file','-t',manifest.targetSha]).trim()==='commit','TARGET_NOT_COMMIT');
    need(git(['merge-base','--is-ancestor',manifest.targetSha,'refs/remotes/origin/main']).trim()==='','TARGET_NOT_ON_MAIN');
@@ -265,6 +270,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
    validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
+    need(nextOperations.operations?.[manifest.postOperation]?.grade==='A'&&
+      nextOperations.operations[manifest.postOperation].resource==='light',
+    'POST_OPERATION_NOT_INSTALLED_READONLY');
    for(const item of manifest.allowFiles){
     need(/^[a-f0-9]{64}$/.test(item.sha256),'ALLOWFILE_HASH');
     need(sha256(git(['show',manifest.targetSha+':'+item.path],{encoding:null}))===item.sha256,'ALLOWFILE_HASH_MISMATCH');
