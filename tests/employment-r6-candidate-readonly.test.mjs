@@ -65,9 +65,32 @@ test('approved fixture runs in workspace and output projection does not leak raw
   assert.equal(Object.hasOwn(result.summary,'UNTRUSTED_RAW'),false);
   assert.equal(result.providerCalls,0);assert.equal(result.d1Writes,0);
   assert.equal(result.promotionApproved,false);
+  assert.equal(result.memoryTelemetry?.kind,'SYSTEM_RAM_SAMPLED_DURING_R6_CHILD_V1');
+  assert.equal(result.memoryTelemetry?.calculationPeakValid,true);
+  assert.equal(result.memoryTelemetry?.measurementPhase,'COMPUTATION');
+  assert.ok(result.memoryTelemetry?.samples>=2);
+  assert.ok(result.memoryTelemetry?.peakSystemUsedMiB>=0);
   assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
   assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
   assert.equal(JSON.stringify(result).includes('PRIVATE_VALUE'),false);
+});
+
+test('early WAL block cannot be misreported as peak calculation memory',async t=>{
+  const f=fixture(t);
+  const blocked=fakeR6.replace("status:'PASS'","status:'BLOCKED'")
+    .replace("code:'EMPLOYMENT_R6_READONLY_STAGE_COMPLETED'","code:'WAL_SIDECAR_NOT_READY'")
+    + '\nprocess.exitCode=2;\n';
+  fs.writeFileSync(f.script,blocked);
+  const files={[ENTRY]:hash(Buffer.from(blocked))};
+  const bytes=Buffer.from(JSON.stringify({files})+'\n');
+  const approved=f.host.approvedSources[SHA];
+  fs.writeFileSync(path.join(approved.root,'manifest.json'),bytes);
+  approved.manifestSha256=hash(bytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'WAL_SIDECAR_NOT_READY');
+  assert.equal(result.memoryTelemetry?.calculationPeakValid,false);
+  assert.equal(result.memoryTelemetry?.measurementPhase,'PREFLIGHT_OR_EARLY_EXIT');
 });
 
 test('hash drift BLOCKED before executing synthetic child',async t=>{
@@ -105,3 +128,4 @@ test('an approved child cannot claim PASS without all 29 validated public status
   assert.equal(result.actualExecutionSha,SHA);
   assert.equal(JSON.stringify(result).includes('PRIVATE_VALUE'),false);
 });
+

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import {spawn} from 'node:child_process';
 
 const ENTRY='scripts/pc-writer/employment-r6-runner-stage.mjs';
@@ -60,14 +61,32 @@ export function validateBundle(request,{host,workspace}){
 }
 
 const runChild=(file,argv,{cwd,env})=>new Promise(resolve=>{
+  // This is system-wide memory use observed while the child runs, not the
+  // child process's own peak RSS. A blocked preflight is not a computation peak.
+  const mib=1048576,intervalMs=100;
+  const totalMiB=Math.floor(os.totalmem()/mib);
+  const baselineFreeMiB=Math.floor(os.freemem()/mib);
+  let minimumFreeMiB=baselineFreeMiB,samples=1,settled=false;
+  const sample=()=>{minimumFreeMiB=Math.min(minimumFreeMiB,Math.floor(os.freemem()/mib));samples++;};
   const child=spawn(process.execPath,[file,...argv],{cwd,env,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']});
+  const interval=setInterval(sample,intervalMs);
+  interval.unref();
+  const done=(exitCode,failed)=>{
+    if(settled)return;
+    settled=true;clearInterval(interval);sample();
+    resolve({exitCode,truncated:truncated||failed,
+      memoryTelemetry:{kind:'SYSTEM_RAM_SAMPLED_DURING_R6_CHILD_V1',
+        intervalMs,samples,totalMiB,baselineFreeMiB,minimumFreeMiB,
+        peakSystemUsedMiB:Math.max(0,totalMiB-minimumFreeMiB),
+        peakIncreaseFromBaselineMiB:Math.max(0,baselineFreeMiB-minimumFreeMiB)}});
+  };
   // Never retain child stdout/stderr: the approved child may accidentally emit
   // sensitive diagnostics and the parent only needs the bounded overflow flag.
   let outputBytes=0,truncated=false;
   const add=b=>{outputBytes=Math.min(2049,outputBytes+b.length);if(outputBytes>2048)truncated=true;};
   child.stdout.on('data',add);child.stderr.on('data',add);
-  child.on('error',()=>resolve({exitCode:-1,truncated:true}));
-  child.on('exit',code=>resolve({exitCode:code,truncated}));
+  child.on('error',()=>done(-1,true));
+  child.on('exit',code=>done(code,false));
 });
 
 export async function inspectEmploymentR6Candidate(request,context){
@@ -135,7 +154,11 @@ export async function inspectEmploymentR6Candidate(request,context){
       sourceBundleSha:request.sourceSha,sqliteOpened:body.sqliteOpened===true,
       summary,pit,indicators,bodyDigest:HASH.test(body.bodyDigest??'')?body.bodyDigest:null,
       walPreflight,promotionApproved:false,
+      memoryTelemetry:{...child.memoryTelemetry,
+        calculationPeakValid:body.status==='PASS',
+        measurementPhase:body.status==='PASS'?'COMPUTATION':'PREFLIGHT_OR_EARLY_EXIT'},
       providerCalls:0,d1Writes:0,operationalWrites:0};
   }catch(error){return {status:'FAIL',code:safe(error.code),candidateExecuted:true,
     actualExecutionSha:request.sourceSha};}
 }
+

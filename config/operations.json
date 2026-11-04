@@ -21,6 +21,7 @@
     "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
     "failure-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
     "timeout-proof": {"grade":"A","timeoutSeconds":5,"resource":"light"},
+    "employment-r6-wal-memory-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "employment-r6-candidate-stage-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536},
     "employment-r6-host-cas-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"}
   },
