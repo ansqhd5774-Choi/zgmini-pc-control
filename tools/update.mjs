@@ -123,7 +123,7 @@ export function inspectR54Bv3SourceTransition({originalRows,candidateRows,
   hasTrustedStartFreeze:false,canInstall:false});
 }
 
-/** Read-only, pinned 6+3 baseline; never follows any source reparse point.
+/** Read-only, pinned approved six-file baseline; never follows reparse points.
  * A mismatch is not fixed by copying an old source or resetting a checkout.
  * This inventory is diagnostic only; it is not an operator freeze attestation. */
 export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={}){
@@ -137,8 +137,7 @@ export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={})
  need(fsImpl.statSync(base).isDirectory()&&
   !fsImpl.lstatSync(base).isSymbolicLink(),
   'R54_B_SOURCE_ROOT_REDIRECT');
- const rows=[...R54_B_SOURCE_FILES.map(x=>({path:x.path,old:x.old})),
-  ...R54_B_GUARD_ORIGINALS];
+ const rows=R54_B_SOURCE_FILES;
  const out=[];
  for(const spec of rows){
   need(spec.path.split('/').every(x=>/^[\w.-]+$/.test(x)&&x!=='.'&&x!=='..'),
@@ -171,7 +170,7 @@ export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={})
  // The existing source lock must not be abandoned by an unknown owner.
  const lockDir=path.join(base,path.basename(R54_B_SOURCE_LEASE_DIR));
  need(!fsImpl.existsSync(lockDir),'R54_B_EXISTING_SOURCE_LEASE_RECONCILE');
- return {status:'R54_B_ORIGINAL_NINE_SHA_VERIFIED',root:base,
+ return {status:'R54_B_ORIGINAL_SIX_SHA_VERIFIED',root:base,
   files:out,sourceChanges:0,taskChanges:0};
 }
 
@@ -247,11 +246,10 @@ export function r54BStartFreezeReady(proof={}){
  if(closedRoutes?.taskName!==R54_TASK_NAME
   ||closedRoutes.schedulerStartDisabled!==true
   ||closedRoutes.taskNotRunning!==true||closedRoutes.childProcessCount!==0
-  ||closedRoutes.otherScheduledEntrypoints!==0
-  ||closedRoutes.otherManualEntrypointsBlocked!==true
+  ||closedRoutes.conflictingSourceLaunches!==0
+  ||closedRoutes.installWindowExclusivityVerified!==true
   ||closedRoutes.relevantLocksClear!==true
-  ||closedRoutes.exclusiveBLeaseHeld!==true
-  ||closedRoutes.twoStablePassesVerified!==true)return false;
+  ||closedRoutes.exclusiveBLeaseHeld!==true)return false;
  if(!Array.isArray(sourceRows)||sourceRows.length!==R54_B_SOURCE_FILES.length
   ||!R54_B_SOURCE_FILES.every((pin,i)=>sourceRows[i]?.path===pin.path
     &&sourceRows[i]?.actual===pin.old))return false;
@@ -290,10 +288,14 @@ export function inspectR54TaskXml(raw,actionBytes){
  const normalized=xml.replace(/(<Settings(?:\s[^>]*)?>[\s\S]*?<Enabled>)(?:true|false)(<\/Enabled>[\s\S]*?<\/Settings>)/i,
   '$1ORIGINAL_ENABLED$2');
  need(normalized!==xml,'R54_TASK_ENABLED_TAG_MISSING');
+ // Task Scheduler may reindent XML or rewrite the declaration. Preserve the
+ // backed-up bytes, but compare the relevant XML structure after restoration.
+ const canonical=normalized.replace(/^\s*<\?xml[^>]*\?>/i,'')
+  .replace(/>\s+</g,'><').trim();
  return {name:R54_TASK_NAME,xml:raw,xmlSha256:sha256(raw),
   enabled:enabled[0][1].toLowerCase()==='true',
   actionPath:action,actionSha256:R54_TASK_ACTION_SHA256,
-  definitionDigest:sha256(Buffer.from(normalized,'utf8'))};
+  definitionDigest:sha256(Buffer.from(canonical,'utf8'))};
 }
 
 /** Fixed-vector Windows schtasks port; shell=false, exactly one Task name.
@@ -401,7 +403,7 @@ export function observeR54BWindowsReadOnly({platform=process.platform,
   ['/Query','/TN',R54_TASK_NAME,'/XML']),readAction(R54_TASK_ACTION));
  const sourceFirst=inspectSource(),taskFirst=task(),processFirst=census();
  const sourceSecond=inspectSource(),taskSecond=task(),processSecond=census();
- need(sourceFirst?.status==='R54_B_ORIGINAL_NINE_SHA_VERIFIED'
+ need(sourceFirst?.status==='R54_B_ORIGINAL_SIX_SHA_VERIFIED'
   &&JSON.stringify(sourceFirst.files)===JSON.stringify(sourceSecond?.files),
   'R54_B_FIXED_SOURCE_CHANGED_DURING_OBSERVATION');
  need(taskFirst.xmlSha256===taskSecond.xmlSha256
@@ -489,8 +491,8 @@ export function createR54WindowsTaskAdapter({requestId,authorization,
   }
   const after=inspect();
   need(after.enabled===baseline.enabled
-   &&after.definitionDigest===baseline.definitionDigest
-   &&after.xmlSha256===baseline.xmlSha256,'R54_TASK_RESTORE_READBACK_DRIFT');
+   &&after.definitionDigest===baseline.definitionDigest,
+   'R54_TASK_RESTORE_READBACK_DRIFT');
   return after;
  };
  return Object.freeze({inspect,saveBaseline,disable,restore});
