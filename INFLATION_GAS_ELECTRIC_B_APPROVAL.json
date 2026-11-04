@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_INFLATION_GAS_ELECTRIC_B_APPROVAL_V1",
+  "scope": "GAS_ELECTRIC_PC_PRIVATE_ONCE",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "de262f47003e3c32fb685cf2c9b1e3edb1ec1b19",
+  "writerHome": "E:\\ZGmini\\data\\pc-writer",
+  "outputRelatives": [
+    "inflation-causal-r1/gas-dhhngsp.json",
+    "inflation-causal-r1/electricity-industrial-eia.json"
+  ],
+  "maxProviderRequests": 3,
+  "maxAutomaticRetries": 0,
+  "allowCoreWrites": false,
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowSchedulerChanges": false,
+  "allowPublicRawData": false,
+  "sourceFileHashes": {
+    "scripts/pc-writer/inflation-gas-electric-once.mjs": "abee3b4876884a0e0a632f08888a6708cc430c59c559e59437014b8b486508dd",
+    "scripts/inflation-causal-gas-electric.mjs": "3f729b8637337f86088d85f3e37c7921477681066c05422a6bcebd91d6a2c541"
+  }
+}
