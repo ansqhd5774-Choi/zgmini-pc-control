@@ -87,14 +87,15 @@ test('planner fails closed on unknown paths, duplicates, missing target blobs, a
 });
 test('planner reports deleted controller and scripts without trying to read missing target blobs',()=>{
  const r=analyzeControllerDelta({installedSha:old,targetSha:next,
-   changedPaths:['controller/obsolete.mjs','scripts/obsolete.js','docs/old.md'],
-   deletedPaths:['controller/obsolete.mjs','scripts/obsolete.js','docs/old.md'],
+   changedPaths:['controller/obsolete.mjs','scripts/obsolete.js','docs/old.md','tools/maintainer.mjs'],
+   deletedPaths:['controller/obsolete.mjs','scripts/obsolete.js','docs/old.md','tools/maintainer.mjs'],
    readTargetFile:()=>{throw Error('deleted blob should not be read');}});
  assert.equal(r.status,'REVIEW_UNCLASSIFIED_CHANGE');
  assert.equal(r.requiresControllerInstall,true);
  assert.equal(r.requiresInfrastructureApproval,true);
- assert.deepEqual(r.removedFiles.map(x=>x.path),['controller/obsolete.mjs','docs/old.md','scripts/obsolete.js']);
- assert.deepEqual(r.needsReview,['controller/obsolete.mjs','scripts/obsolete.js']);
+ assert.equal(r.requiresSeparateMaintenanceHandoff,true);
+ assert.deepEqual(r.removedFiles.map(x=>x.path),['controller/obsolete.mjs','docs/old.md','scripts/obsolete.js','tools/maintainer.mjs']);
+ assert.deepEqual(r.needsReview,['controller/obsolete.mjs','scripts/obsolete.js','tools/maintainer.mjs']);
 });
 test('planner treats undeclared deletion and unsupported diff states as invalid evidence',()=>{
  assert.throws(()=>analyzeControllerDelta({installedSha:old,targetSha:next,

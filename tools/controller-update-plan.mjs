@@ -29,11 +29,15 @@ export function analyzeControllerDelta({installedSha,targetSha,changedPaths,dele
       const group=p.startsWith('controller/')||p.startsWith('config/')
         ?'CONTROLLER_REMOVAL_REQUIRES_REVIEW':
         p.startsWith('.github/workflows/')||p.startsWith('scripts/')
-        ?'INFRA_REMOVAL_REQUIRES_REVIEW':'NON_INSTALLED_REMOVAL';
+        ?'INFRA_REMOVAL_REQUIRES_REVIEW':
+        p.startsWith('tools/')?'MAINTENANCE_REMOVAL_REQUIRES_REVIEW':'NON_INSTALLED_REMOVAL';
       removedFiles.push({path:p,category:group});
-      if(group==='NON_INSTALLED_REMOVAL'&&/^(docs|tests|results|approvals|tools)\//.test(p))
+      if(group==='NON_INSTALLED_REMOVAL'&&/^(docs|tests|results|approvals)\//.test(p))
         otherChanges.push({path:p,category:'NOT_INSTALLED_WITH_CONTROLLER'});
-      else needsReview.push(p);
+      else if(group==='MAINTENANCE_REMOVAL_REQUIRES_REVIEW'){
+        otherChanges.push({path:p,category:'MAINTENANCE_SOURCE_SEPARATE_HANDOFF'});
+        needsReview.push(p);
+      }else needsReview.push(p);
       continue;
     }
     if(p.startsWith('controller/')||p.startsWith('config/')){
