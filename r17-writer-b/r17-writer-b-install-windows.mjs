@@ -15,6 +15,7 @@ import {
 } from './r17-writer-b-install-core.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from './r17-b-xml.mjs';
 import {commitExactOverlay} from './r17-b-git-stage.mjs';
+import {acquireInstallClaim,releaseInstallClaim} from './r17-b-claim.mjs';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const MANIFEST=path.join(ROOT,'approval','R17_WRITER_B_INSTALL_APPROVAL.json');
@@ -172,11 +173,12 @@ function buildIsolatedCommit({originals,newFiles,requestId}){
       check(mode.startsWith('100644 blob '),'R17_B_GIT_BASE_MODE_STOP');
     else check(mode==='','R17_B_GIT_NEWFILE_PRESENT_STOP');
   }
+  const sourceRef=`refs/heads/r17-writer-b/${requestId}`;
   const {sha,diff}=commitExactOverlay({stage,base:BASE,overlay,
-    expectedSha256:TARGET,expectedDiff:DIFF,run:git,runRaw:gitRaw});
+    expectedSha256:TARGET,expectedDiff:DIFF,requestRef:sourceRef,run:git,runRaw:gitRaw});
   return {sha,parent:BASE,cleanCommit:true,targetSha256:TARGET,diff,
     patchSha256:PATCH_HASH,candidateSourceSha:CANDIDATE,
-    branch:`r17-writer-b/${requestId}`,stage};
+    branch:`r17-writer-b/${requestId}`,sourceRef,stage};
 }
 
 function makeAdapter(authorized){
@@ -187,13 +189,10 @@ function makeAdapter(authorized){
   const adapter={
     async claim(id){
       check(id===authorized.requestId,'R17_B_REQUEST_ID_STOP');
-      fs.mkdirSync(JOURNAL_ROOT,{recursive:true});
-      fs.mkdirSync(journalDir,{recursive:false}); // EEXIST => no retry
-      fs.writeFileSync(journalFile,JSON.stringify({status:'CLAIMED',at:new Date().toISOString()})+'\n',{flag:'wx'});
-      lockFd=fs.openSync(SHARED_INSTALL_LOCK,'wx');
-      fs.writeSync(lockFd,id);fs.fsyncSync(lockFd);
-      verifiedEmptyHooksDir=path.join(journalDir,'hooks-empty');
-      fs.mkdirSync(verifiedEmptyHooksDir);
+      const claim=acquireInstallClaim({journalRoot:JOURNAL_ROOT,requestId:id,
+        sharedLock:SHARED_INSTALL_LOCK});
+      lockFd=claim.fd;
+      verifiedEmptyHooksDir=claim.hooksDir;
     },
     async journal(phase,error){
       const fd=fs.openSync(journalFile,'a');
@@ -273,7 +272,9 @@ function makeAdapter(authorized){
         t.unknownProcessLines===0&&!fs.existsSync(LOCK),'R17_B_CORE_NOT_DRAINED_STOP');
     },
     async switchToPreparedCommit({before,prepared:c}){
-      check(c===prepared&&c.branch===`r17-writer-b/${authorized.requestId}`,
+      check(c===prepared&&c.branch===`r17-writer-b/${authorized.requestId}`&&
+        c.sourceRef===`refs/heads/${c.branch}`&&
+        git(c.stage,'rev-parse','--verify',c.sourceRef)===c.sha,
         'R17_B_PREPARED_REF_STOP');
       assertSourceState(BASE,before.originalBranch,BEFORE);
       check(readConfig().raw.equals(originalConfig),'R17_B_PRE_SWITCH_CONFIG_DRIFT_STOP');
@@ -296,8 +297,12 @@ function makeAdapter(authorized){
         check(attribute===`${file}: filter: unspecified`||attribute===`${file}: filter: unset`,
           'R17_B_GIT_FILTER_ATTR_STOP');
       }
-      gitLive('fetch','--no-tags','--no-write-fetch-head',c.stage,`${c.sha}:${ref}`);
+      gitLive('fetch','--no-tags','--no-write-fetch-head',c.stage,`${c.sourceRef}:${ref}`);
+      check(git(SOURCE_ROOT,'rev-parse','--verify',ref)===c.sha,
+        'R17_B_FETCH_REF_SHA_STOP');
       gitLive('switch',c.branch);
+      check(git(SOURCE_ROOT,'rev-parse','HEAD')===c.sha,
+        'R17_B_SWITCH_SHA_STOP');
     },
     async assertSource({head,branch,files}){assertSourceState(head,branch,files);},
     async changeConfigSource({from,to}){
@@ -349,11 +354,10 @@ function makeAdapter(authorized){
     },
     async finalize(result){
       if(lockFd===null)return;
-      fs.closeSync(lockFd);lockFd=null;
-      if(result.status==='R17_B_RECOVERY_REQUIRED')return; // manual inspection
-      const current=fs.readFileSync(SHARED_INSTALL_LOCK,'utf8');
-      check(current===authorized.requestId,'R17_B_SHARED_LOCK_DRIFT_STOP');
-      fs.unlinkSync(SHARED_INSTALL_LOCK); // exact owned leaf, no recursive cleanup
+      releaseInstallClaim({fd:lockFd,sharedLock:SHARED_INSTALL_LOCK,
+        requestId:authorized.requestId,
+        retain:result.status==='R17_B_RECOVERY_REQUIRED'});
+      lockFd=null;
     },
   };
   return adapter;
