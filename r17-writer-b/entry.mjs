@@ -144,7 +144,10 @@ function main(){
     event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
     // Only requestId is reported from untrusted body after the full contract validates.
     requestId=validateEvent(event,env).requestId;
-  }catch(error){return persist({status:'BLOCKED',code:codeOf(error),runId:env.GITHUB_RUN_ID??'unknown'});}
+  }catch(error){
+    process.exitCode=1;
+    return persist({status:'BLOCKED',code:codeOf(error),runId:env.GITHUB_RUN_ID??'unknown'});
+  }
   let report;
   try{
     report=runReadOnly({event,env,controlRoot:path.join(ws,'r17-control'),
