@@ -14,7 +14,7 @@
 
 Controller 설치 잠금·RECOVERY_REQUIRED는 [CONTROLLER_RECOVERY.md](CONTROLLER_RECOVERY.md)를 따른다. 기존 요청의 단계/소유자/실제 바이트/부작용을 확인한 뒤 지원되는 복구 도구를 사용하고 결과 회수·재개까지 담당한다. 진단 PASS나 잠금 보관을 업데이트 PASS로 보고하지 않는다.
 
-2026-11-04 #319 설치 잠금은 공식 `ABORTED_UNTOUCHED`로 보관 완료됐다. 새 Controller 설치가 완료된 것은 아니며 이력은 [복구 지침](CONTROLLER_RECOVERY.md)에 있다. 일반 A급 조회·독립 Reader에는 #319 상태나 6개 Runner 전원 유휴를 반복 선행 조건으로 삼지 않는다. 실제 Controller 교체는 여전히 검증된 독립 유지보수기와 B manifest·원본 보호가 필요하며, Draft #321/#322 미설치 코드를 적용됐다고 간주하지 않는다.
+2026-11-05 KST #319 설치 잠금은 공식 `ABORTED_UNTOUCHED`로 보관 완료됐다. 새 Controller 설치가 완료된 것은 아니며 이력은 [복구 지침](CONTROLLER_RECOVERY.md)에 있다. 일반 A급 조회·독립 Reader에는 #319 상태나 6개 Runner 전원 유휴를 반복 선행 조건으로 삼지 않는다. 실제 Controller 교체는 여전히 검증된 독립 유지보수기와 B manifest·원본 보호가 필요하며, Draft #321/#322 미설치 코드를 적용됐다고 간주하지 않는다.
 
 이 문서는 사용자에게 매번 CMD를 전달하지 않고 GitHub 요청→PC 자동 실행→결과 읽기를 이어가기 위한 진입점이다.
 
