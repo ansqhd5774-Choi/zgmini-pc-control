@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
-import {execFileSync,spawn} from 'node:child_process';
+import {execFileSync,spawn,spawnSync} from 'node:child_process';
+import {TextDecoder} from 'node:util';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-apply.mjs';
 import {validateUpdateRequest,validateMaintenanceRequest,
@@ -197,6 +198,33 @@ export function backlogIssueInPause(entry,window){
    !String(entry?.title??'').startsWith('Maintenance replay ');
 }
 
+const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
+const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
+const decodeTaskOutput=bytes=>new TextDecoder('euc-kr').decode(bytes);
+const taskMissingError=bytes=>[decodeTaskOutput(bytes),Buffer.from(bytes).toString('utf8')].some(taskNotFound);
+export function confirmRetiredIranAbsent({exact,inventory}){
+ // An intentionally removed task is a protected state, not a missing guard.
+ // A nonzero exit alone could mean ACCESS_DENIED. Fail closed on uncertainty.
+ need(exact&&!exact.error&&!exact.signal,'RETIRED_IRAN_QUERY_UNCERTAIN');
+ need(exact.status!==0,'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
+ need(exact.status===1&&taskMissingError(exact.stderr??Buffer.alloc(0)),
+  'RETIRED_IRAN_QUERY_UNCERTAIN');
+ need(inventory&&!inventory.error&&!inventory.signal&&inventory.status===0,
+  'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ const names=decodeTaskOutput(inventory.stdout??Buffer.alloc(0)).split(/\r?\n/)
+  .map(line=>line.match(/^\s*"([^"]+)"\s*,/)?.[1]??null).filter(Boolean);
+ need(names.length>0,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ need(!names.some(name=>/ZGMINI-PC-Iran/i.test(name)),'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
+ return 'APPROVED_RETIRED_ABSENT';
+}
+function retiredIranEvidence(schtasks){
+ const opt={windowsHide:true,timeout:15000,maxBuffer:4000000};
+ const exact=spawnSync(schtasks,['/Query','/TN',retiredIranTask,'/XML'],opt);
+ // Inventory is mandatory even when the direct query failed: reject name drift
+ // and distinguish a genuine absence from an untrustworthy query environment.
+ const inventory=spawnSync(schtasks,['/Query','/FO','CSV','/NH'],opt);
+ return confirmRetiredIranAbsent({exact,inventory});
+}
 function protectedSnapshot() {
  // Existing Core task XML hashes + PC writer config hashes, read-only.
  const dataRoot='E:/ZGmini/data',out={files:{},tasks:{}};
@@ -205,9 +233,10 @@ function protectedSnapshot() {
   if(fs.existsSync(f))out.files[name]=sha256(fs.readFileSync(f));
  }
  const schtasks=path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe');
- for(const name of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13']) {
+ for(const name of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']) {
   out.tasks[name]=sha256(execFileSync(schtasks,['/Query','/TN',name,'/XML'],{windowsHide:true,timeout:15000}));
  }
+ out.tasks[retiredIranTask]=retiredIranEvidence(schtasks);
  return out;
 }
 
@@ -1501,4 +1530,5 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
  catch(error){console.log(JSON.stringify(maintenanceCliFailureReport(error)));process.exitCode=1;}
 }
+
 

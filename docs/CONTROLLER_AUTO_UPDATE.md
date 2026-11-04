@@ -1,5 +1,25 @@
 # 승인된 PC Controller 자동 갱신 — 독립 유지보수기
 
+## 2026-11-05 이란 R13 의도적 운영 제외 — Controller 갱신 전 선행 인계
+
+사용자가 메모리 부담으로 이란 콘텐츠를 제거했다. 2026-11-04T18:54:31Z의
+읽기 전용 Windows 점검에서 `ZGMINI-PC-Iran-Progress-R13` 정확한 작업 조회는
+`TASK_OR_PATH_NOT_FOUND`였고, 전체 예약 목록의 이란 작업 수는 0이었다.
+이는 [#339](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/339)의
+사전검증 실패 경로(`tools/update.mjs` 보호 상태 읽기)를 설명한다.
+이란 작업을 임의 재등록하거나 실행하지 않는다.
+
+변경 계약: Core/Korea 예약 XML과 원본 writer 보호 해시는 계속 필수다. 이란 R13만
+**명시적으로 승인된 부재 상태** `APPROVED_RETIRED_ABSENT`로 기록하되, 정확한
+`schtasks` 미존재 오류와 예약 목록의 이란 작업 0개가 모두 확인되어야 한다.
+접근 거부·명령 실패·목록 불명확·이란 예약 재등장은 차단한다. 설치 전/후 보호
+상태를 동일하게 비교하며 예외적인 해시 완화나 수집 재시작을 하지 않는다.
+
+소스 병합만으로 설치된 유지보수기가 바뀌지 않는다. 별도 B급 인계 승인 manifest와
+`handoff-maintenance.mjs`의 Windows 실증을 먼저 완료한 뒤 새 Controller 승인 SHA로
+설치·6 Runner·A급 사후검사를 확인한다. #339은 재실행하지 않는다.
+1024MiB 메모리 후보 정책 역시 Windows 실측 전까지 변경하지 않는다.
+
 ## 2026-11-05 위험도별 적용 기준 및 #319 복구
 
 [원본 #319](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319)의 2026-11-04 사전검증 실패는 공식 독립 Windows 복구 도구로 `ABORTED_UNTOUCHED`/`DEAD_PREVALIDATION_LEASE_ARCHIVED`까지 검증됐다. 기존 Controller `14940aa112494b1cea09ff5c7250f4af86a4ce6a`의 바이트를 바꾸거나 원본 요청을 재실행하지 않았으며 Core/DB/D1 쓰기도 0건이었다. [복구 결과 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319#issuecomment-6635620932). **설치 실패 잠금의 복구이지 신규 Controller 설치 성공은 아니다.** 복구 이후 Supervisor 소유자·heartbeat·필요 Runner 증거는 실제 조회로 별도 확인한다.
