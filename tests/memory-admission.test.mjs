@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {executeJob} from '../controller/engine.mjs';
+import {exclusive} from '../controller/common.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from '../controller/memory-admission.mjs';
 
 const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
@@ -126,4 +127,17 @@ test('invalid Core config identifies read failure without exposing config bytes 
  assert.equal(fs.existsSync(path.join(c.root,'leases','request-'+q.requestId)),false);
  assert.equal(fs.existsSync(path.join(r.workspace,'input.json')),false);
  assert.equal(JSON.stringify(r.report).includes('private config'),false);
+});
+test('active shared heavy lease is retained and reported as a shared prevalidation conflict',async()=>{
+ const c=setup(),q=request('theme-common-tests','memory-request-6002');
+ const release=exclusive(path.join(c.root,'leases'),'heavy');
+ try{
+  const r=await executeJob(q,{...c,fixtureFreeMiB:()=>2000});
+  assert.equal(r.report.status,'BLOCKED');assert.equal(r.report.code,'LEASE_BUSY');
+  assert.equal(r.report.phase,'PREVALIDATION');assert.equal(r.report.failureOperation,'RESOURCE_LEASE');
+  assert.equal(r.report.affectedScope,'SHARED_LEASE_POSSIBLE');
+  assert.equal(r.report.nextAction,'INSPECT_LEASE_OWNER_NO_LOCK_DELETION');
+  assert.equal(fs.existsSync(path.join(c.root,'leases','heavy')),true);
+  assert.equal(fs.existsSync(path.join(r.workspace,'input.json')),false);
+ }finally{release();}
 });
