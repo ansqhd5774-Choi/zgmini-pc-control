@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,diagnoseR17PatchContexts,diagnoseR17RestrictedContexts,diagnoseR17SingleDispatcher,verifiedR17Source,decodeR17Launcher,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
+import {summarizeR17Probe,assessR17Evidence,assessR17TaskChain,diagnoseR17TaskChain,classifyR17PatchFailure,diagnoseR17PatchContexts,diagnoseR17RestrictedContexts,diagnoseR17SingleDispatcher,verifiedR17Source,decodeR17Launcher,R17_VBS_CHAIN,R17_APPROVED,R17_BASE_FILES,R17_MISSING,R17_PATCH_SHA,R17_PATCH_TEXT,isTrackedSourceDirty} from '../controller/us-breadth-r17-preflight.mjs';
 
 const valid=()=>({
  head:R17_APPROVED,dirty:false,hashes:{...R17_BASE_FILES},
@@ -38,15 +38,18 @@ test('patch diagnosis returns only five-hunk positions and match booleans, even 
 });
 const contextFixture=()=>({
  'scripts/pc-writer/local-cycle.mjs':[
+  ...Array.from({length:179},(_,i)=>`// fixture cycle ${i}`),
   'const prior=1;',
   " const report={at:new Date().toISOString(),lane,collectionExit:collection.status,extra:'SAFE'};",
   ' save(report);',
  ].join('\r\n'),
  'scripts/pc-writer/run-local.mjs':[
+  ...Array.from({length:68},(_,i)=>`// fixture publication head ${i}`),
   ' await attemptOutput(report,\'us-breadth\',async()=>{',
   '  report.usBreadth=await prepareUsBreadth(core,{now:new Date(now)});',
   ' });',
   ' const marketReady=true;',
+  ...Array.from({length:148},(_,i)=>`// fixture publication middle ${i}`),
   ' if(report.usBreadth?.prepared)await attemptOutput(report,\'us-breadth-publication\',async()=>{',
   '   report.usBreadth.publication=await publishUsBreadth(remote,config.core,report.usBreadth,{now});',
   ' });',
@@ -76,9 +79,42 @@ test('restricted contexts fail closed on unapproved head/hash, secrets, ambiguit
  assert.equal(withheld.status,'SENSITIVE_CONTEXT_SUPPRESSED');
  assert.equal(JSON.stringify(withheld).includes('NEVER_EMIT_THIS'),false);
  const dup={...src,'scripts/pc-writer/local-cycle.mjs':src['scripts/pc-writer/local-cycle.mjs']+"\n const report={at:new Date().toISOString(),lane,collectionExit:other};"};
- assert.equal(diagnoseR17RestrictedContexts(dup,valid()).status,'CONTEXT_ANCHOR_NOT_UNIQUE');
+ assert.deepEqual(diagnoseR17RestrictedContexts(dup,valid()),
+  {status:'CONTEXT_LOCATION_UNVERIFIED',failedHunk:'185',excerpts:[]});
  const long={...src,'scripts/pc-writer/local-cycle.mjs':src['scripts/pc-writer/local-cycle.mjs'].replace('extra:', 'x'.repeat(900)+'extra:')};
  assert.equal(diagnoseR17RestrictedContexts(long,valid()).status,'CONTEXT_TOO_LONG');
+});
+test('fuzzy relative alignment retains bounded context when patch old lines are modified/deleted',()=>{
+ const cycle='scripts/pc-writer/local-cycle.mjs',publication='scripts/pc-writer/run-local.mjs';
+ const rows={[cycle]:Array(360).fill('// fixture padding'),
+  [publication]:Array(360).fill('// fixture padding')};
+ const fill=(file,hunk,change)=>{
+  const section=R17_PATCH_TEXT.split(/(?=^diff --git )/m)
+   .find(x=>x.startsWith(`diff --git a/${file} `));
+  const part=section.split(/(?=^@@ )/m).slice(1)
+   .find(x=>x.startsWith(`@@ -${hunk},`));
+  const start=Number(part.match(/^@@ -(\d+)/)[1])-1;
+  const old=part.split('\n').slice(1)
+   .filter(x=>x.startsWith(' ')||x.startsWith('-')).map(x=>x.slice(1));
+  const row=old.findIndex(x=>change.test(x));
+  assert.ok(row>=0);
+  old[row]=old[row].replace(change,'NEW_APPROVED_VALUE');
+  rows[file].splice(start,old.length,...old);
+ };
+ fill(cycle,185,/const report=/);
+ fill(publication,72,/report\.usBreadth=await prepareUsBreadth/);
+ fill(publication,228,/report\.usBreadth\.publication=await publishUsBreadth/);
+ const asSource=()=>Object.fromEntries(Object.entries(rows).map(([k,v])=>[k,v.join('\n')]));
+ const changed=diagnoseR17RestrictedContexts(asSource(),valid());
+ assert.equal(changed.status,'THREE_EXCERPTS_READONLY');
+ assert.deepEqual(changed.excerpts.map(x=>x.method),Array(3).fill('FUZZY_RELATIVE_LINES'));
+ assert.ok(changed.excerpts.every(x=>x.matchedLines>=2&&x.lineCount>=3&&x.lineCount<=6));
+ // Delete a line inside the second hunk: its subsequent context shifts by one.
+ rows[publication].splice(72,1);
+ const deleted=diagnoseR17RestrictedContexts(asSource(),valid());
+ assert.equal(deleted.status,'THREE_EXCERPTS_READONLY');
+ assert.ok(deleted.excerpts.every(x=>x.matchedLines>=2));
+ assert.ok(JSON.stringify(deleted).length<=2500);
 });
 test('dispatcher diagnosis returns one allowlisted static name and hash, never Task/VBS text',()=>{
  const action={command:'C:\\Windows\\System32\\wscript.exe',
