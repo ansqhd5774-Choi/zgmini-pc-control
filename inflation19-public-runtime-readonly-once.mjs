@@ -77,18 +77,22 @@ export function inspectResults(summary,market,html){
  const inflation=market?.domains?.find(x=>x?.id==='inflation');
  if(!inflation||!Array.isArray(inflation.indicators)||inflation.indicators.length!==4)
   stop('INFL19_PUBLIC_EXISTING_FOUR_NOT_VERIFIED');
- const htmlTitle=html.includes('물가 관련 수집 원자료')||html.includes('RESEARCH INPUTS');
- const htmlSection=html.includes('물가 구성 지표')||html.includes('ECONOMIC INDICATORS');
- return {status:htmlTitle&&htmlSection?'PASS':'PARTIAL',
-  code:htmlTitle&&htmlSection?'INFL19_PUBLIC_HTTP_AND_HTML_VERIFIED':'INFL19_PUBLIC_HTML_MARKER_MISSING',
+ const htmlTitle=html.includes('물가 관련 지표 (원자료 19개');
+ const htmlSection=html.includes('ECONOMIC INDICATORS');
+ const inlineStart=html.indexOf('수집 원자료 19개');
+ const firstResearch=html.indexOf('data-research-input="research-1"');
+ const lastResearch=html.indexOf('data-research-input="research-31"');
+ const inline=htmlTitle&&htmlSection&&inlineStart>=0&&firstResearch>inlineStart&&lastResearch>firstResearch;
+ return {status:inline?'PASS':'PARTIAL',
+  code:inline?'INFL19_PUBLIC_INLINE_19_AND_FOUR_API_VERIFIED':'INFL19_PUBLIC_INLINE_RESEARCH_NOT_VERIFIED',
   ready:summary.indicators.length,existingScoreRows:inflation.indicators.length,
   sourceVersion:summary.sourceVersion,publicHtmlResearchTitle:htmlTitle,
-  publicHtmlExistingSection:htmlSection};
+  publicHtmlExistingSection:htmlSection,publicHtmlInlineResearch:inline};
 }
 export async function execute(env=process.env){
  let result={schema:SCHEMA,status:'BLOCKED',code:'INFL19_PUBLIC_NOT_STARTED',ready:null,
   existingScoreRows:null,sourceVersion:null,publicHtmlResearchTitle:false,
-  publicHtmlExistingSection:false,providerCalls:0,dbWrites:0,coreWrites:0,d1Writes:0};
+  publicHtmlExistingSection:false,publicHtmlInlineResearch:false,providerCalls:0,dbWrites:0,coreWrites:0,d1Writes:0};
  let issue;
  try{
   const event=JSON.parse(read(env.GITHUB_EVENT_PATH)),req=validate(event,env);
