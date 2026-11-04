@@ -1,8 +1,8 @@
 {
   "schema": "ZGMINI_R54_READINESS_B_APPROVAL_V1",
   "grade": "B",
-  "scope": "FIXED_R54_READONLY_TASK_MEMORY_CANDIDATE_DATES_LINEAGE_ONCE",
-  "approvalBasis": "docs/PC_AUTOMATION_STANDARD.md#5 + existing-ten-theme R54 recovery current-stage diagnostic",
+  "scope": "FIXED_R54_R35_READONLY_PROBE_LEDGER_SPY_RAW_FORENSICS_ONCE",
+  "approvalBasis": "2026-11-04 user authorization for R35 2026-11-02 and 2026-11-03 read-only scheduled provenance, local probe budget and SPY raw SHA forensics; docs/PC_AUTOMATION_STANDARD.md#5",
   "dataRoot": "E:\\ZGmini\\data",
   "timeoutSeconds": 120,
   "maxProviderRequests": 0,
@@ -11,5 +11,5 @@
   "databaseWrites": false,
   "d1Writes": false,
   "schedulerWrites": false,
-  "scriptSha256": "b2459495b9d85835fc4336537f5ebdefe7747e415afc979c811f76b79117bdb4"
+  "scriptSha256": "86436b6e299980594b235a66676c4e6b34193606ada474751387905f3aa4f8ed"
 }
