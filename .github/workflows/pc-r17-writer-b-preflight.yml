@@ -25,7 +25,7 @@ jobs:
       run:
         shell: cmd
     env:
-      R17_CONTROL_SHA: e48c9b8e9de7fd3d831774f56004c66c3039fb0c
+      R17_CONTROL_SHA: 7090da1b7c42f4da17d8e67fe0c2f15f7eea5df9
       GITHUB_EVENT_ACTION: ${{ github.event.action }}
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: core.autocrlf
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ansqhd5774-Choi/zgmini-pc-control
-          ref: e48c9b8e9de7fd3d831774f56004c66c3039fb0c
+          ref: 7090da1b7c42f4da17d8e67fe0c2f15f7eea5df9
           path: r17-control
           persist-credentials: false
           clean: true
