@@ -174,3 +174,22 @@ export function buildCandidateOverlay({originals,patchBytes,newFiles,newSha256})
   }
   return {overlay,oldTargetSha256:Object.fromEntries(OLD.map(p=>[p,digest(overlay.get(p))]))};
 }
+
+// Native Git applies the approved patch only to isolated, byte-exact copies.
+// Never normalize a mixed-EOL operational source when deriving its target hash.
+export function overlayFromPatchedBytes({patchedOld,newFiles,newSha256}){
+  const overlay=new Map();
+  for(const p of OLD){
+    const b=patchedOld?.[p];
+    if(!Buffer.isBuffer(b)||b.length<1||b.length>2_000_000)
+      stop('R17_B_PATCH_TARGET_MISMATCH_STOP');
+    overlay.set(p,b);
+  }
+  for(const p of ADDED){
+    const b=newFiles[p];
+    if(!Buffer.isBuffer(b)||digest(b)!==newSha256[p])
+      stop('R17_B_CANDIDATE_SHA_STOP');
+    overlay.set(p,b);
+  }
+  return {overlay,oldTargetSha256:Object.fromEntries(OLD.map(p=>[p,digest(overlay.get(p))]))};
+}

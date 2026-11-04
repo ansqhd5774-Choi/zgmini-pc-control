@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {validateEvent,validateManifest,buildCandidateOverlay,digest,OLD,ADDED,FIVE,stop} from './contract.mjs';
+import {validateEvent,validateManifest,buildCandidateOverlay,overlayFromPatchedBytes,digest,OLD,ADDED,FIVE,stop} from './contract.mjs';
 
 const NODE_ENV_KEYS=['SystemRoot','WINDIR','PATH','Path','PATHEXT','ComSpec',
   'USERPROFILE','APPDATA','LOCALAPPDATA','HOMEDRIVE','HOMEPATH','TEMP','TMP'];
@@ -89,6 +89,7 @@ export function runReadOnly({event,env,controlRoot,candidateRoot,taskXml,readPcF
   readConfig=(base)=>JSON.parse(fs.readFileSync(path.join(base,'config.json'),'utf8')),
   readCandidate=p=>regular(candidateRoot,p),
   readPatch=()=>regular(controlRoot,'r17-writer-b/approval/R17_A23_REBASE.patch',2_000_000),
+  makeOverlay=buildCandidateOverlay,
   hash=digest}={}){
   const request=validateEvent(event,env);
   const rawManifest=readApproval();
@@ -104,10 +105,11 @@ export function runReadOnly({event,env,controlRoot,candidateRoot,taskXml,readPcF
   if(config?.source!==manifest.approvedConfigSourceSha)stop('R17_B_CONFIG_PIN_STOP');
   if(hash(taskXml())!==manifest.coreTaskXmlSha256)stop('R17_B_TASK_IDENTITY_STOP');
 
-  const originals={};
+  const originals={},originalBuffers={};
   for(const p of OLD){
     const bytes=readPcFile(pcRoot,p);
     if(hash(bytes)!==manifest.beforeSha256[p])stop('R17_B_EXISTING_SHA_STOP');
+    originalBuffers[p]=bytes;
     originals[p]=bytes.toString('utf8');
   }
   for(const p of ADDED)if(!inspectAbsence(pcRoot,p))stop('R17_B_NEW_FILE_PRESENT_STOP');
@@ -122,7 +124,7 @@ export function runReadOnly({event,env,controlRoot,candidateRoot,taskXml,readPcF
     stop('R17_B_PATCH_APPLY_STOP');
   let candidate;
   try{
-    candidate=buildCandidateOverlay({originals,
+    candidate=makeOverlay({originals,originalBuffers,
       patchBytes:patch,newFiles,newSha256:manifest.newSha256});
   }catch(error){
     if(error?.code==='R17_B_PATCH_CONTEXT_STOP'&&error?.diagnostic)
@@ -149,6 +151,37 @@ const fixedGit=()=>GIT_CANDIDATES.find(x=>fs.existsSync(x))??stop('R17_B_PLATFOR
 const command=(exe,args,env)=>execFileSync(exe,args,{encoding:'utf8',windowsHide:true,
   timeout:15_000,maxBuffer:100_000,env:safeEnv(env)});
 const gitCmd=(root,args,env)=>command(fixedGit(),['-c','core.fsmonitor=false','-C',root,...args],env).trim();
+
+function nativeOverlayInIsolatedWorkspace({workspace,originalBuffers,newFiles,newSha256,env}){
+  // All writes are to one newly created child of this job's checked workspace.
+  // Nothing is applied to E: operational source, local DB or scheduler.
+  const root=fs.realpathSync.native(workspace);
+  const scratch=fs.mkdtempSync(path.join(root,'r17-approved-overlay-'));
+  try{
+    const target=fs.realpathSync.native(scratch);
+    if(!target.toLowerCase().startsWith(root.toLowerCase()+path.sep))
+      stop('R17_B_WORKSPACE_STOP');
+    for(const p of OLD){
+      const buffer=originalBuffers[p];
+      if(!Buffer.isBuffer(buffer)||buffer.length<1||buffer.length>2_000_000)
+        stop('R17_B_PATCH_BASE_MISSING_STOP');
+      const file=path.join(scratch,...p.split('/'));
+      fs.mkdirSync(path.dirname(file),{recursive:true});
+      fs.writeFileSync(file,buffer,{flag:'wx'});
+    }
+    const approved=path.join(workspace,'r17-control','r17-writer-b',
+      'approval','R17_A23_REBASE.patch');
+    try{
+      gitCmd(scratch,['apply','--check','--whitespace=error',approved],env);
+      gitCmd(scratch,['apply','--whitespace=error',approved],env);
+    }catch{stop('R17_B_PATCH_APPLY_STOP')}
+    const patchedOld=Object.fromEntries(OLD.map(p=>[p,regular(scratch,p)]));
+    return overlayFromPatchedBytes({patchedOld,newFiles,newSha256});
+  }finally{
+    // scratch is a validated, newly created, request-local leaf directory.
+    fs.rmSync(scratch,{recursive:true,force:true});
+  }
+}
 
 function main(){
   const env=process.env;
@@ -178,6 +211,18 @@ function main(){
       gitApplyCheck:(root,p)=>{try{gitCmd(root,['apply','--check','--whitespace=error',p],env);return true}catch{return false}},
       resolveRealRoot:root=>fs.realpathSync.native(root),
       readPcFile:(root,p)=>regular(root,p),
+      makeOverlay:inputs=>{
+        // Structural/hunk gate compares LF logical lines only; the canonical
+        // installed byte sequences remain untouched and are applied by Git below.
+        const normalized=Object.fromEntries(OLD.map(p=>
+          [p,inputs.originals[p].replace(/\r\n/g,'\n')]));
+        buildCandidateOverlay({originals:normalized,patchBytes:inputs.patchBytes,
+          newFiles:inputs.newFiles,newSha256:inputs.newSha256});
+        return nativeOverlayInIsolatedWorkspace({
+          workspace:ws,originalBuffers:inputs.originalBuffers,
+          newFiles:inputs.newFiles,newSha256:inputs.newSha256,env,
+        });
+      },
       inspectAbsence:(root,p)=>!fs.existsSync(path.join(root,...p.split('/'))),
       taskXml:()=>execFileSync(SCHTASKS,['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
         {windowsHide:true,timeout:15_000,maxBuffer:100_000,env:safeEnv(env)}),
