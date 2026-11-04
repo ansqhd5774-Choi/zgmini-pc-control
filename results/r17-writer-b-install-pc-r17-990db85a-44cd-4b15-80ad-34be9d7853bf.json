@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_INSTALL_RESULT_V1",
+  "requestId": "pc-r17-990db85a-44cd-4b15-80ad-34be9d7853bf",
+  "status": "R17_B_INSTALL_STOP",
+  "phase": "INIT",
+  "code": "R17_B_UNEXPECTED_STOP",
+  "sourceSha": null,
+  "runId": "41926924474",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
