@@ -96,7 +96,8 @@ export function classifyEvidence(e){
   e.configSource===BASE_SHA&&e.taskHash===EXPECTED_TASK_HASH&&
   e.preflight?.requestId===TARGET_REQUEST&&e.preflight?.terminal===true&&
   e.operatingSourceIdentified===true&&e.runtimeSourceVerified===true&&e.process?.verified===true&&e.process.active===false&&
-  e.lease?.verified===true&&e.lease.active===false&&e.checkpointsBaselineMatched===true;
+  e.lease?.verified===true&&e.lease.active===false&&e.configBaselineMatched===true&&
+  e.checkpointsBaselineMatched===true;
  return complete?{status:'NO_CHANGE_CONFIRMED',code:'R17_268_OPERATIONAL_STATE_UNCHANGED'}:
   {status:'INSUFFICIENT_EVIDENCE',code:'R17_268_LAST_STEP_OR_BASELINE_UNVERIFIED'};
 }
@@ -108,9 +109,30 @@ export function summarizeEvidence(e){
  const admission=assessment==='NO_CHANGE_CONFIRMED'?'PASS':'BLOCKED';
  const admissionCode=assessment==='NO_CHANGE_CONFIRMED'?'R17_268_NO_CHANGE_CONFIRMED':
   assessment==='CHANGED'?'R17_268_OPERATIONAL_CHANGE_BLOCKED':'R17_268_EVIDENCE_INSUFFICIENT_BLOCKED';
+ const sourceComparison=NAMES.map(file=>{
+  const observedSha256=e.sources?.[file]?.sha256??null;
+  const patchTargetSha256=e.targetSha256?.[file]??null;
+  return {file,beforeSha256:BASE_HASHES[file],observedSha256,patchTargetSha256,
+   comparison:!observedSha256?'UNVERIFIED':observedSha256===BASE_HASHES[file]?'BEFORE':
+    patchTargetSha256&&observedSha256===patchTargetSha256?'APPROVED_PATCH':'OTHER',
+   attributedTo268:false};
+ });
+ const missingEvidence=assessment!=='INSUFFICIENT_EVIDENCE'?[]:[
+  [e.preflight?.requestId!==TARGET_REQUEST||e.preflight?.terminal!==true,'REQUEST_TERMINAL_UNVERIFIED'],
+  [sourceComparison.some(x=>x.comparison==='UNVERIFIED'),'SOURCE_FILE_UNVERIFIED'],
+  [e.configSource!==BASE_SHA,'CONFIG_SOURCE_PIN_UNVERIFIED'],
+  [e.configBaselineMatched!==true,'CONFIG_CONTENT_BASELINE_UNVERIFIED'],
+  [e.taskHash!==EXPECTED_TASK_HASH,'CORE_TASK_BASELINE_UNVERIFIED'],
+  [e.operatingSourceIdentified!==true,'OPERATING_SOURCE_PATH_UNVERIFIED'],
+  [e.runtimeSourceVerified!==true,'RUNTIME_SOURCE_UNVERIFIED'],
+  [e.process?.verified!==true||e.process.active!==false,'PROCESS_ABSENCE_UNVERIFIED'],
+  [e.lease?.verified!==true||e.lease.active!==false,'LEASE_ABSENCE_UNVERIFIED'],
+  [e.checkpointsBaselineMatched!==true,'CHECKPOINT_BASELINE_UNVERIFIED'],
+ ].filter(([needed])=>needed).map(([,reason])=>reason);
  return {schema:'ZGMINI_R17_268_POSTCANCEL_READONLY_V1',requestId:TARGET_REQUEST,
   oldRunId:TARGET_RUN,status:admission,code:admissionCode,
-  assessment,assessmentCode,...details,source:e.sources,expectedPatchedSha256:e.targetSha256??null,
+  assessment,assessmentCode,...details,source:e.sources,sourceComparison,missingEvidence,
+  expectedPatchedSha256:e.targetSha256??null,
   taskSha256:e.taskHash??null,expectedTaskSha256:EXPECTED_TASK_HASH,
   configSourceSha:e.configSource??null,preflight:e.preflight??null,
   process:e.process??{verified:false},lease:e.lease??{verified:false},
@@ -239,6 +261,7 @@ export function inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText
   operatingSourceIdentified:sourceTrace?.sourceResolved===true&&
    sourceTrace?.sourceRoot==='projects/zgmini-earnings-history-pc-release',
   runtimeSourceVerified:sourceTrace?.runtimeSourceVerified===true&&sourceTrace?.sourceHead===BASE_SHA,
+   configBaselineMatched:false, // The pre-#268 full config.json hash was not captured.
   checkpointsBaselineMatched:false, // No reliable pre-#268 checkpoint baseline is currently established.
   checkpointEvidence:checkpoints});
  return {...result,configSha256:config.sha256,
