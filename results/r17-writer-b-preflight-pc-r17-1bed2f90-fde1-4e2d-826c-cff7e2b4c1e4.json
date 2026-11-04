@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-r17-1bed2f90-fde1-4e2d-826c-cff7e2b4c1e4",
+  "status": "BLOCKED",
+  "code": "R17_B_PATCH_CONTEXT_STOP",
+  "diagnostic": {
+    "file": "local-cycle",
+    "hunkOldStart": null,
+    "reason": "MIXED_EOL",
+    "matchCount": null,
+    "nativeGitApplyCheck": "PASS"
+  },
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "pcSourceWrites": 0,
+  "operationalConfigWrites": 0,
+  "taskWrites": 0,
+  "runId": "41909730506"
+}
