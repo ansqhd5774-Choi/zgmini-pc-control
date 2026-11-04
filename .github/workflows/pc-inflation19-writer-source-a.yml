@@ -1,0 +1,47 @@
+name: ZGMINI Inflation19 Writer Source Identity A Read-Only
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: inflation19-writer-source-a-single-lane
+  cancel-in-progress: false
+jobs:
+  read-only-source-identity:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.run_attempt == 1 &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-inflation19-writer-source-inventory-a' &&
+      contains(github.event.issue.labels.*.name, 'pc-inflation19-writer-source-inventory-a')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout immutable approved private control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+          clean: true
+      - name: Collect bounded source identity only
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\tools\inflation19-writer-source-a\transport\entry.mjs"'
+      - name: Recover sanitized TXT JSON and original issue comment
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\tools\inflation19-writer-source-a\transport\upload.mjs"'

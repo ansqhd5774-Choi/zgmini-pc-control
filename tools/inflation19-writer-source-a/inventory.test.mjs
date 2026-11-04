@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canonicalWindows,sourceRootFromRealScript,parseCoreTaskXml,
+import {canonicalWindows,sourceRootFromRealScript,parseCoreTaskXml,parseApprovedCoreVbs,
  inventoryReadOnly,FILES,SCHEMA} from './inventory.mjs';
 
 const SCRIPT=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
 const ROOT=String.raw`e:\zgmini\projects\zgmini-earnings-history-pc-release`;
 const SOURCE='a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e';
+const CORE_VBS=String.raw`E:\ZGmini\data\pc-writer\run-local-core.vbs`;
+const vbs=()=>Buffer.from('Set shell = CreateObject("WScript.Shell")\r\n'+
+ 'WScript.Quit shell.Run("""E:\\ZGmini\\runtime\\node.exe"" ""'+SCRIPT+'"" --publish", 0, True)\r\n');
 const xml=(script=SCRIPT,command=String.raw`E:\ZGmini\runtime\node.exe`)=>Buffer.from(
  `<?xml version="1.0"?><Task><Actions><Exec><Command>${command}</Command>`+
  `<Arguments>"${script}"</Arguments></Exec></Actions></Task>`);
@@ -13,6 +16,7 @@ function fixture(overrides={}){
  const deps={taskXml:()=>xml(),resolveRealPath:()=>SCRIPT,
   readConfig:()=>({source:SOURCE}),gitRoot:()=>ROOT,gitHead:()=>SOURCE,
   targetFilesDirty:()=>false,
+  readLauncher:()=>vbs(),
   readTargetExists:(_root,rel)=>rel===FILES[0],
   readTarget:()=>Buffer.from('approved existing run-local source')};
  return {...deps,...overrides};
@@ -21,9 +25,31 @@ function fixture(overrides={}){
 test('task Action pins one script and only exposes digest and executable basename',()=>{
  const p=parseCoreTaskXml(xml());
  assert.equal(p.script,SCRIPT);
+ assert.equal(p.kind,'direct-mjs');
  assert.equal(p.actionExe,'node.exe');
  assert.match(p.taskXmlSha256,/^[a-f0-9]{64}$/);
- assert.equal(Object.keys(p).length,3);
+ assert.equal(Object.keys(p).length,4);
+});
+
+test('documented WScript VBS launcher is parsed as data for an exact MJS path',()=>{
+ const a=parseCoreTaskXml(xml(CORE_VBS,String.raw`C:\Windows\System32\wscript.exe`));
+ assert.equal(a.kind,'vbs');assert.equal(a.launcher,CORE_VBS);
+ assert.equal(parseApprovedCoreVbs(vbs()),SCRIPT);
+ const r=inventoryReadOnly(fixture({taskXml:()=>xml(CORE_VBS,
+  String.raw`C:\Windows\System32\wscript.exe`),
+  resolveRealPath:p=>p===CORE_VBS?CORE_VBS:SCRIPT}));
+ assert.equal(r.status,'PASS_READONLY');assert.equal(r.actionExe,'wscript.exe');
+});
+
+test('nonstandard dispatcher stops with only launcher hash, without exposing content',()=>{
+ const r=inventoryReadOnly(fixture({taskXml:()=>xml(CORE_VBS,
+  String.raw`C:\Windows\System32\wscript.exe`),
+  resolveRealPath:p=>p===CORE_VBS?CORE_VBS:SCRIPT,
+  readLauncher:()=>Buffer.from('secret option --unknown-dispatcher')}));
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'INFL19_A_LAUNCHER_FORMAT_UNSUPPORTED');
+ assert.match(r.launcherSha256,/^[a-f0-9]{64}$/);
+ assert.equal(JSON.stringify(r).includes('secret option'),false);
 });
 
 test('task XML UTF-16LE BOM is decoded without running Action',()=>{
@@ -31,6 +57,7 @@ test('task XML UTF-16LE BOM is decoded without running Action',()=>{
  const p=parseCoreTaskXml(Buffer.concat([Buffer.from([0xff,0xfe]),
   Buffer.from(source,'utf16le')]));
  assert.equal(p.script,SCRIPT);
+ assert.equal(parseCoreTaskXml(Buffer.from(source,'utf16le')).script,SCRIPT);
 });
 
 test('junction-normalized Windows real path stays under approved E project root',()=>{
@@ -65,8 +92,12 @@ test('ambiguous/missing task Action or non-Writer script stops',()=>{
   /INFL19_A_TASK_ACTION_AMBIGUOUS/);
  assert.throws(()=>parseCoreTaskXml(xml(String.raw`E:\ZGmini\projects\foo\not-writer.mjs`)),
   /INFL19_A_SCRIPT_REFERENCE_UNRESOLVED/);
- assert.throws(()=>parseCoreTaskXml(Buffer.from('<Task><Exec><Command>a</Command></Exec>'+ 
-  '<Exec><Command>b</Command></Exec></Task>')),
+ assert.throws(()=>parseCoreTaskXml(Buffer.from('<Task><Actions><Exec><Command>a</Command></Exec>'+ 
+  '<Exec><Command>b</Command></Exec></Actions></Task>')),
+  /INFL19_A_TASK_ACTION_AMBIGUOUS/);
+ assert.throws(()=>parseCoreTaskXml(xml(SCRIPT,String.raw`E:\ZGmini\runtime\not-node.exe`)),
+  /INFL19_A_SCRIPT_REFERENCE_UNRESOLVED/);
+ assert.throws(()=>parseCoreTaskXml(Buffer.from('<Task><Exec><Command>x</Command></Exec></Task>')),
   /INFL19_A_TASK_ACTION_AMBIGUOUS/);
 });
 
