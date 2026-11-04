@@ -54,14 +54,17 @@ function file(root,rel){
 function artifact(target,type,next){return `${target}.R54_B_${type}_${next.slice(0,12)}`;}
 function readHash(filePath){return digest(fs.readFileSync(filePath));}
 const JOURNAL_SCHEMA='ZGMINI_R54_SIXFILE_B_JOURNAL_V1';
-const JOURNAL_NAME='R54_B_SIXFILE_SOURCE_JOURNAL_V1.jsonl';
-function journalFile(installedRoot){
- const root=fs.realpathSync.native(installedRoot);
- assert(fs.statSync(root).isDirectory(),'R54_B_ROOT_NOT_DIRECTORY');
- return path.join(root,JOURNAL_NAME);
+function journalFile(journalRoot,requestId){
+ assert(typeof requestId==='string'&&/^pc-[a-z0-9-]{8,76}$/.test(requestId),
+  'R54_B_REQUEST_ID_REQUIRED');
+ assert(typeof journalRoot==='string'&&path.isAbsolute(journalRoot),
+  'R54_B_JOURNAL_ROOT_REQUIRED');
+ const root=fs.realpathSync.native(journalRoot);
+ assert(fs.statSync(root).isDirectory(),'R54_B_JOURNAL_ROOT_INVALID');
+ return path.join(root,`R54_B_SIXFILE_${requestId}.jsonl`);
 }
-function journalLastState(installedRoot){
- const journal=journalFile(installedRoot);
+function journalLastState(journalRoot,requestId){
+ const journal=journalFile(journalRoot,requestId);
  if(!fs.existsSync(journal))return null;
  assert(!fs.lstatSync(journal).isSymbolicLink(),'R54_B_JOURNAL_REDIRECT_DENIED');
  const bytes=fs.readFileSync(journal);
@@ -104,7 +107,8 @@ function sourceRows({installedRoot,candidateRoot}){
 }
 
 /** Read-only; caller must supply the exact approved B manifest and lease proof. */
-export function preflight({installedRoot,candidateRoot,manifest,gate}={}){
+export function preflight({installedRoot,candidateRoot,manifest,gate,
+ journalRoot,requestId}={}){
  assert(manifest?.schema===R54_B_SCHEMA&&manifest?.status==='APPROVED_B'&&
   manifest.scope==='R54_FIXED_SIXFILE_SOURCE_ONLY'&&manifest.runCount===1&&
   manifest.noProviderCalls===true&&manifest.noD1Writes===true&&
@@ -117,8 +121,8 @@ export function preflight({installedRoot,candidateRoot,manifest,gate}={}){
   Number.isFinite(Date.parse(gate.observedAt))&&
   Math.abs(Date.now()-Date.parse(gate.observedAt))<60000,
   'R54_B_RUNTIME_GATE_REQUIRED');
+ const journalPhase=journalLastState(journalRoot,requestId);
  const rows=sourceRows({installedRoot,candidateRoot});
- const journalPhase=journalLastState(installedRoot);
  assert(journalPhase===null||journalPhase==='SUCCEEDED'&&
   rows.every(x=>x.oldHash===x.next),
   'R54_B_PRIOR_JOURNAL_REQUIRES_RECONCILIATION');
@@ -144,12 +148,13 @@ function copyAndSync(source,dest){
  * Caller must hold an exclusive validated B maintenance lease until return.
  */
 export function applyApprovedSix({installedRoot,candidateRoot,manifest,gate,
+ journalRoot,requestId,
  runtimeProbe,beforeSwap=()=>{}}={}){
  assert(typeof runtimeProbe==='function','R54_B_RUNTIME_REPROBE_REQUIRED');
- const check=preflight({installedRoot,candidateRoot,manifest,gate});
+ const check=preflight({installedRoot,candidateRoot,manifest,gate,journalRoot,requestId});
  if(check.status==='ALREADY_INSTALLED')return {status:'ALREADY_INSTALLED',changed:0};
  const rows=check.rows;
- const fd=fs.openSync(journalFile(installedRoot),'wx',0o600);
+ const fd=fs.openSync(journalFile(journalRoot,requestId),'wx',0o600);
  let seq=0;
  const record=(phase,file=null)=>{
   fs.writeSync(fd,JSON.stringify({schema:JOURNAL_SCHEMA,seq:seq++,phase,file})+'\n');
