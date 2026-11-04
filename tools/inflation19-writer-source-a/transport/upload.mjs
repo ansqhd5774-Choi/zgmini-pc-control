@@ -32,8 +32,14 @@ function txt(result){
   'RETRY=NO_REEXECUTE_READBACK_ONLY'];
  if(result.status==='BLOCKED'&&result.taskXmlSha256){
   lines.push(`TASK_XML_SHA256=${result.taskXmlSha256}`,
-   `ACTION_EXE=${result.actionExe}`,
-   `LAUNCHER_ARGUMENT_SHAPE=${result.launcherArgumentShape}`);
+   `ACTION_EXE=${result.actionExe}`);
+  if(result.launcherArgumentShape)
+   lines.push(`LAUNCHER_ARGUMENT_SHAPE=${result.launcherArgumentShape}`);
+  if(result.code==='INFL19_A_R38_DISPATCH_UNVERIFIED')
+   lines.push(`R38_LAUNCHER_SHA256=${result.launcherSha256}`,
+    `R38_ORIGIN_SHA256=${result.originSha256}`,
+    `R38_STATIC_SCRIPT=${result.staticScriptBasename}`,
+    `R38_EVIDENCE=${result.staticEvidence}`);
  }
  for(const [name,v] of Object.entries(result.files??{}))
   lines.push(`FILE_${name.replace(/[^a-z0-9]/gi,'_')}=${v.status}:${v.sha256??'-'}`);

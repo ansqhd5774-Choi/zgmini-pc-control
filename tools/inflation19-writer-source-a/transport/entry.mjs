@@ -14,6 +14,9 @@ const BLOCKED_ARGUMENT_SHAPES=new Set(['UNSUPPORTED_SIZE','EMPTY','QUOTED_VBS_PA
  'CMD_WITH_FLAGS','MJS_REFERENCE_UNMATCHED','OTHER']);
 const ACTION_UNRESOLVED_CODES=new Set(['INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',
  'INFL19_A_TASK_ACTION_AMBIGUOUS']);
+const R38_STATIC_CODE='INFL19_A_R38_DISPATCH_UNVERIFIED';
+const R38_STATIC_NAMES=new Set(['local-cycle.mjs','quota-runner.mjs',
+ 'run-local.mjs','collect-local.mjs']);
 const filename=(id,issueNumber)=>
  `ZGMINI_INFL19_WRITER_SOURCE_${issueNumber}_${id}.json`;
 export const resultPath=(temp,id,issueNumber)=>{
@@ -46,6 +49,20 @@ export function safeResult(raw,request){
   status:pass?'PASS_READONLY':'BLOCKED',code,providerCalls:0,d1Writes:0,
   pcSourceWrites:0,configWrites:0,taskWrites:0};
  if(!pass){
+  const safeR38=d.schema===INVENTORY_SCHEMA&&d.status==='BLOCKED'&&
+   code===R38_STATIC_CODE&&d.providerCalls===0&&d.d1Writes===0&&
+   d.pcSourceWrites===0&&d.configWrites===0&&d.taskWrites===0&&
+   d.actionExe==='wscript.exe'&&
+   /^[a-f0-9]{64}$/.test(d.taskXmlSha256??'')&&
+   /^[a-f0-9]{64}$/.test(d.launcherSha256??'')&&
+   /^[a-f0-9]{64}$/.test(d.originSha256??'')&&
+   R38_STATIC_NAMES.has(d.staticScriptBasename)&&
+   d.staticEvidence==='REFERENCE_ONLY_NOT_EXECUTION_PROVEN';
+  if(safeR38)return {...base,taskXmlSha256:d.taskXmlSha256,
+   actionExe:'wscript.exe',launcherSha256:d.launcherSha256,
+   originSha256:d.originSha256,
+   staticScriptBasename:d.staticScriptBasename,
+   staticEvidence:'REFERENCE_ONLY_NOT_EXECUTION_PROVEN'};
   const safeAction=d.schema===INVENTORY_SCHEMA&&d.status==='BLOCKED'&&
    ACTION_UNRESOLVED_CODES.has(code)&&d.providerCalls===0&&d.d1Writes===0&&
    d.pcSourceWrites===0&&d.configWrites===0&&d.taskWrites===0&&

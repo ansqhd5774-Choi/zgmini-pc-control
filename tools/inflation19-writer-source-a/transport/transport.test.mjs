@@ -36,6 +36,15 @@ const blockedAction={schema:'ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1',
  launcherArgumentShape:'VBS_WITH_FLAGS',
  taskXml:'RAW_XML_DENIED',arguments:'RAW_ARGS_DENIED',token:'SECRET_DENIED',
  providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
+const blockedR38={schema:'ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1',
+ status:'BLOCKED',code:'INFL19_A_R38_DISPATCH_UNVERIFIED',
+ taskXmlSha256:'b'.repeat(64),actionExe:'wscript.exe',
+ launcherSha256:'c'.repeat(64),originSha256:'d'.repeat(64),
+ staticScriptBasename:'local-cycle.mjs',
+ staticEvidence:'REFERENCE_ONLY_NOT_EXECUTION_PROVEN',
+ launcherPath:'SECRET_PATH_DENIED',originContents:'SECRET_RAW_VBS_DENIED',
+ scriptPath:'SECRET_SOURCE_DENIED',configSecret:'SECRET_CONFIG_DENIED',
+ providerCalls:0,d1Writes:0,pcSourceWrites:0,configWrites:0,taskWrites:0};
 const copy=v=>structuredClone(v);
 
 test('fixed owner, label, one-shot UUID and immutable source pin are required',()=>{
@@ -99,6 +108,45 @@ test('nonzero BLOCKED child preserves exactly three safe action details',t=>{
  const invalid=safeResult({...blockedAction,launcherArgumentShape:'RAW_ARGS_DENIED'},
   {requestId:id,chatId:chat});
  assert.equal('taskXmlSha256' in invalid,false);
+});
+
+test('R38 static BLOCKED keeps two hashes and allowlisted script kind only',()=>{
+ const r=safeResult(blockedR38,{requestId:id,chatId:chat});
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'INFL19_A_R38_DISPATCH_UNVERIFIED');
+ assert.equal(r.taskXmlSha256,'b'.repeat(64));
+ assert.equal(r.launcherSha256,'c'.repeat(64));
+ assert.equal(r.originSha256,'d'.repeat(64));
+ assert.equal(r.staticScriptBasename,'local-cycle.mjs');
+ assert.equal(r.staticEvidence,'REFERENCE_ONLY_NOT_EXECUTION_PROVEN');
+ assert.equal('sourceRoot' in r,false);
+ for(const secret of ['SECRET_PATH_DENIED','SECRET_RAW_VBS_DENIED',
+  'SECRET_SOURCE_DENIED','SECRET_CONFIG_DENIED'])
+  assert.doesNotMatch(JSON.stringify(r),new RegExp(secret));
+ for(const altered of [
+  {...blockedR38,originSha256:'invalid'},
+  {...blockedR38,staticScriptBasename:'evil.mjs'},
+  {...blockedR38,staticEvidence:'EXECUTION_PROVEN'},
+  {...blockedR38,d1Writes:1},
+ ]){
+  const blocked=safeResult(altered,{requestId:id,chatId:chat});
+  assert.equal(blocked.status,'BLOCKED');
+  assert.equal('originSha256' in blocked,false);
+  assert.equal('staticScriptBasename' in blocked,false);
+ }
+});
+
+test('R38 nonzero child remains BLOCKED and retains sanitized static evidence',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'infl19-r38-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const got=executeInventory({event,env,resultDir:temp,
+  scriptPath:'/tmp/fixed-inventory.mjs',
+  spawn:()=>({status:1,stdout:JSON.stringify(blockedR38)})});
+ assert.equal(got.result.status,'BLOCKED');
+ assert.equal(got.result.code,'INFL19_A_R38_DISPATCH_UNVERIFIED');
+ assert.equal(got.result.originSha256,'d'.repeat(64));
+ const body=fs.readFileSync(resultPath(temp,id,400),'utf8');
+ assert.equal(body.includes('SECRET_'),false);
 });
 
 test('uploader posts bounded JSON TXT and one comment without PC writes',async()=>{
@@ -177,6 +225,35 @@ test('uploader BLOCKED TXT and JSON expose only whitelisted action shape',async(
  for(const denied of ['RAW_XML_DENIED','RAW_ARGS_DENIED','SECRET_DENIED']){
   assert.doesNotMatch(txt,new RegExp(denied));
   assert.doesNotMatch(JSON.stringify(json),new RegExp(denied));
+ }
+});
+
+test('uploader R38 TXT JSON and comment preserve only bounded static hashes',async()=>{
+ const requests=[];
+ const fake=async (url,opt)=>{
+  requests.push({url,opt});
+  if(opt.method==='GET')return {status:200,json:async()=>[]};
+  return {status:201};
+ };
+ const bounded=safeResult(blockedR38,{requestId:id,chatId:chat});
+ const response=await uploadReport({event,env,readReport:()=>JSON.stringify(bounded),
+  apiFetch:fake});
+ assert.equal(response.status,'BLOCKED');
+ const uploaded=requests.filter(x=>x.opt.method==='PUT').map(x=>({
+  name:x.url,body:Buffer.from(JSON.parse(x.opt.body).content,'base64').toString('utf8')}));
+ const json=JSON.parse(uploaded.find(x=>x.name.endsWith('.json')).body);
+ const txt=uploaded.find(x=>x.name.endsWith('.txt')).body;
+ const comment=JSON.parse(requests.find(x=>x.opt.method==='POST').opt.body).body;
+ assert.equal(json.originSha256,'d'.repeat(64));
+ assert.equal(json.launcherSha256,'c'.repeat(64));
+ assert.equal(json.staticScriptBasename,'local-cycle.mjs');
+ assert.match(txt,/R38_ORIGIN_SHA256=d{64}/);
+ assert.match(txt,/R38_LAUNCHER_SHA256=c{64}/);
+ assert.match(txt,/R38_EVIDENCE=REFERENCE_ONLY_NOT_EXECUTION_PROVEN/);
+ assert.doesNotMatch(txt,/LAUNCHER_ARGUMENT_SHAPE=undefined/);
+ for(const output of [txt,JSON.stringify(json),comment]){
+  assert.doesNotMatch(output,/SECRET_/);
+  assert.doesNotMatch(output,/scriptPath|originContents|launcherPath|configSecret/);
  }
 });
 
