@@ -16,6 +16,7 @@
     "market-calendar-er1-nov30-availability": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "asset-r10-publication-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "asset-r10-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "marketparquet-r165-r167-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy","minimumFreeMiB":384},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
