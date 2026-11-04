@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-r17-9ff6013a-8c78-4eeb-a1d8-a4db03deb7de",
+  "status": "BLOCKED",
+  "code": "R17_B_PATCH_CONTEXT_STOP",
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "pcSourceWrites": 0,
+  "operationalConfigWrites": 0,
+  "taskWrites": 0,
+  "runId": "41907075463"
+}
