@@ -36,6 +36,30 @@ test('only full read-only evidence can be reported PASS',()=>{
  assert.equal(bad.code,'R17_B_REPORT_UNVERIFIED');
 });
 
+test('bounded parser reason survives upload while raw material is rejected',async()=>{
+ const diagnostic={file:'run-local',hunkOldStart:195,reason:'NO_MATCH',
+  matchCount:0,nativeGitApplyCheck:'PASS'};
+ const blocked={requestId,status:'BLOCKED',code:'R17_B_PATCH_CONTEXT_STOP',
+  diagnostic,runId:'123456'};
+ const safe=sanitizeReport(blocked,requestId);
+ assert.equal(safe.status,'BLOCKED');
+ assert.deepEqual(safe.diagnostic,diagnostic);
+ assert.equal(sanitizeReport({...blocked,diagnostic:{...diagnostic,
+  source:'private-source-content'}},requestId).diagnostic,undefined);
+ assert.equal(sanitizeReport({...blocked,diagnostic:{...diagnostic,
+  nativeGitApplyCheck:'FAIL'}},requestId).diagnostic,undefined);
+ const calls=[];
+ const sent=await uploadReport({event,env,readReport:()=>JSON.stringify(blocked),
+  apiFetch:async(url,options)=>{calls.push({url,options});return {status:201,ok:true}}});
+ assert.deepEqual(sent,{status:'BLOCKED',code:'R17_B_PATCH_CONTEXT_STOP',saved:2});
+ const json=JSON.parse(Buffer.from(JSON.parse(calls[0].options.body).content,'base64').toString('utf8'));
+ assert.deepEqual(json.diagnostic,diagnostic);
+ const txt=Buffer.from(JSON.parse(calls[1].options.body).content,'base64').toString('utf8');
+ assert.match(txt,/PATCH_REASON=NO_MATCH/);
+ assert.match(JSON.parse(calls[2].options.body).body,/"hunkOldStart": 195/);
+ assert(!JSON.stringify(calls).includes('private-source-content'));
+});
+
 test('mismatched request and missing result fail closed without data',()=>{
  const r=sanitizeReport({...valid,requestId:'pc-r17-bad'},requestId);
  assert.equal(r.status,'STATE_UNKNOWN');
