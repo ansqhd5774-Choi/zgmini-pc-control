@@ -254,6 +254,110 @@ export function r54FixedSchtasks(args,{platform=process.platform,
   timeout:15000,maxBuffer:65536});
 }
 
+// Fixed-path, read-only Windows admission observation for the one R54 B
+// operation. Neither Issue JSON nor a caller-selected executable supplies a
+// command. This is intentionally NOT a start fence and never returns READY.
+const R54_B_PROCESS_PATTERN=/(?:theme-nine-r54|theme-ten-r7[89]|theme-ten-r80|theme-ten-r81|THEME_NINE_R54_PUBLIC)/i;
+export function parseR54BProcessCsv(buffer){
+ need(Buffer.isBuffer(buffer)&&buffer.length>0&&buffer.length<=4*1024*1024,
+  'R54_B_FIXED_PROCESS_OUTPUT_INVALID');
+ const utf16le=buffer[0]===0xff&&buffer[1]===0xfe;
+ need(!(buffer[0]===0xfe&&buffer[1]===0xff)&&
+  (!utf16le||buffer.length%2===0),'R54_B_FIXED_PROCESS_ENCODING_UNKNOWN');
+ let src;
+ try{
+  const start=utf16le?2:buffer[0]===0xef&&buffer[1]===0xbb&&buffer[2]===0xbf?3:0;
+  src=new TextDecoder(utf16le?'utf-16le':'utf-8',{fatal:true})
+   .decode(buffer.subarray(start)).replace(/\r\n/g,'\n');
+ }catch{need(false,'R54_B_FIXED_PROCESS_ENCODING_UNKNOWN');}
+ need(!src.includes('\u0000')&&!src.includes('\uFFFD'),
+  'R54_B_FIXED_PROCESS_ENCODING_UNKNOWN');
+ const records=[];let row=[],field='',quoted=false;
+ for(let i=0;i<src.length;i++){
+  const c=src[i];
+  if(c==='"'){
+   if(quoted&&src[i+1]==='"'){field+='"';i++;}
+   else quoted=!quoted;
+  }else if(c===','&&!quoted){row.push(field);field='';}
+  else if(c==='\n'&&!quoted){row.push(field);if(row.some(x=>x.trim()))records.push(row);row=[];field='';}
+  else field+=c;
+ }
+ need(!quoted,'R54_B_FIXED_PROCESS_CSV_UNCLOSED_QUOTE');
+ if(field||row.length){row.push(field);if(row.some(x=>x.trim()))records.push(row);}
+ const index=records.findIndex(r=>r.includes('ProcessId')&&r.includes('ParentProcessId'));
+ need(index>=0,'R54_B_FIXED_PROCESS_HEADER_MISSING');
+ const header=records[index].map(x=>x.trim());
+ const required=['Node','CommandLine','ExecutablePath','Name','ParentProcessId','ProcessId'];
+ need(required.every(x=>header.includes(x)),'R54_B_FIXED_PROCESS_COLUMN_MISSING');
+ const ids=new Set();
+ return records.slice(index+1).map(r=>{
+  need(r.length===header.length,'R54_B_FIXED_PROCESS_ROW_MALFORMED');
+  const at=k=>r[header.indexOf(k)].trim();
+  const pid=Number(at('ProcessId')),parent=Number(at('ParentProcessId'));
+  need(Number.isSafeInteger(pid)&&pid>0&&Number.isSafeInteger(parent)&&parent>=0
+   &&!ids.has(pid),'R54_B_FIXED_PROCESS_PID_UNKNOWN');
+  ids.add(pid);
+  return {pid,parent,name:at('Name'),cmd:at('CommandLine'),exe:at('ExecutablePath')};
+ });
+}
+
+export function classifyR54BProcessTree(items){
+ need(Array.isArray(items),'R54_B_FIXED_PROCESS_ITEMS_INVALID');
+ const roots=new Set();
+ for(const p of items){
+  const name=(p.name??'').toLowerCase();
+  if(/^(?:node|cmd|wscript|cscript|npm|npx)(?:\.exe)?$/.test(name)
+   &&(!p.cmd||!p.exe))need(false,'R54_B_FIXED_PROCESS_LAUNCHER_REDACTED');
+  if(R54_B_PROCESS_PATTERN.test(`${p.cmd??''} ${p.exe??''}`))roots.add(p.pid);
+ }
+ const active=new Set(roots);let changed=true;
+ while(changed){changed=false;for(const p of items){
+  if(active.has(p.parent)&&!active.has(p.pid)){active.add(p.pid);changed=true;}
+ }}
+ return {roots:roots.size,descendants:active.size-roots.size,
+  active:[...active].sort((a,b)=>a-b)};
+}
+
+/** A native Win32 observation; MUST NOT be accepted as a freeze proof.
+ * Dependencies are injectable for isolated tests only. `r54-b-apply` invokes
+ * this with zero arguments, so no Issue field can override fixed OS ports. */
+export function observeR54BWindowsReadOnly({platform=process.platform,
+ systemRoot=process.env.SystemRoot,run=spawnSync,readAction=file=>fs.readFileSync(file),
+ inspectSource=()=>inspectR54BOriginalSource(),
+ inspectTask=inspectR54TaskXml,now=()=>new Date().toISOString()}={}){
+ need(platform==='win32'&&typeof systemRoot==='string'
+  &&/^[a-z]:\\windows$/i.test(systemRoot),'R54_B_FIXED_NATIVE_WINDOWS_REQUIRED');
+ const fixed=(exe,args)=>{
+  const binary=path.win32.join(systemRoot,'System32',exe);
+  const out=run(binary,args,{shell:false,windowsHide:true,encoding:null,
+   timeout:20000,maxBuffer:4*1024*1024});
+  if(exe==='wmic.exe'&&out?.error?.code==='ENOENT')
+   need(false,'R54_B_FIXED_WMIC_UNAVAILABLE');
+  need(out?.status===0&&!out?.error&&!out?.signal&&Buffer.isBuffer(out.stdout),
+   'R54_B_FIXED_OS_OBSERVATION_FAILED');
+  return out.stdout;
+ };
+ const census=()=>classifyR54BProcessTree(parseR54BProcessCsv(fixed('wmic.exe',
+  ['process','get','CommandLine,ExecutablePath,Name,ParentProcessId,ProcessId','/FORMAT:CSV'])));
+ const task=()=>inspectTask(fixed('schtasks.exe',
+  ['/Query','/TN',R54_TASK_NAME,'/XML']),readAction(R54_TASK_ACTION));
+ const sourceFirst=inspectSource(),taskFirst=task(),processFirst=census();
+ const sourceSecond=inspectSource(),taskSecond=task(),processSecond=census();
+ need(sourceFirst?.status==='R54_B_ORIGINAL_NINE_SHA_VERIFIED'
+  &&JSON.stringify(sourceFirst.files)===JSON.stringify(sourceSecond?.files),
+  'R54_B_FIXED_SOURCE_CHANGED_DURING_OBSERVATION');
+ need(taskFirst.xmlSha256===taskSecond.xmlSha256
+  &&taskFirst.definitionDigest===taskSecond.definitionDigest,
+  'R54_B_FIXED_TASK_CHANGED_DURING_OBSERVATION');
+ need(processFirst.active.length===0&&processSecond.active.length===0,
+  'R54_B_FIXED_ACTIVE_WRITER_PRESENT');
+ return Object.freeze({status:'OBSERVED_ONLY_NEEDS_INDEPENDENT_FREEZE',
+  observedAt:now(),taskName:R54_TASK_NAME,taskOriginallyEnabled:taskFirst.enabled,
+  taskXmlSha256:taskFirst.xmlSha256,verifiedOriginalPaths:sourceFirst.files.length,
+  processScans:2,manualEntrypointFreezeVerified:false,
+  exclusiveStartFenceHeld:false,taskChanges:0,sourceChanges:0});
+}
+
 /** Read-only Query, durable baseline, one-task Disable and exact Restore.
  * runTask is an independently trusted, shell:false schtasks fixed-vector port.
  * Required on Windows; tests inject a no-OS mock. No manual entrypoint fence.
@@ -1788,16 +1892,27 @@ export async function command(args=process.argv.slice(2)) {
   const raw=Buffer.from(pkg.manifestRawBase64??'','base64');
   validateR54BManifestRequest(approvedIssue,raw,{
    actor:pkg.actor,controlRepository,installedSha:installedManifest().installedSha});
-  // Actual R54 task has no installed, trusted OS provider that verifies a
-  // durable one-time disable, manual-CMD start block and common B lease.
-  // The only data available here is a GitHub Issue, never acceptable as a
-  // runtime freeze proof. This is intentionally null and cannot be supplied
-  // via Issue body or manifest. Do not call the six-file CAS applier.
+  // Only this fixed native Windows probe is callable. It supplies a durable
+  // *read-only observation*, not an operator freeze or a source-start gate.
+  // Probe errors are diagnostic, never permission to bypass the missing B
+  // transaction or to retry a Task/source mutation.
+  let observed=null,observationFailure=null;
+  try{observed=observeR54BWindowsReadOnly();}
+  catch(error){
+   observationFailure=/^[A-Z0-9_]+$/.test(error?.code??'')
+    ?error.code:'R54_B_FIXED_HOST_OBSERVATION_UNKNOWN';
+  }
+  // A Task disable and two stable process polls do not stop a later manual
+  // or indirect unguarded R54/R78/R80/R81 launch. This can only be replaced
+  // by a held, authenticated Win32 start-fence / full V3 CAS+recovery adapter.
+  // Never construct a proof from Issue, manifest or observed boolean fields.
   const trustedRuntimeFreezeProof=null;
   if(!r54BStartFreezeReady(trustedRuntimeFreezeProof)){
   return {status:'BLOCKED',code:'R54_B_TASK_START_RACE_UNPROTECTED',
    lastPass:'R54_B_ADMISSION_AND_MANIFEST_VERIFIED',
    firstFail:'R54_B_TASK_START_RACE_UNPROTECTED',
+   readOnlyObservation:observed?.status??'UNAVAILABLE',
+   readOnlyObservationError:observationFailure,
    actualControllerSha:installedManifest().installedSha,installAttempted:false,
    writerFilesChanged:0,controllerWrites:0,taskWrites:0,
    providerCalls:0,d1Writes:0,protectedStateUnchanged:true};
