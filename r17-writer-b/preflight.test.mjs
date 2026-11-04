@@ -92,6 +92,17 @@ test('shifted Git hunk positions require unique exact original context',()=>{
   }),/R17_B_PATCH_CONTEXT_STOP/);
 });
 
+test('Windows CRLF source is matched exactly and its original EOL is retained',()=>{
+  const got=applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'header\r\na\r\nb\r\n',[p2]:'x\r\n',
+  });
+  assert.equal(got[p1],'header\r\na\r\nB\r\n');
+  assert.equal(got[p2],'y\r\n');
+  assert.throws(()=>applyTwoFilePatch(Buffer.from(patch),{
+    [p1]:'a\r\nb\n',[p2]:'x\r\n',
+  }),/R17_B_PATCH_CONTEXT_STOP/);
+});
+
 test('PR old full files are not required: 2 old targets derive only from a23 patch',()=>{
   const newFiles=Object.fromEntries(ADDED.map(p=>[p,Buffer.from('export const fresh = true;\n')]));
   const newSha256=Object.fromEntries(ADDED.map(p=>[p,digest(newFiles[p])]));

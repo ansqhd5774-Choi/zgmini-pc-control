@@ -90,7 +90,13 @@ export function applyTwoFilePatch(rawPatch,originals){
       stop('R17_B_PATCH_FILESET_STOP');
     const original=originals[head[1]];
     if(typeof original!=='string')stop('R17_B_PATCH_BASE_MISSING_STOP');
-    const source=original.split('\n');
+    // The approved Windows worktree may be checked out with CRLF. Git's own
+    // apply --check handles that checkout convention; validate against LF
+    // patch context without altering the source file's original EOL style.
+    const hasCRLF=original.includes('\r\n');
+    if(hasCRLF&&/(^|[^\r])\n/.test(original))stop('R17_B_PATCH_CONTEXT_STOP');
+    const eol=hasCRLF?'\r\n':'\n';
+    const source=original.replace(/\r\n/g,'\n').split('\n');
     const output=[];
     let cursor=0;
     let i=lines.findIndex(x=>/^@@ -/.test(x));
@@ -135,7 +141,7 @@ export function applyTwoFilePatch(rawPatch,originals){
       declaredDelta+=after.length-before.length;
     }
     output.push(...source.slice(cursor));
-    outputs[head[1]]=output.join('\n');
+    outputs[head[1]]=output.join('\n').replace(/\n/g,eol);
   }
   if(!OLD.every(p=>Object.hasOwn(outputs,p)))stop('R17_B_PATCH_FILESET_STOP');
   return outputs;
