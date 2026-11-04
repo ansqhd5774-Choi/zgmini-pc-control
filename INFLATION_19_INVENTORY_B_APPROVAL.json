@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_INFLATION_19_B_APPROVAL_V1",
+  "scope": "PRIVATE_READONLY_STORED_INPUT_INVENTORY",
+  "dataHome": "E:\\ZGmini\\data\\pc-writer",
+  "inputCount": 19,
+  "scriptSha256": "db21f67cfb8c32a76d9a7eaffb5503d132f5ede8501c2a4046edcd3f258ec118",
+  "maxProviderRequests": 0,
+  "maxAutomaticRetries": 0,
+  "coreWrites": false,
+  "dbWrites": false,
+  "d1Writes": false,
+  "schedulerWrites": false
+}
