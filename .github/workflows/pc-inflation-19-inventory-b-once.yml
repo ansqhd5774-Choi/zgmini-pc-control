@@ -1,0 +1,47 @@
+# PC-private raw observation inventory. The fixed script never fetches providers or writes Core/D1.
+name: ZGMINI Inflation 19 Saved Inventory Readonly
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-inflation19-private-inventory
+  cancel-in-progress: false
+jobs:
+  inflation19:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-inflation-19-inventory-readonly-once'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 3
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout event-immutable approved private reader
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Execute fixed hash-verified read-only inventory
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\inflation-19-inventory-b-once.mjs"'
+      - name: Return sanitized per-indicator status in private issue comment
+        if: always()
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\inflation-19-inventory-b-once.mjs" --upload'
