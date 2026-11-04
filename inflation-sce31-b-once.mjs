@@ -10,7 +10,6 @@ export const CONTROL_REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const SOURCE_REPO='ansqhd5774-Choi/zgmini';
 export const SOURCE_SHA='f0f70b2bdc091e6f2db7ddac71324b7bdb53dbbd';
 export const TITLE='pc-inflation-sce31-approved-once';
-export const LABEL='pc-inflation-sce31-approved';
 export const RESULT='INFLATION_SCE31_CAPTURE_RESULT.json';
 export const WRITER=String.raw`E:\ZGmini\data\pc-writer`;
 export const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
@@ -31,8 +30,8 @@ export function validateRequest(event,env) {
   if(env.GITHUB_REPOSITORY!==CONTROL_REPO||env.GITHUB_ACTOR!=='ansqhd5774-Choi'||
      env.GITHUB_EVENT_NAME!=='issues'||env.GITHUB_EVENT_ACTION!=='opened'||
      event?.action!=='opened'||event?.repository?.private!==true||
-     event?.issue?.user?.login!=='ansqhd5774-Choi'||event?.issue?.title!==TITLE||
-     !event?.issue?.labels?.some(x=>x.name===LABEL))stop('SCE31_ACTOR_OR_ISSUE_DENIED');
+     event?.issue?.user?.login!=='ansqhd5774-Choi'||event?.issue?.title!==TITLE)
+     stop('SCE31_ACTOR_OR_ISSUE_DENIED');
   let req;
   try{req=JSON.parse(event.issue.body)}catch{stop('SCE31_REQUEST_JSON_INVALID')}
   if(!req||Array.isArray(req)||typeof req!=='object'||
@@ -108,8 +107,9 @@ export function execute({env=process.env}={}){
     verifiedDirectory(MARKER_ROOT);
     // A create-only marker prevents a second provider call after partial/unknown execution.
     const marker=path.join(MARKER_ROOT,'ONCE_STARTED.json');
-    fs.writeFileSync(marker,JSON.stringify({requestId:req.requestId,sourceSha:SOURCE_SHA,
-      at:new Date().toISOString()}),{flag:'wx'});
+    try{fs.writeFileSync(marker,JSON.stringify({requestId:req.requestId,sourceSha:SOURCE_SHA,
+      at:new Date().toISOString()}),{flag:'wx'});}
+    catch(e){if(e?.code==='EEXIST')stop('SCE31_ALREADY_ATTEMPTED');throw e;}
     const child=spawnSync(NODE,[source],{cwd:path.dirname(source),env:childEnv(env),
       encoding:'utf8',windowsHide:true,shell:false,timeout:120000,maxBuffer:4096});
     if(child.error||child.signal){report.status='STATE_UNKNOWN';report.code='SCE31_CHILD_TERMINATION_UNKNOWN';}
