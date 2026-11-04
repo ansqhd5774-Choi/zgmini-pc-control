@@ -14,6 +14,8 @@ test('uncoded preflight exception reports a precise safe stage and leaves Contro
  assert.equal(r.code,'UPDATE_INSPECT_FAILED');
  assert.equal(r.firstFail,'RECEIVED');
  assert.equal(r.failureOperation,'inspect');
+ // A legacy success path does not claim a specialized no-effect proof.
+ assert.equal(r.substate,undefined);
  assert.equal(f.installed,previous);
  assert.equal(f.paused,false);
  assert.ok(!f.events.includes('stage'));
@@ -23,6 +25,61 @@ test('known errors remain exact; system errno is safely tied to the failing stag
  assert.equal(maintenanceFailureCode({code:'SUPERVISOR_NOT_HEALTHY'},'validate'),'SUPERVISOR_NOT_HEALTHY');
  assert.equal(maintenanceFailureCode({code:'ENOENT'},'validate'),'UPDATE_VALIDATE_ENOENT');
  assert.equal(maintenanceFailureCode(Error('token=do-not-log'),'postcheck'),'UPDATE_POSTCHECK_FAILED');
+});
+test('bounded no-effect proof can release an otherwise overly strict busy-Runner prevalidation block',async()=>{
+ const f=fixture({
+  validate:async()=>{throw Object.assign(Error('prevalidation failed'),{code:'ALLOWFILE_HASH_MISMATCH'});},
+  verifyPrevious:async()=>false, // old health check treats a busy unrelated runner as unsafe
+  verifyPrevalidationUntouched:async()=>true, // live original, Core digest and active workflow were read back
+ });
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.substate,'PREVALIDATION_UNTOUCHED_VERIFIED');
+ assert.equal(r.code,'ALLOWFILE_HASH_MISMATCH');
+ assert.equal(r.firstFail,'RECEIVED');
+ assert.equal(r.failureOperation,'validate');
+ assert.equal(r.workflowEnabled,true);
+ assert.equal(f.events.includes('stage'),false);
+});
+test('no-effect assertion cannot override an absent proof or a disabled workflow',async()=>{
+ const noProof=fixture({inspect:async()=>{throw Error('inspect failed');},
+  verifyPrevious:async()=>false,verifyPrevalidationUntouched:async()=>false});
+ const a=await applyApprovedUpdate(request,noProof.port);
+ assert.equal(a.status,'RECOVERY_REQUIRED');
+ assert.equal(a.substate,undefined);
+ assert.equal(a.firstFail,'RECEIVED');
+ const disabled=fixture({inspect:async()=>{throw Error('inspect failed');},
+  verifyPrevious:async()=>false,verifyPrevalidationUntouched:async()=>true,
+  inspectAfterUncertain:async()=>({installedSha:previous,workflowState:'disabled_manually'})});
+ const b=await applyApprovedUpdate(request,disabled.port);
+ assert.equal(b.status,'RECOVERY_REQUIRED');
+ assert.equal(b.substate,undefined);
+ assert.equal(b.workflowEnabled,false);
+});
+test('failed or throwing proof does not turn a recovery requirement into BLOCKED',async()=>{
+ for(const proof of [async()=>{throw Error('readback failed');},async()=>null]){
+  const f=fixture({inspect:async()=>{throw Error('no effect but unverified');},
+   verifyPrevious:async()=>false,verifyPrevalidationUntouched:proof});
+  const r=await applyApprovedUpdate(request,f.port);
+  assert.equal(r.status,'RECOVERY_REQUIRED');
+  assert.equal(r.substate,undefined);
+ }
+});
+test('prevalidation-only exception never changes stored failure into a new top-level status',async()=>{
+ const f=fixture({validate:async()=>{throw Object.assign(Error('invalid digest'),{code:'ALLOWFILE_HASH_MISMATCH'});},
+  verifyPrevalidationUntouched:async()=>true});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.substate,'PREVALIDATION_UNTOUCHED_VERIFIED');
+ assert.ok(!f.events.includes('stage'));
+ assert.ok(!f.events.includes('pause'));
+ const source=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ assert.match(source,/await ports\.capturePrevalidationBaseline\(\);/);
+ assert.match(source,/verifyPrevalidationUntouched:async/);
+ assert.match(source,/prevalidationBaseline\.ownerNonce/);
+ assert.match(source,/protectedSnapshot\(\)/);
+ assert.match(source,/if\(result\.status==='RECOVERY_REQUIRED'\)\{installLock\.holdForRecovery\(\)/);
+ assert.match(source,/if\(!retained\)installLock\.release\(\)/);
 });
 function fixture(overrides={}) {
   const events=[],records=new Map();let installed=previous,paused=false,oldRunning=true;
