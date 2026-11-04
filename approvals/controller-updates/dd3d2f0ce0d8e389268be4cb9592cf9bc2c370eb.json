@@ -47,7 +47,7 @@
   "purpose": "pc-controller-maintenance",
   "approval": {
     "grade": "B",
-    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/338",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/337",
     "scope": "PC_CONTROL_CONTROLLER_UPDATE"
   },
   "checks": {
