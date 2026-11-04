@@ -10,6 +10,7 @@ export const ONE_SHOT_DIAGNOSTIC_ID='pc-9a847b47-9ebd-4c1a-9883-028fc0c2ed97';
 export const ROOT=String.raw`E:\ZGmini`;
 export const SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 export const BASE_SHA='a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e';
+export const APPROVED_PATCH_SHA='728a4887bd4c81c52b01f1a8f5de6b506dd009a37d68b1d9269cd7c19ec7c706';
 export const BASE_HASHES=Object.freeze({
  'scripts/pc-writer/local-cycle.mjs':'9c3fc7788907a2f8756b7ff82c372124a2e26253557b7db8a93eb6c8428eadee',
  'scripts/pc-writer/run-local.mjs':'4370f6f725b0a9ce3d093d3c94e766624f24e8a02896afb79b063d21a9747502',
@@ -217,7 +218,7 @@ export function inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText
  const taskHash=Buffer.isBuffer(coreTaskXml)||typeof coreTaskXml==='string'?digest(coreTaskXml):null;
  const preflight=readPreviousRequest(),processEvidence=readR17Process(),lease=readKnownLease();
  let targetSha256=null;
- if(typeof patchText==='string'){
+ if(typeof patchText==='string'&&digest(Buffer.from(patchText,'utf8'))===APPROVED_PATCH_SHA){
   try{
    const originals={};
    for(const name of NAMES){
@@ -232,7 +233,7 @@ export function inspectR17PostCancel(dataRoot,{coreTaskXml,sourceTrace,patchText
    }
    targetSha256=applyFixedPatch(patchText,originals);
   }catch{errors.push('PATCH_TARGET_UNVERIFIED');}
- }
+ }else errors.push('APPROVED_PATCH_SHA_UNVERIFIED');
  const result=summarizeEvidence({sources,targetSha256,configSource:config.sourceSha,taskHash,
   preflight,process:processEvidence,lease,
   operatingSourceIdentified:sourceTrace?.sourceResolved===true&&
