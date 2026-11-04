@@ -1,0 +1,95 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-41772983322-1-seat-2",
+  "requestId": "pc-2096cf05-0736-48ac-8d66-30b598f00faa",
+  "startedAt": "2026-11-04T04:24:20.773Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "c0dc5dcc99880c4bcfde62683374380cad891ce1",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "e45deed0b3a100d63362ca2cf912972025dd68da",
+  "sourceBranch": "main",
+  "operation": "us-breadth-r17-preflight",
+  "seat": 2,
+  "status": "BLOCKED",
+  "code": "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-61d276d6-7407-4635-9d4e-20748f4dece1",
+  "pcOperationalApprovedSha": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+  "exitCode": 0,
+  "result": {
+    "status": "BLOCKED",
+    "code": "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+    "reasons": [
+      "PR957_CONTEXT_CONFLICT_OR_UNVERIFIED",
+      "LOCAL_ALPACA_GUARD_UNVERIFIED",
+      "CORE_TASK_SOURCE_LINK_UNVERIFIED"
+    ],
+    "sourceHead": "a23c12cc8dd3238fa59adb417a4fdd5fce1bd57e",
+    "checkedExistingFiles": 3,
+    "checkedNewFiles": 3,
+    "runtimeSourceVerified": false,
+    "canInstall": false,
+    "providerCalls": 0,
+    "sqliteWrites": 0,
+    "d1Writes": 0,
+    "diagnostics": {
+      "patchCheck": "PATCH_CONTEXT_MISMATCH",
+      "patchContexts": [
+        {
+          "file": "cycle",
+          "hunk": "23",
+          "oldContextMatches": true
+        },
+        {
+          "file": "cycle",
+          "hunk": "185",
+          "oldContextMatches": false
+        },
+        {
+          "file": "publication",
+          "hunk": "38",
+          "oldContextMatches": true
+        },
+        {
+          "file": "publication",
+          "hunk": "72",
+          "oldContextMatches": false
+        },
+        {
+          "file": "publication",
+          "hunk": "228",
+          "oldContextMatches": false
+        }
+      ],
+      "restrictedContexts": {
+        "status": "CONTEXT_ANCHOR_NOT_UNIQUE",
+        "excerpts": []
+      },
+      "taskChain": {
+        "commandWscript": true,
+        "expectedLauncherArgument": true,
+        "firstLauncherHash": true,
+        "secondLauncherHash": true,
+        "firstHop": true,
+        "secondHop": false
+      },
+      "singleDispatcher": {
+        "status": "DISPATCH_TARGET_NOT_UNIQUE",
+        "singleHop": null
+      }
+    }
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "protectedAfterSha256": "349ff2cca3fbae0aa93e142348eec9b4a549a62b9ec68a42b9dc934cc5b74bbf",
+  "actualExecutionSha": "c0dc5dcc99880c4bcfde62683374380cad891ce1",
+  "next": "RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST",
+  "finishedAt": "2026-11-04T04:24:22.339Z",
+  "durationMs": 1566
+}
