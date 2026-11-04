@@ -32,7 +32,7 @@ function makeAuth(){
   return {env,event,manifest,manifestBytes,request};
 }
 function mockIo({failAt,dirty=false,alreadyInstalled=false,drainRunning=false}={}){
-  const state={claimed:false,head:alreadyInstalled?NEW:BASE,
+  const state={claimed:false,lockHeld:false,head:alreadyInstalled?NEW:BASE,
     branch:alreadyInstalled?'r17-writer-b/local':'main',config:alreadyInstalled?NEW:BASE,
     taskEnabled:true,dirty,changedFiles:alreadyInstalled?TARGET:BEFORE,drainRunning,
     history:[],stages:[]};
@@ -44,7 +44,8 @@ function mockIo({failAt,dirty=false,alreadyInstalled=false,drainRunning=false}={
     existingSha256:BEFORE,absent:Object.keys(TARGET).filter(p=>!Object.hasOwn(BEFORE,p))});
   const driver={
     state,
-    async claim(id){fatal('claim');if(state.claimed)throw new Error('duplicate');state.claimed=id;},
+    async acquireSharedLock(id){fatal('lock');if(state.lockHeld)throw new Error('lock busy');state.lockHeld=id;},
+    async claim(id){fatal('claim');if(state.lockHeld!==id||state.claimed)throw new Error('claim before lock or duplicate');state.claimed=id;},
     async journal(phase){fatal(phase==='CORE_RESTORED'?'journal_post_restore':'journal_other');state.stages.push(phase);},
     async inspectBefore(){fatal('inspect');return inspectBefore();},
     async saveBaseline(){fatal('backup');state.history.push('backup');},
@@ -55,7 +56,7 @@ function mockIo({failAt,dirty=false,alreadyInstalled=false,drainRunning=false}={
     async disableCoreTask(){state.taskEnabled=false;state.history.push('disable');fatal('disable');},
     async assertCoreDisabled(){if(state.taskEnabled)throw new Error('Core is enabled');},
     async waitForDrain({maxDrainMs}){assert.equal(maxDrainMs,180000);
-      state.drainRunning=false;state.history.push('drain');fatal('drain');},
+      state.history.push('drain');fatal('drain');state.drainRunning=false;},
     async assertCoreDrained(){if(state.drainRunning)throw new Error('not drained');},
     async switchToPreparedCommit(){state.head=NEW;state.branch=`r17-writer-b/${RID}`;
       state.changedFiles=TARGET;state.history.push('switch');fatal('switch');},
@@ -99,13 +100,24 @@ test('fivefile B success: exact source/config SHA and restored Core, no provider
   assert.equal(io.state.stages.at(-1),'VERIFIED');
 });
 
-test('active Core before disable is no-op, never temporarily disables or waits on a long run',async()=>{
+test('active Core can be disabled before natural drain, but switch waits for drain',async()=>{
   const io=mockIo({drainRunning:true});
   const r=await performApprovedInstall(authorize(makeAuth()),io);
-  assert.equal(r.status,'R17_B_INSTALL_STOP');
-  assert.equal(r.errorCode,'R17_B_BASELINE_DRIFT_STOP');
+  assert.equal(r.status,'R17_B_INSTALLED_VERIFIED');
   assert.equal(io.state.taskEnabled,true);
-  assert.equal(io.state.history.includes('disable'),false);
+  assert.equal(io.state.drainRunning,false);
+  assert.deepEqual(io.state.history,['backup','prepare','disable','drain','switch','config','restore-task']);
+});
+
+test('an active Core that does not drain never permits source switch or config change',async()=>{
+  const io=mockIo({drainRunning:true,failAt:'drain'});
+  const r=await performApprovedInstall(authorize(makeAuth()),io);
+  assert.equal(r.status,'R17_B_INSTALL_STOP');
+  assert.equal(r.errorCode,'R17_B_SIMULATED_DRAIN_STOP');
+  assert.equal(io.state.taskEnabled,true);
+  assert.equal(io.state.head,BASE);assert.equal(io.state.config,BASE);
+  assert.equal(io.state.drainRunning,true);
+  assert.deepEqual(io.state.history,['backup','prepare','disable','drain','restore-task']);
 });
 
 test('stale or dirty source is no-op: no task/source/config write',async()=>{
@@ -117,8 +129,31 @@ test('stale or dirty source is no-op: no task/source/config write',async()=>{
     assert.equal(r.errorCode,'R17_B_BASELINE_DRIFT_STOP');
     assert.equal(io.state.taskEnabled,before.taskEnabled);
     assert.equal(io.state.head,before.head);assert.equal(io.state.config,before.config);
+    assert.equal(io.state.claimed,false);
+    assert.equal(io.state.lockHeld,RID);
     assert.deepEqual(io.state.history,[]);
   }
+});
+
+test('read-only inspect failure occurs under shared mutex without consuming a claim',async()=>{
+  const io=mockIo({failAt:'inspect'});
+  const r=await performApprovedInstall(authorize(makeAuth()),io);
+  assert.equal(r.status,'R17_B_INSTALL_STOP');
+  assert.equal(r.phase,'INIT');
+  assert.equal(r.errorCode,'R17_B_SIMULATED_INSPECT_STOP');
+  assert.equal(io.state.lockHeld,RID);assert.equal(io.state.claimed,false);
+  assert.equal(io.state.head,BASE);assert.equal(io.state.config,BASE);
+  assert.equal(io.state.taskEnabled,true);
+  assert.deepEqual(io.state.history,[]);
+});
+
+test('shared lock contention fails before read-only inspect and claim',async()=>{
+  const io=mockIo({failAt:'lock'});
+  const r=await performApprovedInstall(authorize(makeAuth()),io);
+  assert.equal(r.status,'R17_B_INSTALL_STOP');
+  assert.equal(r.errorCode,'R17_B_SIMULATED_LOCK_STOP');
+  assert.equal(io.state.lockHeld,false);assert.equal(io.state.claimed,false);
+  assert.equal(io.state.head,BASE);assert.deepEqual(io.state.history,[]);
 });
 
 test('candidate preparation fails before task change, Core remains enabled',async()=>{
