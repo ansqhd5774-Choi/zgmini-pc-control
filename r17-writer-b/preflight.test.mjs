@@ -199,6 +199,26 @@ function preflightFixture(){
   };
   return {opts,called};
 }
+test('JSDoc type-only imports do not become runtime dependencies',()=>{
+ const map=new Map(FIVE.map(p=>[p,Buffer.from('// harmless\n')]));
+ map.set(ADDED[0],Buffer.from(
+   `/** @param {import('../../worker/runtime-contracts').ProjectionId} id */\n`+
+   `/** @returns {import('../../worker/projection-checkpoint-r52.mjs').Result} */\n`+
+   `const ok=true;\n`));
+ assert.equal(verifyImports('/unused',map,()=>false).verifiedImportFiles,5);
+ map.set(ADDED[0],Buffer.from(
+   `/** @param {import('../../worker/runtime-contracts').ProjectionId} id */\n`+
+   `export async function f(){ return import('../../worker/runtime-required.mjs'); }\n`));
+ assert.throws(()=>verifyImports('/unused',map,()=>false),error=>{
+   assert.equal(error.code,'R17_B_IMPORT_RESOLUTION_STOP');
+   assert.deepEqual(error.diagnostic,{
+     sourceKind:'OVERLAY',sourcePath:ADDED[0],
+     dependencyPath:'worker/runtime-required.mjs',reason:'MISSING',
+   });
+   return true;
+ });
+});
+
 test('read-only preflight refuses PC HEAD mismatch before reading config or applying patch',()=>{
   const {opts,called}=preflightFixture();
   const original=opts.gitCommit;
