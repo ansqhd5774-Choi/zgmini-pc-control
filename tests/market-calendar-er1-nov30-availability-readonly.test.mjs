@@ -44,6 +44,10 @@ test('30/30 November calendar 3051 is not confused with historical actuals or sc
     fs.writeFileSync(path.join(known,all[1]+'.json'),JSON.stringify({body:[{
       date:'2026-12-01',symbol:all[1],eps:1,revenue:100
     }]}));
+    const knownOther=path.join(f.input,'dec31-symbol-batch-a');fs.mkdirSync(knownOther);
+    fs.writeFileSync(path.join(knownOther,all[0]+'.json'),JSON.stringify({body:[{
+      date:'2026-08-01',symbol:all[0],eps:2,revenue:200
+    }]}));
     const r=inspectER1NovemberAvailability(f.root,{clock:()=>Date.parse('2026-11-04T04:00:00Z')});
     assert.equal(r.status,'PASS');
     assert.equal(r.code,'ER1_NOV30_AVAILABILITY_READONLY');
@@ -55,6 +59,8 @@ test('30/30 November calendar 3051 is not confused with historical actuals or sc
     assert.equal(r.priorScoreJoinSymbols,4);
     assert.equal(r.priorScoreAsOf,'2026-11-02');
     assert.equal(r.knownActualArchiveSymbols,2);
+    assert.equal(r.actualInputFiles,3);
+    // Same historical ticker in two archives is one scheduled issuer.
     assert.equal(r.candidateHistoricalMatches,1);
     assert.equal(r.actualEligibilityVerified,false);
     assert.equal(r.scoreCalculationPerformed,false);
@@ -78,6 +84,7 @@ test('missing and invalid days are explicit, not silently deemed covered',()=>{
     assert.equal(r.verifiedDayCount,28);
     assert.equal(r.missingDayCount,1);
     assert.equal(r.invalidDayCount,1);
+    assert.equal(r.status,'PARTIAL');
     assert.equal(r.code,'ER1_NOV30_AVAILABILITY_PARTIAL');
     assert.equal(r.priorScoreSnapshotState,'UNAVAILABLE');
     assert.equal(r.providerCalls,0);
@@ -89,4 +96,36 @@ test('invalid unapproved root cannot scan arbitrary paths',()=>{
   const result=inspectER1NovemberAvailability('relative-root');
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'ER1_NOV30_DATA_ROOT_INVALID');
+});
+
+test('30/30 days with an invalid vendor event is PARTIAL, never PASS',()=>{
+  const f=makeFixture();
+  try{
+    for(let day=1;day<=30;day++){
+      const date=`2026-11-${String(day).padStart(2,'0')}`;
+      const body=payload(date,[`T${day}`]);
+      if(day===30)body.pre.push({symbol:'!BAD',name:'Synthetic Corp'});
+      savePrivate(f.privateDir,date,body);
+    }
+    const r=inspectER1NovemberAvailability(f.root);
+    assert.equal(r.status,'PARTIAL');
+    assert.equal(r.verifiedDayCount,30);
+    assert.equal(r.invalidVendorRows,1);
+    assert.equal(r.code,'ER1_NOV30_AVAILABILITY_PARTIAL');
+  }finally{f.cleanup()}
+});
+
+test('unbounded actual archive entries stop with an explicit bounded-scan code',()=>{
+  const f=makeFixture();
+  try{
+    const known=path.join(f.input,'dec31-symbol-probe');fs.mkdirSync(known);
+    for(let i=1;i<=129;i++)fs.writeFileSync(path.join(known,`T${i}.json`),
+      JSON.stringify({body:[{symbol:`T${i}`,date:'2026-08-01',eps:1,revenue:1}]}));
+    const r=inspectER1NovemberAvailability(f.root);
+    assert.equal(r.status,'BLOCKED');
+    assert.equal(r.code,'ER1_NOV30_ACTUAL_ARCHIVE_SCAN_LIMIT_STOP');
+    assert.equal(r.providerCalls,0);
+    assert.equal(r.dbWrites,0);
+    assert.equal(r.d1Writes,0);
+  }finally{f.cleanup()}
 });
