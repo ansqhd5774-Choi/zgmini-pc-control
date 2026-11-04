@@ -86,6 +86,139 @@ export function r54BStartFreezeReady(proof={}){
  return typeof observedAt==='string'&&Number.isFinite(Date.parse(observedAt))
   &&Math.abs(Date.now()-Date.parse(observedAt))<60000;
 }
+// The following Windows adapter is deliberately NOT wired to r54-b-apply.
+// It can only manage the one pinned R54 Task after a durable source snapshot.
+// There is no trustworthy protection yet for manual CMD or R78/R80 writers.
+// Never represent Task Disable as equivalent to a complete Writer freeze.
+export function inspectR54TaskXml(raw,actionBytes){
+ need(Buffer.isBuffer(raw)&&raw.length>0&&raw.length<65536,
+  'R54_TASK_XML_BYTES_INVALID');
+ need(Buffer.isBuffer(actionBytes)&&sha256(actionBytes)===R54_TASK_ACTION_SHA256,
+  'R54_TASK_ACTION_SOURCE_DRIFT');
+ let xml;
+ try{
+  const utf16=raw[0]===0xff&&raw[1]===0xfe;
+  xml=new TextDecoder(utf16?'utf-16le':'utf-8',{fatal:true})
+   .decode(utf16?raw.subarray(2):raw);
+ }catch{throw Object.assign(Error('R54_TASK_XML_ENCODING_INVALID'),
+  {code:'R54_TASK_XML_ENCODING_INVALID'});}
+ const settings=[...xml.matchAll(/<Settings(?:\s[^>]*)?>([\s\S]*?)<\/Settings>/gi)];
+ const actions=[...xml.matchAll(/<Actions(?:\s[^>]*)?>([\s\S]*?)<\/Actions>/gi)];
+ need(settings.length===1&&actions.length===1,'R54_TASK_XML_SHAPE_INVALID');
+ const enabled=[...settings[0][1].matchAll(/<Enabled>(true|false)<\/Enabled>/gi)];
+ const execs=[...actions[0][1].matchAll(/<Exec(?:\s[^>]*)?>([\s\S]*?)<\/Exec>/gi)];
+ need(enabled.length===1&&execs.length===1,'R54_TASK_XML_ACTION_INVALID');
+ const commands=[...execs[0][1].matchAll(/<Command>([^<]+)<\/Command>/gi)];
+ need(commands.length===1,'R54_TASK_XML_COMMAND_INVALID');
+ // No XML entity expansion or arguments: this pinned CMD needs none.
+ const action=commands[0][1];
+ const normalize=s=>s.replace(/\//g,'\\').toLowerCase();
+ need(!action.includes('&')&&normalize(action)===normalize(R54_TASK_ACTION),
+  'R54_TASK_ACTION_CHANGED');
+ const normalized=xml.replace(/(<Settings(?:\s[^>]*)?>[\s\S]*?<Enabled>)(?:true|false)(<\/Enabled>[\s\S]*?<\/Settings>)/i,
+  '$1ORIGINAL_ENABLED$2');
+ need(normalized!==xml,'R54_TASK_ENABLED_TAG_MISSING');
+ return {name:R54_TASK_NAME,xml:raw,xmlSha256:sha256(raw),
+  enabled:enabled[0][1].toLowerCase()==='true',
+  actionPath:action,actionSha256:R54_TASK_ACTION_SHA256,
+  definitionDigest:sha256(Buffer.from(normalized,'utf8'))};
+}
+
+/** Fixed-vector Windows schtasks port; shell=false, exactly one Task name.
+ * This function is never invoked from the active R54 B command in this draft. */
+export function r54FixedSchtasks(args,{platform=process.platform,
+ systemRoot=process.env.SystemRoot,spawnTask=spawnSync}={}){
+ need(platform==='win32'&&typeof systemRoot==='string'
+  &&path.win32.isAbsolute(systemRoot)
+  &&Array.isArray(args),'R54_TASK_WINDOWS_EXECUTOR_REQUIRED');
+ const allowed=JSON.stringify(args)===JSON.stringify(['/Query','/TN',R54_TASK_NAME,'/XML'])
+  ||['/Disable','/Enable'].some(mode=>JSON.stringify(args)===
+   JSON.stringify(['/Change','/TN',R54_TASK_NAME,mode]));
+ need(allowed,'R54_TASK_COMMAND_OUT_OF_SCOPE');
+ const bin=path.win32.join(systemRoot,'System32','schtasks.exe');
+ return spawnTask(bin,[...args],{shell:false,windowsHide:true,encoding:null,
+  timeout:15000,maxBuffer:65536});
+}
+
+/** Read-only Query, durable baseline, one-task Disable and exact Restore.
+ * runTask is an independently trusted, shell:false schtasks fixed-vector port.
+ * Required on Windows; tests inject a no-OS mock. No manual entrypoint fence.
+ */
+export function createR54WindowsTaskAdapter({requestId,authorization,
+ runTask=r54FixedSchtasks,readActionBytes=file=>fs.readFileSync(file),
+ backupBase=path.join(maintenanceRoot,'r54-task-backups'),
+ platform=process.platform}={}){
+ need(platform==='win32'&&/^pc-[a-z0-9-]{8,76}$/.test(requestId??'')
+  &&typeof runTask==='function'&&typeof readActionBytes==='function',
+  'R54_TASK_TRUSTED_WINDOWS_ADAPTER_REQUIRED');
+ need(authorization?.grade==='B'&&authorization.scope===R54_TASK_EXCEPTION
+  &&authorization.taskName===R54_TASK_NAME&&authorization.singleUse===true
+  &&authorization.preserveTaskDefinition===true
+  &&authorization.allowForceTermination===false
+  &&authorization.allowOtherTaskChanges===false,
+  'R54_TASK_B_EXCEPTION_REQUIRED');
+ const taskDir=path.join(backupBase,'r54-'+requestId);
+ const backupFile=path.join(taskDir,'BASELINE.json');
+ let baseline=null,saved=false;
+ const perform=(args,code)=>{
+  const out=runTask([...args]);
+  need(out?.status===0&&!out.error&&!out.signal&&Buffer.isBuffer(out.stdout),code);
+  return out.stdout;
+ };
+ const inspect=()=>{
+  const output=perform(['/Query','/TN',R54_TASK_NAME,'/XML'],'R54_TASK_QUERY_FAILED');
+  return inspectR54TaskXml(output,readActionBytes(R54_TASK_ACTION));
+ };
+ const saveBaseline=()=>{
+  need(!saved&&!fs.existsSync(backupFile),'R54_TASK_BASELINE_ALREADY_EXISTS');
+  const original=inspect();
+  fs.mkdirSync(taskDir,{recursive:true});
+  const data={schema:'ZGMINI_R54_TASK_BASELINE_V1',requestId,
+   name:R54_TASK_NAME,enabled:original.enabled,
+   xmlBase64:original.xml.toString('base64'),xmlSha256:original.xmlSha256,
+   definitionDigest:original.definitionDigest,
+   actionSha256:original.actionSha256};
+  const fd=fs.openSync(backupFile,'wx',0o600);
+  try{fs.writeFileSync(fd,JSON.stringify(data)+'\n');fs.fsyncSync(fd);}
+  finally{fs.closeSync(fd);}
+  const after=json(backupFile);
+  need(after.requestId===requestId&&after.xmlSha256===original.xmlSha256
+   &&sha256(Buffer.from(after.xmlBase64,'base64'))===original.xmlSha256,
+   'R54_TASK_BASELINE_NOT_DURABLE');
+  baseline=original;saved=true;
+  return {...original,durableXmlBackupReadback:true};
+ };
+ const disable=()=>{
+  need(saved&&baseline,'R54_TASK_BASELINE_REQUIRED');
+  const before=inspect();
+  need(before.definitionDigest===baseline.definitionDigest
+   &&before.enabled===baseline.enabled,'R54_TASK_CHANGED_BEFORE_DISABLE');
+  if(before.enabled){
+   perform(['/Change','/TN',R54_TASK_NAME,'/Disable'],'R54_TASK_DISABLE_FAILED');
+  }
+  // No retry on ambiguous schtasks results. The host must reconcile first.
+  const after=inspect();
+  need(after.enabled===false&&after.definitionDigest===baseline.definitionDigest,
+   'R54_TASK_DISABLE_READBACK_UNCERTAIN');
+  return after;
+ };
+ const restore=({writerSixHashVerified=false}={})=>{
+  need(saved&&baseline&&writerSixHashVerified===true,
+   'R54_TASK_RESTORE_SOURCE_UNVERIFIED');
+  const before=inspect();
+  need(before.enabled===false&&before.definitionDigest===baseline.definitionDigest,
+   'R54_TASK_RESTORE_PRESTATE_DRIFT');
+  if(baseline.enabled){
+   perform(['/Change','/TN',R54_TASK_NAME,'/Enable'],'R54_TASK_RESTORE_FAILED');
+  }
+  const after=inspect();
+  need(after.enabled===baseline.enabled
+   &&after.definitionDigest===baseline.definitionDigest
+   &&after.xmlSha256===baseline.xmlSha256,'R54_TASK_RESTORE_READBACK_DRIFT');
+  return after;
+ };
+ return Object.freeze({inspect,saveBaseline,disable,restore});
+}
 const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
 const r6FileIdentity=file=>{const s=fs.statSync(file,{bigint:true});
  need(s.isFile(),'R6_HOST_DB_NOT_REGULAR');
