@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_RESULT_V1",
+  "requestId": "pc-f619c0d6-2ee0-4521-9d5d-15657d4059a0",
+  "chatId": "chat-0579dddc-ef71-40a1-8e30-73d57431249d",
+  "status": "BLOCKED",
+  "code": "INFL19_A_LAUNCHER_FORMAT_UNSUPPORTED",
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "pcSourceWrites": 0,
+  "configWrites": 0,
+  "taskWrites": 0
+}
