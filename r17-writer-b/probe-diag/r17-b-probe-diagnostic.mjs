@@ -12,6 +12,9 @@ const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
 const PROBE_SHA='7050dc256e8165827e5a4296dc3d3e2d18408c94508bdf8b51975f5499c95a13';
 const FIXTURE_SHA='22261ee72d757c9372ed9e0b806e27e4ad65ad9c1d5e274fa82f8e914755fa1d';
+// Previously verified exact Core Task XML. The diagnostic reads only its shape,
+// never the XML body or its action/arguments.
+const CORE_XML_SHA='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028';
 const ID=/^pc-r17-probe-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const CHAT=/^chat-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const SHA40=/^[0-9a-f]{40}$/;
@@ -131,6 +134,28 @@ export function analyzeCscriptResult(result,kind){
     ...stdoutFeatures(stdout,kind)};
 }
 
+export function analyzeCoreTaskXml(result){
+  const raw=bytesOf(result?.stdout),stderr=bytesOf(result?.stderr);
+  const exitCode=Number.isInteger(result?.status)?result.status:null;
+  const execState=result?.error?'SPAWN_ERROR':exitCode===0?'EXIT_ZERO':
+    exitCode!==null?'EXIT_NONZERO':'NO_STATUS';
+  const digestMatched=raw.length>0&&sha256(raw)===CORE_XML_SHA;
+  let xml=raw.toString('utf8');
+  if(raw[0]===0xff&&raw[1]===0xfe)xml=raw.subarray(2).toString('utf16le');
+  else if(raw.length>=4&&raw[1]===0&&raw[3]===0)xml=raw.toString('utf16le');
+  else if(raw[0]===0xfe&&raw[1]===0xff)xml=Buffer.from(raw.subarray(2)).swap16().toString('utf16le');
+  const settings=[...xml.matchAll(/<Settings(?:\s[^>]*)?>[\s\S]*?<\/Settings>/g)];
+  const enabled=settings.length===1?
+    [...settings[0][0].matchAll(/<Enabled>\s*(?:true|false)\s*<\/Enabled>/g)]:[];
+  const shape=execState!=='EXIT_ZERO'?'QUERY_FAILED':
+    settings.length!==1?'SETTINGS_COUNT_INVALID':
+    enabled.length===0?'ENABLED_ABSENT':
+    enabled.length>1?'ENABLED_DUPLICATE':'EXPECTED_SETTINGS_ENABLED';
+  return {execState,exitCode,stderrBytes:stderr.length,
+    stdoutBytes:raw.length,digestMatched,settingsCount:settings.length,
+    enabledCount:enabled.length,shape};
+}
+
 function checkedRead(file,root,digest){
   const stat=fs.lstatSync(file);
   assert(stat.isFile()&&!stat.isSymbolicLink()&&stat.size>0&&stat.size<=MAX,
@@ -142,7 +167,7 @@ function checkedRead(file,root,digest){
   assert(sha256(fs.readFileSync(file))===digest,'R17_B_DIAG_HASH_STOP');
 }
 
-export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript}={}){
+export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript,runTaskXml}={}){
   const request=authorizeDiagnostic(event,env);
   assert(process.platform==='win32'||typeof runCscript==='function',
     'R17_B_DIAG_RUNTIME_STOP');
@@ -158,10 +183,27 @@ export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript}={}){
     {encoding:null,shell:false,windowsHide:true,timeout:20_000,maxBuffer:MAX}));
   const mini=analyzeCscriptResult(execute(executable,fixture),'fixture');
   const original=analyzeCscriptResult(execute(executable,probe),'probe');
+  const schtasks=path.join(env.SystemRoot??String.raw`C:\Windows`,'System32','schtasks.exe');
+  const xmlExecute=runTaskXml??((exe)=>spawnSync(exe,
+    ['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
+    {encoding:null,shell:false,windowsHide:true,timeout:20_000,maxBuffer:131_072}));
+  const taskXml=analyzeCoreTaskXml(xmlExecute(schtasks));
   return {schema:SCHEMA,requestId:request.requestId,status:'DIAGNOSTIC_COMPLETE',
     code:'R17_B_DIAG_READONLY',runId:env.GITHUB_RUN_ID,
-    fixture:mini,probe:original,sourceWrites:0,taskWrites:0,configWrites:0,
+    fixture:mini,probe:original,taskXml,sourceWrites:0,taskWrites:0,configWrites:0,
     installReruns:0};
+}
+
+function validCoreTaskXml(x){
+  return exactKeys(x,['execState','exitCode','stderrBytes','stdoutBytes',
+    'digestMatched','settingsCount','enabledCount','shape'])&&
+    EXEC_STATES.has(x.execState)&&
+    (x.exitCode===null||(Number.isSafeInteger(x.exitCode)&&x.exitCode>=0&&x.exitCode<=32767))&&
+    [x.stderrBytes,x.stdoutBytes,x.settingsCount,x.enabledCount]
+      .every(n=>Number.isSafeInteger(n)&&n>=0&&n<=131_072)&&
+    typeof x.digestMatched==='boolean'&&
+    ['QUERY_FAILED','SETTINGS_COUNT_INVALID','ENABLED_ABSENT',
+      'ENABLED_DUPLICATE','EXPECTED_SETTINGS_ENABLED'].includes(x.shape);
 }
 
 function validOne(raw,kind){
@@ -192,14 +234,15 @@ export function sanitizeDiagnosticResult(raw,requestId,runId){
     raw.schema===SCHEMA&&ALLOWED_CODES.has(raw.code))
     return {...base,status:'DIAGNOSTIC_SETUP_STOP',code:raw.code};
   if(!exactKeys(raw,['schema','requestId','status','code','runId',
-    'fixture','probe','sourceWrites','taskWrites','configWrites','installReruns'])||
+    'fixture','probe','taskXml','sourceWrites','taskWrites','configWrites','installReruns'])||
     raw.schema!==SCHEMA||raw.status!=='DIAGNOSTIC_COMPLETE'||
     raw.code!=='R17_B_DIAG_READONLY'||raw.runId!==runId||
     !validOne(raw.fixture,'fixture')||!validOne(raw.probe,'probe')||
+    !validCoreTaskXml(raw.taskXml)||
     raw.sourceWrites!==0||raw.taskWrites!==0||raw.configWrites!==0||
     raw.installReruns!==0)return base;
   return {...base,status:raw.status,code:raw.code,
-    fixture:{...raw.fixture},probe:{...raw.probe}};
+    fixture:{...raw.fixture},probe:{...raw.probe},taskXml:{...raw.taskXml}};
 }
 
 export function readSafeResult(file){
