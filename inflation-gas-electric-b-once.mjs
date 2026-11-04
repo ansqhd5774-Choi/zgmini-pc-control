@@ -24,7 +24,9 @@ export const SOURCE_FILE_HASHES=Object.freeze({
 const UUID='[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const REQUEST_ID=new RegExp(`^pc-inflation-gas-electric-${UUID}$`);
 const CHAT_ID=new RegExp(`^chat-${UUID}$`);
+const GIT_COMMIT_SHA=/^[0-9a-f]{40}$/;
 const SHA=/^[0-9a-f]{64}$/;
+export function isPinnedSourceCommit(){return GIT_COMMIT_SHA.test(SOURCE_SHA)}
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const stop=code=>{throw Error(code)};
 function failCode(error){
@@ -81,7 +83,7 @@ export function verifyApproval(workspace){
   return approval;
 }
 export function verifySource(workspace,{gitPath}={}){
-  if(!SHA.test(SOURCE_SHA))stop('GASEL_SOURCE_UNPINNED');
+  if(!isPinnedSourceCommit())stop('GASEL_SOURCE_UNPINNED');
   const root=safeDir(path.join(workspace,'source'));
   const git=gitPath??[
     String.raw`C:\Program Files\Git\cmd\git.exe`,
