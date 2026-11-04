@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ansqhd5774-Choi/zgmini
-          ref: 4a3426c53836c019f93536064d94367f680eb742
+          ref: ff04b60fec5d6ece19cd3842eadcbf04965d230b
           path: source
           persist-credentials: false
           fetch-depth: 1
