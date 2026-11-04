@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 export const SCHEMA='ZGMINI_INFL19_WRITER_SOURCE_INVENTORY_A_V1';
 export const TASK='ZGMINI-PC-Local-Core';
 export const PC_DATA=String.raw`E:\ZGmini\data\pc-writer`;
-const CORE_VBS=String.raw`E:\ZGmini\data\pc-writer\run-local-core.vbs`;
+const WRITER_VBS_ROOT=String.raw`e:\zgmini\data\pc-writer`;
 export const FILES=Object.freeze([
  'scripts/pc-writer/run-local.mjs',
  'scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs',
@@ -34,6 +34,27 @@ export function canonicalWindows(p){
  if(!/^[a-z]:\\/.test(normalized)||normalized.startsWith('\\\\'))
   stop('INFL19_A_PATH_DENIED');
  return normalized;
+}
+
+// A Task Action may reference the old C: compatibility junction. A local C:
+// or E: spelling is only a candidate; only native realpath inside the E:
+// Writer data root authorizes reading the launcher.
+function literalLocalVbsPath(p){
+ if(typeof p!=='string'||p.length>512||!(/^[ce]:\\/i.test(p)))
+  stop('INFL19_A_LAUNCHER_PATH_DENIED');
+ const parts=p.slice(3).split('\\');
+ if(parts.some(s=>!s||s==='.'||s==='..'||/[\/<>:"|?*\x00-\x1f]/.test(s)||/[. ]$/.test(s)))
+  stop('INFL19_A_LAUNCHER_PATH_DENIED');
+ const n=canonicalWindows(p);
+ if(!n.endsWith('.vbs'))
+  stop('INFL19_A_LAUNCHER_PATH_DENIED');
+ return n;
+}
+export function approvedWriterVbsPath(p){
+ const n=literalLocalVbsPath(p);
+ if(!n.startsWith(WRITER_VBS_ROOT+'\\'))
+  stop('INFL19_A_LAUNCHER_PATH_DENIED');
+ return n;
 }
 
 export function sourceRootFromRealScript(real){
@@ -109,7 +130,7 @@ export function parseCoreTaskXml(raw){
   return {kind:'direct-mjs',script:refs[0],taskXmlSha256:digest(raw),actionExe};
  if(scripts.length>1)unresolvedAction('INFL19_A_TASK_ACTION_AMBIGUOUS',details);
  if(actionExe!=='wscript.exe')unresolvedAction('INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',details);
- const m=/^"([a-z]:\\[^"\r\n]+\\run-local-core\.vbs)"$/i.exec(args.trim());
+ const m=/^"([a-z]:\\[^"\r\n]+\.vbs)"$/i.exec(args.trim());
  if(!m)unresolvedAction('INFL19_A_SCRIPT_REFERENCE_UNRESOLVED',details);
  return {kind:'vbs',launcher:m[1],taskXmlSha256:digest(raw),actionExe};
 }
@@ -138,8 +159,17 @@ export function inventoryReadOnly({taskXml,resolveRealPath,readConfig,gitRoot,gi
  if(!config||!SHA40.test(config.source))stop('INFL19_A_CONFIG_SOURCE_DENIED');
  let script=action.script;
  if(action.kind==='vbs'){
-  const real=canonicalWindows(resolveRealPath(action.launcher));
-  if(real!==canonicalWindows(CORE_VBS))stop('INFL19_A_LAUNCHER_PATH_DENIED');
+  const diagnostic={taskXmlSha256:action.taskXmlSha256,actionExe:action.actionExe,
+   launcherArgumentShape:'QUOTED_VBS_PATH'};
+  let real;
+  try{
+   literalLocalVbsPath(action.launcher);
+   real=approvedWriterVbsPath(canonicalWindows(resolveRealPath(action.launcher)));
+  }catch(e){
+   if(e?.code==='INFL19_A_LAUNCHER_PATH_DENIED')
+    unresolvedAction(e.code,diagnostic);
+   throw e;
+  }
   const launcher=bounded(readLauncher(action.launcher),16_384,'INFL19_A_LAUNCHER_BYTES_DENIED');
   try{script=parseApprovedCoreVbs(launcher)}catch(e){
    if(e?.code!=='INFL19_A_LAUNCHER_FORMAT_UNSUPPORTED')throw e;
