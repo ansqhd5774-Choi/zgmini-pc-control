@@ -183,10 +183,13 @@ export async function runR54QuarantinedConnectorSwap({gate,ports,
 
  // The quarantined file itself is one of the 6 SHA-pinned source files; the
  // trusted host writes its backup outside the source and verifies exact bytes.
- let quarantined=false,newExposed=false;
+ let quarantineAttempted=false,quarantined=false,newExposed=false;
  try{
+  // A native rename may succeed even if the port throws before acknowledging.
+  // Record the attempt *before* calling the port so catch must reconcile it.
+  quarantineAttempted=true;
   const moved=await ports.quarantineOriginalConnector(connector);
-  quarantined=true; // A timeout/error may have occurred *after* the rename.
+  quarantined=true;
   assert(moved?.atomicRenameVerified===true&&moved?.backupSha256===connector.old,
     'R54_CONNECTOR_QUARANTINE_UNCERTAIN');
   let stable=0;
@@ -224,6 +227,30 @@ export async function runR54QuarantinedConnectorSwap({gate,ports,
  }catch(error){
   // Never expose the original connector while the five may be mixed.
   // A trusted port must re-quarantine a newly exposed connector first.
+  if(quarantineAttempted&&!quarantined){
+   // No swapFive call has run yet. Reconcile the possibly completed rename
+   // from independently read-back source bytes; never infer from a timeout.
+   try{
+    const barrier=await ports.readBarrier();
+    assert(barrier?.exclusiveBLeaseHeld===true&&
+      barrier?.otherSourceWritersExcluded===true,
+      'R54_CONNECTOR_QUARANTINE_ATTEMPT_STATE_UNKNOWN');
+    if(barrier.connectorAbsent===true){
+     assert(barrier.originalBackupSha256===connector.old&&
+       barrier.fiveOriginalShaVerified===true,
+       'R54_CONNECTOR_QUARANTINE_ATTEMPT_STATE_UNKNOWN');
+     const restored=await ports.restoreOldConnector(connector);
+     assert(restored?.originalSha256===connector.old&&
+       fileState(await ports.readSixHashes(),'old'),
+       'R54_CONNECTOR_QUARANTINE_ATTEMPT_RESTORE_UNVERIFIED');
+    }else{
+     assert(barrier.connectorAbsent===false&&
+       fileState(await ports.readSixHashes(),'old'),
+       'R54_CONNECTOR_QUARANTINE_ATTEMPT_STATE_UNKNOWN');
+    }
+   }catch{fail('R54_CONNECTOR_HOLD_TASK_DISABLED_RECOVERY_REQUIRED');}
+   fail('R54_CONNECTOR_SWAP_FAILED_ROLLED_BACK_NO_RETRY');
+  }
   if(quarantined){
    try{
     if(newExposed){

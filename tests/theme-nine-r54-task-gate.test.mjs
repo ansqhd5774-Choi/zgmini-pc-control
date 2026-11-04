@@ -130,7 +130,8 @@ test('verified source rollback still keeps task disabled when descendants are ac
 });
 
 function connectorFixture({bypass=false,regenerator=false,failSwap=false,failRollback=false,
- failAfterExpose=false,activeBeforeQuarantine=0}={}){
+ failAfterExpose=false,failAfterQuarantine=false,failRestoreOriginal=false,
+ activeBeforeQuarantine=0}={}){
  const state={connector:'old',five:'old',manualStarts:[],
   blockedStarts:0,active:activeBeforeQuarantine,drains:0,rollbackCalls:0};
  const spec=FILES.find(x=>x.path.endsWith('/theme-nine-r54-public-connect.mjs'));
@@ -151,6 +152,7 @@ function connectorFixture({bypass=false,regenerator=false,failSwap=false,failRol
   readSixHashes:async()=>rows(),
   quarantineOriginalConnector:async(x)=>{
     assert.equal(x.path,spec.path);state.connector='absent';
+    if(failAfterQuarantine)throw Error('INJECTED_RENAME_SUCCEEDED_ACK_LOST');
     return {atomicRenameVerified:true,backupSha256:spec.old}},
   readBarrier:async()=>({connectorAbsent:state.connector==='absent',
     originalBackupSha256:spec.old,fiveOriginalShaVerified:state.five==='old',
@@ -178,6 +180,7 @@ function connectorFixture({bypass=false,regenerator=false,failSwap=false,failRol
     if(failRollback)return {fiveOldShaVerified:false};
     state.five='old';return {fiveOldShaVerified:true}},
   restoreOldConnector:async()=>{assert.equal(state.five,'old');
+    if(failRestoreOriginal)throw Error('INJECTED_OLD_CONNECTOR_RESTORE_FAIL');
     state.connector='old';return {originalSha256:spec.old}},
   wait:async()=>{},
  };
@@ -213,6 +216,19 @@ test('ambiguous connector exposure is quarantined before rollback',async()=>{
  await assert.rejects(runR54QuarantinedConnectorSwap({...f,waitMs:0}),
   {code:'R54_CONNECTOR_SWAP_FAILED_ROLLED_BACK_NO_RETRY'});
  assert.equal(f.state.connector,'old');assert.equal(f.state.five,'old');
+});
+
+test('quarantine rename success followed by lost ACK restores original or requires recovery',async()=>{
+ const f=connectorFixture({failAfterQuarantine:true});
+ await assert.rejects(runR54QuarantinedConnectorSwap({...f,waitMs:0}),
+  {code:'R54_CONNECTOR_SWAP_FAILED_ROLLED_BACK_NO_RETRY'});
+ assert.equal(f.state.connector,'old');assert.equal(f.state.five,'old');
+ assert.equal(f.state.rollbackCalls,0); // No five-file swap was attempted.
+ const failed=connectorFixture({failAfterQuarantine:true,failRestoreOriginal:true});
+ await assert.rejects(runR54QuarantinedConnectorSwap({...failed,waitMs:0}),
+  {code:'R54_CONNECTOR_HOLD_TASK_DISABLED_RECOVERY_REQUIRED'});
+ assert.equal(failed.state.connector,'absent');
+ assert.equal(failed.state.five,'old');
 });
 
 test('unverified bypass route refuses quarantine; rollback uncertainty holds connector absent',async()=>{
