@@ -29,6 +29,16 @@ const safeStatus=s=>typeof s==='string'&&s.length<=80&&
  (/^(WAIT_|STOP_|PRIVATE_|SOURCE_|R47_|THEME_NINE_R47_|R48_)[A-Z0-9_:-]{1,70}$/.test(s)||
   ['PASS','READY','BLOCKED','FAILED','PENDING','UNAVAILABLE'].includes(s))?s:null;
 const sameReal=(a,b)=>process.platform==='win32'?a.toLowerCase()===b.toLowerCase():a===b;
+const R35_DAYS=['2026-11-02','2026-11-03'];
+const nyParts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',
+ year:'numeric',month:'2-digit',day:'2-digit'});
+function nyDay(value){
+ const d=new Date(value);
+ if(Number.isNaN(d.getTime()))return null;
+ const p=Object.fromEntries(nyParts.formatToParts(d)
+  .filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+ return `${p.year}-${p.month}-${p.day}`;
+}
 
 function inspectFile(p,maxBytes){
  try{
@@ -70,6 +80,82 @@ function inspectRecent(dir,pattern,list,parse){
   })};
  }catch{return {status:'UNAVAILABLE'};}
 }
+function inspectR35Evidence(inside,list){
+ const days=Object.fromEntries(R35_DAYS.map(date=>[date,{attempts:[]}]));
+ const ledger={status:'UNAVAILABLE',nyBudgetTimezone:'America/New_York',
+  maxProbesPerWindowPerNyDay:2,minProbeGapMinutes:360,filesScanned:0,invalidFiles:0,days};
+ try{
+  const dir=inside('themes/legacy-nine-r47-probes');
+  const filenames=checkedDirectory(dir,list).filter(n=>/^r47-source-probe-[a-f0-9]{20}\.json$/.test(n));
+  if(filenames.length>128)throw Error('TOO_MANY_PROBES');
+  ledger.filesScanned=filenames.length;
+  for(const filename of filenames){
+   const observed=inspectFile(path.join(dir,filename),65536);
+   if(observed.status!=='READ'){ledger.invalidFiles++;continue;}
+   try{
+    const v=JSON.parse(observed.buffer.toString('utf8'));
+    const window=v?.window;
+    const identity=sha(JSON.stringify({rosterSha:v?.rosterSha256,
+     start:window?.start,end:window?.end})).slice(0,20);
+    if(v?.version!==1||v?.project!=='legacy-nine-r47-source-probe'||
+       !SHA64.test(v?.rosterSha256??'')||!isoDay(window?.start)||
+       !isoDay(window?.end)||filename!==`r47-source-probe-${identity}.json`||
+       !Array.isArray(v.attempts)||v.attempts.length>14)throw Error('PROBE_INVALID');
+    for(const attempt of v.attempts){
+     const date=nyDay(attempt?.at);
+     if(!date||!safeStatus(attempt?.status)||
+        !Number.isSafeInteger(attempt?.providerCalls)||
+        attempt.providerCalls<0||attempt.providerCalls>256)throw Error('ATTEMPT_INVALID');
+    }
+    for(const attempt of v.attempts){
+     const date=nyDay(attempt.at);
+     if(!Object.hasOwn(days,date))continue;
+     days[date].attempts.push({at:attempt.at,status:attempt.status,
+      providerCalls:attempt.providerCalls,
+      latestSeenSpyNYDay:isoDay(attempt.latestSeenSpyNYDay)?attempt.latestSeenSpyNYDay:null,
+      windowStart:window.start,windowEnd:window.end,ledgerSha256:observed.sha256});
+    }
+   }catch{ledger.invalidFiles++;}
+  }
+  for(const value of Object.values(days)){
+   value.attemptCount=value.attempts.length;
+   value.attempts=value.attempts.sort((a,b)=>a.at.localeCompare(b.at)).slice(-3);
+  }
+  ledger.status='READ';
+ }catch{ledger.status='UNAVAILABLE';}
+ const spyRaw={status:'UNAVAILABLE',filesScanned:0,invalidFiles:0,
+  dates:Object.fromEntries(R35_DAYS.map(date=>[date,{savedRows:0,files:[]}]))};
+ try{
+  const dir=inside('themes/legacy-nine-r35-delta/raw');
+  const names=checkedDirectory(dir,list).filter(n=>/^SPY_[a-f0-9]{64}\.jsonl$/.test(n));
+  if(names.length>16)throw Error('TOO_MANY_SPY_PAGES');
+  spyRaw.filesScanned=names.length;
+  for(const filename of names){
+   const observed=inspectFile(path.join(dir,filename),8000000);
+   if(observed.status!=='READ'||filename!==`SPY_${observed.sha256}.jsonl`){
+    spyRaw.invalidFiles++;continue;
+   }
+   try{
+    const matches=Object.fromEntries(R35_DAYS.map(date=>[date,0]));
+    const lines=observed.buffer.toString('utf8').split(/\r?\n/).filter(Boolean);
+    if(lines.length>5000)throw Error('BAR_LIMIT');
+    for(const line of lines){
+     const bar=JSON.parse(line);
+     if(bar?.symbol!=='SPY'||typeof bar.timestamp!=='string'||!nyDay(bar.timestamp))
+      throw Error('BAR_INVALID');
+     const date=nyDay(bar.timestamp);
+     if(Object.hasOwn(matches,date)&&bar.is_gap!==true)matches[date]++;
+    }
+    for(const [date,count] of Object.entries(matches))if(count){
+     spyRaw.dates[date].savedRows+=count;
+     spyRaw.dates[date].files.push({sha256:observed.sha256,rows:count});
+    }
+   }catch{spyRaw.invalidFiles++;}
+  }
+  spyRaw.status='READ';
+ }catch{spyRaw.status='UNAVAILABLE';}
+ return {probeLedger:ledger,spyRaw};
+}
 function inspectSourceLineage(dataRoot,list){
  const protectedRoot=path.resolve(dataRoot);
  const inside=relative=>{
@@ -108,6 +194,10 @@ function inspectSourceLineage(dataRoot,list){
     const v=JSON.parse(body);
     return {status:safeStatus(v?.status),stage:safeStatus(v?.stage),
      collectionStatus:safeStatus(v?.collection?.status),
+     providerCalls:Number.isSafeInteger(v?.collection?.providerCalls)?
+      v.collection.providerCalls:null,
+     latestSeenSpyNYDay:isoDay(v?.collection?.latestSeenSpyNYDay)?
+      v.collection.latestSeenSpyNYDay:null,
      benchmarkDate:isoDay(v?.benchmarkDate)?v.benchmarkDate:null,
      targetClosedNYDay:isoDay(v?.freshness?.targetClosedNYDay)?v.freshness.targetClosedNYDay:null,
      lastVerifiedSpyNYDay:isoDay(v?.freshness?.lastVerifiedSpyNYDay)?v.freshness.lastVerifiedSpyNYDay:null};
@@ -118,7 +208,7 @@ function inspectSourceLineage(dataRoot,list){
     errors:[...new Set(body.match(/THEME_NINE_R54_[A-Z0-9_]{3,65}/g)||[])].slice(-4)
    }))
  };
- return {installed,manifests,recentRuns};
+ return {installed,manifests,recentRuns,r35Evidence:inspectR35Evidence(inside,list)};
 }
 
 function fileBytes(p,max){
@@ -160,7 +250,7 @@ function approvalCheck(base){
  const p=path.join(base,'control',APPROVAL);
  const a=JSON.parse(fileBytes(p,4096).toString('utf8'));
  if(a.schema!=='ZGMINI_R54_READINESS_B_APPROVAL_V1'||a.grade!=='B'||
-  a.scope!=='FIXED_R54_READONLY_TASK_MEMORY_CANDIDATE_DATES_LINEAGE_ONCE'||
+  a.scope!=='FIXED_R54_R35_READONLY_PROBE_LEDGER_SPY_RAW_FORENSICS_ONCE'||
   a.dataRoot!==DATA_ROOT||a.timeoutSeconds!==120||
   a.maxProviderRequests!==0||a.maxAutomaticRetries!==0||
   a.pcDataWrites!==false||a.databaseWrites!==false||a.d1Writes!==false||
@@ -172,7 +262,7 @@ export function inspect({taskQuery=task=>execFileSync('schtasks.exe',
  ['/Query','/TN',task,'/XML'],{timeout:12000,maxBuffer:1048576,windowsHide:true}),
  list=dir=>fs.readdirSync(dir),freeMiB=Math.floor(os.freemem()/1048576),
  dataRoot=DATA_ROOT}={}){
- const tasks=TASK_NAMES.map(name=>{
+ const tasks=[...TASK_NAMES,'ZGMINI-PC-Theme-Nine-R47-Private'].map(name=>{
   try{const xml=taskQuery(name);return {name,found:true,exitCode:0,
    xmlSha256:sha(Buffer.isBuffer(xml)?xml:Buffer.from(String(xml)))};}
   catch(e){return {name,found:false,exitCode:Number.isSafeInteger(e?.status)?e.status:null,
@@ -198,6 +288,23 @@ export function inspect({taskQuery=task=>execFileSync('schtasks.exe',
  return {freeMiB,tasks,candidates:saved,sourceLineage:inspectSourceLineage(dataRoot,list)};
 }
 const name=n=>`R54_READINESS_${n}.json`;
+export function projectR35Details(details){
+ const lineage=details?.sourceLineage??{};
+ const runs=lineage.recentRuns?.r47??{};
+ const reports=(runs.files??[]).filter(f=>
+  R35_DAYS.includes(f?.detail?.targetClosedNYDay)).map(f=>({
+   sha256:f.sha256??null,modifiedAt:f.modifiedAt??null,detail:f.detail
+  }));
+ const manifest=lineage.manifests?.r35??{};
+ return {
+  r47Task:details.tasks?.find(t=>t.name==='ZGMINI-PC-Theme-Nine-R47-Private')??null,
+  r47Reports:{status:runs.status??'UNAVAILABLE',reports},
+  r35Manifest:{status:manifest.status??'UNAVAILABLE',
+   sha256:manifest.sha256??null,modifiedAt:manifest.modifiedAt??null,
+   latestSpyDay:manifest.latestSpyDay??null,pageCount:manifest.pageCount??null},
+  r35Evidence:lineage.r35Evidence??null
+ };
+}
 const resultBase=env=>({schema:SCHEMA,status:'BLOCKED',code:'R54_READINESS_NOT_STARTED',
  controlSha:env.GITHUB_SHA??null,runId:String(env.GITHUB_RUN_ID??''),
  providerCalls:0,pcDataWrites:0,databaseWrites:0,d1Writes:0,schedulerWrites:0});
@@ -208,7 +315,8 @@ export async function execute({env=process.env,platform=process.platform,inspect
   const event=eventFrom(env),req=validateRequest(event,env);issueNumber=event.issue.number;
   r={...r,issueNumber,requestId:req.requestId,chatId:req.chatId};
   approvalCheck(workspace(env));
-  r={...r,status:'PASS',code:'R54_READINESS_OBSERVED_NOT_PUBLISHED',details:inspectFn()};
+  r={...r,status:'PASS',code:'R54_READINESS_OBSERVED_NOT_PUBLISHED',
+   details:projectR35Details(inspectFn())};
  }catch(e){r={...r,status:'BLOCKED',code:permitted(e?.code)?e.code:'R54_READINESS_UNEXPECTED_STOP'};}
  if(issueNumber!==null){
   try{fs.writeFileSync(path.join(workspace(env),name(issueNumber)),JSON.stringify(r,null,2)+'\n',{flag:'wx'});}
@@ -220,15 +328,15 @@ export async function execute({env=process.env,platform=process.platform,inspect
 export async function upload(env=process.env,fetcher=fetch){
  const event=eventFrom(env),req=validateRequest(event,env),base=workspace(env);
  approvalCheck(base);
- const r=JSON.parse(fileBytes(path.join(base,name(event.issue.number)),8192).toString('utf8'));
+ const r=JSON.parse(fileBytes(path.join(base,name(event.issue.number)),16384).toString('utf8'));
  if(r.schema!==SCHEMA||r.issueNumber!==event.issue.number||
   r.requestId!==req.requestId||r.chatId!==req.chatId||
   r.controlSha!==env.GITHUB_SHA||r.runId!==String(env.GITHUB_RUN_ID??'')||
   !['PASS','BLOCKED'].includes(r.status)||!permitted(r.code)||!env.GITHUB_TOKEN)
   fail('R54_READINESS_RESULT_DENIED');
- const body=`R54 정규 복구 사전조건 1회 읽기 전용 점검: **${r.status}** (${r.code})\n\n`+
+ const body=`R35 11월 2·3일 SPY 저장·호출 원장 1회 읽기 전용 진단: **${r.status}** (${r.code})\n\n`+
   '```json\n'+JSON.stringify(r,null,2)+'\n```';
- if(body.length>12000)fail('R54_READINESS_REPORT_TOO_LARGE');
+ if(body.length>22000)fail('R54_READINESS_REPORT_TOO_LARGE');
  const res=await fetcher(`https://api.github.com/repos/${REPO}/issues/${event.issue.number}/comments`,{
   method:'POST',headers:{accept:'application/vnd.github+json',authorization:`Bearer ${env.GITHUB_TOKEN}`,
    'content-type':'application/json','x-github-api-version':'2022-11-28'},body:JSON.stringify({body})});
