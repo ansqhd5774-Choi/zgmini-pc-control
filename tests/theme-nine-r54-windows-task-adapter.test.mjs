@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {inspectR54TaskXml,createR54WindowsTaskAdapter,r54FixedSchtasks}
  from '../tools/update.mjs';
+import {runApprovedR54TaskTransition} from '../tools/theme-nine-r54-task-gate.mjs';
+import {FILES} from '../tools/theme-nine-r54-sixfile-b.mjs';
 
 // Exact existing R54 CMD fixture, encoded to preserve its Windows CRLF hash.
 const actionBytes=Buffer.from('QGVjaG8gb2ZmDQpzZXRsb2NhbCBFbmFibGVFeHRlbnNpb25zIERpc2FibGVEZWxheWVkRXhwYW5zaW9uDQpyZW0gUjU0IGFwcHJvdmVkIGV4aXN0aW5nLW5pbmUgcHVibGlzaGVyLiBOZXZlciBjb2xsZWN0cyByYXcgYmFycyBvciBtdXRhdGVzIHRhc2tzLg0Kc2V0ICJSNTRfSE9NRT1FOlxaR21pbmlcZGF0YVxwYy13cml0ZXJcdGhlbWUtbmluZS1yNTQiDQpzZXQgIlI1NF9OT0RFPUU6XFpHbWluaVxydW50aW1lXG5vZGUuZXhlIg0Kc2V0ICJaR01JTklfREFUQV9ST09UPUU6XFpHbWluaVxkYXRhIg0Kc2V0ICJSNTRfQ09OU0VOVD0lUjU0X0hPTUUlXFBVQkxJU0hFUl9DT05TRU5UX1I1NC50eHQiDQpzZXQgIlI1NF9MT0dfRElSPSVSNTRfSE9NRSVcbG9ncyINCmlmIG5vdCBleGlzdCAiJVI1NF9MT0dfRElSJVwiIG1rZGlyICIlUjU0X0xPR19ESVIlIiAyPm51bA0Kc2V0ICJSNTRfTE9HPSVSNTRfTE9HX0RJUiVcVEhFTUVfTklORV9SNTRfQ1lDTEVfJVJBTkRPTSVfJVJBTkRPTSUudHh0Ig0KaWYgZXhpc3QgIiVSNTRfTE9HJSIgZXhpdCAvYiAzDQo+IiVSNTRfTE9HJSIgZWNobyBSRVBPUlQ9VEhFTUVfTklORV9SNTRfREFJTFlfUFVCTElDX1NDT1JFX0NPTk5FQ1RJT04NCj4+IiVSNTRfTE9HJSIgZWNobyBTVEFSVEVEPSVEQVRFJSAlVElNRSUNCmlmIG5vdCBleGlzdCAiJVI1NF9OT0RFJSIgZ290byA6c3RvcA0KaWYgbm90IGV4aXN0ICIlUjU0X0NPTlNFTlQlIiBnb3RvIDpzdG9wDQpmaW5kc3RyIC9YIC9DOiJBQ0NFUFRfUjU0X0FOT05ZTU9VU19ERVJJVkVEX1JJU0tfMjAyNjEwMjgiICIlUjU0X0NPTlNFTlQlIiA+bnVsIDI+JjENCmlmIGVycm9ybGV2ZWwgMSBnb3RvIDpzdG9wDQoiJVI1NF9OT0RFJSIgIiVSNTRfSE9NRSVcc2NyaXB0c1xwYy13cml0ZXJcdGhlbWUtbmluZS1yNTQtcHVibGljLWNvbm5lY3QubWpzIiAtLW9uY2UgLS1wdWJsaXNoIC0tYWNjZXB0LWFub255bW91cy1saWNlbnNlLXJpc2sgPj4iJVI1NF9MT0clIiAyPiYxDQppZiBlcnJvcmxldmVsIDEgZ290byA6c3RvcA0KaWYgZXhpc3QgIiVSNTRfSE9NRSVcUjg4X1BPU1RfU1RFUC5jbWQiIGNhbGwgIiVSNTRfSE9NRSVcUjg4X1BPU1RfU1RFUC5jbWQiID4+IiVSNTRfTE9HJSIgMj4mMQ0KaWYgZXJyb3JsZXZlbCAxIGdvdG8gOnN0b3ANCj4+IiVSNTRfTE9HJSIgZWNobyBSRVNVTFQ9RVhFQ1VURURfQ0hFQ0tfSlNPTl9TVEFUVVMNCmV4aXQgL2IgMA0KOnN0b3ANCj4+IiVSNTRfTE9HJSIgZWNobyBSRVNVTFQ9U1RPUF9PUl9QRU5ESU5HX1JFVklFV19UWFQNCmV4aXQgL2IgMQ0K','base64');
@@ -117,4 +119,23 @@ test('fixed Windows schtasks port prohibits all other task names and commands',(
   /R54_TASK_COMMAND_OUT_OF_SCOPE/);
  assert.throws(()=>r54FixedSchtasks(['/Delete','/TN','ZGMINI-PC-Theme-Nine-R54-Public'],env),
   /R54_TASK_COMMAND_OUT_OF_SCOPE/);
+});
+
+test('fixed native Task adapter satisfies B one-shot transition contract',async t=>{
+ const {adapter,commands}=sandbox(t,true);
+ let phase='old',applies=0;
+ const ports={...adapter,
+  closedRoutes:async()=>({taskName:authorization.taskName,
+   schedulerStartDisabled:true,taskNotRunning:true,childProcessCount:0,
+   conflictingSourceLaunches:0,installWindowExclusivityVerified:true,
+   relevantLocksClear:true,exclusiveBLeaseHeld:true}),
+  readSixHashes:async()=>FILES.map(x=>({...x,actual:x[phase]})),
+  wait:async()=>{},
+ };
+ const result=await runApprovedR54TaskTransition({authorization,ports,
+  applySix:async()=>{applies++;phase='next';
+   return {status:'SIX_FILE_SOURCE_APPLIED_SHA_VERIFIED'};},waitMs:0});
+ assert.equal(result.status,'R54_SIXFILE_AND_TASK_RESTORED_VERIFIED');
+ assert.equal(applies,1);
+ assert.equal(commands.filter(x=>x[0]==='/Change').length,2);
 });
