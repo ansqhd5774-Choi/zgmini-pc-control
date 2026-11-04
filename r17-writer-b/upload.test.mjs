@@ -60,6 +60,22 @@ test('bounded parser reason survives upload while raw material is rejected',asyn
  assert(!JSON.stringify(calls).includes('private-source-content'));
 });
 
+test('import-resolution diagnostic retains bounded private module path',()=>{
+ const diagnostic={sourceKind:'PC_BASE',sourcePath:'worker/projection-source-r52.mjs',
+  dependencyPath:'worker/runtime-contracts',reason:'MISSING'};
+ // Only project-approved top-level dirs may be reported.
+ const safe=sanitizeReport({requestId,status:'BLOCKED',
+  code:'R17_B_IMPORT_RESOLUTION_STOP',diagnostic},requestId);
+ assert.deepEqual(safe.diagnostic,diagnostic);
+ const allowed={...diagnostic,sourcePath:'scripts/pc-writer/d1.mjs',
+   dependencyPath:'lib/market-score/unavailable.mjs'};
+ assert.deepEqual(sanitizeReport({requestId,status:'BLOCKED',
+  code:'R17_B_IMPORT_RESOLUTION_STOP',diagnostic:allowed},requestId).diagnostic,allowed);
+ const withSource={...allowed,sourceText:'sensitive'};
+ assert.equal(sanitizeReport({requestId,status:'BLOCKED',
+  code:'R17_B_IMPORT_RESOLUTION_STOP',diagnostic:withSource},requestId).diagnostic,undefined);
+});
+
 test('mismatched request and missing result fail closed without data',()=>{
  const r=sanitizeReport({...valid,requestId:'pc-r17-bad'},requestId);
  assert.equal(r.status,'STATE_UNKNOWN');

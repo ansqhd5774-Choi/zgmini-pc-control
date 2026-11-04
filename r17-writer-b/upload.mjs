@@ -23,6 +23,18 @@ function safePatchDiagnostic(raw){
   matchCount:d.matchCount,nativeGitApplyCheck:'PASS'};
 }
 
+function safeImportDiagnostic(raw){
+ const d=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:null;
+ const safePath=p=>typeof p==='string'&&p.length>=1&&p.length<=180&&
+   /^(?:scripts|lib|worker)\/[A-Za-z0-9_./-]+$/.test(p);
+ if(!d||Object.keys(d).length!==4||
+   !['OVERLAY','PC_BASE'].includes(d.sourceKind)||
+   !['MISSING','ESCAPE','READ_FAILURE','INVALID_BUFFER'].includes(d.reason)||
+   !safePath(d.sourcePath)||!safePath(d.dependencyPath))return null;
+ return {sourceKind:d.sourceKind,sourcePath:d.sourcePath,
+   dependencyPath:d.dependencyPath,reason:d.reason};
+}
+
 export function sanitizeReport(raw,expectedRequestId){
  const source=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
  if(source.requestId!==expectedRequestId)
@@ -38,8 +50,9 @@ export function sanitizeReport(raw,expectedRequestId){
  const status=validPass?'PASS':source.status==='BLOCKED'?'BLOCKED':'STATE_UNKNOWN';
  const code=status==='PASS'?'R17_B_PREFLIGHT_PASS':
   status==='BLOCKED'&&CODE.test(source.code??'')?source.code:'R17_B_REPORT_UNVERIFIED';
- const diagnostic=status==='BLOCKED'&&code==='R17_B_PATCH_CONTEXT_STOP'?
-   safePatchDiagnostic(source.diagnostic):null;
+ const diagnostic=status==='BLOCKED'?
+   (code==='R17_B_PATCH_CONTEXT_STOP'?safePatchDiagnostic(source.diagnostic):
+    code==='R17_B_IMPORT_RESOLUTION_STOP'?safeImportDiagnostic(source.diagnostic):null):null;
  return {schema:'ZGMINI_R17_WRITER_B_PREFLIGHT_RESULT_V1',requestId:expectedRequestId,
   status,code,...(diagnostic?{diagnostic}:{}),
   providerCalls:0,d1Writes:0,pcSourceWrites:0,
@@ -60,10 +73,13 @@ export async function uploadReport({event,env,readReport,apiFetch=fetch}={}){
  const txt=`REQUEST_ID=${result.requestId}\nSTATUS=${result.status}\nCODE=${result.code}\n`+
   `RUN_ID=${simple(result.runId)}\nPROVIDER_CALLS=0\nD1_WRITES=0\n`+
   'PC_SOURCE_WRITES=0\nCONFIG_WRITES=0\nTASK_WRITES=0\n'+
-  (result.diagnostic?
+  (result.code==='R17_B_PATCH_CONTEXT_STOP'&&result.diagnostic?
     `PATCH_FILE=${result.diagnostic.file}\nPATCH_HUNK=${result.diagnostic.hunkOldStart??'NA'}\n`+
     `PATCH_REASON=${result.diagnostic.reason}\nPATCH_MATCH_COUNT=${result.diagnostic.matchCount??'NA'}\n`+
     'NATIVE_GIT_APPLY_CHECK=PASS\n':'')+
+  (result.code==='R17_B_IMPORT_RESOLUTION_STOP'&&result.diagnostic?
+    `IMPORT_SOURCE_KIND=${result.diagnostic.sourceKind}\nIMPORT_SOURCE_PATH=${result.diagnostic.sourcePath}\n`+
+    `IMPORT_DEPENDENCY_PATH=${result.diagnostic.dependencyPath}\nIMPORT_REASON=${result.diagnostic.reason}\n`:'')+
   'RETRY=NO_REEXECUTE_READBACK_ONLY\n';
  const headers={accept:'application/vnd.github+json',authorization:`Bearer ${token}`,
   'x-github-api-version':'2022-11-28','content-type':'application/json',
