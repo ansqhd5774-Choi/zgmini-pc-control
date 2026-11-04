@@ -66,17 +66,19 @@ const safeEnv = env => Object.fromEntries(SAFE_ENV_KEYS
 export function validateApproval(approval) {
   if (!exactFields(approval, [
     'schema', 'scope', 'sourceRepository', 'sourceSha', 'sourceFile',
-    'sourceFileSha256', 'expectedEvents', 'expectedDates', 'outputKey',
+    'sourceFileSha256', 'expectedEvents', 'expectedDates', 'outputKeys',
     'allowProviderCalls', 'allowExistingFeedWrites', 'allowRawVendorPublic',
     'allowFormulaChanges', 'allowSchedulerChanges', 'allowDirectDeployment',
     'maxAutomaticRetries',
   ]) || approval.schema !== 'ZGMINI_ER1_NOV30_HTML_PUBLISH_APPROVAL_V1' ||
-      approval.scope !== 'PC_SAVED_NOV2026_HTML_ONLY_D1_KEY_ONE_SHOT' ||
+      approval.scope !== 'PC_SAVED_NOV2026_HTML_ONLY_D1_TWO_KEYS_ONE_SHOT' ||
       approval.sourceRepository !== PUBLIC_REPO || approval.sourceSha !== SOURCE_SHA ||
       approval.sourceFile !== SOURCE_SCRIPT.replaceAll('\\', '/') ||
       approval.sourceFileSha256 !== SCRIPT_SHA256 ||
       approval.expectedEvents !== 3051 || approval.expectedDates !== 30 ||
-      approval.outputKey !== 'market-calendar:earnings-nov2026-display-html' ||
+      !Array.isArray(approval.outputKeys) || approval.outputKeys.length !== 2 ||
+      approval.outputKeys[0] !== 'market-calendar:earnings-nov2026-h1-display-html' ||
+      approval.outputKeys[1] !== 'market-calendar:earnings-nov2026-h2-display-html' ||
       approval.allowProviderCalls !== false || approval.allowExistingFeedWrites !== false ||
       approval.allowRawVendorPublic !== false || approval.allowFormulaChanges !== false ||
       approval.allowSchedulerChanges !== false || approval.allowDirectDeployment !== false ||
@@ -120,7 +122,7 @@ export function validateChildReport(child) {
       !Number.isInteger(child.existingFeedWrites) || child.existingFeedWrites !== 0 ||
       !Number.isInteger(child.coreWrites) || child.coreWrites !== 0 ||
       !Number.isInteger(child.schedulerWrites) || child.schedulerWrites !== 0 ||
-      !Number.isInteger(child.d1Writes) || child.d1Writes < 0 || child.d1Writes > 1 ||
+      !Number.isInteger(child.d1Writes) || child.d1Writes < 0 || child.d1Writes > 2 ||
       !Number.isInteger(child.rawRowsPublic) || child.rawRowsPublic !== 0 ||
       ![child.eventCount, child.coreReusedDayCount, child.privateReusedDayCount]
         .every((value, index) => value === undefined ||
@@ -130,10 +132,15 @@ export function validateChildReport(child) {
   if (child.status === 'PASS' &&
       (child.eventCount !== 3051 ||
        child.coreReusedDayCount + child.privateReusedDayCount !== 30 ||
-       !['NOV30_PUBLISH_D1_VERIFIED', 'NOV30_PUBLISH_D1_ALREADY_MATCHED'].includes(child.code) ||
-       child.d1Writes !== Number(child.code === 'NOV30_PUBLISH_D1_VERIFIED') ||
-       !/^[a-f0-9]{64}$/.test(child.localHtmlSha256 ?? '') ||
-       child.localHtmlSha256 !== child.d1ReadbackSha256)) {
+       !['NOV30_PUBLISH_D1_BOTH_VERIFIED',
+         'NOV30_PUBLISH_D1_BOTH_ALREADY_MATCHED'].includes(child.code) ||
+       (child.code === 'NOV30_PUBLISH_D1_BOTH_VERIFIED' && child.d1Writes === 0) ||
+       (child.code === 'NOV30_PUBLISH_D1_BOTH_ALREADY_MATCHED' && child.d1Writes !== 0) ||
+       !/^[a-f0-9]{64}$/.test(child.publicationBatchId ?? '') ||
+       !/^[a-f0-9]{64}$/.test(child.localHtmlSha256H1 ?? '') ||
+       !/^[a-f0-9]{64}$/.test(child.localHtmlSha256H2 ?? '') ||
+       child.localHtmlSha256H1 !== child.d1ReadbackSha256H1 ||
+       child.localHtmlSha256H2 !== child.d1ReadbackSha256H2)) {
     stop('NOV30_HTML_CHILD_PASS_INCOMPLETE_STOP');
   }
   // Only return explicit nonsecret summary fields, never arbitrary child payload.
@@ -145,10 +152,16 @@ export function validateChildReport(child) {
     d1Writes: child.d1Writes, providerCalls: child.providerCalls,
     coreWrites: child.coreWrites, schedulerWrites: child.schedulerWrites,
     existingFeedWrites: child.existingFeedWrites, rawRowsPublic: child.rawRowsPublic,
-    localHtmlSha256: /^[a-f0-9]{64}$/.test(child.localHtmlSha256 ?? '')
-      ? child.localHtmlSha256 : null,
-    d1ReadbackSha256: /^[a-f0-9]{64}$/.test(child.d1ReadbackSha256 ?? '')
-      ? child.d1ReadbackSha256 : null,
+    publicationBatchId: /^[a-f0-9]{64}$/.test(child.publicationBatchId ?? '')
+      ? child.publicationBatchId : null,
+    localHtmlSha256H1: /^[a-f0-9]{64}$/.test(child.localHtmlSha256H1 ?? '')
+      ? child.localHtmlSha256H1 : null,
+    localHtmlSha256H2: /^[a-f0-9]{64}$/.test(child.localHtmlSha256H2 ?? '')
+      ? child.localHtmlSha256H2 : null,
+    d1ReadbackSha256H1: /^[a-f0-9]{64}$/.test(child.d1ReadbackSha256H1 ?? '')
+      ? child.d1ReadbackSha256H1 : null,
+    d1ReadbackSha256H2: /^[a-f0-9]{64}$/.test(child.d1ReadbackSha256H2 ?? '')
+      ? child.d1ReadbackSha256H2 : null,
   };
 }
 
