@@ -2,7 +2,7 @@
   "schema": "ZGMINI_INFLATION_19_PREVIEW_B_APPROVAL_V1",
   "scope": "INFLATION_19_PRIVATE_READONLY_PREVIEW",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "sourceSha": "49e71407f5a4978debc604a53a866f1a9527c35a",
+  "sourceSha": "a86229cecd483f39afb501d32ae23e3128134e4e",
   "writerHome": "E:\\ZGmini\\data\\pc-writer",
   "maxProviderRequests": 0,
   "maxAutomaticRetries": 0,
@@ -11,7 +11,7 @@
   "d1Writes": false,
   "schedulerWrites": false,
   "sourceFileHashes": {
-    "scripts/pc-writer/inflation-causal-public-preview-r1.mjs": "28112fc8029c0dfde460d2f79edc813f0ae803905a4bdc131120682db766c075",
+    "scripts/pc-writer/inflation-causal-public-preview-r1.mjs": "34a62afc6ae4aa7f654cfd51405282a0b628fc82a8c69538f1bcae49766b0bed",
     "lib/inflation-causal-public-catalog.mjs": "db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5",
     "worker/inflation-causal-public-r1.mjs": "86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f"
   },
