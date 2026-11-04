@@ -29,7 +29,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
    }
   }
   preflightOperation='SEAT_LEASE';releaseSeat=exclusive(path.join(root,'leases'),'seat-'+seat);
-  if(policy.operations[request.operation].resource==='heavy')releaseResource=exclusive(path.join(root,'leases'),'heavy');
+  if(policy.operations[request.operation].resource==='heavy'){preflightOperation='RESOURCE_LEASE';releaseResource=exclusive(path.join(root,'leases'),'heavy');}
   preflightOperation='PROTECTED_STATE_SNAPSHOT';try{before=protectedState(host.dataRoot,{queryTask:task=>{
    try{return queryTask(task);}catch{throw Object.assign(new Error('PROTECTED_TASK_XML_QUERY_FAILED'),{code:'PROTECTED_TASK_XML_QUERY_FAILED',safeTaskName:task});}
   }});}
@@ -37,10 +37,11 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
    affectedScope:'OWN_REQUEST_ONLY',nextAction:'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
    ...(typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}
   preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
+  preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
   writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
-  const childResult=await new Promise(resolve=>{
+  preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
    const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace};
    const child=spawn(process.execPath,[worker,input,output],{env,cwd:workspace,windowsHide:true,stdio:'ignore'});let timedOut=false,settled=false,grace;
    const timer=setTimeout(()=>{timedOut=true;grace=setTimeout(()=>{if(!settled){settled=true;child.unref();resolve({code:null,timedOut:true,terminationUnknown:true,pid:child.pid});}},terminationGraceMs);if(child.pid){if(terminateTree)try{terminateTree(child.pid);}catch{}else if(process.platform==='win32')try{execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore',timeout:10000});}catch{}else child.kill('SIGKILL');}},ms);
@@ -49,21 +50,25 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   report.lastPass='ALLOWLISTED_WORKER_STARTED';report.exitCode=childResult.code;
   if(childResult.terminationUnknown){uncertainChild=true;report.resourceLeasesRetained=true;report.status='STATE_UNKNOWN';report.code='WORKER_TERMINATION_UNVERIFIED';report.firstFail='OWN_WORKER_TERMINATION';report.workerPid=childResult.pid;report.next='RECONCILE_WORKER_AND_RETAIN_RESOURCE_LEASES';}
   else if(childResult.timedOut){report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';}
-  else if(fs.existsSync(output)){const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result,sqliteOpened:result.sqliteOpened===true});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
+  else if(fs.existsSync(output)){preflightOperation='WORKER_RESULT_PARSE';const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result,sqliteOpened:result.sqliteOpened===true});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
   else{report.status='FAIL';report.code='WORKER_RESULT_MISSING';report.firstFail='RESULT_FILE';}
-  const after=protectedState(host.dataRoot,{queryTask});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
+  preflightOperation='POSTCHECK';const after=protectedState(host.dataRoot,{queryTask});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
   need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
   report.actualExecutionSha=request.operation==='employment-r6-candidate-stage-readonly'
     ?(report.result?.actualExecutionSha??null)
     :(report.result?.actualExecutionSha??host.controllerSourceSha);
   report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??report.pcOperationalApprovedSha;
   report.next??=report.status==='PASS'?'READ_RESULT_NO_REPEAT':report.status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST':'INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY';
-  report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
+  preflightOperation='RESULT_LEDGER_WRITE';report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
  }catch(error){report.status='BLOCKED';const baseCode=errorCode(error);report.code=baseCode==='INTERNAL_EXECUTION_ERROR'&&error instanceof SyntaxError
     ?preflightOperation==='REQUEST_LEDGER'?'REQUEST_LEDGER_PARSE_FAILED':preflightOperation==='CORE_STATE_READ'?'CORE_CONFIG_PARSE_FAILED':baseCode:baseCode;
    report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';
-   if(!report.phase&&report.lastPass==='REQUEST_RECEIVED')Object.assign(report,{phase:'PREVALIDATION',failureOperation:preflightOperation,
-    mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY',nextAction:'INSPECT_NAMED_PREFLIGHT_OPERATION_NO_AUTOMATIC_RETRY'});
+   if(!report.phase&&report.lastPass==='REQUEST_RECEIVED'){
+    const leaseFailure=['REQUEST_LEASE','SEAT_LEASE','RESOURCE_LEASE'].includes(preflightOperation);
+    Object.assign(report,{phase:'PREVALIDATION',failureOperation:preflightOperation,mutationStarted:false,
+     affectedScope:leaseFailure?'SHARED_LEASE_POSSIBLE':'OWN_REQUEST_ONLY',
+     nextAction:leaseFailure?'INSPECT_LEASE_OWNER_NO_LOCK_DELETION':'INSPECT_NAMED_PREFLIGHT_OPERATION_NO_AUTOMATIC_RETRY'});
+   }
   if(report.code==='MEMORY_WAIT_ALREADY_ACTIVE')Object.assign(report,{phase:'PREVALIDATION',failureOperation:'MEMORY_WAIT_LEASE_ACQUIRE',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY',nextAction:'WAIT_FOR_EXISTING_MEMORY_WAITER_NO_LOCK_DELETION',firstFail:'MEMORY_ADMISSION'});
  }
  finally{if(uncertainChild){report.resourceLeasesRetained=true;const marker=path.join(workspace,'RECOVERY_REQUIRED.json');writeJson(marker,{requestId:report.requestId,workerPid:report.workerPid,reason:'WORKER_TERMINATION_UNVERIFIED'});}else{releaseMemoryWait?.();releaseResource?.();releaseSeat?.();releaseRequest?.();}}
