@@ -67,6 +67,18 @@ test('three fixed contexts emit only verified bounded non-sensitive excerpts',()
  assert.ok(JSON.stringify(got).length<=2500);
  assert.equal(got.excerpts.some(x=>x.text.includes('safe')),false);
 });
+test('bounded three-excerpt readback survives the fixed diagnostics envelope',()=>{
+ const evidence={...valid(),patchApplies:false,patchFailureCode:'PATCH_CONTEXT_MISMATCH',
+  restrictedContexts:{status:'THREE_EXCERPTS_READONLY',excerpts:[
+   {file:'cycle',hunk:'185',text:'x'.repeat(750)},
+   {file:'publication',hunk:'72',text:'x'.repeat(750)},
+   {file:'publication',hunk:'228',text:'x'.repeat(750)},
+  ]}};
+ const report=summarizeR17Probe(evidence);
+ assert.equal(report.diagnostics.restrictedContexts.excerpts.length,3);
+ assert.ok(JSON.stringify(report).length>2500);
+ assert.ok(JSON.stringify(report).length<=5000);
+});
 test('restricted contexts fail closed on unapproved head/hash, secrets, ambiguity and oversize',()=>{
  const src=contextFixture();
  const wrong={...valid(),head:'0'.repeat(40)};

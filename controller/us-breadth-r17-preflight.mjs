@@ -153,9 +153,10 @@ export function diagnoseR17RestrictedContexts(sourceByPath,evidence){
    hunk:target.hunk,startLine:from+1,lineCount:selected.length,
    method:location.method,matchedLines:location.matched,text:excerpt});
  }
- const result={status:'THREE_EXCERPTS_READONLY',excerpts};
- if(JSON.stringify(result).length>2500)return {status:'CONTEXT_TOTAL_TOO_LONG',excerpts:[]};
- return result;
+ // Count source text rather than JSON metadata; at most 3 x 800 characters.
+ if(excerpts.reduce((sum,item)=>sum+item.text.length,0)>2500)
+  return {status:'CONTEXT_TOTAL_TOO_LONG',excerpts:[]};
+ return {status:'THREE_EXCERPTS_READONLY',excerpts};
 }
 
 // One extra, fixed-name dispatcher hop. A string reference is *not* runtime
@@ -291,7 +292,9 @@ export function summarizeR17Probe(evidence){
    singleDispatcher:evidence?.singleDispatcher??null}});
 }
 function enforceR17ReportSize(report){
- if(JSON.stringify(report).length>2500&&report.diagnostics?.restrictedContexts?.excerpts?.length){
+ // The three-source-excerpt cap is already 2500 bytes. The envelope also
+ // carries fixed patch/Task predicates, so allow a bounded 5000-byte total.
+ if(JSON.stringify(report).length>5000&&report.diagnostics?.restrictedContexts?.excerpts?.length){
   report.diagnostics.restrictedContexts={status:'CONTEXT_TOTAL_TOO_LONG',excerpts:[]};
  }
  return report;
