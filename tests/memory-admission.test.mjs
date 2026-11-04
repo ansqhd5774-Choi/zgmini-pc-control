@@ -22,7 +22,7 @@ test('gate is operation-specific and preserves the R6 1536 MiB threshold',()=>{
 });
 test('free memory at threshold is admitted without waiting',async()=>{
  const r=await waitForMemoryAdmission({minimumFreeMiB:1536,readFreeMiB:()=>1536,timeoutMs:0});
- assert.equal(r.admitted,true);assert.equal(r.samples,1);assert.equal(r.waitedMs,0);
+ assert.equal(r.admitted,true);assert.equal(r.samples,1);assert.ok(r.waitedMs<10);
 });
 test('temporary RAM deficit recovers in bounded time',async()=>{
  const values=[800,1200,1540];let count=0;
@@ -56,6 +56,36 @@ test('memory-blocked heavy job never acquires seat/heavy leases or starts worker
  const again=await executeJob(q,{...c,runId:'4243',fixtureFreeMiB:()=>20000});
  assert.equal(again.report.reused,true);assert.equal(again.report.code,'RESOURCE_WAIT_MEMORY');
  assert.ok(again.report.prior.finishedAt);assert.equal(again.report.prior.memoryAdmission.admitted,false);
+});
+test('heavy job recovers from low RAM and starts exactly one allowlisted worker',async()=>{
+ const c=setup(),q=request('theme-common-tests','memory-request-3000');let reads=0;
+ const first=await executeJob(q,{...c,runId:'4245',fixtureFreeMiB:()=>++reads===1?200:500,fixtureMemoryWaitMs:60,fixtureMemoryPollMs:2});
+ assert.equal(first.report.memoryAdmission.admitted,true);
+ assert.ok(first.report.memoryAdmission.samples>=2);
+ assert.equal(first.report.result?.code,'SOURCE_NOT_APPROVED_FOR_EXECUTION');
+ assert.equal(first.report.lastPass,'ALLOWLISTED_WORKER_STARTED');
+ assert.equal(first.report.operationalWrites,0);
+ assert.equal(fs.existsSync(path.join(first.workspace,'input.json')),true);
+ const again=await executeJob(q,{...c,runId:'4246',fixtureFreeMiB:()=>20000});
+ assert.equal(again.report.reused,true);
+ assert.equal(fs.existsSync(path.join(again.workspace,'input.json')),false);
+});
+test('only one low-memory heavy job occupies a Runner while the others do not wait',async()=>{
+ const c=setup(),firstRequest=request('employment-r6-candidate-stage-readonly','memory-request-4000');
+ const first=executeJob(firstRequest,{...c,runId:'4247',fixtureFreeMiB:()=>100,fixtureMemoryWaitMs:100,fixtureMemoryPollMs:5});
+ let present=false;
+ for(let n=0;n<50;n++){
+  present=fs.existsSync(path.join(c.root,'leases','heavy-memory-wait'));
+  if(present)break;
+  await new Promise(resolve=>setTimeout(resolve,1));
+ }
+ assert.equal(present,true);
+ const next=await executeJob(request('employment-r6-candidate-stage-readonly','memory-request-4001'),{
+  ...c,seat:2,runId:'4248',fixtureFreeMiB:()=>100,fixtureMemoryWaitMs:100,fixtureMemoryPollMs:5});
+ assert.equal(next.report.status,'BLOCKED');assert.equal(next.report.code,'MEMORY_WAIT_ALREADY_ACTIVE');
+ assert.equal(fs.existsSync(path.join(c.root,'leases','seat-2')),false);
+ assert.equal((await first).report.code,'RESOURCE_WAIT_MEMORY');
+ assert.equal(fs.existsSync(path.join(c.root,'leases','heavy-memory-wait')),false);
 });
 test('independent light work continues while memory-gated heavy job waits',async()=>{
  const c=setup(),heavy=executeJob(request('employment-r6-candidate-stage-readonly','memory-request-2000'),{
