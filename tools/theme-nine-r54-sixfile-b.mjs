@@ -53,6 +53,37 @@ function file(root,rel){
 
 function artifact(target,type,next){return `${target}.R54_B_${type}_${next.slice(0,12)}`;}
 function readHash(filePath){return digest(fs.readFileSync(filePath));}
+const JOURNAL_SCHEMA='ZGMINI_R54_SIXFILE_B_JOURNAL_V1';
+const JOURNAL_NAME='R54_B_SIXFILE_SOURCE_JOURNAL_V1.jsonl';
+function journalFile(installedRoot){
+ const root=fs.realpathSync.native(installedRoot);
+ assert(fs.statSync(root).isDirectory(),'R54_B_ROOT_NOT_DIRECTORY');
+ return path.join(root,JOURNAL_NAME);
+}
+function journalLastState(installedRoot){
+ const journal=journalFile(installedRoot);
+ if(!fs.existsSync(journal))return null;
+ assert(!fs.lstatSync(journal).isSymbolicLink(),'R54_B_JOURNAL_REDIRECT_DENIED');
+ const bytes=fs.readFileSync(journal);
+ assert(bytes.length>0&&bytes.length<=64*1024,'R54_B_JOURNAL_INVALID');
+ const value=bytes.toString('utf8');
+ assert(value.endsWith('\n'),'R54_B_JOURNAL_INCOMPLETE');
+ let previous=null;
+ for(const line of value.trimEnd().split('\n')){
+  let record;
+  try{record=JSON.parse(line);}catch{fail('R54_B_JOURNAL_INVALID')}
+  assert(record.schema===JOURNAL_SCHEMA&&
+   ['STAGING','STAGED','SWAP_STARTED','FILE_APPLIED','STAGING_FAILED',
+    'CAS_BLOCKED','SWAP_INTERRUPTED','ROLLED_BACK_VERIFIED',
+    'RECOVERY_REQUIRED','SUCCEEDED'].includes(record.phase)&&
+   Number.isSafeInteger(record.seq)&&record.seq===(previous?.seq??-1)+1&&
+   (record.file===null||FILES.some(x=>x.path===record.file)),
+   'R54_B_JOURNAL_INVALID');
+  previous=record;
+ }
+ return previous.phase;
+}
+export const readR54RecoveryJournalStatus=journalLastState;
 function sourceRows({installedRoot,candidateRoot}){
  return FILES.map(spec=>{
   const target=file(installedRoot,spec.path),candidate=file(candidateRoot,spec.path);
@@ -87,6 +118,10 @@ export function preflight({installedRoot,candidateRoot,manifest,gate}={}){
   Math.abs(Date.now()-Date.parse(gate.observedAt))<60000,
   'R54_B_RUNTIME_GATE_REQUIRED');
  const rows=sourceRows({installedRoot,candidateRoot});
+ const journalPhase=journalLastState(installedRoot);
+ assert(journalPhase===null||journalPhase==='SUCCEEDED'&&
+  rows.every(x=>x.oldHash===x.next),
+  'R54_B_PRIOR_JOURNAL_REQUIRES_RECONCILIATION');
  assert(rows.every(x=>x.oldHash===x.old)||rows.every(x=>x.oldHash===x.next),
   'R54_B_MIXED_SOURCE_VERSION_STOP');
  const already=rows.every(x=>x.oldHash===x.next);
@@ -109,30 +144,58 @@ function copyAndSync(source,dest){
  * Caller must hold an exclusive validated B maintenance lease until return.
  */
 export function applyApprovedSix({installedRoot,candidateRoot,manifest,gate,
- beforeSwap=()=>{}}={}){
+ runtimeProbe,beforeSwap=()=>{}}={}){
+ assert(typeof runtimeProbe==='function','R54_B_RUNTIME_REPROBE_REQUIRED');
  const check=preflight({installedRoot,candidateRoot,manifest,gate});
  if(check.status==='ALREADY_INSTALLED')return {status:'ALREADY_INSTALLED',changed:0};
  const rows=check.rows;
+ const fd=fs.openSync(journalFile(installedRoot),'wx',0o600);
+ let seq=0;
+ const record=(phase,file=null)=>{
+  fs.writeSync(fd,JSON.stringify({schema:JOURNAL_SCHEMA,seq:seq++,phase,file})+'\n');
+  fs.fsyncSync(fd);
+ };
+ try{
+ record('STAGING');
  // Phase 1: all candidate copies validated and staged. Live code is untouched.
- for(const x of rows){
-  copyAndSync(x.candidate,x.stage);
-  assert(readHash(x.stage)===x.next,'R54_B_STAGE_SHA_STOP');
+ try{
+  for(const x of rows){
+   copyAndSync(x.candidate,x.stage);
+   assert(readHash(x.stage)===x.next,'R54_B_STAGE_SHA_STOP');
+  }
+ }catch{
+  record('STAGING_FAILED');
+  fail('R54_B_STAGE_RECONCILE_REQUIRED');
  }
+ record('STAGED');
  // Validate every live source SHA again immediately before the first swap.
- assert(rows.every(x=>readHash(x.target)===x.old),
-  'R54_B_CAS_CHANGED_BEFORE_SWAP');
+ if(!rows.every(x=>readHash(x.target)===x.old)){
+  record('CAS_BLOCKED');
+  fail('R54_B_CAS_CHANGED_BEFORE_SWAP');
+ }
  const started=[];
  try{
   // Phase 2: fixed-order replacement, no arbitrary path or shell expansion.
   for(const x of rows){
+   const live=runtimeProbe(x.path);
+   assert(live?.publisherConsentVerified===true&&
+    live.taskIdleVerified===true&&live.maintenanceLeaseVerified===true&&
+    live.activeR54ProcessAbsent===true&&live.sourceRootVerified===true&&
+    typeof live.observedAt==='string'&&
+    Number.isFinite(Date.parse(live.observedAt))&&
+    Math.abs(Date.now()-Date.parse(live.observedAt))<60000,
+    'R54_B_RUNTIME_REPROBE_FAILED');
    beforeSwap(x.path);
    assert(readHash(x.target)===x.old,'R54_B_CAS_CHANGED_DURING_SWAP');
+   record('SWAP_STARTED',x.path);
    fs.renameSync(x.target,x.backup);
    started.push(x);
    fs.renameSync(x.stage,x.target);
    assert(readHash(x.target)===x.next,'R54_B_TARGET_READBACK_SHA');
+   record('FILE_APPLIED',x.path);
   }
  }catch(error){
+  record('SWAP_INTERRUPTED');
   const notRestored=[];
   for(const x of [...started].reverse()){
    try{
@@ -141,10 +204,17 @@ export function applyApprovedSix({installedRoot,candidateRoot,manifest,gate,
     if(readHash(x.target)!==x.old)throw new Error('RESTORE_SHA');
    }catch{notRestored.push(x.path)}
   }
-  if(notRestored.length)fail('R54_B_RESTORE_REQUIRED');
+  if(notRestored.length){
+   record('RECOVERY_REQUIRED');
+   fail('R54_B_RESTORE_REQUIRED');
+  }
+  record('ROLLED_BACK_VERIFIED');
   throw error;
  }
+ record('SUCCEEDED');
  return {status:'SIX_FILE_SOURCE_APPLIED_SHA_VERIFIED',changed:FILES.length,
   backupsPreserved:FILES.length,operationalWrites:FILES.length,
   providerCalls:0,d1Writes:0,controllerWrites:0,taskWrites:0};
+ }finally{fs.closeSync(fd)}
 }
+
