@@ -100,6 +100,6 @@ test('dispatcher has one-shot ID gate; published policy remains A/readonly',()=>
  const policy=JSON.parse(readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.match(dispatcher,/request\.requestId!==ONE_SHOT_DIAGNOSTIC_ID/);
  assert.match(dispatcher,/inspectR17PostCancel\(dataRoot,/);
- assert.deepEqual(policy.operations['r17-268-postcancel-readonly'],{grade:'A',timeoutSeconds:120,resource:'light'});
+ assert.deepEqual(policy.operations['r17-268-postcancel-readonly'],{grade:'A',timeoutSeconds:90,resource:'light'});
  assert.equal(policy.mutationsEnabled,false);
 });
