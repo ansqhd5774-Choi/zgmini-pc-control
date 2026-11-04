@@ -1,0 +1,66 @@
+# Dedicated reviewed B-grade R17 five-file operational installation, one attempt.
+# NOT Controller self-update, generic pc-job, scheduled collection, or a retry lane.
+name: ZGMINI R17 Writer B Five File Install Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Create-only, sanitized private TXT/JSON evidence (no overwrite).
+  issues: write # The one approved Issue receives a bounded result comment.
+concurrency:
+  group: zgmini-r17-writer-b-install-once
+  cancel-in-progress: false
+jobs:
+  r17-approved-fivefile-b-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-r17-writer-fivefile-install' &&
+      contains(github.event.issue.labels.*.name, 'pc-r17-writer-b-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: cmd
+    env:
+      R17_CONTROL_SHA: ${{ github.sha }}
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout exact event SHA of private Controller without persisted credentials
+        id: checkout-control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r17-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout fixed approved public candidate source without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 81c8ee543c164fc16c8c760d504b113428d01d4a
+          path: r17-source
+          fetch-depth: 1
+          persist-credentials: false
+      # Exact reviewed local contract files in r17-control/r17-writer-b:
+      # r17-writer-b-install-core.mjs, r17-writer-b-install-windows.mjs,
+      # r17-b-windows-probe.js, r17-b-xml.mjs, contract.mjs,
+      # approval/R17_WRITER_B_INSTALL_APPROVAL.json,
+      # approval/R17_A23_REBASE.patch, r17-writer-b-install-upload.mjs.
+      - name: One approved B-grade five-file installation and bounded JSON result
+        id: r17-install
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\r17-writer-b-install-windows.mjs" > "%RUNNER_TEMP%\r17-b-install-result.json"'
+      - name: Read back and recover sanitized private result without rerunning installer
+        if: always() && steps.checkout-control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\r17-writer-b-install-upload.mjs"'
