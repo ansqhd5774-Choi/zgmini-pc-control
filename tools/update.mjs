@@ -378,6 +378,38 @@ export function classifyR54BProcessTree(items){
   active:[...active].sort((a,b)=>a-b)};
 }
 
+/** Fixed read-only WMI output: PID,parent,match only. Command lines stay in
+ * Windows WMI memory and are never copied into a report or Issue. The bundled
+ * maintenance-ancestry.vbs runs under cscript; WMIC is not required. */
+export function parseR54BScopedWmiSnapshot(buffer){
+ need(Buffer.isBuffer(buffer)&&buffer.length>0&&buffer.length<=4*1024*1024,
+  'R54_B_FIXED_PROCESS_OUTPUT_INVALID');
+ let src;
+ try{src=new TextDecoder('utf-8',{fatal:true}).decode(buffer)
+   .replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').trim();}
+ catch{need(false,'R54_B_FIXED_PROCESS_ENCODING_UNKNOWN');}
+ const lines=src.split('\n');
+ need(lines.shift()==='PID,PARENT,MATCH','R54_B_FIXED_PROCESS_HEADER_MISSING');
+ const items=[],seen=new Set();
+ for(const line of lines){
+  need(/^\d+,\d+,[01?]$/.test(line),'R54_B_FIXED_PROCESS_ROW_MALFORMED');
+  const [id,parent,match]=line.split(','),pid=Number(id),ppid=Number(parent);
+  need(Number.isSafeInteger(pid)&&pid>0&&Number.isSafeInteger(ppid)&&ppid>=0
+   &&!seen.has(pid),'R54_B_FIXED_PROCESS_PID_UNKNOWN');
+  seen.add(pid);items.push({pid,parent:ppid,match});
+ }
+ need(items.length>0,'R54_B_FIXED_PROCESS_SNAPSHOT_EMPTY');
+ need(!items.some(x=>x.match==='?'),'R54_B_FIXED_PROCESS_VISIBILITY_UNKNOWN');
+ const active=new Set(items.filter(x=>x.match==='1').map(x=>x.pid));
+ const roots=active.size;
+ let changed=true;
+ while(changed){changed=false;for(const x of items){
+  if(active.has(x.parent)&&!active.has(x.pid)){active.add(x.pid);changed=true;}
+ }}
+ return {roots,descendants:active.size-roots,
+  active:[...active].sort((a,b)=>a-b)};
+}
+
 /** A native Win32 observation; MUST NOT be accepted as a freeze proof.
  * Dependencies are injectable for isolated tests only. `r54-b-apply` invokes
  * this with zero arguments, so no Issue field can override fixed OS ports. */
@@ -391,14 +423,15 @@ export function observeR54BWindowsReadOnly({platform=process.platform,
   const binary=path.win32.join(systemRoot,'System32',exe);
   const out=run(binary,args,{shell:false,windowsHide:true,encoding:null,
    timeout:20000,maxBuffer:4*1024*1024});
-  if(exe==='wmic.exe'&&out?.error?.code==='ENOENT')
-   need(false,'R54_B_FIXED_WMIC_UNAVAILABLE');
+  if(exe==='cscript.exe'&&out?.error?.code==='ENOENT')
+   need(false,'R54_B_FIXED_WMI_HOST_UNAVAILABLE');
   need(out?.status===0&&!out?.error&&!out?.signal&&Buffer.isBuffer(out.stdout),
    'R54_B_FIXED_OS_OBSERVATION_FAILED');
   return out.stdout;
  };
- const census=()=>classifyR54BProcessTree(parseR54BProcessCsv(fixed('wmic.exe',
-  ['process','get','CommandLine,ExecutablePath,Name,ParentProcessId,ProcessId','/FORMAT:CSV'])));
+ const census=()=>parseR54BScopedWmiSnapshot(fixed('cscript.exe',
+  ['//NoLogo',path.win32.join(maintenanceRoot,'tools','maintenance-ancestry.vbs'),
+   'R54_SCAN']));
  const task=()=>inspectTask(fixed('schtasks.exe',
   ['/Query','/TN',R54_TASK_NAME,'/XML']),readAction(R54_TASK_ACTION));
  const sourceFirst=inspectSource(),taskFirst=task(),processFirst=census();
