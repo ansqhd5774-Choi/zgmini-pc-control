@@ -29,6 +29,18 @@ const REPORT_CODES=new Set([
   'R17_B_IMPORT_RESOLUTION_STOP','R17_B_IMPORT_BUDGET_STOP','R17_B_SOURCE_FILE_STOP',
 ]);
 const codeOf=e=>REPORT_CODES.has(e?.code)?e.code:'R17_B_UNEXPECTED_STOP';
+const safePatchDiagnostic=error=>{
+  const d=error?.diagnostic;
+  if(error?.code!=='R17_B_PATCH_CONTEXT_STOP'||!d||
+    !['local-cycle','run-local'].includes(d.file)||
+    !['MIXED_EOL','NO_MATCH','MULTIPLE_MATCH'].includes(d.reason)||
+    !(d.hunkOldStart===null||
+      (Number.isSafeInteger(d.hunkOldStart)&&d.hunkOldStart>=1&&d.hunkOldStart<=10_000))||
+    ![null,0,2].includes(d.matchCount)||d.nativeGitApplyCheck!=='PASS')
+      return null;
+  return {file:d.file,hunkOldStart:d.hunkOldStart,reason:d.reason,
+    matchCount:d.matchCount,nativeGitApplyCheck:'PASS'};
+};
 
 function regular(base,relative,max=2_000_000){
   const full=path.join(base,...relative.split('/'));
@@ -104,11 +116,20 @@ export function runReadOnly({event,env,controlRoot,candidateRoot,taskXml,readPcF
   const newFiles=Object.fromEntries(ADDED.map(p=>[p,readCandidate(p)]));
   const patch=readPatch();
   if(hash(patch)!==manifest.patchSha256)stop('R17_B_PATCH_SHA_STOP');
-  const {overlay,oldTargetSha256}=buildCandidateOverlay({originals,
-    patchBytes:patch,newFiles,newSha256:manifest.newSha256});
-  // git apply --check performs validation only; no index/worktree writes.
+  // Native Git's check is read-only. Compare its outcome before the separate
+  // strict in-memory parser, so a parser-only mismatch is distinguishable.
   if(!gitApplyCheck(pcRoot,path.join(controlRoot,'r17-writer-b','approval','R17_A23_REBASE.patch')))
     stop('R17_B_PATCH_APPLY_STOP');
+  let candidate;
+  try{
+    candidate=buildCandidateOverlay({originals,
+      patchBytes:patch,newFiles,newSha256:manifest.newSha256});
+  }catch(error){
+    if(error?.code==='R17_B_PATCH_CONTEXT_STOP'&&error?.diagnostic)
+      error.diagnostic.nativeGitApplyCheck='PASS';
+    throw error;
+  }
+  const {overlay,oldTargetSha256}=candidate;
   const imports=verifyImports(pcRoot,overlay,(root,p,probe=false)=>{
     if(probe){try{const st=fs.lstatSync(path.join(root,...p.split('/')));return st.isFile()&&!st.isSymbolicLink()}catch{return false}}
     return regular(root,p);
@@ -154,16 +175,19 @@ function main(){
       candidateRoot:path.join(ws,'r17-source'),
       gitCommit:root=>gitCmd(root,['rev-parse','HEAD'],env),
       gitStatus:root=>gitCmd(root,['status','--porcelain','--untracked-files=all'],env),
-      gitApplyCheck:(root,p)=>{try{gitCmd(root,['apply','--check',p],env);return true}catch{return false}},
+      gitApplyCheck:(root,p)=>{try{gitCmd(root,['apply','--check','--whitespace=error',p],env);return true}catch{return false}},
       resolveRealRoot:root=>fs.realpathSync.native(root),
       readPcFile:(root,p)=>regular(root,p),
       inspectAbsence:(root,p)=>!fs.existsSync(path.join(root,...p.split('/'))),
       taskXml:()=>execFileSync(SCHTASKS,['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
         {windowsHide:true,timeout:15_000,maxBuffer:100_000,env:safeEnv(env)}),
     });
-  }catch(error){report={requestId,runId:env.GITHUB_RUN_ID,
-    status:'BLOCKED',code:codeOf(error),providerCalls:0,d1Writes:0,
-    pcSourceWrites:0,operationalConfigWrites:0,taskWrites:0};}
+  }catch(error){const diagnostic=safePatchDiagnostic(error);
+    report={requestId,runId:env.GITHUB_RUN_ID,
+      status:'BLOCKED',code:codeOf(error),
+      ...(diagnostic?{diagnostic}:{}),
+      providerCalls:0,d1Writes:0,pcSourceWrites:0,
+      operationalConfigWrites:0,taskWrites:0};}
   persist(report,requestId);
   if(report.status!=='PASS')process.exitCode=1;
 }
