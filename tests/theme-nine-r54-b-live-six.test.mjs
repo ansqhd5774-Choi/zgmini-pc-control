@@ -64,7 +64,7 @@ test('R54 B apply rejects arbitrary package file before reading PC state or swap
   '--manifest-file','/tmp/untrusted-r54-package.json']),/R54_B_APPROVAL_FILE_PATH/);
 });
 
-test('inlined start-freeze gate requires independently blocked manual entrypoints',()=>{
+test('inlined start-freeze gate checks actual collision window, not other Tasks',()=>{
  const proof={
   authorization:{grade:'B',scope:'ONE_TIME_R54_TASK_PAUSE_RESTORE_B',
    taskName:'ZGMINI-PC-Theme-Nine-R54-Public',singleUse:true,
@@ -76,14 +76,16 @@ test('inlined start-freeze gate requires independently blocked manual entrypoint
    enabled:false,definitionDigest:'9'.repeat(64),durableXmlBackupReadback:true},
   closedRoutes:{taskName:'ZGMINI-PC-Theme-Nine-R54-Public',
    schedulerStartDisabled:true,taskNotRunning:true,childProcessCount:0,
-   otherScheduledEntrypoints:0,otherManualEntrypointsBlocked:true,
-   relevantLocksClear:true,exclusiveBLeaseHeld:true,twoStablePassesVerified:true},
+   conflictingSourceLaunches:0,installWindowExclusivityVerified:true,
+   unrelatedTaskCount:20,relevantLocksClear:true,exclusiveBLeaseHeld:true},
   sourceRows:R54_B_SOURCE_FILES.map(x=>({path:x.path,actual:x.old})),
   observedAt:new Date().toISOString()};
  assert.equal(r54BStartFreezeReady(null),false);
  assert.equal(r54BStartFreezeReady(proof),true);
  assert.equal(r54BStartFreezeReady({...proof,
-  closedRoutes:{...proof.closedRoutes,otherManualEntrypointsBlocked:false}}),false);
+  closedRoutes:{...proof.closedRoutes,installWindowExclusivityVerified:false}}),false);
+ assert.equal(r54BStartFreezeReady({...proof,
+  closedRoutes:{...proof.closedRoutes,conflictingSourceLaunches:1}}),false);
  assert.equal(r54BStartFreezeReady({...proof,
   closedRoutes:{...proof.closedRoutes,childProcessCount:1}}),false);
  assert.equal(r54BStartFreezeReady({...proof,
