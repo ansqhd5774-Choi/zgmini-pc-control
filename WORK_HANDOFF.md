@@ -174,3 +174,12 @@
 - **웹디버그 연결 한계:** 연결된 로컬 브라우저 확장 접근은 `originating browser context` 부재로 거부되었고 대체 클라우드 브라우저는 빈 탭만 보여 기존 사용자 ChatGPT 일반챗을 특정/재개할 수 없었다. 현재 총괄 도구에 **별도 독립 일반챗 직접 메시지·자동 깨움 경로가 검증되지 않음**. 댓글·GitHub Actions가 그 경로를 제공한다고 주장하지 않는다.
 - **불필요한 구현 제외:** A `pc-job`는 신규 Issue `opened`→기존 self-hosted Runner→requestId 원장/lease→결과 TXT/JSON, B `pc-maintenance`는 독립 Windows receiver `poll`→`claim`/원장→GitHub GET/`VERIFIED`를 이미 갖춘다. 새 큐/Runner/DB/승인 Gate 및 #434 검증용 가짜 B는 만들지 않는다. 독립 ChatGPT 담당에게 전달할 수 없는 상태는 `HANDOFF_RECORDED/ACK_UNCONFIRMED`로 정확히 보고하며 독립 업무를 계속한다.
 - **남은 NEXT:** 지원되는 실제 담당 채널이 확인되는 경우 기존 R54 담당에게 **단 한 번** 명시 인계·ACK를 요청하고 `worker/theme-nine-r37-public.mjs` 1파일 provenance/task binding만 회수한다. 유효한 새 정상 승인 B 실행 후에만 #434 E 신규 요청별 보고서 0·원장 VERIFIED·GitHub GET 실증 판정. 전체 **4/5 FINAL PASS(80%)** 유지. 이번 회차 PC/GitHub Issue/설치 변경 0건, 이 인계 기록 문서만 갱신.
+
+
+## 16. 2026-11-06 R54 1파일 출처 조사 — 전담 서브에이전트 인계 결과
+
+- **실제 인계·수신:** `r54_provenance_worker`(CASE `R54-ONEFILE-PROVENANCE-20261106`) 및 `r54_manifest_reviewer`(CASE `R54-ONEFILE-MANIFEST-20261106`)를 분리 지정하고 각각 선행 `ACK`와 독립 결과 회신을 확보했다. 총괄은 작업자의 조사 결과를 검토했으며 PC 작업·B 설치를 직접 대행하지 않았다.
+- **승인 대조 재사용:** 원격 `main` `approvals/theme-nine-r54/sixfile-source.json` `APPROVED_B`/`R54_FIXED_SIXFILE_SOURCE_ONLY`/`runCount=1`/예약 작업 단회 disable+restore. PC #452의 6파일 중 5개는 `TARGET`, `worker/theme-nine-r37-public.mjs`만 `OTHER`: PC SHA256 `30d47abdb99dc0c73c3daf54fa268e94067a9b632c70e633511c929925e794d0`(11,993 bytes), 승인 `old=e6768dd37...`, `next=30326c94...`.
+- **실제 새 조사:** `zgmini/main`과 R37·R38·R39 관련 GitHub 브랜치의 해당 경로를 읽기 전용 비교했으나 PC의 실제 SHA256을 어느 source에 연결할지 **입증 실패(`SOURCE_NOT_PROVEN`)**. Git blob SHA1과 PC SHA256 직접 비교 금지, GitHub 텍스트 길이·크기 차이만으로 출처 확정 금지.
+- **한 번의 명시 기록 인계:** 기존 R54 작업 Issue [#428 최신 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/428#issuecomment-6668826391)에 새 조사·확정/미확정 근거·다음 필요 행동만 기록. **별도 ChatGPT 담당의 직접 수신/재개 ACK는 미확인**이며 댓글만으로 전달 완료라고 확정하지 않는다. #68에 중복 댓글·새 검증용 B는 만들지 않았다.
+- **원담당 NEXT:** PC 해당 파일의 Git HEAD/branch/dirty/tracked-path 출처를 지원되는 읽기 전용 경로로 1회 조회하고 실제 예약 task binding·승인 경계와 연결한다. 변경 출처가 확인되면 `OTHER` 보존·기존 승인 범위를 따져 최소 1파일 manifest를 준비한다. 기존 정상 5파일 재설치나 과거 #428 B 재실행 불가. 정상 B 발생 후 #434 동일 requestId GitHub GET·ledger VERIFIED·E 신규 보고서 0 검증은 별도 유지. 전체 4/5 FINAL PASS(80%).
