@@ -16,13 +16,17 @@ export function requireInstalledHandoffFiles(installed){
  need(previous,'HANDOFF_INSTALLED_FILE_SET_INVALID');
  return [...previous];
 }
-export function restorePriorHandoffFiles(installDir,backupDir,previous,io=fs){
+export function restorePriorHandoffFiles(installDir,backupDir,previous,newlyWritten=[],io=fs){
  need(Array.isArray(previous)&&[legacyFiles,targetFiles].some(list=>
    previous.length===list.length&&list.every(rel=>previous.includes(rel))),
    'HANDOFF_INSTALLED_FILE_SET_INVALID');
+ const newFiles=targetFiles.filter(file=>!previous.includes(file));
+ need(Array.isArray(newlyWritten)&&newlyWritten.every(rel=>newFiles.includes(rel)),
+   'HANDOFF_NEW_FILE_SET_INVALID');
  for(const rel of [...previous,'MAINTENANCE_INSTALL.json'])
   io.copyFileSync(path.join(backupDir,rel),path.join(installDir,rel));
- for(const rel of targetFiles.filter(file=>!previous.includes(file))){
+ // Never delete an independently appeared file after an exclusive-create race.
+ for(const rel of newlyWritten){
   const newlyAdded=path.join(installDir,rel);
   if(io.existsSync(newlyAdded))io.unlinkSync(newlyAdded);
  }
@@ -203,15 +207,19 @@ export async function main(args=process.argv.slice(2)){
  fs.writeFileSync(backup+'/SNAPSHOT.json',JSON.stringify(snapshot,null,2),{flag:'wx'});
  const result={schema:'ZGMINI_MAINTENANCE_HANDOFF_RESULT_V1',targetSha:target,installedShaBefore:before.sourceSha,status:'RUNNING',backup};
  const persist=()=>fs.writeFileSync(record,JSON.stringify({...result,at:new Date().toISOString()},null,2));persist();
- let reservation=null;
+  let reservation=null;
+  const newlyWritten=[];
  try{
   requirePriorStopped(priorOwner);need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
   reservation=reserveReceiverSlot(root+'/leases/receiver');
   reservation.verify();
   requireStopped(priorOwner);
   need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
-   for(const rel of targetFiles)fs.writeFileSync(path.join(root,rel),bytes[rel],
-     previousFiles.includes(rel)?undefined:{flag:'wx'});
+   for(const rel of targetFiles){
+    const isNew=!previousFiles.includes(rel);
+    fs.writeFileSync(path.join(root,rel),bytes[rel],isNew?{flag:'wx'}:undefined);
+    if(isNew)newlyWritten.push(rel);
+   }
    const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(targetFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   fs.writeFileSync(startup,startupBytes);
@@ -250,7 +258,7 @@ export async function main(args=process.argv.slice(2)){
    if(reservation){reservation.verify();requireStopped(priorOwner);}
    else requirePriorStopped(priorOwner);
    for(const [rel,hash]of Object.entries(snapshot))need(sha(fs.readFileSync(path.join(backup,rel)))===hash,'HANDOFF_BACKUP_DRIFT');
-    restorePriorHandoffFiles(root,backup,previousFiles);
+    restorePriorHandoffFiles(root,backup,previousFiles,newlyWritten);
    fs.writeFileSync(startup,oldStartup);
    if(reservation){reservation.release();reservation=null;}
    // File rollback alone does not prove that the former receiver restarted.
