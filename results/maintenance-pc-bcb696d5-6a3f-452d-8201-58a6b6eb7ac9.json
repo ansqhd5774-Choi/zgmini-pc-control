@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-bcb696d5-6a3f-452d-8201-58a6b6eb7ac9",
+  "targetControllerSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "status": "BLOCKED",
+  "code": "R54_B_ORIGINAL_SOURCE_SHA_DRIFT",
+  "lastPass": "NONE",
+  "firstFail": "NONE",
+  "actualControllerSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
+  "recoverySha": null,
+  "protectedStateUnchanged": true,
+  "workflowEnabled": false
+}
