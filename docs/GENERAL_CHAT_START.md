@@ -46,8 +46,8 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 
 이것은 형식 예시이며 placeholder 그대로 요청하지 않는다. create_issue 도구의 `repository_full_name`, `title`, `body`, `labels` 등 실제 schema를 따른다.
 
-5. **이번에 생성한 고유 Issue 번호·requestId 하나**만 추적한다. 댓글이 아직 없어도 해당 Issue의 Actions 실행 상태를 확인하고, 실행 중이면 예상 완료 시점이나 실제 상태 변화에 맞춰 제한적으로 재조회한다. queued/offline은 곧바로 실패가 아니다. #68 전체 댓글·다른 업무 Issue들을 주기적으로 전량 조회하거나 같은 요청을 새로 만들지 않는다.
-6. 결과 회수는 댓글을 보조 알림으로 사용하고 **고정 결과 파일의 원격 재조회**를 우선한다. 일반 `pc-job`은 해당 Actions 실행의 `runId`/`attempt`/`seat`를 확인해 `results/<runId>-<attempt>-seat-<seat>.json/.txt`를 조회한다. `pc-maintenance`는 고유 `requestId`에 대응하는 `results/maintenance-<requestId>.json/.txt`와 영속 원장·댓글의 `REPORT_UPLOAD`를 구분해 대조한다. 댓글이 없으면 정확한 실행의 jobs/logs·결과 경로를 확인하고, 원격 검증이 불명확하면 `STATE_UNKNOWN`과 다음 확인 조건을 남긴다. 댓글 작성만으로 다른 GitHub Workflow나 독립 ChatGPT 대화가 자동 재개된다고 가정하지 않는다.
+5. **이번에 생성한 고유 Issue 번호·requestId 하나**만 추적한다. `pc-job`은 댓글이 없어도 해당 Issue의 Actions 실행 상태를 확인하고, `pc-maintenance`는 Actions가 아닌 독립 유지보수기 요청으로서 사용 가능한 기존 원장·결과 증거를 확인한다. 진행 중이면 예상 완료 시점이나 실제 상태 변화에 맞춰 제한적으로 재조회한다. queued/offline은 곧바로 실패가 아니다. #68 전체 댓글·다른 업무 Issue들을 주기적으로 전량 조회하거나 같은 요청을 새로 만들지 않는다.
+6. 결과 회수는 댓글을 보조 알림으로 사용하고 **고정 결과 파일의 원격 재조회**를 우선한다. 일반 `pc-job`은 해당 Actions 실행의 `runId`/`attempt`/`seat`를 확인해 `results/<runId>-<attempt>-seat-<seat>.json/.txt`를 조회한다. `pc-maintenance`는 고유 `requestId`에 대응하는 `results/maintenance-<requestId>.json/.txt`와 영속 원장·댓글의 `REPORT_UPLOAD`를 구분해 대조한다. 댓글이 없으면 **`pc-job`에만** 해당 Actions run/jobs/logs를 확인한다. `pc-maintenance`에는 Actions jobs/logs가 없으므로 고정 결과쌍과 승인된 원장 조회 경로를 사용하고, 그 경로가 없으면 전달 상태 미확인으로 기록한다. 원격 전달 여부가 불명확해도 이미 확인된 PC 실행 `PASS`/`FAIL`/`BLOCKED`를 덮어쓰지 않고 **실행 상태와 결과 전달 상태를 분리**해 다음 확인 조건을 남긴다. 댓글 작성만으로 다른 GitHub Workflow나 독립 ChatGPT 대화가 자동 재개된다고 가정하지 않는다.
 
 현재 연결 도구에서 실제 검증한 인수 이름은 create_issue의 `repository_full_name`, fetch_issue_comments의 `repo_full_name`+`issue_number`, fetch_file의 `repository_full_name`+`path`+`ref`다. 도구 schema가 바뀌면 실제 schema가 우선이다. 단순 Actions conclusion만 보지 말고 JSON의 status/code를 확인한다.
 7. PASS이면 해당 실제 증거를 인용한다. FAIL/BLOCKED이면 code/lastPass/firstFail/actualExecutionSha를 근거로 영향 범위를 한정한다. 새 증거나 수정 없이 동일 실패를 재요청하지 않는다.
@@ -69,7 +69,7 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 
 ## 비용과 결과 보관
 
-hosted Runner/Artifact/cache를 사용하지 않는다. 결과는 private 저장소의 작은 TXT/JSON 파일과 해당 요청 Issue의 댓글로 회수한다. 현행 `pc-job` 업로더는 TXT·JSON **두 파일의 원격 GET 동일바이트 확인 후** 성공 댓글을 기록한다. 충돌·업로드 불명확 시 성공 댓글/전체 PASS를 추정하지 않고 기존 Actions 실행·원격 파일·원장을 조회하며 계산·설치를 재실행하지 않는다. `pc-maintenance`도 해당 requestId의 원격 결과 검증·영속 원장을 구분한다. GitHub 자체 API·저장 한도와 PC 자원은 존재하므로 무제한·영구무료를 보장하지 않는다.
+hosted Runner/Artifact/cache를 사용하지 않는다. 결과는 private 저장소의 작은 TXT/JSON 파일과 해당 요청 Issue의 댓글로 회수한다. 현행 `pc-job` 업로더는 TXT·JSON **두 파일의 원격 GET 동일바이트 확인 후** 성공 댓글을 기록한다. 충돌·업로드 불명확 시 성공 댓글이나 **결과 전달 PASS**를 추정하지 않는다. `pc-job`은 Actions 실행·원격 파일을, `pc-maintenance`는 해당 고정 결과·지원되는 원장을 확인하되, 이미 입증된 실행 상태는 보존하며 계산·설치를 재실행하지 않는다. `pc-maintenance`도 해당 requestId의 원격 결과 검증·영속 원장을 구분한다. GitHub 자체 API·저장 한도와 PC 자원은 존재하므로 무제한·영구무료를 보장하지 않는다.
 
 ## Controller 자동 갱신 요청 — 최초 연결 이후에만
 
