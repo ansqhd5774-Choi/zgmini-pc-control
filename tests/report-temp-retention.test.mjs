@@ -12,11 +12,13 @@ function fixture(){
  const jobId=`run-${runId}-${attempt}-seat-${seat}`,requestId='pc-aabbccdd-1234';
  const report={schema:'ZGMINI_PC_RESULT_V1',jobId,requestId,status:'PASS',
   code:'CORE_READONLY_DIAGNOSIS',firstFail:null,protectedStateUnchanged:true,
-  actualExecutionSha:'a'.repeat(40)};
+  actualExecutionSha:'a'.repeat(40),
+  result:{status:'PASS',code:'CORE_READONLY_DIAGNOSIS',value:'ORIGINAL'}};
  const workspace=path.join(root,'jobs',jobId),file=path.join(workspace,'RESULT.json');
  fs.mkdirSync(workspace);
  for(const name of ['input.json','worker-result.json','RESULT.json','RESULT.txt'])
-  fs.writeFileSync(path.join(workspace,name),name==='RESULT.json'?JSON.stringify(report):'fixture');
+  fs.writeFileSync(path.join(workspace,name),name==='RESULT.json'?JSON.stringify(report):
+   name==='worker-result.json'?JSON.stringify(report.result):'fixture');
  const pointer=path.join(root,'reports',`${runId}-${attempt}-${seat}.json`);
  fs.writeFileSync(pointer,JSON.stringify({issueNumber,report,file,workspace}));
  const ledger=path.join(root,'ledger',requestId+'.json');
@@ -98,6 +100,25 @@ test('mismatched pointer, ledger or workspace result fails closed',()=>{
    assert.match(result.code,/MISMATCH/);
    assert.equal(fs.existsSync(f.pointer),true);
    assert.equal(fs.existsSync(f.workspace),true);
+  }finally{f.dispose();}
+ }
+});
+
+test('nested payload divergence across pointer, workspace and worker remains preserved',()=>{
+ for(const which of ['pointer','RESULT.json','worker-result.json']){
+  const f=fixture();
+  try{
+   const target=which==='pointer'?f.pointer:path.join(f.workspace,which);
+   const source=JSON.parse(fs.readFileSync(target,'utf8'));
+   if(which==='pointer')source.report.result.value='ALTERED';
+   else if(which==='RESULT.json')source.result.value='ALTERED';
+   else source.value='ALTERED';
+   fs.writeFileSync(target,JSON.stringify(source));
+   assert.equal(cleanupVerifiedJobTemps(f.options).code,
+    which==='pointer'?'POINTER_RESULT_MISMATCH':'WORKSPACE_RESULT_MISMATCH');
+   assert.equal(fs.existsSync(f.pointer),true);
+   assert.equal(fs.existsSync(f.workspace),true);
+   assert.equal(fs.existsSync(f.ledger),true);
   }finally{f.dispose();}
  }
 });
