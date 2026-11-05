@@ -125,3 +125,10 @@
 - **FIRST FAIL 정정:** R2는 E: 저장소 폴더·Git 명령 존재 확인 후 `git rev-parse --is-inside-work-tree | findstr` 결합 판정에서 실패, stderr·Git exit 별도 없음. 실 Git 저장소 손상으로 분류하지 않음. 이전 #457은 단순 Git exit0만 봤으므로 두 진단은 모순으로 단정할 수 없음.
 - **개선 source:** [Draft PR #459](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/459)에 `MAINTENANCE_434_GIT_PROBE_R3.cmd` 추가, commit `e4fe08bdd59e6702daea707ad1b9c37c3b155034`, Git blob `7f288849d4471b0037bceb05e46be9bfea378645` Windows CRLF/ZIP 내부 동일/압축 PASS/독립 SOURCE GO. Git worktree/toplevel/branch/HEAD 원문 stdout+stderr+exit 분리, manifest exists/tracked, 결과 사용자 TEMP 신규 TXT·Notepad·CMD pause. Git 쓰기/FF 재시도/인계/E: 신규 쓰기 0.
 - **다음 단계 하나:** R3 실제 Windows 결과 회수 → 로컬 HEAD가 `91a6…`/ `14fa…`/그 외인지를 원문 증거로 판정. **원래 FF CMD와 R2는 재실행 금지**, #434 운영 PASS 미판정, 전체 4/5.
+
+
+## 10. 2026-11-06 #434 R3 실제 HEAD 및 FF V2 준비
+
+- **LAST PASS:** 사용자 R3 실PC에서 E: 제어 저장소 `GIT_WORKTREE=true/EXIT=0`, `GIT_TOPLEVEL=E:/ZGmini/projects/zgmini-pc-control`, `main/EXIT=0`, 실제 HEAD `91a6e085d69d35164c28cdfb8ff74cc67a6efd3b/EXIT=0`, 승인 manifest 없음 확인. R2의 `NOT_GIT_REPOSITORY`는 진단기 결합 판정 오류였음. 이전 FF 후 HEAD 진전 없음이나 이전 호출 여부 자체는 UNKNOWN.
+- **개선:** 기존 [PR #458](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/458) Draft branch에 V2 파일 추가, commit `2346d8023b91938d20bf783f9c23bddb35be82e9`, CMD blob `7284a685303ec3ba37b64a6d33addf790e6c7962`. 보고서 TEMP/메모장/콘솔 pause, Git 판정 파이프 제거, branch byte exact, 불필요한 cached origin SHA equality 제거. 16 승인 경로·10 신규 충돌·install lease/filter/hook/목표 SHA 보호 유지. CRLF·ZIP hash/압축·독립 SOURCE GO.
+- **NEXT:** Windows 일반 사용자에서 신규 V2 단회 수행 후 `ZGMINI_MAINTENANCE_434_PINNED_FF_V2_RESULT.txt`로 `SOURCE_FF_PINNED_PASS`+HEAD/manifest 추적 증명. V1/R2 재실행 금지. 이후 V2 유지보수기 자체 인계는 별도 승인된 operator-only 절차와 실제 E 중복 보고 0 검증. 전체 4/5 운영 PASS 유지.
