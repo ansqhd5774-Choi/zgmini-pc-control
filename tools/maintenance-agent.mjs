@@ -624,21 +624,66 @@ export function createMaintenanceAgent({
     return {status:result.status,code:result.code,
       reportUploadStatus:stored.reportUploadStatus,requestId:request.requestId};
   }
+  // Memory-only optimization. A restart or an edited Issue always takes the
+  // complete authenticated path; no local file can authorize a new B operation.
+  const settledIssueCache=new Map();
+  const CACHE_TERMINAL=new Set(["SUCCEEDED","FAILED","BLOCKED"]);
+  function safelyDeliveredLedger(issue,requestId){
+    if(!REQUEST_ID.test(requestId)||!issueIsTrusted(issue,
+      {allowedActors,title:issue?.title,label})||typeof issue.body!=="string")return false;
+    const file=ledgerPath(requestId);
+    try{
+      // A cache decision must never trust symlinks, oversized or incomplete state.
+      const stat=fs.lstatSync(file);
+      if(!stat.isFile()||stat.size>65_536)return false;
+      const ledger=loadLedger(requestId);
+      return ledger?.schema==="ZGMINI_PC_MAINTENANCE_LEDGER_V1"
+        &&ledger.issueNumber===issue.number&&ledger.actor===issue.author.login
+        &&ledger.bodyDigest===sha256(issue.body)
+        &&typeof ledger.fingerprint==="string"&&SHA256.test(ledger.fingerprint)
+        &&CACHE_TERMINAL.has(ledger.status)&&ledger.result?.requestId===requestId
+        &&ledger.result?.status===ledger.status
+        &&ledger.result?.targetControllerSha===ledger.targetControllerSha
+        &&ledger.reportUploadStatus==="VERIFIED"&&ledger.commentPosted===true
+        &&(ledger.commentUploadStatus!=="REPORT_UPLOAD_PENDING"
+          ||ledger.deliveryCommentPosted===true);
+    }catch{return false;}
+  }
   async function pollOnce(){
     await repositoryAllowed();
     const summaries=await githubJson(["issue","list","--repo",repo,"--state","open",
-      "--label",label,"--limit","1000","--json","number,title"],"GITHUB_ISSUE_LIST_FAILED");
+      "--label",label,"--limit","1000","--json","number,title,updatedAt"],"GITHUB_ISSUE_LIST_FAILED");
     if(!Array.isArray(summaries))throw coded("GITHUB_ISSUE_LIST_INVALID");
     const seen=new Set(),results=[];
-    for(const entry of summaries){
+    // New requests are served first. RUNNING and recovery work is still checked
+    // in the same pass, without introducing a new queue or admission gate.
+    const newestFirst=[...summaries].sort((a,b)=>(b?.number??0)-(a?.number??0));
+    for(const entry of newestFirst){
       const number=entry?.number;
       if(!Number.isSafeInteger(number)||number<=0||seen.has(number))continue;
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
       if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
-      try{results.push(await processIssue(await issueDetails(number)));}
-      catch(error){results.push({issueNumber:number,status:"BLOCKED",
+      const cached=settledIssueCache.get(number);
+      const updatedAt=entry?.updatedAt;
+      if(cached&&entry.title===cached.title&&typeof updatedAt==="string"
+        &&updatedAt.length>0&&updatedAt===cached.updatedAt
+        &&safelyDeliveredLedger(cached.issue,cached.requestId))continue;
+      // If the Issue changed, the process restarted, or the ledger is uncertain,
+      // return to full actor/body/label validation and pending delivery recovery.
+      settledIssueCache.delete(number);
+      try{
+        const issue=await issueDetails(number);
+        const result=await processIssue(issue);
+        results.push(result);
+        if(typeof updatedAt==="string"&&updatedAt.length>0
+          &&typeof result?.requestId==="string"
+          &&safelyDeliveredLedger(issue,result.requestId)){
+          settledIssueCache.set(number,{title:entry.title,updatedAt,
+            requestId:result.requestId,issue});
+        }
+      }catch(error){results.push({issueNumber:number,status:"BLOCKED",
         code:safeCode(error?.code??error?.message)});}
     }
     return results;
