@@ -12,13 +12,14 @@ test('handoff ignores unrelated checkout edits, still denies executable and appr
    'maintenance-lock.mjs','update.mjs','maintenance-ancestry.vbs',
    'bootstrap-maintenance.mjs','handoff-maintenance.mjs'].map(name=>'tools/'+name);
  const approval=`approvals/maintenance-handoffs/${target}.json`;
- for(const rel of [...source,approval]){
+ const unrelated=['docs/work-in-progress.md','results/maintenance-result.txt'];
+ for(const rel of [...source,approval,...unrelated]){
    const file=path.join(dir,rel);fs.mkdirSync(path.dirname(file),{recursive:true});
    fs.writeFileSync(file,'approved bytes\n');
  }
- git(['init','-q']);git(['add','--',...source,approval]);
+ git(['init','-q']);git(['add','--',...source,approval,...unrelated]);
  git(['-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','fixture']);
- for(const rel of ['docs/work-in-progress.md','results/maintenance-result.txt']){
+ for(const rel of unrelated){
    const file=path.join(dir,rel);fs.mkdirSync(path.dirname(file),{recursive:true});
    fs.writeFileSync(file,'unrelated local edit\n');
  }
