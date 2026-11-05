@@ -65,9 +65,9 @@
 | --- | --- | --- |
 | [#433 R54 6파일 SHA 진단](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/433) | `main` 병합·8/8 테스트 | 실제 설치·A 진단 미확인. 공유 `operations` 2파일의 #431 중첩을 기존 B 담당이 조정 |
 | [#435 TXT·JSON 재조회](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/435) | `main` 병합·8/8 테스트 | 설치 후 원격 2파일·댓글 재조회 필요. #431과 기술적 파일 중첩 없음 |
-| [#434 E: 중복 보고 방지](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434) | `main` 병합·30/30 테스트 | 독립 유지보수기 인계 manifest·Windows 적용 확인 필요; #431 완료가 기술적 Gate 아님 |
+| [#434 E: 중복 보고 방지](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434) | `main` 병합·30/30 테스트, [#443 명세](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 병합 | **명세 누락 해소**. 실제 Windows checkout 내 승인파일·설치 SHA·Receiver·인계/효과 확인 필요. #431 완료는 기술적 Gate 아님 |
 | [#442 E: 임시 출력 정리](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) | Draft·19/19 테스트, 원격 코드 일치 | #435 실제 게시 검증 뒤 운영 승인 범위로 Windows 단건 시험 |
-| [#437 대기·실행시간 KPI](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | Draft·14/14 테스트, 실 GitHub 17건 기준선 | 동일 작업군의 적용 전후 비교·제외 사유 기록. 순수 Runner 대기/worker 시간으로 단정 금지 |
+| [#437 대기·실행시간 KPI](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | Draft·14/14, 실 GitHub 17건(12 PASS·5 BLOCKED, 제외 0) | Issue 생성→Controller 시작 중앙값 **18,495ms**, 전체 처리 중앙값 **5,718ms**, 관측 겹침 최대 2. 순수 Runner 대기·worker 시간 아님. 실제 개선 효과는 전후 비교 후 판정 |
 
 **다음 필수 실행 하나:** 기존 [#68 단일 B 설치 담당](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6657001707)이 실제 설치 SHA·lease를 확인하고 #431 정확한 4파일 명세의 단회 설치 요청·결과를 회수한다. 동시에 독립 #434 유지보수기 인계 준비와 #435 별도 승인·파일 검토는 기존 담당자가 이어가며, 총괄은 새로운 요청을 중복 생성하지 않는다.
 
