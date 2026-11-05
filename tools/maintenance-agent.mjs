@@ -228,9 +228,11 @@ export function createMaintenanceAgent({
     ||!Number.isInteger(leaseWaitMs)||leaseWaitMs<0||leaseWaitMs>500){
     throw coded("MAINTENANCE_AGENT_CONFIG_INVALID");
   }
-  const requestsDir=path.join(root,"requests"),approvedDir=path.join(root,"approved"),
-    reportsDir=path.join(root,"reports");
-  for(const dir of [requestsDir,approvedDir,reportsDir])fs.mkdirSync(dir,{recursive:true});
+  const requestsDir=path.join(root,"requests"),approvedDir=path.join(root,"approved");
+  // Reports are reconstructed from the durable request ledger when needed.
+  // Do not create per-request TXT/JSON in E:; existing historical reports
+  // remain untouched until an independently approved retention cleanup.
+  for(const dir of [requestsDir,approvedDir])fs.mkdirSync(dir,{recursive:true});
 
   async function exec(file,args,timeout,environment=process.env){
     // Never use a shell. The entire command vector is fixed by this module.
@@ -376,15 +378,24 @@ export function createMaintenanceAgent({
       }
     }
   }
-  async function deliverReports(entry){
+  async function deliverReports(entry,operation){
     if(["VERIFIED","REPORT_UPLOAD_BLOCKED"].includes(entry.reportUploadStatus))return entry;
     let lease=null,code="REPORT_UPLOAD_PENDING",status="REPORT_UPLOAD_PENDING";
     try{
       lease=await acquireUploadLease();
-      const base=path.join(reportsDir,`MAINTENANCE_${entry.requestId}`);
-      // Both outputs are already persisted. Never submit raw manifest/DB data.
-      await uploadOneResult(entry.requestId,"json",fs.readFileSync(base+".json","utf8"));
-      await uploadOneResult(entry.requestId,"txt",fs.readFileSync(base+".txt","utf8"));
+      // The ledger is already durably committed *before* delivery. Reconstruct
+      // the same redacted bytes after crash/restart, without accumulating logs
+      // on E:. No source/manifest/provider/DB payload enters GitHub reports.
+      if(!entry.result||entry.result.requestId!==entry.requestId)
+        throw coded("MAINTENANCE_RESULT_LEDGER_INVALID");
+      // Operation comes from the newly authenticated Issue envelope, not an
+      // unpinned ledger field. Older ledgers intentionally lack operation.
+      const safeResult=normalizedResult({requestId:entry.requestId,
+        targetControllerSha:entry.targetControllerSha,operation},entry.result,entry.result.code);
+      if(safeResult.status!==entry.result.status)
+        throw coded("MAINTENANCE_RESULT_LEDGER_INVALID");
+      await uploadOneResult(entry.requestId,"json",JSON.stringify(safeResult,null,2)+"\n");
+      await uploadOneResult(entry.requestId,"txt",resultComment(safeResult)+"\r\n");
       status="VERIFIED";code="REPORT_UPLOAD_VERIFIED";
     }catch(error){
       code=safeCode(error?.code??error?.message);
@@ -433,18 +444,10 @@ export function createMaintenanceAgent({
   function persistLedger(entry){
     atomicReplace(ledgerPath(entry.requestId),JSON.stringify(entry,null,2)+"\n");
   }
-  function ensureResultFiles(entry){
-    if(!entry.result)return;
-    const filename=path.join(reportsDir,`MAINTENANCE_${entry.requestId}.json`);
-    const result=entry.result;
-    writeOnce(filename,JSON.stringify(result,null,2)+"\n");
-    writeOnce(filename.replace(/\.json$/,".txt"),resultComment(result)+"\r\n");
-  }
   function persistResult(entry,result){
     const updated={...entry,status:result.status,result,completedAt:now(),
       reportUploadStatus:"REPORT_UPLOAD_PENDING",reportUploadCode:"REPORT_UPLOAD_PENDING"};
     persistLedger(updated);
-    ensureResultFiles(updated);
     return updated;
   }
   async function ensureComment(issueNumber,result,uploadStatus){
@@ -545,8 +548,7 @@ export function createMaintenanceAgent({
       }
       const settled=prior.status==="RUNNING"?await reconcileRunning(prior,request):prior;
       if(TERMINAL.has(settled.status)&&settled.result){
-        ensureResultFiles(settled);
-        const delivered=await deliverReports(settled);
+        const delivered=await deliverReports(settled,request.operation);
         await commentOnceAndRecord(delivered);
         await uploadCompletionCommentOnce(loadLedger(request.requestId));
       }
@@ -582,7 +584,7 @@ export function createMaintenanceAgent({
       const blocked=claim(request,issue,fingerprint,bodyDigest);
       if(!blocked.created)return {status:"BLOCKED",code:"DUPLICATE_REQUEST_SUPPRESSED"};
       const result=normalizedResult(request,{status:"BLOCKED",firstFail:code},code);
-      const stored=await deliverReports(persistResult(blocked.entry,result));
+      const stored=await deliverReports(persistResult(blocked.entry,result),request.operation);
       await commentOnceAndRecord(stored);
       return {status:"BLOCKED",code,reportUploadStatus:stored.reportUploadStatus,
         requestId:request.requestId};
@@ -617,7 +619,7 @@ export function createMaintenanceAgent({
           actualControllerSha:current.actualControllerSha??status.actualControllerSha},current.code)
         :failedUpdaterResult(request,error,status);
     }
-    const stored=await deliverReports(persistResult(held.entry,result));
+    const stored=await deliverReports(persistResult(held.entry,result),request.operation);
     await commentOnceAndRecord(stored);
     return {status:result.status,code:result.code,
       reportUploadStatus:stored.reportUploadStatus,requestId:request.requestId};
