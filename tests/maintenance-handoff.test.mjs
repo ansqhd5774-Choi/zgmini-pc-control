@@ -188,7 +188,7 @@ test('old six to target seven rollback restores only prior files and removes the
    fs.writeFileSync(path.join(root,rel),`new-${rel}`);
   }else fs.writeFileSync(path.join(root,rel),'partially installed new adapter');
  }
- restorePriorHandoffFiles(root,backup,oldSix);
+ restorePriorHandoffFiles(root,backup,oldSix,[newSeven.at(-1)]);
  for(const rel of [...oldSix,'MAINTENANCE_INSTALL.json'])
   assert.equal(fs.readFileSync(path.join(root,rel),'utf8'),`approved-${rel}`);
  assert.equal(fs.existsSync(path.join(root,newSeven.at(-1))),false);
@@ -211,7 +211,22 @@ test('simulated rollback copy failure is surfaced, never silently marked complet
  t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
  const root=path.join(temp,'installed'),backup=path.join(temp,'backup');
  const failingIo={...fs,copyFileSync(){throw Error('simulated-restore-failure');}};
- assert.throws(()=>restorePriorHandoffFiles(root,backup,oldSix,failingIo),/simulated-restore-failure/);
+ assert.throws(()=>restorePriorHandoffFiles(root,backup,oldSix,[],failingIo),/simulated-restore-failure/);
  assert.equal(rollbackStatus({filesRestored:false,receiverReattested:false}),'RECOVERY_REQUIRED');
+});
+test('unmanaged seventh-file race is preserved when it was not created by handoff',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-unmanaged-new-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const root=path.join(temp,'installed'),backup=path.join(temp,'backup');
+ for(const rel of [...oldSix,'MAINTENANCE_INSTALL.json']){
+  for(const base of [root,backup])fs.mkdirSync(path.dirname(path.join(base,rel)),{recursive:true});
+  fs.writeFileSync(path.join(backup,rel),'prior');fs.writeFileSync(path.join(root,rel),'changed');
+ }
+ const extra=path.join(root,newSeven.at(-1));
+ fs.writeFileSync(extra,'not-created-by-handoff');
+ restorePriorHandoffFiles(root,backup,oldSix,[]);
+ assert.equal(fs.readFileSync(extra,'utf8'),'not-created-by-handoff');
+ assert.throws(()=>restorePriorHandoffFiles(root,backup,oldSix,['tools/unapproved.mjs']),
+   /HANDOFF_NEW_FILE_SET_INVALID/);
 });
 
