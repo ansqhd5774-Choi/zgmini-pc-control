@@ -54,6 +54,7 @@ test('drift returns BLOCKED before Task, lock or Writer mutation',async t=>{
   acquireInstall:forbidden,acquireWriter:forbidden,taskFactory:forbidden,
   applyFiles:forbidden,sourceScan:forbidden});
  assert.equal(result.status,'BLOCKED');
+ assert.equal(result.lastPass,'R54_B_CANDIDATES_LOADED');
  assert.equal(result.firstFail,'R54_B_ORIGINAL_SOURCE_SHA_DRIFT');
  assert.equal(result.taskWrites,0);
  assert.equal(result.writerFilesChanged,0);
