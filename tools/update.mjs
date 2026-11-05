@@ -765,11 +765,13 @@ export async function runR54BApprovedOneShot({requestId,
   'R54_B_REQUEST_ID_INVALID');
  // Read-only preparation occurs before any maintenance/Task/source write.
  const backupRoot=path.join(backupBase,'R54_B_'+requestId);
- let candidateBytes,installLease;
+ let candidateBytes,installLease,lastPass='NONE';
  try{
   candidateBytes=loadCandidates();
+  lastPass='R54_B_CANDIDATES_LOADED';
   const baselineSource=inspectOriginal({root:writerRoot});
   need(baselineSource.files.length===6,'R54_B_SIX_ORIGINALS_REQUIRED');
+  lastPass='R54_B_ORIGINAL_SIX_SHA_VERIFIED';
   need(!fs.existsSync(backupRoot),'R54_B_PREVIOUS_ATTEMPT_RECONCILE');
   installLease=acquireInstall();
  }catch(error){
@@ -778,7 +780,7 @@ export async function runR54BApprovedOneShot({requestId,
   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:
    /^[A-Z0-9_]+$/.test(error?.message??'')?error.message:
    'R54_B_READONLY_PREPARATION_FAILED';
-  return {status:'BLOCKED',code,taskWrites:0,writerFilesChanged:0,
+  return {status:'BLOCKED',code,lastPass,taskWrites:0,writerFilesChanged:0,
    controllerWrites:0,providerCalls:0,d1Writes:0,
    firstFail:code,
    ...(Array.isArray(error?.sourceInventory)
