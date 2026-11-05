@@ -94,3 +94,10 @@
 - **이번 개선:** [Draft PR #457](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/457) 읽기 전용 Git 상태 회수용 CMD+안내 2파일. 고정 source `61b15f51b5fb0e36460eec786b6198c14fd78cff`, source 정적14/14·독립 검토 GO. 승인 8파일+manifest만 검사하며 `git status` 선택적 잠금 비활성. branch 이름의 CMD 메타문자 주입 위험도 수정. **Windows 실제 진단 미실행**.
 - **NEXT / 담당:** 기존 Windows 일반 사용자 로컬 operator에서 #457 read-only CMD 단회 실행, `ZGMINI_MAINTENANCE_434_CHECKOUT_PREFLIGHT.txt` 한 개 회수. 승인 파일 tracked/로컬 main HEAD·원격 추적 SHA·scoped dirty·target ancestry에 따라 필요한 경우에만 안전한 정규 source 동기화 검토. 원래 #456 CMD 및 기존 TXT 재실행/삭제 금지. 이후 신규 단회 인계→새 maintainer SHA/receiver→다음 정상 B의 E 중복 보고서 0 검증.
 - **조정 증거:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68). 자동 pull/checkout, 임의 JSON 복사, Runner 자체 교체, RDC 사용 금지.
+
+## 9. #434 로컬 checkout 계보 확정 — 2026-11-06
+
+- **실제 사용자 Windows 읽기 전용 결과:** `READONLY_DIAGNOSTIC_COMPLETE`, `main` HEAD `91a6e085d69d35164c28cdfb8ff74cc67a6efd3b`, cached origin/main `50b8a54242525754fadb04b2a172ced884052daf`, approved manifest absent/untracked, 목표 `1d6f66d...` ancestor=false, 승인 9경로 scoped status clean. `HANDOFF_INVOKED=NO`, `SOURCE_UPDATE_ATTEMPTED=NO`.
+- **원인 확정:** GitHub 커밋 계보에서 local main은 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 승인 명세 병합 `14fa522c0b051801f6a12b64d872d7a50532d39e`보다 21커밋·16파일 뒤처졌으며 분기 충돌 0. 최신 remote main과는 45커밋·42파일 차이. 로컬 승인 파일 누락은 stale checkout 때문이고 JSON 1개 임의 복사로 helper의 Git ancestor/tracked 검사를 통과시키지 못한다.
+- **NEXT / 승인 범위:** 활성 source·다른 변경을 보호하면서 정확한 PR#443 merge까지의 로컬 main 단회 fast-forward가 필요한지 검토하고 **16파일 변경 범위에 대한 승인/안전조건**을 확정한다. 새 패킷 준비와 실제 source FF/Windows 유지보수기 인계·E 중복 보고서 검증은 모두 별도 단계. 자동 pull/checkout·Runner 자체 교체/이전 CMD 재실행 금지, #434 및 전체 4/5 유지.
+- **조정 원장:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68).
