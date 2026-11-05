@@ -27,6 +27,87 @@ const ISSUE_KEYS=[
   "schema","requestId","chatId","operation","controlRepository",
   "targetControllerSha","approvalManifestSha256",
 ];
+// The installed maintenance handoff permits exactly its original six tools.
+// Keep the R54 B admission fixed and self-contained in this existing file.
+// No imported R54 helper or Writer application code may be made a bootstrap
+// dependency of the live maintainer.
+export const R54_B_ISSUE_TITLE='pc-theme-nine-r54-sixfile-install';
+export const R54_B_OPERATION='theme-nine-r54-sixfile-install';
+export const R54_B_MANIFEST_SCOPE='R54_FIXED_SIXFILE_SOURCE_ONLY';
+const R54_B_SOURCE_SCHEMA='ZGMINI_R54_SIXFILE_B_ONE_TIME_TASK_HOLD_V2';
+export const R54_B_TASK_EXCEPTION=Object.freeze({
+ mode:'DISABLE_RESTORE_SAME_TASK_ONCE',
+ taskName:'ZGMINI-PC-Theme-Nine-R54-Public',
+ preserveOriginalXml:true,
+ preserveOriginalEnabledState:true,
+ waitForNaturalExit:true,
+ noForceTermination:true,
+ noOtherTaskChanges:true,
+ restoreOnlyAfterSixFileIntegrity:true,
+ noAutomaticRetry:true,
+});
+export const R54_B_SOURCE_FILES=Object.freeze([
+ Object.freeze({path:'scripts/pc-writer/theme-nine-r54-public-connect.mjs',
+  old:'c6e4699d62bdef991911561623e37c205fd8bb6e5aa69907c3e93e36908fd31e',
+  next:'8698389663d2e71c5684c4bcc2dd1e9b0a68d06cc002769b1d2a8e3e68289d3d'}),
+ Object.freeze({path:'scripts/pc-writer/theme-nine-r51-stage-current.mjs',
+  old:'fe079b1e2e5d2f824f6e0ff251bd2a01677fe1a477072c619b614402fbd90ae4',
+  next:'5a50761756be6081c71df7aa30869ed43547fbb867e476b7c581072939c27560'}),
+ Object.freeze({path:'scripts/pc-writer/theme-nine-r51-provisional-overlay.mjs',
+  old:'dfc326e2738c1b8b82451510104ac6ad502e2a9876e0a3a76d939c412e907bb7',
+  next:'7378d04bccea4c68ab93ce3b1b829b5bc0a742db49b88d1e7530482c4ea8b6cc'}),
+ Object.freeze({path:'scripts/pc-writer/theme-nine-r54-public-record.mjs',
+  old:'f2a688da40d7b5ee90ed2a27a40af05b9c63116284930f1cc26041064737d012',
+  next:'85686106412b2c4a5af51ce5de6b844729bad02441cf9bab1e51ae369a3a4a27'}),
+ Object.freeze({path:'scripts/pc-writer/theme-nine-r48-d1-publication.mjs',
+  old:'7a10fe41710dbc1a21c9f3e343c538cd96b6c5695b683f04dce48af85ede6e7e',
+  next:'fc55ee3a2c998a4dfa7c5edd9230a68fab3954dd745b39bbe39a6177363bf45a'}),
+ Object.freeze({path:'worker/theme-nine-r37-public.mjs',
+  old:'e6768dd37ebe65b9015aeb37b4a088c568ab839f085936cec8305c56ea36ce33',
+  next:'30326c94c7b6f0963329cc00f7a3649c906f8e884d6915a4da38005281bcfd85'}),
+]);
+export function validateR54BIssueEnvelope(request,{
+ controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+}={}){
+ if(controlRepository!==CONTROL_REPOSITORY||request?.controlRepository!==CONTROL_REPOSITORY
+  ||actor!==CONTROL_ACTOR||!Array.isArray(allowedActors)
+  ||!allowedActors.includes(CONTROL_ACTOR))
+  throw Error('R54_B_ISSUE_ORIGIN_DENIED');
+ requireKeys(request,ISSUE_KEYS,'R54_B_ISSUE_FIELDS_INVALID');
+ if(request.schema!==MAINTENANCE_ISSUE_SCHEMA||request.operation!==R54_B_OPERATION)
+  throw Error('R54_B_OPERATION_DENIED');
+ requireString(request.requestId,REQUEST_ID,'R54_B_REQUEST_ID_INVALID');
+ requireString(request.chatId,CHAT_ID,'R54_B_CHAT_ID_INVALID');
+ requireSha(request.targetControllerSha,'R54_B_CONTROLLER_PIN_INVALID');
+ requireDigest(request.approvalManifestSha256,'R54_B_MANIFEST_PIN_INVALID');
+ return Object.freeze({...request});
+}
+export function validateR54BManifestRequest(request,manifestBytes,{
+ controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+ installedSha=null,
+}={}){
+ const approved=validateR54BIssueEnvelope(request,{controlRepository,actor,allowedActors});
+ if(!SHA40.test(String(installedSha??''))||installedSha!==approved.targetControllerSha)
+  throw Error('R54_B_INSTALLED_CONTROLLER_DRIFT');
+ if(!Buffer.isBuffer(manifestBytes)||manifestBytes.length===0||manifestBytes.length>32768
+  ||sha256(manifestBytes)!==approved.approvalManifestSha256)
+  throw Error('R54_B_MANIFEST_DIGEST_DENIED');
+ let manifest;
+ try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
+ catch{throw Error('R54_B_MANIFEST_JSON_INVALID');}
+ requireKeys(manifest,['schema','status','scope','runCount',
+  'noProviderCalls','noD1Writes','noControllerChanges','files','taskStateException'],
+  'R54_B_MANIFEST_FIELDS_DENIED');
+ const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+ if(manifest?.schema!==R54_B_SOURCE_SCHEMA||manifest.status!=='APPROVED_B'
+  ||manifest.scope!==R54_B_MANIFEST_SCOPE||manifest.runCount!==1
+  ||manifest.noProviderCalls!==true||manifest.noD1Writes!==true
+  ||manifest.noControllerChanges!==true
+  ||!eq(manifest.taskStateException,R54_B_TASK_EXCEPTION)
+  ||!eq(manifest.files,R54_B_SOURCE_FILES))
+  throw Error('R54_B_MANIFEST_SCOPE_DENIED');
+ return Object.freeze({request:approved,manifest:Object.freeze({...manifest})});
+}
 // Independent B-grade host registration. The ordinary controller-update issue
 // and its eleven-field manifest remain unchanged.
 export const R6_HOST_OPERATION="employment-r6-host-register";
@@ -410,9 +491,8 @@ export function validateUpdateRequest(issue,manifestBytes,{
    if(!CONTROLLER_POST_OPERATIONS.includes(raw.postOperation)){
     throw Error("UPDATE_POST_OPERATION_NOT_ALLOWED");
   }
-  // Explicit opt-in: installing only controller/config bytes must not require
-  // re-approval of independently merged workflows not staged by this updater.
-  // Never allow this exception for host/heavy profiles or an infra approval.
+  // Explicit controller/config-only install does not stage unrelated merged
+  // scripts/workflows; live workflow changes remain outside this exception.
   if(Object.hasOwn(raw,'controllerOnlyInstall')&&
     (raw.controllerOnlyInstall!==true||
      raw.purpose!=='pc-controller-maintenance'||
@@ -462,12 +542,8 @@ export function validateInfrastructureDelta(paths,evidence,readBytes){
  return true;
 }
 
-// For an *explicitly* approved controller/config-only install, compare every
-// actual installed changed path to the exact allowFiles manifest. All unrelated
-// workflows/scripts were already merged into GitHub and are not staged by the
-// PC updater; requiring their combined B approval again is not a safety check
-// on this installation. A change to the live pc-job intake workflow is still
-// outside this limited contract and must be handled by the infrastructure lane.
+// Current main behavior: explicit controller-only approvals compare exactly
+// installed controller/config paths, without unapproved workflow mutations.
 export function validateControllerOnlyInstallDelta(paths,allowFiles){
  if(!Array.isArray(paths)||!Array.isArray(allowFiles)||
   paths.some(p=>typeof p!=='string'||p.includes('..')))
@@ -578,5 +654,4 @@ export function transitionLedger(ledger,event,evidence={}){
   }
   throw Error("UPDATE_TRANSITION_NOT_ALLOWED");
 }
-
 
