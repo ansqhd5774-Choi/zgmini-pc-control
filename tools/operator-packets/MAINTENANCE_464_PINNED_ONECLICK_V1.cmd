@@ -67,6 +67,10 @@ if errorlevel 1 (set "ZG_REASON=PINNED_SOURCE_NOT_PRESENT" & goto :stop)
 if not exist "%ZG_REPO%\approvals\maintenance-handoffs\%ZG_TARGET%.json" (set "ZG_REASON=APPROVAL_MANIFEST_MISSING" & goto :stop)
 call :scope_clean
 if errorlevel 1 (set "ZG_REASON=APPROVED_PATHS_DIRTY_AFTER_FF" & goto :stop)
+rem Before running even the helper itself, authenticate its bytes and all eight files
+rem against the exact pinned Git approval (also when local main is newer than the pin).
+"%ZG_NODE%" -e "try{const f=require('node:fs'),c=require('node:child_process'),h=require('node:crypto'),p=require('node:path'),r=process.argv[1],mp='approvals/maintenance-handoffs/%ZG_TARGET%.json';const show=(rev,n)=>c.execFileSync('git',['-C',r,'show',rev+':'+n],{windowsHide:true,maxBuffer:3000000});const raw=f.readFileSync(p.join(r,mp));if(!raw.equals(show('%ZG_MAIN_PIN%',mp)))process.exit(1);const a=JSON.parse(raw);if(a.schema!=='ZGMINI_MAINTENANCE_HANDOFF_V1'||a.approved!==true||a.targetSha!=='%ZG_TARGET%'||a.installedSha!=='%ZG_INSTALLED%')process.exit(1);const n=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs','tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];const sha=x=>h.createHash('sha256').update(x).digest('hex');process.exit(n.every(x=>sha(f.readFileSync(p.join(r,x)))===a.files?.[x]&&sha(show('%ZG_TARGET%',x))===a.files?.[x])?0:1)}catch{process.exit(1)}" "%ZG_REPO%" >nul 2>nul
+if errorlevel 1 (set "ZG_REASON=EXACT_EIGHT_FILE_OR_MANIFEST_HASH_MISMATCH" & goto :stop)
 >>"%ZG_REPORT%" echo PHASE=HANDOFF_INVOCATION_ATTEMPTED
 set "ZG_HANDOFF=YES"
 "%ZG_NODE%" "%ZG_REPO%\tools\handoff-maintenance.mjs" --source-sha %ZG_TARGET% >>"%ZG_REPORT%" 2>nul
