@@ -36,6 +36,133 @@ const safeCode=value=>typeof value==="string"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(val
 const isSha=value=>typeof value==="string"&&SHA40.test(value);
 const safeString=(value,pattern)=>typeof value==="string"&&pattern.test(value)?value:null;
 
+// One permanent Controller admission state, never one report per poll/request.
+// This is a source-only adapter: the production receiver does not activate it
+// until the manual B submission path shares the same resource lane.
+const CONTROLLER_LANE='controller-install';
+const CONTROLLER_LANE_SCHEMA='ZGMINI_CONTROLLER_ADMISSION_LANE_V1';
+const CONTROLLER_LANE_KEY=/^controller-install:[a-f0-9]{40}:[a-f0-9]{64}$/;
+const CONTROLLER_QUEUE_ID=/^[a-z0-9][a-z0-9-]{7,79}$/;
+const controllerLaneResult=(status,code,extra={})=>Object.freeze({status,code,...extra});
+function parseControllerLaneState(file){
+ if(!fs.existsSync(file))return null;
+ let record;
+ try{record=JSON.parse(fs.readFileSync(file,'utf8'));}catch{return false;}
+ if(record?.schema!==CONTROLLER_LANE_SCHEMA||record.lane!==CONTROLLER_LANE
+   ||!CONTROLLER_LANE_KEY.test(String(record.key??''))
+   ||!CONTROLLER_QUEUE_ID.test(String(record.queueId??''))
+   ||!['HELD','SETTLED'].includes(record.phase)
+   ||!Number.isSafeInteger(record.generation)||record.generation<1)
+  return false;
+ return record;
+}
+
+/**
+ * Exactly one fixed state and one fixed short-lived creation gate inside the
+ * already trusted maintainer root. The gate is atomic across processes; an
+ * orphan gate or malformed state is UNKNOWN and never reclaimed here.
+ * The existing exclusive receiver remains the sole authorized production
+ * writer. No automatic deletion of old admission/claim evidence is allowed.
+ */
+export function createControllerAdmissionLane({stateDir,now=()=>new Date().toISOString(),
+ verifyTerminalEvidence}={}){
+ const root=assertTrustedRoot(stateDir);
+ const file=path.join(root,'CONTROLLER_ADMISSION_LANE.json');
+ const gate=path.join(root,'CONTROLLER_ADMISSION_LANE_LOCK');
+ const swap=file+'.swap';
+ function underGate(work){
+  try{fs.mkdirSync(gate);}catch{
+   return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_GATE_OCCUPIED_OR_ORPHANED');
+  }
+  let outcome;
+  try{outcome=work();}
+  catch{outcome=controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_WRITE_UNCERTAIN');}
+  try{fs.rmdirSync(gate);}catch{
+   return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_GATE_RELEASE_UNCERTAIN');
+  }
+  return outcome;
+ }
+ function persist(next,existing){
+  const bytes=JSON.stringify(next)+'\n';
+  if(!existing){fs.writeFileSync(file,bytes,{flag:'wx',mode:0o600});return;}
+  // A crashed previous replacement must be reconciled; don't erase it.
+  if(fs.existsSync(swap))throw coded('QUEUE_LANE_SWAP_ORPHANED');
+  fs.writeFileSync(swap,bytes,{flag:'wx',mode:0o600});
+  fs.renameSync(swap,file);
+ }
+ function claim({lane,key,queueId}={}){
+  if(lane!==CONTROLLER_LANE||!CONTROLLER_LANE_KEY.test(String(key??''))
+   ||!CONTROLLER_QUEUE_ID.test(String(queueId??'')))
+   return controllerLaneResult('BLOCKED','QUEUE_LANE_INPUT_INVALID');
+  return underGate(()=>{
+   const prior=parseControllerLaneState(file);
+   if(prior===false||fs.existsSync(swap))
+    return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_STATE_UNCERTAIN');
+   if(prior?.phase==='HELD')
+    return controllerLaneResult('WAITING_RESOURCE','QUEUE_LANE_OCCUPIED',{acquired:false});
+   if(prior?.phase==='SETTLED'&&(prior.key===key||prior.queueId===queueId))
+    return controllerLaneResult('EXISTING','QUEUE_LANE_ALREADY_SETTLED',{acquired:false});
+   const next={schema:CONTROLLER_LANE_SCHEMA,lane,key,queueId,phase:'HELD',
+    generation:(prior?.generation??0)+1,createdAt:now()};
+   persist(next,prior!==null);
+   return controllerLaneResult('CLAIMED','QUEUE_LANE_CLAIMED',{acquired:true});
+  });
+ }
+ async function settle({lane,key,queueId}={}){
+  if(lane!==CONTROLLER_LANE||!CONTROLLER_LANE_KEY.test(String(key??''))
+   ||!CONTROLLER_QUEUE_ID.test(String(queueId??'')))
+   return controllerLaneResult('BLOCKED','QUEUE_LANE_INPUT_INVALID');
+  if(typeof verifyTerminalEvidence!=='function')
+   return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_TERMINAL_VERIFIER_MISSING');
+  let proof;
+  try{proof=await verifyTerminalEvidence({lane,key,queueId});}
+  catch{return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_TERMINAL_PROOF_UNCERTAIN');}
+  const safe=proof?.verified===true&&proof.key===key&&proof.queueId===queueId
+   &&Number.isSafeInteger(proof.issueNumber)&&proof.issueNumber>0
+   &&((['SUCCEEDED','PASS'].includes(proof.status)&&proof.postVerified===true)
+    ||(proof.status==='BLOCKED'&&proof.untouchedVerified===true)
+    ||(proof.status==='ROLLED_BACK'&&proof.rollbackVerified===true));
+  if(!safe)return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_TERMINAL_PROOF_UNVERIFIED');
+  return underGate(()=>{
+   const prior=parseControllerLaneState(file);
+   if(!prior||prior.key!==key||prior.queueId!==queueId)
+    return controllerLaneResult('STATE_UNKNOWN','QUEUE_LANE_OWNER_MISMATCH');
+   if(prior.phase==='SETTLED')
+    return controllerLaneResult('EXISTING','QUEUE_LANE_ALREADY_SETTLED');
+   persist({...prior,phase:'SETTLED',issueNumber:proof.issueNumber,
+    terminalStatus:proof.status,settledAt:now()},true);
+   return controllerLaneResult('SETTLED','QUEUE_LANE_TERMINAL_VERIFIED');
+  });
+ }
+ return Object.freeze({claim,settle,read:()=>parseControllerLaneState(file)});
+}
+
+/** OPEN pc-maintenance Issues often have completed local ledgers. The trusted
+ * outcome reader must verify the exact Issue and ledger identity itself.
+ * UNKNOWN/RECOVERY_REQUIRED are never a terminal release proof. */
+export async function readControllerLanePending({issues,readTrustedOutcome}={}){
+ if(!Array.isArray(issues)||typeof readTrustedOutcome!=='function')
+  return {authoritative:false,pending:null};
+ for(const issue of issues){
+  if(issue?.title!=='pc-controller-update')continue;
+  if(!Number.isSafeInteger(issue.number)||issue.number<1)
+   return {authoritative:false,pending:null};
+  let outcome;
+  try{outcome=await readTrustedOutcome(issue);}
+  catch{return {authoritative:false,pending:null};}
+  if(outcome?.verified!==true||outcome.issueNumber!==issue.number)
+   return {authoritative:false,pending:null};
+  const completed=outcome.safeTerminal===true
+   &&((['SUCCEEDED','PASS'].includes(outcome.status)&&outcome.postVerified===true)
+    ||(outcome.status==='BLOCKED'&&outcome.untouchedVerified===true)
+    ||(outcome.status==='ROLLED_BACK'&&outcome.rollbackVerified===true));
+  if(completed)
+   continue;
+  return {authoritative:true,pending:true};
+ }
+ return {authoritative:true,pending:false};
+}
+
 /**
  * Optional source-only bridge for the existing 60-second maintenance receiver.
  * The production receiver intentionally supplies no activation/adapters yet.
