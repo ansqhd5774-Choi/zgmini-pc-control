@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "05d40fd126758ac1cf9f05e4592266c0dc385b48",
+  "targetSha": "c66a629f2a52b232e92b90e42906795afa4cb657",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User-approved continuation on 2026-11-05 and standing approval in docs/PC_AUTOMATION_STANDARD.md section 5. Integrated PR #429 merged to exact commit c66a629f2a52b232e92b90e42906795afa4cb657. Last user-provided Windows handoff on 2026-11-05T10:06:56.075Z proved installed independent maintainer 05d40fd126758ac1cf9f05e4592266c0dc385b48 PASS. Controller is separate at 69c830275bd3fec75b17c8a98c46d689447fb1a7. Fresh Windows operator source/receiver verification required before any handoff mutation.",
+  "files": {
+    "tools/maintenance-contract.mjs": "6c11b85ab41011b4f5baf2958a6560f5613c83a98287d6a29b9db9d2f093fa47",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "67cc9ec6e5ee38c95b4ac42f09c8b41b165a150d893e112c91603b6cb144313d",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "346ed72046b47dbd37246192f9220c3fa4a456131efb8a4bbf9623e65215d581",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "178097c6ba3a86bf1caff0f8ff295412c1efed56fe0d9ba93d2946290e932764"
+  },
+  "checks": {
+    "command": "Isolated combined maintenance-agent/handoff/R54 B tests, 54/54 PASS; target GitHub eight-file blob identity verified against sourceSha 05d40fd and local SHA-256 measured for 3 changed files.",
+    "passed": 54,
+    "failed": 0,
+    "platform": "Linux Node isolated fixture + GitHub source checks ONLY; Windows operator handoff, Writer six-file SHA inventory and R54 runtime not yet executed."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "installed Controller and its source/config/workflows",
+    "Core/Korea/Iran task registrations",
+    "six GitHub Runner registrations",
+    "SQLite/D1, provider credentials and collection sources",
+    "R54 stored raw data, existing ten themes, request/checkpoint ledgers"
+  ],
+  "scopeNote": "Exact one-time independent-maintainer handoff of pinned eight source files to c66a629f. Six installed maintenance files change only where target bytes differ; handoff tool itself runs from main GitHub checkout. No Controller update, Writer/Task mutation, provider/D1 write or data reset. Windows medium-token operator-only handoff must verify actual installed maintainer SHA, git main ancestry and eight checkout/source SHA, receiver Windows origin, active install lease absence, backup and new receiver PASS. Do not rerun R54 #428. Old/next pinned Writer six SHA are still historical until live PC inventory."
+}
