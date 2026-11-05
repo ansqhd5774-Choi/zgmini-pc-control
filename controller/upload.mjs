@@ -1,5 +1,6 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages} from './common.mjs';
 import {uploadVerifiedReportPair} from './report-upload-verified.mjs';
+import {cleanupVerifiedJobTemps} from './report-temp-retention.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));
 const token=process.env.GITHUB_TOKEN;need(token,'REPORT_AUTH_MISSING');need(process.env.GITHUB_REPOSITORY===policy.controlRepository,'REPORT_REPOSITORY');
 const seat=process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1],runId=process.env.GITHUB_RUN_ID,attempt=process.env.GITHUB_RUN_ATTEMPT||'1';
@@ -17,4 +18,12 @@ const allComments=()=>readAllPages(async page=>{const r=await api(`issues/${poin
 let comments=await allComments();
 if(!comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker))){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await allComments();need(comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker)),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
 console.log(JSON.stringify({status:'REPORT_UPLOADED',issueNumber:pointer.issueNumber,resultFiles:files.length,artifactBytes:0,runUrl}));
+// The report is already published. An optional cleanup failure cannot cause a
+// duplicate execution, retroactively fail upload, or remove recovery evidence.
+let commentVerified=false;
+try{commentVerified=(await allComments()).some(x=>x.user?.login==='github-actions[bot]'&&x.body===body);}catch{}
+const cleanup=cleanupVerifiedJobTemps({root,runId,attempt,seat,issueNumber:pointer.issueNumber,
+ report,remoteFilesVerified:files.length===2,commentVerified});
+console.log(JSON.stringify({tempCleanup:cleanup.status,code:cleanup.code??null,removedFiles:cleanup.files??0}));
 }finally{releaseUpload();}
+
