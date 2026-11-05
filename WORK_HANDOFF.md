@@ -132,3 +132,10 @@
 - **LAST PASS:** 사용자 R3 실PC에서 E: 제어 저장소 `GIT_WORKTREE=true/EXIT=0`, `GIT_TOPLEVEL=E:/ZGmini/projects/zgmini-pc-control`, `main/EXIT=0`, 실제 HEAD `91a6e085d69d35164c28cdfb8ff74cc67a6efd3b/EXIT=0`, 승인 manifest 없음 확인. R2의 `NOT_GIT_REPOSITORY`는 진단기 결합 판정 오류였음. 이전 FF 후 HEAD 진전 없음이나 이전 호출 여부 자체는 UNKNOWN.
 - **개선:** 기존 [PR #458](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/458) Draft branch에 V2 파일 추가, commit `2346d8023b91938d20bf783f9c23bddb35be82e9`, CMD blob `7284a685303ec3ba37b64a6d33addf790e6c7962`. 보고서 TEMP/메모장/콘솔 pause, Git 판정 파이프 제거, branch byte exact, 불필요한 cached origin SHA equality 제거. 16 승인 경로·10 신규 충돌·install lease/filter/hook/목표 SHA 보호 유지. CRLF·ZIP hash/압축·독립 SOURCE GO.
 - **NEXT:** Windows 일반 사용자에서 신규 V2 단회 수행 후 `ZGMINI_MAINTENANCE_434_PINNED_FF_V2_RESULT.txt`로 `SOURCE_FF_PINNED_PASS`+HEAD/manifest 추적 증명. V1/R2 재실행 금지. 이후 V2 유지보수기 자체 인계는 별도 승인된 operator-only 절차와 실제 E 중복 보고 0 검증. 전체 4/5 운영 PASS 유지.
+
+
+## 11. 2026-11-06 #434 FF 실PC 성공과 유지보수기 인계 준비
+
+- **LAST PASS — Windows 소스 FF:** 사용자 원본 `ZGMINI_MAINTENANCE_434_PINNED_FF_V2_RESULT.txt`는 `PREFLIGHT=PASS`, `FF_PROCESS_EXIT=0`, `ACTUAL_HEAD_BEFORE=91a6e085d69d35164c28cdfb8ff74cc67a6efd3b`, `ACTUAL_HEAD_AFTER=14fa522c0b051801f6a12b64d872d7a50532d39e`, `SOURCE_FF_PINNED_PASS`, 16파일 FF를 실증함. `HANDOFF_INVOKED=NO`. 승인 manifest tracked/exist는 V2 사후 성공 조건에 포함.
+- **새 V2 설치 인계 source:** [Draft PR #456](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/456) head `4bf5e6606e5228c996ced7882b4be554ea9011b9`, `tools/operator-packets/MAINTENANCE_434_HANDOFF_V2_ONCE.cmd` Git blob `e243c0ffae1c182df637518f0beeb777993c605e`, Windows CRLF, 독립 SOURCE GO. 정확 HEAD `14fa…`/tracked manifest preflight 후 기존 `tools/handoff-maintenance.mjs --source-sha 1d6f…` **operator-only 1회**, 결과 `%TEMP%` 신규 TXT+Notepad+CMD pause. 기존 helper 설치 SHA/Receiver/lease/8해시/rollback 검사 재사용. 이전 #456 V1 CMD/TXT와 #458 FF V1/V2 재실행 금지.
+- **NEXT:** 다운로드 가능한 실행 파일 패키징(현재 로컬 executor 미가용 시 GitHub 소스 준비 완료만 보고) → 승인된 Windows operator-only 인계 1회 → 새 설치 SHA `1d6f…`·Receiver Origin 실증 → 다음 통상 승인 B의 E 신규 `MAINTENANCE_<requestId>.txt/json` 보고서 0 및 GitHub TXT/JSON 회수 확인. 새 B를 검증만 위해 중복 발행 금지. **#434 FINAL 미완료/전체 4/5.**
