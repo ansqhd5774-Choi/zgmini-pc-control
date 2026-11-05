@@ -34,7 +34,7 @@ if /i not "%ZG_HEAD%"=="%ZG_LOCAL_HEAD%" (set "ZG_REASON=LOCAL_SOURCE_HEAD_CHANG
 git -c core.optionalLocks=false -C "%ZG_REPO%" ls-files --error-unmatch -- "approvals/maintenance-handoffs/%ZG_TARGET%.json" >nul 2>&1
 if errorlevel 1 (set "ZG_REASON=APPROVAL_MANIFEST_NOT_TRACKED" & goto :preflight_stop)
 >>"%ZG_RESULT%" echo PREVALIDATION=PASS
->>"%ZG_RESULT%" echo PHASE=HANDOFF_INVOKED_ONCE
+>>"%ZG_RESULT%" echo PHASE=HANDOFF_INVOCATION_ATTEMPTED
 echo Source preflight PASS. Invoking approved Windows maintenance handoff once...
 rem The existing helper independently verifies main, approved 8 source hashes, installed SHA,
 rem receiver identity/origin, Windows medium token, active leases, backup and rollback.
