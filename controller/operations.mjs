@@ -9,6 +9,7 @@ import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectER1NovemberAvailability} from './market-calendar-er1-nov30-availability-readonly.mjs';
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
+import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
@@ -80,6 +81,10 @@ export async function runOperation(request,context){
  }
  if(request.operation==='us-breadth-r17-preflight')return inspectR17Windows();
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
+ if(request.operation==='release-calendar-runtime-readonly'){
+  let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
+  return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
+ }
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
