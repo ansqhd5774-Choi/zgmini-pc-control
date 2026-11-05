@@ -257,6 +257,7 @@ test("incomplete or suspicious settled ledger never enters the fast-path",async 
     entry=>({...entry,commentPosted:false}),
     entry=>({...entry,status:"UNKNOWN",result:{...entry.result,status:"UNKNOWN"}}),
     entry=>({...entry,commentUploadStatus:"REPORT_UPLOAD_PENDING",deliveryCommentPosted:false}),
+    entry=>({...entry,commentUploadStatus:undefined}),
     entry=>({...entry,issueNumber:999}),
   ]){
     const f=fixture(t,{issuePatch:{updatedAt:"2026-11-06T07:30:00Z"}});
