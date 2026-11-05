@@ -11,7 +11,7 @@ const R54_ACTION_PARTS=Object.freeze(['pc-writer','theme-nine-r54','scripts','pc
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const base=()=>({schema:'ZGMINI_R54_RUNTIME_BINDING_READONLY_V1',scope:'FIXED_R54_TASK_AND_ACTION_ONLY',
  taskName:R54_RUNTIME_TASK,taskXmlSha256:null,enabled:null,actionSha256:null,
- taskActionMatches:false,actionBytesMatch:false,workingDirectoryObserved:false,
+ taskActionMatches:false,actionBytesMatch:false,bindingVerified:false,workingDirectoryObserved:false,
  workingDirectoryStatus:'NOT_PRESENT',lastRun:'UNKNOWN',lastResult:'UNKNOWN',
  cycleEvidence:'UNVERIFIED_PATH',providerCalls:0,d1Writes:0,operationalWrites:0});
 const fail=(out,code,status='BLOCKED')=>({...out,status,code});
@@ -113,5 +113,5 @@ export function inspectR54RuntimeBinding({queryTask,hashAction=sha256,
  if(!out.actionBytesMatch)return fail(out,'R54_ACTION_SOURCE_DRIFT','FAIL');
  if(!out.enabled)return fail(out,'R54_TASK_DISABLED','FAIL');
  if(out.workingDirectoryObserved)return {...out,status:'PASS',code:'R54_TASK_ACTION_OBSERVED_WORKDIR_UNVERIFIED'};
- return {...out,status:'PASS',code:'R54_TASK_BINDING_VERIFIED'};
+ return {...out,status:'PASS',code:'R54_TASK_BINDING_VERIFIED',bindingVerified:true};
 }
