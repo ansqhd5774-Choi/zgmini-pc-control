@@ -116,7 +116,7 @@ test('unavailable comments and no terminal result remain missing, never zero suc
  assert.equal(r.coverage.excludedReasons.COMMENTS_UNAVAILABLE,1);
  assert.equal(r.coverage.excludedReasons.RESULT_UNAVAILABLE,1);
  assert.equal(r.queueWait.medianMs,null);
- assert.equal(r.peakObservedConcurrency,0);
+ assert.equal(r.peakObservedConcurrency,null);
 });
 
 test('only bot marker results count; user-shaped result comments are excluded',()=>{
