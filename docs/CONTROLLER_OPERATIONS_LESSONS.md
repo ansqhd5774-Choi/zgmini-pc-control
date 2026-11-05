@@ -115,3 +115,10 @@
 - **최소 개선:** [Draft PR #456](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/456)에서 새 인계 시스템 없이 기존 공식 인계 도구만 고정 목표 SHA로 1회 호출하는 다운로드 CMD와 STOP 안내를 준비했다. `git pull/checkout`, 재실행, 기존 TXT 덮어쓰기, 전체 dirty 강제 검사 없음. Node helper의 설치 SHA/8해시/lease/receiver/rollback 검증을 재사용한다.
 - **검증·한계:** 정확히 2파일, 정적 13/13 및 독립 리뷰 GO, 고정 원격 커밋 `ae129ef64d2af7d8d88a8ef1d6bddac0dc6fef3d`. 잘못된 사전 `HANDOFF_INVOKED` 표시는 `HANDOFF_INVOCATION_PREPARED`로 수정해 거짓 완료를 차단. **Windows 실행 0건 / 운영 #434 미완료 / 전체 4/5 유지**.
 - **재사용 규칙:** 자동 경로가 정말 없으면 승인된 기존 도구를 직접 호출하는 1회 다운로드 전달물을 제공한다. 사용자에게 명령·경로·SHA 복사를 요구하지 않고, PC 실행·Receiver와 중복 E 보고서 0건을 확인한 후에만 FINAL PASS 처리한다.
+
+### #434 승인 manifest 부재에서 배운 점 (2026-11-06)
+
+- **실제 관측:** 사용자 Windows 단회 인계 CMD가 `LOCAL_APPROVAL_MANIFEST_MISSING / HANDOFF_INVOKED=NO`로 안전 중단. 원격 main에 manifest가 있어도 로컬 checkout에는 부재할 수 있다. 해당 result에서는 main HEAD/dirty를 수집하지 않아 stale checkout 원인을 확정할 수 없다.
+- **과잉 조치 방지:** JSON 단순 복사는 untracked/dirty 및 target 조상 검사에 걸릴 수 있고 자동 `git pull`/checkout은 승인되지 않았다. 읽기 전용으로 로컬 main SHA·manifest tracked·승인 9파일 scoped status를 먼저 수집해 정확한 필요 변경만 판단한다.
+- **검증된 최소 개선:** [Draft PR #457](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/457) source 정적14/14 및 독립 리뷰 GO, 고정 커밋 `61b15f51b5fb0e36460eec786b6198c14fd78cff`. CMD 결과 파일 외 Git/PC 쓰기·인계 호출 0. 리뷰가 branch 변수 echo의 CMD 메타문자 주입 위험을 발견해 Git stdout 직접 파일 기록으로 수정. Windows 실제 실행은 아직 미검증.
+- **재사용 규칙:** 일회성 운영 인계 패킷도 실패 시 최소한의 읽기 전용 원인 진단까지 설계하여 사용자 재입력 횟수를 줄인다. `HANDOFF_INVOKED=NO`는 운영 설치 실패가 아니라 사전 차단이며, 기존 TXT 보존 후 별도의 신규 진단 파일을 사용한다. 5개 항목 최종 성과는 현재 **4/5**.
