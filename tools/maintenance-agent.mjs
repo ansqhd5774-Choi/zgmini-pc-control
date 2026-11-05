@@ -650,7 +650,7 @@ function verifyInstalledTools(root){
   const installed=JSON.parse(fs.readFileSync(path.join(root,"MAINTENANCE_INSTALL.json"),"utf8"));
   const expected=["tools/maintenance-contract.mjs","tools/maintenance-apply.mjs",
     "tools/maintenance-agent.mjs","tools/maintenance-lock.mjs","tools/update.mjs",
-    "tools/maintenance-ancestry.vbs"];
+    "tools/maintenance-ancestry.vbs","tools/maintenance-admission-queue.mjs"];
   if(installed.schema!=="ZGMINI_PC_MAINTENANCE_INSTALL_V1"
     ||Object.keys(installed.files??{}).length!==expected.length)throw coded("MAINTENANCE_SELF_MANIFEST_INVALID");
   for(const [rel,hash] of Object.entries(installed.files)){
@@ -728,5 +728,6 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
     process.exitCode=2;
   });
 }
+
 
 
