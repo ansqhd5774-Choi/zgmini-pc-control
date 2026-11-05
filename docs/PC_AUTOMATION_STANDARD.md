@@ -33,7 +33,7 @@
 
 실제 설치된 작업은 현재 schema의 pc-job Issue로 한 번 요청하고 TXT·JSON·댓글을 직접 회수한다. chatId·requestId는 계약의 정확한 UUID 형식으로 만들고 저장소·브랜치·대상 SHA·실행 SHA를 구분한다. status·code·lastPass·firstFail을 확인하며 Actions 성공·HTTP 200을 실제 작업 PASS로 대신하지 않는다.
 
-**결과 회수 경로:** 공용 조정 #68의 전체 댓글은 정상 개별 요청의 상태 조회 대상이 아니다. 원래 요청의 Issue 번호·requestId를 고정해 해당 Actions run/jobs와 검증된 결과 TXT/JSON을 직접 회수하고 댓글은 보조 알림으로 확인한다. `pc-job`은 `<runId>-<attempt>-seat-<seat>` 결과쌍, `pc-maintenance`는 `maintenance-<requestId>` 결과쌍과 영속 원장을 구분한다. `pc-job`의 성공 댓글은 원격 두 파일의 동일바이트 GET 검증 뒤에만 남긴다. 댓글 누락·도구 timeout·불명확 상태라면 해당 요청의 실행/결과/원장부터 확인하여 `STATE_UNKNOWN`과 다음 확인 조건을 남기고 업무 자체를 재실행하지 않는다. GitHub 댓글만으로 독립 일반챗/새 workflow가 자동 재개된다고 가정하지 않는다. 댓글 전체 페이지 검사는 중복 방지에 꼭 필요한 **그 요청 Issue**만 한정하며, 페이지 상한 도달 시 미발견으로 판정하지 않는다.
+**결과 회수 경로:** 공용 조정 #68의 전체 댓글은 정상 개별 요청의 상태 조회 대상이 아니다. 원래 요청의 Issue 번호·requestId를 고정해 검증된 결과 TXT/JSON을 직접 회수하고 댓글은 보조 알림으로 확인한다. Actions run/jobs/logs는 **`pc-job` 전용**이며, 독립 `pc-maintenance`는 해당 requestId의 결과쌍과 지원되는 기존 유지보수기 원장 경로로 확인한다. `pc-job`은 `<runId>-<attempt>-seat-<seat>` 결과쌍, `pc-maintenance`는 `maintenance-<requestId>` 결과쌍과 영속 원장을 구분한다. `pc-job`의 성공 댓글은 원격 두 파일의 동일바이트 GET 검증 뒤에만 남긴다. 댓글 누락·도구 timeout·원격 전달 불명확 시 해당 요청의 결과·실행 증거·접근 가능한 원장부터 확인한다. **실행 `PASS`/`FAIL`/`BLOCKED`가 이미 입증됐으면 그대로 보존**하고 결과 전달만 미확인/대기로 분리한다. 실행 결과 자체가 불명확할 때만 `STATE_UNKNOWN`으로 분류하며, 다음 확인 조건을 남기고 업무를 중복 실행하지 않는다. GitHub 댓글만으로 독립 일반챗/새 workflow가 자동 재개된다고 가정하지 않는다. 댓글 전체 페이지 검사는 중복 방지에 꼭 필요한 **그 요청 Issue**만 한정하며, 페이지 상한 도달 시 미발견으로 판정하지 않는다.
 
 작업이 미등록이면 기존 공통 실행기에 필요한 최소 모듈·명세를 준비하고 5절의 승인·검증된 경로로 등록한다. 허용목록 부재는 기술적 지원 미완료이며 그 자체가 새로운 사용자 승인 필요성을 뜻하지 않는다. 상시 승인만으로 미설치 실행기를 사용할 수도 없다. 임의 shell·SQL·다운로드 주소·스크립트로 우회하지 않는다.
 
