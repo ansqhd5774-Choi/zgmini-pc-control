@@ -108,3 +108,10 @@
 **한 줄 재사용 규칙:** 본문과 댓글의 유효한 최신 상태를 일치시키고, 실제 변경 파일이 겹치는 작업만 조정한다. 독립 업무는 계속한다. 소스 테스트·문서 개선을 PC 설치 완료로 확대하지 않는다.
 
 **5개 항목 범위별 FINAL PASS: 4/5.** #437 KPI 측정 기능(실 GitHub 17/17), #433 실PC R54 6/6 파일 SHA 인벤토리([#452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452#issuecomment-6665267226)), #435 업로더 remote GET 동일바이트 검증([#451](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/451#issuecomment-6665269127)·[#452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452#issuecomment-6665267226))이 각각 기능 목적에서 완료. #442는 [#454 정규 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/454#issuecomment-6665766623)·[#455 자동 A](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/455#issuecomment-6665761836)·Actions stdout `CLEANED/5`로 범위 내 FINAL PASS. **남은 1건은 #434 독립 유지보수기 Windows-local operator-only 자기 인계·중복 보고서 효과 실증**이며, #443 명세 병합만으로 완료 처리하지 않는다. R54 Worker Task 바인딩/설치 승인과 KPI 성능 개선 효과는 별도 범위이며 자동 PASS 확대 금지.
+
+### Windows 운영자 전용 인계의 1회 전달물 (2026-11-06)
+
+- **문제:** #434 소스 30/30·정확한 8파일 manifest [#443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443)는 준비됐으나 유지보수기의 자기 교체는 기존 `handoff-maintenance.mjs`가 Windows 일반 사용자 로컬 operator로만 허용한다. GitHub Runner/RDC 우회는 금지.
+- **최소 개선:** [Draft PR #456](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/456)에서 새 인계 시스템 없이 기존 공식 인계 도구만 고정 목표 SHA로 1회 호출하는 다운로드 CMD와 STOP 안내를 준비했다. `git pull/checkout`, 재실행, 기존 TXT 덮어쓰기, 전체 dirty 강제 검사 없음. Node helper의 설치 SHA/8해시/lease/receiver/rollback 검증을 재사용한다.
+- **검증·한계:** 정확히 2파일, 정적 13/13 및 독립 리뷰 GO, 고정 원격 커밋 `ae129ef64d2af7d8d88a8ef1d6bddac0dc6fef3d`. 잘못된 사전 `HANDOFF_INVOKED` 표시는 `HANDOFF_INVOCATION_PREPARED`로 수정해 거짓 완료를 차단. **Windows 실행 0건 / 운영 #434 미완료 / 전체 4/5 유지**.
+- **재사용 규칙:** 자동 경로가 정말 없으면 승인된 기존 도구를 직접 호출하는 1회 다운로드 전달물을 제공한다. 사용자에게 명령·경로·SHA 복사를 요구하지 않고, PC 실행·Receiver와 중복 E 보고서 0건을 확인한 후에만 FINAL PASS 처리한다.
