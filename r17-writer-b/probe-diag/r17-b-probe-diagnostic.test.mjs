@@ -30,6 +30,9 @@ const event=()=>({action:'opened',
 const normal='{"ok":true,"enabled":true,"state":3,"instances":0,"relatedProcesses":0,"unknownProcessLines":0}\r\n';
 const result=(stdout,status=0,stderr='')=>({status,stdout:Buffer.from(stdout),stderr:Buffer.from(stderr)});
 const taskXml='<Task><Settings><Enabled>true</Enabled><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy></Settings></Task>';
+const gitStage={status:'STOP',lastPass:'READ_TREE',firstFail:'APPLY_CHECK',
+  reason:'COMMAND_FAILED',exitCode:1,sourceWrites:0,taskWrites:0,
+  configWrites:0,installReruns:0};
 
 test('owner-only private A issue exactly gated, fixed probe digest',()=>{
   assert.equal(authorizeDiagnostic(event(),env()).requestId,REQUEST_ID);
@@ -101,6 +104,7 @@ test('mock executes exactly fixture + original probe via fixed single argv lane'
   const called=[];
   const raw=runReadOnlyDiagnostic({event:event(),env:env(),scriptRoot:ROOT,
     runTaskXml:()=>result(taskXml),
+    runGitStage:()=>gitStage,
     runCscript:(exe,script)=>{
       called.push({exe,script});
       return script.endsWith('echo-fixture.js')?
@@ -113,6 +117,7 @@ test('mock executes exactly fixture + original probe via fixed single argv lane'
   assert.equal(raw.fixture.shape,'FIXTURE_MAGIC_MATCH');
   assert.equal(raw.probe.shape,'EXPECTED_SUCCESS');
   assert.equal(raw.taskXml.shape,'EXPECTED_SETTINGS_ENABLED');
+  assert.equal(raw.gitStage.firstFail,'APPLY_CHECK');
   assert.equal(raw.installReruns,0);
   assert.equal(raw.sourceWrites,0);
   assert.equal(raw.taskWrites,0);
@@ -120,6 +125,7 @@ test('mock executes exactly fixture + original probe via fixed single argv lane'
   const safe=sanitizeDiagnosticResult(raw,REQUEST_ID,env().GITHUB_RUN_ID);
   assert.equal(safe.status,'DIAGNOSTIC_COMPLETE');
   assert.equal(safe.taskXml.enabledCount,1);
+  assert.equal(safe.gitStage.lastPass,'READ_TREE');
   assert.throws(()=>runReadOnlyDiagnostic({event:event(),env:env(),
     scriptRoot:'/nonexistent',runCscript:()=>result(normal)}));
 });
@@ -127,6 +133,7 @@ test('mock executes exactly fixture + original probe via fixed single argv lane'
 test('comment only once, never posts raw bytes or secrets and no other method',async()=>{
   const valid=runReadOnlyDiagnostic({event:event(),env:env(),scriptRoot:ROOT,
     runTaskXml:()=>result(taskXml),
+    runGitStage:()=>gitStage,
     runCscript:(_exe,script)=>script.endsWith('echo-fixture.js')?
       result('R17_B_WSH_OK\r\n'):result(normal)});
   let postBody,postCount=0;
@@ -150,4 +157,17 @@ test('missing result strictly unknown; invalid extra shape cannot be promoted',(
     requestId:REQUEST_ID,status:'DIAGNOSTIC_COMPLETE',fixture:{status:0}},
   REQUEST_ID,env().GITHUB_RUN_ID);
   assert.equal(status.status,'STATE_UNKNOWN');
+});
+
+test('Git stage evidence is enum-only and rejects unsafe command output or inconsistent PASS',()=>{
+  const baseline=runReadOnlyDiagnostic({event:event(),env:env(),scriptRoot:ROOT,
+    runTaskXml:()=>result(taskXml),runGitStage:()=>gitStage,
+    runCscript:(_exe,script)=>script.endsWith('echo-fixture.js')?
+      result('R17_B_WSH_OK\r\n'):result(normal)});
+  assert.equal(sanitizeDiagnosticResult(baseline,REQUEST_ID,env().GITHUB_RUN_ID)
+    .gitStage.firstFail,'APPLY_CHECK');
+  assert.equal(sanitizeDiagnosticResult({...baseline,gitStage:{...gitStage,
+    stdout:'CREDENTIALS'}},REQUEST_ID,env().GITHUB_RUN_ID).status,'STATE_UNKNOWN');
+  assert.equal(sanitizeDiagnosticResult({...baseline,gitStage:{...gitStage,
+    status:'PASS'}},REQUEST_ID,env().GITHUB_RUN_ID).status,'STATE_UNKNOWN');
 });
