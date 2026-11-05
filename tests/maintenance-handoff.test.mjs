@@ -1,7 +1,35 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
-import {requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus}from'../tools/handoff-maintenance.mjs';
+import {execFileSync}from'node:child_process';
+import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus}from'../tools/handoff-maintenance.mjs';
 import {acquireMaintenanceLock}from'../tools/maintenance-lock.mjs';
+test('handoff ignores unrelated checkout edits, still denies executable and approval edits',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-scope-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const git=args=>execFileSync('git',args,{cwd:dir});
+ const target='f'.repeat(40);
+ const source=['maintenance-contract.mjs','maintenance-apply.mjs','maintenance-agent.mjs',
+   'maintenance-lock.mjs','update.mjs','maintenance-ancestry.vbs',
+   'bootstrap-maintenance.mjs','handoff-maintenance.mjs'].map(name=>'tools/'+name);
+ const approval=`approvals/maintenance-handoffs/${target}.json`;
+ for(const rel of [...source,approval]){
+   const file=path.join(dir,rel);fs.mkdirSync(path.dirname(file),{recursive:true});
+   fs.writeFileSync(file,'approved bytes\n');
+ }
+ git(['init','-q']);git(['add','--',...source,approval]);
+ git(['-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','fixture']);
+ for(const rel of ['docs/work-in-progress.md','results/maintenance-result.txt']){
+   const file=path.join(dir,rel);fs.mkdirSync(path.dirname(file),{recursive:true});
+   fs.writeFileSync(file,'unrelated local edit\n');
+ }
+ assert.doesNotThrow(()=>requireHandoffCheckoutScope(target,git));
+ fs.writeFileSync(path.join(dir,source[0]),'modified execution source\n');
+ assert.throws(()=>requireHandoffCheckoutScope(target,git),/HANDOFF_CHECKOUT_DIRTY/);
+ fs.writeFileSync(path.join(dir,source[0]),'approved bytes\n');
+ fs.writeFileSync(path.join(dir,approval),'tampered approval\n');
+ assert.throws(()=>requireHandoffCheckoutScope(target,git),/HANDOFF_CHECKOUT_DIRTY/);
+ assert.throws(()=>requireHandoffCheckoutScope('../bad',git),/HANDOFF_PIN_REQUIRED/);
+});
 const prior={pid:123,nonce:'11111111-2222-3333-4444-555555555555',bootAt:1700000000000};
 const installed={sourceSha:'a'.repeat(40),startupSha256:'b'.repeat(64)};
 const proof={schema:'ZGMINI_PC_RECEIVER_ORIGIN_V1',pid:123,nonce:prior.nonce,
