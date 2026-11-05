@@ -2,11 +2,14 @@
 // The host MUST use a single, durable, atomic lane claim and trusted GitHub-main
 // approval readback. The current maintainer still revalidates before installation.
 import {validateMaintenanceRequest,validateUpdateRequest} from './maintenance-contract.mjs';
+import {createHash} from 'node:crypto';
 
 export const CONTROLLER_ADMISSION_LANE='controller-install';
 export const CONTROLLER_ADMISSION_SCHEMA='ZGMINI_CONTROLLER_ADMISSION_ITEM_V1';
 export const CONTROLLER_READY_FEED_SCHEMA='ZGMINI_CONTROLLER_READY_FEED_V1';
 export const CONTROLLER_READY_FEED_PATH='coordination/controller-admission-ready.json';
+const MAIN_API='/repos/ansqhd5774-Choi/zgmini-pc-control';
+const GIT_BLOB_SHA=/^[a-f0-9]{40}$/;
 const QUEUE_ID=/^[a-z0-9][a-z0-9-]{7,79}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA256=/^[a-f0-9]{64}$/;
@@ -98,6 +101,41 @@ export async function parseTrustedControllerReadyFeed({
    executionIntent:Object.freeze({...item.executionIntent})}));
  }
  return result('READY','QUEUE_READY_FEED_VERIFIED',{items:Object.freeze(items)});
+}
+
+function decodeGitHubReadyBase64(record){
+ if(!record||record.encoding!=='base64'||typeof record.content!=='string')return null;
+ const encoded=record.content.replace(/\s/g,'');
+ if(!encoded||encoded.length>45000
+  ||!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded))
+  return null;
+ const bytes=Buffer.from(encoded,'base64');
+ if(bytes.length<2||bytes.length>32768||bytes.length!==record.size)return null;
+ return bytes;
+}
+
+/** Read-only authenticated GitHub main GET of the fixed empty-by-default READY
+ * feed. This never opens an Issue; B execution authorization is a separate
+ * trusted callback verified by the actual host. Not wired into maintainer. */
+export async function readTrustedControllerReadyFromGitHub({
+ githubGet,verifyBExecutionApproval,allowedActors,
+}={}){
+ if(typeof githubGet!=='function')
+  return result('STATE_UNKNOWN','QUEUE_GITHUB_GET_ADAPTER_MISSING');
+ let source;
+ try{source=await githubGet(`${MAIN_API}/contents/${CONTROLLER_READY_FEED_PATH}?ref=main`);}
+ catch{return result('STATE_UNKNOWN','QUEUE_READY_MAIN_GET_UNCERTAIN');}
+ if(source?.type!=='file'||source.path!==CONTROLLER_READY_FEED_PATH
+  ||!GIT_BLOB_SHA.test(String(source.sha??'')))
+  return result('STATE_UNKNOWN','QUEUE_READY_MAIN_METADATA_UNVERIFIED');
+ const bytes=decodeGitHubReadyBase64(source);
+ if(!bytes)return result('STATE_UNKNOWN','QUEUE_READY_MAIN_BYTES_UNVERIFIED');
+ const blobSha=createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+ if(blobSha!==source.sha)
+  return result('STATE_UNKNOWN','QUEUE_READY_MAIN_SHA_MISMATCH');
+ return parseTrustedControllerReadyFeed({bytes,sourceRepository:EXPECTED_REPOSITORY,
+  sourceRef:'main',sourcePath:CONTROLLER_READY_FEED_PATH,
+  mainReadbackVerified:true,verifyBExecutionApproval,allowedActors});
 }
 
 function priorOutcome(prior,key,request,allowedActors){
