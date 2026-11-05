@@ -56,7 +56,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   title="pc-controller-update",issuePatch={},manifestPatch={},
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
-  verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null}={}){
+   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
+   extraIssueSummaries=[]}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -79,7 +80,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify({isPrivate:privateRepo,nameWithOwner:REPO})};
       }
       if(args[0]==="issue"&&args[1]==="list"){
-        return {stdout:JSON.stringify([{number:issue.number}])};
+        assert.equal(args[args.indexOf('--json')+1],'number,title');
+        return {stdout:JSON.stringify([{number:issue.number,title:issue.title},...extraIssueSummaries])};
       }
       if(args[0]==="issue"&&args[1]==="view"){
         return {stdout:JSON.stringify(issue)};
@@ -183,6 +185,17 @@ test("authorized private-repo issue starts one standalone updater and persists r
   assert.equal(f.stats.uploadWrites,2);
 });
 
+test('unrelated open maintenance Issues are skipped before individual GitHub reads',async t=>{
+ const f=fixture(t,{extraIssueSummaries:[
+   {number:73,title:'unrelated-diagnostic'},{number:74,title:'another-maintenance-task'}]});
+ const result=await f.agent.pollOnce();
+ assert.equal(result.length,1);
+ assert.equal(result[0].status,'SUCCEEDED');
+ assert.equal(f.stats.applies,1);
+ assert.equal(f.calls.filter(c=>c.args[0]==='issue'&&c.args[1]==='view'&&
+   ['73','74'].includes(c.args[2])).length,0);
+});
+
 test("an active global install lease keeps another request queued without claiming it",async t=>{
  const f=fixture(t,{installLock:{held:true,recoveryRequired:false,ownerPid:999}});
  const result=await f.agent.pollOnce();
@@ -240,7 +253,8 @@ test("non-owner actor, missing label, title mismatch and closed issue are ignore
   ]){
     const f=fixture(t,variant);
     const output=await f.agent.pollOnce();
-    assert.equal(output[0].status,"IGNORED");
+    if(variant.title)assert.deepEqual(output,[]);
+    else assert.equal(output[0].status,"IGNORED");
     assert.equal(f.stats.applies,0);
     assert.equal(f.stats.manifestReads,0);
   }
