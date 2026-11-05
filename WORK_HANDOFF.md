@@ -101,3 +101,11 @@
 - **원인 확정:** GitHub 커밋 계보에서 local main은 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 승인 명세 병합 `14fa522c0b051801f6a12b64d872d7a50532d39e`보다 21커밋·16파일 뒤처졌으며 분기 충돌 0. 최신 remote main과는 45커밋·42파일 차이. 로컬 승인 파일 누락은 stale checkout 때문이고 JSON 1개 임의 복사로 helper의 Git ancestor/tracked 검사를 통과시키지 못한다.
 - **NEXT / 승인 범위:** 활성 source·다른 변경을 보호하면서 정확한 PR#443 merge까지의 로컬 main 단회 fast-forward가 필요한지 검토하고 **16파일 변경 범위에 대한 승인/안전조건**을 확정한다. 새 패킷 준비와 실제 source FF/Windows 유지보수기 인계·E 중복 보고서 검증은 모두 별도 단계. 자동 pull/checkout·Runner 자체 교체/이전 CMD 재실행 금지, #434 및 전체 4/5 유지.
 - **조정 원장:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68).
+
+
+## 7. 2026-11-06 #434 고정 FF 인계 준비 (최신)
+
+- **LAST PASS — 진단 실행물 개선 실증:** 사용자 Windows 반환 `ZGMINI_MAINTENANCE_434_CHECKOUT_PREFLIGHT.txt`에서 `READONLY_DIAGNOSTIC_COMPLETE` 확인. 첫 CMD는 승인 JSON 없음에서 중단돼 로컬 branch/HEAD를 확인하지 못했으나, [Draft PR #457](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/457) 별도 읽기 전용 진단에서는 `main`/`91a6e085d69d35164c28cdfb8ff74cc67a6efd3b`/`origin/main=50b8a54242525754fadb04b2a172ced884052daf`를 모두 조회(exit 0). 따라서 **진단 누락 결함은 실제 Windows 실행으로 해결**. 인계/소스 변경은 수행하지 않음.
+- **FIRST FAIL — #434 본체 인계 준비:** 로컬 Windows checkout에는 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 승인 manifest가 존재·추적되지 않음. 정확한 병합 SHA `14fa522c0b051801f6a12b64d872d7a50532d39e` 대비 로컬 HEAD는 21커밋·16파일 이전, 무분기. manifest를 임의 복사하거나 최신 원격 main 전체 pull하지 않음.
+- **사용자 조건부 승인과 source 준비:** Windows 로컬 `main`의 정확한 `91a6…`→`14fa522…` **단회 고정 fast-forward만** 승인. 전담 작성·독립 정적 리뷰 GO. [Draft PR #458](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/458) head `0729e41c1dd6065a530819cde2624600dc91344e`, 2파일 패킷. CMD blob `57086d4403a5118be16655a3ee7b31cd574febac`; 기존 16경로 dirty·새 파일 충돌·install lease·HEAD CAS·cached origin·hooks/filter 검사; `fetch/pull`/무단 설치/중복 재실행 없음. **source 검증 GO ≠ Windows 실운영 실행**.
+- **다음 한 단계:** 로컬 Windows 일반 사용자 환경에서 다운로드 `MAINTENANCE_434_PINNED_FF_ONCE.cmd`를 한 번 실행하고 **새 결과** `ZGMINI_MAINTENANCE_434_PINNED_FF_RESULT.txt`만 회수. `SOURCE_FF_PINNED_PASS`이면 이전 #456 CMD를 재실행하지 않고 별도 V2 유지보수기 인계 패킷 준비 → 승인된 Windows-local Receiver 인계 및 E: 새 보고서 0 검증. 실패/UNKNOWN이면 TXT 보존·재실행 금지. 전체 5건 중 **4건 FINAL PASS, #434는 최종 검증 전**.
