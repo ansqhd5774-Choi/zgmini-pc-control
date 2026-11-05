@@ -72,3 +72,15 @@
 **다음 필수 실행 하나:** 기존 [#68 단일 B 설치 담당](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6657001707)이 실제 설치 SHA·lease를 확인하고 #431 정확한 4파일 명세의 단회 설치 요청·결과를 회수한다. 동시에 독립 #434 유지보수기 인계 준비와 #435 별도 승인·파일 검토는 기존 담당자가 이어가며, 총괄은 새로운 요청을 중복 생성하지 않는다.
 
 **이 인계의 한계:** 브랜치 문서 갱신은 `main` 병합·B 승인·PC 설치·E: 삭제를 수행한 것이 아니다. 최신 운영 판단에는 #68과 실제 원본 결과를 다시 대조한다.
+
+## 6. 2026-11-06 검증된 후속 상태 (역사 스냅샷)
+
+- **공용 상태 정정:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 본문 선두에 최신 유효 증거·단일 담당·의존성 요약을 반영. 이전 역사 기록은 보존. Google SRE의 역할 분리·상태 공유 원칙을 참고했으나 운영 효과는 미측정.
+- **사용자 명시 인계:** #434의 독립 유지보수기 인계 **실행 담당만** 총괄 관리 아래 `b434_installer`로 지정. 기존 R17 담당은 #431 Controller 설치와 공용 B 조정을 계속 소유. 담당 지정은 설치 성공이 아니며 Windows-local 운영 경로 확인·B 접수·PC 설치는 0건.
+- **#434 준비:** 현재 확인된 유지보수기 `c66a629f2a52b232e92b90e42906795afa4cb657`와 대상 8파일 중 변경은 `tools/maintenance-agent.mjs` 1파일. 정확한 신규 인계 manifest·8파일 해시·Windows Receiver/lease 확인이 필요. #431 완료는 이 독립 인계의 기술적 선행조건이 아님.
+- **#433/#435/#434:** `main` 소스 병합, 각 신규 운영 적용 증거 미확인. #431·#433은 `operations.json`·`operations.mjs` 2파일 중첩, #435는 #431과 직접 변경 파일 중첩 없음.
+- **#442 E: 정리:** [Draft PR #442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) 소스에서 JSON/TXT 불일치 시 삭제 중단, 격리 테스트 **19/19 PASS**, 실제 Windows/E: 삭제·운영 적용 0건. #435 실제 TXT·JSON·댓글 재조회가 선행.
+- **#437 KPI:** [Draft PR #437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) 실제 GitHub `pc-job` 17건의 측정 기준선 확보. `queueWait`=Issue 생성→Controller 시작, `execution`=Controller 전체 처리시간. 설치 전후 개선 효과는 미측정.
+- **5건 최종 완료 판정:** 운영·효과까지 포함한 `FINAL PASS` **0/5**. 개발 병합·격리 테스트·기초 측정을 완료로 확대하지 않음. 정확한 관측 근거는 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)과 각 원본 PR/Issue에서 확인.
+
+**다음 단일 지원 행동:** #434 전담 담당이 Windows-local 인계 경로·현재 installed SHA·승인 manifest 준비 결과를 반환하면 총괄은 공용 B 순서/잠금 충돌만 조정한다. #431은 R17 담당이 기존 승인 범위로 진행하며, 무관한 A 작업은 계속한다.
