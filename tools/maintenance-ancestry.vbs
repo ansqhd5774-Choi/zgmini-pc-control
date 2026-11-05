@@ -102,7 +102,9 @@ If WScript.Arguments.Count=1 And UCase(CStr(WScript.Arguments(0)))="R54_SCAN" Th
   r54Flag="0"
   If InStr(r54Text,"theme-nine-r54")>0 Or InStr(r54Text,"theme_nine_r54")>0 _
    Or InStr(r54Text,"theme-ten-r78")>0 Or InStr(r54Text,"theme-ten-r80")>0 _
-   Or InStr(r54Text,"theme-ten-r79")>0 Or InStr(r54Text,"theme-ten-r81")>0 Then
+   Or InStr(r54Text,"theme-ten-r79")>0 Or InStr(r54Text,"theme-ten-r81")>0 _
+   Or InStr(r54Text,"theme-nine-r51")>0 Or InStr(r54Text,"theme-nine-r48")>0 _
+   Or InStr(r54Text,"theme-nine-r37")>0 Then
    r54Flag="1"
   ElseIf (r54Name="node.exe" Or r54Name="cmd.exe" Or r54Name="cscript.exe" _
    Or r54Name="wscript.exe") And (r54Cmd="" Or r54Exe="") Then
