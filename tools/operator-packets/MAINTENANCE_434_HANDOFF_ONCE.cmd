@@ -25,7 +25,7 @@ if not "%ZG_BRANCH%"=="main" (set "ZG_REASON=HANDOFF_MAIN_REQUIRED" & goto :pref
 (
   echo SCHEMA=ZGMINI_MAINTENANCE_434_OPERATOR_PACKET_V1
   echo TARGET_SHA=%ZG_TARGET%
-  echo PHASE=ONE_TIME_HANDOFF_INVOKED
+  echo PHASE=HANDOFF_INVOCATION_PREPARED
 ) >"%ZG_REPORT%"
 if errorlevel 1 (
   echo STOP: cannot create result file. Handoff was not invoked.
