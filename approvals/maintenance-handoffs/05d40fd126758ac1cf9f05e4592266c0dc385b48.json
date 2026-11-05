@@ -1,10 +1,10 @@
 {
   "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
-  "installedSha": "5469548b05ba90f3855281e94234952bdb45fa4f",
+  "installedSha": "69c830275bd3fec75b17c8a98c46d689447fb1a7",
   "targetSha": "05d40fd126758ac1cf9f05e4592266c0dc385b48",
   "approved": true,
   "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
-  "approvalBasis": "2026-11-03 standing approval in docs/PC_AUTOMATION_STANDARD.md §5 for validated maintainer policy handoff; user's 2026-11-05 continuation of R54 exactly six-Writer-file plus one Task restoration. Last read-only PC evidence in issue #68 reports installed maintainer 5469548b...; the Windows handoff must independently verify this exact installed SHA and all protected live state immediately before any mutation.",
+  "approvalBasis": "2026-11-03 standing approval in docs/PC_AUTOMATION_STANDARD.md §5 for validated maintainer policy handoff; 2026-11-05 R54 continuation restricted to approved six Writer files and one R54 Task. Verified Windows receiver handoff PASS from 5469548... to maintainer source 69c830275bd3fec75b17c8a98c46d689447fb1a7 in #68 issue comment 6640246017. #345 separately confirms Controller actual SHA 69c830...; subsequent ER1/R54 source changes are GitHub-only as last observed. Windows must freshly verify actual maintainer installation before mutation.",
   "files": {
     "tools/maintenance-contract.mjs": "6c11b85ab41011b4f5baf2958a6560f5613c83a98287d6a29b9db9d2f093fa47",
     "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
@@ -30,5 +30,5 @@
     "SQLite/D1, provider credentials and collection sources",
     "R54 stored raw data, existing ten themes, request/checkpoint ledgers"
   ],
-  "scopeNote": "Only pinned eight independent-maintainer tool bytes. No arbitrary shell, no Controller installation, no Writer or scheduler mutation from this manifest. Windows operator-only medium-token in-place handoff must verify the exact installed 5469548... SHA, WMI Startup receiver origin, no install lease, protective backup and fresh reconnect; mismatch fails closed. After proven maintenance handoff, a separate approved one-shot B request may install exactly R54 six Writer files and one R54 Scheduled Task. Main source approval does not imply PC installation."
+  "scopeNote": "Only pinned eight independent-maintainer tool bytes. Current last verified maintainer source baseline 69c830275bd3fec75b17c8a98c46d689447fb1a7 (not stale 5469548...). Target 05d40... includes existing ER1-compatible changes and R54 six-file one-shot receiver, without requiring a redundant intermediate handoff to 289cfda.... No Controller installation, Writer or Task mutation under this manifest. Windows medium-token operator-only tool must compare current MAINTENANCE_INSTALL.json to pinned source, prove WMI Startup receiver origin, no install lease, verified backup and fresh reconnect; any drift aborts. Separate approved one-shot B request is required for R54 six Writer files and one Task. This is source approval, not Windows install evidence."
 }
