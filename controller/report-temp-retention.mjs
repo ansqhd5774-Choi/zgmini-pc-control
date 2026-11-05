@@ -90,6 +90,14 @@ export function cleanupVerifiedJobTemps({
   if(!isDeepStrictEqual(result,report)||
    !isDeepStrictEqual(workerResult,report.result))
    return skipped('WORKSPACE_RESULT_MISMATCH');
+  // The engine and uploader derive this text from the same report fields.
+  // A differing local copy is evidence to retain, even after remote upload.
+  const expectedText=Object.entries(report)
+   .filter(([key])=>key!=='result'&&key!=='prior')
+   .map(([key,value])=>`${key}=${typeof value==='object'?JSON.stringify(value):value}`)
+   .join('\r\n')+'\r\n';
+  if(!fs.readFileSync(path.join(workspace,'RESULT.txt')).equals(Buffer.from(expectedText,'utf8')))
+   return skipped('WORKSPACE_RESULT_MISMATCH');
 
   // Remove the pointer last: an interrupted cleanup remains inspectable.
   for(const name of expected)fs.unlinkSync(path.join(workspace,name));
