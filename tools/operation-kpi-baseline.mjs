@@ -149,7 +149,7 @@ export function summarizeGithubPcJobMetrics(rows){
    excludedIssues:Object.values(excludedReasons).reduce((a,b)=>a+b,0),excludedReasons,duplicateIssueIds:duplicates},
   statusCounts:statuses,codeCounts:codes,
   queueWait:timings(waits),execution:timings(durations),
-  observedRunnerSeats:[...seats].sort((a,b)=>a-b),peakObservedConcurrency:peak,
+  observedRunnerSeats:[...seats].sort((a,b)=>a-b),peakObservedConcurrency:intervals.length?peak:null,
   notMeasured:['approvalToSubmissionMs','manualInterventionRate','eDriveGrowthBytes','unobservedConcurrency'],
   githubWrites:0,pcWrites:0,eDriveWrites:0};
 }
