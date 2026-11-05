@@ -32,6 +32,7 @@ const result=(stdout,status=0,stderr='')=>({status,stdout:Buffer.from(stdout),st
 const taskXml='<Task><Settings><Enabled>true</Enabled><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy></Settings></Task>';
 const gitStage={status:'STOP',lastPass:'READ_TREE',firstFail:'APPLY_CHECK',
   reason:'COMMAND_FAILED',exitCode:1,alternative:'NOT_TESTED',
+  normalization:{localCycle:'NOT_TESTED',runLocal:'NOT_TESTED'},
   sourceWrites:0,taskWrites:0,
   configWrites:0,installReruns:0};
 
