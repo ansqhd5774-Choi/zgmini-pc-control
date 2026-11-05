@@ -77,3 +77,12 @@
 **이 인계의 한계:** 브랜치 문서 갱신은 `main` 병합·B 승인·PC 설치·E: 삭제를 수행한 것이 아니다. 최신 운영 판단에는 #68과 실제 원본 결과를 다시 대조한다.
 
 **기존 5건 범위별 최종 판정:** **4/5 FINAL PASS** — #437 KPI 측정(실 GitHub 17/17·14/14), #433 R54 설치 6파일 SHA 회수([#452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452#issuecomment-6665267226)), #435 실제 원격 TXT/JSON 동일바이트 재조회([#451](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/451#issuecomment-6665269127)·[#452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452#issuecomment-6665267226))가 기능별 완료 기준에 도달. #442 E: 임시 결과 정리 [#454 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/454#issuecomment-6665766623)·[#455 A](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/455#issuecomment-6665761836)·Actions `CLEANED/5` 검증으로 FINAL PASS. **#434 유지보수기 Windows-local 인계·중복 보고서 효과 1건만 미완료**. KPI 전후 성능 개선과 R54 Task 바인딩은 별도 미검증; 완료를 확장하지 않는다.
+
+## 7. 2026-11-06 #434 Windows 인계 패킷 — 운영 미적용
+
+- **현재 최종 통과:** 기존 5개 공통 문제 중 **4/5**. #433·#435·#437·#442는 실제 기능 검증 완료. 남은 #434 독립 유지보수기 중복 보고서 방지 운영 검증만 미완료.
+- **명시 인계:** 설치 패킷 담당 `b434_windows_handoff`, 별도 독립 안전 검토 `b434_manifest_audit`. #434 소스 [PR #434](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434), 승인된 8파일 명세 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 재사용.
+- **새 준비물:** [Draft PR #456](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/456)의 Windows 일반 사용자 로컬 1회 CMD+안내 2파일, 고정 커밋 `ae129ef64d2af7d8d88a8ef1d6bddac0dc6fef3d`. 승인 목표 SHA `1d6f66d87c0ff247ba75b4c98682c07c646e79cc`. 파일 원격 바이트 재조회·정적 13/13·독립 검토 GO이며 main/PC 설치·Windows 실운영 변경 0.
+- **안전·운영 한계:** CMD는 기존 `tools/handoff-maintenance.mjs`를 정확히 1회 호출하고 자체 재시도·Git pull/checkout·PowerShell/RDC/Runner·관리자 권한 상승 없음. 승인/설치 SHA/lease/receiver/rollback 판정은 기존 인계 프로그램이 수행. 현재 Windows-local operator 실행 수단이 없어 `AUTOMATION_BLOCKED`, **FINAL PASS 아님**. 실행 실패/불명확 상태라면 결과 TXT 보존, 재시도 금지.
+- **다음 최소 실행:** 기존 Windows PC 일반 사용자 로컬 세션에서 다운로드한 검증된 CMD 단회 실행 → `MAINTAINER_HANDOFF_PASS` 및 실제 설치 SHA·Receiver origin 확인 → 다음 정상 B 처리에서 신규 E: 중복 보고서 0건 관측. GitHub 원본 실행 파일이 필요하면 PR #456 고정 커밋에서 내려받는다. user에게 명령/SHA/경로 수정을 요구하지 않는다.
+- **조정 원장:** [Issue #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68). 이미 완료된 #431/#449/#454 B는 다시 발행하지 않는다.
