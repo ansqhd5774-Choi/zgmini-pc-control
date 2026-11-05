@@ -645,8 +645,9 @@ export function createMaintenanceAgent({
         &&ledger.result?.status===ledger.status
         &&ledger.result?.targetControllerSha===ledger.targetControllerSha
         &&ledger.reportUploadStatus==="VERIFIED"&&ledger.commentPosted===true
-        &&(ledger.commentUploadStatus!=="REPORT_UPLOAD_PENDING"
-          ||ledger.deliveryCommentPosted===true);
+        &&(ledger.commentUploadStatus==="VERIFIED"
+          ||(ledger.commentUploadStatus==="REPORT_UPLOAD_PENDING"
+            &&ledger.deliveryCommentPosted===true));
     }catch{return false;}
   }
   async function pollOnce(){
