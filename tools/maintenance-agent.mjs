@@ -11,7 +11,7 @@ import {fileURLToPath,pathToFileURL} from "node:url";
 import {validateMaintenanceRequest,validateUpdateRequest,
   validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
-  R54_B_ISSUE_TITLE,R54_B_OPERATION} from "./maintenance-contract.mjs";
+  R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
@@ -144,24 +144,45 @@ export function failedUpdaterResult(request,error,status){
   firstFail:exact?output.code:'UPDATE_OUTCOME_UNKNOWN',actualControllerSha:status?.actualControllerSha,
   lastPass:untouched?'PRE_INSTALL_REJECTED':'NONE'},exact?output.code:'UPDATE_OUTCOME_UNKNOWN');
 }
-function normalizedResult(request,result,code){
+const SHA256=/^[a-f0-9]{64}$/;
+const R54_SOURCE_STATES=new Set(['OLD','NEXT','UNKNOWN','MISSING']);
+function safeR54SourceInventory(request,from){
+  if(request.operation!==R54_B_OPERATION||!Array.isArray(from.sourceInventory)
+    ||from.sourceInventory.length!==R54_B_SOURCE_FILES.length)return null;
+  const rows=[];
+  for(let i=0;i<R54_B_SOURCE_FILES.length;i++){
+    const pin=R54_B_SOURCE_FILES[i],row=from.sourceInventory[i];
+    if(!row||row.path!==pin.path||row.expectedOld!==pin.old
+      ||row.approvedNext!==pin.next||!R54_SOURCE_STATES.has(row.state)
+      ||!(row.actual===null||typeof row.actual==='string'&&SHA256.test(row.actual))
+      ||(row.state==='MISSING')!==(row.actual===null))return null;
+    rows.push({path:pin.path,state:row.state,actual:row.actual,
+      expectedOld:pin.old,approvedNext:pin.next});
+  }
+  return rows;
+}
+export function normalizedResult(request,result,code){
   const from=result&&typeof result==="object"?result:{};
   const status=from.status==="PASS"?"SUCCEEDED"
     :from.status==="ROLLED_BACK"?"FAILED"
     :from.status==="RECOVERY_REQUIRED"?"UNKNOWN"
     :["SUCCEEDED","FAILED","BLOCKED","UNKNOWN"].includes(from.status)
       ?from.status:"UNKNOWN";
+  const inventory=safeR54SourceInventory(request,from);
   return {
     schema:"ZGMINI_PC_MAINTENANCE_RESULT_V1",
     requestId:request.requestId,targetControllerSha:request.targetControllerSha,
     status,code:safeCode(code??from.code??"UNKNOWN_OUTCOME"),
     lastPass:safeCode(from.lastPass??"NONE"),
-    firstFail:safeCode(from.firstFail??"NONE"),
+    firstFail:safeCode(from.firstFail??(request.operation===R54_B_OPERATION
+      &&status==='BLOCKED'?(code??from.code):'NONE')),
     actualControllerSha:isSha(from.actualControllerSha??from.actualInstalledSha)
       ?(from.actualControllerSha??from.actualInstalledSha):null,
     recoverySha:isSha(from.recoverySha)?from.recoverySha:null,
     protectedStateUnchanged:from.protectedStateUnchanged===true,
-    workflowEnabled:from.workflowEnabled===true,
+    workflowEnabled:typeof from.workflowEnabled==='boolean'
+      ?from.workflowEnabled:request.operation===R54_B_OPERATION?null:false,
+    ...(inventory?{sourceInventory:inventory}:{}),
   };
 }
 function resultComment(result,uploadStatus=null){
@@ -176,7 +197,9 @@ function resultComment(result,uploadStatus=null){
     `ACTUAL_CONTROLLER_SHA: ${result.actualControllerSha??"UNVERIFIED"}`,
     `RECOVERY_SHA: ${result.recoverySha??"NONE"}`,
     `PROTECTED_STATE_UNCHANGED: ${result.protectedStateUnchanged}`,
-    `WORKFLOW_ENABLED: ${result.workflowEnabled}`,
+    `WORKFLOW_ENABLED: ${result.workflowEnabled??'UNVERIFIED'}`,
+    ...(result.sourceInventory?.filter(row=>row.state!=='OLD').map(row=>
+      `R54_SOURCE_DRIFT: ${row.path} ${row.state} ${row.actual??'MISSING'}`)??[]),
     ...(uploadStatus?[`REPORT_UPLOAD: ${uploadStatus}`,
       `RESULT_JSON: results/maintenance-${result.requestId}.json`,
       `RESULT_TXT: results/maintenance-${result.requestId}.txt`]:[])].join("\n");
