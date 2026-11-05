@@ -165,3 +165,12 @@
 - **정본 개선 완료:** [PR #461](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/461)에서 `docs/CONTROLLER_APPLY_QUEUE.md` 1파일 **+2/-0**만 변경, squash 병합 `main` **`c21c249926dc2059e4be298ded8816efb36648c3`**. 원격 main의 `인계 전달과 실행 재개는 별도 상태다` 문단을 재조회했다. 기존 작업 채널로 한 번 명시 전달하고 수신·다음 실행을 확인할 수 있으면 확인하되, 경로가 없으면 `인계 기록 완료/수신 미확인`으로 표기한다. 새 설치·승인 Gate, 검증용 B 요청, 중복 댓글을 만들지 않는다.
 - **현재 실제 상태:** R54 #428은 인계는 기록됐으나 **기존 작업자의 수신/재개 증거가 없음**. `worker/theme-nine-r37-public.mjs` 1파일 OTHER 출처·예약 task binding 대조가 담당자에게 남아 있다. #434은 인계 자체 PASS/신규 정상 B 실운영 효과 PENDING; **4/5 FINAL PASS(80%)** 유지. 인계 댓글만으로 재개/효과 검증 PASS 처리 금지.
 - **NEXT:** 기존 R54 담당 대화/업무 채널에 실제 전달이 가능한 주체가 한 번 인계하고 수신·1파일 provenance 확인 여부를 기록한다. 현재 이 총괄 대화에는 별도 일반챗으로 메시지를 직접 전달할 API가 확인되지 않아 자동 재개됐다고 주장하지 않는다. 정상 승인 B 발생 시 기존 #68의 동일 requestId 결과/원장/E 중복보고0 검증을 수행한다. 설치·PC 쓰기 0건.
+
+
+## 15. 2026-11-06 전담 서브에이전트 인계 실증과 실패변수 모형 검증
+
+- **실제 팀 내 인계 PASS:** 총괄이 활성 서브에이전트 `handoff_pilot_worker`에 `CASE=ZG-HANDOFF-PILOT-20261106-A`를 고유 지정하여 읽기 전용 `main` 지침 확인을 명시 인계했다. 별도 `ACK CASE=... RECEIVED=YES` 메시지를 먼저 받고, 이어 `RESULT ... STATUS=PASS`를 수신했다. 증거 대상 `docs/CONTROLLER_APPLY_QUEUE.md` 원격 `main` blob `79b2184128221829794dc64018afc631c6cf4f38`. **동일 활성 에이전트 팀 내부 전달·응답만 실증**되었으며 다른 독립 일반챗 자동 재개·PC 운영 실행 증거로 확대하지 않는다.
+- **실패 변수 4건 모델 PASS:** `handoff_failure_sim`의 메모리 내 상태 전이 검토에서 ① 정상 `RECORDED→DELIVERED→CLAIMED→VERIFIED`, ② 별도 대화 전달 불가 `DELIVERY_UNAVAILABLE/NO_ACK`, ③ 동일 ID 재전달 `DUPLICATE_SUPPRESSED`, ④ 수신 뒤 중단 `STATE_UNKNOWN`을 구분했다. **모형 4/4 PASS**이며 실제 타 대화 간 중복 차단 또는 Windows 운영 재개 검증은 아니다. 중단·불명확 상태에서 원장/원격 결과를 먼저 조회하고 무조건 재실행하지 않는다.
+- **웹디버그 연결 한계:** 연결된 로컬 브라우저 확장 접근은 `originating browser context` 부재로 거부되었고 대체 클라우드 브라우저는 빈 탭만 보여 기존 사용자 ChatGPT 일반챗을 특정/재개할 수 없었다. 현재 총괄 도구에 **별도 독립 일반챗 직접 메시지·자동 깨움 경로가 검증되지 않음**. 댓글·GitHub Actions가 그 경로를 제공한다고 주장하지 않는다.
+- **불필요한 구현 제외:** A `pc-job`는 신규 Issue `opened`→기존 self-hosted Runner→requestId 원장/lease→결과 TXT/JSON, B `pc-maintenance`는 독립 Windows receiver `poll`→`claim`/원장→GitHub GET/`VERIFIED`를 이미 갖춘다. 새 큐/Runner/DB/승인 Gate 및 #434 검증용 가짜 B는 만들지 않는다. 독립 ChatGPT 담당에게 전달할 수 없는 상태는 `HANDOFF_RECORDED/ACK_UNCONFIRMED`로 정확히 보고하며 독립 업무를 계속한다.
+- **남은 NEXT:** 지원되는 실제 담당 채널이 확인되는 경우 기존 R54 담당에게 **단 한 번** 명시 인계·ACK를 요청하고 `worker/theme-nine-r37-public.mjs` 1파일 provenance/task binding만 회수한다. 유효한 새 정상 승인 B 실행 후에만 #434 E 신규 요청별 보고서 0·원장 VERIFIED·GitHub GET 실증 판정. 전체 **4/5 FINAL PASS(80%)** 유지. 이번 회차 PC/GitHub Issue/설치 변경 0건, 이 인계 기록 문서만 갱신.
