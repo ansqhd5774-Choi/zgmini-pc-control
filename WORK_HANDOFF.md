@@ -117,3 +117,11 @@
 - **기존 자동 경로 검토:** A `source-audit`는 원격 GitHub만 조회하며 로컬 Windows 제어 저장소 HEAD를 검증할 수 없음. 관련 A operation 신규 설치를 강요하지 않음.
 - **최소 수정:** [Draft PR #459](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/459), head `46ff128155a9254f4eae9fed86e7b60452243fb5`, CMD blob `b3f2f98c73572406cdbd6c43b7a6477ba3679b4a`, 독립 정적 리뷰 **SOURCE GO**. 새 CMD는 로컬 HEAD/branch/approval manifest의 **읽기 전용** 확인만 수행하며 출력은 `%TEMP%`의 고정 새 TXT+콘솔+Notepad와 `pause`로 보존. Windows CRLF 확인. 설치·checkout·merge·fetch/pull·Git 운영 쓰기 없음.
 - **다음 한 단계:** 안전하게 다운로드 가능한 R2 읽기 전용 실행물로 실제 로컬 HEAD 분류. 전용 실행 환경 현재 불가이므로 ChatGPT 다운로드 파일 새 패키징은 미완료(원격 GitHub PR에서 소스 조회 가능). 실행 전까지 4/5 FINAL PASS 유지. **#458 FF CMD 재실행 절대 금지.**
+
+
+## 9. 2026-11-06 #434 R2 실제 실패와 R3 원문 진단
+
+- **LAST PASS:** 사용자가 R2에서 실제 `SCHEMA=ZGMINI_MAINTENANCE_434_HEAD_READONLY_R2` / `SOURCE_UPDATE_ATTEMPTED=NO` / `HANDOFF_INVOKED=NO` / `OPERATOR_RESULT=READONLY_FAILED` / `CODE=NOT_GIT_REPOSITORY` 제공. 이는 **R2 진단만 Git/E 운영 미변경**, 이전 FF 미실행의 증거가 아님.
+- **FIRST FAIL 정정:** R2는 E: 저장소 폴더·Git 명령 존재 확인 후 `git rev-parse --is-inside-work-tree | findstr` 결합 판정에서 실패, stderr·Git exit 별도 없음. 실 Git 저장소 손상으로 분류하지 않음. 이전 #457은 단순 Git exit0만 봤으므로 두 진단은 모순으로 단정할 수 없음.
+- **개선 source:** [Draft PR #459](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/459)에 `MAINTENANCE_434_GIT_PROBE_R3.cmd` 추가, commit `e4fe08bdd59e6702daea707ad1b9c37c3b155034`, Git blob `7f288849d4471b0037bceb05e46be9bfea378645` Windows CRLF/ZIP 내부 동일/압축 PASS/독립 SOURCE GO. Git worktree/toplevel/branch/HEAD 원문 stdout+stderr+exit 분리, manifest exists/tracked, 결과 사용자 TEMP 신규 TXT·Notepad·CMD pause. Git 쓰기/FF 재시도/인계/E: 신규 쓰기 0.
+- **다음 단계 하나:** R3 실제 Windows 결과 회수 → 로컬 HEAD가 `91a6…`/ `14fa…`/그 외인지를 원문 증거로 판정. **원래 FF CMD와 R2는 재실행 금지**, #434 운영 PASS 미판정, 전체 4/5.
