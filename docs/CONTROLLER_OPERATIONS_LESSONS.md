@@ -93,6 +93,7 @@
 | --- | --- | --- |
 | [공용 대기열 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | Issue 첫머리의 과거 `14940…` 설치 SHA·#339 실패 표기가 새 기록보다 앞에 있어 오래된 차단을 재사용할 위험. 기존 5,249자 본문을 보존하고 관측 근거·담당·다음 실행·독립성을 담은 현재 상태 요약을 맨 위에 추가. | 변경 후 7,065자 원격 재조회. [#432 Controller 증거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/432#issuecomment-6656893231)·[#68 설치 조정](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6658289465)을 구분. **상태 요약은 실PC 실시간 조회가 아니며** B 설치 직전 SHA·lease 확인 필요. |
 | [#431](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/431) 전역 선행 조건 오판 | #431 완료를 모든 후속 기능의 기술적 Gate로 취급한 계획을 수정. [#433](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/433)은 `config/operations.json`·`controller/operations.mjs` 두 파일 중첩, [#435](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/435)은 #431과 파일 중첩 없음, [#434](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434)는 별도 유지보수기 변경. | **실제 파일·승인·공유 lease에만 의존성 적용.** 기존 단일 B 담당·설치 순서는 임의 변경하지 않되, 무관한 A/소스 검토를 중단하지 않는다. |
+| [#434 전담 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434) | 사용자가 #434 **독립 유지보수기 인계만** `b434_installer`에 맡기고 기존 R17 담당의 #431 Controller 설치 소유를 유지. 총 8파일 SHA를 고정한 [Draft PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 명세 준비, 실제 변경 소스 `tools/maintenance-agent.mjs` 1파일. | **Draft 소스 준비≠Windows-local 검증·B 접수·운영 인계.** 해당 운영 0건, 설치 잠금·Receiver 보호는 유지. #431 설치 완료는 기술적 전제 아님. |
 | [Draft PR #442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) | 임시 정리 전 로컬 `RESULT.json` 중첩 결과 및 `RESULT.txt`가 원격 게시 보고와 달라도 삭제되는 결함을 격리 재현. 포인터·JSON·worker-result의 의미적 일치 및 TXT 바이트 일치 검사 추가. | 소스 집중 시험 **19/19 PASS**, 원격 3파일 일치·별도 격리 재현 PASS. 불일치 시 `SKIPPED`, 폴더·포인터·영속 원장 보존. **Draft·Windows 운영 미검증·E: 실제 삭제 0건.** |
 | [Draft PR #437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | KPI 17개 실제 `pc-job` Issue의 기준선 확보; `queueWait`와 `execution` 용어가 각각 순수 Runner 대기·worker 실행시간으로 오해될 위험. PR 설명에 실제 정의를 명시. | 소스 시험 **14/14 PASS**. `queueWait`=Issue 생성→Controller 시작, `execution`=Controller 전체 처리시간. 기존 기준선 활용 가능하나 개선 전후 효과는 아직 미검증. |
 
@@ -104,20 +105,4 @@
 
 **한 줄 재사용 규칙:** 본문과 댓글의 유효한 최신 상태를 일치시키고, 실제 변경 파일이 겹치는 작업만 조정한다. 독립 업무는 계속한다. 소스 테스트·문서 개선을 PC 설치 완료로 확대하지 않는다.
 
-## 8. 2026-11-06 확인된 신규 사례
-
-| 사례 | 실제 증거와 개선 | 다음 판단에 재사용할 기준 |
-| --- | --- | --- |
-| [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 공용 상태 가독성 | 과거 설치 SHA·차단 이력이 본문 맨 위에 남아 최신 댓글과 혼동됨. 최신 유효 실행 SHA/담당/다음 B/기능별 의존성을 선두에 요약하고 원문 보존. | **상태 요약은 실시간 설치 증거가 아니며**, 실제 B 직전 SHA·lease를 다시 확인. 기존 R17 #431 담당 소유를 유지. |
-| #431·[#433](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/433)·[#435](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/435)·[#434](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434) 의존성 분리 | #431·#433은 `config/operations.json`·`controller/operations.mjs` 중첩, #435는 별도 Controller 업로드 변경, #434는 독립 유지보수기 변경. **#431 완료는 전 기능의 기술적 필수 Gate가 아님.** | 공유 파일의 최종 바이트·승인만 조정하고 독립 기능의 조사·준비를 직렬 대기시키지 않음. 실제 공유 B 쓰기는 기존 lease로 직렬화. |
-| #434 사용자 지정 전담 인계 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 기준 `b434_installer`는 **#434 유지보수기 인계 실행만** 전담. 대상 8파일 중 `tools/maintenance-agent.mjs` 1파일 변경. Windows-local-only 보호와 승인 명세 준비가 남아 있으며 운영 인계 0건. | 총괄의 담당 배정은 실제 Windows 설치·완료 증거가 아님. 기존 R17 #431 설치 소유권을 가져오지 않음. |
-| [#442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) E: 임시 증거 정리 | 격리 시뮬레이션에서 `RESULT.json` 중첩 결과와 `RESULT.txt` 내용 불일치 시에도 삭제되던 사례를 수정. JSON/worker/TXT 일치 검증 및 보존 회귀 시험 **19/19 PASS**. Draft·운영 미설치. | 원격 결과 검증만으로 로컬 증거 삭제의 안전성을 추정하지 않음. 불일치·UNKNOWN·복구 기록 보존, 실제 Windows/E: 검증은 별도. |
-| [#437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) KPI | 실 GitHub `pc-job` 17건 기준선 확인, 대기 중앙값 약 18.5초·Controller 처리시간 약 5.7초. 전후 효과는 미검증. | `queueWait`는 Issue 생성→Controller 시작이며 순수 Runner 대기가 아님. `execution`은 Controller 전체 처리시간이며 순수 worker 시간이 아님. |
-
-### 외부 기술 벤치마킹의 적용 범위
-
-- [Google SRE — Managing Incidents](https://sre.google/sre-book/managing-incidents/): 총괄·운영 변경·기록 역할의 분리. #68 선두 상태 스냅샷 및 #434 전담 인계의 조정 원칙에만 반영.
-- [AWS Builders Library — Idempotent APIs](https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/): 기존 `requestId`·입력 해시·원장과 불명확 결과 재접수 금지 규칙을 **재사용**. 중복 발행기를 새로 만들지 않음.
-- [GitHub Actions — Concurrency](https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency): 충돌하는 B만 기존 단일 설치 lease로 직렬화. 기본 `pending` 교체/취소를 모른 채 전역 concurrency를 추가하지 않음.
-
-**성과의 한계:** 위는 총괄 운영 규칙·소스 결함·격리 검증에 관한 사례다. PC 설치/Windows 인계/대기시간 단축·E: 용량 감소 등의 **실제 운영 효과는 입증되지 않음**. 5개 이슈의 운영·효과 기준 `FINAL PASS`는 현재 **0/5**.
+**5개 항목 FINAL PASS: 0/5.** #433·#435·#434 병합, #442 19/19 격리 시험, #437 17건 KPI 기준선을 실제 PC/Windows 운영 완료 또는 개선 효과로 확장하지 않는다.
