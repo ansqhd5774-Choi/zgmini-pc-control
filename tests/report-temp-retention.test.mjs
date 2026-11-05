@@ -14,11 +14,15 @@ function fixture(){
   code:'CORE_READONLY_DIAGNOSIS',firstFail:null,protectedStateUnchanged:true,
   actualExecutionSha:'a'.repeat(40),
   result:{status:'PASS',code:'CORE_READONLY_DIAGNOSIS',value:'ORIGINAL'}};
+ const reportText=Object.entries(report).filter(([key])=>key!=='result'&&key!=='prior')
+  .map(([key,value])=>`${key}=${typeof value==='object'?JSON.stringify(value):value}`)
+  .join('\r\n')+'\r\n';
  const workspace=path.join(root,'jobs',jobId),file=path.join(workspace,'RESULT.json');
  fs.mkdirSync(workspace);
  for(const name of ['input.json','worker-result.json','RESULT.json','RESULT.txt'])
   fs.writeFileSync(path.join(workspace,name),name==='RESULT.json'?JSON.stringify(report):
-   name==='worker-result.json'?JSON.stringify(report.result):'fixture');
+   name==='worker-result.json'?JSON.stringify(report.result):
+   name==='RESULT.txt'?reportText:'fixture');
  const pointer=path.join(root,'reports',`${runId}-${attempt}-${seat}.json`);
  fs.writeFileSync(pointer,JSON.stringify({issueNumber,report,file,workspace}));
  const ledger=path.join(root,'ledger',requestId+'.json');
@@ -121,6 +125,17 @@ test('nested payload divergence across pointer, workspace and worker remains pre
    assert.equal(fs.existsSync(f.ledger),true);
   }finally{f.dispose();}
  }
+});
+
+test('local RESULT.txt content divergence preserves all recovery evidence',()=>{
+ const f=fixture();
+ try{
+  fs.writeFileSync(path.join(f.workspace,'RESULT.txt'),'TAMPERED_LOCAL_TEXT_ONLY');
+  assert.equal(cleanupVerifiedJobTemps(f.options).code,'WORKSPACE_RESULT_MISMATCH');
+  assert.equal(fs.existsSync(f.pointer),true);
+  assert.equal(fs.existsSync(f.workspace),true);
+  assert.equal(fs.existsSync(f.ledger),true);
+ }finally{f.dispose();}
 });
 
 test('unexpected or recovery marker file prevents any deletion',()=>{
