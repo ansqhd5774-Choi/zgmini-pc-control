@@ -3,6 +3,7 @@ import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
+import {inspectR54SixFileInventory} from './r54-sixfile-inventory-readonly.mjs';
 import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
@@ -81,6 +82,7 @@ export async function runOperation(request,context){
  }
  if(request.operation==='us-breadth-r17-preflight')return inspectR17Windows();
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
+ if(request.operation==='r54-sixfile-inventory-readonly')return inspectR54SixFileInventory(dataRoot);
  if(request.operation==='release-calendar-runtime-readonly'){
   let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
   return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
