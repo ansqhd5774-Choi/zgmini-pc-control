@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {test} from 'node:test';
-import {readTrustedControllerReadyFromGitHub} from '../tools/maintenance-ready-source.mjs';
+import {readTrustedControllerReadyFromGitHub} from '../tools/maintenance-admission-queue.mjs';
 
 const RAW=Buffer.from(JSON.stringify({schema:'ZGMINI_CONTROLLER_READY_FEED_V1',items:[]}));
 const sha=bytes=>createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
