@@ -8,6 +8,10 @@ const samePath=(a,b)=>process.platform==='win32'
  ?path.normalize(a).toLowerCase()===path.normalize(b).toLowerCase()
  :path.normalize(a)===path.normalize(b);
 const safeId=s=>typeof s==='string'&&/^[a-z0-9][a-z0-9-]{7,79}$/.test(s);
+const pathEntryExists=file=>{
+ try{fs.lstatSync(file);return true;}
+ catch(error){if(error.code==='ENOENT')return false;throw error;}
+};
 
 function normalPath(file,kind){
  const stat=fs.lstatSync(file);
@@ -44,8 +48,8 @@ export function cleanupVerifiedJobTemps({
    if(!samePath(real,path.join(rootReal,name)))return skipped('UNSAFE_ROOT_LAYOUT');
   }
   // Another execution/upload for the same request or seat must not be cleaned.
-  if(fs.existsSync(path.join(leasesRoot,'request-'+report.requestId))||
-   fs.existsSync(path.join(leasesRoot,'seat-'+seat)))
+  if(pathEntryExists(path.join(leasesRoot,'request-'+report.requestId))||
+   pathEntryExists(path.join(leasesRoot,'seat-'+seat)))
    return skipped('ACTIVE_REQUEST_OR_SEAT_LEASE');
 
   const workspace=path.join(jobsRoot,jobId);
