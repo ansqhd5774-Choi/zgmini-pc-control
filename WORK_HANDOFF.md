@@ -59,7 +59,7 @@
 - **LAST PASS:** [공용 대기열 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 상단 상태 요약 갱신·본문 5,249자 보존/7,065자 재조회. [#442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) 격리 시험 19/19, 결과 불일치 삭제 중단. [#437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) 14/14 및 실제 GitHub 17건 KPI 기준선 확보.
 - **운영 설치의 마지막 유효 증거:** Controller `69c830275bd3fec75b17c8a98c46d689447fb1a7`([#432](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/432#issuecomment-6656893231)); 유지보수기 `c66a629f2a52b232e92b90e42906795afa4cb657`([#68 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6658289465)). 현재 상태를 보장하지 않음.
 - **실제 미해결:** #431 B 적용 결과 미확인; #433·#435 Controller 기능과 #434 유지보수기 기능의 운영 설치 미확인; #442 Draft/Windows 미검증; #437 Draft/개선 효과 미측정. 과거 #339·#319 복구를 이번 신규 장애로 소급하지 않는다.
-- **#434 새로 확인된 준비 조건:** 마지막 유지보수기 `c66a629f…` 대비 유지보수기 8파일 중 소스 변경은 `tools/maintenance-agent.mjs` 1파일. 현 `main` 목표 인계 승인 manifest 부재. 기존 유지보수기 담당이 정확한 해시·승인·Windows 출처·lease를 확인해 인계 준비한다. [#68 원장 갱신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68). #431 설치 완료를 #434의 기술적 Gate로 삼지 않는다.
+- **#434 새로 확인된 준비 조건:** 마지막 유지보수기 `c66a629f…` 대비 유지보수기 8파일 중 소스 변경은 `tools/maintenance-agent.mjs` 1파일. 현 `main` 목표 인계 승인 manifest 부재. 기존 유지보수기 담당이 정확한 해시·승인·Windows 출처·lease를 확인해 인계 준비한다. [#68 원장 갱신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 및 [#434 담당 PR 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434#issuecomment-6663610515) 등록·재조회. #431 설치 완료를 #434의 기술적 Gate로 삼지 않는다.
 
 | 남은 5개 항목 | 2026-11-06 소스 결과 | 운영 확인과 다음 담당 |
 | --- | --- | --- |
