@@ -1,0 +1,35 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "1d6f66d87c0ff247ba75b4c98682c07c646e79cc",
+  "targetSha": "4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User standing authorization in docs/PC_AUTOMATION_STANDARD.md section 5 covers same-purpose validated independent-maintainer policy/performance corrections. PR #464 source was merged into main at exact target 4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4; its verified-result settled Issue cache changes only tools/maintenance-agent.mjs of the eight pinned handoff source files. This conditional approved source manifest authorizes preparation of the existing safe operator-only handoff, not an assertion that Windows currently runs installedSha. The last actual Windows handoff PASS observed installedSha 1d6f66d87c0ff247ba75b4c98682c07c646e79cc. Before any mutation the operator must independently re-read current E: MAINTENANCE_INSTALL.json and require its sourceSha and all six installed file SHA256 to match, prove live receiver origin/PID/nonce and absence of controller-install lease, verify main checkout and all eight target byte hashes, and preserve backup/rollback/restart attestation. Any mismatch stops, without forcing a second request or weakening checks.",
+  "files": {
+    "tools/maintenance-contract.mjs": "6c11b85ab41011b4f5baf2958a6560f5613c83a98287d6a29b9db9d2f093fa47",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "2ab6b022c012db09c667a43f48f9c8ba3db27f116d30e4ad0ed9e99fcb88b384",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "346ed72046b47dbd37246192f9220c3fa4a456131efb8a4bbf9623e65215d581",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "178097c6ba3a86bf1caff0f8ff295412c1efed56fe0d9ba93d2946290e932764"
+  },
+  "checks": {
+    "command": "PR #464 focused Node isolated maintenance-agent regression suite 33/33 PASS, independent code review P0=0/P1=0; exact main target GitHub raw base64 file bytes independently SHA-256 verified for all eight pinned handoff source files; installed-to-target compare ahead 29 behind 0, one allowed source file differs.",
+    "passed": 33,
+    "failed": 0,
+    "platform": "Source-only test and independent GitHub byte verification, not a current Windows observation. Actual current installed SHA, receiver/lease state and operational latency remain unverified."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "installed Controller and its source/config/workflows",
+    "Core/Korea/Iran task registrations",
+    "six GitHub Runner registrations",
+    "SQLite/D1, provider credentials and collection sources",
+    "existing E: reports, request/checkpoint/install ledgers and required recovery backups",
+    "R54 stored raw data and approved existing themes"
+  ],
+  "scopeNote": "Exactly one-time source-only independent-maintainer fastpath handoff candidate from last observed installed source 1d6f66d87c0ff247ba75b4c98682c07c646e79cc to main target 4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4 for PR #464; eight pinned files, only tools/maintenance-agent.mjs changes. No Controller, workflow, config, Runner, Core/Korea/Iran tasks, DB/D1, writer, published data or permissions change. The current Windows installed SHA is not established by historical PASS; exact installed readback and safety prevalidation are mandatory. This GitHub manifest PR is neither merged installation authorization bypass nor runtime PASS. Operator must use existing Windows main checkout and tools/handoff-maintenance.mjs only after exact approval file is on main, with fresh receiver identity, lease, checksum, backup and rollback checks. Never create an artificial B Issue, run a self-handoff from a Runner/A pc-job, or replay prior #434/#454 requests. Verify impact against the next naturally approved B: durable ledger retained, remote JSON/TXT VERIFIED, no duplicate comments, and no new per-request E: report file accumulation."
+}
