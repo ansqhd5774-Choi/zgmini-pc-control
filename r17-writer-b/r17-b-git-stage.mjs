@@ -2,6 +2,14 @@
 // read-only. Only the caller's scratch repository gets new blobs/tree/commit.
 import {createHash} from 'node:crypto';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+// Approved CRLF source + LF-only patch yields a mixed-EOL scratch file.
+// Git --ignore-space-change preserves context EOL but not newly inserted EOL.
+export function restoreCrLfAfterContextApply(bytes){
+  if(!Buffer.isBuffer(bytes)||bytes.includes(0))throw new Error('R17_B_PATCH_TEXT_STOP');
+  const text=bytes.toString('utf8');
+  if(!Buffer.from(text,'utf8').equals(bytes))throw new Error('R17_B_PATCH_TEXT_STOP');
+  return Buffer.from(text.replace(/\r?\n/g,'\r\n'),'utf8');
+}
 const SHA40=/^[a-f0-9]{40}$/;
 const commitEnv={
   GIT_AUTHOR_NAME:'ZGMINI R17 Approved PC Writer',GIT_AUTHOR_EMAIL:'r17-writer-b@localhost',

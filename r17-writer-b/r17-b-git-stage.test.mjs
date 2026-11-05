@@ -5,13 +5,21 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {commitExactOverlay} from './r17-b-git-stage.mjs';
+import {commitExactOverlay,restoreCrLfAfterContextApply} from './r17-b-git-stage.mjs';
 
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const REF='refs/heads/r17-writer-b/pc-r17-550e8400-e29b-41d4-a716-446655440000';
 const g=(dir,...args)=>execFileSync('git',['-C',dir,...args],{encoding:'utf8'}).trim();
 const raw=(dir,args,{stdin,env}={})=>execFileSync('git',['-C',dir,...args],{
   input:stdin,env:{...process.env,...env},encoding:null,
+});
+test('CRLF restoration operates on scratch text only and never weakens pinned hashes',()=>{
+  const mixed=Buffer.from('old\r\nnew\nend\r\n');
+  const expected=Buffer.from('old\r\nnew\r\nend\r\n');
+  assert.deepEqual(restoreCrLfAfterContextApply(mixed),expected);
+  assert.deepEqual(restoreCrLfAfterContextApply(expected),expected);
+  assert.throws(()=>restoreCrLfAfterContextApply(Buffer.from([0,1,2])),
+    /R17_B_PATCH_TEXT_STOP/);
 });
 function fixture(){
   const dir=mkdtempSync(path.join(os.tmpdir(),'r17-git-test-'));

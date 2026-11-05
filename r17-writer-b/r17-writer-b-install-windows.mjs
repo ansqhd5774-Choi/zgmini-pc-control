@@ -14,7 +14,7 @@ import {
   BEFORE,TARGET,DIFF,sha256,R17Stop,authorize,performApprovedInstall,
 } from './r17-writer-b-install-core.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from './r17-b-xml.mjs';
-import {commitExactOverlay} from './r17-b-git-stage.mjs';
+import {commitExactOverlay,restoreCrLfAfterContextApply} from './r17-b-git-stage.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from './r17-b-claim.mjs';
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
@@ -159,11 +159,13 @@ function buildIsolatedCommit({originals,newFiles,requestId}){
     fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,bytes,{flag:'wx'});
   }
-  git(stage,'apply','--check',PATCH);
-  git(stage,'apply',PATCH);
+  git(stage,'apply','--check','--ignore-space-change',PATCH);
+  git(stage,'apply','--ignore-space-change',PATCH);
   for(const file of Object.keys(BEFORE)){
-    const bytes=fs.readFileSync(path.join(stage,...file.split('/')));
+    const filePath=path.join(stage,...file.split('/'));
+    const bytes=restoreCrLfAfterContextApply(fs.readFileSync(filePath));
     check(sha256(bytes)===TARGET[file],'R17_B_NATIVE_PATCH_TARGET_SHA_STOP');
+    fs.writeFileSync(filePath,bytes);
     overlay.set(file,bytes);
   }
   for(const [file,bytes] of Object.entries(newFiles))overlay.set(file,bytes);
