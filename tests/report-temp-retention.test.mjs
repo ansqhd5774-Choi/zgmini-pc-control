@@ -74,6 +74,16 @@ test('active request or seat lease defers cleanup without touching owner state',
  }
 });
 
+test('dangling lease symlink still counts as a held or unsafe lease',t=>{
+ const f=fixture();
+ try{
+  try{fs.symlinkSync(path.join(f.root,'MISSING'),path.join(f.root,'leases','seat-2'),'dir');}
+  catch(error){if(['EPERM','EACCES'].includes(error.code)){t.skip('symlink privilege unavailable');return;}throw error;}
+  assert.equal(cleanupVerifiedJobTemps(f.options).code,'ACTIVE_REQUEST_OR_SEAT_LEASE');
+  assert.equal(fs.existsSync(f.pointer),true);
+ }finally{f.dispose();}
+});
+
 test('mismatched pointer, ledger or workspace result fails closed',()=>{
  for(const which of ['pointer','ledger','RESULT.json']){
   const f=fixture();
