@@ -6,7 +6,7 @@ import {validateMaintenanceRequest,validateUpdateRequest} from './maintenance-co
 export const CONTROLLER_ADMISSION_LANE='controller-install';
 export const CONTROLLER_ADMISSION_SCHEMA='ZGMINI_CONTROLLER_ADMISSION_ITEM_V1';
 export const CONTROLLER_READY_FEED_SCHEMA='ZGMINI_CONTROLLER_READY_FEED_V1';
-export const CONTROLLER_READY_FEED_PATH='config/controller-admission-ready.json';
+export const CONTROLLER_READY_FEED_PATH='coordination/controller-admission-ready.json';
 const QUEUE_ID=/^[a-z0-9][a-z0-9-]{7,79}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA256=/^[a-f0-9]{64}$/;
