@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {test} from 'node:test';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 import {createControllerAdmissionLane,readControllerLanePending} from '../tools/maintenance-agent.mjs';
 
 const lane='controller-install';
@@ -23,6 +25,31 @@ test('six concurrent candidates have one durable whole-lane winner, no per-run E
  assert.equal(results.filter(item=>item.acquired===true).length,1);
  assert.equal(results.filter(item=>item.acquired===false).length,5);
  assert.equal(states[0].read().phase,'HELD');
+ assert.deepEqual(fs.readdirSync(stateDir),['CONTROLLER_ADMISSION_LANE.json']);
+});
+
+test('six separate Node processes contend on one atomic fixed-file claim',async t=>{
+ const stateDir=scratch(t);
+ const moduleUrl=pathToFileURL(fileURLToPath(new URL('../tools/maintenance-agent.mjs',import.meta.url))).href;
+ const source=`import {createControllerAdmissionLane} from ${JSON.stringify(moduleUrl)};
+  const received=createControllerAdmissionLane({stateDir:${JSON.stringify(stateDir)}})
+   .claim(${JSON.stringify(claimInput())});
+  process.stdout.write(JSON.stringify(received));`;
+ const contenders=Array.from({length:6},()=>new Promise((resolve,reject)=>{
+  const processHandle=spawn(process.execPath,['--input-type=module','--eval',source],
+   {stdio:['ignore','pipe','pipe']});
+  let output='',errors='';
+  processHandle.stdout.on('data',chunk=>output+=chunk);
+  processHandle.stderr.on('data',chunk=>errors+=chunk);
+  processHandle.on('error',reject);
+  processHandle.on('close',code=>{
+   if(code!==0){reject(Error(errors||`CHILD_EXIT_${code}`));return;}
+   try{resolve(JSON.parse(output));}catch(error){reject(error);}
+  });
+ }));
+ const outcomes=await Promise.all(contenders);
+ assert.equal(outcomes.filter(row=>row.acquired===true).length,1);
+ assert.equal(createControllerAdmissionLane({stateDir}).read().phase,'HELD');
  assert.deepEqual(fs.readdirSync(stateDir),['CONTROLLER_ADMISSION_LANE.json']);
 });
 
