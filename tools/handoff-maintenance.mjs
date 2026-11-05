@@ -5,10 +5,18 @@ import {execFileSync} from 'node:child_process';import {fileURLToPath,pathToFile
 const root='E:/ZGmini/automation/pc-maintenance';
 const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const files=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
+const handoffSourceFiles=[...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const git=a=>execFileSync('git',a,{cwd:repo,windowsHide:true,maxBuffer:3000000});
+// Unrelated docs/results edits do not affect this exact approved handoff.
+export function requireHandoffCheckoutScope(target,runGit=git){
+ need(/^[a-f0-9]{40}$/.test(target),'HANDOFF_PIN_REQUIRED');
+ const approvalFile=`approvals/maintenance-handoffs/${target}.json`;
+ need(String(runGit(['status','--porcelain','--',...handoffSourceFiles,approvalFile])).trim()==='',
+   'HANDOFF_CHECKOUT_DIRTY');
+}
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
 export function requireStopped(owner,isAlive=alive){
  need(Number.isSafeInteger(owner?.pid)&&owner.pid>0&&/^[0-9a-f-]{36}$/.test(owner?.nonce??'')
@@ -105,7 +113,7 @@ export async function main(args=process.argv.slice(2)){
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'HANDOFF_OPERATOR_WINDOWS_REQUIRED');
  need(args.length===2&&args[0]==='--source-sha'&&/^[a-f0-9]{40}$/.test(args[1]),'HANDOFF_PIN_REQUIRED');
  const target=args[1];
- need(git(['status','--porcelain']).toString().trim()==='','HANDOFF_CHECKOUT_DIRTY');
+ requireHandoffCheckoutScope(target);
  git(['merge-base','--is-ancestor',target,'HEAD']);
  need(git(['branch','--show-current']).toString().trim()==='main','HANDOFF_MAIN_REQUIRED');
  const approval=read(path.join(repo,'approvals/maintenance-handoffs',target+'.json'));
