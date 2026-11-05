@@ -13,7 +13,7 @@ const controlRoot='E:/ZGmini/automation/pc-control';
 const sourceFiles=[
   'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
   'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
-  'tools/maintenance-ancestry.vbs'
+  'tools/maintenance-ancestry.vbs','tools/maintenance-admission-queue.mjs'
 ];
 const testFiles=[
   'tests/maintenance-contract.test.mjs','tests/maintenance-apply.test.mjs',
@@ -122,3 +122,4 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     testExitStatus:e?.testExitStatus??null,
     instruction:'INSPECT_PARTIAL_BOOTSTRAP_BEFORE_ANY_RETRY'}));process.exitCode=1;}
 }
+
