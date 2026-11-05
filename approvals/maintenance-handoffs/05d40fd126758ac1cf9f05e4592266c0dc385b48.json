@@ -1,0 +1,34 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "5469548b05ba90f3855281e94234952bdb45fa4f",
+  "targetSha": "05d40fd126758ac1cf9f05e4592266c0dc385b48",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-03 standing approval in docs/PC_AUTOMATION_STANDARD.md §5 for validated maintainer policy handoff; user's 2026-11-05 continuation of R54 exactly six-Writer-file plus one Task restoration. Last read-only PC evidence in issue #68 reports installed maintainer 5469548b...; the Windows handoff must independently verify this exact installed SHA and all protected live state immediately before any mutation.",
+  "files": {
+    "tools/maintenance-contract.mjs": "6c11b85ab41011b4f5baf2958a6560f5613c83a98287d6a29b9db9d2f093fa47",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "a4627534ac4e769d51790bbf2e7af8967bfe251abde1d3fa67e420e8c48a0a44",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "c0d1fa07aba97983a7fdf50dd0bc94f5b775e19fa89e01367eaa873bdebfe677",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/bootstrap-maintenance.mjs": "c4ef3272f6cfa997fb76e08a0929dd8a2c2cc2c26c8f6f51dc73a47f66bb2499",
+    "tools/handoff-maintenance.mjs": "87632af5854a5e11d9b0c3455ff0bd14c56e8c46589fcca3cd5a160351471863"
+  },
+  "checks": {
+    "command": "PR #418 R54 focused Node tests: 24/24 PASS; GitHub main exact eight-file SHA-256 + blob identity verified (local 5-byte files, remote 3-byte files); original controller-only delta contract PASS",
+    "passed": 24,
+    "failed": 0,
+    "platform": "Linux Node + GitHub source verification ONLY; actual Windows handoff and PC R54 execution NOT YET RUN"
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "installed Controller and its source/config/workflows",
+    "Core/Korea/Iran task registrations",
+    "six GitHub Runner registrations",
+    "SQLite/D1, provider credentials and collection sources",
+    "R54 stored raw data, existing ten themes, request/checkpoint ledgers"
+  ],
+  "scopeNote": "Only pinned eight independent-maintainer tool bytes. No arbitrary shell, no Controller installation, no Writer or scheduler mutation from this manifest. Windows operator-only medium-token in-place handoff must verify the exact installed 5469548... SHA, WMI Startup receiver origin, no install lease, protective backup and fresh reconnect; mismatch fails closed. After proven maintenance handoff, a separate approved one-shot B request may install exactly R54 six Writer files and one R54 Scheduled Task. Main source approval does not imply PC installation."
+}
