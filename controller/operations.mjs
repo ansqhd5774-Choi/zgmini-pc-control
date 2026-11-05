@@ -81,7 +81,10 @@ export async function runOperation(request,context){
  }
  if(request.operation==='us-breadth-r17-preflight')return inspectR17Windows();
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
- if(request.operation==='release-calendar-runtime-readonly')return inspectReleaseCalendarRuntime(dataRoot);
+ if(request.operation==='release-calendar-runtime-readonly'){
+  let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
+  return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
+ }
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
