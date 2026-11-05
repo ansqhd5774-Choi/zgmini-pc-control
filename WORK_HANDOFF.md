@@ -62,7 +62,7 @@
 - **#434 사용자 지정 전담 인계·준비:** #434 **독립 유지보수기 인계 실행만** `b434_installer`가 총괄 관리 아래 담당하며, 기존 R17 담당은 #431 Controller 설치·공용 B 조정을 유지. 유지보수기 `c66a629f…` 대비 8파일 중 `tools/maintenance-agent.mjs` 1파일 변경. 신규 8파일 SHA 고정 명세는 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443)으로 **main 병합(`14fa522c0b051801f6a12b64d872d7a50532d39e`) 완료**됐으나 **Windows-local 검증·B 접수·PC 인계 0건**. [#68 원장](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 및 [#434 담당 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434#issuecomment-6663610515) 근거. #431 설치 완료는 #434 기술적 Gate 아님.
 
 
-- **선택적 Controller 누적 B 조정:** [#68 비교 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6664241790) 기준 #431 4파일 + #433 신규 R54 A 진단 + #435 원격 재조회 = **실행 파일 7개 후보**(공통 `operations` 2파일 갱신). **각 승인·해시가 충족될 때만** 기존 R17 담당이 단회 누적 명세를 적용하고, 부족하면 승인된 **#431 4파일 단독 설치를 먼저 진행**. 선택적 합산 검토를 새 전역 대기 조건으로 만들거나 총괄이 B를 중복 접수하지 않는다.
+- **선택적 Controller 누적 B 조정:** [#68 비교 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6664241790) 기준 #431 4파일 + #433 신규 R54 A 진단 + #435 원격 재조회 = **실행 파일 7개 후보**(공통 `operations` 2파일 갱신). **각 승인·해시가 충족될 때만** 기존 R17 담당이 단회 누적 명세를 적용하고, 부족하면 승인된 **#431 4파일 단독 설치를 먼저 진행**. 선택적 합산 검토를 새 전역 대기 조건으로 만들거나 총괄이 B를 중복 접수하지 않는다. 기준 `main` `ac1f5c22…`에서 7파일 SHA-256 후보는 위 #68 댓글에 고정했으며, **실제 B 명세 승인 전 `git show` 원본 바이트로 재검산**한다.
 
 | 남은 5개 항목 | 2026-11-06 소스 결과 | 운영 확인과 다음 담당 |
 | --- | --- | --- |
