@@ -81,6 +81,42 @@ Err.Clear
 Set svc=GetObject("winmgmts:\\.\root\cimv2")
 If Err.Number <> 0 Then Unknown
 
+' R54_SCAN is read-only WMI observation. It never exposes CommandLine,
+' tokens or process environment: only PID, parent and a scoped match flag.
+' The caller requires this installed, approved script's exact file hash.
+If WScript.Arguments.Count=1 And UCase(CStr(WScript.Arguments(0)))="R54_SCAN" Then
+ Dim r54Rows,r54Item,r54Name,r54Cmd,r54Exe,r54Text,r54Flag
+ Err.Clear
+ Set r54Rows=svc.ExecQuery("SELECT ProcessId,ParentProcessId,Name,CommandLine,ExecutablePath FROM Win32_Process WHERE ProcessId > 0")
+ If Err.Number <> 0 Then Unknown
+ WScript.Echo "PID,PARENT,MATCH"
+ For Each r54Item In r54Rows
+  Err.Clear
+  r54Name=LCase(CStr(r54Item.Name))
+  r54Cmd=""
+  r54Exe=""
+  If Not IsNull(r54Item.CommandLine) Then r54Cmd=CStr(r54Item.CommandLine)
+  If Not IsNull(r54Item.ExecutablePath) Then r54Exe=CStr(r54Item.ExecutablePath)
+  If Err.Number <> 0 Then Unknown
+  r54Text=LCase(r54Cmd & " " & r54Exe)
+  r54Flag="0"
+  If InStr(r54Text,"theme-nine-r54")>0 Or InStr(r54Text,"theme_nine_r54")>0 _
+   Or InStr(r54Text,"theme-ten-r78")>0 Or InStr(r54Text,"theme-ten-r80")>0 _
+   Or InStr(r54Text,"theme-ten-r79")>0 Or InStr(r54Text,"theme-ten-r81")>0 _
+   Or InStr(r54Text,"theme-nine-r51")>0 Or InStr(r54Text,"theme-nine-r48")>0 _
+   Or InStr(r54Text,"theme-nine-r37")>0 Then
+   r54Flag="1"
+  ElseIf (r54Name="node.exe" Or r54Name="cmd.exe" Or r54Name="cscript.exe" _
+   Or r54Name="wscript.exe") And (r54Cmd="" Or r54Exe="") Then
+   r54Flag="?"
+  End If
+  WScript.Echo CStr(CLng(r54Item.ProcessId)) & "," & CStr(CLng(r54Item.ParentProcessId)) & "," & r54Flag
+  If Err.Number <> 0 Then Unknown
+ Next
+ If Err.Number <> 0 Then Unknown
+ WScript.Quit 0
+End If
+
 If WScript.Arguments.Count=2 And UCase(CStr(WScript.Arguments(0)))="IDENTIFY" Then
  Dim existing,existingBorn,existingSid
  If Not ValidPid(WScript.Arguments(1)) Then Unknown

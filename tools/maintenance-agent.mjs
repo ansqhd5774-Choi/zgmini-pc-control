@@ -9,7 +9,9 @@ import path from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 
 import {validateMaintenanceRequest,validateUpdateRequest,
-  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest} from "./maintenance-contract.mjs";
+  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,
+  validateR54BIssueEnvelope,validateR54BManifestRequest,
+  R54_B_ISSUE_TITLE,R54_B_OPERATION} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
@@ -224,7 +226,8 @@ export function createMaintenanceAgent({
     return exec(nodeBinary,[updateScript,...args],updateTimeoutMs,safeUpdaterEnv());
   }
   async function updaterStatus(id,operation="controller-update"){
-    const subcommand=operation==="employment-r6-host-register"?"host-r6-status":"status";
+    const subcommand=operation===R54_B_OPERATION?'r54-b-status'
+      :operation==="employment-r6-host-register"?"host-r6-status":"status";
     try{return parseJsonOutput(await updater([subcommand,"--request-id",id]),"UPDATE_STATUS_INVALID");}
     catch{throw coded("UPDATE_STATUS_UNAVAILABLE");}
   }
@@ -280,7 +283,9 @@ export function createMaintenanceAgent({
       "--json","number,title,state,body,author,labels,comments"],"GITHUB_ISSUE_READ_FAILED");
   }
   async function manifestBytes(request){
-    const approvedPath=request.operation==="employment-r6-host-register"
+    const approvedPath=request.operation===R54_B_OPERATION
+      ?'approvals/theme-nine-r54/sixfile-source.json'
+      :request.operation==="employment-r6-host-register"
       ?"approvals/host-r6/afdd8fab1c03b321e4b8b0853bb236c0800a0a14.json"
       :`approvals/controller-updates/${request.targetControllerSha}.json`;
     const resource=`repos/${repo}/contents/${approvedPath}?ref=main`;
@@ -484,7 +489,7 @@ export function createMaintenanceAgent({
     return persistResult(entry,result);
   }
   async function processIssue(issue){
-    if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE].includes(issue?.title)
+    if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE].includes(issue?.title)
       ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
       return {status:"IGNORED",issueNumber:issue?.number};
     if(typeof issue.body!=="string"||Buffer.byteLength(issue.body)>MAX_BODY_BYTES){
@@ -495,8 +500,12 @@ export function createMaintenanceAgent({
       const parsed=parseIssueBody(issue.body);
       request=parsed.operation==="employment-r6-host-register"
         ?validateR6HostIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
+        :parsed.operation===R54_B_OPERATION
+        ?validateR54BIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
         :validateMaintenanceRequest(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo});
       if((request.operation==="employment-r6-host-register")!==(issue.title===R6_HOST_ISSUE_TITLE))
+        throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
+      if((request.operation===R54_B_OPERATION)!==(issue.title===R54_B_ISSUE_TITLE))
         throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
     }catch{
       return {status:"BLOCKED",code:"ISSUE_CONTRACT_INVALID",issueNumber:issue.number};
@@ -540,7 +549,9 @@ export function createMaintenanceAgent({
       const installedSha=installedShaFromStatus(preflight);
       if(!isSha(installedSha))throw coded("INSTALLED_CONTROLLER_SHA_UNVERIFIED");
       const args={actor:issue.author.login,allowedActors,controlRepository:repo,installedSha};
-      approved=request.operation==="employment-r6-host-register"
+      approved=request.operation===R54_B_OPERATION
+        ?validateR54BManifestRequest(request,approvedBytes,{...args})
+        :request.operation==="employment-r6-host-register"
         ?validateR6HostRegistrationRequest(request,approvedBytes,args)
         :validateUpdateRequest(request,approvedBytes,args);
     }catch(error){
@@ -568,7 +579,8 @@ export function createMaintenanceAgent({
     if(!held.created)return {status:"RUNNING",code:"DUPLICATE_REQUEST_SUPPRESSED"};
     let result;
     try{
-      const command=request.operation==="employment-r6-host-register"?"host-r6-apply":"apply";
+      const command=request.operation===R54_B_OPERATION?'r54-b-apply'
+        :request.operation==="employment-r6-host-register"?"host-r6-apply":"apply";
       const executed=parseJsonOutput(await updater([command,"--request-id",request.requestId,
         "--manifest-file",packageFile]),"UPDATE_OUTPUT_INVALID");
       result=normalizedResult(request,executed,executed.code);

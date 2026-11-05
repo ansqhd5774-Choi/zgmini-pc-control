@@ -1,0 +1,28 @@
+{
+  "schema": "ZGMINI_R54_SIXFILE_B_ONE_TIME_TASK_HOLD_V2",
+  "status": "APPROVED_B",
+  "scope": "R54_FIXED_SIXFILE_SOURCE_ONLY",
+  "runCount": 1,
+  "noProviderCalls": true,
+  "noD1Writes": true,
+  "noControllerChanges": true,
+  "files": [
+    {"path": "scripts/pc-writer/theme-nine-r54-public-connect.mjs", "old": "c6e4699d62bdef991911561623e37c205fd8bb6e5aa69907c3e93e36908fd31e", "next": "8698389663d2e71c5684c4bcc2dd1e9b0a68d06cc002769b1d2a8e3e68289d3d"},
+    {"path": "scripts/pc-writer/theme-nine-r51-stage-current.mjs", "old": "fe079b1e2e5d2f824f6e0ff251bd2a01677fe1a477072c619b614402fbd90ae4", "next": "5a50761756be6081c71df7aa30869ed43547fbb867e476b7c581072939c27560"},
+    {"path": "scripts/pc-writer/theme-nine-r51-provisional-overlay.mjs", "old": "dfc326e2738c1b8b82451510104ac6ad502e2a9876e0a3a76d939c412e907bb7", "next": "7378d04bccea4c68ab93ce3b1b829b5bc0a742db49b88d1e7530482c4ea8b6cc"},
+    {"path": "scripts/pc-writer/theme-nine-r54-public-record.mjs", "old": "f2a688da40d7b5ee90ed2a27a40af05b9c63116284930f1cc26041064737d012", "next": "85686106412b2c4a5af51ce5de6b844729bad02441cf9bab1e51ae369a3a4a27"},
+    {"path": "scripts/pc-writer/theme-nine-r48-d1-publication.mjs", "old": "7a10fe41710dbc1a21c9f3e343c538cd96b6c5695b683f04dce48af85ede6e7e", "next": "fc55ee3a2c998a4dfa7c5edd9230a68fab3954dd745b39bbe39a6177363bf45a"},
+    {"path": "worker/theme-nine-r37-public.mjs", "old": "e6768dd37ebe65b9015aeb37b4a088c568ab839f085936cec8305c56ea36ce33", "next": "30326c94c7b6f0963329cc00f7a3649c906f8e884d6915a4da38005281bcfd85"}
+  ],
+  "taskStateException": {
+    "mode": "DISABLE_RESTORE_SAME_TASK_ONCE",
+    "taskName": "ZGMINI-PC-Theme-Nine-R54-Public",
+    "preserveOriginalXml": true,
+    "preserveOriginalEnabledState": true,
+    "waitForNaturalExit": true,
+    "noForceTermination": true,
+    "noOtherTaskChanges": true,
+    "restoreOnlyAfterSixFileIntegrity": true,
+    "noAutomaticRetry": true
+  }
+}
