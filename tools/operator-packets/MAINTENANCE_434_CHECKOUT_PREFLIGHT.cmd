@@ -54,15 +54,21 @@ if errorlevel 1 (
   goto :preflight_blocked
 )
 >>"%ZG_REPORT%" echo GIT_CHECKOUT_VALID=YES
-set "ZG_BRANCH=UNAVAILABLE"
-for /f "delims=" %%B in ('git -C "%ZG_REPO%" branch --show-current 2^>nul') do set "ZG_BRANCH=%%B"
->>"%ZG_REPORT%" echo GIT_BRANCH=%ZG_BRANCH%
-set "ZG_HEAD=UNAVAILABLE"
-for /f "delims=" %%H in ('git -C "%ZG_REPO%" rev-parse --verify HEAD 2^>nul') do set "ZG_HEAD=%%H"
->>"%ZG_REPORT%" echo GIT_HEAD=%ZG_HEAD%
-set "ZG_ORIGIN_MAIN=UNAVAILABLE"
-for /f "delims=" %%O in ('git -C "%ZG_REPO%" rev-parse --verify refs/remotes/origin/main 2^>nul') do set "ZG_ORIGIN_MAIN=%%O"
->>"%ZG_REPORT%" echo GIT_ORIGIN_MAIN_LOCAL=%ZG_ORIGIN_MAIN%
+>>"%ZG_REPORT%" echo GIT_BRANCH_BEGIN
+git -C "%ZG_REPO%" branch --show-current >>"%ZG_REPORT%" 2>nul
+set "ZG_BRANCH_RC=%errorlevel%"
+>>"%ZG_REPORT%" echo GIT_BRANCH_END
+>>"%ZG_REPORT%" echo GIT_BRANCH_EXIT=%ZG_BRANCH_RC%
+>>"%ZG_REPORT%" echo GIT_HEAD_BEGIN
+git -C "%ZG_REPO%" rev-parse --verify HEAD >>"%ZG_REPORT%" 2>nul
+set "ZG_HEAD_RC=%errorlevel%"
+>>"%ZG_REPORT%" echo GIT_HEAD_END
+>>"%ZG_REPORT%" echo GIT_HEAD_EXIT=%ZG_HEAD_RC%
+>>"%ZG_REPORT%" echo GIT_ORIGIN_MAIN_LOCAL_BEGIN
+git -C "%ZG_REPO%" rev-parse --verify refs/remotes/origin/main >>"%ZG_REPORT%" 2>nul
+set "ZG_ORIGIN_RC=%errorlevel%"
+>>"%ZG_REPORT%" echo GIT_ORIGIN_MAIN_LOCAL_END
+>>"%ZG_REPORT%" echo GIT_ORIGIN_MAIN_LOCAL_EXIT=%ZG_ORIGIN_RC%
 git -C "%ZG_REPO%" ls-files --error-unmatch -- "%ZG_REL%" >nul 2>&1
 set "ZG_TRACKED_RC=%errorlevel%"
 if "%ZG_TRACKED_RC%"=="0" (
