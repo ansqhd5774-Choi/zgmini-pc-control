@@ -5,12 +5,21 @@ import {validateMaintenanceRequest,validateUpdateRequest} from './maintenance-co
 
 export const CONTROLLER_ADMISSION_LANE='controller-install';
 export const CONTROLLER_ADMISSION_SCHEMA='ZGMINI_CONTROLLER_ADMISSION_ITEM_V1';
+export const CONTROLLER_READY_FEED_SCHEMA='ZGMINI_CONTROLLER_READY_FEED_V1';
+export const CONTROLLER_READY_FEED_PATH='config/controller-admission-ready.json';
 const QUEUE_ID=/^[a-z0-9][a-z0-9-]{7,79}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA256=/^[a-f0-9]{64}$/;
 const safeCode=value=>/^[A-Z][A-Z0-9_]{0,79}$/.test(String(value??''))
  ?String(value):'QUEUE_VALIDATION_FAILED';
 const result=(status,code,extra={})=>Object.freeze({status,code,...extra});
+const READY_ACTION='SUBMIT_APPROVED_B_ONCE';
+const EXPECTED_REPOSITORY='ansqhd5774-Choi/zgmini-pc-control';
+const boundedBytes=raw=>(Buffer.isBuffer(raw)?raw:
+ typeof raw==='string'?Buffer.from(raw,'utf8'):null);
+const exactKeys=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)
+ &&Object.keys(value).length===keys.length
+ &&keys.every(key=>Object.hasOwn(value,key));
 
 function checkItem(item){
  if(!item||typeof item!=='object'||Array.isArray(item)
@@ -23,6 +32,72 @@ function checkItem(item){
  if(item.dependencies!==undefined&&(!Array.isArray(item.dependencies)
    ||item.dependencies.some(x=>!QUEUE_ID.test(String(x)))))return 'QUEUE_DEPENDENCIES_INVALID';
  return null;
+}
+
+/**
+ * Validates an explicit operator READY declaration from authenticated control
+ * repo main. It neither dispatches an Issue nor grants B approval. A host must
+ * independently verify the execution-intent approval reference against the
+ * actual user approval, *separately* from the installation manifest approval.
+ * Main-source proof must be a real remote readback, not a Boolean inferred
+ * from an Issue or from a #68 comment. The host must never build this feed from
+ * free-text coordination comments.
+ */
+export async function parseTrustedControllerReadyFeed({
+ bytes,sourceRepository,sourceRef,sourcePath,mainReadbackVerified,
+ verifyBExecutionApproval,allowedActors=['ansqhd5774-Choi'],
+}={}){
+ if(sourceRepository!==EXPECTED_REPOSITORY||sourceRef!=='main'
+  ||sourcePath!==CONTROLLER_READY_FEED_PATH||mainReadbackVerified!==true)
+  return result('STATE_UNKNOWN','QUEUE_READY_SOURCE_UNVERIFIED');
+ const raw=boundedBytes(bytes);
+ if(!raw||raw.length<2||raw.length>32768)
+  return result('BLOCKED','QUEUE_READY_BYTES_INVALID');
+ let feed;
+ try{feed=JSON.parse(raw.toString('utf8'));}
+ catch{return result('BLOCKED','QUEUE_READY_JSON_INVALID');}
+ if(!exactKeys(feed,['schema','items'])||feed.schema!==CONTROLLER_READY_FEED_SCHEMA
+  ||!Array.isArray(feed.items)||feed.items.length>32)
+  return result('BLOCKED','QUEUE_READY_CONTRACT_INVALID');
+ if(feed.items.length===0)return result('EMPTY','QUEUE_READY_EMPTY',{items:[]});
+ if(typeof verifyBExecutionApproval!=='function')
+  return result('WAITING_APPROVAL','QUEUE_B_EXECUTION_PROOF_ADAPTER_MISSING');
+ const ids=new Set(),items=[];
+ for(const item of feed.items){
+  if(!exactKeys(item,['schema','queueId','resourceLane','status','request',
+    'dependencies','executionIntent']))
+   return result('BLOCKED','QUEUE_READY_ITEM_FIELDS_INVALID');
+  const issue=checkItem(item);
+  if(issue)return result('BLOCKED',issue);
+  if(ids.has(item.queueId))return result('BLOCKED','QUEUE_READY_DUPLICATE_ID');
+  ids.add(item.queueId);
+  if(!exactKeys(item.executionIntent,['action','approvalRef'])
+   ||item.executionIntent.action!==READY_ACTION
+   ||typeof item.executionIntent.approvalRef!=='string'
+   ||!/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/(?:issues|pull)\/[1-9][0-9]*(?:#issuecomment-[1-9][0-9]*)?$/.test(item.executionIntent.approvalRef))
+   return result('BLOCKED','QUEUE_B_EXECUTION_INTENT_INVALID');
+  try{validateMaintenanceRequest(item.request,{
+   actor:'ansqhd5774-Choi',allowedActors});}
+  catch{return result('BLOCKED','QUEUE_READY_REQUEST_INVALID');}
+  let proof;
+  try{proof=await verifyBExecutionApproval({
+   queueId:item.queueId,ref:item.executionIntent.approvalRef,
+   targetControllerSha:item.request.targetControllerSha,
+   approvalManifestSha256:item.request.approvalManifestSha256,
+   scope:'PC_CONTROL_CONTROLLER_UPDATE',action:READY_ACTION});}
+  catch{return result('STATE_UNKNOWN','QUEUE_B_EXECUTION_PROOF_UNCERTAIN');}
+  if(proof?.verified!==true||proof?.scope!=='PC_CONTROL_CONTROLLER_UPDATE'
+   ||proof?.queueId!==item.queueId||proof?.ref!==item.executionIntent.approvalRef
+   ||proof?.targetControllerSha!==item.request.targetControllerSha
+   ||proof?.approvalManifestSha256!==item.request.approvalManifestSha256
+   ||proof?.actor!=='ansqhd5774-Choi')
+   return result('WAITING_APPROVAL','QUEUE_B_EXECUTION_PROOF_UNVERIFIED');
+  items.push(Object.freeze({...item,
+   request:Object.freeze({...item.request}),
+   dependencies:Object.freeze([...item.dependencies]),
+   executionIntent:Object.freeze({...item.executionIntent})}));
+ }
+ return result('READY','QUEUE_READY_FEED_VERIFIED',{items:Object.freeze(items)});
 }
 
 function priorOutcome(prior,key,request,allowedActors){
