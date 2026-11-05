@@ -602,7 +602,7 @@ export function createMaintenanceAgent({
   async function pollOnce(){
     await repositoryAllowed();
     const summaries=await githubJson(["issue","list","--repo",repo,"--state","open",
-       "--label",label,"--limit","1000","--json","number,title"],"GITHUB_ISSUE_LIST_FAILED");
+      "--label",label,"--limit","1000","--json","number,title"],"GITHUB_ISSUE_LIST_FAILED");
     if(!Array.isArray(summaries))throw coded("GITHUB_ISSUE_LIST_INVALID");
     const seen=new Set(),results=[];
     for(const entry of summaries){
