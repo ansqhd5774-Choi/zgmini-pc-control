@@ -58,7 +58,7 @@
 - **현재 목표:** Controller 공통 프로세스 장애 제거·병렬 A 유지·공용 B 설치 중복 방지. 기능별 수집·계산·게시 업무는 해당 작업자가 진행.
 - **LAST PASS:** [공용 대기열 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 상단 상태 요약 갱신·본문 5,249자 보존/7,065자 재조회. [#442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) 격리 시험 19/19, 결과 불일치 삭제 중단. [#437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) 14/14 및 실제 GitHub 17건 KPI 기준선 확보.
 - **운영 설치의 마지막 유효 증거:** Controller `69c830275bd3fec75b17c8a98c46d689447fb1a7`([#432](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/432#issuecomment-6656893231)); 유지보수기 `c66a629f2a52b232e92b90e42906795afa4cb657`([#68 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6658289465)). 현재 상태를 보장하지 않음.
-- **실제 미해결:** #431 B 적용 결과 미확인; #433·#435 Controller 기능과 #434 유지보수기 기능의 운영 설치 미확인; #442 Draft/Windows 미검증; #437 Draft/개선 효과 미측정. 과거 #339·#319 복구를 이번 신규 장애로 소급하지 않는다.
+- **실제 미해결:** #431 B 적용 결과 미확인; #433·#435 Controller 기능과 #434 유지보수기 기능의 운영 설치 미확인; #442 Draft/Windows 미검증; #437 source `main` 병합/개선 효과 미측정. 과거 #339·#319 복구를 이번 신규 장애로 소급하지 않는다.
 - **#434 사용자 지정 전담 인계·준비:** #434 **독립 유지보수기 인계 실행만** `b434_installer`가 총괄 관리 아래 담당하며, 기존 R17 담당은 #431 Controller 설치·공용 B 조정을 유지. 유지보수기 `c66a629f…` 대비 8파일 중 `tools/maintenance-agent.mjs` 1파일 변경. 신규 8파일 SHA 고정 명세는 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443)으로 **main 병합(`14fa522c0b051801f6a12b64d872d7a50532d39e`) 완료**됐으나 **Windows-local 검증·B 접수·PC 인계 0건**. [#68 원장](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 및 [#434 담당 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434#issuecomment-6663610515) 근거. #431 설치 완료는 #434 기술적 Gate 아님.
 
 | 남은 5개 항목 | 2026-11-06 소스 결과 | 운영 확인과 다음 담당 |
@@ -67,10 +67,10 @@
 | [#435 TXT·JSON 재조회](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/435) | `main` 병합·8/8 테스트 | 설치 후 원격 2파일·댓글 재조회 필요. #431과 기술적 파일 중첩 없음 |
 | [#434 E: 중복 보고 방지](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434) | `main` 병합·30/30 테스트, [#443 명세](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 병합 | **명세 누락 해소**. 실제 Windows checkout 내 승인파일·설치 SHA·Receiver·인계/효과 확인 필요. #431 완료는 기술적 Gate 아님 |
 | [#442 E: 임시 출력 정리](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) | Draft·19/19 테스트, 원격 코드 일치 | #435 실제 게시 검증 뒤 운영 승인 범위로 Windows 단건 시험 |
-| [#437 대기·실행시간 KPI](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | Draft·14/14, 실 GitHub 17건(12 PASS·5 BLOCKED, 제외 0) | Issue 생성→Controller 시작 중앙값 **18,495ms**, 전체 처리 중앙값 **5,718ms**, 관측 겹침 최대 2. 순수 Runner 대기·worker 시간 아님. 실제 개선 효과는 전후 비교 후 판정 |
+| [#437 대기·실행시간 KPI](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | `main` source 병합 `ac1f5c22e6b06fafbc45ef6c4d6cacdb309a110a`·14/14, 실 GitHub 17건(12 PASS·5 BLOCKED, 제외 0) | Issue 생성→Controller 시작 중앙값 **18,495ms**, 전체 처리 중앙값 **5,718ms**, 관측 겹침 최대 2. 순수 Runner 대기·worker 시간 아님. 실제 개선 효과는 전후 비교 후 판정 |
 
 **다음 필수 실행 하나:** 기존 [#68 단일 B 설치 담당](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6657001707)이 실제 설치 SHA·lease를 확인하고 #431 정확한 4파일 명세의 단회 설치 요청·결과를 회수한다. 동시에 독립 #434 유지보수기 인계 준비와 #435 별도 승인·파일 검토는 기존 담당자가 이어가며, 총괄은 새로운 요청을 중복 생성하지 않는다.
 
 **이 인계의 한계:** 브랜치 문서 갱신은 `main` 병합·B 승인·PC 설치·E: 삭제를 수행한 것이 아니다. 최신 운영 판단에는 #68과 실제 원본 결과를 다시 대조한다.
 
-**남은 5건 최종 운영 판정:** 현재 `FINAL PASS` **0/5**. #433·#435·#434 소스 병합, #442 19/19 격리 시험, #437 GitHub 17건 기준선은 각각 운영 적용·효과 검증과 구분한다.
+**남은 5건 최종 운영 판정:** 현재 `FINAL PASS` **0/5**. #433·#435·#434·#437 소스 병합, #442 19/19 격리 시험, #437 GitHub 17건 기준선은 각각 운영 적용·효과 검증과 구분한다.
