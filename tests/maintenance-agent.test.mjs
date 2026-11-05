@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {test} from "node:test";
 
-import {createMaintenanceAgent,failedUpdaterResult} from "../tools/maintenance-agent.mjs";
+import {createMaintenanceAgent,failedUpdaterResult,normalizedResult} from "../tools/maintenance-agent.mjs";
 
 test('pre-install child rejection retains exact safe code and current installed SHA',()=>{
  const r=failedUpdaterResult({requestId:'fixture',targetControllerSha:'b'.repeat(40)},
@@ -19,7 +19,7 @@ test('unknown stage never claims untouched install and never copies arbitrary st
  const exact=failedUpdaterResult({requestId:'fixture'},{stdout:JSON.stringify({status:'AUTOMATION_BLOCKED',code:'SUPERVISOR_NOT_HEALTHY'})},{ledger:null,installLock:{held:false}});
  assert.equal(exact.status,'UNKNOWN');assert.equal(exact.code,'SUPERVISOR_NOT_HEALTHY');
 });
-import {manifestFingerprint} from "../tools/maintenance-contract.mjs";
+import {manifestFingerprint,R54_B_SOURCE_FILES,R54_B_OPERATION,R54_B_ISSUE_TITLE} from "../tools/maintenance-contract.mjs";
 
 const REPO="ansqhd5774-Choi/zgmini-pc-control";
 const ACTOR="ansqhd5774-Choi";
@@ -157,7 +157,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   return {root,leaseRoot,agent,stats,remote,calls,issue,request,manifest,rawManifest,fakeExec};
 }
 
-test("authorized private-repo issue starts one standalone updater and persists redacted TXT/JSON and one comment",async t=>{
+test("authorized private-repo issue uploads redacted TXT/JSON without E report accumulation",async t=>{
   const f=fixture(t);
   const result=await f.agent.pollOnce();
   assert.equal(result.length,1);
@@ -169,14 +169,18 @@ test("authorized private-repo issue starts one standalone updater and persists r
   assert.equal(f.agent.loadLedger(REQUEST_ID).reportUploadStatus,"VERIFIED");
   assert.equal(fs.existsSync(path.join(f.leaseRoot,"result-upload")),false);
   const reportFile=path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`);
-  const report=JSON.parse(fs.readFileSync(reportFile,"utf8"));
+  const remoteJson=`repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.json`;
+  const remoteTxt=`repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.txt`;
+  const report=JSON.parse(f.remote.get(remoteJson).toString("utf8"));
   assert.equal(report.status,"SUCCEEDED");
   assert.equal(report.code,"UPDATE_COMMITTED");
   assert.equal(report.actualControllerSha,TARGET);
   assert.equal(report.protectedStateUnchanged,true);
   assert.equal(report.workflowEnabled,false);
-  const text=[fs.readFileSync(reportFile,"utf8"),
-    fs.readFileSync(reportFile.replace(/\.json$/,".txt"),"utf8"),f.issue.comments[0].body].join("\n");
+  assert.equal(fs.existsSync(reportFile),false);
+  assert.equal(fs.existsSync(reportFile.replace(/\.json$/,".txt")),false);
+  const text=[f.remote.get(remoteJson).toString("utf8"),
+    f.remote.get(remoteTxt).toString("utf8"),f.issue.comments[0].body].join("\n");
   assert.doesNotMatch(text,/approved\/|private-|GH_TOKEN|\.sqlite|manifestRawBase64|allowFiles/);
   const repeat=await f.agent.pollOnce();
   assert.equal(repeat[0].code,"DUPLICATE_REQUEST_SUPPRESSED");
@@ -301,18 +305,18 @@ test("same request ID with edited issue payload is blocked without a second inst
   assert.equal(f.stats.comments,1);
 });
 
-test("a new maintainer process reuses durable ledger even if Issue comments disappear",async t=>{
+test("a new maintainer process reuses durable ledger without recreating E reports",async t=>{
   const f=fixture(t);
   await f.agent.pollOnce();
   assert.equal(f.agent.loadLedger(REQUEST_ID).commentPosted,true);
   f.issue.comments.length=0;
   const txt=path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`);
-  fs.unlinkSync(txt); // simulated crash after ledger/JSON but before TXT durability
+  assert.equal(fs.existsSync(txt),false);
   const restarted=createMaintenanceAgent({stateDir:f.root,leaseRoot:f.leaseRoot,
     leaseAttempts:1,leaseWaitMs:0,execFileImpl:f.fakeExec});
   const again=await restarted.pollOnce();
   assert.equal(again[0].code,"DUPLICATE_REQUEST_SUPPRESSED");
-  assert.equal(fs.existsSync(txt),true);
+  assert.equal(fs.existsSync(txt),false);
   assert.equal(f.stats.applies,1);
   assert.equal(f.stats.comments,1);
 });
@@ -334,7 +338,7 @@ test("manifest byte-pin mismatch or missing independent installed SHA blocks bef
   assert.equal(f.stats.comments,1);
 });
 
-test("occupied shared result-upload lease leaves local reports and Issue comment in PENDING, then retries upload only",async t=>{
+test("occupied upload lease keeps only durable ledger in PENDING, then retries upload only",async t=>{
   const f=fixture(t);
   const lock=path.join(f.leaseRoot,"result-upload");
   fs.mkdirSync(lock);
@@ -347,8 +351,9 @@ test("occupied shared result-upload lease leaves local reports and Issue comment
   assert.equal(f.stats.comments,1);
   assert.match(f.issue.comments[0].body,/REPORT_UPLOAD: REPORT_UPLOAD_PENDING/);
   assert.equal(fs.existsSync(path.join(lock,"owner.json")),true);
-  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`)),true);
-  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`)),true);
+  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`)),false);
+  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`)),false);
+  assert.equal(f.agent.loadLedger(REQUEST_ID).result.status,"SUCCEEDED");
   fs.unlinkSync(path.join(lock,"owner.json"));fs.rmdirSync(lock);
   const again=await f.agent.pollOnce();
   assert.equal(again[0].reportUploadStatus,"VERIFIED");
@@ -358,6 +363,108 @@ test("occupied shared result-upload lease leaves local reports and Issue comment
   assert.match(f.issue.comments[1].body,/REPORT_UPLOAD_VERIFIED/);
   await f.agent.pollOnce();
   assert.equal(f.stats.comments,2);
+});
+
+test("a restarted maintainer resumes a PENDING upload from ledger without E report files",async t=>{
+  const f=fixture(t);
+  const lock=path.join(f.leaseRoot,"result-upload");
+  fs.mkdirSync(lock);
+  fs.writeFileSync(path.join(lock,"owner.json"),JSON.stringify({pid:9999,nonce:"another-job"}));
+  const first=await f.agent.pollOnce();
+  assert.equal(first[0].reportUploadStatus,"REPORT_UPLOAD_PENDING");
+  assert.equal(f.stats.applies,1);
+  assert.equal(fs.existsSync(path.join(f.root,"reports")),false);
+  fs.unlinkSync(path.join(lock,"owner.json"));fs.rmdirSync(lock);
+  const restarted=createMaintenanceAgent({stateDir:f.root,leaseRoot:f.leaseRoot,
+    leaseAttempts:1,leaseWaitMs:0,execFileImpl:f.fakeExec});
+  const again=await restarted.pollOnce();
+  assert.equal(again[0].reportUploadStatus,"VERIFIED");
+  assert.equal(f.stats.applies,1);
+  assert.equal(f.remote.size,2);
+  assert.equal(restarted.loadLedger(REQUEST_ID).reportUploadStatus,"VERIFIED");
+  assert.equal(fs.existsSync(path.join(f.root,"reports")),false);
+});
+
+test("preexisting E historical reports are preserved until separately approved cleanup",async t=>{
+  const f=fixture(t);
+  const historical=path.join(f.root,"reports","MAINTENANCE_pc-old-report.json");
+  fs.mkdirSync(path.dirname(historical));
+  fs.writeFileSync(historical,"historical recovery evidence\n");
+  await f.agent.pollOnce();
+  await f.agent.pollOnce();
+  assert.equal(fs.readFileSync(historical,"utf8"),"historical recovery evidence\n");
+  assert.equal(fs.readdirSync(path.dirname(historical)).length,1);
+});
+
+test("uncertain PENDING old local report copies are never deleted or overwritten",async t=>{
+  const f=fixture(t);
+  const reports=path.join(f.root,"reports");
+  fs.mkdirSync(reports);
+  const json=path.join(reports,`MAINTENANCE_${REQUEST_ID}.json`);
+  const txt=path.join(reports,`MAINTENANCE_${REQUEST_ID}.txt`);
+  fs.writeFileSync(json,"legacy pending json\n");
+  fs.writeFileSync(txt,"legacy pending text\n");
+  const lock=path.join(f.leaseRoot,"result-upload");
+  fs.mkdirSync(lock);fs.writeFileSync(path.join(lock,"owner.json"),"other process\n");
+  const pending=await f.agent.pollOnce();
+  assert.equal(pending[0].reportUploadStatus,"REPORT_UPLOAD_PENDING");
+  assert.equal(fs.readFileSync(json,"utf8"),"legacy pending json\n");
+  assert.equal(fs.readFileSync(txt,"utf8"),"legacy pending text\n");
+  fs.unlinkSync(path.join(lock,"owner.json"));fs.rmdirSync(lock);
+  const verified=await f.agent.pollOnce();
+  assert.equal(verified[0].reportUploadStatus,"VERIFIED");
+  assert.equal(fs.readFileSync(json,"utf8"),"legacy pending json\n");
+  assert.equal(fs.readFileSync(txt,"utf8"),"legacy pending text\n");
+});
+
+test("restarted R54 B pending ledger reuploads all six pinned drift hashes without E logs",async t=>{
+  const f=fixture(t);
+  const request={...f.request,operation:R54_B_OPERATION};
+  f.issue.title=R54_B_ISSUE_TITLE;
+  f.issue.body=JSON.stringify(request);
+  const sourceInventory=R54_B_SOURCE_FILES.map((pin,i)=>({
+    path:pin.path,
+    state:i===2?'UNKNOWN':'OLD',
+    actual:i===2?'e'.repeat(64):pin.old,
+    expectedOld:pin.old,
+    approvedNext:pin.next,
+  }));
+  const result=normalizedResult(request,{
+    status:'BLOCKED',code:'R54_B_ORIGINAL_SOURCE_SHA_DRIFT',
+    firstFail:'R54_B_ORIGINAL_SOURCE_SHA_DRIFT',sourceInventory,
+    actualControllerSha:TARGET,workflowEnabled:null,
+  },'R54_B_ORIGINAL_SOURCE_SHA_DRIFT');
+  assert.equal(result.sourceInventory?.length,6);
+  const ledger={schema:'ZGMINI_PC_MAINTENANCE_LEDGER_V1',requestId:request.requestId,
+    issueNumber:f.issue.number,actor:ACTOR,fingerprint:digest(JSON.stringify(request)),
+    bodyDigest:digest(f.issue.body),targetControllerSha:TARGET,status:'BLOCKED',
+    createdAt:new Date().toISOString(),result,
+    reportUploadStatus:'REPORT_UPLOAD_PENDING',reportUploadCode:'REPORT_UPLOAD_PENDING',
+    commentPosted:true,commentUploadStatus:'REPORT_UPLOAD_PENDING'};
+  const requests=path.join(f.root,'requests');fs.mkdirSync(requests,{recursive:true});
+  fs.writeFileSync(path.join(requests,digest(request.requestId)+'.json'),
+    JSON.stringify(ledger,null,2)+'\n');
+  const restarted=createMaintenanceAgent({stateDir:f.root,leaseRoot:f.leaseRoot,
+    leaseAttempts:1,leaseWaitMs:0,execFileImpl:f.fakeExec});
+  const first=await restarted.pollOnce();
+  assert.equal(first[0].code,'DUPLICATE_REQUEST_SUPPRESSED');
+  assert.equal(first[0].reportUploadStatus,'VERIFIED');
+  const jsonKey=`repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.json`;
+  const txtKey=`repos/${REPO}/contents/results/maintenance-${REQUEST_ID}.txt`;
+  const remote=JSON.parse(f.remote.get(jsonKey).toString('utf8'));
+  assert.equal(remote.sourceInventory.length,6);
+  assert.deepEqual(remote.sourceInventory,sourceInventory);
+  assert.equal(remote.workflowEnabled,null);
+  assert.match(f.remote.get(txtKey).toString('utf8'),
+    /R54_SOURCE_DRIFT: scripts\/pc-writer\/theme-nine-r51-provisional-overlay\.mjs UNKNOWN e{64}/);
+  assert.equal(f.stats.applies,0);
+  assert.equal(f.stats.uploadWrites,2);
+  assert.equal(fs.existsSync(path.join(f.root,'reports')),false);
+  assert.equal(f.issue.comments.length,1);
+  assert.match(f.issue.comments[0].body,/REPORT_UPLOAD_VERIFIED/);
+  const second=await restarted.pollOnce();
+  assert.equal(second[0].reportUploadStatus,'VERIFIED');
+  assert.equal(f.stats.uploadWrites,2);
 });
 
 test("existing different bytes at fixed result path STOP without overwrite or repeated upload attempts",async t=>{
@@ -385,7 +492,7 @@ test("ambiguous GitHub PUT timeout is reconciled by GET byte-for-byte readback",
   assert.equal(f.stats.comments,1);
 });
 
-test("failed GitHub PUT keeps local reports and Issue comment, no success claim",async t=>{
+test("failed GitHub PUT keeps durable ledger and Issue comment, no E reports or success claim",async t=>{
   const f=fixture(t,{uploadFailure:Object.assign(Error("offline"),{code:"ETIMEDOUT"})});
   const first=await f.agent.pollOnce();
   assert.equal(first[0].reportUploadStatus,"REPORT_UPLOAD_PENDING");
@@ -393,8 +500,9 @@ test("failed GitHub PUT keeps local reports and Issue comment, no success claim"
   assert.equal(f.stats.comments,1);
   assert.match(f.issue.comments[0].body,/REPORT_UPLOAD: REPORT_UPLOAD_PENDING/);
   assert.equal(f.agent.loadLedger(REQUEST_ID).reportUploadStatus,"REPORT_UPLOAD_PENDING");
-  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`)),true);
-  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`)),true);
+  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`)),false);
+  assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`)),false);
+  assert.equal(f.agent.loadLedger(REQUEST_ID).result.status,"SUCCEEDED");
 });
 
 test("timed-out apply rechecks updater ledger and never repeats installation",async t=>{
@@ -463,8 +571,7 @@ test("coordinator PASS, ROLLED_BACK and RECOVERY_REQUIRED map to safe comment ou
     const f=fixture(t,{applyResult});
     const result=await f.agent.pollOnce();
     assert.equal(result[0].status,expected);
-    const report=JSON.parse(fs.readFileSync(path.join(f.root,"reports",
-      `MAINTENANCE_${REQUEST_ID}.json`),"utf8"));
+    const report=f.agent.loadLedger(REQUEST_ID).result;
     assert.equal(report.status,expected);
     assert.equal(report.actualControllerSha,actual);
   }
