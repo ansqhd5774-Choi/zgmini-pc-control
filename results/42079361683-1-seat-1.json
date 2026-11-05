@@ -1,0 +1,88 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42079361683-1-seat-1",
+  "requestId": "pc-e43cfa12-252b-4ef7-9cda-fae30b08b3eb",
+  "startedAt": "2026-11-05T17:55:58.843Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "ac1f5c22e6b06fafbc45ef6c4d6cacdb309a110a",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "a6dd77d19ccfcb79ddcdd0b4a6f495ec3888e24a",
+  "sourceBranch": "main",
+  "operation": "r54-sixfile-inventory-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "R54_SIXFILE_INVENTORY_COMPLETE",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-f23a7322-a4c9-4309-ac0d-351eda12a3a4",
+  "pcOperationalApprovedSha": "d7bc4948573843766ad82c72ff392220178c36a3",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "R54_SIXFILE_INVENTORY_COMPLETE",
+    "scope": "FIXED_R54_WRITER_SOURCE_FILES_ONLY",
+    "writerRoot": "pc-writer/theme-nine-r54",
+    "files": [
+      {
+        "path": "scripts/pc-writer/theme-nine-r54-public-connect.mjs",
+        "state": "PRESENT",
+        "sha256": "8698389663d2e71c5684c4bcc2dd1e9b0a68d06cc002769b1d2a8e3e68289d3d",
+        "bytes": 16399
+      },
+      {
+        "path": "scripts/pc-writer/theme-nine-r51-stage-current.mjs",
+        "state": "PRESENT",
+        "sha256": "5a50761756be6081c71df7aa30869ed43547fbb867e476b7c581072939c27560",
+        "bytes": 6333
+      },
+      {
+        "path": "scripts/pc-writer/theme-nine-r51-provisional-overlay.mjs",
+        "state": "PRESENT",
+        "sha256": "7378d04bccea4c68ab93ce3b1b829b5bc0a742db49b88d1e7530482c4ea8b6cc",
+        "bytes": 9747
+      },
+      {
+        "path": "scripts/pc-writer/theme-nine-r54-public-record.mjs",
+        "state": "PRESENT",
+        "sha256": "85686106412b2c4a5af51ce5de6b844729bad02441cf9bab1e51ae369a3a4a27",
+        "bytes": 2812
+      },
+      {
+        "path": "scripts/pc-writer/theme-nine-r48-d1-publication.mjs",
+        "state": "PRESENT",
+        "sha256": "fc55ee3a2c998a4dfa7c5edd9230a68fab3954dd745b39bbe39a6177363bf45a",
+        "bytes": 5125
+      },
+      {
+        "path": "worker/theme-nine-r37-public.mjs",
+        "state": "PRESENT",
+        "sha256": "30d47abdb99dc0c73c3daf54fa268e94067a9b632c70e633511c929925e794d0",
+        "bytes": 11993
+      }
+    ],
+    "expectedCount": 6,
+    "presentCount": 6,
+    "missingCount": 0,
+    "rejectedCount": 0,
+    "inventoryComplete": true,
+    "runtimeTaskBindingVerified": false,
+    "approvedForInstallation": false,
+    "providerCalls": 0,
+    "sqliteOpened": false,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "transientELogsWritten": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "02df41645efc14afd2f515c04e7e58230905bd4931f359a329befc94d2363db8",
+  "protectedAfterSha256": "02df41645efc14afd2f515c04e7e58230905bd4931f359a329befc94d2363db8",
+  "actualExecutionSha": "ac1f5c22e6b06fafbc45ef6c4d6cacdb309a110a",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-05T17:56:03.536Z",
+  "durationMs": 4693
+}
