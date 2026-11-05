@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_R17_WRITER_B_INSTALL_RESULT_V1",
+  "requestId": "pc-r17-235556a7-1a3a-4ac2-9cf0-b97b0c48ab49",
+  "status": "R17_B_INSTALLED_VERIFIED",
+  "phase": "VERIFIED",
+  "code": "R17_B_INSTALL_VERIFIED",
+  "sourceSha": "d7bc4948573843766ad82c72ff392220178c36a3",
+  "runId": "42000544313",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
