@@ -183,3 +183,10 @@
 - **실제 새 조사:** `zgmini/main`과 R37·R38·R39 관련 GitHub 브랜치의 해당 경로를 읽기 전용 비교했으나 PC의 실제 SHA256을 어느 source에 연결할지 **입증 실패(`SOURCE_NOT_PROVEN`)**. Git blob SHA1과 PC SHA256 직접 비교 금지, GitHub 텍스트 길이·크기 차이만으로 출처 확정 금지.
 - **한 번의 명시 기록 인계:** 기존 R54 작업 Issue [#428 최신 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/428#issuecomment-6668826391)에 새 조사·확정/미확정 근거·다음 필요 행동만 기록. **별도 ChatGPT 담당의 직접 수신/재개 ACK는 미확인**이며 댓글만으로 전달 완료라고 확정하지 않는다. #68에 중복 댓글·새 검증용 B는 만들지 않았다.
 - **원담당 NEXT:** PC 해당 파일의 Git HEAD/branch/dirty/tracked-path 출처를 지원되는 읽기 전용 경로로 1회 조회하고 실제 예약 task binding·승인 경계와 연결한다. 변경 출처가 확인되면 `OTHER` 보존·기존 승인 범위를 따져 최소 1파일 manifest를 준비한다. 기존 정상 5파일 재설치나 과거 #428 B 재실행 불가. 정상 B 발생 후 #434 동일 requestId GitHub GET·ledger VERIFIED·E 신규 보고서 0 검증은 별도 유지. 전체 4/5 FINAL PASS(80%).
+
+## 17. 2026-11-06 R54 원격 A급 진단 범위 확인
+
+- **독립 전담 조사 결과:** CASE `R54-READONLY-CAPABILITY-20261106`에서 현재 등록된 승인 A급 operation을 비교하여, R54 `worker/theme-nine-r37-public.mjs` **한 파일의 PC Git HEAD/branch/dirty/tracked-path와 예약 작업 binding을 함께 검증하는 기존 계약이 없음(`NOT_AVAILABLE`)**을 확인했다. 진단 불충분은 Controller·Runner 장애나 승인 철회를 의미하지 않는다.
+- `r54-sixfile-inventory-readonly`는 [#452 실PC 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452#issuecomment-6665267226)에서 파일 존재·SHA256은 검증했으나 `runtimeTaskBindingVerified=false`. 이 결과를 Git 출처/작업 연결 확인으로 확대하지 않는다.
+- `pc-source-origin-readonly`는 저장소 후보의 HEAD/전체 dirty 위주이며 해당 파일 tracked 상태·R54 예약 연결은 미지원. [#400 실PC 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/400#issuecomment-6643819841)의 `candidateCount=0`/`inventoryTruncated=true`는 출처 증거가 아니다. `pc-source-preflight`는 Core 대상, `source-audit`는 GitHub 원격만 확인한다.
+- **불필요한 재실행 금지:** 기존 A operation을 같은 입력으로 반복하거나 새 진단용 B 설치를 필수 선행 조건으로 만들지 않는다. 기존 R54 담당은 현재 승인 범위에서 **일회성 한 파일 PC Git + Task binding 읽기 전용 조회**를 수행할 수 있는 실제 지원 경로를 먼저 확인한다. 승인·도구가 지원되는 경로가 없으면 정확한 부족 권한/기능만 제시하고 독립 업무는 계속한다. `OTHER` 파일의 보존·승인 경계, 5개 `TARGET` 보존, #434 정상 B 실효과 대기는 §16 그대로 유지한다. 전체 4/5 FINAL PASS(80%).
