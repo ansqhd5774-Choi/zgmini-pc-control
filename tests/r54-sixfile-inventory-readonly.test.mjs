@@ -100,6 +100,18 @@ test('root redirect or missing drive does not masquerade as missing six files',t
  assert.ok(absent.files.every(x=>x.state==='UNKNOWN_ROOT'));
 });
 
+test('missing Writer installation root is blocked rather than six missing files',t=>{
+ const {dataRoot,writerRoot}=fixture(t);
+ fs.rmdirSync(writerRoot);
+ const result=inspectR54SixFileInventory(dataRoot);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R54_WRITER_ROOT_UNAVAILABLE');
+ assert.equal(result.presentCount,0);
+ assert.equal(result.missingCount,0);
+ assert.equal(result.inventoryComplete,false);
+ assert.ok(result.files.every(x=>x.state==='UNKNOWN_ROOT'));
+});
+
 test('oversized file is blocked and not read into memory',t=>{
  const {dataRoot,writerRoot}=fixture(t),files=seedSix(writerRoot);
  fs.writeFileSync(files[1].file,Buffer.alloc(4_000_001,1));
