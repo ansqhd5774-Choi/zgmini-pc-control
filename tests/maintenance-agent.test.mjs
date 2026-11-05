@@ -57,7 +57,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
-  extraIssueSummaries=[]}={}){
+  extraIssueSummaries=[],extraIssueDetails=[]}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -68,7 +68,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   const issue={number:72,title,state:"OPEN",body:JSON.stringify(request),
     author:{login:actor},labels:labels.map(name=>({name})),comments:[],...issuePatch};
   const calls=[],remote=new Map(),stats={applies:0,statusQueries:0,comments:0,
-    manifestReads:0,uploadWrites:0,uploadReads:0};
+    manifestReads:0,uploadWrites:0,uploadReads:0,issueViews:0};
   const applied=applyResult??{status:"SUCCEEDED",code:"UPDATE_COMMITTED",lastPass:"UPDATE_COMMITTED",
     firstFail:"NONE",actualControllerSha:TARGET,recoverySha:null,
     protectedStateUnchanged:true,workflowEnabled:false};
@@ -80,11 +80,14 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify({isPrivate:privateRepo,nameWithOwner:REPO})};
       }
       if(args[0]==="issue"&&args[1]==="list"){
-        assert.equal(args[args.indexOf('--json')+1],'number,title');
-        return {stdout:JSON.stringify([{number:issue.number,title:issue.title},...extraIssueSummaries])};
+        assert.equal(args[args.indexOf('--json')+1],'number,title,updatedAt');
+        return {stdout:JSON.stringify([{number:issue.number,title:issue.title,
+          updatedAt:issue.updatedAt},...extraIssueSummaries])};
       }
       if(args[0]==="issue"&&args[1]==="view"){
-        return {stdout:JSON.stringify(issue)};
+        stats.issueViews++;
+        const number=Number(args[2]);
+        return {stdout:JSON.stringify(extraIssueDetails.find(row=>row.number===number)??issue)};
       }
       if(args[0]==="api"){
         if(args[1].includes("/contents/results/maintenance-")){
@@ -145,7 +148,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
       assert.deepEqual(packaged.issue,request);
       assert.deepEqual(packaged.manifest,manifest);
       assert.deepEqual(Buffer.from(packaged.manifestRawBase64,"base64"),rawManifest);
-      assert.equal(packaged.issueNumber,72);
+      assert.equal(packaged.issueNumber,issue.number);
       assert.equal(packaged.actor,ACTOR);
       if(applyError)throw applyError;
       return {stdout:JSON.stringify(applied)};
@@ -198,6 +201,74 @@ test('unrelated open maintenance Issues are skipped before individual GitHub rea
  assert.equal(f.stats.applies,1);
  assert.equal(f.calls.filter(c=>c.args[0]==='issue'&&c.args[1]==='view'&&
    ['73','74'].includes(c.args[2])).length,0);
+});
+
+test("38 settled Issues skip repeated full GitHub reads while the newest new Issue runs first",async t=>{
+  const updatedAt="2026-11-06T07:30:00Z";
+  const extraIssueDetails=[],extraIssueSummaries=[];
+  const f=fixture(t,{issuePatch:{number:200,updatedAt},
+    extraIssueDetails,extraIssueSummaries});
+  for(let i=0;i<38;i++){
+    const number=100+i,requestId="pc-"+crypto.randomUUID();
+    const request={...f.request,requestId};
+    const body=JSON.stringify(request);
+    const detail={number,title:"pc-controller-update",state:"OPEN",body,
+      author:{login:ACTOR},labels:[{name:"pc-maintenance"}],comments:[],updatedAt};
+    extraIssueDetails.push(detail);
+    extraIssueSummaries.push({number,title:detail.title,updatedAt});
+    const ledger={schema:"ZGMINI_PC_MAINTENANCE_LEDGER_V1",requestId,
+      issueNumber:number,actor:ACTOR,fingerprint:digest(JSON.stringify(request)),
+      bodyDigest:digest(body),targetControllerSha:TARGET,status:"SUCCEEDED",
+      result:{schema:"ZGMINI_PC_MAINTENANCE_RESULT_V1",requestId,
+        targetControllerSha:TARGET,status:"SUCCEEDED",code:"UPDATE_COMMITTED"},
+      reportUploadStatus:"VERIFIED",commentPosted:true,commentUploadStatus:"VERIFIED"};
+    fs.writeFileSync(path.join(f.root,"requests",digest(requestId)+".json"),
+      JSON.stringify(ledger));
+  }
+  const first=await f.agent.pollOnce();
+  assert.equal(first.length,39);
+  assert.equal(first[0].requestId,REQUEST_ID,"new Issue #200 is served before settled #137");
+  assert.equal(first.filter(row=>row.code==="DUPLICATE_REQUEST_SUPPRESSED").length,38);
+  assert.equal(f.stats.applies,1);
+  const viewsBefore=f.stats.issueViews;
+  const second=await f.agent.pollOnce();
+  assert.deepEqual(second,[],"fully delivered unchanged Issues do not require reprocessing");
+  assert.equal(f.stats.issueViews,viewsBefore,"no 38 repeated gh issue view calls");
+  assert.equal(f.stats.applies,1);
+  assert.equal(f.stats.comments,1);
+});
+
+test("Issue updatedAt change invalidates settled cache and catches edited payload",async t=>{
+  const f=fixture(t,{issuePatch:{updatedAt:"2026-11-06T07:30:00Z"}});
+  await f.agent.pollOnce();
+  const before=f.stats.issueViews;
+  assert.deepEqual(await f.agent.pollOnce(),[]);
+  assert.equal(f.stats.issueViews,before);
+  f.issue.body=" \n"+f.issue.body;
+  f.issue.updatedAt="2026-11-06T07:31:00Z";
+  const changed=await f.agent.pollOnce();
+  assert.equal(changed[0].code,"REQUEST_ID_REUSE_CONFLICT");
+  assert.equal(f.stats.applies,1);
+});
+
+test("incomplete or suspicious settled ledger never enters the fast-path",async t=>{
+  for(const mutate of [
+    entry=>({...entry,reportUploadStatus:"REPORT_UPLOAD_PENDING"}),
+    entry=>({...entry,commentPosted:false}),
+    entry=>({...entry,status:"UNKNOWN",result:{...entry.result,status:"UNKNOWN"}}),
+    entry=>({...entry,commentUploadStatus:"REPORT_UPLOAD_PENDING",deliveryCommentPosted:false}),
+    entry=>({...entry,issueNumber:999}),
+  ]){
+    const f=fixture(t,{issuePatch:{updatedAt:"2026-11-06T07:30:00Z"}});
+    await f.agent.pollOnce();
+    const ledgerFile=path.join(f.root,"requests",digest(REQUEST_ID)+".json");
+    const original=JSON.parse(fs.readFileSync(ledgerFile,"utf8"));
+    fs.writeFileSync(ledgerFile,JSON.stringify(mutate(original)));
+    const before=f.stats.issueViews;
+    await f.agent.pollOnce();
+    assert.ok(f.stats.issueViews>before,"uncertain ledger requires full Issue read");
+    assert.equal(f.stats.applies,1);
+  }
 });
 
 test("an active global install lease keeps another request queued without claiming it",async t=>{
