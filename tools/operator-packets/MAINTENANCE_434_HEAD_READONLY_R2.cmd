@@ -11,7 +11,7 @@ echo ZGMINI 434 - local HEAD read only. Git changes: NONE.
 echo The previous pinned FF CMD must NOT be rerun.
 if not defined TEMP goto :no_temp
 set "ZG_REPORT=%TEMP%\ZGMINI_MAINTENANCE_434_HEAD_READONLY_R2_RESULT.txt"
-echo Result location: %ZG_REPORT%
+echo Result location: the user TEMP folder; Notepad will display it at the end.
 if exist "%ZG_REPORT%" goto :existing
 > "%ZG_REPORT%" echo SCHEMA=ZGMINI_MAINTENANCE_434_HEAD_READONLY_R2
 if errorlevel 1 goto :write_fail
@@ -28,13 +28,17 @@ if errorlevel 1 goto :invalid_repo
 >>"%ZG_REPORT%" echo GIT_BRANCH_BEGIN
 git -C "%ZG_REPO%" branch --show-current >>"%ZG_REPORT%" 2>&1
 >>"%ZG_REPORT%" echo GIT_BRANCH_END
+set "ZG_ON_MAIN=NO"
+git -C "%ZG_REPO%" branch --show-current | findstr /x /c:"main" >nul
+if not errorlevel 1 set "ZG_ON_MAIN=YES"
+>>"%ZG_REPORT%" echo MAIN_BRANCH=%ZG_ON_MAIN%
 set "ZG_HEAD="
 for /f "delims=" %%H in ('git -C "%ZG_REPO%" rev-parse --verify HEAD 2^>nul') do set "ZG_HEAD=%%H"
 if not defined ZG_HEAD goto :head_failed
 >>"%ZG_REPORT%" echo ACTUAL_HEAD=%ZG_HEAD%
 set "ZG_CLASS=UNEXPECTED_HEAD"
-if /i "%ZG_HEAD%"=="%ZG_OLD%" set "ZG_CLASS=BEFORE_PINNED_FF"
-if /i "%ZG_HEAD%"=="%ZG_TARGET%" set "ZG_CLASS=PINNED_SOURCE_PRESENT"
+if "%ZG_ON_MAIN%"=="YES" if /i "%ZG_HEAD%"=="%ZG_OLD%" set "ZG_CLASS=BEFORE_PINNED_FF"
+if "%ZG_ON_MAIN%"=="YES" if /i "%ZG_HEAD%"=="%ZG_TARGET%" set "ZG_CLASS=PINNED_SOURCE_PRESENT"
 >>"%ZG_REPORT%" echo HEAD_CLASS=%ZG_CLASS%
 set "ZG_MANIFEST_EXISTS=NO"
 if exist "%ZG_REPO%\approvals\maintenance-handoffs\1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" set "ZG_MANIFEST_EXISTS=YES"
