@@ -15,7 +15,6 @@ set "ZG_FF=NO"
 if not defined TEMP goto :no_temp
 set "ZG_REPORT=%TEMP%\ZGMINI_MAINTENANCE_464_ONECLICK_RESULT.txt"
 set "ZG_SCOPE=%TEMP%\ZGMINI_MAINTENANCE_464_SCOPE.tmp"
-set "ZG_NO_HOOKS=%ZG_REPO%\__ZGMINI_464_HOOKS_DISABLED_DO_NOT_CREATE__"
 if exist "%ZG_REPORT%" goto :existing
 >"%ZG_REPORT%" echo SCHEMA=ZGMINI_MAINTENANCE_464_ONECLICK_V1
 if errorlevel 1 goto :write_failed
@@ -27,16 +26,19 @@ if defined GITHUB_ACTIONS (set "ZG_REASON=RUNNER_CONTEXT_FORBIDDEN" & goto :stop
 if defined RUNNER_NAME (set "ZG_REASON=RUNNER_CONTEXT_FORBIDDEN" & goto :stop)
 if not exist "%ZG_REPO%\" (set "ZG_REASON=REPOSITORY_PATH_MISSING" & goto :stop)
 if not exist "%ZG_NODE%" (set "ZG_REASON=NODE_MISSING" & goto :stop)
-if exist "%ZG_NO_HOOKS%" (set "ZG_REASON=NO_HOOKS_PATH_ALREADY_PRESENT" & goto :stop)
+if exist "%ZG_SCOPE%" (set "ZG_REASON=SCOPED_TEMP_ALREADY_PRESENT" & goto :stop)
 if exist "E:\ZGmini\automation\pc-maintenance\leases\controller-install" (set "ZG_REASON=CONTROLLER_INSTALL_ACTIVE" & goto :stop)
 where git >nul 2>nul
 if errorlevel 1 (set "ZG_REASON=GIT_UNAVAILABLE" & goto :stop)
 rem Check installed source, lock, and medium integrity before any Git mutation.
-"%ZG_NODE%" -e "try{const f=require('node:fs'),c=require('node:child_process');const p=JSON.parse(f.readFileSync('E:/ZGmini/automation/pc-maintenance/MAINTENANCE_INSTALL.json','utf8'));const g=c.execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});process.exit(p.sourceSha==='%ZG_INSTALLED%'&&!f.existsSync('E:/ZGmini/automation/pc-maintenance/leases/controller-install')&&g.includes('S-1-16-8192')&&!g.includes('S-1-16-12288')?0:1)}catch{process.exit(1)}" >nul 2>nul
-if errorlevel 1 (set "ZG_REASON=INSTALLED_SHA_LOCK_OR_USER_TOKEN_MISMATCH" & goto :stop)
+"%ZG_NODE%" -e "try{const f=require('node:fs'),c=require('node:child_process'),h=require('node:crypto');const r='E:/ZGmini/automation/pc-maintenance/';const p=JSON.parse(f.readFileSync(r+'MAINTENANCE_INSTALL.json','utf8'));const names=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];const good=names.every(n=>h.createHash('sha256').update(f.readFileSync(r+n)).digest('hex')===p.files?.[n]);const g=c.execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});process.exit(p.sourceSha==='%ZG_INSTALLED%'&&good&&!f.existsSync(r+'leases/controller-install')&&g.includes('S-1-16-8192')&&!g.includes('S-1-16-12288')?0:1)}catch{process.exit(1)}" >nul 2>nul
+if errorlevel 1 (set "ZG_REASON=INSTALLED_SHA_HASH_LOCK_OR_USER_TOKEN_MISMATCH" & goto :stop)
 rem Confirm the requested repository root, main branch and exact trusted origin.
 "%ZG_NODE%" -e "try{const c=require('node:child_process'),p=require('node:path');const r=process.argv[1];const v=c.execFileSync('git',['-C',r,'rev-parse','--show-toplevel'],{encoding:'utf8',windowsHide:true}).trim();const b=c.execFileSync('git',['-C',r,'branch','--show-current'],{encoding:'utf8',windowsHide:true}).trim();const u=c.execFileSync('git',['-C',r,'remote','get-url','origin'],{encoding:'utf8',windowsHide:true}).trim();const ok=/^(https:\/\/(?:[^\/@]+@)?github\.com\/ansqhd5774-Choi\/zgmini-pc-control(?:\.git)?|git@github\.com:ansqhd5774-Choi\/zgmini-pc-control(?:\.git)?|ssh:\/\/git@github\.com\/ansqhd5774-Choi\/zgmini-pc-control(?:\.git)?)$/i.test(u);process.exit(p.win32.normalize(v).toLowerCase()===p.win32.normalize(r).toLowerCase()&&b==='main'&&ok?0:1)}catch{process.exit(1)}" "%ZG_REPO%" >nul 2>nul
 if errorlevel 1 (set "ZG_REASON=REPO_MAIN_OR_ORIGIN_INVALID" & goto :stop)
+rem Never override repository hooks. Abort if a custom hooksPath or active mutation hook exists.
+"%ZG_NODE%" -e "try{const f=require('node:fs'),c=require('node:child_process'),p=require('node:path'),r=process.argv[1];const run=a=>c.execFileSync('git',['-C',r,...a],{encoding:'utf8',windowsHide:true}).trim();let custom='';try{custom=run(['config','--get','core.hooksPath'])}catch{};const d=run(['rev-parse','--path-format=absolute','--git-path','hooks']);const active=['post-merge','pre-merge-commit','reference-transaction'].some(n=>f.existsSync(p.join(d,n)));process.exit(custom||active?1:0)}catch{process.exit(1)}" "%ZG_REPO%" >nul 2>nul
+if errorlevel 1 (set "ZG_REASON=ACTIVE_GIT_HOOKS_REVIEW_REQUIRED" & goto :stop)
 rem Only the approved eight source files and exact approval manifest must be clean.
 call :scope_clean
 if errorlevel 1 (set "ZG_REASON=APPROVED_PATHS_DIRTY_OR_STATUS_FAILED" & goto :stop)
@@ -53,7 +55,7 @@ git -C "%ZG_REPO%" merge-base --is-ancestor HEAD %ZG_MAIN_PIN% >nul 2>nul
 if errorlevel 1 goto :already_ahead
 >>"%ZG_REPORT%" echo PHASE=PINNED_FAST_FORWARD_ATTEMPTED
 set "ZG_FF=YES"
-git -c "core.hooksPath=%ZG_NO_HOOKS%" -C "%ZG_REPO%" merge --ff-only %ZG_MAIN_PIN% >nul 2>nul
+git -C "%ZG_REPO%" merge --ff-only %ZG_MAIN_PIN% >nul 2>nul
 if errorlevel 1 (set "ZG_REASON=SOURCE_FF_OUTCOME_UNKNOWN_NO_RETRY" & goto :stop)
 goto :after_ff
 :already_ahead
