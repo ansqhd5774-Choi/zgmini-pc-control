@@ -56,8 +56,8 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   title="pc-controller-update",issuePatch={},manifestPatch={},
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
-   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
-   extraIssueSummaries=[]}={}){
+  verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
+  extraIssueSummaries=[]}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
