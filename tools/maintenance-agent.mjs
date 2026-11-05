@@ -625,12 +625,15 @@ export function createMaintenanceAgent({
   async function pollOnce(){
     await repositoryAllowed();
     const summaries=await githubJson(["issue","list","--repo",repo,"--state","open",
-      "--label",label,"--limit","1000","--json","number"],"GITHUB_ISSUE_LIST_FAILED");
+      "--label",label,"--limit","1000","--json","number,title"],"GITHUB_ISSUE_LIST_FAILED");
     if(!Array.isArray(summaries))throw coded("GITHUB_ISSUE_LIST_INVALID");
     const seen=new Set(),results=[];
     for(const entry of summaries){
       const number=entry?.number;
       if(!Number.isSafeInteger(number)||number<=0||seen.has(number))continue;
+      // Summary filtering avoids unnecessary reads; processIssue still verifies
+      // the full Issue actor, label, request body and approval before applying.
+      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
       try{results.push(await processIssue(await issueDetails(number)));}
       catch(error){results.push({issueNumber:number,status:"BLOCKED",
