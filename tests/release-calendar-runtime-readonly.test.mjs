@@ -19,15 +19,19 @@ function fixture(t,{dirs=70}={}){
  const checkout=path.join(projects,'zgmini-approved');
  fs.mkdirSync(path.join(checkout,'scripts','pc-writer'),{recursive:true});
  fs.mkdirSync(path.join(checkout,'lib'),{recursive:true});
+ fs.mkdirSync(path.join(checkout,'.git'));
  fs.writeFileSync(path.join(checkout,'scripts','pc-writer','collect-local.mjs'),
   "import {collectReleaseCalendar} from './release-calendar.mjs'; collectReleaseCalendar();");
+ fs.writeFileSync(path.join(checkout,'scripts','pc-writer','release-calendar.mjs'),
+  "export async function collectReleaseCalendar() { return 'fixture'; }");
  fs.writeFileSync(path.join(checkout,'lib','release-calendar.mjs'),
   "export const RELEASE_SOURCES=Object.freeze({\n bls:{url:'a'},\n bea:{url:'b'},\n eia_epm:{url:'c'},\n nyfed:{url:'d'}\n});");
  return {root,data,pc,projects,checkout};
 }
 
 test('over 64 project siblings still finds exact calendar source without raw data',t=>{
- const f=fixture(t),out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ const f=fixture(t),out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA,
+  coreTaskXml:'<Task><Command>run-local.cmd</Command></Task>'});
  assert.equal(out.status,'PASS');
  assert.equal(out.code,'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY');
  assert.equal(out.configuredSourceSha,SHA);
@@ -35,6 +39,10 @@ test('over 64 project siblings still finds exact calendar source without raw dat
  assert.equal(out.inventoryTruncated,false);
  assert.equal(out.candidates[0].matchesConfiguredSource,true);
  assert.deepEqual(out.candidates[0].sourceKeys,['bls','bea','eia_epm','nyfed']);
+ assert.equal(out.candidates[0].sourceParseStatus,'PARSED');
+ assert.equal(out.candidates[0].collectorImportsCalendar,true);
+ assert.match(out.candidates[0].runnerSha256,/^[0-9a-f]{64}$/);
+ assert.equal(out.coreTask.mentionsRunLocal,true);
  assert.deepEqual(out.collection.sourceKeys,['bea','bls','nyfed']);
  assert.equal(out.collection.calendarStatus,'PARTIAL');
  assert.equal(out.runtimeSourceVerified,false);
@@ -68,4 +76,22 @@ test('candidate symlink escape and oversized files are never scanned',t=>{
  out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
  assert.equal(out.candidateCount,0);
  assert.equal(out.runtimeSourceVerified,false);
+});
+
+test('missing executable collector, invalid git marker and unknown keys do not certify source',t=>{
+ const f=fixture(t,{dirs:0});
+ const file=path.join(f.checkout,'scripts','pc-writer','release-calendar.mjs');
+ fs.unlinkSync(file);
+ let out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.candidateCount,0);
+ fs.writeFileSync(file,'export const collectReleaseCalendar=()=>null');
+ fs.rmSync(path.join(f.checkout,'.git'),{recursive:true});
+ let calls=0;
+ out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>{calls++;return SHA}});
+ assert.equal(calls,0);
+ assert.equal(out.candidates[0].head,null);
+ fs.writeFileSync(path.join(f.checkout,'lib','release-calendar.mjs'),'export const differentSource = true;');
+ out=inspectReleaseCalendarRuntime(f.data);
+ assert.equal(out.candidates[0].sourceParseStatus,'UNKNOWN');
+ assert.equal(out.candidates[0].sourceCount,null);
 });
