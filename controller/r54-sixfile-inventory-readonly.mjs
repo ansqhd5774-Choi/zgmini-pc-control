@@ -92,6 +92,12 @@ export function inspectR54SixFileInventory(dataRoot=DEFAULT_DATA_ROOT,{fsOps=fs}
  let canonicalRoot;
  try{canonicalRoot=realPath(dataRoot,fsOps);}
  catch{return result;}
+ const writerRoot=path.join(dataRoot,...SOURCE_PARTS);
+ const writerStat=statState(writerRoot,fsOps);
+ if(!writerStat.info||!writerStat.info.isDirectory()||
+   writerStat.info.isSymbolicLink()){
+  result.code='R54_WRITER_ROOT_UNAVAILABLE';return result;
+ }
  result.files=R54_SIX_SOURCE_PATHS.map(file=>({path:file,
   ...classifySource(dataRoot,canonicalRoot,file,fsOps)}));
  result.presentCount=result.files.filter(x=>x.state==='PRESENT').length;
