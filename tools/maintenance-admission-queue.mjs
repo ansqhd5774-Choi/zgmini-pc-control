@@ -18,11 +18,85 @@ const safeCode=value=>/^[A-Z][A-Z0-9_]{0,79}$/.test(String(value??''))
 const result=(status,code,extra={})=>Object.freeze({status,code,...extra});
 const READY_ACTION='SUBMIT_APPROVED_B_ONCE';
 const EXPECTED_REPOSITORY='ansqhd5774-Choi/zgmini-pc-control';
+const CONTROL_ACTOR='ansqhd5774-Choi';
+const CONTROLLER_B_SCOPE='PC_CONTROL_CONTROLLER_UPDATE';
+// Match the existing maintenance contract's two Controller-update purposes.
+// Heavy/moderate/other scopes do not inherit this standing grant.
+const CONTROLLER_B_PURPOSES=new Set([
+ 'pc-controller-maintenance','pc-controller-safety-fix']);
 const boundedBytes=raw=>(Buffer.isBuffer(raw)?raw:
  typeof raw==='string'?Buffer.from(raw,'utf8'):null);
 const exactKeys=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)
  &&Object.keys(value).length===keys.length
  &&keys.every(key=>Object.hasOwn(value,key));
+
+/**
+ * Pure resolver for the existing 2026-11-03 same-purpose standing B grant.
+ * This is not a new grant or a source of truth: the host MUST independently
+ * authenticate the owner-approved standing policy and READY provenance from
+ * GitHub main, and fetch the exact approved manifest bytes. A caller supplied
+ * Boolean or #68 free-text comment is not trusted provenance. Only same-purpose
+ * Controller maintenance can use this route; other effects need their own B
+ * authorization. Full installed-SHA/diff checks remain in validateUpdateRequest.
+ *
+ * The host can use this return value as its verifyBExecutionApproval callback
+ * result. Missing/uncertain provenance stays unverified, not a repeated request
+ * for a new approval already covered by the standing grant.
+ */
+export function resolveStandingControllerBApproval({
+ intent,standingGrant,readyOwnerProof,approvedManifest,
+}={}){
+ const denied=code=>result('WAITING_APPROVAL',code,{verified:false});
+ if(!intent||!QUEUE_ID.test(String(intent.queueId??''))
+   ||!SHA40.test(String(intent.targetControllerSha??''))
+   ||!SHA256.test(String(intent.approvalManifestSha256??''))
+   ||intent.scope!==CONTROLLER_B_SCOPE||intent.action!==READY_ACTION
+   ||typeof intent.ref!=='string')return denied('QUEUE_STANDING_INTENT_INVALID');
+ // The source identities and owner-authored grant/READY are supplied by a
+ // trusted GitHub API adapter; this helper never fabricates them from a
+ // branch name, PR URL, comment body, or local document text.
+ if(standingGrant?.repository!==EXPECTED_REPOSITORY
+   ||standingGrant?.sourceRef!=='main'
+   ||standingGrant?.sourcePath!=='docs/PC_AUTOMATION_STANDARD.md'
+   ||standingGrant?.ownerVerified!==true
+   ||standingGrant?.actor!==CONTROL_ACTOR
+   ||standingGrant?.active!==true
+   ||standingGrant?.scope!==CONTROLLER_B_SCOPE)
+  return denied('QUEUE_STANDING_GRANT_UNVERIFIED');
+ if(readyOwnerProof?.repository!==EXPECTED_REPOSITORY
+   ||readyOwnerProof?.sourceRef!=='main'
+   ||readyOwnerProof?.sourcePath!==CONTROLLER_READY_FEED_PATH
+   ||readyOwnerProof?.ownerVerified!==true
+   ||readyOwnerProof?.actor!==CONTROL_ACTOR
+   ||readyOwnerProof?.queueId!==intent.queueId
+   ||readyOwnerProof?.ref!==intent.ref
+   ||readyOwnerProof?.targetControllerSha!==intent.targetControllerSha
+   ||readyOwnerProof?.approvalManifestSha256!==intent.approvalManifestSha256)
+  return denied('QUEUE_STANDING_READY_OWNER_UNVERIFIED');
+ const bytes=boundedBytes(approvedManifest?.bytes);
+ if(approvedManifest?.sourceRepository!==EXPECTED_REPOSITORY
+   ||approvedManifest?.sourceRef!=='main'
+   ||approvedManifest?.sourcePath!==
+     `approvals/controller-updates/${intent.targetControllerSha}.json`
+   ||approvedManifest?.approvalRefConfirmed!==true
+   ||!bytes||bytes.length<2||bytes.length>32768
+   ||createHash('sha256').update(bytes).digest('hex')!==intent.approvalManifestSha256)
+  return denied('QUEUE_STANDING_MANIFEST_UNVERIFIED');
+ let manifest;
+ try{manifest=JSON.parse(bytes.toString('utf8'));}
+ catch{return denied('QUEUE_STANDING_MANIFEST_UNVERIFIED');}
+ if(manifest?.schema!=='ZGMINI_PC_UPDATE_V1'
+   ||manifest?.targetSha!==intent.targetControllerSha
+   ||!CONTROLLER_B_PURPOSES.has(manifest?.purpose)
+   ||manifest?.approval?.grade!=='B'
+   ||manifest?.approval?.scope!==CONTROLLER_B_SCOPE
+   ||!/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9][0-9]*$/.test(manifest?.approval?.ref??'')
+   ||manifest?.checks?.status!=='PASS'
+   ||manifest?.checks?.targetSha!==intent.targetControllerSha)
+  return denied('QUEUE_STANDING_SCOPE_MISMATCH');
+ return Object.freeze({...intent,verified:true,actor:CONTROL_ACTOR,
+  code:'QUEUE_STANDING_APPROVAL_VERIFIED'});
+}
 
 function checkItem(item){
  if(!item||typeof item!=='object'||Array.isArray(item)
