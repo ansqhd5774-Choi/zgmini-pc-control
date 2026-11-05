@@ -96,7 +96,7 @@
 | [#431·#433·#435 누적 설치 선택](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6664241790) | 설치 `69c830…` 대비 #431 승인 4파일에 #433·#435 변경을 합치면 Controller 실행 파일 **7개 후보**(공통 `operations` 2파일 중첩). `main` `ac1f5c22…` 기준 7파일 SHA-256 후보는 링크된 #68 댓글에 고정했으며, B 명세 승인 전 `git show` 원본 바이트 재검산. | **각 변경의 승인·정확한 해시가 충족되면** 기존 R17 담당이 단회 누적 명세를 조정. 충족되지 않으면 #431의 이미 승인된 4파일 단독 작업을 계속하며 이 선택적 합산안을 새 Gate로 만들지 않음. |
 | [#434 전담 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434) | 사용자가 #434 **독립 유지보수기 인계만** `b434_installer`에 맡기고 기존 R17 담당의 #431 Controller 설치 소유를 유지. 총 8파일 SHA를 고정한 [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 명세 **main 병합(`14fa522c0b051801f6a12b64d872d7a50532d39e`) 완료**,  실제 변경 소스 `tools/maintenance-agent.mjs` 1파일. | **main 명세 병합≠Windows-local 검증·B 접수·운영 인계.** 해당 운영 0건, 설치 잠금·Receiver 보호는 유지. #431 설치 완료는 기술적 전제 아님. |
 | [Draft PR #442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) | 임시 정리 전 로컬 `RESULT.json` 중첩 결과 및 `RESULT.txt`가 원격 게시 보고와 달라도 삭제되는 결함을 격리 재현. 포인터·JSON·worker-result의 의미적 일치 및 TXT 바이트 일치 검사 추가. | 소스 집중 시험 **19/19 PASS**, 원격 3파일 일치·별도 격리 재현 PASS. 불일치 시 `SKIPPED`, 폴더·포인터·영속 원장 보존. **Draft·Windows 운영 미검증·E: 실제 삭제 0건.** |
-| [PR #437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | KPI 17개 실제 `pc-job` Issue의 기준선 확보; `queueWait`와 `execution` 용어가 각각 순수 Runner 대기·worker 실행시간으로 오해될 위험. PR 설명에 실제 정의를 명시. | `main` source 병합 SHA `ac1f5c22e6b06fafbc45ef6c4d6cacdb309a110a`, 소스 시험 **14/14 PASS**. 실제 GitHub 17건(12 PASS·5 BLOCKED, 제외 0)에서 Issue 생성→Controller 시작 중앙값 **18,495ms**, Controller 전체 처리시간 중앙값 **5,718ms**, 최대 동시 관측 2건. 순수 Runner 대기·worker 시간으로 해석 금지. 개선 전후 효과는 아직 미검증. |
+| [PR #437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | KPI 17개 실제 `pc-job` Issue의 기준선 확보; `queueWait`와 `execution` 용어가 각각 순수 Runner 대기·worker 실행시간으로 오해될 위험. PR 설명에 실제 정의를 명시. | `main` source 병합 SHA `ac1f5c22e6b06fafbc45ef6c4d6cacdb309a110a`, 소스 시험 **14/14 PASS**. 실제 GitHub 17건(12 PASS·5 BLOCKED, 제외 0)에서 Issue 생성→Controller 시작 중앙값 **18,495ms**, Controller 전체 처리시간 중앙값 **5,718ms**, 최대 동시 관측 2건. 순수 Runner 대기·worker 시간으로 해석 금지. **KPI 측정 기능 FINAL PASS**: `main` 집계기 14/14와 기존 GitHub 17/17 실데이터 CLI `exit 0`(complete 17/excluded 0). 처리시간 개선 전후 효과·상시 계측은 별도 미검증. |
 
 ### 기업 운영 원칙을 최소 적용한 근거
 
@@ -106,4 +106,4 @@
 
 **한 줄 재사용 규칙:** 본문과 댓글의 유효한 최신 상태를 일치시키고, 실제 변경 파일이 겹치는 작업만 조정한다. 독립 업무는 계속한다. 소스 테스트·문서 개선을 PC 설치 완료로 확대하지 않는다.
 
-**5개 항목 FINAL PASS: 0/5.** #433·#435·#434·#437 병합, #442 19/19 격리 시험, #437 17건 KPI 기준선을 실제 PC/Windows 운영 완료 또는 개선 효과로 확장하지 않는다.
+**5개 항목 범위별 FINAL PASS: 1/5.** #437은 **대기·실행시간 KPI 측정 기능**만 실 GitHub 17건 CLI 집계·14/14 테스트·`main` 병합으로 PASS. 개선 효과·상시 수집·통계적 대표성까지 완료라고 주장하지 않는다. #433·#435·#434는 Windows 운영 검증, #442는 Draft·Windows 실제 파일 보호 검증이 남아 **4건 미완료**. KPI 측정의 비PC read-only 경로에 Windows 설치를 전역 필수 Gate로 강제하지 않는다.
