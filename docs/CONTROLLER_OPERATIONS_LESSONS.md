@@ -84,3 +84,22 @@
 ## 7. 이번 보관 작업의 범위
 
 이 파일은 지식 축적을 위한 GitHub **독립 브랜치 보관**이다. 현재 main, PC Controller, Runner, task, scheduler, Core/D1/공개 사이트에 운영 변경을 요구하지 않는다. 브랜치에 문서를 올렸다는 사실만으로 배포·PC 적용·작업 실행 완료를 주장하지 않는다.
+
+## 8. 2026-11-06 검증된 공통 프로세스 개선
+
+이 절은 **2026-11-06 KST 당시** 확인한 사례를 보존하며, 현재 설치 상태나 운영 승인을 대체하지 않는다.
+
+| 사례 | 발생 문제·조치 | 실제 검증·재사용 규칙 |
+| --- | --- | --- |
+| [공용 대기열 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | Issue 첫머리의 과거 `14940…` 설치 SHA·#339 실패 표기가 새 기록보다 앞에 있어 오래된 차단을 재사용할 위험. 기존 5,249자 본문을 보존하고 관측 근거·담당·다음 실행·독립성을 담은 현재 상태 요약을 맨 위에 추가. | 변경 후 7,065자 원격 재조회. [#432 Controller 증거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/432#issuecomment-6656893231)·[#68 설치 조정](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6658289465)을 구분. **상태 요약은 실PC 실시간 조회가 아니며** B 설치 직전 SHA·lease 확인 필요. |
+| [#431](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/431) 전역 선행 조건 오판 | #431 완료를 모든 후속 기능의 기술적 Gate로 취급한 계획을 수정. [#433](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/433)은 `config/operations.json`·`controller/operations.mjs` 두 파일 중첩, [#435](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/435)은 #431과 파일 중첩 없음, [#434](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/434)는 별도 유지보수기 변경. | **실제 파일·승인·공유 lease에만 의존성 적용.** 기존 단일 B 담당·설치 순서는 임의 변경하지 않되, 무관한 A/소스 검토를 중단하지 않는다. |
+| [Draft PR #442](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/442) | 임시 정리 전 로컬 `RESULT.json` 중첩 결과 및 `RESULT.txt`가 원격 게시 보고와 달라도 삭제되는 결함을 격리 재현. 포인터·JSON·worker-result의 의미적 일치 및 TXT 바이트 일치 검사 추가. | 소스 집중 시험 **19/19 PASS**, 원격 3파일 일치·별도 격리 재현 PASS. 불일치 시 `SKIPPED`, 폴더·포인터·영속 원장 보존. **Draft·Windows 운영 미검증·E: 실제 삭제 0건.** |
+| [Draft PR #437](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437) | KPI 17개 실제 `pc-job` Issue의 기준선 확보; `queueWait`와 `execution` 용어가 각각 순수 Runner 대기·worker 실행시간으로 오해될 위험. PR 설명에 실제 정의를 명시. | 소스 시험 **14/14 PASS**. `queueWait`=Issue 생성→Controller 시작, `execution`=Controller 전체 처리시간. 기존 기준선 활용 가능하나 개선 전후 효과는 아직 미검증. |
+
+### 기업 운영 원칙을 최소 적용한 근거
+
+- [Google SRE — Managing Incidents](https://sre.google/sre-book/managing-incidents/): 총괄·운영 담당을 구분하고 하나의 최신 상태를 공유한다. → #68의 기존 단일 B 담당을 존중하면서 본문 상태를 갱신.
+- [AWS Builders' Library — Making Retries Safe with Idempotent APIs](https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/): 결과가 불명확한 중복 요청의 부작용을 피한다. → 기존 `requestId`·영속 원장/재조회 계약을 재사용하고 추가 실행기를 만들지 않음.
+- [GitHub Actions — Concurrency](https://docs.github.com/en/actions/concepts/workflows-and-actions/concurrency): 충돌 실행을 제한하지만 기본 대기 교체 동작이 있다. → B 신규 전역 concurrency 그룹을 만들지 않고 기존 lease·단일 담당 사용.
+
+**한 줄 재사용 규칙:** 본문과 댓글의 유효한 최신 상태를 일치시키고, 실제 변경 파일이 겹치는 작업만 조정한다. 독립 업무는 계속한다. 소스 테스트·문서 개선을 PC 설치 완료로 확대하지 않는다.
