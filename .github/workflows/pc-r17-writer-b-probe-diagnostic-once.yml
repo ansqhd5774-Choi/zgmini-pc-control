@@ -23,7 +23,7 @@ jobs:
       contains(github.event.issue.labels.*.name, 'pc-r17-writer-b-probe-diag') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 3
+    timeout-minutes: 5
     defaults:
       run:
         shell: cmd
@@ -43,7 +43,15 @@ jobs:
           path: r17-control
           fetch-depth: 1
           persist-credentials: false
-      - name: Diagnose only fixed cscript NoLogo fixture and original probe stdout
+      - name: Checkout pinned public candidate for isolated Git preparation diagnosis
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 81c8ee543c164fc16c8c760d504b113428d01d4a
+          path: r17-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Diagnose probe XML and scratch-only Git preparation once
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-control\r17-writer-b\probe-diag\r17-b-probe-diagnostic.mjs" --diagnose > "%RUNNER_TEMP%\r17-b-probe-diag-result.json"'
       - name: Recover sanitized read-only evidence to owner private Issue
         if: always() && steps.checkout-control.outcome == 'success'
