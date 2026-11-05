@@ -4,8 +4,29 @@ import fs from 'node:fs';import path from 'node:path';import {createHash,randomU
 import {execFileSync} from 'node:child_process';import {fileURLToPath,pathToFileURL} from 'node:url';
 const root='E:/ZGmini/automation/pc-maintenance';
 const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const files=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
-const handoffSourceFiles=[...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+// A previously approved six-file receiver remains valid during its one-time
+// handoff. Replacement bytes use the separately pinned seven-file target set.
+const legacyFiles=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
+const targetFiles=[...legacyFiles,'tools/maintenance-admission-queue.mjs'];
+const handoffSourceFiles=[...targetFiles,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+export function requireInstalledHandoffFiles(installed){
+ const actual=Object.keys(installed?.files??{});
+ const previous=[legacyFiles,targetFiles].find(list=>actual.length===list.length
+   &&list.every(rel=>Object.hasOwn(installed.files,rel)));
+ need(previous,'HANDOFF_INSTALLED_FILE_SET_INVALID');
+ return [...previous];
+}
+export function restorePriorHandoffFiles(installDir,backupDir,previous,io=fs){
+ need(Array.isArray(previous)&&[legacyFiles,targetFiles].some(list=>
+   previous.length===list.length&&list.every(rel=>previous.includes(rel))),
+   'HANDOFF_INSTALLED_FILE_SET_INVALID');
+ for(const rel of [...previous,'MAINTENANCE_INSTALL.json'])
+  io.copyFileSync(path.join(backupDir,rel),path.join(installDir,rel));
+ for(const rel of targetFiles.filter(file=>!previous.includes(file))){
+  const newlyAdded=path.join(installDir,rel);
+  if(io.existsSync(newlyAdded))io.unlinkSync(newlyAdded);
+ }
+}
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
@@ -121,8 +142,13 @@ export async function main(args=process.argv.slice(2)){
  const before=read(root+'/MAINTENANCE_INSTALL.json');
  need(before.sourceSha===approval.installedSha,'HANDOFF_INSTALLED_SHA_MISMATCH');
  need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
- // Verify the installed WMI proof helper before executing it or trusting its receiver record.
- for(const rel of files)need(sha(fs.readFileSync(path.join(root,rel)))===before.files[rel],'HANDOFF_EXISTING_DRIFT');
+  // Prior install retains its own valid installed manifest and file set.
+  const previousFiles=requireInstalledHandoffFiles(before);
+  for(const rel of previousFiles)
+   need(sha(fs.readFileSync(path.join(root,rel)))===before.files[rel],'HANDOFF_EXISTING_DRIFT');
+  // A new target file must not overwrite a pre-existing untracked local file.
+  for(const rel of targetFiles.filter(file=>!previousFiles.includes(file)))
+   need(!fs.existsSync(path.join(root,rel)),'HANDOFF_TARGET_FILE_CONFLICT');
  const priorOwner=owner();
  need(Number.isSafeInteger(priorOwner?.pid)&&priorOwner.pid>0
    &&/^[0-9a-f-]{36}$/.test(priorOwner.nonce??''),'HANDOFF_RECEIVER_NOT_PROVEN_STOPPED');
@@ -136,7 +162,10 @@ export async function main(args=process.argv.slice(2)){
  const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});
  need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'HANDOFF_MEDIUM_TOKEN_REQUIRED');
  const bytes={};
- for(const rel of [...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs']){
+  need(Object.keys(approval.files??{}).length===handoffSourceFiles.length
+    &&handoffSourceFiles.every(file=>Object.hasOwn(approval.files,file)),
+    'HANDOFF_APPROVAL_FILE_SET_INVALID');
+  for(const rel of handoffSourceFiles){
   bytes[rel]=git(['show',target+':'+rel]);
   need(sha(bytes[rel])===approval.files[rel],'HANDOFF_SOURCE_HASH_MISMATCH');
   need(sha(fs.readFileSync(path.join(repo,rel)))===approval.files[rel],'HANDOFF_CHECKOUT_SOURCE_DRIFT');
@@ -166,7 +195,7 @@ export async function main(args=process.argv.slice(2)){
  // Exact byte snapshots; recovery restores only these approved maintenance files.
  fs.mkdirSync(backup,{recursive:true});
  const snapshot={};
- for(const rel of [...files,'MAINTENANCE_INSTALL.json']){
+  for(const rel of [...previousFiles,'MAINTENANCE_INSTALL.json']){
   const b=fs.readFileSync(path.join(root,rel)),dest=path.join(backup,rel);
   fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,b,{flag:'wx'});snapshot[rel]=sha(b);
  }
@@ -181,8 +210,9 @@ export async function main(args=process.argv.slice(2)){
   reservation.verify();
   requireStopped(priorOwner);
   need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
-  for(const rel of files)fs.writeFileSync(path.join(root,rel),bytes[rel]);
-  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(files.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
+   for(const rel of targetFiles)fs.writeFileSync(path.join(root,rel),bytes[rel],
+     previousFiles.includes(rel)?undefined:{flag:'wx'});
+   const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(targetFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   fs.writeFileSync(startup,startupBytes);
   reservation.verify();
@@ -220,7 +250,7 @@ export async function main(args=process.argv.slice(2)){
    if(reservation){reservation.verify();requireStopped(priorOwner);}
    else requirePriorStopped(priorOwner);
    for(const [rel,hash]of Object.entries(snapshot))need(sha(fs.readFileSync(path.join(backup,rel)))===hash,'HANDOFF_BACKUP_DRIFT');
-   for(const rel of [...files,'MAINTENANCE_INSTALL.json'])fs.copyFileSync(path.join(backup,rel),path.join(root,rel));
+    restorePriorHandoffFiles(root,backup,previousFiles);
    fs.writeFileSync(startup,oldStartup);
    if(reservation){reservation.release();reservation=null;}
    // File rollback alone does not prove that the former receiver restarted.
@@ -235,3 +265,4 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  try{const result=await main();console.log(JSON.stringify(result));if(result.status!=='PASS')process.exitCode=1;}
  catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:e.code??'HANDOFF_ENVIRONMENT_ERROR'}));process.exitCode=1;}
 }
+
