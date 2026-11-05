@@ -157,3 +157,11 @@
 - **#434 분리:** #434 독립 유지보수기 Windows 인계 자체는 `PASS`, 신규 정상 승인 B 실행 이후 E 요청별 보고서 미생성과 GitHub GET+ledger VERIFIED 실증은 여전히 `PENDING`. 전체 5건 중 **4/5 FINAL PASS (80%)**. 이번 교정의 PC 설치·E 쓰기·신규 B 요청은 0건.
 
 - **공용 정본 반영 완료(2026-11-06):** 별도 브랜치 `codex/controller-apply-queue-sha-state-r1-20261106`의 [PR #460](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/460)을 독립 검토 후 정규 검토 상태로 전환·squash 병합했다. 원격 `main` 병합 commit **`062e9ed4dfb1e91128357037ef2b309b91f82d65`**, 변경은 `docs/CONTROLLER_APPLY_QUEUE.md` **1파일 +10/-0**, 원격 `main`에서 `파일별 적용 상태와 진단 범위 해석` 절 존재를 재조회했다. `OLD/TARGET/OTHER/MISSING/UNKNOWN` 구분, `PRESENT`와 승인 SHA 검증 분리, 읽기 전용 `false/null`의 해석 제한, 기존 승인·백업·잠금 보존 규칙이 정본에 반영됐다. **문서 반영 완료 ≠ PC 운영 설치 ≠ #434 효과 최종 검증**이며 #434은 통상 승인 B 실측 대기, 전체 4/5 FINAL PASS(80%) 유지.
+
+
+## 14. 2026-11-06 인계 기록과 실제 수신 구분 — 프로세스 정체 오판 교정
+
+- **신규 발견:** 공용 #68 댓글은 다른 ChatGPT 일반챗을 자동 깨우거나 PC `pc-job`/`pc-maintenance` 요청을 접수하는 실행 이벤트가 아니다. 기존 `.github/workflows/pc-job.yml`은 신규 `pc-job` Issue를 처리하고 B 독립 유지보수기는 별도 `pc-maintenance` Issue를 처리한다. 그러므로 원장에 다음 담당·행동을 썼다는 사실은 `HANDOFF_RECORDED` 증거이며, 수신 ACK·실제 재개·설치 진행은 별도 증거가 필요하다.
+- **정본 개선 완료:** [PR #461](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/461)에서 `docs/CONTROLLER_APPLY_QUEUE.md` 1파일 **+2/-0**만 변경, squash 병합 `main` **`c21c249926dc2059e4be298ded8816efb36648c3`**. 원격 main의 `인계 전달과 실행 재개는 별도 상태다` 문단을 재조회했다. 기존 작업 채널로 한 번 명시 전달하고 수신·다음 실행을 확인할 수 있으면 확인하되, 경로가 없으면 `인계 기록 완료/수신 미확인`으로 표기한다. 새 설치·승인 Gate, 검증용 B 요청, 중복 댓글을 만들지 않는다.
+- **현재 실제 상태:** R54 #428은 인계는 기록됐으나 **기존 작업자의 수신/재개 증거가 없음**. `worker/theme-nine-r37-public.mjs` 1파일 OTHER 출처·예약 task binding 대조가 담당자에게 남아 있다. #434은 인계 자체 PASS/신규 정상 B 실운영 효과 PENDING; **4/5 FINAL PASS(80%)** 유지. 인계 댓글만으로 재개/효과 검증 PASS 처리 금지.
+- **NEXT:** 기존 R54 담당 대화/업무 채널에 실제 전달이 가능한 주체가 한 번 인계하고 수신·1파일 provenance 확인 여부를 기록한다. 현재 이 총괄 대화에는 별도 일반챗으로 메시지를 직접 전달할 API가 확인되지 않아 자동 재개됐다고 주장하지 않는다. 정상 승인 B 발생 시 기존 #68의 동일 requestId 결과/원장/E 중복보고0 검증을 수행한다. 설치·PC 쓰기 0건.
