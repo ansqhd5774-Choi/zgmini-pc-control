@@ -32,12 +32,13 @@ const trustedPrior=(f,{issueNumber=72,status='QUEUED',
  issueNumber,status,request,author,title,labels:['pc-maintenance']});
 
 function adapters(raw,{existing=null,approvalRefConfirmed=true,claimResult=true,
- submit=async()=>({issueNumber:88}),confirmRemote=true}={}){
+ pendingLane=false,submit=async()=>({issueNumber:88}),confirmRemote=true}={}){
  let n=0,claims=0,reads=0,current=existing;
  return {loadApprovedManifest:async path=>{
   assert.match(path,/^approvals\/controller-updates\/[a-f0-9]{40}\.json$/);
   return {bytes:raw,sourceRef:'main',approvalRefConfirmed};
  },readExisting:async()=>{reads++;return current;},
+ readLanePending:async()=>({authoritative:true,pending:pendingLane}),
  claimLane:async()=>{claims++;return {acquired:claimResult};},
  submitIssue:async issue=>{
   n++;const result=await submit(issue);
@@ -73,6 +74,7 @@ test('six concurrent chats with a durable atomic lane claim admit only one',asyn
  const f=fixture();let owned=false,created=0;
  const api={loadApprovedManifest:async()=>({bytes:f.raw,sourceRef:'main',approvalRefConfirmed:true}),
   readExisting:async()=>created?trustedPrior(f,{issueNumber:101}):null,
+  readLanePending:async()=>({authoritative:true,pending:false}),
   claimLane:async()=>{if(owned)return {acquired:false};owned=true;return {acquired:true};},
   submitIssue:async()=>({issueNumber:100+ ++created})};
  const rows=await Promise.all(Array.from({length:6},()=>invoke(f,api)));
@@ -88,6 +90,7 @@ test('different target SHAs still contend on the same whole-lane claim',async()=
  const call=f=>invoke(f,{loadApprovedManifest:async()=>({bytes:f.raw,sourceRef:'main',approvalRefConfirmed:true}),
   readExisting:async()=>accepted&&accepted.item.request.requestId===f.item.request.requestId
    ?trustedPrior(f,{issueNumber:accepted.issueNumber}):null,
+  readLanePending:async()=>({authoritative:true,pending:false}),
   claimLane:async()=>{
    if(owned)return {acquired:false};owned=true;return {acquired:true};},
   submitIssue:async()=>{const issueNumber=1+ ++submitted;accepted={item:f.item,issueNumber};
@@ -133,6 +136,7 @@ test('ambiguous Issue creation discovers committed request without submitting ag
  const api={loadApprovedManifest:async()=>({bytes:f.raw,sourceRef:'main',approvalRefConfirmed:true}),
   claimLane:async()=>({acquired:true}),readExisting:async()=>{
    reads++;return reads<3?null:trustedPrior(f,{issueNumber:90});},
+  readLanePending:async()=>({authoritative:true,pending:false}),
   submitIssue:async()=>{submits++;throw Error('NETWORK_TIMEOUT');}};
  const r=await invoke(f,api);
  assert.equal(r.status,'EXISTING');assert.equal(r.issueNumber,90);
@@ -143,6 +147,7 @@ test('unresolved submit/lookup leaves state unknown; never automatically retries
  const f=fixture();let count=0;
  const api={loadApprovedManifest:async()=>({bytes:f.raw,sourceRef:'main',approvalRefConfirmed:true}),
   claimLane:async()=>({acquired:true}),readExisting:async()=>null,
+  readLanePending:async()=>({authoritative:true,pending:false}),
   submitIssue:async()=>{count++;throw Error('NETWORK_TIMEOUT');}};
  const r=await invoke(f,api);
  assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_SUBMISSION_UNCERTAIN');
@@ -153,6 +158,7 @@ test('unavailable lookup fails closed without acquiring lane',async()=>{
  const f=fixture();let claims=0;
  const api={loadApprovedManifest:async()=>({bytes:f.raw,sourceRef:'main',approvalRefConfirmed:true}),
   readExisting:async()=>{throw Error('HTTP_503');},claimLane:async()=>{claims++;return {acquired:true};},
+  readLanePending:async()=>({authoritative:true,pending:false}),
   submitIssue:async()=>{throw Error('MUST_NOT_SUBMIT');}};
  assert.equal((await invoke(f,api)).status,'STATE_UNKNOWN');assert.equal(claims,0);
 });
@@ -178,5 +184,37 @@ test('install lease evidence is required, omitted input never means unlocked',as
  const f=fixture(),a=adapters(f.raw);
  const r=await invoke(f,a,{activeInstallLease:undefined});
  assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_INSTALL_LEASE_UNVERIFIED');
+ assert.equal(a.calls.submitted,0);
+});
+
+test('previous manually queued B issue for different target blocks new admission',async()=>{
+ const f=fixture(),a=adapters(f.raw,{pendingLane:true});
+ const r=await invoke(f,a);
+ assert.equal(r.status,'WAITING_RESOURCE');assert.equal(r.code,'QUEUE_PRIOR_B_PENDING');
+ assert.equal(a.calls.claims,0);assert.equal(a.calls.submitted,0);
+});
+
+test('manual pending issue appearing after claim retains claim for reconciliation',async()=>{
+ const f=fixture();let reads=0,submits=0;
+ const a=adapters(f.raw,{submit:async()=>{submits++;throw Error('NOT_EXPECTED');}});
+ const r=await invoke(f,{...a,readLanePending:async()=>({authoritative:true,pending:++reads>1})});
+ assert.equal(r.status,'WAITING_RESOURCE');assert.equal(r.code,'QUEUE_PRIOR_B_PENDING');
+ assert.equal(r.claimHeld,true);assert.equal(r.needsClaimReconciliation,true);
+ assert.equal(submits,0);
+});
+
+test('missing or malformed authoritative pending-lane observation fails closed',async()=>{
+ const f=fixture(),a=adapters(f.raw);
+ for(const observed of [undefined,{}, {authoritative:true}, {authoritative:false,pending:false}]){
+  const r=await invoke(f,{...a,readLanePending:async()=>observed});
+  assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_LANE_READ_UNVERIFIED');
+ }
+ assert.equal(a.calls.claims,0);assert.equal(a.calls.submitted,0);
+});
+
+test('malformed lane claim is unknown, not a safe occupied-lane result',async()=>{
+ const f=fixture(),a=adapters(f.raw);
+ const r=await invoke(f,{...a,claimLane:async()=>({})});
+ assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_LANE_CLAIM_UNVERIFIED');
  assert.equal(a.calls.submitted,0);
 });
