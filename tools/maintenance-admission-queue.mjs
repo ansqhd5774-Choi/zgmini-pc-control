@@ -65,13 +65,16 @@ function priorOutcome(prior,key,request,allowedActors){
  * validated request. Errors and ambiguous responses must throw.
  * A host must settle a lane claim via trusted maintainer terminal evidence;
  * it may NOT clear it on an unresolved create/lookup or install outcome.
+ * Before enabling this host, any pre-existing manually submitted, nonterminal
+ * B Issue MUST be adopted into the whole-lane claim or remain visible to
+ * `readLanePending`. A PC install lease alone does not cover queued Issues.
  * Issue creation is a separate,
  * existing authorized maintainer integration, never performed inside this file.
  */
 export async function admitApprovedControllerOnce({
  item,installedSha,actor,allowedActors=['ansqhd5774-Choi'],
  completedDependencies=[],activeInstallLease,
- loadApprovedManifest,readExisting,claimLane,submitIssue,
+ loadApprovedManifest,readExisting,readLanePending,claimLane,submitIssue,
 }={}){
  const problem=checkItem(item);
  if(problem==='QUEUE_NOT_READY')return result('WAITING_APPROVAL',problem);
@@ -86,7 +89,8 @@ export async function admitApprovedControllerOnce({
    ||!SHA256.test(String(request.approvalManifestSha256??'')))
   return result('BLOCKED','QUEUE_REQUEST_PIN_INVALID');
  const key=`${CONTROLLER_ADMISSION_LANE}:${request.targetControllerSha}:${request.approvalManifestSha256}`;
- if([loadApprovedManifest,readExisting,claimLane,submitIssue].some(fn=>typeof fn!=='function'))
+ if([loadApprovedManifest,readExisting,readLanePending,claimLane,submitIssue]
+   .some(fn=>typeof fn!=='function'))
   return result('BLOCKED','QUEUE_TRUSTED_ADAPTER_MISSING',{key});
  let approved;
  try{
@@ -108,13 +112,34 @@ export async function admitApprovedControllerOnce({
  };
  const before=await lookup();
  if(before)return before;
+ // The legacy manual queue can already contain a different target while the
+ // PC installation lease is idle. `readLanePending` must reconcile all known
+ // nonterminal pc-maintenance Issue/ledger entries, not just the current key.
+ const pendingLane=async()=>{
+  let observed;
+  try{observed=await readLanePending({lane:CONTROLLER_ADMISSION_LANE,key});}
+  catch{return result('STATE_UNKNOWN','QUEUE_LANE_READ_UNCERTAIN',{key});}
+  if(observed?.authoritative!==true)
+   return result('STATE_UNKNOWN','QUEUE_LANE_READ_UNVERIFIED',{key});
+  if(observed.pending===true)
+   return result('WAITING_RESOURCE','QUEUE_PRIOR_B_PENDING',{key});
+  if(observed.pending!==false)
+   return result('STATE_UNKNOWN','QUEUE_LANE_READ_UNVERIFIED',{key});
+  return null;
+ };
+ const existingLane=await pendingLane();
+ if(existingLane)return existingLane;
  let claim;
  try{claim=await claimLane({lane:CONTROLLER_ADMISSION_LANE,key,queueId:item.queueId});}
  catch{return result('STATE_UNKNOWN','QUEUE_LANE_CLAIM_UNCERTAIN',{key});}
- if(claim?.acquired!==true)return result('WAITING_RESOURCE','QUEUE_LANE_OCCUPIED',{key});
+ if(claim?.acquired===false)return result('WAITING_RESOURCE','QUEUE_LANE_OCCUPIED',{key});
+ if(claim?.acquired!==true)return result('STATE_UNKNOWN','QUEUE_LANE_CLAIM_UNVERIFIED',{key});
  // Re-read under the durable lane claim. Never submit on an uncertain lookup.
  const afterClaim=await lookup();
  if(afterClaim)return Object.freeze({...afterClaim,claimHeld:true,
+  needsClaimReconciliation:true});
+ const changedLane=await pendingLane();
+ if(changedLane)return Object.freeze({...changedLane,claimHeld:true,
   needsClaimReconciliation:true});
  const envelope={
   schema:request.schema,requestId:request.requestId,chatId:request.chatId,
