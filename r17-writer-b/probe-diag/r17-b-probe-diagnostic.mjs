@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {runGitStageDiagnostic} from './r17-b-git-stage-diagnostic.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
@@ -30,6 +31,14 @@ const ENCODINGS=new Set(['UTF8_BOM','UTF16LE_BOM','UTF16BE_BOM',
 const SHAPES=new Set(['EXPECTED_SUCCESS','EXPECTED_PROBE_STOP','JSON_OTHER',
   'JSON_EXTRA_TEXT','NOT_JSON','EMPTY']);
 const EXEC_STATES=new Set(['EXIT_ZERO','EXIT_NONZERO','SPAWN_ERROR','TIMEOUT','NO_STATUS']);
+const GIT_STAGE_STEPS=new Set(['GIT_BINARY','SOURCE_HEAD','SOURCE_OBJECTS',
+  'CANDIDATE_HEAD','CANDIDATE_CLEAN','PATCH_SHA','BASE_FILES',
+  'CANDIDATE_FILES','TEMP_CREATE','GIT_INIT','ALTERNATES','READ_TREE',
+  'COPY_BASE','APPLY_CHECK','APPLY','TARGET_HASHES','SOURCE_LS_TREE',
+  'OVERLAY_HASH_OBJECT','OVERLAY_UPDATE_INDEX','OVERLAY_WRITE_TREE',
+  'OVERLAY_COMMIT_TREE','OVERLAY_DIFF_TREE','OVERLAY_SHOW',
+  'OVERLAY_UPDATE_REF','OVERLAY_REV_PARSE','OVERLAY_CAT_FILE',
+  'STAGE_RESULT','TEMP_CLEANUP']);
 const simpleObject=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
 const exactKeys=(x,keys)=>simpleObject(x)&&Object.keys(x).length===keys.length&&
   keys.every(k=>Object.hasOwn(x,k));
@@ -167,7 +176,7 @@ function checkedRead(file,root,digest){
   assert(sha256(fs.readFileSync(file))===digest,'R17_B_DIAG_HASH_STOP');
 }
 
-export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript,runTaskXml}={}){
+export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript,runTaskXml,runGitStage}={}){
   const request=authorizeDiagnostic(event,env);
   assert(process.platform==='win32'||typeof runCscript==='function',
     'R17_B_DIAG_RUNTIME_STOP');
@@ -188,10 +197,25 @@ export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript,runTaskXm
     ['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],
     {encoding:null,shell:false,windowsHide:true,timeout:20_000,maxBuffer:131_072}));
   const taskXml=analyzeCoreTaskXml(xmlExecute(schtasks));
+  const gitStage=(runGitStage??runGitStageDiagnostic)({workspace:env.GITHUB_WORKSPACE});
   return {schema:SCHEMA,requestId:request.requestId,status:'DIAGNOSTIC_COMPLETE',
     code:'R17_B_DIAG_READONLY',runId:env.GITHUB_RUN_ID,
-    fixture:mini,probe:original,taskXml,sourceWrites:0,taskWrites:0,configWrites:0,
+    fixture:mini,probe:original,taskXml,gitStage,
+    sourceWrites:0,taskWrites:0,configWrites:0,
     installReruns:0};
+}
+
+function validGitStage(x){
+  return exactKeys(x,['status','lastPass','firstFail','reason','exitCode',
+    'sourceWrites','taskWrites','configWrites','installReruns'])&&
+    ['PASS','STOP'].includes(x.status)&&
+    (x.lastPass===null||GIT_STAGE_STEPS.has(x.lastPass))&&
+    (x.firstFail===null||GIT_STAGE_STEPS.has(x.firstFail))&&
+    ['NONE','COMMAND_FAILED','LOCAL_STEP_FAILED','TEMP_CLEANUP_FAILED'].includes(x.reason)&&
+    (x.exitCode===null||(Number.isInteger(x.exitCode)&&x.exitCode>=0&&x.exitCode<=255))&&
+    x.sourceWrites===0&&x.taskWrites===0&&x.configWrites===0&&x.installReruns===0&&
+    (x.status==='PASS'?(x.firstFail===null&&x.reason==='NONE'&&x.exitCode===null):
+      (x.firstFail!==null&&x.reason!=='NONE'));
 }
 
 function validCoreTaskXml(x){
@@ -234,15 +258,16 @@ export function sanitizeDiagnosticResult(raw,requestId,runId){
     raw.schema===SCHEMA&&ALLOWED_CODES.has(raw.code))
     return {...base,status:'DIAGNOSTIC_SETUP_STOP',code:raw.code};
   if(!exactKeys(raw,['schema','requestId','status','code','runId',
-    'fixture','probe','taskXml','sourceWrites','taskWrites','configWrites','installReruns'])||
+    'fixture','probe','taskXml','gitStage','sourceWrites','taskWrites','configWrites','installReruns'])||
     raw.schema!==SCHEMA||raw.status!=='DIAGNOSTIC_COMPLETE'||
     raw.code!=='R17_B_DIAG_READONLY'||raw.runId!==runId||
     !validOne(raw.fixture,'fixture')||!validOne(raw.probe,'probe')||
-    !validCoreTaskXml(raw.taskXml)||
+    !validCoreTaskXml(raw.taskXml)||!validGitStage(raw.gitStage)||
     raw.sourceWrites!==0||raw.taskWrites!==0||raw.configWrites!==0||
     raw.installReruns!==0)return base;
   return {...base,status:raw.status,code:raw.code,
-    fixture:{...raw.fixture},probe:{...raw.probe},taskXml:{...raw.taskXml}};
+    fixture:{...raw.fixture},probe:{...raw.probe},taskXml:{...raw.taskXml},
+    gitStage:{...raw.gitStage}};
 }
 
 export function readSafeResult(file){
