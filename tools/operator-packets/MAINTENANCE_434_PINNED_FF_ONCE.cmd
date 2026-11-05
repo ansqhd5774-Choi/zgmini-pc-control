@@ -55,17 +55,37 @@ git -C "%ZG_REPO%" merge-base --is-ancestor %ZG_OLD% %ZG_TARGET% >nul 2>&1
 if errorlevel 1 (set "ZG_REASON=LOCAL_TARGET_NOT_FF" & goto :preflight_stop)
 git -C "%ZG_REPO%" merge-base --is-ancestor %ZG_TARGET% refs/remotes/origin/main >nul 2>&1
 if errorlevel 1 (set "ZG_REASON=TARGET_NOT_CACHED_ANCESTOR" & goto :preflight_stop)
+rem Protect all 10 added target paths, including ignored and untracked local files.
+if exist "%ZG_REPO%\approvals\controller-updates\364c59b9d3aa30ee7881cdfcff647ccd3a164d9c.json" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\approvals\maintenance-handoffs\1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\controller\r54-sixfile-inventory-readonly.mjs" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\controller\release-calendar-runtime-readonly.mjs" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\controller\report-upload-verified.mjs" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\results\42019572689-1-seat-2.json" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\results\42019572689-1-seat-2.txt" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\tests\r54-sixfile-inventory-readonly.test.mjs" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\tests\release-calendar-runtime-readonly.test.mjs" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
+if exist "%ZG_REPO%\tests\report-upload-verified.test.mjs" (set "ZG_REASON=ADDED_TARGET_ALREADY_PRESENT" & goto :preflight_stop)
 rem Check the 16 exactly approved diff paths, without a global dirty gate.
 git -c core.optionalLocks=false -C "%ZG_REPO%" status --porcelain -- "AGENTS.md" "approvals/controller-updates/364c59b9d3aa30ee7881cdfcff647ccd3a164d9c.json" "approvals/maintenance-handoffs/1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" "config/operations.json" "controller/operations.mjs" "controller/r54-sixfile-inventory-readonly.mjs" "controller/release-calendar-runtime-readonly.mjs" "controller/report-upload-verified.mjs" "controller/upload.mjs" "results/42019572689-1-seat-2.json" "results/42019572689-1-seat-2.txt" "tests/maintenance-agent.test.mjs" "tests/r54-sixfile-inventory-readonly.test.mjs" "tests/release-calendar-runtime-readonly.test.mjs" "tests/report-upload-verified.test.mjs" "tools/maintenance-agent.mjs" >nul 2>&1
 if errorlevel 1 (set "ZG_REASON=SCOPED_STATUS_ERROR" & goto :preflight_stop)
 set "ZG_DIRTY=NO"
 for /f "delims=" %%S in ('git -c core.optionalLocks=false -C "%ZG_REPO%" status --porcelain -- "AGENTS.md" "approvals/controller-updates/364c59b9d3aa30ee7881cdfcff647ccd3a164d9c.json" "approvals/maintenance-handoffs/1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" "config/operations.json" "controller/operations.mjs" "controller/r54-sixfile-inventory-readonly.mjs" "controller/release-calendar-runtime-readonly.mjs" "controller/report-upload-verified.mjs" "controller/upload.mjs" "results/42019572689-1-seat-2.json" "results/42019572689-1-seat-2.txt" "tests/maintenance-agent.test.mjs" "tests/r54-sixfile-inventory-readonly.test.mjs" "tests/release-calendar-runtime-readonly.test.mjs" "tests/report-upload-verified.test.mjs" "tools/maintenance-agent.mjs" 2^>nul') do set "ZG_DIRTY=YES"
 if "%ZG_DIRTY%"=="YES" (set "ZG_REASON=APPROVED_PATHS_DIRTY" & goto :preflight_stop)
-rem Refuse configured smudge filters on approved paths. No checkout source code execution.
-git -C "%ZG_REPO%" check-attr filter -- "AGENTS.md" "approvals/controller-updates/364c59b9d3aa30ee7881cdfcff647ccd3a164d9c.json" "approvals/maintenance-handoffs/1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" "config/operations.json" "controller/operations.mjs" "controller/r54-sixfile-inventory-readonly.mjs" "controller/release-calendar-runtime-readonly.mjs" "controller/report-upload-verified.mjs" "controller/upload.mjs" "results/42019572689-1-seat-2.json" "results/42019572689-1-seat-2.txt" "tests/maintenance-agent.test.mjs" "tests/r54-sixfile-inventory-readonly.test.mjs" "tests/release-calendar-runtime-readonly.test.mjs" "tests/report-upload-verified.test.mjs" "tools/maintenance-agent.mjs" >nul 2>&1
-if errorlevel 1 (set "ZG_REASON=FILTER_CHECK_ERROR" & goto :preflight_stop)
-git -C "%ZG_REPO%" check-attr filter -- "AGENTS.md" "approvals/controller-updates/364c59b9d3aa30ee7881cdfcff647ccd3a164d9c.json" "approvals/maintenance-handoffs/1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" "config/operations.json" "controller/operations.mjs" "controller/r54-sixfile-inventory-readonly.mjs" "controller/release-calendar-runtime-readonly.mjs" "controller/report-upload-verified.mjs" "controller/upload.mjs" "results/42019572689-1-seat-2.json" "results/42019572689-1-seat-2.txt" "tests/maintenance-agent.test.mjs" "tests/r54-sixfile-inventory-readonly.test.mjs" "tests/release-calendar-runtime-readonly.test.mjs" "tests/report-upload-verified.test.mjs" "tools/maintenance-agent.mjs" | findstr /v /c:"filter: unspecified" >nul
-if not errorlevel 1 (set "ZG_REASON=FILTER_ASSIGNED" & goto :preflight_stop)
+rem Capture one filter-attribute lookup in the sole result TXT; test Git exit code.
+git -C "%ZG_REPO%" check-attr filter -- "AGENTS.md" "approvals/controller-updates/364c59b9d3aa30ee7881cdfcff647ccd3a164d9c.json" "approvals/maintenance-handoffs/1d6f66d87c0ff247ba75b4c98682c07c646e79cc.json" "config/operations.json" "controller/operations.mjs" "controller/r54-sixfile-inventory-readonly.mjs" "controller/release-calendar-runtime-readonly.mjs" "controller/report-upload-verified.mjs" "controller/upload.mjs" "results/42019572689-1-seat-2.json" "results/42019572689-1-seat-2.txt" "tests/maintenance-agent.test.mjs" "tests/r54-sixfile-inventory-readonly.test.mjs" "tests/release-calendar-runtime-readonly.test.mjs" "tests/report-upload-verified.test.mjs" "tools/maintenance-agent.mjs" >>"%ZG_REPORT%" 2>&1
+set "ZG_ATTR_RC=%errorlevel%"
+if not "%ZG_ATTR_RC%"=="0" (set "ZG_REASON=FILTER_CHECK_ERROR" & goto :preflight_stop)
+set "ZG_ATTR_COUNT=0"
+set "ZG_FILTERED=NO"
+for /f "usebackq tokens=1,2,* delims=:" %%A in ("%ZG_REPORT%") do (
+  if /i "%%B"==" filter" (
+    set /a ZG_ATTR_COUNT+=1 >nul
+    if /i not "%%C"==" unspecified" set "ZG_FILTERED=YES"
+  )
+)
+if not "%ZG_ATTR_COUNT%"=="16" (set "ZG_REASON=FILTER_LINE_COUNT_ERROR" & goto :preflight_stop)
+if "%ZG_FILTERED%"=="YES" (set "ZG_REASON=FILTER_ASSIGNED" & goto :preflight_stop)
 if exist "%ZG_REPO%\approvals\maintenance-handoffs\%ZG_HANDOFF_TARGET%.json" (
   set "ZG_REASON=APPROVAL_ALREADY_PRESENT_RECHECK"
   goto :preflight_stop
