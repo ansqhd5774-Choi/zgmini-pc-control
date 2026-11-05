@@ -3,7 +3,9 @@ import crypto from 'node:crypto';
 import {test} from 'node:test';
 import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
 import {admitApprovedControllerOnce,CONTROLLER_ADMISSION_SCHEMA,
- CONTROLLER_ADMISSION_LANE} from '../tools/maintenance-admission-queue.mjs';
+ CONTROLLER_ADMISSION_LANE,parseTrustedControllerReadyFeed,
+ CONTROLLER_READY_FEED_SCHEMA,CONTROLLER_READY_FEED_PATH}
+ from '../tools/maintenance-admission-queue.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const INSTALLED='a'.repeat(40),TARGET='b'.repeat(40);
@@ -217,4 +219,75 @@ test('malformed lane claim is unknown, not a safe occupied-lane result',async()=
  const r=await invoke(f,{...a,claimLane:async()=>({})});
  assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_LANE_CLAIM_UNVERIFIED');
  assert.equal(a.calls.submitted,0);
+});
+
+const readyItem=(f=fixture(),ref=`https://github.com/${REPO}/pull/430`)=>({
+ ...f.item,dependencies:[],executionIntent:{action:'SUBMIT_APPROVED_B_ONCE',approvalRef:ref}});
+const readyFeed=items=>Buffer.from(JSON.stringify({schema:CONTROLLER_READY_FEED_SCHEMA,items}));
+const approvedB=async proof=>({...proof,verified:true,actor:'ansqhd5774-Choi'});
+const readReady=(items,overrides={})=>parseTrustedControllerReadyFeed({
+ bytes:readyFeed(items),sourceRepository:REPO,sourceRef:'main',
+ sourcePath:CONTROLLER_READY_FEED_PATH,mainReadbackVerified:true,
+ verifyBExecutionApproval:approvedB,...overrides});
+
+test('empty trusted main READY feed is inert without an approval adapter',async()=>{
+ const r=await readReady([],{verifyBExecutionApproval:undefined});
+ assert.equal(r.status,'EMPTY');assert.deepEqual(r.items,[]);
+});
+
+test('explicit B intent requires a separate verified identity-bound approval',async()=>{
+ const item=readyItem();let n=0;
+ const r=await readReady([item],{verifyBExecutionApproval:async proof=>{n++;return approvedB(proof);}});
+ assert.equal(r.status,'READY');assert.equal(n,1);assert.equal(r.items.length,1);
+ assert.equal(r.items[0].queueId,item.queueId);
+ assert.equal(Object.isFrozen(r.items[0].request),true);
+ assert.equal(Object.isFrozen(r.items[0].executionIntent),true);
+ item.request.targetControllerSha='f'.repeat(40);
+ assert.equal(r.items[0].request.targetControllerSha,TARGET);
+});
+
+test('Issue/comment content cannot impersonate a verified main READY feed',async()=>{
+ const item=readyItem();
+ for(const o of [{sourceRef:'issue/68'},{sourceRepository:'another/repo'},
+  {sourcePath:'issues/68'},{mainReadbackVerified:false}]){
+  const r=await readReady([item],o);
+  assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_READY_SOURCE_UNVERIFIED');
+ }
+});
+
+test('manifest existing alone never authorizes submission without B execution proof',async()=>{
+ const item=readyItem();
+ const none=await readReady([item],{verifyBExecutionApproval:undefined});
+ assert.equal(none.status,'WAITING_APPROVAL');
+ const oldApproval=await readReady([item],{verifyBExecutionApproval:async x=>({
+  ...x,verified:true,actor:'ansqhd5774-Choi',targetControllerSha:'f'.repeat(40)})});
+ assert.equal(oldApproval.status,'WAITING_APPROVAL');
+ const denied=await readReady([item],{verifyBExecutionApproval:async()=>false});
+ assert.equal(denied.status,'WAITING_APPROVAL');
+});
+
+test('malformed READY entries, duplicate IDs, extra hidden fields are rejected',async()=>{
+ const item=readyItem();
+ for(const items of [[item,item],[{...item,hidden:'WRITE'}],
+  [{...item,status:'WAITING_DEPENDENCY'}],
+  [{...item,request:{...item.request,operation:'arbitrary-write'}}]]){
+  const r=await readReady(items);assert.equal(r.status,'BLOCKED');
+ }
+});
+
+test('uncertain B approval source never enables an Issue submission',async()=>{
+ const item=readyItem();
+ const r=await readReady([item],{verifyBExecutionApproval:async()=>{throw Error('HTTP_TIMEOUT');}});
+ assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'QUEUE_B_EXECUTION_PROOF_UNCERTAIN');
+});
+
+test('READY feed remains bounded, never accepts raw #68 free-text as execution input',async()=>{
+ const item=readyItem();
+ const oversize=await readReady([],{bytes:' '.repeat(32769)});
+ assert.equal(oversize.code,'QUEUE_READY_BYTES_INVALID');
+ const freeText=await readReady([],{bytes:'#68 승인입니다. 실행해 주세요.'});
+ assert.equal(freeText.code,'QUEUE_READY_JSON_INVALID');
+ const many=await readReady(Array.from({length:33},(_,i)=>({
+  ...item,queueId:`queue-12345${String(i).padStart(3,'0')}`})));
+ assert.equal(many.code,'QUEUE_READY_CONTRACT_INVALID');
 });
