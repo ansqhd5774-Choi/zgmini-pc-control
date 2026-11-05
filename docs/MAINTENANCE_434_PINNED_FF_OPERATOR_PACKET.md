@@ -17,8 +17,8 @@
 
 - E: 기존 Git checkout `E:\ZGmini\projects\zgmini-pc-control`에서 **현재 branch main·HEAD 정확 `91a6…`**, 로컬 `origin/main` 기록 정확 `50b8…`를 비교합니다.
 - 목표 `14fa…`의 로컬 commit object가 있고 old→target→cached origin/main이 모두 정상 조상 관계인지 확인합니다. GitHub 네트워크 호출·fetch/pull·임의 checkout은 하지 않습니다.
-- GitHub remote compare에서 확인된 **정확한 16 경로**의 scoped dirty/untracked를 검사합니다. 무관한 문서/결과 dirty는 새 전역 Gate로 묶지 않습니다.
-- Controller 설치 lease 존재, 미검증 smudge filter 또는 Git hook disable 경로 존재 시 **쓰기 전 차단**합니다. Git index 관찰에는 `core.optionalLocks=false`를 사용합니다.
+- GitHub remote compare에서 확인된 **정확한 16 경로**의 scoped dirty/untracked를 검사하며, 그중 **새로 추가될 10개 파일의 기존 파일·폴더 존재(ignored 파일 포함)**도 검사합니다. 무관한 문서/결과 dirty는 새 전역 Gate로 묶지 않습니다.
+- Controller 설치 lease 존재, 미검증 smudge filter 또는 Git hook disable 경로 존재 시 **쓰기 전 차단**합니다. `git check-attr`의 단일 호출 결과·종료코드·16개 출력 행을 동일 TXT로 검증합니다. Git index 관찰에는 `core.optionalLocks=false`를 사용합니다.
 - 모든 조건이 통과한 경우에만 로컬 기존 Git object로 `git merge --ff-only 14fa…`를 **한 번 수행**하며, Git post-merge hook 경로는 존재하지 않는 고정 경로로 호출별 비활성화합니다. E: Core/DB·원자료·실제 독립 유지보수기 수신기·예약·운영 설정에는 직접 접근하지 않습니다.
 - 실행 결과에서는 `SOURCE_FF_PINNED_PASS`가 되어도 **로컬 source HEAD와 Git-tracked manifest만 검증한 것**입니다. 실제 유지보수기 인계는 호출하지 않으며 `HANDOFF_INVOKED=NO`로 구분합니다.
 - FF 호출 뒤 오류/결과 불명확 시 `STATE_UNKNOWN`으로 보존하며 자동 복원·재시도하지 않습니다. 과거 HEAD/목표 SHA/exit 정보를 단일 TXT에 남깁니다.
