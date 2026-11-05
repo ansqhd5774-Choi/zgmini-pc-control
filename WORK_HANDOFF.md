@@ -214,3 +214,10 @@
 - **목표 소스 이중 검산:** 승인 manifest `next=30326c94c7b6f0963329cc00f7a3649c906f8e884d6915a4da38005281bcfd85`/12,078B은 [zgmini PR #978 병합 `73746cff927baa67115d8e85bb6498ba41b89759`](https://github.com/ansqhd5774-Choi/zgmini/commit/73746cff927baa67115d8e85bb6498ba41b89759)의 원본 바이트와 정확 일치. 이는 승인 목표 source 지문 확인이며 **PC 실제 설치 이력/예약 task binding 검증은 아니다**.
 - **업무 범위 축소:** R54 6파일 중 5개는 승인 `NEXT`, 남은 1개는 악성/임의 변경이라고 단정할 수 없는 **공식 역사 source**. 기존 B의 '6개 모두 OLD' 사전조건을 맹목 재적용하지 말고 원담당은 **5개 NEXT 보존+역사 1개를 목표로 갱신할 실제 필요성**을 기존 승인 계약과 대조한다. 정확한 역사해시를 새 승인 `OLD`로 자동 간주하거나 기존 #428 B 재실행/강제 덮어쓰기는 금지. 원장·예약 실행 경로는 여전히 미검증이다.
 - **다음 단일 결정:** 원 R54 담당이 고정 `APPROVED_B` sixfile manifest의 기존 precondition과 실제 mixed state의 차이를 확인해 **최소 1파일 변경 방식·승인 적합성·실제 task binding 검증**을 결정한다. Controller 총괄은 필요 시 엄격한 혼합상태 허용 패치의 안전성만 지원하고 실행/설치는 원담당이 한다. #434 정상 B 효과 검증과 전체 4/5 FINAL PASS(80%)는 여전히 별도.
+
+
+## 21. 2026-11-06 R54 혼합상태 B 설치 설계·승인 경계
+
+- **실제 계약의 구조:** `tools/maintenance-contract.mjs`는 R54 V2 고정 6개 OLD/NEXT 배열과 승인 manifest의 정확 일치를 강제하고, `tools/update.mjs`의 `inspectR54BOriginalSource`·`applyR54BPinnedSixConnectorLast`는 6파일 OLD 사전검사/CAS·connector 격리·백업/롤백을 전제로 한다. 따라서 5 `NEXT`+1 공식 역사 소스 `30d47abd...` 상태에서는 기존 #428 B 재실행이 PREVALIDATION에서 다시 차단되며, **V2 manifest의 OLD 해시 한 줄만 바꿔 해결되지 않는다**.
+- **정확한 사용자 승인 범위:** 기존 사용자 R54 조건부 B의 기능 목적·6파일 대상·최종 NEXT·단회 예약 disable+restore는 유효한 기존 승인 증거다. 다만 V2의 정확한 OLD source 계약은 현 PC와 다르므로 새 혼합상태 계약/manifest/파일 해시·테스트를 준비한 뒤 기존 승인과의 동일성·보호 조건을 확인해야 한다. **같은 목적의 후속 오류 수정이면 무의미한 재승인은 생략**, 새 범위·운영 영향이 생기거나 확인되지 않을 때만 정확한 차이를 명시해 사용자 결정을 받는다.
+- **원담당의 단계:** 우선 R54 서비스의 실제 공개/예약 기능에 추가 설치가 필요한지 판단한다. 설치 필요가 입증되면 `5 NEXT` 불변 + 정확한 역사 `1 old=30d47...`→`next=30326...` 전용 계약, 실제 task action binding, 원본/복구 백업, 단회 pause/drain·stage/CAS·6 NEXT 사후 검사·원상 복구를 설계/검증한다. 이는 `tools/update.mjs`·계약/테스트·유지보수기 인계가 필요한 **별도 B 업무**이며 총괄이 원담당의 운영 설치를 대신 실행하지 않는다. 현재까지 새 B·운영 변경 0건, #434 4/5 FINAL PASS 상태 유지.
