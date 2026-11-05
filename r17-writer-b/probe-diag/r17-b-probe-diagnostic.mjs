@@ -207,6 +207,7 @@ export function runReadOnlyDiagnostic({event,env,scriptRoot,runCscript,runTaskXm
 
 function validGitStage(x){
   return exactKeys(x,['status','lastPass','firstFail','reason','exitCode','alternative',
+    'normalization',
     'sourceWrites','taskWrites','configWrites','installReruns'])&&
     ['PASS','STOP'].includes(x.status)&&
     (x.lastPass===null||GIT_STAGE_STEPS.has(x.lastPass))&&
@@ -215,6 +216,9 @@ function validGitStage(x){
     ['NOT_TESTED','IGNORE_CONTEXT_CHECK_PASS_TARGET_UNVERIFIED',
       'IGNORE_CONTEXT_COMMAND_FAILED','IGNORE_CONTEXT_EXACT_TARGETS',
       'IGNORE_CONTEXT_TARGET_MISMATCH'].includes(x.alternative)&&
+    exactKeys(x.normalization,['localCycle','runLocal'])&&
+    [x.normalization.localCycle,x.normalization.runLocal].every(v=>
+      ['NOT_TESTED','EXACT','LF_EXACT','CRLF_EXACT','NO_SIMPLE_EOL_MATCH'].includes(v))&&
     (x.exitCode===null||(Number.isInteger(x.exitCode)&&x.exitCode>=0&&x.exitCode<=255))&&
     x.sourceWrites===0&&x.taskWrites===0&&x.configWrites===0&&x.installReruns===0&&
     (x.status==='PASS'?(x.firstFail===null&&x.reason==='NONE'&&x.exitCode===null):
