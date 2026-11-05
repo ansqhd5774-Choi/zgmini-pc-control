@@ -30,6 +30,7 @@ const split=file=>file.split('/');
 export function runGitStageDiagnostic({workspace,runCommand}={}){
   let stage=null,step='GIT_BINARY',lastPass=null,firstFail=null;
   let reason='NONE',exitCode=null,alternative='NOT_TESTED';
+  const normalization={localCycle:'NOT_TESTED',runLocal:'NOT_TESTED'};
   const setStep=x=>{if(!LABELS.has(x))stop();step=x;};
   const check=(ok,label)=>{setStep(label);if(!ok)stop();lastPass=label;};
   const run=(cwd,args,{stdin,env}={},label)=>{
@@ -124,6 +125,17 @@ export function runGitStageDiagnostic({workspace,runCommand}={}){
         alternative=Object.keys(BEFORE).every(file=>sha256(fs.readFileSync(
           path.join(stage,...split(file))))===TARGET[file])?
           'IGNORE_CONTEXT_EXACT_TARGETS':'IGNORE_CONTEXT_TARGET_MISMATCH';
+        if(alternative==='IGNORE_CONTEXT_TARGET_MISMATCH'){
+          for(const [key,file] of [['localCycle','scripts/pc-writer/local-cycle.mjs'],
+            ['runLocal','scripts/pc-writer/run-local.mjs']]){
+            const bytes=fs.readFileSync(path.join(stage,...split(file)));
+            const raw=bytes.toString('utf8');
+            normalization[key]=sha256(bytes)===TARGET[file]?'EXACT':
+              sha256(Buffer.from(raw.replace(/\r\n/g,'\n'),'utf8'))===TARGET[file]?'LF_EXACT':
+              sha256(Buffer.from(raw.replace(/\r?\n/g,'\r\n'),'utf8'))===TARGET[file]?'CRLF_EXACT':
+              'NO_SIMPLE_EOL_MATCH';
+          }
+        }
       }catch{alternative='IGNORE_CONTEXT_COMMAND_FAILED';}
       exitCode=originalExit;lastPass=originalLastPass;
     }
@@ -140,6 +152,7 @@ export function runGitStageDiagnostic({workspace,runCommand}={}){
     }
   }
   return {status:firstFail?'STOP':'PASS',lastPass,firstFail,
-    reason,exitCode,alternative,sourceWrites:0,taskWrites:0,configWrites:0,
+    reason,exitCode,alternative,normalization,
+    sourceWrites:0,taskWrites:0,configWrites:0,
     installReruns:0};
 }
