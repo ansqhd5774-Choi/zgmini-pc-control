@@ -126,7 +126,13 @@ export function inspectR54Bv3SourceTransition({originalRows,candidateRows,
 
 /** Read-only, pinned approved six-file baseline; never follows reparse points.
  * A mismatch is not fixed by copying an old source or resetting a checkout.
+ * Collect all six SHA states before returning BLOCKED, so the existing
+ * one-shot result can name the real drift without another PC invocation.
  * This inventory is diagnostic only; it is not an operator freeze attestation. */
+export function classifyR54PinnedHash(spec,actual){
+ return actual===null?'MISSING':actual===spec.old?'OLD'
+  :actual===spec.next?'NEXT':'UNKNOWN';
+}
 export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={}){
  need(typeof root==='string'&&path.isAbsolute(root),
   'R54_B_SOURCE_ROOT_INVALID');
@@ -150,7 +156,7 @@ export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={})
    try{need(!fsImpl.lstatSync(current).isSymbolicLink(),
      'R54_B_SOURCE_REPARSE_DENIED');}
    catch(error){
-    if(error?.code==='ENOENT'&&spec.old===null&&current===target){
+    if(error?.code==='ENOENT'){
      missing=true;break;
     }
     throw error;
@@ -158,15 +164,26 @@ export function inspectR54BOriginalSource({root=R54_B_WRITER_ROOT,fsImpl=fs}={})
   }
   if(spec.old===null){
    need(missing,'R54_B_GUARD_HELPER_UNEXPECTEDLY_PRESENT');
-   out.push({path:spec.path,actual:null});
+   out.push({path:spec.path,actual:null,state:'OLD',
+    expectedOld:null,approvedNext:spec.next??null});
+   continue;
+  }
+  if(missing){
+   out.push({path:spec.path,actual:null,state:'MISSING',
+    expectedOld:spec.old,approvedNext:spec.next});
    continue;
   }
   const real=fsImpl.realpathSync.native(target);
   need(real.toLowerCase().startsWith(base.toLowerCase()+path.sep.toLowerCase())&&
    fsImpl.statSync(real).isFile(),'R54_B_SOURCE_PATH_OUTSIDE');
   const actual=sha256(fsImpl.readFileSync(real));
-  need(actual===spec.old,'R54_B_ORIGINAL_SOURCE_SHA_DRIFT');
-  out.push({path:spec.path,actual});
+  out.push({path:spec.path,actual,
+   state:classifyR54PinnedHash(spec,actual),
+   expectedOld:spec.old,approvedNext:spec.next});
+ }
+ if(out.some(row=>row.state!=='OLD')){
+  throw Object.assign(Error('R54_B_ORIGINAL_SOURCE_SHA_DRIFT'),{
+   code:'R54_B_ORIGINAL_SOURCE_SHA_DRIFT',sourceInventory:out});
  }
  // The existing source lock must not be abandoned by an unknown owner.
  const lockDir=path.join(base,path.basename(R54_B_SOURCE_LEASE_DIR));
@@ -748,11 +765,13 @@ export async function runR54BApprovedOneShot({requestId,
   'R54_B_REQUEST_ID_INVALID');
  // Read-only preparation occurs before any maintenance/Task/source write.
  const backupRoot=path.join(backupBase,'R54_B_'+requestId);
- let candidateBytes,installLease;
+ let candidateBytes,installLease,lastPass='NONE';
  try{
   candidateBytes=loadCandidates();
+  lastPass='R54_B_CANDIDATES_LOADED';
   const baselineSource=inspectOriginal({root:writerRoot});
   need(baselineSource.files.length===6,'R54_B_SIX_ORIGINALS_REQUIRED');
+  lastPass='R54_B_ORIGINAL_SIX_SHA_VERIFIED';
   need(!fs.existsSync(backupRoot),'R54_B_PREVIOUS_ATTEMPT_RECONCILE');
   installLease=acquireInstall();
  }catch(error){
@@ -761,8 +780,11 @@ export async function runR54BApprovedOneShot({requestId,
   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:
    /^[A-Z0-9_]+$/.test(error?.message??'')?error.message:
    'R54_B_READONLY_PREPARATION_FAILED';
-  return {status:'BLOCKED',code,taskWrites:0,writerFilesChanged:0,
+  return {status:'BLOCKED',code,lastPass,taskWrites:0,writerFilesChanged:0,
    controllerWrites:0,providerCalls:0,d1Writes:0,
+   firstFail:code,
+   ...(Array.isArray(error?.sourceInventory)
+    ?{sourceInventory:error.sourceInventory}:{}),
    protectedStateUnchanged:true,noAutomaticRetry:true};
  }
  let writerLease=null,task=null,taskBaseline=null,taskDisabled=false;
