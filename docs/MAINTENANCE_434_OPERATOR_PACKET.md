@@ -1,3 +1,14 @@
+> **현재 사용 파일은 V2입니다 (2026-11-06 KST).** 최초 V1 `MAINTENANCE_434_HANDOFF_ONCE.cmd`와 기존 결과 TXT는 역사 기록으로 보존하며 **재실행하지 않습니다.** 실제 Windows 고정 FF V2 `SOURCE_FF_PINNED_PASS` (local `main` HEAD `14fa522c0b051801f6a12b64d872d7a50532d39e`)가 확인됐습니다. 현재 유지보수기 자체 인계는 아직 미실행입니다.
+
+## V2 — 다음 실제 단회 절차
+
+1. 새 `tools/operator-packets/MAINTENANCE_434_HANDOFF_V2_ONCE.cmd` 파일을 다운로드해 Windows 일반 사용자 로컬 세션에서 **한 번만** 실행합니다. Windows `E:\ZGmini` 연결, `E:\ZGmini\runtime\node.exe`와 설치된 독립 Receiver가 필요합니다. GitHub Runner/RDC/관리자 권한에서는 실행하지 않습니다.
+2. V2는 로컬 HEAD `14fa522c0b051801f6a12b64d872d7a50532d39e`, 추적 중인 8파일 승인 manifest와 필수 경로만 확인하고, 정식 `tools/handoff-maintenance.mjs --source-sha 1d6f66d87c0ff247ba75b4c98682c07c646e79cc`를 한 번 호출합니다. 기존 도구의 설치 SHA/byte/Receiver 원본/권한/lease/백업 복원 보호를 재사용합니다.
+3. 결과는 사용자 `%TEMP%\ZGMINI_MAINTENANCE_434_HANDOFF_V2_RESULT.txt` 한 개에 기록되며 CMD 화면과 메모장에 표시되고 `pause`로 창을 유지합니다. `HANDOFF_HELPER_PASS`라도 이후 실제 설치 SHA·새 Receiver·후속 정상 B의 E: 중복 신규 보고서 0건 검증까지 **#434 FINAL PASS가 아닙니다.**
+4. `PREVALIDATION_BLOCKED`, `STOP_NO_RETRY`, `UNKNOWN`, `RECOVERY_REQUIRED`이면 **재실행·파일 변경·임의 복구 없이 결과 원문만 회수**합니다. V1과 FF V2를 재사용·재실행하지 않습니다.
+
+---
+
 # #434 독립 유지보수기 — Windows 로컬 운영자 단회 인계 패킷
 
 상태: **소스 패킷 준비·검토용 (실제 Windows 인계 미실행)**. 이 문서는 운영 적용 완료 증거가 아닙니다.
