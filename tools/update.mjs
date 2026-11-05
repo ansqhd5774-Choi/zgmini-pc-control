@@ -917,7 +917,7 @@ function verifyIndependent(supervisorPid) {
   /^[a-f0-9]{64}$/.test(installed.startupSha256??''),'MAINTENANCE_ORIGIN_UNKNOWN');
  const expected=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
   'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
-  'tools/maintenance-ancestry.vbs'];
+   'tools/maintenance-ancestry.vbs','tools/maintenance-admission-queue.mjs'];
  need(Object.keys(installed.files??{}).length===expected.length,'MAINTENANCE_SELF_DRIFT');
  for(const rel of expected){
   need(/^[a-f0-9]{64}$/.test(installed.files[rel]??'')&&
@@ -2407,5 +2407,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  try{const result=await command();console.log(JSON.stringify(result));if(result.status==='RECOVERY_REQUIRED')process.exitCode=2;}
  catch(error){console.log(JSON.stringify(maintenanceCliFailureReport(error)));process.exitCode=1;}
 }
+
 
 
