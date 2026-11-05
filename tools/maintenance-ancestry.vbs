@@ -87,7 +87,7 @@ If Err.Number <> 0 Then Unknown
 If WScript.Arguments.Count=1 And UCase(CStr(WScript.Arguments(0)))="R54_SCAN" Then
  Dim r54Rows,r54Item,r54Name,r54Cmd,r54Exe,r54Text,r54Flag
  Err.Clear
- Set r54Rows=svc.ExecQuery("SELECT ProcessId,ParentProcessId,Name,CommandLine,ExecutablePath FROM Win32_Process")
+ Set r54Rows=svc.ExecQuery("SELECT ProcessId,ParentProcessId,Name,CommandLine,ExecutablePath FROM Win32_Process WHERE ProcessId > 0")
  If Err.Number <> 0 Then Unknown
  WScript.Echo "PID,PARENT,MATCH"
  For Each r54Item In r54Rows
