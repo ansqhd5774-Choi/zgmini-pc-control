@@ -86,3 +86,11 @@
 - **안전·운영 한계:** CMD는 기존 `tools/handoff-maintenance.mjs`를 정확히 1회 호출하고 자체 재시도·Git pull/checkout·PowerShell/RDC/Runner·관리자 권한 상승 없음. 승인/설치 SHA/lease/receiver/rollback 판정은 기존 인계 프로그램이 수행. 현재 Windows-local operator 실행 수단이 없어 `AUTOMATION_BLOCKED`, **FINAL PASS 아님**. 실행 실패/불명확 상태라면 결과 TXT 보존, 재시도 금지.
 - **다음 최소 실행:** 기존 Windows PC 일반 사용자 로컬 세션에서 다운로드한 검증된 CMD 단회 실행 → `MAINTAINER_HANDOFF_PASS` 및 실제 설치 SHA·Receiver origin 확인 → 다음 정상 B 처리에서 신규 E: 중복 보고서 0건 관측. GitHub 원본 실행 파일이 필요하면 PR #456 고정 커밋에서 내려받는다. user에게 명령/SHA/경로 수정을 요구하지 않는다.
 - **조정 원장:** [Issue #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68). 이미 완료된 #431/#449/#454 B는 다시 발행하지 않는다.
+
+## 8. #434 로컬 승인 명세 미연결 — 2026-11-06 실제 Windows 사전검사
+
+- **LAST PASS:** [PR #443](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/443) 고정 인계 명세 `main` 원격 존재·approved=true; [PR #456](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/456) Windows 1회 패킷 source/독립 정적 GO.
+- **FIRST FAIL / 실제 사용자 TXT:** `OPERATOR_RESULT=AUTOMATION_BLOCKED`, `CODE=LOCAL_APPROVAL_MANIFEST_MISSING`, `HANDOFF_INVOKED=NO`. `E:\ZGmini\projects\zgmini-pc-control` 내 승인 명세 없음. Node/기존 인계 프로그램 존재 검사는 통과. **실제 유지보수기 변경 0**, #434 미완료·5건 4/5 유지. 로컬 HEAD/branch 미확인이라 원인을 stale checkout으로 확정하지 않음.
+- **이번 개선:** [Draft PR #457](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/457) 읽기 전용 Git 상태 회수용 CMD+안내 2파일. 고정 source `61b15f51b5fb0e36460eec786b6198c14fd78cff`, source 정적14/14·독립 검토 GO. 승인 8파일+manifest만 검사하며 `git status` 선택적 잠금 비활성. branch 이름의 CMD 메타문자 주입 위험도 수정. **Windows 실제 진단 미실행**.
+- **NEXT / 담당:** 기존 Windows 일반 사용자 로컬 operator에서 #457 read-only CMD 단회 실행, `ZGMINI_MAINTENANCE_434_CHECKOUT_PREFLIGHT.txt` 한 개 회수. 승인 파일 tracked/로컬 main HEAD·원격 추적 SHA·scoped dirty·target ancestry에 따라 필요한 경우에만 안전한 정규 source 동기화 검토. 원래 #456 CMD 및 기존 TXT 재실행/삭제 금지. 이후 신규 단회 인계→새 maintainer SHA/receiver→다음 정상 B의 E 중복 보고서 0 검증.
+- **조정 증거:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68). 자동 pull/checkout, 임의 JSON 복사, Runner 자체 교체, RDC 사용 금지.
