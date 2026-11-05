@@ -11,6 +11,7 @@
     "us-breadth-r17-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "r17-268-postcancel-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "pc-source-origin-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "release-calendar-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "fear-greed-archive-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "alpaca-quota-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-er1-saved-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
