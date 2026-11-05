@@ -13,6 +13,8 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
+import {readTrustedControllerReadyFromGitHub,
+  admitApprovedControllerOnce} from "./maintenance-admission-queue.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 const ISSUE_TITLE="pc-controller-update";
@@ -33,6 +35,51 @@ const safeCode=value=>typeof value==="string"&&/^[A-Z][A-Z0-9_]{0,79}$/.test(val
   ?value:"UNSPECIFIED_FAILURE";
 const isSha=value=>typeof value==="string"&&SHA40.test(value);
 const safeString=(value,pattern)=>typeof value==="string"&&pattern.test(value)?value:null;
+
+/**
+ * Optional source-only bridge for the existing 60-second maintenance receiver.
+ * The production receiver intentionally supplies no activation/adapters yet.
+ * A standing approval is not itself an authenticated READY declaration, and
+ * manual B Issue writers must share the lane before this can submit anything.
+ * There is no extra polling, Issue creation or E: state in the default path.
+ */
+export async function pollControllerAdmissionBridge({
+  activated=false,manualLaneUnified=false,githubGet,verifyBExecutionApproval,
+  readControllerState,loadApprovedManifest,readExisting,readLanePending,
+  claimLane,submitIssue,actor='ansqhd5774-Choi',
+}={}){
+  if(activated!==true)return {status:'DISABLED',code:'QUEUE_HOST_NOT_ACTIVATED'};
+  if(manualLaneUnified!==true)
+    return {status:'WAITING_RESOURCE',code:'QUEUE_MANUAL_LANE_NOT_UNIFIED'};
+  if([githubGet,verifyBExecutionApproval,readControllerState,
+    loadApprovedManifest,readExisting,readLanePending,claimLane,submitIssue]
+    .some(fn=>typeof fn!=='function'))
+    return {status:'WAITING_SETUP',code:'QUEUE_TRUSTED_HOST_ADAPTER_MISSING'};
+  const feed=await readTrustedControllerReadyFromGitHub({githubGet,
+    verifyBExecutionApproval});
+  if(feed.status!=='READY')return {status:feed.status,code:feed.code};
+  // Exactly one Controller B may be admitted in a poll. Its durable lane
+  // claim must be settled only by trusted post-install/unchanged evidence;
+  // UNKNOWN and RECOVERY_REQUIRED do not free the lane.
+  let state;
+  try{state=await readControllerState({items:feed.items});}
+  catch{return {status:'STATE_UNKNOWN',code:'QUEUE_CONTROLLER_STATE_UNCERTAIN'};}
+  if(!state||!/^[a-f0-9]{40}$/.test(state.installedSha??'')
+    ||typeof state.activeInstallLease!=='boolean')
+    return {status:'STATE_UNKNOWN',code:'QUEUE_CONTROLLER_STATE_UNVERIFIED'};
+  // Only trusted terminal-success or verified-unchanged queue IDs belong here;
+  // UNKNOWN/RECOVERY_REQUIRED must never be treated as completed.
+  const completed=state.completedDependencies??[];
+  if(!Array.isArray(completed)||completed.some(id=>typeof id!=='string'))
+    return {status:'STATE_UNKNOWN',code:'QUEUE_DEPENDENCY_STATE_UNVERIFIED'};
+  const pending=feed.items.filter(candidate=>!completed.includes(candidate.queueId));
+  if(!pending.length)return {status:'EMPTY',code:'QUEUE_ALL_ITEMS_COMPLETED'};
+  const item=pending.find(candidate=>candidate.dependencies.every(id=>completed.includes(id)));
+  if(!item)return {status:'WAITING_DEPENDENCY',code:'QUEUE_DEPENDENCY_PENDING'};
+  return admitApprovedControllerOnce({item,installedSha:state.installedSha,
+    activeInstallLease:state.activeInstallLease,actor,completedDependencies:completed,
+    loadApprovedManifest,readExisting,readLanePending,claimLane,submitIssue});
+}
 
 function defaultExecFile(file,args,options={}){
   return new Promise((resolve,reject)=>{
@@ -219,6 +266,7 @@ export function createMaintenanceAgent({
   installedShaFromStatus=result=>result?.actualControllerSha,
   ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
+  controllerAdmission=null,
 }={}){
   const root=assertTrustedRoot(stateDir);
   if(repo!==CONTROL_REPOSITORY||!Array.isArray(allowedActors)||!allowedActors.length
@@ -640,6 +688,10 @@ export function createMaintenanceAgent({
       try{results.push(await processIssue(await issueDetails(number)));}
       catch(error){results.push({issueNumber:number,status:"BLOCKED",
         code:safeCode(error?.code??error?.message)});}
+    }
+    if(controllerAdmission!==null){
+      try{results.push(await pollControllerAdmissionBridge(controllerAdmission));}
+      catch{results.push({status:'STATE_UNKNOWN',code:'QUEUE_HOST_CALLBACK_FAILED'});}
     }
     return results;
   }
