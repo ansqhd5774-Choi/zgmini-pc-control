@@ -29,7 +29,7 @@ const split=file=>file.split('/');
 
 export function runGitStageDiagnostic({workspace,runCommand}={}){
   let stage=null,step='GIT_BINARY',lastPass=null,firstFail=null;
-  let reason='NONE',exitCode=null;
+  let reason='NONE',exitCode=null,alternative='NOT_TESTED';
   const setStep=x=>{if(!LABELS.has(x))stop();step=x;};
   const check=(ok,label)=>{setStep(label);if(!ok)stop();lastPass=label;};
   const run=(cwd,args,{stdin,env}={},label)=>{
@@ -112,6 +112,21 @@ export function runGitStageDiagnostic({workspace,runCommand}={}){
     check(git(SOURCE_ROOT,'SOURCE_HEAD','rev-parse','HEAD')===BASE,'SOURCE_HEAD');
   }catch{
     firstFail=step;reason=reason==='NONE'?'LOCAL_STEP_FAILED':reason;
+    // One bounded scratch-only simulation after the FIRST failure is recorded.
+    // Git documents --ignore-space-change for context-line whitespace drift.
+    // A successful apply is not accepted unless both exact target SHAs match.
+    if(firstFail==='APPLY_CHECK'&&stage){
+      const originalExit=exitCode,originalLastPass=lastPass;
+      try{
+        git(stage,'APPLY_CHECK','apply','--check','--ignore-space-change',PATCH);
+        alternative='IGNORE_CONTEXT_CHECK_PASS_TARGET_UNVERIFIED';
+        git(stage,'APPLY','apply','--ignore-space-change',PATCH);
+        alternative=Object.keys(BEFORE).every(file=>sha256(fs.readFileSync(
+          path.join(stage,...split(file))))===TARGET[file])?
+          'IGNORE_CONTEXT_EXACT_TARGETS':'IGNORE_CONTEXT_TARGET_MISMATCH';
+      }catch{alternative='IGNORE_CONTEXT_COMMAND_FAILED';}
+      exitCode=originalExit;lastPass=originalLastPass;
+    }
   }finally{
     if(stage){
       try{
@@ -125,6 +140,6 @@ export function runGitStageDiagnostic({workspace,runCommand}={}){
     }
   }
   return {status:firstFail?'STOP':'PASS',lastPass,firstFail,
-    reason,exitCode,sourceWrites:0,taskWrites:0,configWrites:0,
+    reason,exitCode,alternative,sourceWrites:0,taskWrites:0,configWrites:0,
     installReruns:0};
 }
