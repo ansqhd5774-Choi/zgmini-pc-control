@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 
 // Run only after both GitHub files and the bot comment have been read back.
 // This module never deletes an operational ledger, lease, backup, or older run.
@@ -62,6 +63,7 @@ export function cleanupVerifiedJobTemps({
   if(pointer.issueNumber!==issueNumber||pointer.report?.jobId!==jobId||
    pointer.report.requestId!==report.requestId||pointer.report.status!=='PASS'||
    pointer.report.code!==report.code||pointer.report.actualExecutionSha!==report.actualExecutionSha||
+   !isDeepStrictEqual(pointer.report,report)||
    !samePath(pointer.workspace??'',workspace)||
    !samePath(pointer.file??'',path.join(workspace,'RESULT.json')))
    return skipped('POINTER_RESULT_MISMATCH');
@@ -84,9 +86,9 @@ export function cleanupVerifiedJobTemps({
     return skipped('WORKSPACE_FILE_UNSAFE');
   }
   const result=loadJsonFile(path.join(workspace,'RESULT.json'));
-  if(result.jobId!==jobId||result.requestId!==report.requestId||
-   result.status!=='PASS'||result.code!==report.code||
-   result.protectedStateUnchanged!==true)
+  const workerResult=loadJsonFile(path.join(workspace,'worker-result.json'));
+  if(!isDeepStrictEqual(result,report)||
+   !isDeepStrictEqual(workerResult,report.result))
    return skipped('WORKSPACE_RESULT_MISMATCH');
 
   // Remove the pointer last: an interrupted cleanup remains inspectable.
