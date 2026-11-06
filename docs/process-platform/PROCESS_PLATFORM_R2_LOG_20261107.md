@@ -14,7 +14,7 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (계약·상태머신 초안) | 20% 유지 | Draft PR #626 4파일 SOURCE_READY, 14/14 fixture PASS; Windows adapter/정규 수신 경로·실PC 설치 미구현 |
+| M2 공통 Writer B | RUNNING (Windows receiver 소스·테스트 준비, 실PC 미검증) | 20% 유지 | Draft PR #626 신규 11파일, 격리 22/22 PASS, Windows 어댑터·일회성 Issue Workflow 코드 작성; 실제 Runner·Task·설치·결과 조회 미확인 |
 | M3 실패·정상 회귀 | DEFERRED | — | M1/M2 관련 구현 후 시나리오 5개 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
@@ -84,3 +84,12 @@
 - **다른 설치 SHA면:** 실제 PC 값에서 다시 누적 diff 작성. 기존 유지보수기의 Controller 파일 allowpath가 R2 A 파일을 지원하므로 별도 B 설치기/예약 불필요.
 - 다음 실PC 단계: #68 B 담당의 실제 requestId·설치 SHA·A operation 활성 확인 후 고유 A pc-source-preflight로 정적 checkout/file hash 확인, core-runtime-source-readonly의 WMI runtime 체인과 비교. 두 A의 증거 수준 혼동 금지.
 - **LAST PASS:** 소스/manifest 범위 차이와 기존 B 경로 지원을 read-only 확인. **FIRST FAIL:** 현재 실제 설치 SHA와 #68 활성 lease 미조회; R2의 실PC 진단 결과 없음. 중복 B 요청 0, 운영 수정 0.
+
+## 2026-11-07 — M2 범용 Writer B 수신 초안 확장 및 독립 재검증
+
+- [Draft PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) 현재 **신규 11파일**, 기존 공용 Controller/R17/캘린더 운영 파일 수정 **0건**. 범위형 계약·staging/commit·Windows 어댑터·기존 R17 공유 Writer lock/Task probe·일회성 승인 Issue Workflow·위변조 방지 결과 보고 포함. PR은 Draft 상태 유지, 실행 등록/설치 없음.
+- 자체 개발 코드의 세 그룹 테스트를 총괄이 독립 재실행: `node --test r2-writer-b/contract.test.mjs r2-writer-b/installer.test.mjs r2-writer-b/receiver.test.mjs` **22/22 PASS, exit 0**. Windows 어댑터/결과 보고/사전 검사/격리 Git stage 구문 검사 PASS.
+- false PASS 예방: WeakSet 봉인 인증으로 호출자가 승인 boolean을 위조하지 못하게 함; 승인 파일 SHA와 보호 파일 SHA/dirty를 검증, 무관 대용량 파일은 정상 설치의 무의미한 전역 Gate가 되지 않게 bounded metadata로 보존; 외부 결과 2개 중 하나라도 확인 불가 시 성공 댓글 대신 `WRITER_B_STATE_UNKNOWN / RESULT_DELIVERY_UNVERIFIED`.
+- 기존 `r17-b-windows-probe.js`는 `ZGMINI-PC-Local-Core` Task와 `local-cycle.mjs/run-local.mjs` process tree를 수치 기반으로 점검. 일반 Writer B도 정확히 동일 Core Task를 명시적으로 고정하는 계약이고 임의 명령을 실행하지 않는다.
+- **LAST PASS:** Draft source/테스트 22/22, no live operational writes. **FIRST FAIL/미증명:** Windows host 실제 Runner·Task·config.source/checkout 경로 적합성 및 승인 manifest를 통한 일회성 수신·백업·복구·실설치 해시 확인. M2 RUNNING, 전체 **20% 유지**. Windows 실증 없이는 PR을 운영 main에 자동 병합하거나 운영 설치 완료로 주장하지 않는다.
+- **다음 필수 행동:** Draft PR #626 실제 Windows 환경 적합성과 설치/rollback 실패 시나리오를 승인된 경로에서 검증한 뒤 최종 머지·원담당 경로 인계 판단. M1은 #68 기존 Controller 설치 담당의 실제 설치 SHA·A 활성 결과 확보 후 고유 read-only 요청으로 확인. 신규 예약/중복 B 제출/기능 담당 대리 설치 없음.
