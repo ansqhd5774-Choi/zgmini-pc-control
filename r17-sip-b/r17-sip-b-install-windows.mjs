@@ -37,6 +37,9 @@ const BIN={git:GIT_EXE,'schtasks.exe':path.join(SYSTEM32,'schtasks.exe'),
 const stop=code=>{throw new SipBStop(code);};
 const check=(value,code)=>{if(!value)stop(code);};
 const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+export const coreQuietForTarget=(core,coreLockPresent)=>
+  !!core&&core.instances===0&&core.relatedProcesses===0&&
+  core.unknownProcessLines===0&&core.state!==4&&!coreLockPresent;
 
 function command(which,args,{cwd,stdin,env={}}={}){
   check(Object.hasOwn(BIN,which),'SIP_B_EXECUTABLE_SCOPE_STOP');
@@ -315,9 +318,8 @@ function buildAdapter(auth){
         (head===prepared?.commit&&source===head),
         'SIP_B_CORE_SOURCE_CONFIG_PAIR_STOP');
       if(head===prepared?.commit){
-        check(current.instances===0&&current.relatedProcesses===0&&
-          current.unknownProcessLines===0&&current.state!==4&&
-          !fs.existsSync(CORE_LOCK),'SIP_B_CORE_REENABLE_NOT_DRAINED_STOP');
+        check(coreQuietForTarget(current,fs.existsSync(CORE_LOCK)),
+          'SIP_B_CORE_REENABLE_NOT_DRAINED_STOP');
       }
       if(!current.enabled)command('schtasks.exe',['/Change','/TN',CORE_TASK,'/Enable']);
       writeJournal('CORE_RESTORED');
