@@ -13,6 +13,8 @@ const sourceFiles=[
  'scripts/pc-writer/quota-fetch.mjs',
  'lib/market-breadth/us-provisional-r1.mjs',
 ];
+const writerInventoryLimit=Object.freeze({files:256,fileBytes:2_000_000,totalBytes:32_000_000});
+const validSha=value=>typeof value==='string'&&/^[0-9a-f]{40}$/i.test(value);
 
 function xmlDecode(value){
  return value.replace(/&(amp|quot|apos|lt|gt);/g,(_,kind)=>({amp:'&',quot:'"',apos:"'",lt:'<',gt:'>'})[kind]);
@@ -39,6 +41,56 @@ function candidatePaths(text){
  return [...new Set(matches.map(s=>s.trim()))].slice(0,32);
 }
 
+/** The installed A request is fixed-schema: it must not accept arbitrary file paths.
+ * Return only names and digests for bounded, flat Writer JS files. This is a
+ * candidate checkout inventory, not proof that the active Core executes it.
+ */
+export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpathSync.native(p),
+ read=p=>fs.readFileSync(p),dirtyPaths=[]}={}){
+ const unavailable=code=>({status:'STATE_UNKNOWN',code,complete:false,
+  directory:'scripts/pc-writer',files:[],totalBytes:0});
+ const dir=path.join(sourceRoot,'scripts','pc-writer');
+ let canonical;
+ try{
+  canonical=realpath(dir);
+  if(canonical.toLowerCase()!==path.resolve(dir).toLowerCase()||
+   !fs.lstatSync(dir).isDirectory()||fs.lstatSync(dir).isSymbolicLink())
+   return unavailable('WRITER_SOURCE_DIRECTORY_UNVERIFIED');
+ }catch{return unavailable('WRITER_SOURCE_DIRECTORY_UNAVAILABLE');}
+ let names;
+ try{
+  const all=fs.readdirSync(dir);
+  const mjs=all.filter(x=>/\.mjs$/i.test(x));
+  if(mjs.some(x=>!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.mjs$/i.test(x)))
+   return unavailable('WRITER_SOURCE_FILENAME_UNVERIFIED');
+  names=mjs.sort();
+ }
+ catch{return unavailable('WRITER_SOURCE_DIRECTORY_UNREADABLE');}
+ if(names.length>writerInventoryLimit.files)return unavailable('WRITER_SOURCE_FILE_COUNT_LIMIT');
+ const dirty=new Set(dirtyPaths);
+ const files=[];let totalBytes=0;
+ for(const name of names){
+  const p=path.join(dir,name);
+  try{
+   const lstat=fs.lstatSync(p),canonicalFile=realpath(p);
+   if(!lstat.isFile()||lstat.isSymbolicLink()||
+       canonicalFile.toLowerCase()!==path.resolve(p).toLowerCase()||
+       lstat.size>writerInventoryLimit.fileBytes)
+    return unavailable('WRITER_SOURCE_FILE_UNVERIFIED');
+   totalBytes+=lstat.size;
+   if(totalBytes>writerInventoryLimit.totalBytes)
+    return unavailable('WRITER_SOURCE_TOTAL_BYTES_LIMIT');
+   const bytes=read(p);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==lstat.size)
+    return unavailable('WRITER_SOURCE_FILE_READ_MISMATCH');
+   const relative='scripts/pc-writer/'+name;
+   files.push({path:relative,sha256:sha256(bytes),trackedDirty:dirty.has(relative)});
+  }catch{return unavailable('WRITER_SOURCE_FILE_UNAVAILABLE');}
+ }
+ return {status:'PASS',code:'WRITER_SOURCE_INVENTORY_COMPLETE',complete:true,
+  directory:'scripts/pc-writer',files,totalBytes};
+}
+
 /** Injectable dependencies keep fixture tests independent from a real Windows PC. */
 export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  realpath=p=>fs.realpathSync.native(p),read=p=>fs.readFileSync(p),
@@ -56,14 +108,18 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  const inside=p=>p.toLowerCase().startsWith((root+path.sep).toLowerCase());
  const relative=p=>path.relative(root,p).replaceAll('\\','/');
  const action=taskAction(coreTaskXml),queue=[];
- for(const part of [action.command,action.arguments,action.workingDirectory])queue.push(...candidatePaths(part));
+ for(const part of [action.command,action.arguments,action.workingDirectory])
+  for(const raw of candidatePaths(part))queue.push({raw,base:root});
  const visited=new Set(),files=[];let sourceRoot=null;
  while(queue.length&&visited.size<24){
-  const raw=queue.shift();
+  const {raw,base:origin}=queue.shift();
   // No arbitrary task arguments, URL, environment expansion, glob or shell.
   if(raw.includes('%')||raw.includes('$')||raw.includes('*')||raw.includes('?'))continue;
-  const bases=files.length?[path.dirname(files[files.length-1].absolute),root]:[root];
-  const candidates=path.isAbsolute(raw)?[raw]:bases.map(b=>path.resolve(b,raw));
+  const bases=[origin,root];
+  // WSH/VBS uses backslashes even when the diagnostic fixture runs on POSIX.
+  // Do not interpret the reference as a command; resolve only canonical files.
+  const portableRaw=raw.replace(/[\\/]/g,path.sep);
+  const candidates=path.isAbsolute(portableRaw)?[portableRaw]:bases.map(b=>path.resolve(b,portableRaw));
   for(const candidate of candidates){
    let real;try{real=realpath(candidate);}catch{continue;}
    if(!inside(real)||visited.has(real.toLowerCase())||!exists(real))continue;
@@ -71,7 +127,8 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
    if(!stat.isFile()||stat.size>65536)continue;
    const bytes=read(real);visited.add(real.toLowerCase());
    files.push({absolute:real,path:relative(real),sha256:sha256(bytes)});
-   for(const found of candidatePaths(bytes.toString('utf8')))queue.push(found);
+   for(const found of candidatePaths(bytes.toString('utf8')))
+    queue.push({raw:found,base:path.dirname(real)});
    let dir=path.dirname(real);
    while(inside(dir)){
     if(exists(path.join(dir,'.git'))&&exists(path.join(dir,'scripts','pc-writer','local-cycle.mjs'))){sourceRoot=dir;break;}
@@ -88,6 +145,23 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
   tracedLaunchers:safeFiles,sourceResolved:!!sourceRoot,
   sourceRoot:sourceRoot?relative(sourceRoot):null,
   sourceHead:null,trackedDirty:null,requiredFiles:[],providerCalls:0,d1Writes:0,sqliteOpened:false};
+
+ // No config body is returned: source identity is extracted from the fixed
+ // existing Writer config only. This does not prove Runtime source identity.
+ result.configApprovedSha=null;
+ result.sourceHeadMatchesConfig=null;
+ try{
+  const configPath=path.join(root,'data','pc-writer','config.json');
+  const actual=realpath(configPath);
+  if(inside(actual)&&exists(actual)&&fs.lstatSync(actual).isFile()&&
+      fs.statSync(actual).size<=131072){
+   const config=JSON.parse(read(actual).toString('utf8'));
+   const candidates=[config?.source?.sha,config?.source?.commit,
+    config?.source?.commitSha,config?.source,config?.sourceSha];
+   const approved=candidates.find(validSha);
+   if(approved)result.configApprovedSha=approved.toLowerCase();
+  }
+ }catch{} // Unavailable or malformed config is unknown, not an invented SHA.
 
  // The already-running Writer records Git rev-parse HEAD in a fixed checkpoint.
  // Report only bounded status metadata; never return the file's other fields.
@@ -168,7 +242,12 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  try{
   result.sourceHead=git(sourceRoot,['rev-parse','HEAD']).trim();
   const dirty=git(sourceRoot,['status','--porcelain','--untracked-files=no']);
-  result.trackedDirty=dirty.split(/\r?\n/).filter(Boolean).map(x=>x.slice(3)).slice(0,30);
+  const changed=dirty.split(/\r?\n/).filter(Boolean).map(x=>x.slice(3));
+  result.trackedDirty=changed.slice(0,30);
+  result.trackedDirtyTruncated=changed.length>30;
+  if(validSha(result.sourceHead)&&result.configApprovedSha)
+   result.sourceHeadMatchesConfig=result.sourceHead.toLowerCase()===result.configApprovedSha;
+  result.writerSourceInventory=inspectWriterSourceInventory(sourceRoot,{realpath,read,dirtyPaths:changed});
  }catch{result.code='PC_SOURCE_GIT_READ_UNVERIFIED';return result;}
  for(const name of sourceFiles){
   const p=path.join(sourceRoot,...name.split('/'));
@@ -179,3 +258,4 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  }
  return result;
 }
+
