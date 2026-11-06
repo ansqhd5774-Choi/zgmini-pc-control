@@ -2,7 +2,6 @@
 // Production integration candidate; not installed until the control PR is merged.
 import fs from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {runNovemberForecastB} from './er1-nov-forecast-b-core.mjs';
@@ -16,7 +15,6 @@ const MANIFEST='ER1_NOV_FORECAST_B_APPROVAL.json';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const stop=code=>{throw Error(code)};
-const hashBlob=data=>createHash('sha1').update('blob '+data.length+'\0').update(data).digest('hex');
 const exact=(obj,fields)=>!!obj&&typeof obj==='object'&&!Array.isArray(obj)&&
   Object.keys(obj).sort().join('|')===fields.slice().sort().join('|');
 
@@ -41,7 +39,8 @@ export function validateRequest(event,env){
 }
 
 // The Issue creation timestamp is immutable across workflow re-runs.
-// Pin the score's asOf once so repeated attempts cannot drift to a new day.
+// Pin the UTC observation date; KST may already be tomorrow while the public
+// score contract still rejects tomorrow's midnight UTC as a future asOf.
 export function issueAsOf(event){
   const stamp=event?.issue?.created_at;
   if(typeof stamp!=='string'||
@@ -50,7 +49,7 @@ export function issueAsOf(event){
   const epoch=Date.parse(stamp);
   if(!Number.isFinite(epoch)||new Date(epoch).toISOString().slice(0,19)+'Z'!==stamp)
     stop('ER1_NOV_FORECAST_B_ISSUE_TIME_STOP');
-  const day=new Date(epoch+9*60*60*1000).toISOString().slice(0,10);
+  const day=stamp.slice(0,10);
   if(day<'2026-11-01'||day>'2026-11-30')
     stop('ER1_NOV_FORECAST_B_ISSUE_TIME_STOP');
   return day;
@@ -78,16 +77,24 @@ export function validateApproval(m,sourceSha=PINNED_SOURCE){
   return m;
 }
 
-export function verifySource(root,m,{getHead}={}){
-  const sha=getHead?getHead(root):execFileSync('git',['rev-parse','HEAD'],{
+export function verifySource(root,m,{getHead,gitRun}={}){
+  const git=args=>gitRun?gitRun(root,args):execFileSync('git',args,{
     cwd:root,encoding:'utf8',windowsHide:true,timeout:10000}).trim();
+  const sha=getHead?getHead(root):git(['rev-parse','HEAD']);
   if(sha!==m.sourceSha)stop('ER1_NOV_FORECAST_B_SOURCE_STOP');
   for(const entry of m.files){
     const file=path.join(root,...entry.path.split('/'));
     let st;try{st=fs.lstatSync(file)}catch{stop('ER1_NOV_FORECAST_B_FILE_MISSING')}
-    if(!st.isFile()||st.isSymbolicLink()||st.size<2||st.size>1_000_000||
-      hashBlob(fs.readFileSync(file))!==entry.blobSha)
+    if(!st.isFile()||st.isSymbolicLink()||st.size<2||st.size>1_000_000)
       stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP');
+    // The pinned Git blob is canonical LF content. Windows checkout can
+    // materialize safe CRLF; Git clean filters compare that worktree to HEAD.
+    try{
+      if(git(['rev-parse','--verify','HEAD:'+entry.path])!==entry.blobSha||
+        git(['cat-file','-t','HEAD:'+entry.path])!=='blob')
+        stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP');
+      git(['diff','--no-ext-diff','--quiet','HEAD','--',entry.path]);
+    }catch{stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP')}
   }
   return root;
 }
