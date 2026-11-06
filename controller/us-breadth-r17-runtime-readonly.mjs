@@ -27,6 +27,9 @@ function readSmallObject(file) {
   } catch { return {state:'INVALID_JSON'}; }
 }
 
+function cleanUsProvisionalCode(value) {
+  return typeof value === 'string' && /^US_PROVISIONAL_[A-Z0-9_]{1,80}$/.test(value) ? value : null;
+}
 function cleanStatus(value) { return typeof value === 'string' && STATUS.test(value) ? value : null; }
 function cleanIso(value) { return typeof value === 'string' && ISO.test(value) && Number.isFinite(Date.parse(value)) ? value : null; }
 function cleanDate(value) {
@@ -104,6 +107,7 @@ export function inspectUsBreadthR17Runtime(dataRoot,{now=new Date()}={}) {
     modifiedAt:cycle.modifiedAt,sha256:cycle.sha256,
     status:cleanStatus(cycle.value.status),lane:cycle.value.lane === 'core' ? 'core' : null,
     usProvisional:cleanStatus(cycle.value.usProvisional?.status),
+    usProvisionalCode:cleanUsProvisionalCode(cycle.value.usProvisional?.code),
     usProvisionalEarlyPublication:cleanStatus(cycle.value.usProvisionalEarlyPublication?.status),
     usProvisionalSlotEndUtc:cleanIso(cycle.value.usProvisional?.slotEndUtc),
   } : null;
@@ -161,3 +165,4 @@ export function inspectUsBreadthR17Runtime(dataRoot,{now=new Date()}={}) {
     providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0,
   };
 }
+
