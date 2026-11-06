@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-d0e43f9d-4f90-478b-a32c-9be4187a2eec",
+  "targetControllerSha": "6d25a2cbf9b3882b701cac89412c856f1bddbc6f",
+  "status": "BLOCKED",
+  "code": "CONTROLLER_ONLY_INSTALL_SCOPE_INVALID",
+  "lastPass": "NONE",
+  "firstFail": "CONTROLLER_ONLY_INSTALL_SCOPE_INVALID",
+  "actualControllerSha": null,
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": false
+}
