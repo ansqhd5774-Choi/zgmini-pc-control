@@ -9,6 +9,8 @@ import {BASE,PUBLIC,SOURCE_ROOT,CONFIG,CORE_TASK,TARGET_BLOBS,
  INSTALLED_HOTFIX_PATH,INSTALLED_HOTFIX_SHA256,sha256,
  validateOneFileBefore} from './contract.mjs';
 import {traceVbsDataflow} from './vbs-static-dataflow.mjs';
+import {parseNameStatusZ} from './candidate-delta.mjs';
+import {summarizeCycleCheckpoint} from './cycle-checkpoint-summary.mjs';
 
 const WINDOWS_SYSTEM=process.env.SystemRoot??String.raw`C:\Windows`;
 const GIT_CANDIDATES=[
@@ -185,26 +187,55 @@ function inspectCandidateCheckout(){
  const config=JSON.parse(fs.readFileSync(CONFIG,'utf8'));
  const publicHead=publicGit('rev-parse','HEAD');
  const publicBlob=publicGit('rev-parse',`HEAD:${INSTALLED_HOTFIX_PATH}`);
- const relevant=listNull(call(GIT,['-C',SOURCE_ROOT,'diff','--no-ext-diff',
-  '--name-only','-z','HEAD','--','worker','lib','scripts/pc-writer']));
+ const relevant=parseNameStatusZ(call(GIT,['-C',SOURCE_ROOT,'diff',
+  '--no-ext-diff','--no-renames','--name-status','-z','HEAD','--',
+  'worker','lib','scripts/pc-writer']));
  const staged=listNull(call(GIT,['-C',SOURCE_ROOT,'diff','--no-ext-diff',
   '--cached','--name-only','-z']));
  const otherTargets=Object.entries(TARGET_BLOBS).filter(([p])=>p!==INSTALLED_HOTFIX_PATH);
  let matchingOtherBlobs=0;
+ const targetBlobMismatches=[];
  for(const [p,expected] of otherTargets){
-  try{if(git('rev-parse',`HEAD:${p}`)===expected)matchingOtherBlobs++;}catch{}
+  let localBlob=null;
+  try{localBlob=git('rev-parse',`HEAD:${p}`);}catch{}
+  if(localBlob===expected)matchingOtherBlobs++;
+  else targetBlobMismatches.push({path:p,localBlob,publicBlob:expected});
  }
  const hotfixHash=sha256(safeFile(INSTALLED_HOTFIX_PATH));
+ const approvedDirtyNames=new Set([...Object.keys(TARGET_BLOBS),
+  'scripts/pc-writer/us-breadth-provisional-cycle.mjs',
+  'scripts/pc-writer/us-breadth-sip-premarket-cycle.mjs',
+  'lib/market-breadth/us-premarket-sip-r1.mjs']);
+ const dirtyFiles=relevant.map(item=>{
+  let fileSha256=null;
+  if(item.status!=='D'){
+   try{fileSha256=sha256(safeFile(item.path));}catch{}
+  }
+  return {status:item.status,path:approvedDirtyNames.has(item.path)?item.path:
+   'OTHER_RELEVANT_DIRTY',fileSha256};
+ });
  return {activeRootVerified:false,sourceHead,configSource:config.source??null,
   publicHeadPinned:publicHead===PUBLIC,publicHotfixBlobPinned:
    publicBlob===TARGET_BLOBS[INSTALLED_HOTFIX_PATH],
   otherTargetBlobMatches:matchingOtherBlobs,
   otherTargetBlobCount:otherTargets.length,
+  targetBlobMismatches,dirtyFiles,
   relevantDirtyCount:relevant.length,
   soleExpectedHotfixDirty:relevant.length===1&&
-   relevant[0]===INSTALLED_HOTFIX_PATH&&hotfixHash===INSTALLED_HOTFIX_SHA256,
+   relevant[0].path===INSTALLED_HOTFIX_PATH&&hotfixHash===INSTALLED_HOTFIX_SHA256,
   stagedIndexCount:staged.length,configSourceMatchesHistoric:
    config.source===BASE,sourceHeadMatchesHistoric:sourceHead===BASE};
+}
+function cycleCheckpoint(){
+ const file=path.join(path.dirname(CONFIG),'local-cycle-last-run.json');
+ try{
+  const st=fs.lstatSync(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.size>8192||st.size<100)
+   return {exists:false,code:'CHECKPOINT_NOT_REGULAR_OR_BOUNDED'};
+  const bytes=fs.readFileSync(file);
+  return summarizeCycleCheckpoint(bytes,{modifiedAt:st.mtime.toISOString(),
+   hash:sha256(bytes)});
+ }catch{return {exists:false,code:'CHECKPOINT_READ_UNAVAILABLE'};}
 }
 export function issueAuth({env=process.env,event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'))}={}){
  need(env.GITHUB_REPOSITORY==='ansqhd5774-Choi/zgmini-pc-control'&&
@@ -288,6 +319,7 @@ export async function preflight(){
   return {schema:'ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1',
    status:'CAL_B_PREFLIGHT_STOP',code:error.code,requestId:auth.requestId,
    issue:auth.issue,diagnostic:error.diagnostic,candidateCheckout,
+   cycleCheckpoint:cycleCheckpoint(),
    candidateCheckoutErrorCode,activeCoreRootVerified:false,
    providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0};
  }
