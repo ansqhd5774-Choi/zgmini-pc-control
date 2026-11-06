@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 
 export const CONTROL='ansqhd5774-Choi/zgmini-pc-control';
-export const PINNED_SOURCE='f125feb595e696a73961e450125351530c898743';
+export const PINNED_SOURCE='457fc8fe146e8a7a212ee0a68475945082ce30fb';
 const PC_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 const DAYS=Array.from({length:30},(_,i)=>
   `2026-11-${String(i+1).padStart(2,'0')}`);
