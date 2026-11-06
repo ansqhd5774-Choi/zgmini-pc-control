@@ -1,0 +1,54 @@
+name: ZGMINI PC November ER1 Saved Actual Read-Only
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: zgmini-er1-nov30-saved-audit
+  cancel-in-progress: false
+
+jobs:
+  saved-audit:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-er1-nov30-saved-actual-audit' &&
+      contains(github.event.issue.labels.*.name, 'pc-er1-approved')
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout fixed control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Checkout fixed ER1 scorer source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: a6dd77d19ccfcb79ddcdd0b4a6f495ec3888e24a
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Inspect existing PC actual files without network or operation writes
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-saved-actual-audit.mjs"'
+      - name: Report only aggregate read-only result
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\er1-nov30-saved-actual-audit.mjs" --upload'
