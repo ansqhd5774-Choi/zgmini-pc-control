@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_RELEASE_CALENDAR_2FILE_B_RESULT_V1",
+  "requestId": "pc-calendar-d6bb3735-92c9-447a-8824-422e7d495f3e",
+  "issueNumber": 491,
+  "status": "SUCCEEDED",
+  "code": "CAL_B_TWOFILE_INSTALLED_VERIFIED",
+  "phase": "VERIFIED",
+  "controlSha": "a44784270c5d35bf8e2a807fa86ba10e97f09185",
+  "fileCount": 2,
+  "beforeVerified": 2,
+  "afterVerified": 2,
+  "backupVerified": 2,
+  "controllerChanged": false,
+  "schedulerChanged": false,
+  "dbChanged": false,
+  "providerCalls": 0,
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
