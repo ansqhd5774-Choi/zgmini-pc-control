@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {writeOnce,sanitizeDiagnostic} from './upload-preflight-result.mjs';
+import {writeOnce,sanitizeDiagnostic,sanitizeCandidateCheckout} from './upload-preflight-result.mjs';
 function fake(){
  const memory=new Map();let puts=0;
  const fetchImpl=async(url,opts={})=>{
@@ -44,9 +44,21 @@ test('diagnostic export allowlists only boolean call graph, never raw commands o
  const safe=sanitizeDiagnostic({taskCommand:'wscript.exe',secret:'API_KEY_123',
   firstLauncherShaVerified:true,callGraph:[{callCount:1,
    callSites:[{api:'run',argumentForm:'concatenated',
-    raw:'Bearer sensitive-secret',mentionsCoreScript:true}]}]});
+    raw:'Bearer sensitive-secret',mentionsCoreScript:true}]}],
+  causality:[{callCount:1,allCallArgumentsResolved:false,branchSeen:true,
+   calls:[{api:'run',argumentForm:'UNRESOLVED',resolved:false,
+    reason:'UNSAFE_RAW_SECRET',raw:'Bearer sensitive-secret'}]}]});
  const encoded=JSON.stringify(safe);
  assert.equal(encoded.includes('API_KEY_123'),false);
  assert.equal(encoded.includes('Bearer'),false);
  assert.equal(safe.callGraph[0].callSites[0].argumentForm,'concatenated');
+});
+test('candidate checkout is explicitly non-active, only SHA/count/flags exported',()=>{
+ const sanitized=sanitizeCandidateCheckout({activeRootVerified:true,rawConfig:'super-secret',
+  sourceHead:'a'.repeat(40),configSource:'b'.repeat(40),
+  publicHeadPinned:true,otherTargetBlobMatches:9,otherTargetBlobCount:9,
+  soleExpectedHotfixDirty:true,stagedIndexCount:0});
+ assert.equal(sanitized.activeRootVerified,false);
+ assert.equal(sanitized.otherTargetBlobMatches,9);
+ assert.equal(JSON.stringify(sanitized).includes('super-secret'),false);
 });
