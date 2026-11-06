@@ -1,0 +1,394 @@
+#!/usr/bin/env node
+// Source-only generic Writer B Windows adapter. NOT a pc-job operation,
+// Controller maintenance command, scheduled job or authorization shortcut.
+// This file must pass the approved owner Issue / manifest SHA checks before
+// it can access the operational checkout. No deployment occurs on PR creation.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {setTimeout as delay} from 'node:timers/promises';
+import {sha256} from './contract.mjs';
+import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
+import {performWriterBInstall} from './installer.mjs';
+import {commitApprovedWriterBOverlay} from './git-stage.mjs';
+import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
+import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
+import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from '../r17-writer-b/r17-b-claim.mjs';
+
+const ROOT=path.dirname(fileURLToPath(import.meta.url));
+const PROBE=path.join(ROOT,'..','r17-writer-b','r17-b-windows-probe.js');
+const SHARED_LOCK=String.raw`E:\ZGmini\data\pc-writer\writer-source-install.lock`;
+const CORE_CYCLE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
+const JOURNALS=String.raw`E:\ZGmini\data\pc-writer\writer-b-install-once`;
+const SHA40=/^[0-9a-f]{40}$/i;
+const BINARY=Object.freeze({
+ git:[String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`].find(p=>fs.existsSync(p)),
+ schtasks:path.join(process.env.SystemRoot??String.raw`C:\Windows`,'System32','schtasks.exe'),
+ cscript:path.join(process.env.SystemRoot??String.raw`C:\Windows`,'System32','cscript.exe'),
+});
+const stop=code=>{throw Object.assign(new Error(code),{code});};
+const need=(ok,code)=>{if(!ok)stop(code);};
+const now=()=>new Date().toISOString();
+
+function exec(name,args,{cwd,stdin,env={}}={}){
+ need(Object.hasOwn(BINARY,name)&&typeof BINARY[name]==='string'&&
+   fs.existsSync(BINARY[name]),'WRITER_B_EXECUTABLE_SCOPE_STOP');
+ const out=spawnSync(BINARY[name],args,{cwd,windowsHide:true,shell:false,
+  input:stdin,encoding:null,maxBuffer:4_000_000,timeout:45_000,
+  env:{...process.env,GIT_TERMINAL_PROMPT:'0',GIT_CONFIG_NOSYSTEM:'1',...env}});
+ need(out.status===0&&!out.error,'WRITER_B_EXECUTION_FAILED_STOP');
+ return out.stdout;
+}
+const git=(dir,...args)=>exec('git',['-C',dir,'-c','core.fsmonitor=false',...args])
+  .toString('utf8').trim();
+const gitRaw=(dir,args,options={})=>exec('git',
+  ['-C',dir,'-c','core.fsmonitor=false',...args],options);
+let emptyHooks=null;
+function gitLive(...args){
+ need(emptyHooks&&fs.readdirSync(emptyHooks).length===0,
+  'WRITER_B_EMPTY_HOOK_SCOPE_STOP');
+ return exec('git',['-c',`core.hooksPath=${emptyHooks}`,
+  '-c','core.fsmonitor=false',...args]).toString('utf8').trim();
+}
+function rawSafe(file,root){
+ const stat=fs.lstatSync(file);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size<=2_000_000,
+  'WRITER_B_REGULAR_FILE_STOP');
+ const parent=fs.realpathSync.native(root).toLowerCase()+path.sep;
+ need(fs.realpathSync.native(file).toLowerCase().startsWith(parent),
+  'WRITER_B_REALPATH_SCOPE_STOP');
+ return fs.readFileSync(file);
+}
+function scoped(root,relative){return path.join(root,...relative.split('/'));}
+function fixedTaskXml(task){
+ const raw=exec('schtasks',['/Query','/TN',task,'/XML']);
+ let xml=raw.toString('utf8').replace(/^\ufeff/,'');
+ if(raw[0]===255&&raw[1]===254)xml=raw.subarray(2).toString('utf16le');
+ else if(raw[0]===60&&raw[1]===0)xml=raw.toString('utf16le');
+ need(/^\s*<\?xml|^\s*<Task\b/.test(xml),'WRITER_B_TASK_XML_STOP');
+ return {raw,xml,normalized:sameTaskDefinitionExceptSettingsEnabled(xml)};
+}
+function taskProbe(){
+ const out=exec('cscript',['//NoLogo',PROBE]);let x;
+ try{x=JSON.parse(out.toString('utf8').trim());}catch{stop('WRITER_B_TASK_PROBE_JSON_STOP');}
+ need(x?.ok===true&&typeof x.enabled==='boolean'&&
+  Number.isInteger(x.state)&&Number.isInteger(x.instances)&&x.instances>=0&&
+  Number.isInteger(x.relatedProcesses)&&x.relatedProcesses>=0&&
+  Number.isInteger(x.unknownProcessLines)&&x.unknownProcessLines>=0,
+  'WRITER_B_TASK_PROBE_STOP');
+ return x;
+}
+function taskQuiet(task){return task.enabled===false&&task.state!==4&&
+ task.instances===0&&task.relatedProcesses===0&&task.unknownProcessLines===0&&
+ !fs.existsSync(CORE_CYCLE_LOCK);}
+function readConfig(file){
+ const raw=rawSafe(file,path.dirname(file));let json;
+ try{json=JSON.parse(raw.toString('utf8'));}catch{stop('WRITER_B_CONFIG_JSON_STOP');}
+ need(json&&typeof json==='object'&&SHA40.test(json.source??''),
+  'WRITER_B_CONFIG_SOURCE_STOP');return {raw,json};
+}
+function replaceConfigOnly(raw,from,to){
+ const text=raw.toString('utf8');
+ const matches=[...text.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)];
+ need(matches.length===1&&matches[0][1]===from,'WRITER_B_CONFIG_CAS_STOP');
+ const swapped=text.slice(0,matches[0].index)+matches[0][0].replace(from,to)+
+  text.slice(matches[0].index+matches[0][0].length);
+ const oldJson=JSON.parse(text),newJson=JSON.parse(swapped);
+ need(JSON.stringify({...oldJson,source:to})===JSON.stringify(newJson),
+  'WRITER_B_CONFIG_ONLY_SOURCE_STOP');
+ return Buffer.from(swapped,'utf8');
+}
+function atomicBytes(file,bytes,id){
+ const tmp=`${file}.writer-b-${id}.tmp`;
+ need(!fs.existsSync(tmp),'WRITER_B_TEMP_COLLISION_STOP');
+ fs.writeFileSync(tmp,bytes,{flag:'wx'});
+ try{fs.renameSync(tmp,file);}catch{stop('WRITER_B_CONFIG_ATOMIC_RENAME_STOP');}
+ need(fs.readFileSync(file).equals(bytes),'WRITER_B_CONFIG_ATOMIC_READBACK_STOP');
+}
+
+function statusSnapshot(root,manifest){
+ const raw=gitRaw(root,['status','--porcelain=v1','-z','--untracked-files=all']);
+ return snapshotUnrelatedDirty({sourceRoot:root,statusBytes:raw,manifest});
+}
+function sameUnrelated(root,manifest,saved){
+ const current=statusSnapshot(root,manifest);
+ need(current.porcelainSha256===saved.porcelainSha256&&
+  JSON.stringify(current.evidence)===JSON.stringify(saved.evidence),
+  'WRITER_B_UNRELATED_DIRTY_DRIFT_STOP');
+}
+
+export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
+ const m=auth.manifest;
+ const source=m.sourceRoot;
+ const task=m.coreTask;
+ let fd=null,originalConfig=null,originalXml=null,dirty=null,prepared=null;
+ let before=null;
+ const journalDir=path.join(JOURNALS,auth.requestId);
+ const journalFile=path.join(journalDir,'journal.jsonl');
+ const journal=(phase)=>{
+  if(!fs.existsSync(journalFile))return;
+  const f=fs.openSync(journalFile,'a');
+  try{fs.writeSync(f,JSON.stringify({phase,at:now()})+'\n');fs.fsyncSync(f);}
+  finally{fs.closeSync(f);}
+ };
+ const sourceRaw=file=>rawSafe(scoped(source,file),source);
+ const sourceHash=file=>sha256(sourceRaw(file));
+ const assertBase=()=>{
+  need(git(source,'rev-parse','HEAD')===m.baseHead&&
+   git(source,'branch','--show-current')===before.originalBranch&&
+   readConfig(m.configPath).raw.equals(originalConfig),
+   'WRITER_B_BASE_CONCURRENT_DRIFT_STOP');
+  sameUnrelated(source,m,dirty);
+  for(const file of m.files){
+   const target=scoped(source,file.path);
+   if(file.change==='A')need(!fs.existsSync(target),'WRITER_B_ADD_CONFLICT_STOP');
+   else need(sourceHash(file.path)===file.beforeSha256,
+    'WRITER_B_SOURCE_CONCURRENT_DRIFT_STOP');
+  }
+ };
+ const io={
+  async acquireSharedWriterLock(requestId){
+   need(requestId===auth.requestId,'WRITER_B_REQUEST_ID_STOP');
+   fd=acquireInstallLock({journalRoot:JOURNALS,requestId,
+    sharedLock:SHARED_LOCK}).fd;
+  },
+  async readPcPreimage(){
+   need(fs.lstatSync(source).isDirectory()&&
+    !fs.lstatSync(source).isSymbolicLink(),
+    'WRITER_B_SOURCE_ROOT_REPARSE_STOP');
+   const head=git(source,'rev-parse','HEAD');
+   const branch=git(source,'branch','--show-current');
+   originalConfig=readConfig(m.configPath).raw;
+   originalXml=fixedTaskXml(task);
+   dirty=statusSnapshot(source,m);
+   const t=taskProbe();
+   before={sourceRoot:source,configPath:m.configPath,coreTask:task,
+    head,configSource:JSON.parse(originalConfig.toString('utf8')).source,
+    originalConfigSha256:sha256(originalConfig),
+    originalTaskDefinitionSha256:sha256(originalXml.raw),
+    originalBranch:branch,coreTaskEnabled:t.enabled,targetPathsClean:true,
+    beforeSha256:Object.fromEntries(m.files.map(f=>[f.path,
+     f.change==='A'?(fs.existsSync(scoped(source,f.path))?'EXISTS':null):sourceHash(f.path)])),
+    protectedSha256:Object.fromEntries(m.protectedFiles.map(f=>[f.path,sourceHash(f.path)])),
+   };
+   return before;
+  },
+  async readCandidate(){
+   need(git(candidateRoot,'rev-parse','HEAD')===m.candidateSourceSha&&
+    git(candidateRoot,'status','--porcelain=v1','--untracked-files=all')==='',
+    'WRITER_B_CANDIDATE_DRIFT_STOP');
+   return {sourceSha:m.candidateSourceSha,clean:true,
+    sha256:Object.fromEntries(m.files.map(f=>[f.path,
+     sha256(rawSafe(scoped(candidateRoot,f.path),candidateRoot))]))};
+  },
+  async claimRequest(requestId){
+   need(requestId===auth.requestId&&fd!==null,'WRITER_B_CLAIM_LOCK_STOP');
+   const claim=createInstallJournal({journalRoot:JOURNALS,
+    requestId,sharedLock:SHARED_LOCK,fd});
+   emptyHooks=claim.hooksDir;journal('CLAIMED');
+  },
+  async backupOriginal(snapshot){
+   need(snapshot===before&&originalConfig&&originalXml,
+    'WRITER_B_BACKUP_SOURCE_STOP');
+   fs.writeFileSync(path.join(journalDir,'config.original.bin'),originalConfig,{flag:'wx'});
+   fs.writeFileSync(path.join(journalDir,'task.original.xml'),originalXml.raw,{flag:'wx'});
+   for(const file of m.files.filter(f=>f.change==='M')){
+    const basename=file.path.replaceAll('/','__');
+    fs.writeFileSync(path.join(journalDir,`${basename}.original.bin`),
+     sourceRaw(file.path),{flag:'wx'});
+   }
+   fs.writeFileSync(path.join(journalDir,'preimage.json'),
+    JSON.stringify({head:before.head,branch:before.originalBranch,
+     originalConfigSha256:before.originalConfigSha256,
+     originalTaskDefinitionSha256:before.originalTaskDefinitionSha256,
+     beforeSha256:before.beforeSha256,protectedSha256:before.protectedSha256}),
+    {flag:'wx'});
+   journal('BACKED_UP');
+  },
+  async prepareIsolatedCommit(){
+   assertBase();
+   const stage=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-writer-b-'));
+   git(stage,'init','-q');
+   const sourceObjects=git(source,'rev-parse','--git-path','objects');
+   const objects=fs.realpathSync.native(path.isAbsolute(sourceObjects)?
+    sourceObjects:path.resolve(source,sourceObjects));
+   need(fs.statSync(objects).isDirectory(),'WRITER_B_GIT_OBJECT_STORE_STOP');
+   fs.writeFileSync(path.join(stage,'.git','objects','info','alternates'),
+    objects.replaceAll('\\','/')+'\n',{flag:'wx'});
+   git(stage,'read-tree',m.baseHead);
+   const overlay=new Map();
+   for(const file of m.files){
+    const ls=git(source,'ls-tree',m.baseHead,'--',file.path);
+    need(file.change==='M'?ls.startsWith('100644 blob '):ls==='',
+     'WRITER_B_GIT_MODE_PREIMAGE_STOP');
+    overlay.set(file.path,rawSafe(scoped(candidateRoot,file.path),candidateRoot));
+   }
+   const sourceRef=`refs/heads/writer-b/${auth.requestId}`;
+   const result=commitApprovedWriterBOverlay({stage,base:m.baseHead,
+    manifestFiles:m.files,overlay,requestRef:sourceRef,run:git,runRaw:gitRaw});
+   prepared={...result,stage,branch:`writer-b/${auth.requestId}`};
+   journal('STAGED');
+   return prepared;
+  },
+  async pauseCore(){
+   assertBase();
+   need(fixedTaskXml(task).normalized===originalXml.normalized&&
+    taskProbe().enabled===true,'WRITER_B_TASK_PREPAUSE_DRIFT_STOP');
+   exec('schtasks',['/Change','/TN',task,'/Disable']);
+   journal('TASK_PAUSED');
+  },
+  async waitForCoreDrain(){
+   let consecutive=0;const until=Date.now()+90000;
+   while(Date.now()<until){
+    consecutive=taskQuiet(taskProbe())?consecutive+1:0;
+    if(consecutive>=2){journal('CORE_DRAINED');return;}
+    await delay(1500);
+   }
+   stop('WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP');
+  },
+  async assertCoreQuiet(){
+   need(taskQuiet(taskProbe())&&
+    fixedTaskXml(task).normalized===originalXml.normalized,
+    'WRITER_B_CORE_QUIET_STOP');
+  },
+  async switchPreparedSource(artifact){
+   need(artifact===prepared&&
+    git(prepared.stage,'rev-parse','--verify',prepared.sourceRef)===prepared.sha,
+    'WRITER_B_PREPARED_REF_DRIFT_STOP');
+   assertBase();
+   await io.assertCoreQuiet();
+   for(const file of m.files){
+    const attr=git(source,'check-attr','filter','--',file.path);
+    need(attr===`${file.path}: filter: unspecified`||
+     attr===`${file.path}: filter: unset`,
+     'WRITER_B_GIT_FILTER_ATTR_STOP');
+   }
+   const localRef=`refs/heads/${prepared.branch}`;
+   need(git(source,'show-ref','--heads').split(/\r?\n/).every(line=>
+    !line.endsWith(' '+localRef)),'WRITER_B_REF_COLLISION_STOP');
+   gitLive('-C',source,'fetch','--no-tags','--no-write-fetch-head',
+    prepared.stage,`${prepared.sourceRef}:${localRef}`);
+   need(git(source,'rev-parse','--verify',localRef)===prepared.sha,
+    'WRITER_B_LIVE_FETCH_READBACK_STOP');
+   gitLive('-C',source,'switch',prepared.branch);
+   journal('SOURCE_SWITCHED');
+  },
+  async assertWriterSource(artifact){
+   need(artifact===prepared&&git(source,'rev-parse','HEAD')===prepared.sha&&
+    git(source,'branch','--show-current')===prepared.branch,
+    'WRITER_B_LIVE_SOURCE_SHA_STOP');
+   for(const file of m.files)need(sourceHash(file.path)===file.afterSha256,
+    'WRITER_B_LIVE_TARGET_SHA_STOP');
+   for(const file of m.protectedFiles)need(sourceHash(file.path)===file.sha256,
+    'WRITER_B_LIVE_PROTECTED_SHA_STOP');
+   sameUnrelated(source,m,dirty);
+  },
+  async changeConfigSource(from,to){
+   need(from===m.baseHead&&to===prepared?.sha&&
+    fs.readFileSync(m.configPath).equals(originalConfig),
+    'WRITER_B_CONFIG_EXTERNAL_DRIFT_STOP');
+   atomicBytes(m.configPath,replaceConfigOnly(originalConfig,from,to),auth.requestId);
+   journal('CONFIG_SWITCHED');
+  },
+  async assertConfigSource(target){
+   need(readConfig(m.configPath).json.source===target,
+    'WRITER_B_CONFIG_TARGET_SHA_STOP');
+  },
+  async restoreCore(){
+   const state=taskProbe();
+   if(state.enabled){
+    need(fixedTaskXml(task).normalized===originalXml.normalized,
+     'WRITER_B_CORE_ENABLED_DRIFT_STOP');return;
+   }
+   const head=git(source,'rev-parse','HEAD'),cfg=readConfig(m.configPath).json.source;
+   need((head===m.baseHead&&cfg===m.baseHead)||
+    (head===prepared?.sha&&cfg===prepared.sha&&taskQuiet(state)),
+    'WRITER_B_CORE_REENABLE_SOURCE_PAIR_STOP');
+   exec('schtasks',['/Change','/TN',task,'/Enable']);
+   journal('CORE_RESUMED');
+  },
+  async verifyCoreDefinitionUnchanged(){
+   need(taskProbe().enabled&&
+    fixedTaskXml(task).normalized===originalXml.normalized,
+    'WRITER_B_TASK_DEFINITION_DRIFT_STOP');
+  },
+  async restoreOriginalConfig(){
+   const current=fs.readFileSync(m.configPath);
+   if(current.equals(originalConfig))return;
+   need(prepared&&current.equals(replaceConfigOnly(originalConfig,m.baseHead,prepared.sha)),
+    'WRITER_B_CONFIG_ROLLBACK_DRIFT_STOP');
+   atomicBytes(m.configPath,originalConfig,auth.requestId+'-rollback');
+   journal('CONFIG_ROLLED_BACK');
+  },
+  async restoreOriginalSource(){
+   const head=git(source,'rev-parse','HEAD'),branch=git(source,'branch','--show-current');
+   if(head===m.baseHead&&branch===before.originalBranch)return;
+   need(prepared&&head===prepared.sha&&branch===prepared.branch&&
+    taskQuiet(taskProbe()),'WRITER_B_SOURCE_ROLLBACK_DRIFT_STOP');
+   gitLive('-C',source,'switch',before.originalBranch);
+   journal('SOURCE_ROLLED_BACK');
+  },
+  async verifyOriginalState(){
+   need(git(source,'rev-parse','HEAD')===m.baseHead&&
+    git(source,'branch','--show-current')===before.originalBranch&&
+    fs.readFileSync(m.configPath).equals(originalConfig)&&
+    fixedTaskXml(task).normalized===originalXml.normalized&&taskProbe().enabled,
+    'WRITER_B_ORIGINAL_STATE_STOP');
+   for(const file of m.files){
+    if(file.change==='A')need(!fs.existsSync(scoped(source,file.path)),
+     'WRITER_B_ROLLBACK_ADDED_FILE_STOP');
+    else need(sourceHash(file.path)===file.beforeSha256,
+     'WRITER_B_ROLLBACK_TARGET_SHA_STOP');
+   }
+   for(const file of m.protectedFiles)need(sourceHash(file.path)===file.sha256,
+    'WRITER_B_ROLLBACK_PROTECTED_SHA_STOP');
+   sameUnrelated(source,m,dirty);
+  },
+  async releaseSharedWriterLock({requestId,retain}){
+   need(requestId===auth.requestId&&fd!==null,'WRITER_B_LOCK_OWNER_STOP');
+   journal(retain?'RECOVERY_REQUIRED':'FINALIZED');
+   releaseInstallClaim({fd,sharedLock:SHARED_LOCK,requestId,retain});
+   fd=null;
+  },
+ };
+ return io;
+}
+
+async function main(){
+ need(process.platform==='win32','WRITER_B_WINDOWS_HOST_STOP');
+ const workspace=process.env.GITHUB_WORKSPACE;
+ need(typeof workspace==='string'&&workspace.length>0,
+  'WRITER_B_WORKSPACE_STOP');
+ const controlRoot=path.join(workspace,'writer-b-control');
+ const candidateRoot=path.join(workspace,'writer-b-candidate');
+ const head=git(controlRoot,'rev-parse','HEAD');
+ const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+ const relative=approvalPathFromIssue(event);
+ const approvalRoot=path.join(controlRoot,'approvals','writer-updates');
+ need(fs.lstatSync(approvalRoot).isDirectory()&&
+  !fs.lstatSync(approvalRoot).isSymbolicLink()&&
+  fs.realpathSync.native(approvalRoot).toLowerCase().startsWith(
+   fs.realpathSync.native(controlRoot).toLowerCase()+path.sep),
+  'WRITER_B_APPROVAL_DIRECTORY_SCOPE_STOP');
+ const target=scoped(controlRoot,relative);
+ const bytes=rawSafe(target,approvalRoot);
+ const auth=verifyReadOnlyPreflight({event,env:process.env,
+  manifestBytes:bytes,controlHead:head});
+ need(git(candidateRoot,'rev-parse','HEAD')===auth.manifest.candidateSourceSha,
+  'WRITER_B_EXACT_CANDIDATE_SHA_STOP');
+ const result=await performWriterBInstall(auth,
+  makeWindowsBAdapter(auth,{candidateRoot,controlRoot}));
+ process.stdout.write(JSON.stringify(result)+'\n');
+ if(result.status!=='WRITER_B_INSTALLED_VERIFIED')process.exitCode=1;
+}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ try{await main();}catch(error){
+  process.stdout.write(JSON.stringify({status:'WRITER_B_SETUP_STOP',
+   code:/^WRITER_B_[A-Z0-9_]+$/.test(error?.code??'')?error.code:
+    'WRITER_B_SETUP_UNEXPECTED_STOP'})+'\n');
+  process.exitCode=1;
+ }
+}
