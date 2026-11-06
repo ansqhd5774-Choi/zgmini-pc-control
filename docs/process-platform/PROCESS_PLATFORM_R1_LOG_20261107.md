@@ -31,6 +31,8 @@
 | [#520](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/520#issuecomment-6689594993) | 기존 ER1 점수 B `NOV30_ER1_D1_VERIFIED`, D1 재조회 해시 일치, 공급자 호출 0 | 하루 1 GET 검증 증거로 사용할 수 없음 | EPS 운영 완료 보존, 관련 없는 계산·게시 재실행 금지 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)와 공통 적용 규정 | SHA→manifest, 단일 적용 담당, lease, 원본 보호, 결과 회수의 지원 경로 | 부분 변경 패키지 지원·현재 설치 SHA는 대상 결정 전 **미확인** | 실제 적용 시만 정확한 SHA/승인 범위 확인 |
 
+**추가 소스 확인(2026-11-07):** `zgmini/main/scripts/pc-writer/quota-policy.mjs`에 **EarningsAPI 공급자 등록이 없다**. `quota-ledger.mjs`는 등록 공급자만 영속 원장에 반영한다. `collect-local.mjs`의 공통 fetch wrapper는 호출 호스트를 기록할 수 있지만, PC 비공개 `earnings-api-local.mjs`가 해당 wrapper를 경유하는지는 이번 조사로 확인하지 못했다. 따라서 **공통 quota-ledger 요청 0회 = 실제 EarningsAPI 0회**라고 단정할 수 없다. 코드 기록만 추가했고 공급자 호출/PC 실행은 0회.
+
 **진단 판정:** 실제 공급자 호출 실패·Controller 오류는 이번 소스 조사에서 발견되지 않았다. 관측 정보의 부족이 명확한 현재 개선 대상이며 운영 장애 `BLOCKED`로 확장하지 않는다.
 
 ## 3. 중복 방지·기존 과제 분리
