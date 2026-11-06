@@ -31,7 +31,7 @@ function inspectEarningsApiRequests(root,home,fileSystem){
   evidenceLevel:'LOGGED_FETCH_WRAPPER_CALLS_ONLY_NOT_DAILY_LIMIT_OR_SAVED_DATE_PROOF',
   coverage:'NONE',observedWindow:null,observedDays:[],observedDayCount:0,
   observedMaxDailyRequests:null,observedOverOneRequestDays:0,
-  observedStatusDays:[],duplicateHostLogLines:0,statusInvalidEvents:0,
+  observedStatusDays:[],duplicateHostLogLines:0,statusInvalidEvents:0,statusCoverage:'NONE',
   statusColumns:['ok2xx','client4xx','server5xx','networkError','quotaGuard','other','duplicateLines'],
   statusEvidenceLevel:'FETCH_WRAPPER_RESPONSE_STATUSES_NOT_PROVIDER_GET_POLICY_PROOF',
   eventsExamined:0,invalidEvents:0,bytesRead:0,tailTruncated:false,dayListTruncated:false};
@@ -134,6 +134,8 @@ function inspectEarningsApiRequests(root,home,fileSystem){
  out.observedOverOneRequestDays=days.filter(([,n])=>n>1).length;
  out.observedWindow=earliest&&latest?{firstEventAt:earliest,lastEventAt:latest}:null;
  out.coverage=!days.length?'NONE':incomplete||out.invalidEvents?'PARTIAL':'BOUNDED_LOG';
+ out.statusCoverage=!statusesByDay.size?'NONE':incomplete||out.invalidEvents||out.statusInvalidEvents?
+  'PARTIAL':'BOUNDED_LOG';
  out.status=incomplete||out.invalidEvents||!days.length?'STATE_UNKNOWN':'OBSERVED';
  out.code=out.status==='OBSERVED'?'COLLECTION_EVENTS_OBSERVED_ONLY':'COLLECTION_EVENTS_PARTIAL_OR_INVALID';
  return out;
