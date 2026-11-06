@@ -16,7 +16,7 @@
 - **후속 실제 설치 확인(2026-11-05 KST):** 별도 B 요청 [#345](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/345#issuecomment-6640249328)에서 Controller `69c830275bd3fec75b17c8a98c46d689447fb1a7`가 `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`로 설치됐고 보호 상태 유지·Workflow 활성 상태가 확인됐다. [#346](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/346)·[#347](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/347)에서 서로 다른 Runner 좌석의 A급 진단 PASS와 #347 시점 Core 실행 전진이 확인됐다. 이 증거는 #319 보관·유지보수기 인계와 별개이며 해당 관측 시점에만 유효하다. 새 작업은 실제 관련 변경이 있을 때만 영향 범위를 재검증한다.
 - 작업 전 요약: `docs/GENERAL_CHAT_PREWORK.md`. 상태/접수 판정: `docs/AUTOMATION_STATUS_AND_ADMISSION.md`. 과거 실패를 현재 활성 잠금으로 오인하거나 외부 도구 안전 거부를 PC 장애로 확대하지 않는다. 거부된 행동을 다른 도구로 우회하지 않는다.
 - 실행 범위·증거 재사용·BLOCKER 판단은 공통 정본 2절을 따른다. 다른 담당자의 유효한 실PC 결과를 원본 링크와 적용 범위로 재사용하고, 현재 실행에 무관한 전체 경로 진단을 새 선행 조건으로 만들지 않는다. 잘못된 조건은 원래 대기열에서 정정한다.
-- 공용 적용 조정: `docs/CONTROLLER_APPLY_QUEUE.md`. 기능 개발은 병렬로 유지하되 Controller·유지보수기 적용은 단일 조정 원장과 적용 담당 한 명으로 순서를 정한다. 승인된 누적 변경을 정확한 manifest로 묶거나 순차 적용하고, 서로 다른 담당자를 무기한 기다리지 않는다. 기존 PC lease·승인 검사는 그대로 유지한다.
+- 공용 적용 조정: `docs/CONTROLLER_APPLY_QUEUE.md`. 기능 개발은 병렬로 유지하되 Controller·유지보수기 및 동일 PC Core 운영 source lane에 **실제로 겹치는 쓰기**는 단일 조정 원장과 자원별 적용 담당 한 명으로 순서를 정한다. Core 승인 SHA를 직접 검증하는 보조 기록기의 호환성·사후 실제 기록 결과도 영향 범위에 포함한다. 승인된 누적 변경을 정확한 manifest로 묶거나 순차 적용하고, 서로 다른 담당자를 무기한 기다리지 않는다. 기존 PC lease·승인 검사는 그대로 유지한다.
 
 - 한국어로 보고한다. 이 저장소는 비공개 PC 제어 전용이다. 공개 `zgmini`의 개발 source, PC 승인 source, controller source를 구분한다.
 - 새 일반챗은 먼저 README.md와 docs/GENERAL_CHAT_START.md를 읽고 해당 작업을 자동 요청한다. 사용자가 매번 CMD를 실행하고 파일을 전달하도록 되돌리지 않는다.
