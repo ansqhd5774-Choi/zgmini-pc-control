@@ -113,6 +113,7 @@ test('approved source contract, counter coverage and dates must match valid read
     x=>{x.referenceObservedCount=489;},
     x=>{x.freshWithin30m=491;},
     x=>{x.observationDate='2026-11-31';},
+    x=>{x.counts.extraUndocumentedCount=0;},
   ];
   for (const change of invalidCases) {
     const f=fixture(t);
