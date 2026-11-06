@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {BASE,PUBLIC,SOURCE_ROOT,CONFIG,CORE_TASK,TARGET_BLOBS,
  INSTALLED_HOTFIX_PATH,INSTALLED_HOTFIX_SHA256,sha256,
  validateOneFileBefore} from './contract.mjs';
+import {traceVbsDataflow} from './vbs-static-dataflow.mjs';
 
 const WINDOWS_SYSTEM=process.env.SystemRoot??String.raw`C:\Windows`;
 const GIT_CANDIDATES=[
@@ -100,19 +101,33 @@ export function parseCoreTaskAction(xml,{realpath=fs.realpathSync.native,
     'CAL_B_TASK_WRAPPER_FILE_STOP');
    const bytes=readFile(spec.path);
    need(sha256(bytes)===spec.sha,'CAL_B_TASK_WRAPPER_SHA_STOP');
-   return bytes.toString('utf8');
+   return decodeText(bytes);
   });
   // Immutable hashes authenticate file *identity*, but do not prove that a
   // matching token is in an executed branch. Never allow a string-presence
   // check to authorize an operational B write.
   const chain=verified.join('\n').toLowerCase();
   const callGraph=verified.map((v,i)=>({launcher:i+1,...summarizeVbsCalls(v)}));
+  const causality=verified.map((v,i)=>traceVbsDataflow(v,{
+   scriptPath:knownLaunchers[i].path,secondPath:knownLaunchers[1].path,
+   root:SOURCE_ROOT,environment:{
+    systemdrive:process.env.SystemDrive,systemroot:process.env.SystemRoot,
+    windir:process.env.windir,programfiles:process.env.ProgramFiles}}));
+  const allKnownTo=(g,key)=>g.entirelyDeterministic&&g.branchSeen===false&&
+   g.callCount>=1&&g.calls.every(c=>c[key]===true&&
+    c.shellCmdAmbiguous!==true&&c.conditional!==true);
+  const causalityProven=allKnownTo(causality[0],'nextPinnedVbsDirect')&&
+   allKnownTo(causality[1],'coreNodeEntrypointDirect');
+  // A diagnosis cannot certify which conditional VBS action Windows actually
+  // took. Even a completely literal/static candidate is NOT active runtime
+  // evidence sufficient to permit the separate B source mutation.
   const diagnostic={taskCommand:'wscript.exe',firstLauncherShaVerified:true,
    secondLauncherShaVerified:true,
    containsSecondLauncher:verified[0].toLowerCase().includes('run-local-core.vbs'),
    containsSourceRoot:chain.includes(norm(SOURCE_ROOT)),
    containsLocalCycle:chain.includes('local-cycle.mjs'),
-   containsRunLocalCmd:chain.includes('run-local.cmd'),callGraph};
+   containsRunLocalCmd:chain.includes('run-local.cmd'),callGraph,causality,
+   strictStaticChainCandidate:causalityProven};
   const error=Object.assign(new Error('CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP'),{
    code:'CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP',diagnostic});
   throw error;
@@ -160,6 +175,36 @@ function taskXml(){
  const bytes=call(TASK_EXE,['/Query','/TN',CORE_TASK,'/XML'],{maxBuffer:1_000_000});
  const xml=decodeText(bytes);need(/<Task\b/.test(xml),'CAL_B_TASK_XML_STOP');
  return {bytes,xml};
+}
+// The historic checkout is useful diagnostic evidence even when the actual
+// wscript.exe chain is not provably bound to it. Never label this active.
+function inspectCandidateCheckout(){
+ need(GIT&&fs.existsSync(SOURCE_ROOT)&&fs.existsSync(CONFIG),
+  'CAL_B_CANDIDATE_CHECKOUT_MISSING_STOP');
+ const sourceHead=git('rev-parse','HEAD');
+ const config=JSON.parse(fs.readFileSync(CONFIG,'utf8'));
+ const publicHead=publicGit('rev-parse','HEAD');
+ const publicBlob=publicGit('rev-parse',`HEAD:${INSTALLED_HOTFIX_PATH}`);
+ const relevant=listNull(call(GIT,['-C',SOURCE_ROOT,'diff','--no-ext-diff',
+  '--name-only','-z','HEAD','--','worker','lib','scripts/pc-writer']));
+ const staged=listNull(call(GIT,['-C',SOURCE_ROOT,'diff','--no-ext-diff',
+  '--cached','--name-only','-z']));
+ const otherTargets=Object.entries(TARGET_BLOBS).filter(([p])=>p!==INSTALLED_HOTFIX_PATH);
+ let matchingOtherBlobs=0;
+ for(const [p,expected] of otherTargets){
+  try{if(git('rev-parse',`HEAD:${p}`)===expected)matchingOtherBlobs++;}catch{}
+ }
+ const hotfixHash=sha256(safeFile(INSTALLED_HOTFIX_PATH));
+ return {activeRootVerified:false,sourceHead,configSource:config.source??null,
+  publicHeadPinned:publicHead===PUBLIC,publicHotfixBlobPinned:
+   publicBlob===TARGET_BLOBS[INSTALLED_HOTFIX_PATH],
+  otherTargetBlobMatches:matchingOtherBlobs,
+  otherTargetBlobCount:otherTargets.length,
+  relevantDirtyCount:relevant.length,
+  soleExpectedHotfixDirty:relevant.length===1&&
+   relevant[0]===INSTALLED_HOTFIX_PATH&&hotfixHash===INSTALLED_HOTFIX_SHA256,
+  stagedIndexCount:staged.length,configSourceMatchesHistoric:
+   config.source===BASE,sourceHeadMatchesHistoric:sourceHead===BASE};
 }
 export function issueAuth({env=process.env,event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'))}={}){
  need(env.GITHUB_REPOSITORY==='ansqhd5774-Choi/zgmini-pc-control'&&
@@ -233,7 +278,19 @@ export async function inspectCoreRuntime(){
 }
 export async function preflight(){
  const auth=issueAuth();
- const {before:b}=await inspectCoreRuntime();
+ let b;
+ try{({before:b}=await inspectCoreRuntime());}
+ catch(error){
+  if(error?.code!=='CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP')throw error;
+  let candidateCheckout=null,candidateCheckoutErrorCode=null;
+  try{candidateCheckout=inspectCandidateCheckout();}
+  catch(e){candidateCheckoutErrorCode=String(e?.code??'CAL_B_CANDIDATE_UNKNOWN_STOP').slice(0,100);}
+  return {schema:'ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1',
+   status:'CAL_B_PREFLIGHT_STOP',code:error.code,requestId:auth.requestId,
+   issue:auth.issue,diagnostic:error.diagnostic,candidateCheckout,
+   candidateCheckoutErrorCode,activeCoreRootVerified:false,
+   providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0};
+ }
  const {trackedDirty:diff,indexDirty:staged}=b;
  return {schema:'ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1',
   status:'CAL_B_PREFLIGHT_PASS',requestId:auth.requestId,
@@ -246,7 +303,8 @@ export async function preflight(){
   providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- preflight().then(result=>process.stdout.write(JSON.stringify(result)+'\n'))
+ preflight().then(result=>{process.stdout.write(JSON.stringify(result)+'\n');
+  if(result.status!=='CAL_B_PREFLIGHT_PASS')process.exitCode=1;})
   .catch(error=>{process.stdout.write(JSON.stringify({
    schema:'ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1',status:'CAL_B_PREFLIGHT_STOP',
    code:String(error?.code??'CAL_B_PREFLIGHT_UNEXPECTED_STOP').slice(0,100),
