@@ -92,9 +92,13 @@ test('Writer inventory rejects symlinks and reveals no escaped file hashes',t=>{
  fs.writeFileSync(secret,'private-source');
  fs.symlinkSync(secret,path.join(dir,'escaped.mjs'));
  const inventory=inspectWriterSourceInventory(path.join(f.root,'projects/pilot'));
- assert.equal(inventory.status,'STATE_UNKNOWN');
+ assert.equal(inventory.status,'PARTIAL');
  assert.equal(inventory.complete,false);
- assert.deepEqual(inventory.files,[]);
+ assert.equal(inventory.issues.length,1);
+ assert.deepEqual(inventory.issues[0],{
+  path:'scripts/pc-writer/escaped.mjs',code:'WRITER_SOURCE_FILE_UNVERIFIED'});
+ assert.ok(inventory.files.some(x=>x.path==='scripts/pc-writer/run-local.mjs'));
+ assert.ok(inventory.files.some(x=>x.path==='scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs'));
  assert.doesNotMatch(JSON.stringify(inventory),/private-source/);
 });
 
@@ -102,18 +106,39 @@ test('oversize Writer file makes inventory incomplete without digesting it',t=>{
  const f=fixture(t);
  f.put('projects/pilot/scripts/pc-writer/oversize.mjs',Buffer.alloc(2_000_001,65));
  const inventory=inspectWriterSourceInventory(path.join(f.root,'projects/pilot'));
- assert.equal(inventory.code,'WRITER_SOURCE_FILE_UNVERIFIED');
+ assert.equal(inventory.status,'PARTIAL');
+ assert.equal(inventory.code,'WRITER_SOURCE_INVENTORY_PARTIAL');
  assert.equal(inventory.complete,false);
- assert.equal(inventory.files.length,0);
+ assert.deepEqual(inventory.issues,[{
+  path:'scripts/pc-writer/oversize.mjs',code:'WRITER_SOURCE_FILE_BYTES_LIMIT'}]);
+ assert.ok(inventory.files.length>=4);
 });
 
 test('unexpected Writer mjs file names cannot yield falsely complete inventory',t=>{
  const f=fixture(t);
  f.put('projects/pilot/scripts/pc-writer/private data.mjs','export const x=1');
  const inventory=inspectWriterSourceInventory(path.join(f.root,'projects/pilot'));
- assert.equal(inventory.code,'WRITER_SOURCE_FILENAME_UNVERIFIED');
+ assert.equal(inventory.status,'PARTIAL');
  assert.equal(inventory.complete,false);
- assert.deepEqual(inventory.files,[]);
+ assert.deepEqual(inventory.issues,[{code:'WRITER_SOURCE_FILENAME_UNVERIFIED'}]);
+ assert.ok(inventory.files.some(x=>x.path==='scripts/pc-writer/run-local.mjs'));
+});
+
+test('approved target hashes remain usable when only unrelated Writer file is bad',t=>{
+ const f=fixture(t);
+ f.put('projects/pilot/scripts/pc-writer/unrelated-overlarge.mjs',Buffer.alloc(2_000_001,65));
+ const inventory=inspectWriterSourceInventory(path.join(f.root,'projects/pilot'),{
+  dirtyPaths:['scripts/pc-writer/run-local.mjs']});
+ assert.equal(inventory.complete,false);
+ const required=[
+  'scripts/pc-writer/run-local.mjs',
+  'scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs',
+  'scripts/pc-writer/inflation-causal-public-auto-publication-r1.test.mjs',
+ ];
+ const verified=required.map(file=>inventory.files.find(x=>x.path===file));
+ assert.equal(verified.every(x=>x&&/^[a-f0-9]{64}$/.test(x.sha256)),true);
+ assert.equal(verified[0].trackedDirty,true);
+ assert.equal(inventory.issues.some(x=>required.includes(x.path)),false);
 });
 
 test('Writer inventory file-count cap refuses incomplete results',t=>{
