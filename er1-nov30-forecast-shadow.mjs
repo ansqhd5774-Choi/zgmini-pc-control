@@ -60,6 +60,30 @@ function coreReader(pcHome){
   });
 }
 
+// Shared read-only A/B loader. Reuse the existing November private-first
+// and Core query-only paths without modifying A shadow behavior.
+export async function loadSavedNovemberDays({pcHome=PC_HOME,privateGet,
+  coreGet}={}){
+  if(!path.isAbsolute(pcHome))stop('ER1_FORECAST_INPUT_STOP');
+  let db=null;
+  try{
+    if(!coreGet){db=await coreReader(pcHome);coreGet=db.get;}
+    privateGet??=day=>readPrivate(pcHome,day);
+    const savedDays=[];
+    let privateDays=0,coreDays=0;
+    for(const day of DAYS){
+      const p=privateGet(day),stored=p??coreGet(day);
+      if(!stored)continue;
+      if(stored.day!==day||!validBody(stored.body,day)||
+        !Number.isFinite(Date.parse(stored.storedAt)))
+        stop('ER1_FORECAST_SAVED_DAY_INVALID');
+      savedDays.push(stored);
+      if(p)privateDays++;else coreDays++;
+    }
+    return {savedDays,privateDays,coreDays};
+  }finally{try{db?.close()}catch{}}
+}
+
 export async function inspectSavedForecast({pcHome=PC_HOME,asOf=new Date()
   .toISOString().slice(0,10),privateGet,coreGet,adapter,score}={}){
   const report={schema:'ZGMINI_ER1_NOV_FORECAST_SHADOW_A_V1',
