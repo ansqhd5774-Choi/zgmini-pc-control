@@ -120,6 +120,18 @@ export async function runOperation(request,context){
   const ref=await fetch('https://api.github.com/repos/'+request.sourceRepository+'/commits/'+encodeURIComponent(request.sourceBranch),{headers:{accept:'application/vnd.github+json','user-agent':'zgmini-pc-control'},signal:AbortSignal.timeout(20000)});need(ref.ok,'SOURCE_BRANCH_LOOKUP_FAILED');need((await ref.json()).sha===request.sourceSha,'SOURCE_BRANCH_HEAD_CHANGED');
   return {status:'PASS',code:'SOURCE_COMMIT_READONLY_VERIFIED',sourceSha:data.sha,changedFileCount:data.files?.length??null,executedCandidateCode:false};
  }
+ if(request.operation==='theme-platform-shadow-readonly'){
+  try{return await runApprovedShadowReadOnly({request,host,dataRoot});}
+  catch(error){
+   // A source not yet registered by the regular B host admission is a
+   // technical prerequisite, not a source-integrity execution failure.
+   if(error?.code==='SHADOW_SOURCE_NOT_APPROVED')return {
+    status:'BLOCKED',code:'SHADOW_SOURCE_NOT_APPROVED',actualExecutionSha:null,
+    requestedSourceSha:request.sourceSha,candidateExecuted:false,
+    providerCalls:0,d1Writes:0,schedulerWrites:0};
+   throw error;
+  }
+ }
  if(request.operation==='theme-common-tests'){
   const approved=host.approvedSources?.[request.sourceSha];need(approved,'SOURCE_NOT_APPROVED_FOR_EXECUTION');need(approved.branch===request.sourceBranch,'APPROVED_SOURCE_BRANCH_MISMATCH');
   if(os.freemem()/1048576<(policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy))return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',retry:'RESUME_WITH_NEW_REQUEST_WHEN_RESOURCE_CHANGES',candidateExecuted:false};
@@ -138,3 +150,169 @@ export async function runOperation(request,context){
 }
 
 
+
+// Candidate A-grade operation. Requires a separately B-approved immutable
+// source bundle; never downloads or dynamically selects executable code.
+
+const SHADOW_BRANCH='codex/theme-fear-greed-integration-20261025';
+const SHADOW_ENTRY='scripts/pc-writer/theme-config-tool.mjs';
+const SHA40=/^[a-f0-9]{40}$/;
+const SHA64=/^[a-f0-9]{64}$/;
+const sha=digest;
+
+function safeRegular(file,root){
+ const real=fs.realpathSync(file);
+ need(real.startsWith(root+path.sep),'SHADOW_BUNDLE_PATH_ESCAPE');
+ need(fs.statSync(real).isFile()&&!fs.lstatSync(file).isSymbolicLink(),
+  'SHADOW_BUNDLE_NOT_REGULAR');
+ return fs.readFileSync(real);
+}
+
+function verifyApprovedShadowBundle({request,host}){
+ need(request?.sourceRepository==='ansqhd5774-Choi/zgmini',
+  'SHADOW_REPOSITORY_DENIED');
+ need(request.sourceBranch===SHADOW_BRANCH,'SHADOW_BRANCH_DENIED');
+ need(SHA40.test(request.sourceSha??''),'SHADOW_SHA_INVALID');
+ const approved=host?.approvedSources?.[request.sourceSha];
+ need(approved?.branch===SHADOW_BRANCH&&approved?.entrypoint===SHADOW_ENTRY,
+  'SHADOW_SOURCE_NOT_APPROVED');
+ need(SHA64.test(approved.manifestSha256??''),'SHADOW_MANIFEST_SHA_INVALID');
+ need(path.isAbsolute(approved.root??''),'SHADOW_ROOT_NOT_ABSOLUTE');
+ const root=fs.realpathSync(approved.root);
+ need(fs.statSync(root).isDirectory(),'SHADOW_ROOT_NOT_DIRECTORY');
+ const manifestBytes=safeRegular(path.join(root,'manifest.json'),root);
+ need(sha(manifestBytes)===approved.manifestSha256,'SHADOW_MANIFEST_DRIFT');
+ let manifest;
+ try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
+ catch{need(false,'SHADOW_MANIFEST_INVALID');}
+ need(manifest.sourceSha===request.sourceSha&&
+  manifest.sourceBranch===SHADOW_BRANCH&&
+  manifest.entrypoint===SHADOW_ENTRY,'SHADOW_MANIFEST_IDENTITY');
+ const files=manifest.files;
+ need(files&&typeof files==='object'&&!Array.isArray(files)&&
+  Object.keys(files).length>0&&Object.keys(files).length<=300,
+  'SHADOW_MANIFEST_FILES_INVALID');
+ need(Object.hasOwn(files,SHADOW_ENTRY),'SHADOW_ENTRY_MISSING');
+ const sourceRoot=fs.realpathSync(path.join(root,'source'));
+ need(sourceRoot.startsWith(root+path.sep),'SHADOW_SOURCE_ROOT_ESCAPE');
+ for(const [rel,expected] of Object.entries(files)){
+  need(typeof rel==='string'&&rel.length<=240&&
+   (/^(scripts\/pc-writer|worker|config|docs|examples)\/[A-Za-z0-9_.\/-]+$/.test(rel)||
+    /^vendor\/hyparquet-1\.31\.2\/[A-Za-z0-9_.\/-]+$/.test(rel)||
+    rel==='package.json')&&
+   !rel.split('/').includes('..')&&SHA64.test(expected),
+   'SHADOW_MANIFEST_FILE_PATH_INVALID');
+  const file=path.resolve(sourceRoot,...rel.split('/'));
+  need(sha(safeRegular(file,sourceRoot))===expected,'SHADOW_SOURCE_FILE_DRIFT');
+ }
+ // A verified manifest is insufficient if unlisted .mjs files remain beside
+ // approved modules: Node could import those through relative resolution.
+ const listed=new Set(Object.keys(files));
+ const discovered=new Set();
+ const pending=[{dir:sourceRoot,prefix:''}];
+ while(pending.length){
+  const {dir,prefix}=pending.pop();
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+   const rel=prefix?prefix+'/'+entry.name:entry.name;
+   const file=path.join(dir,entry.name);
+   need(!fs.lstatSync(file).isSymbolicLink(),
+    'SHADOW_SOURCE_UNLISTED_OR_LINKED');
+   if(entry.isDirectory())pending.push({dir:file,prefix:rel});
+   else{
+    need(entry.isFile()&&listed.has(rel),
+     'SHADOW_SOURCE_UNLISTED_OR_LINKED');
+    discovered.add(rel);
+   }
+   need(discovered.size+pending.length<=600,
+    'SHADOW_SOURCE_INVENTORY_UNBOUNDED');
+  }
+ }
+ need(discovered.size===listed.size,'SHADOW_SOURCE_MANIFEST_INCOMPLETE');
+ return {sourceRoot,entrypoint:path.join(sourceRoot,...SHADOW_ENTRY.split('/')),
+  sourceSha:request.sourceSha,verifiedFileCount:Object.keys(files).length};
+}
+
+function interpretShadowOutcome({exitCode,stdout='',stderr=''}){
+ need(typeof stdout==='string'&&typeof stderr==='string'&&
+  Buffer.byteLength(stdout)<=2_000_000&&Buffer.byteLength(stderr)<=2_000_000,
+  'SHADOW_OUTPUT_BOUNDS');
+ let result;
+ try{result=JSON.parse(stdout.trim()||stderr.trim());}
+ catch{need(false,'SHADOW_OUTPUT_JSON_INVALID');}
+ need(result&&typeof result==='object','SHADOW_OUTPUT_INVALID');
+ // The CLI writes STOP JSON to stderr and exits 2 when source data is missing.
+ // Return a short public code, never the underlying stdout/stderr or raw data.
+ if(result.status==='STOP'){
+  need(result.d1Writes===0&&result.schedulerWrites===0,
+   'SHADOW_READONLY_CONTRACT_NOT_PROVEN');
+  const reason=typeof result.reason==='string'&&
+   /^[A-Z][A-Z0-9_]{2,99}$/.test(result.reason)?result.reason:'SHADOW_SOURCE_STOP';
+  return {status:'BLOCKED',code:reason,executionMode:'APPROVED_READONLY_SHADOW',
+   providerCalls:0,d1Writes:0,schedulerWrites:0,
+   checkpointPersistence:'TRANSIENT_MEMORY_ONLY'};
+ }
+ need(result.providerCalls===0&&result.d1Writes===0&&
+  result.schedulerWrites===0&&result.publicConnection==='NOT_ACTIVATED'&&
+  result.checkpointPersistence==='TRANSIENT_MEMORY_ONLY',
+  'SHADOW_READONLY_CONTRACT_NOT_PROVEN');
+ need(Array.isArray(result.publicTargetIds)&&new Set(result.publicTargetIds).size===result.publicTargetIds.length&&
+  result.publicTargetIds.length>=10,'SHADOW_PUBLIC_TARGETS_UNDER_MINIMUM');
+ const c=result.coverage?.public;
+ need(c&&c.themes===result.publicTargetIds.length&&
+  c.expectedPhases===2*c.themes&&c.complete+c.blocked+c.pending===c.expectedPhases,
+  'SHADOW_PUBLIC_COVERAGE_INVALID');
+ const complete=exitCode===0&&result.status==='COMPLETE'&&c.status==='COMPLETE';
+ // The shared Controller's idempotent replay accepts only PASS/FAIL/BLOCKED/
+ // STATE_UNKNOWN. Keep partial coverage explicit without persisting a status
+ // that cannot be returned for the same requestId on a later readback.
+ return {status:complete?'PASS':'BLOCKED',replayStatus:complete?'COMPLETE':'PARTIAL',
+  code:complete?'SHADOW_PRIVATE_REPLAY_COMPLETE':'SHADOW_PRIVATE_REPLAY_REVIEW',
+  executionMode:'APPROVED_READONLY_SHADOW',
+  publicTargetCount:c.themes,publicPhases:c.expectedPhases,
+  publicComplete:c.complete,publicBlocked:c.blocked,publicPending:c.pending,
+  privateCoverage:result.coverage?.private??null,
+  sourceMode:result.sourceMode,d1Reads:result.d1Reads??null,
+  publicApiReads:result.publicApiReads??null,
+  providerCalls:0,d1Writes:0,schedulerWrites:0,
+  checkpointPersistence:'TRANSIENT_MEMORY_ONLY'};
+}
+
+async function runApprovedShadowReadOnly({request,host,dataRoot,
+ // The parent Controller worker has a 240s deadline. Leave 30s for cleanup,
+ // protected-state postchecks, and the result upload on a slow Windows PC.
+ timeoutMs=210000,spawnImpl=spawn}={}){
+ const bundle=verifyApprovedShadowBundle({request,host});
+ need(typeof dataRoot==='string'&&path.isAbsolute(dataRoot),
+  'SHADOW_DATA_ROOT_INVALID');
+ const dataReal=fs.realpathSync(dataRoot);
+ need(fs.statSync(dataReal).isDirectory(),'SHADOW_DATA_ROOT_NOT_DIRECTORY');
+ const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
+  PATH:path.dirname(process.execPath),USERPROFILE:process.env.USERPROFILE,
+  APPDATA:process.env.APPDATA,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_API_TOKEN,
+  TEMP:process.env.TEMP,TMP:process.env.TMP,
+  ZGMINI_DATA_ROOT:dataReal};
+ const launched=await new Promise(resolve=>{
+  const child=spawnImpl(process.execPath,
+   ['--max-old-space-size=384',bundle.entrypoint,'--platform-shadow'],
+   {cwd:bundle.sourceRoot,env,windowsHide:true,stdio:['ignore','pipe','pipe']});
+  let stdout='',stderr='',overflow=false,timedOut=false;
+  const timer=setTimeout(()=>{timedOut=true;child.kill();},timeoutMs);
+  child.stdout.on('data',b=>{
+   if(Buffer.byteLength(stdout)+b.length>2_000_000){overflow=true;child.kill();}
+   else stdout+=b.toString('utf8');
+  });
+  child.stderr.on('data',b=>{
+   if(Buffer.byteLength(stderr)+b.length>2_000_000){overflow=true;child.kill();}
+   else stderr+=b.toString('utf8');
+  });
+  child.on('error',()=>{clearTimeout(timer);resolve({exitCode:-1,stdout:'',stderr:'',overflow,timedOut});});
+  child.on('close',code=>{clearTimeout(timer);
+   resolve({exitCode:code,stdout,stderr,overflow,timedOut});});
+ });
+ need(!launched.timedOut,'SHADOW_RUNTIME_TIMEOUT');
+ need(!launched.overflow,'SHADOW_RUNTIME_OUTPUT_OVERFLOW');
+ const outcome=interpretShadowOutcome(launched);
+ return {...outcome,actualExecutionSha:bundle.sourceSha,
+  requestedSourceSha:request.sourceSha,candidateExecuted:true,
+  approvedFileCount:bundle.verifiedFileCount};
+}

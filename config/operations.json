@@ -22,6 +22,7 @@
     "asset-r10-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-audit": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "theme-common-tests": {"grade":"A","timeoutSeconds":180,"resource":"heavy","minimumFreeMiB":384},
+    "theme-platform-shadow-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
     "failure-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
@@ -38,4 +39,3 @@
   "maxReportBytes": 32768,
   "maxAutomaticRetries": 0
 }
-
