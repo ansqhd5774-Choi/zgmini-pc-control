@@ -144,3 +144,13 @@
 - **진행률 80%:** M0/M1/M2/M3 각 20% 완료; M4는 원담당 실제 수신·측정·필요한 최소 후속 수리 완료까지 RUNNING. 이전 60% 계획·Windows 별도 fixture 부재를 전역 차단 Gate로 사용하지 않음.
 - **M4 최소 실행:** ① #537/#545 원본 도입의 사용자 수동 개입/재시도/처리 시간 측정 가능 범위를 원본 증거로 기록 ② 원담당에게 실행/전달 상태를 분리하여 인계하고 실제 ACK만 별도 판단 ③ [#540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540)의 원래 A 결과를 재실행하지 않은 채 결과만 복구할 고정 upload-only 경로를 필요 범위에서 구현/승인/실증. 원본 포인터 부재이면 `ORIGINAL_NOT_PROVEN`으로 종료. 신규 예약/공급자 GET/DB·D1·산식 변경 없음.
 - R1의 종료 조건은 실제 효과 및 막힌 잔여 단계가 각각 증거 링크와 함께 분리되어야 함. #540 원본 자동 전달이 완료되지 않았는데 수정 소스만 병합된 사실로 M4 DONE을 선언하지 않음.
+
+
+## 16. M4 원본 결과 복구 실증·효과 측정·인계 완료 (2026-11-07 KST)
+
+- **원래 A 재실행 없이 복구:** [#540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540)의 기존 run `42261956750-1-seat-3`, 원본 `PASS/RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY`를 기존 pointer/ledger/workspace 일치 검증으로 회수했다. 원본 실행 Controller SHA `af016444b2f87f11cd468428d9235cfc257d317d`와 source SHA `ce9bccd8b38939b204e8f836a50ae362960eb7af`는 불변.
+- **설치/승인:** [PR #575](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/575) 전용 모듈+14 테스트, [PR #577](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/577) 운영 헤더, [PR #578](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/578) 정확 1파일 B manifest, [#579 정규 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/579#issuecomment-6692396363) **SUCCEEDED** `ACTUAL_CONTROLLER_SHA=11899a1a16ea77a6ecc7a579997814cde9ded76f`, 보호 상태 불변, 정상 workflow, 원격 B TXT/JSON 재조회.
+- **일회성 전달:** 설치 후 [PR #580](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/580) 분리 workflow 병합, #540에 정확한 owner trigger [1회](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540#issuecomment-6692414252). [봇 최종 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540#issuecomment-6692421486)과 원격 `results/42261956750-1-seat-3.json` 24,800B / `.txt` 1,130B **총 25,930B**, 댓글 전문·파일 바이트 일치, bot marker 정확 1개. 원본 자료 정리/삭제 없음.
+- **실측 KPI (이번 대표 사례 범위):** #540 복구를 위한 **사용자 PC CMD/원본 파일 제출 0회**, 기존 A 재실행 0회, 신규 공급자 API/DB·D1·산식 변경 0회; 전용 GitHub owner 댓글 1회, 결과 파일 2개 게시/검증 완료. #560 이후 정상 A #570·#571도 업로드 결과 2쌍 회수(기능 결과는 각 PASS·BLOCKED로 구분). 이전 기준선 미측정이므로 평균 시간 단축률/타 작업자의 체감 개선률/PR→PC 리드타임 수치화는 **NOT_MEASURED**.
+- **업무 분리:** 원담당의 EPS #520 DONE은 보존. #540 `runtimeSourceVerified=false`, 하루 1 GET 준수 미입증, Alpaca #571 `ALPACA_LEDGER_ABSENT`, R10 #570 라이브 Core identity 미확정은 각 기능의 운영 후속이며 공통 경로 설치/전송 성공과 혼동하지 않는다. GitHub 전송·공통 #68 인계는 실제이나 **다른 일반챗의 수신 ACK=NOT_OBSERVED**; 이를 가상의 자동 대화 전달로 보고하지 않는다.
+- **M4 완료 판정:** 공통 프로세스가 책임지는 최소 수리·실제 전달·증거 연결·측정 가능한 범위 기록/인계까지 **DONE**. M0~M4 5단계 ×20% 기준 **신규 R1 100%**. 기존 5건의 4/5, 원담당 개별 기능의 미확정, 외부 ACK는 별도 현황이며 R1 완료율에 합산·은폐하지 않는다. 최종 목표 달성 후에도 **신규 예약 검증은 생성하지 않음**.
