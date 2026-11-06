@@ -13,6 +13,7 @@ const COLLECTION_EVENTS_MAX_ROWS=1024;
 const COLLECTION_EVENTS_MAX_DAYS=14;
 // Leave headroom for the pc-job JSON/TXT envelope under its 32 KiB upload cap.
 const CANDIDATES_REPORT_MAX_BYTES=24*1024;
+const RESULT_REPORT_MAX_BYTES=27*1024;
 const EARNINGS_COLLECTOR_EVIDENCE='FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sha=value=>typeof value==='string'&&SHA40.test(value)?value.toLowerCase():null;
@@ -30,6 +31,9 @@ function inspectEarningsApiRequests(root,home,fileSystem){
   evidenceLevel:'LOGGED_FETCH_WRAPPER_CALLS_ONLY_NOT_DAILY_LIMIT_OR_SAVED_DATE_PROOF',
   coverage:'NONE',observedWindow:null,observedDays:[],observedDayCount:0,
   observedMaxDailyRequests:null,observedOverOneRequestDays:0,
+  observedStatusDays:[],duplicateHostLogLines:0,statusInvalidEvents:0,
+  statusColumns:['ok2xx','client4xx','server5xx','networkError','quotaGuard','other','duplicateLines'],
+  statusEvidenceLevel:'FETCH_WRAPPER_RESPONSE_STATUSES_NOT_PROVIDER_GET_POLICY_PROOF',
   eventsExamined:0,invalidEvents:0,bytesRead:0,tailTruncated:false,dayListTruncated:false};
  const file=path.join(home,'collection-events.jsonl');
  let homeStat,fileStat,resolved;
@@ -77,7 +81,7 @@ function inspectEarningsApiRequests(root,home,fileSystem){
   lines=lines.slice(-COLLECTION_EVENTS_MAX_ROWS);incomplete=true;
  }
  out.tailTruncated=incomplete;
- const counts=new Map();
+ const counts=new Map(),statusesByDay=new Map(),seenHostLines=new Set();
  let earliest=null,latest=null;
  for(const line of lines){
   if(!line.trim())continue;
@@ -95,6 +99,28 @@ function inspectEarningsApiRequests(root,home,fileSystem){
   if(!Number.isSafeInteger(requests)||requests<0){out.invalidEvents++;continue;}
   const day=new Date(Date.parse(at)+9*3600*1000).toISOString().slice(0,10);
   counts.set(day,(counts.get(day)||0)+requests);
+  if(host!==null&&requests>0){
+   const bins=statusesByDay.get(day)??{ok2xx:0,client4xx:0,server5xx:0,
+    networkError:0,quotaGuard:0,other:0,duplicateLines:0};
+   statusesByDay.set(day,bins);
+   // Hash the exact JSONL row only for local duplicate detection. Never report
+   // event payloads, request URLs or hashes of raw events.
+   const lineHash=hash(Buffer.from(line));
+   if(seenHostLines.has(lineHash)){bins.duplicateLines++;out.duplicateHostLogLines++;}
+   else seenHostLines.add(lineHash);
+   const statusCounts=host.statuses;
+   if(!statusCounts||typeof statusCounts!=='object'||Array.isArray(statusCounts)){
+    out.statusInvalidEvents++;
+   }else{
+    for(const [status,count] of Object.entries(statusCounts)){
+     if(!Number.isSafeInteger(count)||count<0){out.statusInvalidEvents++;continue;}
+     const field=/^2\d\d$/.test(status)?'ok2xx':/^4\d\d$/.test(status)?'client4xx':
+      /^5\d\d$/.test(status)?'server5xx':status==='NETWORK_ERROR'?'networkError':
+      status==='PROVIDER_QUOTA_GUARD'?'quotaGuard':'other';
+     bins[field]+=count;
+    }
+   }
+  }
   if(!earliest||at<earliest)earliest=at;
   if(!latest||at>latest)latest=at;
  }
@@ -102,6 +128,8 @@ function inspectEarningsApiRequests(root,home,fileSystem){
  out.observedDayCount=days.length;
  out.dayListTruncated=days.length>COLLECTION_EVENTS_MAX_DAYS;
  out.observedDays=days.slice(-COLLECTION_EVENTS_MAX_DAYS).map(([kstDate,observedRequests])=>({kstDate,observedRequests}));
+ out.observedStatusDays=days.slice(-COLLECTION_EVENTS_MAX_DAYS).filter(([day])=>statusesByDay.has(day))
+  .map(([kstDate])=>({kstDate,counts:out.statusColumns.map(key=>statusesByDay.get(kstDate)[key]).join(',')}));
  out.observedMaxDailyRequests=days.length?Math.max(...days.map(([,n])=>n)):null;
  out.observedOverOneRequestDays=days.filter(([,n])=>n>1).length;
  out.observedWindow=earliest&&latest?{firstEventAt:earliest,lastEventAt:latest}:null;
@@ -226,10 +254,11 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
  }
  // The reporter pretty-prints the entire result before applying its 32 KiB
  // upload cap. Bound repeated candidates without hiding the discovered total.
- while(out.candidates.length>1&&
-       Buffer.byteLength(JSON.stringify(out.candidates,null,2),'utf8')>CANDIDATES_REPORT_MAX_BYTES){
+ out.status='PASS';out.code='RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY';
+ while(out.candidates.length>1&&(
+       Buffer.byteLength(JSON.stringify(out.candidates,null,2),'utf8')>CANDIDATES_REPORT_MAX_BYTES||
+       Buffer.byteLength(JSON.stringify(out,null,2),'utf8')>RESULT_REPORT_MAX_BYTES)){
   out.candidates.pop();out.inventoryTruncated=true;
  }
- out.status='PASS';out.code='RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY';
  return out;
 }
