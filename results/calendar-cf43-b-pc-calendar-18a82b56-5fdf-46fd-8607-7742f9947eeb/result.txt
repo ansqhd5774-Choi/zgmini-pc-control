@@ -1,0 +1,8 @@
+status=CAL_CF43_B_PREFLIGHT_STOP
+code=CAL_CF43_BASE_DRIFT_STOP
+sourceSha=null
+operationalWrites=0
+providerCalls=0
+dbWrites=0
+d1Writes=0
+writerRuns=0
