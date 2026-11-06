@@ -121,3 +121,10 @@
 - **현재 핵심 미해결:** #537 Windows 개발 fixture를 안전하게 실행할 기존 승인 수단 미확인. SHA/임시 경로만으로 보안 격리를 보장하지 않으므로 최소 권한 별도 실행 경로가 확인되기 전에는 운영 Windows 시험 PASS/설치 완료로 승격하지 않는다.
 
 **프로젝트 60% 유지, M3 RUNNING/M4 DEFERRED.** 다음 실행: #537의 정확한 개발 source에 대한 단회 Windows 시험 수단을 기존 승인 경로에서 확인·준비하고, 승인 manifest 및 현재 실제 설치 SHA를 맞춰 #68 담당에 인계. 검증 목적의 중복 B/A나 미래 예약은 만들지 않는다.
+
+## 13. M3 결과 전송 공통 결함 작업 추가 (2026-11-07)
+
+- [#540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540)의 공통 업로드 단계 `REPORT_SIZE`는 실행 자체 실패와 분리. 결과 JSON/TXT 원격 회수 계약의 실제 장애로, 기능 수집기 원본/EPS 작업을 변경하지 않는다.
+- [Draft #545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545): pretty+TXT가 기존 32,768B를 넘을 때 **compact JSON+동일 TXT**를 선택하고, 그것도 초과하면 fail-closed. 전체 데이터/UNKNOWN 유지. 공통 Controller 두 파일+관련 테스트 한 파일. Linux Node 24 **14/14 PASS**, 독립 리뷰 2건 신규 중대 결함 없음, 운영 Windows 미실증.
+- 현재 코드·원본 SHA·정규 B 적용 차이는 [M3 #545 후보 명세](M3_545_REPORT_DELIVERY_CANDIDATE_20261107.md)에 기록한다. [Draft #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) 공통 파일 reader와 별개 변경군이다. 필요한 실제 적용은 #68에서 최종 설치 SHA→승인 목표 SHA의 **전체** Controller/config diff 및 manifest, 보호·복구·Windows 결과를 확인한 뒤에만 완료로 판정한다.
+- #540 기존 포인터는 A 재실행 없이 회수 가능한 승인된 upload-only 경로가 증명될 때만 복구; 설치만으로 기존 결과 자동 게시를 주장하지 않는다. M3/M4 미완료, 전체 **60% 유지**.
