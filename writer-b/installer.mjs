@@ -1,7 +1,7 @@
 // Reusable Writer B transaction coordinator. Source-only and I/O-free.
 // An independently authorized Windows B adapter must implement these exact
 // bounded methods; this module is NOT a pc-job handler or remote shell.
-import {validateWriterBManifest} from './contract.mjs';
+import {assertAuthenticatedWriterBIssue,validateWriterBManifest} from './contract.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -80,9 +80,10 @@ const REQUIRED_IO=[
 // Failures after a possible Core state transition are never marked harmless
 // unless the exact original source/config/task state is proven restored.
 export async function performWriterBInstall(auth,io){
- need(object(auth)&&typeof auth.requestId==='string'&&auth.requestId.length>0&&
-   SHA64.test(auth.manifestSha256??'')&&auth.registeredB===true&&
-   auth.exactOneShot===true,'WRITER_B_NOT_REGISTERED_STOP');
+ // No caller-supplied boolean can attest a registered B request. The future
+ // Windows adapter must use the exact authorization object returned by
+ // authorizeWriterBIssue after fetching the immutable approved manifest.
+ assertAuthenticatedWriterBIssue(auth);
  const manifest=validateWriterBManifest(auth.manifest);
  need(object(io)&&REQUIRED_IO.every(name=>typeof io[name]==='function'),
    'WRITER_B_ADAPTER_CONTRACT_STOP');
