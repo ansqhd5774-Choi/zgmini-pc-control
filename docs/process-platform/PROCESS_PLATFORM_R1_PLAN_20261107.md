@@ -128,3 +128,12 @@
 - [Draft #545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545): pretty+TXT가 기존 32,768B를 넘을 때 **compact JSON+동일 TXT**를 선택하고, 그것도 초과하면 fail-closed. 전체 데이터/UNKNOWN 유지. 공통 Controller 두 파일+관련 테스트 한 파일. Linux Node 24 **14/14 PASS**, 독립 리뷰 2건 신규 중대 결함 없음, 운영 Windows 미실증.
 - 현재 코드·원본 SHA·정규 B 적용 차이는 [M3 #545 후보 명세](M3_545_REPORT_DELIVERY_CANDIDATE_20261107.md)에 기록한다. [Draft #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) 공통 파일 reader와 별개 변경군이다. 필요한 실제 적용은 #68에서 최종 설치 SHA→승인 목표 SHA의 **전체** Controller/config diff 및 manifest, 보호·복구·Windows 결과를 확인한 뒤에만 완료로 판정한다.
 - #540 기존 포인터는 A 재실행 없이 회수 가능한 승인된 upload-only 경로가 증명될 때만 복구; 설치만으로 기존 결과 자동 게시를 주장하지 않는다. M3/M4 미완료, 전체 **60% 유지**.
+
+## 14. M3 순차 배포 전략 확정 후보 — 업로드 문제 우선 (2026-11-07)
+
+- [#545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545) 공통 보고서 크기 수정은 `main` 소스 병합 `842e53ed4cd88f789d4782ff2c93dfb102300f05` 완료. **PC 설치/기존 결과 복구 아님.** 공통 reader [Draft #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537)의 3파일 Windows 위험/승인과 묶어 불필요한 전역 Gate를 만들지 않는다.
+- 원담당 선행 [#551](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/551)은 `c480000d…` 1파일 B 접수 중(성공 미확정). 선행 B가 실제로 `SUCCEEDED`해 설치 SHA가 `c480`으로 확정되면 다음 공통 #545 2파일 목표 `842e`로 순차 적용한다. 이 가정에 한정한 정확한 [조건부 manifest Draft #553](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/553)을 준비했고 원본 바이트/파일 지문 로컬 정적 검산 PASS. 다른 installed SHA라면 재작성·재검증, 우회 안 함.
+- #68 단일 유지보수기 담당/lease·검증된 백업/보호·6 Runner 새 연결·사후 `core-status`·GitHub 결과 재조회 후에만 운영 완료로 표시한다. Windows 사전 저권한 격리 시험 통로는 현재 확인되지 않았고, 이 불확실성/추가 설계는 기능별 A 작업 전체를 정지시키지 않는다.
+- 기존 #540 재게시의 별도 결손: `upload-only` 승인 트리거 부재. 진단 재실행/신규 예약을 만들지 말고, 원본 포인터 확인→승인된 단회 업로드 전용 경로→같은 결과 원격 일치 검증으로 복구한다. 새로운 범용 원격 스크립트 실행기는 만들지 않는다.
+
+**M3/M4 미완료, R1 60% 유지.** 예약 검증은 최종 운영 효과까지 완료한 뒤 후속.
