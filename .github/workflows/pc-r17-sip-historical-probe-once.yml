@@ -1,0 +1,49 @@
+# Fixed historical SIP readback, separate from operational IEX/SIP collection.
+# No PC source/DB/sidecar/D1/scheduler modifications; quota reservations only.
+name: ZGMINI R17 SIP Historical Readonly Probe Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Create-only bounded private result TXT/JSON.
+  issues: write # One bounded result comment.
+concurrency:
+  group: zgmini-r17-sip-historical-probe-once
+  cancel-in-progress: false
+jobs:
+  historical-sip-bounded:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-r17-sip-historical-probe' &&
+      contains(github.event.issue.labels.*.name, 'pc-r17-writer-b-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Checkout exact private control event SHA
+        id: checkout-control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r17-sip-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Once read 2026-11-06 historical SIP using installed fixed collector
+        id: probe
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-sip-control\r17-sip-probe\historical-probe.mjs" > "%RUNNER_TEMP%\r17-sip-historical-result.json"'
+      - name: Read back and upload bounded private result without rerunning provider calls
+        if: always() && steps.checkout-control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-sip-control\r17-sip-probe\historical-probe.mjs" upload'
