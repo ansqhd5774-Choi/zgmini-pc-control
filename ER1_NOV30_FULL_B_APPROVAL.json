@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_ER1_NOV30_FULL_APPROVAL_V1",
+  "approvalState": "APPROVED_B_NOV2026_FULL",
+  "scope": "PC_PRIVATE_NOV2026_ER1_FUTURE_COHORT_AND_D1_SCORE_ONLY",
+  "approvalBasis": "2026-11-03 standing B authorization plus user-approved November ER1 collection/publication objective (2026-11-06); registration only in draft PR, no merge or PC execution without coordinator review",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "a6dd77d19ccfcb79ddcdd0b4a6f495ec3888e24a",
+  "outputKey": "market-calendar:earnings-nov2026-er1-score-public",
+  "maxNewProviderRequestsPerRun": 17,
+  "maxAutomaticRetries": 0,
+  "onlyFutureScheduledDates": true,
+  "reuseExistingRawCache": true,
+  "requireLocalReadback": true,
+  "allowCoreWrites": false,
+  "allowSchedulerChanges": false,
+  "allowExistingFeedWrites": false,
+  "allowRawRowsPublic": false,
+  "allowDirectDeployment": false,
+  "files": [
+    {"path":"scripts/pc-writer/market-calendar-nov30-er1-probe-publish.mjs","sha256":"4a7d64fc7e7c847a64b9e3e1b0ebff965287f210ceb3d4828ff730960bc3e080"},
+    {"path":"scripts/pc-writer/market-calendar-nov30-er1-full-private.mjs","sha256":"d6685fb643af965b299a908a8af87f26de08a319b86717261445e982d9df2645"},
+    {"path":"scripts/pc-writer/market-calendar-nov30-er1-score-publish.mjs","sha256":"2e6c6f1dd76005e1cc4201d8328c4c74f3ca3e1e95b20379acd7ca874fffce31"}
+  ]
+}
