@@ -162,3 +162,18 @@
 - **재사용 증거:** PR #537 21/21 Linux 집중 PASS, 유지보수 계약 격리 34/34 PASS, PR #545 14/14 PASS. 별도 Windows 개발 fixture 없이 기존 B 백업/drain/복구/6 Runner/고정 A를 실제 적용. Windows `ALPACA_LEDGER_ABSENT`는 기존 로컬 원장 부재로, 공통 helper의 코드 FAIL이라고 추정하지 않음.
 - **M3 DONE (승인 변경/실PC 적용 범위), M4 RUNNING. 신규 R1 총 80%**. M4는 원담당 실제 수신/효과 및 #540 별도 delivery recovery 공백을 완료와 구분해야 함. #540 원 A를 재실행하지 않았고, 임의 공급자 GET·운영 DB/D1·예약·산식 쓰기 0, 새 예약 검증 없음.
 - **다음 한 행동:** 원담당 후속 진행/ACK와 현재 장애 분리 측정, #540 고정 upload-only 복구 경로를 원본 보존/별도 승인으로 완성. #537 코드를 다시 설치하거나 Alpaca 원장을 만들지 않음.
+
+
+## 13. M4 실제 #540 자동 업로드 복구 실증 및 인계 원장 (2026-11-07 KST)
+
+| 근거 | 사실 | 경계 |
+| --- | --- | --- |
+| [소스 PR #575](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/575) + [헤더 #577](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/577) | 기존 run/Issue/actor/source SHA 고정, pointer·ledger·workspace·host SHA 원본 확인, 공통 upload lease·원격 바이트 재조회. 전체 14/14 Node 집중 PASS | 신규 A worker 호출 없음. 수정 소스만으로 운영 완료 간주 안 함 |
+| [승인 PR #578](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/578) | 실제 구설치 `b6d23680…`→목표 `11899a1a…`, 유일 Controller 추가 `controller/report-recovery-540-once.mjs`, raw SHA256 `00822fa76e9a7378077da157038548b41bb282354fe5099fdd0adf75d8488153`, manifest raw SHA256 `61709631a78837c3ebb234a8e9292a2515c42894a0f9b7df0a5ed97018802c8f` | 타 사업자 workflow/스크립트는 PC controllerOnlyInstall 목록 밖. 백업/rollback=b6d, 기존 core-status post |
+| [정규 PC B #579](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/579#issuecomment-6692396363) | **SUCCEEDED** `APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, PC 실제 SHA 목표와 동일, `PROTECTED_STATE_UNCHANGED=true`, `WORKFLOW_ENABLED=true`, `REPORT_UPLOAD=VERIFIED` | 원격 `results/maintenance-pc-update-201fad66-028d-413e-b7a7-dcfabaeb1a3c.json`/`.txt` 별도 GET 일치 |
+| [Workflow PR #580](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/580) | B 성공 이후만 병합. `issue_comment.created`의 private/owner/#540/정확 명령어, self-hosted Windows 5분, 독립 모듈만 실행. workflow 집중 1/1 PASS, 전체 회귀 15/15 PASS | `pc-job.yml`, `entry.mjs`, `worker.mjs`, `GITHUB_RUN_ID` 위조·재실행 없음 |
+| [#540 1회 owner 트리거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540#issuecomment-6692414252) → [봇 원본 업로드 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540#issuecomment-6692421486) | `PASS/RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY`, 기존 A `42261956750-1-seat-3` 유지. `results/42261956750-1-seat-3.json` 24,800B, `.txt` 1,130B, **합계 25,930B / 32,768B**. 리모트 각 SHA/blob 확인, bot marker 1개, 댓글 내 JSON·TXT는 원격 파일 전문과 정확 일치 | 원본 A Controller `af016444b2f87f11cd468428d9235cfc257d317d`, 공급자 호출/운영 쓰기/D1 0, protected unchanged, 원본 파일/원장 삭제 0. 새로운 데이터 수집/확정 증거 아님 |
+
+**KPI 측정 가능 범위:** 이 #540 원본 회수의 사용자 PC CMD 실행 0, 사용자 원본 파일 제공 0, 신규 A 재실행 0, GitHub owner 명령 댓글 1, 원격 결과쌍 2개 파일과 1개 bot 댓글 완료. 기존 전체 작업 시간·대기·반복 진단 기준선이 없으므로 개선률/전체 채팅 자동 수신/타 원담당 재개율은 `NOT_MEASURED`/`ACK_NOT_OBSERVED`. 별도 일반챗의 자동 수신을 가정하지 않고 #68과 #526에 원본 링크로 인계한다.
+
+**M4 공통 프로세스 본작업 DONE / 신규 R1 100% (M0~M4 각20%).** 기존 5건 4/5와 기능별 1 GET/day, Alpaca 원장 부재, R10 실행 identity 한계는 별도. 새 예약 검증 등록 없음.
