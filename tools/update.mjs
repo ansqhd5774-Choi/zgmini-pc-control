@@ -20,9 +20,12 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
- R54_B_SOURCE_FILES}
+ R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
+ validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
   from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
+import {planSourceBundleRegistration,stageApprovedSourceBundle,
+ applyPreparedSourceBundleHostCas} from './source-bundle-register.mjs';
 
 const controlRoot='E:/ZGmini/automation/pc-control';
 const maintenanceRoot='E:/ZGmini/automation/pc-maintenance';
@@ -1537,6 +1540,197 @@ function readR6GitHubBytes(repository,relative,ref){
  return Buffer.from(compact,'base64');
 }
 
+// Additive source bundle registration. Existing R6, R54 and Controller B
+// paths remain unchanged. This operation never invokes the new source.
+function readBundleSourceBytes(relative,sourceSha){
+ need(validSha(sourceSha),'BUNDLE_SOURCE_SHA_INVALID');
+ need(/^[A-Za-z0-9][A-Za-z0-9._/-]{0,239}$/.test(relative??'')
+   &&!relative.split('/').some(x=>x==='.'||x==='..'||x==='')
+   &&!relative.includes('\\'),'BUNDLE_SOURCE_RELATIVE_PATH_INVALID');
+ const route=`repos/ansqhd5774-Choi/zgmini/contents/${relative}?ref=${sourceSha}`;
+ const raw=execFileSync(gh,['api',route],{encoding:'utf8',windowsHide:true,
+  timeout:60000,maxBuffer:8e6});
+ let object;try{object=JSON.parse(raw);}catch{need(false,'BUNDLE_GITHUB_SOURCE_API_INVALID');}
+ need(object?.type==='file'&&object.encoding==='base64'
+  &&typeof object.content==='string'&&object.content.length<6e6,
+  'BUNDLE_GITHUB_SOURCE_NOT_CONTENT_FILE');
+ const compact=object.content.replace(/\s/g,'');
+ need(/^[A-Za-z0-9+/]*={0,2}$/.test(compact),'BUNDLE_GITHUB_SOURCE_ENCODING');
+ const bytes=Buffer.from(compact,'base64');
+ need(bytes.length<=4*1024*1024,'BUNDLE_GITHUB_FILE_TOO_LARGE');
+ return bytes;
+}
+
+function loadApprovedBundlePackage(requestId,file){
+ const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
+ need(path.resolve(file)===path.resolve(expected),'BUNDLE_APPROVED_PACKAGE_PATH');
+ const data=json(expected),{issue,manifestRawBase64}=data;
+ need(issue?.requestId===requestId&&issue.operation===SOURCE_BUNDLE_OPERATION
+  &&issue.controlRepository===controlRepository,'BUNDLE_APPROVED_REQUEST_MISMATCH');
+ need(data.actor==='ansqhd5774-Choi'&&Number.isSafeInteger(data.issueNumber),
+  'BUNDLE_APPROVED_ACTOR_INVALID');
+ const raw=Buffer.from(manifestRawBase64??'','base64');
+ need(raw.length>0&&raw.length<=65536&&sha256(raw)===issue.approvalManifestSha256,
+  'BUNDLE_APPROVED_BYTES_DRIFT');
+ const actual=github('issues/'+data.issueNumber);
+ let body;try{body=JSON.parse(actual.body);}catch{need(false,'BUNDLE_ISSUE_READBACK_INVALID');}
+ const authenticated=validateSourceBundleIssueEnvelope(body,{actor:actual.user?.login});
+ need(JSON.stringify(authenticated)===JSON.stringify(issue)
+  &&actual.user?.login===data.actor&&actual.state==='open'
+  &&actual.title===SOURCE_BUNDLE_ISSUE_TITLE&&!actual.pull_request
+  &&actual.labels?.some(x=>x.name==='pc-maintenance'),
+  'BUNDLE_ISSUE_IDENTITY_DRIFT');
+ const manifest=validateSourceBundleBApproval(issue,raw,{actor:data.actor,
+  installedSha:installedManifest().installedSha});
+ need(JSON.stringify(data.manifest)===JSON.stringify(JSON.parse(raw)),
+  'BUNDLE_APPROVED_PACKAGE_DRIFT');
+ return {...data,issue:authenticated,manifest};
+}
+
+function readSourceBundleStatus(requestId){
+ const state=readMaintenanceRecoveryStatus(requestId);
+ const backup=path.join(controlRoot,'backups','source-'+requestId);
+ let hostSha256=null,hostReadbackCode=null;
+ try{hostSha256=sha256(fs.readFileSync(hostPath));}
+ catch{hostReadbackCode='BUNDLE_HOST_UNREADABLE';}
+ return {...state,hostSha256,hostReadbackCode,
+  backupExists:fs.existsSync(backup),
+  appliedMarker:fs.existsSync(path.join(backup,'APPLIED.json')),
+  rollbackMarker:fs.existsSync(path.join(backup,'ROLLED_BACK.json'))};
+}
+
+async function applySourceBundleOnly(requestId,packageFile){
+ const {issue,manifest,issueNumber}=loadApprovedBundlePackage(requestId,packageFile);
+ const ledgerFile=path.join(recordDir,requestId+'.json');
+ need(process.platform==='win32','BUNDLE_WINDOWS_REQUIRED');
+ need(!fs.existsSync(ledgerFile),'BUNDLE_EXISTING_LEDGER_RECONCILE_FIRST');
+ need(!fs.existsSync(manifest.backupDirectory),'BUNDLE_BACKUP_ALREADY_EXISTS');
+ const {owner}=readOwner();verifyIndependent(owner.pid);
+ const installed=installedManifest();
+ need(installed.installedSha===manifest.installedControllerSha,
+  'BUNDLE_INSTALLED_CONTROLLER_DRIFT');
+ // The B approval PR must be merged into the current main; a Draft is not permission.
+ const pr=github('pulls/'+manifest.approval.ref.split('/').pop());
+ need(pr.merged===true&&validSha(pr.merge_commit_sha),'BUNDLE_APPROVAL_PR_NOT_MERGED');
+ const manifestApprovalPath=`approvals/source-bundles/${issue.approvalManifestSha256}.json`;
+ let manifestInApprovalPr=false;
+ for(let page=1;page<=10;page++){
+  const rows=github('pulls/'+manifest.approval.ref.split('/').pop()+`/files?per_page=100&page=${page}`);
+  need(Array.isArray(rows),'BUNDLE_APPROVAL_PR_FILES_UNVERIFIED');
+  manifestInApprovalPr=rows.some(row=>row.filename===manifestApprovalPath
+   &&['added','modified'].includes(row.status));
+  if(manifestInApprovalPr||rows.length<100)break;
+ }
+ need(manifestInApprovalPr,'BUNDLE_APPROVAL_PR_DID_NOT_AUTHORIZE_MANIFEST');
+ const approvedRaw=readR6GitHubBytes(controlRepository,manifestApprovalPath,'main');
+ need(sha256(approvedRaw)===issue.approvalManifestSha256,
+  'BUNDLE_APPROVAL_MAIN_MANIFEST_DRIFT');
+ git(['fetch','--no-tags','origin','main']);
+ need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,'refs/remotes/origin/main']).trim()==='',
+  'BUNDLE_APPROVAL_PR_NOT_ON_MAIN');
+ need(path.resolve(path.dirname(manifest.stageBundle))===
+  path.resolve(path.join(controlRoot,'source-bundles')),'BUNDLE_STAGE_ROOT_SCOPE');
+ const beforeHost=fs.readFileSync(hostPath);
+ // Source manifest belongs to approved control main: embedding its own source
+ // commit SHA inside that same source commit would create a hash fixed-point.
+ const sourceManifestBytes=readR6GitHubBytes(controlRepository,manifest.sourceManifestPath,'main');
+ need(sha256(sourceManifestBytes)===manifest.sourceManifestSha256,
+  'BUNDLE_SOURCE_MANIFEST_DRIFT');
+ let sourceManifest;
+ try{sourceManifest=JSON.parse(sourceManifestBytes.toString('utf8'));}
+ catch{need(false,'BUNDLE_SOURCE_MANIFEST_JSON_INVALID');}
+ need(sourceManifest?.schema==='ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1'
+  &&sourceManifest.sourceSha===manifest.sourceSha
+  &&sourceManifest.sourceBranch===manifest.sourceBranch
+  &&sourceManifest.entrypoint===manifest.entrypoint
+  &&sourceManifest.sourceRepository===manifest.sourceRepository
+  &&sourceManifest.files&&typeof sourceManifest.files==='object'
+  &&Object.keys(sourceManifest.files).length>0
+  &&Object.keys(sourceManifest.files).length<=8192,'BUNDLE_SOURCE_MANIFEST_SCOPE');
+ const sourceFiles={};
+ let sourceTotalBytes=0;
+ for(const relative of Object.keys(sourceManifest.files)){
+  const bytes=readBundleSourceBytes(relative,manifest.sourceSha);
+  need(sha256(bytes)===sourceManifest.files[relative],'BUNDLE_SOURCE_FILE_DRIFT');
+  sourceTotalBytes+=bytes.length;
+  need(sourceTotalBytes<=256*1024*1024,'BUNDLE_SOURCE_TOTAL_BYTES_TOO_LARGE');
+  sourceFiles[relative]=bytes;
+ }
+ const lock=acquireMaintenanceLock(maintenanceRoot,'controller-install');
+ let retained=false,modified=false,result;
+ const save=fields=>{
+  const previous=fs.existsSync(ledgerFile)?json(ledgerFile):{};
+  writeJson(ledgerFile,{...previous,schema:'ZGMINI_SOURCE_BUNDLE_B_LEDGER_V1',
+   requestId,issueNumber,targetControllerSha:issue.targetControllerSha,...fields});
+ };
+ try{
+  save({status:'RUNNING',phase:'LEASE_ACQUIRED',lastPass:'SOURCE_BYTES_PINNED',
+   sourceSha:manifest.sourceSha,hostOriginalSha256:sha256(beforeHost),
+   hostProposedSha256:null,
+   leaseOwnerNonce:lock.owner.nonce,leaseOwnerPid:lock.owner.pid});
+  const base=path.dirname(manifest.stageBundle);
+  if(!fs.existsSync(base))fs.mkdirSync(base);
+  const staged=stageApprovedSourceBundle({manifestBytes:sourceManifestBytes,
+   sourceFiles,stageBundle:manifest.stageBundle});
+  need(staged.manifestSha256===manifest.sourceManifestSha256,
+   'BUNDLE_STAGE_MANIFEST_DRIFT');
+  const plan=planSourceBundleRegistration({hostBytes:beforeHost,
+   manifestBytes:sourceManifestBytes,approval:manifest,stageBundle:manifest.stageBundle});
+  save({status:'RUNNING',phase:'BUNDLE_STAGED',lastPass:'SEALED_FILES_VERIFIED',
+   stagedFiles:staged.fileCount,hostOriginalSha256:plan.hostOriginalSha256,
+   hostProposedSha256:plan.hostProposedSha256});
+  const verifyAuthorizedLease=()=>{
+   const live=json(path.join(maintenanceRoot,'leases/controller-install/owner.json'));
+   need(live.pid===process.pid&&live.nonce===lock.owner.nonce,
+    'BUNDLE_LEASE_OWNER_CHANGED');
+   const current=readOwner();
+   need(current.owner.pid===owner.pid&&current.owner.nonce===owner.nonce,
+    'BUNDLE_MAINTAINER_OWNER_CHANGED');
+   verifyIndependent(current.owner.pid);
+  };
+  // Additive host key CAS, not a task/DB/source execution: no six-seat global
+  // idle gate, extra Controller install or workflow disable is necessary.
+  const applied=applyPreparedSourceBundleHostCas({plan,hostPath:manifest.hostPath,
+   backupDirectory:manifest.backupDirectory,verifyAuthorizedLease});
+  modified=applied.status!=='ROLLED_BACK';
+  if(applied.status==='RECOVERY_REQUIRED'){
+   result={status:'RECOVERY_REQUIRED',code:applied.code,
+    lastPass:'HOST_CAS_ATTEMPTED',firstFail:applied.code,
+    actualControllerSha:installed.installedSha};
+   save({status:'RECOVERY_REQUIRED',phase:'HOST_OUTCOME_UNKNOWN',result});
+   lock.holdForRecovery();retained=true;return result;
+  }
+  need(sha256(fs.readFileSync(hostPath))===(applied.status==='APPLIED'
+   ?plan.hostProposedSha256:plan.hostOriginalSha256),
+   'BUNDLE_HOST_POST_APPLY_CAS_FAILED');
+  // No database, checkpoint, task or workflow handle is opened for writing.
+  // Unlike Controller replacement, this additive host-key CAS must not block
+  // legitimate concurrent Core/Writer progress on an unrelated file snapshot.
+  result={status:applied.status==='APPLIED'?'PASS':'ROLLED_BACK',
+   code:applied.status==='APPLIED'?'BUNDLE_REGISTERED':applied.code,
+   lastPass:applied.status==='APPLIED'?'HOST_CAS_READBACK':'HOST_ROLLBACK_READBACK',
+   firstFail:applied.status==='APPLIED'?null:applied.code,
+   sourceSha:manifest.sourceSha,actualControllerSha:installed.installedSha,
+   sourceExecuted:false,dbChanged:false,schedulesChanged:false};
+  save({status:result.status,phase:'COMPLETED',result});
+  return result;
+ }catch(error){
+  const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'BUNDLE_B_PREFLIGHT_UNKNOWN';
+  let hostOriginal=false;
+  try{hostOriginal=sha256(fs.readFileSync(hostPath))===sha256(beforeHost);}catch{}
+  const attempted=fs.existsSync(manifest.backupDirectory)||modified;
+  // A concurrent host change *before* this updater's first host-write/backup
+  // is an ordinary CAS refusal, not a reason to retain the shared B lease.
+  const recovery=attempted;
+  result={status:recovery?'RECOVERY_REQUIRED':'BLOCKED',code,
+   firstFail:code,lastPass:hostOriginal?'HOST_BYTES_UNCHANGED':'SOURCE_BYTES_PINNED',
+   actualControllerSha:installed.installedSha};
+  save({status:result.status,phase:recovery?'RECOVERY_REQUIRED':'BUNDLE_STAGING_BLOCKED',result});
+  if(recovery){lock.holdForRecovery();retained=true;}
+  return result;
+ }finally{if(!retained)lock.release();}
+}
+
 function loadApprovedR6HostPackage(requestId,file){
  const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
  need(path.resolve(file)===path.resolve(expected),'R6_HOST_APPROVAL_FILE_PATH');
@@ -2309,6 +2503,24 @@ function recoverR6HostOnly(requestId,packageFile,mode){
 export async function command(args=process.argv.slice(2)) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
  const cmd=args[0],requestId=safeId(args[2]);
+ if(cmd==='source-bundle-status'){
+  need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
+  return readSourceBundleStatus(requestId);
+ }
+ if(cmd==='source-bundle-apply'){
+  need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file',
+   'MAINTENANCE_ARGS');
+  try{return await applySourceBundleOnly(requestId,args[4]);}
+  catch(error){
+   const state=readSourceBundleStatus(requestId);
+   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'BUNDLE_B_PREFLIGHT_UNKNOWN';
+   const uncertain=Boolean(state.ledger||state.backupExists||state.installLock?.held);
+   return {status:uncertain?'UNKNOWN':'BLOCKED',
+    code:uncertain?'BUNDLE_B_OUTCOME_UNKNOWN':code,
+    firstFail:uncertain?'BUNDLE_B_OUTCOME_UNKNOWN':code,
+    actualControllerSha:state.actualControllerSha};
+  }
+ }
  if(cmd==='r54-b-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   // Status is read-only and may include a prior one-shot backup/journal.

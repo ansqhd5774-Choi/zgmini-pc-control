@@ -1,6 +1,9 @@
 // ZGMINI PC controller update admission and transition contract (pure ESM).
 // This module NEVER runs shell, downloads source, installs code or edits a PC.
 import {createHash} from "node:crypto";
+export {SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
+  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
+  from './source-bundle-register.mjs';
 
 export const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 export const CONTROL_ACTOR="ansqhd5774-Choi";
