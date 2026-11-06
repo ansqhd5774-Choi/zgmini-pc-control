@@ -142,6 +142,27 @@ test('one-shot reporter uses create-only, checks back, comments without raw data
    code:'WRITER_B_CANDIDATE_HASH_STOP',requestId:RID}),apiFetch});
  assert.deepEqual({status:report.status,created:report.created,verified:report.verified},
   {status:'WRITER_B_PREFLIGHT_STOP',created:2,verified:2});
+ assert.equal(report.deliveryStatus,'RESULT_PAIR_READBACK_VERIFIED');
+});
+
+test('partial remote result evidence never produces a verified install comment',async()=>{
+ const x=fixture();let comment='';
+ const apiFetch=async(url,init)=>{
+  if(init.method==='PUT')return {status:201};
+  if(init.method==='GET')return {status:404};
+  if(init.method==='POST'){
+   comment=JSON.parse(init.body).body;return {status:201};
+  }
+ };
+ const local={status:'WRITER_B_INSTALLED_VERIFIED',requestId:RID,
+  sourceSha:CHILD,changedPaths:['scripts/pc-writer/run-local.mjs']};
+ const report=await uploadWriterBReport({event:x.event,env:x.env,
+  rawResult:JSON.stringify(local),apiFetch});
+ assert.equal(report.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.equal(report.deliveryStatus,'RESULT_DELIVERY_UNVERIFIED');
+ assert.equal(report.verified,0);
+ assert.ok(comment.includes('WRITER_B_STATE_UNKNOWN'));
+ assert.equal(comment.includes('WRITER_B_INSTALLED_VERIFIED'),false);
 });
 
 test('unrelated large untracked file is metadata-only and never global size gate',()=>{
