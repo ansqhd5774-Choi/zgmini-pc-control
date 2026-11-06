@@ -6,7 +6,7 @@ export const D30_INSTALL_CONTRACT = Object.freeze({
   scope: 'ER1_D30_SOURCE_3FILE_ONLY',
   sourceRepository: 'ansqhd5774-Choi/zgmini',
   sourcePullRequest: 1000,
-  sourceHead: 'f85ae138a25a20565d3f0ca057c4ae373f940b47',
+  sourceHead: '57f5c72ff0d5f05dee1c76fd3ba7eb904e7adb2a',
   // Historical configuration; not an assertion about live PC source.
   historicConfiguredCoreSha: 'd7bc4948573843766ad82c72ff392220178c36a3',
   historicPublicSourceSha: 'ce9bccd8b38939b204e8f836a50ae362960eb7af',
