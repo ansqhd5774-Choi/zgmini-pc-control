@@ -99,6 +99,7 @@ export async function probeHistorical({now=Date.now(),base=BASE,
       return fetchImpl(url,init);
     }}).fetch;
   }catch{throw failure('SIP_PROBE_QUOTA_INIT_STOP');}
+  requireThat(typeof guarded==='function','SIP_PROBE_QUOTA_INIT_STOP');
   try{
     const reference=await fetchIexWindow({symbols:members,timeframe:'1Day',
       feed:'sip',start:PRIOR+'T00:00:00Z',end:OBSERVATION+'T00:00:00Z',
@@ -283,8 +284,15 @@ export async function loadProbeModules(src){
   return {collector,providers,quota,sip};
 }
 
+export function recheckInstalledSource(verify=verifyInstalledSource){
+  try{return verify();}catch(error){
+    throw failure(CODE.test(error?.safeCode??'')?
+      error.safeCode:'SIP_PROBE_SOURCE_RECHECK_STOP');
+  }
+}
+
 async function realProbe(){
-  verifyInstalledSource();
+  recheckInstalledSource();
   const src=async name=>import(pathToFileURL(fileAt(name)).href);
   const {collector,providers,quota,sip}=await loadProbeModules(src);
   return probeHistorical({storedUniverse:collector.storedUniverse,
