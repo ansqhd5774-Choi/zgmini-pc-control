@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectAlpacaQuotaReadonly} from '../controller/alpaca-quota-readonly.mjs';
+import {createHash} from 'node:crypto';
+import {inspectAlpacaQuotaReadonly,inspectQuotaModuleSourceReadonly} from '../controller/alpaca-quota-readonly.mjs';
 
 const now=Date.parse('2026-11-02T13:00:00Z');
 const fresh=({times=[],limit=null,remaining=null,reset=null,status=null}={})=>({version:1,
@@ -15,6 +16,21 @@ function fixture(fn){
  const file=path.join(root,'alpaca-quota-ledger.json');
  const save=value=>fs.writeFileSync(file,JSON.stringify(value));
  return Promise.resolve().then(()=>fn({dir,root,file,save})).finally(()=>fs.rmSync(dir,{force:true,recursive:true}));
+}
+
+function sourceFixture(fn){
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'r17-quota-source-'));
+ const parent=path.join(temporary,'ZGmini'),data=path.join(parent,'data');
+ const writer=path.join(data,'pc-writer');
+ const modules=path.join(parent,'projects','zgmini-earnings-history-pc-release','scripts','pc-writer');
+ fs.mkdirSync(writer,{recursive:true});fs.mkdirSync(modules,{recursive:true});
+ const names=['quota-fetch.mjs','quota-policy.mjs','quota-ledger.mjs'];
+ const values=Object.fromEntries(names.map((name,i)=>[name,`export const testValue=${i}; // SECRET_SOURCE_DO_NOT_PRINT\n`]));
+ const approvedSha='dace6090f61eb0d0319f79422649af312f7b1764';
+ fs.writeFileSync(path.join(writer,'config.json'),JSON.stringify({source:approvedSha,secret:'PRIVATE_KEY_DO_NOT_PRINT'}));
+ for(const [name,value] of Object.entries(values))fs.writeFileSync(path.join(modules,name),value);
+ return Promise.resolve().then(()=>fn({temporary,parent,data,writer,modules,names,values,approvedSha}))
+  .finally(()=>fs.rmSync(temporary,{force:true,recursive:true}));
 }
 
 test('119 / 120 / 140 / 141 recent reservations have distinct states',()=>fixture(({dir,save})=>{
@@ -92,4 +108,54 @@ test('extra credentials and raw values never escape the sanitized result',()=>fi
  assert.equal(result.baseAgreement,'UNVERIFIED');
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_KEY_DO_NOT_PRINT|PRIVATE_TOKEN|pc-writer/);
  assert.equal(fs.existsSync(file),true);
+}));
+
+test('missing ledger adds fixed installed quota source hashes without changing status or side effects',()=>sourceFixture(({data,writer,names,values,approvedSha})=>{
+ const before=fs.readFileSync(path.join(writer,'config.json'));
+ const outcome=inspectAlpacaQuotaReadonly(data,{now});
+ assert.equal(outcome.status,'BLOCKED');
+ assert.equal(outcome.code,'ALPACA_LEDGER_ABSENT');
+ assert.equal(outcome.providerCalls,0);assert.equal(outcome.d1Writes,0);
+ assert.equal(outcome.operationalWrites,0);assert.equal(outcome.sqliteOpened,false);
+ assert.equal(outcome.sourceInventory.state,'SOURCE_BYTES_AND_CONFIG_READ');
+ assert.equal(outcome.sourceInventory.configApprovedSha,approvedSha);
+ assert.equal(outcome.sourceInventory.runtimeBindingVerified,false);
+ assert.equal(outcome.sourceInventory.complete,true);
+ assert.deepEqual(outcome.sourceInventory.modules.map(x=>x.name),names);
+ for(const item of outcome.sourceInventory.modules){
+  assert.equal(item.state,'PRESENT');
+  assert.equal(item.sha256,createHash('sha256').update(values[item.name]).digest('hex'));
+  assert.equal(item.bytes,Buffer.byteLength(values[item.name]));
+ }
+ assert.deepEqual(fs.readFileSync(path.join(writer,'config.json')),before);
+ assert.doesNotMatch(JSON.stringify(outcome),/PRIVATE_KEY_DO_NOT_PRINT|SECRET_SOURCE_DO_NOT_PRINT/);
+}));
+
+test('valid quota ledger still returns the original quota-only contract',()=>sourceFixture(({data,writer})=>{
+ fs.writeFileSync(path.join(writer,'alpaca-quota-ledger.json'),JSON.stringify(fresh({times:[now]})));
+ const outcome=inspectAlpacaQuotaReadonly(data,{now});
+ assert.equal(outcome.status,'PASS');
+ assert.equal(Object.hasOwn(outcome,'sourceInventory'),false);
+ assert.equal(outcome.quota.recentReservations,1);
+}));
+
+test('missing, symbolic and oversized quota module files remain unverifiable without executing them',()=>sourceFixture(({data,modules})=>{
+ const name='quota-ledger.mjs';
+ fs.unlinkSync(path.join(modules,name));
+ assert.equal(inspectQuotaModuleSourceReadonly(data).modules[2].state,'MISSING');
+ fs.writeFileSync(path.join(modules,name),'x'.repeat(1_048_577));
+ assert.equal(inspectQuotaModuleSourceReadonly(data).modules[2].state,'SIZE_INVALID');
+ fs.unlinkSync(path.join(modules,name));
+ const target=path.join(modules,'quota-fetch.mjs');
+ try{fs.symlinkSync(target,path.join(modules,name));}
+ catch(error){if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code))return;throw error;}
+ const output=inspectQuotaModuleSourceReadonly(data);
+ assert.equal(output.modules[2].state,'UNSAFE_FILE');
+ assert.equal(output.complete,false);
+}));
+
+test('foreign root is not used as an arbitrary file selector',()=>sourceFixture(({temporary,data})=>{
+ const foreign=path.join(temporary,'foreign','data');fs.mkdirSync(foreign,{recursive:true});
+ assert.equal(inspectQuotaModuleSourceReadonly(foreign).state,'SOURCE_ROOT_UNVERIFIED');
+ assert.equal(inspectQuotaModuleSourceReadonly(data).state,'SOURCE_BYTES_AND_CONFIG_READ');
 }));
