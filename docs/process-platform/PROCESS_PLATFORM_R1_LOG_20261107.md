@@ -147,3 +147,18 @@
 - **재시도 경계 확인:** 기존 `pc-job.yml`은 `issues.opened`에서 A `entry.mjs` 후 `upload.mjs`; 기존 #540 결과만 다시 올리는 승인된 경로가 없음. `upload.mjs` 라이브러리를 임의 실행하거나 기존 #540 A 재실행하지 않음. #540 run 42261956750/attempt 1/seat 3의 로컬 포인터 존재 여부는 Windows에서 미검증.
 
 **FIRST GAP:** #551 실제 `SUCCEEDED`/원격 증거 확인, #553 조건부 manifest의 정규 검증/승인·Windows 영향 점검·#68 단일 B 인계, #540 기존 포인터와 안전한 upload-only 복구 통로. **M3 RUNNING/M4 DEFERRED, 신규 R1 60% 유지.** 본 총괄의 새 PC B 요청/예약 검증/원래 A 재실행 0.
+
+## 12. M3 운영 적용 실제 결과 — #560/#567 및 Windows A 2건 (2026-11-07 KST)
+
+**신규 확인/원격 원본:**
+
+| 단계 | 실제 증거 | 판정 |
+| --- | --- | --- |
+| 공통 보고서 업로더 main→PC | [PR #545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545) main source `842e53ed4cd88f789d4782ff2c93dfb102300f05`, 승인 [#553](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/553), 정규 B [#560](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/560#issuecomment-6691876089) `SUCCEEDED`; actual=target, 보호 불변, 결과 TXT·JSON remote GET | **PC 설치 완료**; 과거 #540 자동 회수와 별개 |
+| 공통 고정 파일 reader main→PC | [PR #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) main `b6d23680c371014dc1f73c1b7855c2e18cd80dea`, 정확 3파일 승인 [#565](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/565), 정규 B [#567](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/567#issuecomment-6692051055) `SUCCEEDED`, `ACTUAL_CONTROLLER_SHA=b6d23680...`; 보호 불변/Workflow 활성, remote TXT·JSON GET VERIFIED | **정규 Controller 변경·Windows 설치 확인** |
+| 자산 R10 Windows A 기능 | [#570](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/570#issuecomment-6692074723), `PASS/ASSET_R10_SOURCE_BYTES_READONLY`, source 2개 `exists:true`, actualExecutionSha=b6d23680..., providerCalls=0, operationalWrites=0, protected unchanged; 원격 TXT·JSON GET | **고정 파일 2개 실제 Windows 읽기 PASS**. `sourceIdentityConsistent=false`, `runtimeSourceVerified=false`이므로 라이브 Core 실행 입증 아님 |
+| Alpaca quota Windows A | [#571](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/571#issuecomment-6692072683), `BLOCKED/ALPACA_LEDGER_ABSENT`, actualExecutionSha=b6d23680..., providerCalls=0, operationalWrites=0, protected unchanged; 원격 TXT·JSON GET | **새 Controller 실행/파일 부재 분류 확인**, 원장 읽기 데이터/계정 전체 quota PASS는 미입증. 원장 생성·임의 복원·A 재실행 금지 |
+
+- **재사용 증거:** PR #537 21/21 Linux 집중 PASS, 유지보수 계약 격리 34/34 PASS, PR #545 14/14 PASS. 별도 Windows 개발 fixture 없이 기존 B 백업/drain/복구/6 Runner/고정 A를 실제 적용. Windows `ALPACA_LEDGER_ABSENT`는 기존 로컬 원장 부재로, 공통 helper의 코드 FAIL이라고 추정하지 않음.
+- **M3 DONE (승인 변경/실PC 적용 범위), M4 RUNNING. 신규 R1 총 80%**. M4는 원담당 실제 수신/효과 및 #540 별도 delivery recovery 공백을 완료와 구분해야 함. #540 원 A를 재실행하지 않았고, 임의 공급자 GET·운영 DB/D1·예약·산식 쓰기 0, 새 예약 검증 없음.
+- **다음 한 행동:** 원담당 후속 진행/ACK와 현재 장애 분리 측정, #540 고정 upload-only 복구 경로를 원본 보존/별도 승인으로 완성. #537 코드를 다시 설치하거나 Alpaca 원장을 만들지 않음.
