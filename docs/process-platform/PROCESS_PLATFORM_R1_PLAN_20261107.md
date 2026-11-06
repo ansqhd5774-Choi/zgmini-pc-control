@@ -137,3 +137,10 @@
 - 기존 #540 재게시의 별도 결손: `upload-only` 승인 트리거 부재. 진단 재실행/신규 예약을 만들지 말고, 원본 포인터 확인→승인된 단회 업로드 전용 경로→같은 결과 원격 일치 검증으로 복구한다. 새로운 범용 원격 스크립트 실행기는 만들지 않는다.
 
 **M3/M4 미완료, R1 60% 유지.** 예약 검증은 최종 운영 효과까지 완료한 뒤 후속.
+
+## 15. M3 운영 적용 종료 / M4 본작업 (2026-11-07 KST)
+
+- **M3 DONE:** 공통 업로더 [B #560](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/560), 공통 읽기 모듈 [B #567](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/567) 모두 `SUCCEEDED`·실제 설치 SHA/보호 불변/원격 결과쌍 VERIFIED. 설치된 공통 reader 실제 Windows A 중 [자산 R10 #570](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/570)은 고정 파일 2개 읽기 PASS, [Alpaca #571](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/571)은 helper 실행 후 로컬 ledger 부재를 `ALPACA_LEDGER_ABSENT`로 분류. quota 정책 자체·R10 Core 라이브 소스 동일성을 PASS로 승격하지 않음.
+- **진행률 80%:** M0/M1/M2/M3 각 20% 완료; M4는 원담당 실제 수신·측정·필요한 최소 후속 수리 완료까지 RUNNING. 이전 60% 계획·Windows 별도 fixture 부재를 전역 차단 Gate로 사용하지 않음.
+- **M4 최소 실행:** ① #537/#545 원본 도입의 사용자 수동 개입/재시도/처리 시간 측정 가능 범위를 원본 증거로 기록 ② 원담당에게 실행/전달 상태를 분리하여 인계하고 실제 ACK만 별도 판단 ③ [#540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540)의 원래 A 결과를 재실행하지 않은 채 결과만 복구할 고정 upload-only 경로를 필요 범위에서 구현/승인/실증. 원본 포인터 부재이면 `ORIGINAL_NOT_PROVEN`으로 종료. 신규 예약/공급자 GET/DB·D1·산식 변경 없음.
+- R1의 종료 조건은 실제 효과 및 막힌 잔여 단계가 각각 증거 링크와 함께 분리되어야 함. #540 원본 자동 전달이 완료되지 않았는데 수정 소스만 병합된 사실로 M4 DONE을 선언하지 않음.
