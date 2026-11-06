@@ -209,11 +209,70 @@ test('EarningsAPI request ledger aggregates observed KST days without exposing r
   {kstDate:'2026-11-07',observedRequests:1}
  ]);
  assert.equal(obs.eventsExamined,3);
+ assert.equal(obs.duplicateHostLogLines,0);
+ assert.deepEqual(obs.statusColumns,['ok2xx','client4xx','server5xx','networkError','quotaGuard','other','duplicateLines']);
+ assert.deepEqual(obs.observedStatusDays,[
+  {kstDate:'2026-11-06',counts:'1,0,0,0,0,0,0'},
+  {kstDate:'2026-11-07',counts:'1,0,0,0,0,0,0'}
+ ]);
  assert.deepEqual(obs.observedWindow,{
   firstEventAt:'2026-11-06T14:30:00.000Z',lastEventAt:'2026-11-06T15:10:00.000Z'});
  assert.match(obs.evidenceLevel,/NOT_DAILY_LIMIT_OR_SAVED_DATE_PROOF/);
  assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_LOG|api\.other\.example/);
  assert.equal(out.providerCalls,0);
+});
+
+test('read-only KST response status buckets reveal response outcomes and exact duplicate log lines',t=>{
+ const f=fixture(t,{dirs:0});
+ const first=event('2026-11-06T04:00:00.000Z',14,{
+  'api.earningsapi.com':{requests:14,statuses:{200:11,429:1,503:1,NETWORK_ERROR:1}}});
+ const second=event('2026-11-06T05:00:00.000Z',2,{
+  'api.earningsapi.com':{requests:2,statuses:{PROVIDER_QUOTA_GUARD:1,418:1}}});
+ fs.writeFileSync(path.join(f.pc,'collection-events.jsonl'),[first,first,second,''].join('\n'));
+ const obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'OBSERVED');
+ assert.equal(obs.observedMaxDailyRequests,30);
+ assert.equal(obs.duplicateHostLogLines,1);
+ assert.equal(obs.statusInvalidEvents,0);
+ assert.equal(obs.statusCoverage,'BOUNDED_LOG');
+ assert.deepEqual(obs.observedStatusDays,[
+  {kstDate:'2026-11-06',counts:'22,3,2,2,1,0,1'}
+ ]);
+ assert.doesNotMatch(JSON.stringify(obs),/MUST_NOT_LEAK_LOG|api\.other\.example|apikey=/);
+ assert.equal(inspectReleaseCalendarRuntime(f.data).providerCalls,0);
+});
+
+test('missing or malformed wrapper statuses do not change request counts or imply verified GETs',t=>{
+ const f=fixture(t,{dirs:0});
+ fs.writeFileSync(path.join(f.pc,'collection-events.jsonl'),[
+  event('2026-11-06T04:00:00.000Z',2,{
+   'api.earningsapi.com':{requests:2,statuses:{200:-1,NETWORK_ERROR:'not-a-count'}}}),
+  event('2026-11-06T05:00:00.000Z',3,{
+   'api.earningsapi.com':{requests:3}}),''].join('\n'));
+ const obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'STATE_UNKNOWN');
+ assert.equal(obs.observedMaxDailyRequests,5);
+ assert.equal(obs.statusInvalidEvents,3);
+ assert.equal(obs.statusCoverage,'PARTIAL');
+ assert.equal(obs.coverage,'PARTIAL');
+ assert.match(obs.statusEvidenceLevel,/NOT_PROVIDER_GET_POLICY_PROOF/);
+ assert.equal(obs.observedStatusDays[0].counts,'0,0,0,0,0,0,0');
+});
+
+test('bounded status day details with 62 candidates remain inside upload limit',t=>{
+ const f=fixture(t,{dirs:0});manyCandidates(f,{readable:true});
+ const lines=[];
+ for(let i=0;i<14;i++){
+  const at=new Date(Date.parse('2026-10-25T12:00:00Z')+i*86400000).toISOString();
+  lines.push(event(at,14,{'api.earningsapi.com':{requests:14,
+   statuses:{200:8,429:1,502:1,NETWORK_ERROR:2,PROVIDER_QUOTA_GUARD:2}}}));
+ }
+ fs.writeFileSync(path.join(f.pc,'collection-events.jsonl'),lines.join('\n')+'\n');
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.earningsApiRequestObservations.observedStatusDays.length,14);
+ assert.equal(out.earningsApiRequestObservations.status,'OBSERVED');
+ assert.equal(out.candidateCount,62);
+ assert.ok(uploadBytes(out)<32768,`bounded response detail and inventory fit host upload cap (got ${uploadBytes(out)}B)`);
 });
 
 test('two observed EarningsAPI requests on one KST day are visibly counted, never certified',t=>{
