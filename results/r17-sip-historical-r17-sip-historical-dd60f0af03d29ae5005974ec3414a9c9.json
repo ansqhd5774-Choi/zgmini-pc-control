@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_R17_SIP_HISTORICAL_RESULT_V1",
+  "requestId": "r17-sip-historical-dd60f0af03d29ae5005974ec3414a9c9",
+  "runId": "42265168465",
+  "status": "SIP_HISTORICAL_NOT_VERIFIED",
+  "code": "US_PROVISIONAL_UNIVERSE_MISSING",
+  "observationDate": "2026-11-06",
+  "slotEndUtc": "2026-11-06T14:30:00.000Z",
+  "checkedAt": "2026-11-06T17:50:12.889Z",
+  "providerCalls": 0,
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
