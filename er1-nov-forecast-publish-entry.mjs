@@ -2,6 +2,7 @@
 // Production integration candidate; not installed until the control PR is merged.
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {runNovemberForecastB} from './er1-nov-forecast-b-core.mjs';
@@ -15,6 +16,18 @@ const MANIFEST='ER1_NOV_FORECAST_B_APPROVAL.json';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const stop=code=>{throw Error(code)};
+// Only CRLF pairs may differ from the pinned Git blob. Work on bytes, not
+// decoded JS text; any other change must retain a different object digest.
+function crlfNormalizedBlobSha(file){
+  const bytes=fs.readFileSync(file),normalized=Buffer.allocUnsafe(bytes.length);
+  let n=0;
+  for(let i=0;i<bytes.length;i++){
+    if(bytes[i]===13&&bytes[i+1]===10)continue;
+    normalized[n++]=bytes[i];
+  }
+  return createHash('sha1').update('blob '+n+'\0')
+    .update(normalized.subarray(0,n)).digest('hex');
+}
 const exact=(obj,fields)=>!!obj&&typeof obj==='object'&&!Array.isArray(obj)&&
   Object.keys(obj).sort().join('|')===fields.slice().sort().join('|');
 
@@ -77,24 +90,44 @@ export function validateApproval(m,sourceSha=PINNED_SOURCE){
   return m;
 }
 
-export function verifySource(root,m,{getHead,gitRun}={}){
+export function verifySource(root,m,{getHead,gitRun,onFailure}={}){
   const git=args=>gitRun?gitRun(root,args):execFileSync('git',args,{
     cwd:root,encoding:'utf8',windowsHide:true,timeout:10000}).trim();
-  const sha=getHead?getHead(root):git(['rev-parse','HEAD']);
-  if(sha!==m.sourceSha)stop('ER1_NOV_FORECAST_B_SOURCE_STOP');
+  const fail=(relativePath,stage,code='ER1_NOV_FORECAST_B_SOURCE_HASH_STOP')=>{
+    onFailure?.({path:relativePath,stage});
+    stop(code);
+  };
+  let sha;
+  try{sha=getHead?getHead(root):git(['rev-parse','HEAD'])}
+  catch{fail(null,'HEAD_READ','ER1_NOV_FORECAST_B_SOURCE_STOP')}
+  if(sha!==m.sourceSha)fail(null,'HEAD_MISMATCH',
+    'ER1_NOV_FORECAST_B_SOURCE_STOP');
   for(const entry of m.files){
     const file=path.join(root,...entry.path.split('/'));
-    let st;try{st=fs.lstatSync(file)}catch{stop('ER1_NOV_FORECAST_B_FILE_MISSING')}
+    let st;try{st=fs.lstatSync(file)}
+    catch{fail(entry.path,'FILE_STAT','ER1_NOV_FORECAST_B_FILE_MISSING')}
     if(!st.isFile()||st.isSymbolicLink()||st.size<2||st.size>1_000_000)
-      stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP');
+      fail(entry.path,'FILE_TYPE_SIZE');
     // The pinned Git blob is canonical LF content. Windows checkout can
     // materialize safe CRLF; Git clean filters compare that worktree to HEAD.
-    try{
-      if(git(['rev-parse','--verify','HEAD:'+entry.path])!==entry.blobSha||
-        git(['cat-file','-t','HEAD:'+entry.path])!=='blob')
-        stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP');
-      git(['diff','--no-ext-diff','--quiet','HEAD','--',entry.path]);
-    }catch{stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP')}
+    let objectId;
+    try{objectId=git(['rev-parse','--verify','HEAD:'+entry.path])}
+    catch{fail(entry.path,'BLOB_LOOKUP')}
+    if(objectId!==entry.blobSha)fail(entry.path,'BLOB_MISMATCH');
+    let objectType;
+    try{objectType=git(['cat-file','-t','HEAD:'+entry.path])}
+    catch{fail(entry.path,'OBJECT_TYPE_READ')}
+    if(objectType!=='blob')fail(entry.path,'OBJECT_TYPE');
+    try{git(['diff','--no-ext-diff','--quiet','HEAD','--',entry.path])}
+    catch(error){
+      // Git exit 1 = a content difference. Other exit codes are tool errors:
+      // never bypass an unavailable/broken Git integrity check.
+      if(error?.status!==1)fail(entry.path,'WORKTREE_DIFF');
+      let normalized;
+      try{normalized=crlfNormalizedBlobSha(file)}
+      catch{fail(entry.path,'WORKTREE_DIFF')}
+      if(normalized!==entry.blobSha)fail(entry.path,'WORKTREE_DIFF');
+    }
   }
   return root;
 }
@@ -121,7 +154,8 @@ export async function execute({env=process.env}={}){
     const asOf=issueAsOf(event);
     const approvalPath=path.join(env.GITHUB_WORKSPACE,'control',MANIFEST);
     const m=validateApproval(JSON.parse(fs.readFileSync(approvalPath,'utf8')));
-    const src=verifySource(path.join(env.GITHUB_WORKSPACE,'source'),m);
+    const src=verifySource(path.join(env.GITHUB_WORKSPACE,'source'),m,{
+      onFailure:where=>{report.sourceCheck=where;}});
     const imp=p=>import(pathToFileURL(path.join(src,...p.split('/'))).href);
     const [{loadSavedNovemberDays},{forecastRowsFromSaved},
       {scoreER1ForecastIssuers},{makeER1PublicDisplay},
