@@ -85,6 +85,7 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
    const module=safeFile(path.join(resolved,'lib','release-calendar.mjs'),1048576);
    const runner=safeFile(path.join(resolved,'scripts','pc-writer','release-calendar.mjs'),1048576);
    if(!collector||!module||!runner)continue;
+   const earningsModule=safeFile(path.join(resolved,'scripts','pc-writer','earnings-api-local.mjs'),1048576);
    out.candidateCount++;
    if(out.candidates.length>=32){out.inventoryTruncated=true;continue;}
    const source=module.bytes.toString('utf8');
@@ -116,6 +117,11 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
     collectorCallsCalendar:/\bcollectReleaseCalendar\s*\(/.test(collectorText),
     collectorImportsCalendar:/['"]\.\/release-calendar\.mjs['"]/.test(collectorText),
     moduleSha256:hash(module.bytes),collectorSha256:hash(collector.bytes),runnerSha256:hash(runner.bytes),
+    earningsApiCollector:{present:!!earningsModule,
+     sha256:earningsModule?hash(earningsModule.bytes):null,
+     bytes:earningsModule?.bytes.length??null,
+     modifiedAt:earningsModule?.modifiedAt??null,
+     evidenceLevel:'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF'},
     sourceParseStatus:match&&keys.length?'PARSED':'UNKNOWN',
     sourceKeys:keys,sourceCount:match&&keys.length?keys.length:null});
   }
