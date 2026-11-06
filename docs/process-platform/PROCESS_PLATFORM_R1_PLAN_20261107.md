@@ -1,7 +1,7 @@
 # ZGMINI 공통 실행 효율화 R1 — 프로젝트 계획서
 
 - 작성: 2026-11-07 KST
-- 상태: **M0 DONE / M1 DONE / M2 DONE / M3 사전 조사 완료·본 단계 미완료**, 신규 프로젝트 60% (실PC 효과 미실증)
+- 상태: **M0 DONE / M1 DONE / M2 DONE / M3 배포 범위 분리·시험 착시 수정, 본 단계 미완료**, 신규 프로젝트 60% (Windows/실PC 효과 미실증)
 - 전용 브랜치: `codex/controller-process-platform-r1-20261107`
 - 분기 기준: `codex/controller-ops-lessons-20261105` (기존 업무·완료 증거 보존)
 - 운영 정본: `main`의 `AGENTS.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/GENERAL_CHAT_START.md`, `docs/GENERAL_CHAT_PREWORK.md`
@@ -105,3 +105,10 @@
 - **#524 변화:** EarningsAPI 원담당 PR은 `main`에 병합됨(2026-11-07 KST 확인). 수집기 파일 관측과 KST 로그 집계의 소스 개선이며 운영 1 GET/day 실증과 혼동하지 않는다.
 
 **신규 프로젝트 완료율: M0+M1+M2 = 60%. M3+M4는 미완료.** 운영 API/DB/예약/Controller 교체/정규 Runner 재시작 **0회**.
+
+## 11. M3 추가 확인 (2026-11-07)
+
+- 실제 설치 마지막 A [#532](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/532) `0492f6f5…` → EarningsAPI [PR #535](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/535) 승인 목표 `af016444…`: Controller 1파일. #535 적용 완료 증거는 아직 없다.
+- 해당 승인 목표 → 공통 관측 [Draft PR #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) `e27be6d…`: Controller 3파일. 기존 1파일 승인 명세로 합쳐서 설치할 수 없고, #68 기존 단일 B 담당 및 정확한 새 설치 SHA 기준으로 순차 조정한다.
+- 현행 A/기존 Windows workflow는 미설치 PR #537 코드를 실행하지 않으므로 Windows fixture는 `WINDOWS_SMOKE_PENDING`. 테스트의 Windows symlink 권한거부가 초록색 PASS로 숨지 않도록 `t.skip`/root 탈출 독립 검사로 보정했고 Linux Node 24 집중 21/21 PASS(Windows 증거 아님).
+- 백업·복구·Runner 전환 기존 테스트 소스는 존재하지만 이번 M3에 직접 실행한 복구 시험은 없음. 다음 단계는 승인된 Windows 격리 테스트 경로와 #535 실제 적용 상태 확인, #537 3파일 정확 manifest·복구 검증. 증거/계약/담당 세부는 [실행 원장 §8](PROCESS_PLATFORM_R1_LOG_20261107.md) 참고. **M3·M4 미완료 / 60% 유지**.
