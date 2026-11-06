@@ -124,3 +124,12 @@ test('uncertain rollback retains shared Writer lock for manual reconciliation',a
   assert.equal(io.events.at(-1),'releaseSharedWriterLock');
   assert.deepEqual(io.releaseArgs,{retain:true});
 });
+
+test('Core pause failure after an attempted disable still restores Core state',async()=>{
+  const io=fakeIo({faultAt:'pauseCoreWithoutDefinitionChange'});
+  const result=await performAuthorizedInstall(auth,io);
+  assert.equal(result.status,'SIP_B_INSTALL_STOP');
+  assert.ok(io.events.includes('restoreCoreExactState'));
+  assert.ok(io.events.includes('assertCoreExactState'));
+  assert.deepEqual(io.releaseArgs,{retain:false});
+});
