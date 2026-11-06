@@ -12,7 +12,7 @@
 | TARGET_CANDIDATE | `e27be6d391d738f0d446664ab9f2ca457751f624` · PR #537 개발 브랜치 | **Draft**, 아직 main 병합·B 승인·PC 설치 아님 |
 | installed→candidate 비교 | GitHub compare `af016444…→e27be6d…`: ancestor/ahead 8, 전체 변경 9경로 중 **controller/config 3경로** | 정적 diff 경로 검사 PASS |
 | OTHER | 위 전체 9경로 중 `r17-sip-b/` 3개, `results/` 2개, `tests/` 1개 | Controller-only 단계의 설치 경로로 취급 금지. 기능별 승인·소유 별도 |
-| UNKNOWN/MISSING | 최신 PC lease/current installed 재실측, 후보 main 병합 SHA, 정확한 새 승인 manifest 및 Windows 격리 smoke | **준비 불충분. B 접수 금지** |
+| UNKNOWN/MISSING | #560 종료 이후 최신 PC lease/current installed 재확인, main 병합 SHA 및 실제 누적 diff, 정확한 신규 승인 manifest | **#560 정상 B 종료 전 신규 B 중복 금지**. 독립 Windows 사전 smoke 부재는 별도 위험 관리 항목 |
 
 ## 2. controller/config 정확한 3파일과 SHA-256
 
@@ -35,6 +35,8 @@
 
 ## 4. Windows 격리 시험 경로의 현실적 제한
 
+**2026-11-07 판정 갱신:** 공통 정본 `PC_AUTOMATION_STANDARD.md` §2·5와 `tools/maintenance-contract.mjs` 승인 명세에는 **운영 설치 이전의 별도 Windows 개발 fixture PASS를 B 필수 필드로 요구하지 않는다.** 과거 후보 문서가 Windows 시험 수단 부재를 보편적 설치 차단 조건으로 적은 부분은 자체 과도한 Gate였으므로 정정한다. `WINDOWS_SMOKE_PATH_UNVERIFIED` 자체는 Windows 검증 완료를 뜻하지 않으며, 이 위험을 없던 일로 간주하지 않는다. 기존 승인된 정규 B에서 설치 직전 diff/파일 해시/백업·rollback/drain/6 Runner/보호·고정 post A를 모두 적용하고, 설치 후 기등록 `alpaca-quota-readonly`와 `asset-r10-source-readonly`를 각각 1회 Windows A로 실행하여 고정 경로와 결과 호환을 확인한다. 실패 시 PASS로 덮지 않고 검증 백업의 롤백/복구 계약을 적용한다. **현재 #560 B terminal VERIFIED 전에는 신규 B 접수하지 않는다.**
+
 - `pc-job`과 기존 A는 **설치된 Controller만** 실행한다. 해당 경로에 임의 개발 SHA/명령을 넣지 않는다. `theme-common-tests`는 지정 source 등록에 한정. 기존 승인된 PR #537 독립 Windows Node fixture 실행기가 **확인되지 않았다**: `WINDOWS_SMOKE_PATH_UNVERIFIED`.
 - 최소 후보: 검토된 정확한 source SHA와 재귀 import/test 의존성, 해시, 제한된 test 3개를 고정한 **단회** Windows 개발 격리 시험. 승인된 기존 검증 adapter가 실제로 확인될 때만 사용. 새 보편적 원격 셸·임의 코드 실행 허용목록 금지.
 - `%TEMP%`/Runner workspace 분리는 운영 파일 손상 가능성을 낮추지만 권한 격리는 아니다. 동일 사용자 코드가 접근 가능한 `E:\ZGmini`/GitHub 인증정보를 자동 차단하지 않는다. 가능한 최소 권한 별도 Windows 실행 계정/VM, 비밀정보 미주입, 핀 고정 source review, timeout, 결과 sanitization, 테스트 후 운영 파일 무변경 검산 필요.
@@ -43,7 +45,7 @@
 
 ## 5. 다음 담당·필수 한 행동
 
-1. **프로세스 총괄:** 이 후보 문서·Draft를 유지하면서 #537의 변경만 코드 검토하고, Windows 격리 시험 실행권한·수단이 실제로 있는지 기술 제약을 분리한다. 별도 기능 업무 담당을 대신하지 않는다.
+1. **프로세스 총괄:** #560의 정규 설치 결과 회수 후 #537의 3파일 집중 테스트·Windows 잔여 위험을 명시하여 소스 병합과 정확한 승인 manifest 준비를 추진한다. Windows 사전 시험 통로 신규 구축을 불필요한 배포 Gate로 삼지 않는다. 별도 기능 업무 담당을 대신하지 않는다.
 2. **공용 적용 담당(#68):** #537가 검토·병합되고 승인 manifest가 준비된 후 **직전 실설치 SHA/lease**와 전체 diff/파일 바이트를 다시 대조한 뒤 정규 B 1건만 수행한다. backup/drain/6 Runner 복구/보호 및 사후 관련 A를 증거로 남긴다.
 3. **원담당:** #540의 *이미 존재하는* A 결과를 회수해 EarningsAPI 파일 메타데이터와 KST 호출 로그를 별도 판정. 1 GET/day 운영 보증·EPS 기존 운영 PASS와 혼동하지 않는다.
 
