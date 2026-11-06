@@ -1,0 +1,17 @@
+schema=ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1
+requestId=pc-calendar-772f1151-cc5a-4a78-ae92-6c1055a19099
+issueNumber=558
+status=CAL_B_PREFLIGHT_STOP
+code=CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP
+vbsCallCounts=2,3
+vbsResolvedArguments=true,true
+vbsConditional=true,true
+candidateBlobMatches=7/9
+candidateRelevantDirtyCount=2
+activeCoreRootVerified=false
+head=null
+sourceCount=null
+operationalWrites=0
+providerCalls=0
+d1Writes=0
+sqliteOpened=false
