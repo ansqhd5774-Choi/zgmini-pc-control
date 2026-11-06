@@ -3,7 +3,7 @@
   "scope": "ER1_NOV_SAVED_FORECAST_D1_ONLY",
   "approvalState": "APPROVED_B_NOV2026_FORECAST_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "sourceSha": "67f769b829195fc33745305234c2bb2de3f1eeb1",
+  "sourceSha": "b49293460e86901e0a04effca7945dcd5a2c4318",
   "month": "2026-11",
   "outputKey": "market-calendar:earnings-nov2026-er1-score-public",
   "maxProviderCalls": 0,
@@ -15,19 +15,19 @@
   "files": [
     {
       "path": "lib/market-calendar-er1-forecast-score.mjs",
-      "blobSha": "0327ce3cc232a2a77c043995d1dd09474a3e6ab1"
+      "blobSha": "c030efe62856a06ebb02a1abcf15fd3645ae8431"
     },
     {
       "path": "lib/market-calendar-er1-forecast-saved-adapter.mjs",
-      "blobSha": "2cbcec58ac2302cff59886733bc3ac0650ddc723"
+      "blobSha": "46da2a1b78764552758fc5a8a5a84741abafafa9"
     },
     {
       "path": "lib/market-calendar-er1-forecast-publish-bridge.mjs",
-      "blobSha": "76e9c4f101926f901b19135de1cdb8781bc21420"
+      "blobSha": "8432652c695c26c7b531216fcb8a56c393ac4028"
     },
     {
       "path": "lib/market-calendar-er1-public-display.mjs",
-      "blobSha": "0b74f0c8b1f7f5a75feefaf834f3c3d2b272f7e3"
+      "blobSha": "94b89fb70349d959eb1a539bc0e17e34861cb36f"
     },
     {
       "path": "scripts/pc-writer/market-calendar-nov30-er1-probe-publish.mjs",
