@@ -22,6 +22,11 @@ export function manifest(){
     change:'A',beforeSha256:null,afterSha256:H('new-test')},
   ],
   protectedFiles:[{path:'scripts/pc-writer/release-calendar.mjs',sha256:H('calendar')}],
+  runtimeDependencies:{taskXmlSha256:'2'.repeat(64),consumers:[{
+   id:'core-launcher',kind:'LAUNCHER',
+   path:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs',
+   sha256:H('approved-wrapper'),dependsOn:['scripts/pc-writer/run-local.mjs'],
+  }]},
   runCount:1,allowProviderCalls:false,allowDbChanges:false,allowD1Writes:false,
   allowTaskDefinitionChanges:false,allowOtherSourceChanges:false,
  };
@@ -74,6 +79,20 @@ test('scope refuses task/DB/D1 side effects, delete, overlaps and no-op targets'
  assert.throws(()=>validateWriterBManifest({...m,protectedFiles:[
   {...m.protectedFiles[0],path:m.files[0].path}]}),
   {code:'WRITER_B_PROTECTED_OVERLAP_STOP'});
+});
+
+test('shared entrypoint requires only declared and hash-anchored runtime consumers',()=>{
+ const m=manifest();
+ assert.throws(()=>validateWriterBManifest({...m,
+  runtimeDependencies:{taskXmlSha256:null,consumers:[]}}),
+  {code:'WRITER_B_ENTRYPOINT_CONSUMER_MISSING_STOP'});
+ assert.throws(()=>validateWriterBManifest({...m,
+  runtimeDependencies:{taskXmlSha256:'2'.repeat(64),consumers:[
+   {...m.runtimeDependencies.consumers[0],path:'E:\\outside\\not-allowed.vbs'}]}}),
+  {code:'WRITER_B_RUNTIME_CONSUMER_STOP'});
+ const unrelatedFeature={...m,files:[m.files[1]],
+  runtimeDependencies:{taskXmlSha256:null,consumers:[]}};
+ assert.equal(validateWriterBManifest(unrelatedFeature),unrelatedFeature);
 });
 
 test('GitHub B Issue authenticates private owner, exact id and raw manifest hash',()=>{
