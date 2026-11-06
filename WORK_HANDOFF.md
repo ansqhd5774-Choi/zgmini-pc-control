@@ -7,6 +7,18 @@
 - 필독 정본: [AGENTS.md](AGENTS.md) · [새 일반챗 시작](docs/GENERAL_CHAT_START.md) · [PC 자동화 공통 기준](docs/PC_AUTOMATION_STANDARD.md)
 - 누적 경험: [Controller·6 Runner 운영 노하우](docs/CONTROLLER_OPERATIONS_LESSONS.md)
 
+## 최신 상태 진입점 — 2026-11-06 KST
+
+> **시점별 증거 안내:** 이 절은 마지막 확인 사실을 빠르게 찾는 색인이다. 아래 §1–32의 당시 기록을 수정·삭제하지 않으며, 현재 Windows/GitHub Runtime을 대신하지 않는다.
+
+1. **총괄 진행 4/5건(80%).** 공통 프로세스 개선 #433·#435·#437·#442는 완료. **#434만 자연 발생한 신규 승인 B급 작업에서 실제 효과 확인 대기**. 기능별 구현·배포는 기존 각 업무 담당자가 계속 수행한다.
+2. **설치 SHA는 구분한다.** 마지막 확인 Controller `797f5a80d6ced9412502367bf5419f9b8fdbd086` ([#454 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/454), [#455 A PASS](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/455)). 독립 유지보수기는 사용자 Windows `#464 POSTFF V2`에서 `PREVALIDATION=PASS`·`HANDOFF_HELPER_PASS`, 목표 `4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4`, 수신 PID `41392` 확인. 앞 절의 이전 설치 SHA를 최신값으로 오인하지 않는다.
+3. **#434 완료 기준.** 위 유지보수기 인계 *후* 자연 발생하는 정상 승인 B급에서 JSON/TXT GitHub 원격 재조회 일치·ledger `reportUploadStatus=VERIFIED`·중복 댓글 0·E: `MAINTENANCE_<requestId>.{txt,json}` 신규 파일 0을 실증해야 한다. [#454](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/454)는 인계 전이므로 최종 증거가 아니다. 기존 **「ZGMINI #434 자연 B 감시」** 읽기 전용 감시를 사용한다. 인위적 B 생성·재설치·파일 삭제 금지.
+4. **R54는 원담당 작업.** [#428](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/428) 승인 목표 5개 파일과 공식 이력상 과거 버전 1개 파일, 예약 작업 연결/실행 증거 문제는 R54 원담당에게 인계. Issue에 인계 기록이 남아 있어도 별도 일반챗의 실제 수신·처리 완료로 간주하지 않는다.
+5. **관찰 중인 설계 위험은 NON_BLOCKING.** 전역 A급 사전검사 부담(§30)·전역 결과 업로드 lease(§31)는 실제 신규 오류가 확인되지 않았다. 추가 Gate나 전체 Controller 재설계 없이, 발생한 requestId의 첫 실패부터 범위를 좁혀 대응한다.
+6. **바로 다음 행동.** 다음 *자연 발생한 승인 B*가 있을 때 #434 조건만 검증하고 완료 판정한다. 그 전까지 독립 A급 기능 작업은 계속 진행하며 과거 설치·복구·정상 검사를 반복하지 않는다. §32의 대기시간 실측 표본은 수시간 병목 재발의 증거로 확대하지 않는다.
+7. **읽는 순서.** main의 [AGENTS.md](AGENTS.md)·[GENERAL_CHAT_START.md](docs/GENERAL_CHAT_START.md)·[PC_AUTOMATION_STANDARD.md](docs/PC_AUTOMATION_STANDARD.md) → 이 최신 상태 진입점 → 해당 최신 §28–32 → 필요한 역사 기록 §1–27.
+
 ## 1. 현재 업무의 목적
 
 여섯 개 일반챗과 자체 PC Runner의 병렬 작업에서 **Controller가 독립 업무를 불필요하게 전체 차단하지 않도록 유지**하고, 실제 문제를 해결한 근거를 재사용한다. 이 인계 문서 자체가 새로운 기능 개발이나 Controller 개편의 작업 지시서는 아니다.
