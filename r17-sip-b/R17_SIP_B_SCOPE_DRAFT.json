@@ -1,0 +1,36 @@
+{
+  "schema": "ZGMINI_R17_SIP_B_SCOPE_V1",
+  "status": "SCOPE_APPROVED_PC_PREFLIGHT_PENDING",
+  "repository": "ansqhd5774-Choi/zgmini",
+  "baseSourceSha": "d7bc4948573843766ad82c72ff392220178c36a3",
+  "candidateSourceSha": "b30aefd89793de093369044a14d86c1fdc3b0d61",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": {
+    "scripts/pc-writer/us-breadth-provisional-cycle.mjs": {
+      "status": "M",
+      "beforeSha256": "c181952f9198dfa99641b3f392ff4c1b280e9766cc8da471a2c78464b9ee7626",
+      "targetSha256": "acaf0e46c532c49dc5a571718c2f91ddcd3dd57dbd0b50d1fb9ee350a7538cd1",
+      "targetBlobSha": "c531983f620d5c2315d8c0c92ea46053717ad5ca"
+    },
+    "scripts/pc-writer/us-breadth-sip-premarket-cycle.mjs": {
+      "status": "A",
+      "beforeSha256": null,
+      "targetSha256": "4be51a9d8162a6bc90528965fd263f52371675fabb64df1ac7ae7c18948e4e59",
+      "targetBlobSha": "fb39479e540021e026559c85f4bbaefc1f2bfda5"
+    },
+    "lib/market-breadth/us-premarket-sip-r1.mjs": {
+      "status": "A",
+      "beforeSha256": null,
+      "targetSha256": "a14cbad48d97895f6e4d2961e74af8ab657cd453a691552ab9f6ff675e7e7c6f",
+      "targetBlobSha": "0f7e044330ceee9d8fde8489ba22bceb847362b4"
+    }
+  },
+  "allowProviderCalls": false,
+  "allowD1Writes": false,
+  "allowDbChanges": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "runCount": 1
+}
