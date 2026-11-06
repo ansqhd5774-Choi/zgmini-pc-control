@@ -4,7 +4,7 @@ import {authorize,probeHistorical,sanitizeProbeResult,uploadProbe,claimOnce,
   loadProbeModules,recheckInstalledSource} from './historical-probe.mjs';
 
 const requestId='r17-sip-historical-'+'a'.repeat(32);
-const sourceSha='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
+const sourceSha='dace6090f61eb0d0319f79422649af312f7b1764';
 const event={action:'opened',repository:{private:true,full_name:'ansqhd5774-Choi/zgmini-pc-control'},
   sender:{login:'ansqhd5774-Choi'},issue:{number:538,user:{login:'ansqhd5774-Choi'},
     title:'pc-r17-sip-historical-probe',labels:[{name:'pc-r17-writer-b-install'}],
@@ -24,14 +24,18 @@ function fixture(options={}){
   const urls=[];const calls=[];const universeDates=[];
   return {urls,calls,universeDates,
     dependencies:{now:Date.parse('2026-11-06T15:00:00Z'),base:'/fixture',
-      storedUniverse:(base,date)=>{assert.equal(base,'/fixture');
-        universeDates.push(date);
-        assert.ok(['2026-11-05','2026-11-04'].includes(date));
-        if(date==='2026-11-05'&&options.universeError)throw Error(options.universeError);
-        if(date==='2026-11-04'&&options.previousUniverseError)
-          throw Error(options.previousUniverseError);
-        return date==='2026-11-04'&&options.previousMembers?
-          options.previousMembers:members;},
+      // Mirror only the installed selector's observable return contract. The
+      // real implementation is imported from its pinned PC file, not cloned here.
+      storedSipPremarketUniverse:(base,date)=>{assert.equal(base,'/fixture');
+        assert.equal(date,'2026-11-05');universeDates.push(date);
+        if(options.universeError==='US_PROVISIONAL_UNIVERSE_MISSING'){
+          universeDates.push('2026-11-04');
+          if(options.previousUniverseError)throw Error(options.previousUniverseError);
+          return {members:options.previousMembers??members,
+            universeAsOfDate:'2026-11-04'};
+        }
+        if(options.universeError)throw Error(options.universeError);
+        return {members,universeAsOfDate:options.selectedAsOf??date};},
       loadLocalProviders:()=>{if(options.providerError)throw Error(options.providerError);
         return {APCA_API_KEY_ID:'PRIVATE',APCA_API_SECRET_KEY:'SECRET'};},
       createQuotaFetch:({mode,originalFetch})=>{assert.equal(mode,'enforce');
@@ -117,8 +121,16 @@ test('previous universe read error redacts sensitive path and never queries prov
   const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING',
     previousUniverseError:'E:\\sensitive\\db.sqlite'});
   await assert.rejects(()=>probeHistorical(f.dependencies),{
-    safeCode:'SIP_PROBE_PREVIOUS_UNIVERSE_READ_STOP'});
+    safeCode:'SIP_PROBE_UNIVERSE_READ_STOP'});
   assert.equal(f.calls.length,0);
+});
+test('installed selector cannot silently use an unapproved old/future universe',async()=>{
+  for(const selectedAsOf of ['2026-11-03','2026-11-06']){
+    const f=fixture({selectedAsOf});
+    await assert.rejects(()=>probeHistorical(f.dependencies),{
+      safeCode:'SIP_PROBE_UNIVERSE_SELECTION_STOP'});
+    assert.equal(f.calls.length,0);
+  }
 });
 test('previous saved universe must be the verified 503, not a partial substitute',async()=>{
   const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING',
