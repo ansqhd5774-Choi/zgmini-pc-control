@@ -22,6 +22,7 @@ const PROBE=path.join(ROOT,'..','r17-writer-b','r17-b-windows-probe.js');
 const SHARED_LOCK=String.raw`E:\ZGmini\data\pc-writer\writer-source-install.lock`;
 const CORE_CYCLE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
 const JOURNALS=String.raw`E:\ZGmini\data\pc-writer\writer-b-install-once`;
+const WRITER_DATA_ROOT=String.raw`E:\ZGmini\data\pc-writer`;
 const SHA40=/^[0-9a-f]{40}$/i;
 const BINARY=Object.freeze({
  git:[String.raw`C:\Program Files\Git\cmd\git.exe`,
@@ -120,6 +121,19 @@ function sameUnrelated(root,manifest,saved){
   'WRITER_B_UNRELATED_DIRTY_DRIFT_STOP');
 }
 
+function approvedRuntimeConsumerHash(file){
+ const stat=fs.lstatSync(file);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&
+  stat.size>0&&stat.size<=131072,
+  'WRITER_B_RUNTIME_FILE_SHAPE_STOP');
+ // C: compatibility junction is acceptable ONLY when its native target
+ // resolves inside the existing E: Writer data root.
+ const root=fs.realpathSync.native(WRITER_DATA_ROOT).toLowerCase()+path.sep;
+ need(fs.realpathSync.native(file).toLowerCase().startsWith(root),
+  'WRITER_B_RUNTIME_FILE_REALPATH_STOP');
+ return sha256(fs.readFileSync(file));
+}
+
 export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
  const m=auth.manifest;
  const source=m.sourceRoot;
@@ -136,12 +150,21 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
  };
  const sourceRaw=file=>rawSafe(scoped(source,file),source);
  const sourceHash=file=>sha256(sourceRaw(file));
+ const runtimeConsumerSha256=()=>Object.fromEntries(
+  m.runtimeDependencies.consumers.map(entry=>[entry.path,
+   approvedRuntimeConsumerHash(entry.path)]));
+ const assertRuntimeConsumers=()=>{
+  for(const entry of m.runtimeDependencies.consumers)
+   need(approvedRuntimeConsumerHash(entry.path)===entry.sha256,
+    'WRITER_B_RUNTIME_CONSUMER_DRIFT_STOP');
+ };
  const assertBase=()=>{
   need(git(source,'rev-parse','HEAD')===m.baseHead&&
    git(source,'branch','--show-current')===before.originalBranch&&
    readConfig(m.configPath).raw.equals(originalConfig),
    'WRITER_B_BASE_CONCURRENT_DRIFT_STOP');
   sameUnrelated(source,m,dirty);
+  assertRuntimeConsumers();
   for(const file of m.files){
    const target=scoped(source,file.path);
    if(file.change==='A')need(!fs.existsSync(target),'WRITER_B_ADD_CONFLICT_STOP');
@@ -170,6 +193,7 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     originalConfigSha256:sha256(originalConfig),
     originalTaskDefinitionSha256:sha256(originalXml.raw),
     originalBranch:branch,coreTaskEnabled:t.enabled,targetPathsClean:true,
+    runtimeConsumerSha256:runtimeConsumerSha256(),
     beforeSha256:Object.fromEntries(m.files.map(f=>[f.path,
      f.change==='A'?(fs.existsSync(scoped(source,f.path))?'EXISTS':null):sourceHash(f.path)])),
     protectedSha256:Object.fromEntries(m.protectedFiles.map(f=>[f.path,sourceHash(f.path)])),
@@ -285,6 +309,7 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    for(const file of m.protectedFiles)need(sourceHash(file.path)===file.sha256,
     'WRITER_B_LIVE_PROTECTED_SHA_STOP');
    sameUnrelated(source,m,dirty);
+   assertRuntimeConsumers();
   },
   async changeConfigSource(from,to){
    need(from===m.baseHead&&to===prepared?.sha&&
@@ -346,6 +371,7 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    for(const file of m.protectedFiles)need(sourceHash(file.path)===file.sha256,
     'WRITER_B_ROLLBACK_PROTECTED_SHA_STOP');
    sameUnrelated(source,m,dirty);
+   assertRuntimeConsumers();
   },
   async releaseSharedWriterLock({requestId,retain}){
    need(requestId===auth.requestId&&fd!==null,'WRITER_B_LOCK_OWNER_STOP');
