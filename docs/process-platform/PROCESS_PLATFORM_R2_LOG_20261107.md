@@ -140,3 +140,12 @@
 - 추가 MUST-FIX 검토: 공유 진입점 변경 시 Task XML의 첫 Exec→실제 launcher 경로가 승인 manifest의 LAUNCHER/SHA에 연결되는지 확인(상대 경로는 유효한 Task WorkingDirectory로만 정적 해석; 미확정 시 해당 변경만 STOP). 전체 다단계 VBS/Sidecar dynamic PASS와 구분.
 - 기존 R17과 같은 PC local-only 합성 Git commit 사용은 유지하되 운영 SHA를 GitHub 원격 SHA로 오해하지 않도록 Task pause 전 불변 `LOCAL_OVERLAY` 계보 원장(base/tree·manifest·로컬 SHA/tree/ref·대상 파일 해시) 기록 및 결과 명시를 진행 중. 별도 원격 push Gate 추가 금지.
 - **LAST PASS:** source 초안 안전 보완 2건/34 fixture. **FIRST FAIL/남은 검증:** first-hop·local overlay provenance 코드/fixture 최종 확인, 실 Windows Runner·Task/Sidecar·A 활성·B requestId/rollback 증거. R2 **20% 유지**, 새로운 PC B 요청·원자료·DB/D1·예약 변경 0건.
+
+## 2026-11-07 — M2 첫 실행 파일·로컬 source 계보 보완 원격 반영
+
+- [Draft PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) **head `03518a89f1c95f5b628642ce84dca889b46c0c95`**, 최신 main 대비 **신규 15파일, 기존 파일 변경 0**, main보다 1커밋 뒤처진 분리 브랜치. 이번 9개 수정·추가 파일 원격 9/9 재조회 일치, Draft/미병합 유지.
+- M2 첫-hop 실증 계약: 공유 `run-local.mjs`/`local-cycle.mjs` 변경에서만 실제 Core Task XML의 정확히 한 `Exec`, 고정 WSH/CMD 및 승인 `LAUNCHER` 경로·원본 SHA-256 정합성 검사. Task의 명시적 WorkingDirectory에서만 상대 경로 VBS/CMD를 정적 결합; C: 호환 junction은 E: data 실경로 확인 때만 허용. 모호한 경로·다중 Exec·다른 경로의 동일 basename은 STOP. 다른 기능 파일에 전역 Gate 없음. 결과는 `FIRST_HOP_TASK_LAUNCHER_MATCH`이지 전체 VBS/Sidecar 동적 실행 증거가 아님.
+- R17 선례인 로컬 합성 Git 오버레이 유지: Task pause 전 `provenance.json`을 create-only → fsync → 정확한 바이트 재조회로 고정. `requestId`/manifest·base HEAD/tree/candidate SHA/prepared local SHA/tree/로컬 ref/변경 파일별 이전·목표 SHA 기록. 결과 JSON/TXT에 `LOCAL_OVERLAY`, `localOnly=true`, `provenanceSha256`만 승인 범위로 산출; GitHub 원격 commit 존재를 주장하거나 원격 push Gate를 만들지 않음.
+- 전체 관련 격리 회귀 `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **42/42 PASS, exit 0 (총괄 독립 재실행)**. 앞서 공유 lock 오류 코드 매핑 및 무관 rename/copy 보존 수정도 포함. 실제 PC 설치·Windows Task 실행·다단 Sidecar Runtime 테스트 대체 아님.
+- **상태/진행률:** M1/M2/M3 여전히 RUNNING, M4 미착수, **R2 20%**. GitHub main 지침 PR #624 완료/PR #625 A source 병합만 기존 성과. PC 운영 A/B 활성·manifest 승인·B 결과 requestId·백업/복구 실증 미확정. 대상 Writer/Controller/Calendar·SQLite/D1·예약 신규 변경 0.
+- **다음 필수 행동/소유자:** 기존 #68 Controller 단일 설치 담당의 실제 설치 SHA·core-runtime-source-readonly A 활성 증거 확보 → 승인된 고유 A read-only 1회로 Writer checkout/Task/VBS/Sidecar/파일 해시 확보(총괄 진단) → 기능 원담당 승인 manifest 확정 및 정규 Writer B Windows 한정 실증·실제 requestId/원격 2/2/보호 재조회 → 원담당 운영 적용. #68 기존 B 재제출 금지, 예약 자연 검증을 선행 조건으로 추가 금지.
