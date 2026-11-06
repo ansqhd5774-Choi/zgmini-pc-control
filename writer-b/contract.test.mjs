@@ -80,6 +80,8 @@ test('GitHub B Issue authenticates private owner, exact id and raw manifest hash
  const a=authFixture();const ok=authorizeWriterBIssue(a);
  assert.equal(ok.manifest.files.length,3);
  assert.equal(ok.requestId,RID);
+ assert.equal(Object.isFrozen(ok.manifest),true);
+ assert.equal(Object.isFrozen(ok.manifest.files[0]),true);
  assert.throws(()=>authorizeWriterBIssue({...a,manifestBytes:Buffer.from('{}')}),
   {code:'WRITER_B_MANIFEST_HASH_STOP'});
  assert.throws(()=>authorizeWriterBIssue({...a,env:{...a.env,GITHUB_RUN_ATTEMPT:'2'}}),
