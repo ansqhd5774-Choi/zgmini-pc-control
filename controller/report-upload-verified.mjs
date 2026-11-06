@@ -4,6 +4,20 @@
  */
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 
+// Keep every report field and the existing 32 KiB combined limit. Only remove
+// presentation whitespace when the normal pretty JSON would exceed that limit.
+// The exact returned strings are used by both the GitHub files and the comment.
+export function renderBoundedReport(report,maxReportBytes){
+ const txt=Object.entries(report).filter(([key])=>!['result','prior'].includes(key))
+  .map(([key,value])=>`${key}=${typeof value==='object'?JSON.stringify(value):value}`).join('\r\n')+'\r\n';
+ let json=JSON.stringify(report,null,2)+'\n';
+ if(Buffer.byteLength(json)+Buffer.byteLength(txt)>maxReportBytes)
+  json=JSON.stringify(report)+'\n';
+ if(!Number.isSafeInteger(maxReportBytes)||maxReportBytes<1||
+    Buffer.byteLength(json)+Buffer.byteLength(txt)>maxReportBytes)fail('REPORT_SIZE');
+ return {json,txt};
+}
+
 function verifyRemoteFile(response,bytes){
  if(response.status!==200)return false;
  const data=response.data;
