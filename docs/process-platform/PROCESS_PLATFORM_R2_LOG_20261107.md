@@ -14,7 +14,7 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (Windows receiver 소스·테스트 준비, 실PC 미검증) | 20% 유지 | Draft PR #626 신규 11파일, 격리 22/22 PASS, Windows 어댑터·일회성 Issue Workflow 코드 작성; 실제 Runner·Task·설치·결과 조회 미확인 |
+| M2 공통 Writer B | RUNNING (Windows receiver 초안 보완, 실PC 미검증) | 20% 유지 | Draft PR #626 head 6fcc7c53, 신규 11파일, 격리 24/24 PASS; Task 재활성 복구 및 공유 진입점 소비자 명세 보완, 실제 Runner/설치/Sidecar 동적 호환 미확인 |
 | M3 실패·정상 회귀 | DEFERRED | — | M1/M2 관련 구현 후 시나리오 5개 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
@@ -93,3 +93,15 @@
 - 기존 `r17-b-windows-probe.js`는 `ZGMINI-PC-Local-Core` Task와 `local-cycle.mjs/run-local.mjs` process tree를 수치 기반으로 점검. 일반 Writer B도 정확히 동일 Core Task를 명시적으로 고정하는 계약이고 임의 명령을 실행하지 않는다.
 - **LAST PASS:** Draft source/테스트 22/22, no live operational writes. **FIRST FAIL/미증명:** Windows host 실제 Runner·Task·config.source/checkout 경로 적합성 및 승인 manifest를 통한 일회성 수신·백업·복구·실설치 해시 확인. M2 RUNNING, 전체 **20% 유지**. Windows 실증 없이는 PR을 운영 main에 자동 병합하거나 운영 설치 완료로 주장하지 않는다.
 - **다음 필수 행동:** Draft PR #626 실제 Windows 환경 적합성과 설치/rollback 실패 시나리오를 승인된 경로에서 검증한 뒤 최종 머지·원담당 경로 인계 판단. M1은 #68 기존 Controller 설치 담당의 실제 설치 SHA·A 활성 결과 확보 후 고유 read-only 요청으로 확인. 신규 예약/중복 B 제출/기능 담당 대리 설치 없음.
+
+## 2026-11-07 — M2 독립 안전 감사 및 MUST-FIX 보완
+
+- 추가 감사에서 초기 수신기 초안의 Task 재활성 검사 전 rollback 플래그 조기 해제를 발견. `schtasks /Enable` 반환이 0이어도 실제 Task가 disabled로 남는 시뮬레이션에서 원본 HEAD/config 및 Task 재활성 확인 후에만 안전 복구 판정하도록 **실행기 코드와 fixture 수정**.
+- R6 공통 정본의 Writer B 계약은 실행 래퍼·Sidecar 영향 명세를 요구. 공유 `run-local.mjs/local-cycle.mjs` 변경 시에 한하여 승인 manifest에 Task XML SHA 및 실제 연관 VBS/CMD/Sidecar 파일의 byte SHA·dependsOn 기록 필수; 선언한 소비자만 read-only 해시 및 E: realpath 확인. 무관한 단독 파일 변경은 빈 목록 허용하여 새로운 전역 Gate를 만들지 않음.
+- [Draft PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) 현재 head **`6fcc7c53f8ac00de4fd1b0829e0cbd4e145de905`**, 신규 **11파일만**, main 기존 파일 변경 0. 총괄이 소스 재조회 후 격리 **24/24 PASS, exit=0** 독립 재실행. `node --check` PASS. Draft 상태, 미병합/미설치.
+- R17 공유 lock/Task probe/XML 비교는 계약상 고정된 `ZGMINI-PC-Local-Core` Task와 일치. 다단계 VBS 실제 chain 및 Sidecar가 신규 source SHA를 받아들이는지의 동적 적합성은 아직 A 실측·원담당 영향 검토가 필요하며 **SOURCE_ONLY**에서 확정 불가.
+- 공용 [#68 조정 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6696727102)에 #608 현재 마지막 PC Controller 설치 SHA `db892416…`, #615 승인 5파일과 R2 PR #625의 1파일 차이 및 기존 단일 B 담당 설치 분기를 기록. 이 댓글은 다른 GPT 대화의 실제 인수/PC 적용 증명이 아님.
+- #68 최근 기록 재확인: #615 목표 `f6338ee4…`의 신규 설치 SUCCEEDED/requestId 및 `core-runtime-source-readonly` 활성 결과는 확인되지 않음. #614 거부 이후 R2 A operation의 PC 성공 증거 없음. R2의 중복 B 요청 0, 운영 변경 0.
+- **LAST PASS:** source B 수정본·격리 24/24, 승인 범위 한정 계약/공유 자원 조정 기록.
+- **FIRST FAIL/미확인:** 실제 PC sourceRoot/config.source 형식/Runtime 실행 래퍼 및 Sidecar bytes, Windows Runner B 적용·rollback·원격 결과쌍·requestId. M1, M2는 RUNNING; 전체 **20%**.
+- **다음 필수 단계:** #68 기존 설치 담당의 B 결과 확보→A 고유 read-only request로 실제 source와 runtime 소비자 목록 확보→기능별 승인 manifest 생성→Draft B Windows 환경 집중 실증·검증 후 통합 여부 판단. M3/M4 선행 완료로 간주하지 않음.
