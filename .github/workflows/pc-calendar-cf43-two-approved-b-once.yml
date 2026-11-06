@@ -1,0 +1,45 @@
+name: ZGMINI Calendar cf43 Approved Two-File Source Alignment Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-calendar-cf43-twofile-b-source
+  cancel-in-progress: false
+jobs:
+  calendar-cf43-two-approved-source:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-calendar-cf43-two-approved-source-align-once' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Checkout exact private control commit
+        id: source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Approved cf43 two-file source B once
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\calendar-cf43-b-windows-adapter\install.mjs" > "%RUNNER_TEMP%\calendar-cf43-b-result.json"'
+      - name: Private JSON/TXT exact readback and one Issue comment
+        if: always() && steps.source.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\calendar-cf43-b-windows-adapter\upload.mjs"'
