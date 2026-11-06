@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_CALENDAR_PARSER_SOURCE_RECOVERY_B_APPROVAL_V1",
-  "status": "DRAFT_REQUIRES_EXACT_B_APPROVAL",
+  "status": "APPROVED_B_SOURCE_READONLY_EXPORT_ONCE",
   "scope": "READ_FIVE_FIXED_HISTORICAL_PARSER_FILES_AND_STAGE_ONLY_TO_PRIVATE_CONTROL",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
   "paths": [
