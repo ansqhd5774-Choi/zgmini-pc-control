@@ -130,3 +130,13 @@
 - 실 설치 SHA·경로를 예시에서 추정하지 않고 플레이스홀더/비실행임 명시. 기존 코드 변경 0, 이전 격리 28/28 PASS 증거 그대로 유지. GitHub 원격 README blob **`2ab7f1b1b3e2eb4648d2bd56931f11cdbb950590`** 재조회. 운영 변경 0.
 - **LAST PASS:** 공통 수신기 source·순수함수 모의 검증·반복 기능용 사용 안내까지 Draft에서 준비됨.
 - **FIRST FAIL/남은 조건:** 실제 Controller A 활성/Writer PC read-only 지문, Windows Runner에서 B 수신/복구 실증, manifest 정규 승인/실행 requestId, 원담당 실제 수신은 아직 없음. M2/M3/M4 완료 아님, 전체 **20% 유지**.
+
+## 2026-11-07 — Writer B 수신기 구조 결함 2건 수정 / 2건 보완 진행
+
+- Draft [PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) head `bd5ebcb0487bf072b57291f5d3f9507acbaddd77`, 신규 14파일, 기존 Calendar/Controller/R17 운영 파일 변경 0, PR 미병합·실PC 미설치 유지.
+- 공유 R17 B lock/claim이 발생시키는 정확한 Busy/AlreadyClaimed/LockDrift 코드가 generic B 결과에서 소실되던 결함을 공통 허용코드 1:1로 보존하도록 수정. 임의 오류 문자열 공개는 계속 금지.
+- `git status --porcelain=v1 -z`의 무관 rename/copy 두 경로를 무조건 거부하던 불필요한 전역 Gate 제거; 두 경로를 모두 기록하되 승인 target/protected와 충돌하면 그대로 STOP.
+- 총괄 독립 재실행 `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **34/34 PASS (exit 0)**. 실행 결과는 격리 fixture이며 운영 Writer/Task 설치 증거가 아니다.
+- 추가 MUST-FIX 검토: 공유 진입점 변경 시 Task XML의 첫 Exec→실제 launcher 경로가 승인 manifest의 LAUNCHER/SHA에 연결되는지 확인(상대 경로는 유효한 Task WorkingDirectory로만 정적 해석; 미확정 시 해당 변경만 STOP). 전체 다단계 VBS/Sidecar dynamic PASS와 구분.
+- 기존 R17과 같은 PC local-only 합성 Git commit 사용은 유지하되 운영 SHA를 GitHub 원격 SHA로 오해하지 않도록 Task pause 전 불변 `LOCAL_OVERLAY` 계보 원장(base/tree·manifest·로컬 SHA/tree/ref·대상 파일 해시) 기록 및 결과 명시를 진행 중. 별도 원격 push Gate 추가 금지.
+- **LAST PASS:** source 초안 안전 보완 2건/34 fixture. **FIRST FAIL/남은 검증:** first-hop·local overlay provenance 코드/fixture 최종 확인, 실 Windows Runner·Task/Sidecar·A 활성·B requestId/rollback 증거. R2 **20% 유지**, 새로운 PC B 요청·원자료·DB/D1·예약 변경 0건.
