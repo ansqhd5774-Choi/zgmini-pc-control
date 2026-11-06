@@ -1,6 +1,6 @@
 # 12공급원 원본 파서 5개 비공개 회수 — B 초안
 
-상태: **LOCAL_DRAFT / NOT_APPROVED / NOT_INSTALLED / NOT_RUN** (2026-11-07)
+상태: **SCOPE_APPROVED / NOT_INSTALLED / NOT_RUN** (2026-11-07)
 
 이 패키지는 현재 PC의 **실행 중인 Core 소스를 확인한 것이 아닙니다.** 고정 경로
 `E:\ZGmini\projects\zgmini-earnings-history-pc-release`의 역사적 Git checkout에서
@@ -24,20 +24,18 @@
 
 ## 승인·등록 전 필수 확인
 
-1. 현재 `approval.json`은 `DRAFT_REQUIRES_EXACT_B_APPROVAL`이며
-   `export.mjs`의 `APPROVAL_SHA`는 **해당 초안 원본 바이트** 해시입니다.
-   그러므로 **실행 불가(fail-closed)** 상태입니다.
-2. 별도 명시 승인 후 승인 파일의 `status`만
-   `APPROVED_B_SOURCE_READONLY_EXPORT_ONCE`로 바꾸고 변경된 전체 바이트
-   SHA-256을 `export.mjs`에 정확히 재고정하십시오. 경로·범위·저장소·지침은
-   늘리지 마십시오.
+1. 사용자의 기존 고정 5파일 회수 범위에 대한 계속 진행 지시에 따라 승인 명세를
+   `APPROVED_B_SOURCE_READONLY_EXPORT_ONCE`로 설정했습니다. `export.mjs`의
+   `APPROVAL_SHA`는 승인 파일 원본 바이트 SHA-256과 정확히 일치해야 합니다.
+   변경된 범위·상태·해시가 맞지 않으면 즉시 중단합니다.
+2. 승인 범위를 확대하거나 PC 운영 파일·DB·예약을 변경하지 않습니다.
 3. 비공개 `ansqhd5774-Choi/zgmini-pc-control`에
    `codex/calendar-parser-source-stage-20261107` **전용 브랜치가 사전에 존재하는지**
    확인합니다. 미존재면 업로더는 중단하며 자동 생성하거나 `main`에 쓰지 않습니다.
 4. `calendar-source-recovery-b/` 아래 `approval.json`과 `installer` 2개를
    private control에, `.github/workflows/pc-calendar-source-recovery-once.yml`을
    승인된 방식으로 등록한 뒤 정확한 `controlSha`로 일치하는 1회성 `issues:opened`
-   요청만 허용하십시오. 아직 이 단계는 수행되지 않았습니다.
+   요청만 허용하십시오. PC 작업은 실제 결과가 도착하기 전까지 성공으로 보고하지 않습니다.
 5. 요청 Issue 본문은 임의 코드/경로 없이 아래 고정 형태입니다. ID는 요청 시
    실제 UUID v4로 대체하고 `approvalManifestSha256`에 **승인 후 새로운 SHA**를
    넣습니다.
