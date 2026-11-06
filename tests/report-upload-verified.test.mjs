@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {uploadVerifiedReportPair} from '../controller/report-upload-verified.mjs';
+import {renderBoundedReport,uploadVerifiedReportPair} from '../controller/report-upload-verified.mjs';
 
 const params={repository:'ansqhd5774-Choi/zgmini-pc-control',runId:'12345',attempt:'1',seat:'2',
  json:'{"ok":true}\n',txt:'status=PASS\r\n',wait:async()=>{}};
@@ -90,4 +90,60 @@ test('caller posts Issue comment only after await of both verified artifacts',()
  assert.ok(src.indexOf('await uploadVerifiedReportPair(')<src.indexOf('const allComments='));
  assert.ok(src.indexOf('const allComments=')<src.indexOf('if(!comments.some('));
  assert.match(src,/resultFiles:files\.length/);
+});
+
+test('reports already within the combined limit retain the existing pretty JSON and TXT',()=>{
+ const report={schema:'ZGMINI_PC_RESULT_V1',status:'PASS',code:'READ_ONLY',result:{count:1},firstFail:null};
+ const out=renderBoundedReport(report,32768);
+ assert.equal(out.json,JSON.stringify(report,null,2)+'\n');
+ assert.equal(out.txt,'schema=ZGMINI_PC_RESULT_V1\r\nstatus=PASS\r\ncode=READ_ONLY\r\nfirstFail=null\r\n');
+});
+
+test('combined size uses UTF-8 bytes for Korean strings and never drops fields',()=>{
+ const report={status:'PASS',message:'읽기 전용 진단',result:{label:'자료 검증',notes:'값 누락 없음'}};
+ const pretty=JSON.stringify(report,null,2)+'\n';
+ const txt='status=PASS\r\nmessage=읽기 전용 진단\r\n';
+ const prettyBytes=Buffer.byteLength(pretty)+Buffer.byteLength(txt);
+ const compactBytes=Buffer.byteLength(JSON.stringify(report)+'\n')+Buffer.byteLength(txt);
+ assert.ok(prettyBytes>compactBytes);
+ assert.ok(Buffer.byteLength(pretty)+txt.length<prettyBytes);
+ const out=renderBoundedReport(report,compactBytes);
+ assert.equal(out.json,JSON.stringify(report)+'\n');
+ assert.equal(out.txt,txt);
+ assert.deepEqual(JSON.parse(out.json),report);
+ assert.throws(()=>renderBoundedReport(report,compactBytes-1),{code:'REPORT_SIZE'});
+});
+
+test('oversized pretty report uses compact JSON preserving all uncertain evidence and uploads exact bytes',async()=>{
+ const report={status:'PASS',code:'RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY',lastPass:'OPERATION_PASS',
+  firstFail:null,result:{candidateCount:62,inventoryTruncated:true,
+   earningsApiRequestObservations:{status:'STATE_UNKNOWN',coverage:'PARTIAL',observedDayCount:14},
+   candidates:Array.from({length:32},(_,i)=>({
+    path:`projects/candidate-${i}`,head:'a'.repeat(40),
+    moduleSha256:'b'.repeat(64),collectorSha256:'c'.repeat(64),runnerSha256:'d'.repeat(64),
+    collectorCallsCalendar:true,collectorImportsCalendar:true,matchesConfiguredSource:i===7,
+    earningsApiCollector:{verifiedReadable:i===7,sha256:'e'.repeat(64),bytes:5625},
+    identification:{status:'UNVERIFIED',source:'LOCAL_INSPECTION_READONLY',owner:'RELEASE_CALENDAR',notes:'CANDIDATE_ONLY'},
+    sourceKeys:['a','b','c','d','e','f','g'],sourceCount:7,sourceParseStatus:'PARSED',
+   }))}};
+ const pretty=JSON.stringify(report,null,2)+'\n';
+ const out=renderBoundedReport(report,32768);
+ assert.ok(Buffer.byteLength(pretty)+Buffer.byteLength(out.txt)>32768,
+  `pretty=${Buffer.byteLength(pretty)} txt=${Buffer.byteLength(out.txt)} compact=${Buffer.byteLength(JSON.stringify(report)+'\n')}`);
+ assert.ok(Buffer.byteLength(out.json)+Buffer.byteLength(out.txt)<=32768);
+ assert.equal(out.json,JSON.stringify(report)+'\n');
+ assert.deepEqual(JSON.parse(out.json),report);
+ assert.equal(JSON.parse(out.json).result.candidates.length,32);
+ assert.equal(JSON.parse(out.json).result.earningsApiRequestObservations.status,'STATE_UNKNOWN');
+ const f=fixture();
+ const links=await uploadVerifiedReportPair({...params,json:out.json,txt:out.txt,api:f.api});
+ assert.equal(links.length,2);
+ assert.equal(f.remote.get(target('json')).toString(),out.json);
+ assert.equal(f.remote.get(target('txt')).toString(),out.txt);
+});
+
+test('even compact output over the same limit fails before any upload',()=>{
+ const report={status:'PASS',result:{sensitiveBlob:'x'.repeat(32768)}};
+ assert.throws(()=>renderBoundedReport(report,32768),{code:'REPORT_SIZE'});
+ assert.equal(report.result.sensitiveBlob.length,32768);
 });
