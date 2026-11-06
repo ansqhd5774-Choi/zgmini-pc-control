@@ -14,8 +14,8 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (Windows receiver 초안 보완, 실PC 미검증) | 20% 유지 | Draft PR #626 head 6fcc7c53, 신규 11파일, 격리 24/24 PASS; Task 재활성 복구 및 공유 진입점 소비자 명세 보완, 실제 Runner/설치/Sidecar 동적 호환 미확인 |
-| M3 실패·정상 회귀 | DEFERRED | — | M1/M2 관련 구현 후 시나리오 5개 |
+| M2 공통 Writer B | RUNNING (Windows receiver 소스·시뮬 준비, 실PC 미검증) | 20% 유지 | Draft PR #626 head 884aeee1, 신규 13파일, 격리 28/28 PASS; Windows Task XML/Core drain pure guard·복구 fixture, 실제 Runner/설치/Sidecar 동적 호환 미확인 |
+| M3 실패·정상 회귀 | RUNNING (격리 시나리오 일부 PASS) | 20% 유지 | 파일 dirty/원본 SHA/부분 전환/Task 종료 대기 등 모의 실패 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -113,3 +113,12 @@
 - 기존 [#531](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/531) A PASS(KST 2026-11-07 02:09)도 `sourceResolved=false`, `runtimeSourceVerified=false`, 역사적 checkout 후보 HEAD `d7bc4948…` 및 dirty=true였으므로 실 실행 checkout 증거가 아님. [#530](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/530) configApprovedSha 후보 `d7bc…`와 이후 #609 운영 source `f7ed…`의 시점/범위도 구분.
 - **결정:** 구형 A를 동일 목적에 재요청해도 M1 목표인 현재 PC live checkout/HEAD/config.source/3개 파일 SHA·dirty를 확보할 수 없다. 일부 보조 조회 가능은 유지하되 새 전역 Gate나 무효한 요청을 추가하지 않음.
 - **LAST PASS:** 기존 설치 operation 정적 계약 및 #530/#531 당시 실제 A 범위 확인. **FIRST FAIL:** 신규 A 코드 #625는 main source 병합만 되었고 PC 등록/실행 미증명. #68 단일 B 담당이 기존 승인 누적 diff와 실제 SHA를 반영해 설치한 후 고유 A 요청 + Runtime 체인을 검증해야 M1 완료. 새로운 A/B Issue 0, PC 쓰기 0, R2 20% 유지.
+
+## 2026-11-07 — M2/M3 무쓰기 Windows guard 시뮬 보강
+
+- [Draft PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) head **`884aeee1f535c7808574f56cb4e5d9c373578a32`**, 신규 **13파일**, 기존 운영 파일 수정 0. 운영 수신기 미등록/미설치, Draft 유지.
+- Windows adapter 실제 사용 경로에서 Task XML byte decoder·Core quiet 순수 guard를 공용 함수로 추출: UTF-8/BOM/UTF-16LE 정상, 손상/비지원 UTF-16BE 안전 거부, Task disabled+running instance/process/ambiguous 0+Core cycle lock 없음만 drain 판정.
+- fixture 추가: Task pause 부분 적용 실패 또는 Core 자연 drain timeout 시 승인 파일/HEAD/config 원본 유지, Task 재활성 및 공유 Writer lock 회수 확인. `/Enable` 정상 반환·실제 disabled 실패 복구 fixture도 유지.
+- 총괄 독립 재실행: `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **28/28 PASS, exit 0**. PR head/13파일·신규 guard 2파일 원격 재조회. source-only simulation은 **실 Windows Scheduler/Runner 설치 실증이 아님**.
+- M3 모의 시나리오 일부 RUNNING으로 진전했으나 실제 Windows 정상/충돌/복구 요청 ID 증거가 아직 없어 완료 아님. R2 전체 **20%** 유지. 실제 PC/Controller/Calendar/DB/D1/예약 변경 0.
+- **NEXT:** #68 기존 단일 담당의 Controller 설치 성공·신규 A 활성 증거 → 실제 Writer source/Task/VBS/Sidecar read-only 인벤토리 → 승인된 Writer B manifest 확정·Windows 한정 실증. 실제 설치는 원담당 역할을 유지하며 자동 재시도/새 Gate 금지.
