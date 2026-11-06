@@ -189,6 +189,21 @@ test('partial config change rolls back both config and source before resuming Co
  assert.equal(state.config,manifest().baseHead);assert.equal(state.head,manifest().baseHead);
 });
 
+test('Task pause or Core natural-drain timeout resumes original Task without switching Writer',async()=>{
+ for(const failAt of ['pause','drain']){
+  const {io,state}=mockIO({failAt});
+  const result=await performWriterBInstall(auth(),io);
+  assert.equal(result.status,'WRITER_B_INSTALL_STOP_RESTORED',failAt);
+  assert.equal(result.recovery,'ORIGINAL_VERIFIED',failAt);
+  assert.equal(state.head,manifest().baseHead,failAt);
+  assert.equal(state.config,manifest().baseHead,failAt);
+  assert.equal(state.coreEnabled,true,failAt);
+  assert.equal(state.steps.includes('switch'),false,failAt);
+  assert.equal(state.steps.includes('rollback-source'),false,failAt);
+  assert.equal(state.retained,false,failAt);
+ }
+});
+
 test('recovery uncertainty retains shared lock and refuses automatic repeat',async()=>{
  const {io,state}=mockIO({failAt:'config',rollbackFail:true});
  const result=await performWriterBInstall(auth(),io);

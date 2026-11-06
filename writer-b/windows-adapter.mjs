@@ -14,6 +14,7 @@ import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
 import {performWriterBInstall} from './installer.mjs';
 import {commitApprovedWriterBOverlay} from './git-stage.mjs';
 import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
+import {decodeTaskXmlBytes,coreQuietFromProbe} from './windows-guards.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from '../r17-writer-b/r17-b-claim.mjs';
 
@@ -66,10 +67,7 @@ function rawSafe(file,root){
 function scoped(root,relative){return path.join(root,...relative.split('/'));}
 function fixedTaskXml(task){
  const raw=exec('schtasks',['/Query','/TN',task,'/XML']);
- let xml=raw.toString('utf8').replace(/^\ufeff/,'');
- if(raw[0]===255&&raw[1]===254)xml=raw.subarray(2).toString('utf16le');
- else if(raw[0]===60&&raw[1]===0)xml=raw.toString('utf16le');
- need(/^\s*<\?xml|^\s*<Task\b/.test(xml),'WRITER_B_TASK_XML_STOP');
+ const xml=decodeTaskXmlBytes(raw);
  return {raw,xml,normalized:sameTaskDefinitionExceptSettingsEnabled(xml)};
 }
 function taskProbe(){
@@ -82,9 +80,7 @@ function taskProbe(){
   'WRITER_B_TASK_PROBE_STOP');
  return x;
 }
-function taskQuiet(task){return task.enabled===false&&task.state!==4&&
- task.instances===0&&task.relatedProcesses===0&&task.unknownProcessLines===0&&
- !fs.existsSync(CORE_CYCLE_LOCK);}
+function taskQuiet(task){return coreQuietFromProbe(task,fs.existsSync(CORE_CYCLE_LOCK));}
 function readConfig(file){
  const raw=rawSafe(file,path.dirname(file));let json;
  try{json=JSON.parse(raw.toString('utf8'));}catch{stop('WRITER_B_CONFIG_JSON_STOP');}
