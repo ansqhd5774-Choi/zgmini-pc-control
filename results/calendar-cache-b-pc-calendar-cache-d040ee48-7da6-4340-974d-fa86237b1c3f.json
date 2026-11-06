@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_RELEASE_CALENDAR_CACHE_HOTFIX_B_RESULT_V1",
+  "requestId": "pc-calendar-cache-d040ee48-7da6-4340-974d-fa86237b1c3f",
+  "issueNumber": 500,
+  "status": "BLOCKED",
+  "code": "CAL_CACHE_B_CYCLE_BUSY_STOP",
+  "phase": "NOT_VERIFIED",
+  "controlSha": "51ef1667ab8c493eefaa66edca0b2dace38026b8",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
