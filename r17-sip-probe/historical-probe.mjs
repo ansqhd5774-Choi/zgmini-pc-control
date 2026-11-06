@@ -11,7 +11,7 @@ const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 const BASE=String.raw`E:\ZGmini\data\pc-writer`;
 const CONFIG=path.join(BASE,'config.json');
-const INSTALLED_SHA='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
+const INSTALLED_SHA='dace6090f61eb0d0319f79422649af312f7b1764';
 const OBSERVATION='2026-11-06';
 const PRIOR='2026-11-05';
 const PREVIOUS_SAVED_UNIVERSE='2026-11-04'; // Diagnostic membership only; SIP bars remain 11/05–11/06.
@@ -23,7 +23,7 @@ const SHA256=/^[a-f0-9]{64}$/;
 const BUDGET=24;
 const FILES=Object.freeze({
   'scripts/pc-writer/us-breadth-provisional-cycle.mjs':'acaf0e46c532c49dc5a571718c2f91ddcd3dd57dbd0b50d1fb9ee350a7538cd1',
-  'scripts/pc-writer/us-breadth-sip-premarket-cycle.mjs':'4be51a9d8162a6bc90528965fd263f52371675fabb64df1ac7ae7c18948e4e59',
+  'scripts/pc-writer/us-breadth-sip-premarket-cycle.mjs':'bf0d4858679295a19c0a35c2a704899d28cbef9e7874efe38d0f71a337b3a959',
   'lib/market-breadth/us-premarket-sip-r1.mjs':'a14cbad48d97895f6e4d2961e74af8ab657cd453a691552ab9f6ff675e7e7c6f',
 });
 
@@ -73,28 +73,23 @@ export function verifyInstalledSource(){
 }
 
 export async function probeHistorical({now=Date.now(),base=BASE,
-  storedUniverse,loadLocalProviders,createQuotaFetch,fetchIexWindow,
+  storedSipPremarketUniverse,loadLocalProviders,createQuotaFetch,fetchIexWindow,
   calculateUsSipPremarket,validUsSipPremarket,fetchImpl=fetch}={}){
   requireThat(now>=EARLIEST,'SIP_PROBE_HISTORICAL_NOT_YET_DELAYED');
-  let members;
-  let universeAsOfDate=PRIOR;
-  let universeSelection='EXACT_REQUESTED';
-  try{members=storedUniverse(base,PRIOR);}catch(error){
-    // Only this precise missing-day result permits the older saved diagnostic universe.
-    if(error?.message!=='US_PROVISIONAL_UNIVERSE_MISSING'){
-      const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_INVALID'];
-      throw failure(known.includes(error?.message)?error.message:
-        'SIP_PROBE_UNIVERSE_READ_STOP');
-    }
-    try{members=storedUniverse(base,PREVIOUS_SAVED_UNIVERSE);}catch(previousError){
-      const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_MISSING',
-        'US_PROVISIONAL_UNIVERSE_INVALID'];
-      throw failure(known.includes(previousError?.message)?previousError.message:
-        'SIP_PROBE_PREVIOUS_UNIVERSE_READ_STOP');
-    }
-    universeAsOfDate=PREVIOUS_SAVED_UNIVERSE;
-    universeSelection='PREVIOUS_SAVED_DIAGNOSTIC';
+  // Use the actual newly installed SIP-only membership selector; this probe
+  // must not carry its own fallback implementation or modify the IEX selector.
+  let selected;
+  try{selected=storedSipPremarketUniverse(base,PRIOR);}catch(error){
+    const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_MISSING',
+      'US_PROVISIONAL_UNIVERSE_INVALID'];
+    throw failure(known.includes(error?.message)?error.message:
+      'SIP_PROBE_UNIVERSE_READ_STOP');
   }
+  const {members,universeAsOfDate}=selected??{};
+  requireThat(universeAsOfDate===PRIOR||universeAsOfDate===PREVIOUS_SAVED_UNIVERSE,
+    'SIP_PROBE_UNIVERSE_SELECTION_STOP');
+  const universeSelection=universeAsOfDate===PRIOR?
+    'EXACT_REQUESTED':'PREVIOUS_SAVED_DIAGNOSTIC';
   requireThat(Array.isArray(members)&&members.length>=490&&members.length<=520,
     'SIP_PROBE_UNIVERSE_STOP');
   if(universeSelection==='PREVIOUS_SAVED_DIAGNOSTIC')
@@ -311,15 +306,16 @@ export async function uploadProbe({event,env,raw,api=fetch}){
 }
 
 export async function loadProbeModules(src){
-  let collector,providers,quota,sip;
-  try{[collector,providers,quota,sip]=await Promise.all([
+  let collector,providers,quota,sip,sipCollector;
+  try{[collector,providers,quota,sip,sipCollector]=await Promise.all([
       src('scripts/pc-writer/us-breadth-provisional-cycle.mjs'),
       src('scripts/pc-writer/local-env.mjs'),
       src('scripts/pc-writer/quota-fetch.mjs'),
       src('lib/market-breadth/us-premarket-sip-r1.mjs'),
+      src('scripts/pc-writer/us-breadth-sip-premarket-cycle.mjs'),
     ]);
   }catch{throw failure('SIP_PROBE_MODULE_IMPORT_STOP');}
-  return {collector,providers,quota,sip};
+  return {collector,providers,quota,sip,sipCollector};
 }
 
 export function recheckInstalledSource(verify=verifyInstalledSource){
@@ -332,8 +328,8 @@ export function recheckInstalledSource(verify=verifyInstalledSource){
 async function realProbe(){
   recheckInstalledSource();
   const src=async name=>import(pathToFileURL(fileAt(name)).href);
-  const {collector,providers,quota,sip}=await loadProbeModules(src);
-  return probeHistorical({storedUniverse:collector.storedUniverse,
+  const {collector,providers,quota,sip,sipCollector}=await loadProbeModules(src);
+  return probeHistorical({storedSipPremarketUniverse:sipCollector.storedSipPremarketUniverse,
     fetchIexWindow:collector.fetchIexWindow,
     loadLocalProviders:providers.loadLocalProviders,
     createQuotaFetch:quota.createQuotaFetch,
