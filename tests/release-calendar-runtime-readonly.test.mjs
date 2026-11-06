@@ -95,3 +95,121 @@ test('missing executable collector, invalid git marker and unknown keys do not c
  assert.equal(out.candidates[0].sourceParseStatus,'UNKNOWN');
  assert.equal(out.candidates[0].sourceCount,null);
 });
+
+test('PC-only EarningsAPI collector is reported by metadata, never raw source',t=>{
+ const f=fixture(t,{dirs:0});
+ const module=path.join(f.checkout,'scripts','pc-writer','earnings-api-local.mjs');
+ fs.writeFileSync(module,'// MUST_NOT_LEAK_SECRET: fake test fixture, not an API key\nexport const noop=()=>{};\n');
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidates[0].earningsApiCollector.verifiedReadable,true);
+ assert.match(out.candidates[0].earningsApiCollector.sha256,/^[0-9a-f]{64}$/);
+ assert.ok(out.candidates[0].earningsApiCollector.bytes>0);
+ assert.match(out.candidates[0].earningsApiCollector.modifiedAt,/^20\d\d-/);
+ assert.equal(out.candidates[0].earningsApiCollector.evidenceLevel,'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF');
+ assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_SECRET/);
+ assert.equal(out.providerCalls,0);
+});
+
+test('missing EarningsAPI collector is not treated as verified readable',t=>{
+ const f=fixture(t,{dirs:0});
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.deepEqual(out.candidates[0].earningsApiCollector,{
+  verifiedReadable:false,sha256:null,bytes:null,modifiedAt:null,
+  evidenceLevel:'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF'});
+});
+
+test('EarningsAPI collector symlink outside approved root is excluded',t=>{
+ const f=fixture(t,{dirs:0});
+ const outside=path.join(path.dirname(f.root),'outside-earnings-api-local.mjs');
+ fs.writeFileSync(outside,'// MUST_NOT_LEAK_EXTERNAL\n');
+ fs.symlinkSync(outside,path.join(f.checkout,'scripts','pc-writer','earnings-api-local.mjs'));
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidates[0].earningsApiCollector.verifiedReadable,false);
+ assert.equal(out.candidates[0].earningsApiCollector.sha256,null);
+ assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_EXTERNAL/);
+});
+
+const event=(at,requests,extra={})=>JSON.stringify({at,lane:'core',providers:{
+ ...(requests===null?{}:{'api.earningsapi.com':{requests,statuses:{200:requests}}}),
+ 'api.other.example':{requests:3},...extra},secret:'MUST_NOT_LEAK_LOG'});
+
+test('EarningsAPI request ledger aggregates observed KST days without exposing raw events',t=>{
+ const f=fixture(t,{dirs:0});
+ fs.writeFileSync(path.join(f.pc,'collection-events.jsonl'),[
+  event('2026-11-06T14:30:00.000Z',1), // 2026-11-06 23:30 KST
+  event('2026-11-06T14:45:00.000Z',null),
+  event('2026-11-06T15:10:00.000Z',1), // 2026-11-07 00:10 KST
+  ''
+ ].join('\n'));
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ const obs=out.earningsApiRequestObservations;
+ assert.equal(out.status,'PASS');
+ assert.equal(obs.status,'OBSERVED');
+ assert.equal(obs.coverage,'BOUNDED_LOG');
+ assert.equal(obs.observedMaxDailyRequests,1);
+ assert.equal(obs.observedOverOneRequestDays,0);
+ assert.deepEqual(obs.observedDays,[
+  {kstDate:'2026-11-06',observedRequests:1},
+  {kstDate:'2026-11-07',observedRequests:1}
+ ]);
+ assert.equal(obs.eventsExamined,3);
+ assert.deepEqual(obs.observedWindow,{
+  firstEventAt:'2026-11-06T14:30:00.000Z',lastEventAt:'2026-11-06T15:10:00.000Z'});
+ assert.match(obs.evidenceLevel,/NOT_DAILY_LIMIT_OR_SAVED_DATE_PROOF/);
+ assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_LOG|api\.other\.example/);
+ assert.equal(out.providerCalls,0);
+});
+
+test('two observed EarningsAPI requests on one KST day are visibly counted, never certified',t=>{
+ const f=fixture(t,{dirs:0});
+ fs.writeFileSync(path.join(f.pc,'collection-events.jsonl'),[
+  event('2026-11-06T04:00:00.000Z',1),
+  event('2026-11-06T05:00:00.000Z',1),''
+ ].join('\n'));
+ const obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'OBSERVED');
+ assert.deepEqual(obs.observedDays,[{kstDate:'2026-11-06',observedRequests:2}]);
+ assert.equal(obs.observedOverOneRequestDays,1);
+ assert.equal(obs.observedMaxDailyRequests,2);
+ assert.match(obs.evidenceLevel,/ONLY_NOT_DAILY_LIMIT/);
+});
+
+test('missing, symlink and malformed collection logs remain STATE_UNKNOWN',t=>{
+ const f=fixture(t,{dirs:0}),file=path.join(f.pc,'collection-events.jsonl');
+ let obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'STATE_UNKNOWN');
+ assert.equal(obs.code,'COLLECTION_EVENTS_UNAVAILABLE');
+ const outside=path.join(path.dirname(f.root),'outside-collection-events.jsonl');
+ fs.writeFileSync(outside,event('2026-11-06T04:00:00.000Z',1)+'\n');
+ fs.symlinkSync(outside,file);
+ obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'STATE_UNKNOWN');
+ assert.equal(obs.observedDayCount,0);
+ fs.unlinkSync(file);
+ fs.writeFileSync(file,event('2026-11-06T04:00:00.000Z',1)+'\nINVALID\n');
+ obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'STATE_UNKNOWN');
+ assert.equal(obs.coverage,'PARTIAL');
+ assert.equal(obs.invalidEvents,1);
+ assert.equal(obs.observedDays[0].observedRequests,1);
+});
+
+test('truncated tail and incomplete final event never imply complete daily coverage',t=>{
+ const f=fixture(t,{dirs:0}),file=path.join(f.pc,'collection-events.jsonl');
+ const massive=event('2026-11-05T04:00:00.000Z',1)+'\n';
+ fs.writeFileSync(file,massive.repeat(4500)+event('2026-11-06T04:00:00.000Z',1)+'\n');
+ let obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'STATE_UNKNOWN');
+ assert.equal(obs.coverage,'PARTIAL');
+ assert.equal(obs.tailTruncated,true);
+ assert.ok(obs.bytesRead<=512*1024);
+ fs.writeFileSync(file,event('2026-11-06T04:00:00.000Z',1)+'\n'+
+  '{"at":"2026-11-06T05:00:00.000Z","providers":');
+ obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
+ assert.equal(obs.status,'STATE_UNKNOWN');
+ assert.equal(obs.tailTruncated,true);
+ assert.deepEqual(obs.observedDays,[{kstDate:'2026-11-06',observedRequests:1}]);
+});
