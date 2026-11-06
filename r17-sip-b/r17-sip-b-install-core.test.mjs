@@ -12,6 +12,7 @@ const existing='scripts/pc-writer/us-breadth-provisional-cycle.mjs';
 const absent=Object.keys(TARGET).filter(p=>TARGET[p].status==='A');
 const preimage=()=>({sourceRoot:SOURCE_ROOT,configPath:CONFIG_PATH,
   coreTask:CORE_TASK,head:BASELINE_SOURCE,configSource:BASELINE_SOURCE,
+  originalBranch:'r17-writer-b/pc-r17-12345678-1234-4123-8123-123456789abc',
   worktreeClean:true,coreTaskEnabled:true,
   existingSha256:{[existing]:TARGET[existing].beforeSha256},absent});
 const candidate=()=>({sourceSha:CANDIDATE_SOURCE,clean:true,
@@ -35,7 +36,8 @@ test('three-file draft scope exact; no publisher, DB or task-definition writes',
 
 test('actual PC baseline must match local configured source, clean tree and exact preimage',()=>{
   assert.equal(validatePcPreimage(preimage()).head,BASELINE_SOURCE);
-  for(const bad of [{head:'0'.repeat(40)},
+  for(const bad of [{head:'0'.repeat(40)},{originalBranch:''},
+    {originalBranch:'bad..branch'},
     {configSource:'0'.repeat(40)},{worktreeClean:false},
     {existingSha256:{[existing]:'0'.repeat(64)}},{absent:[]},
     {coreTaskEnabled:false}]){
