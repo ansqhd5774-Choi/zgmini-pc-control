@@ -74,7 +74,7 @@ test('non-Windows host never tries probe',()=>{
 });
 
 function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',runningCount=1}){
- const source=fs.readFileSync(new URL('../controller/core-runtime-source-wmi.js',import.meta.url),'utf8');
+ const source=fs.readFileSync(new URL('../controller/core-runtime-source-wmi.mjs',import.meta.url),'utf8');
  const records=[
   {ProcessId:10,ParentProcessId:1,Name:'taskeng.exe',CommandLine:'service',CreationDate:null},
   {ProcessId:20,ParentProcessId:10,Name:'wscript.exe',CommandLine:'wrapper',CreationDate:null},
