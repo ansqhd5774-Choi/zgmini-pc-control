@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {authorizeSipInstall,digest} from './r17-sip-b-auth.mjs';
 import {sanitizeSipReport} from './r17-sip-b-install-upload.mjs';
-import {runWindowsInstall} from './r17-sip-b-install-windows.mjs';
+import {runWindowsInstall,coreQuietForTarget} from './r17-sip-b-install-windows.mjs';
 
 const bytes=fs.readFileSync(new URL('./R17_SIP_B_SCOPE_DRAFT.json',import.meta.url));
 const requestId='pc-r17-12345678-1234-4123-8123-123456789abc';
@@ -72,4 +72,14 @@ test('private upload report sanitizes exact statuses and never leaks raw error',
   const recovery=sanitizeSipReport({status:'SIP_B_RECOVERY_REQUIRED',
     code:'SIP_B_DRIVER_STOP',recovery:'MANUAL_RECONCILIATION_REQUIRED'},requestId,'123');
   assert.equal(recovery.recovery,'MANUAL_RECONCILIATION_REQUIRED');
+});
+
+test('Core source/config target pair cannot re-enable while a process or lock remains',()=>{
+  const quiet={instances:0,relatedProcesses:0,unknownProcessLines:0,state:3};
+  assert.equal(coreQuietForTarget(quiet,false),true);
+  assert.equal(coreQuietForTarget(quiet,true),false);
+  assert.equal(coreQuietForTarget({...quiet,instances:1},false),false);
+  assert.equal(coreQuietForTarget({...quiet,relatedProcesses:1},false),false);
+  assert.equal(coreQuietForTarget({...quiet,unknownProcessLines:1},false),false);
+  assert.equal(coreQuietForTarget({...quiet,state:4},false),false);
 });
