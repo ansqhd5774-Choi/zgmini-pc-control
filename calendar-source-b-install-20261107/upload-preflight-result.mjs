@@ -72,10 +72,10 @@ export async function uploadPreflight({env=process.env,fetchImpl=fetch}={}){
   typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>15,
   'CAL_B_UPLOAD_AUTH_STOP');
  const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
- need(event.repository?.private===true&&event.action==='opened'&&
+ need(event.repository?.private===true&&event.repository?.full_name===REPO&&
+  event.sender?.login===env.GITHUB_ACTOR&&event.action==='opened'&&
   event.issue?.title==='pc-calendar-source-preflight-once'&&
-  event.issue?.user?.login===env.GITHUB_ACTOR&&
-  event.issue.labels?.some(x=>x.name==='pc-calendar-source-preflight'),
+  event.issue?.user?.login===env.GITHUB_ACTOR,
   'CAL_B_UPLOAD_ISSUE_STOP');
  const request=JSON.parse(event.issue.body);
  need(request.schema==='ZGMINI_CALENDAR_SOURCE_PREFLIGHT_V1'&&
