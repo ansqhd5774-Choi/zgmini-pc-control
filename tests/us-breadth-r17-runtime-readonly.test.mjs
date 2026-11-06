@@ -135,3 +135,32 @@ test('malformed or oversized sidecar does not disclose content or throw',t=>{
   assert.equal(result.sidecar.state,'INVALID_JSON');
   assert.doesNotMatch(JSON.stringify(result),/DO_NOT_EXPOSE_BAD_JSON/);
 });
+
+
+test('IEX failure code is safely included without exposing raw provider error or secrets',t=>{
+  const f=fixture(t);
+  f.write('local-cycle-last-run.json',{
+    status:'PUBLICATION_NOT_VERIFIED',lane:'core',
+    usProvisional:{status:'FAILED_PREVIOUS_PROVISIONAL_PRESERVED',code:'US_PROVISIONAL_HTTP_403'},
+  });
+  f.write('local-us-breadth-iex-provisional.json',{
+    attemptStatus:'FAILED',lastAttemptSlot:'2026-11-06:600',output:correctOutput(),
+    raw:{secret:'DO_NOT_EXPOSE_SECRET'},
+  });
+  const result=inspectUsBreadthR17Runtime(f.root,{now:new Date('2026-11-06T16:05:00Z')});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.evidenceStatus,'LAST_ATTEMPT_UNVERIFIED');
+  assert.equal(result.cycle.usProvisional,'FAILED_PREVIOUS_PROVISIONAL_PRESERVED');
+  assert.equal(result.cycle.usProvisionalCode,'US_PROVISIONAL_HTTP_403');
+  assert.doesNotMatch(JSON.stringify(result),/DO_NOT_EXPOSE_SECRET/);
+
+  f.write('local-cycle-last-run.json',{
+    status:'PUBLICATION_NOT_VERIFIED',lane:'core',
+    usProvisional:{status:'FAILED_PREVIOUS_PROVISIONAL_PRESERVED',
+      code:'US_PROVISIONAL_HTTP_403\\nDO_NOT_EXPOSE_KEY'},
+  });
+  const tainted=inspectUsBreadthR17Runtime(f.root,{now:new Date('2026-11-06T16:05:00Z')});
+  assert.equal(tainted.cycle.usProvisionalCode,null);
+  assert.doesNotMatch(JSON.stringify(tainted),/DO_NOT_EXPOSE_KEY/);
+});
+
