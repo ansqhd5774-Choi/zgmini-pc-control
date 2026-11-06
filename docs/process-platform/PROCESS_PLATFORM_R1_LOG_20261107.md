@@ -91,3 +91,18 @@
 **다음 실행(M3):** Windows A smoke가 실제로 필요한 변경만 #68 단일 적용 담당과 조정. 기존 Controller 업데이트 전체와 B 작업을 회피·우회하지 말고, 새 승인 목표 SHA와 전체 changed controller/config 파일의 정합성을 검증한다. 병합·설치·M4 효과 실증은 미완료.
 
 **현재 신규 완료율 M0+M1+M2=60%.** 기존 5건 4/5=80% 별도. 예약 검증은 모든 실제 작업 이후 후속.
+
+## 8. M3 후보 배포 범위 분리·검증 통로 판정 (2026-11-07 KST)
+
+**이번 단계 증거 판정: M3 RUNNING / 신규 프로젝트 60% 유지.** 실제 Windows 실행·설치·Provider GET·DB/예약/운영 파일 변경은 없음.
+
+- **LAST PASS / 실제 PC 이전 상태:** [A #532](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/532)에서 실측된 설치 Controller SHA `0492f6f5bb16769e914ca85c63db119979fcf0a6`. 이후 설치 여부는 새 A 또는 정규 B 원장으로 재측정해야 하며 현시점 고정값으로 사용 금지.
+- **승인 1차 목표:** [PR #535](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/535)의 기존 EarningsAPI 1파일 B 후보는 `af016444b2f87f11cd468428d9235cfc257d317d`까지 누적 Controller/config diff **`controller/release-calendar-runtime-readonly.mjs` 1개**. [main 승인 manifest](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/approvals/controller-updates/af016444b2f87f11cd468428d9235cfc257d317d.json)와 경로 일치. 설치 성공은 아직 확인되지 않으며 #68 단일 담당 작업을 우선한다.
+- **M2 후보 2차 목표:** 승인 목표 `af016444…` → [#537 코드 Draft 현재 HEAD `e27be6d391d738f0d446664ab9f2ca457751f624`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) 누적 Controller/config diff **3개**: `controller/alpaca-quota-readonly.mjs`, `controller/asset-r10-source-readonly.mjs`, 신규 `controller/fixed-readonly-bytes.mjs`. 마지막 확인 설치 `0492f6f5…`에서 Draft HEAD 직행하면 4개가 되므로 **1파일 승인 manifest로는 절대로 직행 불가**. #537은 아직 승인 manifest·main 병합·Windows 실증 없음.
+- **분류 계약:** OLD=`0492f6f5…`(시점 제한 실측); TARGET_APPROVED=`af016444…`(아직 설치 미확인); TARGET_CANDIDATE=`e27be6…`(Draft/미승인); OTHER=`#537` 고정 3파일(기존 1파일 manifest 밖); MISSING=`#537` 승인 manifest와 Windows 실행 증거; UNKNOWN=`#535` 후의 실제 PC SHA. 설치·목표 누적 비교는 GitHub compare(95파일/9파일 중 Controller/config 1/3)로 확인했으며 다른 경로의 허용 여부까지 포괄 승인하지 않았다.
+- **경합:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)의 기존 단일 B lane은 #535 준비 중. #537의 3파일은 #535와 직접 경로 중복 없음. 순차 전환 시 이전 작업의 실제 설치 완료·원장·보호/백업·Runner 재연결을 확인하고 다음 승인 manifest를 새 실측 SHA로 구성해야 한다.
+- **Windows 시험 경로:** 현행 `pc-job`은 설치된 고정 `entry.mjs`만 실행; `runner-smoke`/기존 A/`source-audit`는 #537 후보 코드를 실행하지 않음. `theme-common-tests`는 별도 승인된 정확한 source/fixture만 실행. 일반 PR Windows 격리 smoke의 기존 승인 경로 **미확인**. 따라서 `WINDOWS_SMOKE_PENDING`, 우회 workflow·임의 CMD·B 생성 금지.
+- **M3 테스트 착시 수정:** #537의 기존 Linux 19/19에는 Windows `fs.symlinkSync` 권한거부 시 해당 테스트 callback `return`으로 symlink 및 뒤따른 root 탈출 검사가 생략되더라도 PASS 가능성이 있었다. 같은 PR의 테스트 파일을 분리하여 root 탈출 검사는 항상 독립 검사, Windows 권한 제한은 `t.skip('SYMLINK_UNVERIFIED…')`로 명시. 변경 후 **Linux Node v24.22.1 21/21 PASS, skip 0**. Windows 실증은 여전히 0; Windows 실행 시 PASS 숫자와 별개로 symlink skip=0 확인 필수.
+- **복구/전환 시험:** 기존 `tests/maintenance-apply.test.mjs`, `tests/interrupted-rollback.test.mjs`, `tests/maintenance-contract.test.mjs`에 보호·검증된 백업·복구 시나리오가 존재함을 소스로 확인. **이번 차례 직접 실행/Windows 전환 실패·복구 시험은 수행하지 않음**. M3 전체 완료 증거로 승격하지 않음.
+
+**FIRST GAP:** #535 정상 B 완료 SHA, #537의 승인/Windows 격리 smoke 실행 경로, 새 3파일의 승인 manifest·복구 검증이 아직 없다. **다음 필수 행동:** #68에서 #535 자연 적용의 완료 상태를 확인한 뒤 #537 범위·검토·Windows 시험의 승인 경로를 조정하고, 정확한 실제 설치 SHA에 맞춘 #537 manifest/격리 복구 시험을 준비한다. 원담당의 독립 기능 진행을 멈추지 않는다.
