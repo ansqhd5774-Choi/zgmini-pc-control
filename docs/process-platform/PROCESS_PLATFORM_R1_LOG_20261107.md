@@ -113,3 +113,16 @@
 - 명령: `node --test --test-skip-pattern='regular maintenance updater uses scoped gate' tests/maintenance-contract.test.mjs tests/interrupted-rollback.test.mjs`. **선택 실행된 34/34 PASS, fail 0, skip 0**. 누락/잘못된 승인 경로·고정 installed SHA·사후 보호 상태·실패 전/후 구분·중단 rollback·미검증 백업·재연결/작업 접수 보호 시나리오 포함.
 - 제외 1건은 `tools/update.mjs` 전체 소스 정적 검사에 의존하는 별도 테스트. **전체 유지보수기/Windows 통합 테스트 PASS로 주장하지 않음**. 포트 mock·계약 fixture 테스트이며 실제 PC 백업·설치·복구 호출 0.
 - 위 결과로 백업/복구 계약의 Linux 격리 회귀 근거를 확보했으나 **실제 #537 승인 manifest 부재, Windows 신규 reader smoke 미실시, #535 운영 적용 상태 미확정**이어서 M3를 DONE으로 승격하지 않음. 진행률 **60% 유지**.
+
+## 9. M3 실제 기준 전진 — 정규 B #538 완료·3파일 후보 고정 (2026-11-07 KST)
+
+**새 외부 완료 증거:** EarningsAPI 원담당이 정규 B [#538](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/538#issuecomment-6691090423)에서 고유 `pc-update-cb732e7e-2827-44e3-9d1c-e1de0179d0ed`를 실제 실행했다. `STATUS=SUCCEEDED`, `CODE=APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, `TARGET=ACTUAL=af016444b2f87f11cd468428d9235cfc257d317d`, `PROTECTED_STATE_UNCHANGED=true`, `WORKFLOW_ENABLED=true`, `REPORT_UPLOAD=VERIFIED`, `RECOVERY=NONE`. 이는 **#535 1파일 적용 성공**이며 #537 코드 설치 증거가 아니다. [결과 JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/maintenance-pc-update-cb732e7e-2827-44e3-9d1c-e1de0179d0ed.json).
+
+- 총괄은 실측 설치 기준을 이제 **#538 완료 시점 `af016444…`**으로 갱신. 기존 #532 `0492f6f5…`와의 1파일 차이는 성공 설치 증거로 충족. 이후 새 B가 있었는지는 실제 적용 직전 확인.
+- 후속 #537 immutable 개발 HEAD `e27be6d391d738f0d446664ab9f2ca457751f624`까지 GitHub compare: **전체 9경로 / Controller-config 3개**, upstream ancestor/ahead 8. 코드 파일 3개의 GitHub blob과 로컬 `git hash-object` 3/3 일치; SHA-256은 새 [M3 비승인 후보 명세](M3_537_CONTROLLER_DELTA_CANDIDATE_20261107.md)에 파일별 고정.
+- OLD=`af016444…`(정규 B 실설치); TARGET_CANDIDATE=`e27be6d…`(Draft); OTHER=`r17-sip-b/` 3개, `results/` 2개, `tests/` 1개(Controller-only stage에 포함 안 됨); MISSING=`#537` main 병합 SHA/승인 manifest/Windows isolated 실행 경로; UNKNOWN=`#538` 이후 실시간 변경 및 공유 lease(적용 직전만 측정).
+- 별도 원담당은 [A #540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540) `pc-dd8ebabd-0022-4b2c-9886-308058ed9357`를 이미 접수. 조회 시 결과 댓글 0이므로 **신규 A 생성 금지**, 정확히 #540 결과만 원담당이 회수.
+- Windows 경로 독립 검토: 일반 pc-job은 설치된 A 코드만 호출, 고정 SHA의 독립 개발 검증 실행기는 미확인. SHA pin/임시 workspace는 **권한 격리가 아님**. 제한된 Windows 사용자/VM·영향파일·테스트 재귀 import 검토·비밀정보 비주입·타임아웃 및 원본 무변경 확인이 선행돼야 한다. 기존 B 또는 임의 remote source 실행으로 우회하지 않음.
+- 공용 담당에는 [#68 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6691257448) **기록 완료**. 이는 설치 요청·타 담당 수신 ACK가 아님.
+
+**M3 RUNNING / 전체 60% 유지.** 완료 조건은 #537 자체의 검증된 안전 Windows 시험 경로와 정확 승인 manifest·정규 보호 절차. 신규 Controller 설치 0(이번 총괄 작업), 공급자 API/DB/예약 변경 0. #535 B 성공을 총괄 신규 설치 성과로 계산하지 않는다.
