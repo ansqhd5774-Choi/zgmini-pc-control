@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import {classifyCoreSnapshot,inspectCoreRuntimeSource} from '../controller/core-runtime-source-readonly.mjs';
 
 const snapshot={ok:true,runningInstances:1,engines:[10],processes:[
@@ -56,4 +58,42 @@ test('injected collector snapshot yields PASS without touching host',()=>{
 test('non-Windows host never tries probe',()=>{
  const result=inspectCoreRuntimeSource({platform:'linux',probe:()=>{throw Error('MUST_NOT_RUN');}});
  assert.equal(result.code,'CORE_WINDOWS_REQUIRED');
+});
+
+function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',runningCount=1}){
+ const source=fs.readFileSync(new URL('../controller/core-runtime-source-wmi.js',import.meta.url),'utf8');
+ const records=[
+  {ProcessId:10,ParentProcessId:1,Name:'taskeng.exe',CommandLine:'service',CreationDate:null},
+  {ProcessId:20,ParentProcessId:10,Name:'wscript.exe',CommandLine:'wrapper',CreationDate:null},
+  {ProcessId:30,ParentProcessId:20,Name:'node.exe',CommandLine:command,CreationDate:null},
+  {ProcessId:99,ParentProcessId:1,Name:'node.exe',CommandLine:otherCommand,CreationDate:null},
+ ];
+ let printed='';
+ function Enumerator(rows){this.rows=rows;this.i=0;this.atEnd=()=>this.i>=this.rows.length;
+  this.moveNext=()=>{this.i++;};this.item=()=>this.rows[this.i];}
+ const task={GetInstances:()=>({Count:runningCount,Item:()=>({EnginePID:10})})};
+ const context={
+  ActiveXObject:function(){return {Connect:()=>{},GetFolder:()=>({GetTask:()=>task})};},
+  GetObject:()=>({ExecQuery:()=>records}),
+  Enumerator,
+  WScript:{Echo:x=>{printed+=x;},Quit:code=>{throw Error('WSH_EXIT_'+code);}},
+ };
+ vm.runInNewContext(source,context,{timeout:1000});
+ return {snapshot:JSON.parse(printed),printed};
+}
+test('actual JScript WMI serialization returns only fixed enums and no raw commands',()=>{
+ const cmd=String.raw`"E:\ZGmini\runtime\node.exe" "E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs" --publish`;
+ const {snapshot:s,printed}=simulateWsh({command:cmd});
+ assert.equal(s.ok,true);
+ assert.equal(s.processes.find(p=>p.pid===30).sourceMarker,'E');
+ assert.equal(classifyCoreSnapshot(s,{realpath}).status,'PASS');
+ assert.doesNotMatch(printed,/CommandLine|SECRET_NEVER_PRINT|--token|E:\\ZGmini/i);
+});
+test('JScript rejects extra arguments and wrong script',()=>{
+ const cmd=String.raw`"E:\ZGmini\runtime\node.exe" "E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs" --publish`;
+ for(const altered of [cmd+' --unexpected',cmd.replace('local-cycle.mjs','other-cycle.mjs')]){
+  const {snapshot:s}=simulateWsh({command:altered});
+  assert.equal(s.processes.find(p=>p.pid===30).sourceMarker,'');
+  assert.equal(classifyCoreSnapshot(s,{realpath}).status,'STATE_UNKNOWN');
+ }
 });
