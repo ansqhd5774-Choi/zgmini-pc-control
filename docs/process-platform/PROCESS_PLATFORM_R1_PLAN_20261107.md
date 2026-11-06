@@ -1,7 +1,7 @@
 # ZGMINI 공통 실행 효율화 R1 — 프로젝트 계획서
 
 - 작성: 2026-11-07 KST
-- 상태: **착수 / M0 진행 중** (문서·원장·Draft PR 생성 후 M0 DONE)
+- 상태: **M0 DONE / M1 READY**, 신규 프로젝트 20% (GitHub 문서·추적 기록만 완료)
 - 전용 브랜치: `codex/controller-process-platform-r1-20261107`
 - 분기 기준: `codex/controller-ops-lessons-20261105` (기존 업무·완료 증거 보존)
 - 운영 정본: `main`의 `AGENTS.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/GENERAL_CHAT_START.md`, `docs/GENERAL_CHAT_PREWORK.md`
@@ -48,6 +48,7 @@
 | `release-calendar-runtime-readonly` | 출시 캘린더 source/checkpoint/후보 checkout 읽기 전용 A | EarningsAPI 날짜별 호출/체크포인트 및 실제 실행 연결 미확인 | 이 한계를 넘는 새로운 주장은 하지 않음 |
 | Draft PR #524 | 후보 체크아웃의 EarningsAPI 파일 해시/크기/mtime | 단일 파일 존재 ≠ 활성 실행, 일일 호출 증거 아님 | Draft 보존. 원담당과 중복 코드 변경 금지 |
 | `market-calendar-er1-saved-status` | 지정 과거 5일 입력·검증 개수·바인딩 지문 | 오늘 호출 ledger/런타임 요청 증거를 제공하지 않음 | 원래 기능 완료 증거 재사용; 신규 전역 진단으로 확대 금지 |
+| `scripts/pc-writer/quota-ledger.mjs` + `quota-policy.mjs` (`zgmini` main) | 공통 provider quota 원장 및 요청 시각 저장 로직 존재 | 현재 공식 등록 공급자에 **EarningsAPI 없음**; 비공개 수집기의 실제 경로/이 원장 경유 여부 미확인 | 기존 원장만으로 하루 1 GET 입증 불가. 새 quota 정책을 임의로 추가하지 않음 |
 | `controller/operations.mjs`+`config/operations.json` | 고정 operation allowlist·등급/자원·실행 어댑터 | 신기능 자동 로딩은 아님 | 임의 경로/스크립트 실행 없는 고정 등록 유지 |
 | `docs/CONTROLLER_APPLY_QUEUE.md` + #68 | 실제 설치 SHA→목표 누적 diff 및 승인 manifest·단일 담당·lease·원본 보호 | 최소 부분 적용 가능 여부는 실제 설치기/정확한 대상에 따라 다름 | 설치기 지원을 검증하기 전 부분 적용이 가능한 것으로 단정하지 않음 |
 
