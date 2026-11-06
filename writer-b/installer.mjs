@@ -17,6 +17,7 @@ export function verifyWriterBPreimage(manifest,preimage){
  validateWriterBManifest(manifest);
  const changed=manifest.files.map(x=>x.path);
  const protectedPaths=manifest.protectedFiles.map(x=>x.path);
+ const runtimePaths=manifest.runtimeDependencies.consumers.map(x=>x.path);
  need(object(preimage)&&preimage.sourceRoot===manifest.sourceRoot&&
    preimage.configPath===manifest.configPath&&preimage.coreTask===manifest.coreTask&&
    preimage.head===manifest.baseHead&&
@@ -28,7 +29,8 @@ export function verifyWriterBPreimage(manifest,preimage){
    !preimage.originalBranch.includes('..')&&
    preimage.coreTaskEnabled===true&&preimage.targetPathsClean===true&&
    sameKeys(preimage.beforeSha256,changed)&&
-   sameKeys(preimage.protectedSha256,protectedPaths),
+   sameKeys(preimage.protectedSha256,protectedPaths)&&
+   sameKeys(preimage.runtimeConsumerSha256,runtimePaths),
    'WRITER_B_PC_PREIMAGE_STOP');
  for(const item of manifest.files){
   const actual=preimage.beforeSha256[item.path];
@@ -38,6 +40,13 @@ export function verifyWriterBPreimage(manifest,preimage){
  for(const item of manifest.protectedFiles)
   need(preimage.protectedSha256[item.path]===item.sha256,
     'WRITER_B_PROTECTED_SHA_STOP');
+ if(manifest.runtimeDependencies.taskXmlSha256!==null)
+  need(preimage.originalTaskDefinitionSha256===
+   manifest.runtimeDependencies.taskXmlSha256,
+   'WRITER_B_TASK_APPROVED_XML_SHA_STOP');
+ for(const item of manifest.runtimeDependencies.consumers)
+  need(preimage.runtimeConsumerSha256[item.path]===item.sha256,
+   'WRITER_B_RUNTIME_CONSUMER_SHA_STOP');
  // Unrelated dirty files are deliberately not an automatic global install gate.
  // The adapter must snapshot them and prove that the switch preserves them.
  return preimage;
@@ -113,8 +122,10 @@ export async function performWriterBInstall(auth,io){
   await io.assertConfigSource(prepared.sha);
 
   await io.restoreCore(before);
-  taskMayHaveChanged=false;
   await io.verifyCoreDefinitionUnchanged(before);
+  // schtasks /Enable returning zero is not proof the task actually became
+  // enabled. Keep rollback eligibility until the readback proves it.
+  taskMayHaveChanged=false;
   await io.assertWriterSource(prepared,manifest);
   await io.assertConfigSource(prepared.sha);
   result={status:'WRITER_B_INSTALLED_VERIFIED',sourceSha:prepared.sha,
