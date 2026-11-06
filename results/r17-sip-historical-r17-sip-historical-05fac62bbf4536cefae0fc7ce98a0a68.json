@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_R17_SIP_HISTORICAL_RESULT_V1",
+  "requestId": "r17-sip-historical-05fac62bbf4536cefae0fc7ce98a0a68",
+  "runId": "42269065590",
+  "status": "SIP_HISTORICAL_NOT_VERIFIED",
+  "code": "SIP_PROBE_PROVIDER_OR_VALIDATION_FAILED",
+  "observationDate": "2026-11-06",
+  "slotEndUtc": "2026-11-06T14:30:00.000Z",
+  "checkedAt": "2026-11-06T18:16:36.285Z",
+  "providerCalls": 1,
+  "retry": "NO_REEXECUTE_READBACK_ONLY",
+  "universeAsOfDate": "2026-11-04",
+  "universeSelection": "PREVIOUS_SAVED_DIAGNOSTIC"
+}
