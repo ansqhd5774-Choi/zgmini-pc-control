@@ -30,7 +30,8 @@ function fixture(options={}){
         if(date==='2026-11-05'&&options.universeError)throw Error(options.universeError);
         if(date==='2026-11-04'&&options.previousUniverseError)
           throw Error(options.previousUniverseError);
-        return members;},
+        return date==='2026-11-04'&&options.previousMembers?
+          options.previousMembers:members;},
       loadLocalProviders:()=>{if(options.providerError)throw Error(options.providerError);
         return {APCA_API_KEY_ID:'PRIVATE',APCA_API_SECRET_KEY:'SECRET'};},
       createQuotaFetch:({mode,originalFetch})=>{assert.equal(mode,'enforce');
@@ -117,6 +118,13 @@ test('previous universe read error redacts sensitive path and never queries prov
     previousUniverseError:'E:\\sensitive\\db.sqlite'});
   await assert.rejects(()=>probeHistorical(f.dependencies),{
     safeCode:'SIP_PROBE_PREVIOUS_UNIVERSE_READ_STOP'});
+  assert.equal(f.calls.length,0);
+});
+test('previous saved universe must be the verified 503, not a partial substitute',async()=>{
+  const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING',
+    previousMembers:members.slice(0,502)});
+  await assert.rejects(()=>probeHistorical(f.dependencies),{
+    safeCode:'SIP_PROBE_PREVIOUS_UNIVERSE_COUNT_STOP'});
   assert.equal(f.calls.length,0);
 });
 test('DB missing and universe invalid retain only safe codes, unknown error is redacted',async()=>{
