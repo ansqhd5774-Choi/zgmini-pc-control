@@ -11,6 +11,24 @@ const control='E:/ZGmini/automation/pc-control',root='E:/ZGmini/automation/pc-ma
 const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repository='ansqhd5774-Choi/zgmini-pc-control',gh='C:/Program Files/GitHub CLI/gh.exe';
 const digest=b=>createHash('sha256').update(b).digest('hex');
+export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFileSync){
+ // Verified final pre-upgrade Windows six-file source (464 POSTFF V2).
+ // A newer source must carry its seventh runtime module, even if its manifest
+ // falsely shrinks to six internally consistent file hashes.
+ const legacySixSource='4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4';
+ const original=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+  'tools/update.mjs','tools/maintenance-ancestry.vbs'];
+ const next=[...original,'tools/source-bundle-register.mjs'];
+ const files=installed?.files;
+ if(installed?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'
+  ||!files||typeof files!=='object'||Array.isArray(files))return false;
+ const keys=Object.keys(files),expected=keys.length===6&&installed.sourceSha===legacySixSource
+  ?original:keys.length===7&&/^[a-f0-9]{40}$/.test(installed.sourceSha??'')?next:null;
+ if(!expected||!keys.every(p=>expected.includes(p)))return false;
+ return expected.every(p=>/^[a-f0-9]{64}$/.test(files[p]??'')
+  &&digest(readBytes(path.join(rootDir,p)))===files[p]);
+}
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const json=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
@@ -82,10 +100,7 @@ function observe(requestId){
  const controllerVerified=/^[a-f0-9]{40}$/.test(host.controllerSourceSha??'')&&Object.keys(host.controllerFiles??{}).length>=5&&
   Object.entries(host.controllerFiles).every(([p,h])=>validFile(p)&&/^[a-f0-9]{64}$/.test(h)&&digest(fs.readFileSync(path.join(control,p)))===h);
  const installed=json(path.join(root,'MAINTENANCE_INSTALL.json'));
- const expected=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs',
-  'tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
- const maintenanceVerified=installed.schema==='ZGMINI_PC_MAINTENANCE_INSTALL_V1'&&Object.keys(installed.files??{}).length===6&&
-  expected.every(p=>digest(fs.readFileSync(path.join(root,p)))===installed.files[p]);
+ const maintenanceVerified=verifyMaintenanceManifest(installed,root);
  const issue=github('issues/'+ledger.issueNumber);let body;try{body=JSON.parse(issue.body);}catch{}
  const identityVerified=ledger.requestId===requestId&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&
   /^[0-9a-f-]{36}$/.test(owner.nonce??'')&&marker.nonce===owner.nonce&&marker.requestOwnerPid===owner.pid&&

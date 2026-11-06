@@ -1,11 +1,39 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {classifyRecovery,archiveUntouched} from '../tools/maintenance-recovery.mjs';
+import {createHash} from 'node:crypto';
+import {classifyRecovery,archiveUntouched,
+ verifyMaintenanceManifest as recoveryInventory} from '../tools/maintenance-recovery.mjs';
+import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
 const state=()=>({identityVerified:true,ownerAlive:false,
  ledger:{status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'RECEIVED',installedShaBefore:sha,intakePaused:false,workflowEnabled:true},
  actualSha:sha,controllerVerified:true,maintenanceVerified:true,backupExists:false,backlogExists:false,
  workflow:'active',runnerSetVerified:true,runnersIdle:true,otherLeaseCount:0});
+test('status and recovery verify both pre-handoff six and post-handoff seven exact runtime files',()=>{
+ const original=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+  'tools/update.mjs','tools/maintenance-ancestry.vbs'];
+ const next=[...original,'tools/source-bundle-register.mjs'];
+ const data=Object.fromEntries([...next,'tools/unapproved.mjs'].map(p=>[p,Buffer.from(p)]));
+ const oldSha='4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4';
+ const targetSha='f'.repeat(40);
+ const manifest=(files,sourceSha=files.length===original.length?oldSha:targetSha)=>({
+  schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha,files:Object.fromEntries(
+  files.map(p=>[p,createHash('sha256').update(data[p]).digest('hex')]))});
+ const readBytes=p=>data[path.relative('/fixture',p)];
+ for(const validate of [recoveryInventory,statusInventory]){
+  assert.equal(validate(manifest(original),'/fixture',readBytes),true);
+  assert.equal(validate(manifest(next),'/fixture',readBytes),true);
+  assert.equal(validate(manifest(original,targetSha),'/fixture',readBytes),false);
+  assert.equal(validate(manifest([...original,'tools/unapproved.mjs']),'/fixture',readBytes),false);
+  assert.equal(validate(manifest([...next,'tools/unapproved.mjs']),'/fixture',readBytes),false);
+  const changed=manifest(next);changed.files['tools/update.mjs']='0'.repeat(64);
+  assert.equal(validate(changed,'/fixture',readBytes),false);
+  const missing=manifest(next);delete missing.files['tools/source-bundle-register.mjs'];
+  missing.files['tools/unapproved.mjs']='0'.repeat(64);
+  assert.equal(validate(missing,'/fixture',readBytes),false);
+ }
+});
 function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-recovery-'));
  fs.mkdirSync(path.join(root,'leases/controller-install'),{recursive:true});fs.mkdirSync(path.join(root,'ledger'));

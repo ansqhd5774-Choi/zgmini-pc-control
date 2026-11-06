@@ -4,11 +4,34 @@ import fs from 'node:fs';import path from 'node:path';import {createHash,randomU
 import {execFileSync} from 'node:child_process';import {fileURLToPath,pathToFileURL} from 'node:url';
 const root='E:/ZGmini/automation/pc-maintenance';
 const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const files=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
-const handoffSourceFiles=[...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+// The live receiver is a six-file installation. The approved replacement has
+// seven runtime files; the new module must be installed atomically with its
+// importers, never loaded from an unpinned checkout or an old installation.
+export const priorRuntimeFiles=Object.freeze([
+ 'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+ 'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+ 'tools/update.mjs','tools/maintenance-ancestry.vbs',
+]);
+export const nextRuntimeFiles=Object.freeze([...priorRuntimeFiles,
+ 'tools/source-bundle-register.mjs']);
+const newRuntimeFile='tools/source-bundle-register.mjs';
+const handoffSourceFiles=[...nextRuntimeFiles,
+ 'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
+export function requireOriginalStartupBytes(installed,bytes){
+ need(Buffer.isBuffer(bytes)&&/^[a-f0-9]{64}$/.test(installed?.startupSha256??'')
+  &&sha(bytes)===installed.startupSha256,'HANDOFF_STARTUP_DRIFT');
+}
+export function requireSixToSevenContract(installedFiles,approvedFiles){
+ const exact=(actual,expected)=>actual&&typeof actual==='object'&&!Array.isArray(actual)
+  &&Object.keys(actual).length===expected.length
+  &&Object.keys(actual).every(name=>expected.includes(name))
+  &&expected.every(name=>/^[a-f0-9]{64}$/.test(actual[name]??''));
+ need(exact(installedFiles,priorRuntimeFiles),'HANDOFF_INSTALLED_FILE_SET_MISMATCH');
+ need(exact(approvedFiles,handoffSourceFiles),'HANDOFF_TARGET_FILE_SET_MISMATCH');
+}
 const git=a=>execFileSync('git',a,{cwd:repo,windowsHide:true,maxBuffer:3000000});
 // Unrelated docs/results edits do not affect this exact approved handoff.
 export function requireHandoffCheckoutScope(target,runGit=git){
@@ -25,6 +48,14 @@ export function requireStopped(owner,isAlive=alive){
 export function requireNoReplacement(prior,current){
  need(prior&&(!current||(current.pid===prior.pid&&current.nonce===prior.nonce)),
    'HANDOFF_RECEIVER_CHANGED');
+}
+// Once the new receiver's startup was requested, a failed attestation is not
+// permission to overwrite its executable files or to delete its new module.
+export function requireRollbackWindow({startupInvoked=false,prior,current,reservationOwner=null}={}){
+ need(startupInvoked!==true,'HANDOFF_NEW_RECEIVER_MAY_BE_RUNNING');
+ const ownedReservation=reservationOwner&&current
+  &&reservationOwner.pid===current.pid&&reservationOwner.nonce===current.nonce;
+ if(!ownedReservation)requireNoReplacement(prior,current);
 }
 export function requireReceiverOrigin(prior,proof,installed,capture=null){
  const correct=Number.isSafeInteger(prior?.pid)&&prior.pid>0
@@ -99,6 +130,11 @@ export function reservationFailureStatus(error){
 export function rollbackStatus({filesRestored=false,receiverReattested=false}={}){
  return filesRestored&&receiverReattested?'ROLLED_BACK':'RECOVERY_REQUIRED';
 }
+export function preserveRollbackReservation(reservation){
+ // Files restored without a restarted, independently attested receiver are
+ // RECOVERY_REQUIRED. Keep the lease marker for the supported recovery path.
+ if(reservation)reservation.verify();
+}
 const owner=()=>{
  const file=root+'/leases/receiver/owner.json';
  if(!fs.existsSync(file))return null;
@@ -120,9 +156,11 @@ export async function main(args=process.argv.slice(2)){
  need(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V1'&&approval.targetSha===target&&approval.approved===true&&['STOPPED_RECEIVER_IN_PLACE_ONLY','COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'].includes(approval.scope),'HANDOFF_APPROVAL_REQUIRED');
  const before=read(root+'/MAINTENANCE_INSTALL.json');
  need(before.sourceSha===approval.installedSha,'HANDOFF_INSTALLED_SHA_MISMATCH');
+ requireSixToSevenContract(before.files,approval.files);
+ need(!fs.existsSync(path.join(root,newRuntimeFile)),'HANDOFF_UNMANAGED_TARGET_PRESENT');
  need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
  // Verify the installed WMI proof helper before executing it or trusting its receiver record.
- for(const rel of files)need(sha(fs.readFileSync(path.join(root,rel)))===before.files[rel],'HANDOFF_EXISTING_DRIFT');
+ for(const rel of priorRuntimeFiles)need(sha(fs.readFileSync(path.join(root,rel)))===before.files[rel],'HANDOFF_EXISTING_DRIFT');
  const priorOwner=owner();
  need(Number.isSafeInteger(priorOwner?.pid)&&priorOwner.pid>0
    &&/^[0-9a-f-]{36}$/.test(priorOwner.nonce??''),'HANDOFF_RECEIVER_NOT_PROVEN_STOPPED');
@@ -133,10 +171,12 @@ export async function main(args=process.argv.slice(2)){
  // Validate replacement bytes and token BEFORE asking the receiver to stop.
  // A missing file, dirty checkout or elevated operator must leave it running.
  const startup=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
+ const oldStartup=fs.readFileSync(startup);
+ requireOriginalStartupBytes(before,oldStartup);
  const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});
  need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'HANDOFF_MEDIUM_TOKEN_REQUIRED');
  const bytes={};
- for(const rel of [...files,'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs']){
+ for(const rel of handoffSourceFiles){
   bytes[rel]=git(['show',target+':'+rel]);
   need(sha(bytes[rel])===approval.files[rel],'HANDOFF_SOURCE_HASH_MISMATCH');
   need(sha(fs.readFileSync(path.join(repo,rel)))===approval.files[rel],'HANDOFF_CHECKOUT_SOURCE_DRIFT');
@@ -166,27 +206,32 @@ export async function main(args=process.argv.slice(2)){
  // Exact byte snapshots; recovery restores only these approved maintenance files.
  fs.mkdirSync(backup,{recursive:true});
  const snapshot={};
- for(const rel of [...files,'MAINTENANCE_INSTALL.json']){
+ for(const rel of [...priorRuntimeFiles,'MAINTENANCE_INSTALL.json']){
   const b=fs.readFileSync(path.join(root,rel)),dest=path.join(backup,rel);
   fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,b,{flag:'wx'});snapshot[rel]=sha(b);
  }
- const oldStartup=fs.readFileSync(startup);fs.writeFileSync(backup+'/startup.vbs',oldStartup,{flag:'wx'});snapshot['startup.vbs']=sha(oldStartup);
+ requireOriginalStartupBytes(before,fs.readFileSync(startup));
+ fs.writeFileSync(backup+'/startup.vbs',oldStartup,{flag:'wx'});snapshot['startup.vbs']=sha(oldStartup);
  fs.writeFileSync(backup+'/SNAPSHOT.json',JSON.stringify(snapshot,null,2),{flag:'wx'});
  const result={schema:'ZGMINI_MAINTENANCE_HANDOFF_RESULT_V1',targetSha:target,installedShaBefore:before.sourceSha,status:'RUNNING',backup};
  const persist=()=>fs.writeFileSync(record,JSON.stringify({...result,at:new Date().toISOString()},null,2));persist();
- let reservation=null;
+ let reservation=null,startupInvoked=false;
  try{
   requirePriorStopped(priorOwner);need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
   reservation=reserveReceiverSlot(root+'/leases/receiver');
   reservation.verify();
   requireStopped(priorOwner);
   need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
-  for(const rel of files)fs.writeFileSync(path.join(root,rel),bytes[rel]);
-  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(files.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
+  for(const rel of nextRuntimeFiles){
+   fs.writeFileSync(path.join(root,rel),bytes[rel],
+    rel===newRuntimeFile?{flag:'wx'}:undefined);
+  }
+  const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(nextRuntimeFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   fs.writeFileSync(startup,startupBytes);
   reservation.verify();
   reservation.release();reservation=null;
+  startupInvoked=true;
   launchStartup(startup);
   for(let i=0;i<30;i++){
    await new Promise(r=>setTimeout(r,1000));const current=owner();
@@ -217,12 +262,20 @@ export async function main(args=process.argv.slice(2)){
    return result;
   }
   try{
+   requireRollbackWindow({startupInvoked,prior:priorOwner,current:owner(),
+    reservationOwner:reservation?.owner??null});
    if(reservation){reservation.verify();requireStopped(priorOwner);}
    else requirePriorStopped(priorOwner);
    for(const [rel,hash]of Object.entries(snapshot))need(sha(fs.readFileSync(path.join(backup,rel)))===hash,'HANDOFF_BACKUP_DRIFT');
-   for(const rel of [...files,'MAINTENANCE_INSTALL.json'])fs.copyFileSync(path.join(backup,rel),path.join(root,rel));
+   const added=path.join(root,newRuntimeFile);
+   if(fs.existsSync(added)){
+    need(sha(fs.readFileSync(added))===sha(bytes[newRuntimeFile]),'HANDOFF_NEW_FILE_DRIFT');
+    fs.unlinkSync(added); // Only the newly added, byte-verified file; never preexisting data.
+   }
+   for(const rel of [...priorRuntimeFiles,'MAINTENANCE_INSTALL.json'])
+    fs.copyFileSync(path.join(backup,rel),path.join(root,rel));
    fs.writeFileSync(startup,oldStartup);
-   if(reservation){reservation.release();reservation=null;}
+   preserveRollbackReservation(reservation);
    // File rollback alone does not prove that the former receiver restarted.
    // Never claim ROLLED_BACK without a new Windows origin/reconnect proof.
    result.status=rollbackStatus({filesRestored:true,receiverReattested:false});

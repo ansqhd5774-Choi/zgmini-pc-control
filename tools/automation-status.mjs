@@ -8,6 +8,24 @@ const control='E:/ZGmini/automation/pc-control',maintenance='E:/ZGmini/automatio
 const repo='ansqhd5774-Choi/zgmini-pc-control',gh='C:/Program Files/GitHub CLI/gh.exe';
 const read=f=>JSON.parse(fs.readFileSync(f,'utf8'));
 const hash=b=>createHash('sha256').update(b).digest('hex');
+export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFileSync){
+ // Verified final pre-upgrade Windows six-file source (464 POSTFF V2).
+ // A newer source must carry its seventh runtime module, even if its manifest
+ // falsely shrinks to six internally consistent file hashes.
+ const legacySixSource='4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4';
+ const original=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+  'tools/update.mjs','tools/maintenance-ancestry.vbs'];
+ const next=[...original,'tools/source-bundle-register.mjs'];
+ const files=installed?.files;
+ if(installed?.schema!=='ZGMINI_PC_MAINTENANCE_INSTALL_V1'
+  ||!files||typeof files!=='object'||Array.isArray(files))return false;
+ const keys=Object.keys(files),expected=keys.length===6&&installed.sourceSha===legacySixSource
+  ?original:keys.length===7&&/^[a-f0-9]{40}$/.test(installed.sourceSha??'')?next:null;
+ if(!expected||!keys.every(p=>expected.includes(p)))return false;
+ return expected.every(p=>/^[a-f0-9]{64}$/.test(files[p]??'')
+  &&hash(readBytes(path.join(rootDir,p)))===files[p]);
+}
 const need=(b,c)=>{if(!b)throw Object.assign(Error(c),{code:c});};
 const live=pid=>{if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
 
@@ -32,8 +50,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
  const host=observe('CONTROLLER_MANIFEST_UNAVAILABLE',()=>read(control+'/host.json'));
  const installed=observe('MAINTENANCE_MANIFEST_UNAVAILABLE',()=>read(maintenance+'/MAINTENANCE_INSTALL.json'));
  const maintenanceVerified=observe('MAINTENANCE_FILES_UNVERIFIED',()=>{
-  const expected=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs','tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs','tools/maintenance-ancestry.vbs'];
-  return Object.keys(installed?.files??{}).length===expected.length&&expected.every(p=>hash(fs.readFileSync(path.join(maintenance,p)))===installed.files[p]);
+  return verifyMaintenanceManifest(installed,maintenance);
  });
  const receiver=observe('RECEIVER_STATUS_UNAVAILABLE',()=>read(maintenance+'/RECEIVER_STATUS.json'));
  const receiverOwner=observe('RECEIVER_OWNER_UNAVAILABLE',()=>read(maintenance+'/leases/receiver/owner.json'));

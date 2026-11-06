@@ -498,7 +498,7 @@ export function validateUpdateRequest(issue,manifestBytes,{
   // scripts/workflows; live workflow changes remain outside this exception.
   if(Object.hasOwn(raw,'controllerOnlyInstall')&&
     (raw.controllerOnlyInstall!==true||
-     raw.purpose!=='pc-controller-maintenance'||
+     !['pc-controller-maintenance','pc-controller-heavy-readonly'].includes(raw.purpose)||
      Object.hasOwn(raw,'infrastructureEvidence')))
     throw Error('CONTROLLER_ONLY_INSTALL_SCOPE_INVALID');
   if(typeof raw.postSourceBranch!=="string"
