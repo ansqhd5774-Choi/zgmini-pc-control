@@ -250,10 +250,11 @@ test('missing or malformed wrapper statuses do not change request counts or impl
   event('2026-11-06T05:00:00.000Z',3,{
    'api.earningsapi.com':{requests:3}}),''].join('\n'));
  const obs=inspectReleaseCalendarRuntime(f.data).earningsApiRequestObservations;
- assert.equal(obs.status,'OBSERVED');
+ assert.equal(obs.status,'STATE_UNKNOWN');
  assert.equal(obs.observedMaxDailyRequests,5);
  assert.equal(obs.statusInvalidEvents,3);
  assert.equal(obs.statusCoverage,'PARTIAL');
+ assert.equal(obs.coverage,'PARTIAL');
  assert.match(obs.statusEvidenceLevel,/NOT_PROVIDER_GET_POLICY_PROOF/);
  assert.equal(obs.observedStatusDays[0].counts,'0,0,0,0,0,0,0');
 });
