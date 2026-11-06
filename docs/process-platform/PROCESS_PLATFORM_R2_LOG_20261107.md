@@ -14,7 +14,7 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | READY | — | 실PC 지원 확인, scope-bound manifest/수신기와 승인/백업/lease 필요 |
+| M2 공통 Writer B | RUNNING (계약·상태머신 초안) | 20% 유지 | Draft PR #626 4파일 SOURCE_READY, 14/14 fixture PASS; Windows adapter/정규 수신 경로·실PC 설치 미구현 |
 | M3 실패·정상 회귀 | DEFERRED | — | M1/M2 관련 구현 후 시나리오 5개 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
@@ -64,3 +64,13 @@
 - **LAST PASS:** source 병합·원격 재조회·격리 18/18 PASS.
 - **FIRST FAIL / 미확인:** 해당 수정은 PC 설치 증거가 아니며, #614 운영 Controller A 허용목록과 실제 조회 요청·writer checkout/HEAD/config.source/PR #981 세 파일 해시·dirty 회수 미완료. M1 **RUNNING**, R2 **20% 유지**.
 - **다음:** #68 원담당의 실제 Controller 설치·A 활성 결과를 확인한 뒤 같은 요청 ID를 재사용하지 않는 승인 A 1회로 대상 PC 증거 회수. 별도 기능 CMD·새 예약·중복 Controller B 제출 금지.
+
+## 2026-11-07 — M2 공통 Writer B 코드 초안 (수신 미완성)
+
+- [Draft PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) (브랜치 codex/controller-process-platform-r2-writer-b-20261107), 신규 4파일만: writer-b/contract.mjs, installer.mjs, 각 테스트.
+- 재사용 근거: r17-writer-b/r17-b-claim.mjs(공유 writer-source-install.lock/요청 원장), r17-b-git-stage.mjs(격리 commit/해시 검산), r17-sip-refresh-b/install-core.mjs(대상 dirty/backup/Core drain/config.source CAS/rollback). 고정 R17/calendar 설치기와 Controller-only maintenance를 다른 기능 설치로 우회 사용하지 않음.
+- 계약: private owner Issue/요청 SHA/승인 manifest 원문 해시, source HEAD=config.source, 파일 1~32개 변경 전/후 해시·허용 경로, 단일 Writer lock, backup/restore/RECOVERY_REQUIRED, provider/DB/D1/Task definition write 금지. 원격 입력 임의 shell 실행 없음.
+- 로컬 fixture **14/14 PASS**, 부모 독립 재실행 exit=0. 인증된 authorizeWriterBIssue 결과만 installer coordinator가 받는 내부 seal 보완 포함.
+- **LAST PASS:** SOURCE_READY / FIXTURE_PASS / 4파일만 격리 PR.
+- **FIRST FAIL / 미완성:** Windows adapter + 실제 B 요청 수신 Workflow/Runner 연결·결과 원장/실PC 적용이 구현·검증되지 않아 일반 Writer B 설치 가능 상태를 주장할 수 없음. M2 **RUNNING**, 전체 R2 **20% 유지**.
+- **다음:** 기존 자체 Runner 승인 B 전달 방법과 보존된 Windows 자산을 좁게 재사용한 adapter/receiver 구현·관련 격리 테스트. 실제 운영 적용은 #68 단일 담당·승인 경로에서만 수행.
