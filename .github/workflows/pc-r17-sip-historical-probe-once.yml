@@ -41,6 +41,8 @@ jobs:
           persist-credentials: false
       - name: Once read 2026-11-06 historical SIP using installed fixed collector
         id: probe
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # Exact create-only private claim before provider calls.
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r17-sip-control\r17-sip-probe\historical-probe.mjs" > "%RUNNER_TEMP%\r17-sip-historical-result.json"'
       - name: Read back and upload bounded private result without rerunning provider calls
         if: always() && steps.checkout-control.outcome == 'success'
