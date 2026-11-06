@@ -7,6 +7,10 @@ import {execFileSync} from 'node:child_process';
 
 const SHA40=/^[0-9a-f]{40}$/i;
 const KEY=/^[a-z][a-z0-9_-]{0,48}$/;
+const EARNINGS_HOST='api.earningsapi.com';
+const COLLECTION_EVENTS_MAX_BYTES=512*1024;
+const COLLECTION_EVENTS_MAX_ROWS=1024;
+const COLLECTION_EVENTS_MAX_DAYS=14;
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sha=value=>typeof value==='string'&&SHA40.test(value)?value.toLowerCase():null;
 const date=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():null;
@@ -15,6 +19,94 @@ const inside=(root,other)=>{
  const relative=path.relative(root,other);
  return relative!==''&&relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative);
 };
+
+// Read only the approved collection-events ledger. This is an observation of
+// fetch-wrapper calls, not proof of an absolute daily GET limit or saved dates.
+function inspectEarningsApiRequests(root,home,fileSystem){
+ const out={status:'STATE_UNKNOWN',code:'COLLECTION_EVENTS_UNAVAILABLE',
+  evidenceLevel:'LOGGED_FETCH_WRAPPER_CALLS_ONLY_NOT_DAILY_LIMIT_OR_SAVED_DATE_PROOF',
+  coverage:'NONE',observedWindow:null,observedDays:[],observedDayCount:0,
+  observedMaxDailyRequests:null,observedOverOneRequestDays:0,
+  eventsExamined:0,invalidEvents:0,bytesRead:0,tailTruncated:false,dayListTruncated:false};
+ const file=path.join(home,'collection-events.jsonl');
+ let homeStat,fileStat,resolved;
+ try{
+  homeStat=fileSystem.lstatSync(home);
+  resolved=fileSystem.realpathSync(file);
+  fileStat=fileSystem.lstatSync(file);
+ }catch{return out;}
+ if(!homeStat.isDirectory()||homeStat.isSymbolicLink()||
+    !inside(root,resolved)||!fileStat.isFile()||fileStat.isSymbolicLink()||
+    fileStat.size<1||!Number.isSafeInteger(fileStat.size)){
+  out.code='COLLECTION_EVENTS_UNSAFE_OR_EMPTY';return out;
+ }
+ const start=Math.max(0,fileStat.size-COLLECTION_EVENTS_MAX_BYTES);
+ const bytesToRead=fileStat.size-start;
+ let fd,buffer;
+ try{
+  fd=fileSystem.openSync(file,'r');
+  const opened=fileSystem.fstatSync(fd);
+  if(!opened.isFile()||opened.size!==fileStat.size){
+   out.code='COLLECTION_EVENTS_CHANGED_DURING_READ';return out;
+  }
+  buffer=Buffer.alloc(bytesToRead);
+  let read=0;
+  while(read<buffer.length){
+   const n=fileSystem.readSync(fd,buffer,read,buffer.length-read,start+read);
+   if(n<=0)break;
+   read+=n;
+  }
+  if(read!==buffer.length){out.code='COLLECTION_EVENTS_INCOMPLETE_READ';return out;}
+ }catch{out.code='COLLECTION_EVENTS_READ_ERROR';return out;}
+ finally{if(fd!==undefined)try{fileSystem.closeSync(fd);}catch{}}
+ out.bytesRead=buffer.length;
+ let text=buffer.toString('utf8');
+ let incomplete=start>0||!text.endsWith('\n');
+ if(start>0){
+  const firstNewline=text.indexOf('\n');
+  if(firstNewline<0){out.code='COLLECTION_EVENTS_TAIL_UNUSABLE';out.tailTruncated=true;return out;}
+  text=text.slice(firstNewline+1);
+ }
+ let lines=text.split('\n');
+ if(lines.at(-1)==='')lines.pop();
+ else if(lines.length)lines.pop(); // Incomplete final append is not a valid event.
+ if(lines.length>COLLECTION_EVENTS_MAX_ROWS){
+  lines=lines.slice(-COLLECTION_EVENTS_MAX_ROWS);incomplete=true;
+ }
+ out.tailTruncated=incomplete;
+ const counts=new Map();
+ let earliest=null,latest=null;
+ for(const line of lines){
+  if(!line.trim())continue;
+  out.eventsExamined++;
+  let event;
+  try{event=JSON.parse(line);}catch{out.invalidEvents++;continue;}
+  const at=event?.at;
+  const providers=event?.providers;
+  if(typeof at!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(at)||
+     !Number.isFinite(Date.parse(at))||!providers||typeof providers!=='object'||Array.isArray(providers)){
+   out.invalidEvents++;continue;
+  }
+  const host=Object.hasOwn(providers,EARNINGS_HOST)?providers[EARNINGS_HOST]:null;
+  const requests=host===null?0:host?.requests;
+  if(!Number.isSafeInteger(requests)||requests<0){out.invalidEvents++;continue;}
+  const day=new Date(Date.parse(at)+9*3600*1000).toISOString().slice(0,10);
+  counts.set(day,(counts.get(day)||0)+requests);
+  if(!earliest||at<earliest)earliest=at;
+  if(!latest||at>latest)latest=at;
+ }
+ const days=[...counts].sort(([a],[b])=>a.localeCompare(b));
+ out.observedDayCount=days.length;
+ out.dayListTruncated=days.length>COLLECTION_EVENTS_MAX_DAYS;
+ out.observedDays=days.slice(-COLLECTION_EVENTS_MAX_DAYS).map(([kstDate,observedRequests])=>({kstDate,observedRequests}));
+ out.observedMaxDailyRequests=days.length?Math.max(...days.map(([,n])=>n)):null;
+ out.observedOverOneRequestDays=days.filter(([,n])=>n>1).length;
+ out.observedWindow=earliest&&latest?{firstEventAt:earliest,lastEventAt:latest}:null;
+ out.coverage=!days.length?'NONE':incomplete||out.invalidEvents?'PARTIAL':'BOUNDED_LOG';
+ out.status=incomplete||out.invalidEvents||!days.length?'STATE_UNKNOWN':'OBSERVED';
+ out.code=out.status==='OBSERVED'?'COLLECTION_EVENTS_OBSERVED_ONLY':'COLLECTION_EVENTS_PARTIAL_OR_INVALID';
+ return out;
+}
 
 function defaultGitHead(dir){
  const exe=process.platform==='win32'
@@ -29,7 +121,7 @@ function defaultGitHead(dir){
 export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=defaultGitHead,coreTaskXml=null}={}){
  const out={status:'BLOCKED',code:'RELEASE_CALENDAR_DATA_ROOT_UNVERIFIED',
   evidenceLevel:'CHECKPOINT_AND_SOURCE_INVENTORY_NOT_LIVE_PROCESS',runtimeSourceVerified:false,
-  configuredSourceSha:null,collection:null,coreTask:null,candidates:[],candidateCount:0,gitSkippedCandidates:0,
+  configuredSourceSha:null,collection:null,earningsApiRequestObservations:null,coreTask:null,candidates:[],candidateCount:0,gitSkippedCandidates:0,
   inventoryTruncated:false,providerCalls:0,sqliteOpened:false,d1Writes:0,operationalWrites:0};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return out;
  const real=p=>{try{return fileSystem.realpathSync(p)}catch{return null}};
@@ -49,6 +141,7 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
   catch{return null;}
  };
  const home=path.join(actualData,'pc-writer');
+ out.earningsApiRequestObservations=inspectEarningsApiRequests(root,home,fileSystem);
  if(coreTaskXml){
   const bytes=Buffer.isBuffer(coreTaskXml)?coreTaskXml:Buffer.from(String(coreTaskXml));
   const decoded=bytes.length>=4&&bytes[1]===0&&bytes[3]===0?bytes.toString('utf16le'):bytes.toString('utf8');
