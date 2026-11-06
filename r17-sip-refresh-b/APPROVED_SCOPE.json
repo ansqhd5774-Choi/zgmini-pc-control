@@ -1,0 +1,28 @@
+{
+  "schema": "ZGMINI_R17_SIP_REFRESH_B_SCOPE_V1",
+  "status": "SOURCE_APPROVED_PC_PREFLIGHT_PENDING",
+  "repository": "ansqhd5774-Choi/zgmini",
+  "baseSourceSha": "cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc",
+  "candidateSourceSha": "d913514d919c1e499b7af9bc86d17ca07da18094",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": {
+    "scripts/pc-writer/us-breadth-sip-premarket-cycle.mjs": {
+      "status": "M",
+      "beforeSha256": "4be51a9d8162a6bc90528965fd263f52371675fabb64df1ac7ae7c18948e4e59",
+      "targetSha256": "bf0d4858679295a19c0a35c2a704899d28cbef9e7874efe38d0f71a337b3a959",
+      "targetBlobSha": "7ee9783744d45c3e5c2f88dc06f7e5c9687d7be3"
+    }
+  },
+  "protectedFiles": {
+    "scripts/pc-writer/us-breadth-provisional-cycle.mjs": "acaf0e46c532c49dc5a571718c2f91ddcd3dd57dbd0b50d1fb9ee350a7538cd1",
+    "lib/market-breadth/us-premarket-sip-r1.mjs": "a14cbad48d97895f6e4d2961e74af8ab657cd453a691552ab9f6ff675e7e7c6f"
+  },
+  "allowProviderCalls": false,
+  "allowD1Writes": false,
+  "allowDbChanges": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "runCount": 1
+}

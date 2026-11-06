@@ -1,0 +1,61 @@
+# R17 SIP-only collector patch, never touches regular IEX, formula, DB or D1.
+# The owner-created scoped B Issue is the sole trigger; no schedule/dispatch.
+name: ZGMINI R17 SIP Premarket One File Refresh B Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-r17-sip-premarket-onefile-source-refresh-b
+  cancel-in-progress: false
+jobs:
+  r17-sip-onefile-approved-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-r17-sip-refresh-onefile-install' &&
+      contains(github.event.issue.labels.*.name, 'pc-r17-writer-b-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: cmd
+    env:
+      R17_SIP_CONTROL_SHA: ${{ github.sha }}
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout exact private control event SHA
+        id: checkout-control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r17-sip-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Checkout fixed reviewed public SIP onefile source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: d913514d919c1e499b7af9bc86d17ca07da18094
+          path: r17-sip-refresh-candidate
+          fetch-depth: 1
+          persist-credentials: false
+      - name: One authenticated SIP-only source patch
+        id: refresh
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\r17-sip-control\\r17-sip-refresh-b\\windows.mjs" > "%RUNNER_TEMP%\\r17-sip-refresh-b-install-result.json"'
+      - name: Read back and upload bounded private result, never rerun patch
+        if: always() && steps.checkout-control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\r17-sip-control\\r17-sip-refresh-b\\upload.mjs"'
