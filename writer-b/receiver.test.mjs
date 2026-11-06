@@ -28,7 +28,12 @@ function fixture(){
   baseHead:BASE,baseConfigSourceSha:BASE,
   sourceRoot:'E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release',
   configPath:'E:\\ZGmini\\data\\pc-writer\\config.json',
-  coreTask:'ZGMINI-PC-Local-Core',files,protectedFiles:[],runCount:1,
+  coreTask:'ZGMINI-PC-Local-Core',files,protectedFiles:[],
+  runtimeDependencies:{taskXmlSha256:'2'.repeat(64),consumers:[{
+   id:'core-launcher',kind:'LAUNCHER',
+   path:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs',
+   sha256:H('approved-wrapper'),dependsOn:['scripts/pc-writer/run-local.mjs'],
+  }]},runCount:1,
   allowProviderCalls:false,allowDbChanges:false,allowD1Writes:false,
   allowTaskDefinitionChanges:false,allowOtherSourceChanges:false};
  const manifestBytes=Buffer.from(JSON.stringify(manifest));
