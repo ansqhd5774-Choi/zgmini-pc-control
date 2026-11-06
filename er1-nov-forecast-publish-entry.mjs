@@ -77,24 +77,36 @@ export function validateApproval(m,sourceSha=PINNED_SOURCE){
   return m;
 }
 
-export function verifySource(root,m,{getHead,gitRun}={}){
+export function verifySource(root,m,{getHead,gitRun,onFailure}={}){
   const git=args=>gitRun?gitRun(root,args):execFileSync('git',args,{
     cwd:root,encoding:'utf8',windowsHide:true,timeout:10000}).trim();
-  const sha=getHead?getHead(root):git(['rev-parse','HEAD']);
-  if(sha!==m.sourceSha)stop('ER1_NOV_FORECAST_B_SOURCE_STOP');
+  const fail=(relativePath,stage,code='ER1_NOV_FORECAST_B_SOURCE_HASH_STOP')=>{
+    onFailure?.({path:relativePath,stage});
+    stop(code);
+  };
+  let sha;
+  try{sha=getHead?getHead(root):git(['rev-parse','HEAD'])}
+  catch{fail(null,'HEAD_READ','ER1_NOV_FORECAST_B_SOURCE_STOP')}
+  if(sha!==m.sourceSha)fail(null,'HEAD_MISMATCH',
+    'ER1_NOV_FORECAST_B_SOURCE_STOP');
   for(const entry of m.files){
     const file=path.join(root,...entry.path.split('/'));
-    let st;try{st=fs.lstatSync(file)}catch{stop('ER1_NOV_FORECAST_B_FILE_MISSING')}
+    let st;try{st=fs.lstatSync(file)}
+    catch{fail(entry.path,'FILE_STAT','ER1_NOV_FORECAST_B_FILE_MISSING')}
     if(!st.isFile()||st.isSymbolicLink()||st.size<2||st.size>1_000_000)
-      stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP');
+      fail(entry.path,'FILE_TYPE_SIZE');
     // The pinned Git blob is canonical LF content. Windows checkout can
     // materialize safe CRLF; Git clean filters compare that worktree to HEAD.
-    try{
-      if(git(['rev-parse','--verify','HEAD:'+entry.path])!==entry.blobSha||
-        git(['cat-file','-t','HEAD:'+entry.path])!=='blob')
-        stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP');
-      git(['diff','--no-ext-diff','--quiet','HEAD','--',entry.path]);
-    }catch{stop('ER1_NOV_FORECAST_B_SOURCE_HASH_STOP')}
+    let objectId;
+    try{objectId=git(['rev-parse','--verify','HEAD:'+entry.path])}
+    catch{fail(entry.path,'BLOB_LOOKUP')}
+    if(objectId!==entry.blobSha)fail(entry.path,'BLOB_MISMATCH');
+    let objectType;
+    try{objectType=git(['cat-file','-t','HEAD:'+entry.path])}
+    catch{fail(entry.path,'OBJECT_TYPE_READ')}
+    if(objectType!=='blob')fail(entry.path,'OBJECT_TYPE');
+    try{git(['diff','--no-ext-diff','--quiet','HEAD','--',entry.path])}
+    catch{fail(entry.path,'WORKTREE_DIFF')}
   }
   return root;
 }
@@ -121,7 +133,8 @@ export async function execute({env=process.env}={}){
     const asOf=issueAsOf(event);
     const approvalPath=path.join(env.GITHUB_WORKSPACE,'control',MANIFEST);
     const m=validateApproval(JSON.parse(fs.readFileSync(approvalPath,'utf8')));
-    const src=verifySource(path.join(env.GITHUB_WORKSPACE,'source'),m);
+    const src=verifySource(path.join(env.GITHUB_WORKSPACE,'source'),m,{
+      onFailure:where=>{report.sourceCheck=where;}});
     const imp=p=>import(pathToFileURL(path.join(src,...p.split('/'))).href);
     const [{loadSavedNovemberDays},{forecastRowsFromSaved},
       {scoreER1ForecastIssuers},{makeER1PublicDisplay},

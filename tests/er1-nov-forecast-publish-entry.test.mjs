@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {validateRequest,validateApproval,verifySource,issueAsOf,PINNED_SOURCE} from
   '../er1-nov-forecast-publish-entry.mjs';
@@ -81,15 +82,51 @@ test('pinned Git blob and clean LF/CRLF checkout are accepted; drift is rejected
       fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(/\n/g,'\r\n'));
     }
     assert.equal(verifySource(dir,m),dir); // CRLF, Git clean-normalized.
-    assert.throws(()=>verifySource(dir,m,{getHead:()=>('a'.repeat(40))}),
-      /ER1_NOV_FORECAST_B_SOURCE_STOP/);
-    assert.throws(()=>verifySource(dir,{...m,files:[
-      {...m.files[0],blobSha:'f'.repeat(40)},...m.files.slice(1)]}),
-      /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/);
+    const first=(invoke,pattern,where)=>{
+      let failure=null;
+      assert.throws(()=>invoke(x=>{failure=x}),pattern);
+      assert.deepEqual(failure,where);
+    };
+    first(onFailure=>verifySource(dir,m,{getHead:()=>('a'.repeat(40)),
+      onFailure}),
+      /ER1_NOV_FORECAST_B_SOURCE_STOP/,
+      {path:null,stage:'HEAD_MISMATCH'});
+    const wrong={...m,files:[
+      {...m.files[0],blobSha:'f'.repeat(40)},...m.files.slice(1)]};
+    first(onFailure=>verifySource(dir,wrong,{onFailure}),
+      /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,
+      {path:m.files[0].path,stage:'BLOB_MISMATCH'});
+    const modifiedFile=path.join(dir,m.files[0].path);
+    const clean=fs.readFileSync(modifiedFile);
+    fs.writeFileSync(modifiedFile,'');
+    first(onFailure=>verifySource(dir,m,{onFailure}),
+      /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,
+      {path:m.files[0].path,stage:'FILE_TYPE_SIZE'});
+    fs.writeFileSync(modifiedFile,clean);
+    first(onFailure=>verifySource(dir,m,{onFailure,
+      gitRun:(_,args)=>args[0]==='rev-parse'&&args[1]==='--verify'?
+        (()=>{throw Error('GIT_MISSING')})():git(args)}),
+      /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,
+      {path:m.files[0].path,stage:'BLOB_LOOKUP'});
     fs.appendFileSync(path.join(dir,m.files[0].path),'// tampered\r\n');
-    assert.throws(()=>verifySource(dir,m),/ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/);
+    first(onFailure=>verifySource(dir,m,{onFailure}),
+      /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,
+      {path:m.files[0].path,stage:'WORKTREE_DIFF'});
   }finally{
     // Isolated temporary test fixture only; production paths are untouched.
     fs.rmSync(dir,{recursive:true,force:true});
   }
+});
+
+test('byte-level CRLF normalization matches canonical blob only without mutation',()=>{
+  const canonical=Buffer.from('// source\nconst eps=-1;\n');
+  const crlf=Buffer.from('// source\r\nconst eps=-1;\r\n');
+  const tampered=Buffer.from('// source\r\nconst eps=+1;\r\n');
+  const sha=bytes=>createHash('sha1').update('blob '+bytes.length+'\0')
+    .update(bytes).digest('hex');
+  const normalize=bytes=>Buffer.from(bytes.filter((x,i)=>
+    !(x===13&&bytes[i+1]===10)));
+  assert.equal(sha(normalize(canonical)),sha(canonical));
+  assert.equal(sha(normalize(crlf)),sha(canonical));
+  assert.notEqual(sha(normalize(tampered)),sha(canonical));
 });
