@@ -124,7 +124,10 @@ export async function performAuthorizedInstall(auth,io){
     requireThat(sha40(prepared?.commit)&&prepared.commit!==BASELINE_SOURCE&&
       prepared.parent===BASELINE_SOURCE&&prepared.clean===true&&
       prepared.onlyThreeFiles===true,'SIP_B_PREPARED_SCOPE_STOP');
-    await io.pauseCoreWithoutDefinitionChange();quiesced=true;
+    // The pause may disable Core and then fail while journaling. Mark intent
+    // before the call so recovery always verifies/restores its exact state.
+    quiesced=true;
+    await io.pauseCoreWithoutDefinitionChange();
     await io.waitForCoreDrain();
     await io.assertCoreQuiet();
     switched=true;
