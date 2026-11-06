@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_RELEASE_CALENDAR_CACHE_HOTFIX_B_RESULT_V1",
+  "requestId": "pc-calendar-cache-1ae85f09-71fa-40f9-90db-90d61079dd50",
+  "issueNumber": 511,
+  "status": "SUCCEEDED",
+  "code": "CAL_CACHE_B_ONEFILE_INSTALLED_VERIFIED",
+  "phase": "VERIFIED",
+  "controlSha": "d38bbc1d6177e7ed1f43bedbfa84b95e656b8d3f",
+  "fileCount": 1,
+  "beforeVerified": 1,
+  "afterVerified": 1,
+  "backupVerified": 1,
+  "controllerChanged": false,
+  "schedulerChanged": false,
+  "dbChanged": false,
+  "providerCalls": 0,
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
