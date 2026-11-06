@@ -137,3 +137,13 @@
 - **다음 필수 행동:** #68의 단일 담당에게 #545 후보 파일 2개와 해당 비완료 조건을 인계하고 실제 필요한 공용 적용에서만 누적 diff/정확한 승인·Windows 보호 경로를 확정. 원래 A·Provider 재호출이나 예약 검증은 만들지 않음.
 
 **M3 RUNNING / 신규 R1 60% 유지.** 이 작업에서 PC Controller/DB/API/예약/게시 변경 0, 기존 작업자 기능 구현 대체 0.
+
+## 11. M3 소스 병합과 조건부 2파일 B 준비 (2026-11-07 KST)
+
+- **실제 신규 수행:** 공통 결과 `REPORT_SIZE` 수정 [PR #545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545)을 Draft 해제 후 GitHub `main`에 **squash 소스 병합 성공**. 병합 SHA `842e53ed4cd88f789d4782ff2c93dfb102300f05`; 설치 SHA와 구별. 소스 대상 3파일, Linux Node 24 14/14 PASS, 독립 검토 2건 중대 결함 없음. 이 단계의 Windows PC 실행/Controller 설치 0.
+- **병렬 원담당 전진:** EarningsAPI 원담당은 별도 [정규 B #551](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/551)를 `targetControllerSha=c480000dfd487d3cc1ed3daa6b2663c86d0c2d65`로 **접수**. 마지막 조회에서 결과 댓글 **0**, 따라서 성공/설치 SHA 확정 아님. 이전 정상 B #538의 `af016444…`는 시점 제한 기준으로 보존. #551을 총괄 작업 성과/완료로 계산하지 않는다.
+- **정확한 누적 diff:** `af016444…→c480000d…` Controller 1파일(`release-calendar-runtime-readonly.mjs`, 원담당 [#547](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/547) 승인); `c480000d…→842e53…` Controller 2파일(`report-upload-verified.mjs`, `upload.mjs`, [#545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545) 승인). 이 경계에는 R17 스크립트/테스트/기타 파일을 Controller 적용 목록에 포함하지 않는다.
+- **조건부 설치 manifest 준비:** 별도 [Draft PR #553](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/553) `approvals/controller-updates/842e53ed4cd88f789d4782ff2c93dfb102300f05.json` 1파일. **선행 `c480`이 실제 PC에 설치된 경우에만** `installedSha=c480`→`targetSha=842e` 2파일을 적용하도록 고정. GitHub 원격과 로컬 JSON 동일, raw SHA256 `073604bce3fd69c52e0520013c4309b28e72e0b36c1412489a697f79b5fb997f`, file-list fingerprint `cc559ec21f8f3cec696cec8d72db6dc7a859d1336e9b0ee734d311dd8435f38b`, 2/2 파일 source SHA256/rollback-target 정적 PASS. **Draft 상태로 실제 적용 안 함**; 검증된 B manifest 주장은 하지 않음.
+- **재시도 경계 확인:** 기존 `pc-job.yml`은 `issues.opened`에서 A `entry.mjs` 후 `upload.mjs`; 기존 #540 결과만 다시 올리는 승인된 경로가 없음. `upload.mjs` 라이브러리를 임의 실행하거나 기존 #540 A 재실행하지 않음. #540 run 42261956750/attempt 1/seat 3의 로컬 포인터 존재 여부는 Windows에서 미검증.
+
+**FIRST GAP:** #551 실제 `SUCCEEDED`/원격 증거 확인, #553 조건부 manifest의 정규 검증/승인·Windows 영향 점검·#68 단일 B 인계, #540 기존 포인터와 안전한 upload-only 복구 통로. **M3 RUNNING/M4 DEFERRED, 신규 R1 60% 유지.** 본 총괄의 새 PC B 요청/예약 검증/원래 A 재실행 0.
