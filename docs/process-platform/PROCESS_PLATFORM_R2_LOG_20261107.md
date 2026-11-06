@@ -105,3 +105,11 @@
 - **LAST PASS:** source B 수정본·격리 24/24, 승인 범위 한정 계약/공유 자원 조정 기록.
 - **FIRST FAIL/미확인:** 실제 PC sourceRoot/config.source 형식/Runtime 실행 래퍼 및 Sidecar bytes, Windows Runner B 적용·rollback·원격 결과쌍·requestId. M1, M2는 RUNNING; 전체 **20%**.
 - **다음 필수 단계:** #68 기존 설치 담당의 B 결과 확보→A 고유 read-only request로 실제 source와 runtime 소비자 목록 확보→기능별 승인 manifest 생성→Draft B Windows 환경 집중 실증·검증 후 통합 여부 판단. M3/M4 선행 완료로 간주하지 않음.
+
+## 2026-11-07 — M1 구형 A operation 재사용 가능 범위 확정 (READ-ONLY)
+
+- #608 설치 SHA `db8924162d42adf6ee6aa27a04ce1719c8fe96c2`의 operations/dispatcher에 이미 `core-status`, `pc-source-preflight`, `pc-source-origin-readonly` 등록. 반면 `core-runtime-source-readonly`는 구 설치 허용목록 밖(#614의 `OPERATION_NOT_ALLOWED`와 정합).
+- 기존 `pc-source-preflight`는 다단계 VBS에서 실제 live checkout 추적 실패 가능성이 있고 고정 6파일 해시만 조회. 물가지표 PR #981 대상 3개 중 `run-local.mjs`만 포함; `inflation-causal-public-auto-publication-r1.mjs`, `.test.mjs`는 없음. `config.source`와 3파일별 dirty를 한 번에 제공하지 못함.
+- 기존 [#531](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/531) A PASS(KST 2026-11-07 02:09)도 `sourceResolved=false`, `runtimeSourceVerified=false`, 역사적 checkout 후보 HEAD `d7bc4948…` 및 dirty=true였으므로 실 실행 checkout 증거가 아님. [#530](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/530) configApprovedSha 후보 `d7bc…`와 이후 #609 운영 source `f7ed…`의 시점/범위도 구분.
+- **결정:** 구형 A를 동일 목적에 재요청해도 M1 목표인 현재 PC live checkout/HEAD/config.source/3개 파일 SHA·dirty를 확보할 수 없다. 일부 보조 조회 가능은 유지하되 새 전역 Gate나 무효한 요청을 추가하지 않음.
+- **LAST PASS:** 기존 설치 operation 정적 계약 및 #530/#531 당시 실제 A 범위 확인. **FIRST FAIL:** 신규 A 코드 #625는 main source 병합만 되었고 PC 등록/실행 미증명. #68 단일 B 담당이 기존 승인 누적 diff와 실제 SHA를 반영해 설치한 후 고유 A 요청 + Runtime 체인을 검증해야 M1 완료. 새로운 A/B Issue 0, PC 쓰기 0, R2 20% 유지.
