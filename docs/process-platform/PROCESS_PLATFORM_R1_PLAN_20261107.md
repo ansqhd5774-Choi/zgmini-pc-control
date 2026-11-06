@@ -1,7 +1,7 @@
 # ZGMINI 공통 실행 효율화 R1 — 프로젝트 계획서
 
 - 작성: 2026-11-07 KST
-- 상태: **M0 DONE / M1 READY**, 신규 프로젝트 20% (GitHub 문서·추적 기록만 완료)
+- 상태: **M0 DONE / M1 DONE / M2 계약 구체화 중 / M3 사전 조사 완료**, 신규 프로젝트 40% (실PC 효과 미실증)
 - 전용 브랜치: `codex/controller-process-platform-r1-20261107`
 - 분기 기준: `codex/controller-ops-lessons-20261105` (기존 업무·완료 증거 보존)
 - 운영 정본: `main`의 `AGENTS.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/GENERAL_CHAT_START.md`, `docs/GENERAL_CHAT_PREWORK.md`
@@ -23,7 +23,7 @@
 ## 2. 보존 대상·업무 경계
 
 - 기존 5건: #433/#435/#437/#442 DONE; #434는 유지보수기 인계 PASS지만 신규 E: 보고 파일 0 운영 효과 미실증. **4/5=80% 보존**. #434 확인용 인위적인 B 금지.
-- EarningsAPI: [#520](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/520#issuecomment-6689594993) `NOV30_ER1_D1_VERIFIED`은 기존 EPS 점수 게시·재조회 PASS(`providerCalls=0`)의 증거다. 하루 1 GET의 런타임 증거는 아님. [Draft PR #524](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/524) 2파일·관련 테스트 7/7, 실PC 미설치; 파일 메타데이터만으로 날짜별 호출 제한을 증명하지 못함. PR #524를 중복 편집/병합하지 않는다.
+- EarningsAPI: [#520](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/520#issuecomment-6689594993) `NOV30_ER1_D1_VERIFIED`은 기존 EPS 점수 게시·재조회 PASS(`providerCalls=0`)의 증거다. 하루 1 GET의 런타임 증거는 아님. [Draft PR #524](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/524) 2파일·관련 테스트 **11/11**, 실PC 미설치; 고정 `collection-events.jsonl`의 KST 날짜별 fetch-wrapper 로그 관측 기능도 추가됨. 단 이 기록은 비공개 수집기의 모든 GET·일일 차단·활성 설치를 증명하지 못함. PR #524를 중복 편집/병합하지 않는다.
 - R54: V3/V4 일회성 결과 TXT가 E:에 기록되는 원인은 개별 패킷의 하드코딩. 복구 백업은 E:에 보존하고 출력은 템플릿/원담당 범위에서 조정. 성공한 V4 재실행 금지.
 - 원담당: EarningsAPI·R54·R17·ER1의 수집/계산/게시/기능 코드 및 본래 설치 실행.
 - 총괄: 공통 진단·조정·문서·통합 계약·프로세스 지표. 원담당의 기능을 대신 개발하거나 PC 운영 효과를 임의 선언하지 않는다.
@@ -46,11 +46,11 @@
 | --- | --- | --- | --- |
 | `tools/automation-status.mjs` | PC 고정 경로에서 Controller/유지보수기/Runner/lease/설치 operation 요약 | 일반 `pc-job` allowlist 등록·실설치 증거 없음 | **재사용 후보**, 기존 A 또는 원본 결과로 확인; 전역 건강 검사로 만들지 않음 |
 | `release-calendar-runtime-readonly` | 출시 캘린더 source/checkpoint/후보 checkout 읽기 전용 A | EarningsAPI 날짜별 호출/체크포인트 및 실제 실행 연결 미확인 | 이 한계를 넘는 새로운 주장은 하지 않음 |
-| Draft PR #524 | 후보 체크아웃의 EarningsAPI 파일 해시/크기/mtime | 단일 파일 존재 ≠ 활성 실행, 일일 호출 증거 아님 | Draft 보존. 원담당과 중복 코드 변경 금지 |
+| Draft PR #524 | 후보 체크아웃 파일 메타데이터 + 고정 fetch-wrapper 로그의 최근 512 KiB/1024행/14일 KST 날짜별 관측; 11/11 테스트 | 단일 파일·부분 로그는 활성 실행/하루 1 GET 차단의 증거 아님. 누락·절단·비공개 bypass 가능성 `STATE_UNKNOWN` | 원담당 PR 보존. 수집기·날짜별 파서 중복 구현 금지 |
 | `market-calendar-er1-saved-status` | 지정 과거 5일 입력·검증 개수·바인딩 지문 | 오늘 호출 ledger/런타임 요청 증거를 제공하지 않음 | 원래 기능 완료 증거 재사용; 신규 전역 진단으로 확대 금지 |
 | `scripts/pc-writer/quota-ledger.mjs` + `quota-policy.mjs` (`zgmini` main) | 공통 provider quota 원장 및 요청 시각 저장 로직 존재 | 현재 공식 등록 공급자에 **EarningsAPI 없음**; 비공개 수집기의 실제 경로/이 원장 경유 여부 미확인 | 기존 원장만으로 하루 1 GET 입증 불가. 새 quota 정책을 임의로 추가하지 않음 |
 | `controller/operations.mjs`+`config/operations.json` | 고정 operation allowlist·등급/자원·실행 어댑터 | 신기능 자동 로딩은 아님 | 임의 경로/스크립트 실행 없는 고정 등록 유지 |
-| `docs/CONTROLLER_APPLY_QUEUE.md` + #68 | 실제 설치 SHA→목표 누적 diff 및 승인 manifest·단일 담당·lease·원본 보호 | 최소 부분 적용 가능 여부는 실제 설치기/정확한 대상에 따라 다름 | 설치기 지원을 검증하기 전 부분 적용이 가능한 것으로 단정하지 않음 |
+| `tools/update.mjs` + #68 | 설치 SHA→목표 SHA 모든 `controller/`,`config/` 변경과 `manifest.allowFiles` 완전일치 후 목표 디렉터리 전체 교체 | **현재 일부 파일만 발췌 설치 불가**(`ALLOWFILE_DIFF_MISMATCH`). 실설치 SHA는 #476 정상 B 당시 `0492f6f5…` | 기존 A는 독립. 승인된 통합 manifest 또는 정확한 목표 SHA 순차 B. 검사/백업/드레인 우회 불가 |
 
 ## 5. 실행 단계와 완료 조건
 
@@ -64,7 +64,7 @@
 
 **실PC 효과 검증은 그 기능에 실제로 필요한 업무 흐름에서만 수행.** M2 코드·fixture 성공을 PC 설치로, M3 명세 완료를 운영 적용으로, M4 Issue 기록을 일반챗 자동 재개로 치환하지 않는다.
 
-## 6. 관측 계약 초안 — M1에서 확정
+## 6. 관측 계약 — M1 확정
 
 목표는 모든 경로를 임의로 읽는 범용 파일 조회기가 아니다. 기존 승인된 A operation 또는 고정 allowlist의 **등록된 관측 대상**에서 아래 최소 메타데이터를 추출하는 것이다.
 
@@ -74,7 +74,7 @@
 - 비노출: 파일 원문·키·전체 설정·HTTP 요청 URL·원자료·임의 인자·임의 JS/SQL.
 - 테스트: 반복 호출/같은 날짜/날짜 변경/중단 후 재개/수집 실패/원장 부재/다중 Runner 경합/경계 밖 symlink/기존 계약 호환. 기존 공통 테스트를 그대로 재사용하고 영향 범위를 좁힌다.
 
-**핵심 결정:** #524의 해시 검증은 좋은 원자적 단계지만 날짜별 호출 검증의 대체가 아니다. 먼저 기존 evidence를 수집하고, 부족할 때만 위 최소 계약의 구현을 승인 범위로 진행한다.
+**확정:** `FILE_INVENTORY_ONLY` / `LOGGED_FETCH_WRAPPER_CALLS_ONLY` / `SAVED_CHECKPOINT_ONLY` / `ACTIVE_RUNTIME_VERIFIED`를 서로 구분한다. 한 등급의 PASS를 다음 등급으로 승격하지 않는다. 로그 부분/중단·활성 설치 불명·비공개 checkpoint 부재 시 `STATE_UNKNOWN` 유지. M2 공통화 후보는 여러 A 진단기의 고정 경로·symlink·용량 제한·안정적 읽기 계약 하나이며, 파일 형식이 달라 성급한 범용 reader 분리 대신 실제 두 번째 소비자가 확인된 경우에만 최소 모듈을 추출한다. #524의 기능별 파서는 건드리지 않는다.
 
 ## 7. 실행 기록·진행 지표
 
@@ -83,8 +83,14 @@
 
 운영 KPI는 이번 착수 시 **기준치 미측정**으로 보존한다. 초기 대표 사례 #524 및 다른 실제 공용 장애를 통해 `사용자 수동 개입 횟수`, `동일 진단 반복 횟수`, `Controller 때문에 멈춘 시간`, `PR→PC 적용 소요`, `원담당 다음 실행 완료율`을 관측 가능한 범위에서만 측정한다. 증거 없는 향상률·무중단 보장·가공된 수치 금지.
 
-## 8. 현재 결정과 바로 다음 한 행동
+## 8. M1 완료 판정과 다음 실행 (2026-11-07)
 
-1. **현재:** M0 산출물 등록, 실제 코드/설치/PC 변경 없음.
-2. **다음 필수 실행(M1):** 총괄이 기존 `tools/automation-status.mjs`/A operation/유효 ledger에 대해 **읽기 가능 증거와 설치 여부를 분리한 공백 표**를 완성하고, #524 원담당의 기존 기록을 대조해 **최소 관측 계약 1건**만 확정한다.
-3. 지원이 불명확하거나 권한 거부 시 원문·요청 경로·담당·해제 조건만 기록. 모든 일반 작업자의 별도 기능 작업은 계속한다.
+**M1 완료 / 신규 진행률 40%.** 기존 A, quota ledger, fetch-wrapper 로그와 비공개 EarningsAPI 수집기의 관측 공백을 확인하고 위 단일 증거 등급 계약을 확정했다. PR #524의 11/11은 소스 fixture 검증이며 운영 PC 설치·1 GET/day 실증은 미확인.
+
+**M2 다음 행동:** 현재 여러 A 진단기에서 중복되는 안전 파일 읽기 계약의 실제 공통 소비자·테스트 필요성을 확인한다. 위험한 임의 경로 reader는 만들지 않는다. 소비자가 확인되면 최소 유틸/fixture만 구현하고 #524 원담당과 충돌하는 기존 reader 수정은 피한다. 그렇지 않으면 불필요한 미사용 유틸 생산을 보류한다.
+
+**M3 확인 결과:** 실제 설치된 Controller SHA로 확인된 최신 정상 B #476의 목표는 `0492f6f5bb16769e914ca85c63db119979fcf0a6` ([근거](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/476#issuecomment-6685444328)); 이는 당시 증거이며 현재 PC 재측정 값은 아니다. 기존 정상 B #445→#449→#454→#476은 승인된 정확한 목표 커밋에 맞춰 **순차적으로 전체 diff를 적용한 성공 사례**다. 해당 대상 커밋의 일부 파일만 임의 선택한 것은 아니다. 유지보수기 설치 SHA `4f076a…`와 Controller SHA를 혼동하지 않는다.
+
+**M3 다음 행동:** 현재 설치 SHA와 승인된 정확한 목표 SHA가 있는 실제 공유 변경에 한정해 기존 manifest/백업/restore/6 Runner 복구 시나리오를 격리 시험한다. #68 단일 적용 담당 외 임의 B 요청·설치 금지.
+
+**운영 변경:** 이번 조사·기록 단계에서 실제 Windows 실행/Controller 교체/공급자 API 호출/DB·예약 변경 없음. 원담당 업무 진행을 중단시키지 않는다. 예약 검증은 본 업무가 끝난 후 별도 후속 작업이다.
