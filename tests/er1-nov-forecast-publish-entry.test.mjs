@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {validateRequest,validateApproval,verifySource,PINNED_SOURCE} from
+import {validateRequest,validateApproval,verifySource,issueAsOf,PINNED_SOURCE} from
   '../er1-nov-forecast-publish-entry.mjs';
 
 const approval=JSON.parse(fs.readFileSync(new URL(
@@ -18,7 +18,16 @@ const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
   GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened'};
 const event={action:'opened',issue:{title:'pc-er1-nov-forecast-publish',
   user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-er1-approved'}],
-  body:JSON.stringify(request)}};
+  created_at:'2026-11-06T16:20:30Z',body:JSON.stringify(request)}};
+
+test('Issue creation time fixes November KST asOf across reruns',()=>{
+  assert.equal(issueAsOf(event),'2026-11-07');
+  assert.equal(issueAsOf(structuredClone(event)),'2026-11-07');
+  for(const stamp of [undefined,'2026-11-31T12:00:00Z',
+    '2026-12-01T00:00:00Z'])
+    assert.throws(()=>issueAsOf({...event,issue:{...event.issue,
+      created_at:stamp}}),/ER1_NOV_FORECAST_B_ISSUE_TIME_STOP/);
+});
 
 test('fixed issue accepts exactly saved-only forecast B and pinned source',()=>{
   assert.deepEqual(validateRequest(event,env),request);

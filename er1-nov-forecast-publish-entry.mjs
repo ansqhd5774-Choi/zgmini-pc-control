@@ -40,6 +40,22 @@ export function validateRequest(event,env){
   return req;
 }
 
+// The Issue creation timestamp is immutable across workflow re-runs.
+// Pin the score's asOf once so repeated attempts cannot drift to a new day.
+export function issueAsOf(event){
+  const stamp=event?.issue?.created_at;
+  if(typeof stamp!=='string'||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(stamp))
+    stop('ER1_NOV_FORECAST_B_ISSUE_TIME_STOP');
+  const epoch=Date.parse(stamp);
+  if(!Number.isFinite(epoch)||new Date(epoch).toISOString().slice(0,19)+'Z'!==stamp)
+    stop('ER1_NOV_FORECAST_B_ISSUE_TIME_STOP');
+  const day=new Date(epoch+9*60*60*1000).toISOString().slice(0,10);
+  if(day<'2026-11-01'||day>'2026-11-30')
+    stop('ER1_NOV_FORECAST_B_ISSUE_TIME_STOP');
+  return day;
+}
+
 export function validateApproval(m,sourceSha=PINNED_SOURCE){
   const paths=['lib/market-calendar-er1-forecast-score.mjs',
     'lib/market-calendar-er1-forecast-saved-adapter.mjs',
@@ -95,6 +111,7 @@ export async function execute({env=process.env}={}){
     output=path.join(env.GITHUB_WORKSPACE,resultName(event.issue.number));
     // Even a rejected request leaves a minimal status report for the Issue.
     const req=validateRequest(event,env);
+    const asOf=issueAsOf(event);
     const approvalPath=path.join(env.GITHUB_WORKSPACE,'control',MANIFEST);
     const m=validateApproval(JSON.parse(fs.readFileSync(approvalPath,'utf8')));
     const src=verifySource(path.join(env.GITHUB_WORKSPACE,'source'),m);
@@ -117,8 +134,7 @@ export async function execute({env=process.env}={}){
     sideEffectAttempted=true; // local derived save can begin below
     report=await runNovemberForecastB({
       approval:m,sourceSha:req.sourceSha,
-      // The operational calendar and page dates are Asia/Seoul dates.
-      asOf:new Date(Date.now()+9*60*60*1000).toISOString().slice(0,10),
+      asOf,
       loadSavedNovemberDays,adapter:forecastRowsFromSaved,
       scorer:scoreER1ForecastIssuers,publicSerializer:makeER1PublicDisplay,
       prepareForecastMonth,stageForecastMonth,publishForecastMonth,
