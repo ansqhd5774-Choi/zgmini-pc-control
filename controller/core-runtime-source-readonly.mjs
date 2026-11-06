@@ -105,10 +105,10 @@ export function inspectCoreRuntimeSource({platform=process.platform,
  systemRoot=process.env.SystemRoot??String.raw`C:\Windows`}={}){
  if(platform!=='win32')return unknown('CORE_WINDOWS_REQUIRED');
  const cscript=path.win32.join(systemRoot,'System32','cscript.exe');
- const script=fileURLToPath(new URL('./core-runtime-source-wmi.js',import.meta.url));
+ const script=fileURLToPath(new URL('./core-runtime-source-wmi.mjs',import.meta.url));
  if(!exists(cscript)||!exists(script))return unknown('CORE_FIXED_PROBE_UNAVAILABLE');
  try{
-  const result=probe(cscript,['//NoLogo',script],{
+  const result=probe(cscript,['//NoLogo','//E:JScript',script],{
    encoding:'utf8',windowsHide:true,shell:false,timeout:20000,maxBuffer:1500000,
   });
   if(result?.error||result?.status!==0||typeof result.stdout!=='string'||
