@@ -1,0 +1,87 @@
+{
+  "schema": "ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-calendar-1655c6b0-3074-4741-9e07-ddb4f9eac464",
+  "issueNumber": 546,
+  "status": "CAL_B_PREFLIGHT_STOP",
+  "code": "CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP",
+  "diagnostic": {
+    "taskCommand": "wscript.exe",
+    "firstLauncherShaVerified": true,
+    "secondLauncherShaVerified": true,
+    "containsSecondLauncher": true,
+    "containsSourceRoot": false,
+    "containsLocalCycle": false,
+    "containsRunLocalCmd": false,
+    "callGraph": [
+      {
+        "launcher": 1,
+        "callCount": 2,
+        "truncated": false,
+        "commentStripped": true,
+        "anyConditionalSyntax": true,
+        "sourceRootMentioned": false,
+        "callSites": [
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "mentionsSecondLauncher": true,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          }
+        ]
+      },
+      {
+        "launcher": 2,
+        "callCount": 3,
+        "truncated": false,
+        "commentStripped": true,
+        "anyConditionalSyntax": true,
+        "sourceRootMentioned": false,
+        "callSites": [
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          }
+        ]
+      }
+    ]
+  },
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "operationalWrites": 0
+}
