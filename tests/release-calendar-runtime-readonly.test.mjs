@@ -115,9 +115,8 @@ test('missing EarningsAPI collector is not treated as verified readable',t=>{
  const f=fixture(t,{dirs:0});
  const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
  assert.equal(out.status,'PASS');
- assert.deepEqual(out.candidates[0].earningsApiCollector,{
-  verifiedReadable:false,sha256:null,bytes:null,modifiedAt:null,
-  evidenceLevel:'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF'});
+ assert.deepEqual(out.candidates[0].earningsApiCollector,{verifiedReadable:false});
+ assert.equal(out.earningsApiCollectorEvidenceLevel,'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF');
 });
 
 test('EarningsAPI collector symlink outside approved root is excluded',t=>{
@@ -128,8 +127,62 @@ test('EarningsAPI collector symlink outside approved root is excluded',t=>{
  const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
  assert.equal(out.status,'PASS');
  assert.equal(out.candidates[0].earningsApiCollector.verifiedReadable,false);
- assert.equal(out.candidates[0].earningsApiCollector.sha256,null);
+ assert.equal(out.candidates[0].earningsApiCollector.sha256,undefined);
  assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_EXTERNAL/);
+});
+
+function manyCandidates(f,{readable=false}={}){
+ if(readable)fs.writeFileSync(path.join(f.checkout,'scripts','pc-writer','earnings-api-local.mjs'),
+  'export const safe = true;\n');
+ for(let i=0;i<61;i++){
+  const dest=path.join(f.projects,`zgmini-release-calendar-candidate-${String(i).padStart(3,'0')}-copy`);
+  fs.cpSync(f.checkout,dest,{recursive:true});
+ }
+}
+
+function uploadBytes(out){
+ const body={schema:'ZGMINI_PC_RESULT_V1',jobId:'run-42261956750-1-seat-3',
+  requestId:'pc-dd8ebabd-0022-4b2c-9886-308058ed9357',startedAt:'2026-11-06T17:28:37.859Z',
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',controlSourceSha:SHA,
+  sourceRepository:'ansqhd5774-Choi/zgmini',requestedSourceSha:SHA,sourceBranch:'main',
+  operation:'release-calendar-runtime-readonly',seat:3,status:'PASS',code:out.code,
+  lastPass:'ALLOWLISTED_OPERATION_COMPLETED',firstFail:null,operationalWrites:0,
+  providerCalls:0,d1Writes:0,sqliteOpened:false,controlWorkspaceWrites:true,
+  chatId:'chat-48a82f49-de79-449a-92b7-c23db8c43e95',pcOperationalApprovedSha:SHA,
+  exitCode:0,result:out,protectedStateUnchanged:true,protectedBeforeSha256:'a'.repeat(64),
+  protectedAfterSha256:'a'.repeat(64),actualExecutionSha:SHA,
+  next:'READ_RESULT_NO_REPEAT',finishedAt:'2026-11-06T17:29:04.556Z',durationMs:26697};
+ const json=JSON.stringify(body,null,2)+'\n';
+ const txt=Object.entries(body).filter(([key])=>!['result','prior'].includes(key))
+  .map(([key,value])=>`${key}=${typeof value==='object'?JSON.stringify(value):value}`)
+  .join('\r\n')+'\r\n';
+ return Buffer.byteLength(json)+Buffer.byteLength(txt);
+}
+
+test('62 candidates keep negative EarningsAPI observations explicit and report under 32 KiB',t=>{
+ const f=fixture(t,{dirs:0});
+ manyCandidates(f);
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidateCount,62);
+ assert.equal(out.candidates.length,32);
+ assert.equal(out.inventoryTruncated,true);
+ assert.ok(out.candidates.every(candidate=>candidate.earningsApiCollector.verifiedReadable===false));
+ assert.equal(out.earningsApiRequestObservations.status,'STATE_UNKNOWN');
+ assert.ok(uploadBytes(out)<32768,'the fixed host uploader must accept this result');
+});
+
+test('readable EarningsAPI metadata remains available when candidate payload must truncate',t=>{
+ const f=fixture(t,{dirs:0});
+ manyCandidates(f,{readable:true});
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidateCount,62);
+ assert.equal(out.inventoryTruncated,true);
+ assert.ok(out.candidates.length>0&&out.candidates.length<=32);
+ assert.ok(out.candidates.every(candidate=>candidate.earningsApiCollector.verifiedReadable===true));
+ assert.ok(out.candidates.every(candidate=>/^[a-f0-9]{64}$/.test(candidate.earningsApiCollector.sha256)));
+ assert.ok(uploadBytes(out)<32768,'readable metadata must also fit uploader');
 });
 
 const event=(at,requests,extra={})=>JSON.stringify({at,lane:'core',providers:{
