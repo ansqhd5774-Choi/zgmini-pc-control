@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {traceVbsDataflow,logicalLines} from './vbs-static-dataflow.mjs';
+import {traceVbsDataflow,logicalLines,classifyResolvedCommand} from './vbs-static-dataflow.mjs';
 const root=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 const source=String.raw`E:\ZGmini\data\pc-writer\cutover-evidence\run-local-core.vbs`;
 const script=String.raw`E:\ZGmini\data\pc-writer\archive-sidecar-r7\run-original-then-archive.vbs`;
@@ -88,4 +88,37 @@ test('inline CreateObject.Run and Win32_Process.Create are never quietly ignored
   'Win32_Process.Create "E:\\other.exe"',context);
  assert.equal(x.indirectExecutionSeen,true);
  assert.equal(x.entirelyDeterministic,false);
+});
+test('resolved VBS calls reveal only program/script basenames and bounded next hop',()=>{
+ const core=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
+ const c=classifyResolvedCommand(`E:\\ZGmini\\runtime\\node.exe "${core}" --publish`,root);
+ assert.equal(c.executableBasename,'node.exe');
+ assert.equal(c.scriptBasename,'local-cycle.mjs');
+ assert.equal(c.scriptExtension,'.mjs');
+ assert.equal(c.scriptRooted,true);
+ assert.equal(c.approvedRootMatch,true);
+ assert.equal(c.nextHopKind,'CORE_LOCAL_CYCLE');
+ assert.equal(JSON.stringify(c).includes(root),false);
+ const one=classifyResolvedCommand(`cmd.exe /c wscript.exe "${source}"`,root);
+ assert.equal(one.executableBasename,'cmd.exe');
+ assert.equal(one.scriptBasename,'run-local-core.vbs');
+ assert.equal(one.nextHopKind,'CMD_ONE_HOP_KNOWN_VBS_WRAPPER');
+ assert.equal(one.oneHopCmdParsed,true);
+});
+test('shell operators, unbalanced quotes and relative path are flagged',()=>{
+ const unsafe=classifyResolvedCommand('cmd.exe /c node.exe a.mjs & other.exe',root);
+ assert.equal(unsafe.nextHopKind,'CMD_AMBIGUOUS');
+ assert.equal(unsafe.oneHopCmdParsed,false);
+ assert.equal(classifyResolvedCommand('node.exe "unterminated',root).nextHopKind,'UNKNOWN');
+ const relative=classifyResolvedCommand('node.exe local-cycle.mjs',root);
+ assert.equal(relative.scriptRooted,false);
+ assert.equal(relative.approvedRootMatch,false);
+});
+test('even the PC temporary JSON contains no arbitrary script/executable filename',()=>{
+ const classified=classifyResolvedCommand('secret-password.exe E:\\private\\token-secret-value.mjs',root);
+ assert.equal(classified.executableBasename,'OTHER_EXECUTABLE');
+ assert.equal(classified.scriptBasename,'OTHER_SCRIPT');
+ assert.equal(classified.scriptExtension,'.mjs');
+ assert.equal(JSON.stringify(classified).includes('secret-password'),false);
+ assert.equal(JSON.stringify(classified).includes('token-secret-value'),false);
 });

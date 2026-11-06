@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {writeOnce,sanitizeDiagnostic,sanitizeCandidateCheckout} from './upload-preflight-result.mjs';
+import {writeOnce,sanitizeDiagnostic,sanitizeCandidateCheckout,
+ sanitizeCycleCheckpoint} from './upload-preflight-result.mjs';
 function fake(){
  const memory=new Map();let puts=0;
  const fetchImpl=async(url,opts={})=>{
@@ -61,4 +62,47 @@ test('candidate checkout is explicitly non-active, only SHA/count/flags exported
  assert.equal(sanitized.activeRootVerified,false);
  assert.equal(sanitized.otherTargetBlobMatches,9);
  assert.equal(JSON.stringify(sanitized).includes('super-secret'),false);
+});
+test('third A exact relative dirty and two known mismatches safely export',()=>{
+ const sha='a'.repeat(40),sum='b'.repeat(64);
+ const v=sanitizeCandidateCheckout({dirtyFiles:[{path:'lib/release-calendar.mjs',
+  status:'M',fileSha256:sum},{path:'E:\\private\\key.txt',status:'M',fileSha256:sum}],
+  targetBlobMismatches:[{path:'lib/eia-calendar.mjs',localBlob:sha,
+   publicBlob:'ba6b9760481af53501abeb2b454d8f7683908a8e'},
+   {path:'E:\\private\\key.txt',localBlob:sha,publicBlob:sha}]});
+ assert.equal(v.dirtyFiles[0].path,'lib/release-calendar.mjs');
+ assert.equal(v.dirtyFiles[1].path,'OTHER_RELEVANT_DIRTY');
+ assert.equal(v.targetBlobMismatches[0].path,'lib/eia-calendar.mjs');
+ assert.equal(v.targetBlobMismatches[1].path,null);
+ assert.equal(JSON.stringify(v).includes('private'),false);
+});
+test('third A VBS hop basename output never leaks path or credential-looking name',()=>{
+ const safe=sanitizeDiagnostic({causality:[{callCount:1,calls:[{
+  api:'run',resolved:true,argumentForm:'concatenated',
+  commandShape:{executableBasename:'node.exe',scriptBasename:'local-cycle.mjs',
+   scriptExtension:'.mjs',scriptRooted:true,approvedRootMatch:true,
+   nextHopKind:'CORE_LOCAL_CYCLE',oneHopCmdParsed:false,
+   raw:'E:\\SECRET\\TOKEN_URL'}}]}]});
+ const shape=safe.causality[0].calls[0].commandShape;
+ assert.equal(shape.executableBasename,'node.exe');
+ assert.equal(shape.nextHopKind,'CORE_LOCAL_CYCLE');
+ assert.equal(JSON.stringify(safe).includes('TOKEN_URL'),false);
+ const redacted=sanitizeDiagnostic({causality:[{calls:[{commandShape:{
+  executableBasename:'secret-password.exe',scriptBasename:'token-secret-value.mjs',
+  nextHopKind:'UNTRUSTED'}}]}]});
+ assert.equal(redacted.causality[0].calls[0].commandShape.executableBasename,'OTHER_EXECUTABLE');
+ assert.equal(redacted.causality[0].calls[0].commandShape.scriptBasename,'OTHER_SCRIPT');
+ assert.equal(redacted.causality[0].calls[0].commandShape.nextHopKind,'UNKNOWN');
+ assert.equal(JSON.stringify(redacted).includes('token-secret-value'),false);
+});
+test('publication checkpoint projection remains whitelist-only on upload',()=>{
+ const safe=sanitizeCycleCheckpoint({exists:true,status:'PUBLICATION_NOT_VERIFIED',
+  publicationExit:1,progressiveReason:'AUXILIARY_INPUTS_CHANGED',
+  rawError:'access-token=private'});
+ assert.equal(safe.publicationExit,1);
+ assert.equal(safe.progressiveReason,'AUXILIARY_INPUTS_CHANGED');
+ assert.equal(JSON.stringify(safe).includes('access-token'),false);
+ const date=sanitizeCycleCheckpoint({exists:true,
+  modifiedAt:'2026-11-06T17:49:30.743Z injected-secret'});
+ assert.equal(date.modifiedAt,null);
 });
