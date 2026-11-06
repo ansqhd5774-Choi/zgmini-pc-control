@@ -1,0 +1,52 @@
+# Integration note: place this exact file at the control repository's root
+# .github/workflows/pc-calendar-cache-hotfix-once.yml before opening an Issue.
+# This is a one-file source update, not a Controller or scheduler update.
+name: ZGMINI Release Calendar Cache B One File Install
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-release-calendar-cache-b-install
+  cancel-in-progress: false
+jobs:
+  calendar-cache-b-onefile:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-calendar-cache-hotfix-install-once' &&
+      contains(github.event.issue.labels.*.name, 'pc-calendar-cache-hotfix-b-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout exact control event source
+        id: source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install exactly one approved calendar cache file
+        id: install
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\calendar-cache-hotfix\installer\install.mjs"'
+      - name: Upload result TXT and JSON without installation retry
+        if: always() && steps.source.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\calendar-cache-hotfix\installer\upload.mjs"'
