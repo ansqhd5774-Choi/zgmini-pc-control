@@ -26,6 +26,11 @@ function manifest(){
     change:'A',beforeSha256:null,afterSha256:H('new-test')},
   ],
   protectedFiles:[{path:'scripts/pc-writer/release-calendar.mjs',sha256:H('calendar')}],
+  runtimeDependencies:{taskXmlSha256:'2'.repeat(64),consumers:[{
+   id:'core-launcher',kind:'LAUNCHER',
+   path:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs',
+   sha256:H('approved-wrapper'),dependsOn:['scripts/pc-writer/run-local.mjs'],
+  }]},
   runCount:1,allowProviderCalls:false,allowDbChanges:false,allowD1Writes:false,
   allowTaskDefinitionChanges:false,allowOtherSourceChanges:false,
  };
@@ -50,12 +55,13 @@ const auth=()=>{
 const map=(m,k)=>Object.fromEntries(m.map(x=>[x.path,x[k]]));
 
 function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
- candidateWrong=false,otherDirty=false}={}){
+ candidateWrong=false,otherDirty=false,resumeUnconfirmedOnce=false}={}){
  const m=manifest(),files=map(m.files,'beforeSha256'),
   protectedFiles=map(m.protectedFiles,'sha256');
+ const runtimeConsumers=map(m.runtimeDependencies.consumers,'sha256');
  const state={head:m.baseHead,config:m.baseHead,branch:'main',coreEnabled:true,
   acquired:false,claimed:false,released:false,retained:false,
-  unrelatedTrackedDirty:otherDirty,steps:[],files:{...files}};
+  unrelatedTrackedDirty:otherDirty,steps:[],files:{...files},resumeCalls:0};
  const mark=step=>{state.steps.push(step);};
  const fatal=stage=>{if(failAt===stage)
   throw Object.assign(new Error(stage),{code:'WRITER_B_SIMULATED_'+stage.toUpperCase()+'_STOP'});};
@@ -67,6 +73,7 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
    originalConfigSha256:'1'.repeat(64),originalTaskDefinitionSha256:'2'.repeat(64),
    coreTaskEnabled:state.coreEnabled,targetPathsClean:!dirtyTarget,
    beforeSha256:{...state.files},protectedSha256:{...protectedFiles},
+   runtimeConsumerSha256:{...runtimeConsumers},
    unrelatedTrackedDirty:state.unrelatedTrackedDirty,
   };},
   async readCandidate(){mark('candidate');fatal('candidate');const hashes=map(m.files,'afterSha256');
@@ -89,7 +96,9 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
   async changeConfigSource(from,to){mark('config');assert.equal(from,m.baseHead);
    state.config=to;fatal('config');},
   async assertConfigSource(sha){mark('assert-config');assert.equal(state.config,sha);},
-  async restoreCore(){mark('resume');state.coreEnabled=true;fatal('resume');},
+  async restoreCore(){mark('resume');state.resumeCalls++;
+   if(!(resumeUnconfirmedOnce&&state.resumeCalls===1))state.coreEnabled=true;
+   fatal('resume');},
   async verifyCoreDefinitionUnchanged(){mark('task-verify');fatal('task-verify');
    assert.equal(state.coreEnabled,true);},
   async restoreOriginalConfig(){mark('rollback-config');state.config=m.baseHead;
@@ -194,4 +203,17 @@ test('unverified lock finalize never yields a successful install status',async()
  assert.equal(result.status,'WRITER_B_RECOVERY_REQUIRED');
  assert.equal(result.code,'WRITER_B_LOCK_FINALIZE_STOP');
  assert.equal(state.released,true);
+});
+
+test('enable returned without actually enabling: rollback re-enables task after source restoration',async()=>{
+ const {io,state}=mockIO({resumeUnconfirmedOnce:true});
+ const result=await performWriterBInstall(auth(),io);
+ assert.equal(result.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(result.code,'WRITER_B_ADAPTER_UNEXPECTED_STOP');
+ assert.equal(result.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.config,manifest().baseHead);
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.resumeCalls,2);
+ assert.equal(state.retained,false);
 });
