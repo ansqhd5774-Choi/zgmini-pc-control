@@ -17,7 +17,7 @@ export const FILES=['lib/eia-calendar.mjs','lib/usda-calendar.mjs',
  'lib/cftc-calendar.mjs','lib/treasury-calendar.mjs','lib/tic-calendar.mjs'];
 // SHA256 of this package's DRAFT approval.json. An operator must explicitly
 // approve, update status and re-pin the new SHA before live use.
-export const APPROVAL_SHA='6bb941d94273422087f063d34eb2e14a1335ca0380edac525b3aa7b9618d8b3b';
+export const APPROVAL_SHA='49fc7f7daf6d027426f575e515d75b57074891b906f106c934ffed623019b367';
 export const RESULT_NAME='calendar-parser-recovery-result.json';
 const CAPSULE='private-parser-capsule';
 const HASH40=/^[a-f0-9]{40}$/;
