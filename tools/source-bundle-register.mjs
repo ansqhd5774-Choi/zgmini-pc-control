@@ -136,33 +136,97 @@ function verifyInventory(stageBundle,files,manifestBytes){
     fail('BUNDLE_MANIFEST_BYTES_DRIFT');
 }
 
-function verifyModules(sourceRoot,files){
+/** Minimal lexical mask, not a JavaScript parser. It preserves the offsets and
+ * quote delimiters of actual import specifiers, but masks comments, JSDoc,
+ * ordinary string contents and template text. Executable ${...} expressions
+ * inside template literals are scanned as code. */
+function executableImportMask(code){
+  const output=code.split('');
+  const blank=i=>{if(output[i]!=='\n'&&output[i]!=='\r')output[i]=' ';};
+  const frames=[{kind:'code',braceDepth:null}];
+  let i=0;
+  while(i<code.length){
+    const frame=frames.at(-1),ch=code[i],next=code[i+1];
+    if(frame.kind==='template'){
+      if(ch==='\\'){blank(i++);if(i<code.length)blank(i++);continue;}
+      if(ch==='`'){blank(i++);frames.pop();continue;}
+      if(ch==='$'&&next==='{'){
+        blank(i++);blank(i++);frames.push({kind:'code',braceDepth:1});continue;
+      }
+      blank(i++);continue;
+    }
+    if(frame.braceDepth!==null){
+      if(ch==='{')frame.braceDepth++;
+      else if(ch==='}'&&--frame.braceDepth===0){
+        blank(i++);frames.pop();continue;
+      }
+    }
+    if(ch==='\''||ch==='"'){
+      const quote=ch;i++;
+      while(i<code.length){
+        if(code[i]==='\\'){blank(i++);if(i<code.length)blank(i++);continue;}
+        if(code[i]===quote){i++;break;}
+        blank(i++);
+      }
+      continue;
+    }
+    if(ch==='`'){blank(i++);frames.push({kind:'template'});continue;}
+    if(ch==='/'&&next==='/'){
+      blank(i++);blank(i++);
+      while(i<code.length&&code[i]!=='\r'&&code[i]!=='\n')blank(i++);
+      continue;
+    }
+    if(ch==='/'&&next==='*'){
+      blank(i++);blank(i++);
+      while(i<code.length){
+        if(code[i]==='*'&&code[i+1]==='/'){blank(i++);blank(i++);break;}
+        blank(i++);
+      }
+      continue;
+    }
+    i++;
+  }
+  return output.join('');
+}
+
+function verifyModules(sourceRoot,files,{collectMissing=false}={}){
   // Registration is inert. Close static/literal ESM imports, side-effect ESM
   // imports and literal CJS require. This deliberately does NOT pretend that
   // computed import(expr), require(variable), loaders or fs reads are closed;
   // those exact bytes need B source review. No source is executed here.
   const existing=new Set(files);
+  const missing=[];
+  const record=(code,source,specifier,target)=>missing.push({code,source,specifier,target});
   for(const rel of files){
     if(!/\.(mjs|js|cjs)$/.test(rel))continue;
     const code=readFileStrict(path.join(sourceRoot,...rel.split('/'))).toString('utf8');
-    const regex=/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)['"]([^'"]+)['"]/g;
-    for(const match of code.matchAll(regex)){
-      const spec=match[1];
+    const executable=executableImportMask(code);
+    const regex=/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)(['"])([^'"]+)\1/dg;
+    for(const match of executable.matchAll(regex)){
+      const [start,end]=match.indices[2];
+      const spec=code.slice(start,end);
       if(isBuiltin(spec))continue;
       if(spec.startsWith('file:')||spec.startsWith('/')||spec.startsWith('\\'))
         fail('BUNDLE_IMPORT_ESCAPE');
       if(spec.startsWith('.')){
         const target=path.posix.normalize(path.posix.join(path.posix.dirname(rel),spec));
-        safeRel(target);
+        try{safeRel(target);}catch{
+          if(!collectMissing)fail('BUNDLE_UNSAFE_PATH');
+          record('BUNDLE_UNSAFE_PATH',rel,spec,target);continue;
+        }
         if(!existing.has(target)&&!existing.has(`${target}.js`)
           &&!existing.has(`${target}.mjs`)&&!existing.has(`${target}.cjs`)
-          &&!existing.has(`${target}/index.js`))fail('BUNDLE_RELATIVE_IMPORT_UNCLOSED');
+          &&!existing.has(`${target}/index.js`)){
+          record('BUNDLE_RELATIVE_IMPORT_UNCLOSED',rel,spec,target);
+          continue;
+        }
       }else{
         const base=spec.startsWith('@')?spec.split('/').slice(0,2).join('/'):spec.split('/')[0];
         const packageRoot=`node_modules/${base}/`;
         if(!existing.has(`${packageRoot}package.json`)
-          ||!files.some(x=>x.startsWith(packageRoot)))
-          fail('BUNDLE_PACKAGE_IMPORT_UNCLOSED');
+          ||!files.some(x=>x.startsWith(packageRoot))){
+          record('BUNDLE_PACKAGE_IMPORT_UNCLOSED',rel,spec,packageRoot);continue;
+        }
         let config;
         try{config=JSON.parse(readFileStrict(path.join(sourceRoot,`${packageRoot}package.json`)));}
         catch{fail('BUNDLE_PACKAGE_METADATA_INVALID');}
@@ -188,10 +252,22 @@ function verifyModules(sourceRoot,files){
           if(x.startsWith('.')||x.startsWith('/')||x.includes('..'))return false;
           const relative=`${packageRoot}${x}`;
           return existing.has(relative)||existing.has(`${relative}.js`);
-        }))fail('BUNDLE_PACKAGE_ENTRYPOINT_UNCLOSED');
+        }))record('BUNDLE_PACKAGE_ENTRYPOINT_UNCLOSED',rel,spec,packageRoot);
       }
     }
   }
+  if(collectMissing)return missing;
+  if(missing.length){
+    const first=missing[0];
+    throw Object.assign(new Error(`${first.code} ${first.source} => ${first.specifier}`),
+      {code:first.code});
+  }
+}
+
+/** Read-only source closure diagnosis; never modifies a manifest or bundle. */
+export function inspectBundleMissingImports({sourceRoot,files}){
+  if(!Array.isArray(files)||!path.isAbsolute(sourceRoot??''))fail('BUNDLE_INSPECTION_INPUT');
+  return verifyModules(sourceRoot,files,{collectMissing:true});
 }
 
 /** Construct an immutable, exact-source host CAS overlay; performs no writes.

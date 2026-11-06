@@ -104,6 +104,27 @@ test('side-effect relative import missing from bundle inventory is rejected',t=>
  assert.throws(()=>plan(rewriteModuleAndPin(f,"import './unlisted.mjs';\n")),
    err('BUNDLE_RELATIVE_IMPORT_UNCLOSED'));
 });
+test('JSDoc typedef and commented examples are not executable imports',t=>{
+ const f=fixture(t);
+ const code=`/**
+  * @typedef {import('../src/types.d.ts').Awaitable<T>} Awaitable<T>
+  * Example: import { ParquetReadOptions } from 'hyparquet'
+  */
+  // import './unlisted.mjs';
+  const note = "import './not-module.mjs'";
+  const url = 'https://example.test/data';
+  import {reader} from './reader.mjs';
+  import {decode} from 'hyparquet';
+  export {reader,decode};
+  `;
+ assert.equal(plan(rewriteModuleAndPin(f,code)).fileCount,4);
+});
+test('executable import inside template expression still rejects missing module',t=>{
+ const f=fixture(t);
+ assert.throws(()=>plan(rewriteModuleAndPin(f,
+  'const x = `literal ${import("./unlisted.mjs")}`;\n')),
+  err('BUNDLE_RELATIVE_IMPORT_UNCLOSED'));
+});
 test('manifest source mismatch refused',t=>{
  const f=fixture(t);
  f.approval.sourceSha='d'.repeat(40);
