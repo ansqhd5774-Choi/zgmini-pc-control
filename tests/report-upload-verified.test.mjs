@@ -140,6 +140,30 @@ test('oversized pretty report uses compact JSON preserving all uncertain evidenc
  assert.equal(links.length,2);
  assert.equal(f.remote.get(target('json')).toString(),out.json);
  assert.equal(f.remote.get(target('txt')).toString(),out.txt);
+ const uploads=f.calls.filter(x=>x.method==='PUT').length;
+ await uploadVerifiedReportPair({...params,json:out.json,txt:out.txt,api:f.api});
+ assert.equal(f.calls.filter(x=>x.method==='PUT').length,uploads);
+ const collision=fixture();
+ collision.remote.set(target('json'),Buffer.from(pretty));
+ await assert.rejects(uploadVerifiedReportPair({...params,json:out.json,txt:out.txt,api:collision.api}),
+  {code:'REPORT_REMOTE_CONTENT_CHANGED'});
+ assert.equal(collision.calls.filter(x=>x.method==='PUT').length,0);
+});
+
+test('32 KiB exact byte boundary is allowed, one extra byte is rejected',()=>{
+ const make=length=>({status:'PASS',result:{label:'검증',blob:'x'.repeat(length)}});
+ const base=make(0),txt='status=PASS\r\n';
+ const baseSize=Buffer.byteLength(JSON.stringify(base)+'\n')+Buffer.byteLength(txt);
+ const exact=make(32768-baseSize);
+ const out=renderBoundedReport(exact,32768);
+ assert.equal(Buffer.byteLength(out.json)+Buffer.byteLength(out.txt),32768);
+ assert.equal(out.json,JSON.stringify(exact)+'\n');
+ assert.throws(()=>renderBoundedReport(make(32769-baseSize),32768),{code:'REPORT_SIZE'});
+});
+
+test('large TXT alone cannot bypass the total byte limit',()=>{
+ assert.throws(()=>renderBoundedReport({status:'다'.repeat(11000),result:{}},32768),
+  {code:'REPORT_SIZE'});
 });
 
 test('even compact output over the same limit fails before any upload',()=>{
