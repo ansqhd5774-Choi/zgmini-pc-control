@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {authorize,probeHistorical,sanitizeProbeResult,uploadProbe,claimOnce,
-  loadProbeModules} from './historical-probe.mjs';
+  loadProbeModules,recheckInstalledSource} from './historical-probe.mjs';
 
 const requestId='r17-sip-historical-'+'a'.repeat(32);
 const sourceSha='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
@@ -31,6 +31,7 @@ function fixture(options={}){
         return {APCA_API_KEY_ID:'PRIVATE',APCA_API_SECRET_KEY:'SECRET'};},
       createQuotaFetch:({mode,originalFetch})=>{assert.equal(mode,'enforce');
         if(options.quotaError)throw Error(options.quotaError);
+        if(options.quotaEmpty)return {};
         return {fetch:originalFetch};},
       fetchImpl:async(input)=>{urls.push(input);return {status:200,ok:true};},
       fetchIexWindow:async input=>{
@@ -107,12 +108,21 @@ test('quota initialization failure is categorized before network calls',async()=
   await assert.rejects(()=>probeHistorical(f.dependencies),{
     safeCode:'SIP_PROBE_QUOTA_INIT_STOP'});
   assert.equal(f.calls.length,0);
+  const empty=fixture({quotaEmpty:true});
+  await assert.rejects(()=>probeHistorical(empty.dependencies),{
+    safeCode:'SIP_PROBE_QUOTA_INIT_STOP'});
+  assert.equal(empty.calls.length,0);
 });
 test('installed import failure uses a fixed stage code without dynamic path/stack',async()=>{
   let error;try{await loadProbeModules(async()=>{throw Error('file:///private/path');});}
   catch(e){error=e;}
   assert.equal(error.safeCode,'SIP_PROBE_MODULE_IMPORT_STOP');
   assert.ok(!String(error).includes('/private/path'));
+});
+test('second installed-source preflight exception is bounded without leaking paths',()=>{
+  assert.throws(()=>recheckInstalledSource(()=>{throw Error('E:\\private\\file');}),{
+    safeCode:'SIP_PROBE_SOURCE_RECHECK_STOP'});
+  assert.equal(recheckInstalledSource(()=>true),true);
 });
 test('HTTP 403 yields a bounded error without secrets/raw prices',async()=>{
   const f=fixture({error:'US_PROVISIONAL_HTTP_403'});
