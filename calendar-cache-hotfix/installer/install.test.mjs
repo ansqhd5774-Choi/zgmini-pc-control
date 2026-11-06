@@ -122,6 +122,34 @@ test('mutex and Core cycle lock stop without erasing other owners',t=>{
  assert.equal(fs.existsSync(args.sharedLock),false);
 });
 
+test('one-shot Core wait proceeds only after owner lock disappears',t=>{
+ const args=fixture(t),owner=JSON.stringify({pid:777,at:1});
+ fs.writeFileSync(args.cycleLock,owner);
+ let ticks=0;
+ const result=installOneFile({...args,waitCycleMs:5000,waitCycleTick:()=>{
+  ticks++;
+  assert.equal(fs.readFileSync(args.cycleLock,'utf8'),owner);
+  assert.equal(fs.existsSync(args.sharedLock),false);
+  assert.equal(installed(args.sourceRoot),before);
+  fs.unlinkSync(args.cycleLock);
+ }});
+ assert.equal(ticks,1);
+ assert.equal(result.status,'SUCCEEDED');
+ assert.equal(installed(args.sourceRoot),after);
+ assert.equal(fs.existsSync(args.cycleLock),false);
+});
+
+test('bounded Core wait does not steal owner lock or mutate source',t=>{
+ const args=fixture(t),owner='another-cycle';
+ fs.writeFileSync(args.cycleLock,owner);
+ assert.throws(()=>installOneFile({...args,waitCycleMs:1,waitCycleTick:()=>{}}),
+  /CAL_CACHE_B_CYCLE_BUSY_TIMEOUT_STOP/);
+ assert.equal(fs.readFileSync(args.cycleLock,'utf8'),owner);
+ assert.equal(installed(args.sourceRoot),before);
+ assert.equal(fs.existsSync(args.sharedLock),false);
+ assert.equal(fs.existsSync(args.backupRoot),false);
+});
+
 test('failure after replacement restores verified original and releases locks',t=>{
  const args=fixture(t);
  assert.throws(()=>installOneFile({...args,simulateFailureAfterReplace:true}),
