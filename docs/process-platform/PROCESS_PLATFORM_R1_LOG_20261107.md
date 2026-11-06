@@ -126,3 +126,14 @@
 - 공용 담당에는 [#68 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6691257448) **기록 완료**. 이는 설치 요청·타 담당 수신 ACK가 아님.
 
 **M3 RUNNING / 전체 60% 유지.** 완료 조건은 #537 자체의 검증된 안전 Windows 시험 경로와 정확 승인 manifest·정규 보호 절차. 신규 Controller 설치 0(이번 총괄 작업), 공급자 API/DB/예약 변경 0. #535 B 성공을 총괄 신규 설치 성과로 계산하지 않는다.
+
+## 10. M3 공통 업로드 결함 분리 — #540 REPORT_SIZE / Draft #545 (2026-11-07 KST)
+
+- **분류:** 원담당 [A #540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540) 고정 읽기 전용 진단 자체 **PASS**; 공통 결과 전송 단계는 `REPORT_SIZE` **FAILED**. 원담당 기능 코드·EPS 완료·기존 `STATE_UNKNOWN` 상태 보존. 같은 A 재실행 금지.
+- **원인/최소 수정:** pretty JSON 34,130B + TXT 1,130B > 32,768B. 데이터 삭제·한도 확대 대신 pretty가 초과할 때만 compact JSON으로 전송(실증 출력 재계산 24,800B + 1,130B = 25,930B). 두 직렬화 모두 넘으면 기존 `REPORT_SIZE` 유지.
+- **구현:** 전용 개발 브랜치 [Draft PR #545](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/545) HEAD `aa581948949c01c7c391af812fe7064116a10ef0`. Controller 2파일, test 1파일. Linux Node 24 **14/14 PASS**, Controller 구문 검사 PASS, 2개 독립 소스 리뷰 중대 결함 없음. 신규 #545 소스 원격 반영 ≠ Windows 설치/기존 #540 결과 회수.
+- **파일 바이트 및 누적 diff:** [정확한 후보 명세](M3_545_REPORT_DELIVERY_CANDIDATE_20261107.md). #538 B 당시 설치 `af016444…`→`main` Controller 1파일(원담당), →#545 HEAD Controller 2파일(업로드 공통), →#537 HEAD Controller 3파일(공통 읽기). 각 분리 브랜치를 임의 설치 목표로 사용하지 않고, 최종 병합 SHA 기준 전체 변경과 승인 manifest를 #68 담당이 조정.
+- **FIRST GAP:** (1) #545 Windows 최소 권한 검증 경로/정규 설치 없음, (2) #540 기존 결과 포인터 보존/승인된 upload-only 회수 경로 미확인, (3) 설치 당시 이후 현재 SHA/공유 경합 적용 직전 확인 필요.
+- **다음 필수 행동:** #68의 단일 담당에게 #545 후보 파일 2개와 해당 비완료 조건을 인계하고 실제 필요한 공용 적용에서만 누적 diff/정확한 승인·Windows 보호 경로를 확정. 원래 A·Provider 재호출이나 예약 검증은 만들지 않음.
+
+**M3 RUNNING / 신규 R1 60% 유지.** 이 작업에서 PC Controller/DB/API/예약/게시 변경 0, 기존 작업자 기능 구현 대체 0.
