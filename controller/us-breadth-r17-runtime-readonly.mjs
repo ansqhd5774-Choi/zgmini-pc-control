@@ -73,6 +73,7 @@ function validOutput(output) {
     typeof coverage === 'number' && Number.isFinite(coverage) &&
     Math.abs(coverage - observedCount / expectedCount) <= 1e-9 &&
     counts && typeof counts === 'object' && !Array.isArray(counts) &&
+    Object.keys(counts).sort().join(',') === 'falling,rising,unchanged' &&
     COUNT(counts.rising) && COUNT(counts.falling) && COUNT(counts.unchanged) &&
     counts.rising + counts.falling + counts.unchanged === observedCount &&
     ['COMPLETE','INCOMPLETE_PAGINATION'].includes(output.collectionStatus);
