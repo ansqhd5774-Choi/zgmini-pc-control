@@ -129,8 +129,8 @@ export async function execute({env=process.env}={}){
     report.requestId=req.requestId;
   }catch(e){
     report.status=sideEffectAttempted?'STATE_UNKNOWN':'BLOCKED';
-    report.code=/^ER1_(NOV_)?FORECAST_[A-Z0-9_]+$/.test(e?.message??'')?
-      e.message:'ER1_NOV_FORECAST_B_UNEXPECTED_STOP';
+    report.code=/^(?:ER1_(?:NOV_)?FORECAST|NOV30_ER1)_[A-Z0-9_]+$/.test(
+      e?.message??'')?e.message:'ER1_NOV_FORECAST_B_UNEXPECTED_STOP';
   }
   try{if(output)fs.writeFileSync(output,JSON.stringify(report)+'\n',{flag:'wx'})}
   catch{process.stderr.write('ER1_NOV_FORECAST_B_REPORT_STOP\n')}

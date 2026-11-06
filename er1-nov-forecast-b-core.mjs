@@ -68,8 +68,9 @@ export async function runNovemberForecastB({approval,sourceSha,asOf,
     report.d1ReadbackSha256=published.bodySha256;
   }catch(error){
     report.status=publishing?'STATE_UNKNOWN':staged?'PENDING':'BLOCKED';
-    report.code=/^ER1_(NOV_)?FORECAST_[A-Z0-9_]+$/.test(error?.message??'')?
-      error.message:'ER1_NOV_FORECAST_B_UNKNOWN_STOP';
+    // Preserve approved helper error codes; never print unrestricted exceptions.
+    report.code=/^(?:ER1_(?:NOV_)?FORECAST|NOV30_ER1)_[A-Z0-9_]+$/.test(
+      error?.message??'')?error.message:'ER1_NOV_FORECAST_B_UNKNOWN_STOP';
   }
   return report;
 }

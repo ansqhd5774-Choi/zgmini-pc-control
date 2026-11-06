@@ -101,10 +101,10 @@ test('derived checksum failure stops D1 before effect',async()=>{
 
 test('uncertain D1 outcome is STATE_UNKNOWN, not PASS',async()=>{
   const {args}=make({syncD1:{publicKey:NOV_FORECAST_PUBLIC_KEY,
-    run:async()=>{throw Error('D1_RECEIPT_LOST')}}});
+    run:async()=>{throw Error('NOV30_ER1_D1_READBACK_STOP')}}});
   const out=await runNovemberForecastB(args);
   assert.equal(out.status,'STATE_UNKNOWN');
-  assert.notEqual(out.code,'NOV30_ER1_D1_VERIFIED');
+  assert.equal(out.code,'NOV30_ER1_D1_READBACK_STOP');
 });
 
 test('matched result reports zero additional D1 writes',async()=>{
