@@ -11,6 +11,9 @@ const EARNINGS_HOST='api.earningsapi.com';
 const COLLECTION_EVENTS_MAX_BYTES=512*1024;
 const COLLECTION_EVENTS_MAX_ROWS=1024;
 const COLLECTION_EVENTS_MAX_DAYS=14;
+// Leave headroom for the pc-job JSON/TXT envelope under its 32 KiB upload cap.
+const CANDIDATES_REPORT_MAX_BYTES=24*1024;
+const EARNINGS_COLLECTOR_EVIDENCE='FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sha=value=>typeof value==='string'&&SHA40.test(value)?value.toLowerCase():null;
 const date=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():null;
@@ -122,6 +125,7 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
  const out={status:'BLOCKED',code:'RELEASE_CALENDAR_DATA_ROOT_UNVERIFIED',
   evidenceLevel:'CHECKPOINT_AND_SOURCE_INVENTORY_NOT_LIVE_PROCESS',runtimeSourceVerified:false,
   configuredSourceSha:null,collection:null,earningsApiRequestObservations:null,coreTask:null,candidates:[],candidateCount:0,gitSkippedCandidates:0,
+  earningsApiCollectorEvidenceLevel:EARNINGS_COLLECTOR_EVIDENCE,
   inventoryTruncated:false,providerCalls:0,sqliteOpened:false,d1Writes:0,operationalWrites:0};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return out;
  const real=p=>{try{return fileSystem.realpathSync(p)}catch{return null}};
@@ -210,14 +214,21 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
     collectorCallsCalendar:/\bcollectReleaseCalendar\s*\(/.test(collectorText),
     collectorImportsCalendar:/['"]\.\/release-calendar\.mjs['"]/.test(collectorText),
     moduleSha256:hash(module.bytes),collectorSha256:hash(collector.bytes),runnerSha256:hash(runner.bytes),
-    earningsApiCollector:{verifiedReadable:!!earningsModule,
-     sha256:earningsModule?hash(earningsModule.bytes):null,
-     bytes:earningsModule?.bytes.length??null,
-     modifiedAt:earningsModule?.modifiedAt??null,
-     evidenceLevel:'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF'},
+    // Preserve a per-checkout negative observation without repeating five
+    // null/evidence fields across every absent PC-only collector candidate.
+    earningsApiCollector:earningsModule?{verifiedReadable:true,
+     sha256:hash(earningsModule.bytes),bytes:earningsModule.bytes.length,
+     modifiedAt:earningsModule.modifiedAt,
+     evidenceLevel:EARNINGS_COLLECTOR_EVIDENCE}:{verifiedReadable:false},
     sourceParseStatus:match&&keys.length?'PARSED':'UNKNOWN',
     sourceKeys:keys,sourceCount:match&&keys.length?keys.length:null});
   }
+ }
+ // The reporter pretty-prints the entire result before applying its 32 KiB
+ // upload cap. Bound repeated candidates without hiding the discovered total.
+ while(out.candidates.length>1&&
+       Buffer.byteLength(JSON.stringify(out.candidates,null,2),'utf8')>CANDIDATES_REPORT_MAX_BYTES){
+  out.candidates.pop();out.inventoryTruncated=true;
  }
  out.status='PASS';out.code='RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY';
  return out;
