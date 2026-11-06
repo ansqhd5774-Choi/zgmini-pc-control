@@ -153,12 +153,18 @@ function buildAdapter(auth){
       originalConfig=readConfig().raw;
       originalTask=taskXml();originalComparable=originalTask.comparable;
       const core=probeCore();
+      const head=git(SOURCE_ROOT,'rev-parse','HEAD');
+      const originalBranch=git(SOURCE_ROOT,'branch','--show-current');
+      check(originalBranch.length>0&&
+        git(SOURCE_ROOT,'check-ref-format','--branch',originalBranch)===originalBranch&&
+        git(SOURCE_ROOT,'rev-parse','--verify',`refs/heads/${originalBranch}`)===head,
+        'SIP_B_BASELINE_BRANCH_STOP');
       baseline={sourceRoot:SOURCE_ROOT,configPath:CONFIG_PATH,coreTask:CORE_TASK,
-        head:git(SOURCE_ROOT,'rev-parse','HEAD'),
+        head,
         configSource:JSON.parse(originalConfig.toString('utf8')).source,
         worktreeClean:git(SOURCE_ROOT,'status','--porcelain=v1','--untracked-files=all')==='',
         coreTaskEnabled:core.enabled,
-        originalBranch:git(SOURCE_ROOT,'branch','--show-current'),
+        originalBranch,
         existingSha256:Object.fromEntries(Object.keys(TARGET).filter(p=>TARGET[p].status==='M')
           .map(p=>[p,fs.existsSync(sourcePath(p))?sourceHash(p):null])),
         absent:Object.keys(TARGET).filter(p=>TARGET[p].status==='A'&&!fs.existsSync(sourcePath(p))),
