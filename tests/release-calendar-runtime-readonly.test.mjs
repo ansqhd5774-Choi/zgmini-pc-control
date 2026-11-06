@@ -95,3 +95,39 @@ test('missing executable collector, invalid git marker and unknown keys do not c
  assert.equal(out.candidates[0].sourceParseStatus,'UNKNOWN');
  assert.equal(out.candidates[0].sourceCount,null);
 });
+
+test('PC-only EarningsAPI collector is reported by metadata, never raw source',t=>{
+ const f=fixture(t,{dirs:0});
+ const module=path.join(f.checkout,'scripts','pc-writer','earnings-api-local.mjs');
+ fs.writeFileSync(module,'// MUST_NOT_LEAK_SECRET: fake test fixture, not an API key\nexport const noop=()=>{};\n');
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidates[0].earningsApiCollector.present,true);
+ assert.match(out.candidates[0].earningsApiCollector.sha256,/^[0-9a-f]{64}$/);
+ assert.ok(out.candidates[0].earningsApiCollector.bytes>0);
+ assert.match(out.candidates[0].earningsApiCollector.modifiedAt,/^20\d\d-/);
+ assert.equal(out.candidates[0].earningsApiCollector.evidenceLevel,'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF');
+ assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_SECRET/);
+ assert.equal(out.providerCalls,0);
+});
+
+test('missing EarningsAPI collector is not treated as installed',t=>{
+ const f=fixture(t,{dirs:0});
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.deepEqual(out.candidates[0].earningsApiCollector,{
+  present:false,sha256:null,bytes:null,modifiedAt:null,
+  evidenceLevel:'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF'});
+});
+
+test('EarningsAPI collector symlink outside approved root is excluded',t=>{
+ const f=fixture(t,{dirs:0});
+ const outside=path.join(path.dirname(f.root),'outside-earnings-api-local.mjs');
+ fs.writeFileSync(outside,'// MUST_NOT_LEAK_EXTERNAL\n');
+ fs.symlinkSync(outside,path.join(f.checkout,'scripts','pc-writer','earnings-api-local.mjs'));
+ const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.candidates[0].earningsApiCollector.present,false);
+ assert.equal(out.candidates[0].earningsApiCollector.sha256,null);
+ assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_EXTERNAL/);
+});
