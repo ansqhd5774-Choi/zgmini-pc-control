@@ -351,7 +351,15 @@ export async function runWindowsInstall(event,env,manifestBytes){
   validateScopeManifest(JSON.parse(manifestBytes.toString('utf8')));
   const io=buildAdapter(auth);
   const result=await performAuthorizedInstall(auth,io);
-  io.recordResult(result);
+  return preserveResultAfterJournal(result,io.recordResult);
+}
+
+// A failed post-install evidence append cannot retroactively turn a verified
+// source/config/Core installation into a setup failure or authorize a retry.
+export function preserveResultAfterJournal(result,record,warning=()=>{
+  process.stderr.write('SIP_B_JOURNAL_APPEND_UNVERIFIED\n');
+}){
+  try{record(result);}catch{warning();}
   return result;
 }
 
