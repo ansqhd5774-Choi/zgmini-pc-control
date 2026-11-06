@@ -14,7 +14,7 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (Windows receiver 소스·시뮬 준비, 실PC 미검증) | 20% 유지 | Draft PR #626 head 884aeee1, 신규 13파일, 격리 28/28 PASS; Windows Task XML/Core drain pure guard·복구 fixture, 실제 Runner/설치/Sidecar 동적 호환 미확인 |
+| M2 공통 Writer B | RUNNING (Windows receiver 소스·시뮬 준비, 실PC 미검증) | 20% 유지 | Draft PR #626 head 846285b6, 신규 14파일(README 포함), 격리 28/28 PASS; Task XML/Core drain·복구 fixture와 기능 담당 재사용 안내, 실제 Runner/설치/Sidecar 동적 호환 미확인 |
 | M3 실패·정상 회귀 | RUNNING (격리 시나리오 일부 PASS) | 20% 유지 | 파일 dirty/원본 SHA/부분 전환/Task 종료 대기 등 모의 실패 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
@@ -122,3 +122,11 @@
 - 총괄 독립 재실행: `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **28/28 PASS, exit 0**. PR head/13파일·신규 guard 2파일 원격 재조회. source-only simulation은 **실 Windows Scheduler/Runner 설치 실증이 아님**.
 - M3 모의 시나리오 일부 RUNNING으로 진전했으나 실제 Windows 정상/충돌/복구 요청 ID 증거가 아직 없어 완료 아님. R2 전체 **20%** 유지. 실제 PC/Controller/Calendar/DB/D1/예약 변경 0.
 - **NEXT:** #68 기존 단일 담당의 Controller 설치 성공·신규 A 활성 증거 → 실제 Writer source/Task/VBS/Sidecar read-only 인벤토리 → 승인된 Writer B manifest 확정·Windows 한정 실증. 실제 설치는 원담당 역할을 유지하며 자동 재시도/새 Gate 금지.
+
+## 2026-11-07 — Writer B 공통 경로 셀프서비스 인계 안내 (SOURCE_ONLY)
+
+- [Draft PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) head **`846285b6c4b741cb2b34dc21a9f33cf947d1335c`**, 기존 공용/기능 파일 수정 **0**, 신규 **14파일**(문서 1파일 추가), Draft/미병합 유지.
+- [writer-b/README.md](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-process-platform-r2-writer-b-20261107/writer-b/README.md) 신설: 기능 원담당 A 실증 → 정규 승인을 받은 manifest의 원본바이트 SHA → 소유자 1회 B Issue → 원격 JSON/TXT 2/2·실 source/Task 재조회 → 원담당 운영 실증의 자가 재사용 절차를 단계별 기록. 실패·RECOVERY_REQUIRED·STATE_UNKNOWN STOP 및 총괄/기능 역할 구분.
+- 실 설치 SHA·경로를 예시에서 추정하지 않고 플레이스홀더/비실행임 명시. 기존 코드 변경 0, 이전 격리 28/28 PASS 증거 그대로 유지. GitHub 원격 README blob **`2ab7f1b1b3e2eb4648d2bd56931f11cdbb950590`** 재조회. 운영 변경 0.
+- **LAST PASS:** 공통 수신기 source·순수함수 모의 검증·반복 기능용 사용 안내까지 Draft에서 준비됨.
+- **FIRST FAIL/남은 조건:** 실제 Controller A 활성/Writer PC read-only 지문, Windows Runner에서 B 수신/복구 실증, manifest 정규 승인/실행 requestId, 원담당 실제 수신은 아직 없음. M2/M3/M4 완료 아님, 전체 **20% 유지**.
