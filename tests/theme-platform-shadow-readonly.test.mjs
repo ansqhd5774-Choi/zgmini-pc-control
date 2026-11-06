@@ -10,6 +10,7 @@ import {PassThrough} from 'node:stream';
 import vm from 'node:vm';
 
 const sha=x=>createHash('sha256').update(x).digest('hex');
+const scheduledTimeouts=[];
 const controllerSource=fs.readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');
 const inlineStart=controllerSource.lastIndexOf("const SHADOW_BRANCH=");
 assert.ok(inlineStart>0,'production inline helper absent');
@@ -18,7 +19,9 @@ assert.ok(inlineStart>0,'production inline helper absent');
 const inline=vm.runInNewContext(controllerSource.slice(inlineStart)+
  '\n({verifyApprovedShadowBundle,interpretShadowOutcome,runApprovedShadowReadOnly,SHADOW_BRANCH,SHADOW_ENTRY})',
  {fs,path,digest:sha,need:(v,code)=>{if(!v)throw Object.assign(new Error(code),{code});},
-  spawn,process,Buffer,setTimeout,clearTimeout});
+  spawn,process,Buffer,setTimeout:(callback,ms)=>{
+   scheduledTimeouts.push(ms);return setTimeout(callback,ms);
+  },clearTimeout});
 const {verifyApprovedShadowBundle,interpretShadowOutcome,runApprovedShadowReadOnly,
  SHADOW_BRANCH,SHADOW_ENTRY}=inline;
 const SHA='074028fb54f71faa70e465c90a02161f43ce3ef8';
@@ -75,19 +78,24 @@ test('manifest identity drift and traversal never execute',t=>{
   {code:'SHADOW_MANIFEST_FILE_PATH_INVALID'});
 });
 
-test('real dependency closure accepts worker modules and root package.json only when hashed',t=>{
+test('real dependency closure accepts worker, approved hyparquet and root package.json only when hashed',t=>{
  const x=fixture(t);
  const worker='worker/theme-nine-r88-provisional.mjs';
  const pathWorker=path.join(x.root,'source',worker);
  fs.mkdirSync(path.dirname(pathWorker),{recursive:true});
  fs.writeFileSync(pathWorker,'export const marker=true;\n');
+ const decoder='node_modules/hyparquet/src/index.js';
+ const pathDecoder=path.join(x.root,'source',decoder);
+ fs.mkdirSync(path.dirname(pathDecoder),{recursive:true});
+ fs.writeFileSync(pathDecoder,'export const parquetReadObjects=()=>[];\n');
  fs.writeFileSync(path.join(x.root,'source','package.json'),'{"type":"module"}\n');
  x.manifest.files[worker]=sha(fs.readFileSync(pathWorker));
+ x.manifest.files[decoder]=sha(fs.readFileSync(pathDecoder));
  x.manifest.files['package.json']=sha(fs.readFileSync(path.join(x.root,'source','package.json')));
  const raw=Buffer.from(JSON.stringify(x.manifest));
  fs.writeFileSync(path.join(x.root,'manifest.json'),raw);
  x.host.approvedSources[SHA].manifestSha256=sha(raw);
- assert.equal(verifyApprovedShadowBundle(x).verifiedFileCount,3);
+ assert.equal(verifyApprovedShadowBundle(x).verifiedFileCount,4);
  fs.appendFileSync(pathWorker,'modified');
  assert.throws(()=>verifyApprovedShadowBundle(x),{code:'SHADOW_SOURCE_FILE_DRIFT'});
 });
@@ -131,11 +139,12 @@ test('missing coverage, false zero-write claim, or small theme set fails closed'
   {code:'SHADOW_PUBLIC_COVERAGE_INVALID'});
 });
 
-test('partial shadow remains PARTIAL and never becomes runtime success',()=>{
+test('partial shadow is BLOCKED but retains explicit PARTIAL replay status',()=>{
  const body=outcome({status:'PARTIAL',coverage:{public:{status:'PARTIAL',
   themes:10,expectedPhases:20,complete:15,blocked:3,pending:2}}});
  const res=interpretShadowOutcome({exitCode:2,stdout:JSON.stringify(body)});
- assert.equal(res.status,'PARTIAL');
+ assert.equal(res.status,'BLOCKED');
+ assert.equal(res.replayStatus,'PARTIAL');
  assert.equal(res.publicBlocked,3);
 });
 
@@ -167,9 +176,14 @@ test('single fixed Node launch with no arbitrary args, no fixture write, sanitiz
   dataRoot:x.root,spawnImpl});
  assert.deepEqual(Array.from(invocation.args.slice(-2)),[x.entry,'--platform-shadow']);
  assert.equal(invocation.opts.env.ZGMINI_DATA_ROOT,fs.realpathSync(x.root));
+ assert.equal(invocation.opts.env.TEMP,process.env.TEMP);
+ assert.equal(invocation.opts.env.TMP,process.env.TMP);
  assert.equal(invocation.opts.stdio[0],'ignore');
  assert.equal(result.status,'PASS');
  assert.equal(result.actualExecutionSha,SHA);
+ assert.equal(result.requestedSourceSha,SHA);
+ assert.equal(result.candidateExecuted,true);
+ assert.ok(scheduledTimeouts.includes(210000),'shadow must exit before 240s worker timeout');
  assert.ok(!Object.hasOwn(result,'results'));
 });
 
@@ -180,4 +194,22 @@ test('actual installable Controller dispatches one shadow operation with A polic
  const policy=JSON.parse(fs.readFileSync(path.join(root,'config','operations.json')));
  assert.deepEqual(policy.operations['theme-platform-shadow-readonly'],
   {grade:'A',timeoutSeconds:240,resource:'heavy',minimumFreeMiB:1536});
+});
+
+test('dispatch treats only missing B-approved source as BLOCKED, not hash drift',async()=>{
+ const start=controllerSource.indexOf(" if(request.operation==='theme-platform-shadow-readonly'){");
+ const end=controllerSource.indexOf(" if(request.operation==='theme-common-tests'){",start);
+ assert.ok(start>=0&&end>start,'production dispatch branch missing');
+ const dispatch=vm.runInNewContext('(async(request,host,dataRoot,runApprovedShadowReadOnly)=>{'+
+  controllerSource.slice(start,end)+'})');
+ const missing=Object.assign(new Error('missing'),{code:'SHADOW_SOURCE_NOT_APPROVED'});
+ const response=await dispatch({operation:'theme-platform-shadow-readonly',sourceSha:SHA},null,null,
+  async()=>{throw missing;});
+ assert.equal(response.status,'BLOCKED');
+ assert.equal(response.actualExecutionSha,null);
+ assert.equal(response.candidateExecuted,false);
+ assert.equal(response.requestedSourceSha,SHA);
+ await assert.rejects(dispatch({operation:'theme-platform-shadow-readonly',sourceSha:SHA},null,null,
+  async()=>{throw Object.assign(new Error('drift'),{code:'SHADOW_SOURCE_FILE_DRIFT'});}),
+  {code:'SHADOW_SOURCE_FILE_DRIFT'});
 });

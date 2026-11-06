@@ -121,7 +121,16 @@ export async function runOperation(request,context){
   return {status:'PASS',code:'SOURCE_COMMIT_READONLY_VERIFIED',sourceSha:data.sha,changedFileCount:data.files?.length??null,executedCandidateCode:false};
  }
  if(request.operation==='theme-platform-shadow-readonly'){
-  return await runApprovedShadowReadOnly({request,host,dataRoot});
+  try{return await runApprovedShadowReadOnly({request,host,dataRoot});}
+  catch(error){
+   // A source not yet registered by the regular B host admission is a
+   // technical prerequisite, not a source-integrity execution failure.
+   if(error?.code==='SHADOW_SOURCE_NOT_APPROVED')return {
+    status:'BLOCKED',code:'SHADOW_SOURCE_NOT_APPROVED',actualExecutionSha:null,
+    requestedSourceSha:request.sourceSha,candidateExecuted:false,
+    providerCalls:0,d1Writes:0,schedulerWrites:0};
+   throw error;
+  }
  }
  if(request.operation==='theme-common-tests'){
   const approved=host.approvedSources?.[request.sourceSha];need(approved,'SOURCE_NOT_APPROVED_FOR_EXECUTION');need(approved.branch===request.sourceBranch,'APPROVED_SOURCE_BRANCH_MISMATCH');
@@ -189,6 +198,7 @@ function verifyApprovedShadowBundle({request,host}){
  for(const [rel,expected] of Object.entries(files)){
   need(typeof rel==='string'&&rel.length<=240&&
    (/^(scripts\/pc-writer|worker|config|docs|examples)\/[A-Za-z0-9_.\/-]+$/.test(rel)||
+    /^node_modules\/hyparquet\/[A-Za-z0-9_.\/-]+$/.test(rel)||
     rel==='package.json')&&
    !rel.split('/').includes('..')&&SHA64.test(expected),
    'SHADOW_MANIFEST_FILE_PATH_INVALID');
@@ -252,7 +262,10 @@ function interpretShadowOutcome({exitCode,stdout='',stderr=''}){
   c.expectedPhases===2*c.themes&&c.complete+c.blocked+c.pending===c.expectedPhases,
   'SHADOW_PUBLIC_COVERAGE_INVALID');
  const complete=exitCode===0&&result.status==='COMPLETE'&&c.status==='COMPLETE';
- return {status:complete?'PASS':'PARTIAL',
+ // The shared Controller's idempotent replay accepts only PASS/FAIL/BLOCKED/
+ // STATE_UNKNOWN. Keep partial coverage explicit without persisting a status
+ // that cannot be returned for the same requestId on a later readback.
+ return {status:complete?'PASS':'BLOCKED',replayStatus:complete?'COMPLETE':'PARTIAL',
   code:complete?'SHADOW_PRIVATE_REPLAY_COMPLETE':'SHADOW_PRIVATE_REPLAY_REVIEW',
   executionMode:'APPROVED_READONLY_SHADOW',
   publicTargetCount:c.themes,publicPhases:c.expectedPhases,
@@ -265,7 +278,9 @@ function interpretShadowOutcome({exitCode,stdout='',stderr=''}){
 }
 
 async function runApprovedShadowReadOnly({request,host,dataRoot,
- timeoutMs=240000,spawnImpl=spawn}={}){
+ // The parent Controller worker has a 240s deadline. Leave 30s for cleanup,
+ // protected-state postchecks, and the result upload on a slow Windows PC.
+ timeoutMs=210000,spawnImpl=spawn}={}){
  const bundle=verifyApprovedShadowBundle({request,host});
  need(typeof dataRoot==='string'&&path.isAbsolute(dataRoot),
   'SHADOW_DATA_ROOT_INVALID');
@@ -274,6 +289,7 @@ async function runApprovedShadowReadOnly({request,host,dataRoot,
  const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
   PATH:path.dirname(process.execPath),USERPROFILE:process.env.USERPROFILE,
   APPDATA:process.env.APPDATA,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_API_TOKEN,
+  TEMP:process.env.TEMP,TMP:process.env.TMP,
   ZGMINI_DATA_ROOT:dataReal};
  const launched=await new Promise(resolve=>{
   const child=spawnImpl(process.execPath,
@@ -297,5 +313,6 @@ async function runApprovedShadowReadOnly({request,host,dataRoot,
  need(!launched.overflow,'SHADOW_RUNTIME_OUTPUT_OVERFLOW');
  const outcome=interpretShadowOutcome(launched);
  return {...outcome,actualExecutionSha:bundle.sourceSha,
+  requestedSourceSha:request.sourceSha,candidateExecuted:true,
   approvedFileCount:bundle.verifiedFileCount};
 }
