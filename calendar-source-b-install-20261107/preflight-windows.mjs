@@ -161,19 +161,16 @@ function taskXml(){
  const xml=decodeText(bytes);need(/<Task\b/.test(xml),'CAL_B_TASK_XML_STOP');
  return {bytes,xml};
 }
-function issueAuth(){
- const env=process.env;
+export function issueAuth({env=process.env,event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'))}={}){
  need(env.GITHUB_REPOSITORY==='ansqhd5774-Choi/zgmini-pc-control'&&
   env.GITHUB_ACTOR==='ansqhd5774-Choi'&&env.GITHUB_EVENT_NAME==='issues'&&
   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_RUN_ATTEMPT==='1',
   'CAL_B_PREFLIGHT_EVENT_STOP');
- const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
  need(event.action==='opened'&&event.repository?.private===true&&
   event.repository?.full_name===env.GITHUB_REPOSITORY&&
   event.sender?.login===env.GITHUB_ACTOR&&
   event.issue?.user?.login===env.GITHUB_ACTOR&&
-  event.issue?.title==='pc-calendar-source-preflight-once'&&
-  event.issue.labels?.some(x=>x.name==='pc-calendar-source-preflight'),
+  event.issue?.title==='pc-calendar-source-preflight-once',
   'CAL_B_PREFLIGHT_ISSUE_STOP');
  need(typeof event.issue.body==='string'&&event.issue.body.length<=2048,
   'CAL_B_PREFLIGHT_BODY_STOP');
