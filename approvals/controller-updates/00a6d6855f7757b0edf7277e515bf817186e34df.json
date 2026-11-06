@@ -24,12 +24,12 @@
       "sha256": "d0160e75c5d0b93194b945c083e48ab225cdf1deaabef96fe3676d8bdb86378e"
     }
   ],
-  "purpose": "pc-controller-maintenance",
+  "purpose": "pc-controller-heavy-readonly",
   "controllerOnlyInstall": true,
   "approval": {
     "grade": "B",
-    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/599",
-    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/592",
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE"
   },
   "checks": {
     "targetSha": "00a6d6855f7757b0edf7277e515bf817186e34df",
