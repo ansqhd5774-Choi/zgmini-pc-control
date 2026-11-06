@@ -10,11 +10,11 @@ import {fileURLToPath} from 'node:url';
 const repoRoot=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const maintenanceRoot='E:/ZGmini/automation/pc-maintenance';
 const controlRoot='E:/ZGmini/automation/pc-control';
-const sourceFiles=[
+export const sourceFiles=Object.freeze([
   'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
   'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
-  'tools/maintenance-ancestry.vbs'
-];
+  'tools/maintenance-ancestry.vbs','tools/source-bundle-register.mjs'
+]);
 const testFiles=[
   'tests/maintenance-contract.test.mjs','tests/maintenance-apply.test.mjs',
   'tests/maintenance-agent.test.mjs','tests/maintenance-lock.test.mjs'

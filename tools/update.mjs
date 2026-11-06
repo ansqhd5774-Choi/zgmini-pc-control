@@ -29,6 +29,12 @@ import {planSourceBundleRegistration,stageApprovedSourceBundle,
 
 const controlRoot='E:/ZGmini/automation/pc-control';
 const maintenanceRoot='E:/ZGmini/automation/pc-maintenance';
+export const maintenanceOriginFiles=Object.freeze([
+ 'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+ 'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+ 'tools/update.mjs','tools/maintenance-ancestry.vbs',
+ 'tools/source-bundle-register.mjs',
+]);
 const checkout='E:/ZGmini/projects/zgmini-pc-control';
 const controlRepository='ansqhd5774-Choi/zgmini-pc-control';
 const gh='C:/Program Files/GitHub CLI/gh.exe';
@@ -918,9 +924,7 @@ function verifyIndependent(supervisorPid) {
  const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
  need(installed.schema==='ZGMINI_PC_MAINTENANCE_INSTALL_V1'&&validSha(installed.sourceSha)&&
   /^[a-f0-9]{64}$/.test(installed.startupSha256??''),'MAINTENANCE_ORIGIN_UNKNOWN');
- const expected=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
-  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
-  'tools/maintenance-ancestry.vbs'];
+ const expected=maintenanceOriginFiles;
  need(Object.keys(installed.files??{}).length===expected.length,'MAINTENANCE_SELF_DRIFT');
  for(const rel of expected){
   need(/^[a-f0-9]{64}$/.test(installed.files[rel]??'')&&

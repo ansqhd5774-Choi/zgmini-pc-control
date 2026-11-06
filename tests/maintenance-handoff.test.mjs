@@ -1,7 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
+import {createHash} from 'node:crypto';
 import {execFileSync}from'node:child_process';
-import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus}from'../tools/handoff-maintenance.mjs';
+import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus,
+  priorRuntimeFiles,nextRuntimeFiles,requireSixToSevenContract,requireRollbackWindow,
+  requireOriginalStartupBytes,preserveRollbackReservation}from'../tools/handoff-maintenance.mjs';
+import {sourceFiles as bootstrapFiles}from'../tools/bootstrap-maintenance.mjs';
+import {maintenanceOriginFiles}from'../tools/update.mjs';
 import {acquireMaintenanceLock}from'../tools/maintenance-lock.mjs';
 test('handoff ignores unrelated checkout edits, still denies executable and approval edits',t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-scope-'));
@@ -10,7 +15,8 @@ test('handoff ignores unrelated checkout edits, still denies executable and appr
  const target='f'.repeat(40);
  const source=['maintenance-contract.mjs','maintenance-apply.mjs','maintenance-agent.mjs',
    'maintenance-lock.mjs','update.mjs','maintenance-ancestry.vbs',
-   'bootstrap-maintenance.mjs','handoff-maintenance.mjs'].map(name=>'tools/'+name);
+   'bootstrap-maintenance.mjs','handoff-maintenance.mjs',
+   'source-bundle-register.mjs'].map(name=>'tools/'+name);
  const approval=`approvals/maintenance-handoffs/${target}.json`;
  const unrelated=['docs/work-in-progress.md','results/maintenance-result.txt'];
  for(const rel of [...source,approval,...unrelated]){
@@ -30,6 +36,34 @@ test('handoff ignores unrelated checkout edits, still denies executable and appr
  fs.writeFileSync(path.join(dir,approval),'tampered approval\n');
  assert.throws(()=>requireHandoffCheckoutScope(target,git),/HANDOFF_CHECKOUT_DIRTY/);
  assert.throws(()=>requireHandoffCheckoutScope('../bad',git),/HANDOFF_PIN_REQUIRED/);
+});
+test('old six-file install is admitted only with exact nine-file handoff source approval',()=>{
+ const hash='a'.repeat(64);
+ const old=Object.fromEntries(priorRuntimeFiles.map(name=>[name,hash]));
+ const approved=Object.fromEntries([...nextRuntimeFiles,
+  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'].map(name=>[name,hash]));
+ assert.equal(priorRuntimeFiles.length,6);
+ assert.equal(nextRuntimeFiles.length,7);
+ assert.deepEqual(bootstrapFiles,nextRuntimeFiles);
+ assert.deepEqual(maintenanceOriginFiles,nextRuntimeFiles);
+ assert.doesNotThrow(()=>requireSixToSevenContract(old,approved));
+ assert.throws(()=>requireSixToSevenContract({...old,['tools/source-bundle-register.mjs']:hash},approved),
+  /HANDOFF_INSTALLED_FILE_SET_MISMATCH/);
+ assert.throws(()=>requireSixToSevenContract(old,{...approved,['tools/unapproved.mjs']:hash}),
+  /HANDOFF_TARGET_FILE_SET_MISMATCH/);
+ const missing={...approved};delete missing['tools/source-bundle-register.mjs'];
+ assert.throws(()=>requireSixToSevenContract(old,missing),/HANDOFF_TARGET_FILE_SET_MISMATCH/);
+ assert.throws(()=>requireSixToSevenContract(old,{...approved,['tools/update.mjs']:'bad'}),
+  /HANDOFF_TARGET_FILE_SET_MISMATCH/);
+});
+test('pre-stop handoff rejects any startup byte drift from installed manifest',()=>{
+ const startup=Buffer.from('approved startup vbs\r\n');
+ const original={startupSha256:createHash('sha256').update(startup).digest('hex')};
+ assert.doesNotThrow(()=>requireOriginalStartupBytes(original,startup));
+ assert.throws(()=>requireOriginalStartupBytes(original,Buffer.from('modified startup vbs\r\n')),
+  /HANDOFF_STARTUP_DRIFT/);
+ assert.throws(()=>requireOriginalStartupBytes({...original,startupSha256:'bad'},startup),
+  /HANDOFF_STARTUP_DRIFT/);
 });
 const prior={pid:123,nonce:'11111111-2222-3333-4444-555555555555',bootAt:1700000000000};
 const installed={sourceSha:'a'.repeat(40),startupSha256:'b'.repeat(64)};
@@ -55,6 +89,19 @@ test('released original lease is allowed only with a known, stopped prior receiv
  assert.throws(()=>requireNoReplacement(null,null),/HANDOFF_RECEIVER_CHANGED/);
  assert.throws(()=>requireNoReplacement(prior,{...prior,nonce:'other'}),/HANDOFF_RECEIVER_CHANGED/);
  assert.throws(()=>requireNoReplacement(prior,{pid:456,nonce:prior.nonce}),/HANDOFF_RECEIVER_CHANGED/);
+});
+test('rollback window permits only original or our own reserved slot before new startup',()=>{
+ const reserved={pid:987,nonce:'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'};
+ assert.doesNotThrow(()=>requireRollbackWindow({prior,current:null}));
+ assert.doesNotThrow(()=>requireRollbackWindow({prior,current:prior}));
+ assert.doesNotThrow(()=>requireRollbackWindow({prior,current:reserved,reservationOwner:reserved}));
+ assert.throws(()=>requireRollbackWindow({prior,current:reserved}),/HANDOFF_RECEIVER_CHANGED/);
+ assert.throws(()=>requireRollbackWindow({prior,current:reserved,reservationOwner:{...reserved,nonce:'drift'}}),
+  /HANDOFF_RECEIVER_CHANGED/);
+ assert.throws(()=>requireRollbackWindow({prior,current:null,startupInvoked:true}),
+  /HANDOFF_NEW_RECEIVER_MAY_BE_RUNNING/);
+ assert.throws(()=>requireRollbackWindow({prior,current:reserved,reservationOwner:reserved,startupInvoked:true}),
+  /HANDOFF_NEW_RECEIVER_MAY_BE_RUNNING/);
 });
 test('receiver record and live Windows CAPTURE must match the prior process identity',()=>{
  const capture=`ATTESTED|${proof.created}|${proof.session}|${proof.sid}`;
@@ -105,6 +152,18 @@ test('atomic handoff reservation blocks a second receiver until owned release',(
   reservation.release();
   assert.equal(fs.existsSync(dir),false);
   assert.throws(()=>reservation.release(),/HANDOFF_RESERVATION_ALREADY_RELEASED/);
+ }finally{fs.rmSync(temp,{recursive:true,force:true});}
+});
+test('pre-startup rollback retains receiver recovery marker until independently resolved',()=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-rollback-'));
+ const dir=path.join(temp,'receiver');
+ try{
+  const reservation=reserveReceiverSlot(dir);
+  assert.doesNotThrow(()=>preserveRollbackReservation(reservation));
+  assert.equal(fs.existsSync(path.join(dir,'RECOVERY_REQUIRED.json')),true);
+  assert.throws(()=>reserveReceiverSlot(dir),/HANDOFF_RECEIVER_LEASE_BUSY/);
+  assert.equal(rollbackStatus({filesRestored:true,receiverReattested:false}),'RECOVERY_REQUIRED');
+  reservation.release(); // Isolated fixture cleanup, not the production rollback path.
  }finally{fs.rmSync(temp,{recursive:true,force:true});}
 });
 test('interrupted handoff reservation remains unreclaimable after owner exits',()=>{
