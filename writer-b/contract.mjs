@@ -18,6 +18,12 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const MANIFEST_PATH=/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
 const RELATIVE=/^(?:scripts\/pc-writer|lib|worker)\/(?:[a-z0-9][a-z0-9._-]*\/)*[a-z0-9][a-z0-9._-]*\.mjs$/i;
 const FORBIDDEN_SEGMENTS=new Set(['.','..']);
+// Process-local provenance seal: the transaction must not accept fabricated
+// {registeredB:true,exactOneShot:true} flags from arbitrary caller JSON.
+// A future trusted Windows B adapter must fetch approved manifest bytes from
+// the pinned control source, authorize the Issue, and call the coordinator in
+// the SAME Node process. This does not by itself install/register that adapter.
+const VERIFIED_ISSUES=new WeakSet();
 const REQUEST_KEYS=['schema','requestId','chatId','operation','controlRepository',
   'approvalManifestPath','approvalManifestSha256'];
 const APPROVAL_KEYS=['schema','status','scope','sourceRepository','sourceBranch',
@@ -105,10 +111,22 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
  catch{fail('WRITER_B_MANIFEST_JSON_STOP');}
  validateWriterBManifest(manifest);
- return Object.freeze({requestId:request.requestId,chatId:request.chatId,
+ for(const entry of manifest.files)Object.freeze(entry);
+ for(const entry of manifest.protectedFiles)Object.freeze(entry);
+ Object.freeze(manifest.files);Object.freeze(manifest.protectedFiles);
+ Object.freeze(manifest);
+ const authorization=Object.freeze({requestId:request.requestId,chatId:request.chatId,
    manifest,manifestSha256:request.approvalManifestSha256,
    manifestPath:request.approvalManifestPath,controlSha:env.GITHUB_SHA,
    issueNumber:event.issue.number});
+ VERIFIED_ISSUES.add(authorization);
+ return authorization;
+}
+
+export function assertAuthenticatedWriterBIssue(authorization){
+ need(object(authorization)&&VERIFIED_ISSUES.has(authorization),
+   'WRITER_B_UNVERIFIED_ISSUE_STOP');
+ return authorization;
 }
 
 export function expectedFileMap(manifest){
