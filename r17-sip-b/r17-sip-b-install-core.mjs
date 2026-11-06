@@ -26,6 +26,11 @@ export const TARGET = Object.freeze({
     targetBlobSha:'0f7e044330ceee9d8fde8489ba22bceb847362b4',
   }),
 });
+// Scope Git cleanliness to the only paths this installation can replace.
+// Unrelated work in the shared checkout must remain untouched, not block R17.
+export const TARGET_STATUS_ARGS = Object.freeze([
+  'status','--porcelain=v1','--untracked-files=all','--',...Object.keys(TARGET),
+]);
 
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 export class SipBStop extends Error {
@@ -70,7 +75,7 @@ export function validatePcPreimage(snapshot){
     /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(snapshot.originalBranch)&&
     !snapshot.originalBranch.includes('..')&&
     !snapshot.originalBranch.endsWith('/')&&
-    snapshot.worktreeClean===true&&snapshot.coreTaskEnabled===true&&
+    snapshot.targetPathsClean===true&&snapshot.coreTaskEnabled===true&&
     sameKeys(snapshot.existingSha256,{
       'scripts/pc-writer/us-breadth-provisional-cycle.mjs':''})&&
     snapshot.existingSha256['scripts/pc-writer/us-breadth-provisional-cycle.mjs']===

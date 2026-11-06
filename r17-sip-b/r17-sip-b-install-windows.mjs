@@ -10,6 +10,7 @@ import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {
   BASELINE_SOURCE,CANDIDATE_SOURCE,SOURCE_ROOT,CONFIG_PATH,CORE_TASK,TARGET,
+  TARGET_STATUS_ARGS,
   sha256,SipBStop,validateScopeManifest,performAuthorizedInstall,
 } from './r17-sip-b-install-core.mjs';
 import {authorizeSipInstall} from './r17-sip-b-auth.mjs';
@@ -73,6 +74,7 @@ function regularBytes(file,root){
 }
 function sourcePath(file){return path.join(SOURCE_ROOT,...file.split('/'));}
 function sourceHash(file){return sha256(regularBytes(sourcePath(file),SOURCE_ROOT));}
+function targetPathsClean(){return git(SOURCE_ROOT,...TARGET_STATUS_ARGS)==='';}
 function readConfig(){
   const raw=regularBytes(CONFIG_PATH,path.dirname(CONFIG_PATH));
   let obj;try{obj=JSON.parse(raw.toString('utf8'));}catch{stop('SIP_B_CONFIG_JSON_STOP');}
@@ -118,7 +120,7 @@ function probeCore(){
 function assertSource(head,branch,post){
   check(git(SOURCE_ROOT,'rev-parse','HEAD')===head&&
     git(SOURCE_ROOT,'branch','--show-current')===branch&&
-    git(SOURCE_ROOT,'status','--porcelain=v1','--untracked-files=all')==='',
+    targetPathsClean(),
     'SIP_B_SOURCE_DRIFT_STOP');
   for(const [file,v] of Object.entries(TARGET)){
     if(!post&&v.status==='A'){
@@ -162,7 +164,7 @@ function buildAdapter(auth){
       baseline={sourceRoot:SOURCE_ROOT,configPath:CONFIG_PATH,coreTask:CORE_TASK,
         head,
         configSource:JSON.parse(originalConfig.toString('utf8')).source,
-        worktreeClean:git(SOURCE_ROOT,'status','--porcelain=v1','--untracked-files=all')==='',
+        targetPathsClean:targetPathsClean(),
         coreTaskEnabled:core.enabled,
         originalBranch,
         existingSha256:Object.fromEntries(Object.keys(TARGET).filter(p=>TARGET[p].status==='M')
