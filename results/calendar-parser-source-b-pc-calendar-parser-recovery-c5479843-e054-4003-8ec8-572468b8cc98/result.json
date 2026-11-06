@@ -1,0 +1,76 @@
+{
+  "schema": "ZGMINI_CALENDAR_PARSER_SOURCE_RECOVERY_B_RESULT_V1",
+  "requestId": "pc-calendar-parser-recovery-c5479843-e054-4003-8ec8-572468b8cc98",
+  "issueNumber": 529,
+  "status": "READY",
+  "code": "CAL_SOURCE_B_FIVE_FILES_STAGED_PRIVATE",
+  "controlSha": "43e2a099f343e3709233ae5d5345651dcd80078f",
+  "git": {
+    "head": "d7bc4948573843766ad82c72ff392220178c36a3",
+    "worktreeRootVerified": true,
+    "files": [
+      {
+        "path": "lib/eia-calendar.mjs",
+        "tracked": true,
+        "state": "TRACKED_CLEAN",
+        "gitStatusCode": "  "
+      },
+      {
+        "path": "lib/usda-calendar.mjs",
+        "tracked": true,
+        "state": "TRACKED_CLEAN",
+        "gitStatusCode": "  "
+      },
+      {
+        "path": "lib/cftc-calendar.mjs",
+        "tracked": true,
+        "state": "TRACKED_CLEAN",
+        "gitStatusCode": "  "
+      },
+      {
+        "path": "lib/treasury-calendar.mjs",
+        "tracked": true,
+        "state": "TRACKED_CLEAN",
+        "gitStatusCode": "  "
+      },
+      {
+        "path": "lib/tic-calendar.mjs",
+        "tracked": true,
+        "state": "TRACKED_CLEAN",
+        "gitStatusCode": "  "
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "lib/eia-calendar.mjs",
+      "sha256": "6099a1fb912077b2627369b8428a600f613004b2facdb16b262a8ea5b3f65e90",
+      "size": 6594
+    },
+    {
+      "path": "lib/usda-calendar.mjs",
+      "sha256": "24555a8084b4cb62398b617331498ffa548018bed7e9058f59a6ecff15d3d7ba",
+      "size": 2854
+    },
+    {
+      "path": "lib/cftc-calendar.mjs",
+      "sha256": "61ac33217c742672038e5209c8dccf11935db80d088c354f51785afe61cb4bd5",
+      "size": 3681
+    },
+    {
+      "path": "lib/treasury-calendar.mjs",
+      "sha256": "0eb744d67fc2d82cbba1bf7b578503dcdfe6a609df557c8666517fc1c91f9c36",
+      "size": 3323
+    },
+    {
+      "path": "lib/tic-calendar.mjs",
+      "sha256": "86a2a62d35f26627f8623ab9002ff56a9c28ed10b1357e2abd3794a1b3d26dae",
+      "size": 5252
+    }
+  ],
+  "sourceEvidence": "HISTORICAL_CHECKOUT_ONLY",
+  "runtimeSourceVerified": false,
+  "operationalWrites": false,
+  "publicRepoWrites": false,
+  "retry": "NO_EXPORT_REEXECUTION_ON_UNKNOWN"
+}
