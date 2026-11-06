@@ -16,6 +16,19 @@ const MANIFEST='ER1_NOV_FORECAST_B_APPROVAL.json';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const stop=code=>{throw Error(code)};
+const SAFE_OPERATION_CODE=/^(?:ER1|NOV30_ER1|DEC31_PUBLISH)_[A-Z0-9_]+$/;
+const SAFE_SYSTEM_CODES=new Set(['ENOENT','ENOTDIR','EACCES','EPERM',
+  'MODULE_NOT_FOUND','ERR_MODULE_NOT_FOUND','ERR_INVALID_URL',
+  'ERR_UNSUPPORTED_ESM_URL_SCHEME']);
+export function safeOperationCode(error){
+  for(const candidate of [error?.message,error?.code]){
+    if(typeof candidate==='string'&&SAFE_OPERATION_CODE.test(candidate))
+      return candidate;
+  }
+  // OS errors may contain paths in .message; only disclose a fixed .code.
+  if(SAFE_SYSTEM_CODES.has(error?.code))return error.code;
+  return 'ER1_NOV_FORECAST_B_UNEXPECTED_STOP';
+}
 // Only CRLF pairs may differ from the pinned Git blob. Work on bytes, not
 // decoded JS text; any other change must retain a different object digest.
 function crlfNormalizedBlobSha(file){
@@ -141,7 +154,8 @@ export const resultName=number=>{
 // existing pinned checkout and already-approved local PC configuration.
 export async function execute({env=process.env}={}){
   let report={schema:'ZGMINI_ER1_NOV_FORECAST_B_RESULT_V1',status:'BLOCKED',
-    code:'ER1_NOV_FORECAST_B_NOT_STARTED',providerCalls:0,coreWrites:0,
+    code:'ER1_NOV_FORECAST_B_NOT_STARTED',step:'REQUEST',
+    providerCalls:0,coreWrites:0,
     schedulerWrites:0,rawRowsPublic:0,d1Writes:0};
   let output,sideEffectAttempted=false;
   try{
@@ -152,10 +166,13 @@ export async function execute({env=process.env}={}){
     // Even a rejected request leaves a minimal status report for the Issue.
     const req=validateRequest(event,env);
     const asOf=issueAsOf(event);
+    report.step='MANIFEST';
     const approvalPath=path.join(env.GITHUB_WORKSPACE,'control',MANIFEST);
     const m=validateApproval(JSON.parse(fs.readFileSync(approvalPath,'utf8')));
+    report.step='SOURCE';
     const src=verifySource(path.join(env.GITHUB_WORKSPACE,'source'),m,{
       onFailure:where=>{report.sourceCheck=where;}});
+    report.step='IMPORTS';
     const imp=p=>import(pathToFileURL(path.join(src,...p.split('/'))).href);
     const [{loadSavedNovemberDays},{forecastRowsFromSaved},
       {scoreER1ForecastIssuers},{makeER1PublicDisplay},
@@ -171,8 +188,10 @@ export async function execute({env=process.env}={}){
     if(NOV2026_ER1_PUBLIC_KEY!==PUBLIC_KEY)stop('ER1_NOV_FORECAST_B_PUBLIC_KEY_STOP');
     const outputDir=path.join(PC_HOME,'er1-input','nov30-forecast-derived');
     // Remote resolver reuses existing config.source approval, no new key path.
+    report.step='REMOTE';
     const {remote,core}=await getRemote(PC_HOME);
     sideEffectAttempted=true; // local derived save can begin below
+    report.step='RUN';
     report=await runNovemberForecastB({
       approval:m,sourceSha:req.sourceSha,
       asOf,
@@ -183,11 +202,11 @@ export async function execute({env=process.env}={}){
       syncD1:{publicKey:PUBLIC_KEY,run:syncNovemberER1D1},
       remote,core
     });
+    report.step='RUN';
     report.requestId=req.requestId;
   }catch(e){
     report.status=sideEffectAttempted?'STATE_UNKNOWN':'BLOCKED';
-    report.code=/^(?:ER1_(?:NOV_)?FORECAST|NOV30_ER1)_[A-Z0-9_]+$/.test(
-      e?.message??'')?e.message:'ER1_NOV_FORECAST_B_UNEXPECTED_STOP';
+    report.code=safeOperationCode(e);
   }
   try{if(output)fs.writeFileSync(output,JSON.stringify(report)+'\n',{flag:'wx'})}
   catch{process.stderr.write('ER1_NOV_FORECAST_B_REPORT_STOP\n')}

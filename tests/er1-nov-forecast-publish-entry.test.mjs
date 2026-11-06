@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {validateRequest,validateApproval,verifySource,issueAsOf,PINNED_SOURCE} from
+import {validateRequest,validateApproval,verifySource,issueAsOf,
+  safeOperationCode,PINNED_SOURCE} from
   '../er1-nov-forecast-publish-entry.mjs';
 
 const approval=JSON.parse(fs.readFileSync(new URL(
@@ -20,6 +21,22 @@ const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
 const event={action:'opened',issue:{title:'pc-er1-nov-forecast-publish',
   user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-er1-approved'}],
   created_at:'2026-11-06T16:20:30Z',body:JSON.stringify(request)}};
+
+test('only fixed operation codes and OS error.code escape redaction',()=>{
+  assert.equal(safeOperationCode(Error('DEC31_PUBLISH_SOURCE_STOP')),
+    'DEC31_PUBLISH_SOURCE_STOP');
+  assert.equal(safeOperationCode(Error('NOV30_ER1_OPERATION_CONFIG_STOP')),
+    'NOV30_ER1_OPERATION_CONFIG_STOP');
+  assert.equal(safeOperationCode(Error('ER1_NOV_FORECAST_B_SOURCE_STOP')),
+    'ER1_NOV_FORECAST_B_SOURCE_STOP');
+  const osError=Object.assign(Error('private folder C:\\secrets\\config.json'),
+    {code:'ENOENT'});
+  assert.equal(safeOperationCode(osError),'ENOENT');
+  assert.equal(safeOperationCode(Error('private folder C:\\secrets\\config.json')),
+    'ER1_NOV_FORECAST_B_UNEXPECTED_STOP');
+  assert.equal(safeOperationCode(Object.assign(Error('private key'),
+    {code:'UNKNOWN_PRIVATE_KEY'})),'ER1_NOV_FORECAST_B_UNEXPECTED_STOP');
+});
 
 test('Issue creation time fixes UTC observation asOf across reruns',()=>{
   assert.equal(issueAsOf(event),'2026-11-06');
