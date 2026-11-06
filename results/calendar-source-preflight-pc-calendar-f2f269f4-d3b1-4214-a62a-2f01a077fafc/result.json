@@ -1,0 +1,276 @@
+{
+  "schema": "ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-calendar-f2f269f4-d3b1-4214-a62a-2f01a077fafc",
+  "issueNumber": 566,
+  "status": "CAL_B_PREFLIGHT_STOP",
+  "code": "CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP",
+  "diagnostic": {
+    "taskCommand": "wscript.exe",
+    "firstLauncherShaVerified": true,
+    "secondLauncherShaVerified": true,
+    "containsSecondLauncher": true,
+    "containsSourceRoot": false,
+    "containsLocalCycle": false,
+    "containsRunLocalCmd": false,
+    "strictStaticChainCandidate": false,
+    "callGraph": [
+      {
+        "launcher": 1,
+        "callCount": 2,
+        "truncated": false,
+        "commentStripped": true,
+        "anyConditionalSyntax": true,
+        "sourceRootMentioned": false,
+        "callSites": [
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "mentionsSecondLauncher": true,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          }
+        ]
+      },
+      {
+        "launcher": 2,
+        "callCount": 3,
+        "truncated": false,
+        "commentStripped": true,
+        "anyConditionalSyntax": true,
+        "sourceRootMentioned": false,
+        "callSites": [
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          }
+        ]
+      }
+    ],
+    "causality": [
+      {
+        "launcher": 1,
+        "callCount": 2,
+        "unresolvedCount": 0,
+        "branchSeen": true,
+        "indirectExecutionSeen": true,
+        "sourceTooLarge": false,
+        "entirelyDeterministic": false,
+        "allCallArgumentsResolved": true,
+        "calls": [
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": true,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false,
+            "commandShape": {
+              "executableBasename": "wscript.exe",
+              "scriptBasename": "run-local-core.vbs",
+              "scriptExtension": ".vbs",
+              "scriptRooted": true,
+              "approvedRootMatch": false,
+              "nextHopKind": "KNOWN_VBS_WRAPPER",
+              "oneHopCmdParsed": false
+            }
+          },
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": true,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false,
+            "commandShape": {
+              "executableBasename": "node.exe",
+              "scriptBasename": "archive-run.mjs",
+              "scriptExtension": ".mjs",
+              "scriptRooted": true,
+              "approvedRootMatch": false,
+              "nextHopKind": "ARCHIVE_SIDECAR",
+              "oneHopCmdParsed": false
+            }
+          }
+        ]
+      },
+      {
+        "launcher": 2,
+        "callCount": 3,
+        "unresolvedCount": 0,
+        "branchSeen": true,
+        "indirectExecutionSeen": true,
+        "sourceTooLarge": false,
+        "entirelyDeterministic": false,
+        "allCallArgumentsResolved": true,
+        "calls": [
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false,
+            "commandShape": {
+              "executableBasename": "node.exe",
+              "scriptBasename": "OTHER_SCRIPT",
+              "scriptExtension": ".mjs",
+              "scriptRooted": true,
+              "approvedRootMatch": false,
+              "nextHopKind": "OTHER_NODE_SCRIPT",
+              "oneHopCmdParsed": false
+            }
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false,
+            "commandShape": {
+              "executableBasename": "wscript.exe",
+              "scriptBasename": "OTHER_SCRIPT",
+              "scriptExtension": ".vbs",
+              "scriptRooted": true,
+              "approvedRootMatch": false,
+              "nextHopKind": "OTHER_VBS",
+              "oneHopCmdParsed": false
+            }
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false,
+            "commandShape": {
+              "executableBasename": "node.exe",
+              "scriptBasename": "OTHER_SCRIPT",
+              "scriptExtension": ".mjs",
+              "scriptRooted": true,
+              "approvedRootMatch": false,
+              "nextHopKind": "OTHER_NODE_SCRIPT",
+              "oneHopCmdParsed": false
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "candidateCheckout": {
+    "activeRootVerified": false,
+    "sourceHead": "cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc",
+    "configSource": "cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc",
+    "publicHeadPinned": true,
+    "publicHotfixBlobPinned": true,
+    "otherTargetBlobMatches": 7,
+    "otherTargetBlobCount": 9,
+    "dirtyFiles": [
+      {
+        "path": "lib/release-calendar.mjs",
+        "status": "M",
+        "fileSha256": "d12028f9b9c66d63a10d1e1b93d0846b5bf8d9e7c49fed2be6efefd9694f8d0b"
+      },
+      {
+        "path": "scripts/pc-writer/release-calendar.mjs",
+        "status": "M",
+        "fileSha256": "3fa8e1039fcedd3b2fb07b888996f845c6b7102505acdba7608818cb56238871"
+      }
+    ],
+    "targetBlobMismatches": [
+      {
+        "path": "lib/release-calendar.mjs",
+        "localBlob": "5f4098aca91810db44b9be2dd25688a6a1d031bf",
+        "publicBlob": "6e6fb2ad3bc1e5ada326354d52f813c0330f8300"
+      },
+      {
+        "path": "scripts/pc-writer/earnings-api-local.mjs",
+        "localBlob": "1bf31af759d1bdb140afec2ce34e922d94b37480",
+        "publicBlob": "86c08de695983cb4974d54965aea8ab8e0b1be91"
+      }
+    ],
+    "relevantDirtyCount": 2,
+    "soleExpectedHotfixDirty": false,
+    "stagedIndexCount": 0,
+    "configSourceMatchesHistoric": false,
+    "sourceHeadMatchesHistoric": false
+  },
+  "cycleCheckpoint": {
+    "exists": true,
+    "modifiedAt": "2026-11-06T18:04:27.869Z",
+    "checkpointSha256": "d6c0052d52f0d4b0f6a6f6c7aa30856b67ecec9104f8959dba8fa440b3782735",
+    "status": "PUBLICATION_NOT_VERIFIED",
+    "publishRequested": true,
+    "publicationExit": 1,
+    "collectionExit": 0,
+    "collectionStatus": "COMPLETE",
+    "policyPublishAllowed": true,
+    "policyCollectionDegraded": false,
+    "policyInputPolicy": "NORMAL_STORED_INPUTS",
+    "policyCollectionReason": null,
+    "progressiveEnabled": true,
+    "progressiveEarlyExit": 1,
+    "progressiveFinalSkipped": false,
+    "progressiveReason": "CHECKPOINT_UNAVAILABLE_OR_EARLY_NOT_VERIFIED"
+  },
+  "candidateCheckoutErrorCode": null,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "operationalWrites": 0
+}
