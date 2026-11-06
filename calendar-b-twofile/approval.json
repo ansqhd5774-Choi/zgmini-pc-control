@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_RELEASE_CALENDAR_2FILE_B_APPROVAL_V1",
+  "status": "APPROVED_B_INSTALL_ONCE",
+  "scope": "RELEASE_CALENDAR_TWO_FILE_ONLY",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "backupRoot": "E:\\ZGmini\\data\\pc-writer\\calendar-b-backups",
+  "files": {
+    "lib/release-calendar.mjs": {
+      "beforeSha256": "97800cfbe226be56c3f10e9fa4a37a8967a7e84ad5ba2f098477f7fb3447aefe",
+      "afterSha256": "d12028f9b9c66d63a10d1e1b93d0846b5bf8d9e7c49fed2be6efefd9694f8d0b"
+    },
+    "scripts/pc-writer/release-calendar.mjs": {
+      "beforeSha256": "75861acfb5481572cbfb4d769647cc77fb991f5b44cf909851172ebb93566eda",
+      "afterSha256": "e428c40301ce34f2cadd06d15dcb9d73f554ef989bd9379cef68b2cd461a1a94"
+    }
+  },
+  "changes": {
+    "controller": false,
+    "scheduler": false,
+    "config": false,
+    "db": false,
+    "providerCalls": false,
+    "publishing": false
+  }
+}
