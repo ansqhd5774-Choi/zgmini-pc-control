@@ -102,7 +102,7 @@ test('PC-only EarningsAPI collector is reported by metadata, never raw source',t
  fs.writeFileSync(module,'// MUST_NOT_LEAK_SECRET: fake test fixture, not an API key\nexport const noop=()=>{};\n');
  const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
  assert.equal(out.status,'PASS');
- assert.equal(out.candidates[0].earningsApiCollector.present,true);
+ assert.equal(out.candidates[0].earningsApiCollector.verifiedReadable,true);
  assert.match(out.candidates[0].earningsApiCollector.sha256,/^[0-9a-f]{64}$/);
  assert.ok(out.candidates[0].earningsApiCollector.bytes>0);
  assert.match(out.candidates[0].earningsApiCollector.modifiedAt,/^20\d\d-/);
@@ -111,12 +111,12 @@ test('PC-only EarningsAPI collector is reported by metadata, never raw source',t
  assert.equal(out.providerCalls,0);
 });
 
-test('missing EarningsAPI collector is not treated as installed',t=>{
+test('missing EarningsAPI collector is not treated as verified readable',t=>{
  const f=fixture(t,{dirs:0});
  const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
  assert.equal(out.status,'PASS');
  assert.deepEqual(out.candidates[0].earningsApiCollector,{
-  present:false,sha256:null,bytes:null,modifiedAt:null,
+  verifiedReadable:false,sha256:null,bytes:null,modifiedAt:null,
   evidenceLevel:'FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF'});
 });
 
@@ -127,7 +127,7 @@ test('EarningsAPI collector symlink outside approved root is excluded',t=>{
  fs.symlinkSync(outside,path.join(f.checkout,'scripts','pc-writer','earnings-api-local.mjs'));
  const out=inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
  assert.equal(out.status,'PASS');
- assert.equal(out.candidates[0].earningsApiCollector.present,false);
+ assert.equal(out.candidates[0].earningsApiCollector.verifiedReadable,false);
  assert.equal(out.candidates[0].earningsApiCollector.sha256,null);
  assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_EXTERNAL/);
 });
