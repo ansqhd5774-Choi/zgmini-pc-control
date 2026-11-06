@@ -74,7 +74,14 @@ export async function inspectSavedActual({pcHome=PC_HOME,
     code:'NOV30_SAVED_AUDIT_NOT_STARTED',asOf,dayCount:0,coreDays:0,
     privateDays:0,eventRows:0,scheduledSymbols:0,futureSymbols:0,
     candidateSetSha256:null,priorCalendarRowsBothActual:0,
-    futureCalendarRowsBothActual:0,historyFileSymbols:0,
+    futureCalendarRowsBothActual:0,
+    calendarForecastEPSNumberRows:0,calendarForecastEPSNullOrMissingRows:0,
+    calendarForecastRevenueNumberRows:0,calendarForecastRevenueNullOrMissingRows:0,
+    calendarRowsBothForecast:0,priorCalendarRowsBothForecast:0,
+    futureCalendarRowsBothForecast:0,futureForecastInvalidRows:0,
+    futureSymbolsWithEPSForecast:0,futureSymbolsWithRevenueForecast:0,
+    futureSymbolsWithBothForecast:0,futureSymbolsWithoutBothForecast:0,
+    historyFileSymbols:0,
     historyFilesInvalid:0,historyRowsPast:0,historyRowsRecent140d:0,
     historyEPSActualRows:0,
     historyRevenueActualRows:0,historyBothActualRows:0,
@@ -108,6 +115,8 @@ export async function inspectSavedActual({pcHome=PC_HOME,
       }else readCore=()=>null;
     }
     const future=new Set(),all=new Set();
+    const futureEPSForecast=new Set(),futureRevenueForecast=new Set();
+    const futureBothForecast=new Set();
     for(const day of DAYS){
       const file=path.join(input,'nov30-forward-days',day+'.json');
       let rows=null,privateRead=false;
@@ -128,6 +137,28 @@ export async function inspectSavedActual({pcHome=PC_HOME,
       for(const r of rows){
         all.add(r.symbol);
         if(day>asOf)future.add(r.symbol);
+        const epsForecast=typeof r.epsEstimate==='number'&&
+          Number.isFinite(r.epsEstimate);
+        const revenueForecast=typeof r.revenueEstimate==='number'&&
+          Number.isFinite(r.revenueEstimate)&&r.revenueEstimate>=0;
+        const epsMissing=r.epsEstimate===null||r.epsEstimate===undefined;
+        const revenueMissing=r.revenueEstimate===null||r.revenueEstimate===undefined;
+        if(epsForecast)result.calendarForecastEPSNumberRows++;
+        else if(epsMissing)result.calendarForecastEPSNullOrMissingRows++;
+        if(revenueForecast)result.calendarForecastRevenueNumberRows++;
+        else if(revenueMissing)result.calendarForecastRevenueNullOrMissingRows++;
+        if(epsForecast&&revenueForecast){
+          result.calendarRowsBothForecast++;
+          if(day<asOf)result.priorCalendarRowsBothForecast++;
+          else if(day>asOf)result.futureCalendarRowsBothForecast++;
+        }
+        if(day>asOf){
+          if((!epsForecast&&!epsMissing)||(!revenueForecast&&!revenueMissing))
+            result.futureForecastInvalidRows++;
+          if(epsForecast)futureEPSForecast.add(r.symbol);
+          if(revenueForecast)futureRevenueForecast.add(r.symbol);
+          if(epsForecast&&revenueForecast)futureBothForecast.add(r.symbol);
+        }
         if(typeof r.eps==='number'&&Number.isFinite(r.eps)&&
           typeof r.revenue==='number'&&Number.isFinite(r.revenue)&&r.revenue>=0){
           if(day<asOf)result.priorCalendarRowsBothActual++;
@@ -137,6 +168,10 @@ export async function inspectSavedActual({pcHome=PC_HOME,
     }
     result.scheduledSymbols=all.size;
     result.futureSymbols=future.size;
+    result.futureSymbolsWithEPSForecast=futureEPSForecast.size;
+    result.futureSymbolsWithRevenueForecast=futureRevenueForecast.size;
+    result.futureSymbolsWithBothForecast=futureBothForecast.size;
+    result.futureSymbolsWithoutBothForecast=future.size-futureBothForecast.size;
     const symbols=[...future].sort();
     result.candidateSetSha256=sha256(JSON.stringify(symbols));
     const issuerMap=new Map();
