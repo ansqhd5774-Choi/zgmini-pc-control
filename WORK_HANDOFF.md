@@ -302,3 +302,11 @@
 - **현재 장애 판단:** 최근 #455·#452·#451 정상 원격 JSON/TXT/댓글 회수 확인, `REPORT_UPLOAD_QUEUE_TIMEOUT` 신규 실측 증거 없음. 그러므로 **NON_BLOCKING/DEFERRED**. 일괄 lock 폐지·대기 한도 무조건 확장·유료 큐·재설치·인위적 6 B/A 작업 생성은 하지 않는다.
 - **발생 시 최소 대응:** 실제 `REPORT_UPLOAD_QUEUE_TIMEOUT` 또는 동시 다수 요청의 업로드 대기 지연이 증명되면 원 요청들의 실행 결과와 **전달 실패**를 분리하고 requestId/seat/runId·해당 실행의 잠금 보유 시각·GitHub 응답 지연만 대조한다. 우선 결과쌍의 직렬 GitHub 쓰기는 보호하면서, 서로 다른 Issue의 댓글 확인/종료 정리처럼 안전하게 분리 가능한 부분만 lock 밖으로 옮기는 최소 변경을 검토한다. 동일 요청 재실행/중복 댓글 없이 격리 모형 검증→정규 Controller 승인 설치 판단 순으로 진행.
 - **진행률:** 기존 #434 자연 승인 B 효과 증거 대기 유지. 전체 4/5 FINAL PASS(80%). 이번 용량 감사에서 PC 실행·Issue/댓글·운영 설치 0건.
+
+
+## 32. 2026-11-06 이미 수집된 KPI로 단계별 대기 구분 — 수시간 병목 귀속 보류
+
+- **기존 KPI 재사용:** [#437 실데이터 17건](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/437#issuecomment-6661783275)은 17/17 유효(PASS 12/BLOCKED 5), Issue 생성→Controller 시작 중앙값 18,495ms(12.9~36.7초), Controller 시작→종료 중앙값 5,718ms(최대 16.2초), 관측 최대 실행 겹침 2건. 첫 구간에는 GitHub 이벤트 전달·Runner 접수 등이 포함되어 **순수 Runner 대기라고 하지 않는다**. #437 측정 기능의 이전 source·fixture 성공과 새 운영 설치/속도 개선 효과는 구분한다.
+- **동일 operation 좁은 사례:** [#347](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/347) `core-status`는 Issue 2026-11-04T19:45:23Z, Controller 시작 19:45:39.680Z(16.680초), 실행 6,057ms, PASS; [#455](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/455)는 Issue 2026-11-05T18:20:34Z→시작 18:20:44.416Z(10.416초), 실행 5,921ms, PASS. 서로 다른 시점·Controller SHA의 각 1건이므로 **성능 개선량이나 인과관계 단정 금지**.
+- **기존 B 명세→접수 2사례:** [PR #448](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/448) 종료 2026-11-05T17:46:17Z→[#449 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/449) 생성 17:48:03Z = 1분46초. [PR #453](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/453) 종료 18:13:04Z→[#454 B](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/454) 생성 18:16:46Z = 3분42초. 정확한 승인 시각 전체가 아니라 **PR 종료→B Issue 생성 구간만** 보여준다. 확인된 두 사례에서 이 구간의 수시간 대기는 관측되지 않았다.
+- **총괄 판단/다음:** 사용자 경험의 수시간 정체는 실제로 있었으나, 이 표본만으로 댓글 API·Runner·Controller 실행에 귀속할 수 없다. 새로운 수시간 사례가 **실제로 발생하면** 해당 업무의 기존 승인 시각/manifest 준비→B 접수 Issue→Actions/maintenance 시작→원격 TXT/JSON VERIFIED→담당 채팅 수신·재개를 고유 requestId로 연결하고 **최초 지연 구간 하나만** 찾는다. timestamp 없는 구간은 UNKNOWN; 기존 작업 재실행·전체 검사·새 로그/예약 도입 금지. #434 자연 발생 B 최종 효과 증거 대기는 별도 유지, 전체 4/5(80%).
