@@ -122,3 +122,28 @@ End If`;
  assert.equal(x.callSites[1].mentionsCoreScript,true);
  assert.equal(x.callSites.some(c=>c.mentionsRunLocalCmd),false);
 });
+test('even strict literal VBS candidate is diagnostic-only; conditional is weaker',()=>{
+ const a=String.raw`E:\ZGmini\data\pc-writer\archive-sidecar-r7\run-original-then-archive.vbs`;
+ const b=String.raw`E:\ZGmini\data\pc-writer\cutover-evidence\inflation-r37-2026-10-20T19-39-19-549Z\run-local-core.vbs`;
+ const first=Buffer.from(`Set sh=CreateObject("WScript.Shell")\nsh.Run "${b}"`);
+ const second=Buffer.from(`Set sh=CreateObject("WScript.Shell")\nsh.Run "E:\\ZGmini\\runtime\\node.exe ${script} --publish"`);
+ const hash=x=>createHash('sha256').update(x).digest('hex');
+ const files=new Map([[a,first],[b,second]]);
+ const injected={realpath:p=>p,knownLaunchers:[{path:a,sha:hash(first)},{path:b,sha:hash(second)}],
+  statFile:p=>({isFile:()=>true,isSymbolicLink:()=>false,size:files.get(p).length}),
+  readFile:p=>files.get(p)};
+ assert.throws(()=>parseCoreTaskAction(xml('wscript.exe',`"${a}"`),injected),e=>{
+  assert.equal(e.code,'CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP');
+  assert.equal(e.diagnostic.strictStaticChainCandidate,true);
+  return true;
+ });
+ const conditional=Buffer.from(`Set sh=CreateObject("WScript.Shell")\nIf flag Then\nsh.Run "${b}"\nEnd If`);
+ const restricted={...injected,knownLaunchers:[{path:a,sha:hash(conditional)},{path:b,sha:hash(second)}],
+  readFile:p=>p===a?conditional:second};
+ assert.throws(()=>parseCoreTaskAction(xml('wscript.exe',`"${a}"`),restricted),e=>{
+  assert.equal(e.code,'CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP');
+  assert.equal(e.diagnostic.causality[0].branchSeen,true);
+  assert.equal(e.diagnostic.strictStaticChainCandidate,false);
+  return true;
+ });
+});
