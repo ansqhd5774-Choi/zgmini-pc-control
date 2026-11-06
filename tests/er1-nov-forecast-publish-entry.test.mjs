@@ -82,6 +82,10 @@ test('pinned Git blob and clean LF/CRLF checkout are accepted; drift is rejected
       fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(/\n/g,'\r\n'));
     }
     assert.equal(verifySource(dir,m),dir); // CRLF, Git clean-normalized.
+    git(['config','core.autocrlf','false']);
+    assert.throws(()=>git(['diff','--no-ext-diff','--quiet','HEAD','--',
+      m.files[0].path]),error=>error.status===1);
+    assert.equal(verifySource(dir,m),dir); // CRLF fallback, Git sees dirty.
     const first=(invoke,pattern,where)=>{
       let failure=null;
       assert.throws(()=>invoke(x=>{failure=x}),pattern);
@@ -108,6 +112,11 @@ test('pinned Git blob and clean LF/CRLF checkout are accepted; drift is rejected
         (()=>{throw Error('GIT_MISSING')})():git(args)}),
       /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,
       {path:m.files[0].path,stage:'BLOB_LOOKUP'});
+    first(onFailure=>verifySource(dir,m,{onFailure,
+      gitRun:(_,args)=>args[0]==='diff'?
+        (()=>{throw Object.assign(Error('GIT_FAILURE'),{status:128})})():git(args)}),
+      /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,
+      {path:m.files[0].path,stage:'WORKTREE_DIFF'});
     fs.appendFileSync(path.join(dir,m.files[0].path),'// tampered\r\n');
     first(onFailure=>verifySource(dir,m,{onFailure}),
       /ER1_NOV_FORECAST_B_SOURCE_HASH_STOP/,

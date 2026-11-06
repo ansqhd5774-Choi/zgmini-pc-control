@@ -2,6 +2,7 @@
 // Production integration candidate; not installed until the control PR is merged.
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {runNovemberForecastB} from './er1-nov-forecast-b-core.mjs';
@@ -15,6 +16,18 @@ const MANIFEST='ER1_NOV_FORECAST_B_APPROVAL.json';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA40=/^[a-f0-9]{40}$/;
 const stop=code=>{throw Error(code)};
+// Only CRLF pairs may differ from the pinned Git blob. Work on bytes, not
+// decoded JS text; any other change must retain a different object digest.
+function crlfNormalizedBlobSha(file){
+  const bytes=fs.readFileSync(file),normalized=Buffer.allocUnsafe(bytes.length);
+  let n=0;
+  for(let i=0;i<bytes.length;i++){
+    if(bytes[i]===13&&bytes[i+1]===10)continue;
+    normalized[n++]=bytes[i];
+  }
+  return createHash('sha1').update('blob '+n+'\0')
+    .update(normalized.subarray(0,n)).digest('hex');
+}
 const exact=(obj,fields)=>!!obj&&typeof obj==='object'&&!Array.isArray(obj)&&
   Object.keys(obj).sort().join('|')===fields.slice().sort().join('|');
 
@@ -106,7 +119,15 @@ export function verifySource(root,m,{getHead,gitRun,onFailure}={}){
     catch{fail(entry.path,'OBJECT_TYPE_READ')}
     if(objectType!=='blob')fail(entry.path,'OBJECT_TYPE');
     try{git(['diff','--no-ext-diff','--quiet','HEAD','--',entry.path])}
-    catch{fail(entry.path,'WORKTREE_DIFF')}
+    catch(error){
+      // Git exit 1 = a content difference. Other exit codes are tool errors:
+      // never bypass an unavailable/broken Git integrity check.
+      if(error?.status!==1)fail(entry.path,'WORKTREE_DIFF');
+      let normalized;
+      try{normalized=crlfNormalizedBlobSha(file)}
+      catch{fail(entry.path,'WORKTREE_DIFF')}
+      if(normalized!==entry.blobSha)fail(entry.path,'WORKTREE_DIFF');
+    }
   }
   return root;
 }
