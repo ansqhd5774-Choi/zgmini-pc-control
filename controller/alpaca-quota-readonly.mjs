@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 const WINDOW_MS=60_000;
 const HARD_CAP=140;
@@ -19,22 +20,15 @@ function readLedger(dataRoot){
   if(!stat.isDirectory()||stat.isSymbolicLink())return {error:'ALPACA_BASE_UNVERIFIED'};
  }
  const file=path.join(root,'alpaca-quota-ledger.json');
- let stat;
- try{stat=fs.lstatSync(file);}catch(error){return {error:error?.code==='ENOENT'?'ALPACA_LEDGER_ABSENT':'ALPACA_LEDGER_UNREADABLE'};}
- if(!stat.isFile()||stat.isSymbolicLink())return {error:'ALPACA_LEDGER_UNSAFE_FILE'};
- if(stat.size<=0||stat.size>MAX_LEDGER_BYTES)return {error:'ALPACA_LEDGER_SIZE_INVALID'};
- let content,fd;
- try{
-  fd=fs.openSync(file,'r');
-  const opened=fs.fstatSync(fd);
-  if(!opened.isFile()||opened.size<=0||opened.size>MAX_LEDGER_BYTES)return {error:'ALPACA_LEDGER_SIZE_INVALID'};
-  if(stat.ino&&opened.ino&&stat.ino!==opened.ino)return {error:'ALPACA_LEDGER_CHANGED_DURING_READ'};
-  const bytes=Buffer.alloc(opened.size);let offset=0;
-  while(offset<bytes.length){const n=fs.readSync(fd,bytes,offset,bytes.length-offset,offset);if(n<=0)break;offset+=n;}
-  if(offset!==bytes.length)return {error:'ALPACA_LEDGER_SHORT_READ'};
-  content=bytes.toString('utf8');
- }catch{return {error:'ALPACA_LEDGER_UNREADABLE'};}
- finally{if(fd!==undefined)try{fs.closeSync(fd);}catch{}}
+ const read=readFixedReadonlyBytes(file,{verifiedRoot:root,maxBytes:MAX_LEDGER_BYTES});
+ if(!read.ok){
+  const errors={MISSING:'ALPACA_LEDGER_ABSENT',UNREADABLE:'ALPACA_LEDGER_UNREADABLE',
+   UNSAFE_FILE:'ALPACA_LEDGER_UNSAFE_FILE',SIZE_INVALID:'ALPACA_LEDGER_SIZE_INVALID',
+   CHANGED_DURING_READ:'ALPACA_LEDGER_CHANGED_DURING_READ',
+   SHORT_READ:'ALPACA_LEDGER_SHORT_READ'};
+  return {error:errors[read.reason]??'ALPACA_LEDGER_UNREADABLE'};
+ }
+ const content=read.bytes.toString('utf8');
  let value;
  try{value=JSON.parse(content);}catch{return {error:'ALPACA_LEDGER_INVALID'};}
  if(!value||value.version!==1||!Array.isArray(value.requestTimes)||
@@ -77,3 +71,4 @@ export function inspectAlpacaQuotaReadonly(dataRoot,{now=Date.now()}={}){
  if(count>HARD_CAP)return result('FAIL','ALPACA_LOCAL_140_EXCEEDED',{quota:observed});
  return result('PASS','ALPACA_QUOTA_READONLY_DIAGNOSIS',{quota:observed});
 }
+

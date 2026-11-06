@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {inspectPcSource} from './pc-source-readonly.mjs';
+import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 export const R10_SOURCE_FILES=Object.freeze([
  'lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs',
@@ -22,11 +23,11 @@ const safeSha=x=>typeof x==='string'&&SHA40.test(x)?x:null;
 
 function readApprovedSha(dataRoot,{fileSystem=fs}={}){
  const p=path.join(dataRoot,'pc-writer','config.json');
- let info;
- try{info=fileSystem.lstatSync(p);}catch{return null;}
- if(!info.isFile()||info.isSymbolicLink()||info.size<2||info.size>65_536)return null;
+ const read=readFixedReadonlyBytes(p,{fileSystem,verifiedRoot:dataRoot,
+  minBytes:2,maxBytes:65_536});
+ if(!read.ok)return null;
  try{
-  const config=JSON.parse(fileSystem.readFileSync(p,'utf8'));
+  const config=JSON.parse(read.bytes.toString('utf8'));
   return safeSha(config?.source);
  }catch{return null;}
 }
@@ -91,14 +92,14 @@ export function inspectAssetR10SourceBytes(dataRoot,{coreTaskXml,
  result.files=R10_SOURCE_FILES.map(relative=>{
   const file=path.join(real,...relative.split('/'));
   try{
-   const resolved=fileSystem.realpathSync.native(file);
-   const stat=fileSystem.lstatSync(file);
-   if(!inside(real,resolved)||!stat.isFile()||stat.isSymbolicLink()||
-    stat.size<1||stat.size>MAX_FILE_BYTES)throw Error('UNSAFE');
-   return {path:relative,exists:true,sha256:sha256(fileSystem.readFileSync(file))};
+   const read=readFixedReadonlyBytes(file,{fileSystem,verifiedRoot:real,
+    maxBytes:MAX_FILE_BYTES});
+   if(!read.ok)throw Error('UNSAFE');
+   return {path:relative,exists:true,sha256:sha256(read.bytes)};
   }catch{return {path:relative,exists:false,sha256:null};}
  });
  result.status='PASS';
  result.code='ASSET_R10_SOURCE_BYTES_READONLY';
  return result;
 }
+
