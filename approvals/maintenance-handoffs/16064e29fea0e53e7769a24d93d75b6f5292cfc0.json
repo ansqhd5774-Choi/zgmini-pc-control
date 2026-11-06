@@ -1,0 +1,36 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V1",
+  "installedSha": "4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4",
+  "targetSha": "16064e29fea0e53e7769a24d93d75b6f5292cfc0",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Existing standing approval for verified same-purpose PC maintenance-source handoff under docs/PC_AUTOMATION_STANDARD.md section 5 and user-authorized ZGMINI common platform transition. PR #594 is merged at exact main commit 16064e29fea0e53e7769a24d93d75b6f5292cfc0; it corrects old-six/new-seven independent-maintainer self-manifest installation and preserves protected Controller/Runner/data paths. Historical 2026-11-06 Windows 464 POSTFF V2 observed installed maintenance source 4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4. This historical SHA is a conditional exact preimage, NOT current Runtime proof: immediately before any mutation the Windows operator must reread MAINTENANCE_INSTALL.json, all six installed file hashes, Startup SHA, authenticated receiver origin/PID/nonce, lease absence and approved main source bytes; any drift stops without installing. This approval candidate on its own is not a Windows installation or a GitHub-main approval-file presence proof.",
+  "files": {
+    "tools/maintenance-contract.mjs": "98ed143788e8433c93cb558a6e81939e0f7f5387be7b847ee2791406b1184197",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "fd4aa486ebff95f5b52a6ad41220781132320aa15af74ea507309538bf31cfc5",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "13fac9fea45a4c08f002026e7fd7457599b78fb276f9140d17847ede8f459d50",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "bfdd5c7ce261183239f354f9760fd8cfb694a866a310e87ce7216dea332fefb3"
+  },
+  "checks": {
+    "command": "PR #594 merged main target source, exact 9/9 Git blob and SHA-256 readback; old 4f076a0 to new 16064e2 cumulative nine-path diff: five modified, one added, three unchanged. Isolated handoff and recovery Node tests 35/35 PASS with startup drift, new receiver rollback protection, old6/new7 exact file sets, new source plus six-file manifest reject and unrelated-path deny. Node syntax affected tools PASS. No Windows execution.",
+    "passed": 35,
+    "failed": 0,
+    "platform": "Read-only GitHub exact commit/blob proof plus isolated Node source tests; Windows current installed SHA, receiver, lease, local checkout, actual handoff, and new receiver remain unverified."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "installed Controller source, host.json, controller/config and workflow",
+    "Core/Korea/Iran task registration and six Runner registrations",
+    "all SQLite/D1/provider credentials and PC raw/derived/publication data",
+    "existing E: request, checkpoint, maintenance ledger and historical report files",
+    "existing maintenance source-bundles, snapshots and recovery backups",
+    "existing published theme records and final/provisional history"
+  ],
+  "scopeNote": "One-time operator-only in-place six-to-seven independent-maintainer handoff candidate. The nine pinned Git source files comprise seven installed runtime tools plus bootstrap-maintenance.mjs and handoff-maintenance.mjs used only as source-verified Windows operator helpers. Relative to historical installed source 4f076a0228f8ba9598e85b7d0f64f161b6b7c8a4, only maintenance-contract.mjs, maintenance-agent.mjs, update.mjs, bootstrap-maintenance.mjs, handoff-maintenance.mjs and new source-bundle-register.mjs differ; maintenance-apply.mjs, maintenance-lock.mjs and maintenance-ancestry.vbs have identical bytes. Never import candidate from an unapproved checkout, run from an Actions Runner/pc-job, change Controller/Reader/Task/D1 or reset any ledger. Require exact current installed source CAS and Windows origin/lease/protected backup readback. New receiver attested PASS is the self-handoff success criterion; generic source registration B and public ten-theme operation remain separate uncompleted steps."
+}
