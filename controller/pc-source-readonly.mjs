@@ -41,6 +41,16 @@ function candidatePaths(text){
  return [...new Set(matches.map(s=>s.trim()))].slice(0,32);
 }
 
+function launcherText(bytes){
+ if(bytes.length>=2&&bytes[0]===0xff&&bytes[1]===0xfe)
+  return bytes.subarray(2).toString('utf16le');
+ if(bytes.length>=2&&bytes[0]===0xfe&&bytes[1]===0xff)
+  return Buffer.from(bytes.subarray(2)).swap16().toString('utf16le');
+ if(bytes.length>=4&&bytes[1]===0&&bytes[3]===0)
+  return bytes.toString('utf16le');
+ return bytes.toString('utf8');
+}
+
 /** The installed A request is fixed-schema: it must not accept arbitrary file paths.
  * Return only names and digests for bounded, flat Writer JS files. This is a
  * candidate checkout inventory, not proof that the active Core executes it.
@@ -127,7 +137,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
    if(!stat.isFile()||stat.size>65536)continue;
    const bytes=read(real);visited.add(real.toLowerCase());
    files.push({absolute:real,path:relative(real),sha256:sha256(bytes)});
-   for(const found of candidatePaths(bytes.toString('utf8')))
+   for(const found of candidatePaths(launcherText(bytes)))
     queue.push({raw:found,base:path.dirname(real)});
    let dir=path.dirname(real);
    while(inside(dir)){
