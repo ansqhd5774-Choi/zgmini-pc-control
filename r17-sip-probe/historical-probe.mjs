@@ -14,6 +14,7 @@ const CONFIG=path.join(BASE,'config.json');
 const INSTALLED_SHA='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
 const OBSERVATION='2026-11-06';
 const PRIOR='2026-11-05';
+const PREVIOUS_SAVED_UNIVERSE='2026-11-04'; // Diagnostic membership only; SIP bars remain 11/05–11/06.
 const SESSION_START='2026-11-06T09:00:00.000Z'; // 04:00 New York EST.
 const SESSION_END='2026-11-06T14:30:00.000Z'; // 09:30 New York EST.
 const EARLIEST=Date.parse(SESSION_END)+16*60_000;
@@ -76,15 +77,28 @@ export async function probeHistorical({now=Date.now(),base=BASE,
   calculateUsSipPremarket,validUsSipPremarket,fetchImpl=fetch}={}){
   requireThat(now>=EARLIEST,'SIP_PROBE_HISTORICAL_NOT_YET_DELAYED');
   let members;
+  let universeAsOfDate=PRIOR;
+  let universeSelection='EXACT_REQUESTED';
   try{members=storedUniverse(base,PRIOR);}catch(error){
-    // Explicit known read-only DB/universe codes only. Never serialize SQL or paths.
-    const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_MISSING',
-      'US_PROVISIONAL_UNIVERSE_INVALID'];
-    throw failure(known.includes(error?.message)?error.message:
-      'SIP_PROBE_UNIVERSE_READ_STOP');
+    // Only this precise missing-day result permits the older saved diagnostic universe.
+    if(error?.message!=='US_PROVISIONAL_UNIVERSE_MISSING'){
+      const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_INVALID'];
+      throw failure(known.includes(error?.message)?error.message:
+        'SIP_PROBE_UNIVERSE_READ_STOP');
+    }
+    try{members=storedUniverse(base,PREVIOUS_SAVED_UNIVERSE);}catch(previousError){
+      const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_MISSING',
+        'US_PROVISIONAL_UNIVERSE_INVALID'];
+      throw failure(known.includes(previousError?.message)?previousError.message:
+        'SIP_PROBE_PREVIOUS_UNIVERSE_READ_STOP');
+    }
+    universeAsOfDate=PREVIOUS_SAVED_UNIVERSE;
+    universeSelection='PREVIOUS_SAVED_DIAGNOSTIC';
   }
   requireThat(Array.isArray(members)&&members.length>=490&&members.length<=520,
     'SIP_PROBE_UNIVERSE_STOP');
+  if(universeSelection==='PREVIOUS_SAVED_DIAGNOSTIC')
+    requireThat(members.length===503,'SIP_PROBE_PREVIOUS_UNIVERSE_COUNT_STOP');
   let auth;
   try{auth=loadLocalProviders(base);}catch{
     throw failure('SIP_PROBE_PROVIDER_ENV_STOP');
@@ -116,11 +130,16 @@ export async function probeHistorical({now=Date.now(),base=BASE,
     const complete=record.collectionStatus==='COMPLETE';
     const empty=complete&&record.observedCount===0;
     return {status:!complete?'SIP_HISTORICAL_INCOMPLETE_PAGINATION':
-      empty?'SIP_HISTORICAL_EMPTY_OBSERVATION':'SIP_HISTORICAL_REAL_DATA_PASS',
+      empty?'SIP_HISTORICAL_EMPTY_OBSERVATION':
+        universeSelection==='PREVIOUS_SAVED_DIAGNOSTIC'?
+          'SIP_HISTORICAL_FALLBACK_DIAGNOSTIC':'SIP_HISTORICAL_REAL_DATA_PASS',
       code:!complete?'SIP_PROBE_INCOMPLETE':
-        empty?'SIP_PROBE_NO_OBSERVATIONS':'SIP_PROBE_VERIFIED',
+        empty?'SIP_PROBE_NO_OBSERVATIONS':
+          universeSelection==='PREVIOUS_SAVED_DIAGNOSTIC'?
+            'SIP_PROBE_PREVIOUS_UNIVERSE_DIAGNOSTIC':'SIP_PROBE_VERIFIED',
       observationDate:OBSERVATION,slotEndUtc:SESSION_END,
       checkedAt:new Date().toISOString(),providerCalls,
+      universeAsOfDate,universeSelection,
       source:'ALPACA_SIP_PREMARKET_15MIN_DELAYED_SPLIT',
       expectedCount:record.expectedCount,observedCount:record.observedCount,
       missingCount:record.missingCount,
@@ -137,7 +156,8 @@ export async function probeHistorical({now=Date.now(),base=BASE,
           'SIP_PROBE_PROVIDER_OR_VALIDATION_FAILED';
     return {status:'SIP_HISTORICAL_NOT_VERIFIED',code:err,
       observationDate:OBSERVATION,slotEndUtc:SESSION_END,
-      checkedAt:new Date().toISOString(),providerCalls};
+      checkedAt:new Date().toISOString(),providerCalls,
+      universeAsOfDate,universeSelection};
   }
 }
 
@@ -148,6 +168,7 @@ export function sanitizeProbeResult(raw,requestId,runId){
     observationDate:OBSERVATION,slotEndUtc:SESSION_END,
     checkedAt:null,providerCalls:null,retry:'NO_REEXECUTE_READBACK_ONLY'};
   if(!jsonObject(raw)||!['SIP_HISTORICAL_REAL_DATA_PASS',
+    'SIP_HISTORICAL_FALLBACK_DIAGNOSTIC',
     'SIP_HISTORICAL_INCOMPLETE_PAGINATION','SIP_HISTORICAL_EMPTY_OBSERVATION',
     'SIP_HISTORICAL_NOT_VERIFIED']
     .includes(raw.status)||!CODE.test(raw.code??'')||
@@ -159,10 +180,17 @@ export function sanitizeProbeResult(raw,requestId,runId){
     raw.providerCalls>BUDGET)return empty;
   const core={...empty,status:raw.status,code:raw.code,
     checkedAt:raw.checkedAt,providerCalls:raw.providerCalls};
-  if(raw.status==='SIP_HISTORICAL_NOT_VERIFIED')return core;
+  const selectionValid=(raw.universeAsOfDate===PRIOR&&
+    raw.universeSelection==='EXACT_REQUESTED')||
+    (raw.universeAsOfDate===PREVIOUS_SAVED_UNIVERSE&&
+    raw.universeSelection==='PREVIOUS_SAVED_DIAGNOSTIC');
+  if(raw.status==='SIP_HISTORICAL_NOT_VERIFIED')return selectionValid?
+    {...core,universeAsOfDate:raw.universeAsOfDate,
+      universeSelection:raw.universeSelection}:core;
   const countNames=['expectedCount','observedCount','missingCount','risingCount',
     'fallingCount','unchangedCount','referenceObservedCount','freshWithin30m'];
-  if(countNames.some(k=>!Number.isSafeInteger(raw[k])||raw[k]<0)||
+  if(!selectionValid||
+    countNames.some(k=>!Number.isSafeInteger(raw[k])||raw[k]<0)||
     raw.expectedCount<490||raw.expectedCount>520||
     raw.observedCount+raw.missingCount!==raw.expectedCount||
     raw.risingCount+raw.fallingCount+raw.unchangedCount!==raw.observedCount||
@@ -170,12 +198,18 @@ export function sanitizeProbeResult(raw,requestId,runId){
     raw.source!=='ALPACA_SIP_PREMARKET_15MIN_DELAYED_SPLIT'||
     !['COMPLETE','INCOMPLETE_PAGINATION'].includes(raw.collectionStatus)||
     (raw.status==='SIP_HISTORICAL_REAL_DATA_PASS'&&
-      (raw.collectionStatus!=='COMPLETE'||raw.observedCount===0))||
+      (raw.collectionStatus!=='COMPLETE'||raw.observedCount===0||
+        raw.universeSelection!=='EXACT_REQUESTED'||raw.code!=='SIP_PROBE_VERIFIED'))||
+    (raw.status==='SIP_HISTORICAL_FALLBACK_DIAGNOSTIC'&&
+      (raw.collectionStatus!=='COMPLETE'||raw.observedCount===0||
+        raw.universeSelection!=='PREVIOUS_SAVED_DIAGNOSTIC'||
+        raw.code!=='SIP_PROBE_PREVIOUS_UNIVERSE_DIAGNOSTIC'))||
     (raw.status==='SIP_HISTORICAL_EMPTY_OBSERVATION'&&
       (raw.collectionStatus!=='COMPLETE'||raw.observedCount!==0))||
     (raw.status==='SIP_HISTORICAL_INCOMPLETE_PAGINATION'&&
       raw.collectionStatus!=='INCOMPLETE_PAGINATION'))return empty;
   return {...core,source:raw.source,collectionStatus:raw.collectionStatus,
+    universeAsOfDate:raw.universeAsOfDate,universeSelection:raw.universeSelection,
     ...Object.fromEntries(countNames.map(k=>[k,raw[k]]))};
 }
 
@@ -235,6 +269,8 @@ export async function uploadProbe({event,env,raw,api=fetch}){
     [`${prefix}.txt`,[
       `REQUEST_ID=${report.requestId}`,`STATUS=${report.status}`,
       `CODE=${report.code}`,`DATE=${report.observationDate}`,
+      `UNIVERSE_AS_OF_DATE=${report.universeAsOfDate??'UNKNOWN'}`,
+      `UNIVERSE_SELECTION=${report.universeSelection??'UNKNOWN'}`,
       `SLOT_END_UTC=${report.slotEndUtc}`,`CHECKED_AT=${report.checkedAt??'UNKNOWN'}`,
       `SOURCE=${report.source??'NONE'}`,`EXPECTED=${report.expectedCount??'UNKNOWN'}`,
       `OBSERVED=${report.observedCount??'UNKNOWN'}`,
@@ -263,7 +299,9 @@ export async function uploadProbe({event,env,raw,api=fetch}){
   }
   const comment=`<!-- r17-sip-historical:${auth.requestId} -->\n`+
     `R17 historical SIP: **${report.status}** (${report.code}); `+
-    `date=${OBSERVATION}; source=${report.source??'UNKNOWN'}.\n`+
+    `date=${OBSERVATION}; universeAsOf=${report.universeAsOfDate??'UNKNOWN'}; `+
+    `universeSelection=${report.universeSelection??'UNKNOWN'}; `+
+    `source=${report.source??'UNKNOWN'}.\n`+
     `RESULT_CREATED=${created}/2; RESULT_READBACK=${verified}/2. `+
     `RETRY=NO_REEXECUTE_READBACK_ONLY.\n`;
   const response=await api(`https://api.github.com/repos/${REPO}/issues/${event.issue.number}/comments`,
@@ -321,7 +359,8 @@ async function main(){
       error.safeCode:'SIP_PROBE_SETUP_STOP');
   }
   process.stdout.write(JSON.stringify(result)+'\n');
-  if(result.status!=='SIP_HISTORICAL_REAL_DATA_PASS')process.exitCode=1;
+  if(!['SIP_HISTORICAL_REAL_DATA_PASS',
+    'SIP_HISTORICAL_FALLBACK_DIAGNOSTIC'].includes(result.status))process.exitCode=1;
 }
 
 async function uploadMain(){
