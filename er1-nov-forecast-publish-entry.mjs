@@ -9,7 +9,7 @@ import {runNovemberForecastB} from './er1-nov-forecast-b-core.mjs';
 
 const CONTROL='ansqhd5774-Choi/zgmini-pc-control';
 const SOURCE='ansqhd5774-Choi/zgmini';
-export const PINNED_SOURCE='67f769b829195fc33745305234c2bb2de3f1eeb1';
+export const PINNED_SOURCE='b49293460e86901e0a04effca7945dcd5a2c4318';
 const PUBLIC_KEY='market-calendar:earnings-nov2026-er1-score-public';
 const PC_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 const MANIFEST='ER1_NOV_FORECAST_B_APPROVAL.json';
