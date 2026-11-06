@@ -106,3 +106,10 @@
 - **복구/전환 시험:** 기존 `tests/maintenance-apply.test.mjs`, `tests/interrupted-rollback.test.mjs`, `tests/maintenance-contract.test.mjs`에 보호·검증된 백업·복구 시나리오가 존재함을 소스로 확인. **이번 차례 직접 실행/Windows 전환 실패·복구 시험은 수행하지 않음**. M3 전체 완료 증거로 승격하지 않음.
 
 **FIRST GAP:** #535 정상 B 완료 SHA, #537의 승인/Windows 격리 smoke 실행 경로, 새 3파일의 승인 manifest·복구 검증이 아직 없다. **다음 필수 행동:** #68에서 #535 자연 적용의 완료 상태를 확인한 뒤 #537 범위·검토·Windows 시험의 승인 경로를 조정하고, 정확한 실제 설치 SHA에 맞춘 #537 manifest/격리 복구 시험을 준비한다. 원담당의 독립 기능 진행을 멈추지 않는다.
+
+### M3 격리 회복·배포 계약 실제 테스트 — 추가 증거
+
+- GitHub `main`의 `tools/maintenance-contract.mjs`(blob `0b1dca5f…`), `tools/maintenance-apply.mjs`(blob `dd671e38…`), `tests/maintenance-contract.test.mjs`, `tests/interrupted-rollback.test.mjs`를 **격리 임시 경로에 정확히 복사**하고 Node **v24.22.1**로 실행.
+- 명령: `node --test --test-skip-pattern='regular maintenance updater uses scoped gate' tests/maintenance-contract.test.mjs tests/interrupted-rollback.test.mjs`. **선택 실행된 34/34 PASS, fail 0, skip 0**. 누락/잘못된 승인 경로·고정 installed SHA·사후 보호 상태·실패 전/후 구분·중단 rollback·미검증 백업·재연결/작업 접수 보호 시나리오 포함.
+- 제외 1건은 `tools/update.mjs` 전체 소스 정적 검사에 의존하는 별도 테스트. **전체 유지보수기/Windows 통합 테스트 PASS로 주장하지 않음**. 포트 mock·계약 fixture 테스트이며 실제 PC 백업·설치·복구 호출 0.
+- 위 결과로 백업/복구 계약의 Linux 격리 회귀 근거를 확보했으나 **실제 #537 승인 manifest 부재, Windows 신규 reader smoke 미실시, #535 운영 적용 상태 미확정**이어서 M3를 DONE으로 승격하지 않음. 진행률 **60% 유지**.
