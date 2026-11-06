@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 
-export const BASE='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
+export const BASE='dace6090f61eb0d0319f79422649af312f7b1764';
 export const CONTROL_REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const SOURCE_ROOT=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 export const CONFIG_PATH=String.raw`E:\ZGmini\data\pc-writer\config.json`;
