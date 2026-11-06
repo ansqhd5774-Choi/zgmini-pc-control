@@ -85,9 +85,9 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
    const module=safeFile(path.join(resolved,'lib','release-calendar.mjs'),1048576);
    const runner=safeFile(path.join(resolved,'scripts','pc-writer','release-calendar.mjs'),1048576);
    if(!collector||!module||!runner)continue;
-   const earningsModule=safeFile(path.join(resolved,'scripts','pc-writer','earnings-api-local.mjs'),1048576);
    out.candidateCount++;
    if(out.candidates.length>=32){out.inventoryTruncated=true;continue;}
+   const earningsModule=safeFile(path.join(resolved,'scripts','pc-writer','earnings-api-local.mjs'),1048576);
    const source=module.bytes.toString('utf8');
    const match=source.match(/export\s+const\s+RELEASE_SOURCES\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\);/);
    const keys=match?[...match[1].matchAll(/^\s*([a-z][a-z0-9_]*)\s*:/gm)].map(m=>m[1]).filter(validKey).slice(0,32):[];
@@ -117,7 +117,7 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
     collectorCallsCalendar:/\bcollectReleaseCalendar\s*\(/.test(collectorText),
     collectorImportsCalendar:/['"]\.\/release-calendar\.mjs['"]/.test(collectorText),
     moduleSha256:hash(module.bytes),collectorSha256:hash(collector.bytes),runnerSha256:hash(runner.bytes),
-    earningsApiCollector:{present:!!earningsModule,
+    earningsApiCollector:{verifiedReadable:!!earningsModule,
      sha256:earningsModule?hash(earningsModule.bytes):null,
      bytes:earningsModule?.bytes.length??null,
      modifiedAt:earningsModule?.modifiedAt??null,
