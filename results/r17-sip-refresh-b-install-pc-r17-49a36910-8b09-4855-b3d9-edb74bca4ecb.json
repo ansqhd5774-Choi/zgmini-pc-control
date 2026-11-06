@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_R17_SIP_REFRESH_B_INSTALL_RESULT_V1",
+  "requestId": "pc-r17-49a36910-8b09-4855-b3d9-edb74bca4ecb",
+  "status": "SIP_B_INSTALLED_VERIFIED",
+  "code": "SIP_B_INSTALL_VERIFIED",
+  "sourceSha": "dace6090f61eb0d0319f79422649af312f7b1764",
+  "recovery": null,
+  "runId": "42267881168",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
