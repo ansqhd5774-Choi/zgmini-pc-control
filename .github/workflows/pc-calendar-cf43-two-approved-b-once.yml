@@ -26,6 +26,9 @@ jobs:
         shell: cmd
     env:
       GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
     steps:
       - name: Checkout exact private control commit
         id: source
