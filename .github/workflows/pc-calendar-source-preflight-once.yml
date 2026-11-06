@@ -1,0 +1,58 @@
+# One-shot read-only reality check for market calendar's active Core.
+# No Controller install, SQL, provider GET, D1 write, task or Git mutation.
+name: ZGMINI Calendar Active Source Preflight Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Private control result.json/TXT only.
+  issues: write # One bound result comment.
+concurrency:
+  group: zgmini-calendar-active-core-readonly
+  cancel-in-progress: false
+jobs:
+  active-core-source-readonly:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-calendar-source-preflight-once' &&
+      contains(github.event.issue.labels.*.name, 'pc-calendar-source-preflight') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Read exact private control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: calendar-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read pinned, already merged public source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ce9bccd8b38939b204e8f836a50ae362960eb7af
+          path: calendar-public
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Active Core root, exact dirty overlay and 12 source count (no writes)
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\calendar-control\calendar-source-b-install-20261107\preflight-windows.mjs" > "%RUNNER_TEMP%\calendar-source-preflight-result.json"'
+      - name: Recover private JSON and TXT without repeating PC preflight
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\calendar-control\calendar-source-b-install-20261107\upload-preflight-result.mjs"'
