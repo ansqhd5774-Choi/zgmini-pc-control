@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_CAL_CF43_TWO_APPROVED_SOURCE_B_V1",
+  "status": "APPROVED_B_INSTALL_ONCE",
+  "scope": "SYNTHETIC_GIT_COMMIT_APPROVED_DIRTY_TWO_FILES",
+  "baseSourceSha": "cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc",
+  "coreTaskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "approvedPathsSha256": {
+    "lib/release-calendar.mjs": "d12028f9b9c66d63a10d1e1b93d0846b5bf8d9e7c49fed2be6efefd9694f8d0b",
+    "scripts/pc-writer/release-calendar.mjs": "3fa8e1039fcedd3b2fb07b888996f845c6b7102505acdba7608818cb56238871"
+  },
+  "historicalApprovals": [491, 511, 534],
+  "approvalPolicy": "ZGMINI_R6_0_PRIOR_B_EFFECT_REUSE_NO_NEW_RUNTIME_FUNCTION",
+  "protectedR17Tree": "PARENT_TREE_PRESERVE",
+  "gitEffect": "ONE_NEW_LOCAL_BRANCH_TWO_FILE_COMMIT_NO_RESET_STASH",
+  "configEffect": "SOURCE_SHA_ONLY",
+  "coreTaskEffect": "TEMPORARY_DISABLE_DRAIN_RESTORE",
+  "providerCalls": 0,
+  "databaseWrites": 0,
+  "writerRuns": 0,
+  "schedulerDefinitionChanges": 0,
+  "runCount": 1
+}
