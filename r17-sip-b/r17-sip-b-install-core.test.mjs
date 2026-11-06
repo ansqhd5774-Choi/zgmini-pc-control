@@ -60,7 +60,8 @@ function fakeIo({faultAt=null,snapshot=preimage(),candidateInspection=candidate(
   const io={events};
   const make=(name,value)=>async(...args)=>{
     events.push(name);
-    if(name===faultAt)throw new Error('fixture-failure');
+    if(name===faultAt||(Array.isArray(faultAt)&&faultAt.includes(name)))
+      throw new Error('fixture-failure');
     return typeof value==='function'?value(...args):value;
   };
   for(const name of ['acquireSharedWriterLock','claimOnce','backupExactSourceAndConfig',
@@ -73,6 +74,8 @@ function fakeIo({faultAt=null,snapshot=preimage(),candidateInspection=candidate(
   io.inspectPinnedCandidate=make('inspectPinnedCandidate',candidateInspection);
   io.prepareIsolatedExactThreeFileCommit=make('prepareIsolatedExactThreeFileCommit',{
     commit:'f'.repeat(40),parent:BASELINE_SOURCE,clean:true,onlyThreeFiles:true});
+  const release=io.releaseSharedWriterLock;
+  io.releaseSharedWriterLock=async args=>{io.releaseArgs=args;return release(args);};
   return io;
 }
 
@@ -111,4 +114,13 @@ test('unregistered adapter cannot run, even with source manifest',async()=>{
   await assert.rejects(performAuthorizedInstall({...auth,registeredB:false},io),
     {code:'SIP_B_NOT_REGISTERED_OR_AUTHORIZED_STOP'});
   assert.deepEqual(io.events,[]);
+});
+
+test('uncertain rollback retains shared Writer lock for manual reconciliation',async()=>{
+  const io=fakeIo({faultAt:['assertConfigSource','restoreOriginalSourceExactly']});
+  const result=await performAuthorizedInstall(auth,io);
+  assert.equal(result.status,'SIP_B_RECOVERY_REQUIRED');
+  assert.equal(result.recovery,'MANUAL_RECONCILIATION_REQUIRED');
+  assert.equal(io.events.at(-1),'releaseSharedWriterLock');
+  assert.deepEqual(io.releaseArgs,{retain:true});
 });
