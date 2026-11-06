@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_PC_SOURCE_BUNDLE_B_APPROVAL_V2",
+  "operation": "pc-source-bundle-register",
+  "scope": "HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/theme-fear-greed-integration-20261025",
+  "sourceSha": "dfd8913ac928f7e8015ba394206e8c046f84c213",
+  "sourceManifestPath": "approvals/source-bundles/manifests/dfd8913ac928f7e8015ba394206e8c046f84c213.json",
+  "sourceManifestSha256": "dba6c955c7afaa82499acf9ad7729947e86e6fc59b5093c62732e5cecc9be7d6",
+  "entrypoint": "scripts/pc-writer/theme-config-tool.mjs",
+  "installedControllerSha": "11899a1a16ea77a6ecc7a579997814cde9ded76f",
+  "hostPath": "E:/ZGmini/automation/pc-control/host.json",
+  "stageBundle": "E:/ZGmini/automation/pc-control/source-bundles/source-dfd8913ac928f7e8015ba394206e8c046f84c213",
+  "backupDirectory": "E:/ZGmini/automation/pc-control/backups/source-pc-0802abe4-9f89-41ba-a4d5-86c268b1c39d",
+  "approval": {
+    "grade": "B",
+    "scope": "HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/576"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": "RESTORE_HOST_SHA256"
+  }
+}
