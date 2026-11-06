@@ -66,6 +66,10 @@ export function validatePcPreimage(snapshot){
   requireThat(object(snapshot)&&snapshot.sourceRoot===SOURCE_ROOT&&
     snapshot.configPath===CONFIG_PATH&&snapshot.coreTask===CORE_TASK&&
     snapshot.head===BASELINE_SOURCE&&snapshot.configSource===BASELINE_SOURCE&&
+    typeof snapshot.originalBranch==='string'&&
+    /^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(snapshot.originalBranch)&&
+    !snapshot.originalBranch.includes('..')&&
+    !snapshot.originalBranch.endsWith('/')&&
     snapshot.worktreeClean===true&&snapshot.coreTaskEnabled===true&&
     sameKeys(snapshot.existingSha256,{
       'scripts/pc-writer/us-breadth-provisional-cycle.mjs':''})&&
