@@ -6,7 +6,7 @@
 
 **시작 지침:** [docs/GENERAL_CHAT_START.md](docs/GENERAL_CHAT_START.md) · [허용목록](config/operations.json)
 
-**여러 작업의 공용 설치:** [적용 대기열 운영 방침](docs/CONTROLLER_APPLY_QUEUE.md). 독립 개발·실행은 병렬로, 공용 Controller·유지보수기 적용만 단일 원장·담당으로 조정한다.
+**여러 작업의 공용 설치:** [적용 대기열 운영 방침](docs/CONTROLLER_APPLY_QUEUE.md). 독립 개발·실행은 병렬로, 공용 Controller·유지보수기 및 동일 PC Core 운영 checkout의 공유 변경만 단일 원장·자원별 담당으로 조정한다.
 
 ## 구조
 
