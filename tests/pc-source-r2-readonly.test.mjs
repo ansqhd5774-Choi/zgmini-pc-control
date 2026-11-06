@@ -71,6 +71,18 @@ test('config source mismatch is reported but cannot falsify PC Runtime proof',t=
  assert.doesNotMatch(JSON.stringify(result),/SECRET/);
 });
 
+test('UTF-16LE VBS wrapper resolves nested launcher without executing it',t=>{
+ const f=fixture(t);
+ f.put('stage-one.vbs',Buffer.concat([
+  Buffer.from([0xff,0xfe]),
+  Buffer.from('CreateObject("WScript.Shell").Run "nested\\stage-two.vbs"','utf16le'),
+ ]));
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,git:f.git});
+ assert.equal(result.sourceResolved,true);
+ assert.equal(result.evidenceLevel,'STATIC_LAUNCHER_TRACE_ONLY');
+ assert.equal(result.runtimeSourceVerified,false);
+});
+
 test('Writer inventory rejects symlinks and reveals no escaped file hashes',t=>{
  const f=fixture(t);
  const dir=path.join(f.root,'projects/pilot/scripts/pc-writer');
