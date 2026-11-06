@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorize,probeHistorical,sanitizeProbeResult,uploadProbe} from './historical-probe.mjs';
+import {authorize,probeHistorical,sanitizeProbeResult,uploadProbe,claimOnce} from './historical-probe.mjs';
 
 const requestId='r17-sip-historical-'+'a'.repeat(32);
 const sourceSha='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
@@ -38,8 +38,10 @@ function fixture(options={}){
         assert.equal(raw.sessionStartUtc,'2026-11-06T09:00:00.000Z');
         assert.equal(raw.slotEndUtc,'2026-11-06T14:30:00.000Z');
         assert.equal(raw.members.length,503);
-        return {...full,collectionStatus:raw.currentPageComplete&&raw.referencePageComplete?
-          'COMPLETE':'INCOMPLETE_PAGINATION'};
+        return {...full,...(options.empty?{observedCount:0,missingCount:503,
+          freshWithin30m:0,counts:{rising:0,falling:0,unchanged:0}}:{}),
+          collectionStatus:raw.currentPageComplete&&raw.referencePageComplete?
+            'COMPLETE':'INCOMPLETE_PAGINATION'};
       },
       validUsSipPremarket:record=>record.expectedCount===503}};
 }
@@ -84,6 +86,23 @@ test('incomplete pagination is separate from successful full readback',async()=>
   assert.equal(got.status,'SIP_HISTORICAL_INCOMPLETE_PAGINATION');
   assert.equal(got.collectionStatus,'INCOMPLETE_PAGINATION');
 });
+test('complete pagination with zero observed is not real data PASS and counts survive sanitization',async()=>{
+  const f=fixture({empty:true});const raw=await probeHistorical(f.dependencies);
+  assert.equal(raw.status,'SIP_HISTORICAL_EMPTY_OBSERVATION');
+  assert.equal(raw.code,'SIP_PROBE_NO_OBSERVATIONS');
+  assert.equal(raw.observedCount,0);
+  const sanitized=sanitizeProbeResult(raw,requestId,'42299900000');
+  assert.equal(sanitized.status,'SIP_HISTORICAL_EMPTY_OBSERVATION');
+  assert.equal(sanitized.expectedCount,503);
+  assert.equal(sanitized.missingCount,503);
+  assert.equal(sanitized.risingCount,0);
+  assert.equal(sanitized.fallingCount,0);
+  assert.equal(sanitized.unchangedCount,0);
+  assert.equal(sanitized.code,'SIP_PROBE_NO_OBSERVATIONS');
+  assert.equal(sanitizeProbeResult({...raw,status:'SIP_HISTORICAL_REAL_DATA_PASS',
+    code:'SIP_PROBE_VERIFIED'},requestId,'42299900000').code,
+    'SIP_PROBE_RESULT_UNVERIFIED');
+});
 test('report sanitizer strips unapproved raw bars and tokens',()=>{
   const f=fixture();return probeHistorical(f.dependencies).then(result=>{
     const clean=sanitizeProbeResult({...result,token:'SECRET',bars:{TEST0:{c:300}}},requestId,'42299900000');
@@ -96,12 +115,45 @@ test('report sanitizer strips unapproved raw bars and tokens',()=>{
 test('invalid count arithmetic fails closed',()=>{
   const record={status:'SIP_HISTORICAL_REAL_DATA_PASS',code:'SIP_PROBE_VERIFIED',
     observationDate:'2026-11-06',slotEndUtc:'2026-11-06T14:30:00.000Z',
-    checkedAt:'2026-11-07T00:00:00Z',providerCalls:3,
+    checkedAt:'2026-11-07T00:00:00.000Z',providerCalls:3,
     source:'ALPACA_SIP_PREMARKET_15MIN_DELAYED_SPLIT',
     collectionStatus:'COMPLETE',...Object.fromEntries([
       'expectedCount','observedCount','missingCount','risingCount','fallingCount',
       'unchangedCount','referenceObservedCount','freshWithin30m'].map(k=>[k,1]))};
   assert.equal(sanitizeProbeResult(record,requestId,'1').code,'SIP_PROBE_RESULT_UNVERIFIED');
+});
+test('durable private GitHub claim is required before provider calls and rejects duplicate requestId',async()=>{
+  const files=new Map();let puts=0,gets=0;
+  const api=async (url,init)=>{
+    if(init.method==='PUT'){
+      puts++;
+      if(files.has(url))return {status:422};
+      const body=JSON.parse(init.body);
+      assert.ok(!Object.hasOwn(body,'sha')); // Create-only, no overwrite.
+      files.set(url,Buffer.from(body.content,'base64'));
+      return {status:201};
+    }
+    gets++;const bytes=files.get(url.replace('?ref=main',''));
+    return {status:bytes?200:404,json:async()=>({encoding:'base64',
+      content:bytes?.toString('base64')})};
+  };
+  const claim=await claimOnce({event,env,api});
+  assert.equal(claim.claimed,true);assert.equal(puts,1);assert.equal(gets,2);
+  await assert.rejects(()=>claimOnce({event,env,api}),/SIP_PROBE_DUPLICATE_REQUEST_STOP/);
+  assert.equal(puts,1);
+});
+test('claim fails closed on GitHub read failure, ambiguous PUT, and unavailable token',async()=>{
+  await assert.rejects(()=>claimOnce({event,env,api:async()=>({status:503})}),
+    /SIP_PROBE_CLAIM_READ_STOP/);
+  let calls=0;
+  await assert.rejects(()=>claimOnce({event,env,api:async(url,init)=>{
+    calls++;
+    if(init.method==='PUT')throw Error('TIMEOUT');
+    return {status:404};
+  }}),/SIP_PROBE_CLAIM_WRITE_STOP/);
+  assert.equal(calls,2);
+  await assert.rejects(()=>claimOnce({event,env:{...env,GITHUB_TOKEN:undefined}}),
+    /SIP_PROBE_CLAIM_TOKEN_STOP/);
 });
 test('result write is create-only and verified by readback, uploader never calls providers',async()=>{
   const f=fixture();const result=await probeHistorical(f.dependencies);
