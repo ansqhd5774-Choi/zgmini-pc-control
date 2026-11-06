@@ -110,6 +110,7 @@ export async function performAuthorizedInstall(auth,io){
     'SIP_B_NOT_REGISTERED_OR_AUTHORIZED_STOP');
   requireThat(object(io),'SIP_B_IO_STOP');
   let acquired=false,claimed=false,quiesced=false,switched=false,configChanged=false;
+  let retainSharedLock=false;
   let before=null,prepared=null;
   try{
     await io.acquireSharedWriterLock();acquired=true;
@@ -154,8 +155,9 @@ export async function performAuthorizedInstall(auth,io){
       }
       if(quiesced){await io.restoreCoreExactState(before);await io.assertCoreExactState(before);}
     }catch{recovery='MANUAL_RECONCILIATION_REQUIRED';}
-    return {status:recovery==='NOT_NEEDED'?'SIP_B_INSTALL_STOP':'SIP_B_RECOVERY_REQUIRED',code,recovery};
+    retainSharedLock=recovery!=='NOT_NEEDED';
+    return {status:retainSharedLock?'SIP_B_RECOVERY_REQUIRED':'SIP_B_INSTALL_STOP',code,recovery};
   }finally{
-    if(acquired)await io.releaseSharedWriterLock();
+    if(acquired)await io.releaseSharedWriterLock({retain:retainSharedLock});
   }
 }
