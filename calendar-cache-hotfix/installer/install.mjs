@@ -116,10 +116,25 @@ function claimLock(file,content,code){
  return ()=>{try{if(fs.readFileSync(file,'utf8')===content)fs.unlinkSync(file);}catch{}};
 }
 
+// Wait only for the existing Core owner to finish. Never remove, replace,
+// or claim its lock while it is present; abort if the bounded window expires.
+function waitForCoreQuiet(file,waitMs,tick=ms=>Atomics.wait(
+ new Int32Array(new SharedArrayBuffer(4)),0,0,ms)){
+ need(Number.isSafeInteger(waitMs)&&waitMs>=0&&waitMs<=180000,
+  'CAL_CACHE_B_WAIT_SCOPE_STOP');
+ if(waitMs===0)return;
+ const deadline=Date.now()+waitMs;
+ while(fs.existsSync(file)){
+  const remaining=deadline-Date.now();
+  need(remaining>0,'CAL_CACHE_B_CYCLE_BUSY_TIMEOUT_STOP');
+  tick(Math.min(1500,remaining));
+ }
+}
+
 /** Only fixture callers may override paths; runLive always pins production paths. */
 export function installOneFile({requestId,sourceRoot,backupRoot,sharedLock,cycleLock,
  payloadRoot=path.join(HERE,'..','payload'),simulateFailureAfterReplace=false,
- simulateRollbackFailure=false}={}){
+ simulateRollbackFailure=false,waitCycleMs=0,waitCycleTick}={}){
  need(REQUEST.test(requestId??''),'CAL_CACHE_B_INSTALL_REQUEST_STOP');
  need(path.isAbsolute(sourceRoot)&&path.isAbsolute(backupRoot),
   'CAL_CACHE_B_ROOT_STOP');
@@ -131,6 +146,7 @@ export function installOneFile({requestId,sourceRoot,backupRoot,sharedLock,cycle
  let releaseShared,releaseCycle,backupDir,transactionStarted=false;
  let preserveLocks=false;
  try{
+  waitForCoreQuiet(cycleLock,waitCycleMs,waitCycleTick);
   releaseShared=claimLock(sharedLock,requestId,'CAL_CACHE_B_SHARED_LOCK_BUSY_STOP');
   releaseCycle=claimLock(cycleLock,JSON.stringify({pid:process.pid,at:Date.now(),
    kind:'calendar-cache-onefile',requestId}),'CAL_CACHE_B_CYCLE_BUSY_STOP');
@@ -208,7 +224,8 @@ export function runLive(env=process.env){
   Object.assign(result,{requestId,issueNumber:accepted.issueNumber});
   verifyApproval(fs.readFileSync(path.join(HERE,'approval.json')));
   Object.assign(result,installOneFile({requestId,sourceRoot:SOURCE_ROOT,
-   backupRoot:BACKUP_ROOT,sharedLock:SHARED_LOCK,cycleLock:CYCLE_LOCK}));
+   backupRoot:BACKUP_ROOT,sharedLock:SHARED_LOCK,cycleLock:CYCLE_LOCK,
+   waitCycleMs:180000}));
  }catch(error){
   const code=resultCode(error),recovery=code==='CAL_CACHE_B_RECOVERY_REQUIRED_STOP',
    rolled=code==='CAL_CACHE_B_ROLLED_BACK_VERIFIED';

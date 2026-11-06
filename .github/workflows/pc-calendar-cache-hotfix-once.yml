@@ -24,7 +24,7 @@ jobs:
       contains(github.event.issue.labels.*.name, 'pc-calendar-cache-hotfix-b-install') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 5
+    timeout-minutes: 8
     defaults:
       run:
         shell: cmd
