@@ -27,6 +27,8 @@
 4. `finally`에서 **일회성** `R54_READER_ONEFILE_INSTALL_RESULT_V4.txt`까지 같은 `reportDir`에 `fs.writeFileSync(...,{flag:'wx'})`하여 E:에 남긴다. 조기 중단 보고서는 `HERE`(압축 해제 위치)에 저장한다.
 5. `README_V4.txt`도 해당 E: 결과 경로를 사용자에게 안내한다. 이는 공통 규칙 누락이 아니라 **이 패킷의 출력 경로 구현** 문제다. #434 유지보수기 결과 저장 경로와는 별개다.
 
+**반복성 확인(2026-11-07):** 이전 V3 ZIP(`ZGMINI_R54_READER_ONEFILE_INSTALL_ONCE_V3_20261106.zip`)의 `r54-reader-onefile-install.mjs`도 `backupDir = path.join(HOME,'maintenance',...)`에 일회성 `R54_READER_ONEFILE_INSTALL_RESULT.txt`를 함께 저장한다. V3→V4 반복은 확인됐지만 이 둘은 독립 일회성 패킷이며, **하나의 공통 생성기 소스는 아직 발견되지 않았다.** 반면 제어 저장소의 `calendar-b-twofile/install.mjs`·`calendar-cache-hotfix/installer/install.mjs`는 이미 `RUNNER_TEMP ?? os.tmpdir()`를 사용한다. 중앙 Controller 경로의 신규 전역 차단/재작성은 불필요하며, 실제 재사용되는 R54 패킷 생성 원본 또는 템플릿에서만 출력 기본값을 개선한다. 원본 V4 성공 패킷을 수정·재발행해 재설치를 유도하지 않는다.
+
 **다음 필수 실행 한 건 — 담당: R54 일회성 설치 패킷/공통 출력 템플릿 소스 담당.**
 - 이 V4 패킷의 생성·재사용 템플릿이 실제로 있는지 원본 저장소/담당에서 식별한다. 현재 조사로는 R54 V4 패킷 내부 직접 하드코딩만 확인됐고 공통 생성기 경로는 **미확정**이다.
 - 재사용 템플릿이 확인되면 기본값에서 `backup`은 기존 E: 복구 위치로 유지하고 결과 TXT/JSON·실패 보고는 `os.tmpdir()`(Windows 사용자 `%TEMP%`)의 고유 파일 또는 기존 승인 원격 결과 경로로 분리한다. 별도 생성기가 없으면 **향후 일회성 패킷의 실제 출력 함수**만 최소 수정한다. `console.log` 결과/업로드 호환은 보존.
