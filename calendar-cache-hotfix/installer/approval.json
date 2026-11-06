@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_RELEASE_CALENDAR_CACHE_HOTFIX_B_APPROVAL_V1",
+  "status": "APPROVED_B_INSTALL_ONCE",
+  "scope": "RELEASE_CALENDAR_CACHE_HOTFIX_ONE_FILE_ONLY",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "backupRoot": "E:\\ZGmini\\data\\pc-writer\\calendar-b-backups",
+  "file": {
+    "path": "scripts/pc-writer/release-calendar.mjs",
+    "beforeSha256": "e428c40301ce34f2cadd06d15dcb9d73f554ef989bd9379cef68b2cd461a1a94",
+    "afterSha256": "3fa8e1039fcedd3b2fb07b888996f845c6b7102505acdba7608818cb56238871"
+  },
+  "changes": {
+    "controller": false,
+    "scheduler": false,
+    "config": false,
+    "db": false,
+    "providerCalls": false,
+    "publishing": false
+  }
+}
