@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_R17_SIP_HISTORICAL_RESULT_V1",
+  "requestId": "r17-sip-historical-b6df79b0cf6bdb9562cb9444a70f5cc2",
+  "runId": "42264085112",
+  "status": "SIP_HISTORICAL_NOT_VERIFIED",
+  "code": "SIP_PROBE_SETUP_STOP",
+  "observationDate": "2026-11-06",
+  "slotEndUtc": "2026-11-06T14:30:00.000Z",
+  "checkedAt": "2026-11-06T17:43:40.664Z",
+  "providerCalls": 0,
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
