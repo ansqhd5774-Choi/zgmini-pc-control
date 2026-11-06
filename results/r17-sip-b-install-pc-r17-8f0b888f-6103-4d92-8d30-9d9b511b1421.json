@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_R17_SIP_B_INSTALL_RESULT_V1",
+  "requestId": "pc-r17-8f0b888f-6103-4d92-8d30-9d9b511b1421",
+  "status": "SIP_B_PREFLIGHT_STOP",
+  "code": "SIP_B_PC_PREIMAGE_STOP",
+  "sourceSha": null,
+  "recovery": null,
+  "runId": "42258517926",
+  "retry": "NO_REEXECUTE_READBACK_ONLY"
+}
