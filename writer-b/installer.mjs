@@ -84,6 +84,11 @@ export function verifyPreparedWriterCommit(manifest,prepared){
  const paths=manifest.files.map(x=>x.path);
  need(object(prepared)&&SHA40.test(prepared.sha??'')&&
    prepared.sha!==manifest.baseHead&&prepared.parent===manifest.baseHead&&
+   SHA40.test(prepared.baseTreeOid??'')&&
+   SHA40.test(prepared.preparedTreeOid??'')&&
+   prepared.baseTreeOid!==prepared.preparedTreeOid&&
+   SHA64.test(prepared.provenanceSha256??'')&&
+   prepared.mode==='LOCAL_OVERLAY'&&prepared.localOnly===true&&
    prepared.clean===true&&samePaths(prepared.changedPaths,paths)&&
    sameKeys(prepared.sha256,paths),
    'WRITER_B_PREPARED_SCOPE_STOP');
@@ -145,7 +150,13 @@ export async function performWriterBInstall(auth,io){
   await io.assertWriterSource(prepared,manifest);
   await io.assertConfigSource(prepared.sha);
   result={status:'WRITER_B_INSTALLED_VERIFIED',sourceSha:prepared.sha,
-    requestId:auth.requestId,changedPaths:manifest.files.map(x=>x.path)};
+    requestId:auth.requestId,changedPaths:manifest.files.map(x=>x.path),
+    mode:'LOCAL_OVERLAY',localOnly:true,baseHead:manifest.baseHead,
+    candidateSourceSha:manifest.candidateSourceSha,
+    manifestSha256:auth.manifestSha256,
+    baseTreeOid:prepared.baseTreeOid,
+    preparedTreeOid:prepared.preparedTreeOid,
+    provenanceSha256:prepared.provenanceSha256};
  }catch(error){
   const code=publicErrorCode(error,'WRITER_B_ADAPTER_UNEXPECTED_STOP');
   if(!claimed){

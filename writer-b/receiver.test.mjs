@@ -7,6 +7,7 @@ import {commitApprovedWriterBOverlay} from './git-stage.mjs';
 import {validateWriterBReportEvent,sanitizeWriterBResult,
  uploadWriterBReport} from './report.mjs';
 import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
+import {buildLocalOverlayProvenance,writeImmutableLocalProvenance} from './provenance.mjs';
 
 const RID='01234567-89ab-4cde-8fab-0123456789ab';
 const CID='11234567-89ab-4cde-8fab-1123456789ab';
@@ -51,6 +52,14 @@ function fixture(){
   GITHUB_TOKEN:'fixture-secret-token-never-log'};
  return {manifest,manifestBytes,request,event,env,overlay};
 }
+function localInstalledResult(x){return {
+ status:'WRITER_B_INSTALLED_VERIFIED',requestId:RID,sourceSha:CHILD,
+ changedPaths:x.manifest.files.map(f=>f.path),
+ mode:'LOCAL_OVERLAY',localOnly:true,baseHead:BASE,
+ candidateSourceSha:CANDIDATE,manifestSha256:sha256(x.manifestBytes),
+ baseTreeOid:'d'.repeat(40),preparedTreeOid:'e'.repeat(40),
+ provenanceSha256:'f'.repeat(64),
+};}
 
 test('owner Issue preflight derives candidate only from verified approval bytes',()=>{
  const x=fixture();
@@ -159,8 +168,7 @@ test('partial remote result evidence never produces a verified install comment',
    comment=JSON.parse(init.body).body;return {status:201};
   }
  };
- const local={status:'WRITER_B_INSTALLED_VERIFIED',requestId:RID,
-  sourceSha:CHILD,changedPaths:['scripts/pc-writer/run-local.mjs']};
+ const local=localInstalledResult(x);
  const report=await uploadWriterBReport({event:x.event,env:x.env,
   rawResult:JSON.stringify(local),apiFetch});
  assert.equal(report.status,'WRITER_B_INSTALLED_VERIFIED');
@@ -168,6 +176,45 @@ test('partial remote result evidence never produces a verified install comment',
  assert.equal(report.verified,0);
  assert.ok(comment.includes('WRITER_B_STATE_UNKNOWN'));
  assert.equal(comment.includes('WRITER_B_INSTALLED_VERIFIED'),false);
+});
+
+test('source result requires provenance and labels local synthetic SHA never remote-published',()=>{
+ const x=fixture(),valid=localInstalledResult(x);
+ assert.equal(sanitizeWriterBResult(valid,RID,'123456').localOnly,true);
+ assert.equal(sanitizeWriterBResult(valid,RID,'123456').mode,'LOCAL_OVERLAY');
+ assert.equal(sanitizeWriterBResult({...valid,provenanceSha256:null},RID,'123456').status,
+  'WRITER_B_STATE_UNKNOWN');
+ assert.equal(sanitizeWriterBResult({...valid,localOnly:false},RID,'123456').status,
+  'WRITER_B_STATE_UNKNOWN');
+});
+
+test('local overlay write-once provenance is flushed/read back before Task pause',()=>{
+ const x=fixture();
+ const auth=verifyReadOnlyPreflight({event:x.event,env:x.env,
+  manifestBytes:x.manifestBytes,controlHead:BASE});
+ const prepared={sha:CHILD,parent:BASE,changedPaths:x.manifest.files.map(f=>f.path),
+  sha256:Object.fromEntries(x.manifest.files.map(f=>[f.path,f.afterSha256])),
+  sourceRef:`refs/heads/writer-b/${RID}`};
+ const proof=buildLocalOverlayProvenance({auth,prepared,
+  baseTreeOid:'d'.repeat(40),preparedTreeOid:'e'.repeat(40)});
+ assert.equal(proof.record.mode,'LOCAL_OVERLAY');
+ assert.equal(proof.record.localOnly,true);
+ assert.equal(proof.record.changedPaths.length,3);
+ assert.equal(proof.record.manifestSha,x.request.approvalManifestSha256);
+ const calls=[];let saved=null;
+ const fsOps={
+  openSync(file,flag){assert.equal(flag,'wx');calls.push('open');
+   if(saved)throw Object.assign(new Error('duplicate'),{code:'EEXIST'});return 14;},
+  writeSync(fd,bytes){assert.equal(fd,14);calls.push('write');saved=Buffer.from(bytes);return bytes.length;},
+  fsyncSync(fd){assert.equal(fd,14);calls.push('fsync');},
+  closeSync(fd){assert.equal(fd,14);calls.push('close');},
+  readFileSync(){calls.push('readback');return saved;},
+ };
+ const file='E:\\writer-b-fixture\\provenance.json';
+ assert.equal(writeImmutableLocalProvenance({file,bytes:proof.bytes,fsOps}),proof.sha256);
+ assert.deepEqual(calls,['open','write','fsync','close','readback']);
+ assert.throws(()=>writeImmutableLocalProvenance({file,bytes:proof.bytes,fsOps}),
+  {code:'EEXIST'});
 });
 
 test('unrelated large untracked file is metadata-only and never global size gate',()=>{

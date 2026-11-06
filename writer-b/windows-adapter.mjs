@@ -13,8 +13,11 @@ import {sha256} from './contract.mjs';
 import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
 import {performWriterBInstall} from './installer.mjs';
 import {commitApprovedWriterBOverlay} from './git-stage.mjs';
+import {buildLocalOverlayProvenance,
+ writeImmutableLocalProvenance} from './provenance.mjs';
 import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
-import {decodeTaskXmlBytes,coreQuietFromProbe} from './windows-guards.mjs';
+import {decodeTaskXmlBytes,coreQuietFromProbe,
+ attestTaskFirstHopLauncher} from './windows-guards.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from '../r17-writer-b/r17-b-claim.mjs';
 
@@ -182,6 +185,8 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    const branch=git(source,'branch','--show-current');
    originalConfig=readConfig(m.configPath).raw;
    originalXml=fixedTaskXml(task);
+   const firstHop=attestTaskFirstHopLauncher({taskXml:originalXml.xml,
+    manifest:m,realpath:fs.realpathSync.native});
    dirty=statusSnapshot(source,m);
    const t=taskProbe();
    before={sourceRoot:source,configPath:m.configPath,coreTask:task,
@@ -190,6 +195,8 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     originalTaskDefinitionSha256:sha256(originalXml.raw),
     originalBranch:branch,coreTaskEnabled:t.enabled,targetPathsClean:true,
     runtimeConsumerSha256:runtimeConsumerSha256(),
+    firstHopEvidence:{code:firstHop.code,
+     runtimeChainVerified:false,consumerId:firstHop.consumerId??null},
     beforeSha256:Object.fromEntries(m.files.map(f=>[f.path,
      f.change==='A'?(fs.existsSync(scoped(source,f.path))?'EXISTS':null):sourceHash(f.path)])),
     protectedSha256:Object.fromEntries(m.protectedFiles.map(f=>[f.path,sourceHash(f.path)])),
@@ -249,7 +256,17 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    const sourceRef=`refs/heads/writer-b/${auth.requestId}`;
    const result=commitApprovedWriterBOverlay({stage,base:m.baseHead,
     manifestFiles:m.files,overlay,requestRef:sourceRef,run:git,runRaw:gitRaw});
-   prepared={...result,stage,branch:`writer-b/${auth.requestId}`};
+   const provenance=buildLocalOverlayProvenance({auth,prepared:result,
+    baseTreeOid:git(stage,'rev-parse',`${m.baseHead}^{tree}`),
+    preparedTreeOid:git(stage,'rev-parse',`${result.sha}^{tree}`)});
+   const digest=writeImmutableLocalProvenance({
+    file:path.join(journalDir,'provenance.json'),bytes:provenance.bytes});
+   need(digest===provenance.sha256,
+    'WRITER_B_LOCAL_PROVENANCE_DIGEST_STOP');
+   prepared={...result,stage,branch:`writer-b/${auth.requestId}`,
+    baseTreeOid:provenance.record.baseTreeOid,
+    preparedTreeOid:provenance.record.preparedTreeOid,
+    provenanceSha256:digest,mode:'LOCAL_OVERLAY',localOnly:true};
    journal('STAGED');
    return prepared;
   },

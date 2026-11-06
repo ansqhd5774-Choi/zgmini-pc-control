@@ -11,6 +11,8 @@
 4. 정규 경로가 **실제로 활성화되었고** 승인된 범위에 한하여, 아래 단회 private Issue를 원 소유자가 등록한다. 기존 자체 Windows Runner의 공통 workflow가 고정된 control commit과 승인 후보 SHA만 검사한 뒤 해당 파일 오버레이를 시도한다. 신규 CMD·예약·전역 Runner 유휴 조건은 추가하지 않는다.
 5. 정확한 requestId의 PC 결과와 원격 `results/writer-b-source-install-<requestId>.json`·`.txt` **두 결과쌍 2/2 재조회**, 실제 HEAD·config·Task·파일 보호 상태를 확인한 뒤 기능 원담당이 수집→저장→D1→API→페이지 운영 검증을 계속한다.
 
+**첫 실행 경로 확인의 범위:** `run-local.mjs`/`local-cycle.mjs`를 변경할 때만 Task XML의 단일 `<Exec>`와 첫 WSH/CMD VBS·CMD 경로를 확인한다. Task의 절대 `WorkingDirectory`가 있는 상대 경로는 그 기준으로 결합하고, C: 호환 junction은 실제 E: Writer data 경로로 확인되는 경우만 허용한다. 실제 승인 `LAUNCHER` 경로·SHA와 맞아야 `FIRST_HOP_TASK_LAUNCHER_MATCH`이며, 불분명한 실행 경로는 STOP이다. **이 증거는 첫 hop에 한하며 다단 VBS·Sidecar 전체 체인이나 실제 실행 성공을 보증하지 않는다.**
+
 ## 2. manifest 계약 (사용 전 반드시 실제 승인·해시 고정)
 
 `writer-b/contract.mjs`의 `ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1`이 정본이다. 아래는 **필드 안내**이며 승인된 예시 manifest나 복사 실행용 JSON이 아니다.
@@ -53,5 +55,7 @@
 - `WRITER_B_INSTALL_STOP_RESTORED`: 원본 HEAD/config/Task 복구 확인 결과만 인정한다. 원담당이 실패 지점을 수정하고 **새로운 명시 승인**이 필요한지 기존 범위와 대조한다.
 - `WRITER_B_RECOVERY_REQUIRED` 또는 `WRITER_B_STATE_UNKNOWN`: **재실행·잠금 강제 해제·수동 소스 전환 금지**. 해당 requestId의 원장·백업·실제 PC 상태를 읽기 전용으로 재조정하고 승인된 복구 담당 경로로 인계한다.
 - `RESULT_DELIVERY_UNVERIFIED`: 로컬 실행 성공 여부와 원격 증거 전송을 분리한다. JSON/TXT 원격 2/2가 아니면 GitHub 댓글만으로 설치 성공 주장 금지, PUT·설치를 무조건 재시도하지 않는다.
+
+**로컬 합성 SHA의 추적:** Writer B는 기존 R17 선례처럼 승인 파일만 격리 Git overlay로 합성한다. 생성된 `preparedLocalSha`는 **PC 로컬 커밋이며 GitHub에 push하지 않는다.** Task 일시 중지 *이전*에 `E:\ZGmini\data\pc-writer\writer-b-install-once\<requestId>\provenance.json`에 `LOCAL_OVERLAY`, 승인 manifest 해시, base/candidate SHA, base/prepared tree OID, 로컬 ref, 파일별 원본·목표 해시를 일회 기록·fsync·재조회한다. 원격 TXT/JSON의 `LOCAL_ONLY=true`·`PROVENANCE_SHA256`은 이 로컬 증거를 지칭하며 GitHub 커밋 URL 존재의 증거가 아니다. **다음 B·후속 A에서는 GitHub SHA 조회로 로컬 HEAD를 추정하지 말고**, 실제 PC checkout HEAD·config.source·해당 로컬 Git object/ref·manifest/원장 SHA를 다시 읽기 전용으로 확인한 뒤 다음 적용 기준을 확정한다.
 
 **프로세스 총괄**은 공통 계약·수신기·충돌·복구 경로를 맡고, **기능 원담당**은 기능 코드/manifest 검토·승인된 B 신청·실제 기능 게시 검증을 맡는다. Issue 댓글은 다른 ChatGPT 대화의 수신 증거가 아니다. 전용 R17·캘린더 고정 B 및 Controller-only 유지보수기를 기능별 Writer 변경에 우회 사용하지 않는다.

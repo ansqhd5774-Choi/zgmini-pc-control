@@ -37,18 +37,29 @@ export function validateWriterBReportEvent(event,env){
 export function sanitizeWriterBResult(raw,requestId,runId){
  const base={schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',requestId,
   status:'WRITER_B_STATE_UNKNOWN',code:'WRITER_B_RESULT_UNVERIFIED_STOP',
-  sourceSha:null,runId:/^\d{1,18}$/.test(runId??'')?runId:null,
+  sourceSha:null,mode:null,localOnly:null,baseHead:null,
+  candidateSourceSha:null,manifestSha256:null,baseTreeOid:null,
+  preparedTreeOid:null,provenanceSha256:null,
+  runId:/^\d{1,18}$/.test(runId??'')?runId:null,
   retry:'READ_ONLY_RECONCILE_NO_REEXECUTE'};
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return base;
  if(raw.status==='WRITER_B_SETUP_STOP'&&CODE.test(raw.code??''))
   return {...base,status:raw.status,code:raw.code};
  if(raw.requestId!==requestId)return base;
  if(raw.status==='WRITER_B_INSTALLED_VERIFIED'&&SHA40.test(raw.sourceSha??'')&&
+  raw.mode==='LOCAL_OVERLAY'&&raw.localOnly===true&&
+  SHA40.test(raw.baseHead??'')&&SHA40.test(raw.candidateSourceSha??'')&&
+  SHA40.test(raw.baseTreeOid??'')&&SHA40.test(raw.preparedTreeOid??'')&&
+  SHA64.test(raw.manifestSha256??'')&&SHA64.test(raw.provenanceSha256??'')&&
   Array.isArray(raw.changedPaths)&&raw.changedPaths.length>0&&
   raw.changedPaths.length<=32&&raw.changedPaths.every(x=>
    typeof x==='string'&&/^(?:scripts\/pc-writer|lib|worker)\//.test(x)))
   return {...base,status:raw.status,code:'WRITER_B_INSTALL_VERIFIED',
-   sourceSha:raw.sourceSha,changedPaths:raw.changedPaths};
+   sourceSha:raw.sourceSha,changedPaths:raw.changedPaths,
+   mode:'LOCAL_OVERLAY',localOnly:true,baseHead:raw.baseHead,
+   candidateSourceSha:raw.candidateSourceSha,
+   manifestSha256:raw.manifestSha256,baseTreeOid:raw.baseTreeOid,
+   preparedTreeOid:raw.preparedTreeOid,provenanceSha256:raw.provenanceSha256};
  if(['WRITER_B_PREFLIGHT_STOP','WRITER_B_INSTALL_STOP_RESTORED',
   'WRITER_B_RECOVERY_REQUIRED'].includes(raw.status)&&CODE.test(raw.code??''))
   return {...base,status:raw.status,code:raw.code,
@@ -60,6 +71,14 @@ export function sanitizeWriterBResult(raw,requestId,runId){
 function textResult(result){return [
  `REQUEST_ID=${result.requestId}`,`STATUS=${result.status}`,
  `CODE=${result.code}`,`SOURCE_SHA=${result.sourceSha??'NONE'}`,
+ `SOURCE_MODE=${result.mode??'UNKNOWN'}`,
+ `LOCAL_ONLY=${result.localOnly===true?'true':'UNKNOWN'}`,
+ `BASE_HEAD=${result.baseHead??'NONE'}`,
+ `CANDIDATE_SOURCE_SHA=${result.candidateSourceSha??'NONE'}`,
+ `MANIFEST_SHA256=${result.manifestSha256??'NONE'}`,
+ `BASE_TREE_OID=${result.baseTreeOid??'NONE'}`,
+ `PREPARED_TREE_OID=${result.preparedTreeOid??'NONE'}`,
+ `PROVENANCE_SHA256=${result.provenanceSha256??'NONE'}`,
  `RUN_ID=${result.runId??'UNKNOWN'}`,
  'RETRY=READ_ONLY_RECONCILE_NO_REEXECUTE','',
 ].join('\n');}
@@ -110,6 +129,8 @@ export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
  const comment=`<!-- zgmini-writer-b-install:${req.requestId} -->\n`+
   `Writer B evidence: **${publicStatus}** (${publicCode})\n`+
   `DELIVERY: ${deliveryStatus}\n`+
+  `LOCAL_ONLY: ${verified===2&&result.localOnly===true?'true':'UNKNOWN'}; `+
+  `REMOTE_SOURCE: NOT_PUBLISHED_BY_INSTALLER\n`+
   `RESULT_CREATED: ${created}/2; RESULT_READBACK: ${verified}/2\n`+
   `RUN_ID: ${result.runId??'UNKNOWN'}; RETRY: NO_REEXECUTE\n`;
  const reply=await apiFetch(

@@ -83,6 +83,8 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
   async backupOriginal(){mark('backup');fatal('backup');},
   async prepareIsolatedCommit(){mark('prepare');fatal('prepare');return {
    sha:NEXT,parent:m.baseHead,clean:true,changedPaths:m.files.map(x=>x.path),
+   baseTreeOid:'1'.repeat(40),preparedTreeOid:'2'.repeat(40),
+   provenanceSha256:'3'.repeat(64),mode:'LOCAL_OVERLAY',localOnly:true,
    sha256:map(m.files,'afterSha256'),
   };},
   async pauseCore(){mark('pause');state.coreEnabled=false;fatal('pause');},
@@ -145,6 +147,10 @@ test('normal 3-file B install: HEAD/config sha consistent, task returned, no unr
  const result=await performWriterBInstall(auth(),io);
  assert.equal(result.status,'WRITER_B_INSTALLED_VERIFIED');
  assert.equal(result.sourceSha,NEXT);assert.equal(state.head,NEXT);
+ assert.equal(result.localOnly,true);
+ assert.equal(result.mode,'LOCAL_OVERLAY');
+ assert.equal(result.baseHead,manifest().baseHead);
+ assert.equal(result.preparedTreeOid,'2'.repeat(40));
  assert.equal(state.config,NEXT);assert.equal(state.coreEnabled,true);
  assert.equal(state.unrelatedTrackedDirty,true);
  assert.equal(state.retained,false);
