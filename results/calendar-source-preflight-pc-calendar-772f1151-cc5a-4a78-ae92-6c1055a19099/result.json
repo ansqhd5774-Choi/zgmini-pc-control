@@ -1,0 +1,189 @@
+{
+  "schema": "ZGMINI_CALENDAR_SOURCE_PREFLIGHT_RESULT_V1",
+  "requestId": "pc-calendar-772f1151-cc5a-4a78-ae92-6c1055a19099",
+  "issueNumber": 558,
+  "status": "CAL_B_PREFLIGHT_STOP",
+  "code": "CAL_B_TASK_WRAPPER_STATIC_CANDIDATE_STOP",
+  "diagnostic": {
+    "taskCommand": "wscript.exe",
+    "firstLauncherShaVerified": true,
+    "secondLauncherShaVerified": true,
+    "containsSecondLauncher": true,
+    "containsSourceRoot": false,
+    "containsLocalCycle": false,
+    "containsRunLocalCmd": false,
+    "strictStaticChainCandidate": false,
+    "callGraph": [
+      {
+        "launcher": 1,
+        "callCount": 2,
+        "truncated": false,
+        "commentStripped": true,
+        "anyConditionalSyntax": true,
+        "sourceRootMentioned": false,
+        "callSites": [
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "mentionsSecondLauncher": true,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          }
+        ]
+      },
+      {
+        "launcher": 2,
+        "callCount": 3,
+        "truncated": false,
+        "commentStripped": true,
+        "anyConditionalSyntax": true,
+        "sourceRootMentioned": false,
+        "callSites": [
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "mentionsSecondLauncher": false,
+            "mentionsCoreScript": false,
+            "mentionsWriterOnly": false,
+            "mentionsRunLocalCmd": false,
+            "mentionsSourceRoot": false
+          }
+        ]
+      }
+    ],
+    "causality": [
+      {
+        "launcher": 1,
+        "callCount": 2,
+        "unresolvedCount": 0,
+        "branchSeen": true,
+        "indirectExecutionSeen": true,
+        "sourceTooLarge": false,
+        "entirelyDeterministic": false,
+        "allCallArgumentsResolved": true,
+        "calls": [
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": true,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "literal",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": true,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false
+          }
+        ]
+      },
+      {
+        "launcher": 2,
+        "callCount": 3,
+        "unresolvedCount": 0,
+        "branchSeen": true,
+        "indirectExecutionSeen": true,
+        "sourceTooLarge": false,
+        "entirelyDeterministic": false,
+        "allCallArgumentsResolved": true,
+        "calls": [
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false
+          },
+          {
+            "api": "run",
+            "argumentForm": "concatenated",
+            "resolved": true,
+            "reason": null,
+            "nextPinnedVbsDirect": false,
+            "coreNodeEntrypointDirect": false,
+            "sourceRootReferenced": false,
+            "archiveSidecar": false,
+            "earningsSidecar": false,
+            "shellCmdAmbiguous": false
+          }
+        ]
+      }
+    ]
+  },
+  "candidateCheckout": {
+    "activeRootVerified": false,
+    "sourceHead": "cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc",
+    "configSource": "cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc",
+    "publicHeadPinned": true,
+    "publicHotfixBlobPinned": true,
+    "otherTargetBlobMatches": 7,
+    "otherTargetBlobCount": 9,
+    "relevantDirtyCount": 2,
+    "soleExpectedHotfixDirty": false,
+    "stagedIndexCount": 0,
+    "configSourceMatchesHistoric": false,
+    "sourceHeadMatchesHistoric": false
+  },
+  "candidateCheckoutErrorCode": null,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "operationalWrites": 0
+}
