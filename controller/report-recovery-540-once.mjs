@@ -1,7 +1,5 @@
-// SCRATCH PROTOTYPE ONLY. On promotion to controller/, change the two
-// ../controller/ imports to ./ imports and replace the fixture common import
-// with ./common.mjs. Include the resulting byte in the approved
-// Controller manifest. Do not run this prototype on a production PC.
+// Fixed, one-time upload-only recovery for #540's retained original result.
+// Never invokes the original A operation or rewrites its local evidence.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
