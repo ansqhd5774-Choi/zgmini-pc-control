@@ -11,7 +11,8 @@ const before=()=>({sourceRoot:SOURCE_ROOT,configPath:CONFIG_PATH,
  headTree:blob,stagedCount:0,relevantDirty:FILES.map(path=>({path,status:'M',
  sha256:APPROVED[path]}))});
 
-test('exact approved cf43 source and exactly two B-success dirty files',()=>{
+test('latest R17 approved source and exactly two B-success dirty files',()=>{
+ assert.equal(BASE,'dace6090f61eb0d0319f79422649af312f7b1764');
  assert.equal(verifyBefore(before()).base,BASE);
  for(const change of [b=>{b.head='d7bc4948573843766ad82c72ff392220178c36a3';},
   b=>{b.relevantDirty[0].sha256='f'.repeat(64);},
