@@ -198,7 +198,7 @@ function verifyApprovedShadowBundle({request,host}){
  for(const [rel,expected] of Object.entries(files)){
   need(typeof rel==='string'&&rel.length<=240&&
    (/^(scripts\/pc-writer|worker|config|docs|examples)\/[A-Za-z0-9_.\/-]+$/.test(rel)||
-    /^node_modules\/hyparquet\/[A-Za-z0-9_.\/-]+$/.test(rel)||
+    /^vendor\/hyparquet-1\.31\.2\/[A-Za-z0-9_.\/-]+$/.test(rel)||
     rel==='package.json')&&
    !rel.split('/').includes('..')&&SHA64.test(expected),
    'SHADOW_MANIFEST_FILE_PATH_INVALID');

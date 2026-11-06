@@ -84,7 +84,7 @@ test('real dependency closure accepts worker, approved hyparquet and root packag
  const pathWorker=path.join(x.root,'source',worker);
  fs.mkdirSync(path.dirname(pathWorker),{recursive:true});
  fs.writeFileSync(pathWorker,'export const marker=true;\n');
- const decoder='node_modules/hyparquet/src/index.js';
+ const decoder='vendor/hyparquet-1.31.2/src/index.js';
  const pathDecoder=path.join(x.root,'source',decoder);
  fs.mkdirSync(path.dirname(pathDecoder),{recursive:true});
  fs.writeFileSync(pathDecoder,'export const parquetReadObjects=()=>[];\n');
