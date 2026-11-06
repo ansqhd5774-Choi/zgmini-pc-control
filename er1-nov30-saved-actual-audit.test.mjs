@@ -13,7 +13,9 @@ function fixture(t,days=[1,12,13]){
   for(const n of days){
     const date='2026-11-'+String(n).padStart(2,'0');
     const body={date,pre:[{symbol:n===1?'ONE':'TWO',name:'Issuer '+n,
-      eps:n===1?1.25:null,revenue:n===1?200:null}],after:[],notSupplied:[]};
+      eps:n===1?1.25:null,revenue:n===1?200:null,
+      epsEstimate:n===1?0.8:n===12?0:1.2,
+      revenueEstimate:n===13?null:n===1?205:123}],after:[],notSupplied:[]};
     fs.writeFileSync(path.join(d,date+'.json'),JSON.stringify({
       storedAt:'2026-11-06T01:00:00Z',body}));
   }
@@ -40,6 +42,18 @@ test('No network: aggregate saved history and November raw; preview only',async 
   assert.equal(report.dayCount,3);
   assert.equal(report.priorCalendarRowsBothActual,1);
   assert.equal(report.futureSymbols,1);
+  assert.equal(report.calendarForecastEPSNumberRows,3);
+  assert.equal(report.calendarForecastEPSNullOrMissingRows,0);
+  assert.equal(report.calendarForecastRevenueNumberRows,2);
+  assert.equal(report.calendarForecastRevenueNullOrMissingRows,1);
+  assert.equal(report.calendarRowsBothForecast,2);
+  assert.equal(report.priorCalendarRowsBothForecast,1);
+  assert.equal(report.futureCalendarRowsBothForecast,1);
+  assert.equal(report.futureSymbolsWithEPSForecast,1);
+  assert.equal(report.futureSymbolsWithRevenueForecast,1);
+  assert.equal(report.futureSymbolsWithBothForecast,1);
+  assert.equal(report.futureSymbolsWithoutBothForecast,0);
+  assert.equal(report.futureForecastInvalidRows,0);
   assert.equal(report.historyFileSymbols,1);
   assert.equal(report.futureSymbolsWithBothActual,1);
   assert.equal(report.futureSymbolsWithRecentEPSandRevenueActual,1);
@@ -63,4 +77,27 @@ test('Missing and corrupt saved histories are not substituted with estimates',as
   assert.equal(report.scoreableIssuers,0);
   assert.equal(report.status,'PARTIAL');
   assert.equal(report.providerCalls,0);
+});
+
+test('Null, absent and malformed forecasts are counted without turning into zero',async t=>{
+  const pcHome=fixture(t,[12,13]);
+  const folder=path.join(pcHome,'er1-input','nov30-forward-days');
+  const first=path.join(folder,'2026-11-12.json');
+  const firstBody=JSON.parse(fs.readFileSync(first,'utf8'));
+  delete firstBody.body.pre[0].epsEstimate;
+  firstBody.body.pre[0].revenueEstimate='not-a-number';
+  fs.writeFileSync(first,JSON.stringify(firstBody));
+  const report=await inspectSavedActual({pcHome,asOf:'2026-11-06',
+    readCore:()=>null,score:()=>({coverage:{scoreableIssuers:0}})});
+  assert.equal(report.futureSymbols,1);
+  assert.equal(report.calendarForecastEPSNullOrMissingRows,1);
+  assert.equal(report.calendarForecastEPSNumberRows,1);
+  assert.equal(report.calendarForecastRevenueNullOrMissingRows,1);
+  assert.equal(report.calendarForecastRevenueNumberRows,0);
+  assert.equal(report.futureForecastInvalidRows,1);
+  assert.equal(report.futureSymbolsWithBothForecast,0);
+  assert.equal(report.futureSymbolsWithoutBothForecast,1);
+  assert.equal(report.providerCalls,0);
+  assert.equal(report.d1Writes,0);
+  assert.equal(JSON.stringify(report).includes('TWO'),false);
 });
