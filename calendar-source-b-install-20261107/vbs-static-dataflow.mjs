@@ -132,6 +132,72 @@ function valueOf(expression,vars,objects,context,depth=0){
  }
  return unknown('EXPRESSION_NOT_ALLOWLISTED');
 }
+// A constrained command *shape* classifier. It never emits argument values or
+// absolute paths; cmd.exe is parsed at most one safe literal hop. This is not
+// proof that Windows executed the command, especially under conditional VBS.
+export function classifyResolvedCommand(value,root){
+ const empty={executableBasename:null,scriptBasename:null,scriptExtension:null,
+  scriptRooted:false,approvedRootMatch:false,nextHopKind:'UNKNOWN',
+  oneHopCmdParsed:false};
+ const raw=String(value);
+ if(raw.length===0||raw.length>4096)return empty;
+ const tokens=[];let token='',quoted=false;
+ for(let i=0;i<raw.length;i++){
+  const c=raw[i];
+  if(c==='"'){quoted=!quoted;continue;}
+  if(/\s/.test(c)&&!quoted){if(token){tokens.push(token);token='';}continue;}
+  token+=c;
+ }
+ if(quoted)return empty;
+ if(token)tokens.push(token);
+ if(!tokens.length||tokens.length>30)return empty;
+ const basename=full=>{
+  const name=path.win32.basename(full);
+  return /^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$/.test(name)?name.toLowerCase():null;
+ };
+ const allowedExecutables=new Set(['node.exe','node','wscript.exe','cscript.exe',
+  'cmd.exe','cmd']);
+ const allowedScripts=new Set(['local-cycle.mjs','run-local.mjs','collect-local.mjs',
+  'archive-run.mjs','earnings-api-local.mjs','run-local-core.vbs',
+  'run-original-then-archive.vbs']);
+ const rawExe=basename(tokens[0]);
+ const exe=rawExe&&allowedExecutables.has(rawExe)?rawExe:'OTHER_EXECUTABLE';
+ let active=tokens,oneHopCmdParsed=false,kindOverride=null;
+ if(['cmd.exe','cmd'].includes(exe)){
+  const idx=tokens.findIndex((t,i)=>i>=1&&/^\/(?:c|k)$/i.test(t));
+  if(idx<0||idx+1>=tokens.length||/[&|><%!]/.test(raw))
+   return {...empty,executableBasename:exe,nextHopKind:'CMD_AMBIGUOUS'};
+  active=tokens.slice(idx+1);
+  oneHopCmdParsed=true;kindOverride='CMD_ONE_HOP';
+ }
+ const rawActiveExe=basename(active[0]);
+ const exec=rawActiveExe&&allowedExecutables.has(rawActiveExe)?
+  rawActiveExe:'OTHER_EXECUTABLE';
+ const scriptToken=active.find(t=>/\.(?:mjs|js|vbs|cmd|bat)$/i.test(t));
+ const rawScript=scriptToken?basename(scriptToken):null;
+ const script=rawScript&&allowedScripts.has(rawScript)?rawScript:
+  scriptToken?'OTHER_SCRIPT':null;
+ const ext=scriptToken?path.win32.extname(scriptToken).toLowerCase():null;
+ const rooted=!!scriptToken&&path.win32.isAbsolute(scriptToken);
+ const underRoot=rooted&&winNorm(scriptToken).startsWith(winNorm(root)+path.win32.sep);
+ let kind='OTHER';
+ if(script==='local-cycle.mjs')kind='CORE_LOCAL_CYCLE';
+ else if(script==='run-local.mjs')kind='WRITER_ONLY';
+ else if(script==='archive-run.mjs')kind='ARCHIVE_SIDECAR';
+ else if(script==='earnings-api-local.mjs')kind='EARNINGS_SIDECAR';
+ else if(['run-local-core.vbs','run-original-then-archive.vbs'].includes(script))
+  kind='KNOWN_VBS_WRAPPER';
+ else if(ext==='.vbs')kind='OTHER_VBS';
+ else if(ext==='.mjs'||ext==='.js')kind='OTHER_NODE_SCRIPT';
+ else if(ext==='.cmd'||ext==='.bat')kind='OTHER_CMD_SCRIPT';
+ else if(exec==='node.exe'||exec==='node')kind='NODE_NO_SCRIPT';
+ else if(exec==='wscript.exe'||exec==='cscript.exe')kind='VBS_NO_SCRIPT';
+ else if(exec==='cmd.exe'||exec==='cmd')kind='CMD_NO_SCRIPT';
+ return {executableBasename:exe,scriptBasename:script,
+  scriptExtension:ext,scriptRooted:rooted,
+  approvedRootMatch:underRoot,nextHopKind:kindOverride?
+   `${kindOverride}_${kind}`:kind,oneHopCmdParsed};
+}
 function identifyCommand(value,{scriptPath,secondPath,root}){
  const lower=winNorm(value);
  const next=secondPath&&lower.includes(winNorm(secondPath));
@@ -151,7 +217,8 @@ function identifyCommand(value,{scriptPath,secondPath,root}){
   sourceRootReferenced:rootMatch,archiveSidecar:archive,earningsSidecar:earnings,
   nextPinnedVbsDirect:Boolean(nextLiteral),coreNodeEntrypointDirect:exactNodeEntrypoint,
   shellCmdAmbiguous:cmdAmbiguous,absolutePathObserved:exactAbsolute,
-  scriptFullNameReferenced:lower.includes(winNorm(scriptPath))};
+  scriptFullNameReferenced:lower.includes(winNorm(scriptPath)),
+  commandShape:classifyResolvedCommand(value,root)};
 }
 export function traceVbsDataflow(raw,{scriptPath,secondPath=null,root,
  environment={}}){
