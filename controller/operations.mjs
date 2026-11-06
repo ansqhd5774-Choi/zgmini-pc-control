@@ -2,6 +2,7 @@ import fs from 'node:fs';import path from 'node:path';import os from 'node:os';i
 import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
+import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
 import {inspectR54SixFileInventory} from './r54-sixfile-inventory-readonly.mjs';
 import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
@@ -70,6 +71,7 @@ export async function runOperation(request,context){
  const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence}=context;
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask,retiredTaskEvidence}),providerCalls:0,d1Writes:0,sqliteOpened:false};
+ if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
  if(request.operation==='alpaca-quota-readonly')return inspectAlpacaQuotaReadonly(dataRoot);
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
