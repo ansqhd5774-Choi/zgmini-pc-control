@@ -56,3 +56,18 @@
 **M3 적용 담당:** 실제 후보 변경과 승인 명세가 존재할 때 #68에서 설치 SHA→정확 목표 SHA의 누적 diff, 백업/lease/drain/6 Runner 연결을 검토한다. 지금 본래 기능 작업의 정상 A 조회에 전역 Controller 설치 Gate를 추가하지 않는다.
 
 **현재:** 신규 R1 **40%**, 실제 PC/Controller/DB/API/예약 변경 0, 운영 효과 별도 미실증. 예약 검증은 본 작업 후속.
+
+## 6. M3 격리 시뮬레이션 — 과거 승인 명세 대 누적 diff (2026-11-07)
+
+검사 방식: 각 승인 manifest의 `installedSha→targetSha` GitHub compare에서 `controller/`·`config/` 변경 경로만 추출하여 manifest `allowFiles[].path`와 **정확한 집합 일치** 비교. 이번 비교 결과는 모두 300파일 상한 미만(최대 152파일)이며 실제 PC·유지보수기 실행은 없음.
+
+| 기존 설치 기준→목표 | 전체 GitHub 변경 파일 | Controller/Config 변경 | 승인 목록 | 차이 | 원래 정규 B 증거 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `69c83027→364c59b9` | 152 | 4 | 4 | **0** | [#445](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/445#issuecomment-6664737429) |
+| `364c59b9→ac1f5c22` | 16 | 5 | 5 | **0** | [#449](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/449#issuecomment-6665207414) |
+| `ac1f5c22→797f5a80` | 20 | 2 | 2 | **0** | [#454](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/454#issuecomment-6665766623) |
+| `797f5a80→0492f6f5` | 26 | 3 | 3 | **0** | [#476](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/476#issuecomment-6685444328) |
+
+**판정:** 경로 집합 4/4 PASS, 비교상 누락·추가 경로 0. `status=ahead`, `behind_by=0`으로 연결된 목표 SHA의 순차 적용 가능성을 뒷받침한다. 이 확인은 **manifest 경로 집합과 GitHub 역사에 대한 정적 비교**로서 각 파일의 실제 설치 바이트 재검증, 승인 자체의 유효성 재심사, Windows 백업/드레인/실패 복원 시험이 아니다. 운영 설치 성공은 각 기존 정규 B 원본 증거로만 보존한다.
+
+**남은 M3:** 실제 새 변경의 installed/target SHA와 승인 범위가 정해질 때만 후보별 diff·해시·실패 복구 시나리오를 검증한다. 별도 신규 B는 만들지 않는다. 신규 R1 완료율 **40% 유지**.
