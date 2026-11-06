@@ -6,7 +6,7 @@
 
 ## 0. 판정 방법
 
-- M0~M4 각각 20%. **증거가 있는 DONE만 반영**. M0+M1 DONE = 신규 프로젝트 **40%**, M2~M4는 단계 미완료.
+- M0~M4 각각 20%. **증거가 있는 DONE만 반영**. M0+M1+M2 DONE = 신규 프로젝트 **60%**, M3~M4는 단계 미완료.
 - 각 단계: `상태 / 이전 PASS / 첫 미완료·오류 / 근거(원본 링크·관측시각·SHA) / 실제 PC 실행·설치 효과 / 담당 / 다음 한 행동`.
 - `STATE_UNKNOWN`을 PASS로 바꾸지 않음. 기존 성공은 업무 완료 재검증이 아니라 선행 증거로 재사용.
 - 원담당에게 남긴 GitHub 기록은 실제 수신 ACK가 아니다. 별도 일반챗의 기능 재개는 주장하지 않음.
@@ -17,7 +17,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 2026-11-07 | M0 | **DONE** | 기준 `codex/controller-ops-lessons-20261105`→전용 `codex/controller-process-platform-r1-20261107`, 프로젝트 계획, 이 원장, Issue #526, Draft PR #527 | **소스 문서·원장만 작성**. Controller/PC/DB/API/예약/게시 변경 0 | M1 현재 관측 경로의 읽기 가능성/실제 설치 여부 대조 |
 | 2026-11-07 | M1 | **DONE** | 기존 A·quota ledger·fetch-wrapper와 PR #524 현재 11/11 상태 비교. FILE_INVENTORY/LOGGED_FETCH/SAVED_CHECKPOINT/ACTIVE_RUNTIME을 구분하는 단일 계약 확정 | 실제 Windows 실행 **없음**, 수집기 하루 1 GET 보장·설치 **미확인** | M2 공통 소비자가 확인될 때만 집중 구현 |
-| 2026-11-07 | M2 | **RUNNING / 미완료** | PR #524·R17·Alpaca·asset R10 A의 고정 경로 안전 읽기 중복 확인. 형식·크기·상태 차이 때문에 범용 리더의 성급한 분리 보류 | 신규 코드·PC 0 | 실제 공통 소비자 1건·기존 테스트 파악 후 최소 계약/fixture만 구현 |
+| 2026-11-07 | M2 | **DONE (코드·검토·격리)** | 최신 main 기반 전용 구현 브랜치, [Draft PR #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) 4파일: helper+기존 Alpaca/asset R10 A 2개 소비자+새 테스트. 19/19 PASS, 독립 검토 회귀 1건 수정 뒤 통과 | 운영 PC·Controller·API·DB·예약 0, Windows smoke/실제 효과 미검증 | M3 Windows·배포 정확 manifest 검증 |
 | 2026-11-07 | M3 | **사전 조사 DONE / 단계 미완료** | `tools/update.mjs` 전체 diff+allowFiles exact·목표 전체 트리 교체 확인. #445/#449/#454/#476 정상 순차 B, 마지막 실측 Controller SHA `0492f6f5…` | 본 조사 Windows 교체 0, 마지막 실측 이후 변경은 별도 재확인 필요 | 실제 적용 후보가 있을 때만 #68 조정·격리 시뮬레이션 |
 | 미시작 | M4 | **DEFERRED** | 실제 재개·운영효과의 신규 증거 없음 | 0 | 앞 단계 결과 후 |
 
@@ -27,7 +27,7 @@
 | --- | --- | --- | --- |
 | `tools/automation-status.mjs` ([main](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/tools/automation-status.mjs)) | 고정 E: 경로의 설치 파일 해시, Supervisor·Runner, 설치 operation, 유지보수 상태를 읽기 전용 요약하도록 작성되어 있음 | **일반 pc-job allowlist에 없음**; 이 채팅에서 현재 PC 설치/실행 여부 확인하지 않음 | 설치/접근 구분. 기존 수단 재사용 가능성 검토 |
 | `controller/operations.mjs` 및 `config/operations.json` ([main](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/config/operations.json)) | 고정 A operation과 리소스·실행기가 분리되어 있음. `release-calendar-runtime-readonly` 및 `market-calendar-er1-saved-status` 등록 | 등록되지 않은 경로/임의 코드 호출 불가; 날짜별 EarningsAPI 요청 수를 직접 반환하는 기존 op 확인되지 않음 | 신규 범용 파일 reader 금지, 필요한 최소 고정 어댑터만 검토 |
-| [PR #524](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/524) | Draft, 파일 2개, 11/11 테스트; 후보 파일 메타데이터 + 고정 `collection-events.jsonl`의 KST 날짜별 fetch-wrapper 호출 관측, PC 미설치 | ACTIVE runtime 소스·모든 GET·내구성 checkpoint·일일 차단 증거 **없음**, 부분 로그 `STATE_UNKNOWN` | 원담당 PR 보존. 중복 코드 편집/전체 설치 Gate 금지 |
+| [PR #524](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/524) | main 병합 완료, 파일 2개, 11/11 테스트; 후보 파일 메타데이터 + 고정 `collection-events.jsonl`의 KST 날짜별 fetch-wrapper 호출 관측, PC 미설치 | ACTIVE runtime 소스·모든 GET·내구성 checkpoint·일일 차단 증거 **없음**, 부분 로그 `STATE_UNKNOWN` | 원담당 PR 보존. 중복 코드 편집/전체 설치 Gate 금지 |
 | [#520](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/520#issuecomment-6689594993) | 기존 ER1 점수 B `NOV30_ER1_D1_VERIFIED`, D1 재조회 해시 일치, 공급자 호출 0 | 하루 1 GET 검증 증거로 사용할 수 없음 | EPS 운영 완료 보존, 관련 없는 계산·게시 재실행 금지 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)와 공통 적용 규정 | SHA→manifest, 단일 적용 담당, lease, 원본 보호, 결과 회수의 지원 경로 | 부분 변경 패키지 지원·현재 설치 SHA는 대상 결정 전 **미확인** | 실제 적용 시만 정확한 SHA/승인 범위 확인 |
 
@@ -51,11 +51,11 @@
 
 ## 5. 다음 필수 행동
 
-**M2 총괄:** 기존 읽기 전용 A 중 공유 안전 읽기 코드의 실제 재사용 소비자를 선정하고, 사용자가 검증하지 않아도 될 `UNKNOWN` 경계 시뮬레이션을 좁은 fixture로 정의·실행한다. 실제 소비자가 없는 독립 모듈을 양산하지 않는다.
+**M2 완료:** 실제 소비자 Alpaca quota/asset R10 A를 선택해 공통 고정 경로 바이트 reader를 구현하고 fixture 19/19 통과·독립 검토 회귀 수정. 코드 브랜치는 오래된 R1 문서 브랜치에서가 아니라 최신 main에서 분기한 Draft PR #537. #524의 feature reader는 손대지 않음.
 
 **M3 적용 담당:** 실제 후보 변경과 승인 명세가 존재할 때 #68에서 설치 SHA→정확 목표 SHA의 누적 diff, 백업/lease/drain/6 Runner 연결을 검토한다. 지금 본래 기능 작업의 정상 A 조회에 전역 Controller 설치 Gate를 추가하지 않는다.
 
-**현재:** 신규 R1 **40%**, 실제 PC/Controller/DB/API/예약 변경 0, 운영 효과 별도 미실증. 예약 검증은 본 작업 후속.
+**현재:** 신규 R1 **60%**, 실제 PC/Controller/DB/API/예약 변경 0, 운영 효과 별도 미실증. 예약 검증은 본 작업 후속.
 
 ## 6. M3 격리 시뮬레이션 — 과거 승인 명세 대 누적 diff (2026-11-07)
 
@@ -70,6 +70,24 @@
 
 **판정:** 경로 집합 4/4 PASS, 비교상 누락·추가 경로 0. `status=ahead`, `behind_by=0`으로 연결된 목표 SHA의 순차 적용 가능성을 뒷받침한다. 이 확인은 **manifest 경로 집합과 GitHub 역사에 대한 정적 비교**로서 각 파일의 실제 설치 바이트 재검증, 승인 자체의 유효성 재심사, Windows 백업/드레인/실패 복원 시험이 아니다. 운영 설치 성공은 각 기존 정규 B 원본 증거로만 보존한다.
 
-**남은 M3:** 실제 새 변경의 installed/target SHA와 승인 범위가 정해질 때만 후보별 diff·해시·실패 복구 시나리오를 검증한다. 별도 신규 B는 만들지 않는다. 신규 R1 완료율 **40% 유지**.
+**남은 M3:** 실제 새 변경의 installed/target SHA와 승인 범위가 정해질 때만 후보별 diff·해시·실패 복구 시나리오를 검증한다. 별도 신규 B는 만들지 않는다. M3 당시에도 신규 R1 완료율 **40% 유지**(M2 구현 전 정적 검사 시점).
 
 **경계 입력의 정적 모의검사(실제 설치기 실행 아님):** 같은 4개 승인 명세 각각에 대해 ① 정상 경로 목록 4/4 일치, ② 허용 파일 1개 제거 시 4/4 불일치 감지, ③ 미승인 `controller/not-approved.mjs` 1개 추가 시 4/4 불일치 감지, ④ 설치/목표 SHA 체인 4/4 일치. 총 16개 조건의 로컬 집합·문자열 비교 통과. 실제 `tools/update.mjs` 호출, Windows rollforward/rollback, 파일 바이트 SHA256 재계산은 수행하지 않았다. 이 검사는 위험한 부분 설치를 합리화하지 않는다.
+
+## 7. M2 구현·회귀 검증 결과 (2026-11-07 KST)
+
+| 항목 | 실제 증거 | 상태/범위 |
+| --- | --- | --- |
+| 코드 저장 | [최신 main 기반 M2 Draft PR #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) · 코드 브랜치 `codex/controller-process-safe-read-r1-20261107` | 원격 4개 파일 재조회·로컬 동일 내용, 원래 #527 문서 PR 및 다른 작업자 PR 불변 |
+| 기존 A 소비자 | `alpaca-quota-readonly.mjs` ledger, `asset-r10-source-readonly.mjs` 고정 config+2 source | 기존 기능별 상태·JSON 검증·쿼터 계산·SHA 출력 그대로 유지 |
+| 신규 모듈 | `controller/fixed-readonly-bytes.mjs` | 고정 경로/verifiedRoot, size, symlink, realpath, FD inode/dev/mtime, short read. 호출자 승인/원문 비노출 유지 |
+| 집중 테스트 | `node --test tests/fixed-readonly-bytes.test.mjs tests/alpaca-quota-readonly.test.mjs tests/asset-r10-source-readonly.test.mjs` | **19/19 PASS (Linux Node 24)**; 실제 공급자 GET 0, DB/D1/예약/PC 변경 0 |
+| 독립 검토 | FD open 후 크기 부적격의 기존 `ALPACA_LEDGER_SIZE_INVALID`→잘못된 `CHANGED` 코드 회귀 발견·수정, 추가 테스트 1건 | **조건부 통과**: Windows 경합·symlink·정상/실패 오류코드 smoke는 M3 |
+| 원담당 #524 | [#524](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/524) `main` 병합 | 기존 KST fetch-wrapper 관측 추가. 실제 1 GET/day 보증/PC 설치 증거와 구분 |
+| 설치 충돌 방지 | 현재 R1 문서 브랜치가 main에서 크게 분기. M2는 최신 main 기반. 코드 PR 네 파일만 변경 | 운영 Controller 설치 전 다시 실제 installed SHA·누적 diff 승인 정합성 확인 |
+
+**M2 확정 완료 범위는 소스·격리 테스트·독립 검토까지**다. Linux fixture 성공만으로 Windows 파일 경합 안전성 또는 정상 사용자의 수동 개입 감소를 주장하지 않는다. 기존 정상 서비스는 변경 없음.
+
+**다음 실행(M3):** Windows A smoke가 실제로 필요한 변경만 #68 단일 적용 담당과 조정. 기존 Controller 업데이트 전체와 B 작업을 회피·우회하지 말고, 새 승인 목표 SHA와 전체 changed controller/config 파일의 정합성을 검증한다. 병합·설치·M4 효과 실증은 미완료.
+
+**현재 신규 완료율 M0+M1+M2=60%.** 기존 5건 4/5=80% 별도. 예약 검증은 모든 실제 작업 이후 후속.
