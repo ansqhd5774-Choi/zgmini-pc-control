@@ -19,8 +19,8 @@ export const D30_INSTALL_CONTRACT = Object.freeze({
     }),
     Object.freeze({
       path: 'scripts/pc-writer/earnings-api-local.mjs',
-      targetBlob: '6dbc33113574f1b2f3253f6a095626caa6dd6423',
-      targetSha256: '23468a6efcd95293dd499518ab23c5460b92e5660770d80e052b868ed194fc93',
+      targetBlob: '4abf15cf8ef0763b0107e921d5fe36acc22e1e15',
+      targetSha256: 'd3a44b963b2396a002e317b4583ca2546e6409aacba8162b089b653aef9bec4a',
     }),
     Object.freeze({
       path: 'scripts/pc-writer/release-calendar.mjs',
