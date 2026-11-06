@@ -133,10 +133,10 @@ function inspectEarningsApiRequests(root,home,fileSystem){
  out.observedMaxDailyRequests=days.length?Math.max(...days.map(([,n])=>n)):null;
  out.observedOverOneRequestDays=days.filter(([,n])=>n>1).length;
  out.observedWindow=earliest&&latest?{firstEventAt:earliest,lastEventAt:latest}:null;
- out.coverage=!days.length?'NONE':incomplete||out.invalidEvents?'PARTIAL':'BOUNDED_LOG';
+ out.coverage=!days.length?'NONE':incomplete||out.invalidEvents||out.statusInvalidEvents?'PARTIAL':'BOUNDED_LOG';
  out.statusCoverage=!statusesByDay.size?'NONE':incomplete||out.invalidEvents||out.statusInvalidEvents?
   'PARTIAL':'BOUNDED_LOG';
- out.status=incomplete||out.invalidEvents||!days.length?'STATE_UNKNOWN':'OBSERVED';
+ out.status=incomplete||out.invalidEvents||out.statusInvalidEvents||!days.length?'STATE_UNKNOWN':'OBSERVED';
  out.code=out.status==='OBSERVED'?'COLLECTION_EVENTS_OBSERVED_ONLY':'COLLECTION_EVENTS_PARTIAL_OR_INVALID';
  return out;
 }
