@@ -100,9 +100,12 @@ export async function probeHistorical({now=Date.now(),base=BASE,
       currentBars:current.bars,referencePageComplete:reference.pageComplete,
       currentPageComplete:current.pageComplete,collectedAt:new Date(Date.now()).toISOString()});
     requireThat(validUsSipPremarket(record),'SIP_PROBE_CALCULATION_STOP');
-    return {status:record.collectionStatus==='COMPLETE'?
-      'SIP_HISTORICAL_REAL_DATA_PASS':'SIP_HISTORICAL_INCOMPLETE_PAGINATION',
-      code:record.collectionStatus==='COMPLETE'?'SIP_PROBE_VERIFIED':'SIP_PROBE_INCOMPLETE',
+    const complete=record.collectionStatus==='COMPLETE';
+    const empty=complete&&record.observedCount===0;
+    return {status:!complete?'SIP_HISTORICAL_INCOMPLETE_PAGINATION':
+      empty?'SIP_HISTORICAL_EMPTY_OBSERVATION':'SIP_HISTORICAL_REAL_DATA_PASS',
+      code:!complete?'SIP_PROBE_INCOMPLETE':
+        empty?'SIP_PROBE_NO_OBSERVATIONS':'SIP_PROBE_VERIFIED',
       observationDate:OBSERVATION,slotEndUtc:SESSION_END,
       checkedAt:new Date().toISOString(),providerCalls,
       source:'ALPACA_SIP_PREMARKET_15MIN_DELAYED_SPLIT',
@@ -132,10 +135,13 @@ export function sanitizeProbeResult(raw,requestId,runId){
     observationDate:OBSERVATION,slotEndUtc:SESSION_END,
     checkedAt:null,providerCalls:null,retry:'NO_REEXECUTE_READBACK_ONLY'};
   if(!jsonObject(raw)||!['SIP_HISTORICAL_REAL_DATA_PASS',
-    'SIP_HISTORICAL_INCOMPLETE_PAGINATION','SIP_HISTORICAL_NOT_VERIFIED']
+    'SIP_HISTORICAL_INCOMPLETE_PAGINATION','SIP_HISTORICAL_EMPTY_OBSERVATION',
+    'SIP_HISTORICAL_NOT_VERIFIED']
     .includes(raw.status)||!CODE.test(raw.code??'')||
     raw.observationDate!==OBSERVATION||raw.slotEndUtc!==SESSION_END||
-    typeof raw.checkedAt!=='string'||!Number.isFinite(Date.parse(raw.checkedAt))||
+    typeof raw.checkedAt!=='string'||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(raw.checkedAt)||
+    !Number.isFinite(Date.parse(raw.checkedAt))||
     !Number.isSafeInteger(raw.providerCalls)||raw.providerCalls<0||
     raw.providerCalls>BUDGET)return empty;
   const core={...empty,status:raw.status,code:raw.code,
@@ -150,10 +156,50 @@ export function sanitizeProbeResult(raw,requestId,runId){
     raw.freshWithin30m>raw.observedCount||raw.referenceObservedCount>raw.expectedCount||
     raw.source!=='ALPACA_SIP_PREMARKET_15MIN_DELAYED_SPLIT'||
     !['COMPLETE','INCOMPLETE_PAGINATION'].includes(raw.collectionStatus)||
-    (raw.status==='SIP_HISTORICAL_REAL_DATA_PASS')!==
-      (raw.collectionStatus==='COMPLETE'))return empty;
+    (raw.status==='SIP_HISTORICAL_REAL_DATA_PASS'&&
+      (raw.collectionStatus!=='COMPLETE'||raw.observedCount===0))||
+    (raw.status==='SIP_HISTORICAL_EMPTY_OBSERVATION'&&
+      (raw.collectionStatus!=='COMPLETE'||raw.observedCount!==0))||
+    (raw.status==='SIP_HISTORICAL_INCOMPLETE_PAGINATION'&&
+      raw.collectionStatus!=='INCOMPLETE_PAGINATION'))return empty;
   return {...core,source:raw.source,collectionStatus:raw.collectionStatus,
     ...Object.fromEntries(countNames.map(k=>[k,raw[k]]))};
+}
+
+/** Private GitHub claim is create-only. A missing/ambiguous readback is STOP,
+ * not permission to repeat the provider calls or create a second request.
+ */
+export async function claimOnce({event,env,api=fetch}){
+  const auth=authorize(event,env);
+  requireThat(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>20,
+    'SIP_PROBE_CLAIM_TOKEN_STOP');
+  const claim={schema:'ZGMINI_R17_SIP_HISTORICAL_CLAIM_V1',
+    requestId:auth.requestId,issueNumber:event.issue.number,
+    installedSourceSha:INSTALLED_SHA};
+  const content=JSON.stringify(claim)+'\n';
+  const filename=`results/r17-sip-historical-claim-${auth.requestId}.json`;
+  const url=`https://api.github.com/repos/${REPO}/contents/${filename}`;
+  const headers={authorization:`Bearer ${env.GITHUB_TOKEN}`,
+    accept:'application/vnd.github+json',
+    'x-github-api-version':'2022-11-28',
+    'content-type':'application/json',
+    'user-agent':'zgmini-r17-sip-historical-once'};
+  let first;
+  try{first=await api(`${url}?ref=main`,{headers});}
+  catch{throw failure('SIP_PROBE_CLAIM_READ_STOP');}
+  if(first.status===200)throw failure('SIP_PROBE_DUPLICATE_REQUEST_STOP');
+  requireThat(first.status===404,'SIP_PROBE_CLAIM_READ_STOP');
+  // No SHA supplied: this is a create-only GitHub Contents write.
+  let created=false;
+  try{const response=await api(url,{method:'PUT',headers,body:JSON.stringify({
+    message:`chore(r17): claim once ${auth.requestId}`,
+    content:Buffer.from(content).toString('base64')})});
+    created=response.status===201;
+  }catch{/* Unknown claim result: do NOT call the provider. */}
+  requireThat(created,'SIP_PROBE_CLAIM_WRITE_STOP');
+  requireThat(await verifyUploaded(api,url,headers,content),
+    'SIP_PROBE_CLAIM_READBACK_STOP');
+  return {claimed:true,requestId:auth.requestId};
 }
 
 async function verifyUploaded(api,url,headers,expected){
@@ -240,6 +286,8 @@ async function main(){
     requireThat(process.platform==='win32','SIP_PROBE_WINDOWS_STOP');
     const event=JSON.parse(regular(process.env.GITHUB_EVENT_PATH,200_000));
     authorize(event,process.env);
+    verifyInstalledSource();
+    await claimOnce({event,env:process.env});
     result=await realProbe();
   }catch(error){
     result=emptyResult(CODE.test(error?.safeCode??'')?
