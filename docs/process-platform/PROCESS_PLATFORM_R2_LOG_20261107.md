@@ -13,7 +13,7 @@
 | 단계 | 상태 | 누적 진행률 | 이번 확인 / 남은 증거 |
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
-| M1 읽기 전용 A | RUNNING (source 감사) | 20% 유지 | main A 진단기 2종의 제한 확인: 정적 래퍼 조회·기능별 고정 파일 목록, 실제 PC 설치·inflation 세 파일 해시는 미확인 |
+| M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
 | M2 공통 Writer B | READY | — | 실PC 지원 확인, scope-bound manifest/수신기와 승인/백업/lease 필요 |
 | M3 실패·정상 회귀 | DEFERRED | — | M1/M2 관련 구현 후 시나리오 5개 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
@@ -54,3 +54,13 @@
 - 보존: Runtime·원자료·DB·D1·운영 파일 수정 0건. 새 검사나 전역 Gate 추가 0건.
 - **LAST PASS:** source 코드·현재 GitHub 허용목록의 정적 지원 범위 확인.
 - **FIRST FAIL / 남은 조건:** 실제 PC A operation 활성/세 파일 read-only 해시를 획득하지 못함(#614 이전 거부 증거). 다음: 기존 Controller 설치 담당의 실제 설치 결과 대조 후 허용된 A 요청; 동시에 source의 bounded 진단기 개선·관련 fixture 테스트.
+
+## 2026-11-07 — M1 공통 A 코드·회귀 완료 (Runtime 별개)
+
+- [PR #625](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/625) 최신 main 병합: merge SHA **6348be5201801e008be10867fd68add4ddeca52c**, 변경 파일 2개만.
+- [controller/pc-source-readonly.mjs](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/controller/pc-source-readonly.mjs) blob **3ab1095a61e3c1b22918689e7cafc0950f7e1022**, [tests/pc-source-r2-readonly.test.mjs](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/tests/pc-source-r2-readonly.test.mjs) blob **d2f1e10a4ff0cb954d7d9eb27b759b0766253c21** 원격 main 재조회.
+- 다단계/UTF-16LE VBS read-only 정적 추적, bounded scripts/pc-writer/*.mjs 파일명/SHA256/dirty inventory, config.source SHA↔HEAD 비교. 무관 파일의 2MB 초과·비정상/심볼릭 링크 오류는 partial issues[]로 분리해 정상 파일의 해시를 보존한다.
+- 관련 격리 테스트 **18/18 PASS**, 부모 총괄 독립 재실행 exit=0. 초기 UTF-16LE 1건 실패와 무관 파일 전역 차단 설계를 발견해 수정한 뒤 병합했다.
+- **LAST PASS:** source 병합·원격 재조회·격리 18/18 PASS.
+- **FIRST FAIL / 미확인:** 해당 수정은 PC 설치 증거가 아니며, #614 운영 Controller A 허용목록과 실제 조회 요청·writer checkout/HEAD/config.source/PR #981 세 파일 해시·dirty 회수 미완료. M1 **RUNNING**, R2 **20% 유지**.
+- **다음:** #68 원담당의 실제 Controller 설치·A 활성 결과를 확인한 뒤 같은 요청 ID를 재사용하지 않는 승인 A 1회로 대상 PC 증거 회수. 별도 기능 CMD·새 예약·중복 Controller B 제출 금지.
