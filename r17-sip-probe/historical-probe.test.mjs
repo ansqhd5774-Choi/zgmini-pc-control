@@ -21,11 +21,15 @@ const full={version:1,phase:'PROVISIONAL',source:'ALPACA_SIP_PREMARKET_15MIN_DEL
   collectionStatus:'COMPLETE'};
 
 function fixture(options={}){
-  const urls=[];const calls=[];
-  return {urls,calls,
+  const urls=[];const calls=[];const universeDates=[];
+  return {urls,calls,universeDates,
     dependencies:{now:Date.parse('2026-11-06T15:00:00Z'),base:'/fixture',
-      storedUniverse:(base,date)=>{assert.equal(base,'/fixture');assert.equal(date,'2026-11-05');
-        if(options.universeError)throw Error(options.universeError);
+      storedUniverse:(base,date)=>{assert.equal(base,'/fixture');
+        universeDates.push(date);
+        assert.ok(['2026-11-05','2026-11-04'].includes(date));
+        if(date==='2026-11-05'&&options.universeError)throw Error(options.universeError);
+        if(date==='2026-11-04'&&options.previousUniverseError)
+          throw Error(options.previousUniverseError);
         return members;},
       loadLocalProviders:()=>{if(options.providerError)throw Error(options.providerError);
         return {APCA_API_KEY_ID:'PRIVATE',APCA_API_SECRET_KEY:'SECRET'};},
@@ -67,6 +71,9 @@ test('untrusted actor, duplicate run, wrong date and extra fields stop',()=>{
 test('historical SIP queries allowed after delay, fixed 503 members and approved windows',async()=>{
   const f=fixture();const got=await probeHistorical(f.dependencies);
   assert.equal(got.status,'SIP_HISTORICAL_REAL_DATA_PASS');
+  assert.equal(got.universeAsOfDate,'2026-11-05');
+  assert.equal(got.universeSelection,'EXACT_REQUESTED');
+  assert.deepEqual(f.universeDates,['2026-11-05']);
   assert.equal(got.observedCount,2);assert.equal(got.risingCount,1);
   assert.equal(got.fallingCount,1);assert.equal(got.missingCount,501);
   assert.equal(got.providerCalls,2);assert.equal(f.calls.length,2);
@@ -80,10 +87,36 @@ test('before historical 16-minute delay no providers are queried',async()=>{
   await assert.rejects(()=>probeHistorical(f.dependencies),/SIP_PROBE_HISTORICAL_NOT_YET_DELAYED/);
   assert.equal(f.calls.length,0);
 });
-test('missing 11/05 universe is a precise allowlisted code with zero provider calls',async()=>{
+test('only missing 11/05 universe reuses saved 11/04 503 for a clearly labeled diagnostic',async()=>{
   const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING'});
+  const got=await probeHistorical(f.dependencies);
+  assert.deepEqual(f.universeDates,['2026-11-05','2026-11-04']);
+  assert.equal(got.status,'SIP_HISTORICAL_FALLBACK_DIAGNOSTIC');
+  assert.equal(got.code,'SIP_PROBE_PREVIOUS_UNIVERSE_DIAGNOSTIC');
+  assert.equal(got.universeAsOfDate,'2026-11-04');
+  assert.equal(got.universeSelection,'PREVIOUS_SAVED_DIAGNOSTIC');
+  assert.equal(got.providerCalls,2);
+  assert.equal(got.expectedCount,503);
+  assert.equal(f.calls[0].start,'2026-11-05T00:00:00Z');
+  assert.equal(f.calls[1].end,'2026-11-06T14:30:00.000Z');
+  const safe=sanitizeProbeResult(got,requestId,env.GITHUB_RUN_ID);
+  assert.equal(safe.status,'SIP_HISTORICAL_FALLBACK_DIAGNOSTIC');
+  assert.equal(safe.universeAsOfDate,'2026-11-04');
+  assert.equal(safe.universeSelection,'PREVIOUS_SAVED_DIAGNOSTIC');
+});
+test('missing both fixed saved universes fails closed before providers',async()=>{
+  const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING',
+    previousUniverseError:'US_PROVISIONAL_UNIVERSE_MISSING'});
   await assert.rejects(()=>probeHistorical(f.dependencies),{
     safeCode:'US_PROVISIONAL_UNIVERSE_MISSING'});
+  assert.deepEqual(f.universeDates,['2026-11-05','2026-11-04']);
+  assert.equal(f.calls.length,0);
+});
+test('previous universe read error redacts sensitive path and never queries provider',async()=>{
+  const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING',
+    previousUniverseError:'E:\\sensitive\\db.sqlite'});
+  await assert.rejects(()=>probeHistorical(f.dependencies),{
+    safeCode:'SIP_PROBE_PREVIOUS_UNIVERSE_READ_STOP'});
   assert.equal(f.calls.length,0);
 });
 test('DB missing and universe invalid retain only safe codes, unknown error is redacted',async()=>{
@@ -91,6 +124,7 @@ test('DB missing and universe invalid retain only safe codes, unknown error is r
     const f=fixture({universeError:code});
     await assert.rejects(()=>probeHistorical(f.dependencies),{safeCode:code});
     assert.equal(f.calls.length,0);
+    assert.deepEqual(f.universeDates,['2026-11-05']);
   }
   const f=fixture({universeError:'sensitive SQL path E:\\ZGmini\\...'});
   let error;try{await probeHistorical(f.dependencies);}catch(e){error=e;}
@@ -162,6 +196,17 @@ test('report sanitizer strips unapproved raw bars and tokens',()=>{
     assert.ok(!JSON.stringify(clean).includes('TEST0'));
     assert.equal(clean.expectedCount,503);
   });
+});
+test('fallback date cannot be mislabeled as an exact full current PASS',async()=>{
+  const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING'});
+  const raw=await probeHistorical(f.dependencies);
+  for(const forged of [
+    {...raw,status:'SIP_HISTORICAL_REAL_DATA_PASS',code:'SIP_PROBE_VERIFIED'},
+    {...raw,universeAsOfDate:'2026-11-05'},
+    {...raw,universeSelection:'EXACT_REQUESTED'},
+    {...raw,universeAsOfDate:'2026-11-03'},
+  ])assert.equal(sanitizeProbeResult(forged,requestId,env.GITHUB_RUN_ID).code,
+    'SIP_PROBE_RESULT_UNVERIFIED');
 });
 test('invalid count arithmetic fails closed',()=>{
   const record={status:'SIP_HISTORICAL_REAL_DATA_PASS',code:'SIP_PROBE_VERIFIED',
