@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 const WINDOW_MS=60_000;
@@ -7,9 +8,64 @@ const HARD_CAP=140;
 const WARNING_AT=120;
 const MAX_LEDGER_BYTES=32_768;
 const SCOPE='READ_ONLY_NO_PROVIDER_NO_SQLITE_NO_PUBLICATION';
+const SOURCE_NAME='zgmini-earnings-history-pc-release';
+const SOURCE_ROOT='projects/'+SOURCE_NAME;
+const QUOTA_MODULES=Object.freeze(['quota-fetch.mjs','quota-policy.mjs','quota-ledger.mjs']);
+const SHA40=/^[a-f0-9]{40}$/;
+const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 const result=(status,code,details={})=>({status,code,scope:SCOPE,accountWide30Percent:'UNVERIFIED',baseAgreement:'UNVERIFIED',
  operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,...details});
+
+/** Additional evidence ONLY for a missing quota ledger. Fixed local paths, no provider/DB/workflow calls.
+ * The hashes describe filesystem bytes, not the currently running process or a Git HEAD.
+ */
+export function inspectQuotaModuleSourceReadonly(dataRoot){
+ const output={state:'SOURCE_ROOT_UNVERIFIED',sourceRoot:SOURCE_ROOT,
+  moduleDirectory:'scripts/pc-writer',configApprovedSha:null,
+  configState:'UNVERIFIED',runtimeBindingVerified:false,
+  modules:QUOTA_MODULES.map(name=>({name,state:'UNVERIFIED',sha256:null,bytes:null})),
+  complete:false};
+ if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return output;
+ const data=path.resolve(dataRoot),zgmini=path.dirname(data);
+ if(path.basename(data).toLowerCase()!=='data'||
+    path.basename(zgmini).toLowerCase()!=='zgmini')return output;
+ const writer=path.join(data,'pc-writer');
+ const projects=path.join(zgmini,'projects');
+ const source=path.join(projects,SOURCE_NAME);
+ const scripts=path.join(source,'scripts');
+ const modules=path.join(scripts,'pc-writer');
+ // Reject symlinked intermediates; do not follow a user-controlled tree outside E:/ZGmini.
+ for(const directory of [zgmini,data,writer,projects,source,scripts,modules]){
+  let info;
+  try{info=fs.lstatSync(directory);}catch{return output;}
+  if(!info.isDirectory()||info.isSymbolicLink())return output;
+ }
+ let canonicalModules,canonicalWriter;
+ try{canonicalModules=fs.realpathSync(modules);canonicalWriter=fs.realpathSync(writer);}
+ catch{return output;}
+ const configRead=readFixedReadonlyBytes(path.join(writer,'config.json'),{
+  verifiedRoot:canonicalWriter,maxBytes:65_536});
+ if(configRead.ok){
+  try{
+   const config=JSON.parse(configRead.bytes.toString('utf8'));
+   if(typeof config?.source==='string'&&SHA40.test(config.source)){
+    output.configApprovedSha=config.source;
+    output.configState='SOURCE_SHA_READ';
+   }else output.configState='SOURCE_SHA_UNVERIFIED';
+  }catch{output.configState='INVALID_CONFIG';}
+ }else output.configState='CONFIG_'+configRead.reason;
+ output.modules=QUOTA_MODULES.map(name=>{
+  const read=readFixedReadonlyBytes(path.join(modules,name),{
+   verifiedRoot:canonicalModules,maxBytes:1_048_576});
+  return read.ok?{name,state:'PRESENT',sha256:digest(read.bytes),bytes:read.bytes.length}:
+   {name,state:read.reason,sha256:null,bytes:null};
+ });
+ output.complete=output.modules.every(x=>x.state==='PRESENT')&&
+  output.configState==='SOURCE_SHA_READ';
+ output.state=output.complete?'SOURCE_BYTES_AND_CONFIG_READ':'PARTIAL_SOURCE_INVENTORY';
+ return output;
+}
 
 function readLedger(dataRoot){
  // A fixed host-owned path only: request JSON cannot select a filename.
@@ -44,7 +100,8 @@ function readLedger(dataRoot){
 export function inspectAlpacaQuotaReadonly(dataRoot,{now=Date.now()}={}){
  if(!Number.isSafeInteger(now)||now<0)return result('BLOCKED','ALPACA_CLOCK_INVALID');
  const {error,value}=readLedger(dataRoot);
- if(error)return result('BLOCKED',error);
+ if(error)return error==='ALPACA_LEDGER_ABSENT'?result('BLOCKED',error,{
+  sourceInventory:inspectQuotaModuleSourceReadonly(dataRoot)}):result('BLOCKED',error);
  if(value.requestTimes.some(x=>x>now+1_000))return result('BLOCKED','ALPACA_CLOCK_DRIFT');
  // Match the live reservation guard: up to 1s future skew is accepted and
  // still counts toward the cap, rather than being treated as a free slot.
