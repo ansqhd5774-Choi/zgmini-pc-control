@@ -194,3 +194,57 @@ test('target dirty remains strict rejection regardless of unrelated size',()=>{
   manifest:x.manifest,lstat:()=>{throw Error('must not stat target');}}),
   {code:'WRITER_B_TARGET_DIRTY_STOP'});
 });
+
+test('unrelated porcelain -z rename/copy attests both paths without a global R/C gate',()=>{
+ const x=fixture();
+ const status=Buffer.from('R  notes/new.txt\0notes/old.txt\0'+
+  'C  copies/new.txt\0copies/original.txt\0');
+ const contents=new Map([['notes/new.txt','new'],
+  ['copies/new.txt','copy'],['copies/original.txt','copy']]);
+ const relative=file=>file.slice('/some/checkout/'.length);
+ const lstat=file=>{
+  const data=contents.get(relative(file));
+  if(data===undefined)throw Object.assign(new Error('missing'),{code:'ENOENT'});
+  return {isFile:()=>true,isSymbolicLink:()=>false,isDirectory:()=>false,
+   size:Buffer.byteLength(data),mtimeMs:100,ctimeMs:101,mode:33188,ino:1,dev:2};
+ };
+ const readFile=file=>Buffer.from(contents.get(relative(file)));
+ const take=()=>snapshotUnrelatedDirty({sourceRoot:'/some/checkout',
+  statusBytes:status,manifest:x.manifest,lstat,readFile});
+ const original=take();
+ assert.deepEqual(original.evidence.map(x=>[x.path,x.kind]),[
+  ['notes/new.txt','file'],['notes/old.txt','deleted'],
+  ['copies/new.txt','file'],['copies/original.txt','file']]);
+ assert.deepEqual(take(),original);
+ contents.set('notes/new.txt','NEW');
+ assert.notDeepEqual(take(),original,'rename destination byte drift must be detected');
+ contents.set('notes/new.txt','new');
+ contents.set('copies/original.txt','COPY');
+ assert.notDeepEqual(take(),original,'copy original byte drift must be detected');
+});
+
+test('rename/copy target or protected overlap on either name safely rejects',()=>{
+ const x=fixture(),target=x.manifest.files[0].path;
+ const protectedPath='scripts/pc-writer/release-calendar.mjs';
+ const withProtected={...x.manifest,protectedFiles:[{path:protectedPath,sha256:H('calendar')}]};
+ for(const [row,manifest] of [
+  [`R  ${target}\0notes/old.txt\0`,x.manifest],
+  [`R  notes/new.txt\0${target}\0`,x.manifest],
+  [`C  notes/copy.txt\0${target}\0`,x.manifest],
+  [`R  ${protectedPath}\0notes/old.txt\0`,withProtected],
+  [`C  notes/copy.txt\0${protectedPath}\0`,withProtected],
+ ])assert.throws(()=>snapshotUnrelatedDirty({sourceRoot:'/some/checkout',
+   statusBytes:Buffer.from(row),manifest,
+   lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,
+    isDirectory:()=>false,size:2,mtimeMs:1,ctimeMs:1,mode:33188,ino:1,dev:1}),
+   readFile:()=>Buffer.from('ok')}),{code:'WRITER_B_TARGET_DIRTY_STOP'});
+});
+
+test('truncated rename or copy porcelain -z is a safe format stop',()=>{
+ const x=fixture();
+ for(const bad of ['R  notes/new.txt\0','C  notes/new.txt\0',
+  'R  notes/new.txt\0notes/old.txt'])
+  assert.throws(()=>snapshotUnrelatedDirty({sourceRoot:'/some/checkout',
+   statusBytes:Buffer.from(bad),manifest:x.manifest}),
+   {code:'WRITER_B_DIRTY_PORCELAIN_FORMAT_STOP'});
+});
