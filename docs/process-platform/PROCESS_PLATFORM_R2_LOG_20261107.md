@@ -74,3 +74,13 @@
 - **LAST PASS:** SOURCE_READY / FIXTURE_PASS / 4파일만 격리 PR.
 - **FIRST FAIL / 미완성:** Windows adapter + 실제 B 요청 수신 Workflow/Runner 연결·결과 원장/실PC 적용이 구현·검증되지 않아 일반 Writer B 설치 가능 상태를 주장할 수 없음. M2 **RUNNING**, 전체 R2 **20% 유지**.
 - **다음:** 기존 자체 Runner 승인 B 전달 방법과 보존된 Windows 자산을 좁게 재사용한 adapter/receiver 구현·관련 격리 테스트. 실제 운영 적용은 #68 단일 담당·승인 경로에서만 수행.
+
+## 2026-11-07 — M1 실설치 연계 정밀 분기 (READ-ONLY)
+
+- #608에서 실제 설치 확인된 Controller SHA db8924162d42adf6ee6aa27a04ce1719c8fe96c2, #614에서 그 설치 SHA의 A core-runtime-source-readonly가 OPERATION_NOT_ALLOWED(2026-11-07 05:33 KST).
+- #615(기존 Controller R17 통합) 승인 manifest는 **db892→f6338ee4**의 고정 **5파일**이며, R2 PR #625의 추가 A 진단 코드 controller/pc-source-readonly.mjs는 포함하지 않는다. 기존 승인서를 6파일로 읽거나 수정해서 재목적 사용하지 않는다.
+- **현재 설치가 db892라면:** 해당 5+신규 1파일의 누적 실제 변경·각 소스 SHA/승인 범위를 대조한 불변 6파일 통합 B manifest 후보를 #68 단일 적용 담당이 준비·확정.
+- **이미 f633 설치가 성공했다면:** 실제 설치 SHA/target 누적 diff에 맞춰 신규 A 파일 1개만의 범위형 후속 manifest 판단.
+- **다른 설치 SHA면:** 실제 PC 값에서 다시 누적 diff 작성. 기존 유지보수기의 Controller 파일 allowpath가 R2 A 파일을 지원하므로 별도 B 설치기/예약 불필요.
+- 다음 실PC 단계: #68 B 담당의 실제 requestId·설치 SHA·A operation 활성 확인 후 고유 A pc-source-preflight로 정적 checkout/file hash 확인, core-runtime-source-readonly의 WMI runtime 체인과 비교. 두 A의 증거 수준 혼동 금지.
+- **LAST PASS:** 소스/manifest 범위 차이와 기존 B 경로 지원을 read-only 확인. **FIRST FAIL:** 현재 실제 설치 SHA와 #68 활성 lease 미조회; R2의 실PC 진단 결과 없음. 중복 B 요청 0, 운영 수정 0.
