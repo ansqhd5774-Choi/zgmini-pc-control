@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {parseCoreTaskAction,summarizeVbsCalls} from './preflight-windows.mjs';
+import {parseCoreTaskAction,summarizeVbsCalls,issueAuth} from './preflight-windows.mjs';
 const xml=(command,args)=>`<?xml version="1.0"?><Task><Actions><Exec>
 <Command>${command}</Command><Arguments>${args}</Arguments>
 <WorkingDirectory>E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release</WorkingDirectory>
@@ -9,6 +9,32 @@ const xml=(command,args)=>`<?xml version="1.0"?><Task><Actions><Exec>
 const node=String.raw`E:\ZGmini\runtime\node.exe`;
 const script=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
 const fake={realpath:path=>path};
+test('owner-only one-shot issue auth needs exact title and four fields, no new label',()=>{
+ const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+  GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',
+  GITHUB_EVENT_ACTION:'opened',GITHUB_RUN_ATTEMPT:'1'};
+ const body={schema:'ZGMINI_CALENDAR_SOURCE_PREFLIGHT_V1',
+  requestId:'pc-calendar-11111111-1111-4111-8111-111111111111',
+  chatId:'chat-22222222-2222-4222-8222-222222222222',
+  sourceSha:'ce9bccd8b38939b204e8f836a50ae362960eb7af'};
+ const event={action:'opened',repository:{private:true,full_name:env.GITHUB_REPOSITORY},
+  sender:{login:env.GITHUB_ACTOR},issue:{number:558,
+   user:{login:env.GITHUB_ACTOR},title:'pc-calendar-source-preflight-once',
+   body:JSON.stringify(body),labels:[]}};
+ assert.equal(issueAuth({env,event}).issue,558);
+ assert.throws(()=>issueAuth({env:{...env,GITHUB_ACTOR:'intruder'},event}),
+  /CAL_B_PREFLIGHT_EVENT_STOP/);
+ assert.throws(()=>issueAuth({env,event:{...event,sender:{login:'intruder'}}}),
+  /CAL_B_PREFLIGHT_ISSUE_STOP/);
+ assert.throws(()=>issueAuth({env,event:{...event,issue:{...event.issue,title:'other'}}}),
+  /CAL_B_PREFLIGHT_ISSUE_STOP/);
+ assert.throws(()=>issueAuth({env,event:{...event,issue:{...event.issue,
+  body:JSON.stringify({...body,schema:'OTHER'})}}}),
+  /CAL_B_PREFLIGHT_REQUEST_STOP/);
+ assert.throws(()=>issueAuth({env,event:{...event,issue:{...event.issue,
+  body:JSON.stringify({...body,extra:'x'})}}}),
+  /CAL_B_PREFLIGHT_REQUEST_STOP/);
+});
 test('verifies exact active Core node+script, no mutation',()=>{
  assert.equal(parseCoreTaskAction(xml(node,`"${script}" --publish`),fake)
   .relativeEntrypoint,'scripts/pc-writer/local-cycle.mjs');
