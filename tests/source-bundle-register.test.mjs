@@ -37,14 +37,10 @@ function fixture(t){
  const host={schema:'ZGMINI_PC_HOST_V1',controllerSourceSha:INSTALLED_SHA,
    dataRoot:'E:/ZGmini/data',reserved:{preserve:'yes'},approvedSources:{['c'.repeat(40)]:{root:'old'}}};
  const hostBytes=Buffer.from(JSON.stringify(host,null,2)+'\n');
- const proposed=structuredClone(host);
- proposed.approvedSources[SOURCE_SHA]={root:stageBundle,branch:manifest.sourceBranch,
-   entrypoint:manifest.entrypoint,manifestSha256:hash(manifestBytes)};
  const approval={schema:SOURCE_BUNDLE_APPROVAL_SCHEMA,operation:SOURCE_BUNDLE_OPERATION,
    scope:'HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY',sourceRepository:manifest.sourceRepository,
    sourceSha:SOURCE_SHA,sourceBranch:manifest.sourceBranch,entrypoint:manifest.entrypoint,
-   sourceManifestSha256:hash(manifestBytes),hostOriginalSha256:hash(hostBytes),
-   hostProposedSha256:hash(Buffer.from(JSON.stringify(proposed,null,2)+'\n')),
+   sourceManifestSha256:hash(manifestBytes),
    hostPath:path.join(dir,'host.json'),installedControllerSha:INSTALLED_SHA,stageBundle};
  return {dir,manifest,manifestBytes,host,hostBytes,approval,stageBundle};
 }
@@ -56,11 +52,7 @@ function rewriteModuleAndPin(f,newCode){
  f.manifest.files[rel]=hash(newCode);
  const manifestBytes=Buffer.from(JSON.stringify(f.manifest,null,2)+'\n');
  fs.writeFileSync(path.join(f.stageBundle,'manifest.json'),manifestBytes);
- const proposed=structuredClone(f.host);
- proposed.approvedSources[SOURCE_SHA]={root:f.stageBundle,branch:f.manifest.sourceBranch,
-   entrypoint:f.manifest.entrypoint,manifestSha256:hash(manifestBytes)};
- const approval={...f.approval,sourceManifestSha256:hash(manifestBytes),
-   hostProposedSha256:hash(Buffer.from(JSON.stringify(proposed,null,2)+'\n'))};
+ const approval={...f.approval,sourceManifestSha256:hash(manifestBytes)};
  return {...f,manifestBytes,approval};
 }
 
@@ -73,10 +65,13 @@ test('sealed bundle gets single approvedSources CAS, with existing keys untouche
  assert.equal(next.approvedSources[SOURCE_SHA].manifestSha256,hash(f.manifestBytes));
  assert.equal(fs.existsSync(f.approval.hostPath),false,'candidate cannot mutate host');
 });
-test('host CAS mismatch refused',t=>{
+test('B computes host before/after hashes locally from private actual host bytes',t=>{
  const f=fixture(t);
  const mutated=Buffer.from(f.hostBytes.toString().replace('yes','no'));
- assert.throws(()=>plan({...f,hostBytes:mutated}),err('BUNDLE_APPROVAL_OR_HOST_CAS_MISMATCH'));
+ const computed=plan({...f,hostBytes:mutated});
+ assert.equal(computed.hostOriginalSha256,hash(mutated));
+ assert.equal(computed.hostProposedSha256,hash(computed.proposedHostBytes));
+ assert.equal(JSON.parse(computed.proposedHostBytes).reserved.preserve,'no');
 });
 test('unlisted staged file refused',t=>{
  const f=fixture(t);
@@ -135,7 +130,6 @@ test('approved bundle already present cannot overwrite old registration',t=>{
  const copied=structuredClone(f.host);
  copied.approvedSources[SOURCE_SHA]={root:'existing'};
  const hostBytes=Buffer.from(JSON.stringify(copied,null,2)+'\n');
- f.approval.hostOriginalSha256=hash(hostBytes);
  assert.throws(()=>plan({...f,hostBytes}),err('BUNDLE_HOST_PRECONDITION'));
 });
 test('staged directory symlink is refused',t=>{
@@ -168,17 +162,20 @@ test('Issue + B approval pin exact bytes and restrict host/staging paths',()=>{
    sourceManifestSha256:'d'.repeat(64),
    entrypoint:'scripts/pc-writer/theme-platform.mjs',installedControllerSha:INSTALLED_SHA,
    hostPath:'E:/ZGmini/automation/pc-control/host.json',
-   hostOriginalSha256:'a'.repeat(64),hostProposedSha256:'b'.repeat(64),
    stageBundle:`E:/ZGmini/automation/pc-control/source-bundles/source-${SOURCE_SHA}`,
    backupDirectory:`E:/ZGmini/automation/pc-control/backups/source-${request.requestId}`,
    approval:{grade:'B',scope:'HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY',
      ref:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/552'},
-   backup:{strategy:'VERSIONED_SNAPSHOT',rollback:'RESTORE_HOST_SHA256',
-     originalSha256:'a'.repeat(64)}};
+   backup:{strategy:'VERSIONED_SNAPSHOT',rollback:'RESTORE_HOST_SHA256'}};
  const bytes=Buffer.from(JSON.stringify(manifest));request.approvalManifestSha256=hash(bytes);
  assert.deepEqual(validateSourceBundleIssueEnvelope(request,{actor:'ansqhd5774-Choi'}),request);
  assert.equal(validateSourceBundleBApproval(request,bytes,{actor:'ansqhd5774-Choi',
    installedSha:INSTALLED_SHA}).sourceSha,SOURCE_SHA);
+ const legacy={...manifest,hostOriginalSha256:'a'.repeat(64),hostProposedSha256:'b'.repeat(64)};
+ const legacyBytes=Buffer.from(JSON.stringify(legacy));
+ assert.throws(()=>validateSourceBundleBApproval({...request,
+   approvalManifestSha256:hash(legacyBytes)},legacyBytes,
+   {actor:'ansqhd5774-Choi',installedSha:INSTALLED_SHA}),err('BUNDLE_B_APPROVAL_CONTRACT_INVALID'));
  assert.throws(()=>validateSourceBundleBApproval(request,Buffer.concat([bytes,Buffer.from(' ')]),
    {actor:'ansqhd5774-Choi',installedSha:INSTALLED_SHA}),err('BUNDLE_B_APPROVAL_BYTES_DRIFT'));
  const invalid={...manifest,hostPath:'C:/temp/host.json'};
@@ -211,6 +208,15 @@ function simulateHostApply(t,verified){
   run:()=>applyPreparedSourceBundleHostCas({plan:proposed,hostPath,
    backupDirectory:path.join(f.dir,'snapshot'),verifyAuthorizedLease:verified})};
 }
+test('on-disk host drift after local plan rejects CAS before backup or swap',t=>{
+ const s=simulateHostApply(t,()=>{});
+ const concurrent={...s.f.host,reserved:{preserve:'concurrent'}};
+ const changed=Buffer.from(JSON.stringify(concurrent,null,2)+'\n');
+ fs.writeFileSync(s.hostPath,changed);
+ assert.throws(()=>s.run(),err('BUNDLE_B_HOST_CAS_CHANGED'));
+ assert.equal(hash(fs.readFileSync(s.hostPath)),hash(changed));
+ assert.equal(fs.existsSync(s.backupDirectory),false);
+});
 test('B host CAS applies only one new source key with exact backup and readback',t=>{
  const s=simulateHostApply(t,()=>{}),result=s.run();
  assert.equal(result.status,'APPLIED');

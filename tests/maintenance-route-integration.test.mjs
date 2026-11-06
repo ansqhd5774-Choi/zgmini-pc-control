@@ -25,13 +25,11 @@ function routeFixture(t,{corruptApprovedBytes=false,operation=SOURCE_BUNDLE_OPER
   sourceManifestSha256:'d'.repeat(64),entrypoint:'scripts/pc-writer/theme-platform.mjs',
   installedControllerSha:CONTROLLER_SHA,
   hostPath:'E:/ZGmini/automation/pc-control/host.json',
-  hostOriginalSha256:'1'.repeat(64),hostProposedSha256:'2'.repeat(64),
   stageBundle:`E:/ZGmini/automation/pc-control/source-bundles/source-${SOURCE_SHA}`,
   backupDirectory:`E:/ZGmini/automation/pc-control/backups/source-${ID}`,
   approval:{grade:'B',scope:'HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY',
    ref:'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/552'},
-  backup:{strategy:'VERSIONED_SNAPSHOT',rollback:'RESTORE_HOST_SHA256',
-   originalSha256:'1'.repeat(64)}};
+  backup:{strategy:'VERSIONED_SNAPSHOT',rollback:'RESTORE_HOST_SHA256'}};
  const bytes=Buffer.from(JSON.stringify(manifest));
  const request={schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',requestId:ID,chatId:CHAT,
   operation,controlRepository:'ansqhd5774-Choi/zgmini-pc-control',

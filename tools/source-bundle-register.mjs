@@ -9,7 +9,7 @@ import {isBuiltin} from 'node:module';
 
 export const SOURCE_BUNDLE_OPERATION='pc-source-bundle-register';
 export const SOURCE_BUNDLE_SCHEMA='ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1';
-export const SOURCE_BUNDLE_APPROVAL_SCHEMA='ZGMINI_PC_SOURCE_BUNDLE_B_APPROVAL_V1';
+export const SOURCE_BUNDLE_APPROVAL_SCHEMA='ZGMINI_PC_SOURCE_BUNDLE_B_APPROVAL_V2';
 export const SOURCE_BUNDLE_ISSUE_TITLE='pc-source-bundle-register';
 export const SOURCE_BUNDLE_SCOPE='HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY';
 const SHA40=/^[a-f0-9]{40}$/;
@@ -28,8 +28,8 @@ const EXACT_ISSUE_FIELDS=['schema','requestId','chatId','operation','controlRepo
   'targetControllerSha','approvalManifestSha256'];
 const EXACT_APPROVAL_FIELDS=['schema','operation','scope','sourceRepository',
   'sourceBranch','sourceSha','sourceManifestPath','sourceManifestSha256',
-  'entrypoint','installedControllerSha','hostPath','hostOriginalSha256',
-  'hostProposedSha256','stageBundle','backupDirectory','approval','backup'];
+  'entrypoint','installedControllerSha','hostPath','stageBundle',
+  'backupDirectory','approval','backup'];
 const exactFields=(obj,keys)=>requireObject(obj)&&Object.keys(obj).length===keys.length
   &&keys.every(k=>own(obj,k));
 
@@ -65,9 +65,6 @@ export function validateSourceBundleBApproval(request,bytes,{actor,installedSha}
     ||manifest.sourceRepository!=='ansqhd5774-Choi/zgmini'
     ||!SHA40.test(manifest.sourceSha??'')
     ||!SHA256.test(manifest.sourceManifestSha256??'')
-    ||!SHA256.test(manifest.hostOriginalSha256??'')
-    ||!SHA256.test(manifest.hostProposedSha256??'')
-    ||manifest.hostOriginalSha256===manifest.hostProposedSha256
     ||manifest.installedControllerSha!==request.targetControllerSha
     ||installedSha!==request.targetControllerSha
     ||!typeofString(manifest.sourceBranch)||!typeofString(manifest.entrypoint)
@@ -85,8 +82,7 @@ export function validateSourceBundleBApproval(request,bytes,{actor,installedSha}
     ||manifest.approval.scope!==SOURCE_BUNDLE_SCOPE
     ||!/^https:\/\/github\.com\/ansqhd5774-Choi\/zgmini-pc-control\/pull\/[1-9]\d*$/.test(manifest.approval.ref??'')
     ||!requireObject(manifest.backup)||manifest.backup.strategy!=='VERSIONED_SNAPSHOT'
-    ||manifest.backup.rollback!=='RESTORE_HOST_SHA256'
-    ||manifest.backup.originalSha256!==manifest.hostOriginalSha256)
+    ||manifest.backup.rollback!=='RESTORE_HOST_SHA256')
     fail('BUNDLE_B_APPROVAL_PROTECTION_INVALID');
   return Object.freeze({...manifest});
 }
@@ -273,6 +269,9 @@ export function inspectBundleMissingImports({sourceRoot,files}){
 /** Construct an immutable, exact-source host CAS overlay; performs no writes.
  * `approval` is trusted only AFTER the independent maintainer verifies B issue
  * identity, merged approval, installed version, and allowed operation scope.
+ * Raw PC host bytes remain private. The B maintainer computes before/after
+ * digests under its own authority; the PR approves only the *single-key*
+ * transformation and exact immutable source manifest, not a guessed host hash.
  */
 export function planSourceBundleRegistration({hostBytes,manifestBytes,approval,stageBundle}){
   if(!Buffer.isBuffer(hostBytes)||!Buffer.isBuffer(manifestBytes)
@@ -284,9 +283,7 @@ export function planSourceBundleRegistration({hostBytes,manifestBytes,approval,s
     ||approval.scope!=='HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY'
     ||approval.sourceRepository!=='ansqhd5774-Choi/zgmini'
     ||!SHA40.test(approval.sourceSha??'')||!SHA256.test(approval.sourceManifestSha256??'')
-    ||!SHA256.test(approval.hostOriginalSha256??'')
-    ||!SHA256.test(approval.hostProposedSha256??'')
-    ||approval.sourceManifestSha256!==digest||approval.hostOriginalSha256!==sha256(hostBytes)
+    ||approval.sourceManifestSha256!==digest
     ||approval.stageBundle!==stageBundle)fail('BUNDLE_APPROVAL_OR_HOST_CAS_MISMATCH');
   if(!path.isAbsolute(stageBundle)||!path.isAbsolute(approval.hostPath??''))
     fail('BUNDLE_ABSOLUTE_PATH_REQUIRED');
@@ -324,12 +321,11 @@ export function planSourceBundleRegistration({hostBytes,manifestBytes,approval,s
   proposed.approvedSources[manifest.sourceSha]={root:stageBundle,branch:manifest.sourceBranch,
     entrypoint:manifest.entrypoint,manifestSha256:digest};
   const proposedHostBytes=Buffer.from(JSON.stringify(proposed,null,2)+'\n');
-  if(sha256(proposedHostBytes)!==approval.hostProposedSha256)
-    fail('BUNDLE_HOST_PROPOSED_CAS_MISMATCH');
+  const beforeSha=sha256(hostBytes),afterSha=sha256(proposedHostBytes);
+  if(beforeSha===afterSha)fail('BUNDLE_HOST_NO_EFFECT');
   return Object.freeze({operation:SOURCE_BUNDLE_OPERATION,sourceSha:manifest.sourceSha,
     stageBundle,fileCount:files.length,sourceManifestSha256:digest,
-    hostOriginalSha256:approval.hostOriginalSha256,
-    hostProposedSha256:approval.hostProposedSha256,proposedHostBytes});
+    hostOriginalSha256:beforeSha,hostProposedSha256:afterSha,proposedHostBytes});
 }
 const typeofString=x=>typeof x==='string'&&x.length>0&&x.length<=240;
 

@@ -1631,7 +1631,6 @@ async function applySourceBundleOnly(requestId,packageFile){
  need(path.resolve(path.dirname(manifest.stageBundle))===
   path.resolve(path.join(controlRoot,'source-bundles')),'BUNDLE_STAGE_ROOT_SCOPE');
  const beforeHost=fs.readFileSync(hostPath);
- need(sha256(beforeHost)===manifest.hostOriginalSha256,'BUNDLE_HOST_ORIGINAL_CHANGED');
  // Source manifest belongs to approved control main: embedding its own source
  // commit SHA inside that same source commit would create a hash fixed-point.
  const sourceManifestBytes=readR6GitHubBytes(controlRepository,manifest.sourceManifestPath,'main');
@@ -1666,8 +1665,8 @@ async function applySourceBundleOnly(requestId,packageFile){
  };
  try{
   save({status:'RUNNING',phase:'LEASE_ACQUIRED',lastPass:'SOURCE_BYTES_PINNED',
-   sourceSha:manifest.sourceSha,hostOriginalSha256:manifest.hostOriginalSha256,
-   hostProposedSha256:manifest.hostProposedSha256,
+   sourceSha:manifest.sourceSha,hostOriginalSha256:sha256(beforeHost),
+   hostProposedSha256:null,
    leaseOwnerNonce:lock.owner.nonce,leaseOwnerPid:lock.owner.pid});
   const base=path.dirname(manifest.stageBundle);
   if(!fs.existsSync(base))fs.mkdirSync(base);
@@ -1678,7 +1677,8 @@ async function applySourceBundleOnly(requestId,packageFile){
   const plan=planSourceBundleRegistration({hostBytes:beforeHost,
    manifestBytes:sourceManifestBytes,approval:manifest,stageBundle:manifest.stageBundle});
   save({status:'RUNNING',phase:'BUNDLE_STAGED',lastPass:'SEALED_FILES_VERIFIED',
-   stagedFiles:staged.fileCount});
+   stagedFiles:staged.fileCount,hostOriginalSha256:plan.hostOriginalSha256,
+   hostProposedSha256:plan.hostProposedSha256});
   const verifyAuthorizedLease=()=>{
    const live=json(path.join(maintenanceRoot,'leases/controller-install/owner.json'));
    need(live.pid===process.pid&&live.nonce===lock.owner.nonce,
@@ -1701,7 +1701,7 @@ async function applySourceBundleOnly(requestId,packageFile){
    lock.holdForRecovery();retained=true;return result;
   }
   need(sha256(fs.readFileSync(hostPath))===(applied.status==='APPLIED'
-   ?manifest.hostProposedSha256:manifest.hostOriginalSha256),
+   ?plan.hostProposedSha256:plan.hostOriginalSha256),
    'BUNDLE_HOST_POST_APPLY_CAS_FAILED');
   // No database, checkpoint, task or workflow handle is opened for writing.
   // Unlike Controller replacement, this additive host-key CAS must not block
@@ -1717,9 +1717,11 @@ async function applySourceBundleOnly(requestId,packageFile){
  }catch(error){
   const code=/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:'BUNDLE_B_PREFLIGHT_UNKNOWN';
   let hostOriginal=false;
-  try{hostOriginal=sha256(fs.readFileSync(hostPath))===manifest.hostOriginalSha256;}catch{}
+  try{hostOriginal=sha256(fs.readFileSync(hostPath))===sha256(beforeHost);}catch{}
   const attempted=fs.existsSync(manifest.backupDirectory)||modified;
-  const recovery=attempted||!hostOriginal;
+  // A concurrent host change *before* this updater's first host-write/backup
+  // is an ordinary CAS refusal, not a reason to retain the shared B lease.
+  const recovery=attempted;
   result={status:recovery?'RECOVERY_REQUIRED':'BLOCKED',code,
    firstFail:code,lastPass:hostOriginal?'HOST_BYTES_UNCHANGED':'SOURCE_BYTES_PINNED',
    actualControllerSha:installed.installedSha};
