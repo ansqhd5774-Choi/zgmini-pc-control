@@ -97,6 +97,8 @@ export async function probeHistorical({now=Date.now(),base=BASE,
   }
   requireThat(Array.isArray(members)&&members.length>=490&&members.length<=520,
     'SIP_PROBE_UNIVERSE_STOP');
+  if(universeSelection==='PREVIOUS_SAVED_DIAGNOSTIC')
+    requireThat(members.length===503,'SIP_PROBE_PREVIOUS_UNIVERSE_COUNT_STOP');
   let auth;
   try{auth=loadLocalProviders(base);}catch{
     throw failure('SIP_PROBE_PROVIDER_ENV_STOP');
