@@ -6,12 +6,13 @@
 - 전용 브랜치: codex/controller-ops-lessons-20261105
 - R1 완료 기록: #526 / R1 M0–M4 100% 보존
 - 기준: 단계마다 20%, **증명되지 않은 운영 상태를 점수에 반영하지 않음**
+- **현재 진행률: 20% (M0 DONE, M1–M4 미완료)**
 
 ## 최신 상태
 
 | 단계 | 상태 | 누적 진행률 | 이번 확인 / 남은 증거 |
 |---|---|---:|---|
-| M0 계획·기준·지침 | RUNNING | 0% (M0 완료 전) | Issue #622 생성, R2 계획·원장 저장. 최신 main 최소 지침 PR·반영 및 원격 재조회 필요 |
+| M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | READY | — | 운영 VBS 다단 래퍼 + 실제 A allowlist/source/file SHA/dirty read-only 수집 필요 |
 | M2 공통 Writer B | READY | — | 실PC 지원 확인, scope-bound manifest/수신기와 승인/백업/lease 필요 |
 | M3 실패·정상 회귀 | DEFERRED | — | M1/M2 관련 구현 후 시나리오 5개 |
@@ -31,12 +32,14 @@
 
 ### 수행·영향
 - 새 추적 Issue #622 생성.
-- 기존 프로세스 총괄 브랜치에 R2 계획을 신규 생성. 기존 R1 기록·기능 소스 수정 없음.
+- 기존 프로세스 총괄 브랜치에 R2 계획·원장을 신규 생성. 기존 R1 기록·기능 소스 수정 없음.
+- 공통 지침 수정: [PR #624](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/624) 병합, merge commit a842f4225ce062dce6ce3dc85d8e15c750ca4220. 최신 main 기준 3개 Markdown 파일만 변경(AGENTS.md, docs/GENERAL_CHAT_PREWORK.md, docs/PC_AUTOMATION_STANDARD.md). main 원격 파일 3개 내용이 PR 브랜치의 목표 본문과 정확히 일치하는 것을 확인.
+- §2 신규 기능 초기 공통 A/B 경로 매핑, §5 범위 제한 Writer B 계약, §8 반복 문제 구조 개선 기준 반영; 원담당 대리 설치·프로세스 Gate 추가 없음.
 - 새 예약·PC A/B 실행·DB/D1/운영 Writer 변경 0건.
 
 ### 다음 필수 행동
-- M0: 최신 main 기반 공통 지침 최소 변경 전용 브랜치/PR 생성·검증·병합하고 원격 정본 링크 및 SHA 기록.
-- M1과 M2 독립 계약 조사 병렬 진행, 운영 쓰기 시 승인된 단일 담당으로 직렬화.
+- M1: 기존 operation 지원·실제 PC 허용목록·VBS 다단 래퍼의 읽기 전용 진단 계약을 필요한 범위에서 대조. 최신 Controller 실제 설치 결과가 나오면 #614 거부 원인과 구분해 실PC checkout/HEAD/config.source/세 파일의 SHA/dirty를 회수한다.
+- M2: 공통 Writer B의 기존 자산·승인 범위와 3파일 manifest 수신 경로를 병렬 준비한다. 실제 운영 쓰기는 기존 #68의 단일 담당/lease로만 진행한다.
 
 ### 명시적 미확인
 - 현재 Controller/PC Writer 설치 SHA와 실제 Core 승인 source는 본 실행에서 새로 조회하지 않음.
