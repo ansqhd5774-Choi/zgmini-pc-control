@@ -27,29 +27,40 @@ test('fixed bounded file returns only exact bytes without writing',t=>{
  assert.equal(before.size,after.size);
  assert.equal(before.mtimeMs,after.mtimeMs);
 });
-test('missing, empty, oversized, symlink and root escapes cannot be read',t=>{
+test('missing, empty and oversized files cannot be read',t=>{
  const f=fixture(t);
  assert.deepEqual(f.read(),{ok:false,reason:'MISSING'});
  fs.writeFileSync(f.file,'');
  assert.equal(f.read().reason,'SIZE_INVALID');
  fs.writeFileSync(f.file,'x'.repeat(2049));
  assert.equal(f.read().reason,'SIZE_INVALID');
- fs.unlinkSync(f.file);
+});
+test('outside-root and relative paths cannot be read',t=>{
+ const f=fixture(t);
+ const privateFile=path.join(f.outside,'private.json');
+ fs.writeFileSync(privateFile,'PRIVATE_CREDENTIAL_DO_NOT_LEAK');
+ const result=readFixedReadonlyBytes(privateFile,{
+  verifiedRoot:f.allowed,maxBytes:2048});
+ assert.deepEqual(result,{ok:false,reason:'UNSAFE_FILE'});
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_CREDENTIAL/);
+ assert.equal(readFixedReadonlyBytes('relative.json',{
+  verifiedRoot:f.allowed,maxBytes:2048}).reason,'UNSAFE_FILE');
+});
+test('symlinks cannot read outside-root private files',t=>{
+ const f=fixture(t);
  const privateFile=path.join(f.outside,'private.json');
  fs.writeFileSync(privateFile,'PRIVATE_CREDENTIAL_DO_NOT_LEAK');
  try{fs.symlinkSync(privateFile,f.file);}
  catch(error){
-  if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code))return;
+  if(process.platform==='win32'&&['EPERM','EACCES'].includes(error.code)){
+   t.skip(`SYMLINK_UNVERIFIED: Windows symlink creation denied (${error.code})`);
+   return;
+  }
   throw error;
  }
  const symlink=f.read();
  assert.deepEqual(symlink,{ok:false,reason:'UNSAFE_FILE'});
  assert.doesNotMatch(JSON.stringify(symlink),/PRIVATE_CREDENTIAL/);
- fs.unlinkSync(f.file);
- assert.deepEqual(readFixedReadonlyBytes(privateFile,{
-  verifiedRoot:f.allowed,maxBytes:2048}),{ok:false,reason:'UNSAFE_FILE'});
- assert.equal(readFixedReadonlyBytes('relative.json',{
-  verifiedRoot:f.allowed,maxBytes:2048}).reason,'UNSAFE_FILE');
 });
 test('rejects short read and changed inode before exposing bytes',t=>{
  const f=fixture(t);fs.writeFileSync(f.file,'{"safe":true}');
