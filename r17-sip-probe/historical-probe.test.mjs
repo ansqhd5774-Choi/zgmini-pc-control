@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorize,probeHistorical,sanitizeProbeResult,uploadProbe,claimOnce} from './historical-probe.mjs';
+import {authorize,probeHistorical,sanitizeProbeResult,uploadProbe,claimOnce,
+  loadProbeModules,recheckInstalledSource} from './historical-probe.mjs';
 
 const requestId='r17-sip-historical-'+'a'.repeat(32);
 const sourceSha='cf43e65bbf72f56b70a52bc5a650a0cb5682b6bc';
@@ -23,9 +24,15 @@ function fixture(options={}){
   const urls=[];const calls=[];
   return {urls,calls,
     dependencies:{now:Date.parse('2026-11-06T15:00:00Z'),base:'/fixture',
-      storedUniverse:(base,date)=>{assert.equal(base,'/fixture');assert.equal(date,'2026-11-05');return members;},
-      loadLocalProviders:()=>({APCA_API_KEY_ID:'PRIVATE',APCA_API_SECRET_KEY:'SECRET'}),
-      createQuotaFetch:({mode,originalFetch})=>{assert.equal(mode,'enforce');return {fetch:originalFetch};},
+      storedUniverse:(base,date)=>{assert.equal(base,'/fixture');assert.equal(date,'2026-11-05');
+        if(options.universeError)throw Error(options.universeError);
+        return members;},
+      loadLocalProviders:()=>{if(options.providerError)throw Error(options.providerError);
+        return {APCA_API_KEY_ID:'PRIVATE',APCA_API_SECRET_KEY:'SECRET'};},
+      createQuotaFetch:({mode,originalFetch})=>{assert.equal(mode,'enforce');
+        if(options.quotaError)throw Error(options.quotaError);
+        if(options.quotaEmpty)return {};
+        return {fetch:originalFetch};},
       fetchImpl:async(input)=>{urls.push(input);return {status:200,ok:true};},
       fetchIexWindow:async input=>{
         calls.push(input);assert.equal(input.feed,'sip');
@@ -72,6 +79,50 @@ test('before historical 16-minute delay no providers are queried',async()=>{
   const f=fixture();f.dependencies.now=Date.parse('2026-11-06T14:45:59Z');
   await assert.rejects(()=>probeHistorical(f.dependencies),/SIP_PROBE_HISTORICAL_NOT_YET_DELAYED/);
   assert.equal(f.calls.length,0);
+});
+test('missing 11/05 universe is a precise allowlisted code with zero provider calls',async()=>{
+  const f=fixture({universeError:'US_PROVISIONAL_UNIVERSE_MISSING'});
+  await assert.rejects(()=>probeHistorical(f.dependencies),{
+    safeCode:'US_PROVISIONAL_UNIVERSE_MISSING'});
+  assert.equal(f.calls.length,0);
+});
+test('DB missing and universe invalid retain only safe codes, unknown error is redacted',async()=>{
+  for(const code of ['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_INVALID']){
+    const f=fixture({universeError:code});
+    await assert.rejects(()=>probeHistorical(f.dependencies),{safeCode:code});
+    assert.equal(f.calls.length,0);
+  }
+  const f=fixture({universeError:'sensitive SQL path E:\\ZGmini\\...'});
+  let error;try{await probeHistorical(f.dependencies);}catch(e){error=e;}
+  assert.equal(error.safeCode,'SIP_PROBE_UNIVERSE_READ_STOP');
+  assert.ok(!String(error).includes('E:\\ZGmini'));
+});
+test('provider env loader failure is categorized without exposing provider key',async()=>{
+  const f=fixture({providerError:'API SECRET HEADER!'});
+  await assert.rejects(()=>probeHistorical(f.dependencies),{
+    safeCode:'SIP_PROBE_PROVIDER_ENV_STOP'});
+  assert.equal(f.calls.length,0);
+});
+test('quota initialization failure is categorized before network calls',async()=>{
+  const f=fixture({quotaError:'quota ledger path contents...'});
+  await assert.rejects(()=>probeHistorical(f.dependencies),{
+    safeCode:'SIP_PROBE_QUOTA_INIT_STOP'});
+  assert.equal(f.calls.length,0);
+  const empty=fixture({quotaEmpty:true});
+  await assert.rejects(()=>probeHistorical(empty.dependencies),{
+    safeCode:'SIP_PROBE_QUOTA_INIT_STOP'});
+  assert.equal(empty.calls.length,0);
+});
+test('installed import failure uses a fixed stage code without dynamic path/stack',async()=>{
+  let error;try{await loadProbeModules(async()=>{throw Error('file:///private/path');});}
+  catch(e){error=e;}
+  assert.equal(error.safeCode,'SIP_PROBE_MODULE_IMPORT_STOP');
+  assert.ok(!String(error).includes('/private/path'));
+});
+test('second installed-source preflight exception is bounded without leaking paths',()=>{
+  assert.throws(()=>recheckInstalledSource(()=>{throw Error('E:\\private\\file');}),{
+    safeCode:'SIP_PROBE_SOURCE_RECHECK_STOP'});
+  assert.equal(recheckInstalledSource(()=>true),true);
 });
 test('HTTP 403 yields a bounded error without secrets/raw prices',async()=>{
   const f=fixture({error:'US_PROVISIONAL_HTTP_403'});

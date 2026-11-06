@@ -75,18 +75,31 @@ export async function probeHistorical({now=Date.now(),base=BASE,
   storedUniverse,loadLocalProviders,createQuotaFetch,fetchIexWindow,
   calculateUsSipPremarket,validUsSipPremarket,fetchImpl=fetch}={}){
   requireThat(now>=EARLIEST,'SIP_PROBE_HISTORICAL_NOT_YET_DELAYED');
-  const members=storedUniverse(base,PRIOR); // Existing DB access is read-only.
+  let members;
+  try{members=storedUniverse(base,PRIOR);}catch(error){
+    // Explicit known read-only DB/universe codes only. Never serialize SQL or paths.
+    const known=['US_PROVISIONAL_DB_MISSING','US_PROVISIONAL_UNIVERSE_MISSING',
+      'US_PROVISIONAL_UNIVERSE_INVALID'];
+    throw failure(known.includes(error?.message)?error.message:
+      'SIP_PROBE_UNIVERSE_READ_STOP');
+  }
   requireThat(Array.isArray(members)&&members.length>=490&&members.length<=520,
     'SIP_PROBE_UNIVERSE_STOP');
-  const auth=loadLocalProviders(base); // Never serialize or log provider tokens.
+  let auth;
+  try{auth=loadLocalProviders(base);}catch{
+    throw failure('SIP_PROBE_PROVIDER_ENV_STOP');
+  } // Never serialize or log provider tokens.
   requireThat(auth?.APCA_API_KEY_ID&&auth?.APCA_API_SECRET_KEY,
     'SIP_PROBE_CREDENTIALS_MISSING');
   let providerCalls=0;
-  const guarded=createQuotaFetch({base,mode:'enforce',originalFetch:async(url,init)=>{
-    requireThat(providerCalls<BUDGET,'SIP_PROBE_BUDGET_STOP');
-    providerCalls++;
-    return fetchImpl(url,init);
-  }}).fetch;
+  let guarded;
+  try{guarded=createQuotaFetch({base,mode:'enforce',originalFetch:async(url,init)=>{
+      requireThat(providerCalls<BUDGET,'SIP_PROBE_BUDGET_STOP');
+      providerCalls++;
+      return fetchImpl(url,init);
+    }}).fetch;
+  }catch{throw failure('SIP_PROBE_QUOTA_INIT_STOP');}
+  requireThat(typeof guarded==='function','SIP_PROBE_QUOTA_INIT_STOP');
   try{
     const reference=await fetchIexWindow({symbols:members,timeframe:'1Day',
       feed:'sip',start:PRIOR+'T00:00:00Z',end:OBSERVATION+'T00:00:00Z',
@@ -259,15 +272,29 @@ export async function uploadProbe({event,env,raw,api=fetch}){
   return {status:report.status,code:report.code,created,verified};
 }
 
+export async function loadProbeModules(src){
+  let collector,providers,quota,sip;
+  try{[collector,providers,quota,sip]=await Promise.all([
+      src('scripts/pc-writer/us-breadth-provisional-cycle.mjs'),
+      src('scripts/pc-writer/local-env.mjs'),
+      src('scripts/pc-writer/quota-fetch.mjs'),
+      src('lib/market-breadth/us-premarket-sip-r1.mjs'),
+    ]);
+  }catch{throw failure('SIP_PROBE_MODULE_IMPORT_STOP');}
+  return {collector,providers,quota,sip};
+}
+
+export function recheckInstalledSource(verify=verifyInstalledSource){
+  try{return verify();}catch(error){
+    throw failure(CODE.test(error?.safeCode??'')?
+      error.safeCode:'SIP_PROBE_SOURCE_RECHECK_STOP');
+  }
+}
+
 async function realProbe(){
-  verifyInstalledSource();
+  recheckInstalledSource();
   const src=async name=>import(pathToFileURL(fileAt(name)).href);
-  const [collector,providers,quota,sip]=await Promise.all([
-    src('scripts/pc-writer/us-breadth-provisional-cycle.mjs'),
-    src('scripts/pc-writer/local-env.mjs'),
-    src('scripts/pc-writer/quota-fetch.mjs'),
-    src('lib/market-breadth/us-premarket-sip-r1.mjs'),
-  ]);
+  const {collector,providers,quota,sip}=await loadProbeModules(src);
   return probeHistorical({storedUniverse:collector.storedUniverse,
     fetchIexWindow:collector.fetchIexWindow,
     loadLocalProviders:providers.loadLocalProviders,
