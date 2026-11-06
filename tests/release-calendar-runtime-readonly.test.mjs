@@ -234,6 +234,7 @@ test('read-only KST response status buckets reveal response outcomes and exact d
  assert.equal(obs.observedMaxDailyRequests,30);
  assert.equal(obs.duplicateHostLogLines,1);
  assert.equal(obs.statusInvalidEvents,0);
+ assert.equal(obs.statusCoverage,'BOUNDED_LOG');
  assert.deepEqual(obs.observedStatusDays,[
   {kstDate:'2026-11-06',counts:'22,3,2,2,1,0,1'}
  ]);
@@ -252,6 +253,7 @@ test('missing or malformed wrapper statuses do not change request counts or impl
  assert.equal(obs.status,'OBSERVED');
  assert.equal(obs.observedMaxDailyRequests,5);
  assert.equal(obs.statusInvalidEvents,3);
+ assert.equal(obs.statusCoverage,'PARTIAL');
  assert.match(obs.statusEvidenceLevel,/NOT_PROVIDER_GET_POLICY_PROOF/);
  assert.equal(obs.observedStatusDays[0].counts,'0,0,0,0,0,0,0');
 });
