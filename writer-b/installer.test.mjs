@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sha256,APPROVAL_SCHEMA,SCOPE,SOURCE_REPO} from './contract.mjs';
+import {sha256,authorizeWriterBIssue,APPROVAL_SCHEMA,SCOPE,SOURCE_REPO,
+ REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE} from './contract.mjs';
 import {performWriterBInstall,verifyWriterBPreimage,
   verifyWriterBCandidate,verifyPreparedWriterCommit} from './installer.mjs';
 
@@ -29,8 +30,23 @@ function manifest(){
   allowTaskDefinitionChanges:false,allowOtherSourceChanges:false,
  };
 }
-const auth=()=>({manifest:manifest(),manifestSha256:'e'.repeat(64),
- requestId:RID,registeredB:true,exactOneShot:true});
+const auth=()=>{
+ const bytes=Buffer.from(JSON.stringify(manifest()));
+ return authorizeWriterBIssue({
+  manifestBytes:bytes,
+  env:{GITHUB_REPOSITORY:CONTROL_REPO,GITHUB_EVENT_NAME:'issues',
+   GITHUB_EVENT_ACTION:'opened',GITHUB_ACTOR:'ansqhd5774-Choi',
+   GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40)},
+  event:{repository:{full_name:CONTROL_REPO,private:true},
+   sender:{login:'ansqhd5774-Choi'},issue:{user:{login:'ansqhd5774-Choi'},
+    title:ISSUE_TITLE,number:777,labels:[{name:ISSUE_LABEL}],
+    body:JSON.stringify({schema:REQUEST_SCHEMA,requestId:RID,
+     chatId:'11234567-89ab-4cde-8fab-1123456789ab',operation:OPERATION,
+     controlRepository:CONTROL_REPO,
+     approvalManifestPath:'approvals/writer-updates/inflation19-20261107.json',
+     approvalManifestSha256:sha256(bytes)})}},
+ });
+};
 const map=(m,k)=>Object.fromEntries(m.map(x=>[x.path,x[k]]));
 
 function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
@@ -89,6 +105,15 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
  };
  return {io,state};
 }
+
+test('B coordinator rejects forged registration flags before lock or other I/O',async()=>{
+ const {io,state}=mockIO();
+ await assert.rejects(performWriterBInstall({manifest:manifest(),
+  manifestSha256:'e'.repeat(64),requestId:RID,
+  registeredB:true,exactOneShot:true},io),
+ {code:'WRITER_B_UNVERIFIED_ISSUE_STOP'});
+ assert.deepEqual(state.steps,[]);
+});
 
 test('preimage compares actual 3-file SHA and scoped dirty, ignoring unrelated dirty',()=>{
  const m=manifest(),{io,state}=mockIO({otherDirty:true});
