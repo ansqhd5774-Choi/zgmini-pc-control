@@ -58,7 +58,7 @@ function launcherText(bytes){
 export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpathSync.native(p),
  read=p=>fs.readFileSync(p),dirtyPaths=[]}={}){
  const unavailable=code=>({status:'STATE_UNKNOWN',code,complete:false,
-  directory:'scripts/pc-writer',files:[],totalBytes:0});
+  directory:'scripts/pc-writer',files:[],issues:[],totalBytes:0});
  const dir=path.join(sourceRoot,'scripts','pc-writer');
  let canonical;
  try{
@@ -70,35 +70,46 @@ export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpath
  let names;
  try{
   const all=fs.readdirSync(dir);
-  const mjs=all.filter(x=>/\.mjs$/i.test(x));
-  if(mjs.some(x=>!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.mjs$/i.test(x)))
-   return unavailable('WRITER_SOURCE_FILENAME_UNVERIFIED');
-  names=mjs.sort();
+  names=all.filter(x=>/\.mjs$/i.test(x)).sort();
  }
  catch{return unavailable('WRITER_SOURCE_DIRECTORY_UNREADABLE');}
  if(names.length>writerInventoryLimit.files)return unavailable('WRITER_SOURCE_FILE_COUNT_LIMIT');
  const dirty=new Set(dirtyPaths);
- const files=[];let totalBytes=0;
+ const files=[],issues=[];let totalBytes=0;
  for(const name of names){
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.mjs$/i.test(name)){
+   // An unsafe name is not echoed or opened, but must not hide safe siblings.
+   issues.push({code:'WRITER_SOURCE_FILENAME_UNVERIFIED'});
+   continue;
+  }
   const p=path.join(dir,name);
+  const relative='scripts/pc-writer/'+name;
   try{
    const lstat=fs.lstatSync(p),canonicalFile=realpath(p);
    if(!lstat.isFile()||lstat.isSymbolicLink()||
-       canonicalFile.toLowerCase()!==path.resolve(p).toLowerCase()||
-       lstat.size>writerInventoryLimit.fileBytes)
-    return unavailable('WRITER_SOURCE_FILE_UNVERIFIED');
+       canonicalFile.toLowerCase()!==path.resolve(p).toLowerCase()){
+    issues.push({path:relative,code:'WRITER_SOURCE_FILE_UNVERIFIED'});
+    continue;
+   }
+   if(lstat.size>writerInventoryLimit.fileBytes){
+    issues.push({path:relative,code:'WRITER_SOURCE_FILE_BYTES_LIMIT'});
+    continue;
+   }
    totalBytes+=lstat.size;
    if(totalBytes>writerInventoryLimit.totalBytes)
     return unavailable('WRITER_SOURCE_TOTAL_BYTES_LIMIT');
    const bytes=read(p);
-   if(!Buffer.isBuffer(bytes)||bytes.length!==lstat.size)
-    return unavailable('WRITER_SOURCE_FILE_READ_MISMATCH');
-   const relative='scripts/pc-writer/'+name;
+   if(!Buffer.isBuffer(bytes)||bytes.length!==lstat.size){
+    issues.push({path:relative,code:'WRITER_SOURCE_FILE_READ_MISMATCH'});
+    continue;
+   }
    files.push({path:relative,sha256:sha256(bytes),trackedDirty:dirty.has(relative)});
-  }catch{return unavailable('WRITER_SOURCE_FILE_UNAVAILABLE');}
+  }catch{issues.push({path:relative,code:'WRITER_SOURCE_FILE_UNAVAILABLE'});}
  }
- return {status:'PASS',code:'WRITER_SOURCE_INVENTORY_COMPLETE',complete:true,
-  directory:'scripts/pc-writer',files,totalBytes};
+ const complete=issues.length===0;
+ return {status:complete?'PASS':'PARTIAL',
+  code:complete?'WRITER_SOURCE_INVENTORY_COMPLETE':'WRITER_SOURCE_INVENTORY_PARTIAL',
+  complete,directory:'scripts/pc-writer',files,issues,totalBytes};
 }
 
 /** Injectable dependencies keep fixture tests independent from a real Windows PC. */
