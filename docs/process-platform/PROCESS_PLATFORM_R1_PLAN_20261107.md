@@ -112,3 +112,12 @@
 - 해당 승인 목표 → 공통 관측 [Draft PR #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) `e27be6d…`: Controller 3파일. 기존 1파일 승인 명세로 합쳐서 설치할 수 없고, #68 기존 단일 B 담당 및 정확한 새 설치 SHA 기준으로 순차 조정한다.
 - 현행 A/기존 Windows workflow는 미설치 PR #537 코드를 실행하지 않으므로 Windows fixture는 `WINDOWS_SMOKE_PENDING`. 테스트의 Windows symlink 권한거부가 초록색 PASS로 숨지 않도록 `t.skip`/root 탈출 독립 검사로 보정했고 Linux Node 24 집중 21/21 PASS(Windows 증거 아님).
 - 공유 설치의 백업·복구 계약은 최신 main의 `maintenance-contract`/ `maintenance-apply`/ `interrupted-rollback` 격리 소스 테스트를 **Linux Node v24.22.1에서 34/34 PASS**(정규 updater 전체 소스 정적 검사 1건 제외). 실PC/Windows 복구 시험은 아님. 다음은 승인된 Windows 격리 경로, #535 실제 적용 확인, #537 3파일 정확 manifest/검증이다. 증거·제외 범위는 [실행 원장 §8](PROCESS_PLATFORM_R1_LOG_20261107.md) 참고. **M3·M4 미완료 / 60% 유지**.
+
+## 12. M3 배포 기준 전진 (2026-11-07 KST)
+
+- 이전 1파일 승인 설치는 정규 [B #538](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/538#issuecomment-6691090423)에서 실제 **SUCCEEDED**. Controller `af016444b2f87f11cd468428d9235cfc257d317d`, 보호 상태·workflow·결과 회수 PASS. 이전 1파일 병목 해소는 원담당/단일 설치자의 실제 성과로 보존한다.
+- 남은 공통 변경은 [PR #537](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/537) `e27be6d…`의 **3파일**이며, 정확한 파일 경로·raw SHA-256·원격 바이트 일치·권한/검증 상태는 [M3 배포 후보](M3_537_CONTROLLER_DELTA_CANDIDATE_20261107.md)로 분리. 기존 B manifest 재사용 금지.
+- 기존 A [#540](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/540)은 원담당이 이미 접수하여 중복 발행 안 함. #68에도 [후보 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6691257448) 기록. 수신·적용 자동 완료를 주장하지 않는다.
+- **현재 핵심 미해결:** #537 Windows 개발 fixture를 안전하게 실행할 기존 승인 수단 미확인. SHA/임시 경로만으로 보안 격리를 보장하지 않으므로 최소 권한 별도 실행 경로가 확인되기 전에는 운영 Windows 시험 PASS/설치 완료로 승격하지 않는다.
+
+**프로젝트 60% 유지, M3 RUNNING/M4 DEFERRED.** 다음 실행: #537의 정확한 개발 source에 대한 단회 Windows 시험 수단을 기존 승인 경로에서 확인·준비하고, 승인 manifest 및 현재 실제 설치 SHA를 맞춰 #68 담당에 인계. 검증 목적의 중복 B/A나 미래 예약은 만들지 않는다.
