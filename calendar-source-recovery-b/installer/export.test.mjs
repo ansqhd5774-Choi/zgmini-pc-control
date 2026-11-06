@@ -81,14 +81,14 @@ test('Git HEAD, exact root and per-file provenance are collected',()=>withFixtur
  assert.throws(()=>inspectGit(dir,FILES,wrong),/CAL_SOURCE_B_GIT_HEAD_STOP/);
 }));
 
-test('draft approval is sha-pinned and fail-closed until actual B approval',()=>{
+test('approved B manifest is sha-pinned and tampered status fails closed',()=>{
  const bytes=fs.readFileSync(new URL('../approval.json',import.meta.url));
  assert.equal(sha(bytes),APPROVAL_SHA);
- assert.throws(()=>verifyApproval(bytes),/CAL_SOURCE_B_APPROVAL_SCOPE_STOP/);
+ assert.equal(verifyApproval(bytes).sourceRoot,SOURCE_ROOT);
  const m=JSON.parse(bytes);
- m.status='APPROVED_B_SOURCE_READONLY_EXPORT_ONCE';
- assert.equal(verifyApproval(Buffer.from(JSON.stringify(m)),
-  sha(Buffer.from(JSON.stringify(m)))).sourceRoot,SOURCE_ROOT);
+ m.status='DRAFT_REQUIRES_EXACT_B_APPROVAL';
+ assert.throws(()=>verifyApproval(Buffer.from(JSON.stringify(m)),
+  sha(Buffer.from(JSON.stringify(m)))),/CAL_SOURCE_B_APPROVAL_SCOPE_STOP/);
  assert.throws(()=>verifyApproval(Buffer.from(JSON.stringify(m))),
   /CAL_SOURCE_B_APPROVAL_SHA_STOP/);
 });
