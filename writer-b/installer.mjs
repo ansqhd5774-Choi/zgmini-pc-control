@@ -12,6 +12,22 @@ const sameKeys=(map,keys)=>object(map)&&Object.keys(map).length===keys.length&&
   keys.every(x=>Object.hasOwn(map,x));
 const samePaths=(actual,expected)=>Array.isArray(actual)&&actual.length===expected.length&&
   actual.every(x=>expected.includes(x))&&new Set(actual).size===actual.length;
+// Only these exact upstream R17 shared-lock/one-shot claim errors are allowed
+// through the generic Writer B result contract. No arbitrary upstream codes
+// or untrusted Error.message text may reach GitHub result evidence.
+const SHARED_CLAIM_CODES=Object.freeze({
+ R17_B_SHARED_INSTALL_BUSY_NOOP_STOP:'WRITER_B_SHARED_INSTALL_BUSY_NOOP_STOP',
+ R17_B_REQUEST_ALREADY_CLAIMED_STOP:'WRITER_B_REQUEST_ALREADY_CLAIMED_STOP',
+ R17_B_SHARED_INSTALL_LOCK_STOP:'WRITER_B_SHARED_INSTALL_LOCK_STOP',
+ R17_B_SHARED_LOCK_DRIFT_STOP:'WRITER_B_SHARED_LOCK_DRIFT_STOP',
+ R17_B_CLAIM_INITIALIZATION_STOP:'WRITER_B_CLAIM_INITIALIZATION_STOP',
+});
+function publicErrorCode(error,fallback){
+ const code=error?.code;
+ if(typeof code!=='string')return fallback;
+ return /^WRITER_B_[A-Z0-9_]+$/.test(code)?code:
+  (Object.hasOwn(SHARED_CLAIM_CODES,code)?SHARED_CLAIM_CODES[code]:fallback);
+}
 
 export function verifyWriterBPreimage(manifest,preimage){
  validateWriterBManifest(manifest);
@@ -131,8 +147,7 @@ export async function performWriterBInstall(auth,io){
   result={status:'WRITER_B_INSTALLED_VERIFIED',sourceSha:prepared.sha,
     requestId:auth.requestId,changedPaths:manifest.files.map(x=>x.path)};
  }catch(error){
-  const code=/^WRITER_B_[A-Z0-9_]+$/.test(error?.code??'')?
-    error.code:'WRITER_B_ADAPTER_UNEXPECTED_STOP';
+  const code=publicErrorCode(error,'WRITER_B_ADAPTER_UNEXPECTED_STOP');
   if(!claimed){
    result={status:'WRITER_B_PREFLIGHT_STOP',code,requestId:auth.requestId};
   }else{
@@ -155,10 +170,10 @@ export async function performWriterBInstall(auth,io){
  }finally{
   if(acquired){
    try{await io.releaseSharedWriterLock({requestId:auth.requestId,retain});}
-   catch{
+   catch(error){
     // A missing release confirmation is never a verified successful install.
     result={status:'WRITER_B_RECOVERY_REQUIRED',
-      code:'WRITER_B_LOCK_FINALIZE_STOP',requestId:auth.requestId,
+      code:publicErrorCode(error,'WRITER_B_LOCK_FINALIZE_STOP'),requestId:auth.requestId,
       recovery:'READ_ONLY_RECONCILE_LOCK_AND_SOURCE'};
    }
   }

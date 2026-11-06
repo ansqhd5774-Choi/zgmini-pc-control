@@ -171,6 +171,44 @@ test('wrong candidate hash refuses before claim without touching PC source',asyn
  assert.equal(state.claimed,false);assert.equal(state.head,manifest().baseHead);
 });
 
+test('known R17 shared lock busy and one-shot replay remain distinguishable, no PC mutation',async()=>{
+ for(const [upstream,publicCode] of [
+  ['R17_B_SHARED_INSTALL_BUSY_NOOP_STOP','WRITER_B_SHARED_INSTALL_BUSY_NOOP_STOP'],
+  ['R17_B_REQUEST_ALREADY_CLAIMED_STOP','WRITER_B_REQUEST_ALREADY_CLAIMED_STOP'],
+  ['R17_B_SHARED_INSTALL_LOCK_STOP','WRITER_B_SHARED_INSTALL_LOCK_STOP'],
+ ]){
+  const {io,state}=mockIO();
+  io.acquireSharedWriterLock=async()=>{
+   throw Object.assign(new Error('nonpublic detail'),{code:upstream});
+  };
+  const result=await performWriterBInstall(auth(),io);
+  assert.equal(result.status,'WRITER_B_PREFLIGHT_STOP');
+  assert.equal(result.code,publicCode);
+  assert.equal(state.claimed,false);
+  assert.equal(state.head,manifest().baseHead);
+  assert.equal(state.coreEnabled,true);
+ }
+});
+
+test('claim init/lock drift retain exact bounded diagnostics; unknown upstream stays generic',async()=>{
+ for(const [upstream,expected] of [
+  ['R17_B_CLAIM_INITIALIZATION_STOP','WRITER_B_CLAIM_INITIALIZATION_STOP'],
+  ['R17_B_SHARED_LOCK_DRIFT_STOP','WRITER_B_SHARED_LOCK_DRIFT_STOP'],
+  ['R17_B_UNREVIEWED_INTERNAL','WRITER_B_ADAPTER_UNEXPECTED_STOP'],
+ ]){
+  const {io,state}=mockIO();
+  io.claimRequest=async()=>{
+   throw Object.assign(new Error('private error message'),{code:upstream});
+  };
+  const result=await performWriterBInstall(auth(),io);
+  assert.equal(result.status,'WRITER_B_PREFLIGHT_STOP');
+  assert.equal(result.code,expected);
+  assert.equal(state.head,manifest().baseHead);
+  assert.equal(state.released,true);
+  assert.equal(state.steps.includes('pause'),false);
+ }
+});
+
 test('partially switched source is restored with exact previous source/config',async()=>{
  const {io,state}=mockIO({failAt:'switch'});
  const result=await performWriterBInstall(auth(),io);
@@ -218,6 +256,18 @@ test('unverified lock finalize never yields a successful install status',async()
  assert.equal(result.status,'WRITER_B_RECOVERY_REQUIRED');
  assert.equal(result.code,'WRITER_B_LOCK_FINALIZE_STOP');
  assert.equal(state.released,true);
+});
+
+test('release lock owner drift cannot claim install verified and keeps exact error',async()=>{
+ const {io}=mockIO();
+ io.releaseSharedWriterLock=async()=>{
+  throw Object.assign(new Error('nonpublic lock owner detail'),
+   {code:'R17_B_SHARED_LOCK_DRIFT_STOP'});
+ };
+ const result=await performWriterBInstall(auth(),io);
+ assert.equal(result.status,'WRITER_B_RECOVERY_REQUIRED');
+ assert.equal(result.code,'WRITER_B_SHARED_LOCK_DRIFT_STOP');
+ assert.equal(result.recovery,'READ_ONLY_RECONCILE_LOCK_AND_SOURCE');
 });
 
 test('enable returned without actually enabling: rollback re-enables task after source restoration',async()=>{
