@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {authorizeSipInstall,digest} from './r17-sip-b-auth.mjs';
 import {sanitizeSipReport} from './r17-sip-b-install-upload.mjs';
-import {runWindowsInstall,coreQuietForTarget} from './r17-sip-b-install-windows.mjs';
+import {runWindowsInstall,coreQuietForTarget,preserveResultAfterJournal}
+  from './r17-sip-b-install-windows.mjs';
 
 const bytes=fs.readFileSync(new URL('./R17_SIP_B_SCOPE_DRAFT.json',import.meta.url));
 const requestId='pc-r17-12345678-1234-4123-8123-123456789abc';
@@ -82,4 +83,12 @@ test('Core source/config target pair cannot re-enable while a process or lock re
   assert.equal(coreQuietForTarget({...quiet,relatedProcesses:1},false),false);
   assert.equal(coreQuietForTarget({...quiet,unknownProcessLines:1},false),false);
   assert.equal(coreQuietForTarget({...quiet,state:4},false),false);
+});
+
+test('post-install journal failure cannot falsify a verified PC installation result',()=>{
+  const result={status:'SIP_B_INSTALLED_VERIFIED',sourceSha:'f'.repeat(40),requestId};
+  const warning=[];
+  assert.equal(preserveResultAfterJournal(result,()=>{throw Error('IO_FAIL')},
+    ()=>warning.push('SIP_B_JOURNAL_APPEND_UNVERIFIED')),result);
+  assert.deepEqual(warning,['SIP_B_JOURNAL_APPEND_UNVERIFIED']);
 });
