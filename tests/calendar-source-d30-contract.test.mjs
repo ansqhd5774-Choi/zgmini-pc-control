@@ -14,6 +14,15 @@ const proof = {
   evidenceRequestId: 'fixture-not-a-real-pc-result',
 };
 
+test('three-file install target pins the post-race-fix collector exactly', () => {
+  const [calendar, collector, writer] = D30_INSTALL_CONTRACT.operationalFiles;
+  assert.equal(D30_INSTALL_CONTRACT.operationalFiles.length, 3);
+  assert.equal(calendar.targetBlob, '4530407da60f17373906222686c7c2351730f1ae');
+  assert.equal(collector.targetBlob, '4abf15cf8ef0763b0107e921d5fe36acc22e1e15');
+  assert.equal(collector.targetSha256, 'd3a44b963b2396a002e317b4583ca2546e6409aacba8162b089b653aef9bec4a');
+  assert.equal(writer.targetBlob, '0d3c0a18863f79304fceb5fea6367bec4ecd186a');
+});
+
 function fixture() {
   return {
     activeCore: { ...proof },
