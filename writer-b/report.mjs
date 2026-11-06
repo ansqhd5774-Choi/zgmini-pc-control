@@ -100,15 +100,23 @@ export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
   }catch{/* Ambiguous PUT must never automatically retry. */}
   if(await readback(apiFetch,url,headers,content))verified++;
  }
+ // The Windows installer may have succeeded locally, but a partial/unknown
+ // remote evidence pair is NOT a verified GitHub installation record.
+ // Never misreport delivery failure as installer rollback or auto-retry.
+ const deliveryStatus=verified===2?'RESULT_PAIR_READBACK_VERIFIED':
+  'RESULT_DELIVERY_UNVERIFIED';
+ const publicStatus=verified===2?result.status:'WRITER_B_STATE_UNKNOWN';
+ const publicCode=verified===2?result.code:'WRITER_B_RESULT_PAIR_READBACK_STOP';
  const comment=`<!-- zgmini-writer-b-install:${req.requestId} -->\n`+
-  `Writer B: **${result.status}** (${result.code})\n`+
+  `Writer B evidence: **${publicStatus}** (${publicCode})\n`+
+  `DELIVERY: ${deliveryStatus}\n`+
   `RESULT_CREATED: ${created}/2; RESULT_READBACK: ${verified}/2\n`+
   `RUN_ID: ${result.runId??'UNKNOWN'}; RETRY: NO_REEXECUTE\n`;
  const reply=await apiFetch(
   `https://api.github.com/repos/${CONTROL_REPO}/issues/${event.issue.number}/comments`,
   {method:'POST',headers,body:JSON.stringify({body:comment})});
  need(reply.status===201,'WRITER_B_REPORT_COMMENT_STOP');
- return {status:result.status,code:result.code,created,verified};
+ return {status:result.status,code:result.code,deliveryStatus,created,verified};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
@@ -119,7 +127,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   try{result=fs.readFileSync(path.join(env.RUNNER_TEMP??'',
    'writer-b-install-result.json'),'utf8');}catch{}
   const report=await uploadWriterBReport({event,env,rawResult:result});
-  process.stdout.write(`WRITER_B_REPORT ${report.status} `+
+  process.stdout.write(`WRITER_B_REPORT ${report.deliveryStatus} `+
    `CREATED=${report.created}/2 READBACK=${report.verified}/2\n`);
  }catch{
   process.stderr.write('WRITER_B_REPORT_UNVERIFIED_READ_ONLY_RECONCILE\n');
