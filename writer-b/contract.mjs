@@ -28,10 +28,16 @@ const REQUEST_KEYS=['schema','requestId','chatId','operation','controlRepository
   'approvalManifestPath','approvalManifestSha256'];
 const APPROVAL_KEYS=['schema','status','scope','sourceRepository','sourceBranch',
   'candidateSourceSha','baseHead','baseConfigSourceSha','sourceRoot','configPath',
-  'coreTask','files','protectedFiles','runCount','allowProviderCalls','allowDbChanges',
+  'coreTask','files','protectedFiles','runtimeDependencies',
+  'runCount','allowProviderCalls','allowDbChanges',
   'allowD1Writes','allowTaskDefinitionChanges','allowOtherSourceChanges'];
 const FILE_KEYS=['path','change','beforeSha256','afterSha256'];
 const PROTECTED_KEYS=['path','sha256'];
+const RUNTIME_KEYS=['taskXmlSha256','consumers'];
+const CONSUMER_KEYS=['id','kind','path','sha256','dependsOn'];
+const RUNTIME_FILE=/^[CE]:\\ZGmini\\data\\pc-writer\\(?:[a-z0-9][a-z0-9._-]*\\){0,5}[a-z0-9][a-z0-9._-]*\.(?:vbs|cmd|mjs|json)$/i;
+const ENTRYPOINTS=new Set(['scripts/pc-writer/run-local.mjs',
+ 'scripts/pc-writer/local-cycle.mjs']);
 
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const exact=(x,keys)=>object(x)&&Object.keys(x).length===keys.length&&
@@ -82,6 +88,34 @@ export function validateWriterBManifest(manifest){
   const norm=entry.path.toLowerCase();
   need(!seen.has(norm),'WRITER_B_PROTECTED_OVERLAP_STOP');seen.add(norm);
  }
+ // This is a bounded read-only attestation list, not a license to execute
+ // launchers or inspect every file on the PC. The A inventory must enumerate
+ // the actually affected VBS/CMD/Sidecar source consumers before approval.
+ const deps=manifest.runtimeDependencies;
+ need(exact(deps,RUNTIME_KEYS)&&
+  (deps.taskXmlSha256===null||SHA64.test(deps.taskXmlSha256??''))&&
+  Array.isArray(deps.consumers)&&deps.consumers.length<=24,
+  'WRITER_B_RUNTIME_DEPENDENCIES_STOP');
+ const declared=new Set();
+ for(const entry of deps.consumers){
+  need(exact(entry,CONSUMER_KEYS)&&
+   /^[a-z0-9][a-z0-9._-]{0,79}$/i.test(entry.id??'')&&
+   (entry.kind==='LAUNCHER'||entry.kind==='SIDECAR_SOURCE')&&
+   typeof entry.path==='string'&&entry.path.length<=240&&
+   RUNTIME_FILE.test(entry.path)&&!entry.path.split('\\').some(x=>x==='..')&&
+   SHA64.test(entry.sha256??'')&&Array.isArray(entry.dependsOn)&&
+   entry.dependsOn.length>=1&&entry.dependsOn.length<=manifest.files.length&&
+   entry.dependsOn.every(p=>manifest.files.some(file=>file.path===p))&&
+   new Set(entry.dependsOn).size===entry.dependsOn.length,
+   'WRITER_B_RUNTIME_CONSUMER_STOP');
+  const id=entry.id.toLowerCase(),file=entry.path.toLowerCase();
+  need(!declared.has(id)&&!declared.has(file),'WRITER_B_RUNTIME_DUPLICATE_STOP');
+  declared.add(id);declared.add(file);
+ }
+ if(manifest.files.some(f=>ENTRYPOINTS.has(f.path.toLowerCase())))
+  need(SHA64.test(deps.taskXmlSha256??'')&&deps.consumers.length>=1&&
+   deps.consumers.some(x=>x.kind==='LAUNCHER'),
+   'WRITER_B_ENTRYPOINT_CONSUMER_MISSING_STOP');
  return manifest;
 }
 
@@ -113,7 +147,12 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  validateWriterBManifest(manifest);
  for(const entry of manifest.files)Object.freeze(entry);
  for(const entry of manifest.protectedFiles)Object.freeze(entry);
+ for(const entry of manifest.runtimeDependencies.consumers){
+  Object.freeze(entry.dependsOn);Object.freeze(entry);
+ }
  Object.freeze(manifest.files);Object.freeze(manifest.protectedFiles);
+ Object.freeze(manifest.runtimeDependencies.consumers);
+ Object.freeze(manifest.runtimeDependencies);
  Object.freeze(manifest);
  const authorization=Object.freeze({requestId:request.requestId,chatId:request.chatId,
    manifest,manifestSha256:request.approvalManifestSha256,
