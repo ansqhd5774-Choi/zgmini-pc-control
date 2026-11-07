@@ -176,8 +176,11 @@ a B install. New content adds one approved profile to the same file,
 not two independently registered profiles or receiver code rewrites.
 
 The registry itself may be missing on the first approved registration.
-Only a real read-only absence observation plus explicit approval of
-registryBeforeSha256=null and oldPin=null authorize first-create. The
+Only a real, fixed-path, non-mutating **B receiver preflight** observation
+of host PIN null, registry leaf absence and an existing verified parent
+directory, plus exact approved manifest values
+registryBeforeSha256=null and oldPin=null, authorizes first-create. This
+preflight must repeat under the same Writer lock before any CAS. The
 receiver must use CREATE_NEW/no-overwrite and journal the original ABSENT
 state; recovery removes only the transaction-created file after exact
 CAS. Existing files always require exact old SHA, security-preserving
@@ -191,7 +194,9 @@ orphan-recovery approval scope and complete registry review. Valid ordinary
 registration states are either both old PIN and registry absent (bootstrap)
 or old PIN exactly equal to the existing registry raw SHA256.
 
-This remains LOCAL pure source/tests only, and the exact installed host
-path/registry path and current PIN state MUST be observed through an
-authorized A/read-only inventory before any real B approval. No live
+This remains LOCAL pure source/tests only. The exact installed host
+path/registry path and current PIN state MUST be verified by the installed,
+authorized B receiver's fixed-target read-only preflight before first B
+registration. The new A reader itself requires the PIN, so making it a
+pre-bootstrap requirement would create a circular dependency. No live
 Windows receiver, actual Git provenance or PC activation is claimed.
