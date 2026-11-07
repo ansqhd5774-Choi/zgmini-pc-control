@@ -15,7 +15,7 @@ import {runApprovedRegistryCas,patchHostRuntimePinBytes,
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const SOURCE='a'.repeat(40);
 const HOST=String.raw`E:\ZGmini\data\pc-writer\controller\host.json`;
-const REG=String.raw`E:\ZGmini\data\pc-writer\controller-approvals\approved-runtime-inventory-profiles.json`;
+const REG=String.raw`E:\ZGmini\data\pc-writer\approved-runtime-inventory-profiles.json`;
 const LCK=String.raw`E:\ZGmini\data\pc-writer\writer-source-install.lock`;
 const JROOT=String.raw`E:\ZGmini\data\pc-writer\approved-runtime-pin-cas`;
 const RESULTS=String.raw`E:\ZGmini\data\pc-writer\results`;
@@ -26,7 +26,8 @@ const throwCode=code=>{const e=new Error(code);e.code=code;throw e;};
 
 function setup({registryAbsent=false,fault=null,aclDrift=false,
  rollbackAclDrift=false,registryParentMissing=false,driveUnavailable=false,
- registryParentReparse=false,driveUnavailableAfterLock=false}={}){
+ registryParentReparse=false,driveUnavailableAfterLock=false,
+ ownerUnverified=false}={}){
  const physical=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-b-pin-windows-mock-'));
  const translate=win=>{
   const normalized=path.win32.normalize(win);
@@ -70,11 +71,14 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
  if(beforeRegistry!==null)fs.writeFileSync(translate(REG),beforeRegistry);
  if(registryParentMissing){
   assert.equal(registryAbsent,true,'missing-parent fixture requires absent registry');
-  fs.rmdirSync(path.dirname(translate(REG)));
+  // Simulate the *fixed* pc-writer parent disappearing independently of the
+  // existing host bytes. Physically removing it would erase the fixture host.
  }
  let afterLock=false,afterBackup=false,operationalSwitches=0;
  const io={constants:fs.constants,
   lstatSync:p=>{
+   if(registryParentMissing&&p===path.win32.dirname(REG))
+    throw Object.assign(new Error('missing pc-writer parent'),{code:'ENOENT'});
    if(p===TARGETS.dataRoot&&(driveUnavailable||
     (driveUnavailableAfterLock&&afterLock)||
     (fault==='DRIVE_LOST_AFTER_BACKUP'&&afterBackup)))
@@ -146,6 +150,8 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
   targets:TARGETS,requestId:REQUEST,approvedRegistryAfterBytes:targetRegistry,
   verifyApproval:async({sha256:approved})=>({verified:true,
    rawApprovalSha256:approved}),lockApi:claimApi,fileIO:io,
+  verifyDirectoryOwnership:()=>({ownerVerified:!ownerUnverified,
+   noReparse:true,aclVerified:true}),
   aclFingerprint:p=>{
    if(fault==='DRIVE_LOST_AFTER_BACKUP'&&
     p===REG+'.pin-b-'+REQUEST+'.original.bin')afterBackup=true;
@@ -301,6 +307,18 @@ test('Windows-mapped DI: registry parent reparse redirection denies bootstrap',a
    pinnedApproval:x.pinnedApproval,adapter:x.adapter});
   assert.equal(out.status,'BLOCKED',JSON.stringify(out));
   assert.equal(out.code,'B_PIN_WINDOWS_REGISTRY_PARENT_REPARSE');
+  assert.equal(x.getOperationalSwitchCount(),0);
+  assert.equal(fs.existsSync(x.translate(REG)),false);
+  assert.equal(fs.existsSync(x.translate(LCK)),false);
+ });
+});
+
+test('Windows-mapped DI: installed writer parent owner cannot be inferred from path',async()=>{
+ await withFixture({registryAbsent:true,ownerUnverified:true},async x=>{
+  const out=await runApprovedRegistryCas({approvalRaw:x.raw,
+   pinnedApproval:x.pinnedApproval,adapter:x.adapter});
+  assert.equal(out.status,'BLOCKED',JSON.stringify(out));
+  assert.equal(out.code,'B_PIN_WINDOWS_REGISTRY_PARENT_OWNER_UNVERIFIED');
   assert.equal(x.getOperationalSwitchCount(),0);
   assert.equal(fs.existsSync(x.translate(REG)),false);
   assert.equal(fs.existsSync(x.translate(LCK)),false);
