@@ -126,14 +126,16 @@ export async function performWriterBInstall(auth,io){
   await io.acquireSharedWriterLock(auth.requestId);acquired=true;
   before=verifyWriterBPreimage(manifest,await io.readPcPreimage(manifest));
   verifyWriterBCandidate(manifest,await io.readCandidate(manifest));
+
+  // Observe the Core before claiming the one-shot maintenance request or
+  // creating backups/commits. A busy Core is a clean preflight deferral,
+  // not a partially started installation.
+  await io.waitForCoreIdleWindow();
+
   await io.claimRequest(auth.requestId);claimed=true;
   await io.backupOriginal(before,manifest);
   prepared=verifyPreparedWriterCommit(manifest,
     await io.prepareIsolatedCommit(before,manifest));
-
-  // A busy Core is normal. Before disabling its scheduled entrypoint,
-  // wait read-only for a natural idle window. Deferral keeps Task enabled.
-  await io.waitForCoreIdleWindow();
 
   // Mark mutation intent before any call that may partially apply its effects.
   taskMayHaveChanged=true;
