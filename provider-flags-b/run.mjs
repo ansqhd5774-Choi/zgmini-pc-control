@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {authorize,FILE,FLAGS,sha256} from './contract.mjs';
+import {authorize,FILE,FLAGS,SCOPE,flagProfileForPath,flagsForScope,
+  isAllowedManifestPath,sha256} from './contract.mjs';
 import {changeProviderFlags} from './patch.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
   from '../r17-writer-b/r17-b-claim.mjs';
@@ -64,8 +65,8 @@ export function loadAuthorization({env=process.env,readFile=fs.readFileSync,
     'PROVIDER_B_CONTROL_ROOT_STOP');
   const event=JSON.parse(readFile(env.GITHUB_EVENT_PATH,'utf8'));
   const req=JSON.parse(event.issue.body);
-  need(/^approvals\/writer-config\/inflation19-flags-[a-z0-9-]{4,70}\.json$/.test(
-    req.approvalManifestPath??''),'PROVIDER_B_APPROVAL_PATH_STOP');
+  need(isAllowedManifestPath(req.approvalManifestPath),
+    'PROVIDER_B_APPROVAL_PATH_STOP');
   const root=path.join(controlRoot,'approvals','writer-config');
   const manifestPath=path.join(controlRoot,...req.approvalManifestPath.split('/'));
   const workspaceBytes=regular(manifestPath,root,4096);
@@ -150,6 +151,13 @@ function atomicReplace(target,bytes,suffix){
 export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
   sharedLock=SHARED_LOCK,beforeSwitch=()=>{},afterSwitch=()=>{}}={}){
   const requestId=auth.request.requestId;
+  // Preserve legacy direct-call fixtures. Production gets a verified manifest;
+  // the candidate profile never activates without an explicit matching scope.
+  const selected=flagProfileForPath(auth.request?.approvalManifestPath);
+  const flags=auth.manifest?
+    selected?.scope===auth.manifest.scope?flagsForScope(auth.manifest.scope):null:
+    selected?.scope===SCOPE?FLAGS:null;
+  need(flags!==null,'PROVIDER_B_PROFILE_KEYS_STOP');
   let lock=null,claimed=false,retain=false,original=null,proposed=null,
     wrote=false,result=null,stage='LOCK';
   const journal=phase=>{
@@ -165,7 +173,7 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
     stage='ORIGINAL_READ';
     original=regular(target,path.dirname(target));
     stage='PATCH';
-    proposed=changeProviderFlags(original);
+    proposed=changeProviderFlags(original,flags);
     stage='JOURNAL_CREATE';
     createInstallJournal({journalRoot,requestId,sharedLock,fd:lock.fd});
     claimed=true;
@@ -191,13 +199,13 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
     stage='RESULT_READBACK';
     need(regular(target,path.dirname(target)).equals(proposed.bytes),
       'PROVIDER_B_READBACK_STOP');
-    need(changeProviderFlags(proposed.bytes).changed===false,
+    need(changeProviderFlags(proposed.bytes,flags).changed===false,
       'PROVIDER_B_IDEMPOTENCE_STOP');
     stage='JOURNAL_VERIFIED';
     journal('VERIFIED');
     result={status:'PROVIDER_B_APPLIED_VERIFIED',requestId,
       code:proposed.changed?'PROVIDER_B_TWO_FLAGS_SET':'PROVIDER_B_ALREADY_SET',
-      changedKeys:[...FLAGS],manifestSha256:auth.request.approvalManifestSha256,
+      changedKeys:[...flags],manifestSha256:auth.request.approvalManifestSha256,
       controlSha:auth.controlSha,beforeSha256:proposed.beforeSha256,
       afterSha256:proposed.afterSha256,backupVerified:true};
   }catch(error){
