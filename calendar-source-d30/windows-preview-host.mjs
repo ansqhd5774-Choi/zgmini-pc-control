@@ -177,6 +177,8 @@ export async function runD30ReadOnlyWindowsHost({env=process.env}={}){
               registeredConfigurationStatus:proof.registeredConfigurationStatus,
               registeredBeforeSourceSha:proof.registeredBeforeSourceSha,
               registeredExactThreePreimages:proof.registeredExactThreePreimages,
+              registeredThreeFileTrackedOverlayObserved:
+                proof.registeredThreeFileTrackedOverlayObserved,
               registeredTaskXmlMatchesHistoricB:proof.registeredTaskXmlMatchesHistoricB}:{}),
           };
         return {preflightStatus:proof.status,sourceRoot:SOURCE_ROOT,

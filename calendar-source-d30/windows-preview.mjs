@@ -69,6 +69,8 @@ export async function runD30WindowsReadOnlyPreview({host,gitExe='git',tempRoot}=
         registeredConfigurationStatus:evidence.registeredConfigurationStatus,
         registeredBeforeSourceSha:evidence.registeredBeforeSourceSha,
         registeredExactThreePreimages:evidence.registeredExactThreePreimages,
+        registeredThreeFileTrackedOverlayObserved:
+          evidence.registeredThreeFileTrackedOverlayObserved,
         registeredTaskXmlMatchesHistoricB:evidence.registeredTaskXmlMatchesHistoricB}:{}),
       ...(evidence?.sidecarSourceBinding?
         {sidecarSourceBinding:evidence.sidecarSourceBinding}:{}),
