@@ -27,19 +27,39 @@ function regular(file,parent,limit=262144){
   return fs.readFileSync(file);
 }
 
-function gitHead(root){
+function gitBinary(){
   const bin=[String.raw`C:\Program Files\Git\cmd\git.exe`,
     String.raw`C:\Program Files\Git\bin\git.exe`].find(p=>fs.existsSync(p));
   need(bin,'PROVIDER_B_GIT_UNAVAILABLE_STOP');
-  const r=spawnSync(bin,['-C',root,'rev-parse','HEAD'],{
+  return bin;
+}
+function gitHead(root){
+  const r=spawnSync(gitBinary(),['-C',root,'rev-parse','HEAD'],{
     encoding:'utf8',shell:false,windowsHide:true,timeout:15000});
   need(r.status===0&&/^[a-f0-9]{40}$/i.test(r.stdout.trim()),
     'PROVIDER_B_GIT_HEAD_STOP');
   return r.stdout.trim();
 }
+function gitCommittedManifest(root,relativePath){
+  // Git's committed blob has the approval's exact bytes even when a Windows
+  // checkout applies core.autocrlf (LF -> CRLF) to the workspace copy.
+  const r=spawnSync(gitBinary(),['-C',root,'show','HEAD:'+relativePath],{
+    encoding:'buffer',shell:false,windowsHide:true,timeout:15000,maxBuffer:8192});
+  need(r.status===0&&Buffer.isBuffer(r.stdout)&&
+    r.stdout.length>=200&&r.stdout.length<=4096,
+    'PROVIDER_B_GIT_MANIFEST_STOP');
+  return r.stdout;
+}
+function checkoutMatchesBlob(worktree,blob){
+  // Only Git checkout's text newline conversion is tolerated, never arbitrary
+  // edits to the on-disk manifest. The hash is still checked on the raw blob.
+  if(worktree.equals(blob))return true;
+  if(blob.includes(13))return false;
+  return worktree.equals(Buffer.from(blob.toString('utf8').replace(/\n/g,'\r\n')));
+}
 
 export function loadAuthorization({env=process.env,readFile=fs.readFileSync,
-  controlRoot,head=gitHead}={}){
+  controlRoot,head=gitHead,blob=gitCommittedManifest}={}){
   need(typeof controlRoot==='string'&&controlRoot.length>0,
     'PROVIDER_B_CONTROL_ROOT_STOP');
   const event=JSON.parse(readFile(env.GITHUB_EVENT_PATH,'utf8'));
@@ -48,8 +68,11 @@ export function loadAuthorization({env=process.env,readFile=fs.readFileSync,
     req.approvalManifestPath??''),'PROVIDER_B_APPROVAL_PATH_STOP');
   const root=path.join(controlRoot,'approvals','writer-config');
   const manifestPath=path.join(controlRoot,...req.approvalManifestPath.split('/'));
-  const raw=regular(manifestPath,root,4096);
+  const workspaceBytes=regular(manifestPath,root,4096);
   need(head(controlRoot)===env.GITHUB_SHA,'PROVIDER_B_CONTROL_SHA_STOP');
+  const raw=blob(controlRoot,req.approvalManifestPath);
+  need(Buffer.isBuffer(raw)&&checkoutMatchesBlob(workspaceBytes,raw),
+    'PROVIDER_B_MANIFEST_WORKTREE_DRIFT_STOP');
   return authorize({event,env,manifestBytes:raw});
 }
 

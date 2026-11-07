@@ -7,7 +7,7 @@
 - 대상: `E:\ZGmini\data\pc-writer\providers.env` 정확히 1파일
 - 고정 값: `ZGMINI_INFL19_RECURRING_APPROVED=1`, `ZGMINI_INFL19_GAS_DAILY_APPROVED=1`
 - 수신: private repo의 원소유자 `pc-writer-provider-flags-once` Issue, 기존 공통 B의 `pc-writer-b-install` label 재사용, `opened` 한 번만
-- 승인: `approvals/writer-config/inflation19-flags-<id>.json` 원문 SHA256이 요청과 일치해야 함
+- 승인: `approvals/writer-config/inflation19-flags-<id>.json` 원문 SHA256이 요청과 일치해야 함 (Windows checkout의 LF→CRLF 변환과 구별하기 위해 고정 Git `HEAD:path` 원본 blob 바이트로 계산; 워크트리에는 Git 줄바꿈 변환만 허용)
 - 실행: 자체 Windows Runner의 고정 `.github/workflows/pc-writer-provider-flags-once.yml`
 - 보호: Writer source B 공유 잠금, 기존 요청 ID 단회 claim, 원본 바이트 비공개 백업·fsync, 최종 CAS, 원자적 파일 교체, 실파일 재조회·복구 확인
 - 회수: `results/provider-flags-b-<requestId>.json/.txt` 2/2 동일바이트 재조회 및 고유 Issue 댓글

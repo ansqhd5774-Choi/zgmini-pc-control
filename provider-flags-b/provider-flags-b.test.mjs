@@ -50,14 +50,36 @@ test('workspace manifest must match exact owner event and pinned control SHA',()
     JSON.stringify(manifest));
   const e={...env,GITHUB_EVENT_PATH:path.join(root,'event.json')};
   fs.writeFileSync(e.GITHUB_EVENT_PATH,JSON.stringify(event(req)));
-  const auth=loadAuthorization({env:e,controlRoot:root,head:()=>env.GITHUB_SHA});
+  const raw=Buffer.from(JSON.stringify(manifest));
+  const blob=()=>raw;
+  const auth=loadAuthorization({env:e,controlRoot:root,head:()=>env.GITHUB_SHA,blob});
   assert.equal(auth.request.requestId,req.requestId);
   assert.throws(()=>loadAuthorization({env:e,controlRoot:root,
-    head:()=> 'b'.repeat(40)}),{code:'PROVIDER_B_CONTROL_SHA_STOP'});
+    head:()=> 'b'.repeat(40),blob}),{code:'PROVIDER_B_CONTROL_SHA_STOP'});
   fs.writeFileSync(path.join(sub,'inflation19-flags-20261108.json'),
     JSON.stringify({...manifest,runCount:2}));
   assert.throws(()=>loadAuthorization({env:e,controlRoot:root,
-    head:()=>env.GITHUB_SHA}),{code:'PROVIDER_B_MANIFEST_HASH_STOP'});
+    head:()=>env.GITHUB_SHA,blob}),{code:'PROVIDER_B_MANIFEST_WORKTREE_DRIFT_STOP'});
+});
+test('Windows CRLF checkout uses Git blob raw approval bytes, not transformed worktree',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'config-b-crlf-'));
+  const sub=path.join(root,'approvals','writer-config');
+  fs.mkdirSync(sub,{recursive:true});
+  const manifestPath=path.join(sub,'inflation19-flags-20261108.json');
+  const committed=Buffer.from(JSON.stringify(manifest,null,2)+'\n');
+  const converted=Buffer.from(committed.toString('utf8').replace(/\n/g,'\r\n'));
+  assert.notEqual(sha256(converted),sha256(committed));
+  fs.writeFileSync(manifestPath,converted);
+  const req={...request(),approvalManifestSha256:sha256(committed)};
+  const e={...env,GITHUB_EVENT_PATH:path.join(root,'event.json')};
+  fs.writeFileSync(e.GITHUB_EVENT_PATH,JSON.stringify(event(req)));
+  const x=loadAuthorization({env:e,controlRoot:root,
+    head:()=>e.GITHUB_SHA,blob:()=>committed});
+  assert.equal(x.request.requestId,req.requestId);
+  fs.writeFileSync(manifestPath,Buffer.from(converted.toString().replace('APPROVED_B','APPROVED_A')));
+  assert.throws(()=>loadAuthorization({env:e,controlRoot:root,
+    head:()=>e.GITHUB_SHA,blob:()=>committed}),
+    {code:'PROVIDER_B_MANIFEST_WORKTREE_DRIFT_STOP'});
 });
 test('CRLF, BOM, comments, secret bytes and unrelated keys preserved',()=>{
   const secret='FRED_API_KEY=sensitive-super-secret';
