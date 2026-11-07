@@ -90,11 +90,13 @@ export function makeWindowsVersionedBundleAdapterCandidate({
   if(compatibility?.strategy==='IMMUTABLE_VERSION_PINNED_LAUNCHER'){
    // An exact authenticated approval must pin the evidence bytes. Merely
    // returning true for launcher safety is never sufficient.
-   await verifyImmutablePinnedLauncherEvidence({
+   const pinnedShape=await verifyImmutablePinnedLauncherEvidence({
     evidenceRawBytes:compatibility.evidenceRawBytes,
     approvedEvidenceSha256:approvedCompatibilitySha256,
     approvedLauncherNames,manifest,plan,bridge,lock,
    });
+   need(pinnedShape.runtimeCompatibilityProven===true,
+    'B_WINDOWS_COMPATIBILITY_EVIDENCE_REQUIRED');
    return;
   }
   need(compatibility?.strategy==='STATIC_DISPATCHER_POINTER_SWITCH'&&
