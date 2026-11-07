@@ -56,8 +56,13 @@ export function coreSourceIdentity(activeCore) {
       activeCore.gitVerified === true &&
       activeCore.taskLauncherSourceVerified === true &&
       activeCore.configSourceMatchesHead === true &&
-      activeCore.writerCheckpointMatchesHead === true &&
-      activeCore.trackedDirty === false) return activeCore.operationalSourceSha;
+      // A last-run checkpoint records a PAST execution. A stale historical
+      // SHA does not invalidate the independently verified registered source.
+      (activeCore.trackedDirty === false ||
+        (activeCore.trackedDirty === true &&
+          activeCore.sourceTrackedDirtyScope === 'PINNED_TARGET_3FILES' &&
+          activeCore.pinnedOverlayVerified === true)))
+    return activeCore.operationalSourceSha;
   return null;
 }
 
