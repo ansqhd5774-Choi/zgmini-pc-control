@@ -76,14 +76,23 @@ export function loadAuthorization({env=process.env,readFile=fs.readFileSync,
   return authorize({event,env,manifestBytes:raw});
 }
 
-function writeOriginalBackup(bytes,source,requestId){
+export function flushCopiedBackup(file,{open=fs.openSync,flush=fs.fsyncSync,
+  close=fs.closeSync}={}){
+  // On Windows FlushFileBuffers requires GENERIC_WRITE; opening the copy with
+  // 'r' worked on POSIX but fails on the real Windows Runner.
+  const fd=open(file,'r+');
+  try{flush(fd);}finally{close(fd);}
+}
+function writeOriginalBackup(bytes,source,requestId,setStage=()=>{}){
   // A child journal directory can inherit a *different* ACL. Keep the durable
   // backup in the original directory so the exact file security is inherited
   // from the same parent, while retaining the source file's copied ACL.
   const dest=source+'.provider-b-'+requestId+'.original.bin';
+  setStage('BACKUP_COPY');
   copyPreservingSecurity(source,dest);
-  const fd=fs.openSync(dest,'r');
-  try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  setStage('BACKUP_SYNC');
+  flushCopiedBackup(dest);
+  setStage('BACKUP_READBACK');
   need(fs.readFileSync(dest).equals(bytes),'PROVIDER_B_BACKUP_READBACK_STOP');
 }
 export function normalizeAclEvidence(stdout,file){
@@ -142,7 +151,7 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
   sharedLock=SHARED_LOCK,beforeSwitch=()=>{},afterSwitch=()=>{}}={}){
   const requestId=auth.request.requestId;
   let lock=null,claimed=false,retain=false,original=null,proposed=null,
-    wrote=false,result=null;
+    wrote=false,result=null,stage='LOCK';
   const journal=phase=>{
     if(!claimed)return;
     const file=path.join(journalRoot,requestId,'journal.jsonl');
@@ -153,28 +162,38 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
   try{
     // Same shared Writer resource lock as source-overlay B; no task stop.
     lock=acquireInstallLock({journalRoot,requestId,sharedLock});
+    stage='ORIGINAL_READ';
     original=regular(target,path.dirname(target));
+    stage='PATCH';
     proposed=changeProviderFlags(original);
+    stage='JOURNAL_CREATE';
     createInstallJournal({journalRoot,requestId,sharedLock,fd:lock.fd});
     claimed=true;
-    writeOriginalBackup(original,target,requestId);
+    writeOriginalBackup(original,target,requestId,x=>{stage=x;});
+    stage='JOURNAL_BACKED_UP';
     journal('BACKED_UP');
     // Direct CAS immediately before atomic switch. Other software not honoring
     // the shared writer lock may cause a safe STOP instead of overwrite.
+    stage='FINAL_CAS';
     beforeSwitch();
     need(regular(target,path.dirname(target)).equals(original),
       'PROVIDER_B_CONCURRENT_FILE_DRIFT_STOP');
     if(proposed.changed){
       // Mark intent before the possible atomic switch for safe rollback.
       wrote=true;
+      stage='ATOMIC_SWITCH';
       atomicReplace(target,proposed.bytes,requestId);
+      stage='JOURNAL_SWITCH';
       journal('SWITCHED');
+      stage='AFTER_SWITCH';
       afterSwitch();
     }
+    stage='RESULT_READBACK';
     need(regular(target,path.dirname(target)).equals(proposed.bytes),
       'PROVIDER_B_READBACK_STOP');
     need(changeProviderFlags(proposed.bytes).changed===false,
       'PROVIDER_B_IDEMPOTENCE_STOP');
+    stage='JOURNAL_VERIFIED';
     journal('VERIFIED');
     result={status:'PROVIDER_B_APPLIED_VERIFIED',requestId,
       code:proposed.changed?'PROVIDER_B_TWO_FLAGS_SET':'PROVIDER_B_ALREADY_SET',
@@ -182,7 +201,9 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
       controlSha:auth.controlSha,beforeSha256:proposed.beforeSha256,
       afterSha256:proposed.afterSha256,backupVerified:true};
   }catch(error){
-    const code=publicCode(error);
+    const genericCode=publicCode(error);
+    const code=genericCode==='PROVIDER_B_UNEXPECTED_STOP'?
+      `PROVIDER_B_${stage}_SYSTEM_STOP`:genericCode;
     if(!claimed){result={status:'PROVIDER_B_PREFLIGHT_STOP',code,requestId};}
     else{
       try{
