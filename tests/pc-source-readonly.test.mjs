@@ -112,6 +112,9 @@ test('fixed historical checkout reports HEAD and Writer agreement as candidate o
  fs.mkdirSync(mark,{recursive:true});
  f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
  f.put(p+'/scripts/pc-writer/run-local.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs','export const inflation=1');
+ f.put(p+'/scripts/pc-writer/inflation-causal-public-auto-publication-r1.test.mjs','export const inflationTest=1');
+ f.put('data/pc-writer/config.json',JSON.stringify({source:{sha}}));
  f.put('data/pc-writer/local-writer-last-run.json',
   JSON.stringify({source:sha,at:'2026-11-03T08:00:00Z',status:'VERIFIED',
    secret:'UNSAFE_SECRET_VALUE'}));
@@ -133,11 +136,68 @@ test('fixed historical checkout reports HEAD and Writer agreement as candidate o
  assert.equal(result.historicalCheckoutCandidate.gitVerified,true);
  assert.equal(result.historicalCheckoutCandidate.trackedDirty,false);
  assert.equal(result.historicalCheckoutCandidate.matchesWriterCheckpoint,true);
+ const inventory=result.historicalCheckoutCandidate.writerSourceInventory;
+ assert.equal(inventory.complete,true);
+ for(const name of ['run-local.mjs','inflation-causal-public-auto-publication-r1.mjs',
+  'inflation-causal-public-auto-publication-r1.test.mjs']){
+  const file=inventory.files.find(x=>x.path==='scripts/pc-writer/'+name);
+  assert.match(file?.sha256??'',/^[a-f0-9]{64}$/);
+  assert.equal(file.trackedDirty,null,'historical Git status excludes untracked files');
+ }
  assert.equal(result.historicalCheckoutCandidate.requiredFiles
   .find(x=>x.path==='scripts/pc-writer/us-breadth-provisional-cycle.mjs').exists,false);
  assert.equal(seen.length,2);
  assert.doesNotMatch(JSON.stringify(result),/UNSAFE_SECRET_VALUE/);
  assert.equal(result.providerCalls,0);assert.equal(result.d1Writes,0);
+});
+
+test('historical candidate without config agreement has no expanded Writer inventory',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release';
+ f.put('start.cmd','rem no source reference');
+ fs.mkdirSync(path.join(f.root,p,'.git'),{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put('data/pc-writer/config.json',JSON.stringify({source:'b'.repeat(40)}));
+ f.put('data/pc-writer/local-writer-last-run.json',JSON.stringify({source:'a'.repeat(40)}));
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:(cwd,args)=>args[0]==='rev-parse'?'a'.repeat(40):''});
+ assert.equal(result.historicalCheckoutCandidate.gitVerified,true);
+ assert.equal(result.historicalCheckoutCandidate.writerSourceInventory,undefined);
+ assert.equal(result.runtimeSourceVerified,false);
+});
+
+test('dirty historical candidate hashes are not mistaken for clean per-file state',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release',sha='c'.repeat(40);
+ f.put('start.cmd','rem no source reference');
+ fs.mkdirSync(path.join(f.root,p,'.git'),{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/run-local.mjs','export {}');
+ f.put('data/pc-writer/config.json',JSON.stringify({source:sha}));
+ f.put('data/pc-writer/local-writer-last-run.json',JSON.stringify({source:sha}));
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:(cwd,args)=>args[0]==='rev-parse'?sha:' M scripts/pc-writer/run-local.mjs\n'});
+ const candidate=result.historicalCheckoutCandidate;
+ assert.equal(candidate.trackedDirty,true);
+ assert.equal(candidate.writerSourceInventory.files.find(x=>x.path==='scripts/pc-writer/run-local.mjs').trackedDirty,null);
+ assert.equal(result.sourceResolved,false);
+ assert.equal(result.runtimeSourceVerified,false);
+});
+
+test('untracked historical Writer JS never receives a false clean assertion',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release',sha='d'.repeat(40);
+ f.put('start.cmd','rem no source reference');
+ fs.mkdirSync(path.join(f.root,p,'.git'),{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/new-untracked.mjs','export const newFile=1');
+ f.put('data/pc-writer/config.json',JSON.stringify({source:sha}));
+ f.put('data/pc-writer/local-writer-last-run.json',JSON.stringify({source:sha}));
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  // Simulate Git --untracked-files=no returning an empty status for new file.
+  git:(cwd,args)=>args[0]==='rev-parse'?sha:''});
+ const candidate=result.historicalCheckoutCandidate;
+ assert.equal(candidate.trackedDirty,false);
+ const file=candidate.writerSourceInventory.files.find(x=>x.path==='scripts/pc-writer/new-untracked.mjs');
+ assert.match(file.sha256,/^[a-f0-9]{64}$/);
+ assert.equal(file.trackedDirty,null);
 });
 
 test('escaped Git pointer cannot be used to read a historical checkout',t=>{

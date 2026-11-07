@@ -56,7 +56,7 @@ function launcherText(bytes){
  * candidate checkout inventory, not proof that the active Core executes it.
  */
 export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpathSync.native(p),
- read=p=>fs.readFileSync(p),dirtyPaths=[]}={}){
+ read=p=>fs.readFileSync(p),dirtyPaths=null}={}){
  const unavailable=code=>({status:'STATE_UNKNOWN',code,complete:false,
   directory:'scripts/pc-writer',files:[],issues:[],totalBytes:0});
  const dir=path.join(sourceRoot,'scripts','pc-writer');
@@ -74,7 +74,8 @@ export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpath
  }
  catch{return unavailable('WRITER_SOURCE_DIRECTORY_UNREADABLE');}
  if(names.length>writerInventoryLimit.files)return unavailable('WRITER_SOURCE_FILE_COUNT_LIMIT');
- const dirty=new Set(dirtyPaths);
+ // A missing Git status is unknown, not evidence that the file is clean.
+ const dirty=Array.isArray(dirtyPaths)?new Set(dirtyPaths):null;
  const files=[],issues=[];let totalBytes=0;
  for(const name of names){
   if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.mjs$/i.test(name)){
@@ -103,7 +104,7 @@ export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpath
     issues.push({path:relative,code:'WRITER_SOURCE_FILE_READ_MISMATCH'});
     continue;
    }
-   files.push({path:relative,sha256:sha256(bytes),trackedDirty:dirty.has(relative)});
+   files.push({path:relative,sha256:sha256(bytes),trackedDirty:dirty?dirty.has(relative):null});
   }catch{issues.push({path:relative,code:'WRITER_SOURCE_FILE_UNAVAILABLE'});}
  }
  const complete=issues.length===0;
@@ -253,6 +254,16 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
       }catch{}
      }
      candidate.requiredFiles.push({path:name,exists:present,sha256:hash});
+    }
+    // This fixed checkout is corroborated by the approved config and a prior
+    // Writer checkpoint. Inventory is valuable, but must stay labeled as a
+    // historical candidate rather than an active Core Runtime source.
+    if(candidate.gitVerified&&candidate.head===result.configApprovedSha&&
+       candidate.matchesWriterCheckpoint===true){
+     candidate.writerSourceInventory=inspectWriterSourceInventory(real,{realpath,read,
+      // `--untracked-files=no` does not establish each inventory file is
+      // tracked. A candidate-level clean status cannot prove per-file clean.
+      dirtyPaths:null});
     }
     result.historicalCheckoutCandidate=candidate;
    }
