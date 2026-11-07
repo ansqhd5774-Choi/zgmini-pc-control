@@ -1,0 +1,129 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42403135809-1-seat-2",
+  "requestId": "pc-70c4806c-9ad9-4ab6-9a38-6b32f1569b22",
+  "startedAt": "2026-11-07T18:49:06.842Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "aada254071879544f87ffd286f02a7d6053cd8ba",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "ec9c9738bf3e07e15eeac06a02ab3e5bec9ef9d0",
+  "sourceBranch": "main",
+  "operation": "theme-l7-runtime-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "L7_RUNTIME_READONLY_INVENTORY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-c78b6474-9bb9-4d4a-b893-90aa63f1350d",
+  "pcOperationalApprovedSha": "24c2ff1f3eba73cae8b86f81ce75c6ffacfb497f",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "L7_RUNTIME_READONLY_INVENTORY",
+    "operationalReadiness": "NOT_ASSERTED",
+    "sourceDirectory": "PRESENT",
+    "sources": {
+      "r181-primary-cycle.mjs": {
+        "present": true,
+        "sha256": "be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62",
+        "bytes": 7089,
+        "modifiedAt": "2026-10-21T10:31:51.066Z"
+      },
+      "r179-publish-core.mjs": {
+        "present": true,
+        "sha256": "f9ea0a1bfaf52909b7a434b65ba93887f56660bc979a3cb7e0992597bc9f3b68",
+        "bytes": 10822,
+        "modifiedAt": "2026-10-23T07:34:43.700Z"
+      },
+      "r171-publish.mjs": {
+        "present": true,
+        "sha256": "d6b921acd2b935360a4f1df2ce7329b4fdde0d999dddd5ee3f7f6169c9046ba8",
+        "bytes": 6389,
+        "modifiedAt": "2026-10-23T07:34:43.713Z"
+      }
+    },
+    "ledgers": {
+      "R181_PRIMARY_LAST_RUN.json": {
+        "present": true,
+        "status": "STOP",
+        "resultCode": null,
+        "dates": {},
+        "times": {},
+        "modifiedAt": "2026-11-07T05:00:12.226Z",
+        "diagnostic": {
+          "status": "CANDIDATES_WITHOUT_SAFE_VALUE",
+          "fields": [
+            {
+              "path": "reason",
+              "type": "string"
+            }
+          ],
+          "values": [],
+          "truncated": false
+        }
+      },
+      "ZGMINI_R179_PUBLICATION_LAST_RUN.json": {
+        "present": true,
+        "status": "PUBLIC_API_ROLLING_MISMATCH",
+        "resultCode": null,
+        "dates": {},
+        "times": {},
+        "modifiedAt": "2026-10-30T05:21:24.013Z",
+        "diagnostic": {
+          "status": "SAFE_VALUES_FOUND",
+          "fields": [
+            {
+              "path": "observedDate",
+              "type": "string"
+            }
+          ],
+          "values": [
+            {
+              "path": "observedDate",
+              "value": "2026-10-28"
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "R183_PUBLICATION_RETRY_LAST_RUN.json": {
+        "present": true,
+        "status": "PUBLISHER_CHILD_FAILED_REVIEW",
+        "resultCode": null,
+        "dates": {},
+        "times": {},
+        "modifiedAt": "2026-10-30T05:21:24.052Z",
+        "diagnostic": {
+          "status": "UNKNOWN",
+          "fields": [],
+          "values": [],
+          "truncated": false
+        }
+      }
+    },
+    "task": {
+      "status": "XML_READ",
+      "enabled": null,
+      "referencesKnownCollector": true,
+      "referencesExistingRoot": true,
+      "actionSha256": "4bdbfeaa9dff719ba6e8c48a4b0c94c8deef70e3b8e849de73c4a73fd18965fe"
+    },
+    "collectionAndPublicationNotExecuted": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "f1c8920a2d6594a0cba08d9a6431d1fdccc2b1be3c205b483055df7cc1898bd4",
+  "protectedAfterSha256": "f1c8920a2d6594a0cba08d9a6431d1fdccc2b1be3c205b483055df7cc1898bd4",
+  "actualExecutionSha": "aada254071879544f87ffd286f02a7d6053cd8ba",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-07T18:49:11.058Z",
+  "durationMs": 4216
+}
