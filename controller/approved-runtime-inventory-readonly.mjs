@@ -9,6 +9,9 @@ import {createHash} from 'node:crypto';
 const MAX_REPORT_BYTES = 20 * 1024;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_TASK_BYTES = 256 * 1024;
+const MAX_MANIFEST_BYTES = 128 * 1024;
+const MAX_REGISTERED_PROFILES = 128;
+const MAX_SELECTED_PROFILES = 4;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
 const SAFE_KEY = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/;
 const SAFE_TASK_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,95}$/;
@@ -39,8 +42,17 @@ function name(value){
  return value;
 }
 function profileSpec(profile){
- plain(profile,['id','rootSegments','files','directories','tasks'],'INVENTORY_PROFILE_INVALID');
+ plain(profile,['id','binding','rootSegments','files','directories','tasks'],'INVENTORY_PROFILE_INVALID');
  name(profile.id);
+ plain(profile.binding,['sourceRepository','sourceBranch','sourceSha'],'INVENTORY_BINDING_INVALID');
+ if(typeof profile.binding.sourceRepository!=='string' ||
+    !/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(profile.binding.sourceRepository) ||
+    typeof profile.binding.sourceBranch!=='string' ||
+    !/^[A-Za-z0-9_./-]{1,160}$/.test(profile.binding.sourceBranch) ||
+    profile.binding.sourceBranch.split('/').includes('..') ||
+    typeof profile.binding.sourceSha!=='string' ||
+    !/^[a-f0-9]{40}$/.test(profile.binding.sourceSha))
+  fail('INVENTORY_BINDING_INVALID');
  if(!Array.isArray(profile.rootSegments) || profile.rootSegments.length < 1 ||
     profile.rootSegments.length > 5) fail('INVENTORY_PROFILE_INVALID');
  profile.rootSegments.forEach(segment);
@@ -209,30 +221,42 @@ export function inspectApprovedRuntimeInventory({dataRoot,profile,queryTask}={})
  * pinned hash nor profile selection may originate in pc-job Issue JSON.
  */
 export function inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes,
- approvedManifestSha256}={}){
+ approvedManifestSha256,requestIdentity}={}){
  if(typeof approvedManifestSha256!=='string' || !/^[a-f0-9]{64}$/.test(approvedManifestSha256))
   fail('INVENTORY_APPROVAL_PIN_INVALID');
- if(!Buffer.isBuffer(manifestBytes) || manifestBytes.length<16 || manifestBytes.length>16384)
+ if(!Buffer.isBuffer(manifestBytes) || manifestBytes.length<16 || manifestBytes.length>MAX_MANIFEST_BYTES)
   fail('INVENTORY_MANIFEST_SIZE_INVALID');
+ if(!requestIdentity || typeof requestIdentity!=='object' ||
+    typeof requestIdentity.sourceRepository!=='string' ||
+    typeof requestIdentity.sourceBranch!=='string' ||
+    !/^[a-f0-9]{40}$/.test(requestIdentity.sourceSha??''))
+  fail('INVENTORY_REQUEST_IDENTITY_INVALID');
  const manifestHash=sha(manifestBytes);
  if(manifestHash!==approvedManifestSha256)fail('INVENTORY_MANIFEST_APPROVAL_MISMATCH');
  let manifest;
  try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
  catch{fail('INVENTORY_MANIFEST_INVALID_JSON');}
  plain(manifest,['schema','profiles'],'INVENTORY_MANIFEST_INVALID');
- if(manifest.schema!=='ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V1' ||
+ if(manifest.schema!=='ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2' ||
     !Array.isArray(manifest.profiles) || manifest.profiles.length===0 ||
-    manifest.profiles.length>8)fail('INVENTORY_MANIFEST_INVALID');
+    manifest.profiles.length>MAX_REGISTERED_PROFILES)fail('INVENTORY_MANIFEST_INVALID');
  const ids=new Set();
  for(const profile of manifest.profiles){
   profileSpec(profile); // Validate *all* selectors before any filesystem reads.
   if(ids.has(profile.id))fail('INVENTORY_DUPLICATE_PROFILE');
   ids.add(profile.id);
  }
- const profiles=manifest.profiles.map(profile=>
+ const approved=manifest.profiles.filter(profile=>
+  profile.binding.sourceRepository===requestIdentity.sourceRepository &&
+  profile.binding.sourceBranch===requestIdentity.sourceBranch &&
+  profile.binding.sourceSha===requestIdentity.sourceSha);
+ if(approved.length===0)fail('INVENTORY_SOURCE_UNREGISTERED');
+ if(approved.length>MAX_SELECTED_PROFILES)fail('INVENTORY_PROFILE_SELECTION_OVERSIZED');
+ const profiles=approved.map(profile=>
   inspectApprovedRuntimeInventory({dataRoot,profile,queryTask}));
  const result={status:'DONE',code:'APPROVED_RUNTIME_REGISTRY_READONLY',
-  registrySha256:manifestHash,profileCount:profiles.length,profiles,
+  registrySha256:manifestHash,registeredCount:manifest.profiles.length,
+  selectedCount:profiles.length,profiles,
   operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(Buffer.byteLength(JSON.stringify(result),'utf8')>MAX_REPORT_BYTES)
   fail('INVENTORY_REPORT_OVERSIZED');
