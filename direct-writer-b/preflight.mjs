@@ -13,7 +13,8 @@ const fail=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)fail(code);};
 
 export function approvedCandidateSource(auth){
- need(['PIN_REGISTRY_CAS','VERSIONED_BUNDLE_ACTIVATE'].includes(auth?.mode)&&
+ need(['PIN_REGISTRY_CAS','VERSIONED_BUNDLE_ACTIVATE',
+   'CONFIGURED_THEMES_REPEAT_UPGRADE'].includes(auth?.mode)&&
   SHA40.test(auth?.manifest?.sourceSha??'')&&
   SHA40.test(auth?.controlSha??'')&&
   SHA64.test(auth?.request?.approvalManifestSha256??''),
