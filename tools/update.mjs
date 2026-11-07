@@ -2504,9 +2504,15 @@ function recoverR6HostOnly(requestId,packageFile,mode){
  }
 }
 
-export async function command(args=process.argv.slice(2)) {
+export async function command(args=process.argv.slice(2),{approvedRuntimeBHook=null}={}) {
  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
- const cmd=args[0],requestId=safeId(args[2]);
+ const cmd=args[0];
+ if(cmd==='approved-runtime-b-status'||cmd==='approved-runtime-b-apply'){
+  if(approvedRuntimeBHook===null)need(false,'B_UPDATE_HOOK_NOT_INSTALLED');
+  need(typeof approvedRuntimeBHook.command==='function','B_UPDATE_HOOK_INVALID');
+  return approvedRuntimeBHook.command(args);
+ }
+ const requestId=safeId(args[2]);
  if(cmd==='source-bundle-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   return readSourceBundleStatus(requestId);
