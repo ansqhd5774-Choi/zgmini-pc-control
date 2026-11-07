@@ -30,6 +30,97 @@ const stamp=x=>typeof x==='string'&&x.length<=40&&
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const reject=x=>{throw Object.assign(new Error(x),{code:x});};
 
+// These are labels, not permission to return arbitrary strings. The PC ledger
+// structures are not asserted in advance; safe candidates and their types are
+// discovered without returning raw JSON, secrets, URLs or price observations.
+const DIAGNOSTIC_FIELDS=Object.freeze({
+ reason:'code',reasonCode:'code',stopReason:'code',stopCode:'code',
+ errorCode:'code',failureCode:'code',resultCode:'code',mismatchCode:'code',
+ sourcePreflightReason:'code',code:'code',firstFail:'stage',lastPass:'stage',
+ failureStage:'stage',failedStage:'stage',childStage:'stage',
+ publisherStage:'stage',stage:'stage',phase:'stage',
+ expectedObservationDate:'date',actualObservationDate:'date',
+ expectedDate:'date',actualDate:'date',confirmedObservationDate:'date',
+ observedDate:'date',modelVersion:'version',
+ expectedModelVersion:'version',actualModelVersion:'version',
+ reason_code:'code',stop_reason:'code',stop_code:'code',error_code:'code',
+ failure_code:'code',result_code:'code',mismatch_code:'code',
+ source_preflight_reason:'code',first_fail:'stage',last_pass:'stage',
+ last_success_stage:'stage',failure_stage:'stage',failed_stage:'stage',
+ child_stage:'stage',publisher_stage:'stage',
+ expected_observation_date:'date',actual_observation_date:'date',
+ expected_date:'date',actual_date:'date',confirmed_observation_date:'date',
+ observed_date:'date',model_version:'version',
+ expected_model_version:'version',actual_model_version:'version',
+});
+const DIAGNOSTIC_CONTAINERS=new Set([
+ 'diagnostic','diagnostics','details','detail','comparison','rolling',
+ 'expected','actual','failure','error','cause','result','publication',
+ 'child','publisher','stop','source','context','summary','review',
+]);
+const CODE_TERMS=/(?:^|_)(?:STOP|FAIL|FAILED|ERROR|MISMATCH|INVALID|MISSING|UNAVAILABLE|BLOCKED|SKIP|SKIPPED|STALE|EMPTY|DRIFT|CONFLICT|REVIEW|TIMEOUT|DENIED|REJECTED)(?:_|$)/;
+const STAGE_TERMS=/(?:^|_)(?:COLLECT|FETCH|SOURCE|CALCULATE|COMPUTE|SAVE|STORE|PUBLISH|PUBLISHER|WRITE|READ|READBACK|VERIFY|PREVIEW|PRECHECK|START|END|DONE|PASS|STOP|FAIL|CHILD)(?:_|$)/;
+// Never echo a freeform uppercase string merely because it includes FAILURE.
+// Every component must be an explicitly approved diagnostic word.
+const SAFE_WORDS=new Set([
+ 'R178','R179','R181','R183','L7','V1','V2','V3','D1','API',
+ 'PUBLIC','PRIVATE','SOURCE','COLLECT','COLLECTOR','FETCH','FETCHER',
+ 'CALCULATE','CALCULATION','COMPUTE','SAVE','SAVED','STORE','STORED',
+ 'PUBLISH','PUBLISHER','PUBLICATION','WRITE','WRITER','READ','READBACK',
+ 'VERIFY','VERIFIED','PREVIEW','PRECHECK','PREFLIGHT','START','STARTED',
+ 'FINISH','FINISHED','END','DONE','PASS','STOP','FAIL','FAILED','FAILURE',
+ 'ERROR','MISMATCH','INVALID','MISSING','UNAVAILABLE','BLOCKED',
+ 'SKIP','SKIPPED','STALE','EMPTY','DRIFT','CONFLICT','REVIEW','TIMEOUT',
+ 'DENIED','REJECTED','CHILD','PARENT','PRIMARY','SECONDARY','RETRY',
+ 'ROLLING','OBSERVATION','DATE','MODEL','VERSION','DATA','HASH','SHA256',
+ 'CHECKPOINT','READONLY','STATUS','VALUE','VALUES','LATEST','EXPECTED',
+ 'ACTUAL','INSERT','UPDATE','UPDATED','NORMALIZED','DAY','DAILY','GET',
+ 'CORE','RUN','RESULT','SAFE','NO','COMMON','THROUGH','UNREPORTED',
+]);
+const safeWords=x=>x.split('_').length<=8&&
+ x.split('_').every(word=>SAFE_WORDS.has(word));
+const modelVersion=x=>typeof x==='string'&&x.length<=48&&
+ /^(?:R\d{1,4}|V\d{1,4})(?:[._-](?:R\d{1,4}|V\d{1,4}|[A-Z]{1,12}))?$/.test(x)&&
+ !/(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|ACCESS|BEARER|AUTH|PRIVATE|PRICE|URL|KEY)/.test(x)?x:null;
+function diagnosticValue(kind,value){
+ if(kind==='date')return date(value);
+ if(kind==='version')return modelVersion(value);
+ const valid=code(value);
+ if(!valid)return null;
+ return safeWords(valid)&&(kind==='code'?CODE_TERMS:STAGE_TERMS).test(valid)?valid:null;
+}
+function valueType(value){
+ if(value===null)return 'null';
+ if(Array.isArray(value))return 'array';
+ return typeof value;
+}
+function diagnosticState(raw){
+ const fields=[];
+ const values=[];
+ let scanned=0;
+ let truncated=false;
+ const walk=(node,prefix,depth)=>{
+  if(depth>3||!node||typeof node!=='object'||Array.isArray(node))return;
+  for(const [name,value] of Object.entries(node)){
+   if(++scanned>96||fields.length>=24){truncated=true;break;}
+   const full=prefix?prefix+'.'+name:name;
+   const kind=Object.hasOwn(DIAGNOSTIC_FIELDS,name)?DIAGNOSTIC_FIELDS[name]:null;
+   if(kind){
+    fields.push({path:full,type:valueType(value)});
+    const safe=diagnosticValue(kind,value);
+    if(safe!==null&&values.length<16)values.push({path:full,value:safe});
+   }
+   if(depth<3&&DIAGNOSTIC_CONTAINERS.has(name)&&
+      value&&typeof value==='object'&&!Array.isArray(value))
+    walk(value,full,depth+1);
+   if(truncated)break;
+  }
+ };
+ walk(raw,'',0);
+ return {status:values.length?'SAFE_VALUES_FOUND':fields.length?
+  'CANDIDATES_WITHOUT_SAFE_VALUE':'UNKNOWN',fields,values,truncated};
+}
+
 function child(base,name){
  const target=path.join(base,name);
  if(!fs.existsSync(target))return null;
@@ -61,7 +152,8 @@ function ledgerState(base,name){
  const times={};
  for(const field of STAMP_FIELDS){const value=stamp(raw[field]);if(value)times[field]=value;}
  return {present:true,status:code(raw.status)??'UNREPORTED',
-  resultCode:code(raw.code),dates,times,modifiedAt:entry.modifiedAt};
+  resultCode:code(raw.code),dates,times,modifiedAt:entry.modifiedAt,
+  diagnostic:diagnosticState(raw)};
 }
 
 function taskState(queryTask){

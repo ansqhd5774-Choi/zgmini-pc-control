@@ -30,6 +30,7 @@ test('reads only fixed L7 source hashes, narrow ledger fields and task metadata'
   assert.equal(out.task.referencesKnownCollector,true);
   assert.equal(out.ledgers['R181_PRIMARY_LAST_RUN.json'].status,'SOURCE_FAILED');
   assert.equal(out.ledgers['R181_PRIMARY_LAST_RUN.json'].dates.observationDate,'2026-11-06');
+  assert.equal(out.ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic.status,'UNKNOWN');
   assert.deepEqual(Object.keys(out.sources).sort(),[...names].sort());
   assert.ok(out.sources[names[0]].sha256.match(/^[a-f0-9]{64}$/));
   assert.equal(out.providerCalls,0);
@@ -81,6 +82,103 @@ test('symlinks and malformed ledger values cannot escape or leak the boundary',(
   assert.equal(out.task.status,'QUERY_UNAVAILABLE');
   assert.equal(out.ledgers['R181_PRIMARY_LAST_RUN.json'].status,'UNREPORTED');
   assert.deepEqual(out.ledgers['R181_PRIMARY_LAST_RUN.json'].dates,{});
+  assert.equal(out.ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic.status,'UNKNOWN');
   assert.equal(JSON.stringify(out).includes('SECRET'),false);
+ }finally{f.close();}
+});
+
+test('fixed ledgers expose bounded safe cause codes, stages, dates and version',()=>{
+ const f=fixture();try{
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),JSON.stringify({
+   status:'STOP',reasonCode:'SOURCE_FETCH_FAILED',
+   failure:{firstFail:'COLLECT_SOURCE',errorCode:'SOURCE_TIMEOUT',
+    message:'Authorization: Bearer VERY_SECRET_TOKEN',url:'https://private.example/token'},
+   observedDate:'2026-11-07',modelVersion:'R181',
+   token:'VERY_SECRET_TOKEN',price:197.50}));
+  fs.writeFileSync(path.join(f.l7,'ZGMINI_R179_PUBLICATION_LAST_RUN.json'),JSON.stringify({
+   status:'PUBLIC_API_ROLLING_MISMATCH',
+   comparison:{expectedObservationDate:'2026-11-07',
+    actualObservationDate:'2026-11-06',
+    expectedModelVersion:'R179',actualModelVersion:'R178',
+    mismatchCode:'PUBLIC_API_ROLLING_MISMATCH',
+    expected:123.45,actual:118.11},
+   error:'SECRET_TOKEN_AND_URL'}));
+  fs.writeFileSync(path.join(f.l7,'R183_PUBLICATION_RETRY_LAST_RUN.json'),JSON.stringify({
+   status:'PUBLISHER_CHILD_FAILED_REVIEW',
+   publisher:{child:{failedStage:'PUBLISH_READBACK',
+    failureCode:'PUBLISHER_CHILD_FAILED_REVIEW',
+    reason:'https://secret.example/?api_key=VERY_SECRET_TOKEN'}}}));
+  const out=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+  const a=out.ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  const b=out.ledgers['ZGMINI_R179_PUBLICATION_LAST_RUN.json'].diagnostic;
+  const c=out.ledgers['R183_PUBLICATION_RETRY_LAST_RUN.json'].diagnostic;
+  assert.equal(a.status,'SAFE_VALUES_FOUND');
+  assert.ok(a.values.some(x=>x.path==='reasonCode'&&x.value==='SOURCE_FETCH_FAILED'));
+  assert.ok(a.values.some(x=>x.path==='failure.firstFail'&&x.value==='COLLECT_SOURCE'));
+  assert.ok(a.values.some(x=>x.path==='modelVersion'&&x.value==='R181'));
+  assert.ok(b.values.some(x=>x.path==='comparison.expectedObservationDate'&&x.value==='2026-11-07'));
+  assert.ok(b.values.some(x=>x.path==='comparison.actualObservationDate'&&x.value==='2026-11-06'));
+  assert.ok(c.values.some(x=>x.path==='publisher.child.failedStage'&&x.value==='PUBLISH_READBACK'));
+  assert.ok(c.values.some(x=>x.path==='publisher.child.failureCode'&&x.value==='PUBLISHER_CHILD_FAILED_REVIEW'));
+  const json=JSON.stringify(out);
+  for(const secret of ['VERY_SECRET_TOKEN','secret.example','private.example','123.45','118.11','197.5'])
+   assert.equal(json.includes(secret),false,secret);
+  assert.equal(out.providerCalls,0);
+  assert.equal(out.operationalWrites,0);
+ }finally{f.close();}
+});
+
+test('malformed fields show only safe path and type, not arbitrary strings',()=>{
+ const f=fixture();try{
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),JSON.stringify({
+   status:'STOP',reason:'SECRET_TOKEN',reasonCode:'https://secret.example/path',
+   failure:{firstFail:'any freeform source key=SECRET',
+    expectedDate:'2026-02-30',modelVersion:'PRIVATE_TOKEN',
+    errorCode:'SOURCE_FAILED_SECRET_TOKEN',failedStage:'PUBLISH_SECRET'},
+   diagnostic:{lastPass:33,actualDate:['2026-11-07']}}));
+  const d=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+   .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  assert.equal(d.status,'CANDIDATES_WITHOUT_SAFE_VALUE');
+  assert.ok(d.fields.some(f=>f.path==='reason'&&f.type==='string'));
+  assert.ok(d.fields.some(f=>f.path==='diagnostic.lastPass'&&f.type==='number'));
+  assert.ok(d.fields.some(f=>f.path==='diagnostic.actualDate'&&f.type==='array'));
+  assert.deepEqual(d.values,[]);
+  const json=JSON.stringify(d);
+  assert.equal(json.includes('SECRET'),false);
+  assert.equal(json.includes('https://'),false);
+ }finally{f.close();}
+});
+
+test('snake_case allowlisted aliases are inspected without scanning arbitrary names',()=>{
+ const f=fixture();try{
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),JSON.stringify({
+   status:'STOP',reason_code:'SOURCE_FETCH_FAILED',
+   failure:{error_code:'SOURCE_TIMEOUT',last_success_stage:'COLLECT_SOURCE',
+    failed_stage:'PUBLISH_READBACK',unexpected_payload:'PRIVATE_SECRET'},
+   expected_observation_date:'2026-11-07',
+   actual_observation_date:'2026-11-06',model_version:'R181'}));
+  const d=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+   .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  assert.ok(d.values.some(x=>x.path==='reason_code'&&x.value==='SOURCE_FETCH_FAILED'));
+  assert.ok(d.values.some(x=>x.path==='failure.last_success_stage'&&x.value==='COLLECT_SOURCE'));
+  assert.ok(d.values.some(x=>x.path==='failure.failed_stage'&&x.value==='PUBLISH_READBACK'));
+  assert.ok(d.values.some(x=>x.path==='expected_observation_date'&&x.value==='2026-11-07'));
+  assert.equal(JSON.stringify(d).includes('PRIVATE_SECRET'),false);
+ }finally{f.close();}
+});
+
+test('candidate list and nested search remain bounded for large malformed structures',()=>{
+ const f=fixture();try{
+  const failure={};for(let i=0;i<70;i++)failure['untrusted'+i]='PRIVATE_SECRET_'+i;
+  const root={status:'STOP',failure,diagnostic:{}};
+  for(let i=0;i<60;i++)root['untrusted'+i]='PRIVATE_SECRET_'+i;
+  root.diagnostic.failure={failureStage:'PUBLISH_READBACK'};
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),JSON.stringify(root));
+  const d=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+   .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  assert.equal(d.truncated,true);
+  assert.ok(d.fields.length<=24);
+  assert.ok(d.values.length<=16);
+  assert.equal(JSON.stringify(d).includes('PRIVATE_SECRET'),false);
  }finally{f.close();}
 });
