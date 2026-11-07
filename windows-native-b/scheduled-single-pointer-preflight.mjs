@@ -146,11 +146,17 @@ export function inspectWindowsConfiguredRuntimeMode({platform=process.platform,
  need(platform==='win32','B_NATIVE_WINDOWS_REQUIRED');
  const active=existsSync(ACTIVE);
  const installed=path.win32.join(HOME,'INSTALL_RESULT.json');
- for(const file of active?[installed,ACTIVE]:[installed]){
+ const hasInstalled=existsSync(installed);
+ // ACTIVE is the authoritative repeatable-mode selector in the installed
+ // package runner. INSTALL_RESULT is historical and may legitimately be absent.
+ need(active||hasInstalled,'B_NATIVE_INSTALLED_PREIMAGE_MISSING');
+ for(const file of [active?ACTIVE:null,hasInstalled?installed:null].filter(Boolean)){
   const stat=lstat(file);
   need(stat.isFile()&&!stat.isSymbolicLink(),
    'B_NATIVE_RUNTIME_MODE_FILE_REDIRECT');
  }
+ need(existsSync(ACTIVE)===active&&existsSync(installed)===hasInstalled,
+  'B_NATIVE_RUNTIME_MODE_CHANGED_DURING_READ');
  return Object.freeze({status:'RUNTIME_MODE_INVENTORY_ONLY',
   mode:active?'REPEATABLE_ACTIVE_RUNTIME':'FIRST_SINGLE_CMD_UPGRADE',
   activationAllowed:false,operationalWrites:0});
