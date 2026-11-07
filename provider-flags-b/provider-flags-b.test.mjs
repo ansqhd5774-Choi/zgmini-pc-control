@@ -131,6 +131,28 @@ test('CAS drift before switch: keep concurrent edit, do not rollback it',()=>{
   assert.equal(r.code,'PROVIDER_B_CONCURRENT_FILE_DRIFT_STOP');
   assert.equal(fs.readFileSync(e.target,'utf8'),'X=concurrent\n');
 });
+test('post-switch failure restores original bytes from protected backup',()=>{
+  const e=sandbox(),original=Buffer.from('API_KEY=secret\r\nX=1\r\n');
+  fs.writeFileSync(e.target,original);
+  const a=auth(),r=applyApprovedFlags(a,{...e,
+    afterSwitch:()=>{throw Object.assign(new Error('synthetic'),
+      {code:'PROVIDER_B_INJECTED_FAILURE_STOP'});}});
+  assert.equal(r.status,'PROVIDER_B_STOP_RESTORED');
+  assert.equal(r.code,'PROVIDER_B_INJECTED_FAILURE_STOP');
+  assert.equal(fs.readFileSync(e.target).equals(original),true);
+  assert.equal(fs.existsSync(e.sharedLock),false);
+});
+test('post-switch concurrent tampering retains lock for safe reconciliation',()=>{
+  const e=sandbox(),original=Buffer.from('API_KEY=secret\nX=1\n');
+  fs.writeFileSync(e.target,original);
+  const a=auth(),r=applyApprovedFlags(a,{...e,
+    afterSwitch:()=>{fs.writeFileSync(e.target,'X=another-process\n');
+      throw Object.assign(new Error('synthetic'),
+        {code:'PROVIDER_B_POSTCHECK_FAILED_STOP'});}});
+  assert.equal(r.status,'PROVIDER_B_RECOVERY_REQUIRED');
+  assert.equal(fs.existsSync(e.sharedLock),true);
+  assert.equal(fs.readFileSync(e.target,'utf8'),'X=another-process\n');
+});
 test('report outputs only safe fixed keys, hashes and codes',()=>{
   const req=request();
   const raw={status:'PROVIDER_B_APPLIED_VERIFIED',code:'PROVIDER_B_TWO_FLAGS_SET',
