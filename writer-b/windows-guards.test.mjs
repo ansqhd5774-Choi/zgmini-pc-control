@@ -27,7 +27,10 @@ test('malformed Task XML bytes and unsupported UTF-16BE reject read-only',()=>{
 
 test('Core drain requires disabled Task, no active instance/process, no cycle lock',()=>{
  assert.equal(coreQuietFromProbe(quiet(),false),true);
- for(const delta of [{enabled:true},{state:4},{instances:1},
+ assert.equal(coreQuietFromProbe({...quiet(),state:1},false),true,
+  'a disabled Task with no active instances remains quiescent');
+ for(const delta of [{enabled:true},{state:0},{state:2},{state:4},
+  {state:undefined},{instances:1},
   {relatedProcesses:1},{unknownProcessLines:1}])
   assert.equal(coreQuietFromProbe({...quiet(),...delta},false),false);
  assert.equal(coreQuietFromProbe(quiet(),true),false);
