@@ -5,6 +5,9 @@
 // In particular, no arbitrary shell, Task change, provider/DB/D1 operation.
 import {createHash} from 'node:crypto';
 import {buildPinnedVersionedBundlePlan} from './pinned-bundle-profiles.mjs';
+import {isWriterBRequestId} from './writer-b-request-id.mjs';
+import {verifyImmutablePinnedLauncherEvidence} from
+ './immutable-pinned-launcher-evidence.mjs';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const stop=code=>{const e=Error(code);e.code=code;throw e;};
@@ -47,6 +50,12 @@ export function makeWindowsVersionedBundleAdapterCandidate({
   approval:manifest,manifestBytes:registryBytes,
   approvedManifestSha256:hostApprovedRegistrySha256,requestIdentity,
  });
+ const approvedRecord=JSON.parse(registryBytes.toString('utf8')).profiles.find(
+  item=>item.id===manifest.profileId);
+ const approvedLauncherNames=[
+  ...approvedRecord.bundleProfile.requiredLaunchers,
+  ...approvedRecord.bundleProfile.optionalLaunchers,
+ ];
  need(plan.status==='PLAN_ONLY'&&plan.sourceSha===requestIdentity.sourceSha&&
   SHA40.test(manifest.sourceSha)&&SHA64.test(hostApprovedRegistrySha256),
   'B_WINDOWS_PROFILE_DRIFT');
@@ -55,7 +64,7 @@ export function makeWindowsVersionedBundleAdapterCandidate({
   {...manifest.activation.activeRecord,kind:'active-record'},
  ];
  let sourceBytes=null,activeBytes=null,launcherBytes=null,stageReadBack=null;
- let journalId=null,lease=null,requestId=null;
+ let journalId=null,lease=null,requestId=null,approvedCompatibilitySha256=null;
  const requireLease=lock=>need(lock!==null&&lock===lease&&requestId,
   'B_WINDOWS_LOCK_UNOWNED');
  const verifyHandles=async(lock,phase)=>{
@@ -78,6 +87,16 @@ export function makeWindowsVersionedBundleAdapterCandidate({
    })),
    activeRecord:manifest.activation.activeRecord,
   });
+  if(compatibility?.strategy==='IMMUTABLE_VERSION_PINNED_LAUNCHER'){
+   // An exact authenticated approval must pin the evidence bytes. Merely
+   // returning true for launcher safety is never sufficient.
+   await verifyImmutablePinnedLauncherEvidence({
+    evidenceRawBytes:compatibility.evidenceRawBytes,
+    approvedEvidenceSha256:approvedCompatibilitySha256,
+    approvedLauncherNames,manifest,plan,bridge,lock,
+   });
+   return;
+  }
   need(compatibility?.strategy==='STATIC_DISPATCHER_POINTER_SWITCH'&&
    compatibility?.taskUnchanged===true&&
    compatibility?.oldAndNewLaunchersCompatible===true&&
@@ -134,6 +153,7 @@ export function makeWindowsVersionedBundleAdapterCandidate({
    });
    need(auth?.verified===true&&auth?.rawSha256===rawSha256,
     'B_WINDOWS_APPROVAL_NOT_ATTESTED');
+   approvedCompatibilitySha256=auth.compatibilityEvidenceSha256??null;
    const source=await bridge.verifyApprovedSourceTree({
     repo:manifest.sourceRepository,sourceSha:manifest.sourceSha,
     sourceTreeGitOid:manifest.bundle.sourceTreeGitOid,
@@ -148,8 +168,8 @@ export function makeWindowsVersionedBundleAdapterCandidate({
   },
   async inspectPreimage(){return inspect();},
   async acquireSharedWriterLock({requestId:rid,profileId}){
-   need(profileId===manifest.profileId&&typeof rid==='string'&&
-    /^[A-Za-z0-9_-]{12,128}$/.test(rid),'B_WINDOWS_REQUEST_ID');
+   need(profileId===manifest.profileId&&isWriterBRequestId(rid),
+    'B_WINDOWS_REQUEST_ID');
    need(lease===null,'B_WINDOWS_DOUBLE_LOCK');
    const result=await bridge.acquireExistingR17SharedWriterLock({
     requestId:rid,profileId,mode:'EXCLUSIVE_SAME_WRITER_B',
