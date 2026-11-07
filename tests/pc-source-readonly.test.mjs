@@ -142,7 +142,7 @@ test('fixed historical checkout reports HEAD and Writer agreement as candidate o
   'inflation-causal-public-auto-publication-r1.test.mjs']){
   const file=inventory.files.find(x=>x.path==='scripts/pc-writer/'+name);
   assert.match(file?.sha256??'',/^[a-f0-9]{64}$/);
-  assert.equal(file.trackedDirty,false);
+  assert.equal(file.trackedDirty,null,'historical Git status excludes untracked files');
  }
  assert.equal(result.historicalCheckoutCandidate.requiredFiles
   .find(x=>x.path==='scripts/pc-writer/us-breadth-provisional-cycle.mjs').exists,false);
@@ -180,6 +180,24 @@ test('dirty historical candidate hashes are not mistaken for clean per-file stat
  assert.equal(candidate.writerSourceInventory.files.find(x=>x.path==='scripts/pc-writer/run-local.mjs').trackedDirty,null);
  assert.equal(result.sourceResolved,false);
  assert.equal(result.runtimeSourceVerified,false);
+});
+
+test('untracked historical Writer JS never receives a false clean assertion',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release',sha='d'.repeat(40);
+ f.put('start.cmd','rem no source reference');
+ fs.mkdirSync(path.join(f.root,p,'.git'),{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/new-untracked.mjs','export const newFile=1');
+ f.put('data/pc-writer/config.json',JSON.stringify({source:sha}));
+ f.put('data/pc-writer/local-writer-last-run.json',JSON.stringify({source:sha}));
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  // Simulate Git --untracked-files=no returning an empty status for new file.
+  git:(cwd,args)=>args[0]==='rev-parse'?sha:''});
+ const candidate=result.historicalCheckoutCandidate;
+ assert.equal(candidate.trackedDirty,false);
+ const file=candidate.writerSourceInventory.files.find(x=>x.path==='scripts/pc-writer/new-untracked.mjs');
+ assert.match(file.sha256,/^[a-f0-9]{64}$/);
+ assert.equal(file.trackedDirty,null);
 });
 
 test('escaped Git pointer cannot be used to read a historical checkout',t=>{
