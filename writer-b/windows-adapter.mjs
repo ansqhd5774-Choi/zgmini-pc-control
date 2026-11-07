@@ -218,11 +218,13 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    // Probe only literal relative imports in exact approved AFTER bytes, not
    // arbitrary candidate files. Missing dependencies fail before request
    // claim, backup, Task disable or operational source modifications.
+   const beforeFiles=new Map(m.files.filter(file=>file.change==='M')
+    .map(file=>[file.path,sourceRaw(file.path)]));
    const after=new Map(m.files.map(file=>[file.path,
     materializeApprovedWriterFile(file,inputs.get(file.path),
-     Object.hasOwn(file,'insertions')?sourceRaw(file.path):null)]));
+     Object.hasOwn(file,'insertions')?beforeFiles.get(file.path):null)]));
    const sourceReal=fs.realpathSync.native(source).toLowerCase()+path.sep;
-   verifyWriterBImportAvailability({afterFiles:after,existing:relative=>{
+   verifyWriterBImportAvailability({afterFiles:after,beforeFiles,existing:relative=>{
     const file=scoped(source,relative);
     try{
      const stat=fs.lstatSync(file);
