@@ -9,7 +9,7 @@
 - 수신: private repo의 원소유자 `pc-writer-provider-flags-once` Issue, 기존 공통 B의 `pc-writer-b-install` label 재사용, `opened` 한 번만
 - 승인: `approvals/writer-config/inflation19-flags-<id>.json` 원문 SHA256이 요청과 일치해야 함 (Windows checkout의 LF→CRLF 변환과 구별하기 위해 고정 Git `HEAD:path` 원본 blob 바이트로 계산; 워크트리에는 Git 줄바꿈 변환만 허용)
 - 실행: 자체 Windows Runner의 고정 `.github/workflows/pc-writer-provider-flags-once.yml`
-- 보호: Writer source B 공유 잠금, 기존 요청 ID 단회 claim, 원본 `providers.env`와 동일한 상위 폴더의 고유 이름·동일 ACL 비공개 백업·fsync, 최종 CAS, 원자적 파일 교체, 실파일 재조회·복구 확인
+- 보호: Writer source B 공유 잠금, 기존 요청 ID 단회 claim, 원본 `providers.env`와 동일한 상위 폴더의 고유 이름·동일 ACL 비공개 백업·fsync, 최종 CAS, 원자적 파일 교체, 실파일 재조회·복구 확인 (백업 `fsync`는 Windows `FlushFileBuffers`의 요구에 맞는 쓰기 가능 핸들로만 호출; 권한 범위 확대·원본 파일 내용 수정 없음)
 - 회수: `results/provider-flags-b-<requestId>.json/.txt` 2/2 동일바이트 재조회 및 고유 Issue 댓글
 - 실패·결과 불명: 기존 고유 ID를 조회한다. 단회 Issue·requestId를 재사용하거나 다른 명령으로 우회하지 않는다.
 
