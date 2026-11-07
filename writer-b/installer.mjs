@@ -75,7 +75,8 @@ export function verifyWriterBCandidate(manifest,candidate){
    candidate.clean===true&&sameKeys(candidate.sha256,paths),
    'WRITER_B_CANDIDATE_SOURCE_STOP');
  for(const item of manifest.files)
-  need(candidate.sha256[item.path]===item.afterSha256,
+  need(candidate.sha256[item.path]===
+   (Object.hasOwn(item,'insertions')?item.candidateSha256:item.afterSha256),
     'WRITER_B_CANDIDATE_HASH_STOP');
  return candidate;
 }
@@ -191,3 +192,4 @@ export async function performWriterBInstall(auth,io){
  }
  return result;
 }
+

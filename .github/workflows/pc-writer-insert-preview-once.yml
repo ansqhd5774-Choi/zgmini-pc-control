@@ -1,0 +1,47 @@
+name: ZGMINI Generic Writer Insert Preview A Read-Only
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-writer-insert-preview-a
+  cancel-in-progress: false
+jobs:
+  exact-writer-insert-preview-a:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.action == 'opened' &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-writer-insert-preview' &&
+      contains(github.event.issue.labels.*.name, 'pc-writer-insert-preview') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout pinned reviewed control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: writer-preview-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Inspect exact PC source without mutation
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-preview-control\writer-b\preview-entry.mjs"'
+      - name: Recover sanitized read-only JSON TXT
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-preview-control\writer-b\preview-report.mjs"'

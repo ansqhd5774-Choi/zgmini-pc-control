@@ -10,6 +10,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {sha256} from './contract.mjs';
+import {materializeApprovedWriterFile} from './insert-only-patch.mjs';
 import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
 import {performWriterBInstall} from './installer.mjs';
 import {commitApprovedWriterBOverlay} from './git-stage.mjs';
@@ -251,7 +252,9 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     const ls=git(source,'ls-tree',m.baseHead,'--',file.path);
     need(file.change==='M'?ls.startsWith('100644 blob '):ls==='',
      'WRITER_B_GIT_MODE_PREIMAGE_STOP');
-    overlay.set(file.path,rawSafe(scoped(candidateRoot,file.path),candidateRoot));
+    overlay.set(file.path,materializeApprovedWriterFile(file,
+     rawSafe(scoped(candidateRoot,file.path),candidateRoot),
+     Object.hasOwn(file,'insertions')?sourceRaw(file.path):null));
    }
    const sourceRef=`refs/heads/writer-b/${auth.requestId}`;
    const result=commitApprovedWriterBOverlay({stage,base:m.baseHead,
@@ -431,3 +434,4 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   process.exitCode=1;
  }
 }
+
