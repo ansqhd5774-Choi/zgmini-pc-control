@@ -26,6 +26,8 @@ jobs:
     defaults:
       run:
         shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
     steps:
       - name: Pin reviewed control source
         id: control
