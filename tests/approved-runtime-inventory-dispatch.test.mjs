@@ -9,10 +9,13 @@ import {runApprovedRuntimeInventory} from '../controller/approved-runtime-invent
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const temp=()=>fs.mkdtempSync(path.join(os.tmpdir(),'generic-dispatch-'));
 const withTmp=async fn=>{const dir=temp();try{await fn(dir);}finally{fs.rmSync(dir,{recursive:true,force:true});}};
+const identity={sourceRepository:'ansqhd5774-Choi/zgmini',
+ sourceBranch:'codex/theme',sourceSha:'1'.repeat(40)};
 const manifest=(profiles=[])=>Buffer.from(JSON.stringify({
- schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V1',profiles,
+ schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2',profiles,
 }));
-const profile=(id,subdir)=>({id,rootSegments:['pc-writer',subdir],
+const profile=(id,subdir,sourceSha=identity.sourceSha)=>({id,
+ binding:{...identity,sourceSha},rootSegments:['pc-writer',subdir],
  files:[{key:'install',relativePath:'INSTALL_RESULT.json'}],directories:[],tasks:[]});
 const setup=(root,bytes)=>{
  fs.mkdirSync(path.join(root,'pc-writer','controller-approvals'),{recursive:true});
@@ -23,7 +26,7 @@ const setup=(root,bytes)=>{
 test('before B-grade registration, missing PIN is clean BLOCKED even with manifest present',async()=>{
  await withTmp(async root=>{
   const bytes=manifest([profile('theme','theme-runtime')]);setup(root,bytes);
-  const result=runApprovedRuntimeInventory({dataRoot:root,host:{},
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,host:{},
    queryTask:()=>{throw Error('should not query task');}});
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'APPROVED_INVENTORY_NOT_REGISTERED');
@@ -34,7 +37,7 @@ test('before B-grade registration, missing PIN is clean BLOCKED even with manife
 
 test('approved SHA but manifest not installed yields clean bounded BLOCKED',async()=>{
  await withTmp(async root=>{
-  const result=runApprovedRuntimeInventory({dataRoot:root,
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:'a'.repeat(64)}});
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'APPROVED_INVENTORY_REGISTRY_ABSENT');
@@ -46,10 +49,11 @@ test('installed registry and independent host approval PIN grant one generic ope
  await withTmp(async root=>{
   const bytes=manifest([profile('theme','theme-runtime'),profile('other','other-runtime')]);
   setup(root,bytes);
-  const result=runApprovedRuntimeInventory({dataRoot:root,
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(bytes)}});
   assert.equal(result.status,'PASS');
-  assert.equal(result.profileCount,2);
+  assert.equal(result.registeredCount,2);
+  assert.equal(result.selectedCount,2);
   assert.equal(result.profiles[0].rootExists,false);
   assert.equal(result.profiles[1].rootExists,false);
   assert.equal(result.operationalWrites,0);
@@ -63,7 +67,7 @@ test('post-approval registry tampering is blocked and returns no contents',async
   const original=manifest([profile('theme','theme-runtime')]);
   const changed=manifest([profile('unapproved','new-runtime')]);
   setup(root,changed);
-  const result=runApprovedRuntimeInventory({dataRoot:root,
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(original)}});
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'APPROVED_INVENTORY_REGISTRY_DRIFT');
@@ -74,12 +78,12 @@ test('post-approval registry tampering is blocked and returns no contents',async
 test('an extra untrusted request selector cannot influence the fixed registry operation',async()=>{
  await withTmp(async root=>{
   const bytes=manifest([profile('approved','safe-runtime')]);setup(root,bytes);
-  const result=runApprovedRuntimeInventory({dataRoot:root,
+  const result=runApprovedRuntimeInventory({request:{...identity,
+   profileId:'bad',path:'../../private.json',operation:'arbitrary-shell'},dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(bytes)},
-   request:{profileId:'bad',path:'../../private.json',operation:'arbitrary-shell'},
    profileId:'bad',registryPath:'../../private.json'});
   assert.equal(result.status,'PASS');
-  assert.equal(result.profileCount,1);
+  assert.equal(result.selectedCount,1);
   assert.equal(result.profiles[0].profileId,'approved');
   assert.ok(!JSON.stringify(result).includes('private.json'));
  });
@@ -90,7 +94,7 @@ test('even SHA-matched malicious paths cannot expand rights',async()=>{
   const bytes=manifest([{
    ...profile('theme','theme-runtime'),files:[{key:'arbitrary',relativePath:'../../secret.json'}],
   }]);setup(root,bytes);
-  const result=runApprovedRuntimeInventory({dataRoot:root,
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(bytes)}});
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'APPROVED_INVENTORY_REGISTRY_INVALID');
@@ -105,9 +109,48 @@ test('registry symlink redirection denied regardless of same approved content',a
   fs.symlinkSync(path.join(root,'approved.json'),
    path.join(root,'pc-writer','controller-approvals',
     'approved-runtime-inventory-profiles.json'),'file');
-  const result=runApprovedRuntimeInventory({dataRoot:root,
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(bytes)}});
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.code,'APPROVED_INVENTORY_REGISTRY_INVALID');
+ });
+});
+
+test('128 approved profiles: source SHA selects only its own profile, not a 128-profile report',async()=>{
+ await withTmp(async root=>{
+  const profiles=Array.from({length:128},(_,i)=>
+   profile('profile'+i,'runtime'+i,(i+1).toString(16).padStart(40,'0')));
+  const bytes=manifest(profiles);setup(root,bytes);
+  const selectedSha=(128).toString(16).padStart(40,'0');
+  const result=runApprovedRuntimeInventory({request:{...identity,sourceSha:selectedSha},
+   dataRoot:root,host:{approvedRuntimeInventorySha256:sha(bytes)}});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.registeredCount,128);
+  assert.equal(result.selectedCount,1);
+  assert.equal(result.profiles[0].profileId,'profile127');
+  assert.ok(!JSON.stringify(result).includes('profile126'));
+  assert.ok(Buffer.byteLength(JSON.stringify(result))<32768);
+ });
+});
+
+test('unregistered source SHA never gains profile lookup authority',async()=>{
+ await withTmp(async root=>{
+  const bytes=manifest([profile('theme','theme-runtime')]);setup(root,bytes);
+  const result=runApprovedRuntimeInventory({request:{...identity,sourceSha:'f'.repeat(40)},
+   dataRoot:root,host:{approvedRuntimeInventorySha256:sha(bytes)}});
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'APPROVED_INVENTORY_SOURCE_UNREGISTERED');
+  assert.ok(!JSON.stringify(result).includes('theme-runtime'));
+ });
+});
+
+test('more than four approved profiles for one source remain bounded',async()=>{
+ await withTmp(async root=>{
+  const bytes=manifest(Array.from({length:5},(_,i)=>profile('same'+i,'runtime'+i)));
+  setup(root,bytes);
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
+   host:{approvedRuntimeInventorySha256:sha(bytes)}});
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.code,'APPROVED_INVENTORY_SELECTION_TOO_LARGE');
  });
 });
