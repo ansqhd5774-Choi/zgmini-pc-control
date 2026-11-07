@@ -18,8 +18,8 @@ const profile=(id,subdir,sourceSha=identity.sourceSha)=>({id,
  binding:{...identity,sourceSha},rootSegments:['pc-writer',subdir],
  files:[{key:'install',relativePath:'INSTALL_RESULT.json'}],directories:[],tasks:[]});
 const setup=(root,bytes)=>{
- fs.mkdirSync(path.join(root,'pc-writer','controller-approvals'),{recursive:true});
- fs.writeFileSync(path.join(root,'pc-writer','controller-approvals',
+ fs.mkdirSync(path.join(root,'pc-writer'),{recursive:true});
+ fs.writeFileSync(path.join(root,'pc-writer',
   'approved-runtime-inventory-profiles.json'),bytes);
 };
 
@@ -104,10 +104,10 @@ test('even SHA-matched malicious paths cannot expand rights',async()=>{
 test('registry symlink redirection denied regardless of same approved content',async()=>{
  await withTmp(async root=>{
   const bytes=manifest([profile('theme','theme-runtime')]);
-  fs.mkdirSync(path.join(root,'pc-writer','controller-approvals'),{recursive:true});
+  fs.mkdirSync(path.join(root,'pc-writer'),{recursive:true});
   fs.writeFileSync(path.join(root,'approved.json'),bytes);
   fs.symlinkSync(path.join(root,'approved.json'),
-   path.join(root,'pc-writer','controller-approvals',
+   path.join(root,'pc-writer',
     'approved-runtime-inventory-profiles.json'),'file');
   const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(bytes)}});
