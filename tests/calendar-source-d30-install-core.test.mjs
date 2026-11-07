@@ -6,9 +6,14 @@ import {installD30ApprovedThreeFiles} from '../calendar-source-d30/install-core.
 const PATHS=D30_INSTALL_CONTRACT.operationalFiles.map(x=>x.path);
 const OLD='a'.repeat(40),NEXT='b'.repeat(40);
 const ROOT='E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release';
-const bytes=Object.fromEntries(PATHS.map((p,i)=>[p,String(i+1).repeat(64)]));
+const bytes=Object.fromEntries(D30_INSTALL_CONTRACT.operationalFiles.map(x=>
+  [x.path,x.baseSha256]));
+bytes[PATHS[1]]='f80bced7233ba9da5511a73bf324ae73a4a7c505ecf1ce9f690cb412b98b1b62';
+const MERGED='9'.repeat(64); // test-only synthetic after digest
 const targets=Object.fromEntries(D30_INSTALL_CONTRACT.operationalFiles.map(x=>
-  [x.path,{sha256:x.targetSha256,blob:x.targetBlob}]));
+  [x.path,{sha256:x.path===PATHS[1]?MERGED:x.targetSha256,
+    candidateSha256:x.targetSha256,blob:x.targetBlob,
+    preservationVerified:x.path===PATHS[1]}]));
 const activeCore={runtimeSourceVerified:true,evidenceLevel:'LIVE_CORE_EXECUTION_VERIFIED',
   sourceRoot:ROOT,runtimeSourceSha:OLD,evidenceIssue:602,
   evidenceRequestId:'pc-fixture-a'};
@@ -16,7 +21,13 @@ const manifest={scope:D30_INSTALL_CONTRACT.scope,
   sourceHead:D30_INSTALL_CONTRACT.sourceHead,sourceRoot:ROOT,beforeSourceSha:OLD,
   approvalEvidence:'fixture-only-not-real-authorization',
   files:D30_INSTALL_CONTRACT.operationalFiles.map(x=>({path:x.path,
-    beforeSha256:bytes[x.path],targetBlob:x.targetBlob,targetSha256:x.targetSha256}))};
+    beforeSha256:bytes[x.path],targetBlob:x.targetBlob,targetSha256:x.targetSha256,
+    afterSha256:x.path===PATHS[1]?MERGED:x.targetSha256,
+    ...(x.path===PATHS[1]?{mergePreview:{
+      status:'CLEAN_PRESERVED_VERIFIED',beforeSha256:bytes[x.path],
+      baseSha256:x.baseSha256,candidateSha256:x.targetSha256,afterSha256:MERGED,
+      conflictCount:0,preservedVerified:true,sourceWrites:0,
+      evidenceIssue:999,evidenceRequestId:'fixture-merge-not-pc-evidence'}}:{})}))};
 
 function fixture(){
   const calls=[];
@@ -29,14 +40,17 @@ function fixture(){
       installedFileHashes:{...files},gitHead:head,configSource:config,
       sourceRoot:ROOT,trackedDirty:[],stagedPaths:[],
       coreShaConsumers:['CORE_PUBLISHER','CNN_ARCHIVE_SIDECAR']};},
-    async stageSourceTargets(paths,sourceHead){calls.push('stage');
+    async stageApprovedTargets(paths,sourceHead,approved){calls.push('stage');
       assert.deepEqual(paths,PATHS);assert.equal(sourceHead,manifest.sourceHead);
-      return structuredClone(targets);},
+      assert.deepEqual(approved,manifest);
+      return {stageId:'fixture-staged-approved-after-bytes',files:structuredClone(targets)};},
     async verifyExclusiveLease(){calls.push('lease');},
     async verifyCoreQuiesced(){calls.push('quiesced');},
     async snapshotOriginal(paths){calls.push('backup');assert.deepEqual(paths,PATHS);
       return {backupId:'fixture-recoverable-copy',readbackVerified:true};},
-    async applyExactPaths(paths){calls.push('apply');files=Object.fromEntries(paths.map(p=>
+    async applyStagedExactPaths(paths,stageId){calls.push('apply');
+      assert.equal(stageId,'fixture-staged-approved-after-bytes');
+      files=Object.fromEntries(paths.map(p=>
       [p,targets[p].sha256]));return {updatedPaths:paths};},
     async commitExactPaths(paths,beforeSha){calls.push('commit');
       assert.equal(beforeSha,OLD);head=NEXT;
@@ -74,7 +88,7 @@ test('missing actual A-grade evidence stops without a lease or write',async()=>{
 test('mismatched #511 overlay stops before staging',async()=>{
   const h=fixture(),orig=h.attest;
   h.attest=async()=>{const r=await orig();r.installedFileHashes[PATHS[2]]=
-    '3fa8e1039fcedd3b2fb07b888996f845c6b7102505acdba7608818cb56238871';
+    '8'.repeat(64);
     return r;};
   await assert.rejects(installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h}),
     {code:'ER1_D30_FILE_SCOPE_OR_DIGEST_MISMATCH'});
@@ -98,11 +112,37 @@ test('tracked-dirty Core checkout cannot be silently committed',async()=>{
 });
 
 test('target file hash substitution fails before lock acquisition',async()=>{
-  const h=fixture();h.stageSourceTargets=async()=>({...targets,
-    [PATHS[1]]:{...targets[PATHS[1]],sha256:'c'.repeat(64)}});
+  const h=fixture();h.stageApprovedTargets=async()=>({stageId:'fixture-stage',files:{...targets,
+    [PATHS[1]]:{...targets[PATHS[1]],sha256:'c'.repeat(64)}}});
   await assert.rejects(installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h}),
     {code:'ER1_D30_TARGET_BYTES_DRIFT'});
   assert.deepEqual(h.calls,['authority','attest']);
+});
+
+test('candidate PR blob staged wholesale fails when Windows PC overlay needs merge',async()=>{
+  const h=fixture();h.stageApprovedTargets=async()=>({stageId:'fixture-stage',files:{...targets,
+    [PATHS[1]]:{...targets[PATHS[1]],sha256:manifest.files[1].targetSha256}}});
+  await assert.rejects(installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h}),
+    {code:'ER1_D30_TARGET_BYTES_DRIFT'});
+  assert.deepEqual(h.calls,['authority','attest']);
+});
+
+test('unverified staging preservation fails before acquiring write lease',async()=>{
+  const h=fixture();h.stageApprovedTargets=async()=>({stageId:'fixture-stage',files:{...targets,
+    [PATHS[1]]:{...targets[PATHS[1]],preservationVerified:false}}});
+  await assert.rejects(installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h}),
+    {code:'ER1_D30_TARGET_BYTES_DRIFT'});
+  assert.deepEqual(h.calls,['authority','attest']);
+});
+
+test('live readback cannot accept candidate-only digest after merged install',async()=>{
+  const h=fixture();h.verifyFinal=async()=>({gitHead:NEXT,configSource:NEXT,
+    clean:true,protectedUnchanged:true,coreTaskRestored:true,
+    fileSha256:{...Object.fromEntries(PATHS.map(p=>[p,targets[p].sha256])),
+      [PATHS[1]]:manifest.files[1].targetSha256}});
+  const result=await installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h});
+  assert.equal(result.status,'ROLLED_BACK');
+  assert.equal(result.code,'ER1_D30_FINAL_READBACK_STOP');
 });
 
 test('prewrite drift after lease stops before backup or file writes',async()=>{
