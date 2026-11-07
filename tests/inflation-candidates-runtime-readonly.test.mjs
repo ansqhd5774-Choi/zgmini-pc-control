@@ -116,3 +116,20 @@ test('no directory, unexpected root and symlinked candidate directory',()=>{
     assert.equal(inspect(x.root).candidateDirectoryStatus,'UNSAFE');
   }finally{x.cleanup();}
 });
+
+test('Fed G17 1972/1999 history is valid without accepting invalid calendar dates',()=>{
+  const x=mk();try{
+    fixture(x.target);
+    const historical=[row('1972-01-01',44),row('1999-12-01',83),row('2026-09-01',101)];
+    write(x.target,'fed-g17-manufacturing-ip.json',{
+      ...header('FEDERAL_RESERVE_G17'),observations:historical});
+    const good=inspect(x.root).indicators.find(i=>i.id===29);
+    assert.equal(good.status,'PRESENT_VALID');
+    assert.equal(good.observationCount,3);
+    assert.equal(good.latestObservationDate,'2026-09-01');
+    historical[1]=row('1999-02-30',83);
+    write(x.target,'fed-g17-manufacturing-ip.json',{
+      ...header('FEDERAL_RESERVE_G17'),observations:historical});
+    assert.equal(inspect(x.root).indicators.find(i=>i.id===29).status,'INVALID');
+  }finally{x.cleanup();}
+});
