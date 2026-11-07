@@ -2,6 +2,10 @@
 // Live Windows probes, clock and sleeps are supplied by the adapter. This
 // helper never modifies a Task, lock, source checkout, DB, or config.
 export const MAX_CORE_IDLE_WAIT_MS=6*60000;
+// A second wait occurs after isolated staging, inside the same 12-minute
+// GitHub Actions job as preflight, rollback and final result reporting. Keep
+// the late natural-idle window short so the bounded transaction can finish.
+export const MAX_POST_PREPARE_IDLE_WAIT_MS=90000;
 export const CORE_IDLE_POLL_MS=1500;
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
