@@ -201,16 +201,21 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
         sourceSha:auth.manifest.sourceSha,profileId:auth.manifest.profileId},
       trustedProfiles:capability.trustedProfiles,adapter:capability.adapter});
   }
-  // Do not treat a local PASS as public verified 2/2 report.
-  return {status:outcome?.status==='PASS'?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
-    outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
-    'DIRECT_B_EFFECT_BLOCKED',
-    code:outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_STATE_UNKNOWN':
-      outcome?.status==='PASS'?'DIRECT_B_LOCAL_EFFECT_PASS':'DIRECT_B_EFFECT_STOP',
+  // An effect may have occurred even when the local JSON/TXT ledger failed.
+  // Do not promote that ambiguous state to a verified B success.
+  const ledgerComplete=outcome?.status==='PASS'&&
+    outcome?.endToEndDone===true&&outcome?.reportStatus==='JSON_TXT_2_OF_2';
+  const ledgerIncomplete=outcome?.status==='PASS'&&!ledgerComplete;
+  return {status:ledgerComplete?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
+    outcome?.status==='STATE_UNKNOWN'||ledgerIncomplete?
+      'DIRECT_B_EFFECT_UNKNOWN':'DIRECT_B_EFFECT_BLOCKED',
+    code:ledgerIncomplete?'DIRECT_B_LEDGER_INCOMPLETE':
+      outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_STATE_UNKNOWN':
+      ledgerComplete?'DIRECT_B_LOCAL_EFFECT_PASS':'DIRECT_B_EFFECT_STOP',
     requestId:auth.request.requestId,manifestSha256:sha(auth.raw),
     controlSha:auth.controlSha,sourceSha:auth.manifest.sourceSha,
     mode:auth.mode,reportStatus:outcome?.reportStatus??'INCOMPLETE',
-    operationSucceeded:outcome?.status==='PASS'};
+    operationSucceeded:ledgerComplete};
 }
 
 async function main(){
