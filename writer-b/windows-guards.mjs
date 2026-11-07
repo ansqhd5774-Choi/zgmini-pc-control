@@ -34,6 +34,23 @@ export function coreQuietFromProbe(probe,coreCycleLockExists){
   probe.unknownProcessLines===0&&coreCycleLockExists===false;
 }
 
+// A live Writer B may pause the Scheduler only after two consecutive
+// read-only idle samples. Never interpret an enabled Task as already drained;
+// the existing post-disable check remains mandatory for a start race.
+export function coreReadyForMaintenance(probe,coreCycleLockExists){
+ return probe?.enabled===true&&probe.state===3&&
+  probe.instances===0&&probe.relatedProcesses===0&&
+  probe.unknownProcessLines===0&&coreCycleLockExists===false;
+}
+
+export function coreMaintenanceWindowBlockCode(probe,coreCycleLockExists){
+ if(coreReadyForMaintenance(probe,coreCycleLockExists))return null;
+ if(coreCycleLockExists===true||probe?.instances>0||
+    probe?.relatedProcesses>0||probe?.state===4)
+  return 'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED';
+ return 'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED';
+}
+
 const ENTRYPOINTS=new Set(['scripts/pc-writer/run-local.mjs',
  'scripts/pc-writer/local-cycle.mjs']);
 const WRITER_DATA=/^E:\\ZGmini\\data\\pc-writer\\/i;

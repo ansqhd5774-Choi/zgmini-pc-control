@@ -101,7 +101,8 @@ export function verifyPreparedWriterCommit(manifest,prepared){
 
 const REQUIRED_IO=[
  'acquireSharedWriterLock','readPcPreimage','readCandidate','claimRequest',
- 'backupOriginal','prepareIsolatedCommit','pauseCore','waitForCoreDrain',
+ 'backupOriginal','prepareIsolatedCommit','waitForCoreIdleWindow',
+ 'pauseCore','waitForCoreDrain',
  'assertCoreQuiet','switchPreparedSource','assertWriterSource','changeConfigSource',
  'assertConfigSource','restoreCore','verifyCoreDefinitionUnchanged',
  'restoreOriginalConfig','restoreOriginalSource','verifyOriginalState',
@@ -125,6 +126,12 @@ export async function performWriterBInstall(auth,io){
   await io.acquireSharedWriterLock(auth.requestId);acquired=true;
   before=verifyWriterBPreimage(manifest,await io.readPcPreimage(manifest));
   verifyWriterBCandidate(manifest,await io.readCandidate(manifest));
+
+  // Observe the Core before claiming the one-shot maintenance request or
+  // creating backups/commits. A busy Core is a clean preflight deferral,
+  // not a partially started installation.
+  await io.waitForCoreIdleWindow();
+
   await io.claimRequest(auth.requestId);claimed=true;
   await io.backupOriginal(before,manifest);
   prepared=verifyPreparedWriterCommit(manifest,
