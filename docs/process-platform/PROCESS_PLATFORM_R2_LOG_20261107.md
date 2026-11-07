@@ -173,3 +173,12 @@
 - [PR #627](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/627) **main 병합** SHA `8df0a81e7e21c72ffbb51e9af528993ecd8ca2eb`. 정확히 4파일만 변경 (`writer-b/report.mjs`, `writer-b/receiver.test.mjs`, `writer-b/windows-guards.mjs`, `writer-b/windows-guards.test.mjs`), 기존 Controller/Calendar/R17/물가지표 파일·Workflow 변경 0. `main` 원격 4파일 compare/핵심 코드 재조회 확인.
 - 독립 `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **43/43 PASS, exit 0**. 실제 Windows `enabled=false, state=2` 재현 여부·Task pause/복구·Sidecar 전 체인 실증은 이 테스트로 확정되지 않음.
 - **LAST PASS:** source main 안전 결함 수정/43 fixture. **FIRST FAIL/운영 의존:** #68 기존 단일 담당의 실제 Controller 설치·신규 A 활성, PC Writer Task/파일 지문, 원담당 B 승인 manifest 및 첫 실PC 정규 1회 설치/복구 결과 부재. **R2 20% 유지**, 신규 A/B 요청·PC/원자료·SQLite/D1·예약 쓰기 0.
+
+## 2026-11-07 — 사용자 승인 R17 설치 인수 및 실PC 정규 B 1회 요청
+
+- 명시적 사용자 변경: R17 단일 B 설치 책임 → 현재 R2 총괄. [#68 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6699762305). 다른 일반챗 수신 ACK는 별도.
+- 실PC A [#628](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/628#issuecomment-6699772094) PASS/CORE_READONLY_DIAGNOSIS, Controller db8924162d42adf6ee6aa27a04ce1719c8fe96c2, 보호 전후 해시 동일, 원자료/API/D1 운영 쓰기 0, 결과 JSON/TXT 원격 2/2 재조회.
+- db892→6348 누적 Controller/config 6파일(기존 R17 5파일 동일 바이트 + 신규 pc-source-readonly 1파일), workflow 설치 변경 없음. 독립 감사 GO: 파일 SHA 6/6, 기존 fingerprint 521548 재현, 신규 fingerprint 9aac7af1a1f00d31dd2ba63f54236ea878ec7055ec7caa99b979f12a8b1763e9, heavy scope/purpose/controllerOnlyInstall 계약 유효.
+- 새 불변 manifest [PR #629](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/629) main merge 2ca6204f5653d1da66ced2ecf64bff4a141a7272, 승인 RAW SHA256 75aebe1445b2c40e49ea852ec7ef86fac2b152c7202b82f0abfa9b93f1fb24e1, 원격 바이트 일치. 기존 #615 수정 없음.
+- **정규 B 신규 단회 요청 [#630](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/630)** requestId pc-update-2b963307-a5dd-4225-9366-29d0687e6a24, pc-maintenance/controller-update, target 6348be5201801e008be10867fd68add4ddeca52c. 결과/원장/설치 SHA/보호 상태는 아직 미확정; 동일 ID만 추적하고 재요청 금지.
+- LAST PASS #628 실제 사전 A 및 #629 승인 main; FIRST PENDING #630 독립 유지보수 결과와 새 A operation 실증. **R2 20% 유지**. Core/Writer/Calendar·SQLite/D1·예약 변화 확인 안 됨.
