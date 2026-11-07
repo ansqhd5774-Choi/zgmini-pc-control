@@ -82,7 +82,7 @@ values must be verified against approved host registration before use.
 has one `id` and one source binding; the optional `bundleProfile.id` must equal
 the parent profile `id`. The B writer must update only the selected profile
 through its independently protected B transaction, preserving all other
-entries, and atomically CAS the single external registry plus trusted host PIN.
+entries, and journaled, separately CAS the external registry and trusted host PIN with backup/readback/reverse rollback. This is **not** an atomic two-file operation.
 Current A code is a read-only consumer and does not implement this B transaction.
 
 ## Guarantees, scope and limitations
@@ -104,7 +104,7 @@ Current A code is a read-only consumer and does not implement this B transaction
   registry >128 KiB is rejected, and nested selected output >20 KiB is rejected.
 - No source-identity match yields `BLOCKED/APPROVED_INVENTORY_SOURCE_UNREGISTERED`.
   Five or more profiles matching one identity yields bounded
-  `BLOCKED/APPROVED_INVENTORY_SELECTION_TOO_LARGE`. A source revision needs
+  `BLOCKED/APPROVED_INVENTORY_SELECTION_TOO_LARGE`. This is an **explicit future scalability limit**, not a current feature blocker; before registering five or more on a shared SHA, implement approved bounded pagination/selection without changing the seven-field Issue contract. A source revision needs
   an exact new binding approved through B maintenance, but never a new
   per-feature Controller code branch or full Controller source installation.
 - The installed current `host.json` does **not** yet expose
@@ -114,7 +114,10 @@ Current A code is a read-only consumer and does not implement this B transaction
   yields `BLOCKED/APPROVED_INVENTORY_REGISTRY_ABSENT` and a changed unapproved
   registry yields `BLOCKED/APPROVED_INVENTORY_REGISTRY_DRIFT`.
 - Changing a pin is itself a **B-grade** trusted approval state transition;
-  the actual secure host-PIN config-only update path **remains unimplemented**.
+  a narrow host-PIN + registry **prototype** with offline tests now exists in
+  `writer-b/approved-versioned-bundle/approved-registry-cas.mjs` and its
+  `windows-registry-pin-adapter.mjs` candidate, but the current installed
+  Windows Writer B still **does not implement or authorize** that effect.
   That is an integration prerequisite, not a reason to re-install Controller
   source for each new content feature.
 - This is a portable module and tests, **not** a completed integration into
