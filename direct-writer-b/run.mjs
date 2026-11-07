@@ -148,6 +148,18 @@ export function loadApprovedRaw({event,env,controlRoot,
     actualHead:gitHead(controlRoot)});
 }
 
+// The approved source SHA must match the actual candidate checkout. The
+// workflow chooses this fixed directory after the approval-first preflight;
+// the Issue cannot select an alternate path or repository.
+export function verifyPinnedSourceCheckout(auth,{sourceRoot,
+  gitHead=root=>git(root,['rev-parse','HEAD'],512).toString('utf8').trim()}={}){
+  need(typeof sourceRoot==='string'&&path.isAbsolute(sourceRoot)&&
+    SHA40.test(auth?.manifest?.sourceSha??'')&&
+    auth.manifest.sourceSha===gitHead(sourceRoot),
+  'DIRECT_B_CANDIDATE_SOURCE_DRIFT');
+  return Object.freeze({sourceSha:auth.manifest.sourceSha,sourceRoot});
+}
+
 export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
   pinRunner=null,bundleRunner=null,
   configuredRunner=dispatchConfiguredRuntimeB}={}){
@@ -219,6 +231,8 @@ async function main(){
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   const controlRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-control');
   const auth=loadApprovedRaw({event,env,controlRoot});
+  verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(env.GITHUB_WORKSPACE??'',
+    'generic-b-approved-source')});
   // The sole native factory is code in the fixed reviewed checkout. Issue body
   // cannot select modules, paths, commands, targets or bridge capabilities.
   const fixedBridge=new URL('./native-adapter.mjs',import.meta.url);
