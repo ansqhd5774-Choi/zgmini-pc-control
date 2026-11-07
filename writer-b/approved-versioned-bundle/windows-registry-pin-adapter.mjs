@@ -40,7 +40,7 @@ function fixedTargets(targets){
    !value.includes('..')&&!value.includes('\\\\?\\')&&!value.includes('\\\\.\\'),
    'B_PIN_WINDOWS_TARGET_PATH');
  const base=path.win32.join(targets.dataRoot,'pc-writer');
- need(equalPath(targets.registryFile,path.win32.join(base,'controller-approvals',
+ need(equalPath(targets.registryFile,path.win32.join(base,
   'approved-runtime-inventory-profiles.json'))&&
   equalPath(targets.sharedWriterLock,path.win32.join(base,
    'writer-source-install.lock'))&&
@@ -66,6 +66,7 @@ export function makeWindowsRegistryPinBAdapter({
  authenticatedReceiver,targets,requestId,approvedRegistryAfterBytes,
  verifyApproval,lockApi,
  fileIO=fs,aclFingerprint=defaultAclFingerprint,
+ verifyDirectoryOwnership=()=>false,
  platform=()=>process.platform,
 }={}){
  need(authenticatedReceiver?.approvalScope===
@@ -79,6 +80,7 @@ export function makeWindowsRegistryPinBAdapter({
   approvedRegistryAfterBytes.length<=131072,
   'B_PIN_WINDOWS_INPUT');
  need(typeof verifyApproval==='function'&&typeof aclFingerprint==='function'&&
+  typeof verifyDirectoryOwnership==='function'&&
   ['acquireInstallLock','createInstallJournal','releaseInstallClaim'].every(
    name=>typeof lockApi?.[name]==='function'),
   'B_PIN_WINDOWS_TRUSTED_DEPENDENCIES');
@@ -92,8 +94,9 @@ export function makeWindowsRegistryPinBAdapter({
  // when every fixed parent exists on the expected data volume. A missing
  // parent or disconnected drive must never masquerade as `registry: null`.
  // Check before and after the leaf probe, and repeat under the Writer mutex.
- const approvedParents=[targets.dataRoot,
-  path.win32.join(targets.dataRoot,'pc-writer'),path.win32.dirname(REG)];
+ // Existing fixed data root and existing pc-writer directory only. No
+ // No extra subdirectory or mkdir bootstrap is ever necessary.
+ const approvedParents=[targets.dataRoot,path.win32.join(targets.dataRoot,'pc-writer')];
  const verifiedRegistryParent=()=>{
   for(const dir of approvedParents){
    let stat,real;
@@ -213,6 +216,21 @@ export function makeWindowsRegistryPinBAdapter({
   },
   async verifyPreimageUnderLock({lock:token}){
    checkLease(token);return snapshot();
+  },
+  async verifyApprovedRegistryParentUnderLock({lock:token,targetId}){
+   checkLease(token);
+   need(targetId==='HOST_DATA_ROOT_PC_WRITER',
+    'B_PIN_WINDOWS_REGISTRY_PARENT_TARGET');
+   // lstat/realpath catches an absent root and any reparse/junction. The
+   // owner verifier must come from the *installed* receiver, never the Issue.
+   verifiedRegistryParent();
+   const writerRoot=path.win32.join(targets.dataRoot,'pc-writer');
+   const proof=verifyDirectoryOwnership({directory:writerRoot,targetId});
+   need(proof?.ownerVerified===true&&proof?.noReparse===true&&
+    proof?.aclVerified===true,
+    'B_PIN_WINDOWS_REGISTRY_PARENT_OWNER_UNVERIFIED');
+   return {targetId,status:'EXISTS_TRUSTED_DIRECTORY',
+    reparsePoint:false,noReparse:true,ownerVerified:true,aclVerified:true};
   },
   async loadApprovedRegistryAfterBytes({lock:token,approvalSha256}){
    checkLease(token);
