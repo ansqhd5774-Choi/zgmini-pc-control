@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "b8b9fb4b-70e1-4561-9457-f658af0a2f1c",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "96cafd91f05e2310f66a73522028d10210a14b73",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "5ba646c721c052ff62506255cc54a7b730af102d",
+  "candidateSourceSha": "4ad4e9683d681022720dab54dd21ecc920cd7549",
+  "manifestSha256": "901c4174fffadebf71d3e1b3c6e6afb49bdfbdda9dc9fa91ca0c043206c7ed31",
+  "baseTreeOid": "c3dfd8d4cd1afa09d2ad0c162d957be8bbf1b491",
+  "preparedTreeOid": "9e7c75ad595ed8b8dfd9762a232da8fd9bc18dbe",
+  "provenanceSha256": "6e152e56ac5702f3bf7bec55d7b0bb10c5dd63a893fa5c57a5d2282174ac0961",
+  "runId": "42391593347",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/earnings-api-calendar.mjs",
+    "scripts/pc-writer/earnings-api-local.mjs",
+    "scripts/pc-writer/release-calendar.mjs"
+  ]
+}
