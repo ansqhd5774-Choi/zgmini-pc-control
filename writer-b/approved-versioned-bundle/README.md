@@ -83,6 +83,9 @@ receiver, **not proof that the actual Windows receiver supports them**.
    launcher combination is safe and the active pointer switches last, with
    schedule-tick interleaving simulation plus real Windows evidence. If not,
    do not activate. Leave Scheduled Task XML unchanged.
+   This is **cutover safety**, not a requirement to wait for the next natural
+   13:00 scheduled run. Natural recurring-run verification is a later follow-up
+   after feature collection, calculation, publish and API/UI are complete.
 8. readBack: inspect actual launchers, active JSON and all bundle hashes
    after cutover; re-check unchanged Task XML and metadata.
 9. commit: seal durable journal; failure/ambiguous commit is STATE_UNKNOWN
