@@ -23,6 +23,7 @@ function inspectOneDatabase(file) {
     walExists: isOrdinaryFile(file + '-wal'),
     shmExists: isOrdinaryFile(file + '-shm'),
     sidecarsRequired: null,
+    walSidecarState: null,
     ready: false,
     problem: null,
   };
@@ -44,8 +45,15 @@ function inspectOneDatabase(file) {
     const walMode = header[18] === 2 || header[19] === 2;
     info.headerMode = walMode ? 'WAL' : 'ROLLBACK';
     info.sidecarsRequired = walMode;
-    info.ready = !walMode || (info.walExists && info.shmExists);
-    if (!info.ready) info.problem = 'WAL_SIDECAR_NOT_READY';
+    info.walSidecarState = !walMode ? 'NOT_REQUIRED'
+      : info.walExists && info.shmExists ? 'BOTH_PRESENT'
+      : !info.walExists && !info.shmExists ? 'BOTH_ABSENT'
+      : info.walExists ? 'WAL_ONLY' : 'SHM_ONLY';
+    // Missing sidecars can follow a normal final checkpoint/close.
+    // Keep the operational read guard closed: SQLite may create them on open.
+    info.ready = !walMode || info.walSidecarState === 'BOTH_PRESENT';
+    if (!info.ready) info.problem = info.walSidecarState === 'BOTH_ABSENT'
+      ? 'WAL_SIDECARS_ABSENT_UNVERIFIED' : 'WAL_SIDECARS_PARTIAL';
   } catch (error) {
     info.problem = /^(DB_MISSING|SQLITE_HEADER_INVALID|SQLITE_HEADER_MODE_INVALID)$/.test(error.message)
       ? error.message : 'DB_READ_FAILED';
@@ -69,6 +77,7 @@ export function inspectEmploymentR6WalMemoryPreflight({host}) {
     core: null,
     candidate: null,
     resource,
+    blockedConditions: [],
     candidateExecuted: false,
     sqliteOpened: false,
     providerCalls: 0,
@@ -93,6 +102,10 @@ export function inspectEmploymentR6WalMemoryPreflight({host}) {
   }
   result.core = inspectOneDatabase(corePath);
   result.candidate = inspectOneDatabase(candidatePath);
+  for (const [role, db] of [['CORE', result.core], ['CANDIDATE', result.candidate]]) {
+    if (!db.ready) result.blockedConditions.push(role + '_' + (db.problem ?? 'DB_NOT_READY'));
+  }
+  if (!resource.ready) result.blockedConditions.push('RESOURCE_WAIT_MEMORY');
   if (!result.core.ready || !result.candidate.ready) {
     result.code = 'R6_DB_PREFLIGHT_FAILED';
   } else if (!resource.ready) {
@@ -103,3 +116,4 @@ export function inspectEmploymentR6WalMemoryPreflight({host}) {
   }
   return result;
 }
+
