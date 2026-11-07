@@ -91,3 +91,15 @@ test('A-only registry has no B activation capability',()=>{
  assert.throws(()=>selectPinnedBundleProfiles(f),
   e=>e.code==='B_PROFILE_NO_APPROVED_B_ENTRY');
 });
+test('Windows device launcher and normalized duplicate names denied',()=>{
+ const f=fixture();
+ f.registry.profiles[0].bundleProfile.requiredLaunchers=['CON.cmd'];
+ f.manifestBytes=Buffer.from(JSON.stringify(f.registry)+'\n');
+ f.approvedManifestSha256=hash(f.manifestBytes);
+ assert.throws(()=>selectPinnedBundleProfiles(f));
+ const other=fixture();
+ other.registry.profiles[0].bundleProfile.optionalLaunchers=['theme_scheduled.CMD'];
+ other.manifestBytes=Buffer.from(JSON.stringify(other.registry)+'\n');
+ other.approvedManifestSha256=hash(other.manifestBytes);
+ assert.throws(()=>selectPinnedBundleProfiles(other));
+});
