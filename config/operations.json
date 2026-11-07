@@ -6,6 +6,7 @@
   "seats": 6,
   "operations": {
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "approved-runtime-inventory-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-runtime-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "pc-source-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
