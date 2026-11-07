@@ -30,6 +30,10 @@ export const A_RESULT='approved-runtime-a-once-result.json';
 export const A_TITLE=TITLE;
 export const A_OPERATION=OPERATION;
 export const A_SCHEMA=SCHEMA;
+export function requestIdForFailure(eventText,env){
+ try{return verifyARequest(JSON.parse(eventText),env).requestId;}
+ catch{return null;}
+}
 
 export function verifyARequest(event,env){
  need(env?.GITHUB_REPOSITORY===REPO&&env.GITHUB_EVENT_NAME==='issues'&&
@@ -154,8 +158,11 @@ export function inspectApprovedA(auth,{dataRoot=String.raw`E:\ZGmini\data`,
      !installedState.sha256?'INSTALL_PREIMAGE_UNVERIFIED':'FIRST_SINGLE_CMD_UPGRADE';
    }
    return {...report,runtimeMode};
-  }catch{
-   return {profileId:profile.id,status:'BLOCKED',code:'A_RUNTIME_READ_UNAVAILABLE',
+  }catch(error){
+   const sourceCode=typeof error?.code==='string'&&
+    /^INVENTORY_[A-Z0-9_]{2,80}$/.test(error.code)?
+    `A_RUNTIME_${error.code}`:'A_RUNTIME_READ_UNAVAILABLE';
+   return {profileId:profile.id,status:'BLOCKED',code:sourceCode,
     rootExists:null,runtimeMode:'STATE_UNKNOWN',files:{},tasks:{}};
   }
  });
@@ -163,7 +170,8 @@ export function inspectApprovedA(auth,{dataRoot=String.raw`E:\ZGmini\data`,
  const taskChecksComplete=blocked===0&&profiles.every(p=>
   Object.values(p.tasks??{}).every(x=>x.status==='XML_READ'&&
    x.expectedCommandPresent!==false&&x.expectedHourPresent!==false));
- return {status:'DONE',code:blocked?'A_RUNTIME_PARTIAL':'A_RUNTIME_FILE_AND_TASK_READONLY',
+ return {status:blocked?'BLOCKED':'DONE',
+  code:blocked?'A_RUNTIME_PARTIAL':'A_RUNTIME_FILE_AND_TASK_READONLY',
   mode:'DETAILED',registeredCount:auth.registeredCount,
   registrySha256:auth.registrySha256,controlSha:auth.controlSha,
   requestedSourceSha:auth.req.sourceSha,selectedCount:profiles.length,
@@ -180,8 +188,13 @@ async function main(){
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  let report;try{report=await main();}
- catch(e){report={status:'BLOCKED',code:/^A_RUNTIME_[A-Z0-9_]{1,100}$/.test(e.code??'')?
-  e.code:'A_RUNTIME_READ_UNAVAILABLE',requestId:null,operationalWrites:0};}
+ catch(e){
+  let requestId=null;
+  try{requestId=requestIdForFailure(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'),
+   process.env);}catch{/* Request evidence unavailable; keep null. */}
+  report={status:'BLOCKED',code:/^A_RUNTIME_[A-Z0-9_]{1,100}$/.test(e.code??'')?
+   e.code:'A_RUNTIME_READ_UNAVAILABLE',requestId,operationalWrites:0};
+ }
  try{
   need(typeof process.env.RUNNER_TEMP==='string'&&path.isAbsolute(process.env.RUNNER_TEMP),
    'A_RUNTIME_TEMP_STOP');
