@@ -93,6 +93,10 @@ Current A code is a read-only consumer and does not implement this B transaction
 - Missing root/file/directory is reported as `exists:false`. An attempted
   symlink/junction/reparse-like redirect, unsafe selector, credential-like
   filename or unapproved registry hash is rejected, not silently followed.
+- Windows device basenames (`CON`, `NUL`, `PRN`, `AUX`, `COM1`–`COM9`,
+  `LPT1`–`LPT9`, including suffixes such as `CON.cmd`) and trailing-dot
+  path/launcher/Task names are rejected before filesystem access.
+  Required/optional launcher names are de-duplicated case-insensitively.
 - Task metadata is only whether XML was queried, expected fixed command
   basename/hour matches, enabled boolean, and XML SHA-256. It does not claim
   actual Task last-run status, installation PASS or any B-level permission.
