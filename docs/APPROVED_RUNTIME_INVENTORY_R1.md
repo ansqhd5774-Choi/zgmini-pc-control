@@ -1,6 +1,7 @@
 # Reusable A/light approved runtime inventory (local prototype)
 
-This draft PR adds a **one-time** generic Controller operation in source, but has not been installed on a Windows PC. Existing operational files, tasks and databases remain unchanged.
+This isolated prototype does **not** modify existing ZGMINI Controller operations,
+production PC files, GitHub branches, jobs or Task Scheduler entries.
 
 ## Source and trust boundary
 
@@ -11,7 +12,7 @@ This draft PR adds a **one-time** generic Controller operation in source, but ha
   approved local registry file; its SHA-256 is pinned **separately** in trusted
   host/approval metadata. Merely embedding a SHA in the manifest itself is not approval.
 - The production adapter reads the registry at a **fixed path outside the
-  Controller checkout**: `<host.dataRoot>/pc-writer/controller-approvals/approved-runtime-inventory-profiles.json`.
+  Controller checkout**: `<host.dataRoot>/pc-writer/approved-runtime-inventory-profiles.json`.
   There is no path override in host settings or Issue JSON. B-grade registration
   adds/replaces the registry, then independently sets the protected
   `host.approvedRuntimeInventorySha256` pin. Both need exact before/after
@@ -25,12 +26,14 @@ This draft PR adds a **one-time** generic Controller operation in source, but ha
   (`grade: A`, `resource: light`) and wire it once to the stable receiver.
   Adding a feature then updates the independently approved declarative registry
   and its trust pin, **not** `controller/operations.mjs` per-feature branches.
-- The registry can contain up to **128 named profiles**, but the receiver
-  inspects **1–4** profiles with detailed SHA/Task output; for **5–128**
-  profiles sharing the same approved source identity it returns bounded
-  `SUMMARY_ONLY` root existence/error summaries without scanning files or
-  querying Tasks. Other source identities are never traversed or returned. It uses fixed
-  relative roots, selectors and task names, never scans recursively, and never returns raw
+- The registry can contain up to **128 named profiles**. For an exact approved
+  source identity with **1–4** profiles, the receiver returns bounded detailed
+  file hashes and Task metadata. For **5–128** profiles it returns `SUMMARY_ONLY`
+  containing per-profile root existence or safe blocked codes, without
+  opening source files or querying Tasks. An oversized detailed result also
+  falls back to `SUMMARY_ONLY`; it never falsely asserts full preimage proof.
+  Other source identities' profiles are never traversed or returned. It uses
+  fixed relative roots, selectors and task names, never scans recursively, and never returns raw
   file, environment, command, arguments, Task XML or configuration content.
 - **One shared A/B capability registry:** an entry may additionally have
   `bundleProfile`. The A receiver strictly checks its inert field types,
@@ -84,7 +87,7 @@ values must be verified against approved host registration before use.
 has one `id` and one source binding; the optional `bundleProfile.id` must equal
 the parent profile `id`. The B writer must update only the selected profile
 through its independently protected B transaction, preserving all other
-entries. It must update the external registry and trusted host PIN with separately journaled CAS, backup/readback and reverse rollback. This is **not** an atomic two-file operation.
+entries, and atomically CAS the single external registry plus trusted host PIN.
 Current A code is a read-only consumer and does not implement this B transaction.
 
 ## Guarantees, scope and limitations
@@ -103,30 +106,28 @@ Current A code is a read-only consumer and does not implement this B transaction
   basename/hour matches, enabled boolean, and XML SHA-256. It does not claim
   actual Task last-run status, installation PASS or any B-level permission.
 - Each file >8 MiB is marked `SIZE_LIMIT`, Task XML >256 KiB cannot be parsed,
-  registry >128 KiB is rejected. A detailed output >20 KiB switches to
-  `SUMMARY_ONLY`; if even summary rows exceed the limit, it returns selected
-  count and summary SHA-256 without individual rows.
+  registry >128 KiB is rejected. The nested A response stays under 20 KiB;
+  if even the summary exceeds that limit, individual rows are omitted and a
+  summary SHA-256 with the selected count is returned.
 - No source-identity match yields `BLOCKED/APPROVED_INVENTORY_SOURCE_UNREGISTERED`.
-  Five or more profiles matching one identity no longer cause a global
-  blocker: they return `PASS/APPROVED_RUNTIME_REGISTRY_SUMMARY_ONLY` with
+  Five or more profiles matching one identity **do not block** the source;
+  they produce `PASS/APPROVED_RUNTIME_REGISTRY_SUMMARY_ONLY` with
   `fileHashesComplete:false`, `taskChecksComplete:false` and
-  `preimageEvidenceLevel:'ROOT_EXISTENCE_ONLY'`. A B writer must independently
-  validate exact preimages before mutation; A summaries are not B installation approval.
-  A single profile root error remains scoped to that profile. A source revision needs
+  `preimageEvidenceLevel:'ROOT_EXISTENCE_ONLY'`. A source revision needs
   an exact new binding approved through B maintenance, but never a new
   per-feature Controller code branch or full Controller source installation.
+- `SUMMARY_ONLY` is not a B install-ready preimage: B must perform its own
+  exact per-target hashes, protected Task validation and CAS before mutation.
+  A broken root/file in one approved profile is recorded for that profile
+  without concealing or blocking successful inspection of its siblings.
 - The installed current `host.json` does **not** yet expose
   `approvedRuntimeInventorySha256`. Until a separately reviewed B-grade
   config-only update sets this field, the stable A receiver returns clean
   `BLOCKED/APPROVED_INVENTORY_NOT_REGISTERED`. A missing external registry
   yields `BLOCKED/APPROVED_INVENTORY_REGISTRY_ABSENT` and a changed unapproved
   registry yields `BLOCKED/APPROVED_INVENTORY_REGISTRY_DRIFT`.
-- **First registration cannot depend on this new A reader**: before a PIN exists it intentionally returns `NOT_REGISTERED`. The authorized common B receiver must do a fixed-target, non-mutating preflight itself (host original SHA/PIN-null, verified Registry parent directory and leaf ABSENT), authenticate those exact preimages against its manifest, then repeat under its shared lock before exclusive create and CAS. This avoids an A→B→A bootstrap cycle; a summary-only A response is never a B CAS preimage.
 - Changing a pin is itself a **B-grade** trusted approval state transition;
-  a narrow host-PIN + registry **prototype** with offline tests now exists in
-  `writer-b/approved-versioned-bundle/approved-registry-cas.mjs` and its
-  `windows-registry-pin-adapter.mjs` candidate, but the current installed
-  Windows Writer B still **does not implement or authorize** that effect.
+  the actual secure host-PIN config-only update path **remains unimplemented**.
   That is an integration prerequisite, not a reason to re-install Controller
   source for each new content feature.
 - This is a portable module and tests, **not** a completed integration into
@@ -137,4 +138,4 @@ Current A code is a read-only consumer and does not implement this B transaction
   GitHub envelope's 32KiB bound; the exact assembled report must still be
   verified on real Windows before broad rollout.
 
-Run: `node --test tests/approved-runtime-inventory-*.test.mjs`
+Run: `node --test theme-generic-a/tests/*.test.mjs`
