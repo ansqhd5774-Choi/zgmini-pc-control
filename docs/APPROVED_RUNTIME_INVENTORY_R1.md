@@ -121,6 +121,7 @@ Current A code is a read-only consumer and does not implement this B transaction
   `BLOCKED/APPROVED_INVENTORY_NOT_REGISTERED`. A missing external registry
   yields `BLOCKED/APPROVED_INVENTORY_REGISTRY_ABSENT` and a changed unapproved
   registry yields `BLOCKED/APPROVED_INVENTORY_REGISTRY_DRIFT`.
+- **First registration cannot depend on this new A reader**: before a PIN exists it intentionally returns `NOT_REGISTERED`. The authorized common B receiver must do a fixed-target, non-mutating preflight itself (host original SHA/PIN-null, verified Registry parent directory and leaf ABSENT), authenticate those exact preimages against its manifest, then repeat under its shared lock before exclusive create and CAS. This avoids an A→B→A bootstrap cycle; a summary-only A response is never a B CAS preimage.
 - Changing a pin is itself a **B-grade** trusted approval state transition;
   a narrow host-PIN + registry **prototype** with offline tests now exists in
   `writer-b/approved-versioned-bundle/approved-registry-cas.mjs` and its
