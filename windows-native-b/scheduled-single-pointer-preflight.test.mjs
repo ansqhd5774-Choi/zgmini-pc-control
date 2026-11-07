@@ -108,13 +108,32 @@ test('native preflight rejects junction/reparse and snapshot races',()=>{
 test('read-only runtime inventory distinguishes original single-CMD from active repeatable mode',()=>{
  const fakeStat=()=>({isFile:()=>true,isSymbolicLink:()=>false});
  const first=inspectWindowsConfiguredRuntimeMode({platform:'win32',
-  existsSync:()=>false,lstat:fakeStat});
+  existsSync:p=>p.endsWith('INSTALL_RESULT.json'),lstat:fakeStat});
  assert.equal(first.mode,'FIRST_SINGLE_CMD_UPGRADE');
  assert.equal(first.activationAllowed,false);
  const repeat=inspectWindowsConfiguredRuntimeMode({platform:'win32',
   existsSync:()=>true,lstat:fakeStat});
  assert.equal(repeat.mode,'REPEATABLE_ACTIVE_RUNTIME');
  assert.equal(repeat.operationalWrites,0);
+});
+test('ACTIVE alone is repeatable; absent and redirected mode records are never classified',()=>{
+ const activePath=home+'\\ACTIVE_RUNTIME.json';
+ const fakeStat=()=>({isFile:()=>true,isSymbolicLink:()=>false});
+ const activeOnly=inspectWindowsConfiguredRuntimeMode({platform:'win32',
+  existsSync:p=>p===activePath,lstat:fakeStat});
+ assert.equal(activeOnly.mode,'REPEATABLE_ACTIVE_RUNTIME');
+ assert.equal(activeOnly.activationAllowed,false);
+ assert.throws(()=>inspectWindowsConfiguredRuntimeMode({platform:'win32',
+  existsSync:()=>false,lstat:fakeStat}),
+  e=>e.code==='B_NATIVE_INSTALLED_PREIMAGE_MISSING');
+ assert.throws(()=>inspectWindowsConfiguredRuntimeMode({platform:'win32',
+  existsSync:p=>p===activePath,
+  lstat:()=>({isFile:()=>true,isSymbolicLink:()=>true})}),
+  e=>e.code==='B_NATIVE_RUNTIME_MODE_FILE_REDIRECT');
+ let activeReads=0;
+ assert.throws(()=>inspectWindowsConfiguredRuntimeMode({platform:'win32',
+  existsSync:p=>p===activePath&&++activeReads===1,lstat:fakeStat}),
+  e=>e.code==='B_NATIVE_RUNTIME_MODE_CHANGED_DURING_READ');
 });
 test('single-CMD preflight does not silently run in repeatable ACTIVE_RUNTIME mode',()=>{
  assert.throws(()=>inspectWindowsScheduledSinglePointer({approval:approved,
