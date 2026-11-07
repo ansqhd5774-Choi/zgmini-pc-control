@@ -15,6 +15,7 @@ const MAX_SELECTED_PROFILES = 4;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
 const SAFE_KEY = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/;
 const SAFE_TASK_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,95}$/;
+const SAFE_WINDOWS_HOME = /^E:\\ZGmini\\data\\pc-writer\\[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/i;
 const SAFE_FILE_EXTENSIONS = new Set(['.cmd','.vbs','.json','.mjs','.js','.txt','.md','.ps1','.bat','.xml']);
 const PRIVATE_NAME = /(?:^\.|(?:^|[-_.])(env|secret|secrets|token|tokens|password|passwords|credential|credentials|apikey|private[-_.]?key|id_rsa)(?:[-_.]|$))/i;
 const fail = code => {throw Object.assign(new Error(code), {code});};
@@ -41,9 +42,42 @@ function name(value){
  if(typeof value !== 'string' || !SAFE_KEY.test(value)) fail('INVENTORY_KEY_INVALID');
  return value;
 }
+// Bundle metadata is for a separately authorized B receiver. A validates its
+// inert schema only; it MUST NOT inspect bundle home, Task, launcher or bytes.
+function bundleProfileSyntax(profileId, bundle){
+ plain(bundle,['id','home','taskName','taskTime','requiredLaunchers',
+  'optionalLaunchers','activeRecord','maxFiles','maxBundleBytes'],
+  'INVENTORY_BUNDLE_PROFILE_INVALID');
+ if(bundle.id!==profileId || typeof bundle.home!=='string' ||
+    !SAFE_WINDOWS_HOME.test(bundle.home) ||
+    typeof bundle.taskName!=='string' || !SAFE_TASK_NAME.test(bundle.taskName) ||
+    typeof bundle.taskTime!=='string' ||
+    !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(bundle.taskTime) ||
+    !Number.isInteger(bundle.maxFiles) || bundle.maxFiles<1 || bundle.maxFiles>256 ||
+    !Number.isInteger(bundle.maxBundleBytes) || bundle.maxBundleBytes<1 ||
+    bundle.maxBundleBytes>32*1024*1024)
+  fail('INVENTORY_BUNDLE_PROFILE_INVALID');
+ if(!Array.isArray(bundle.requiredLaunchers) || bundle.requiredLaunchers.length<1 ||
+    bundle.requiredLaunchers.length>8 ||
+    !Array.isArray(bundle.optionalLaunchers) || bundle.optionalLaunchers.length>8)
+  fail('INVENTORY_BUNDLE_PROFILE_INVALID');
+ const allowed=new Set(['.cmd','.vbs']);
+ const seen=new Set();
+ for(const item of [...bundle.requiredLaunchers,...bundle.optionalLaunchers]){
+  segment(item);
+  if(!allowed.has(path.extname(item).toLowerCase()) || seen.has(item.toLowerCase()))
+   fail('INVENTORY_BUNDLE_PROFILE_INVALID');
+  seen.add(item.toLowerCase());
+ }
+ segment(bundle.activeRecord);
+ if(path.extname(bundle.activeRecord).toLowerCase()!=='.json')
+  fail('INVENTORY_BUNDLE_PROFILE_INVALID');
+}
 function profileSpec(profile){
- plain(profile,['id','binding','rootSegments','files','directories','tasks'],'INVENTORY_PROFILE_INVALID');
+ plain(profile,['id','binding','rootSegments','files','directories','tasks','bundleProfile'],
+  'INVENTORY_PROFILE_INVALID');
  name(profile.id);
+ if(own(profile,'bundleProfile'))bundleProfileSyntax(profile.id,profile.bundleProfile);
  plain(profile.binding,['sourceRepository','sourceBranch','sourceSha'],'INVENTORY_BINDING_INVALID');
  if(typeof profile.binding.sourceRepository!=='string' ||
     !/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(profile.binding.sourceRepository) ||
@@ -214,13 +248,11 @@ export function inspectApprovedRuntimeInventory({dataRoot,profile,queryTask}={})
  return result;
 }
 
-/**
- * Stable A/light receiver. No feature-specific Controller branch/operation is
- * needed when onboarding a new approved profile: only the external registry
- * and its independently trusted pinned SHA-256 change. Neither registry bytes,
- * pinned hash nor profile selection may originate in pc-job Issue JSON.
+/** Shared A/B parser, INTERNAL ONLY: returned profile definitions (including
+ * optional B metadata) must never be published to an Issue or public API.
+ * A reads selected A fields; B applies its own independent mutation approval.
  */
-export function inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes,
+export function selectPinnedCapabilityProfiles({manifestBytes,
  approvedManifestSha256,requestIdentity}={}){
  if(typeof approvedManifestSha256!=='string' || !/^[a-f0-9]{64}$/.test(approvedManifestSha256))
   fail('INVENTORY_APPROVAL_PIN_INVALID');
@@ -237,7 +269,7 @@ export function inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes
  try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
  catch{fail('INVENTORY_MANIFEST_INVALID_JSON');}
  plain(manifest,['schema','profiles'],'INVENTORY_MANIFEST_INVALID');
- if(manifest.schema!=='ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2' ||
+ if(manifest.schema!=='ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1' ||
     !Array.isArray(manifest.profiles) || manifest.profiles.length===0 ||
     manifest.profiles.length>MAX_REGISTERED_PROFILES)fail('INVENTORY_MANIFEST_INVALID');
  const ids=new Set();
@@ -252,10 +284,24 @@ export function inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes
   profile.binding.sourceSha===requestIdentity.sourceSha);
  if(approved.length===0)fail('INVENTORY_SOURCE_UNREGISTERED');
  if(approved.length>MAX_SELECTED_PROFILES)fail('INVENTORY_PROFILE_SELECTION_OVERSIZED');
- const profiles=approved.map(profile=>
+ return {registrySha256:manifestHash,registeredCount:manifest.profiles.length,
+  approvedProfiles:approved};
+}
+
+/**
+ * Stable A/light receiver. No feature-specific Controller branch/operation is
+ * needed when onboarding a new approved profile: only the external registry
+ * and its independently trusted pinned SHA-256 change. Neither registry bytes,
+ * pinned hash nor profile selection may originate in pc-job Issue JSON.
+ */
+export function inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes,
+ approvedManifestSha256,requestIdentity}={}){
+ const selected=selectPinnedCapabilityProfiles({manifestBytes,
+  approvedManifestSha256,requestIdentity});
+ const profiles=selected.approvedProfiles.map(profile=>
   inspectApprovedRuntimeInventory({dataRoot,profile,queryTask}));
  const result={status:'DONE',code:'APPROVED_RUNTIME_REGISTRY_READONLY',
-  registrySha256:manifestHash,registeredCount:manifest.profiles.length,
+  registrySha256:selected.registrySha256,registeredCount:selected.registeredCount,
   selectedCount:profiles.length,profiles,
   operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(Buffer.byteLength(JSON.stringify(result),'utf8')>MAX_REPORT_BYTES)
