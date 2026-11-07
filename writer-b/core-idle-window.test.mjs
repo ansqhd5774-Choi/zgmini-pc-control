@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {awaitNaturalCoreIdle} from './core-idle-window.mjs';
+import {awaitNaturalCoreIdle,MAX_CORE_IDLE_WAIT_MS,
+ MAX_POST_PREPARE_IDLE_WAIT_MS} from './core-idle-window.mjs';
 import {coreReadyForMaintenance,coreMaintenanceWindowBlockCode} from './windows-guards.mjs';
 
 const ready={enabled:true,state:3,instances:0,
@@ -71,4 +72,19 @@ test('read-only sample failure propagates without Task mutation',async()=>{
   {code:'WRITER_B_TASK_PROBE_STOP'});};
  await assert.rejects(awaitNaturalCoreIdle(opts,{windowMs:1500}),
   {code:'WRITER_B_TASK_PROBE_STOP'});
+});
+
+test('post-prepare natural idle is bounded to 90 seconds inside 12-minute job',async()=>{
+ assert.equal(MAX_CORE_IDLE_WAIT_MS,360000);
+ assert.equal(MAX_POST_PREPARE_IDLE_WAIT_MS,90000);
+ // 12-minute Actions timeout must retain room for prep, final Core drain,
+ // restoration and result upload; do not add a second six-minute wait.
+ assert.ok(MAX_CORE_IDLE_WAIT_MS+MAX_POST_PREPARE_IDLE_WAIT_MS+90000
+  <12*60000);
+ const {opts,calls}=harness([{probe:running,lock:true}]);
+ await assert.rejects(awaitNaturalCoreIdle(opts,
+  {windowMs:MAX_POST_PREPARE_IDLE_WAIT_MS}),
+  {code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'});
+ assert.equal(calls.samples,60);
+ assert.equal(calls.sleeps,60);
 });
