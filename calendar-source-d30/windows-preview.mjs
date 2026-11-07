@@ -61,6 +61,12 @@ export async function runD30WindowsReadOnlyPreview({host,gitExe='git',tempRoot}=
       coreSourceIdentity(evidence):null;
     const result={status:'READ_ONLY_PREVIEW_VERIFIED',
       sourceProvenance:beforeSourceSha?'CORROBORATED':'PENDING',
+      sourcePreflightStatus:evidence?.preflightStatus??'NOT_AVAILABLE',
+      ...(evidence?.preflightCode?{sourcePreflightCode:evidence.preflightCode}:{}),
+      ...(evidence?.sidecarSourceBinding?
+        {sidecarSourceBinding:evidence.sidecarSourceBinding}:{}),
+      ...(evidence?.lastRunSourceStatus?
+        {lastRunSourceStatus:evidence.lastRunSourceStatus}:{}),
       ...(beforeSourceSha?{beforeSourceSha}:{}),
       baseSourceSha:BASE,candidateSourceSha:TARGET,
       files:PATHS.map(rel=>({path:rel,

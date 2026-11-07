@@ -8,6 +8,9 @@ import {fileURLToPath} from 'node:url';
 import {D30_INSTALL_CONTRACT} from './contract.mjs';
 import {D30_WINDOWS_SOURCE_ROOT,runD30WindowsReadOnlyPreview}
   from './windows-preview.mjs';
+import {createD30FeatureBReadOnlyHost} from './windows-b-probe-host.mjs';
+import {inspectD30WindowsBReadOnlyPreflight}
+  from './windows-b-preflight.mjs';
 
 const OWNER='ansqhd5774-Choi';
 const CONTROL=`${OWNER}/zgmini-pc-control`;
@@ -135,7 +138,7 @@ export async function runD30ReadOnlyWindowsHost({env=process.env}={}){
     'ER1_D30_PREVIEW_EVENT_FILE_STOP');
     const eventBytes=safeFile(env.GITHUB_EVENT_PATH,path.win32.dirname(env.GITHUB_EVENT_PATH));
     const event=parseD30ReadOnlyIssueEvent(eventBytes);
-    validateD30ReadOnlyIssue({env,event,controlHead});
+    const trustedRequest=validateD30ReadOnlyIssue({env,event,controlHead});
     assertCheckoutIdentity(gitExe,control,controlHead,CONTROL);
     // No operating-source directory or file is inspected before the event,
     // actor and checkout identity have passed the trusted read-only gate.
@@ -161,9 +164,28 @@ export async function runD30ReadOnlyWindowsHost({env=process.env}={}){
         need(expected.includes(absolute),'ER1_D30_PREVIEW_PC_SCOPE_STOP');
         return safeFile(absolute,operating);
       },
-      // A separate existing authorized source-provenance probe must supply
-      // the full Task/config/checkpoint attestation; pending is NOT a B gate.
-      async inspectSourceProvenance(){return null;},
+      // Reuse this authenticated, already installed one-shot read-only route.
+      // It inspects only the fixed operational source and never executes B.
+      async inspectSourceProvenance(){
+        const probeHost=createD30FeatureBReadOnlyHost({evidenceId:{
+          issue:event.issue.number,requestId:trustedRequest.requestId}});
+        const proof=await inspectD30WindowsBReadOnlyPreflight({host:probeHost});
+        if(proof.status!=='READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED')
+          return {preflightStatus:proof.status,preflightCode:proof.code};
+        return {preflightStatus:proof.status,sourceRoot:SOURCE_ROOT,
+          runtimeSourceVerified:false,
+          evidenceLevel:'REGISTERED_CORE_SOURCE_PROVENANCE_VERIFIED',
+          operationalSourceSha:proof.beforeSourceSha,gitVerified:true,
+          taskLauncherSourceVerified:true,configSourceMatchesHead:true,
+          writerCheckpointMatchesHead:proof.lastRunSourceStatus==='MATCH',
+          lastRunSourceStatus:proof.lastRunSourceStatus,
+          trackedDirty:proof.threeFileTrackedOverlayObserved,
+          sourceTrackedDirtyScope:'PINNED_TARGET_3FILES',
+          pinnedOverlayVerified:true,
+          evidenceIssue:proof.preflightEvidenceIssue,
+          evidenceRequestId:trustedRequest.requestId,
+          sidecarSourceBinding:proof.sidecarSourceBinding};
+      },
     };
     const report=await runD30WindowsReadOnlyPreview({host,gitExe,tempRoot:temp});
     need(Buffer.byteLength(JSON.stringify(report),'utf8')<32_768,

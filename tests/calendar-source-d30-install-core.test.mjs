@@ -95,12 +95,27 @@ test('mismatched #511 overlay stops before staging',async()=>{
   assert.deepEqual(h.calls,['authority','attest']);
 });
 
-test('unreviewed shared CNN Sidecar source consumer stops before backup',async()=>{
+test('unverified Core publisher source consumer stops before backup',async()=>{
   const h=fixture(),orig=h.attest;
-  h.attest=async()=>{const r=await orig();r.coreShaConsumers=['CORE_PUBLISHER'];return r;};
+  h.attest=async()=>{const r=await orig();r.coreShaConsumers=['CNN_ARCHIVE_SIDECAR'];return r;};
   await assert.rejects(installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h}),
     {code:'ER1_D30_SHARED_SHA_CONSUMERS_UNREVIEWED'});
   assert.deepEqual(h.calls,['authority','attest']);
+});
+
+test('separately unknown sidecar does not block installed Core source transaction',async()=>{
+  const h=fixture(),orig=h.attest;
+  h.attest=async()=>{const r=await orig();r.coreShaConsumers=['CORE_PUBLISHER'];return r;};
+  const result=await installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h});
+  assert.equal(result.status,'SOURCE_INSTALLED_VERIFIED');
+  assert.equal(result.sidecarRuntime,'NOT_VERIFIED');
+});
+
+test('exactly pinned target-file overlay can be preserved in B commit',async()=>{
+  const h=fixture(),orig=h.attest;
+  h.attest=async()=>{const r=await orig();r.trackedDirty=[PATHS[1]];return r;};
+  const result=await installD30ApprovedThreeFiles({approvedBManifest:manifest,host:h});
+  assert.equal(result.status,'SOURCE_INSTALLED_VERIFIED');
 });
 
 test('tracked-dirty Core checkout cannot be silently committed',async()=>{

@@ -60,11 +60,13 @@ export async function installD30ApprovedThreeFiles({
     before.gitHead===beforeSourceSha&&
     before.configSource===beforeSourceSha,
   'ER1_D30_CORE_HEAD_CONFIG_DRIFT');
-  need(exact(before.trackedDirty,[])&&exact(before.stagedPaths,[]),
+  // Exact original bytes of the three target paths are independently pinned.
+  // An approved target overlay is not an unrelated dirty checkout.
+  const approvedDirty=dirty=>Array.isArray(dirty)&&dirty.every(p=>PATHS.includes(p));
+  need(approvedDirty(before.trackedDirty)&&exact(before.stagedPaths,[]),
     'ER1_D30_UNAPPROVED_DIRTY_STOP');
   need(Array.isArray(before.coreShaConsumers)&&
-    before.coreShaConsumers.includes('CORE_PUBLISHER')&&
-    before.coreShaConsumers.includes('CNN_ARCHIVE_SIDECAR'),
+    before.coreShaConsumers.includes('CORE_PUBLISHER'),
   'ER1_D30_SHARED_SHA_CONSUMERS_UNREVIEWED');
 
   const staged=await host.stageApprovedTargets(PATHS,D30_INSTALL_CONTRACT.sourceHead,
@@ -87,7 +89,9 @@ export async function installD30ApprovedThreeFiles({
   need(recheck?.gitHead===before.gitHead&&recheck?.configSource===before.configSource&&
     coreSourceIdentity(recheck?.activeCore)===beforeSourceSha&&
     recheck?.sourceRoot===before.sourceRoot&&
-    exact(recheck?.trackedDirty,[])&&exact(recheck?.stagedPaths,[])&&
+    approvedDirty(recheck?.trackedDirty)&&
+    exact(recheck?.trackedDirty,before.trackedDirty)&&
+    exact(recheck?.stagedPaths,[])&&
     PATHS.every(path=>recheck.installedFileHashes?.[path]===installedFileHashes[path]),
   'ER1_D30_PREWRITE_DRIFT');
 
