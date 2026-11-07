@@ -5,7 +5,7 @@
 - 계획·경과 보존 브랜치: codex/controller-ops-lessons-20261105
 - 공통 지침 적용 기준: ansqhd5774-Choi/zgmini-pc-control 최신 main
 - 기존 프로세스 R1: Issue #526 / 이전 계획·운영 완료 100% 보존, 재개하지 않음
-- 전체 R2 진행 상태: **M0·M1 DONE — 공식 40%**, M2 후속 PC module 사전 증거·M4 인계 미완료 (2026-11-07 사용자 승인 증거 계약, §12)
+- 전체 R2 진행 상태: **M0–M3 DONE — 공식 80%**, M4 실제 원담당 수신·인계 미완료. Preview 추가 3파일과 #662 모듈 조회는 별도 기능 후속 (§13)
 
 ## 1. 해결하려는 반복 문제와 최종 목표
 
@@ -140,3 +140,11 @@ M1과 M2의 코드·문서 준비는 독립적으로 병렬 수행한다. **동�
 - **M1(b) 허용된 교차 증거:** [#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654) Writer checkpoint `2026-11-07T03:20:40.051Z`는 #651 설치 이후 새 source SHA로 자연 전진; [#661](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/661) 실제 새 Controller A 실행에서 Core Task XML hash `dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028` 불변·보호 상태 불변, Writer checkpoint는 이후에도 기록됨. **판정명 `CORROBORATED_OPERATIONAL_WRITER_PROVENANCE`** — 승인 source의 실제 Writer 실행 전진에 대한 충분한 운영 증거.
 - **남는 사실:** #654 `sourceResolved=false`, `runtimeSourceVerified=false`, 후보 분류 `HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME`; 정확한 Core Task→checkout PID/실행 인과는 **STATE_UNKNOWN**이며 수동 Writer 실행 가능성은 완전히 배제되지 않는다. 이는 이번 사용자 선택에 따라 M1 완료의 선행 조건은 아니지만, 정확한 Task 인과를 증명했다고 보고·표현하지 않는다. 장기 자연 관측·강제 예약 실행·추가 전역 Gate 불필요.
 - **단계 분리:** M1의 원래 대상은 #651 Writer 3파일 원본 조회이며 #662 새 `lib/`·`worker/` 의존 모듈 인벤토리는 후속 M2 설치 준비 증거다. #662 run/status는 미확인, 새 Writer B 승인 manifest는 미확정, 물가지표 19/19 기능 게시도 이 R2 단계 완료와 별개. M1 **DONE**, R2 공식 누적 **40%**. 다음 핵심은 #662 고유 Actions 결과 회수 및 실제 PC 모듈 preimage에 따른 최소 B 계약.
+
+## 13. 2026-11-07 M2/M3 원래 범위 완료 판정 — 신규 Preview는 별도 후속
+
+- **범위 재판정:** §1 완료 수치 2항·§3 M2의 원래 목표는 공통 Writer B 수신기로 `scripts/pc-writer/run-local.mjs` M, `inflation-causal-public-auto-publication-r1.mjs` A, 동일 `.test.mjs` A **3파일을 실제 PC에 안전하게 적용**하고 원본 Writer·Task·다른 기능을 보존하는 것이다. #657 추가 Preview→Catalog/Worker 파일은 그 후의 별도 기능 확대이며 기존 M2 PASS를 취소할 신규 Gate가 아니다.
+- **M2 DONE 근거:** [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651) 정규 Writer B `WRITER_B_INSTALLED_VERIFIED` 및 readback 2/2, manifest 정확한 변경 3파일·Local Overlay source `d50ba2630bb04c7c50911dac0a4069a8056ee469`; [#652](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/652)·[#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654) A PC HEAD/config/파일 해시·dirty 재확인; [#646](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/646) 자연 drain 실패 시 원본 복구; [#657](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/657) 미승인 상대 import 전 설치 중단. 기존 공통 lock·backup·CAS·복구 자산 재사용, 새로운 기능별 설치기·예약 없음.
+- **M3 DONE 근거:** 원격 main과 blob 8/8 일치하는 실제 테스트 소스로 다단 VBS, 타 담당 dirty, source·file 해시 불일치, 부분 적용·복구, 정상 B 3파일 **독립 5/5**; Linux Node 24 `40/40 PASS`, 실제 Windows #651 정상 / #646 중단 복원 / #657 의존성 안전 거부 교차증거. Linux 테스트를 Windows 실PC 전체 회귀나 기능 게시 실증으로 과장하지 않음.
+- **#662 정확한 역할:** PR #658의 추가 `lib/`·`worker/` 일반 A 인벤토리 및 Preview/Catalog/Worker 후속 승인 준비는 별도 기능·진단 범위. #660 Controller 설치 성공, #661 A 진단 성공이지만 [#662](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/662) 의존 모듈 결과 미도착은 `STATE_UNKNOWN`. 사용자 선택에 따른 M1 완료·원래 M2/M3 완료를 되돌릴 근거는 아니나, 해당 기능의 신규 Writer B 설치·게시 성공도 주장하지 않는다.
+- **공식 R2:** M0 20% + M1 20% + M2 20% + M3 20% = **80%**, M4 20% 미완료. M4는 총괄의 완료 증거 패키지·공통 경로와 후속 경계 전달 및 원담당 대화의 실제 수신을 요구한다. 다른 대화의 GitHub 댓글을 수신 ACK로 오인하지 않음. 사용자가 총괄 검증 완료 후 인계를 지시한 이력에 따라 실제 인계 전 사용자에게 현재 완료·잔존 경계 보고.
