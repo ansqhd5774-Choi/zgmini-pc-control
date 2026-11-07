@@ -17,7 +17,7 @@ function createFixture(t,{faultAt=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-b-fixture-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  write(path.join(root,'SIMULATION_ONLY.json'),'ZGMINI_B_DISPOSABLE_FIXTURE_V1\n');
- const id='test-approval-request-778899';
+ const id='a08a54e5-8f26-4875-a6c4-39c23b008111';
  const profileId='job-one';
  const parent=path.join(root,'profiles',profileId);
  fs.mkdirSync(path.join(parent,'launchers'),{recursive:true});
@@ -154,7 +154,7 @@ test('failed launcher CAS leaves exact immutable version reusable by a fresh req
  assert.equal(first.status,'BLOCKED');
  assert.equal(first.rollback,'VERIFIED');
  assert.equal(fs.existsSync(path.join(f.parent,'versions',f.manifest.bundle.version)),true);
- const newRequestId='test-approved-request-334455';
+ const newRequestId='d5f34f9b-2770-4cf8-b547-5c413c3da779';
  const pinnedApproval={...f.arg.pinnedApproval,requestId:newRequestId};
  const second=await runVersionedBundleTransaction({
   ...f.arg,pinnedApproval,
@@ -172,7 +172,7 @@ test('existing version with extra or corrupted file is never reused',async t=>{
  assert.equal(first.rollback,'VERIFIED');
  const version=path.join(f.parent,'versions',f.manifest.bundle.version);
  fs.writeFileSync(path.join(version,'docs','README.md'),Buffer.from('corrupted'));
- const newRequestId='test-approved-request-445566';
+ const newRequestId='ea49681f-ecde-43e1-9175-0fc8cd760310';
  const result=await runVersionedBundleTransaction({
   ...f.arg,pinnedApproval:{...f.arg.pinnedApproval,requestId:newRequestId},
   adapter:f.make({requestId:newRequestId,faultAt:'__none__'}),
