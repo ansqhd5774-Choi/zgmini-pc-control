@@ -16,6 +16,7 @@ const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
 const SAFE_KEY = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/;
 const SAFE_TASK_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,95}$/;
 const SAFE_WINDOWS_HOME = /^E:\\ZGmini\\data\\pc-writer\\[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/i;
+const WINDOWS_DEVICE_NAME = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
 const SAFE_FILE_EXTENSIONS = new Set(['.cmd','.vbs','.json','.mjs','.js','.txt','.md','.ps1','.bat','.xml']);
 const PRIVATE_NAME = /(?:^\.|(?:^|[-_.])(env|secret|secrets|token|tokens|password|passwords|credential|credentials|apikey|private[-_.]?key|id_rsa)(?:[-_.]|$))/i;
 const fail = code => {throw Object.assign(new Error(code), {code});};
@@ -29,7 +30,15 @@ function plain(object, keys, code){
 }
 function segment(value){
  if(typeof value !== 'string' || value === '.' || value === '..' ||
-    !SAFE_SEGMENT.test(value) || PRIVATE_NAME.test(value)) fail('INVENTORY_SELECTOR_DENIED');
+    !SAFE_SEGMENT.test(value) || value.endsWith('.') ||
+    WINDOWS_DEVICE_NAME.test(value) || PRIVATE_NAME.test(value))
+  fail('INVENTORY_SELECTOR_DENIED');
+ return value;
+}
+function taskName(value){
+ if(typeof value!=='string' || !SAFE_TASK_NAME.test(value) ||
+    value.endsWith('.') || value.endsWith(' ') || WINDOWS_DEVICE_NAME.test(value))
+  fail('INVENTORY_TASK_NAME_DENIED');
  return value;
 }
 function relativeSelector(value){
@@ -50,13 +59,15 @@ function bundleProfileSyntax(profileId, bundle){
   'INVENTORY_BUNDLE_PROFILE_INVALID');
  if(bundle.id!==profileId || typeof bundle.home!=='string' ||
     !SAFE_WINDOWS_HOME.test(bundle.home) ||
-    typeof bundle.taskName!=='string' || !SAFE_TASK_NAME.test(bundle.taskName) ||
+    typeof bundle.taskName!=='string' ||
     typeof bundle.taskTime!=='string' ||
     !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(bundle.taskTime) ||
     !Number.isInteger(bundle.maxFiles) || bundle.maxFiles<1 || bundle.maxFiles>256 ||
     !Number.isInteger(bundle.maxBundleBytes) || bundle.maxBundleBytes<1 ||
     bundle.maxBundleBytes>32*1024*1024)
   fail('INVENTORY_BUNDLE_PROFILE_INVALID');
+ segment(bundle.home.split('\\').at(-1));
+ taskName(bundle.taskName);
  if(!Array.isArray(bundle.requiredLaunchers) || bundle.requiredLaunchers.length<1 ||
     bundle.requiredLaunchers.length>8 ||
     !Array.isArray(bundle.optionalLaunchers) || bundle.optionalLaunchers.length>8)
@@ -110,8 +121,7 @@ function profileSpec(profile){
  for(const task of profile.tasks){
   plain(task,['key','name','expectedCommandBasename','expectedHour'],'INVENTORY_PROFILE_INVALID');
   unique(task.key);
-  if(typeof task.name!=='string' || !SAFE_TASK_NAME.test(task.name))
-   fail('INVENTORY_TASK_NAME_DENIED');
+  taskName(task.name);
   if(own(task,'expectedCommandBasename')){
    segment(task.expectedCommandBasename);
    if(!SAFE_FILE_EXTENSIONS.has(path.extname(task.expectedCommandBasename).toLowerCase()))
