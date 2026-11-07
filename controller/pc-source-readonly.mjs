@@ -261,9 +261,9 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
     if(candidate.gitVerified&&candidate.head===result.configApprovedSha&&
        candidate.matchesWriterCheckpoint===true){
      candidate.writerSourceInventory=inspectWriterSourceInventory(real,{realpath,read,
-      // Clean tracked Git status proves each tracked file is clean. With
-      // changes, individual paths cannot safely be inferred from a Boolean.
-      dirtyPaths:candidate.trackedDirty===false?[]:null});
+      // `--untracked-files=no` does not establish each inventory file is
+      // tracked. A candidate-level clean status cannot prove per-file clean.
+      dirtyPaths:null});
     }
     result.historicalCheckoutCandidate=candidate;
    }
