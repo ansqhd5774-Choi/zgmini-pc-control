@@ -34,7 +34,7 @@ export function validateWriterBReportEvent(event,env){
  return request;
 }
 
-export function sanitizeWriterBResult(raw,requestId,runId){
+export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256){
  const base={schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',requestId,
   status:'WRITER_B_STATE_UNKNOWN',code:'WRITER_B_RESULT_UNVERIFIED_STOP',
   sourceSha:null,mode:null,localOnly:null,baseHead:null,
@@ -50,7 +50,9 @@ export function sanitizeWriterBResult(raw,requestId,runId){
   raw.mode==='LOCAL_OVERLAY'&&raw.localOnly===true&&
   SHA40.test(raw.baseHead??'')&&SHA40.test(raw.candidateSourceSha??'')&&
   SHA40.test(raw.baseTreeOid??'')&&SHA40.test(raw.preparedTreeOid??'')&&
-  SHA64.test(raw.manifestSha256??'')&&SHA64.test(raw.provenanceSha256??'')&&
+  SHA64.test(approvedManifestSha256??'')&&
+  raw.manifestSha256===approvedManifestSha256&&
+  SHA64.test(raw.provenanceSha256??'')&&
   Array.isArray(raw.changedPaths)&&raw.changedPaths.length>0&&
   raw.changedPaths.length<=32&&raw.changedPaths.every(x=>
    typeof x==='string'&&/^(?:scripts\/pc-writer|lib|worker)\//.test(x)))
@@ -100,7 +102,8 @@ export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
  let parsed;
  try{parsed=typeof rawResult==='string'&&Buffer.byteLength(rawResult)<=8192?
   JSON.parse(rawResult):null;}catch{parsed=null;}
- const result=sanitizeWriterBResult(parsed,req.requestId,env.GITHUB_RUN_ID);
+ const result=sanitizeWriterBResult(parsed,req.requestId,env.GITHUB_RUN_ID,
+  req.approvalManifestSha256);
  const json=JSON.stringify(result,null,2)+'\n';
  const txt=textResult(result);
  const headers={accept:'application/vnd.github+json',

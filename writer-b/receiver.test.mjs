@@ -180,12 +180,55 @@ test('partial remote result evidence never produces a verified install comment',
 
 test('source result requires provenance and labels local synthetic SHA never remote-published',()=>{
  const x=fixture(),valid=localInstalledResult(x);
- assert.equal(sanitizeWriterBResult(valid,RID,'123456').localOnly,true);
- assert.equal(sanitizeWriterBResult(valid,RID,'123456').mode,'LOCAL_OVERLAY');
- assert.equal(sanitizeWriterBResult({...valid,provenanceSha256:null},RID,'123456').status,
+ const approved=x.request.approvalManifestSha256;
+ assert.equal(sanitizeWriterBResult(valid,RID,'123456',approved).localOnly,true);
+ assert.equal(sanitizeWriterBResult(valid,RID,'123456',approved).mode,'LOCAL_OVERLAY');
+ assert.equal(sanitizeWriterBResult(valid,RID,'123456').status,
+  'WRITER_B_STATE_UNKNOWN','missing approval context cannot establish install');
+ assert.equal(sanitizeWriterBResult({...valid,manifestSha256:'0'.repeat(64)},
+  RID,'123456',approved).status,
+  'WRITER_B_STATE_UNKNOWN','different but valid SHA64 is not an approved manifest');
+ assert.equal(sanitizeWriterBResult({...valid,provenanceSha256:null},RID,'123456',approved).status,
   'WRITER_B_STATE_UNKNOWN');
- assert.equal(sanitizeWriterBResult({...valid,localOnly:false},RID,'123456').status,
+ assert.equal(sanitizeWriterBResult({...valid,localOnly:false},RID,'123456',approved).status,
   'WRITER_B_STATE_UNKNOWN');
+});
+
+test('remote 2/2 reports install only for the exact approved raw manifest SHA',async()=>{
+ const x=fixture();
+ for(const approved of [true,false]){
+  const created=new Map();let comment='';
+  const apiFetch=async(url,init)=>{
+   if(init.method==='PUT'){
+    created.set(url,Buffer.from(JSON.parse(init.body).content,'base64').toString('utf8'));
+    return {status:201};
+   }
+   if(init.method==='GET')return {status:200,json:async()=>({encoding:'base64',
+    content:Buffer.from(created.get(url.replace('?ref=main',''))??'').toString('base64')})};
+   if(init.method==='POST'){
+    comment=JSON.parse(init.body).body;return {status:201};
+   }
+   throw Error('unexpected HTTP method');
+  };
+  const result=localInstalledResult(x);
+  if(!approved)result.manifestSha256='0'.repeat(64);
+  assert.notEqual('0'.repeat(64),x.request.approvalManifestSha256);
+  const output=await uploadWriterBReport({event:x.event,env:x.env,
+   rawResult:JSON.stringify(result),apiFetch});
+  assert.equal(output.verified,2);
+  assert.equal(output.deliveryStatus,'RESULT_PAIR_READBACK_VERIFIED');
+  const json=[...created.entries()].find(([url])=>url.endsWith('.json'))?.[1];
+  const remote=JSON.parse(json);
+  const expected=approved?'WRITER_B_INSTALLED_VERIFIED':'WRITER_B_STATE_UNKNOWN';
+  assert.equal(remote.status,expected);
+  assert.equal(output.status,expected);
+  assert.ok(comment.includes(`Writer B evidence: **${expected}**`));
+  if(!approved){
+   assert.equal(remote.sourceSha,null);
+   assert.equal(remote.localOnly,null);
+   assert.equal(comment.includes('WRITER_B_INSTALLED_VERIFIED'),false);
+  }
+ }
 });
 
 test('local overlay write-once provenance is flushed/read back before Task pause',()=>{
