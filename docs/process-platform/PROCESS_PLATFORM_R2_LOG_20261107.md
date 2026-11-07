@@ -14,8 +14,8 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (Windows receiver 소스·시뮬 준비, 실PC 미검증) | 20% 유지 | Draft PR #626 head 846285b6, 신규 14파일(README 포함), 격리 28/28 PASS; Task XML/Core drain·복구 fixture와 기능 담당 재사용 안내, 실제 Runner/설치/Sidecar 동적 호환 미확인 |
-| M3 실패·정상 회귀 | RUNNING (격리 시나리오 일부 PASS) | 20% 유지 | 파일 dirty/원본 SHA/부분 전환/Task 종료 대기 등 모의 실패 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
+| M2 공통 Writer B | RUNNING (source main 병합, 실PC 미검증) | 20% 유지 | PR #626 main 병합 SHA 5fb5a7c4, 신규 15파일·기존 파일 수정 0; 격리 42/42 PASS; `issues: opened` 범위형 B workflow source 활성, 유효 승인 manifest 0건·Windows Runner 설치/Sidecar 동적 호환 미확인 |
+| M3 실패·정상 회귀 | RUNNING (격리 42/42 PASS, 실PC 미완료) | 20% 유지 | lock/rename, 첫 hop 및 local overlay 원장, dirty/해시/Task/부분 전환 mock 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -149,3 +149,11 @@
 - 전체 관련 격리 회귀 `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **42/42 PASS, exit 0 (총괄 독립 재실행)**. 앞서 공유 lock 오류 코드 매핑 및 무관 rename/copy 보존 수정도 포함. 실제 PC 설치·Windows Task 실행·다단 Sidecar Runtime 테스트 대체 아님.
 - **상태/진행률:** M1/M2/M3 여전히 RUNNING, M4 미착수, **R2 20%**. GitHub main 지침 PR #624 완료/PR #625 A source 병합만 기존 성과. PC 운영 A/B 활성·manifest 승인·B 결과 requestId·백업/복구 실증 미확정. 대상 Writer/Controller/Calendar·SQLite/D1·예약 신규 변경 0.
 - **다음 필수 행동/소유자:** 기존 #68 Controller 단일 설치 담당의 실제 설치 SHA·core-runtime-source-readonly A 활성 증거 확보 → 승인된 고유 A read-only 1회로 Writer checkout/Task/VBS/Sidecar/파일 해시 확보(총괄 진단) → 기능 원담당 승인 manifest 확정 및 정규 Writer B Windows 한정 실증·실제 requestId/원격 2/2/보호 재조회 → 원담당 운영 적용. #68 기존 B 재제출 금지, 예약 자연 검증을 선행 조건으로 추가 금지.
+
+## 2026-11-07 — M2 공통 Writer B source main 병합 (운영 설치 아님)
+
+- [PR #626](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/626) 독립 Source-only 감사: 15파일 전부 신규, 기존 Controller/R17/Calendar/기능 파일 변경·충돌 0, 42/42 격리 PASS, 공유 R17 lock/xml/probe 및 최신 main A `taskAction` 정확 호환. 조건부 source GO와 Windows 운영 NO-GO 구분.
+- PR 리뷰 준비 전환 후 **2026-11-07 KST main 병합 완료**, merge SHA **`5fb5a7c4b434e55a319d1b00f0193900a04b8ca3`**. 병합 전 main `6348be5201801e008be10867fd68add4ddeca52c`와 compare에서 변경 **신규 15파일만** 원격 확인. main의 `writer-b/provenance.mjs` blob `d9c596be2042558e9f243c36450b0e5a5ef9ccf5`, `.github/workflows/pc-writer-b-source-once.yml` blob `3cf525b4f8cb6335ff36245c9afe088d8a0adda8` 재조회.
+- **구분할 실제 운영 효과:** merge로 기본 브랜치에 `issues: opened` 기반 Writer B 1회 수신 Workflow source가 활성화됨. 단, owner/private Issue/정확한 title·label·UUID·control SHA·승인 manifest 원본 SHA·파일 해시 등 복합 계약이 있고 **현재 승인 `approvals/writer-updates/*` manifest 0개**라 승인된 설치 요청을 생성하지 않았다. 활성화된 이벤트 수신 ≠ Windows Runner 실설치 검증·운영 Writer 적용 성공.
+- **새 PC B Issue / requestId / PC Writer 교체 / Task·예약 / SQLite·D1 / 기능 산식 변경 0**. 미검증 상태를 PASS로 보고하지 않음. M2 RUNNING, R2 **20% 유지**.
+- **다음:** 기존 #68 단일 Controller 설치 담당의 실설치 SHA·신규 A 활성 증거 확보 → 고유 A read-only PC 조회로 Writer 현재 HEAD/config.source/Task XML/first-hop·Sidecar/세 파일 SHA·dirty 확인 → 원담당 범위형 승인 manifest + Windows 관련 집중 검증 후 단회 B 경로 사용. source merge를 재설치·새 전역 Gate로 확대 금지.
