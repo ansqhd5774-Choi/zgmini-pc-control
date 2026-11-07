@@ -9,8 +9,10 @@ import {inspectApprovedRuntimeInventory,inspectApprovedRuntimeRegistry}
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const tmp=()=>fs.mkdtempSync(path.join(os.tmpdir(),'approved-inventory-'));
+const identity={sourceRepository:'ansqhd5774-Choi/zgmini',
+ sourceBranch:'codex/theme',sourceSha:'1'.repeat(40)};
 const fixture=()=>({
- id:'approvedTheme',rootSegments:['pc-writer','theme-runtime'],
+ id:'approvedTheme',binding:{...identity},rootSegments:['pc-writer','theme-runtime'],
  files:[{key:'installer',relativePath:'bin/INSTALL_RESULT.json'},
   {key:'schedule',relativePath:'THEME_SCHEDULED.cmd'}],
  directories:[{key:'backup',relativePath:'backup'}],
@@ -142,23 +144,24 @@ test('oversize file yields bounded no-content state; Task UTF-16LE and failed ta
 test('stable generic receiver: separately pinned approved registry onboards a second feature without code changes',async()=>{
  await withTmp(async base=>{
   const other={...fixture(),id:'otherApprovedFeature',rootSegments:['pc-writer','other-feature'],
+   binding:{...identity,sourceSha:'2'.repeat(40)},
    files:[{key:'snapshot',relativePath:'INSTALL_RESULT.json'}],directories:[],tasks:[]};
   const manifest=Buffer.from(JSON.stringify({
-   schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V1',
+   schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2',
    profiles:[fixture(),other],
   }));
   const expectedHash=sha(manifest);
   const result=inspectApprovedRuntimeRegistry({dataRoot:base,manifestBytes:manifest,
-   approvedManifestSha256:expectedHash});
-  assert.equal(result.profileCount,2);
+   approvedManifestSha256:expectedHash,requestIdentity:identity});
+  assert.equal(result.registeredCount,2);
+  assert.equal(result.selectedCount,1);
   assert.equal(result.profiles[0].profileId,'approvedTheme');
-  assert.equal(result.profiles[1].profileId,'otherApprovedFeature');
-  assert.equal(result.profiles[1].files.snapshot.exists,false);
+  assert.ok(!JSON.stringify(result).includes('otherApprovedFeature'));
   assert.equal(result.registrySha256,expectedHash);
   assert.equal(result.operationalWrites,0);
   assert.ok(Buffer.byteLength(JSON.stringify(result))<=32768);
   assert.throws(()=>inspectApprovedRuntimeRegistry({dataRoot:base,manifestBytes:manifest,
-   approvedManifestSha256:'a'.repeat(64)}),
+   approvedManifestSha256:'a'.repeat(64),requestIdentity:identity}),
    {code:'INVENTORY_MANIFEST_APPROVAL_MISMATCH'});
  });
 });
@@ -170,10 +173,10 @@ test('registry with pinned hash still rejects malicious selector and duplicate p
    [{...fixture(),files:[{key:'steal',relativePath:'../../private.json'}]}],
   ]){
    const manifest=Buffer.from(JSON.stringify({
-    schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V1',profiles,
+    schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2',profiles,
    }));
    assert.throws(()=>inspectApprovedRuntimeRegistry({dataRoot:base,manifestBytes:manifest,
-    approvedManifestSha256:sha(manifest)}),{code:/^INVENTORY_/});
+    approvedManifestSha256:sha(manifest),requestIdentity:identity}),{code:/^INVENTORY_/});
   }
  });
 });
