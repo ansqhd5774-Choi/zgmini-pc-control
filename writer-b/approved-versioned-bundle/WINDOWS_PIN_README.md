@@ -16,6 +16,12 @@ create a Scheduled Task or touch PC operational files.
   replaced. The parent coordinator validates the exact SHA-approved registry
   afterimage and requires a **single approved profile change**, preserving
   all unrelated registry bytes, identities and profile entries.
+- The Registry is one fixed file directly under the existing approved
+  `dataRoot/pc-writer` directory. No newly named intermediate directory or
+  directory-creation approval is needed. The B adapter verifies that both
+  `dataRoot` and `pc-writer` are genuine canonical directories, and the
+  installed receiver must independently attest owner/DACL under the shared
+  lock before this B operation may run.
 - Both files must have pinned before/after raw SHA-256 hashes and be backed
   up in their respective directories before the first CAS switch. A verified
   **first registration** may specify registry-before `null` only when the
