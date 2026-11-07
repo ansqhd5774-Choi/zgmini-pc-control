@@ -60,8 +60,11 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
       task.nodePath!==NODE||!SHA64.test(task.taskXmlSha256??'')||
       task.chainVerified!==true||task.taskXmlReadbackVerified!==true||
       task.vbsOrDirectNodeVerified!==true)
-    return fail('ER1_D30_B_TASK_CHAIN_UNRESOLVED',
-      'Task XML to VBS/direct Node to fixed E: source has not been proven.');
+    return {...fail('ER1_D30_B_TASK_CHAIN_UNRESOLVED',
+      'Task XML to VBS/direct Node to fixed E: source has not been proven.'),
+      // Fixed internal enum only. Never print raw VBS, Task XML or arguments.
+      taskChainReason:/^ER1_D30_B_[A-Z0-9_]{3,64}$/.test(task?.reason??'')?
+        task.reason:'ER1_D30_B_TASK_CHAIN_REASON_UNAVAILABLE'};
   if(config?.sourceRoot!==ROOT||config.readbackVerified!==true||
       config.sourceSha!==git.head)
     return fail('ER1_D30_B_CONFIG_SOURCE_MISMATCH','config.source differs from actual source HEAD.');
