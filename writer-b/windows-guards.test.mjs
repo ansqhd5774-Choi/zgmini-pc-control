@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {decodeTaskXmlBytes,coreQuietFromProbe,
+ coreReadyForMaintenance,coreMaintenanceWindowBlockCode,
  attestTaskFirstHopLauncher} from './windows-guards.mjs';
 
 const XML='<?xml version="1.0"?><Task><Settings><Enabled>true</Enabled></Settings></Task>';
@@ -34,6 +35,24 @@ test('Core drain requires disabled Task, no active instance/process, no cycle lo
   {relatedProcesses:1},{unknownProcessLines:1}])
   assert.equal(coreQuietFromProbe({...quiet(),...delta},false),false);
  assert.equal(coreQuietFromProbe(quiet(),true),false);
+});
+
+test('Core maintenance window requires enabled READY Task with no running Core',()=>{
+ const ready={...quiet(),enabled:true};
+ assert.equal(coreReadyForMaintenance(ready,false),true);
+ assert.equal(coreMaintenanceWindowBlockCode(ready,false),null);
+ // A live Core cycle should not be interrupted for an installation.
+ for(const change of [{state:4},{state:2},{state:0},{instances:1},
+  {relatedProcesses:2},{unknownProcessLines:1},{enabled:false}]){
+  assert.equal(coreReadyForMaintenance({...ready,...change},false),false);
+ }
+ assert.equal(coreReadyForMaintenance(ready,true),false);
+ assert.equal(coreMaintenanceWindowBlockCode({...ready,relatedProcesses:2},false),
+  'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+ assert.equal(coreMaintenanceWindowBlockCode(ready,true),
+  'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+ assert.equal(coreMaintenanceWindowBlockCode({...ready,state:0},false),
+  'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED');
 });
 
 const LAUNCHER=String.raw`E:\ZGmini\data\pc-writer\archive-sidecar-r7\run-original-then-archive.vbs`;
