@@ -1,0 +1,16 @@
+{
+  "schema": "ZGMINI_WRITER_PROVIDER_FLAGS_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "INFLATION19_EXACT_TWO_PROVIDER_FLAGS_ONLY",
+  "targetPath": "E:\\ZGmini\\data\\pc-writer\\providers.env",
+  "changes": [
+    {"key": "ZGMINI_INFL19_RECURRING_APPROVED", "value": "1"},
+    {"key": "ZGMINI_INFL19_GAS_DAILY_APPROVED", "value": "1"}
+  ],
+  "runCount": 1,
+  "allowOtherChanges": false,
+  "allowProviderCalls": false,
+  "allowTaskChanges": false,
+  "allowSourceChanges": false,
+  "allowDbWrites": false
+}
