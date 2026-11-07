@@ -157,3 +157,10 @@
 - **구분할 실제 운영 효과:** merge로 기본 브랜치에 `issues: opened` 기반 Writer B 1회 수신 Workflow source가 활성화됨. 단, owner/private Issue/정확한 title·label·UUID·control SHA·승인 manifest 원본 SHA·파일 해시 등 복합 계약이 있고 **현재 승인 `approvals/writer-updates/*` manifest 0개**라 승인된 설치 요청을 생성하지 않았다. 활성화된 이벤트 수신 ≠ Windows Runner 실설치 검증·운영 Writer 적용 성공.
 - **새 PC B Issue / requestId / PC Writer 교체 / Task·예약 / SQLite·D1 / 기능 산식 변경 0**. 미검증 상태를 PASS로 보고하지 않음. M2 RUNNING, R2 **20% 유지**.
 - **다음:** 기존 #68 단일 Controller 설치 담당의 실설치 SHA·신규 A 활성 증거 확보 → 고유 A read-only PC 조회로 Writer 현재 HEAD/config.source/Task XML/first-hop·Sidecar/세 파일 SHA·dirty 확인 → 원담당 범위형 승인 manifest + Windows 관련 집중 검증 후 단회 B 경로 사용. source merge를 재설치·새 전역 Gate로 확대 금지.
+
+## 2026-11-07 — M1 증분 운영 확인 / M2 기존 Windows 무쓰기 검증 계약 판별
+
+- **2026-11-07 09:26 KST** #68 공용 원장 댓글 225→225 신규 0, 이후 신규 Controller `pc-maintenance` B request/실제 목표 `f6338ee4...` `SUCCEEDED`/신규 `core-runtime-source-readonly` 또는 `pc-source-preflight` A 결과 0. 마지막 **확인된 과거** PC Controller #608 SHA `db8924162d42adf6ee6aa27a04ce1719c8fe96c2`; 현재 실PC 새 실측은 아님. 구형 #531 A의 `sourceResolved=false` 재요청으로 Inflation19 3파일 지문을 확보할 수 없음.
+- 최신 main `config/operations.json` 및 기존 고정 워크플로 범위 감사: `runner-smoke`, `core-status`, 구 `pc-source-preflight`, 소스 등록만 된 `core-runtime-source-readonly` 중 **범용 Writer B `windows-adapter.mjs`의 실제 Task/checkout/manifest/rollback에 대해 독립 Windows 무쓰기 dry-run을 제공하는 승인 operation 없음**. R17/inflation 고정 전용 워크플로도 범용 B 동적 검증의 대체 아님.
+- **결정:** 기능별 새 CMD·A operation·시험용 B Issue/예약을 만들어 확인하는 경로는 비용·권한 및 오검증 위험이 커서 추가하지 않음. 기존 #68 단일 설치 담당의 유효 Controller B 결과/신규 A 활성→실 Writer 지문→원담당 정규 B manifest/최초 정상 업무 1회 실증을 재사용. 다른 독립 업무는 NON_BLOCKING.
+- **LAST PASS:** PR #626 source main 병합/42 fixture, PC 과거 #608 설치 결과 보존, A 정적 지원 계약 분기 확정. **FIRST FAIL/현재 필수 의존:** #68 원담당의 신규 Controller 실제 B install result/requestId 및 R2 A 활성 증거 없음. R2 **20% 유지**. PC/Writer/DB/D1/예약 신규 쓰기 0건.
