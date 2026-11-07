@@ -11,7 +11,7 @@ const need=(yes,code)=>{if(!yes)stop(code);};
 // Captures literal-relative: static import/export "from", side-effect import,
 // dynamic import('literal') and CJS require('literal'). The references remain
 // data: no import/require/module evaluation occurs here.
-const EXT=/\.(?:mjs|cjs|js|json)$/i;
+const EXT=/\.[a-z0-9]{1,8}$/i; // Includes Node 22 .ts/.mts and existing source modules.
 const ROOT_ESCAPE=/^(?:\.\.(?:\/|$)|\/)/;
 const ID_START=/[A-Za-z_$]/;
 const ID_BODY=/[A-Za-z0-9_$]/;
