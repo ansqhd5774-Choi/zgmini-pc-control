@@ -279,3 +279,11 @@
 - **구조 수정 Draft [PR #650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/650)**: 독립 `codex/r2-writer-b-core-idle-handoff-20261107`, 정확히 Writer B 관련 5파일, 기존 Core/Controller/Task/Runner/기능 코드 수정 0. 공유 Writer lock + backup + isolated prepared commit 뒤, **Task 활성 상태에서** 최대 6분 read-only WMI/Task/lock 조회로 `READY(3)` + instances/processes/unknown 0 + cycle lock 없음 **연속 2회**를 확인한 뒤에만 pause. pause 직전 별도 재확인으로 race STOP. 안전 구간이 없으면 `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`와 원본 불변 검증·lock 해제로 종료. pause 이후 기존 90초 drain, config/source CAS, backup/rollback, report 결과 계약은 유지. 새 예약·Runner/Controller·provider/DB/D1·운영 Writer 쓰기 0.
 - **검증 경계:** 신규 Core idle predicate 로컬 Node 6 assertion PASS, PR #650 원격 5파일 compare 및 보호/순서/timeout/race 포함 정적 계약 검사 9/9 PASS. **공통 Writer B 전체 Node 회귀 실행과 실 Windows 재실증은 아직 수행하지 않음**; PR #650은 Draft/unmerged. 별도 유료 CI/hosted runner 또는 미승인 Windows 명령 실행 없음. 현재 공식 R2 진행률 **20%** 유지; M1의 모든 동적 source binding, M2 Windows 설치 성공, M3 정상 회귀/복구 및 M4 최종 인계 미완료.
 - **다음 필수 행동:** PR #650 전체 관련 격리 테스트/보안검토 → exact 5파일 source GO → main 병합 후 승인 manifest 원본/Task/Writer 보호 영향 검산 → **새 requestId로** 정상 Writer B 1회 실증(과거 #646 재실행 금지) → Core/Writer source, 결과 2/2, 게시 자동 갱신 정상 확인. 정상 Core의 긴 작업이 계속되면 안전 대기(`DEFERRED`)로 구분하고 운영을 강제로 끊지 않음.
+
+## 2026-11-07 — PR #650 Core idle-window 대기 루프 격리 실험 보강 (운영 적용 아님)
+
+- [Draft PR #650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/650) 최종 검토 대상은 범용 Writer B 관련 **7파일**(기존 5수정 + 순수 대기 모듈·테스트 2신규). 이전 원장에 적힌 5파일은 초기 Draft 범위. 정규 B/Controller/Core/기능 source 운영 적용 0.
+- 신규 `writer-b/core-idle-window.mjs` 원격 Git blob **`ce0fc538af6188d0e6a222979e16db3b3cc4d334`**, 로컬 테스트에서 Git blob 동일함 확인. 테스트 원문 `writer-b/core-idle-window.test.mjs` 원격/blob 로컬 동일 **`489157b3b9a4e8f8326d7230056ed941341a5bbf`**.
+- Node `--check` PASS, 순수 대기 모듈 6개 시뮬레이션 `node --test` **6/6 PASS**(Core active→ready, ready 중간 재시작, lock 지속, Task unknown, 시간 정지/범위, probe 오류). 기존 guard 순수 판정 6 검산 PASS + PR 원격 코드 정적 계약 9/9 PASS.
+- 현재 미확인 범위: 코디네이터·Windows 어댑터·공유 수신기 통합 회귀 테스트 전체 실행과 실 Windows B 한 회 적용. 따라서 **Draft·main 미병합**, M2/M3 DONE 아님, R2 **20% 유지**. 이전 #646 B requestId의 재실행은 계속 금지.
+- 다음: 같은 소스/환경의 기존 Writer B 회귀 테스트 PASS→고경계 경로와 승인 manifest 충돌 검사→source main 반영 여부 판정→신규 requestId 정규 실PC 1회/원본·Runtime 증거 회수.
