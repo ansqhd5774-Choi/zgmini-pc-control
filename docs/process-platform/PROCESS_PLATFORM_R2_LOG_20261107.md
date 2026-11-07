@@ -261,3 +261,12 @@
 - **Windows A 미리보기 단회 생성:** [Issue #643](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/643), requestId `e8a06f0b-2cd1-4e6f-af16-5d0d7c8d9355`; PC 원본 변경/Task 변경/DB/D1/provider calls 허용 안 함. 아직 원격 결과 JSON/TXT/실PC after SHA 미수신이므로 **STATE_UNKNOWN**. B manifest·B 실설치 Issue는 **아직 없음**.
 - **다음 필수 실행:** #643 결과 확인 → 승인 PC 원본 삽입 가능성과 after SHA·Task XML SHA 확보 → 실제 launcher SHA/PC 소비자 증거와 대조 → 첫 B 정확한 manifest 및 단회 설치. 실패는 FIRST FAIL 코드로 분류, 승인 우회·무한 재요청 금지. 사용자 지시에 따라 R2 총괄이 첫 설치·개선·재발 방지 실증까지 맡고 기능 담당자 인계는 그 이후로 보류.
 - **R2 공식 진행률:** 20% 유지. M1 실PC B 검증까지 아직 미완료.
+
+## 2026-11-07 — 첫 실PC A 실패 분석과 선별 삽입 수정, 첫 B 정규 설치 요청
+
+- **A 첫 실패 [#643](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/643):** `BLOCKED / WRITER_B_INSERT_PREIMAGE_NEWLINE_STOP`, 결과 2/2, PC/Task/DB/D1 쓰기 0. 앞단의 PC source HEAD/config/head·대상 해시 검사를 통과했으나 PC `run-local.mjs`에 마지막 줄바꿈이 없는 실제 상태가 공통 순수 삽입기의 불필요한 선행 거부 조건에 걸림. **이는 Writer B 설치 실패가 아니라 A 안전 프리뷰 내부 입력 호환성 실패**.
+- **재발 방지 [PR #644](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/644):** 기존 줄바꿈 조건을 파일 전체 Gate에서 제거하고 EOF 마지막 불완전 줄의 `after` 삽입 위험만 거부, 원본 EOF 바이트 보존 테스트 추가. squash merge `da2439e5649a0a2120610820ddada0fab0a60781`; 격리 Node 회귀 **31/31 PASS**. 에러를 숨기지 않고 실제 범위를 좁힌 구조 수정.
+- **A 재실증 [#645](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/645):** `PASS_READONLY / WRITER_B_INSERT_PREVIEW_VERIFIED` 및 GitHub 결과 JSON/TXT **2/2 직접 재조회**. 정확한 PC before `922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a`, 실제 PC insert 후 after `50ee0c0863c10aa5106e18e8466517143ef3dbc75f95abc18bc359f2cbbced9e`, Task XML `dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028`, PC source HEAD `f7ed1e44957b5a8994163c1f2e5bd23bc1cb9ab5`. 삽입 위치 2개 유일, source/Task/DB/D1 쓰기 0.
+- PR #981 pinned commit `6ffe6bb7f3ff8faa452dc86fdcc2a44d0926b1a7`는 실제 source branch `codex/inflation19-auto-sidecar-prep-20261104`와 GitHub commit 비교 `identical` 확인. 3파일 B manifest `approvals/writer-updates/infl19-r2-pc-preserve.json` 원문 SHA256=`4f0c6893550e61ca903cb57f6cc4e44bf596671a8f7321f39f82b35c967ea4e9`를 control main 생성, 계약 검증 PASS. B 후속 설치에 기존 run-local **전체 교체 금지**, insertion-only M 및 새 hook/test A 2개만 지정.
+- **B 최초 단회 실제 설치 요청 [#646](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/646):** requestId `8cdc99d1-95db-4ffe-940f-13634b737c8b` 생성. 정확한 원격 설치 결과/복구/원본 보호는 아직 **STATE_UNKNOWN**; 완료 단정하지 않음. 응답 시 LAST PASS/FIRST FAIL 판정 후 공통 결함만 고쳐서 동일 requestId 중복 실행 금지.
+- **R2 공식 진행률:** 20%, 첫 B 설치 Runtime 결과 수신 전 M1 미완료.
