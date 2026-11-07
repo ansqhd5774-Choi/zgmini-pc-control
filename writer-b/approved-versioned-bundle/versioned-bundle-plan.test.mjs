@@ -55,6 +55,18 @@ test('approved immutable bundle accepts exact hash-pinned .js Node modules',()=>
  assert.equal(plan.fileCount,4);
  assert.equal(plan.bundleVersion,m.bundle.version);
 });
+test('98-file package with 26 approved .js modules stays within B scope',()=>{
+ const m=fixture();
+ m.bundle.files=Array.from({length:98},(_,i)=>({
+  path:`scripts/pc-writer/approved-${String(i).padStart(3,'0')}.${i<26?'js':'mjs'}`,
+  sha256:hash(`approved-package-file-${i}`),bytes:128,
+ }));
+ m.bundle.version=hash(JSON.stringify(Object.fromEntries(
+  m.bundle.files.map(f=>[f.path,f.sha256])))).slice(0,16);
+ const p=buildVersionedBundlePlan(m,profiles);
+ assert.equal(p.fileCount,98);
+ assert.equal(p.totalBytes,98*128);
+});
 test('profile must be independently registered by trusted receiver',()=>{
  rejected(m=>{m.profileId='unregistered-profile'},'B_PROFILE_NOT_REGISTERED');
 });
