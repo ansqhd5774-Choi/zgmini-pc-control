@@ -155,8 +155,8 @@ test('normal 3-file B install: HEAD/config sha consistent, task returned, no unr
  assert.equal(state.config,NEXT);assert.equal(state.coreEnabled,true);
  assert.equal(state.unrelatedTrackedDirty,true);
  assert.equal(state.retained,false);
- assert.deepEqual(state.steps,['lock','preimage','candidate','claim','backup','prepare',
-  'window','pause','drain','quiet','switch','assert-source','config','assert-config','resume',
+ assert.deepEqual(state.steps,['lock','preimage','candidate','window','claim','backup','prepare',
+  'pause','drain','quiet','switch','assert-source','config','assert-config','resume',
   'task-verify','assert-source','assert-config','release']);
 });
 
@@ -234,12 +234,14 @@ test('partial config change rolls back both config and source before resuming Co
  assert.equal(state.config,manifest().baseHead);assert.equal(state.head,manifest().baseHead);
 });
 
-test('busy natural Core defers before Task pause, source/config and lease remain original',async()=>{
+test('busy natural Core defers before claim, backup, and Task pause; source/config untouched',async()=>{
  const {io,state}=mockIO({failAt:'window',otherDirty:true});
  const result=await performWriterBInstall(auth(),io);
- assert.equal(result.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(result.status,'WRITER_B_PREFLIGHT_STOP');
  assert.equal(result.code,'WRITER_B_SIMULATED_WINDOW_STOP');
- assert.equal(result.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(state.claimed,false);
+ assert.equal(state.steps.includes('backup'),false);
+ assert.equal(state.steps.includes('prepare'),false);
  assert.equal(state.head,manifest().baseHead);
  assert.equal(state.config,manifest().baseHead);
  assert.equal(state.coreEnabled,true);
