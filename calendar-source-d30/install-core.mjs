@@ -2,7 +2,7 @@
 // Not a CLI, Issue receiver, scheduler, or generic shell. The independently
 // approved PC maintainer supplies the authorized Windows host operations.
 // No provider fetch, database access, or new Core scheduling is performed.
-import {assessD30SourceInstall, D30_INSTALL_CONTRACT} from './contract.mjs';
+import {assessD30SourceInstall, coreSourceIdentity, D30_INSTALL_CONTRACT} from './contract.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
@@ -20,9 +20,12 @@ const PATHS=D30_INSTALL_CONTRACT.operationalFiles.map(f=>f.path);
  *   attest() -> {activeCore,installedFileHashes,gitHead,configSource,
  *                sourceRoot,trackedDirty,stagedPaths,coreShaConsumers}
  *   verifyAuthority(), verifyExclusiveLease(), verifyCoreQuiesced()
- *   stageSourceTargets(paths,sourceHead) -> {path:{sha256,blob}}
+ *   stageApprovedTargets(paths,sourceHead,manifest) -> {stageId,files:{
+ *      path:{sha256,candidateSha256,blob,preservationVerified?}}}
+ *     The host independently generates and verifies exact approved output
+ *     bytes (including any clean 3-way merge) in an isolated staging area.
  *   snapshotOriginal(paths) -> {backupId,readbackVerified:true}
- *   applyExactPaths(paths,sourceHead) -> {updatedPaths}
+ *   applyStagedExactPaths(paths,stageId) -> {updatedPaths}
  *   commitExactPaths(paths,beforeSha) -> {sha,changedPaths,clean,protectedUnchanged}
  *   casConfigSource(beforeSha,afterSha) -> {sourceSha}
  *   verifyFinal(paths,afterSha) -> {fileSha256,gitHead,configSource,clean,
@@ -39,8 +42,8 @@ export async function installD30ApprovedThreeFiles({
 }={}){
   need(host&&typeof host==='object','ER1_D30_TRUSTED_HOST_REQUIRED');
   for(const key of ['attest','verifyAuthority','verifyExclusiveLease',
-    'verifyCoreQuiesced','stageSourceTargets','snapshotOriginal',
-    'applyExactPaths','commitExactPaths','casConfigSource','verifyFinal','recover']){
+    'verifyCoreQuiesced','stageApprovedTargets','snapshotOriginal',
+    'applyStagedExactPaths','commitExactPaths','casConfigSource','verifyFinal','recover']){
     need(typeof host[key]==='function','ER1_D30_HOST_CONTRACT_INCOMPLETE');
   }
 
@@ -52,9 +55,10 @@ export async function installD30ApprovedThreeFiles({
   const eligible=assessD30SourceInstall({activeCore,installedFileHashes,approvedBManifest});
   need(eligible.status==='READY_FOR_SEPARATE_APPROVED_B_INSTALL',
     eligible.code??'ER1_D30_PREFLIGHT_STOP');
+  const beforeSourceSha=coreSourceIdentity(activeCore);
   need(before.sourceRoot===activeCore.sourceRoot&&
-    before.gitHead===activeCore.runtimeSourceSha&&
-    before.configSource===activeCore.runtimeSourceSha,
+    before.gitHead===beforeSourceSha&&
+    before.configSource===beforeSourceSha,
   'ER1_D30_CORE_HEAD_CONFIG_DRIFT');
   need(exact(before.trackedDirty,[])&&exact(before.stagedPaths,[]),
     'ER1_D30_UNAPPROVED_DIRTY_STOP');
@@ -63,12 +67,16 @@ export async function installD30ApprovedThreeFiles({
     before.coreShaConsumers.includes('CNN_ARCHIVE_SIDECAR'),
   'ER1_D30_SHARED_SHA_CONSUMERS_UNREVIEWED');
 
-  const target=await host.stageSourceTargets(PATHS,D30_INSTALL_CONTRACT.sourceHead);
-  const expected=Object.fromEntries(D30_INSTALL_CONTRACT.operationalFiles.map(f=>
-    [f.path,{sha256:f.targetSha256,blob:f.targetBlob}]));
-  need(target&&exact(Object.keys(target),PATHS)&&PATHS.every(path=>
-    target[path]?.sha256===expected[path].sha256&&
-    target[path]?.blob===expected[path].blob),
+  const staged=await host.stageApprovedTargets(PATHS,D30_INSTALL_CONTRACT.sourceHead,
+    approvedBManifest);
+  const expected=Object.fromEntries(approvedBManifest.files.map(f=>[f.path,f]));
+  need(staged&&typeof staged.stageId==='string'&&staged.stageId.trim()&&
+    staged.files&&exact(Object.keys(staged.files),PATHS)&&PATHS.every(path=>
+      staged.files[path]?.sha256===expected[path].afterSha256&&
+      staged.files[path]?.candidateSha256===expected[path].targetSha256&&
+      staged.files[path]?.blob===expected[path].targetBlob&&
+      (expected[path].mergePreview==null ||
+        staged.files[path]?.preservationVerified===true)),
   'ER1_D30_TARGET_BYTES_DRIFT');
 
   // The host's lease must be shared with other Core-source writers. Its
@@ -77,6 +85,7 @@ export async function installD30ApprovedThreeFiles({
   await host.verifyCoreQuiesced();
   const recheck=await host.attest();
   need(recheck?.gitHead===before.gitHead&&recheck?.configSource===before.configSource&&
+    coreSourceIdentity(recheck?.activeCore)===beforeSourceSha&&
     recheck?.sourceRoot===before.sourceRoot&&
     exact(recheck?.trackedDirty,[])&&exact(recheck?.stagedPaths,[])&&
     PATHS.every(path=>recheck.installedFileHashes?.[path]===installedFileHashes[path]),
@@ -90,7 +99,7 @@ export async function installD30ApprovedThreeFiles({
     await host.verifyExclusiveLease();
     await host.verifyCoreQuiesced();
     changed=true; // Any subsequent uncertain write must be recovered, not retried.
-    const applied=await host.applyExactPaths(PATHS,D30_INSTALL_CONTRACT.sourceHead);
+    const applied=await host.applyStagedExactPaths(PATHS,staged.stageId);
     need(exact(applied?.updatedPaths,PATHS),'ER1_D30_APPLIED_PATHS_MISMATCH');
     const commit=await host.commitExactPaths(PATHS,before.gitHead);
     need(SHA40.test(commit?.sha??'')&&commit.sha!==before.gitHead&&
@@ -103,7 +112,7 @@ export async function installD30ApprovedThreeFiles({
       observed.clean===true&&observed.protectedUnchanged===true&&
       observed.coreTaskRestored===true&&
       PATHS.every(path=>SHA64.test(observed.fileSha256?.[path]??'')&&
-        observed.fileSha256[path]===expected[path].sha256),
+        observed.fileSha256[path]===expected[path].afterSha256),
     'ER1_D30_FINAL_READBACK_STOP');
     return {status:'SOURCE_INSTALLED_VERIFIED',sourceSha:commit.sha,
       installedFileCount:3,backupId:backup.backupId,
