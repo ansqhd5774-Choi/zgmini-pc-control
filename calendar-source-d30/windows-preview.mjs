@@ -65,6 +65,11 @@ export async function runD30WindowsReadOnlyPreview({host,gitExe='git',tempRoot}=
       ...(evidence?.preflightCode?{sourcePreflightCode:evidence.preflightCode}:{}),
       ...(evidence?.preflightReason?
         {sourcePreflightReason:evidence.preflightReason}:{}),
+      ...(evidence?.registeredConfigurationStatus?{
+        registeredConfigurationStatus:evidence.registeredConfigurationStatus,
+        registeredBeforeSourceSha:evidence.registeredBeforeSourceSha,
+        registeredExactThreePreimages:evidence.registeredExactThreePreimages,
+        registeredTaskXmlMatchesHistoricB:evidence.registeredTaskXmlMatchesHistoricB}:{}),
       ...(evidence?.sidecarSourceBinding?
         {sidecarSourceBinding:evidence.sidecarSourceBinding}:{}),
       ...(evidence?.lastRunSourceStatus?

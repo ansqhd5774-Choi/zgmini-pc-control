@@ -172,7 +172,13 @@ export async function runD30ReadOnlyWindowsHost({env=process.env}={}){
         const proof=await inspectD30WindowsBReadOnlyPreflight({host:probeHost});
         if(proof.status!=='READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED')
           return {preflightStatus:proof.status,preflightCode:proof.code,
-            ...(proof.taskChainReason?{preflightReason:proof.taskChainReason}:{})};
+            ...(proof.taskChainReason?{preflightReason:proof.taskChainReason}:{}),
+            ...(proof.registeredConfigurationStatus?{
+              registeredConfigurationStatus:proof.registeredConfigurationStatus,
+              registeredBeforeSourceSha:proof.registeredBeforeSourceSha,
+              registeredExactThreePreimages:proof.registeredExactThreePreimages,
+              registeredTaskXmlMatchesHistoricB:proof.registeredTaskXmlMatchesHistoricB}:{}),
+          };
         return {preflightStatus:proof.status,sourceRoot:SOURCE_ROOT,
           runtimeSourceVerified:false,
           evidenceLevel:'REGISTERED_CORE_SOURCE_PROVENANCE_VERIFIED',

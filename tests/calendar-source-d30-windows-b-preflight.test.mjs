@@ -97,6 +97,10 @@ test('Task XML to VBS/Node launcher chain unresolved does not fake provenance',a
   assert.equal(r.code,'ER1_D30_B_TASK_CHAIN_UNRESOLVED');
   assert.equal(r.sourceProvenance,'UNVERIFIED');
   assert.equal(r.taskChainReason,'ER1_D30_B_NODE_SOURCE_UNRESOLVED');
+  assert.equal(r.registeredConfigurationStatus,
+    'REGISTERED_CONFIGURATION_OBSERVED_NOT_RUNTIME');
+  assert.equal(r.registeredBeforeSourceSha,HEAD);
+  assert.equal(r.registeredExactThreePreimages,true);
 });
 
 test('any one of three PC preimage SHA changes blocks #682 preflight',async()=>{
