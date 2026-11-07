@@ -1,6 +1,7 @@
 // Shared, source-only Writer B authorization and file-scope contract.
 // This module never executes a shell, opens a PC file or applies a change.
 import {createHash} from 'node:crypto';
+import {validateInsertions} from './insert-only-patch.mjs';
 
 export const OPERATION='pc-writer-source-install';
 export const ISSUE_TITLE='pc-writer-source-install';
@@ -32,6 +33,7 @@ const APPROVAL_KEYS=['schema','status','scope','sourceRepository','sourceBranch'
   'runCount','allowProviderCalls','allowDbChanges',
   'allowD1Writes','allowTaskDefinitionChanges','allowOtherSourceChanges'];
 const FILE_KEYS=['path','change','beforeSha256','afterSha256'];
+const INSERT_FILE_KEYS=[...FILE_KEYS,'candidateSha256','insertions'];
 const PROTECTED_KEYS=['path','sha256'];
 const RUNTIME_KEYS=['taskXmlSha256','consumers'];
 const CONSUMER_KEYS=['id','kind','path','sha256','dependsOn'];
@@ -74,10 +76,17 @@ export function validateWriterBManifest(manifest){
    manifest.protectedFiles.length<=128,'WRITER_B_FILE_COUNT_STOP');
  const seen=new Set();
  for(const entry of manifest.files){
-  need(exact(entry,FILE_KEYS)&&isScopedWriterPath(entry.path)&&
+  const insertMode=Object.hasOwn(entry??{},'insertions');
+  need((insertMode?exact(entry,INSERT_FILE_KEYS):exact(entry,FILE_KEYS))&&
+    isScopedWriterPath(entry.path)&&
     (entry.change==='M'||entry.change==='A')&&SHA64.test(entry.afterSha256)&&
     (entry.change==='M'?SHA64.test(entry.beforeSha256):entry.beforeSha256===null),
     'WRITER_B_FILE_CONTRACT_STOP');
+  if(insertMode){
+   need(entry.change==='M'&&SHA64.test(entry.candidateSha256),
+    'WRITER_B_INSERT_TARGET_SCOPE_STOP');
+   validateInsertions(entry.insertions);
+  }
   const norm=entry.path.toLowerCase();
   need(!seen.has(norm),'WRITER_B_FILE_DUPLICATE_STOP');seen.add(norm);
   need(entry.beforeSha256!==entry.afterSha256,'WRITER_B_NOOP_FILE_STOP');
@@ -145,7 +154,13 @@ export function authorizeWriterBIssue({event,env,manifestBytes}){
  try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
  catch{fail('WRITER_B_MANIFEST_JSON_STOP');}
  validateWriterBManifest(manifest);
- for(const entry of manifest.files)Object.freeze(entry);
+ for(const entry of manifest.files){
+  if(Object.hasOwn(entry,'insertions')){
+   for(const insertion of entry.insertions)Object.freeze(insertion);
+   Object.freeze(entry.insertions);
+  }
+  Object.freeze(entry);
+ }
  for(const entry of manifest.protectedFiles)Object.freeze(entry);
  for(const entry of manifest.runtimeDependencies.consumers){
   Object.freeze(entry.dependsOn);Object.freeze(entry);
@@ -172,3 +187,4 @@ export function expectedFileMap(manifest){
  validateWriterBManifest(manifest);
  return Object.fromEntries(manifest.files.map(entry=>[entry.path,entry]));
 }
+
