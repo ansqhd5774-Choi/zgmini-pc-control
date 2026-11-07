@@ -112,6 +112,9 @@ export function verifyWriterBImportAvailability({afterFiles,existing}){
   typeof existing==='function','WRITER_B_IMPORT_CHECK_CONTRACT_STOP');
  let inspected=0;
  for(const [file,bytes] of afterFiles){
+  // An approved test fixture is not imported by the Core runtime; do not
+  // make intentional negative test imports a global installation blocker.
+  if(/\.test\.(?:mjs|cjs|js)$/i.test(file))continue;
   for(const ref of relativeModuleReferences(file,bytes)){
    inspected++;
    need(inspected<=1024,'WRITER_B_IMPORT_REFERENCE_LIMIT_STOP');
