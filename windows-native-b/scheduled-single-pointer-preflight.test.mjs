@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {analyzeScheduledSinglePointer,inspectWindowsScheduledSinglePointer} from
+import {analyzeScheduledSinglePointer,inspectWindowsScheduledSinglePointer,
+ inspectWindowsConfiguredRuntimeMode} from
  './scheduled-single-pointer-preflight.mjs';
 
 const home='E:\\ZGmini\\data\\pc-writer\\theme-config-tool';
@@ -102,4 +103,31 @@ test('native preflight rejects junction/reparse and snapshot races',()=>{
   readFile:p=>p.endsWith('.cmd')?base.oldCmdBytes:vbs,
   readTaskXml:()=>++calls===1?xml:Buffer.from('<Task/>'),
  }),e=>e.code==='B_NATIVE_TASK_SNAPSHOT_DRIFT');
+});
+
+test('read-only runtime inventory distinguishes original single-CMD from active repeatable mode',()=>{
+ const fakeStat=()=>({isFile:()=>true,isSymbolicLink:()=>false});
+ const first=inspectWindowsConfiguredRuntimeMode({platform:'win32',
+  existsSync:()=>false,lstat:fakeStat});
+ assert.equal(first.mode,'FIRST_SINGLE_CMD_UPGRADE');
+ assert.equal(first.activationAllowed,false);
+ const repeat=inspectWindowsConfiguredRuntimeMode({platform:'win32',
+  existsSync:()=>true,lstat:fakeStat});
+ assert.equal(repeat.mode,'REPEATABLE_ACTIVE_RUNTIME');
+ assert.equal(repeat.operationalWrites,0);
+});
+test('single-CMD preflight does not silently run in repeatable ACTIVE_RUNTIME mode',()=>{
+ assert.throws(()=>inspectWindowsScheduledSinglePointer({approval:approved,
+  newCmdBytes:base.newCmdBytes,platform:'win32',existsSync:()=>true}),
+  e=>e.code==='B_NATIVE_REPEATABLE_RUNTIME_DIFFERENT_EFFECT');
+ let checks=0;
+ assert.throws(()=>inspectWindowsScheduledSinglePointer({approval:approved,
+  newCmdBytes:base.newCmdBytes,platform:'win32',
+  existsSync:()=>++checks>1,
+  lstat:p=>({isSymbolicLink:()=>false,
+   isFile:()=>p.endsWith('.cmd')||p.endsWith('.vbs'),
+   isDirectory:()=>!p.endsWith('.cmd')&&!p.endsWith('.vbs')}),
+  readFile:p=>p.endsWith('.cmd')?base.oldCmdBytes:vbs,
+  readTaskXml:()=>xml,
+ }),e=>e.code==='B_NATIVE_RUNTIME_MODE_CHANGED_DURING_READ');
 });
