@@ -1,8 +1,8 @@
-# ZGMINI 공통 실행·설치 경로 R2 — 원담당 인계 초안
+# ZGMINI 공통 실행·설치 경로 R2 — 원담당 인계 완료
 
 - 작성: 2026-11-07 KST / 프로세스 총괄
 - 기준 계획: [R2 PLAN](PROCESS_PLATFORM_R2_PLAN_20261107.md) · [R2 LOG](PROCESS_PLATFORM_R2_LOG_20261107.md) · [Issue #622](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/622)
-- 공식 R2 **80% (M0–M3 DONE / M4 실제 수신 미완료)**. 인계 자료를 [물가지표 PR #981 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295)에 **PUBLISHED_OWNER_ACK_PENDING** 상태로 게시했으나, GitHub 게시를 다른 ChatGPT 대화의 실제 수신 ACK로 간주하지 않음.
+- 공식 R2 **100% (M0–M4 DONE / OWNER_RECEIVED)**. 자료 게시 [물가지표 PR #981 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295)에 더해, 사용자가 원담당 대화의 실제 인수 응답 `OWNER_RECEIVED` 및 다음 단일 실행을 총괄에게 전달함. GitHub 댓글만으로 ACK 처리하지 않았음.
 - 대상은 공통 A/B 자동 경로를 원담당이 재사용하도록 하는 것. Inflation19 수집·계산·D1·페이지 게시 자체는 기능 원담당 업무.
 
 ## 이미 입증된 공통 경로 — 다시 설치·검사할 필요 없음
@@ -21,12 +21,19 @@
 
 ## M4 실제 인계 완료 확인 항목
 
-- [ ] 사용자 의도에 따른 실제 원담당 대화에서 이 문서·Issue 원본 링크를 전달받음.
-- [ ] 원담당이 공통 A/B 경로와 #662 조회 미확인/Preview 기능 후속 분리를 이해하고 다음 **단일 필수 실행**을 명시함.
-- [ ] 총괄은 실제 수신 사실을 원장에 기록하고 M4만 최종 판정. **GitHub 파일 생성·댓글만으로 100%를 주장하지 않음**.
+- [x] 사용자 의도에 따른 실제 원담당 대화에서 이 문서·Issue 원본 링크를 전달받음.
+- [x] 원담당이 공통 A/B 경로와 #662 조회 미확인/Preview 기능 후속 분리를 이해하고 다음 **단일 필수 실행**을 명시함.
+- [x] 총괄은 실제 수신 사실을 원장에 기록하고 M4를 최종 판정. **실제 원담당 응답 수신 근거로 100% 인정; GitHub 댓글만으로 판단하지 않음**.
 
 ## 2026-11-07 M4 인계 게시 현황
 
 - **게시 완료:** [물가지표 기능 PR #981 최신 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295) 1건 게시·원격 본문 재조회 확인. 과거 PR #981 댓글의 구형 A/B 대기 설명을 현재 M0–M3 실PC 완료 증거로 정정했다. 실제 기능 코드는 변경하지 않았다.
 - **남은 조건:** 별도 원담당 ChatGPT 대화 `물가지표-fix/economic12-inflation-legacy4-r35-20261021-3`에서 본 인계서를 실제 열람하고 다음 필수 실행을 응답해야 M4 OWNER_RECEIVED. 아직 ACK가 없으므로 공식 R2 진행률 80% 유지. PR 댓글만으로 M4 100% 처리 금지.
 - **#662:** 기존 A 요청의 Actions 실행 ID/결과 여전히 미확인 STATE_UNKNOWN. 새 요청·운영 변경 없이 동일 요청의 Run 상태 확인을 후속 처리.
+
+## 2026-11-07 M4 OWNER_RECEIVED 및 R2 종료 증거
+
+- 사용자 전달의 물가지표 담당 대화 인수 응답 원문에 **OWNER_RECEIVED**, 공통 A/B 재사용, 설치 #651/#654와 안전 중단 #657 구분, 자동 갱신은 미완료, 다음 단일 필수 실행이 기록됨. 직접 대화 간 자동 메시지가 아니라 **사용자 매개 실제 인계 응답**에 따른 승인.
+- M4 요건(실제 수신→이해·다음 실행 명시→총괄 기록) 충족. R2 M0–M4 누적 **100% DONE**, 공통 플랫폼 R2 종료. 물가지표 후속 Preview 3파일 설치·19개 자동 갱신과 나머지 11개 수집은 기능 원담당 소유로 분리.
+- 새 [#662 Actions Run 42339890739](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42339890739) 조회 결과 PC A 실행 단계 성공, TXT/JSON 업로드 단계 실패. 원담당은 보고서 약 772KB/REPORT_SIZE 및 Preview·Catalog·Worker 3파일 부재를 보고함. 이는 새로운 **공통 결과 업로드기 후속 결함**으로 분리하며 기존 #651 Writer B 설치 성공이나 R2 완료를 소급 취소하지 않음. 실제 파일 부재·크기 상세는 실행 로그/원본으로 추가 검증하여 구분.
+- 기존 #662 requestId 재요청·운영 쓰기·임의 Controller 재설치 금지. 원담당은 기존 B 계약/새 단일 승인 manifest로 기능 후속 처리.
