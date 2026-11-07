@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {selectPinnedCapabilityProfiles} from
- '../theme-generic-a/controller/approved-runtime-inventory-readonly.mjs';
+ '../../controller/approved-runtime-inventory-readonly.mjs';
 import {selectPinnedBundleProfiles} from './pinned-bundle-profiles.mjs';
 import {isWriterBRequestId} from './writer-b-request-id.mjs';
 
