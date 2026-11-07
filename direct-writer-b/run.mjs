@@ -115,6 +115,17 @@ export function loadApprovedRaw({event,env,controlRoot,
     actualHead:gitHead(controlRoot)});
 }
 
+// The approval SHA must identify the actual candidate checkout, not merely
+// a string in a GitHub Issue or manifest. The workflow checks out this exact
+// SHA after its separate read-only authorization step.
+export function verifyPinnedSourceCheckout(auth,{sourceRoot,
+ gitHead=root=>git(root,['rev-parse','HEAD'],512).toString('utf8').trim()}={}){
+ need(path.isAbsolute(sourceRoot??'')&&
+  auth?.manifest?.sourceSha===gitHead(sourceRoot),
+  'DIRECT_B_CANDIDATE_SOURCE_DRIFT');
+ return Object.freeze({sourceSha:auth.manifest.sourceSha,sourceRoot});
+}
+
 export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
   pinRunner=runApprovedRegistryCas,bundleRunner=runVersionedBundleTransaction}={}){
   // No default OS adapter: using an uninstalled B source must not grant effects.
@@ -157,6 +168,8 @@ async function main(){
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   const controlRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-control');
   const auth=loadApprovedRaw({event,env,controlRoot});
+  verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(env.GITHUB_WORKSPACE??'',
+   'generic-b-approved-source')});
   // The sole native factory is code in the fixed reviewed checkout. Issue body
   // cannot select modules, paths, commands, targets or bridge capabilities.
   const fixedBridge=new URL('./native-adapter.mjs',import.meta.url);
