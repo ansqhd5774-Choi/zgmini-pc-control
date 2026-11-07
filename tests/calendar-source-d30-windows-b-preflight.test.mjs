@@ -92,9 +92,11 @@ test('approved three-file PC overlay passes exact SHA provenance without global 
 
 test('Task XML to VBS/Node launcher chain unresolved does not fake provenance',async()=>{
   const {host,values}=fixture();values.task.vbsOrDirectNodeVerified=false;
+  values.task.reason='ER1_D30_B_NODE_SOURCE_UNRESOLVED';
   const r=await inspectD30WindowsBReadOnlyPreflight({host});
   assert.equal(r.code,'ER1_D30_B_TASK_CHAIN_UNRESOLVED');
   assert.equal(r.sourceProvenance,'UNVERIFIED');
+  assert.equal(r.taskChainReason,'ER1_D30_B_NODE_SOURCE_UNRESOLVED');
 });
 
 test('any one of three PC preimage SHA changes blocks #682 preflight',async()=>{
