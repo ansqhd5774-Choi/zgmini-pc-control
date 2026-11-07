@@ -6,7 +6,7 @@
 - 전용 브랜치: codex/controller-ops-lessons-20261105
 - R1 완료 기록: #526 / R1 M0–M4 100% 보존
 - 기준: 단계마다 20%, **증명되지 않은 운영 상태를 점수에 반영하지 않음**
-- **현재 진행률: 80% (M0–M3 DONE, M4 실제 원담당 수신·인계 미완료)**
+- **현재 진행률: 100% (M0–M4 DONE, 원담당 OWNER_RECEIVED / 사용자 전달 인수 응답)**
 
 ## 최신 상태
 
@@ -16,7 +16,7 @@
 | M1 읽기 전용 A | DONE — 사용자 승인 운영 Writer provenance | 40% | #651 실PC Writer B 3파일 설치·#654 HEAD=config=자연 checkpoint d50ba263/3파일 hash/clean PASS·#661 Task XML 보호 확인. 정확한 Task→PID 인과는 별도 STATE_UNKNOWN; #662 신규 의존 모듈은 M2 후속 |
 | M2 공통 Writer B | DONE — 원래 승인 Writer 3파일 실PC 정규 B 설치/보호 확인 | 60% | #651 3파일 설치·#652/#654 PC A 사후 검증·#646 원복. #657 추가 Preview 의존성 STOP은 기능 후속이며 공통 B 안전 보호 성공; #662 새 module 인벤토리는 별도 추적 |
 | M3 실패·정상 회귀 | DONE — 독립 시나리오 5/5 PASS | 80% | main 원문 Git blob 8/8·Node 40/40 PASS, Windows #651 정상·#646 복구·#657 안전 STOP. 실제 Task PID 인과의 미확인은 M1 승인 경계로 기록, 기능 게시·원담당 인계는 M4와 별개 |
-| M4 실PC 적용 경로·인계 | PREPARED_NOT_DELIVERED | 80% 유지 | 공통 A/B 원본 증거와 기능 후속 경계 인계 초안 작성·원격 재조회 PASS. 원담당 실제 대화 수신 및 #662 상태 공유 미확인 → ACK 전 완료 금지 |
+| M4 실PC 적용 경로·인계 | DONE — OWNER_RECEIVED | **100%** | 사용자 전달 원담당 인수 응답: 정본·PR #981 인계 확인, 공통 A/B 재사용 이해, 자동 게시 미완료 분리 및 #662 원본 증거에 따른 3파일 manifest 다음 실행 명시. 총괄 원장 기록 완료 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
 
@@ -394,3 +394,11 @@
 - **공식 인계 상태:** [최신 OWNER HANDOFF](PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md) `PUBLISHED_OWNER_ACK_PENDING`. GitHub PR 댓글은 수신용 게시판에 남긴 기록일 뿐 다른 ChatGPT 대화의 실제 전달·확인 응답이 아니다. M4 체크박스 미완료, R2 M0–M3 **80% 유지**.
 - **실제 남은 한 행동:** 원담당 대화 `물가지표-fix/economic12-inflation-legacy4-r35-20261021-3`가 이 정본을 열람하고 공통 A/B 수신 및 자체 기능의 다음 단일 필수 실행을 회신 → 총괄이 원장에 OWNER_RECEIVED 기록. #662 Actions Run ID는 별도 읽기 전용 분류 대상으로 남김.
 - **보호:** PR #981 소스·승인 manifest·PC Controller/Writer/예약/DB/D1/Cloudflare 변경 없음. 신규 PC Issue·재실행 없음.
+
+## 2026-11-07 — M4 OWNER_RECEIVED 정식 종료, R2 누적 100% / #662 업로드 결함 후속 분리
+
+- **원담당 실제 인수:** 사용자가 `물가지표-fix/economic12-inflation-legacy4-r35-20261021-3` 대화의 실제 인수 응답 `OWNER_RECEIVED` 전체를 전달. 원담당은 [R2 인계 문서](PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md)/계획·원장/[PR #981 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295)을 학습, 기존 A 조회·B 설치 공통 경로 재사용, 실PC 승인 3파일 완료와 기능 자동 갱신 미완료를 분리. 다음 단일 실행은 PC 부재 3개 의존성의 범위형 승인 Writer B manifest 구성으로 명시.
+- **공식 종료:** M0–M4 **DONE, 100%**. GitHub 댓글만으로 ACK 간주하지 않았으며 사용자 전달의 실제 담당 대화 응답으로 확인. 원 기능 19개 자동 갱신·나머지 11개 수집·최종 산식은 각 담당 업무에서 별도 계속. 시장 캘린더 담당에게도 공통 개선 인계 지시문 전달, 별도 ACK를 R2 완료 신규 Gate로 추가하지 않음.
+- **#662 최종 실행 증거:** [Actions 42339890739](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42339890739) job `128305017428` Runner `zgmini-pc-05`, PC allowlist Step 2 `PASS / PC_SOURCE_READONLY_DIAGNOSIS`, exit 0, Controller source `70222f9a...`, 보호 상태·운영 쓰기 0. Step 3 업로드 `REPORT_SIZE` failure. `controller/report-upload-verified.mjs:renderBoundedReport`, 정책 `maxReportBytes=32768`; compact JSON 46389 + TXT 1101 = **47490 bytes**, 정책 대비 **14722 bytes 초과**. pretty+TXT 66798 bytes. `moduleSourceInventory.totalBytes=772068`은 *조회 대상 모듈 원본 파일 크기의 합계*이며 **업로드 보고서 크기가 아님**.
+- **A PC inventory:** 기존 Writer 139개·일반 lib/worker 141개, 두 목록 모두 complete, issues 0, HEAD/config/checkpoint `d50ba263...`, git trackedDirty=false. Preview `scripts/pc-writer/inflation-causal-public-preview-r1.mjs`, Catalog `lib/inflation-causal-public-catalog.mjs`, Worker `worker/inflation-causal-public-r1.mjs` 3개는 전체 목록에 **부재**. 이는 filesystem 원본 조회의 증거이고 직접 Task→PID 인과 증거는 아님.
+- **후속 소유권:** 원담당은 #662 재실행 없이 누락된 3파일을 기존 B 승인 manifest 1건으로 설치·검증. 프로세스 총괄은 독립 공통 결함 **결과 업로드 32KiB 예산 초과**를 최소 영향 소스·회귀 테스트 대상으로 개선. #662 이력·기존 #651 운영 성과 보존, 업로드기 오류를 물가지표 설치 선행 신규 Gate로 추가하지 않음.
