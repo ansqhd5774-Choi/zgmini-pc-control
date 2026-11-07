@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {authorizePreviewRequest,resultPath} from './preview-entry.mjs';
+import {validateCoreDrainSummary} from './core-drain-readonly.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const HASH=/^[0-9a-f]{64}$/i;
@@ -33,7 +34,8 @@ export function sanitizePreview(raw,req,num){
  return {...safe,status:'PASS_READONLY',code:raw.code,
   beforeSha256:raw.beforeSha256,afterSha256:raw.afterSha256,
   taskXmlSha256:raw.taskXmlSha256,baseHead:raw.baseHead,
-  filePath:raw.filePath,insertions:raw.insertions};
+  filePath:raw.filePath,insertions:raw.insertions,
+  ...(validateCoreDrainSummary(raw.coreDrain)?{coreDrain:raw.coreDrain}:{})};
 }
 
 export async function uploadPreview({event,env,readReport,apiFetch=fetch}={}){

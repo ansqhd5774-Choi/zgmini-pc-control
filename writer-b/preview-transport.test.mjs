@@ -38,4 +38,10 @@ test('sanitized PASS requires complete read-only SHA evidence',()=>{
  assert.equal(Object.hasOwn(out,'untrustedToken'),false);
  assert.equal(sanitizePreview({...result,pcSourceWrites:1},req,645).status,'BLOCKED');
  assert.equal(sanitizePreview({...result,afterSha256:null},req,645).status,'BLOCKED');
+ const withDrain=sanitizePreview({...result,coreDrain:{status:'SNAPSHOT',enabled:true,
+  state:4,instances:1,relatedProcesses:1,unknownProcessLines:0,
+  cycleLockPresent:true,drainReadyIfDisabled:false}},req,645);
+ assert.equal(withDrain.coreDrain.instances,1);
+ assert.equal(Object.hasOwn(sanitizePreview({...result,
+  coreDrain:{status:'SNAPSHOT',commandLine:'secret'}},req,645),'coreDrain'),false);
 });
