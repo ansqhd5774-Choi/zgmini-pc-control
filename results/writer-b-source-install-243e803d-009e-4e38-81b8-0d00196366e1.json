@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "243e803d-009e-4e38-81b8-0d00196366e1",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "39e1a5b16a1656023deeb38e81000606c74ff38b",
+  "candidateSourceSha": "1be1734e9d8cf74375b3663ceee0033b928108a2",
+  "manifestSha256": "8120fb973fbbebda9225b77b27856e313275395188f2324baaf1e513fa3e40ae",
+  "baseTreeOid": "69554fdb4862e2e7a6b298214090b88d3ccc3ed6",
+  "preparedTreeOid": "ac98a9dec2646b9cbcecce0e82d7e8cf7ff6d636",
+  "provenanceSha256": "08f2c442982b1395723adbc958c3accfde49936eba921dbebe46d135ce04eb90",
+  "runId": "42412932416",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/market-calendar-er1-auto-output.mjs"
+  ]
+}
