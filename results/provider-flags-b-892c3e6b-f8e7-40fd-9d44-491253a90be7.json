@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_WRITER_PROVIDER_FLAGS_B_RESULT_V1",
+  "requestId": "892c3e6b-f8e7-40fd-9d44-491253a90be7",
+  "status": "PROVIDER_B_APPLIED_VERIFIED",
+  "code": "PROVIDER_B_TWO_FLAGS_SET",
+  "changedKeys": [
+    "ZGMINI_INFL19_RECURRING_APPROVED",
+    "ZGMINI_INFL19_GAS_DAILY_APPROVED"
+  ],
+  "manifestSha256": "e5d28463bd082401070d2205d8a51ca924225a619f633ec8bf7ee8d0332cfa01",
+  "controlSha": "3b6e948b5fe9f1c91d8d823bf648503dc26300bb",
+  "beforeSha256": "f49b098cffc2cf827c19dccf9283aad8230b466d03581db9cc60fa8c6b443b31",
+  "afterSha256": "b771cdac15dac8b5ce3efdd8188db4b3849191ac9fb134a0ccf485b6fe257c33",
+  "backupVerified": true,
+  "runId": "42401443148",
+  "retry": "NO_REEXECUTE_READ_ONLY_RECONCILE"
+}
