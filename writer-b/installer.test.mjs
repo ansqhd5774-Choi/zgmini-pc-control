@@ -170,6 +170,24 @@ test('target dirty mismatch refuses before claim, never mutates Writer or config
  assert.equal(state.released,true);assert.equal(state.retained,false);
 });
 
+test('missing relative runtime import preflight refuses before claim and Task changes',async()=>{
+ const {io,state}=mockIO({otherDirty:true});
+ io.readCandidate=async()=>{
+  state.steps.push('candidate');
+  throw Object.assign(new Error('unapproved import not on PC'),{
+   code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP'});
+ };
+ const result=await performWriterBInstall(auth(),io);
+ assert.equal(result.status,'WRITER_B_PREFLIGHT_STOP');
+ assert.equal(result.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ assert.equal(state.claimed,false);
+ assert.equal(state.coreEnabled,true);
+ assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.config,manifest().baseHead);
+ assert.equal(state.released,true);
+ assert.deepEqual(state.steps,['lock','preimage','candidate','release']);
+});
+
 test('wrong candidate hash refuses before claim without touching PC source',async()=>{
  const {io,state}=mockIO({candidateWrong:true});
  const result=await performWriterBInstall(auth(),io);
