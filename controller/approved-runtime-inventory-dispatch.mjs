@@ -6,8 +6,9 @@ import {inspectApprovedRuntimeRegistry} from './approved-runtime-inventory-reado
 
 // A fixed external B-owned registry, not a file under the Controller checkout.
 // New profiles update registry + B-approved PIN, never Controller source files.
-const MANIFEST_RELATIVE=['pc-writer','controller-approvals',
- 'approved-runtime-inventory-profiles.json'];
+// This sidecar is created in the already-installed pc-writer data folder.
+// Avoid inventing a new parent-directory bootstrap / mkdir permission.
+const MANIFEST_RELATIVE=['pc-writer','approved-runtime-inventory-profiles.json'];
 const PIN=/^[a-f0-9]{64}$/;
 const blocked=code=>({status:'BLOCKED',code,actualExecutionSha:null,
  operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,
