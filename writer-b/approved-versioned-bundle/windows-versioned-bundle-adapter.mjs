@@ -99,12 +99,14 @@ export function makeWindowsVersionedBundleAdapterCandidate({
     'B_WINDOWS_COMPATIBILITY_EVIDENCE_REQUIRED');
    return;
   }
-  need(compatibility?.strategy==='STATIC_DISPATCHER_POINTER_SWITCH'&&
-   compatibility?.taskUnchanged===true&&
-   compatibility?.oldAndNewLaunchersCompatible===true&&
-   compatibility?.activePointerAtomic===true&&
-   compatibility?.scheduleTickSafe===true,
-   'B_WINDOWS_MIXED_RUNTIME_NOT_PROVEN');
+  if(compatibility?.strategy==='STATIC_DISPATCHER_POINTER_SWITCH'){
+   // Legacy bridge booleans are not trusted evidence that the scheduled VBS,
+   // launcher and active pointer form one atomic runtime switch. No receiver
+   // currently supplies an approved raw-hash-anchored byte proof for this mode.
+   // Therefore never activate on synthetic {scheduleTickSafe:true} flags.
+   need(false,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
+  }
+  need(false,'B_WINDOWS_MIXED_RUNTIME_NOT_PROVEN');
  };
  const taskSnapshot=async()=>{
   const task=await bridge.readTaskDefinition({profileId:manifest.profileId,
