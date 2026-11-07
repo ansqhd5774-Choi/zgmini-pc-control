@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
+import {DatabaseSync} from 'node:sqlite';
+import {inspectEmploymentR6WalMemoryPreflight} from '../controller/employment-r6-wal-memory-readonly.mjs';
 
 function fixture(t, coreMode, candidateMode, walFiles = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-r6-wal-fixture-'));
@@ -49,7 +50,10 @@ test('independent diagnosis retains candidate missing -shm (never collapses to f
   assert.equal(r.candidate.headerMode, 'WAL');
   assert.equal(r.candidate.walExists, true);
   assert.equal(r.candidate.shmExists, false);
-  assert.equal(r.candidate.problem, 'WAL_SIDECAR_NOT_READY');
+  assert.equal(r.candidate.problem, 'WAL_SIDECARS_PARTIAL');
+  assert.equal(r.candidate.walSidecarState, 'WAL_ONLY');
+  assert.ok(r.blockedConditions.includes('CANDIDATE_WAL_SIDECARS_PARTIAL'));
+
   assert.equal(fs.existsSync(f.candidate + '-shm'), false);
 });
 
@@ -61,3 +65,86 @@ test('rollback mode does not require sidecars', t => {
   assert.equal(r.core.sidecarsRequired, false);
   assert.equal(r.candidate.walExists, false);
 });
+
+test('clean-close-shaped WAL with both sidecars absent is unverified, not DB corruption', t => {
+  const f = fixture(t, 'WAL', 'ROLLBACK');
+  const before = [f.core, f.candidate].map(p => [fs.readFileSync(p), fs.statSync(p).mtimeMs]);
+  const r = inspectEmploymentR6WalMemoryPreflight({host: f.host});
+  assert.equal(r.core.headerMode, 'WAL');
+  assert.equal(r.core.walSidecarState, 'BOTH_ABSENT');
+  assert.equal(r.core.problem, 'WAL_SIDECARS_ABSENT_UNVERIFIED');
+  assert.equal(r.core.ready, false);
+  assert.equal(r.status, 'BLOCKED');
+  assert.equal(r.code, 'R6_DB_PREFLIGHT_FAILED'); // Stable external code.
+  assert.ok(r.blockedConditions.includes('CORE_WAL_SIDECARS_ABSENT_UNVERIFIED'));
+  assert.equal(r.blockedConditions.includes('RESOURCE_WAIT_MEMORY'), !r.resource.ready);
+  assert.equal(r.sqliteOpened, false);
+  assert.equal(r.operationalWrites, 0);
+  for (const [i, p] of [f.core, f.candidate].entries()) {
+    assert.deepEqual(fs.readFileSync(p), before[i][0]);
+    assert.equal(fs.statSync(p).mtimeMs, before[i][1]);
+  }
+  assert.equal(fs.existsSync(f.core + '-wal'), false);
+  assert.equal(fs.existsSync(f.core + '-shm'), false);
+});
+
+test('WAL sidecars partial shm-only remains blocked with exact reason', t => {
+  const f = fixture(t, 'WAL', 'ROLLBACK', {'core':['-shm']});
+  const r = inspectEmploymentR6WalMemoryPreflight({host: f.host});
+  assert.equal(r.core.walSidecarState, 'SHM_ONLY');
+  assert.equal(r.core.problem, 'WAL_SIDECARS_PARTIAL');
+  assert.equal(r.core.ready, false);
+  assert.ok(r.blockedConditions.includes('CORE_WAL_SIDECARS_PARTIAL'));
+  assert.equal(fs.existsSync(f.core + '-wal'), false);
+  assert.equal(r.operationalWrites, 0);
+});
+
+test('present WAL pair stays eligible independently of memory gate', t => {
+  const f = fixture(t, 'WAL', 'ROLLBACK', {'core':['-wal','-shm']});
+  const r = inspectEmploymentR6WalMemoryPreflight({host: f.host});
+  assert.equal(r.core.walSidecarState, 'BOTH_PRESENT');
+  assert.equal(r.core.ready, true);
+  assert.equal(r.candidate.walSidecarState, 'NOT_REQUIRED');
+  assert.equal(r.blockedConditions.includes('RESOURCE_WAIT_MEMORY'), !r.resource.ready);
+  assert.equal(r.code, r.resource.ready ? 'R6_WAL_MEMORY_PREFLIGHT_READY' : 'RESOURCE_WAIT_MEMORY');
+  assert.equal(r.candidateExecuted, false);
+  assert.equal(r.operationalWrites, 0);
+});
+
+test('R6 #741 shape reports sidecar absence and 480MiB shortage together', t => {
+  const f = fixture(t, 'WAL', 'ROLLBACK');
+  t.mock.method(os, 'freemem', () => 480 * 1048576);
+  const r = inspectEmploymentR6WalMemoryPreflight({host: f.host});
+  assert.equal(r.status, 'BLOCKED');
+  assert.equal(r.code, 'R6_DB_PREFLIGHT_FAILED');
+  assert.deepEqual(r.blockedConditions,
+    ['CORE_WAL_SIDECARS_ABSENT_UNVERIFIED', 'RESOURCE_WAIT_MEMORY']);
+  assert.equal(r.resource.freeMiB, 480);
+  assert.equal(r.resource.minimumFreeMiB, 1536);
+  assert.equal(r.candidateExecuted, false);
+  assert.equal(r.sqliteOpened, false);
+  assert.equal(r.operationalWrites, 0);
+  assert.equal(fs.existsSync(f.core + '-wal'), false);
+  assert.equal(fs.existsSync(f.core + '-shm'), false);
+});
+
+test('real SQLite normal WAL final close may remove sidecars; probe does not recreate them', t => {
+  const f = fixture(t, 'WAL', 'ROLLBACK');
+  fs.unlinkSync(f.core);
+  const db = new DatabaseSync(f.core);
+  db.exec('PRAGMA journal_mode=WAL; CREATE TABLE observation(v INTEGER); INSERT INTO observation VALUES(1)');
+  db.close();
+  assert.equal(fs.existsSync(f.core + '-wal'), false);
+  assert.equal(fs.existsSync(f.core + '-shm'), false);
+  const before = fs.readFileSync(f.core);
+  const beforeMtime = fs.statSync(f.core).mtimeMs;
+  const r = inspectEmploymentR6WalMemoryPreflight({host: f.host});
+  assert.equal(r.core.walSidecarState, 'BOTH_ABSENT');
+  assert.equal(r.core.problem, 'WAL_SIDECARS_ABSENT_UNVERIFIED');
+  assert.equal(r.core.ready, false);
+  assert.deepEqual(fs.readFileSync(f.core), before);
+  assert.equal(fs.statSync(f.core).mtimeMs, beforeMtime);
+  assert.equal(fs.existsSync(f.core + '-wal'), false);
+  assert.equal(fs.existsSync(f.core + '-shm'), false);
+});
+
