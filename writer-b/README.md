@@ -1,6 +1,6 @@
 # 공통 Writer B — 신규 기능 재사용 안내 (Source-only)
 
-> **현재 Draft 구현이며 실제 PC 수신기 설치·Windows Runtime 통과 증거가 아니다.**
+> **공통 Writer B 소스는 main의 PR #626/#627에 반영됐다. 단, 실제 GitHub Actions enabled/Windows Runner 접수 및 최초 PC Writer B 설치는 아직 확인되지 않았다.**
 > 아래는 승인된 공통 경로가 운영 가능 상태로 확인된 뒤, **각 기능의 원담당**이 재사용할 절차다. PR 생성·병합·테스트 PASS를 PC 설치나 기능 게시 완료로 보고하지 않는다.
 
 ## 1. 한 기능을 추가할 때
@@ -46,7 +46,7 @@
 
 - 저장소: 비공개 `ansqhd5774-Choi/zgmini-pc-control`
 - Issue 제목: `pc-writer-source-install` · label: `pc-writer-b-install` · 동작: 원 소유자의 신규 `opened` 한 번
-- workflow: `.github/workflows/pc-writer-b-source-once.yml` (**운영 등록·활성 여부를 먼저 확인**, Draft만으로 실행되지 않음)
+- workflow: `.github/workflows/pc-writer-b-source-once.yml` (**인증된 Actions 활성 상태를 확인**, 소스 병합은 실제 Runner 접수·PC 설치 성공 증거가 아님)
 - 요청 불변 조건: Issue 승인 경로/해시, control event commit, 후보 commit, 대상 파일 SHA; **같은 requestId 재실행·임의 운영 명령 불가**
 
 ## 4. 실패와 담당 구분
