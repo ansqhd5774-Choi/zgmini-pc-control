@@ -25,7 +25,8 @@ const REQUEST='18927e34-9d91-471b-80ce-b47cb4d0df8a';
 const throwCode=code=>{const e=new Error(code);e.code=code;throw e;};
 
 function setup({registryAbsent=false,fault=null,aclDrift=false,
- rollbackAclDrift=false}={}){
+ rollbackAclDrift=false,registryParentMissing=false,driveUnavailable=false,
+ registryParentReparse=false,driveUnavailableAfterLock=false}={}){
  const physical=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-b-pin-windows-mock-'));
  const translate=win=>{
   const normalized=path.win32.normalize(win);
@@ -67,9 +68,22 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
  }
  fs.writeFileSync(translate(HOST),host);
  if(beforeRegistry!==null)fs.writeFileSync(translate(REG),beforeRegistry);
+ if(registryParentMissing){
+  assert.equal(registryAbsent,true,'missing-parent fixture requires absent registry');
+  fs.rmdirSync(path.dirname(translate(REG)));
+ }
+ let afterLock=false,afterBackup=false,operationalSwitches=0;
  const io={constants:fs.constants,
-  lstatSync:p=>fs.lstatSync(translate(p)),
+  lstatSync:p=>{
+   if(p===TARGETS.dataRoot&&(driveUnavailable||
+    (driveUnavailableAfterLock&&afterLock)||
+    (fault==='DRIVE_LOST_AFTER_BACKUP'&&afterBackup)))
+    throw Object.assign(new Error('simulated missing E: drive'),{code:'ENODEV'});
+   return fs.lstatSync(translate(p));
+  },
   realpathSync:{native:p=>{
+   if(registryParentReparse&&p===path.win32.dirname(REG))
+    return String.raw`Z:\unapproved\redirect`;
    const native=translate(p),resolved=fs.realpathSync.native(native);
    return resolved===native?path.win32.normalize(p):String.raw`Z:\unapproved\reparse`;
   }},
@@ -90,11 +104,13 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
   ftruncateSync:(...args)=>fs.ftruncateSync(...args),
   unlinkSync:p=>fs.unlinkSync(translate(p)),
   linkSync:(s,d)=>{
+   operationalSwitches++;
    fs.linkSync(translate(s),translate(d));
    if(fault==='REGISTRY_LINKED'&&d===REG)
     throwCode('B_PIN_WINDOWS_INJECTED_LINK');
   },
   renameSync:(s,d)=>{
+   operationalSwitches++;
    fs.renameSync(translate(s),translate(d));
    if(fault==='HOST_RENAMED'&&d===HOST&&!s.includes('-restore'))
     throwCode('B_PIN_WINDOWS_INJECTED_HOST');
@@ -109,6 +125,7 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
     throwCode('R17_B_REQUEST_ALREADY_CLAIMED_STOP');
    const fd=fs.openSync(translate(sharedLock),'wx');
    fs.writeSync(fd,requestId);fs.fsyncSync(fd);
+   afterLock=true;
    return {fd,journalDir:path.win32.join(journalRoot,requestId)};
   },
   createInstallJournal({requestId,fd,sharedLock}){
@@ -130,6 +147,8 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
   verifyApproval:async({sha256:approved})=>({verified:true,
    rawApprovalSha256:approved}),lockApi:claimApi,fileIO:io,
   aclFingerprint:p=>{
+   if(fault==='DRIVE_LOST_AFTER_BACKUP'&&
+    p===REG+'.pin-b-'+REQUEST+'.original.bin')afterBackup=true;
    if(fault==='HOST_CONCURRENT_DRIFT'&&p.includes('.tmp')&&
     p.startsWith(HOST)&&!p.includes('-restore'))
     fs.writeFileSync(translate(HOST),'EXTERNAL_UNCOOPERATIVE_WRITER');
@@ -140,7 +159,7 @@ function setup({registryAbsent=false,fault=null,aclDrift=false,
   platform:()=> 'win32',
  });
  return {physical,translate,adapter,raw,pinnedApproval,host,afterHost,beforeRegistry,
-  targetRegistry};
+  targetRegistry,getOperationalSwitchCount:()=>operationalSwitches};
 }
 async function withFixture(opts,fn){
  const x=setup(opts);
@@ -247,6 +266,70 @@ test('Windows-mapped DI: bootstrap create and rollback preserve actual absence',
   assert.equal(out.rollback,'VERIFIED');
   assert.equal(fs.existsSync(x.translate(REG)),false);
   assert.deepEqual(fs.readFileSync(x.translate(HOST)),x.host);
+ });
+});
+
+test('Windows-mapped DI: missing registry parent does not count as leaf ABSENT',async()=>{
+ await withFixture({registryAbsent:true,registryParentMissing:true},async x=>{
+  const out=await runApprovedRegistryCas({approvalRaw:x.raw,
+   pinnedApproval:x.pinnedApproval,adapter:x.adapter});
+  assert.equal(out.status,'BLOCKED',JSON.stringify(out));
+  assert.equal(out.code,'B_PIN_WINDOWS_REGISTRY_PARENT_MISSING');
+  assert.equal(x.getOperationalSwitchCount(),0);
+  assert.deepEqual(fs.readFileSync(x.translate(HOST)),x.host);
+  assert.equal(fs.existsSync(x.translate(REG)),false);
+  assert.equal(fs.existsSync(x.translate(LCK)),false);
+ });
+});
+
+test('Windows-mapped DI: disconnected E: drive is not a safe first-registration preimage',async()=>{
+ await withFixture({registryAbsent:true,driveUnavailable:true},async x=>{
+  const out=await runApprovedRegistryCas({approvalRaw:x.raw,
+   pinnedApproval:x.pinnedApproval,adapter:x.adapter});
+  assert.equal(out.status,'BLOCKED',JSON.stringify(out));
+  assert.equal(out.code,'B_PIN_WINDOWS_REGISTRY_PARENT_MISSING');
+  assert.equal(x.getOperationalSwitchCount(),0);
+  assert.deepEqual(fs.readFileSync(x.translate(HOST)),x.host);
+  assert.equal(fs.existsSync(x.translate(REG)),false);
+  assert.equal(fs.existsSync(x.translate(LCK)),false);
+ });
+});
+
+test('Windows-mapped DI: registry parent reparse redirection denies bootstrap',async()=>{
+ await withFixture({registryAbsent:true,registryParentReparse:true},async x=>{
+  const out=await runApprovedRegistryCas({approvalRaw:x.raw,
+   pinnedApproval:x.pinnedApproval,adapter:x.adapter});
+  assert.equal(out.status,'BLOCKED',JSON.stringify(out));
+  assert.equal(out.code,'B_PIN_WINDOWS_REGISTRY_PARENT_REPARSE');
+  assert.equal(x.getOperationalSwitchCount(),0);
+  assert.equal(fs.existsSync(x.translate(REG)),false);
+  assert.equal(fs.existsSync(x.translate(LCK)),false);
+ });
+});
+
+test('Windows-mapped DI: drive disappears after shared lock => no CAS/create',async()=>{
+ await withFixture({registryAbsent:true,driveUnavailableAfterLock:true},async x=>{
+  const out=await runApprovedRegistryCas({approvalRaw:x.raw,
+   pinnedApproval:x.pinnedApproval,adapter:x.adapter});
+  assert.equal(out.status,'BLOCKED',JSON.stringify(out));
+  assert.equal(out.code,'B_PIN_WINDOWS_REGISTRY_PARENT_MISSING');
+  assert.equal(x.getOperationalSwitchCount(),0);
+  assert.deepEqual(fs.readFileSync(x.translate(HOST)),x.host);
+  assert.equal(fs.existsSync(x.translate(REG)),false);
+  assert.equal(fs.existsSync(x.translate(LCK)),false);
+ });
+});
+
+test('Windows-mapped DI: drive disappears after backup retains lock with zero CAS',async()=>{
+ await withFixture({fault:'DRIVE_LOST_AFTER_BACKUP'},async x=>{
+  const out=await runApprovedRegistryCas({approvalRaw:x.raw,
+   pinnedApproval:x.pinnedApproval,adapter:x.adapter});
+  assert.equal(out.status,'STATE_UNKNOWN',JSON.stringify(out));
+  assert.equal(out.retainLockForRecovery,true);
+  assert.equal(x.getOperationalSwitchCount(),0);
+  assert.deepEqual(fs.readFileSync(x.translate(HOST)),x.host);
+  assert.deepEqual(fs.readFileSync(x.translate(REG)),x.beforeRegistry);
+  assert.equal(fs.readFileSync(x.translate(LCK),'utf8'),REQUEST);
  });
 });
 
