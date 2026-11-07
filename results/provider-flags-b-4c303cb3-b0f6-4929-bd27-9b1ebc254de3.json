@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_PROVIDER_FLAGS_B_RESULT_V1",
+  "requestId": "4c303cb3-b0f6-4929-bd27-9b1ebc254de3",
+  "status": "PROVIDER_B_STOP_RESTORED",
+  "code": "PROVIDER_B_UNEXPECTED_STOP",
+  "changedKeys": [],
+  "manifestSha256": "e5d28463bd082401070d2205d8a51ca924225a619f633ec8bf7ee8d0332cfa01",
+  "controlSha": null,
+  "beforeSha256": null,
+  "afterSha256": null,
+  "backupVerified": false,
+  "runId": "42401040266",
+  "retry": "NO_REEXECUTE_READ_ONLY_RECONCILE"
+}
