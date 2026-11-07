@@ -108,3 +108,12 @@ M1과 M2의 코드·문서 준비는 독립적으로 병렬 수행한다. **동�
 4. M4: 안전한 승인 B 적용의 실PC 실행 결과·물가지표 담당 실제 수신을 확보해 인계하고 R2를 닫는다.
 
 불필요한 예약·CMD·유료 서비스·새 승인 반복·무관 기능 수정·기존 R1 재검증은 계획에서 제외한다.
+
+## 9. 2026-11-07 사용자 명시 변경 — R17 Controller 단일 설치 담당 R2 총괄 인수
+
+- 사용자 선택에 따라 기존 R17 B 적용 담당 대신 **현재 R2 프로세스 총괄이 정규 Controller 설치와 결과 회수까지 직접 수행**한다. 이는 R2 Controller 공통 전제의 한정된 역할 변경이다. 물가지표 기능/게시, 캘린더, ER1 Core 수집기의 원담당 권한은 이전하지 않는다. §2·§4·§5·§8의 기존 "R17 대기/총괄 B 금지"는 사용자 변경 이전 이력으로 해석한다.
+- [공용 #68 인수 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6699762305)으로 기존 담당의 중복 B 생성을 방지한다. 댓글은 다른 ChatGPT 대화의 실제 ACK나 PC lease의 대체물이 아니다.
+- 실제 최신 [읽기 전용 A #628](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/628) PASS, PC Controller db8924162d42adf6ee6aa27a04ce1719c8fe96c2, 보호 상태 불변/운영 쓰기 0.
+- 기존 승인 5파일 [#615](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/615) + R2 A 1파일 [#625](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/625)의 정확한 6파일 누적 diff를 신규 불변 B 승인 [#629](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/629)로 main 반영. 목표 6348be5201801e008be10867fd68add4ddeca52c, RAW SHA256 75aebe1445b2c40e49ea852ec7ef86fac2b152c7202b82f0abfa9b93f1fb24e1. 기존 #615 manifest 수정 없음.
+- [정규 단회 B 요청 #630](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/630), requestId pc-update-2b963307-a5dd-4225-9366-29d0687e6a24 접수. **결과 미확정/RUNNING, PC 설치 완료 주장 금지**. 동일 요청 결과를 한 번 회수해 설치 SHA/보호/Workflow/새 A 활성으로 판정한다.
+- R2 M1 통과는 설치 이후 물가지표 Writer 파일 해시와 dirty를 실제 A로 확보할 때다. 단순 Controller B 접수만으로 R2 진도 20%를 올리지 않는다.
