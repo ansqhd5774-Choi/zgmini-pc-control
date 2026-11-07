@@ -21,7 +21,7 @@ const JROOT=String.raw`E:\ZGmini\data\pc-writer\approved-runtime-pin-cas`;
 const RESULTS=String.raw`E:\ZGmini\data\pc-writer\results`;
 const TARGETS={dataRoot:String.raw`E:\ZGmini\data`,hostFile:HOST,
  registryFile:REG,sharedWriterLock:LCK,journalRoot:JROOT,resultRoot:RESULTS};
-const REQUEST='pinregistration00003';
+const REQUEST='18927e34-9d91-471b-80ce-b47cb4d0df8a';
 const throwCode=code=>{const e=new Error(code);e.code=code;throw e;};
 
 function setup({registryAbsent=false,fault=null,aclDrift=false,
