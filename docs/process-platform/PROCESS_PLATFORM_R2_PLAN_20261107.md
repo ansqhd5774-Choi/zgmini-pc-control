@@ -5,7 +5,7 @@
 - 계획·경과 보존 브랜치: codex/controller-ops-lessons-20261105
 - 공통 지침 적용 기준: ansqhd5774-Choi/zgmini-pc-control 최신 main
 - 기존 프로세스 R1: Issue #526 / 이전 계획·운영 완료 100% 보존, 재개하지 않음
-- 전체 R2 진행 상태: **M0–M3 DONE — 공식 80%**, M4 실제 원담당 수신·인계 미완료. Preview 추가 3파일과 #662 모듈 조회는 별도 기능 후속 (§13)
+- 전체 R2 진행 상태: **M0–M4 DONE — 공식 100%**. 사용자 전달의 원담당 대화 `OWNER_RECEIVED` 수신 및 다음 실행 확인으로 M4 종결 (§14). Preview 추가 3파일/자동 갱신과 #662 공통 보고업로더 오류는 별도 후속 (§13–14).
 
 ## 1. 해결하려는 반복 문제와 최종 목표
 
@@ -148,3 +148,10 @@ M1과 M2의 코드·문서 준비는 독립적으로 병렬 수행한다. **동�
 - **M3 DONE 근거:** 원격 main과 blob 8/8 일치하는 실제 테스트 소스로 다단 VBS, 타 담당 dirty, source·file 해시 불일치, 부분 적용·복구, 정상 B 3파일 **독립 5/5**; Linux Node 24 `40/40 PASS`, 실제 Windows #651 정상 / #646 중단 복원 / #657 의존성 안전 거부 교차증거. Linux 테스트를 Windows 실PC 전체 회귀나 기능 게시 실증으로 과장하지 않음.
 - **#662 정확한 역할:** PR #658의 추가 `lib/`·`worker/` 일반 A 인벤토리 및 Preview/Catalog/Worker 후속 승인 준비는 별도 기능·진단 범위. #660 Controller 설치 성공, #661 A 진단 성공이지만 [#662](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/662) 의존 모듈 결과 미도착은 `STATE_UNKNOWN`. 사용자 선택에 따른 M1 완료·원래 M2/M3 완료를 되돌릴 근거는 아니나, 해당 기능의 신규 Writer B 설치·게시 성공도 주장하지 않는다.
 - **공식 R2:** M0 20% + M1 20% + M2 20% + M3 20% = **80%**, M4 20% 미완료. M4는 총괄의 완료 증거 패키지·공통 경로와 후속 경계 전달 및 원담당 대화의 실제 수신을 요구한다. 다른 대화의 GitHub 댓글을 수신 ACK로 오인하지 않음. 사용자가 총괄 검증 완료 후 인계를 지시한 이력에 따라 실제 인계 전 사용자에게 현재 완료·잔존 경계 보고.
+
+## 14. 2026-11-07 원담당 실제 수신 완료 — R2 공식 100% 종결
+
+- **M4 OWNER_RECEIVED:** 사용자가 별도 물가지표 담당 대화에서 인계 정본·계획·원장 및 [기능 PR #981 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295)을 확인한 인수 응답 전체를 전달함. 응답은 `OWNER_RECEIVED`, 공통 A/B 재사용 이해, #651 설치 성공·#657 의존성 보호 실패의 구분, 다음 **단일 필수 실행**(기존 #662 증거로 Preview 3파일 단일 승인 manifest 작성)을 명시. GitHub 인계 댓글 자체를 수신으로 오판하지 않음.
+- **R2 단계 판정:** M0 20 + M1 20 + M2 20 + M3 20 + M4 20 = **100% DONE**. R1 #526 기존 완료 별도 보존. 이번 플랫폼 종료는 기능의 19/19 자동 갱신, 나머지 11개 수집·산식, Cloudflare 배포와 무관.
+- **#662 실제 후속 증거:** [Actions Run 42339890739](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42339890739) Windows A 실행 PASS(실제 설치 Controller `70222f9a...`, 운영 쓰기 0), 업로드 Step FAIL `REPORT_SIZE`(기존 최대 32KiB, module inventory 총 772068 bytes). 완전 A inventory에서 Preview·Catalog·Worker 정확한 3파일 absent; Writer 기존 후보 HEAD=config/checkpoint `d50ba263...`·trackedDirty=false. 이는 결과 전달기의 **새 공통 결함**이므로 독립 수정과 집중 회귀로 추적하고, 동일 #662 요청 재발행·기능 설치 선행 신규 Gate를 만들지 않음.
+- **다음 소유자:** 물가지표 담당은 기존 공통 Writer B 단일 승인 manifest로 Preview 3파일 설치/자동 게시 검증을 진행. 프로세스 총괄은 대용량 A 결과의 읽기전용 상세 증거를 숨기지 않으면서 업로드 크기 제한을 준수하도록 **공통 보고 경로**를 개선. 두 작업은 독립 진행 가능.
