@@ -73,7 +73,7 @@ export function nativeTaskXml(task){return execFileSync(path.join(process.env.Sy
 export async function runOperation(request,context){
  const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence}=context;
  if(request.operation==='approved-runtime-inventory-readonly')
-  return runApprovedRuntimeInventory({dataRoot,host,queryTask});
+  return runApprovedRuntimeInventory({request,dataRoot,host,queryTask});
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask,retiredTaskEvidence}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
