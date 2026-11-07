@@ -13,7 +13,10 @@ let releaseUpload;for(let n=0;n<120&&!releaseUpload;n++){try{releaseUpload=exclu
 try{
 const files=await uploadVerifiedReportPair({api,repository:policy.controlRepository,runId,attempt,seat,json,txt});
 const marker=`<!-- zgmini-pc-result:${runId}:${attempt}:${seat} -->`,runUrl=`https://github.com/${policy.controlRepository}/actions/runs/${runId}`;
-const body=`${marker}\n**${report.status} — ${report.code}**\n\n실행: ${runUrl}\n\n${files.map(x=>'- '+x).join('\n')}\n\nJSON 결과:\n\n\`\`\`json\n${json}\`\`\`\n\nTXT 결과:\n\n\`\`\`text\n${txt}\`\`\`\n`;
+const transfer=JSON.parse(json).reportTransfer;
+const scopeNotice=transfer?.status==='SUMMARY_ONLY'?
+ '\n\n**전송 범위: SUMMARY_ONLY — 파일별 목록은 PC 원장에만 보존. 이 댓글은 전체 inventory/해시의 원격 검증 증거가 아닙니다.**':'';
+const body=`${marker}\n**${report.status} — ${report.code}**${scopeNotice}\n\n실행: ${runUrl}\n\n${files.map(x=>'- '+x).join('\n')}\n\nJSON 결과:\n\n\`\`\`json\n${json}\`\`\`\n\nTXT 결과:\n\n\`\`\`text\n${txt}\`\`\`\n`;
 const allComments=()=>readAllPages(async page=>{const r=await api(`issues/${pointer.issueNumber}/comments?per_page=100&page=${page}`);need(r.status===200,'REPORT_COMMENTS_LOOKUP_FAILED');return r.data;});
 let comments=await allComments();
 if(!comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker))){try{const post=await api(`issues/${pointer.issueNumber}/comments`,'POST',{body});need(post.status===201,'REPORT_COMMENT_WRITE_FAILED');}catch(error){comments=await allComments();need(comments.some(x=>x.user?.login==='github-actions[bot]'&&x.body?.includes(marker)),'REPORT_COMMENT_OUTCOME_UNKNOWN');}}
@@ -26,4 +29,5 @@ const cleanup=cleanupVerifiedJobTemps({root,runId,attempt,seat,issueNumber:point
  report,remoteFilesVerified:files.length===2,commentVerified});
 console.log(JSON.stringify({tempCleanup:cleanup.status,code:cleanup.code??null,removedFiles:cleanup.files??0}));
 }finally{releaseUpload();}
+
 
