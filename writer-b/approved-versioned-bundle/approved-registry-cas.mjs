@@ -3,8 +3,9 @@
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {selectPinnedCapabilityProfiles} from
- '../theme-generic-a/controller/approved-runtime-inventory-readonly.mjs';
+ '../../controller/approved-runtime-inventory-readonly.mjs';
 import {selectPinnedBundleProfiles} from './pinned-bundle-profiles.mjs';
+import {isWriterBRequestId} from './writer-b-request-id.mjs';
 
 export const PIN_CAS_SCHEMA='ZGMINI_PC_RUNTIME_PIN_AND_REGISTRY_CAS_B_V1';
 export const PIN_CAS_SCOPE='HOST_RUNTIME_PIN_AND_REGISTRY_BYTE_CAS_ONLY';
@@ -272,8 +273,7 @@ function validateApproval(approval,rawBytes,pin){
   // reconciliation requires a different recovery scope and full review.
   approval.oldPin===approval.registryBeforeSha256,
   'B_PIN_REGISTRY_DIGEST_BINDING');
- need(typeof pin?.requestId==='string'&&
-  /^[A-Za-z0-9_-]{12,128}$/.test(pin.requestId),
+ need(isWriterBRequestId(pin?.requestId),
   'B_PIN_REQUEST_ID');
  // Actual paths are resolved by the installed Receiver, never from Issue or
  // this plan. No second per-content trusted-profile registry exists.
