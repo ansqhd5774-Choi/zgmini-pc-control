@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "8cdc99d1-95db-4ffe-940f-13634b737c8b",
+  "status": "WRITER_B_INSTALL_STOP_RESTORED",
+  "code": "WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP",
+  "sourceSha": null,
+  "mode": null,
+  "localOnly": null,
+  "baseHead": null,
+  "candidateSourceSha": null,
+  "manifestSha256": null,
+  "baseTreeOid": null,
+  "preparedTreeOid": null,
+  "provenanceSha256": null,
+  "runId": "42328236728",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE"
+}
