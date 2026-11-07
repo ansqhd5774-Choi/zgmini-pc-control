@@ -1,7 +1,6 @@
 # Reusable A/light approved runtime inventory (local prototype)
 
-This isolated prototype does **not** modify existing ZGMINI Controller operations,
-production PC files, GitHub branches, jobs or Task Scheduler entries.
+This draft PR adds a **one-time** generic Controller operation in source, but has not been installed on a Windows PC. Existing operational files, tasks and databases remain unchanged.
 
 ## Source and trust boundary
 
@@ -97,4 +96,4 @@ values must be verified against approved host registration before use.
   GitHub envelope's 32KiB bound; the exact assembled report must still be
   verified on real Windows before broad rollout.
 
-Run: `node --test theme-generic-a/tests/*.test.mjs`
+Run: `node --test tests/approved-runtime-inventory-*.test.mjs`
