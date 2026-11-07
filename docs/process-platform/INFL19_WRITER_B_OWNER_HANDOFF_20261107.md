@@ -40,3 +40,13 @@ R2 추적: [#622](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/62
 
 
 > SHA 정정 (2026-11-07): 위 `run-local.mjs` After의 실제 GitHub PR head 원문 SHA-256은 `e7986e8cf120f490d83a10218cb6656fb78e6ce493c2f6b2b6d899adb77b927c`이다. 구 `…b2d6…` 기록은 오기. 기존 PC before `922503ba…`는 PR base 파일 `1c336662…`와 다르므로 전체 blob 교체 manifest를 발급하지 않는다. 이번 첫 B 설치·실증 책임은 사용자 최신 지시에 따라 R2 총괄이 한정 인수했으며 다른 기능 담당자의 설치를 병렬로 만들지 않는다.
+
+
+## R2 총괄 단회 통합 실증 전환 — 2026-11-07
+
+사용자 명시 지시로 **이번 첫 Inflation19 Writer B 설치·시행착오·재발 방지 실증은 R2 프로세스 총괄이 완결할 때까지 원담당에게 넘기지 않는다.** 앞의 ‘원담당이 남은 정규 B 적용’ 절은 과거 인계안으로 보존하며, 현재 실행 소유자는 R2 총괄이다. 같은 Writer 대상 작업의 동시 B 설치는 금지하되 다른 독립 콘텐츠 개발은 임의 중단하지 않는다.
+
+- 원격 control main: [공통 구조개선 PR #642](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/642) 병합 `2aada572c8d7356faeb60fc6f3655438479067ad`; 기존 PC 바이트를 보존하는 선택적 삽입형 B 계약 및 읽기 전용 A 예측 도구 추가.
+- 격리 테스트: 30/30 PASS. PC 적용 PASS로 해석하지 않는다.
+- 첫 A 실PC 미리보기 요청: [Issue #643](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/643), 승인 spec `approvals/writer-previews/infl19-r2.json` SHA256 `1d025c2ccf032ae6638946a4d572b846f1cbf50ed5ceb3301673240838751dae`. 원격 결과 미수신, 실제 운영 쓰기 0을 목표로 함.
+- **승인 전 다음 행동:** #643의 정확한 반환을 기다려 실제 PC after SHA와 Task XML 해시를 확정하고, 기존 launcher와 소비자 증거를 대조한 뒤 B manifest를 고정한다. 원문 불일치 시 전체 파일 교체로 대체하거나 무한 재요청하지 않는다.
