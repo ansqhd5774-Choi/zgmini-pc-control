@@ -272,6 +272,9 @@ function validateApproval(approval,rawBytes,pin){
   // reconciliation requires a different recovery scope and full review.
   approval.oldPin===approval.registryBeforeSha256,
   'B_PIN_REGISTRY_DIGEST_BINDING');
+ need(typeof pin?.requestId==='string'&&
+  /^[A-Za-z0-9_-]{12,128}$/.test(pin.requestId),
+  'B_PIN_REQUEST_ID');
  // Actual paths are resolved by the installed Receiver, never from Issue or
  // this plan. No second per-content trusted-profile registry exists.
  need(pin?.profileId===approval.profileId&&
