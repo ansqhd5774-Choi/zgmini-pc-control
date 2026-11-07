@@ -137,6 +137,11 @@ export async function performWriterBInstall(auth,io){
   prepared=verifyPreparedWriterCommit(manifest,
     await io.prepareIsolatedCommit(before,manifest));
 
+  // Preparing the isolated overlay can overlap a new, legitimate Core cycle.
+  // Reuse the existing bounded natural-idle wait just before the final
+  // pause check. The wait never disables Core or bypasses the last CAS.
+  await io.waitForCoreIdleWindow('POST_PREPARE');
+
   // Mark mutation intent before any call that may partially apply its effects.
   taskMayHaveChanged=true;
   await io.pauseCore(before);
