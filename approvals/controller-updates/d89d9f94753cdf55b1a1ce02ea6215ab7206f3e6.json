@@ -5,7 +5,7 @@
   "allowFiles": [
     {
       "path": "controller/inflation-candidates-runtime-readonly.mjs",
-      "sha256": "5933649643005bb386d1c6593b672a5cf805e4e561baa9da2b295484999c635d"
+      "sha256": "fb0737a94ad71253d8d28c75fcfc7e2e301f0ad7e79a3cca60b50aaa1239a4e4"
     }
   ],
   "purpose": "pc-controller-maintenance",
@@ -18,7 +18,7 @@
   "checks": {
     "targetSha": "d89d9f94753cdf55b1a1ce02ea6215ab7206f3e6",
     "status": "PASS",
-    "manifestSha256": "7543b4be1114916860c9e795a70c0bad0160b21440152fd43501ca0df398f729"
+    "manifestSha256": "494a04d8c488d170df8032f4992b6be36531a8e8c0532ecaeb33485076a290d5"
   },
   "backup": {
     "strategy": "VERSIONED_SNAPSHOT",
