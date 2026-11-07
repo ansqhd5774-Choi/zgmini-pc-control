@@ -32,8 +32,9 @@
 ## 반복 차단 방지를 위한 경계 조건
 
 - 불변 `versions/<digest>`가 이전 실패 후 남아도 파일 목록·크기·SHA가 **모두 일치**하면 승인된 새 고유 ID로 읽기 전용 재사용한다. 내용 불일치·타 소유 stage/journal이면 임의 삭제·덮어쓰기 없이 별도 복구로 분리한다.
-- 다중 CMD/VBS 런처 순차 교체는 전체 원자적이지 않다. Writer B lock이 기존 Scheduler 실행까지 차단한다고 가정하지 않는다. **예약 실행이 각 교체 사이에 끼어드는 경우**를 기존/신규 launcher 및 활성 pointer 조합마다 시험하고 안전한 고정 디스패처+마지막 pointer 전환이 입증되기 전에는 B 활성화를 허용하지 않는다. 기존 Task XML·예약을 중단하거나 변경하여 해결하지 않는다. 이것은 **설치 전환 중 동시 실행 안전성** 확인이며, 다음날/다음 시각의 **자연 예약 자동 갱신 검증**은 기능의 수집→계산→게시→API/UI 완료 후 별도 후속 작업으로 수행한다.
+- 다중 CMD/VBS 런처 순차 교체는 전체 원자적이지 않다. Writer B lock이 기존 Scheduler 실행까지 차단한다고 가정하지 않는다. **예약 실행이 각 교체 사이에 끼어드는 경우**를 기존/신규 launcher 및 활성 pointer 조합마다 모의시험한다. 설치 효과는 (a) 검증된 고정 dispatcher+최종 pointer 교체 또는 (b) Task→VBS→CMD→불변 버전 Node 진입점의 정확한 원본 바이트와 구/신 실행 상태·lock·DB/checkpoint 호환성이 승인 SHA와 함께 증명된 경우에만 허용한다. bridge의 임의 boolean, JS 주석/marker 일치, 원본 해시만 맞는 잘못된 명령 경로는 호환성 증거가 아니다. 지금 두 전략 모두 실제 Windows 증명이 완료되지 않았으므로 승인 없이 활성화하지 않는다. 기존 Task XML·예약을 중단하거나 변경하여 해결하지 않는다. 이것은 **설치 전환 중 동시 실행 안전성** 확인이며, 다음날/다음 시각의 **자연 예약 자동 갱신 검증**은 기능의 수집→계산→게시→API/UI 완료 후 별도 후속 작업으로 수행한다.
 - 운영 mutation이 commit되었더라도 결과 파일 한 쪽이라도 없으면 `status=PASS`만으로 최종 DONE 판정 금지. `reportStatus=JSON_TXT_2_OF_2`와 고유 요청 ID의 실제 원장을 함께 확인하고, 불완전하면 기존 commit 원장에서 증거만 복구하며 **운영 B 재실행은 금지**한다.
+- 최초 A/B 승인 registry는 기존 고정 `<dataRoot>/pc-writer/approved-runtime-inventory-profiles.json` 단일 파일이다. `controller-approvals` 신규 디렉터리 생성 권한은 불필요하다. 이미 존재하는 E:/dataRoot/pc-writer의 canonical·비reparse 경로와 승인된 소유권을 먼저 확인하며, registry 파일만 없는 경우를 최초 create-exclusive로 취급한다. E: 연결 실패나 상위 폴더 없음은 registry ABSENT로 인정하지 않는다.
 - 두 단계의 CAS(공통 registry와 host PIN)는 저널·백업·순서·검산·역순 복구로 보장하며 두 파일의 동시 원자성은 주장하지 않는다. 실제 Windows ACL/NTFS/강제종료 실증 및 신규 B effect 명시 승인 전에는 모두 후보 코드일 뿐이다.
 
 ## 검증 기준
