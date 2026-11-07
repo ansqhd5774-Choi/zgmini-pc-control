@@ -11,24 +11,57 @@ const SHA64=/^[0-9a-f]{64}$/;
 const VERSION=/^[0-9a-f]{16}$/;
 const pathRx=/^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*\.(?:mjs|json|md)$/i;
 const scriptRx=/^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*\.mjs$/i;
-const escapeRx=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const utf8=bytes=>{
  need(Buffer.isBuffer(bytes)&&bytes.length>0&&
   Buffer.from(bytes.toString('utf8'),'utf8').equals(bytes));
  return bytes.toString('utf8');
 };
+const taskXmlText=bytes=>{
+ need(Buffer.isBuffer(bytes)&&bytes.length>0);
+ if(bytes.length>=2&&bytes[0]===255&&bytes[1]===254){
+  need((bytes.length-2)%2===0);
+  const body=bytes.subarray(2),s=body.toString('utf16le');
+  need(Buffer.from(s,'utf16le').equals(body));return s;
+ }
+ if(bytes.length>=4&&bytes[0]===60&&bytes[1]===0&&bytes[2]===63&&bytes[3]===0){
+  need(bytes.length%2===0);
+  const s=bytes.toString('utf16le');
+  need(Buffer.from(s,'utf16le').equals(bytes));return s;
+ }
+ const s=utf8(bytes);return s.startsWith('\uFEFF')?s.slice(1):s;
+};
 const canonicalCommand=(bytes,home)=>{
- const value=utf8(bytes),prefix=home+'\\versions\\';
- const pattern=new RegExp(escapeRx(prefix)+'([0-9a-f]{16})\\\\','gi');
- const versions=[...value.matchAll(pattern)];
- need(versions.length===1);
- const item=versions[0],version=item[1].toLowerCase();
- // Exactly one pinned Node entrypoint: no dynamic ACTIVE_RUNTIME indirection.
- need(value.includes('E:\\ZGmini\\runtime\\node.exe')&&
-  !value.includes('ACTIVE_RUNTIME')&&!value.includes('%VERSION%'));
- const replaced=value.slice(0,item.index)+prefix+'{VERSION}\\'+
-  value.slice(item.index+item[0].length);
- return {version,normalized:replaced};
+ const value=utf8(bytes);
+ // Exact generated Windows CMD grammar, no comments, CALL, IF, FOR, ECHO,
+ // second Node invocation, shell extension or arbitrary extra command.
+ need(!value.includes('\r\r')&&!value.includes('\0'));
+ const lines=value.split('\r\n');
+ if(lines.at(-1)==='')lines.pop();
+ need((lines.length===6||lines.length===7)&&
+  lines[0]==='@echo off'&&
+  lines[1]==='setlocal EnableExtensions DisableDelayedExpansion'&&
+  lines[4]==='set "RESULT=%ERRORLEVEL%"'&&
+  lines.at(-1)==='exit /b %RESULT%');
+ const dataRoot=home.slice(0,home.toLowerCase().indexOf('\\pc-writer\\'));
+ need(dataRoot.length>0&&lines[2]===`set "ZGMINI_DATA_ROOT=${dataRoot}"`);
+ const prefix='"E:\\ZGmini\\runtime\\node.exe" "'+home+'\\versions\\';
+ need(lines[3].startsWith(prefix));
+ const fragment=lines[3].slice(prefix.length);
+ const match=fragment.match(/^([0-9a-f]{16})\\([a-z0-9_./\\-]+\.mjs)"(.*)$/i);
+ need(match!==null);
+ const version=match[1].toLowerCase(),script=match[2].replaceAll('\\','/'),
+  suffix=match[3];
+ need(scriptRx.test(script));
+ const mode=/^ --scheduled >>"(.+)" 2>&1$/.exec(suffix);
+ if(mode){
+  need(lines.length===6&&mode[1]===home+'\\SCHEDULE_HISTORY.log');
+ }else{
+  need(lines.length===7&&lines[5]==='pause'&&
+   [' --import "%~1"',' --interactive-cycle',' --list'].includes(suffix));
+ }
+ const normalized=lines.map((line,index)=>index===3?
+  prefix+'{VERSION}\\'+match[2]+'"'+suffix:line).join('\r\n');
+ return {version,normalized,script,mode:mode?'scheduled':'manual'};
 };
 
 /** Returns VERIFIED only after byte/hash checks, not boolean attestations. */
@@ -56,30 +89,33 @@ export async function verifyImmutablePinnedLauncherEvidence({
   !manifest.activation.launchers.some(item=>
    item.name.toLowerCase()===evidence.taskVbsName.toLowerCase())&&
   SHA64.test(evidence.taskVbsSha256??'')&&
-  typeof evidence.lockPathMarker==='string'&&
-  evidence.lockPathMarker.includes('scheduled.lock')&&
-  typeof evidence.exclusiveLockMarker==='string'&&
-  evidence.exclusiveLockMarker.includes('wx')&&
-  typeof evidence.dbSchemaMarker==='string'&&
-  evidence.dbSchemaMarker.length>=12&&
-  typeof evidence.checkpointMarker==='string'&&
-  evidence.checkpointMarker.length>=12&&
   Array.isArray(evidence.oldFiles)&&evidence.oldFiles.length>0&&
   evidence.oldFiles.length<=256);
  const liveTask=await bridge.readTaskDefinition({profileId:manifest.profileId,
   taskName:manifest.activation.task.name});
  need(Buffer.isBuffer(liveTask?.xmlBytes)&&
   sha(liveTask.xmlBytes)===evidence.taskXmlSha256);
- const liveXml=utf8(liveTask.xmlBytes);
+ const liveXml=taskXmlText(liveTask.xmlBytes);
  const actions=[...liveXml.matchAll(/<Exec(?:\s[^>]*)?>([\s\S]*?)<\/Exec>/gi)];
  need(actions.length===1);
  const command=actions[0][1].match(/<Command>([^<]*)<\/Command>/i)?.[1]??'';
  const args=actions[0][1].match(/<Arguments>([^<]*)<\/Arguments>/i)?.[1]??'';
- need(/(?:^|\\)(?:wscript|cscript)(?:\.exe)?$/i.test(command)&&
-  args.toLowerCase().includes((plan.home+'\\'+evidence.taskVbsName).toLowerCase()));
+ const parsedArgs=args.replaceAll('&quot;','"').replaceAll('&amp;','&');
+ need(/^(?:(?:[cC]:\\Windows\\System32\\)?)(?:wscript|cscript)(?:\.exe)?$/i.test(command)&&
+  parsedArgs.toLowerCase()==='"'+(plan.home+'\\'+evidence.taskVbsName).toLowerCase()+'"');
  const fixedVbs=await bridge.readLauncherBytes({profileId:manifest.profileId,
   launcherName:evidence.taskVbsName});
  need(Buffer.isBuffer(fixedVbs)&&sha(fixedVbs)===evidence.taskVbsSha256);
+ const fixedVbsLines=utf8(fixedVbs).split('\r\n');
+ if(fixedVbsLines.at(-1)==='')fixedVbsLines.pop();
+ const scheduledCmd=evidence.taskVbsName.replace(/\.vbs$/i,'.cmd');
+ need(fixedVbsLines.length===4&&
+  fixedVbsLines[0]==='Option Explicit'&&
+  fixedVbsLines[1]==='Dim shell'&&
+  fixedVbsLines[2]==='Set shell = CreateObject("WScript.Shell")'&&
+  fixedVbsLines[3]===
+   'WScript.Quit shell.Run("""'+plan.home+'\\'+scheduledCmd+'""", 0, True)'&&
+  manifest.activation.launchers.some(item=>item.name===scheduledCmd));
  const oldFiles=evidence.oldFiles;
  const seen=new Set();
  let totalOld=0;
@@ -119,11 +155,7 @@ export async function verifyImmutablePinnedLauncherEvidence({
    oldCmd.normalized===newCmd.normalized);
   // Same normalized CMD => all Node binary, flags, environment, source path,
   // and argument bytes remain unchanged; only immutable version differs.
-  const pathEnd='\\versions\\{VERSION}\\';
-  const offset=newCmd.normalized.indexOf(pathEnd);
-  need(offset>=0);
-  const tail=newCmd.normalized.slice(offset+pathEnd.length);
-  const script=tail.split('"')[0].replaceAll('\\','/');
+  const script=newCmd.script;
   need(scriptRx.test(script)&&manifest.bundle.files.some(f=>f.path===script)&&
    oldFiles.some(f=>f.path===script));
   if(executedPath!==null)need(executedPath===script);
@@ -139,15 +171,11 @@ export async function verifyImmutablePinnedLauncherEvidence({
  need(Buffer.isBuffer(oldSource)&&oldSource.length===oldEntry.bytes&&
   sha(oldSource)===oldEntry.sha256&&Buffer.isBuffer(newSource)&&
   newSource.length===newEntry.bytes&&sha(newSource)===newEntry.sha256);
- const beforeProgram=utf8(oldSource),afterProgram=utf8(newSource);
- for(const fragment of [evidence.lockPathMarker,evidence.exclusiveLockMarker,
-  evidence.dbSchemaMarker,evidence.checkpointMarker]){
-  need(beforeProgram.includes(fragment)&&afterProgram.includes(fragment));
- }
- // A committed external DB effect of an already-running process is never
- // reverted by file-CAS rollback. Only a pinned *identical* lock/schema model
- // can allow the in-flight old/new process overlap proposed by this strategy.
- return {strategy:'IMMUTABLE_VERSION_PINNED_LAUNCHER',
+ // Source bytes/CLI shape are proven, but matching string markers in source
+ // (possibly comments) DO NOT prove that both entrypoint call paths honor the
+ // same exclusive lock or cross-read DB/checkpoint schema. That still needs an
+ // independently approved old/new live-fixture compatibility transcript.
+ return {strategy:'IMMUTABLE_VERSION_PINNED_LAUNCHER_CANDIDATE_ONLY',
   evidenceSha256:approvedEvidenceSha256,oldVersion:evidence.oldVersion,
-  newVersion:evidence.newVersion};
+  newVersion:evidence.newVersion,runtimeCompatibilityProven:false};
 }
