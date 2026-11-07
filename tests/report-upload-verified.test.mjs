@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {renderBoundedReport,uploadVerifiedReportPair} from '../controller/report-upload-verified.mjs';
+import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair} from '../controller/report-upload-verified.mjs';
 
 const params={repository:'ansqhd5774-Choi/zgmini-pc-control',runId:'12345',attempt:'1',seat:'2',
  json:'{"ok":true}\n',txt:'status=PASS\r\n',wait:async()=>{}};
@@ -171,3 +172,76 @@ test('even compact output over the same limit fails before any upload',()=>{
  assert.throws(()=>renderBoundedReport(report,32768),{code:'REPORT_SIZE'});
  assert.equal(report.result.sensitiveBlob.length,32768);
 });
+
+test('large pc-source-preflight inventory reports explicit summary within 32KiB',async()=>{
+ const file=(dir,index)=>({path:`${dir}/f${index}.mjs`,sha256:'a'.repeat(64),trackedDirty:null});
+ const writer=Array.from({length:139},(_,i)=>file('scripts/pc-writer',i));
+ const modules=Array.from({length:141},(_,i)=>file(i%2?'lib':'worker',i));
+ const report={schema:'ZGMINI_PC_RESULT_V1',operation:'pc-source-preflight',
+  status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',sourceBranch:'main',
+  result:{status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',result:{
+   sourceResolved:false,runtimeSourceVerified:false,
+   lastWriterEvidence:{status:'PASS',sourceHead:'b'.repeat(40)},
+   historicalCheckoutCandidate:{gitVerified:true,head:'b'.repeat(40),
+    writerSourceInventory:{status:'PASS',complete:true,files:writer,issues:[],totalBytes:300000},
+    moduleSourceInventory:{status:'PASS',complete:true,files:modules,issues:[],totalBytes:772068}}
+  }}};
+ const before=JSON.stringify(report);
+ assert.throws(()=>renderBoundedReport({...report,operation:'another'},32768),{code:'REPORT_SIZE'});
+ const out=renderBoundedReport(report,32768),transmitted=JSON.parse(out.json);
+ assert.ok(Buffer.byteLength(out.json)+Buffer.byteLength(out.txt)<=32768);
+ assert.equal(JSON.stringify(report),before,'full PC report must remain untouched');
+ assert.equal(transmitted.status,'PASS');
+ assert.equal(transmitted.reportTransfer.status,'SUMMARY_ONLY');
+ assert.equal(transmitted.reportTransfer.omittedFileEntries,280);
+ assert.equal(transmitted.reportTransfer.fullInventoryTransferVerified,false);
+ assert.equal(transmitted.reportTransfer.hashRepresentation,'COMPACT_JSON_UTF8');
+ assert.equal(transmitted.reportTransfer.fullReportSha256,
+  createHash('sha256').update(before).digest('hex'));
+ const c=transmitted.result.result.historicalCheckoutCandidate;
+ for(const [inventory,files] of [[c.writerSourceInventory,writer],[c.moduleSourceInventory,modules]]){
+  assert.equal(inventory.complete,true);
+  assert.equal(inventory.filesTransfer,'OMITTED_SUMMARY_ONLY');
+  assert.equal(inventory.filesCount,files.length);
+  assert.equal(Object.hasOwn(inventory,'files'),false);
+  assert.equal(inventory.filesSha256,createHash('sha256').update(JSON.stringify(files)).digest('hex'));
+  assert.equal(inventory.filesHashRepresentation,'COMPACT_JSON_UTF8');
+ }
+ assert.equal(projectSourcePreflightReport({...report,operation:'other'}),null);
+ const f=fixture();
+ assert.equal((await uploadVerifiedReportPair({...params,json:out.json,txt:out.txt,api:f.api})).length,2);
+ assert.equal(f.remote.get(target('json')).toString(),out.json);
+});
+
+test('small pc-source-preflight result remains fully intact',()=>{
+ const report={operation:'pc-source-preflight',status:'PASS',result:{
+  moduleSourceInventory:{status:'PARTIAL',complete:false,files:[{path:'lib/x.mjs',sha256:null}],
+   issues:[{code:'WRITER_MODULE_FILE_UNAVAILABLE'}]}}};
+ const transmitted=JSON.parse(renderBoundedReport(report,32768).json);
+ assert.deepEqual(transmitted,report);
+ assert.equal(Object.hasOwn(transmitted,'reportTransfer'),false);
+});
+
+test('duplicate preflight prior is summarized without changing original execution evidence',()=>{
+ const prior={status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',
+  result:{moduleSourceInventory:{files:Array.from({length:400},(_,i)=>({
+   path:`lib/${i}.mjs`,sha256:'d'.repeat(64)}))}}};
+ const report={operation:'pc-source-preflight',status:'PASS',code:prior.code,
+  reused:true,reuseCode:'DUPLICATE_REUSED_NO_EXECUTION',prior};
+ const out=renderBoundedReport(report,32768),summary=JSON.parse(out.json);
+ assert.ok(Buffer.byteLength(out.json)+Buffer.byteLength(out.txt)<=32768);
+ assert.equal(summary.reused,true);
+ assert.equal(summary.prior.status,'PASS');
+ assert.equal(summary.prior.transfer,'SUMMARY_ONLY_PRIOR');
+ assert.equal(summary.reportTransfer.priorSummarized,true);
+ assert.equal(summary.reportTransfer.omittedFileEntries,0);
+ assert.equal(report.prior.result.moduleSourceInventory.files.length,400);
+});
+
+test('public Issue summary-only indicator is visible before the JSON payload',()=>{
+ const src=fs.readFileSync(fileURLToPath(new URL('../controller/upload.mjs',import.meta.url)),'utf8');
+ assert.match(src,/const scopeNotice=/);
+ assert.match(src,/전송 범위: SUMMARY_ONLY/);
+ assert.match(src,/\.status==='SUMMARY_ONLY'/);
+});
+
