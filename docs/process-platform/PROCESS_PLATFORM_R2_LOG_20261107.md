@@ -16,7 +16,7 @@
 | M1 읽기 전용 A | DONE — 사용자 승인 운영 Writer provenance | 40% | #651 실PC Writer B 3파일 설치·#654 HEAD=config=자연 checkpoint d50ba263/3파일 hash/clean PASS·#661 Task XML 보호 확인. 정확한 Task→PID 인과는 별도 STATE_UNKNOWN; #662 신규 의존 모듈은 M2 후속 |
 | M2 공통 Writer B | DONE — 원래 승인 Writer 3파일 실PC 정규 B 설치/보호 확인 | 60% | #651 3파일 설치·#652/#654 PC A 사후 검증·#646 원복. #657 추가 Preview 의존성 STOP은 기능 후속이며 공통 B 안전 보호 성공; #662 새 module 인벤토리는 별도 추적 |
 | M3 실패·정상 회귀 | DONE — 독립 시나리오 5/5 PASS | 80% | main 원문 Git blob 8/8·Node 40/40 PASS, Windows #651 정상·#646 복구·#657 안전 STOP. 실제 Task PID 인과의 미확인은 M1 승인 경계로 기록, 기능 게시·원담당 인계는 M4와 별개 |
-| M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
+| M4 실PC 적용 경로·인계 | PREPARED_NOT_DELIVERED | 80% 유지 | 공통 A/B 원본 증거와 기능 후속 경계 인계 초안 작성·원격 재조회 PASS. 원담당 실제 대화 수신 및 #662 상태 공유 미확인 → ACK 전 완료 금지 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
 
@@ -381,3 +381,9 @@
 - **M2 DONE:** 정확한 한 Writer B manifest 3파일, 원본 보호·단일 lock·CAS·실PC 정상 1건·복구/거부 2건 확인. 기능별 신규 B Receiver/CMD/예약 0. 누적 60%.
 - **M3 DONE:** M3 요구 정상1/실패4 시나리오 각각 source fixture·집중 테스트 통과(총 40/40 Node PASS, 원격 Git blob 8/8 일치); 실PC #651 정상·#646 원복·#657 안전 거부로 결과의 실제 경계 교차. 누적 80%.
 - **잔여 M4:** 원담당에게 공통 A/B 실행 계약·기존 성과·남은 기능 의존성 경계·#662 `STATE_UNKNOWN` 처리법을 전달하고, **원담당 대화가 실제로 수신·재개**했는지 확인해야 100%. 이전 사용자 지시대로 총괄 점검이 완료되기 전 임의로 일을 넘기지 않음. 새 PC/Issue/예약 작업 0, 기능 게시 성공 주장 없음.
+
+## 2026-11-07 — M4 원담당 인계 초안 준비, 실제 수신 미확인
+
+- **M4 준비물 생성:** [PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md](PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md) 전용 총괄 브랜치 원격 생성·본문 재조회 일치, commit `2736aa2ecc38510ab9a05669b173bfeac44ff164`. 공통 A/B 사용계약, 실제 #651/#654/#646/#657 증거, 사용자 승인 M1 provenance 경계, #662 현재 Actions 결과 STATE_UNKNOWN, Preview→Catalog/Worker 후보 SHA·범위를 구분하여 1회 인계 자료로 압축함.
+- **업무 보호:** 원담당의 기능 게시·Writer B 후속 설치를 총괄이 대리하지 않았으며, GitHub 초안 생성은 대화 전달·수신 ACK가 아님. 아직 실제 owner 수신/다음 실행 확인 없음. 사용자 이전 지시에 따라 준비되지 않은 사항을 완료로 주장하지 않음.
+- **공식 진행률:** M0–M3 80% 유지, M4 `PREPARED_NOT_DELIVERED`. #662 원래 요청의 runId/상태는 여전히 조회 미확인; 허가 없이 재실행·Workflow 트리거 변경·기능 원장 쓰기 없음.
