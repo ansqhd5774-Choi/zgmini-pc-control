@@ -28,6 +28,10 @@ content never comes from an Issue alone.
 | versioned-bundle-transaction.test.mjs | In-memory fault injection | None |
 | isolated-windows-fixture-adapter.mjs | Real Node fs CAS/backup/journal/rollback, hard-locked to disposable TEMP test fixture | Fixture only |
 | isolated-windows-fixture-adapter.test.mjs | End-to-end fixture I/O and fault injection | Fixture only |
+| approved-registry-cas.mjs | Pure two-file host PIN + shared A/B capability registry B-CAS coordinator | None |
+| approved-registry-cas.test.mjs | In-memory byte-preserving patch + failure/rollback/bootstrap | None |
+| pinned-bundle-profiles.mjs | Maps the same PIN-verified A/B registry to B profile contracts | None |
+| pinned-bundle-profiles.test.mjs | Tests shared A parser, source binding, A-only exclusions | None |
 
 Neither generic planning/coordinator module invokes shell, filesystem,
 GitHub, SQL or Task Scheduler.
@@ -115,7 +119,7 @@ sidecar. These are **not** versioned-bundle launcher/active-pointer targets.
 The current control repo main Writer B operation authorizes only .mjs
 source overlay. Its independent source-bundle B operation is restricted to
 the approvedSources registry entry in host.json; it cannot alter the
-runtime-inventory PIN or a separate controller-approvals/registry.json file.
+runtime-inventory PIN or the approved capability profiles sidecar.
 Treating either as a bundle file or injecting an operation into pc-job
 would cross authorization boundaries. A new **small common B effect**
 requires explicit approval, not a new ad hoc script:
@@ -128,8 +132,9 @@ requires explicit approval, not a new ad hoc script:
 3. Patch only host.approvedRuntimeInventorySha256. Preserve all other
    host fields/values and their exact raw bytes outside this one field
    (or require a separately approved one-time migration if absent).
-4. Patch only the explicitly approved registry entry, preserve all others;
-   validate the registry schema with the installed Controller.
+4. Patch only one explicitly approved A/B capability registry profile,
+   preserve all other bytes; validate the exact common schema through the
+   same read-only parser as the installed Controller A route.
 5. Use the SAME Writer B lock, one-shot request claim, same-parent ACL
    backups, fsync, CAS, staged atomic per-file replacement, durable
    journal and reverse rollback, and JSON/TXT 2/2 remote readback.
@@ -137,6 +142,33 @@ requires explicit approval, not a new ad hoc script:
    partial success must not be reported as PASS. Never default to
    replacing whole host.json with a newly generated template.
 
-No claim is made that a specific runtime-inventory PIN currently exists
-on the real host; its actual value and registry schema need the already
-approved A/read-only inventory evidence before drafting the exact B diff.
+**One registry, one approval:** the shared sidecar schema is
+ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1, with profiles[] entries
+containing id, binding (source repo/branch/SHA), rootSegments, A files,
+directories, tasks and optional bundleProfile B metadata. A validates
+but does not execute/return B metadata; B reads that same raw PIN-verified
+file, applies separate B semantics, and projects approved bundleProfile
+entries into the versioned-bundle planner. A-only entries cannot activate
+a B install. New content adds one approved profile to the same file,
+not two independently registered profiles or receiver code rewrites.
+
+The registry itself may be missing on the first approved registration.
+Only a real read-only absence observation plus explicit approval of
+registryBeforeSha256=null and oldPin=null authorize first-create. The
+receiver must use CREATE_NEW/no-overwrite and journal the original ABSENT
+state; recovery removes only the transaction-created file after exact
+CAS. Existing files always require exact old SHA, security-preserving
+backup and rollback. Missing due to access error must NOT be treated as
+absent.
+
+If an existing registry has bytes but the host PIN is absent, the ordinary
+registration operation MUST refuse to adopt it. Pinning its existing SHA
+would implicitly approve all unrelated profiles; this needs a separate
+orphan-recovery approval scope and complete registry review. Valid ordinary
+registration states are either both old PIN and registry absent (bootstrap)
+or old PIN exactly equal to the existing registry raw SHA256.
+
+This remains LOCAL pure source/tests only, and the exact installed host
+path/registry path and current PIN state MUST be observed through an
+authorized A/read-only inventory before any real B approval. No live
+Windows receiver, actual Git provenance or PC activation is claimed.
