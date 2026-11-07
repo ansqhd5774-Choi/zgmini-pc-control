@@ -10,7 +10,9 @@ export const SCOPE='PC_WRITER_APPROVED_VERSIONED_BUNDLE_ACTIVATION_ONLY';
 const SHA40=/^[0-9a-f]{40}$/;
 const SHA64=/^[0-9a-f]{64}$/;
 const SOURCE_REPO='ansqhd5774-Choi/zgmini';
-const BUNDLE_EXT=/\.(?:mjs|json|md)$/i;
+// The existing configured-theme package includes fixed, hash-pinned .js
+// Node modules alongside .mjs/.json/.md; launcher/script files remain denied.
+const BUNDLE_EXT=/\.(?:mjs|js|json|md)$/i;
 const LAUNCHER_EXT=/\.(?:cmd|vbs)$/i;
 const DEVICE=/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i;
 
