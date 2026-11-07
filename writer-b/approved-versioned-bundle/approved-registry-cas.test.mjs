@@ -65,7 +65,7 @@ function fixture(){
   beforeRegistry,afterRegistry,newEntry,existing,approval:normalizedApproval,
   approvalRaw,pinnedApproval};
 }
-function mockIo(f,{faultAt=null,rollbackFault=false}={}){
+function mockIo(f,{faultAt=null,rollbackFault=false,reportIncomplete=false}={}){
  const copy=x=>x===null?null:Buffer.from(x);
  const state={host:copy(f.hostRaw),registry:copy(f.beforeRegistry),
   lock:null,backup:null,history:[],reported:null};
@@ -117,7 +117,7 @@ function mockIo(f,{faultAt=null,rollbackFault=false}={}){
   async releaseSharedWriterLock(){hit('unlock');state.lock=null;},
   async recordResult({report}){
    state.history.push('report');state.reported=JSON.stringify(report);
-   return {json:true,txt:true};
+   return {json:true,txt:!reportIncomplete};
   },
  };
  return {state,adapter};
@@ -169,6 +169,8 @@ test('approved dual-file CAS: authenticates, backs up, changes two files, report
   approvalRaw:f.approvalRaw,pinnedApproval:f.pinnedApproval,adapter:d.adapter});
  assert.equal(result.status,'PASS');
  assert.equal(result.reportStatus,'JSON_TXT_2_OF_2');
+ assert.equal(result.endToEndDone,true);
+ assert.equal(result.evidenceRecoveryRequired,false);
  assert.deepEqual(d.state.host,f.hostAfter);
  assert.deepEqual(d.state.registry,f.afterRegistry);
  assert.equal(d.state.lock,null);
@@ -176,6 +178,16 @@ test('approved dual-file CAS: authenticates, backs up, changes two files, report
  assert.deepEqual(d.state.history,['authenticate','preimage','lock','under-lock',
   'load-approved-registry','backup','cas-host','cas-registry','readback','commit',
   'unlock','report']);
+});
+test('committed PIN CAS with incomplete result proof requires evidence recovery, not B replay',async()=>{
+ const f=fixture(),d=mockIo(f,{reportIncomplete:true});
+ const r=await runApprovedRegistryCas({
+  approvalRaw:f.approvalRaw,pinnedApproval:f.pinnedApproval,adapter:d.adapter});
+ assert.equal(r.status,'PASS');assert.equal(r.reportStatus,'INCOMPLETE');
+ assert.equal(r.endToEndDone,false);assert.equal(r.evidenceRecoveryRequired,true);
+ assert.deepEqual(d.state.host,f.hostAfter);
+ assert.deepEqual(d.state.registry,f.afterRegistry);
+ assert.equal(d.state.history.filter(step=>step==='cas-host').length,1);
 });
 test('malformed/unpinned approval never reaches preimage or writes',async()=>{
  const f=fixture(),d=mockIo(f);
