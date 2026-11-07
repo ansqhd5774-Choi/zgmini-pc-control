@@ -113,8 +113,8 @@ test('reviewed injected B adapter only: source-only module routing',async()=>{
     const result=await applyApprovedOnce(f.auth,{
       makeApprovedNativeAdapter:async()=>({originVerified:true,
         effect:mode,sourceSha,adapter:{},trustedProfiles:{}}),
-      bundleRunner:async arg=>{seen=arg;return {status:'PASS'};},
-      pinRunner:async arg=>{seen=arg;return {status:'PASS'};}});
+      bundleRunner:async arg=>{seen=arg;return {status:'PASS',endToEndDone:true,reportStatus:'JSON_TXT_2_OF_2'};},
+      pinRunner:async arg=>{seen=arg;return {status:'PASS',endToEndDone:true,reportStatus:'JSON_TXT_2_OF_2'};}});
     assert.equal(result.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
     assert.equal(result.mode,mode);
     assert.equal(seen.pinnedApproval.sourceSha,sourceSha);
@@ -128,16 +128,38 @@ test('reviewed injected B adapter only: source-only module routing',async()=>{
     /DIRECT_B_NATIVE_BRIDGE_UNVERIFIED/);
 });
 
+test('PIN and bundle PASS without complete local JSON/TXT ledger is UNKNOWN',async()=>{
+  for(const kind of ['bundle','pin']){
+    const f=fixture(kind);
+    const mode=kind==='bundle'?'VERSIONED_BUNDLE_ACTIVATE':'PIN_REGISTRY_CAS';
+    const result=await applyApprovedOnce(f.auth,{
+      makeApprovedNativeAdapter:async()=>({originVerified:true,
+        effect:mode,sourceSha,adapter:{},trustedProfiles:{}}),
+      bundleRunner:async()=>({status:'PASS',endToEndDone:false,
+        reportStatus:'INCOMPLETE',evidenceRecoveryRequired:true}),
+      pinRunner:async()=>({status:'PASS',endToEndDone:false,
+        reportStatus:'INCOMPLETE',evidenceRecoveryRequired:true})});
+    assert.equal(result.status,'DIRECT_B_EFFECT_UNKNOWN');
+    assert.equal(result.code,'DIRECT_B_LEDGER_INCOMPLETE');
+    assert.equal(result.operationSucceeded,false);
+    const cleaned=sanitizeDirectBReport(result,f.request,env());
+    assert.equal(cleaned.operationSucceeded,false);
+  }
+});
+
 test('local success remains explicitly unpublished and cannot fake hashes',()=>{
   const f=fixture();
   const raw={status:'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED',
     code:'DIRECT_B_LOCAL_EFFECT_PASS',requestId,mode:f.auth.mode,
     manifestSha256:digest(f.raw),controlSha,sourceSha,
-    operationSucceeded:true,rawApiKey:'do not expose'};
+    operationSucceeded:true,reportStatus:'JSON_TXT_2_OF_2',
+    rawApiKey:'do not expose'};
   const clean=sanitizeDirectBReport(raw,f.request,env());
   assert.equal(clean.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
   assert.equal(clean.runtimeEffectProof,'LOCAL_EXECUTOR_PASS_REPORT_PENDING');
   assert.equal(clean.rawApiKey,undefined);
+  assert.equal(sanitizeDirectBReport({...raw,reportStatus:'INCOMPLETE'},
+    f.request,env()).status,'DIRECT_B_STATE_UNKNOWN');
   assert.equal(sanitizeDirectBReport({...raw,sourceSha:'invalid'},f.request,env())
     .status,'DIRECT_B_STATE_UNKNOWN');
 });
@@ -182,7 +204,8 @@ test('ambiguous or partial report cannot be labeled published success or auto-re
   const f=fixture();
   const ok={status:'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED',
     code:'DIRECT_B_LOCAL_EFFECT_PASS',requestId,mode:'VERSIONED_BUNDLE_ACTIVATE',
-    manifestSha256:digest(f.raw),controlSha,sourceSha,operationSucceeded:true};
+    manifestSha256:digest(f.raw),controlSha,sourceSha,
+    operationSucceeded:true,reportStatus:'JSON_TXT_2_OF_2'};
   const http=fakeGithub({failReadbackTxt:true});
   const result=await uploadDirectBReport({event:f.ev,env:env(),
     rawResult:JSON.stringify(ok),fetchApi:http.fetch});
