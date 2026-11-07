@@ -189,6 +189,9 @@ export async function runVersionedBundleTransaction({
     state.reportStatus=written?.json===true&&written?.txt===true?'JSON_TXT_2_OF_2':'INCOMPLETE';
    }catch{state.reportStatus='INCOMPLETE';}
   }
-  return Object.freeze({...report,reportStatus:state.reportStatus});
+  return Object.freeze({...report,reportStatus:state.reportStatus,
+   endToEndDone:report.status==='PASS'&&state.reportStatus==='JSON_TXT_2_OF_2',
+   evidenceRecoveryRequired:report.status==='PASS'&&
+    state.reportStatus!=='JSON_TXT_2_OF_2'});
  }
 }
