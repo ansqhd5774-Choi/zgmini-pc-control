@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 
 const SHA64=/^[a-f0-9]{64}$/;
-const REQ=/^[A-Za-z0-9_-]{12,128}$/;
+const REQ=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const bad=code=>{const e=new Error(code);e.code=code;throw e;};
 const need=(ok,code)=>{if(!ok)bad(code);};
