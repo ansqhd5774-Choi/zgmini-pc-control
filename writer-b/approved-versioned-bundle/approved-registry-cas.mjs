@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {selectPinnedCapabilityProfiles} from
- '../../controller/approved-runtime-inventory-readonly.mjs';
+ '../theme-generic-a/controller/approved-runtime-inventory-readonly.mjs';
 import {selectPinnedBundleProfiles} from './pinned-bundle-profiles.mjs';
 import {isWriterBRequestId} from './writer-b-request-id.mjs';
 
@@ -305,7 +305,8 @@ export async function runApprovedRegistryCas({
   profile=validateApproval(approval,approvalRaw,pinnedApproval);
   const required=[
    'authenticatePinnedApproval','inspectPreimage','acquireSharedWriterLock',
-   'verifyPreimageUnderLock','loadApprovedRegistryAfterBytes',
+   'verifyPreimageUnderLock','verifyApprovedRegistryParentUnderLock',
+   'loadApprovedRegistryAfterBytes',
    'backupBoth','casHost','casRegistry','readBack','commit',
    'restoreRegistry','restoreHost','verifyRestored',
    'releaseSharedWriterLock','recordResult',
@@ -334,6 +335,19 @@ export async function runApprovedRegistryCas({
    (before.registry===null?again.registry===null:
     Buffer.isBuffer(again.registry)&&again.registry.equals(before.registry)),
    'B_PIN_UNDER_LOCK_DRIFT');
+  // FIRST_CREATE permits an absent leaf registry file, NEVER a missing drive,
+  // missing pc-writer parent, redirected junction, or untrusted owner.
+  // This is an inspection-only callback. No mkdir bootstrap is authorized.
+  phase='REGISTRY_PARENT';
+  const parent=await adapter.verifyApprovedRegistryParentUnderLock({lock,profile,
+   targetId:'HOST_DATA_ROOT_PC_WRITER'});
+  if(parent?.status==='DRIVE_UNAVAILABLE')fail('B_PIN_REGISTRY_DRIVE_UNAVAILABLE');
+  if(parent?.status==='PARENT_ABSENT')fail('B_PIN_REGISTRY_PARENT_ABSENT');
+  need(parent?.targetId==='HOST_DATA_ROOT_PC_WRITER'&&
+   parent?.status==='EXISTS_TRUSTED_DIRECTORY'&&
+   parent?.reparsePoint===false&&parent?.ownerVerified===true,
+   'B_PIN_REGISTRY_PARENT_UNTRUSTED');
+  stages.push('TRUSTED_REGISTRY_PARENT_EXISTS');
   phase='PLAN';
   const hostAfter=patchHostRuntimePinBytes(before.host,approval);
   equalSha(hostAfter,approval.hostAfterSha256,'B_HOST_TARGET_SHA');
