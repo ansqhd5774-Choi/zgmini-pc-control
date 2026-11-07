@@ -32,7 +32,11 @@ export function sanitizeDirectBReport(raw,request,env){
       raw.manifestSha256!==base.manifestSha256||
       !SHA40.test(raw.controlSha??'')||!SHA40.test(raw.sourceSha??'')||
       !['PIN_REGISTRY_CAS','VERSIONED_BUNDLE_ACTIVATE',
-        'CONFIGURED_THEMES_REPEAT_UPGRADE'].includes(raw.mode))return base;
+        'CONFIGURED_THEMES_REPEAT_UPGRADE'].includes(raw.mode)||
+      (raw.mode!=='CONFIGURED_THEMES_REPEAT_UPGRADE'&&
+        raw.reportStatus!=='JSON_TXT_2_OF_2')||
+      (raw.mode==='CONFIGURED_THEMES_REPEAT_UPGRADE'&&
+        raw.reportStatus!=='INCOMPLETE'))return base;
     return {...base,status:raw.status,code:raw.code,mode:raw.mode,
       sourceSha:raw.sourceSha,controlSha:raw.controlSha,operationSucceeded:true,
       runtimeEffectProof:'LOCAL_EXECUTOR_PASS_REPORT_PENDING'};
