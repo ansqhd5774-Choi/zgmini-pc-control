@@ -1,0 +1,33 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "d476c42a8d44ce30e5497b283f22d25ec77e2324",
+  "targetSha": "d89d9f94753cdf55b1a1ce02ea6215ab7206f3e6",
+  "allowFiles": [
+    {
+      "path": "controller/inflation-candidates-runtime-readonly.mjs",
+      "sha256": "5933649643005bb386d1c6593b672a5cf805e4e561baa9da2b295484999c635d"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/807",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "d89d9f94753cdf55b1a1ce02ea6215ab7206f3e6",
+    "status": "PASS",
+    "manifestSha256": "7543b4be1114916860c9e795a70c0bad0160b21440152fd43501ca0df398f729"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "d476c42a8d44ce30e5497b283f22d25ec77e2324"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "ca0394cb11cc08c7ade67aa9576c8c5c73aa8eb0"
+}
