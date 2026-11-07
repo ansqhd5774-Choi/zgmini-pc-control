@@ -32,6 +32,8 @@ content never comes from an Issue alone.
 | approved-registry-cas.test.mjs | In-memory byte-preserving patch + failure/rollback/bootstrap | None |
 | pinned-bundle-profiles.mjs | Maps the same PIN-verified A/B registry to B profile contracts | None |
 | pinned-bundle-profiles.test.mjs | Tests shared A parser, source binding, A-only exclusions | None |
+| windows-versioned-bundle-adapter.mjs | Capability-injected Windows receiver bridge **candidate**; no live integration | None without separately authorized bridge |
+| windows-versioned-bundle-adapter.test.mjs | Receiver bridge contract, post-lock reparse/handle checks, immutable reuse and schedule-race faults | Simulation only |
 
 Neither generic planning/coordinator module invokes shell, filesystem,
 GitHub, SQL or Task Scheduler.
@@ -46,7 +48,11 @@ Scheduler, fetches approvals, runs .cmd/.vbs/.mjs, or opens a production PC
 path. Its locally injected approval is a **test simulation**, not a real
 GitHub authorization proof.
 
-## Windows adapter contract: REQUIRED, NOT IMPLEMENTED
+## Windows adapter contract: CANDIDATE ONLY, NOT INSTALLED
+
+A capability-injected candidate is included for review. Its required
+`bridge` methods are obligations of an independently authorized Windows
+receiver, **not proof that the actual Windows receiver supports them**.
 
 1. authenticatePinnedApproval: fetch approved Git ref and actual exact raw
    bytes; verify SHA256, source commit SHA, unique requestId, profile
@@ -61,14 +67,22 @@ GitHub authorization proof.
    plus ZIP/package SHA, file count and manifest digest; reject NTFS case
    collisions, reparse points, junction parents, path escapes, file streams
    and unsafe permissions. Stage transaction-owned immutable version only.
-   No staged code execution. No replacing existing immutable versions.
+   No staged code execution. Never overwrite an existing immutable version.
+   If a failed activation left an immutable version, exact name/count/content
+   hashes may permit read-only reuse under a fresh, separately approved
+   request ID; any drift is an immediate stop. Orphan staging/journals need
+   owner-confirmed recovery, not an unconditional delete.
 6. backupPreimages: preserve exact bytes plus ACL/attributes and same-volume
    durable journal for all target launchers and active JSON. A partial/unknown
    backup must retain ownership and journal, not be silently discarded.
 7. casActivate: immediately rehash each preimage, then atomic **per-file**
    rename of approved launchers and active marker in journaled sequence.
-   Multiple files do not have whole-bundle atomicity on NTFS, so rollback
-   and crash recovery are essential. Leave Scheduled Task XML unchanged.
+   Multiple files do not have whole-bundle atomicity on NTFS. In particular,
+   the existing Task Scheduler may start a launcher **between** two renames,
+   regardless of the Writer B lock. Before installing, prove each old/new
+   launcher combination is safe and the active pointer switches last, with
+   schedule-tick interleaving simulation plus real Windows evidence. If not,
+   do not activate. Leave Scheduled Task XML unchanged.
 8. readBack: inspect actual launchers, active JSON and all bundle hashes
    after cutover; re-check unchanged Task XML and metadata.
 9. commit: seal durable journal; failure/ambiguous commit is STATE_UNKNOWN
@@ -78,7 +92,11 @@ GitHub authorization proof.
     failure is STATE_UNKNOWN with lock/journal held for authorized recovery.
 11. releaseSharedWriterLock: only after PASS or verified rollback.
 12. recordResult: JSON and TXT artifacts, preserving user secrets, no
-    unbounded source payloads.
+    unbounded source payloads. A committed file mutation with incomplete
+    report artifacts is **not end-to-end DONE**: consumer must require
+    `status=PASS` **and** `reportStatus=JSON_TXT_2_OF_2`, and recover missing
+    results from the existing committed journal without reapplying B or
+    reusing a consumed request ID.
 
 The above steps are **adapter obligations**, not proven Windows operations.
 Local simulated tests demonstrate the **ordering, transitions and fault
@@ -108,7 +126,7 @@ The one-time enhancement does **not** authorize provider calls, database
 or D1 writes, Task creation/modification or arbitrary execution. It does
 not alter currently healthy Controller/Core/other features.
 
-Repository tests: `node --test writer-b/approved-versioned-bundle/*.test.mjs`
+Local tests: node --test theme-generic-b/*.test.mjs
 
 ## Distinct A inventory PIN / registry sidecar issue
 
