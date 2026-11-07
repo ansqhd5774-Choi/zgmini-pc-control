@@ -117,3 +117,11 @@ M1과 M2의 코드·문서 준비는 독립적으로 병렬 수행한다. **동�
 - 기존 승인 5파일 [#615](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/615) + R2 A 1파일 [#625](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/625)의 정확한 6파일 누적 diff를 신규 불변 B 승인 [#629](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/629)로 main 반영. 목표 6348be5201801e008be10867fd68add4ddeca52c, RAW SHA256 75aebe1445b2c40e49ea852ec7ef86fac2b152c7202b82f0abfa9b93f1fb24e1. 기존 #615 manifest 수정 없음.
 - [정규 단회 B 요청 #630](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/630), requestId pc-update-2b963307-a5dd-4225-9366-29d0687e6a24 접수. **결과 미확정/RUNNING, PC 설치 완료 주장 금지**. 동일 요청 결과를 한 번 회수해 설치 SHA/보호/Workflow/새 A 활성으로 판정한다.
 - R2 M1 통과는 설치 이후 물가지표 Writer 파일 해시와 dirty를 실제 A로 확보할 때다. 단순 Controller B 접수만으로 R2 진도 20%를 올리지 않는다.
+
+## 10. 2026-11-07 실제 설치 후 결정 사항 — M1 Runtime 증거와 후보 해시 분리
+
+- [#630](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/630) 실제 PC Controller가 목표 `6348be5201801e008be10867fd68add4ddeca52c`로 설치되었음(SUCCEEDED/보호 불변). §9 마지막 문단의 RUNNING은 과거 이력이며 종결됐다.
+- [#632](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/632): 자연 실행 중이지 않은 Core는 runtime 검증 `STATE_UNKNOWN`; 근거 없는 재시도·예약/운영 설정 변경 금지.
+- [#633](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/633): 정적 VBS 탐색은 PASS, `sourceResolved=false`; Git/승인 config.source/Writer checkpoint가 일치하는 고정 checkout 후보 확보. [#634](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/634)는 디렉터리 인벤토리 상한(`inventoryTruncated=true`)으로 후보 없음. 둘을 혼동하거나 동일 요청 반복하지 않는다.
+- M1은 **(a) corroborated candidate file inventory**(존재/각 SHA256/dirty와 Git/config/checkpoint 일치)와 **(b) actual Core Runtime binding**(활성 Task 실행 연결)을 별개로 검증한다. (a)만 PASS이면 M1 완료 아님; B의 사전 source gate에서 (b) 필요 여부를 실제 설치기 계약과 대조한다. 별도 Core 강제 시작·신규 스케줄을 Gate로 만들지 않는다.
+- [PR #635](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/635)는 기존 `pc-source-preflight` 재사용 보완, 테스트 20/20 PASS인 GitHub 소스 준비다. 새 Controller B가 승인·PC 설치되기 전 기능 활성은 아니다. 다음 공통 실행은 PR 독립 리뷰→정확한 설치 전후 지문 계약→정규 1회 B→A 후보 3파일 실측. Writer 설치는 사용자 별도 명시 없는 한 물가지표 원담당의 영역으로 유지한다.
