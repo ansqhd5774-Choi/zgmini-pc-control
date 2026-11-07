@@ -1,0 +1,54 @@
+{
+  "schema": "ZGMINI_APPROVED_RUNTIME_A_RESULT_V1",
+  "requestId": "6b19ecbf-c6c3-44a7-9ad1-5464c4ae6d69",
+  "status": "DONE",
+  "code": "A_RUNTIME_FILE_AND_TASK_READONLY",
+  "runId": "42424394398",
+  "manifestSha256": "b949aba19cdf5dabc750bb8ea3b57fe1b4c00a0498a98f1fd68d22257c92ef61",
+  "sourceSha": "0c97599431882245a156470bd51290e327e7ee78",
+  "fileHashesComplete": true,
+  "taskChecksComplete": true,
+  "operationalWrites": 0,
+  "retry": "NO_AUTO_RETRY_READ_ONLY_RECONCILE",
+  "profiles": [
+    {
+      "profileId": "configuredThemeRuntime",
+      "status": "DONE",
+      "rootExists": true,
+      "runtimeMode": "REPEATABLE_ACTIVE_RUNTIME",
+      "files": {
+        "installed": {
+          "exists": true,
+          "sha256": "b05bb32a8b08fb078e7c8b18acc5c7741fba4d2ee8eb3b49530f1991b624b6fb",
+          "sizeBytes": 1886
+        },
+        "active": {
+          "exists": true,
+          "sha256": "e97ff8825ff3b031f8a47bc7e608e04a4a39bb3c332ecc47eeeaa507c512e100",
+          "sizeBytes": 4751
+        },
+        "scheduledCmd": {
+          "exists": true,
+          "sha256": "92d1088d26568b6aebdaf98d8537520b8dc989b7f6a14acf0dbcbb8762be7f7e",
+          "sizeBytes": 372
+        },
+        "scheduledVbs": {
+          "exists": true,
+          "sha256": "8078db57c878d114472cca6b27d1c45c377216ac16427d72ac85b142a8e5ffa6",
+          "sizeBytes": 174
+        }
+      },
+      "tasks": {
+        "configuredTask": {
+          "status": "XML_READ",
+          "xmlSha256": "11123921e42e01a65140ae147894ba355b7fbe2106a145fcdf606f88bfcc2507",
+          "enabled": null,
+          "expectedHourPresent": true
+        }
+      }
+    }
+  ],
+  "controlSha": "4fa542042c3d2f5f99ced3cd2848709cd982424a",
+  "registeredCount": 1,
+  "selectedCount": 1
+}
