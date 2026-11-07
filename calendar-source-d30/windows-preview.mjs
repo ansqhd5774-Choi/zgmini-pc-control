@@ -63,6 +63,8 @@ export async function runD30WindowsReadOnlyPreview({host,gitExe='git',tempRoot}=
       sourceProvenance:beforeSourceSha?'CORROBORATED':'PENDING',
       sourcePreflightStatus:evidence?.preflightStatus??'NOT_AVAILABLE',
       ...(evidence?.preflightCode?{sourcePreflightCode:evidence.preflightCode}:{}),
+      ...(evidence?.preflightReason?
+        {sourcePreflightReason:evidence.preflightReason}:{}),
       ...(evidence?.sidecarSourceBinding?
         {sidecarSourceBinding:evidence.sidecarSourceBinding}:{}),
       ...(evidence?.lastRunSourceStatus?

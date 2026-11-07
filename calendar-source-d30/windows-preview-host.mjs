@@ -171,7 +171,8 @@ export async function runD30ReadOnlyWindowsHost({env=process.env}={}){
           issue:event.issue.number,requestId:trustedRequest.requestId}});
         const proof=await inspectD30WindowsBReadOnlyPreflight({host:probeHost});
         if(proof.status!=='READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED')
-          return {preflightStatus:proof.status,preflightCode:proof.code};
+          return {preflightStatus:proof.status,preflightCode:proof.code,
+            ...(proof.taskChainReason?{preflightReason:proof.taskChainReason}:{})};
         return {preflightStatus:proof.status,sourceRoot:SOURCE_ROOT,
           runtimeSourceVerified:false,
           evidenceLevel:'REGISTERED_CORE_SOURCE_PROVENANCE_VERIFIED',
