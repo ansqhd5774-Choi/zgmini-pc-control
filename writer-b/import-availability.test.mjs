@@ -64,6 +64,12 @@ test('side-effect import and require both respect approved-root resolution',()=>
  assert.deepEqual(refs,['scripts/pc-writer/other.mjs','lib/item.json']);
 });
 
+test('existing Node TypeScript imports are allowed, never trigger an extra global Gate',()=>{
+ const refs=relativeModuleReferences('scripts/pc-writer/run-local.mjs',
+  B("const build=await import('../../worker/projection-builders.ts');\n"));
+ assert.deepEqual(refs,['worker/projection-builders.ts']);
+});
+
 test('escape, unsupported extension and malformed source fail without evaluation',()=>{
  for(const spec of ['../../../../secret.mjs','./image.png','./evil\\name.mjs']){
   assert.throws(()=>relativeModuleReferences('scripts/pc-writer/new.mjs',
