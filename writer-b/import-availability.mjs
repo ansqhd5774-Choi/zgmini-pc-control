@@ -107,18 +107,26 @@ export function relativeModuleReferences(file,bytes){
  return [...refs];
 }
 
-export function verifyWriterBImportAvailability({afterFiles,existing}){
+export function verifyWriterBImportAvailability({afterFiles,beforeFiles=new Map(),existing}){
  need(afterFiles instanceof Map&&afterFiles.size>=1&&afterFiles.size<=32&&
+  beforeFiles instanceof Map&&
+  [...beforeFiles.keys()].every(file=>afterFiles.has(file))&&
   typeof existing==='function','WRITER_B_IMPORT_CHECK_CONTRACT_STOP');
  let inspected=0;
+ const approved=new Set([...afterFiles.keys()].map(s=>s.toLowerCase()));
  for(const [file,bytes] of afterFiles){
   // An approved test fixture is not imported by the Core runtime; do not
   // make intentional negative test imports a global installation blocker.
   if(/\.test\.(?:mjs|cjs|js)$/i.test(file))continue;
+  // Existing optional imports are not new obligations merely because an
+  // unrelated line changed. Probe only new imports in M, all imports in A.
+  const previous=new Set(beforeFiles.has(file)?
+   relativeModuleReferences(file,beforeFiles.get(file)):[]);
   for(const ref of relativeModuleReferences(file,bytes)){
+   if(previous.has(ref.toLowerCase())||previous.has(ref))continue;
    inspected++;
    need(inspected<=1024,'WRITER_B_IMPORT_REFERENCE_LIMIT_STOP');
-   if(afterFiles.has(ref))continue;
+   if(approved.has(ref.toLowerCase()))continue;
    // 'existing' is an injected bounded, read-only operational-source
    // existence check. Never inspect arbitrary workspace or candidate files.
    need(existing(ref)===true,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
@@ -126,5 +134,5 @@ export function verifyWriterBImportAvailability({afterFiles,existing}){
  }
  return {status:'PASS',code:'WRITER_B_LITERAL_IMPORTS_AVAILABLE',
   approvedFiles:afterFiles.size,checkedReferences:inspected,
-  evidenceLevel:'LITERAL_RELATIVE_IMPORTS_ONLY'};
+  evidenceLevel:'NEW_LITERAL_RELATIVE_IMPORTS_ONLY'};
 }
