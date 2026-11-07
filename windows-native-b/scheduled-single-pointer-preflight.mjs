@@ -11,6 +11,7 @@ const VERSION=/^[0-9a-f]{16}$/;
 const SHA=/^[0-9a-f]{64}$/;
 const HOME='E:\\ZGmini\\data\\pc-writer\\theme-config-tool';
 const TASK='ZGMINI-PC-Configured-Themes';
+const ACTIVE=path.win32.join(HOME,'ACTIVE_RUNTIME.json');
 const fail=code=>{const e=new Error(code);e.code=code;throw e;};
 const need=(ok,code)=>{if(!ok)fail(code);};
 const normalizedBytes=bytes=>{
@@ -101,12 +102,17 @@ export function analyzeScheduledSinglePointer({approval,taskXmlBytes,
 /** Native exact-scope snapshot. It performs no writes and never opens a shell. */
 export function inspectWindowsScheduledSinglePointer({approval,newCmdBytes,
  platform=process.platform,readFile=fs.readFileSync,
- lstat=fs.lstatSync,readTaskXml=()=>execFileSync('schtasks.exe',
+ lstat=fs.lstatSync,existsSync=fs.existsSync,
+ readTaskXml=()=>execFileSync('schtasks.exe',
   ['/Query','/TN',TASK,'/XML'],
   {windowsHide:true,maxBuffer:262144,stdio:['ignore','pipe','pipe']}),
 }={}){
  need(platform==='win32','B_NATIVE_WINDOWS_REQUIRED');
  need(Buffer.isBuffer(newCmdBytes),'B_NATIVE_APPROVED_AFTER_BYTES_REQUIRED');
+ // The original package installer has two distinct operational modes:
+ // first upgrade has one scheduled CMD, repeatable upgrade additionally
+ // switches three manual CMDs and ACTIVE_RUNTIME.json. Never confuse them.
+ need(!existsSync(ACTIVE),'B_NATIVE_REPEATABLE_RUNTIME_DIFFERENT_EFFECT');
  const scopedFile=(basename)=>{
   need(['THEME_SCHEDULED.cmd','THEME_SCHEDULED.vbs'].includes(basename),
    'B_NATIVE_READ_SCOPE');
@@ -129,6 +135,23 @@ export function inspectWindowsScheduledSinglePointer({approval,newCmdBytes,
   beforeXml.equals(afterXml),'B_NATIVE_TASK_SNAPSHOT_DRIFT');
  const afterCmd=scopedFile('THEME_SCHEDULED.cmd');
  need(oldCmd.equals(afterCmd),'B_NATIVE_CMD_SNAPSHOT_DRIFT');
+ need(!existsSync(ACTIVE),'B_NATIVE_RUNTIME_MODE_CHANGED_DURING_READ');
  return analyzeScheduledSinglePointer({approval,taskXmlBytes:beforeXml,
   oldCmdBytes:oldCmd,newCmdBytes,vbsBytes:vbs});
+}
+
+/** A/light inventory selector only; never authorizes either B effect. */
+export function inspectWindowsConfiguredRuntimeMode({platform=process.platform,
+ existsSync=fs.existsSync,lstat=fs.lstatSync}={}){
+ need(platform==='win32','B_NATIVE_WINDOWS_REQUIRED');
+ const active=existsSync(ACTIVE);
+ const installed=path.win32.join(HOME,'INSTALL_RESULT.json');
+ for(const file of active?[installed,ACTIVE]:[installed]){
+  const stat=lstat(file);
+  need(stat.isFile()&&!stat.isSymbolicLink(),
+   'B_NATIVE_RUNTIME_MODE_FILE_REDIRECT');
+ }
+ return Object.freeze({status:'RUNTIME_MODE_INVENTORY_ONLY',
+  mode:active?'REPEATABLE_ACTIVE_RUNTIME':'FIRST_SINGLE_CMD_UPGRADE',
+  activationAllowed:false,operationalWrites:0});
 }
