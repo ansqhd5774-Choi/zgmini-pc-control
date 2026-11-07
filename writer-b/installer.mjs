@@ -101,7 +101,8 @@ export function verifyPreparedWriterCommit(manifest,prepared){
 
 const REQUIRED_IO=[
  'acquireSharedWriterLock','readPcPreimage','readCandidate','claimRequest',
- 'backupOriginal','prepareIsolatedCommit','pauseCore','waitForCoreDrain',
+ 'backupOriginal','prepareIsolatedCommit','waitForCoreIdleWindow',
+ 'pauseCore','waitForCoreDrain',
  'assertCoreQuiet','switchPreparedSource','assertWriterSource','changeConfigSource',
  'assertConfigSource','restoreCore','verifyCoreDefinitionUnchanged',
  'restoreOriginalConfig','restoreOriginalSource','verifyOriginalState',
@@ -129,6 +130,10 @@ export async function performWriterBInstall(auth,io){
   await io.backupOriginal(before,manifest);
   prepared=verifyPreparedWriterCommit(manifest,
     await io.prepareIsolatedCommit(before,manifest));
+
+  // A busy Core is normal. Before disabling its scheduled entrypoint,
+  // wait read-only for a natural idle window. Deferral keeps Task enabled.
+  await io.waitForCoreIdleWindow();
 
   // Mark mutation intent before any call that may partially apply its effects.
   taskMayHaveChanged=true;
