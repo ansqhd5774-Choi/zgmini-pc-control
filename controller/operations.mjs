@@ -260,21 +260,56 @@ function interpretShadowOutcome({exitCode,stdout='',stderr=''}){
  need(Array.isArray(result.publicTargetIds)&&new Set(result.publicTargetIds).size===result.publicTargetIds.length&&
   result.publicTargetIds.length>=10,'SHADOW_PUBLIC_TARGETS_UNDER_MINIMUM');
  const c=result.coverage?.public;
- need(c&&c.themes===result.publicTargetIds.length&&
+ need(c&&[c.themes,c.expectedPhases,c.complete,c.blocked,c.pending].every(n=>
+  Number.isSafeInteger(n)&&n>=0)&&c.themes===result.publicTargetIds.length&&
   c.expectedPhases===2*c.themes&&c.complete+c.blocked+c.pending===c.expectedPhases,
   'SHADOW_PUBLIC_COVERAGE_INVALID');
- const complete=exitCode===0&&result.status==='COMPLETE'&&c.status==='COMPLETE';
+ // Private configuration replay is diagnostic only. A private provisional
+ // adapter can exit 2 while every public phase has genuinely completed.
+ const p=result.coverage?.private;
+ const privateValid=p&&Number.isSafeInteger(p.themes)&&p.themes>=0&&
+  p.expectedPhases===2*p.themes&&
+  [p.complete,p.blocked,p.pending].every(n=>Number.isSafeInteger(n)&&n>=0)&&
+  p.complete+p.blocked+p.pending===p.expectedPhases&&
+  ['COMPLETE','PARTIAL','RUNNING','INCOMPLETE','NOT_APPLICABLE'].includes(p.status);
+ const privateCoverage=privateValid?{status:p.status,themes:p.themes,
+  expectedPhases:p.expectedPhases,complete:p.complete,blocked:p.blocked,
+  pending:p.pending}:null;
+ need(privateValid,'SHADOW_PRIVATE_COVERAGE_INVALID');
+ const publicComplete=c.status==='COMPLETE'&&
+  c.complete===c.expectedPhases&&c.blocked===0&&c.pending===0;
+ const normalExit=exitCode===0&&result.status==='COMPLETE'&&
+  ['COMPLETE','NOT_APPLICABLE'].includes(privateCoverage.status)&&
+  privateCoverage.blocked===0&&privateCoverage.pending===0;
+ const privateOnlyPartial=exitCode===2&&result.status==='PARTIAL'&&
+  privateCoverage?.status==='PARTIAL'&&privateCoverage.blocked>0;
+ const complete=publicComplete&&(normalExit||privateOnlyPartial);
+ // Only bounded, enumerated phase diagnostics leave the Controller. Never
+ // return source results, stdout/stderr, error messages or checkpoint data.
+ const safe=(value,re,fallback)=>typeof value==='string'&&re.test(value)?value:fallback;
+ const phaseRows=Array.isArray(result.results)?result.results.slice(0,64).map(row=>({
+  id:safe(row?.id,/^[a-z0-9][a-z0-9-]{0,79}$/,'REDACTED'),
+  kind:['confirmed','provisional'].includes(row?.kind)?row.kind:'REDACTED',
+  status:['COMPLETE','BLOCKED'].includes(row?.status)?row.status:'UNKNOWN',
+  stage:safe(row?.stage,/^[a-z][a-z0-9-]{0,39}$/,null),
+  code:safe(row?.code,/^[A-Z][A-Z0-9_]{0,99}$/,null)
+ })):[];
  // The shared Controller's idempotent replay accepts only PASS/FAIL/BLOCKED/
  // STATE_UNKNOWN. Keep partial coverage explicit without persisting a status
  // that cannot be returned for the same requestId on a later readback.
  return {status:complete?'PASS':'BLOCKED',replayStatus:complete?'COMPLETE':'PARTIAL',
-  code:complete?'SHADOW_PRIVATE_REPLAY_COMPLETE':'SHADOW_PRIVATE_REPLAY_REVIEW',
+  code:complete?'SHADOW_PUBLIC_REPLAY_COMPLETE':'SHADOW_PUBLIC_REPLAY_REVIEW',
   executionMode:'APPROVED_READONLY_SHADOW',
   publicTargetCount:c.themes,publicPhases:c.expectedPhases,
   publicComplete:c.complete,publicBlocked:c.blocked,publicPending:c.pending,
-  privateCoverage:result.coverage?.private??null,
-  sourceMode:result.sourceMode,d1Reads:result.d1Reads??null,
-  publicApiReads:result.publicApiReads??null,
+  publicCoverageStatus:publicComplete?'COMPLETE':'PARTIAL',
+  privateCoverage,privateCoverageStatus:privateCoverage?.status??'UNKNOWN',
+  phaseRows,phaseRowsTruncated:Array.isArray(result.results)&&result.results.length>64,
+  sourceMode:['EXISTING_LOCAL_SAVED_ONLY','SAVED_PLUS_PUBLIC_API_AND_D1_READS',
+   'CUSTOM_ADAPTER_UNVERIFIED'].includes(result.sourceMode)?result.sourceMode:null,
+  d1Reads:Number.isSafeInteger(result.d1Reads)&&result.d1Reads>=0?result.d1Reads:null,
+  publicApiReads:Number.isSafeInteger(result.publicApiReads)&&result.publicApiReads>=0?
+   result.publicApiReads:null,
   providerCalls:0,d1Writes:0,schedulerWrites:0,
   checkpointPersistence:'TRANSIENT_MEMORY_ONLY'};
 }

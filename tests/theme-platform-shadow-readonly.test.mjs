@@ -115,7 +115,8 @@ function outcome(overrides={}){
  return {status:'COMPLETE',providerCalls:0,d1Writes:0,schedulerWrites:0,
   publicConnection:'NOT_ACTIVATED',checkpointPersistence:'TRANSIENT_MEMORY_ONLY',
   publicTargetIds:ids,coverage:{public:{status:'COMPLETE',themes:10,
-   expectedPhases:20,complete:20,blocked:0,pending:0}},...overrides};
+   expectedPhases:20,complete:20,blocked:0,pending:0},private:{status:'COMPLETE',themes:1,
+   expectedPhases:2,complete:2,blocked:0,pending:0}},...overrides};
 }
 
 test('valid complete ten-theme shadow is PASS, with no raw result exposure',()=>{
@@ -140,7 +141,7 @@ test('missing coverage, false zero-write claim, or small theme set fails closed'
 });
 
 test('partial shadow is BLOCKED but retains explicit PARTIAL replay status',()=>{
- const body=outcome({status:'PARTIAL',coverage:{public:{status:'PARTIAL',
+ const body=outcome({status:'PARTIAL',coverage:{...outcome().coverage,public:{status:'PARTIAL',
   themes:10,expectedPhases:20,complete:15,blocked:3,pending:2}}});
  const res=interpretShadowOutcome({exitCode:2,stdout:JSON.stringify(body)});
  assert.equal(res.status,'BLOCKED');
