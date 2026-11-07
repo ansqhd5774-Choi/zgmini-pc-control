@@ -14,6 +14,7 @@
 | `ACTIVE_PREIMAGE_UNVERIFIED` / `STATE_UNKNOWN*` | 활성 원본 불확실·검사 중 변동 | B급 설치 판단 불가 |
 
 이 모드는 **A 조회 증거**일 뿐 B 실행 권한이 아니다. 기존 `R179` 게시 실패, `L7` 수집 실패, 공개 API `STALE`은 이 조회 성공만으로 해결되지 않는다.
+파일·Task의 두 번 조회 사이에 변경이 감지되거나 프로필 접근에 실패하면 최상위도 `BLOCKED`이고, 각 프로필의 제한된 실패 코드가 결과에 남는다. Task 조회만 불완전한 경우에는 `taskChecksComplete:false`를 표시하므로 B급 활성화 검토에 그대로 사용할 수 없다.
 
 ## 공통 등록과 요청 계약
 
@@ -30,4 +31,4 @@
 3. 승인된 1회 실제 PC A 조회의 **고유 requestId**를 발행하고 JSON/TXT 원본을 회수해 `FIRST/REPEATABLE/UNKNOWN` 상태를 확정한다. 이 결과를 B급 정규 manifest·해시·원본 백업 계약과 연결한다.
 4. 그다음 기능 담당자가 승인된 B로 설치→수집→계산→D1→API→UI를 복구한다. 장래 예약 검증은 전 단계가 완료된 후 별도 진행한다.
 
-로컬 검증: `node --test windows-runtime-mode-a/approved-runtime-a.test.mjs theme-generic-a/tests/*.test.mjs` (2026-11-08, **34/34 통과**, Windows 실PC 미검증).
+로컬 검증: `node --test windows-runtime-mode-a/approved-runtime-a.test.mjs theme-generic-a/tests/*.test.mjs` (2026-11-08, **37/37 통과**, Windows 실PC 미검증).
