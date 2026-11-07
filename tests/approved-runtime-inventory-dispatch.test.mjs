@@ -12,7 +12,7 @@ const withTmp=async fn=>{const dir=temp();try{await fn(dir);}finally{fs.rmSync(d
 const identity={sourceRepository:'ansqhd5774-Choi/zgmini',
  sourceBranch:'codex/theme',sourceSha:'1'.repeat(40)};
 const manifest=(profiles=[])=>Buffer.from(JSON.stringify({
- schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2',profiles,
+ schema:'ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1',profiles,
 }));
 const profile=(id,subdir,sourceSha=identity.sourceSha)=>({id,
  binding:{...identity,sourceSha},rootSegments:['pc-writer',subdir],
