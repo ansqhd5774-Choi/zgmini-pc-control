@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "5ba646c721c052ff62506255cc54a7b730af102d",
+  "filePath": "scripts/pc-writer/local-cycle.mjs",
+  "beforeSha256": "185f93e27f9be28362417402b99da07431699ed4f96a0ca37dde29982c675be7",
+  "insertions": [
+    {
+      "anchor": " const {publication,progressive}=await progressivePublication({",
+      "position": "before",
+      "text": " // Optional 19-input research collection uses the existing Core lock and\n // occurs before the early Writer publication pass. Off by default.\n let inflationRecurring={status:lane==='core'?'DISABLED':'SKIPPED_KOREA_LANE',providerRequests:0};\n if(lane==='core'&&collection.status===0){\n  try{\n   const {runInflation19RecurringFromCore}=await import('./inflation-causal-recurring-r1.mjs');\n   inflationRecurring=await runInflation19RecurringFromCore(base);\n  }catch{\n   inflationRecurring={status:'FAILED_PREVIOUS_INPUTS_PRESERVED',providerRequests:null};\n  }\n }\n"
+    },
+    {
+      "anchor": " save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));",
+      "position": "before",
+      "text": " report.inflationRecurring=inflationRecurring;\n"
+    }
+  ]
+}
