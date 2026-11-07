@@ -287,3 +287,10 @@
 - Node `--check` PASS, 순수 대기 모듈 6개 시뮬레이션 `node --test` **6/6 PASS**(Core active→ready, ready 중간 재시작, lock 지속, Task unknown, 시간 정지/범위, probe 오류). 기존 guard 순수 판정 6 검산 PASS + PR 원격 코드 정적 계약 9/9 PASS.
 - 현재 미확인 범위: 코디네이터·Windows 어댑터·공유 수신기 통합 회귀 테스트 전체 실행과 실 Windows B 한 회 적용. 따라서 **Draft·main 미병합**, M2/M3 DONE 아님, R2 **20% 유지**. 이전 #646 B requestId의 재실행은 계속 금지.
 - 다음: 같은 소스/환경의 기존 Writer B 회귀 테스트 PASS→고경계 경로와 승인 manifest 충돌 검사→source main 반영 여부 판정→신규 requestId 정규 실PC 1회/원본·Runtime 증거 회수.
+
+## 2026-11-07 — #650 실제 테스트/새 대기 순서 보강 (운영 적용 0)
+
+- **구조적 비효율 발견·수정:** 초기 #650 Draft는 Core가 바빨 때도 승인된 one-shot B requestId를 미리 claim하고 PC 백업/격리 임시 commit까지 생성하였음. 이를 고쳐 `acquireSharedWriterLock → readPcPreimage → readCandidate → waitForCoreIdleWindow → claimRequest → backupOriginal → prepareIsolatedCommit → pauseCore`로 정렬. **진행 중 Core**는 예약 활성/운영 원본 불변, 추가 B claim/백업/격리 commit없이 `WRITER_B_PREFLIGHT_STOP / WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`로 보고. 적용 직전 Core 새 실행 경합은 그 다음 별도 guard에서 안전게 STOP.
+- **결과:** GitHub [Draft PR #650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/650) 현재 head `e3ab5fce05a4db612f8d9f4ac3e90d84818c9390`, 공통 Writer B 7파일만 변경. GitHub 원문 `contract.mjs`, `installer.mjs`, `installer.test.mjs` V8 격리 실행 모의 Node Buffer/crypto로 설치·복구 16/16 PASS; 고유 소스로 해석한 순수 대기 모듈 6/6 PASS. 추가로 실제 **Node v22** `node --check` PASS, `node --test writer-b/core-idle-window.test.mjs` **6/6 PASS**. 해당 신규 소스 Git blob `ce0fc538af6188d0e6a222979e16db3b3cc4d334`, 테스트 blob `489157b3b9a4e8f8326d7230056ed941341a5bbf`가 GitHub 대상과 각각 일치(기존 `windows-guards.mjs` Core 판단 2함수만 동일한 격리 버전 사용).
+- **미증명:** 변경된 공통 수신기 전체 정규 Node test, 실 Windows WMI/Task 기능 실증, 승인 manifest 기반 실PC B 성공, Core가 6분 동안 연속 활성인 환경에서 안전한 유휴 창을 확보할 수 있는지 등. 실PC 배포 PASS 아님, #646 같은 ID 재실행 금지. M0 DONE, M1–M4 미완료, R2 **20% 유지**.
+- **다음 필수:** 전체 Writer B Node 회귀 획득(이미 검증한 순수 테스트는 재진행 불필요) → main 병합 여부 안전 판단 → 정규 실PC 단회 B 실증 → 소스/결과/원본/게시 증거 회수.
