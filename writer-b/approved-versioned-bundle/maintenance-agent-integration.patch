@@ -1,0 +1,46 @@
+diff --git a/tools/maintenance-agent.mjs b/tools/maintenance-agent.mjs
+--- a/tools/maintenance-agent.mjs
++++ b/tools/maintenance-agent.mjs
+@@ -19,6 +19,7 @@
+ const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
+ const ISSUE_TITLE="pc-controller-update";
+ const R6_HOST_ISSUE_TITLE="pc-r6-host-register";
++const GENERIC_B_ISSUE_TITLE="pc-approved-runtime-b";
+ const ISSUE_LABEL="pc-maintenance";
+ const ALLOWED_ACTORS=Object.freeze(["ansqhd5774-Choi"]);
+ const SHA40=/^[a-f0-9]{40}$/;
+@@ -218,6 +219,7 @@
+   leaseRoot=FIXED_LEASE_ROOT,leaseAttempts=120,leaseWaitMs=500,
+   updateScript=path.join(path.dirname(fileURLToPath(import.meta.url)),"update.mjs"),
+   verifyInstalledSource=()=>{},
++  approvedGenericBHook=null,
+   installedShaFromStatus=result=>result?.actualControllerSha,
+   ghTimeoutMs=20_000,updateTimeoutMs=0,
+   now=()=>new Date().toISOString(),
+@@ -522,4 +524,17 @@
+   async function processIssue(issue){
++    // New effect is opt-in and separated from legacy parser/slug IDs.
++    // Its own installed approved handler owns the UUID ledger/reconciliation.
++    if(issue?.title===GENERIC_B_ISSUE_TITLE){
++      if(!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
++        return {status:"IGNORED",issueNumber:issue?.number};
++      if(approvedGenericBHook===null)
++        return {status:"BLOCKED",code:"B_ROUTE_NOT_INSTALLED",issueNumber:issue.number};
++      if(typeof approvedGenericBHook.dispatch!=="function")
++        throw coded("B_ROUTE_HOOK_INVALID");
++      const outcome=await approvedGenericBHook.dispatch(issue);
++      if(outcome?.handled!==true||!outcome.result)throw coded("B_ROUTE_RESULT_UNVERIFIED");
++      return outcome.result;
++    }
+     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
+       ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
+       return {status:"IGNORED",issueNumber:issue?.number};
+@@ -677,6 +692,7 @@
+       // Summary filtering avoids unnecessary reads; processIssue still verifies
+       // the full Issue actor, label, request body and approval before applying.
+-      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(entry?.title))continue;
++      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,
++        GENERIC_B_ISSUE_TITLE].includes(entry?.title))continue;
+       seen.add(number);
+       const cached=settledIssueCache.get(number);
+       const updatedAt=entry?.updatedAt;
