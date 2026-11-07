@@ -135,6 +135,32 @@ export function makeIsolatedWindowsFixtureAdapter({
   finally{fs.closeSync(f);}
  };
  const inject=phase=>{if(faultAt===phase)fail('B_FIXTURE_FAULT_'+phase.toUpperCase());};
+ const exactExistingVersion=()=>{
+  check(fs.existsSync(versionFinal)&&fs.lstatSync(versionFinal).isDirectory()&&
+   !fs.lstatSync(versionFinal).isSymbolicLink(),
+   'B_FIXTURE_IMMUTABLE_MISSING');
+  const found=[];
+  const walk=(directory,prefix='')=>{
+   for(const entry of fs.readdirSync(directory,{withFileTypes:true})){
+    check(!entry.isSymbolicLink(),'B_FIXTURE_IMMUTABLE_REPARSE');
+    const rel=prefix?prefix+'/'+entry.name:entry.name;
+    const target=fileWithin(root,'profiles',p,'versions',manifest.bundle.version,
+     ...rel.split('/'));
+    if(entry.isDirectory())walk(target,rel);
+    else{
+     check(entry.isFile(),'B_FIXTURE_IMMUTABLE_TYPE');
+     const bytes=read(root,target);
+     found.push({path:rel,sha256:sha(bytes),bytes:bytes.length});
+    }
+   }
+  };
+  walk(versionFinal);
+  const expected=sorted(manifest.bundle.files),actual=sorted(found);
+  check(actual.length===expected.length&&actual.every((x,i)=>
+   x.path===expected[i].path&&x.sha256===expected[i].sha256&&
+   x.bytes===expected[i].bytes),'B_FIXTURE_IMMUTABLE_HASH_DRIFT');
+  return sha(Buffer.from(JSON.stringify(actual)));
+ };
  const inspect=()=>{
   const xml=read(root,fileWithin(root,'profiles',p,'task.xml'));
   const taskState=JSON.parse(read(root,fileWithin(root,'profiles',p,'task-state.json')).toString('utf8'));
@@ -150,13 +176,8 @@ export function makeIsolatedWindowsFixtureAdapter({
     })()},
    bundleVersion:null,fileListSha256:null};
   if(fs.existsSync(versionFinal)){
-   const actual=manifest.bundle.files.map(f=>{
-    const bytes=read(root,fileWithin(root,'profiles',p,'versions',manifest.bundle.version,
-     ...f.path.split('/')));
-    return {path:f.path,sha256:sha(bytes),bytes:bytes.length};
-   });
    s.bundleVersion=manifest.bundle.version;
-   s.fileListSha256=sha(Buffer.from(JSON.stringify(sorted(actual))));
+   s.fileListSha256=exactExistingVersion();
   }
   return s;
  };
@@ -187,10 +208,16 @@ export function makeIsolatedWindowsFixtureAdapter({
   },
   async stageVerifiedBundle({lock:lease,plan}){
    assertLock(lease);inject('stage');
-   check(!fs.existsSync(versionFinal)&&!fs.existsSync(stageRoot),
-    'B_FIXTURE_IMMUTABLE_EXISTS');
    check(Buffer.isBuffer(zipBlob)&&sha(zipBlob)===manifest.bundle.zipSha256,
     'B_FIXTURE_ZIP_HASH');
+   if(fs.existsSync(versionFinal)){
+    const existingDigest=exactExistingVersion();
+    exact(existingDigest,plan.fileListSha256,'B_FIXTURE_IMMUTABLE_HASH_DRIFT');
+    log('EXACT_IMMUTABLE_VERSION_REUSED');
+    return {verified:true,fileListSha256:existingDigest,
+     stageVersion:versionFinal,reused:true};
+   }
+   check(!fs.existsSync(stageRoot),'B_FIXTURE_STAGE_ALREADY_EXISTS');
    const actual=[];
    for(const f of manifest.bundle.files){
     const bytes=sourceBlobs?.[f.path];
@@ -222,10 +249,17 @@ export function makeIsolatedWindowsFixtureAdapter({
   async casActivate({lock:lease,staged,backup}){
    assertLock(lease);journalOwned();
    exact(backup.journalId,id,'B_FIXTURE_JOURNAL_ID');
-   exact(staged.stageVersion,stageVersion,'B_FIXTURE_STAGE_ID');
-   inject('activation-before-version');
-   fs.renameSync(stageVersion,versionFinal);
-   log('IMMUTABLE_VERSION_ACTIVATED');
+   if(staged.reused){
+    exact(staged.stageVersion,versionFinal,'B_FIXTURE_REUSED_VERSION_ID');
+    exact(exactExistingVersion(),staged.fileListSha256,
+     'B_FIXTURE_REUSED_VERSION_DRIFT');
+    log('EXACT_IMMUTABLE_VERSION_RECONFIRMED');
+   }else{
+    exact(staged.stageVersion,stageVersion,'B_FIXTURE_STAGE_ID');
+    inject('activation-before-version');
+    fs.renameSync(stageVersion,versionFinal);
+    log('IMMUTABLE_VERSION_ACTIVATED');
+   }
    for(const entry of backups()){
     const bytes=entry.bytes;
     check(Buffer.isBuffer(bytes)&&sha(bytes)===entry.after,
