@@ -35,9 +35,41 @@ test('worker without catalog still fails, full approved closure passes',()=>{
  const complete=new Map([...three,[CATALOG,catalog]]);
  const s=verifyWriterBImportAvailability({afterFiles:complete,existing});
  assert.equal(s.status,'PASS');
- assert.equal(s.evidenceLevel,'LITERAL_RELATIVE_IMPORTS_ONLY');
+ assert.equal(s.evidenceLevel,'NEW_LITERAL_RELATIVE_IMPORTS_ONLY');
  assert.equal(s.approvedFiles,4);
  assert.equal(s.checkedReferences,5);
+});
+
+test('existing optional imports in modified M are not a new global gate',()=>{
+ const file='scripts/pc-writer/run-local.mjs';
+ const before=B("import './old-optional.mjs';\nexport const x=1;\n");
+ const after=B("import './old-optional.mjs';\nexport const x=2;\n");
+ const seen=[];
+ const result=verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,after]]),
+  beforeFiles:new Map([[file,before]]),
+  existing:p=>{seen.push(p);return false;}
+ });
+ assert.equal(result.status,'PASS');
+ assert.equal(result.checkedReferences,0);
+ assert.deepEqual(seen,[]);
+});
+
+test('a newly introduced import in M requires approved overlay or existing PC file',()=>{
+ const file='scripts/pc-writer/run-local.mjs';
+ const before=B("export const x=1;\n");
+ const after=B("export const x=1;\nconst a=import('./new-hook.mjs');\n");
+ assert.throws(()=>verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,after]]),
+  beforeFiles:new Map([[file,before]]),
+  existing:()=>false
+ }),{code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP'});
+ assert.equal(verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,after],
+   ['scripts/pc-writer/new-hook.mjs',B('export const ok=true;')]]),
+  beforeFiles:new Map([[file,before]]),
+  existing:()=>false
+ }).status,'PASS');
 });
 
 test('test-only negative import fixtures do not block real runtime modules',()=>{
