@@ -69,6 +69,9 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
   // for a B manifest, but DOES NOT prove which source the dynamic VBS ran.
   const registered={registeredConfigurationStatus:'REGISTERED_CONFIGURATION_OBSERVED_NOT_RUNTIME',
     registeredBeforeSourceSha:git.head,registeredExactThreePreimages:true,
+    // Registered source status only; a pinned target-file overlay is not a
+    // live process attestation and must not be called a clean checkout.
+    registeredThreeFileTrackedOverlayObserved:git.trackedDirty,
     registeredTaskXmlMatchesHistoricB:
       task?.taskXmlSha256==='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028'};
   if(task?.taskName!==TASK||task.sourceRoot!==ROOT||
