@@ -1,0 +1,48 @@
+# Generic read-only Windows inventory; no Controller install and no B effects.
+# Register as .github/workflows/pc-approved-runtime-a-once.yml only after review.
+name: ZGMINI Approved Runtime A Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-approved-runtime-a-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  read-approved-runtime:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-approved-runtime-a' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Checkout exact approved control commit
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: approved-a-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read fixed approved A profiles without PC writes
+        id: inspect
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\approved-a-control\windows-runtime-mode-a\run.mjs"'
+      - name: Create-only sanitized JSON and TXT with readback
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\approved-a-control\windows-runtime-mode-a\report.mjs"'

@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1",
+  "profiles": [
+    {
+      "id": "configuredThemeRuntime",
+      "binding": {
+        "sourceRepository": "ansqhd5774-Choi/zgmini",
+        "sourceBranch": "codex/theme-fear-greed-integration-20261025",
+        "sourceSha": "0c97599431882245a156470bd51290e327e7ee78"
+      },
+      "rootSegments": ["pc-writer", "theme-config-tool"],
+      "files": [
+        {"key": "installed", "relativePath": "INSTALL_RESULT.json"},
+        {"key": "active", "relativePath": "ACTIVE_RUNTIME.json"},
+        {"key": "scheduledCmd", "relativePath": "THEME_SCHEDULED.cmd"},
+        {"key": "scheduledVbs", "relativePath": "THEME_SCHEDULED.vbs"}
+      ],
+      "directories": [
+        {"key": "versions", "relativePath": "versions"},
+        {"key": "backups", "relativePath": "backups"}
+      ],
+      "tasks": [
+        {"key": "configuredTask", "name": "ZGMINI-PC-Configured-Themes", "expectedHour": 13}
+      ]
+    }
+  ]
+}
