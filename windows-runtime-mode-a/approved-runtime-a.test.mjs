@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {verifyARequest,authorizeARegistry,approvalPath,inspectApprovedA}
+import {verifyARequest,authorizeARegistry,approvalPath,inspectApprovedA,requestIdForFailure}
  from './run.mjs';
 import {sanitizeAReport,uploadAReport} from './report.mjs';
 
@@ -64,6 +64,14 @@ test('fixed owner/private/opened one-shot and exact digest-pinned manifest',()=>
  assert.equal(auth().profiles[0].id,'configuredThemeRuntime');
  const noLabel={...event,issue:{...event.issue,labels:[]}};
  assert.equal(verifyARequest(noLabel,env).requestId,requestId);
+});
+test('a post-validation Git or manifest failure retains its requestId and first-fail code',()=>{
+ assert.equal(requestIdForFailure(JSON.stringify(event),env),requestId);
+ assert.equal(requestIdForFailure(JSON.stringify(event),{...env,GITHUB_ACTOR:'wrong'}),null);
+ const result=sanitizeAReport({status:'BLOCKED',
+  code:'A_RUNTIME_REGISTRY_BYTES_STOP',requestId},request,env);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'A_RUNTIME_REGISTRY_BYTES_STOP');
 });
 test('Issue body cannot select path, task, profile, or arbitrary shell',()=>{
  for(const injected of ['path','task','profile','shell']){
@@ -129,8 +137,13 @@ test('mode snapshot race returns BLOCKED/UNKNOWN instead of selecting a B mode',
    scheduledVbs:{exists:true,sha256:sha('vbs'),sizeBytes:3},
   },tasks:{configuredTask:{status:'XML_READ'}}})});
  assert.equal(result.blockedProfiles,1);
+ assert.equal(result.status,'BLOCKED');
  assert.equal(result.profiles[0].runtimeMode,'STATE_UNKNOWN_CHANGED_DURING_READ');
  assert.equal(result.fileHashesComplete,false);
+ const publicResult=sanitizeAReport({schema:'ZGMINI_APPROVED_RUNTIME_A_LOCAL_RESULT_V1',
+  requestId,...result},request,env);
+ assert.equal(publicResult.status,'BLOCKED');
+ assert.equal(publicResult.profiles[0].code,'A_RUNTIME_SNAPSHOT_CHANGED_DURING_READ');
 });
 test('Task XML changing between snapshots never yields a decided runtime mode',()=>{
  fixture(({root})=>{
