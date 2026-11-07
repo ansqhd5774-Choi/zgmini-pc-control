@@ -26,10 +26,21 @@ content never comes from an Issue alone.
 | versioned-bundle-transaction.mjs | Shared generic state machine with capability-injected adapter, rollback and fault states | None in prototype |
 | versioned-bundle-plan.test.mjs | Manifest negative cases | None |
 | versioned-bundle-transaction.test.mjs | In-memory fault injection | None |
+| isolated-windows-fixture-adapter.mjs | Real Node fs CAS/backup/journal/rollback, hard-locked to disposable TEMP test fixture | Fixture only |
+| isolated-windows-fixture-adapter.test.mjs | End-to-end fixture I/O and fault injection | Fixture only |
 
-Neither module invokes shell, filesystem, GitHub, SQL or Task Scheduler.
+Neither generic planning/coordinator module invokes shell, filesystem,
+GitHub, SQL or Task Scheduler.
 The injected adapter is trusted code **only** from the installed and approved
 common B receiver. The Issue/manifest cannot supply adapter functions.
+
+The separate isolated-windows-fixture-adapter.mjs intentionally DOES use
+Node filesystem calls, but refuses all locations except a top-level
+marker-bearing zgmini-b-fixture-* directory inside the OS TEMP folder.
+It simulates Task XML with local fixture files; it never calls Windows Task
+Scheduler, fetches approvals, runs .cmd/.vbs/.mjs, or opens a production PC
+path. Its locally injected approval is a **test simulation**, not a real
+GitHub authorization proof.
 
 ## Windows adapter contract: REQUIRED, NOT IMPLEMENTED
 
@@ -94,3 +105,38 @@ or D1 writes, Task creation/modification or arbitrary execution. It does
 not alter currently healthy Controller/Core/other features.
 
 Local tests: node --test theme-generic-b/*.test.mjs
+
+## Distinct A inventory PIN / registry sidecar issue
+
+An A operation may require a paired approved runtime-inventory digest in
+host.approvedRuntimeInventorySha256 and a controller approval registry
+sidecar. These are **not** versioned-bundle launcher/active-pointer targets.
+
+The current control repo main Writer B operation authorizes only .mjs
+source overlay. Its independent source-bundle B operation is restricted to
+the approvedSources registry entry in host.json; it cannot alter the
+runtime-inventory PIN or a separate controller-approvals/registry.json file.
+Treating either as a bundle file or injecting an operation into pc-job
+would cross authorization boundaries. A new **small common B effect**
+requires explicit approval, not a new ad hoc script:
+
+1. Fixed exact host path and fixed existing registry sidecar path, checked
+   against installed controller host/config. No arbitrary file path from
+   Issue payload.
+2. Approved exact old SHA256 and new SHA256 for both operational files,
+   plus an approved runtime-inventory content hash and registry scope.
+3. Patch only host.approvedRuntimeInventorySha256. Preserve all other
+   host fields/values and their exact raw bytes outside this one field
+   (or require a separately approved one-time migration if absent).
+4. Patch only the explicitly approved registry entry, preserve all others;
+   validate the registry schema with the installed Controller.
+5. Use the SAME Writer B lock, one-shot request claim, same-parent ACL
+   backups, fsync, CAS, staged atomic per-file replacement, durable
+   journal and reverse rollback, and JSON/TXT 2/2 remote readback.
+6. The approval must pin both effects as ONE recoverable transaction;
+   partial success must not be reported as PASS. Never default to
+   replacing whole host.json with a newly generated template.
+
+No claim is made that a specific runtime-inventory PIN currently exists
+on the real host; its actual value and registry schema need the already
+approved A/read-only inventory evidence before drafting the exact B diff.
