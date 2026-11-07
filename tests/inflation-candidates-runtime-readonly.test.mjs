@@ -45,6 +45,8 @@ test('7 indicators, 6 groups, valid snapshots with read-only and no provider cal
     assert.equal(result.groups.find(g=>g.group==='cpi').status,'PRESENT_VALID');
     assert.equal(result.checkpointStatus,'PRESENT_VALID');
     assert.equal(result.groups.find(g=>g.group==='cpi').checkpoint.processed,true);
+    assert.equal(result.groups.find(g=>g.group==='cpi').checkpoint.failureCode,null);
+    assert.ok(result.groups.every(g=>g.checkpoint.failureCode===null));
     assert.equal(result.operationalReadiness,'NOT_ASSERTED');
     assert.equal(result.providerCalls,0);assert.equal(result.d1Writes,0);
     assert.equal(result.operationalWrites,0);assert.equal(result.sqliteOpened,false);
@@ -131,5 +133,48 @@ test('Fed G17 1972/1999 history is valid without accepting invalid calendar date
     write(x.target,'fed-g17-manufacturing-ip.json',{
       ...header('FEDERAL_RESERVE_G17'),observations:historical});
     assert.equal(inspect(x.root).indicators.find(i=>i.id===29).status,'INVALID');
+  }finally{x.cleanup();}
+});
+
+test('new checkpoint exposes only sanitized per-group failure code without mutation',()=>{
+  const x=mk();try{
+    fixture(x.target);
+    write(x.target,'core-attempts-r1.json',{
+      schema:'ZGMINI_INFLATION_CANDIDATE_CORE_R1',processed:{},
+      attempted:{
+        cpi:{eventKey:'private:cpi:2026-10-01',at:STAMP,failureCode:'BLS_CANDIDATE_RATE_LIMITED'},
+        fed:{eventKey:'private:fed:2026-10-01',at:STAMP,failureCode:'FED_G17_NOT_AVAILABLE'},
+      }});
+    const previous=fs.readFileSync(path.join(x.target,'core-attempts-r1.json'),'utf8');
+    const time=fs.statSync(path.join(x.target,'core-attempts-r1.json')).mtimeMs;
+    const result=inspect(x.root);
+    assert.equal(result.checkpointStatus,'PRESENT_VALID');
+    assert.equal(result.presentValidCount,7);
+    assert.equal(result.groups.find(g=>g.group==='cpi').checkpoint.failureCode,'BLS_CANDIDATE_RATE_LIMITED');
+    assert.equal(result.groups.find(g=>g.group==='fed').checkpoint.failureCode,'FED_G17_NOT_AVAILABLE');
+    assert.equal(result.groups.find(g=>g.group==='ppi').checkpoint.failureCode,null);
+    assert.ok(!JSON.stringify(result).includes('private:cpi'));
+    assert.equal(fs.readFileSync(path.join(x.target,'core-attempts-r1.json'),'utf8'),previous);
+    assert.equal(fs.statSync(path.join(x.target,'core-attempts-r1.json')).mtimeMs,time);
+    assert.equal(result.providerCalls,0);
+    assert.equal(result.d1Writes,0);
+    assert.equal(result.operationalWrites,0);
+  }finally{x.cleanup();}
+});
+
+test('arbitrary checkpoint failure text is rejected without exposing secrets',()=>{
+  const x=mk();try{
+    fixture(x.target);
+    for(const code of ['SECRET_TOKEN_VALUE', 'BLS_CANDIDATE_bad', 'BLS_CANDIDATE_'+('X'.repeat(91)), 7]){
+      write(x.target,'core-attempts-r1.json',{
+        schema:'ZGMINI_INFLATION_CANDIDATE_CORE_R1',processed:{},
+        attempted:{cpi:{eventKey:'private:cpi:2026-10-01',at:STAMP,failureCode:code}}});
+      const result=inspect(x.root);
+      assert.equal(result.checkpointStatus,'INVALID');
+      assert.equal(result.groups.find(g=>g.group==='cpi').checkpoint,null);
+      assert.ok(!JSON.stringify(result).includes('SECRET_TOKEN_VALUE'));
+      assert.ok(!JSON.stringify(result).includes('private:cpi'));
+      assert.equal(result.presentValidCount,7);
+    }
   }finally{x.cleanup();}
 });
