@@ -82,7 +82,7 @@ values must be verified against approved host registration before use.
 has one `id` and one source binding; the optional `bundleProfile.id` must equal
 the parent profile `id`. The B writer must update only the selected profile
 through its independently protected B transaction, preserving all other
-entries, and journaled, separately CAS the external registry and trusted host PIN with backup/readback/reverse rollback. This is **not** an atomic two-file operation.
+entries. It must update the external registry and trusted host PIN with separately journaled CAS, backup/readback and reverse rollback. This is **not** an atomic two-file operation.
 Current A code is a read-only consumer and does not implement this B transaction.
 
 ## Guarantees, scope and limitations
