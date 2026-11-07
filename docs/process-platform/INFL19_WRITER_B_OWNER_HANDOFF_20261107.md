@@ -27,6 +27,8 @@
 4. 허용된 **정규 Writer B** 첫 단회 Issue로 적용한다. 설치기의 `verifyWriterBPreimage`가 실제 PC HEAD/config·before 파일 바이트/dirty·Task/launcher를 설치 직전 재검산하며 모순이면 **0 writes STOP**. Controller-only B 경로로 우회하지 않는다. 다른 Writer 소유자의 동시 쓰기만 lease 직렬화.
 5. 정확한 requestId의 원격 결과 JSON/TXT 2/2, 로컬 합성 소스 HEAD/provenance·백업/복구 및 관련 Writer 기능을 확인한 후, 물가지표 원담당이 PC Writer→로컬 결과→D1→공개 API→19개 페이지 자동 갱신을 실증한다. 예약 자연 갱신 장기 검증은 후속 단계.
 
+**공통 B 수신기 최신 계약 (2026-11-07):** [PR #640](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/640)으로 source 병합과 운영 활성 미확인을 구분했고, [PR #641](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/641)으로 유효한 owner Issue의 승인 manifest/path/hash 사전 거부 때 정확한 `WRITER_B_*` 코드가 원격 결과에 남도록 보완했다(격리 45/45 PASS). 이는 **main source 변경**이며 실제 Windows Workflow 활성 또는 첫 Writer B 성공 증거가 아니다. 무효 JSON/UUID 요청은 기존처럼 결과 없이 fail-closed될 수 있다.
+
 ## 4. 인계 상태
 
 - `DONE`: Controller 공통 A 설치/운영 활성, 다단계 VBS 정적 조회, 승인 source와 후보 checkout 교차검증, 3파일 후보 존재와 before 해시, 원본 보호.
