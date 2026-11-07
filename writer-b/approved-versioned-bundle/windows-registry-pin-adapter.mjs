@@ -88,10 +88,35 @@ export function makeWindowsRegistryPinBAdapter({
  const JDIR=path.win32.join(JROOT,requestId);
  const JFILE=path.win32.join(JDIR,'journal.jsonl');
  let lock=null,claimCreated=false;
+ // An ENOENT for the registry LEAF is an approved bootstrap possibility only
+ // when every fixed parent exists on the expected data volume. A missing
+ // parent or disconnected drive must never masquerade as `registry: null`.
+ // Check before and after the leaf probe, and repeat under the Writer mutex.
+ const approvedParents=[targets.dataRoot,
+  path.win32.join(targets.dataRoot,'pc-writer'),path.win32.dirname(REG)];
+ const verifiedRegistryParent=()=>{
+  for(const dir of approvedParents){
+   let stat,real;
+   try{stat=fileIO.lstatSync(dir);}catch(error){
+    bad(error?.code==='ENOENT'||error?.code==='ENODEV'?
+     'B_PIN_WINDOWS_REGISTRY_PARENT_MISSING':
+     'B_PIN_WINDOWS_REGISTRY_PARENT_UNAVAILABLE');
+   }
+   need(stat.isDirectory()&&!stat.isSymbolicLink(),
+    'B_PIN_WINDOWS_REGISTRY_PARENT_SCOPE');
+   try{real=fileIO.realpathSync.native(dir);}catch{
+    bad('B_PIN_WINDOWS_REGISTRY_PARENT_UNAVAILABLE');
+   }
+   need(equalPath(real,dir),'B_PIN_WINDOWS_REGISTRY_PARENT_REPARSE');
+  }
+ };
  const ensureRegular=(file,allowMissing=false)=>{
+  if(file===REG)verifiedRegistryParent();
   let stat;
   try{stat=fileIO.lstatSync(file);}catch(error){
-   if(error.code==='ENOENT'&&allowMissing)return null;
+   if(error.code==='ENOENT'&&allowMissing&&file===REG){
+    verifiedRegistryParent();return null;
+   }
    bad('B_PIN_WINDOWS_FILE_READ');
   }
   need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size<=1048576,
@@ -212,6 +237,10 @@ export function makeWindowsRegistryPinBAdapter({
   async casHost({lock:token,backup,expectedSha256,afterBytes}){
    checkLease(token);
    need(backup?.journalId===requestId,'B_PIN_WINDOWS_JOURNAL_ID');
+   // A previously valid ABSENT observation is not a promise that E: stayed
+   // mounted through backup. Refuse the first switch if its trusted parent
+   // tree is no longer present/canonical.
+   verifiedRegistryParent();
    event('HOST_CAS_INTENT');
    atomicFileReplace(HOST,expectedSha256,afterBytes);
    event('HOST_CAS_DONE');
@@ -219,6 +248,7 @@ export function makeWindowsRegistryPinBAdapter({
   async casRegistry({lock:token,backup,expectedSha256,afterBytes}){
    checkLease(token);
    need(backup?.journalId===requestId,'B_PIN_WINDOWS_JOURNAL_ID');
+   verifiedRegistryParent();
    event('REGISTRY_CAS_INTENT');
    if(expectedSha256===null)createExclusive(REG,afterBytes);
    else atomicFileReplace(REG,expectedSha256,afterBytes);
