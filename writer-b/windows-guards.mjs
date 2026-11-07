@@ -27,7 +27,9 @@ export function decodeTaskXmlBytes(raw){
 }
 
 export function coreQuietFromProbe(probe,coreCycleLockExists){
- return probe?.enabled===false&&probe.state!==4&&
+ // TASK_STATE: 0 unknown, 1 disabled, 2 queued, 3 ready, 4 running.
+ // Unknown/queued must not be mistaken for a drained Core.
+ return probe?.enabled===false&&[1,3].includes(probe.state)&&
   probe.instances===0&&probe.relatedProcesses===0&&
   probe.unknownProcessLines===0&&coreCycleLockExists===false;
 }
