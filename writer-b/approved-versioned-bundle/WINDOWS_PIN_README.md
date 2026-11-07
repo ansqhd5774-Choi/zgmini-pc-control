@@ -74,7 +74,9 @@ a Windows-drive/path translator plus injected lock and ACL fingerprints.
 It covers denial without a trusted receiver, wrong platform/fixed paths,
 full approved two-file effect, backup readback, faults after host/registry
 switches, partial backup `STATE_UNKNOWN` plus lock retention, absent-registry
-bootstrap and exact absent rollback, ACL drift rejection, rollback ACL failure
+bootstrap and exact absent rollback, **missing Registry parent/drive versus
+legitimate missing leaf**, parent reparse, drive disappearing after lock or
+after backup with zero CAS/create, ACL drift rejection, rollback ACL failure
 leaving `STATE_UNKNOWN`/lock retained, and JSON/TXT report failure remaining
 `PASS` with `reportStatus:INCOMPLETE`. The bootstrap test separates the
 read-only A-style absent/PIN-null observation from the later B claim.
