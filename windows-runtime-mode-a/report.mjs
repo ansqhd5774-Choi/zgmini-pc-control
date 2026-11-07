@@ -44,6 +44,7 @@ function cleanProfile(p){
  const out={profileId:p.profileId,status:p.status==='DONE'?'DONE':'BLOCKED',
   rootExists:flag(p.rootExists),runtimeMode:MODES.has(p.runtimeMode)?p.runtimeMode:'UNVERIFIED',
   files:{},tasks:{}};
+ if(out.status==='BLOCKED'&&CODE.test(p.code??''))out.code=p.code;
  for(const [key,value] of Object.entries(plain(p.files)?p.files:{}))
   if(KEY.test(key)&&Object.keys(out.files).length<32)out.files[key]=cleanFile(value);
  for(const [key,value] of Object.entries(plain(p.tasks)?p.tasks:{}))
@@ -59,18 +60,21 @@ export function sanitizeAReport(raw,req,env){
   operationalWrites:0,retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE',profiles:[]};
  if(!plain(raw)||raw.requestId!==req.requestId||
   !['DONE','BLOCKED'].includes(raw.status))return fallback;
- if(raw.status==='BLOCKED')return {...fallback,status:'BLOCKED',
-  code:CODE.test(raw.code??'')?raw.code:'A_RUNTIME_EXECUTION_STOP'};
+ const blocked=raw.status==='BLOCKED';
+ const blockedCode=CODE.test(raw.code??'')?raw.code:'A_RUNTIME_EXECUTION_STOP';
+ const safeBlocked={...fallback,status:'BLOCKED',code:blockedCode};
  if(raw.schema!=='ZGMINI_APPROVED_RUNTIME_A_LOCAL_RESULT_V1'||
   raw.operationalWrites!==0||raw.providerCalls!==0||raw.d1Writes!==0||
   !SHA40.test(raw.controlSha??'')||!SHA64.test(raw.registrySha256??'')||
   raw.registrySha256!==req.approvalManifestSha256||
   raw.requestedSourceSha!==req.sourceSha||
-  !Array.isArray(raw.profiles)||raw.profiles.length>4)return fallback;
+  !Array.isArray(raw.profiles)||raw.profiles.length>4)
+  return blocked?safeBlocked:fallback;
  const profiles=raw.profiles.map(cleanProfile);
- if(profiles.some(x=>x===null))return fallback;
- const report={...fallback,status:'DONE',code:raw.code==='A_RUNTIME_FILE_AND_TASK_READONLY'?
-  raw.code:'A_RUNTIME_PARTIAL',controlSha:raw.controlSha,
+ if(profiles.some(x=>x===null))return blocked?safeBlocked:fallback;
+ const report={...fallback,status:blocked?'BLOCKED':'DONE',
+  code:blocked?blockedCode:raw.code==='A_RUNTIME_FILE_AND_TASK_READONLY'?
+   raw.code:'A_RUNTIME_PARTIAL',controlSha:raw.controlSha,
   fileHashesComplete:flag(raw.fileHashesComplete)===true,
   taskChecksComplete:flag(raw.taskChecksComplete)===true,
   registeredCount:bounded(raw.registeredCount),
