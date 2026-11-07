@@ -11,6 +11,7 @@ import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {sha256} from './contract.mjs';
 import {materializeApprovedWriterFile} from './insert-only-patch.mjs';
+import {verifyWriterBImportAvailability} from './import-availability.mjs';
 import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
 import {performWriterBInstall} from './installer.mjs';
 import {commitApprovedWriterBOverlay} from './git-stage.mjs';
@@ -210,9 +211,29 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    need(git(candidateRoot,'rev-parse','HEAD')===m.candidateSourceSha&&
     git(candidateRoot,'status','--porcelain=v1','--untracked-files=all')==='',
     'WRITER_B_CANDIDATE_DRIFT_STOP');
-   return {sourceSha:m.candidateSourceSha,clean:true,
-    sha256:Object.fromEntries(m.files.map(f=>[f.path,
-     sha256(rawSafe(scoped(candidateRoot,f.path),candidateRoot))]))};
+   const inputs=new Map(m.files.map(file=>[file.path,
+    rawSafe(scoped(candidateRoot,file.path),candidateRoot)]));
+   const hashes=Object.fromEntries([...inputs].map(([name,bytes])=>
+    [name,sha256(bytes)]));
+   // Probe only literal relative imports in exact approved AFTER bytes, not
+   // arbitrary candidate files. Missing dependencies fail before request
+   // claim, backup, Task disable or operational source modifications.
+   const beforeFiles=new Map(m.files.filter(file=>file.change==='M')
+    .map(file=>[file.path,sourceRaw(file.path)]));
+   const after=new Map(m.files.map(file=>[file.path,
+    materializeApprovedWriterFile(file,inputs.get(file.path),
+     Object.hasOwn(file,'insertions')?beforeFiles.get(file.path):null)]));
+   const sourceReal=fs.realpathSync.native(source).toLowerCase()+path.sep;
+   verifyWriterBImportAvailability({afterFiles:after,beforeFiles,existing:relative=>{
+    const file=scoped(source,relative);
+    try{
+     const stat=fs.lstatSync(file);
+     return stat.isFile()&&!stat.isSymbolicLink()&&
+      stat.size>0&&stat.size<=2_000_000&&
+      fs.realpathSync.native(file).toLowerCase().startsWith(sourceReal);
+    }catch{return false;}
+   }});
+   return {sourceSha:m.candidateSourceSha,clean:true,sha256:hashes};
   },
   async claimRequest(requestId){
    need(requestId===auth.requestId&&fd!==null,'WRITER_B_CLAIM_LOCK_STOP');
