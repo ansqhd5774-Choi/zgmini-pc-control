@@ -14,6 +14,26 @@ const CODE=/^WRITER_B_[A-Z0-9_]{1,100}$/;
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 
+export function readWriterBLocalResult({env,fsOps=fs}){
+ let result;
+ try{result=fsOps.readFileSync(path.join(env.RUNNER_TEMP??'',
+  'writer-b-install-result.json'),'utf8');return result;}catch{}
+ // The install step was skipped after a failed approval preflight. A
+ // run-specific, bounded diagnostic is safe to forward as a SETUP_STOP only.
+ const runId=env?.GITHUB_RUN_ID,runnerTemp=env?.RUNNER_TEMP;
+ if(!/^\d{1,18}$/.test(runId??'')||typeof runnerTemp!=='string'||
+   !path.isAbsolute(runnerTemp))return '{}';
+ try{
+  const raw=fsOps.readFileSync(path.join(runnerTemp,
+   `writer-b-preflight-stop-${runId}.json`),'utf8');
+  if(Buffer.byteLength(raw)>512)return '{}';
+  const proof=JSON.parse(raw);
+  if(proof.status==='WRITER_B_SETUP_STOP'&&proof.runId===runId&&
+    CODE.test(proof.code??''))return raw;
+ }catch{}
+ return '{}';
+}
+
 export function validateWriterBReportEvent(event,env){
  need(env?.GITHUB_REPOSITORY===CONTROL_REPO&&env.GITHUB_ACTOR===ACTOR&&
   env.GITHUB_EVENT_NAME==='issues'&&env.GITHUB_EVENT_ACTION==='opened'&&
@@ -147,9 +167,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  try{
   const env=process.env;
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
-  let result='{}';
-  try{result=fs.readFileSync(path.join(env.RUNNER_TEMP??'',
-   'writer-b-install-result.json'),'utf8');}catch{}
+  const result=readWriterBLocalResult({env});
   const report=await uploadWriterBReport({event,env,rawResult:result});
   process.stdout.write(`WRITER_B_REPORT ${report.deliveryStatus} `+
    `CREATED=${report.created}/2 READBACK=${report.verified}/2\n`);
