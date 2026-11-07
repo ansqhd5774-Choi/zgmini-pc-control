@@ -86,6 +86,16 @@ function writeOriginalBackup(bytes,source,requestId){
   try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   need(fs.readFileSync(dest).equals(bytes),'PROVIDER_B_BACKUP_READBACK_STOP');
 }
+export function normalizeAclEvidence(stdout,file){
+  need(typeof stdout==='string'&&stdout.startsWith(file),
+    'PROVIDER_B_ACL_QUERY_STOP');
+  // `icacls` indents continuation lines to the *filename length*. Comparing
+  // its raw output rejects identical ACLs for different basename lengths.
+  const body=stdout.slice(file.length).split(/\r?\n/)
+    .map(line=>line.trim()).filter(Boolean).join('\n');
+  need(body.length>0,'PROVIDER_B_ACL_EMPTY_STOP');
+  return body;
+}
 function aclEvidence(file){
   if(process.platform!=='win32')return null;
   const exe=path.join(process.env.SystemRoot??String.raw`C:\Windows`,
@@ -96,9 +106,7 @@ function aclEvidence(file){
   need(result.status===0&&!result.error&&typeof result.stdout==='string'&&
     result.stdout.startsWith(file),'PROVIDER_B_ACL_QUERY_STOP');
   // Never publish names/SIDs. Compare file-relative read-only ACL evidence.
-  const body=result.stdout.slice(file.length).replace(/\r\n/g,'\n').trim();
-  need(body.length>0,'PROVIDER_B_ACL_EMPTY_STOP');
-  return body;
+  return normalizeAclEvidence(result.stdout,file);
 }
 function copyPreservingSecurity(source,dest){
   // Windows CopyFile preserves original security attributes; unlike creating
