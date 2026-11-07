@@ -40,6 +40,13 @@ test('worker without catalog still fails, full approved closure passes',()=>{
  assert.equal(s.checkedReferences,5);
 });
 
+test('test-only negative import fixtures do not block real runtime modules',()=>{
+ const after=new Map([['lib/core.mjs',B("export const x=1;")],
+  ['lib/core.test.mjs',B("import './intentionally-missing.mjs';")]]);
+ assert.equal(verifyWriterBImportAvailability({afterFiles:after,
+  existing:()=>false}).status,'PASS');
+});
+
 test('comments, fake string imports and interpolated templates do not add false Gate',()=>{
  const backtick=String.fromCharCode(96);
  const text="// import('./nonexistent.mjs')\n"+
