@@ -26,8 +26,10 @@ This draft PR adds a **one-time** generic Controller operation in source, but ha
   Adding a feature then updates the independently approved declarative registry
   and its trust pin, **not** `controller/operations.mjs` per-feature branches.
 - The registry can contain up to **128 named profiles**, but the receiver
-  inspects only **one to four** profiles sharing the exact approved source
-  identity. Other profiles are never traversed or returned. It uses fixed
+  inspects **1–4** profiles with detailed SHA/Task output; for **5–128**
+  profiles sharing the same approved source identity it returns bounded
+  `SUMMARY_ONLY` root existence/error summaries without scanning files or
+  querying Tasks. Other source identities are never traversed or returned. It uses fixed
   relative roots, selectors and task names, never scans recursively, and never returns raw
   file, environment, command, arguments, Task XML or configuration content.
 - **One shared A/B capability registry:** an entry may additionally have
@@ -101,10 +103,16 @@ Current A code is a read-only consumer and does not implement this B transaction
   basename/hour matches, enabled boolean, and XML SHA-256. It does not claim
   actual Task last-run status, installation PASS or any B-level permission.
 - Each file >8 MiB is marked `SIZE_LIMIT`, Task XML >256 KiB cannot be parsed,
-  registry >128 KiB is rejected, and nested selected output >20 KiB is rejected.
+  registry >128 KiB is rejected. A detailed output >20 KiB switches to
+  `SUMMARY_ONLY`; if even summary rows exceed the limit, it returns selected
+  count and summary SHA-256 without individual rows.
 - No source-identity match yields `BLOCKED/APPROVED_INVENTORY_SOURCE_UNREGISTERED`.
-  Five or more profiles matching one identity yields bounded
-  `BLOCKED/APPROVED_INVENTORY_SELECTION_TOO_LARGE`. This is an **explicit future scalability limit**, not a current feature blocker; before registering five or more on a shared SHA, implement approved bounded pagination/selection without changing the seven-field Issue contract. A source revision needs
+  Five or more profiles matching one identity no longer cause a global
+  blocker: they return `PASS/APPROVED_RUNTIME_REGISTRY_SUMMARY_ONLY` with
+  `fileHashesComplete:false`, `taskChecksComplete:false` and
+  `preimageEvidenceLevel:'ROOT_EXISTENCE_ONLY'`. A B writer must independently
+  validate exact preimages before mutation; A summaries are not B installation approval.
+  A single profile root error remains scoped to that profile. A source revision needs
   an exact new binding approved through B maintenance, but never a new
   per-feature Controller code branch or full Controller source installation.
 - The installed current `host.json` does **not** yet expose
