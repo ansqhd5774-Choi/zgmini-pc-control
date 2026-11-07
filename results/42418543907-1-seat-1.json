@@ -1,0 +1,191 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42418543907-1-seat-1",
+  "requestId": "pc-c35691d8-b6e5-4293-a8ef-19c7b9662756",
+  "startedAt": "2026-11-07T22:00:45.028Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "e2cb5d6ec57b1295df780953b6a830d23d275d5b",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "000aec713ea2ee63dc72d30149a84df81e5ef255",
+  "sourceBranch": "main",
+  "operation": "pc-source-preflight",
+  "seat": 1,
+  "status": "PASS",
+  "code": "PC_SOURCE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-c7da6a69-2539-48a6-8e01-1ba79a492fc7",
+  "pcOperationalApprovedSha": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "PC_SOURCE_READONLY_DIAGNOSIS",
+    "evidenceLevel": "STATIC_LAUNCHER_TRACE_ONLY",
+    "runtimeSourceVerified": false,
+    "coreTaskAction": {
+      "commandFile": "wscript.exe",
+      "scriptFiles": [
+        "run-original-then-archive.vbs"
+      ]
+    },
+    "tracedLaunchers": [
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c"
+      },
+      {
+        "path": "data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+        "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+        "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-core-r10.mjs",
+        "sha256": "e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/verified-checks-r10.mjs",
+        "sha256": "f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R31_SCOPED_PUBLICATION.mjs",
+        "sha256": "ffa71643748e79eedacf26b72880804cbab0edfb2eb32435da2346ec4bd0ad19"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R33_OBSERVE_PUBLISH_CYCLE.mjs",
+        "sha256": "7bd792d1ed84067846ca3ef0748b4a5eac8e5ba78feb18c9a3fcaf46b58ee58b"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R22_CHANGE_GATE.mjs",
+        "sha256": "f400fc1c74ad518e7d6bfec5bb40e3a356de9fc810c5e2976deb0f561e7aeab9"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R21_OBSERVATION_LEDGER.mjs",
+        "sha256": "c03ba882011160746ae441c8992fcbc2f89960207b1bf8590c32fb55da84b778"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R20_PROVISIONAL_SHADOW_READONLY.mjs",
+        "sha256": "1139c4863fd97099c3e3552f42814ecd2a8fee9e81f11740e33304311ef4d0a7"
+      }
+    ],
+    "sourceResolved": false,
+    "sourceRoot": null,
+    "sourceHead": null,
+    "trackedDirty": null,
+    "requiredFiles": [],
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "configApprovedSha": "9040e821cc813f1c31d09210268b8774bddc8cea",
+    "sourceHeadMatchesConfig": null,
+    "lastWriterEvidence": {
+      "evidenceLevel": "STORED_WRITER_RUNTIME_CHECKPOINT",
+      "sourceHead": "9040e821cc813f1c31d09210268b8774bddc8cea",
+      "at": "2026-11-07T21:55:09.217Z",
+      "status": "VERIFIED"
+    },
+    "historicalCheckoutCandidate": {
+      "evidenceLevel": "HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME",
+      "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+      "gitVerified": true,
+      "head": "9040e821cc813f1c31d09210268b8774bddc8cea",
+      "trackedDirty": false,
+      "matchesWriterCheckpoint": true,
+      "requiredFiles": [
+        {
+          "path": "scripts/pc-writer/local-cycle.mjs",
+          "exists": true,
+          "sha256": "bf884242b13d5f6b9f42d81acbfe88fccc8810011cf20e3244ef24d1941920c1"
+        },
+        {
+          "path": "scripts/pc-writer/run-local.mjs",
+          "exists": true,
+          "sha256": "9dc27a1501191018703bbd2fae52d5d7ab230b5ebcced9933617e3c2d227e3c7"
+        },
+        {
+          "path": "scripts/pc-writer/us-breadth-provisional-cycle.mjs",
+          "exists": true,
+          "sha256": "acaf0e46c532c49dc5a571718c2f91ddcd3dd57dbd0b50d1fb9ee350a7538cd1"
+        },
+        {
+          "path": "scripts/pc-writer/us-breadth-provisional-publication.mjs",
+          "exists": true,
+          "sha256": "1ea555e324b6c6b9226841ba05bb5ce41ca1865ab302c19eadc39e995c8d4d26"
+        },
+        {
+          "path": "scripts/pc-writer/quota-fetch.mjs",
+          "exists": true,
+          "sha256": "6be2406ee68524c561f911c61b8f9d62ca604ec96f34bdb9752d78346acc3c13"
+        },
+        {
+          "path": "lib/market-breadth/us-provisional-r1.mjs",
+          "exists": true,
+          "sha256": "08e8d31a969b43842a2a69051a716e30db57947c85560b538252fba004e4f2b2"
+        }
+      ],
+      "writerSourceInventory": {
+        "status": "PASS",
+        "code": "WRITER_SOURCE_INVENTORY_COMPLETE",
+        "complete": true,
+        "directory": "scripts/pc-writer",
+        "issues": [],
+        "totalBytes": 958298,
+        "filesCount": 146,
+        "filesSha256": "25620565c9760342a006af95d0165c3ef136cd10692dc6c2a166eedcfa9472fc",
+        "filesHashRepresentation": "COMPACT_JSON_UTF8",
+        "filesTransfer": "OMITTED_SUMMARY_ONLY"
+      },
+      "moduleSourceInventory": {
+        "status": "PASS",
+        "code": "WRITER_MODULE_INVENTORY_COMPLETE",
+        "complete": true,
+        "evidenceLevel": "CHECKOUT_FILESYSTEM_NOT_CORE_RUNTIME",
+        "directories": [
+          {
+            "path": "lib",
+            "present": true
+          },
+          {
+            "path": "worker",
+            "present": true
+          }
+        ],
+        "issues": [],
+        "totalBytes": 808369,
+        "filesCount": 148,
+        "filesSha256": "1585929d825577a61d0ef5cce291bb55686e239dc964df8ea47eaf388982f39f",
+        "filesHashRepresentation": "COMPACT_JSON_UTF8",
+        "filesTransfer": "OMITTED_SUMMARY_ONLY"
+      }
+    }
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "2abc728e734a7fe00bd9fc1773de0dfb95f8b07ed785fd20ea62a7998e74ebc4",
+  "protectedAfterSha256": "2abc728e734a7fe00bd9fc1773de0dfb95f8b07ed785fd20ea62a7998e74ebc4",
+  "actualExecutionSha": "e2cb5d6ec57b1295df780953b6a830d23d275d5b",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-07T22:00:50.480Z",
+  "durationMs": 5453,
+  "reportTransfer": {
+    "status": "SUMMARY_ONLY",
+    "reason": "SOURCE_INVENTORY_EXCEEDS_REPORT_BUDGET",
+    "fullReportSha256": "5ccd437d3102f0ec80d5129d1bd40fe89ec0b097d86ce905648953ac3f71cbd5",
+    "hashRepresentation": "COMPACT_JSON_UTF8",
+    "fullReportBytes": 48520,
+    "omittedFileEntries": 294,
+    "priorSummarized": false,
+    "originalStored": "PC_REQUEST_LEDGER",
+    "fullInventoryTransferVerified": false
+  }
+}
