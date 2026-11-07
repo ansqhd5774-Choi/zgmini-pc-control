@@ -104,7 +104,7 @@ The one-time enhancement does **not** authorize provider calls, database
 or D1 writes, Task creation/modification or arbitrary execution. It does
 not alter currently healthy Controller/Core/other features.
 
-Local tests: node --test theme-generic-b/*.test.mjs
+Repository tests: `node --test writer-b/approved-versioned-bundle/*.test.mjs`
 
 ## Distinct A inventory PIN / registry sidecar issue
 
