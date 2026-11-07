@@ -4,6 +4,7 @@
 // This is a testable protocol prototype, NOT a deployed/approved Receiver.
 import {createHash} from 'node:crypto';
 import {buildVersionedBundlePlan} from './versioned-bundle-plan.mjs';
+import {isWriterBRequestId} from './writer-b-request-id.mjs';
 
 const SHA64=/^[a-f0-9]{64}$/;
 const SHA40=/^[a-f0-9]{40}$/;
@@ -74,8 +75,7 @@ export async function runVersionedBundleTransaction({
    Object.keys(pinnedApproval).sort().join('|')===
    ['requestId','rawManifestSha256','approvalRef','sourceSha','profileId'].sort().join('|'),
    'B_PIN_FORMAT');
-  expect(typeof pinnedApproval.requestId==='string'&&
-   /^[a-zA-Z0-9_-]{12,128}$/.test(pinnedApproval.requestId)&&
+  expect(isWriterBRequestId(pinnedApproval.requestId)&&
    SHA64.test(pinnedApproval.rawManifestSha256)&&SHA40.test(pinnedApproval.sourceSha)&&
    typeof pinnedApproval.approvalRef==='string'&&
    /^[a-z0-9_.\/-]{10,200}$/i.test(pinnedApproval.approvalRef)&&
