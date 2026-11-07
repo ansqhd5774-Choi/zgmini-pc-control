@@ -45,7 +45,6 @@ export function applyApprovedInsertions(original,insertions){
   'WRITER_B_INSERT_MIXED_NEWLINE_STOP');
  need(crlf||!source.includes('\r'),'WRITER_B_INSERT_MIXED_NEWLINE_STOP');
  const newline=crlf?'\r\n':'\n';
- need(source.endsWith(newline),'WRITER_B_INSERT_PREIMAGE_NEWLINE_STOP');
  const lines=source.split(newline);
  const prepared=[];
  const positions=new Set();
@@ -54,6 +53,11 @@ export function applyApprovedInsertions(original,insertions){
   for(let i=0;i<lines.length;i++)if(lines[i]===op.anchor)matches.push(i);
   need(matches.length===1,'WRITER_B_INSERT_ANCHOR_MATCH_STOP');
   const index=matches[0];
+  // Windows PC source may legitimately omit its terminal newline. Inserting
+  // after its final unterminated line would change that original line, so
+  // reject only that placement rather than blocking the whole source.
+  need(source.endsWith(newline)||op.position!=='after'||index<lines.length-1,
+   'WRITER_B_INSERT_UNTERMINATED_EOF_APPEND_STOP');
   need(!positions.has(index),'WRITER_B_INSERT_ANCHOR_OVERLAP_STOP');
   positions.add(index);
   prepared.push({index:index+(op.position==='after'?1:0),
