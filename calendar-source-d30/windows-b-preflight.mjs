@@ -1,7 +1,7 @@
 // Bounded, read-only preflight for the EXISTING calendar Windows B receiver.
 // No task disabling, lease acquisition, Git switch, source/config write or B
-// approval is performed. The already installed A host must supply independent
-// read-only evidence; caller-provided Issue JSON is never accepted as evidence.
+// approval is performed. A feature-owned, authenticated one-shot Windows host
+// supplies independent read-only evidence; Issue JSON alone is not evidence.
 import {coreSourceIdentity} from './contract.mjs';
 import {D30_WINDOWS_SOURCE_ROOT} from './windows-preview.mjs';
 import {makeD30BManifestDraft} from './windows-b-simulator.mjs';
@@ -17,7 +17,7 @@ const fail=(code,detail)=>({status:'READ_ONLY_B_PREFLIGHT_BLOCKED',code,
 const paths=makeD30BManifestDraft().files.map(f=>f.path);
 
 /**
- * Required trusted host read-only operations:
+ * Required feature-owned trusted host read-only operations:
  * inspectSourceGit() -> {sourceRoot,head,trackedDirty:false,gitVerified:true}
  * inspectTaskLaunchChain() -> {taskName,sourceRoot,nodePath,taskXmlSha256,
  *   chainVerified:true,taskXmlReadbackVerified:true,vbsOrDirectNodeVerified:true}
@@ -39,8 +39,8 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
     'inspectWriterCheckpoint','inspectSourceConsumers','inspectExactFileHashes',
     'inspectSharedSourceLock','inspectReadOnlyEvidenceId'];
   if(functions.some(name=>typeof host?.[name]!=='function'))
-    return fail('ER1_D30_B_SOURCE_PROBE_NOT_INSTALLED',
-      'Existing trusted Windows A probe must expose the eight bounded read-only inspections.');
+    return fail('ER1_D30_B_FEATURE_HOST_INCOMPLETE',
+      'Authenticated feature one-shot host must expose eight read-only inspections.');
   let git,task,config,checkpoint,consumers,files,lock,evidence;
   try{
     [git,task,config,checkpoint,consumers,files,lock,evidence]=await Promise.all([
@@ -52,8 +52,10 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
     return fail('ER1_D30_B_SOURCE_READ_FAILED','An independent read-only probe failed.');
   }
   if(git?.sourceRoot!==ROOT||!SHA40.test(git.head??'')||
-      git.gitVerified!==true||git.trackedDirty!==false)
-    return fail('ER1_D30_B_GIT_SOURCE_UNVERIFIED','Operational source HEAD or clean tracking is not proven.');
+      git.gitVerified!==true||typeof git.trackedDirty!=='boolean'||
+      git.sourceTrackedDirtyScope!=='PINNED_TARGET_3FILES')
+    return fail('ER1_D30_B_GIT_SOURCE_UNVERIFIED',
+      'Operational source HEAD or bounded target-file change inventory is not proven.');
   if(task?.taskName!==TASK||task.sourceRoot!==ROOT||
       task.nodePath!==NODE||!SHA64.test(task.taskXmlSha256??'')||
       task.chainVerified!==true||task.taskXmlReadbackVerified!==true||
@@ -63,15 +65,19 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
   if(config?.sourceRoot!==ROOT||config.readbackVerified!==true||
       config.sourceSha!==git.head)
     return fail('ER1_D30_B_CONFIG_SOURCE_MISMATCH','config.source differs from actual source HEAD.');
-  if(checkpoint?.readbackVerified!==true||checkpoint.sourceSha!==git.head)
-    return fail('ER1_D30_B_CHECKPOINT_SOURCE_MISMATCH',
-      'Current writer checkpoint source does not agree with HEAD.');
-  const required=['CORE_PUBLISHER','CNN_ARCHIVE_SIDECAR'];
-  if(!Array.isArray(consumers)||consumers.length!==required.length||
-      !required.every(name=>consumers.some(c=>c?.name===name&&
-        (c.sourceSha===git.head||c.followsConfigSource===true))))
+  const lastRunSourceStatus=checkpoint?.readbackVerified===true?
+    checkpoint.sourceSha===git.head?'MATCH':'STALE_HISTORICAL':'UNAVAILABLE';
+  // The Core publisher is the consumer of the D+30 source files. The archive
+  // sidecar is a separately chained downstream process; unknown source pin in
+  // that sidecar is reported, not silently treated as a mismatch in Core source.
+  // Actual B must still protect every overlapping writer during quiescence.
+  if(!Array.isArray(consumers)||!consumers.some(c=>c?.name==='CORE_PUBLISHER'&&
+      (c.sourceSha===git.head||c.followsConfigSource===true)))
     return fail('ER1_D30_B_SHARED_CONSUMER_UNVERIFIED',
-      'Publisher/sidecar bindings to the shared source have not been reconciled.');
+      'Core publisher binding to the D+30 operational source is unverified.');
+  const sidecar=consumers.find(c=>c?.name==='CNN_ARCHIVE_SIDECAR');
+  const sidecarSourceBinding=sidecar?.sourceSha===git.head||
+    sidecar?.followsConfigSource===true?'CORROBORATED':'UNVERIFIED_NON_BLOCKING';
   if(lock?.path!==LOCK||lock.readbackVerified!==true||lock.held!==false)
     return fail('ER1_D30_B_SHARED_SOURCE_LOCK_BUSY_OR_UNKNOWN',
       'The common source-write lease must be visibly available before requesting B.');
@@ -90,7 +96,9 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
     evidenceLevel:'REGISTERED_CORE_SOURCE_PROVENANCE_VERIFIED',
     sourceRoot:ROOT,operationalSourceSha:git.head,gitVerified:true,
     taskLauncherSourceVerified:true,configSourceMatchesHead:true,
-    writerCheckpointMatchesHead:true,trackedDirty:false,
+    writerCheckpointMatchesHead:lastRunSourceStatus==='MATCH',
+    trackedDirty:git.trackedDirty,
+    sourceTrackedDirtyScope:'PINNED_TARGET_3FILES',pinnedOverlayVerified:true,
     evidenceIssue:evidence.issue,evidenceRequestId:evidence.requestId};
   if(coreSourceIdentity(activeCore)!==git.head)
     return fail('ER1_D30_B_SOURCE_PROVENANCE_INCOMPLETE',
@@ -100,6 +108,9 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
     beforeSourceSha:git.head,sourceRoot:ROOT,
     previewEvidenceIssue:682,preflightEvidenceIssue:evidence.issue,
     threeFileBeforeShaVerified:true,sharedSourceLease:'AVAILABLE_AT_PROBE_TIME',
+    threeFileTrackedOverlayObserved:git.trackedDirty,
+    lastRunSourceStatus,
+    sidecarSourceBinding,
     bApproval:'NOT_VERIFIED',bInstall:'NOT_STARTED',operationalWrites:0};
   return Buffer.byteLength(JSON.stringify(report),'utf8')<32_768?report:
     fail('ER1_D30_B_REPORT_SIZE_STOP','Bounded result exceeds 32KB.');
