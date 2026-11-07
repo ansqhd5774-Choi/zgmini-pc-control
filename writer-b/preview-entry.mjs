@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {previewWriterInsertions,validatePreviewSpec,sha256} from './insert-preview-readonly.mjs';
+import {summarizeCoreDrainProbe} from './core-drain-readonly.mjs';
 
 export const REQUEST_SCHEMA='ZGMINI_WRITER_B_INSERT_PREVIEW_REQUEST_V1';
 export const ISSUE_TITLE='pc-writer-insert-preview';
@@ -22,7 +23,9 @@ const BIN={
  git:[String.raw`C:\Program Files\Git\cmd\git.exe`,
       String.raw`C:\Program Files\Git\bin\git.exe`].find(fs.existsSync),
  schtasks:String.raw`C:\Windows\System32\schtasks.exe`,
+ cscript:String.raw`C:\Windows\System32\cscript.exe`,
 };
+const CORE_CYCLE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
 const run=(binary,args,{cwd}={})=>{
  need(binary&&fs.existsSync(binary),'WRITER_B_PREVIEW_EXECUTABLE_STOP');
  const r=spawnSync(binary,args,{cwd,encoding:null,windowsHide:true,shell:false,
@@ -106,8 +109,21 @@ function preview({event,env}){
   readTarget:(r,p)=>safeFile(r,p),
   taskXml:()=>run(BIN.schtasks,['/Query','/TN','ZGMINI-PC-Local-Core','/XML']),
  });
+ // A drain snapshot is diagnostic only: it cannot turn a safe insertion
+ // preview into a blocking gate or mutate the Core scheduler or lock.
+ let coreDrain={status:'UNAVAILABLE'};
+ try{
+  const probe=path.join(control,'r17-writer-b','r17-b-windows-probe.js');
+  const stat=fs.lstatSync(probe);
+  need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size<8192&&
+   normal(fs.realpathSync.native(probe))===normal(probe),
+   'WRITER_B_DRAIN_PROBE_SCOPE_STOP');
+  coreDrain=summarizeCoreDrainProbe(run(BIN.cscript,['//NoLogo',probe]),
+   fs.existsSync(CORE_CYCLE_LOCK));
+ }catch{}
  return {schema:'ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1',
-  requestId:req.requestId,chatId:req.chatId,issueNumber:event.issue.number,...result};
+  requestId:req.requestId,chatId:req.chatId,issueNumber:event.issue.number,
+  ...result,coreDrain};
 }
 function resultPath(env){
  need(/^\d{1,18}$/.test(env.GITHUB_RUN_ID??'')&&
