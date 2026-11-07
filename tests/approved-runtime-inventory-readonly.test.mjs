@@ -217,6 +217,15 @@ test('optional B metadata malformed/secret/unsafe fields are strictly rejected b
    {...validBundle('approvedTheme'),activeRecord:'token.json'},
    {...validBundle('approvedTheme'),maxBundleBytes:33*1024*1024},
    {...validBundle('approvedTheme'),privateKey:'NEVER_ALLOWED'},
+   {...validBundle('approvedTheme'),home:'E:\\ZGmini\\data\\pc-writer\\CON'},
+   {...validBundle('approvedTheme'),home:'E:\\ZGmini\\data\\pc-writer\\theme.'},
+   {...validBundle('approvedTheme'),taskName:'NUL'},
+   {...validBundle('approvedTheme'),taskName:'Theme Task.'},
+   {...validBundle('approvedTheme'),requiredLaunchers:['COM1.cmd']},
+   {...validBundle('approvedTheme'),requiredLaunchers:['THEME_SCHEDULED.cmd'],
+    optionalLaunchers:['theme_scheduled.CMD']},
+   {...validBundle('approvedTheme'),activeRecord:'LPT1.json'},
+   {...validBundle('approvedTheme'),activeRecord:'ACTIVE_RUNTIME.json.'},
   ];
   for(const bundleProfile of candidates){
    const manifest=Buffer.from(JSON.stringify({
@@ -229,5 +238,28 @@ test('optional B metadata malformed/secret/unsafe fields are strictly rejected b
     queryTask:()=>{called=true;return taskXml;}}),{code:/^INVENTORY_/});
    assert.equal(called,false);
   }
+ });
+});
+
+test('Windows device basenames and trailing dots denied across A roots, files and Tasks',async()=>{
+ await withTmp(async base=>{
+  const malicious=[
+   {...fixture(),rootSegments:['pc-writer','CON']},
+   {...fixture(),rootSegments:['pc-writer','con.']},
+   {...fixture(),rootSegments:['pc-writer','NUL']},
+   {...fixture(),rootSegments:['pc-writer','lPt9']},
+   {...fixture(),rootSegments:['pc-writer','runtime.']},
+   {...fixture(),files:[{key:'bad',relativePath:'COM1.cmd'}]},
+   {...fixture(),files:[{key:'bad',relativePath:'bin/AUX.json'}]},
+   {...fixture(),files:[{key:'bad',relativePath:'INSTALL_RESULT.json.'}]},
+   {...fixture(),directories:[{key:'bad',relativePath:'backup/PRN'}]},
+   {...fixture(),tasks:[{key:'task',name:'CON'}]},
+   {...fixture(),tasks:[{key:'task',name:'ZGMINI-PC-Task.'}]},
+   {...fixture(),tasks:[{key:'task',name:'ZGMINI-PC-Task',
+    expectedCommandBasename:'NUL.cmd'}]},
+  ];
+  for(const profile of malicious)
+   assert.throws(()=>inspectApprovedRuntimeInventory({dataRoot:base,profile}),
+    {code:/^INVENTORY_/});
  });
 });
