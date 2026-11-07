@@ -256,24 +256,28 @@ async function execute(f,driver){
   rawManifest:f.rawManifest,pinnedApproval:f.pinnedApproval,
   trustedProfiles:{[f.manifest.profileId]:bundleProfile},adapter});
 }
-test('approved common B bridge: stage immutable files, backup, CAS and readback',async()=>{
+test('legacy synthetic static booleans cannot authorize common B bridge writes',async()=>{
  const f=setup(),driver=makeBridge(f);
  const result=await execute(f,driver);
- assert.equal(result.status,'PASS',JSON.stringify(result));
- assert.deepEqual(driver.current.launcher,f.targetLauncher);
- assert.deepEqual(driver.current.marker,f.targetMarker);
- assert.ok(driver.current.promoted);
+ assert.equal(result.status,'BLOCKED',JSON.stringify(result));
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.deepEqual(driver.current.launcher,f.originalLauncher);
+ assert.deepEqual(driver.current.marker,f.originalMarker);
+ assert.equal(driver.current.promoted,false);
  assert.equal(driver.saved(),null);
  assert.equal(result.reportStatus,'JSON_TXT_2_OF_2');
  assert.ok(driver.steps.includes('shared-lock'));
- assert.ok(driver.steps.includes('cas-launcher'));
- assert.ok(driver.steps.includes('cas-active-record'));
+ assert.equal(driver.steps.includes('stage-file'),false);
+ assert.equal(driver.steps.includes('cas-launcher'),false);
+ assert.equal(driver.steps.includes('cas-active-record'),false);
 });
-test('second unrelated approved profile uses identical bridge/adapter source',async()=>{
+test('second unrelated profile also refuses synthetic static activation',async()=>{
  const f=setup('economic-series'),driver=makeBridge(f);
  const result=await execute(f,driver);
- assert.equal(result.status,'PASS',JSON.stringify(result));
+ assert.equal(result.status,'BLOCKED',JSON.stringify(result));
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
  assert.equal(result.profileId,'economic-series');
+ assert.equal(driver.steps.includes('cas-launcher'),false);
 });
 test('incomplete Windows bridge is a hard blocker before mutation',()=>{
  const f=setup();
@@ -304,48 +308,50 @@ test('untrusted registry raw PIN cannot unlock/activate',()=>{
  }),e=>e.code==='INVENTORY_MANIFEST_APPROVAL_MISMATCH');
  assert.equal(driver.steps.length,0);
 });
-test('pinned source blob drift blocks before backup/CAS',async()=>{
+test('static proof absence stops before potentially tampered source bytes are staged',async()=>{
  const f=setup(),driver=makeBridge(f,{sourceTampered:true});
  const result=await execute(f,driver);
  assert.equal(result.status,'BLOCKED');
- assert.equal(result.code,'B_WINDOWS_SOURCE_BYTES_DRIFT');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(driver.steps.includes('source-blob'),false);
  assert.equal(driver.steps.includes('backup'),false);
  assert.equal(driver.steps.includes('cas-launcher'),false);
  assert.deepEqual(driver.current.launcher,f.originalLauncher);
 });
-test('launcher CAS post-write fault restores exact original state in reverse order',async()=>{
+test('static strategy cannot reach injected launcher CAS fault without pinned evidence',async()=>{
  const f=setup(),driver=makeBridge(f,{failAt:'cas-launcher'});
  const result=await execute(f,driver);
  assert.equal(result.status,'BLOCKED');
- assert.equal(result.rollback,'VERIFIED');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(result.rollback,null);
  assert.deepEqual(driver.current.launcher,f.originalLauncher);
  assert.deepEqual(driver.current.marker,f.originalMarker);
- const registryIndex=driver.steps.indexOf('restore-active-record');
- const launcherIndex=driver.steps.indexOf('restore-launcher');
- assert.ok(registryIndex<launcherIndex);
+ assert.equal(driver.steps.includes('cas-launcher'),false);
+ assert.equal(driver.steps.includes('restore-active-record'),false);
 });
-test('Task XML readback drift cannot be passed off as successful rollback',async()=>{
+test('untrusted static attestation cannot reach post-activation Task XML drift',async()=>{
  const f=setup(),driver=makeBridge(f,{taskDrift:true});
  const result=await execute(f,driver);
- assert.equal(result.status,'STATE_UNKNOWN');
- assert.equal(result.code,'B_ROLLBACK_UNKNOWN');
- assert.equal(result.rollback,'UNVERIFIED');
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(result.rollback,null);
  assert.deepEqual(driver.current.launcher,f.originalLauncher);
- assert.ok(driver.saved()!==null);
+ assert.equal(driver.saved(),null);
 });
-test('prior exact immutable version can be reused without restaging',async()=>{
+test('exact immutable version cannot bypass missing static runtime proof',async()=>{
  const f=setup(),driver=makeBridge(f,{priorExact:true});
  const result=await execute(f,driver);
- assert.equal(result.status,'PASS');
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
  assert.equal(driver.steps.includes('stage-file'),false);
  assert.equal(driver.steps.includes('promote'),false);
- assert.ok(driver.steps.includes('cas-launcher'));
+ assert.equal(driver.steps.includes('cas-launcher'),false);
 });
-test('prior immutable version with hash drift never gets silently replaced',async()=>{
+test('corrupt immutable version remains untouched when static proof is missing',async()=>{
  const f=setup(),driver=makeBridge(f,{priorCorrupt:true});
  const result=await execute(f,driver);
  assert.equal(result.status,'BLOCKED');
- assert.equal(result.code,'B_WINDOWS_IMMUTABLE_REUSE_DRIFT');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
  assert.equal(driver.steps.includes('stage-file'),false);
  assert.equal(driver.steps.includes('cas-launcher'),false);
 });
@@ -362,7 +368,7 @@ test('unproven scheduler tick/launcher compatibility stops before any CAS',async
  const f=setup(),driver=makeBridge(f,{mixedRuntimeUnsafe:true});
  const result=await execute(f,driver);
  assert.equal(result.status,'BLOCKED');
- assert.equal(result.code,'B_WINDOWS_MIXED_RUNTIME_NOT_PROVEN');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
  assert.ok(driver.steps.includes('activation-compatibility'));
  assert.equal(driver.steps.includes('stage-file'),false);
  assert.equal(driver.steps.includes('backup'),false);
@@ -416,18 +422,15 @@ test('source with inconsistent lock cannot bypass external runtime proof using s
  assert.equal(result.code,'B_WINDOWS_COMPATIBILITY_EVIDENCE_REQUIRED');
  assert.equal(driver.steps.includes('stage-file'),false);
 });
-test('schedule tick after first CAS can leave external effects despite file rollback',async()=>{
- // The static dispatcher fixture proves only file-rollback boundaries.
- // Pinned-launcher mutations are independently blocked without runtime proof.
+test('even an injected scheduler tick/CAS fault cannot run before static proof',async()=>{
  const f=setup('configured-themes');
  const driver=makeBridge(f,{simulateTaskTick:true,failAt:'cas-launcher'});
  const result=await execute(f,driver);
  assert.equal(result.status,'BLOCKED',JSON.stringify(result));
- assert.equal(result.rollback,'VERIFIED');
+ assert.equal(result.code,'B_WINDOWS_STATIC_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(result.rollback,null);
  assert.deepEqual(driver.current.launcher,f.originalLauncher);
  assert.deepEqual(driver.current.marker,f.originalMarker);
- // The in-flight process launched the new immutable version. Writer-B can
- // restore files but cannot undo that process's DB/checkpoint effects.
- assert.equal(driver.externalEffects.length,1);
- assert.equal(driver.externalEffects[0].version,f.manifest.bundle.version);
+ assert.equal(driver.externalEffects.length,0);
+ assert.equal(driver.steps.includes('cas-launcher'),false);
 });
