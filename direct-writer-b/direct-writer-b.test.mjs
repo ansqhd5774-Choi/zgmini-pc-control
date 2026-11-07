@@ -5,7 +5,9 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {verifyOpenedOwnerIssue,approvalPathFor,authorizeApprovedRaw,
-  loadApprovedRaw,applyApprovedOnce,DIRECT_B_RESULT} from './run.mjs';
+  loadApprovedRaw,applyApprovedOnce,verifyPinnedSourceCheckout,
+  DIRECT_B_RESULT} from './run.mjs';
+import {approvedCandidateSource,appendCandidatePin} from './preflight.mjs';
 import {sanitizeDirectBReport,uploadDirectBReport} from './report.mjs';
 import {SCHEMA as BUNDLE_SCHEMA,SCOPE as BUNDLE_SCOPE}
   from '../writer-b/approved-versioned-bundle/versioned-bundle-plan.mjs';
@@ -248,6 +250,27 @@ test('configured repeat B has distinct fixed approval profile and pinned preimag
   ]){
     const m=configuredApproval();modify(m);
     assert.throws(()=>configuredFixture(m),/DIRECT_B_EFFECT_SCOPE_STOP/);
+  }
+});
+
+test('configured repeat B preflight emits exact approved feature SHA',()=>{
+  const f=configuredFixture();
+  assert.deepEqual(approvedCandidateSource(f.auth),{
+    repository:'ansqhd5774-Choi/zgmini',sourceSha});
+  const writes=[];
+  const output=appendCandidatePin(f.auth,{outputFile:'/tmp/approved-runtime-b-output',
+    append:(file,bytes)=>writes.push({file,bytes})});
+  assert.equal(output.sourceSha,sourceSha);
+  assert.deepEqual(writes,[{file:'/tmp/approved-runtime-b-output',
+    bytes:`candidateSourceSha=${sourceSha}\n`}]);
+});
+
+test('all B variants independently recheck candidate Git HEAD before effect',()=>{
+  for(const f of [fixture('pin'),fixture('bundle'),configuredFixture()]){
+    assert.equal(verifyPinnedSourceCheckout(f.auth,{sourceRoot:'/approved',
+      gitHead:()=>sourceSha}).sourceSha,sourceSha);
+    assert.throws(()=>verifyPinnedSourceCheckout(f.auth,{sourceRoot:'/approved',
+      gitHead:()=>('f'.repeat(40))}),/DIRECT_B_CANDIDATE_SOURCE_DRIFT/);
   }
 });
 test('configured B routes exact pinned manifest into existing dispatcher',async()=>{
