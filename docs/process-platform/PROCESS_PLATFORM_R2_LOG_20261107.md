@@ -387,3 +387,10 @@
 - **M4 준비물 생성:** [PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md](PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md) 전용 총괄 브랜치 원격 생성·본문 재조회 일치, commit `2736aa2ecc38510ab9a05669b173bfeac44ff164`. 공통 A/B 사용계약, 실제 #651/#654/#646/#657 증거, 사용자 승인 M1 provenance 경계, #662 현재 Actions 결과 STATE_UNKNOWN, Preview→Catalog/Worker 후보 SHA·범위를 구분하여 1회 인계 자료로 압축함.
 - **업무 보호:** 원담당의 기능 게시·Writer B 후속 설치를 총괄이 대리하지 않았으며, GitHub 초안 생성은 대화 전달·수신 ACK가 아님. 아직 실제 owner 수신/다음 실행 확인 없음. 사용자 이전 지시에 따라 준비되지 않은 사항을 완료로 주장하지 않음.
 - **공식 진행률:** M0–M3 80% 유지, M4 `PREPARED_NOT_DELIVERED`. #662 원래 요청의 runId/상태는 여전히 조회 미확인; 허가 없이 재실행·Workflow 트리거 변경·기능 원장 쓰기 없음.
+
+## 2026-11-07 — M4 기능 원담당 PR 인계 게시(실제 대화 ACK 대기), 공식 80%
+
+- **LAST PASS:** [물가지표 PR #981](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295)에 R2 공통 A/B 최신 3파일 Windows 실설치 PASS·운영 provenance·보호/실패 회귀, Preview 기능 후속과 #662 STATE_UNKNOWN 경계를 명시한 인계 댓글 게시. 원격 PR 재조회에서 정확한 댓글 ID `6707683295`/본문 확인. 과거 동일 PR 댓글의 소스 준비·설치 대기 상태를 현재 증거로 최신화.
+- **공식 인계 상태:** [최신 OWNER HANDOFF](PROCESS_PLATFORM_R2_OWNER_HANDOFF_20261107.md) `PUBLISHED_OWNER_ACK_PENDING`. GitHub PR 댓글은 수신용 게시판에 남긴 기록일 뿐 다른 ChatGPT 대화의 실제 전달·확인 응답이 아니다. M4 체크박스 미완료, R2 M0–M3 **80% 유지**.
+- **실제 남은 한 행동:** 원담당 대화 `물가지표-fix/economic12-inflation-legacy4-r35-20261021-3`가 이 정본을 열람하고 공통 A/B 수신 및 자체 기능의 다음 단일 필수 실행을 회신 → 총괄이 원장에 OWNER_RECEIVED 기록. #662 Actions Run ID는 별도 읽기 전용 분류 대상으로 남김.
+- **보호:** PR #981 소스·승인 manifest·PC Controller/Writer/예약/DB/D1/Cloudflare 변경 없음. 신규 PC Issue·재실행 없음.
