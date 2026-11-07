@@ -11,7 +11,8 @@ const files=Object.fromEntries(makeD30BManifestDraft().files.map(f=>
   [f.path,f.beforeSha256]));
 function fixture(){
   const values={
-    git:{sourceRoot:ROOT,head:HEAD,trackedDirty:false,gitVerified:true},
+    git:{sourceRoot:ROOT,head:HEAD,trackedDirty:false,
+      sourceTrackedDirtyScope:'PINNED_TARGET_3FILES',gitVerified:true},
     task:{taskName:'ZGMINI-PC-Local-Core',sourceRoot:ROOT,
       nodePath:'E:\\ZGmini\\runtime\\node.exe',taskXmlSha256:'b'.repeat(64),
       chainVerified:true,taskXmlReadbackVerified:true,vbsOrDirectNodeVerified:true},
@@ -55,6 +56,40 @@ test('config.source mismatch stops without mutating source',async()=>{
   assert.equal(r.operationalWrites,0);
 });
 
+test('historical last-run checkpoint may be stale without blocking registered source',async()=>{
+  const {host,values}=fixture();values.checkpoint.sourceSha='d'.repeat(40);
+  const r=await inspectD30WindowsBReadOnlyPreflight({host});
+  assert.equal(r.status,'READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED');
+  assert.equal(r.lastRunSourceStatus,'STALE_HISTORICAL');
+  assert.equal(r.bInstall,'NOT_STARTED');
+});
+
+test('unknown sidecar source is advisory while corroborated Core publisher can pass',async()=>{
+  const {host,values}=fixture();
+  values.consumers[1]={name:'CNN_ARCHIVE_SIDECAR',sourceSha:null,
+    followsConfigSource:false,archiveWrapperObserved:true};
+  const r=await inspectD30WindowsBReadOnlyPreflight({host});
+  assert.equal(r.status,'READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED');
+  assert.equal(r.sidecarSourceBinding,'UNVERIFIED_NON_BLOCKING');
+  assert.equal(r.bApproval,'NOT_VERIFIED');
+  assert.equal(r.bInstall,'NOT_STARTED');
+});
+
+test('unverified Core publisher still blocks regardless of sidecar',async()=>{
+  const {host,values}=fixture();
+  values.consumers[0]={name:'CORE_PUBLISHER',sourceSha:null};
+  const r=await inspectD30WindowsBReadOnlyPreflight({host});
+  assert.equal(r.code,'ER1_D30_B_SHARED_CONSUMER_UNVERIFIED');
+});
+
+test('approved three-file PC overlay passes exact SHA provenance without global clean gate',async()=>{
+  const {host,values}=fixture();values.git.trackedDirty=true;
+  const r=await inspectD30WindowsBReadOnlyPreflight({host});
+  assert.equal(r.status,'READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED');
+  assert.equal(r.threeFileTrackedOverlayObserved,true);
+  assert.equal(r.threeFileBeforeShaVerified,true);
+});
+
 test('Task XML to VBS/Node launcher chain unresolved does not fake provenance',async()=>{
   const {host,values}=fixture();values.task.vbsOrDirectNodeVerified=false;
   const r=await inspectD30WindowsBReadOnlyPreflight({host});
@@ -75,8 +110,8 @@ test('occupied common source-write lock stops; no global Runner idle gate',async
   assert.equal(r.code,'ER1_D30_B_SHARED_SOURCE_LOCK_BUSY_OR_UNKNOWN');
 });
 
-test('unavailable installed A host operation is explicit infrastructure gap',async()=>{
+test('unavailable feature-owned one-shot host method is an explicit integration gap',async()=>{
   const {host}=fixture();delete host.inspectTaskLaunchChain;
   const r=await inspectD30WindowsBReadOnlyPreflight({host});
-  assert.equal(r.code,'ER1_D30_B_SOURCE_PROBE_NOT_INSTALLED');
+  assert.equal(r.code,'ER1_D30_B_FEATURE_HOST_INCOMPLETE');
 });
