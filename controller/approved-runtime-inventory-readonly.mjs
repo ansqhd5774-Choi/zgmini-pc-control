@@ -11,7 +11,7 @@ const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_TASK_BYTES = 256 * 1024;
 const MAX_MANIFEST_BYTES = 128 * 1024;
 const MAX_REGISTERED_PROFILES = 128;
-const MAX_SELECTED_PROFILES = 4;
+const MAX_DETAILED_PROFILES = 4;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$/;
 const SAFE_KEY = /^[A-Za-z][A-Za-z0-9_-]{0,47}$/;
 const SAFE_TASK_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,95}$/;
@@ -293,9 +293,39 @@ export function selectPinnedCapabilityProfiles({manifestBytes,
   profile.binding.sourceBranch===requestIdentity.sourceBranch &&
   profile.binding.sourceSha===requestIdentity.sourceSha);
  if(approved.length===0)fail('INVENTORY_SOURCE_UNREGISTERED');
- if(approved.length>MAX_SELECTED_PROFILES)fail('INVENTORY_PROFILE_SELECTION_OVERSIZED');
  return {registrySha256:manifestHash,registeredCount:manifest.profiles.length,
   approvedProfiles:approved};
+}
+
+const safeFailureCode=error=>typeof error?.code==='string'&&
+ /^INVENTORY_[A-Z0-9_]{2,80}$/.test(error.code)?error.code:'INVENTORY_READ_UNAVAILABLE';
+function rootSummary(profile,dataRoot){
+ try{
+  const root=safeRoot(dataRoot,profile.rootSegments);
+  return {profileId:profile.id,status:root.exists?'ROOT_PRESENT':'ROOT_ABSENT',
+   rootExists:root.exists};
+ }catch(error){
+  return {profileId:profile.id,status:'BLOCKED',rootExists:null,
+   code:safeFailureCode(error)};
+ }
+}
+function summaryOnly(approved,dataRoot,registry){
+ const profiles=approved.map(profile=>rootSummary(profile,dataRoot));
+ const blockedProfiles=profiles.filter(x=>x.status==='BLOCKED').length;
+ const result={status:'DONE',code:'APPROVED_RUNTIME_REGISTRY_SUMMARY_ONLY',
+  registrySha256:registry.registrySha256,registeredCount:registry.registeredCount,
+  selectedCount:approved.length,mode:'SUMMARY_ONLY',
+  preimageEvidenceLevel:'ROOT_EXISTENCE_ONLY',fileHashesComplete:false,
+  taskChecksComplete:false,blockedProfiles,profiles,
+  operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false};
+ if(Buffer.byteLength(JSON.stringify(result),'utf8')>MAX_REPORT_BYTES){
+  // Every approved profile is accounted for by count+fingerprint, but no
+  // individual detail is falsely claimed to have been remotely transferred.
+  result.summarySha256=sha(Buffer.from(JSON.stringify(profiles)));
+  result.profileRowsOmitted=true;
+  result.profiles=[];
+ }
+ return result;
 }
 
 /**
@@ -308,13 +338,24 @@ export function inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes
  approvedManifestSha256,requestIdentity}={}){
  const selected=selectPinnedCapabilityProfiles({manifestBytes,
   approvedManifestSha256,requestIdentity});
- const profiles=selected.approvedProfiles.map(profile=>
-  inspectApprovedRuntimeInventory({dataRoot,profile,queryTask}));
- const result={status:'DONE',code:'APPROVED_RUNTIME_REGISTRY_READONLY',
+ if(selected.approvedProfiles.length>MAX_DETAILED_PROFILES)
+  return summaryOnly(selected.approvedProfiles,dataRoot,selected);
+ const profiles=selected.approvedProfiles.map(profile=>{
+  try{return inspectApprovedRuntimeInventory({dataRoot,profile,queryTask});}
+  catch(error){return {profileId:profile.id,status:'BLOCKED',
+   code:safeFailureCode(error),writes:0,collectorRuns:0,d1Writes:0,
+   dbOpens:0,installationPerformed:false};}
+ });
+ const blockedProfiles=profiles.filter(x=>x.status==='BLOCKED').length;
+ const result={status:'DONE',code:blockedProfiles===0?
+  'APPROVED_RUNTIME_REGISTRY_READONLY':'APPROVED_RUNTIME_REGISTRY_PARTIAL_READONLY',
   registrySha256:selected.registrySha256,registeredCount:selected.registeredCount,
-  selectedCount:profiles.length,profiles,
+  selectedCount:profiles.length,mode:'DETAILED',
+  preimageEvidenceLevel:'FILES_AND_TASK_METADATA',
+  fileHashesComplete:blockedProfiles===0,taskChecksComplete:blockedProfiles===0,
+  blockedProfiles,profiles,
   operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(Buffer.byteLength(JSON.stringify(result),'utf8')>MAX_REPORT_BYTES)
-  fail('INVENTORY_REPORT_OVERSIZED');
+  return summaryOnly(selected.approvedProfiles,dataRoot,selected);
  return result;
 }
