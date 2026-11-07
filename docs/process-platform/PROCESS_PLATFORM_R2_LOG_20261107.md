@@ -6,7 +6,7 @@
 - 전용 브랜치: codex/controller-ops-lessons-20261105
 - R1 완료 기록: #526 / R1 M0–M4 100% 보존
 - 기준: 단계마다 20%, **증명되지 않은 운영 상태를 점수에 반영하지 않음**
-- **현재 진행률: 40% (M0·M1 DONE, M2 후속 진행·M3 독립 회귀 PASS·M4 인계 미완료)**
+- **현재 진행률: 80% (M0–M3 DONE, M4 실제 원담당 수신·인계 미완료)**
 
 ## 최신 상태
 
@@ -14,8 +14,8 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | DONE — 사용자 승인 운영 Writer provenance | 40% | #651 실PC Writer B 3파일 설치·#654 HEAD=config=자연 checkpoint d50ba263/3파일 hash/clean PASS·#661 Task XML 보호 확인. 정확한 Task→PID 인과는 별도 STATE_UNKNOWN; #662 신규 의존 모듈은 M2 후속 |
-| M2 공통 Writer B | RUNNING (기존 정상 B PASS, 후속 후보 안전 시뮬레이션 PASS) | 40% 유지 | #651 실제 3파일 설치·#657 import 누락 STOP, preview+catalog+worker 후보 가상 B 계약 PASS. #662 PC lib/worker 존재·before SHA 없이는 새 APPROVED_B 확정/적용 금지 |
-| M3 실패·정상 회귀 | 독립 시나리오 5/5 PASS (M4 인계와 별개) | 40% 유지 | 현행 main 원문 8파일 Git blob 일치·집중 Node 40/40 PASS, 실PC #651 정상 B·#646 원복·#657 의존성 STOP 증거. 정확한 Task→PID 인과 미확인은 별도 보존하며 후속 M4 인계는 미완료 |
+| M2 공통 Writer B | DONE — 원래 승인 Writer 3파일 실PC 정규 B 설치/보호 확인 | 60% | #651 3파일 설치·#652/#654 PC A 사후 검증·#646 원복. #657 추가 Preview 의존성 STOP은 기능 후속이며 공통 B 안전 보호 성공; #662 새 module 인벤토리는 별도 추적 |
+| M3 실패·정상 회귀 | DONE — 독립 시나리오 5/5 PASS | 80% | main 원문 Git blob 8/8·Node 40/40 PASS, Windows #651 정상·#646 복구·#657 안전 STOP. 실제 Task PID 인과의 미확인은 M1 승인 경계로 기록, 기능 게시·원담당 인계는 M4와 별개 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -373,3 +373,11 @@
 - **완료 범위:** M1 목표 기존 Writer 3파일 읽기 전용 A/운영 source 정합성 **DONE — `CORROBORATED_OPERATIONAL_WRITER_PROVENANCE`**. 이것은 `runtimeSourceVerified=true`로 바뀐 것이 아니고, 예약 Task→실행 PID 인과·물가지표 19개 공개 게시 성공·신규 lib/worker 실제 설치는 주장하지 않음. #662는 원래 M1 3파일 외 후속 M2 의존성 조사로 계속 추적.
 - **단계 업데이트:** R2 M0 20% + M1 20% = **누적 공식 40%**. M2 새 Preview·Catalog·Worker 승인 manifest는 #662 실제 PC 조회 전 확정하지 않음. M3 독립 회귀 5/5 PASS 유지, M4 원담당 실제 수신·공통 경로 인계 미완료. PC 쓰기/새 예약/Issue 재생 0.
 - **NEXT:** 동일 #662의 Actions runId/상태 확보 → 실제 PC `moduleSourceInventory` 존재·SHA 확인 → 최소 Writer B manifest 사전 구성 및 원담당 역할의 후속 적용 조정. 안정적 증거를 택했더라도 #662 실행·업로드 장애를 숨기거나 실패로 단정하지 않는다.
+
+## 2026-11-07 — M2/M3 완료 범위 정합성 판정, R2 공식 80%
+
+- **독립 리뷰 및 원문 계약 확인:** R2 PLAN §1·§3 M2는 공통 Writer B 수신기가 PR #981의 정해진 `run-local.mjs` 수정 1 + 자동 게시기 신규 1 + 테스트 신규 1의 **원래 3파일**을 실제 PC에 안전하게 적용하는 단계. 승인 실제 설치 [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651) `WRITER_B_INSTALLED_VERIFIED` + [#652](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/652)/[#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654) A 사후 HEAD/config/3파일 SHA/dirty 대조로 충족. #646 자연 drain 원복과 #657 미승인 import preflight STOP는 보호 계약이 동작한 실제 증거.
+- **확장 경계:** 기존 `run-local.mjs`에는 승인 Inflation19 hook가 있으나 `inflation-causal-public-auto-publication-r1.mjs`는 별도 preview/worker를 동적 import하며 missing 시 해당 출력 실패가 `report.failures`에 기록될 수 있음. **#657 Preview→Catalog·Worker 누락은 Inflation19 기능 게시 미완료이지만, 공통 B 수신기의 #651 정상 설치를 취소하지 않음.** 기능 원담당이 #662 실제 PC inventory 확보 후 필요한 승인 파일을 작성·공통 B 경로로 완료할 후속 업무. 공통 프로세스 총괄이 기능 게시를 대리하지 않음.
+- **M2 DONE:** 정확한 한 Writer B manifest 3파일, 원본 보호·단일 lock·CAS·실PC 정상 1건·복구/거부 2건 확인. 기능별 신규 B Receiver/CMD/예약 0. 누적 60%.
+- **M3 DONE:** M3 요구 정상1/실패4 시나리오 각각 source fixture·집중 테스트 통과(총 40/40 Node PASS, 원격 Git blob 8/8 일치); 실PC #651 정상·#646 원복·#657 안전 거부로 결과의 실제 경계 교차. 누적 80%.
+- **잔여 M4:** 원담당에게 공통 A/B 실행 계약·기존 성과·남은 기능 의존성 경계·#662 `STATE_UNKNOWN` 처리법을 전달하고, **원담당 대화가 실제로 수신·재개**했는지 확인해야 100%. 이전 사용자 지시대로 총괄 점검이 완료되기 전 임의로 일을 넘기지 않음. 새 PC/Issue/예약 작업 0, 기능 게시 성공 주장 없음.
