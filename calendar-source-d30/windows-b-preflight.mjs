@@ -56,18 +56,31 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
       git.sourceTrackedDirtyScope!=='PINNED_TARGET_3FILES')
     return fail('ER1_D30_B_GIT_SOURCE_UNVERIFIED',
       'Operational source HEAD or bounded target-file change inventory is not proven.');
+  if(config?.sourceRoot!==ROOT||config.readbackVerified!==true||
+      config.sourceSha!==git.head)
+    return fail('ER1_D30_B_CONFIG_SOURCE_MISMATCH','config.source differs from actual source HEAD.');
+  const draft=makeD30BManifestDraft();
+  if(!files||typeof files!=='object'||Array.isArray(files)||
+      Object.keys(files).sort().join('|')!==[...paths].sort().join('|')||
+      draft.files.some(f=>files[f.path]!==f.beforeSha256))
+    return fail('ER1_D30_B_PREVIEW_BEFORE_SHA_DRIFT',
+      'One of the exact three PC files differs from verified #682 preimage.');
+  // Independent registered checkout/config/bytes observation. This is useful
+  // for a B manifest, but DOES NOT prove which source the dynamic VBS ran.
+  const registered={registeredConfigurationStatus:'REGISTERED_CONFIGURATION_OBSERVED_NOT_RUNTIME',
+    registeredBeforeSourceSha:git.head,registeredExactThreePreimages:true,
+    registeredTaskXmlMatchesHistoricB:
+      task?.taskXmlSha256==='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028'};
   if(task?.taskName!==TASK||task.sourceRoot!==ROOT||
       task.nodePath!==NODE||!SHA64.test(task.taskXmlSha256??'')||
       task.chainVerified!==true||task.taskXmlReadbackVerified!==true||
       task.vbsOrDirectNodeVerified!==true)
     return {...fail('ER1_D30_B_TASK_CHAIN_UNRESOLVED',
       'Task XML to VBS/direct Node to fixed E: source has not been proven.'),
+      ...registered,
       // Fixed internal enum only. Never print raw VBS, Task XML or arguments.
       taskChainReason:/^ER1_D30_B_[A-Z0-9_]{3,64}$/.test(task?.reason??'')?
         task.reason:'ER1_D30_B_TASK_CHAIN_REASON_UNAVAILABLE'};
-  if(config?.sourceRoot!==ROOT||config.readbackVerified!==true||
-      config.sourceSha!==git.head)
-    return fail('ER1_D30_B_CONFIG_SOURCE_MISMATCH','config.source differs from actual source HEAD.');
   const lastRunSourceStatus=checkpoint?.readbackVerified===true?
     checkpoint.sourceSha===git.head?'MATCH':'STALE_HISTORICAL':'UNAVAILABLE';
   // The Core publisher is the consumer of the D+30 source files. The archive
@@ -84,12 +97,6 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
   if(lock?.path!==LOCK||lock.readbackVerified!==true||lock.held!==false)
     return fail('ER1_D30_B_SHARED_SOURCE_LOCK_BUSY_OR_UNKNOWN',
       'The common source-write lease must be visibly available before requesting B.');
-  const draft=makeD30BManifestDraft();
-  if(!files||typeof files!=='object'||Array.isArray(files)||
-      Object.keys(files).sort().join('|')!==[...paths].sort().join('|')||
-      draft.files.some(f=>files[f.path]!==f.beforeSha256))
-    return fail('ER1_D30_B_PREVIEW_BEFORE_SHA_DRIFT',
-      'One of the exact three PC files differs from verified #682 preimage.');
   if(!Number.isSafeInteger(evidence?.issue)||evidence.issue<=0||
       !String(evidence.requestId||'').trim())
     return fail('ER1_D30_B_EVIDENCE_ID_MISSING','Trusted A probe request identity is missing.');
@@ -108,6 +115,7 @@ export async function inspectD30WindowsBReadOnlyPreflight({host}={}){
       'The corroborated source origin did not meet the shared D30 contract.');
   const report={status:'READ_ONLY_B_PREFLIGHT_SOURCE_VERIFIED',
     sourceProvenance:'REGISTERED_CORE_SOURCE_PROVENANCE_VERIFIED',
+    ...registered,
     beforeSourceSha:git.head,sourceRoot:ROOT,
     previewEvidenceIssue:682,preflightEvidenceIssue:evidence.issue,
     threeFileBeforeShaVerified:true,sharedSourceLease:'AVAILABLE_AT_PROBE_TIME',
