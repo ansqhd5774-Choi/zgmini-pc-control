@@ -1,0 +1,273 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42416928270-1-seat-5",
+  "requestId": "pc-237b6195-7f6f-41c1-9e5c-4c61c6822d70",
+  "startedAt": "2026-11-07T21:40:05.488Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "e2cb5d6ec57b1295df780953b6a830d23d275d5b",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+  "sourceBranch": "codex/employment-1y-reader-r1",
+  "operation": "employment-r6-candidate-stage-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-dc7bc5d5-384d-411f-ae03-759807969af2",
+  "memoryAdmission": {
+    "admitted": true,
+    "minimumFreeMiB": 1536,
+    "firstFreeMiB": 3102,
+    "freeMiB": 3102,
+    "minObservedMiB": 3102,
+    "samples": 1,
+    "waitedMs": 0.016899999999992588
+  },
+  "pcOperationalApprovedSha": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+    "actualExecutionSha": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+    "sourceBundleSha": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+    "sqliteOpened": true,
+    "summary": {
+      "sourceFeatures": 29,
+      "recentlyObservedFeatures": 23,
+      "chartReadyFeatures": 21,
+      "chartPartialFeatures": 5,
+      "scoredFeatures": 2,
+      "recentlyScoredFeatures": 2
+    },
+    "pit": {
+      "coreCurrentRows": 7695,
+      "coreHistoryRevisions": 5680,
+      "coreCurrentKeys": 7695,
+      "coreCurrentKeysMissingHistory": 2880,
+      "missingKeysWithCandidateHistory": 2625,
+      "missingKeysWithMatchingCandidateValueAndHash": 2625,
+      "candidateCurrentKeys": 3700,
+      "candidateNewKeys": 640,
+      "candidateOverlapMatchingKeys": 3058,
+      "candidateOverlapConflictingKeys": 2,
+      "candidateOverlapUnverifiedKeys": 0,
+      "candidateNewKeysWithConsistentPITMetadata": 640,
+      "candidateNewKeysWithIncompletePITMetadata": 0,
+      "coreMissingHistoryKeysWithConsistentCandidateMetadata": 2625,
+      "coreMissingHistoryKeysWithoutConsistentCandidateMetadata": 255,
+      "candidateReconciliationPreviewStatus": "HOLD_CONFLICTING_REVISIONS"
+    },
+    "indicators": [
+      {
+        "id": "U3_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "U6_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "LFPR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "EPOP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "PAYEMS_MOM",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "PAYEMS_3M_AVG",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "PAYEMS_ACCEL",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "AVG_WEEKLY_HOURS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "TEMP_HELP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "INITIAL_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "INITIAL_CLAIMS_4W",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "CONTINUED_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "IUR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "STATE_CLAIMS_BREADTH",
+        "rawStatus": "READY",
+        "chartStatus": "UNAVAILABLE",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "JOLTS_OPENINGS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "JOLTS_HIRES_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "JOLTS_QUITS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "JOLTS_LAYOFFS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "AHE_YOY",
+        "rawStatus": "READY",
+        "chartStatus": "UNAVAILABLE",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "ECI_12M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "INDUSTRY_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "STATE_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "MSA_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_GAINS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "BED_GROSS_LOSSES_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "BED_NET_GROSS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "BED_SMALL_FIRM_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "BED_STATE_BREADTH",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "BED_BIRTH_DEATH_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "UNAVAILABLE",
+        "scoreStatus": "PARTIAL_HISTORY"
+      }
+    ],
+    "bodyDigest": "8134a5c96a3df4ac1a06d32c2cab20585ad376d3fe4f8610f5b80807e46bc088",
+    "walPreflight": {
+      "coreWalMode": true,
+      "candidateWalMode": false,
+      "coreWalSidecarsPreexisting": true,
+      "candidateWalSidecarsPreexisting": false
+    },
+    "promotionApproved": false,
+    "memoryTelemetry": {
+      "kind": "SYSTEM_RAM_SAMPLED_DURING_R6_CHILD_V1",
+      "intervalMs": 100,
+      "samples": 61,
+      "totalMiB": 16122,
+      "baselineFreeMiB": 2998,
+      "minimumFreeMiB": 2806,
+      "peakSystemUsedMiB": 13316,
+      "peakIncreaseFromBaselineMiB": 192,
+      "calculationPeakValid": true,
+      "measurementPhase": "COMPUTATION"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "2abc728e734a7fe00bd9fc1773de0dfb95f8b07ed785fd20ea62a7998e74ebc4",
+  "protectedAfterSha256": "2abc728e734a7fe00bd9fc1773de0dfb95f8b07ed785fd20ea62a7998e74ebc4",
+  "actualExecutionSha": "afdd8fab1c03b321e4b8b0853bb236c0800a0a14",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-07T21:40:15.545Z",
+  "durationMs": 10057
+}
