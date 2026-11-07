@@ -16,6 +16,7 @@ const WRITER_STATES=new Set(['READBACK_VERIFIED','ALREADY_STORED',
 const COLLECTOR_STATES=new Set(['SAVED_READBACK','STORED','UNCHANGED',
  'UNCHANGED_VALID_INPUT_PRESERVED','UNCHANGED_WAITING_NEXT_DUE']);
 const TOP_LEVEL_STATES=new Set(['COMPLETE','VERIFIED','VERIFIED_WITH_GAPS',
+ 'COMPLETE_WITH_COLLECTION_GAPS','PUBLICATION_NOT_VERIFIED',
  'FAILED','DRY_RUN_PASS','DRY_RUN_PARTIAL','PARTIAL','STOP']);
 const REPORTS=Object.freeze([
  ['cycle',['local-cycle-last-run.json'],131072],
@@ -41,6 +42,9 @@ const observationDate=x=>typeof x==='string'&&/^20\d\d-\d\d(?:-\d\d)?$/.test(x)&
  new Date(x.length===7?x+'-01T00:00:00.000Z':x+'T00:00:00.000Z').toISOString().slice(0,x.length)===x?x:null;
 const allow=(set,x)=>set.has(x)?x:'UNREPORTED';
 const errorCode=x=>typeof x==='string'&&/^INFL19_[A-Z0-9_]{1,90}$/.test(x)&&
+ !/(TOKEN|SECRET|PASSWORD|AUTH|KEY|URL|CREDENTIAL)/.test(x)?x:'UNREPORTED';
+const publishCode=x=>typeof x==='string'&&
+ (/^(?:INFL19|INFLATION_CAUSAL)_[A-Z0-9_]{1,90}$/.test(x)||x==='OUTPUT_STAGE_FAILED')&&
  !/(TOKEN|SECRET|PASSWORD|AUTH|KEY|URL|CREDENTIAL)/.test(x)?x:'UNREPORTED';
 const version=x=>typeof x==='string'&&/^INFL19_PRESENTATION_[a-f0-9]{64}$/.test(x)?x:null;
 
@@ -96,6 +100,8 @@ function cycleState(file){
  return {availability:'PRESENT',modifiedAt:file.modifiedAt,
   cycleStatus:allow(TOP_LEVEL_STATES,file.data.status),
   cycleAt:instant(file.data.at),
+  collectionExit:integer(file.data.collectionExit),
+  publicationExit:integer(file.data.publicationExit),
   status:allow(CYCLE_STATES,raw.status),providerRequests:integer(raw.providerRequests),
   byGroup};
 }
@@ -117,14 +123,18 @@ function checkpointState(file){
 
 function writerState(file){
  if(file.availability!=='PRESENT')return {availability:file.availability};
+ const failed=Array.isArray(file.data.failures)?file.data.failures.find(x=>
+  record(x)&&x.id==='inflation-19-publication'):null;
+ const inflationFailure=failed?publishCode(failed.reason):null;
  const raw=file.data.inflation19;
  if(!record(raw))return {availability:'PRESENT',modifiedAt:file.modifiedAt,
   writerStatus:allow(TOP_LEVEL_STATES,file.data.status),
-  status:'NOT_RECORDED'};
+  status:failed?'FAILED_STAGE':'NOT_RECORDED',inflationFailure};
  return {availability:'PRESENT',modifiedAt:file.modifiedAt,
   writerAt:instant(file.data.at),
   writerStatus:allow(TOP_LEVEL_STATES,file.data.status),
-  status:allow(WRITER_STATES,raw.status),readyCount:integer(raw.ready),
+  status:allow(WRITER_STATES,raw.status),inflationFailure,
+  readyCount:integer(raw.ready),
   d1Writes:integer(raw.d1Writes),sourceStoredAt:timeMillis(raw.sourceStoredAt),
   sourceVersion:version(raw.sourceVersion)};
 }
