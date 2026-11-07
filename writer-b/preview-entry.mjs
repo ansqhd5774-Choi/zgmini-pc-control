@@ -58,6 +58,7 @@ export function authorizePreviewRequest(event,env){
   env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
   event?.repository?.full_name===CONTROL&&event.repository.private===true&&
   event.sender?.login===OWNER&&event.issue?.user?.login===OWNER&&
+  !event.issue.pull_request&&
   event.issue.title===ISSUE_TITLE&&
   event.issue.labels?.some(x=>x.name===ISSUE_LABEL)&&
   Number.isSafeInteger(event.issue.number)&&event.issue.number>0,
