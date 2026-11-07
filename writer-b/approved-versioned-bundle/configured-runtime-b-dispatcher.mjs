@@ -14,6 +14,10 @@ export const REQUIRED_MANUAL_COMMANDS = Object.freeze([
 const SHA40 = /^[a-f0-9]{40}$/;
 const SHA64 = /^[a-f0-9]{64}$/;
 const TOKEN = /^[a-zA-Z0-9._-]{1,128}$/;
+const TRUSTED_REQUEST_KEYS = Object.freeze([
+  'requestId','sourceSha','approvalSha256',
+  'packageManifestSha256','runtimePreimage',
+]);
 
 function fail(code) {
   const error = new Error(code);
@@ -38,8 +42,22 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
     let phase = 'VERIFY';
     let consumed = false;
     try {
-      need(plain(request) && typeof request.requestId === 'string' &&
+      need(plain(request) && Object.keys(request).length===
+        TRUSTED_REQUEST_KEYS.length &&
+        TRUSTED_REQUEST_KEYS.every(k=>Object.hasOwn(request,k)) &&
+        typeof request.requestId === 'string' &&
         TOKEN.test(request.requestId), 'B_REQUEST_ID');
+      // Always require the exact five values from the authenticated B action.
+      // Even test callers cannot bypass Git-manifest/source preimage binding.
+      need(sha40(request.sourceSha)&&
+        sha64(request.approvalSha256)&&
+        sha64(request.packageManifestSha256)&&
+        plain(request.runtimePreimage)&&
+        ['activeRuntimeSha256','taskXmlSha256','scheduledCmdSha256',
+          'scheduledVbsSha256'].every(k=>
+          sha64(request.runtimePreimage[k]))&&
+        Object.keys(request.runtimePreimage).length===4,
+      'B_REQUEST_APPROVAL_PIN');
 
       // Adapter is loaded by a fixed import path in the production entry point.
       // Its methods independently read the approval/source/Windows facts.
@@ -62,6 +80,10 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         typeof approval.packageRoot === 'string' &&
         approval.packageRoot.length > 0,
       'B_APPROVAL_SOURCE_PIN');
+      need(approval.sourceSha===request.sourceSha&&
+        approval.approvalSha256===request.approvalSha256&&
+        approval.packageManifestSha256===request.packageManifestSha256,
+      'B_APPROVAL_IDENTITY_DRIFT');
 
       // Existing runConfiguredPackage preflight verifies the package and
       // installed scheduled Task/CMD state; upgradeConfiguredRuntime checks
@@ -76,6 +98,12 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         sha64(windows.activeRuntimeSha256) &&
         sha64(windows.compatibilityEvidenceSha256),
       'B_WINDOWS_REPEAT_COMPATIBILITY');
+      need(windows.activeRuntimeSha256===
+          request.runtimePreimage.activeRuntimeSha256&&
+        windows.taskXmlSha256===request.runtimePreimage.taskXmlSha256&&
+        windows.scheduledCmdSha256===request.runtimePreimage.scheduledCmdSha256&&
+        windows.scheduledVbsSha256===request.runtimePreimage.scheduledVbsSha256,
+      'B_WINDOWS_APPROVED_PREIMAGE_DRIFT');
 
       const loaded = await receiver.loadPinnedPackageRunner(approval);
       need(plain(loaded) && loaded.sourceSha === approval.sourceSha &&
