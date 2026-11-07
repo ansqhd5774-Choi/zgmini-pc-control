@@ -2,6 +2,16 @@
 
 > R2 프로세스 총괄의 A급 실PC 조회·Controller 설치 인계. 본 문서는 물가지표 19개 자동 갱신의 **Writer 설치 승인서가 아니며**, 다른 ChatGPT 대화의 실제 수신 증거가 아니다. 정확한 manifest의 승인·정규 Writer B 신청·기능 실증은 물가지표 원담당이 수행한다.
 
+## 2026-11-07 12:14 KST — 최초 범용 Writer B 실제 설치 결과 (우선 상태)
+
+**상태 우선순위:** 아래 문서의 `OWNER_PENDING`/`B 첫 설치 미확정`은 **이 시점 이후 과거 이력**이다. 이 첫 설치는 사용자의 명시적 지시에 따라 R2 프로세스 총괄이 직접 수행했다. 원담당 대화의 실제 수신 `OWNER_RECEIVED`나 Inflation19 정규 자동 게시 완료를 의미하지 않는다.
+
+- **정규 source:** [PR #650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/650) main merge `aded1623c2992ee467b08c2034bd11d125f36e7e`, GitHub 원문 일치 테스트 Node 37/37 PASS.
+- **첫 실제 범용 Writer B 설치:** [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651#issuecomment-6701499354) 단일 requestId `46ca5a2a-c7c3-4b02-b88f-987e984ac2ba`, **`WRITER_B_INSTALLED_VERIFIED`**, 원격 결과 JSON/TXT 2/2, `LOCAL_OVERLAY` 운영 SHA `d50ba2630bb04c7c50911dac0a4069a8056ee469`. 동일 승인 manifest `infl19-r2-pc-preserve.json`의 대상 3파일 M/A/A만 정상 적용; 기존 후속 설치 요청 **중복 생성 금지**.
+- **사후 실제 PC A:** [#652](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/652#issuecomment-6701518308) `PC_SOURCE_READONLY_DIAGNOSIS` PASS, HEAD/config source 모두 `d50ba263...`, `run-local.mjs` SHA256 `50ee0c0863c10aa5106e18e8466517143ef3dbc75f95abc18bc359f2cbbced9e`, 기존 Task 첫 VBS 유지, trackedDirty false, 운영 보호 불변.
+- **남은 범위:** 2026-11-07T03:10:06Z Writer checkpoint source `f7ed1e44...`는 설치 **이전** 실행. 새 `d50ba263...`로 완료한 **정규 Core 실행/Writer checkpoint** 확인 전 `runtimeSourceVerified=true`를 주장하지 않음. 물가지표 D1/API/UI 자동 갱신 검증은 기능 원담당이 실제 인수 후 수행하며, 프로세스 총괄은 공통 Writer A/B 경로와 첫 설치/복구 검증을 마무리한다.
+- 다음 필수 공통 검증: 기존 A `core-status`로 자연 Writer checkpoint가 실제 신규 SHA로 전진하는지 읽기 전용 1회 확인 → 보호 상태 유지/원장 정리 → **사용자 지시 전 기능별 새로운 B나 예약 생성 금지**. GitHub 기록만으로 다른 대화 수신 ACK 확정 금지.
+
 ## 1. 마지막 확정 PASS와 증거
 
 - Controller 실제 설치 [#637](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/637#issuecomment-6700052457): `SUCCEEDED`, Controller SHA `29d667763650b5d719926034ce3583d563a35d23`, 보호 불변/Workflow enabled, 결과 2/2.
