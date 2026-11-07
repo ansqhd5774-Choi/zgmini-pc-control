@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sha256,APPROVAL_SCHEMA,SCOPE,SOURCE_REPO,CONTROL_REPO,
  OPERATION,REQUEST_SCHEMA,ISSUE_TITLE,ISSUE_LABEL} from './contract.mjs';
-import {approvalPathFromIssue,verifyReadOnlyPreflight} from './preflight.mjs';
+import {approvalPathFromIssue,verifyReadOnlyPreflight,
+ writePreflightStopEvidence} from './preflight.mjs';
 import {commitApprovedWriterBOverlay} from './git-stage.mjs';
 import {validateWriterBReportEvent,sanitizeWriterBResult,
- uploadWriterBReport} from './report.mjs';
+ uploadWriterBReport,readWriterBLocalResult} from './report.mjs';
 import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
 import {buildLocalOverlayProvenance,writeImmutableLocalProvenance} from './provenance.mjs';
 
@@ -73,6 +74,53 @@ test('owner Issue preflight derives candidate only from verified approval bytes'
  assert.throws(()=>verifyReadOnlyPreflight({event:x.event,
   env:x.env,manifestBytes:Buffer.from('{}'),controlHead:BASE}),
   {code:'WRITER_B_MANIFEST_HASH_STOP'});
+});
+
+test('approval preflight preserves only its exact bounded stop in run TEMP',()=>{
+ const env={RUNNER_TEMP:'/tmp/zgmini-writer-b-test',GITHUB_RUN_ID:'123456'};
+ let writes=[];
+ const fsOps={writeFileSync:(target,value,options)=>{
+  writes.push({target,value,options});
+  assert.deepEqual(options,{encoding:'utf8',flag:'wx'});
+ }};
+ assert.equal(writePreflightStopEvidence({env,
+  code:'WRITER_B_MANIFEST_HASH_STOP',fsOps}),true);
+ assert.equal(writes.length,1);
+ assert.ok(writes[0].target.endsWith('writer-b-preflight-stop-123456.json'));
+ assert.deepEqual(JSON.parse(writes[0].value),{
+  status:'WRITER_B_SETUP_STOP',code:'WRITER_B_MANIFEST_HASH_STOP',
+  runId:'123456'});
+ assert.equal(writePreflightStopEvidence({env,
+  code:'UNSAFE_RAW_KEY=secret',fsOps}),true);
+ assert.equal(JSON.parse(writes[1].value).code,
+  'WRITER_B_APPROVAL_PREFLIGHT_UNEXPECTED_STOP');
+ assert.equal(writePreflightStopEvidence({env:{...env,GITHUB_RUN_ID:'../bad'},
+  code:'WRITER_B_MANIFEST_HASH_STOP',fsOps}),false);
+ assert.equal(writes.length,2);
+});
+
+test('reporter uses matching run-scoped preflight stop only when install output absent',()=>{
+ const env={RUNNER_TEMP:'/tmp/zgmini-writer-b-test',GITHUB_RUN_ID:'123456'};
+ const fsOps={readFileSync:filename=>{
+  if(filename.endsWith('writer-b-install-result.json'))throw Error('ENOENT');
+  return JSON.stringify({status:'WRITER_B_SETUP_STOP',
+   code:'WRITER_B_APPROVAL_PATH_STOP',runId:'123456'});
+ }};
+ const raw=readWriterBLocalResult({env,fsOps});
+ assert.equal(sanitizeWriterBResult(JSON.parse(raw),RID,'123456').code,
+  'WRITER_B_APPROVAL_PATH_STOP');
+ const stale={readFileSync:filename=>{
+  if(filename.endsWith('writer-b-install-result.json'))throw Error('ENOENT');
+  return JSON.stringify({status:'WRITER_B_SETUP_STOP',
+   code:'WRITER_B_APPROVAL_PATH_STOP',runId:'old-run'});
+ }};
+ assert.equal(readWriterBLocalResult({env,fsOps:stale}),'{}');
+ const malicious={readFileSync:filename=>{
+  if(filename.endsWith('writer-b-install-result.json'))throw Error('ENOENT');
+  return JSON.stringify({status:'WRITER_B_INSTALLED_VERIFIED',
+   code:'WRITER_B_APPROVAL_PATH_STOP',runId:'123456'});
+ }};
+ assert.equal(readWriterBLocalResult({env,fsOps:malicious}),'{}');
 });
 
 test('exact overlay stages only three approved M/A paths and request-local ref',()=>{
