@@ -87,7 +87,9 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
    provenanceSha256:'3'.repeat(64),mode:'LOCAL_OVERLAY',localOnly:true,
    sha256:map(m.files,'afterSha256'),
   };},
-  async waitForCoreIdleWindow(){mark('window');fatal('window');},
+  async waitForCoreIdleWindow(phase='PRECLAIM'){
+   mark(phase==='POST_PREPARE'?'window-final':'window');fatal('window');
+  },
   async pauseCore(){mark('pause');state.coreEnabled=false;fatal('pause');},
   async waitForCoreDrain(){mark('drain');fatal('drain');},
   async assertCoreQuiet(){mark('quiet');if(state.coreEnabled)
@@ -156,7 +158,7 @@ test('normal 3-file B install: HEAD/config sha consistent, task returned, no unr
  assert.equal(state.unrelatedTrackedDirty,true);
  assert.equal(state.retained,false);
  assert.deepEqual(state.steps,['lock','preimage','candidate','window','claim','backup','prepare',
-  'pause','drain','quiet','switch','assert-source','config','assert-config','resume',
+  'window-final','pause','drain','quiet','switch','assert-source','config','assert-config','resume',
   'task-verify','assert-source','assert-config','release']);
 });
 
@@ -324,4 +326,97 @@ test('enable returned without actually enabling: rollback re-enables task after 
  assert.equal(state.coreEnabled,true);
  assert.equal(state.resumeCalls,2);
  assert.equal(state.retained,false);
+});
+
+test('post-preparation Core cycle naturally finishes before the second bounded idle window returns',async()=>{
+ const {io,state}=mockIO();
+ const original=io.waitForCoreIdleWindow;
+ io.waitForCoreIdleWindow=async phase=>{
+  if(phase!=='POST_PREPARE')return original(phase);
+  state.steps.push('window-final','core-cycle-observed','core-cycle-finished');
+ };
+ const result=await performWriterBInstall(auth(),io);
+ assert.equal(result.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.ok(state.steps.indexOf('prepare')<state.steps.indexOf('window-final'));
+ assert.ok(state.steps.indexOf('core-cycle-finished')<state.steps.indexOf('pause'));
+ assert.equal(state.coreEnabled,true);assert.equal(state.retained,false);
+});
+
+test('active Core after candidate preparation defers after bounded final wait, with original state verified',async()=>{
+ const {io,state}=mockIO();const initial=io.waitForCoreIdleWindow;
+ io.waitForCoreIdleWindow=async phase=>{
+  if(phase!=='POST_PREPARE')return initial(phase);
+  state.steps.push('window-final');
+  throw Object.assign(new Error('busy core'),{code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'});
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+ assert.equal(out.recovery,'ORIGINAL_VERIFIED');
+ assert.equal(state.claimed,true);assert.equal(state.coreEnabled,true);
+ assert.equal(state.steps.includes('pause'),false);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.head,manifest().baseHead);assert.equal(state.config,manifest().baseHead);
+});
+
+test('unknown Core state at final idle window never becomes a permitted pause',async()=>{
+ const {io,state}=mockIO();const initial=io.waitForCoreIdleWindow;
+ io.waitForCoreIdleWindow=async phase=>{
+  if(phase!=='POST_PREPARE')return initial(phase);
+  state.steps.push('window-final');
+  throw Object.assign(new Error('unverified'),{code:'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED'});
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED');
+ assert.equal(state.steps.includes('pause'),false);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.retained,false);
+});
+
+test('Task XML drift at final pause has distinct bounded failure code and no source switch',async()=>{
+ const {io,state}=mockIO();
+ io.pauseCore=async()=>{
+  state.steps.push('pause');
+  throw Object.assign(new Error('Task XML bytes are not returned'),
+   {code:'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP'});
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP');
+ assert.equal(state.steps.includes('window-final'),true);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.retained,false);assert.equal(state.coreEnabled,true);
+});
+
+test('Core restarts after the second idle window: final instant safety check still rejects',async()=>{
+ const {io,state}=mockIO();
+ io.pauseCore=async()=>{
+  state.steps.push('pause');
+  throw Object.assign(new Error('Core activity'),
+   {code:'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED'});
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(out.code,'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED');
+ assert.equal(state.steps.includes('window-final'),true);
+ assert.equal(state.steps.includes('switch'),false);
+ assert.equal(state.retained,false);assert.equal(state.coreEnabled,true);
+});
+
+test('late-window restore uncertainty retains the original claim without another attempt',async()=>{
+ const {io,state}=mockIO();const initial=io.waitForCoreIdleWindow;
+ io.waitForCoreIdleWindow=async phase=>{
+  if(phase!=='POST_PREPARE')return initial(phase);
+  state.steps.push('window-final');
+  throw Object.assign(new Error('Core timeout'),{code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'});
+ };
+ io.verifyOriginalState=async()=>{state.steps.push('verify-original');
+  throw Object.assign(new Error('unverified'),{code:'WRITER_B_ORIGINAL_STATE_STOP'});
+ };
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_RECOVERY_REQUIRED');
+ assert.equal(out.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+ assert.equal(out.recovery,'RECONCILE_EXACT_REQUEST_NO_RETRY');
+ assert.equal(state.retained,true);assert.equal(state.steps.includes('switch'),false);
 });
