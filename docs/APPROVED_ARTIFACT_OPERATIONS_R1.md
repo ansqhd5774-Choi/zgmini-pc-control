@@ -29,6 +29,13 @@
 4. **검산**: 설치 파일의 목표 해시, 런처·버전 메타데이터, Task XML/상태, 보호 상태/기존 데이터 불변 확인. PC 원장/결과 JSON·TXT 2/2 업로드와 GET 재조회.
 5. **오류**: 마지막 변경 단계와 보호 상태를 코드로 보고. 원본 백업에 의해 정확한 복원이 입증되면 STOP_RESTORED, 부작용 불명확하면 RECOVERY_REQUIRED. 기존 ID 자동 재실행 금지.
 
+## 반복 차단 방지를 위한 경계 조건
+
+- 불변 `versions/<digest>`가 이전 실패 후 남아도 파일 목록·크기·SHA가 **모두 일치**하면 승인된 새 고유 ID로 읽기 전용 재사용한다. 내용 불일치·타 소유 stage/journal이면 임의 삭제·덮어쓰기 없이 별도 복구로 분리한다.
+- 다중 CMD/VBS 런처 순차 교체는 전체 원자적이지 않다. Writer B lock이 기존 Scheduler 실행까지 차단한다고 가정하지 않는다. **예약 실행이 각 교체 사이에 끼어드는 경우**를 기존/신규 launcher 및 활성 pointer 조합마다 시험하고 안전한 고정 디스패처+마지막 pointer 전환이 입증되기 전에는 B 활성화를 허용하지 않는다. 기존 Task XML·예약을 중단하거나 변경하여 해결하지 않는다.
+- 운영 mutation이 commit되었더라도 결과 파일 한 쪽이라도 없으면 `status=PASS`만으로 최종 DONE 판정 금지. `reportStatus=JSON_TXT_2_OF_2`와 고유 요청 ID의 실제 원장을 함께 확인하고, 불완전하면 기존 commit 원장에서 증거만 복구하며 **운영 B 재실행은 금지**한다.
+- 두 단계의 CAS(공통 registry와 host PIN)는 저널·백업·순서·검산·역순 복구로 보장하며 두 파일의 동시 원자성은 주장하지 않는다. 실제 Windows ACL/NTFS/강제종료 실증 및 신규 B effect 명시 승인 전에는 모두 후보 코드일 뿐이다.
+
 ## 검증 기준
 
 - 정상: A 조회·고정 bundle stage·런처 활성 후 실제 PC readback; A 조회/자료 변경 0, 새 Task 0, 운영 Core 불변.
