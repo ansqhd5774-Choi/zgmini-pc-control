@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "57036ce1-354f-4943-a321-7f1ac8d96626",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "24610129461d027524a018daeba9f8b0cf9ed02c",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "24c2ff1f3eba73cae8b86f81ce75c6ffacfb497f",
+  "candidateSourceSha": "ec9c9738bf3e07e15eeac06a02ab3e5bec9ef9d0",
+  "manifestSha256": "59201f29dced4f66156b10104e7e278556d832415d13caedb0ac7f9b0fe84ea4",
+  "baseTreeOid": "7f794f4d79ac582a2a5b750890703191204a0dc6",
+  "preparedTreeOid": "53ab57738e63eb9d70bd8764555e62783554b6fe",
+  "provenanceSha256": "274a9c8e785607a5777416fa2b4bc420e25c5ae07de0c176b4eed71d6875170d",
+  "runId": "42403562060",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/run-local.mjs",
+    "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+    "lib/market-calendar-er1-month-key.mjs",
+    "lib/market-calendar-er1-forecast-saved-adapter.mjs",
+    "lib/market-calendar-er1-forecast-score.mjs",
+    "lib/market-calendar-er1-public-display.mjs",
+    "lib/market-calendar-er1-earnings-score.mjs"
+  ]
+}
