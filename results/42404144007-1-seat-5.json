@@ -1,0 +1,68 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42404144007-1-seat-5",
+  "requestId": "pc-5ef0c5f4-4d9c-4b4c-bb55-0578d3fa17ac",
+  "startedAt": "2026-11-07T19:01:28.922Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "aada254071879544f87ffd286f02a7d6053cd8ba",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "ec9c9738bf3e07e15eeac06a02ab3e5bec9ef9d0",
+  "sourceBranch": "main",
+  "operation": "core-status",
+  "seat": 5,
+  "status": "PASS",
+  "code": "CORE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-d83c7c60-d214-4691-9cc4-d985fdaff4d2",
+  "pcOperationalApprovedSha": "24610129461d027524a018daeba9f8b0cf9ed02c",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_READONLY_DIAGNOSIS",
+    "core": {
+      "lockPresent": true,
+      "checkpoints": {
+        "local-cycle-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-07T18:56:57.190Z",
+          "bytes": 2236,
+          "status": "COMPLETE"
+        },
+        "local-collection-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-07T19:00:05.351Z",
+          "bytes": 2218,
+          "status": "SKIPPED"
+        },
+        "local-writer-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-07T19:00:53.444Z",
+          "bytes": 3813,
+          "status": "VERIFIED"
+        }
+      },
+      "taskXmlHashes": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1",
+        "ZGMINI-PC-Iran-Progress-R13": "APPROVED_RETIRED_ABSENT"
+      },
+      "approvedSourceSha": "24610129461d027524a018daeba9f8b0cf9ed02c"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "c0e8a72e31aac192da4b9539cff99846c8fd92eb277afee061ee3a1708a3d70a",
+  "protectedAfterSha256": "c0e8a72e31aac192da4b9539cff99846c8fd92eb277afee061ee3a1708a3d70a",
+  "actualExecutionSha": "aada254071879544f87ffd286f02a7d6053cd8ba",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-07T19:01:35.393Z",
+  "durationMs": 6471
+}
