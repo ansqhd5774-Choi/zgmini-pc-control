@@ -5,7 +5,7 @@
 - 계획·경과 보존 브랜치: codex/controller-ops-lessons-20261105
 - 공통 지침 적용 기준: ansqhd5774-Choi/zgmini-pc-control 최신 main
 - 기존 프로세스 R1: Issue #526 / 이전 계획·운영 완료 100% 보존, 재개하지 않음
-- 전체 R2 진행 상태: M0 진행 중(진행률은 증거 기반으로 갱신)
+- 전체 R2 진행 상태: **M0·M1 DONE — 공식 40%**, M2 후속 PC module 사전 증거·M4 인계 미완료 (2026-11-07 사용자 승인 증거 계약, §12)
 
 ## 1. 해결하려는 반복 문제와 최종 목표
 
@@ -41,7 +41,7 @@
 | 단계 | 누적 진도 | 소유자 | 산출물·필수 PASS | 실패·대기 처리 |
 |---|---:|---|---|---|
 | M0. 기준·추적 계약 | 20% | 프로세스 총괄 | R2 계획·로그를 기존 전용 브랜치에 기록, Issue #622 추적, R1 완료 보존, 최신 main 기준 최소 지침 PR 검증·반영 | 지침 PR 미병합이면 M0 진행 |
-| M1. 읽기 전용 A 실행 원본 | 40% | 공통 A 담당/총괄 | 기존 A 계약·실제 허용목록 일치; 다단 VBS의 승인된 고정 대상만 추적; Writer checkout/HEAD/config.source/3파일 존재·SHA256·dirty 획득; PC 원자료/DB/D1/source 변경 0 | 미설치라면 별도 지원 등록; 다른 승인 B를 A로 우회 금지 |
+| M1. 읽기 전용 A 실행 원본 | 40% | 공통 A 담당/총괄 | 기존 A의 Writer 후보 checkout/HEAD/config.source·3파일 SHA·dirty 실측, 정규 B 설치 후 자연 Writer checkpoint sourceHead와 시각 전진·Task 정의 불변의 **운영 Writer provenance**가 일치하면 PASS. 실시간 Core Task PID 인과는 별도 UNKNOWN으로 보존 (§12) | A 조회 자체의 PC 운영 쓰기 0, 수동 실행 가능성 명시. 과거 실시간 PID 스냅샷 미포착을 정상 운영의 전역 Gate로 삼지 않음 |
 | M2. 범위 제한 Writer B | 60% | 공통 B 담당/총괄 | 기존 B 잠금·백업·복구 자산 재사용; 실제 PC 기준 before/after source와 세 파일 해시·호환성·단일 적용 담당·유한 범위 승인 manifest; 수신기 코드 및 관련 집중 테스트 | Controller-only 또는 캘린더 고정 수신기 우회 사용 금지 |
 | M3. 정상·실패 회귀 | 80% | A/B 담당·총괄 | 정상 1, 다단 VBS 1, 타 담당 dirty 충돌 1, source/file 해시 불일치 1, 부분 적용·복구 1 관련 fixture/격리 시뮬·집중 테스트 PASS; 기존 파일 보호 | 거부 원인·원본 유지·RECOVERY_REQUIRED 구분 |
 | M4. 실PC 경로·인계 | 100% | 총괄 + 실제 B 적용 원담당 | 기존 승인 범위의 정상 실PC A·B 결과(requestId, 설치 SHA, 보호 해시, 원장), Writer 기존 기능 보존, 원담당에게 실행 계약 실제 전달·수신 확인 | 설치/수신 미확인은 미완료; 원담당 기능 게시 실증은 별도 |
@@ -132,3 +132,11 @@ M1과 M2의 코드·문서 준비는 독립적으로 병렬 수행한다. **동�
 - 새 A [#639](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/639) PASS: 승인 config.source=Writer checkpoint=고정 후보 Git HEAD `f7ed1e44957b5a8994163c1f2e5bd23bc1cb9ab5`; file inventory 137/137. 정확한 후보 3파일은 `run-local.mjs` M(기존 SHA `922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a`), `inflation-causal-public-auto-publication-r1.mjs` A, 동일 `.test.mjs` A. 실제 각 파일 dirty UNKNOWN; `sourceResolved/runtimeSourceVerified=false`.
 - 다음 B 접수 계약: 기능 원담당은 #981의 3파일 after SHA와 최신 main/운영 후보를 재대조하고, 실제 Core Task 첫 hop/Task XML·관련 VBS/Sidecar/protected file SHA와 Writer B 운영 활성 확인 후, `writer-b/contract.mjs`의 승인 manifest 1개를 고정한다. 정규 B 수신기 `verifyWriterBPreimage`가 설치 직전 동일 Git HEAD/config/파일 존재·해시/dirty를 CAS 방식 검증하므로 소스 후보의 UNKNOWN을 허위 PASS로 승격하거나 별도 전역 A Gate를 추가하지 않는다.
 - 프로세스 총괄은 공통 B 경로·오류·회귀/인계 계약을 증명하고 기능 설치/19지표 갱신은 원담당이 수행한다. 실제 Writer B 정상 1회 통과와 사용자/원담당 인수까지 R2 최종 완료 아님.
+
+## 12. 2026-11-07 사용자 명시 결정 — M1 운영 Writer provenance 수용
+
+- **변경 승인:** 사용자는 M1(b) 완료 기준에서 `정규 설치·SHA 일치·자연 checkpoint 전진`을 실질 운영 증거로 수용하고, 정확한 예약 Task→PID 인과는 별도 UNKNOWN으로 기록하는 방안을 명시 선택했다. 앞선 §10의 '실시간 WMI PID 직접 포착이 있어야만 M1 완료' 해석은 이 결정으로 대체하되, 기존 결과 필드 `runtimeSourceVerified=false`를 거짓으로 수정하지 않는다.
+- **M1(a) PC 검증:** [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651) `WRITER_B_INSTALLED_VERIFIED` 로컬 overlay source `d50ba2630bb04c7c50911dac0a4069a8056ee469` 승인 3파일 설치; [#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654) Windows A `PASS`, 고정 후보 HEAD=configApprovedSha=checkpoint.sourceHead=`d50ba263...`, gitVerified true, trackedDirty false, Writer inventory 139/139 complete, 설치 후 3파일 SHA 일치. `pc-source-preflight` A 실행 자체의 운영 source·DB·D1·원자료 쓰기 0.
+- **M1(b) 허용된 교차 증거:** [#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654) Writer checkpoint `2026-11-07T03:20:40.051Z`는 #651 설치 이후 새 source SHA로 자연 전진; [#661](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/661) 실제 새 Controller A 실행에서 Core Task XML hash `dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028` 불변·보호 상태 불변, Writer checkpoint는 이후에도 기록됨. **판정명 `CORROBORATED_OPERATIONAL_WRITER_PROVENANCE`** — 승인 source의 실제 Writer 실행 전진에 대한 충분한 운영 증거.
+- **남는 사실:** #654 `sourceResolved=false`, `runtimeSourceVerified=false`, 후보 분류 `HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME`; 정확한 Core Task→checkout PID/실행 인과는 **STATE_UNKNOWN**이며 수동 Writer 실행 가능성은 완전히 배제되지 않는다. 이는 이번 사용자 선택에 따라 M1 완료의 선행 조건은 아니지만, 정확한 Task 인과를 증명했다고 보고·표현하지 않는다. 장기 자연 관측·강제 예약 실행·추가 전역 Gate 불필요.
+- **단계 분리:** M1의 원래 대상은 #651 Writer 3파일 원본 조회이며 #662 새 `lib/`·`worker/` 의존 모듈 인벤토리는 후속 M2 설치 준비 증거다. #662 run/status는 미확인, 새 Writer B 승인 manifest는 미확정, 물가지표 19/19 기능 게시도 이 R2 단계 완료와 별개. M1 **DONE**, R2 공식 누적 **40%**. 다음 핵심은 #662 고유 Actions 결과 회수 및 실제 PC 모듈 preimage에 따른 최소 B 계약.
