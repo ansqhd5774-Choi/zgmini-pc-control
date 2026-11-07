@@ -1,0 +1,16 @@
+diff --git a/tools/update.mjs b/tools/update.mjs
+--- a/tools/update.mjs
++++ b/tools/update.mjs
+@@ -2507,3 +2507,10 @@
+-export async function command(args=process.argv.slice(2)) {
++export async function command(args=process.argv.slice(2),{approvedRuntimeBHook=null}={}) {
+  need(args.length>=1,'MAINTENANCE_SUBCOMMAND_REQUIRED');
+- const cmd=args[0],requestId=safeId(args[2]);
++ const cmd=args[0];
++ // Do not pass UUID new B requests through the legacy slug-ID parser.
++ if(cmd==='approved-runtime-b-status'||cmd==='approved-runtime-b-apply'){
++  if(approvedRuntimeBHook===null)need(false,'B_UPDATE_HOOK_NOT_INSTALLED');
++  need(typeof approvedRuntimeBHook.command==='function','B_UPDATE_HOOK_INVALID');
++  return approvedRuntimeBHook.command(args);
++ }
++ const requestId=safeId(args[2]);
