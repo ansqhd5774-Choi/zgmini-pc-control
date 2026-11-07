@@ -129,8 +129,10 @@ test('full exact B apply: one-shot lock, backup and no secret disclosure',()=>{
   assert.equal(r.backupVerified,true);
   assert.deepEqual(r.changedKeys,FLAGS);
   assert.equal(fs.existsSync(envFile.sharedLock),false);
+  assert.equal(fs.readFileSync(envFile.target+'.provider-b-'+
+    a.request.requestId+'.original.bin').equals(original),true);
   assert.equal(fs.readFileSync(path.join(envFile.journalRoot,a.request.requestId,
-    'providers.original.bin')).equals(original),true);
+    'journal.jsonl'),'utf8').includes('BACKED_UP'),true);
   assert.equal(fs.readFileSync(envFile.target,'utf8').includes('API_KEY=secret-do-not-print'),true);
   assert.equal(JSON.stringify(r).includes('secret-do-not-print'),false);
   const replay=applyApprovedFlags(a,envFile);
