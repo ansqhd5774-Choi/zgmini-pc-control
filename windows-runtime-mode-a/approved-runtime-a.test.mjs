@@ -109,6 +109,16 @@ test('ACTIVE presence yields repeatable runtime with exact SHA and no PC write',
   assert.deepEqual(fs.readdirSync(home).sort(),before);
  });
 });
+test('ACTIVE alone is a valid repeatable preimage without INSTALL_RESULT',()=>{
+ fixture(({root,home})=>{
+  fs.writeFileSync(path.join(home,'ACTIVE_RUNTIME.json'),'REPEATABLE_POINTER');
+  fs.unlinkSync(path.join(home,'INSTALL_RESULT.json'));
+  const result=inspectApprovedA(auth(),{dataRoot:root,queryTask:()=>xml});
+  assert.equal(result.profiles[0].runtimeMode,'REPEATABLE_ACTIVE_RUNTIME');
+  assert.equal(result.profiles[0].files.installed.exists,false);
+  assert.equal(result.fileHashesComplete,true);
+ });
+});
 test('mode snapshot race returns BLOCKED/UNKNOWN instead of selecting a B mode',()=>{
  const authn=auth();let calls=0;
  const result=inspectApprovedA(authn,{dataRoot:'/unused',queryTask:()=>xml,
@@ -121,6 +131,16 @@ test('mode snapshot race returns BLOCKED/UNKNOWN instead of selecting a B mode',
  assert.equal(result.blockedProfiles,1);
  assert.equal(result.profiles[0].runtimeMode,'STATE_UNKNOWN_CHANGED_DURING_READ');
  assert.equal(result.fileHashesComplete,false);
+});
+test('Task XML changing between snapshots never yields a decided runtime mode',()=>{
+ fixture(({root})=>{
+  let calls=0;
+  const result=inspectApprovedA(auth(),{dataRoot:root,
+   queryTask:()=>xml.replace('2026-11-08',calls++===0?'2026-11-08':'2026-11-09')});
+  assert.equal(result.profiles[0].runtimeMode,'STATE_UNKNOWN_CHANGED_DURING_READ');
+  assert.equal(result.taskChecksComplete,false);
+  assert.equal(result.blockedProfiles,1);
+ });
 });
 test('unavailable Task metadata never becomes taskChecksComplete=true',()=>{
  fixture(({root})=>{
