@@ -21,7 +21,8 @@ import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
 import {decodeTaskXmlBytes,coreQuietFromProbe,
  coreReadyForMaintenance,coreMaintenanceWindowBlockCode,
  attestTaskFirstHopLauncher} from './windows-guards.mjs';
-import {awaitNaturalCoreIdle} from './core-idle-window.mjs';
+import {awaitNaturalCoreIdle,
+ MAX_POST_PREPARE_IDLE_WAIT_MS} from './core-idle-window.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim} from '../r17-writer-b/r17-b-claim.mjs';
 
@@ -296,20 +297,23 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    journal('STAGED');
    return prepared;
   },
-  async waitForCoreIdleWindow(){
+  async waitForCoreIdleWindow(phase='PRECLAIM'){
+   need(phase==='PRECLAIM'||phase==='POST_PREPARE',
+    'WRITER_B_CORE_IDLE_PHASE_STOP');
    // Existing Core continues unmodified until two natural idle snapshots.
    await awaitNaturalCoreIdle({
     sample:()=>({probe:taskProbe(),lock:fs.existsSync(CORE_CYCLE_LOCK)}),
     wait:delay,clock:Date.now,
     isReady:coreReadyForMaintenance,
     blockCode:coreMaintenanceWindowBlockCode,
-   });
-   journal('CORE_PREPAUSE_IDLE');
+   },phase==='POST_PREPARE'?{windowMs:MAX_POST_PREPARE_IDLE_WAIT_MS}:undefined);
+   journal(phase==='POST_PREPARE'?'CORE_POST_PREPARE_IDLE':'CORE_PREPAUSE_IDLE');
   },
   async pauseCore(){
    assertBase();
-   need(fixedTaskXml(task).normalized===originalXml.normalized&&
-    coreReadyForMaintenance(taskProbe(),fs.existsSync(CORE_CYCLE_LOCK)),
+   need(fixedTaskXml(task).normalized===originalXml.normalized,
+    'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP');
+   need(coreReadyForMaintenance(taskProbe(),fs.existsSync(CORE_CYCLE_LOCK)),
     'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED');
    exec('schtasks',['/Change','/TN',task,'/Disable']);
    journal('TASK_PAUSED');
