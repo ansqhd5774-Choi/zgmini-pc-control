@@ -186,6 +186,16 @@ test('malformed/unpinned approval never reaches preimage or writes',async()=>{
  assert.equal(result.code,'B_PIN_APPROVAL_AUTH_DRIFT');
  assert.deepEqual(d.state.history,['report']);
 });
+test('unbounded or unsafe one-shot request ID denied before adapter callbacks',async()=>{
+ const f=fixture(),d=mockIo(f);
+ const result=await runApprovedRegistryCas({
+  approvalRaw:f.approvalRaw,
+  pinnedApproval:{...f.pinnedApproval,requestId:'../unsafe'},
+  adapter:d.adapter});
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'B_PIN_REQUEST_ID');
+ assert.deepEqual(d.state.history,['report']);
+});
 test('all early transaction faults stop without operational mutation',async()=>{
  for(const faultAt of ['authenticate','preimage','lock','under-lock',
   'load-approved-registry']){
