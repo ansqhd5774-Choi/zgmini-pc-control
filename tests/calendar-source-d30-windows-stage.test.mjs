@@ -39,6 +39,21 @@ test('conflicting PC and PR edit stops with no operational write and temp cleanu
   });
 });
 
+test('exact baseline minus final LF preserves PC formatting while applying EOF additions',()=>{
+  isolated(tempRoot=>{
+    const base=buf('original code\n');
+    const ours=buf('original code');
+    const theirs=buf('original code\nadded D30 code\n');
+    const r=mergeTextThreeWay({base,ours,theirs,tempRoot});
+    assert.equal(r.bytes.toString('utf8'),'original code\nadded D30 code');
+    assert.equal(r.preservedVerified,true);
+    assert.equal(r.sourceWrites,0);
+    // A substantive PC edit may not be classified as the one-byte case.
+    assert.throws(()=>mergeTextThreeWay({base,ours:buf('changed code'),
+      theirs,tempRoot}),{code:'ER1_D30_STAGE_MERGE_CONFLICT_STOP'});
+  });
+});
+
 test('mixed line endings stop before merge staging',()=>{
   isolated(tempRoot=>{
     const s=src();
