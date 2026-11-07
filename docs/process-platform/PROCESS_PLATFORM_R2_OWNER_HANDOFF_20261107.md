@@ -2,7 +2,7 @@
 
 - 작성: 2026-11-07 KST / 프로세스 총괄
 - 기준 계획: [R2 PLAN](PROCESS_PLATFORM_R2_PLAN_20261107.md) · [R2 LOG](PROCESS_PLATFORM_R2_LOG_20261107.md) · [Issue #622](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/622)
-- 공식 R2 **80% (M0–M3 DONE / M4 실제 수신 미완료)**. 이 문서는 **PREPARED_NOT_DELIVERED**, GitHub 반영을 다른 ChatGPT 대화의 ACK로 간주하지 않음.
+- 공식 R2 **80% (M0–M3 DONE / M4 실제 수신 미완료)**. 인계 자료를 [물가지표 PR #981 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295)에 **PUBLISHED_OWNER_ACK_PENDING** 상태로 게시했으나, GitHub 게시를 다른 ChatGPT 대화의 실제 수신 ACK로 간주하지 않음.
 - 대상은 공통 A/B 자동 경로를 원담당이 재사용하도록 하는 것. Inflation19 수집·계산·D1·페이지 게시 자체는 기능 원담당 업무.
 
 ## 이미 입증된 공통 경로 — 다시 설치·검사할 필요 없음
@@ -24,3 +24,9 @@
 - [ ] 사용자 의도에 따른 실제 원담당 대화에서 이 문서·Issue 원본 링크를 전달받음.
 - [ ] 원담당이 공통 A/B 경로와 #662 조회 미확인/Preview 기능 후속 분리를 이해하고 다음 **단일 필수 실행**을 명시함.
 - [ ] 총괄은 실제 수신 사실을 원장에 기록하고 M4만 최종 판정. **GitHub 파일 생성·댓글만으로 100%를 주장하지 않음**.
+
+## 2026-11-07 M4 인계 게시 현황
+
+- **게시 완료:** [물가지표 기능 PR #981 최신 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini/pull/981#issuecomment-6707683295) 1건 게시·원격 본문 재조회 확인. 과거 PR #981 댓글의 구형 A/B 대기 설명을 현재 M0–M3 실PC 완료 증거로 정정했다. 실제 기능 코드는 변경하지 않았다.
+- **남은 조건:** 별도 원담당 ChatGPT 대화 `물가지표-fix/economic12-inflation-legacy4-r35-20261021-3`에서 본 인계서를 실제 열람하고 다음 필수 실행을 응답해야 M4 OWNER_RECEIVED. 아직 ACK가 없으므로 공식 R2 진행률 80% 유지. PR 댓글만으로 M4 100% 처리 금지.
+- **#662:** 기존 A 요청의 Actions 실행 ID/결과 여전히 미확인 STATE_UNKNOWN. 새 요청·운영 변경 없이 동일 요청의 Run 상태 확인을 후속 처리.
