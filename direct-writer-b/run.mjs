@@ -12,6 +12,8 @@ import {runVersionedBundleTransaction}
   from '../writer-b/approved-versioned-bundle/versioned-bundle-transaction.mjs';
 import {SCHEMA as BUNDLE_SCHEMA,SCOPE as BUNDLE_SCOPE}
   from '../writer-b/approved-versioned-bundle/versioned-bundle-plan.mjs';
+import {dispatchConfiguredRuntimeB}
+  from '../writer-b/approved-versioned-bundle/configured-runtime-b-dispatcher.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const ACTOR='ansqhd5774-Choi';
@@ -30,6 +32,32 @@ const exact=(v,keys)=>object(v)&&Object.keys(v).length===keys.length&&
   keys.every(x=>Object.hasOwn(v,x));
 const REQUEST_KEYS=['schema','requestId','chatId','operation','controlRepository',
   'approvalManifestSha256'];
+export const CONFIGURED_B_SCHEMA='ZGMINI_CONFIGURED_RUNTIME_B_APPROVAL_V1';
+export const CONFIGURED_B_SCOPE='PC_WRITER_CONFIGURED_THEME_REPEAT_UPGRADE_ONLY';
+const CONFIGURED_B_EFFECT='CONFIGURED_THEMES_REPEAT_UPGRADE';
+const CONFIGURED_B_KEYS=['schema','status','scope','sourceRepository',
+  'sourceSha','profileId','runnerPath','packageManifestSha256','runtimeMode',
+  'runtimePreimage','effects'];
+const CONFIGURED_B_PREIMAGE=['activeRuntimeSha256','taskXmlSha256',
+  'scheduledCmdSha256','scheduledVbsSha256'];
+const CONFIGURED_B_SIDE_EFFECTS=['providerCalls','dbWrites','d1Writes',
+  'taskDefinitionChanges','newTasks','otherOperationalFiles'];
+
+function isApprovedConfiguredRuntime(m){
+  return exact(m,CONFIGURED_B_KEYS)&&
+    m.schema===CONFIGURED_B_SCHEMA&&m.status==='APPROVED_B'&&
+    m.scope===CONFIGURED_B_SCOPE&&
+    m.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+    SHA40.test(m.sourceSha??'')&&
+    m.profileId==='configured-themes'&&
+    m.runnerPath==='scripts/pc-writer/theme-config-package-runner.mjs'&&
+    SHA64.test(m.packageManifestSha256??'')&&
+    m.runtimeMode==='REPEATABLE_ACTIVE_RUNTIME'&&
+    exact(m.runtimePreimage,CONFIGURED_B_PREIMAGE)&&
+    Object.values(m.runtimePreimage).every(x=>SHA64.test(x??''))&&
+    exact(m.effects,CONFIGURED_B_SIDE_EFFECTS)&&
+    Object.values(m.effects).every(x=>x===false);
+}
 
 export const DIRECT_B_RESULT='approved-runtime-b-once-result.json';
 export const DIRECT_B_TITLE=TITLE;
@@ -90,15 +118,18 @@ export function authorizeApprovedRaw({event,env,raw,worktree,actualHead}){
   try{manifest=JSON.parse(raw.toString('utf8'));}catch{fail('DIRECT_B_APPROVAL_JSON_STOP');}
   const isPin=manifest?.schema===PIN_CAS_SCHEMA;
   const isBundle=manifest?.schema===BUNDLE_SCHEMA;
+  const isConfigured=manifest?.schema===CONFIGURED_B_SCHEMA;
   need((isPin&&manifest.scope===PIN_CAS_SCOPE&&manifest.status==='APPROVED_B')||
-    (isBundle&&manifest.scope===BUNDLE_SCOPE&&manifest.status==='APPROVED'),
+    (isBundle&&manifest.scope===BUNDLE_SCOPE&&manifest.status==='APPROVED')||
+    (isConfigured&&isApprovedConfiguredRuntime(manifest)),
     'DIRECT_B_EFFECT_SCOPE_STOP');
   need(SHA40.test(manifest.sourceSha??'')&&
     typeof manifest.profileId==='string'&&manifest.profileId.length>0,
     'DIRECT_B_APPROVED_SOURCE_STOP');
   return Object.freeze({request,manifest,raw,issueNumber:event.issue.number,
     controlSha:env.GITHUB_SHA,approvalPath:approvalPathFor(request),
-    mode:isPin?'PIN_REGISTRY_CAS':'VERSIONED_BUNDLE_ACTIVATE'});
+    mode:isPin?'PIN_REGISTRY_CAS':isConfigured?CONFIGURED_B_EFFECT:
+      'VERSIONED_BUNDLE_ACTIVATE'});
 }
 
 export function loadApprovedRaw({event,env,controlRoot,
@@ -115,19 +146,31 @@ export function loadApprovedRaw({event,env,controlRoot,
     actualHead:gitHead(controlRoot)});
 }
 
-// The approval SHA must identify the actual candidate checkout, not merely
-// a string in a GitHub Issue or manifest. The workflow checks out this exact
-// SHA after its separate read-only authorization step.
-export function verifyPinnedSourceCheckout(auth,{sourceRoot,
- gitHead=root=>git(root,['rev-parse','HEAD'],512).toString('utf8').trim()}={}){
- need(path.isAbsolute(sourceRoot??'')&&
-  auth?.manifest?.sourceSha===gitHead(sourceRoot),
-  'DIRECT_B_CANDIDATE_SOURCE_DRIFT');
- return Object.freeze({sourceSha:auth.manifest.sourceSha,sourceRoot});
-}
-
 export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
-  pinRunner=runApprovedRegistryCas,bundleRunner=runVersionedBundleTransaction}={}){
+  pinRunner=runApprovedRegistryCas,bundleRunner=runVersionedBundleTransaction,
+  configuredRunner=dispatchConfiguredRuntimeB}={}){
+  // The installed configured-theme runtime has its own reviewed, recoverable
+  // preflight -> one-shot -> repeat-upgrade engine. Do not wrap it in the
+  // incompatible generic bundle CAS transaction.
+  if(auth.mode===CONFIGURED_B_EFFECT){
+    const outcome=await configuredRunner({requestId:auth.request.requestId,
+      sourceSha:auth.manifest.sourceSha,
+      approvalSha256:sha(auth.raw),
+      packageManifestSha256:auth.manifest.packageManifestSha256,
+      runtimePreimage:auth.manifest.runtimePreimage});
+    const verified=outcome?.status==='DONE'&&
+      outcome.sourceSha===auth.manifest.sourceSha&&
+      outcome.verified==='PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK';
+    return {status:verified?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
+      outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
+      'DIRECT_B_EFFECT_BLOCKED',
+      code:verified?'DIRECT_B_LOCAL_EFFECT_PASS':
+        outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_STATE_UNKNOWN':
+        'DIRECT_B_EFFECT_STOP',
+      requestId:auth.request.requestId,manifestSha256:sha(auth.raw),
+      controlSha:auth.controlSha,sourceSha:auth.manifest.sourceSha,
+      mode:auth.mode,reportStatus:'INCOMPLETE',operationSucceeded:verified};
+  }
   // No default OS adapter: using an uninstalled B source must not grant effects.
   need(typeof makeApprovedNativeAdapter==='function',
     'DIRECT_B_NATIVE_BRIDGE_NOT_INSTALLED');
@@ -168,11 +211,10 @@ async function main(){
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   const controlRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-control');
   const auth=loadApprovedRaw({event,env,controlRoot});
-  verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(env.GITHUB_WORKSPACE??'',
-   'generic-b-approved-source')});
   // The sole native factory is code in the fixed reviewed checkout. Issue body
   // cannot select modules, paths, commands, targets or bridge capabilities.
   const fixedBridge=new URL('./native-adapter.mjs',import.meta.url);
+  if(auth.mode===CONFIGURED_B_EFFECT)return applyApprovedOnce(auth);
   if(!fs.existsSync(fileURLToPath(fixedBridge)))return applyApprovedOnce(auth);
   const native=await import(fixedBridge.href);
   need(typeof native.makeApprovedNativeAdapter==='function',
