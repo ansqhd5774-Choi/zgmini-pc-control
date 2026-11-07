@@ -1,7 +1,7 @@
 # 공통 Writer B — 신규 기능 재사용 안내 (Source-only)
 
-> **공통 Writer B 소스는 main의 PR #626/#627에 반영됐다. 단, 실제 GitHub Actions enabled/Windows Runner 접수 및 최초 PC Writer B 설치는 아직 확인되지 않았다.**
-> 아래는 승인된 공통 경로가 운영 가능 상태로 확인된 뒤, **각 기능의 원담당**이 재사용할 절차다. PR 생성·병합·테스트 PASS를 PC 설치나 기능 게시 완료로 보고하지 않는다.
+> 공통 Writer B의 실제 PC 설치 선례: [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651), [#666](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/666). 해당 당시의 승인 범위에만 유효하며, 후속 기능 파일의 자동 설치·게시 성공을 뜻하지 않는다.
+> 아래는 **각 기능 원담당**의 승인된 공통 경로 재사용 안내다. PR 생성·병합·테스트 PASS와 새 기능의 실제 PC 설치·게시 검증을 구분한다.
 
 ## 1. 한 기능을 추가할 때
 
@@ -12,6 +12,13 @@
 5. 정확한 requestId의 PC 결과와 원격 `results/writer-b-source-install-<requestId>.json`·`.txt` **두 결과쌍 2/2 재조회**, 실제 HEAD·config·Task·파일 보호 상태를 확인한 뒤 기능 원담당이 수집→저장→D1→API→페이지 운영 검증을 계속한다.
 
 **첫 실행 경로 확인의 범위:** `run-local.mjs`/`local-cycle.mjs`를 변경할 때만 Task XML의 단일 `<Exec>`와 첫 WSH/CMD VBS·CMD 경로를 확인한다. Task의 절대 `WorkingDirectory`가 있는 상대 경로는 그 기준으로 결합하고, C: 호환 junction은 실제 E: Writer data 경로로 확인되는 경우만 허용한다. 실제 승인 `LAUNCHER` 경로·SHA와 맞아야 `FIRST_HOP_TASK_LAUNCHER_MATCH`이며, 불분명한 실행 경로는 STOP이다. **이 증거는 첫 hop에 한하며 다단 VBS·Sidecar 전체 체인이나 실제 실행 성공을 보증하지 않는다.**
+
+### 기존 파일에 코드 삽입이 필요한 경우 — 읽기 전용 SHA 프리뷰 재사용
+
+- 공유 `scripts/pc-writer/*.mjs`에 **삽입만** 필요한 변경은 [`insert-only-patch.mjs`](insert-only-patch.mjs)와 [`insert-preview-readonly.mjs`](insert-preview-readonly.mjs)를 먼저 확인한다. 정확한 `afterSha256`를 알 수 없다는 이유로 Writer B의 원본·목표 SHA 계약을 완화하거나 새 Controller·CMD를 만들지 않는다.
+- PC 원본 바이트를 출력하지 않고 사전/사후 SHA와 Task XML SHA를 계산하는 기존 단회 A 워크플로는 [`pc-writer-insert-preview-once.yml`](../.github/workflows/pc-writer-insert-preview-once.yml)이다. [#645](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/645)·[#648](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/648) 실PC 성공은 **당시 지정된 파일**의 증거이며 다른 파일에 그대로 전용할 수 없다.
+- 새 프리뷰 사양은 `approvals/writer-previews/<새-id>.json`의 **6필드** `schema/sourceRoot/baseHead/filePath/beforeSha256/insertions`와 그 원문 SHA256에 고정한다. 현재 PC `HEAD=config.source`, 대상 tracked-clean, 정확한 preimage SHA 및 고유 anchor를 기존 프리뷰가 검증한다. 과거 기능의 spec·SHA를 복사하지 않는다.
+- 고유 `pc-writer-insert-preview` Issue의 결과 JSON/TXT를 직접 재조회한 뒤 **해당** `afterSha256`를 본문 2절의 기존 Writer B manifest에 반영한다. 프리뷰 PASS는 설치·공급자 호출·DB/D1 갱신 성공이 아니며, 실제 운영 쓰기는 기존 정규 B 및 기능 승인 범위로만 진행한다.
 
 ## 2. manifest 계약 (사용 전 반드시 실제 승인·해시 고정)
 
