@@ -21,6 +21,7 @@ export function projectSourcePreflightReport(report){
    const files=inventory.files;
    inventory.filesCount=files.length;
    inventory.filesSha256=createHash('sha256').update(JSON.stringify(files)).digest('hex');
+   inventory.filesHashRepresentation='COMPACT_JSON_UTF8';
    inventory.filesTransfer='OMITTED_SUMMARY_ONLY';
    delete inventory.files;
    omitted+=files.length;
@@ -42,6 +43,7 @@ export function projectSourcePreflightReport(report){
  projected.reportTransfer={status:'SUMMARY_ONLY',
   reason:'SOURCE_INVENTORY_EXCEEDS_REPORT_BUDGET',
   fullReportSha256:createHash('sha256').update(original).digest('hex'),
+  hashRepresentation:'COMPACT_JSON_UTF8',
   fullReportBytes:Buffer.byteLength(original),
   omittedFileEntries:omitted,
   priorSummarized,
