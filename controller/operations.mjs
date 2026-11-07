@@ -14,6 +14,7 @@ import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
 import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
+import {runApprovedRuntimeInventory} from './approved-runtime-inventory-dispatch.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
@@ -71,6 +72,8 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
 export function nativeTaskXml(task){return execFileSync(path.join(process.env.SystemRoot||'C:/Windows','System32','schtasks.exe'),['/Query','/TN',task,'/XML'],{windowsHide:true,timeout:12000,maxBuffer:262144});}
 export async function runOperation(request,context){
  const {workspace,dataRoot,policy,host,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence}=context;
+ if(request.operation==='approved-runtime-inventory-readonly')
+  return runApprovedRuntimeInventory({dataRoot,host,queryTask});
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask,retiredTaskEvidence}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
