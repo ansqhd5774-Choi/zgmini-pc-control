@@ -10,7 +10,11 @@ const hash64 = 'b'.repeat(64);
 const manifest = 'c'.repeat(64);
 const task = 'd'.repeat(64);
 const token = 'e'.repeat(64);
-const request = {requestId: 'github-request-823'};
+const request = {requestId: 'github-request-823',sourceSha:hash40,
+  approvalSha256:hash64,packageManifestSha256:manifest,
+  runtimePreimage:{activeRuntimeSha256:token,taskXmlSha256:task,
+    scheduledCmdSha256:'a'.repeat(64),
+    scheduledVbsSha256:'c'.repeat(64)}};
 
 function fixture() {
   const calls = [];
@@ -26,6 +30,8 @@ function fixture() {
     os: 'win32', runtimeMode: 'REPEATABLE_ACTIVE_RUNTIME',
     sourceSha: hash40, taskXmlSha256: task,
     activeRuntimeSha256: token, compatibilityEvidenceSha256: hash64,
+    scheduledCmdSha256:'a'.repeat(64),
+    scheduledVbsSha256:'c'.repeat(64),
   };
   const receiver = {
     async verifyApprovedPackage(id) {
@@ -71,6 +77,8 @@ function fixture() {
 
 const configured = receiver =>
   createDispatcherForTrustedNativeReceiver(async () => receiver)(request);
+const approvedPin = () => ({...request,
+  runtimePreimage:{...request.runtimePreimage}});
 
 test('production default has no installed native bridge: no effect',async()=>{
   const result = await dispatchConfiguredRuntimeB(request);
@@ -96,8 +104,9 @@ test('Issue cannot provide its own methods or source approval',async()=>{
     approved:true,sourceSha:'f'.repeat(40)};
   const result = await createDispatcherForTrustedNativeReceiver(
     async()=>receiver)(evil);
-  assert.equal(result.status,'DONE');
-  assert.deepEqual(calls.filter(x=>x==='install'),['install']);
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.reason,'B_REQUEST_ID');
+  assert.equal(calls.includes('install'),false);
 });
 
 test('unknown native loader blocks before preflight/install',async()=>{
@@ -182,4 +191,31 @@ test('readback not proved remains STATE_UNKNOWN, not DONE',async()=>{
   assert.equal(result.status,'STATE_UNKNOWN');
   assert.equal(result.reason,'B_INSTALLED_READBACK_UNCERTAIN');
   assert.equal(calls.filter(x=>x==='install').length,1);
+});
+
+test('Git-pinned approval must match independent receiver and Windows preimages',async()=>{
+  const {receiver,windows}=fixture();
+  windows.scheduledCmdSha256='a'.repeat(64);
+  windows.scheduledVbsSha256='c'.repeat(64);
+  const dispatch=createDispatcherForTrustedNativeReceiver(async()=>receiver);
+  assert.equal((await dispatch(approvedPin())).status,'DONE');
+  const badSource={...approvedPin(),sourceSha:'d'.repeat(40)};
+  const wrongSource=await dispatch(badSource);
+  assert.equal(wrongSource.status,'BLOCKED');
+  assert.equal(wrongSource.reason,'B_APPROVAL_IDENTITY_DRIFT');
+  const badPreimage=approvedPin();
+  badPreimage.runtimePreimage.taskXmlSha256='1'.repeat(64);
+  const wrongPreimage=await dispatch(badPreimage);
+  assert.equal(wrongPreimage.status,'BLOCKED');
+  assert.equal(wrongPreimage.reason,'B_WINDOWS_APPROVED_PREIMAGE_DRIFT');
+});
+
+test('partially supplied approved pin cannot reach native receiver',async()=>{
+  const {receiver,calls}=fixture();
+  const dispatch=createDispatcherForTrustedNativeReceiver(async()=>receiver);
+  const result=await dispatch({requestId:request.requestId,
+    approvalSha256:hash64});
+  assert.equal(result.status,'BLOCKED');
+  assert.equal(result.reason,'B_REQUEST_ID');
+  assert.deepEqual(calls,[]);
 });
