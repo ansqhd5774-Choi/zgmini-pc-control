@@ -3,7 +3,7 @@
 import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {selectPinnedCapabilityProfiles} from
- '../../controller/approved-runtime-inventory-readonly.mjs';
+ '../theme-generic-a/controller/approved-runtime-inventory-readonly.mjs';
 import {selectPinnedBundleProfiles} from './pinned-bundle-profiles.mjs';
 
 export const PIN_CAS_SCHEMA='ZGMINI_PC_RUNTIME_PIN_AND_REGISTRY_CAS_B_V1';
@@ -428,5 +428,7 @@ export async function runApprovedRegistryCas({
      'JSON_TXT_2_OF_2':'INCOMPLETE';
    }catch{reportStatus='INCOMPLETE';}
   }
-  return {...report,reportStatus};
+  return {...report,reportStatus,
+   endToEndDone:status==='PASS'&&reportStatus==='JSON_TXT_2_OF_2',
+   evidenceRecoveryRequired:status==='PASS'&&reportStatus!=='JSON_TXT_2_OF_2'};
 }
