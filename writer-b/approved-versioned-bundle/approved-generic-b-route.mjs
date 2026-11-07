@@ -71,7 +71,7 @@ function parseIssueFlatStrings(body){
  return parsed;
 }
 
-function authenticateIssue(issue){
+export function authenticateApprovedGenericBIssue(issue){
  need(issue?.title===GENERIC_B_TITLE&&issue?.state==='OPEN'&&
   issue?.author?.login===OWNER&&Number.isSafeInteger(issue?.number)&&issue.number>0&&
   Array.isArray(issue?.labels)&&issue.labels.some(x=>x?.name===GENERIC_B_LABEL)&&
@@ -127,7 +127,7 @@ export function createApprovedGenericBReceiverRoute({
     SHA40.test(runtime?.installedReceiverSha)&&SHA40.test(runtime?.controlCommitSha)&&
     runtime?.privateRepositoryVerified===true,
     'B_ROUTE_NOT_INSTALLED');
-   const request=authenticateIssue(issue);
+   const request=authenticateApprovedGenericBIssue(issue);
    need(request.expectedInstalledReceiverSha===runtime.installedReceiverSha,
     'B_ROUTE_RECEIVER_SHA_DRIFT');
    const previous=await requestStatus({requestId:request.requestId,
