@@ -8,7 +8,7 @@ import {changeProviderFlags} from './patch.mjs';
 import {FLAGS,FILE,APPROVAL_SCHEMA,SCOPE,verifyApproval,
   authorize,REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ACTOR,ISSUE_TITLE,ISSUE_LABEL,
   sha256} from './contract.mjs';
-import {applyApprovedFlags,loadAuthorization} from './run.mjs';
+import {applyApprovedFlags,loadAuthorization,normalizeAclEvidence} from './run.mjs';
 import {sanitizeReport,uploadReport} from './report.mjs';
 
 const manifest={schema:APPROVAL_SCHEMA,status:'APPROVED_B',scope:SCOPE,
@@ -80,6 +80,18 @@ test('Windows CRLF checkout uses Git blob raw approval bytes, not transformed wo
   assert.throws(()=>loadAuthorization({env:e,controlRoot:root,
     head:()=>e.GITHUB_SHA,blob:()=>committed}),
     {code:'PROVIDER_B_MANIFEST_WORKTREE_DRIFT_STOP'});
+});
+test('icacls continuation spacing depends on filename length, not access rights',()=>{
+  const source='E:\\ZGmini\\data\\pc-writer\\providers.env';
+  const backup=source+'.provider-b-12345678-1234-4123-8123-123456789abc.original.bin';
+  const acl=['BUILTIN\\Administrators:(I)(F)','NT AUTHORITY\\SYSTEM:(I)(F)'];
+  const format=file=>file+' '+acl[0]+'\r\n'+
+    ' '.repeat(file.length+1)+acl[1]+
+    '\r\nSuccessfully processed 1 files; Failed processing 0 files\r\n';
+  assert.equal(normalizeAclEvidence(format(source),source),
+    normalizeAclEvidence(format(backup),backup));
+  assert.notEqual(normalizeAclEvidence(format(source),source),
+    normalizeAclEvidence(format(backup).replace('(I)(F)','(I)(R)'),backup));
 });
 test('CRLF, BOM, comments, secret bytes and unrelated keys preserved',()=>{
   const secret='FRED_API_KEY=sensitive-super-secret';
