@@ -6,16 +6,16 @@
 - 전용 브랜치: codex/controller-ops-lessons-20261105
 - R1 완료 기록: #526 / R1 M0–M4 100% 보존
 - 기준: 단계마다 20%, **증명되지 않은 운영 상태를 점수에 반영하지 않음**
-- **현재 진행률: 20% (M0 DONE, M1–M4 미완료)**
+- **현재 진행률: 40% (M0·M1 DONE, M2 후속 진행·M3 독립 회귀 PASS·M4 인계 미완료)**
 
 ## 최신 상태
 
 | 단계 | 상태 | 누적 진행률 | 이번 확인 / 남은 증거 |
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
-| M1 읽기 전용 A | PARTIAL: (a) 기존 3파일 PASS, (b) Task→checkout 인과 미확인 | 20% 유지 | #654 후보 HEAD=config/checkpoint d50ba263·파일 3개·dirty=false PASS, #660 Controller 설치·#661 A 진단 PASS. #662 lib/worker 목록과 실제 Task PID 상관은 STATE_UNKNOWN |
-| M2 공통 Writer B | RUNNING (기존 정상 B PASS, 후속 후보 안전 시뮬레이션 PASS) | 20% 유지 | #651 실제 3파일 설치·#657 import 누락 STOP, preview+catalog+worker 후보 가상 B 계약 PASS. #662 PC lib/worker 존재·before SHA 없이는 새 APPROVED_B 확정/적용 금지 |
-| M3 실패·정상 회귀 | 독립 시나리오 5/5 PASS (M1/M4 실운영 증거 별개) | 20% 유지 | 현행 main 원문 8파일 Git blob 일치·집중 Node 40/40 PASS, 실PC #651 정상 B·#646 원복·#657 의존성 STOP 증거. Windows Runtime 연결·인계는 M1/M4에 남음 |
+| M1 읽기 전용 A | DONE — 사용자 승인 운영 Writer provenance | 40% | #651 실PC Writer B 3파일 설치·#654 HEAD=config=자연 checkpoint d50ba263/3파일 hash/clean PASS·#661 Task XML 보호 확인. 정확한 Task→PID 인과는 별도 STATE_UNKNOWN; #662 신규 의존 모듈은 M2 후속 |
+| M2 공통 Writer B | RUNNING (기존 정상 B PASS, 후속 후보 안전 시뮬레이션 PASS) | 40% 유지 | #651 실제 3파일 설치·#657 import 누락 STOP, preview+catalog+worker 후보 가상 B 계약 PASS. #662 PC lib/worker 존재·before SHA 없이는 새 APPROVED_B 확정/적용 금지 |
+| M3 실패·정상 회귀 | 독립 시나리오 5/5 PASS (M4 인계와 별개) | 40% 유지 | 현행 main 원문 8파일 Git blob 일치·집중 Node 40/40 PASS, 실PC #651 정상 B·#646 원복·#657 의존성 STOP 증거. 정확한 Task→PID 인과 미확인은 별도 보존하며 후속 M4 인계는 미완료 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -365,3 +365,11 @@
 - **M1(b) 근본 설계 검토:** 기존 `core-runtime-source-readonly`는 짧게 실행되는 Task engine+Node 프로세스의 실시간 WMI PID 스냅샷에 의존. [#632](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/632) `CORE_NO_ACTIVE_TASK_ENGINE`은 '조회 순간 미실행'이지 부적합 source 증거가 아님. #654 결과는 `sourceResolved=false/runtimeSourceVerified=false`로 *정확한 Task→checkout PID 인과*는 여전히 UNKNOWN. 정상 Writer checkpoint와 HEAD/config/Task XML 불변은 강한 **CORROBORATED_OPERATIONAL_WRITER_PROVENANCE** 대안 후보이나 수동 실행 가능성을 배제하지 못함. 기존 M1(b) 완료 계약 **임의 변경하지 않음**; 사용자에게 실용 증거 채택과 정밀 TaskScheduler 로그 상관 중 선택을 요청할 것.
 - **Writer B 3파일 후보:** candidate source `6ffe6bb7f3ff8faa452dc86fdcc2a44d0926b1a7`, preview SHA256 `bc458372f86faf061306ae50e2bc806534f80e4458e45dc7901a3e09cfab86cc`, catalog `db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5`, worker `86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f`. #654 A 당시 preview absent, #657 B import STOP/원본 무변경. 기존 B 계약으로 셋 모두 A의 가상 manifest+preimage PASS; 실제 lib/worker 기존 파일 존재 시 target before mismatch가 `WRITER_B_TARGET_PREIMAGE_SHA_STOP`, PC HEAD drift 시 `WRITER_B_PC_PREIMAGE_STOP`으로 안전 거부됨. **실PC lib/worker 현재 상태·해시 미회수 → 승인/실설치 불가**. R17 및 기존 run-local/Task 보호 유지, 신규 검사/Controller 업데이트 불필요.
 - **공식 판정:** M3 독립 5/5 PASS, M1(a) 기존 3파일 PASS, M1(b) 엄격한 Task 인과 미확인, M2 후속 Preview dependency PC preimage 미확인. R2 누적 **20% 유지**. 다음 실행은 #662 동일 runId/Job 상태 회수 또는 M1(b) 증거 계약의 사용자 선택 후 해당 범위 최소 경로로 진행한다.
+
+## 2026-11-07 — 사용자 승인 M1 실운영 Writer provenance 채택, 공식 40%
+
+- **사용자 결정:** M1(b)에서 실시간 Core Task PID 포착 대신 실제 정규 Writer 설치·Git/config/checkpoint SHA 정합·설치 후 자연 checkpoint 전진과 Task XML 보호를 충분한 운영 증거로 인정. 정확한 Task→PID 인과는 **STATE_UNKNOWN**으로 계속 기록한다. 원래 계획서 §12에 승인 기준·증거·잔존 위험을 명시하여 이력 보존.
+- **실제 증거 최종 교차:** [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651) `WRITER_B_INSTALLED_VERIFIED`, `LOCAL_OVERLAY`, 설치 3파일 SHA; [#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654) `PASS`, candidate HEAD=config.source=lastWriterEvidence.sourceHead `d50ba2630bb04c7c50911dac0a4069a8056ee469`, checkpoint `2026-11-07T03:20:40.051Z` B 설치 후 전진, gitVerified/clean/inventory complete, 3파일 해시 정확히 일치; [#661](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/661) Core Task XML `dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028` 유지·보호 상태 불변, 이후 writer checkpoint 전진.
+- **완료 범위:** M1 목표 기존 Writer 3파일 읽기 전용 A/운영 source 정합성 **DONE — `CORROBORATED_OPERATIONAL_WRITER_PROVENANCE`**. 이것은 `runtimeSourceVerified=true`로 바뀐 것이 아니고, 예약 Task→실행 PID 인과·물가지표 19개 공개 게시 성공·신규 lib/worker 실제 설치는 주장하지 않음. #662는 원래 M1 3파일 외 후속 M2 의존성 조사로 계속 추적.
+- **단계 업데이트:** R2 M0 20% + M1 20% = **누적 공식 40%**. M2 새 Preview·Catalog·Worker 승인 manifest는 #662 실제 PC 조회 전 확정하지 않음. M3 독립 회귀 5/5 PASS 유지, M4 원담당 실제 수신·공통 경로 인계 미완료. PC 쓰기/새 예약/Issue 재생 0.
+- **NEXT:** 동일 #662의 Actions runId/상태 확보 → 실제 PC `moduleSourceInventory` 존재·SHA 확인 → 최소 Writer B manifest 사전 구성 및 원담당 역할의 후속 적용 조정. 안정적 증거를 택했더라도 #662 실행·업로드 장애를 숨기거나 실패로 단정하지 않는다.
