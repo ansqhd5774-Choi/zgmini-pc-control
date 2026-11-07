@@ -125,3 +125,10 @@ M1과 M2의 코드·문서 준비는 독립적으로 병렬 수행한다. **동�
 - [#633](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/633): 정적 VBS 탐색은 PASS, `sourceResolved=false`; Git/승인 config.source/Writer checkpoint가 일치하는 고정 checkout 후보 확보. [#634](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/634)는 디렉터리 인벤토리 상한(`inventoryTruncated=true`)으로 후보 없음. 둘을 혼동하거나 동일 요청 반복하지 않는다.
 - M1은 **(a) corroborated candidate file inventory**(존재/각 SHA256/dirty와 Git/config/checkpoint 일치)와 **(b) actual Core Runtime binding**(활성 Task 실행 연결)을 별개로 검증한다. (a)만 PASS이면 M1 완료 아님; B의 사전 source gate에서 (b) 필요 여부를 실제 설치기 계약과 대조한다. 별도 Core 강제 시작·신규 스케줄을 Gate로 만들지 않는다.
 - [PR #635](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/635)는 기존 `pc-source-preflight` 재사용 보완, 테스트 20/20 PASS인 GitHub 소스 준비다. 새 Controller B가 승인·PC 설치되기 전 기능 활성은 아니다. 다음 공통 실행은 PR 독립 리뷰→정확한 설치 전후 지문 계약→정규 1회 B→A 후보 3파일 실측. Writer 설치는 사용자 별도 명시 없는 한 물가지표 원담당의 영역으로 유지한다.
+
+## 11. 2026-11-07 M1 실PC 읽기 전용 결과와 다음 필수 인계
+
+- 공통 A 진단 개선 PR #635와 승인 PR #636 반영 후 실제 B [#637](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/637) **SUCCEEDED**, Controller `29d667763650b5d719926034ce3583d563a35d23` 설치/보호 불변.
+- 새 A [#639](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/639) PASS: 승인 config.source=Writer checkpoint=고정 후보 Git HEAD `f7ed1e44957b5a8994163c1f2e5bd23bc1cb9ab5`; file inventory 137/137. 정확한 후보 3파일은 `run-local.mjs` M(기존 SHA `922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a`), `inflation-causal-public-auto-publication-r1.mjs` A, 동일 `.test.mjs` A. 실제 각 파일 dirty UNKNOWN; `sourceResolved/runtimeSourceVerified=false`.
+- 다음 B 접수 계약: 기능 원담당은 #981의 3파일 after SHA와 최신 main/운영 후보를 재대조하고, 실제 Core Task 첫 hop/Task XML·관련 VBS/Sidecar/protected file SHA와 Writer B 운영 활성 확인 후, `writer-b/contract.mjs`의 승인 manifest 1개를 고정한다. 정규 B 수신기 `verifyWriterBPreimage`가 설치 직전 동일 Git HEAD/config/파일 존재·해시/dirty를 CAS 방식 검증하므로 소스 후보의 UNKNOWN을 허위 PASS로 승격하거나 별도 전역 A Gate를 추가하지 않는다.
+- 프로세스 총괄은 공통 B 경로·오류·회귀/인계 계약을 증명하고 기능 설치/19지표 갱신은 원담당이 수행한다. 실제 Writer B 정상 1회 통과와 사용자/원담당 인수까지 R2 최종 완료 아님.
