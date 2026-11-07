@@ -9,8 +9,8 @@
 | 조회 모드 | 관측 조건 | 후속 B급 후보 |
 | --- | --- | --- |
 | `FIRST_SINGLE_CMD_UPGRADE` | 설치 원본은 안정적으로 존재, `ACTIVE_RUNTIME.json` 없음 | 최초 안전 전환의 사전검사만 가능 |
-| `REPEATABLE_ACTIVE_RUNTIME` | 설치 원본·`ACTIVE_RUNTIME.json` 둘 다 안정적으로 존재 | 기존 활성 포인터 기반 반복 전환 후보 |
-| `INSTALL_PREIMAGE_NOT_FOUND` / `INSTALL_PREIMAGE_UNVERIFIED` | 설치 원본 부재·크기 초과·해시 불가 | B급 설치 판단 불가 |
+| `REPEATABLE_ACTIVE_RUNTIME` | `ACTIVE_RUNTIME.json`의 안정적인 해시 존재 (최초 설치 원장 없어도 정상 후보) | 기존 활성 포인터 기반 반복 전환 후보 |
+| `INSTALL_PREIMAGE_NOT_FOUND` / `INSTALL_PREIMAGE_UNVERIFIED` | 활성 포인터가 없고 최초 설치 원본도 부재·해시 불가 | B급 설치 판단 불가 |
 | `ACTIVE_PREIMAGE_UNVERIFIED` / `STATE_UNKNOWN*` | 활성 원본 불확실·검사 중 변동 | B급 설치 판단 불가 |
 
 이 모드는 **A 조회 증거**일 뿐 B 실행 권한이 아니다. 기존 `R179` 게시 실패, `L7` 수집 실패, 공개 API `STALE`은 이 조회 성공만으로 해결되지 않는다.
