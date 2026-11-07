@@ -51,7 +51,8 @@ function snapshot(manifest,after=false,trustedProfiles=profiles){
   fileListSha256:after?buildVersionedBundlePlan(manifest,trustedProfiles).fileListSha256:null,
  };
 }
-function driver(manifest,{failAt=null,rollbackFails=false,trustedProfiles=profiles}={}){
+function driver(manifest,{failAt=null,rollbackFails=false,trustedProfiles=profiles,
+ reportIncomplete=false}={}){
  const log=[];
  const state={active:false,locked:false,staged:false,backup:false,committed:false,
   results:[]};
@@ -84,7 +85,8 @@ function driver(manifest,{failAt=null,rollbackFails=false,trustedProfiles=profil
   },
   async verifyRollback(){maybe('verify-rollback');return snapshot(manifest,state.active,trustedProfiles);},
   async releaseSharedWriterLock(){maybe('unlock');state.locked=false;},
-  async recordResult({report}){log.push('report');state.results.push(report);return {json:true,txt:true};},
+  async recordResult({report}){log.push('report');state.results.push(report);
+   return {json:true,txt:!reportIncomplete};},
  };
  return {log,state,adapter};
 }
@@ -93,10 +95,19 @@ test('generic common B transaction: authenticated preflight to readback 2/2 with
  const arg=input();const d=driver(arg.manifest);
  const r=await runVersionedBundleTransaction({...arg,adapter:d.adapter});
  assert.equal(r.status,'PASS');assert.equal(r.reportStatus,'JSON_TXT_2_OF_2');
+ assert.equal(r.endToEndDone,true);assert.equal(r.evidenceRecoveryRequired,false);
  assert.equal(r.retainLockForRecovery,false);
  assert.equal(d.state.active,true);assert.equal(d.state.locked,false);
  assert.deepEqual(d.log,['authenticate','preimage','lock','under-lock','stage',
   'backup','activate','readback','commit','unlock','report']);
+});
+test('committed B mutation with incomplete evidence is not end-to-end DONE or safe to replay',async()=>{
+ const arg=input();const d=driver(arg.manifest,{reportIncomplete:true});
+ const r=await runVersionedBundleTransaction({...arg,adapter:d.adapter});
+ assert.equal(r.status,'PASS');assert.equal(r.reportStatus,'INCOMPLETE');
+ assert.equal(r.endToEndDone,false);assert.equal(r.evidenceRecoveryRequired,true);
+ assert.equal(d.state.committed,true);assert.equal(d.state.active,true);
+ assert.equal(d.log.filter(x=>x==='activate').length,1);
 });
 test('unauthenticated raw manifest never calls adapter or writes',async()=>{
  const arg=input();const d=driver(arg.manifest);
