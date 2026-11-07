@@ -52,7 +52,11 @@ poller can still discover requests. The Issue never supplies `path`, `task`,
 
 `maintenance-agent-generic-b-hook.mjs` is a tiny optional branch which leaves
 all four existing Issue titles untouched. Its presence grants NO capability:
-calling it requires the above installed/approved injected dependencies.
+calling it requires the above installed/approved injected dependencies. Its
+handler is **intake-only** (`approvedRoute.receive`): approval/package identity
+is checked and the *existing fixed `tools/update.mjs` CLI* is called. The
+actual PIN CAS/versioned effect route is imported only by the installed
+updater, not executed inside the maintenance-agent poll loop.
 
 `maintenance-agent-integration.patch` is the **unapplied 18-line-source
 candidate** against main `tools/maintenance-agent.mjs`. It adds one new
@@ -84,7 +88,8 @@ reusing the legacy name would invite a critical old/new-SHA mix-up.
 3. Insert `GENERIC_B_TITLE` in `tools/maintenance-agent.mjs::pollOnce`
    summary-title allowlist, and call the installed hook at the **beginning**
    of `processIssue` before its legacy four-title filter/slug parser. Import
-   the new hook and route in the receiver's verified SHA manifest; keep its
+   the intake-only hook in the maintenance receiver and the actual route in
+   the installed updater; pin both in the verified SHA manifest. Keep its
    existing poller, lease, Origin attestation and report delivery.
 4. Implement exact `tools/update.mjs` **fixed** `approved-runtime-b-status`
    and `approved-runtime-b-apply` commands, with installed owner/manifest
@@ -103,7 +108,9 @@ reusing the legacy name would invite a critical old/new-SHA mix-up.
 The code here is the safe routing *shape*, **not** a complete deployable
 updater: it deliberately lacks GitHub fetcher, installed-origin verifier,
 durable B ledger, live Windows bridge for the 108-file Task/launcher swap,
-registered CLI status/apply, installed hashes and signed/merged B permission.
+the actual installed CLI factory injection, installed hashes and signed/merged
+B permission. See `update-integration/` for the fixed CLI candidate and its
+one-request vertical DI simulation.
 Pretending those are satisfied would be the very permission bypass this
 project is removing. They remain explicit integration work.
 
