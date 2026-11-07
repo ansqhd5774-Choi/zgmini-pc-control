@@ -32,7 +32,7 @@ function input(){
   effects:{taskDefinitionChanges:false,newTasks:false,providerCalls:false,
    dbWrites:false,d1Writes:false,secretReads:false,otherOperationalFiles:false}};
  const rawManifest=JSON.stringify(manifest);
- const pinnedApproval={requestId:'issue-765-request-1',rawManifestSha256:hash(rawManifest),
+ const pinnedApproval={requestId:'a08a54e5-8f26-4875-a6c4-39c23b008111',rawManifestSha256:hash(rawManifest),
   approvalRef:'docs/approved/bundle-manifest.json',
   sourceSha:manifest.sourceSha,profileId:manifest.profileId};
  return {manifest,rawManifest,pinnedApproval,trustedProfiles:profiles};
@@ -115,6 +115,18 @@ test('unauthenticated raw manifest never calls adapter or writes',async()=>{
  const r=await runVersionedBundleTransaction({...arg,adapter:d.adapter});
  assert.equal(r.status,'BLOCKED');assert.equal(r.code,'B_PIN_RAW_HASH_DRIFT');
  assert.deepEqual(d.log,['report']);
+});
+test('legacy non-UUID B request IDs fail before authorization, lock, or mutation',async()=>{
+ for(const badId of ['issue-765-request-1',
+  '00000000-0000-9000-8000-000000000000',
+  '00000000-0000-4000-7000-000000000000']){
+  const arg=input();const d=driver(arg.manifest);
+  arg.pinnedApproval.requestId=badId;
+  const r=await runVersionedBundleTransaction({...arg,adapter:d.adapter});
+  assert.equal(r.status,'BLOCKED',badId);
+  assert.equal(r.code,'B_PIN_FORMAT',badId);
+  assert.deepEqual(d.log,['report'],badId);
+ }
 });
 test('early failures release shared lock without activating',async()=>{
  for(const failAt of ['authenticate','preimage','lock','under-lock','stage']){
