@@ -92,6 +92,25 @@ test('writer VERIFIED never masquerades as inflation publication success',t=>{
  assert.equal(report.projection.availability,'MISSING');
 });
 
+test('core collection gaps and isolated inflation publication error are distinct',t=>{
+ const f=fixture(t);
+ f.put('local-cycle-last-run.json',{status:'COMPLETE_WITH_COLLECTION_GAPS',
+  collectionExit:1,publicationExit:0,
+  inflationRecurring:{status:'FAILED_PREVIOUS_INPUTS_PRESERVED',providerRequests:null}});
+ f.put('local-writer-last-run.json',{status:'VERIFIED_WITH_GAPS',
+  failures:[{id:'inflation-19-publication',reason:'INFL19_AUTO_D1_READBACK_MISMATCH'},
+   {id:'unrelated-output',reason:'SECRET_TOKEN'}]});
+ const report=inspectInflation19RuntimeReadonly(f.root);
+ assert.equal(report.cycle.cycleStatus,'COMPLETE_WITH_COLLECTION_GAPS');
+ assert.equal(report.cycle.collectionExit,1);
+ assert.equal(report.cycle.publicationExit,0);
+ assert.equal(report.cycle.status,'FAILED_PREVIOUS_INPUTS_PRESERVED');
+ assert.equal(report.writer.writerStatus,'VERIFIED_WITH_GAPS');
+ assert.equal(report.writer.status,'FAILED_STAGE');
+ assert.equal(report.writer.inflationFailure,'INFL19_AUTO_D1_READBACK_MISMATCH');
+ assert.equal(JSON.stringify(report).includes('SECRET_TOKEN'),false);
+});
+
 test('not recorded, malformed JSON, too-large and symlink are safely classified',t=>{
  const f=fixture(t);
  let out=inspectInflation19RuntimeReadonly(f.root);
