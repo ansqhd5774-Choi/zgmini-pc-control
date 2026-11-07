@@ -24,6 +24,16 @@ test('CRLF preimage remains CRLF without unrelated normalization',()=>{
  assert.equal(output.includes('=true;\n'),false);
  assert.equal(output.endsWith(anchorB+'\r\n'),true);
 });
+test('PC source without final newline preserves original terminal bytes',()=>{
+ const bytes=Buffer.from(anchorA+'\nconst untouched=5;\n'+anchorB);
+ const output=applyApprovedInsertions(bytes,insertions).toString('utf8');
+ assert.ok(output.endsWith(anchorB));
+ assert.equal(output.endsWith(anchorB+'\n'),false);
+ assert.ok(output.includes('const untouched=5;\n'));
+ const lastLineOnly=[{anchor:anchorB,position:'after',text:'const x=1;\n'}];
+ assert.throws(()=>applyApprovedInsertions(bytes,lastLineOnly),
+  {code:'WRITER_B_INSERT_UNTERMINATED_EOF_APPEND_STOP'});
+});
 test('missing or ambiguous anchor refuses overlay',()=>{
  assert.throws(()=>applyApprovedInsertions(Buffer.from(anchorA+'\n'),insertions),
   /WRITER_B_INSERT_ANCHOR_MATCH_STOP/);
@@ -37,5 +47,5 @@ test('reject mutation-like input, excess, or duplicate anchors',()=>{
  assert.throws(()=>validateInsertions([insertions[0],insertions[0]]),
   /WRITER_B_INSERT_DUPLICATE_ANCHOR_STOP/);
  assert.throws(()=>applyApprovedInsertions(Buffer.from('abc'),insertions),
-  /WRITER_B_INSERT_PREIMAGE_NEWLINE_STOP/);
+  /WRITER_B_INSERT_ANCHOR_MATCH_STOP/);
 });
