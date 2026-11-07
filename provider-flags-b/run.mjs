@@ -105,7 +105,7 @@ function atomicReplace(target,bytes,suffix){
 }
 
 export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
-  sharedLock=SHARED_LOCK,beforeSwitch=()=>{}}={}){
+  sharedLock=SHARED_LOCK,beforeSwitch=()=>{},afterSwitch=()=>{}}={}){
   const requestId=auth.request.requestId;
   let lock=null,claimed=false,retain=false,original=null,proposed=null,
     wrote=false,result=null;
@@ -135,6 +135,7 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
       wrote=true;
       atomicReplace(target,proposed.bytes,requestId);
       journal('SWITCHED');
+      afterSwitch();
     }
     need(regular(target,path.dirname(target)).equals(proposed.bytes),
       'PROVIDER_B_READBACK_STOP');
