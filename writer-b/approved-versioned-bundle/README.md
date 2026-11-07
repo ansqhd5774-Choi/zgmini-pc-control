@@ -94,9 +94,11 @@ receiver, **not proof that the actual Windows receiver supports them**.
 12. recordResult: JSON and TXT artifacts, preserving user secrets, no
     unbounded source payloads. A committed file mutation with incomplete
     report artifacts is **not end-to-end DONE**: consumer must require
-    `status=PASS` **and** `reportStatus=JSON_TXT_2_OF_2`, and recover missing
-    results from the existing committed journal without reapplying B or
-    reusing a consumed request ID.
+    `status=PASS` **and** `reportStatus=JSON_TXT_2_OF_2`. Both coordinators
+    expose `endToEndDone:false` and `evidenceRecoveryRequired:true` for a
+    committed mutation with incomplete JSON/TXT, and the receiver must
+    recover missing results from the existing committed journal without
+    reapplying B or reusing a consumed request ID.
 
 The above steps are **adapter obligations**, not proven Windows operations.
 Local simulated tests demonstrate the **ordering, transitions and fault
