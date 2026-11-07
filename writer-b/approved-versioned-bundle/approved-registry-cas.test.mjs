@@ -59,7 +59,7 @@ function fixture(){
  const normalizedApproval={...approval,hostBeforeSha256:sha(normalizedHost),
   hostAfterSha256:sha(normalizedHostAfter),oldPin:sha(beforeRegistry)};
  const approvalRaw=Buffer.from(JSON.stringify(normalizedApproval));
- const pinnedApproval={requestId:'approved-request-20261108-001',
+ const pinnedApproval={requestId:'f7732b82-279a-42c8-a6d5-2d1d9f0a789e',
   sourceSha,profileId:id,rawApprovalSha256:sha(approvalRaw)};
  return {hostRaw:normalizedHost,hostAfter:normalizedHostAfter,
   beforeRegistry,afterRegistry,newEntry,existing,approval:normalizedApproval,
@@ -207,6 +207,18 @@ test('unbounded or unsafe one-shot request ID denied before adapter callbacks',a
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'B_PIN_REQUEST_ID');
  assert.deepEqual(d.state.history,['report']);
+});
+test('ordinary slugs and structurally invalid UUIDs cannot invoke PIN CAS',async()=>{
+ for(const badId of ['approved-request-20261108-001',
+  '00000000-0000-9000-8000-000000000000',
+  '00000000-0000-4000-7000-000000000000']){
+  const f=fixture(),d=mockIo(f);
+  const result=await runApprovedRegistryCas({approvalRaw:f.approvalRaw,
+   pinnedApproval:{...f.pinnedApproval,requestId:badId},adapter:d.adapter});
+  assert.equal(result.status,'BLOCKED',badId);
+  assert.equal(result.code,'B_PIN_REQUEST_ID',badId);
+  assert.deepEqual(d.state.history,['report'],badId);
+ }
 });
 test('all early transaction faults stop without operational mutation',async()=>{
  for(const faultAt of ['authenticate','preimage','lock','under-lock',
