@@ -1,0 +1,66 @@
+# Generic approved Writer source B installation. This is not an A-grade
+# pc-job, Controller maintenance action, recurring schedule, or a release gate.
+name: ZGMINI Approved Writer B Source Overlay Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Create-only sanitized result evidence.
+  issues: write # One bounded result comment to originating Issue.
+concurrency:
+  group: zgmini-writer-source-b-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  writer-source-approved-b:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-writer-source-install' &&
+      contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Pin reviewed control source
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: writer-b-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Approve exact manifest before candidate checkout
+        id: manifest
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\preflight.mjs"'
+      - name: Checkout approved public candidate SHA only
+        if: steps.manifest.outcome == 'success'
+        id: candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.manifest.outputs.candidateSourceSha }}
+          path: writer-b-candidate
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run approved exact-file Writer B source transaction
+        if: steps.candidate.outcome == 'success'
+        id: install
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\windows-adapter.mjs" > "%RUNNER_TEMP%\writer-b-install-result.json"'
+      - name: Create-only sanitized result and originating Issue comment
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\report.mjs"'
