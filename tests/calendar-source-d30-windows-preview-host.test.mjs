@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {D30_INSTALL_CONTRACT} from '../calendar-source-d30/contract.mjs';
-import {validateD30ReadOnlyIssue,runD30ReadOnlyWindowsHost}
+import {validateD30ReadOnlyIssue,parseD30ReadOnlyIssueEvent,
+  runD30ReadOnlyWindowsHost}
   from '../calendar-source-d30/windows-preview-host.mjs';
 
 const owner='ansqhd5774-Choi';
@@ -30,6 +31,17 @@ test('exact private owner-origin Issue and control SHA authorizes read-only prev
   assert.equal(r.requestId,request.requestId);
   assert.equal(r.controlHead,controlSha);
   assert.equal('install' in r,false);
+});
+
+test('normal GitHub Issue metadata beyond 8 KiB does not block a valid request',()=>{
+  const f=fixture();
+  f.event.repository.description='context'.repeat(3000);
+  const bytes=Buffer.from(JSON.stringify(f.event),'utf8');
+  assert.ok(bytes.length>8192);
+  const event=parseD30ReadOnlyIssueEvent(bytes);
+  assert.equal(validateD30ReadOnlyIssue({...f,event}).requestId,request.requestId);
+  assert.throws(()=>parseD30ReadOnlyIssueEvent(Buffer.alloc(2_000_000)),
+    {code:'ER1_D30_PREVIEW_EVENT_FILE_STOP'});
 });
 
 test('other actor or mismatched control checkout cannot authorize source reads',()=>{
