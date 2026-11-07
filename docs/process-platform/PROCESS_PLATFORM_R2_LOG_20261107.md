@@ -245,3 +245,10 @@
 - **공통 구조 문제:** 최초 Writer B는 승인 `beforeSha256`을 검증하지만 수정 파일 M의 내용은 후보 GitHub commit의 **전체 파일 바이트**를 대체한다. PC 운영 HEAD가 원격 후보와 정확히 계보 일치하지 않을 때, 승인된 변경 hunk만 보존하는 공통 경로가 부족하다. 기능별 CMD·신규 일정·Controller-only 우회로 해결하지 않는다.
 - **최소 수정 방향 (R2 M1/M2 내, 새 완료 Gate 아님):** 기존 A급 읽기 전용 범위를 이용해 PC 원본과 승인된 변경 hunk의 적용 가능성·최종 해시만 확인(운영 파일/전체 원본 외부 업로드 금지) → 공통 Writer B가 `before SHA + 승인된 정확한 삽입 패치 + after SHA`로 검증된 **선별 변경**만 임시 Git 객체에 적용하도록 보완·격리 회귀 → 동일 원본·첫 launcher·Task·lease/backup/rollback 보호를 유지한 실제 B 단회 → 결과 2/2, 보호 및 기능 후속 확인. 기존 전체 파일 오버레이 경로는 변경하지 않고 선택적 패치 모드만 추가할지 계약·테스트로 검토한다.
 - 신규 Writer B Issue/운영 설치·DB·D1·Task 변경 **0**. **R2 공식 20% 유지**, 안전한 설치 방식이 확정되기 전 추정 manifest 발행 금지.
+
+## 2026-11-07 — PR #981 실제 후보 해시 재검산 및 삽입 전용 변환 격리 실험
+
+- PR head `6ffe6bb7f3ff8faa452dc86fdcc2a44d0926b1a7`의 정확한 UTF-8 원문을 3파일 각각 GitHub fetch 후 SHA256 재계산. `run-local.mjs` **실제 목표**=`e7986e8cf120f490d83a10218cb6656fb78e6ce493c2f6b2b6d899adb77b927c`; 이전 PR/인계 `…b2d6…`는 한 글자 오기여서 [PR #981](https://github.com/ansqhd5774-Choi/zgmini/pull/981) 설명과 담당 인계서 교정. 신규 hook=`2e9bf2b817635a816cb2327efc379bb5b2bb9c55a76c50155c14b76ee9f4d725`, test=`6201d1448bbe581059d31b14fbffb2d552b71a1c30e6c1906ce7b479dded37e0`는 기존 기록과 일치.
+- PR base `run-local.mjs` SHA256=`1c336662a36248d9fb3cf1207dc900514a4cad4e00aaf1d04d5e3be09898c6ae`, 실제 PC 후보 SHA256=`922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a`. 두 원본이 다르다는 독립 재검산 유지. 최신 GitHub 원격 기록에서 PC 파일 원문을 아직 확보하지 않았으므로 **전체 파일 오버레이는 여전히 중단**.
+- 공통 삽입-only 순수 변환의 로컬 격리 프로토타입 `writer-b/insert-only-patch.mjs`/테스트 작성, 4/4 PASS: 유일 anchor·정확한 UTF-8 추가만 허용, CRLF 유지, 원본 Byte 불변, 모호한 위치 거부. PR base에 두 정확한 삽입을 적용한 결과 해시도 실제 PR head `…b2b6…`와 일치. **아직 GitHub 공통 소스/Writer B에 통합하지 않았으며 실PC 적용 증거 아님**. 다음은 현재 PC 원본에 이 두 anchor가 정확히 존재하는지 읽기 전용 미리보기로 확인하고, 필요한 범위에서 범용 B 계약을 보완하는 것.
+- 구조 교훈: after SHA는 수기 복사하지 않고 **실제 GitHub 후보 바이트에서 기계적으로 산출**하고 manifest와 교차 검산해야 한다. 운영 코드 변경·Task/DB/D1·B 요청 0. 공식 R2 **20% 유지**.
