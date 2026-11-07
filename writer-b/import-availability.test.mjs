@@ -71,7 +71,7 @@ test('existing Node TypeScript imports are allowed, never trigger an extra globa
 });
 
 test('escape, unsupported extension and malformed source fail without evaluation',()=>{
- for(const spec of ['../../../../secret.mjs','./image.png','./evil\\name.mjs']){
+ for(const spec of ['../../../../secret.mjs','./no-extension','./evil\\name.mjs']){
   assert.throws(()=>relativeModuleReferences('scripts/pc-writer/new.mjs',
    B("import('"+spec+"');\n")),
    {code:'WRITER_B_IMPORT_PATH_SCOPE_STOP'});
