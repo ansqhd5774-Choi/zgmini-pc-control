@@ -5,9 +5,8 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {verifyOpenedOwnerIssue,approvalPathFor,authorizeApprovedRaw,
-  loadApprovedRaw,applyApprovedOnce,verifyPinnedSourceCheckout,DIRECT_B_RESULT} from './run.mjs';
+  loadApprovedRaw,applyApprovedOnce,DIRECT_B_RESULT} from './run.mjs';
 import {sanitizeDirectBReport,uploadDirectBReport} from './report.mjs';
-import {approvedCandidateSource,appendCandidatePin} from './preflight.mjs';
 import {SCHEMA as BUNDLE_SCHEMA,SCOPE as BUNDLE_SCOPE}
   from '../writer-b/approved-versioned-bundle/versioned-bundle-plan.mjs';
 import {PIN_CAS_SCHEMA,PIN_CAS_SCOPE}
@@ -85,29 +84,6 @@ test('fixed Git blob identity, working file identity and SHA must all agree',()=
     assert.throws(()=>authorizeApprovedRaw({event:f.ev,env:env(),
       raw:f.raw,worktree:f.raw,actualHead:controlSha,...partial}),/DIRECT_B_/);
   }
-});
-test('candidate source checkout is emitted only after the exact B approval',()=>{
- const f=fixture();const writes=[];
- const pin=appendCandidatePin(f.auth,{outputFile:'/trusted/github-output',
-  append:(file,content)=>writes.push({file,content})});
- assert.equal(pin.repository,'ansqhd5774-Choi/zgmini');
- assert.equal(pin.sourceSha,sourceSha);
- assert.deepEqual(writes,[{file:'/trusted/github-output',
-  content:`candidateSourceSha=${sourceSha}\n`}]);
- assert.throws(()=>appendCandidatePin(f.auth,{outputFile:'relative-output',
-  append:()=>{}}),/DIRECT_B_ACTIONS_OUTPUT_STOP/);
- assert.throws(()=>approvedCandidateSource({...f.auth,
-  manifest:{...f.auth.manifest,sourceSha:'anybranch'}}),
-  /DIRECT_B_CANDIDATE_SOURCE_UNVERIFIED/);
-});
-test('actual candidate checkout must have the approved source SHA',()=>{
- const f=fixture();
- assert.equal(verifyPinnedSourceCheckout(f.auth,{sourceRoot:'/absolute/candidate',
-  gitHead:()=>sourceSha}).sourceSha,sourceSha);
- for(const opts of [{sourceRoot:'relative',gitHead:()=>sourceSha},
-  {sourceRoot:'/absolute/candidate',gitHead:()=>('f'.repeat(40))}])
-  assert.throws(()=>verifyPinnedSourceCheckout(f.auth,opts),
-   /DIRECT_B_CANDIDATE_SOURCE_DRIFT/);
 });
 
 test('unreviewed or broadened effects cannot pass manifest authorization',()=>{
@@ -222,8 +198,7 @@ test('ambiguous or partial report cannot be labeled published success or auto-re
 
 test('workflow remains inert local candidate, exact one-shot Windows shared writer lane',()=>{
   const dir=path.dirname(fileURLToPath(import.meta.url));
-  const yml=fs.readFileSync(path.join(dir,'..','.github','workflows',
-   'pc-approved-runtime-b-once.yml'),'utf8');
+  const yml=fs.readFileSync(path.join(dir,'../.github/workflows/pc-approved-runtime-b-once.yml'),'utf8');
   assert.match(yml,/types:\s*\[opened\]/);
   assert.match(yml,/github\.run_attempt == 1/);
   assert.match(yml,/github\.event\.repository\.private == true/);
@@ -231,12 +206,83 @@ test('workflow remains inert local candidate, exact one-shot Windows shared writ
   assert.match(yml,/zgmini-writer-source-b-one-at-a-time/);
   assert.match(yml,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
   assert.match(yml,/persist-credentials: false/);
-  assert.match(yml,/direct-writer-b\\preflight\.mjs/);
-  assert.match(yml,/steps\.manifest\.outputs\.candidateSourceSha/);
-  assert.match(yml,/generic-b-approved-source/);
-  assert.ok(yml.indexOf('preflight.mjs')<yml.indexOf('id: candidate'));
-  assert.ok(yml.indexOf('id: candidate')<yml.indexOf('id: apply'));
   assert.match(yml,/report\.mjs/);
   assert.match(yml,/if: always\(\)/);
   assert.equal(DIRECT_B_RESULT,'approved-runtime-b-once-result.json');
+});
+
+function configuredApproval(){
+  return {schema:'ZGMINI_CONFIGURED_RUNTIME_B_APPROVAL_V1',
+    status:'APPROVED_B',scope:'PC_WRITER_CONFIGURED_THEME_REPEAT_UPGRADE_ONLY',
+    sourceRepository:'ansqhd5774-Choi/zgmini',sourceSha,
+    profileId:'configured-themes',
+    runnerPath:'scripts/pc-writer/theme-config-package-runner.mjs',
+    packageManifestSha256:'b'.repeat(64),
+    runtimeMode:'REPEATABLE_ACTIVE_RUNTIME',
+    runtimePreimage:{
+      activeRuntimeSha256:'c'.repeat(64),
+      taskXmlSha256:'d'.repeat(64),
+      scheduledCmdSha256:'e'.repeat(64),
+      scheduledVbsSha256:'f'.repeat(64)},
+    effects:{providerCalls:false,dbWrites:false,d1Writes:false,
+      taskDefinitionChanges:false,newTasks:false,
+      otherOperationalFiles:false}};
+}
+function configuredFixture(manifest=configuredApproval()){
+  const raw=Buffer.from(JSON.stringify(manifest)+'\n');
+  const request=req(digest(raw));
+  const auth=authorizeApprovedRaw({event:event(JSON.stringify(request)),
+    env:env(),raw,worktree:raw,actualHead:controlSha});
+  return {raw,request,auth};
+}
+test('configured repeat B has distinct fixed approval profile and pinned preimages',()=>{
+  const f=configuredFixture();
+  assert.equal(f.auth.mode,'CONFIGURED_THEMES_REPEAT_UPGRADE');
+  assert.equal(f.auth.manifest.packageManifestSha256,'b'.repeat(64));
+  for(const modify of [
+    m=>{m.runnerPath='scripts/arbitrary.mjs';},
+    m=>{m.effects.dbWrites=true;},
+    m=>{m.runtimeMode='FIRST_SINGLE_CMD_UPGRADE';},
+    m=>{m.runtimePreimage.taskXmlSha256=null;},
+    m=>{m.profileId='unregistered';},
+  ]){
+    const m=configuredApproval();modify(m);
+    assert.throws(()=>configuredFixture(m),/DIRECT_B_EFFECT_SCOPE_STOP/);
+  }
+});
+test('configured B routes exact pinned manifest into existing dispatcher',async()=>{
+  const f=configuredFixture();let calls=0;
+  const result=await applyApprovedOnce(f.auth,{configuredRunner:async pins=>{
+    calls++;assert.equal(pins.requestId,requestId);
+    assert.equal(pins.sourceSha,sourceSha);
+    assert.equal(pins.approvalSha256,digest(f.raw));
+    assert.equal(pins.packageManifestSha256,'b'.repeat(64));
+    assert.deepEqual(pins.runtimePreimage,f.auth.manifest.runtimePreimage);
+    return {status:'DONE',sourceSha,
+      verified:'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'};
+  }});
+  assert.equal(calls,1);
+  assert.equal(result.mode,'CONFIGURED_THEMES_REPEAT_UPGRADE');
+  assert.equal(result.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
+  const cleaned=sanitizeDirectBReport(result,f.request,env());
+  assert.equal(cleaned.mode,'CONFIGURED_THEMES_REPEAT_UPGRADE');
+  assert.equal(cleaned.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
+  const http=fakeGithub();
+  const delivered=await uploadDirectBReport({event:event(JSON.stringify(f.request)),
+    env:env(),rawResult:JSON.stringify(result),fetchApi:http.fetch});
+  assert.equal(delivered.verified,2);
+  assert.equal(delivered.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
+});
+test('missing fixed Windows receiver blocks configured B before install',async()=>{
+  const f=configuredFixture();
+  const result=await applyApprovedOnce(f.auth);
+  assert.equal(result.status,'DIRECT_B_EFFECT_BLOCKED');
+  assert.equal(result.operationSucceeded,false);
+  const wrongSource=await applyApprovedOnce(f.auth,{configuredRunner:async()=>({
+    status:'DONE',sourceSha:'a'.repeat(40),
+    verified:'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'})});
+  assert.equal(wrongSource.status,'DIRECT_B_EFFECT_BLOCKED');
+  const uncertain=await applyApprovedOnce(f.auth,{configuredRunner:async()=>({
+    status:'STATE_UNKNOWN'})});
+  assert.equal(uncertain.status,'DIRECT_B_EFFECT_UNKNOWN');
 });
