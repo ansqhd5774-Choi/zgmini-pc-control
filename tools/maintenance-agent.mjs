@@ -19,6 +19,7 @@ import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 const ISSUE_TITLE="pc-controller-update";
 const R6_HOST_ISSUE_TITLE="pc-r6-host-register";
+const GENERIC_B_ISSUE_TITLE="pc-approved-runtime-b";
 const ISSUE_LABEL="pc-maintenance";
 const ALLOWED_ACTORS=Object.freeze(["ansqhd5774-Choi"]);
 const SHA40=/^[a-f0-9]{40}$/;
@@ -218,6 +219,7 @@ export function createMaintenanceAgent({
   leaseRoot=FIXED_LEASE_ROOT,leaseAttempts=120,leaseWaitMs=500,
   updateScript=path.join(path.dirname(fileURLToPath(import.meta.url)),"update.mjs"),
   verifyInstalledSource=()=>{},
+  approvedGenericBHook=null,
   installedShaFromStatus=result=>result?.actualControllerSha,
   ghTimeoutMs=20_000,updateTimeoutMs=0,
   now=()=>new Date().toISOString(),
@@ -520,6 +522,20 @@ export function createMaintenanceAgent({
     return persistResult(entry,result);
   }
   async function processIssue(issue){
+    // An additional approved effect is opt-in. Existing four maintenance
+    // operations and their installed parser/ledger contract stay unchanged.
+    if(issue?.title===GENERIC_B_ISSUE_TITLE){
+      if(!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
+        return {status:"IGNORED",issueNumber:issue?.number};
+      if(approvedGenericBHook===null)
+        return {status:"BLOCKED",code:"B_ROUTE_NOT_INSTALLED",issueNumber:issue.number};
+      if(typeof approvedGenericBHook.dispatch!=="function")
+        throw coded("B_ROUTE_HOOK_INVALID");
+      const outcome=await approvedGenericBHook.dispatch(issue);
+      if(outcome?.handled!==true||!outcome.result)
+        throw coded("B_ROUTE_RESULT_UNVERIFIED");
+      return outcome.result;
+    }
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
       ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
       return {status:"IGNORED",issueNumber:issue?.number};
@@ -676,7 +692,8 @@ export function createMaintenanceAgent({
       if(!Number.isSafeInteger(number)||number<=0||seen.has(number))continue;
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
-      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(entry?.title))continue;
+      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,
+        GENERIC_B_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
       const cached=settledIssueCache.get(number);
       const updatedAt=entry?.updatedAt;
