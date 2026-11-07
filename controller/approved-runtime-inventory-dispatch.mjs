@@ -72,8 +72,6 @@ export function runApprovedRuntimeInventory({request,dataRoot,host,queryTask}={}
    return blocked('APPROVED_INVENTORY_REPORT_TOO_LARGE');
   if(code==='INVENTORY_SOURCE_UNREGISTERED')
    return blocked('APPROVED_INVENTORY_SOURCE_UNREGISTERED');
-  if(code==='INVENTORY_PROFILE_SELECTION_OVERSIZED')
-   return blocked('APPROVED_INVENTORY_SELECTION_TOO_LARGE');
   if(code==='INVENTORY_REPARSE_OR_TYPE_DENIED')
    return blocked('APPROVED_INVENTORY_PATH_PROTECTION_STOP');
   return blocked('APPROVED_INVENTORY_REGISTRY_INVALID');
