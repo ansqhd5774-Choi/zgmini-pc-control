@@ -195,6 +195,7 @@ test('large pc-source-preflight inventory reports explicit summary within 32KiB'
  assert.equal(transmitted.reportTransfer.status,'SUMMARY_ONLY');
  assert.equal(transmitted.reportTransfer.omittedFileEntries,280);
  assert.equal(transmitted.reportTransfer.fullInventoryTransferVerified,false);
+ assert.equal(transmitted.reportTransfer.hashRepresentation,'COMPACT_JSON_UTF8');
  assert.equal(transmitted.reportTransfer.fullReportSha256,
   createHash('sha256').update(before).digest('hex'));
  const c=transmitted.result.result.historicalCheckoutCandidate;
@@ -204,6 +205,7 @@ test('large pc-source-preflight inventory reports explicit summary within 32KiB'
   assert.equal(inventory.filesCount,files.length);
   assert.equal(Object.hasOwn(inventory,'files'),false);
   assert.equal(inventory.filesSha256,createHash('sha256').update(JSON.stringify(files)).digest('hex'));
+  assert.equal(inventory.filesHashRepresentation,'COMPACT_JSON_UTF8');
  }
  assert.equal(projectSourcePreflightReport({...report,operation:'other'}),null);
  const f=fixture();
