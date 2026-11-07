@@ -137,10 +137,9 @@ export function inspectApprovedA(auth,{dataRoot=String.raw`E:\ZGmini\data`,
     // Never declare legacy vs repeatable while the installed preimage moves.
     // Second independent read detects a write between first mode and hashes.
     const second=inspect({dataRoot,profile,queryTask});
-    const watched=profile.files.filter(x=>[
-     'ACTIVE_RUNTIME.json','INSTALL_RESULT.json',
-     'THEME_SCHEDULED.cmd','THEME_SCHEDULED.vbs'].includes(x.relativePath));
-    const stable=watched.every(x=>JSON.stringify(report.files?.[x.key])===
+    // Every approved preimage file must be stable, including repeatable
+    // runtime manual launchers registered after the initial A profile.
+    const stable=profile.files.every(x=>JSON.stringify(report.files?.[x.key])===
      JSON.stringify(second.files?.[x.key]))&&
      profile.tasks.every(x=>JSON.stringify(report.tasks?.[x.key])===
       JSON.stringify(second.tasks?.[x.key]));
