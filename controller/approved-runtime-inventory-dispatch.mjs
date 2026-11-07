@@ -19,7 +19,7 @@ const blocked=code=>({status:'BLOCKED',code,actualExecutionSha:null,
  * MUST be maintained independently of registry file content and Issue JSON.
  * No other `host` property is treated as a selectable path or operation.
  */
-export function runApprovedRuntimeInventory({dataRoot,host,queryTask}={}){
+export function runApprovedRuntimeInventory({request,dataRoot,host,queryTask}={}){
  if(!PIN.test(host?.approvedRuntimeInventorySha256??''))
   return blocked('APPROVED_INVENTORY_NOT_REGISTERED');
  // Constant trusted-data-root-relative target; no Issue/host path selection.
@@ -52,7 +52,7 @@ export function runApprovedRuntimeInventory({dataRoot,host,queryTask}={}){
   return blocked(error.code==='ENOENT'?'APPROVED_INVENTORY_REGISTRY_ABSENT':
    'APPROVED_INVENTORY_REGISTRY_UNAVAILABLE');
  }
- if(!entry.isFile() || entry.isSymbolicLink() || entry.size>16384 || entry.size<16)
+ if(!entry.isFile() || entry.isSymbolicLink() || entry.size>128*1024 || entry.size<16)
   return blocked('APPROVED_INVENTORY_REGISTRY_INVALID');
  try{
   const real=fs.realpathSync(target);
@@ -62,7 +62,7 @@ export function runApprovedRuntimeInventory({dataRoot,host,queryTask}={}){
    return blocked('APPROVED_INVENTORY_REGISTRY_INVALID');
   const bytes=fs.readFileSync(target);
   const inventory=inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes:bytes,
-   approvedManifestSha256:host.approvedRuntimeInventorySha256});
+   approvedManifestSha256:host.approvedRuntimeInventorySha256,requestIdentity:request});
   return {...inventory,status:'PASS',actualExecutionSha:null};
  }catch(error){
   const code=String(error?.code??'');
@@ -70,6 +70,10 @@ export function runApprovedRuntimeInventory({dataRoot,host,queryTask}={}){
    return blocked('APPROVED_INVENTORY_REGISTRY_DRIFT');
   if(code==='INVENTORY_REPORT_OVERSIZED')
    return blocked('APPROVED_INVENTORY_REPORT_TOO_LARGE');
+  if(code==='INVENTORY_SOURCE_UNREGISTERED')
+   return blocked('APPROVED_INVENTORY_SOURCE_UNREGISTERED');
+  if(code==='INVENTORY_PROFILE_SELECTION_OVERSIZED')
+   return blocked('APPROVED_INVENTORY_SELECTION_TOO_LARGE');
   if(code==='INVENTORY_REPARSE_OR_TYPE_DENIED')
    return blocked('APPROVED_INVENTORY_PATH_PROTECTION_STOP');
   return blocked('APPROVED_INVENTORY_REGISTRY_INVALID');
