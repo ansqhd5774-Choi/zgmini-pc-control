@@ -32,6 +32,8 @@ const day=v=>typeof v==='string'&&/^(?:19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\
   Number.isFinite(Date.parse(`${v}T00:00:00Z`))&&
   new Date(`${v}T00:00:00Z`).toISOString().slice(0,10)===v;
 const version=v=>typeof v==='string'&&v.length>0&&v.length<=100&&/^[A-Za-z0-9._-]+$/.test(v);
+const failureCode=v=>typeof v==='string'&&
+  /^(?:INFL_CANDIDATE|BLS_CANDIDATE|TREASURY_CUSTOMS|CENSUS_M3|FED_G17|EIA_REGULAR)_[A-Z0-9_]{1,90}$/.test(v);
 
 function regularDirectory(location){
   try{const stat=fs.lstatSync(location);
@@ -89,9 +91,10 @@ function safeCheckpoint(snapshot){
   for(const group of GROUPS){
     const p=doc.processed[group],a=doc.attempted[group];
     if(p&&(typeof p.eventKey!=='string'||p.eventKey.length>240||!day(p.observationDate)))return {status:'INVALID'};
-    if(a&&(typeof a.eventKey!=='string'||a.eventKey.length>240||!iso(a.at)))return {status:'INVALID'};
+    if(a&&(typeof a.eventKey!=='string'||a.eventKey.length>240||!iso(a.at)||
+      (a.failureCode!==undefined&&!failureCode(a.failureCode))))return {status:'INVALID'};
     byGroup[group]={processed:!!p,processedObservationDate:p?.observationDate??null,
-      attempted:!!a,lastAttemptedAt:a?.at??null};
+      attempted:!!a,lastAttemptedAt:a?.at??null,failureCode:a?.failureCode??null};
   }
   return {status:'PRESENT_VALID',fileSha256:snapshot.sha256,groups:byGroup};
 }
