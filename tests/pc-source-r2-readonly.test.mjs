@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectPcSource,inspectWriterSourceInventory} from '../controller/pc-source-readonly.mjs';
+import {inspectPcSource,inspectWriterSourceInventory,inspectWriterModuleInventory} from '../controller/pc-source-readonly.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const fixture=t=>{
@@ -60,6 +60,54 @@ test('two-level VBS wrapper resolves static Writer source without execution',t=>
  assert.doesNotMatch(JSON.stringify(result),/NEVER_OUTPUT_SECRET/);
  assert.equal(result.providerCalls,0);
  assert.equal(result.d1Writes,0);
+});
+
+test('generic A inventories direct worker/lib modules with bounded SHA only',t=>{
+ const f=fixture(t),root=path.join(f.root,'projects/pilot');
+ f.put('projects/pilot/worker/inflation-causal-public-r1.mjs','export const worker=1;');
+ f.put('projects/pilot/lib/inflation-causal-public-catalog.mjs','export const catalog=1;');
+ const inventory=inspectWriterModuleInventory(root);
+ assert.equal(inventory.status,'PASS');
+ assert.equal(inventory.complete,true);
+ assert.equal(inventory.files.length,2);
+ assert.equal(inventory.files.find(x=>
+  x.path==='worker/inflation-causal-public-r1.mjs').sha256,
+  hash(Buffer.from('export const worker=1;')));
+ assert.equal(inventory.files.find(x=>
+  x.path==='lib/inflation-causal-public-catalog.mjs').sha256,
+  hash(Buffer.from('export const catalog=1;')));
+ assert.equal(inventory.files.every(x=>x.trackedDirty===null),true);
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,git:f.git});
+ assert.equal(result.moduleSourceInventory.status,'PASS');
+ assert.equal(result.runtimeSourceVerified,false,
+  'module inventory is not an active Task runtime attestation');
+});
+
+test('missing worker/lib root directories are observed absence, not a global gate',t=>{
+ const f=fixture(t);
+ const r=inspectWriterModuleInventory(path.join(f.root,'projects/pilot'));
+ assert.equal(r.status,'PASS');
+ assert.equal(r.complete,true);
+ assert.deepEqual(r.directories,[{path:'lib',present:false},{path:'worker',present:false}]);
+ assert.deepEqual(r.files,[]);
+});
+
+test('unsafe or oversized source modules cannot hide safe sibling digests',t=>{
+ const f=fixture(t),root=path.join(f.root,'projects/pilot');
+ f.put('projects/pilot/lib/valid.mjs','export const val=1;');
+ f.put('projects/pilot/lib/too-large.mjs',Buffer.alloc(2_000_001,65));
+ const external=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-r2-secret-'));
+ t.after(()=>fs.rmSync(external,{recursive:true,force:true}));
+ const secret=path.join(external,'secret.mjs');fs.writeFileSync(secret,'SECRET_RAW');
+ fs.symlinkSync(secret,path.join(root,'lib','escaped.mjs'));
+ const r=inspectWriterModuleInventory(root);
+ assert.equal(r.status,'PARTIAL');
+ assert.equal(r.complete,false);
+ assert.equal(r.files.length,1);
+ assert.equal(r.files[0].path,'lib/valid.mjs');
+ assert.ok(r.issues.some(x=>x.path==='lib/escaped.mjs'));
+ assert.ok(r.issues.some(x=>x.path==='lib/too-large.mjs'));
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_RAW/);
 });
 
 test('config source mismatch is reported but cannot falsify PC Runtime proof',t=>{

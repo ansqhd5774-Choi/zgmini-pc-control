@@ -113,6 +113,79 @@ export function inspectWriterSourceInventory(sourceRoot,{realpath=p=>fs.realpath
   complete,directory:'scripts/pc-writer',files,issues,totalBytes};
 }
 
+/**
+ * Optional, bounded dependency-module inventory for the already-identified
+ * Writer checkout. Direct lib/ and worker/ files only, no arbitrary paths,
+ * recursive traversal, source contents, DB, keys, provider calls or writes.
+ * Missing directories are observed ABSENT; read errors remain PARTIAL.
+ */
+export function inspectWriterModuleInventory(sourceRoot,{
+ realpath=p=>fs.realpathSync.native(p),read=p=>fs.readFileSync(p)
+}={}){
+ const output={status:'PASS',code:'WRITER_MODULE_INVENTORY_COMPLETE',
+  complete:true,evidenceLevel:'CHECKOUT_FILESYSTEM_NOT_CORE_RUNTIME',
+  directories:[],files:[],issues:[],totalBytes:0};
+ const issue=(code,relative)=>output.issues.push({code,...(relative?{path:relative}:{})});
+ const wanted=/\.(?:mjs|cjs|js|ts|mts|cts)$/i;
+ const safeName=/^[a-z0-9][a-z0-9._-]{0,127}\.(?:mjs|cjs|js|ts|mts|cts)$/i;
+ try{
+  const rootReal=realpath(sourceRoot);
+  if(rootReal.toLowerCase()!==path.resolve(sourceRoot).toLowerCase()||
+     !fs.lstatSync(sourceRoot).isDirectory()||
+     fs.lstatSync(sourceRoot).isSymbolicLink())
+   throw Error('UNVERIFIED');
+ }catch{
+  return {...output,status:'STATE_UNKNOWN',
+   code:'WRITER_MODULE_SOURCE_UNVERIFIED',complete:false};
+ }
+ for(const dirName of ['lib','worker']){
+  const dir=path.join(sourceRoot,dirName);
+  let stat;
+  try{stat=fs.lstatSync(dir);}
+  catch(e){
+   if(e?.code==='ENOENT'){output.directories.push({path:dirName,present:false});continue;}
+   issue('WRITER_MODULE_DIRECTORY_UNREADABLE',dirName);continue;
+  }
+  try{
+   if(!stat.isDirectory()||stat.isSymbolicLink()||
+      realpath(dir).toLowerCase()!==path.resolve(dir).toLowerCase())
+    throw Error('UNVERIFIED');
+  }catch{issue('WRITER_MODULE_DIRECTORY_UNVERIFIED',dirName);continue;}
+  output.directories.push({path:dirName,present:true});
+  let names;
+  try{names=fs.readdirSync(dir).filter(n=>wanted.test(n)).sort();}
+  catch{issue('WRITER_MODULE_DIRECTORY_UNREADABLE',dirName);continue;}
+  if(names.length>256){
+   issue('WRITER_MODULE_FILE_COUNT_LIMIT',dirName);continue;
+  }
+  for(const name of names){
+   if(!safeName.test(name)){issue('WRITER_MODULE_FILENAME_UNVERIFIED',dirName);continue;}
+   const relative=dirName+'/'+name,p=path.join(dir,name);
+   try{
+    const file=fs.lstatSync(p);
+    if(!file.isFile()||file.isSymbolicLink()||
+       file.size<1||file.size>2_000_000||
+       realpath(p).toLowerCase()!==path.resolve(p).toLowerCase()){
+     issue('WRITER_MODULE_FILE_UNVERIFIED',relative);continue;
+    }
+    if(output.totalBytes+file.size>24_000_000||
+       output.files.length>=400){
+     issue('WRITER_MODULE_TOTAL_LIMIT',relative);continue;
+    }
+    const bytes=read(p);
+    if(!Buffer.isBuffer(bytes)||bytes.length!==file.size){
+     issue('WRITER_MODULE_FILE_READ_MISMATCH',relative);continue;
+    }
+    output.totalBytes+=bytes.length;
+    output.files.push({path:relative,sha256:sha256(bytes),trackedDirty:null});
+   }catch{issue('WRITER_MODULE_FILE_UNAVAILABLE',relative);}
+  }
+ }
+ if(output.issues.length){output.status='PARTIAL';
+  output.code='WRITER_MODULE_INVENTORY_PARTIAL';output.complete=false;}
+ return output;
+}
+
 /** Injectable dependencies keep fixture tests independent from a real Windows PC. */
 export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  realpath=p=>fs.realpathSync.native(p),read=p=>fs.readFileSync(p),
@@ -264,6 +337,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
       // `--untracked-files=no` does not establish each inventory file is
       // tracked. A candidate-level clean status cannot prove per-file clean.
       dirtyPaths:null});
+     candidate.moduleSourceInventory=inspectWriterModuleInventory(real,{realpath,read});
     }
     result.historicalCheckoutCandidate=candidate;
    }
@@ -280,6 +354,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
   if(validSha(result.sourceHead)&&result.configApprovedSha)
    result.sourceHeadMatchesConfig=result.sourceHead.toLowerCase()===result.configApprovedSha;
   result.writerSourceInventory=inspectWriterSourceInventory(sourceRoot,{realpath,read,dirtyPaths:changed});
+  result.moduleSourceInventory=inspectWriterModuleInventory(sourceRoot,{realpath,read});
  }catch{result.code='PC_SOURCE_GIT_READ_UNVERIFIED';return result;}
  for(const name of sourceFiles){
   const p=path.join(sourceRoot,...name.split('/'));
