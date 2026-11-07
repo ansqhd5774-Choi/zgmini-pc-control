@@ -1,4 +1,4 @@
-name: ZGMINI Calendar D30 Read-Only Three-File Preview Once
+name: ZGMINI Calendar D30 Read-Only Preview Or SQLite Verification
 on:
   issues:
     types: [opened]
@@ -17,7 +17,8 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      github.event.issue.title == 'pc-calendar-d30-readonly-preview-once' &&
+      (github.event.issue.title == 'pc-calendar-d30-readonly-preview-once' ||
+       github.event.issue.title == 'pc-calendar-d30-db-readonly-once') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 6
@@ -39,6 +40,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Read approved public base source
+        if: github.event.issue.title == 'pc-calendar-d30-readonly-preview-once'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ansqhd5774-Choi/zgmini
@@ -47,6 +49,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Read exact D30 candidate source
+        if: github.event.issue.title == 'pc-calendar-d30-readonly-preview-once'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ansqhd5774-Choi/zgmini
@@ -55,4 +58,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Read-only three-file D30 merge preview
+        if: github.event.issue.title == 'pc-calendar-d30-readonly-preview-once'
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\calendar-source-d30\windows-preview-host.mjs"'
+      - name: Read-only D30 private SQLite evidence
+        if: github.event.issue.title == 'pc-calendar-d30-db-readonly-once'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\calendar-source-d30\windows-d30-sqlite-readback.mjs"'
