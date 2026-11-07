@@ -235,3 +235,13 @@
 - **다음 실제 실행:** 물가지표 담당이 최신 PR 3파일과 실제 Core Task/sourceRoot/HEAD/config·해시/dirty/first-hop 의존성을 확정해 불변 B manifest 승인 → 원담당 단회 B Issue로 Windows Runner 실제 수신·설치 및 보호·복구 결과를 검증. R2 총괄은 첫 공통 경로 결함만 처리하며 기능 자동 게시 실증은 별도. **공식 R2 20% 유지.**
 
 - **동일 Runner 라벨 교차검증:** 같은 이슈 #639의 [공용 A 성공 run #42322099022](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42322099022)는 `completed/success`, job `approved-pc-job`이며 실행 당시 `.github/workflows/pc-job.yml`의 `runs-on: [self-hosted, Windows, X64, zgmini-pc-control]`가 공통 Writer B workflow와 정확히 일치한다. 즉 2026-11-07 10:05 KST에는 해당 라벨의 자체 Windows Runner가 **A job 1건을 수행**한 증거가 있다. B job은 아직 경로 조건을 통과하지 않았으므로 B 전용 수신기·source 설치·backup/rollback 검증은 미완료다.
+
+## 2026-11-07 — 최초 범용 Writer B 실설치 직전 원본 드리프트 발견
+
+- 사용자가 이번 19개 지표 Writer B 첫 실제 설치·시행착오·재발 방지까지 **R2 프로세스 총괄이 단일 적용 책임을 수행하도록 직접 지시**했다. 기존 물가지표 담당자는 새 병행 B 요청을 만들지 않는다. 범위는 PR #981의 승인된 3개 파일과 공통 A/B 설치 경로; 데이터 산식·수집기·게시 정책·일반 기능 구현 무단 변경 없음.
+- **LAST PASS:** 공통 B `issues.opened` 이벤트 수신 [run #42322098882](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42322098882), 동일 라벨 Windows Runner A 성공 [run #42322099022](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42322099022), Controller #637/A #639 기존 실증.
+- **FIRST FAIL/설치 전 출처 충돌:** PC [#639](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/639) 고정 후보 `run-local.mjs` SHA256=`922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a`; PR #981 기준 `run-local.mjs` SHA256=`1c336662a36248d9fb3cf1207dc900514a4cad4e00aaf1d04d5e3be09898c6ae`; PR #981 전체 교체 목표=`e7986e8cf120f490d83a10218cb6656fb78e6ce493c2f6b2d6d899adb77b927c`. 파일 전체 오버레이는 PR의 **9줄 추가 범위 밖 기존 코드가 교체될 위험**이 있으므로 정규 manifest를 승인하지 않음.
+- 실PC 승인 Git HEAD `f7ed1e44957b5a8994163c1f2e5bd23bc1cb9ab5`는 GitHub `zgmini` commit/contents 조회에서 `404 No commit found`. `run-local.mjs`의 해당 SHA256은 원격 기본 브랜치 파일 변경 36개 버전에서도 일치하지 않았고, 확인한 관련 브랜치 8개 파일도 불일치. **PC 원본의 정확한 내용·미반영 변경은 아직 미확인**이며 임의로 과거 HEAD로 덮어쓰지 않는다.
+- **공통 구조 문제:** 최초 Writer B는 승인 `beforeSha256`을 검증하지만 수정 파일 M의 내용은 후보 GitHub commit의 **전체 파일 바이트**를 대체한다. PC 운영 HEAD가 원격 후보와 정확히 계보 일치하지 않을 때, 승인된 변경 hunk만 보존하는 공통 경로가 부족하다. 기능별 CMD·신규 일정·Controller-only 우회로 해결하지 않는다.
+- **최소 수정 방향 (R2 M1/M2 내, 새 완료 Gate 아님):** 기존 A급 읽기 전용 범위를 이용해 PC 원본과 승인된 변경 hunk의 적용 가능성·최종 해시만 확인(운영 파일/전체 원본 외부 업로드 금지) → 공통 Writer B가 `before SHA + 승인된 정확한 삽입 패치 + after SHA`로 검증된 **선별 변경**만 임시 Git 객체에 적용하도록 보완·격리 회귀 → 동일 원본·첫 launcher·Task·lease/backup/rollback 보호를 유지한 실제 B 단회 → 결과 2/2, 보호 및 기능 후속 확인. 기존 전체 파일 오버레이 경로는 변경하지 않고 선택적 패치 모드만 추가할지 계약·테스트로 검토한다.
+- 신규 Writer B Issue/운영 설치·DB·D1·Task 변경 **0**. **R2 공식 20% 유지**, 안전한 설치 방식이 확정되기 전 추정 manifest 발행 금지.
