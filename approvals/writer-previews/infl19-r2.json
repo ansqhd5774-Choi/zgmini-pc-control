@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "f7ed1e44957b5a8994163c1f2e5bd23bc1cb9ab5",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a",
+  "insertions": [
+    {
+      "anchor": "const publish=process.argv.includes('--publish');",
+      "position": "after",
+      "text": "// Candidate only: recurring inflation research sidecar writes require their own\n// approved publication scope and exact installed-source manifest before enablement.\nconst INFLATION_19_AUTO_PUBLICATION_APPROVED=true;\n"
+    },
+    {
+      "anchor": "  // Reuse the existing public snapshot table; publish only the bounded display score.",
+      "position": "before",
+      "text": "  if(INFLATION_19_AUTO_PUBLICATION_APPROVED){\n   await attemptOutput(report,'inflation-19-publication',async()=>{\n    const {publishInflation19Auto}=await import('./inflation-causal-public-auto-publication-r1.mjs');\n    report.inflation19=await publishInflation19Auto({pcHome:base,remote,coreDb:config.core});\n   });\n  }\n"
+    }
+  ]
+}
