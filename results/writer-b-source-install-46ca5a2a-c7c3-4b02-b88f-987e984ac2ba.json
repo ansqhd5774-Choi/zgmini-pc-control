@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "46ca5a2a-c7c3-4b02-b88f-987e984ac2ba",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "d50ba2630bb04c7c50911dac0a4069a8056ee469",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "f7ed1e44957b5a8994163c1f2e5bd23bc1cb9ab5",
+  "candidateSourceSha": "6ffe6bb7f3ff8faa452dc86fdcc2a44d0926b1a7",
+  "manifestSha256": "4f0c6893550e61ca903cb57f6cc4e44bf596671a8f7321f39f82b35c967ea4e9",
+  "baseTreeOid": "9407814e5de44a7e08e70e0d87c55daf4e4676d3",
+  "preparedTreeOid": "0cf74fb4c9761598f12f60769e01d04c9360a006",
+  "provenanceSha256": "5599eefa2403c40db3f66b7924d6b62ac701d464f70859c0aea7a969d393fc1d",
+  "runId": "42332932474",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/run-local.mjs",
+    "scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs",
+    "scripts/pc-writer/inflation-causal-public-auto-publication-r1.test.mjs"
+  ]
+}
