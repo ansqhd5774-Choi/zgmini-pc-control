@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectInflationCandidatesRuntimeReadonly as inspect} from './inflation-candidates-runtime-readonly.mjs';
+import {inspectInflationCandidatesRuntimeReadonly as inspect} from '../controller/inflation-candidates-runtime-readonly.mjs';
 
 const VERSION='INFL_CANDIDATE_FIXTURE_R1',STAMP='2026-11-08T00:00:00.000Z';
 const mk=()=>{
