@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {ACTOR,CONTROL_REPO,RESULT_SCHEMA,FLAGS,issueRequest,verifyEvent} from './contract.mjs';
+import {ACTOR,CONTROL_REPO,RESULT_SCHEMA,flagProfileForPath,issueRequest,verifyEvent} from './contract.mjs';
 
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
@@ -28,15 +28,16 @@ export function sanitizeReport(raw,request,env){
   if(raw.requestId!==request.requestId&&
     !(raw.status==='PROVIDER_B_SETUP_STOP'&&raw.requestId===null))return base;
   if(raw.status==='PROVIDER_B_APPLIED_VERIFIED'){
-    if(!['PROVIDER_B_TWO_FLAGS_SET','PROVIDER_B_ALREADY_SET'].includes(raw.code)||
+    const flags=flagProfileForPath(request.approvalManifestPath)?.flags;
+    if(!flags||!['PROVIDER_B_TWO_FLAGS_SET','PROVIDER_B_ALREADY_SET'].includes(raw.code)||
       raw.changedKeys?.length!==2||
-      !FLAGS.every((key,i)=>raw.changedKeys[i]===key)||
+      !flags.every((key,i)=>raw.changedKeys[i]===key)||
       raw.manifestSha256!==request.approvalManifestSha256||
       !SHA40.test(raw.controlSha??'')||
       !SHA64.test(raw.beforeSha256??'')||!SHA64.test(raw.afterSha256??'')||
       raw.backupVerified!==true)return base;
     return {...base,status:raw.status,code:raw.code,
-      changedKeys:[...FLAGS],controlSha:raw.controlSha,
+      changedKeys:[...flags],controlSha:raw.controlSha,
       beforeSha256:raw.beforeSha256,afterSha256:raw.afterSha256,
       backupVerified:true};
   }
