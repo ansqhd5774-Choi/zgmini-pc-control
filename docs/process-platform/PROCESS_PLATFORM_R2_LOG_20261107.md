@@ -252,3 +252,12 @@
 - PR base `run-local.mjs` SHA256=`1c336662a36248d9fb3cf1207dc900514a4cad4e00aaf1d04d5e3be09898c6ae`, 실제 PC 후보 SHA256=`922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a`. 두 원본이 다르다는 독립 재검산 유지. 최신 GitHub 원격 기록에서 PC 파일 원문을 아직 확보하지 않았으므로 **전체 파일 오버레이는 여전히 중단**.
 - 공통 삽입-only 순수 변환의 로컬 격리 프로토타입 `writer-b/insert-only-patch.mjs`/테스트 작성, 4/4 PASS: 유일 anchor·정확한 UTF-8 추가만 허용, CRLF 유지, 원본 Byte 불변, 모호한 위치 거부. PR base에 두 정확한 삽입을 적용한 결과 해시도 실제 PR head `…b2b6…`와 일치. **아직 GitHub 공통 소스/Writer B에 통합하지 않았으며 실PC 적용 증거 아님**. 다음은 현재 PC 원본에 이 두 anchor가 정확히 존재하는지 읽기 전용 미리보기로 확인하고, 필요한 범위에서 범용 B 계약을 보완하는 것.
 - 구조 교훈: after SHA는 수기 복사하지 않고 **실제 GitHub 후보 바이트에서 기계적으로 산출**하고 manifest와 교차 검산해야 한다. 운영 코드 변경·Task/DB/D1·B 요청 0. 공식 R2 **20% 유지**.
+
+## 2026-11-07 — 공통 B 삽입형 실장과 A 읽기 전용 첫 실행 요청
+
+- **공통 구조 수정 source 완료:** [PR #642](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/642) squash merge `2aada572c8d7356faeb60fc6f3655438479067ad` → control main. 이전 4-key B full-file 모드 보존; 신규 M insert 모드는 `beforeSha256`, PR 후보 `candidateSha256`, 독립 `afterSha256`, 위치·텍스트를 전부 승인 해시에 묶는다. Windows B 준비 단계는 실제 PC before bytes를 보존하면서 삽입하고 after SHA를 재계산한다. Task pause **이전** 로컬 합성 commit/hash 보호 및 기존 lock/backup/rollback 유지.
+- **검증:** 순수 overlay/PC 프리뷰/요청 인증/B 기존 receiver 회귀 등 로컬 Node **30/30 PASS**. A 프리뷰 독립 정적 검토에서 무단 PC 쓰기·명백한 승인 우회 미발견. 이것은 source 검증이지 PC B 설치 성공이 아님.
+- **A 승인 명세:** control main `approvals/writer-previews/infl19-r2.json` 원문 SHA-256 `1d025c2ccf032ae6638946a4d572b846f1cbf50ed5ceb3301673240838751dae`, main commit `23705e9bbaf6c850fb41121f7d1912e9d3ac0087`. PC 기존 run-local before `922503ba…`, PC base HEAD `f7ed1e44…`, PR #981에서 기계 검산된 삽입 2개만 고정.
+- **Windows A 미리보기 단회 생성:** [Issue #643](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/643), requestId `e8a06f0b-2cd1-4e6f-af16-5d0d7c8d9355`; PC 원본 변경/Task 변경/DB/D1/provider calls 허용 안 함. 아직 원격 결과 JSON/TXT/실PC after SHA 미수신이므로 **STATE_UNKNOWN**. B manifest·B 실설치 Issue는 **아직 없음**.
+- **다음 필수 실행:** #643 결과 확인 → 승인 PC 원본 삽입 가능성과 after SHA·Task XML SHA 확보 → 실제 launcher SHA/PC 소비자 증거와 대조 → 첫 B 정확한 manifest 및 단회 설치. 실패는 FIRST FAIL 코드로 분류, 승인 우회·무한 재요청 금지. 사용자 지시에 따라 R2 총괄이 첫 설치·개선·재발 방지 실증까지 맡고 기능 담당자 인계는 그 이후로 보류.
+- **R2 공식 진행률:** 20% 유지. M1 실PC B 검증까지 아직 미완료.
