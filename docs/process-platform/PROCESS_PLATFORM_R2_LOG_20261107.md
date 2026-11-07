@@ -13,9 +13,9 @@
 | 단계 | 상태 | 누적 진행률 | 이번 확인 / 남은 증거 |
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
-| M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (source main 병합, 실PC 미검증) | 20% 유지 | PR #626 main 병합 + 안전 보완 PR #627 main 병합 SHA 8df0a81e, 신규 15파일·기존 기능 파일 수정 0; 격리 43/43 PASS; `issues: opened` 범위형 B workflow source 활성, 유효 승인 manifest 0건·Windows Runner 설치/Sidecar 동적 호환 미확인 |
-| M3 실패·정상 회귀 | RUNNING (격리 43/43 PASS, 실PC 미완료) | 20% 유지 | lock/rename, 첫 hop 및 local overlay 원장, dirty/해시/Task/부분 전환 mock 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
+| M1 읽기 전용 A | RUNNING (신규 Controller 실PC 설치, 모듈 목록 조회 미회수) | 20% 유지 | 공통 A 보완 PR #658 병합·#660 설치 PASS·#661 A 진단 PASS. #662 모듈 목록/동적 Core Runtime 연결 아직 미확인 |
+| M2 공통 Writer B | RUNNING (정상 실PC 적용 입증, 의존성 최소 보완 중) | 20% 유지 | 일반 Writer B #651 정상 적용·A #652 사후 PASS. #657에서 preview 의존성 누락을 안전 중단; 실PC lib/worker 목록 확인 후 새 manifest 범위 확정 |
+| M3 실패·정상 회귀 | RUNNING (PC 정상/복구 근거 일부 확보) | 20% 유지 | 정규 B #651 설치 PASS, #646 중단·원복 및 #657 누락 import 안전 중단. 범위별 fixture PASS; 단계 종료에 필요한 최종 Runtime 연계·인계 미완료 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -332,3 +332,11 @@
 - [#661](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/661) Controller B #660 자동 사후 `core-status` 결과는 Windows Actions `42339830691`에서 `PASS / CORE_READONLY_DIAGNOSIS`, `actualExecutionSha=70222f9a6418225ecad962efdad1e2bc1c0fa14b`, 보호 SHA 동일, 결과 2/2. 새 Controller가 A Runner 경로에서 실제 실행된 증거 확보.
 - 신규 [#662](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/662) A `pc-source-preflight`는 2026-11-07 13:46 KST 1회 접수 후 14:56 KST까지 **댓글 0/원격 실행 결과 미회수**. `.github/workflows/pc-job.yml`은 `issues.opened`·`pc-job` label·8분 timeout 계약을 유지, Issue body/label 7키 검증됨. 원격 Actions run 목록은 현재 연결된 GitHub tool에 제공되지 않으며 private 브라우저는 로그인 부재로 404; 실행 시작/Queue/실패 자체는 **STATE_UNKNOWN**. #661 성공을 #662 성공으로 대체하거나 새 Issue로 자동 재접수하지 않음.
 - 안전 다음 실행은 **기존 #662의 Actions run 존재·상태만 읽기 전용 확인**(사용자 인증된 GitHub Actions 또는 추후 제공되는 연결) → 있으면 동일 run ID 보고서/댓글 회수, 없으면 등록 경로 원인 조사 및 승인된 1회 복구 판단. 같은 A 요청의 시험 재생 금지. Runtime 원자료·PC 운영 파일 변경 없음.
+
+## 2026-11-07 — #662 실행 원장 재확인, Writer B 최소 의존성 폐쇄 시뮬레이션
+
+- **기존 요청 #662:** 같은 고유 Issue/requestId를 재조회했으나 `pc-job` label·요청 7필드는 유지, 댓글 **0건**, 수정 시각은 생성 시각 `2026-11-07T04:46:25Z` 그대로. **Actions runId를 확인하지 못했으므로 `STATE_UNKNOWN`**; 중복 A나 B 생성 0건. `.github/workflows/pc-job.yml`의 `issues.opened`·`pc-job` label·self-hosted Windows·8분 계약을 소스로 재확인. 과거 동일 A [#654](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/654)는 설치 전 Controller에서 `PASS / PC_SOURCE_READONLY_DIAGNOSIS`, run `42333662163`; 이는 새 확장 module inventory의 실PC PASS를 대신하지 않음.
+- **실제 실패 범위:** [#657](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/657) `WRITER_B_PREFLIGHT_STOP / WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP`, 결과 `2/2 READBACK_VERIFIED`, 설치/배포 없음. 기존 승인에는 `scripts/pc-writer/inflation-causal-public-preview-r1.mjs` 하나만 있었으며, preview는 `lib/inflation-causal-public-catalog.mjs`와 `worker/inflation-causal-public-r1.mjs`를 import, worker는 catalog를 import함.
+- **검증된 후보 원문 해시 (zgmini `codex/inflation19-auto-sidecar-prep-20261104`, `6ffe6bb7f3ff8faa452dc86fdcc2a44d0926b1a7`):** preview SHA256 `bc458372f86faf061306ae50e2bc806534f80e4458e45dc7901a3e09cfab86cc`; catalog `db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5`; worker `86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f`. 원격 UTF-8 본문으로 해시 산출했고 preview는 이전 승인 해시와 정확히 일치.
+- **기존 공통 검사기 자체 시뮬레이션:** `writer-b/import-availability.mjs` 원문을 그대로 로딩해 `existing=()=>false` 보수 가정에서 preview 1파일 `STOP`, preview+catalog 2파일 `STOP`, preview+catalog+worker 3파일 **`PASS / WRITER_B_LITERAL_IMPORTS_AVAILABLE`, 참조 3개 검사**. 추가 임의 Gate·새 operation·Runner/예약 없음. 이 검사는 정적 import 폐쇄성만 증명하며 실제 PC 파일 부재·설치 성공·Core 정상 실행을 입증하지 않음.
+- **다음 필수 행동:** #662의 동일 Actions run 유무를 인증된 Actions에서 확인 → run이 있으면 JSON/TXT 조회 및 lib/worker 실제 존재·해시 확인 → 그 결과에 맞춰 `A`/`M` 및 정확한 before SHA가 들어간 최소 새 Writer B manifest 작성·정규 B 적용 여부 판단. #657 재실행 금지, 현재 운영 source/Task/DB/D1 무변경. R2 공식 **20% 유지**.
