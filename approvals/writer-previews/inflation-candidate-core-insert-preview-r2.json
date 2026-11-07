@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "filePath": "scripts/pc-writer/local-cycle.mjs",
+  "beforeSha256": "bf884242b13d5f6b9f42d81acbfe88fccc8810011cf20e3244ef24d1941920c1",
+  "insertions": [
+    {
+      "anchor": " const lane=process.argv.includes('--korea')?'korea':'core';",
+      "position": "after",
+      "text": " // Isolated inflation candidate collection: default disabled; never changes Core publication.\n if(lane==='core'){\n  try{\n   const {runInflationCandidatesFromCore}=await import('./inflation-causal-candidate-core-bridge.mjs');\n   const candidateResult=await runInflationCandidatesFromCore(base);\n   console.log('INFLATION_CANDIDATE_CORE '+candidateResult.status);\n  }catch{console.warn('INFLATION_CANDIDATE_CORE_FAILED_PREVIOUS_INPUTS_PRESERVED');}\n }\n"
+    }
+  ]
+}
