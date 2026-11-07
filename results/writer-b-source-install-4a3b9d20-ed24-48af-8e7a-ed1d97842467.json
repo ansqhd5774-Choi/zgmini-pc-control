@@ -1,0 +1,28 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "4a3b9d20-ed24-48af-8e7a-ed1d97842467",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "591d43d53f043cee531ef1e02bb59716c8356b36",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "candidateSourceSha": "56b8ae8bec2a2d966e1da9ea7d6c284908468e89",
+  "manifestSha256": "44913c6a354572c5a6ce7dec69d8777e723ea97ffaec4e639c90ee61fbe25ddf",
+  "baseTreeOid": "ac98a9dec2646b9cbcecce0e82d7e8cf7ff6d636",
+  "preparedTreeOid": "c501546c8816126167e388aeb289b39ca199ee95",
+  "provenanceSha256": "5d91431c9bf4c8e8d610696c667f3e930052e7ba8d2440bdf96eb488d10710bb",
+  "runId": "42420591053",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/inflation-causal-candidate-bls3.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-census-m3.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-core-bridge.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-eia-gasoline.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-fed-g17.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-once.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-treasury.mjs",
+    "scripts/pc-writer/quota-policy.mjs",
+    "scripts/pc-writer/local-cycle.mjs"
+  ]
+}
