@@ -6,14 +6,16 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {runApprovedRegistryCas,PIN_CAS_SCHEMA,PIN_CAS_SCOPE}
-  from '../writer-b/approved-versioned-bundle/approved-registry-cas.mjs';
-import {runVersionedBundleTransaction}
-  from '../writer-b/approved-versioned-bundle/versioned-bundle-transaction.mjs';
-import {SCHEMA as BUNDLE_SCHEMA,SCOPE as BUNDLE_SCOPE}
-  from '../writer-b/approved-versioned-bundle/versioned-bundle-plan.mjs';
 import {dispatchConfiguredRuntimeB}
   from '../writer-b/approved-versioned-bundle/configured-runtime-b-dispatcher.mjs';
+
+// Schema tokens are fixed here so the configured-runtime B route does not
+// require unrelated PIN/BUNDLE implementation modules at process startup.
+// Their actual effect code is imported only when that effect is authorized.
+const PIN_CAS_SCHEMA='ZGMINI_PC_RUNTIME_PIN_AND_REGISTRY_CAS_B_V1';
+const PIN_CAS_SCOPE='HOST_RUNTIME_PIN_AND_REGISTRY_BYTE_CAS_ONLY';
+const BUNDLE_SCHEMA='ZGMINI_PC_VERSIONED_BUNDLE_APPROVAL_V1';
+const BUNDLE_SCOPE='PC_WRITER_APPROVED_VERSIONED_BUNDLE_ACTIVATION_ONLY';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const ACTOR='ansqhd5774-Choi';
@@ -147,7 +149,7 @@ export function loadApprovedRaw({event,env,controlRoot,
 }
 
 export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
-  pinRunner=runApprovedRegistryCas,bundleRunner=runVersionedBundleTransaction,
+  pinRunner=null,bundleRunner=null,
   configuredRunner=dispatchConfiguredRuntimeB}={}){
   // The installed configured-theme runtime has its own reviewed, recoverable
   // preflight -> one-shot -> repeat-upgrade engine. Do not wrap it in the
@@ -181,13 +183,19 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
     'DIRECT_B_NATIVE_BRIDGE_UNVERIFIED');
   let outcome;
   if(auth.mode==='PIN_REGISTRY_CAS'){
-    outcome=await pinRunner({approvalRaw:auth.raw,
+    const selected=pinRunner??(await import(
+      '../writer-b/approved-versioned-bundle/approved-registry-cas.mjs'))
+      .runApprovedRegistryCas;
+    outcome=await selected({approvalRaw:auth.raw,
       pinnedApproval:{requestId:auth.request.requestId,
         profileId:auth.manifest.profileId,sourceSha:auth.manifest.sourceSha,
         rawApprovalSha256:sha(auth.raw)},adapter:capability.adapter});
   }else{
     need(capability.trustedProfiles!==undefined,'DIRECT_B_REGISTRY_PIN_NOT_INSTALLED');
-    outcome=await bundleRunner({rawManifest:auth.raw,
+    const selected=bundleRunner??(await import(
+      '../writer-b/approved-versioned-bundle/versioned-bundle-transaction.mjs'))
+      .runVersionedBundleTransaction;
+    outcome=await selected({rawManifest:auth.raw,
       pinnedApproval:{requestId:auth.request.requestId,
         rawManifestSha256:sha(auth.raw),approvalRef:auth.approvalPath,
         sourceSha:auth.manifest.sourceSha,profileId:auth.manifest.profileId},
