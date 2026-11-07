@@ -52,6 +52,16 @@ export function mergeTextThreeWay({base,ours,theirs,gitExe='git',tempRoot=os.tmp
     fs.lstatSync(tempRoot).isDirectory()&&!fs.lstatSync(tempRoot).isSymbolicLink(),
   'ER1_D30_STAGE_TEMP_ROOT_STOP');
 
+  // On the existing PC the collector's pinned SHA is exactly the public
+  // baseline minus its final LF. Git merge-file reports an EOF conflict when
+  // the candidate appends code there. Preserve that one-byte formatting
+  // difference, but ONLY when all other original bytes match the baseline.
+  if(base.length>1&&base.at(-1)===10&&base.at(-2)!==13&&
+    theirs.at(-1)===10&&ours.length===base.length-1&&
+    ours.equals(base.subarray(0,-1)))
+    return {bytes:Buffer.from(theirs.subarray(0,-1)),conflictCount:0,
+      preservedVerified:true,sourceWrites:0};
+
   const dir=fs.mkdtempSync(path.join(fs.realpathSync(tempRoot),'zgmini-d30-'));
   const names=['ours.mjs','base.mjs','theirs.mjs'];
   try{
