@@ -1,0 +1,58 @@
+name: ZGMINI Calendar D30 Read-Only Three-File Preview Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: read
+concurrency:
+  group: zgmini-calendar-d30-readonly-preview
+  cancel-in-progress: false
+jobs:
+  calendar-d30-preview:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-calendar-d30-readonly-preview-once' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Read exact private control source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read approved public base source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ce9bccd8b38939b204e8f836a50ae362960eb7af
+          path: d30-base
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read exact D30 candidate source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: 57f5c72ff0d5f05dee1c76fd3ba7eb904e7adb2a
+          path: d30-candidate
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read-only three-file D30 merge preview
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\control\calendar-source-d30\windows-preview-host.mjs"'
