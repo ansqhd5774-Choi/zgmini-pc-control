@@ -90,6 +90,41 @@ test('comments, fake string imports and interpolated templates do not add false 
  assert.deepEqual(refs,['lib/actually-real.mjs']);
 });
 
+test('official G17 regexp with a literal quote does not create a syntax Gate',()=>{
+ const source='if(/^\\s*"[A-Z0-9]+: /.test(line))break;\n'+
+  'const row=line.match(/^\\s*"GMF"\\s+(\\d{4})\\s+(.+?)\\s*$/);\n'+
+  "import './actual-collector.mjs';\n";
+ assert.deepEqual(relativeModuleReferences('scripts/pc-writer/fed.mjs',B(source)),
+  ['scripts/pc-writer/actual-collector.mjs']);
+});
+
+test('regexp quote, class and escaped slash cannot forge a relative import',()=>{
+ const source="const fake=/import\\(['\\\"]\\.\\/ghost.mjs['\\\"]\\)/;\n"+
+  "const another=/[\\\"']from ['\\\"]\\.\\/phantom.mjs/;\n"+
+  "const slashes=/[\\/]/;\n"+
+  "const matched=await import('./real.mjs');\n";
+ assert.deepEqual(relativeModuleReferences('lib/probe.mjs',B(source)),
+  ['lib/real.mjs']);
+});
+
+test('division remains a binary operator; missing real import still stops',()=>{
+ const source='const average=12 / 3;\n'+
+  'const value=(8 + 4) / 2;\n'+
+  "const pattern=/api\\/v2/;\nimport './required.mjs';\n";
+ const file='scripts/pc-writer/probe.mjs',buffer=B(source);
+ assert.deepEqual(relativeModuleReferences(file,buffer),
+  ['scripts/pc-writer/required.mjs']);
+ assert.throws(()=>verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,buffer]]),existing:()=>false,
+ }),{code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP'});
+});
+
+test('unterminated regex stays a strict source syntax STOP',()=>{
+ assert.throws(()=>relativeModuleReferences('lib/probe.mjs',
+  B("const bad=/[\\\"'];\nimport './real.mjs';\n")),
+  {code:'WRITER_B_IMPORT_SOURCE_SYNTAX_STOP'});
+});
+
 test('side-effect import and require both respect approved-root resolution',()=>{
  const refs=relativeModuleReferences('scripts/pc-writer/new.mjs',
   B("import './other.mjs';\nconst r=require('../../lib/item.json');\n"));

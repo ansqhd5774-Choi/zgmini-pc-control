@@ -35,6 +35,32 @@ function sourceTokens(code){
    need(close!==-1,'WRITER_B_IMPORT_SOURCE_SYNTAX_STOP');
    i=close+2;continue;
   }
+  if(ch==='/'){
+   // A regexp literal can contain quote characters. Treating those quotes as
+   // JavaScript strings causes a false syntax STOP and may invent imports.
+   // Distinguish expression-start '/' from division using the immediate
+   // preceding token/context; never interpret division as a regexp.
+   let previous=i-1;
+   while(previous>=0&&/\s/.test(code[previous]))previous--;
+   const last=out.at(-1);
+   const startsExpression=previous<0||'([{:;,=!?&|'.includes(code[previous])||
+    (last?.kind==='word'&&['return','throw','case','yield','await'].includes(last.value));
+   if(startsExpression){
+    let end=i+1,characterClass=false,escaped=false,closed=false;
+    for(;end<code.length;end++){
+     const c=code[end];
+     if(c==='\r'||c==='\n')break;
+     if(escaped){escaped=false;continue;}
+     if(c==='\\'){escaped=true;continue;}
+     if(c==='['){characterClass=true;continue;}
+     if(c===']'){characterClass=false;continue;}
+     if(c==='/'&&!characterClass){end++;closed=true;break;}
+    }
+    need(closed,'WRITER_B_IMPORT_SOURCE_SYNTAX_STOP');
+    while(end<code.length&&/[a-z]/i.test(code[end]))end++;
+    add('regexp','');i=end;continue;
+   }
+  }
   if(ch==='"'||ch==="'"){
    const quote=ch;let str='',closed=false;i++;
    for(;i<code.length;i++){
