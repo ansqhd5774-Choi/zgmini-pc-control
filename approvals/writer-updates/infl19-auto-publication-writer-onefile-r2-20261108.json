@@ -1,0 +1,60 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/infl19-auto-hook-writer-source-20261108",
+  "candidateSourceSha": "b5bff83e8d46e0e279b5dea047afd8ea011edbbc",
+  "baseHead": "24610129461d027524a018daeba9f8b0cf9ed02c",
+  "baseConfigSourceSha": "24610129461d027524a018daeba9f8b0cf9ed02c",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "b349b401b786cbddd83e0ded11fac474e3b023f16c84f219b6c52a5eec4b80b0",
+      "afterSha256": "9dc27a1501191018703bbd2fae52d5d7ab230b5ebcced9933617e3c2d227e3c7",
+      "candidateSha256": "0c58ee4763d205c2772e847d8aa2806d7c259bbd5d9e0f111cc7539fa69969f3",
+      "insertions": [
+        {
+          "anchor": "  // Reuse the existing public snapshot table; publish only the bounded display score.",
+          "position": "before",
+          "text": "  await attemptOutput(report,'inflation-19-publication',async()=>{\n   const {publishInflation19Auto}=await import('./inflation-causal-public-auto-publication-r1.mjs');\n   report.inflation19=await publishInflation19Auto({pcHome:base,remote,coreDb:config.core});\n  });\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs",
+      "sha256": "2e9bf2b817635a816cb2327efc379bb5b2bb9c55a76c50155c14b76ee9f4d725"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-original-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": ["scripts/pc-writer/run-local.mjs"]
+      },
+      {
+        "id": "core-wrapper-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": ["scripts/pc-writer/run-local.mjs"]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
