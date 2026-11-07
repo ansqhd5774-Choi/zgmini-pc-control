@@ -155,6 +155,26 @@ test('Task XML changing between snapshots never yields a decided runtime mode',(
   assert.equal(result.blockedProfiles,1);
  });
 });
+test('additional approved manual launcher changing between reads blocks B preimage',()=>{
+ const extended={...auth(),profiles:[{...profile,files:[
+  ...profile.files,{key:'registerCmd',relativePath:'THEME_REGISTER.cmd'},
+ ]}]};
+ let calls=0;
+ const result=inspectApprovedA(extended,{dataRoot:'/unused',queryTask:()=>xml,
+  inspect:()=>{
+   const read=calls++;
+   return {status:'DONE',rootExists:true,files:{
+    installed:{exists:true,sha256:sha('installed'),sizeBytes:9},
+    active:{exists:true,sha256:sha('active'),sizeBytes:6},
+    scheduledCmd:{exists:true,sha256:sha('cmd'),sizeBytes:3},
+    scheduledVbs:{exists:true,sha256:sha('vbs'),sizeBytes:3},
+    registerCmd:{exists:true,sha256:sha(read===0?'old':'new'),sizeBytes:3},
+   },tasks:{configuredTask:{status:'XML_READ',xmlSha256:sha(xml)}}};
+  }});
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.profiles[0].runtimeMode,'STATE_UNKNOWN_CHANGED_DURING_READ');
+ assert.equal(result.fileHashesComplete,false);
+});
 test('unavailable Task metadata never becomes taskChecksComplete=true',()=>{
  fixture(({root})=>{
   const result=inspectApprovedA(auth(),{dataRoot:root,
@@ -206,7 +226,8 @@ test('JSON/TXT create-only pair 2/2 readback and incomplete report no PASS claim
 });
 test('workflow only names fixed Windows Runner, no arbitrary shell and no B stage',()=>{
  const dirname=path.dirname(fileURLToPath(import.meta.url));
- const text=fs.readFileSync(path.join(dirname,'pc-approved-runtime-a-once.yml'),'utf8');
+ const text=fs.readFileSync(path.join(dirname,'..','.github','workflows',
+  'pc-approved-runtime-a-once.yml'),'utf8');
  assert.ok(text.includes('runs-on: [self-hosted, Windows, X64, zgmini-pc-control]'));
  assert.ok(text.includes('persist-credentials: false'));
  assert.ok(text.includes('github.run_attempt == 1'));
