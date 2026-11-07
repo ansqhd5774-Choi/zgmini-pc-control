@@ -1,0 +1,57 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/inflation19-auto-sidecar-prep-20261104",
+  "candidateSourceSha": "6ffe6bb7f3ff8faa452dc86fdcc2a44d0926b1a7",
+  "baseHead": "d50ba2630bb04c7c50911dac0a4069a8056ee469",
+  "baseConfigSourceSha": "d50ba2630bb04c7c50911dac0a4069a8056ee469",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-public-preview-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "bc458372f86faf061306ae50e2bc806534f80e4458e45dc7901a3e09cfab86cc"
+    },
+    {
+      "path": "lib/inflation-causal-public-catalog.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "db4e05baaa62b51a0a783ce66466c18bb02a924894fc3aca605f473cbe3632e5"
+    },
+    {
+      "path": "worker/inflation-causal-public-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "50ee0c0863c10aa5106e18e8466517143ef3dbc75f95abc18bc359f2cbbced9e"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs",
+      "sha256": "2e9bf2b817635a816cb2327efc379bb5b2bb9c55a76c50155c14b76ee9f4d725"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-public-auto-publication-r1.test.mjs",
+      "sha256": "6201d1448bbe581059d31b14fbffb2d552b71a1c30e6c1906ce7b479dded37e0"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
