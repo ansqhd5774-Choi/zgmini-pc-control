@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "88c85138-e439-4850-a31b-e65b51721ed1",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "24c2ff1f3eba73cae8b86f81ce75c6ffacfb497f",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "96cafd91f05e2310f66a73522028d10210a14b73",
+  "candidateSourceSha": "5dbdb145383036f830c67e66f41f7e0dd1d5c196",
+  "manifestSha256": "831dac1d25466f3c748fa30250affbe7f39a202c5f5e3136aaf111b1fe5a2a65",
+  "baseTreeOid": "9e7c75ad595ed8b8dfd9762a232da8fd9bc18dbe",
+  "preparedTreeOid": "7f794f4d79ac582a2a5b750890703191204a0dc6",
+  "provenanceSha256": "a2a226ac744990c2e509ba840df8d657eff8fa586dc31e14de76d7c119911a5d",
+  "runId": "42394139451",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/local-cycle.mjs",
+    "scripts/pc-writer/inflation-causal-bls8.mjs",
+    "scripts/pc-writer/inflation-causal-gas-electric.mjs",
+    "scripts/pc-writer/inflation-sce-collector.mjs",
+    "scripts/pc-writer/inflation-sce-source.mjs",
+    "scripts/pc-writer/inflation-causal-recurring-r1.mjs"
+  ]
+}
