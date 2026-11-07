@@ -12,7 +12,8 @@ import {createHash} from 'node:crypto';
 
 const MARKER='ZGMINI_PIN_CAS_ISOLATED_FIXTURE_V1';
 const SHA64=/^[a-f0-9]{64}$/;
-const REQUEST=/^[A-Za-z0-9_-]{12,128}$/;
+// Match the installed common Writer-B Issue envelope (contract.mjs).
+const REQUEST=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const fail=code=>{const err=new Error(code);err.code=code;throw err;};
 const need=(ok,code)=>{if(!ok)fail(code);};
@@ -121,7 +122,7 @@ export function makeIsolatedRegistryPinAdapter({fixtureRoot,requestId,
  need(REQUEST.test(requestId??'')&&SHA64.test(trustedApprovalSha256??'')&&
   Buffer.isBuffer(targetRegistryBytes),'B_PIN_FIXTURE_INPUT');
  const HOST='host.json';
- const REG='pc-writer/controller-approvals/approved-runtime-inventory-profiles.json';
+ const REG='pc-writer/approved-runtime-inventory-profiles.json';
  const LOCK='writer-source-install.lock';
  const JOURNAL='pin-cas-journal.'+requestId+'.jsonl';
  let lease=null,backupDone=false;
@@ -149,6 +150,18 @@ export function makeIsolatedRegistryPinAdapter({fixtureRoot,requestId,
    return lease;
   },
   async verifyPreimageUnderLock({lock}){requireLock(lock);fault('UNDER_LOCK');return snapshot();},
+  async verifyApprovedRegistryParentUnderLock({lock,targetId}){
+   requireLock(lock);
+   need(targetId==='HOST_DATA_ROOT_PC_WRITER','B_PIN_FIXTURE_PARENT_ID');
+   fault('PARENT');
+   const directory=scope(root,'pc-writer');
+   const stat=fs.lstatSync(directory);
+   need(stat.isDirectory()&&!stat.isSymbolicLink()&&
+    fs.realpathSync.native(directory)===directory,
+    'B_PIN_FIXTURE_PARENT_UNTRUSTED');
+   return {targetId,status:'EXISTS_TRUSTED_DIRECTORY',
+    reparsePoint:false,noReparse:true,ownerVerified:true,aclVerified:true};
+  },
   async loadApprovedRegistryAfterBytes({lock,approvalSha256}){
    requireLock(lock);fault('LOAD_AFTER');
    need(digest(targetRegistryBytes)===approvalSha256,
