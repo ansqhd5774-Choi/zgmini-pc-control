@@ -44,6 +44,17 @@ test('valid profile creates plan with no write action',()=>{
  assert.equal(Object.hasOwn(plan,'execute'),false);
  assert.ok(plan.runtimeRequired.includes('RECOVERABLE_JOURNAL_AND_ROLLBACK'));
 });
+test('approved immutable bundle accepts exact hash-pinned .js Node modules',()=>{
+ const m=fixture();
+ m.bundle.files.push({path:'scripts/pc-writer/theme-config-task-state.js',
+  sha256:hash('approved-state-reader'),bytes:21});
+ const sorted=[...m.bundle.files].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
+ m.bundle.version=hash(JSON.stringify(Object.fromEntries(
+  sorted.map(f=>[f.path,f.sha256])))).slice(0,16);
+ const plan=buildVersionedBundlePlan(m,profiles);
+ assert.equal(plan.fileCount,4);
+ assert.equal(plan.bundleVersion,m.bundle.version);
+});
 test('profile must be independently registered by trusted receiver',()=>{
  rejected(m=>{m.profileId='unregistered-profile'},'B_PROFILE_NOT_REGISTERED');
 });
@@ -56,6 +67,8 @@ test('no traversal or absolute source path or arbitrary script type',()=>{
  rejected(m=>{m.bundle.files[0].path='C:/tools/other.json'},'B_UNSAFE_BUNDLE_PATH');
  rejected(m=>{m.bundle.files[0].path='scripts\\other.mjs'},'B_UNSAFE_BUNDLE_PATH');
  rejected(m=>{m.bundle.files[0].path='scripts/autorun.cmd'},'B_UNSAFE_BUNDLE_PATH');
+ rejected(m=>{m.bundle.files[0].path='scripts/autorun.ps1'},'B_UNSAFE_BUNDLE_PATH');
+ rejected(m=>{m.bundle.files[0].path='scripts/autorun.cjs'},'B_UNSAFE_BUNDLE_PATH');
  rejected(m=>{m.bundle.files[0].path='CON.mjs'},'B_UNSAFE_BUNDLE_PATH');
 });
 test('NTFS case collision forbidden',()=>{
