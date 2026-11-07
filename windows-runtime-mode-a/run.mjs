@@ -137,16 +137,21 @@ export function inspectApprovedA(auth,{dataRoot=String.raw`E:\ZGmini\data`,
      'ACTIVE_RUNTIME.json','INSTALL_RESULT.json',
      'THEME_SCHEDULED.cmd','THEME_SCHEDULED.vbs'].includes(x.relativePath));
     const stable=watched.every(x=>JSON.stringify(report.files?.[x.key])===
-     JSON.stringify(second.files?.[x.key]));
+     JSON.stringify(second.files?.[x.key]))&&
+     profile.tasks.every(x=>JSON.stringify(report.tasks?.[x.key])===
+      JSON.stringify(second.tasks?.[x.key]));
     if(!stable)return {profileId:profile.id,status:'BLOCKED',
      code:'A_RUNTIME_SNAPSHOT_CHANGED_DURING_READ',rootExists:report.rootExists,
      runtimeMode:'STATE_UNKNOWN_CHANGED_DURING_READ',files:{},tasks:{}};
     const activeState=report.files?.[active.key];
     const installedState=report.files?.[installed.key];
-    runtimeMode=installedState?.exists!==true?'INSTALL_PREIMAGE_NOT_FOUND':
-     !installedState.sha256?'INSTALL_PREIMAGE_UNVERIFIED':
-     activeState?.exists===true&&!activeState.sha256?'ACTIVE_PREIMAGE_UNVERIFIED':
-     activeState?.exists===true?'REPEATABLE_ACTIVE_RUNTIME':'FIRST_SINGLE_CMD_UPGRADE';
+    // The production package runner chooses ACTIVE first when present.
+    // INSTALL_RESULT is only the legacy/first-upgrade fallback, not an
+    // additional requirement for an already configured repeatable runtime.
+    runtimeMode=activeState?.exists===true?
+     (activeState.sha256?'REPEATABLE_ACTIVE_RUNTIME':'ACTIVE_PREIMAGE_UNVERIFIED'):
+     installedState?.exists!==true?'INSTALL_PREIMAGE_NOT_FOUND':
+     !installedState.sha256?'INSTALL_PREIMAGE_UNVERIFIED':'FIRST_SINGLE_CMD_UPGRADE';
    }
    return {...report,runtimeMode};
   }catch{
