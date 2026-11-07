@@ -28,7 +28,7 @@ const INDICATORS=Object.freeze([
 const fail=code=>Object.assign(new Error(code),{code});
 const iso=v=>typeof v==='string'&&v.length<=32&&Number.isFinite(Date.parse(v))&&
   new Date(v).toISOString()===v;
-const day=v=>typeof v==='string'&&/^20\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v)&&
+const day=v=>typeof v==='string'&&/^(?:19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v)&&
   Number.isFinite(Date.parse(`${v}T00:00:00Z`))&&
   new Date(`${v}T00:00:00Z`).toISOString().slice(0,10)===v;
 const version=v=>typeof v==='string'&&v.length>0&&v.length<=100&&/^[A-Za-z0-9._-]+$/.test(v);
