@@ -13,7 +13,7 @@
 
 | path (공통 prefix `scripts/pc-writer/`) | PC 고정 후보 상태 | Before SHA-256 | PR #981 목표 After SHA-256 |
 |---|---|---|---|
-| `run-local.mjs` | **M** 현재 존재 | `922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a` | `e7986e8cf120f490d83a10218cb6656fb78e6ce493c2f6b2d6d899adb77b927c` |
+| `run-local.mjs` | **M** 현재 존재 | `922503baa358203521698f157db59c23af29c0072c6d8af9d52a18541d61cc0a` | `e7986e8cf120f490d83a10218cb6656fb78e6ce493c2f6b2b6d899adb77b927c` |
 | `inflation-causal-public-auto-publication-r1.mjs` | **A** 후보에 없음 | `null` | `2e9bf2b817635a816cb2327efc379bb5b2bb9c55a76c50155c14b76ee9f4d725` |
 | `inflation-causal-public-auto-publication-r1.test.mjs` | **A** 후보에 없음 | `null` | `6201d1448bbe581059d31b14fbffb2d552b71a1c30e6c1906ce7b479dded37e0` |
 
@@ -37,3 +37,6 @@
 - 이 문서/PR 댓글이 원담당 ChatGPT 대화의 `OWNER_RECEIVED`를 의미하지 않는다. 실제 수신·다음 실행은 원담당에서 확인한다.
 
 R2 추적: [#622](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/622) / [공용 원장 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68).
+
+
+> SHA 정정 (2026-11-07): 위 `run-local.mjs` After의 실제 GitHub PR head 원문 SHA-256은 `e7986e8cf120f490d83a10218cb6656fb78e6ce493c2f6b2b6d899adb77b927c`이다. 구 `…b2d6…` 기록은 오기. 기존 PC before `922503ba…`는 PR base 파일 `1c336662…`와 다르므로 전체 blob 교체 manifest를 발급하지 않는다. 이번 첫 B 설치·실증 책임은 사용자 최신 지시에 따라 R2 총괄이 한정 인수했으며 다른 기능 담당자의 설치를 병렬로 만들지 않는다.
