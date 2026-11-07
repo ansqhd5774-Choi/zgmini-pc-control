@@ -73,7 +73,7 @@ function createFixture(t,{faultAt=null}={}){
  }};
  const arg={rawManifest,pinnedApproval,trustedProfiles};
  const make=options=>makeIsolatedWindowsFixtureAdapter({
-  fixtureRoot:root,manifest,requestId:id,
+  fixtureRoot:root,manifest,requestId:options?.requestId??id,
   approvedManifestSha256:pinnedApproval.rawManifestSha256,
   approvedSourceSha:pinnedApproval.sourceSha,
   approvedApprovalRef,sourceBlobs,zipBlob,
@@ -147,4 +147,37 @@ test('adapter refuses non-fixture root and lacks shell/external commands',t=>{
  assert.throws(()=>makeIsolatedWindowsFixtureAdapter({
   fixtureRoot:f.parent,manifest:f.manifest,requestId:f.id,
  }),e=>e.code==='B_FIXTURE_ROOT');
+});
+test('failed launcher CAS leaves exact immutable version reusable by a fresh request',async t=>{
+ const f=createFixture(t,{faultAt:'activation-after-file'});
+ const first=await runVersionedBundleTransaction({...f.arg,adapter:f.make()});
+ assert.equal(first.status,'BLOCKED');
+ assert.equal(first.rollback,'VERIFIED');
+ assert.equal(fs.existsSync(path.join(f.parent,'versions',f.manifest.bundle.version)),true);
+ const newRequestId='test-approved-request-334455';
+ const pinnedApproval={...f.arg.pinnedApproval,requestId:newRequestId};
+ const second=await runVersionedBundleTransaction({
+  ...f.arg,pinnedApproval,
+  adapter:f.make({requestId:newRequestId,faultAt:'__none__'}),
+ });
+ assert.equal(second.status,'PASS',JSON.stringify(second));
+ assert.equal(second.reportStatus,'JSON_TXT_2_OF_2');
+ assert.deepEqual(fs.readFileSync(path.join(f.parent,'ACTIVE_RUNTIME.json')),f.newRecord);
+ assert.ok(fs.readFileSync(path.join(f.parent,'journals',newRequestId+'.jsonl'),'utf8')
+  .includes('EXACT_IMMUTABLE_VERSION_REUSED'));
+});
+test('existing version with extra or corrupted file is never reused',async t=>{
+ const f=createFixture(t,{faultAt:'activation-after-file'});
+ const first=await runVersionedBundleTransaction({...f.arg,adapter:f.make()});
+ assert.equal(first.rollback,'VERIFIED');
+ const version=path.join(f.parent,'versions',f.manifest.bundle.version);
+ fs.writeFileSync(path.join(version,'docs','README.md'),Buffer.from('corrupted'));
+ const newRequestId='test-approved-request-445566';
+ const result=await runVersionedBundleTransaction({
+  ...f.arg,pinnedApproval:{...f.arg.pinnedApproval,requestId:newRequestId},
+  adapter:f.make({requestId:newRequestId,faultAt:'__none__'}),
+ });
+ assert.equal(result.status,'BLOCKED');
+ assert.ok(result.code==='B_ADAPTER_ERROR'||result.code==='B_FIXTURE_IMMUTABLE_HASH_DRIFT');
+ assert.deepEqual(fs.readFileSync(path.join(f.parent,'launchers',f.launcher)),f.oldLauncher);
 });
