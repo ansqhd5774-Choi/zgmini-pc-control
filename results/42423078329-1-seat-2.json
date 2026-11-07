@@ -1,0 +1,208 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42423078329-1-seat-2",
+  "requestId": "pc-2e384864-e66a-46a3-920c-0131e3bda8e0",
+  "startedAt": "2026-11-07T22:58:44.617Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "d89d9f94753cdf55b1a1ce02ea6215ab7206f3e6",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "c1ef34d02517d258a4eeeb599d0beb9cceb27894",
+  "sourceBranch": "main",
+  "operation": "inflation-candidates-runtime-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "INFLATION_CANDIDATES_RUNTIME_READONLY_EVIDENCE",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-a9a0d032-38c9-4017-8900-6ab394c80fea",
+  "pcOperationalApprovedSha": "591d43d53f043cee531ef1e02bb59716c8356b36",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "INFLATION_CANDIDATES_RUNTIME_READONLY_EVIDENCE",
+    "operationalReadiness": "NOT_ASSERTED",
+    "evidenceScope": "LOCAL_SNAPSHOT_AND_CHECKPOINT_ONLY",
+    "candidateDirectoryStatus": "PRESENT",
+    "indicatorCount": 7,
+    "collectorGroupCount": 6,
+    "presentValidCount": 4,
+    "indicators": [
+      {
+        "id": 22,
+        "group": "cpi",
+        "sourceSeriesId": "CUSR0000SEHA",
+        "status": "INVALID",
+        "observationCount": 0,
+        "latestObservationDate": null,
+        "sourceStoredAt": null,
+        "sourceVersion": null,
+        "fileSha256": null
+      },
+      {
+        "id": 23,
+        "group": "cpi",
+        "sourceSeriesId": "CUSR0000SEHC01",
+        "status": "INVALID",
+        "observationCount": 0,
+        "latestObservationDate": null,
+        "sourceStoredAt": null,
+        "sourceVersion": null,
+        "fileSha256": null
+      },
+      {
+        "id": 24,
+        "group": "ppi",
+        "sourceSeriesId": "WPSFD4",
+        "status": "PRESENT_VALID",
+        "observationCount": 203,
+        "latestObservationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z",
+        "sourceVersion": "INFLATION_CAUSAL_CANDIDATE_BLS3_R1",
+        "fileSha256": "845cb9cad8fd24cdcafecc499fb71b28f4200e21f5b4aef5b64a3bc3fd0c16c5"
+      },
+      {
+        "id": 16,
+        "group": "treasury",
+        "sourceSeriesId": null,
+        "status": "PRESENT_VALID",
+        "observationCount": 139,
+        "latestObservationDate": "2026-09-30",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z",
+        "sourceVersion": "INFLATION_CAUSAL_CANDIDATE_TREASURY_MTS_R1",
+        "fileSha256": "9c195071b3449579815290e98ed83466905ce5d3a72e19b45c37b2b22a2bfa69"
+      },
+      {
+        "id": 28,
+        "group": "census",
+        "sourceSeriesId": null,
+        "status": "MISSING",
+        "observationCount": 0,
+        "latestObservationDate": null,
+        "sourceStoredAt": null,
+        "sourceVersion": null,
+        "fileSha256": null
+      },
+      {
+        "id": 29,
+        "group": "fed",
+        "sourceSeriesId": null,
+        "status": "PRESENT_VALID",
+        "observationCount": 657,
+        "latestObservationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z",
+        "sourceVersion": "INFLATION_CAUSAL_CANDIDATE_FED_G17_R1",
+        "fileSha256": "c6b565a50582b572d81f673492d9c47a331a6725a5b740aa36b867dce9214df2"
+      },
+      {
+        "id": 2,
+        "group": "eia",
+        "sourceSeriesId": null,
+        "status": "PRESENT_VALID",
+        "observationCount": 520,
+        "latestObservationDate": "2026-11-02",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z",
+        "sourceVersion": "INFLATION_CAUSAL_CANDIDATE_EIA_REGULAR_R1",
+        "fileSha256": "3fd56a657c673603c6f083e307a30d2ddd72746a3d0e28d39496531220d692f6"
+      }
+    ],
+    "groups": [
+      {
+        "group": "cpi",
+        "indicatorIds": [
+          22,
+          23
+        ],
+        "status": "INVALID",
+        "checkpoint": {
+          "processed": false,
+          "processedObservationDate": null,
+          "attempted": true,
+          "lastAttemptedAt": "2026-11-07T22:40:02.928Z"
+        }
+      },
+      {
+        "group": "ppi",
+        "indicatorIds": [
+          24
+        ],
+        "status": "PRESENT_VALID",
+        "checkpoint": {
+          "processed": true,
+          "processedObservationDate": "2026-09-01",
+          "attempted": true,
+          "lastAttemptedAt": "2026-11-07T22:40:02.928Z"
+        }
+      },
+      {
+        "group": "fed",
+        "indicatorIds": [
+          29
+        ],
+        "status": "PRESENT_VALID",
+        "checkpoint": {
+          "processed": true,
+          "processedObservationDate": "2026-09-01",
+          "attempted": true,
+          "lastAttemptedAt": "2026-11-07T22:40:02.928Z"
+        }
+      },
+      {
+        "group": "census",
+        "indicatorIds": [
+          28
+        ],
+        "status": "MISSING",
+        "checkpoint": {
+          "processed": false,
+          "processedObservationDate": null,
+          "attempted": true,
+          "lastAttemptedAt": "2026-11-07T22:40:02.928Z"
+        }
+      },
+      {
+        "group": "treasury",
+        "indicatorIds": [
+          16
+        ],
+        "status": "PRESENT_VALID",
+        "checkpoint": {
+          "processed": true,
+          "processedObservationDate": "2026-09-30",
+          "attempted": true,
+          "lastAttemptedAt": "2026-11-07T22:40:02.928Z"
+        }
+      },
+      {
+        "group": "eia",
+        "indicatorIds": [
+          2
+        ],
+        "status": "PRESENT_VALID",
+        "checkpoint": {
+          "processed": true,
+          "processedObservationDate": "2026-11-02",
+          "attempted": true,
+          "lastAttemptedAt": "2026-11-07T22:40:02.928Z"
+        }
+      }
+    ],
+    "checkpointStatus": "PRESENT_VALID",
+    "checkpointSha256": "a31a14a9ae36d5c7dd826ed79e41eb773792cd9204afe0350dff589a1a8c1276",
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "089301ce6ced913d71915b9400f00c8ec6b51f8ac7b44d5547a8c3183270abd2",
+  "protectedAfterSha256": "089301ce6ced913d71915b9400f00c8ec6b51f8ac7b44d5547a8c3183270abd2",
+  "actualExecutionSha": "d89d9f94753cdf55b1a1ce02ea6215ab7206f3e6",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-07T22:58:47.960Z",
+  "durationMs": 3343
+}
