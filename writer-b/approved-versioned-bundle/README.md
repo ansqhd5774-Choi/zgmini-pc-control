@@ -79,10 +79,14 @@ receiver, **not proof that the actual Windows receiver supports them**.
    rename of approved launchers and active marker in journaled sequence.
    Multiple files do not have whole-bundle atomicity on NTFS. In particular,
    the existing Task Scheduler may start a launcher **between** two renames,
-   regardless of the Writer B lock. Before installing, prove each old/new
-   launcher combination is safe and the active pointer switches last, with
-   schedule-tick interleaving simulation plus real Windows evidence. If not,
-   do not activate. Leave Scheduled Task XML unchanged.
+   regardless of the Writer B lock. Before installing, prove either a stable
+   dispatcher with a final atomic pointer or an explicitly pinned immutable
+   version launcher chain (Task -> unchanged VBS -> one CMD -> one Node entrypoint).
+   The latter also requires independent old/new scheduled-lock and database/
+   checkpoint cross-version compatibility evidence; arbitrary marker substrings
+   and a boolean attestation cannot establish safety. Interleaving simulation
+   and real Windows cutover evidence are required. Otherwise do not activate.
+   Leave Scheduled Task XML unchanged.
    This is **cutover safety**, not a requirement to wait for the next natural
    13:00 scheduled run. Natural recurring-run verification is a later follow-up
    after feature collection, calculation, publish and API/UI are complete.
@@ -177,8 +181,8 @@ not two independently registered profiles or receiver code rewrites.
 
 The registry itself may be missing on the first approved registration.
 Only a real, fixed-path, non-mutating **B receiver preflight** observation
-of host PIN null, registry leaf absence and an existing verified parent
-directory, plus exact approved manifest values
+of host PIN null, registry leaf absence and verified trusted parent paths,
+plus exact approved manifest values
 registryBeforeSha256=null and oldPin=null, authorizes first-create. This
 preflight must repeat under the same Writer lock before any CAS. The
 receiver must use CREATE_NEW/no-overwrite and journal the original ABSENT
@@ -186,6 +190,17 @@ state; recovery removes only the transaction-created file after exact
 CAS. Existing files always require exact old SHA, security-preserving
 backup and rollback. Missing due to access error must NOT be treated as
 absent.
+
+**First-registration directory simplified:** the external registry is pinned
+directly to the already established `<dataRoot>/pc-writer/approved-runtime-inventory-profiles.json`.
+No `controller-approvals` directory or extra B `mkdir` effect is needed. The
+installed receiver must still prove that the E: drive, `dataRoot` and
+`pc-writer` trusted parent directories exist, have canonical paths, are not
+reparse points, and retain the approved security owner. Only the fixed leaf
+may be absent for `FIRST_CREATE`, and it is then created exclusively under
+the Writer lock with original-ABSENT journal and exact rollback. A missing
+drive/parent or ambiguous ownership must block, not be silently treated as
+an absent registry file.
 
 If an existing registry has bytes but the host PIN is absent, the ordinary
 registration operation MUST refuse to adopt it. Pinning its existing SHA
