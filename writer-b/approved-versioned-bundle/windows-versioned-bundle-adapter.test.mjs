@@ -9,7 +9,8 @@ import {SCHEMA,SCOPE} from './versioned-bundle-plan.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const SHA40='0c97599431882245a156470bd51290e327e7ee78';
 function setup(profileId='configured-themes',{pinnedLauncher=false,
- changedNodeFlags=false,misroutedTaskVbs=false,brokenLockContract=false}={}){
+ changedNodeFlags=false,misroutedTaskVbs=false,maliciousVbsRedirect=false,
+ fakeVersionRem=false,utf16TaskXml=false,brokenLockContract=false}={}){
  const home='E:\\ZGmini\\data\\pc-writer\\'+profileId;
  const taskName='ZGMINI-PC-'+profileId.split('-').map(x=>x[0].toUpperCase()+x.slice(1)).join('-');
  const launcher='SCHEDULED.cmd';
@@ -28,18 +29,41 @@ function setup(profileId='configured-themes',{pinnedLauncher=false,
  }));
  const version=hash(JSON.stringify(Object.fromEntries(files.map(x=>[x.path,x.sha256])))).slice(0,16);
  const oldVersion='1111111111111111';
- const taskXml=Buffer.from(pinnedLauncher?
+ const taskXmlText=pinnedLauncher?
   '<Task><Actions><Exec><Command>wscript.exe</Command><Arguments>"'+
-  (misroutedTaskVbs?'C:\\Foreign':home)+'\\SCHEDULED.vbs"</Arguments></Exec></Actions></Task>\n':
-  '<Task>fixed</Task>\n');
- const previousCmd='@echo off\r\n"E:\\ZGmini\\runtime\\node.exe" "'+
-  home+'\\versions\\'+oldVersion+'\\scripts\\pc-writer\\job.mjs" scheduled\r\n';
- const nextCmd=previousCmd.replace(oldVersion,version).replace(
+  (misroutedTaskVbs?'C:\\Foreign':home)+'\\SCHEDULED.vbs"'+
+  (misroutedTaskVbs?' "'+home+'\\SCHEDULED.vbs"':'')+
+  '</Arguments></Exec></Actions></Task>\n':
+  '<Task>fixed</Task>\n';
+ const taskXml=utf16TaskXml?Buffer.from('\uFEFF'+taskXmlText,'utf16le'):
+  Buffer.from(taskXmlText);
+ const command=(value)=>[
+  '@echo off',
+  'setlocal EnableExtensions DisableDelayedExpansion',
+  'set "ZGMINI_DATA_ROOT=E:\\ZGmini\\data"',
+  '"E:\\ZGmini\\runtime\\node.exe" "'+home+'\\versions\\'+value+
+   '\\scripts\\pc-writer\\job.mjs" --scheduled >>"'+home+
+   '\\SCHEDULE_HISTORY.log" 2>&1',
+  'set "RESULT=%ERRORLEVEL%"',
+  'exit /b %RESULT%',
+  '',
+ ].join('\r\n');
+ const previousCmd=command(oldVersion);
+ const nextCmd=command(version).replace(
   '"E:\\ZGmini\\runtime\\node.exe"',
   '"E:\\ZGmini\\runtime\\node.exe"'+(changedNodeFlags?' --trace-warnings':''));
  const originalLauncher=Buffer.from(pinnedLauncher?previousCmd:'@echo off\r\nrem old\r\n');
- const targetLauncher=Buffer.from(pinnedLauncher?nextCmd:'@echo off\r\nrem new\r\n');
- const fixedVbs=Buffer.from('WScript.CreateObject("WScript.Shell").Run "SCHEDULED.cmd"\r\n');
+ const targetLauncher=Buffer.from(pinnedLauncher?(fakeVersionRem?
+  nextCmd.replace('set "RESULT=%ERRORLEVEL%"',
+   'rem "'+home+'\\versions\\'+version+'\\scripts\\pc-writer\\job.mjs"\r\n'+
+   '"C:\\Foreign\\node.exe" "C:\\Foreign\\evil.mjs"\r\n'+
+   'set "RESULT=%ERRORLEVEL%"'):nextCmd):'@echo off\r\nrem new\r\n');
+ const fixedVbs=Buffer.from([
+  'Option Explicit','Dim shell',
+  'Set shell = CreateObject("WScript.Shell")',
+  'WScript.Quit shell.Run("""'+(maliciousVbsRedirect?'C:\\Foreign':home)+
+   '\\SCHEDULED.cmd""", 0, True)','',
+ ].join('\r\n'));
  const originalMarker=Buffer.from('{"version":"old"}\n');
  const targetMarker=Buffer.from('{"version":"'+version+'"}\n');
  const zip=Buffer.from('approved zip fixture, no executable unzip\n');
@@ -344,16 +368,14 @@ test('unproven scheduler tick/launcher compatibility stops before any CAS',async
  assert.equal(driver.steps.includes('backup'),false);
  assert.equal(driver.steps.includes('cas-launcher'),false);
 });
-test('pinned immutable launcher activates only with authenticated byte-level evidence',async()=>{
+test('actual theme-generated scheduled CMD/VBS grammar passes shape, but awaits runtime proof',async()=>{
  const f=setup('configured-themes',{pinnedLauncher:true});
- const driver=makeBridge(f,{simulateTaskTick:true});
+ const driver=makeBridge(f);
  const result=await execute(f,driver);
- assert.equal(result.status,'PASS',JSON.stringify(result));
- assert.deepEqual(driver.current.launcher,f.targetLauncher);
- assert.ok(driver.steps.includes('scheduler-tick-after-launcher'));
- assert.ok(driver.steps.includes('scheduler-tick-after-active-record'));
- assert.deepEqual(driver.externalEffects.map(x=>x.version),
-  [f.manifest.bundle.version,f.manifest.bundle.version]);
+ assert.equal(result.status,'BLOCKED',JSON.stringify(result));
+ assert.equal(result.code,'B_WINDOWS_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(driver.steps.includes('stage-file'),false);
+ assert.equal(driver.steps.includes('cas-launcher'),false);
 });
 test('pinned version proof without raw authenticated SHA never reaches stage/CAS',async()=>{
  for(const options of [{pinnedEvidenceUnapproved:true},
@@ -368,9 +390,9 @@ test('pinned version proof without raw authenticated SHA never reaches stage/CAS
   assert.equal(driver.steps.includes('cas-launcher'),false);
  }
 });
-test('pinned launcher rejects changed Node flags, redirected Task VBS, or missing lock',async()=>{
+test('pinned launcher blocks extra Node flags, evil-first Task args, malicious VBS, REM fake path',async()=>{
  for(const option of [{changedNodeFlags:true},{misroutedTaskVbs:true},
-  {brokenLockContract:true}]){
+  {maliciousVbsRedirect:true},{fakeVersionRem:true}]){
   const f=setup('configured-themes',{pinnedLauncher:true,...option});
   const driver=makeBridge(f);
   const result=await execute(f,driver);
@@ -380,8 +402,24 @@ test('pinned launcher rejects changed Node flags, redirected Task VBS, or missin
   assert.equal(driver.steps.includes('backup'),false);
  }
 });
+test('UTF-16LE Task XML uses raw hash and reaches only external runtime proof gate',async()=>{
+ const f=setup('configured-themes',{pinnedLauncher:true,utf16TaskXml:true});
+ const driver=makeBridge(f);
+ const result=await execute(f,driver);
+ assert.equal(result.code,'B_WINDOWS_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(driver.steps.includes('stage-file'),false);
+});
+test('source with inconsistent lock cannot bypass external runtime proof using strings',async()=>{
+ const f=setup('configured-themes',{pinnedLauncher:true,brokenLockContract:true});
+ const driver=makeBridge(f);
+ const result=await execute(f,driver);
+ assert.equal(result.code,'B_WINDOWS_COMPATIBILITY_EVIDENCE_REQUIRED');
+ assert.equal(driver.steps.includes('stage-file'),false);
+});
 test('schedule tick after first CAS can leave external effects despite file rollback',async()=>{
- const f=setup('configured-themes',{pinnedLauncher:true});
+ // The static dispatcher fixture proves only file-rollback boundaries.
+ // Pinned-launcher mutations are independently blocked without runtime proof.
+ const f=setup('configured-themes');
  const driver=makeBridge(f,{simulateTaskTick:true,failAt:'cas-launcher'});
  const result=await execute(f,driver);
  assert.equal(result.status,'BLOCKED',JSON.stringify(result));
