@@ -14,8 +14,8 @@
 |---|---|---:|---|
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (source 병합, PC 미검증) | 20% 유지 | PR #625 main 병합·18/18 fixture PASS; 실제 A operation 설치·실PC 체크아웃/해시 회수 미확인 |
-| M2 공통 Writer B | RUNNING (source main 병합, 실PC 미검증) | 20% 유지 | PR #626 main 병합 SHA 5fb5a7c4, 신규 15파일·기존 파일 수정 0; 격리 42/42 PASS; `issues: opened` 범위형 B workflow source 활성, 유효 승인 manifest 0건·Windows Runner 설치/Sidecar 동적 호환 미확인 |
-| M3 실패·정상 회귀 | RUNNING (격리 42/42 PASS, 실PC 미완료) | 20% 유지 | lock/rename, 첫 hop 및 local overlay 원장, dirty/해시/Task/부분 전환 mock 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
+| M2 공통 Writer B | RUNNING (source main 병합, 실PC 미검증) | 20% 유지 | PR #626 main 병합 + 안전 보완 PR #627 main 병합 SHA 8df0a81e, 신규 15파일·기존 기능 파일 수정 0; 격리 43/43 PASS; `issues: opened` 범위형 B workflow source 활성, 유효 승인 manifest 0건·Windows Runner 설치/Sidecar 동적 호환 미확인 |
+| M3 실패·정상 회귀 | RUNNING (격리 43/43 PASS, 실PC 미완료) | 20% 유지 | lock/rename, 첫 hop 및 local overlay 원장, dirty/해시/Task/부분 전환 mock 검증; 실 Windows 정상 1건·rollback 증거 미확인 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -164,3 +164,12 @@
 - 최신 main `config/operations.json` 및 기존 고정 워크플로 범위 감사: `runner-smoke`, `core-status`, 구 `pc-source-preflight`, 소스 등록만 된 `core-runtime-source-readonly` 중 **범용 Writer B `windows-adapter.mjs`의 실제 Task/checkout/manifest/rollback에 대해 독립 Windows 무쓰기 dry-run을 제공하는 승인 operation 없음**. R17/inflation 고정 전용 워크플로도 범용 B 동적 검증의 대체 아님.
 - **결정:** 기능별 새 CMD·A operation·시험용 B Issue/예약을 만들어 확인하는 경로는 비용·권한 및 오검증 위험이 커서 추가하지 않음. 기존 #68 단일 설치 담당의 유효 Controller B 결과/신규 A 활성→실 Writer 지문→원담당 정규 B manifest/최초 정상 업무 1회 실증을 재사용. 다른 독립 업무는 NON_BLOCKING.
 - **LAST PASS:** PR #626 source main 병합/42 fixture, PC 과거 #608 설치 결과 보존, A 정적 지원 계약 분기 확정. **FIRST FAIL/현재 필수 의존:** #68 원담당의 신규 Controller 실제 B install result/requestId 및 R2 A 활성 증거 없음. R2 **20% 유지**. PC/Writer/DB/D1/예약 신규 쓰기 0건.
+
+## 2026-11-07 — M2/M3 Writer B 독립 감사 MUST-FIX 2건 수정·main 반영
+
+- #68 실제 Controller 후속 B/A 증거 없음(마지막 확인 #608); 소스 대기 동안 PR #626의 핵심 안전 경로만 독립 검토했고 두 구체적 결함을 확인. 기존 코드에서 정상 경로가 이미 성공했다고 주장하지 않음.
+- **보고기 허위 PASS:** `writer-b/report.mjs`는 임시 설치 결과의 `manifestSha256`가 64-hex인지 검사했지만, 결과가 실제 owner Issue의 `approvalManifestSha256`과 같은지 비교하지 않았음. 비정상/오염된 결과가 다른 유효 해시를 담아도 원격 2/2 성공 댓글로 올라갈 수 있는 증거 결함. 수정 후 정확 해시 일치 때만 `WRITER_B_INSTALLED_VERIFIED`; 불일치는 `WRITER_B_STATE_UNKNOWN`으로 기록, 원격 2/2라도 성공으로 올리지 않음.
+- **Core Task 종료 판정:** 기존 `coreQuietFromProbe`가 Task state `4=RUNNING`만 배제해 `0=UNKNOWN`, `2=QUEUED`도 종료로 오판할 수 있는 결함. Windows 공식 `TASK_STATE` 정의([Microsoft](https://learn.microsoft.com/en-us/windows/win32/api/taskschd/ne-taskschd-task_state))를 확인, `state=1(DISABLED)`·`3(READY)`만 기존 enabled=false/instances=0/process=0/lock=absent 조건에서 인정. queued/unknown은 STOP, 새로운 일반 작업 Gate 아님.
+- [PR #627](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/627) **main 병합** SHA `8df0a81e7e21c72ffbb51e9af528993ecd8ca2eb`. 정확히 4파일만 변경 (`writer-b/report.mjs`, `writer-b/receiver.test.mjs`, `writer-b/windows-guards.mjs`, `writer-b/windows-guards.test.mjs`), 기존 Controller/Calendar/R17/물가지표 파일·Workflow 변경 0. `main` 원격 4파일 compare/핵심 코드 재조회 확인.
+- 독립 `node --test r2-writer-b/{contract,installer,receiver,windows-guards}.test.mjs` **43/43 PASS, exit 0**. 실제 Windows `enabled=false, state=2` 재현 여부·Task pause/복구·Sidecar 전 체인 실증은 이 테스트로 확정되지 않음.
+- **LAST PASS:** source main 안전 결함 수정/43 fixture. **FIRST FAIL/운영 의존:** #68 기존 단일 담당의 실제 Controller 설치·신규 A 활성, PC Writer Task/파일 지문, 원담당 B 승인 manifest 및 첫 실PC 정규 1회 설치/복구 결과 부재. **R2 20% 유지**, 신규 A/B 요청·PC/원자료·SQLite/D1·예약 쓰기 0.
