@@ -1,0 +1,115 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/inflation19-auto-sidecar-prep-20261104",
+  "candidateSourceSha": "5dbdb145383036f830c67e66f41f7e0dd1d5c196",
+  "baseHead": "96cafd91f05e2310f66a73522028d10210a14b73",
+  "baseConfigSourceSha": "96cafd91f05e2310f66a73522028d10210a14b73",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "185f93e27f9be28362417402b99da07431699ed4f96a0ca37dde29982c675be7",
+      "afterSha256": "bf884242b13d5f6b9f42d81acbfe88fccc8810011cf20e3244ef24d1941920c1",
+      "candidateSha256": "38ad0d75beb58e28a88a7c0dcb82a2be83d866ffb68757af5888daf2b37e4341",
+      "insertions": [
+        {
+          "anchor": " const {publication,progressive}=await progressivePublication({",
+          "position": "before",
+          "text": " // Optional 19-input research collection uses the existing Core lock and\n // occurs before the early Writer publication pass. Off by default.\n let inflationRecurring={status:lane==='core'?'DISABLED':'SKIPPED_KOREA_LANE',providerRequests:0};\n if(lane==='core'&&collection.status===0){\n  try{\n   const {runInflation19RecurringFromCore}=await import('./inflation-causal-recurring-r1.mjs');\n   inflationRecurring=await runInflation19RecurringFromCore(base);\n  }catch{\n   inflationRecurring={status:'FAILED_PREVIOUS_INPUTS_PRESERVED',providerRequests:null};\n  }\n }\n"
+        },
+        {
+          "anchor": " save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));",
+          "position": "before",
+          "text": " report.inflationRecurring=inflationRecurring;\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-bls8.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "061524721b92aa72d3bf8e63baf96b3335a0a1822ad12449e8d0006e776f59c9"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-gas-electric.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "3f729b8637337f86088d85f3e37c7921477681066c05422a6bcebd91d6a2c541"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-sce-collector.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a733d5cb62da6439ea8064b49b882c704e33dddf50d188cad83fb04bc24ce019"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-sce-source.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5110a6bbda7a31462df012e4f2e116f4e6e7790098a645ba02bb777d21d2e47d"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-recurring-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "e7c95922da8abb17d37bfd2a013fd783062c93d4bd093f7977d83279a9e46a0c"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "50ee0c0863c10aa5106e18e8466517143ef3dbc75f95abc18bc359f2cbbced9e"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs",
+      "sha256": "2e9bf2b817635a816cb2327efc379bb5b2bb9c55a76c50155c14b76ee9f4d725"
+    },
+    {
+      "path": "lib/earnings-api-calendar.mjs",
+      "sha256": "e48d4ea5da65d2b72b070e54bb41103486e730c38b8c040215388a9b57af39cb"
+    },
+    {
+      "path": "scripts/pc-writer/earnings-api-local.mjs",
+      "sha256": "a686bf736c9a5ae274cd2dc69dd169e93ddab90f72ae273c45e765c788226ce8"
+    },
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "sha256": "1f7186cad2240839a432bd6ac9351c83762334b38a988d27d971cb4ffe647f1b"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      },
+      {
+        "id": "core-vbs-wrapper",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
