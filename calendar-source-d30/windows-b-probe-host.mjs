@@ -59,7 +59,7 @@ export function traceD30CoreTaskChain({taskXml,readVbs,resolvePath=p=>p}={}){
   let base;
   try{base=canonical(DATA);}catch{return unknown('ER1_D30_B_DATA_ROOT_UNRESOLVED');}
   const action=taskAction(taskXml);
-  if(!/[/\\]wscript\.exe$/i.test(action.command))
+  if(!/(?:^|[/\\])wscript\.exe$/i.test(action.command))
     return unknown('ER1_D30_B_TASK_ACTION_NOT_WSCRIPT');
   const first=vbsPaths(action.args);
   let firstMatches=false;
