@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "24c2ff1f3eba73cae8b86f81ce75c6ffacfb497f",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "50ee0c0863c10aa5106e18e8466517143ef3dbc75f95abc18bc359f2cbbced9e",
+  "insertions": [
+    {
+      "anchor": " if(publish){",
+      "position": "before",
+      "text": " // Score only complete future monthly cohorts from already-saved PC inputs.\n // This local calculation also runs without --publish; an unavailable D1\n // cannot prevent the derived score from being stored for a later publication.\n await attemptOutput(report,'market-calendar-er1-future',async()=>{\n  const {publicFeedStore}=await import('../../worker/public-feed-store.mjs');\n  const {refreshSavedER1MonthlyOutputs}=await import('./market-calendar-er1-auto-output.mjs');\n  report.er1Future=await refreshSavedER1MonthlyOutputs({store:publicFeedStore(core),now});\n });\n"
+    }
+  ]
+}
