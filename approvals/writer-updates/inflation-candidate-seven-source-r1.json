@@ -1,0 +1,107 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "56b8ae8bec2a2d966e1da9ea7d6c284908468e89",
+  "baseHead": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "baseConfigSourceSha": "9040e821cc813f1c31d09210268b8774bddc8cea",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-bls3.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5d4e4eab1ffa2f5491227802f560d7d094ae51aa32a3fe7182fa12d154256156"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-census-m3.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "77f0852f829f4df0ddbb04ea01e046b5899202e565c38c4e014740462609017a"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-core-bridge.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "139e63b6fe57161beaed024ab55d049830a3ebb141c4ccf154f039c551f6a923"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-eia-gasoline.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "42bfce1ed8988174110a646a23f36e65fdd81ad681452ee284ec23152159488d"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-fed-g17.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "901ace8c44858900db50052bdf378592deb80da1981bbb3a1f2348ac5404d9d8"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-once.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "68c6a8736d2bd4bfc8278bacda8f002760679501de308f8fcd6e988e8015b71d"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-treasury.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c3c9053bf51851b146d3f29cd693272ac0b32560ed14db34b86cb12eea490474"
+    },
+    {
+      "path": "scripts/pc-writer/quota-policy.mjs",
+      "change": "M",
+      "beforeSha256": "c57b7017f791ad904df8c9e7d2b2d1d7654f459b392eadc39a97c728b2bae2e8",
+      "afterSha256": "c8deabedb7e0d3611fc416da49ca630647ffb06c68ef2838132f843abb6e920d"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "bf884242b13d5f6b9f42d81acbfe88fccc8810011cf20e3244ef24d1941920c1",
+      "afterSha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d",
+      "candidateSha256": "38ad0d75beb58e28a88a7c0dcb82a2be83d866ffb68757af5888daf2b37e4341",
+      "insertions": [
+        {
+          "anchor": " const lane=process.argv.includes('--korea')?'korea':'core';",
+          "position": "after",
+          "text": " // Isolated inflation candidate collection: default disabled; never changes Core publication.\n if(lane==='core'){\n  try{\n   const {runInflationCandidatesFromCore}=await import('./inflation-causal-candidate-core-bridge.mjs');\n   const candidateResult=await runInflationCandidatesFromCore(base);\n   console.log('INFLATION_CANDIDATE_CORE '+candidateResult.status);\n  }catch{console.warn('INFLATION_CANDIDATE_CORE_FAILED_PREVIOUS_INPUTS_PRESERVED');}\n }\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/quota-fetch.mjs",
+      "sha256": "6be2406ee68524c561f911c61b8f9d62ca604ec96f34bdb9752d78346acc3c13"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "9dc27a1501191018703bbd2fae52d5d7ab230b5ebcced9933617e3c2d227e3c7"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
