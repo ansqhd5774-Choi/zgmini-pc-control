@@ -13,6 +13,7 @@ import {inspectER1NovemberAvailability} from './market-calendar-er1-nov30-availa
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
+import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
@@ -122,6 +123,7 @@ export async function runOperation(request,context){
   const ref=await fetch('https://api.github.com/repos/'+request.sourceRepository+'/commits/'+encodeURIComponent(request.sourceBranch),{headers:{accept:'application/vnd.github+json','user-agent':'zgmini-pc-control'},signal:AbortSignal.timeout(20000)});need(ref.ok,'SOURCE_BRANCH_LOOKUP_FAILED');need((await ref.json()).sha===request.sourceSha,'SOURCE_BRANCH_HEAD_CHANGED');
   return {status:'PASS',code:'SOURCE_COMMIT_READONLY_VERIFIED',sourceSha:data.sha,changedFileCount:data.files?.length??null,executedCandidateCode:false};
  }
+ if(request.operation==='theme-l7-runtime-readonly')return inspectThemeL7RuntimeReadonly({dataRoot,queryTask});
  if(request.operation==='theme-platform-shadow-readonly'){
   try{return await runApprovedShadowReadOnly({request,host,dataRoot});}
   catch(error){
