@@ -15,7 +15,7 @@
 | M0 계획·기준·지침 | DONE | 20% | Issue #622 + 계획·원장 전용 브랜치 저장. 최신 main 지침 PR #624 병합, 3개 파일 원격 재조회 본문 정확 일치 |
 | M1 읽기 전용 A | RUNNING (신규 Controller 실PC 설치, 모듈 목록 조회 미회수) | 20% 유지 | 공통 A 보완 PR #658 병합·#660 설치 PASS·#661 A 진단 PASS. #662 모듈 목록/동적 Core Runtime 연결 아직 미확인 |
 | M2 공통 Writer B | RUNNING (정상 실PC 적용 입증, 의존성 최소 보완 중) | 20% 유지 | 일반 Writer B #651 정상 적용·A #652 사후 PASS. #657에서 preview 의존성 누락을 안전 중단; 실PC lib/worker 목록 확인 후 새 manifest 범위 확정 |
-| M3 실패·정상 회귀 | RUNNING (PC 정상/복구 근거 일부 확보) | 20% 유지 | 정규 B #651 설치 PASS, #646 중단·원복 및 #657 누락 import 안전 중단. 범위별 fixture PASS; 단계 종료에 필요한 최종 Runtime 연계·인계 미완료 |
+| M3 실패·정상 회귀 | 독립 시나리오 5/5 PASS (M1/M4 실운영 증거 별개) | 20% 유지 | 현행 main 원문 8파일 Git blob 일치·집중 Node 40/40 PASS, 실PC #651 정상 B·#646 원복·#657 의존성 STOP 증거. Windows Runtime 연결·인계는 M1/M4에 남음 |
 | M4 실PC 적용 경로·인계 | DEFERRED | — | 승인 실PC 결과, requestId/보호 상태 및 원담당 실제 수신 |
 
 **진행률 원칙:** M0가 모두 검증되면 20%; M1 40%; M2 60%; M3 80%; M4 100%. 코드 작성·PR 병합은 설치·운영 완료의 대체 증거가 아니다.
@@ -347,3 +347,12 @@
 - **업로드 경로 교차검증:** GitHub `main` 최근 커밋 검색에서 가장 늦은 리포트 커밋은 2026-11-07 13:45:51 KST `report: PC job 42339830691-1 seat 2`(#661); 최신 유지보수 결과 커밋은 13:46:04 KST(#660)이며 **#662 생성 시각 이후의 PC 결과 커밋은 확인되지 않음**. 업로드 설계 `controller/upload.mjs`는 TXT/JSON 2개 readback 후 댓글을 게시한다. 현재 확정 가능한 사실은 `NO_DELIVERED_RESULT`; PC 런타임 실패 `RUNTIME_FAILED` 아님.
 - **독립 소스 리뷰:** 기존 `writer-b/import-availability.mjs`는 literal relative import 확인과 신규 M import만 검증하고, 테스트는 Preview→Worker→Catalog 전이 누락/승인 전체 통과를 이미 포함한다. #657은 올바른 안전 차단. 신규 Controller/Writer 검증기나 추가 Gate를 만들지 않음. 기존 `relativeModuleReferences`를 **후보 manifest 준비 시** 재귀 활용하고 PC A 실측 해시와 결합하는 것으로 재발 방지 방향을 확정.
 - **LAST PASS:** Controller #660 설치·#661 A 진단·Writer #651 정상 적용·#657 안전 중단·3파일 정적 의존성 폐쇄 시뮬레이션. **FIRST FAIL/불명:** #662 Actions runId·신규 `moduleSourceInventory` 결과 부재. 기존 #662 runId/상태의 인증된 Actions 읽기 전용 확인만 필요; 새로운 A/B Issue·PC 파일/예약/검사 Gate 생성 0. 공식 R2 20% 유지.
+
+## 2026-11-07 — M3 회귀 5/5 독립 통과·#662 트리거 판정 경계
+
+- **검증 기준:** R2 계획의 M3 필수 다섯 시나리오(다단 VBS, 타 담당 dirty, source/file 해시 불일치, 부분 적용·원복, 승인 정상 3파일)를 현재 `main` 실제 소스·테스트에서 개별 매핑. 범위 밖 전체 Controller 테스트를 M3의 새 Gate로 만들지 않음.
+- **실제 소스 원본 증명:** `controller/pc-source-readonly.mjs`, `writer-b/{contract,installer,import-availability,insert-only-patch}.mjs`, 테스트 `tests/pc-source-r2-readonly.test.mjs`, `writer-b/{installer,import-availability}.test.mjs` 합계 8파일의 로컬 Git blob SHA가 원격 main blob SHA와 **8/8 정확히 일치**.
+- **독립 재실행:** Node `v24.22.1`(Linux scratch)에서 A 12, Writer B transaction 17, import safety 11 = **40/40 PASS**, 실패/skip 0. 다단 UTF-16LE VBS·한정된 module hash, 정상 3파일/HEAD/config/Task 보호, dirty·후보 hash mismatch 선거부, source/config 부분 전환 rollback, Core 자연 drain·불확실 복구/락 보관, preview→worker→catalog import 관계 및 기존 optional import 예외 포함.
+- **실PC 교차증거:** Writer B [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651) `WRITER_B_INSTALLED_VERIFIED`, [#646](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/646) `WRITER_B_INSTALL_STOP_RESTORED` + 결과 pair 2/2, [#657](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/657) 미승인 import의 설치 전 안전 STOP. **M3 자체 회귀 시나리오 5/5 통과**; Linux 회귀를 PC Windows 자연 Core Runtime 연결 PASS로 오인하지 않음.
+- **#662 Action 진단(공식 GitHub 문서 대조):** 자체 Runner는 미배정 시 최대 24시간 queue 상태일 수 있으며 workflow의 `timeout-minutes:8`은 *실행 시간 제한*이지 queue 8분 만료 근거가 아님. `jobs.if` 조건 false의 skipped, `issues.opened` 실행 미생성, queue/offline, 실행/업로드 실패는 현재 Run ID 없이 구분 불가. `issues:[opened,labeled]` 단순 추가는 단일 Issue에서 중복 Actions 실행 위험이 있어 금지. 참조: https://docs.github.com/en/actions/reference/runners/self-hosted-runners 및 https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows .
+- **진행률 판단:** M3 독립 검증은 PASS이나 R2 공식 누적 단계는 M1 dynamic Runtime binding 및 M4 실제 인계 미확정으로 **20% 유지**. #662 재생·새 A/B 요청·운영 변경 없음. 다음 단일 필요 입력은 기존 #662의 Actions runId와 queued/skipped/in_progress/completed 상태이며, 확보 시 jobs/steps/logs 및 JSON/TXT로 해당 실패 지점만 진단.
