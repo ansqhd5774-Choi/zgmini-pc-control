@@ -30,12 +30,18 @@ This draft PR adds a **one-time** generic Controller operation in source, but ha
   identity. Other profiles are never traversed or returned. It uses fixed
   relative roots, selectors and task names, never scans recursively, and never returns raw
   file, environment, command, arguments, Task XML or configuration content.
+- **One shared A/B capability registry:** an entry may additionally have
+  `bundleProfile`. The A receiver strictly checks its inert field types,
+  fixed shape and bounds, but never queries, executes, exposes or interprets
+  B-specific home/launcher information. A separate approved B receiver must
+  validate the full operational contract against the installed PC and the
+  same PIN-approved registry bytes before performing any mutation.
 
 ## Registry shape (example, not an approved PC installation)
 
 ```json
 {
-  "schema": "ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2",
+  "schema": "ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1",
   "profiles": [
     {
       "id": "themeTool",
@@ -51,7 +57,18 @@ This draft PR adds a **one-time** generic Controller operation in source, but ha
       ],
       "directories": [{"key": "backup", "relativePath": "backup"}],
       "tasks": [{"key": "scheduled", "name": "ZGMINI-PC-ThemeSchedule",
-        "expectedCommandBasename": "THEME_SCHEDULED.cmd", "expectedHour": 13}]
+        "expectedCommandBasename": "THEME_SCHEDULED.cmd", "expectedHour": 13}],
+      "bundleProfile": {
+        "id": "themeTool",
+        "home": "E:\\ZGmini\\data\\pc-writer\\theme-config-tool",
+        "taskName": "ZGMINI-PC-ThemeSchedule",
+        "taskTime": "13:00",
+        "requiredLaunchers": ["THEME_SCHEDULED.cmd"],
+        "optionalLaunchers": ["THEME_LIST.cmd", "THEME_REGISTER.cmd"],
+        "activeRecord": "ACTIVE_RUNTIME.json",
+        "maxFiles": 128,
+        "maxBundleBytes": 16777216
+      }
     }
   ]
 }
@@ -59,6 +76,14 @@ This draft PR adds a **one-time** generic Controller operation in source, but ha
 
 These paths/task names and SHA are examples, **not** approved identities. Actual
 values must be verified against approved host registration before use.
+
+**Version decision:** `ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1`
+(unified A/B schema) supersedes the prototype inventory-only V2. Each profile
+has one `id` and one source binding; the optional `bundleProfile.id` must equal
+the parent profile `id`. The B writer must update only the selected profile
+through its independently protected B transaction, preserving all other
+entries, and atomically CAS the single external registry plus trusted host PIN.
+Current A code is a read-only consumer and does not implement this B transaction.
 
 ## Guarantees, scope and limitations
 
