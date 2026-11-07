@@ -11,6 +11,11 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 const tmp=()=>fs.mkdtempSync(path.join(os.tmpdir(),'approved-inventory-'));
 const identity={sourceRepository:'ansqhd5774-Choi/zgmini',
  sourceBranch:'codex/theme',sourceSha:'1'.repeat(40)};
+const validBundle=id=>({id,home:'E:\\ZGmini\\data\\pc-writer\\theme-config-tool',
+ taskName:'ZGMINI-PC-ThemeSchedule',taskTime:'13:00',
+ requiredLaunchers:['THEME_SCHEDULED.cmd'],
+ optionalLaunchers:['THEME_LIST.cmd','THEME_REGISTER.cmd'],
+ activeRecord:'ACTIVE_RUNTIME.json',maxFiles:128,maxBundleBytes:16*1024*1024});
 const fixture=()=>({
  id:'approvedTheme',binding:{...identity},rootSegments:['pc-writer','theme-runtime'],
  files:[{key:'installer',relativePath:'bin/INSTALL_RESULT.json'},
@@ -147,7 +152,7 @@ test('stable generic receiver: separately pinned approved registry onboards a se
    binding:{...identity,sourceSha:'2'.repeat(40)},
    files:[{key:'snapshot',relativePath:'INSTALL_RESULT.json'}],directories:[],tasks:[]};
   const manifest=Buffer.from(JSON.stringify({
-   schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2',
+   schema:'ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1',
    profiles:[fixture(),other],
   }));
   const expectedHash=sha(manifest);
@@ -173,10 +178,56 @@ test('registry with pinned hash still rejects malicious selector and duplicate p
    [{...fixture(),files:[{key:'steal',relativePath:'../../private.json'}]}],
   ]){
    const manifest=Buffer.from(JSON.stringify({
-    schema:'ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2',profiles,
+    schema:'ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1',profiles,
    }));
    assert.throws(()=>inspectApprovedRuntimeRegistry({dataRoot:base,manifestBytes:manifest,
     approvedManifestSha256:sha(manifest),requestIdentity:identity}),{code:/^INVENTORY_/});
+  }
+ });
+});
+
+test('single A/B capability registry accepts safe optional B metadata but A never reads or returns it',async()=>{
+ await withTmp(async base=>{
+  const p={...fixture(),bundleProfile:validBundle('approvedTheme')};
+  const manifest=Buffer.from(JSON.stringify({
+   schema:'ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1',profiles:[p],
+  }));
+  const queryCount={value:0};
+  const result=inspectApprovedRuntimeRegistry({dataRoot:base,manifestBytes:manifest,
+   approvedManifestSha256:sha(manifest),requestIdentity:identity,
+   queryTask:()=>{queryCount.value++;return taskXml;}});
+  assert.equal(result.selectedCount,1);
+  assert.equal(queryCount.value,1); // A-defined Task only; no B Task query.
+  assert.equal(result.profiles[0].profileId,'approvedTheme');
+  for(const key of ['bundleProfile','maxBundleBytes','requiredLaunchers','ACTIVE_RUNTIME.json',
+    'E:\\ZGmini\\data\\pc-writer\\theme-config-tool'])
+   assert.ok(!JSON.stringify(result).includes(key));
+ });
+});
+
+test('optional B metadata malformed/secret/unsafe fields are strictly rejected before A reads',async()=>{
+ await withTmp(async base=>{
+  const candidates=[
+   {...validBundle('approvedTheme'),home:'C:\\Windows\\system32'},
+   {...validBundle('approvedTheme'),home:'E:\\ZGmini\\data\\pc-writer\\..\\escape'},
+   {...validBundle('approvedTheme'),id:'otherProfile'},
+   {...validBundle('approvedTheme'),requiredLaunchers:['../../run.cmd']},
+   {...validBundle('approvedTheme'),optionalLaunchers:['secrets.env']},
+   {...validBundle('approvedTheme'),optionalLaunchers:['THEME_SCHEDULED.cmd']},
+   {...validBundle('approvedTheme'),activeRecord:'token.json'},
+   {...validBundle('approvedTheme'),maxBundleBytes:33*1024*1024},
+   {...validBundle('approvedTheme'),privateKey:'NEVER_ALLOWED'},
+  ];
+  for(const bundleProfile of candidates){
+   const manifest=Buffer.from(JSON.stringify({
+    schema:'ZGMINI_APPROVED_RUNTIME_CAPABILITY_PROFILES_V1',
+    profiles:[{...fixture(),bundleProfile}],
+   }));
+   let called=false;
+   assert.throws(()=>inspectApprovedRuntimeRegistry({dataRoot:base,manifestBytes:manifest,
+    approvedManifestSha256:sha(manifest),requestIdentity:identity,
+    queryTask:()=>{called=true;return taskXml;}}),{code:/^INVENTORY_/});
+   assert.equal(called,false);
   }
  });
 });
