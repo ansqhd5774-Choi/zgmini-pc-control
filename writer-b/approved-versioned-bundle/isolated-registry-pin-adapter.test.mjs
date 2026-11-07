@@ -11,13 +11,13 @@ import {makeIsolatedRegistryPinAdapter,ISOLATED_FIXTURE_MARKER}
  from './isolated-registry-pin-adapter.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-const REG='pc-writer/controller-approvals/approved-runtime-inventory-profiles.json';
+const REG='pc-writer/approved-runtime-inventory-profiles.json';
 const SOURCE='a'.repeat(40);
 
 function setup({injectFailure=null,registryAbsent=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-b-pin-fixture-'));
  fs.writeFileSync(path.join(root,'SIMULATION_ONLY'),ISOLATED_FIXTURE_MARKER);
- fs.mkdirSync(path.join(root,'pc-writer','controller-approvals'),{recursive:true});
+ fs.mkdirSync(path.join(root,'pc-writer'),{recursive:true});
  const existing={id:'existing',binding:{sourceRepository:'ansqhd5774-Choi/zgmini',
   sourceBranch:'main',sourceSha:'b'.repeat(40)},
   rootSegments:['pc-writer','existing'],files:[],directories:[],tasks:[]};
@@ -44,7 +44,7 @@ function setup({injectFailure=null,registryAbsent=false}={}){
   registryEntryKey:profile.id,registryEntryBeforeSha256:null,
   registryEntryAfterSha256:hash(Buffer.from(JSON.stringify(profile)))};
  const raw=Buffer.from(JSON.stringify(approval));
- const requestId='pinregistration00001';
+ const requestId='e29d2294-6f0e-466f-a8cd-fd97374c8b4e';
  const pinnedApproval={requestId,profileId:profile.id,sourceSha:SOURCE,
   rawApprovalSha256:hash(raw)};
  fs.writeFileSync(path.join(root,'host.json'),host);
@@ -148,7 +148,7 @@ test('unapproved symlink and non-fixture path are refused',async()=>{
  });
  const unrelated=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-b-unrelated-'));
  try{assert.throws(()=>makeIsolatedRegistryPinAdapter({fixtureRoot:unrelated,
-  requestId:'pinregistration00001',trustedApprovalSha256:'a'.repeat(64),
+  requestId:'e29d2294-6f0e-466f-a8cd-fd97374c8b4e',trustedApprovalSha256:'a'.repeat(64),
   targetRegistryBytes:Buffer.from('{}')}),{code:'B_PIN_FIXTURE_SCOPE'});}
  finally{fs.rmSync(unrelated,{recursive:true,force:true});}
 });
