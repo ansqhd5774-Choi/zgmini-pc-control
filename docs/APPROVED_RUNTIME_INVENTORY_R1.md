@@ -6,7 +6,7 @@ production PC files, GitHub branches, jobs or Task Scheduler entries.
 ## Source and trust boundary
 
 - `controller/approved-runtime-inventory-readonly.mjs` exports the stable
-  `inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes,approvedManifestSha256})`.
+  `inspectApprovedRuntimeRegistry({dataRoot,queryTask,manifestBytes,approvedManifestSha256,requestIdentity})`.
 - `dataRoot` and `queryTask` must be provided by the installed Controller, not an
   Issue author. The entire `manifestBytes` is read from a B-maintenance-owned,
   approved local registry file; its SHA-256 is pinned **separately** in trusted
@@ -19,22 +19,32 @@ production PC files, GitHub branches, jobs or Task Scheduler entries.
   approval, backup, CAS and rollback under the established B-maintenance lane.
 - Keep the `pc-job` Issue JSON contract at exactly seven existing keys; do not
   add `profileId`, path, Task name, registry URI or arbitrary argument to it.
+  The already validated `sourceRepository`, `sourceBranch` and `sourceSha`
+  select only profiles whose **PIN-approved** `binding` exactly matches all
+  three values. Possessing a source SHA alone never grants inventory access.
 - Install **one** operation such as `approved-runtime-inventory-readonly`
   (`grade: A`, `resource: light`) and wire it once to the stable receiver.
   Adding a feature then updates the independently approved declarative registry
   and its trust pin, **not** `controller/operations.mjs` per-feature branches.
-- The receiver inspects up to eight named profiles, with fixed relative roots,
-  selectors and task names. It never scans recursively and never returns raw
+- The registry can contain up to **128 named profiles**, but the receiver
+  inspects only **one to four** profiles sharing the exact approved source
+  identity. Other profiles are never traversed or returned. It uses fixed
+  relative roots, selectors and task names, never scans recursively, and never returns raw
   file, environment, command, arguments, Task XML or configuration content.
 
 ## Registry shape (example, not an approved PC installation)
 
 ```json
 {
-  "schema": "ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V1",
+  "schema": "ZGMINI_APPROVED_RUNTIME_INVENTORY_PROFILES_V2",
   "profiles": [
     {
       "id": "themeTool",
+      "binding": {
+        "sourceRepository": "ansqhd5774-Choi/zgmini",
+        "sourceBranch": "codex/theme-fear-greed-integration-20261025",
+        "sourceSha": "1111111111111111111111111111111111111111"
+      },
       "rootSegments": ["pc-writer", "theme-config-tool"],
       "files": [
         {"key": "install", "relativePath": "INSTALL_RESULT.json"},
@@ -48,8 +58,8 @@ production PC files, GitHub branches, jobs or Task Scheduler entries.
 }
 ```
 
-These paths/task names are examples and must be verified against actual
-approved host registration before adding a production registry profile.
+These paths/task names and SHA are examples, **not** approved identities. Actual
+values must be verified against approved host registration before use.
 
 ## Guarantees, scope and limitations
 
@@ -63,7 +73,12 @@ approved host registration before adding a production registry profile.
   basename/hour matches, enabled boolean, and XML SHA-256. It does not claim
   actual Task last-run status, installation PASS or any B-level permission.
 - Each file >8 MiB is marked `SIZE_LIMIT`, Task XML >256 KiB cannot be parsed,
-  registry >16 KiB is rejected, and nested inventory output >20 KiB is rejected.
+  registry >128 KiB is rejected, and nested selected output >20 KiB is rejected.
+- No source-identity match yields `BLOCKED/APPROVED_INVENTORY_SOURCE_UNREGISTERED`.
+  Five or more profiles matching one identity yields bounded
+  `BLOCKED/APPROVED_INVENTORY_SELECTION_TOO_LARGE`. A source revision needs
+  an exact new binding approved through B maintenance, but never a new
+  per-feature Controller code branch or full Controller source installation.
 - The installed current `host.json` does **not** yet expose
   `approvedRuntimeInventorySha256`. Until a separately reviewed B-grade
   config-only update sets this field, the stable A receiver returns clean
