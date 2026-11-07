@@ -7,6 +7,11 @@ import {buildVersionedBundlePlan} from './versioned-bundle-plan.mjs';
 
 const fail=code=>{const e=Error(code);e.code=code;throw e;};
 const need=(ok,code)=>{if(!ok)fail(code);};
+const WINDOWS_DEVICE=/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
+const safeBasename=name=>typeof name==='string'&&
+ /^[a-z0-9_.-]+$/i.test(name)&&
+ name!=='.'&&name!=='..'&&!/[. ]$/.test(name)&&
+ !WINDOWS_DEVICE.test(name);
 
 /**
  * The caller MUST be the installed approved B receiver. It obtains
@@ -44,9 +49,10 @@ export function selectPinnedBundleProfiles({
    /^ZGMINI-PC-[A-Za-z0-9-]{1,100}$/.test(candidate.taskName)&&
    /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(candidate.taskTime),
    'B_PROFILE_TARGET_DENIED');
-  need(candidate.requiredLaunchers.every(name=>/^[a-z0-9_.-]+\.(?:cmd|vbs)$/i.test(name))&&
-   candidate.optionalLaunchers.every(name=>/^[a-z0-9_.-]+\.(?:cmd|vbs)$/i.test(name))&&
-   /^[a-z0-9_.-]+\.json$/i.test(candidate.activeRecord),
+  const launchers=[...candidate.requiredLaunchers,...candidate.optionalLaunchers];
+  need(launchers.every(name=>safeBasename(name)&&/\.(?:cmd|vbs)$/i.test(name))&&
+   new Set(launchers.map(x=>x.toLowerCase())).size===launchers.length&&
+   safeBasename(candidate.activeRecord)&&/\.json$/i.test(candidate.activeRecord),
    'B_PROFILE_LAUNCHER_DENIED');
   trustedProfiles[bundle.id]=Object.freeze(candidate);
   count++;
