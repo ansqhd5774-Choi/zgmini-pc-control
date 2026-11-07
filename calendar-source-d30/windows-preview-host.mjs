@@ -24,6 +24,15 @@ const MAX_FILE_BYTES=2_000_000;
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 
+// GitHub's issue webhook contains repository/installation metadata beyond the
+// small approved Issue body. Do not reject a normal event at an arbitrary 8 KiB.
+export function parseD30ReadOnlyIssueEvent(bytes){
+  need(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<MAX_FILE_BYTES,
+    'ER1_D30_PREVIEW_EVENT_FILE_STOP');
+  try{return JSON.parse(bytes.toString('utf8'));}
+  catch{stop('ER1_D30_PREVIEW_EVENT_FILE_STOP');}
+}
+
 /** Pure event gate, unit-testable without Windows, runner, or network. */
 export function validateD30ReadOnlyIssue({env,event,controlHead}={}){
   need(env?.GITHUB_REPOSITORY===CONTROL&&env?.GITHUB_ACTOR===OWNER&&
@@ -125,8 +134,7 @@ export async function runD30ReadOnlyWindowsHost({env=process.env}={}){
       path.win32.isAbsolute(env.GITHUB_EVENT_PATH),
     'ER1_D30_PREVIEW_EVENT_FILE_STOP');
     const eventBytes=safeFile(env.GITHUB_EVENT_PATH,path.win32.dirname(env.GITHUB_EVENT_PATH));
-    need(eventBytes.length<8192,'ER1_D30_PREVIEW_EVENT_FILE_STOP');
-    const event=JSON.parse(eventBytes.toString('utf8'));
+    const event=parseD30ReadOnlyIssueEvent(eventBytes);
     validateD30ReadOnlyIssue({env,event,controlHead});
     assertCheckoutIdentity(gitExe,control,controlHead,CONTROL);
     // No operating-source directory or file is inspected before the event,
