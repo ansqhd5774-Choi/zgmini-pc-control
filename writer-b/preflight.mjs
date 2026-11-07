@@ -11,6 +11,23 @@ const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 const SHA40=/^[a-f0-9]{40}$/i;
 const APPROVAL_PATH=/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
+const SAFE_STOP=/^WRITER_B_[A-Z0-9_]{1,100}$/;
+const RUN_ID=/^\d{1,18}$/;
+
+// A failed approval check still needs an exact, bounded remote error code.
+// Store only the code under a run-scoped create-only TEMP path; never an
+// untrusted event, manifest, credential, or raw exception message.
+export function writePreflightStopEvidence({env,code,fsOps=fs}){
+ const runId=env?.GITHUB_RUN_ID,runnerTemp=env?.RUNNER_TEMP;
+ if(!RUN_ID.test(runId??'')||typeof runnerTemp!=='string'||
+   !path.isAbsolute(runnerTemp))return false;
+ const safeCode=SAFE_STOP.test(code??'')?code:
+  'WRITER_B_APPROVAL_PREFLIGHT_UNEXPECTED_STOP';
+ fsOps.writeFileSync(path.join(runnerTemp,`writer-b-preflight-stop-${runId}.json`),
+  JSON.stringify({status:'WRITER_B_SETUP_STOP',code:safeCode,runId})+'\n',
+  {encoding:'utf8',flag:'wx'});
+ return true;
+}
 
 export function approvalPathFromIssue(event){
  let body;
@@ -80,8 +97,10 @@ async function main(){
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{await main();}catch(error){
-  process.stderr.write((/^WRITER_B_[A-Z0-9_]+$/.test(error?.code??'')?
-   error.code:'WRITER_B_APPROVAL_PREFLIGHT_UNEXPECTED_STOP')+'\n');
+  const code=SAFE_STOP.test(error?.code??'')?error.code:
+   'WRITER_B_APPROVAL_PREFLIGHT_UNEXPECTED_STOP';
+  try{writePreflightStopEvidence({env:process.env,code});}catch{}
+  process.stderr.write(code+'\n');
   process.exitCode=1;
  }
 }
