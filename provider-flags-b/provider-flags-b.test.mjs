@@ -8,7 +8,8 @@ import {changeProviderFlags} from './patch.mjs';
 import {FLAGS,FILE,APPROVAL_SCHEMA,SCOPE,verifyApproval,
   authorize,REQUEST_SCHEMA,OPERATION,CONTROL_REPO,ACTOR,ISSUE_TITLE,ISSUE_LABEL,
   sha256} from './contract.mjs';
-import {applyApprovedFlags,loadAuthorization,normalizeAclEvidence} from './run.mjs';
+import {applyApprovedFlags,loadAuthorization,normalizeAclEvidence,
+  flushCopiedBackup} from './run.mjs';
 import {sanitizeReport,uploadReport} from './report.mjs';
 
 const manifest={schema:APPROVAL_SCHEMA,status:'APPROVED_B',scope:SCOPE,
@@ -93,6 +94,15 @@ test('icacls continuation spacing depends on filename length, not access rights'
   assert.notEqual(normalizeAclEvidence(format(source),source),
     normalizeAclEvidence(format(backup).replace('(I)(F)','(I)(R)'),backup));
 });
+test('Windows backup fsync uses writable file handle and always closes it',()=>{
+  const calls=[];
+  flushCopiedBackup('fixed-copy',{open:(file,mode)=>{
+    calls.push(['open',file,mode]);
+    if(mode!=='r+')throw Error('FlushFileBuffers requires GENERIC_WRITE');
+    return 21;
+  },flush:fd=>calls.push(['flush',fd]),close:fd=>calls.push(['close',fd])});
+  assert.deepEqual(calls,[['open','fixed-copy','r+'],['flush',21],['close',21]]);
+});
 test('CRLF, BOM, comments, secret bytes and unrelated keys preserved',()=>{
   const secret='FRED_API_KEY=sensitive-super-secret';
   const original=Buffer.from('\uFEFF'+secret+'\r\n' +
@@ -158,6 +168,17 @@ test('shared Writer lock contention: no env change, no request claim',()=>{
   assert.equal(r.code,'PROVIDER_B_SHARED_WRITER_BUSY_STOP');
   assert.equal(fs.readFileSync(e.target).equals(original),true);
   assert.equal(fs.existsSync(path.join(e.journalRoot,a.request.requestId)),false);
+});
+test('unexpected native failure returns safe exact stage code without path or secret',()=>{
+  const e=sandbox(),original=Buffer.from('API_KEY=secret\n');
+  fs.writeFileSync(e.target,original);
+  const x=applyApprovedFlags(auth(),{...e,beforeSwitch:()=>{
+    throw new Error('EACCES at C:\\private-path with secret');
+  }});
+  assert.equal(x.status,'PROVIDER_B_STOP_RESTORED');
+  assert.equal(x.code,'PROVIDER_B_FINAL_CAS_SYSTEM_STOP');
+  assert.equal(JSON.stringify(x).includes('private-path'),false);
+  assert.equal(fs.readFileSync(e.target).equals(original),true);
 });
 test('CAS drift before switch: keep concurrent edit, do not rollback it',()=>{
   const e=sandbox(),original=Buffer.from('X=unchanged\n');fs.writeFileSync(e.target,original);
