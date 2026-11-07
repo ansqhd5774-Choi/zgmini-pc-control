@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "c1ef34d02517d258a4eeeb599d0beb9cceb27894",
+  "baseHead": "591d43d53f043cee531ef1e02bb59716c8356b36",
+  "baseConfigSourceSha": "591d43d53f043cee531ef1e02bb59716c8356b36",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-census-m3.mjs",
+      "change": "M",
+      "beforeSha256": "77f0852f829f4df0ddbb04ea01e046b5899202e565c38c4e014740462609017a",
+      "afterSha256": "63762f7d3ce93573c41392bd3fe2b87b576d32fec66298ada10aaca800f630a7"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
