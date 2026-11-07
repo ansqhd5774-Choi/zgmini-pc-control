@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/er1-d30-pc-eof-preserved-20261108",
+  "candidateSourceSha": "4ad4e9683d681022720dab54dd21ecc920cd7549",
+  "baseHead": "5ba646c721c052ff62506255cc54a7b730af102d",
+  "baseConfigSourceSha": "5ba646c721c052ff62506255cc54a7b730af102d",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/earnings-api-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "e5c0fdfaddd8048fcb7e79c40f9d39185c75efbe73e7f6b62752073f14b23b3f",
+      "afterSha256": "e48d4ea5da65d2b72b070e54bb41103486e730c38b8c040215388a9b57af39cb"
+    },
+    {
+      "path": "scripts/pc-writer/earnings-api-local.mjs",
+      "change": "M",
+      "beforeSha256": "f80bced7233ba9da5511a73bf324ae73a4a7c505ecf1ce9f690cb412b98b1b62",
+      "afterSha256": "a686bf736c9a5ae274cd2dc69dd169e93ddab90f72ae273c45e765c788226ce8"
+    },
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "3fa8e1039fcedd3b2fb07b888996f845c6b7102505acdba7608818cb56238871",
+      "afterSha256": "1f7186cad2240839a432bd6ac9351c83762334b38a988d27d971cb4ffe647f1b"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
