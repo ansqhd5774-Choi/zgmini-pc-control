@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "1be1734e9d8cf74375b3663ceee0033b928108a2",
+  "baseHead": "24610129461d027524a018daeba9f8b0cf9ed02c",
+  "baseConfigSourceSha": "24610129461d027524a018daeba9f8b0cf9ed02c",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+      "change": "M",
+      "beforeSha256": "94e98f36d1a7bca242e6a4fc2212369c3a29726e9a396565b820636dc5803119",
+      "afterSha256": "5f5da53aa6437ca863a21a2ad263935ad5e5f497ffda18cfa9979801a75f9f61"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
