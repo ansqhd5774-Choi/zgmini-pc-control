@@ -5,8 +5,9 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {verifyOpenedOwnerIssue,approvalPathFor,authorizeApprovedRaw,
-  loadApprovedRaw,applyApprovedOnce,DIRECT_B_RESULT} from './run.mjs';
+  loadApprovedRaw,applyApprovedOnce,verifyPinnedSourceCheckout,DIRECT_B_RESULT} from './run.mjs';
 import {sanitizeDirectBReport,uploadDirectBReport} from './report.mjs';
+import {approvedCandidateSource,appendCandidatePin} from './preflight.mjs';
 import {SCHEMA as BUNDLE_SCHEMA,SCOPE as BUNDLE_SCOPE}
   from '../writer-b/approved-versioned-bundle/versioned-bundle-plan.mjs';
 import {PIN_CAS_SCHEMA,PIN_CAS_SCOPE}
@@ -84,6 +85,29 @@ test('fixed Git blob identity, working file identity and SHA must all agree',()=
     assert.throws(()=>authorizeApprovedRaw({event:f.ev,env:env(),
       raw:f.raw,worktree:f.raw,actualHead:controlSha,...partial}),/DIRECT_B_/);
   }
+});
+test('candidate source checkout is emitted only after the exact B approval',()=>{
+ const f=fixture();const writes=[];
+ const pin=appendCandidatePin(f.auth,{outputFile:'/trusted/github-output',
+  append:(file,content)=>writes.push({file,content})});
+ assert.equal(pin.repository,'ansqhd5774-Choi/zgmini');
+ assert.equal(pin.sourceSha,sourceSha);
+ assert.deepEqual(writes,[{file:'/trusted/github-output',
+  content:`candidateSourceSha=${sourceSha}\n`}]);
+ assert.throws(()=>appendCandidatePin(f.auth,{outputFile:'relative-output',
+  append:()=>{}}),/DIRECT_B_ACTIONS_OUTPUT_STOP/);
+ assert.throws(()=>approvedCandidateSource({...f.auth,
+  manifest:{...f.auth.manifest,sourceSha:'anybranch'}}),
+  /DIRECT_B_CANDIDATE_SOURCE_UNVERIFIED/);
+});
+test('actual candidate checkout must have the approved source SHA',()=>{
+ const f=fixture();
+ assert.equal(verifyPinnedSourceCheckout(f.auth,{sourceRoot:'/absolute/candidate',
+  gitHead:()=>sourceSha}).sourceSha,sourceSha);
+ for(const opts of [{sourceRoot:'relative',gitHead:()=>sourceSha},
+  {sourceRoot:'/absolute/candidate',gitHead:()=>('f'.repeat(40))}])
+  assert.throws(()=>verifyPinnedSourceCheckout(f.auth,opts),
+   /DIRECT_B_CANDIDATE_SOURCE_DRIFT/);
 });
 
 test('unreviewed or broadened effects cannot pass manifest authorization',()=>{
@@ -198,7 +222,8 @@ test('ambiguous or partial report cannot be labeled published success or auto-re
 
 test('workflow remains inert local candidate, exact one-shot Windows shared writer lane',()=>{
   const dir=path.dirname(fileURLToPath(import.meta.url));
-  const yml=fs.readFileSync(path.join(dir,'pc-approved-runtime-b-once.yml'),'utf8');
+  const yml=fs.readFileSync(path.join(dir,'..','.github','workflows',
+   'pc-approved-runtime-b-once.yml'),'utf8');
   assert.match(yml,/types:\s*\[opened\]/);
   assert.match(yml,/github\.run_attempt == 1/);
   assert.match(yml,/github\.event\.repository\.private == true/);
@@ -206,6 +231,11 @@ test('workflow remains inert local candidate, exact one-shot Windows shared writ
   assert.match(yml,/zgmini-writer-source-b-one-at-a-time/);
   assert.match(yml,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
   assert.match(yml,/persist-credentials: false/);
+  assert.match(yml,/direct-writer-b\\preflight\.mjs/);
+  assert.match(yml,/steps\.manifest\.outputs\.candidateSourceSha/);
+  assert.match(yml,/generic-b-approved-source/);
+  assert.ok(yml.indexOf('preflight.mjs')<yml.indexOf('id: candidate'));
+  assert.ok(yml.indexOf('id: candidate')<yml.indexOf('id: apply'));
   assert.match(yml,/report\.mjs/);
   assert.match(yml,/if: always\(\)/);
   assert.equal(DIRECT_B_RESULT,'approved-runtime-b-once-result.json');
