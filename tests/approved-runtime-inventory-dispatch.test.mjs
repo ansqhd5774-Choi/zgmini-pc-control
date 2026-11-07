@@ -144,13 +144,99 @@ test('unregistered source SHA never gains profile lookup authority',async()=>{
  });
 });
 
-test('more than four approved profiles for one source remain bounded',async()=>{
+test('five approved profiles for one source return truthful bounded SUMMARY_ONLY without blocking',async()=>{
  await withTmp(async root=>{
   const bytes=manifest(Array.from({length:5},(_,i)=>profile('same'+i,'runtime'+i)));
   setup(root,bytes);
   const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
    host:{approvedRuntimeInventorySha256:sha(bytes)}});
-  assert.equal(result.status,'BLOCKED');
-  assert.equal(result.code,'APPROVED_INVENTORY_SELECTION_TOO_LARGE');
+  assert.equal(result.status,'PASS');
+  assert.equal(result.code,'APPROVED_RUNTIME_REGISTRY_SUMMARY_ONLY');
+  assert.equal(result.mode,'SUMMARY_ONLY');
+  assert.equal(result.selectedCount,5);
+  assert.equal(result.fileHashesComplete,false);
+  assert.equal(result.taskChecksComplete,false);
+  assert.equal(result.preimageEvidenceLevel,'ROOT_EXISTENCE_ONLY');
+  assert.equal(result.profiles.length,5);
+  assert.ok(result.profiles.every(p=>p.status==='ROOT_ABSENT'));
+  assert.ok(Buffer.byteLength(JSON.stringify(result))<=20*1024);
+ });
+});
+
+test('128 profiles sharing one approved source produce bounded summary without file/Task queries',async()=>{
+ await withTmp(async root=>{
+  const profiles=Array.from({length:128},(_,i)=>profile('longProfile'+i,'runtime'+i));
+  const bytes=manifest(profiles);setup(root,bytes);
+  let queries=0;
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
+   host:{approvedRuntimeInventorySha256:sha(bytes)},queryTask:()=>{queries++;throw Error('unexpected');}});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.selectedCount,128);
+  assert.equal(result.mode,'SUMMARY_ONLY');
+  assert.equal(result.fileHashesComplete,false);
+  assert.equal(queries,0);
+  assert.ok(Buffer.byteLength(JSON.stringify(result))<=20*1024);
+ });
+});
+
+test('worst-case long-ID blocked summaries fit bounds or compact without blocking',async()=>{
+ await withTmp(async root=>{
+  fs.mkdirSync(path.join(root,'pc-writer'),{recursive:true});
+  const profiles=Array.from({length:128},(_,i)=>{
+   fs.writeFileSync(path.join(root,'pc-writer','runtime'+i),'not-a-directory');
+   return profile('longProfile'+'x'.repeat(31)+i,'runtime'+i);
+  });
+  const bytes=manifest(profiles);setup(root,bytes);
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
+   host:{approvedRuntimeInventorySha256:sha(bytes)}});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.mode,'SUMMARY_ONLY');
+  assert.equal(result.selectedCount,128);
+  assert.equal(result.blockedProfiles,128);
+  if(result.profileRowsOmitted){
+   assert.deepEqual(result.profiles,[]);
+   assert.match(result.summarySha256,/^[a-f0-9]{64}$/);
+  }else{
+   assert.equal(result.profiles.length,128);
+   assert.ok(result.profiles.every(p=>p.status==='BLOCKED'));
+  }
+  assert.ok(Buffer.byteLength(JSON.stringify(result))<=20*1024);
+ });
+});
+
+test('one bad profile root does not block other profile summaries',async()=>{
+ await withTmp(async root=>{
+  const profiles=Array.from({length:5},(_,i)=>profile('item'+i,'runtime'+i));
+  fs.mkdirSync(path.join(root,'pc-writer'),{recursive:true});
+  fs.writeFileSync(path.join(root,'pc-writer','runtime1'),'wrong type');
+  const bytes=manifest(profiles);setup(root,bytes);
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
+   host:{approvedRuntimeInventorySha256:sha(bytes)}});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.mode,'SUMMARY_ONLY');
+  assert.equal(result.blockedProfiles,1);
+  assert.equal(result.profiles.find(p=>p.profileId==='item1').status,'BLOCKED');
+  assert.equal(result.profiles.find(p=>p.profileId==='item2').status,'ROOT_ABSENT');
+ });
+});
+
+test('one unsafe detailed profile is isolated; another profile retains full evidence',async()=>{
+ await withTmp(async root=>{
+  const profiles=[profile('good','good-runtime'),profile('bad','bad-runtime')];
+  const good=path.join(root,'pc-writer','good-runtime');
+  const bad=path.join(root,'pc-writer','bad-runtime');
+  fs.mkdirSync(good,{recursive:true});
+  fs.writeFileSync(path.join(good,'INSTALL_RESULT.json'),'fixed');
+  fs.writeFileSync(bad,'wrong type');
+  const bytes=manifest(profiles);setup(root,bytes);
+  const result=runApprovedRuntimeInventory({request:identity,dataRoot:root,
+   host:{approvedRuntimeInventorySha256:sha(bytes)}});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.mode,'DETAILED');
+  assert.equal(result.code,'APPROVED_RUNTIME_REGISTRY_PARTIAL_READONLY');
+  assert.equal(result.blockedProfiles,1);
+  assert.equal(result.fileHashesComplete,false);
+  assert.equal(result.profiles.find(p=>p.profileId==='bad').status,'BLOCKED');
+  assert.ok(result.profiles.find(p=>p.profileId==='good').files.install.sha256);
  });
 });
