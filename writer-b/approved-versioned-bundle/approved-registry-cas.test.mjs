@@ -65,7 +65,27 @@ function fixture(){
   beforeRegistry,afterRegistry,newEntry,existing,approval:normalizedApproval,
   approvalRaw,pinnedApproval};
 }
-function mockIo(f,{faultAt=null,rollbackFault=false,reportIncomplete=false}={}){
+function firstCreateFixture(){
+ const f=fixture();
+ f.beforeRegistry=null;
+ f.afterRegistry=Buffer.from(JSON.stringify({
+  schema:RUNTIME_REGISTRY_SCHEMA,profiles:[f.newEntry],
+ })+'\n');
+ f.hostRaw=Buffer.from(
+  '{"schema":"ZGMINI_PC_HOST_V1","secretCarrier":"unchanged"}\n');
+ f.hostAfter=patchHostRuntimePinBytes(f.hostRaw,{
+  oldPin:null,newPin:sha(f.afterRegistry),
+ });
+ f.approval={...f.approval,oldPin:null,newPin:sha(f.afterRegistry),
+  registryBeforeSha256:null,registryAfterSha256:sha(f.afterRegistry),
+  hostBeforeSha256:sha(f.hostRaw),hostAfterSha256:sha(f.hostAfter)};
+ f.approvalRaw=Buffer.from(JSON.stringify(f.approval));
+ f.pinnedApproval={...f.pinnedApproval,rawApprovalSha256:sha(f.approvalRaw)};
+ return f;
+}
+function mockIo(f,{faultAt=null,rollbackFault=false,reportIncomplete=false,
+ parentStatus='EXISTS_TRUSTED_DIRECTORY',parentReparsePoint=false,
+ parentOwnerVerified=true}={}){
  const copy=x=>x===null?null:Buffer.from(x);
  const state={host:copy(f.hostRaw),registry:copy(f.beforeRegistry),
   lock:null,backup:null,history:[],reported:null};
@@ -79,6 +99,11 @@ function mockIo(f,{faultAt=null,rollbackFault=false,reportIncomplete=false}={}){
   async acquireSharedWriterLock(){hit('lock');state.lock={id:'shared-lock'};return state.lock;},
   async verifyPreimageUnderLock(){hit('under-lock');return {
    host:copy(state.host),registry:copy(state.registry)};},
+  async verifyApprovedRegistryParentUnderLock({targetId}){
+   hit('verify-parent');
+   return {targetId,status:parentStatus,reparsePoint:parentReparsePoint,
+    ownerVerified:parentOwnerVerified};
+  },
   async loadApprovedRegistryAfterBytes(){
    hit('load-approved-registry');return Buffer.from(f.afterRegistry);
   },
@@ -176,7 +201,7 @@ test('approved dual-file CAS: authenticates, backs up, changes two files, report
  assert.equal(d.state.lock,null);
  assert.equal(d.state.reported.includes('private value'),false);
  assert.deepEqual(d.state.history,['authenticate','preimage','lock','under-lock',
-  'load-approved-registry','backup','cas-host','cas-registry','readback','commit',
+  'verify-parent','load-approved-registry','backup','cas-host','cas-registry','readback','commit',
   'unlock','report']);
 });
 test('committed PIN CAS with incomplete result proof requires evidence recovery, not B replay',async()=>{
@@ -222,7 +247,7 @@ test('ordinary slugs and structurally invalid UUIDs cannot invoke PIN CAS',async
 });
 test('all early transaction faults stop without operational mutation',async()=>{
  for(const faultAt of ['authenticate','preimage','lock','under-lock',
-  'load-approved-registry']){
+  'verify-parent','load-approved-registry']){
   const f=fixture(),d=mockIo(f,{faultAt});
   const result=await runApprovedRegistryCas({
    approvalRaw:f.approvalRaw,pinnedApproval:f.pinnedApproval,adapter:d.adapter});
@@ -263,21 +288,7 @@ test('partial backup/ambiguous commit/rollback failure retains lock and UNKNOWN'
  assert.ok(d.state.lock!==null);
 });
 test('explicit first-create: absent registry+absent host PIN is byte-CAS, no fake empty file',async()=>{
- const f=fixture();
- f.beforeRegistry=null;
- f.afterRegistry=Buffer.from(JSON.stringify({
-  schema:RUNTIME_REGISTRY_SCHEMA,profiles:[f.newEntry],
- })+'\n');
- f.hostRaw=Buffer.from(
-  '{"schema":"ZGMINI_PC_HOST_V1","secretCarrier":"unchanged"}\n');
- f.hostAfter=patchHostRuntimePinBytes(f.hostRaw,{
-  oldPin:null,newPin:sha(f.afterRegistry),
- });
- f.approval={...f.approval,oldPin:null,newPin:sha(f.afterRegistry),
-  registryBeforeSha256:null,registryAfterSha256:sha(f.afterRegistry),
-  hostBeforeSha256:sha(f.hostRaw),hostAfterSha256:sha(f.hostAfter)};
- f.approvalRaw=Buffer.from(JSON.stringify(f.approval));
- f.pinnedApproval={...f.pinnedApproval,rawApprovalSha256:sha(f.approvalRaw)};
+ const f=firstCreateFixture();
  const d=mockIo(f);
  const result=await runApprovedRegistryCas({
   approvalRaw:f.approvalRaw,pinnedApproval:f.pinnedApproval,adapter:d.adapter,
@@ -285,6 +296,37 @@ test('explicit first-create: absent registry+absent host PIN is byte-CAS, no fak
  assert.equal(result.status,'PASS');
  assert.deepEqual(d.state.host,f.hostAfter);
  assert.deepEqual(d.state.registry,f.afterRegistry);
+});
+test('first-create cannot mkdir a missing parent or missing drive; zero operational writes',async()=>{
+ for(const [parentStatus,expectedCode] of [
+  ['PARENT_ABSENT','B_PIN_REGISTRY_PARENT_ABSENT'],
+  ['DRIVE_UNAVAILABLE','B_PIN_REGISTRY_DRIVE_UNAVAILABLE'],
+ ]){
+  const f=firstCreateFixture(),d=mockIo(f,{parentStatus});
+  const r=await runApprovedRegistryCas({approvalRaw:f.approvalRaw,
+   pinnedApproval:f.pinnedApproval,adapter:d.adapter});
+  assert.equal(r.status,'BLOCKED',parentStatus);
+  assert.equal(r.code,expectedCode,parentStatus);
+  assert.deepEqual(d.state.host,f.hostRaw);
+  assert.equal(d.state.registry,null);
+  assert.equal(d.state.lock,null);
+  assert.ok(!d.state.history.includes('backup'));
+  assert.ok(!d.state.history.includes('cas-host'));
+  assert.ok(!d.state.history.includes('cas-registry'));
+ }
+});
+test('first-create parent must be approved non-reparse directory with verified ownership',async()=>{
+ for(const opts of [{parentReparsePoint:true},{parentOwnerVerified:false},
+  {parentStatus:'UNTRUSTED_OWNER'}]){
+  const f=firstCreateFixture(),d=mockIo(f,opts);
+  const r=await runApprovedRegistryCas({approvalRaw:f.approvalRaw,
+   pinnedApproval:f.pinnedApproval,adapter:d.adapter});
+  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.code,'B_PIN_REGISTRY_PARENT_UNTRUSTED');
+  assert.deepEqual(d.state.host,f.hostRaw);
+  assert.equal(d.state.registry,null);
+  assert.ok(!d.state.history.includes('backup'));
+ }
 });
 test('orphan adoption forbidden: registry exists but host PIN is absent',async()=>{
  const f=fixture();
