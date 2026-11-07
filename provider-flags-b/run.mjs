@@ -76,12 +76,25 @@ export function loadAuthorization({env=process.env,readFile=fs.readFileSync,
   return authorize({event,env,manifestBytes:raw});
 }
 
-function writeOriginalBackup(dir,bytes,source){
-  const dest=path.join(dir,'providers.original.bin');
+function writeOriginalBackup(bytes,source,requestId){
+  // A child journal directory can inherit a *different* ACL. Keep the durable
+  // backup in the original directory so the exact file security is inherited
+  // from the same parent, while retaining the source file's copied ACL.
+  const dest=source+'.provider-b-'+requestId+'.original.bin';
   copyPreservingSecurity(source,dest);
   const fd=fs.openSync(dest,'r');
   try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   need(fs.readFileSync(dest).equals(bytes),'PROVIDER_B_BACKUP_READBACK_STOP');
+}
+export function normalizeAclEvidence(stdout,file){
+  need(typeof stdout==='string'&&stdout.startsWith(file),
+    'PROVIDER_B_ACL_QUERY_STOP');
+  // `icacls` indents continuation lines to the *filename length*. Comparing
+  // its raw output rejects identical ACLs for different basename lengths.
+  const body=stdout.slice(file.length).split(/\r?\n/)
+    .map(line=>line.trim()).filter(Boolean).join('\n');
+  need(body.length>0,'PROVIDER_B_ACL_EMPTY_STOP');
+  return body;
 }
 function aclEvidence(file){
   if(process.platform!=='win32')return null;
@@ -93,9 +106,7 @@ function aclEvidence(file){
   need(result.status===0&&!result.error&&typeof result.stdout==='string'&&
     result.stdout.startsWith(file),'PROVIDER_B_ACL_QUERY_STOP');
   // Never publish names/SIDs. Compare file-relative read-only ACL evidence.
-  const body=result.stdout.slice(file.length).replace(/\r\n/g,'\n').trim();
-  need(body.length>0,'PROVIDER_B_ACL_EMPTY_STOP');
-  return body;
+  return normalizeAclEvidence(result.stdout,file);
 }
 function copyPreservingSecurity(source,dest){
   // Windows CopyFile preserves original security attributes; unlike creating
@@ -146,7 +157,7 @@ export function applyApprovedFlags(auth,{target=FILE,journalRoot=JOURNAL_ROOT,
     proposed=changeProviderFlags(original);
     createInstallJournal({journalRoot,requestId,sharedLock,fd:lock.fd});
     claimed=true;
-    writeOriginalBackup(path.join(journalRoot,requestId),original,target);
+    writeOriginalBackup(original,target,requestId);
     journal('BACKED_UP');
     // Direct CAS immediately before atomic switch. Other software not honoring
     // the shared writer lock may cause a safe STOP instead of overwrite.
