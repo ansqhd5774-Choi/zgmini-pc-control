@@ -57,12 +57,51 @@ export function protectedState(dataRoot,{queryTask,retiredTaskEvidence=nativeRet
  }
  return output;
 }
+// Project only bounded, non-sensitive R6 status from existing Core/Writer ledgers.
+const r6GroupNames=new Set([
+ 'DOL_UI_WEEKLY_CLAIMS','BLS_EMPLOYMENT_SITUATION','BLS_JOLTS',
+ 'BLS_ECI','BLS_STATE_MSA','BLS_BED',
+]);
+const r6Code=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,99}$/.test(value)?value:null;
+const r6Count=value=>Number.isSafeInteger(value)&&value>=0&&value<=100000?value:null;
+function r6CollectionProjection(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+ const rows=(items,planned)=>Array.isArray(items)?items.slice(0,12).flatMap(item=>{
+  if(!item||!r6GroupNames.has(item.groupName))return [];
+  const status=r6Code(item.status);
+  if(!status)return [];
+  return [{groupName:item.groupName,status,...(planned?{due:item.due===true}: {})}];
+ }).slice(0,6):[];
+ return {status:r6Code(raw.status),code:r6Code(raw.code),
+  providerRequests:r6Count(raw.providerRequests),
+  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
+}
+function r6PublicationProjection(report){
+ const raw=report?.employmentR6OneYear;
+ const failure=Array.isArray(report?.failures)
+  ?report.failures.find(item=>item?.id==='employment-r6-one-year-publication'):null;
+ if(!raw&&!failure)return null;
+ const safeDate=typeof raw?.asOfDate==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
+ return {status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
+  asOfDate:safeDate,sourceStoredAt:r6Count(raw?.sourceStoredAt),
+  sourceFeatures:r6Count(raw?.sourceFeatures),
+  chartReadyFeatures:r6Count(raw?.chartReadyFeatures),
+  recentlyObservedFeatures:r6Count(raw?.recentlyObservedFeatures)};
+}
 export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
  for(const file of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json']){
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
   const s=fs.statSync(p);let data;try{data=JSON.parse(fs.readFileSync(p));}catch{data={};}
   out.checkpoints[file]={exists:true,modifiedAt:s.mtime.toISOString(),bytes:s.size,status:typeof data.status==='string'&&/^[A-Z0-9_:-]{1,80}$/.test(data.status)?data.status:null};
+  if(file==='local-collection-last-run.json'){
+   const employmentR6=r6CollectionProjection(data.employmentR6Collection);
+   if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
+  }
+  if(file==='local-writer-last-run.json'){
+   const employmentR6=r6PublicationProjection(data);
+   if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
+  }
  }
  const config=path.join(root,'config.json');if(fs.existsSync(config)){const c=JSON.parse(fs.readFileSync(config));const x=c.source;out.approvedSourceSha=[x?.sha,x?.commit,x?.commitSha,x,c.sourceSha].find(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v))??null;}
  if(queryTask){
