@@ -57,6 +57,8 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 ## 허용 작업
 
 - runner-smoke: 자체 CMD→Node 경로 및 읽기 전용 상태.
+- writer-install-preimage-readonly: 실제 Windows의 고정 시장 캘린더 3파일·고용 R6 19파일 설치 전 존재/SHA-256, 운영 sourceRoot/HEAD/config.source 및 R6 설정 두 키 상태를 원본 변경 없이 조회. 실제 실행 중 Core source 확인과는 별도.
+- writer-publication-evidence-readonly: ER1 Writer 월별 상태·전체 게시 원장과 고정 11월 로컬 공개 output의 저장 시각·본문 SHA-256만 조회. 개별 D1 재조회는 기록되지 않으면 `NOT_RECORDED`이며 기능 담당자가 별도로 확인.
 - fear-greed-archive-status: 실PC 설치·실행 검증된 Core SQLite 관측·검증 기록 및 실행 경로 읽기 전용 진단.
 - core-status: 기존 task XML hash·config의 승인 SHA·checkpoint 상태만 요약. 원자료/키/전체 config는 미출력.
 - source-audit: GitHub source SHA·branch HEAD 읽기 전용 대조. 후보 코드를 실행하지 않음.
