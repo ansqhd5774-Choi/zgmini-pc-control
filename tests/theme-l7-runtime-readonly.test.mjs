@@ -182,3 +182,39 @@ test('candidate list and nested search remain bounded for large malformed struct
   assert.equal(JSON.stringify(d).includes('PRIVATE_SECRET'),false);
  }finally{f.close();}
 });
+
+test('legacy freeform R181 STOP reason yields only a fixed safe category hint',()=>{
+ const f=fixture();try{
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),JSON.stringify({
+   status:'STOP',reason:'fetch failed after timeout',
+   observedDate:'2026-11-07',token:'DO_NOT_EXPOSE_TOKEN',
+   other:{rawPrices:[123.45,789.01]}}));
+  const out=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+   .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  assert.equal(out.status,'SAFE_VALUES_FOUND');
+  assert.ok(out.values.some(v=>v.path==='reason.categoryHint'&&
+   v.value==='L7_HINT_NETWORK_FAILURE'));
+  const json=JSON.stringify(out);
+  for(const secret of ['fetch failed after timeout','DO_NOT_EXPOSE_TOKEN','123.45','789.01'])
+   assert.equal(json.includes(secret),false);
+ }finally{f.close();}
+});
+
+test('freeform secrets and ambiguous causes stay unclassified',()=>{
+ const f=fixture();try{
+  for(const reason of [
+   'https://secret.example?api_key=PRIVATE 429',
+   'Authorization Bearer token 403',
+   'fetch failed due to HTTP 429 quota exceeded',
+   'private user id ABC123',
+   'Authorization Bearer PRIVATE_SECRET_TOKEN',
+  ]){
+   fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+    JSON.stringify({status:'STOP',reason}));
+   const result=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+    .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+   assert.deepEqual(result.values,[],reason);
+   assert.equal(JSON.stringify(result).includes(reason),false);
+  }
+ }finally{f.close();}
+});
