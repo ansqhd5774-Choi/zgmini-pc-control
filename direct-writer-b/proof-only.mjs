@@ -10,6 +10,7 @@ import {isApprovedConfiguredRuntime,verifyPinnedSourceCheckout}
   from './run.mjs';
 import {runWindowsCrossVersionProof}
   from '../writer-b/approved-versioned-bundle/windows-cross-version-proof.mjs';
+import {reportProofFromRunner} from './proof-only-report.mjs';
 
 export const PROOF_RESULT='configured-runtime-proof-once-result.json';
 export const PROOF_SCHEMA='ZGMINI_CONFIGURED_RUNTIME_WINDOWS_PROOF_RESULT_V1';
@@ -180,8 +181,7 @@ async function main(){
   need(['--pin','--run','--report'].includes(mode)&&
     process.argv.length===3,'PROOF_FIXED_MODE_ONLY');
   if(mode==='--report'){
-    const reporter=await import('./proof-only-report.mjs');
-    return reporter.reportProofFromRunner();
+    return reportProofFromRunner();
   }
   need(process.platform==='win32','PROOF_WINDOWS_REQUIRED');
   const env=process.env;

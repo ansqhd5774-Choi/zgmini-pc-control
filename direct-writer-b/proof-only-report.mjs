@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {verifyProofIssue,PROOF_RESULT,PROOF_SCHEMA}
+import {verifyProofIssue,loadProofApproval,PROOF_RESULT,PROOF_SCHEMA}
   from './proof-only.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -157,7 +157,6 @@ export async function uploadProofReport({event,env,auth,rawResult,
 export async function reportProofFromRunner(){
   const env=process.env;
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
-  const {loadProofApproval}=await import('./proof-only.mjs');
   const auth=loadProofApproval({event,env});
   let rawResult='';
   try{rawResult=fs.readFileSync(path.join(env.RUNNER_TEMP,PROOF_RESULT),'utf8');}

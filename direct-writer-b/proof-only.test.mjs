@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {verifyProofIssue,loadProofApproval,proveWithoutInstall,PROOF_SCHEMA}
   from './proof-only.mjs';
@@ -106,6 +108,22 @@ test('no Windows environment reaches neither package build nor operation',async(
   await assert.rejects(proveWithoutInstall({auth:f.auth,env:{RUNNER_TEMP:'/tmp'},
     loadModule:()=>{imported++;}}),/PROOF_WINDOWS_TEMP_REQUIRED/);
   assert.equal(imported,0);
+});
+
+test('proof reporter CLI cannot deadlock its own ES module import',()=>{
+  const dir=path.dirname(fileURLToPath(import.meta.url));
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-proof-cli-'));
+  try{
+    const event=path.join(temp,'event.json');
+    fs.writeFileSync(event,'{}\n',{flag:'wx'});
+    const run=spawnSync(process.execPath,
+      [path.join(dir,'proof-only.mjs'),'--report'],
+      {env:{...process.env,GITHUB_EVENT_PATH:event},
+        encoding:'utf8',timeout:6000});
+    assert.equal(run.status,1);
+    assert.match(run.stderr,/PROOF_OWNER_ISSUE_DENIED/);
+    assert.doesNotMatch(run.stderr,/unsettled top-level await/i);
+  }finally{fs.rmSync(temp,{recursive:true});}
 });
 
 test('proof-only workflow has no install/effect stage',()=>{
