@@ -1,7 +1,7 @@
 name: ZGMINI Agent Handoff Intake
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
   issue_comment:
     types: [created]
 permissions:
