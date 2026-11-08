@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {loadApprovedRaw} from './run.mjs';
+import {loadApprovedRaw} from './approval-contract.mjs';
 
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const need=(ok,code)=>{if(!ok)fail(code);};
