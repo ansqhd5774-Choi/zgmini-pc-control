@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {loadApprovedRaw,verifyPinnedSourceCheckout}
   from '../../direct-writer-b/run.mjs';
-import {acquireInstallClaim,releaseInstallClaim}
+import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
   from '../../r17-writer-b/r17-b-claim.mjs';
 
 const SOURCE_REPO='ansqhd5774-Choi/zgmini';
@@ -53,7 +53,8 @@ export function createFixedConfiguredReceiver({
   pinCheckout=verifyPinnedSourceCheckout,
   importModule=moduleAt,
   verifyCrossVersion=defaultCompatibility,
-  claim=acquireInstallClaim,release=releaseInstallClaim,
+  claim=acquireInstallLock,consumeClaim=createInstallJournal,
+  release=releaseInstallClaim,
 }={}){
   let approved=null,sourceRoot=null,feature=null,sourceInstall=null;
   let baseline=null,claimHandle=null,claimRequest=null;
@@ -155,18 +156,26 @@ export function createFixedConfiguredReceiver({
         packageManifestSha256:parsed.manifestSha256,
         runConfiguredPackage:feature.runConfiguredPackage};
     },
-    async consumeOneShotAuthorization({approval,windows,preflight}){
+    async acquireSharedWriterLease({approval,windows}){
       need(!claimHandle&&baseline&&
         approval.requestId===approved.requestId&&
-        windows.taskXmlSha256===baseline.taskXmlSha256&&
-        preflight.status==='PREFLIGHT_PASS',
+        windows.taskXmlSha256===baseline.taskXmlSha256,
       'B_FIXED_CLAIM_PRECONDITION');
       directory(WRITER_HOME);
-      // A previous request journal is never deleted or retried. Only the
-      // fixed Writer B lock is acquired; the feature updater keeps its own.
+      // The shared lease protects feature preflight too; the requestId is
+      // consumed only once that preflight succeeds, in the next method.
       claimRequest=approval.requestId;
       claimHandle=claim({journalRoot:JOURNALS,
         requestId:claimRequest,sharedLock:SHARED_LOCK});
+      return {requestId:claimRequest,ownerVerified:true};
+    },
+    async consumeOneShotAuthorization({approval,windows,preflight}){
+      need(claimHandle&&claimRequest===approval.requestId&&baseline&&
+        windows.taskXmlSha256===baseline.taskXmlSha256&&
+        preflight.status==='PREFLIGHT_PASS',
+      'B_FIXED_ONESHOT_PRECONDITION');
+      consumeClaim({journalRoot:JOURNALS,requestId:claimRequest,
+        sharedLock:SHARED_LOCK,fd:claimHandle.fd});
       const receiptSha256=sha(Buffer.from(JSON.stringify({
         requestId:claimRequest,sourceSha:approval.sourceSha,
         approvalSha256:approval.approvalSha256,
@@ -218,18 +227,22 @@ export function createFixedConfiguredReceiver({
         activeRuntimeVersion:active.version,
         manualCommandsVerified:changed,rollbackRecordVerified:true};
     },
-    async finalizeOneShotAuthorization({requestId,status,phase,reason}){
+    async releaseSharedWriterLease({requestId,retain}){
       need(claimHandle&&claimRequest===requestId,
         'B_FIXED_NO_OWNED_CLAIM');
       const journal=path.join(claimHandle.journalDir,'journal.jsonl');
-      fs.appendFileSync(journal,JSON.stringify({
-        status,phase,reason,at:new Date().toISOString()})+'\n');
-      // Do not erase the one-shot journal. Releasing this exact owned mutex
-      // prevents unrelated Writer B work from becoming permanently blocked.
+      if(fs.existsSync(journal)){
+        fs.appendFileSync(journal,JSON.stringify({
+          status:retain?'STATE_UNKNOWN':'CLOSED',
+          at:new Date().toISOString()})+'\n');
+      }
+      // The caller keeps the mutex leaf for an uncertain effect so that a
+      // later job cannot overwrite an uninspected runtime. The journal is
+      // always preserved and the exact fd is closed only by its owner.
       release({fd:claimHandle.fd,sharedLock:SHARED_LOCK,
-        requestId,retain:false});
+        requestId,retain:retain===true});
       claimHandle=null;
-      return {status:'JOURNALED_AND_UNLOCKED',requestId};
+      return {status:retain?'RETAINED_FOR_RECONCILIATION':'RELEASED',requestId};
     },
   };
   return receiver;
