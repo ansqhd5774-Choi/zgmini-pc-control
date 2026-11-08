@@ -80,15 +80,25 @@ async function listCompletePrComments(target) {
   throw new Error('HANDOFF_PR_COMMENT_SCAN_LIMIT_STOP');
 }
 
-export async function main(env = process.env, {queue = null, prWakeBinding = null} = {}) {
+export async function main(env = process.env, {queue = null, prWakeBinding = null,
+  resolvePrWakeBinding = null} = {}) {
+  if (resolvePrWakeBinding !== null &&
+      (typeof resolvePrWakeBinding !== 'function' || prWakeBinding !== null)) {
+    throw new Error('HANDOFF_PR_WAKE_RESOLVER_CONFLICT');
+  }
   // The normal CLI still has neither a database nor an event target.  An
   // explicit PR binding cannot silently fall back to the GitHub-only path.
-  if (prWakeBinding !== null && queue === null) {
+  if ((prWakeBinding !== null || resolvePrWakeBinding !== null) && queue === null) {
     throw new Error('HANDOFF_PR_WAKE_QUEUE_REQUIRED');
   }
   if (!env.GITHUB_EVENT_PATH) throw new Error('GITHUB_EVENT_PATH_REQUIRED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   assertEvent(event, env);
+  const binding = resolvePrWakeBinding === null ? prWakeBinding :
+    resolvePrWakeBinding(event.issue.body);
+  if (resolvePrWakeBinding !== null && binding === null) {
+    throw new Error('HANDOFF_PR_WAKE_RESOLUTION_REQUIRED');
+  }
   // Opt-in dependency injection only. Production main() has no queue object
   // and preserves the existing GitHub-only broker behavior without PC DB IO.
   if (queue !== null) {
@@ -97,9 +107,9 @@ export async function main(env = process.env, {queue = null, prWakeBinding = nul
       readComments: listCompleteIssueComments,
       postComment: async (issueNumber, body) => api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments`,
         {method: 'POST', body: {body}}),
-      prWakeBinding,
-      readPrComments: prWakeBinding === null ? undefined : listCompletePrComments,
-      postPrComment: prWakeBinding === null ? undefined :
+      prWakeBinding: binding,
+      readPrComments: binding === null ? undefined : listCompletePrComments,
+      postPrComment: binding === null ? undefined :
         async (target, body) => api(`/repos/${REPOSITORY}/issues/${target.pullRequestNumber}/comments`,
           {method: 'POST', body: {body}})});
     if (outcome.commentId) {
