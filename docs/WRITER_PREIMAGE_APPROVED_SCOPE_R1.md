@@ -1,6 +1,6 @@
 # Writer 설치 전 원본 조회 — 재사용 가능한 승인 범위 R1
 
-2026-11-08. 이 문서는 새 기능별 Controller 소스 하드코딩을 없애는 **후보 계약**이다. 소스 PR/병합은 실제 Windows Controller 설치 증거가 아니다. 사용 전 설치된 `host.controllerFiles`와 고유 `pc-job` 결과를 확인한다.
+2026-11-08. 이 문서는 새 기능별 Controller 소스 하드코딩을 없애는 **실증된 공통 조회 계약**이다. 기능과 분리된 정규 Controller B [#880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/880)에서 대상 소스 `c6a3d15beae9139e66629fb5e442202434b11481` 실제 설치·보호 PASS, 후속 승인 범위 A [#882](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/882)에서 승인 7파일의 Windows 조회·원격 JSON/TXT 2/2 PASS를 확인했다. 이후 기능도 매번 현재 설치 source와 승인 범위를 확인하되 공통 Controller 재설치를 선행 Gate로 만들지 않는다.
 
 ## 문제와 호환성
 
