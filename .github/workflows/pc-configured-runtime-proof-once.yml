@@ -6,9 +6,6 @@ on:
 permissions:
   contents: write
   issues: write
-concurrency:
-  group: zgmini-writer-source-b-one-at-a-time
-  cancel-in-progress: false
 jobs:
   configured-runtime-proof:
     if: >-
@@ -20,6 +17,9 @@ jobs:
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       github.event.issue.title == 'pc-configured-runtime-proof' &&
       github.run_attempt == 1
+    concurrency:
+      group: zgmini-configured-runtime-proof-${{ github.event.issue.number }}
+      cancel-in-progress: false
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 30
     defaults:

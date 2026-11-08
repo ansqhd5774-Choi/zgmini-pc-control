@@ -121,6 +121,29 @@ test('proof-only workflow has no install/effect stage',()=>{
   assert.doesNotMatch(yml,/RUN_INSTALL\.cmd/);
 });
 
+test('unmatched Issue workflows cannot evict a valid Writer B or proof job',()=>{
+  const dir=path.dirname(fileURLToPath(import.meta.url));
+  const workflows=[
+    ['pc-approved-runtime-b-once.yml',true],
+    ['pc-writer-b-source-once.yml',true],
+    ['pc-writer-provider-flags-once.yml',true],
+    ['pc-configured-runtime-proof-once.yml',false],
+  ];
+  for(const [name,writer] of workflows){
+    const yml=fs.readFileSync(path.join(dir,'../.github/workflows',name),'utf8');
+    assert.doesNotMatch(yml,/^concurrency:/m,`${name}: run-level collision`);
+    assert.match(yml,/^    concurrency:\n      group: /m);
+    assert.match(yml,/^      cancel-in-progress: false$/m);
+    if(writer){
+      assert.match(yml,/^      group: zgmini-writer-source-b-one-at-a-time$/m);
+      assert.match(yml,/^      queue: max$/m);
+    }else{
+      assert.match(yml,/^      group: zgmini-configured-runtime-proof-/m);
+      assert.doesNotMatch(yml,/^      group: zgmini-writer-source-b-one-at-a-time$/m);
+    }
+  }
+});
+
 test('create-only remote proof pair verifies both blobs, no retry',async()=>{
   const f=fixture(),objects=new Map();
   const mockFetch=async(url,options)=>{
