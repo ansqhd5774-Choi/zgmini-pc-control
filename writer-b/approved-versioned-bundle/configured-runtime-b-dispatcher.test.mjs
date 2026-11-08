@@ -30,6 +30,7 @@ function fixture() {
     os: 'win32', runtimeMode: 'REPEATABLE_ACTIVE_RUNTIME',
     sourceSha: hash40, taskXmlSha256: task,
     activeRuntimeSha256: token, compatibilityEvidenceSha256: hash64,
+    compatibilityDirections:2,compatibilitySharedLockVerified:true,
     scheduledCmdSha256:'a'.repeat(64),
     scheduledVbsSha256:'c'.repeat(64),
   };
@@ -102,6 +103,9 @@ test('fixed receiver DI uses existing package preflight then install once',async
   const {calls,receiver} = fixture();
   const result = await configured(receiver);
   assert.equal(result.status,'DONE',JSON.stringify(result));
+  assert.equal(result.compatibilityEvidenceSha256,hash64);
+  assert.equal(result.compatibilityDirections,2);
+  assert.equal(result.compatibilitySharedLockVerified,true);
   assert.deepEqual(calls,[
     'approved','compatibility','load','lease','preflight','consume','install',
     'readback','release',
