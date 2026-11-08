@@ -57,6 +57,28 @@ Runner·Writer 오류는 `processOwner` 수신함으로, 기능별 오류는 등
 `resolveResultPrBinding`은 **명시 주입된 경우에만** 이 함수를 사용한다. 기본 CLI와
 Workflow는 이전과 동일하게 미연결이다.
 
+### 2026-11-09 KST — 최초 2개 시험 수신함 확보
+
+다음 두 PR은 **실제 GitHub 비공개 저장소에 생성·댓글 재조회가 끝난 Draft 후보**다.
+번호가 확정된 것은 GitHub 수신함까지이며, 실제 일반 ChatGPT 대화 또는 task에
+연결되었다는 의미가 아니다. 최종 담당 대화가 다르면 매핑부터 재승인해야 한다.
+
+| 후보 역할 | Draft PR | HEAD SHA | 시험 댓글 ID | 시험 probeId |
+| --- | --- | --- | --- | --- |
+| 원담당 1번 | [#945](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/945) | `8a537c12b55d25a6ee253142ac9ee372969f02b5` | `6723684240` | `zgm-20261109-origin-1` |
+| 전문담당 5번 | [#944](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/944) | `57549b4f7c4f6117fb41e1112a1b2cbc1fd341e6` | `6723684081` | `zgm-20261109-specialist-5` |
+
+두 PR은 `main`에서 개별 1개 문서만 만든 **미병합·병합 금지** 수신함이고,
+`ZGMINI_CHAT_INBOX_PROBE_V1` 1건씩만 소유자 계정으로 기록했다. 해당 댓글은
+`github-actions[bot]`의 실제 WAKE/RETURN이 아니므로 기존 검증기를 통과시키거나
+업무를 실행하는 이벤트로 다루지 않는다. 운영 PC/DB/Workflow/Controller/Runner와
+자동화 등록·기존 기능에는 변경이 없다.
+
+다음 필수 실증은 **서로 다른 일반 ChatGPT 대화 2개 안에서** 각각 이 PR을 대상으로
+한 최초 1회 자연 예약 읽기를 등록하고, 두 `run_details.chat_ref`가 실제로
+서로 다르며 probe ID를 정확히 읽었는지 확인하는 것이다. 이 단일 대화의
+GitHub 연결 권한으로 타 일반 대화의 예약 task를 대신 생성하지 않는다.
+
 실제 배치 전에는 각각의 PR 비공개 여부·GitHub 권한과 Scheduled task의 고유
 `chat_ref`를 검증하고, 승인된 설정의 SHA·버전·적용 시점을 보존해야 한다. 진행 중인
 Incident의 수신 PR을 설정 갱신으로 바꾸지 않도록 기존 매핑을 유지하거나 정확한
