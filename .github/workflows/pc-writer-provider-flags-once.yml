@@ -6,9 +6,6 @@ on:
 permissions:
   contents: write # Create-only sanitized JSON/TXT readback.
   issues: write # One bounded comment on originating request.
-concurrency:
-  group: zgmini-writer-source-b-one-at-a-time
-  cancel-in-progress: false
 jobs:
   provider-flags-approved-b:
     if: >-
@@ -21,6 +18,10 @@ jobs:
       github.event.issue.title == 'pc-writer-provider-flags-once' &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
+    concurrency:
+      group: zgmini-writer-source-b-one-at-a-time
+      cancel-in-progress: false
+      queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
     timeout-minutes: 12
     defaults:
