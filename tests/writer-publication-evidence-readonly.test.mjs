@@ -86,3 +86,93 @@ test('WAL-backed local output reader adds no DB, WAL or SHM write in fixture',()
   assert.deepEqual(after,before);
  }finally{writer?.close();f.close();}
 });
+
+function writeMonthlyFixture(f,{month='2027-04',body='{"score":97}',
+ storedAt=1800000000000,readbackBody=body,readbackStoredAt=storedAt,
+ writerMode='PUBLISH',writerStatus='VERIFIED',ledgerSource='a'.repeat(40),
+ readbackStatus='MATCHED',ledgerStatus='VERIFIED'}={}){
+ const dir=path.join(f.d,'pc-writer','storage');fs.mkdirSync(dir);
+ const db=new DatabaseSync(path.join(dir,'core.sqlite'));
+ db.exec('CREATE TABLE public_feed_snapshots_v1 (kind TEXT,feed_key TEXT,snapshot_key TEXT,stored_at INTEGER,body TEXT)');
+ const key=`market-calendar:earnings-er1-score-${month}-public`;
+ db.prepare('INSERT INTO public_feed_snapshots_v1 VALUES (?,?,?,?,?)').run('output',key,'current',storedAt,body);
+ db.close();
+ f.write('local-writer-last-run.json',{at:'2027-04-01T00:00:00.000Z',source:'a'.repeat(40),
+  mode:writerMode,status:writerStatus,er1Future:{months:[{month,status:'READY_OUTPUT'}]}});
+ f.write('local-publication-ledger.json',{source:ledgerSource,status:ledgerStatus,
+  at:Date.parse('2027-04-01T00:02:00.000Z'),er1FeedReadbacks:[{
+   key,status:readbackStatus,localStoredAt:storedAt,localBodySha256:createHash('sha256').update(body).digest('hex'),
+   d1StoredAt:readbackStoredAt,d1BodySha256:readbackBody===null?null:createHash('sha256').update(readbackBody).digest('hex'),
+   observedAt:'2027-04-01T00:01:00.000Z',sensitiveRaw:'DO_NOT_ECHO',
+  }]});
+ return key;
+}
+
+test('future monthly output is dynamically selected and exact Writer D1 ledger verifies',()=>{
+ const f=fixture();try{
+  const key=writeMonthlyFixture(f);
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.status,'PASS');assert.equal(r.output.key,key);
+  assert.equal(r.d1.perKeyReadback,'VERIFIED');
+  assert.equal(r.d1.matchedToLocal,true);
+  assert.equal(r.d1.productionVerified,false);
+  assert.equal(r.d1.publicApiUiVerified,false);
+  assert.equal(r.d1.evidenceState,'VERIFIED');
+  assert.equal(r.d1.verificationScope,'AT_WRITER_PUBLISH_TIME');
+  assert.equal(JSON.stringify(r).includes('DO_NOT_ECHO'),false);
+ }finally{f.close();}
+});
+
+test('same D1 timestamp but different body SHA is never matched',()=>{
+ const f=fixture();try{
+  writeMonthlyFixture(f,{readbackBody:'{"score":85}',readbackStatus:'BODY_MISMATCH'});
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.d1.perKeyReadback,'BODY_MISMATCH');
+  assert.equal(r.d1.productionVerified,false);
+  assert.equal(r.d1.evidenceState,'UNMATCHED');
+ }finally{f.close();}
+});
+
+test('old matching evidence cannot become current proof after a DRY_RUN',()=>{
+ const f=fixture();try{
+  writeMonthlyFixture(f,{writerMode:'DRY_RUN'});
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.d1.perKeyReadback,'MATCHED');
+  assert.equal(r.d1.productionVerified,false);
+  assert.equal(r.d1.evidenceState,'STALE');
+ }finally{f.close();}
+});
+
+test('mismatched source or preserved remote newer is not verified',()=>{
+ for(const options of [
+  {ledgerSource:'b'.repeat(40)},
+  {readbackStoredAt:1800000000001,readbackStatus:'REMOTE_NEWER_PRESERVED'}]){
+  const f=fixture();try{
+   writeMonthlyFixture(f,options);
+   const r=inspectWriterPublicationEvidence(f.d);
+   assert.equal(r.d1.matchedToLocal,false);
+  }finally{f.close();}
+ }
+});
+
+test('unrelated output failure does not veto this exact ER1 D1 readback',()=>{
+ const f=fixture();try{
+  writeMonthlyFixture(f,{writerStatus:'VERIFIED_WITH_GAPS',ledgerStatus:'PARTIAL'});
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.globalLedgerVerified,false);
+  assert.equal(r.d1.perKeyReadback,'VERIFIED');
+  assert.equal(r.d1.matchedToLocal,true);
+  assert.equal(r.d1.productionVerified,false);
+ }finally{f.close();}
+});
+
+test('spoofed metadata status MATCHED without identical stored_at and SHA is rejected',()=>{
+ const f=fixture();try{
+  writeMonthlyFixture(f,{readbackBody:'{"score":85}',readbackStatus:'MATCHED'});
+  const r=inspectWriterPublicationEvidence(f.d);
+  assert.equal(r.d1.perKeyReadback,'MATCHED');
+  assert.equal(r.d1.productionVerified,false);
+  assert.equal(r.d1.evidenceState,'STALE');
+ }finally{f.close();}
+});
+
