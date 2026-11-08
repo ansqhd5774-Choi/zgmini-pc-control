@@ -9,7 +9,11 @@ import {fileURLToPath} from 'node:url';
 const entry=fileURLToPath(new URL('./run.mjs',import.meta.url));
 
 test('real CLI top-level-await resolves fixed receiver import without exit 13',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-direct-b-cycle-'));
+  // Windows proof supplies RUNNER_TEMP explicitly. Developer tests keep the
+  // OS temporary default; neither variant writes into operational PC roots.
+  const tempBase=process.env.CYCLE_TEST_TEMP_BASE??os.tmpdir();
+  assert.ok(path.isAbsolute(tempBase));
+  const root=fs.mkdtempSync(path.join(tempBase,'zgmini-direct-b-cycle-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   // The child executes the production CLI with a pinned, read-only fake
   // Git approval. Its fixed receiver stops before creating any PC effects.
