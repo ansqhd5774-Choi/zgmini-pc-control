@@ -7,6 +7,9 @@ const CONTROL_REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
 const PRODUCER = 'github-actions[bot]';
 const SUPPORTED_FAILURES = new Set(['FAIL', 'RUNTIME_FAILED']);
+// These allowlisted PC operations deliberately generate failures/timeouts to
+// prove the reporter. Their outcomes are not production incidents.
+const EXPECTED_FAILURE_FIXTURES = new Set(['failure-proof', 'timeout-proof']);
 const CHECKPOINTS = ['SOURCE', 'INSTALL', 'COLLECT', 'CALCULATE', 'STORE', 'D1', 'API', 'UI'];
 
 function stop(message) { throw new Error(`PC_HANDOFF_${message}`); }
@@ -47,7 +50,7 @@ export function preparePcFailureHandoff({originIssue, report, resultPath}) {
   catch { stop('REQUEST_JSON_INVALID'); }
   if (!request || request.schema !== 'ZGMINI_PC_JOB_V1' ||
       typeof request.requestId !== 'string' ||
-      !/^pc-[a-z0-9-]{5,77}$/.test(request.requestId) ||
+      !/^[a-z0-9-]{8,80}$/.test(request.requestId) ||
       typeof request.chatId !== 'string' || !/^[a-z0-9-]{4,80}$/.test(request.chatId) ||
       !validSha(request.sourceSha) ||
       !['ansqhd5774-Choi/zgmini', CONTROL_REPO].includes(request.sourceRepository)) {
@@ -74,7 +77,8 @@ export function preparePcFailureHandoff({originIssue, report, resultPath}) {
 
   // An uncertain, blocked or successful observation is NOT proof of a runtime
   // defect. Never silently promote those states to a repair request.
-  if (!SUPPORTED_FAILURES.has(report.status)) {
+  if (!SUPPORTED_FAILURES.has(report.status) ||
+      EXPECTED_FAILURE_FIXTURES.has(request.operation)) {
     return Object.freeze({state: 'NOT_ELIGIBLE', status: report.status,
       originIssueNumber: originIssue.number, resultPath});
   }
