@@ -45,7 +45,7 @@ const CONFIGURED_B_PREIMAGE=['activeRuntimeSha256','taskXmlSha256',
 const CONFIGURED_B_SIDE_EFFECTS=['providerCalls','dbWrites','d1Writes',
   'taskDefinitionChanges','newTasks','otherOperationalFiles'];
 
-function isApprovedConfiguredRuntime(m){
+export function isApprovedConfiguredRuntime(m){
   return exact(m,CONFIGURED_B_KEYS)&&
     m.schema===CONFIGURED_B_SCHEMA&&m.status==='APPROVED_B'&&
     m.scope===CONFIGURED_B_SCOPE&&
