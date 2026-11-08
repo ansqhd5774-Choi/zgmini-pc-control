@@ -9,6 +9,7 @@
     {"path": "worker/inflation-causal-candidates-public-7-writer-r1.mjs", "change": "A"},
     {"path": "scripts/pc-writer/inflation-causal-candidates-public-7-preview-r1.mjs", "change": "A"},
     {"path": "scripts/pc-writer/inflation-causal-candidates-public-7-auto-publication-r1.mjs", "change": "A"},
+    {"path": "scripts/pc-writer/independent-publication.mjs", "change": "M"},
     {"path": "scripts/pc-writer/run-local.mjs", "change": "M"}
   ],
   "allowOtherPaths": false
