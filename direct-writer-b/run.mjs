@@ -231,8 +231,10 @@ async function main(){
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   const controlRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-control');
   const auth=loadApprovedRaw({event,env,controlRoot});
+  const candidateDir=auth.mode===CONFIGURED_B_EFFECT?
+    'configured-feature-source':'generic-b-approved-source';
   verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(env.GITHUB_WORKSPACE??'',
-    'generic-b-approved-source')});
+    candidateDir)});
   // The sole native factory is code in the fixed reviewed checkout. Issue body
   // cannot select modules, paths, commands, targets or bridge capabilities.
   const fixedBridge=new URL('./native-adapter.mjs',import.meta.url);
