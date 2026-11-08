@@ -6,6 +6,8 @@ import path from 'node:path';
 import {parseHandoff, fingerprintHandoff} from '../agent-handoff/contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from '../agent-handoff/result-contract.mjs';
 import {main as runResultBroker, assertWorkflowResultRepository} from '../agent-handoff/result-broker.mjs';
+import {createChatBindingRegistry, CHAT_BINDING_REGISTRY_SCHEMA} from
+  '../agent-handoff/chat-binding-registry.mjs';
 
 function setup() {
   const handoff = parseHandoff(JSON.stringify({schema: 'ZGMINI_AGENT_HANDOFF_V1', incidentId: 'handoff-123456789abc',
@@ -76,7 +78,7 @@ test('result digest fixes exact result payload for collision detection', () => {
 });
 
 async function simulate({lostComment = false, collision = false, unauthorized = false,
-  retryReturn = false, resultPrBinding = false, lostPrReadback = false} = {}) {
+  retryReturn = false, resultPrBinding = false, resolvedReturn = false, lostPrReadback = false} = {}) {
   const {handoff, result, pr, run} = setup();
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-result-'));
   const eventPath = path.join(temp, 'event.json');
@@ -132,16 +134,21 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       await runResultBroker(env, {returnPrEvent});
       assert.equal(calls, 2);
       assert.deepEqual(seen, ['comment'], 'a return retry must not duplicate the result Issue comment');
-    } else if (resultPrBinding) {
+    } else if (resultPrBinding || resolvedReturn) {
       const binding = {enabled: true, repository: 'ansqhd5774-Choi/zgmini-pc-control',
         pullRequestNumber: 992, targetChatId: handoff.origin.chatId};
+      const registry = createChatBindingRegistry({schema: CHAT_BINDING_REGISTRY_SCHEMA,
+        repository: binding.repository, processOwner: {chatId: 'chat-process-owner', inboxPr: 991},
+        origins: [{chatId: handoff.origin.chatId, inboxPr: 992}]});
+      const options = resolvedReturn
+        ? {resolveResultPrBinding: registry.resolveReturn} : {resultPrBinding: binding};
       if (lostPrReadback) {
-        await assert.rejects(runResultBroker(env, {resultPrBinding: binding}),
+        await assert.rejects(runResultBroker(env, options),
           /CHAT_RESULT_RETURN_PR_READBACK_STOP/);
         assert.deepEqual(seen, ['comment', 'pr-comment']);
       } else {
-        await runResultBroker(env, {resultPrBinding: binding});
-        await runResultBroker(env, {resultPrBinding: binding});
+        await runResultBroker(env, options);
+        await runResultBroker(env, options);
         assert.deepEqual(seen, ['comment', 'pr-comment'], 'each result and PR receipt posts once');
         assert.equal(originPrComments.length, 1);
         assert.match(originPrComments[0].body, /^ZGMINI_CHAT_RESULT_RETURN_V1\n/);
@@ -165,6 +172,8 @@ test('opt-in origin PR return recovers after uncertainty without reposting resul
   async () => simulate({retryReturn: true}));
 test('result broker opt-in PR return verifies GitHub Issue then PR readback without duplicate posts',
   async () => simulate({resultPrBinding: true}));
+test('result broker dynamically resolves registered origin PR without duplicate posts',
+  async () => simulate({resolvedReturn: true}));
 test('result broker never claims PR return when the target PR readback is absent',
   async () => simulate({resultPrBinding: true, lostPrReadback: true}));
 test('result broker rejects a non-function return path before reading the event', async () => {
@@ -173,4 +182,6 @@ test('result broker rejects a non-function return path before reading the event'
 test('result broker rejects two competing PR return transports', async () => {
   await assert.rejects(runResultBroker({}, {returnPrEvent: async () => {}, resultPrBinding: {}}),
     /RESULT_PR_RETURN_TRANSPORT_CONFLICT/);
+  await assert.rejects(runResultBroker({}, {resultPrBinding: {},
+    resolveResultPrBinding: () => ({})}), /RESULT_PR_RETURN_TRANSPORT_CONFLICT/);
 });
