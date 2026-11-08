@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "f5dbfd16-de90-480c-b870-74d28e5616f5",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "0480134de0ccdd3d787ecfe05eb09a261088b4f1",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "165ca9ebbacf1782f7535aa6a8a3e9cfea80df44",
+  "candidateSourceSha": "065b2c01263abfee493b04227a2ba0963c64eaac",
+  "manifestSha256": "d6f11dfb19df8c1fe80784a68e9e8d6aca4f700df9354c03b0132222326b4865",
+  "baseTreeOid": "368f96c0a23509e3005beb88a0b2aa6a879bf098",
+  "preparedTreeOid": "5821a161cc999e58e582f58a8300f1e292189811",
+  "provenanceSha256": "2686dec1c0d767ee188ecca8f04c8da462b193d55e59d9b96c0e8b71b6a4681b",
+  "runId": "42501347234",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-score/employment-r6-collector.mjs",
+    "scripts/pc-writer/employment-r6-auto-collection.mjs"
+  ]
+}
