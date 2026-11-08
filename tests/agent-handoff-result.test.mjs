@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseHandoff, fingerprintHandoff} from '../agent-handoff/contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from '../agent-handoff/result-contract.mjs';
-import {main as runResultBroker} from '../agent-handoff/result-broker.mjs';
+import {main as runResultBroker, assertWorkflowResultRepository} from '../agent-handoff/result-broker.mjs';
 
 function setup() {
   const handoff = parseHandoff(JSON.stringify({schema: 'ZGMINI_AGENT_HANDOFF_V1', incidentId: 'handoff-123456789abc',
@@ -47,6 +47,14 @@ test('rejects PR substitution or wrong repository', () => {
   assert.throws(() => verifyAgentResult(handoff, result, bad, run), /RESULT_PR_PROVENANCE_STOP/);
   const wrong = structuredClone(result); wrong.pullRequest.repository = 'ansqhd5774-Choi/zgmini';
   assert.throws(() => verifyAgentResult(handoff, wrong, pr, run), /RESULT_OWNER_REPOSITORY_STOP/);
+});
+test('repo-scoped workflow refuses cross-repo result without configured GitHub App permissions', () => {
+  const {result} = setup();
+  assert.doesNotThrow(() => assertWorkflowResultRepository(result));
+  const otherRepo = structuredClone(result);
+  otherRepo.pullRequest.repository = 'ansqhd5774-Choi/zgmini';
+  otherRepo.testRun.repository = 'ansqhd5774-Choi/zgmini';
+  assert.throws(() => assertWorkflowResultRepository(otherRepo), /RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED/);
 });
 test('rejects failed or different-SHA GitHub run', () => {
   const {handoff, result, pr, run} = setup();
