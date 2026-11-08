@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {prepareHandoff} from './route.mjs';
+import {routeHandoffQueueMetadata} from './queue-bridge.mjs';
 
 // No agent or PC source is executed here. The broker only validates structured
 // reports and records a durable routing decision in the original queue Issue.
@@ -56,10 +57,39 @@ async function hasVerifiedComment(issueNumber, marker, fingerprint) {
   throw new Error('HANDOFF_COMMENT_SCAN_LIMIT_STOP');
 }
 
-export async function main(env = process.env) {
+async function listCompleteIssueComments(issueNumber) {
+  const comments = [];
+  for (let page = 1; page <= 4; page++) {
+    const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) throw new Error('HANDOFF_QUEUE_COMMENT_LEDGER_INVALID');
+    comments.push(...rows);
+    if (rows.length < 100) return comments;
+  }
+  throw new Error('HANDOFF_QUEUE_COMMENT_SCAN_LIMIT_STOP');
+}
+
+export async function main(env = process.env, {queue = null} = {}) {
   if (!env.GITHUB_EVENT_PATH) throw new Error('GITHUB_EVENT_PATH_REQUIRED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   assertEvent(event, env);
+  // Opt-in dependency injection only. Production main() has no queue object
+  // and preserves the existing GitHub-only broker behavior without PC DB IO.
+  if (queue !== null) {
+    const outcome = await routeHandoffQueueMetadata({queue, body: event.issue.body,
+      issueNumber: event.issue.number,
+      readComments: listCompleteIssueComments,
+      postComment: async (issueNumber, body) => api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments`,
+        {method: 'POST', body: {body}})});
+    if (outcome.commentId) {
+      const current = await api(`/repos/${REPOSITORY}/issues/${event.issue.number}`);
+      if (!current.labels?.some((label) => label.name === 'handoff-agent-pending')) {
+        await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/labels`,
+          {method: 'POST', body: {labels: ['handoff-agent-pending']}});
+      }
+    }
+    process.stdout.write(`HANDOFF_QUEUE_${outcome.state}\n`);
+    return outcome;
+  }
   const outcome = prepareHandoff(event.issue.body, await listPreviousBodies(event.issue.number));
   const duplicate = outcome.state === 'DUPLICATE_REUSED';
   const stateLabel = duplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
