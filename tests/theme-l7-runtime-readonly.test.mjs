@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectThemeL7RuntimeReadonly} from '../controller/theme-l7-runtime-readonly.mjs';
+import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -274,4 +274,60 @@ test('lexical signals are bounded, unique and stable for repeated unknown prose'
   assert.equal(new Set(d.reasonProfiles[0].signals).size,12);
   assert.deepEqual(d.reasonProfiles[0].signals,[...d.reasonProfiles[0].signals].sort());
  }finally{f.close();}
+});
+
+test('approved PC source diagnostic never returns source code or credentials',()=>{
+ const source=[
+  "const secret='supersecret987';",
+  "const url='https://provider.example/api?token=private';",
+  "const response=await fetch(url,{headers:{Authorization:secret}});",
+  "if(response.status!==200)throw Error('R181_SPY_HTTP_'+response.status);",
+  "const ledger={status:'STOP',reason:'R181_SPY_HTTP_500'};",
+  "try { fail(); } catch(e) { return {reason:e.message}; }",
+ ].join('\n');
+ const d=safeR181SourceStructure(source);
+ assert.equal(d.status,'STRUCTURE_ONLY');
+ assert.ok(d.sites.some(x=>x.kinds.includes('REASON_ASSIGNMENT')));
+ assert.ok(d.sites.some(x=>x.kinds.includes('R181_SPY_HTTP_MARKER')));
+ const json=JSON.stringify(d);
+ for(const secret of ['supersecret987','private','Authorization','provider.example','R181_SPY_HTTP_500','response.status'])
+  assert.equal(json.includes(secret),false);
+ assert.ok(d.sites.every(x=>Number.isInteger(x.line)&&x.line>0&&
+  x.kinds.every(k=>/^[A-Z0-9_]+$/.test(k))));
+});
+
+test('unapproved R181 source fingerprint is not structurally inspected',()=>{
+ const f=fixture();try{
+  const result=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+  assert.deepEqual(result.sources['r181-primary-cycle.mjs'].safeSourceInspection,
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],truncated:false});
+  assert.equal(result.ledgers['R181_PRIMARY_LAST_RUN.json'].safeHttpFailure,null);
+ }finally{f.close();}
+});
+
+test('fixed R181 SPY HTTP reason extracts only a valid HTTP status',()=>{
+ const f=fixture();try{
+  for(const [reason,want] of [
+   ['R181_SPY_HTTP_503',{source:'R181_SPY_HTTP',status:503,group:'SERVER_5XX'}],
+   ['R181_SPY_HTTP_404',{source:'R181_SPY_HTTP',status:404,group:'CLIENT_4XX'}],
+   ['R181_SPY_HTTP_429?token=secret',null],
+   ['RAW_COUNT_503',null],
+   ['R181_SPY_HTTP_999',null],
+  ]){
+   fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+    JSON.stringify({status:'STOP',reason}));
+   const out=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+   assert.deepEqual(out.ledgers['R181_PRIMARY_LAST_RUN.json'].safeHttpFailure,want);
+  }
+ }finally{f.close();}
+});
+
+test('source diagnostic is bounded on long or hostile source text',()=>{
+ const huge='throw new Error("SECRETVALUE")\n'.repeat(400);
+ assert.deepEqual(safeR181SourceStructure(huge),
+  {status:'UNREADABLE_SOURCE',sites:[],truncated:false});
+ const limited=safeR181SourceStructure('throw Error("SECRET")\n'.repeat(30));
+ assert.equal(limited.sites.length,16);
+ assert.equal(limited.truncated,true);
+ assert.equal(JSON.stringify(limited).includes('SECRET'),false);
 });
