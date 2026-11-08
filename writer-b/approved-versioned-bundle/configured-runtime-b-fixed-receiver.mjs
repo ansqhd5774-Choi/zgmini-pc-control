@@ -45,6 +45,25 @@ const moduleAt=(root,relative)=>import(pathToFileURL(
   path.join(root,...relative.split('/'))).href);
 const defaultCompatibility=async()=>fail('B_WINDOWS_CROSS_VERSION_PROOF_PENDING');
 
+export function verifyLockedRuntimePreimage({fresh,baseline,
+  activeSha256,originalSha256,manualSha256}={}){
+  need(fresh?.oldVersion===baseline?.oldVersion&&
+    fresh.taskState===3&&
+    fresh.taskXmlSha256===baseline.taskXmlSha256&&
+    fresh.oldCmdSha256===baseline.scheduledCmdSha256&&
+    fresh.oldVbsSha256===baseline.scheduledVbsSha256&&
+    activeSha256===baseline.activeSha256&&
+    originalSha256===baseline.originalSha256,
+  'B_FIXED_POST_LOCK_PREIMAGE_DRIFT');
+  need(manualSha256 instanceof Map&&baseline.manual instanceof Map,
+    'B_FIXED_POST_LOCK_MANUAL_DRIFT');
+  for(const [name,expectedSha] of baseline.manual){
+    need(manualSha256.get(name)===expectedSha,
+      'B_FIXED_POST_LOCK_MANUAL_DRIFT');
+  }
+  return true;
+}
+
 // DI exists only for bounded offline tests; the production default below
 // passes fixed Node/Windows functions and a fail-closed proof provider.
 export function createFixedConfiguredReceiver({
@@ -167,6 +186,27 @@ export function createFixedConfiguredReceiver({
       claimRequest=approval.requestId;
       claimHandle=claim({journalRoot:JOURNALS,
         requestId:claimRequest,sharedLock:SHARED_LOCK});
+      try{
+        // The Windows state may have changed between the first A-like read
+        // and acquiring the shared Writer mutex. Pin the *same* preimage again
+        // under our lease; the package's own preflight will check it a third
+        // time immediately before the existing recoverable updater runs.
+        const fresh=feature.inspectConfiguredPackage({
+          packageRoot:approval.packageRoot,dataRoot:DATA_ROOT});
+        const manualSha256=new Map(MANUAL.map(([name])=>[name,
+          sha(regular(path.join(HOME,name)))]));
+        verifyLockedRuntimePreimage({fresh,baseline,
+          activeSha256:sha(regular(path.join(HOME,'ACTIVE_RUNTIME.json'))),
+          originalSha256:sha(regular(path.join(HOME,'INSTALL_RESULT.json'))),
+          manualSha256});
+      }catch(error){
+        try{
+          release({fd:claimHandle.fd,sharedLock:SHARED_LOCK,
+            requestId:claimRequest,retain:false});
+          claimHandle=null;claimRequest=null;
+        }catch{fail('B_FIXED_POST_LOCK_RELEASE_UNKNOWN');}
+        throw error;
+      }
       return {requestId:claimRequest,ownerVerified:true};
     },
     async consumeOneShotAuthorization({approval,windows,preflight}){
