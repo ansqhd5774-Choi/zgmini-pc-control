@@ -6,12 +6,13 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {ACTOR,CONTROL_REPOSITORY} from './contract.mjs';
+import {uploadResultPairAtomic} from './result-pair-atomic.mjs';
 
 const TITLE='pc-writer-config-b-proof-once';
 const RESULT='writer-config-b-proof-result.json';
 const TESTS=['contract.test.mjs','config-two-key-patch.test.mjs',
  'installed-r6-guard.test.mjs','transaction.test.mjs','run.test.mjs',
- 'report.test.mjs','proof-only.test.mjs'];
+ 'report.test.mjs','proof-only.test.mjs','result-pair-atomic.test.mjs'];
 const stop=x=>{throw Error(x);};
 const need=(ok,x)=>{if(!ok)stop(x);};
 function authorize(event,env){
@@ -54,14 +55,6 @@ export function runFixtureProof(event,env,{execute=spawnSync}={}){
  fs.writeFileSync(resultPath(env),JSON.stringify(report)+'\n',{flag:'wx'});
  return report;
 }
-async function compareReadback(url,headers,expected,fetchApi){
- try{const r=await fetchApi(url+'?ref=main',{method:'GET',headers});
-  if(r.status!==200)return false;
-  const body=await r.json();
-  return body?.encoding==='base64'&&
-   Buffer.from(String(body.content).replace(/\s/g,''),'base64').equals(Buffer.from(expected));
- }catch{return false;}
-}
 export async function reportProof(event,env,{fetchApi=fetch}={}){
  authorize(event,env);
  need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20&&
@@ -88,17 +81,11 @@ export async function reportProof(event,env,{fetchApi=fetch}={}){
   'x-github-api-version':'2022-11-28',
   'content-type':'application/json','user-agent':'zgmini-config-b-proof'};
  const prefix=`results/writer-config-b-proof-${event.issue.number}-${env.GITHUB_RUN_ID}`;
- const outputs=[['json',JSON.stringify(safe,null,2)+'\n'],
-  ['txt',Object.entries(safe).map(([k,v])=>`${k}=${v}`).join('\n')+'\n']];
- let verified=0,created=0;
- for(const [ext,bytes] of outputs){
-  const url=`https://api.github.com/repos/${CONTROL_REPOSITORY}/contents/${prefix}.${ext}`;
-  try{const r=await fetchApi(url,{method:'PUT',headers,body:JSON.stringify({
-   message:'chore(pc): record Windows temporary config B fixture proof',
-   content:Buffer.from(bytes).toString('base64')})});
-   if(r.status===201)created++;}catch{/* No retry after ambiguous write. */}
-  if(await compareReadback(url,headers,bytes,fetchApi))verified++;
- }
+ const pair=await uploadResultPairAtomic({headers,fetchApi,
+  message:'chore(pc): record Windows temporary config B fixture proof',
+  outputs:[[prefix+'.json',JSON.stringify(safe,null,2)+'\n'],
+   [prefix+'.txt',Object.entries(safe).map(([k,v])=>`${k}=${v}`).join('\n')+'\n']]});
+ const {verified,created}=pair;
  const reported=verified===2?safe.status:'STATE_UNKNOWN';
  const body=`<!-- config-b-proof:${event.issue.number}:${env.GITHUB_RUN_ID} -->\n`+
   `Windows config-B **${reported}** — TEMP fixture only, operational config unchanged.\n`+
