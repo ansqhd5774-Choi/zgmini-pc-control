@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_CONFIGURED_RUNTIME_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_CONFIGURED_THEME_REPEAT_UPGRADE_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "0c97599431882245a156470bd51290e327e7ee78",
+  "profileId": "configured-themes",
+  "runnerPath": "scripts/pc-writer/theme-config-package-runner.mjs",
+  "packageManifestSha256": "727a8640dabee96966574118f8bb5daecadb5d763190f3e8c26e651d8609bb03",
+  "runtimeMode": "REPEATABLE_ACTIVE_RUNTIME",
+  "runtimePreimage": {
+    "activeRuntimeSha256": "e97ff8825ff3b031f8a47bc7e608e04a4a39bb3c332ecc47eeeaa507c512e100",
+    "taskXmlSha256": "11123921e42e01a65140ae147894ba355b7fbe2106a145fcdf606f88bfcc2507",
+    "scheduledCmdSha256": "92d1088d26568b6aebdaf98d8537520b8dc989b7f6a14acf0dbcbb8762be7f7e",
+    "scheduledVbsSha256": "8078db57c878d114472cca6b27d1c45c377216ac16427d72ac85b142a8e5ffa6"
+  },
+  "effects": {
+    "providerCalls": false,
+    "dbWrites": false,
+    "d1Writes": false,
+    "taskDefinitionChanges": false,
+    "newTasks": false,
+    "otherOperationalFiles": false
+  }
+}
