@@ -1,0 +1,75 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "f03efe453fc26c158d07081ce9fb316deba7d7d5",
+  "baseHead": "ec48fc456274fd16dbf0ebe29cf201b8497450d1",
+  "baseConfigSourceSha": "ec48fc456274fd16dbf0ebe29cf201b8497450d1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/earnings-api-display.mjs",
+      "change": "M",
+      "beforeSha256": "5157408f9dbdad79a4fede1dbb129823dbaad465446145abc7004094aa3f684d",
+      "afterSha256": "f39adc9e00f0d3edb613a800a1b331d1aad4020377f8e3bd8c7364ea6b4cfa14"
+    },
+    {
+      "path": "scripts/pc-writer/er1-monthly-vintage-publication.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "43c69010f5f2ffafd80b2b5408f4b78ed95f217dd145463d1d1bb9852d75021c"
+    },
+    {
+      "path": "scripts/pc-writer/independent-publication.mjs",
+      "change": "M",
+      "beforeSha256": "b93ba7e5e82c11eb8357e0a79398c313e08b21c27c88ef5412a887775677e611",
+      "afterSha256": "f90e73f98e7606d9c0cb6b04a470c5307577cdcd3f6d84699a99a4715b288ce8"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "44fe384bfad99d27d8304e2f85ed094bf247dd36575f9c3a8d5de21b2f0a1754",
+      "afterSha256": "71145f8db8f80346236896940749ba810b6125ba8947abfb0ba51864381d7699"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "change": "M",
+      "beforeSha256": "42619b35d0a8666c7b463defc8f787e92356bcb070f674dbe6b4eff14a9ab668",
+      "afterSha256": "b21f03057025bad7aed58c7bb1f69b2abba0f0b446c587869594eea732adfaa6"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "core-second-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
