@@ -149,7 +149,16 @@ export function createFixedConfiguredReceiver({
         /^[a-f0-9]{64}$/.test(proof.evidenceSha256??'')&&
         proof.oldVersion===current.oldVersion&&
         proof.newSourceSha===approval.sourceSha&&
-        proof.taskXmlSha256===current.taskXmlSha256,
+        proof.taskXmlSha256===current.taskXmlSha256&&
+        proof.transcript?.sourceSha===approval.sourceSha&&
+        proof.transcript?.taskXmlSha256===current.taskXmlSha256&&
+        proof.transcript?.metrics?.simulations?.length===2&&
+        proof.transcript.metrics.simulations[0].direction==='OLD_TO_NEW'&&
+        proof.transcript.metrics.simulations[1].direction==='NEW_TO_OLD'&&
+        proof.transcript.metrics.sharedLeaseCollisionRejected===true&&
+        proof.transcript.metrics.oneShotReplayRejected===true&&
+        proof.transcript.metrics.externalNetworkCalls===0&&
+        proof.transcript.metrics.d1Writes===0,
       'B_FIXED_CROSS_VERSION_PROOF_UNVERIFIED');
       feature=module;
       baseline={oldVersion:current.oldVersion,
@@ -164,10 +173,7 @@ export function createFixedConfiguredReceiver({
         scheduledCmdSha256:current.oldCmdSha256,
         scheduledVbsSha256:current.oldVbsSha256,
         compatibilityEvidenceSha256:proof.evidenceSha256,
-        compatibilityDirections:proof.transcript?.metrics?.simulations?.length===2?
-          2:0,
-        compatibilitySharedLockVerified:
-          proof.transcript?.metrics?.sharedLeaseCollisionRejected===true};
+        compatibilityDirections:2,compatibilitySharedLockVerified:true};
     },
     async loadPinnedPackageRunner(approval){
       need(feature&&baseline&&approved?.requestId===approval.requestId,
