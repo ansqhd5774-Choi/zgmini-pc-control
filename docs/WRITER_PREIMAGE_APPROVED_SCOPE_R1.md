@@ -4,7 +4,7 @@
 
 ## 문제와 호환성
 
-- 과거 `writer-install-preimage-readonly`는 시장 캘린더 3개 + 고용 R6 19개를 코드 상수로만 조회했다. 새 물가지표 6개를 지원하려면 동일 Controller를 매번 수정해야 하는 구조적 문제가 있었다.
+- 과거 `writer-install-preimage-readonly`는 시장 캘린더 3개 + 고용 R6 19개를 코드 상수로만 조회했다. 새 물가지표 6개(후속 의존 변경을 포함하면 7개)를 지원하려면 동일 Controller를 매번 수정해야 하는 구조적 문제가 있었다.
 - **기존 7필드 요청은 그대로** 동작하며 이전 22개 경로, 원본 SHA/상태, `calendar`·`employmentR6` 응답 키는 유지한다.
 - 신규 범위는 **동일 A operation**에 `preimageManifestPath`와 `preimageManifestSha256` 두 필드를 함께 추가한다. 이외의 임의 `paths`, 쉘, SQL, URL 입력은 금지한다. 다른 operation에는 추가 필드가 허용되지 않는다.
 - 별도 Controller·Runner·workflow·스케줄러·기능별 CMD는 생성하지 않는다. 이후 새 기능은 검토·승인된 manifest 파일만 GitHub 정본에 추가하므로 Controller 재설치가 필요하지 않아야 한다.
@@ -31,7 +31,7 @@
   "sourceBranch": "main",
   "sourceSha": "0000000000000000000000000000000000000000",
   "preimageManifestPath": "approvals/writer-preimage/inflation-candidates-7-r1.json",
-  "preimageManifestSha256": "4c5c0af01e5214390854688ff241b7bb6530a601c24aaf566dfce79f6b40e6a4"
+  "preimageManifestSha256": "a9270933bd399b0c6b3fd39b4b63b5dbfbf4332020953039e56bd2c477a7f2be"
 }
 ```
 
@@ -40,6 +40,6 @@
 ## 인계·완료 판단
 
 - 신규 기능용 manifest 반영은 공통 도구의 일회성 배포 이후 **Controller 코드 재설치 없이** 진행한다. 단 기존 승인 파일을 무단으로 수정하거나 HEAD를 과거 값으로 추측하지 않는다.
-- `scopedPreimage.files[]`의 파일별 `path`, `expectedEffect`, `exists`, `sha256`, `state`, `trackedDirty`를 B 설치 manifest 준비에 사용한다. scoped 요청에서는 고정 22개 필드가 `NOT_OBSERVED`로 나오는 것이 정상이며 그 경로를 별도로 재조회했다고 보고하지 않는다.
+- `scopedPreimage.files[]`의 파일별 `path`, `expectedEffect`, `exists`, `sha256`, `state`, `trackedDirty`를 B 설치 manifest 준비에 사용한다. scoped 요청에서는 고정 22개 필드가 `NOT_OBSERVED`로 나오는 것이 정상이며 그 경로를 별도로 재조회했다고 보고하지 않는다. **물가지표 #1020의 `scripts/pc-writer/run-local.mjs`가 추가로 요구하는 `scripts/pc-writer/independent-publication.mjs`의 named exports는 동일 Writer B 승인 manifest에서 함께 맞춰야 한다.** 두 파일의 현재 before SHA는 이 A 범위로 조회할 수 있으며, 단순 source 병합을 운영 설치/호환 PASS로 간주하지 않는다.
 - 완료 증거: 정확한 승인 manifest commit/SHA + 실제 Controller 설치 source + 고유 A Issue/Run + TXT/JSON 2/2 재조회 + 운영 source/head/config 및 파일별 SHA 검증. PR·모의 시험만으로 Windows 사용 가능하다고 보고하지 않는다.
 - 다음 기능이 같은 조회를 요청하면 비밀정보를 제외한 승인 manifest 및 결과 계약을 재사용한다. 이미 성공한 #863 22개 고정 조회를 불필요하게 반복하지 않는다.
