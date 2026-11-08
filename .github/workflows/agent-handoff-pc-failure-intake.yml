@@ -1,0 +1,34 @@
+name: ZGMINI Agent Handoff PC Failure Intake
+on:
+  workflow_run:
+    workflows: [ZGMINI PC Job]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  issues: write
+concurrency:
+  # Single metadata writer lane: two completed PC runs may describe one incident.
+  group: agent-handoff-pc-failure-intake
+  cancel-in-progress: false
+jobs:
+  enqueue-confirmed-failures:
+    # Disabled by default. Uses the already-approved private self-hosted runner;
+    # do not activate before reviewing the source and operational scope.
+    if: >-
+      vars.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.workflow_run.event == 'issues' &&
+      github.event.workflow_run.actor.login == 'ansqhd5774-Choi'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify published pc-job report and emit one sanitized incident
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: cmd
+        run: E:\ZGmini\runtime\node.exe agent-handoff\pc-failure-producer.mjs
