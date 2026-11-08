@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectWriterPublicationEvidence} from '../controller/writer-publication-evidence-readonly.mjs';
+import {createHash} from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
+import {inspectWriterPublicationEvidence,readER1LocalOutput}
+ from '../controller/writer-publication-evidence-readonly.mjs';
 const fixture=()=>{
  const d=fs.mkdtempSync(path.join(os.tmpdir(),'er1-meta-'));
  fs.mkdirSync(path.join(d,'pc-writer'));return{d,write:(p,o)=>fs.writeFileSync(
@@ -34,4 +37,52 @@ test('missing ledger gives metadata but does not claim publish success',()=>{
   assert.equal(r.er1Future.months[0].sqliteDays,null);
   assert.equal(r.globalLedgerVerified,false);
  }finally{f.close();}
+});
+test('fixed ER1 SQLite output hash and stored_at can be read without modifying DB',()=>{
+ const f=fixture();try{
+  const dir=path.join(f.d,'pc-writer','storage');fs.mkdirSync(dir);
+  const filename=path.join(dir,'core.sqlite');const db=new DatabaseSync(filename);
+  db.exec('CREATE TABLE public_feed_snapshots_v1 (kind TEXT,feed_key TEXT,snapshot_key TEXT,stored_at INTEGER,body TEXT)');
+  const body='{"published":42,"secret":"PRIVATE_NOT_RETURNED"}';
+  db.prepare('INSERT INTO public_feed_snapshots_v1 VALUES (?,?,?,?,?)').run(
+   'output','market-calendar:earnings-er1-score-2026-11-public',
+   'current',1794100000000,body);
+  db.close();
+  const original=fs.readFileSync(filename);const before=fs.statSync(filename);
+  const r=readER1LocalOutput(f.d);
+  assert.equal(r.state,'READ');assert.equal(r.storedAt,1794100000000);
+  assert.equal(r.bodySha256,createHash('sha256').update(body).digest('hex'));
+  assert.equal(JSON.stringify(r).includes('PRIVATE_NOT_RETURNED'),false);
+  assert.equal(fs.readFileSync(filename).equals(original),true);
+  assert.equal(fs.statSync(filename).mtimeMs,before.mtimeMs);
+ }finally{f.close();}
+});
+test('does not claim local output success when SQLite key absent',()=>{
+ const f=fixture();try{
+  const dir=path.join(f.d,'pc-writer','storage');fs.mkdirSync(dir);
+  const db=new DatabaseSync(path.join(dir,'core.sqlite'));
+  db.exec('CREATE TABLE public_feed_snapshots_v1 (kind TEXT,feed_key TEXT,snapshot_key TEXT,stored_at INTEGER,body TEXT)');
+  db.close();
+  const r=readER1LocalOutput(f.d);
+  assert.equal(r.state,'NOT_FOUND');assert.equal(r.bodySha256,undefined);
+ }finally{f.close();}
+});
+test('WAL-backed local output reader adds no DB, WAL or SHM write in fixture',()=>{
+ const f=fixture();let writer;
+ try{
+  const dir=path.join(f.d,'pc-writer','storage');fs.mkdirSync(dir);
+  const filename=path.join(dir,'core.sqlite');writer=new DatabaseSync(filename);
+  writer.exec('PRAGMA journal_mode=WAL');
+  writer.exec('CREATE TABLE public_feed_snapshots_v1 (kind TEXT,feed_key TEXT,snapshot_key TEXT,stored_at INTEGER,body TEXT)');
+  writer.prepare('INSERT INTO public_feed_snapshots_v1 VALUES (?,?,?,?,?)').run(
+   'output','market-calendar:earnings-er1-score-2026-11-public','current',1794100000000,'{"score":97}');
+  const files=[filename,filename+'-wal',filename+'-shm'];
+  const before=files.map(p=>fs.existsSync(p)?{size:fs.statSync(p).size,
+   mtimeMs:fs.statSync(p).mtimeMs}:null);
+  const r=readER1LocalOutput(f.d);
+  assert.equal(r.state,'READ');
+  const after=files.map(p=>fs.existsSync(p)?{size:fs.statSync(p).size,
+   mtimeMs:fs.statSync(p).mtimeMs}:null);
+  assert.deepEqual(after,before);
+ }finally{writer?.close();f.close();}
 });
