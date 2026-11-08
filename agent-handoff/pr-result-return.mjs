@@ -1,6 +1,6 @@
 // Source-only result-return candidate. A verified PR/run and GitHub comment
 // are *not* evidence of Windows application or an actual ChatGPT chat resume.
-import {parseHandoff} from './contract.mjs';
+import {parseHandoff, fingerprintHandoff} from './contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contract.mjs';
 
 export const CHAT_RESULT_RETURN_MARKER = 'ZGMINI_CHAT_RESULT_RETURN_V1';
@@ -40,6 +40,30 @@ function returnBinding(binding, originChatId) {
   return Object.freeze({...binding});
 }
 
+/** Exact bot-owned result-return comment for the original chat's PR inbox. */
+export function expectedPrResultReturnLines({handoffBody, resultBody,
+  queueIssueNumber, resultIssueCommentId, binding, verification}) {
+  const handoff = parseHandoff(typeof handoffBody === 'string'
+    ? handoffBody : JSON.stringify(handoffBody));
+  const result = parseAgentResult(typeof resultBody === 'string'
+    ? resultBody : JSON.stringify(resultBody));
+  if (!Number.isSafeInteger(queueIssueNumber) || queueIssueNumber < 1 ||
+      !Number.isSafeInteger(resultIssueCommentId) || resultIssueCommentId < 1 ||
+      verification !== 'RUNTIME_VERIFICATION_PENDING' ||
+      handoff.incidentId !== result.incidentId ||
+      result.fingerprint !== fingerprintHandoff(handoff)) {
+    throw new Error('CHAT_RESULT_RETURN_LINES_INVALID');
+  }
+  returnBinding(binding, handoff.origin.chatId);
+  return Object.freeze([CHAT_RESULT_RETURN_MARKER,
+    `resultId: ${result.resultId}`, `digest: ${resultDigest(result)}`,
+    `incidentId: ${result.incidentId}`, `fingerprint: ${result.fingerprint}`,
+    `queueIssue: ${queueIssueNumber}`, `resultIssueCommentId: ${resultIssueCommentId}`,
+    `originChatId: ${handoff.origin.chatId}`,
+    `verification: ${verification}`,
+    'effect: METADATA_ONLY', 'pcRetries: 0']);
+}
+
 /**
  * A result is returnable only after its existing GitHub result-broker receipt
  * and matching PR/Actions evidence have both been independently verified.
@@ -66,13 +90,9 @@ export async function recordPrResultReturn({handoffBody, resultBody, pr, run,
     `fingerprint: ${result.fingerprint}`, `state: ${verified.state}`]);
   if (resultIssueCommentId === null) throw new Error('CHAT_RESULT_RETURN_SOURCE_RECEIPT_STOP');
 
-  const lines = [CHAT_RESULT_RETURN_MARKER,
-    `resultId: ${result.resultId}`, `digest: ${digest}`,
-    `incidentId: ${result.incidentId}`, `fingerprint: ${result.fingerprint}`,
-    `queueIssue: ${queueIssueNumber}`, `resultIssueCommentId: ${resultIssueCommentId}`,
-    `originChatId: ${handoff.origin.chatId}`,
-    `verification: ${verified.state}`,
-    'effect: METADATA_ONLY', 'pcRetries: 0'];
+  const lines = expectedPrResultReturnLines({handoffBody, resultBody,
+    queueIssueNumber, resultIssueCommentId, binding: target,
+    verification: verified.state});
   const find = async () => findReceipt(
     inventoryRows(await readPrComments(target), 'pr', target.pullRequestNumber),
     lines, {exact: true});
