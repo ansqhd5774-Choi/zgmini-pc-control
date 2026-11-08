@@ -81,9 +81,9 @@ function r6PublicationProjection(report){
  const failure=Array.isArray(report?.failures)
   ?report.failures.find(item=>item?.id==='employment-r6-one-year-publication'):null;
  if(!raw&&!failure)return null;
- const safeDate=typeof raw?.asOfDate==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
+ const safeDate=typeof raw?.asOfDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
  return {status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
-  asOfDate:safeDate,sourceStoredAt:r6Count(raw?.sourceStoredAt),
+  asOfDate:safeDate,sourceStoredAt:Number.isSafeInteger(raw?.sourceStoredAt)&&raw.sourceStoredAt>0?raw.sourceStoredAt:null,
   sourceFeatures:r6Count(raw?.sourceFeatures),
   chartReadyFeatures:r6Count(raw?.chartReadyFeatures),
   recentlyObservedFeatures:r6Count(raw?.recentlyObservedFeatures)};
