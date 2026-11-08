@@ -9,8 +9,10 @@ const API = 'https://api.github.com';
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 
 function assertEvent(event, env) {
+  const validIntake = event.action === 'opened' ||
+    (event.action === 'labeled' && event.label?.name === 'agent-handoff');
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_ACTOR !== 'ansqhd5774-Choi' ||
-      env.GITHUB_EVENT_NAME !== 'issues' || event.action !== 'opened' ||
+      env.GITHUB_EVENT_NAME !== 'issues' || !validIntake ||
       event.repository?.private !== true || event.issue?.user?.login !== 'ansqhd5774-Choi' ||
       !event.issue.labels?.some((label) => label.name === 'agent-handoff') ||
       !Number.isSafeInteger(event.issue.number)) throw new Error('HANDOFF_EVENT_NOT_ALLOWED');
