@@ -10,6 +10,7 @@ const SUPPORTED_FAILURES = new Set(['FAIL', 'RUNTIME_FAILED']);
 // These allowlisted PC operations deliberately generate failures/timeouts to
 // prove the reporter. Their outcomes are not production incidents.
 const EXPECTED_FAILURE_FIXTURES = new Set(['failure-proof', 'timeout-proof']);
+export const isExpectedFailureProof = operation => EXPECTED_FAILURE_FIXTURES.has(operation);
 const CHECKPOINTS = ['SOURCE', 'INSTALL', 'COLLECT', 'CALCULATE', 'STORE', 'D1', 'API', 'UI'];
 
 function stop(message) { throw new Error(`PC_HANDOFF_${message}`); }
@@ -78,7 +79,7 @@ export function preparePcFailureHandoff({originIssue, report, resultPath}) {
   // An uncertain, blocked or successful observation is NOT proof of a runtime
   // defect. Never silently promote those states to a repair request.
   if (!SUPPORTED_FAILURES.has(report.status) ||
-      EXPECTED_FAILURE_FIXTURES.has(request.operation)) {
+      isExpectedFailureProof(request.operation)) {
     return Object.freeze({state: 'NOT_ELIGIBLE', status: report.status,
       originIssueNumber: originIssue.number, resultPath});
   }
