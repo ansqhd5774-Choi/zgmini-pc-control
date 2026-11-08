@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {preparePcFailureHandoff, reconcileHandoffInventory} from './pc-result-to-incident.mjs';
+import {preparePcFailureHandoff, reconcileHandoffInventory,
+  isExpectedFailureProof} from './pc-result-to-incident.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -73,7 +74,8 @@ export async function processCompletedPcJob(event, {
     if (report === null) continue;
     result.reportsObserved++;
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
-    if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status)) continue;
+    if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status) ||
+        isExpectedFailureProof(report.operation)) continue;
     result.confirmedFailures++;
     comments ??= await readComments(run.since);
     const original = findOriginalIssueNumber(comments, {...run, seat});
