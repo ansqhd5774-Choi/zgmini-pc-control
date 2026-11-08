@@ -116,6 +116,52 @@ test('duplicate intake from another Issue is not misreported as a delivered comm
   } finally {db.close();}
 });
 
+test('opt-in PR wake event is recorded only after the Issue receipt is verified', async () => {
+  const {db, args, comments} = harness();
+  const prComments = [];
+  const prWakeBinding = {enabled: true, repository: 'ansqhd5774-Choi/zgmini-pc-control',
+    pullRequestNumber: 934, targetChatId: 'chat-process-owner', targetRole: 'COMMON_PROCESS_OWNER'};
+  const withPr = {...args, prWakeBinding,
+    readPrComments: async target => ({repository: target.repository,
+      pullRequestNumber: target.pullRequestNumber, complete: true, comments: [...prComments]}),
+    postPrComment: async (_target, body) => {
+      assert.equal(comments.length, 1, 'Issue readback must precede PR posting');
+      prComments.push({id: 301, user: {login: 'github-actions[bot]'}, body});
+    }};
+  try {
+    const first = await routeHandoffQueueMetadata(withPr);
+    assert.equal(first.prEvent.commentId, 301);
+    assert.equal(first.prEvent.actualChatResumeVerified, false);
+    assert.equal(first.newDispatches, 0);
+    const again = await routeHandoffQueueMetadata(withPr);
+    assert.equal(again.prEvent.posted, false);
+    assert.equal(prComments.length, 1);
+  } finally {db.close();}
+});
+
+test('uncertain PR delivery can be recovered without repeating Issue or PC actions', async () => {
+  const {db, queue, args, posted} = harness();
+  let completed = false;
+  const prComments = [];
+  const withPr = {...args, prWakeBinding: {enabled: true,
+    repository: 'ansqhd5774-Choi/zgmini-pc-control', pullRequestNumber: 934,
+    targetChatId: 'chat-process-owner', targetRole: 'COMMON_PROCESS_OWNER'},
+    readPrComments: async target => ({repository: target.repository,
+      pullRequestNumber: target.pullRequestNumber, complete: true, comments: [...prComments]}),
+    postPrComment: async (_target, body) => {
+      if (completed) prComments.push({id: 301, user: {login: 'github-actions[bot]'}, body});
+    }};
+  try {
+    await assert.rejects(routeHandoffQueueMetadata(withPr), /CHAT_PR_WAKE_READBACK_STOP/);
+    assert.equal(queue.stats().ROUTED_PENDING_AGENT, 1);
+    completed = true;
+    const recovered = await routeHandoffQueueMetadata(withPr);
+    assert.equal(recovered.prEvent.commentId, 301);
+    assert.equal(posted.length, 1, 'the Issue handoff must not be posted twice');
+    assert.equal(recovered.automaticPcRetries, 0);
+  } finally {db.close();}
+});
+
 test('invalid event parameters are rejected before queue writes', async () => {
   const {db, queue, args} = harness();
   try {
