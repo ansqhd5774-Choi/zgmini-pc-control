@@ -48,6 +48,7 @@ test('fixed 22-file A inventory observes only approved file hashes and two safe 
   assert.equal(r.employmentR6[0].trackedDirty,false);
   assert.equal(r.r6Config.keys.employmentR6AutoCollection,'DISABLED');
   assert.equal(r.r6Config.keys.employmentR6OneYearAutoPublication,'ENABLED');
+  assert.match(r.r6Config.configSha256,/^[0-9a-f]{64}$/);
   assert.equal(JSON.stringify(r).includes('never expose'),false);
   assert.equal(r.sqliteOpened,false);assert.equal(r.operationalWrites,0);
  }finally{f.finish();}
