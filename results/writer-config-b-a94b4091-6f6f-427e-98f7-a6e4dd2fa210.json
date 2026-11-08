@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_CONFIG_B_RESULT_V1",
+  "requestId": "a94b4091-6f6f-427e-98f7-a6e4dd2fa210",
+  "status": "CONFIG_B_APPLIED_VERIFIED",
+  "code": "CONFIG_B_OPTINS_SET",
+  "manifestSha256": "95eff79cdf1b4a5e3a6ed43a73b4314ee4f7fc0288e3d30123813dc27ca0e6a8",
+  "controlSha": "1179f002d8a26fd420ca369d543944f6591ad766",
+  "beforeSha256": "a521780ee35ffe689fd954dd5237c0a19138847b5326b1b64e31e341eaba852b",
+  "afterSha256": "fdcef5017ee673f465a27219e6dc091df368f204fb61e98048ad94d09e88599d",
+  "backupVerified": true,
+  "changedKeys": [
+    "employmentR6AutoCollection",
+    "employmentR6OneYearAutoPublication"
+  ],
+  "installedSourceSha": "ec48fc456274fd16dbf0ebe29cf201b8497450d1",
+  "verifiedInstalledFiles": 19,
+  "runId": "42492034633",
+  "retry": "NO_REEXECUTE_READ_ONLY_RECONCILE"
+}
