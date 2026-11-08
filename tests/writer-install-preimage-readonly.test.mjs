@@ -41,6 +41,7 @@ test('fixed 22-file A inventory observes only approved file hashes and two safe 
   assert.equal(r.status,'PASS');assert.equal(r.code,'WRITER_FIXED_PREIMAGE_READONLY');
   assert.equal(r.calendar.length,3);assert.equal(r.employmentR6.length,19);
   assert.equal(r.sourceHead,SHA);assert.equal(r.approvedConfigSource,SHA);
+  assert.equal(r.sourceRootAbsolute,fs.realpathSync.native(f.source));
   assert.equal(r.sourceIdentityConsistent,true);
   assert.equal(r.calendar[2].expectedEffect,'M');
   assert.equal(r.calendar[2].sha256,sha(Buffer.from('export default 1;\n')));
