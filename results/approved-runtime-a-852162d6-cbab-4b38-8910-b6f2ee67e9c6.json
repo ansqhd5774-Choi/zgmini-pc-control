@@ -1,0 +1,69 @@
+{
+  "schema": "ZGMINI_APPROVED_RUNTIME_A_RESULT_V1",
+  "requestId": "852162d6-cbab-4b38-8910-b6f2ee67e9c6",
+  "status": "DONE",
+  "code": "A_RUNTIME_FILE_AND_TASK_READONLY",
+  "runId": "42446453409",
+  "manifestSha256": "2ea913fa3b4a646e606e30c3542c4492fe3d46651bd0752f8f29b6e29eeee6dc",
+  "sourceSha": "0c97599431882245a156470bd51290e327e7ee78",
+  "fileHashesComplete": true,
+  "taskChecksComplete": true,
+  "operationalWrites": 0,
+  "retry": "NO_AUTO_RETRY_READ_ONLY_RECONCILE",
+  "profiles": [
+    {
+      "profileId": "configuredThemeRuntime",
+      "status": "DONE",
+      "rootExists": true,
+      "runtimeMode": "REPEATABLE_ACTIVE_RUNTIME",
+      "files": {
+        "installed": {
+          "exists": true,
+          "sha256": "b05bb32a8b08fb078e7c8b18acc5c7741fba4d2ee8eb3b49530f1991b624b6fb",
+          "sizeBytes": 1886
+        },
+        "active": {
+          "exists": true,
+          "sha256": "245ec086b589924d13277566f23b95b1d9aca705a5efb9d40031dbae1213dd96",
+          "sizeBytes": 12205
+        },
+        "scheduledCmd": {
+          "exists": true,
+          "sha256": "e623c982dcffb63316313354560f00cc8a9686f4c274937a47330186381ce66a",
+          "sizeBytes": 372
+        },
+        "scheduledVbs": {
+          "exists": true,
+          "sha256": "8078db57c878d114472cca6b27d1c45c377216ac16427d72ac85b142a8e5ffa6",
+          "sizeBytes": 174
+        },
+        "registerCmd": {
+          "exists": true,
+          "sha256": "c1da0e63e9cad28102091fa9108319e9fb5ee176eff569a71d94495486bb63d9",
+          "sizeBytes": 309
+        },
+        "listCmd": {
+          "exists": true,
+          "sha256": "58244238018a8be8d69a0bdd0ff595cc3b04e80f2e16f9ce9a60f0443751bb2c",
+          "sizeBytes": 301
+        },
+        "updateCmd": {
+          "exists": true,
+          "sha256": "16db4131b1d13ef822611473dcbacf67b79f68f0dc468bf1a1981202533b2942",
+          "sizeBytes": 314
+        }
+      },
+      "tasks": {
+        "configuredTask": {
+          "status": "XML_READ",
+          "xmlSha256": "11123921e42e01a65140ae147894ba355b7fbe2106a145fcdf606f88bfcc2507",
+          "enabled": null,
+          "expectedHourPresent": true
+        }
+      }
+    }
+  ],
+  "controlSha": "69ab9603ab50841b512af95f85077e947a815ea5",
+  "registeredCount": 1,
+  "selectedCount": 1
+}
