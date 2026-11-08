@@ -184,6 +184,79 @@ export function safeR181SourceStructure(source){
  return {status:'STRUCTURE_ONLY',sites,truncated};
 }
 
+// A narrowly bounded, de-identified control-flow view for the approved R181
+// source. No identifiers, literal values, comments, expressions within
+// templates, URLs, request arguments or environment names leave the host.
+// Consistent local identifier labels preserve just enough structure to identify
+// where the HTTP failure was caught and written into the STOP ledger.
+const SOURCE_KEYWORDS=new Set([
+ 'const','let','var','if','else','try','catch','finally','throw','new',
+ 'return','await','async','function','true','false','null','undefined',
+ 'typeof','in','of','while','for','break','continue','switch','case',
+ 'default','Error','JSON','Promise','Boolean','Number','String',
+ 'reason','status','statusCode','message','error','response','res',
+]);
+const R181_CONTEXT_WINDOWS=Object.freeze([[7,19],[81,98]]);
+export function safeR181ErrorFlow(source){
+ if(typeof source!=='string'||Buffer.byteLength(source,'utf8')>8192||
+  source.includes('\0'))return {status:'UNREADABLE_SOURCE',lines:[]};
+ const identifiers=new Map();
+ const lines=[];
+ let number=1, output='', state='CODE', quote='', escaped=false;
+ const interested=line=>R181_CONTEXT_WINDOWS.some(([from,to])=>line>=from&&line<=to);
+ const emit=x=>{if(interested(number)&&output.length<240)output+=x;};
+ const flush=()=>{
+  if(interested(number))lines.push({line:number,pattern:output.trim().slice(0,240)});
+  number++;output='';
+ };
+ const lex=x=>{
+  if(SOURCE_KEYWORDS.has(x))return x;
+  if(!identifiers.has(x))identifiers.set(x,'ID'+(identifiers.size+1));
+  return identifiers.get(x);
+ };
+ for(let i=0;i<source.length;i++){
+  const c=source[i],next=source[i+1]??'';
+  if(c==='\r'&&next==='\n')continue;
+  if(c==='\n'){
+   flush();
+   if(state==='LINE_COMMENT')state='CODE';
+   continue;
+  }
+  if(state==='LINE_COMMENT')continue;
+  if(state==='BLOCK_COMMENT'){
+   if(c==='*'&&next==='/'){state='CODE';i++;}
+   continue;
+  }
+  if(state==='STRING'){
+   if(escaped){escaped=false;continue;}
+   if(c==='\\'){escaped=true;continue;}
+   if(c===quote){state='CODE';}
+   continue;
+  }
+  if(c==='/'&&next==='/'){state='LINE_COMMENT';i++;continue;}
+  if(c==='/'&&next==='*'){state='BLOCK_COMMENT';i++;continue;}
+  if(c==='\''||c==='"'||c==='`'){
+   quote=c;state='STRING';escaped=false;emit(c==='`'?' TPL ':' STR ');
+   continue;
+  }
+  if(/[A-Za-z_$]/.test(c)){
+   let j=i+1;
+   while(j<source.length&&/[A-Za-z0-9_$]/.test(source[j]))j++;
+   emit(' '+lex(source.slice(i,j))+' ');i=j-1;continue;
+  }
+  if(/[0-9]/.test(c)){
+   let j=i+1;
+   while(j<source.length&&/[A-Za-z0-9_.]/.test(source[j]))j++;
+   emit(' NUM ');i=j-1;continue;
+  }
+  if(/[{}()[\];:,.=+*?!<>|&%^\-/]/.test(c))emit(c);
+  else if(/\s/.test(c))emit(' ');
+  else emit(' ? ');
+ }
+ if(output&&interested(number))lines.push({line:number,pattern:output.trim().slice(0,240)});
+ return {status:'REDACTED_ERROR_FLOW',lines};
+}
+
 function valueType(value){
  if(value===null)return 'null';
  if(Array.isArray(value))return 'array';
@@ -251,6 +324,9 @@ function sourceState(base,name){
   result.safeSourceInspection=digest===APPROVED_R181_SHA&&bytes.length<=8192?
    safeR181SourceStructure(bytes.toString('utf8')):
    {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],truncated:false};
+  result.safeErrorFlow=digest===APPROVED_R181_SHA&&bytes.length<=8192?
+   safeR181ErrorFlow(bytes.toString('utf8')):
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH',lines:[]};
  }
  return result;
 }

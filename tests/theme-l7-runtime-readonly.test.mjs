@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure} from '../controller/theme-l7-runtime-readonly.mjs';
+import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
+ safeR181ErrorFlow} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -330,4 +331,42 @@ test('source diagnostic is bounded on long or hostile source text',()=>{
  assert.equal(limited.sites.length,16);
  assert.equal(limited.truncated,true);
  assert.equal(JSON.stringify(limited).includes('SECRET'),false);
+});
+
+test('R181 error-flow view preserves control structure but strips literals, tokens and identifiers',()=>{
+ const source=Array.from({length:105},(_,i)=>{
+  if(i===10)return 'if (rsp.status !== 200) throw new Error(`R181_SPY_HTTP_${rsp.status}:${secretApiKey}`);';
+  if(i===11)return "const token = 'ghp_letmeinSECRET'; // API key for provider";
+  if(i===87)return "} catch (providerError) { const reason = `R181_SPY_HTTP_${providerError.message}`;";
+  if(i===88)return '  saveLedger({ status: "STOP", reason, password: process.env.PROVIDER_SECRET });';
+  if(i===89)return '  throw providerError;';
+  return 'const harmless = 3;';
+ }).join('\n');
+ const output=safeR181ErrorFlow(source);
+ assert.equal(output.status,'REDACTED_ERROR_FLOW');
+ assert.deepEqual(output.lines.map(x=>x.line),[
+  ...Array.from({length:13},(_,i)=>i+7),
+  ...Array.from({length:18},(_,i)=>i+81),
+ ]);
+ const json=JSON.stringify(output);
+ for(const secret of ['ghp_letmeinSECRET','secretApiKey','providerError',
+  'process','PROVIDER_SECRET','password','token','API key','R181_SPY_HTTP_',
+  'saveLedger','rsp.status','200'])assert.equal(json.includes(secret),false,secret);
+ assert.ok(output.lines.find(x=>x.line===88).pattern.includes('catch'));
+ assert.ok(output.lines.find(x=>x.line===89).pattern.includes('status'));
+ assert.ok(json.length<8500);
+});
+
+test('R181 redacted source handles multiline comments, strings and template values',()=>{
+ const source=['/* sensitive id API_KEY_123','more private details */',
+  'const key = "https://foo/private?key=ghp_testSECRET";',
+  'const template = `token=${process.env.GH_SECRET}',
+  'private-data-${foo}`;',
+  'try { fn(); } catch(ex) { throw ex; }'].join('\n');
+ const output=safeR181ErrorFlow(source);
+ const json=JSON.stringify(output);
+ for(const forbidden of ['API_KEY_123','private','GH_SECRET','ghp_testSECRET',
+  'foo','key=','token='])assert.equal(json.includes(forbidden),false,forbidden);
+ assert.deepEqual(safeR181ErrorFlow('throw Error("x")\n'.repeat(1000)),
+  {status:'UNREADABLE_SOURCE',lines:[]});
 });
