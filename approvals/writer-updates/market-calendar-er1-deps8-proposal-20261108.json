@@ -1,0 +1,87 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "7703964728cd8c2431ce1d0192ede1854481c1bd",
+  "baseHead": "3f6fc4a847e2e048ca499d4583adc6b72003c3b8",
+  "baseConfigSourceSha": "3f6fc4a847e2e048ca499d4583adc6b72003c3b8",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/asset-r10-refresh-gate.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "0165f96a1d33e5a3f279aeb60990b0aba58b32aec4a435aa0203845a4c62a306"
+    },
+    {
+      "path": "scripts/pc-writer/market-breadth-us-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "1f7d17aa7f71def7ff39fade3a6f71d01c9a9d223a3a3258f9975dcfbf4923ea"
+    },
+    {
+      "path": "scripts/pc-writer/composite-observed-archive-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "27116ce57c553955efb88addc154d194ecdc402911c1fcd6f33d8f290506bdbc"
+    },
+    {
+      "path": "scripts/pc-writer/cnn-observed-archive-publication-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "9c52d17e82483fc35c1280d53687342e9c08e727ca1712b0c1d8290d0acb3f11"
+    },
+    {
+      "path": "lib/market-breadth/compute.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "25d50550b7e3ab8abadf90fc78e8dd3c3f37b6f7a0b72f2e0b11482c8c9c7c10"
+    },
+    {
+      "path": "lib/market-breadth/us-public-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "f0b092af381413b8d7b02baf5750388cb384e9e53e6b3f3a362be781efe6382b"
+    },
+    {
+      "path": "lib/composite-observed-history-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "119046885a64ff0b476af96fbfffd7982b5782b1f0f7edf70b44e487c623eb71"
+    },
+    {
+      "path": "lib/cnn-observed-archive-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "f9cb4c8da02e2175527c389a54563a6f45c6f2815f5af524c27b071a6059ec63"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-calendar-company-ko.mjs",
+      "sha256": "b442ac3ba3a4ea6947dde207548d97382197de70341df94035ad79e72037399c"
+    },
+    {
+      "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+      "sha256": "b9b8cd2331ad70bc7bdc6e7c722ce272163c73ac9c370c0c93c951d783e36d62"
+    },
+    {
+      "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+      "sha256": "f13accdeed8601b898343eb09331470f4d6783ca94af22022543be7ea7e2b66e"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
