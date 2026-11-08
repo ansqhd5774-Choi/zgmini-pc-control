@@ -33,6 +33,35 @@ ChatGPT conversation ID 또는 task ID와 자동 매핑되지 않는다.
 PR 번호·작성자·repo를 사전 등록하지 못하면 task는 읽기만 하고 중단한다.
 미리 승인된 수신함을 확인하기 전까지 기존 #934는 시험용으로만 사용한다.
 
+### 여러 대화에 공통 적용하는 비활성 매핑 후보
+
+`agent-handoff/chat-binding-registry.mjs`는 **호출자가 별도 승인·고정한** 하나의
+매핑 객체를 받아 `resolveWake`/`resolveReturn` 두 함수를 제공한다. 공통 Controller·
+Runner·Writer 오류는 `processOwner` 수신함으로, 기능별 오류는 등록된 원담당
+`origins[]` 수신함으로 전달한다. 결과는 항상 원래 기능 담당의 PR로 반환한다.
+대화가 추가되어도 브로커 코드를 기능마다 복사하지 않는다.
+
+```json
+{
+  "schema": "ZGMINI_HANDOFF_CHAT_BINDINGS_V1",
+  "repository": "ansqhd5774-Choi/zgmini-pc-control",
+  "processOwner": {"chatId": "chat-process-owner", "inboxPr": 900},
+  "origins": [{"chatId": "chat-feature-1", "inboxPr": 1001}]
+}
+```
+
+위 PR 번호와 Chat ID는 **시험 예시**이며 실제 수신함·대화 연결 증거가 아니다.
+서로 다른 Chat ID·PR만 허용하며 미등록 원담당·중복·잘못된 repo·추가 필드가 있으면
+거부한다. Issue 본문에 임의 PR을 지정해도 등록된 수신함을 바꿀 수 없다.
+`issue-broker.mjs`의 `resolvePrWakeBinding`, `result-broker.mjs`의
+`resolveResultPrBinding`은 **명시 주입된 경우에만** 이 함수를 사용한다. 기본 CLI와
+Workflow는 이전과 동일하게 미연결이다.
+
+실제 배치 전에는 각각의 PR 비공개 여부·GitHub 권한과 Scheduled task의 고유
+`chat_ref`를 검증하고, 승인된 설정의 SHA·버전·적용 시점을 보존해야 한다. 진행 중인
+Incident의 수신 PR을 설정 갱신으로 바꾸지 않도록 기존 매핑을 유지하거나 정확한
+이력 버전으로 조회한다. 이 레지스트리는 승인·실제 대화 귀속을 증명하지 않는다.
+
 ## 전달·수신 확인의 서로 다른 의미
 
 1. Queue `HANDOFF_ROUTED` 및 GitHub PR `ZGMINI_CHAT_HANDOFF_WAKE_V1`은 **전달 기록**이다.
