@@ -1,0 +1,108 @@
+{
+  "schema": "ZGMINI_WRITER_CONFIG_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "EMPLOYMENT_R6_TWO_OPTIN_BOOLEAN_ONLY",
+  "targetPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "beforeSha256": "a521780ee35ffe689fd954dd5237c0a19138847b5326b1b64e31e341eaba852b",
+  "changes": [
+    {
+      "key": "employmentR6AutoCollection",
+      "value": true
+    },
+    {
+      "key": "employmentR6OneYearAutoPublication",
+      "value": true
+    }
+  ],
+  "runCount": 1,
+  "allowOtherChanges": false,
+  "allowProviderCalls": false,
+  "allowTaskChanges": false,
+  "allowSourceChanges": false,
+  "allowDbWrites": false,
+  "verifiedR6Install": {
+    "requestId": "007ce184-e072-4d2c-8a33-fa62e4cca49f",
+    "manifestSha256": "87b324c26e0c3b2e6188083ce8a938071bcd2bc84bdd557b3f28c8d215fbdaa8",
+    "sourceSha": "ec48fc456274fd16dbf0ebe29cf201b8497450d1",
+    "issueNumber": 929,
+    "status": "WRITER_B_INSTALLED_VERIFIED"
+  },
+  "installedFiles": [
+    {
+      "path": "lib/market-score/employment-r4-bed-provider.mjs",
+      "afterSha256": "5508ca3e0512564a2bfae647aea72da6ff4a757755a1a8fc99dc5f0a1efd7ec0"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-store.mjs",
+      "afterSha256": "9e6f50ebc672c135eb04445ba9bad383fae161f7dbeece47793e385f3376874c"
+    },
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "afterSha256": "9e1c0168eb6f10e9d88f678ca8d8131b2ecd1e5ee0d9c741361fc6dfea99b10f"
+    },
+    {
+      "path": "lib/market-score/employment-r6-contract.mjs",
+      "afterSha256": "bb140adbf45bc445bcd84d16aa2893fda943d4b3f2b388927d9f8268ca1d7076"
+    },
+    {
+      "path": "lib/market-score/employment-r6-feature-engine.mjs",
+      "afterSha256": "8bf2f799c540fbaa23e14aafe99e1842c6865975170960b1fa3a61d5e95109d5"
+    },
+    {
+      "path": "lib/market-score/employment-r6-observation-reader.mjs",
+      "afterSha256": "81d9341a625d75bb96816657dbb26cc906a6afaaa49482d1c8cef8eb72291b88"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "afterSha256": "01773f71649c346da59129f9b4bb6f3a742e02ee4f0f5404076927904bba7712"
+    },
+    {
+      "path": "lib/market-score/employment-r6-scheduler.mjs",
+      "afterSha256": "b128a2aed096cd7a87140152999317c0a28e14f9341ebd2aa3bdca169c94c3bf"
+    },
+    {
+      "path": "lib/market-score/employment-r6-store.mjs",
+      "afterSha256": "a6c2938bae56147ab4bf3fcb9ba3046355360a538e58f6d34de021ea1d586851"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "afterSha256": "9fd530866185d4499db35513207af0888a4f49165e766e5d75a133785ad7ce24"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "afterSha256": "44fe384bfad99d27d8304e2f85ed094bf247dd36575f9c3a8d5de21b2f0a1754"
+    },
+    {
+      "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+      "afterSha256": "aa6a9f429f64802251b88a839f56154f43d73864f8d11df569ef56210fee69a4"
+    },
+    {
+      "path": "lib/market-score/employment-r6-window.mjs",
+      "afterSha256": "dc41a6780f05d28c31ee52b77b2f688df27216d109ae4c7dc1aa17a9da07decd"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+      "afterSha256": "75cbf8fab32509b9b9b90f6ad6d9fd17187ede3836070fad8387ba331b09e6dd"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+      "afterSha256": "5363c5aba19e3ef67d01307f46b3283ce2f38dd9d3673cc73331e980850c38ea"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+      "afterSha256": "e4b78dbd756743316beba0655a3fe89f45d7c93fb8036572bff5d5431d8e4a07"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+      "afterSha256": "1b12d0bfc00ae5bae4b3d91c0f3552abce5d93bf5c01337784fe464d2d30b741"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+      "afterSha256": "4b73aa44e1f104d10bfcc4ace3a07127f0d27b14cadf4c9b7f49b2c664d506e8"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "afterSha256": "e6d5829237ffff18007a84dd2aea1d156ee245ca0d722e8055881f38bf725951"
+    }
+  ]
+}
