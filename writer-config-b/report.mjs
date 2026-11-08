@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ACTOR,CONTROL_REPOSITORY,REQUEST_SCHEMA,TITLE,LABEL,OPERATION,
  authorizeRequest} from './contract.mjs';
+import {uploadResultPairAtomic} from './result-pair-atomic.mjs';
 
 const CODE=/^CONFIG_B_[A-Z0-9_]{1,100}$/;
 const SHA40=/^[0-9a-f]{40}$/i;
@@ -84,15 +85,6 @@ function textReport(r){return [
  'RETRY=NO_REEXECUTE_READ_ONLY_RECONCILE','',
 ].join('\n');}
 
-async function readback(fetchApi,url,headers,bytes){
- try{const res=await fetchApi(url+'?ref=main',{method:'GET',headers});
-  if(res.status!==200)return false;
-  const b=await res.json();
-  return b?.encoding==='base64'&&
-   Buffer.from(String(b.content).replace(/\s/g,''),'base64').equals(Buffer.from(bytes));
- }catch{return false;}
-}
-
 export async function uploadReport({event,env,rawResult,fetchApi=fetch}){
  const request=validateReportEvent(event,env);
  need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20&&
@@ -105,18 +97,12 @@ export async function uploadReport({event,env,rawResult,fetchApi=fetch}){
   authorization:'Bearer '+env.GITHUB_TOKEN,
   'x-github-api-version':'2022-11-28','content-type':'application/json',
   'user-agent':'zgmini-writer-config-b-once'};
- let created=0,verified=0;
- for(const [ext,content] of [['json',JSON.stringify(report,null,2)+'\n'],
-  ['txt',textReport(report)]]){
-  const url=`https://api.github.com/repos/${CONTROL_REPOSITORY}/contents/`+
-   `results/writer-config-b-${request.requestId}.${ext}`;
-  try{const res=await fetchApi(url,{method:'PUT',headers,
-   body:JSON.stringify({message:'chore(config-b): one-shot sanitized result',
-    content:Buffer.from(content).toString('base64')})});
-   if(res.status===201)created++;
-  }catch{/* Never retry an ambiguous create. */}
-  if(await readback(fetchApi,url,headers,content))verified++;
- }
+ const prefix=`results/writer-config-b-${request.requestId}`;
+ const pair=await uploadResultPairAtomic({fetchApi,headers,
+  message:'chore(config-b): one-shot sanitized result pair',
+  outputs:[[prefix+'.json',JSON.stringify(report,null,2)+'\n'],
+   [prefix+'.txt',textReport(report)]]});
+ const {created,verified}=pair;
  const delivery=verified===2?'RESULT_PAIR_READBACK_VERIFIED':
   'RESULT_DELIVERY_UNVERIFIED';
  const status=verified===2?report.status:'CONFIG_B_STATE_UNKNOWN';

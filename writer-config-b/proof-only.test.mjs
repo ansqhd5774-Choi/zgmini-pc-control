@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {reportProof,runFixtureProof} from './proof-only.mjs';
 import {ACTOR,CONTROL_REPOSITORY} from './contract.mjs';
+import {createGitPairFixture} from './result-pair-test-fixture.mjs';
 
 function fixture(){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'r6-proof-reporter-'));
@@ -19,7 +20,7 @@ function fixture(){
  const result={schema:'ZGMINI_WRITER_CONFIG_B_WINDOWS_PROOF_V1',
   status:'PASS',code:'WINDOWS_TEMP_FIXTURE_TESTS_PASS',
   controlSha:env.GITHUB_SHA,runId:env.GITHUB_RUN_ID,
-  issueNumber:1818,testFiles:7,configOperationalWrites:0,
+  issueNumber:1818,testFiles:8,configOperationalWrites:0,
   writerOperationalWrites:0,mode:'TEMP_FIXTURE_ONLY_NOT_PRODUCTION_INSTALL'};
  fs.writeFileSync(writer,JSON.stringify(result));
  return {dir,event,env,result,close(){fs.rmSync(dir,{recursive:true,force:true});}};
@@ -31,26 +32,22 @@ test('proof-only mode must never invoke operational B in non-Windows environment
    /CONFIG_B_PROOF_WINDOWS_REQUIRED/);
  }finally{x.close();}
 });
-test('sanitized proof report writes two create-only artifacts with independent readback',async()=>{
- const x=fixture(),files=new Map();let puts=0,gets=0,comments=0;
- const fetchApi=async(url,opts)=>{
-  if(url.endsWith('/comments')){comments++;return {status:201};}
-  if(opts.method==='PUT'){
-   const body=JSON.parse(opts.body);assert.equal(Object.hasOwn(body,'sha'),false);
-   puts++;files.set(url,Buffer.from(body.content,'base64'));return {status:201};
-  }
-  if(opts.method==='GET'){
-   gets++;const bytes=files.get(url.split('?')[0]);
-   return {status:bytes?200:404,async json(){return {
-    encoding:'base64',content:bytes?.toString('base64')}}};
-  }
-  throw Error('Unknown method');
- };
+test('sanitized proof report publishes one atomic pair and independently reads back',async()=>{
+ const x=fixture(),f=createGitPairFixture();
  try{
-  const r=await reportProof(x.event,x.env,{fetchApi});
-  assert.deepEqual([r.status,r.verified,r.created,puts,gets,comments],
-   ['PASS',2,2,2,2,1]);
-  const data=[...files.values()].map(x=>x.toString('utf8')).join('\n');
+  const r=await reportProof(x.event,x.env,{fetchApi:f.fetchApi});
+  assert.deepEqual([r.status,r.verified,r.created,f.counts.commits,
+   f.counts.updates,f.counts.readbacks,f.counts.comments],
+   ['PASS',2,2,1,1,4,1]);
+  const data=[...f.files.values()].map(x=>x.toString('utf8')).join('\n');
   assert.equal(data.includes(x.env.GITHUB_TOKEN),false);
+ }finally{x.close();}
+});
+test('proof report preserves unknown on concurrent main ref advance, without a partial file',async()=>{
+ const x=fixture(),f=createGitPairFixture({rejectRefUpdate:true});
+ try{
+  const r=await reportProof(x.event,x.env,{fetchApi:f.fetchApi});
+  assert.deepEqual([r.status,r.verified,r.created,f.files.size,f.counts.comments],
+   ['STATE_UNKNOWN',0,0,0,1]);
  }finally{x.close();}
 });

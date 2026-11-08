@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sanitizeReport,uploadReport,validateReportEvent} from './report.mjs';
 import {REQUEST_SCHEMA,OPERATION,CONTROL_REPOSITORY,TITLE,LABEL,ACTOR} from './contract.mjs';
+import {createGitPairFixture} from './result-pair-test-fixture.mjs';
 
 const request={schema:REQUEST_SCHEMA,
  requestId:'a314f1b7-6279-4136-9bd2-b20123456789',
@@ -45,26 +46,18 @@ test('event authorizer accepts only owner and exact issue',()=>{
  assert.throws(()=>validateReportEvent(event,{...env,GITHUB_ACTOR:'unknown'}),
   /CONFIG_B_REPORT_EVENT_AUTH_STOP/);
 });
-test('one-shot create-only result uploads both, checks bytes and comments',async()=>{
- const stored=new Map();let puts=0,gets=0,comments=0;
- async function fetchApi(url,opts){
-  if(url.includes('/comments')){comments++;return {status:201};}
-  if(opts.method==='PUT'){
-   puts++;
-   const payload=JSON.parse(opts.body);
-   assert.equal(Object.hasOwn(payload,'sha'),false);
-   stored.set(url,Buffer.from(payload.content,'base64'));
-   return {status:201};
-  }
-  if(opts.method==='GET'){
-   gets++;
-   const value=stored.get(url.split('?')[0]);
-   return {status:value?200:404,async json(){return {
-    encoding:'base64',content:value?.toString('base64')}}};
-  }
-  throw Error('Unexpected fetch');
- }
- const r=await uploadReport({event,env,rawResult:JSON.stringify(complete),fetchApi});
- assert.deepEqual([r.created,r.verified,puts,gets,comments],[2,2,2,2,1]);
+test('one-shot result pair commits atomically, checks bytes and comments',async()=>{
+ const f=createGitPairFixture();
+ const r=await uploadReport({event,env,rawResult:JSON.stringify(complete),
+  fetchApi:f.fetchApi});
+ assert.deepEqual([r.created,r.verified,f.counts.commits,f.counts.updates,
+  f.counts.readbacks,f.counts.comments],[2,2,1,1,4,1]);
  assert.equal(r.status,'CONFIG_B_APPLIED_VERIFIED');
+});
+test('config-B result reporter never claims delivery after branch race',async()=>{
+ const f=createGitPairFixture({rejectRefUpdate:true});
+ const r=await uploadReport({event,env,rawResult:JSON.stringify(complete),
+  fetchApi:f.fetchApi});
+ assert.deepEqual([r.status,r.verified,r.created,f.files.size,f.counts.comments],
+  ['CONFIG_B_STATE_UNKNOWN',0,0,0,1]);
 });

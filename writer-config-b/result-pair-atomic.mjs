@@ -1,0 +1,94 @@
+// Publish the two sanitized evidence files in one Git commit. The branch ref
+// is updated once (non-force), so a concurrent writer cannot leave half a pair.
+import {CONTROL_REPOSITORY} from './contract.mjs';
+
+const SHA40=/^[a-f0-9]{40}$/i;
+const need=(ok,code)=>{if(!ok)throw new Error(code);};
+const api=`https://api.github.com/repos/${CONTROL_REPOSITORY}`;
+
+async function json(fetchApi,url,opts,expected){
+ const res=await fetchApi(url,opts);
+ need(res?.status===expected,'CONFIG_B_PAIR_REMOTE_STOP');
+ const value=await res.json();
+ need(value&&typeof value==='object','CONFIG_B_PAIR_RESPONSE_STOP');
+ return value;
+}
+
+export async function uploadResultPairAtomic({outputs,headers,fetchApi=fetch,
+ message='chore(pc): record one-shot sanitized evidence'}={}){
+ need(Array.isArray(outputs)&&outputs.length===2&&
+  outputs[0][0].endsWith('.json')&&outputs[1][0].endsWith('.txt')&&
+  outputs.every(([p,s])=>typeof p==='string'&&
+   /^results\/[a-zA-Z0-9._-]{1,160}\.(?:json|txt)$/.test(p)&&
+   typeof s==='string'&&Buffer.byteLength(s)>0&&Buffer.byteLength(s)<32768)&&
+  outputs[0][0].slice(0,-5)===outputs[1][0].slice(0,-4)&&
+  typeof headers?.authorization==='string'&&
+  typeof message==='string'&&message.length<160,
+ 'CONFIG_B_PAIR_INPUT_STOP');
+ const get={method:'GET',headers};
+ const ref=await json(fetchApi,`${api}/git/ref/heads/main`,get,200);
+ const base=ref?.object?.sha;
+ need(SHA40.test(base??''),'CONFIG_B_PAIR_BASE_STOP');
+ // `git/trees` can overwrite an existing path. Reject every pre-existing
+ // result before creating any Git object; branch fast-forward protects races.
+ for(const [path] of outputs){
+  let found;
+  try{found=await fetchApi(`${api}/contents/${path}?ref=${base}`,get);}
+  catch{return{created:0,verified:0,delivery:'RESULT_PAIR_PREFLIGHT_UNVERIFIED'};}
+  if(found?.status!==404)return{created:0,verified:0,
+   delivery:'RESULT_PAIR_ALREADY_EXISTS_OR_PREFLIGHT_UNVERIFIED'};
+ }
+ const original=await json(fetchApi,`${api}/git/commits/${base}`,get,200);
+ const baseTree=original?.tree?.sha;
+ need(SHA40.test(baseTree??''),'CONFIG_B_PAIR_TREE_STOP');
+ const entries=[];
+ for(const [path,content] of outputs){
+  const blob=await json(fetchApi,`${api}/git/blobs`,{method:'POST',headers,
+   body:JSON.stringify({content:Buffer.from(content).toString('base64'),
+    encoding:'base64'})},201);
+  need(SHA40.test(blob?.sha??''),'CONFIG_B_PAIR_BLOB_STOP');
+  entries.push({path,mode:'100644',type:'blob',sha:blob.sha});
+ }
+ const tree=await json(fetchApi,`${api}/git/trees`,{method:'POST',headers,
+  body:JSON.stringify({base_tree:baseTree,tree:entries})},201);
+ need(SHA40.test(tree?.sha??''),'CONFIG_B_PAIR_TREE_STOP');
+ const commit=await json(fetchApi,`${api}/git/commits`,{method:'POST',headers,
+  body:JSON.stringify({message,tree:tree.sha,parents:[base]})},201);
+ need(SHA40.test(commit?.sha??''),'CONFIG_B_PAIR_COMMIT_STOP');
+ // One compare/fast-forward operation. Never use force or retry ambiguity.
+ let updated=null,moved=null;
+ try{
+  updated=await fetchApi(`${api}/git/refs/heads/main`,{method:'PATCH',headers,
+   body:JSON.stringify({sha:commit.sha,force:false})});
+  if(updated?.status===200)moved=await updated.json();
+ }catch{/* Ambiguous response: reconcile by reads only, never PATCH again. */}
+ if(updated?.status===422)return{created:0,verified:0,
+  delivery:'RESULT_PAIR_REF_CONFLICT_UNTOUCHED'};
+ let branchContainsCommit=updated?.status===200&&moved?.object?.sha===commit.sha;
+ if(!branchContainsCommit){
+  try{
+   const now=await json(fetchApi,`${api}/git/ref/heads/main`,get,200);
+   const liveSha=now?.object?.sha;
+   if(liveSha===commit.sha)branchContainsCommit=true;
+   else if(SHA40.test(liveSha??'')){
+    const compare=await json(fetchApi,
+     `${api}/compare/${commit.sha}...${liveSha}`,get,200);
+    branchContainsCommit=['ahead','identical'].includes(compare?.status);
+   }
+  }catch{/* Keep unconfirmed, do not retry a possibly applied PATCH. */}
+ }
+ if(!branchContainsCommit)return{created:null,verified:0,
+  delivery:'RESULT_PAIR_REF_UNVERIFIED_READ_ONLY_RECONCILE'};
+ let verified=0;
+ for(const [path,content] of outputs){
+  try{
+   const file=await json(fetchApi,`${api}/contents/${path}?ref=${commit.sha}`,
+    get,200);
+   if(file?.encoding==='base64'&&
+    Buffer.from(String(file.content).replace(/\s/g,''),'base64')
+     .equals(Buffer.from(content)))verified++;
+  }catch{/* No retry after a post-commit readback failure. */}
+ }
+ return{created:2,verified,delivery:verified===2?
+  'RESULT_PAIR_READBACK_VERIFIED':'RESULT_PAIR_READBACK_UNVERIFIED'};
+}
