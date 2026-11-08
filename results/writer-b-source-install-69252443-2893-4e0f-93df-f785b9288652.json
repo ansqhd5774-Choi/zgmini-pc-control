@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "69252443-2893-4e0f-93df-f785b9288652",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "165ca9ebbacf1782f7535aa6a8a3e9cfea80df44",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "ec48fc456274fd16dbf0ebe29cf201b8497450d1",
+  "candidateSourceSha": "f03efe453fc26c158d07081ce9fb316deba7d7d5",
+  "manifestSha256": "011aeaaa222e02d2ac12e433b2c8a02d9349fdeeb6b769b2bd21880183de33fa",
+  "baseTreeOid": "3d6dd3ab65e70f31156e6054001db6dca187cf3a",
+  "preparedTreeOid": "368f96c0a23509e3005beb88a0b2aa6a879bf098",
+  "provenanceSha256": "921c713e97226bae98969036a6fdb6014bdc8be05e258591e5970d1e0483c437",
+  "runId": "42492287039",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/earnings-api-display.mjs",
+    "scripts/pc-writer/er1-monthly-vintage-publication.mjs",
+    "scripts/pc-writer/independent-publication.mjs",
+    "scripts/pc-writer/run-local.mjs",
+    "worker/public-feed-store.mjs"
+  ]
+}
