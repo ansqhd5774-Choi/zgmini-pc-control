@@ -1,6 +1,6 @@
 // Fixed Windows receiver for the existing configured-theme package upgrader.
-// The deployed receiver has NO arbitrary command/path interface. The only
-// default compatibility provider intentionally refuses unproven old/new state.
+// The deployed receiver has NO arbitrary command/path interface. Its fixed
+// compatibility provider executes offline old/new Windows fixtures first.
 // Package staging is restricted to RUNNER_TEMP; operational writes happen
 // solely inside the existing feature package runner, after a Writer B claim.
 import fs from 'node:fs';
@@ -11,6 +11,8 @@ import {loadApprovedRaw,verifyPinnedSourceCheckout}
   from '../../direct-writer-b/run.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
   from '../../r17-writer-b/r17-b-claim.mjs';
+import {runWindowsCrossVersionProof}
+  from './windows-cross-version-proof.mjs';
 
 const SOURCE_REPO='ansqhd5774-Choi/zgmini';
 const DATA_ROOT='E:/ZGmini/data';
@@ -43,7 +45,6 @@ function directory(dir){
 }
 const moduleAt=(root,relative)=>import(pathToFileURL(
   path.join(root,...relative.split('/'))).href);
-const defaultCompatibility=async()=>fail('B_WINDOWS_CROSS_VERSION_PROOF_PENDING');
 
 export function verifyLockedRuntimePreimage({fresh,baseline,
   activeSha256,originalSha256,manualSha256}={}){
@@ -65,13 +66,13 @@ export function verifyLockedRuntimePreimage({fresh,baseline,
 }
 
 // DI exists only for bounded offline tests; the production default below
-// passes fixed Node/Windows functions and a fail-closed proof provider.
+// passes fixed Node/Windows functions and a fail-closed offline proof provider.
 export function createFixedConfiguredReceiver({
   env=process.env,platform=process.platform,
   authorize=loadApprovedRaw,
   pinCheckout=verifyPinnedSourceCheckout,
   importModule=moduleAt,
-  verifyCrossVersion=defaultCompatibility,
+  verifyCrossVersion=runWindowsCrossVersionProof,
   claim=acquireInstallLock,consumeClaim=createInstallJournal,
   release=releaseInstallClaim,
 }={}){
@@ -162,7 +163,11 @@ export function createFixedConfiguredReceiver({
         activeRuntimeSha256:baseline.activeSha256,
         scheduledCmdSha256:current.oldCmdSha256,
         scheduledVbsSha256:current.oldVbsSha256,
-        compatibilityEvidenceSha256:proof.evidenceSha256};
+        compatibilityEvidenceSha256:proof.evidenceSha256,
+        compatibilityDirections:proof.transcript?.metrics?.simulations?.length===2?
+          2:0,
+        compatibilitySharedLockVerified:
+          proof.transcript?.metrics?.sharedLeaseCollisionRejected===true};
     },
     async loadPinnedPackageRunner(approval){
       need(feature&&baseline&&approved?.requestId===approval.requestId,
