@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_APPROVED_RUNTIME_B_RESULT_R1",
+  "requestId": "fb3dd7e4-e3cc-4a49-851b-377f9f824529",
+  "status": "DIRECT_B_STATE_UNKNOWN",
+  "code": "DIRECT_B_RESULT_UNVERIFIED",
+  "mode": null,
+  "manifestSha256": "ae5ef03f69b73a897dc24b68503a2a47858ac0989d93018c1fb90e5d4d2d8093",
+  "controlSha": null,
+  "sourceSha": null,
+  "operationSucceeded": false,
+  "runtimeEffectProof": "NOT_ESTABLISHED",
+  "compatibilityEvidenceSha256": null,
+  "compatibilityDirections": 0,
+  "compatibilitySharedLockVerified": false,
+  "runId": "42433385671",
+  "retry": "NO_AUTO_RETRY_READ_ONLY_RECONCILE"
+}
