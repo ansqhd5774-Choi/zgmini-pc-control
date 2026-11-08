@@ -2,7 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {verifyProofIssue,loadProofApproval,PROOF_RESULT,PROOF_SCHEMA}
+import {verifyProofIssue,loadProofApproval,PROOF_RESULT,
+  PROOF_SCHEMA,PROOF_CLI_SCHEMA}
   from './proof-only.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -51,24 +52,46 @@ function safeTranscript(value,auth){
   return JSON.stringify(t)===JSON.stringify(value)?t:null;
 }
 
+function safeCliEntryProof(value){
+  if(value?.status!=='PASS'||value.childExitCode!==0||
+    value.fixtureRoot!=='RUNNER_TEMP'||value.operationWrites!==0||
+    !SHA64.test(value.testSha256??'')||
+    Object.keys(value).length!==5)return null;
+  // The proof and reporter load this same immutable control checkout.
+  try{
+    const testFile=new URL('./approval-cycle.test.mjs',import.meta.url);
+    if(sha(fs.readFileSync(testFile))!==value.testSha256)return null;
+  }catch{return null;}
+  return {status:'PASS',childExitCode:0,
+    testSha256:value.testSha256,fixtureRoot:'RUNNER_TEMP',operationWrites:0};
+}
+
 export function sanitizeProofReport(raw,auth,env){
-  const base={schema:PROOF_SCHEMA,requestId:auth.request.requestId,
+  const modern=raw?.schema===PROOF_CLI_SCHEMA;
+  const legacy=raw?.schema===PROOF_SCHEMA;
+  const base={schema:modern?PROOF_CLI_SCHEMA:PROOF_SCHEMA,
+    requestId:auth.request.requestId,
     runId:RUN.test(env?.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
     approvalSha256:auth.approvalSha256,
     sourceSha:auth.manifest.sourceSha,
     manifestSha256:auth.manifest.packageManifestSha256,
     status:'PROOF_UNVERIFIED',code:'PROOF_RESULT_MISSING_OR_INVALID',
     operationWrites:0,windowsProof:'NOT_ESTABLISHED',
+    cliEntrypointProof:modern?'NOT_ESTABLISHED':'LEGACY_NOT_TESTED',
+    cliTestSha256:null,cliNodeExitCode:null,
     activeRuntimeSha256:null,taskXmlSha256:null,
     evidenceSha256:null,transcript:null,
     retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE'};
-  if(raw?.schema!==PROOF_SCHEMA||raw.requestId!==base.requestId||
+  if((!modern&&!legacy)||raw.requestId!==base.requestId||
     raw.sourceSha!==base.sourceSha||
     raw.manifestSha256!==base.manifestSha256||
     raw.approvalSha256!==base.approvalSha256||raw.operationWrites!==0)
     return base;
   if(raw.status==='PROOF_BLOCKED'&&statusCode(raw.code))
-    return {...base,status:'PROOF_BLOCKED',code:raw.code};
+    return {...base,status:'PROOF_BLOCKED',code:raw.code,
+      cliNodeExitCode:modern&&Number.isInteger(raw.cliNodeExitCode)&&
+        raw.cliNodeExitCode>=0&&raw.cliNodeExitCode<=255?
+        raw.cliNodeExitCode:null};
   if(raw.status!=='PROOF_PASS'||
     raw.activeRuntimeSha256!==
       auth.manifest.runtimePreimage.activeRuntimeSha256||
@@ -77,8 +100,15 @@ export function sanitizeProofReport(raw,auth,env){
   const transcript=safeTranscript(raw.transcript,auth);
   if(!transcript||sha(Buffer.from(JSON.stringify(transcript)))!==
     raw.evidenceSha256)return base;
-  return {...base,status:'PROOF_PASS',code:'PROOF_WINDOWS_BILATERAL_PASS',
+  const cli=modern?safeCliEntryProof(raw.cliEntrypointProof):null;
+  if(modern&&!cli)return base;
+  return {...base,status:'PROOF_PASS',
+    code:modern?'PROOF_WINDOWS_BILATERAL_CLI_PASS':
+      'PROOF_WINDOWS_BILATERAL_PASS',
     windowsProof:'OLD_NEW_TEMP_FIXTURE_ONLY_NO_INSTALL',
+    cliEntrypointProof:modern?'WINDOWS_CLI_ENTRY_PASS':'LEGACY_NOT_TESTED',
+    cliTestSha256:cli?.testSha256??null,
+    cliNodeExitCode:cli?.childExitCode??null,
     activeRuntimeSha256:raw.activeRuntimeSha256,
     taskXmlSha256:raw.taskXmlSha256,
     evidenceSha256:raw.evidenceSha256,transcript};
@@ -93,6 +123,9 @@ const textReport=r=>[
   `ACTIVE_RUNTIME_SHA256=${r.activeRuntimeSha256??'UNKNOWN'}`,
   `TASK_XML_SHA256=${r.taskXmlSha256??'UNKNOWN'}`,
   `WINDOWS_PROOF=${r.windowsProof}`,
+  `CLI_ENTRY_PROOF=${r.cliEntrypointProof}`,
+  `CLI_TEST_SHA256=${r.cliTestSha256??'UNKNOWN'}`,
+  `CLI_NODE_EXIT_CODE=${r.cliNodeExitCode??'UNKNOWN'}`,
   `EVIDENCE_SHA256=${r.evidenceSha256??'UNKNOWN'}`,
   `OPERATION_WRITES=${r.operationWrites}`,
   `RETRY=${r.retry}`,'',
@@ -145,6 +178,8 @@ export async function uploadProofReport({event,env,auth,rawResult,
     `(${verified===2?report.code:'PROOF_RESULT_PAIR_UNVERIFIED'})\n`+
     `RUN_ID: ${report.runId??'UNKNOWN'}; RESULT READBACK: ${verified}/2; `+
     `CREATED: ${created}/2; EVIDENCE: ${report.evidenceSha256??'UNKNOWN'}\n`+
+    `CLI_ENTRY: ${report.cliEntrypointProof}; CLI_NODE_EXIT: `+
+    `${report.cliNodeExitCode??'UNKNOWN'}\n`+
     'OPERATION WRITES: 0; NO B INSTALL; NO SCHEDULED UPDATE TEST; '+
     'NO AUTO RETRY\n';
   const posted=await fetchApi(`https://api.github.com/repos/${REPO}/issues/`+
