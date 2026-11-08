@@ -6,7 +6,8 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {verifyProofIssue,loadProofApproval,proveWithoutInstall,PROOF_SCHEMA}
+import {verifyProofIssue,loadProofApproval,proveWithoutInstall,
+  proveReadOnlyCliEntrypoint,PROOF_SCHEMA,PROOF_CLI_SCHEMA}
   from './proof-only.mjs';
 import {sanitizeProofReport,uploadProofReport}
   from './proof-only-report.mjs';
@@ -89,6 +90,13 @@ function validProof(auth){
     taskXmlSha256:auth.manifest.runtimePreimage.taskXmlSha256,
     evidenceSha256:sha(JSON.stringify(transcript)),transcript,operationWrites:0};
 }
+function modernProof(auth){
+  const original=validProof(auth);
+  return {...original,schema:PROOF_CLI_SCHEMA,
+    cliEntrypointProof:{status:'PASS',childExitCode:0,
+      testSha256:sha(fs.readFileSync(new URL('./approval-cycle.test.mjs',
+        import.meta.url))),fixtureRoot:'RUNNER_TEMP',operationWrites:0}};
+}
 
 test('read-only Windows transcript is independently checked and bounded',()=>{
   const f=fixture();
@@ -103,6 +111,64 @@ test('read-only Windows transcript is independently checked and bounded',()=>{
     f.auth,env).status,'PROOF_UNVERIFIED');
 });
 
+test('V2 requires pinned real CLI entrypoint proof; historical V1 stays valid',()=>{
+  const f=fixture();
+  const old=sanitizeProofReport(validProof(f.auth),f.auth,env);
+  assert.equal(old.code,'PROOF_WINDOWS_BILATERAL_PASS');
+  assert.equal(old.cliEntrypointProof,'LEGACY_NOT_TESTED');
+  const newer=sanitizeProofReport(modernProof(f.auth),f.auth,env);
+  assert.equal(newer.status,'PROOF_PASS');
+  assert.equal(newer.code,'PROOF_WINDOWS_BILATERAL_CLI_PASS');
+  assert.equal(newer.cliEntrypointProof,'WINDOWS_CLI_ENTRY_PASS');
+  assert.equal(newer.cliNodeExitCode,0);
+  const missing=modernProof(f.auth);delete missing.cliEntrypointProof;
+  assert.equal(sanitizeProofReport(missing,f.auth,env).status,'PROOF_UNVERIFIED');
+  for(const modified of [
+    {childExitCode:13},{testSha256:'0'.repeat(64)},
+    {fixtureRoot:'OPERATING_ROOT'},{operationWrites:1},{extra:'spoof'}]){
+    const invalid=modernProof(f.auth);
+    invalid.cliEntrypointProof={...invalid.cliEntrypointProof,...modified};
+    assert.equal(sanitizeProofReport(invalid,f.auth,env).status,
+      'PROOF_UNVERIFIED');
+  }
+});
+
+test('pinned CLI child test runs only under temp without workflow secrets',t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-proof-cycle-'));
+  t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  const passed=proveReadOnlyCliEntrypoint({env:{
+    RUNNER_TEMP:temp,GITHUB_TOKEN:'PRIVATE_TOKEN_NOT_FOR_CHILD'},
+    platform:'win32'});
+  assert.equal(passed.status,'PASS');
+  assert.equal(passed.childExitCode,0);
+  assert.equal(passed.operationWrites,0);
+  assert.equal(passed.fixtureRoot,'RUNNER_TEMP');
+  assert.match(passed.testSha256,/^[a-f0-9]{64}$/);
+  assert.throws(()=>proveReadOnlyCliEntrypoint({
+    env:{RUNNER_TEMP:temp},platform:'win32',
+    runNode:(_node,args,opts)=>{
+      assert.equal(args[0],'--test');
+      assert.ok(args[1].endsWith('approval-cycle.test.mjs'));
+      assert.equal(opts.env.CYCLE_TEST_TEMP_BASE,temp);
+      assert.equal(opts.env.GITHUB_TOKEN,undefined);
+      return {status:13,signal:null};},
+  }),err=>err.code==='PROOF_CLI_UNSETTLED_AWAIT_STOP'&&
+    err.nodeExitCode===13);
+});
+
+test('V2 BLOCKED preserves bounded CLI Node exit for reporter',()=>{
+  const f=fixture();
+  const raw={schema:PROOF_CLI_SCHEMA,status:'PROOF_BLOCKED',
+    requestId,sourceSha,approvalSha256:f.auth.approvalSha256,
+    manifestSha256:f.auth.manifest.packageManifestSha256,
+    code:'PROOF_CLI_UNSETTLED_AWAIT_STOP',cliNodeExitCode:13,
+    operationWrites:0};
+  const found=sanitizeProofReport(raw,f.auth,env);
+  assert.equal(found.status,'PROOF_BLOCKED');
+  assert.equal(found.code,'PROOF_CLI_UNSETTLED_AWAIT_STOP');
+  assert.equal(found.cliNodeExitCode,13);
+});
+
 test('no Windows environment reaches neither package build nor operation',async()=>{
   const f=fixture();let imported=0;
   await assert.rejects(proveWithoutInstall({auth:f.auth,env:{RUNNER_TEMP:'/tmp'},
@@ -110,7 +176,7 @@ test('no Windows environment reaches neither package build nor operation',async(
   assert.equal(imported,0);
 });
 
-test('proof reporter CLI cannot deadlock its own ES module import',()=>{
+test('proof CLI --run/--report cannot deadlock their ES module imports',()=>{
   const dir=path.dirname(fileURLToPath(import.meta.url));
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-proof-cli-'));
   try{
@@ -123,6 +189,15 @@ test('proof reporter CLI cannot deadlock its own ES module import',()=>{
     assert.equal(run.status,1);
     assert.match(run.stderr,/PROOF_OWNER_ISSUE_DENIED/);
     assert.doesNotMatch(run.stderr,/unsettled top-level await/i);
+    const runMode=spawnSync(process.execPath,
+      [path.join(dir,'proof-only.mjs'),'--run'],
+      {env:{...process.env,GITHUB_EVENT_PATH:event},
+        encoding:'utf8',timeout:6000});
+    assert.equal(runMode.status,1);
+    assert.match(runMode.stderr,
+      process.platform==='win32'?/PROOF_OWNER_ISSUE_DENIED/:
+        /PROOF_WINDOWS_REQUIRED/);
+    assert.doesNotMatch(runMode.stderr,/unsettled top-level await/i);
   }finally{fs.rmSync(temp,{recursive:true});}
 });
 
@@ -134,6 +209,7 @@ test('proof-only workflow has no install/effect stage',()=>{
   assert.match(yml,/pc-configured-runtime-proof/);
   assert.match(yml,/--pin/);
   assert.match(yml,/--run/);
+  assert.match(yml,/Prove Windows CLI entrypoint and both versions/);
   assert.match(yml,/--report/);
   assert.doesNotMatch(yml,/direct-writer-b\\run\.mjs/);
   assert.doesNotMatch(yml,/RUN_INSTALL\.cmd/);
@@ -162,26 +238,35 @@ test('unmatched Issue workflows cannot evict a valid Writer B or proof job',()=>
   }
 });
 
-test('create-only remote proof pair verifies both blobs, no retry',async()=>{
-  const f=fixture(),objects=new Map();
-  const mockFetch=async(url,options)=>{
-    if(options.method==='PUT'){
-      objects.set(url,Buffer.from(JSON.parse(options.body).content,'base64'));
-      return {status:201};
-    }
-    if(options.method==='GET'){
-      const bytes=objects.get(url.split('?ref=')[0]);
-      return bytes?{status:200,json:async()=>({encoding:'base64',
-        content:bytes.toString('base64')})}:{status:404};
-    }
-    if(options.method==='POST')return {status:201};
-    throw Error('unexpected method');
-  };
-  const result=await uploadProofReport({event:f.event,env,
-    auth:f.auth,rawResult:JSON.stringify(validProof(f.auth)),fetchApi:mockFetch});
-  assert.deepEqual(result,{status:'PROOF_PASS',created:2,verified:2});
-  assert.equal(objects.size,2);
-  const json=[...objects].find(([k])=>k.endsWith('.json'))[1];
-  assert.equal(JSON.parse(json).evidenceSha256,
-    validProof(f.auth).evidenceSha256);
+test('legacy and V2 create-only proof pairs verify JSON/TXT without retry',async()=>{
+  const f=fixture();
+  for(const rawProof of [validProof(f.auth),modernProof(f.auth)]){
+    const objects=new Map();
+    const mockFetch=async(url,options)=>{
+      if(options.method==='PUT'){
+        objects.set(url,Buffer.from(JSON.parse(options.body).content,'base64'));
+        return {status:201};
+      }
+      if(options.method==='GET'){
+        const bytes=objects.get(url.split('?ref=')[0]);
+        return bytes?{status:200,json:async()=>({encoding:'base64',
+          content:bytes.toString('base64')})}:{status:404};
+      }
+      if(options.method==='POST')return {status:201};
+      throw Error('unexpected method');
+    };
+    const result=await uploadProofReport({event:f.event,env,auth:f.auth,
+      rawResult:JSON.stringify(rawProof),fetchApi:mockFetch});
+    assert.deepEqual(result,{status:'PROOF_PASS',created:2,verified:2});
+    assert.equal(objects.size,2);
+    const json=[...objects].find(([k])=>k.endsWith('.json'))[1];
+    const txt=[...objects].find(([k])=>k.endsWith('.txt'))[1];
+    assert.equal(JSON.parse(json).evidenceSha256,rawProof.evidenceSha256);
+    if(rawProof.schema===PROOF_CLI_SCHEMA){
+      assert.equal(JSON.parse(json).cliEntrypointProof,
+        'WINDOWS_CLI_ENTRY_PASS');
+      assert.match(txt.toString('utf8'),/CLI_NODE_EXIT_CODE=0/);
+    }else assert.match(txt.toString('utf8'),
+      /CLI_ENTRY_PROOF=LEGACY_NOT_TESTED/);
+  }
 });
