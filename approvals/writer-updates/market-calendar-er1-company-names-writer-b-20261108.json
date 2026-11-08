@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "fcfd4468dc24c5d38763c78a2a4732c76c0628ad",
+  "baseHead": "551cc9b704d7b977a9c9fe6a82c737372bfc8018",
+  "baseConfigSourceSha": "551cc9b704d7b977a9c9fe6a82c737372bfc8018",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-calendar-company-ko.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "b442ac3ba3a4ea6947dde207548d97382197de70341df94035ad79e72037399c"
+    },
+    {
+      "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "b9b8cd2331ad70bc7bdc6e7c722ce272163c73ac9c370c0c93c951d783e36d62"
+    },
+    {
+      "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+      "change": "M",
+      "beforeSha256": "5f5da53aa6437ca863a21a2ad263935ad5e5f497ffda18cfa9979801a75f9f61",
+      "afterSha256": "f13accdeed8601b898343eb09331470f4d6783ca94af22022543be7ea7e2b66e"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
