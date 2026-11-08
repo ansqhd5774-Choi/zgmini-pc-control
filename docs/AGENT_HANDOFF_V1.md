@@ -6,6 +6,7 @@
 ## 적용 및 현재 한계
 
 - `agent-handoff` label로 생성한 **별도** 비공개 Issue JSON만 인계 후보로 접수한다.
+- Issue 생성 시 라벨을 지정하거나, 소유자가 생성 후 `agent-handoff` 라벨을 부착해도 접수한다. 라벨을 여러 번 바꾸거나 Workflow를 재실행해도 기존 검증된 인계 댓글을 재사용한다. 임의 다른 라벨/작성자의 이벤트는 차단한다.
 - 별도 Workflow는 `ZGMINI_AGENT_HANDOFF_ENABLED=true` 저장소 변수 설정 전 **비활성**이다.
 - 현재 구현된 것은 검증·분류·중복 인식·안전한 상태 표시다. AI 호출/소스 수정/테스트/PR 생성/ChatGPT 대화 깨우기는 **미연결**이다. 사용량 과금이나 Copilot 구독을 자동 활성화하지 않는다.
 - V2 반환 연결은 `issue_comment`의 결과 JSON에서 같은 사고 ID·fingerprint, 실제 PR HEAD 및 GitHub Actions Run 성공/HEAD 일치를 조회해 **원래 인계 Issue 안에** `RUNTIME_VERIFICATION_PENDING`을 기록한다. 이는 실제 테스트의 의미·운영 적용 검증을 대체하지 않는다.
