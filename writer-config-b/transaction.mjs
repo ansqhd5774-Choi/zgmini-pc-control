@@ -119,6 +119,10 @@ export function applyApprovedConfig(auth,{target=TARGET,
   journal('BACKED_UP_OR_NOOP');
   stage='FINAL_CAS';
   beforeSwitch();
+  // Source may have drifted after the first read while backup was prepared.
+  // Recheck the same fixed 19 files immediately before any config rename.
+  need(verifyInstalled(auth.manifest,original)?.verifiedFiles===19,
+   'CONFIG_B_INSTALL_FINAL_DRIFT_STOP');
   need(readRegular(target,path.dirname(target)).equals(original),
     'CONFIG_B_CONCURRENT_FILE_DRIFT_STOP');
   if(proposed.changed){

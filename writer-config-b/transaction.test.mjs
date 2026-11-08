@@ -76,6 +76,18 @@ test('external file edit before final CAS blocks without clobbering third-party 
  }finally{x.close();}
 });
 
+test('post-backup source drift blocks without enabling opt-in or removing backup',()=>{
+ const x=fixture();let reads=0;
+ try{
+  const result=applyApprovedConfig(x.auth,{...x.args,
+   verifyInstalled:()=>({verifiedFiles:++reads===1?19:0})});
+  assert.equal(result.status,'CONFIG_B_STOP_RESTORED');
+  assert.equal(result.code,'CONFIG_B_INSTALL_FINAL_DRIFT_STOP');
+  assert.equal(reads,2);
+  assert.equal(fs.readFileSync(x.target).equals(x.original),true);
+ }finally{x.close();}
+});
+
 test('post-switch failure rolls back original bytes',()=>{
  const x=fixture();
  try{

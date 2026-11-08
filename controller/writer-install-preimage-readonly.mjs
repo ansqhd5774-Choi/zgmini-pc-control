@@ -49,7 +49,7 @@ export function readR6OptInStatus(dataRoot,{fileSystem=fs}={}){
  const states={employmentR6AutoCollection:'UNKNOWN',
   employmentR6OneYearAutoPublication:'UNKNOWN'};
  const bytes=readFixedReadonlyBytes(path.join(dataRoot,'pc-writer','config.json'),
-  {fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:65_536});
+  {fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:131_072});
  if(!bytes.ok)return {status:'STATE_UNKNOWN',keys:states,configSha256:null,reason:bytes.reason};
  try{
   const config=JSON.parse(bytes.bytes.toString('utf8'));
