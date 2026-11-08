@@ -70,6 +70,21 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function checkedStoredHandoff(row) {
+  // Always verify bytes read from SQLite, including ordinary read/claim paths.
+  // An intact payload hash alone cannot prove that it belongs to this key.
+  if (sha256(row.payload) !== row.payload_sha256) {
+    throw new Error('HANDOFF_QUEUE_PAYLOAD_HASH_MISMATCH_STOP');
+  }
+  const handoff = parseHandoff(row.payload);
+  if (JSON.stringify(handoff) !== row.payload ||
+      fingerprintHandoff(handoff) !== row.fingerprint ||
+      routeHandoff(handoff).role !== row.role) {
+    throw new Error('HANDOFF_QUEUE_STORED_CONTRACT_MISMATCH_STOP');
+  }
+  return handoff;
+}
+
 // Explicit schema setup only. Never call this from the existing Controller or
 // GitHub Actions workflow until the PC database path and B approval are fixed.
 export function initializeHandoffQueueSchema(db) {
@@ -82,6 +97,10 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
   validDatabase(db);
   if (typeof clock !== 'function') throw new Error('HANDOFF_QUEUE_CLOCK_INVALID');
 
+  // Busy timeout is connection-local. A second Runner does not inherit the
+  // setting from the connection that initialized the shared database schema.
+  db.exec('PRAGMA busy_timeout = 5000');
+
   const statements = {
     insert: db.prepare(`INSERT INTO ${HANDOFF_QUEUE_TABLE}
       (fingerprint, payload, payload_sha256, role, created_at, updated_at)
@@ -93,7 +112,7 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
       WHERE fingerprint = (SELECT fingerprint FROM ${HANDOFF_QUEUE_TABLE}
         WHERE status = 'PENDING' AND (? IS NULL OR fingerprint = ?)
         ORDER BY created_at, fingerprint LIMIT 1)
-      RETURNING fingerprint, payload, role, receive_generation, lease_token, lease_expires_at`),
+      RETURNING fingerprint, payload, payload_sha256, role, receive_generation, lease_token, lease_expires_at`),
     extend: db.prepare(`UPDATE ${HANDOFF_QUEUE_TABLE} SET lease_expires_at = ?, updated_at = ?
       WHERE fingerprint = ? AND status = 'CLAIMED' AND receive_generation = ?
         AND lease_token = ? AND lease_expires_at > ?`),
@@ -121,7 +140,7 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
         routeHandoff(handoff).role, now, now);
       const row = statements.get.get(fingerprint);
       if (!row) throw new Error('HANDOFF_QUEUE_READBACK_STOP');
-      const stored = JSON.parse(row.payload);
+      const stored = checkedStoredHandoff(row);
       // Existing Issue handoff behavior permits a new incidentId for an
       // identical failure; only the first incident is authoritative.
       const comparable = {...handoff, incidentId: stored.incidentId};
@@ -143,9 +162,10 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
       const expiry = timestampAfter(clock, leaseMs);
       const row = statements.claim.get(randomUUID(), owner, expiry, nowIso(clock), fingerprint, fingerprint);
       if (!row) return null;
+      const handoff = checkedStoredHandoff(row);
       return Object.freeze({fingerprint: row.fingerprint, token: row.lease_token,
         generation: row.receive_generation, leaseExpiresAt: row.lease_expires_at,
-        handoff: JSON.parse(row.payload), role: row.role,
+        handoff, role: row.role,
         automaticPcRetries: HANDOFF_QUEUE_RETRIES, operationalWrites: 0});
     },
 
@@ -188,7 +208,7 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
     read(fingerprint) {
       const row = statements.get.get(requireFingerprint(fingerprint));
       if (!row) return null;
-      return Object.freeze({fingerprint: row.fingerprint, handoff: JSON.parse(row.payload),
+      return Object.freeze({fingerprint: row.fingerprint, handoff: checkedStoredHandoff(row),
         role: row.role, status: row.status, generation: row.receive_generation,
         leaseExpiresAt: row.lease_expires_at, routeEvidence: row.route_evidence ? JSON.parse(row.route_evidence) : null});
     },
