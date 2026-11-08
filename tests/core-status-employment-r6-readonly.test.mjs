@@ -24,12 +24,13 @@ test('core-status projects bounded R6 collection and publication evidence',t=>{
  const view=fixture(t,{
   status:'PARTIAL',providerRequests:2,code:'EMPLOYMENT_R6_COLLECTION_FAILED',
   groups:[
-   {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'FAIL',rawBody:'DO_NOT_TRANSFER'},
+   {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'FAIL',failureCode:'HTTP_403',providerRequests:1,rawBody:'DO_NOT_TRANSFER'},
    {groupName:'UNKNOWN_GROUP',status:'SUCCESS'},
   ],
   plannedGroups:[
    {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'DUE',due:true,
     releaseAt:'DO_NOT_TRANSFER'},
+   {groupName:'BLS_JOLTS',status:'CIRCUIT_OPEN',due:false,failureCode:'BLS_REQUEST_NOT_PROCESSED'},
   ],
  },{employmentR6OneYear:{
   status:'PUBLISHED',asOfDate:'2026-11-09',sourceStoredAt:1794149721916,
@@ -39,8 +40,9 @@ test('core-status projects bounded R6 collection and publication evidence',t=>{
  const collection=view.checkpoints['local-collection-last-run.json'].employmentR6;
  assert.deepEqual(collection,{
   status:'PARTIAL',code:'EMPLOYMENT_R6_COLLECTION_FAILED',providerRequests:2,
-  groups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'FAIL'}],
-  plannedGroups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'DUE',due:true}],
+  groups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'FAIL',failureCode:'HTTP_403',providerRequests:1}],
+  plannedGroups:[{groupName:'DOL_UI_WEEKLY_CLAIMS',status:'DUE',due:true},
+   {groupName:'BLS_JOLTS',status:'CIRCUIT_OPEN',failureCode:'BLS_REQUEST_NOT_PROCESSED',due:false}],
  });
  const publication=view.checkpoints['local-writer-last-run.json'].employmentR6;
  assert.deepEqual(publication,{
@@ -63,4 +65,27 @@ test('core-status exposes only R6-scoped Writer failure code',t=>{
  assert.equal(result.status,'DISABLED');
  assert.equal(result.failureCode,'R6_PUBLICATION_MISSING');
  assert(!JSON.stringify(result).includes('OTHER_FAILURE'));
+});
+
+test('core-status excludes malformed R6 diagnostic fields and unknown groups',t=>{
+ const view=fixture(t,{
+  status:'FAIL',providerRequests:100001,
+  groups:[
+   {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'FAIL',failureCode:'HTTP_403 https://token',providerRequests:-1},
+   {groupName:'BLS_JOLTS',status:'PARTIAL',failureCode:'NO_OBSERVATIONS',providerRequests:2},
+   {groupName:'UNAPPROVED',status:'FAIL',failureCode:'SECRET'},
+  ],
+  plannedGroups:[{groupName:'BLS_ECI',status:'CIRCUIT_OPEN',due:false,failureCode:'BLS_REQUEST_NOT_PROCESSED'}],
+ },{});
+ const c=view.checkpoints['local-collection-last-run.json'].employmentR6;
+ assert.equal(c.providerRequests,null);
+ assert.deepEqual(c.groups,[
+  {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'FAIL'},
+  {groupName:'BLS_JOLTS',status:'PARTIAL',failureCode:'NO_OBSERVATIONS',providerRequests:2},
+ ]);
+ assert.deepEqual(c.plannedGroups,[
+  {groupName:'BLS_ECI',status:'CIRCUIT_OPEN',failureCode:'BLS_REQUEST_NOT_PROCESSED',due:false},
+ ]);
+ assert(!JSON.stringify(view).includes('https://token'));
+ assert(!JSON.stringify(view).includes('UNAPPROVED'));
 });
