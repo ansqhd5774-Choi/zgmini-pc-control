@@ -177,6 +177,7 @@ test('original Issue broker accepts opt-in injected queue and reads back GitHub 
   const previousToken = process.env.GITHUB_TOKEN;
   const previousFetch = globalThis.fetch;
   const comments = [];
+  const prComments = [];
   const labels = [];
   const posted = [];
   const repository = 'ansqhd5774-Choi/zgmini-pc-control';
@@ -194,6 +195,14 @@ test('original Issue broker accepts opt-in injected queue and reads back GitHub 
       comments.push({id: 201, user: {login: 'github-actions[bot]'},
         body: JSON.parse(request.body).body});
       data = {id: 201};
+    } else if (uri.pathname.endsWith('/issues/934/comments') && method === 'GET') {
+      data = prComments;
+    } else if (uri.pathname.endsWith('/issues/934/comments') && method === 'POST') {
+      assert.equal(comments.length, 1, 'Issue receipt must be read before PR delivery');
+      posted.push('pr-comment');
+      prComments.push({id: 301, user: {login: 'github-actions[bot]'},
+        body: JSON.parse(request.body).body});
+      data = {id: 301};
     } else if (uri.pathname.endsWith('/issues/2001') && method === 'GET') {
       data = {labels: labels.map((name) => ({name}))};
     } else if (uri.pathname.endsWith('/issues/2001/labels') && method === 'POST') {
@@ -203,13 +212,19 @@ test('original Issue broker accepts opt-in injected queue and reads back GitHub 
   };
   const env = {GITHUB_EVENT_PATH: eventPath, GITHUB_REPOSITORY: repository,
     GITHUB_ACTOR: 'ansqhd5774-Choi', GITHUB_EVENT_NAME: 'issues'};
+  const prWakeBinding = {enabled: true, repository, pullRequestNumber: 934,
+    targetChatId: 'chat-process-owner', targetRole: 'COMMON_PROCESS_OWNER'};
   try {
-    const first = await issueBroker(env, {queue});
+    const first = await issueBroker(env, {queue, prWakeBinding});
     assert.equal(first.state, 'ROUTED_PENDING_AGENT');
     assert.equal(first.commentId, 201);
-    const again = await issueBroker(env, {queue});
+    assert.equal(first.prEvent.commentId, 301);
+    assert.equal(first.prEvent.actualChatResumeVerified, false);
+    const again = await issueBroker(env, {queue, prWakeBinding});
     assert.equal(again.state, 'ROUTED_PENDING_AGENT');
-    assert.deepEqual(posted, ['comment', 'label']);
+    assert.equal(again.prEvent.posted, false);
+    assert.deepEqual(posted, ['comment', 'pr-comment', 'label']);
+    assert.equal(prComments.length, 1);
     assert.equal(queue.stats().ROUTED_PENDING_AGENT, 1);
   } finally {
     globalThis.fetch = previousFetch;
@@ -218,4 +233,9 @@ test('original Issue broker accepts opt-in injected queue and reads back GitHub 
     db.close();
     fs.rmSync(dir, {recursive: true, force: true});
   }
+});
+
+test('original Issue broker rejects PR delivery without an explicitly injected queue', async () => {
+  await assert.rejects(issueBroker({}, {prWakeBinding: {enabled: true}}),
+    /HANDOFF_PR_WAKE_QUEUE_REQUIRED/);
 });
