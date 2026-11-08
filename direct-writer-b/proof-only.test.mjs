@@ -38,7 +38,7 @@ function fixture(){
   const event={repository:{full_name:repo,private:true},
     sender:{login:'ansqhd5774-Choi'},issue:{user:{login:'ansqhd5774-Choi'},
       title:'pc-configured-runtime-proof',number:837,
-      labels:[{name:'pc-runtime-proof-readonly'}],body:JSON.stringify(request)}};
+      labels:[],body:JSON.stringify(request)}};
   const auth=loadProofApproval({event,env,root:'/fixed-control',
     head:()=>env.GITHUB_SHA,blob:(_,p)=>{
       assert.equal(p,`approvals/approved-runtime-b/${sha(raw)}.json`);
@@ -55,7 +55,7 @@ test('proof-only owner Issue and committed approval pins reject injection',()=>{
     e=>{e.sender.login='other';},
     e=>{e.repository.private=false;},
     e=>{e.issue.body=JSON.stringify({...f.request,command:'cmd /c evil'});},
-    e=>{e.issue.labels=[];},
+    e=>{e.issue.title='pc-configured-runtime-other';},
   ]){
     const e=structuredClone(f.event);change(e);
     assert.throws(()=>verifyProofIssue(e,env),/PROOF_/);
@@ -113,7 +113,7 @@ test('proof-only workflow has no install/effect stage',()=>{
   const yml=fs.readFileSync(path.join(dir,
     '../.github/workflows/pc-configured-runtime-proof-once.yml'),'utf8');
   assert.match(yml,/types: \[opened\]/);
-  assert.match(yml,/pc-runtime-proof-readonly/);
+  assert.match(yml,/pc-configured-runtime-proof/);
   assert.match(yml,/--pin/);
   assert.match(yml,/--run/);
   assert.match(yml,/--report/);
