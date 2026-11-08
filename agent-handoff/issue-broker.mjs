@@ -35,7 +35,8 @@ async function listPreviousBodies(currentIssue) {
   for (let page = 1; page <= 5; page++) {
     const rows = await api(`/repos/${REPOSITORY}/issues?state=all&labels=agent-handoff&per_page=100&page=${page}`);
     if (!Array.isArray(rows)) throw new Error('HANDOFF_LEDGER_INVALID');
-    for (const issue of rows) if (issue.number !== currentIssue && typeof issue.body === 'string') bodies.push(issue.body);
+    // The lowest issue number wins even when two opens race concurrently.
+    for (const issue of rows) if (issue.number < currentIssue && typeof issue.body === 'string') bodies.push(issue.body);
     if (rows.length < 100) return bodies;
   }
   throw new Error('HANDOFF_LEDGER_SCAN_LIMIT_STOP');
