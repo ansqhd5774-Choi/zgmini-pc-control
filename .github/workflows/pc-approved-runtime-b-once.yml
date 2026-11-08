@@ -29,9 +29,6 @@ jobs:
         shell: cmd
     env:
       GITHUB_EVENT_ACTION: ${{ github.event.action }}
-      GIT_CONFIG_COUNT: '1'
-      GIT_CONFIG_KEY_0: core.autocrlf
-      GIT_CONFIG_VALUE_0: 'false'
     steps:
       - name: Pin reviewed control source
         id: control
@@ -42,22 +39,25 @@ jobs:
           path: generic-b-control
           fetch-depth: 1
           persist-credentials: false
-      - name: Authorize exact source SHA before candidate checkout
-        id: manifest
-        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\preflight.mjs"'
-      - name: Checkout immutable approved candidate source
-        if: steps.manifest.outcome == 'success'
+      - name: Resolve exact configured source from approved Git blob
+        id: configured
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\configured-source-pin.mjs"'
+      - name: Checkout exact approved configured source
         id: candidate
+        if: steps.configured.outputs.candidateCheckoutRequired == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ansqhd5774-Choi/zgmini
-          ref: ${{ steps.manifest.outputs.candidateSourceSha }}
-          path: generic-b-approved-source
+          ref: ${{ steps.configured.outputs.sourceSha }}
+          path: configured-feature-source
           fetch-depth: 1
           persist-credentials: false
       - name: Apply exact approved runtime B effect
         id: apply
-        if: steps.candidate.outcome == 'success'
+        if: >-
+          success() &&
+          (steps.configured.outputs.candidateCheckoutRequired != 'true' ||
+          steps.candidate.outcome == 'success')
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\run.mjs"'
       - name: Create-only sanitized JSON TXT with readback
         if: always() && steps.control.outcome == 'success'
