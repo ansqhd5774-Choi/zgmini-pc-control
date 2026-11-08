@@ -59,7 +59,7 @@ export function createFixedConfiguredReceiver({
   let approved=null,sourceRoot=null,feature=null,sourceInstall=null;
   let baseline=null,claimHandle=null,claimRequest=null;
   const controlRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-control');
-  const candidateRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-approved-source');
+  const candidateRoot=path.join(env.GITHUB_WORKSPACE??'','configured-feature-source');
   function currentApproval(requestId){
     need(platform==='win32','B_FIXED_WINDOWS_REQUIRED');
     need(typeof env.RUNNER_TEMP==='string'&&path.isAbsolute(env.RUNNER_TEMP),
