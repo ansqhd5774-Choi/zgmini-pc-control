@@ -104,7 +104,9 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         windows.sourceSha === approval.sourceSha &&
         sha64(windows.taskXmlSha256) &&
         sha64(windows.activeRuntimeSha256) &&
-        sha64(windows.compatibilityEvidenceSha256),
+        sha64(windows.compatibilityEvidenceSha256) &&
+        windows.compatibilityDirections===2&&
+        windows.compatibilitySharedLockVerified===true,
       'B_WINDOWS_REPEAT_COMPATIBILITY');
       need(windows.activeRuntimeSha256===
           request.runtimePreimage.activeRuntimeSha256&&
