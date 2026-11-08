@@ -43,6 +43,11 @@ test('new source sha yields a different failure fingerprint', () => {
   const revised = make(); revised.origin.sourceSha = 'b'.repeat(40);
   assert.notEqual(fingerprintHandoff(parseHandoff(json())), fingerprintHandoff(parseHandoff(json(revised))));
 });
+test('normalized contract can be safely parsed again for a result handoff', () => {
+  const item = make(); delete item.failure.evidenceIssueNumber;
+  const once = parseHandoff(json(item));
+  assert.deepEqual(parseHandoff(JSON.stringify(once)), once);
+});
 test('rejects raw error strings and unknown keys', () => {
   const item = make(); item.failure.rawError = 'Authorization: secret';
   assert.throws(() => parseHandoff(json(item)), /UNEXPECTED_FIELD/);
