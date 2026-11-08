@@ -21,6 +21,24 @@ function validBinding(binding, role) {
   return Object.freeze({...binding});
 }
 
+/** Exact bot-owned wake comment for the specified incident and PR mapping. */
+export function expectedPrWakeLines({body, queueIssueNumber, binding}) {
+  const handoff = parseHandoff(typeof body === 'string' ? body : JSON.stringify(body));
+  if (!Number.isSafeInteger(queueIssueNumber) || queueIssueNumber < 1) {
+    throw new Error('CHAT_PR_WAKE_INPUT_INVALID');
+  }
+  const target = validBinding(binding, routeHandoff(handoff).role);
+  const fingerprint = fingerprintHandoff(handoff);
+  return Object.freeze([CHAT_WAKE_MARKER,
+    `incidentId: ${handoff.incidentId}`,
+    `fingerprint: ${fingerprint}`,
+    `queueIssue: ${queueIssueNumber}`,
+    `targetRole: ${target.targetRole}`,
+    `targetChatId: ${target.targetChatId}`,
+    'effect: METADATA_ONLY',
+    'pcRetries: 0']);
+}
+
 function receipt(inventory, binding, expected) {
   // Caller must fully page/read back the actual *target* PR's comments.
   if (!inventory || typeof inventory !== 'object' ||
@@ -51,14 +69,7 @@ export async function recordPrWakeEvent({body, queueIssueNumber, binding,
   }
   const target = validBinding(binding, routeHandoff(handoff).role);
   const fingerprint = fingerprintHandoff(handoff);
-  const lines = [CHAT_WAKE_MARKER,
-    `incidentId: ${handoff.incidentId}`,
-    `fingerprint: ${fingerprint}`,
-    `queueIssue: ${queueIssueNumber}`,
-    `targetRole: ${target.targetRole}`,
-    `targetChatId: ${target.targetChatId}`,
-    'effect: METADATA_ONLY',
-    'pcRetries: 0'];
+  const lines = expectedPrWakeLines({body, queueIssueNumber, binding: target});
   const find = async () => receipt(await readPrComments(target), target, lines);
   let commentId = await find();
   let posted = false;
