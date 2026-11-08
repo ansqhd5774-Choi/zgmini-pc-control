@@ -8,6 +8,7 @@ import {validateRequest} from '../controller/common.mjs';
 import {validatePreimageApproval,readStagedPreimageScope,preimageStageFile,
  stagedPayload,isSafePreimagePath,blockedPayload} from '../controller/preimage-manifest-contract.mjs';
 import {stagePreimageManifest,verifyInstalledStageSource} from '../controller/preimage-manifest-stager.mjs';
+import {executeJob} from '../controller/engine.mjs';
 
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const MANIFEST='approvals/writer-preimage/inflation-candidates-7-r1.json';
@@ -132,4 +133,35 @@ test('a failed stage yields a bounded BLOCKED code, never a default scope',()=>{
   assert.deepEqual(blockedPayload('arbitrary credential error'),
    {status:'BLOCKED',code:'PREIMAGE_STAGE_OUTPUT_STOP'});
  }finally{fs.rmSync(t,{recursive:true,force:true});}
+});
+
+test('engine passes only approved read-only scope in isolated worker input, not credential',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'preimage-engine-'));
+ const dataRoot=path.join(root,'data');
+ const actualPolicy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
+ const secret='integration-secret-never-forward-to-worker';
+ const original=process.env.GITHUB_TOKEN;
+ try{
+  fs.mkdirSync(path.join(dataRoot,'pc-writer'),{recursive:true});
+  fs.writeFileSync(path.join(dataRoot,'pc-writer/config.json'),
+   JSON.stringify({source:SOURCE_SHA}));
+  process.env.GITHUB_TOKEN=secret;
+  const request=scoped();
+  const approvedPreimageScope=validatePreimageApproval(bytes(),{
+   expectedSha256:request.preimageManifestSha256,
+   manifestPath:request.preimageManifestPath});
+  const result=await executeJob(request,{root,policy:actualPolicy,
+   host:{dataRoot,controllerSourceSha:'b'.repeat(40)},seat:1,runId:'800801',
+   queryTask:()=>Buffer.from('fixture task'),
+   retiredTaskEvidence:()=> 'APPROVED_RETIRED_ABSENT',approvedPreimageScope});
+  const input=JSON.parse(fs.readFileSync(path.join(result.workspace,'input.json'),'utf8'));
+  assert.deepEqual(input.context.approvedPreimageScope,approvedPreimageScope);
+  assert.equal(JSON.stringify(input).includes(secret),false);
+  assert.equal(fs.readFileSync(path.join(result.workspace,'RESULT.json'),'utf8').includes(secret),false);
+  assert.equal(result.report.requestId,request.requestId);
+ }finally{
+  if(original===undefined)delete process.env.GITHUB_TOKEN;
+  else process.env.GITHUB_TOKEN=original;
+  fs.rmSync(root,{recursive:true,force:true});
+ }
 });
