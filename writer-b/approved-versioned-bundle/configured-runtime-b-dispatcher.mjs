@@ -41,6 +41,8 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
   return async function dispatch(request) {
     let phase = 'VERIFY';
     let consumed = false;
+    let receiver = null;
+    let outcome;
     try {
       need(plain(request) && Object.keys(request).length===
         TRUSTED_REQUEST_KEYS.length &&
@@ -61,13 +63,14 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
 
       // Adapter is loaded by a fixed import path in the production entry point.
       // Its methods independently read the approval/source/Windows facts.
-      const receiver = await loadFixedReceiver();
+      receiver = await loadFixedReceiver();
       need(plain(receiver) &&
         typeof receiver.verifyApprovedPackage === 'function' &&
         typeof receiver.verifyWindowsCompatibility === 'function' &&
         typeof receiver.loadPinnedPackageRunner === 'function' &&
         typeof receiver.consumeOneShotAuthorization === 'function' &&
-        typeof receiver.verifyInstalledReadback === 'function',
+        typeof receiver.verifyInstalledReadback === 'function' &&
+        typeof receiver.finalizeOneShotAuthorization === 'function',
       'B_FIXED_RECEIVER_CONTRACT');
 
       const approval = await receiver.verifyApprovedPackage(request.requestId);
@@ -156,18 +159,37 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         readback.rollbackRecordVerified === true,
       'B_INSTALLED_READBACK_UNCERTAIN');
 
-      return Object.freeze({schema: SCHEMA, status: 'DONE',
+      outcome = {schema: SCHEMA, status: 'DONE',
         requestId: request.requestId, sourceSha: approval.sourceSha,
         installedVersion: readback.activeRuntimeVersion,
         reservation: receipt.receiptSha256,
-        verified: 'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'});
+        verified: 'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'};
     } catch (error) {
-      return Object.freeze({schema: SCHEMA,
+      outcome = {schema: SCHEMA,
         status: consumed ? 'STATE_UNKNOWN' : 'BLOCKED',
         reason: safeCode(error), phase,
         effectAttempted: consumed,
-        retryAllowed: false});
+        retryAllowed: false};
     }
+    if (consumed) {
+      // The shared Writer B lock must remain owned through readback, then
+      // close with an immutable journal entry even for uncertain outcomes.
+      // The requestId stays consumed; closing the mutex is NOT a retry.
+      try {
+        const closed = await receiver.finalizeOneShotAuthorization({
+          requestId: request.requestId,status: outcome.status,
+          phase,reason: outcome.reason ?? null,
+        });
+        need(plain(closed) && closed.status === 'JOURNALED_AND_UNLOCKED' &&
+          closed.requestId === request.requestId,
+        'B_ONESHOT_FINALIZATION_UNVERIFIED');
+      } catch {
+        return Object.freeze({schema: SCHEMA,status: 'STATE_UNKNOWN',
+          reason: 'B_ONESHOT_FINALIZATION_UNVERIFIED',phase: 'FINALIZE',
+          effectAttempted: true,retryAllowed: false});
+      }
+    }
+    return Object.freeze(outcome);
   };
 }
 
