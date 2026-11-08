@@ -256,18 +256,24 @@ export async function runWindowsCrossVersionProof({approval,current,
   const newRoot=realDirectory(packageRoot);
   need(realDirectory(sourceRoot)&&realDirectory(runnerTemp),
     'B_CROSS_TRUSTED_DIRECTORIES');
-  const [oldRuntime,newRuntime]=await Promise.all([
-    loadVersion(oldRoot,load),loadVersion(newRoot,load)]);
-  const metrics=await proveIsolatedOldNewFixtures({oldRuntime,newRuntime,
-    runnerTemp,makeTemp});
-  const transcript={schema:SCHEMA,sourceSha:approval.sourceSha,
-    oldSourceSha:active.sourceSha,oldVersion:active.version,
-    taskXmlSha256:current.taskXmlSha256,
-    metrics};
-  const evidenceSha256=sha(Buffer.from(JSON.stringify(transcript)));
-  // This true flag is NOT sourced from a JSON file or user Issue. It is
-  // returned only after the current Windows process performed both fixtures.
-  return Object.freeze({trustedRunnerVerified:true,evidenceSha256,
-    oldVersion:current.oldVersion,newSourceSha:approval.sourceSha,
-    taskXmlSha256:current.taskXmlSha256,transcript});
+  const hostFetch=globalThis.fetch;
+  // Guard module initialization too: no old/new import may perform a provider
+  // GET before the isolated mock collector installs its narrower guard.
+  globalThis.fetch=async()=>fail('B_CROSS_IMPORT_NETWORK_FORBIDDEN');
+  try{
+    const [oldRuntime,newRuntime]=await Promise.all([
+      loadVersion(oldRoot,load),loadVersion(newRoot,load)]);
+    const metrics=await proveIsolatedOldNewFixtures({oldRuntime,newRuntime,
+      runnerTemp,makeTemp});
+    const transcript={schema:SCHEMA,sourceSha:approval.sourceSha,
+      oldSourceSha:active.sourceSha,oldVersion:active.version,
+      taskXmlSha256:current.taskXmlSha256,
+      metrics};
+    const evidenceSha256=sha(Buffer.from(JSON.stringify(transcript)));
+    // This true flag is returned only after this Windows process executed
+    // both directions and the isolated Writer lease replay checks.
+    return Object.freeze({trustedRunnerVerified:true,evidenceSha256,
+      oldVersion:current.oldVersion,newSourceSha:approval.sourceSha,
+      taskXmlSha256:current.taskXmlSha256,transcript});
+  }finally{globalThis.fetch=hostFetch;}
 }
