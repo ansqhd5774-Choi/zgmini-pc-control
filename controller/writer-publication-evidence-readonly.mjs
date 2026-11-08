@@ -1,5 +1,5 @@
-// A/light evidence for a fixed ER1 Writer lane. Local output is read using
-// readOnly/query_only SQLite; per-key D1 readback is not in the global ledger.
+// A/light ER1 evidence. Local output is readOnly/query_only SQLite; D1 metadata
+// is from the authenticated Writer's existing local publication ledger.
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
@@ -7,9 +7,10 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
+const SHA64=/^[a-f0-9]{64}$/;
 const SAFE_STATUS=/^[A-Z0-9_]{1,80}$/;
 const MONTH=/^20[0-9]{2}-(0[1-9]|1[0-2])$/;
-const OUT_KEY='market-calendar:earnings-er1-score-2026-11-public';
+const OUT_KEY=/^market-calendar:earnings-er1-score-20[0-9]{2}-(0[1-9]|1[0-2])-public$/;
 const MAX_OUTPUT_BODY=4_000_000;
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const safeTime=s=>typeof s==='string'&&Number.isFinite(Date.parse(s))?
@@ -36,11 +37,12 @@ export function readER1LocalOutput(dataRoot,{fileSystem=fs,
    return {state:'DB_PATH_UNSAFE',sqliteOpened:false};
   db=openDatabase(filename);
   db.exec('PRAGMA query_only=ON');
-  const row=db.prepare("SELECT stored_at,body FROM public_feed_snapshots_v1 WHERE kind='output' AND feed_key=? AND snapshot_key='current' LIMIT 1").get(OUT_KEY);
-  if(!row)return {state:'NOT_FOUND',sqliteOpened:true};
+  const rows=db.prepare("SELECT feed_key,stored_at,body FROM public_feed_snapshots_v1 WHERE kind='output' AND feed_key LIKE 'market-calendar:earnings-er1-score-%-public' AND snapshot_key='current' ORDER BY feed_key DESC LIMIT 24").all();
+  const row=rows.find(item=>OUT_KEY.test(item.feed_key));
+  if(!row)return {state:'NOT_FOUND',key:null,sqliteOpened:true};
   if(typeof row.body!=='string'||Buffer.byteLength(row.body)>MAX_OUTPUT_BODY)
-   return {state:'INVALID_BODY',sqliteOpened:true};
-  return {state:'READ',storedAt:safeStoredAt(row.stored_at),
+   return {state:'INVALID_BODY',key:row.feed_key,sqliteOpened:true};
+  return {state:'READ',key:row.feed_key,storedAt:safeStoredAt(row.stored_at),
    bodySha256:hash(Buffer.from(row.body,'utf8')),sqliteOpened:true};
  }catch(error){return {state:'READ_FAILED',sqliteOpened:!!db,
   errorCode:/^SQLITE_[A-Z_]+$|^ERR_[A-Z_]+$/.test(error?.code??'')?
@@ -62,17 +64,19 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
  const result={status:'STATE_UNKNOWN',code:'ER1_WRITER_EVIDENCE_UNAVAILABLE',
   observedAt:new Date().toISOString(),evidenceLevel:'LOCAL_WRITER_AND_OUTPUT_READONLY',
   writer:null,er1Future:null,ledger:null,
-  output:{key:OUT_KEY,state:'NOT_OBSERVED',storedAt:null,bodySha256:null},
-  d1:{perKeyReadback:'NOT_RECORDED',productionVerified:false},
+  output:{key:null,state:'NOT_OBSERVED',storedAt:null,bodySha256:null},
+  d1:{perKeyReadback:'NOT_RECORDED',matchedToLocal:false,
+   productionVerified:false,publicApiUiVerified:false,
+   verificationScope:'AT_WRITER_PUBLISH_TIME'},
   localOutputVerified:false,globalLedgerVerified:false,
   providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return result;
  const output=readOutput(dataRoot,{fileSystem});
  result.sqliteOpened=output.sqliteOpened===true;
- result.output={key:OUT_KEY,state:output.state,
+ result.output={key:OUT_KEY.test(output.key??'')?output.key:null,state:output.state,
   storedAt:output.storedAt??null,bodySha256:output.bodySha256??null};
  result.localOutputVerified=output.state==='READ'&&
-  /^[a-f0-9]{64}$/.test(output.bodySha256??'')&&output.storedAt!==null;
+  SHA64.test(output.bodySha256??'')&&output.storedAt!==null;
  const writer=readLedger(dataRoot,'local-writer-last-run.json',{fileSystem});
  const ledger=readLedger(dataRoot,'local-publication-ledger.json',{fileSystem});
  if(writer.state!=='READY')return {...result,writer:{state:writer.state}};
@@ -84,7 +88,8 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
    scoreableIssuers:safeCount(x.scoreableIssuers)}));
  const failed=(Array.isArray(w.failures)?w.failures:[])
   .filter(x=>x?.id==='market-calendar-er1-future'||
-   x?.id===`feed:${OUT_KEY}`).slice(0,3).map(x=>({stage:x.id,reason:safeStatus(x.reason)}));
+   (result.output.key&&x?.id===`feed:${result.output.key}`)).slice(0,3)
+  .map(x=>({stage:x.id,reason:safeStatus(x.reason)}));
  result.writer={at:safeTime(w.at),source:SHA40.test(w.source??'')?w.source:null,
   mode:w.mode==='PUBLISH'?'PUBLISH':w.mode==='DRY_RUN'?'DRY_RUN':null,
   status:safeStatus(w.status)};
@@ -97,7 +102,38 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
   // Global ledger success is not evidence for this specific output key.
   result.globalLedgerVerified=Boolean(result.writer.mode==='PUBLISH'&&
    l.source===result.writer.source&&l.status==='VERIFIED');
+  const readback=(Array.isArray(l.er1FeedReadbacks)?l.er1FeedReadbacks:[])
+   .slice(0,24).find(x=>x&&x.key===result.output.key);
+  if(readback&&OUT_KEY.test(readback.key)){
+   const status=safeStatus(readback.status);
+   const observedAt=safeTime(readback.observedAt);
+   const d1Sha=SHA64.test(readback.d1BodySha256??'')?
+    readback.d1BodySha256:null;
+   const d1StoredAt=safeStoredAt(readback.d1StoredAt);
+   const localSame=result.localOutputVerified&&
+    readback.localStoredAt===result.output.storedAt&&
+    readback.localBodySha256===result.output.bodySha256;
+   const ledgerAt=safeEpoch(l.at);
+   const writerAt=result.writer.at;
+   const matchingRun=Boolean(result.writer.mode==='PUBLISH'&&
+    ['VERIFIED','VERIFIED_WITH_GAPS'].includes(result.writer.status)&&
+    l.source===result.writer.source&&['VERIFIED','PARTIAL'].includes(l.status)&&
+    writerAt&&ledgerAt&&
+    Date.parse(ledgerAt)>=Date.parse(writerAt)&&
+    observedAt&&Date.parse(observedAt)>=Date.parse(writerAt)&&
+    Date.parse(observedAt)<=Date.parse(ledgerAt));
+   const matched=Boolean(localSame&&status==='MATCHED'&&observedAt&&
+    d1StoredAt===result.output.storedAt&&d1Sha===result.output.bodySha256&&
+    matchingRun);
+   result.d1={perKeyReadback:matched?'VERIFIED':status??'INVALID_RECORD',
+    matchedToLocal:matched,productionVerified:false,publicApiUiVerified:false,
+    verificationScope:'AT_WRITER_PUBLISH_TIME',
+    evidenceState:matched?'VERIFIED':status==='MATCHED'?'STALE':'UNMATCHED',
+    observedAt,d1StoredAt,d1BodySha256:d1Sha,
+   };
+  }
  }else result.ledger={state:ledger.state};
  result.status='PASS';result.code='ER1_WRITER_METADATA_READONLY';
  return result;
 }
+
