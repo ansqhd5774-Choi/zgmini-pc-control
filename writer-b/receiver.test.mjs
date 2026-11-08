@@ -386,3 +386,63 @@ test('truncated rename or copy porcelain -z is a safe format stop',()=>{
    statusBytes:Buffer.from(bad),manifest:x.manifest}),
    {code:'WRITER_B_DIRTY_PORCELAIN_FORMAT_STOP'});
 });
+
+test('import preflight diagnosis survives safe JSON/TXT 2/2 without secret fields',async()=>{
+ const x=fixture(),created=new Map();let comment='';
+ const diagnostic={sourceKind:'APPROVED_AFTER',
+  sourcePath:'scripts/pc-writer/run-local.mjs',
+  dependencyPath:'lib/market-score/employment-r6-formula.mjs',
+  reason:'NOT_FOUND',absolutePath:'E:\\\\secret\\\\config.json',
+  token:'do-not-publish'};
+ const raw={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
+  code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',diagnostic};
+ const safe=sanitizeWriterBResult(raw,RID,'123456');
+ assert.deepEqual(safe.diagnostic,{
+  sourceKind:diagnostic.sourceKind,sourcePath:diagnostic.sourcePath,
+  dependencyPath:diagnostic.dependencyPath,reason:diagnostic.reason});
+ assert.equal(JSON.stringify(safe).includes('do-not-publish'),false);
+ const apiFetch=async(url,init)=>{
+  if(init.method==='PUT'){
+   created.set(url,Buffer.from(JSON.parse(init.body).content,'base64').toString('utf8'));
+   return {status:201};
+  }
+  if(init.method==='GET')return {status:200,json:async()=>({encoding:'base64',
+   content:Buffer.from(created.get(url.replace('?ref=main',''))??'').toString('base64')})};
+  if(init.method==='POST'){
+   comment=JSON.parse(init.body).body;return {status:201};
+  }
+ };
+ const result=await uploadWriterBReport({event:x.event,env:x.env,
+  rawResult:JSON.stringify(raw),apiFetch});
+ assert.equal(result.verified,2);
+ assert.equal(result.deliveryStatus,'RESULT_PAIR_READBACK_VERIFIED');
+ const json=[...created].find(([url])=>url.endsWith('.json'))?.[1];
+ const txt=[...created].find(([url])=>url.endsWith('.txt'))?.[1];
+ assert.deepEqual(JSON.parse(json).diagnostic,safe.diagnostic);
+ assert.ok(txt.includes('IMPORT_DEPENDENCY_PATH=lib/market-score/employment-r6-formula.mjs'));
+ assert.ok(txt.includes('IMPORT_REASON=NOT_FOUND'));
+ for(const output of [json,txt,comment]){
+  assert.equal(output.includes('do-not-publish'),false);
+  assert.equal(output.includes('secret'),false);
+ }
+});
+
+test('reporter drops malformed, escaped, mismatched or irrelevant import diagnostics',()=>{
+ const base={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
+  code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
+  diagnostic:{sourceKind:'APPROVED_AFTER',sourcePath:'lib/source.mjs',
+   dependencyPath:'lib/needed.mjs',reason:'READ_ERROR'}};
+ const bad=[
+  {...base,diagnostic:{...base.diagnostic,sourcePath:'../escape.txt'}},
+  {...base,diagnostic:{...base.diagnostic,dependencyPath:'E:\\\\secret\\\\foo.mjs'}},
+  {...base,diagnostic:{...base.diagnostic,reason:'TOKEN=abc'}},
+  {...base,requestId:'another-request'},
+  {...base,status:'WRITER_B_INSTALLED_VERIFIED'},
+  {...base,code:'WRITER_B_CANDIDATE_HASH_STOP'},
+ ];
+ for(const candidate of bad){
+  const sanitized=sanitizeWriterBResult(candidate,RID,'123456');
+  assert.equal(Object.hasOwn(sanitized,'diagnostic'),false);
+ }
+ assert.equal(sanitizeWriterBResult(base,RID,'123456').diagnostic.reason,'READ_ERROR');
+});
