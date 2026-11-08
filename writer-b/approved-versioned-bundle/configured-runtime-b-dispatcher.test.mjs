@@ -88,11 +88,12 @@ const configured = receiver =>
 const approvedPin = () => ({...request,
   runtimePreimage:{...request.runtimePreimage}});
 
-test('production default has no installed native bridge: no effect',async()=>{
+test('production default blocks before operational effect without Windows proof',async()=>{
   const result = await dispatchConfiguredRuntimeB(request);
   assert.equal(result.schema,SCHEMA);
   assert.equal(result.status,'BLOCKED');
-  assert.equal(result.reason,'B_FIXED_NATIVE_RECEIVER_NOT_INSTALLED');
+  assert.equal(result.reason,process.platform==='win32'?
+    'B_RECEIVER_UNAVAILABLE_OR_FAILED':'B_FIXED_WINDOWS_REQUIRED');
   assert.equal(result.effectAttempted,false);
   assert.equal(result.retryAllowed,false);
 });
