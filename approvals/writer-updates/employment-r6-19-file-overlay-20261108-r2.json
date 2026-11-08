@@ -1,0 +1,159 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/employment-1y-reader-r1",
+  "candidateSourceSha": "10ec532f349f12ecdffa86b031514fae7f3fbd0a",
+  "baseHead": "3f6fc4a847e2e048ca499d4583adc6b72003c3b8",
+  "baseConfigSourceSha": "3f6fc4a847e2e048ca499d4583adc6b72003c3b8",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r4-bed-provider.mjs",
+      "change": "M",
+      "beforeSha256": "6007328a9e88d43d3366706c7d6fb6e152cab6fdff1a9d9536faa1f9083e816c",
+      "afterSha256": "5508ca3e0512564a2bfae647aea72da6ff4a757755a1a8fc99dc5f0a1efd7ec0"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-store.mjs",
+      "change": "M",
+      "beforeSha256": "0dd025ff7fd97d39af0acfb679caf9913ee12c6b3c5dd2dd416afd1e1a5f196d",
+      "afterSha256": "9e6f50ebc672c135eb04445ba9bad383fae161f7dbeece47793e385f3376874c"
+    },
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "6f9e71d681d913b94c9918d8101f2eee086cd6c0f81f20c26a8376e74f0989e5",
+      "afterSha256": "9e1c0168eb6f10e9d88f678ca8d8131b2ecd1e5ee0d9c741361fc6dfea99b10f"
+    },
+    {
+      "path": "lib/market-score/employment-r6-contract.mjs",
+      "change": "M",
+      "beforeSha256": "a52553d7732afb4cb0e35cf335bdfd03d459d41a65dfb12e5afe8a74de548c26",
+      "afterSha256": "bb140adbf45bc445bcd84d16aa2893fda943d4b3f2b388927d9f8268ca1d7076"
+    },
+    {
+      "path": "lib/market-score/employment-r6-feature-engine.mjs",
+      "change": "M",
+      "beforeSha256": "4c551925a3f6e360f1890362a5deff4b5e3192aeec0a2ab903833166b86476df",
+      "afterSha256": "8bf2f799c540fbaa23e14aafe99e1842c6865975170960b1fa3a61d5e95109d5"
+    },
+    {
+      "path": "lib/market-score/employment-r6-observation-reader.mjs",
+      "change": "M",
+      "beforeSha256": "8b92098f0acdd590964857dfec471c3b695c668e92bfab0c14e1f7c1e17958d5",
+      "afterSha256": "81d9341a625d75bb96816657dbb26cc906a6afaaa49482d1c8cef8eb72291b88"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "change": "M",
+      "beforeSha256": "71d4ac97168fb8b8e775d92597b304f5aa27722c2e534ca8fa869f4fd6e14e3b",
+      "afterSha256": "01773f71649c346da59129f9b4bb6f3a742e02ee4f0f5404076927904bba7712"
+    },
+    {
+      "path": "lib/market-score/employment-r6-scheduler.mjs",
+      "change": "M",
+      "beforeSha256": "853cabe4d6ff167da90606073dd9125686a02516c19806602f0062ee360cc7ec",
+      "afterSha256": "b128a2aed096cd7a87140152999317c0a28e14f9341ebd2aa3bdca169c94c3bf"
+    },
+    {
+      "path": "lib/market-score/employment-r6-store.mjs",
+      "change": "M",
+      "beforeSha256": "d59dc6f1c63bbe1c1802a84f7523a49235218ab096b4fd2cdd9fd836f4951675",
+      "afterSha256": "a6c2938bae56147ab4bf3fcb9ba3046355360a538e58f6d34de021ea1d586851"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "f2e95b7b4bf7fbf164ff5b4de8dfb253ebcffdf0739e9917c44b4536ba6576d1",
+      "afterSha256": "9fd530866185d4499db35513207af0888a4f49165e766e5d75a133785ad7ce24"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "9dc27a1501191018703bbd2fae52d5d7ab230b5ebcced9933617e3c2d227e3c7",
+      "afterSha256": "2d1b5a5d772117da4ee2c79e2e00c66b5b8fee1cfd519dba651eba29a65bc658"
+    },
+    {
+      "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "aa6a9f429f64802251b88a839f56154f43d73864f8d11df569ef56210fee69a4"
+    },
+    {
+      "path": "lib/market-score/employment-r6-window.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "dc41a6780f05d28c31ee52b77b2f688df27216d109ae4c7dc1aa17a9da07decd"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "75cbf8fab32509b9b9b90f6ad6d9fd17187ede3836070fad8387ba331b09e6dd"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5363c5aba19e3ef67d01307f46b3283ce2f38dd9d3673cc73331e980850c38ea"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "e4b78dbd756743316beba0655a3fe89f45d7c93fb8036572bff5d5431d8e4a07"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "1b12d0bfc00ae5bae4b3d91c0f3552abce5d93bf5c01337784fe464d2d30b741"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4b73aa44e1f104d10bfcc4ace3a07127f0d27b14cadf4c9b7f49b2c664d506e8"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "b0eaf71afbcebaa89519ebf246aa74fe173561bef44d4314021f5880ae43e41f"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "core-vbs-wrapper",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
