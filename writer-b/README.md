@@ -7,6 +7,8 @@
 
 - `WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP`은 기존 **설치 전 안전 중단**이며 자동 복구·재실행 요청이 아니다. 실제 PC 파일 부재뿐 아니라 심볼릭 링크·파일 범위·크기·읽기 검증 실패일 수 있으므로 경로 없이 원인을 추측하지 않는다.
 - 검증된 결과 JSON의 선택적 `diagnostic`은 `sourceKind=APPROVED_AFTER`, `sourcePath`, `dependencyPath`, `reason`만 허용하며, TXT에는 `IMPORT_SOURCE_KIND`, `IMPORT_SOURCE_PATH`, `IMPORT_DEPENDENCY_PATH`, `IMPORT_REASON`으로 제공한다. 경로는 승인된 소스 루트 내부 **상대경로**만 출력한다.
+- 같은 승인 AFTER의 미확인 상대 import가 둘 이상이면 첫 `diagnostic`은 유지한 채, 안전 검증된 `diagnostics[]` 최대 8건과 `diagnosticsOmitted`를 **동일 preflight STOP의 JSON/TXT**에 함께 기록한다. 9건째 이후는 생략 개수만 보존하며 원자료·절대경로·임의 Error.message는 보고하지 않는다. 여러 의존성 때문에 정상 B 요청을 한 건씩 반복 소비하지 않도록 하는 관측 개선이다. 안전 STOP·기존 1건 결과·requestId 단회 계약은 변하지 않는다.
+- 위 Writer B 검사는 새 `pc-writer-source-install` Issue의 GitHub event SHA로 checkout한 **그 Run의 제어 repo 소스**를 사용한다. Controller 업데이트 [#880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/880)은 `controller/` 8파일만 실PC 설치한 결과이므로 Writer B의 신규 진단 코드가 실제 Windows B에서 실행됐다는 증거로 혼용하지 않는다.
 - `reason`은 `NOT_FOUND`, `SYMLINK`, `NOT_FILE`, `SIZE`, `OUTSIDE_ROOT`, `READ_ERROR`, `UNAVAILABLE_OR_UNSAFE` 중 하나다. `UNAVAILABLE_OR_UNSAFE`는 미확정 사유이지 파일 부재 판정이 아니다.
 - 해당 결과를 받은 기능 원담당이 대상 import의 승인 범위·실제 설치 원본을 확인하고 필요한 범위만 조정한다. **미승인 의존 파일 자동 복제·검사 우회·소비된 Issue 재실행을 금지**한다. 소스 PR·로컬 테스트만으로 실제 Windows 진단 인계 완료를 선언하지 않는다.
 

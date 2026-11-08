@@ -198,6 +198,37 @@ test('missing relative runtime import preflight refuses before claim and Task ch
  assert.deepEqual(state.steps,['lock','preimage','candidate','release']);
 });
 
+test('multiple missing imports remain one fail-closed preclaim result',async()=>{
+ const {io,state}=mockIO();
+ const first={sourceKind:'APPROVED_AFTER',
+  sourcePath:'worker/employment-r6.mjs',
+  dependencyPath:'lib/employment-r6-formula.mjs',reason:'NOT_FOUND'};
+ const second={sourceKind:'APPROVED_AFTER',
+  sourcePath:'worker/employment-r6.mjs',
+  dependencyPath:'lib/employment-r4-shadow-contract.mjs',reason:'READ_ERROR'};
+ io.readCandidate=async()=>{
+  state.steps.push('candidate');
+  throw Object.assign(new Error('untrusted private details'),{
+   code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
+   diagnostic:{...first,secret:'NEVER_FORWARD'},
+   diagnostics:[first,{...second,secret:'NEVER_FORWARD'}],
+   diagnosticsOmitted:0,
+  });
+ };
+ const result=await performWriterBInstall(auth(),io);
+ assert.equal(result.status,'WRITER_B_PREFLIGHT_STOP');
+ assert.equal(result.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ assert.deepEqual(result.diagnostic,first);
+ assert.deepEqual(result.diagnostics,[first,second]);
+ assert.equal(result.diagnosticsOmitted,0);
+ assert.equal(JSON.stringify(result).includes('NEVER_FORWARD'),false);
+ assert.deepEqual(state.steps,['lock','preimage','candidate','release']);
+ assert.equal(state.claimed,false);
+ assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.config,manifest().baseHead);
+ assert.equal(state.coreEnabled,true);
+});
+
 test('wrong candidate hash refuses before claim without touching PC source',async()=>{
  const {io,state}=mockIO({candidateWrong:true});
  const result=await performWriterBInstall(auth(),io);
