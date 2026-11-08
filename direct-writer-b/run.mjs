@@ -179,6 +179,13 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
     // operator can distinguish proof-pending from a failed Windows install.
     const configuredReason=/^B_[A-Z0-9_]{3,80}$/.test(outcome?.reason??'')?
       'DIRECT_'+outcome.reason:null;
+    const compatibilityProof=/^[a-f0-9]{64}$/.test(
+      outcome?.compatibilityEvidenceSha256??'')&&
+      outcome.compatibilityDirections===2&&
+      outcome.compatibilitySharedLockVerified===true?{
+        compatibilityEvidenceSha256:outcome.compatibilityEvidenceSha256,
+        compatibilityDirections:2,
+        compatibilitySharedLockVerified:true}:{};
     return {status:verified?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
       outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
       'DIRECT_B_EFFECT_BLOCKED',
@@ -187,7 +194,8 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
           'DIRECT_B_STATE_UNKNOWN':'DIRECT_B_EFFECT_STOP'),
       requestId:auth.request.requestId,manifestSha256:sha(auth.raw),
       controlSha:auth.controlSha,sourceSha:auth.manifest.sourceSha,
-      mode:auth.mode,reportStatus:'INCOMPLETE',operationSucceeded:verified};
+      mode:auth.mode,reportStatus:'INCOMPLETE',operationSucceeded:verified,
+      ...compatibilityProof};
   }
   // No default OS adapter: using an uninstalled B source must not grant effects.
   need(typeof makeApprovedNativeAdapter==='function',
