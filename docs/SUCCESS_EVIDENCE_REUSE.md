@@ -27,8 +27,11 @@
 | 유형과 단계 | 승인·실제 결과 파일 | Windows 원본 | 재사용할 것 / 유효 범위 |
 | --- | --- | --- | --- |
 | Writer 운영 파일 설치, PC_INSTALL_PASS | [캘린더 3파일 승인](../approvals/writer-updates/market-calendar-er1-company-names-writer-b-20261108.json) · [실제 결과 JSON](../results/writer-b-source-install-45d5b569-18fc-4abc-b3f9-3e73ca981c02.json) | [#871](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/871) | 공통 Writer B의 승인·원본 CAS·설치·보호와 결과 연결. 해당 캘린더 3파일만 설치 검증; 게시 성공과 별개 |
-| 설치 전 원본 해시, A_READONLY_PASS | [결과 JSON](../results/42435780811-1-seat-5.json) · [TXT](../results/42435780811-1-seat-5.txt) | [#863](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/863), Run 42435780811 | 정확한 sourceRoot·before SHA·A/M 상태·두 설정 상태 확인. **현재 고정 22파일만 지원**, `runtimeSourceVerified:false` |
+| 설치 전 원본 해시, A_READONLY_PASS | [결과 JSON](../results/42435780811-1-seat-5.json) · [TXT](../results/42435780811-1-seat-5.txt) | [#863](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/863), Run 42435780811 | 해당 실행의 고정 22파일 sourceRoot·before SHA·A/M·두 설정 확인. 이후 신규 승인 범위는 #882 사례 참고. `runtimeSourceVerified:false` |
 | 원자적 결과 보고, WINDOWS_FIXTURE_PASS | [결과 JSON](../results/writer-config-b-proof-868-42436432888.json) · [TXT](../results/writer-config-b-proof-868-42436432888.txt) | [#868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/868), Run 42436432888 | 동일 실행의 결과쌍 2/2 재조회·부분 실패 검증. **운영 config ON/실제 R6 설치 증거 아님** |
+| 승인된 공용 Controller 누적 B 설치, WINDOWS_INSTALL_PASS | [8파일+infra 2파일 승인](../approvals/controller-updates/c6a3d15beae9139e66629fb5e442202434b11481.json) · [결과 JSON](../results/maintenance-pc-update-4d77f839-b39b-47df-bdd7-d0b7d14d6597.json) · [TXT](../results/maintenance-pc-update-4d77f839-b39b-47df-bdd7-d0b7d14d6597.txt) | [#880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/880), 목표/설치 SHA `c6a3d15…` | 승인 manifest 원문 SHA `c43cbfa…`, Controller 8·Workflow 2의 누적 해시·복구 원본, 실PC `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, 보호 상태 불변·Workflow 활성. R6 기능 설치/D1 게시 성공 아님 |
+| 승인 manifest 범용 원본 조회, WINDOWS_A_PASS | [범위 승인](../approvals/writer-preimage/inflation-candidates-7-r1.json) · [결과 JSON](../results/42441568644-1-seat-3.json) · [TXT](../results/42441568644-1-seat-3.txt) | [#882](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/882), Run 42441568644 | 기존 `writer-install-preimage-readonly`의 승인 manifest 7경로 조회: 신규 5파일 ABSENT, 공유 2파일 PRESENT/원본 SHA 확인, `HEAD=config.source=3f6fc4a…`, 운영 쓰기 0·보호 상태 유지. Core 실행 중 source 검증은 별개 |
+| 월별 게시 증거 조회, WINDOWS_A_PASS / D1_PENDING | [결과 JSON](../results/42441568196-1-seat-6.json) · [TXT](../results/42441568196-1-seat-6.txt) | [#883](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/883), Run 42441568196 | 최신 ER1 월별 로컬 결과·Writer 원장 PASS, 2026-11 key SHA `c0852ed…`; **D1 개별 원장은 `NOT_RECORDED`**. 신규 `run-local.mjs`·`independent-publication.mjs`의 동일 승인 B 설치와 이후 정상 게시까지 D1 동등성 미확정 |
 
 관련 실패 회귀 예: [#860](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/860)의 JSON/TXT 1/2, [#874](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/874)의 누락 import 경로 미표시. 성공 사례가 이 문제들까지 자동 해결했다고 간주하지 않는다.
 
@@ -49,4 +52,4 @@
 - 장애를 발견하면 원래 성공 증거와 **다른 구현체에도 남은 동일한 결함**을 함께 조사한다. 근본 원인을 공통 코드/생성기/계약에 수정하고 관련 실패 회귀 테스트 및 필요한 Windows 증거를 연결한다.
 - 모든 성공을 무조건 기록하기 위한 별도 예약·Runner·신규 Gate는 만들지 않는다. 원래 결과 회수 경로를 활용하고, 기존 정상 기능·다른 독립 작업을 중단하지 않는다.
 
-**완료 판정:** 이 파일·시작 지침의 배포는 문서의 재사용 계약을 마련한 것일 뿐, 개별 원본 조회 범용화·D1 증거 자동화·Writer B 의존성 진단·공유 Reporter 코드 개선 또는 PC 설치 완료를 의미하지 않는다.
+**완료 판정:** #880의 Controller 누적 B 설치와 #882·#883의 A급 읽기 동작은 실제 Windows 원본으로 확인됐다. 하지만 #883의 D1 개별 해시 일치와 #874의 실제 누락 의존성 경로·R6 19파일 설치는 아직 미확정이다. 각 기능의 게시·화면·예약 자동 갱신은 원담당의 별도 증거가 필요하다. 이 색인의 존재만으로 다른 GPT 대화나 PC 실행기가 자동으로 학습·변경되지 않는다.
