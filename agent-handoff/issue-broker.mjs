@@ -68,7 +68,24 @@ async function listCompleteIssueComments(issueNumber) {
   throw new Error('HANDOFF_QUEUE_COMMENT_SCAN_LIMIT_STOP');
 }
 
-export async function main(env = process.env, {queue = null} = {}) {
+async function listCompletePrComments(target) {
+  const comments = [];
+  for (let page = 1; page <= 4; page++) {
+    const rows = await api(`/repos/${REPOSITORY}/issues/${target.pullRequestNumber}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) throw new Error('HANDOFF_PR_COMMENT_LEDGER_INVALID');
+    comments.push(...rows);
+    if (rows.length < 100) return {repository: REPOSITORY,
+      pullRequestNumber: target.pullRequestNumber, complete: true, comments};
+  }
+  throw new Error('HANDOFF_PR_COMMENT_SCAN_LIMIT_STOP');
+}
+
+export async function main(env = process.env, {queue = null, prWakeBinding = null} = {}) {
+  // The normal CLI still has neither a database nor an event target.  An
+  // explicit PR binding cannot silently fall back to the GitHub-only path.
+  if (prWakeBinding !== null && queue === null) {
+    throw new Error('HANDOFF_PR_WAKE_QUEUE_REQUIRED');
+  }
   if (!env.GITHUB_EVENT_PATH) throw new Error('GITHUB_EVENT_PATH_REQUIRED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   assertEvent(event, env);
@@ -79,7 +96,12 @@ export async function main(env = process.env, {queue = null} = {}) {
       issueNumber: event.issue.number,
       readComments: listCompleteIssueComments,
       postComment: async (issueNumber, body) => api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments`,
-        {method: 'POST', body: {body}})});
+        {method: 'POST', body: {body}}),
+      prWakeBinding,
+      readPrComments: prWakeBinding === null ? undefined : listCompletePrComments,
+      postPrComment: prWakeBinding === null ? undefined :
+        async (target, body) => api(`/repos/${REPOSITORY}/issues/${target.pullRequestNumber}/comments`,
+          {method: 'POST', body: {body}})});
     if (outcome.commentId) {
       const current = await api(`/repos/${REPOSITORY}/issues/${event.issue.number}`);
       if (!current.labels?.some((label) => label.name === 'handoff-agent-pending')) {
