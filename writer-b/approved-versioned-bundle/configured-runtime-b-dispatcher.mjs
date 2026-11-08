@@ -46,6 +46,7 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
     let completed = false;
     let receiver = null;
     let result = null;
+    let compatibilityEvidence = null;
     try {
       need(plain(request) && Object.keys(request).length===
         TRUSTED_REQUEST_KEYS.length &&
@@ -111,6 +112,12 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         windows.scheduledCmdSha256===request.runtimePreimage.scheduledCmdSha256&&
         windows.scheduledVbsSha256===request.runtimePreimage.scheduledVbsSha256,
       'B_WINDOWS_APPROVED_PREIMAGE_DRIFT');
+      compatibilityEvidence = {
+        compatibilityEvidenceSha256: windows.compatibilityEvidenceSha256,
+        compatibilityDirections: windows.compatibilityDirections===2?2:0,
+        compatibilitySharedLockVerified:
+          windows.compatibilitySharedLockVerified===true,
+      };
 
       const loaded = await receiver.loadPinnedPackageRunner(approval);
       need(plain(loaded) && loaded.sourceSha === approval.sourceSha &&
@@ -176,12 +183,14 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         requestId: request.requestId, sourceSha: approval.sourceSha,
         installedVersion: readback.activeRuntimeVersion,
         reservation: receipt.receiptSha256,
+        ...compatibilityEvidence,
         verified: 'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'};
     } catch (error) {
       result = {schema: SCHEMA,
         status: consumed || (leaseStarted && !leaseOwned) ?
           'STATE_UNKNOWN' : 'BLOCKED',
         reason: safeCode(error), phase,
+        ...(compatibilityEvidence??{}),
         effectAttempted: consumed,retryAllowed: false};
     } finally {
       if(leaseOwned){
