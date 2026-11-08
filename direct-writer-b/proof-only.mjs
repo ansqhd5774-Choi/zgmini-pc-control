@@ -16,7 +16,6 @@ export const PROOF_SCHEMA='ZGMINI_CONFIGURED_RUNTIME_WINDOWS_PROOF_RESULT_V1';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const USER='ansqhd5774-Choi';
 const TITLE='pc-configured-runtime-proof';
-const LABEL='pc-runtime-proof-readonly';
 const REQUEST_SCHEMA='ZGMINI_CONFIGURED_RUNTIME_PROOF_REQUEST_V1';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/;
@@ -67,7 +66,6 @@ export function verifyProofIssue(event,env){
     event.repository.private===true&&
     event.sender?.login===USER&&event.issue?.user?.login===USER&&
     !event.issue.pull_request&&event.issue.title===TITLE&&
-    event.issue.labels?.some(x=>x.name===LABEL)&&
     Number.isSafeInteger(event.issue.number)&&event.issue.number>0,
   'PROOF_OWNER_ISSUE_DENIED');
   let request;
