@@ -17,6 +17,9 @@ const LEDGER_NAMES=[
  'R183_PUBLICATION_RETRY_LAST_RUN.json',
 ];
 const TASK='ZGMINI-PC-GetMarketHistory-ETF';
+// A one-file, one-version source inspection approved for the R181 STOP
+// investigation. Unexpected PC source bytes are never inspected or echoed.
+const APPROVED_R181_SHA='be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62';
 const STAMP_FIELDS=['startedAt','finishedAt','sourceStoredAt','publishedAt',
  'updatedAt','lastRunAt'];
 const DATE_FIELDS=['observationDate','latestCommonDate','confirmedThrough',
@@ -141,6 +144,46 @@ function safeReasonSignals(value){
   signals:signals.sort()};
 }
 
+function safeR181HttpCode(raw){
+ const value=raw?.reason;
+ if(typeof value!=='string'||value.length>512||SENSITIVE_REASON.test(value))return null;
+ // Extract an HTTP status only when explicitly attached to the approved
+ // R181/SPY/HTTP reason prefix; never expose a number from arbitrary prose.
+ const m=value.match(/(?:^|[^A-Z0-9])R181[_ -]SPY[_ -]HTTP[_ -]([1-5]\d\d)(?=$|[^0-9])/i);
+ if(!m)return null;
+ const status=Number(m[1]);
+ return {source:'R181_SPY_HTTP',status,group:status>=500?'SERVER_5XX':
+  status>=400?'CLIENT_4XX':status>=300?'REDIRECT_3XX':
+   status>=200?'SUCCESS_2XX':'INFORMATIONAL_1XX'};
+}
+
+// Only line positions and fixed syntactic categories are returned; source
+// text, identifiers, string literals, URLs, arguments, paths and comments
+// are never copied from this private PC file to the result.
+export function safeR181SourceStructure(source){
+ if(typeof source!=='string'||Buffer.byteLength(source,'utf8')>8192||source.includes('\0'))
+  return {status:'UNREADABLE_SOURCE',sites:[],truncated:false};
+ const sites=[];
+ const lines=source.split(/\r?\n/);
+ let truncated=false;
+ for(let i=0;i<lines.length;i++){
+  const line=lines[i].trim();
+  if(!line||line.startsWith('//')||line.startsWith('*'))continue;
+  const kinds=[];
+  if(/\b(?:reason|stopReason|stop_reason)\s*[:=]/.test(line))kinds.push('REASON_ASSIGNMENT');
+  if(/\b(?:statusCode|status|httpStatus|responseStatus)\b/.test(line)&&
+     /\b(?:res|response|http|fetch|status|code)\b/i.test(line))kinds.push('HTTP_STATUS_CHECK');
+  if(/\bcatch\s*\(/.test(line))kinds.push('CATCH_CLAUSE');
+  if(/\bthrow\b/.test(line))kinds.push('THROW_STATEMENT');
+  if(/(?:R181[_-]SPY[_-]HTTP|SPY[_-]HTTP)/.test(line))
+   kinds.push('R181_SPY_HTTP_MARKER');
+  if(!kinds.length)continue;
+  if(sites.length>=16){truncated=true;break;}
+  sites.push({line:i+1,kinds});
+ }
+ return {status:'STRUCTURE_ONLY',sites,truncated};
+}
+
 function valueType(value){
  if(value===null)return 'null';
  if(Array.isArray(value))return 'array';
@@ -200,8 +243,16 @@ function sourceState(base,name){
  if(!entry)return {present:false};
  // A source fingerprint is not executable approval. Never return source text.
  if(entry.bytes>8*1024*1024)reject('L7_SOURCE_OVERSIZED');
- return {present:true,sha256:sha(fs.readFileSync(entry.target)),
-  bytes:entry.bytes,modifiedAt:entry.modifiedAt};
+ const bytes=fs.readFileSync(entry.target);
+ const digest=sha(bytes);
+ const result={present:true,sha256:digest,bytes:entry.bytes,
+  modifiedAt:entry.modifiedAt};
+ if(name===SOURCE_NAMES[0]){
+  result.safeSourceInspection=digest===APPROVED_R181_SHA&&bytes.length<=8192?
+   safeR181SourceStructure(bytes.toString('utf8')):
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],truncated:false};
+ }
+ return result;
 }
 
 function ledgerState(base,name){
@@ -219,7 +270,8 @@ function ledgerState(base,name){
  for(const field of STAMP_FIELDS){const value=stamp(raw[field]);if(value)times[field]=value;}
  return {present:true,status:code(raw.status)??'UNREPORTED',
   resultCode:code(raw.code),dates,times,modifiedAt:entry.modifiedAt,
-  diagnostic:diagnosticState(raw)};
+  diagnostic:diagnosticState(raw),
+  ...(name===LEDGER_NAMES[0]?{safeHttpFailure:safeR181HttpCode(raw)}:{})};
 }
 
 function taskState(queryTask){
