@@ -6,7 +6,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CONTROL_REPO,ACTOR,ISSUE_LABEL,ISSUE_TITLE,
  REQUEST_SCHEMA,OPERATION} from './contract.mjs';
-import {safeWriterBImportDiagnostic} from './import-availability.mjs';
+import {safeWriterBImportDiagnostic,
+ safeWriterBImportDiagnosticBatch} from './import-availability.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -87,8 +88,10 @@ export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256
   'WRITER_B_RECOVERY_REQUIRED'].includes(raw.status)&&CODE.test(raw.code??'')){
   const diagnostic=raw.status==='WRITER_B_PREFLIGHT_STOP'?
    safeWriterBImportDiagnostic(raw):null;
+   const batch=raw.status==='WRITER_B_PREFLIGHT_STOP'?
+    safeWriterBImportDiagnosticBatch(raw):null;
   return {...base,status:raw.status,code:raw.code,
-   ...(diagnostic?{diagnostic}:{}),
+    ...(diagnostic?{diagnostic}:{}),...(batch??{}),
    recovery:raw.status==='WRITER_B_RECOVERY_REQUIRED'?
     'RECONCILE_EXACT_REQUEST_NO_RETRY':undefined};
  }
@@ -104,6 +107,15 @@ function textResult(result){return [
   `IMPORT_DEPENDENCY_PATH=${result.diagnostic.dependencyPath}`,
   `IMPORT_REASON=${result.diagnostic.reason}`,
  ]:[]),
+  ...(result.diagnostics?[
+   `IMPORT_DIAGNOSTICS_RECORDED=${result.diagnostics.length}`,
+   `IMPORT_DIAGNOSTICS_OMITTED=${result.diagnosticsOmitted}`,
+   ...result.diagnostics.flatMap((d,i)=>[
+    `IMPORT_${i+1}_SOURCE_PATH=${d.sourcePath}`,
+    `IMPORT_${i+1}_DEPENDENCY_PATH=${d.dependencyPath}`,
+    `IMPORT_${i+1}_REASON=${d.reason}`,
+   ]),
+  ]:[]),
  `SOURCE_MODE=${result.mode??'UNKNOWN'}`,
  `LOCAL_ONLY=${result.localOnly===true?'true':'UNKNOWN'}`,
  `BASE_HEAD=${result.baseHead??'NONE'}`,
