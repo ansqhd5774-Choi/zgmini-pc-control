@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONFIGURED_RUNTIME_WINDOWS_PROOF_RESULT_V1",
+  "requestId": "39221f08-ee7b-4e1d-b78d-098b3e5f4246",
+  "runId": "42431932172",
+  "approvalSha256": "ae5ef03f69b73a897dc24b68503a2a47858ac0989d93018c1fb90e5d4d2d8093",
+  "sourceSha": "0c97599431882245a156470bd51290e327e7ee78",
+  "manifestSha256": "727a8640dabee96966574118f8bb5daecadb5d763190f3e8c26e651d8609bb03",
+  "status": "PROOF_BLOCKED",
+  "code": "B_CROSS_CAS_REJECT_MISSING",
+  "operationWrites": 0,
+  "windowsProof": "NOT_ESTABLISHED",
+  "activeRuntimeSha256": null,
+  "taskXmlSha256": null,
+  "evidenceSha256": null,
+  "transcript": null,
+  "retry": "NO_AUTO_RETRY_READ_ONLY_RECONCILE"
+}
