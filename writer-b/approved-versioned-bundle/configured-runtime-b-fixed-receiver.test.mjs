@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createFixedConfiguredReceiver}
+import {createFixedConfiguredReceiver,verifyLockedRuntimePreimage}
   from './configured-runtime-b-fixed-receiver.mjs';
 
 const sourceSha='a'.repeat(40),approvalSha='b'.repeat(64);
@@ -69,4 +69,29 @@ test('unknown request identity and non-Windows platform never stage package',asy
   const b=createFixedConfiguredReceiver({platform:'linux'});
   await assert.rejects(b.verifyApprovedPackage(requestId),
     /B_FIXED_WINDOWS_REQUIRED/);
+});
+
+test('lock-acquisition race cannot reuse stale active, Task or manual bytes',()=>{
+  const baseline={oldVersion:'1'.repeat(16),taskXmlSha256:'2'.repeat(64),
+    scheduledCmdSha256:'3'.repeat(64),scheduledVbsSha256:'4'.repeat(64),
+    activeSha256:'5'.repeat(64),originalSha256:'6'.repeat(64),
+    manual:new Map([['THEME_REGISTER.cmd','7'.repeat(64)],
+      ['THEME_LIST.cmd','8'.repeat(64)]])};
+  const fresh={oldVersion:baseline.oldVersion,taskState:3,
+    taskXmlSha256:baseline.taskXmlSha256,
+    oldCmdSha256:baseline.scheduledCmdSha256,
+    oldVbsSha256:baseline.scheduledVbsSha256};
+  const manualSha256=new Map(baseline.manual);
+  const source={fresh,baseline,manualSha256,
+    activeSha256:baseline.activeSha256,
+    originalSha256:baseline.originalSha256};
+  assert.equal(verifyLockedRuntimePreimage(source),true);
+  for(const patch of [{activeSha256:'a'.repeat(64)},
+    {fresh:{...fresh,taskXmlSha256:'b'.repeat(64)}},
+    {fresh:{...fresh,taskState:4}},
+    {manualSha256:new Map([['THEME_REGISTER.cmd','c'.repeat(64)],
+      ['THEME_LIST.cmd','8'.repeat(64)]])}]){
+    assert.throws(()=>verifyLockedRuntimePreimage({...source,...patch}),
+      /B_FIXED_POST_LOCK_(PREIMAGE|MANUAL)_DRIFT/);
+  }
 });
