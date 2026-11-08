@@ -52,7 +52,10 @@ function authorize(event, env) {
       !Number.isSafeInteger(event.issue.number)) throw new Error('RESULT_EVENT_NOT_ALLOWED');
 }
 
-export async function main(env = process.env) {
+export async function main(env = process.env, {returnPrEvent = null} = {}) {
+  if (returnPrEvent !== null && typeof returnPrEvent !== 'function') {
+    throw new Error('RESULT_PR_RETURN_CALLBACK_INVALID');
+  }
   if (!env.GITHUB_EVENT_PATH) throw new Error('RESULT_EVENT_PATH_STOP');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   authorize(event, env);
@@ -60,7 +63,8 @@ export async function main(env = process.env) {
   const result = parseAgentResult(event.comment.body);
   assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
-  if (await inspectExistingResult(event.issue.number, result.resultId, digest)) {
+  const alreadyRecorded = await inspectExistingResult(event.issue.number, result.resultId, digest);
+  if (alreadyRecorded && returnPrEvent === null) {
     process.stdout.write('HANDOFF_RESULT_ALREADY_RECORDED\n');
     return;
   }
@@ -79,8 +83,16 @@ export async function main(env = process.env) {
     'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
     'PC retries: 0', 'operationalWrites: 0'
   ].join('\n');
-  await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`, {method: 'POST', body: {body: comment}});
-  if (!await inspectExistingResult(event.issue.number, result.resultId, digest)) throw new Error('RESULT_COMMENT_READBACK_STOP');
+  if (!alreadyRecorded) {
+    await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`, {method: 'POST', body: {body: comment}});
+    if (!await inspectExistingResult(event.issue.number, result.resultId, digest)) throw new Error('RESULT_COMMENT_READBACK_STOP');
+  }
+  // Optional, explicitly injected transport only. The existing Workflow still
+  // calls main() without this hook and cannot wake another ChatGPT conversation.
+  // A failed PR readback may be retried on a later event without re-POSTing
+  // the original verified result comment or repeating any PC operation.
+  if (returnPrEvent !== null) await returnPrEvent({handoff, result, pr, run,
+    queueIssueNumber: event.issue.number});
   process.stdout.write('HANDOFF_RESULT_RECORDED_PENDING_RUNTIME\n');
 }
 
