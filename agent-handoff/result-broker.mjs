@@ -3,6 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseHandoff} from './contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contract.mjs';
+import {recordPrResultReturn} from './pr-result-return.mjs';
 
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 const API = 'https://api.github.com';
@@ -42,6 +43,18 @@ async function inspectExistingResult(issueNumber, resultId, digest) {
   throw new Error('RESULT_COMMENT_SCAN_LIMIT_STOP');
 }
 
+async function listCompleteComments(number, kind) {
+  const comments = [];
+  for (let page = 1; page <= 4; page++) {
+    const rows = await api(`/repos/${REPOSITORY}/issues/${number}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) throw new Error('RESULT_RETURN_COMMENT_LEDGER_STOP');
+    comments.push(...rows);
+    if (rows.length < 100) return {repository: REPOSITORY, complete: true,
+      [kind === 'pr' ? 'pullRequestNumber' : 'issueNumber']: number, comments};
+  }
+  throw new Error('RESULT_RETURN_COMMENT_SCAN_LIMIT_STOP');
+}
+
 function authorize(event, env) {
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_EVENT_NAME !== 'issue_comment' ||
       env.GITHUB_ACTOR !== 'ansqhd5774-Choi' || event.action !== 'created' ||
@@ -52,10 +65,25 @@ function authorize(event, env) {
       !Number.isSafeInteger(event.issue.number)) throw new Error('RESULT_EVENT_NOT_ALLOWED');
 }
 
-export async function main(env = process.env, {returnPrEvent = null} = {}) {
+export async function main(env = process.env, {returnPrEvent = null, resultPrBinding = null} = {}) {
   if (returnPrEvent !== null && typeof returnPrEvent !== 'function') {
     throw new Error('RESULT_PR_RETURN_CALLBACK_INVALID');
   }
+  if (resultPrBinding !== null && returnPrEvent !== null) {
+    throw new Error('RESULT_PR_RETURN_TRANSPORT_CONFLICT');
+  }
+  const publishReturn = resultPrBinding === null ? returnPrEvent :
+    async ({handoff, result, pr, run, queueIssueNumber}) => recordPrResultReturn({
+      handoffBody: handoff, resultBody: result, pr, run, queueIssueNumber,
+      binding: resultPrBinding,
+      readResultIssueComments: issue => listCompleteComments(issue, 'issue'),
+      readPrComments: target => listCompleteComments(target.pullRequestNumber, 'pr'),
+      postPrComment: (target, body) => {
+        if (target.repository !== REPOSITORY) throw new Error('RESULT_PR_RETURN_REPO_STOP');
+        return api(`/repos/${REPOSITORY}/issues/${target.pullRequestNumber}/comments`,
+          {method: 'POST', body: {body}});
+      }
+    });
   if (!env.GITHUB_EVENT_PATH) throw new Error('RESULT_EVENT_PATH_STOP');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   authorize(event, env);
@@ -64,7 +92,7 @@ export async function main(env = process.env, {returnPrEvent = null} = {}) {
   assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
   const alreadyRecorded = await inspectExistingResult(event.issue.number, result.resultId, digest);
-  if (alreadyRecorded && returnPrEvent === null) {
+  if (alreadyRecorded && publishReturn === null) {
     process.stdout.write('HANDOFF_RESULT_ALREADY_RECORDED\n');
     return;
   }
@@ -91,7 +119,7 @@ export async function main(env = process.env, {returnPrEvent = null} = {}) {
   // calls main() without this hook and cannot wake another ChatGPT conversation.
   // A failed PR readback may be retried on a later event without re-POSTing
   // the original verified result comment or repeating any PC operation.
-  if (returnPrEvent !== null) await returnPrEvent({handoff, result, pr, run,
+  if (publishReturn !== null) await publishReturn({handoff, result, pr, run,
     queueIssueNumber: event.issue.number});
   process.stdout.write('HANDOFF_RESULT_RECORDED_PENDING_RUNTIME\n');
 }
