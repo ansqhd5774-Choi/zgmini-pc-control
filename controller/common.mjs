@@ -10,7 +10,22 @@ export function exclusive(root,id){
 export function validateRequest(request,policy){
  need(request&&typeof request==='object'&&!Array.isArray(request),'REQUEST_OBJECT');
  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
- need(Object.keys(request).length===keys.length&&keys.every(k=>Object.hasOwn(request,k)),'REQUEST_FIELDS');
+ const extra=['preimageManifestPath','preimageManifestSha256'];
+ const scoped=request.operation==='writer-install-preimage-readonly'&&
+  Object.keys(request).length===keys.length+extra.length&&
+  extra.every(k=>Object.hasOwn(request,k));
+ need(Object.keys(request).length===keys.length+(scoped?extra.length:0)&&
+  keys.every(k=>Object.hasOwn(request,k))&&
+  Object.keys(request).every(k=>keys.includes(k)||(scoped&&extra.includes(k))),
+  'REQUEST_FIELDS');
+ if(scoped){
+  need(typeof request.preimageManifestPath==='string'&&
+   /^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(request.preimageManifestPath),
+   'PREIMAGE_MANIFEST_PATH');
+  need(typeof request.preimageManifestSha256==='string'&&
+   /^[0-9a-f]{64}$/.test(request.preimageManifestSha256),
+   'PREIMAGE_MANIFEST_SHA');
+ }
  need(request.schema==='ZGMINI_PC_JOB_V1','REQUEST_SCHEMA');
  need(/^[a-z0-9][a-z0-9-]{7,79}$/.test(request.requestId),'REQUEST_ID');
  need(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(request.chatId),'CHAT_ID');
