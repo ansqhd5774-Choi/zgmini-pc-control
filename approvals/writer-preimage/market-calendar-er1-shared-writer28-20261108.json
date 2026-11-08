@@ -1,0 +1,121 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "lib/earnings-api-display.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/inflation-causal-candidates-public-7-catalog.mjs",
+      "change": "A"
+    },
+    {
+      "path": "lib/market-score/employment-r4-bed-provider.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-store.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-contract.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-feature-engine.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-observation-reader.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+      "change": "A"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-scheduler.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-store.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-window.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/er1-monthly-vintage-publication.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/independent-publication.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidates-public-7-auto-publication-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidates-public-7-preview-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "change": "A"
+    },
+    {
+      "path": "worker/inflation-causal-candidates-public-7-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "worker/inflation-causal-candidates-public-7-writer-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
