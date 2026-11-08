@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
-  "status": "PROPOSED_B",
+  "status": "APPROVED_B",
   "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "sourceBranch": "main",
