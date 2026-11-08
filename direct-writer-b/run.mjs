@@ -175,12 +175,16 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
     const verified=outcome?.status==='DONE'&&
       outcome.sourceSha===auth.manifest.sourceSha&&
       outcome.verified==='PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK';
+    // Preserve a sanitized first-fail in the immutable result pair so an
+    // operator can distinguish proof-pending from a failed Windows install.
+    const configuredReason=/^B_[A-Z0-9_]{3,80}$/.test(outcome?.reason??'')?
+      'DIRECT_'+outcome.reason:null;
     return {status:verified?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
       outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
       'DIRECT_B_EFFECT_BLOCKED',
       code:verified?'DIRECT_B_LOCAL_EFFECT_PASS':
-        outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_STATE_UNKNOWN':
-        'DIRECT_B_EFFECT_STOP',
+        configuredReason??(outcome?.status==='STATE_UNKNOWN'?
+          'DIRECT_B_STATE_UNKNOWN':'DIRECT_B_EFFECT_STOP'),
       requestId:auth.request.requestId,manifestSha256:sha(auth.raw),
       controlSha:auth.controlSha,sourceSha:auth.manifest.sourceSha,
       mode:auth.mode,reportStatus:'INCOMPLETE',operationSucceeded:verified};
