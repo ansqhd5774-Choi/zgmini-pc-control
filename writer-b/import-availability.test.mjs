@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {relativeModuleReferences,verifyWriterBImportAvailability}
- from './import-availability.mjs';
+import {relativeModuleReferences,verifyWriterBImportAvailability,
+ safeWriterBImportDiagnostic} from './import-availability.mjs';
 const B=s=>Buffer.from(s,'utf8');
 const AUTO='scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs';
 const PREVIEW='scripts/pc-writer/inflation-causal-public-preview-r1.mjs';
@@ -155,4 +155,41 @@ test('existing callback never reads outside approved virtual source path',()=>{
   existing:p=>{touched.push(p);return p==='lib/x.mjs';}});
  assert.equal(a.status,'PASS');
  assert.deepEqual(touched,['lib/x.mjs']);
+});
+
+test('missing import identifies only approved relative paths and bounded reason',()=>{
+ const source='scripts/pc-writer/new.mjs';
+ const after=new Map([[source,B("import './needed.mjs';")]]);
+ let latestFailure;
+ for(const reason of ['NOT_FOUND','SYMLINK','NOT_FILE','SIZE',
+  'OUTSIDE_ROOT','READ_ERROR','UNAVAILABLE_OR_UNSAFE']){
+  let failure=null;
+  try{verifyWriterBImportAvailability({afterFiles:after,
+   existing:()=>({available:false,reason})});}
+  catch(error){failure=error;}
+  latestFailure=failure;
+  assert.equal(failure?.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+  assert.deepEqual(safeWriterBImportDiagnostic(failure),{
+   sourceKind:'APPROVED_AFTER',sourcePath:source,
+   dependencyPath:'scripts/pc-writer/needed.mjs',reason});
+  assert.equal(Object.keys(failure.diagnostic).length,4);
+ }
+ const bad={code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',diagnostic:{
+  sourceKind:'APPROVED_AFTER',sourcePath:source,
+  dependencyPath:'../../sensitive.txt',reason:'NOT_FOUND',secret:'DO_NOT_LOG'}};
+ assert.equal(safeWriterBImportDiagnostic(bad),null);
+ assert.equal(safeWriterBImportDiagnostic({code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
+  diagnostic:{...bad.diagnostic,dependencyPath:'scripts/pc-writer/needed.mjs',
+   reason:'SYSTEM_TOKEN_EXPOSED'}}),null);
+ assert.equal(safeWriterBImportDiagnostic({code:'WRITER_B_OTHER_STOP',
+  diagnostic:latestFailure.diagnostic}),null);
+});
+
+test('legacy false existence check remains fail-closed and gives cautious reason',()=>{
+ let error;
+ try{verifyWriterBImportAvailability({
+  afterFiles:new Map([['lib/new.mjs',B("import './missing.mjs';")]]),
+  existing:()=>false});}catch(e){error=e;}
+ assert.equal(error?.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ assert.equal(safeWriterBImportDiagnostic(error)?.reason,'UNAVAILABLE_OR_UNSAFE');
 });
