@@ -137,6 +137,10 @@ const DIAGNOSTIC_REASONS=new Set([
  'NOT_FOUND','SYMLINK','NOT_FILE','SIZE','OUTSIDE_ROOT','READ_ERROR',
  'UNAVAILABLE_OR_UNSAFE',
 ]);
+// Keep the single historical diagnostic and add a bounded batch only when
+// multiple approved imports are unavailable. This stays within reporter's
+// 8 KiB raw-result limit even for maximum-length allowed relative paths.
+const MAX_IMPORT_DIAGNOSTICS=8;
 const SAFE_RELATIVE=/^(?:scripts\/pc-writer|lib|worker)\/[A-Za-z0-9_./-]+$/;
 const safeDiagnosticPath=value=>typeof value==='string'&&value.length>=1&&
  value.length<=180&&SAFE_RELATIVE.test(value)&&
@@ -151,12 +155,24 @@ export function safeWriterBImportDiagnostic(error){
  return {sourceKind:'APPROVED_AFTER',sourcePath:d.sourcePath,
   dependencyPath:d.dependencyPath,reason:d.reason};
 }
-function unavailableImport(sourcePath,dependencyPath,reason){
+export function safeWriterBImportDiagnosticBatch(error){
+ const first=safeWriterBImportDiagnostic(error);
+ const raw=error?.diagnostics,omitted=error?.diagnosticsOmitted;
+ if(!first||!Array.isArray(raw)||raw.length<2||
+   raw.length>MAX_IMPORT_DIAGNOSTICS||!Number.isInteger(omitted)||
+   omitted<0||omitted>1024)return null;
+ const diagnostics=raw.map(entry=>safeWriterBImportDiagnostic({
+  code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',diagnostic:entry}));
+ if(diagnostics.some(entry=>entry===null)||
+   JSON.stringify(diagnostics[0])!==JSON.stringify(first))return null;
+ return {diagnostics,diagnosticsOmitted:omitted};
+}
+function unavailableImports(diagnostics,omitted){
  const code='WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP';
- const error=Object.assign(new Error(code),{code,diagnostic:{
-  sourceKind:'APPROVED_AFTER',sourcePath,dependencyPath,
-  reason:DIAGNOSTIC_REASONS.has(reason)?reason:'UNAVAILABLE_OR_UNSAFE',
- }});
+ const error=Object.assign(new Error(code),{code,diagnostic:diagnostics[0],
+  ...(diagnostics.length>1||omitted>0?{
+  diagnostics,diagnosticsOmitted:omitted,
+  }: {})});
  throw error;
 }
 
@@ -166,6 +182,7 @@ export function verifyWriterBImportAvailability({afterFiles,beforeFiles=new Map(
   [...beforeFiles.keys()].every(file=>afterFiles.has(file))&&
   typeof existing==='function','WRITER_B_IMPORT_CHECK_CONTRACT_STOP');
  let inspected=0;
+ const missing=[];let totalMissing=0;
  const approved=new Set([...afterFiles.keys()].map(s=>s.toLowerCase()));
  for(const [file,bytes] of afterFiles){
   // An approved test fixture is not imported by the Core runtime; do not
@@ -182,13 +199,20 @@ export function verifyWriterBImportAvailability({afterFiles,beforeFiles=new Map(
    if(approved.has(ref.toLowerCase()))continue;
    // 'existing' is an injected bounded, read-only operational-source
    // existence check. Never inspect arbitrary workspace or candidate files.
-   const availability=existing(ref);
+   let availability;
+   try{availability=existing(ref);}
+   catch{availability={available:false,reason:'READ_ERROR'};}
    if(availability===true)continue;
    const reason=availability&&typeof availability==='object'?
     availability.reason:'UNAVAILABLE_OR_UNSAFE';
-   unavailableImport(file,ref,reason);
+   totalMissing++;
+   if(missing.length<MAX_IMPORT_DIAGNOSTICS)missing.push({
+    sourceKind:'APPROVED_AFTER',sourcePath:file,dependencyPath:ref,
+    reason:DIAGNOSTIC_REASONS.has(reason)?reason:'UNAVAILABLE_OR_UNSAFE',
+   });
   }
  }
+ if(totalMissing)unavailableImports(missing,totalMissing-missing.length);
  return {status:'PASS',code:'WRITER_B_LITERAL_IMPORTS_AVAILABLE',
   approvedFiles:afterFiles.size,checkedReferences:inspected,
   evidenceLevel:'NEW_LITERAL_RELATIVE_IMPORTS_ONLY'};
