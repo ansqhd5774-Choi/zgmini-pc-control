@@ -109,6 +109,38 @@ function safeReasonHint(value){
  return matched.length===1?matched[0][0]:null;
 }
 
+// Existing production R181 ledgers sometimes have a free-form reason that does
+// not match any single safe category. Expose only approved *individual words*
+// (never a substring, code suffix, raw reason, or a digest of that reason).
+// This is observational evidence, not a claim about the underlying first fail.
+const REASON_SIGNAL_WORDS=new Set([
+ 'NO','NEW','NOT','READY','COMPLETE','INCOMPLETE','PRIMARY','SECONDARY',
+ 'SOURCE','PROVIDER','GMH','MARKETPARQUET','ETF','ETFS','SPY','COVERAGE',
+ 'DATE','DAY','CALENDAR','SESSION','MARKET','CLOSED','OPEN','WEEKEND',
+ 'HOLIDAY','OBSERVATION','LATEST','ROLLING','HISTORY','STALE','FRESH',
+ 'MISSING','EMPTY','RECORD','RECORDS','ROWS','DATA','RAW','STORED',
+ 'STOP','SKIP','SKIPPED','BLOCKED','DENIED','UNAVAILABLE','INVALID',
+ 'FAILED','FAILURE','ERROR','MISMATCH','CHECKPOINT','FILE','PATH',
+ 'FETCH','REQUEST','RESPONSE','NETWORK','TIMEOUT','QUOTA','LIMIT',
+ 'AUTH','ACCESS','PUBLISH','PUBLICATION','PUBLISHER','READBACK',
+ 'D1','API','HTTP','R181','R179','R183','R178',
+]);
+const SENSITIVE_REASON=/(?:https?:\/\/|[\\/@]|\b(?:token|secret|password|passwd|credential|bearer|authorization|api[_-]?key|private[_-]?key|connection[_-]?string)\b|[?&][A-Za-z_]+=)/i;
+function safeReasonSignals(value){
+ if(typeof value!=='string'||!value.trim()||value.length>512||
+   SENSITIVE_REASON.test(value))return null;
+ const words=value.replace(/([a-z])([A-Z])/g,'$1 $2')
+  .split(/[^A-Za-z0-9]+/).filter(Boolean).map(x=>x.toUpperCase());
+ const signals=[];
+ for(const word of words){
+  if(REASON_SIGNAL_WORDS.has(word)&&!signals.includes(word))signals.push(word);
+  if(signals.length>=12)break;
+ }
+ // Use fixed vocabulary and a bounded array; unknown words are never echoed.
+ return {path:'reason',status:signals.length?'FIXED_SIGNALS':'NO_FIXED_SIGNALS',
+  signals:signals.sort()};
+}
+
 function valueType(value){
  if(value===null)return 'null';
  if(Array.isArray(value))return 'array';
@@ -117,6 +149,7 @@ function valueType(value){
 function diagnosticState(raw){
  const fields=[];
  const values=[];
+ const reasonProfiles=[];
  let scanned=0;
  let truncated=false;
  const walk=(node,prefix,depth)=>{
@@ -136,6 +169,11 @@ function diagnosticState(raw){
      const hint=safeReasonHint(value);
      if(hint)values.push({path:full+'.categoryHint',value:hint});
     }
+    if((name==='reason'||name==='stopReason'||name==='stop_reason')&&
+      reasonProfiles.length<4){
+     const profile=safeReasonSignals(value);
+     if(profile)reasonProfiles.push({...profile,path:full});
+    }
    }
    if(depth<3&&DIAGNOSTIC_CONTAINERS.has(name)&&
       value&&typeof value==='object'&&!Array.isArray(value))
@@ -145,7 +183,8 @@ function diagnosticState(raw){
  };
  walk(raw,'',0);
  return {status:values.length?'SAFE_VALUES_FOUND':fields.length?
-  'CANDIDATES_WITHOUT_SAFE_VALUE':'UNKNOWN',fields,values,truncated};
+  'CANDIDATES_WITHOUT_SAFE_VALUE':'UNKNOWN',fields,values,reasonProfiles,
+  truncated};
 }
 
 function child(base,name){
