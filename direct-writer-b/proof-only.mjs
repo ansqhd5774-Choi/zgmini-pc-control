@@ -14,6 +14,9 @@ import {reportProofFromRunner} from './proof-only-report.mjs';
 
 export const PROOF_RESULT='configured-runtime-proof-once-result.json';
 export const PROOF_SCHEMA='ZGMINI_CONFIGURED_RUNTIME_WINDOWS_PROOF_RESULT_V1';
+// V1 remains valid for historical #845 evidence. New runs include a real CLI
+// entrypoint regression and use the extended V2 evidence contract.
+export const PROOF_CLI_SCHEMA='ZGMINI_CONFIGURED_RUNTIME_WINDOWS_PROOF_RESULT_V2';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const USER='ansqhd5774-Choi';
 const TITLE='pc-configured-runtime-proof';
@@ -114,15 +117,52 @@ function readPreimage(){
   return {active,installedSha256:sha(installed),manual};
 }
 
+// Execute only the repository-pinned Node regression, NEVER the operational
+// Writer B CLI directly. The test itself launches the real CLI import graph
+// with mocked Git/Windows inputs and stops before any operational effect.
+export function proveReadOnlyCliEntrypoint({env=process.env,
+  platform=process.platform,runNode=spawnSync}={}){
+  need(platform==='win32'&&typeof env.RUNNER_TEMP==='string'&&
+    path.isAbsolute(env.RUNNER_TEMP)&&fs.existsSync(env.RUNNER_TEMP),
+  'PROOF_CLI_TEMP_REQUIRED');
+  const testFile=fileURLToPath(new URL('./approval-cycle.test.mjs',import.meta.url));
+  const testSha256=sha(fileBytes(testFile));
+  // Do not hand the child workflow tokens or provider credentials.
+  const childEnv={PATH:env.PATH??process.env.PATH??'',
+    SystemRoot:env.SystemRoot??process.env.SystemRoot??String.raw`C:\Windows`,
+    TEMP:env.RUNNER_TEMP,TMP:env.RUNNER_TEMP,
+    CYCLE_TEST_TEMP_BASE:env.RUNNER_TEMP};
+  const child=runNode(process.execPath,['--test',testFile],{
+    env:childEnv,encoding:'utf8',shell:false,windowsHide:true,
+    timeout:15000,maxBuffer:65536});
+  const exitCode=Number.isInteger(child?.status)&&child.status>=0&&
+    child.status<=255?child.status:null;
+  if(child?.error||child?.signal||exitCode!==0){
+    const code=exitCode===13?'PROOF_CLI_UNSETTLED_AWAIT_STOP':
+      'PROOF_CLI_ENTRYPOINT_STOP';
+    throw Object.assign(Error(code),{code,nodeExitCode:exitCode});
+  }
+  return Object.freeze({status:'PASS',testSha256,childExitCode:0,
+    fixtureRoot:'RUNNER_TEMP',operationWrites:0});
+}
+
 export async function proveWithoutInstall({auth,env=process.env,
   loadModule=(root,rel)=>import(pathToFileURL(path.join(root,
     ...rel.split('/'))).href),
-  inspectProof=runWindowsCrossVersionProof}={}){
+  inspectProof=runWindowsCrossVersionProof,
+  checkCli=proveReadOnlyCliEntrypoint}={}){
   need(process.platform==='win32'&&
     typeof env.RUNNER_TEMP==='string'&&path.isAbsolute(env.RUNNER_TEMP),
   'PROOF_WINDOWS_TEMP_REQUIRED');
   const feature=sourceRoot(env);
   verifyPinnedSourceCheckout({manifest:auth.manifest},{sourceRoot:feature});
+  const cliEntrypointProof=checkCli({env});
+  need(cliEntrypointProof?.status==='PASS'&&
+    SHA64.test(cliEntrypointProof.testSha256??'')&&
+    cliEntrypointProof.childExitCode===0&&
+    cliEntrypointProof.fixtureRoot==='RUNNER_TEMP'&&
+    cliEntrypointProof.operationWrites===0,
+  'PROOF_CLI_EVIDENCE_INVALID');
   const builder=await loadModule(feature,BUILDER);
   const inspector=await loadModule(feature,INSPECTOR);
   need(typeof builder.buildConfiguredPackage==='function'&&
@@ -167,13 +207,13 @@ export async function proveWithoutInstall({auth,env=process.env,
     compatible.oldVersion===before.oldVersion&&
     compatible.newSourceSha===auth.manifest.sourceSha,
   'PROOF_CROSS_VERSION_UNVERIFIED');
-  return {schema:PROOF_SCHEMA,status:'PROOF_PASS',
+  return {schema:PROOF_CLI_SCHEMA,status:'PROOF_PASS',
     requestId:auth.request.requestId,sourceSha:auth.manifest.sourceSha,
     manifestSha256:auth.manifest.packageManifestSha256,
     approvalSha256:auth.approvalSha256,
     activeRuntimeSha256:sha(pre.active),taskXmlSha256:before.taskXmlSha256,
     evidenceSha256:compatible.evidenceSha256,
-    transcript:compatible.transcript,operationWrites:0};
+    transcript:compatible.transcript,cliEntrypointProof,operationWrites:0};
 }
 
 async function main(){
@@ -196,12 +236,15 @@ async function main(){
   }
   let result;
   try{result=await proveWithoutInstall({auth,env});}
-  catch(error){result={schema:PROOF_SCHEMA,status:'PROOF_BLOCKED',
+  catch(error){result={schema:PROOF_CLI_SCHEMA,status:'PROOF_BLOCKED',
     requestId:auth.request.requestId,sourceSha:auth.manifest.sourceSha,
     manifestSha256:auth.manifest.packageManifestSha256,
     approvalSha256:auth.approvalSha256,
     code:/^(?:B_|PACKAGE_|PROOF_)[A-Z0-9_]{3,100}$/.test(error?.code??'')?
-      error.code:'PROOF_READONLY_RUN_STOP',operationWrites:0};}
+      error.code:'PROOF_READONLY_RUN_STOP',
+    cliNodeExitCode:Number.isInteger(error?.nodeExitCode)&&
+      error.nodeExitCode>=0&&error.nodeExitCode<=255?
+      error.nodeExitCode:null,operationWrites:0};}
   fs.writeFileSync(path.join(env.RUNNER_TEMP,PROOF_RESULT),
     JSON.stringify(result)+'\n',{flag:'wx'});
   if(result.status!=='PROOF_PASS')process.exitCode=1;
