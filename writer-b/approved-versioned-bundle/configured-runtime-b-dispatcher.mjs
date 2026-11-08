@@ -41,8 +41,11 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
   return async function dispatch(request) {
     let phase = 'VERIFY';
     let consumed = false;
+    let leaseStarted = false;
+    let leaseOwned = false;
+    let completed = false;
     let receiver = null;
-    let outcome;
+    let result = null;
     try {
       need(plain(request) && Object.keys(request).length===
         TRUSTED_REQUEST_KEYS.length &&
@@ -68,9 +71,10 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         typeof receiver.verifyApprovedPackage === 'function' &&
         typeof receiver.verifyWindowsCompatibility === 'function' &&
         typeof receiver.loadPinnedPackageRunner === 'function' &&
+        typeof receiver.acquireSharedWriterLease === 'function' &&
         typeof receiver.consumeOneShotAuthorization === 'function' &&
         typeof receiver.verifyInstalledReadback === 'function' &&
-        typeof receiver.finalizeOneShotAuthorization === 'function',
+        typeof receiver.releaseSharedWriterLease === 'function',
       'B_FIXED_RECEIVER_CONTRACT');
 
       const approval = await receiver.verifyApprovedPackage(request.requestId);
@@ -117,6 +121,14 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
       const invoke = mode => loaded.runConfiguredPackage({
         mode, packageRoot: approval.packageRoot,
       });
+      // Acquire the existing R17 Writer mutex before preflight. Keep it while
+      // the existing theme installer checks its own runtime-upgrade lock.
+      phase = 'WRITER_LEASE';
+      leaseStarted = true;
+      const lease = await receiver.acquireSharedWriterLease({approval,windows});
+      need(plain(lease) && lease.requestId === request.requestId &&
+        lease.ownerVerified === true,'B_WRITER_SHARED_LEASE');
+      leaseOwned = true;
       phase = 'PREFLIGHT';
       const preflight = await invoke('preflight');
       need(plain(preflight) && preflight.status === 'PREFLIGHT_PASS' &&
@@ -140,15 +152,15 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         sha64(receipt.receiptSha256),
       'B_ONESHOT_RECEIPT');
       phase = 'INSTALL';
-      const result = await invoke('install');
-      need(plain(result) &&
-        result.status === 'CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED' &&
-        result.sourceSha === approval.sourceSha && result.changed === 1,
+      const installed = await invoke('install');
+      need(plain(installed) &&
+        installed.status === 'CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED' &&
+        installed.sourceSha === approval.sourceSha && installed.changed === 1,
       'B_CONFIG_PACKAGE_INSTALL_UNCERTAIN');
 
       phase = 'READBACK';
       const readback = await receiver.verifyInstalledReadback({
-        approval, windows, receipt, result,
+        approval, windows, receipt, result:installed,
       });
       need(plain(readback) && readback.status === 'VERIFIED' &&
         readback.sourceSha === approval.sourceSha &&
@@ -159,37 +171,33 @@ export function createDispatcherForTrustedNativeReceiver(loadFixedReceiver) {
         readback.rollbackRecordVerified === true,
       'B_INSTALLED_READBACK_UNCERTAIN');
 
-      outcome = {schema: SCHEMA, status: 'DONE',
+      completed = true;
+      result = {schema: SCHEMA, status: 'DONE',
         requestId: request.requestId, sourceSha: approval.sourceSha,
         installedVersion: readback.activeRuntimeVersion,
         reservation: receipt.receiptSha256,
         verified: 'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'};
     } catch (error) {
-      outcome = {schema: SCHEMA,
-        status: consumed ? 'STATE_UNKNOWN' : 'BLOCKED',
+      result = {schema: SCHEMA,
+        status: consumed || (leaseStarted && !leaseOwned) ?
+          'STATE_UNKNOWN' : 'BLOCKED',
         reason: safeCode(error), phase,
-        effectAttempted: consumed,
-        retryAllowed: false};
-    }
-    if (consumed) {
-      // The shared Writer B lock must remain owned through readback, then
-      // close with an immutable journal entry even for uncertain outcomes.
-      // The requestId stays consumed; closing the mutex is NOT a retry.
-      try {
-        const closed = await receiver.finalizeOneShotAuthorization({
-          requestId: request.requestId,status: outcome.status,
-          phase,reason: outcome.reason ?? null,
-        });
-        need(plain(closed) && closed.status === 'JOURNALED_AND_UNLOCKED' &&
-          closed.requestId === request.requestId,
-        'B_ONESHOT_FINALIZATION_UNVERIFIED');
-      } catch {
-        return Object.freeze({schema: SCHEMA,status: 'STATE_UNKNOWN',
-          reason: 'B_ONESHOT_FINALIZATION_UNVERIFIED',phase: 'FINALIZE',
-          effectAttempted: true,retryAllowed: false});
+        effectAttempted: consumed,retryAllowed: false};
+    } finally {
+      if(leaseOwned){
+        try{
+          // No automatic lock removal if the effect or readback is uncertain.
+          // Native receiver must match the stored FD and request ID.
+          await receiver.releaseSharedWriterLease({
+            requestId:request.requestId,retain:consumed&&!completed});
+        }catch{
+          result={schema:SCHEMA,status:'STATE_UNKNOWN',
+            reason:'B_WRITER_LEASE_RELEASE_UNCERTAIN',phase:'RELEASE',
+            effectAttempted:consumed,retryAllowed:false};
+        }
       }
     }
-    return Object.freeze(outcome);
+    return Object.freeze(result);
   };
 }
 
