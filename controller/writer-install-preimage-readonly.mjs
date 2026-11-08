@@ -68,7 +68,8 @@ export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
  const result={status:'STATE_UNKNOWN',code:'WRITER_PREIMAGE_SOURCE_UNVERIFIED',
   observedAt:new Date().toISOString(),
   evidenceLevel:'FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS',runtimeSourceVerified:false,
-  sourceRoot:null,sourceHead:null,approvedConfigSource:null,checkpointSource:null,
+  sourceRoot:null,sourceRootAbsolute:null,sourceHead:null,
+  approvedConfigSource:null,checkpointSource:null,
   sourceIdentityConsistent:false,coreTaskSourceLinked:false,
   taskLaunchers:[],
   r6Config:{status:'STATE_UNKNOWN',configSha256:null,
@@ -119,7 +120,8 @@ export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
  }catch{return {...result,code:'WRITER_PREIMAGE_CHECKOUT_PATH_UNVERIFIED'};}
  const configSource=sourceState(trace?.configApprovedSha);
  const checkpointSource=sourceState(trace?.lastWriterEvidence?.sourceHead);
- result.sourceRoot=CHECKOUT;result.sourceHead=sourceState(candidate.head);
+ result.sourceRoot=CHECKOUT;result.sourceRootAbsolute=source;
+ result.sourceHead=sourceState(candidate.head);
  result.approvedConfigSource=configSource;result.checkpointSource=checkpointSource;
  result.coreTaskSourceLinked=!!direct;
  result.sourceIdentityConsistent=Boolean(candidate.clean&&configSource===result.sourceHead&&
