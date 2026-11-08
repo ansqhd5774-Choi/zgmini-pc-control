@@ -102,7 +102,8 @@ export async function processCompletedPcJob(event, {
     }
     result.newIssues++;
   }
-  if (result.confirmedFailures && result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
+  if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
+  else if (result.confirmedFailures && result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
   return Object.freeze(result);
 }
 
@@ -159,7 +160,7 @@ export async function main(env = process.env) {
         labels: ['agent-handoff'], body: prepared.body}})
   });
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (report.state === 'PARTIAL_RECEIPT_PENDING') process.exitCode = 1;
+  if (['PARTIAL_RECEIPT_PENDING', 'NO_PUBLISHED_RESULTS'].includes(report.state)) process.exitCode = 1;
   return report;
 }
 
