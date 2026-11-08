@@ -129,7 +129,9 @@ async function checkpointRevision(writer,reader,root,metrics){
   need(JSON.stringify(await a.load(KEY))===JSON.stringify(second),
     'B_CROSS_REVISION_REVERSE_READ');
   let conflict=false;
-  try{await a.save(KEY,{...second,revision:3},1);}
+  // A stale writer must propose the next revision *for its stale version*.
+  // An unrelated revision gap fails validation before the CAS is exercised.
+  try{await a.save(KEY,{...second,revision:2},1);}
   catch(e){conflict=e?.code==='THEME_CHECKPOINT_CAS_CONFLICT';}
   need(conflict,'B_CROSS_CAS_REJECT_MISSING');
   metrics.revisions=2;

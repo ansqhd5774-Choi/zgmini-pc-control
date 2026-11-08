@@ -74,6 +74,9 @@ function fakeRuntime({duplicateFetch=false,resetBudget=false}={}){
       return envelope.state;
     };
     return {load,save:async(key,state,expected)=>{
+      if(state.revision!==expected+1)
+        throw Object.assign(Error('THEME_CHECKPOINT_REVISION'),
+          {code:'THEME_CHECKPOINT_REVISION'});
       if((await load(key))?.revision!==expected&&
         !((await load(key))===null&&expected===0))
         throw Object.assign(Error('THEME_CHECKPOINT_CAS_CONFLICT'),
@@ -83,6 +86,19 @@ function fakeRuntime({duplicateFetch=false,resetBudget=false}={}){
   }};
   return {registry,tool,store};
 }
+
+test('fixture enforces next revision before stale CAS comparison',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'cross-version-cas-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const key='a'.repeat(64);
+  const store=fakeRuntime().store.createThemeCheckpointStore({dataRoot:root});
+  await store.save(key,{fingerprint:key,revision:1},0);
+  await store.save(key,{fingerprint:key,revision:2},1);
+  await assert.rejects(store.save(key,{fingerprint:key,revision:3},1),
+    {code:'THEME_CHECKPOINT_REVISION'});
+  await assert.rejects(store.save(key,{fingerprint:key,revision:2},1),
+    {code:'THEME_CHECKPOINT_CAS_CONFLICT'});
+});
 
 test('two directions and isolated checkpoint/lease fixtures, no external effects',async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'cross-version-fixture-'));
