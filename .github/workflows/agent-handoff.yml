@@ -1,0 +1,32 @@
+name: ZGMINI Agent Handoff Intake
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: agent-handoff-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  route-sanitized-incident:
+    # Opt-in only. Keep the existing pc-job / Controller path untouched.
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      contains(github.event.issue.labels.*.name, 'agent-handoff') &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 3
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate queue and record routing only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" agent-handoff/issue-broker.mjs'
