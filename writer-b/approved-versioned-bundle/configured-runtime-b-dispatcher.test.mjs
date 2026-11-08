@@ -56,6 +56,10 @@ function fixture() {
         },
       };
     },
+    async acquireSharedWriterLease({approval:a,windows:w}){
+      calls.push('lease');assert.equal(a,approval);assert.equal(w,windows);
+      return {requestId:request.requestId,ownerVerified:true};
+    },
     async consumeOneShotAuthorization({approval: a,windows: w,preflight}) {
       calls.push('consume');
       assert.equal(a,approval);assert.equal(w,windows);
@@ -71,13 +75,9 @@ function fixture() {
         activeRuntimeVersion:'v123',manualCommandsVerified:3,
         rollbackRecordVerified:true};
     },
-    async finalizeOneShotAuthorization({requestId,status,reason}) {
-      calls.push('finalize');
+    async releaseSharedWriterLease({requestId,retain}){
       assert.equal(requestId,request.requestId);
-      assert.ok(['DONE','STATE_UNKNOWN'].includes(status));
-      assert.equal(status==='DONE'?reason===null:
-        typeof reason==='string'&&reason.startsWith('B_'),true);
-      return {status:'JOURNALED_AND_UNLOCKED',requestId};
+      calls.push(retain?'retain':'release');
     },
   };
   return {calls,approval,windows,receiver};
@@ -100,10 +100,10 @@ test('production default has no installed native bridge: no effect',async()=>{
 test('fixed receiver DI uses existing package preflight then install once',async()=>{
   const {calls,receiver} = fixture();
   const result = await configured(receiver);
-  assert.equal(result.status,'DONE');
+  assert.equal(result.status,'DONE',JSON.stringify(result));
   assert.deepEqual(calls,[
-    'approved','compatibility','load','preflight','consume','install','readback',
-    'finalize',
+    'approved','compatibility','load','lease','preflight','consume','install',
+    'readback','release',
   ]);
 });
 
@@ -155,7 +155,7 @@ test('preflight failure does not consume one-shot or install',async()=>{
   const result = await configured(receiver);
   assert.equal(result.status,'BLOCKED');
   assert.equal(result.reason,'B_CONFIG_PACKAGE_PREFLIGHT');
-  assert.deepEqual(calls,['approved','compatibility','load']);
+  assert.deepEqual(calls,['approved','compatibility','load','lease','release']);
 });
 
 test('uncertain one-shot consumption never reaches install or allows retry',async()=>{
@@ -168,20 +168,7 @@ test('uncertain one-shot consumption never reaches install or allows retry',asyn
   assert.equal(result.reason,'B_ONESHOT_RECEIPT');
   assert.equal(result.retryAllowed,false);
   assert.equal(calls.includes('install'),false);
-  assert.equal(calls.at(-1),'finalize');
-});
-
-test('finalization failure does not report success or authorize retry',async()=>{
-  const {receiver,calls}=fixture();
-  receiver.finalizeOneShotAuthorization=async()=>{
-    calls.push('finalize');throw Error('disk unavailable');
-  };
-  const result=await configured(receiver);
-  assert.equal(result.status,'STATE_UNKNOWN');
-  assert.equal(result.reason,'B_ONESHOT_FINALIZATION_UNVERIFIED');
-  assert.equal(result.retryAllowed,false);
-  assert.equal(calls.filter(x=>x==='install').length,1);
-  assert.equal(calls.at(-1),'finalize');
+  assert.equal(calls.at(-1),'retain');
 });
 
 test('failed installer becomes STATE_UNKNOWN and is never retried',async()=>{
@@ -204,6 +191,7 @@ test('failed installer becomes STATE_UNKNOWN and is never retried',async()=>{
   assert.equal(result.retryAllowed,false);
   assert.equal(result.effectAttempted,true);
   assert.equal(calls.filter(x=>x==='install').length,1);
+  assert.equal(calls.at(-1),'retain');
 });
 
 test('readback not proved remains STATE_UNKNOWN, not DONE',async()=>{
@@ -214,6 +202,31 @@ test('readback not proved remains STATE_UNKNOWN, not DONE',async()=>{
   assert.equal(result.status,'STATE_UNKNOWN');
   assert.equal(result.reason,'B_INSTALLED_READBACK_UNCERTAIN');
   assert.equal(calls.filter(x=>x==='install').length,1);
+  assert.equal(calls.at(-1),'retain');
+});
+
+test('shared writer lock denied cannot consume or install and is uncertain',async()=>{
+  const {receiver,calls}=fixture();
+  receiver.acquireSharedWriterLease=async()=>{
+    calls.push('lease');throw Object.assign(Error('unknown'),{
+      code:'B_WRITER_LEASE_UNCERTAIN'});
+  };
+  const result=await configured(receiver);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.reason,'B_WRITER_LEASE_UNCERTAIN');
+  assert.equal(calls.includes('consume'),false);
+  assert.equal(calls.includes('install'),false);
+});
+
+test('shared writer release failure cannot report DONE',async()=>{
+  const {receiver,calls}=fixture();
+  receiver.releaseSharedWriterLease=async()=>{
+    calls.push('release');throw Error('FD drift');
+  };
+  const result=await configured(receiver);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.reason,'B_WRITER_LEASE_RELEASE_UNCERTAIN');
+  assert.equal(calls.includes('install'),true);
 });
 
 test('Git-pinned approval must match independent receiver and Windows preimages',async()=>{
