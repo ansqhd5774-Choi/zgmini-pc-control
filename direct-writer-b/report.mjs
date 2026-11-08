@@ -3,7 +3,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {DIRECT_B_RESULT,verifyOpenedOwnerIssue} from './run.mjs';
+import {DIRECT_B_RESULT,verifyOpenedOwnerIssue} from './approval-contract.mjs';
+import {DIRECT_B_EXIT_FILE,DIRECT_B_EXIT_SCHEMA}
+  from './capture-apply-exit.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const RUN=/^[0-9]{1,18}$/;
@@ -12,9 +14,63 @@ const SHA64=/^[0-9a-f]{64}$/;
 const CODE=/^DIRECT_B_[A-Z0-9_]{1,100}$/;
 const VALID=new Set(['DIRECT_B_PREFLIGHT_STOP','DIRECT_B_EFFECT_BLOCKED',
   'DIRECT_B_EFFECT_UNKNOWN','DIRECT_B_EFFECT_PASS_NOT_PUBLISHED']);
+const OUTCOMES=new Set(['success','failure','skipped','cancelled']);
 const need=(x,code)=>{if(!x)throw Object.assign(Error(code),{code});};
 
-export function sanitizeDirectBReport(raw,request,env){
+const STEP={sourcePin:'CONFIGURED_SOURCE_PIN',
+  sourceCheckout:'APPROVED_SOURCE_CHECKOUT',apply:'APPLY_RUNTIME_B_EFFECT',
+  control:'CONTROL_SOURCE_CHECKOUT'};
+function processProvenance(env,exitEvidence){
+  // Actions supplies outcomes as fixed workflow expressions, never Issue text.
+  const configured=env?.DIRECT_B_CONFIGURED_OUTCOME;
+  const candidate=env?.DIRECT_B_CANDIDATE_OUTCOME;
+  const apply=env?.DIRECT_B_APPLY_OUTCOME;
+  const stepsKnown=[configured,candidate,apply].every(x=>OUTCOMES.has(x));
+  let lastPassStep=null,firstFailStep=null,firstFailCode=null;
+  if(stepsKnown){
+    lastPassStep=STEP.control;
+    if(configured==='failure'||configured==='cancelled'){
+      firstFailStep=STEP.sourcePin;
+      firstFailCode='DIRECT_B_SOURCE_PIN_STEP_FAILED';
+    }else if(configured==='success'){
+      lastPassStep=STEP.sourcePin;
+      if(candidate==='failure'||candidate==='cancelled'){
+        firstFailStep=STEP.sourceCheckout;
+        firstFailCode='DIRECT_B_SOURCE_CHECKOUT_STEP_FAILED';
+      }else{
+        if(candidate==='success')lastPassStep=STEP.sourceCheckout;
+        if(apply==='failure'||apply==='cancelled'){
+          firstFailStep=STEP.apply;
+          firstFailCode='DIRECT_B_APPLY_STEP_FAILED_EXIT_UNKNOWN';
+        }
+      }
+    }
+  }
+  const jobName=/^[a-z0-9-]{1,80}$/.test(env?.GITHUB_JOB??'')?
+    env.GITHUB_JOB:null;
+  const validExit=exitEvidence&&typeof exitEvidence==='object'&&
+    !Array.isArray(exitEvidence)&&
+    Object.keys(exitEvidence).length===5&&
+    exitEvidence.schema===DIRECT_B_EXIT_SCHEMA&&
+    exitEvidence.runId===env?.GITHUB_RUN_ID&&
+    exitEvidence.jobName===jobName&&jobName!==null&&
+    exitEvidence.step==='apply'&&
+    Number.isSafeInteger(exitEvidence.nodeExitCode)&&
+    exitEvidence.nodeExitCode>=0&&exitEvidence.nodeExitCode<=255;
+  const nodeExitCode=validExit?exitEvidence.nodeExitCode:null;
+  if(firstFailStep===STEP.apply&&nodeExitCode!==null)
+    firstFailCode=nodeExitCode===0?'DIRECT_B_APPLY_STEP_STATUS_CONFLICT':
+      'DIRECT_B_APPLY_NODE_EXIT_NONZERO';
+  return {lastPassStep,firstFailStep,firstFailCode,nodeExitCode,
+    jobName,jobId:null,stepOutcomesKnown:stepsKnown,
+    applyOutcome:stepsKnown?apply:null,
+    applyStepInvoked:stepsKnown&&['success','failure'].includes(apply),
+    operationalEffectAttempted:stepsKnown&&['success','failure'].includes(apply)?
+      'UNKNOWN':'NOT_STARTED_BY_WORKFLOW'};
+}
+
+export function sanitizeDirectBReport(raw,request,env,exitEvidence=null){
+  const provenance=processProvenance(env,exitEvidence);
   const base={schema:'ZGMINI_APPROVED_RUNTIME_B_RESULT_R1',
     requestId:request.requestId,status:'DIRECT_B_STATE_UNKNOWN',
     code:'DIRECT_B_RESULT_UNVERIFIED',
@@ -25,11 +81,26 @@ export function sanitizeDirectBReport(raw,request,env){
     compatibilityDirections:0,
     compatibilitySharedLockVerified:false,
     runId:RUN.test(env?.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
-    retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE'};
+    ...provenance,retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE'};
+  if(provenance.firstFailStep&&(!raw||!VALID.has(raw.status)||
+    !CODE.test(raw.code??'')))
+    base.code=provenance.firstFailCode??'DIRECT_B_RESULT_UNVERIFIED';
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||
     !VALID.has(raw.status)||!CODE.test(raw.code??''))return base;
   if(raw.requestId!==request.requestId&&
     !(raw.status==='DIRECT_B_PREFLIGHT_STOP'&&raw.requestId===null))return base;
+  // A reported PASS with a failed process, or a failed result with exit 0,
+  // must remain UNKNOWN; neither side may manufacture a Windows effect proof.
+  if((provenance.nodeExitCode!==null&&
+       ((raw.status==='DIRECT_B_EFFECT_PASS_NOT_PUBLISHED')!==
+        (provenance.nodeExitCode===0)))||
+    (provenance.stepOutcomesKnown&&
+       ((raw.status==='DIRECT_B_EFFECT_PASS_NOT_PUBLISHED')!==
+        (provenance.applyOutcome==='success')))||
+    (provenance.stepOutcomesKnown&&provenance.applyOutcome==='success'&&
+      provenance.nodeExitCode===null))
+    return {...base,code:'DIRECT_B_RESULT_PROCESS_CONFLICT',
+      firstFailStep:STEP.apply,firstFailCode:'DIRECT_B_RESULT_PROCESS_CONFLICT'};
   const compatibility=/^[a-f0-9]{64}$/.test(
     raw.compatibilityEvidenceSha256??'')&&
     raw.compatibilityDirections===2&&
@@ -45,9 +116,15 @@ export function sanitizeDirectBReport(raw,request,env){
         'CONFIGURED_THEMES_REPEAT_UPGRADE'].includes(raw.mode))return base;
     return {...base,...compatibility,status:raw.status,code:raw.code,mode:raw.mode,
       sourceSha:raw.sourceSha,controlSha:raw.controlSha,operationSucceeded:true,
-      runtimeEffectProof:'LOCAL_EXECUTOR_PASS_REPORT_PENDING'};
+      runtimeEffectProof:'LOCAL_EXECUTOR_PASS_REPORT_PENDING',
+      operationalEffectAttempted:'LOCAL_EXECUTOR_PASS'};
   }
-  return {...base,...compatibility,status:raw.status,code:raw.code};
+  return {...base,...compatibility,status:raw.status,code:raw.code,
+    firstFailStep:raw.status==='DIRECT_B_PREFLIGHT_STOP'?
+      'APPROVAL_PREFLIGHT':provenance.firstFailStep??STEP.apply,
+    firstFailCode:raw.code,
+    operationalEffectAttempted:raw.status==='DIRECT_B_PREFLIGHT_STOP'?
+      'NOT_STARTED_BY_PREFLIGHT':provenance.operationalEffectAttempted};
 }
 
 export function directBTextReport(r){return [
@@ -61,6 +138,13 @@ export function directBTextReport(r){return [
   `COMPATIBILITY_DIRECTIONS=${r.compatibilityDirections}`,
   `COMPATIBILITY_SHARED_LOCK_VERIFIED=${r.compatibilitySharedLockVerified}`,
   `RUN_ID=${r.runId??'UNKNOWN'}`,
+  `JOB_NAME=${r.jobName??'UNKNOWN'}`,`JOB_ID=${r.jobId??'UNKNOWN'}`,
+  `LAST_PASS=${r.lastPassStep??'UNKNOWN'}`,
+  `FIRST_FAIL=${r.firstFailStep??'UNKNOWN'}`,
+  `FIRST_FAIL_CODE=${r.firstFailCode??'UNKNOWN'}`,
+  `NODE_EXIT_CODE=${r.nodeExitCode??'UNKNOWN'}`,
+  `APPLY_STEP_INVOKED=${r.applyStepInvoked}`,
+  `OPERATIONAL_EFFECT_ATTEMPTED=${r.operationalEffectAttempted}`,
   `RETRY=${r.retry}`,'',
 ].join('\n');}
 
@@ -75,14 +159,19 @@ async function sameReadback(fetchApi,url,headers,bytes){
   }catch{return false;}
 }
 
-export async function uploadDirectBReport({event,env,rawResult,fetchApi=fetch}){
+export async function uploadDirectBReport({event,env,rawResult,
+  rawExitEvidence='',fetchApi=fetch}){
   const request=verifyOpenedOwnerIssue(event,env);
   need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20&&
     RUN.test(env.GITHUB_RUN_ID??''),'DIRECT_B_REPORT_AUTH_STOP');
   let parsed;
   try{parsed=typeof rawResult==='string'&&Buffer.byteLength(rawResult)<=2048?
     JSON.parse(rawResult):null;}catch{parsed=null;}
-  const r=sanitizeDirectBReport(parsed,request,env);
+  let exitEvidence;
+  try{exitEvidence=typeof rawExitEvidence==='string'&&
+    Buffer.byteLength(rawExitEvidence)<=512?JSON.parse(rawExitEvidence):null;}
+  catch{exitEvidence=null;}
+  const r=sanitizeDirectBReport(parsed,request,env,exitEvidence);
   const headers={accept:'application/vnd.github+json',
     authorization:'Bearer '+env.GITHUB_TOKEN,
     'x-github-api-version':'2022-11-28',
@@ -110,6 +199,13 @@ export async function uploadDirectBReport({event,env,rawResult,fetchApi=fetch}){
     `RESULT DELIVERY: ${delivery}; CREATED: ${created}/2; `+
     `READBACK: ${verified}/2\n`+
     `LOCAL EFFECT: ${r.runtimeEffectProof}; RUN_ID: ${r.runId??'UNKNOWN'}; `+
+    `JOB: ${r.jobName??'UNKNOWN'}; `+
+    `LAST_PASS: ${r.lastPassStep??'UNKNOWN'}; `+
+    `FIRST_FAIL: ${r.firstFailStep??'UNKNOWN'}; `+
+    `FIRST_FAIL_CODE: ${r.firstFailCode??'UNKNOWN'}; `+
+    `NODE_EXIT: ${r.nodeExitCode??'UNKNOWN'}; `+
+    `APPLY_STEP_INVOKED: ${r.applyStepInvoked}; `+
+    `OPERATIONAL_EFFECT_ATTEMPTED: ${r.operationalEffectAttempted}; `+
     `CROSS_VERSION: ${r.compatibilityEvidenceSha256??'UNKNOWN'}; `+
     'NO AUTO RE-EXECUTION\n';
   const response=await fetchApi(`https://api.github.com/repos/${REPO}/issues/`+
@@ -123,10 +219,14 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   try{
     const env=process.env;
     const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
-    let local;
+    let local,exitEvidence;
     try{local=fs.readFileSync(path.join(env.RUNNER_TEMP,DIRECT_B_RESULT),'utf8');}
     catch{local='';}
-    const report=await uploadDirectBReport({event,env,rawResult:local});
+    try{exitEvidence=fs.readFileSync(path.join(env.RUNNER_TEMP,
+      DIRECT_B_EXIT_FILE),'utf8');}
+    catch{exitEvidence='';}
+    const report=await uploadDirectBReport({event,env,rawResult:local,
+      rawExitEvidence:exitEvidence});
     process.stdout.write(`DIRECT_B_REPORT ${report.delivery} ${report.verified}/2\n`);
   }catch{
     process.stderr.write('DIRECT_B_REPORT_UNVERIFIED_READ_ONLY_RECONCILE\n');
