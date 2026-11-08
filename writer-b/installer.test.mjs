@@ -177,11 +177,19 @@ test('missing relative runtime import preflight refuses before claim and Task ch
  io.readCandidate=async()=>{
   state.steps.push('candidate');
   throw Object.assign(new Error('unapproved import not on PC'),{
-   code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP'});
+   code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
+   diagnostic:{sourceKind:'APPROVED_AFTER',
+    sourcePath:'scripts/pc-writer/run-local.mjs',
+    dependencyPath:'scripts/pc-writer/required.mjs',reason:'NOT_FOUND',
+    secret:'must-never-forward'}});
  };
  const result=await performWriterBInstall(auth(),io);
  assert.equal(result.status,'WRITER_B_PREFLIGHT_STOP');
  assert.equal(result.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ assert.deepEqual(result.diagnostic,{
+  sourceKind:'APPROVED_AFTER',
+  sourcePath:'scripts/pc-writer/run-local.mjs',
+  dependencyPath:'scripts/pc-writer/required.mjs',reason:'NOT_FOUND'});
  assert.equal(state.claimed,false);
  assert.equal(state.coreEnabled,true);
  assert.equal(state.head,manifest().baseHead);

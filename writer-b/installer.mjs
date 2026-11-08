@@ -2,6 +2,7 @@
 // An independently authorized Windows B adapter must implement these exact
 // bounded methods; this module is NOT a pc-job handler or remote shell.
 import {assertAuthenticatedWriterBIssue,validateWriterBManifest} from './contract.mjs';
+import {safeWriterBImportDiagnostic} from './import-availability.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -173,7 +174,9 @@ export async function performWriterBInstall(auth,io){
  }catch(error){
   const code=publicErrorCode(error,'WRITER_B_ADAPTER_UNEXPECTED_STOP');
   if(!claimed){
-   result={status:'WRITER_B_PREFLIGHT_STOP',code,requestId:auth.requestId};
+   const diagnostic=safeWriterBImportDiagnostic(error);
+   result={status:'WRITER_B_PREFLIGHT_STOP',code,requestId:auth.requestId,
+    ...(diagnostic?{diagnostic}:{})};
   }else{
    try{
     if(configMayHaveChanged||sourceMayHaveChanged){

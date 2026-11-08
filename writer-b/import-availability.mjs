@@ -133,6 +133,33 @@ export function relativeModuleReferences(file,bytes){
  return [...refs];
 }
 
+const DIAGNOSTIC_REASONS=new Set([
+ 'NOT_FOUND','SYMLINK','NOT_FILE','SIZE','OUTSIDE_ROOT','READ_ERROR',
+ 'UNAVAILABLE_OR_UNSAFE',
+]);
+const SAFE_RELATIVE=/^(?:scripts\/pc-writer|lib|worker)\/[A-Za-z0-9_./-]+$/;
+const safeDiagnosticPath=value=>typeof value==='string'&&value.length>=1&&
+ value.length<=180&&SAFE_RELATIVE.test(value)&&
+ !value.split('/').some(part=>part===''||part==='.'||part==='..');
+export function safeWriterBImportDiagnostic(error){
+ if(error?.code!=='WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP')return null;
+ const d=error?.diagnostic;
+ if(!d||d.sourceKind!=='APPROVED_AFTER'||
+  !safeDiagnosticPath(d.sourcePath)||
+  !safeDiagnosticPath(d.dependencyPath)||
+  !DIAGNOSTIC_REASONS.has(d.reason))return null;
+ return {sourceKind:'APPROVED_AFTER',sourcePath:d.sourcePath,
+  dependencyPath:d.dependencyPath,reason:d.reason};
+}
+function unavailableImport(sourcePath,dependencyPath,reason){
+ const code='WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP';
+ const error=Object.assign(new Error(code),{code,diagnostic:{
+  sourceKind:'APPROVED_AFTER',sourcePath,dependencyPath,
+  reason:DIAGNOSTIC_REASONS.has(reason)?reason:'UNAVAILABLE_OR_UNSAFE',
+ }});
+ throw error;
+}
+
 export function verifyWriterBImportAvailability({afterFiles,beforeFiles=new Map(),existing}){
  need(afterFiles instanceof Map&&afterFiles.size>=1&&afterFiles.size<=32&&
   beforeFiles instanceof Map&&
@@ -155,7 +182,11 @@ export function verifyWriterBImportAvailability({afterFiles,beforeFiles=new Map(
    if(approved.has(ref.toLowerCase()))continue;
    // 'existing' is an injected bounded, read-only operational-source
    // existence check. Never inspect arbitrary workspace or candidate files.
-   need(existing(ref)===true,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+   const availability=existing(ref);
+   if(availability===true)continue;
+   const reason=availability&&typeof availability==='object'?
+    availability.reason:'UNAVAILABLE_OR_UNSAFE';
+   unavailableImport(file,ref,reason);
   }
  }
  return {status:'PASS',code:'WRITER_B_LITERAL_IMPORTS_AVAILABLE',

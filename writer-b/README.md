@@ -3,6 +3,13 @@
 > 공통 Writer B의 실제 PC 설치 선례: [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651), [#666](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/666). 해당 당시의 승인 범위에만 유효하며, 후속 기능 파일의 자동 설치·게시 성공을 뜻하지 않는다.
 > 아래는 **각 기능 원담당**의 승인된 공통 경로 재사용 안내다. PR 생성·병합·테스트 PASS와 새 기능의 실제 PC 설치·게시 검증을 구분한다.
 
+### 승인 소스의 상대 import 누락 진단 (소스 계약; Windows 적용 별도)
+
+- `WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP`은 기존 **설치 전 안전 중단**이며 자동 복구·재실행 요청이 아니다. 실제 PC 파일 부재뿐 아니라 심볼릭 링크·파일 범위·크기·읽기 검증 실패일 수 있으므로 경로 없이 원인을 추측하지 않는다.
+- 검증된 결과 JSON의 선택적 `diagnostic`은 `sourceKind=APPROVED_AFTER`, `sourcePath`, `dependencyPath`, `reason`만 허용하며, TXT에는 `IMPORT_SOURCE_KIND`, `IMPORT_SOURCE_PATH`, `IMPORT_DEPENDENCY_PATH`, `IMPORT_REASON`으로 제공한다. 경로는 승인된 소스 루트 내부 **상대경로**만 출력한다.
+- `reason`은 `NOT_FOUND`, `SYMLINK`, `NOT_FILE`, `SIZE`, `OUTSIDE_ROOT`, `READ_ERROR`, `UNAVAILABLE_OR_UNSAFE` 중 하나다. `UNAVAILABLE_OR_UNSAFE`는 미확정 사유이지 파일 부재 판정이 아니다.
+- 해당 결과를 받은 기능 원담당이 대상 import의 승인 범위·실제 설치 원본을 확인하고 필요한 범위만 조정한다. **미승인 의존 파일 자동 복제·검사 우회·소비된 Issue 재실행을 금지**한다. 소스 PR·로컬 테스트만으로 실제 Windows 진단 인계 완료를 선언하지 않는다.
+
 ## 1. 한 기능을 추가할 때
 
 1. **기능 원담당**이 최신 개발 `main`과 실제 PC의 승인 source·실행 checkout·운영 Git HEAD/branch·`config.source`·Core Task/실행 래퍼를 구분하여 필요한 **A급 읽기 전용** 증거를 확보한다. 과거 SHA·예시 경로를 현재 값으로 추정하지 않는다.
