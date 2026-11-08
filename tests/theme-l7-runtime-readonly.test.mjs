@@ -218,3 +218,60 @@ test('freeform secrets and ambiguous causes stay unclassified',()=>{
   }
  }finally{f.close();}
 });
+
+test('unknown production-style STOP prose returns fixed lexical signals without raw reason',()=>{
+ const f=fixture();try{
+  const reason='NO_NEW_COMPLETE_PRIMARY_DATE yet; latest ETF coverage still incomplete #9917';
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+   JSON.stringify({status:'STOP',reason,irrelevant:'SENSITIVE_OBSERVATIONS'}));
+  const d=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+   .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  assert.equal(d.status,'CANDIDATES_WITHOUT_SAFE_VALUE');
+  assert.deepEqual(d.values,[]);
+  assert.deepEqual(d.reasonProfiles,[{
+   path:'reason',status:'FIXED_SIGNALS',
+   signals:['COMPLETE','COVERAGE','DATE','ETF','INCOMPLETE','LATEST',
+    'NEW','NO','PRIMARY'],
+  }]);
+  const json=JSON.stringify(d);
+  for(const forbidden of [reason,'9917','SENSITIVE_OBSERVATIONS','yet'])
+   assert.equal(json.includes(forbidden),false);
+ }finally{f.close();}
+});
+
+test('freeform reason signals suppress sensitive values and do not emit arbitrary words',()=>{
+ const f=fixture();try{
+  for(const reason of [
+   'unmappedprovidererror_XYZ456898',
+   'Private key at C:\\secret\\foo.mjs; NO_NEW_DATE',
+   'Bearer abc.def.ghi; MISSING PRIMARY DATA',
+   'reason@example.com; MARKET CLOSED',
+   'NO_NEW_DATE '.repeat(48),
+  ]){
+   fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+    JSON.stringify({status:'STOP',reason}));
+   const d=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+    .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+   assert.deepEqual(d.values,[]);
+   assert.equal(JSON.stringify(d).includes(reason),false);
+   if(reason==='unmappedprovidererror_XYZ456898'){
+    assert.deepEqual(d.reasonProfiles,[{
+     path:'reason',status:'NO_FIXED_SIGNALS',signals:[],
+    }]);
+   }else assert.deepEqual(d.reasonProfiles,[]);
+  }
+ }finally{f.close();}
+});
+
+test('lexical signals are bounded, unique and stable for repeated unknown prose',()=>{
+ const f=fixture();try{
+  const reason='NO NEW NOT READY COMPLETE INCOMPLETE PRIMARY SECONDARY SOURCE PROVIDER GMH MARKETPARQUET ETF ETFS SPY COVERAGE';
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+   JSON.stringify({status:'STOP',reason}));
+  const d=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot})
+   .ledgers['R181_PRIMARY_LAST_RUN.json'].diagnostic;
+  assert.equal(d.reasonProfiles[0].signals.length,12);
+  assert.equal(new Set(d.reasonProfiles[0].signals).size,12);
+  assert.deepEqual(d.reasonProfiles[0].signals,[...d.reasonProfiles[0].signals].sort());
+ }finally{f.close();}
+});
