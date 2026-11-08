@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_WRITER_CONFIG_B_WINDOWS_PROOF_V1",
+  "status": "PASS",
+  "code": "WINDOWS_TEMP_FIXTURE_TESTS_PASS",
+  "issueNumber": 868,
+  "runId": "42436432888",
+  "controlSha": "3f65d049645782d7d0803b48af22dfd97acbdb76",
+  "testFiles": 8,
+  "mode": "TEMP_FIXTURE_ONLY_NOT_PRODUCTION_INSTALL",
+  "configOperationalWrites": 0,
+  "writerOperationalWrites": 0
+}
