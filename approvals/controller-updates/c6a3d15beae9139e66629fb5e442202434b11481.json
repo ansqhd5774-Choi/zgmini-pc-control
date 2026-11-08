@@ -1,0 +1,74 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "db31fd6f3e9df2ae648ff0b1bf2d8c2f5457be59",
+  "targetSha": "c6a3d15beae9139e66629fb5e442202434b11481",
+  "allowFiles": [
+    {
+      "path": "controller/common.mjs",
+      "sha256": "47bc1e9e7d35a3b970fc85e92e12f8e5ad4cf42f625b1fe242cfc3c1ad5a4cd6"
+    },
+    {
+      "path": "controller/engine.mjs",
+      "sha256": "2926e3de44a8ed42085f7e57e912a88afad95039478182279f7fae4adbab3429"
+    },
+    {
+      "path": "controller/entry.mjs",
+      "sha256": "d9cea9a7b20c3f4e3f488c73e69f459011f6f68613e18257073d0378af672ecf"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "ea775e484353063b455f42aaf31357e89521788fff1b6e0501cab4c2920b5ef8"
+    },
+    {
+      "path": "controller/preimage-manifest-contract.mjs",
+      "sha256": "c6cdd28a2efa73955e09a3fbc6d147e13a8d11b97e1ff34bf847441dce571977"
+    },
+    {
+      "path": "controller/preimage-manifest-stager.mjs",
+      "sha256": "d5811466058e2a3a681eae19f3dd8de2a9c7649c1cb548fff665aa556338a547"
+    },
+    {
+      "path": "controller/writer-install-preimage-readonly.mjs",
+      "sha256": "b1e9e3589dde0ef9c2a6a47feb08a86436b42c49b1357309b851488cedbf1d83"
+    },
+    {
+      "path": "controller/writer-publication-evidence-readonly.mjs",
+      "sha256": "1f3a4bd6f9c736faeda1f5ca8f1b8bfd4ee14b3c4482fdcf0b46c9f46ee89bb6"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/878",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "c6a3d15beae9139e66629fb5e442202434b11481",
+    "status": "PASS",
+    "manifestSha256": "bb49e13974890455b8be92116b2caa7e4276db7fa4ad4fa5bef66304855b54d2"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "db31fd6f3e9df2ae648ff0b1bf2d8c2f5457be59"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "680e9afcb8ad34cd20a49933b260de57282c0546",
+  "infrastructureEvidence": {
+    "schema": "ZGMINI_NON_DEPLOYED_INFRA_ACK_V1",
+    "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/878",
+    "files": [
+      {
+        "path": ".github/workflows/pc-job.yml",
+        "sha256": "76621ee9180d01a2a82e68ed35ffb0f86f5e51474d4f1aae008377aab5f81232"
+      },
+      {
+        "path": ".github/workflows/pc-writer-config-b-proof-once.yml",
+        "sha256": "57546490e5af92c316943babf47384212fdfca0a7b2131b814e6d3b738f6b0c2"
+      }
+    ]
+  }
+}
