@@ -86,6 +86,38 @@ ZGMINI_CHAT_HANDOFF_POLL_ACK_V1 8줄을 원래 수신 PR에 단 한 번 등록�
 결과 Issue의 bot 수신증거, PR HEAD, Actions run이 일치해야 하며 원담당 대화에서
 별도의 자연 예약 ACK 증거를 확보하기 전에는 `OWNER_RESUMED`로 바꾸지 않는다.
 
+## 원담당의 결과 반환 수신 ACK — 추가 후보
+
+반환 경로는 담당 PR의 수신 ACK와 별도로, **원담당 전용 PR**의 bot 반환 댓글을
+기준으로 한다. `pr-result-return.mjs`의 11줄 `ZGMINI_CHAT_RESULT_RETURN_V1`가
+동일 Issue의 `HANDOFF_RESULT_RECORDED` bot receipt를 참조해야 하며, `resultId`,
+`digest`, `incidentId`, `fingerprint`, `queueIssue`, `resultIssueCommentId`,
+`originChatId`, `verification: RUNTIME_VERIFICATION_PENDING`이 일치해야 한다.
+또한 원본 결과 PR HEAD와 성공한 GitHub Actions run이 동일 SHA·repo여야 한다.
+
+원담당 일반챗 예약 작업의 결과 ACK는 아래 10줄이며, `returnCommentId`는 정확히
+그 원담당 PR에 존재하는 bot 반환 댓글 ID다.
+
+```text
+ZGMINI_CHAT_RESULT_POLL_ACK_V1
+resultId: result-123456789abc
+digest: <64자리 결과 해시>
+incidentId: handoff-123456789abc
+fingerprint: <64자리 오류 지문>
+queueIssue: 1234
+returnCommentId: 5678
+originChatId: chat-theme1
+ack: RESULT_METADATA_RECEIVED_ONLY
+pcRetries: 0
+```
+
+`agent-handoff/chat-result-poll-receipt.mjs`는 bot 원본 Issue/반환 PR과 별도
+account ACK를 조회만 하여 일치 여부를 판단한다. 성공해도 상태는
+`CHAT_RESULT_POLL_ACK_COMMENT_VERIFIED_CHAT_REF_UNKNOWN`, `ownerResumed: false`다.
+실제 원담당 ChatGPT 대화가 깨어난 증거는 별도 Scheduled task의 `run_details.chat_ref`다.
+PR/CI 성공은 Windows 운영 적용이 아니므로 `APPLIED_VERIFIED`·`OWNER_RESUMED`
+승격 조건이 되지 않는다. 이 ACK 후보는 **등록·운영 활성화되지 않았다**.
+
 ## 통과 기준과 다음 단계
 
 - 서로 **다른 두 `chat_ref`**가 각각 자기 task의 자연 실행 결과에 존재한다.
