@@ -74,6 +74,19 @@ test('STATE_UNKNOWN, BLOCKED and PASS are non-eligible and never generate Issues
   }
 });
 
+test('deliberate failure-proof and timeout-proof FAIL reports do not stop intake', async () => {
+  for (const operation of ['failure-proof', 'timeout-proof']) {
+    const f = fixture();
+    f.io.readReport = async p => p.endsWith('seat-4.json') ?
+      {...report('FAIL'), operation} : null;
+    const outcome = await processCompletedPcJob(event(), f.io);
+    assert.equal(outcome.state, 'SCAN_COMPLETED');
+    assert.equal(outcome.confirmedFailures, 0);
+    assert.equal(outcome.newIssues, 0);
+    assert.equal(f.posts, 0);
+  }
+});
+
 test('a completed pc-job without a published JSON is unknown, not successful intake', async () => {
   const f = fixture(); f.io.readReport = async () => null;
   const outcome = await processCompletedPcJob(event(), f.io);
