@@ -7,6 +7,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {initializeHandoffQueueSchema, createHandoffQueue} from '../agent-handoff/sqlite-queue.mjs';
 import {routeHandoffQueueMetadata} from '../agent-handoff/queue-bridge.mjs';
 import {main as issueBroker} from '../agent-handoff/issue-broker.mjs';
+import {createChatBindingRegistry, CHAT_BINDING_REGISTRY_SCHEMA} from
+  '../agent-handoff/chat-binding-registry.mjs';
 
 const incident = (sha = 'a'.repeat(40)) => ({
   schema: 'ZGMINI_AGENT_HANDOFF_V1', incidentId: 'handoff-123456789abc',
@@ -214,8 +216,12 @@ test('original Issue broker accepts opt-in injected queue and reads back GitHub 
     GITHUB_ACTOR: 'ansqhd5774-Choi', GITHUB_EVENT_NAME: 'issues'};
   const prWakeBinding = {enabled: true, repository, pullRequestNumber: 934,
     targetChatId: 'chat-process-owner', targetRole: 'COMMON_PROCESS_OWNER'};
+  const registry = createChatBindingRegistry({schema: CHAT_BINDING_REGISTRY_SCHEMA,
+    repository, processOwner: {chatId: 'chat-process-owner', inboxPr: 934},
+    origins: [{chatId: 'chat-theme1', inboxPr: 935}]});
   try {
-    const first = await issueBroker(env, {queue, prWakeBinding});
+    const first = await issueBroker(env, {queue,
+      resolvePrWakeBinding: registry.resolveWake});
     assert.equal(first.state, 'ROUTED_PENDING_AGENT');
     assert.equal(first.commentId, 201);
     assert.equal(first.prEvent.commentId, 301);
@@ -238,4 +244,8 @@ test('original Issue broker accepts opt-in injected queue and reads back GitHub 
 test('original Issue broker rejects PR delivery without an explicitly injected queue', async () => {
   await assert.rejects(issueBroker({}, {prWakeBinding: {enabled: true}}),
     /HANDOFF_PR_WAKE_QUEUE_REQUIRED/);
+  await assert.rejects(issueBroker({}, {resolvePrWakeBinding: () => ({})}),
+    /HANDOFF_PR_WAKE_QUEUE_REQUIRED/);
+  await assert.rejects(issueBroker({}, {queue: {}, prWakeBinding: {},
+    resolvePrWakeBinding: () => ({})}), /HANDOFF_PR_WAKE_RESOLVER_CONFLICT/);
 });
