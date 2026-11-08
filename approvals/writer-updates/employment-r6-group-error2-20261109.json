@@ -1,0 +1,63 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/employment-r6-group-failure-code-20261109",
+  "candidateSourceSha": "065b2c01263abfee493b04227a2ba0963c64eaac",
+  "baseHead": "165ca9ebbacf1782f7535aa6a8a3e9cfea80df44",
+  "baseConfigSourceSha": "165ca9ebbacf1782f7535aa6a8a3e9cfea80df44",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "9e1c0168eb6f10e9d88f678ca8d8131b2ecd1e5ee0d9c741361fc6dfea99b10f",
+      "afterSha256": "d21a3499356be68e8e703bd43b6a29ff67cd498885d84e0664b93f9f5d52a304"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+      "change": "M",
+      "beforeSha256": "75cbf8fab32509b9b9b90f6ad6d9fd17187ede3836070fad8387ba331b09e6dd",
+      "afterSha256": "52a33ebf92ec2314e52569754a06eea93acc3ce4c6d3cb8ccd68b12803e63208"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "71145f8db8f80346236896940749ba810b6125ba8947abfb0ba51864381d7699"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "sha256": "9fd530866185d4499db35513207af0888a4f49165e766e5d75a133785ad7ce24"
+    },
+    {
+      "path": "lib/market-score/employment-r6-contract.mjs",
+      "sha256": "bb140adbf45bc445bcd84d16aa2893fda943d4b3f2b388927d9f8268ca1d7076"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "sha256": "01773f71649c346da59129f9b4bb6f3a742e02ee4f0f5404076927904bba7712"
+    },
+    {
+      "path": "lib/market-score/employment-r6-store.mjs",
+      "sha256": "a6c2938bae56147ab4bf3fcb9ba3046355360a538e58f6d34de021ea1d586851"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+      "sha256": "5363c5aba19e3ef67d01307f46b3283ce2f38dd9d3673cc73331e980850c38ea"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
