@@ -59,9 +59,16 @@ jobs:
           success() &&
           (steps.configured.outputs.candidateCheckoutRequired != 'true' ||
           steps.candidate.outcome == 'success')
-        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\run.mjs"'
+        run: |
+          "E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\run.mjs"
+          set "zgmini_apply_exit=%ERRORLEVEL%"
+          "E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\capture-apply-exit.mjs" %zgmini_apply_exit%
+          exit /b %zgmini_apply_exit%
       - name: Create-only sanitized JSON TXT with readback
         if: always() && steps.control.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          DIRECT_B_CONFIGURED_OUTCOME: ${{ steps.configured.outcome }}
+          DIRECT_B_CANDIDATE_OUTCOME: ${{ steps.candidate.outcome }}
+          DIRECT_B_APPLY_OUTCOME: ${{ steps.apply.outcome }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\report.mjs"'
