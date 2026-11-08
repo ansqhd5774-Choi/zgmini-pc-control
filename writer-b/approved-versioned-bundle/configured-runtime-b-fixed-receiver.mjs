@@ -8,7 +8,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {loadApprovedRaw,verifyPinnedSourceCheckout}
-  from '../../direct-writer-b/run.mjs';
+  from '../../direct-writer-b/approval-contract.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
   from '../../r17-writer-b/r17-b-claim.mjs';
 import {runWindowsCrossVersionProof}
