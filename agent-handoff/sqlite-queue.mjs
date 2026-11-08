@@ -91,7 +91,8 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
       SET status = 'CLAIMED', receive_generation = receive_generation + 1,
           lease_token = ?, lease_owner = ?, lease_expires_at = ?, updated_at = ?
       WHERE fingerprint = (SELECT fingerprint FROM ${HANDOFF_QUEUE_TABLE}
-        WHERE status = 'PENDING' ORDER BY created_at, fingerprint LIMIT 1)
+        WHERE status = 'PENDING' AND (? IS NULL OR fingerprint = ?)
+        ORDER BY created_at, fingerprint LIMIT 1)
       RETURNING fingerprint, payload, role, receive_generation, lease_token, lease_expires_at`),
     extend: db.prepare(`UPDATE ${HANDOFF_QUEUE_TABLE} SET lease_expires_at = ?, updated_at = ?
       WHERE fingerprint = ? AND status = 'CLAIMED' AND receive_generation = ?
@@ -119,21 +120,28 @@ export function createHandoffQueue(db, {clock = Date.now} = {}) {
       const inserted = !!statements.insert.get(fingerprint, payload, hash,
         routeHandoff(handoff).role, now, now);
       const row = statements.get.get(fingerprint);
-      if (!row || row.payload_sha256 !== hash) {
+      if (!row) throw new Error('HANDOFF_QUEUE_READBACK_STOP');
+      const stored = JSON.parse(row.payload);
+      // Existing Issue handoff behavior permits a new incidentId for an
+      // identical failure; only the first incident is authoritative.
+      const comparable = {...handoff, incidentId: stored.incidentId};
+      if (row.payload_sha256 !== sha256(JSON.stringify(comparable))) {
         throw new Error('HANDOFF_QUEUE_FINGERPRINT_COLLISION_STOP');
       }
       return Object.freeze({fingerprint, inserted, status: row.status,
+        existingIncidentId: stored.incidentId,
         automaticPcRetries: HANDOFF_QUEUE_RETRIES, operationalWrites: 0});
     },
 
     // A claim means only that a metadata processor owns this queue record.
     // It does NOT prove that another ChatGPT conversation received a message.
-    claim(owner, {leaseMs = 60_000} = {}) {
+    claim(owner, {leaseMs = 60_000, fingerprint = null} = {}) {
       if (typeof owner !== 'string' || !/^[a-z][a-z0-9-]{2,79}$/.test(owner)) {
         throw new Error('HANDOFF_QUEUE_OWNER_INVALID');
       }
+      if (fingerprint !== null) requireFingerprint(fingerprint);
       const expiry = timestampAfter(clock, leaseMs);
-      const row = statements.claim.get(randomUUID(), owner, expiry, nowIso(clock));
+      const row = statements.claim.get(randomUUID(), owner, expiry, nowIso(clock), fingerprint, fingerprint);
       if (!row) return null;
       return Object.freeze({fingerprint: row.fingerprint, token: row.lease_token,
         generation: row.receive_generation, leaseExpiresAt: row.lease_expires_at,
