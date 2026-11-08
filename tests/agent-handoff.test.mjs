@@ -95,10 +95,11 @@ test('rejects skips, terminal repeats and unknown states', () => {
   assert.throws(() => transitionHandoff('OTHER', 'TESTED'), /TRANSITION_STOP/);
 });
 
-async function simulateBroker({untrustedActor = false, loseComment = false, existingLabels = []} = {}) {
+async function simulateBroker({untrustedActor = false, loseComment = false, existingLabels = [],
+  action = 'opened', labelName = 'agent-handoff', expectRejected = false} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
-  fs.writeFileSync(eventPath, JSON.stringify({action: 'opened', repository: {private: true},
+  fs.writeFileSync(eventPath, JSON.stringify({action, label: {name: labelName}, repository: {private: true},
     issue: {number: 2001, user: {login: 'ansqhd5774-Choi'}, labels: [{name: 'agent-handoff'}], body: json()}}));
   const previousToken = process.env.GITHUB_TOKEN;
   const previousFetch = globalThis.fetch;
@@ -129,7 +130,7 @@ async function simulateBroker({untrustedActor = false, loseComment = false, exis
   const env = {GITHUB_EVENT_PATH: eventPath, GITHUB_REPOSITORY: 'ansqhd5774-Choi/zgmini-pc-control',
     GITHUB_ACTOR: untrustedActor ? 'unknown-user' : 'ansqhd5774-Choi', GITHUB_EVENT_NAME: 'issues'};
   try {
-    if (untrustedActor) {
+    if (untrustedActor || expectRejected) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_EVENT_NOT_ALLOWED/);
       assert.equal(posts.length, 0);
     } else if (loseComment) {
@@ -160,4 +161,11 @@ test('broker refuses to mark success when comment readback is missing', async ()
 });
 test('broker refuses issue events from untrusted actors', async () => {
   await simulateBroker({untrustedActor: true});
+});
+test('broker accepts an owner-labeled incident and reruns it exactly once', async () => {
+  await simulateBroker({action: 'labeled'});
+});
+test('broker ignores unrelated labels and unsupported issue actions', async () => {
+  await simulateBroker({action: 'labeled', labelName: 'pc-job', expectRejected: true});
+  await simulateBroker({action: 'edited', expectRejected: true});
 });
