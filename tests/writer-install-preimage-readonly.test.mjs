@@ -82,3 +82,37 @@ test('wrong checkout and absent task source never become verified',()=>{
   assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.sourceRoot,null);
  }finally{f.finish();}
 });
+
+test('manifest-scoped A only reads selected approved paths, legacy output stays unobserved',()=>{
+ const f=fixture();try{
+  const selected='lib/inflation-causal-candidates-public-7-catalog.mjs';
+  const unrelated=CALENDAR_PREIMAGE_FILES[2];
+  for(const rel of [selected,unrelated]){
+   const file=path.join(f.source,...rel.split('/'));
+   fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`// ${rel}\n`);
+  }
+  for(let i=0;i<70;i++)fs.mkdirSync(path.join(f.source,'unused-'+i));
+  const scope={scope:'APPROVED_MANIFEST',
+   sourceRoot:'projects/zgmini-earnings-history-pc-release',
+   manifestPath:'approvals/writer-preimage/inflation-candidates-7-r1.json',
+   manifestSha256:'a'.repeat(64),files:[
+    {path:selected,change:'A'},
+    {path:'scripts/pc-writer/run-local.mjs',change:'M'}]};
+  const result=inspectWriterInstallPreimage(f.data,{strictPlatform:false,
+   inspectSource:f.trace,approvedPreimageScope:scope});
+  assert.equal(result.status,'PASS');
+  assert.equal(result.code,'WRITER_APPROVED_PREIMAGE_READONLY');
+  assert.equal(result.scopedPreimage.files.length,2);
+  assert.equal(result.scopedPreimage.files[0].sha256,
+   sha(Buffer.from(`// ${selected}\n`)));
+  assert.equal(result.scopedPreimage.files[1].state,'ABSENT');
+  assert.equal(result.calendar[2].state,'NOT_OBSERVED');
+  assert.equal(result.employmentR6[0].state,'NOT_OBSERVED');
+  assert.equal(result.operationalWrites,0);assert.equal(result.sqliteOpened,false);
+  const forged={...scope,files:[{path:'../../private.mjs',change:'M'}]};
+  const blocked=inspectWriterInstallPreimage(f.data,{strictPlatform:false,
+   approvedPreimageScope:forged});
+  assert.equal(blocked.status,'BLOCKED');
+  assert.equal(blocked.code,'WRITER_PREIMAGE_SCOPE_UNAPPROVED');
+ }finally{f.finish();}
+});

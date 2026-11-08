@@ -57,7 +57,7 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 ## 허용 작업
 
 - runner-smoke: 자체 CMD→Node 경로 및 읽기 전용 상태.
-- writer-install-preimage-readonly: 실제 Windows의 고정 시장 캘린더 3파일·고용 R6 19파일 설치 전 존재/SHA-256, 운영 sourceRoot/HEAD/config.source 및 R6 설정 두 키 상태를 원본 변경 없이 조회. 실제 실행 중 Core source 확인과는 별도.
+- writer-install-preimage-readonly: 기존 7필드 요청은 실제 Windows의 고정 시장 캘린더 3파일·고용 R6 19파일 설치 전 존재/SHA-256, 운영 sourceRoot/HEAD/config.source 및 R6 설정 두 키 상태를 원본 변경 없이 조회한다. **승인된 신규 기능**은 동일 operation에서 `preimageManifestPath`·`preimageManifestSha256`만 추가할 수 있다. 고유 Issue가 임의 상대경로 배열을 입력하는 것은 불가하며, GitHub 인증 단계가 당시 `GITHUB_SHA`의 비공개 승인 JSON을 원본 SHA로 고정하고 고정 Writer sourceRoot·최대 32 `.mjs` 경로·M/A만 검증해 PC 작업에 비민감 범위만 전달한다. 기존 7필드 호출은 이 단계를 건너뛴다. 해당 고정 추가 조회 계약은 신규 Controller 소스가 실제 승인 설치된 후에만 사용 가능하며, GitHub 병합만으로 운영 A급 사용 가능하다고 간주하지 않는다. 실제 실행 중 Core source 확인과는 별도다.
 - writer-publication-evidence-readonly: ER1 Writer 월별 상태·전체 게시 원장과 고정 11월 로컬 공개 output의 저장 시각·본문 SHA-256만 조회. 개별 D1 재조회는 기록되지 않으면 `NOT_RECORDED`이며 기능 담당자가 별도로 확인.
 - fear-greed-archive-status: 실PC 설치·실행 검증된 Core SQLite 관측·검증 기록 및 실행 경로 읽기 전용 진단.
 - core-status: 기존 task XML hash·config의 승인 SHA·checkpoint 상태만 요약. 원자료/키/전체 config는 미출력.

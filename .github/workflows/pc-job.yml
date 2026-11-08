@@ -17,6 +17,14 @@ jobs:
       run:
         shell: cmd
     steps:
+      - name: Stage approved read-only preimage scope
+        if: contains(github.event.issue.body, 'preimageManifestPath')
+        # The fixed Controller entry must still produce a BLOCKED JSON/TXT
+        # when staging itself fails before an attestable scope is available.
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\preimage-manifest-stager.mjs"'
       - name: Execute fixed host allowlist entry
         run: '"E:\ZGmini\runtime\node.exe" "E:\ZGmini\automation\pc-control\controller\entry.mjs"'
       - name: Upload sanitized TXT JSON and issue result

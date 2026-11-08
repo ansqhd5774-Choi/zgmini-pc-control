@@ -1,0 +1,16 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {"path": "lib/inflation-causal-candidates-public-7-catalog.mjs", "change": "A"},
+    {"path": "worker/inflation-causal-candidates-public-7-r1.mjs", "change": "A"},
+    {"path": "worker/inflation-causal-candidates-public-7-writer-r1.mjs", "change": "A"},
+    {"path": "scripts/pc-writer/inflation-causal-candidates-public-7-preview-r1.mjs", "change": "A"},
+    {"path": "scripts/pc-writer/inflation-causal-candidates-public-7-auto-publication-r1.mjs", "change": "A"},
+    {"path": "scripts/pc-writer/independent-publication.mjs", "change": "M"},
+    {"path": "scripts/pc-writer/run-local.mjs", "change": "M"}
+  ],
+  "allowOtherPaths": false
+}
