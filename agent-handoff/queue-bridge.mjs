@@ -2,6 +2,7 @@
 // isolated SQLite metadata queue. No GitHub token, PC operation or worker is
 // started by importing this module. An approved caller supplies GitHub I/O.
 import {prepareHandoff} from './route.mjs';
+import {recordPrWakeEvent} from './pr-wakeup.mjs';
 
 const BOT = 'github-actions[bot]';
 const MARKER = 'HANDOFF_ROUTED';
@@ -27,7 +28,8 @@ function validatedCommentId(comments, fingerprint, incidentId) {
  * No claim timeout causes this function to re-enqueue or re-run a PC job.
  */
 export async function routeHandoffQueueMetadata({queue, body, issueNumber,
-  readComments, postComment, owner = 'github-handoff-broker', leaseMs = 60_000}) {
+  readComments, postComment, owner = 'github-handoff-broker', leaseMs = 60_000,
+  prWakeBinding = null, readPrComments, postPrComment}) {
   if (!queue || typeof queue.enqueue !== 'function' || typeof queue.claim !== 'function' ||
       typeof queue.markRouted !== 'function') throw new Error('HANDOFF_QUEUE_BRIDGE_REQUIRED');
   if (!Number.isSafeInteger(issueNumber) || issueNumber < 1 ||
@@ -38,6 +40,14 @@ export async function routeHandoffQueueMetadata({queue, body, issueNumber,
   const prepared = prepareHandoff(body);
   const queued = queue.enqueue(body);
   if (queued.fingerprint !== prepared.fingerprint) throw new Error('HANDOFF_QUEUE_FINGERPRINT_STOP');
+  const withOptionalPrEvent = async (result) => {
+    // An opted-in PR event is permitted only after this Issue's own comment
+    // has passed readback, and is idempotent on later broker invocations.
+    if (prWakeBinding === null) return result;
+    const prEvent = await recordPrWakeEvent({body, queueIssueNumber: issueNumber,
+      binding: prWakeBinding, readPrComments, postPrComment});
+    return Object.freeze({...result, prEvent});
+  };
   if (queued.status !== 'PENDING') {
     // If a label write failed after routing, an idempotent broker invocation
     // can recover that label from the existing verified comment, not re-POST.
@@ -46,8 +56,10 @@ export async function routeHandoffQueueMetadata({queue, body, issueNumber,
       : null;
     const state = queued.status === 'ROUTED_PENDING_AGENT' && commentId === null
       ? 'DUPLICATE_REUSED_NO_CURRENT_ISSUE_RECEIPT' : queued.status;
-    return Object.freeze({fingerprint: queued.fingerprint, state,
+    const result = Object.freeze({fingerprint: queued.fingerprint, state,
       commentId, newDispatches: 0, automaticPcRetries: 0, operationalWrites: 0});
+    return queued.status === 'ROUTED_PENDING_AGENT' && commentId !== null
+      ? withOptionalPrEvent(result) : result;
   }
 
   // Target by fingerprint: concurrent per-Issue workflows cannot accidentally
@@ -74,6 +86,6 @@ export async function routeHandoffQueueMetadata({queue, body, issueNumber,
   const marked = queue.markRouted(lease, {issueNumber, commentId,
     fingerprint: queued.fingerprint, marker: MARKER, verifiedCommentReadback: true});
   if (!marked) throw new Error('HANDOFF_QUEUE_LEASE_LOST_STATE_UNKNOWN');
-  return Object.freeze({fingerprint: queued.fingerprint, state: 'ROUTED_PENDING_AGENT',
-    commentId, newDispatches: 0, automaticPcRetries: 0, operationalWrites: 0});
+  return withOptionalPrEvent(Object.freeze({fingerprint: queued.fingerprint, state: 'ROUTED_PENDING_AGENT',
+    commentId, newDispatches: 0, automaticPcRetries: 0, operationalWrites: 0}));
 }
