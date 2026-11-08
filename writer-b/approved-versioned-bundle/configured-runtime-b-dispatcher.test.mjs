@@ -71,6 +71,14 @@ function fixture() {
         activeRuntimeVersion:'v123',manualCommandsVerified:3,
         rollbackRecordVerified:true};
     },
+    async finalizeOneShotAuthorization({requestId,status,reason}) {
+      calls.push('finalize');
+      assert.equal(requestId,request.requestId);
+      assert.ok(['DONE','STATE_UNKNOWN'].includes(status));
+      assert.equal(status==='DONE'?reason===null:
+        typeof reason==='string'&&reason.startsWith('B_'),true);
+      return {status:'JOURNALED_AND_UNLOCKED',requestId};
+    },
   };
   return {calls,approval,windows,receiver};
 }
@@ -95,6 +103,7 @@ test('fixed receiver DI uses existing package preflight then install once',async
   assert.equal(result.status,'DONE');
   assert.deepEqual(calls,[
     'approved','compatibility','load','preflight','consume','install','readback',
+    'finalize',
   ]);
 });
 
@@ -159,6 +168,20 @@ test('uncertain one-shot consumption never reaches install or allows retry',asyn
   assert.equal(result.reason,'B_ONESHOT_RECEIPT');
   assert.equal(result.retryAllowed,false);
   assert.equal(calls.includes('install'),false);
+  assert.equal(calls.at(-1),'finalize');
+});
+
+test('finalization failure does not report success or authorize retry',async()=>{
+  const {receiver,calls}=fixture();
+  receiver.finalizeOneShotAuthorization=async()=>{
+    calls.push('finalize');throw Error('disk unavailable');
+  };
+  const result=await configured(receiver);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.reason,'B_ONESHOT_FINALIZATION_UNVERIFIED');
+  assert.equal(result.retryAllowed,false);
+  assert.equal(calls.filter(x=>x==='install').length,1);
+  assert.equal(calls.at(-1),'finalize');
 });
 
 test('failed installer becomes STATE_UNKNOWN and is never retried',async()=>{
