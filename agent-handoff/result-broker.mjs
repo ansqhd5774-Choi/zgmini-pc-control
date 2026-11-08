@@ -65,17 +65,30 @@ function authorize(event, env) {
       !Number.isSafeInteger(event.issue.number)) throw new Error('RESULT_EVENT_NOT_ALLOWED');
 }
 
-export async function main(env = process.env, {returnPrEvent = null, resultPrBinding = null} = {}) {
+export async function main(env = process.env, {returnPrEvent = null, resultPrBinding = null,
+  resolveResultPrBinding = null} = {}) {
   if (returnPrEvent !== null && typeof returnPrEvent !== 'function') {
     throw new Error('RESULT_PR_RETURN_CALLBACK_INVALID');
   }
-  if (resultPrBinding !== null && returnPrEvent !== null) {
+  if ((resultPrBinding !== null && returnPrEvent !== null) ||
+      (resolveResultPrBinding !== null &&
+        (typeof resolveResultPrBinding !== 'function' ||
+          resultPrBinding !== null || returnPrEvent !== null))) {
     throw new Error('RESULT_PR_RETURN_TRANSPORT_CONFLICT');
   }
-  const publishReturn = resultPrBinding === null ? returnPrEvent :
+  if (!env.GITHUB_EVENT_PATH) throw new Error('RESULT_EVENT_PATH_STOP');
+  const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
+  authorize(event, env);
+  const handoff = parseHandoff(event.issue.body);
+  const binding = resolveResultPrBinding === null ? resultPrBinding :
+    resolveResultPrBinding(handoff);
+  if (resolveResultPrBinding !== null && binding === null) {
+    throw new Error('RESULT_PR_RETURN_RESOLUTION_REQUIRED');
+  }
+  const publishReturn = binding === null ? returnPrEvent :
     async ({handoff, result, pr, run, queueIssueNumber}) => recordPrResultReturn({
       handoffBody: handoff, resultBody: result, pr, run, queueIssueNumber,
-      binding: resultPrBinding,
+      binding,
       readResultIssueComments: issue => listCompleteComments(issue, 'issue'),
       readPrComments: target => listCompleteComments(target.pullRequestNumber, 'pr'),
       postPrComment: (target, body) => {
@@ -84,10 +97,6 @@ export async function main(env = process.env, {returnPrEvent = null, resultPrBin
           {method: 'POST', body: {body}});
       }
     });
-  if (!env.GITHUB_EVENT_PATH) throw new Error('RESULT_EVENT_PATH_STOP');
-  const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
-  authorize(event, env);
-  const handoff = parseHandoff(event.issue.body);
   const result = parseAgentResult(event.comment.body);
   assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
