@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {isApprovedConfiguredRuntime,verifyPinnedSourceCheckout}
-  from './run.mjs';
+  from './approval-contract.mjs';
 import {runWindowsCrossVersionProof}
   from '../writer-b/approved-versioned-bundle/windows-cross-version-proof.mjs';
 import {reportProofFromRunner} from './proof-only-report.mjs';
