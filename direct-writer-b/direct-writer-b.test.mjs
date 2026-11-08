@@ -298,6 +298,9 @@ test('missing fixed Windows receiver blocks configured B before install',async()
   const result=await applyApprovedOnce(f.auth);
   assert.equal(result.status,'DIRECT_B_EFFECT_BLOCKED');
   assert.equal(result.operationSucceeded,false);
+  assert.equal(result.code,process.platform==='win32'?
+    'DIRECT_B_RECEIVER_UNAVAILABLE_OR_FAILED':
+    'DIRECT_B_FIXED_WINDOWS_REQUIRED');
   const wrongSource=await applyApprovedOnce(f.auth,{configuredRunner:async()=>({
     status:'DONE',sourceSha:'a'.repeat(40),
     verified:'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'})});
