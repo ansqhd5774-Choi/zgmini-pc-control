@@ -1,0 +1,54 @@
+{
+  "schema": "ZGMINI_CONFIGURED_RUNTIME_WINDOWS_PROOF_RESULT_V1",
+  "requestId": "ef9db185-01e3-4d6d-a006-0174e0c5ce7b",
+  "runId": "42432253703",
+  "approvalSha256": "ae5ef03f69b73a897dc24b68503a2a47858ac0989d93018c1fb90e5d4d2d8093",
+  "sourceSha": "0c97599431882245a156470bd51290e327e7ee78",
+  "manifestSha256": "727a8640dabee96966574118f8bb5daecadb5d763190f3e8c26e651d8609bb03",
+  "status": "PROOF_PASS",
+  "code": "PROOF_WINDOWS_BILATERAL_PASS",
+  "operationWrites": 0,
+  "windowsProof": "OLD_NEW_TEMP_FIXTURE_ONLY_NO_INSTALL",
+  "activeRuntimeSha256": "e97ff8825ff3b031f8a47bc7e608e04a4a39bb3c332ecc47eeeaa507c512e100",
+  "taskXmlSha256": "11123921e42e01a65140ae147894ba355b7fbe2106a145fcdf606f88bfcc2507",
+  "evidenceSha256": "ae65478c9dce2663d5cf7d30354e823cde9919945e074e06b8bdab0275faad05",
+  "transcript": {
+    "schema": "ZGMINI_CONFIGURED_OLD_NEW_WINDOWS_PROOF_V1",
+    "sourceSha": "0c97599431882245a156470bd51290e327e7ee78",
+    "oldSourceSha": "9cad027530230d5b4f97707a9707ab97866dd1d6",
+    "oldVersion": "0b1ed5d35888b0e0",
+    "taskXmlSha256": "11123921e42e01a65140ae147894ba355b7fbe2106a145fcdf606f88bfcc2507",
+    "metrics": {
+      "externalNetworkCalls": 0,
+      "d1Writes": 0,
+      "simulations": [
+        {
+          "direction": "OLD_TO_NEW",
+          "mockFetchCalls": 4,
+          "d1Writes": 0,
+          "cycleCheckpointSha256": "3459f40b3464a21674998b79e34f9d42ef2f72fac102913ae08f4503d3ab8dd5",
+          "sameWindowDedup": true,
+          "revisions": 2,
+          "casRejected": true,
+          "tamperRejected": true,
+          "sameDayBudgetRetained": true
+        },
+        {
+          "direction": "NEW_TO_OLD",
+          "mockFetchCalls": 4,
+          "d1Writes": 0,
+          "cycleCheckpointSha256": "3459f40b3464a21674998b79e34f9d42ef2f72fac102913ae08f4503d3ab8dd5",
+          "sameWindowDedup": true,
+          "revisions": 2,
+          "casRejected": true,
+          "tamperRejected": true,
+          "sameDayBudgetRetained": true
+        }
+      ],
+      "mockFetchCalls": 8,
+      "sharedLeaseCollisionRejected": true,
+      "oneShotReplayRejected": true
+    }
+  },
+  "retry": "NO_AUTO_RETRY_READ_ONLY_RECONCILE"
+}
