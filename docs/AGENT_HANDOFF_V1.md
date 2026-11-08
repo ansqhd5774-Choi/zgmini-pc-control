@@ -11,6 +11,7 @@
 - V2 반환 연결은 `issue_comment`의 결과 JSON에서 같은 사고 ID·fingerprint, 실제 PR HEAD 및 GitHub Actions Run 성공/HEAD 일치를 조회해 **원래 인계 Issue 안에** `RUNTIME_VERIFICATION_PENDING`을 기록한다. 이는 실제 테스트의 의미·운영 적용 검증을 대체하지 않는다.
 - 기존 GitHub Actions `GITHUB_TOKEN`으로 작성한 댓글은 다음 Workflow를 보통 트리거하지 않으므로, 전문 AI가 결과 댓글을 자동 발행하는 자격·실행 경로는 별도 연결이 필요하다. 현재는 owner 작성 이벤트만 수신한다.
 - `zgmini-pc-control` Workflow의 기본 `GITHUB_TOKEN`은 다른 저장소의 원본 Issue에 쓰기 권한이 있다고 가정하지 않는다. 원본 업무 참조는 기록하되 다른 ChatGPT 대화가 실제 수신했다고 표기하지 않는다.
+- 결과 반환 job은 해당 저장소의 PR 및 Actions 실행 조회에 필요한 `pull-requests: read`, `actions: read` 최소 권한을 가진다. 다른 저장소의 비공개 PR/Run을 이 권한으로 읽을 수 있다고 가정하지 않는다. 현재 result broker는 cross-repo 제안을 `RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED`로 거부한다. 향후 승인된 GitHub App 권한이 준비된 경우에만 확장한다.
 - `agentConfigured: true`는 향후 승인된 실제 엔드포인트를 연결할 때만 사용한다. `ASSIGNED`만으로 실제 AI 시작·코드 수정·운영 적용을 주장할 수 없다.
 - 실패 검사와 접수는 PC 실행 재시도가 아니다. 기존 `maxAutomaticRetries=0`을 보존한다.
 - Workflow는 Node source를 Windows에 실행하므로 기존 승인·설치 경로에 맞는 검증을 거친 후에만 활성화한다. PR 병합만으로 실PC 활성화라고 보고하지 않는다.

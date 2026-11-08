@@ -7,6 +7,14 @@ import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contra
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 const API = 'https://api.github.com';
 
+export function assertWorkflowResultRepository(result) {
+  // The repository-scoped GITHUB_TOKEN cannot read another private repo's
+  // PR/Actions metadata. A multi-repo GitHub App is a separate permission step.
+  if (result.pullRequest.repository !== REPOSITORY || result.testRun.repository !== REPOSITORY) {
+    throw new Error('RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED');
+  }
+}
+
 async function api(resource, {method = 'GET', body} = {}) {
   if (!process.env.GITHUB_TOKEN) throw new Error('RESULT_GITHUB_TOKEN_STOP');
   const response = await fetch(`${API}${resource}`, {method,
@@ -50,6 +58,7 @@ export async function main(env = process.env) {
   authorize(event, env);
   const handoff = parseHandoff(event.issue.body);
   const result = parseAgentResult(event.comment.body);
+  assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
   if (await inspectExistingResult(event.issue.number, result.resultId, digest)) {
     process.stdout.write('HANDOFF_RESULT_ALREADY_RECORDED\n');
