@@ -5,6 +5,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
+import {isSafePreimagePath,PREIMAGE_SOURCE_ROOT} from './preimage-manifest-contract.mjs';
 
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const SHA40=/^[0-9a-f]{40}$/i;
@@ -43,6 +44,23 @@ const inside=(root,file)=>{const rel=path.relative(root,file);
  return rel!==''&&rel!=='..'&&!rel.startsWith('..'+path.sep)&&!path.isAbsolute(rel);};
 const safeOption=value=>value===true?'ENABLED':value===false?'DISABLED':
  value===undefined?'ABSENT':'UNRECOGNIZED';
+const approvedScope=value=>{
+ if(value===null||value===undefined)return null;
+ if(value?.scope!=='APPROVED_MANIFEST'||value.sourceRoot!==PREIMAGE_SOURCE_ROOT||
+   typeof value.manifestPath!=='string'||
+   !/^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(value.manifestPath)||
+   !/^[0-9a-f]{64}$/.test(value.manifestSha256??'')||
+   !Array.isArray(value.files)||value.files.length<1||value.files.length>32)
+   return false;
+ const seen=new Set();
+ for(const item of value.files){
+  if(!item||Object.keys(item).sort().join('|')!=='change|path'||
+    !isSafePreimagePath(item.path)||!['M','A'].includes(item.change)||
+    seen.has(item.path.toLowerCase()))return false;
+  seen.add(item.path.toLowerCase());
+ }
+ return value;
+};
 
 /** Return only the two public opt-in states; never return the rest of config. */
 export function readR6OptInStatus(dataRoot,{fileSystem=fs}={}){
@@ -64,7 +82,9 @@ export function readR6OptInStatus(dataRoot,{fileSystem=fs}={}){
 
 /** The caller may inject fixture dependencies, but never a file list. */
 export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
- fileSystem=fs,inspectSource=inspectPcSource,strictPlatform=true}={}){
+ fileSystem=fs,inspectSource=inspectPcSource,strictPlatform=true,
+ approvedPreimageScope=null}={}){
+ const scope=approvedScope(approvedPreimageScope);
  const result={status:'STATE_UNKNOWN',code:'WRITER_PREIMAGE_SOURCE_UNVERIFIED',
   observedAt:new Date().toISOString(),
   evidenceLevel:'FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS',runtimeSourceVerified:false,
@@ -78,6 +98,9 @@ export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
   calendar:CALENDAR_PREIMAGE_FILES.map(p=>empty(p,p===CALENDAR_PREIMAGE_FILES[2]?'M':'A')),
   employmentR6:EMPLOYMENT_R6_PREIMAGE_FILES.map((p,i)=>empty(p,i<11?'M':'A')),
   operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false};
+ if(scope===false)return {...result,status:'BLOCKED',code:'WRITER_PREIMAGE_SCOPE_UNAPPROVED'};
+ if(scope){result.scopedPreimage={manifestPath:scope.manifestPath,
+  manifestSha256:scope.manifestSha256,files:scope.files.map(x=>empty(x.path,x.change))};}
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot)||
     (strictPlatform&&process.platform!=='win32'))return result;
  let data,base;
@@ -143,8 +166,15 @@ export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
    return item;
   });
  }
- result.calendar=filesFor(CALENDAR_PREIMAGE_FILES,(_,i)=>i===2);
- result.employmentR6=filesFor(EMPLOYMENT_R6_PREIMAGE_FILES,(_,i)=>i<11);
- result.status='PASS';result.code='WRITER_FIXED_PREIMAGE_READONLY';
+ if(scope){
+  // Scoped requests read only the approved manifest's bounded paths. Existing
+  // seven-field requests keep the exact historical 22-path result unchanged.
+  result.scopedPreimage.files=filesFor(scope.files.map(x=>x.path),(_,i)=>
+   scope.files[i].change==='M');
+ }else{
+  result.calendar=filesFor(CALENDAR_PREIMAGE_FILES,(_,i)=>i===2);
+  result.employmentR6=filesFor(EMPLOYMENT_R6_PREIMAGE_FILES,(_,i)=>i<11);
+ }
+ result.status='PASS';result.code=scope?'WRITER_APPROVED_PREIMAGE_READONLY':'WRITER_FIXED_PREIMAGE_READONLY';
  return result;
 }
