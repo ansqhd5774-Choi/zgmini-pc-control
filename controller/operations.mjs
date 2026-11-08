@@ -70,7 +70,10 @@ function r6CollectionProjection(raw){
   if(!item||!r6GroupNames.has(item.groupName))return [];
   const status=r6Code(item.status);
   if(!status)return [];
-  return [{groupName:item.groupName,status,...(planned?{due:item.due===true}: {})}];
+  return [{groupName:item.groupName,status,
+   ...(r6Code(item.failureCode)?{failureCode:r6Code(item.failureCode)}:{}),
+   ...(!planned&&r6Count(item.providerRequests)!==null?{providerRequests:item.providerRequests}:{}),
+   ...(planned?{due:item.due===true}: {})}];
  }).slice(0,6):[];
  return {status:r6Code(raw.status),code:r6Code(raw.code),
   providerRequests:r6Count(raw.providerRequests),
