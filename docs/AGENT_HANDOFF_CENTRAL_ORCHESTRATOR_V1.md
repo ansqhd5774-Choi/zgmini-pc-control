@@ -1,6 +1,6 @@
 # ZGMINI 단일 ChatGPT 총괄 — 공통 장애 대기열 실행 계약
 
-상태: 중앙 ChatGPT 예약 등록 완료(첫 자연 실행 대기) + SOURCE_ONLY 소스.
+상태: 중앙 ChatGPT 예약 등록 및 첫 실제 실행 완료(NO_WORK) + SOURCE_ONLY 소스.
 운영 자동 처리/PC 설치 성공 증거 아님.
 
 ## 사용자 최종 역할 지시
@@ -52,15 +52,22 @@
   0건을 관측했다. 이는 검색 시점의 대기열 현황이고 상시 비어 있음을 의미하지 않는다.
 - **2026-11-09 KST 실제 등록:** 단일 task `ZGMINI 공통 인계 중앙 처리`,
   ID `Automation_9a403a04a8ac8191a331e94f9abeb1b4`,
-  `conversation_id=6af0833b-a34c-83ec-99a3-1acde1007171`,
   `is_enabled=true`, 매시간 조건 확인. 신규 대화별 task 0건.
-  즉시 실행 호출은 `Ready to run in this conversation`으로 반환되었고
-  `inline_run=true`였다. **자연 예약 실행 `run_details.last_run`은 아직 null**이며,
-  이를 자연 실행 PASS로 기록하지 않는다.
+  등록 직후의 `conversation_id`는 `6af0833b-a34c-83ec-99a3-1acde1007171`였으나,
+  실제 실행 후 자동화 레코드의 `conversation_id`와 `run_details.chat_ref`는
+  모두 **`6af09dfa-38a0-83ee-ad03-8a27bc3460f3`**로 관측되었다.
+  서로 다른 ID를 동일 채팅이라고 간주하지 않는다.
 - 최초 등록 후 검색 Gate를 `agent-handoff` 라벨 단독으로 줄였다. 기존
   `handoff-agent-pending` 라벨/Workflow opt-in이 없더라도 유효 사건의 읽기 전용
   진단은 가능하며, 없던 `HANDOFF_ROUTED` 봇 증거를 위조하지 않는다.
-- 다음 실행: 첫 자연 실행의 `run_details.chat_ref`와 GitHub 조회 범위 확인,
-  이후 유효 장애가 유입되면 승인 범위 내 원인 수정과 결과를 끝까지 수행한다.
+- **첫 실제 예약 실행 PASS(대기열 조회에 한정):** 실행 ID
+  `d43c770c-6fa8-832f-a4f5-4e006664d76c`, scheduled
+  `2026-11-08T16:06:35Z`, started `16:05:57.590984Z`,
+  completed `16:06:17.675456Z`, recorded_status=`completed`.
+  결과 `NO_WORK`, 미처리 인계 Issue **0건**, GitHub/PC 쓰기 **0건**.
+  이는 실제 장애 원인 수정·코드/PC Runtime/결과 반환 성공 증거가 아니다.
+- 다음 실행: **실제 유효 장애 유입 경로(원래 실패 → `agent-handoff` Issue)**와
+  정확한 bot 라우팅/결과 기록의 연결을 확인한다. 그전까지 조회 전용 작업의 성공을
+  전체 장애 해결 자동화 성공으로 과장하지 않는다.
 - 현재 기본 Workflow `main()`의 `queue=null` 연결과 Windows DB 실제 설치는
   미완료. 따라서 Source 통과만으로 Runtime 큐 처리 완료를 선언하지 않는다.
