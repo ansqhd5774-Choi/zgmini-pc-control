@@ -1,0 +1,66 @@
+# Source-only candidate. Install only after exact approval and Windows bridge proof.
+# Reuses the independently proven Writer B Actions lane, NOT maintenance handoff.
+name: ZGMINI Approved Runtime B Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-writer-source-b-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  approved-runtime-b:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-approved-runtime-b' &&
+      contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Pin reviewed control source
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: generic-b-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Resolve exact configured source from approved Git blob
+        id: configured
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\configured-source-pin.mjs"'
+      - name: Checkout exact approved configured source
+        id: candidate
+        if: steps.configured.outputs.candidateCheckoutRequired == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.configured.outputs.sourceSha }}
+          path: configured-feature-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Apply exact approved runtime B effect
+        id: apply
+        if: >-
+          success() &&
+          (steps.configured.outputs.candidateCheckoutRequired != 'true' ||
+          steps.candidate.outcome == 'success')
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\run.mjs"'
+      - name: Create-only sanitized JSON TXT with readback
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\report.mjs"'
