@@ -279,6 +279,8 @@ test('configured B routes exact pinned manifest into existing dispatcher',async(
     assert.equal(pins.packageManifestSha256,'b'.repeat(64));
     assert.deepEqual(pins.runtimePreimage,f.auth.manifest.runtimePreimage);
     return {status:'DONE',sourceSha,
+      compatibilityEvidenceSha256:'9'.repeat(64),
+      compatibilityDirections:2,compatibilitySharedLockVerified:true,
       verified:'PC_RUNTIME_SOURCE_TASK_MANUAL_ACTIVE_ROLLBACK'};
   }});
   assert.equal(calls,1);
@@ -287,11 +289,30 @@ test('configured B routes exact pinned manifest into existing dispatcher',async(
   const cleaned=sanitizeDirectBReport(result,f.request,env());
   assert.equal(cleaned.mode,'CONFIGURED_THEMES_REPEAT_UPGRADE');
   assert.equal(cleaned.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
+  assert.equal(cleaned.compatibilityEvidenceSha256,'9'.repeat(64));
+  assert.equal(cleaned.compatibilityDirections,2);
+  assert.equal(cleaned.compatibilitySharedLockVerified,true);
+  assert.equal(cleaned.runId,'4117');
   const http=fakeGithub();
   const delivered=await uploadDirectBReport({event:event(JSON.stringify(f.request)),
     env:env(),rawResult:JSON.stringify(result),fetchApi:http.fetch});
   assert.equal(delivered.verified,2);
   assert.equal(delivered.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
+  const json=[...http.objects].find(([url])=>url.endsWith('.json'))?.[1];
+  const txt=[...http.objects].find(([url])=>url.endsWith('.txt'))?.[1];
+  assert.equal(JSON.parse(json).compatibilityEvidenceSha256,'9'.repeat(64));
+  assert.match(txt.toString('utf8'),/COMPATIBILITY_DIRECTIONS=2/);
+});
+test('untrusted compatibility claims are removed from exported B report',()=>{
+  const f=configuredFixture();
+  const cleaned=sanitizeDirectBReport({
+    status:'DIRECT_B_EFFECT_BLOCKED',code:'DIRECT_B_FIXED_WINDOWS_REQUIRED',
+    requestId,compatibilityEvidenceSha256:'a'.repeat(64),
+    compatibilityDirections:1,compatibilitySharedLockVerified:true,
+  },f.request,env());
+  assert.equal(cleaned.compatibilityEvidenceSha256,null);
+  assert.equal(cleaned.compatibilityDirections,0);
+  assert.equal(cleaned.compatibilitySharedLockVerified,false);
 });
 test('missing fixed Windows receiver blocks configured B before install',async()=>{
   const f=configuredFixture();
