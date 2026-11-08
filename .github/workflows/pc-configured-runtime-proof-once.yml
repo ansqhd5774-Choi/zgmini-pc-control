@@ -1,0 +1,61 @@
+# Independent read-only Windows proof. Does NOT call Writer B install.
+name: ZGMINI Configured Runtime Proof Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-writer-source-b-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  configured-runtime-proof:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-configured-runtime-proof' &&
+      contains(github.event.issue.labels.*.name, 'pc-runtime-proof-readonly') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Pin reviewed proof code and approval bytes
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: generic-b-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read-only approval and source pin
+        id: configured
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\proof-only.mjs" --pin'
+      - name: Checkout immutable configured runtime source
+        id: candidate
+        if: steps.configured.outcome == 'success'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.configured.outputs.sourceSha }}
+          path: configured-feature-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Prove both Windows versions with temporary fixtures only
+        if: success() && steps.candidate.outcome == 'success'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\proof-only.mjs" --run'
+      - name: Create-only sanitized proof JSON and TXT with readback
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\proof-only.mjs" --report'
