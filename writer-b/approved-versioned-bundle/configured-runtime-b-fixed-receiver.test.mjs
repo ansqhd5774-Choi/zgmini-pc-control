@@ -11,7 +11,7 @@ const requestId='abeb79fe-03b3-4f7c-9df3-f521bff31c50';
 function setup(t,{wrongManifest=false}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'fixed-configured-b-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  fs.mkdirSync(path.join(root,'generic-b-approved-source'));
+  fs.mkdirSync(path.join(root,'configured-feature-source'));
   fs.mkdirSync(path.join(root,'generic-b-control'));
   const eventFile=path.join(root,'event.json');
   fs.writeFileSync(eventFile,'{}');
@@ -25,7 +25,7 @@ function setup(t,{wrongManifest=false}={}){
     authorize:()=>{called.push('authorize');return auth;},
     pinCheckout:(_,pin)=>{
       called.push('pin');assert.equal(pin.sourceRoot,
-        path.join(root,'generic-b-approved-source'));
+        path.join(root,'configured-feature-source'));
     },
     importModule:async(_,rel)=>{
       called.push(rel);
