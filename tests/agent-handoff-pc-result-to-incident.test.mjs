@@ -41,6 +41,23 @@ test('STATE_UNKNOWN, BLOCKED and PASS never become repair incidents', () => {
   }
 });
 
+test('existing owner pc-job requestId UUID is valid', () => {
+  const candidate = input();
+  candidate.originIssue.body = JSON.stringify({...request(),
+    requestId: 'da879c37-c151-4960-86d9-2444e3aabe09'});
+  candidate.report.requestId = 'da879c37-c151-4960-86d9-2444e3aabe09';
+  assert.equal(preparePcFailureHandoff(candidate).state, 'READY_TO_ENQUEUE');
+});
+
+test('intentional failure-proof and timeout-proof results are not repair incidents', () => {
+  for (const operation of ['failure-proof', 'timeout-proof']) {
+    const candidate = input();
+    candidate.originIssue.body = JSON.stringify({...request(), operation});
+    candidate.report.operation = operation;
+    assert.equal(preparePcFailureHandoff(candidate).state, 'NOT_ELIGIBLE');
+  }
+});
+
 test('spoofed original issue author, repo or pc-job label is refused', () => {
   for (const change of [
     v => { v.originIssue.user.login = 'attacker'; },
