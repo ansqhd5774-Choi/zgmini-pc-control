@@ -71,7 +71,7 @@ export function parseHandoff(body) {
     throw new Error('FILE_REFS_INVALID');
   }
   const fileRefs = failure.fileRefs.map(requirePath);
-  const evidenceIssueNumber = failure.evidenceIssueNumber === undefined ? null : requireIssue(failure.evidenceIssueNumber, 'EVIDENCE_ISSUE');
+  const evidenceIssueNumber = failure.evidenceIssueNumber == null ? null : requireIssue(failure.evidenceIssueNumber, 'EVIDENCE_ISSUE');
   const clean = {
     schema: HANDOFF_SCHEMA, incidentId,
     origin: {repository, issueNumber, requestId, chatId, branch, sourceSha, checkpoint: origin.checkpoint},
