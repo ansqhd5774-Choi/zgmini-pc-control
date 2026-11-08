@@ -76,7 +76,7 @@ test('result digest fixes exact result payload for collision detection', () => {
 });
 
 async function simulate({lostComment = false, collision = false, unauthorized = false,
-  retryReturn = false} = {}) {
+  retryReturn = false, resultPrBinding = false, lostPrReadback = false} = {}) {
   const {handoff, result, pr, run} = setup();
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-result-'));
   const eventPath = path.join(temp, 'event.json');
@@ -86,6 +86,7 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
   const originalToken = process.env.GITHUB_TOKEN;
   const originalFetch = globalThis.fetch;
   const seen = [];
+  const originPrComments = [];
   const comments = collision ? [{user: {login: 'github-actions[bot]'},
     body: `HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${'0'.repeat(64)}`}]: [];
   process.env.GITHUB_TOKEN = 'unit-test-nonsecret';
@@ -96,8 +97,16 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
     if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') value = comments;
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       seen.push('comment');
-      if (!lostComment) comments.push({user: {login: 'github-actions[bot]'}, body: JSON.parse(request.body).body});
+      if (!lostComment) comments.push({id: 101, user: {login: 'github-actions[bot]'},
+        body: JSON.parse(request.body).body});
       value = {id: 1};
+    } else if (uri.pathname.endsWith('/issues/992/comments') && method === 'GET') {
+      value = originPrComments;
+    } else if (uri.pathname.endsWith('/issues/992/comments') && method === 'POST') {
+      seen.push('pr-comment');
+      if (!lostPrReadback) originPrComments.push({id: 301,
+        user: {login: 'github-actions[bot]'}, body: JSON.parse(request.body).body});
+      value = {id: 301};
     } else if (uri.pathname.endsWith('/pulls/920')) value = pr;
     else if (uri.pathname.endsWith('/actions/runs/42450377234')) value = run;
     else throw new Error(`unexpected GitHub API ${uri.pathname}`);
@@ -123,6 +132,22 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       await runResultBroker(env, {returnPrEvent});
       assert.equal(calls, 2);
       assert.deepEqual(seen, ['comment'], 'a return retry must not duplicate the result Issue comment');
+    } else if (resultPrBinding) {
+      const binding = {enabled: true, repository: 'ansqhd5774-Choi/zgmini-pc-control',
+        pullRequestNumber: 992, targetChatId: handoff.origin.chatId};
+      if (lostPrReadback) {
+        await assert.rejects(runResultBroker(env, {resultPrBinding: binding}),
+          /CHAT_RESULT_RETURN_PR_READBACK_STOP/);
+        assert.deepEqual(seen, ['comment', 'pr-comment']);
+      } else {
+        await runResultBroker(env, {resultPrBinding: binding});
+        await runResultBroker(env, {resultPrBinding: binding});
+        assert.deepEqual(seen, ['comment', 'pr-comment'], 'each result and PR receipt posts once');
+        assert.equal(originPrComments.length, 1);
+        assert.match(originPrComments[0].body, /^ZGMINI_CHAT_RESULT_RETURN_V1\n/);
+        assert.match(originPrComments[0].body, /verification: RUNTIME_VERIFICATION_PENDING/);
+        assert.doesNotMatch(originPrComments[0].body, /ownerResumed: true/);
+      }
     } else { await runResultBroker(env); await runResultBroker(env); assert.deepEqual(seen, ['comment']); }
     if (unauthorized || collision) assert.deepEqual(seen, []);
   } finally {
@@ -138,6 +163,14 @@ test('result broker blocks same ID with different payload', async () => simulate
 test('result broker rejects untrusted issue comment actor', async () => simulate({unauthorized: true}));
 test('opt-in origin PR return recovers after uncertainty without reposting result',
   async () => simulate({retryReturn: true}));
+test('result broker opt-in PR return verifies GitHub Issue then PR readback without duplicate posts',
+  async () => simulate({resultPrBinding: true}));
+test('result broker never claims PR return when the target PR readback is absent',
+  async () => simulate({resultPrBinding: true, lostPrReadback: true}));
 test('result broker rejects a non-function return path before reading the event', async () => {
   await assert.rejects(runResultBroker({}, {returnPrEvent: true}), /RETURN_CALLBACK_INVALID/);
+});
+test('result broker rejects two competing PR return transports', async () => {
+  await assert.rejects(runResultBroker({}, {returnPrEvent: async () => {}, resultPrBinding: {}}),
+    /RESULT_PR_RETURN_TRANSPORT_CONFLICT/);
 });
