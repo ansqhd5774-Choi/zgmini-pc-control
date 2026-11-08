@@ -36,7 +36,7 @@ test('source-only API never opens a PC database or retries an operation', () => 
   } finally { db.close(); }
 });
 
-test('identical duplicate is reused; changed payload with same fingerprint fails closed', () => {
+test('identical failure with a new incident ID is reused; substantive mutation fails closed', () => {
   const {db, queue} = inMemory(() => 1_000);
   try {
     const first = queue.enqueue(JSON.stringify(incident()));
@@ -44,6 +44,10 @@ test('identical duplicate is reused; changed payload with same fingerprint fails
     assert.equal(again.inserted, false);
     assert.equal(first.fingerprint, again.fingerprint);
     const changed = incident('handoff-abcdef012345');
+    const reused = queue.enqueue(changed);
+    assert.equal(reused.inserted, false);
+    assert.equal(reused.existingIncidentId, 'handoff-123456789abc');
+    changed.failure.lastPass = 'DIAGNOSTIC_PASS';
     assert.throws(() => queue.enqueue(changed), /FINGERPRINT_COLLISION_STOP/);
     assert.equal(queue.stats().total, 1);
   } finally { db.close(); }
