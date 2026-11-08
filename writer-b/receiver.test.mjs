@@ -427,6 +427,61 @@ test('import preflight diagnosis survives safe JSON/TXT 2/2 without secret field
  }
 });
 
+test('batched import problems use same one-shot JSON/TXT 2/2 with no secrets',async()=>{
+ const x=fixture(),created=new Map();let comment='';
+ const first={sourceKind:'APPROVED_AFTER',sourcePath:'worker/r6.mjs',
+  dependencyPath:'lib/r6-formula.mjs',reason:'NOT_FOUND'};
+ const second={sourceKind:'APPROVED_AFTER',sourcePath:'worker/r6.mjs',
+  dependencyPath:'lib/r4-shadow.mjs',reason:'SYMLINK'};
+ const raw={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
+  code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
+  diagnostic:{...first,token:'PRIVATE_TOKEN'},
+  diagnostics:[first,{...second,absolutePath:'E:\\PRIVATE\\key.json'}],
+  diagnosticsOmitted:3};
+ const apiFetch=async(url,init)=>{
+  if(init.method==='PUT'){
+   created.set(url,Buffer.from(JSON.parse(init.body).content,'base64').toString('utf8'));
+   return {status:201};
+  }
+  if(init.method==='GET')return {status:200,json:async()=>({encoding:'base64',
+   content:Buffer.from(created.get(url.replace('?ref=main',''))??'').toString('base64')})};
+  if(init.method==='POST'){
+   comment=JSON.parse(init.body).body;return {status:201};
+  }
+ };
+ const result=await uploadWriterBReport({event:x.event,env:x.env,
+  rawResult:JSON.stringify(raw),apiFetch});
+ assert.equal(result.verified,2);
+ assert.equal(result.deliveryStatus,'RESULT_PAIR_READBACK_VERIFIED');
+ const json=[...created].find(([url])=>url.endsWith('.json'))?.[1];
+ const txt=[...created].find(([url])=>url.endsWith('.txt'))?.[1];
+ const safe=JSON.parse(json);
+ assert.deepEqual(safe.diagnostic,first);
+ assert.deepEqual(safe.diagnostics,[first,second]);
+ assert.equal(safe.diagnosticsOmitted,3);
+ assert.ok(txt.includes('IMPORT_DIAGNOSTICS_RECORDED=2'));
+ assert.ok(txt.includes('IMPORT_DIAGNOSTICS_OMITTED=3'));
+ assert.ok(txt.includes('IMPORT_2_DEPENDENCY_PATH=lib/r4-shadow.mjs'));
+ assert.ok(txt.includes('IMPORT_2_REASON=SYMLINK'));
+ for(const output of [json,txt,comment]){
+  assert.equal(output.includes('PRIVATE'),false);
+  assert.equal(output.includes('key.json'),false);
+ }
+});
+
+test('reporter keeps legacy first diagnostic but discards unsafe appended batch',()=>{
+ const first={sourceKind:'APPROVED_AFTER',sourcePath:'lib/source.mjs',
+  dependencyPath:'lib/one.mjs',reason:'NOT_FOUND'};
+ const base={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
+  code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',diagnostic:first,
+  diagnostics:[first,{...first,dependencyPath:'../../secret.txt'}],
+  diagnosticsOmitted:0};
+ const sanitized=sanitizeWriterBResult(base,RID,'123456');
+ assert.deepEqual(sanitized.diagnostic,first);
+ assert.equal(Object.hasOwn(sanitized,'diagnostics'),false);
+ assert.equal(JSON.stringify(sanitized).includes('secret'),false);
+});
+
 test('reporter drops malformed, escaped, mismatched or irrelevant import diagnostics',()=>{
  const base={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
   code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
