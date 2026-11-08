@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {assertCompletedPcJobEvent, findOriginalIssueNumber, processCompletedPcJob} from
   '../agent-handoff/pc-failure-producer.mjs';
 
@@ -131,4 +132,16 @@ test('failed readback stops instead of claiming enqueue success', async () => {
   f.io.readIssue = async n => n === 2003 ? {...await read(n), body: '{}'} : read(n);
   await assert.rejects(processCompletedPcJob(event(), f.io), /CREATE_READBACK_STOP/);
   assert.equal(f.posts, 1);
+});
+
+test('the new workflow remains opt-in, single-writer and self-hosted', () => {
+  const yaml = readFileSync(new URL('../.github/workflows/agent-handoff-pc-failure-intake.yml',
+    import.meta.url), 'utf8');
+  assert.match(yaml, /workflow_run:\s*\n\s*workflows: \[ZGMINI PC Job\]/);
+  assert.match(yaml, /types: \[completed\]/);
+  assert.match(yaml, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
+  assert.match(yaml, /group: agent-handoff-pc-failure-intake/);
+  assert.match(yaml, /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
+  assert.match(yaml, /run: E:\\ZGmini\\runtime\\node\.exe/);
+  assert.doesNotMatch(yaml, /runs-on: ubuntu-latest|actions\/setup-node/);
 });
