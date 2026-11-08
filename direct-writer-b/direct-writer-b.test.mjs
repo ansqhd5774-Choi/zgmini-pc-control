@@ -5,10 +5,9 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {verifyOpenedOwnerIssue,approvalPathFor,authorizeApprovedRaw,
-  loadApprovedRaw,applyApprovedOnce,verifyPinnedSourceCheckout,
-  DIRECT_B_RESULT} from './run.mjs';
-import {approvedCandidateSource,appendCandidatePin} from './preflight.mjs';
+  loadApprovedRaw,applyApprovedOnce,DIRECT_B_RESULT} from './run.mjs';
 import {sanitizeDirectBReport,uploadDirectBReport} from './report.mjs';
+import {resolveConfiguredSourcePin} from './configured-source-pin.mjs';
 import {SCHEMA as BUNDLE_SCHEMA,SCOPE as BUNDLE_SCOPE}
   from '../writer-b/approved-versioned-bundle/versioned-bundle-plan.mjs';
 import {PIN_CAS_SCHEMA,PIN_CAS_SCOPE}
@@ -208,6 +207,12 @@ test('workflow remains inert local candidate, exact one-shot Windows shared writ
   assert.match(yml,/zgmini-writer-source-b-one-at-a-time/);
   assert.match(yml,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
   assert.match(yml,/persist-credentials: false/);
+  assert.match(yml,/Resolve exact configured source from approved Git blob/);
+  assert.match(yml,/id: candidate\n\s+if: steps\.configured\.outputs\.candidateCheckoutRequired == 'true'/);
+  assert.match(yml,/steps\.configured\.outputs\.candidateCheckoutRequired != 'true'/);
+  assert.match(yml,/steps\.candidate\.outcome == 'success'/);
+  assert.match(yml,/ref: \$\{\{ steps\.configured\.outputs\.sourceSha \}\}/);
+  assert.match(yml,/path: configured-feature-source/);
   assert.match(yml,/report\.mjs/);
   assert.match(yml,/if: always\(\)/);
   assert.equal(DIRECT_B_RESULT,'approved-runtime-b-once-result.json');
@@ -252,26 +257,18 @@ test('configured repeat B has distinct fixed approval profile and pinned preimag
     assert.throws(()=>configuredFixture(m),/DIRECT_B_EFFECT_SCOPE_STOP/);
   }
 });
-
-test('configured repeat B preflight emits exact approved feature SHA',()=>{
+test('second checkout uses only preverified configured Git SHA',()=>{
   const f=configuredFixture();
-  assert.deepEqual(approvedCandidateSource(f.auth),{
-    repository:'ansqhd5774-Choi/zgmini',sourceSha});
-  const writes=[];
-  const output=appendCandidatePin(f.auth,{outputFile:'/tmp/approved-runtime-b-output',
-    append:(file,bytes)=>writes.push({file,bytes})});
-  assert.equal(output.sourceSha,sourceSha);
-  assert.deepEqual(writes,[{file:'/tmp/approved-runtime-b-output',
-    bytes:`candidateSourceSha=${sourceSha}\n`}]);
-});
-
-test('all B variants independently recheck candidate Git HEAD before effect',()=>{
-  for(const f of [fixture('pin'),fixture('bundle'),configuredFixture()]){
-    assert.equal(verifyPinnedSourceCheckout(f.auth,{sourceRoot:'/approved',
-      gitHead:()=>sourceSha}).sourceSha,sourceSha);
-    assert.throws(()=>verifyPinnedSourceCheckout(f.auth,{sourceRoot:'/approved',
-      gitHead:()=>('f'.repeat(40))}),/DIRECT_B_CANDIDATE_SOURCE_DRIFT/);
-  }
+  assert.equal(resolveConfiguredSourcePin({event:{},env:{},controlRoot:'/fake',
+    loadAuth:()=>f.auth}),sourceSha);
+  const ordinary=fixture();
+  assert.equal(resolveConfiguredSourcePin({event:{},env:{},controlRoot:'/fake',
+    loadAuth:()=>ordinary.auth}),'');
+  const unsafe={...f.auth,manifest:{...f.auth.manifest,
+    runnerPath:'scripts/unsafe.mjs'}};
+  assert.throws(()=>resolveConfiguredSourcePin({event:{},env:{},
+    controlRoot:'/fake',loadAuth:()=>unsafe}),
+  /DIRECT_B_CONFIGURED_SOURCE_PIN_STOP/);
 });
 test('configured B routes exact pinned manifest into existing dispatcher',async()=>{
   const f=configuredFixture();let calls=0;
