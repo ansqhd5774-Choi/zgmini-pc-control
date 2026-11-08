@@ -235,15 +235,20 @@ async function main(){
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   const controlRoot=path.join(env.GITHUB_WORKSPACE??'','generic-b-control');
   const auth=loadApprovedRaw({event,env,controlRoot});
-  const candidateDir=auth.mode===CONFIGURED_B_EFFECT?
-    'configured-feature-source':'generic-b-approved-source';
-  verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(env.GITHUB_WORKSPACE??'',
-    candidateDir)});
   // The sole native factory is code in the fixed reviewed checkout. Issue body
   // cannot select modules, paths, commands, targets or bridge capabilities.
   const fixedBridge=new URL('./native-adapter.mjs',import.meta.url);
-  if(auth.mode===CONFIGURED_B_EFFECT)return applyApprovedOnce(auth);
+  if(auth.mode===CONFIGURED_B_EFFECT){
+    verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(
+      env.GITHUB_WORKSPACE??'','configured-feature-source')});
+    return applyApprovedOnce(auth);
+  }
+  // PIN/BUNDLE are not installed by this configured-only checkout workflow.
+  // Report the true missing native bridge, without pretending a candidate
+  // checkout was attempted. If installed later, require that exact SHA too.
   if(!fs.existsSync(fileURLToPath(fixedBridge)))return applyApprovedOnce(auth);
+  verifyPinnedSourceCheckout(auth,{sourceRoot:path.join(
+    env.GITHUB_WORKSPACE??'','generic-b-approved-source')});
   const native=await import(fixedBridge.href);
   need(typeof native.makeApprovedNativeAdapter==='function',
     'DIRECT_B_NATIVE_BRIDGE_INCOMPLETE');
