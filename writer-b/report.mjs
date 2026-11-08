@@ -6,6 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CONTROL_REPO,ACTOR,ISSUE_LABEL,ISSUE_TITLE,
  REQUEST_SCHEMA,OPERATION} from './contract.mjs';
+import {safeWriterBImportDiagnostic} from './import-availability.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -83,16 +84,26 @@ export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256
    manifestSha256:raw.manifestSha256,baseTreeOid:raw.baseTreeOid,
    preparedTreeOid:raw.preparedTreeOid,provenanceSha256:raw.provenanceSha256};
  if(['WRITER_B_PREFLIGHT_STOP','WRITER_B_INSTALL_STOP_RESTORED',
-  'WRITER_B_RECOVERY_REQUIRED'].includes(raw.status)&&CODE.test(raw.code??''))
+  'WRITER_B_RECOVERY_REQUIRED'].includes(raw.status)&&CODE.test(raw.code??'')){
+  const diagnostic=raw.status==='WRITER_B_PREFLIGHT_STOP'?
+   safeWriterBImportDiagnostic(raw):null;
   return {...base,status:raw.status,code:raw.code,
+   ...(diagnostic?{diagnostic}:{}),
    recovery:raw.status==='WRITER_B_RECOVERY_REQUIRED'?
     'RECONCILE_EXACT_REQUEST_NO_RETRY':undefined};
+ }
  return base;
 }
 
 function textResult(result){return [
  `REQUEST_ID=${result.requestId}`,`STATUS=${result.status}`,
  `CODE=${result.code}`,`SOURCE_SHA=${result.sourceSha??'NONE'}`,
+ ...(result.diagnostic?[
+  `IMPORT_SOURCE_KIND=${result.diagnostic.sourceKind}`,
+  `IMPORT_SOURCE_PATH=${result.diagnostic.sourcePath}`,
+  `IMPORT_DEPENDENCY_PATH=${result.diagnostic.dependencyPath}`,
+  `IMPORT_REASON=${result.diagnostic.reason}`,
+ ]:[]),
  `SOURCE_MODE=${result.mode??'UNKNOWN'}`,
  `LOCAL_ONLY=${result.localOnly===true?'true':'UNKNOWN'}`,
  `BASE_HEAD=${result.baseHead??'NONE'}`,
