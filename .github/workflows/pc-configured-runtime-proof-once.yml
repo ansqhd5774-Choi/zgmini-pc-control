@@ -50,7 +50,7 @@ jobs:
           path: configured-feature-source
           fetch-depth: 1
           persist-credentials: false
-      - name: Prove both Windows versions with temporary fixtures only
+      - name: Prove Windows CLI entrypoint and both versions in temp only
         if: success() && steps.candidate.outcome == 'success'
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\proof-only.mjs" --run'
       - name: Create-only sanitized proof JSON and TXT with readback
