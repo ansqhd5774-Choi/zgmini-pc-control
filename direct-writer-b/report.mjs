@@ -21,23 +21,33 @@ export function sanitizeDirectBReport(raw,request,env){
     mode:null,manifestSha256:request.approvalManifestSha256,
     controlSha:null,sourceSha:null,operationSucceeded:false,
     runtimeEffectProof:'NOT_ESTABLISHED',
+    compatibilityEvidenceSha256:null,
+    compatibilityDirections:0,
+    compatibilitySharedLockVerified:false,
     runId:RUN.test(env?.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
     retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE'};
   if(!raw||typeof raw!=='object'||Array.isArray(raw)||
     !VALID.has(raw.status)||!CODE.test(raw.code??''))return base;
   if(raw.requestId!==request.requestId&&
     !(raw.status==='DIRECT_B_PREFLIGHT_STOP'&&raw.requestId===null))return base;
+  const compatibility=/^[a-f0-9]{64}$/.test(
+    raw.compatibilityEvidenceSha256??'')&&
+    raw.compatibilityDirections===2&&
+    raw.compatibilitySharedLockVerified===true?{
+      compatibilityEvidenceSha256:raw.compatibilityEvidenceSha256,
+      compatibilityDirections:2,
+      compatibilitySharedLockVerified:true}:{};
   if(raw.status==='DIRECT_B_EFFECT_PASS_NOT_PUBLISHED'){
     if(raw.code!=='DIRECT_B_LOCAL_EFFECT_PASS'||raw.operationSucceeded!==true||
       raw.manifestSha256!==base.manifestSha256||
       !SHA40.test(raw.controlSha??'')||!SHA40.test(raw.sourceSha??'')||
       !['PIN_REGISTRY_CAS','VERSIONED_BUNDLE_ACTIVATE',
         'CONFIGURED_THEMES_REPEAT_UPGRADE'].includes(raw.mode))return base;
-    return {...base,status:raw.status,code:raw.code,mode:raw.mode,
+    return {...base,...compatibility,status:raw.status,code:raw.code,mode:raw.mode,
       sourceSha:raw.sourceSha,controlSha:raw.controlSha,operationSucceeded:true,
       runtimeEffectProof:'LOCAL_EXECUTOR_PASS_REPORT_PENDING'};
   }
-  return {...base,status:raw.status,code:raw.code};
+  return {...base,...compatibility,status:raw.status,code:raw.code};
 }
 
 export function directBTextReport(r){return [
@@ -47,6 +57,9 @@ export function directBTextReport(r){return [
   `SOURCE_SHA=${r.sourceSha??'UNKNOWN'}`,
   `OPERATION_SUCCEEDED=${r.operationSucceeded}`,
   `RUNTIME_EFFECT_PROOF=${r.runtimeEffectProof}`,
+  `COMPATIBILITY_EVIDENCE_SHA256=${r.compatibilityEvidenceSha256??'UNKNOWN'}`,
+  `COMPATIBILITY_DIRECTIONS=${r.compatibilityDirections}`,
+  `COMPATIBILITY_SHARED_LOCK_VERIFIED=${r.compatibilitySharedLockVerified}`,
   `RUN_ID=${r.runId??'UNKNOWN'}`,
   `RETRY=${r.retry}`,'',
 ].join('\n');}
@@ -97,6 +110,7 @@ export async function uploadDirectBReport({event,env,rawResult,fetchApi=fetch}){
     `RESULT DELIVERY: ${delivery}; CREATED: ${created}/2; `+
     `READBACK: ${verified}/2\n`+
     `LOCAL EFFECT: ${r.runtimeEffectProof}; RUN_ID: ${r.runId??'UNKNOWN'}; `+
+    `CROSS_VERSION: ${r.compatibilityEvidenceSha256??'UNKNOWN'}; `+
     'NO AUTO RE-EXECUTION\n';
   const response=await fetchApi(`https://api.github.com/repos/${REPO}/issues/`+
     `${event.issue.number}/comments`,{method:'POST',headers,
