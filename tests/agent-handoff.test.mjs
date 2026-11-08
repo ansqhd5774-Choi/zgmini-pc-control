@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {parseHandoff, fingerprintHandoff, routeHandoff, transitionHandoff} from '../agent-handoff/contract.mjs';
 import {prepareHandoff} from '../agent-handoff/route.mjs';
+import {main as runIssueBroker} from '../agent-handoff/issue-broker.mjs';
 
 const make = () => ({
   schema: 'ZGMINI_AGENT_HANDOFF_V1', incidentId: 'handoff-123456789abc',
@@ -84,4 +88,71 @@ test('rejects skips, terminal repeats and unknown states', () => {
   assert.throws(() => transitionHandoff('QUEUED', 'OWNER_RESUMED', {ownerAcknowledged: true}), /TRANSITION_STOP/);
   assert.throws(() => transitionHandoff('BLOCKED', 'ASSIGNED'), /TRANSITION_STOP/);
   assert.throws(() => transitionHandoff('OTHER', 'TESTED'), /TRANSITION_STOP/);
+});
+
+async function simulateBroker({untrustedActor = false, loseComment = false, existingLabels = []} = {}) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
+  const eventPath = path.join(tmp, 'event.json');
+  fs.writeFileSync(eventPath, JSON.stringify({action: 'opened', repository: {private: true},
+    issue: {number: 2001, user: {login: 'ansqhd5774-Choi'}, labels: [{name: 'agent-handoff'}], body: json()}}));
+  const previousToken = process.env.GITHUB_TOKEN;
+  const previousFetch = globalThis.fetch;
+  process.env.GITHUB_TOKEN = 'unit-test-nonsecret';
+  const comments = [];
+  const labels = [...existingLabels];
+  const posts = [];
+  globalThis.fetch = async (url, request = {}) => {
+    const method = request.method ?? 'GET';
+    const uri = new URL(url);
+    let value;
+    if (uri.pathname.endsWith('/issues') && method === 'GET') value = [];
+    else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') value = comments;
+    else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
+      posts.push('comment');
+      const body = JSON.parse(request.body).body;
+      if (!loseComment) comments.push({user: {login: 'github-actions[bot]'}, body});
+      value = {id: 1};
+    } else if (uri.pathname.endsWith('/issues/2001/labels') && method === 'POST') {
+      posts.push('label');
+      labels.push(...JSON.parse(request.body).labels);
+      value = labels.map((name) => ({name}));
+    } else if (uri.pathname.endsWith('/issues/2001') && method === 'GET') {
+      value = {labels: labels.map((name) => ({name}))};
+    } else throw new Error(`unexpected request: ${method} ${uri.pathname}`);
+    return {ok: true, status: 200, json: async () => value};
+  };
+  const env = {GITHUB_EVENT_PATH: eventPath, GITHUB_REPOSITORY: 'ansqhd5774-Choi/zgmini-pc-control',
+    GITHUB_ACTOR: untrustedActor ? 'unknown-user' : 'ansqhd5774-Choi', GITHUB_EVENT_NAME: 'issues'};
+  try {
+    if (untrustedActor) {
+      await assert.rejects(runIssueBroker(env), /HANDOFF_EVENT_NOT_ALLOWED/);
+      assert.equal(posts.length, 0);
+    } else if (loseComment) {
+      await assert.rejects(runIssueBroker(env), /HANDOFF_COMMENT_READBACK_STOP/);
+      assert.equal(labels.length, existingLabels.length);
+    } else {
+      await runIssueBroker(env);
+      await runIssueBroker(env);
+      assert.deepEqual(posts, ['comment', ...(existingLabels.includes('handoff-agent-pending') ? [] : ['label'])]);
+      assert.equal(comments.length, 1);
+    }
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = previousToken;
+    fs.rmSync(tmp, {recursive: true, force: true});
+  }
+}
+
+test('broker records one comment and one label even if event is rerun', async () => {
+  await simulateBroker();
+});
+test('broker recovers missing comment when status label already exists', async () => {
+  await simulateBroker({existingLabels: ['handoff-agent-pending']});
+});
+test('broker refuses to mark success when comment readback is missing', async () => {
+  await simulateBroker({loseComment: true});
+});
+test('broker refuses issue events from untrusted actors', async () => {
+  await simulateBroker({untrustedActor: true});
 });
