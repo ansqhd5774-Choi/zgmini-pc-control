@@ -2,6 +2,8 @@ name: ZGMINI Agent Handoff Intake
 on:
   issues:
     types: [opened]
+  issue_comment:
+    types: [created]
 permissions:
   contents: read
   issues: write
@@ -12,6 +14,7 @@ jobs:
   route-sanitized-incident:
     # Opt-in only. Keep the existing pc-job / Controller path untouched.
     if: >-
+      github.event_name == 'issues' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       github.actor == 'ansqhd5774-Choi' &&
@@ -30,3 +33,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" agent-handoff/issue-broker.mjs'
+  record-verified-return:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.pull_request == null &&
+      contains(github.event.issue.labels.*.name, 'agent-handoff') &&
+      startsWith(github.event.comment.body, '{"schema":"ZGMINI_AGENT_HANDOFF_RESULT_V1"') &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 3
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify PR and CI provenance and record pending runtime return
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" agent-handoff/result-broker.mjs'
