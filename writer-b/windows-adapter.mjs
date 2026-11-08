@@ -227,12 +227,20 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    const sourceReal=fs.realpathSync.native(source).toLowerCase()+path.sep;
    verifyWriterBImportAvailability({afterFiles:after,beforeFiles,existing:relative=>{
     const file=scoped(source,relative);
-    try{
-     const stat=fs.lstatSync(file);
-     return stat.isFile()&&!stat.isSymbolicLink()&&
-      stat.size>0&&stat.size<=2_000_000&&
-      fs.realpathSync.native(file).toLowerCase().startsWith(sourceReal);
-    }catch{return false;}
+    let stat;
+    try{stat=fs.lstatSync(file);}
+    catch(error){return {available:false,reason:
+     error?.code==='ENOENT'?'NOT_FOUND':'READ_ERROR'};}
+    if(stat.isSymbolicLink())return {available:false,reason:'SYMLINK'};
+    if(!stat.isFile())return {available:false,reason:'NOT_FILE'};
+    if(stat.size<=0||stat.size>2_000_000)
+     return {available:false,reason:'SIZE'};
+    let real;
+    try{real=fs.realpathSync.native(file).toLowerCase();}
+    catch{return {available:false,reason:'READ_ERROR'};}
+    if(!real.startsWith(sourceReal))
+     return {available:false,reason:'OUTSIDE_ROOT'};
+    return true;
    }});
    return {sourceSha:m.candidateSourceSha,clean:true,sha256:hashes};
   },
