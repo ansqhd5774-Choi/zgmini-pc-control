@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {relativeModuleReferences,verifyWriterBImportAvailability,
- safeWriterBImportDiagnostic} from './import-availability.mjs';
+ safeWriterBImportDiagnostic,safeWriterBImportDiagnosticBatch} from './import-availability.mjs';
 const B=s=>Buffer.from(s,'utf8');
 const AUTO='scripts/pc-writer/inflation-causal-public-auto-publication-r1.mjs';
 const PREVIEW='scripts/pc-writer/inflation-causal-public-preview-r1.mjs';
@@ -192,4 +192,96 @@ test('legacy false existence check remains fail-closed and gives cautious reason
   existing:()=>false});}catch(e){error=e;}
  assert.equal(error?.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
  assert.equal(safeWriterBImportDiagnostic(error)?.reason,'UNAVAILABLE_OR_UNSAFE');
+});
+
+test('one approved overlay reports all missing new literal imports in one STOP',()=>{
+ const seen=[];
+ const afterFiles=new Map([
+  ['worker/new-r6.mjs',B("import '../lib/one.mjs';\nimport '../lib/two.mjs';\n")],
+  ['scripts/pc-writer/new-r6.mjs',B("import '../../lib/three.mjs';\n")],
+ ]);
+ let failure;
+ try{verifyWriterBImportAvailability({afterFiles,existing:ref=>{
+  seen.push(ref);
+  return {available:false,reason:ref.endsWith('two.mjs')?'SYMLINK':'NOT_FOUND'};
+ }});}catch(error){failure=error;}
+ assert.equal(failure?.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ assert.deepEqual(seen,['lib/one.mjs','lib/two.mjs','lib/three.mjs']);
+ assert.deepEqual(failure.diagnostic,{
+  sourceKind:'APPROVED_AFTER',sourcePath:'worker/new-r6.mjs',
+  dependencyPath:'lib/one.mjs',reason:'NOT_FOUND'});
+ const batch=safeWriterBImportDiagnosticBatch(failure);
+ assert.equal(batch.diagnostics.length,3);
+ assert.deepEqual(batch.diagnostics.map(x=>x.dependencyPath),seen);
+ assert.deepEqual(batch.diagnostics.map(x=>x.reason),
+  ['NOT_FOUND','SYMLINK','NOT_FOUND']);
+ assert.equal(batch.diagnosticsOmitted,0);
+});
+
+test('large approved import set stays bounded at eight and counts omitted',()=>{
+ const source='lib/new-batch.mjs';
+ const text=Array.from({length:13},(_,i)=>`import './dep-${i}.mjs';`).join('\n');
+ let failure;
+ try{verifyWriterBImportAvailability({
+  afterFiles:new Map([[source,B(text)]]),existing:()=>false,
+ });}catch(error){failure=error;}
+ assert.equal(failure.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ const batch=safeWriterBImportDiagnosticBatch(failure);
+ assert.equal(batch.diagnostics.length,8);
+ assert.equal(batch.diagnosticsOmitted,5);
+ assert.equal(batch.diagnostics[0].dependencyPath,'lib/dep-0.mjs');
+ assert.equal(batch.diagnostics[7].dependencyPath,'lib/dep-7.mjs');
+ assert.equal(JSON.stringify(failure).length<8192,true);
+});
+
+test('eight maximum-length safe paths fit existing eight-KiB reporter budget',()=>{
+ const source=`worker/${'s'.repeat(160)}.mjs`;
+ const after=Array.from({length:9},(_,i)=>
+  `import './${String(i)}${'d'.repeat(159)}.mjs';`).join('\n');
+ let failure;
+ try{verifyWriterBImportAvailability({
+  afterFiles:new Map([[source,B(after)]]),existing:()=>false,
+ });}catch(error){failure=error;}
+ assert.equal(failure.code,'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+ const batch=safeWriterBImportDiagnosticBatch(failure);
+ assert.equal(batch.diagnostics.length,8);
+ assert.equal(batch.diagnosticsOmitted,1);
+ assert.equal(JSON.stringify(failure).length<=8192,true);
+});
+
+test('M old imports remain exempt while two newly added problems aggregate',()=>{
+ const file='scripts/pc-writer/run-local.mjs';
+ const old=B("import './optional-old.mjs';\n");
+ const after=B("import './optional-old.mjs';\n"+
+  "import './new-a.mjs';\nimport './new-b.mjs';\n");
+ let failure;const seen=[];
+ try{verifyWriterBImportAvailability({
+  afterFiles:new Map([[file,after]]),beforeFiles:new Map([[file,old]]),
+  existing:ref=>{seen.push(ref);if(ref.endsWith('new-b.mjs'))throw Error('SECRET');
+   return {available:false,reason:'SIZE'};},
+ });}catch(error){failure=error;}
+ assert.deepEqual(seen,['scripts/pc-writer/new-a.mjs',
+  'scripts/pc-writer/new-b.mjs']);
+ assert.deepEqual(safeWriterBImportDiagnosticBatch(failure).diagnostics
+  .map(x=>x.reason),['SIZE','READ_ERROR']);
+ assert.equal(JSON.stringify(failure).includes('SECRET'),false);
+});
+
+test('malformed batched details never expose paths or arbitrary reasons',()=>{
+ const valid={sourceKind:'APPROVED_AFTER',sourcePath:'lib/new.mjs',
+  dependencyPath:'lib/one.mjs',reason:'NOT_FOUND'};
+ const other={...valid,dependencyPath:'lib/two.mjs',reason:'READ_ERROR'};
+ const base={code:'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP',
+  diagnostic:valid,diagnostics:[valid,other],diagnosticsOmitted:0};
+ assert.equal(safeWriterBImportDiagnosticBatch(base).diagnostics.length,2);
+ for(const bad of [
+  {...base,diagnostics:[valid,{...other,dependencyPath:'../../private.txt'}]},
+  {...base,diagnostics:[valid,{...other,reason:'SECRET'}]},
+  {...base,diagnostics:[other,valid]},
+  {...base,diagnosticsOmitted:-1},
+  {...base,diagnosticsOmitted:1025},
+  {...base,diagnostics:Array.from({length:9},()=>valid)},
+ ])assert.equal(safeWriterBImportDiagnosticBatch(bad),null);
+ assert.equal(safeWriterBImportDiagnosticBatch({code:base.code,
+  diagnostic:valid}),null); // Old Writer B results remain single-only.
 });
