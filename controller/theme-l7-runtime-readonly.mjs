@@ -89,6 +89,26 @@ function diagnosticValue(kind,value){
  if(!valid)return null;
  return safeWords(valid)&&(kind==='code'?CODE_TERMS:STAGE_TERMS).test(valid)?valid:null;
 }
+// Privacy-preserving *hints* for legacy free-form STOP reasons. This is not a
+// statement that the collector ran or that a root cause has been proven.
+// Never return raw reason text, URL, credentials, observations, or identifiers.
+const REASON_HINTS=Object.freeze([
+ ['L7_HINT_RATE_LIMIT',/(?:^|[^0-9])429(?:[^0-9]|$)|\b(?:rate[ _-]*limit|quota[ _-]*(?:exceeded|limit))\b/i],
+ ['L7_HINT_AUTH_DENIED',/(?:^|[^0-9])(?:401|403)(?:[^0-9]|$)|\b(?:unauthorized|forbidden|access[ _-]*denied|EACCES|EPERM)\b/i],
+ ['L7_HINT_FILE_MISSING',/\b(?:ENOENT|file[ _-]*not[ _-]*found|no[ _-]*such[ _-]*file)\b/i],
+ ['L7_HINT_NETWORK_FAILURE',/\b(?:ETIMEDOUT|ECONNRESET|ENOTFOUND|connection[ _-]*refused|fetch[ _-]*failed|timed?[ _-]*out)\b/i],
+ ['L7_HINT_SOURCE_EMPTY',/\b(?:no[ _-]*new[ _-]*data|source[ _-]*not[ _-]*ready|no[ _-]*records|missing[ _-]*observation|empty[ _-]*source)\b/i],
+ ['L7_HINT_DATE_MISMATCH',/\b(?:NON_SPY_DATE|calendar[ _-]*mismatch|observation[ _-]*date[ _-]*mismatch|DATE_MISMATCH)\b/i],
+ ['L7_HINT_PUBLISH_MISMATCH',/\b(?:PUBLIC_API_ROLLING_MISMATCH|D1_READBACK_MISMATCH|PUBLISHER_CHILD_FAILED_REVIEW)\b/i],
+]);
+function safeReasonHint(value){
+ if(typeof value!=='string'||value.length>512||!value.trim())return null;
+ // A token or URL in a free-form string makes classification too ambiguous.
+ if(/https?:\/\/|\b(?:token|secret|password|credential|bearer|authorization|api[_-]?key)\b|[?&][A-Za-z_]+=/.test(value.toLowerCase()))return null;
+ const matched=REASON_HINTS.filter(([,pattern])=>pattern.test(value));
+ return matched.length===1?matched[0][0]:null;
+}
+
 function valueType(value){
  if(value===null)return 'null';
  if(Array.isArray(value))return 'array';
@@ -109,6 +129,13 @@ function diagnosticState(raw){
     fields.push({path:full,type:valueType(value)});
     const safe=diagnosticValue(kind,value);
     if(safe!==null&&values.length<16)values.push({path:full,value:safe});
+    // The field is kept, but legacy prose may be outside the safe-code
+    // vocabulary. Report only one explicit non-sensitive classification hint.
+    else if((name==='reason'||name==='stopReason'||name==='stop_reason')&&
+      values.length<16){
+     const hint=safeReasonHint(value);
+     if(hint)values.push({path:full+'.categoryHint',value:hint});
+    }
    }
    if(depth<3&&DIAGNOSTIC_CONTAINERS.has(name)&&
       value&&typeof value==='object'&&!Array.isArray(value))
