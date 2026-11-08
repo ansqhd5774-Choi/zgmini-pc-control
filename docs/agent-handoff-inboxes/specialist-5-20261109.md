@@ -1,0 +1,12 @@
+# ZGMINI 메타데이터 수신함 — 전문담당 5번 후보
+
+상태: SOURCE_ONLY / DRAFT / CHAT_NOT_BOUND / PC_NOT_APPLIED.
+
+이 Draft PR의 댓글은 최초 2개 일반 ChatGPT 대화 간 메타데이터 왕복을 검증하기 위한 후보 수신함이다. PR 번호는 생성 후 고정한다. 이 파일은 실제 대화 ID, ChatGPT Scheduled task, GitHub 봇 수신 또는 AI 처리를 증명하지 않는다.
+
+- 허용: 승인된 handoff wake의 최소 메타데이터 댓글 조회·ACK 검증.
+- 금지: 원자료·키·환경변수, 운영 설치 명령, PC 재실행, 무인 배포.
+- 실제 대상 대화·논리 chatId·예약 `chat_ref`의 1회 초기 연결은 미완료.
+- 시스템 브로커 기본 CLI/Workflow 연결은 기존 그대로 비활성.
+
+참조 소스 후보: #932 → #933 → #934. 이 수신함 PR은 **병합하지 않고 시험용으로만** 유지한다.
