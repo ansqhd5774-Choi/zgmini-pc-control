@@ -1,6 +1,7 @@
 # ZGMINI 단일 ChatGPT 총괄 — 공통 장애 대기열 실행 계약
 
-상태: SOURCE_ONLY 설계 + GitHub 확인. 운영 자동 처리/PC 설치 성공 증거 아님.
+상태: 중앙 ChatGPT 예약 등록 완료(첫 자연 실행 대기) + SOURCE_ONLY 소스.
+운영 자동 처리/PC 설치 성공 증거 아님.
 
 ## 사용자 최종 역할 지시
 
@@ -46,7 +47,14 @@
   바인딩 기능은 자동 운영 활성화하지 않는다.
 - 기존 Issue 검색에서 `label:handoff-agent-pending` 0건, `label:agent-handoff`
   0건을 관측했다. 이는 검색 시점의 대기열 현황이고 상시 비어 있음을 의미하지 않는다.
-- 다음 실행: 단일 총괄 작업을 안전한 읽기 중심으로 등록하고 첫 실제 실행을 확인,
+- **2026-11-09 KST 실제 등록:** 단일 task `ZGMINI 공통 인계 중앙 처리`,
+  ID `Automation_9a403a04a8ac8191a331e94f9abeb1b4`,
+  `conversation_id=6af0833b-a34c-83ec-99a3-1acde1007171`,
+  `is_enabled=true`, 매시간 조건 확인. 신규 대화별 task 0건.
+  즉시 실행 호출은 `Ready to run in this conversation`으로 반환되었고
+  `inline_run=true`였다. **자연 예약 실행 `run_details.last_run`은 아직 null**이며,
+  이를 자연 실행 PASS로 기록하지 않는다.
+- 다음 실행: 첫 자연 실행의 `run_details.chat_ref`와 GitHub 조회 범위 확인,
   이후 유효 장애가 유입되면 승인 범위 내 원인 수정과 결과를 끝까지 수행한다.
 - 현재 기본 Workflow `main()`의 `queue=null` 연결과 Windows DB 실제 설치는
   미완료. 따라서 Source 통과만으로 Runtime 큐 처리 완료를 선언하지 않는다.
