@@ -73,6 +73,15 @@ test('STATE_UNKNOWN, BLOCKED and PASS are non-eligible and never generate Issues
   }
 });
 
+test('a completed pc-job without a published JSON is unknown, not successful intake', async () => {
+  const f = fixture(); f.io.readReport = async () => null;
+  const outcome = await processCompletedPcJob(event(), f.io);
+  assert.equal(outcome.state, 'NO_PUBLISHED_RESULTS');
+  assert.equal(outcome.reportsObserved, 0);
+  assert.equal(outcome.newIssues, 0);
+  assert.equal(f.posts, 0);
+});
+
 test('missing bot receipt remains pending without speculative issue creation', async () => {
   const f = fixture(); f.io.readComments = async () => [];
   const outcome = await processCompletedPcJob(event(), f.io);
