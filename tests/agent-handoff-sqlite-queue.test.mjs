@@ -1,0 +1,156 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import {createHandoffQueue, initializeHandoffQueueSchema,
+  HANDOFF_QUEUE_RETRIES} from '../agent-handoff/sqlite-queue.mjs';
+
+function incident(id = 'handoff-123456789abc') {
+  return {schema: 'ZGMINI_AGENT_HANDOFF_V1', incidentId: id,
+    origin: {repository: 'ansqhd5774-Choi/zgmini', issueNumber: 1009,
+      requestId: 'pc-123456789abc', chatId: 'chat-theme1',
+      branch: 'codex/theme', sourceSha: 'a'.repeat(40), checkpoint: 'COLLECT'},
+    failure: {kind: 'COMMON_CONTROLLER', code: 'RUNNER_IMPORT_STOP',
+      lastPass: 'SOURCE_CHECKED', firstFail: 'RUNTIME_IMPORT', fileRefs: []}};
+}
+
+function inMemory(clock) {
+  const db = new DatabaseSync(':memory:');
+  initializeHandoffQueueSchema(db);
+  return {db, queue: createHandoffQueue(db, {clock})};
+}
+
+test('source-only API never opens a PC database or retries an operation', () => {
+  assert.equal(HANDOFF_QUEUE_RETRIES, 0);
+  const {db, queue} = inMemory(() => 1_000);
+  try {
+    const saved = queue.enqueue(incident());
+    assert.equal(saved.inserted, true);
+    assert.equal(saved.operationalWrites, 0);
+    assert.equal(saved.automaticPcRetries, 0);
+    assert.equal(queue.read(saved.fingerprint).status, 'PENDING');
+    assert.deepEqual(queue.stats(), {PENDING: 1, CLAIMED: 0,
+      ROUTED_PENDING_AGENT: 0, STATE_UNKNOWN: 0, total: 1});
+  } finally { db.close(); }
+});
+
+test('identical duplicate is reused; changed payload with same fingerprint fails closed', () => {
+  const {db, queue} = inMemory(() => 1_000);
+  try {
+    const first = queue.enqueue(JSON.stringify(incident()));
+    const again = queue.enqueue(incident());
+    assert.equal(again.inserted, false);
+    assert.equal(first.fingerprint, again.fingerprint);
+    const changed = incident('handoff-abcdef012345');
+    assert.throws(() => queue.enqueue(changed), /FINGERPRINT_COLLISION_STOP/);
+    assert.equal(queue.stats().total, 1);
+  } finally { db.close(); }
+});
+
+test('different source SHA creates a distinct queued incident', () => {
+  const {db, queue} = inMemory(() => 1_000);
+  try {
+    queue.enqueue(incident());
+    const other = incident('handoff-abcdef012345');
+    other.origin.sourceSha = 'b'.repeat(40);
+    assert.equal(queue.enqueue(other).inserted, true);
+    assert.equal(queue.stats().PENDING, 2);
+  } finally { db.close(); }
+});
+
+test('six independent Runner-like SQLite connections claim a shared incident once', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-queue-test-'));
+  const filename = path.join(dir, 'handoff-test.sqlite');
+  const connections = Array.from({length: 6}, () => new DatabaseSync(filename));
+  let now = 1_000;
+  try {
+    initializeHandoffQueueSchema(connections[0]);
+    const queues = connections.map((db) => createHandoffQueue(db, {clock: () => now}));
+    queues[0].enqueue(incident());
+    const claims = queues.map((queue, i) => queue.claim(`worker-${i + 1}`));
+    assert.equal(claims.filter(Boolean).length, 1);
+    const first = claims.find(Boolean);
+    assert.equal(first.generation, 1);
+    assert.equal(queues[4].read(first.fingerprint).status, 'CLAIMED');
+    now += 60_001;
+    assert.equal(queues[4].claim('worker-seven'), null, 'lease timeout must never auto re-run');
+    assert.equal(queues[4].markExpiredUnknown(), 1);
+    assert.equal(queues[0].read(first.fingerprint).status, 'STATE_UNKNOWN');
+    assert.equal(queues[0].claim('worker-one'), null);
+  } finally {
+    for (const db of connections) db.close();
+    fs.rmSync(dir, {recursive: true, force: true});
+  }
+});
+
+test('live lease may extend; stale tokens cannot extend or close it', () => {
+  let now = 1_000;
+  const {db, queue} = inMemory(() => now);
+  try {
+    queue.enqueue(incident());
+    const lease = queue.claim('worker-one', {leaseMs: 40});
+    now += 20;
+    assert.equal(queue.extend({...lease, generation: 2}), false);
+    assert.equal(queue.extend(lease, {leaseMs: 80}), true);
+    now += 25;
+    assert.equal(queue.markExpiredUnknown(), 0, 'the valid extension keeps ownership');
+    now += 60;
+    assert.equal(queue.extend(lease), false);
+    assert.equal(queue.markExpiredUnknown(), 1);
+  } finally { db.close(); }
+});
+
+test('expired or incorrect lease cannot acknowledge a successful handoff', () => {
+  let now = 1_000;
+  const {db, queue} = inMemory(() => now);
+  try {
+    const saved = queue.enqueue(incident());
+    const lease = queue.claim('worker-one', {leaseMs: 50});
+    const evidence = {issueNumber: 2001, commentId: 123, fingerprint: saved.fingerprint,
+      marker: 'HANDOFF_ROUTED', verifiedCommentReadback: true};
+    assert.equal(queue.markRouted({...lease, token: '0'.repeat(36)}, evidence), false);
+    now += 51;
+    assert.equal(queue.extend(lease), false);
+    assert.equal(queue.markRouted(lease, evidence), false);
+    assert.equal(queue.markExpiredUnknown(), 1);
+    assert.equal(queue.markRouted(lease, evidence), false);
+    assert.equal(queue.stats().STATE_UNKNOWN, 1);
+  } finally { db.close(); }
+});
+
+test('readback evidence is mandatory and only records routing, not AI reception', () => {
+  const {db, queue} = inMemory(() => 1_000);
+  try {
+    const saved = queue.enqueue(incident());
+    const lease = queue.claim('worker-one');
+    const evidence = {issueNumber: 2001, commentId: 123, fingerprint: saved.fingerprint,
+      marker: 'HANDOFF_ROUTED', verifiedCommentReadback: true};
+    assert.throws(() => queue.markRouted(lease, {...evidence, verifiedCommentReadback: false}),
+      /ROUTE_EVIDENCE_REQUIRED/);
+    assert.throws(() => queue.markRouted(lease, {...evidence, secret: 'never store'}),
+      /ROUTE_EVIDENCE_REQUIRED/);
+    assert.equal(queue.markRouted(lease, evidence), true);
+    assert.equal(queue.markRouted(lease, evidence), false);
+    assert.equal(queue.read(saved.fingerprint).status, 'ROUTED_PENDING_AGENT');
+    assert.deepEqual(queue.read(saved.fingerprint).routeEvidence,
+      {issueNumber: 2001, commentId: 123, fingerprint: saved.fingerprint, marker: 'HANDOFF_ROUTED'});
+    assert.equal(queue.stats().ROUTED_PENDING_AGENT, 1);
+    assert.equal(queue.claim('worker-two'), null);
+  } finally { db.close(); }
+});
+
+test('handoff contract rejects raw secrets, foreign repositories and invalid owners', () => {
+  const {db, queue} = inMemory(() => 1_000);
+  try {
+    const bad = incident();
+    bad.failure.rawError = 'Authorization: bearer secret';
+    assert.throws(() => queue.enqueue(bad), /UNEXPECTED_FIELD/);
+    const foreign = incident();
+    foreign.origin.repository = 'unknown/repo';
+    assert.throws(() => queue.enqueue(foreign), /REPOSITORY_NOT_ALLOWED/);
+    assert.throws(() => queue.claim('E:/PC/root'), /OWNER_INVALID/);
+    assert.equal(queue.stats().total, 0);
+  } finally { db.close(); }
+});
