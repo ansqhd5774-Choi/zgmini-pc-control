@@ -2,7 +2,7 @@ import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync
 import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
-export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence,fixture=false,terminateTree=null,terminationGraceMs=5000,fixtureFreeMiB=null,fixtureMemoryWaitMs=20,fixtureMemoryPollMs=2}={}){
+export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence,fixture=false,terminateTree=null,terminationGraceMs=5000,fixtureFreeMiB=null,fixtureMemoryWaitMs=20,fixtureMemoryPollMs=2,approvedPreimageScope=null}={}){
  need(Number.isInteger(seat)&&seat>=1&&seat<=policy.seats,'SEAT_NOT_ALLOWED');need(/^\d{1,20}$/.test(String(runId)),'RUN_ID');
  const workspaceId=`run-${runId}-${attempt}-seat-${seat}`,workspace=path.join(root,'jobs',workspaceId);fs.mkdirSync(workspace,{recursive:true});
  const start=Date.now(),report={schema:'ZGMINI_PC_RESULT_V1',jobId:workspaceId,requestId:typeof raw?.requestId==='string'&&/^[a-z0-9-]{8,80}$/.test(raw.requestId)?raw.requestId:null,startedAt:new Date(start).toISOString(),controlRepository:policy.controlRepository,controlSourceSha:host.controllerSourceSha,sourceRepository:policy.sourceRepository,requestedSourceSha:/^[a-f0-9]{40}$/.test(raw?.sourceSha??'')?raw.sourceSha:null,sourceBranch:typeof raw?.sourceBranch==='string'&&/^[a-zA-Z0-9_./-]{1,160}$/.test(raw.sourceBranch)?raw.sourceBranch:null,operation:Object.hasOwn(policy.operations,raw?.operation)?raw.operation:'NOT_ALLOWED',seat,status:'BLOCKED',code:'PREFLIGHT_NOT_COMPLETED',lastPass:'REQUEST_RECEIVED',firstFail:null,operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,controlWorkspaceWrites:true};
@@ -40,7 +40,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
   preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
-  writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat}});
+  writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat,approvedPreimageScope}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
   preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
    const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace};
