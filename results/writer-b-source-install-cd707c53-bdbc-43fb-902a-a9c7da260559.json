@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "cd707c53-bdbc-43fb-902a-a9c7da260559",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "df04a41be80da6c05b2b42ffc827be26eaa0755d",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "3f6fc4a847e2e048ca499d4583adc6b72003c3b8",
+  "candidateSourceSha": "7703964728cd8c2431ce1d0192ede1854481c1bd",
+  "manifestSha256": "47e6b46c206c374c2fe389a08aedfff4cd4d253f584ae2de3d541322951b96bf",
+  "baseTreeOid": "aa693cd4339794e0cff27b252746455b40e918b8",
+  "preparedTreeOid": "5471838ae6f8d8dee4b29aac34b9f8c3d5185818",
+  "provenanceSha256": "262732e2056f2f14f3e309b405372377bf740f2e17732b4383303325b618172a",
+  "runId": "42483517614",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/asset-r10-refresh-gate.mjs",
+    "scripts/pc-writer/market-breadth-us-r1.mjs",
+    "scripts/pc-writer/composite-observed-archive-r1.mjs",
+    "scripts/pc-writer/cnn-observed-archive-publication-r1.mjs",
+    "lib/market-breadth/compute.mjs",
+    "lib/market-breadth/us-public-r1.mjs",
+    "lib/composite-observed-history-r1.mjs",
+    "lib/cnn-observed-archive-r1.mjs"
+  ]
+}
