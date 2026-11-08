@@ -75,7 +75,8 @@ test('result digest fixes exact result payload for collision detection', () => {
   assert.notEqual(resultDigest(parseAgentResult(JSON.stringify(result))), resultDigest(parseAgentResult(JSON.stringify(changed))));
 });
 
-async function simulate({lostComment = false, collision = false, unauthorized = false} = {}) {
+async function simulate({lostComment = false, collision = false, unauthorized = false,
+  retryReturn = false} = {}) {
   const {handoff, result, pr, run} = setup();
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-result-'));
   const eventPath = path.join(temp, 'event.json');
@@ -108,7 +109,21 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
     if (unauthorized) await assert.rejects(runResultBroker(env), /RESULT_EVENT_NOT_ALLOWED/);
     else if (collision) await assert.rejects(runResultBroker(env), /RESULT_ID_COLLISION_STOP/);
     else if (lostComment) await assert.rejects(runResultBroker(env), /RESULT_COMMENT_READBACK_STOP/);
-    else { await runResultBroker(env); await runResultBroker(env); assert.deepEqual(seen, ['comment']); }
+    else if (retryReturn) {
+      let calls = 0;
+      const returnPrEvent = async (received) => {
+        calls++;
+        assert.equal(received.queueIssueNumber, 2001);
+        assert.equal(received.result.resultId, result.resultId);
+        assert.equal(received.handoff.incidentId, handoff.incidentId);
+        assert.equal(received.pr.number, 920);
+        if (calls === 1) throw new Error('CHAT_PR_RETURN_READBACK_STOP');
+      };
+      await assert.rejects(runResultBroker(env, {returnPrEvent}), /CHAT_PR_RETURN_READBACK_STOP/);
+      await runResultBroker(env, {returnPrEvent});
+      assert.equal(calls, 2);
+      assert.deepEqual(seen, ['comment'], 'a return retry must not duplicate the result Issue comment');
+    } else { await runResultBroker(env); await runResultBroker(env); assert.deepEqual(seen, ['comment']); }
     if (unauthorized || collision) assert.deepEqual(seen, []);
   } finally {
     globalThis.fetch = originalFetch;
@@ -121,3 +136,8 @@ test('result broker records one verified comment and remains idempotent', async 
 test('result broker fails closed if GitHub result comment disappears', async () => simulate({lostComment: true}));
 test('result broker blocks same ID with different payload', async () => simulate({collision: true}));
 test('result broker rejects untrusted issue comment actor', async () => simulate({unauthorized: true}));
+test('opt-in origin PR return recovers after uncertainty without reposting result',
+  async () => simulate({retryReturn: true}));
+test('result broker rejects a non-function return path before reading the event', async () => {
+  await assert.rejects(runResultBroker({}, {returnPrEvent: true}), /RETURN_CALLBACK_INVALID/);
+});
