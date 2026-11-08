@@ -49,17 +49,17 @@ export function readR6OptInStatus(dataRoot,{fileSystem=fs}={}){
  const states={employmentR6AutoCollection:'UNKNOWN',
   employmentR6OneYearAutoPublication:'UNKNOWN'};
  const bytes=readFixedReadonlyBytes(path.join(dataRoot,'pc-writer','config.json'),
-  {fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:65_536});
- if(!bytes.ok)return {status:'STATE_UNKNOWN',keys:states,reason:bytes.reason};
+  {fileSystem,verifiedRoot:dataRoot,minBytes:2,maxBytes:131_072});
+ if(!bytes.ok)return {status:'STATE_UNKNOWN',keys:states,configSha256:null,reason:bytes.reason};
  try{
   const config=JSON.parse(bytes.bytes.toString('utf8'));
   if(!config||typeof config!=='object'||Array.isArray(config))
-   return {status:'STATE_UNKNOWN',keys:states,reason:'CONFIG_INVALID'};
-  return {status:'PASS',keys:{
+   return {status:'STATE_UNKNOWN',keys:states,configSha256:null,reason:'CONFIG_INVALID'};
+  return {status:'PASS',configSha256:sha256(bytes.bytes),keys:{
    employmentR6AutoCollection:safeOption(config.employmentR6AutoCollection),
    employmentR6OneYearAutoPublication:safeOption(config.employmentR6OneYearAutoPublication),
   },reason:null};
- }catch{return {status:'STATE_UNKNOWN',keys:states,reason:'CONFIG_INVALID'};}
+ }catch{return {status:'STATE_UNKNOWN',keys:states,configSha256:null,reason:'CONFIG_INVALID'};}
 }
 
 /** The caller may inject fixture dependencies, but never a file list. */
@@ -71,7 +71,8 @@ export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
   sourceRoot:null,sourceHead:null,approvedConfigSource:null,checkpointSource:null,
   sourceIdentityConsistent:false,coreTaskSourceLinked:false,
   taskLaunchers:[],
-  r6Config:{status:'STATE_UNKNOWN',keys:{employmentR6AutoCollection:'UNKNOWN',
+  r6Config:{status:'STATE_UNKNOWN',configSha256:null,
+   keys:{employmentR6AutoCollection:'UNKNOWN',
    employmentR6OneYearAutoPublication:'UNKNOWN'}},
   calendar:CALENDAR_PREIMAGE_FILES.map(p=>empty(p,p===CALENDAR_PREIMAGE_FILES[2]?'M':'A')),
   employmentR6:EMPLOYMENT_R6_PREIMAGE_FILES.map((p,i)=>empty(p,i<11?'M':'A')),
