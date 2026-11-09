@@ -66,9 +66,11 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes}={}
   approval.overlayManifestSha256===sha(overlayBytes)&&
   approval.maxBlsCalls===(approval.mode==='ONE_YEAR'?7:14)&&
   approval.maxDolCalls===2&&
-  exact(approval.effects,['registeredBlsCalls','dolCalls','sqliteWrites','d1PublicSnapshot','taskWrites','sourceWrites'])&&
+  exact(approval.effects,['registeredBlsCalls','dolCalls','sqliteWrites',
+   'd1ReadOnlyPreflight','d1PublicSnapshot','taskWrites','sourceWrites'])&&
   approval.effects.registeredBlsCalls===true&&approval.effects.dolCalls===true&&
-  approval.effects.sqliteWrites===true&&approval.effects.d1PublicSnapshot===true&&
+  approval.effects.sqliteWrites===true&&approval.effects.d1ReadOnlyPreflight===true&&
+  approval.effects.d1PublicSnapshot===true&&
   approval.effects.taskWrites===false&&approval.effects.sourceWrites===false&&
   overlay?.schema==='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1'&&
   overlay.status==='APPROVED_B'&&overlay.candidateSourceSha&&
@@ -155,10 +157,24 @@ async function loadInstalledProviderFields({sourceRoot,pcHome}){
  return loadLocalProviders(pcHome);
 }
 
+async function probeExistingD1Read({sourceRoot,config}){
+ try{
+  const {client,credential}=await import(pathToFileURL(
+   path.join(sourceRoot,'scripts','pc-writer','d1.mjs')).href);
+  // Reuse the PC Writer's existing official credential resolver. Do not
+  // create, extract, print or transport any Cloudflare credential.
+  const remote=client(config,()=>credential(sourceRoot));
+  const row=(await remote.query(config.core,'SELECT 1 AS r6_b_read_probe'))?.results?.[0];
+  need(Number(row?.r6_b_read_probe)===1,'R6_B_D1_AUTH_UNAVAILABLE');
+  return true;
+ }catch{throw error('R6_B_D1_AUTH_UNAVAILABLE');}
+}
+
 export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
  pcHome=R6_B_HOME,lockFactory=withCoreLock,claim=claimOnce,
  verifyOverlay=verifyInstalledR6Overlay,
- providerFieldsLoader=loadInstalledProviderFields,run=null}={}){
+ providerFieldsLoader=loadInstalledProviderFields,
+ d1ReadProbe=probeExistingD1Read,run=null}={}){
  const base={schema:'ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1',
   requestId:auth.request.requestId,sourceSha:auth.approval.installedSourceSha,
   mode:auth.approval.mode,status:'STATE_UNKNOWN',code:'R6_B_NOT_STARTED',
@@ -178,6 +194,13 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   lastPass='REGISTERED_KEY_PRESENT';
   lock=lockFactory(pcHome,auth.request.requestId);
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
+  // The Actions Runner may have a different Windows user than scheduled Core.
+  // Fail before the no-retry claim and BLS calls if its existing Wrangler/D1
+  // read credential is unavailable. SELECT 1 is strictly read-only.
+  need(await d1ReadProbe({sourceRoot,pcHome,config})===true,
+   'R6_B_D1_AUTH_UNAVAILABLE');
+  need(lock.held(),'R6_B_CORE_LOCK_LOST');
+  lastPass='D1_READONLY_PREFLIGHT';
   const execute=run??runInstalledR6;
   // A persistent date/mode claim precedes every SQLite or provider effect.
   claimAttempted=true;
