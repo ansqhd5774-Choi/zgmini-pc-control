@@ -50,7 +50,7 @@ export function inspectR6ActivationCheckout({event,env,io=fs,gitInspect,
      event?.action!=='opened') fail('R6_B_ACTIVATION_EVENT_STOP');
   if(typeof env?.GITHUB_WORKSPACE!=='string'||!path.isAbsolute(env.GITHUB_WORKSPACE))
     fail('R6_B_WORKSPACE_UNVERIFIED');
-  const activated=path.join(env.GITHUB_WORKSPACE,'r6-workflow-control');
+  const activated=path.join(env.GITHUB_WORKSPACE,'r6-activation');
   let workspaceReal,activatedReal;
   try {
     if(!io.lstatSync(env.GITHUB_WORKSPACE).isDirectory()||
@@ -60,7 +60,7 @@ export function inspectR6ActivationCheckout({event,env,io=fs,gitInspect,
     activatedReal=io.realpathSync.native(activated);
   }catch(cause){fail(cause?.code?.startsWith('R6_B_')?cause.code:'R6_B_ACTIVATION_CHECKOUT_UNAVAILABLE');}
   const rel=path.relative(workspaceReal,activatedReal);
-  if(rel!== 'r6-workflow-control')fail('R6_B_ACTIVATION_CHECKOUT_ESCAPE_STOP');
+  if(rel!== 'r6-activation')fail('R6_B_ACTIVATION_CHECKOUT_ESCAPE_STOP');
   if(typeof gitInspect!=='function')fail('R6_B_ACTIVATION_GIT_INSPECTOR_MISSING');
   const checked=gitInspect(activatedReal);
   if(!SHA40.test(checked?.head??'')||checked.head!==env.GITHUB_SHA||checked.dirty!==false)
