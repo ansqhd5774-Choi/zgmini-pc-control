@@ -22,6 +22,7 @@ function adapter(a){
  const calls=[],io={
   async acquireSharedLock(){calls.push('lock');},
   async readSourcePreimage(){calls.push('source');return preimage(a);},
+  async proveActiveCoreLock(){calls.push('livecore');},
   async fetchExactSources(){calls.push('download');return raw();},
   async preflightParse(){calls.push('parse');},
   async assertCoreIdle(){calls.push('idle');},
@@ -42,7 +43,7 @@ test('one-shot happy path validates before claiming and verifies readback',async
  assert.equal(r.status,'INFL_MANUAL_B_SAVED_VERIFIED');
  assert.equal(r.code,'INFL_MANUAL_B_READBACK_VERIFIED');
  assert.deepEqual(r.committed,{bls:'3'.repeat(64),census:'4'.repeat(64)});
- assert.deepEqual(calls,['lock','source','download','parse','idle',
+ assert.deepEqual(calls,['lock','source','livecore','download','parse','idle',
   'corelock','claim','journal:CLAIMED','source','coreproof','store','readback',
   'journal:COMPLETED','coreunlock','release:false']);
 });
@@ -61,6 +62,15 @@ test('wrong source SHA stops before download and claim',async()=>{
  const r=await performOfficialManualB(a,io);
  assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
  assert.deepEqual(calls,['lock','release:false']);
+});
+test('unproved live Core lock stops before official GET or one-shot claim',async()=>{
+ const a=auth(),{io,calls}=adapter(a);
+ io.proveActiveCoreLock=()=>{throw Object.assign(new Error('not linked'),
+  {code:'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP'});};
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
+ assert.equal(r.code,'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+ assert.deepEqual(calls,['lock','source','release:false']);
 });
 test('bad live workbook is rejected before claim with no data writes',async()=>{
  const a=auth(),{io,calls}=adapter(a);
