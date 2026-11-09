@@ -101,6 +101,19 @@ export function classifyPostSwitchEvidence(evidence) {
       'PREPARE_EXACT_APPROVAL_AND_ISOLATED_FORWARD_RECOVERY_NO_AUTOMATIC_EXECUTION'};
 }
 
+// The six dedicated PC seats must each be uniquely registered and online.
+// Additional independently scoped runners (for example, handoff CI spares)
+// are unrelated to the recovery of these seats and must not create a false
+// shared-Controller outage.
+export function verifyNamedPcRunnersOnline(rows) {
+  if (!Array.isArray(rows)) return false;
+  const names = Array.from({length: 6}, (_, index) => `zgmini-pc-0${index + 1}`);
+  return names.every(name => {
+    const matches = rows.filter(row => row?.name === name);
+    return matches.length === 1 && matches[0].status === 'online';
+  });
+}
+
 function readGitHub(route) {
   return JSON.parse(execFileSync(gh, ['api', `repos/${repository}/${route}`],
     {encoding: 'utf8', windowsHide: true, timeout: 30000, maxBuffer: 3e6}));
@@ -190,9 +203,7 @@ export async function main(args = process.argv.slice(2)) {
   }
 
   const runnerRows = readGitHub('actions/runners?per_page=100').runners;
-  const names = Array.from({length: 6}, (_, index) => `zgmini-pc-0${index + 1}`);
-  const runnerSetVerified = Array.isArray(runnerRows) && runnerRows.length === 6 &&
-    names.every(name => runnerRows.some(row => row.name === name && row.status === 'online'));
+  const runnerSetVerified = verifyNamedPcRunnersOnline(runnerRows);
   const workflow = readGitHub('actions/workflows/pc-job.yml').state;
   let supervisorVerified = false;
   try {
