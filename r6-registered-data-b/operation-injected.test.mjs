@@ -154,6 +154,17 @@ test('bounded Core lock: 60s exhaustion remains BLOCKED with zero claim/provider
   !f.calls.includes('RUN')&&!f.calls.includes('UNLOCK'));
 });
 
+test('bounded Core lock: delayed timer cannot acquire after 60s deadline',async()=>{
+ let clock=0,attempts=0;
+ await assert.rejects(acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{attempts++;
+   if(attempts===1)throw lockError('R6_B_CORE_LOCK_OCCUPIED');
+   return{held:()=>true,release:()=>true};},
+  now:()=>clock,sleep:async()=>{clock+=70_000;}}),
+ e=>e.code==='R6_B_CORE_LOCK_OCCUPIED');
+ assert.equal(attempts,1);
+});
+
 test('bounded Core lock: non-EEXIST create failure stops without waiting',async()=>{
  let waits=0,attempts=0;
  await assert.rejects(acquireCoreLockBounded('fixture','request',{
