@@ -128,6 +128,8 @@ function recheckInput(wait = candidate()) {
       issueNumber: wait.origin.issueNumber,
       requestId: wait.origin.requestId,
       runId: wait.evidence.runId,
+      status: wait.evidence.status,
+      code: wait.evidence.code,
       resultJsonPath: wait.evidence.resultJsonPath,
       resultTxtPath: wait.evidence.resultTxtPath,
       controlSourceSha: wait.origin.sourceSha,
@@ -192,6 +194,18 @@ test('cross-request, spoofed A operation and result-pair mismatch stay pending',
     'ORIGINAL_ISSUE_RUN_RESULT_PAIR',
     'WINDOWS_READONLY_RELEASE_CANDIDATE'
   ]);
+  assert.equal(result.ownerReplanAuthorized, false);
+});
+
+
+test('origin result status and failure code must match the historical wait', () => {
+  const w = candidate();
+  const forged = recheckInput(w);
+  forged.originReadback.status = 'WRITER_B_INSTALLED_VERIFIED';
+  forged.originReadback.code = 'OTHER_CODE';
+  const result = summarizeResourceRecheckEvidence(w, forged);
+  assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
+  assert.deepEqual(result.missing, ['ORIGINAL_ISSUE_RUN_RESULT_PAIR']);
   assert.equal(result.ownerReplanAuthorized, false);
 });
 
