@@ -55,6 +55,21 @@ test('post-claim deferral requires exact original restoration proof', () => {
     recovery: 'ORIGINAL_VERIFIED'}), /SAFE_POINT_UNPROVEN/);
 });
 
+test('PC Controller consumed request is not a Writer B unclaimed preflight', () => {
+  const pc = candidate(1201, 'pc-job-heavy-memory', {
+    requestId:'pc-abcd1234-1234', status:'BLOCKED',
+    code:'RESOURCE_WAIT_MEMORY',
+    safePoint:'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+    releaseCondition:'HEAVY_MEMORY_AVAILABLE_VERIFIED'});
+  assert.equal(pc.safePoint, 'REQUEST_CONSUMED_PREWORKER_UNTOUCHED');
+  assert.equal(pc.originalStateVerified, false);
+  assert.equal(pc.automaticPcRetries, 0);
+  assert.equal(pc.resume, 'OWNER_REPLAN_NEW_AUTHORIZED_REQUEST_ONLY');
+  assert.throws(() => candidate(1201, 'pc-job-heavy-memory', {
+    safePoint:'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+    recovery:'ORIGINAL_VERIFIED'}), /SAFE_POINT_UNPROVEN/);
+});
+
 test('cannot create waiting records from unverified or spoofed evidence', () => {
   const good = candidate();
   for (const mutation of [
