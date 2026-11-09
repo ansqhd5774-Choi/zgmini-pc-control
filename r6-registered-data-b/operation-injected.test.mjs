@@ -7,7 +7,8 @@ const auth={request:{requestId:'a3b44168-e96e-48b2-b787-10aa1a0e001a',
  approval:{installedSourceSha:'b'.repeat(40),mode:'ONE_YEAR',maxBlsCalls:7,
   maxDolCalls:2},overlay:{files:Array(13).fill({})}};
 
-function inject({lockOccupied=false,claimError=null,runError=null,releaseFails=false}={}){
+function inject({lockOccupied=false,claimError=null,runError=null,
+ releaseFails=false,probeError=null}={}){
  const calls=[];
  let held=true;
  const verifyOverlay=()=>{calls.push('VERIFY');return{core:'fixture-db-id'};};
@@ -18,18 +19,20 @@ function inject({lockOccupied=false,claimError=null,runError=null,releaseFails=f
   return{held:()=>held,release:()=>{calls.push('UNLOCK');
    if(releaseFails)return false;
    held=false;return true;}};};
+ const d1ReadProbe=async()=>{calls.push('D1_READ');
+  if(probeError)throw probeError;return true;};
  const claim=()=>{calls.push('CLAIM');if(claimError)throw claimError;return{file:'fixture'};};
  const run=async()=>{calls.push('RUN');if(runError)throw runError;
   return{status:'SUCCESS',code:'R6_B_COLLECT_PUBLISH_VERIFIED',
    providerRequests:9,blsRequests:7,dolRequests:2,groupResults:[],
    sqlite:'COLLECTOR_RECORDED',publication:'VERIFIED',sourceStoredAt:1794206708243};};
- return{calls,verifyOverlay,providerFieldsLoader,lockFactory,claim,run};
+ return{calls,verifyOverlay,providerFieldsLoader,d1ReadProbe,lockFactory,claim,run};
 }
 
-test('injected authorized path executes a single collect/publish and releases lock',async()=>{
+test('D1 read preflight precedes single collect/publish and releases lock',async()=>{
  const f=inject();
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
  assert.equal(result.status,'SUCCESS');
  assert.equal(result.code,'R6_B_COLLECT_PUBLISH_VERIFIED');
  assert.equal(result.lastPass,'PUBLISH_READBACK');
@@ -50,7 +53,7 @@ test('same-day claim conflict: no provider work and lock released',async()=>{
   {code:'R6_B_TODAY_ALREADY_CLAIMED'});
  const f=inject({claimError});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','CLAIM','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','UNLOCK']);
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'R6_B_TODAY_ALREADY_CLAIMED');
  assert.equal(result.firstFail,'PREFLIGHT');
@@ -61,7 +64,7 @@ test('post-claim provider or D1 failure stays STATE_UNKNOWN; never auto retries'
   {code:'D1_PUBLICATION_READBACK_MISMATCH'});
  const f=inject({runError});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
  assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.firstFail,'COLLECT_OR_PUBLISH');
  assert.equal(result.lastPass,'ONE_SHOT_CLAIMED');
@@ -84,10 +87,23 @@ test('source mismatch preflight: prevents lock, claim and run',async()=>{
 test('Core lock release unverified downgrades apparent success without deleting lock',async()=>{
  const f=inject({releaseFails:true});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
  assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.code,'R6_B_CORE_LOCK_RELEASE_UNVERIFIED');
  assert.equal(result.firstFail,'CORE_LOCK_RELEASE');
  assert.equal(result.retry,'READ_EXISTING_CORE_LOCK_NO_AUTO_RETRY');
  assert.notEqual(result.status,'SUCCESS');
+});
+
+test('D1 read authorization failure leaves claim and provider untouched',async()=>{
+ const probeError=Object.assign(new Error('R6_B_D1_AUTH_UNAVAILABLE'),
+  {code:'R6_B_D1_AUTH_UNAVAILABLE'});
+ const f=inject({probeError});
+ const result=await performR6RegisteredOnce({auth,...f});
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','UNLOCK']);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R6_B_D1_AUTH_UNAVAILABLE');
+ assert.equal(result.lastPass,'REGISTERED_KEY_PRESENT');
+ assert.equal(result.firstFail,'PREFLIGHT');
+ assert.notEqual(result.providerRequests,9);
 });
