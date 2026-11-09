@@ -372,7 +372,8 @@ async function runInstalledR6({auth,sourceRoot,pcHome,config,lock}){
  try{
   result=await runEmploymentR6CollectionStep({db,env:{DB:db,
    BLS_API_KEY:providerEnv.BLS_API_KEY,BLS_REGISTRATION_KEY:providerEnv.BLS_REGISTRATION_KEY},
-   fetchImpl:(input,init)=>quota.fetch(input,init),mode:auth.approval.mode});
+   fetchImpl:(input,init)=>quota.fetch(input,init),mode:auth.approval.mode,
+   approvedManualRequestId:auth.request.requestId});
  }finally{hooks.deregister();db.close();}
  need(lock.held(),'R6_B_CORE_LOCK_LOST');
  const groups=safeGroups(result.groupResults??[]);
