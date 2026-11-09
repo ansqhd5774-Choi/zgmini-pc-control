@@ -64,6 +64,11 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
     need(claim?.acquired === true && claim?.exclusive === true && claim?.preexisting === false,
       'FORWARD_CLAIM_NOT_EXCLUSIVE');
     claimAcquired = true;
+    // The claim can be acquired after the read-only snapshot but before the
+    // first operational write. Revalidate the entire signed/live envelope,
+    // not just the old ledger, while the exclusive claim is held.
+    const held = await ports.verifyPreconditions({ledger, evidence, claimHeld: true});
+    need(held?.verified === true, 'FORWARD_POSTCLAIM_PRECONDITION_DRIFT');
     need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
     await record('FORWARD_PREPARED', {claimHeld: true});
 
