@@ -315,7 +315,7 @@ test('unrelated large untracked file is metadata-only and never global size gate
   isDirectory:()=>false,size:file.includes('large-archive')?2_000_000_000:12,
   mtimeMs:100,ctimeMs:101,mode:33188,ino:4,dev:6});
  const readFile=file=>{readCount++;
-  assert.ok(file.endsWith('notes/ongoing.txt'));return Buffer.from('ongoing user');};
+  assert.ok(file.replaceAll('\\','/').endsWith('notes/ongoing.txt'));return Buffer.from('ongoing user');};
  const a=snapshotUnrelatedDirty({sourceRoot:'/some/checkout',statusBytes:status,
   manifest:x.manifest,lstat:stat,readFile});
  assert.equal(a.evidence.length,2);
@@ -339,7 +339,7 @@ test('unrelated porcelain -z rename/copy attests both paths without a global R/C
   'C  copies/new.txt\0copies/original.txt\0');
  const contents=new Map([['notes/new.txt','new'],
   ['copies/new.txt','copy'],['copies/original.txt','copy']]);
- const relative=file=>file.slice('/some/checkout/'.length);
+ const relative=file=>file.replaceAll('\\','/').slice('/some/checkout/'.length);
  const lstat=file=>{
   const data=contents.get(relative(file));
   if(data===undefined)throw Object.assign(new Error('missing'),{code:'ENOENT'});
