@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "e488094f695ec62a8f6e4b2a5bfa505bb5abe57d",
+  "filePath": "scripts/pc-writer/local-cycle.mjs",
+  "beforeSha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d",
+  "insertions": [
+    {
+      "anchor": " let supplyR10=null,alpacaIncremental=null,sp500Shadow=null,sectorFearGreedR3=null,sectorFearGreedR3Report=null;",
+      "position": "before",
+      "text": " // Candidate research inputs share the existing Core lock and run before\n // the early Writer pass; their own approved provider gate is default-off.\n let inflationCandidates={status:lane==='core'?'DISABLED':'SKIPPED_KOREA_LANE',providerRequests:0};\n if(lane==='core'&&collection.status===0){\n  try{\n   const {runInflationCandidatesFromCore}=await import('./inflation-causal-candidate-core-bridge.mjs');\n   inflationCandidates=await runInflationCandidatesFromCore(base);\n  }catch{\n   inflationCandidates={status:'FAILED_PREVIOUS_INPUTS_PRESERVED',providerRequests:null};\n  }\n }\n"
+    },
+    {
+      "anchor": " save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));",
+      "position": "before",
+      "text": " report.inflationCandidates=inflationCandidates;\n"
+    }
+  ]
+}
