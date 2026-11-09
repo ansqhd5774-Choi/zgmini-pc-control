@@ -74,3 +74,12 @@
 - A 반환 `PASS`는 **두 번의 로컬 관측을 수집했다**는 뜻이다. `releaseVerified=false`, `runtimeSourceVerified=false`, `approvalVerified=false`, `ownerReplanAuthorized=false`, `automaticPcRetries=0`를 고정한다. `reviewResourceWait`의 `RECHECK_EVIDENCE_PENDING` 차단은 그대로이며, 진단 결과 하나만으로 자동 재개/새 설치하지 않는다.
 - 이 소스의 GitHub 병합만으로 Windows 사용 가능이라 주장하지 않는다. 정규 승인된 Controller 설치가 `config/operations.json`, dispatcher, 신규 관측기 및 기존 `writer-b-1063-task-probe.mjs` 의존 파일을 동일 버전으로 설치한 뒤에만 사용 가능하다. #917 복구 및 운영 승인 보호를 우회하지 않는다.
 - 남은 필수 연결: 원본 #68 대기 및 원본 Issue/Run+JSON/TXT 인증 readback, 현재 A 관측 Run/결과쌍의 원격 재조회, 최신 운영 source와 현재 승인 manifest 대조, 자원별 소유권 검증, 실제 Windows 대기→해제→원담당의 새 승인 판단. 이 모두가 실증되기 전까지 5단계는 **미완료**다. 새 예약 수집/자동 재시도는 하지 않는다.
+
+### 공통 장애 인계의 운영 PC 독립화 (2026-11-10, 소스 단계)
+
+- 기존 중앙 인계 4개 작업(PC 실패 접수·Writer B 실패 접수·Issue 분류/라우팅·검증 결과 반환)은 모두 운영 PC의 `zgmini-pc-control` Runner와 `E:\\ZGmini\\runtime\\node.exe`를 호출했다. 이는 Controller 장애가 중앙 장애 처리 기능까지 멈추게 하는 단일 장애점이었다.
+- 네 작업은 운영 파일·Controller·Core·Writer/DB를 직접 조작하지 않는 GitHub API 전용 작업임을 확인했다. 해당 워크플로는 별도 승인 격리 Windows Runner `zgmini-handoff-ci-isolated`와 고정 SHA의 checkout/setup-node 22로 분리한다. 운영 B 설치와 실제 PC 점검은 계속 원래 보호된 운영 경로에 둔다.
+- 승인된 GitHub actor/라벨/정확한 Issue/결과 스키마 및 기존 `vars.ZGMINI_AGENT_HANDOFF_ENABLED`·`ZGMINI_PC_HANDOFF_INTAKE_ENABLED`·`ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED` opt-in 조건을 변경하지 않는다. Runner 분리는 **미활성화 기능을 자동 활성화하지 않는다**. GitHub Issue 기록 역시 다른 일반챗에 자동 전달되지 않는다.
+- 격리 공통 요청 admission의 실패 `SHARED_ADMISSION_REPORT_ENV_NOT_ALLOWED`는 Actions가 자동 제공하지 않는 `GITHUB_EVENT_ACTION`를 검증 스크립트가 요구하는 불일치 때문이었다. 호출 step에 `GITHUB_EVENT_ACTION: ${{ github.event.action }}`를 명시한다.
+- 독립 테스트는 4개 중앙 job의 Runner/source-only 경로, opt-in/출처 검증, admission 환경값을 고정한다. CI 완료는 실제 운영 활성·실패 사건 완전 자동 인계·Controller #917 회복을 증명하지 않는다.
+- **장애 격리 원칙:** Controller `RECOVERY_REQUIRED`는 Controller 실제 갱신·동일 lease에 직접 의존하는 실행만 중지한다. GitHub 중앙 조정, 독립 개발·정적 검증, 승인된 별도 Runner 작업, 각 기능의 무관한 경로를 한꺼번에 막지 않는다. 동일 Writer 설치 요청은 실제 Windows source·manifest·자원 상태를 현재 값으로 재검증하며 중복 requestId 자동 재시도 금지.
