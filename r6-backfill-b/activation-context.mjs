@@ -61,6 +61,20 @@ export function inspectR6ActivationCheckout({event,env,io=fs,gitInspect,
   }catch(cause){fail(cause?.code?.startsWith('R6_B_')?cause.code:'R6_B_ACTIVATION_CHECKOUT_UNAVAILABLE');}
   const rel=path.relative(workspaceReal,activatedReal);
   if(rel!== 'r6-activation')fail('R6_B_ACTIVATION_CHECKOUT_ESCAPE_STOP');
+  // The two approved files must also stay under a real directory within the
+  // reviewed activation checkout. A leaf-only lstat would follow a symlink or
+  // Windows directory junction named r6-backfill-b to arbitrary host files.
+  const artifacts=path.join(activatedReal,'r6-backfill-b');
+  let artifactsReal;
+  try{
+    const info=io.lstatSync(artifacts);
+    if(!info.isDirectory()||info.isSymbolicLink())
+      fail('R6_B_ACTIVATION_ARTIFACT_PARENT_SHAPE_STOP');
+    artifactsReal=io.realpathSync.native(artifacts);
+  }catch(cause){fail(cause?.code?.startsWith('R6_B_')?cause.code:
+    'R6_B_ACTIVATION_ARTIFACT_PARENT_UNAVAILABLE');}
+  if(path.relative(activatedReal,artifactsReal)!=='r6-backfill-b')
+    fail('R6_B_ACTIVATION_ARTIFACT_PARENT_ESCAPE_STOP');
   if(typeof gitInspect!=='function')fail('R6_B_ACTIVATION_GIT_INSPECTOR_MISSING');
   const checked=gitInspect(activatedReal);
   if(!SHA40.test(checked?.head??'')||checked.head!==env.GITHUB_SHA||checked.dirty!==false)
