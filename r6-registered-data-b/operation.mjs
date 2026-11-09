@@ -133,10 +133,14 @@ function withCoreLock(pcHome,requestId){
 export async function acquireCoreLockBounded(pcHome,requestId,{
  createLock=withCoreLock,now=()=>performance.now(),sleep=delay}={}){
  const started=now();
+ let lastOccupied=null;
  for(let retry=0;;retry++){
+  // A delayed timer must not let a resumed process acquire beyond the bound.
+  if(retry>0&&now()-started>60_000)throw lastOccupied;
   try{return await createLock(pcHome,requestId);}
   catch(cause){
    if(cause?.code!=='R6_B_CORE_LOCK_OCCUPIED')throw cause;
+   lastOccupied=cause;
    const remaining=60_000-(now()-started);
    if(retry>=12||!Number.isFinite(remaining)||remaining<=0)throw cause;
    await sleep(Math.min(5_000,remaining));
