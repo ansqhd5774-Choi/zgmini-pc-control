@@ -114,6 +114,7 @@ function setup(writer=true,claimed=false){
   const aJsonPath='results/'+aRun+'-1-seat-'+seat+'.json';
   const aDetail={status:'PASS',code:'SHARED_RESOURCE_READONLY_SNAPSHOT',
     sampleCount:2,sourceStable:true,taskXmlStable:true,
+    observedAt:'2026-11-09T20:16:30Z',
     observedConfigSourceSha:runtime,releaseVerified:false,
     ownerReplanAuthorized:false,resources:{[wait.resourceKey]:{
       state:'CANDIDATE_CLEAR_NOT_AUTHORIZED'}}};
@@ -208,6 +209,23 @@ test('old A snapshot and altered Writer manifest cannot be release candidates',(
   changed.origin.manifest.content=changed.origin.manifest.content+' ';
   assert.ok(reviewRecordedResourceReadbacks(changed).missing.includes(
     'ORIGINAL_ISSUE_RUN_RESULT_PAIR'));
+});
+
+test('Windows second sample must be observed within signed A report interval',()=>{
+  const inputs=setup();
+  const report=JSON.parse(inputs.observation.json.content);
+  report.result.observedAt='2026-11-09T19:59:59Z';
+  inputs.observation.json.content=JSON.stringify(report);
+  assert.ok(reviewRecordedResourceReadbacks(inputs).missing.includes(
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'));
+  report.result.observedAt='2026-11-09T20:17:01Z';
+  inputs.observation.json.content=JSON.stringify(report);
+  assert.ok(reviewRecordedResourceReadbacks(inputs).missing.includes(
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'));
+  delete report.result.observedAt;
+  inputs.observation.json.content=JSON.stringify(report);
+  assert.ok(reviewRecordedResourceReadbacks(inputs).missing.includes(
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'));
 });
 
 test('original resource wait must preserve exact no-write and postclaim recovery proof',()=>{
