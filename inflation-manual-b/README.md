@@ -10,11 +10,13 @@ checkpoint, D1, publishing path, credentials or feature formula.
    compare its raw SHA-256 with the owner's private, single-use Issue.
 2. Verify the exact installed PC Git HEAD, `config.source`, source module hashes
    **including `local-cycle.mjs`**, and two already-approved feature parsers.
-3. Under the shared Writer B installation mutex, first observe a naturally
-   running `ZGMINI-PC-Local-Core` Task whose Task-Engine-linked `node.exe`
+3. **Before acquiring the shared Writer B installation mutex**, observe a
+   naturally running `ZGMINI-PC-Local-Core` Task whose Task-Engine-linked `node.exe`
    `local-cycle.mjs` PID owns the **exact** E: `local-cycle.lock` in the same
-   run (bounded six-minute read-only observation). Then GET the two frozen
-   official BLS/Census files with finite limits and parse the workbook on PC.
+   run (bounded six-minute read-only observation). This wait cannot occupy
+   the shared Writer B mutex or block another function's installer. Then
+   acquire that mutex, reverify the PC source, GET the two frozen official
+   BLS/Census files with finite limits, and parse the workbook on PC.
 4. Wait for natural Core idle, atomically obtain the observed `local-cycle.lock`
    respected by the existing Core, claim the one-shot journal, reverify source
    and lease, archive the official bytes privately and store/read back only:
