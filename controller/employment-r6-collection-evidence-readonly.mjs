@@ -81,7 +81,7 @@ function coverage(rows){
   unknown:safeInt(r.unknown_code_count),nonpositive:safeInt(r.nonpositive_count)})).filter(x=>x.week);
  weeks.sort((a,b)=>a.week.localeCompare(b.week));
  const complete=x=>x?.count===51&&x?.regions===51&&x?.unknown===0;
- let latestCandidate=null,earliestBreak=null,eligible=0;
+ let latestCandidate=null,earliestBreak=null,latestBreak=null,eligible=0;
  for(let i=55;i<weeks.length;i++){
   const current=weeks.slice(i-3,i+1),previous=weeks.slice(i-55,i-51);
   const consecutive=group=>group.every((x,j)=>j===0||day(x.week)-day(group[j-1].week)===7*86400000);
@@ -90,7 +90,7 @@ function coverage(rows){
      current.some((x,j)=>day(x.week)-day(previous[j].week)!==52*7*86400000))reason='WEEK_ALIGNMENT_GAP';
   else if([...current,...previous].some(x=>!complete(x)))reason='REGION_51_COVERAGE_GAP';
   else if(previous.some(x=>x.nonpositive!==0))reason='PRIOR_4W_NONPOSITIVE';
-  if(reason){if(!earliestBreak)earliestBreak={week:weeks[i].week,reason};}
+  if(reason){if(!earliestBreak)earliestBreak={week:weeks[i].week,reason};latestBreak={week:weeks[i].week,reason};}
   else{latestCandidate=weeks[i].week;eligible++;}
  }
  const last=weeks.at(-1);
@@ -99,7 +99,7 @@ function coverage(rows){
  return {status:'OBSERVED',sampledWeeks:weeks.length,firstWeek:first?.week??null,lastWeek:last?.week??null,
   complete51Weeks:weeks.filter(complete).length,incompleteWeeks:weeks.filter(x=>!complete(x)).length,
   latestComplete51Week:latestComplete,latestStrict52WeekCandidate:latestCandidate,
-  strict52WeekCandidateCount:eligible,firstWindowBreak:earliestBreak,
+  strict52WeekCandidateCount:eligible,firstWindowBreak:earliestBreak,latestWindowBreak:latestBreak,
   recentIncompleteWeeks:weeks.filter(x=>!complete(x)).slice(-8).reverse().map(x=>({week:x.week,regions:x.regions,rows:x.count,unknownCodes:x.unknown})),
   note:'COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION'};
 }
@@ -139,7 +139,8 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    json_extract(detail_json,'$.historyWeeks') AS history_weeks,
    json_extract(detail_json,'$.parserMeta.latestCompleteWeek') AS latest_complete_week,
    json_extract(detail_json,'$.parserMeta.coreCount') AS core_count,
-   json_array_length(detail_json,'$.parserMeta.selectedWeeks') AS selected_weeks
+   json_array_length(detail_json,'$.parserMeta.selectedWeeks') AS selected_weeks,
+   json_extract(detail_json,'$.parserMeta.selectedWeeks[0]') AS first_selected_week
    FROM market_score_employment_r6_raw_snapshot_v1
    WHERE release_group='DOL_UI_WEEKLY_CLAIMS' AND chunk_index=0
      AND request_key IN ('DOL_ETA539:600w','DOL_ETA539:112w','DOL_ETA539:60w')
@@ -148,7 +149,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    mode:r.request_key==='DOL_ETA539:600w'?'BACKFILL':r.request_key==='DOL_ETA539:112w'?'ONE_YEAR':'RELEASE',
    snapshotStoredAt:stamp(r.retrieved_at),httpStatus:safeInt(r.http_status),
    historyWeeks:safeInt(r.history_weeks),selectedWeeks:safeInt(r.selected_weeks),
-   latestCompleteWeek:date(r.latest_complete_week),coreCount:safeInt(r.core_count),
+   firstSelectedWeek:date(r.first_selected_week),latestCompleteWeek:date(r.latest_complete_week),coreCount:safeInt(r.core_count),
   })):[{status:'NOT_STORED'}];
   stage='STATE_CLAIMS_51_COVERAGE';
   // All geography labels are fixed source constants; only aggregates leave the DB.
