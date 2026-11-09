@@ -67,6 +67,13 @@ export function prepareBacklogReadOnly({requestId,backlog,fetchIssues,
     source:'EXHAUSTIVE_REMOTE_READBACK',writes:0};
 }
 
+// The preflight must inspect the same approved Writer transition as its
+// caller; omitting it would reclassify an approved source-only change as drift.
+export async function inspectPreflightEvidence(args,{inspect=inspectPostSwitch,
+  writerTransition=null}={}){
+  return inspect(args,{writerTransition});
+}
+
 export async function main(args=process.argv.slice(2), ports={}){
   need(process.platform==='win32' && !process.env.GITHUB_ACTIONS &&
     !process.env.RUNNER_NAME, 'POSTSWITCH_OPERATOR_WINDOWS_REQUIRED');
@@ -81,7 +88,8 @@ export async function main(args=process.argv.slice(2), ports={}){
     need(sha256(git(['show',`${source}:${rel}`]))===
       sha256(fs.readFileSync(path.join(repo,rel))), 'POSTSWITCH_PREFLIGHT_SOURCE_DRIFT');
   }
-  const evidence=await (ports.inspect??inspectPostSwitch)(args);
+  const evidence=await inspectPreflightEvidence(args,{inspect:ports.inspect??inspectPostSwitch,
+    writerTransition:ports.writerTransition??null});
   need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED' &&
     evidence.requestId===id && evidence.sourceSha===source,
   'POSTSWITCH_PREFLIGHT_EVIDENCE_UNVERIFIED');
