@@ -14,7 +14,7 @@ const env={GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
  GITHUB_EVENT_NAME:'issues',GITHUB_EVENT_ACTION:'opened',
  GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_RUN_ATTEMPT:'1',
  GITHUB_SHA:'b'.repeat(40),GITHUB_RUN_ID:'42599999999',
- GITHUB_TOKEN:'local-test-token-no-network'};
+ GITHUB_TOKEN:'local-test-token-no-network',R6_B_EFFECT_OUTCOME:'success'};
 function event(){return{action:'opened',
  repository:{full_name:env.GITHUB_REPOSITORY,private:true},
  sender:{login:env.GITHUB_ACTOR},issue:{number:1010,title:'pc-employment-r6-registered-data-once',
@@ -77,6 +77,13 @@ test('NOOP and safe PRESTART BLOCKED remain distinct from success',()=>{
  const out=sanitizeR6BResult(blocked,request,env);
  assert.equal(out.status,'BLOCKED');
  assert.doesNotMatch(JSON.stringify(out),/secret|token/);
+});
+
+test('failed Actions effect step cannot be mislabeled SUCCESS by reporter',()=>{
+ const raw=validRaw();
+ const result=sanitizeR6BResult(raw,request,{...env,R6_B_EFFECT_OUTCOME:'failure'});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'R6_B_RESULT_UNVERIFIED_STOP');
 });
 
 test('atomic JSON/TXT pair and one originating comment; delivery readback required',async()=>{
