@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a3b44168-e96e-48b2-b787-10aa1a0e001a",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "e488094f695ec62a8f6e4b2a5bfa505bb5abe57d",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "e633b7ceed26cf5ea773b2f31d40d3df4c8a1f5f",
+  "candidateSourceSha": "58a8d800738384437d4acc24c9e12fb0fa804df8",
+  "manifestSha256": "405fadd0fab40c29292512ba41124ecc653f5a545825ebb7fc2e7f19809230f6",
+  "baseTreeOid": "55e441e75bd583b066403820003a993b9ee80ed9",
+  "preparedTreeOid": "09cb161e2354315031afd080cb020694b5897506",
+  "provenanceSha256": "6377e1e2f10f7e6c49dab4564fa4a30cd624d746c00522b9b1d6f98cef77c451",
+  "runId": "42585051794",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-score/employment-r4-bed-collector.mjs",
+    "lib/market-score/employment-r4-bed-provider.mjs",
+    "lib/market-score/employment-r4-bed-runtime.mjs",
+    "lib/market-score/employment-r4-history-worker-domain.mjs",
+    "lib/market-score/employment-r4-runtime-trigger.mjs",
+    "lib/market-score/employment-r4-shadow-collector.mjs",
+    "lib/market-score/employment-r4-shadow-provider.mjs",
+    "lib/market-score/employment-r4-shadow-worker-domain.mjs",
+    "lib/market-score/employment-r6-collector.mjs",
+    "lib/market-score/employment-r6-contract.mjs",
+    "lib/market-score/employment-r6-provider.mjs",
+    "scripts/pc-writer/collect-local.mjs",
+    "scripts/pc-writer/employment-r6-auto-collection.mjs"
+  ]
+}
