@@ -32,10 +32,13 @@ test('separate tokenless Windows writer and token-bearing result reporter',()=>{
 });
 
 test('live Core lock owner check is bounded, Task-linked and read-only',()=>{
- assert.match(yaml,/timeout-minutes: 20/);
- assert.match(windowsAdapter,/CORE_OWNER_OBSERVATION_MS=6\*60_000/);
+ assert.match(yaml,/timeout-minutes: 30/);
+ assert.match(windowsAdapter,/CORE_OWNER_OBSERVATION_MS=12\*60_000/);
  assert.match(windowsAdapter,/async proveActiveCoreLock\(\)/);
  assert.match(windowsAdapter,/INFL_MANUAL_B_CORE_OWNER_NOT_OBSERVED_STOP/);
+ assert.match(windowsAdapter,/INFL_MANUAL_B_CORE_TASK_INSTANCE_GAP_STOP/);
+ assert.match(windowsAdapter,/INFL_MANUAL_B_CORE_PROCESS_GAP_STOP/);
+ assert.match(windowsAdapter,/if\(result.status!=='INFL_MANUAL_B_SAVED_VERIFIED'\)process.exitCode=1/);
  assert.match(ownerProbe,/GetTask\('ZGMINI-PC-Local-Core'\)/);
  assert.match(ownerProbe,/GetInstances\(0\)/);
  assert.match(ownerProbe,/EnginePID/);
