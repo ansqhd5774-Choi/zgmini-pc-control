@@ -37,11 +37,36 @@ export const TOOL_PATHS = Object.freeze([
   'tools/source-bundle-register.mjs',
 ]);
 
+
+// This is incident-specific evidence, not an implicit recovery authorization.
+// The direct C manifest must explicitly consent to these exact observed bytes.
+export const WRITER_TRANSITION = Object.freeze({
+  baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
+  currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+  approvedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+  writerBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
+  writerAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+});
+
 export function validatePostSwitchApproval(approval, {requestId,sourceSha,evidence} = {}) {
+  const transitionRequested = Object.hasOwn(approval ?? {}, 'writerTransition');
   need(keysAre(approval, ['schema','approved','operation','requestId','issueNumber',
     'sourceSha','targetControllerSha','installedShaBefore','evidenceHashes',
-    'toolHashes','postcheck','expectedBacklogIssues']),
+    'toolHashes','postcheck','expectedBacklogIssues',
+    ...(transitionRequested ? ['writerTransition'] : [])]),
   'POSTSWITCH_APPROVAL_FIELDS_INVALID');
+  if (transitionRequested) {
+    need(keysAre(approval.writerTransition, Object.keys(WRITER_TRANSITION)) &&
+      Object.entries(WRITER_TRANSITION).every(([key,value])=>
+        approval.writerTransition[key]===value),
+    'POSTSWITCH_APPROVED_WRITER_TRANSITION_MISMATCH');
+    need(evidence?.checks?.PROTECTION_UNCHANGED === false &&
+      evidence?.checks?.PROTECTION_CONTRACT_VERIFIED === true,
+    'POSTSWITCH_APPROVED_WRITER_TRANSITION_UNVERIFIED');
+  } else {
+    need(evidence?.checks?.PROTECTION_UNCHANGED === true,
+      'POSTSWITCH_APPROVAL_PROTECTION_UNVERIFIED');
+  }
   need(approval.schema === 'ZGMINI_PC_POSTSWITCH_RECOVERY_APPROVAL_V1' &&
     approval.approved === true && approval.operation === 'FORWARD_POSTSWITCH_917' &&
     approval.requestId === INCIDENT.requestId &&
