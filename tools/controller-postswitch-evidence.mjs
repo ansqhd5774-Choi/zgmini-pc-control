@@ -6,6 +6,8 @@ import {createHash} from 'node:crypto';
 import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {WRITER_FOLLOWUP_CANDIDATE, WRITER_TRANSITION}
+  from './controller-postswitch-approval.mjs';
 
 const control = 'E:/ZGmini/automation/pc-control';
 const maintenance = 'E:/ZGmini/automation/pc-maintenance';
@@ -161,6 +163,141 @@ export function verifyWriterProtectionEvidence({baseline, current,
 export function verifyWriterProtectionTransition(proof = {}) {
   return verifyWriterProtectionEvidence(proof) &&
     verifySourceOnlyConfigEvolution(proof.currentConfigRaw, proof.transition);
+}
+
+const gitBlobDigest = raw => createHash('sha1')
+  .update(Buffer.from(`blob ${raw.length}\0`, 'utf8')).update(raw).digest('hex');
+
+/**
+ * Strictly verify all three *additional* approved Writer B result bytes.
+ * The A-grade observations below are intentionally NOT promoted into a
+ * successful, current live-Core source check. This candidate is not a C
+ * approval, and this helper is not wired into the live recovery operator.
+ */
+export function verifyWriterFollowupBReceipts(receipts) {
+  const contract = WRITER_FOLLOWUP_CANDIDATE;
+  if (!Array.isArray(receipts) || receipts.length !== 3 ||
+      !Array.isArray(contract?.writerB) || contract.writerB.length !== 3) return false;
+  for (let index = 0; index < 3; index++) {
+    const expected = contract.writerB[index], row = receipts[index];
+    if (!Buffer.isBuffer(row?.raw) || row.path !== expected.path ||
+        row.blobSha !== expected.blobSha ||
+        gitBlobDigest(row.raw) !== expected.blobSha ||
+        digest(row.raw) !== expected.rawSha256) return false;
+    let result;
+    try {
+      const utf8 = row.raw.toString('utf8');
+      if (!Buffer.from(utf8, 'utf8').equals(row.raw)) return false;
+      result = JSON.parse(utf8);
+    } catch {return false;}
+    if (result?.schema !== 'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1' ||
+        result.requestId !== expected.requestId ||
+        result.status !== 'WRITER_B_INSTALLED_VERIFIED' ||
+        result.code !== 'WRITER_B_INSTALL_VERIFIED' ||
+        result.mode !== 'LOCAL_OVERLAY' || result.localOnly !== true ||
+        result.baseHead !== expected.baseHead ||
+        result.sourceSha !== expected.sourceSha ||
+        result.candidateSourceSha !== expected.candidateSourceSha ||
+        result.manifestSha256 !== expected.manifestSha256 ||
+        !Array.isArray(result.changedPaths) ||
+        result.changedPaths.length !== 1 ||
+        result.changedPaths[0] !== expected.changedPath) return false;
+  }
+  return contract.writerB.every((entry, index) =>
+    entry.baseHead === contract.sourceSequence[index] &&
+    entry.sourceSha === contract.sourceSequence[index + 1]);
+}
+
+/**
+ * A byte-only, in-memory inverse over the JSON source field. Anchors at 48d,
+ * 144f, 75f and 70d were observed separately. The 4ec digest is calculated,
+ * never asserted as an independently observed historical A-grade digest.
+ * No argument or return value constitutes live-Core or C-grade verification.
+ */
+export function analyzeSourceOnlyReplacementChain(raw, {sources, anchors} = {}) {
+  const stop = code => ({status:'SOURCE_ONLY_CHAIN_UNVERIFIED', code,
+    cApprovalAuthorized:false, liveCoreSourceVerified:false});
+  if (!Buffer.isBuffer(raw) || !Array.isArray(sources) ||
+      sources.length !== 5 || sources.some(source =>
+        typeof source !== 'string' || !/^[a-f0-9]{40}$/.test(source)) ||
+      new Set(sources).size !== 5 || !anchors ||
+      Object.keys(anchors).length !== 5) return stop('WRITER_CHAIN_ARGUMENTS_INVALID');
+  try {
+    let currentText = raw.toString('utf8');
+    if (!Buffer.from(currentText, 'utf8').equals(raw))
+      return stop('WRITER_CHAIN_UTF8_INVALID');
+    const derived=[];
+    for (let step=4;step>=0;step--) {
+      const currentSource=sources[step];
+      const currentRaw=Buffer.from(currentText,'utf8');
+      const currentHash=digest(currentRaw);
+      const expectedHash=anchors[currentSource];
+      if (expectedHash != null &&
+          (!/^[a-f0-9]{64}$/.test(expectedHash) || currentHash !== expectedHash))
+        return stop('WRITER_CHAIN_CONFIG_SHA_MISMATCH');
+      const parsed=JSON.parse(currentText);
+      const hits=[...currentText.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)];
+      if (hits.length !== 1 || hits[0][1] !== currentSource ||
+          parsed?.source !== currentSource)
+        return stop('WRITER_CHAIN_SOURCE_NOT_UNIQUE');
+      derived.push({sourceSha:currentSource,configSha256:currentHash,
+        evidenceLevel:expectedHash == null ? 'DERIVED_ONLY' : 'PINNED_DIGEST_MATCH'});
+      if (step === 0) break;
+      const priorSource=sources[step-1], hit=hits[0];
+      const replaced=hit[0].replace(currentSource,priorSource);
+      if (replaced === hit[0])return stop('WRITER_CHAIN_SOURCE_REPLACE_FAILED');
+      const nextText=currentText.slice(0,hit.index)+replaced+
+        currentText.slice(hit.index+hit[0].length);
+      if (JSON.stringify({...parsed,source:priorSource}) !==
+          JSON.stringify(JSON.parse(nextText)))
+        return stop('WRITER_CHAIN_NON_SOURCE_DRIFT');
+      currentText=nextText;
+    }
+    return {status:'SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED',
+      code:'WRITER_CHAIN_PINNED_ENDPOINTS_MATCH',
+      stages:derived,intermediate4ecIndependentlyObserved:false,
+      cApprovalAuthorized:false,liveCoreSourceVerified:false};
+  } catch {return stop('WRITER_CHAIN_BYTES_INVALID');}
+}
+
+export function analyzeWriterFollowupSourceCandidate(currentConfigRaw) {
+  const candidate=WRITER_FOLLOWUP_CANDIDATE;
+  const [source75,source4ec,source144,source48]=candidate.sourceSequence;
+  const h=candidate.configShaAnchors;
+  return analyzeSourceOnlyReplacementChain(currentConfigRaw,{
+    sources:[WRITER_TRANSITION.priorApprovedSourceSha,
+      source75,source4ec,source144,source48],
+    anchors:{
+      [WRITER_TRANSITION.priorApprovedSourceSha]:h.prior70,
+      [source75]:h.at75,[source4ec]:h.at4ec,
+      [source144]:h.at144,[source48]:h.at48,
+    },
+  });
+}
+
+export function classifyWriterFollowupAObservations({at144,at48Uncorroborated,
+  at48HistoricalOnly} = {}) {
+  const s=WRITER_FOLLOWUP_CANDIDATE.sourceSequence;
+  const accurate = at144?.status === 'PASS' &&
+    at144.code === 'WRITER_APPROVED_PREIMAGE_READONLY' &&
+    at144.result?.sourceHead === s[2] &&
+    at144.result?.approvedConfigSource === s[2] &&
+    at144.result?.checkpointSource === s[1] &&
+    at144.result?.sourceIdentityConsistent === false &&
+    at144.result?.runtimeSourceVerified === false &&
+    at48Uncorroborated?.status === 'STATE_UNKNOWN' &&
+    at48Uncorroborated.code === 'WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED' &&
+    at48Uncorroborated.result?.sourceHead === null &&
+    at48Uncorroborated.result?.runtimeSourceVerified === false &&
+    at48HistoricalOnly?.status === 'PASS' &&
+    at48HistoricalOnly.code === 'PC_SOURCE_READONLY_DIAGNOSIS' &&
+    at48HistoricalOnly.result?.runtimeSourceVerified === false &&
+    at48HistoricalOnly.result?.historicalCheckoutCandidate?.head === s[3] &&
+    at48HistoricalOnly.result?.historicalCheckoutCandidate?.trackedDirty === false;
+  return {status:accurate ? 'A_OBSERVATIONS_CLASSIFIED_NOT_LIVE_CORE' :
+    'A_OBSERVATIONS_UNVERIFIED',
+    liveCoreSourceVerified:false,latestPreimagePass:false,
+    cApprovalAuthorized:false};
 }
 
 function verifiedGitHubResult(pathName, expectedBlobSha) {

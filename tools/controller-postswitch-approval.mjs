@@ -52,6 +52,87 @@ export const WRITER_TRANSITION = Object.freeze({
   writerAResultBlobSha:'65e7edf335d9492058e5e8d183d9927c9c5ba3c0',
 });
 
+// Later B-grade Writer overlays are separate from the historical #917 C-grade
+// approval. Recording them does not authorize a new protection exception or a
+// Windows recovery. In particular, the 4ec config digest has no independent
+// historical A-grade observation; it may only be calculated from live bytes.
+export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
+  scope:'READONLY_SOURCE_ONLY_CANDIDATE_NOT_C_APPROVAL',
+  sourceSequence:Object.freeze([
+    '75f73d8613550221f8e80b304d67b8b10a228e7f',
+    '4ec0b8c197627ebdb316be8df291e30d7e435784',
+    '144f3b8f673cc3d18f004ddd65f6920d450f0ea6',
+    '48d3478030590ca63aaab2435e88c896608c70d3',
+  ]),
+  configShaAnchors:Object.freeze({
+    prior70:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+    at75:'05eeb13d9183480b89413557c7e65c57d818a5d8fc5eaa88261e55cfc409c57a',
+    at4ec:null, // DERIVED_ONLY: never report this as observed A-grade proof.
+    at144:'9e9bbe92ee7a2e368c08ec5ddb21bdb7fc782613a05d610da963f7278c75a404',
+    at48:'59777810c0949036f03777b7ea5561bd72bf0697cdaba65e393af49bf67356dc',
+  }),
+  writerB:Object.freeze([
+    Object.freeze({
+      path:'results/writer-b-source-install-a861da80-8765-4e8c-b5a0-1824764284e2.json',
+      blobSha:'0d79ca8a7dd75740894df8576ca266e599df8c5d',
+      rawSha256:'151a27ae60b86c6f89144ab75168c06cf9547085c8905c27dd537a87c0ee6339',
+      requestId:'a861da80-8765-4e8c-b5a0-1824764284e2',
+      baseHead:'75f73d8613550221f8e80b304d67b8b10a228e7f',
+      sourceSha:'4ec0b8c197627ebdb316be8df291e30d7e435784',
+      candidateSourceSha:'27c02d9b254e92af21b2a5b92a4c0bb152bb5713',
+      manifestSha256:'3452198846df9e4bb6f2299e3f4be64691ec87d4c9801121db130482c866904c',
+      changedPath:'scripts/pc-writer/build-asset-r10-release.mjs',
+    }),
+    Object.freeze({
+      path:'results/writer-b-source-install-b86e398c-59dd-485e-a3b1-2596fb5466d2.json',
+      blobSha:'77d9eb6965a272dc797e7052b62a8e172df5e302',
+      rawSha256:'bc73d77b72c2d11cb0ba8806adc369100087bfb883d6e9894f806e905f1941a7',
+      requestId:'b86e398c-59dd-485e-a3b1-2596fb5466d2',
+      baseHead:'4ec0b8c197627ebdb316be8df291e30d7e435784',
+      sourceSha:'144f3b8f673cc3d18f004ddd65f6920d450f0ea6',
+      candidateSourceSha:'27c02d9b254e92af21b2a5b92a4c0bb152bb5713',
+      manifestSha256:'88c28ab0fbe7ae4683f76a94af907df5ef591623bdec37b01a670914cfa88703',
+      changedPath:'scripts/pc-writer/run-local.mjs',
+    }),
+    Object.freeze({
+      path:'results/writer-b-source-install-d9cc77ff-acb0-44e0-9f2b-1659efead888.json',
+      blobSha:'c594b77b96d8b822cce38a36d36bfa562e123be1',
+      rawSha256:'425d4a06585694c94f612af769e6341153dba9c1e7f9718f279c7111b98a2d50',
+      requestId:'d9cc77ff-acb0-44e0-9f2b-1659efead888',
+      baseHead:'144f3b8f673cc3d18f004ddd65f6920d450f0ea6',
+      sourceSha:'48d3478030590ca63aaab2435e88c896608c70d3',
+      candidateSourceSha:'66cb996994dbece69f64bb2de51ef6e4c0a874de',
+      manifestSha256:'0f0e02409e9c206f8c35e1efe7790ce1a80a3e3eb0bcf8bbf4f8931a1587a57c',
+      changedPath:'scripts/pc-writer/run-local.mjs',
+    }),
+  ]),
+  aObservations:Object.freeze({
+    at144:Object.freeze({
+      path:'results/42709978452-1-seat-6.json',
+      blobSha:'01c74375290e3d6b0727a88d6c44a3b89d56da12',
+      rawSha256:'eae8ba147d1e2ff5eea078b9728b5602877dea22f46dd62f0482915e53c9d799',
+      sourceSha:'144f3b8f673cc3d18f004ddd65f6920d450f0ea6',
+      checkpointSha:'4ec0b8c197627ebdb316be8df291e30d7e435784',
+      status:'PASS',code:'WRITER_APPROVED_PREIMAGE_READONLY',
+      evidenceLevel:'FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS',
+    }),
+    at48Uncorroborated:Object.freeze({
+      path:'results/42712917820-1-seat-1.json',
+      blobSha:'19b1831712a2db5837b54401cc8995e389ae7a1a',
+      rawSha256:'75455b80247383d886d0832301f2ac25ac19749a5ac500a29bc24dd9ca9aef4c',
+      status:'STATE_UNKNOWN',code:'WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED',
+    }),
+    at48HistoricalOnly:Object.freeze({
+      path:'results/42714326288-1-seat-6.json',
+      blobSha:'b5a7fb1999fd4daf80178c4093fe58f79cd8b270',
+      rawSha256:'c3d6d41cc29f27f5d360995435de9ec8eef4bcdb168a646f8edb6248390b761f',
+      sourceSha:'48d3478030590ca63aaab2435e88c896608c70d3',
+      status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',
+      evidenceLevel:'HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME',
+    }),
+  }),
+});
+
 export function validatePostSwitchApproval(approval, {requestId,sourceSha,evidence} = {}) {
   const transitionRequested = Object.hasOwn(approval ?? {}, 'writerTransition');
   need(keysAre(approval, ['schema','approved','operation','requestId','issueNumber',
