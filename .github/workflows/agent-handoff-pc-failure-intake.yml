@@ -24,14 +24,17 @@ jobs:
       github.event.workflow_run.event == 'issues' &&
       github.event.workflow_run.conclusion != 'skipped' &&
       github.event.workflow_run.actor.login == 'ansqhd5774-Choi'
-    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 pinned
+        with:
+          node-version: '22'
       - name: Verify published pc-job report and emit one sanitized incident
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: cmd
-        run: E:\ZGmini\runtime\node.exe agent-handoff\pc-failure-producer.mjs
+        run: node agent-handoff/pc-failure-producer.mjs

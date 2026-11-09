@@ -20,19 +20,22 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       contains(github.event.issue.labels.*.name, 'agent-handoff') &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'
-    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 3
     defaults:
       run:
         shell: cmd
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 pinned
+        with:
+          node-version: '22'
       - name: Validate queue and record routing only
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: '"E:\ZGmini\runtime\node.exe" agent-handoff/issue-broker.mjs'
+        run: node agent-handoff/issue-broker.mjs
   record-verified-return:
     permissions:
       contents: read
@@ -48,16 +51,19 @@ jobs:
       contains(github.event.issue.labels.*.name, 'agent-handoff') &&
       startsWith(github.event.comment.body, '{"schema":"ZGMINI_AGENT_HANDOFF_RESULT_V1"') &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'
-    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 3
     defaults:
       run:
         shell: cmd
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 pinned
+        with:
+          node-version: '22'
       - name: Verify PR and CI provenance and record pending runtime return
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: '"E:\ZGmini\runtime\node.exe" agent-handoff/result-broker.mjs'
+        run: node agent-handoff/result-broker.mjs

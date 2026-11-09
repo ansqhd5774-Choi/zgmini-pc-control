@@ -171,7 +171,8 @@ test('the new workflow remains opt-in, single-writer and self-hosted', () => {
   assert.match(yaml, /group: agent-handoff-pc-failure-intake/);
   assert.match(yaml, /queue: max/);
   assert.match(yaml, /cancel-in-progress: false/);
-  assert.match(yaml, /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
-  assert.match(yaml, /run: E:\\ZGmini\\runtime\\node\.exe/);
-  assert.doesNotMatch(yaml, /runs-on: ubuntu-latest|actions\/setup-node/);
+  assert.match(yaml, /runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+  assert.match(yaml, /run: node agent-handoff\/pc-failure-producer\.mjs/);
+  assert.match(yaml, /uses: actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
+  assert.doesNotMatch(yaml, /runs-on: ubuntu-latest|E:\\\\ZGmini\\\\runtime\\\\node\.exe/);
 });

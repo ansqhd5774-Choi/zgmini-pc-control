@@ -15,7 +15,8 @@ test('Writer B intake is gated independently and retains pending events', () => 
   assert.match(workflow, /github\.event\.workflow_run\.conclusion != 'skipped'/);
   assert.doesNotMatch(workflow, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
   assert.match(workflow, /cancel-in-progress: false\s*\n\s+queue: max/);
-  assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
+  assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+  assert.match(workflow, /uses: actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
 });
 
 test('Writer B intake runs only its metadata adapter, never the PC installer', () => {

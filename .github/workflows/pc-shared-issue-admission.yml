@@ -34,6 +34,7 @@ jobs:
           node-version: '22'
       - name: Record a rejected known shared-resource request without PC execution
         env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
           GITHUB_TOKEN: ${{ github.token }}
         shell: cmd
         run: node shared-resource\issue-admission-report.mjs
