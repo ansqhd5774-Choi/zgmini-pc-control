@@ -2,20 +2,19 @@
 // No PC action, lease release, issue comment, scheduler or automatic retry.
 // Read operations are injected by the caller and must use authenticated
 // bounded GitHub GETs; a candidate never authorizes owner replan.
-import {createHash} from 'node:crypto';
 import {parseResourceWaitComment} from './resource-wait-ledger.mjs';
+import {preparePcSharedResourceWait} from './pc-result-to-incident.mjs';
+import {prepareWriterBFailureHandoff} from './writer-b-result-to-incident.mjs';
 import {summarizeResourceRecheckEvidence} from '../shared-resource/lifecycle.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
 const BOT='github-actions[bot]';
 const SHA40=/^[a-f0-9]{40}$/;
-const SHA64=/^[a-f0-9]{64}$/;
 const MAX_BYTES=65536;
 const stop=code=>{throw Error('RESOURCE_RECHECK_READBACK_'+code);};
 const issueUrl=number=>`https://api.github.com/repos/${REPO}/issues/${number}`;
 const hasLabel=(issue,label)=>issue?.labels?.some(x=>x?.name===label);
-const sha256=value=>createHash('sha256').update(value).digest('hex');
 
 function content(file,path,ref='main',maxBytes=MAX_BYTES){
   if(file?.path!==path||file.ref!==ref||
@@ -72,72 +71,44 @@ function originCandidate(wait,origin){
   if(request?.requestId!==wait.origin.requestId||
      request.chatId!==wait.origin.chatId)return null;
   const result=parsed(json,wait.evidence.resultJsonPath);
-  const text=content(txt,wait.evidence.resultTxtPath);
-  if(!result||text===null)return null;
-  if(writer){
-    const manifestBytes=content(manifest,request.approvalManifestPath,
-      run.head_sha,131072);
-    let approved;
-    try{approved=JSON.parse(manifestBytes);}catch{return null;}
-    if(run.run_attempt!==1||run.head_sha!==wait.origin.sourceSha||
-       request.schema!=='ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1'||
-       request.controlRepository!==REPO||
-       !/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/.test(
-         request.approvalManifestPath??'')||
-       request.approvalManifestSha256!==wait.origin.manifestSha256||
-       !SHA64.test(request.approvalManifestSha256??'')||
-       manifestBytes===null||
-       sha256(manifestBytes)!==request.approvalManifestSha256||
-       approved?.schema!=='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1'||
-       approved.status!=='APPROVED_B'||
-       approved.scope!=='PC_WRITER_APPROVED_FILE_OVERLAY_ONLY'||
-       approved.runCount!==1||
-       approved.sourceRepository!=='ansqhd5774-Choi/zgmini'||
-       !SHA40.test(approved.candidateSourceSha??'')||
-       result.schema!=='ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1'||
-       result.requestId!==request.requestId||result.runId!==String(run.id)||
-       result.status!==wait.evidence.status||result.code!==wait.evidence.code||
-       !botReceipt(receipt,issue,`<!-- zgmini-writer-b-install:${request.requestId} -->`)||
-       !receipt.body.includes('DELIVERY: RESULT_PAIR_READBACK_VERIFIED')||
-       !receipt.body.includes(
-         `Writer B evidence: **${result.status}** (${result.code})`)||
-       !/^RESULT_CREATED: [0-2]\/2; RESULT_READBACK: 2\/2$/m.test(receipt.body)||
-       !receipt.body.includes(`RUN_ID: ${run.id}; RETRY: NO_REEXECUTE`)||
-       !txtMatches(text,[['REQUEST_ID',request.requestId],['STATUS',result.status],
-         ['CODE',result.code],['RUN_ID',String(run.id)]]))return null;
-    return {repository:REPO,issueNumber:issue.number,requestId:request.requestId,
-      runId:run.id,status:result.status,code:result.code,
-      resultJsonPath:json.path,resultTxtPath:txt.path,
-      controlSourceSha:run.head_sha,manifestSha256:request.approvalManifestSha256,
-      botReceiptReadbackVerified:true,resultPairReadbackVerified:true};
-  }
-  if(request.schema!=='ZGMINI_PC_JOB_V1'||request.sourceSha!==wait.origin.sourceSha||
-     !SHA40.test(request.sourceSha??'')||
-     result.schema!=='ZGMINI_PC_RESULT_V1'||
-     result.controlRepository!==REPO||
-     result.requestId!==request.requestId||result.chatId!==request.chatId||
-     result.operation!==request.operation||
-     result.sourceRepository!==request.sourceRepository||
-     result.sourceBranch!==request.sourceBranch||
-     result.requestedSourceSha!==request.sourceSha||
-     !SHA40.test(result.controlSourceSha??'')||
-     result.status!==wait.evidence.status||result.code!==wait.evidence.code||
-     !Number.isSafeInteger(result.seat)||result.seat<1||result.seat>6||
-     result.jobId!==`run-${run.id}-${run.run_attempt}-seat-${result.seat}`||
-     !botReceipt(receipt,issue,
-       `<!-- zgmini-pc-result:${run.id}:${run.run_attempt}:${result.seat} -->`)||
-     !receipt.body.includes(`**${result.status} — ${result.code}**`)||
-     !txtMatches(text,[['requestId',request.requestId],['jobId',result.jobId],
-       ['status',result.status],['code',result.code]]))return null;
-  const fingerprint=sha256(JSON.stringify({operation:request.operation,
-    sourceRepository:request.sourceRepository,sourceBranch:request.sourceBranch,
-    sourceSha:request.sourceSha}));
-  if(fingerprint!==wait.origin.approvalFingerprintSha256)return null;
+  const resultText=content(txt,wait.evidence.resultTxtPath);
+  if(!result||resultText===null)return null;
+  let prepared;
+  try{
+    if(writer){
+      if(run.head_branch!=='main'||run.run_attempt!==1||
+         !botReceipt(receipt,issue,
+           `<!-- zgmini-writer-b-install:${request.requestId} -->`))return null;
+      prepared=prepareWriterBFailureHandoff({
+        event:{action:'completed',repository:{full_name:REPO,private:true},
+          workflow_run:run},
+        originIssue:issue,
+        receipt:{issueNumber:issue.number,requestId:request.requestId,comment:receipt},
+        resultJson:json,resultTxt:txt,manifestJson:manifest
+      });
+    }else{
+      if(!botReceipt(receipt,issue,
+        `<!-- zgmini-pc-result:${run.id}:${run.run_attempt}:${result.seat} -->`)||
+        !receipt.body.includes(`**${result.status} — ${result.code}**`))
+        return null;
+      prepared=preparePcSharedResourceWait({
+        originIssue:issue,report:result,
+        resultPath:json.path,resultTxt:resultText
+      });
+    }
+  }catch{return null;}
+  // Re-derive every wait safety field using its original, stricter producer,
+  // not a loose copy of the existing #68 record.
+  if(prepared?.state!=='WAITING_SHARED_RESOURCE'||
+     JSON.stringify(prepared.wait)!==JSON.stringify(wait))return null;
   return {repository:REPO,issueNumber:issue.number,requestId:request.requestId,
     runId:run.id,status:result.status,code:result.code,
     resultJsonPath:json.path,resultTxtPath:txt.path,
-    requestedSourceSha:request.sourceSha,controlSourceSha:result.controlSourceSha,
-    approvalFingerprintSha256:fingerprint,
+    ...(writer?{controlSourceSha:run.head_sha,
+      manifestSha256:request.approvalManifestSha256}:{
+      requestedSourceSha:request.sourceSha,
+      controlSourceSha:result.controlSourceSha,
+      approvalFingerprintSha256:wait.origin.approvalFingerprintSha256}),
     botReceiptReadbackVerified:true,resultPairReadbackVerified:true};
 }
 
