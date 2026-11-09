@@ -5,7 +5,12 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const workflow = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)),
-  '../.github/workflows/agent-handoff-pr-evidence.yml'), 'utf8');
+  '../.github/workflows/agent-handoff-pr-evidence.yml'), 'utf8').replace(/\r\n/g, '\n');
+
+test('workflow assertions tolerate Windows CRLF checkout without changing source', () => {
+  const windowsWorkflow = workflow.replace(/\n/g, '\r\n');
+  assert.equal(windowsWorkflow.replace(/\r\n/g, '\n'), workflow);
+});
 
 test('new handoff CI is PR-only, owner-label gated, and cannot run on push or schedule', () => {
   assert.match(workflow, /^on:\n  pull_request:\n    types: \[labeled\]/m);
