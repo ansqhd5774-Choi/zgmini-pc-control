@@ -195,15 +195,15 @@ const SOURCE_KEYWORDS=new Set([
  'typeof','in','of','while','for','break','continue','switch','case',
  'default','Error','JSON','Promise','Boolean','Number','String',
  'reason','status','statusCode','message','error','response','res',
+ 'fetch','http','httpStatus','responseStatus',
 ]);
 const R181_CONTEXT_WINDOWS=Object.freeze([[7,19],[81,98]]);
-export function safeR181ErrorFlow(source){
+function redactR181Flow(source,interested){
  if(typeof source!=='string'||Buffer.byteLength(source,'utf8')>8192||
   source.includes('\0'))return {status:'UNREADABLE_SOURCE',lines:[]};
  const identifiers=new Map();
  const lines=[];
  let number=1, output='', state='CODE', quote='', escaped=false;
- const interested=line=>R181_CONTEXT_WINDOWS.some(([from,to])=>line>=from&&line<=to);
  const emit=x=>{if(interested(number)&&output.length<240)output+=x;};
  const flush=()=>{
   if(interested(number))lines.push({line:number,pattern:output.trim().slice(0,240)});
@@ -255,6 +255,36 @@ export function safeR181ErrorFlow(source){
  }
  if(output&&interested(number))lines.push({line:number,pattern:output.trim().slice(0,240)});
  return {status:'REDACTED_ERROR_FLOW',lines};
+}
+
+export function safeR181ErrorFlow(source){
+ return redactR181Flow(source,line=>
+  R181_CONTEXT_WINDOWS.some(([from,to])=>line>=from&&line<=to));
+}
+
+// Extra, source-only evidence for the explicitly approved R181 20..80 failure
+// segment. Site selection runs on *redacted tokens*, never on literal text:
+// credentials, comments and quoted HTTP strings cannot select a source line.
+// This cannot prove which branch ran or identify a runtime HTTP response.
+export function safeR181HttpErrorFlow(source){
+ const view=redactR181Flow(source,()=>true);
+ if(view.status==='UNREADABLE_SOURCE')
+  return {status:'UNREADABLE_SOURCE',sites:[],lines:[],truncated:false};
+ const candidates=view.lines.filter(({line,pattern})=>line>=20&&line<=80&&
+  (/\b(?:throw|catch|fetch|http|httpStatus|responseStatus)\b/.test(pattern)||
+   /\.\s*(?:status|statusCode)\b/.test(pattern)||
+   /\b(?:response|res)\b/.test(pattern)));
+ const score=pattern=>/\b(?:throw|catch)\b/.test(pattern)?4:
+  /\.\s*(?:status|statusCode)\b/.test(pattern)?3:
+  /\b(?:fetch|http|httpStatus|responseStatus)\b/.test(pattern)?2:1;
+ const sites=candidates.sort((a,b)=>score(b.pattern)-score(a.pattern)||a.line-b.line)
+  .slice(0,8).map(x=>x.line).sort((a,b)=>a-b);
+ const selected=new Set();
+ for(const site of sites)for(const line of [site-1,site,site+1])
+  if(line>=20&&line<=80)selected.add(line);
+ const lines=view.lines.filter(x=>selected.has(x.line)).slice(0,24);
+ return {status:'STATIC_SOURCE_FLOW_ONLY',sites,lines,
+  truncated:candidates.length>sites.length||selected.size>24};
 }
 
 function valueType(value){
@@ -327,6 +357,9 @@ function sourceState(base,name){
   result.safeErrorFlow=digest===APPROVED_R181_SHA&&bytes.length<=8192?
    safeR181ErrorFlow(bytes.toString('utf8')):
    {status:'SOURCE_PIN_OR_SIZE_MISMATCH',lines:[]};
+  result.safeHttpErrorFlow=digest===APPROVED_R181_SHA&&bytes.length<=8192?
+   safeR181HttpErrorFlow(bytes.toString('utf8')):
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],lines:[],truncated:false};
  }
  return result;
 }
