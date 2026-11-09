@@ -231,8 +231,21 @@ export async function acquireCoreLockBounded(pcHome,requestId,{
 }
 
 function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
- // A manual request may be repeated the same day with a new approved requestId.
- // Keep a durable, one-shot claim per request; never replay an uncertain request.
+ // An already consumed legacy date claim must never become replayable after
+ // switching to per-request claims. Read-only lookup; preserve all old files.
+ let existing;
+ try{existing=fs.readdirSync(pcHome);}
+ catch{throw error('R6_B_LEGACY_CLAIM_READ_STOP');}
+ for(const name of existing){
+  if(!/^employment-r6-registered-(?:one_year|backfill)-\d{4}-\d{2}-\d{2}\.claim\.json$/.test(name))continue;
+  let legacy;
+  try{legacy=JSON.parse(fs.readFileSync(path.join(pcHome,name),'utf8'));}
+  catch{throw error('R6_B_LEGACY_CLAIM_STATE_UNKNOWN');}
+  need(typeof legacy?.requestId==='string'&&UUID.test(legacy.requestId),
+   'R6_B_LEGACY_CLAIM_STATE_UNKNOWN');
+  if(legacy.requestId===requestId)throw error('R6_B_REQUEST_ALREADY_CLAIMED');
+ }
+ // A new manually approved request may run the same day. Still one-shot per ID.
  need(UUID.test(requestId),'R6_B_REQUEST_ID_STOP');
  const file=path.join(pcHome,`employment-r6-registered-request-${requestId}.claim.json`);
  let fd;
