@@ -89,9 +89,11 @@ export function reconcileResourceWait(candidate, inventory) {
 }
 
 /**
- * This cannot resume execution. The verifier is responsible for checking
- * actual lock release, source bytes and unchanged approval before calling.
- * A true release flag by itself cannot override source/approval drift.
+ * Source-only recheck. There is no authenticated runtime release observation
+ * adapter yet. A caller-supplied VERIFIED_RELEASED string and copied SHA
+ * values are NOT proof of a free lease, safe Core window or current source.
+ * Until a resource-specific verified readback adapter is implemented, this
+ * function must never grant READY_FOR_OWNER_REPLAN or authorize execution.
  */
 export function reviewResourceWait(candidate, check) {
   if (candidate?.schema !== RESOURCE_WAIT_SCHEMA ||
@@ -105,15 +107,10 @@ export function reviewResourceWait(candidate, check) {
   if (check.release !== 'VERIFIED_RELEASED')
     return Object.freeze({state: 'WAITING_SHARED_RESOURCE',
       waitId: candidate.waitId, automaticPcRetries: 0});
-  if (check.sourceSha !== candidate.origin.sourceSha ||
-      (candidate.origin.manifestSha256 != null ?
-        check.manifestSha256 !== candidate.origin.manifestSha256 :
-        check.approvalFingerprintSha256 !== candidate.origin.approvalFingerprintSha256))
-    return Object.freeze({state: 'SOURCE_DRIFT_REVIEW',
-      waitId: candidate.waitId, automaticPcRetries: 0,
-      nextAction: 'REVALIDATE_EXACT_SOURCE_AND_APPROVAL'});
-  return Object.freeze({state: 'READY_FOR_OWNER_REPLAN',
+  // Fail closed even when source/approval match the old wait: neither was
+  // read back from the CURRENT running PC by this pure module.
+  return Object.freeze({state: 'RECHECK_EVIDENCE_PENDING',
     waitId: candidate.waitId, automaticPcRetries: 0,
     ownerReceipt: 'UNKNOWN',
-    nextAction: 'OWNER_MAY_CREATE_NEW_AUTHORIZED_REQUEST'});
+    nextAction: 'VERIFY_RESOURCE_RELEASE_CURRENT_SOURCE_AND_APPROVAL'});
 }
