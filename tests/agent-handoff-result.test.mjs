@@ -86,13 +86,18 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
   botOrigin = false, botBadTitle = false, botForeignOrigin = false,
   botMissingEvidence = false, untrustedIssueAuthor = false,
   invalidOriginalAuthor = false, wrongOriginalRequest = false,
-  originPostFailsOnce = false} = {}) {
+  originPostFailsOnce = false, writerOrigin = false, wrongWriterSource = false} = {}) {
   let {handoff, result, pr, run} = setup();
   if (botOrigin) {
     const candidate = structuredClone(handoff);
     candidate.origin.repository = botForeignOrigin ? 'ansqhd5774-Choi/zgmini' :
       'ansqhd5774-Choi/zgmini-pc-control';
     if (!botMissingEvidence) candidate.failure.evidenceIssueNumber = candidate.origin.issueNumber;
+    if (writerOrigin) {
+      candidate.failure.kind = 'COMMON_WRITER';
+      candidate.failure.code = 'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP';
+      candidate.origin.branch = 'main';
+    }
     handoff = parseHandoff(JSON.stringify(candidate));
     result.fingerprint = fingerprintHandoff(handoff);
   }
@@ -109,11 +114,21 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
   const seen = [];
   const comments = collision ? [{user: {login: 'github-actions[bot]'},
     body: `HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${'0'.repeat(64)}`}]: [];
-  const originComments = [];
+  const originComments = writerOrigin ? [{user: {login: 'github-actions[bot]'},
+    issue_url: 'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/1009',
+    body: [`<!-- zgmini-writer-b-install:${handoff.origin.requestId} -->`,
+      `Writer B evidence: **WRITER_B_PREFLIGHT_STOP** (${handoff.failure.code})`,
+      'DELIVERY: RESULT_PAIR_READBACK_VERIFIED',
+      'RESULT_CREATED: 2/2; RESULT_READBACK: 2/2',
+      'RUN_ID: 42570000003; RETRY: NO_REEXECUTE'].join('\n')}] : [];
   const originalIssue = {number: 1009,
     user: {login: invalidOriginalAuthor ? 'untrusted-user' : 'ansqhd5774-Choi'},
-    labels: [{name: 'pc-job'}],
-    body: JSON.stringify({schema: 'ZGMINI_PC_JOB_V1',
+    title: writerOrigin ? 'pc-writer-source-install' : 'pc-job',
+    labels: [{name: writerOrigin ? 'pc-writer-b-install' : 'pc-job'}],
+    body: JSON.stringify(writerOrigin ? {schema: 'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1',
+      operation: 'pc-writer-source-install', controlRepository: 'ansqhd5774-Choi/zgmini-pc-control',
+      requestId: wrongOriginalRequest ? 'pc-wrong-original-request' : handoff.origin.requestId,
+      chatId: handoff.origin.chatId} : {schema: 'ZGMINI_PC_JOB_V1',
       requestId: wrongOriginalRequest ? 'pc-wrong-original-request' : handoff.origin.requestId,
       chatId: handoff.origin.chatId, sourceSha: handoff.origin.sourceSha,
       sourceBranch: handoff.origin.branch, sourceRepository: 'ansqhd5774-Choi/zgmini'})};
@@ -130,6 +145,12 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       value = {id: 1};
     } else if (uri.pathname.endsWith('/pulls/920')) value = pr;
     else if (uri.pathname.endsWith('/actions/runs/42450377234')) value = run;
+    else if (uri.pathname.endsWith('/actions/runs/42570000003')) value = {id: 42570000003,
+      name: 'ZGMINI Approved Writer B Source Overlay Once',
+      head_sha: wrongWriterSource ? 'c'.repeat(40) : handoff.origin.sourceSha,
+      head_branch: 'main', event: 'issues', actor: {login: 'ansqhd5774-Choi'},
+      repository: {full_name: 'ansqhd5774-Choi/zgmini-pc-control'},
+      run_attempt: 1, status: 'completed'};
     else if (uri.pathname.endsWith('/issues/1009') && method === 'GET') value = originalIssue;
     else if (uri.pathname.endsWith('/issues/1009/comments') && method === 'GET') value = originComments;
     else if (uri.pathname.endsWith('/issues/1009/comments') && method === 'POST') {
@@ -163,6 +184,9 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       assert.deepEqual(seen, ['comment', 'origin-comment', 'origin-comment']);
       assert.equal(comments.length, 1);
       assert.equal(originComments.length, 1);
+    } else if (wrongWriterSource) {
+      await assert.rejects(runResultBroker(env), /RESULT_WRITER_SOURCE_PROVENANCE_STOP/);
+      assert.deepEqual(seen, []);
     }
     else { await runResultBroker(env); await runResultBroker(env);
       assert.deepEqual(seen, botOrigin ? ['comment', 'origin-comment'] : ['comment']); }
@@ -188,6 +212,10 @@ test('result broker prevents return to mismatched original request ID',
   async () => simulate({botOrigin: true, wrongOriginalRequest: true}));
 test('result broker repairs a partial original return without duplicating central record',
   async () => simulate({botOrigin: true, originPostFailsOnce: true}));
+test('Writer B original result checks the authenticated completed control workflow source SHA',
+  async () => simulate({botOrigin: true, writerOrigin: true}));
+test('Writer B original result rejects wrong workflow SHA before any comment write',
+  async () => simulate({botOrigin: true, writerOrigin: true, wrongWriterSource: true}));
 test('result broker refuses a bot-created intake with a different title',
   async () => simulate({botOrigin: true, botBadTitle: true}));
 test('result broker refuses a bot-created intake with a foreign origin',
