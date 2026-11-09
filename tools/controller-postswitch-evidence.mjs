@@ -281,6 +281,64 @@ export function analyzeWriterFollowupSourceCandidate(currentConfigRaw) {
   });
 }
 
+/**
+ * #917's immutable PROTECTED_BEFORE snapshot is never rewritten to make later
+ * Writer overlays appear unchanged. This only compares the new *candidate*
+ * against the separately observed, latest 48d Writer config digest. It is NOT
+ * a C-grade consent or a substitute for the historical 70d→75f approval.
+ */
+export function verifyWriterFollowupProtectedSnapshot(baseline, current) {
+  const baselineSha=WRITER_TRANSITION.baselineConfigSha256;
+  const latestSha=WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at48;
+  if (!sameKeys(baseline,current) ||
+      !sameKeys(baseline?.files,current?.files) ||
+      !sameKeys(baseline?.tasks,current?.tasks) ||
+      baseline.files['config.json']!==baselineSha ||
+      current.files['config.json']!==latestSha ||
+      Object.keys(baseline.tasks).length!==3 ||
+      !Object.hasOwn(baseline.tasks,'ZGMINI-PC-Local-Core') ||
+      !Object.hasOwn(baseline.tasks,'ZGMINI-PC-Local-Korea') ||
+      baseline.tasks['ZGMINI-PC-Iran-Progress-R13']!==
+        'APPROVED_RETIRED_ABSENT') return false;
+  return Object.keys(baseline.files).every(key=>
+    key==='config.json' || baseline.files[key]===current.files[key]) &&
+    Object.keys(baseline.tasks).every(key=>baseline.tasks[key]===current.tasks[key]);
+}
+
+/**
+ * Combine independently pinned B receipts, actual local Writer config bytes,
+ * and the original protected snapshot for READ-ONLY planning only. Success is
+ * never passed to validatePostSwitchApproval or the Windows C-grade operator.
+ * In particular, this does not promote partial A observations to live Core.
+ */
+export function inspectWriterFollowupProtectionCandidate({baseline,current,
+  writerBReceipts,currentConfigRaw}={}) {
+  const result={schema:'ZGMINI_PC_WRITER_FOLLOWUP_PROTECTION_CANDIDATE_V1',
+    status:'READONLY_WRITER_FOLLOWUP_PROTECTION_UNVERIFIED',
+    code:'WRITER_FOLLOWUP_PROTECTION_INCOMPLETE',
+    operationalWrites:0,cApprovalAuthorized:false,liveCoreSourceVerified:false,
+    historicalCConsentVerifiedHere:false};
+  if (!verifyWriterFollowupProtectedSnapshot(baseline,current))
+    return {...result,code:'WRITER_FOLLOWUP_PROTECTED_STATE_DRIFT'};
+  if (!verifyWriterFollowupBReceipts(writerBReceipts))
+    return {...result,code:'WRITER_FOLLOWUP_B_RECEIPTS_UNVERIFIED'};
+  const analysis=analyzeWriterFollowupSourceCandidate(currentConfigRaw);
+  if (analysis.status!=='SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED' ||
+      analysis.code!=='WRITER_CHAIN_PINNED_ENDPOINTS_MATCH' ||
+      analysis.cApprovalAuthorized!==false ||
+      analysis.liveCoreSourceVerified!==false ||
+      analysis.intermediate4ecIndependentlyObserved!==false ||
+      !Array.isArray(analysis.stages) || analysis.stages.length!==5 ||
+      analysis.stages.some((step,index)=>
+        step.evidenceLevel!==(index===2?'DERIVED_ONLY':'PINNED_DIGEST_MATCH')))
+    return {...result,code:'WRITER_FOLLOWUP_CONFIG_BYTES_UNVERIFIED'};
+  return {...result,status:'READONLY_WRITER_FOLLOWUP_PROTECTION_CANDIDATE_VERIFIED',
+    code:'WRITER_FOLLOWUP_PINNED_READONLY_EVIDENCE_MATCH',
+    digestStages:analysis.stages.map(({sourceSha,configSha256,evidenceLevel})=>
+      ({sourceSha,configSha256,evidenceLevel})),
+    next:'EXPLICIT_NEW_C_GRADE_CONSENT_AND_LIVE_CORE_PROOF_REQUIRED'};
+}
+
 export function classifyWriterFollowupAObservations({at144,at48Uncorroborated,
   at48HistoricalOnly} = {}) {
   const s=WRITER_FOLLOWUP_CANDIDATE.sourceSequence;
