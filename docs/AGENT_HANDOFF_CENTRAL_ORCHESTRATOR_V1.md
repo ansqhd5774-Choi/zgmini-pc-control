@@ -1,7 +1,7 @@
 # ZGMINI 단일 ChatGPT 총괄 — 공통 장애 대기열 실행 계약
 
 상태(2026-11-09 KST): PC Job 자동 접수 소스 main 병합·기존 opt-in 사용자 확인; Writer B 자동 접수 소스 main 병합·중앙 ChatGPT 유형별 검증 프롬프트 저장/재조회 완료.
-Writer B 전용 opt-in 활성 여부 및 자연 장애→중앙 수정→원담당 기록의 E2E는 미검증. PR/CI/예약 조회를 PC Runtime·운영 적용 성공으로 간주하지 않는다.
+Writer B 전용 opt-in은 사용자 `true` 저장 확인 및 실제 정상·건너뜀 분기 실증 완료. 자연 장애→중앙 수정→원래 Issue 결과 기록의 E2E는 미검증. PR/CI/예약 조회를 PC Runtime·운영 적용 성공으로 간주하지 않는다.
 
 ## 사용자 최종 역할 지시
 
@@ -74,7 +74,7 @@ Writer B 전용 opt-in 활성 여부 및 자연 장애→중앙 수정→원담�
   `.github/workflows/agent-handoff-writer-b-failure-intake.yml`(PR #972)을
   main에 병합했다. Writer B 전용 변수
   `ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED == 'true'`만 producer를 활성화한다.
-  이 변수의 실제 등록 여부는 미확인이다. 원본 owner 요청·workflow_run·bot
+  이 변수는 2026-11-09 사용자 `true` 저장을 확인했다. 실제 Writer B 원본 Run `42569264941` → 장애 접수 Run `42569394131`은 `NOT_ELIGIBLE`/`WRITER_B_INSTALLED_VERIFIED`, verifiedResults 1건·신규 장애 Issue 0건이었다. 건너뛴 원본 Run `42569494307`의 접수 Run `42569500468`도 `SKIPPED`였다(건너뜀 가드 PR #981 병합 후). 원본 owner 요청·workflow_run·bot
   receipt·고정 manifest SHA-256·결과 JSON/TXT 2/2를 확인한 실패만 접수한다.
   `WRITER_B_SETUP_STOP`, `WRITER_B_STATE_UNKNOWN`, 성공은 자동 수리 제외,
   `WRITER_B_RECOVERY_REQUIRED`는 읽기 전용이다. 자동 PC 재실행 0건.
@@ -122,7 +122,7 @@ Writer B 전용 opt-in 활성 여부 및 자연 장애→중앙 수정→원담�
   매시간 일정과 활성 상태를 보존한 채 2026-11-09 Writer B 출처·실패 상태
   검증을 추가하고 재조회했다. 최신 관측 접수 `agent-handoff`는 0건이므로
   실제 처리 성공으로 평가하지 않는다.
-- 다음 필수 단계는 Writer B 전용 Actions 변수 등록 상태 확인이다. 등록 후에는
+- Writer B 변수 등록과 정상 경로 실증은 완료됐다. 다음 필수 단계는
   실제 자연 발생한 유효 실패 1건의 인계 Issue 생성·원장 중복 방지·중앙 처리·
   원래 Issue 결과 기록을 증거로 검증한다. 검증만을 위한 인위적 PC 실패,
   Writer B 재실행·재설치·복구 변경은 하지 않는다. 이전 다중 대화 Draft의
