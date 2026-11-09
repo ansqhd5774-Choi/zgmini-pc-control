@@ -51,7 +51,7 @@
 - `.github/workflows/pc-shared-issue-admission.yml`은 등록된 제목 또는 라벨이 있는 새 Issue를 격리 Runner에서 검사한다. 잘못된 제목/라벨/본문은 원본 Issue에 읽기 검증된 미접수 댓글을 남기며, 기존 설치 workflow의 엄격한 진입 검사는 그대로다. 새 Issue가 아예 어떤 등록된 제목·라벨도 갖지 않은 경우는 의도를 추정할 수 없으므로 생성자가 사전검증해야 한다.
 - `shared-resource/lifecycle.mjs`는 공통 자원 키·안전 이연 시점·근거 결과쌍·중복 ID·신규 승인 재계획을 정의한다. 기존 일반챗이 자동으로 재개되는 인터페이스는 아니다.
 - `agent-handoff/resource-wait-ledger.mjs`는 인증된 정상 자원 대기만 #68에 영구 댓글로 1회 기록한다. 중복 수신은 기존 기록 재사용, POST ACK 분실은 조회만 수행한다. 조정 원장 #68은 실제 PC lease가 아니다.
-- 현재 자동 이벤트 연결은 **Writer B 완료 결과**와 **등록된 Writer B 승인 Issue 접수**에서만 존재한다. Controller/pc-job/신규 승인 라우트는 각자가 동일 공통 모듈의 인증 adapter를 사용해야 한다. 미래의 모든 업무에 이미 자동 배포됐다고 보고하지 않는다.
+- 현재 자동 이벤트 연결은 등록 Writer B 승인 Issue 사전검사, PC Job/Writer B 완료 결과에 대한 별도 오류 접수, 중앙 사고 라우팅·검증 결과 반환의 워크플로 정의로 확장됐다([PR #1133](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1133)). 다만 **실제 운영 확인은 PC Job 정상 결과의 독립 failure-intake 2/2만 PASS**이고, Writer B 오류 접수의 활성 범위·실패 사고 라우팅/반환·원담당 실제 수신은 별개 미검증이다. 미래의 모든 업무가 자동 배포·재개된 것으로 보고하지 않는다.
 - 실제 GitHub workflow의 활성 동작과 PC 운영 적용·원담당 수신·자원 해제 재평가는 별도 단계로 실증한다.
 
 ### A급 pc-job 공용 자원 대기 연결
@@ -75,7 +75,7 @@
 - 이 소스의 GitHub 병합만으로 Windows 사용 가능이라 주장하지 않는다. 정규 승인된 Controller 설치가 `config/operations.json`, dispatcher, 신규 관측기 및 기존 `writer-b-1063-task-probe.mjs` 의존 파일을 동일 버전으로 설치한 뒤에만 사용 가능하다. #917 복구 및 운영 승인 보호를 우회하지 않는다.
 - 남은 필수 연결: 원본 #68 대기 및 원본 Issue/Run+JSON/TXT 인증 readback, 현재 A 관측 Run/결과쌍의 원격 재조회, 최신 운영 source와 현재 승인 manifest 대조, 자원별 소유권 검증, 실제 Windows 대기→해제→원담당의 새 승인 판단. 이 모두가 실증되기 전까지 5단계는 **미완료**다. 새 예약 수집/자동 재시도는 하지 않는다.
 
-### 공통 장애 인계의 운영 PC 독립화 (2026-11-10, 소스 단계)
+### 공통 장애 인계의 운영 PC 독립화 (2026-11-10, 소스 병합 및 부분 실운영 확인)
 
 - 기존 중앙 인계 4개 작업(PC 실패 접수·Writer B 실패 접수·Issue 분류/라우팅·검증 결과 반환)은 모두 운영 PC의 `zgmini-pc-control` Runner와 `E:\\ZGmini\\runtime\\node.exe`를 호출했다. 이는 Controller 장애가 중앙 장애 처리 기능까지 멈추게 하는 단일 장애점이었다.
 - 네 작업은 운영 파일·Controller·Core·Writer/DB를 직접 조작하지 않는 GitHub API 전용 작업임을 확인했다. 해당 워크플로는 별도 승인 격리 Windows Runner `zgmini-handoff-ci-isolated`와 고정 SHA의 checkout/setup-node 22로 분리한다. 운영 B 설치와 실제 PC 점검은 계속 원래 보호된 운영 경로에 둔다.
@@ -83,3 +83,11 @@
 - 격리 공통 요청 admission의 실패 `SHARED_ADMISSION_REPORT_ENV_NOT_ALLOWED`는 Actions가 자동 제공하지 않는 `GITHUB_EVENT_ACTION`를 검증 스크립트가 요구하는 불일치 때문이었다. 호출 step에 `GITHUB_EVENT_ACTION: ${{ github.event.action }}`를 명시한다.
 - 독립 테스트는 4개 중앙 job의 Runner/source-only 경로, opt-in/출처 검증, admission 환경값을 고정한다. CI 완료는 실제 운영 활성·실패 사건 완전 자동 인계·Controller #917 회복을 증명하지 않는다.
 - **장애 격리 원칙:** Controller `RECOVERY_REQUIRED`는 Controller 실제 갱신·동일 lease에 직접 의존하는 실행만 중지한다. GitHub 중앙 조정, 독립 개발·정적 검증, 승인된 별도 Runner 작업, 각 기능의 무관한 경로를 한꺼번에 막지 않는다. 동일 Writer 설치 요청은 실제 Windows source·manifest·자원 상태를 현재 값으로 재검증하며 중복 requestId 자동 재시도 금지.
+
+### 공통 인계 독립 운영의 자연 실증 (2026-11-10)
+
+- #1133가 `main`에 squash 병합됐다(`7d561babe2ff510638b2227445c0245408da45d6`). 중앙 인계 4개 job 모두 기존 운영 `zgmini-pc-control` Runner가 아닌 `zgmini-handoff-ci-isolated`에서 실행되도록 정의됐고, 격리 Windows CI [Run 42691701101](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42691701101) **206/206 PASS**.
+- 병합 뒤 원본 PC A [#1134](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1134)와 [#1135](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1135)의 **실제 완료**를 각 [intake Run 42691970785](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42691970785)와 [42692830715](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42692830715)이 Controller #917 미복구 상태에서도 성공적으로 읽었다. `SCAN_COMPLETED` 2/2, 각 결과 1건, 실제 실패 0, 신규 사고 0, 운영 PC 쓰기 0, 재시도 0.
+- 이 성공은 **정상 원본의 안전 제외** 증거다. 실제 실패에서 원본 Issue/Run+JSON/TXT 인증 → 전문 중앙 Issue → 검증된 복구 결과 반환 → 원담당이 별도 일반챗에서 직접 수신한 경우는 아직 관측되지 않았다. 입구의 `GITHUB_EVENT_ACTION` 소스 수정 역시 자연 발생한 부적합 승인 Issue의 bot 영수증은 미검증이다.
+- 중앙 #68 최상단에는 [2026-11-10 현재 범위/재개 안내](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6750647072)를 연결해 과거 11월 8일 공유 Writer 설치 계획을 현행 전역 Gate로 오독하지 않게 했다. 기존 이력은 보존했다.
+- 5/5 단계 완료 기준은 변하지 않는다. 새 시험용 PC 작업·인위적 실패·기존 requestId 재실행·예약 검증을 만들어 최종 실증을 당기지 않는다.

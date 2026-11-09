@@ -128,3 +128,11 @@ test('unknown shared-label body lists valid titles without guessing one',()=>{
   assert.match(body,/pc-inflation-official-manual-once/);
   assert.match(body,/pc-writer-source-install/);
 });
+
+test('#1130-style non-UUID chatId is rejected before a Writer B request is published',()=>{
+  const invalid={...request(),chatId:'market-calendar-treasury-annual-r2-20261110'};
+  const outcome=inspectSharedIssueAdmission({...base(),body:JSON.stringify(invalid)});
+  assert.equal(outcome.state,'REJECTED_AT_ADMISSION');
+  assert.equal(outcome.code,'REQUEST_MANIFEST_OR_IDENTITY_INVALID');
+  assert.throws(()=>prepareSharedApprovalIssue('writer-source-b',invalid),/REQUEST_INVALID/);
+});
