@@ -114,13 +114,15 @@ Writer B 전용 opt-in은 사용자 `true` 저장 확인 및 실제 정상·건�
 
 - **계획·구성 세부 마일스톤: 6/8 = 75%.** 이는 source·설정·라우팅 단계의 누적 수치이며 **실제 자연 장애 E2E는 0/1 = 0% 검증**이다. 문서 수정이나 단순 예약 실행으로 7·8단계 진행률을 올리지 않는다. 전체 운영 기능 완료라고 표현하지 않는다.
 - **ChatGPT 구조 제약:** 중앙 ChatGPT가 다른 일반 ChatGPT의 대화 ID를 지정해 그 대화에 Tasks를 설치하거나 대화를 깨우는 지원 경로는 확인되지 않았다. `origin.chatId`는 원 사고 추적용이며 실제 `chat_ref`와 별개다. 다른 일반챗마다 최초 1회 Tasks 연결, PR 알림 브리지, Work 전용 MCP Events는 현재 **비채택·완료조건 제외**한다. 이 제약을 회피했다고 주장하지 않는다.
-- **새 실제 대기열 관측:** #1041(`agent-handoff`, `handoff-agent-pending`)은 #1030 Writer insert **읽기 전용 프리뷰의 안전 중단**을 사람이 인계한 사고다. bot 상태 `AWAITING_AGENT_CONFIGURATION`은 실제 중앙 AI 수리·원담당 채팅 재개 증거가 아니다. 원담당 후속 증거에 따르면 기존 단일 Core 훅의 설치 SHA가 이미 일치하여 **R2 중복 Core 훅 설치/재시도는 보류**한다. #1041을 자동 유입 성공이나 반드시 재설치할 결함으로 세지 않는다.
+- **#1041 중앙 판정 완료(2026-11-09 KST):** #1041은 사람이 작성한 #1030 읽기 전용 Writer insertion **프리뷰 안전 중단** 인계로, 자연 PC Job/정규 Writer B 설치 장애 자동 접수 실증이 아니다. 원본 상태 `BLOCKED / WRITER_B_INSERT_ANCHOR_MATCH_STOP`, 결과 JSON/TXT 2/2, PC source·Task·DB·D1·Provider 쓰기/호출 0. #792의 승인된 단일 Core 훅 after SHA-256과 #1012의 실제 Windows A 조회 파일 SHA-256이 `2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d`로 일치한다. **#1012는 특정 checkout 파일/bridge 존재 증거일 뿐 현재 실행 중 Core launcher 연결·gate 활성 증거는 아니다**. #1022 HEAD/config 조회를 파일 SHA 직접 증거로 오인하지 않는다. 최신 owner 댓글의 R2 이중 hook 중복 위험에 따라 신규 설치·재시도는 보류한다. 중앙 총괄이 #1041에 `CENTRAL_TRIAGE_RECORDED` 댓글 [#1041 comment 6739037534](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1041#issuecomment-6739037534)를 남기고 읽기 재조회했으며, 완료된 판정의 무한 재처리 방지를 위해 `handoff-agent-pending`만 제거했다. `agent-handoff` 라벨과 Issue(open), 원본 #1030, 기존 원장은 보존. 무수정 판정을 result-broker의 `HANDOFF_RESULT_RECORDED`/운영 해결로 승격하지 않는다. 현행 broker의 자동 원본 반환 대상은 인증된 pc-job/Writer B **소스 설치** Issue로, #1030 프리뷰는 해당 계약과 다르다.
+
+**중앙 예약 지시문 정합성(2026-11-09 KST):** 기존 단일 task `Automation_9a403a04a8ac8191a331e94f9abeb1b4`의 저장된 prompt를 이 계획의 단계 7(자연 유효 장애 자동 접수), 8(중앙 해결→원본 Issue 반환)에 맞춰 업데이트·재조회했다. 구형 '7번 = 다른 일반 ChatGPT 자동 재개' 문구는 제거했고, #1041을 비대상/DEFERRED로 분류하도록 명시했다. task ID·기존 일정·활성 상태는 유지하며 추가 대화별 task 0건. 이전 실제 예약 Run `4f285e2a-b46c-8327-b2ff-351ffecadebd`는 #1041 1건을 조회·자동 수정 제외한 것으로 확인됐다. **프롬프트 수정 후 자연 예약 실행 결과는 아직 미검증**이며, 이것을 7·8단계 실증으로 세지 않는다.
 
 **다음 필수 실행과 인수 조건**
 
-1. **중앙 총괄 / 대상 #1041:** #1030 결과 2/2·bot 라우팅·#1041 후속 댓글의 기존 설치 SHA 증거를 읽기 전용으로 대조하고, **기존 Core 훅 중복 설치 없이** 사건의 처리 필요성·소유자·상태를 판정한다. 공유 진단 필드 개선은 독립된 실제 필요와 승인 범위를 확인하고 수행하며, 원담당 물가 기능의 B 설치 Gate로 만들지 않는다. 판정 근거는 원본 Issue에 기록하되, 실제 수리 없이는 `RESOLVED`/운영 완료를 표기하지 않는다.
-2. **중앙 총괄 / 7→8단계:** 다음 자연 발생 *유효* PC Job 또는 Writer B 실패 1건에서 원본 run/요청/해시·bot 결과를 검증하고, 등록·중복 억제·중앙 작업 수행·원본 Issue receipt를 순서대로 실증한다. 기존 예약 하나만 사용한다. 가상 사건·PC 재실행·중복 예약·불필요한 설치를 만들지 않는다.
-3. **보고 계약:** 사건별 LAST PASS/FIRST FAIL, 최초 실패 코드, 원본 Issue·정확한 실행 ID·수정 PR·CI·실제 Runtime 적용 유무를 분리한다. 원본 Issue 기록은 **다른 일반챗 실제 수신이 아님**을 명시한다. 종료 시 세부 마일스톤과 자연 E2E 진행률을 각각 제시한다.
+1. **7→8단계 실제 기능:** 기존 중앙 예약을 유지하면서 다음 자연 발생 *유효* PC Job/Writer B 실패 1건의 owner 요청·bot receipt·workflow run·원문 SHA·결과 JSON/TXT를 교차 검증한다. 정확한 중복 억제 Issue 등록을 확인하고, 중앙 총괄이 허용 범위의 최소 수정·관련 테스트·PR/CI와 인증된 원본 Issue receipt를 처리한다. 원본 결과는 다른 일반 ChatGPT 대화의 자동 재개가 아니다. 합성 장애·중복 PC 재실행·별도 원담당 Tasks·예약 자연 갱신 검증을 선행하지 않는다.
+2. **이미 판정된 #1041:** 새로운 실제 근거가 없으면 중복 훅 설치·불필요한 Writer 진단 코드 개조·추가 수동 반환을 반복하지 않는다. 원담당 물가지표 기능은 독립적으로 기존 Core launcher/gate를 승인된 경로로 확인하고 수집·게시를 진행한다. 총괄은 그 소유 영역을 변경하지 않는다.
+3. **보고 계약:** 준비·구현 6/8(75%)와 자연 장애 전체 처리 0/1(미검증)을 구분하고, 사건별 LAST PASS/FIRST FAIL·PR/CI·실제 Runtime 적용 여부·원본 Issue readback을 별도 기록한다. 새로운 실증이 있을 때만 해당 단계 진행률을 높인다.
 
 ## 수정된 증거와 남은 필수 단계
 
