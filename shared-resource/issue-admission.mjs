@@ -54,9 +54,21 @@ export function inspectSharedIssueAdmission({title,labels,body}) {
   if(new Set(routes.map(([,r])=>r.label)).size!==1)
     return Object.freeze({state:'REJECTED_AT_ADMISSION',code:'MULTIPLE_RESOURCE_ROUTES'});
   const matching=routes.filter(([,r])=>title===r.title);
-  if(matching.length!==1)return Object.freeze({state:'REJECTED_AT_ADMISSION',
-    code:'EXACT_ISSUE_TITLE_REQUIRED',
-    ...(routes.length===1?{kind:routes[0][0],expectedTitle:routes[0][1].title}:{})});
+  if(matching.length!==1){
+    // Different approved operations may intentionally share one B install label.
+    // For a wrong title, the exact known body identity identifies the route;
+    // if ambiguous, expose valid titles without guessing or authorizing it.
+    let parsed=null;
+    try{parsed=JSON.parse(body);}catch{}
+    const hinted=routes.filter(([,r])=>parsed?.schema===r.schema&&
+      parsed?.operation===r.operation&&
+      r.approvalPathPattern.test(parsed?.approvalManifestPath??''));
+    const unique=hinted.length===1?hinted[0]:(routes.length===1?routes[0]:null);
+    return Object.freeze({state:'REJECTED_AT_ADMISSION',
+      code:'EXACT_ISSUE_TITLE_REQUIRED',
+      ...(unique?{kind:unique[0],expectedTitle:unique[1].title}:
+        {expectedTitles:routes.map(([,r])=>r.title).sort()})});
+  }
   const [kind,route]=matching[0];
   let req;
   try{req=JSON.parse(body);}catch{return Object.freeze({state:'REJECTED_AT_ADMISSION',
