@@ -3,8 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {preparePcFailureHandoff, reconcileHandoffInventory,
-  isExpectedFailureProof} from './pc-result-to-incident.mjs';
+import {preparePcFailureHandoff, reconcileHandoffInventory} from './pc-result-to-incident.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -74,15 +73,17 @@ export async function processCompletedPcJob(event, {
     if (report === null) continue;
     result.reportsObserved++;
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
-    if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status) ||
-        isExpectedFailureProof(report.operation)) continue;
-    result.confirmedFailures++;
+    if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status)) continue;
     comments ??= await readComments(run.since);
     const original = findOriginalIssueNumber(comments, {...run, seat});
     if (original === null) { result.missingReceipts++; continue; }
     const originIssue = await readIssue(original);
     const prepared = preparePcFailureHandoff({originIssue, report, resultPath});
+    // A failure-proof fixture is eligible for exclusion only after the
+    // authenticated original request agrees with the published result.
+    if (prepared.state === 'NOT_ELIGIBLE') continue;
     if (prepared.state !== 'READY_TO_ENQUEUE') stop('STATE_DRIFT');
+    result.confirmedFailures++;
     const inventory = await listHandoffs();
     const decision = reconcileHandoffInventory(prepared, inventory);
     if (decision.state === 'REUSE_EXISTING') { result.reusedIssues++; continue; }
@@ -105,7 +106,7 @@ export async function processCompletedPcJob(event, {
     result.newIssues++;
   }
   if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
-  else if (result.confirmedFailures && result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
+  else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
   return Object.freeze(result);
 }
 

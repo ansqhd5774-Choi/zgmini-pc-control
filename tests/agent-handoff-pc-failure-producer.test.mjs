@@ -79,10 +79,23 @@ test('deliberate failure-proof and timeout-proof FAIL reports do not stop intake
     const f = fixture();
     f.io.readReport = async p => p.endsWith('seat-4.json') ?
       {...report('FAIL'), operation} : null;
+    const originalReadIssue = f.io.readIssue;
+    f.io.readIssue = async n => n === 1009 ?
+      {...issue(), body: JSON.stringify({...request(), operation})} : originalReadIssue(n);
     const outcome = await processCompletedPcJob(event(), f.io);
     assert.equal(outcome.state, 'SCAN_COMPLETED');
     assert.equal(outcome.confirmedFailures, 0);
     assert.equal(outcome.newIssues, 0);
+    assert.equal(f.posts, 0);
+  }
+});
+
+test('a fixture-labelled result cannot hide a genuine owner operation mismatch', async () => {
+  for (const operation of ['failure-proof', 'timeout-proof']) {
+    const f = fixture();
+    f.io.readReport = async p => p.endsWith('seat-4.json') ?
+      {...report('FAIL'), operation} : null;
+    await assert.rejects(processCompletedPcJob(event(), f.io), /OPERATION_MISMATCH_STOP/);
     assert.equal(f.posts, 0);
   }
 });
