@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {performR6RegisteredOnce} from './operation.mjs';
+import {acquireCoreLockBounded,performR6RegisteredOnce} from './operation.mjs';
 
 const auth={request:{requestId:'a3b44168-e96e-48b2-b787-10aa1a0e001a',
  approvalManifestSha256:'a'.repeat(64)},
@@ -106,4 +106,74 @@ test('D1 read authorization failure leaves claim and provider untouched',async()
  assert.equal(result.lastPass,'REGISTERED_KEY_PRESENT');
  assert.equal(result.firstFail,'PREFLIGHT');
  assert.notEqual(result.providerRequests,9);
+});
+
+const lockError=code=>Object.assign(new Error(code),{code});
+
+test('bounded Core lock: immediate idle acquires without sleeping',async()=>{
+ const lock={held:()=>true,release:()=>true};
+ const calls=[];
+ const got=await acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{calls.push('LOCK');return lock;},
+  now:()=>100,sleep:async(ms)=>calls.push(`WAIT_${ms}`)});
+ assert.equal(got,lock);
+ assert.deepEqual(calls,['LOCK']);
+});
+
+test('bounded Core lock: occupied owner naturally releases within two polls',async()=>{
+ let clock=100,attempt=0;
+ const waits=[];
+ const lock={held:()=>true,release:()=>true};
+ const got=await acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{attempt++;
+   if(attempt<=2)throw lockError('R6_B_CORE_LOCK_OCCUPIED');
+   return lock;},
+  now:()=>clock,sleep:async(ms)=>{waits.push(ms);clock+=ms;}});
+ assert.equal(got,lock);
+ assert.equal(attempt,3);
+ assert.deepEqual(waits,[5_000,5_000]);
+});
+
+test('bounded Core lock: 60s exhaustion remains BLOCKED with zero claim/provider',async()=>{
+ const f=inject();
+ let clock=0,attempt=0;
+ const waits=[];
+ const lockFactory=()=>acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{attempt++;f.calls.push('LOCK');
+   throw lockError('R6_B_CORE_LOCK_OCCUPIED');},
+  now:()=>clock,sleep:async(ms)=>{waits.push(ms);clock+=ms;}});
+ const result=await performR6RegisteredOnce({auth,...f,lockFactory});
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R6_B_CORE_LOCK_OCCUPIED');
+ assert.equal(result.firstFail,'PREFLIGHT');
+ assert.equal(clock,60_000);
+ assert.equal(attempt,13);
+ assert.equal(waits.length,12);
+ assert.deepEqual(waits,Array(12).fill(5_000));
+ assert.ok(!f.calls.includes('D1_READ')&&!f.calls.includes('CLAIM')&&
+  !f.calls.includes('RUN')&&!f.calls.includes('UNLOCK'));
+});
+
+test('bounded Core lock: non-EEXIST create failure stops without waiting',async()=>{
+ let waits=0,attempts=0;
+ await assert.rejects(acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{attempts++;throw lockError('R6_B_CORE_LOCK_CREATE_STOP');},
+  now:()=>0,sleep:async()=>{waits++;}}),
+ e=>e.code==='R6_B_CORE_LOCK_CREATE_STOP');
+ assert.equal(attempts,1);
+ assert.equal(waits,0);
+});
+
+test('bounded Core lock: ownership UNKNOWN stops immediately, never claiming',async()=>{
+ const f=inject();
+ let calls=0,clock=0;
+ const lockFactory=()=>acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{f.calls.push('LOCK');throw lockError('R6_B_CORE_LOCK_UNKNOWN');},
+  now:()=>clock,sleep:async(ms)=>{calls++;clock+=ms;}});
+ const result=await performR6RegisteredOnce({auth,...f,lockFactory});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'R6_B_CORE_LOCK_UNKNOWN');
+ assert.equal(result.firstFail,'PREFLIGHT');
+ assert.equal(calls,0);
+ assert.deepEqual(f.calls,['VERIFY','LOCK']);
 });
