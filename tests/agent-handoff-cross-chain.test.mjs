@@ -239,7 +239,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     issue: incident, comment: {user: {login: owner}, body: JSON.stringify(result)}}));
   const oldFetch = globalThis.fetch;
   const oldToken = process.env.GITHUB_TOKEN;
-  const ledger = [], originLedger = [];
+  const ledger = [], originLedger = [receipt];
   let resultWrites = 0;
   process.env.GITHUB_TOKEN = 'integration-test-placeholder';
   globalThis.fetch = async (url, init = {}) => {
@@ -254,6 +254,10 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
     else if (u.pathname.endsWith('/actions/runs/42570000004')) data = {id: 42570000004,
       head_sha: repairSha, status: 'completed', conclusion: 'success', repository: {full_name: repo}};
+    else if (u.pathname.endsWith('/actions/runs/42570000003')) data = {id: writerRunId,
+      name: 'ZGMINI Approved Writer B Source Overlay Once', head_sha: sourceSha,
+      head_branch: 'main', event: 'issues', actor: {login: owner},
+      repository: {full_name: repo}, status: 'completed', run_attempt: 1};
     else if (u.pathname.endsWith('/issues/2403')) data = originIssue;
     else if (u.pathname.endsWith('/issues/2403/comments') && init.method === 'GET') data = originLedger;
     else if (u.pathname.endsWith('/issues/2403/comments') && init.method === 'POST') {
@@ -269,8 +273,8 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     await runResultBroker(env);
     await runResultBroker(env);
     assert.equal(resultWrites, 1);
-    assert.equal(originLedger.length, 1);
-    assert.match(originLedger[0].body, /HANDOFF_ORIGIN_RESULT_RECORDED/);
+    assert.equal(originLedger.length, 2);
+    assert.match(originLedger[1].body, /HANDOFF_ORIGIN_RESULT_RECORDED/);
     assert.match(ledger[0].body, /state: RUNTIME_VERIFICATION_PENDING/);
     assert.match(ledger[0].body, /Windows\/D1\/API\/UI verification: NOT_VERIFIED/);
   } finally {
