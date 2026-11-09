@@ -13,6 +13,9 @@ export const R6_ONE_SHOT = Object.freeze({
   approvalSchema: "ZGMINI_EMPLOYMENT_R6_BACKFILL_B_APPROVAL_V1",
   repository: "ansqhd5774-Choi/zgmini-pc-control",
   sourceRepository: "ansqhd5774-Choi/zgmini",
+  // The one-shot approval must bind the *exact* existing Core DB. Another
+  // otherwise-valid database under E:\\ZGmini\\data is never in scope.
+  coreDatabasePath: String.raw`E:\ZGmini\data\pc-writer\storage\core.sqlite`,
   owner: "ansqhd5774-Choi",
   issueTitle: "pc-employment-r6-backfill-one-shot",
   issueLabel: "pc-employment-r6-backfill-b",
@@ -61,11 +64,12 @@ export function validateR6OneShotRequest(event, env, pins) {
 
 export function validateR6OneShotApproval(manifest, pins) {
   if (!hex(pins?.sourceSha, 40) || !hex(pins?.controlSha, 40) ||
-    !exact(manifest, ["schema", "approvalState", "scope", "sourceRepository", "sourceSha", "controlSha", "runCount", "maxBlsRequests", "maxDolRequests", "maxTotalRequests", "blsUnregistered24hLimit", "allowProviderCalls", "allowLocalRawDbWrites", "allowD1Writes", "allowSchedulerChanges", "allowCoreSourceChanges", "maxAutomaticRetries"]) ||
+    !exact(manifest, ["schema", "approvalState", "scope", "sourceRepository", "sourceSha", "controlSha", "coreDatabasePath", "runCount", "maxBlsRequests", "maxDolRequests", "maxTotalRequests", "blsUnregistered24hLimit", "allowProviderCalls", "allowLocalRawDbWrites", "allowD1Writes", "allowSchedulerChanges", "allowCoreSourceChanges", "maxAutomaticRetries"]) ||
     manifest.schema !== R6_ONE_SHOT.approvalSchema ||
     manifest.approvalState !== "APPROVED_B_ONE_SHOT" ||
     manifest.scope !== R6_ONE_SHOT.scope ||
     manifest.sourceRepository !== R6_ONE_SHOT.sourceRepository ||
+    manifest.coreDatabasePath !== R6_ONE_SHOT.coreDatabasePath ||
     manifest.sourceSha !== pins?.sourceSha || manifest.controlSha !== pins?.controlSha ||
     manifest.runCount !== 1 || manifest.maxAutomaticRetries !== 0 ||
     manifest.maxBlsRequests !== 18 || manifest.maxDolRequests !== 2 ||
