@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "b86e398c-59dd-485e-a3b1-2596fb5466d2",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "144f3b8f673cc3d18f004ddd65f6920d450f0ea6",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "4ec0b8c197627ebdb316be8df291e30d7e435784",
+  "candidateSourceSha": "27c02d9b254e92af21b2a5b92a4c0bb152bb5713",
+  "manifestSha256": "88c28ab0fbe7ae4683f76a94af907df5ef591623bdec37b01a670914cfa88703",
+  "baseTreeOid": "215cfe0e32046457248cec2be68a54e42e5d4fc0",
+  "preparedTreeOid": "90773b401efb20e4b099ebc8d9ba9942ed619f69",
+  "provenanceSha256": "190cf6c5b9c11ef9d9f9ec19bcf0ecd559773ff5f7dc4d3025b71da75a276adc",
+  "runId": "42709232093",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/run-local.mjs"
+  ]
+}
