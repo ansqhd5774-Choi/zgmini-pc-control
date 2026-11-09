@@ -1,0 +1,11 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42722875226-1-seat-4",
+  "status": "BLOCKED",
+  "code": "OPERATION_NOT_ALLOWED",
+  "lastPass": "EVENT_RECEIVED",
+  "firstFail": "EVENT_OR_REQUEST_VALIDATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0
+}
