@@ -1,10 +1,28 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {classifyRecovery,archiveUntouched,
+import {classifyRecovery,archiveUntouched,inspectEvidenceFile,
  verifyMaintenanceManifest as recoveryInventory} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
+test('inspection distinguishes missing evidence, unreadable evidence and malformed JSON without exposing paths',()=>{
+ const file='E:/private/secret.json';
+ const attempt=(label,read)=>()=>inspectEvidenceFile(file,label,read);
+ const missing=Object.assign(new Error('private path'),{code:'ENOENT'});
+ const forbidden=Object.assign(new Error('private path'),{code:'EACCES'});
+ assert.throws(attempt('RECOVERY_REQUEST_LEDGER',()=>{throw missing;}),{code:'RECOVERY_REQUEST_LEDGER_MISSING'});
+ assert.throws(attempt('RECOVERY_INSTALL_OWNER',()=>{throw forbidden;}),{code:'RECOVERY_INSTALL_OWNER_UNREADABLE'});
+ assert.throws(attempt('RECOVERY_INSTALL_MARKER',()=>Buffer.from('{oops')),{code:'RECOVERY_INSTALL_MARKER_INVALID_JSON'});
+ const value=inspectEvidenceFile(file,'RECOVERY_REQUEST_LEDGER',()=>Buffer.from('{"status":"RECOVERY_REQUIRED"}'));
+ assert.equal(value.value.status,'RECOVERY_REQUIRED');
+ for(const run of [attempt('RECOVERY_REQUEST_LEDGER',()=>{throw missing;}),
+  attempt('RECOVERY_INSTALL_OWNER',()=>{throw forbidden;}),
+  attempt('RECOVERY_INSTALL_MARKER',()=>Buffer.from('{oops'))]){
+  try{run();assert.fail('must fail closed');}catch(e){
+   assert.equal(e.message.includes('E:/private'),false);
+  }
+ }
+});
 const state=()=>({identityVerified:true,ownerAlive:false,
  ledger:{status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'RECEIVED',installedShaBefore:sha,intakePaused:false,workflowEnabled:true},
  actualSha:sha,controllerVerified:true,maintenanceVerified:true,backupExists:false,backlogExists:false,
@@ -83,3 +101,4 @@ test('second recovery cannot compete for single reservation',()=>{
   assert.ok(fs.existsSync(path.join(f.root,'leases/controller-install')));
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 });
+
