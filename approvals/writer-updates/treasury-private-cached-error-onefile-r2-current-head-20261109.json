@@ -1,0 +1,42 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/market-calendar-treasury-cache-private-code-r1-20261109",
+  "candidateSourceSha": "ecb69fba0a098109f1e17ea901eb98e3929e97aa",
+  "baseHead": "825cfbd6e2025940e3e48631e7ff1dddf582e75a",
+  "baseConfigSourceSha": "825cfbd6e2025940e3e48631e7ff1dddf582e75a",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "67b2aed41b753004521f56a71b76bb48374c482cbde96de035a4c1cda3fa1c79",
+      "afterSha256": "d1367323dd8a74c87b5c5f7ac0d98a4c83bdcc77ea96a66ed2216da604f2c4e9"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/release-calendar.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
