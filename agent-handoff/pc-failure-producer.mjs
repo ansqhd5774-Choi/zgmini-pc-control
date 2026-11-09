@@ -6,6 +6,7 @@ import {pathToFileURL} from 'node:url';
 import {preparePcFailureHandoff,preparePcSharedResourceWait,
   reconcileHandoffInventory} from './pc-result-to-incident.mjs';
 import {persistResourceWait} from './resource-wait-ledger.mjs';
+import {routeVerifiedBotIssue} from './bot-direct-route.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -63,15 +64,23 @@ export function findOriginalIssueNumber(comments, {runId, attempt, seat}) {
 export async function processCompletedPcJob(event, {
   readReport, readComments, readIssue, listHandoffs, createHandoff,
   readReportText, listResourceWaitComments, createResourceWaitComment,
-  readResourceWaitComment
+  readResourceWaitComment, routeHandoff
 }) {
   const run = assertCompletedPcJobEvent(event);
   if ([readReport, readComments, readIssue, listHandoffs, createHandoff]
     .some(fn => typeof fn !== 'function')) stop('IO_NOT_CONFIGURED');
   const result = {state: 'SCAN_COMPLETED', runId: run.runId, attempt: run.attempt,
     reportsObserved: 0, confirmedFailures: 0, newIssues: 0, reusedIssues: 0,
+    routesRecorded: 0, routesReused: 0,
     waitsRecorded:0,waitsReused:0,waitProofPending:0,
     missingReceipts: 0, pcOperationalWrites: 0, automaticPcRetries: 0};
+  const confirmRoute = async (prepared, number) => {
+    if (typeof routeHandoff !== 'function') stop('ROUTE_NOT_CONFIGURED');
+    const routed = await routeHandoff(prepared, number);
+    if (routed?.state === 'ROUTE_RECORDED') result.routesRecorded++;
+    else if (routed?.state === 'ROUTE_REUSED') result.routesReused++;
+    else stop('ROUTE_RESULT_INVALID');
+  };
   let comments = null;
   for (let seat = 1; seat <= 6; seat++) {
     const resultPath = `results/${run.runId}-${run.attempt}-seat-${seat}.json`;
@@ -114,13 +123,17 @@ export async function processCompletedPcJob(event, {
     result.confirmedFailures++;
     const inventory = await listHandoffs();
     const decision = reconcileHandoffInventory(prepared, inventory);
-    if (decision.state === 'REUSE_EXISTING') { result.reusedIssues++; continue; }
+    if (decision.state === 'REUSE_EXISTING') {
+      await confirmRoute(prepared, decision.issueNumber);
+      result.reusedIssues++; continue;
+    }
     let created;
     try { created = await createHandoff(prepared); }
     catch {
       // Lost POST response: read the ledger once, never blindly POST again.
       const after = reconcileHandoffInventory(prepared, await listHandoffs());
       if (after.state !== 'REUSE_EXISTING') stop('POST_OUTCOME_UNKNOWN');
+      await confirmRoute(prepared, after.issueNumber);
       result.reusedIssues++;
       continue;
     }
@@ -131,6 +144,7 @@ export async function processCompletedPcJob(event, {
         !verified.labels?.some(x => x.name === 'agent-handoff')) {
       stop('CREATE_READBACK_STOP');
     }
+    await confirmRoute(prepared, created.number);
     result.newIssues++;
   }
   if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
@@ -192,6 +206,15 @@ export async function main(env = process.env) {
     createHandoff: async prepared => request('issues', {method: 'POST',
       body: {title: `agent-handoff ${prepared.incidentId}`,
         labels: ['agent-handoff'], body: prepared.body}}),
+    routeHandoff: (prepared, number) => routeVerifiedBotIssue(prepared, number, {
+      readIssue: async n => ({...await request(`issues/${n}`), repository: REPO}),
+      listHandoffs: async () => ({repository: REPO, complete: true,
+        issues: (await completePages('issues?state=all&labels=agent-handoff', 'HANDOFF'))
+          .filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
+      listIssueComments: n => completePages(`issues/${n}/comments`, 'ROUTE_COMMENT', 4),
+      postIssueComment: (n, body) => request(`issues/${n}/comments`, {method:'POST', body:{body}}),
+      addIssueLabel: (n, label) => request(`issues/${n}/labels`, {method:'POST', body:{labels:[label]}})
+    }),
     readReportText: async resultPath => {
       const content=await request(`contents/${resultPath}?ref=main`,{missingOk:true});
       if(content===null)return null;
