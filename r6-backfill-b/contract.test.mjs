@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   R6_ONE_SHOT, plannedR6BackfillCost,
-  validateR6OneShotRequest, validateR6OneShotApproval,
+  validateR6OneShotRequest, validateR6OneShotApproval, verifyR6OneShotApprovalBytes,
 } from "./contract.mjs";
 import { assessR6BackfillAdmission } from "./admission.mjs";
 import { sanitizeR6BackfillResult } from "./report.mjs";
@@ -53,6 +54,23 @@ test("R6 one-shot exact approval refuses publication and repeat permissions", ()
   assert.throws(() => validateR6OneShotApproval({ ...approval, sourceSha: undefined }, {}), /APPROVAL_SCOPE_STOP/);
   assert.throws(() => validateR6OneShotApproval({ ...approval, runCount: 2 }, pins), /APPROVAL_SCOPE_STOP/);
   assert.throws(() => validateR6OneShotApproval({ ...approval, allowTaskDefinitionChanges: true }, pins), /APPROVAL_SCOPE_STOP/);
+});
+
+test("R6 exact approval bytes must match immutable SHA256", () => {
+  const bytes = Buffer.from(JSON.stringify(approval), "utf8");
+  const manifestHash = createHash("sha256").update(bytes).digest("hex");
+  const approvedPins = { ...pins, approvalManifestSha256: manifestHash };
+  assert.deepEqual(verifyR6OneShotApprovalBytes(bytes, approvedPins), approval);
+  assert.throws(() => verifyR6OneShotApprovalBytes(Buffer.from(JSON.stringify({
+    ...approval, allowD1Writes: true,
+  })), approvedPins), /APPROVAL_HASH_STOP/);
+  assert.throws(() => verifyR6OneShotApprovalBytes(Buffer.from("not-json"), {
+    ...pins, approvalManifestSha256: createHash("sha256").update("not-json").digest("hex"),
+  }), /APPROVAL_JSON_STOP/);
+  assert.throws(() => verifyR6OneShotApprovalBytes(Buffer.from(JSON.stringify({
+    ...approval, runCount: 2,
+  })), { ...pins, approvalManifestSha256: createHash("sha256")
+    .update(JSON.stringify({ ...approval, runCount: 2 })).digest("hex") }), /APPROVAL_SCOPE_STOP/);
 });
 
 test("R6 one-shot cost is bounded to 6 named groups, BLS18 and DOL2", () => {
@@ -127,11 +145,23 @@ test("B result report refuses unverified effects or out-of-bound calls", () => {
   const base = {
     requestId: request.requestId, status: "SUCCESS", providerRequests: 20,
     blsRequests: 18, dolRequests: 2, d1Writes: 0, schedulerWrites: 0,
-    groupResults: [],
+    groupResults: Object.entries(R6_ONE_SHOT.groups).map(([groupName, max]) => ({
+      groupName, status: "SUCCESS", providerRequests: groupName === "DOL_UI_WEEKLY_CLAIMS" ? 2 : max,
+    })),
   };
   assert.equal(sanitizeR6BackfillResult(base).status, "SUCCESS");
   assert.equal(sanitizeR6BackfillResult({ ...base, d1Writes: 1 }).status, "STATE_UNKNOWN");
   assert.equal(sanitizeR6BackfillResult({ ...base, schedulerWrites: null }).status, "STATE_UNKNOWN");
   assert.equal(sanitizeR6BackfillResult({ ...base, providerRequests: 21 }).status, "STATE_UNKNOWN");
   assert.equal(sanitizeR6BackfillResult({ ...base, requestId: "sensitive" }).requestId, null);
+  assert.equal(sanitizeR6BackfillResult({ ...base, groupResults: [] }).status, "STATE_UNKNOWN");
+  assert.equal(sanitizeR6BackfillResult({ ...base, groupResults: base.groupResults.map(x =>
+    x.groupName === "BLS_JOLTS" ? { ...x, providerRequests: 3 } : x) }).status, "STATE_UNKNOWN");
+  assert.equal(sanitizeR6BackfillResult({ ...base, status: "NOOP" }).status, "STATE_UNKNOWN");
+  assert.equal(sanitizeR6BackfillResult({ ...base, groupResults: [] }).providerRequests, null);
+  const effectViolation = sanitizeR6BackfillResult({ ...base, d1Writes: 1 });
+  assert.equal(effectViolation.d1Writes, null);
+  assert.equal(effectViolation.schedulerWrites, null);
+  assert.equal(effectViolation.effectsVerified, false);
+  assert.equal(sanitizeR6BackfillResult(base).effectsVerified, true);
 });
