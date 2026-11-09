@@ -78,6 +78,16 @@ test('one bot-verified preflight failure yields a sanitized and deterministic ca
   assert.doesNotMatch(first.body, /GITHUB_TOKEN|password|rawPayload/);
 });
 
+test('authenticated shared Writer install busy NOOP does not enqueue a repair', () => {
+  const item = prepareWriterBFailureHandoff(fixture(result(
+    'WRITER_B_PREFLIGHT_STOP', 'WRITER_B_SHARED_INSTALL_BUSY_NOOP_STOP')));
+  assert.equal(item.state, 'NOT_ELIGIBLE');
+  assert.equal(item.reportStatus, 'WRITER_B_PREFLIGHT_STOP');
+  assert.equal(item.automaticPcRetries, 0);
+  assert.equal(item.pcOperationalWrites, 0);
+  assert.equal(Object.hasOwn(item, 'body'), false);
+});
+
 test('verified success and STATE_UNKNOWN cannot become repair incidents', () => {
   for (const [status, code] of [
     ['WRITER_B_INSTALLED_VERIFIED', 'WRITER_B_INSTALL_VERIFIED'],
