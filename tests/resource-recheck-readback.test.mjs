@@ -170,6 +170,24 @@ test('PC job uses feature SHA/fingerprint instead of control workflow SHA/manife
   assert.equal(drift.historicalApprovalChanged,true);
 });
 
+test('PC original run attempt mismatch cannot authenticate old result pair',()=>{
+  const inputs=setup(false);
+  inputs.origin.run.run_attempt=2;
+  const result=reviewRecordedResourceReadbacks(inputs);
+  assert.deepEqual(result.missing,['ORIGINAL_ISSUE_RUN_RESULT_PAIR']);
+  assert.equal(result.state,'RECHECK_EVIDENCE_PENDING');
+  assert.equal(result.ownerReplanAuthorized,false);
+});
+
+test('PC original matching run attempt retains read-only candidate',()=>{
+  const inputs=setup(false);
+  const result=reviewRecordedResourceReadbacks(inputs);
+  assert.deepEqual(result.missing,[]);
+  assert.equal(result.state,'RECHECK_EVIDENCE_PENDING');
+  assert.equal(result.releaseVerified,false);
+  assert.equal(result.ownerReplanAuthorized,false);
+});
+
 test('cross-resource A, mismatching TXT and spoofed receipt stay pending',()=>{
   const inputs=setup();
   delete inputs.observation.json;
