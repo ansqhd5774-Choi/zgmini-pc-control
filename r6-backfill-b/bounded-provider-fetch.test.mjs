@@ -76,3 +76,45 @@ test('physical fetch always disallows redirects outside the fixed allowlist',asy
   assert.equal(observed?.redirect,'error');
   assert.deepEqual(physical.snapshot(),{bls:1,dol:0,total:1});
 });
+
+test('a custom network dispatcher cannot bypass exact provider URL routing',async()=>{
+  let network=0;
+  const physical=createR6BBoundedPhysicalFetch({
+    originalFetch:async()=>{network++;return {ok:true};},
+    heldCoreLock:{verifyHeld:()=>true},allowPhysicalNetwork:true,
+  });
+  // Node's native fetch accepts init.dispatcher as an Undici transport hook.
+  // Passing it through can change the real network destination even though
+  // the checked URL string and redirect mode look safe.
+  const dispatcher={dispatch(){throw Error('CUSTOM_TRANSPORT_MUST_NOT_RUN');}};
+  await assert.rejects(physical.fetch(BLS,{...b(),dispatcher}),
+    {code:'R6_B_PHYSICAL_REQUEST_SHAPE_STOP'});
+  assert.equal(network,0);
+  assert.deepEqual(physical.snapshot(),{bls:0,dol:0,total:0});
+});
+
+test('transport extension, spoofed Host and invalid fetch init fail before attempt',async()=>{
+  let network=0;
+  const physical=createR6BBoundedPhysicalFetch({
+    originalFetch:async()=>{network++;},heldCoreLock:{verifyHeld:()=>true},
+    allowPhysicalNetwork:true,
+  });
+  const denied=[
+    {...b(),agent:{createConnection(){}}},
+    {...b(),duplex:'half'},
+    {...b(),headers:{Host:'different.example'}},
+    {...b(),headers:{Authorization:'Bearer fake'}},
+    {...b(),headers:new Headers({Host:'different.example'})},
+    {...b(),headers:{'content-type':42}},
+    {...b(),signal:{aborted:false}},
+    {...b(),method:{toString:()=> 'POST'}},
+    {...b(),redirect:'CUSTOM'},
+  ];
+  for(const init of denied)await assert.rejects(physical.fetch(BLS,init),
+    {code:'R6_B_PHYSICAL_REQUEST_SHAPE_STOP'});
+  assert.equal(network,0);
+  assert.deepEqual(physical.snapshot(),{bls:0,dol:0,total:0});
+  await physical.fetch(BLS,{...b(),headers:{'content-type':'application/json'},
+    signal:new AbortController().signal});
+  assert.equal(network,1);
+});
