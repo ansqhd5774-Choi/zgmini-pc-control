@@ -13,11 +13,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   enqueue-confirmed-failures:
-    # First stage: source integration only. Even if the repository variable was
-    # previously enabled, this workflow cannot run until a separately reviewed
-    # activation change removes this immutable false condition.
+    # Activation is controlled by the reviewed repository Actions variable.
+    # Keep the workflow disabled until that setting and the operating scope
+    # have been confirmed by an authorized maintainer.
     if: >-
-      false &&
       vars.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
