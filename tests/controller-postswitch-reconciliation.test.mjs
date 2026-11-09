@@ -25,6 +25,9 @@ function ports(calls, options={}) {
     verifyOriginalUnchanged:async()=>{calls.push('original-unchanged');
       if(options.originalChanged)throw Object.assign(Error('ORIGINAL_CHANGED'),{code:'ORIGINAL_CHANGED'});
       return options.originalFalse ? false : true;},
+    acquireClaim:async()=>{calls.push('claim');return options.claimExists ?
+      {acquired:false,exclusive:false,preexisting:true}:
+      {acquired:true,exclusive:true,preexisting:false};},
     reconcileBacklog:async()=>{calls.push('backlog');return options.backlog ?? {verified:true};},
     postcheck:async()=>{calls.push('postcheck');return options.post ?? {
       status:'PASS',actualExecutionSha:newSha,protectedStateUnchanged:true,
@@ -60,7 +63,9 @@ test('durable intent precedes replay, separately verified postcheck and final re
   assert.equal(records.at(-1).code,'FORWARD_VERIFIED_READY_FOR_LEASE_ARCHIVE');
   assert.ok(calls.indexOf('persist:FORWARD_BACKLOG_REPLAY_STARTED')<calls.indexOf('backlog'));
   assert.ok(calls.indexOf('persist:FORWARD_POSTCHECK_STARTED')<calls.indexOf('postcheck'));
-  assert.equal(calls.filter(x=>x==='original-unchanged').length,4);
+  assert.equal(calls.filter(x=>x==='original-unchanged').length,5);
+  assert.ok(calls.indexOf('claim')<calls.indexOf('backlog'));
+  assert.ok(calls.indexOf('claim')<calls.indexOf('persist:FORWARD_PREPARED'));
 });
 
 test('unverified replay is a hard stop; no postcheck',async()=>{
@@ -98,6 +103,16 @@ test('a false return from original ledger CAS is also a hard stop',async()=>{
   assert.equal(result.status,'RECOVERY_REQUIRED');
   assert.equal(result.code,'FORWARD_ORIGINAL_CHANGED');
   assert.equal(calls.includes('backlog'),false);
+});
+
+test('an existing recovery claim blocks a second replay attempt',async()=>{
+  const calls=[];
+  const result=await reconcilePostSwitchForward({ledger:ledger(),evidence:evidence(),
+    ports:ports(calls,{claimExists:true}),persist:async()=>{}});
+  assert.equal(result.status,'RECOVERY_REQUIRED');
+  assert.equal(result.code,'FORWARD_CLAIM_NOT_EXCLUSIVE');
+  assert.equal(calls.includes('backlog'),false);
+  assert.equal(calls.includes('postcheck'),false);
 });
 
 test('final workflow mismatch blocks success even if backlog and postcheck were PASS',async()=>{
