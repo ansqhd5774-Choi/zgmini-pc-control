@@ -48,6 +48,24 @@ test('PC resource wait reuses generic ledger contract with pc- requestId',()=>{
   assert.equal(outcome.wait.automaticPcRetries,0);
 });
 
+test('busy lease before ledger still consumes one-shot Issue attempt',()=>{
+  const cases=[
+    ['REQUEST_LEASE','pc-job-request-lease'],
+    ['SEAT_LEASE',`pc-job-seat-${seat}`],
+    ['RESOURCE_LEASE','pc-job-heavy-resource'],
+  ];
+  for(const [failureOperation,resourceKey] of cases){
+    const r=blocked('LEASE_BUSY');r.failureOperation=failureOperation;
+    const outcome=preparePcSharedResourceWait({originIssue:issue(),report:r,
+      resultPath:pathJson,resultTxt:textReport(r)});
+    assert.equal(outcome.state,'WAITING_SHARED_RESOURCE');
+    assert.equal(outcome.wait.resourceKey,resourceKey);
+    assert.equal(outcome.wait.safePoint,'REQUEST_CONSUMED_PREWORKER_UNTOUCHED');
+    assert.equal(outcome.wait.automaticPcRetries,0);
+    assert.equal(outcome.wait.resume,'OWNER_REPLAN_NEW_AUTHORIZED_REQUEST_ONLY');
+  }
+});
+
 test('blocked-looking result missing no-mutation proof cannot enter wait ledger',()=>{
   for(const modify of [
     r=>{r.mutationStarted=true;},
