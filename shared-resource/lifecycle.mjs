@@ -141,6 +141,8 @@ export function summarizeResourceRecheckEvidence(wait, {
     originReadback.issueNumber === wait.origin.issueNumber &&
     originReadback.requestId === wait.origin.requestId &&
     originReadback.runId === wait.evidence.runId &&
+    originReadback.status === wait.evidence.status &&
+    originReadback.code === wait.evidence.code &&
     originReadback.resultJsonPath === wait.evidence.resultJsonPath &&
     originReadback.resultTxtPath === wait.evidence.resultTxtPath &&
     originReadback.controlSourceSha === wait.origin.sourceSha &&
