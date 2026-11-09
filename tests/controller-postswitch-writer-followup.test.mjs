@@ -18,18 +18,24 @@ const pinnedRaw = [
   "{\n  \"schema\": \"ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1\",\n  \"requestId\": \"a861da80-8765-4e8c-b5a0-1824764284e2\",\n  \"status\": \"WRITER_B_INSTALLED_VERIFIED\",\n  \"code\": \"WRITER_B_INSTALL_VERIFIED\",\n  \"sourceSha\": \"4ec0b8c197627ebdb316be8df291e30d7e435784\",\n  \"mode\": \"LOCAL_OVERLAY\",\n  \"localOnly\": true,\n  \"baseHead\": \"75f73d8613550221f8e80b304d67b8b10a228e7f\",\n  \"candidateSourceSha\": \"27c02d9b254e92af21b2a5b92a4c0bb152bb5713\",\n  \"manifestSha256\": \"3452198846df9e4bb6f2299e3f4be64691ec87d4c9801121db130482c866904c\",\n  \"baseTreeOid\": \"5467892732dcaf8d4e3da7d4ddcca0358bfd25f9\",\n  \"preparedTreeOid\": \"215cfe0e32046457248cec2be68a54e42e5d4fc0\",\n  \"provenanceSha256\": \"35e6013e58c988458831928dc2949c8d4a2b15bd1b24740f26869055880bd6ab\",\n  \"runId\": \"42706312346\",\n  \"retry\": \"READ_ONLY_RECONCILE_NO_REEXECUTE\",\n  \"changedPaths\": [\n    \"scripts/pc-writer/build-asset-r10-release.mjs\"\n  ]\n}\n",
   "{\n  \"schema\": \"ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1\",\n  \"requestId\": \"b86e398c-59dd-485e-a3b1-2596fb5466d2\",\n  \"status\": \"WRITER_B_INSTALLED_VERIFIED\",\n  \"code\": \"WRITER_B_INSTALL_VERIFIED\",\n  \"sourceSha\": \"144f3b8f673cc3d18f004ddd65f6920d450f0ea6\",\n  \"mode\": \"LOCAL_OVERLAY\",\n  \"localOnly\": true,\n  \"baseHead\": \"4ec0b8c197627ebdb316be8df291e30d7e435784\",\n  \"candidateSourceSha\": \"27c02d9b254e92af21b2a5b92a4c0bb152bb5713\",\n  \"manifestSha256\": \"88c28ab0fbe7ae4683f76a94af907df5ef591623bdec37b01a670914cfa88703\",\n  \"baseTreeOid\": \"215cfe0e32046457248cec2be68a54e42e5d4fc0\",\n  \"preparedTreeOid\": \"90773b401efb20e4b099ebc8d9ba9942ed619f69\",\n  \"provenanceSha256\": \"190cf6c5b9c11ef9d9f9ec19bcf0ecd559773ff5f7dc4d3025b71da75a276adc\",\n  \"runId\": \"42709232093\",\n  \"retry\": \"READ_ONLY_RECONCILE_NO_REEXECUTE\",\n  \"changedPaths\": [\n    \"scripts/pc-writer/run-local.mjs\"\n  ]\n}\n",
   "{\n  \"schema\": \"ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1\",\n  \"requestId\": \"d9cc77ff-acb0-44e0-9f2b-1659efead888\",\n  \"status\": \"WRITER_B_INSTALLED_VERIFIED\",\n  \"code\": \"WRITER_B_INSTALL_VERIFIED\",\n  \"sourceSha\": \"48d3478030590ca63aaab2435e88c896608c70d3\",\n  \"mode\": \"LOCAL_OVERLAY\",\n  \"localOnly\": true,\n  \"baseHead\": \"144f3b8f673cc3d18f004ddd65f6920d450f0ea6\",\n  \"candidateSourceSha\": \"66cb996994dbece69f64bb2de51ef6e4c0a874de\",\n  \"manifestSha256\": \"0f0e02409e9c206f8c35e1efe7790ce1a80a3e3eb0bcf8bbf4f8931a1587a57c\",\n  \"baseTreeOid\": \"90773b401efb20e4b099ebc8d9ba9942ed619f69\",\n  \"preparedTreeOid\": \"18305f03c00112b0530fb5020fc64841ffb6a657\",\n  \"provenanceSha256\": \"e07deeb33ffc1bdc7a1d0700e6eecd845ef9fc7e0dc295e6661346fa95fd3cd9\",\n  \"runId\": \"42711838501\",\n  \"retry\": \"READ_ONLY_RECONCILE_NO_REEXECUTE\",\n  \"changedPaths\": [\n    \"scripts/pc-writer/run-local.mjs\"\n  ]\n}\n",
+  "{\n  \"schema\": \"ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1\",\n  \"requestId\": \"f18e341c-e37e-4975-8a1b-2fa9818b9fae\",\n  \"status\": \"WRITER_B_INSTALLED_VERIFIED\",\n  \"code\": \"WRITER_B_INSTALL_VERIFIED\",\n  \"sourceSha\": \"de81749f83c086f5cb0cad7ed1d5cc958de19280\",\n  \"mode\": \"LOCAL_OVERLAY\",\n  \"localOnly\": true,\n  \"baseHead\": \"48d3478030590ca63aaab2435e88c896608c70d3\",\n  \"candidateSourceSha\": \"b37c7c029d36c6d29c50a5173018836918db5c78\",\n  \"manifestSha256\": \"dc6b0707ae4778ecf99cdcb186a96a0c64aac9441fd42ec09f509640ee1f325c\",\n  \"baseTreeOid\": \"18305f03c00112b0530fb5020fc64841ffb6a657\",\n  \"preparedTreeOid\": \"3097b3f0b7de5ae9bb6dc482013fb51b8aeb305f\",\n  \"provenanceSha256\": \"7c30ba7cc6cf59612bfd319a0010ad545edcfbc8174ced7aef25248630c2d0ed\",\n  \"runId\": \"42721416977\",\n  \"retry\": \"READ_ONLY_RECONCILE_NO_REEXECUTE\",\n  \"changedPaths\": [\n    \"lib/market-score/employment-r6-formula.mjs\",\n    \"lib/market-score/employment-r6-feature-engine.mjs\",\n    \"lib/market-score/employment-r6-one-year-read-model.mjs\",\n    \"scripts/pc-writer/employment-r6-one-year-stage.mjs\",\n    \"worker/employment-r6-public-display.mjs\"\n  ]\n}\n",
 ];
 const receipts = () => WRITER_FOLLOWUP_CANDIDATE.writerB.map((expected,index)=>({
   path:expected.path,blobSha:expected.blobSha,raw:Buffer.from(pinnedRaw[index],'utf8'),
 }));
 
-test('three approved Writer B receipts match the exact raw bytes, blobs and ordered sources',()=>{
+test('four approved Writer B receipts match exact bytes, blobs and ordered sources',()=>{
   assert.equal(verifyWriterFollowupBReceipts(receipts()),true);
   const b=WRITER_FOLLOWUP_CANDIDATE.writerB;
-  assert.deepEqual(b.map(x=>x.changedPath),[
-    'scripts/pc-writer/build-asset-r10-release.mjs',
-    'scripts/pc-writer/run-local.mjs',
-    'scripts/pc-writer/run-local.mjs',
+  assert.deepEqual(b.map(x=>x.changedPaths ?? [x.changedPath]),[
+    ['scripts/pc-writer/build-asset-r10-release.mjs'],
+    ['scripts/pc-writer/run-local.mjs'],
+    ['scripts/pc-writer/run-local.mjs'],
+    ['lib/market-score/employment-r6-formula.mjs',
+      'lib/market-score/employment-r6-feature-engine.mjs',
+      'lib/market-score/employment-r6-one-year-read-model.mjs',
+      'scripts/pc-writer/employment-r6-one-year-stage.mjs',
+      'worker/employment-r6-public-display.mjs'],
   ]);
   assert.equal(WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at4ec,null);
   assert.equal(WRITER_FOLLOWUP_CANDIDATE.scope,
@@ -44,6 +50,7 @@ test('Writer B receipt drift, missing, reordered, changed raw or substituted blo
     list=>{list[1].blobSha='0'.repeat(40);},
     list=>{list[2].raw=Buffer.from(list[2].raw.toString('utf8')+' ');},
     list=>{list[0].raw=Buffer.from(list[1].raw);},
+    list=>{list[3].raw=Buffer.from(list[3].raw.toString('utf8')+' ');},
   ]) {
     const rows=receipts();edit(rows);
     assert.equal(verifyWriterFollowupBReceipts(rows),false);
@@ -60,7 +67,7 @@ const protectedBaseline=()=>({
 });
 const protectedCurrent=()=>{
   const snapshot=structuredClone(protectedBaseline());
-  snapshot.files['config.json']=WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at48;
+  snapshot.files['config.json']=WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.atDe;
   return snapshot;
 };
 
@@ -71,6 +78,9 @@ test('Writer follow-up protected snapshot pins baseline/current config and prese
     'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037');
   assert.equal(WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at48,
     '59777810c0949036f03777b7ea5561bd72bf0697cdaba65e393af49bf67356dc');
+  assert.equal(WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.atDe,
+    '0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453');
+  assert.equal(WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.issueNumber,1202);
 });
 
 test('Writer follow-up protected snapshot rejects stale consent and unrelated changes',()=>{
@@ -169,14 +179,36 @@ test('inverse chain requires every exact source anchor and keeps 4ec derived-onl
   }).code,'WRITER_CHAIN_ARGUMENTS_INVALID');
 });
 
+test('new post-#1195 six-stage Writer chain requires the extra independently pinned A digest',()=>{
+  const six=['0','1','2','3','4','5'].map(c=>c.repeat(40));
+  const sha=Object.fromEntries(six.map((s,index)=>[
+    s,index===2?null:digest(config(s)),
+  ]));
+  const ok=analyzeSourceOnlyReplacementChain(config(six[5]),{
+    sources:six,anchors:sha,
+  });
+  assert.equal(ok.status,'SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED');
+  assert.deepEqual(ok.stages.map(s=>s.sourceSha),six.slice().reverse());
+  assert.equal(ok.stages[3].evidenceLevel,'DERIVED_ONLY');
+  assert.equal(ok.stages[0].evidenceLevel,'PINNED_DIGEST_MATCH');
+  assert.equal(ok.liveCoreSourceVerified,false);
+  assert.equal(analyzeSourceOnlyReplacementChain(config(six[5]),{
+    sources:six,anchors:{...sha,[six[5]]:'a'.repeat(64)},
+  }).code,'WRITER_CHAIN_CONFIG_SHA_MISMATCH');
+  assert.equal(analyzeSourceOnlyReplacementChain(config(six[5]),{
+    sources:six,anchors:{...sha,[six[5]]:null},
+  }).code,'WRITER_CHAIN_ARGUMENTS_INVALID');
+});
+
 const candidateStages=()=>[
   WRITER_FOLLOWUP_CANDIDATE.sourceSequence.at(-1),
+  WRITER_FOLLOWUP_CANDIDATE.sourceSequence[3],
   WRITER_FOLLOWUP_CANDIDATE.sourceSequence[2],
   WRITER_FOLLOWUP_CANDIDATE.sourceSequence[1],
   WRITER_FOLLOWUP_CANDIDATE.sourceSequence[0],
   '70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
 ].map((sourceSha,index)=>({sourceSha,configSha256:`${index}`.repeat(64),
-  evidenceLevel:index===2?'DERIVED_ONLY':'PINNED_DIGEST_MATCH'}));
+  evidenceLevel:index===3?'DERIVED_ONLY':'PINNED_DIGEST_MATCH'}));
 const candidateAnalysis=()=>({status:'SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED',
   code:'WRITER_CHAIN_PINNED_ENDPOINTS_MATCH',stages:candidateStages(),
   intermediate4ecIndependentlyObserved:false,
@@ -191,8 +223,8 @@ test('local Writer proof reads only the fixed Windows path and emits hashes, nev
   });
   assert.equal(reads,1);
   assert.equal(actual.status,'READONLY_SOURCE_CANDIDATE_VERIFIED');
-  assert.equal(actual.digestStages.length,5);
-  assert.equal(actual.digestStages[2].evidenceLevel,'DERIVED_ONLY');
+  assert.equal(actual.digestStages.length,6);
+  assert.equal(actual.digestStages[3].evidenceLevel,'DERIVED_ONLY');
   assert.equal(actual.cApprovalAuthorized,false);
   assert.equal(actual.liveCoreSourceVerified,false);
   assert.equal(actual.operationalWrites,0);
@@ -213,8 +245,8 @@ test('local Writer proof rejects unreadable, tampered and misclassified bytes wi
     x=>{x.cApprovalAuthorized=true;},
     x=>{x.liveCoreSourceVerified=true;},
     x=>{x.intermediate4ecIndependentlyObserved=true;},
-    x=>{x.stages[2].evidenceLevel='PINNED_DIGEST_MATCH';},
-    x=>{x.stages[3].configSha256='bad-sha';},
+    x=>{x.stages[3].evidenceLevel='PINNED_DIGEST_MATCH';},
+    x=>{x.stages[4].configSha256='bad-sha';},
     x=>{x.stages[0].sourceSha='0'.repeat(40);},
   ]){
     const analysis=candidateAnalysis();modify(analysis);
