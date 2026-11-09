@@ -77,6 +77,8 @@
 - A 반환 `PASS`는 **두 번의 로컬 관측을 수집했다**는 뜻이다. `releaseVerified=false`, `runtimeSourceVerified=false`, `approvalVerified=false`, `ownerReplanAuthorized=false`, `automaticPcRetries=0`를 고정한다. `reviewResourceWait`의 `RECHECK_EVIDENCE_PENDING` 차단은 그대로이며, 진단 결과 하나만으로 자동 재개/새 설치하지 않는다.
 - 이 소스의 GitHub 병합만으로 Windows 사용 가능이라 주장하지 않는다. 정규 승인된 Controller 설치가 `config/operations.json`, dispatcher, 신규 관측기 및 기존 `writer-b-1063-task-probe.mjs` 의존 파일을 동일 버전으로 설치한 뒤에만 사용 가능하다. #917 복구 및 운영 승인 보호를 우회하지 않는다.
 - 남은 필수 연결: 원본 #68 대기 및 원본 Issue/Run+JSON/TXT 인증 readback, 현재 A 관측 Run/결과쌍의 원격 재조회, 최신 운영 source와 현재 승인 manifest 대조, 자원별 소유권 검증, 실제 Windows 대기→해제→원담당의 새 승인 판단. 이 모두가 실증되기 전까지 5단계는 **미완료**다. 새 예약 수집/자동 재시도는 하지 않는다.
+- **5단계 증거 대조 소스 후보(PR #1157, 운영 효과 미검증):** `summarizeResourceRecheckEvidence`가 원본 Issue/requestId/Run/JSON·TXT 결과쌍과 별도 A 관측 결과쌍 및 현행 승인 후보를 교차 비교한다. 옛 manifest와 현재 지문이 다르면 `SOURCE_DRIFT_REVIEW`로 구분하고, 완전한 후보더라도 `READY_FOR_OWNER_REPLAN`은 열지 않는다. source-only 회귀 12/12 PASS. 실제 Windows 관측기 설치·결과 readback·자원별 lease 소유권 검증·원담당 수신은 미완료. 과거 [#1092](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1092) 이연과 [#1132](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1132) 별도 R2 승인을 단일 해제 사건으로 합산하지 않는다.
+
 
 ### 공통 장애 인계의 운영 PC 독립화 (2026-11-10, 소스 병합 및 부분 실운영 확인)
 

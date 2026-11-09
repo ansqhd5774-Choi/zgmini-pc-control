@@ -114,3 +114,87 @@ export function reviewResourceWait(candidate, check) {
     ownerReceipt: 'UNKNOWN',
     nextAction: 'VERIFY_RESOURCE_RELEASE_CURRENT_SOURCE_AND_APPROVAL'});
 }
+
+
+/**
+ * SOURCE-ONLY evidence coverage for a historical resource wait.
+ *
+ * Inputs are candidate readbacks, NOT independently authenticated by this
+ * pure function. The caller must verify original GitHub Issue/Run/bot receipt
+ * and both immutable result pairs, then current Windows source and approval.
+ * Even a complete candidate is NOT proof of lease ownership/release and must
+ * never authorize a PC job or a new owner request by itself.
+ *
+ * 'origin.sourceSha' pins the CONTROL workflow commit; the observed Windows
+ * 'configSourceSha' is a DIFFERENT source domain. They must not be compared.
+ */
+export function summarizeResourceRecheckEvidence(wait, {
+  originReadback, releaseObservation, currentApproval
+} = {}) {
+  if (wait?.schema !== RESOURCE_WAIT_SCHEMA ||
+      wait.state !== 'WAITING_SHARED_RESOURCE' ||
+      !/^resource-wait-[a-f0-9]{24}$/.test(wait.waitId ?? '') ||
+      wait.automaticPcRetries !== 0) stop('RECHECK_WAIT_INVALID');
+  const missing = [];
+  const exactOrigin = originReadback &&
+    originReadback.repository === wait.origin.repository &&
+    originReadback.issueNumber === wait.origin.issueNumber &&
+    originReadback.requestId === wait.origin.requestId &&
+    originReadback.runId === wait.evidence.runId &&
+    originReadback.status === wait.evidence.status &&
+    originReadback.code === wait.evidence.code &&
+    originReadback.resultJsonPath === wait.evidence.resultJsonPath &&
+    originReadback.resultTxtPath === wait.evidence.resultTxtPath &&
+    originReadback.controlSourceSha === wait.origin.sourceSha &&
+    originReadback.manifestSha256 === approvalHash(wait.origin) &&
+    originReadback.botReceiptReadbackVerified === true &&
+    originReadback.resultPairReadbackVerified === true;
+  if (!exactOrigin) missing.push('ORIGINAL_ISSUE_RUN_RESULT_PAIR');
+
+  // The A diagnostic is a two-sample Windows candidate, not a release grant.
+  const observation = releaseObservation;
+  const observed = observation &&
+    observation.operation === 'shared-resource-release-readonly' &&
+    Number.isSafeInteger(observation.runId) && observation.runId > 0 &&
+    observation.runId !== wait.evidence.runId &&
+    RESULT.test(observation.resultJsonPath ?? '') &&
+    RESULT.test(observation.resultTxtPath ?? '') &&
+    observation.resultJsonPath.slice(0, -5) ===
+      observation.resultTxtPath.slice(0, -4) &&
+    observation.resultPairReadbackVerified === true &&
+    observation.status === 'PASS' &&
+    observation.code === 'SHARED_RESOURCE_READONLY_SNAPSHOT' &&
+    observation.resourceKey === wait.resourceKey &&
+    observation.resourceState === 'CANDIDATE_CLEAR_NOT_AUTHORIZED' &&
+    SHA40.test(observation.observedConfigSourceSha ?? '') &&
+    observation.releaseVerified === false &&
+    observation.ownerReplanAuthorized === false;
+  if (!observed) missing.push('WINDOWS_READONLY_RELEASE_CANDIDATE');
+
+  const current = currentApproval;
+  const approved = current &&
+    current.currentReadbackVerified === true &&
+    SHA40.test(current.controlSourceSha ?? '') &&
+    SHA40.test(current.runtimeConfigSourceSha ?? '') &&
+    SHA40.test(current.approvedRuntimeConfigSourceSha ?? '') &&
+    SHA64.test(current.manifestSha256 ?? '') &&
+    current.runtimeConfigSourceSha === current.approvedRuntimeConfigSourceSha &&
+    (!observed ||
+      current.runtimeConfigSourceSha === observation.observedConfigSourceSha);
+  if (!approved) missing.push('CURRENT_SOURCE_AND_APPROVAL_READBACK');
+
+  const manifestChanged = approved &&
+    current.manifestSha256 !== approvalHash(wait.origin);
+  const state = manifestChanged && exactOrigin ?
+    'SOURCE_DRIFT_REVIEW' : 'RECHECK_EVIDENCE_PENDING';
+  return Object.freeze({
+    state, waitId: wait.waitId, resourceKey: wait.resourceKey,
+    missing: Object.freeze(missing),
+    historicalManifestChanged: Boolean(manifestChanged),
+    releaseVerified: false, ownerReplanAuthorized: false,
+    ownerReceipt: 'UNKNOWN', automaticPcRetries: 0,
+    nextAction: state === 'SOURCE_DRIFT_REVIEW' ?
+      'OWNER_REVIEW_NEW_APPROVAL_AND_RELEASE_EVIDENCE' :
+      'VERIFY_RELEASE_OWNERSHIP_AND_RUNTIME_AUTHORIZATION'
+  });
+}

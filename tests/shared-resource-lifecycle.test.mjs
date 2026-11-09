@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {prepareResourceWait, reconcileResourceWait, reviewResourceWait}
+import {prepareResourceWait, reconcileResourceWait, reviewResourceWait, summarizeResourceRecheckEvidence}
   from '../shared-resource/lifecycle.mjs';
 
 const uuid = '9b4e50f9-8674-4894-9c5e-8ba454d6f79d';
@@ -118,4 +118,114 @@ test('release hint cannot grant owner replan without authenticated runtime proof
     sourceSha:src}).state, 'RECHECK_EVIDENCE_PENDING');
   assert.throws(() => reviewResourceWait(w, {release:'FORCE_UNLOCK'}),
     /RECHECK_INVALID/);
+});
+
+
+function recheckInput(wait = candidate()) {
+  return {
+    originReadback: {
+      repository: wait.origin.repository,
+      issueNumber: wait.origin.issueNumber,
+      requestId: wait.origin.requestId,
+      runId: wait.evidence.runId,
+      status: wait.evidence.status,
+      code: wait.evidence.code,
+      resultJsonPath: wait.evidence.resultJsonPath,
+      resultTxtPath: wait.evidence.resultTxtPath,
+      controlSourceSha: wait.origin.sourceSha,
+      manifestSha256: wait.origin.manifestSha256,
+      botReceiptReadbackVerified: true,
+      resultPairReadbackVerified: true,
+    },
+    releaseObservation: {
+      operation: 'shared-resource-release-readonly',
+      runId: 42699990000,
+      resultJsonPath: 'results/42699990000-1-seat-2.json',
+      resultTxtPath: 'results/42699990000-1-seat-2.txt',
+      resultPairReadbackVerified: true,
+      status: 'PASS',
+      code: 'SHARED_RESOURCE_READONLY_SNAPSHOT',
+      resourceKey: wait.resourceKey,
+      resourceState: 'CANDIDATE_CLEAR_NOT_AUTHORIZED',
+      observedConfigSourceSha: 'c'.repeat(40),
+      releaseVerified: false,
+      ownerReplanAuthorized: false,
+    },
+    currentApproval: {
+      currentReadbackVerified: true,
+      controlSourceSha: 'd'.repeat(40),
+      runtimeConfigSourceSha: 'c'.repeat(40),
+      approvedRuntimeConfigSourceSha: 'c'.repeat(40),
+      manifestSha256: wait.origin.manifestSha256,
+    },
+  };
+}
+
+test('source-only recheck summary remains closed even with consistent candidates', () => {
+  const w = candidate();
+  const result = summarizeResourceRecheckEvidence(w, recheckInput(w));
+  assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
+  assert.deepEqual(result.missing, []);
+  assert.equal(result.releaseVerified, false);
+  assert.equal(result.ownerReplanAuthorized, false);
+  assert.equal(result.automaticPcRetries, 0);
+});
+
+test('different approved manifest is a drift review, never implicit release', () => {
+  const w = candidate();
+  const input = recheckInput(w);
+  input.currentApproval.manifestSha256 = 'e'.repeat(64);
+  const result = summarizeResourceRecheckEvidence(w, input);
+  assert.equal(result.state, 'SOURCE_DRIFT_REVIEW');
+  assert.equal(result.historicalManifestChanged, true);
+  assert.equal(result.ownerReplanAuthorized, false);
+  assert.equal(result.nextAction, 'OWNER_REVIEW_NEW_APPROVAL_AND_RELEASE_EVIDENCE');
+});
+
+test('cross-request, spoofed A operation and result-pair mismatch stay pending', () => {
+  const w = candidate();
+  const forged = recheckInput(w);
+  forged.originReadback.requestId = '9'.repeat(36);
+  forged.releaseObservation.operation = 'another-operation';
+  forged.releaseObservation.resultTxtPath = 'results/other.txt';
+  const result = summarizeResourceRecheckEvidence(w, forged);
+  assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
+  assert.deepEqual(result.missing, [
+    'ORIGINAL_ISSUE_RUN_RESULT_PAIR',
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'
+  ]);
+  assert.equal(result.ownerReplanAuthorized, false);
+});
+
+
+test('origin result status and failure code must match the historical wait', () => {
+  const w = candidate();
+  const forged = recheckInput(w);
+  forged.originReadback.status = 'WRITER_B_INSTALLED_VERIFIED';
+  forged.originReadback.code = 'OTHER_CODE';
+  const result = summarizeResourceRecheckEvidence(w, forged);
+  assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
+  assert.deepEqual(result.missing, ['ORIGINAL_ISSUE_RUN_RESULT_PAIR']);
+  assert.equal(result.ownerReplanAuthorized, false);
+});
+
+test('unverified source/approval and forged release flag cannot grant readiness', () => {
+  const w = candidate();
+  const input = recheckInput(w);
+  input.releaseObservation.releaseVerified = true;
+  input.currentApproval.currentReadbackVerified = false;
+  const result = summarizeResourceRecheckEvidence(w, input);
+  assert.ok(result.missing.includes('WINDOWS_READONLY_RELEASE_CANDIDATE'));
+  assert.ok(result.missing.includes('CURRENT_SOURCE_AND_APPROVAL_READBACK'));
+  assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
+  assert.equal(result.ownerReceipt, 'UNKNOWN');
+});
+
+test('Windows config source must match the current approved runtime scope', () => {
+  const w = candidate();
+  const input = recheckInput(w);
+  input.currentApproval.approvedRuntimeConfigSourceSha = 'f'.repeat(40);
+  const result = summarizeResourceRecheckEvidence(w, input);
+  assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
+  assert.ok(result.missing.includes('CURRENT_SOURCE_AND_APPROVAL_READBACK'));
 });
