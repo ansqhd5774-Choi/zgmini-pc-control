@@ -7,12 +7,14 @@ import {pathToFileURL} from 'node:url';
 import {assertCompletedWriterBEvent, findWriterBReceipt,
   prepareWriterBFailureHandoff} from './writer-b-result-to-incident.mjs';
 import {reconcileHandoffInventory} from './pc-result-to-incident.mjs';
+import {persistResourceWait} from './resource-wait-ledger.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
 const BOT = 'github-actions[bot]';
 const API = `https://api.github.com/repos/${REPO}`;
 const MAX_PAGES = 5;
+const MAX_QUEUE_PAGES = 20;
 const MAX_REPORT_BYTES = 65536;
 const MAX_MANIFEST_BYTES = 131072;
 const MANIFEST_PATH = /^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
@@ -40,7 +42,8 @@ function authorizedManifestPath(originIssue) {
 
 /** A verified completed Writer B run can generate *at most one* incident. */
 export async function processCompletedWriterB(event, {
-  readComments, readIssue, readFile, listHandoffs, createHandoff
+  readComments, readIssue, readFile, listHandoffs, createHandoff,
+  listResourceWaitComments, createResourceWaitComment, readResourceWaitComment
 }) {
   const run = assertCompletedWriterBEvent(event);
   if ([readComments, readIssue, readFile, listHandoffs, createHandoff]
@@ -72,6 +75,17 @@ export async function processCompletedWriterB(event, {
     state: 'SETUP_REVIEW_REQUIRED', reportStatus: prepared.reportStatus});
   if (prepared.state === 'NOT_ELIGIBLE') return Object.freeze({...observed,
     state: 'NOT_ELIGIBLE', reportStatus: prepared.reportStatus});
+  // A normal busy/idle deferral belongs in the existing #68 coordination
+  // ledger, NOT a repair Incident. Reuse exact immutable evidence/receipt.
+  if (prepared.state === 'WAITING_SHARED_RESOURCE') {
+    const ledger=await persistResourceWait(prepared.wait,{
+      listComments:listResourceWaitComments,
+      postComment:createResourceWaitComment,
+      getComment:readResourceWaitComment});
+    return Object.freeze({...observed, ...ledger,
+      resourceKey:prepared.wait.resourceKey,
+      reportStatus:prepared.reportStatus, automaticPcRetries:0});
+  }
   if (prepared.state !== 'READY_TO_ENQUEUE') stop('ADAPTER_STATE_INVALID');
   observed.confirmedFailures = 1;
   const decision = reconcileHandoffInventory(prepared, await listHandoffs());
@@ -108,9 +122,9 @@ async function request(resource, {method = 'GET', body, missingOk = false} = {})
   return response.json();
 }
 
-async function completePages(endpoint, category) {
+async function completePages(endpoint, category, maxPages=MAX_PAGES) {
   const rows = [];
-  for (let page = 1; page <= MAX_PAGES; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     const separator = endpoint.includes('?') ? '&' : '?';
     const part = await request(`${endpoint}${separator}per_page=100&page=${page}`);
     if (!Array.isArray(part)) stop(`${category}_INVENTORY_INVALID`);
@@ -146,7 +160,12 @@ export async function main(env = process.env) {
         'HANDOFFS')).filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
     createHandoff: async prepared => request('issues', {method: 'POST',
       body: {title: `agent-handoff ${prepared.incidentId}`,
-        labels: ['agent-handoff'], body: prepared.body}})
+        labels: ['agent-handoff'], body: prepared.body}}),
+    listResourceWaitComments: () => completePages('issues/68/comments',
+      'RESOURCE_WAIT', MAX_QUEUE_PAGES),
+    createResourceWaitComment: body => request('issues/68/comments',
+      {method:'POST',body:{body}}),
+    readResourceWaitComment: id => request(`issues/comments/${id}`)
   });
   process.stdout.write(`${JSON.stringify(result)}\n`);
   return result;
