@@ -114,11 +114,30 @@ A source-only merge does not install a PC operation or prove its effects.
   total Actions limit, better observation-gap codes and truthful nonzero
   exit on non-success status. This is **source-only**, not Windows runtime
   proof or a reason to reexecute #1177.
-- **Next action:** reconcile the actual Task→Core PID→E: lock ownership using
-  approved read-only evidence. If safely proved, request a new exact-scope
-  single-use B for the two official static sources, then read back both
-  archives and at most two approved raw JSON targets. Do not require any
-  clock time, 6-seat global idle or unrelated Controller work as a gate.
+- [Read-only A #1186](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1186),
+  run `42719810637`, observed `CORE_NO_ACTIVE_TASK_ENGINE` at
+  2026-11-09 23:21:47 UTC. This is an inconclusive instantaneous snapshot,
+  not a broken Core Task or evidence of a different Core lock path.
+- [Read-only A #1187](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1187),
+  run `42719971556`, found `lockPresent:false` at 23:23 UTC, unchanged
+  Core/Korea Task XML hashes and forward progress: Core cycle report
+  22:39 → 23:21 UTC, collection 22:40 → 23:15, Writer 22:52 → 23:20.
+  This rules out an indefinitely stuck lock at that snapshot; it does
+  **not** prove Task→Node→E: lock lineage while active.
+- The existing feature `local-cycle.mjs` uses one lock for both Core and
+  Korea lanes, while the B owner observer only accepts Core Task instances.
+  The actual failure mechanism is still unproven. Extending the observation
+  timeout from six to twelve minutes alone must not be treated as a fix.
+- **Next action:** identify the scheduled Task's effective Core lock root,
+  its canonical equivalence to the B receiver's E: lock, and the exact
+  Task/VBS/Node process relation using a bounded authorized read-only
+  mechanism. Repair only the proven false guard, preserving the atomic
+  exclusive Core lease, shared Writer lease, source/hash checks and
+  fail-closed behavior. Then submit a **new single-use B request** for the
+  existing two official sources and verify its private readback, followed by
+  calculation, D1 and public API/UI. Do not make any 09:00 time gate or
+  natural scheduled verification a prerequisite; do not repeat #1177 or
+  generate further identical instantaneous A snapshots.
 
 The exact operation manifest must remain within the already-approved scope:
 two official static GETs, archive plus at most two named JSON updates/backups,
