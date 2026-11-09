@@ -57,7 +57,7 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,del
  try{approval=JSON.parse(approvalBytes.toString('utf8'));
   overlay=JSON.parse(overlayBytes.toString('utf8'));}
  catch{throw error('R6_B_MANIFEST_JSON_STOP');}
- const v2=approval.schema===R6_B_APPROVAL_V2;
+ const v2=approval?.schema===R6_B_APPROVAL_V2;
  const approvalKeys=['schema','status','scope','mode','sourceRepository',
   'installedSourceSha','overlayManifestPath','overlayManifestSha256',
   'sourceRoot','pcHome','maxBlsCalls','maxDolCalls','effects'];
