@@ -4,7 +4,7 @@ This is a dormant, one-shot, exact-scope Windows adapter. It **is not** an
 installed/registered PC operation and does not change the Core scheduler, DB,
 checkpoint, D1, publishing path, credentials or feature formula.
 
-## Intended effect after separate operator authorization
+## Intended effect under the existing approved feature scope
 
 1. Read an explicit `APPROVED_B` manifest from the control repository and
    compare its raw SHA-256 with the owner's private, single-use Issue.
@@ -31,12 +31,19 @@ records exact private recovery metadata; **no automatic retry or rollback**.
 
 ## Activation is deliberately absent
 
-- No approval manifest or Issue is shipped.
+- No operation manifest or Issue is shipped. The existing user approval for
+  official inflation inputs and the standing approval for common registration
+  must first be mapped to the exact manifest; a manifest is a technical
+  boundary, not a reason to demand duplicate user consent. Only effects beyond
+  that existing scope require new authorization.
 - GitHub Actions job requires the opt-in variable
   `ZGMINI_INFLATION_MANUAL_B_ENABLED` with the exact value `true`. Do not turn
-  it on until an approved B manifest, exact live PC file preimage and explicit
-  Core lock lease approval have been reconciled.
+  it on until a scope-pinned B manifest, exact installed PC file preimage and
+  the existing Core lock protection contract have been reconciled.
 - Any unrelated `pc-job`, generic command or scheduled Cron cannot invoke it.
+- This draft must also be checked against the current shared-resource Issue
+  admission/lifecycle registration before activation. Do not create a second
+  parallel admission system or weaken existing workflow guards.
 - This PR is a development artifact, **not** a PC installation or data capture.
 - The operational objective remains official candidate data storage, then
   existing computation → Writer → D1 → public API/UI verification. The
@@ -78,9 +85,11 @@ checkout source (`4273137a...`) in #1105; the later stored Writer checkpoint
 mentions `4273137a...`, but neither observation alone resolves the live Task
 chain. Do not retry A #1119 to turn static evidence into Runtime evidence.
 
-The operator must separately authorize exactly two official static GETs,
-archive plus at most two named JSON updates/backups, temporary Core lock
-ownership, and the private one-shot journal. Nothing authorizes scheduler,
+The exact operation manifest must remain within the already-approved scope:
+two official static GETs, archive plus at most two named JSON updates/backups,
+temporary Core lock ownership, and the private one-shot journal. If any one
+of these effects is outside the existing scope, stop for explicit approval.
+Nothing authorizes scheduler,
 DB, D1, source replacement, a recovery rollback, or repeated execution.
 
 ### Shared recovery and lock-path interpretation
