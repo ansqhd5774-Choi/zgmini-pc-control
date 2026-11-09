@@ -1,0 +1,54 @@
+{
+  "schema": "ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1",
+  "requestId": "662f48fa-3801-43a8-b6b1-ea100ce813c0",
+  "approvalManifestSha256": "4105ee176f05b06876d648e01059ba350853bb8c29e0e808aba7e3ec5d8a0c22",
+  "status": "PARTIAL",
+  "code": "R6_B_PARTIAL_PUBLISH_VERIFIED",
+  "sourceSha": "2b0cfdc956bd04a2ca4195a3eda7ce4c8d9a15a8",
+  "mode": "BACKFILL",
+  "providerRequests": 16,
+  "blsRequests": 14,
+  "dolRequests": 2,
+  "groupResults": [
+    {
+      "groupName": "DOL_UI_WEEKLY_CLAIMS",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_EMPLOYMENT_SITUATION",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_JOLTS",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_ECI",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_STATE_MSA",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_BED",
+      "status": "PARTIAL",
+      "providerRequests": 6,
+      "failureCode": "SERIES_PARTIAL"
+    }
+  ],
+  "sqlite": "COLLECTOR_RECORDED",
+  "publication": "VERIFIED",
+  "sourceStoredAt": 1794218629943,
+  "sourceFeatures": 29,
+  "chartReadyFeatures": 22,
+  "lastPass": "PUBLISH_READBACK",
+  "firstFail": null,
+  "runId": "42597285824",
+  "retry": "READ_EXISTING_REQUEST_NO_REEXECUTE"
+}
