@@ -25,7 +25,7 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 12
+    timeout-minutes: 16
     defaults:
       run:
         shell: cmd
