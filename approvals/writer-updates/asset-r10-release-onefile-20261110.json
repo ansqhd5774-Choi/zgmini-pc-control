@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/asset-r10-latest-main-slice-20261109",
+  "candidateSourceSha": "27c02d9b254e92af21b2a5b92a4c0bb152bb5713",
+  "baseHead": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+  "baseConfigSourceSha": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/build-asset-r10-release.mjs",
+      "change": "M",
+      "beforeSha256": "deed690d7840974e9fad786e150c9621ae172c9108f8b4109dc6e59555269fe9",
+      "afterSha256": "74e9931d824681e3ff5b9fac89cfb79be0e65fd1625dcd5445f09e08da3cd126"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
