@@ -7,6 +7,8 @@ import {execFileSync} from 'node:child_process';
 
 const SHA40=/^[0-9a-f]{40}$/i;
 const KEY=/^[a-z][a-z0-9_-]{0,48}$/;
+// Strict allowlist: report one bounded code, never arbitrary private error text.
+const TREASURY_FAILURE_CODE=/^TREASURY_(?:HTTP_[1-5]\d{2}|REDIRECT_NOT_ALLOWED|XML_TOO_LARGE_OR_EMPTY|OFFICIAL_XML_INVALID|RELEASE_ENTRIES_MISSING|ENTRY_SECTIONS_MISSING|ENTRY_FIELD_INVALID|DATES_UNAVAILABLE|STORED_DATES_UNAVAILABLE|DUPLICATE_CUSIP_DATE|FROM_DATE_INVALID|TIMEOUT|FETCH_FAILED|COLLECTION_FAILED)$/;
 const EARNINGS_HOST='api.earningsapi.com';
 const COLLECTION_EVENTS_MAX_BYTES=512*1024;
 const COLLECTION_EVENTS_MAX_ROWS=1024;
@@ -193,7 +195,10 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
    sourceSha:sha(saved.body?.source),
    calendarStatus:typeof report?.status==='string'&&/^[A-Z_]{2,40}$/.test(report.status)?report.status:null,
    providerRequests:Number.isSafeInteger(report?.providerRequests)&&report.providerRequests>=0?report.providerRequests:null,
-   sourceKeys,sourceCount:sourceKeys.length};
+   sourceKeys,sourceCount:sourceKeys.length,
+   treasuryFailureCode:report?.status==='PARTIAL'&&sources.treasury==='SOURCE_FAILED'&&
+    typeof report?.treasuryFailureCode==='string'&&TREASURY_FAILURE_CODE.test(report.treasuryFailureCode)
+    ?report.treasuryFailureCode:null};
  }
  // Search only direct checkouts in the approved E:\\ZGmini\\projects tree.
  // Unlike the old 64-entry inventory, a large root does not skip every child.

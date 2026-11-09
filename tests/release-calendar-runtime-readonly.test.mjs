@@ -325,3 +325,28 @@ test('truncated tail and incomplete final event never imply complete daily cover
  assert.equal(obs.tailTruncated,true);
  assert.deepEqual(obs.observedDays,[{kstDate:'2026-11-06',observedRequests:1}]);
 });
+
+
+test('Treasury failure code is bounded, private, and only reported on PARTIAL failure',t=>{
+ const f=fixture(t,{dirs:0}),file=path.join(f.pc,'local-collection-last-run.json');
+ const read=(code,status='PARTIAL',treasury='SOURCE_FAILED')=>{
+  fs.writeFileSync(file,JSON.stringify({at:'2026-11-09T09:15:00.000Z',source:SHA,
+   releaseCalendar:{status,providerRequests:1,sources:{treasury},treasuryFailureCode:code},
+   secrets:'MUST_NOT_LEAK_TREASURY_TOKEN'}));
+  return inspectReleaseCalendarRuntime(f.data,{gitHead:()=>SHA});
+ };
+ for(const code of ['TREASURY_HTTP_429','TREASURY_TIMEOUT','TREASURY_FETCH_FAILED',
+  'TREASURY_COLLECTION_FAILED','TREASURY_ENTRY_FIELD_INVALID']){
+  const out=read(code);
+  assert.equal(out.collection.treasuryFailureCode,code);
+  assert.equal(out.providerCalls,0);assert.equal(out.operationalWrites,0);
+  assert.doesNotMatch(JSON.stringify(out),/MUST_NOT_LEAK_TREASURY_TOKEN/);
+ }
+ for(const code of ['https://example.invalid/secret','TREASURY_HTTP_999',
+  'TREASURY_HTTP_429\nSECRET','TREASURY_HTTP_429_SECRET','TREASURY_'+'X'.repeat(90)]){
+  assert.equal(read(code).collection.treasuryFailureCode,null);
+ }
+ assert.equal(read('TREASURY_HTTP_429','CACHED').collection.treasuryFailureCode,null);
+ assert.equal(read('TREASURY_HTTP_429','READY','READY').collection.treasuryFailureCode,null);
+ assert.equal(read(undefined).collection.treasuryFailureCode,null);
+});
