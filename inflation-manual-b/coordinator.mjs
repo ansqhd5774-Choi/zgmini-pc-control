@@ -9,6 +9,7 @@ const fail=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)fail(code);};
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const METHODS=['acquireSharedLock','readSourcePreimage','fetchExactSources',
+ 'proveActiveCoreLock',
  'preflightParse','assertCoreIdle','acquireCoreLease','verifyCoreLease',
  'releaseCoreLease','claimOnce','applyData','readbackStored','journalPhase',
  'releaseSharedLock'];
@@ -73,6 +74,9 @@ export async function performOfficialManualB(auth,io){
   // A busy shared writer lock must stop without consuming requestId.
   await io.acquireSharedLock(requestId);locked=true;
   verifyManualPreimage(manifest,await io.readSourcePreimage(manifest));
+  // Never treat an arbitrary E: lock or an idle Task as proof of the Core
+  // writer's actual lock path. A live Task-linked Core must own it once.
+  await io.proveActiveCoreLock();
   const bytes=verifyOfficialBytes(await io.fetchExactSources({urls:URLS,
    maxBytes:MAX_BYTES,timeoutMs:manifest.timeoutMs}));
   // Import and parse the actual Census XLSX with the PC's installed xlsx-lite
