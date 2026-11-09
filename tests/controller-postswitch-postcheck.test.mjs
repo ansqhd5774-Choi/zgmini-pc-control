@@ -60,7 +60,9 @@ test('lost acknowledgement may recover unique existing Issue but never repost',a
 });
 
 test('interrupted earlier creation with zero readback is blocked without POST',async()=>{
-  const f=fixture({oldRecord:{...record(),postcheckCreationAttempted:true}});
+  const d=postcheckEnvelope(issue,manifest);
+  const f=fixture({oldRecord:{...record(),postcheckCreationAttempted:true,
+    postcheckTitle:d.title,postcheckBody:d.body}});
   await assert.rejects(()=>ensurePostcheckIssue(f.options),/POSTCHECK_OUTCOME_UNKNOWN/);
   assert.equal(f.calls.includes('create'),false);
 });
@@ -85,8 +87,21 @@ test('a separate recovery record must be held and durably writable before POST',
 });
 
 test('recorded Issue number drift is a hard failure',async()=>{
-  const f=fixture({present:[row(postcheckEnvelope(issue,manifest),1234)],
-    oldRecord:{...record(),postcheckIssueNumber:4444}});
+  const d=postcheckEnvelope(issue,manifest);
+  const f=fixture({present:[row(d,1234)],
+    oldRecord:{...record(),postcheckIssueNumber:4444,
+      postcheckTitle:d.title,postcheckBody:d.body}});
   await assert.rejects(()=>ensurePostcheckIssue(f.options),/POSTCHECK_RECORDED_ISSUE_DRIFT/);
   assert.equal(f.calls.includes('create'),false);
+});
+
+test('an existing postcheck intent cannot change its immutable title or body',async()=>{
+  const d=postcheckEnvelope(issue,manifest);
+  for(const changes of [{postcheckTitle:'other'},{postcheckBody:'{}'}]){
+    const f=fixture({oldRecord:{...record(),postcheckCreationAttempted:true,
+      postcheckTitle:d.title,postcheckBody:d.body,...changes}});
+    await assert.rejects(()=>ensurePostcheckIssue(f.options),
+      /POSTCHECK_RECORDED_DESCRIPTOR_DRIFT/);
+    assert.equal(f.calls.includes('create'),false);
+  }
 });
