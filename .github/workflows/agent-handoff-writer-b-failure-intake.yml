@@ -1,0 +1,36 @@
+name: ZGMINI Agent Handoff Writer B Failure Intake
+on:
+  workflow_run:
+    workflows: [ZGMINI Approved Writer B Source Overlay Once]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  issues: write
+concurrency:
+  # Serialize this incident writer; preserve each pending completion event.
+  group: agent-handoff-writer-b-failure-intake
+  cancel-in-progress: false
+  queue: max
+jobs:
+  enqueue-verified-writer-b-failures:
+    # Independent opt-in. Existing PC Job intake activation does not enable B.
+    if: >-
+      vars.ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED == 'true' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.workflow_run.event == 'issues' &&
+      github.event.workflow_run.actor.login == 'ansqhd5774-Choi' &&
+      github.event.workflow_run.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify read-back Writer B evidence and enqueue only confirmed failures
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: cmd
+        run: E:\ZGmini\runtime\node.exe agent-handoff\writer-b-failure-producer.mjs
