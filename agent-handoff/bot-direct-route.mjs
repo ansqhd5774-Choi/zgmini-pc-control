@@ -64,12 +64,16 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
   const current = await readIssue(issueNumber);
   if (current?.repository !== REPOSITORY || current.number !== issueNumber ||
       current.body !== prepared.body || current.user?.login !== BOT ||
-      current.title !== `agent-handoff ${prepared.incidentId}`)
+      current.title !== `agent-handoff ${prepared.incidentId}` ||
+      !current.labels?.some(label => label.name === 'agent-handoff'))
     stop('ISSUE_DRIFT_STOP');
   if (!current.labels?.some(label => label.name === stateLabel)) {
     await addIssueLabel(issueNumber, stateLabel);
     const after = await readIssue(issueNumber);
-    if (!after?.labels?.some(label => label.name === stateLabel))
+    if (after?.repository !== REPOSITORY || after.number !== issueNumber ||
+        after.user?.login !== BOT || after.body !== prepared.body ||
+        !after.labels?.some(label => label.name === 'agent-handoff') ||
+        !after.labels?.some(label => label.name === stateLabel))
       stop('LABEL_READBACK_STOP');
   }
   return Object.freeze({state: existed ? 'ROUTE_REUSED' : 'ROUTE_RECORDED',
