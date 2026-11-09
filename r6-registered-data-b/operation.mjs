@@ -1,0 +1,282 @@
+#!/usr/bin/env node
+// Exact, owner-approved R6 registered-BLS one-shot. The existing PC collector,
+// SQLite store, quota guard and publisher own all data effects. No shell input.
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash,randomUUID} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {pathToFileURL,fileURLToPath} from 'node:url';
+
+export const R6_B_REPO='ansqhd5774-Choi/zgmini-pc-control';
+export const R6_B_TITLE='pc-employment-r6-registered-data-once';
+export const R6_B_LABEL='pc-writer-b-install';
+export const R6_B_SCHEMA='ZGMINI_R6_REGISTERED_DATA_B_REQUEST_V1';
+export const R6_B_APPROVAL='ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V1';
+export const R6_B_RESULT='r6-registered-data-result.json';
+export const R6_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
+export const R6_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
+const OWNER='ansqhd5774-Choi';
+const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const SHA40=/^[a-f0-9]{40}$/;
+const SHA64=/^[a-f0-9]{64}$/;
+const CODES=/^[A-Z][A-Z0-9_]{0,95}$/;
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const error=code=>Object.assign(new Error(code),{code});
+const need=(ok,code)=>{if(!ok)throw error(code);};
+const exact=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&
+ Object.keys(v).sort().join('|')===keys.slice().sort().join('|');
+const same=(a,b)=>path.win32.normalize(a).toLowerCase()===path.win32.normalize(b).toLowerCase();
+const safeCode=x=>CODES.test(x??'')?x:'R6_B_UNCLASSIFIED_STOP';
+
+export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes}={}){
+ need(env?.GITHUB_REPOSITORY===R6_B_REPO&&env.GITHUB_EVENT_NAME==='issues'&&
+  env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_ACTOR===OWNER&&
+  env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
+  event?.action==='opened'&&event.repository?.full_name===R6_B_REPO&&
+  event.repository.private===true&&event.sender?.login===OWNER&&
+  event.issue?.user?.login===OWNER&&!event.issue.pull_request&&
+  event.issue.title===R6_B_TITLE&&
+  event.issue.labels?.some(x=>x.name===R6_B_LABEL),
+ 'R6_B_OWNER_EVENT_STOP');
+ let request;
+ try{request=JSON.parse(event.issue.body);}catch{throw error('R6_B_REQUEST_JSON_STOP');}
+ need(exact(request,['schema','requestId','chatId','operation','approvalManifestSha256'])&&
+  request.schema===R6_B_SCHEMA&&request.operation==='employment-r6-registered-data-once'&&
+  UUID.test(request.requestId??'')&&UUID.test(request.chatId??'')&&
+  SHA64.test(request.approvalManifestSha256??''),
+ 'R6_B_REQUEST_SCOPE_STOP');
+ need(Buffer.isBuffer(approvalBytes)&&approvalBytes.length>0&&approvalBytes.length<16384&&
+  sha(approvalBytes)===request.approvalManifestSha256,'R6_B_APPROVAL_HASH_STOP');
+ let approval,overlay;
+ try{approval=JSON.parse(approvalBytes.toString('utf8'));
+  overlay=JSON.parse(overlayBytes.toString('utf8'));}
+ catch{throw error('R6_B_MANIFEST_JSON_STOP');}
+ need(exact(approval,['schema','status','scope','mode','sourceRepository',
+  'installedSourceSha','overlayManifestPath','overlayManifestSha256',
+  'sourceRoot','pcHome','maxBlsCalls','maxDolCalls','effects'])&&
+  approval.schema===R6_B_APPROVAL&&approval.status==='APPROVED_B'&&
+  approval.scope==='EMPLOYMENT_R6_REGISTERED_DATA_SQLITE_D1_ONCE'&&
+  ['ONE_YEAR','BACKFILL'].includes(approval.mode)&&
+  approval.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+  SHA40.test(approval.installedSourceSha??'')&&
+  same(approval.sourceRoot,R6_B_SOURCE)&&same(approval.pcHome,R6_B_HOME)&&
+  approval.overlayManifestPath==='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json'&&
+  SHA64.test(approval.overlayManifestSha256??'')&&
+  approval.overlayManifestSha256===sha(overlayBytes)&&
+  approval.maxBlsCalls===(approval.mode==='ONE_YEAR'?7:14)&&
+  approval.maxDolCalls===2&&
+  exact(approval.effects,['registeredBlsCalls','dolCalls','sqliteWrites','d1PublicSnapshot','taskWrites','sourceWrites'])&&
+  approval.effects.registeredBlsCalls===true&&approval.effects.dolCalls===true&&
+  approval.effects.sqliteWrites===true&&approval.effects.d1PublicSnapshot===true&&
+  approval.effects.taskWrites===false&&approval.effects.sourceWrites===false&&
+  overlay?.schema==='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1'&&
+  overlay.status==='APPROVED_B'&&overlay.candidateSourceSha&&
+  overlay.files?.length===13&&overlay.allowProviderCalls===false&&
+  overlay.allowDbChanges===false&&overlay.allowD1Writes===false&&
+  same(overlay.sourceRoot,R6_B_SOURCE),
+ 'R6_B_EFFECT_APPROVAL_STOP');
+ return Object.freeze({request,approval,overlay});
+}
+
+export function verifyInstalledR6Overlay({sourceRoot,pcHome,approvedSha,overlay,
+ read=fs.readFileSync,exists=fs.existsSync,
+ git=(args)=>execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,stdio:'pipe'}).trim()}={}){
+ need(process.platform==='win32'&&same(sourceRoot,R6_B_SOURCE)&&same(pcHome,R6_B_HOME),
+  'R6_B_WINDOWS_PATH_STOP');
+ need(exists(path.join(pcHome,'storage','core.sqlite')),
+  'R6_B_EXISTING_CORE_DB_REQUIRED');
+ const config=JSON.parse(read(path.join(pcHome,'config.json'),'utf8'));
+ need(config.enabled===true&&config.collectionTarget==='pc'&&
+  config.employmentR6AutoCollection===true&&
+  config.employmentR6OneYearAutoPublication===true&&
+  config.source===approvedSha&&git(['rev-parse','HEAD'])===approvedSha,
+  'R6_B_INSTALLED_SOURCE_STOP');
+ git(['diff','--quiet','HEAD','--','lib','worker','scripts/pc-writer']);
+ for(const file of overlay.files){
+  need(/^(?:lib\/market-score|scripts\/pc-writer)\/[a-zA-Z0-9_.-]+\.mjs$/.test(file.path)&&
+    SHA64.test(file.afterSha256??'')&&
+    sha(read(path.join(sourceRoot,...file.path.split('/'))))===file.afterSha256,
+  'R6_B_INSTALLED_OVERLAY_DRIFT_STOP');
+ }
+ return config;
+}
+
+function withCoreLock(pcHome,requestId){
+ const file=path.join(pcHome,'local-cycle.lock');
+ const bytes=JSON.stringify({pid:process.pid,at:Date.now(),owner:'R6_REGISTERED_DATA_B',
+  requestId,nonce:randomUUID()});
+ let fd;
+ try{fd=fs.openSync(file,'wx',0o600);}
+ catch{throw error('R6_B_CORE_LOCK_OCCUPIED');}
+ let original;
+ try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);fs.closeSync(fd);fd=null;
+  original=fs.statSync(file);
+  need(fs.readFileSync(file,'utf8')===bytes,'R6_B_CORE_LOCK_READBACK_STOP');}
+ catch{if(fd!==undefined&&fd!==null)try{fs.closeSync(fd);}catch{}
+  throw error('R6_B_CORE_LOCK_UNKNOWN');}
+ const held=()=>{try{const actual=fs.statSync(file);
+  return actual.dev===original.dev&&actual.ino===original.ino&&
+   fs.readFileSync(file,'utf8')===bytes;}catch{return false;}};
+ return {held,release(){if(!held())return false;
+  try{fs.unlinkSync(file);return true;}catch{return false;}}};
+}
+
+function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
+ const date=new Date().toISOString().slice(0,10);
+ const file=path.join(pcHome,`employment-r6-registered-${mode.toLowerCase()}-${date}.claim.json`);
+ let fd;
+ try{fd=fs.openSync(file,'wx',0o600);}
+ catch{throw error('R6_B_TODAY_ALREADY_CLAIMED');}
+ const value=JSON.stringify({schema:'R6_REGISTERED_ONE_SHOT_CLAIM_V1',
+  requestId,approvalManifestSha256,mode,claimedAt:new Date().toISOString()})+'\n';
+ try{fs.writeFileSync(fd,value);fs.fsyncSync(fd);fs.closeSync(fd);fd=null;
+  need(fs.readFileSync(file,'utf8')===value,'R6_B_CLAIM_READBACK_STOP');}
+ catch{if(fd!==undefined&&fd!==null)try{fs.closeSync(fd);}catch{}
+  throw error('R6_B_CLAIM_STATE_UNKNOWN');}
+ return {file};
+}
+
+function safeGroups(rows){
+ return rows.map(row=>({groupName:/^[A-Z][A-Z0-9_]{1,60}$/.test(row.groupName??'')?
+  row.groupName:'INVALID_GROUP',
+  status:['SUCCESS','PARTIAL','FAIL','SKIPPED_BLS_BUDGET','SKIPPED_LOCKED'].includes(row.status)?
+   row.status:'UNKNOWN',
+  providerRequests:Number.isSafeInteger(row.providerRequests)&&row.providerRequests>=0?
+   row.providerRequests:null,
+  ...(CODES.test(row.failureCode??'')?{failureCode:row.failureCode}:{})}));
+}
+
+export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
+ pcHome=R6_B_HOME,lockFactory=withCoreLock,claim=claimOnce,
+ run=null}={}){
+ const base={schema:'ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1',
+  requestId:auth.request.requestId,sourceSha:auth.approval.installedSourceSha,
+  mode:auth.approval.mode,status:'STATE_UNKNOWN',code:'R6_B_NOT_STARTED',
+  providerRequests:null,blsRequests:null,dolRequests:null,groupResults:[],
+  sqlite:'UNVERIFIED',publication:'UNVERIFIED',sourceStoredAt:null,
+  sourceFeatures:null,chartReadyFeatures:null,retry:'NO_AUTO_RETRY'};
+ let lock=null,claimed=false,lastPass='SOURCE_VERIFIED';
+ try{
+  const config=verifyInstalledR6Overlay({sourceRoot,pcHome,
+   approvedSha:auth.approval.installedSourceSha,overlay:auth.overlay});
+  // Missing credentials are a read-only preflight failure, not a consumed
+  // one-shot. Inspect presence only, before creating the durable claim.
+  const envURL=pathToFileURL(path.join(sourceRoot,'scripts','pc-writer','local-env.mjs'));
+  const {loadLocalProviders}=await import(envURL.href);
+  const providerFields=loadLocalProviders(pcHome);
+  need(Boolean(providerFields.BLS_API_KEY?.trim()||
+   providerFields.BLS_REGISTRATION_KEY?.trim()),'R6_B_REGISTERED_KEY_MISSING');
+  lastPass='REGISTERED_KEY_PRESENT';
+  lock=lockFactory(pcHome,auth.request.requestId);
+  need(lock.held(),'R6_B_CORE_LOCK_LOST');
+  const execute=run??runInstalledR6;
+  // A persistent date/mode claim precedes every SQLite or provider effect.
+  claim(pcHome,{requestId:auth.request.requestId,
+   approvalManifestSha256:auth.request.approvalManifestSha256},auth.approval.mode);
+  claimed=true;lastPass='ONE_SHOT_CLAIMED';
+  const value=await execute({auth,sourceRoot,pcHome,config,lock});
+  return {...base,...value,lastPass:'PUBLISH_READBACK',firstFail:null};
+ }catch(cause){
+  const code=safeCode(cause?.code??cause?.message);
+  return {...base,status:claimed?'STATE_UNKNOWN':'BLOCKED',code,
+   lastPass,firstFail:claimed?'COLLECT_OR_PUBLISH':'PREFLIGHT',
+   retry:'READ_EXISTING_CLAIM_AND_DB_NO_RETRY'};
+ }finally{if(lock){const released=lock.release();if(!released)
+   process.stderr.write('R6_B_CORE_LOCK_RELEASE_UNVERIFIED\n');}}
+}
+
+async function runInstalledR6({auth,sourceRoot,pcHome,config,lock}){
+ const rootURL=pathToFileURL(path.join(sourceRoot,'scripts','pc-writer')+path.sep);
+ const mod=async name=>import(new URL(name,rootURL).href);
+ const {loadLocalProviders,installLocalRuntime}=await mod('local-env.mjs');
+ const {localDatabase}=await mod('local-db.mjs');
+ const {createQuotaFetch}=await mod('quota-fetch.mjs');
+ const {runEmploymentR6CollectionStep}=await import(pathToFileURL(
+  path.join(sourceRoot,'lib','market-score','employment-r6-collector.mjs')).href);
+ const {runEmploymentR6AutoPublication}=await mod('employment-r6-auto-publication.mjs');
+ const {client,credential}=await mod('d1.mjs');
+ need(lock.held(),'R6_B_CORE_LOCK_LOST');
+ const providerEnv=loadLocalProviders(pcHome);
+ need(Boolean(providerEnv.BLS_API_KEY?.trim()||providerEnv.BLS_REGISTRATION_KEY?.trim()),
+  'R6_B_REGISTERED_KEY_MISSING');
+ const originalFetch=globalThis.fetch;
+ const quota=createQuotaFetch({base:pcHome,originalFetch,mode:'enforce'});
+ const db=localDatabase(path.join(pcHome,'storage','core.sqlite'));
+ const hooks=installLocalRuntime({DB:db,BLS_API_KEY:providerEnv.BLS_API_KEY,
+  BLS_REGISTRATION_KEY:providerEnv.BLS_REGISTRATION_KEY});
+ let result;
+ try{
+  result=await runEmploymentR6CollectionStep({db,env:{DB:db,
+   BLS_API_KEY:providerEnv.BLS_API_KEY,BLS_REGISTRATION_KEY:providerEnv.BLS_REGISTRATION_KEY},
+   fetchImpl:(input,init)=>quota.fetch(input,init),mode:auth.approval.mode});
+ }finally{hooks.deregister();db.close();}
+ need(lock.held(),'R6_B_CORE_LOCK_LOST');
+ const groups=safeGroups(result.groupResults??[]);
+ const dol=groups.filter(x=>x.groupName==='DOL_UI_WEEKLY_CLAIMS')
+  .reduce((a,x)=>a+(x.providerRequests??0),0);
+ const bls=groups.filter(x=>x.groupName!=='DOL_UI_WEEKLY_CLAIMS')
+  .reduce((a,x)=>a+(x.providerRequests??0),0);
+ need(bls<=auth.approval.maxBlsCalls&&dol<=auth.approval.maxDolCalls&&
+  groups.length<=6&&groups.every(x=>x.providerRequests!==null)&&
+  bls+dol===result.providerRequests,'R6_B_PROVIDER_SCOPE_STOP');
+ if(result.status==='NOOP')return {status:'NOOP',code:'R6_B_ALREADY_COLLECTED',
+  providerRequests:0,blsRequests:0,dolRequests:0,groupResults:groups,
+  sqlite:'UNCHANGED',publication:'NOT_ATTEMPTED'};
+ need(['SUCCESS','PARTIAL','FAIL'].includes(result.status),
+  'R6_B_COLLECTION_STATUS_STOP');
+ // Preserve incomplete groups as PARTIAL; publisher reads only existing PIT
+ // records and cannot invent a missing observation or change score formulas.
+ const remote=client(config,()=>credential(sourceRoot),{fetchImpl:originalFetch});
+ let published;
+ try{published=await runEmploymentR6AutoPublication({enabled:true,pcHome,
+  approvedSource:auth.approval.installedSourceSha,
+  runningSource:auth.approval.installedSourceSha,remote,dbId:config.core,
+  now:Date.now()});}
+ catch(e){throw error(/^([A-Z][A-Z0-9_]{0,95})$/.test(e?.message??'')?
+  e.message:'R6_B_D1_PUBLICATION_FAILED');}
+ need(['VERIFIED','UNCHANGED'].includes(published.status),
+  'R6_B_D1_READBACK_STOP');
+ const complete=result.status==='SUCCESS'&&groups.every(x=>x.status==='SUCCESS');
+ return {status:complete?'SUCCESS':'PARTIAL',
+  code:complete?'R6_B_COLLECT_PUBLISH_VERIFIED':'R6_B_PARTIAL_PUBLISH_VERIFIED',
+  providerRequests:result.providerRequests,blsRequests:bls,dolRequests:dol,
+  groupResults:groups,sqlite:'COLLECTOR_RECORDED',publication:published.status,
+  sourceStoredAt:published.sourceStoredAt,
+  sourceFeatures:published.sourceFeatures,
+  chartReadyFeatures:published.chartReadyFeatures};
+}
+
+export async function runR6RegisteredOnce({env=process.env}={}){
+ need(process.platform==='win32','R6_B_WINDOWS_ONLY_STOP');
+ const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
+ const controlRoot=path.join(env.GITHUB_WORKSPACE,'r6-registered-control');
+ const request=JSON.parse(event.issue.body);
+ need(SHA64.test(request?.approvalManifestSha256??''),'R6_B_REQUEST_HASH_STOP');
+ const relative=`approvals/employment-r6-registered-data/${request.approvalManifestSha256}.json`;
+ const git=(args)=>execFileSync('git',args,{cwd:controlRoot,windowsHide:true,stdio:'pipe'});
+ need(git(['rev-parse','HEAD']).toString('utf8').trim()===env.GITHUB_SHA,
+  'R6_B_CONTROL_PIN_STOP');
+ const approvalBytes=git(['show',`HEAD:${relative}`]);
+ need(sha(approvalBytes)===request.approvalManifestSha256&&
+  sha(fs.readFileSync(path.join(controlRoot,...relative.split('/'))))===sha(approvalBytes),
+  'R6_B_APPROVAL_WORKTREE_STOP');
+ const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';
+ const overlayBytes=git(['show',`HEAD:${overlayPath}`]);
+ const auth=authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes});
+ return performR6RegisteredOnce({auth});
+}
+
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ let result;
+ try{result=await runR6RegisteredOnce();}
+ catch(cause){result={schema:'ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1',
+  status:'BLOCKED',code:safeCode(cause?.code??cause?.message),
+  requestId:null,retry:'NO_AUTO_RETRY'};}
+ try{need(typeof process.env.RUNNER_TEMP==='string'&&path.isAbsolute(process.env.RUNNER_TEMP),
+  'R6_B_TEMP_REQUIRED');
+  fs.writeFileSync(path.join(process.env.RUNNER_TEMP,R6_B_RESULT),
+   JSON.stringify(result)+'\n',{flag:'wx'});
+ }catch{process.exitCode=1;}
+ process.stdout.write(`R6_B_${result.status} ${result.code}\n`);
+ if(!['SUCCESS','PARTIAL','NOOP'].includes(result.status))process.exitCode=1;
+}
