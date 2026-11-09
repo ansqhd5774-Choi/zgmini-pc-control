@@ -80,9 +80,13 @@ export function exactReplayCandidates(maintenanceRequestId, original, issues) {
   const marker = `Maintenance replay ${maintenanceRequestId} original #${original.number}`;
   const unique = new Map();
   for (const issue of issues) {
-    if (issue?.title !== marker || issue?.body !== original.body ||
-      issue?.user?.login !== actor || issue.pull_request ||
-      !Array.isArray(issue.labels) || !issue.labels.some(x => x?.name === 'pc-job')) continue;
+    if (issue?.title !== marker) continue;
+    // A same-title but different-body/actor Issue must never authorize a
+    // second POST merely because it was filtered out of the exact match set.
+    need(issue?.body === original.body && issue?.user?.login === actor &&
+      !issue.pull_request && Array.isArray(issue.labels) &&
+      issue.labels.some(x => x?.name === 'pc-job'),
+    'POSTSWITCH_BACKLOG_REPLAY_CONTENDER_UNTRUSTED');
     need(isIssueNumber(issue.number), 'POSTSWITCH_BACKLOG_REPLAY_ISSUE_INVALID');
     unique.set(issue.number, issue);
   }
