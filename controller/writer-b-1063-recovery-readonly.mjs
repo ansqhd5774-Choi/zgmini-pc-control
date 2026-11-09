@@ -5,8 +5,6 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
-import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
 
 export const WRITER_B_1063_REQUEST_ID='bd435d7c-2939-457f-907c-98d551f6b8cf';
 const M_FILE='lib/market-score/employment-r6-collector.mjs';
@@ -34,6 +32,39 @@ const DEFAULT_PATHS=Object.freeze({
  sourceRoot:String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`,
 });
 const sha256=b=>createHash('sha256').update(b).digest('hex');
+// Controller A installs are file-scoped. Keep the pre-existing Writer B
+// enabled-only normalization semantics local to avoid a new runtime import
+// dependency on the separately deployed maintenance adapter.
+function taskDefinitionExceptEnabled(raw){
+ need(Buffer.isBuffer(raw)&&raw.length>=5,'WRITER_B_1063_TASK_XML_BYTES');
+ let xml;
+ if(raw[0]===255&&raw[1]===254){
+  need((raw.length-2)%2===0,'WRITER_B_1063_TASK_XML_ENCODING');
+  xml=raw.subarray(2).toString('utf16le');
+ }else if(raw[0]===60&&raw[1]===0){
+  need(raw.length%2===0,'WRITER_B_1063_TASK_XML_ENCODING');
+  xml=raw.toString('utf16le');
+ }else{
+  need(!(raw[0]===254&&raw[1]===255),'WRITER_B_1063_TASK_XML_ENCODING');
+  const content=raw[0]===239&&raw[1]===187&&raw[2]===191?
+   raw.subarray(3):raw;
+  xml=content.toString('utf8');
+  need(Buffer.from(xml,'utf8').equals(content),'WRITER_B_1063_TASK_XML_ENCODING');
+ }
+ need(/^\s*(?:<\?xml|<Task\b)/.test(xml),'WRITER_B_1063_TASK_XML_FORMAT');
+ const settings=[...xml.matchAll(/<Settings(?:\s[^>]*)?>[\s\S]*?<\/Settings>/g)];
+ need(settings.length===1,'WRITER_B_1063_TASK_XML_SETTINGS');
+ const entry=settings[0];
+ const valid=[...entry[0].matchAll(/<Enabled>\s*(?:true|false)\s*<\/Enabled>/g)];
+ const all=[...entry[0].matchAll(/<Enabled\b/g)];
+ need(valid.length<=1&&valid.length===all.length,
+  'WRITER_B_1063_TASK_XML_ENABLED');
+ const normalized=entry[0]
+  .replace(/<Enabled>\s*(?:true|false)\s*<\/Enabled>/g,'')
+  .replace(/>\s+</g,'><');
+ return xml.slice(0,entry.index)+normalized+
+  xml.slice(entry.index+entry[0].length);
+}
 const localPath=x=>{
  need(typeof x==='string'&&x.length>0,'WRITER_B_1063_PATH_INVALID');
  if(process.platform!=='win32'){
@@ -296,8 +327,7 @@ export function inspectWriterB1063Recovery({
    // A paused Task may differ from its original XML solely in Settings.Enabled.
    // Raw XML equality cannot distinguish that expected change from drift.
    const definitionMatchesOriginalExceptEnabled=
-    sameTaskDefinitionExceptSettingsEnabled(decodeTaskXmlBytes(xml))===
-    sameTaskDefinitionExceptSettingsEnabled(decodeTaskXmlBytes(taskOriginal));
+    taskDefinitionExceptEnabled(xml)===taskDefinitionExceptEnabled(taskOriginal);
   const probe=taskProbe();
   need(strictObject(probe)&&typeof probe.enabled==='boolean'&&
    [probe.instances,probe.relatedProcesses,probe.unknownProcessLines]
