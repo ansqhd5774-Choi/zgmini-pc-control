@@ -25,27 +25,59 @@ const sameKeys = (left, right) => left && right &&
 const WRITER_B_RESULT_PATH =
   'results/writer-b-source-install-b14af1b2-9a23-4f5a-9239-218498ddb403.json';
 const WRITER_A_RESULT_PATH = 'results/42693903840-1-seat-1.json';
+const WRITER_B2_RESULT_PATH =
+  'results/writer-b-source-install-df88aee8-f993-4280-ad8f-522da056134e.json';
+const WRITER_A2_RESULT_PATH = 'results/42701322061-1-seat-3.json';
+const WRITER_CONFIG_PATH = 'E:/ZGmini/data/pc-writer/config.json';
 const WRITER_RESULT_RAW_SHA256 = Object.freeze({
   [WRITER_B_RESULT_PATH]:'c0b3f677b83babef8db31d0e155f33226f939bca468c2c8e2cb6b655b02a1a62',
   [WRITER_A_RESULT_PATH]:'1d35d6550595802f2f060f88f82f34757c898bd92c372cdf52a13405221faae0',
+  [WRITER_B2_RESULT_PATH]:'22edebeadc41c1e418b7a6444f4a4714c719cc3ccddb2462804766ba445702e2',
+  [WRITER_A2_RESULT_PATH]:'920d01cfcdb80120a5d1623f70bcce7579ee7febf286741f2ef285522b648e66',
 });
 const EXPECTED_TRANSITION = Object.freeze({
   baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
-  currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
-  approvedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
-  writerBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
-  writerAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+  priorConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+  currentConfigSha256:'05eeb13d9183480b89413557c7e65c57d818a5d8fc5eaa88261e55cfc409c57a',
+  priorApprovedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+  approvedSourceSha:'75f73d8613550221f8e80b304d67b8b10a228e7f',
+  priorWriterBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
+  priorWriterAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+  writerBResultBlobSha:'6315e35e980a58a55a6dd8ae11ca53c8e945f42f',
+  writerAResultBlobSha:'65e7edf335d9492058e5e8d183d9927c9c5ba3c0',
 });
 
 /**
  * Historical #917 protection is immutable. An explicitly approved C-grade
  * recovery may accept only the separately pinned Writer config evolution.
- * It does NOT attest that all config bytes originated from one B install:
- * that absence of before/after B hashes is covered by the exact current
- * digest in the separately approved C manifest and fresh Windows readback.
+ * The first Writer B's historical config digest remains a separately pinned
+ * C-grade consent. The second Writer B's source-only config change must also
+ * be independently reversed against those exact historical bytes at runtime.
  */
-export function verifyWriterProtectionTransition({baseline, current,
-  transition, writerB, writerA, writerBBlobSha, writerABlobSha} = {}) {
+export function verifySourceOnlyConfigEvolution(raw, transition) {
+  if (!Buffer.isBuffer(raw) || !sameKeys(transition, EXPECTED_TRANSITION) ||
+      digest(raw) !== transition.currentConfigSha256) return false;
+  try {
+    const text = raw.toString('utf8');
+    // Invalid UTF-8 must not silently normalize to replacement characters.
+    if (!Buffer.from(text, 'utf8').equals(raw)) return false;
+    const current = JSON.parse(text);
+    const matches = [...text.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)];
+    if (matches.length !== 1 || matches[0][1] !== transition.approvedSourceSha ||
+        current?.source !== transition.approvedSourceSha) return false;
+    const inverted = text.slice(0, matches[0].index) +
+      matches[0][0].replace(transition.approvedSourceSha,
+        transition.priorApprovedSourceSha) +
+      text.slice(matches[0].index + matches[0][0].length);
+    return digest(Buffer.from(inverted, 'utf8')) === transition.priorConfigSha256 &&
+      JSON.stringify({...current, source:transition.priorApprovedSourceSha}) ===
+        JSON.stringify(JSON.parse(inverted));
+  } catch { return false; }
+}
+
+export function verifyWriterProtectionEvidence({baseline, current,
+  transition, writerB, writerA, writerBBlobSha, writerABlobSha,
+  writerB2, writerA2, writerB2BlobSha, writerA2BlobSha} = {}) {
   if (!sameKeys(transition, EXPECTED_TRANSITION) ||
       !Object.entries(EXPECTED_TRANSITION).every(([key, value]) =>
         transition[key] === value) ||
@@ -63,14 +95,16 @@ export function verifyWriterProtectionTransition({baseline, current,
       !Object.hasOwn(baseline.tasks, 'ZGMINI-PC-Local-Core') ||
       !Object.hasOwn(baseline.tasks, 'ZGMINI-PC-Local-Korea') ||
       baseline.tasks['ZGMINI-PC-Iran-Progress-R13'] !== 'APPROVED_RETIRED_ABSENT' ||
-      writerBBlobSha !== transition.writerBResultBlobSha ||
-      writerABlobSha !== transition.writerAResultBlobSha) return false;
+      writerBBlobSha !== transition.priorWriterBResultBlobSha ||
+      writerABlobSha !== transition.priorWriterAResultBlobSha ||
+      writerB2BlobSha !== transition.writerBResultBlobSha ||
+      writerA2BlobSha !== transition.writerAResultBlobSha) return false;
   if (writerB?.schema !== 'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1' ||
       writerB?.requestId !== 'b14af1b2-9a23-4f5a-9239-218498ddb403' ||
       writerB?.status !== 'WRITER_B_INSTALLED_VERIFIED' ||
       writerB?.code !== 'WRITER_B_INSTALL_VERIFIED' ||
       writerB?.localOnly !== true || writerB?.mode !== 'LOCAL_OVERLAY' ||
-      writerB?.sourceSha !== transition.approvedSourceSha ||
+      writerB?.sourceSha !== transition.priorApprovedSourceSha ||
       writerB?.manifestSha256 !==
         '593004aa6b0c5c6471a691faebd9c98f142af4990580a8b1d5a0619d829b2e6f' ||
       !Array.isArray(writerB?.changedPaths) || writerB.changedPaths.length !== 4 ||
@@ -89,11 +123,44 @@ export function verifyWriterProtectionTransition({baseline, current,
     writerA.d1Writes === 0 && writerA.sqliteOpened === false &&
     writerA.protectedStateUnchanged === true &&
     observed?.status === 'PASS' && observed?.sourceIdentityConsistent === true &&
-    observed?.sourceHead === transition.approvedSourceSha &&
-    observed?.approvedConfigSource === transition.approvedSourceSha &&
-    observed?.checkpointSource === transition.approvedSourceSha &&
+    observed?.sourceHead === transition.priorApprovedSourceSha &&
+    observed?.approvedConfigSource === transition.priorApprovedSourceSha &&
+    observed?.checkpointSource === transition.priorApprovedSourceSha &&
     observed?.r6Config?.status === 'PASS' &&
-    observed.r6Config.configSha256 === transition.currentConfigSha256;
+    observed.r6Config.configSha256 === transition.priorConfigSha256 &&
+    writerB2?.schema === 'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1' &&
+    writerB2.requestId === 'df88aee8-f993-4280-ad8f-522da056134e' &&
+    writerB2.status === 'WRITER_B_INSTALLED_VERIFIED' &&
+    writerB2.code === 'WRITER_B_INSTALL_VERIFIED' &&
+    writerB2.mode === 'LOCAL_OVERLAY' && writerB2.localOnly === true &&
+    writerB2.baseHead === transition.priorApprovedSourceSha &&
+    writerB2.sourceSha === transition.approvedSourceSha &&
+    writerB2.manifestSha256 ===
+      'b030d7fca591d9a39a4af9337ac8df632933ea4e710f83d1f3bc6b2c59ea435b' &&
+    Array.isArray(writerB2.changedPaths) && writerB2.changedPaths.length === 2 &&
+    new Set(writerB2.changedPaths).size === 2 &&
+    ['lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs',
+      'worker/asset-bubble-r10-raw-r1.mjs']
+      .every(name => writerB2.changedPaths.includes(name)) &&
+    writerA2?.schema === 'ZGMINI_PC_RESULT_V1' &&
+    writerA2.requestId === 'pc-1f2318d5-6122-40a6-8581-5f1fba0f9d69' &&
+    writerA2.operation === 'writer-install-preimage-readonly' &&
+    writerA2.status === 'PASS' && writerA2.code === 'WRITER_FIXED_PREIMAGE_READONLY' &&
+    writerA2.operationalWrites === 0 && writerA2.providerCalls === 0 &&
+    writerA2.d1Writes === 0 && writerA2.sqliteOpened === false &&
+    writerA2.protectedStateUnchanged === true &&
+    writerA2.result?.status === 'PASS' &&
+    writerA2.result.sourceIdentityConsistent === true &&
+    writerA2.result.sourceHead === transition.approvedSourceSha &&
+    writerA2.result.approvedConfigSource === transition.approvedSourceSha &&
+    writerA2.result.checkpointSource === transition.approvedSourceSha &&
+    writerA2.result.r6Config?.status === 'PASS' &&
+    writerA2.result.r6Config.configSha256 === transition.currentConfigSha256;
+}
+
+export function verifyWriterProtectionTransition(proof = {}) {
+  return verifyWriterProtectionEvidence(proof) &&
+    verifySourceOnlyConfigEvolution(proof.currentConfigRaw, proof.transition);
 }
 
 function verifiedGitHubResult(pathName, expectedBlobSha) {
@@ -308,13 +375,20 @@ export async function main(args = process.argv.slice(2), {writerTransition = nul
         protectionCode = error.code;
         const current = protectedSnapshot();
         const writerB = verifiedGitHubResult(WRITER_B_RESULT_PATH,
-          writerTransition?.writerBResultBlobSha);
+          writerTransition?.priorWriterBResultBlobSha);
         const writerA = verifiedGitHubResult(WRITER_A_RESULT_PATH,
+          writerTransition?.priorWriterAResultBlobSha);
+        const writerB2 = verifiedGitHubResult(WRITER_B2_RESULT_PATH,
+          writerTransition?.writerBResultBlobSha);
+        const writerA2 = verifiedGitHubResult(WRITER_A2_RESULT_PATH,
           writerTransition?.writerAResultBlobSha);
+        const currentConfigRaw = fs.readFileSync(WRITER_CONFIG_PATH);
         protectionContractVerified = verifyWriterProtectionTransition({
           baseline:json(baselinePath),current,transition:writerTransition,
-          writerB,writerA,writerBBlobSha:writerTransition.writerBResultBlobSha,
-          writerABlobSha:writerTransition.writerAResultBlobSha});
+          writerB,writerA,writerBBlobSha:writerTransition.priorWriterBResultBlobSha,
+          writerABlobSha:writerTransition.priorWriterAResultBlobSha,
+          writerB2,writerA2,writerB2BlobSha:writerTransition.writerBResultBlobSha,
+          writerA2BlobSha:writerTransition.writerAResultBlobSha,currentConfigRaw});
         need(protectionContractVerified,'POSTSWITCH_WRITER_CONTRACT_NOT_VERIFIED');
       }
     } catch (error) {protectionCode = /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code :
