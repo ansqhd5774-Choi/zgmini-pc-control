@@ -1,0 +1,11 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {"path": "scripts/pc-writer/local-cycle.mjs", "change": "M"},
+    {"path": "scripts/pc-writer/inflation-causal-candidate-core-bridge.mjs", "change": "A"}
+  ],
+  "allowOtherPaths": false
+}
