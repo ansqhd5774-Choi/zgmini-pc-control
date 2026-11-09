@@ -91,3 +91,12 @@ test('unknown activation pins JSON field fails closed',()=>fixture(data=>{
   fs.writeFileSync(file,JSON.stringify({...pins,allowDbWrites:true}));
   assert.throws(()=>check(data),{code:'R6_B_ACTIVATION_PINS_CONTRACT_STOP'});
 }));
+
+test('activation artifact parent symlink or junction cannot escape trusted checkout',()=>fixture(data=>{
+  const folder=path.join(data.root,'r6-backfill-b');
+  const outside=path.join(data.workspace,'outside-artifacts');
+  fs.renameSync(folder,outside);
+  fs.symlinkSync(outside,folder,process.platform==='win32'?'junction':'dir');
+  assert.throws(()=>check(data),
+    {code:'R6_B_ACTIVATION_ARTIFACT_PARENT_SHAPE_STOP'});
+}));
