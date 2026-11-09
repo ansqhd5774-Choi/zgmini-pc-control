@@ -41,3 +41,37 @@ records exact private recovery metadata; **no automatic retry or rollback**.
 
 Local tests: `node --test inflation-manual-b/*.test.mjs`. Windows live
 side effects remain untested until the separately approved single-use run.
+
+## 2026-11-10 preflight evidence (not execution authorization)
+
+- [A #1105, run 42639125861](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1105):
+  approved historical PC checkout `4273137a85adcc90c863a27f703baa749b05cb64`
+  matches `config.source`; these three source file SHA-256 digests were read on PC:
+  - `inflation-causal-candidate-manual-official-r1.mjs`:
+    `53c01bbc129e1c4c5ff129d37fae8e0ff801c30bfe50a6ad0ab1227d394a5ed6`
+  - `inflation-causal-candidate-manual-official-store-r1.mjs`:
+    `3ef346bd5e240cdcdbd741a0f62b665bba42bf33556e37a6efa359f07de834ec`
+  - `xlsx-lite.mjs`:
+    `44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a`
+- [A #1119, run 42646137586](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1119):
+  `pc-source-preflight` **PASS** with no operational writes and fourth file
+  `local-cycle.mjs` SHA-256
+  `2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d`.
+  The report was `SUMMARY_ONLY` and verified **only a historical checkout**, not
+  a currently executing Core process or its effective lock root.
+- Existing live Core proof attempts, for example
+  [run 42642308955](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/42642308955-1-seat-3.json),
+  returned `STATE_UNKNOWN / CORE_NO_ACTIVE_TASK_ENGINE`, not a failed Core.
+
+**Next distinct requirement:** before preparing `APPROVED_B`, prove that the
+actual registered Core uses the same canonical `local-cycle.lock` as this B
+receiver, and reconcile the current installed source with the four preimages.
+The observed `checkpointSource` (`434f30d2...`) differed from the static
+checkout source (`4273137a...`) in #1105; the later stored Writer checkpoint
+mentions `4273137a...`, but neither observation alone resolves the live Task
+chain. Do not retry A #1119 to turn static evidence into Runtime evidence.
+
+The operator must separately authorize exactly two official static GETs,
+archive plus at most two named JSON updates/backups, temporary Core lock
+ownership, and the private one-shot journal. Nothing authorizes scheduler,
+DB, D1, source replacement, a recovery rollback, or repeated execution.
