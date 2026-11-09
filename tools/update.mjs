@@ -40,6 +40,22 @@ const controlRepository='ansqhd5774-Choi/zgmini-pc-control';
 const gh='C:/Program Files/GitHub CLI/gh.exe';
 const node='E:/ZGmini/runtime/node.exe';
 const requiredRunners=Array.from({length:6},(_,n)=>`zgmini-pc-0${n+1}`);
+// The six dedicated PC seats are the maintenance resource. An independently
+// scoped runner registered in the same repository must not count as a seventh
+// PC seat or block drain/reconnect of the six named seats.
+export function dedicatedPcRunnerRows(rows,{requireOnline=false,requireIdle=false}={}) {
+ if(!Array.isArray(rows))return null;
+ const selected=[];
+ for(const name of requiredRunners){
+  const matches=rows.filter(row=>row?.name===name);
+  if(matches.length!==1)return null;
+  const row=matches[0];
+  if(requireOnline&&row.status!=='online')return null;
+  if(requireIdle&&row.busy!==false)return null;
+  selected.push(row);
+ }
+ return selected;
+}
 const sha256=x=>createHash('sha256').update(x).digest('hex');
 const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1089,8 +1105,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const snapshotRoot=path.join(backupRoot,'snapshot');
  let plannedFiles=[],protectedBefore,prevalidationBaseline,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
  const apiRunners=()=>github('actions/runners?per_page=100').runners;
- const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
- const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
+ const runnersCorrect=rows=>dedicatedPcRunnerRows(rows)!==null;
+ const available=rows=>dedicatedPcRunnerRows(rows,{requireOnline:true,requireIdle:true})!==null;
  const waitForReconnect=async(pid,sourceSha,code)=>{
   const deadline=Date.now()+600000;
   let stable=0;
@@ -1099,8 +1115,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const rows=apiRunners();
    const listeners=freshListenerCount(controlRoot,reconnectStartedAt);
    const matched=status?.pid===pid&&status.sourceSha===sourceSha&&Date.now()-Date.parse(status.at)<45000&&status.children?.length===6&&listeners===6;
-   const state=reconnectState({now:Date.now(),deadline,matched,online:runnersCorrect(rows)&&rows.every(x=>x.status==='online')});
-   writeJson(path.join(maintenanceRoot,'reconnect',request.requestId+'.json'),{at:new Date().toISOString(),state,supervisorPid:pid,sourceSha,freshListeners:listeners,onlineCount:rows.filter(x=>x.status==='online').length,deadline:new Date(deadline).toISOString()});
+   const seats=dedicatedPcRunnerRows(rows);
+   const online=seats!==null&&seats.every(x=>x.status==='online');
+   const state=reconnectState({now:Date.now(),deadline,matched,online});
+   writeJson(path.join(maintenanceRoot,'reconnect',request.requestId+'.json'),{at:new Date().toISOString(),state,supervisorPid:pid,sourceSha,freshListeners:listeners,onlineCount:seats?.filter(x=>x.status==='online').length??0,deadline:new Date(deadline).toISOString()});
    if(state==='PASS'){if(++stable>=2)return;}else stable=0;
    if(state==='TIMEOUT')throw Object.assign(Error(code),{code});
    await wait(3000);
@@ -1221,8 +1239,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    // avoids replacing files during a newly completed upload's last lease.
    let quiet=0;
    for(let n=0;n<180;n++){
-    const rows=apiRunners();need(runnersCorrect(rows),'RUNNER_SET_DRIFT');
-    const busy=rows.some(x=>x.busy),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
+    const rows=apiRunners(),seats=dedicatedPcRunnerRows(rows);
+    need(seats!==null,'RUNNER_SET_DRIFT');
+    const busy=seats.some(x=>x.busy),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
     const pending=['in_progress','queued','waiting'].map(status=>github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0).reduce((a,b)=>a+b,0);
     if(!busy&&!leases.length&&!pending){quiet++;if(quiet>=2)return;}else quiet=0;
     await wait(3000);
@@ -1365,7 +1384,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
      // maintainer's Core/Korea/Iran protection attestation. Verify that here.
      const protectedStateUnchanged=JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
      const runnerState=apiRunners();
-     const runnerSetVerified=runnersCorrect(runnerState)&&runnerState.every(x=>x.status==='online');
+     const runnerSetVerified=dedicatedPcRunnerRows(runnerState,{requireOnline:true})!==null;
      return {status:result.status,code:result.code,actualExecutionSha:result.actualExecutionSha,
        issueNumber:postIssueNumber,protectedStateUnchanged,runnerSetVerified,
        postSourceVerified:result.requestedSourceSha===manifest.postSourceSha&&
@@ -1398,7 +1417,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    for(let n=0;n<180;n++){
     const rows=apiRunners(),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
     const pending=['in_progress','queued','waiting'].map(status=>github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0).reduce((a,b)=>a+b,0);
-    if(runnersCorrect(rows)&&rows.every(x=>!x.busy)&&!leases.length&&!pending){if(++stable>=2)break;}else stable=0;
+    if(dedicatedPcRunnerRows(rows,{requireIdle:true})!==null&&!leases.length&&!pending){if(++stable>=2)break;}else stable=0;
     await wait(3000);
    }
    need(stable>=2,'ROLLBACK_DRAIN_TIMEOUT');
@@ -2034,13 +2053,12 @@ async function applyR6HostOnly(requestId,packageFile){
   let quiet=0;
   for(let n=0;n<180;n++){
    const rows=github('actions/runners?per_page=100').runners;
-   need(Array.isArray(rows)&&rows.length===6
-     &&requiredRunners.every(name=>rows.some(row=>row.name===name)),
-     'R6_HOST_RUNNER_SET_DRIFT');
+   const seats=dedicatedPcRunnerRows(rows);
+   need(seats!==null,'R6_HOST_RUNNER_SET_DRIFT');
    const active=['in_progress','queued','waiting'].reduce((sum,status)=>
      sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
    const leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
-   if(rows.every(x=>x.status==='online'&&!x.busy)&&active===0&&leases.length===0){
+   if(seats.every(x=>x.status==='online'&&!x.busy)&&active===0&&leases.length===0){
     if(++quiet>=2)break;
    }else quiet=0;
    need(n<179,'R6_HOST_DRAIN_WAIT_TIMEOUT');
@@ -2234,8 +2252,7 @@ function recoverR6HostOnly(requestId,packageFile,mode){
   decision?.code??'R6_RECOVERY_EVIDENCE_NOT_ELIGIBLE');
  need(reentry.allowed===true,reentry.code??'R6_RECOVERY_MODE_DOES_NOT_MATCH_ACTUAL_HOST');
  const seatRows=github('actions/runners?per_page=100').runners;
- need(Array.isArray(seatRows)&&seatRows.length===6&&requiredRunners.every(name=>
-  seatRows.some(x=>x.name===name&&x.status==='online'&&!x.busy)),
+ need(dedicatedPcRunnerRows(seatRows,{requireOnline:true,requireIdle:true})!==null,
   'R6_RECOVERY_RUNNERS_NOT_IDLE');
  const active=['in_progress','queued','waiting'].reduce((sum,state)=>sum+
   (github(`actions/workflows/pc-job.yml/runs?status=${state}&per_page=1`).total_count||0),0);
@@ -2478,8 +2495,7 @@ function recoverR6HostOnly(requestId,packageFile,mode){
   leaseCas();
   const freshOwner=readOwner();verifyIndependent(freshOwner.owner.pid);
   const freshRunners=github('actions/runners?per_page=100').runners;
-  need(Array.isArray(freshRunners)&&freshRunners.length===6
-   &&requiredRunners.every(name=>freshRunners.some(x=>x.name===name&&x.status==='online')),
+  need(dedicatedPcRunnerRows(freshRunners,{requireOnline:true})!==null,
    'R6_RECOVERY_FINAL_RUNNER_SET_UNVERIFIED');
   need(readR6HostStatus(requestId).recovery?.ownerDead===true,
    'R6_RECOVERY_ORIGINAL_OWNER_REAPPEARED');
