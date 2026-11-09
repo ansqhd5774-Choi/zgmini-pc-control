@@ -157,6 +157,9 @@ function observationCandidate(wait,observation,originRun){
      detail?.status!==report.status||detail?.code!==report.code||
      detail.sampleCount!==2||detail.sourceStable!==true||
      detail.taskXmlStable!==true||
+     !Number.isFinite(Date.parse(detail.observedAt))||
+     Date.parse(detail.observedAt)<Date.parse(report.startedAt)||
+     Date.parse(detail.observedAt)>Date.parse(report.finishedAt)||
      detail.resources?.[wait.resourceKey]?.state!=='CANDIDATE_CLEAR_NOT_AUTHORIZED'||
      !SHA40.test(detail.observedConfigSourceSha??'')||
      detail.releaseVerified!==false||detail.ownerReplanAuthorized!==false||
