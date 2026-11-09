@@ -1,0 +1,29 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-formula.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-feature-engine.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
