@@ -15,7 +15,7 @@
 | 구분 | 판정 증거 | 처리 |
 | --- | --- | --- |
 | `REJECTED_AT_ADMISSION` | Issue 생성 전 제목/라벨/schema/manifest 유효성 오류 또는 실제 workflow skipped | 명시적 접수 오류. 실행/성공으로 간주 금지 |
-| `WAITING_SHARED_RESOURCE` | 인증된 결과쌍에서 *청구 전 무변경* 경합·Core 활성 이연 또는 청구 후 *원본 복구 VERIFIED* | 원본 Issue + #68 대기 항목. 원본 요청 자동 재실행 금지 |
+| `WAITING_SHARED_RESOURCE` | 인증된 결과쌍에서 Writer B의 *청구 전 무변경* 경합·Core 활성 이연, PC Job의 *요청 소모 후 작업자 실행 전 무변경* 경합 또는 청구 후 *원본 복구 VERIFIED* | 원본 Issue + #68 대기 항목. 원본 요청 자동 재실행 금지 |
 | `RECOVERY_REQUIRED` | 부분 적용·잠금 보존·원본 복원 미입증 | 동일 사고 담당·정확한 승인/백업으로 별도 복구, 일반 대기로 숨기지 않음 |
 | `RESULT_UNVERIFIED` | JSON/TXT/봇 영수증·작업 종료 또는 결과 전달 불명확 | 기존 증거 조회·STATE_UNKNOWN. 무조건 재실행 금지 |
 | `COMPLETED_VERIFIED` | 실제 실행 성공+별도 결과 원격 readback | 원본 완료, 영향 소비자 검증 범위 한정 |
@@ -59,3 +59,10 @@
 `agent-handoff/pc-result-to-incident.mjs`와 `pc-failure-producer.mjs`는 인증된 원본 pc-job Issue·완료 Run·결과 JSON/TXT로부터 **메모리 대기 및 seat/heavy lease 경합**만 공통 #68 원장에 기록하도록 보강했다. `BLOCKED` 전부를 대기로 취급하지 않는다. `PREVALIDATION`·`mutationStarted=false`·운영/공급처/D1 쓰기 0·SQLite 미접근·자원 lease 미보존 및 동일 TXT 일치를 요구한다. 증거가 부족하면 `PARTIAL_WAIT_EVIDENCE_PENDING`으로 보존하고 임의 재실행하지 않는다.
 
 원래 pc-job에는 승인 manifest가 없을 수 있으므로, 공통 원장은 승인 범위(작업 종류·source 저장소/브랜치/SHA)의 SHA-256 `approvalFingerprintSha256`를 허용한다. Writer B는 원래의 실제 manifest SHA-256을 그대로 사용한다. 일반 pc-job requestId는 UUID 외 `pc-...` 형식도 기존 Controller 검증 계약 범위에서 허용한다. 신규 기능은 이 공통 모델에 adapter를 연결하되 원래 승인/로그/결과 형식을 임의 변경하지 않는다.
+
+### 요청 소모와 안전한 재평가 (코드 리뷰 보강)
+
+- Writer B 진입 전 대기는 `UNCLAIMED_UNTOUCHED`, 이미 Controller request lease·원장을 소모한 pc-job의 작업자 시작 전 대기는 `REQUEST_CONSUMED_PREWORKER_UNTOUCHED`로 구분한다. 둘 다 자동 재실행은 금지하며, PC Job의 기존 requestId 재사용은 불허한다.
+- `reviewResourceWait`는 순수 판정 함수로 운영 파일·lock을 직접 확인하지 않는다. 인증된 현재 자원 해제·source SHA·원래 승인 readback 어댑터가 아직 없으므로 자동 재개 또는 운영 완료 증거로 사용하지 않는다. 실제 운영 연결은 5단계에서 별도 검증한다.
+- 공통 #68 원장 기록 성공 시 `WAITING_SHARED_RESOURCE_RECORDED` 반환을 추가했다. 이 상태는 원담당 ChatGPT가 결과를 자동 수신했음을 뜻하지 않는다.
+- 확장 격리 CI에서 발견된 기존 `writer-b/receiver.test.mjs`의 POSIX 경로 전용 검사 두 건은 테스트 픽스처에서 Windows 구분자를 정규화해 동일 의미로 검증한다. 운영 복구 동작은 변경하지 않았다.
