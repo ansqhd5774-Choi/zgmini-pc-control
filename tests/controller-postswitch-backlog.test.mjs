@@ -105,7 +105,10 @@ test('unique exact clone requires title, original body, actor and label',()=>{
     {...good,number:4567,labels:[]},
     {...good,number:5678,labels:{name:'pc-job'}},
     {...good,number:6789,labels:[null]}];
-  assert.deepEqual(exactReplayCandidates(requestId,source,[...spoof,good]),[1234]);
+  for(const item of spoof)
+    assert.throws(()=>exactReplayCandidates(requestId,source,[item,good]),
+      /POSTSWITCH_BACKLOG_REPLAY_CONTENDER_UNTRUSTED/);
+  assert.deepEqual(exactReplayCandidates(requestId,source,[good]),[1234]);
   assert.deepEqual(exactReplayCandidates(requestId,source,[good,good]),[1234]);
 });
 
