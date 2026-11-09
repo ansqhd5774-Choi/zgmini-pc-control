@@ -48,14 +48,14 @@ test('active Core lock: no claim, network or SQLite operation',async()=>{
  assert.equal(result.firstFail,'PREFLIGHT');
 });
 
-test('same-day claim conflict: no provider work and lock released',async()=>{
- const claimError=Object.assign(new Error('R6_B_TODAY_ALREADY_CLAIMED'),
-  {code:'R6_B_TODAY_ALREADY_CLAIMED'});
+test('duplicate request claim: no provider work and lock released',async()=>{
+ const claimError=Object.assign(new Error('R6_B_REQUEST_ALREADY_CLAIMED'),
+  {code:'R6_B_REQUEST_ALREADY_CLAIMED'});
  const f=inject({claimError});
  const result=await performR6RegisteredOnce({auth,...f});
  assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','UNLOCK']);
  assert.equal(result.status,'BLOCKED');
- assert.equal(result.code,'R6_B_TODAY_ALREADY_CLAIMED');
+ assert.equal(result.code,'R6_B_REQUEST_ALREADY_CLAIMED');
  assert.equal(result.firstFail,'PREFLIGHT');
 });
 
@@ -201,4 +201,33 @@ test('bounded Core lock: ownership UNKNOWN stops immediately, never claiming',as
  assert.equal(result.firstFail,'PREFLIGHT');
  assert.equal(calls,0);
  assert.deepEqual(f.calls,['VERIFY','LOCK']);
+});
+
+
+test('manual requests with different IDs run the same UTC day; same request never replays',async t=>{
+ const {mkdtempSync,readdirSync,rmSync,writeFileSync}=await import('node:fs');
+ const {tmpdir}=await import('node:os');
+ const path=await import('node:path');
+ const pcHome=mkdtempSync(path.join(tmpdir(),'r6-request-claim-'));
+ t.after(()=>rmSync(pcHome,{recursive:true,force:true}));
+ // Preserve historic date claims as evidence; they must not block a new request.
+ const oldDaily=path.join(pcHome,'employment-r6-registered-one_year-'+
+  new Date().toISOString().slice(0,10)+'.claim.json');
+ writeFileSync(oldDaily,'historic claim evidence\n');
+ const r1=inject();const {claim:unusedClaim1,...first}=r1;
+ const a=await performR6RegisteredOnce({auth,pcHome,...first});
+ assert.equal(a.status,'SUCCESS');
+ const r2=inject();const {claim:unusedClaim2,...second}=r2;
+ const duplicate=await performR6RegisteredOnce({auth,pcHome,...second});
+ assert.equal(duplicate.status,'BLOCKED');
+ assert.equal(duplicate.code,'R6_B_REQUEST_ALREADY_CLAIMED');
+ assert.ok(!r2.calls.includes('RUN'));
+ const nextAuth={...auth,request:{...auth.request,
+  requestId:'a3b44168-e96e-48b2-b787-10aa1a0e001b'}};
+ const r3=inject();const {claim:unusedClaim3,...third}=r3;
+ const next=await performR6RegisteredOnce({auth:nextAuth,pcHome,...third});
+ assert.equal(next.status,'SUCCESS');
+ const claims=readdirSync(pcHome).filter(f=>f.endsWith('.claim.json'));
+ assert.equal(claims.length,3);
+ assert.ok(claims.includes(path.basename(oldDaily)));
 });
