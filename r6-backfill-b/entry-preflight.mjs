@@ -63,7 +63,7 @@ export async function checkR6BEntryPreflight({
     // bytes BEFORE any filesystem or Git probe, especially before DB planning.
     const request = validateR6OneShotRequest(event, env, pins);
     requestId = request.requestId;
-    verifyR6OneShotApprovalBytes(manifestBytes, pins);
+    const approvedManifest = verifyR6OneShotApprovalBytes(manifestBytes, pins);
     if (platform !== 'win32') fail('R6_B_WINDOWS_ONLY_STOP');
     if (typeof gitInspect !== 'function' || typeof coreLease !== 'function' ||
       typeof blsCoverage !== 'function') fail('R6_B_TRUSTED_PROBE_UNAVAILABLE');
@@ -85,6 +85,11 @@ export async function checkR6BEntryPreflight({
     // would silently create or mutate user data and is strictly forbidden.
     const coreDb = verifiedExisting(io, WIN.join(base, 'storage', 'core.sqlite'), 'CORE_DB_FILE');
     if (!inside(norm(coreDb), norm(base))) fail('R6_B_DB_ESCAPE_STOP');
+    // The approved manifest, not merely an Issue or arbitrary E: directory,
+    // pins the exact Core DB target. This compares resolved existing bytes'
+    // path and prevents a different valid-looking core.sqlite from passing.
+    if (norm(coreDb) !== norm(approvedManifest.coreDatabasePath))
+      fail('R6_B_APPROVED_CORE_DB_PATH_STOP');
 
     // The host's Git inspector must run fixed, read-only rev-parse/status on
     // both actual checkouts, not trust filenames or source SHA claims.
