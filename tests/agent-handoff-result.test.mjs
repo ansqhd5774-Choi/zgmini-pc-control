@@ -75,12 +75,25 @@ test('result digest fixes exact result payload for collision detection', () => {
   assert.notEqual(resultDigest(parseAgentResult(JSON.stringify(result))), resultDigest(parseAgentResult(JSON.stringify(changed))));
 });
 
-async function simulate({lostComment = false, collision = false, unauthorized = false} = {}) {
-  const {handoff, result, pr, run} = setup();
+async function simulate({lostComment = false, collision = false, unauthorized = false,
+  botOrigin = false, botBadTitle = false, botForeignOrigin = false,
+  botMissingEvidence = false, untrustedIssueAuthor = false} = {}) {
+  let {handoff, result, pr, run} = setup();
+  if (botOrigin) {
+    const candidate = structuredClone(handoff);
+    candidate.origin.repository = botForeignOrigin ? 'ansqhd5774-Choi/zgmini' :
+      'ansqhd5774-Choi/zgmini-pc-control';
+    if (!botMissingEvidence) candidate.failure.evidenceIssueNumber = candidate.origin.issueNumber;
+    handoff = parseHandoff(JSON.stringify(candidate));
+    result.fingerprint = fingerprintHandoff(handoff);
+  }
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-result-'));
   const eventPath = path.join(temp, 'event.json');
   fs.writeFileSync(eventPath, JSON.stringify({action: 'created', repository: {private: true},
-    issue: {number: 2001, labels: [{name: 'agent-handoff'}], user: {login: 'ansqhd5774-Choi'},
+    issue: {number: 2001, title: botBadTitle ? 'incorrect title' :
+      `agent-handoff ${handoff.incidentId}`, labels: [{name: 'agent-handoff'}],
+      user: {login: untrustedIssueAuthor ? 'untrusted-user' :
+        botOrigin ? 'github-actions[bot]' : 'ansqhd5774-Choi'},
       body: JSON.stringify(handoff)}, comment: {body: JSON.stringify(result), user: {login: 'ansqhd5774-Choi'}}}));
   const originalToken = process.env.GITHUB_TOKEN;
   const originalFetch = globalThis.fetch;
@@ -106,10 +119,14 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
     GITHUB_EVENT_NAME: 'issue_comment', GITHUB_ACTOR: unauthorized ? 'unknown-user' : 'ansqhd5774-Choi'};
   try {
     if (unauthorized) await assert.rejects(runResultBroker(env), /RESULT_EVENT_NOT_ALLOWED/);
+    else if (untrustedIssueAuthor) await assert.rejects(runResultBroker(env), /RESULT_EVENT_NOT_ALLOWED/);
+    else if (botBadTitle || botForeignOrigin || botMissingEvidence)
+      await assert.rejects(runResultBroker(env), /RESULT_BOT_INCIDENT_BINDING_STOP/);
     else if (collision) await assert.rejects(runResultBroker(env), /RESULT_ID_COLLISION_STOP/);
     else if (lostComment) await assert.rejects(runResultBroker(env), /RESULT_COMMENT_READBACK_STOP/);
     else { await runResultBroker(env); await runResultBroker(env); assert.deepEqual(seen, ['comment']); }
-    if (unauthorized || collision) assert.deepEqual(seen, []);
+    if (unauthorized || untrustedIssueAuthor || botBadTitle || botForeignOrigin ||
+        botMissingEvidence || collision) assert.deepEqual(seen, []);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalToken === undefined) delete process.env.GITHUB_TOKEN;
@@ -121,3 +138,13 @@ test('result broker records one verified comment and remains idempotent', async 
 test('result broker fails closed if GitHub result comment disappears', async () => simulate({lostComment: true}));
 test('result broker blocks same ID with different payload', async () => simulate({collision: true}));
 test('result broker rejects untrusted issue comment actor', async () => simulate({unauthorized: true}));
+test('result broker accepts a bound bot-created intake with an authenticated owner result',
+  async () => simulate({botOrigin: true}));
+test('result broker refuses a bot-created intake with a different title',
+  async () => simulate({botOrigin: true, botBadTitle: true}));
+test('result broker refuses a bot-created intake with a foreign origin',
+  async () => simulate({botOrigin: true, botForeignOrigin: true}));
+test('result broker refuses a bot-created intake without its origin evidence link',
+  async () => simulate({botOrigin: true, botMissingEvidence: true}));
+test('result broker still rejects a third-party Issue even with an owner comment',
+  async () => simulate({untrustedIssueAuthor: true}));
