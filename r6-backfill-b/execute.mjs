@@ -83,15 +83,17 @@ function stateUnknown(requestId, code) {
  *   full unregistered-BLS caller coverage + approved shared journal
  * - planDueGroups: existing R6 BACKFILL planner (may initialize SQLite)
  * - inspectQuotaAdmission: due-only 25/24h read-only snapshot admission
- * - claimOneShot: durable, globally unique no-retry execution claim
+ * - claimOneShot: durable, globally unique no-retry claim BEFORE any DB planner
  * - reserveBlsBatch: atomic, durable shared lease reservation
  * - quotaAdapter: installed shared quota instance exposing fetchR6WithLease
  * - collectBackfill: existing runEmploymentR6CollectionStep
  * - auditEffects: trusted post-run provider/DB/D1/Task/source verification
  *
  * No callback before approved scope and protected-host verification may plan
- * or modify the DB. Reservation always occurs before creating the lease fetch.
- * Any unknown effects after a claim are STATE_UNKNOWN; never auto-retry/refund.
+ * or modify the DB. The first planner may initialize SQLite, so the one-shot
+ * claim must precede it; its input is the approved request, NOT a due-group
+ * result that cannot yet be known. Reservation precedes the lease fetch.
+ * Any unknown effect after a claim attempt is STATE_UNKNOWN; never retry/refund.
  */
 export async function coordinateR6BackfillOnce({
   requestId, verifyApprovedScope, verifyProtectedHost, planDueGroups,
@@ -106,8 +108,7 @@ export async function coordinateR6BackfillOnce({
   if (required.some(fn => typeof fn !== 'function'))
     return stateUnknown(requestId, 'R6_B_HOST_CALLBACK_UNAVAILABLE');
 
-  let startedPlan = false;
-  let claimed = false;
+  let claimAttempted = false;
   try {
     const approved = await verifyApprovedScope({ requestId });
     if (approved?.status !== 'APPROVED_B_SCOPE_VERIFIED' || approved.requestId !== requestId)
@@ -118,19 +119,20 @@ export async function coordinateR6BackfillOnce({
       host?.sharedJournalVerified !== true)
       fail('R6_B_HOST_OR_SHARED_QUOTA_UNVERIFIED');
 
-    // The existing planner calls store.initialize(). Its invocation is behind
-    // BOTH immutable approval and verified PC source/DB/Core/quota coverage.
-    startedPlan = true;
+    // Even the BACKFILL *planner* may call store.initialize(), which can
+    // mutate SQLite before any provider request. A crash at that point must
+    // never leave the approval unclaimed and replayable with a new Issue ID.
+    // A failed or ambiguous claim callback may already have fsynced its marker.
+    claimAttempted = true;
+    const claim = await claimOneShot({ requestId, approved });
+    if (claim?.status !== 'CLAIMED_NO_RETRY' || claim.requestId !== requestId)
+      fail('R6_B_ONESHOT_CLAIM_UNVERIFIED');
+
     const plans = await planDueGroups({ requestId, mode: 'BACKFILL', groups: [...GROUPS], approved, host });
     const { dueGroups, cost } = validateDuePlans(plans);
 
     if (cost.total === 0) {
-      // A zero-work approval still consumes its one-shot identity. Otherwise a
-      // later retry with the same requestId could run newly-due provider work.
-      const claim = await claimOneShot({ requestId, dueGroups, cost, approved });
-      if (claim?.status !== 'CLAIMED_NO_RETRY' || claim.requestId !== requestId)
-        fail('R6_B_ONESHOT_CLAIM_UNVERIFIED');
-      claimed = true;
+      // NOOP also consumed the approval before the potentially writing planner.
       const counts = { bls: 0, dol: 0 };
       const audit = await auditEffects({ requestId, mode: 'BACKFILL', dueGroups, cost,
         collected: null, noop: true });
@@ -146,12 +148,6 @@ export async function coordinateR6BackfillOnce({
       admission?.expectedDolRequests !== cost.dol || admission?.allowProviderCalls !== false)
       fail('R6_B_QUOTA_PREFLIGHT_NOT_READY');
 
-    const claim = await claimOneShot({ requestId, dueGroups, cost, approved });
-    // The claim must be a globally unique, durable one-shot; a boolean is not
-    // sufficient evidence. The trusted B entry implements actual persistence.
-    if (claim?.status !== 'CLAIMED_NO_RETRY' || claim.requestId !== requestId)
-      fail('R6_B_ONESHOT_CLAIM_UNVERIFIED');
-    claimed = true;
     if (cost.bls > 0) {
       const reservation = await reserveBlsBatch({ requestId, count: cost.bls,
         maxDaily: R6_ONE_SHOT.blsUnregistered24hLimit });
@@ -175,11 +171,10 @@ export async function coordinateR6BackfillOnce({
       blsRequests: verified.bls, dolRequests: verified.dol,
       groupResults: verified.results, d1Writes: 0, schedulerWrites: 0 });
   } catch (error) {
-    // A plan may initialize the existing DB. A claim/reservation may be
-    // durable even if the caller receives an error. Do not invent zero writes
-    // or turn any ambiguous operation into an automatically retryable BLOCKED.
+    // The claim attempt may be durable even if the callback threw; the planner
+    // can also initialize SQLite. Never imply safe retry after either step.
     const code = safeCode(error?.code ?? error?.message);
-    if (startedPlan || claimed) return stateUnknown(requestId, code);
+    if (claimAttempted) return stateUnknown(requestId, code);
     return { ...stateUnknown(requestId, code), status: 'BLOCKED' };
   }
 }
