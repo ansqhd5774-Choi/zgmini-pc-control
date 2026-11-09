@@ -32,7 +32,7 @@ test('separate tokenless Windows writer and token-bearing result reporter',()=>{
 });
 
 test('live Core lock owner check is bounded, Task-linked and read-only',()=>{
- assert.match(yaml,/timeout-minutes: 16/);
+ assert.match(yaml,/timeout-minutes: 20/);
  assert.match(windowsAdapter,/CORE_OWNER_OBSERVATION_MS=6\*60_000/);
  assert.match(windowsAdapter,/async proveActiveCoreLock\(\)/);
  assert.match(windowsAdapter,/INFL_MANUAL_B_CORE_OWNER_NOT_OBSERVED_STOP/);
