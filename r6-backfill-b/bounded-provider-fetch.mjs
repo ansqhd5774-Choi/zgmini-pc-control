@@ -8,6 +8,36 @@ const URL_BLS='https://api.bls.gov/publicAPI/v1/timeseries/data/';
 const URL_DOL_NATIONAL='https://oui.doleta.gov/unemploy/wkclaims/report.asp';
 const URL_DOL_ETA539='https://oui.doleta.gov/unemploy/csv/ar539.csv';
 const error=code=>Object.assign(Error(code),{code});
+const FETCH_INIT_KEYS=new Set(['method','body','headers','signal','redirect']);
+const FORBIDDEN_HEADERS=/^(?:host|authorization|proxy-authorization|proxy-connection|connection|cookie|transfer-encoding|content-length|upgrade)$/i;
+const plainRecord=value=>value!==null&&typeof value==='object'&&
+  !Array.isArray(value)&&
+  (Object.getPrototypeOf(value)===Object.prototype||Object.getPrototypeOf(value)===null);
+
+function approvedHeaders(headers){
+  if(headers===undefined)return true;
+  if(typeof Headers!=='undefined'&&headers instanceof Headers){
+    for(const [key] of headers)if(FORBIDDEN_HEADERS.test(key))return false;
+    return true;
+  }
+  if(!plainRecord(headers)||Object.getOwnPropertySymbols(headers).length)return false;
+  return Object.entries(headers).every(([key,value])=>
+    typeof value==='string'&&/^[a-zA-Z0-9-]{1,64}$/.test(key)&&
+    !FORBIDDEN_HEADERS.test(key));
+}
+
+function approvedInit(init){
+  try{
+    return plainRecord(init)&&Object.getOwnPropertySymbols(init).length===0&&
+      Object.keys(init).every(key=>FETCH_INIT_KEYS.has(key))&&
+      (init.method===undefined||typeof init.method==='string')&&
+      (init.body===undefined||init.body===null||typeof init.body==='string')&&
+      approvedHeaders(init.headers)&&
+      (init.signal===undefined||init.signal===null||
+        (typeof AbortSignal!=='undefined'&&init.signal instanceof AbortSignal))&&
+      (init.redirect===undefined||['error','manual','follow'].includes(init.redirect));
+  }catch{return false;}
+}
 
 export function createR6BBoundedPhysicalFetch({originalFetch,
   heldCoreLock,allowPhysicalNetwork=false}={}){
@@ -17,8 +47,8 @@ export function createR6BBoundedPhysicalFetch({originalFetch,
   const fetch=async(input,init={})=>{
     if(!allowPhysicalNetwork||heldCoreLock?.verifyHeld?.()!==true)
       throw error('R6_B_PHYSICAL_NETWORK_NOT_AUTHORIZED');
-    if(typeof input!=='string'||!init||typeof init!=='object'||
-      Array.isArray(init))throw error('R6_B_PHYSICAL_REQUEST_SHAPE_STOP');
+    if(typeof input!=='string'||!approvedInit(init))
+      throw error('R6_B_PHYSICAL_REQUEST_SHAPE_STOP');
     const verb=String(init.method??'GET').toUpperCase();
     let category;
     if(input===URL_BLS&&verb==='POST'&&typeof init.body==='string'){
