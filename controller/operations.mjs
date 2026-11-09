@@ -15,6 +15,7 @@ import {inspectER1NovemberAvailability} from './market-calendar-er1-nov30-availa
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
+import {inspectSourceInventory} from './source-inventory-runtime-readonly.mjs';
 import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
@@ -98,6 +99,7 @@ export async function runOperation(request,context){
   let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
   return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
  }
+ if(request.operation==='source-inventory-runtime-readonly')return inspectSourceInventory(dataRoot);
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
