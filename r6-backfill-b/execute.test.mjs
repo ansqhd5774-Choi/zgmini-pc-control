@@ -105,13 +105,23 @@ test('host verification including Core lane and caller coverage precedes planner
   assert.deepEqual(events, ['scope','host-reject']);
 });
 
-test('already completed and attempted groups cause NOOP with no claim or reservation', async () => {
+test('already completed and attempted groups consume one-shot ID with no reservation', async () => {
   const events = [];
   const result = await coordinateR6BackfillOnce(fixture({ due: [], events }));
   assert.equal(result.status, 'NOOP');
   assert.equal(result.providerRequests, 0);
   assert.equal(result.effectsVerified, true);
-  assert.deepEqual(events, ['scope','host','plan','audit']);
+  assert.deepEqual(events, ['scope','host','plan','claim','audit']);
+});
+
+test('a zero-due request with an already-claimed ID cannot be replayed when data changes', async () => {
+  const events = [];
+  const result = await coordinateR6BackfillOnce(fixture({ due: [], events,
+    claim: { status: 'ALREADY_CLAIMED', requestId: REQUEST } }));
+  assert.equal(result.status, 'STATE_UNKNOWN');
+  assert.equal(result.code, 'R6_B_ONESHOT_CLAIM_UNVERIFIED');
+  assert.equal(result.providerRequests, null);
+  assert.deepEqual(events, ['scope','host','plan','claim']);
 });
 
 test('a DOL-only resume never reserves BLS but still uses the isolated B adapter', async () => {
