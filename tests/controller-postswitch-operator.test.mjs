@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,
+import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,
   validatePostSwitchApproval} from '../tools/controller-postswitch-approval.mjs';
 import {runApprovedPostSwitch} from '../tools/controller-postswitch-operator.mjs';
 
@@ -11,7 +11,8 @@ const evidence=()=>({status:'READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
   requestId:id,actualControllerSha:target,installedShaBefore:old,
   materialHashes:{...material},checks:{
     ORIGINAL_LEDGER:true,TARGET_SWITCHED:true,BACKUP_VERIFIED:true,
-    OWNER_DEAD_AND_MATCHED:true,PROTECTION_UNCHANGED:true,BACKLOG_CLOSED:true,
+    OWNER_DEAD_AND_MATCHED:true,PROTECTION_UNCHANGED:true,
+    PROTECTION_CONTRACT_VERIFIED:false,BACKLOG_CLOSED:true,
     LIVE_WORKFLOW_ACTIVE:true,RUNNERS_ONLINE:true,SUPERVISOR_FRESH:true}});
 const ledger=()=>({requestId:id,issueNumber:917,
   status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
@@ -109,4 +110,36 @@ test('missing, extra or untrusted ports stop before the first effect',async()=>{
   await assert.rejects(()=>runApprovedPostSwitch({approval:approval(),ledger:ledger(),
     evidence:evidence(),sourceSha:source,ports:p}),/POSTSWITCH_OPERATOR_PORT_MISSING/);
   assert.deepEqual(p.events,[]);
+});
+
+test('explicit C-grade Writer transition preserves historical unchanged=false',async()=>{
+  const p=goodPorts();
+  const ev=evidence();
+  ev.checks.PROTECTION_UNCHANGED=false;
+  ev.checks.PROTECTION_CONTRACT_VERIFIED=true;
+  const ap={...approval(),writerTransition:{...WRITER_TRANSITION}};
+  p.verifyFinal=async()=>{p.events.push('final');return {
+    currentSourceSha:target,protectedStateUnchanged:false,protectionContractVerified:true,
+    workflowActive:true,supervisorVerified:true,backlogVerified:true,runnerSetVerified:true};};
+  const outcome=await runApprovedPostSwitch({approval:ap,ledger:ledger(),
+    evidence:ev,sourceSha:source,ports:p});
+  assert.equal(outcome.status,'RECOVERY_COMPLETED');
+  assert.equal(ev.checks.PROTECTION_UNCHANGED,false);
+  assert.ok(p.events.includes('archive'));
+});
+
+test('Writer config transition drift at final readback prevents lease archive',async()=>{
+  const p=goodPorts();
+  const ev=evidence();
+  ev.checks.PROTECTION_UNCHANGED=false;
+  ev.checks.PROTECTION_CONTRACT_VERIFIED=true;
+  const ap={...approval(),writerTransition:{...WRITER_TRANSITION}};
+  p.verifyFinal=async()=>{p.events.push('final');return {
+    currentSourceSha:target,protectedStateUnchanged:false,protectionContractVerified:false,
+    workflowActive:true,supervisorVerified:true,backlogVerified:true,runnerSetVerified:true};};
+  const outcome=await runApprovedPostSwitch({approval:ap,ledger:ledger(),
+    evidence:ev,sourceSha:source,ports:p});
+  assert.equal(outcome.status,'RECOVERY_REQUIRED');
+  assert.equal(outcome.code,'FORWARD_FINAL_READBACK_FAILED');
+  assert.equal(p.events.includes('archive'),false);
 });
