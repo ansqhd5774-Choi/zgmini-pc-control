@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {classifyPostSwitchEvidence, verifyControllerFiles} from '../tools/controller-postswitch-evidence.mjs';
+import {classifyPostSwitchEvidence, verifyControllerFiles,
+  verifyExactPostSwitchInventory,verifySourceBytes} from '../tools/controller-postswitch-evidence.mjs';
 
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const before = 'c09bf6a6f66f229016135020d6ba553ba9a94676';
@@ -106,4 +107,33 @@ test('38-file host inventory checks all bytes, including the only changed contro
   assert.equal(verifyControllerFiles(host,'/snapshot',reader),true);
   entries.set(path.join('/snapshot',additional[0]),Buffer.from('changed-file-corrupted'));
   assert.equal(verifyControllerFiles(host,'/snapshot',reader),false);
+});
+
+test('C-grade inventory requires exact 38 manifest paths and both source trees',()=>{
+  const all=['config/operations.json',...Array.from({length:37},(_,i)=>
+    `controller/test-module-${i}.mjs`)];
+  const host={controllerSourceSha:after,controllerFiles:Object.fromEntries(
+    all.map(name=>[name,sha256(name)]))};
+  const backup={...host,controllerSourceSha:before};
+  assert.equal(verifyExactPostSwitchInventory(host,backup,all,all),true);
+  const short=all.slice(0,-1);
+  assert.equal(verifyExactPostSwitchInventory(host,backup,short,short),false);
+  assert.equal(verifyExactPostSwitchInventory({...host,controllerFiles:Object.fromEntries(
+    short.map(name=>[name,sha256(name)]))},backup,all,all),false);
+  assert.equal(verifyExactPostSwitchInventory(host,backup,all,
+    [...short,'controller/foreign-file.mjs']),false);
+  assert.equal(verifyExactPostSwitchInventory(host,backup,[...all,all[0]],all),false);
+});
+
+test('all 38 declared SHA-256 values also match the exact Git SHA blobs',()=>{
+  const names=['config/operations.json',...Array.from({length:37},(_,i)=>
+    `controller/source-file-${i}.mjs`)];
+  const host={controllerSourceSha:after,controllerFiles:Object.fromEntries(
+    names.map(name=>[name,sha256(`${after}:${name}`)]))};
+  const read=(sha,rel)=>Buffer.from(`${sha}:${rel}`);
+  assert.equal(verifySourceBytes(host,after,read),true);
+  assert.equal(verifySourceBytes(host,before,read),false);
+  const corrupted='controller/source-file-15.mjs';
+  assert.equal(verifySourceBytes(host,after,(sha,rel)=>
+    Buffer.from(rel===corrupted?'corrupted':`${sha}:${rel}`)),false);
 });
