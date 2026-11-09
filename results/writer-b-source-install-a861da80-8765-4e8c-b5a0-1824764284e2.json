@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a861da80-8765-4e8c-b5a0-1824764284e2",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "4ec0b8c197627ebdb316be8df291e30d7e435784",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+  "candidateSourceSha": "27c02d9b254e92af21b2a5b92a4c0bb152bb5713",
+  "manifestSha256": "3452198846df9e4bb6f2299e3f4be64691ec87d4c9801121db130482c866904c",
+  "baseTreeOid": "5467892732dcaf8d4e3da7d4ddcca0358bfd25f9",
+  "preparedTreeOid": "215cfe0e32046457248cec2be68a54e42e5d4fc0",
+  "provenanceSha256": "35e6013e58c988458831928dc2949c8d4a2b15bd1b24740f26869055880bd6ab",
+  "runId": "42706312346",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/build-asset-r10-release.mjs"
+  ]
+}
