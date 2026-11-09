@@ -20,6 +20,7 @@ jobs:
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       github.event.workflow_run.event == 'issues' &&
+      github.event.workflow_run.conclusion != 'skipped' &&
       github.event.workflow_run.actor.login == 'ansqhd5774-Choi' &&
       github.event.workflow_run.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
