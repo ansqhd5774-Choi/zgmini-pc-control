@@ -53,6 +53,8 @@
 - `agent-handoff/resource-wait-ledger.mjs`는 인증된 정상 자원 대기만 #68에 영구 댓글로 1회 기록한다. 중복 수신은 기존 기록 재사용, POST ACK 분실은 조회만 수행한다. 조정 원장 #68은 실제 PC lease가 아니다.
 - 현재 자동 이벤트 연결은 등록 Writer B 승인 Issue 사전검사, PC Job/Writer B 완료 결과에 대한 독립 오류 접수 및 결과 반환으로 확장됐다([PR #1133](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1133)). **2026-11-10 실제 PC Job 정상 결과 접수 3/3 PASS**(#1134·#1135·#1136), 확인된 실패 0건, 자동 PC 재시도 0회. 이는 실패 사고의 종단간 실증이 아니다.
 - **봇 생성 Incident의 연결 보완(2026-11-10):** 접수 워크플로가 기본 `GITHUB_TOKEN`으로 생성한 `agent-handoff` Issue는 GitHub의 연쇄 이벤트 방지 규칙으로 일반 `issues.opened` 워크플로를 자동 실행하지 않는다. 또한 수동 Issue 라우터는 원담당 계정 작성 이벤트로 엄격히 한정되어 있다. 따라서 PC/Writer B producer는 인증된 원본 결과→봇 Issue 생성·본문/라벨/작성자 readback 후 **동일한 격리 `workflow_run` 잡에서** 직접 `HANDOFF_ROUTED` 댓글과 대기 라벨을 기록한다. 기존 Issue 재사용·POST 응답 분실·댓글 성공/라벨 실패도 같은 bot readback으로 보정하며, 실패 시 route 성공을 선언하지 않는다. 새 AI 에이전트 자동 실행·다른 일반챗 자동 수신·PC 복구/설치·예약은 여전히 수행하지 않는다. 실제 실패→route→verified return→원담당 ACK는 자연 발생 증거가 있기 전까지 미검증이다.
+- **활성화 변수 범위:** `ZGMINI_PC_HANDOFF_INTAKE_ENABLED`는 PC Job의 독립 오류 접수 **및 해당 접수 내부의 인증된 bot 직접 라우팅**을 한 단위로 허용한다. `ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED`는 Writer B의 동일 단위를 별도 허용한다. 반면 `ZGMINI_AGENT_HANDOFF_ENABLED`는 owner가 직접 만든 Issue의 수동 라우팅과 owner 결과 댓글 처리 워크플로에 적용된다. **중앙 변수 하나가 모든 입구를 정지시키는 공통 kill-switch는 아니다.** 특정 경로를 끄려면 해당 독립 승인 변수를 적용 범위에서 조정해야 하며, 새로운 Gate를 임의로 늘리지 않는다. 현재 값은 여기서 주장하지 않는다.
+- **라벨 readback 경합 보호:** 직접 라우팅이 댓글과 상태 라벨을 기록하기 전후에도 기본 `agent-handoff` 라벨·봇 작성자·원본 본문이 유지되는지 확인한다. 기본 라벨이 사라지면 성공으로 기록하지 않으며 자동 재발행·PC 재실행을 수행하지 않는다.
 - 실제 GitHub workflow의 활성 동작과 PC 운영 적용·원담당 수신·자원 해제 재평가는 별도 단계로 실증한다.
 
 ### A급 pc-job 공용 자원 대기 연결
