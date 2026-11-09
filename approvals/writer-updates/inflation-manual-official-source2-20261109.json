@@ -1,0 +1,43 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/inflation-official-manual-source-r1-20261109",
+  "candidateSourceSha": "6058c309aea5a6fa1dcbd1529578faab35860290",
+  "baseHead": "434f30d2aa221bddacab5afa09241916618d8e22",
+  "baseConfigSourceSha": "434f30d2aa221bddacab5afa09241916618d8e22",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "53c01bbc129e1c4c5ff129d37fae8e0ff801c30bfe50a6ad0ab1227d394a5ed6"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-store-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "3ef346bd5e240cdcdbd741a0f62b665bba42bf33556e37a6efa359f07de834ec"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/diagnostic-layer/xlsx-lite.mjs",
+      "sha256": "44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
