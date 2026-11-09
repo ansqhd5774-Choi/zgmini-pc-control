@@ -148,6 +148,14 @@ test('PID reuse, false source ancestry and changed lock cannot claim verified ow
  assert.equal(classifyCoreLockOwner({...snapshot,engines:[]},lock,lock,
   {realpath}).status,'UNVERIFIED');
 });
+test('lock owner PID absent from WMI is observed as unverified, not auto-stale',()=>{
+ const lock={state:'PRESENT',pid:87654,
+  at:Date.UTC(2026,10,9,16,50,0),fingerprint:'a'.repeat(64)};
+ const out=classifyCoreLockOwner({...snapshot,engines:[]},lock,lock,{realpath});
+ assert.equal(out.status,'UNVERIFIED');
+ assert.equal(out.code,'CORE_LOCK_OWNER_PID_NOT_OBSERVED');
+});
+
 test('missing, symlinked, oversized, malformed Core lock never becomes stale proof',()=>{
  const at=Date.UTC(2026,10,9,16,50,0);
  const missing=readCoreLockSnapshot({lstat:()=>{throw Object.assign(Error('no'),{code:'ENOENT'});}});
