@@ -46,7 +46,7 @@ function fixture(t){
  fs.mkdirSync(paths.sourceRoot,{recursive:true});
  const journal=p=>path.join(paths.journalDir,p);
  const originalConfig=Buffer.from(JSON.stringify({source:BASE,password:'PRIVATE_ORIGINAL_SECRET'}));
- const originalTask=Buffer.from('<Task><Enabled>true</Enabled></Task>');
+ const originalTask=Buffer.from('<Task><Settings><Enabled>true</Enabled></Settings></Task>');
  const preimage={
   head:BASE,branch:'main',originalConfigSha256:hash(originalConfig),
   originalTaskDefinitionSha256:hash(originalTask),
@@ -73,7 +73,7 @@ function fixture(t){
  write(path.join(paths.sourceRoot,...MODULE.split('/')),afterModule);
  const context={platform:'win32',paths,digest:testDigest,
   git:(_root,args)=>args.at(-1)==='HEAD'?SHA40:`writer-b/${WRITER_B_1063_REQUEST_ID}`,
-  taskXml:()=>Buffer.from('<Task><Enabled>false</Enabled></Task>'),
+  taskXml:()=>Buffer.from('<Task><Settings><Enabled>false</Enabled></Settings></Task>'),
   taskProbe:()=>({enabled:false,state:1,instances:0,
    relatedProcesses:0,unknownProcessLines:0})};
  const run=(override={})=>inspectWriterB1063Recovery({...context,...override});
@@ -113,12 +113,27 @@ test('fixed incident snapshot: authentic provenance, prepared pair, disabled Cor
  assert.equal(result.coreTask.coreQuietSnapshot,true);
  assert.equal(result.coreTask.resumeAuthorized,false);
  assert.equal(result.coreTask.xmlMatchesOriginal,false);
+ assert.equal(result.coreTask.definitionMatchesOriginalExceptEnabled,true);
  assert.equal(result.recoveryStatus,'RECOVERY_REQUIRED');
  assert.equal(result.recoveryAuthorized,false);
  assert.equal(result.runtimeSourceVerified,false);
  assert.equal(result.operationalWrites,0);
  assert.equal(digestFixture(f.base),before);
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_ORIGINAL_SECRET|DO_NOT_RETURN/);
+});
+
+test('Core Task activation toggle is benign but unrelated XML drift is reported',t=>{
+ const f=fixture(t);
+ const toggle=f.run();
+ assert.equal(toggle.coreTask.xmlMatchesOriginal,false);
+ assert.equal(toggle.coreTask.definitionMatchesOriginalExceptEnabled,true);
+ const drift=f.run({taskXml:()=>Buffer.from(
+  '<Task><Settings><Enabled>false</Enabled></Settings><Actions><Exec/></Actions></Task>')});
+ assert.equal(drift.status,'PASS');
+ assert.equal(drift.coreTask.definitionMatchesOriginalExceptEnabled,false);
+ assert.equal(drift.coreTask.resumeAuthorized,false);
+ const malformed=f.run({taskXml:()=>Buffer.from('<Task><Enabled>false</Enabled></Task>')});
+ assert.equal(malformed.status,'STATE_UNKNOWN');
 });
 
 test('missing, oversized or partial journal fails closed',t=>{
@@ -230,13 +245,14 @@ test('absent lock, source drift, original base and disabled Task remain diagnost
  assert.equal(drift.recoveryAuthorized,false);
  write(f.paths.configPath,JSON.stringify({source:BASE}));
  const original=f.run({git:(_root,args)=>args.at(-1)==='HEAD'?BASE:'main',
-  taskXml:()=>Buffer.from('<Task><Enabled>true</Enabled></Task>'),
+  taskXml:()=>Buffer.from('<Task><Settings><Enabled>true</Enabled></Settings></Task>'),
   taskProbe:()=>({enabled:true,state:3,instances:0,
    relatedProcesses:0,unknownProcessLines:0})});
  assert.equal(original.status,'PASS');
  assert.equal(original.source.sourcePair,'ORIGINAL_BASE_PAIR');
  assert.equal(original.coreTask.enabled,true);
  assert.equal(original.coreTask.xmlMatchesOriginal,true);
+ assert.equal(original.coreTask.definitionMatchesOriginalExceptEnabled,true);
  assert.equal(original.recoveryStatus,'RECOVERY_REQUIRED');
 });
 
