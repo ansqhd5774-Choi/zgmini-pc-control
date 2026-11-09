@@ -2,7 +2,7 @@
 
 상태: **#1063 공통 Writer B 실PC 복구 성공 / 후속 기능 설치 검증 대기 / Core 이후 정규 cycle 미관측**.
 중앙 대기열: [#1068](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1068).
-원본 영향 4건: #1063, #1064, #1066, #1081. **공통 잠금 복구 1/1=100%**, **기능 설치 성공 0/4=0%**, **인계 댓글 기록 4/4=100% (원담당 수신/실행 미확인)**. 중앙 자동 인계·처리 **8/8=100%(사고 표본 1/1)**. 기능 설치 0/4와 Core 정규 cycle 미관측은 중앙 인계율과 별도.
+원본 영향 4건: #1063, #1064, #1066, #1081. **공통 잠금 복구 1/1=100%**, **기능 설치 성공 0/4=0%**, **인계 댓글 기록 4/4=100% (원담당별 실제 수신/실행 별도 판단)**. 중앙 자동 인계·처리 **8/8=100%(사고 표본 1/1)**. 기능 설치 0/4와 Core 정규 cycle 미관측은 중앙 인계율과 별도.
 
 ## 복구 전 확정된 실PC 증거 (2026-11-09 고정 스냅샷)
 
@@ -21,6 +21,15 @@
 - **확인 범위 제한:** `installationVerified=false`; 원래 #1063 B 설치 실행 실패 이력은 그대로다. 복구 후 Core **정규 cycle 관측은 아직 미확인**이며 자동 추정하지 않는다. 해당 관측은 자연스럽게 발생하는 기존 정상 업무 증거로 확인하고 복구 확인용 신규 예약 작업은 만들지 않는다.
 - 인계 증거 4/4: [고용 #1063](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1063#issuecomment-6742556270), [시장 캘린더 #1064](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1064#issuecomment-6742557176), [자산 R10 #1066](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1066#issuecomment-6742556786), [물가지표 #1081](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1081#issuecomment-6742555835). 상태는 **HANDOFF_RECORDED / OWNER_ACK_UNKNOWN**. GitHub 댓글로 다른 일반챗이 자동 호출되지 않는다.
 - #1064·#1066 기존 승인 명세의 base HEAD는 원본 PC prepared HEAD와 달라 새 current-head 승인 명세/새 requestId 필요. #1081은 base HEAD가 일치하지만 현재 preimage·보호 해시를 확인하고 새 requestId 사용. #1063은 이미 준비된 소스의 실제 기능 활성·결과부터 확인하고 원 설치 성공을 주장하지 않는다.
+
+## 후속 신규 B 실행 — Core 활성 시간창 안전 중단 (2026-11-09)
+
+- Treasury 연간 4파일 사전 조회 [#1089 / Run 42635470978](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1089): `PASS / WRITER_APPROVED_PREIMAGE_READONLY`, HEAD/config/체크포인트 소스 `434f30d2aa221bddacab5afa09241916618d8e22`, 그러나 실제 B 설치·Core 정규 실행 증거는 아님.
+- [#1090 / Run 42635628648](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1090): Issue 제목이 정확한 `pc-writer-source-install`이 아니므로 B Job **skipped**, 설치 실행 0회. 동일 manifest 신규 요청이 중복 접수돼도 이것을 운영 중복 실행으로 잘못 판정하지 않는다.
+- [#1092 / Run 42636354244](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1092): 정확한 제목으로 B 실행, **`WRITER_B_PREFLIGHT_STOP / WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`**. 원격 JSON/TXT 2/2, sourceSha/baseHead null. 설치 전 `waitForCoreIdleWindow()`가 최대 6분 간 자연 유휴 연속 2샘플을 확인하지 못한 **preclaim 안전 중단**이다. 과거 #1063 공유 설치 lock 보존 사고의 재발로 혼동하지 않는다.
+- 공통 적용 원장 [#68 최신 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6742981464) 및 시장 담당 [#1064 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1064#issuecomment-6742981960)를 기록했다.
+- **원담당 다음 실행:** 최근 Core cycle/Task quiet/lock의 기존 증거를 필요한 범위에서 확인하고 실제 자연 유휴 창에 최신 승인 manifest·preimage를 재확인한 새 requestId로 정규 B 설치. 안전 검사 우회·Core 강제 정지·기존 요청 재실행 금지. 아직 시장 캘린더 4파일 설치 성공 **0건**.
+- **재발 방지 설계 입력:** `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`는 원본 source/Task 변경 없는 대기·재계획 상태로 구분하고, B 요청 제목 사전 검증/공유 자원 자연 유휴창 조건/일회성 결과 소비와 새 요청 재개 계약을 평가한다. 이 문서 갱신 자체가 운영 설치기 코드 적용이 아니다.
 
 ## 순서와 통과 조건 (실행 이력 보존)
 
