@@ -1,0 +1,45 @@
+{
+  "schema": "ZGMINI_INFLATION_OFFICIAL_MANUAL_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "INFLATION_OFFICIAL_STATIC_TWO_RAW_JSON_ONLY",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "sourceSha": "4273137a85adcc90c863a27f703baa749b05cb64",
+  "sourceFiles": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-r1.mjs",
+      "sha256": "53c01bbc129e1c4c5ff129d37fae8e0ff801c30bfe50a6ad0ab1227d394a5ed6"
+    },
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-store-r1.mjs",
+      "sha256": "3ef346bd5e240cdcdbd741a0f62b665bba42bf33556e37a6efa359f07de834ec"
+    },
+    {
+      "path": "lib/diagnostic-layer/xlsx-lite.mjs",
+      "sha256": "44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d"
+    }
+  ],
+  "providerUrls": {
+    "bls": "https://download.bls.gov/pub/time.series/cu/cu.data.12.USHousing",
+    "census": "https://www.census.gov/manufacturing/m3/prel/historical_data/histshts/naics/naicsinvp.xlsx"
+  },
+  "targetFiles": {
+    "bls": "E:\\ZGmini\\data\\pc-writer\\inflation-causal-candidates-r1\\bls-cpi-ppi3.json",
+    "census": "E:\\ZGmini\\data\\pc-writer\\inflation-causal-candidates-r1\\census-m3-manufacturing-inventories.json"
+  },
+  "maxBytes": {
+    "bls": 8000000,
+    "census": 6000000
+  },
+  "timeoutMs": 40000,
+  "runCount": 1,
+  "coreLeaseMode": "EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK",
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowTaskChanges": false,
+  "allowSourceChanges": false,
+  "allowOtherWrites": false
+}
