@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "PROPOSED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "feat/bls-registered-v2-20261109",
+  "candidateSourceSha": "b1541453df0a92af748eb8e191c96bb3ef1e6071",
+  "baseHead": "f422cd570b679f21cebbd76db11310fa9087ee5f",
+  "baseConfigSourceSha": "f422cd570b679f21cebbd76db11310fa9087ee5f",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "5be5155196c8539639f6bb5228d5af145646e0aff7f7c92a86ba3341d83efc39",
+      "afterSha256": "f22b2f1447e462d3101caf027323572606db61352ab6a53524dd406cca7a4915"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
