@@ -18,7 +18,9 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
         .some(fn => typeof fn !== 'function')) stop('INPUT_INVALID');
   const verified = await readIssue(issueNumber);
   if (verified?.repository !== REPOSITORY || verified.number !== issueNumber ||
-      verified.user?.login !== BOT || verified.body !== prepared.body ||
+      verified.user?.login !== BOT ||
+      verified.title !== `agent-handoff ${prepared.incidentId}` ||
+      verified.body !== prepared.body ||
       !verified.labels?.some(label => label.name === 'agent-handoff')) {
     stop('BOT_ISSUE_READBACK_STOP');
   }
@@ -61,7 +63,8 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
   }
   const current = await readIssue(issueNumber);
   if (current?.repository !== REPOSITORY || current.number !== issueNumber ||
-      current.body !== prepared.body || current.user?.login !== BOT)
+      current.body !== prepared.body || current.user?.login !== BOT ||
+      current.title !== `agent-handoff ${prepared.incidentId}`)
     stop('ISSUE_DRIFT_STOP');
   if (!current.labels?.some(label => label.name === stateLabel)) {
     await addIssueLabel(issueNumber, stateLabel);
