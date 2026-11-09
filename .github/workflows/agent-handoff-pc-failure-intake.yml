@@ -11,6 +11,7 @@ concurrency:
   # Single metadata writer lane: two completed PC runs may describe one incident.
   group: agent-handoff-pc-failure-intake
   cancel-in-progress: false
+  queue: max
 jobs:
   enqueue-confirmed-failures:
     # Activation is controlled by the reviewed repository Actions variable.
