@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  DATA_ROOT,MAX_BYTES,TARGETS,authorizeManualReceiver,assertAuthorizedManualReceiver,
- sha256,validateApprovalManifest,
+ sha256,validateApprovalManifest,verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {manifest,authorizationFixture} from './fixture.mjs';
 const code=(fn,expected)=>assert.throws(fn,error=>error.code===expected);
@@ -67,6 +67,18 @@ test('mutated manifest or raw hash is rejected before authorization',()=>{
   approvalManifestSha256:'0'.repeat(64)});
  code(()=>authorizeManualReceiver({event:f.event,env:f.env,
   manifestBytes:f.bytes}),'INFL_MANUAL_B_MANIFEST_HASH_STOP');
+});
+test('pinned manifest accepts Git CRLF checkout but hashes HEAD blob bytes',()=>{
+ const f=authorizationFixture();
+ const crlf=Buffer.from(f.bytes.toString('utf8').replace(/\r?\n/g,'\r\n'));
+ assert.equal(verifiedPinnedManifestBytes(crlf,f.bytes),f.bytes);
+ assert.equal(verifiedPinnedManifestBytes(f.bytes,f.bytes),f.bytes);
+ assert.equal(sha256(verifiedPinnedManifestBytes(crlf,f.bytes)),sha256(f.bytes));
+ const mutated=Buffer.concat([crlf,Buffer.from(' ')]);
+ code(()=>verifiedPinnedManifestBytes(mutated,f.bytes),
+  'INFL_MANUAL_B_MANIFEST_WORKTREE_DRIFT_STOP');
+ code(()=>verifiedPinnedManifestBytes(f.bytes,Buffer.from('bad')),
+  'INFL_MANUAL_B_MANIFEST_GIT_BLOB_STOP');
 });
 test('requestId and manifest path cannot be arbitrary inputs',()=>{
  for(const change of [
