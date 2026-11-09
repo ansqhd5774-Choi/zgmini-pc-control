@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {classifyCoreSnapshot,inspectCoreRuntimeSource,hashActiveCoreFiles} from '../controller/core-runtime-source-readonly.mjs';
+import {classifyCoreSnapshot,inspectCoreRuntimeSource,hashActiveCoreFiles,
+ readCoreLockSnapshot,classifyCoreLockOwner} from '../controller/core-runtime-source-readonly.mjs';
 
 const snapshot={ok:true,runningInstances:1,engines:[10],processes:[
  {pid:0,parentPid:0,name:'other',sourceMarker:'',createdAtMs:null},
@@ -73,12 +74,13 @@ test('non-Windows host never tries probe',()=>{
  assert.equal(result.code,'CORE_WINDOWS_REQUIRED');
 });
 
-function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',runningCount=1}){
+function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',
+ runningCount=1,creationDate=null}){
  const source=fs.readFileSync(new URL('../controller/core-runtime-source-wmi.mjs',import.meta.url),'utf8');
  const records=[
   {ProcessId:10,ParentProcessId:1,Name:'taskeng.exe',CommandLine:'service',CreationDate:null},
   {ProcessId:20,ParentProcessId:10,Name:'wscript.exe',CommandLine:'wrapper',CreationDate:null},
-  {ProcessId:30,ParentProcessId:20,Name:'node.exe',CommandLine:command,CreationDate:null},
+  {ProcessId:30,ParentProcessId:20,Name:'node.exe',CommandLine:command,CreationDate:creationDate},
   {ProcessId:99,ParentProcessId:1,Name:'node.exe',CommandLine:otherCommand,CreationDate:null},
  ];
  let printed='';
@@ -117,4 +119,65 @@ test('JScript rejects extra arguments and wrong script',()=>{
   assert.equal(s.processes.find(p=>p.pid===30).sourceMarker,'');
   assert.equal(classifyCoreSnapshot(s,{realpath}).status,'STATE_UNKNOWN');
  }
+});
+
+test('fixed Core lock is read only and never returns raw bytes or owner PID publicly',()=>{
+ const at=Date.UTC(2026,10,9,16,50,0),bytes=Buffer.from(JSON.stringify({pid:30,at}));
+ const evidence=readCoreLockSnapshot({file:'test-lock',clock:()=>at+1000,
+  lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:bytes.length}),
+  read:()=>bytes});
+ assert.equal(evidence.state,'PRESENT');
+ assert.equal(evidence.pid,30);
+ assert.equal(evidence.fingerprint.length,64);
+ assert.equal(classifyCoreLockOwner(snapshot,evidence,evidence,{realpath}).status,
+  'VERIFIED_ACTIVE_CORE');
+ assert.doesNotMatch(JSON.stringify(classifyCoreLockOwner(snapshot,evidence,evidence,
+  {realpath})),/"pid"|"at"|fingerprint|token/i);
+});
+test('PID reuse, false source ancestry and changed lock cannot claim verified owner',()=>{
+ const at=Date.UTC(2026,10,9,16,50,0);
+ const lock={state:'PRESENT',pid:30,at,fingerprint:'a'.repeat(64)};
+ assert.equal(classifyCoreLockOwner(snapshot,lock,{...lock,fingerprint:'b'.repeat(64)},
+  {realpath}).code,'CORE_LOCK_CHANGED_DURING_PROBE');
+ assert.equal(classifyCoreLockOwner(snapshot,{...lock,pid:99},{...lock,pid:99},
+  {realpath}).status,'UNVERIFIED');
+ const reused={...snapshot,processes:snapshot.processes.map(p=>p.pid===30?
+  {...p,createdAtMs:at+6000}:p)};
+ assert.equal(classifyCoreLockOwner(reused,lock,lock,{realpath}).code,
+  'CORE_LOCK_PID_REUSE_POSSIBLE');
+ assert.equal(classifyCoreLockOwner({...snapshot,engines:[]},lock,lock,
+  {realpath}).status,'UNVERIFIED');
+});
+test('missing, symlinked, oversized, malformed Core lock never becomes stale proof',()=>{
+ const at=Date.UTC(2026,10,9,16,50,0);
+ const missing=readCoreLockSnapshot({lstat:()=>{throw Object.assign(Error('no'),{code:'ENOENT'});}});
+ assert.equal(missing.state,'ABSENT');
+ assert.equal(classifyCoreLockOwner(snapshot,missing,missing).status,'ABSENT');
+ const invalid=readCoreLockSnapshot({clock:()=>at+1000,
+  lstat:()=>({isFile:()=>true,isSymbolicLink:()=>true,size:32}),
+  read:()=>Buffer.from(JSON.stringify({pid:30,at}))});
+ assert.equal(invalid.state,'UNKNOWN');
+ assert.equal(classifyCoreLockOwner(snapshot,invalid,invalid).status,'UNVERIFIED');
+ assert.equal(readCoreLockSnapshot({lstat:()=>({isFile:()=>true,
+  isSymbolicLink:()=>false,size:513}),read:()=>{throw Error('must not read');}})
+  .state,'UNKNOWN');
+});
+test('WMI CIM_DATETIME +540 offset is converted to real UTC creation instant',()=>{
+ const cmd=String.raw`"E:\ZGmini\runtime\node.exe" "E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs" --publish`;
+ const {snapshot:s}=simulateWsh({command:cmd,
+  creationDate:'20261110015000.000000+540'});
+ assert.equal(s.processes.find(p=>p.pid===30).createdAtMs,
+  Date.UTC(2026,10,9,16,50,0));
+});
+test('existing A collector attaches independent lock-owner evidence without writes',()=>{
+ const at=Date.UTC(2026,10,9,16,50,0),bytes=Buffer.from('approved-source-bytes');
+ const lock={state:'PRESENT',pid:30,at,fingerprint:'a'.repeat(64)};
+ const out=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,
+  probe:()=>({status:0,stdout:JSON.stringify(snapshot)}),realpath,
+  lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:bytes.length}),
+  read:()=>bytes,readLock:()=>lock});
+ assert.equal(out.status,'PASS');
+ assert.equal(out.lockOwner.status,'VERIFIED_ACTIVE_CORE');
+ assert.equal(out.operationalWrites,0);
+ assert.equal(out.d1Writes,0);
 });
