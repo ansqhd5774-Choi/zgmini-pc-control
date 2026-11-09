@@ -119,14 +119,20 @@ export function classifyCoreLockOwner(snapshot,before,after,
   return unverified('CORE_LOCK_UNREADABLE_OR_CHANGED');
  if(before.fingerprint!==after.fingerprint||before.pid!==after.pid||
     before.at!==after.at)return unverified('CORE_LOCK_CHANGED_DURING_PROBE');
- const core=classifyCoreSnapshot(snapshot,{realpath,includeOwnerPid:true});
- if(core.status!=='PASS')return unverified('CORE_LOCK_TASK_LINEAGE_UNVERIFIED');
- if(core.ownerPid!==before.pid)return unverified('CORE_LOCK_PID_NOT_LINKED_CORE');
- const match=snapshot.processes.find(row=>row.pid===before.pid);
- if(!Number.isSafeInteger(match?.createdAtMs))
+ if(snapshot?.ok!==true||!Array.isArray(snapshot.processes)||
+    snapshot.processes.length>8192)
+  return unverified('CORE_LOCK_PROCESS_INVENTORY_UNAVAILABLE');
+ const candidates=snapshot.processes.filter(row=>row.pid===before.pid);
+ if(candidates.length===0)return unverified('CORE_LOCK_OWNER_PID_NOT_OBSERVED');
+ if(candidates.length!==1)return unverified('CORE_LOCK_PROCESS_INVENTORY_INVALID');
+ const match=candidates[0];
+ if(!Number.isSafeInteger(match.createdAtMs))
   return unverified('CORE_LOCK_PROCESS_START_UNVERIFIED');
  if(match.createdAtMs>before.at+5000)
   return unverified('CORE_LOCK_PID_REUSE_POSSIBLE');
+ const core=classifyCoreSnapshot(snapshot,{realpath,includeOwnerPid:true});
+ if(core.status!=='PASS')return unverified('CORE_LOCK_TASK_LINEAGE_UNVERIFIED');
+ if(core.ownerPid!==before.pid)return unverified('CORE_LOCK_PID_NOT_LINKED_CORE');
  return {status:'VERIFIED_ACTIVE_CORE',code:'CORE_LOCK_TASK_LINKED_OWNER_VERIFIED'};
 }
 
