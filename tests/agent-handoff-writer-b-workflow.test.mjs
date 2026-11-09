@@ -12,6 +12,7 @@ test('Writer B intake listens only to completed Writer B runs', () => {
 
 test('Writer B intake is gated independently and retains pending events', () => {
   assert.match(workflow, /vars\.ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED == 'true'/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion != 'skipped'/);
   assert.doesNotMatch(workflow, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
   assert.match(workflow, /cancel-in-progress: false\s*\n\s+queue: max/);
   assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
