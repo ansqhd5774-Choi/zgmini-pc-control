@@ -20,7 +20,8 @@ const unknown=code=>({status:'STATE_UNKNOWN',code,
  evidenceLevel:'LIVE_PROCESS_SNAPSHOT_INCONCLUSIVE',runtimeSourceVerified:false,
  providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0});
 
-export function classifyCoreSnapshot(snapshot,{realpath=fs.realpathSync.native}={}){
+export function classifyCoreSnapshot(snapshot,{realpath=fs.realpathSync.native,
+ includeOwnerPid=false}={}){
  if(snapshot?.ok!==true||!Array.isArray(snapshot?.engines)||
    !Array.isArray(snapshot?.processes)||snapshot.processes.length>8192)
   return unknown('CORE_PROCESS_SNAPSHOT_UNAVAILABLE');
@@ -75,7 +76,64 @@ export function classifyCoreSnapshot(snapshot,{realpath=fs.realpathSync.native}=
   activeCoreSourceVerified:true,activeCoreRoot:matching[0].sourceRoot,
   relativeEntrypoint:'scripts/pc-writer/local-cycle.mjs',
   runningTaskInstances:snapshot.runningInstances,
+  ...(includeOwnerPid?{ownerPid:matching[0].pid}:{}),
   providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0};
+}
+
+
+// Fixed, bounded read-only inspection of the Core cycle lock. A lock PID is
+// only a candidate: even a successful read never authorizes deletion or
+// suspension of an active process.
+const CORE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
+export function readCoreLockSnapshot({
+ file=CORE_LOCK,lstat=fs.lstatSync,read=fs.readFileSync,clock=Date.now,
+}={}){
+ try{
+  const stat=lstat(file);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<2||stat.size>512)
+   return {state:'UNKNOWN'};
+  const bytes=read(file);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==stat.size)
+   return {state:'UNKNOWN'};
+  let value;
+  try{value=JSON.parse(bytes.toString('utf8'));}catch{return {state:'UNKNOWN'};}
+  if(!validPid(value?.pid)||!Number.isSafeInteger(value?.at)||
+     value.at<946684800000||value.at>clock()+60000)
+   return {state:'UNKNOWN'};
+  return {state:'PRESENT',pid:value.pid,at:value.at,
+   fingerprint:createHash('sha256').update(bytes).digest('hex')};
+ }catch(error){
+  return error?.code==='ENOENT'?{state:'ABSENT'}:{state:'UNKNOWN'};
+ }
+}
+
+// Task Engine chain and lock owner are independent assertions. A matching PID
+// without an active Core Task chain or plausible process creation time is NOT
+// proof of ownership; Windows PID reuse remains fail-closed.
+export function classifyCoreLockOwner(snapshot,before,after,
+ {realpath=fs.realpathSync.native}={}){
+ const unverified=code=>({status:'UNVERIFIED',code});
+ if(before?.state==='ABSENT'&&after?.state==='ABSENT')
+  return {status:'ABSENT',code:'CORE_LOCK_ABSENT'};
+ if(before?.state!=='PRESENT'||after?.state!=='PRESENT')
+  return unverified('CORE_LOCK_UNREADABLE_OR_CHANGED');
+ if(before.fingerprint!==after.fingerprint||before.pid!==after.pid||
+    before.at!==after.at)return unverified('CORE_LOCK_CHANGED_DURING_PROBE');
+ if(snapshot?.ok!==true||!Array.isArray(snapshot.processes)||
+    snapshot.processes.length>8192)
+  return unverified('CORE_LOCK_PROCESS_INVENTORY_UNAVAILABLE');
+ const candidates=snapshot.processes.filter(row=>row.pid===before.pid);
+ if(candidates.length===0)return unverified('CORE_LOCK_OWNER_PID_NOT_OBSERVED');
+ if(candidates.length!==1)return unverified('CORE_LOCK_PROCESS_INVENTORY_INVALID');
+ const match=candidates[0];
+ if(!Number.isSafeInteger(match.createdAtMs))
+  return unverified('CORE_LOCK_PROCESS_START_UNVERIFIED');
+ if(match.createdAtMs>before.at+5000)
+  return unverified('CORE_LOCK_PID_REUSE_POSSIBLE');
+ const core=classifyCoreSnapshot(snapshot,{realpath,includeOwnerPid:true});
+ if(core.status!=='PASS')return unverified('CORE_LOCK_TASK_LINEAGE_UNVERIFIED');
+ if(core.ownerPid!==before.pid)return unverified('CORE_LOCK_PID_NOT_LINKED_CORE');
+ return {status:'VERIFIED_ACTIVE_CORE',code:'CORE_LOCK_TASK_LINKED_OWNER_VERIFIED'};
 }
 
 export function hashActiveCoreFiles(sourceRoot,{realpath=fs.realpathSync.native,
@@ -102,22 +160,26 @@ export function hashActiveCoreFiles(sourceRoot,{realpath=fs.realpathSync.native,
 export function inspectCoreRuntimeSource({platform=process.platform,
  probe=spawnSync,exists=fs.existsSync,realpath=fs.realpathSync.native,
  lstat=fs.lstatSync,read=fs.readFileSync,
+ readLock=readCoreLockSnapshot,
  systemRoot=process.env.SystemRoot??String.raw`C:\Windows`}={}){
  if(platform!=='win32')return unknown('CORE_WINDOWS_REQUIRED');
  const cscript=path.win32.join(systemRoot,'System32','cscript.exe');
  const script=fileURLToPath(new URL('./core-runtime-source-wmi.mjs',import.meta.url));
  if(!exists(cscript)||!exists(script))return unknown('CORE_FIXED_PROBE_UNAVAILABLE');
  try{
+  const lockBefore=readLock();
   const result=probe(cscript,['//NoLogo','//E:JScript',script],{
    encoding:'utf8',windowsHide:true,shell:false,timeout:20000,maxBuffer:1500000,
   });
   if(result?.error||result?.status!==0||typeof result.stdout!=='string'||
      result.stdout.length>1500000)return unknown('CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE');
   const snapshot=JSON.parse(result.stdout.trim());
+  const lockAfter=readLock();
+  const lockOwner=classifyCoreLockOwner(snapshot,lockBefore,lockAfter,{realpath});
   const classified=classifyCoreSnapshot(snapshot,{realpath});
-  if(classified.status!=='PASS')return classified;
+  if(classified.status!=='PASS')return {...classified,lockOwner};
   const beforeFileSha256=hashActiveCoreFiles(classified.activeCoreRoot,{realpath,lstat,read});
-  if(!beforeFileSha256)return unknown('CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE');
-  return {...classified,beforeFileSha256};
+  if(!beforeFileSha256)return {...unknown('CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE'),lockOwner};
+  return {...classified,beforeFileSha256,lockOwner};
  }catch{return unknown('CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE');}
 }
