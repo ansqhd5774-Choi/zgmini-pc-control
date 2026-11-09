@@ -1,0 +1,39 @@
+# A source-only rejected-request receipt. It does not run PC jobs or B installs.
+# New shared-resource approval routes reuse shared-resource/issue-admission.mjs.
+name: ZGMINI Shared Resource Issue Admission
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: zgmini-shared-admission-${{ github.event.issue.number }}
+  cancel-in-progress: false
+  queue: max
+jobs:
+  inspect-known-approval-issue:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.action == 'opened' &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      (contains(github.event.issue.labels.*.name, 'pc-writer-b-install') ||
+       github.event.issue.title == 'pc-writer-source-install') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Record a rejected known shared-resource request without PC execution
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: cmd
+        run: node shared-resource\issue-admission-report.mjs
