@@ -93,7 +93,8 @@ export async function main(args = process.argv.slice(2)) {
     original.title === 'pc-controller-update' && original.user?.login === 'ansqhd5774-Choi' &&
     issueBody?.requestId === id && issueBody?.targetControllerSha === ledger.targetSha;
 
-  const currentHost = json(path.join(control, 'host.json'));
+  const currentHostRaw = fs.readFileSync(path.join(control, 'host.json'));
+  const currentHost = JSON.parse(currentHostRaw);
   const base = path.join(control, 'backups', `controller-update-${id}`);
   const snapshotHostPath = path.join(base, 'snapshot', 'host.json');
   const snapshotHostRaw = fs.readFileSync(snapshotHostPath);
@@ -108,18 +109,21 @@ export async function main(args = process.argv.slice(2)) {
     Number.isFinite(Date.parse(w.pausedAt)) && Number.isFinite(Date.parse(w.resumedAt)) &&
     Date.parse(w.resumedAt) >= Date.parse(w.pausedAt));
   const backlogVerified = backlog.schema === 'ZGMINI_PC_BACKLOG_V1' && backlog.requestId === id &&
-    backlog.replays && typeof backlog.replays === 'object' && !Array.isArray(backlog.replays);
+    backlog.replays && typeof backlog.replays === 'object' && !Array.isArray(backlog.replays) &&
+    Object.entries(backlog.replays).every(([issue, entry]) => /^\d{1,10}$/.test(issue) &&
+      ['DONE', 'SKIPPED_RESULT_PRESENT', 'POSTING'].includes(entry?.status));
 
   // Reuse the exact existing maintenance protection attestation: Core/Korea
   // scheduled task XML, writer configs, retired Iran approval, real workflow,
   // and every closed maintenance pause interval. All these port calls are reads.
   let protectionVerified = false, protectionCode = null;
-  let currentInventoryComplete = false;
+  let currentInventoryComplete = false, snapshotInventoryComplete = false;
   if (baselineExists && backlogVerified) {
     try {
       const {loadApprovedPackage, makePorts, prevalidationInventory} = await import('./update.mjs');
       const data = loadApprovedPackage(id, path.join(maintenance, 'approved', `${id}.json`), {recovery: true});
       currentInventoryComplete = prevalidationInventory(currentHost) !== null;
+      snapshotInventoryComplete = prevalidationInventory(snapshotHost) !== null;
       const {ports} = makePorts(data, data.issueNumber, {recoveryOperator: true});
       await ports.prepareRecovery();
       protectionVerified = true;
@@ -148,24 +152,33 @@ export async function main(args = process.argv.slice(2)) {
     currentSha: currentHost.controllerSourceSha,
     currentBytesVerified: currentInventoryComplete && verifyControllerFiles(currentHost, control),
     snapshotSha: snapshotHost.controllerSourceSha,
-    snapshotBytesVerified: verifyControllerFiles(snapshotHost, path.join(base, 'snapshot')),
+    snapshotBytesVerified: snapshotInventoryComplete &&
+      verifyControllerFiles(snapshotHost, path.join(base, 'snapshot')),
     ownerIdentityVerified, ownerAlive: alive(owner.pid), protectionVerified,
     backlogVerified, pauseWindowsClosed, workflow, runnerSetVerified, supervisorVerified,
     otherControlLeaseCount});
+  const replayStates = Object.fromEntries(Object.entries(backlog.replays || {})
+    .filter(([issue]) => /^\d{1,10}$/.test(issue))
+    .map(([issue, entry]) => [issue,
+      ['DONE', 'SKIPPED_RESULT_PRESENT', 'POSTING'].includes(entry?.status) ? entry.status : 'UNKNOWN']));
   return {schema: 'ZGMINI_PC_POSTSWITCH_EVIDENCE_V1', requestId: id, sourceSha: source,
     ...decision, actualControllerSha: currentHost.controllerSourceSha,
     installedShaBefore: ledger.installedShaBefore, backupSha: snapshotHost.controllerSourceSha,
     materialHashes: {ledger: digest(ledgerRaw), owner: digest(ownerRaw), marker: digest(markerRaw),
+      currentHost: digest(currentHostRaw),
       snapshotHost: digest(snapshotHostRaw),
       protectedBefore: baselineExists ? digest(fs.readFileSync(baselinePath)) : null,
       backlog: digest(backlogRaw)},
-    backlogReplayStates: Object.fromEntries(Object.entries(backlog.replays || {}).map(([issue, entry]) =>
-      [issue, entry?.status || 'UNKNOWN'])),
+    backlogReplayStates: replayStates,
     protectionCode, otherControlLeaseCount, operationalWrites: 0};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {console.log(JSON.stringify(await main()));}
+  try {
+    const result = await main();
+    console.log(JSON.stringify(result));
+    if (result.status !== 'READONLY_POSTSWITCH_EVIDENCE_VERIFIED') process.exitCode = 2;
+  }
   catch (error) {console.log(JSON.stringify({status: 'RECOVERY_REQUIRED',
     code: /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : 'POSTSWITCH_INSPECTION_FAILED',
     next: 'READ_ONLY_RECONCILE_NO_INSTALL_OR_LOCK_CHANGE', operationalWrites: 0}));
