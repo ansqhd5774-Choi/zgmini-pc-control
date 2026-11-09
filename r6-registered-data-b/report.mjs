@@ -77,7 +77,8 @@ export function sanitizeR6BResult(raw,request,env){
   (raw.requestId!==request.requestId&&
    !(raw.status==='BLOCKED'&&raw.requestId==null)))return base;
  const simple={...base,status:raw.status,code:raw.code,
-  lastPass:['SOURCE_VERIFIED','REGISTERED_KEY_PRESENT','ONE_SHOT_CLAIMED',
+  lastPass:['SOURCE_VERIFIED','REGISTERED_KEY_PRESENT','D1_READONLY_PREFLIGHT',
+   'ONE_SHOT_CLAIMED',
    'PUBLISH_READBACK'].includes(raw.lastPass)?raw.lastPass:null,
   firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH','CORE_LOCK_RELEASE']
    .includes(raw.firstFail)?raw.firstFail:null};
