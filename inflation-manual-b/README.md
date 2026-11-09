@@ -10,9 +10,12 @@ checkpoint, D1, publishing path, credentials or feature formula.
    compare its raw SHA-256 with the owner's private, single-use Issue.
 2. Verify the exact installed PC Git HEAD, `config.source`, source module hashes
    **including `local-cycle.mjs`**, and two already-approved feature parsers.
-3. Under the shared Writer B installation mutex, GET the two frozen official
-   BLS/Census files with finite limits, then parse the actual workbook on PC.
-4. Wait for natural Core idle, atomically obtain the same `local-cycle.lock`
+3. Under the shared Writer B installation mutex, first observe a naturally
+   running `ZGMINI-PC-Local-Core` Task whose Task-Engine-linked `node.exe`
+   `local-cycle.mjs` PID owns the **exact** E: `local-cycle.lock` in the same
+   run (bounded six-minute read-only observation). Then GET the two frozen
+   official BLS/Census files with finite limits and parse the workbook on PC.
+4. Wait for natural Core idle, atomically obtain the observed `local-cycle.lock`
    respected by the existing Core, claim the one-shot journal, reverify source
    and lease, archive the official bytes privately and store/read back only:
    - `inflation-causal-candidates-r1/bls-cpi-ppi3.json` (retains PPI `WPSFD4`)
@@ -63,9 +66,13 @@ side effects remain untested until the separately approved single-use run.
   [run 42642308955](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/42642308955-1-seat-3.json),
   returned `STATE_UNKNOWN / CORE_NO_ACTIVE_TASK_ENGINE`, not a failed Core.
 
-**Next distinct requirement:** before preparing `APPROVED_B`, prove that the
-actual registered Core uses the same canonical `local-cycle.lock` as this B
-receiver, and reconcile the current installed source with the four preimages.
+**Next distinct requirement:** before preparing `APPROVED_B`, reconcile the
+current installed source with the four preimages. The dormant receiver now
+contains an exact-path live lock-owner proof: during the authorized one-shot
+it must observe an active Task-linked Core PID that owns the exact E: lock,
+before any official GET, request claim, or data write. No live Windows proof
+has yet been produced; if Core does not naturally run during the bounded
+window, the run fails closed, without starting or disabling the Task.
 The observed `checkpointSource` (`434f30d2...`) differed from the static
 checkout source (`4273137a...`) in #1105; the later stored Writer checkpoint
 mentions `4273137a...`, but neither observation alone resolves the live Task
@@ -92,5 +99,6 @@ DB, D1, source replacement, a recovery rollback, or repeated execution.
 - The regular Writer B installer can temporarily disable and restore Core,
   but that changes Task state and caused a prior restoration incident. It is
   not an authorized substitute for this two-file data operation. Preserve
-  this receiver's Task-unchanged scope; resolve only the relevant lock-path
-  ambiguity before an authorized one-shot execution.
+  this receiver's Task-unchanged scope; the new read-only Windows/JScript
+  observer confirms an actual owner only while Core naturally runs, and never
+  outputs process command lines, user names, environment or process lists.
