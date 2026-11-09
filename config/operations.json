@@ -8,6 +8,7 @@
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-runtime-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "writer-b-1063-recovery-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "pc-source-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "writer-install-preimage-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "writer-publication-evidence-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
