@@ -50,6 +50,11 @@ export async function ensurePostcheckIssue({issue, manifest, record, listIssues,
     record.requestId === issue.requestId && record.claimHeld === true &&
     typeof listIssues === 'function' && typeof createIssue === 'function' &&
     typeof persist === 'function', 'POSTCHECK_RECOVERY_CLAIM_REQUIRED');
+  if (record.postcheckCreationAttempted === true || record.postcheckIssueNumber != null) {
+    need(record.postcheckTitle === descriptor.title &&
+      record.postcheckBody === descriptor.body,
+    'POSTCHECK_RECORDED_DESCRIPTOR_DRIFT');
+  }
   const current = uniqueExisting(await listIssues(), descriptor);
   if (record.postcheckIssueNumber != null) {
     need(current?.number === record.postcheckIssueNumber, 'POSTCHECK_RECORDED_ISSUE_DRIFT');
