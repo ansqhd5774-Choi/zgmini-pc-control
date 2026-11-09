@@ -52,12 +52,6 @@ export function assessR6BlsCutoverQuarantine({
       hostProof.externalEgressScope !== 'ALL_UNREGISTERED_BLS_EGRESS_VERIFIED' ||
       hostProof.untrackedExternalCallers !== 0 ||
       hostProof.continuousProtectionVerified !== true ||
-      // Merely delaying the R6 batch does NOT protect pre-cutover quota from
-      // ordinary Core/R4 unregistered calls. An uncounted historical window
-      // needs a continuous, explicit no-physical-call quarantine for ALL
-      // unregistered callers; no synthetic requestTimes may be seeded.
-      hostProof.precutoverQuarantineMode !== 'ALL_UNREGISTERED_BLS_PHYSICAL_CALLS_BLOCKED' ||
-      hostProof.quarantineContinuouslyEnforced !== true ||
       !finiteTime(hostProof.cutoverAt) || !finiteTime(hostProof.observedAt))
     return blocked('R6_B_QUARANTINE_COVERAGE_UNVERIFIED', cost);
   if (journalProof?.schema !== 'ZGMINI_BLS_UNREGISTERED_SHARED_JOURNAL_PROOF_V1' ||
@@ -66,8 +60,6 @@ export function assessR6BlsCutoverQuarantine({
       journalProof.activationManifestSha256 !== reviewedPins.activationManifestSha256 ||
       journalProof.cutoverAt !== hostProof.cutoverAt ||
       journalProof.continuousHistoryVerified !== true ||
-      journalProof.quarantinePhysicalAttemptsVerified !== true ||
-      journalProof.quarantinePhysicalAttempts !== 0 ||
       !SHA64.test(journalProof.anchorSha256 ?? '') ||
       !Number.isSafeInteger(journalProof.occupiedSlots24h) ||
       journalProof.occupiedSlots24h < 0 ||
@@ -79,11 +71,29 @@ export function assessR6BlsCutoverQuarantine({
   const observations = [Date.parse(hostProof.observedAt), Date.parse(journalProof.observedAt)];
   if (cutover > at || observations.some(value => value < cutover || value > at || at - value > FRESH))
     return blocked('R6_B_QUARANTINE_OBSERVATION_STALE', cost);
-  // This conservative 24h no-effect window avoids interpreting an absent old
-  // unkeyed call log as zero. Every post-cutover call must be counted in the
-  // sealed cross-process journal. No background polling or sleeping here.
-  if (at - cutover < DAY)
-    return blocked('R6_B_QUARANTINE_24H_NOT_ELAPSED', cost);
+  // Precisely two acceptable cutover routes. Without independently verified
+  // historical physical timestamps, merely delaying R6 is insufficient:
+  // normal Core/R4 callers must ALSO be physically blocked for the first 24h.
+  // That temporary availability impact requires separately approved change.
+  // Do not seed synthetic "historic requests" to fake a valid ledger.
+  if (hostProof.precutoverSafetyMode === 'ALL_UNREGISTERED_BLS_PHYSICAL_CALLS_BLOCKED') {
+    if (hostProof.quarantineContinuouslyEnforced !== true ||
+        journalProof.quarantinePhysicalAttemptsVerified !== true ||
+        journalProof.quarantinePhysicalAttempts !== 0)
+      return blocked('R6_B_QUARANTINE_ALL_CALLERS_BLOCK_UNVERIFIED', cost);
+    if (at - cutover < DAY)
+      return blocked('R6_B_QUARANTINE_24H_NOT_ELAPSED', cost);
+  } else if (hostProof.precutoverSafetyMode === 'FULL_PRECUTOVER_24H_PHYSICAL_HISTORY_ATTESTED') {
+    // A total alone is insufficient: the exact attempt timestamp history must
+    // be independently verified and match immutable initial seed bytes.
+    if (hostProof.fullHistoricalAttemptTimesVerified !== true ||
+        !SHA64.test(hostProof.historicalSeedSha256 ?? '') ||
+        journalProof.initialSeedMatchesPhysicalHistory !== true ||
+        journalProof.historicalSeedSha256 !== hostProof.historicalSeedSha256)
+      return blocked('R6_B_QUARANTINE_HISTORICAL_SEED_UNVERIFIED', cost);
+  } else {
+    return blocked('R6_B_QUARANTINE_PRECUTOVER_SAFETY_UNVERIFIED', cost);
+  }
   const occupied = journalProof.occupiedSlots24h;
   const remaining = R6_ONE_SHOT.blsUnregistered24hLimit - occupied;
   if (cost.bls > remaining) return Object.freeze({
