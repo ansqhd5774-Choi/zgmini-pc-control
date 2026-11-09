@@ -109,6 +109,12 @@ test('rejects invalid or oversized Census diagnostic without returning its conte
   collectionStatus:'SOURCE_FAILED',attempts:[{endpoint:'UNKNOWN',code:'UNKNOWN'}],
   attemptedAt:null,storedAt:1});
  assert.doesNotMatch(JSON.stringify(result),/SECRET/);
+ const writer=new DatabaseSync(core.name);
+ writer.prepare('UPDATE public_feed_snapshots_v1 SET body=? WHERE kind=? AND feed_key=?').run(
+  'X'.repeat(12001),'input','release-calendar:census:diagnostic:2027');
+ writer.close();
+ assert.deepEqual(inspectSourceInventory(data).core.census2027Diagnostic,
+  {status:'UNREADABLE_OR_INVALID',year:2027});
 });
 
 test('decodes bounded compressed Census diagnostic and rejects wrong-year payload',t=>{
