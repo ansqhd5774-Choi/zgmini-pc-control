@@ -136,6 +136,8 @@ export async function processCompletedPcJob(event, {
   if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
   else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
   else if (result.waitProofPending) result.state = 'PARTIAL_WAIT_EVIDENCE_PENDING';
+  else if (result.waitsRecorded || result.waitsReused)
+    result.state = 'WAITING_SHARED_RESOURCE_RECORDED';
   return Object.freeze(result);
 }
 
