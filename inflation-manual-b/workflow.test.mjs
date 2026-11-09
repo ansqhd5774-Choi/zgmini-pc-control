@@ -5,6 +5,10 @@ import fs from 'node:fs';
 const yaml=fs.readFileSync(new URL(
  '../.github/workflows/pc-inflation-official-manual-b-once.yml',import.meta.url),
  'utf8');
+const windowsAdapter=fs.readFileSync(new URL('./windows-adapter.mjs',
+ import.meta.url),'utf8');
+const ownerProbe=fs.readFileSync(new URL('./core-lock-owner-probe.js',
+ import.meta.url),'utf8');
 
 test('only owner issue with explicit off-by-default opt-in can queue one B run',()=>{
  assert.match(yaml,/issues:\s*\n\s*types: \[opened\]/);
@@ -25,4 +29,18 @@ test('separate tokenless Windows writer and token-bearing result reporter',()=>{
  assert.match(yaml,/report\.mjs/);
  assert.equal((yaml.match(/GITHUB_TOKEN:/g)??[]).length,1);
  assert.doesNotMatch(yaml,/powershell|schtasks|wrangler|setup-node/);
+});
+
+test('live Core lock owner check is bounded, Task-linked and read-only',()=>{
+ assert.match(yaml,/timeout-minutes: 16/);
+ assert.match(windowsAdapter,/CORE_OWNER_OBSERVATION_MS=6\*60_000/);
+ assert.match(windowsAdapter,/async proveActiveCoreLock\(\)/);
+ assert.match(windowsAdapter,/INFL_MANUAL_B_CORE_OWNER_NOT_OBSERVED_STOP/);
+ assert.match(ownerProbe,/GetTask\('ZGMINI-PC-Local-Core'\)/);
+ assert.match(ownerProbe,/GetInstances\(0\)/);
+ assert.match(ownerProbe,/EnginePID/);
+ assert.match(ownerProbe,/CommandLine/);
+ assert.match(ownerProbe,/indexOf\('local-cycle.mjs'\)/);
+ assert.doesNotMatch(ownerProbe,/RegisterTask|Stop\(|Run\(|DeleteTask|\.Enabled\s*=/);
+ assert.doesNotMatch(windowsAdapter,/schtasks|Start-ScheduledTask|Stop-ScheduledTask/);
 });
