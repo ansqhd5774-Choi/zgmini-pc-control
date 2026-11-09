@@ -85,7 +85,7 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
     issue: incident, comment: {body: JSON.stringify(result), user: {login: owner}}}));
   const originalFetch = globalThis.fetch;
   const originalToken = process.env.GITHUB_TOKEN;
-  const ledger = [];
+  const ledger = [], originLedger = [];
   let writes = 0;
   process.env.GITHUB_TOKEN = 'integration-test-placeholder';
   globalThis.fetch = async (url, init = {}) => {
@@ -101,6 +101,12 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
     else if (u.pathname.endsWith('/actions/runs/42570000002')) value = {id: 42570000002,
       head_sha: repairSha, status: 'completed', conclusion: 'success', repository: {full_name: repo}};
+    else if (u.pathname.endsWith(`/issues/${originalNumber}`)) value = original;
+    else if (u.pathname.endsWith(`/issues/${originalNumber}/comments`) && method === 'GET') value = originLedger;
+    else if (u.pathname.endsWith(`/issues/${originalNumber}/comments`) && method === 'POST') {
+      originLedger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      value = {id: 3};
+    }
     else throw new Error(`unrecognized mock route ${u.pathname}`);
     return {ok: true, status: 200, json: async () => value};
   };
@@ -110,6 +116,8 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
     await runResultBroker(env);
     await runResultBroker(env);
     assert.equal(writes, 1);
+    assert.equal(originLedger.length, 1);
+    assert.match(originLedger[0].body, /HANDOFF_ORIGIN_RESULT_RECORDED/);
     assert.match(ledger[0].body, /HANDOFF_RESULT_RECORDED/);
     assert.match(ledger[0].body, new RegExp(`origin: ${repo}#${originalNumber}`));
     assert.match(ledger[0].body, /state: RUNTIME_VERIFICATION_PENDING/);
@@ -231,7 +239,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     issue: incident, comment: {user: {login: owner}, body: JSON.stringify(result)}}));
   const oldFetch = globalThis.fetch;
   const oldToken = process.env.GITHUB_TOKEN;
-  const ledger = [];
+  const ledger = [], originLedger = [receipt];
   let resultWrites = 0;
   process.env.GITHUB_TOKEN = 'integration-test-placeholder';
   globalThis.fetch = async (url, init = {}) => {
@@ -246,6 +254,16 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
     else if (u.pathname.endsWith('/actions/runs/42570000004')) data = {id: 42570000004,
       head_sha: repairSha, status: 'completed', conclusion: 'success', repository: {full_name: repo}};
+    else if (u.pathname.endsWith('/actions/runs/42570000003')) data = {id: writerRunId,
+      name: 'ZGMINI Approved Writer B Source Overlay Once', head_sha: sourceSha,
+      head_branch: 'main', event: 'issues', actor: {login: owner},
+      repository: {full_name: repo}, status: 'completed', run_attempt: 1};
+    else if (u.pathname.endsWith('/issues/2403')) data = originIssue;
+    else if (u.pathname.endsWith('/issues/2403/comments') && init.method === 'GET') data = originLedger;
+    else if (u.pathname.endsWith('/issues/2403/comments') && init.method === 'POST') {
+      originLedger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      data = {id: 4};
+    }
     else throw new Error(`unexpected GitHub API ${u.pathname}`);
     return {ok: true, status: 200, json: async () => data};
   };
@@ -255,6 +273,8 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     await runResultBroker(env);
     await runResultBroker(env);
     assert.equal(resultWrites, 1);
+    assert.equal(originLedger.length, 2);
+    assert.match(originLedger[1].body, /HANDOFF_ORIGIN_RESULT_RECORDED/);
     assert.match(ledger[0].body, /state: RUNTIME_VERIFICATION_PENDING/);
     assert.match(ledger[0].body, /Windows\/D1\/API\/UI verification: NOT_VERIFIED/);
   } finally {

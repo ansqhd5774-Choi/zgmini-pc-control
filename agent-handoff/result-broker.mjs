@@ -58,6 +58,93 @@ async function inspectExistingResult(issueNumber, resultId, digest) {
   throw new Error('RESULT_COMMENT_SCAN_LIMIT_STOP');
 }
 
+async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNumber) {
+  for (let page = 1; page <= 4; page++) {
+    const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) throw new Error('RESULT_ORIGIN_LEDGER_STOP');
+    for (const row of rows) {
+      if (row.user?.login !== BOT || typeof row.body !== 'string' ||
+          !row.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n')) continue;
+      const lines = row.body.split('\n');
+      if (!lines.includes(`resultId: ${result.resultId}`)) continue;
+      if (!lines.includes(`digest: ${digest}`)) throw new Error('RESULT_ORIGIN_ID_COLLISION_STOP');
+      if (!lines.includes(`incidentId: ${result.incidentId}`) ||
+          !lines.includes(`handoffIssue: ${handoffIssueNumber}`)) {
+        throw new Error('RESULT_ORIGIN_RECEIPT_BINDING_STOP');
+      }
+      return true;
+    }
+    if (rows.length < 100) return false;
+  }
+  throw new Error('RESULT_ORIGIN_LEDGER_SCAN_LIMIT_STOP');
+}
+
+async function verifyWriterBSourceAtOrigin(number, requestId, sourceSha, code) {
+  let matched = null;
+  for (let page = 1; page <= 4; page++) {
+    const rows = await api(`/repos/${REPOSITORY}/issues/${number}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) throw new Error('RESULT_WRITER_RECEIPT_LEDGER_STOP');
+    for (const item of rows) {
+      if (item.user?.login !== BOT || typeof item.body !== 'string' || item.body.length > 4096 ||
+          item.body.split('\n', 1)[0] !== `<!-- zgmini-writer-b-install:${requestId} -->` ||
+          item.issue_url !== `https://api.github.com/repos/${REPOSITORY}/issues/${number}` ||
+          !item.body.includes('DELIVERY: RESULT_PAIR_READBACK_VERIFIED\n') ||
+          !/^RESULT_CREATED: [0-2]\/2; RESULT_READBACK: 2\/2$/m.test(item.body) ||
+          !item.body.includes(` (${code})`)) continue;
+      const marker = item.body.match(/^RUN_ID: ([1-9][0-9]{0,17}); RETRY: NO_REEXECUTE$/m);
+      if (!marker) continue;
+      const runId = Number(marker[1]);
+      if (!Number.isSafeInteger(runId) || matched !== null) {
+        throw new Error('RESULT_WRITER_RECEIPT_AMBIGUOUS_STOP');
+      }
+      matched = runId;
+    }
+    if (rows.length < 100) break;
+    if (page === 4) throw new Error('RESULT_WRITER_RECEIPT_SCAN_LIMIT_STOP');
+  }
+  if (matched === null) throw new Error('RESULT_WRITER_RECEIPT_MISSING_STOP');
+  const run = await api(`/repos/${REPOSITORY}/actions/runs/${matched}`);
+  if (run?.id !== matched || run?.name !== 'ZGMINI Approved Writer B Source Overlay Once' ||
+      run?.head_sha !== sourceSha || run?.head_branch !== 'main' || run?.event !== 'issues' ||
+      run?.actor?.login !== OWNER || run?.repository?.full_name !== REPOSITORY ||
+      run?.status !== 'completed' || run?.run_attempt !== 1) {
+    throw new Error('RESULT_WRITER_SOURCE_PROVENANCE_STOP');
+  }
+}
+
+// Return only to the authenticated original control Issue, never to arbitrary
+// repository/issue targets from an owner-supplied JSON body.
+async function verifiedOriginIssue(handoff, handoffIssueNumber) {
+  if (handoff.origin.repository !== REPOSITORY ||
+      handoff.failure.evidenceIssueNumber !== handoff.origin.issueNumber) return null;
+  const number = handoff.origin.issueNumber;
+  if (number === handoffIssueNumber) throw new Error('RESULT_ORIGIN_SELF_REFERENCE_STOP');
+  const issue = await api(`/repos/${REPOSITORY}/issues/${number}`);
+  if (issue?.number !== number || issue?.user?.login !== OWNER || issue?.pull_request ||
+      typeof issue.body !== 'string' || issue.body.length > 8192) {
+    throw new Error('RESULT_ORIGIN_ISSUE_NOT_AUTHORIZED');
+  }
+  let request;
+  try { request = JSON.parse(issue.body); } catch { throw new Error('RESULT_ORIGIN_REQUEST_JSON_STOP'); }
+  const pcJob = issue.labels?.some(x => x.name === 'pc-job') &&
+    request?.schema === 'ZGMINI_PC_JOB_V1' &&
+    request.sourceSha === handoff.origin.sourceSha &&
+    request.sourceBranch === handoff.origin.branch &&
+    [REPOSITORY, PUBLIC_FEATURE_REPOSITORY].includes(request.sourceRepository);
+  const writerB = issue.title === 'pc-writer-source-install' &&
+    issue.labels?.some(x => x.name === 'pc-writer-b-install') &&
+    request?.schema === 'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1' &&
+    request.operation === 'pc-writer-source-install' && request.controlRepository === REPOSITORY;
+  if ((!pcJob && !writerB) || request.requestId !== handoff.origin.requestId ||
+      request.chatId !== handoff.origin.chatId ||
+      (writerB && handoff.failure.kind !== 'COMMON_WRITER')) {
+    throw new Error('RESULT_ORIGIN_REQUEST_BINDING_STOP');
+  }
+  if (writerB) await verifyWriterBSourceAtOrigin(number, request.requestId,
+    handoff.origin.sourceSha, handoff.failure.code);
+  return number;
+}
+
 function authorize(event, env) {
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_EVENT_NAME !== 'issue_comment' ||
       env.GITHUB_ACTOR !== OWNER || event.action !== 'created' ||
@@ -110,10 +197,7 @@ export async function main(env = process.env) {
   const result = parseAgentResult(event.comment.body);
   assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
-  if (await inspectExistingResult(event.issue.number, result.resultId, digest)) {
-    process.stdout.write('HANDOFF_RESULT_ALREADY_RECORDED\n');
-    return;
-  }
+  const alreadyRecorded = await inspectExistingResult(event.issue.number, result.resultId, digest);
   const featureSourceRepository = await verifiedFeatureSourceRepository(handoff);
   const repo = result.pullRequest.repository;
   const read = repo === PUBLIC_FEATURE_REPOSITORY ? publicEvidence : api;
@@ -122,6 +206,7 @@ export async function main(env = process.env) {
     read(`/repos/${repo}/actions/runs/${result.testRun.runId}`)
   ]);
   const verified = verifyAgentResult(handoff, result, pr, run, {featureSourceRepository});
+  const originalIssue = await verifiedOriginIssue(handoff, event.issue.number);
   const comment = [
     'HANDOFF_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
     `incidentId: ${result.incidentId}`, `fingerprint: ${result.fingerprint}`,
@@ -131,9 +216,30 @@ export async function main(env = process.env) {
     'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
     'PC retries: 0', 'operationalWrites: 0'
   ].join('\n');
-  await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`, {method: 'POST', body: {body: comment}});
-  if (!await inspectExistingResult(event.issue.number, result.resultId, digest)) throw new Error('RESULT_COMMENT_READBACK_STOP');
-  process.stdout.write('HANDOFF_RESULT_RECORDED_PENDING_RUNTIME\n');
+  if (!alreadyRecorded) {
+    await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`, {method: 'POST', body: {body: comment}});
+    if (!await inspectExistingResult(event.issue.number, result.resultId, digest)) throw new Error('RESULT_COMMENT_READBACK_STOP');
+  }
+  if (originalIssue !== null) {
+    const delivered = await inspectOriginReceipt(originalIssue, result, digest, event.issue.number);
+    if (!delivered) {
+      const receipt = [
+        'HANDOFF_ORIGIN_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
+        `incidentId: ${result.incidentId}`, `handoffIssue: ${event.issue.number}`,
+        `fixPr: ${repo}#${result.pullRequest.number}`, `prHeadSha: ${result.pullRequest.headSha}`,
+        `testRunId: ${result.testRun.runId}`, `state: ${verified.state}`,
+        'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
+        'PC retries: 0', 'operationalWrites: 0'
+      ].join('\n');
+      await api(`/repos/${REPOSITORY}/issues/${originalIssue}/comments`, {method: 'POST', body: {body: receipt}});
+      if (!await inspectOriginReceipt(originalIssue, result, digest, event.issue.number)) {
+        throw new Error('RESULT_ORIGIN_COMMENT_READBACK_STOP');
+      }
+    }
+    process.stdout.write('HANDOFF_RESULT_RETURNED_TO_ORIGIN_PENDING_RUNTIME\n');
+    return;
+  }
+  process.stdout.write(alreadyRecorded ? 'HANDOFF_RESULT_ALREADY_RECORDED\n' : 'HANDOFF_RESULT_RECORDED_PENDING_RUNTIME\n');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
