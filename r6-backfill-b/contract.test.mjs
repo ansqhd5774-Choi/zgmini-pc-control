@@ -32,7 +32,7 @@ const env = {
 const approval = {
   schema: R6_ONE_SHOT.approvalSchema, approvalState: "APPROVED_B_ONE_SHOT",
   scope: R6_ONE_SHOT.scope, sourceRepository: R6_ONE_SHOT.sourceRepository,
-  sourceSha, controlSha, runCount: 1,
+  sourceSha, controlSha, coreDatabasePath: R6_ONE_SHOT.coreDatabasePath, runCount: 1,
   maxBlsRequests: 18, maxDolRequests: 2, maxTotalRequests: 20,
   blsUnregistered24hLimit: 25, allowProviderCalls: true,
   allowLocalRawDbWrites: true, allowD1Writes: false,
@@ -53,6 +53,8 @@ test("R6 one-shot exact approval refuses publication and repeat permissions", ()
   assert.throws(() => validateR6OneShotApproval({ ...approval, allowD1Writes: true }, pins), /APPROVAL_SCOPE_STOP/);
   assert.throws(() => validateR6OneShotApproval({ ...approval, sourceSha: undefined }, {}), /APPROVAL_SCOPE_STOP/);
   assert.throws(() => validateR6OneShotApproval({ ...approval, runCount: 2 }, pins), /APPROVAL_SCOPE_STOP/);
+  assert.throws(() => validateR6OneShotApproval({ ...approval,
+    coreDatabasePath: String.raw`E:\ZGmini\data\other\storage\core.sqlite` }, pins), /APPROVAL_SCOPE_STOP/);
   assert.throws(() => validateR6OneShotApproval({ ...approval, allowTaskDefinitionChanges: true }, pins), /APPROVAL_SCOPE_STOP/);
 });
 
