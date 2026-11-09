@@ -5,6 +5,7 @@ import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.mjs';
 import {inspectWriterPublicationEvidence} from './writer-publication-evidence-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
+import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
 import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs';
 import {inspectSharedResourceReleaseReadonly} from './shared-resource-release-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
@@ -80,6 +81,8 @@ export async function runOperation(request,context){
  if(request.operation==='runner-smoke')return {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',seat:context.seat,resource:{totalMiB:Math.floor(os.totalmem()/1048576),freeMiB:Math.floor(os.freemem()/1048576)},execution: 'CMD_TO_PINNED_NODE',providerCalls:0,d1Writes:0};
  if(request.operation==='core-status')return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,{queryTask,retiredTaskEvidence}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
+ if(request.operation==='inflation-core-lock-observation-readonly')
+  return observeInflationCoreLock({queryTask});
  if(request.operation==='shared-resource-release-readonly')return inspectSharedResourceReleaseReadonly({dataRoot,queryTask});
   if(request.operation==='writer-b-1063-recovery-readonly')return inspectWriterB1063Recovery();
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
