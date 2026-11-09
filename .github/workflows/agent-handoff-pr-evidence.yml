@@ -39,4 +39,4 @@ jobs:
         with:
           node-version: '22'
       - name: Check handoff result and producer contracts
-        run: node --test --test-concurrency=1 "tests/agent-handoff*.test.mjs"
+        run: node --test --test-concurrency=1 "tests/agent-handoff*.test.mjs" "tests/shared-resource*.test.mjs" "tests/writer-b-recovery-proof.test.mjs"
