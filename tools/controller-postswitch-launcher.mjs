@@ -107,7 +107,11 @@ async function prepareReadOnly(args){
   // closure was verified against the pinned Git commit.
   const {main:inspect}=await import('./controller-postswitch-evidence.mjs');
   const {main:preflight}=await import('./controller-postswitch-preflight.mjs');
-  const evidence=await inspect(['--request-id',id,'--source-sha',source]);
+  const {WRITER_TRANSITION}=await import('./controller-postswitch-approval.mjs');
+  // Read-only candidate construction verifies the pinned transition bytes.
+  // This does not grant C approval: the emitted manifest stays approved:false.
+  const evidence=await inspect(['--request-id',id,'--source-sha',source],
+    {writerTransition:WRITER_TRANSITION});
   const namedFailure=summarizePrepareEvidence(evidence);
   if(namedFailure)return {...namedFailure,requestId:id,sourceSha:source};
   const plan=await preflight(['--request-id',id,'--source-sha',source]);
@@ -130,6 +134,7 @@ async function prepareReadOnly(args){
     evidenceHashes:evidence.materialHashes,
     toolHashes,
     expectedBacklogIssues:[919],
+    writerTransition:{...WRITER_TRANSITION},
     postcheck:{operation:'core-status',sourceRepository:'ansqhd5774-Choi/zgmini',
       sourceBranch:'main',sourceSha:postSourceSha},
   };
