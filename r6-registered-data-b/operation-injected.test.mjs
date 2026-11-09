@@ -213,7 +213,8 @@ test('manual requests with different IDs run the same UTC day; same request neve
  // Preserve historic date claims as evidence; they must not block a new request.
  const oldDaily=path.join(pcHome,'employment-r6-registered-one_year-'+
   new Date().toISOString().slice(0,10)+'.claim.json');
- writeFileSync(oldDaily,'historic claim evidence\n');
+ writeFileSync(oldDaily,JSON.stringify({schema:'R6_REGISTERED_ONE_SHOT_CLAIM_V1',
+  requestId:'a3b44168-e96e-48b2-b787-10aa1a0e0099',mode:'ONE_YEAR'}));
  const r1=inject();const {claim:unusedClaim1,...first}=r1;
  const a=await performR6RegisteredOnce({auth,pcHome,...first});
  assert.equal(a.status,'SUCCESS');
@@ -230,4 +231,22 @@ test('manual requests with different IDs run the same UTC day; same request neve
  const claims=readdirSync(pcHome).filter(f=>f.endsWith('.claim.json'));
  assert.equal(claims.length,3);
  assert.ok(claims.includes(path.basename(oldDaily)));
+});
+
+
+test('historically claimed request is blocked even after the claim filename migration',async t=>{
+ const {mkdtempSync,rmSync,writeFileSync,readdirSync}=await import('node:fs');
+ const {tmpdir}=await import('node:os');
+ const path=await import('node:path');
+ const pcHome=mkdtempSync(path.join(tmpdir(),'r6-legacy-claim-'));
+ t.after(()=>rmSync(pcHome,{recursive:true,force:true}));
+ const oldDaily=path.join(pcHome,'employment-r6-registered-one_year-2026-11-09.claim.json');
+ writeFileSync(oldDaily,JSON.stringify({schema:'R6_REGISTERED_ONE_SHOT_CLAIM_V1',
+  requestId:auth.request.requestId,mode:'ONE_YEAR'}));
+ const f=inject();const {claim:unusedClaim,...realClaim}=f;
+ const result=await performR6RegisteredOnce({auth,pcHome,...realClaim});
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R6_B_REQUEST_ALREADY_CLAIMED');
+ assert.ok(!f.calls.includes('RUN'));
+ assert.deepEqual(readdirSync(pcHome),[path.basename(oldDaily)]);
 });
