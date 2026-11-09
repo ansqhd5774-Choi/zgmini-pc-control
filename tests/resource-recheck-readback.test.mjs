@@ -19,11 +19,11 @@ const txt=(path,lines)=>({path,ref:'main',content:lines.map(([k,v])=>k+'='+v).jo
 const receipt=(number,body)=>({user:{...bot},issue_url:api+'/issues/'+number,body});
 const run=(id,name,sha=source,observation=false)=>({id,name,event:'issues',
   status:'completed',actor:owner,head_repository:{full_name:repo},
-  head_sha:sha,run_attempt:1,
+  head_sha:sha,head_branch:'main',run_attempt:1,
   created_at:observation?'2026-11-09T20:15:00Z':'2026-11-09T20:00:00Z',
   updated_at:observation?'2026-11-09T20:20:00Z':'2026-11-09T20:10:00Z'});
 
-function setup(writer=true){
+function setup(writer=true,claimed=false){
   const origNumber=1401, origRun=42777777770, aIssueNumber=1402,aRun=42777777771,seat=3;
   const manifestBody=JSON.stringify({schema:'ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1',
     status:'APPROVED_B',scope:'PC_WRITER_APPROVED_FILE_OVERLAY_ONLY',
@@ -53,16 +53,21 @@ function setup(writer=true){
       requestId:origRequest.requestId,chatId:origRequest.chatId,
       sourceSha:source,...(writer?{manifestSha256:fingerprint}:
         {approvalFingerprintSha256:fingerprint})},
-    evidence:{runId:origRun,status:writer?'WRITER_B_PREFLIGHT_STOP':'BLOCKED',
+    evidence:{runId:origRun,status:writer?
+      (claimed?'WRITER_B_INSTALL_STOP_RESTORED':'WRITER_B_PREFLIGHT_STOP'):'BLOCKED',
       code:writer?'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED':'RESOURCE_WAIT_MEMORY',
       resultJsonPath:origJsonPath,resultTxtPath:origTxtPath,
       resultPairReadbackVerified:true},
-    safePoint:writer?'UNCLAIMED_UNTOUCHED':'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+    safePoint:writer?(claimed?'CLAIMED_ORIGINAL_VERIFIED':'UNCLAIMED_UNTOUCHED'):
+      'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+    ...(claimed?{recovery:'ORIGINAL_VERIFIED'}:{}),
     releaseCondition:writer?'CORE_IDLE_WINDOW_VERIFIED':'HEAVY_MEMORY_AVAILABLE_VERIFIED'
   });
   const origReport=writer?{
     schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',requestId:uuid,
-    runId:String(origRun),status:wait.evidence.status,code:wait.evidence.code
+    runId:String(origRun),status:wait.evidence.status,code:wait.evidence.code,
+    retry:'READ_ONLY_RECONCILE_NO_REEXECUTE',
+    ...(claimed?{recovery:'ORIGINAL_VERIFIED'}:{})
   }:{
     schema:'ZGMINI_PC_RESULT_V1',controlRepository:repo,
     jobId:'run-'+origRun+'-1-seat-'+seat,
@@ -70,13 +75,20 @@ function setup(writer=true){
     sourceRepository:origRequest.sourceRepository,
     sourceBranch:origRequest.sourceBranch,requestedSourceSha:source,
     controlSourceSha:'d'.repeat(40),operation:origRequest.operation,
-    status:wait.evidence.status,code:wait.evidence.code,seat
+    status:wait.evidence.status,code:wait.evidence.code,seat,
+    finishedAt:'2026-11-09T20:05:00Z',phase:'PREVALIDATION',
+    mutationStarted:false,operationalWrites:0,providerCalls:0,
+    d1Writes:0,sqliteOpened:false,resourceLeasesRetained:false
   };
   const origTxt=writer?
     [['REQUEST_ID',uuid],['STATUS',origReport.status],['CODE',origReport.code],
-      ['RUN_ID',String(origRun)]] :
+      ['RUN_ID',String(origRun)],['RETRY',origReport.retry],
+      ...(claimed?[['RECOVERY','ORIGINAL_VERIFIED']]:[]) ] :
     [['jobId',origReport.jobId],['requestId',origReport.requestId],
-      ['status',origReport.status],['code',origReport.code]];
+      ['status',origReport.status],['code',origReport.code],
+      ['phase','PREVALIDATION'],['mutationStarted','false'],
+      ['operationalWrites','0'],['providerCalls','0'],['d1Writes','0'],
+      ['sqliteOpened','false']];
   const origReceipt=writer?
     '<!-- zgmini-writer-b-install:'+uuid+' -->\n'+
       'Writer B evidence: **'+origReport.status+'** ('+origReport.code+')\n'+
@@ -195,6 +207,21 @@ test('old A snapshot and altered Writer manifest cannot be release candidates',(
   const changed=setup();
   changed.origin.manifest.content=changed.origin.manifest.content+' ';
   assert.ok(reviewRecordedResourceReadbacks(changed).missing.includes(
+    'ORIGINAL_ISSUE_RUN_RESULT_PAIR'));
+});
+
+test('original resource wait must preserve exact no-write and postclaim recovery proof',()=>{
+  const pc=setup(false);
+  pc.origin.json.content=JSON.stringify({
+    ...JSON.parse(pc.origin.json.content),mutationStarted:true});
+  assert.ok(reviewRecordedResourceReadbacks(pc).missing.includes(
+    'ORIGINAL_ISSUE_RUN_RESULT_PAIR'));
+  const restored=setup(true,true);
+  assert.deepEqual(reviewRecordedResourceReadbacks(restored).missing,[]);
+  const forged=setup(true,true);
+  forged.origin.json.content=JSON.stringify({
+    ...JSON.parse(forged.origin.json.content),recovery:'READ_ONLY_RECONCILE_LOCK_AND_SOURCE'});
+  assert.ok(reviewRecordedResourceReadbacks(forged).missing.includes(
     'ORIGINAL_ISSUE_RUN_RESULT_PAIR'));
 });
 
