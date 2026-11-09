@@ -128,21 +128,22 @@ function withCoreLock(pcHome,requestId){
 }
 
 // Active Core runs release their own lock naturally. Give the 5-minute Core
-// cadence a bounded 60-second idle opportunity; never inspect/delete someone
+// cadence a bounded five-minute idle opportunity; never inspect/delete someone
 // else's lock or retry unexpected/unknown lock-ownership errors.
 export async function acquireCoreLockBounded(pcHome,requestId,{
  createLock=withCoreLock,now=()=>performance.now(),sleep=delay}={}){
  const started=now();
+ const maxWaitMs=5*60_000,maxRetries=maxWaitMs/5_000;
  let lastOccupied=null;
  for(let retry=0;;retry++){
   // A delayed timer must not let a resumed process acquire beyond the bound.
-  if(retry>0&&now()-started>60_000)throw lastOccupied;
+  if(retry>0&&now()-started>maxWaitMs)throw lastOccupied;
   try{return await createLock(pcHome,requestId);}
   catch(cause){
    if(cause?.code!=='R6_B_CORE_LOCK_OCCUPIED')throw cause;
    lastOccupied=cause;
-   const remaining=60_000-(now()-started);
-   if(retry>=12||!Number.isFinite(remaining)||remaining<=0)throw cause;
+   const remaining=maxWaitMs-(now()-started);
+   if(retry>=maxRetries||!Number.isFinite(remaining)||remaining<=0)throw cause;
    await sleep(Math.min(5_000,remaining));
   }
  }
