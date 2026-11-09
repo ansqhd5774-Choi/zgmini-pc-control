@@ -164,7 +164,7 @@ async function probeExistingD1Read({sourceRoot,config}){
   // Reuse the PC Writer's existing official credential resolver. Do not
   // create, extract, print or transport any Cloudflare credential.
   const remote=client(config,()=>credential(sourceRoot));
-  const row=(await remote.query(config.core,'SELECT 1 AS r6_b_read_probe'))?.results?.[0];
+  const row=(await remote.query(config.core,'SELECT 1 AS r6_b_read_probe',[]))?.results?.[0];
   need(Number(row?.r6_b_read_probe)===1,'R6_B_D1_AUTH_UNAVAILABLE');
   return true;
  }catch{throw error('R6_B_D1_AUTH_UNAVAILABLE');}
