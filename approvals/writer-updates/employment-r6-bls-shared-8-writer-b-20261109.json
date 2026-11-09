@@ -1,0 +1,74 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "feat/employment-r6-bls-shared-quota-proposal-20261109",
+  "candidateSourceSha": "80a6a462158c7ee44dd0cf8d0527ad3d093e9354",
+  "baseHead": "b37f07cfecc3ecbb419eb48b2094d0fbbeacad3c",
+  "baseConfigSourceSha": "b37f07cfecc3ecbb419eb48b2094d0fbbeacad3c",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "052a3520cbb49814347df0bba5f8ef555fa88284ea32371b4073d06a7a2d2891",
+      "afterSha256": "9c8462a2150f9b96e974904190a99d105c561620c18833e558868f94d378e3c6"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "change": "M",
+      "beforeSha256": "08869ef38b29d7536c70d51cabc86829dd42012a4ef55c4f235de54ec7a945c1",
+      "afterSha256": "38f579c4ad1957d4da56e8d337770fb414b9a00aa5e715b6fe7fb9944c80458f"
+    },
+    {
+      "path": "scripts/pc-writer/backfill-monthly-one-year.mjs",
+      "change": "M",
+      "beforeSha256": "14c49da8458c8275eb19bb82950150db81437d35583ea6c7e50cf62bb2caaad3",
+      "afterSha256": "06d29085ff780007d8f46c4e1801611c7beec38d96d2ad402c8b739efb2f4242"
+    },
+    {
+      "path": "scripts/pc-writer/backfill-one-year.mjs",
+      "change": "M",
+      "beforeSha256": "7c7d98a4373ac2dee46e3a5fc7e7d31d91c96f5d071f082267ba7fd85f5b7428",
+      "afterSha256": "6a24099ce431e8ab4cd462891eda7932ad907aaa222d63e5ae14fa66a4a42bdf"
+    },
+    {
+      "path": "scripts/pc-writer/bls-core-activation.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a8a142ea836c8410f2cd7708a4f6fb9f9597ee8b79814b1dcf42c657bf8896b2"
+    },
+    {
+      "path": "scripts/pc-writer/bls-unregistered-reservation.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4416ed00eccde5bf0eec06a9f12a8cb332c8147ac63642fd1454188b3ee4c35f"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "9fd530866185d4499db35513207af0888a4f49165e766e5d75a133785ad7ce24",
+      "afterSha256": "8487fbaf0fc1a5dc7cc8602491fca2bbf5f284e5b0f293c9d4033dac50162f8b"
+    },
+    {
+      "path": "scripts/pc-writer/quota-fetch.mjs",
+      "change": "M",
+      "beforeSha256": "6be2406ee68524c561f911c61b8f9d62ca604ec96f34bdb9752d78346acc3c13",
+      "afterSha256": "5ff750e1abf607e4a207bed16c20394406ca2ba8fe4ca42e2c514a155c87818b"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
