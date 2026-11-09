@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+  "filePath": "scripts/pc-writer/alpaca-incremental.mjs",
+  "beforeSha256": "0876e48fca8eab41ab1a429a09f437f14c9be960ea5cd661702b75bec2393e45",
+  "insertions": [
+    {
+      "anchor": "export async function collectAlpacaIncremental(base,{fetchImpl=fetch,now=Date.now(),wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){",
+      "position": "after",
+      "text": " return {status:'EXCLUDED_BY_USER',runRequests:0};\n"
+    }
+  ]
+}
