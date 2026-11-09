@@ -15,6 +15,7 @@
     "registeredBlsCalls": true,
     "dolCalls": true,
     "sqliteWrites": true,
+    "d1ReadOnlyPreflight": true,
     "d1PublicSnapshot": true,
     "taskWrites": false,
     "sourceWrites": false
