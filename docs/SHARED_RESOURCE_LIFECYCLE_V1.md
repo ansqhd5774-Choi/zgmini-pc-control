@@ -66,3 +66,11 @@
 - `reviewResourceWait`는 순수 판정 함수로 운영 파일·lock을 직접 확인하지 않는다. 현재 자원 해제·source SHA·원래 승인 상태를 함께 인증하는 실제 PC readback adapter가 아직 없기 때문에, 문자열 `VERIFIED_RELEASED`와 과거 SHA가 일치해도 **`RECHECK_EVIDENCE_PENDING`만 반환하고 `READY_FOR_OWNER_REPLAN`을 반환하지 않는다**. 자원별 인증된 원본 Issue·Run·봇 영수증·JSON/TXT 해시·시각·현재 source/승인·해제 증거가 구축되기 전까지 운영 자동 재개/성공 근거로 사용하지 않는다. 실제 운영 연결은 5단계에서 별도 검증한다.
 - 공통 #68 원장 기록 성공 시 `WAITING_SHARED_RESOURCE_RECORDED` 반환을 추가했다. 이 상태는 원담당 ChatGPT가 결과를 자동 수신했음을 뜻하지 않는다.
 - 확장 격리 CI에서 발견된 기존 `writer-b/receiver.test.mjs`의 POSIX 경로 전용 검사 두 건은 테스트 픽스처에서 Windows 구분자를 정규화해 동일 의미로 검증한다. 운영 복구 동작은 변경하지 않았다.
+
+### 범용 자원 해제 A급 관측기 — 소스 준비 단계 (2026-11-10)
+
+- `shared-resource-release-readonly`는 기존 Controller A급 허용목록에 등록한 **읽기 전용 관측 후보**다. `controller/shared-resource-release-readonly.mjs`는 고정 Windows `E:\\ZGmini\\data\\pc-writer`의 Core/Writer lock, 승인 설정의 **관측 SHA**, 기존 Scheduler/WMI JScript probe, Core Task XML hash를 1.5초 간격의 두 샘플로 대조한다. Task가 enabled/READY, 인스턴스·관련/불명확 프로세스 0, Core/Writer 잠금 부재, Task XML·설정 SHA 안정 조건에서만 `CANDIDATE_CLEAR_NOT_AUTHORIZED`를 표기한다. 그 외는 `OBSERVED_BUSY` 또는 `UNVERIFIED`다.
+- 이 A 관측기 자신도 Controller의 request/seat lease를 사용하므로 **모든 lease 디렉터리 0개**로 판정하지 않는다. Controller 설치 owner lease, heavy 메모리/좌석, 결과 업로드 자원은 현재 `UNVERIFIED`로 남긴다. 새 공용 자원은 자원별 실제 소유권 판정과 보호 조건을 검증해 별도 확장한다.
+- A 반환 `PASS`는 **두 번의 로컬 관측을 수집했다**는 뜻이다. `releaseVerified=false`, `runtimeSourceVerified=false`, `approvalVerified=false`, `ownerReplanAuthorized=false`, `automaticPcRetries=0`를 고정한다. `reviewResourceWait`의 `RECHECK_EVIDENCE_PENDING` 차단은 그대로이며, 진단 결과 하나만으로 자동 재개/새 설치하지 않는다.
+- 이 소스의 GitHub 병합만으로 Windows 사용 가능이라 주장하지 않는다. 정규 승인된 Controller 설치가 `config/operations.json`, dispatcher, 신규 관측기 및 기존 `writer-b-1063-task-probe.mjs` 의존 파일을 동일 버전으로 설치한 뒤에만 사용 가능하다. #917 복구 및 운영 승인 보호를 우회하지 않는다.
+- 남은 필수 연결: 원본 #68 대기 및 원본 Issue/Run+JSON/TXT 인증 readback, 현재 A 관측 Run/결과쌍의 원격 재조회, 최신 운영 source와 현재 승인 manifest 대조, 자원별 소유권 검증, 실제 Windows 대기→해제→원담당의 새 승인 판단. 이 모두가 실증되기 전까지 5단계는 **미완료**다. 새 예약 수집/자동 재시도는 하지 않는다.
