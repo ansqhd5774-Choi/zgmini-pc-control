@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V2",
+  "status": "APPROVED_B",
+  "scope": "EMPLOYMENT_R6_REGISTERED_DATA_SQLITE_D1_ONCE",
+  "mode": "BACKFILL",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "installedSourceSha": "f422cd570b679f21cebbd76db11310fa9087ee5f",
+  "overlayManifestPath": "approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json",
+  "overlayManifestSha256": "405fadd0fab40c29292512ba41124ecc653f5a545825ebb7fc2e7f19809230f6",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "pcHome": "E:\\ZGmini\\data\\pc-writer",
+  "maxBlsCalls": 14,
+  "maxDolCalls": 2,
+  "effects": {
+    "registeredBlsCalls": true,
+    "dolCalls": true,
+    "sqliteWrites": true,
+    "d1ReadOnlyPreflight": true,
+    "d1PublicSnapshot": true,
+    "taskWrites": false,
+    "sourceWrites": false
+  },
+  "deltaOverlayManifestPath": "approvals/writer-updates/employment-r6-2015-600-onefile-20261109.json",
+  "deltaOverlayManifestSha256": "a321c1aa001c10907b7abc67b5f8f0f9aa1a19a407c7f01d7d48334feb254d23"
+}
