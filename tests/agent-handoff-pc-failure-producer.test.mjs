@@ -153,6 +153,7 @@ test('the new workflow remains opt-in, single-writer and self-hosted', () => {
   assert.match(yaml, /workflow_run:\s*\n\s*workflows: \[ZGMINI PC Job\]/);
   assert.match(yaml, /types: \[completed\]/);
   assert.match(yaml, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
+  assert.match(yaml, /if: >-\s*\n\s*false &&/);
   assert.match(yaml, /group: agent-handoff-pc-failure-intake/);
   assert.match(yaml, /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
   assert.match(yaml, /run: E:\\ZGmini\\runtime\\node\.exe/);
