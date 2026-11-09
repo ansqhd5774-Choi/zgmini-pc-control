@@ -82,6 +82,9 @@ export function sanitizeR6BResult(raw,request,env){
   firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH','CORE_LOCK_RELEASE']
    .includes(raw.firstFail)?raw.firstFail:null};
  if(!['SUCCESS','PARTIAL','NOOP'].includes(raw.status))return simple;
+ // The immutable workflow's real effect step must have exited successfully;
+ // a stale/forged local SUCCESS file cannot override a failed Actions step.
+ if(env?.R6_B_EFFECT_OUTCOME!=='success')return base;
  const sourceOk=SHA40.test(raw.sourceSha??'');
  const validCount=x=>Number.isSafeInteger(x)&&x>=0;
  const groups=safeGroups(raw.groupResults);
