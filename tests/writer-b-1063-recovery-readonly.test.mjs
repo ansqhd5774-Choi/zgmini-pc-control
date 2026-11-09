@@ -132,6 +132,11 @@ test('Core Task activation toggle is benign but unrelated XML drift is reported'
  assert.equal(drift.status,'PASS');
  assert.equal(drift.coreTask.definitionMatchesOriginalExceptEnabled,false);
  assert.equal(drift.coreTask.resumeAuthorized,false);
+ const utf16=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from(
+  '<Task><Settings><Enabled>false</Enabled></Settings></Task>','utf16le')]);
+ const encoded=f.run({taskXml:()=>utf16});
+ assert.equal(encoded.status,'PASS');
+ assert.equal(encoded.coreTask.definitionMatchesOriginalExceptEnabled,true);
  const malformed=f.run({taskXml:()=>Buffer.from('<Task><Enabled>false</Enabled></Task>')});
  assert.equal(malformed.status,'STATE_UNKNOWN');
 });
