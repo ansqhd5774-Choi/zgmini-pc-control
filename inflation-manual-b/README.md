@@ -75,3 +75,22 @@ The operator must separately authorize exactly two official static GETs,
 archive plus at most two named JSON updates/backups, temporary Core lock
 ownership, and the private one-shot journal. Nothing authorizes scheduler,
 DB, D1, source replacement, a recovery rollback, or repeated execution.
+
+### Shared recovery and lock-path interpretation
+
+- [#1087](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1087)
+  records `WRITER_B_1063_CORE_RECOVERED`, Core enabled and the prior #1063
+  lock finalized. It does **not** verify that the original #1063 Writer B
+  installation succeeded. Do not reopen that recovered Core lock incident or
+  re-run its original maintenance request as a preflight for this feature.
+- The feature Core code derives its cycle lock from `ZGMINI_PC_HOME`, or from
+  the scheduled account's `.zgmini/pc-writer` home when unset. The B receiver
+  names `E:\ZGmini\data\pc-writer\local-cycle.lock`. A C: junction may make
+  these identical, but current static source/Task evidence does not prove
+  their canonical identity. A Runner user's environment alone is not proof
+  of the scheduled Core Task's effective environment.
+- The regular Writer B installer can temporarily disable and restore Core,
+  but that changes Task state and caused a prior restoration incident. It is
+  not an authorized substitute for this two-file data operation. Preserve
+  this receiver's Task-unchanged scope; resolve only the relevant lock-path
+  ambiguity before an authorized one-shot execution.
