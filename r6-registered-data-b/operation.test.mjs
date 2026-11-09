@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2}
+import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2,R6_B_APPROVAL_V3}
  from './operation.mjs';
 
 const uid='d3ac6032-49c1-47e6-98d1-d7adeba91a7c';
@@ -135,6 +135,81 @@ test('V1 cannot smuggle a supplemental delta without V2 explicit authorization',
  const input=fixture();
  input.deltaOverlayBytes=Buffer.from('{}');
  assert.throws(()=>authorizeR6RegisteredB(input),/R6_B_DELTA_SCOPE_STOP/);
+});
+
+
+const collectorDeltaPath='approvals/writer-updates/PROPOSED-employment-r6-backfill-window-collector-20261109.json';
+const collectorPath='lib/market-score/employment-r6-collector.mjs';
+function v3Fixture({mutateCollector=()=>{},mutateApproval=()=>{}}={}){
+ const input=v2Fixture();
+ const base=JSON.parse(input.overlayBytes.toString('utf8'));
+ base.files[1]={...base.files[1],path:collectorPath};
+ input.overlayBytes=Buffer.from(JSON.stringify(base));
+ const delta={
+  schema:'ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1',status:'APPROVED_B',
+  scope:'PC_WRITER_APPROVED_FILE_OVERLAY_ONLY',
+  sourceRepository:proposed.sourceRepository,sourceBranch:base.sourceBranch,
+  sourceRoot:proposed.sourceRoot,candidateSourceSha:'b'.repeat(40),runCount:1,
+  allowProviderCalls:false,allowDbChanges:false,allowD1Writes:false,
+  allowTaskDefinitionChanges:false,allowOtherSourceChanges:false,
+  files:[{path:collectorPath,change:'M',beforeSha256:sha64,afterSha256:'9'.repeat(64)}],
+ };
+ mutateCollector(delta);
+ input.collectorDeltaOverlayBytes=Buffer.from(JSON.stringify(delta));
+ const approved=JSON.parse(input.approvalBytes.toString('utf8'));
+ approved.schema=R6_B_APPROVAL_V3;
+ approved.overlayManifestSha256=hash(input.overlayBytes);
+ approved.collectorDeltaOverlayManifestPath=collectorDeltaPath;
+ approved.collectorDeltaOverlayManifestSha256=hash(input.collectorDeltaOverlayBytes);
+ mutateApproval(approved);
+ input.approvalBytes=Buffer.from(JSON.stringify(approved));
+ const request=JSON.parse(input.event.issue.body);
+ request.approvalManifestSha256=hash(input.approvalBytes);
+ input.event.issue.body=JSON.stringify(request);
+ return input;
+}
+
+test('V3 composes 13 original overlay hashes with exactly two independently approved deltas',()=>{
+ const auth=authorizeR6RegisteredB(v3Fixture());
+ assert.equal(auth.approval.schema,R6_B_APPROVAL_V3);
+ assert.equal(auth.approval.mode,'BACKFILL');
+ assert.equal(auth.approval.maxBlsCalls,14);
+ assert.equal(auth.overlay.files.length,13);
+ assert.equal(auth.overlay.files[0].path,providerPath);
+ assert.equal(auth.overlay.files[0].afterSha256,'e'.repeat(64));
+ assert.equal(auth.overlay.files[1].path,collectorPath);
+ assert.equal(auth.overlay.files[1].afterSha256,'9'.repeat(64));
+ assert.deepEqual(auth.overlay.files.slice(2),overlay.files.slice(2));
+});
+
+test('V3 denies missing, altered, unapproved or broadened collector delta before provider effects',()=>{
+ const missing=v3Fixture();
+ missing.collectorDeltaOverlayBytes=null;
+ assert.throws(()=>authorizeR6RegisteredB(missing),/R6_B_COLLECTOR_DELTA_APPROVAL_STOP/);
+ const changed=v3Fixture();
+ changed.collectorDeltaOverlayBytes=Buffer.from('{}');
+ assert.throws(()=>authorizeR6RegisteredB(changed),/R6_B_COLLECTOR_DELTA_APPROVAL_STOP/);
+ for(const mutateCollector of [
+  d=>{d.status='PROPOSED_B';},
+  d=>{d.files[0].path='lib/market-score/not-collector.mjs';},
+  d=>{d.files[0].beforeSha256='0'.repeat(64);},
+  d=>{d.files.push({...d.files[0],path:'lib/market-score/extra.mjs'});},
+  d=>{d.allowProviderCalls=true;},
+  d=>{d.allowDbChanges=true;},
+ ])assert.throws(()=>authorizeR6RegisteredB(v3Fixture({mutateCollector})),
+  /R6_B_COLLECTOR_DELTA_SCOPE_STOP/);
+ assert.throws(()=>authorizeR6RegisteredB(v3Fixture({
+  mutateApproval:a=>{a.collectorDeltaOverlayManifestPath='approvals/elsewhere.json';}
+ })),/R6_B_COLLECTOR_DELTA_APPROVAL_STOP/);
+});
+
+test('V2 and V1 cannot smuggle a collector delta without V3 scope',()=>{
+ const v2=v2Fixture();
+ v2.collectorDeltaOverlayBytes=Buffer.from('{}');
+ assert.throws(()=>authorizeR6RegisteredB(v2),/R6_B_COLLECTOR_DELTA_SCOPE_STOP/);
+ const v1=fixture();
+ v1.collectorDeltaOverlayBytes=Buffer.from('{}');
+ assert.throws(()=>authorizeR6RegisteredB(v1),/R6_B_COLLECTOR_DELTA_SCOPE_STOP/);
 });
 
 test('malformed null approval fails closed with the documented approval code',()=>{
