@@ -20,8 +20,10 @@ const evidence=()=>{
     installedShaBefore:oldSha,materialHashes};
 };
 function ports(calls, options={}) {
+  let preflightCount=0;
   return {
-    verifyPreconditions:async()=>{calls.push('preflight');return {verified:true};},
+    verifyPreconditions:async()=>{calls.push('preflight');preflightCount++;
+      return {verified:!(options.preconditionAfterClaimFail && preflightCount>1)};},
     verifyOriginalUnchanged:async()=>{calls.push('original-unchanged');
       if(options.originalChanged)throw Object.assign(Error('ORIGINAL_CHANGED'),{code:'ORIGINAL_CHANGED'});
       return options.originalFalse ? false : true;},
@@ -113,6 +115,19 @@ test('an existing recovery claim blocks a second replay attempt',async()=>{
   assert.equal(result.code,'FORWARD_CLAIM_NOT_EXCLUSIVE');
   assert.equal(calls.includes('backlog'),false);
   assert.equal(calls.includes('postcheck'),false);
+});
+
+test('preconditions are freshly verified under the claim before any replay',async()=>{
+  const calls=[],records=[];
+  const result=await reconcilePostSwitchForward({ledger:ledger(),evidence:evidence(),
+    ports:ports(calls,{preconditionAfterClaimFail:true}),
+    persist:async record=>records.push(record)});
+  assert.equal(result.status,'RECOVERY_REQUIRED');
+  assert.equal(result.code,'FORWARD_POSTCLAIM_PRECONDITION_DRIFT');
+  assert.equal(calls.filter(x=>x==='preflight').length,2);
+  assert.equal(calls.includes('backlog'),false);
+  assert.equal(calls.includes('postcheck'),false);
+  assert.equal(records.at(-1).next,'INSPECT_RECOVERY_CLAIM_BACKLOG_AND_POSTCHECK_NO_AUTOMATIC_RETRY');
 });
 
 test('final workflow mismatch blocks success even if backlog and postcheck were PASS',async()=>{
