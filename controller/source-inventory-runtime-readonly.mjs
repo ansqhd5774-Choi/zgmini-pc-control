@@ -20,9 +20,9 @@ const TABLES=Object.freeze({
 });
 const BATCH_KEYS=Object.freeze(['macro','credit','supply','fundFlows','bisDsr','bisTc','rates']);
 const CENSUS_2027_DIAGNOSTIC_KEY='release-calendar:census:diagnostic:2027';
-// Fixed private PC input key; the collector uses RELEASE_CALENDAR_KEY='release-calendar'.
-// The date is stored in the body, not appended to this SQLite primary key.
-const TREASURY_TAWS_INPUT_KEY='release-calendar:treasury:taws';
+// The collector writes this fixed family; marketOperationalStore appends the
+// UTC collection day to the SQLite primary key (key:YYYY-MM-DD).
+const TREASURY_TAWS_INPUT_PREFIX='release-calendar:treasury:taws:';
 const TREASURY_TAWS_MAX_TEXT_BYTES=6*1024*1024;
 const CENSUS_DIAGNOSTIC_STATUSES=new Set(['READY','READY_WITH_FALLBACK','SOURCE_FAILED']);
 const CENSUS_DIAGNOSTIC_CODES=new Set([
@@ -77,9 +77,11 @@ function census2027DiagnosticSummary(encoded,storedAt){
 
 // Only bounded verification metadata is exposed. Never return the TA_WS rows,
 // CUSIPs, source URL, raw response, unexpected fields or decode errors.
-function treasuryTawsInputSummary(encoded,storedAt){
+function treasuryTawsInputSummary(encoded,storedAt,batchKey){
  try{
-  if(typeof encoded!=='string'||Buffer.byteLength(encoded)>20_000_000)
+  if(typeof batchKey!=='string'||
+     !/^release-calendar:treasury:taws:20\d{2}-\d{2}-\d{2}$/.test(batchKey)||
+     typeof encoded!=='string'||Buffer.byteLength(encoded)>20_000_000)
    return {status:'UNREADABLE_OR_INVALID'};
   const decoded=encoded.startsWith('gzip:')?
    gunzipSync(Buffer.from(encoded.slice(5),'base64'),{maxOutputLength:16_000_000}).toString('utf8'):encoded;
@@ -89,6 +91,8 @@ function treasuryTawsInputSummary(encoded,storedAt){
    Number.isFinite(Date.parse(d+'T00:00:00Z'))&&
    new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
   if(!object(body)||!validDay(body.fromDate)||!validDay(body.toDate)||
+     !validDay(batchKey.slice(TREASURY_TAWS_INPUT_PREFIX.length))||
+     batchKey.slice(TREASURY_TAWS_INPUT_PREFIX.length)!==body.toDate||
      Date.parse(body.toDate)-Date.parse(body.fromDate)>=365*86400000||
      body.toDate<body.fromDate||!Number.isSafeInteger(body.awardedCount)||
      body.awardedCount<1||body.awardedCount>2000||
@@ -191,10 +195,10 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    out.batch={storedBatches:integer(all.n),latestStoredAt:integer(all.latest),knownFamilies:known,
     distinctSeriesInsideBodies:'NOT_INSPECTED'};
    queryStage='TREASURY_TAWS_FIXED_INPUT';
-   const taws=db.prepare('SELECT body,stored_at FROM market_input_batches_v1 WHERE batch_key=? LIMIT 1')
-    .get(TREASURY_TAWS_INPUT_KEY);
+   const taws=db.prepare('SELECT batch_key,body,stored_at FROM market_input_batches_v1 WHERE batch_key LIKE ? ORDER BY stored_at DESC LIMIT 1')
+    .get(TREASURY_TAWS_INPUT_PREFIX+'%');
    out.treasuryTawsInput=taws?
-    treasuryTawsInputSummary(taws.body,taws.stored_at):{status:'NOT_STORED'};
+    treasuryTawsInputSummary(taws.body,taws.stored_at,taws.batch_key):{status:'NOT_STORED'};
   }
   if(has('employment')){
    queryStage='EMPLOYMENT_R4';
