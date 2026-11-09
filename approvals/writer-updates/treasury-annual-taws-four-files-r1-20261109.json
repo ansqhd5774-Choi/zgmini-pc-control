@@ -4,7 +4,7 @@
   "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "sourceBranch": "codex/market-calendar-treasury-cache-private-code-r1-20261109",
-  "candidateSourceSha": "3718f9902cb6d814a4372362cae49f07f7a848a6",
+  "candidateSourceSha": "40111539a3536d99b22c99551d30f1b170246682",
   "baseHead": "434f30d2aa221bddacab5afa09241916618d8e22",
   "baseConfigSourceSha": "434f30d2aa221bddacab5afa09241916618d8e22",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
@@ -15,7 +15,7 @@
       "path": "scripts/pc-writer/release-calendar.mjs",
       "change": "M",
       "beforeSha256": "67b2aed41b753004521f56a71b76bb48374c482cbde96de035a4c1cda3fa1c79",
-      "afterSha256": "1bcfcd5090a1d0b82bce2bfb35ed914fc49dd34cf54f1299946e9f78a4ca7289"
+      "afterSha256": "383dbf3e66b2291be30c8dc3d96e91030e827e64bea5bed9fc74b758d0cbd4b2"
     },
     {
       "path": "lib/treasury-auction-history-source.mjs",
