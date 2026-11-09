@@ -13,9 +13,10 @@ const SHA64 = /^[a-f0-9]{64}$/;
 // Must also fit the existing handoff V1 failure.code maximum (79 chars).
 const CODE = /^WRITER_B_[A-Z0-9_]{1,70}$/;
 const MANIFEST = /^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
-const FAILURES = new Set(['WRITER_B_SETUP_STOP', 'WRITER_B_PREFLIGHT_STOP',
+const FAILURES = new Set(['WRITER_B_PREFLIGHT_STOP',
   'WRITER_B_INSTALL_STOP_RESTORED', 'WRITER_B_RECOVERY_REQUIRED']);
 const NON_FAILURES = new Set(['WRITER_B_INSTALLED_VERIFIED', 'WRITER_B_STATE_UNKNOWN']);
+const SETUP_REVIEW_ONLY = 'WRITER_B_SETUP_STOP';
 const REQUIRED_KEYS = ['schema', 'requestId', 'chatId', 'operation',
   'controlRepository', 'approvalManifestPath', 'approvalManifestSha256'];
 const MAX_COMMENT_ROWS = 500;
@@ -147,7 +148,7 @@ export function prepareWriterBFailureHandoff({event, originIssue, receipt,
       result.runId !== String(run.runId) ||
       result.retry !== 'READ_ONLY_RECONCILE_NO_REEXECUTE' ||
       !CODE.test(result.code ?? '') ||
-      ![...FAILURES, ...NON_FAILURES].includes(result.status))
+      ![...FAILURES, ...NON_FAILURES, SETUP_REVIEW_ONLY].includes(result.status))
     stop('RESULT_IDENTITY_INVALID');
   if ((result.status === 'WRITER_B_INSTALLED_VERIFIED' &&
        result.code !== 'WRITER_B_INSTALL_VERIFIED') ||
@@ -164,6 +165,13 @@ export function prepareWriterBFailureHandoff({event, originIssue, receipt,
       !verifiedReceipt.comment.body.includes(
         `Writer B evidence: **${result.status}** (${result.code})\n`))
     stop('RECEIPT_READBACK_MISMATCH_STOP');
+  // Setup STOP may reflect a rejected approval manifest, not a PC runtime
+  // failure. Do not classify it as a shared Writer incident before the full
+  // Writer B approval contract is independently revalidated.
+  if (result.status === SETUP_REVIEW_ONLY) return Object.freeze({
+    state: 'SETUP_REVIEW_REQUIRED', reportStatus: result.status,
+    runId: run.runId, originIssueNumber: originIssue.number,
+    pcOperationalWrites: 0, automaticPcRetries: 0});
   if (!FAILURES.has(result.status)) return Object.freeze({state: 'NOT_ELIGIBLE',
     reportStatus: result.status, runId: run.runId, originIssueNumber: originIssue.number,
     pcOperationalWrites: 0, automaticPcRetries: 0});
