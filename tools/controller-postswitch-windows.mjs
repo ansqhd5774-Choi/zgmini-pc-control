@@ -181,7 +181,8 @@ function makePorts({approval,evidence,source,preflight,ledger}){
   let state=null,backlogIssueNumber=null,backlogResult=null,postcheckResult=null;
   const checked=async()=>{
     stablePreimages(approval);
-    const fresh=await inspectPostSwitch(['--request-id',id,'--source-sha',source]);
+    const fresh=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
+      {writerTransition:approval.writerTransition ?? null});
     validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence:fresh});
     need(fresh.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
       'POSTSWITCH_LIVE_PRECONDITION_FAILED');
@@ -290,6 +291,7 @@ function makePorts({approval,evidence,source,preflight,ledger}){
       const fresh=await checked();
       return {currentSourceSha:fresh.actualControllerSha,
         protectedStateUnchanged:fresh.checks.PROTECTION_UNCHANGED,
+        protectionContractVerified:fresh.checks.PROTECTION_CONTRACT_VERIFIED,
         workflowActive:fresh.checks.LIVE_WORKFLOW_ACTIVE,
         supervisorVerified:fresh.checks.SUPERVISOR_FRESH,
         runnerSetVerified:fresh.checks.RUNNERS_ONLINE,
@@ -345,7 +347,8 @@ export async function main(args=process.argv.slice(2),{launcherVerified=false}={
   const {approval,source}=loadApproval(args),id=INCIDENT.requestId;
   need(approval.sourceSha===source,'POSTSWITCH_APPROVAL_SOURCE_MISMATCH');
   pinnedTools(approval,source);
-  const evidence=await inspectPostSwitch(['--request-id',id,'--source-sha',source]);
+  const evidence=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
+      {writerTransition:approval.writerTransition ?? null});
   validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence});
   need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
     'POSTSWITCH_EVIDENCE_FAILED');
