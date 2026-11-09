@@ -15,8 +15,11 @@ export const R6_B_LABEL='pc-writer-b-install';
 export const R6_B_SCHEMA='ZGMINI_R6_REGISTERED_DATA_B_REQUEST_V1';
 export const R6_B_APPROVAL='ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V1';
 export const R6_B_APPROVAL_V2='ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V2';
+export const R6_B_APPROVAL_V3='ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V3';
 const R6_B_DELTA_OVERLAY_PATH='approvals/writer-updates/employment-r6-2015-600-onefile-20261109.json';
 const R6_B_PROVIDER_PATH='lib/market-score/employment-r6-provider.mjs';
+const R6_B_COLLECTOR_DELTA_PATH='approvals/writer-updates/PROPOSED-employment-r6-backfill-window-collector-20261109.json';
+const R6_B_COLLECTOR_PATH='lib/market-score/employment-r6-collector.mjs';
 export const R6_B_RESULT='r6-registered-data-result.json';
 export const R6_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 export const R6_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
@@ -34,7 +37,8 @@ const same=(a,b)=>path.win32.normalize(a).toLowerCase()===path.win32.normalize(b
 const safeCode=x=>CODES.test(x??'')&&x.length<=80?
  (x.startsWith('R6_B_')?x:`R6_B_${x}`):'R6_B_UNCLASSIFIED_STOP';
 
-export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,deltaOverlayBytes=null}={}){
+export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,
+ deltaOverlayBytes=null,collectorDeltaOverlayBytes=null}={}){
  need(env?.GITHUB_REPOSITORY===R6_B_REPO&&env.GITHUB_EVENT_NAME==='issues'&&
   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_ACTOR===OWNER&&
   env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
@@ -58,12 +62,16 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,del
   overlay=JSON.parse(overlayBytes.toString('utf8'));}
  catch{throw error('R6_B_MANIFEST_JSON_STOP');}
  const v2=approval?.schema===R6_B_APPROVAL_V2;
+ const v3=approval?.schema===R6_B_APPROVAL_V3;
  const approvalKeys=['schema','status','scope','mode','sourceRepository',
   'installedSourceSha','overlayManifestPath','overlayManifestSha256',
   'sourceRoot','pcHome','maxBlsCalls','maxDolCalls','effects'];
- need(exact(approval,v2?[...approvalKeys,'deltaOverlayManifestPath',
-  'deltaOverlayManifestSha256']:approvalKeys)&&
-  (approval.schema===R6_B_APPROVAL||v2)&&approval.status==='APPROVED_B'&&
+ need(exact(approval,v3?[...approvalKeys,'deltaOverlayManifestPath',
+  'deltaOverlayManifestSha256','collectorDeltaOverlayManifestPath',
+  'collectorDeltaOverlayManifestSha256']:
+  v2?[...approvalKeys,'deltaOverlayManifestPath','deltaOverlayManifestSha256']:
+  approvalKeys)&&
+  (approval.schema===R6_B_APPROVAL||v2||v3)&&approval.status==='APPROVED_B'&&
   approval.scope==='EMPLOYMENT_R6_REGISTERED_DATA_SQLITE_D1_ONCE'&&
   ['ONE_YEAR','BACKFILL'].includes(approval.mode)&&
   approval.sourceRepository==='ansqhd5774-Choi/zgmini'&&
@@ -87,7 +95,7 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,del
   same(overlay.sourceRoot,R6_B_SOURCE),
  'R6_B_EFFECT_APPROVAL_STOP');
  let effectiveOverlay=overlay;
- if(v2){
+ if(v2||v3){
   need(approval.deltaOverlayManifestPath===R6_B_DELTA_OVERLAY_PATH&&
    SHA64.test(approval.deltaOverlayManifestSha256??'')&&
    Buffer.isBuffer(deltaOverlayBytes)&&deltaOverlayBytes.length>0&&
@@ -120,6 +128,39 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,del
   effectiveOverlay={...overlay,files:overlay.files.map(file=>
    file.path===R6_B_PROVIDER_PATH?{...file,afterSha256:changed.afterSha256}:file)};
  }else need(deltaOverlayBytes===null,'R6_B_DELTA_SCOPE_STOP');
+ if(v3){
+  need(approval.collectorDeltaOverlayManifestPath===R6_B_COLLECTOR_DELTA_PATH&&
+   SHA64.test(approval.collectorDeltaOverlayManifestSha256??'')&&
+   Buffer.isBuffer(collectorDeltaOverlayBytes)&&collectorDeltaOverlayBytes.length>0&&
+   collectorDeltaOverlayBytes.length<16384&&
+   sha(collectorDeltaOverlayBytes)===approval.collectorDeltaOverlayManifestSha256,
+   'R6_B_COLLECTOR_DELTA_APPROVAL_STOP');
+  let collectorDelta;
+  try{collectorDelta=JSON.parse(collectorDeltaOverlayBytes.toString('utf8'));}
+  catch{throw error('R6_B_COLLECTOR_DELTA_JSON_STOP');}
+  const original=overlay.files.filter(file=>file.path===R6_B_COLLECTOR_PATH);
+  const changed=collectorDelta?.files?.[0];
+  need(collectorDelta?.schema==='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1'&&
+   collectorDelta.status==='APPROVED_B'&&
+   collectorDelta.scope==='PC_WRITER_APPROVED_FILE_OVERLAY_ONLY'&&
+   collectorDelta.sourceRepository===approval.sourceRepository&&
+   collectorDelta.sourceBranch===overlay.sourceBranch&&
+   SHA40.test(collectorDelta.candidateSourceSha??'')&&
+   same(collectorDelta.sourceRoot,R6_B_SOURCE)&&
+   collectorDelta.runCount===1&&
+   collectorDelta.allowProviderCalls===false&&collectorDelta.allowDbChanges===false&&
+   collectorDelta.allowD1Writes===false&&collectorDelta.allowTaskDefinitionChanges===false&&
+   collectorDelta.allowOtherSourceChanges===false&&
+   Array.isArray(collectorDelta.files)&&collectorDelta.files.length===1&&
+   original.length===1&&changed?.path===R6_B_COLLECTOR_PATH&&
+   changed.change==='M'&&SHA64.test(changed.beforeSha256??'')&&
+   SHA64.test(changed.afterSha256??'')&&
+   changed.beforeSha256===original[0].afterSha256&&
+   changed.afterSha256!==changed.beforeSha256,
+   'R6_B_COLLECTOR_DELTA_SCOPE_STOP');
+  effectiveOverlay={...effectiveOverlay,files:effectiveOverlay.files.map(file=>
+   file.path===R6_B_COLLECTOR_PATH?{...file,afterSha256:changed.afterSha256}:file)};
+ }else need(collectorDeltaOverlayBytes===null,'R6_B_COLLECTOR_DELTA_SCOPE_STOP');
  return Object.freeze({request,approval,overlay:effectiveOverlay});
 }
 
@@ -371,9 +412,13 @@ export async function runR6RegisteredOnce({env=process.env}={}){
  const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';
  const overlayBytes=git(['show',`HEAD:${overlayPath}`]);
  const parsedApproval=JSON.parse(approvalBytes.toString('utf8'));
- const deltaOverlayBytes=parsedApproval?.schema===R6_B_APPROVAL_V2?
+ const deltaOverlayBytes=[R6_B_APPROVAL_V2,R6_B_APPROVAL_V3]
+  .includes(parsedApproval?.schema)?
   git(['show',`HEAD:${R6_B_DELTA_OVERLAY_PATH}`]):null;
- const auth=authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,deltaOverlayBytes});
+ const collectorDeltaOverlayBytes=parsedApproval?.schema===R6_B_APPROVAL_V3?
+  git(['show',`HEAD:${R6_B_COLLECTOR_DELTA_PATH}`]):null;
+ const auth=authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,
+  deltaOverlayBytes,collectorDeltaOverlayBytes});
  return performR6RegisteredOnce({auth});
 }
 
