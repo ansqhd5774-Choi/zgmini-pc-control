@@ -24,6 +24,7 @@ const CENSUS_2027_DIAGNOSTIC_KEY='release-calendar:census:diagnostic:2027';
 // UTC collection day to the SQLite primary key (key:YYYY-MM-DD).
 const TREASURY_TAWS_INPUT_PREFIX='release-calendar:treasury:taws:';
 const TREASURY_TAWS_MAX_TEXT_BYTES=6*1024*1024;
+const TREASURY_TAWS_SOURCE_URL='https://www.treasurydirect.gov/TA_WS/securities/search';
 const CENSUS_DIAGNOSTIC_STATUSES=new Set(['READY','READY_WITH_FALLBACK','SOURCE_FAILED']);
 const CENSUS_DIAGNOSTIC_CODES=new Set([
  'HTTP_400','HTTP_401','HTTP_403','HTTP_404','HTTP_408','HTTP_429',
@@ -94,7 +95,8 @@ function treasuryTawsInputSummary(encoded,storedAt,batchKey){
      !validDay(batchKey.slice(TREASURY_TAWS_INPUT_PREFIX.length))||
      batchKey.slice(TREASURY_TAWS_INPUT_PREFIX.length)!==body.toDate||
      Date.parse(body.toDate)-Date.parse(body.fromDate)>=365*86400000||
-     body.toDate<body.fromDate||!Number.isSafeInteger(body.awardedCount)||
+     body.toDate<body.fromDate||body.sourceUrl!==TREASURY_TAWS_SOURCE_URL||
+     !Number.isSafeInteger(body.awardedCount)||
      body.awardedCount<1||body.awardedCount>2000||
      typeof body.text!=='string'||
      Buffer.byteLength(body.text)>TREASURY_TAWS_MAX_TEXT_BYTES)
@@ -110,8 +112,9 @@ function treasuryTawsInputSummary(encoded,storedAt,batchKey){
    const day=r.competitiveAuctionCloseDate.slice(0,10);
    if(!validDay(day))return {status:'UNREADABLE_OR_INVALID'};
    if(day<body.fromDate||day>body.toDate)continue;
-   const ratio=typeof r.bidToCoverRatio==='string'?r.bidToCoverRatio.trim():
-    r.bidToCoverRatio===null?'':String(r.bidToCoverRatio??'').trim();
+   // Match the collector parser's string-only ratio contract. A numeric JSON
+   // value is not an awarded result in the approved parser.
+   const ratio=typeof r.bidToCoverRatio==='string'?r.bidToCoverRatio.trim():'';
    if(!ratio||ratio.toLowerCase()==='null')continue;
    if(!/^\d+(?:\.\d+)?$/.test(ratio))return {status:'UNREADABLE_OR_INVALID'};
    eligibleAwardedRows++;
