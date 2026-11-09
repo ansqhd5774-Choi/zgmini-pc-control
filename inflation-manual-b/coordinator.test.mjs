@@ -43,7 +43,7 @@ test('one-shot happy path validates before claiming and verifies readback',async
  assert.equal(r.status,'INFL_MANUAL_B_SAVED_VERIFIED');
  assert.equal(r.code,'INFL_MANUAL_B_READBACK_VERIFIED');
  assert.deepEqual(r.committed,{bls:'3'.repeat(64),census:'4'.repeat(64)});
- assert.deepEqual(calls,['lock','source','livecore','download','parse','idle',
+ assert.deepEqual(calls,['livecore','lock','source','download','parse','idle',
   'corelock','claim','journal:CLAIMED','source','coreproof','store','readback',
   'journal:COMPLETED','coreunlock','release:false']);
 });
@@ -54,14 +54,14 @@ test('shared lock refusal is a harmless, unclaimed stop',async()=>{
  const r=await performOfficialManualB(a,io);
  assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
  assert.equal(r.code,'INFL_MANUAL_B_SHARED_BUSY_STOP');
- assert.deepEqual(calls,[]);
+ assert.deepEqual(calls,['livecore']);
 });
 test('wrong source SHA stops before download and claim',async()=>{
  const a=auth(),{io,calls}=adapter(a);
  io.readSourcePreimage=()=>({...preimage(a),sourceHead:'f'.repeat(40)});
  const r=await performOfficialManualB(a,io);
  assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
- assert.deepEqual(calls,['lock','release:false']);
+ assert.deepEqual(calls,['livecore','lock','release:false']);
 });
 test('unproved live Core lock stops before official GET or one-shot claim',async()=>{
  const a=auth(),{io,calls}=adapter(a);
@@ -70,7 +70,21 @@ test('unproved live Core lock stops before official GET or one-shot claim',async
  const r=await performOfficialManualB(a,io);
  assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
  assert.equal(r.code,'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
- assert.deepEqual(calls,['lock','source','release:false']);
+ assert.deepEqual(calls,[]);
+});
+test('waiting for natural Core never acquires the shared Writer B lock',async()=>{
+ const a=auth(),{io,calls}=adapter(a);
+ let observed,finish;
+ const entered=new Promise(resolve=>{observed=resolve;});
+ const held=new Promise(resolve=>{finish=resolve;});
+ io.proveActiveCoreLock=()=>{calls.push('livecore');observed();return held;};
+ const execution=performOfficialManualB(a,io);
+ await entered;
+ assert.deepEqual(calls,['livecore']);
+ finish();
+ const result=await execution;
+ assert.equal(result.status,'INFL_MANUAL_B_SAVED_VERIFIED');
+ assert.equal(calls[1],'lock');
 });
 test('bad live workbook is rejected before claim with no data writes',async()=>{
  const a=auth(),{io,calls}=adapter(a);
