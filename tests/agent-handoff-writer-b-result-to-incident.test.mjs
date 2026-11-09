@@ -90,6 +90,14 @@ test('verified success and STATE_UNKNOWN cannot become repair incidents', () => 
   }
 });
 
+test('approval setup STOP is kept separate from authenticated PC runtime failures', () => {
+  const item = prepareWriterBFailureHandoff(fixture(result(
+    'WRITER_B_SETUP_STOP', 'WRITER_B_APPROVAL_PATH_STOP')));
+  assert.equal(item.state, 'SETUP_REVIEW_REQUIRED');
+  assert.equal(item.automaticPcRetries, 0);
+  assert.equal(Object.hasOwn(item, 'body'), false);
+});
+
 test('a reported successful or unknown status cannot carry a contradictory code', () => {
   for (const status of ['WRITER_B_INSTALLED_VERIFIED', 'WRITER_B_STATE_UNKNOWN']) {
     const f = fixture(result(status, 'WRITER_B_PREFLIGHT_STOP'));
