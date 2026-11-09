@@ -1,5 +1,6 @@
 // Proposed, INACTIVE R6 one-shot B contract. This module never executes jobs.
 // A separately approved immutable manifest and PC admission are mandatory.
+import { createHash } from "node:crypto";
 const stop = code => { throw Error(`R6_B_${code}`); };
 const hex = (s, n) => typeof s === "string" && new RegExp(`^[a-f0-9]{${n}}$`).test(s);
 const uuid = s => typeof s === "string"
@@ -74,6 +75,20 @@ export function validateR6OneShotApproval(manifest, pins) {
     manifest.allowCoreSourceChanges !== false)
     stop("APPROVAL_SCOPE_STOP");
   return true;
+}
+
+// Verify the exact approved bytes before trusting parsed manifest fields.
+// `pins` must come from a reviewed immutable workflow, never the issue body.
+export function verifyR6OneShotApprovalBytes(bytes, pins) {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 ||
+    !hex(pins?.approvalManifestSha256, 64)) stop("APPROVAL_BYTES_INVALID");
+  const actual = createHash("sha256").update(bytes).digest("hex");
+  if (actual !== pins.approvalManifestSha256) stop("APPROVAL_HASH_STOP");
+  let manifest;
+  try { manifest = JSON.parse(Buffer.from(bytes).toString("utf8")); }
+  catch { stop("APPROVAL_JSON_STOP"); }
+  validateR6OneShotApproval(manifest, pins);
+  return manifest;
 }
 
 export function plannedR6BackfillCost(dueGroups) {
