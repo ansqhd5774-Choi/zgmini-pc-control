@@ -5,7 +5,8 @@ import {createHash} from 'node:crypto';
 import {classifyPostSwitchEvidence, verifyControllerFiles,
   verifyExactPostSwitchInventory,verifySourceBytes,
   verifySupervisorSnapshot,verifyNamedPcRunnersOnline,
-  verifyWriterProtectionTransition} from '../tools/controller-postswitch-evidence.mjs';
+  verifyWriterProtectionTransition,verifyWriterProtectionEvidence,
+  verifySourceOnlyConfigEvolution} from '../tools/controller-postswitch-evidence.mjs';
 
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const before = 'c09bf6a6f66f229016135020d6ba553ba9a94676';
@@ -49,10 +50,14 @@ test('valid post-switch evidence remains read-only and eligible for a *plan*, ne
 
 const writerTransition=()=>({
   baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
-  currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
-  approvedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
-  writerBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
-  writerAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+  priorConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+  currentConfigSha256:'05eeb13d9183480b89413557c7e65c57d818a5d8fc5eaa88261e55cfc409c57a',
+  priorApprovedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+  approvedSourceSha:'75f73d8613550221f8e80b304d67b8b10a228e7f',
+  priorWriterBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
+  priorWriterAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+  writerBResultBlobSha:'6315e35e980a58a55a6dd8ae11ca53c8e945f42f',
+  writerAResultBlobSha:'65e7edf335d9492058e5e8d183d9927c9c5ba3c0',
 });
 function approvedWriterFixture() {
   const t=writerTransition();
@@ -67,7 +72,7 @@ function approvedWriterFixture() {
     writerB:{schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',
       requestId:'b14af1b2-9a23-4f5a-9239-218498ddb403',
       status:'WRITER_B_INSTALLED_VERIFIED',code:'WRITER_B_INSTALL_VERIFIED',
-      sourceSha:t.approvedSourceSha,mode:'LOCAL_OVERLAY',localOnly:true,
+      sourceSha:t.priorApprovedSourceSha,mode:'LOCAL_OVERLAY',localOnly:true,
       manifestSha256:'593004aa6b0c5c6471a691faebd9c98f142af4990580a8b1d5a0619d829b2e6f',
       changedPaths:['scripts/pc-writer/release-calendar.mjs',
         'lib/treasury-auction-history-source.mjs',
@@ -79,10 +84,29 @@ function approvedWriterFixture() {
       code:'WRITER_FIXED_PREIMAGE_READONLY',operationalWrites:0,
       providerCalls:0,d1Writes:0,sqliteOpened:false,protectedStateUnchanged:true,
       result:{status:'PASS',sourceIdentityConsistent:true,
+        sourceHead:t.priorApprovedSourceSha,approvedConfigSource:t.priorApprovedSourceSha,
+        checkpointSource:t.priorApprovedSourceSha,
+        r6Config:{status:'PASS',configSha256:t.priorConfigSha256}}},
+    writerB2:{schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',
+      requestId:'df88aee8-f993-4280-ad8f-522da056134e',
+      status:'WRITER_B_INSTALLED_VERIFIED',code:'WRITER_B_INSTALL_VERIFIED',
+      sourceSha:t.approvedSourceSha,baseHead:t.priorApprovedSourceSha,
+      mode:'LOCAL_OVERLAY',localOnly:true,
+      manifestSha256:'b030d7fca591d9a39a4af9337ac8df632933ea4e710f83d1f3bc6b2c59ea435b',
+      changedPaths:['lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs',
+        'worker/asset-bubble-r10-raw-r1.mjs']},
+    writerA2:{schema:'ZGMINI_PC_RESULT_V1',
+      requestId:'pc-1f2318d5-6122-40a6-8581-5f1fba0f9d69',
+      operation:'writer-install-preimage-readonly',status:'PASS',
+      code:'WRITER_FIXED_PREIMAGE_READONLY',operationalWrites:0,
+      providerCalls:0,d1Writes:0,sqliteOpened:false,protectedStateUnchanged:true,
+      result:{status:'PASS',sourceIdentityConsistent:true,
         sourceHead:t.approvedSourceSha,approvedConfigSource:t.approvedSourceSha,
         checkpointSource:t.approvedSourceSha,
         r6Config:{status:'PASS',configSha256:t.currentConfigSha256}}},
-    writerBBlobSha:t.writerBResultBlobSha,writerABlobSha:t.writerAResultBlobSha,
+    writerBBlobSha:t.priorWriterBResultBlobSha,writerABlobSha:t.priorWriterAResultBlobSha,
+    writerB2BlobSha:t.writerBResultBlobSha,writerA2BlobSha:t.writerAResultBlobSha,
+    currentConfigRaw:null,
   };
 }
 function completeWriterFixture() {
@@ -91,9 +115,11 @@ function completeWriterFixture() {
   data.current.files['config.json']=data.transition.currentConfigSha256;
   return data;
 }
-test('explicit Writer transition validates independent A and B evidence without rewriting #917 baseline',()=>{
+test('two Writer transitions validate both independent A/B results without rewriting #917 baseline',()=>{
   const data=completeWriterFixture();
-  assert.equal(verifyWriterProtectionTransition(data),true);
+  assert.equal(verifyWriterProtectionEvidence(data),true);
+  assert.equal(verifyWriterProtectionTransition(data),false,
+    'C-grade must also recheck the private Windows config bytes');
   assert.equal(data.baseline.files['config.json'],data.transition.baselineConfigSha256);
   const evidence=valid();
   evidence.protectionVerified=false;
@@ -116,7 +142,7 @@ test('Writer config transition rejects changed digest and extra approval field',
     x=>{x.baseline.files['config.json']=sha256('modified historical snapshot');},
   ]){
     const d=completeWriterFixture();mutate(d);
-    assert.equal(verifyWriterProtectionTransition(d),false);
+    assert.equal(verifyWriterProtectionEvidence(d),false);
   }
 });
 test('Writer transition rejects unrelated files, Task or retired-Iran modifications',()=>{
@@ -130,13 +156,15 @@ test('Writer transition rejects unrelated files, Task or retired-Iran modificati
     x=>{delete x.current.tasks['ZGMINI-PC-Iran-Progress-R13'];},
   ]) {
     const d=completeWriterFixture();mutate(d);
-    assert.equal(verifyWriterProtectionTransition(d),false);
+    assert.equal(verifyWriterProtectionEvidence(d),false);
   }
 });
 test('Writer transition rejects forged or stale A/B proof and blob identities',()=>{
   for(const mutate of [
     x=>{x.writerBBlobSha='f'.repeat(40);},
     x=>{x.writerABlobSha='f'.repeat(40);},
+    x=>{x.writerB2BlobSha='f'.repeat(40);},
+    x=>{x.writerA2BlobSha='f'.repeat(40);},
     x=>{x.writerB.status='RECOVERY_REQUIRED';},
     x=>{x.writerB.sourceSha='a'.repeat(40);},
     x=>{x.writerB.manifestSha256='f'.repeat(64);},
@@ -148,10 +176,44 @@ test('Writer transition rejects forged or stale A/B proof and blob identities',(
     x=>{x.writerA.result.sourceIdentityConsistent=false;},
     x=>{x.writerA.result.approvedConfigSource='f'.repeat(40);},
     x=>{x.writerA.result.r6Config.configSha256='f'.repeat(64);},
+    x=>{x.writerB2.status='RECOVERY_REQUIRED';},
+    x=>{x.writerB2.baseHead='f'.repeat(40);},
+    x=>{x.writerB2.sourceSha='f'.repeat(40);},
+    x=>{x.writerB2.manifestSha256='f'.repeat(64);},
+    x=>{x.writerB2.changedPaths.pop();},
+    x=>{x.writerA2.status='FAIL';},
+    x=>{x.writerA2.operationalWrites=1;},
+    x=>{x.writerA2.result.sourceIdentityConsistent=false;},
+    x=>{x.writerA2.result.checkpointSource='f'.repeat(40);},
+    x=>{x.writerA2.result.r6Config.configSha256='f'.repeat(64);},
   ]) {
     const d=completeWriterFixture();mutate(d);
-    assert.equal(verifyWriterProtectionTransition(d),false);
+    assert.equal(verifyWriterProtectionEvidence(d),false);
   }
+});
+
+test('source-only config inversion checks byte identity and refuses unrelated mutations',()=>{
+  const t=writerTransition();
+  const prev=Buffer.from(`{\r\n  "source": "${t.priorApprovedSourceSha}",\r\n  "feature": true\r\n}\r\n`);
+  const next=Buffer.from(prev.toString('utf8').replace(t.priorApprovedSourceSha,
+    t.approvedSourceSha));
+  t.priorConfigSha256=sha256(prev);
+  t.currentConfigSha256=sha256(next);
+  assert.equal(verifySourceOnlyConfigEvolution(next,t),true);
+  assert.equal(verifySourceOnlyConfigEvolution(null,t),false);
+  assert.equal(verifySourceOnlyConfigEvolution(prev,t),false);
+  const edited=Buffer.from(next.toString('utf8').replace('true','false'));
+  assert.equal(verifySourceOnlyConfigEvolution(edited,t),false);
+  t.currentConfigSha256=sha256(edited);
+  assert.equal(verifySourceOnlyConfigEvolution(edited,t),false,
+    'a matching new digest alone must not permit an unrelated field change');
+  const doubled=Buffer.from(next.toString('utf8').replace('"feature": true',
+    `"feature": true, "nested": {"source": "${t.approvedSourceSha}"}`));
+  t.currentConfigSha256=sha256(doubled);
+  assert.equal(verifySourceOnlyConfigEvolution(doubled,t),false);
+  const invalid=Buffer.concat([next,Buffer.from([0xff])]);
+  t.currentConfigSha256=sha256(invalid);
+  assert.equal(verifySourceOnlyConfigEvolution(invalid,t),false);
 });
 
 test('historical ledger workflow false does not substitute for current live workflow', () => {
