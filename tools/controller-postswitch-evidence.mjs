@@ -169,16 +169,17 @@ const gitBlobDigest = raw => createHash('sha1')
   .update(Buffer.from(`blob ${raw.length}\0`, 'utf8')).update(raw).digest('hex');
 
 /**
- * Strictly verify all three *additional* approved Writer B result bytes.
+ * Strictly verify all four *additional* approved Writer B result bytes.
  * The A-grade observations below are intentionally NOT promoted into a
  * successful, current live-Core source check. This candidate is not a C
  * approval, and this helper is not wired into the live recovery operator.
  */
 export function verifyWriterFollowupBReceipts(receipts) {
   const contract = WRITER_FOLLOWUP_CANDIDATE;
-  if (!Array.isArray(receipts) || receipts.length !== 3 ||
-      !Array.isArray(contract?.writerB) || contract.writerB.length !== 3) return false;
-  for (let index = 0; index < 3; index++) {
+  const count=contract.sourceSequence.length-1;
+  if (!Array.isArray(receipts) || receipts.length !== count ||
+      !Array.isArray(contract?.writerB) || contract.writerB.length !== count) return false;
+  for (let index = 0; index < count; index++) {
     const expected = contract.writerB[index], row = receipts[index];
     if (!Buffer.isBuffer(row?.raw) || row.path !== expected.path ||
         row.blobSha !== expected.blobSha ||
@@ -200,8 +201,8 @@ export function verifyWriterFollowupBReceipts(receipts) {
         result.candidateSourceSha !== expected.candidateSourceSha ||
         result.manifestSha256 !== expected.manifestSha256 ||
         !Array.isArray(result.changedPaths) ||
-        result.changedPaths.length !== 1 ||
-        result.changedPaths[0] !== expected.changedPath) return false;
+        JSON.stringify(result.changedPaths) !== JSON.stringify(
+          expected.changedPaths ?? [expected.changedPath])) return false;
   }
   return contract.writerB.every((entry, index) =>
     entry.baseHead === contract.sourceSequence[index] &&
@@ -209,8 +210,8 @@ export function verifyWriterFollowupBReceipts(receipts) {
 }
 
 /**
- * A byte-only, in-memory inverse over the JSON source field. Anchors at 48d,
- * 144f, 75f and 70d were observed separately. The 4ec digest is calculated,
+ * A byte-only, in-memory inverse over the JSON source field. Anchors at de8,
+ * 48d, 144f, 75f and 70d were observed separately. The 4ec digest is calculated,
  * never asserted as an independently observed historical A-grade digest.
  * No argument or return value constitutes live-Core or C-grade verification.
  */
@@ -218,9 +219,9 @@ export function analyzeSourceOnlyReplacementChain(raw, {sources, anchors} = {}) 
   const stop = code => ({status:'SOURCE_ONLY_CHAIN_UNVERIFIED', code,
     cApprovalAuthorized:false, liveCoreSourceVerified:false});
   if (!Buffer.isBuffer(raw) || !Array.isArray(sources) ||
-      sources.length !== 5 || sources.some(source =>
+      ![5,6].includes(sources.length) || sources.some(source =>
         typeof source !== 'string' || !/^[a-f0-9]{40}$/.test(source)) ||
-      new Set(sources).size !== 5 || !anchors ||
+      new Set(sources).size !== sources.length || !anchors ||
       typeof anchors !== 'object' || Array.isArray(anchors) ||
       Object.keys(anchors).length !== sources.length ||
       sources.some((source,index)=>!Object.hasOwn(anchors,source) ||
@@ -233,7 +234,7 @@ export function analyzeSourceOnlyReplacementChain(raw, {sources, anchors} = {}) 
     if (!Buffer.from(currentText, 'utf8').equals(raw))
       return stop('WRITER_CHAIN_UTF8_INVALID');
     const derived=[];
-    for (let step=4;step>=0;step--) {
+    for (let step=sources.length-1;step>=0;step--) {
       const currentSource=sources[step];
       const currentRaw=Buffer.from(currentText,'utf8');
       const currentHash=digest(currentRaw);
@@ -268,15 +269,15 @@ export function analyzeSourceOnlyReplacementChain(raw, {sources, anchors} = {}) 
 
 export function analyzeWriterFollowupSourceCandidate(currentConfigRaw) {
   const candidate=WRITER_FOLLOWUP_CANDIDATE;
-  const [source75,source4ec,source144,source48]=candidate.sourceSequence;
+  const [source75,source4ec,source144,source48,sourceDe]=candidate.sourceSequence;
   const h=candidate.configShaAnchors;
   return analyzeSourceOnlyReplacementChain(currentConfigRaw,{
     sources:[WRITER_TRANSITION.priorApprovedSourceSha,
-      source75,source4ec,source144,source48],
+      source75,source4ec,source144,source48,sourceDe],
     anchors:{
       [WRITER_TRANSITION.priorApprovedSourceSha]:h.prior70,
       [source75]:h.at75,[source4ec]:h.at4ec,
-      [source144]:h.at144,[source48]:h.at48,
+      [source144]:h.at144,[source48]:h.at48,[sourceDe]:h.atDe,
     },
   });
 }
@@ -284,12 +285,12 @@ export function analyzeWriterFollowupSourceCandidate(currentConfigRaw) {
 /**
  * #917's immutable PROTECTED_BEFORE snapshot is never rewritten to make later
  * Writer overlays appear unchanged. This only compares the new *candidate*
- * against the separately observed, latest 48d Writer config digest. It is NOT
+ * against the separately observed, post-#1195 de8 Writer config digest. It is NOT
  * a C-grade consent or a substitute for the historical 70d→75f approval.
  */
 export function verifyWriterFollowupProtectedSnapshot(baseline, current) {
   const baselineSha=WRITER_TRANSITION.baselineConfigSha256;
-  const latestSha=WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at48;
+  const latestSha=WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.atDe;
   if (!sameKeys(baseline,current) ||
       !sameKeys(baseline?.files,current?.files) ||
       !sameKeys(baseline?.tasks,current?.tasks) ||
@@ -328,9 +329,9 @@ export function inspectWriterFollowupProtectionCandidate({baseline,current,
       analysis.cApprovalAuthorized!==false ||
       analysis.liveCoreSourceVerified!==false ||
       analysis.intermediate4ecIndependentlyObserved!==false ||
-      !Array.isArray(analysis.stages) || analysis.stages.length!==5 ||
+      !Array.isArray(analysis.stages) || analysis.stages.length!==6 ||
       analysis.stages.some((step,index)=>
-        step.evidenceLevel!==(index===2?'DERIVED_ONLY':'PINNED_DIGEST_MATCH')))
+        step.evidenceLevel!==(index===3?'DERIVED_ONLY':'PINNED_DIGEST_MATCH')))
     return {...result,code:'WRITER_FOLLOWUP_CONFIG_BYTES_UNVERIFIED'};
   return {...result,status:'READONLY_WRITER_FOLLOWUP_PROTECTION_CANDIDATE_VERIFIED',
     code:'WRITER_FOLLOWUP_PINNED_READONLY_EVIDENCE_MATCH',
