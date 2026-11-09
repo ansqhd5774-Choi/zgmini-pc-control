@@ -1,7 +1,6 @@
 # ZGMINI 단일 ChatGPT 총괄 — 공통 장애 대기열 실행 계약
 
-상태(2026-11-09 KST): PC Job 자동 접수 소스 main 병합·기존 opt-in 사용자 확인; Writer B 자동 접수 소스 main 병합·중앙 ChatGPT 유형별 검증 프롬프트 저장/재조회 완료.
-Writer B 전용 opt-in은 사용자 `true` 저장 확인 및 실제 정상·건너뜀 분기 실증 완료. 자연 장애→중앙 수정→원래 Issue 결과 기록의 E2E는 미검증. PR/CI/예약 조회를 PC Runtime·운영 적용 성공으로 간주하지 않는다.
+상태(2026-11-09 KST): **자연 Writer B 공통 장애 1건을 자동 접수 → 중앙 해결 → 격리 러너 CI → 정식 원본 Issue 결과 반환까지 E2E 1/1 실증 완료.** 중앙 처리 계획 8/8=100% (실증 1건 기준). 원본 기능 설치 0/4·Core 복구 후 자연 정규 cycle 미확인은 별도 관리한다. PR/CI·결과 영수증은 다른 ChatGPT의 자동 수신 또는 개별 기능 설치·D1/API/UI 운영 적용 증거가 아니다.
 
 ## 사용자 최종 역할 지시
 
@@ -109,10 +108,10 @@ Writer B 전용 opt-in은 사용자 `true` 저장 확인 및 실제 정상·건�
 | 4 | 단일 중앙 ChatGPT 예약 작업 등록 및 실제 대기열 조회 | **완료(SCHEDULER)** — `Automation_9a403a04a8ac8191a331e94f9abeb1b4`, 첫 자연 실행 `NO_WORK` |
 | 5 | 기존 GitHub Issue 라우팅·검증 증거 보존 | **완료(ROUTING 한정)** — #1041에 bot `HANDOFF_ROUTED` 기록; **수동 생성 사건**이므로 자연 자동 intake 증거는 아님 |
 | 6 | 원본 GitHub Issue 결과 반환 계약과 broker 소스 확보 | **완료(SOURCE)** — 기존 result broker; 실제 자연 사건의 결과 반환은 8단계 미검증 |
-| 7 | 승인된 PC Job/Writer B의 **자연 발생 유효 실패** → 증거 대조 → 단일 Incident Issue 자동 등록·중복 방지·재조회 | **미완료(RUNTIME E2E)** — 인위적 실패를 만들지 않음 |
-| 8 | 중앙 ChatGPT가 실제 사건을 선택하여 원인 수정·회귀·정확한 PR/CI·원본 Issue 결과 기록까지 수행하고 필요한 운영 적용을 별도 판정 | **미완료(AGENT E2E)** — `NO_WORK`/PR/CI만으로 완료 판정 금지 |
+| 7 | 승인된 PC Job/Writer B의 **자연 발생 유효 실패** → 증거 대조 → 단일 Incident Issue 자동 등록·중복 방지·재조회 | **완료(Writer B 1건 RUNTIME)** — #1063 원본 Run 42617811190 실패, bot #1068 자동 생성·원본 requestId/code/증거 대조·동일 incident 검색 1건 |
+| 8 | 중앙 ChatGPT가 실제 사건을 선택하여 원인 수정·회귀·정확한 PR/CI·원본 Issue 결과 기록까지 수행하고 필요한 운영 적용을 별도 판정 | **완료(Writer B 1건 AGENT E2E)** — #1086 수정/32회 로컬 회귀·격리 CI 42637013508 성공, #1087 Core/lock 실PC 복구, broker 영수증 #1068/#1063 각 1건. broker state는 `RUNTIME_VERIFICATION_PENDING`; 기능 설치 별도 |
 
-- **계획·구성 세부 마일스톤: 6/8 = 75%.** 이는 source·설정·라우팅 단계의 누적 수치이며 **실제 자연 장애 E2E는 0/1 = 0% 검증**이다. 문서 수정이나 단순 예약 실행으로 7·8단계 진행률을 올리지 않는다. 전체 운영 기능 완료라고 표현하지 않는다.
+- **중앙 인계 8개 마일스톤: 8/8 = 100%, 자연 Writer B 공통 사고 처리 E2E 표본 1/1.** 실제 #1063→#1068 자동 접수, #1086 수정·격리 CI 성공, #1087 원본 PC Core Enabled/lock finalized, broker 인증 댓글 2/2가 서로 다른 증거다. **각 기능 후속 설치 성공 0/4, 복구 후 Core 정규 cycle 미관측**이며 전체 ZGMINI 운영 기능 완료로 표현하지 않는다. 다음 자연 사고에 대한 반복 재현 성공률은 아직 측정되지 않았다.
 - **ChatGPT 구조 제약:** 중앙 ChatGPT가 다른 일반 ChatGPT의 대화 ID를 지정해 그 대화에 Tasks를 설치하거나 대화를 깨우는 지원 경로는 확인되지 않았다. `origin.chatId`는 원 사고 추적용이며 실제 `chat_ref`와 별개다. 다른 일반챗마다 최초 1회 Tasks 연결, PR 알림 브리지, Work 전용 MCP Events는 현재 **비채택·완료조건 제외**한다. 이 제약을 회피했다고 주장하지 않는다.
 - **#1041 중앙 판정 완료(2026-11-09 KST):** #1041은 사람이 작성한 #1030 읽기 전용 Writer insertion **프리뷰 안전 중단** 인계로, 자연 PC Job/정규 Writer B 설치 장애 자동 접수 실증이 아니다. 원본 상태 `BLOCKED / WRITER_B_INSERT_ANCHOR_MATCH_STOP`, 결과 JSON/TXT 2/2, PC source·Task·DB·D1·Provider 쓰기/호출 0. #792의 승인된 단일 Core 훅 after SHA-256과 #1012의 실제 Windows A 조회 파일 SHA-256이 `2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d`로 일치한다. **#1012는 특정 checkout 파일/bridge 존재 증거일 뿐 현재 실행 중 Core launcher 연결·gate 활성 증거는 아니다**. #1022 HEAD/config 조회를 파일 SHA 직접 증거로 오인하지 않는다. 최신 owner 댓글의 R2 이중 hook 중복 위험에 따라 신규 설치·재시도는 보류한다. 중앙 총괄이 #1041에 `CENTRAL_TRIAGE_RECORDED` 댓글 [#1041 comment 6739037534](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1041#issuecomment-6739037534)를 남기고 읽기 재조회했으며, 완료된 판정의 무한 재처리 방지를 위해 `handoff-agent-pending`만 제거했다. `agent-handoff` 라벨과 Issue(open), 원본 #1030, 기존 원장은 보존. 무수정 판정을 result-broker의 `HANDOFF_RESULT_RECORDED`/운영 해결로 승격하지 않는다. 현행 broker의 자동 원본 반환 대상은 인증된 pc-job/Writer B **소스 설치** Issue로, #1030 프리뷰는 해당 계약과 다르다.
 
@@ -120,9 +119,9 @@ Writer B 전용 opt-in은 사용자 `true` 저장 확인 및 실제 정상·건�
 
 **다음 필수 실행과 인수 조건**
 
-1. **7→8단계 실제 기능:** 기존 중앙 예약을 유지하면서 다음 자연 발생 *유효* PC Job/Writer B 실패 1건의 owner 요청·bot receipt·workflow run·원문 SHA·결과 JSON/TXT를 교차 검증한다. 정확한 중복 억제 Issue 등록을 확인하고, 중앙 총괄이 허용 범위의 최소 수정·관련 테스트·PR/CI와 인증된 원본 Issue receipt를 처리한다. 원본 결과는 다른 일반 ChatGPT 대화의 자동 재개가 아니다. 합성 장애·중복 PC 재실행·별도 원담당 Tasks·예약 자연 갱신 검증을 선행하지 않는다.
+1. **다음 실제 실행:** 중앙 인계 E2E 1건 성공은 보존하고 과거 검증을 다시 돌리지 않는다. 현재 공유 Writer B #1063 복구 후 원담당 4개 기능의 신규 설치/활성 증거 및 자연 Core cycle 관측을 확인한다. 동일 Treasury manifest 중복 접수 #1090(실행 job skipped)/#1092(신규 정상 제목 B 진행)는 원래 Run/JSON/TXT로 구별한다. 기능 처리와 무관한 원담당 재개 ACK Gate를 새로 만들지 않는다. 4건 후속 결과 확보 뒤 승인된 공유 잠금/복구 프로세스 재발 방지 패치·회귀를 수행한다. 예약 갱신 검증은 기능 완료 뒤만 한다.
 2. **이미 판정된 #1041:** 새로운 실제 근거가 없으면 중복 훅 설치·불필요한 Writer 진단 코드 개조·추가 수동 반환을 반복하지 않는다. 원담당 물가지표 기능은 독립적으로 기존 Core launcher/gate를 승인된 경로로 확인하고 수집·게시를 진행한다. 총괄은 그 소유 영역을 변경하지 않는다.
-3. **보고 계약:** 준비·구현 6/8(75%)와 자연 장애 전체 처리 0/1(미검증)을 구분하고, 사건별 LAST PASS/FIRST FAIL·PR/CI·실제 Runtime 적용 여부·원본 Issue readback을 별도 기록한다. 새로운 실증이 있을 때만 해당 단계 진행률을 높인다.
+3. **보고 계약:** 중앙 인계 E2E 마일스톤 8/8(100%)는 실제 Writer B 사고 1건의 접수·중앙 해결·정식 반환 범위만 뜻한다. 원본 기능 설치 0/4, Core 자연 실행 미관측, 다른 챗 수신 `UNKNOWN`, broker `RUNTIME_VERIFICATION_PENDING`을 반드시 별도 기재한다. 사건별 LAST PASS/FIRST FAIL·PR/CI·실제 Runtime 적용·원본 Issue readback 분리를 유지한다.
 
 ## 수정된 증거와 남은 필수 단계
 
@@ -156,8 +155,4 @@ Writer B 전용 opt-in은 사용자 `true` 저장 확인 및 실제 정상·건�
   매시간 일정과 활성 상태를 보존한 채 2026-11-09 Writer B 출처·실패 상태
   검증을 추가하고 재조회했다. 최신 관측 접수 `agent-handoff`는 0건이므로
   실제 처리 성공으로 평가하지 않는다.
-- Writer B 변수 등록과 정상 경로 실증은 완료됐다. 다음 필수 단계는
-  실제 자연 발생한 유효 실패 1건의 인계 Issue 생성·원장 중복 방지·중앙 처리·
-  원래 Issue 결과 기록을 증거로 검증한다. 검증만을 위한 인위적 PC 실패,
-  Writer B 재실행·재설치·복구 변경은 하지 않는다. 이전 다중 대화 Draft의
-  `queue=null`/별도 Windows DB 미연결은 본 단일 중앙 intake의 완료 Gate가 아니다.
+- Writer B 정상/건너뜀 및 자연 실패 자동접수→중앙 처리→정식 결과 반환의 첫 표본을 확인했다. [#1068 정식 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1068#issuecomment-6742864318), [#1063 원본 receipt](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1063#issuecomment-6742864978), 격리 CI Run `42637013508`이다. 검증만을 위한 인위적 실패·기존 Writer B 요청 재실행·별도 chat 자동 수신함을 만들지 않는다. 이전 다중 대화 Draft의 `queue=null`/별도 Windows DB 미연결은 본 단일 중앙 intake의 완료 Gate가 아니다.
