@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "c7e02178-a60d-42bd-8c37-170a8b7e3df7",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "825cfbd6e2025940e3e48631e7ff1dddf582e75a",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "f422cd570b679f21cebbd76db11310fa9087ee5f",
+  "candidateSourceSha": "22618f2110eb1662d96d65e976134b23c9e608ff",
+  "manifestSha256": "0eea80efba61d8e68003fdd1daf5a54795de7a246ddec338fad5a879960680b6",
+  "baseTreeOid": "c7787eecf2ee0bf9b17092bc8fd1e27171785f06",
+  "preparedTreeOid": "65f20000de4c126121fd1e52e63e6471477684f4",
+  "provenanceSha256": "a48ac05ff1c7b053131e6f261ae66ad610bfd4a8b278b0a7bda32034eda30fbb",
+  "runId": "42610482387",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/release-calendar.mjs"
+  ]
+}
