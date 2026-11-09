@@ -123,6 +123,18 @@ test('base handoff label lost between reads prevents a false routed success',asy
   assert.equal(f.labelCount,0);
 });
 
+test('title changed while applying state label fails final readback',async()=>{
+  const f=fixture();
+  f.io.addIssueLabel=async(number,label)=>{
+    assert.equal(number,1200);
+    f.created.labels.push({name:label});
+    f.created.title='untrusted';
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),/LABEL_READBACK_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.comments.length,1);
+});
+
 test('base handoff label lost while applying state label fails final readback',async()=>{
   const f=fixture();
   f.io.addIssueLabel=async(number,label)=>{
