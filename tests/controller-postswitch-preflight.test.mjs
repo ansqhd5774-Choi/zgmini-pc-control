@@ -4,15 +4,18 @@ import {readAllPages,prepareBacklogReadOnly} from '../tools/controller-postswitc
 
 const id='pc-update-877e10c8-8580-4095-a675-bef9ec032193';
 const pause='2026-11-08T12:28:00Z',resume='2026-11-08T12:29:00Z';
-const req={schema:'ZGMINI_PC_JOB_V1',requestId:'pcr6-20261108-919',
-  chatId:'chat-abc',operation:'writer-install-preimage-readonly',
-  sourceRepository:'ansqhd5774-Choi/zgmini-pc-control',sourceBranch:'main',
-  sourceSha:'a'.repeat(40),
-  preimageManifestPath:'approvals/writer-preimage/abcd-0001.json',
-  preimageManifestSha256:'f'.repeat(64)};
-const original={number:919,title:'A grade',body:JSON.stringify(req),
+// The actual 2026-11-08 #919 GitHub Issue's nine-field payload, with no key/token.
+const req={schema:'ZGMINI_PC_JOB_V1',
+  sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
+  sourceSha:'7703964728cd8c2431ce1d0192ede1854481c1bd',
+  requestId:'pc-290d6501-ab68-4fda-b4c4-473b582fb2f1',
+  chatId:'chat-0f48a9ef-a950-4491-bfa0-15fdfd349943',
+  operation:'writer-install-preimage-readonly',
+  preimageManifestPath:'approvals/writer-preimage/market-calendar-er1-import-deps6-readonly-20261108.json',
+  preimageManifestSha256:'385c758d6ab8f4e183699b3b98739350381d873496dc5d59c4e58cf4ceaf0f16'};
+const original={number:919,title:'pc-job',body:JSON.stringify(req),
   user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
-  created_at:'2026-11-08T12:28:45Z'};
+  created_at:'2026-11-08T12:28:34Z'};
 const backlog=()=>({schema:'ZGMINI_PC_BACKLOG_V1',requestId:id,
   pausedAt:pause,resumedAt:resume,replays:{}});
 function ports(options={}){
