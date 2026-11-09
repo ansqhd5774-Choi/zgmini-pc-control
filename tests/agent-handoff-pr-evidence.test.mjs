@@ -21,9 +21,11 @@ test('new handoff CI checks out exact PR head and preserves read-only credential
   assert.match(workflow, /permissions:\n  contents: read/);
   assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
-  assert.match(workflow, /run: node --test tests\/agent-handoff\*\.test\.mjs/);
-  assert.match(workflow, /runs-on: ubuntu-latest/);
+  assert.match(workflow, /run: node --test "tests\/agent-handoff\*\.test\.mjs"/);
+  assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+  assert.match(workflow, /defaults:\s*\n\s+run:\s*\n\s+shell: cmd/);
   assert.match(workflow, /timeout-minutes: 5/);
   assert.match(workflow, /cancel-in-progress: true/);
-  assert.doesNotMatch(workflow, /runs-on: \[self-hosted|E:\\ZGmini|secrets\.|issues: write|actions: write/);
+  assert.doesNotMatch(workflow, /runs-on: ubuntu-latest|zgmini-pc-control\]|node\.exe|\$\{\{\s*secrets\.|issues: write|actions: write/);
+  assert.doesNotMatch(workflow, /^(?:\s*)(?:artifact|cache|schedule):/m);
 });
