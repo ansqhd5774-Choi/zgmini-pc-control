@@ -77,8 +77,10 @@ export function sanitizeR6BResult(raw,request,env){
   (raw.requestId!==request.requestId&&
    !(raw.status==='BLOCKED'&&raw.requestId==null)))return base;
  const simple={...base,status:raw.status,code:raw.code,
-  lastPass:['SOURCE_VERIFIED','ONE_SHOT_CLAIMED','PUBLISH_READBACK'].includes(raw.lastPass)?raw.lastPass:null,
-  firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH'].includes(raw.firstFail)?raw.firstFail:null};
+  lastPass:['SOURCE_VERIFIED','REGISTERED_KEY_PRESENT','ONE_SHOT_CLAIMED',
+   'PUBLISH_READBACK'].includes(raw.lastPass)?raw.lastPass:null,
+  firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH','CORE_LOCK_RELEASE']
+   .includes(raw.firstFail)?raw.firstFail:null};
  if(!['SUCCESS','PARTIAL','NOOP'].includes(raw.status))return simple;
  const sourceOk=SHA40.test(raw.sourceSha??'');
  const validCount=x=>Number.isSafeInteger(x)&&x>=0;
