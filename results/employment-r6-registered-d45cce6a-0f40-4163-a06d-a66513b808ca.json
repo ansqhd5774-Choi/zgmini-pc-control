@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1",
+  "requestId": "d45cce6a-0f40-4163-a06d-a66513b808ca",
+  "approvalManifestSha256": "36728d099ae0fd74faae6c9c6a5cc6b0847d78881ec660b94ad1e9b37bc5f3f5",
+  "status": "BLOCKED",
+  "code": "R6_B_INSTALLED_SOURCE_STOP",
+  "sourceSha": null,
+  "mode": null,
+  "providerRequests": null,
+  "blsRequests": null,
+  "dolRequests": null,
+  "groupResults": [],
+  "sqlite": "UNVERIFIED",
+  "publication": "UNVERIFIED",
+  "sourceStoredAt": null,
+  "sourceFeatures": null,
+  "chartReadyFeatures": null,
+  "lastPass": "SOURCE_VERIFIED",
+  "firstFail": "PREFLIGHT",
+  "runId": "42709699561",
+  "retry": "READ_EXISTING_REQUEST_NO_REEXECUTE"
+}
