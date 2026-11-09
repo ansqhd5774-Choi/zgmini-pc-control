@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
@@ -50,6 +51,27 @@ export function verifySourceBytes(host, sourceSha, readPinnedBlob) {
       digest(readPinnedBlob(sourceSha, rel)) === expected;}
     catch {return false;}
   });
+}
+
+export function verifySupervisorSnapshot(status, owner, {targetSha,
+  livePid = alive, now = Date.now(), bootAt = now - os.uptime() * 1000} = {}) {
+  if (status?.mode !== 'LISTENING' || status?.sourceSha !== targetSha ||
+      !Number.isSafeInteger(status.pid) || status.pid < 1 ||
+      owner?.pid !== status.pid || !/^[a-f0-9-]{36}$/.test(owner?.nonce ?? '') ||
+      !Number.isFinite(owner?.bootAt) || Math.abs(owner.bootAt - bootAt) > 10000 ||
+      livePid(status.pid) !== true || !Array.isArray(status.children) ||
+      status.children.length !== 6 ||
+      !Number.isFinite(Date.parse(status.at ?? '')) ||
+      now - Date.parse(status.at) < 0 || now - Date.parse(status.at) >= 45000) return false;
+  const seats = new Set();
+  for (const child of status.children) {
+    if (!Number.isInteger(child?.seat) || child.seat < 1 || child.seat > 6 ||
+        seats.has(child.seat) || child.alive !== true ||
+        !Number.isSafeInteger(child.pid) || child.pid < 1 ||
+        livePid(child.pid) !== true) return false;
+    seats.add(child.seat);
+  }
+  return seats.size === 6;
 }
 
 export function classifyPostSwitchEvidence(evidence) {
@@ -176,11 +198,8 @@ export async function main(args = process.argv.slice(2)) {
   try {
     const supervisor = json(path.join(control, 'SUPERVISOR_STATUS.json'));
     const supervisorOwner = json(path.join(control, 'leases/supervisor/owner.json'));
-    supervisorVerified = supervisor.sourceSha === ledger.targetSha && Number.isSafeInteger(supervisor.pid) &&
-      supervisorOwner.pid === supervisor.pid &&
-      alive(supervisor.pid) === true && Array.isArray(supervisor.children) && supervisor.children.length === 6 &&
-      Number.isFinite(Date.parse(supervisor.at)) && Date.now() - Date.parse(supervisor.at) >= 0 &&
-      Date.now() - Date.parse(supervisor.at) < 45000;
+    supervisorVerified = verifySupervisorSnapshot(supervisor, supervisorOwner,
+      {targetSha: ledger.targetSha});
   } catch {}
   const otherControlLeaseCount = fs.readdirSync(path.join(control, 'leases')).filter(name =>
     name !== 'supervisor' && !name.startsWith('supervisor.dead-')).length;
