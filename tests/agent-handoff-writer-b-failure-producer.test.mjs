@@ -46,6 +46,7 @@ const comment = r => ({user: {login: bot},
 function fixture(initial = report()) {
   const state = {report: initial, original: issue(), comments: [comment(initial)],
     manifest: manifest(), missing: null, created: [],
+    waitComments: [], waitPost: 0, waitRead: 0, waitList: 0,
     calls: {comments: 0, file: [], list: 0, create: 0, readIssue: []},
     failAfterPost: false, failBeforePost: false, tamperReadback: false};
   const io = {
@@ -84,7 +85,22 @@ function fixture(initial = report()) {
       state.created.push(created);
       if (state.failAfterPost) throw new Error('POST_ACK_LOST');
       return {number: created.number};
-    }
+    },
+    listResourceWaitComments: async () => {
+      state.waitList++;
+      return state.waitComments;
+    },
+    createResourceWaitComment: async body => {
+      state.waitPost++;
+      const item={id:7201,body,user:{login:bot},
+        issue_url:`https://api.github.com/repos/${repo}/issues/68`};
+      state.waitComments.push(item);
+      return {id:item.id};
+    },
+    readResourceWaitComment: async id => {
+      state.waitRead++;
+      return state.waitComments.find(x=>x.id===id);
+    },
   };
   return {state, io};
 }
@@ -139,6 +155,23 @@ test('approval setup STOP is reported for review without generating a repair Iss
   assert.equal(result.confirmedFailures, 0);
   assert.equal(state.calls.create, 0);
   assert.equal(state.calls.list, 0);
+});
+
+test('a verified clean shared-resource deferral stays out of the repair queue', async () => {
+  const {io,state} = fixture(report('WRITER_B_PREFLIGHT_STOP',
+    'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'));
+  const result = await processCompletedWriterB(event(), io);
+  assert.equal(result.state, 'WAIT_RECORDED');
+  assert.equal(result.resourceKey, 'writer-source');
+  assert.match(result.waitId, /^resource-wait-/);
+  assert.equal(result.automaticPcRetries, 0);
+  assert.equal(state.calls.create, 0);
+  assert.equal(state.calls.list, 0);
+  assert.equal(state.waitPost, 1);
+  assert.equal(state.waitRead, 1);
+  const again = await processCompletedWriterB(event(), io);
+  assert.equal(again.state, 'WAIT_REUSED');
+  assert.equal(state.waitPost, 1);
 });
 
 test('completed but skipped irrelevant Issue has no Writer B receipt', async () => {

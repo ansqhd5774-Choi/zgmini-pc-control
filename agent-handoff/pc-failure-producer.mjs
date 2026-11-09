@@ -3,13 +3,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {preparePcFailureHandoff, reconcileHandoffInventory} from './pc-result-to-incident.mjs';
+import {preparePcFailureHandoff,preparePcSharedResourceWait,
+  reconcileHandoffInventory} from './pc-result-to-incident.mjs';
+import {persistResourceWait} from './resource-wait-ledger.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
 const BOT = 'github-actions[bot]';
 const API = `https://api.github.com/repos/${REPO}`;
 const MAX_PAGES = 5;
+const MAX_QUEUE_PAGES = 20;
 const MAX_BYTES = 65536;
 
 function stop(code) { throw new Error(`PC_HANDOFF_PRODUCER_${code}`); }
@@ -58,13 +61,16 @@ export function findOriginalIssueNumber(comments, {runId, attempt, seat}) {
  * Return states remain honest when uploads/receipts are absent.
  */
 export async function processCompletedPcJob(event, {
-  readReport, readComments, readIssue, listHandoffs, createHandoff
+  readReport, readComments, readIssue, listHandoffs, createHandoff,
+  readReportText, listResourceWaitComments, createResourceWaitComment,
+  readResourceWaitComment
 }) {
   const run = assertCompletedPcJobEvent(event);
   if ([readReport, readComments, readIssue, listHandoffs, createHandoff]
     .some(fn => typeof fn !== 'function')) stop('IO_NOT_CONFIGURED');
   const result = {state: 'SCAN_COMPLETED', runId: run.runId, attempt: run.attempt,
     reportsObserved: 0, confirmedFailures: 0, newIssues: 0, reusedIssues: 0,
+    waitsRecorded:0,waitsReused:0,waitProofPending:0,
     missingReceipts: 0, pcOperationalWrites: 0, automaticPcRetries: 0};
   let comments = null;
   for (let seat = 1; seat <= 6; seat++) {
@@ -72,6 +78,28 @@ export async function processCompletedPcJob(event, {
     const report = await readReport(resultPath);
     if (report === null) continue;
     result.reportsObserved++;
+    // Memory/seat lease contention is not a repair incident. Require the
+    // original bot receipt and both immutable result files, then persist one
+    // central wait record. Other BLOCKED codes remain out of this path.
+    if(report.status==='BLOCKED'&&
+      ['RESOURCE_WAIT_MEMORY','MEMORY_WAIT_ALREADY_ACTIVE','LEASE_BUSY'].includes(report.code)){
+      comments ??= await readComments(run.since);
+      const original=findOriginalIssueNumber(comments,{...run,seat});
+      if(original===null){result.missingReceipts++;continue;}
+      const originIssue=await readIssue(original);
+      if(typeof readReportText!=='function')stop('WAIT_TEXT_READER_MISSING');
+      const resultTxt=await readReportText(resultPath.replace(/\.json$/,'.txt'));
+      const wait=preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt});
+      if(wait.state==='WAIT_PROOF_UNVERIFIED'){result.waitProofPending++;continue;}
+      if(wait.state!=='WAITING_SHARED_RESOURCE')stop('WAIT_CLASSIFICATION_STOP');
+      const ledger=await persistResourceWait(wait.wait,{
+        listComments:listResourceWaitComments,
+        postComment:createResourceWaitComment,
+        getComment:readResourceWaitComment});
+      if(ledger.state==='WAIT_RECORDED')result.waitsRecorded++;
+      else result.waitsReused++;
+      continue;
+    }
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
     if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status)) continue;
     comments ??= await readComments(run.since);
@@ -107,6 +135,9 @@ export async function processCompletedPcJob(event, {
   }
   if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
   else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
+  else if (result.waitProofPending) result.state = 'PARTIAL_WAIT_EVIDENCE_PENDING';
+  else if (result.waitsRecorded || result.waitsReused)
+    result.state = 'WAITING_SHARED_RESOURCE_RECORDED';
   return Object.freeze(result);
 }
 
@@ -124,9 +155,9 @@ async function request(resource, {method = 'GET', body, missingOk = false} = {})
   return response.json();
 }
 
-async function completePages(endpoint, label) {
+async function completePages(endpoint, label, maxPages=MAX_PAGES) {
   const rows = [];
-  for (let page = 1; page <= MAX_PAGES; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     const part = await request(`${endpoint}${endpoint.includes('?') ? '&' : '?'}per_page=100&page=${page}`);
     if (!Array.isArray(part)) stop(`${label}_INVENTORY_INVALID`);
     rows.push(...part);
@@ -160,10 +191,26 @@ export async function main(env = process.env) {
         .filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
     createHandoff: async prepared => request('issues', {method: 'POST',
       body: {title: `agent-handoff ${prepared.incidentId}`,
-        labels: ['agent-handoff'], body: prepared.body}})
+        labels: ['agent-handoff'], body: prepared.body}}),
+    readReportText: async resultPath => {
+      const content=await request(`contents/${resultPath}?ref=main`,{missingOk:true});
+      if(content===null)return null;
+      if(content.encoding!=='base64'||typeof content.content!=='string'||
+        !Number.isSafeInteger(content.size)||content.size>MAX_BYTES)
+        stop('WAIT_TEXT_CONTENT_INVALID');
+      const decoded=Buffer.from(content.content.replace(/\s/g,''),'base64');
+      if(decoded.length!==content.size)stop('WAIT_TEXT_SIZE_MISMATCH');
+      return decoded.toString('utf8');
+    },
+    listResourceWaitComments:()=>completePages('issues/68/comments',
+      'RESOURCE_WAIT',MAX_QUEUE_PAGES),
+    createResourceWaitComment:body=>request('issues/68/comments',
+      {method:'POST',body:{body}}),
+    readResourceWaitComment:id=>request(`issues/comments/${id}`)
   });
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (['PARTIAL_RECEIPT_PENDING', 'NO_PUBLISHED_RESULTS'].includes(report.state)) process.exitCode = 1;
+  if (['PARTIAL_RECEIPT_PENDING','PARTIAL_WAIT_EVIDENCE_PENDING',
+    'NO_PUBLISHED_RESULTS'].includes(report.state)) process.exitCode = 1;
   return report;
 }
 
