@@ -48,13 +48,20 @@ test('rejects PR substitution or wrong repository', () => {
   const wrong = structuredClone(result); wrong.pullRequest.repository = 'ansqhd5774-Choi/zgmini';
   assert.throws(() => verifyAgentResult(handoff, wrong, pr, run), /RESULT_OWNER_REPOSITORY_STOP/);
 });
-test('repo-scoped workflow refuses cross-repo result without configured GitHub App permissions', () => {
+test('workflow accepts only same-repo result evidence from control or public feature repository', () => {
   const {result} = setup();
   assert.doesNotThrow(() => assertWorkflowResultRepository(result));
   const otherRepo = structuredClone(result);
   otherRepo.pullRequest.repository = 'ansqhd5774-Choi/zgmini';
   otherRepo.testRun.repository = 'ansqhd5774-Choi/zgmini';
-  assert.throws(() => assertWorkflowResultRepository(otherRepo), /RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED/);
+  assert.doesNotThrow(() => assertWorkflowResultRepository(otherRepo));
+  const mixed = structuredClone(otherRepo);
+  mixed.testRun.repository = 'ansqhd5774-Choi/zgmini-pc-control';
+  assert.throws(() => assertWorkflowResultRepository(mixed), /RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED/);
+  const foreign = structuredClone(otherRepo);
+  foreign.pullRequest.repository = 'third-party/unknown';
+  foreign.testRun.repository = 'third-party/unknown';
+  assert.throws(() => assertWorkflowResultRepository(foreign), /RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED/);
 });
 test('rejects failed or different-SHA GitHub run', () => {
   const {handoff, result, pr, run} = setup();
@@ -148,3 +155,86 @@ test('result broker refuses a bot-created intake without its origin evidence lin
   async () => simulate({botOrigin: true, botMissingEvidence: true}));
 test('result broker still rejects a third-party Issue even with an owner comment',
   async () => simulate({untrustedIssueAuthor: true}));
+
+async function simulatePublicFeature({invalidOriginal = false, wrongSource = false,
+  wrongSha = false, publicDenied = false, failedCi = false} = {}) {
+  const seed = setup();
+  const input = structuredClone(seed.handoff);
+  input.origin.repository = 'ansqhd5774-Choi/zgmini-pc-control';
+  input.failure.kind = 'FEATURE';
+  input.failure.evidenceIssueNumber = 1009;
+  const handoff = parseHandoff(JSON.stringify(input));
+  const result = structuredClone(seed.result);
+  result.fingerprint = fingerprintHandoff(handoff);
+  result.pullRequest.repository = 'ansqhd5774-Choi/zgmini';
+  result.testRun.repository = 'ansqhd5774-Choi/zgmini';
+  const pr = structuredClone(seed.pr);
+  pr.head.repo.full_name = 'ansqhd5774-Choi/zgmini';
+  pr.base.repo.full_name = 'ansqhd5774-Choi/zgmini';
+  const run = structuredClone(seed.run);
+  run.repository.full_name = 'ansqhd5774-Choi/zgmini';
+  if (wrongSha) run.head_sha = 'c'.repeat(40);
+  if (failedCi) run.conclusion = 'failure';
+  const origin = {number: 1009, user: {login: invalidOriginal ? 'intruder' : 'ansqhd5774-Choi'},
+    labels: [{name: 'pc-job'}], body: JSON.stringify({schema: 'ZGMINI_PC_JOB_V1',
+      requestId: handoff.origin.requestId, chatId: handoff.origin.chatId,
+      sourceSha: handoff.origin.sourceSha, sourceBranch: handoff.origin.branch,
+      sourceRepository: wrongSource ? 'ansqhd5774-Choi/zgmini-pc-control' : 'ansqhd5774-Choi/zgmini'})};
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-public-'));
+  const eventPath = path.join(temp, 'event.json');
+  fs.writeFileSync(eventPath, JSON.stringify({action: 'created', repository: {private: true},
+    issue: {number: 2001, title: `agent-handoff ${handoff.incidentId}`,
+      labels: [{name: 'agent-handoff'}], user: {login: 'github-actions[bot]'},
+      body: JSON.stringify(handoff)},
+    comment: {body: JSON.stringify(result), user: {login: 'ansqhd5774-Choi'}}}));
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = 'unit-test-nonsecret';
+  const writes = [], publicHeaders = [], ledger = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const uri = new URL(url), method = options.method ?? 'GET';
+    if (uri.pathname.startsWith('/repos/ansqhd5774-Choi/zgmini/')) {
+      publicHeaders.push(options.headers);
+      if (publicDenied) return {ok: false, status: 403};
+      if (uri.pathname.endsWith('/pulls/920')) return {ok: true, json: async () => pr};
+      if (uri.pathname.endsWith('/actions/runs/42450377234')) return {ok: true, json: async () => run};
+    }
+    if (uri.pathname.endsWith('/issues/1009')) return {ok: true, json: async () => origin};
+    if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET')
+      return {ok: true, json: async () => ledger};
+    if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
+      writes.push(JSON.parse(options.body).body);
+      ledger.push({user: {login: 'github-actions[bot]'}, body: writes.at(-1)});
+      return {ok: true, json: async () => ({id: 1})};
+    }
+    throw new Error(`unexpected GitHub API ${uri.pathname}`);
+  };
+  const env = {GITHUB_EVENT_PATH: eventPath, GITHUB_REPOSITORY: 'ansqhd5774-Choi/zgmini-pc-control',
+    GITHUB_EVENT_NAME: 'issue_comment', GITHUB_ACTOR: 'ansqhd5774-Choi'};
+  try {
+    const bad = invalidOriginal || wrongSource || wrongSha || publicDenied || failedCi;
+    if (bad) await assert.rejects(runResultBroker(env),
+      /RESULT_FEATURE_ORIGIN_NOT_AUTHORIZED|RESULT_OWNER_REPOSITORY_STOP|RESULT_TEST_RUN_PROVENANCE_STOP|RESULT_PUBLIC_GITHUB_API_403_STOP/);
+    else { await runResultBroker(env); await runResultBroker(env); }
+    assert.equal(writes.length, bad ? 0 : 1);
+    for (const headers of publicHeaders) assert.equal(headers.Authorization, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = originalToken;
+    fs.rmSync(temp, {recursive: true, force: true});
+  }
+}
+
+test('verified PC Job feature source allows public feature PR/run and one idempotent private return',
+  async () => simulatePublicFeature());
+test('public return rejects untrusted original PC Job author without a GitHub write',
+  async () => simulatePublicFeature({invalidOriginal: true}));
+test('public return rejects a source-repository mismatch without a GitHub write',
+  async () => simulatePublicFeature({wrongSource: true}));
+test('public return rejects a different-SHA CI run without a GitHub write',
+  async () => simulatePublicFeature({wrongSha: true}));
+test('public return rejects failed CI without a GitHub write',
+  async () => simulatePublicFeature({failedCi: true}));
+test('public return stops on a public API denial without a GitHub write',
+  async () => simulatePublicFeature({publicDenied: true}));
