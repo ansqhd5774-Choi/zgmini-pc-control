@@ -1,0 +1,56 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "release/employment-r6-cps-r2-20261110",
+  "candidateSourceSha": "b37c7c029d36c6d29c50a5173018836918db5c78",
+  "baseHead": "48d3478030590ca63aaab2435e88c896608c70d3",
+  "baseConfigSourceSha": "48d3478030590ca63aaab2435e88c896608c70d3",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-formula.mjs",
+      "change": "M",
+      "beforeSha256": "3e316153cec4c5d141c840cfd966aa95d648a522386a969fbaa83fd7a9b5d897",
+      "afterSha256": "9c811f735db664ac6fada79d692a2c9fff244e85b434dfe2a8c4c8ea4211c204"
+    },
+    {
+      "path": "lib/market-score/employment-r6-feature-engine.mjs",
+      "change": "M",
+      "beforeSha256": "8bf2f799c540fbaa23e14aafe99e1842c6865975170960b1fa3a61d5e95109d5",
+      "afterSha256": "49c4f47e5e2fccf541722148752a65bf1d76f19b7a8974d7533e7e983de63294"
+    },
+    {
+      "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+      "change": "M",
+      "beforeSha256": "aa6a9f429f64802251b88a839f56154f43d73864f8d11df569ef56210fee69a4",
+      "afterSha256": "45faa17a3306ef5bc6dead703fa64eadb95b53c20e405ea151fab6cb2f00eae2"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+      "change": "M",
+      "beforeSha256": "1b12d0bfc00ae5bae4b3d91c0f3552abce5d93bf5c01337784fe464d2d30b741",
+      "afterSha256": "2c65cf6c1c0564dbead7c8a0ed5b8d5bbce9a80125f54cfc8aa23de9ee232f38"
+    },
+    {
+      "path": "worker/employment-r6-public-display.mjs",
+      "change": "M",
+      "beforeSha256": "e6d5829237ffff18007a84dd2aea1d156ee245ca0d722e8055881f38bf725951",
+      "afterSha256": "2c7110e13f7025dff7c204d8a3727d14c937898e612ed35d38686ef6be88562e"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
