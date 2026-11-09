@@ -4,7 +4,8 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyPostSwitchEvidence, verifyControllerFiles,
   verifyExactPostSwitchInventory,verifySourceBytes,
-  verifySupervisorSnapshot,verifyNamedPcRunnersOnline} from '../tools/controller-postswitch-evidence.mjs';
+  verifySupervisorSnapshot,verifyNamedPcRunnersOnline,
+  verifyWriterProtectionTransition} from '../tools/controller-postswitch-evidence.mjs';
 
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const before = 'c09bf6a6f66f229016135020d6ba553ba9a94676';
@@ -41,8 +42,116 @@ test('valid post-switch evidence remains read-only and eligible for a *plan*, ne
   const result = classifyPostSwitchEvidence(valid());
   assert.equal(result.status, 'READONLY_POSTSWITCH_EVIDENCE_VERIFIED');
   assert.equal(result.code, 'POSTSWITCH_EVIDENCE_VERIFIED');
-  assert.equal(Object.values(result.checks).every(Boolean), true);
+  assert.equal(Object.entries(result.checks).every(([key,ok]) =>
+    key === 'PROTECTION_CONTRACT_VERIFIED' || ok), true);
   assert.match(result.next, /NO_AUTOMATIC_EXECUTION/);
+});
+
+const writerTransition=()=>({
+  baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
+  currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+  approvedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+  writerBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
+  writerAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+});
+function approvedWriterFixture() {
+  const t=writerTransition();
+  return {
+    transition:t,
+    baseline:{files:{'config.json':t.baselineConfigSha256,
+      'quota-runner.cmd':sha256('quota'),'run-local.cmd':sha256('run')},
+      tasks:{'ZGMINI-PC-Local-Core':sha256('core'),
+        'ZGMINI-PC-Local-Korea':sha256('korea'),
+        'ZGMINI-PC-Iran-Progress-R13':'APPROVED_RETIRED_ABSENT'}},
+    current:null,
+    writerB:{schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',
+      requestId:'b14af1b2-9a23-4f5a-9239-218498ddb403',
+      status:'WRITER_B_INSTALLED_VERIFIED',code:'WRITER_B_INSTALL_VERIFIED',
+      sourceSha:t.approvedSourceSha,mode:'LOCAL_OVERLAY',localOnly:true,
+      manifestSha256:'593004aa6b0c5c6471a691faebd9c98f142af4990580a8b1d5a0619d829b2e6f',
+      changedPaths:['scripts/pc-writer/release-calendar.mjs',
+        'lib/treasury-auction-history-source.mjs',
+        'lib/treasury-auction-history.mjs',
+        'lib/treasury-auction-history-taws.mjs']},
+    writerA:{schema:'ZGMINI_PC_RESULT_V1',
+      requestId:'pc-4b53b63d-cf6f-4898-806d-f6774b63009c',
+      operation:'writer-install-preimage-readonly',status:'PASS',
+      code:'WRITER_FIXED_PREIMAGE_READONLY',operationalWrites:0,
+      providerCalls:0,d1Writes:0,sqliteOpened:false,protectedStateUnchanged:true,
+      result:{status:'PASS',sourceIdentityConsistent:true,
+        sourceHead:t.approvedSourceSha,approvedConfigSource:t.approvedSourceSha,
+        checkpointSource:t.approvedSourceSha,
+        r6Config:{status:'PASS',configSha256:t.currentConfigSha256}}},
+    writerBBlobSha:t.writerBResultBlobSha,writerABlobSha:t.writerAResultBlobSha,
+  };
+}
+function completeWriterFixture() {
+  const data=approvedWriterFixture();
+  data.current=structuredClone(data.baseline);
+  data.current.files['config.json']=data.transition.currentConfigSha256;
+  return data;
+}
+test('explicit Writer transition validates independent A and B evidence without rewriting #917 baseline',()=>{
+  const data=completeWriterFixture();
+  assert.equal(verifyWriterProtectionTransition(data),true);
+  assert.equal(data.baseline.files['config.json'],data.transition.baselineConfigSha256);
+  const evidence=valid();
+  evidence.protectionVerified=false;
+  evidence.protectionContractVerified=true;
+  const decision=classifyPostSwitchEvidence(evidence);
+  assert.equal(decision.status,'READONLY_POSTSWITCH_EVIDENCE_VERIFIED');
+  assert.equal(decision.checks.PROTECTION_UNCHANGED,false);
+  assert.equal(decision.checks.PROTECTION_CONTRACT_VERIFIED,true);
+});
+test('no C-grade contract means historical Writer config drift remains blocked',()=>{
+  const evidence=valid();evidence.protectionVerified=false;
+  assert.equal(classifyPostSwitchEvidence(evidence).status,'RECOVERY_REQUIRED');
+  assert.equal(classifyPostSwitchEvidence(evidence).code,'PROTECTION_UNCHANGED');
+});
+test('Writer config transition rejects changed digest and extra approval field',()=>{
+  for(const mutate of [
+    x=>{x.current.files['config.json']=sha256('unknown config');},
+    x=>{x.transition.currentConfigSha256=sha256('unapproved');},
+    x=>{x.transition.unapprovedBypass=true;},
+    x=>{x.baseline.files['config.json']=sha256('modified historical snapshot');},
+  ]){
+    const d=completeWriterFixture();mutate(d);
+    assert.equal(verifyWriterProtectionTransition(d),false);
+  }
+});
+test('Writer transition rejects unrelated files, Task or retired-Iran modifications',()=>{
+  for(const mutate of [
+    x=>{x.current.files['quota-runner.cmd']=sha256('altered');},
+    x=>{delete x.current.files['run-local.cmd'];},
+    x=>{x.current.files['another.cmd']=sha256('new');},
+    x=>{x.current.tasks['ZGMINI-PC-Local-Core']=sha256('altered');},
+    x=>{x.current.tasks['ZGMINI-PC-Local-Korea']=sha256('altered');},
+    x=>{x.current.tasks['ZGMINI-PC-Iran-Progress-R13']=sha256('active');},
+    x=>{delete x.current.tasks['ZGMINI-PC-Iran-Progress-R13'];},
+  ]) {
+    const d=completeWriterFixture();mutate(d);
+    assert.equal(verifyWriterProtectionTransition(d),false);
+  }
+});
+test('Writer transition rejects forged or stale A/B proof and blob identities',()=>{
+  for(const mutate of [
+    x=>{x.writerBBlobSha='f'.repeat(40);},
+    x=>{x.writerABlobSha='f'.repeat(40);},
+    x=>{x.writerB.status='RECOVERY_REQUIRED';},
+    x=>{x.writerB.sourceSha='a'.repeat(40);},
+    x=>{x.writerB.manifestSha256='f'.repeat(64);},
+    x=>{x.writerB.changedPaths.pop();},
+    x=>{x.writerA.status='FAIL';},
+    x=>{x.writerA.operation='writer-install';},
+    x=>{x.writerA.operationalWrites=1;},
+    x=>{x.writerA.protectedStateUnchanged=false;},
+    x=>{x.writerA.result.sourceIdentityConsistent=false;},
+    x=>{x.writerA.result.approvedConfigSource='f'.repeat(40);},
+    x=>{x.writerA.result.r6Config.configSha256='f'.repeat(64);},
+  ]) {
+    const d=completeWriterFixture();mutate(d);
+    assert.equal(verifyWriterProtectionTransition(d),false);
+  }
 });
 
 test('historical ledger workflow false does not substitute for current live workflow', () => {
