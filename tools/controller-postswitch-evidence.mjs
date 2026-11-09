@@ -28,6 +28,30 @@ export function verifyControllerFiles(host, root, readBytes = fs.readFileSync) {
     (() => {try {return digest(readBytes(path.join(root, rel))) === hash;} catch {return false;}})());
 }
 
+// #917 is a fixed 38-file post-switch incident. A self-consistent but reduced
+// host.json (37/37 etc.) must not silently pass the C-grade recovery gate.
+export function verifyExactPostSwitchInventory(currentHost, backupHost,
+  currentSourcePaths, backupSourcePaths) {
+  const set = items => Array.isArray(items) && items.length === 38 &&
+    items.every(p => /^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p)) &&
+    new Set(items).size === 38 ? [...items].sort().join('\n') : null;
+  const current = set(Object.keys(currentHost?.controllerFiles ?? {}));
+  const backup = set(Object.keys(backupHost?.controllerFiles ?? {}));
+  return current !== null && backup !== null && current === backup &&
+    current === set(currentSourcePaths) && backup === set(backupSourcePaths);
+}
+
+export function verifySourceBytes(host, sourceSha, readPinnedBlob) {
+  if (!host || host.controllerSourceSha !== sourceSha ||
+      typeof readPinnedBlob !== 'function' ||
+      !host.controllerFiles || typeof host.controllerFiles !== 'object') return false;
+  return Object.entries(host.controllerFiles).every(([rel, expected]) => {
+    try {return /^[a-f0-9]{64}$/.test(expected) &&
+      digest(readPinnedBlob(sourceSha, rel)) === expected;}
+    catch {return false;}
+  });
+}
+
 export function classifyPostSwitchEvidence(evidence) {
   const checks = {
     ORIGINAL_LEDGER: evidence.ledger?.status === 'RECOVERY_REQUIRED' &&
@@ -103,6 +127,14 @@ export async function main(args = process.argv.slice(2)) {
   const snapshotHostPath = path.join(base, 'snapshot', 'host.json');
   const snapshotHostRaw = fs.readFileSync(snapshotHostPath);
   const snapshotHost = JSON.parse(snapshotHostRaw);
+  const sourcePaths = sha => git(['ls-tree', '-r', '--name-only', sha]).toString('utf8')
+    .split(/\r?\n/).filter(p => /^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p));
+  const exactInventories = verifyExactPostSwitchInventory(currentHost, snapshotHost,
+    sourcePaths(ledger.targetSha), sourcePaths(ledger.installedShaBefore));
+  const sourceBlob = (sha, rel) => git(['show', `${sha}:${rel}`]);
+  const exactSourceBytes = exactInventories &&
+    verifySourceBytes(currentHost, ledger.targetSha, sourceBlob) &&
+    verifySourceBytes(snapshotHost, ledger.installedShaBefore, sourceBlob);
   const baselinePath = path.join(base, 'PROTECTED_BEFORE.json');
   const baselineExists = fs.existsSync(baselinePath);
   const backlogPath = path.join(maintenance, 'backlog', `${id}.json`);
@@ -154,9 +186,10 @@ export async function main(args = process.argv.slice(2)) {
     name !== 'supervisor' && !name.startsWith('supervisor.dead-')).length;
   const decision = classifyPostSwitchEvidence({ledger,
     currentSha: currentHost.controllerSourceSha,
-    currentBytesVerified: currentInventoryComplete && verifyControllerFiles(currentHost, control),
+    currentBytesVerified: exactSourceBytes && currentInventoryComplete &&
+      verifyControllerFiles(currentHost, control),
     snapshotSha: snapshotHost.controllerSourceSha,
-    snapshotBytesVerified: snapshotInventoryComplete &&
+    snapshotBytesVerified: exactSourceBytes && snapshotInventoryComplete &&
       verifyControllerFiles(snapshotHost, path.join(base, 'snapshot')),
     ownerIdentityVerified, ownerAlive: alive(owner.pid), protectionVerified,
     backlogVerified, pauseWindowsClosed, workflow, runnerSetVerified, supervisorVerified,
@@ -174,7 +207,7 @@ export async function main(args = process.argv.slice(2)) {
       protectedBefore: baselineExists ? digest(fs.readFileSync(baselinePath)) : null,
       backlog: digest(backlogRaw)},
     backlogReplayStates: replayStates,
-    protectionCode, otherControlLeaseCount, operationalWrites: 0};
+    protectionCode, exactInventories, exactSourceBytes, otherControlLeaseCount, operationalWrites: 0};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
