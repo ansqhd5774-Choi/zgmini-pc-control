@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a0044ff4-cfb6-414f-be9f-e380a4f3456d",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "4273137a85adcc90c863a27f703baa749b05cb64",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "434f30d2aa221bddacab5afa09241916618d8e22",
+  "candidateSourceSha": "6058c309aea5a6fa1dcbd1529578faab35860290",
+  "manifestSha256": "a41541d17b414a6a994e6606c244fd8e2ccb147701321ea87a8407f1e8783834",
+  "baseTreeOid": "fe4b17b65ae7385afb30498b0099498f293ae463",
+  "preparedTreeOid": "5f06132b4aef8af253af5ad54eef6152b52fb636",
+  "provenanceSha256": "c605db3254ae236677252e3ba821f59b7fb4dd957352939d0306b0a77c348c14",
+  "runId": "42636781846",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/inflation-causal-candidate-manual-official-r1.mjs",
+    "scripts/pc-writer/inflation-causal-candidate-manual-official-store-r1.mjs"
+  ]
+}
