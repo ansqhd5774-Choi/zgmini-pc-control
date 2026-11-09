@@ -1,0 +1,55 @@
+# Exact owner-approved R6 registered-v2 data one-shot, never a generic command.
+# Source overlay installation #1003 and functional provider/DB/D1 effects differ.
+name: ZGMINI Employment R6 Registered Data B Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Create-only one atomic sanitized JSON/TXT result pair.
+  issues: write # Result notification to the originating owner Issue.
+jobs:
+  r6-registered-b:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-employment-r6-registered-data-once' &&
+      contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
+      github.run_attempt == 1
+    concurrency:
+      group: zgmini-writer-source-b-one-at-a-time
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout event-immutable control source
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r6-registered-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run owner-approved exact R6 collection and existing publisher
+        if: steps.control.outcome == 'success'
+        id: effect
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r6-registered-control\r6-registered-data-b\operation.mjs"'
+      - name: Return create-only sanitized evidence pair and origin comment
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          R6_B_EFFECT_OUTCOME: ${{ steps.effect.outcome }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r6-registered-control\r6-registered-data-b\report.mjs"'
