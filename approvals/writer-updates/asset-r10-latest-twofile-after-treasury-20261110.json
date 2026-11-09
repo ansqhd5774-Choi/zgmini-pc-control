@@ -1,0 +1,38 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/asset-r10-latest-main-slice-20261109",
+  "candidateSourceSha": "17c3c0485d30ec59e68f0e70c9472a5b1afab339",
+  "baseHead": "70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9",
+  "baseConfigSourceSha": "70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/diagnostic-layer/asset-bubble-r10-raw-evidence-r1.mjs",
+      "change": "M",
+      "beforeSha256": "2d56786eb2a7e93ca5e7daf97cd743253fcab9bf2282e651e164957d20858282",
+      "afterSha256": "3b0c92881994375d84f95203126c60dec363a5bb48cf659d551b034d2a2958c9"
+    },
+    {
+      "path": "worker/asset-bubble-r10-raw-r1.mjs",
+      "change": "M",
+      "beforeSha256": "8007ee068f85a5d9db29f7422b484b0ddd2a3b68bb4291eab8dc4e072d733c1e",
+      "afterSha256": "9c651ec732e6b5e94822c279b5baebd47f2502e42082c6779021b14e5894b6ac"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
