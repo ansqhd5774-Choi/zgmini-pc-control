@@ -231,12 +231,14 @@ export async function acquireCoreLockBounded(pcHome,requestId,{
 }
 
 function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
- const date=new Date().toISOString().slice(0,10);
- const file=path.join(pcHome,`employment-r6-registered-${mode.toLowerCase()}-${date}.claim.json`);
+ // A manual request may be repeated the same day with a new approved requestId.
+ // Keep a durable, one-shot claim per request; never replay an uncertain request.
+ need(UUID.test(requestId),'R6_B_REQUEST_ID_STOP');
+ const file=path.join(pcHome,`employment-r6-registered-request-${requestId}.claim.json`);
  let fd;
  try{fd=fs.openSync(file,'wx',0o600);}
  catch(cause){throw error(cause?.code==='EEXIST'?
-  'R6_B_TODAY_ALREADY_CLAIMED':'R6_B_CLAIM_CREATE_STOP');}
+  'R6_B_REQUEST_ALREADY_CLAIMED':'R6_B_CLAIM_CREATE_STOP');}
  const value=JSON.stringify({schema:'R6_REGISTERED_ONE_SHOT_CLAIM_V1',
   requestId,approvalManifestSha256,mode,claimedAt:new Date().toISOString()})+'\n';
  try{fs.writeFileSync(fd,value);fs.fsyncSync(fd);fs.closeSync(fd);fd=null;
@@ -307,7 +309,7 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
   lastPass='D1_READONLY_PREFLIGHT';
   const execute=run??runInstalledR6;
-  // A persistent date/mode claim precedes every SQLite or provider effect.
+  // A persistent request/mode claim precedes every SQLite or provider effect.
   claimAttempted=true;
   claim(pcHome,{requestId:auth.request.requestId,
    approvalManifestSha256:auth.request.approvalManifestSha256},auth.approval.mode);
@@ -319,7 +321,7 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   // A claim may have reached persistent storage before the exception; do not
   // call such an outcome a harmless preflight stop or permit an automatic retry.
   const unknown=claimed||code==='R6_B_CORE_LOCK_UNKNOWN'||
-   (claimAttempted&&!['R6_B_TODAY_ALREADY_CLAIMED',
+   (claimAttempted&&!['R6_B_REQUEST_ALREADY_CLAIMED',
     'R6_B_CLAIM_CREATE_STOP'].includes(code));
   outcome={...base,status:unknown?'STATE_UNKNOWN':'BLOCKED',code,
    lastPass,firstFail:claimed?'COLLECT_OR_PUBLISH':'PREFLIGHT',
