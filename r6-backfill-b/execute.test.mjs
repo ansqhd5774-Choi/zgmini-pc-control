@@ -39,7 +39,10 @@ function fixture({ due = ['BLS_JOLTS'], events = [],
         expectedBlsRequests: cost.bls, expectedDolRequests: cost.dol,
         allowProviderCalls: false };
     },
-    async claimOneShot({ requestId }) {
+    async claimOneShot({ requestId, dueGroups, cost: claimCost }) {
+      // Claim is approval-wide and must happen before any DB-writing plan.
+      assert.equal(dueGroups, undefined);
+      assert.equal(claimCost, undefined);
       events.push('claim'); return claim ?? { status: 'CLAIMED_NO_RETRY', requestId };
     },
     async reserveBlsBatch({ requestId, count, maxDaily }) {
@@ -78,7 +81,7 @@ test('partial resume reserves exactly due BLS slots and passes only due groups t
   assert.equal(result.blsRequests, 12);
   assert.equal(result.dolRequests, 2);
   assert.equal(result.effectsVerified, true);
-  assert.deepEqual(events, ['scope','host','plan','admission','claim','reserve:12',
+  assert.deepEqual(events, ['scope','host','claim','plan','admission','reserve:12',
     'lease-fetch','collector','audit']);
 });
 
@@ -111,7 +114,7 @@ test('already completed and attempted groups consume one-shot ID with no reserva
   assert.equal(result.status, 'NOOP');
   assert.equal(result.providerRequests, 0);
   assert.equal(result.effectsVerified, true);
-  assert.deepEqual(events, ['scope','host','plan','claim','audit']);
+  assert.deepEqual(events, ['scope','host','claim','plan','audit']);
 });
 
 test('a zero-due request with an already-claimed ID cannot be replayed when data changes', async () => {
@@ -121,7 +124,7 @@ test('a zero-due request with an already-claimed ID cannot be replayed when data
   assert.equal(result.status, 'STATE_UNKNOWN');
   assert.equal(result.code, 'R6_B_ONESHOT_CLAIM_UNVERIFIED');
   assert.equal(result.providerRequests, null);
-  assert.deepEqual(events, ['scope','host','plan','claim']);
+  assert.deepEqual(events, ['scope','host','claim']);
 });
 
 test('a DOL-only resume never reserves BLS but still uses the isolated B adapter', async () => {
@@ -130,7 +133,7 @@ test('a DOL-only resume never reserves BLS but still uses the isolated B adapter
   assert.equal(result.status, 'SUCCESS');
   assert.equal(result.blsRequests, 0);
   assert.equal(result.dolRequests, 2);
-  assert.deepEqual(events, ['scope','host','plan','admission','claim',
+  assert.deepEqual(events, ['scope','host','claim','plan','admission',
     'lease-fetch','collector','audit']);
 });
 
@@ -141,7 +144,35 @@ test('a duplicate/ambiguous global claim cannot enter provider code or be retrie
   assert.equal(result.status, 'STATE_UNKNOWN');
   assert.equal(result.code, 'R6_B_ONESHOT_CLAIM_UNVERIFIED');
   assert.equal(result.providerRequests, null);
-  assert.deepEqual(events, ['scope','host','plan','admission','claim']);
+  assert.deepEqual(events, ['scope','host','claim']);
+});
+
+test('a claim callback that persists then throws remains STATE_UNKNOWN without DB planning', async () => {
+  const events = [];
+  const options = fixture({ events });
+  options.claimOneShot = async () => {
+    events.push('claim-fsync-then-error');
+    throw Object.assign(new Error('R6_B_CLAIM_ACK_LOST'), { code: 'R6_B_CLAIM_ACK_LOST' });
+  };
+  const result = await coordinateR6BackfillOnce(options);
+  assert.equal(result.status, 'STATE_UNKNOWN');
+  assert.equal(result.code, 'R6_B_CLAIM_ACK_LOST');
+  assert.equal(result.providerRequests, null);
+  assert.deepEqual(events, ['scope','host','claim-fsync-then-error']);
+});
+
+test('a planner crash after durable claim cannot be classified retryable', async () => {
+  const events = [];
+  const options = fixture({ events });
+  options.planDueGroups = async () => {
+    events.push('plan-crash');
+    throw Object.assign(new Error('R6_B_SQLITE_PLAN_CRASH'), { code: 'R6_B_SQLITE_PLAN_CRASH' });
+  };
+  const result = await coordinateR6BackfillOnce(options);
+  assert.equal(result.status, 'STATE_UNKNOWN');
+  assert.equal(result.code, 'R6_B_SQLITE_PLAN_CRASH');
+  assert.equal(result.effectsVerified, false);
+  assert.deepEqual(events, ['scope','host','claim','plan-crash']);
 });
 
 test('quota preflight refusal cannot reserve or call collector', async () => {
@@ -151,7 +182,7 @@ test('quota preflight refusal cannot reserve or call collector', async () => {
       allowProviderCalls: false } }));
   assert.equal(result.status, 'STATE_UNKNOWN'); // planner can initialize existing DB
   assert.equal(result.code, 'R6_B_QUOTA_PREFLIGHT_NOT_READY');
-  assert.deepEqual(events, ['scope','host','plan','admission']);
+  assert.deepEqual(events, ['scope','host','claim','plan','admission']);
 });
 
 test('reservation mismatch fails closed before lease fetch and collector', async () => {
@@ -160,7 +191,7 @@ test('reservation mismatch fails closed before lease fetch and collector', async
     reservation: { requestId: REQUEST, reserved: 1 } }));
   assert.equal(result.status, 'STATE_UNKNOWN');
   assert.equal(result.code, 'R6_B_BATCH_RESERVATION_UNVERIFIED');
-  assert.deepEqual(events, ['scope','host','plan','admission','claim','reserve:2']);
+  assert.deepEqual(events, ['scope','host','claim','plan','admission','reserve:2']);
 });
 
 test('collector cannot invent extra group or count more calls than reserved', async () => {
