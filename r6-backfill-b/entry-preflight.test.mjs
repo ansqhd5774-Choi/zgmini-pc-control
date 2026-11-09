@@ -20,7 +20,7 @@ const manifest = {
   schema: R6_ONE_SHOT.approvalSchema,
   approvalState: 'APPROVED_B_ONE_SHOT', scope: R6_ONE_SHOT.scope,
   sourceRepository: R6_ONE_SHOT.sourceRepository, sourceSha: SOURCE,
-  controlSha: CONTROL, runCount: 1,
+  controlSha: CONTROL, coreDatabasePath: CORE_DB, runCount: 1,
   maxBlsRequests: 18, maxDolRequests: 2, maxTotalRequests: 20,
   blsUnregistered24hLimit: 25, allowProviderCalls: true,
   allowLocalRawDbWrites: true, allowD1Writes: false,
@@ -116,6 +116,19 @@ test('missing existing core.sqlite fails closed, without attempting its creation
   const result = await checkR6BEntryPreflight(options);
   assert.equal(result.status, 'BLOCKED');
   assert.equal(result.code, 'R6_B_CORE_DB_FILE_MISSING');
+  assert.ok(!calls.some(x => x.startsWith('git:')));
+});
+
+test('another existing E: core.sqlite is rejected even if the host approves its base', async () => {
+  const { options, calls, types } = setup();
+  const otherBase = String.raw`E:\ZGmini\data\different-writer`;
+  const otherDb = W.join(otherBase, 'storage', 'core.sqlite');
+  types.set(otherBase, 'dir');
+  types.set(otherDb, 'file');
+  options.approvedDataBase = otherBase;
+  const result = await checkR6BEntryPreflight(options);
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.code, 'R6_B_APPROVED_CORE_DB_PATH_STOP');
   assert.ok(!calls.some(x => x.startsWith('git:')));
 });
 
