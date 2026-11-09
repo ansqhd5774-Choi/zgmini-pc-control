@@ -5,16 +5,30 @@ import {parseHandoff} from './contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contract.mjs';
 
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
+const PUBLIC_FEATURE_REPOSITORY = 'ansqhd5774-Choi/zgmini';
 const API = 'https://api.github.com';
 const OWNER = 'ansqhd5774-Choi';
 const BOT = 'github-actions[bot]';
 
 export function assertWorkflowResultRepository(result) {
-  // The repository-scoped GITHUB_TOKEN cannot read another private repo's
-  // PR/Actions metadata. A multi-repo GitHub App is a separate permission step.
-  if (result.pullRequest.repository !== REPOSITORY || result.testRun.repository !== REPOSITORY) {
+  // Cross-repo reads are restricted to the known public feature repository.
+  // Any other private repo would require a separate permission decision.
+  if (result.pullRequest.repository !== result.testRun.repository ||
+      ![REPOSITORY, PUBLIC_FEATURE_REPOSITORY].includes(result.pullRequest.repository)) {
     throw new Error('RESULT_CROSS_REPO_AUTH_NOT_CONFIGURED');
   }
+}
+
+async function publicEvidence(resource) {
+  if (!/^\/repos\/ansqhd5774-Choi\/zgmini\/(?:pulls|actions\/runs)\/[1-9][0-9]*$/.test(resource)) {
+    throw new Error('RESULT_PUBLIC_READ_SCOPE_STOP');
+  }
+  // A control-repository GITHUB_TOKEN cannot confer permissions on another
+  // repository. These two public metadata reads need no credential.
+  const response = await fetch(`${API}${resource}`, {headers: {
+    Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}});
+  if (!response.ok) throw new Error(`RESULT_PUBLIC_GITHUB_API_${response.status}_STOP`);
+  return response.json();
 }
 
 async function api(resource, {method = 'GET', body} = {}) {
@@ -66,6 +80,27 @@ function assertBotIncidentBinding(event, handoff) {
   }
 }
 
+async function verifiedFeatureSourceRepository(handoff) {
+  if (handoff.failure.kind !== 'FEATURE' || handoff.origin.repository !== REPOSITORY) return null;
+  const origin = await api(`/repos/${REPOSITORY}/issues/${handoff.origin.issueNumber}`);
+  if (origin?.number !== handoff.origin.issueNumber || origin?.user?.login !== OWNER ||
+      origin?.pull_request || !origin?.labels?.some(x => x.name === 'pc-job') ||
+      typeof origin?.body !== 'string' || origin.body.length > 8192) {
+    throw new Error('RESULT_FEATURE_ORIGIN_NOT_AUTHORIZED');
+  }
+  let request;
+  try {request = JSON.parse(origin.body);} catch {throw new Error('RESULT_FEATURE_ORIGIN_JSON_STOP');}
+  if (request?.schema !== 'ZGMINI_PC_JOB_V1' ||
+      request.requestId !== handoff.origin.requestId ||
+      request.chatId !== handoff.origin.chatId ||
+      request.sourceSha !== handoff.origin.sourceSha ||
+      request.sourceBranch !== handoff.origin.branch ||
+      ![REPOSITORY, PUBLIC_FEATURE_REPOSITORY].includes(request.sourceRepository)) {
+    throw new Error('RESULT_FEATURE_ORIGIN_BINDING_STOP');
+  }
+  return request.sourceRepository;
+}
+
 export async function main(env = process.env) {
   if (!env.GITHUB_EVENT_PATH) throw new Error('RESULT_EVENT_PATH_STOP');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
@@ -79,12 +114,14 @@ export async function main(env = process.env) {
     process.stdout.write('HANDOFF_RESULT_ALREADY_RECORDED\n');
     return;
   }
+  const featureSourceRepository = await verifiedFeatureSourceRepository(handoff);
   const repo = result.pullRequest.repository;
+  const read = repo === PUBLIC_FEATURE_REPOSITORY ? publicEvidence : api;
   const [pr, run] = await Promise.all([
-    api(`/repos/${repo}/pulls/${result.pullRequest.number}`),
-    api(`/repos/${repo}/actions/runs/${result.testRun.runId}`)
+    read(`/repos/${repo}/pulls/${result.pullRequest.number}`),
+    read(`/repos/${repo}/actions/runs/${result.testRun.runId}`)
   ]);
-  const verified = verifyAgentResult(handoff, result, pr, run);
+  const verified = verifyAgentResult(handoff, result, pr, run, {featureSourceRepository});
   const comment = [
     'HANDOFF_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
     `incidentId: ${result.incidentId}`, `fingerprint: ${result.fingerprint}`,

@@ -50,12 +50,18 @@ export function resultDigest(result) {
 }
 
 // GitHub API evidence does not establish that Windows/D1/UI runtime changed.
-export function verifyAgentResult(handoff, result, pr, run) {
+export function verifyAgentResult(handoff, result, pr, run, {featureSourceRepository = null} = {}) {
   if (handoff.incidentId !== result.incidentId || fingerprintHandoff(handoff) !== result.fingerprint) {
     throw new Error('RESULT_ORIGIN_MISMATCH_STOP');
   }
-  const expectedRepository = handoff.failure.kind === 'FEATURE'
+  let expectedRepository = handoff.failure.kind === 'FEATURE'
     ? handoff.origin.repository : 'ansqhd5774-Choi/zgmini-pc-control';
+  if (featureSourceRepository !== null) {
+    if (handoff.failure.kind !== 'FEATURE' ||
+        handoff.origin.repository !== 'ansqhd5774-Choi/zgmini-pc-control' ||
+        !REPOSITORIES.has(featureSourceRepository)) throw new Error('RESULT_FEATURE_SOURCE_SCOPE_STOP');
+    expectedRepository = featureSourceRepository;
+  }
   if (result.pullRequest.repository !== expectedRepository || result.testRun.repository !== expectedRepository) {
     throw new Error('RESULT_OWNER_REPOSITORY_STOP');
   }
