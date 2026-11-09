@@ -71,12 +71,14 @@ export async function performOfficialManualB(auth,io){
  let result={status:'INFL_MANUAL_B_STATE_UNKNOWN',
   code:'INFL_MANUAL_B_RESULT_UNVERIFIED_STOP',requestId};
  try{
+  // Never treat an arbitrary E: lock or an idle Task as proof of the Core
+  // writer's actual lock path. A live Task-linked Core must own it once.
+  // Crucially, this bounded natural observation does NOT hold the shared
+  // Writer B lock and cannot make other unrelated installs wait for minutes.
+  await io.proveActiveCoreLock();
   // A busy shared writer lock must stop without consuming requestId.
   await io.acquireSharedLock(requestId);locked=true;
   verifyManualPreimage(manifest,await io.readSourcePreimage(manifest));
-  // Never treat an arbitrary E: lock or an idle Task as proof of the Core
-  // writer's actual lock path. A live Task-linked Core must own it once.
-  await io.proveActiveCoreLock();
   const bytes=verifyOfficialBytes(await io.fetchExactSources({urls:URLS,
    maxBytes:MAX_BYTES,timeoutMs:manifest.timeoutMs}));
   // Import and parse the actual Census XLSX with the PC's installed xlsx-lite
