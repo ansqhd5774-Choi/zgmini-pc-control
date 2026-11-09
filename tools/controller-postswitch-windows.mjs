@@ -352,7 +352,8 @@ export async function main(args=process.argv.slice(2),{launcherVerified=false}={
   validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence});
   need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
     'POSTSWITCH_EVIDENCE_FAILED');
-  const preflight=await inspectPreflight(['--request-id',id,'--source-sha',source]);
+  const preflight=await inspectPreflight(['--request-id',id,'--source-sha',source],
+    {writerTransition:approval.writerTransition ?? null});
   need(preflight.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS' &&
     preflight.backlogPlan.candidateCount===1 &&
     preflight.backlogPlan.actions[0]?.originalIssueNumber===919,
