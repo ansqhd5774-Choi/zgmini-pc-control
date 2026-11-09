@@ -42,6 +42,27 @@ const node='E:/ZGmini/runtime/node.exe';
 const requiredRunners=Array.from({length:6},(_,n)=>`zgmini-pc-0${n+1}`);
 const sha256=x=>createHash('sha256').update(x).digest('hex');
 const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
+// Accept the same optional preimage manifest scope as controller/common.mjs.
+// The independent maintenance updater cannot import controller files during recovery.
+export function validBacklogOriginalPcJob(body){
+ if(!body||typeof body!=='object'||Array.isArray(body))return false;
+ const base=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
+ const extra=['preimageManifestPath','preimageManifestSha256'];
+ const keys=Object.keys(body);
+ const scoped=body.operation==='writer-install-preimage-readonly'&&
+  keys.length===base.length+extra.length&&extra.every(k=>Object.hasOwn(body,k));
+ const allowed=scoped?[...base,...extra]:base;
+ if(keys.length!==allowed.length||!allowed.every(k=>Object.hasOwn(body,k))||
+    keys.some(k=>!allowed.includes(k)))return false;
+ if(scoped){
+  if(typeof body.preimageManifestPath!=='string'||
+     !/^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(body.preimageManifestPath)||
+     typeof body.preimageManifestSha256!=='string'||
+     !/^[0-9a-f]{64}$/.test(body.preimageManifestSha256))return false;
+ }
+ return body.schema==='ZGMINI_PC_JOB_V1'&&/^[a-z0-9-]{8,80}$/.test(body.requestId);
+}
+
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const writeJson=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);};
@@ -1305,9 +1326,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
        state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);continue;
      }
      let body;try{body=JSON.parse(original.body);}catch{throw Object.assign(Error('BACKLOG_ORIGINAL_BODY_INVALID'),{code:'BACKLOG_ORIGINAL_BODY_INVALID'});}
-     const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
-     need(Object.keys(body).sort().join(',')===keys.sort().join(',')&&body.schema==='ZGMINI_PC_JOB_V1'&&
-       /^[a-z0-9-]{8,80}$/.test(body.requestId),'BACKLOG_ORIGINAL_REQUEST_INVALID');
+     need(validBacklogOriginalPcJob(body),'BACKLOG_ORIGINAL_REQUEST_INVALID');
      const marker=`Maintenance replay ${request.requestId} original #${original.number}`;
      state.replays[key]={status:'POSTING',originalRequestId:body.requestId};writeJson(backlogFile,state);
      const input=path.join(maintenanceRoot,'approved',request.requestId+'.replay-'+original.number+'.json');
@@ -1933,10 +1952,7 @@ function replayR6Backlog(requestId,backlogFile){
    continue;
   }
   let body;try{body=JSON.parse(original.body);}catch{need(false,'R6_HOST_BACKLOG_ORIGINAL_BODY_INVALID');}
-  const keys=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
-  need(Object.keys(body).sort().join(',')===keys.sort().join(',')
-    &&body.schema==='ZGMINI_PC_JOB_V1'&&/^[a-z0-9-]{8,80}$/.test(body.requestId),
-    'R6_HOST_BACKLOG_ORIGINAL_REQUEST_INVALID');
+  need(validBacklogOriginalPcJob(body),'R6_HOST_BACKLOG_ORIGINAL_REQUEST_INVALID');
   state.replays[key]={status:'POSTING',originalRequestId:body.requestId};
   writeJson(backlogFile,state);
   const input=path.join(maintenanceRoot,'approved',requestId+'.replay-'+original.number+'.json');
