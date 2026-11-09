@@ -10,7 +10,9 @@ const pinned = Object.freeze({
   preparedSourceSha: 'a'.repeat(40), activationManifestSha256: 'b'.repeat(64),
 });
 const NOW = '2026-11-10T12:00:00.000Z';
-const CUTOVER = '2026-11-09T12:00:00.000Z';
+// 25h earlier allows seven *post-quarantine* ordinary calls in the last hour.
+// Exactly 24h and seven calls would contradict a true all-call 24h pause.
+const CUTOVER = '2026-11-09T11:00:00.000Z';
 
 function proof(overrides = {}) {
   const hostProof = {
@@ -23,7 +25,7 @@ function proof(overrides = {}) {
     externalEgressScope: 'ALL_UNREGISTERED_BLS_EGRESS_VERIFIED',
     untrackedExternalCallers: 0,
     continuousProtectionVerified: true,
-    precutoverQuarantineMode: 'ALL_UNREGISTERED_BLS_PHYSICAL_CALLS_BLOCKED',
+    precutoverSafetyMode: 'ALL_UNREGISTERED_BLS_PHYSICAL_CALLS_BLOCKED',
     quarantineContinuouslyEnforced: true,
     cutoverAt: CUTOVER, observedAt: NOW,
     ...overrides.host,
@@ -58,7 +60,7 @@ const denied = (result, code) => {
   assert.equal(result.providerRequests, 0);
 };
 
-test('full 24h quarantine with attested 7 occupied slots remains read-only', () => {
+test('25h since cutover, seven verified post-quarantine slots remains read-only', () => {
   const result = run();
   assert.equal(result.status, 'READY_FOR_ATOMIC_RECHECK_NOT_EXECUTABLE');
   assert.equal(result.expectedBlsRequests, 18);
@@ -75,6 +77,15 @@ test('23h59m quarantine cannot be interpreted as historical zero', () => {
   denied(run({host: {cutoverAt: '2026-11-09T12:01:00.000Z'},
     journal: {cutoverAt: '2026-11-09T12:01:00.000Z'}}),
   'R6_B_QUARANTINE_24H_NOT_ELAPSED');
+});
+
+test('exactly 24h after full all-caller pause, verified zero slots can pass read-only', () => {
+  const exact = '2026-11-09T12:00:00.000Z';
+  const result = run({host: {cutoverAt: exact},
+    journal: {cutoverAt: exact, occupiedSlots24h: 0}});
+  assert.equal(result.status, 'READY_FOR_ATOMIC_RECHECK_NOT_EXECUTABLE');
+  assert.equal(result.remainingSlots24h, 25);
+  assert.equal(result.allowProviderCalls, false);
 });
 
 test('8 occupied plus 18 new BLS requests is denied without network', () => {
@@ -106,16 +117,53 @@ test('disabled or interrupted guard cannot pass a 24h time condition', () => {
 });
 
 test('delaying only R6 does not protect normal Core/R4 calls before 24h', () => {
-  denied(run({host: {precutoverQuarantineMode: 'R6_BATCH_ONLY'}}),
-    'R6_B_QUARANTINE_COVERAGE_UNVERIFIED');
+  denied(run({host: {precutoverSafetyMode: 'R6_BATCH_ONLY'}}),
+    'R6_B_QUARANTINE_PRECUTOVER_SAFETY_UNVERIFIED');
   denied(run({host: {quarantineContinuouslyEnforced: false}}),
-    'R6_B_QUARANTINE_COVERAGE_UNVERIFIED');
+    'R6_B_QUARANTINE_ALL_CALLERS_BLOCK_UNVERIFIED');
   denied(run({journal: {quarantinePhysicalAttemptsVerified: false}}),
-    'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
+    'R6_B_QUARANTINE_ALL_CALLERS_BLOCK_UNVERIFIED');
   denied(run({journal: {quarantinePhysicalAttempts: 1}}),
-    'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
+    'R6_B_QUARANTINE_ALL_CALLERS_BLOCK_UNVERIFIED');
   denied(run({journal: {quarantinePhysicalAttempts: null}}),
-    'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
+    'R6_B_QUARANTINE_ALL_CALLERS_BLOCK_UNVERIFIED');
+});
+
+test('full independently verified attempt timestamps can replace 24h pause', () => {
+  const withinHour = '2026-11-10T11:00:00.000Z';
+  const valid = run({host: {
+    cutoverAt: withinHour,
+    precutoverSafetyMode: 'FULL_PRECUTOVER_24H_PHYSICAL_HISTORY_ATTESTED',
+    fullHistoricalAttemptTimesVerified: true,
+    historicalSeedSha256: 'd'.repeat(64),
+  }, journal: {
+    cutoverAt: withinHour,
+    initialSeedMatchesPhysicalHistory: true,
+    historicalSeedSha256: 'd'.repeat(64),
+  }});
+  assert.equal(valid.status, 'READY_FOR_ATOMIC_RECHECK_NOT_EXECUTABLE');
+  assert.equal(valid.allowProviderCalls, false);
+  assert.equal(valid.executable, false);
+  denied(run({host: {
+    cutoverAt: withinHour,
+    precutoverSafetyMode: 'FULL_PRECUTOVER_24H_PHYSICAL_HISTORY_ATTESTED',
+    fullHistoricalAttemptTimesVerified: false,
+    historicalSeedSha256: 'd'.repeat(64),
+  }, journal: {
+    cutoverAt: withinHour,
+    initialSeedMatchesPhysicalHistory: true,
+    historicalSeedSha256: 'd'.repeat(64),
+  }}), 'R6_B_QUARANTINE_HISTORICAL_SEED_UNVERIFIED');
+  denied(run({host: {
+    cutoverAt: withinHour,
+    precutoverSafetyMode: 'FULL_PRECUTOVER_24H_PHYSICAL_HISTORY_ATTESTED',
+    fullHistoricalAttemptTimesVerified: true,
+    historicalSeedSha256: 'd'.repeat(64),
+  }, journal: {
+    cutoverAt: withinHour,
+    initialSeedMatchesPhysicalHistory: true,
+    historicalSeedSha256: 'e'.repeat(64),
+  }}), 'R6_B_QUARANTINE_HISTORICAL_SEED_UNVERIFIED');
 });
 
 test('Issue-like source SHA and activation digest cannot replace reviewed pins', () => {
