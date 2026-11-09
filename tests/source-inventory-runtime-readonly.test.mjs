@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {gzipSync} from 'node:zlib';
 import {DatabaseSync} from 'node:sqlite';
 import {inspectSourceInventory} from '../controller/source-inventory-runtime-readonly.mjs';
 
@@ -40,11 +41,16 @@ test('counts distinct active source keys without returning raw data or writes',t
   INSERT INTO c1_r3_source_snapshots_v1 VALUES('2026-11-09','BEA:PCE','BEA'),('2026-11-09','FRED:RSX','FRED');
   CREATE TABLE public_feed_snapshots_v1(kind TEXT,feed_key TEXT,snapshot_key TEXT);
   INSERT INTO public_feed_snapshots_v1 VALUES('output','release-calendar','current');`);
+ const encoded='gzip:'+gzipSync(JSON.stringify({series:{SENSITIVE_SERIES_A:[1],SENSITIVE_SERIES_B:[2]},external:{SECRET_SOURCE:{value:1}}})).toString('base64');
+ db.prepare("UPDATE market_input_batches_v1 SET body=? WHERE batch_key='macro:2026-11-09'").run(encoded);
  db.close();const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
  const before=hash(name),files=fs.readdirSync(storage).sort();
  const r=inspectSourceInventory(data);
  assert.equal(r.status,'PASS',JSON.stringify(r));
  assert.equal(r.core.employment.observationRows,3);
+ assert.equal(r.core.batch.knownFamilies.macro.latestBodyKeys.rootSeriesKeys,2);
+ assert.equal(r.core.batch.knownFamilies.macro.latestBodyKeys.externalKeys,1);
+ assert.equal(r.core.coverageStatus,'ALL_TARGET_TABLES_PRESENT');
  assert.equal(r.core.employment.uniqueProviderSeriesGeography,2);
  assert.equal(r.core.employmentR6.snapshots,2);
  assert.equal(r.core.employmentR6.uniqueReleaseRequests,1);
@@ -58,7 +64,7 @@ test('counts distinct active source keys without returning raw data or writes',t
  assert.equal(r.d1Writes,0);
  assert.equal(hash(name),before);
  assert.deepEqual(fs.readdirSync(storage).sort(),files);
- assert.doesNotMatch(JSON.stringify(r),/CES123|AAA|PCE|SECRET|HIDDEN/);
+ assert.doesNotMatch(JSON.stringify(r),/CES123|AAA|PCE|SECRET|HIDDEN|SENSITIVE_SERIES/);
  assert.ok(Buffer.byteLength(JSON.stringify(r))<24000);
 });
 
@@ -97,8 +103,21 @@ test('missing tables are unknown, never reported as zero input series',t=>{
  const r=inspectSourceInventory(data);
  assert.equal(r.status,'PASS',JSON.stringify(r));
  assert.equal(r.core.tableAvailability.employment,false);
+ assert.equal(r.core.coverageStatus,'NO_TARGET_TABLES');
  assert.equal(r.core.employment,null);
  assert.equal(r.overallUniqueSourceCount,null);
+});
+
+test('reports a fixed first-failing table without exposing SQLite SQL/error text',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT,body TEXT)');core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const r=inspectSourceInventory(data);
+ assert.equal(r.core.status,'STATE_UNKNOWN');
+ assert.equal(r.core.code,'READONLY_QUERY_FAILED');
+ assert.equal(r.core.firstFail,'BATCH');
+ assert.doesNotMatch(JSON.stringify(r),/no such column|SELECT .* FROM/i);
 });
 
 test('rejects unapproved roots and does not create SQLite files',t=>{
