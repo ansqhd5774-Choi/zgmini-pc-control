@@ -52,6 +52,12 @@ export function assessR6BlsCutoverQuarantine({
       hostProof.externalEgressScope !== 'ALL_UNREGISTERED_BLS_EGRESS_VERIFIED' ||
       hostProof.untrackedExternalCallers !== 0 ||
       hostProof.continuousProtectionVerified !== true ||
+      // Merely delaying the R6 batch does NOT protect pre-cutover quota from
+      // ordinary Core/R4 unregistered calls. An uncounted historical window
+      // needs a continuous, explicit no-physical-call quarantine for ALL
+      // unregistered callers; no synthetic requestTimes may be seeded.
+      hostProof.precutoverQuarantineMode !== 'ALL_UNREGISTERED_BLS_PHYSICAL_CALLS_BLOCKED' ||
+      hostProof.quarantineContinuouslyEnforced !== true ||
       !finiteTime(hostProof.cutoverAt) || !finiteTime(hostProof.observedAt))
     return blocked('R6_B_QUARANTINE_COVERAGE_UNVERIFIED', cost);
   if (journalProof?.schema !== 'ZGMINI_BLS_UNREGISTERED_SHARED_JOURNAL_PROOF_V1' ||
@@ -60,6 +66,8 @@ export function assessR6BlsCutoverQuarantine({
       journalProof.activationManifestSha256 !== reviewedPins.activationManifestSha256 ||
       journalProof.cutoverAt !== hostProof.cutoverAt ||
       journalProof.continuousHistoryVerified !== true ||
+      journalProof.quarantinePhysicalAttemptsVerified !== true ||
+      journalProof.quarantinePhysicalAttempts !== 0 ||
       !SHA64.test(journalProof.anchorSha256 ?? '') ||
       !Number.isSafeInteger(journalProof.occupiedSlots24h) ||
       journalProof.occupiedSlots24h < 0 ||
