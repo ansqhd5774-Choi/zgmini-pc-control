@@ -30,11 +30,13 @@ const comments = () => [{user: {login: bot}, body: `<!-- zgmini-pc-result:${runI
 const fixture = (status = 'FAIL') => {
   const issues = [];
   let posts = 0;
+  let routeCalls = 0;
   const io = {
     readReport: async p => p.endsWith('seat-4.json') ? report(status) : null,
     readComments: async () => comments(),
     readIssue: async n => n === 1009 ? issue() : issues.find(x => x.number === n),
     listHandoffs: async () => ({repository: repo, complete: true, issues: structuredClone(issues)}),
+    routeHandoff: async () => ({state: ++routeCalls === 1 ? 'ROUTE_RECORDED' : 'ROUTE_REUSED'}),
     createHandoff: async candidate => {
       posts++;
       const item = {repository: repo, number: 2003, body: candidate.body,
@@ -43,7 +45,7 @@ const fixture = (status = 'FAIL') => {
       return item;
     }
   };
-  return {io, issues, get posts() { return posts; }};
+  return {io, issues, get posts() { return posts; }, get routeCalls() {return routeCalls;}};
 };
 
 test('completed six-seat run emits exactly one sanitized handoff for one confirmed FAIL', async () => {
@@ -53,6 +55,8 @@ test('completed six-seat run emits exactly one sanitized handoff for one confirm
   assert.equal(result.reportsObserved, 1);
   assert.equal(result.confirmedFailures, 1);
   assert.equal(result.newIssues, 1);
+  assert.equal(result.routesRecorded, 1);
+  assert.equal(f.routeCalls, 1);
   assert.equal(result.pcOperationalWrites, 0);
   assert.equal(result.automaticPcRetries, 0);
   assert.equal(f.posts, 1);
@@ -60,6 +64,8 @@ test('completed six-seat run emits exactly one sanitized handoff for one confirm
   assert.doesNotMatch(f.issues[0].body, /GITHUB_TOKEN|rawPayload|password/);
   const repeated = await processCompletedPcJob(event(), f.io);
   assert.equal(repeated.reusedIssues, 1);
+  assert.equal(repeated.routesReused, 1);
+  assert.equal(f.routeCalls, 2);
   assert.equal(repeated.newIssues, 0);
   assert.equal(f.posts, 1);
 });
@@ -148,6 +154,7 @@ test('lost POST response reconciles existing issue and never blindly posts twice
   f.io.createHandoff = async candidate => { await create(candidate); throw new Error('response lost'); };
   const outcome = await processCompletedPcJob(event(), f.io);
   assert.equal(outcome.reusedIssues, 1);
+  assert.equal(outcome.routesRecorded, 1);
   assert.equal(outcome.newIssues, 0);
   assert.equal(f.posts, 1);
 });
@@ -175,4 +182,14 @@ test('the new workflow remains opt-in, single-writer and self-hosted', () => {
   assert.match(yaml, /run: node agent-handoff\/pc-failure-producer\.mjs/);
   assert.match(yaml, /uses: actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
   assert.doesNotMatch(yaml, /runs-on: ubuntu-latest|E:\\\\ZGmini\\\\runtime\\\\node\.exe/);
+});
+
+test('missing route handler or failed route readback stops completion after intake', async () => {
+  const missing = fixture(); delete missing.io.routeHandoff;
+  await assert.rejects(processCompletedPcJob(event(), missing.io), /ROUTE_NOT_CONFIGURED/);
+  assert.equal(missing.posts, 1);
+  const fail = fixture();
+  fail.io.routeHandoff = async () => { throw new Error('HANDOFF_BOT_DIRECT_ROUTE_COMMENT_READBACK_STOP'); };
+  await assert.rejects(processCompletedPcJob(event(), fail.io), /COMMENT_READBACK_STOP/);
+  assert.equal(fail.posts, 1);
 });
