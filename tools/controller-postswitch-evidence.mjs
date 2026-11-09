@@ -17,6 +17,94 @@ const need = (ok, code) => {if (!ok) throw Object.assign(new Error(code), {code}
 const json = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const isSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const alive = pid => {try {process.kill(pid, 0); return true;} catch (error) {return error.code === 'ESRCH' ? false : null;}};
+const sameKeys = (left, right) => left && right &&
+  typeof left === 'object' && typeof right === 'object' &&
+  !Array.isArray(left) && !Array.isArray(right) &&
+  Object.keys(left).length === Object.keys(right).length &&
+  Object.keys(left).every(key => Object.hasOwn(right, key));
+const WRITER_B_RESULT_PATH =
+  'results/writer-b-source-install-b14af1b2-9a23-4f5a-9239-218498ddb403.json';
+const WRITER_A_RESULT_PATH = 'results/42693903840-1-seat-1.json';
+const EXPECTED_TRANSITION = Object.freeze({
+  baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
+  currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+  approvedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+  writerBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
+  writerAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+});
+
+/**
+ * Historical #917 protection is immutable. An explicitly approved C-grade
+ * recovery may accept only the separately pinned Writer config evolution.
+ * It does NOT attest that all config bytes originated from one B install:
+ * that absence of before/after B hashes is covered by the exact current
+ * digest in the separately approved C manifest and fresh Windows readback.
+ */
+export function verifyWriterProtectionTransition({baseline, current,
+  transition, writerB, writerA, writerBBlobSha, writerABlobSha} = {}) {
+  if (!sameKeys(transition, EXPECTED_TRANSITION) ||
+      !Object.entries(EXPECTED_TRANSITION).every(([key, value]) =>
+        transition[key] === value) ||
+      !sameKeys(baseline, current) ||
+      !sameKeys(baseline?.files, current?.files) ||
+      !sameKeys(baseline?.tasks, current?.tasks) ||
+      baseline.files['config.json'] !== transition.baselineConfigSha256 ||
+      current.files['config.json'] !== transition.currentConfigSha256 ||
+      baseline.files['config.json'] === current.files['config.json'] ||
+      !Object.keys(baseline.files).every(key =>
+        key === 'config.json' || baseline.files[key] === current.files[key]) ||
+      !Object.keys(baseline.tasks).every(key =>
+        baseline.tasks[key] === current.tasks[key]) ||
+      Object.keys(baseline.tasks).length !== 3 ||
+      !Object.hasOwn(baseline.tasks, 'ZGMINI-PC-Local-Core') ||
+      !Object.hasOwn(baseline.tasks, 'ZGMINI-PC-Local-Korea') ||
+      baseline.tasks['ZGMINI-PC-Iran-Progress-R13'] !== 'APPROVED_RETIRED_ABSENT' ||
+      writerBBlobSha !== transition.writerBResultBlobSha ||
+      writerABlobSha !== transition.writerAResultBlobSha) return false;
+  if (writerB?.schema !== 'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1' ||
+      writerB?.requestId !== 'b14af1b2-9a23-4f5a-9239-218498ddb403' ||
+      writerB?.status !== 'WRITER_B_INSTALLED_VERIFIED' ||
+      writerB?.code !== 'WRITER_B_INSTALL_VERIFIED' ||
+      writerB?.localOnly !== true || writerB?.mode !== 'LOCAL_OVERLAY' ||
+      writerB?.sourceSha !== transition.approvedSourceSha ||
+      writerB?.manifestSha256 !==
+        '593004aa6b0c5c6471a691faebd9c98f142af4990580a8b1d5a0619d829b2e6f' ||
+      !Array.isArray(writerB?.changedPaths) || writerB.changedPaths.length !== 4 ||
+      !['scripts/pc-writer/release-calendar.mjs',
+        'lib/treasury-auction-history-source.mjs',
+        'lib/treasury-auction-history.mjs',
+        'lib/treasury-auction-history-taws.mjs']
+        .every(name => writerB.changedPaths.includes(name)))
+    return false;
+  const observed = writerA?.result;
+  return writerA?.schema === 'ZGMINI_PC_RESULT_V1' &&
+    writerA.requestId === 'pc-4b53b63d-cf6f-4898-806d-f6774b63009c' &&
+    writerA.operation === 'writer-install-preimage-readonly' &&
+    writerA.status === 'PASS' && writerA.code === 'WRITER_FIXED_PREIMAGE_READONLY' &&
+    writerA.operationalWrites === 0 && writerA.providerCalls === 0 &&
+    writerA.d1Writes === 0 && writerA.sqliteOpened === false &&
+    writerA.protectedStateUnchanged === true &&
+    observed?.status === 'PASS' && observed?.sourceIdentityConsistent === true &&
+    observed?.sourceHead === transition.approvedSourceSha &&
+    observed?.approvedConfigSource === transition.approvedSourceSha &&
+    observed?.checkpointSource === transition.approvedSourceSha &&
+    observed?.r6Config?.status === 'PASS' &&
+    observed.r6Config.configSha256 === transition.currentConfigSha256;
+}
+
+function verifiedGitHubResult(pathName, expectedBlobSha) {
+  const row = readGitHub('contents/' + pathName);
+  need(row?.type === 'file' && row?.path === pathName &&
+    row?.sha === expectedBlobSha && row?.encoding === 'base64' &&
+    typeof row?.content === 'string',
+  'POSTSWITCH_WRITER_RESULT_BLOB_DRIFT');
+  try {
+    return JSON.parse(Buffer.from(row.content.replace(/\s/g, ''), 'base64')
+      .toString('utf8'));
+  } catch {
+    need(false, 'POSTSWITCH_WRITER_RESULT_UNREADABLE');
+  }
+}
 
 export function verifyControllerFiles(host, root, readBytes = fs.readFileSync) {
   if (!host || !isSha(host.controllerSourceSha) || !host.controllerFiles ||
@@ -89,12 +177,18 @@ export function classifyPostSwitchEvidence(evidence) {
       evidence.snapshotBytesVerified === true,
     OWNER_DEAD_AND_MATCHED: evidence.ownerIdentityVerified === true && evidence.ownerAlive === false,
     PROTECTION_UNCHANGED: evidence.protectionVerified === true,
+    PROTECTION_CONTRACT_VERIFIED: evidence.protectionContractVerified === true,
     BACKLOG_CLOSED: evidence.backlogVerified === true && evidence.pauseWindowsClosed === true,
     LIVE_WORKFLOW_ACTIVE: evidence.workflow === 'active',
     RUNNERS_ONLINE: evidence.runnerSetVerified === true,
     SUPERVISOR_FRESH: evidence.supervisorVerified === true,
   };
-  const failed = Object.entries(checks).filter(([, pass]) => !pass).map(([name]) => name);
+  // Keep the historical truth visible. A separately pinned C-grade contract
+  // may satisfy protection, but must never relabel the old snapshot unchanged.
+  const failed = Object.entries(checks).filter(([name, pass]) => !pass &&
+    name !== 'PROTECTION_CONTRACT_VERIFIED' &&
+    !(name === 'PROTECTION_UNCHANGED' && checks.PROTECTION_CONTRACT_VERIFIED))
+    .map(([name]) => name);
   return {status: failed.length ? 'RECOVERY_REQUIRED' : 'READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
     code: failed[0] ?? 'POSTSWITCH_EVIDENCE_VERIFIED', checks,
     next: failed.length ? 'RECONCILE_NAMED_CHECKS_WITHOUT_OPERATIONAL_WRITE' :
@@ -119,7 +213,7 @@ function readGitHub(route) {
     {encoding: 'utf8', windowsHide: true, timeout: 30000, maxBuffer: 3e6}));
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args = process.argv.slice(2), {writerTransition = null} = {}) {
   need(process.platform === 'win32' && !process.env.GITHUB_ACTIONS && !process.env.RUNNER_NAME,
     'POSTSWITCH_OPERATOR_WINDOWS_REQUIRED');
   need(args.length === 4 && args[0] === '--request-id' && args[2] === '--source-sha' &&
@@ -188,16 +282,35 @@ export async function main(args = process.argv.slice(2)) {
   // scheduled task XML, writer configs, retired Iran approval, real workflow,
   // and every closed maintenance pause interval. All these port calls are reads.
   let protectionVerified = false, protectionCode = null;
+  let protectionContractVerified = false;
   let currentInventoryComplete = false, snapshotInventoryComplete = false;
   if (baselineExists && backlogVerified) {
     try {
-      const {loadApprovedPackage, makePorts, prevalidationInventory} = await import('./update.mjs');
+      const {loadApprovedPackage, makePorts, prevalidationInventory,
+        protectedSnapshot} = await import('./update.mjs');
       const data = loadApprovedPackage(id, path.join(maintenance, 'approved', `${id}.json`), {recovery: true});
       currentInventoryComplete = prevalidationInventory(currentHost) !== null;
       snapshotInventoryComplete = prevalidationInventory(snapshotHost) !== null;
       const {ports} = makePorts(data, data.issueNumber, {recoveryOperator: true});
-      await ports.prepareRecovery();
-      protectionVerified = true;
+      try {
+        await ports.prepareRecovery();
+        need(writerTransition === null, 'POSTSWITCH_WRITER_TRANSITION_UNEXPECTED');
+        protectionVerified = true;
+      } catch (error) {
+        if (error?.code !== 'PROTECTED_STATE_DRIFT' || writerTransition === null)
+          throw error;
+        protectionCode = error.code;
+        const current = protectedSnapshot();
+        const writerB = verifiedGitHubResult(WRITER_B_RESULT_PATH,
+          writerTransition?.writerBResultBlobSha);
+        const writerA = verifiedGitHubResult(WRITER_A_RESULT_PATH,
+          writerTransition?.writerAResultBlobSha);
+        protectionContractVerified = verifyWriterProtectionTransition({
+          baseline:json(baselinePath),current,transition:writerTransition,
+          writerB,writerA,writerBBlobSha:writerTransition.writerBResultBlobSha,
+          writerABlobSha:writerTransition.writerAResultBlobSha});
+        need(protectionContractVerified,'POSTSWITCH_WRITER_CONTRACT_NOT_VERIFIED');
+      }
     } catch (error) {protectionCode = /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code :
       'POSTSWITCH_PROTECTION_READBACK_FAILED';}
   }
@@ -222,6 +335,7 @@ export async function main(args = process.argv.slice(2)) {
     snapshotBytesVerified: exactSourceBytes && snapshotInventoryComplete &&
       verifyControllerFiles(snapshotHost, path.join(base, 'snapshot')),
     ownerIdentityVerified, ownerAlive: alive(owner.pid), protectionVerified,
+    protectionContractVerified,
     backlogVerified, pauseWindowsClosed, workflow, runnerSetVerified, supervisorVerified,
     otherControlLeaseCount});
   const replayStates = Object.fromEntries(Object.entries(backlog.replays || {})
@@ -237,7 +351,8 @@ export async function main(args = process.argv.slice(2)) {
       protectedBefore: baselineExists ? digest(fs.readFileSync(baselinePath)) : null,
       backlog: digest(backlogRaw)},
     backlogReplayStates: replayStates,
-    protectionCode, exactInventories, exactSourceBytes, otherControlLeaseCount, operationalWrites: 0};
+    protectionCode, protectionContractVerified,
+    exactInventories, exactSourceBytes, otherControlLeaseCount, operationalWrites: 0};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
