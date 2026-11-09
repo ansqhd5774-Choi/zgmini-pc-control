@@ -26,7 +26,8 @@ const need=(ok,code)=>{if(!ok)throw error(code);};
 const exact=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&
  Object.keys(v).sort().join('|')===keys.slice().sort().join('|');
 const same=(a,b)=>path.win32.normalize(a).toLowerCase()===path.win32.normalize(b).toLowerCase();
-const safeCode=x=>CODES.test(x??'')?x:'R6_B_UNCLASSIFIED_STOP';
+const safeCode=x=>CODES.test(x??'')&&x.length<=80?
+ (x.startsWith('R6_B_')?x:`R6_B_${x}`):'R6_B_UNCLASSIFIED_STOP';
 
 export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes}={}){
  need(env?.GITHUB_REPOSITORY===R6_B_REPO&&env.GITHUB_EVENT_NAME==='issues'&&
@@ -107,7 +108,8 @@ function withCoreLock(pcHome,requestId){
   requestId,nonce:randomUUID()});
  let fd;
  try{fd=fs.openSync(file,'wx',0o600);}
- catch{throw error('R6_B_CORE_LOCK_OCCUPIED');}
+ catch(cause){throw error(cause?.code==='EEXIST'?
+  'R6_B_CORE_LOCK_OCCUPIED':'R6_B_CORE_LOCK_CREATE_STOP');}
  let original;
  try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);fs.closeSync(fd);fd=null;
   original=fs.statSync(file);
@@ -126,7 +128,8 @@ function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
  const file=path.join(pcHome,`employment-r6-registered-${mode.toLowerCase()}-${date}.claim.json`);
  let fd;
  try{fd=fs.openSync(file,'wx',0o600);}
- catch{throw error('R6_B_TODAY_ALREADY_CLAIMED');}
+ catch(cause){throw error(cause?.code==='EEXIST'?
+  'R6_B_TODAY_ALREADY_CLAIMED':'R6_B_CLAIM_CREATE_STOP');}
  const value=JSON.stringify({schema:'R6_REGISTERED_ONE_SHOT_CLAIM_V1',
   requestId,approvalManifestSha256,mode,claimedAt:new Date().toISOString()})+'\n';
  try{fs.writeFileSync(fd,value);fs.fsyncSync(fd);fs.closeSync(fd);fd=null;
@@ -146,24 +149,30 @@ function safeGroups(rows){
   ...(CODES.test(row.failureCode??'')?{failureCode:row.failureCode}:{})}));
 }
 
+async function loadInstalledProviderFields({sourceRoot,pcHome}){
+ const envURL=pathToFileURL(path.join(sourceRoot,'scripts','pc-writer','local-env.mjs'));
+ const {loadLocalProviders}=await import(envURL.href);
+ return loadLocalProviders(pcHome);
+}
+
 export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
  pcHome=R6_B_HOME,lockFactory=withCoreLock,claim=claimOnce,
- run=null}={}){
+ verifyOverlay=verifyInstalledR6Overlay,
+ providerFieldsLoader=loadInstalledProviderFields,run=null}={}){
  const base={schema:'ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1',
   requestId:auth.request.requestId,sourceSha:auth.approval.installedSourceSha,
   mode:auth.approval.mode,status:'STATE_UNKNOWN',code:'R6_B_NOT_STARTED',
   providerRequests:null,blsRequests:null,dolRequests:null,groupResults:[],
   sqlite:'UNVERIFIED',publication:'UNVERIFIED',sourceStoredAt:null,
   sourceFeatures:null,chartReadyFeatures:null,retry:'NO_AUTO_RETRY'};
- let lock=null,claimed=false,lastPass='SOURCE_VERIFIED';
+ let lock=null,claimed=false,claimAttempted=false,lastPass='SOURCE_VERIFIED';
+ let outcome;
  try{
-  const config=verifyInstalledR6Overlay({sourceRoot,pcHome,
+  const config=verifyOverlay({sourceRoot,pcHome,
    approvedSha:auth.approval.installedSourceSha,overlay:auth.overlay});
   // Missing credentials are a read-only preflight failure, not a consumed
   // one-shot. Inspect presence only, before creating the durable claim.
-  const envURL=pathToFileURL(path.join(sourceRoot,'scripts','pc-writer','local-env.mjs'));
-  const {loadLocalProviders}=await import(envURL.href);
-  const providerFields=loadLocalProviders(pcHome);
+  const providerFields=await providerFieldsLoader({sourceRoot,pcHome});
   need(Boolean(providerFields.BLS_API_KEY?.trim()||
    providerFields.BLS_REGISTRATION_KEY?.trim()),'R6_B_REGISTERED_KEY_MISSING');
   lastPass='REGISTERED_KEY_PRESENT';
@@ -171,18 +180,30 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
   const execute=run??runInstalledR6;
   // A persistent date/mode claim precedes every SQLite or provider effect.
+  claimAttempted=true;
   claim(pcHome,{requestId:auth.request.requestId,
    approvalManifestSha256:auth.request.approvalManifestSha256},auth.approval.mode);
   claimed=true;lastPass='ONE_SHOT_CLAIMED';
   const value=await execute({auth,sourceRoot,pcHome,config,lock});
-  return {...base,...value,lastPass:'PUBLISH_READBACK',firstFail:null};
+  outcome={...base,...value,lastPass:'PUBLISH_READBACK',firstFail:null};
  }catch(cause){
   const code=safeCode(cause?.code??cause?.message);
-  return {...base,status:claimed?'STATE_UNKNOWN':'BLOCKED',code,
+  // A claim may have reached persistent storage before the exception; do not
+  // call such an outcome a harmless preflight stop or permit an automatic retry.
+  const unknown=claimed||code==='R6_B_CORE_LOCK_UNKNOWN'||
+   (claimAttempted&&!['R6_B_TODAY_ALREADY_CLAIMED',
+    'R6_B_CLAIM_CREATE_STOP'].includes(code));
+  outcome={...base,status:unknown?'STATE_UNKNOWN':'BLOCKED',code,
    lastPass,firstFail:claimed?'COLLECT_OR_PUBLISH':'PREFLIGHT',
    retry:'READ_EXISTING_CLAIM_AND_DB_NO_RETRY'};
- }finally{if(lock){const released=lock.release();if(!released)
-   process.stderr.write('R6_B_CORE_LOCK_RELEASE_UNVERIFIED\n');}}
+ }finally{if(lock){const released=lock.release();if(!released){
+  // Source effects may already have completed, but an unresolved Core lock
+  // can block ordinary cycles. Preserve it for an authorized read-only review.
+  outcome={...base,status:'STATE_UNKNOWN',
+   code:'R6_B_CORE_LOCK_RELEASE_UNVERIFIED',lastPass:outcome?.lastPass??lastPass,
+   firstFail:'CORE_LOCK_RELEASE',retry:'READ_EXISTING_CORE_LOCK_NO_AUTO_RETRY'};
+ }}}
+ return outcome;
 }
 
 async function runInstalledR6({auth,sourceRoot,pcHome,config,lock}){
