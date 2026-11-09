@@ -125,6 +125,12 @@ export async function coordinateR6BackfillOnce({
     const { dueGroups, cost } = validateDuePlans(plans);
 
     if (cost.total === 0) {
+      // A zero-work approval still consumes its one-shot identity. Otherwise a
+      // later retry with the same requestId could run newly-due provider work.
+      const claim = await claimOneShot({ requestId, dueGroups, cost, approved });
+      if (claim?.status !== 'CLAIMED_NO_RETRY' || claim.requestId !== requestId)
+        fail('R6_B_ONESHOT_CLAIM_UNVERIFIED');
+      claimed = true;
       const counts = { bls: 0, dol: 0 };
       const audit = await auditEffects({ requestId, mode: 'BACKFILL', dueGroups, cost,
         collected: null, noop: true });
