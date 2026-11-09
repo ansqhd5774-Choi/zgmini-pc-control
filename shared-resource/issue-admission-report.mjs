@@ -30,6 +30,8 @@ export function rejectionBody(issueNumber,admission) {
     `공용 작업 요청 미접수: ${admission.code}\n`+
     (admission.expectedTitle?
       `정확한 Issue 제목: \`${admission.expectedTitle}\`\n`:'')+
+    (Array.isArray(admission.expectedTitles)&&admission.expectedTitles.length<=12?
+      '허용된 Issue 제목 중 하나: '+admission.expectedTitles.map(x=>'`'+x+'`').join(', ')+'\n':'')+
     (admission.expectedLabel?
       `필수 Issue 라벨: \`${admission.expectedLabel}\`\n`:'')+
     '기존 요청은 설치·실행 성공이 아닙니다. 승인·manifest를 다시 대조하고 새로운 고유 요청을 명시적으로 생성해야 합니다. 기존 requestId 자동 재실행은 없습니다.\n';

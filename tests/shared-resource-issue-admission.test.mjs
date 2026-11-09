@@ -98,3 +98,33 @@ test('lost POST response does not duplicate an admission rejection',async()=>{
   }),/POST_OUTCOME_UNKNOWN/);
   assert.equal(posts,1);
 });
+
+
+test('same B label uses schema and manifest route to return its exact title',()=>{
+  const inflation={schema:'ZGMINI_INFLATION_OFFICIAL_MANUAL_B_REQUEST_V1',
+    requestId:'9b4e50f9-8674-4894-9c5e-8ba454d6f79d',
+    chatId:'e94b51bd-0c27-4257-b430-c8f69fa6728e',
+    operation:'inflation-official-manual',controlRepository:repo,
+    approvalManifestPath:'approvals/inflation-manual-b/inflation-official-r1.json',
+    approvalManifestSha256:'b'.repeat(64)};
+  const outcome=inspectSharedIssueAdmission({...base(),
+    title:'not-a-real-install-title',body:JSON.stringify(inflation)});
+  assert.equal(outcome.code,'EXACT_ISSUE_TITLE_REQUIRED');
+  assert.equal(outcome.kind,'inflation-manual-b');
+  assert.equal(outcome.expectedTitle,'pc-inflation-official-manual-once');
+  assert.equal(inspectSharedIssueAdmission(prepareSharedApprovalIssue(
+    'inflation-manual-b',inflation)).state,'ADMITTED_TO_WORKFLOW');
+});
+
+test('unknown shared-label body lists valid titles without guessing one',()=>{
+  const unknown=inspectSharedIssueAdmission({...base(),
+    title:'wrong-title',body:'not json'});
+  assert.equal(unknown.state,'REJECTED_AT_ADMISSION');
+  assert.equal(unknown.expectedTitle,undefined);
+  assert.deepEqual(unknown.expectedTitles,
+    ['pc-inflation-official-manual-once','pc-writer-source-install']);
+  const body=rejectionBody(1090,unknown);
+  assert.match(body,/허용된 Issue 제목 중 하나:/);
+  assert.match(body,/pc-inflation-official-manual-once/);
+  assert.match(body,/pc-writer-source-install/);
+});
