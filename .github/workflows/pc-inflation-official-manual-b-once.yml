@@ -1,0 +1,53 @@
+# Source-only dormant candidate. Do NOT enable until a reviewed B manifest and
+# operator approval for the exact PC source and Core lock contract exist.
+name: ZGMINI Inflation Official Manual B Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+jobs:
+  inflation-official-manual-b:
+    if: >-
+      vars.ZGMINI_INFLATION_MANUAL_B_ENABLED == 'true' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-inflation-official-manual-once' &&
+      contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
+      github.run_attempt == 1
+    concurrency:
+      group: zgmini-writer-source-b-one-at-a-time
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    # 6m pre-lock owner observation + existing 6m/90s natural idle bounds,
+    # two 40s official GET ceilings, transaction and result report allowance.
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Checkout exact event control source without retained credentials
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: inflation-manual-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run manifest-pinned official GET and Core-exclusive two-file store
+        id: store
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\inflation-manual-control\inflation-manual-b\windows-adapter.mjs"'
+      - name: Create-only sanitized JSON and TXT with independent readback
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\inflation-manual-control\inflation-manual-b\report.mjs"'
