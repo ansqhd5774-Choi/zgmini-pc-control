@@ -151,8 +151,9 @@ export function preparePcSharedResourceWait({originIssue,report,resultPath,resul
     evidence:{runId,status:report.status,code:report.code,
       resultJsonPath:resultPath,resultTxtPath:resultPath.replace(/\.json$/,'.txt'),
       resultPairReadbackVerified:true},
-    // Engine has already consumed this request in its ledger/lease, although
-    // the guarded worker has not mutated any operational data.
+    // The original Issue's one-shot execution opportunity is spent. The
+    // Controller may have exited before its request ledger or lease was
+    // acquired (e.g. LEASE_BUSY), but operational data remains untouched.
     safePoint:'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',releaseCondition:report.code==='RESOURCE_WAIT_MEMORY'?
       'HEAVY_MEMORY_AVAILABLE_VERIFIED':'LEASE_OWNER_RELEASE_VERIFIED'});
   return Object.freeze({state:'WAITING_SHARED_RESOURCE',wait});
