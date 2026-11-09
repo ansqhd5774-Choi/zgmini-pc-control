@@ -53,3 +53,9 @@
 - `agent-handoff/resource-wait-ledger.mjs`는 인증된 정상 자원 대기만 #68에 영구 댓글로 1회 기록한다. 중복 수신은 기존 기록 재사용, POST ACK 분실은 조회만 수행한다. 조정 원장 #68은 실제 PC lease가 아니다.
 - 현재 자동 이벤트 연결은 **Writer B 완료 결과**와 **등록된 Writer B 승인 Issue 접수**에서만 존재한다. Controller/pc-job/신규 승인 라우트는 각자가 동일 공통 모듈의 인증 adapter를 사용해야 한다. 미래의 모든 업무에 이미 자동 배포됐다고 보고하지 않는다.
 - 실제 GitHub workflow의 활성 동작과 PC 운영 적용·원담당 수신·자원 해제 재평가는 별도 단계로 실증한다.
+
+### A급 pc-job 공용 자원 대기 연결
+
+`agent-handoff/pc-result-to-incident.mjs`와 `pc-failure-producer.mjs`는 인증된 원본 pc-job Issue·완료 Run·결과 JSON/TXT로부터 **메모리 대기 및 seat/heavy lease 경합**만 공통 #68 원장에 기록하도록 보강했다. `BLOCKED` 전부를 대기로 취급하지 않는다. `PREVALIDATION`·`mutationStarted=false`·운영/공급처/D1 쓰기 0·SQLite 미접근·자원 lease 미보존 및 동일 TXT 일치를 요구한다. 증거가 부족하면 `PARTIAL_WAIT_EVIDENCE_PENDING`으로 보존하고 임의 재실행하지 않는다.
+
+원래 pc-job에는 승인 manifest가 없을 수 있으므로, 공통 원장은 승인 범위(작업 종류·source 저장소/브랜치/SHA)의 SHA-256 `approvalFingerprintSha256`를 허용한다. Writer B는 원래의 실제 manifest SHA-256을 그대로 사용한다. 일반 pc-job requestId는 UUID 외 `pc-...` 형식도 기존 Controller 검증 계약 범위에서 허용한다. 신규 기능은 이 공통 모델에 adapter를 연결하되 원래 승인/로그/결과 형식을 임의 변경하지 않는다.
