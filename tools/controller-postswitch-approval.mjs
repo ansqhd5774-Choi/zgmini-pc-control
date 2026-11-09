@@ -56,6 +56,7 @@ export const WRITER_TRANSITION = Object.freeze({
 // approval. Recording them does not authorize a new protection exception or a
 // Windows recovery. In particular, the 4ec config digest has no independent
 // historical A-grade observation; it may only be calculated from live bytes.
+// The final 0be... config digest was observed after #1195 by read-only #1202.
 export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
   scope:'READONLY_SOURCE_ONLY_CANDIDATE_NOT_C_APPROVAL',
   sourceSequence:Object.freeze([
@@ -63,6 +64,7 @@ export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
     '4ec0b8c197627ebdb316be8df291e30d7e435784',
     '144f3b8f673cc3d18f004ddd65f6920d450f0ea6',
     '48d3478030590ca63aaab2435e88c896608c70d3',
+    'de81749f83c086f5cb0cad7ed1d5cc958de19280',
   ]),
   configShaAnchors:Object.freeze({
     prior70:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
@@ -70,6 +72,7 @@ export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
     at4ec:null, // DERIVED_ONLY: never report this as observed A-grade proof.
     at144:'9e9bbe92ee7a2e368c08ec5ddb21bdb7fc782613a05d610da963f7278c75a404',
     at48:'59777810c0949036f03777b7ea5561bd72bf0697cdaba65e393af49bf67356dc',
+    atDe:'0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453',
   }),
   writerB:Object.freeze([
     Object.freeze({
@@ -105,6 +108,23 @@ export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
       manifestSha256:'0f0e02409e9c206f8c35e1efe7790ce1a80a3e3eb0bcf8bbf4f8931a1587a57c',
       changedPath:'scripts/pc-writer/run-local.mjs',
     }),
+    Object.freeze({
+      path:'results/writer-b-source-install-f18e341c-e37e-4975-8a1b-2fa9818b9fae.json',
+      blobSha:'e53ccadeecd51929eaa1db38f161c50b03811f06',
+      rawSha256:'bc03c09f451ea151a22be22cc7b5851c7984754899398a321c7036dbf02a59ad',
+      requestId:'f18e341c-e37e-4975-8a1b-2fa9818b9fae',
+      baseHead:'48d3478030590ca63aaab2435e88c896608c70d3',
+      sourceSha:'de81749f83c086f5cb0cad7ed1d5cc958de19280',
+      candidateSourceSha:'b37c7c029d36c6d29c50a5173018836918db5c78',
+      manifestSha256:'dc6b0707ae4778ecf99cdcb186a96a0c64aac9441fd42ec09f509640ee1f325c',
+      changedPaths:Object.freeze([
+        'lib/market-score/employment-r6-formula.mjs',
+        'lib/market-score/employment-r6-feature-engine.mjs',
+        'lib/market-score/employment-r6-one-year-read-model.mjs',
+        'scripts/pc-writer/employment-r6-one-year-stage.mjs',
+        'worker/employment-r6-public-display.mjs',
+      ]),
+    }),
   ]),
   aObservations:Object.freeze({
     at144:Object.freeze({
@@ -129,6 +149,15 @@ export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
       sourceSha:'48d3478030590ca63aaab2435e88c896608c70d3',
       status:'PASS',code:'PC_SOURCE_READONLY_DIAGNOSIS',
       evidenceLevel:'HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME',
+    }),
+    atDeReadOnly:Object.freeze({
+      issueNumber:1202,
+      path:'results/42722662159-1-seat-2.json',
+      blobSha:'247bc5dcc61ac7472e8869b92882aa2e29684e38',
+      requestId:'pc-7fec8790-8160-4bd3-950d-7398da251793',
+      sourceSha:'de81749f83c086f5cb0cad7ed1d5cc958de19280',
+      configSha256:'0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453',
+      evidenceLevel:'READONLY_CONFIG_BYTES_NOT_LIVE_CORE_PROCESS',
     }),
   }),
 });
