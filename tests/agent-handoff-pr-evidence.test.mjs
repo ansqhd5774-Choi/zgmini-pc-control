@@ -27,8 +27,8 @@ test('new handoff CI checks out exact PR head and preserves read-only credential
   assert.match(workflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
   assert.doesNotMatch(workflow, /uses: actions\/(checkout|setup-node)@v\d/);
   assert.match(workflow, /run: node --test --test-concurrency=1 "tests\/agent-handoff\*\.test\.mjs"/);
-  assert.match(workflow, /runs-on: \[self-hosted, Linux, X64, zgmini-handoff-ci-isolated\]/);
-  assert.match(workflow, /defaults:\s*\n\s+run:\s*\n\s+shell: bash/);
+  assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+  assert.match(workflow, /defaults:\s*\n\s+run:\s*\n\s+shell: cmd/);
   assert.match(workflow, /timeout-minutes: 5/);
   assert.match(workflow, /cancel-in-progress: true/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest|zgmini-pc-control\]|node\.exe|\$\{\{\s*secrets\.|issues: write|actions: write/);
