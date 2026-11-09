@@ -70,7 +70,7 @@ test('counts distinct active source keys without returning raw data or writes',t
  assert.ok(Buffer.byteLength(JSON.stringify(r))<24000);
 });
 
-test('audits the exact private TA_WS key and returns only dated counts and raw-text hash',t=>{
+test('audits only the dated TA_WS private input family and returns bounded metadata',t=>{
  const {data,storage}=fixture(t);
  const core=database(storage);
  core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
@@ -83,7 +83,8 @@ test('audits the exact private TA_WS key and returns only dated counts and raw-t
  const body={text,sourceUrl:'SECRET_TREASURY_PROVIDER_URL',fromDate:'2025-11-10',
   toDate:'2026-11-09',awardedCount:2,privateExtra:'SECRET_TREASURY_PRIVATE'};
  core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)').run(
-  'release-calendar:treasury:taws','gzip:'+gzipSync(JSON.stringify(body)).toString('base64'),1794255759536);
+  'release-calendar:treasury:taws:2026-11-09',
+  'gzip:'+gzipSync(JSON.stringify(body)).toString('base64'),1794255759536);
  core.db.close();
  const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
  const before=hash(core.name),files=fs.readdirSync(storage).sort();
@@ -105,7 +106,7 @@ test('invalid TA_WS metadata is never treated as a valid count or exposed',t=>{
  const core=database(storage);
  core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
  const update=core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)');
- update.run('release-calendar:treasury:taws',JSON.stringify({text:'SECRET_INVALID_TREASURY',
+ update.run('release-calendar:treasury:taws:2026-11-09',JSON.stringify({text:'SECRET_INVALID_TREASURY',
   fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:2}),55);
  core.db.close();
  const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
@@ -114,7 +115,7 @@ test('invalid TA_WS metadata is never treated as a valid count or exposed',t=>{
  assert.doesNotMatch(JSON.stringify(r),/SECRET_INVALID_TREASURY/);
  const writer=new DatabaseSync(core.name);
  writer.prepare('UPDATE market_input_batches_v1 SET body=? WHERE batch_key=?').run('X'.repeat(20_000_001),
-  'release-calendar:treasury:taws');
+  'release-calendar:treasury:taws:2026-11-09');
  writer.close();
  assert.deepEqual(inspectSourceInventory(data).core.treasuryTawsInput,
   {status:'UNREADABLE_OR_INVALID'});
@@ -126,7 +127,7 @@ test('TA_WS counted results show mismatch rather than claiming full parser valid
  core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
  const text=JSON.stringify([{competitiveAuctionCloseDate:'2026-11-08T00:00:00',bidToCoverRatio:'2.8'}]);
  core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)').run(
-  'release-calendar:treasury:taws',JSON.stringify({text,fromDate:'2025-11-10',
+  'release-calendar:treasury:taws:2026-11-09',JSON.stringify({text,fromDate:'2025-11-10',
    toDate:'2026-11-09',awardedCount:2}),99);
  core.db.close();
  const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
@@ -135,6 +136,33 @@ test('TA_WS counted results show mismatch rather than claiming full parser valid
  assert.equal(r.core.treasuryTawsInput.storedAwardedCount,2);
  assert.equal(r.core.treasuryTawsInput.eligibleCountMatchesStored,false);
  assert.equal(r.core.treasuryTawsInput.status,'OBSERVED');
+});
+
+test('TA_WS audit selects latest dated private input and rejects key/date mismatch',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
+ const add=core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)');
+ const text=JSON.stringify([{competitiveAuctionCloseDate:'2026-11-08T00:00:00',bidToCoverRatio:'2.8'}]);
+ add.run('release-calendar:treasury:taws:2026-11-08',JSON.stringify({text,
+  fromDate:'2025-11-09',toDate:'2026-11-08',awardedCount:1}),98);
+ add.run('release-calendar:treasury:taws:2026-11-09',JSON.stringify({text,
+  fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:1}),99);
+ add.run('release-calendar:treasury:other:2026-11-10','SECRET_NOT_TAWS',100);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const r=inspectSourceInventory(data);
+ assert.equal(r.core.treasuryTawsInput.status,'OBSERVED');
+ assert.equal(r.core.treasuryTawsInput.toDate,'2026-11-09');
+ assert.equal(r.core.treasuryTawsInput.storedAt,99);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_NOT_TAWS/);
+ const writer=new DatabaseSync(core.name);
+ writer.prepare('UPDATE market_input_batches_v1 SET body=? WHERE batch_key=?').run(
+  JSON.stringify({text,fromDate:'2025-11-10',toDate:'2026-11-08',awardedCount:1}),
+  'release-calendar:treasury:taws:2026-11-09');
+ writer.close();
+ assert.deepEqual(inspectSourceInventory(data).core.treasuryTawsInput,
+  {status:'UNREADABLE_OR_INVALID'});
 });
 
 test('reports only allowlisted fixed Census 2027 diagnosis without exposing private body',t=>{
