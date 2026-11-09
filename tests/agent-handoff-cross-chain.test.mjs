@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {processCompletedPcJob} from '../agent-handoff/pc-failure-producer.mjs';
 import {processCompletedWriterB} from '../agent-handoff/writer-b-failure-producer.mjs';
+import {routeVerifiedBotIssue} from '../agent-handoff/bot-direct-route.mjs';
 import {parseHandoff, fingerprintHandoff} from '../agent-handoff/contract.mjs';
 import {prepareHandoff} from '../agent-handoff/route.mjs';
 import {main as runResultBroker} from '../agent-handoff/result-broker.mjs';
@@ -41,6 +42,7 @@ const pcReport = {schema: 'ZGMINI_PC_RESULT_V1',
 function intakeFixture({status = 'RUNTIME_FAILED', authenticatedReceipt = true} = {}) {
   const incidents = [];
   let posts = 0;
+  const routingComments = [];
   const io = {
     readReport: async name => name.endsWith('seat-2.json') ? {...pcReport, status} : null,
     readComments: async () => authenticatedReceipt ? [{user: {login: bot},
@@ -48,6 +50,12 @@ function intakeFixture({status = 'RUNTIME_FAILED', authenticatedReceipt = true} 
       issue_url: `https://api.github.com/repos/${repo}/issues/${originalNumber}`}]: [],
     readIssue: async number => number === originalNumber ? original : incidents.find(x => x.number === number),
     listHandoffs: async () => ({repository: repo, complete: true, issues: structuredClone(incidents)}),
+    routeHandoff: (prepared,number) => routeVerifiedBotIssue(prepared,number,{
+      readIssue:n=>io.readIssue(n),listHandoffs:()=>io.listHandoffs(),
+      listIssueComments:async()=>routingComments,
+      postIssueComment:async(n,body)=>{routingComments.push({user:{login:bot},body});},
+      addIssueLabel:async(n,label)=>{incidents.find(x=>x.number===n).labels.push({name:label});}
+    }),
     createHandoff: async prepared => {
       posts++;
       const item = {repository: repo, number: incidentNumber,
@@ -65,6 +73,7 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
   const intake = await processCompletedPcJob(pcEvent, f.io);
   assert.equal(intake.confirmedFailures, 1);
   assert.equal(intake.newIssues, 1);
+  assert.equal(intake.routesRecorded, 1);
   assert.equal(intake.automaticPcRetries, 0);
   assert.equal(intake.pcOperationalWrites, 0);
   assert.equal(f.posts, 1);
@@ -188,6 +197,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
       'RESULT_CREATED: 2/2; RESULT_READBACK: 2/2\n' +
       `RUN_ID: ${writerRunId}; RETRY: NO_REEXECUTE\n`};
   const incidents = [];
+  const routingComments = [];
   let issueCreates = 0;
   const io = {
     readComments: async () => [receipt],
@@ -201,6 +211,12 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
       return {path: filePath, ref, content};
     },
     listHandoffs: async () => ({repository: repo, complete: true, issues: structuredClone(incidents)}),
+    routeHandoff: (prepared,number) => routeVerifiedBotIssue(prepared,number,{
+      readIssue:n=>io.readIssue(n),listHandoffs:()=>io.listHandoffs(),
+      listIssueComments:async()=>routingComments,
+      postIssueComment:async(n,body)=>{routingComments.push({user:{login:bot},body});},
+      addIssueLabel:async(n,label)=>{incidents.find(x=>x.number===n).labels.push({name:label});}
+    }),
     createHandoff: async prepared => {
       issueCreates++;
       const item = {repository: repo, number: 2404, user: {login: bot},
@@ -214,6 +230,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
   assert.equal(intake.state, 'ISSUE_CREATED_VERIFIED');
   assert.equal(intake.confirmedFailures, 1);
   assert.equal(intake.newIssues, 1);
+  assert.equal(intake.routesRecorded, 1);
   assert.equal(intake.pcOperationalWrites, 0);
   assert.equal(intake.automaticPcRetries, 0);
   const incident = incidents[0];
@@ -226,6 +243,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
   assert.equal(prepareHandoff(incident.body).role, 'COMMON_PROCESS_OWNER');
   const again = await processCompletedWriterB(writerEvent, io);
   assert.equal(again.state, 'REUSED_EXISTING');
+  assert.equal(again.routesReused, 1);
   assert.equal(issueCreates, 1);
 
   const result = {schema: 'ZGMINI_AGENT_HANDOFF_RESULT_V1',
