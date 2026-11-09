@@ -25,6 +25,10 @@ const sameKeys = (left, right) => left && right &&
 const WRITER_B_RESULT_PATH =
   'results/writer-b-source-install-b14af1b2-9a23-4f5a-9239-218498ddb403.json';
 const WRITER_A_RESULT_PATH = 'results/42693903840-1-seat-1.json';
+const WRITER_RESULT_RAW_SHA256 = Object.freeze({
+  [WRITER_B_RESULT_PATH]:'c0b3f677b83babef8db31d0e155f33226f939bca468c2c8e2cb6b655b02a1a62',
+  [WRITER_A_RESULT_PATH]:'1d35d6550595802f2f060f88f82f34757c898bd92c372cdf52a13405221faae0',
+});
 const EXPECTED_TRANSITION = Object.freeze({
   baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
   currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
@@ -98,9 +102,11 @@ function verifiedGitHubResult(pathName, expectedBlobSha) {
     row?.sha === expectedBlobSha && row?.encoding === 'base64' &&
     typeof row?.content === 'string',
   'POSTSWITCH_WRITER_RESULT_BLOB_DRIFT');
+  const bytes = Buffer.from(row.content.replace(/\s/g, ''), 'base64');
+  need(digest(bytes) === WRITER_RESULT_RAW_SHA256[pathName],
+    'POSTSWITCH_WRITER_RESULT_RAW_DRIFT');
   try {
-    return JSON.parse(Buffer.from(row.content.replace(/\s/g, ''), 'base64')
-      .toString('utf8'));
+    return JSON.parse(bytes.toString('utf8'));
   } catch {
     need(false, 'POSTSWITCH_WRITER_RESULT_UNREADABLE');
   }
