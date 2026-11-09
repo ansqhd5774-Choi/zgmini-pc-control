@@ -109,3 +109,26 @@ test('unbounded or incomplete handoff inventory is fail-closed',async()=>{
     /INVENTORY_INCOMPLETE/);
   assert.equal(f.postCount,0);
 });
+
+test('base handoff label lost between reads prevents a false routed success',async()=>{
+  const f=fixture();let reads=0;
+  const read=f.io.readIssue;
+  f.io.readIssue=async number=>{
+    const issue=await read(number);
+    if(++reads>=2)issue.labels=issue.labels.filter(x=>x.name!=='agent-handoff');
+    return issue;
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),/ISSUE_DRIFT_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.labelCount,0);
+});
+
+test('base handoff label lost while applying state label fails final readback',async()=>{
+  const f=fixture();
+  f.io.addIssueLabel=async(number,label)=>{
+    f.created.labels.push({name:label});
+    f.created.labels=f.created.labels.filter(x=>x.name!=='agent-handoff');
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),/LABEL_READBACK_STOP/);
+  assert.equal(f.postCount,1);
+});
