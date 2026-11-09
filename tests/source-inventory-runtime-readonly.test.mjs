@@ -39,8 +39,8 @@ test('counts distinct active source keys without returning raw data or writes',t
   INSERT INTO market_score_earnings_e1_r3_universe_v1 VALUES('2026-09-30',503,500,'2026-11-09T01:00:00Z');
   CREATE TABLE c1_r3_source_snapshots_v1(score_date TEXT,source_key TEXT,provider TEXT);
   INSERT INTO c1_r3_source_snapshots_v1 VALUES('2026-11-09','BEA:PCE','BEA'),('2026-11-09','FRED:RSX','FRED');
-  CREATE TABLE public_feed_snapshots_v1(kind TEXT,feed_key TEXT,snapshot_key TEXT);
-  INSERT INTO public_feed_snapshots_v1 VALUES('output','release-calendar','current');`);
+  CREATE TABLE public_feed_snapshots_v1(kind TEXT,feed_key TEXT,snapshot_key TEXT,body TEXT,stored_at INTEGER);
+  INSERT INTO public_feed_snapshots_v1 VALUES('output','release-calendar','current','HIDDEN',1);`);
  const encoded='gzip:'+gzipSync(JSON.stringify({series:{SENSITIVE_SERIES_A:[1],SENSITIVE_SERIES_B:[2]},external:{SECRET_SOURCE:{value:1}}})).toString('base64');
  db.prepare("UPDATE market_input_batches_v1 SET body=? WHERE batch_key='macro:2026-11-09'").run(encoded);
  db.close();const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
@@ -58,6 +58,7 @@ test('counts distinct active source keys without returning raw data or writes',t
  assert.equal(r.core.earningsUniverse.reportedIssuerCount,500);
  assert.equal(r.core.consumption.uniqueSourceKeys,2);
  assert.equal(r.core.publicFeeds.countedAsRawInput,false);
+ assert.deepEqual(r.core.census2027Diagnostic,{status:'NOT_STORED',year:2027});
  assert.equal(r.overallUniqueSourceCount,null);
  assert.equal(r.operationalWrites,0);
  assert.equal(r.providerCalls,0);
@@ -66,6 +67,79 @@ test('counts distinct active source keys without returning raw data or writes',t
  assert.deepEqual(fs.readdirSync(storage).sort(),files);
  assert.doesNotMatch(JSON.stringify(r),/CES123|AAA|PCE|SECRET|HIDDEN|SENSITIVE_SERIES/);
  assert.ok(Buffer.byteLength(JSON.stringify(r))<24000);
+});
+
+test('reports only allowlisted fixed Census 2027 diagnosis without exposing private body',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE public_feed_snapshots_v1(kind TEXT,feed_key TEXT,snapshot_key TEXT,body TEXT,stored_at INTEGER)');
+ const secret='SECRET_PRIVATE_CENSUS_HTML_AND_TOKEN';
+ const body=JSON.stringify({year:2027,status:'SOURCE_FAILED',
+  attempts:[{endpoint:'annual',code:'HTTP_404',privateUrl:secret},
+   {endpoint:'official-list',code:'YEAR_EVENTS_EMPTY_OR_WRONG_YEAR',privateHtml:secret}],
+  attemptedAt:'2026-11-09T02:00:00.000Z',privateData:secret});
+ core.db.prepare('INSERT INTO public_feed_snapshots_v1 VALUES(?,?,?,?,?)')
+  .run('input','release-calendar:census:diagnostic:2027','current',body,12345);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const before=hash(core.name),files=fs.readdirSync(storage).sort();
+ const result=inspectSourceInventory(data);
+ assert.equal(result.status,'PASS',JSON.stringify(result));
+ assert.deepEqual(result.core.census2027Diagnostic,{status:'OBSERVED',year:2027,
+  collectionStatus:'SOURCE_FAILED',attempts:[
+   {endpoint:'annual',code:'HTTP_404'},
+   {endpoint:'official-list',code:'YEAR_EVENTS_EMPTY_OR_WRONG_YEAR'}],
+  attemptedAt:'2026-11-09T02:00:00.000Z',storedAt:12345});
+ assert.doesNotMatch(JSON.stringify(result),/SECRET|privateData|privateHtml|privateUrl/);
+ assert.equal(hash(core.name),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),files);
+});
+
+test('rejects invalid or oversized Census diagnostic without returning its contents',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE public_feed_snapshots_v1(kind TEXT,feed_key TEXT,snapshot_key TEXT,body TEXT,stored_at INTEGER)');
+ const insert=core.db.prepare('INSERT INTO public_feed_snapshots_v1 VALUES(?,?,?,?,?)');
+ insert.run('input','release-calendar:census:diagnostic:2027','current',
+  JSON.stringify({year:2027,status:'SOURCE_FAILED',attempts:[{endpoint:'SECRET',code:'SECRET'}]}),1);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const result=inspectSourceInventory(data);
+ assert.deepEqual(result.core.census2027Diagnostic,{status:'OBSERVED',year:2027,
+  collectionStatus:'SOURCE_FAILED',attempts:[{endpoint:'UNKNOWN',code:'UNKNOWN'}],
+  attemptedAt:null,storedAt:1});
+ assert.doesNotMatch(JSON.stringify(result),/SECRET/);
+ const writer=new DatabaseSync(core.name);
+ writer.prepare('UPDATE public_feed_snapshots_v1 SET body=? WHERE kind=? AND feed_key=?').run(
+  'X'.repeat(12001),'input','release-calendar:census:diagnostic:2027');
+ writer.close();
+ assert.deepEqual(inspectSourceInventory(data).core.census2027Diagnostic,
+  {status:'UNREADABLE_OR_INVALID',year:2027});
+});
+
+test('decodes bounded compressed Census diagnostic and rejects wrong-year payload',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE public_feed_snapshots_v1(kind TEXT,feed_key TEXT,snapshot_key TEXT,body TEXT,stored_at INTEGER)');
+ const body=JSON.stringify({year:2027,status:'READY_WITH_FALLBACK',
+  attempts:[{endpoint:'annual',code:'YEAR_EVENTS_EMPTY_OR_WRONG_YEAR'}],
+  attemptedAt:'2026-11-09T03:00:00.000Z'});
+ const compressed='gzip:'+gzipSync(body).toString('base64');
+ core.db.prepare('INSERT INTO public_feed_snapshots_v1 VALUES(?,?,?,?,?)').run('input',
+  'release-calendar:census:diagnostic:2027','current',compressed,54321);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const result=inspectSourceInventory(data);
+ assert.equal(result.core.census2027Diagnostic.collectionStatus,'READY_WITH_FALLBACK');
+ assert.equal(result.core.census2027Diagnostic.attempts[0].code,'YEAR_EVENTS_EMPTY_OR_WRONG_YEAR');
+ assert.equal(result.core.census2027Diagnostic.storedAt,54321);
+ const writer=new DatabaseSync(core.name);
+ writer.prepare('UPDATE public_feed_snapshots_v1 SET body=? WHERE kind=? AND feed_key=?').run(
+  JSON.stringify({year:2026,status:'SOURCE_FAILED',attempts:[]}),
+  'input','release-calendar:census:diagnostic:2027');
+ writer.close();
+ assert.deepEqual(inspectSourceInventory(data).core.census2027Diagnostic,
+  {status:'UNREADABLE_OR_INVALID',year:2027});
 });
 
 test('WAL with missing sidecars does not open or alter SQLite',t=>{

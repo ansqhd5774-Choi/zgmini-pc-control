@@ -18,6 +18,15 @@ const TABLES=Object.freeze({
  feeds:'public_feed_snapshots_v1',
 });
 const BATCH_KEYS=Object.freeze(['macro','credit','supply','fundFlows','bisDsr','bisTc','rates']);
+const CENSUS_2027_DIAGNOSTIC_KEY='release-calendar:census:diagnostic:2027';
+const CENSUS_DIAGNOSTIC_STATUSES=new Set(['READY','READY_WITH_FALLBACK','SOURCE_FAILED']);
+const CENSUS_DIAGNOSTIC_CODES=new Set([
+ 'HTTP_400','HTTP_401','HTTP_403','HTTP_404','HTTP_408','HTTP_429',
+ 'HTTP_500','HTTP_502','HTTP_503','HTTP_504',
+ 'REQUEST_TIMEOUT_OR_ABORT','YEAR_EVENTS_EMPTY_OR_WRONG_YEAR',
+ 'SOURCE_TOO_LARGE','STORED_EVENTS_EMPTY','SOURCE_PARSE_OR_FORMAT_FAILED',
+ 'NETWORK_OR_RESPONSE_ERROR','SOURCE_UNCLASSIFIED',
+]);
 const SQLITE_MAGIC='SQLite format 3\0';
 const MAX_DB_BYTES=64*1024**3;
 const integer=x=>Number.isSafeInteger(x)&&x>=0?x:null;
@@ -37,6 +46,28 @@ function savedBatchKeyCounts(encoded){
    rootSeriesKeys:keys(body.series),rateR2SeriesKeys:keys(body.rateR2?.series),
    externalKeys:keys(body.external),providerSummaryKeys:keys(body.providerSummary)};
  }catch{return {status:'UNREADABLE_OR_INVALID'};}
+}
+
+// Only one fixed, private Census troubleshooting key is read. Never return
+// the raw source body, URLs, unexpected diagnostic fields or SQLite errors.
+function census2027DiagnosticSummary(encoded,storedAt){
+ try{
+  if(typeof encoded!=='string'||encoded.length>12000)
+   return {status:'UNREADABLE_OR_INVALID',year:2027};
+  const decoded=encoded.startsWith('gzip:')?
+   gunzipSync(Buffer.from(encoded.slice(5),'base64'),{maxOutputLength:16000}).toString('utf8'):encoded;
+  if(Buffer.byteLength(decoded)>16000)return {status:'UNREADABLE_OR_INVALID',year:2027};
+  const body=JSON.parse(decoded);
+  if(!object(body)||body.year!==2027||!CENSUS_DIAGNOSTIC_STATUSES.has(body.status)||
+     !Array.isArray(body.attempts)||body.attempts.length>2)
+   return {status:'UNREADABLE_OR_INVALID',year:2027};
+  const attempts=body.attempts.map(x=>({
+   endpoint:x?.endpoint==='annual'||x?.endpoint==='official-list'?x.endpoint:'UNKNOWN',
+   code:CENSUS_DIAGNOSTIC_CODES.has(x?.code)?x.code:'UNKNOWN',
+  }));
+  return {status:'OBSERVED',year:2027,collectionStatus:body.status,
+   attempts,attemptedAt:stamp(body.attemptedAt),storedAt:integer(storedAt)};
+ }catch{return {status:'UNREADABLE_OR_INVALID',year:2027};}
 }
 
 function safePath(p,root,filesystem){
@@ -94,7 +125,7 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    observedTableCount:found,targetTableCount:Object.keys(TABLES).length,
    tableAvailability:Object.fromEntries(Object.entries(TABLES).map(([k,v])=>[k,tables.has(v)])),
    batch:null,employment:null,employmentR6:null,breadth:null,breadthUniverse:null,
-   earningsUniverse:null,consumption:null,publicFeeds:null};
+   earningsUniverse:null,consumption:null,publicFeeds:null,census2027Diagnostic:null};
   if(has('batch')){
    queryStage='BATCH';
    const all=row('SELECT COUNT(*) AS n,MAX(stored_at) AS latest FROM market_input_batches_v1');
@@ -146,6 +177,10 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    queryStage='PUBLIC_FEEDS';
    const x=row("SELECT COUNT(DISTINCT feed_key) AS n FROM public_feed_snapshots_v1 WHERE kind='output' AND snapshot_key='current'");
    out.publicFeeds={currentOutputFeedKeys:integer(x.n),countedAsRawInput:false};
+   queryStage='CENSUS_2027_FIXED_DIAGNOSTIC';
+   const diagnostic=db.prepare("SELECT body,stored_at FROM public_feed_snapshots_v1 WHERE kind='input' AND feed_key=? AND snapshot_key='current' LIMIT 1").get(CENSUS_2027_DIAGNOSTIC_KEY);
+   out.census2027Diagnostic=diagnostic?
+    census2027DiagnosticSummary(diagnostic.body,diagnostic.stored_at):{status:'NOT_STORED',year:2027};
   }
   return out;
  }catch{
