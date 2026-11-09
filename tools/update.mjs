@@ -1064,7 +1064,7 @@ function retiredIranEvidence(schtasks){
  const inventory=spawnSync(schtasks,['/Query','/FO','CSV','/NH'],opt);
  return confirmRetiredIranAbsent({exact,inventory});
 }
-function protectedSnapshot() {
+export function protectedSnapshot() {
  // Existing Core task XML hashes + PC writer config hashes, read-only.
  const dataRoot='E:/ZGmini/data',out={files:{},tasks:{}};
  for(const name of ['config.json','quota-runner.cmd','run-local.cmd']) {
