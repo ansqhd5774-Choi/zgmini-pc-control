@@ -1,0 +1,38 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/asset-r10-latest-main-slice-20261109",
+  "candidateSourceSha": "7065d1fd84246aa23adae720fd21a130fd971585",
+  "baseHead": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+  "baseConfigSourceSha": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/build-asset-r10-release.mjs",
+      "change": "M",
+      "beforeSha256": "deed690d7840974e9fad786e150c9621ae172c9108f8b4109dc6e59555269fe9",
+      "afterSha256": "7e4872fdcf3591bb415608ff4ee31fa54095edc95eda90c237f8d4c19d4f2921"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "71145f8db8f80346236896940749ba810b6125ba8947abfb0ba51864381d7699",
+      "afterSha256": "4fd223e8121e9b002435f9bee6ecd3dcb7e8390e391727259c02d9c94d9c200c"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
