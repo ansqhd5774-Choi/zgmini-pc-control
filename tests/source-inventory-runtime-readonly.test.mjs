@@ -17,6 +17,7 @@ function fixture(t){
  return {root,data,storage};
 }
 const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const TAWS_SOURCE_URL='https://www.treasurydirect.gov/TA_WS/securities/search';
 function database(storage,kind='core'){
  const name=path.join(storage,kind+'.sqlite');
  const db=new DatabaseSync(name);
@@ -80,7 +81,7 @@ test('audits only the dated TA_WS private input family and returns bounded metad
   {competitiveAuctionCloseDate:'2026-11-04T00:00:00',bidToCoverRatio:'3.2',cusip:sensitive},
   {competitiveAuctionCloseDate:'2026-11-05T00:00:00',bidToCoverRatio:null,cusip:sensitive},
  ]);
- const body={text,sourceUrl:'SECRET_TREASURY_PROVIDER_URL',fromDate:'2025-11-10',
+ const body={text,sourceUrl:TAWS_SOURCE_URL,fromDate:'2025-11-10',
   toDate:'2026-11-09',awardedCount:2,privateExtra:'SECRET_TREASURY_PRIVATE'};
  core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)').run(
   'release-calendar:treasury:taws:2026-11-09',
@@ -128,7 +129,7 @@ test('TA_WS counted results show mismatch rather than claiming full parser valid
  const text=JSON.stringify([{competitiveAuctionCloseDate:'2026-11-08T00:00:00',bidToCoverRatio:'2.8'}]);
  core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)').run(
   'release-calendar:treasury:taws:2026-11-09',JSON.stringify({text,fromDate:'2025-11-10',
-   toDate:'2026-11-09',awardedCount:2}),99);
+   toDate:'2026-11-09',awardedCount:2,sourceUrl:TAWS_SOURCE_URL}),99);
  core.db.close();
  const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
  const r=inspectSourceInventory(data);
@@ -145,9 +146,11 @@ test('TA_WS audit selects latest dated private input and rejects key/date mismat
  const add=core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)');
  const text=JSON.stringify([{competitiveAuctionCloseDate:'2026-11-08T00:00:00',bidToCoverRatio:'2.8'}]);
  add.run('release-calendar:treasury:taws:2026-11-08',JSON.stringify({text,
-  fromDate:'2025-11-09',toDate:'2026-11-08',awardedCount:1}),98);
+  fromDate:'2025-11-09',toDate:'2026-11-08',awardedCount:1,
+  sourceUrl:TAWS_SOURCE_URL}),98);
  add.run('release-calendar:treasury:taws:2026-11-09',JSON.stringify({text,
-  fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:1}),99);
+  fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:1,
+  sourceUrl:TAWS_SOURCE_URL}),99);
  add.run('release-calendar:treasury:other:2026-11-10','SECRET_NOT_TAWS',100);
  core.db.close();
  const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
@@ -158,11 +161,41 @@ test('TA_WS audit selects latest dated private input and rejects key/date mismat
  assert.doesNotMatch(JSON.stringify(r),/SECRET_NOT_TAWS/);
  const writer=new DatabaseSync(core.name);
  writer.prepare('UPDATE market_input_batches_v1 SET body=? WHERE batch_key=?').run(
-  JSON.stringify({text,fromDate:'2025-11-10',toDate:'2026-11-08',awardedCount:1}),
+  JSON.stringify({text,fromDate:'2025-11-10',toDate:'2026-11-08',awardedCount:1,
+   sourceUrl:TAWS_SOURCE_URL}),
   'release-calendar:treasury:taws:2026-11-09');
  writer.close();
  assert.deepEqual(inspectSourceInventory(data).core.treasuryTawsInput,
   {status:'UNREADABLE_OR_INVALID'});
+});
+
+test('TA_WS audit enforces official source and collector string-only result semantics',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
+ const text=JSON.stringify([
+  {competitiveAuctionCloseDate:'2026-11-07T00:00:00',bidToCoverRatio:2.8},
+  {competitiveAuctionCloseDate:'2026-11-08T00:00:00',bidToCoverRatio:'2.8'},
+ ]);
+ const write=core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)');
+ write.run('release-calendar:treasury:taws:2026-11-09',JSON.stringify({text,
+  fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:1,
+  sourceUrl:TAWS_SOURCE_URL}),101);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const r=inspectSourceInventory(data);
+ assert.equal(r.core.treasuryTawsInput.status,'OBSERVED');
+ assert.equal(r.core.treasuryTawsInput.eligibleAwardedRows,1);
+ assert.equal(r.core.treasuryTawsInput.eligibleCountMatchesStored,true);
+ const writer=new DatabaseSync(core.name);
+ writer.prepare('UPDATE market_input_batches_v1 SET body=? WHERE batch_key=?').run(
+  JSON.stringify({text,fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:1,
+   sourceUrl:'SECRET_UNAPPROVED_SOURCE'}),
+  'release-calendar:treasury:taws:2026-11-09');
+ writer.close();
+ const rejected=inspectSourceInventory(data);
+ assert.deepEqual(rejected.core.treasuryTawsInput,{status:'UNREADABLE_OR_INVALID'});
+ assert.doesNotMatch(JSON.stringify(rejected),/SECRET_UNAPPROVED_SOURCE/);
 });
 
 test('reports only allowlisted fixed Census 2027 diagnosis without exposing private body',t=>{
