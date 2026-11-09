@@ -32,13 +32,14 @@ export function forwardRecoveryCandidate(ledger, evidence) {
 }
 
 /**
- * The adapter must atomically persist separate recovery records, never the
- * original maintenance ledger. It must fail closed when an old replay's ACK
- * is unknown, and must not issue duplicate pc-job or postcheck requests.
+ * The adapter must atomically acquire a request-scoped exclusive recovery claim
+ * and persist a separate recovery record, never the original maintenance
+ * ledger. An interrupted claim may only be inspected, never automatically
+ * reacquired or replayed. Both pc-job and postcheck ACK loss are hard stops.
  */
 export async function reconcilePostSwitchForward({ledger, evidence, ports, persist}) {
   need(forwardRecoveryCandidate(ledger, evidence), 'FORWARD_ORIGINAL_NOT_ELIGIBLE');
-  for (const key of ['verifyPreconditions', 'reconcileBacklog', 'postcheck',
+  for (const key of ['verifyPreconditions', 'acquireClaim', 'reconcileBacklog', 'postcheck',
     'verifyFinal', 'verifyOriginalUnchanged']) need(typeof ports?.[key] === 'function', 'FORWARD_PORT_MISSING');
   need(typeof persist === 'function', 'FORWARD_PERSIST_MISSING');
   const report = {schema: 'ZGMINI_PC_POSTSWITCH_RECONCILIATION_V1',
@@ -50,12 +51,21 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
     Object.assign(report, {code, ...patch});
     await persist({...report});
   };
-  let mutated = false;
+  let mutated = false, claimAcquired = false;
   try {
     const before = await ports.verifyPreconditions({ledger, evidence});
     need(before?.verified === true, 'FORWARD_PRECONDITION_FAILED');
     need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
-    await record('FORWARD_PREPARED');
+    // An exclusive claim is a separate recoverable artifact, not a release of
+    // the existing install lease. A pre-existing claim must be inspected by
+    // its owner; blindly starting this state machine again risks duplication.
+    const claim = await ports.acquireClaim({requestId: ledger.requestId,
+      ledgerDigest: evidence.materialHashes.ledger});
+    need(claim?.acquired === true && claim?.exclusive === true && claim?.preexisting === false,
+      'FORWARD_CLAIM_NOT_EXCLUSIVE');
+    claimAcquired = true;
+    need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
+    await record('FORWARD_PREPARED', {claimHeld: true});
 
     // A replay may send a GitHub request before yielding or receiving an ACK.
     // Durable intent and a held recovery claim are necessary BEFORE this call.
@@ -92,8 +102,10 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
       'FORWARD_OUTCOME_UNKNOWN';
     // The adapter keeps the old install lease. If a GitHub write may have been
     // sent, the independent recovery claim must also survive for reconciliation.
-    await record(code, {status:'RECOVERY_REQUIRED', mutationStarted: mutated,
-      next:'INSPECT_RECOVERY_CLAIM_BACKLOG_AND_POSTCHECK_NO_AUTOMATIC_RETRY'});
+    const patch = {status:'RECOVERY_REQUIRED', mutationStarted: mutated,
+      next:'INSPECT_RECOVERY_CLAIM_BACKLOG_AND_POSTCHECK_NO_AUTOMATIC_RETRY'};
+    if (claimAcquired) await record(code, patch);
+    else Object.assign(report, {code, ...patch});
     return {...report};
   }
 }
