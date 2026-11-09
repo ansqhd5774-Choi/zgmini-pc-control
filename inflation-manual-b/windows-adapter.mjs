@@ -21,6 +21,7 @@ import {awaitNaturalCoreIdle,MAX_POST_PREPARE_IDLE_WAIT_MS}
 
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const PROBE=path.join(ROOT,'..','r17-writer-b','r17-b-windows-probe.js');
+const CORE_OWNER_PROBE=path.join(ROOT,'core-lock-owner-probe.js');
 const SHARED_LOCK=String.raw`E:\ZGmini\data\pc-writer\writer-source-install.lock`;
 const CORE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
 const JOURNAL_ROOT=String.raw`E:\ZGmini\data\pc-writer\inflation-manual-b-once`;
@@ -28,6 +29,7 @@ const CONFIG=String.raw`E:\ZGmini\data\pc-writer\config.json`;
 const SOURCE_MJS=SOURCE_FILES[0];
 const STORE_MJS=SOURCE_FILES[1];
 const MAX_FILE=24_000_000;
+const CORE_OWNER_OBSERVATION_MS=6*60_000;
 const same=(a,b)=>path.win32.normalize(a).toLowerCase()===
  path.win32.normalize(b).toLowerCase();
 const fail=code=>{throw Object.assign(new Error(code),{code});};
@@ -84,6 +86,52 @@ function taskProbe(){
   Number.isInteger(proof.unknownProcessLines),
   'INFL_MANUAL_B_CORE_PROBE_STOP');
  return proof;
+}
+
+// An idle snapshot alone does not establish which physical file Core locks.
+// Require a naturally active Task-linked Core Node PID to own the E: lock at
+// least once in THIS bounded B run. No Task start, disable, or forced cycle.
+async function observeLiveCoreLockOwner(){
+ const deadline=Date.now()+CORE_OWNER_OBSERVATION_MS;
+ while(Date.now()<deadline){
+  const probe=taskProbe();
+  need(probe.enabled===true,
+   'INFL_MANUAL_B_CORE_OWNER_PROBE_UNVERIFIED_STOP');
+  if(probe.unknownProcessLines>0){await delay(1500);continue;}
+  if(probe.instances>0&&probe.relatedProcesses>0&&fs.existsSync(CORE_LOCK)){
+   let lockBytes,lock;
+   try{
+    const stat=fs.lstatSync(CORE_LOCK);
+    need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size>0&&stat.size<512,
+     'INFL_MANUAL_B_CORE_OWNER_LOCK_SHAPE_STOP');
+    lockBytes=fs.readFileSync(CORE_LOCK,'utf8');
+    lock=JSON.parse(lockBytes);
+   }catch(error){
+    if(error?.code?.startsWith?.('INFL_MANUAL_B_'))throw error;
+    fail('INFL_MANUAL_B_CORE_OWNER_LOCK_READ_STOP');
+   }
+   const age=Date.now()-lock?.at;
+   need(lock&&typeof lock==='object'&&!Array.isArray(lock)&&
+    Object.keys(lock).sort().join(',')==='at,pid'&&
+    Number.isSafeInteger(lock.pid)&&lock.pid>0&&
+    Number.isSafeInteger(lock.at)&&age>=0&&age<60*60_000&&
+    lock.pid!==process.pid,
+    'INFL_MANUAL_B_CORE_OWNER_LOCK_FORMAT_STOP');
+   let ownerProof;
+   try{ownerProof=JSON.parse(execute('cscript',
+    ['//NoLogo','//E:JScript',CORE_OWNER_PROBE,String(lock.pid)]));}
+   catch{fail('INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');}
+   need(ownerProof?.ok===true&&ownerProof.linked===true,
+    'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+   // A vanished or replaced lock is not proof of the observed owner.
+   need(fs.existsSync(CORE_LOCK)&&
+    fs.readFileSync(CORE_LOCK,'utf8')===lockBytes,
+    'INFL_MANUAL_B_CORE_OWNER_LOCK_RACE_STOP');
+   return;
+  }
+  await delay(1500);
+ }
+ fail('INFL_MANUAL_B_CORE_OWNER_NOT_OBSERVED_STOP');
 }
 
 // Exact official URLs are already frozen by the pinned feature parser;
@@ -164,6 +212,7 @@ export function makeWindowsManualAdapter(auth){
    }
   },
   async readSourcePreimage(){return sourcePreimage(auth);},
+  async proveActiveCoreLock(){await observeLiveCoreLockOwner();},
   async fetchExactSources(){
    source??=await import(pathToFileURL(sourceFile(SOURCE_MJS)).href);
    return officialBytes(source);
