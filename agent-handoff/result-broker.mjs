@@ -58,7 +58,7 @@ async function inspectExistingResult(issueNumber, resultId, digest) {
   throw new Error('RESULT_COMMENT_SCAN_LIMIT_STOP');
 }
 
-async function inspectOriginReceipt(issueNumber, resultId, digest) {
+async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNumber) {
   for (let page = 1; page <= 4; page++) {
     const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
     if (!Array.isArray(rows)) throw new Error('RESULT_ORIGIN_LEDGER_STOP');
@@ -66,13 +66,50 @@ async function inspectOriginReceipt(issueNumber, resultId, digest) {
       if (row.user?.login !== BOT || typeof row.body !== 'string' ||
           !row.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n')) continue;
       const lines = row.body.split('\n');
-      if (!lines.includes(`resultId: ${resultId}`)) continue;
+      if (!lines.includes(`resultId: ${result.resultId}`)) continue;
       if (!lines.includes(`digest: ${digest}`)) throw new Error('RESULT_ORIGIN_ID_COLLISION_STOP');
+      if (!lines.includes(`incidentId: ${result.incidentId}`) ||
+          !lines.includes(`handoffIssue: ${handoffIssueNumber}`)) {
+        throw new Error('RESULT_ORIGIN_RECEIPT_BINDING_STOP');
+      }
       return true;
     }
     if (rows.length < 100) return false;
   }
   throw new Error('RESULT_ORIGIN_LEDGER_SCAN_LIMIT_STOP');
+}
+
+async function verifyWriterBSourceAtOrigin(number, requestId, sourceSha, code) {
+  let matched = null;
+  for (let page = 1; page <= 4; page++) {
+    const rows = await api(`/repos/${REPOSITORY}/issues/${number}/comments?per_page=100&page=${page}`);
+    if (!Array.isArray(rows)) throw new Error('RESULT_WRITER_RECEIPT_LEDGER_STOP');
+    for (const item of rows) {
+      if (item.user?.login !== BOT || typeof item.body !== 'string' || item.body.length > 4096 ||
+          item.body.split('\n', 1)[0] !== `<!-- zgmini-writer-b-install:${requestId} -->` ||
+          item.issue_url !== `https://api.github.com/repos/${REPOSITORY}/issues/${number}` ||
+          !item.body.includes('DELIVERY: RESULT_PAIR_READBACK_VERIFIED\n') ||
+          !/^RESULT_CREATED: [0-2]\/2; RESULT_READBACK: 2\/2$/m.test(item.body) ||
+          !item.body.includes(` (${code})`)) continue;
+      const marker = item.body.match(/^RUN_ID: ([1-9][0-9]{0,17}); RETRY: NO_REEXECUTE$/m);
+      if (!marker) continue;
+      const runId = Number(marker[1]);
+      if (!Number.isSafeInteger(runId) || matched !== null) {
+        throw new Error('RESULT_WRITER_RECEIPT_AMBIGUOUS_STOP');
+      }
+      matched = runId;
+    }
+    if (rows.length < 100) break;
+    if (page === 4) throw new Error('RESULT_WRITER_RECEIPT_SCAN_LIMIT_STOP');
+  }
+  if (matched === null) throw new Error('RESULT_WRITER_RECEIPT_MISSING_STOP');
+  const run = await api(`/repos/${REPOSITORY}/actions/runs/${matched}`);
+  if (run?.id !== matched || run?.name !== 'ZGMINI Approved Writer B Source Overlay Once' ||
+      run?.head_sha !== sourceSha || run?.head_branch !== 'main' || run?.event !== 'issues' ||
+      run?.actor?.login !== OWNER || run?.repository?.full_name !== REPOSITORY ||
+      run?.status !== 'completed' || run?.run_attempt !== 1) {
+    throw new Error('RESULT_WRITER_SOURCE_PROVENANCE_STOP');
+  }
 }
 
 // Return only to the authenticated original control Issue, never to arbitrary
@@ -103,6 +140,8 @@ async function verifiedOriginIssue(handoff, handoffIssueNumber) {
       (writerB && handoff.failure.kind !== 'COMMON_WRITER')) {
     throw new Error('RESULT_ORIGIN_REQUEST_BINDING_STOP');
   }
+  if (writerB) await verifyWriterBSourceAtOrigin(number, request.requestId,
+    handoff.origin.sourceSha, handoff.failure.code);
   return number;
 }
 
@@ -182,7 +221,7 @@ export async function main(env = process.env) {
     if (!await inspectExistingResult(event.issue.number, result.resultId, digest)) throw new Error('RESULT_COMMENT_READBACK_STOP');
   }
   if (originalIssue !== null) {
-    const delivered = await inspectOriginReceipt(originalIssue, result.resultId, digest);
+    const delivered = await inspectOriginReceipt(originalIssue, result, digest, event.issue.number);
     if (!delivered) {
       const receipt = [
         'HANDOFF_ORIGIN_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
@@ -193,7 +232,7 @@ export async function main(env = process.env) {
         'PC retries: 0', 'operationalWrites: 0'
       ].join('\n');
       await api(`/repos/${REPOSITORY}/issues/${originalIssue}/comments`, {method: 'POST', body: {body: receipt}});
-      if (!await inspectOriginReceipt(originalIssue, result.resultId, digest)) {
+      if (!await inspectOriginReceipt(originalIssue, result, digest, event.issue.number)) {
         throw new Error('RESULT_ORIGIN_COMMENT_READBACK_STOP');
       }
     }
