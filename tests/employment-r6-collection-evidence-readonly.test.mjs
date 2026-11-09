@@ -68,6 +68,7 @@ test('read-only summaries preserve SQLite bytes and hide raw bodies/tokens',t=>{
  assert.equal(r.bed.BACKFILL.missingSeriesCount,2);
  assert.deepEqual(r.bed.BACKFILL.knownMissingSeries,['BDS0000000000']);
  assert.equal(r.eta539[0].selectedWeeks,2);
+ assert.equal(r.eta539[0].firstSelectedWeek,'2025-07-19');
  assert.equal(r.stateClaims.complete51Weeks,56);
  assert.equal(r.stateClaims.strict52WeekCandidateCount,1);
  assert.equal(r.stateClaims.latestStrict52WeekCandidate,new Date(Date.parse('2025-01-04T00:00:00.000Z')+55*7*86400000).toISOString().slice(0,10));
@@ -85,7 +86,21 @@ test('51-region missing week prevents claiming strict 52-week coverage',t=>{
  assert.equal(r.stateClaims.incompleteWeeks,1);
  assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
  assert.equal(r.stateClaims.firstWindowBreak.reason,'REGION_51_COVERAGE_GAP');
+ assert.equal(r.stateClaims.latestWindowBreak.reason,'REGION_51_COVERAGE_GAP');
  assert.equal(r.stateClaims.recentIncompleteWeeks[0].regions,50);
+});
+
+test('unrecognized region does not pass merely because 51 rows exist',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);
+ const last=new Date(Date.parse('2025-01-04T00:00:00.000Z')+55*7*86400000).toISOString().slice(0,10);
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET geography_code='ZZ' WHERE observation_date=? AND geography_code='WY'").run(last);
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].rows,51);
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].regions,51);
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].unknownCodes,1);
+ assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
 });
 
 test('WAL database without sidecars remains untouched and unopened',t=>{
