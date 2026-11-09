@@ -314,21 +314,25 @@ function makePorts({approval,evidence,source,preflight,ledger}){
       state.append('INSTALL_LEASE_ARCHIVE_INTENT',
         {originalRequestId:id,archiveName:path.basename(oldArchive)});
       stablePreimages(approval);
-      fs.renameSync(dir,oldArchive);
-      need(digest(read(path.join(oldArchive,'owner.json')))===
-        approval.evidenceHashes.owner &&
-        digest(read(path.join(oldArchive,'RECOVERY_REQUIRED.json')))===
-        approval.evidenceHashes.marker &&
-        digest(read(paths.ledger))===approval.evidenceHashes.ledger,
-      'POSTSWITCH_LEASE_ARCHIVE_READBACK_FAILED');
-      state.append('INSTALL_LEASE_ARCHIVED',
-        {archiveName:path.basename(oldArchive)});
+      // Archive the independent claim first, while the *original* install
+      // lock still protects the shared lane. The original lease rename is
+      // the final shared-state mutation / explicit release point.
       state.append('RECOVERY_CLAIM_ARCHIVE_INTENT',
         {archiveName:path.basename(claimArchive)});
       const claimOriginal=digest(read(path.join(state.claimDir,'owner.json')));
       fs.renameSync(state.claimDir,claimArchive);
       need(digest(read(path.join(claimArchive,'owner.json')))===claimOriginal &&
         !fs.existsSync(state.claimDir),'POSTSWITCH_CLAIM_ARCHIVE_READBACK_FAILED');
+      stablePreimages(approval);
+      fs.renameSync(dir,oldArchive);
+      // Readback only after releasing the install lock: a new approved
+      // maintenance request may now legitimately acquire its own lease.
+      need(digest(read(path.join(oldArchive,'owner.json')))===
+        approval.evidenceHashes.owner &&
+        digest(read(path.join(oldArchive,'RECOVERY_REQUIRED.json')))===
+        approval.evidenceHashes.marker &&
+        digest(read(paths.ledger))===approval.evidenceHashes.ledger,
+      'POSTSWITCH_LEASE_ARCHIVE_READBACK_FAILED');
       return {verified:true,originalPreserved:true,archiveVerified:true,
         claimPreserved:true,archiveName:path.basename(oldArchive)};
     },
