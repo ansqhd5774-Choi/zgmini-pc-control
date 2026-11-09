@@ -59,10 +59,16 @@
       var created = null;
       try {
         var stamp = String(p.CreationDate || '');
-        if (/^\d{14}\./.test(stamp)) {
-          created = Date.UTC(Number(stamp.substring(0,4)),Number(stamp.substring(4,6))-1,
-            Number(stamp.substring(6,8)),Number(stamp.substring(8,10)),
-            Number(stamp.substring(10,12)),Number(stamp.substring(12,14)));
+        // CIM_DATETIME is local wall time plus an explicit signed UTC offset
+        // in minutes. Omitting that offset falsely reports PID reuse in KST.
+        var ts = /^(\d{14})\.\d{6}([+-])(\d{3})$/.exec(stamp);
+        if (ts) {
+          var wallUtc = Date.UTC(Number(stamp.substring(0,4)),
+            Number(stamp.substring(4,6))-1,Number(stamp.substring(6,8)),
+            Number(stamp.substring(8,10)),Number(stamp.substring(10,12)),
+            Number(stamp.substring(12,14)));
+          var minutes = Number(ts[3]) * (ts[2]==='+'?1:-1);
+          created = wallUtc-minutes*60000;
           if (!isFinite(created)) created = null;
         }
       } catch (ignoreCreated) { }
