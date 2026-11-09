@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_WRITER_B_1063_RECOVERY_RESULT_V1",
+  "recoveryRequestId": "b709eb8b-c752-44cf-a1cb-36eaa574c3ef",
+  "incidentRequestId": "bd435d7c-2939-457f-907c-98d551f6b8cf",
+  "runId": "42634492692",
+  "status": "WRITER_B_1063_CORE_RECOVERED",
+  "code": "WRITER_B_1063_PREPARED_CORE_ENABLED_LOCK_FINALIZED",
+  "sourceSha": "434f30d2aa221bddacab5afa09241916618d8e22",
+  "coreTaskEnabledVerified": true,
+  "lockFinalized": true,
+  "installationVerified": false,
+  "retry": "NO_REEXECUTE"
+}
