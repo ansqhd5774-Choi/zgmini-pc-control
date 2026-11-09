@@ -69,6 +69,12 @@ function verifyPinnedClosure(args){
     Object.keys(hashes).length===files.length&&
     files.every(f=>/^[a-f0-9]{64}$/.test(hashes[f]??'')),
   'POSTSWITCH_LAUNCHER_APPROVAL_INVALID');
+  const git=params=>execFileSync('git',params,{cwd:repo,windowsHide:true,
+    timeout:30000,maxBuffer:8e6});
+  const committedApproval=git(['show','HEAD:approvals/maintenance-recoveries/'+
+    id+'.postswitch.json']);
+  need(hash(committedApproval)===hash(raw),
+    'POSTSWITCH_LAUNCHER_APPROVAL_NOT_COMMITTED');
   const committed=committedClosure(source);
   need(files.every(file=>committed[file]===hashes[file]),
     'POSTSWITCH_LAUNCHER_APPROVED_TOOL_DRIFT');
