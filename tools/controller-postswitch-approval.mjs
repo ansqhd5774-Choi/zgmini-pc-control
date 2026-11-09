@@ -42,10 +42,14 @@ export const TOOL_PATHS = Object.freeze([
 // The direct C manifest must explicitly consent to these exact observed bytes.
 export const WRITER_TRANSITION = Object.freeze({
   baselineConfigSha256:'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037',
-  currentConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
-  approvedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
-  writerBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
-  writerAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+  priorConfigSha256:'e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c',
+  currentConfigSha256:'05eeb13d9183480b89413557c7e65c57d818a5d8fc5eaa88261e55cfc409c57a',
+  priorApprovedSourceSha:'70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+  approvedSourceSha:'75f73d8613550221f8e80b304d67b8b10a228e7f',
+  priorWriterBResultBlobSha:'e07389fb660359352109146175eb8fa3f7ae0798',
+  priorWriterAResultBlobSha:'6baf4fd2d8d6067bc178b7f79a95c4381771c512',
+  writerBResultBlobSha:'6315e35e980a58a55a6dd8ae11ca53c8e945f42f',
+  writerAResultBlobSha:'65e7edf335d9492058e5e8d183d9927c9c5ba3c0',
 });
 
 export function validatePostSwitchApproval(approval, {requestId,sourceSha,evidence} = {}) {
