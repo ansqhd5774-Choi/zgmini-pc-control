@@ -1,0 +1,63 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "36b8ac9192bf14964cb376d7f567c94589411777",
+  "baseHead": "2fa9d98048ecb664add12fe183b67dc818014ebd",
+  "baseConfigSourceSha": "2fa9d98048ecb664add12fe183b67dc818014ebd",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "8c2d06944b4ce20acb2a1cde28572641096108b65358db62fd34149df5c13a9a",
+      "afterSha256": "052a3520cbb49814347df0bba5f8ef555fa88284ea32371b4073d06a7a2d2891"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "change": "M",
+      "beforeSha256": "01773f71649c346da59129f9b4bb6f3a742e02ee4f0f5404076927904bba7712",
+      "afterSha256": "08869ef38b29d7536c70d51cabc86829dd42012a4ef55c4f235de54ec7a945c1"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "71145f8db8f80346236896940749ba810b6125ba8947abfb0ba51864381d7699"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "sha256": "9fd530866185d4499db35513207af0888a4f49165e766e5d75a133785ad7ce24"
+    },
+    {
+      "path": "lib/market-score/employment-r6-contract.mjs",
+      "sha256": "bb140adbf45bc445bcd84d16aa2893fda943d4b3f2b388927d9f8268ca1d7076"
+    },
+    {
+      "path": "lib/market-score/employment-r6-store.mjs",
+      "sha256": "a6c2938bae56147ab4bf3fcb9ba3046355360a538e58f6d34de021ea1d586851"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+      "sha256": "5363c5aba19e3ef67d01307f46b3283ce2f38dd9d3673cc73331e980850c38ea"
+    },
+    {
+      "path": "lib/market-score/employment-r6-scheduler.mjs",
+      "sha256": "8ca32aadb2ecacd2c4248868394cb3ea2ca8ca8c25216f16f0c4f4812cc31600"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
