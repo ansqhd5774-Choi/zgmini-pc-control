@@ -1,0 +1,42 @@
+name: ZGMINI Agent Handoff PR Evidence CI
+on:
+  pull_request:
+    types: [labeled]
+
+# SOURCE_ONLY proposal. Requires an approved dedicated spare Windows PC and
+# low-privilege isolated self-hosted runner. Never install this label on the
+# six operational PC runners or grant PR code access to E:\ZGmini / secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: zgmini-handoff-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  handoff-source-tests:
+    # A new PR SHA requires another explicit label event after source review.
+    # In particular, later synchronize events must never auto-execute new code.
+    if: >-
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'agent-handoff-ci') &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'agent-handoff-ci'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
+        with:
+          # A normal PR merge-ref is not the same SHA as the proposed fix.
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Check handoff result and producer contracts
+        run: node --test --test-concurrency=1 "tests/agent-handoff*.test.mjs"
