@@ -4,8 +4,10 @@ const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const SHA64=/^[a-f0-9]{64}$/;
 const MANIFEST=/^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
+const INFLATION_MANIFEST=/^approvals\/inflation-manual-b\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
 
-// Register future B-type operations here, not as feature-specific exceptions.
+// Registered operations may share an existing B label. The exact title and
+// request schema, not a label alone, disambiguate the approved route.
 export const APPROVAL_ROUTES=Object.freeze({
   'writer-source-b':Object.freeze({
     label:'pc-writer-b-install',
@@ -15,7 +17,16 @@ export const APPROVAL_ROUTES=Object.freeze({
     approvalPathPattern:MANIFEST,
     requestKeys:Object.freeze(['schema','requestId','chatId','operation',
       'controlRepository','approvalManifestPath','approvalManifestSha256']),
-  })
+  }),
+  'inflation-manual-b':Object.freeze({
+    label:'pc-writer-b-install',
+    title:'pc-inflation-official-manual-once',
+    schema:'ZGMINI_INFLATION_OFFICIAL_MANUAL_B_REQUEST_V1',
+    operation:'inflation-official-manual',
+    approvalPathPattern:INFLATION_MANIFEST,
+    requestKeys:Object.freeze(['schema','requestId','chatId','operation',
+      'controlRepository','approvalManifestPath','approvalManifestSha256']),
+  }),
 });
 const stop=code=>{throw new Error('SHARED_ISSUE_ADMISSION_'+code);};
 const exactKeys=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&
@@ -40,10 +51,13 @@ export function inspectSharedIssueAdmission({title,labels,body}) {
       expectedLabel:named[0][1].label});
     return Object.freeze({state:'UNMANAGED',code:'NO_REGISTERED_RESOURCE_ROUTE'});
   }
-  if(routes.length!==1)return Object.freeze({state:'REJECTED_AT_ADMISSION',code:'MULTIPLE_RESOURCE_ROUTES'});
-  const [kind,route]=routes[0];
-  if(title!==route.title)return Object.freeze({state:'REJECTED_AT_ADMISSION',
-    code:'EXACT_ISSUE_TITLE_REQUIRED',kind,expectedTitle:route.title});
+  if(new Set(routes.map(([,r])=>r.label)).size!==1)
+    return Object.freeze({state:'REJECTED_AT_ADMISSION',code:'MULTIPLE_RESOURCE_ROUTES'});
+  const matching=routes.filter(([,r])=>title===r.title);
+  if(matching.length!==1)return Object.freeze({state:'REJECTED_AT_ADMISSION',
+    code:'EXACT_ISSUE_TITLE_REQUIRED',
+    ...(routes.length===1?{kind:routes[0][0],expectedTitle:routes[0][1].title}:{})});
+  const [kind,route]=matching[0];
   let req;
   try{req=JSON.parse(body);}catch{return Object.freeze({state:'REJECTED_AT_ADMISSION',
     code:'REQUEST_JSON_INVALID',kind});}
