@@ -17,6 +17,7 @@ const FAILURES = new Set(['WRITER_B_PREFLIGHT_STOP',
   'WRITER_B_INSTALL_STOP_RESTORED', 'WRITER_B_RECOVERY_REQUIRED']);
 const NON_FAILURES = new Set(['WRITER_B_INSTALLED_VERIFIED', 'WRITER_B_STATE_UNKNOWN']);
 const SETUP_REVIEW_ONLY = 'WRITER_B_SETUP_STOP';
+const EXPECTED_SHARED_BUSY_NOOP = 'WRITER_B_SHARED_INSTALL_BUSY_NOOP_STOP';
 const REQUIRED_KEYS = ['schema', 'requestId', 'chatId', 'operation',
   'controlRepository', 'approvalManifestPath', 'approvalManifestSha256'];
 const MAX_COMMENT_ROWS = 500;
@@ -170,6 +171,15 @@ export function prepareWriterBFailureHandoff({event, originIssue, receipt,
   // Writer B approval contract is independently revalidated.
   if (result.status === SETUP_REVIEW_ONLY) return Object.freeze({
     state: 'SETUP_REVIEW_REQUIRED', reportStatus: result.status,
+    runId: run.runId, originIssueNumber: originIssue.number,
+    pcOperationalWrites: 0, automaticPcRetries: 0});
+  // A contended shared install lock can intentionally decline a second
+  // overlapping Writer B request before claiming or changing PC state.
+  // Its authenticated receipt remains in the owner Issue, but it is not a
+  // distinct repair incident. Recovery-required failures stay eligible.
+  if (result.status === 'WRITER_B_PREFLIGHT_STOP' &&
+      result.code === EXPECTED_SHARED_BUSY_NOOP) return Object.freeze({
+    state: 'NOT_ELIGIBLE', reportStatus: result.status,
     runId: run.runId, originIssueNumber: originIssue.number,
     pcOperationalWrites: 0, automaticPcRetries: 0});
   if (!FAILURES.has(result.status)) return Object.freeze({state: 'NOT_ELIGIBLE',
