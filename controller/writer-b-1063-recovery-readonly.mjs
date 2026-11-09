@@ -5,6 +5,8 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
+import {sameTaskDefinitionExceptSettingsEnabled} from '../r17-writer-b/r17-b-xml.mjs';
 
 export const WRITER_B_1063_REQUEST_ID='bd435d7c-2939-457f-907c-98d551f6b8cf';
 const M_FILE='lib/market-score/employment-r6-collector.mjs';
@@ -291,6 +293,11 @@ export function inspectWriterB1063Recovery({
   const xml=taskXml();
   need(Buffer.isBuffer(xml)&&xml.length>0&&xml.length<=262144,
    'WRITER_B_1063_TASK_XML_UNAVAILABLE');
+   // A paused Task may differ from its original XML solely in Settings.Enabled.
+   // Raw XML equality cannot distinguish that expected change from drift.
+   const definitionMatchesOriginalExceptEnabled=
+    sameTaskDefinitionExceptSettingsEnabled(decodeTaskXmlBytes(xml))===
+    sameTaskDefinitionExceptSettingsEnabled(decodeTaskXmlBytes(taskOriginal));
   const probe=taskProbe();
   need(strictObject(probe)&&typeof probe.enabled==='boolean'&&
    [probe.instances,probe.relatedProcesses,probe.unknownProcessLines]
@@ -339,7 +346,8 @@ export function inspectWriterB1063Recovery({
     coreCycleLockPresent,coreQuietSnapshot,
     resumeAuthorized:false,
     xmlSha256:digest(xml),
-    xmlMatchesOriginal:digest(xml)===preimage.originalTaskDefinitionSha256},
+    xmlMatchesOriginal:digest(xml)===preimage.originalTaskDefinitionSha256,
+    definitionMatchesOriginalExceptEnabled},
    runtimeSourceVerified:false,operationalWrites:0,
    providerCalls:0,d1Writes:0,sqliteOpened:false};
  }catch(error){
