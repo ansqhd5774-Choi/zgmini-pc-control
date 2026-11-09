@@ -80,6 +80,26 @@ function verifyPinnedClosure(args){
     'POSTSWITCH_LAUNCHER_APPROVED_TOOL_DRIFT');
   return approval;
 }
+// A failed *read-only* C preflight must expose the exact failed checks, not
+// collapse them into an opaque error that asks the operator to rerun blindly.
+// Never include raw ledger/owner/marker, access tokens or protected contents.
+export function summarizePrepareEvidence(evidence){
+  if(evidence?.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED')return null;
+  const checks=evidence?.checks&&typeof evidence.checks==='object' &&
+    !Array.isArray(evidence.checks)?evidence.checks:{};
+  const safeCode=value=>typeof value==='string'&&/^[A-Z0-9_]{1,100}$/.test(value)
+    ?value:'NOT_RECORDED';
+  return {status:'RECOVERY_REQUIRED',
+    code:'POSTSWITCH_PREPARE_EVIDENCE_FAILED',
+    evidenceCode:safeCode(evidence?.code),
+    failedChecks:Object.entries(checks).filter(([,ok])=>ok!==true)
+      .map(([name])=>name).filter(name=>/^[A-Z0-9_]{1,100}$/.test(name)),
+    protectionCode:safeCode(evidence?.protectionCode),
+    exactInventories:evidence?.exactInventories===true,
+    exactSourceBytes:evidence?.exactSourceBytes===true,
+    operationalWrites:0,recoveryAuthorized:false,
+    next:'RECONCILE_NAMED_READONLY_CHECKS_NO_RETRY_OR_LOCK_CHANGE'};
+}
 async function prepareReadOnly(args){
   verifyReadOnlyPrepareArguments(args);
   const source=args[4],toolHashes=committedClosure(source);
@@ -88,8 +108,8 @@ async function prepareReadOnly(args){
   const {main:inspect}=await import('./controller-postswitch-evidence.mjs');
   const {main:preflight}=await import('./controller-postswitch-preflight.mjs');
   const evidence=await inspect(['--request-id',id,'--source-sha',source]);
-  need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
-    'POSTSWITCH_PREPARE_EVIDENCE_FAILED');
+  const namedFailure=summarizePrepareEvidence(evidence);
+  if(namedFailure)return {...namedFailure,requestId:id,sourceSha:source};
   const plan=await preflight(['--request-id',id,'--source-sha',source]);
   need(plan.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS'&&
     plan.backlogPlan.candidateCount===1&&
