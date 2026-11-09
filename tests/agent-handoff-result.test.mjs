@@ -157,8 +157,9 @@ test('result broker still rejects a third-party Issue even with an owner comment
   async () => simulate({untrustedIssueAuthor: true}));
 
 async function simulatePublicFeature({invalidOriginal = false, wrongSource = false,
-  wrongIdentity = false, forkPr = false, wrongSha = false,
-  publicDenied = false, failedCi = false} = {}) {
+  wrongIdentity = false, wrongChat = false, wrongBranch = false,
+  forkPr = false, wrongSha = false, publicDenied = false,
+  publicMissing = false, publicTimeout = false, failedCi = false} = {}) {
   const seed = setup();
   const input = structuredClone(seed.handoff);
   input.origin.repository = 'ansqhd5774-Choi/zgmini-pc-control';
@@ -180,8 +181,9 @@ async function simulatePublicFeature({invalidOriginal = false, wrongSource = fal
   const origin = {number: 1009, user: {login: invalidOriginal ? 'intruder' : 'ansqhd5774-Choi'},
     labels: [{name: 'pc-job'}], body: JSON.stringify({schema: 'ZGMINI_PC_JOB_V1',
       requestId: wrongIdentity ? 'pc-different-id' : handoff.origin.requestId,
-      chatId: handoff.origin.chatId,
-      sourceSha: handoff.origin.sourceSha, sourceBranch: handoff.origin.branch,
+      chatId: wrongChat ? 'chat-different' : handoff.origin.chatId,
+      sourceSha: handoff.origin.sourceSha,
+      sourceBranch: wrongBranch ? 'codex/other-branch' : handoff.origin.branch,
       sourceRepository: wrongSource ? 'ansqhd5774-Choi/zgmini-pc-control' : 'ansqhd5774-Choi/zgmini'})};
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-public-'));
   const eventPath = path.join(temp, 'event.json');
@@ -198,7 +200,9 @@ async function simulatePublicFeature({invalidOriginal = false, wrongSource = fal
     const uri = new URL(url), method = options.method ?? 'GET';
     if (uri.pathname.startsWith('/repos/ansqhd5774-Choi/zgmini/')) {
       publicHeaders.push(options.headers);
+      if (publicTimeout) throw new TypeError('simulated network timeout');
       if (publicDenied) return {ok: false, status: 403};
+      if (publicMissing) return {ok: false, status: 404};
       if (uri.pathname.endsWith('/pulls/920')) return {ok: true, json: async () => pr};
       if (uri.pathname.endsWith('/actions/runs/42450377234')) return {ok: true, json: async () => run};
     }
@@ -215,10 +219,11 @@ async function simulatePublicFeature({invalidOriginal = false, wrongSource = fal
   const env = {GITHUB_EVENT_PATH: eventPath, GITHUB_REPOSITORY: 'ansqhd5774-Choi/zgmini-pc-control',
     GITHUB_EVENT_NAME: 'issue_comment', GITHUB_ACTOR: 'ansqhd5774-Choi'};
   try {
-    const bad = invalidOriginal || wrongSource || wrongIdentity || forkPr ||
-      wrongSha || publicDenied || failedCi;
+    const bad = invalidOriginal || wrongSource || wrongIdentity || wrongChat ||
+      wrongBranch || forkPr || wrongSha || publicDenied || publicMissing ||
+      publicTimeout || failedCi;
     if (bad) await assert.rejects(runResultBroker(env),
-      /RESULT_FEATURE_ORIGIN_NOT_AUTHORIZED|RESULT_FEATURE_ORIGIN_BINDING_STOP|RESULT_OWNER_REPOSITORY_STOP|RESULT_PR_PROVENANCE_STOP|RESULT_TEST_RUN_PROVENANCE_STOP|RESULT_PUBLIC_GITHUB_API_403_STOP/);
+      /RESULT_FEATURE_ORIGIN_NOT_AUTHORIZED|RESULT_FEATURE_ORIGIN_BINDING_STOP|RESULT_OWNER_REPOSITORY_STOP|RESULT_PR_PROVENANCE_STOP|RESULT_TEST_RUN_PROVENANCE_STOP|RESULT_PUBLIC_GITHUB_API_40[34]_STOP|simulated network timeout/);
     else { await runResultBroker(env); await runResultBroker(env); }
     assert.equal(writes.length, bad ? 0 : 1);
     for (const headers of publicHeaders) assert.equal(headers.Authorization, undefined);
@@ -238,6 +243,10 @@ test('public return rejects a source-repository mismatch without a GitHub write'
   async () => simulatePublicFeature({wrongSource: true}));
 test('public return rejects a changed original request ID without a GitHub write',
   async () => simulatePublicFeature({wrongIdentity: true}));
+test('public return rejects an altered original chat ID without a GitHub write',
+  async () => simulatePublicFeature({wrongChat: true}));
+test('public return rejects an altered original branch without a GitHub write',
+  async () => simulatePublicFeature({wrongBranch: true}));
 test('public return rejects a fork PR without a GitHub write',
   async () => simulatePublicFeature({forkPr: true}));
 test('public return rejects a different-SHA CI run without a GitHub write',
@@ -246,3 +255,7 @@ test('public return rejects failed CI without a GitHub write',
   async () => simulatePublicFeature({failedCi: true}));
 test('public return stops on a public API denial without a GitHub write',
   async () => simulatePublicFeature({publicDenied: true}));
+test('public return stops on a public API 404 without a GitHub write',
+  async () => simulatePublicFeature({publicMissing: true}));
+test('public return stops on a public API timeout without a GitHub write',
+  async () => simulatePublicFeature({publicTimeout: true}));
