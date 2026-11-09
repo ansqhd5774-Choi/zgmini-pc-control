@@ -134,7 +134,7 @@ test('bounded Core lock: occupied owner naturally releases within two polls',asy
  assert.deepEqual(waits,[5_000,5_000]);
 });
 
-test('bounded Core lock: 60s exhaustion remains BLOCKED with zero claim/provider',async()=>{
+test('bounded Core lock: five-minute exhaustion remains BLOCKED with zero claim/provider',async()=>{
  const f=inject();
  let clock=0,attempt=0;
  const waits=[];
@@ -146,23 +146,37 @@ test('bounded Core lock: 60s exhaustion remains BLOCKED with zero claim/provider
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'R6_B_CORE_LOCK_OCCUPIED');
  assert.equal(result.firstFail,'PREFLIGHT');
- assert.equal(clock,60_000);
- assert.equal(attempt,13);
- assert.equal(waits.length,12);
- assert.deepEqual(waits,Array(12).fill(5_000));
+ assert.equal(clock,300_000);
+ assert.equal(attempt,61);
+ assert.equal(waits.length,60);
+ assert.deepEqual(waits,Array(60).fill(5_000));
  assert.ok(!f.calls.includes('D1_READ')&&!f.calls.includes('CLAIM')&&
   !f.calls.includes('RUN')&&!f.calls.includes('UNLOCK'));
 });
 
-test('bounded Core lock: delayed timer cannot acquire after 60s deadline',async()=>{
+test('bounded Core lock: delayed timer cannot acquire after five-minute deadline',async()=>{
  let clock=0,attempts=0;
  await assert.rejects(acquireCoreLockBounded('fixture','request',{
   createLock:()=>{attempts++;
    if(attempts===1)throw lockError('R6_B_CORE_LOCK_OCCUPIED');
    return{held:()=>true,release:()=>true};},
-  now:()=>clock,sleep:async()=>{clock+=70_000;}}),
+  now:()=>clock,sleep:async()=>{clock+=310_000;}}),
  e=>e.code==='R6_B_CORE_LOCK_OCCUPIED');
  assert.equal(attempts,1);
+});
+
+
+test('bounded Core lock: natural release after two minutes still acquires safely',async()=>{
+ let clock=0,attempt=0;
+ const lock={held:()=>true,release:()=>true};
+ const got=await acquireCoreLockBounded('fixture','request',{
+  createLock:()=>{attempt++;
+   if(clock<120_000)throw lockError('R6_B_CORE_LOCK_OCCUPIED');
+   return lock;},
+  now:()=>clock,sleep:async(ms)=>{clock+=ms;}});
+ assert.equal(got,lock);
+ assert.equal(clock,120_000);
+ assert.equal(attempt,25);
 });
 
 test('bounded Core lock: non-EEXIST create failure stops without waiting',async()=>{
