@@ -14,6 +14,9 @@ export const R6_B_TITLE='pc-employment-r6-registered-data-once';
 export const R6_B_LABEL='pc-writer-b-install';
 export const R6_B_SCHEMA='ZGMINI_R6_REGISTERED_DATA_B_REQUEST_V1';
 export const R6_B_APPROVAL='ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V1';
+export const R6_B_APPROVAL_V2='ZGMINI_R6_REGISTERED_DATA_B_APPROVAL_V2';
+const R6_B_DELTA_OVERLAY_PATH='approvals/writer-updates/employment-r6-2015-600-onefile-20261109.json';
+const R6_B_PROVIDER_PATH='lib/market-score/employment-r6-provider.mjs';
 export const R6_B_RESULT='r6-registered-data-result.json';
 export const R6_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 export const R6_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
@@ -31,7 +34,7 @@ const same=(a,b)=>path.win32.normalize(a).toLowerCase()===path.win32.normalize(b
 const safeCode=x=>CODES.test(x??'')&&x.length<=80?
  (x.startsWith('R6_B_')?x:`R6_B_${x}`):'R6_B_UNCLASSIFIED_STOP';
 
-export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes}={}){
+export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,deltaOverlayBytes=null}={}){
  need(env?.GITHUB_REPOSITORY===R6_B_REPO&&env.GITHUB_EVENT_NAME==='issues'&&
   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_ACTOR===OWNER&&
   env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
@@ -54,10 +57,13 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes}={}
  try{approval=JSON.parse(approvalBytes.toString('utf8'));
   overlay=JSON.parse(overlayBytes.toString('utf8'));}
  catch{throw error('R6_B_MANIFEST_JSON_STOP');}
- need(exact(approval,['schema','status','scope','mode','sourceRepository',
+ const v2=approval?.schema===R6_B_APPROVAL_V2;
+ const approvalKeys=['schema','status','scope','mode','sourceRepository',
   'installedSourceSha','overlayManifestPath','overlayManifestSha256',
-  'sourceRoot','pcHome','maxBlsCalls','maxDolCalls','effects'])&&
-  approval.schema===R6_B_APPROVAL&&approval.status==='APPROVED_B'&&
+  'sourceRoot','pcHome','maxBlsCalls','maxDolCalls','effects'];
+ need(exact(approval,v2?[...approvalKeys,'deltaOverlayManifestPath',
+  'deltaOverlayManifestSha256']:approvalKeys)&&
+  (approval.schema===R6_B_APPROVAL||v2)&&approval.status==='APPROVED_B'&&
   approval.scope==='EMPLOYMENT_R6_REGISTERED_DATA_SQLITE_D1_ONCE'&&
   ['ONE_YEAR','BACKFILL'].includes(approval.mode)&&
   approval.sourceRepository==='ansqhd5774-Choi/zgmini'&&
@@ -80,7 +86,41 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes}={}
   overlay.allowDbChanges===false&&overlay.allowD1Writes===false&&
   same(overlay.sourceRoot,R6_B_SOURCE),
  'R6_B_EFFECT_APPROVAL_STOP');
- return Object.freeze({request,approval,overlay});
+ let effectiveOverlay=overlay;
+ if(v2){
+  need(approval.deltaOverlayManifestPath===R6_B_DELTA_OVERLAY_PATH&&
+   SHA64.test(approval.deltaOverlayManifestSha256??'')&&
+   Buffer.isBuffer(deltaOverlayBytes)&&deltaOverlayBytes.length>0&&
+   deltaOverlayBytes.length<16384&&
+   sha(deltaOverlayBytes)===approval.deltaOverlayManifestSha256,
+   'R6_B_DELTA_APPROVAL_STOP');
+  let delta;
+  try{delta=JSON.parse(deltaOverlayBytes.toString('utf8'));}
+  catch{throw error('R6_B_DELTA_JSON_STOP');}
+  const prior=overlay.files.filter(file=>file.path===R6_B_PROVIDER_PATH);
+  const changed=delta?.files?.[0];
+  need(delta?.schema==='ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1'&&
+   delta.status==='APPROVED_B'&&
+   delta.scope==='PC_WRITER_APPROVED_FILE_OVERLAY_ONLY'&&
+   delta.sourceRepository===approval.sourceRepository&&
+   delta.sourceBranch===overlay.sourceBranch&&
+   SHA40.test(delta.candidateSourceSha??'')&&
+   same(delta.sourceRoot,R6_B_SOURCE)&&
+   delta.runCount===1&&
+   delta.allowProviderCalls===false&&delta.allowDbChanges===false&&
+   delta.allowD1Writes===false&&delta.allowTaskDefinitionChanges===false&&
+   delta.allowOtherSourceChanges===false&&
+   Array.isArray(delta.files)&&delta.files.length===1&&
+   prior.length===1&&changed?.path===R6_B_PROVIDER_PATH&&
+   changed.change==='M'&&SHA64.test(changed.beforeSha256??'')&&
+   SHA64.test(changed.afterSha256??'')&&
+   changed.beforeSha256===prior[0].afterSha256&&
+   changed.afterSha256!==changed.beforeSha256,
+   'R6_B_DELTA_SCOPE_STOP');
+  effectiveOverlay={...overlay,files:overlay.files.map(file=>
+   file.path===R6_B_PROVIDER_PATH?{...file,afterSha256:changed.afterSha256}:file)};
+ }else need(deltaOverlayBytes===null,'R6_B_DELTA_SCOPE_STOP');
+ return Object.freeze({request,approval,overlay:effectiveOverlay});
 }
 
 export function verifyInstalledR6Overlay({sourceRoot,pcHome,approvedSha,overlay,
@@ -330,7 +370,10 @@ export async function runR6RegisteredOnce({env=process.env}={}){
   'R6_B_APPROVAL_WORKTREE_STOP');
  const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';
  const overlayBytes=git(['show',`HEAD:${overlayPath}`]);
- const auth=authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes});
+ const parsedApproval=JSON.parse(approvalBytes.toString('utf8'));
+ const deltaOverlayBytes=parsedApproval?.schema===R6_B_APPROVAL_V2?
+  git(['show',`HEAD:${R6_B_DELTA_OVERLAY_PATH}`]):null;
+ const auth=authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,deltaOverlayBytes});
  return performR6RegisteredOnce({auth});
 }
 
