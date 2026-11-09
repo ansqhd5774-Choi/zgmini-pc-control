@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
