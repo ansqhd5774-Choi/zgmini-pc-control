@@ -7,8 +7,9 @@ const isSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const isDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const REQUIRED_EVIDENCE_CHECKS = Object.freeze([
   'ORIGINAL_LEDGER', 'TARGET_SWITCHED', 'BACKUP_VERIFIED',
-  'OWNER_DEAD_AND_MATCHED', 'PROTECTION_UNCHANGED', 'BACKLOG_CLOSED',
+  'OWNER_DEAD_AND_MATCHED', 'BACKLOG_CLOSED',
   'LIVE_WORKFLOW_ACTIVE', 'RUNNERS_ONLINE', 'SUPERVISOR_FRESH',
+  'PROTECTION_UNCHANGED', 'PROTECTION_CONTRACT_VERIFIED',
 ]);
 const REQUIRED_MATERIALS = Object.freeze([
   'ledger', 'owner', 'marker', 'currentHost', 'snapshotHost',
@@ -26,7 +27,13 @@ export function forwardRecoveryCandidate(ledger, evidence) {
       evidence.actualControllerSha !== ledger.targetSha ||
       evidence.installedShaBefore !== ledger.installedShaBefore ||
       !evidence.checks || Object.keys(evidence.checks).length !== REQUIRED_EVIDENCE_CHECKS.length ||
-      !REQUIRED_EVIDENCE_CHECKS.every(key => evidence.checks[key] === true) ||
+      !REQUIRED_EVIDENCE_CHECKS.filter(key =>
+        key !== 'PROTECTION_UNCHANGED' && key !== 'PROTECTION_CONTRACT_VERIFIED')
+        .every(key => evidence.checks[key] === true) ||
+      !((evidence.checks.PROTECTION_UNCHANGED === true &&
+          evidence.checks.PROTECTION_CONTRACT_VERIFIED === false) ||
+        (evidence.checks.PROTECTION_UNCHANGED === false &&
+          evidence.checks.PROTECTION_CONTRACT_VERIFIED === true)) ||
       !REQUIRED_MATERIALS.every(key => isDigest(evidence.materialHashes?.[key]))) return false;
   return true;
 }
@@ -94,7 +101,8 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
     await record('FORWARD_POSTCHECK_VERIFIED', {postcheckVerified: true});
 
     const final = await ports.verifyFinal({ledger, evidence});
-    need(final?.currentSourceSha === ledger.targetSha && final?.protectedStateUnchanged === true &&
+    need(final?.currentSourceSha === ledger.targetSha &&
+      (final?.protectedStateUnchanged === true || final?.protectionContractVerified === true) &&
       final?.workflowActive === true && final?.supervisorVerified === true &&
       final?.backlogVerified === true && final?.runnerSetVerified === true,
       'FORWARD_FINAL_READBACK_FAILED');
