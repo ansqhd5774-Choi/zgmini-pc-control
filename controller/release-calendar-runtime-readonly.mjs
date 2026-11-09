@@ -196,7 +196,8 @@ export function inspectReleaseCalendarRuntime(dataRoot,{fileSystem=fs,gitHead=de
    calendarStatus:typeof report?.status==='string'&&/^[A-Z_]{2,40}$/.test(report.status)?report.status:null,
    providerRequests:Number.isSafeInteger(report?.providerRequests)&&report.providerRequests>=0?report.providerRequests:null,
    sourceKeys,sourceCount:sourceKeys.length,
-   treasuryFailureCode:report?.status==='PARTIAL'&&sources.treasury==='SOURCE_FAILED'&&
+   treasuryFailureCode:(report?.status==='PARTIAL'||report?.status==='CACHED')&&
+    sources.treasury==='SOURCE_FAILED'&&
     typeof report?.treasuryFailureCode==='string'&&TREASURY_FAILURE_CODE.test(report.treasuryFailureCode)
     ?report.treasuryFailureCode:null};
  }
