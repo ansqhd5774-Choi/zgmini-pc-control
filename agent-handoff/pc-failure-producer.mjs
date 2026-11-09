@@ -1,5 +1,5 @@
-// SOURCE_ONLY, not deployed. When enabled, runs as a bounded metadata-only
-// workflow_run on the approved self-hosted runner. No PC job is retried.
+// Metadata-only workflow_run on the approved isolated self-hosted runner.
+// A verified bot Incident is directly routed in this job. No PC retry.
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
