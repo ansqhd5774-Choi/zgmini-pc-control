@@ -38,12 +38,13 @@ export function inspectLocalWriterSourceOnly({
       analysis.cApprovalAuthorized!==false ||
       analysis.liveCoreSourceVerified!==false ||
       analysis.intermediate4ecIndependentlyObserved!==false ||
-      !Array.isArray(analysis.stages) || analysis.stages.length!==5 ||
+      !Array.isArray(analysis.stages) ||
+      analysis.stages.length!==expectedSources.length ||
       analysis.stages.some((stage,index)=>
         stage?.sourceSha!==expectedSources[index] ||
         typeof stage.configSha256!=='string' ||
         !/^[a-f0-9]{64}$/.test(stage.configSha256) ||
-        stage.evidenceLevel!==(index===2 ? 'DERIVED_ONLY' :
+        stage.evidenceLevel!==(index===3 ? 'DERIVED_ONLY' :
           'PINNED_DIGEST_MATCH')))
     return fail('WRITER_SOURCE_ONLY_PINNED_BYTES_UNVERIFIED');
   return {
