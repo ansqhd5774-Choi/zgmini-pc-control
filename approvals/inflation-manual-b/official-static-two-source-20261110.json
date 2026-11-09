@@ -3,7 +3,7 @@
   "status": "APPROVED_B",
   "scope": "INFLATION_OFFICIAL_STATIC_TWO_RAW_JSON_ONLY",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
-  "sourceSha": "4273137a85adcc90c863a27f703baa749b05cb64",
+  "sourceSha": "48d3478030590ca63aaab2435e88c896608c70d3",
   "sourceFiles": [
     {
       "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-r1.mjs",
