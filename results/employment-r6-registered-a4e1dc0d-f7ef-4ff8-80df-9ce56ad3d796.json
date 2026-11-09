@@ -1,0 +1,55 @@
+{
+  "schema": "ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1",
+  "requestId": "a4e1dc0d-f7ef-4ff8-80df-9ce56ad3d796",
+  "approvalManifestSha256": "8c84c1ab63e8501e10083b1945accdc76c8692bb11d27edab766e32f34b64aae",
+  "status": "PARTIAL",
+  "code": "R6_B_PARTIAL_PUBLISH_VERIFIED",
+  "sourceSha": "144f3b8f673cc3d18f004ddd65f6920d450f0ea6",
+  "mode": "BACKFILL",
+  "providerRequests": 16,
+  "blsRequests": 14,
+  "dolRequests": 2,
+  "groupResults": [
+    {
+      "groupName": "DOL_UI_WEEKLY_CLAIMS",
+      "status": "PARTIAL",
+      "providerRequests": 2,
+      "failureCode": "SERIES_PARTIAL"
+    },
+    {
+      "groupName": "BLS_EMPLOYMENT_SITUATION",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_JOLTS",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_ECI",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_STATE_MSA",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_BED",
+      "status": "PARTIAL",
+      "providerRequests": 6,
+      "failureCode": "SERIES_PARTIAL"
+    }
+  ],
+  "sqlite": "COLLECTOR_RECORDED",
+  "publication": "VERIFIED",
+  "sourceStoredAt": 1794262879306,
+  "sourceFeatures": 29,
+  "chartReadyFeatures": 22,
+  "lastPass": "PUBLISH_READBACK",
+  "firstFail": null,
+  "runId": "42710641027",
+  "retry": "READ_EXISTING_REQUEST_NO_REEXECUTE"
+}
