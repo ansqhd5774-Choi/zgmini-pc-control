@@ -59,6 +59,7 @@ test('counts distinct active source keys without returning raw data or writes',t
  assert.equal(r.core.consumption.uniqueSourceKeys,2);
  assert.equal(r.core.publicFeeds.countedAsRawInput,false);
  assert.deepEqual(r.core.census2027Diagnostic,{status:'NOT_STORED',year:2027});
+ assert.deepEqual(r.core.treasuryTawsInput,{status:'NOT_STORED'});
  assert.equal(r.overallUniqueSourceCount,null);
  assert.equal(r.operationalWrites,0);
  assert.equal(r.providerCalls,0);
@@ -67,6 +68,73 @@ test('counts distinct active source keys without returning raw data or writes',t
  assert.deepEqual(fs.readdirSync(storage).sort(),files);
  assert.doesNotMatch(JSON.stringify(r),/CES123|AAA|PCE|SECRET|HIDDEN|SENSITIVE_SERIES/);
  assert.ok(Buffer.byteLength(JSON.stringify(r))<24000);
+});
+
+test('audits the exact private TA_WS key and returns only dated counts and raw-text hash',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
+ const sensitive='SECRET_TREASURY_CUSIP_123456789';
+ const text=JSON.stringify([
+  {competitiveAuctionCloseDate:'2026-11-03T00:00:00',bidToCoverRatio:'2.5',cusip:sensitive},
+  {competitiveAuctionCloseDate:'2026-11-04T00:00:00',bidToCoverRatio:'3.2',cusip:sensitive},
+  {competitiveAuctionCloseDate:'2026-11-05T00:00:00',bidToCoverRatio:null,cusip:sensitive},
+ ]);
+ const body={text,sourceUrl:'SECRET_TREASURY_PROVIDER_URL',fromDate:'2025-11-10',
+  toDate:'2026-11-09',awardedCount:2,privateExtra:'SECRET_TREASURY_PRIVATE'};
+ core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)').run(
+  'release-calendar:treasury:taws','gzip:'+gzipSync(JSON.stringify(body)).toString('base64'),1794255759536);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const before=hash(core.name),files=fs.readdirSync(storage).sort();
+ const r=inspectSourceInventory(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.deepEqual(r.core.treasuryTawsInput,{status:'OBSERVED',storedAt:1794255759536,
+  fromDate:'2025-11-10',toDate:'2026-11-09',rawRowCount:3,storedAwardedCount:2,
+  eligibleAwardedRows:2,eligibleCountMatchesStored:true,textBytes:Buffer.byteLength(text),
+  textSha256:createHash('sha256').update(text).digest('hex'),
+  scope:'ELIGIBLE_RESULT_COUNT_NOT_FULL_PARSER_REVALIDATION'});
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_TREASURY|cusip|sourceUrl|privateExtra/);
+ assert.equal(hash(core.name),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),files);
+ assert.equal(r.providerCalls,0);assert.equal(r.operationalWrites,0);assert.equal(r.d1Writes,0);
+});
+
+test('invalid TA_WS metadata is never treated as a valid count or exposed',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
+ const update=core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)');
+ update.run('release-calendar:treasury:taws',JSON.stringify({text:'SECRET_INVALID_TREASURY',
+  fromDate:'2025-11-10',toDate:'2026-11-09',awardedCount:2}),55);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const r=inspectSourceInventory(data);
+ assert.deepEqual(r.core.treasuryTawsInput,{status:'UNREADABLE_OR_INVALID'});
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_INVALID_TREASURY/);
+ const writer=new DatabaseSync(core.name);
+ writer.prepare('UPDATE market_input_batches_v1 SET body=? WHERE batch_key=?').run('X'.repeat(20_000_001),
+  'release-calendar:treasury:taws');
+ writer.close();
+ assert.deepEqual(inspectSourceInventory(data).core.treasuryTawsInput,
+  {status:'UNREADABLE_OR_INVALID'});
+});
+
+test('TA_WS counted results show mismatch rather than claiming full parser validation',t=>{
+ const {data,storage}=fixture(t);
+ const core=database(storage);
+ core.db.exec('CREATE TABLE market_input_batches_v1(batch_key TEXT PRIMARY KEY,body TEXT,stored_at INTEGER)');
+ const text=JSON.stringify([{competitiveAuctionCloseDate:'2026-11-08T00:00:00',bidToCoverRatio:'2.8'}]);
+ core.db.prepare('INSERT INTO market_input_batches_v1 VALUES(?,?,?)').run(
+  'release-calendar:treasury:taws',JSON.stringify({text,fromDate:'2025-11-10',
+   toDate:'2026-11-09',awardedCount:2}),99);
+ core.db.close();
+ const history=database(storage,'history');history.db.exec('CREATE TABLE irrelevant(x)');history.db.close();
+ const r=inspectSourceInventory(data);
+ assert.equal(r.core.treasuryTawsInput.eligibleAwardedRows,1);
+ assert.equal(r.core.treasuryTawsInput.storedAwardedCount,2);
+ assert.equal(r.core.treasuryTawsInput.eligibleCountMatchesStored,false);
+ assert.equal(r.core.treasuryTawsInput.status,'OBSERVED');
 });
 
 test('reports only allowlisted fixed Census 2027 diagnosis without exposing private body',t=>{
