@@ -4,6 +4,16 @@
 
 const need = (pass, code) => {if (!pass) throw Object.assign(new Error(code), {code});};
 const isSha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
+const isDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+const REQUIRED_EVIDENCE_CHECKS = Object.freeze([
+  'ORIGINAL_LEDGER', 'TARGET_SWITCHED', 'BACKUP_VERIFIED',
+  'OWNER_DEAD_AND_MATCHED', 'PROTECTION_UNCHANGED', 'BACKLOG_CLOSED',
+  'LIVE_WORKFLOW_ACTIVE', 'RUNNERS_ONLINE', 'SUPERVISOR_FRESH',
+]);
+const REQUIRED_MATERIALS = Object.freeze([
+  'ledger', 'owner', 'marker', 'currentHost', 'snapshotHost',
+  'protectedBefore', 'backlog',
+]);
 
 export function forwardRecoveryCandidate(ledger, evidence) {
   if (!ledger || ledger.status !== 'RECOVERY_REQUIRED' || ledger.phase !== 'RECOVERY_REQUIRED' ||
@@ -12,10 +22,12 @@ export function forwardRecoveryCandidate(ledger, evidence) {
       !isSha(ledger.installedShaBefore) || !isSha(ledger.targetSha) ||
       ledger.installedShaBefore === ledger.targetSha) return false;
   if (evidence?.status !== 'READONLY_POSTSWITCH_EVIDENCE_VERIFIED' ||
+      evidence.requestId !== ledger.requestId ||
       evidence.actualControllerSha !== ledger.targetSha ||
       evidence.installedShaBefore !== ledger.installedShaBefore ||
-      Object.values(evidence.checks || {}).some(value => value !== true) ||
-      !Object.keys(evidence.checks || {}).length) return false;
+      !evidence.checks || Object.keys(evidence.checks).length !== REQUIRED_EVIDENCE_CHECKS.length ||
+      !REQUIRED_EVIDENCE_CHECKS.every(key => evidence.checks[key] === true) ||
+      !REQUIRED_MATERIALS.every(key => isDigest(evidence.materialHashes?.[key]))) return false;
   return true;
 }
 
@@ -42,7 +54,7 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
   try {
     const before = await ports.verifyPreconditions({ledger, evidence});
     need(before?.verified === true, 'FORWARD_PRECONDITION_FAILED');
-    await ports.verifyOriginalUnchanged();
+    need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
     await record('FORWARD_PREPARED');
 
     // A replay may send a GitHub request before yielding or receiving an ACK.
@@ -52,7 +64,7 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
     const backlog = await ports.reconcileBacklog();
     need(backlog?.verified === true && backlog?.outcomeUnknown !== true,
       'FORWARD_BACKLOG_NOT_VERIFIED');
-    await ports.verifyOriginalUnchanged();
+    need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
     await record('FORWARD_BACKLOG_RECONCILED', {backlogVerified: true});
 
     // postcheck is adapter-owned, with separate recovery state and unique Issue
@@ -63,7 +75,7 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
       post?.protectedStateUnchanged === true && post?.runnerSetVerified === true &&
       post?.postSourceVerified === true && post?.outcomeUnknown !== true,
       'FORWARD_POSTCHECK_NOT_VERIFIED');
-    await ports.verifyOriginalUnchanged();
+    need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
     await record('FORWARD_POSTCHECK_VERIFIED', {postcheckVerified: true});
 
     const final = await ports.verifyFinal({ledger, evidence});
@@ -71,7 +83,7 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
       final?.workflowActive === true && final?.supervisorVerified === true &&
       final?.backlogVerified === true && final?.runnerSetVerified === true,
       'FORWARD_FINAL_READBACK_FAILED');
-    await ports.verifyOriginalUnchanged();
+    need(await ports.verifyOriginalUnchanged() === true, 'FORWARD_ORIGINAL_CHANGED');
     await record('FORWARD_VERIFIED_READY_FOR_LEASE_ARCHIVE',
       {status:'FORWARD_RECONCILED', originalLedgerPreserved:true});
     return {...report};
