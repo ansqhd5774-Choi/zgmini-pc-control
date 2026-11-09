@@ -89,3 +89,21 @@ test('missing, malformed or short file inventory does not pass', () => {
   assert.equal(verifyControllerFiles({controllerSourceSha:after,controllerFiles:{}},'/verified'),false);
   assert.equal(verifyControllerFiles({controllerSourceSha:'bad',controllerFiles:{}},'/verified'),false);
 });
+
+test('38-file host inventory checks all bytes, including the only changed controller file', () => {
+  const mandatory=['config/operations.json','controller/common.mjs','controller/engine.mjs',
+    'controller/entry.mjs','controller/fear-greed-archive-readonly.mjs',
+    'controller/operations.mjs','controller/supervisor.mjs',
+    'controller/upload.mjs','controller/worker.mjs'];
+  const additional=['controller/theme-l7-runtime-readonly.mjs',
+    ...Array.from({length:28},(_,i)=>`controller/extra-readonly-${i}.mjs`)];
+  const all=[...mandatory,...additional];
+  assert.equal(all.length,38);
+  const entries=new Map(all.map(name=>[path.join('/snapshot',name),Buffer.from(name)]));
+  const host={controllerSourceSha:after,controllerFiles:Object.fromEntries(
+    all.map(name=>[name,sha256(Buffer.from(name))]))};
+  const reader=file=>{if(!entries.has(file))throw Error('missing');return entries.get(file);};
+  assert.equal(verifyControllerFiles(host,'/snapshot',reader),true);
+  entries.set(path.join('/snapshot',additional[0]),Buffer.from('changed-file-corrupted'));
+  assert.equal(verifyControllerFiles(host,'/snapshot',reader),false);
+});
