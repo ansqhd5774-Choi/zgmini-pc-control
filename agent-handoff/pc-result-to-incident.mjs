@@ -2,6 +2,7 @@
 // handoff candidate. Nothing here creates Issues, opens SQLite, or retries PC.
 import {createHash} from 'node:crypto';
 import {parseHandoff, fingerprintHandoff} from './contract.mjs';
+import {prepareResourceWait} from '../shared-resource/lifecycle.mjs';
 
 const CONTROL_REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -102,6 +103,57 @@ export function preparePcFailureHandoff({originIssue, report, resultPath}) {
   return Object.freeze({state: 'READY_TO_ENQUEUE', incidentId,
     fingerprint: fingerprintHandoff(handoff), resultPath,
     originIssueNumber: originIssue.number, body: JSON.stringify(handoff)});
+}
+
+// Only genuinely clean pre-worker resource contention is a waiting task.
+// BLOCKED alone can mean invalid approvals, safety drift or unknown effects.
+const CLEAN_WAIT_CODES = new Set([
+  'RESOURCE_WAIT_MEMORY', 'MEMORY_WAIT_ALREADY_ACTIVE', 'LEASE_BUSY']);
+
+const textMatches=(txt,key,value)=>typeof txt==='string'&&
+  txt.split(/\r?\n/).filter(x=>x.startsWith(`${key}=`)).length===1&&
+  txt.split(/\r?\n/).includes(`${key}=${value}`);
+
+/** Called only after the producer has read BOTH immutable files from GitHub. */
+export function preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt}){
+  // Reuse the existing strict owner/report identity validator. It must find
+  // BLOCKED noneligible; the clean-wait allowlist is deliberately much narrower.
+  const authenticated=preparePcFailureHandoff({originIssue,report,resultPath});
+  if(report.status!=='BLOCKED'||!CLEAN_WAIT_CODES.has(report.code))
+    return Object.freeze({state:'NOT_ELIGIBLE'});
+  if(authenticated.state!=='NOT_ELIGIBLE')stop('WAIT_IDENTITY_INVALID');
+  const preflight=report.phase==='PREVALIDATION'&&report.mutationStarted===false&&
+    report.operationalWrites===0&&report.providerCalls===0&&
+    report.d1Writes===0&&report.sqliteOpened===false&&
+    report.resourceLeasesRetained!==true;
+  const validLease=report.code!=='LEASE_BUSY'||['REQUEST_LEASE','SEAT_LEASE',
+    'RESOURCE_LEASE'].includes(report.failureOperation);
+  if(!preflight||!validLease)return Object.freeze({state:'WAIT_PROOF_UNVERIFIED'});
+  const proofs=[['jobId',report.jobId],['requestId',report.requestId],
+    ['status','BLOCKED'],['code',report.code],['phase','PREVALIDATION'],
+    ['mutationStarted','false'],['operationalWrites','0'],
+    ['providerCalls','0'],['d1Writes','0'],['sqliteOpened','false']];
+  if(proofs.some(([k,v])=>!textMatches(resultTxt,k,v)))
+    return Object.freeze({state:'WAIT_PROOF_UNVERIFIED'});
+  const request=JSON.parse(originIssue.body);
+  const intentFingerprint=createHash('sha256').update(JSON.stringify({
+    operation:request.operation,sourceRepository:request.sourceRepository,
+    sourceBranch:request.sourceBranch,sourceSha:request.sourceSha})).digest('hex');
+  const runId=Number(report.jobId.match(/^run-([0-9]+)-/)[1]);
+  let resourceKey='pc-job-heavy-memory';
+  if(report.code==='LEASE_BUSY')resourceKey=report.failureOperation==='SEAT_LEASE'?
+    `pc-job-seat-${report.seat}`:report.failureOperation==='RESOURCE_LEASE'?
+      'pc-job-heavy-resource':'pc-job-request-lease';
+  const wait=prepareResourceWait({resourceKey,
+    origin:{repository:CONTROL_REPO,issueNumber:originIssue.number,
+      requestId:request.requestId,chatId:request.chatId,
+      sourceSha:request.sourceSha,approvalFingerprintSha256:intentFingerprint},
+    evidence:{runId,status:report.status,code:report.code,
+      resultJsonPath:resultPath,resultTxtPath:resultPath.replace(/\.json$/,'.txt'),
+      resultPairReadbackVerified:true},
+    safePoint:'UNCLAIMED_UNTOUCHED',releaseCondition:report.code==='RESOURCE_WAIT_MEMORY'?
+      'HEAVY_MEMORY_AVAILABLE_VERIFIED':'LEASE_OWNER_RELEASE_VERIFIED'});
+  return Object.freeze({state:'WAITING_SHARED_RESOURCE',wait});
 }
 
 /** A complete, author-verified inventory is required before issue creation. */
