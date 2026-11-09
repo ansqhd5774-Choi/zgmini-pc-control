@@ -2,7 +2,7 @@
 
 상태: **#1063 공통 Writer B 실PC 복구 성공 / 후속 기능 설치 검증 대기 / Core 이후 정규 cycle 미관측**.
 중앙 대기열: [#1068](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1068).
-원본 영향 4건: #1063, #1064, #1066, #1081. **공통 잠금 복구 1/1=100%**, **기능 설치 성공 0/4=0%**, **인계 댓글 기록 4/4=100% (원담당 수신/실행 미확인)**. 공통 프로세스 완료 항목 **6/8=75%** (기존 8개 항목 산정 기준 유지).
+원본 영향 4건: #1063, #1064, #1066, #1081. **공통 잠금 복구 1/1=100%**, **기능 설치 성공 0/4=0%**, **인계 댓글 기록 4/4=100% (원담당 수신/실행 미확인)**. 중앙 자동 인계·처리 **8/8=100%(사고 표본 1/1)**. 기능 설치 0/4와 Core 정규 cycle 미관측은 중앙 인계율과 별도.
 
 ## 복구 전 확정된 실PC 증거 (2026-11-09 고정 스냅샷)
 
@@ -17,6 +17,7 @@
 
 - 고정 복구 PR [#1086](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1086) 병합 (`807a5a69105fd9ee839d368a414e53d8f6c217c9`). 단일 사고 전용 실행기 및 정적 승인 명세를 등록했다. 일반 B의 소비된 원 요청을 재실행하지 않았다.
 - 복구 [#1087 / Run 42634492692](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1087#issuecomment-6742480737): **`WRITER_B_1063_CORE_RECOVERED / WRITER_B_1063_PREPARED_CORE_ENABLED_LOCK_FINALIZED`**. 원본 PC Core Task Enabled 실조회 `true`, 원본 공유 잠금 안전 보관·정리 `true`, 원격 JSON/TXT create/readback `2/2`. 결과 파일 `results/writer-b-1063-recovery-b709eb8b-c752-44cf-a1cb-36eaa574c3ef.json` 및 `.txt`.
+- **정식 중앙 결과 반환:** [격리 CI Run 42637013508](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42637013508) 원본 PR #1086 head `f723f776c60f30d0d6a68a333319b5d895333111` 성공. 자동 접수 #1068에는 [`HANDOFF_RESULT_RECORDED`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1068#issuecomment-6742864318), 원본 #1063에는 [`HANDOFF_ORIGIN_RESULT_RECORDED`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1063#issuecomment-6742864978) 영수증이 생성·재조회됐다. Broker state `RUNTIME_VERIFICATION_PENDING`이며 owner chat 수신 `UNKNOWN`.
 - **확인 범위 제한:** `installationVerified=false`; 원래 #1063 B 설치 실행 실패 이력은 그대로다. 복구 후 Core **정규 cycle 관측은 아직 미확인**이며 자동 추정하지 않는다. 해당 관측은 자연스럽게 발생하는 기존 정상 업무 증거로 확인하고 복구 확인용 신규 예약 작업은 만들지 않는다.
 - 인계 증거 4/4: [고용 #1063](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1063#issuecomment-6742556270), [시장 캘린더 #1064](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1064#issuecomment-6742557176), [자산 R10 #1066](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1066#issuecomment-6742556786), [물가지표 #1081](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1081#issuecomment-6742555835). 상태는 **HANDOFF_RECORDED / OWNER_ACK_UNKNOWN**. GitHub 댓글로 다른 일반챗이 자동 호출되지 않는다.
 - #1064·#1066 기존 승인 명세의 base HEAD는 원본 PC prepared HEAD와 달라 새 current-head 승인 명세/새 requestId 필요. #1081은 base HEAD가 일치하지만 현재 preimage·보호 해시를 확인하고 새 requestId 사용. #1063은 이미 준비된 소스의 실제 기능 활성·결과부터 확인하고 원 설치 성공을 주장하지 않는다.
