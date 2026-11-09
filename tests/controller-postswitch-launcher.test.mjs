@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {verifyLauncherArguments,main} from '../tools/controller-postswitch-launcher.mjs';
+import {verifyLauncherArguments,verifyReadOnlyPrepareArguments,main}
+  from '../tools/controller-postswitch-launcher.mjs';
 
 const id='pc-update-877e10c8-8580-4095-a675-bef9ec032193';
 const good=['--request-id',id,'--source-sha','a'.repeat(40),
@@ -18,4 +19,14 @@ test('direct C launcher accepts only the fixed incident and exact arguments',()=
 test('launcher refuses unattended/Linux execution before loading local code',async()=>{
   await assert.rejects(()=>main(good),
     /POSTSWITCH_DIRECT_WINDOWS_C_OPERATOR_REQUIRED/);
+});
+test('read-only preparation never accepts an arbitrary incident or source',()=>{
+  const prepare=['prepare','--request-id',id,'--source-sha','c'.repeat(40)];
+  assert.equal(verifyReadOnlyPrepareArguments(prepare),prepare);
+  for(const wrong of [
+    ['prepare','--request-id','other','--source-sha','c'.repeat(40)],
+    [...prepare,'--execute'],
+    ['prepare','--request-id',id,'--source-sha','BAD'],
+  ])assert.throws(()=>verifyReadOnlyPrepareArguments(wrong),
+    /POSTSWITCH_PREPARE_ARGUMENTS_INVALID/);
 });

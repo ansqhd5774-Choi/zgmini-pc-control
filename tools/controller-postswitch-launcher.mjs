@@ -35,6 +35,26 @@ export function verifyLauncherArguments(args){
   'POSTSWITCH_LAUNCHER_ARGUMENTS_INVALID');
   return args;
 }
+export function verifyReadOnlyPrepareArguments(args){
+  need(Array.isArray(args)&&args.length===5&&
+    args[0]==='prepare'&&args[1]==='--request-id'&&args[2]===id&&
+    args[3]==='--source-sha'&&/^[a-f0-9]{40}$/.test(args[4]),
+  'POSTSWITCH_PREPARE_ARGUMENTS_INVALID');
+  return args;
+}
+function committedClosure(source){
+  const git=params=>execFileSync('git',params,{cwd:repo,windowsHide:true,
+    timeout:30000,maxBuffer:8e6});
+  git(['merge-base','--is-ancestor',source,'HEAD']);
+  const hashes={};
+  for(const file of files){
+    const live=hash(fs.readFileSync(path.join(repo,file)));
+    const committed=hash(git(['show',source+':'+file]));
+    need(live===committed,'POSTSWITCH_LAUNCHER_SOURCE_DRIFT');
+    hashes[file]=live;
+  }
+  return hashes;
+}
 function verifyPinnedClosure(args){
   const source=args[3],approvalFile=path.join(repo,'approvals',
     'maintenance-recoveries',id+'.postswitch.json');
@@ -49,21 +69,55 @@ function verifyPinnedClosure(args){
     Object.keys(hashes).length===files.length&&
     files.every(f=>/^[a-f0-9]{64}$/.test(hashes[f]??'')),
   'POSTSWITCH_LAUNCHER_APPROVAL_INVALID');
-  const git=params=>execFileSync('git',params,{cwd:repo,windowsHide:true,
-    timeout:30000,maxBuffer:8e6});
-  git(['merge-base','--is-ancestor',source,'HEAD']);
-  for(const file of files){
-    const live=hash(fs.readFileSync(path.join(repo,file)));
-    const committed=hash(git(['show',source+':'+file]));
-    need(live===committed&&live===hashes[file],
-      'POSTSWITCH_LAUNCHER_SOURCE_DRIFT');
-  }
+  const committed=committedClosure(source);
+  need(files.every(file=>committed[file]===hashes[file]),
+    'POSTSWITCH_LAUNCHER_APPROVED_TOOL_DRIFT');
   return approval;
+}
+async function prepareReadOnly(args){
+  verifyReadOnlyPrepareArguments(args);
+  const source=args[4],toolHashes=committedClosure(source);
+  // Import the read-only planners only after the entire local dependency
+  // closure was verified against the pinned Git commit.
+  const {main:inspect}=await import('./controller-postswitch-evidence.mjs');
+  const {main:preflight}=await import('./controller-postswitch-preflight.mjs');
+  const evidence=await inspect(['--request-id',id,'--source-sha',source]);
+  need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
+    'POSTSWITCH_PREPARE_EVIDENCE_FAILED');
+  const plan=await preflight(['--request-id',id,'--source-sha',source]);
+  need(plan.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS'&&
+    plan.backlogPlan.candidateCount===1&&
+    plan.backlogPlan.actions[0]?.originalIssueNumber===919,
+  'POSTSWITCH_PREPARE_BACKLOG_SCOPE_DRIFT');
+  const gh='C:/Program Files/GitHub CLI/gh.exe';
+  const remote=execFileSync(gh,['api','repos/ansqhd5774-Choi/zgmini/commits/main'],
+    {encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:3e6});
+  const postSourceSha=JSON.parse(remote).sha;
+  need(/^[a-f0-9]{40}$/.test(postSourceSha),
+    'POSTSWITCH_PREPARE_POST_SOURCE_UNVERIFIED');
+  const candidate={
+    schema:'ZGMINI_PC_POSTSWITCH_RECOVERY_APPROVAL_V1',
+    approved:false,operation:'FORWARD_POSTSWITCH_917',
+    requestId:id,issueNumber:917,sourceSha:source,
+    installedShaBefore:'c09bf6a6f66f229016135020d6ba553ba9a94676',
+    targetControllerSha:'badad9124157879d7a645b64f2768113d632355b',
+    evidenceHashes:evidence.materialHashes,
+    toolHashes,
+    expectedBacklogIssues:[919],
+    postcheck:{operation:'core-status',sourceRepository:'ansqhd5774-Choi/zgmini',
+      sourceBranch:'main',sourceSha:postSourceSha},
+  };
+  return {status:'POSTSWITCH_APPROVAL_CANDIDATE_READONLY',
+    requestId:id,sourceSha:source,approvalCandidate:candidate,
+    operationalWrites:0,recoveryAuthorized:false,
+    next:'REVIEW_EXACT_MANIFEST_THEN_DIRECT_C_GRADE_OPERATOR'};
 }
 export async function main(args=process.argv.slice(2)){
   need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&
-    !process.env.RUNNER_NAME&&process.stdin.isTTY===true&&
-    process.stdout.isTTY===true,'POSTSWITCH_DIRECT_WINDOWS_C_OPERATOR_REQUIRED');
+    !process.env.RUNNER_NAME,'POSTSWITCH_DIRECT_WINDOWS_C_OPERATOR_REQUIRED');
+  if(args[0]==='prepare')return prepareReadOnly(args);
+  need(process.stdin.isTTY===true&&process.stdout.isTTY===true,
+    'POSTSWITCH_DIRECT_WINDOWS_C_OPERATOR_REQUIRED');
   verifyLauncherArguments(args);
   verifyPinnedClosure(args);
   const {main:run}=await import('./controller-postswitch-windows.mjs');
@@ -73,7 +127,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   try{
     const result=await main();
     console.log(JSON.stringify(result));
-    if(result.status!=='RECOVERY_COMPLETED')process.exitCode=2;
+    if(!['RECOVERY_COMPLETED','POSTSWITCH_APPROVAL_CANDIDATE_READONLY'].includes(result.status))
+      process.exitCode=2;
   }catch(error){
     console.log(JSON.stringify({status:'RECOVERY_REQUIRED',
       code:/^[A-Z0-9_]+$/.test(error?.code??'')?error.code:
