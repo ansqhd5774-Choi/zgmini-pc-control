@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {performance} from 'node:perf_hooks';
+import {setTimeout as delay} from 'node:timers/promises';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 
 export const R6_B_REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -125,6 +127,27 @@ function withCoreLock(pcHome,requestId){
   try{fs.unlinkSync(file);return true;}catch{return false;}}};
 }
 
+// Active Core runs release their own lock naturally. Give the 5-minute Core
+// cadence a bounded 60-second idle opportunity; never inspect/delete someone
+// else's lock or retry unexpected/unknown lock-ownership errors.
+export async function acquireCoreLockBounded(pcHome,requestId,{
+ createLock=withCoreLock,now=()=>performance.now(),sleep=delay}={}){
+ const started=now();
+ let lastOccupied=null;
+ for(let retry=0;;retry++){
+  // A delayed timer must not let a resumed process acquire beyond the bound.
+  if(retry>0&&now()-started>60_000)throw lastOccupied;
+  try{return await createLock(pcHome,requestId);}
+  catch(cause){
+   if(cause?.code!=='R6_B_CORE_LOCK_OCCUPIED')throw cause;
+   lastOccupied=cause;
+   const remaining=60_000-(now()-started);
+   if(retry>=12||!Number.isFinite(remaining)||remaining<=0)throw cause;
+   await sleep(Math.min(5_000,remaining));
+  }
+ }
+}
+
 function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
  const date=new Date().toISOString().slice(0,10);
  const file=path.join(pcHome,`employment-r6-registered-${mode.toLowerCase()}-${date}.claim.json`);
@@ -171,7 +194,7 @@ async function probeExistingD1Read({sourceRoot,config}){
 }
 
 export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
- pcHome=R6_B_HOME,lockFactory=withCoreLock,claim=claimOnce,
+ pcHome=R6_B_HOME,lockFactory=acquireCoreLockBounded,claim=claimOnce,
  verifyOverlay=verifyInstalledR6Overlay,
  providerFieldsLoader=loadInstalledProviderFields,
  d1ReadProbe=probeExistingD1Read,run=null}={}){
@@ -192,7 +215,7 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   need(Boolean(providerFields.BLS_API_KEY?.trim()||
    providerFields.BLS_REGISTRATION_KEY?.trim()),'R6_B_REGISTERED_KEY_MISSING');
   lastPass='REGISTERED_KEY_PRESENT';
-  lock=lockFactory(pcHome,auth.request.requestId);
+  lock=await lockFactory(pcHome,auth.request.requestId);
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
   // The Actions Runner may have a different Windows user than scheduled Core.
   // Fail before the no-retry claim and BLS calls if its existing Wrangler/D1
