@@ -1,0 +1,851 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-42574708549-1-seat-2",
+  "requestId": "pc-77044ea9-2fae-7a2e-c65e-8ff182f74df7",
+  "startedAt": "2026-11-09T06:42:40.788Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "daf5ede1b1518c982e28d366529e22ea612ef237",
+  "sourceBranch": "main",
+  "operation": "release-calendar-runtime-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-market-calendar-283-20261109",
+  "pcOperationalApprovedSha": "7534d20673f22d8766aa4587412868e00bc6bea3",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "RELEASE_CALENDAR_SOURCE_INVENTORY_READONLY",
+    "evidenceLevel": "CHECKPOINT_AND_SOURCE_INVENTORY_NOT_LIVE_PROCESS",
+    "runtimeSourceVerified": false,
+    "configuredSourceSha": "7534d20673f22d8766aa4587412868e00bc6bea3",
+    "collection": {
+      "modifiedAt": "2026-11-09T06:40:26.712Z",
+      "at": "2026-11-09T06:40:26.641Z",
+      "sourceSha": null,
+      "calendarStatus": "CACHED",
+      "providerRequests": 0,
+      "sourceKeys": [],
+      "sourceCount": 0
+    },
+    "earningsApiRequestObservations": {
+      "status": "STATE_UNKNOWN",
+      "code": "COLLECTION_EVENTS_PARTIAL_OR_INVALID",
+      "evidenceLevel": "LOGGED_FETCH_WRAPPER_CALLS_ONLY_NOT_DAILY_LIMIT_OR_SAVED_DATE_PROOF",
+      "coverage": "PARTIAL",
+      "observedWindow": {
+        "firstEventAt": "2026-11-05T07:35:04.428Z",
+        "lastEventAt": "2026-11-09T06:40:26.641Z"
+      },
+      "observedDays": [
+        {
+          "kstDate": "2026-11-05",
+          "observedRequests": 0
+        },
+        {
+          "kstDate": "2026-11-06",
+          "observedRequests": 14
+        },
+        {
+          "kstDate": "2026-11-07",
+          "observedRequests": 14
+        },
+        {
+          "kstDate": "2026-11-08",
+          "observedRequests": 16
+        },
+        {
+          "kstDate": "2026-11-09",
+          "observedRequests": 15
+        }
+      ],
+      "observedDayCount": 5,
+      "observedMaxDailyRequests": 16,
+      "observedOverOneRequestDays": 4,
+      "observedStatusDays": [
+        {
+          "kstDate": "2026-11-06",
+          "counts": "14,0,0,0,0,0,0"
+        },
+        {
+          "kstDate": "2026-11-07",
+          "counts": "14,0,0,0,0,0,0"
+        },
+        {
+          "kstDate": "2026-11-08",
+          "counts": "16,0,0,0,0,0,0"
+        },
+        {
+          "kstDate": "2026-11-09",
+          "counts": "15,0,0,0,0,0,0"
+        }
+      ],
+      "duplicateHostLogLines": 0,
+      "statusInvalidEvents": 0,
+      "statusCoverage": "PARTIAL",
+      "statusColumns": [
+        "ok2xx",
+        "client4xx",
+        "server5xx",
+        "networkError",
+        "quotaGuard",
+        "other",
+        "duplicateLines"
+      ],
+      "statusEvidenceLevel": "FETCH_WRAPPER_RESPONSE_STATUSES_NOT_PROVIDER_GET_POLICY_PROOF",
+      "eventsExamined": 1024,
+      "invalidEvents": 0,
+      "bytesRead": 524288,
+      "tailTruncated": true,
+      "dayListTruncated": false
+    },
+    "coreTask": {
+      "xmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+      "mentionsRunLocal": false,
+      "mentionsLocalCycle": false,
+      "evidenceLevel": "REGISTERED_TASK_XML_STATIC_ONLY"
+    },
+    "candidates": [
+      {
+        "path": "projects/iran-news-analysis-r1-56eec668",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "9204ab733b45ad3f01a1b8a0754ce8a3f3e3d5feb4245cd01a081a5da838511f",
+        "collectorSha256": "cd5f37e9f01ee85b4810a6c9c1294bb543daecd1722ef8b23b5e83348a50076a",
+        "runnerSha256": "4af1164793d95e7b0a97643d91e6d23749974d17c7048bac677f727376fc7afc",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-calendar-banner-release",
+        "head": "c2cfa229b35f511f7ba10bfca985bce5ce75f222",
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "5d1eded2dacc14135692fd5953f1d47f67865fe7f7fd62f6e8f7ca401149dc93",
+        "collectorSha256": "f2e95b7b4bf7fbf164ff5b4de8dfb253ebcffdf0739e9917c44b4536ba6576d1",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-calendar-header",
+        "head": "c0fdab19b1e6dbe97b72b6c14756c82c774081c7",
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "5d1eded2dacc14135692fd5953f1d47f67865fe7f7fd62f6e8f7ca401149dc93",
+        "collectorSha256": "f2e95b7b4bf7fbf164ff5b4de8dfb253ebcffdf0739e9917c44b4536ba6576d1",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-composite-year-boundary",
+        "head": "9a0dc7a6860738ad376fb200ba30a8b0518fe476",
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-composite-year-pc-release",
+        "head": "d5d64f645ba06225acd39d96e9342c0506753b97",
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-d1-auth-refresh",
+        "head": "c2f3349e62bf9a036a6d87c9c6b0317c856c1c5d",
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "32d206f84b5625acd01e1124bf3a3624dae7ed43c4e340487cf29aadfb3ac5cf",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-debt-history-pc-release",
+        "head": "c9fa324f31e4b246f028f1b438219165bdc5d088",
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-history-pc-release",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "539dbad05be5b5f76b0989f491411140504e1613105f5157e784f8b18064564e",
+        "collectorSha256": "8487fbaf0fc1a5dc7cc8602491fca2bbf5f284e5b0f293c9d4033dac50162f8b",
+        "runnerSha256": "20c4af9a1734176239ce0a8a83aeb3ae4e5b7315d7df6507467ee2fd0ab2fad3",
+        "earningsApiCollector": {
+          "verifiedReadable": true,
+          "sha256": "a686bf736c9a5ae274cd2dc69dd169e93ddab90f72ae273c45e765c788226ce8",
+          "bytes": 7384,
+          "modifiedAt": "2026-11-07T16:34:24.137Z",
+          "evidenceLevel": "FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF"
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "fed_calendar",
+          "census",
+          "eia",
+          "usda",
+          "cftc",
+          "treasury",
+          "tic",
+          "eia_epm",
+          "nyfed"
+        ],
+        "sourceCount": 12
+      },
+      {
+        "path": "projects/zgmini-earnings-r10-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-r11-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-r22-stage-64993372",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-r23-stage-3f536784",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-r38-approved-runtime",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-r4-c-d1-publish-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "565d1d40cc415a9f9f70d403e4265e38f5b845f7734e6fa8748ca525d65ac890",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-r46-7c67a659eeb5",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-risk-r28-candidate",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-risk-r29-candidate",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-earnings-style",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-economic12-r14-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-economic12-r16-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-economic12-r22-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-fomc-countdown",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-footer-information",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-footer-pages",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-growth-census",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "5d1eded2dacc14135692fd5953f1d47f67865fe7f7fd62f6e8f7ca401149dc93",
+        "collectorSha256": "f2e95b7b4bf7fbf164ff5b4de8dfb253ebcffdf0739e9917c44b4536ba6576d1",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-inflation-r37-stage",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-iran-arrow-pc-release",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-iran-arrow-r5",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-iran-news-retention",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "62cd314f3a1d9824c4c527f10bbf75c34019328a309e6a6663446233019cae67",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-iran-r3-release-a56c935e",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-iran-r3-v51-stage-e393e5da",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      },
+      {
+        "path": "projects/zgmini-iran-r34-stage-bc7bd678",
+        "head": null,
+        "matchesConfiguredSource": false,
+        "matchesCollectionSource": false,
+        "collectorCallsCalendar": true,
+        "collectorImportsCalendar": true,
+        "moduleSha256": "902983e7e70da98c1d4c2b0c90edbc6215816d02a9e44471eaf5740347ec2b3c",
+        "collectorSha256": "bf4bbde7829fd25d4d00941a23b4c0189e62e8b5e19e8e797fc364b0b6ef11ad",
+        "runnerSha256": "1b8c2760a4f815191282dd55969ce8170072d4f747c8468ddd6601dc50ee88d6",
+        "earningsApiCollector": {
+          "verifiedReadable": false
+        },
+        "sourceParseStatus": "PARSED",
+        "sourceKeys": [
+          "bls",
+          "bea",
+          "fed",
+          "census"
+        ],
+        "sourceCount": 4
+      }
+    ],
+    "candidateCount": 62,
+    "gitSkippedCandidates": 25,
+    "earningsApiCollectorEvidenceLevel": "FILE_INVENTORY_ONLY_NOT_DAILY_GET_PROOF",
+    "inventoryTruncated": true,
+    "providerCalls": 0,
+    "sqliteOpened": false,
+    "d1Writes": 0,
+    "operationalWrites": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "c328b0c94c879c3d893099ca589e42132aec9cd87bc396bf0ac9c28d5e76f506",
+  "protectedAfterSha256": "c328b0c94c879c3d893099ca589e42132aec9cd87bc396bf0ac9c28d5e76f506",
+  "actualExecutionSha": "badad9124157879d7a645b64f2768113d632355b",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-09T06:43:10.534Z",
+  "durationMs": 29746
+}
