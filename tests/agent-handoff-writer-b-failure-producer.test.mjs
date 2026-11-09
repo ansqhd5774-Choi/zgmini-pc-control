@@ -47,7 +47,7 @@ function fixture(initial = report()) {
   const state = {report: initial, original: issue(), comments: [comment(initial)],
     manifest: manifest(), missing: null, created: [],
     waitComments: [], waitPost: 0, waitRead: 0, waitList: 0,
-    calls: {comments: 0, file: [], list: 0, create: 0, readIssue: []},
+    calls: {comments: 0, file: [], list: 0, create: 0, route: 0, readIssue: []},
     failAfterPost: false, failBeforePost: false, tamperReadback: false};
   const io = {
     readComments: async since => {
@@ -77,6 +77,7 @@ function fixture(initial = report()) {
       state.calls.list++;
       return {repository: repo, complete: true, issues: state.created};
     },
+    routeHandoff: async () => ({state: ++state.calls.route === 1 ? 'ROUTE_RECORDED' : 'ROUTE_REUSED'}),
     createHandoff: async prepared => {
       state.calls.create++;
       if (state.failBeforePost) throw new Error('POST_LOST');
@@ -112,6 +113,8 @@ test('confirmed #874-shaped failure produces one bot-read-back verified handoff'
   assert.equal(actual.verifiedResults, 1);
   assert.equal(actual.confirmedFailures, 1);
   assert.equal(actual.newIssues, 1);
+  assert.equal(actual.routesRecorded, 1);
+  assert.equal(state.calls.route, 1);
   assert.equal(actual.pcOperationalWrites, 0);
   assert.equal(actual.automaticPcRetries, 0);
   assert.equal(state.calls.create, 1);
@@ -131,6 +134,8 @@ test('same run is idempotent: on repeat no second Issue POST', async () => {
   const again = await processCompletedWriterB(event(), io);
   assert.equal(again.state, 'REUSED_EXISTING');
   assert.equal(again.reusedIssues, 1);
+  assert.equal(again.routesReused, 1);
+  assert.equal(state.calls.route, 2);
   assert.equal(state.calls.create, 1);
 });
 
@@ -219,6 +224,7 @@ test('ambiguous Issue POST outcome reconciles once, never retries', async () => 
   assert.equal(recovered.state, 'POST_RECONCILED');
   assert.equal(first.state.calls.list, 2);
   assert.equal(first.state.calls.create, 1);
+  assert.equal(first.state.calls.route, 1);
   const second = fixture(); second.state.failBeforePost = true;
   await assert.rejects(() => processCompletedWriterB(event(), second.io),
     /POST_OUTCOME_UNKNOWN/);
@@ -231,4 +237,12 @@ test('a created Issue is not accepted without exact authenticated readback', asy
   await assert.rejects(() => processCompletedWriterB(event(), io),
     /CREATE_READBACK_STOP/);
   assert.equal(state.calls.create, 1);
+});
+
+test('route failure prevents Writer B intake completion and never retries the installer', async () => {
+  const {io, state} = fixture();
+  io.routeHandoff = async () => { throw new Error('HANDOFF_BOT_DIRECT_ROUTE_COMMENT_READBACK_STOP'); };
+  await assert.rejects(processCompletedWriterB(event(), io), /COMMENT_READBACK_STOP/);
+  assert.equal(state.calls.create, 1);
+  assert.equal(state.calls.route, 0);
 });
