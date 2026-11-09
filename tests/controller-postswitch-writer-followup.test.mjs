@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {WRITER_FOLLOWUP_CANDIDATE} from '../tools/controller-postswitch-approval.mjs';
+import {WRITER_FOLLOWUP_CANDIDATE,WRITER_TRANSITION}
+  from '../tools/controller-postswitch-approval.mjs';
 import {verifyWriterFollowupBReceipts, analyzeSourceOnlyReplacementChain,
-  analyzeWriterFollowupSourceCandidate, classifyWriterFollowupAObservations}
+  analyzeWriterFollowupSourceCandidate, classifyWriterFollowupAObservations,
+  verifyWriterFollowupProtectedSnapshot, inspectWriterFollowupProtectionCandidate}
   from '../tools/controller-postswitch-evidence.mjs';
 import {WRITER_CONFIG_PATH,inspectLocalWriterSourceOnly,
   main as writerReadOnlyMain}
@@ -45,6 +47,74 @@ test('Writer B receipt drift, missing, reordered, changed raw or substituted blo
   ]) {
     const rows=receipts();edit(rows);
     assert.equal(verifyWriterFollowupBReceipts(rows),false);
+  }
+});
+
+const protectedBaseline=()=>({
+  files:{'config.json':WRITER_TRANSITION.baselineConfigSha256,
+    'run-local.mjs':digest('unchanged-writer'),
+    'controller.json':digest('unchanged-controller')},
+  tasks:{'ZGMINI-PC-Local-Core':digest('unchanged-core-task'),
+    'ZGMINI-PC-Local-Korea':digest('unchanged-korea-task'),
+    'ZGMINI-PC-Iran-Progress-R13':'APPROVED_RETIRED_ABSENT'},
+});
+const protectedCurrent=()=>{
+  const snapshot=structuredClone(protectedBaseline());
+  snapshot.files['config.json']=WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at48;
+  return snapshot;
+};
+
+test('Writer follow-up protected snapshot pins baseline/current config and preserves other assets',()=>{
+  assert.equal(verifyWriterFollowupProtectedSnapshot(
+    protectedBaseline(),protectedCurrent()),true);
+  assert.equal(WRITER_TRANSITION.baselineConfigSha256,
+    'a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037');
+  assert.equal(WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.at48,
+    '59777810c0949036f03777b7ea5561bd72bf0697cdaba65e393af49bf67356dc');
+});
+
+test('Writer follow-up protected snapshot rejects stale consent and unrelated changes',()=>{
+  const changes=[
+    (b,c)=>{b.files['config.json']=WRITER_TRANSITION.currentConfigSha256;},
+    (b,c)=>{c.files['config.json']=WRITER_TRANSITION.currentConfigSha256;},
+    (b,c)=>{c.files['run-local.mjs']=digest('tampered');},
+    (b,c)=>{c.files['unexpected.json']=digest('new');},
+    (b,c)=>{delete c.files['controller.json'];},
+    (b,c)=>{c.tasks['ZGMINI-PC-Local-Core']=digest('rescheduled');},
+    (b,c)=>{c.tasks['ZGMINI-PC-Local-Korea']=digest('rescheduled');},
+    (b,c)=>{c.tasks['ZGMINI-PC-Iran-Progress-R13']=digest('restored');},
+    (b,c)=>{delete c.tasks['ZGMINI-PC-Iran-Progress-R13'];},
+    (b,c)=>{c.tasks['Unexpected-Task']=digest('new');},
+    (b,c)=>{b.tasks['ZGMINI-PC-Iran-Progress-R13']=digest('not-retired');},
+  ];
+  for (const modify of changes) {
+    const baseline=protectedBaseline();
+    const current=protectedCurrent();
+    modify(baseline,current);
+    assert.equal(verifyWriterFollowupProtectedSnapshot(baseline,current),false);
+  }
+});
+
+test('Writer follow-up combined evidence fails closed without real Windows raw and new C consent',()=>{
+  const baseline=protectedBaseline();
+  const current=protectedCurrent();
+  const input={baseline,current,writerBReceipts:receipts(),
+    currentConfigRaw:Buffer.from('private-config-cannot-be-reconstructed')};
+  const runCandidate=patch=>inspectWriterFollowupProtectionCandidate({...input,...patch});
+  const withoutRaw=runCandidate({currentConfigRaw:undefined});
+  assert.equal(withoutRaw.code,'WRITER_FOLLOWUP_CONFIG_BYTES_UNVERIFIED');
+  assert.equal(runCandidate({}).code,'WRITER_FOLLOWUP_CONFIG_BYTES_UNVERIFIED');
+  assert.equal(runCandidate({writerBReceipts:receipts().slice(0,2)}).code,
+    'WRITER_FOLLOWUP_B_RECEIPTS_UNVERIFIED');
+  assert.equal(runCandidate({current:{...current,files:{...current.files,
+    'config.json':WRITER_TRANSITION.currentConfigSha256}}}).code,
+    'WRITER_FOLLOWUP_PROTECTED_STATE_DRIFT');
+  for (const result of [withoutRaw,runCandidate({})]) {
+    assert.equal(result.cApprovalAuthorized,false);
+    assert.equal(result.historicalCConsentVerifiedHere,false);
+    assert.equal(result.liveCoreSourceVerified,false);
+    assert.equal(result.operationalWrites,0);
+    assert.doesNotMatch(JSON.stringify(result),/private-config-cannot/);
   }
 });
 
