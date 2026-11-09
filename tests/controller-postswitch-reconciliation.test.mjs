@@ -19,6 +19,14 @@ const evidence=()=>{
   return {...classifyPostSwitchEvidence(e),requestId,actualControllerSha:newSha,
     installedShaBefore:oldSha,materialHashes};
 };
+// A C-approved Writer transition is separately attested; it is never labeled
+// as unchanged relative to #917's historical protected snapshot.
+const transitionedEvidence=()=>{
+  const e=evidence();
+  return {...e,checks:{...e.checks,PROTECTION_UNCHANGED:false,
+    PROTECTION_CONTRACT_VERIFIED:true}};
+};
+
 function ports(calls, options={}) {
   let preflightCount=0;
   return {
@@ -144,4 +152,44 @@ test('missing ports never starts or writes recovery',async()=>{
   await assert.rejects(()=>reconcilePostSwitchForward({ledger:ledger(),evidence:evidence(),ports:{},
     persist:async()=>{writes++;}}),/FORWARD_PORT_MISSING/);
   assert.equal(writes,0);
+});
+
+
+test('an approved Writer transition is accepted without falsifying historical unchanged',async()=>{
+  const ev=transitionedEvidence();
+  assert.equal(ev.checks.PROTECTION_UNCHANGED,false);
+  assert.equal(ev.checks.PROTECTION_CONTRACT_VERIFIED,true);
+  assert.equal(forwardRecoveryCandidate(ledger(),ev),true);
+  const calls=[];
+  const result=await reconcilePostSwitchForward({ledger:ledger(),evidence:ev,
+    ports:ports(calls,{final:{
+      currentSourceSha:newSha,protectedStateUnchanged:false,protectionContractVerified:true,
+      workflowActive:true,supervisorVerified:true,backlogVerified:true,runnerSetVerified:true}}),
+    persist:async()=>{}});
+  assert.equal(result.status,'FORWARD_RECONCILED');
+  assert.ok(calls.includes('final'));
+});
+
+test('protection transition cannot bypass missing or contradictory evidence',()=>{
+  const ev=transitionedEvidence();
+  for(const checks of [
+    {...ev.checks,PROTECTION_CONTRACT_VERIFIED:false},
+    {...ev.checks,PROTECTION_UNCHANGED:true},
+    {...ev.checks,RUNNERS_ONLINE:false},
+  ]) {
+    assert.equal(forwardRecoveryCandidate(ledger(),{...ev,checks}),false);
+  }
+});
+
+test('transition drift at final readback retains recovery claim and stops',async()=>{
+  const calls=[];
+  const result=await reconcilePostSwitchForward({
+    ledger:ledger(),evidence:transitionedEvidence(),
+    ports:ports(calls,{final:{
+      currentSourceSha:newSha,protectedStateUnchanged:false,protectionContractVerified:false,
+      workflowActive:true,supervisorVerified:true,backlogVerified:true,runnerSetVerified:true}}),
+    persist:async()=>{}});
+  assert.equal(result.status,'RECOVERY_REQUIRED');
+  assert.equal(result.code,'FORWARD_FINAL_READBACK_FAILED');
+  assert.equal(result.mutationStarted,true);
 });
