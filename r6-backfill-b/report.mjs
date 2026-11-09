@@ -17,15 +17,24 @@ export function sanitizeR6BackfillResult({ requestId, status, failureCode, group
   const validGroupResults = Array.isArray(groupResults) && groupResults.length <= 6 &&
     new Set(groupResults.map(x => x?.groupName)).size === groupResults.length &&
     groupResults.every(x => Object.hasOwn(R6_ONE_SHOT.groups, x?.groupName) &&
-      ALLOWED_GROUP_STATUS.has(x?.status) && count(x?.providerRequests, 20) !== null);
+      ALLOWED_GROUP_STATUS.has(x?.status) &&
+      count(x?.providerRequests, x.groupName === "DOL_UI_WEEKLY_CLAIMS"
+        ? R6_ONE_SHOT.maxDolRequests : R6_ONE_SHOT.groups[x.groupName]) !== null);
   const validCounts = count(providerRequests, 20) !== null &&
     count(blsRequests, 18) !== null && count(dolRequests, 2) !== null &&
-    providerRequests === blsRequests + dolRequests;
+    providerRequests === blsRequests + dolRequests &&
+    (validGroupResults && groupResults.reduce((sum, x) => sum + x.providerRequests, 0) === providerRequests) &&
+    (!validGroupResults ||
+      groupResults.filter(x => x.groupName === "DOL_UI_WEEKLY_CLAIMS")
+        .reduce((sum, x) => sum + x.providerRequests, 0) === dolRequests);
   if (!validGroupResults || !validCounts || !ALLOWED_STATUS.has(status) ||
+    (status === "SUCCESS" && (groupResults.length === 0 ||
+      groupResults.some(x => x.status !== "SUCCESS"))) ||
+    (status === "NOOP" && providerRequests !== 0) ||
     d1Writes !== 0 || schedulerWrites !== 0 || !safeRequestId(requestId)) {
     return { schema: "ZGMINI_R6_BACKFILL_B_RESULT_V1", requestId: safeRequestId(requestId),
-      status: "STATE_UNKNOWN", code: "R6_B_RESULT_SCOPE_STOP", providerRequests: 0,
-      groupResults: [], d1Writes: 0, schedulerWrites: 0 };
+      status: "STATE_UNKNOWN", code: "R6_B_RESULT_SCOPE_STOP", providerRequests: null,
+      groupResults: [], d1Writes: null, schedulerWrites: null, effectsVerified: false };
   }
   return {
     schema: "ZGMINI_R6_BACKFILL_B_RESULT_V1", requestId,
@@ -35,6 +44,6 @@ export function sanitizeR6BackfillResult({ requestId, status, failureCode, group
       groupName: x.groupName, status: x.status, providerRequests: x.providerRequests,
       ...(x.failureCode ? { failureCode: code(x.failureCode) } : {}),
     })),
-    d1Writes: 0, schedulerWrites: 0,
+    d1Writes: 0, schedulerWrites: 0, effectsVerified: true,
   };
 }
