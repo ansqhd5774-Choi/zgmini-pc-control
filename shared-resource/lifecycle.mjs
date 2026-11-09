@@ -40,9 +40,10 @@ export function prepareResourceWait({resourceKey, origin, evidence, safePoint,
       evidence.resultJsonPath.slice(0, -5) !== evidence.resultTxtPath.slice(0, -4) ||
       evidence.resultPairReadbackVerified !== true ||
       !CODE.test(releaseCondition ?? '')) stop('WAIT_EVIDENCE_INVALID');
-  // PC Controller consumes its request lease/ledger before reaching the
-  // worker, even when that worker performs no operational writes. It must not
-  // reuse Writer B's truly unclaimed preclaim status.
+  // A completed pc-job Issue consumes its one-shot execution opportunity,
+  // even without operational writes. Depending on the busy point, the
+  // Controller may exit before acquiring a lease or recording its ledger.
+  // It must not reuse Writer B's truly unclaimed preclaim status.
   if (!['UNCLAIMED_UNTOUCHED', 'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
         'CLAIMED_ORIGINAL_VERIFIED'].includes(safePoint) ||
       (safePoint !== 'CLAIMED_ORIGINAL_VERIFIED' && recovery != null) ||
