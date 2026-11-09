@@ -42,6 +42,8 @@ test('PC resource wait reuses generic ledger contract with pc- requestId',()=>{
   assert.equal(outcome.state,'WAITING_SHARED_RESOURCE');
   assert.equal(outcome.wait.resourceKey,'pc-job-heavy-memory');
   assert.equal(outcome.wait.origin.requestId,'pc-abcd1234-1234');
+  assert.equal(outcome.wait.safePoint,'REQUEST_CONSUMED_PREWORKER_UNTOUCHED');
+  assert.equal(outcome.wait.resume,'OWNER_REPLAN_NEW_AUTHORIZED_REQUEST_ONLY');
   assert.match(outcome.wait.origin.approvalFingerprintSha256,/^[a-f0-9]{64}$/);
   assert.equal(outcome.wait.automaticPcRetries,0);
 });
@@ -82,12 +84,14 @@ test('PC verified memory contention records one #68 wait, without repair or retr
     readResourceWaitComment:async id=>queue.find(x=>x.id===id),
   };
   const first=await processCompletedPcJob(ev(),io);
+  assert.equal(first.state,'WAITING_SHARED_RESOURCE_RECORDED');
   assert.equal(first.waitsRecorded,1);
   assert.equal(first.confirmedFailures,0);
   assert.equal(first.newIssues,0);
   assert.equal(first.automaticPcRetries,0);
   assert.equal(posts,1);
   const again=await processCompletedPcJob(ev(),io);
+  assert.equal(again.state,'WAITING_SHARED_RESOURCE_RECORDED');
   assert.equal(again.waitsReused,1);
   assert.equal(posts,1);
   assert.equal(repairs,0);
