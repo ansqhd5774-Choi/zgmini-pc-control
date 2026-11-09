@@ -98,7 +98,7 @@ test('cannot create waiting records from unverified or spoofed evidence', () => 
     {complete: true, records: [good, good]}), /DUPLICATE_WAIT_STOP/);
 });
 
-test('release never retries; drift demands new source approval review', () => {
+test('release hint cannot grant owner replan without authenticated runtime proof', () => {
   const w = candidate();
   assert.equal(reviewResourceWait(w, {release:'STILL_BUSY'}).state,
     'WAITING_SHARED_RESOURCE');
@@ -106,13 +106,16 @@ test('release never retries; drift demands new source approval review', () => {
     'WAITING_SHARED_RESOURCE');
   const released = reviewResourceWait(w, {release:'VERIFIED_RELEASED',
     sourceSha:src, manifestSha256:approval});
-  assert.equal(released.state, 'READY_FOR_OWNER_REPLAN');
+  assert.equal(released.state, 'RECHECK_EVIDENCE_PENDING');
   assert.equal(released.ownerReceipt, 'UNKNOWN');
   assert.equal(released.automaticPcRetries, 0);
+  assert.equal(released.nextAction,
+    'VERIFY_RESOURCE_RELEASE_CURRENT_SOURCE_AND_APPROVAL');
   assert.equal(reviewResourceWait(w, {release:'VERIFIED_RELEASED',
-    sourceSha:'c'.repeat(40), manifestSha256:approval}).state, 'SOURCE_DRIFT_REVIEW');
+    sourceSha:'c'.repeat(40), manifestSha256:approval}).state,
+    'RECHECK_EVIDENCE_PENDING');
   assert.equal(reviewResourceWait(w, {release:'VERIFIED_RELEASED',
-    sourceSha:src}).state, 'SOURCE_DRIFT_REVIEW');
+    sourceSha:src}).state, 'RECHECK_EVIDENCE_PENDING');
   assert.throws(() => reviewResourceWait(w, {release:'FORCE_UNLOCK'}),
     /RECHECK_INVALID/);
 });

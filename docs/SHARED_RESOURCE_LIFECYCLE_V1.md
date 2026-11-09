@@ -63,6 +63,6 @@
 ### 요청 소모와 안전한 재평가 (코드 리뷰 보강)
 
 - Writer B 진입 전 대기는 `UNCLAIMED_UNTOUCHED`, GitHub 원본 요청의 단회 실행 기회가 소모된 pc-job의 작업자 시작 전 대기는 `REQUEST_CONSUMED_PREWORKER_UNTOUCHED`로 구분한다. 둘 다 자동 재실행은 금지하며, PC Job의 기존 requestId 재사용은 불허한다.
-- `reviewResourceWait`는 순수 판정 함수로 운영 파일·lock을 직접 확인하지 않는다. 인증된 현재 자원 해제·source SHA·원래 승인 readback 어댑터가 아직 없으므로 자동 재개 또는 운영 완료 증거로 사용하지 않는다. 실제 운영 연결은 5단계에서 별도 검증한다.
+- `reviewResourceWait`는 순수 판정 함수로 운영 파일·lock을 직접 확인하지 않는다. 현재 자원 해제·source SHA·원래 승인 상태를 함께 인증하는 실제 PC readback adapter가 아직 없기 때문에, 문자열 `VERIFIED_RELEASED`와 과거 SHA가 일치해도 **`RECHECK_EVIDENCE_PENDING`만 반환하고 `READY_FOR_OWNER_REPLAN`을 반환하지 않는다**. 자원별 인증된 원본 Issue·Run·봇 영수증·JSON/TXT 해시·시각·현재 source/승인·해제 증거가 구축되기 전까지 운영 자동 재개/성공 근거로 사용하지 않는다. 실제 운영 연결은 5단계에서 별도 검증한다.
 - 공통 #68 원장 기록 성공 시 `WAITING_SHARED_RESOURCE_RECORDED` 반환을 추가했다. 이 상태는 원담당 ChatGPT가 결과를 자동 수신했음을 뜻하지 않는다.
 - 확장 격리 CI에서 발견된 기존 `writer-b/receiver.test.mjs`의 POSIX 경로 전용 검사 두 건은 테스트 픽스처에서 Windows 구분자를 정규화해 동일 의미로 검증한다. 운영 복구 동작은 변경하지 않았다.
