@@ -6,6 +6,8 @@ import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contra
 
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 const API = 'https://api.github.com';
+const OWNER = 'ansqhd5774-Choi';
+const BOT = 'github-actions[bot]';
 
 export function assertWorkflowResultRepository(result) {
   // The repository-scoped GITHUB_TOKEN cannot read another private repo's
@@ -44,12 +46,24 @@ async function inspectExistingResult(issueNumber, resultId, digest) {
 
 function authorize(event, env) {
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_EVENT_NAME !== 'issue_comment' ||
-      env.GITHUB_ACTOR !== 'ansqhd5774-Choi' || event.action !== 'created' ||
+      env.GITHUB_ACTOR !== OWNER || event.action !== 'created' ||
       event.repository?.private !== true || event.issue?.pull_request ||
-      event.issue?.user?.login !== 'ansqhd5774-Choi' ||
-      event.comment?.user?.login !== 'ansqhd5774-Choi' ||
+      ![OWNER, BOT].includes(event.issue?.user?.login) ||
+      event.comment?.user?.login !== OWNER ||
       !event.issue?.labels?.some((label) => label.name === 'agent-handoff') ||
       !Number.isSafeInteger(event.issue.number)) throw new Error('RESULT_EVENT_NOT_ALLOWED');
+}
+
+function assertBotIncidentBinding(event, handoff) {
+  // Owner-signed result comments remain mandatory. A bot-created Issue must
+  // match the source-only intake shape; this result broker does not claim to
+  // independently reprove the original PC run or its Runtime success.
+  if (event.issue.user.login !== BOT) return;
+  if (event.issue.title !== `agent-handoff ${handoff.incidentId}` ||
+      handoff.origin.repository !== REPOSITORY ||
+      handoff.failure.evidenceIssueNumber !== handoff.origin.issueNumber) {
+    throw new Error('RESULT_BOT_INCIDENT_BINDING_STOP');
+  }
 }
 
 export async function main(env = process.env) {
@@ -57,6 +71,7 @@ export async function main(env = process.env) {
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   authorize(event, env);
   const handoff = parseHandoff(event.issue.body);
+  assertBotIncidentBinding(event, handoff);
   const result = parseAgentResult(event.comment.body);
   assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
