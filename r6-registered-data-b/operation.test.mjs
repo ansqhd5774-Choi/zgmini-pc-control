@@ -138,7 +138,7 @@ test('V1 cannot smuggle a supplemental delta without V2 explicit authorization',
 });
 
 
-const collectorDeltaPath='approvals/writer-updates/PROPOSED-employment-r6-backfill-window-collector-20261109.json';
+const collectorDeltaPath='approvals/writer-updates/employment-r6-backfill-window-collector-20261109.json';
 const collectorPath='lib/market-score/employment-r6-collector.mjs';
 function v3Fixture({mutateCollector=()=>{},mutateApproval=()=>{}}={}){
  const input=v2Fixture();
