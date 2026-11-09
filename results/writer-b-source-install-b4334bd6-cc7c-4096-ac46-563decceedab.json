@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "b4334bd6-cc7c-4096-ac46-563decceedab",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "7534d20673f22d8766aa4587412868e00bc6bea3",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "b37f07cfecc3ecbb419eb48b2094d0fbbeacad3c",
+  "candidateSourceSha": "80a6a462158c7ee44dd0cf8d0527ad3d093e9354",
+  "manifestSha256": "b855bd61f12dc4e19802793f6236cbddac3c19083d90e830230539e809520097",
+  "baseTreeOid": "5397a4ae68d7c8294e5c4000e0f2b6da07fe738e",
+  "preparedTreeOid": "096bbb99da46d720d1fb53c16956fe54c2bbd68e",
+  "provenanceSha256": "c6ea49caf5f3e6e80032d79a4a6c06b639caa6c118574b1b44bb4aba9480baca",
+  "runId": "42569264941",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-score/employment-r6-collector.mjs",
+    "lib/market-score/employment-r6-provider.mjs",
+    "scripts/pc-writer/backfill-monthly-one-year.mjs",
+    "scripts/pc-writer/backfill-one-year.mjs",
+    "scripts/pc-writer/bls-core-activation.mjs",
+    "scripts/pc-writer/bls-unregistered-reservation.mjs",
+    "scripts/pc-writer/collect-local.mjs",
+    "scripts/pc-writer/quota-fetch.mjs"
+  ]
+}
