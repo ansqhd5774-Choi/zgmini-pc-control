@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
 import {WRITER_FOLLOWUP_CANDIDATE,WRITER_TRANSITION}
   from '../tools/controller-postswitch-approval.mjs';
 import {verifyWriterFollowupBReceipts, analyzeSourceOnlyReplacementChain,
@@ -8,7 +9,9 @@ import {verifyWriterFollowupBReceipts, analyzeSourceOnlyReplacementChain,
   verifyWriterFollowupProtectedSnapshot, inspectWriterFollowupProtectionCandidate}
   from '../tools/controller-postswitch-evidence.mjs';
 import {WRITER_CONFIG_PATH,inspectLocalWriterSourceOnly,
-  main as writerReadOnlyMain}
+  inspectLocalWriterProtectionReadOnly,verifyWriterFollowupAReadOnlyReceipt,
+  verifyLocalWriterSourcePin,
+  main as writerReadOnlyMain,mainAsync as writerReadOnlyMainAsync}
   from '../tools/controller-postswitch-writer-readonly.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -213,6 +216,128 @@ const candidateAnalysis=()=>({status:'SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED',
   code:'WRITER_CHAIN_PINNED_ENDPOINTS_MATCH',stages:candidateStages(),
   intermediate4ecIndependentlyObserved:false,
   cApprovalAuthorized:false,liveCoreSourceVerified:false});
+
+const a1202Raw=()=>fs.readFileSync(new URL(
+  './fixtures/controller-postswitch-writer-a-1202.json',import.meta.url));
+const a1202Receipt=()=>({
+  path:WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.path,
+  blobSha:WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.blobSha,
+  raw:a1202Raw(),
+});
+
+test('post-#1195 A #1202 raw receipt proves observed config hash, never live Core',()=>{
+  assert.equal(verifyWriterFollowupAReadOnlyReceipt(a1202Receipt()),true);
+  const body=JSON.parse(a1202Raw().toString('utf8'));
+  assert.equal(body.result?.sourceHead,
+    WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.sourceSha);
+  assert.equal(body.result?.r6Config?.configSha256,
+    WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.atDe);
+  assert.equal(body.result?.runtimeSourceVerified,false);
+  for(const mutate of [
+    row=>{row.blobSha='f'.repeat(40);},
+    row=>{row.path='results/other.json';},
+    row=>{row.raw=Buffer.concat([row.raw,Buffer.from(' ')]);},
+    row=>{row.raw=Buffer.from(row.raw.toString('utf8').replace(
+      '0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453',
+      '0'.repeat(64)));},
+  ]){
+    const receipt=a1202Receipt();mutate(receipt);
+    assert.equal(verifyWriterFollowupAReadOnlyReceipt(receipt),false);
+  }
+});
+
+const protectionStub=()=>({status:'READONLY_WRITER_FOLLOWUP_PROTECTION_CANDIDATE_VERIFIED',
+  code:'WRITER_FOLLOWUP_PINNED_READONLY_EVIDENCE_MATCH',
+  digestStages:candidateStages(),operationalWrites:0,cApprovalAuthorized:false,
+  liveCoreSourceVerified:false,historicalCConsentVerifiedHere:false});
+
+test('local Windows composite proof reads fixed inputs and emits only safe digests',async()=>{
+  const secret='private-writer-value';
+  const fetched=[];
+  const result=await inspectLocalWriterProtectionReadOnly({
+    readConfigRaw:path=>{assert.equal(path,WRITER_CONFIG_PATH);return Buffer.from(secret);},
+    readBaseline:()=>protectedBaseline(),readCurrent:()=>protectedCurrent(),
+    fetchResult:path=>{
+      fetched.push(path);
+      return path===WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.path
+        ?a1202Receipt():receipts().find(row=>row.path===path);
+    },
+    inspect:proof=>{
+      assert.equal(proof.currentConfigRaw.toString(),secret);
+      assert.equal(proof.writerBReceipts.length,4);
+      assert.equal(proof.baseline.files['config.json'],
+        WRITER_TRANSITION.baselineConfigSha256);
+      return protectionStub();
+    },
+  });
+  assert.equal(result.status,'READONLY_WRITER_PROTECTION_CANDIDATE_VERIFIED');
+  assert.equal(result.writerBReceiptCount,4);
+  assert.equal(fetched.length,5);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(result.cApprovalAuthorized,false);
+  assert.equal(result.liveCoreSourceVerified,false);
+  assert.doesNotMatch(JSON.stringify(result),/private-writer-value/);
+});
+
+test('local composite proof fails closed on unreadable, stale A and falsely claimed C',async()=>{
+  const secret='private-do-not-export';
+  const ports={readConfigRaw:()=>Buffer.from(secret),
+    readBaseline:()=>protectedBaseline(),readCurrent:()=>protectedCurrent(),
+    fetchResult:path=>path===WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.path
+      ?a1202Receipt():receipts().find(row=>row.path===path),
+    inspect:protectionStub};
+  const failRead=await inspectLocalWriterProtectionReadOnly({...ports,
+    readConfigRaw:()=>{throw Error(secret);}});
+  assert.equal(failRead.code,'WRITER_PROTECTION_READONLY_INPUT_UNAVAILABLE');
+  const failA=await inspectLocalWriterProtectionReadOnly({...ports,
+    fetchResult:path=>path===WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly.path
+      ?{...a1202Receipt(),blobSha:'f'.repeat(40)}:
+      receipts().find(row=>row.path===path)});
+  assert.equal(failA.code,'WRITER_PROTECTION_POST_B_A_PROOF_UNVERIFIED');
+  const falseC=await inspectLocalWriterProtectionReadOnly({...ports,
+    inspect:()=>({...protectionStub(),cApprovalAuthorized:true})});
+  assert.equal(falseC.code,'WRITER_PROTECTION_COMBINED_EVIDENCE_UNVERIFIED');
+  for(const result of [failRead,failA,falseC]){
+    assert.equal(result.operationalWrites,0);
+    assert.equal(result.cApprovalAuthorized,false);
+    assert.doesNotMatch(JSON.stringify(result),/private-do-not-export/);
+  }
+});
+
+test('local composite CLI refuses Runner/CI/Linux; permits only fixed Windows mode',async()=>{
+  let count=0;
+  let pinned=0;
+  const source='a'.repeat(40);
+  const inspectProtection=()=>{count++;return {status:'READONLY_WRITER_PROTECTION_CANDIDATE_VERIFIED'};};
+  for(const guard of [
+    {platform:'linux'},
+    {platform:'win32',githubActions:'true'},
+    {platform:'win32',runnerName:'pc-runner'},
+  ]){
+    const result=await writerReadOnlyMainAsync([
+      '--verify-local-writer-protection','--source-sha',source],
+      {...guard,inspectProtection,verifySourcePin:()=>{pinned++;return true;}});
+    assert.equal(result.code,'WRITER_PROTECTION_INTERACTIVE_WINDOWS_REQUIRED');
+  }
+  assert.equal(count,0);
+  assert.equal(pinned,0);
+  const missingPin=await writerReadOnlyMainAsync(['--verify-local-writer-protection'],
+    {platform:'win32',githubActions:'',runnerName:'',inspectProtection});
+  assert.equal(missingPin.code,'WRITER_PROTECTION_FIXED_SOURCE_REQUIRED');
+  const wrongPin=await writerReadOnlyMainAsync([
+    '--verify-local-writer-protection','--source-sha',source],
+    {platform:'win32',githubActions:'',runnerName:'',inspectProtection,
+      verifySourcePin:()=>false});
+  assert.equal(wrongPin.code,'WRITER_PROTECTION_SOURCE_PIN_FAILED');
+  const result=await writerReadOnlyMainAsync([
+    '--verify-local-writer-protection','--source-sha',source],
+    {platform:'win32',githubActions:'',runnerName:'',inspectProtection,
+      verifySourcePin:sha=>{assert.equal(sha,source);pinned++;return true;}});
+  assert.equal(result.status,'READONLY_WRITER_PROTECTION_CANDIDATE_VERIFIED');
+  assert.equal(count,1);
+  assert.equal(pinned,1);
+  assert.equal(verifyLocalWriterSourcePin('not-a-sha'),false);
+});
 
 test('local Writer proof reads only the fixed Windows path and emits hashes, never config raw',()=>{
   const privateBytes=Buffer.from('{"source":"secret-string","credential":"private-token"}');
