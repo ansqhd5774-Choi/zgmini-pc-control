@@ -1,0 +1,68 @@
+# DRAFT: intentionally disabled until the separately reviewed exact B effect
+# manifest and trusted Windows host source have immutable source pins.
+# This is NOT a recurring schedule, a Controller replacement or a pc-job A.
+# Activation is a separate reviewed commit C1: fixed host source C0 and feature
+# source S0 are pinned BEFORE the manifest M1 is approved; M1 binds C0 and S0.
+# C1 carries the literal M1 raw SHA256 and checkouts C0, not C1. Do not place
+# C1's own commit SHA in the approval manifest (circular self-reference).
+name: ZGMINI Employment R6 Approved B Backfill Once (Inactive)
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write # Only isolated sanitized JSON+TXT result reporter.
+  issues: write # One bounded originating Issue status comment.
+jobs:
+  employment-r6-backfill-b:
+    # Deliberately false until immutable C0/S0/M1 pins and trusted CLI are
+    # reviewed in a future activation PR. A matching Issue cannot execute it.
+    if: >-
+      false &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-employment-r6-backfill-one-shot' &&
+      contains(github.event.issue.labels.*.name, 'pc-employment-r6-backfill-b') &&
+      github.run_attempt == 1
+    concurrency:
+      # Reuse the Writer B per-resource lane; the PC Core's own local-cycle
+      # lock is an additional mandatory atomic lease, not this queue.
+      group: zgmini-writer-source-b-one-at-a-time
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout workflow activation control source C1
+        id: activation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r6-activation
+          fetch-depth: 1
+          persist-credentials: false
+      # The fixed C0/S0/M1 checkout/preflight and Core-locked collector steps
+      # are deliberately absent. NEVER swap `false` to `true` without those
+      # steps, immutable source review, exact B-effect manifest and NTFS
+      # journal coverage evidence. Merely running `entry-preflight.mjs` (an
+      # export-only fixture) is NOT executable approval.
+      - name: Fail closed until reviewed host binding is complete
+        id: denied
+        run: 'exit /b 1'
+      - name: Isolated sanitized result delivery (no provider token)
+        if: always() && steps.activation.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r6-activation\r6-backfill-b\report-transport.mjs"'
