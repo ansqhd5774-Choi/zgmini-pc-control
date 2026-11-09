@@ -150,6 +150,9 @@ function observationCandidate(wait,observation,originRun){
      report.seat!==seat||
      report.jobId!==`run-${run.id}-${run.run_attempt}-seat-${seat}`||
      report.status!=='PASS'||report.code!=='SHARED_RESOURCE_READONLY_SNAPSHOT'||
+     report.operationalWrites!==0||report.providerCalls!==0||
+     report.d1Writes!==0||report.sqliteOpened!==false||
+     report.protectedStateUnchanged!==true||
      !Number.isFinite(Date.parse(report.startedAt))||
      !Number.isFinite(Date.parse(report.finishedAt))||
      Date.parse(report.startedAt)<Date.parse(run.created_at)||
@@ -157,6 +160,9 @@ function observationCandidate(wait,observation,originRun){
      detail?.status!==report.status||detail?.code!==report.code||
      detail.sampleCount!==2||detail.sourceStable!==true||
      detail.taskXmlStable!==true||
+     detail.operationalWrites!==0||detail.providerCalls!==0||
+     detail.d1Writes!==0||detail.sqliteOpened!==false||
+     detail.automaticPcRetries!==0||
      !Number.isFinite(Date.parse(detail.observedAt))||
      Date.parse(detail.observedAt)<Date.parse(report.startedAt)||
      Date.parse(detail.observedAt)>Date.parse(report.finishedAt)||
