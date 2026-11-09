@@ -30,7 +30,7 @@ const CONFIG=String.raw`E:\ZGmini\data\pc-writer\config.json`;
 const SOURCE_MJS=SOURCE_FILES[0];
 const STORE_MJS=SOURCE_FILES[1];
 const MAX_FILE=24_000_000;
-const CORE_OWNER_OBSERVATION_MS=6*60_000;
+const CORE_OWNER_OBSERVATION_MS=12*60_000;
 const same=(a,b)=>path.win32.normalize(a).toLowerCase()===
  path.win32.normalize(b).toLowerCase();
 const fail=code=>{throw Object.assign(new Error(code),{code});};
@@ -102,8 +102,12 @@ function taskProbe(){
 // least once in THIS bounded B run. No Task start, disable, or forced cycle.
 async function observeLiveCoreLockOwner(){
  const deadline=Date.now()+CORE_OWNER_OBSERVATION_MS;
+ let sawTaskInstance=false,sawRelatedCore=false,sawCoreLock=false;
  while(Date.now()<deadline){
   const probe=taskProbe();
+  sawTaskInstance||=probe.instances>0;
+  sawRelatedCore||=probe.relatedProcesses>0;
+  sawCoreLock||=fs.existsSync(CORE_LOCK);
   need(probe.enabled===true,
    'INFL_MANUAL_B_CORE_OWNER_PROBE_UNVERIFIED_STOP');
   if(probe.unknownProcessLines>0){await delay(1500);continue;}
@@ -140,6 +144,12 @@ async function observeLiveCoreLockOwner(){
   }
   await delay(1500);
  }
+ // Distinguish an active E: Core lock from a missing Task engine window.
+ // These bounded flags disclose no PID, command line, path or raw content.
+ if(sawCoreLock&&!sawTaskInstance)
+  fail('INFL_MANUAL_B_CORE_TASK_INSTANCE_GAP_STOP');
+ if(sawCoreLock&&!sawRelatedCore)
+  fail('INFL_MANUAL_B_CORE_PROCESS_GAP_STOP');
  fail('INFL_MANUAL_B_CORE_OWNER_NOT_OBSERVED_STOP');
 }
 
@@ -339,6 +349,8 @@ async function main(){
  const out=path.join(env.RUNNER_TEMP,'inflation-manual-b-result.json');
  fs.writeFileSync(out,JSON.stringify(result)+'\n',{flag:'wx'});
  process.stdout.write(result.status+' '+result.code+'\n');
+ // A delivered STOP report must never produce a green Actions run.
+ if(result.status!=='INFL_MANUAL_B_SAVED_VERIFIED')process.exitCode=1;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{await main();}catch(error){
