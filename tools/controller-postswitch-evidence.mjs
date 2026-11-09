@@ -70,8 +70,12 @@ export async function main(args = process.argv.slice(2)) {
   git(['merge-base', '--is-ancestor', source, 'HEAD']);
   need(digest(git(['show', `${source}:tools/controller-postswitch-evidence.mjs`])) ===
     digest(fs.readFileSync(fileURLToPath(import.meta.url))), 'POSTSWITCH_SOURCE_DRIFT');
+  // Import closure of update.mjs: maintenance-contract.mjs re-exports the
+  // source-bundle contract, and update.mjs imports that module directly too.
+  // Every local non-builtin import must match the pinned recovery source.
   for (const rel of ['tools/update.mjs', 'tools/maintenance-apply.mjs',
-    'tools/maintenance-contract.mjs', 'tools/maintenance-lock.mjs']) {
+    'tools/maintenance-contract.mjs', 'tools/maintenance-lock.mjs',
+    'tools/source-bundle-register.mjs']) {
     need(digest(git(['show', `${source}:${rel}`])) === digest(fs.readFileSync(path.join(repo, rel))),
       'POSTSWITCH_DEPENDENCY_DRIFT');
   }
