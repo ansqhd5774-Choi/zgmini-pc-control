@@ -47,7 +47,9 @@ function validateCollectionResult(result, dueGroups, cost) {
     results.some(x => x.status !== 'SUCCESS') ? 'PARTIAL' : 'SUCCESS';
   // Status may be weaker than the group details, but never accept an aggregate
   // SUCCESS claim when any group is incomplete.
-  if (!['SUCCESS', 'PARTIAL', 'FAIL', 'NOOP'].includes(result?.status) ||
+  // With at least one due group, aggregate NOOP is contradictory even if its
+  // group rows claim SUCCESS. Never promote that forged aggregate to SUCCESS.
+  if (!['SUCCESS', 'PARTIAL', 'FAIL'].includes(result?.status) ||
     (result.status === 'SUCCESS' && status !== 'SUCCESS'))
     fail('R6_B_COLLECTOR_STATUS_INCONSISTENT');
   // A weaker aggregate PARTIAL/FAIL must never be promoted to SUCCESS merely
