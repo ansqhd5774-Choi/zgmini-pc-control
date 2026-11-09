@@ -327,7 +327,7 @@ test('truncated tail and incomplete final event never imply complete daily cover
 });
 
 
-test('Treasury failure code is bounded, private, and only reported on PARTIAL failure',t=>{
+test('Treasury failure code is bounded, private, and reported after a CACHED failed attempt',t=>{
  const f=fixture(t,{dirs:0}),file=path.join(f.pc,'local-collection-last-run.json');
  const read=(code,status='PARTIAL',treasury='SOURCE_FAILED')=>{
   fs.writeFileSync(file,JSON.stringify({at:'2026-11-09T09:15:00.000Z',source:SHA,
@@ -346,7 +346,8 @@ test('Treasury failure code is bounded, private, and only reported on PARTIAL fa
   'TREASURY_HTTP_429\nSECRET','TREASURY_HTTP_429_SECRET','TREASURY_'+'X'.repeat(90)]){
   assert.equal(read(code).collection.treasuryFailureCode,null);
  }
- assert.equal(read('TREASURY_HTTP_429','CACHED').collection.treasuryFailureCode,null);
+ assert.equal(read('TREASURY_HTTP_429','CACHED').collection.treasuryFailureCode,'TREASURY_HTTP_429');
+ assert.equal(read('TREASURY_HTTP_429','CACHED','READY').collection.treasuryFailureCode,null);
  assert.equal(read('TREASURY_HTTP_429','READY','READY').collection.treasuryFailureCode,null);
  assert.equal(read(undefined).collection.treasuryFailureCode,null);
 });
