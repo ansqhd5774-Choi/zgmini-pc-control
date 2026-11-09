@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA}
+import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2}
  from './operation.mjs';
 
 const uid='d3ac6032-49c1-47e6-98d1-d7adeba91a7c';
@@ -63,4 +63,76 @@ test('registered API call over-cap and unauthorized task effect fail',()=>{
   assert.throws(()=>authorizeR6RegisteredB(fixture(a)),
    /R6_B_EFFECT_APPROVAL_STOP/);
  }
+});
+
+const deltaPath='approvals/writer-updates/employment-r6-2015-600-onefile-20261109.json';
+const providerPath='lib/market-score/employment-r6-provider.mjs';
+function v2Fixture({mutateDelta=()=>{},mutateApproval=()=>{}}={}){
+ const input=fixture();
+ const baseOverlay={...overlay,sourceBranch:'feat/bls-registered-v2-20261109',
+  files:overlay.files.map((f,i)=>i===0?{...f,path:providerPath}:f)};
+ input.overlayBytes=Buffer.from(JSON.stringify(baseOverlay));
+ const delta={schema:'ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1',
+  status:'APPROVED_B',scope:'PC_WRITER_APPROVED_FILE_OVERLAY_ONLY',
+  sourceRepository:proposed.sourceRepository,sourceBranch:baseOverlay.sourceBranch,
+  sourceRoot:proposed.sourceRoot,candidateSourceSha:'c'.repeat(40),runCount:1,
+  allowProviderCalls:false,allowDbChanges:false,allowD1Writes:false,
+  allowTaskDefinitionChanges:false,allowOtherSourceChanges:false,
+  files:[{path:providerPath,change:'M',beforeSha256:sha64,afterSha256:'e'.repeat(64)}]};
+ mutateDelta(delta);
+ input.deltaOverlayBytes=Buffer.from(JSON.stringify(delta));
+ const approved={...proposed,schema:R6_B_APPROVAL_V2,status:'APPROVED_B',
+  mode:'BACKFILL',maxBlsCalls:14,
+  overlayManifestSha256:hash(input.overlayBytes),
+  deltaOverlayManifestPath:deltaPath,
+  deltaOverlayManifestSha256:hash(input.deltaOverlayBytes)};
+ mutateApproval(approved);
+ input.approvalBytes=Buffer.from(JSON.stringify(approved));
+ const request=JSON.parse(input.event.issue.body);
+ request.approvalManifestSha256=hash(input.approvalBytes);
+ input.event.issue.body=JSON.stringify(request);
+ return input;
+}
+
+test('V2 one-file delta retains all 13 effective SHA checks and BACKFILL caps',()=>{
+ const input=v2Fixture();
+ const auth=authorizeR6RegisteredB(input);
+ assert.equal(auth.approval.schema,R6_B_APPROVAL_V2);
+ assert.equal(auth.approval.mode,'BACKFILL');
+ assert.equal(auth.approval.maxBlsCalls,14);
+ assert.equal(auth.approval.maxDolCalls,2);
+ assert.equal(auth.overlay.files.length,13);
+ assert.equal(auth.overlay.files[0].path,providerPath);
+ assert.equal(auth.overlay.files[0].afterSha256,'e'.repeat(64));
+ assert.deepEqual(auth.overlay.files.slice(1),overlay.files.slice(1));
+});
+
+test('V2 rejects absent or tampered delta bytes before provider effects',()=>{
+ const absent=v2Fixture();
+ absent.deltaOverlayBytes=null;
+ assert.throws(()=>authorizeR6RegisteredB(absent),/R6_B_DELTA_APPROVAL_STOP/);
+ const tampered=v2Fixture();
+ tampered.deltaOverlayBytes=Buffer.from('{}');
+ assert.throws(()=>authorizeR6RegisteredB(tampered),/R6_B_DELTA_APPROVAL_STOP/);
+});
+
+test('V2 rejects wrong delta path, predecessor, broadened files or DB scope',()=>{
+ for(const mutateDelta of [
+  d=>{d.files[0].path='lib/market-score/another.mjs';},
+  d=>{d.files[0].beforeSha256='0'.repeat(64);},
+  d=>{d.files.push({...d.files[0],path:'lib/market-score/extra.mjs'});},
+  d=>{d.allowDbChanges=true;},
+ ]){
+  assert.throws(()=>authorizeR6RegisteredB(v2Fixture({mutateDelta})),
+   /R6_B_DELTA_SCOPE_STOP/);
+ }
+ assert.throws(()=>authorizeR6RegisteredB(v2Fixture({
+  mutateApproval:a=>{a.deltaOverlayManifestPath='approvals/writer-updates/unapproved.json';}
+ })),/R6_B_DELTA_APPROVAL_STOP/);
+});
+
+test('V1 cannot smuggle a supplemental delta without V2 explicit authorization',()=>{
+ const input=fixture();
+ input.deltaOverlayBytes=Buffer.from('{}');
+ assert.throws(()=>authorizeR6RegisteredB(input),/R6_B_DELTA_SCOPE_STOP/);
 });
