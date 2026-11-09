@@ -1,0 +1,23 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "b14af1b2-9a23-4f5a-9239-218498ddb403",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "4273137a85adcc90c863a27f703baa749b05cb64",
+  "candidateSourceSha": "40111539a3536d99b22c99551d30f1b170246682",
+  "manifestSha256": "593004aa6b0c5c6471a691faebd9c98f142af4990580a8b1d5a0619d829b2e6f",
+  "baseTreeOid": "5f06132b4aef8af253af5ad54eef6152b52fb636",
+  "preparedTreeOid": "ac1cded8684acd7c3f54b15a54443194afe832fa",
+  "provenanceSha256": "4262883c7606893b6f0b07008cc95371e13b803d19cf7358d4be1f383cf4c7a0",
+  "runId": "42690541955",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/release-calendar.mjs",
+    "lib/treasury-auction-history-source.mjs",
+    "lib/treasury-auction-history.mjs",
+    "lib/treasury-auction-history-taws.mjs"
+  ]
+}
