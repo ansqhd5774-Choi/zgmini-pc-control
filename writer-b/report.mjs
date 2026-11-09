@@ -84,16 +84,27 @@ export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256
    candidateSourceSha:raw.candidateSourceSha,
    manifestSha256:raw.manifestSha256,baseTreeOid:raw.baseTreeOid,
    preparedTreeOid:raw.preparedTreeOid,provenanceSha256:raw.provenanceSha256};
- if(['WRITER_B_PREFLIGHT_STOP','WRITER_B_INSTALL_STOP_RESTORED',
-  'WRITER_B_RECOVERY_REQUIRED'].includes(raw.status)&&CODE.test(raw.code??'')){
+  if(['WRITER_B_PREFLIGHT_STOP','WRITER_B_INSTALL_STOP_RESTORED',
+   'WRITER_B_RECOVERY_REQUIRED'].includes(raw.status)&&CODE.test(raw.code??'')){
+   // A post-claim STOP is safe to report as restored only if the installer
+   // verified the original task/config/source. Otherwise keep it UNKNOWN.
+   if(raw.status==='WRITER_B_INSTALL_STOP_RESTORED'&&
+     raw.recovery!=='ORIGINAL_VERIFIED')return base;
+   if(raw.status==='WRITER_B_RECOVERY_REQUIRED'&&
+     !['RECONCILE_EXACT_REQUEST_NO_RETRY',
+       'READ_ONLY_RECONCILE_LOCK_AND_SOURCE'].includes(raw.recovery))
+     return {...base,status:'WRITER_B_RECOVERY_REQUIRED',code:raw.code,
+       recovery:'RECONCILE_EXACT_REQUEST_NO_RETRY'};
   const diagnostic=raw.status==='WRITER_B_PREFLIGHT_STOP'?
    safeWriterBImportDiagnostic(raw):null;
    const batch=raw.status==='WRITER_B_PREFLIGHT_STOP'?
     safeWriterBImportDiagnosticBatch(raw):null;
   return {...base,status:raw.status,code:raw.code,
     ...(diagnostic?{diagnostic}:{}),...(batch??{}),
-   recovery:raw.status==='WRITER_B_RECOVERY_REQUIRED'?
-    'RECONCILE_EXACT_REQUEST_NO_RETRY':undefined};
+    ...(raw.status==='WRITER_B_INSTALL_STOP_RESTORED'?
+     {recovery:'ORIGINAL_VERIFIED'}:{}),
+    ...(raw.status==='WRITER_B_RECOVERY_REQUIRED'?
+     {recovery:raw.recovery}:{})};
  }
  return base;
 }
@@ -124,6 +135,7 @@ function textResult(result){return [
  `BASE_TREE_OID=${result.baseTreeOid??'NONE'}`,
  `PREPARED_TREE_OID=${result.preparedTreeOid??'NONE'}`,
  `PROVENANCE_SHA256=${result.provenanceSha256??'NONE'}`,
+  `RECOVERY=${result.recovery??'NONE'}`,
  `RUN_ID=${result.runId??'UNKNOWN'}`,
  'RETRY=READ_ONLY_RECONCILE_NO_REEXECUTE','',
 ].join('\n');}
