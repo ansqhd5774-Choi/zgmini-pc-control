@@ -5,6 +5,7 @@ import {
   validateR6OneShotRequest, validateR6OneShotApproval,
 } from "./contract.mjs";
 import { assessR6BackfillAdmission } from "./admission.mjs";
+import { sanitizeR6BackfillResult } from "./report.mjs";
 
 const sourceSha = "a".repeat(40), controlSha = "b".repeat(40);
 const approvalManifestSha256 = "c".repeat(64);
@@ -103,4 +104,34 @@ test("unverified DB never gets an execution permission", () => {
   assert.equal(assessR6BackfillAdmission({ ...good, coreDbExistingAndVerified: false }).code,
     "R6_B_PC_SOURCE_OR_DB_UNVERIFIED");
   assert.equal(assessR6BackfillAdmission({ ...good, dueGroups: [] }).status, "NOOP");
+});
+
+test("B result report strips raw provider response and paths", () => {
+  const safe = sanitizeR6BackfillResult({
+    requestId: request.requestId, status: "PARTIAL", failureCode: "BLS_SERIES_PARTIAL",
+    providerRequests: 2, blsRequests: 2, dolRequests: 0,
+    d1Writes: 0, schedulerWrites: 0,
+    token: "secret-must-never-appear", sourcePath: "E:/sensitive/raw.sqlite",
+    groupResults: [{ groupName: "BLS_JOLTS", status: "PARTIAL", providerRequests: 2,
+      failureCode: "BLS_SERIES_PARTIAL", rawBody: "private-observation-dump" }],
+  });
+  assert.equal(safe.status, "PARTIAL");
+  assert.equal(safe.providerRequests, 2);
+  assert.equal(safe.groupResults.length, 1);
+  assert.equal(JSON.stringify(safe).includes("secret-must-never-appear"), false);
+  assert.equal(JSON.stringify(safe).includes("private-observation-dump"), false);
+  assert.equal(JSON.stringify(safe).includes("sensitive/raw.sqlite"), false);
+});
+
+test("B result report refuses unverified effects or out-of-bound calls", () => {
+  const base = {
+    requestId: request.requestId, status: "SUCCESS", providerRequests: 20,
+    blsRequests: 18, dolRequests: 2, d1Writes: 0, schedulerWrites: 0,
+    groupResults: [],
+  };
+  assert.equal(sanitizeR6BackfillResult(base).status, "SUCCESS");
+  assert.equal(sanitizeR6BackfillResult({ ...base, d1Writes: 1 }).status, "STATE_UNKNOWN");
+  assert.equal(sanitizeR6BackfillResult({ ...base, schedulerWrites: null }).status, "STATE_UNKNOWN");
+  assert.equal(sanitizeR6BackfillResult({ ...base, providerRequests: 21 }).status, "STATE_UNKNOWN");
+  assert.equal(sanitizeR6BackfillResult({ ...base, requestId: "sensitive" }).requestId, null);
 });
