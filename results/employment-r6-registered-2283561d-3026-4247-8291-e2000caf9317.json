@@ -1,0 +1,53 @@
+{
+  "schema": "ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1",
+  "requestId": "2283561d-3026-4247-8291-e2000caf9317",
+  "approvalManifestSha256": "46c17dcce56a20a5ba6fef22d954eeb7b33160244b4b39578204edf0b6a3551c",
+  "status": "SUCCESS",
+  "code": "R6_B_COLLECT_PUBLISH_VERIFIED",
+  "sourceSha": "2b0cfdc956bd04a2ca4195a3eda7ce4c8d9a15a8",
+  "mode": "ONE_YEAR",
+  "providerRequests": 9,
+  "blsRequests": 7,
+  "dolRequests": 2,
+  "groupResults": [
+    {
+      "groupName": "DOL_UI_WEEKLY_CLAIMS",
+      "status": "SUCCESS",
+      "providerRequests": 2
+    },
+    {
+      "groupName": "BLS_EMPLOYMENT_SITUATION",
+      "status": "SUCCESS",
+      "providerRequests": 1
+    },
+    {
+      "groupName": "BLS_JOLTS",
+      "status": "SUCCESS",
+      "providerRequests": 1
+    },
+    {
+      "groupName": "BLS_ECI",
+      "status": "SUCCESS",
+      "providerRequests": 1
+    },
+    {
+      "groupName": "BLS_STATE_MSA",
+      "status": "SUCCESS",
+      "providerRequests": 1
+    },
+    {
+      "groupName": "BLS_BED",
+      "status": "SUCCESS",
+      "providerRequests": 3
+    }
+  ],
+  "sqlite": "COLLECTOR_RECORDED",
+  "publication": "VERIFIED",
+  "sourceStoredAt": 1794217845949,
+  "sourceFeatures": 28,
+  "chartReadyFeatures": 22,
+  "lastPass": "PUBLISH_READBACK",
+  "firstFail": null,
+  "runId": "42595763736",
+  "retry": "READ_EXISTING_REQUEST_NO_REEXECUTE"
+}
