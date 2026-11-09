@@ -82,13 +82,24 @@ jobs:
               const args = { owner, repo, issue_number: issueNumber, per_page: 100 };
               const result = await github.rest.issues.listComments(args);
               if (result.data.length === 100) throw new Error('TEST_COMMENT_PAGE_LIMIT');
-              const existing = result.data.filter(comment => comment.body === receipt);
+              const expected = JSON.parse(receipt);
+              const trusted = result.data.filter(comment => comment.user?.login === 'github-actions[bot]');
+              for (const comment of trusted) {
+                let prior;
+                try { prior = JSON.parse(comment.body ?? ''); } catch { continue; }
+                if (prior.schema === expected.schema && prior.testId === expected.testId &&
+                    comment.body !== receipt) {
+                  throw new Error('TEST_ORIGIN_ALREADY_BOUND');
+                }
+              }
+              const existing = trusted.filter(comment => comment.body === receipt);
               if (existing.length > 1) throw new Error('TEST_DUPLICATE_RECEIPT');
               if (existing.length === 0) {
                 await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: receipt });
               }
               const verified = await github.rest.issues.listComments(args);
-              if (verified.data.filter(comment => comment.body === receipt).length !== 1) {
+              if (verified.data.filter(comment =>
+                comment.user?.login === 'github-actions[bot]' && comment.body === receipt).length !== 1) {
                 throw new Error('TEST_RECEIPT_READBACK_FAILED');
               }
             }
