@@ -4,11 +4,27 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyPostSwitchEvidence, verifyControllerFiles,
   verifyExactPostSwitchInventory,verifySourceBytes,
-  verifySupervisorSnapshot} from '../tools/controller-postswitch-evidence.mjs';
+  verifySupervisorSnapshot,verifyNamedPcRunnersOnline} from '../tools/controller-postswitch-evidence.mjs';
 
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const before = 'c09bf6a6f66f229016135020d6ba553ba9a94676';
 const after = 'badad9124157879d7a645b64f2768113d632355b';
+const seats = () => Array.from({length: 6}, (_, i) =>
+  ({name:`zgmini-pc-0${i + 1}`,status:'online'}));
+
+test('six named PC seats remain healthy with independently registered spare runner', () => {
+  assert.equal(verifyNamedPcRunnersOnline(seats()), true);
+  assert.equal(verifyNamedPcRunnersOnline([
+    {name:'zgmini-handoff-ci-spare-01',status:'online'},...seats()]), true);
+});
+
+test('missing, offline, duplicate and malformed dedicated seats fail closed', () => {
+  assert.equal(verifyNamedPcRunnersOnline(null), false);
+  assert.equal(verifyNamedPcRunnersOnline(seats().slice(0, 5)), false);
+  assert.equal(verifyNamedPcRunnersOnline(seats().map((x,i) =>
+    i === 2 ? {...x,status:'offline'} : x)), false);
+  assert.equal(verifyNamedPcRunnersOnline([...seats(),seats()[0]]), false);
+});
 function valid() {
   return {
     ledger: {status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'INTAKE_RESUMED',intakePaused:false,
