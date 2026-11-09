@@ -183,6 +183,18 @@ test('a weaker collector aggregate PARTIAL cannot be upgraded to SUCCESS', async
   assert.equal(result.effectsVerified, true);
 });
 
+test('nonempty due groups reject contradictory aggregate NOOP, even with SUCCESS rows', async () => {
+  const events = [];
+  const result = await coordinateR6BackfillOnce(fixture({ events,
+    collectResult: { status: 'NOOP', providerRequests: 2,
+      groupResults: [{ groupName: 'BLS_JOLTS', status: 'SUCCESS', providerRequests: 2 }] },
+  }));
+  assert.equal(result.status, 'STATE_UNKNOWN');
+  assert.equal(result.code, 'R6_B_COLLECTOR_STATUS_INCONSISTENT');
+  assert.equal(result.effectsVerified, false);
+  assert.equal(events.at(-1), 'collector');
+});
+
 test('a BLS guard with confirmed zero physical calls stays FAIL, not SUCCESS', async () => {
   const events = [];
   const result = await coordinateR6BackfillOnce(fixture({ events,
