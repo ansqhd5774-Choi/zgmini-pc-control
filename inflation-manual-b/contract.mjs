@@ -49,6 +49,20 @@ const fixed=(actual,expected)=>exact(actual,Object.keys(expected))&&
  Object.entries(expected).every(([key,value])=>actual[key]===value);
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 
+// Git for Windows may check out a text JSON blob with CRLF. Authenticate the
+// immutable HEAD blob, and allow only Git's exact LF→CRLF worktree conversion.
+// Never hash or authorize arbitrary worktree bytes as the approval original.
+export function verifiedPinnedManifestBytes(worktreeBytes,blobBytes){
+ need(Buffer.isBuffer(worktreeBytes)&&Buffer.isBuffer(blobBytes)&&
+  blobBytes.length>=250&&blobBytes.length<=8192,
+  'INFL_MANUAL_B_MANIFEST_GIT_BLOB_STOP');
+ const checkoutCrlf=Buffer.from(blobBytes.toString('utf8')
+  .replace(/\r?\n/g,'\r\n'),'utf8');
+ need(worktreeBytes.equals(blobBytes)||worktreeBytes.equals(checkoutCrlf),
+  'INFL_MANUAL_B_MANIFEST_WORKTREE_DRIFT_STOP');
+ return blobBytes;
+}
+
 export function validateApprovalManifest(m){
  need(exact(m,APPROVAL_KEYS),'INFL_MANUAL_B_MANIFEST_FIELDS_STOP');
  need(m.schema===APPROVAL_SCHEMA&&m.status==='APPROVED_B'&&
