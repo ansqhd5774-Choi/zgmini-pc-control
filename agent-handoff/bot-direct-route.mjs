@@ -72,6 +72,7 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
     const after = await readIssue(issueNumber);
     if (after?.repository !== REPOSITORY || after.number !== issueNumber ||
         after.user?.login !== BOT || after.body !== prepared.body ||
+        after.title !== `agent-handoff ${prepared.incidentId}` ||
         !after.labels?.some(label => label.name === 'agent-handoff') ||
         !after.labels?.some(label => label.name === stateLabel))
       stop('LABEL_READBACK_STOP');
