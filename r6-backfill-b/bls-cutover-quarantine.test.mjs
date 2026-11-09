@@ -23,6 +23,8 @@ function proof(overrides = {}) {
     externalEgressScope: 'ALL_UNREGISTERED_BLS_EGRESS_VERIFIED',
     untrackedExternalCallers: 0,
     continuousProtectionVerified: true,
+    precutoverQuarantineMode: 'ALL_UNREGISTERED_BLS_PHYSICAL_CALLS_BLOCKED',
+    quarantineContinuouslyEnforced: true,
     cutoverAt: CUTOVER, observedAt: NOW,
     ...overrides.host,
   };
@@ -33,6 +35,8 @@ function proof(overrides = {}) {
     activationManifestSha256: pinned.activationManifestSha256,
     cutoverAt: CUTOVER,
     continuousHistoryVerified: true,
+    quarantinePhysicalAttemptsVerified: true,
+    quarantinePhysicalAttempts: 0,
     anchorSha256: 'c'.repeat(64),
     occupiedSlots24h: 7,
     observedAt: NOW,
@@ -98,6 +102,19 @@ test('disabled or interrupted guard cannot pass a 24h time condition', () => {
   denied(run({host: {continuousProtectionVerified: false}}),
     'R6_B_QUARANTINE_COVERAGE_UNVERIFIED');
   denied(run({journal: {continuousHistoryVerified: false}}),
+    'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
+});
+
+test('delaying only R6 does not protect normal Core/R4 calls before 24h', () => {
+  denied(run({host: {precutoverQuarantineMode: 'R6_BATCH_ONLY'}}),
+    'R6_B_QUARANTINE_COVERAGE_UNVERIFIED');
+  denied(run({host: {quarantineContinuouslyEnforced: false}}),
+    'R6_B_QUARANTINE_COVERAGE_UNVERIFIED');
+  denied(run({journal: {quarantinePhysicalAttemptsVerified: false}}),
+    'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
+  denied(run({journal: {quarantinePhysicalAttempts: 1}}),
+    'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
+  denied(run({journal: {quarantinePhysicalAttempts: null}}),
     'R6_B_QUARANTINE_JOURNAL_UNVERIFIED');
 });
 
