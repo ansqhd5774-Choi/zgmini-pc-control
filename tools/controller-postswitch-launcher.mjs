@@ -114,7 +114,8 @@ async function prepareReadOnly(args){
     {writerTransition:WRITER_TRANSITION});
   const namedFailure=summarizePrepareEvidence(evidence);
   if(namedFailure)return {...namedFailure,requestId:id,sourceSha:source};
-  const plan=await preflight(['--request-id',id,'--source-sha',source]);
+  const plan=await preflight(['--request-id',id,'--source-sha',source],
+    {writerTransition:WRITER_TRANSITION});
   need(plan.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS'&&
     plan.backlogPlan.candidateCount===1&&
     plan.backlogPlan.actions[0]?.originalIssueNumber===919,
