@@ -115,6 +115,8 @@ function setup(writer=true,claimed=false){
   const aDetail={status:'PASS',code:'SHARED_RESOURCE_READONLY_SNAPSHOT',
     sampleCount:2,sourceStable:true,taskXmlStable:true,
     observedAt:'2026-11-09T20:16:30Z',
+    operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,
+    automaticPcRetries:0,
     observedConfigSourceSha:runtime,releaseVerified:false,
     ownerReplanAuthorized:false,resources:{[wait.resourceKey]:{
       state:'CANDIDATE_CLEAR_NOT_AUTHORIZED'}}};
@@ -124,6 +126,8 @@ function setup(writer=true,claimed=false){
     sourceRepository:aRequest.sourceRepository,sourceBranch:aRequest.sourceBranch,
     requestedSourceSha:aRequest.sourceSha,controlSourceSha:'d'.repeat(40),
     operation:aRequest.operation,seat,status:'PASS',
+    operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false,
+    protectedStateUnchanged:true,
     startedAt:'2026-11-09T20:16:00Z',finishedAt:'2026-11-09T20:17:00Z',
     code:'SHARED_RESOURCE_READONLY_SNAPSHOT',result:aDetail};
   const observation={issue:{repository:repo,number:aIssueNumber,title:'pc-job',
@@ -225,6 +229,27 @@ test('Windows second sample must be observed within signed A report interval',()
   delete report.result.observedAt;
   inputs.observation.json.content=JSON.stringify(report);
   assert.ok(reviewRecordedResourceReadbacks(inputs).missing.includes(
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'));
+});
+
+test('A-grade release observation with recorded operational writes is never a candidate',()=>{
+  const outerWrite=setup();
+  const outer=JSON.parse(outerWrite.observation.json.content);
+  outer.operationalWrites=1;
+  outerWrite.observation.json.content=JSON.stringify(outer);
+  assert.ok(reviewRecordedResourceReadbacks(outerWrite).missing.includes(
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'));
+  const innerWrite=setup();
+  const inner=JSON.parse(innerWrite.observation.json.content);
+  inner.result.providerCalls=1;
+  innerWrite.observation.json.content=JSON.stringify(inner);
+  assert.ok(reviewRecordedResourceReadbacks(innerWrite).missing.includes(
+    'WINDOWS_READONLY_RELEASE_CANDIDATE'));
+  const touched=setup();
+  const changed=JSON.parse(touched.observation.json.content);
+  changed.protectedStateUnchanged=false;
+  touched.observation.json.content=JSON.stringify(changed);
+  assert.ok(reviewRecordedResourceReadbacks(touched).missing.includes(
     'WINDOWS_READONLY_RELEASE_CANDIDATE'));
 });
 
