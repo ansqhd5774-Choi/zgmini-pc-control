@@ -221,7 +221,13 @@ export function analyzeSourceOnlyReplacementChain(raw, {sources, anchors} = {}) 
       sources.length !== 5 || sources.some(source =>
         typeof source !== 'string' || !/^[a-f0-9]{40}$/.test(source)) ||
       new Set(sources).size !== 5 || !anchors ||
-      Object.keys(anchors).length !== 5) return stop('WRITER_CHAIN_ARGUMENTS_INVALID');
+      typeof anchors !== 'object' || Array.isArray(anchors) ||
+      Object.keys(anchors).length !== sources.length ||
+      sources.some((source,index)=>!Object.hasOwn(anchors,source) ||
+        (anchors[source] === null ? index !== 2 :
+          typeof anchors[source] !== 'string' ||
+          !/^[a-f0-9]{64}$/.test(anchors[source]))))
+    return stop('WRITER_CHAIN_ARGUMENTS_INVALID');
   try {
     let currentText = raw.toString('utf8');
     if (!Buffer.from(currentText, 'utf8').equals(raw))

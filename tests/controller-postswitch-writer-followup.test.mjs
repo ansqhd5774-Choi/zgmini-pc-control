@@ -5,6 +5,9 @@ import {WRITER_FOLLOWUP_CANDIDATE} from '../tools/controller-postswitch-approval
 import {verifyWriterFollowupBReceipts, analyzeSourceOnlyReplacementChain,
   analyzeWriterFollowupSourceCandidate, classifyWriterFollowupAObservations}
   from '../tools/controller-postswitch-evidence.mjs';
+import {WRITER_CONFIG_PATH,inspectLocalWriterSourceOnly,
+  main as writerReadOnlyMain}
+  from '../tools/controller-postswitch-writer-readonly.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 // These three literal raw GitHub result files are intentionally pinned byte-for-
@@ -79,6 +82,102 @@ test('inverse chain rejects unrelated-byte drift, invalid source, bad anchor and
   }).code,'WRITER_CHAIN_CONFIG_SHA_MISMATCH');
   assert.equal(analyzeWriterFollowupSourceCandidate(null).status,
     'SOURCE_ONLY_CHAIN_UNVERIFIED');
+});
+
+test('inverse chain requires every exact source anchor and keeps 4ec derived-only',()=>{
+  const missingKey={...anchors};
+  delete missingKey[sources[0]];
+  missingKey['f'.repeat(40)]=digest(config(sources[0]));
+  assert.equal(analyzeSourceOnlyReplacementChain(config(sources[4]),{
+    sources,anchors:missingKey,
+  }).code,'WRITER_CHAIN_ARGUMENTS_INVALID');
+  assert.equal(analyzeSourceOnlyReplacementChain(config(sources[4]),{
+    sources,anchors:{...anchors,[sources[4]]:null},
+  }).code,'WRITER_CHAIN_ARGUMENTS_INVALID');
+  assert.equal(analyzeSourceOnlyReplacementChain(config(sources[4]),{
+    sources,anchors:{...anchors,[sources[2]]:undefined},
+  }).code,'WRITER_CHAIN_ARGUMENTS_INVALID');
+});
+
+const candidateStages=()=>[
+  WRITER_FOLLOWUP_CANDIDATE.sourceSequence.at(-1),
+  WRITER_FOLLOWUP_CANDIDATE.sourceSequence[2],
+  WRITER_FOLLOWUP_CANDIDATE.sourceSequence[1],
+  WRITER_FOLLOWUP_CANDIDATE.sourceSequence[0],
+  '70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9',
+].map((sourceSha,index)=>({sourceSha,configSha256:`${index}`.repeat(64),
+  evidenceLevel:index===2?'DERIVED_ONLY':'PINNED_DIGEST_MATCH'}));
+const candidateAnalysis=()=>({status:'SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED',
+  code:'WRITER_CHAIN_PINNED_ENDPOINTS_MATCH',stages:candidateStages(),
+  intermediate4ecIndependentlyObserved:false,
+  cApprovalAuthorized:false,liveCoreSourceVerified:false});
+
+test('local Writer proof reads only the fixed Windows path and emits hashes, never config raw',()=>{
+  const privateBytes=Buffer.from('{"source":"secret-string","credential":"private-token"}');
+  let reads=0;
+  const actual=inspectLocalWriterSourceOnly({
+    readConfigRaw:file=>{assert.equal(file,WRITER_CONFIG_PATH);reads++;return privateBytes;},
+    analyze:raw=>{assert.equal(raw,privateBytes);return candidateAnalysis();},
+  });
+  assert.equal(reads,1);
+  assert.equal(actual.status,'READONLY_SOURCE_CANDIDATE_VERIFIED');
+  assert.equal(actual.digestStages.length,5);
+  assert.equal(actual.digestStages[2].evidenceLevel,'DERIVED_ONLY');
+  assert.equal(actual.cApprovalAuthorized,false);
+  assert.equal(actual.liveCoreSourceVerified,false);
+  assert.equal(actual.operationalWrites,0);
+  assert.equal(actual.remoteBReceiptsVerifiedHere,false);
+  assert.doesNotMatch(JSON.stringify(actual),/credential|private-token|secret-string/);
+});
+
+test('local Writer proof rejects unreadable, tampered and misclassified bytes without leaking',()=>{
+  const secret='secret-in-windows-config';
+  const unreadable=inspectLocalWriterSourceOnly({readConfigRaw:()=>{throw Error(secret);}});
+  assert.equal(unreadable.code,'WRITER_SOURCE_ONLY_LOCAL_READ_FAILED');
+  assert.doesNotMatch(JSON.stringify(unreadable),/secret-in-windows-config/);
+  assert.equal(inspectLocalWriterSourceOnly({readConfigRaw:()=>secret}).code,
+    'WRITER_SOURCE_ONLY_RAW_NOT_BUFFER');
+  assert.equal(inspectLocalWriterSourceOnly({readConfigRaw:()=>Buffer.from(secret)}).status,
+    'READONLY_SOURCE_CANDIDATE_UNVERIFIED');
+  for(const modify of [
+    x=>{x.cApprovalAuthorized=true;},
+    x=>{x.liveCoreSourceVerified=true;},
+    x=>{x.intermediate4ecIndependentlyObserved=true;},
+    x=>{x.stages[2].evidenceLevel='PINNED_DIGEST_MATCH';},
+    x=>{x.stages[3].configSha256='bad-sha';},
+    x=>{x.stages[0].sourceSha='0'.repeat(40);},
+  ]){
+    const analysis=candidateAnalysis();modify(analysis);
+    const result=inspectLocalWriterSourceOnly({
+      readConfigRaw:()=>Buffer.from(secret),analyze:()=>analysis,
+    });
+    assert.equal(result.status,'READONLY_SOURCE_CANDIDATE_UNVERIFIED');
+    assert.equal(result.cApprovalAuthorized,false);
+    assert.equal(result.operationalWrites,0);
+    assert.doesNotMatch(JSON.stringify(result),/secret-in-windows-config/);
+  }
+});
+
+test('local Writer CLI refuses CI/non-Windows and accepts only fixed read-only mode',()=>{
+  let invoked=0;
+  const inspect=()=>{invoked++;return {status:'READONLY_SOURCE_CANDIDATE_VERIFIED'};};
+  const args=['--verify-local-writer-source'];
+  for(const ports of [
+    {platform:'linux'},
+    {platform:'win32',githubActions:'true'},
+    {platform:'win32',runnerName:'gh-runner'},
+  ]){
+    assert.equal(writerReadOnlyMain(args,{...ports,inspect}).status,
+      'READONLY_SOURCE_CANDIDATE_UNVERIFIED');
+  }
+  assert.equal(writerReadOnlyMain([],{
+    platform:'win32',inspect,githubActions:null,runnerName:null,
+  }).code,'WRITER_SOURCE_ONLY_FIXED_USAGE_REQUIRED');
+  assert.equal(invoked,0);
+  assert.equal(writerReadOnlyMain(args,{
+    platform:'win32',inspect,githubActions:null,runnerName:null,
+  }).status,'READONLY_SOURCE_CANDIDATE_VERIFIED');
+  assert.equal(invoked,1);
 });
 
 test('A point observations are classified without promoting source identity or live Core',()=>{
