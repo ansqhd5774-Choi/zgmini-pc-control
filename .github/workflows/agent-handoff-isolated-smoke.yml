@@ -1,0 +1,97 @@
+name: ZGMINI Isolated Handoff GitHub Transport Smoke (TEST ONLY)
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+concurrency:
+  group: zgmini-isolated-handoff-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  isolated-issue-roundtrip:
+    # Inert until a separate, non-production Windows runner and opt-in are ready.
+    # Never use agent-handoff label: the existing operational workflow owns it.
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      startsWith(github.event.issue.title, '[ISOLATED-TEST] INCIDENT ') &&
+      !contains(github.event.issue.labels.*.name, 'agent-handoff') &&
+      vars.ZGMINI_HANDOFF_ISOLATED_TEST_ENABLED == 'true'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-isolated]
+    timeout-minutes: 3
+    steps:
+      - name: Validate two test-only issues and verify original Issue receipt
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const { owner, repo } = context.repo;
+            const ownerLogin = 'ansqhd5774-choi';
+            const titleMatch = /^\[ISOLATED-TEST\] INCIDENT ([a-z0-9-]{8,60})$/.exec(issue.title);
+            if (!titleMatch) throw new Error('TEST_ISSUE_TITLE_INVALID');
+            if (issue.user.login.toLowerCase() !== ownerLogin) throw new Error('TEST_ISSUE_OWNER_INVALID');
+            if (issue.labels.some(label => label.name === 'agent-handoff')) throw new Error('PRODUCTION_LABEL_FORBIDDEN');
+            let payload;
+            try { payload = JSON.parse(issue.body ?? ''); }
+            catch { throw new Error('TEST_ISSUE_BODY_INVALID'); }
+            if (payload.schema !== 'ZGMINI_HANDOFF_ISOLATED_TRANSPORT_V1' ||
+                payload.testId !== titleMatch[1] ||
+                Object.keys(payload).sort().join(',') !== 'originIssue,schema,testId' ||
+                !Number.isSafeInteger(payload.originIssue) ||
+                payload.originIssue < 1 ||
+                payload.originIssue >= issue.number) {
+              throw new Error('TEST_ISSUE_CONTRACT_INVALID');
+            }
+            const originNumber = payload.originIssue;
+            const originResponse = await github.rest.issues.get({ owner, repo, issue_number: originNumber });
+            const origin = originResponse.data;
+            if (origin.pull_request || origin.state !== 'open' ||
+                origin.user.login.toLowerCase() !== ownerLogin ||
+                origin.title !== `[ISOLATED-TEST] ORIGIN ${payload.testId}` ||
+                origin.labels.some(label => label.name === 'agent-handoff')) {
+              throw new Error('TEST_ORIGIN_INVALID');
+            }
+            let originBody;
+            try { originBody = JSON.parse(origin.body ?? ''); }
+            catch { throw new Error('TEST_ORIGIN_BODY_INVALID'); }
+            if (originBody.schema !== 'ZGMINI_HANDOFF_ISOLATED_ORIGIN_V1' ||
+                originBody.testId !== payload.testId ||
+                Object.keys(originBody).sort().join(',') !== 'schema,testId') {
+              throw new Error('TEST_ORIGIN_CONTRACT_INVALID');
+            }
+            const originReceipt = JSON.stringify({
+              schema: 'ZGMINI_HANDOFF_ISOLATED_ORIGIN_RECEIPT_V1',
+              testId: payload.testId,
+              incidentIssue: issue.number,
+              status: 'TEST_ONLY_RECORDED'
+            });
+            const incidentReceipt = JSON.stringify({
+              schema: 'ZGMINI_HANDOFF_ISOLATED_INCIDENT_RECEIPT_V1',
+              testId: payload.testId,
+              originIssue: originNumber,
+              status: 'TEST_ONLY_RECORDED'
+            });
+            async function ensureSingleReceipt(issueNumber, receipt) {
+              const args = { owner, repo, issue_number: issueNumber, per_page: 100 };
+              const result = await github.rest.issues.listComments(args);
+              if (result.data.length === 100) throw new Error('TEST_COMMENT_PAGE_LIMIT');
+              const existing = result.data.filter(comment => comment.body === receipt);
+              if (existing.length > 1) throw new Error('TEST_DUPLICATE_RECEIPT');
+              if (existing.length === 0) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: receipt });
+              }
+              const verified = await github.rest.issues.listComments(args);
+              if (verified.data.filter(comment => comment.body === receipt).length !== 1) {
+                throw new Error('TEST_RECEIPT_READBACK_FAILED');
+              }
+            }
+            await ensureSingleReceipt(originNumber, originReceipt);
+            await ensureSingleReceipt(issue.number, incidentReceipt);
+            core.info('ISOLATED_GITHUB_TRANSPORT_VERIFIED: 2/2 test receipts; no application DB/source operations requested');
