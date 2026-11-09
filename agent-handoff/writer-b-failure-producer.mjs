@@ -1,6 +1,6 @@
-// SOURCE_ONLY: the Writer B workflow is not subscribed to this module yet.
-// GitHub readback + an explicit Issues API dependency are the only I/O. This
-// cannot execute an installer, Controller, PC job, or recovery operation.
+// Metadata-only Writer B workflow_run on the approved isolated runner.
+// Only verified failure evidence may create and directly route a bot Incident;
+// no installer, Controller, PC job, or recovery action is executed.
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -8,6 +8,7 @@ import {assertCompletedWriterBEvent, findWriterBReceipt,
   prepareWriterBFailureHandoff} from './writer-b-result-to-incident.mjs';
 import {reconcileHandoffInventory} from './pc-result-to-incident.mjs';
 import {persistResourceWait} from './resource-wait-ledger.mjs';
+import {routeVerifiedBotIssue} from './bot-direct-route.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -43,14 +44,16 @@ function authorizedManifestPath(originIssue) {
 /** A verified completed Writer B run can generate *at most one* incident. */
 export async function processCompletedWriterB(event, {
   readComments, readIssue, readFile, listHandoffs, createHandoff,
-  listResourceWaitComments, createResourceWaitComment, readResourceWaitComment
+  listResourceWaitComments, createResourceWaitComment, readResourceWaitComment,
+  routeHandoff
 }) {
   const run = assertCompletedWriterBEvent(event);
   if ([readComments, readIssue, readFile, listHandoffs, createHandoff]
     .some(fn => typeof fn !== 'function')) stop('IO_NOT_CONFIGURED');
   const initial = {state: 'SCAN_COMPLETED', runId: run.runId,
     originalIssues: 0, verifiedResults: 0, confirmedFailures: 0,
-    newIssues: 0, reusedIssues: 0, pcOperationalWrites: 0, automaticPcRetries: 0};
+    newIssues: 0, reusedIssues: 0, routesRecorded: 0, routesReused: 0,
+    pcOperationalWrites: 0, automaticPcRetries: 0};
 
   // The source workflow fires on all owner-opened Issues. Most runs have a
   // skipped Writer B job, so absence of its exact bot receipt is not failure.
@@ -88,9 +91,18 @@ export async function processCompletedWriterB(event, {
   }
   if (prepared.state !== 'READY_TO_ENQUEUE') stop('ADAPTER_STATE_INVALID');
   observed.confirmedFailures = 1;
+  const confirmRoute = async number => {
+    if (typeof routeHandoff !== 'function') stop('ROUTE_NOT_CONFIGURED');
+    const routed = await routeHandoff(prepared, number);
+    if (routed?.state === 'ROUTE_RECORDED') observed.routesRecorded++;
+    else if (routed?.state === 'ROUTE_REUSED') observed.routesReused++;
+    else stop('ROUTE_RESULT_INVALID');
+  };
   const decision = reconcileHandoffInventory(prepared, await listHandoffs());
-  if (decision.state === 'REUSE_EXISTING') return Object.freeze({...observed,
-    state: 'REUSED_EXISTING', reusedIssues: 1});
+  if (decision.state === 'REUSE_EXISTING') {
+    await confirmRoute(decision.issueNumber);
+    return Object.freeze({...observed, state: 'REUSED_EXISTING', reusedIssues: 1});
+  }
   if (decision.state !== 'CREATE_CANDIDATE_ONLY') stop('INVENTORY_STATE_INVALID');
   let created;
   try { created = await createHandoff(prepared); }
@@ -98,6 +110,7 @@ export async function processCompletedWriterB(event, {
     // A lost POST response is ambiguous, never automatically re-POST.
     const after = reconcileHandoffInventory(prepared, await listHandoffs());
     if (after.state !== 'REUSE_EXISTING') stop('POST_OUTCOME_UNKNOWN');
+    await confirmRoute(after.issueNumber);
     return Object.freeze({...observed, state: 'POST_RECONCILED', reusedIssues: 1});
   }
   if (!positive(created?.number)) stop('CREATE_RECEIPT_INVALID');
@@ -106,6 +119,7 @@ export async function processCompletedWriterB(event, {
       verified.body !== prepared.body ||
       !verified.labels?.some(x => x.name === 'agent-handoff'))
     stop('CREATE_READBACK_STOP');
+  await confirmRoute(created.number);
   return Object.freeze({...observed, state: 'ISSUE_CREATED_VERIFIED', newIssues: 1});
 }
 
@@ -161,6 +175,15 @@ export async function main(env = process.env) {
     createHandoff: async prepared => request('issues', {method: 'POST',
       body: {title: `agent-handoff ${prepared.incidentId}`,
         labels: ['agent-handoff'], body: prepared.body}}),
+    routeHandoff: (prepared, number) => routeVerifiedBotIssue(prepared, number, {
+      readIssue: async n => ({...await request(`issues/${n}`), repository: REPO}),
+      listHandoffs: async () => ({repository: REPO, complete: true,
+        issues: (await completePages('issues?state=all&labels=agent-handoff', 'HANDOFFS'))
+          .filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
+      listIssueComments: n => completePages(`issues/${n}/comments`, 'ROUTE_COMMENTS', 4),
+      postIssueComment: (n, body) => request(`issues/${n}/comments`, {method:'POST', body:{body}}),
+      addIssueLabel: (n, label) => request(`issues/${n}/labels`, {method:'POST', body:{labels:[label]}})
+    }),
     listResourceWaitComments: () => completePages('issues/68/comments',
       'RESOURCE_WAIT', MAX_QUEUE_PAGES),
     createResourceWaitComment: body => request('issues/68/comments',

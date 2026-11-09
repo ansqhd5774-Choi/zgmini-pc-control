@@ -51,7 +51,8 @@
 - `.github/workflows/pc-shared-issue-admission.yml`은 등록된 제목 또는 라벨이 있는 새 Issue를 격리 Runner에서 검사한다. 잘못된 제목/라벨/본문은 원본 Issue에 읽기 검증된 미접수 댓글을 남기며, 기존 설치 workflow의 엄격한 진입 검사는 그대로다. 새 Issue가 아예 어떤 등록된 제목·라벨도 갖지 않은 경우는 의도를 추정할 수 없으므로 생성자가 사전검증해야 한다.
 - `shared-resource/lifecycle.mjs`는 공통 자원 키·안전 이연 시점·근거 결과쌍·중복 ID·신규 승인 재계획을 정의한다. 기존 일반챗이 자동으로 재개되는 인터페이스는 아니다.
 - `agent-handoff/resource-wait-ledger.mjs`는 인증된 정상 자원 대기만 #68에 영구 댓글로 1회 기록한다. 중복 수신은 기존 기록 재사용, POST ACK 분실은 조회만 수행한다. 조정 원장 #68은 실제 PC lease가 아니다.
-- 현재 자동 이벤트 연결은 등록 Writer B 승인 Issue 사전검사, PC Job/Writer B 완료 결과에 대한 별도 오류 접수, 중앙 사고 라우팅·검증 결과 반환의 워크플로 정의로 확장됐다([PR #1133](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1133)). 다만 **실제 운영 확인은 PC Job 정상 결과의 독립 failure-intake 2/2만 PASS**이고, Writer B 오류 접수의 활성 범위·실패 사고 라우팅/반환·원담당 실제 수신은 별개 미검증이다. 미래의 모든 업무가 자동 배포·재개된 것으로 보고하지 않는다.
+- 현재 자동 이벤트 연결은 등록 Writer B 승인 Issue 사전검사, PC Job/Writer B 완료 결과에 대한 독립 오류 접수 및 결과 반환으로 확장됐다([PR #1133](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1133)). **2026-11-10 실제 PC Job 정상 결과 접수 3/3 PASS**(#1134·#1135·#1136), 확인된 실패 0건, 자동 PC 재시도 0회. 이는 실패 사고의 종단간 실증이 아니다.
+- **봇 생성 Incident의 연결 보완(2026-11-10):** 접수 워크플로가 기본 `GITHUB_TOKEN`으로 생성한 `agent-handoff` Issue는 GitHub의 연쇄 이벤트 방지 규칙으로 일반 `issues.opened` 워크플로를 자동 실행하지 않는다. 또한 수동 Issue 라우터는 원담당 계정 작성 이벤트로 엄격히 한정되어 있다. 따라서 PC/Writer B producer는 인증된 원본 결과→봇 Issue 생성·본문/라벨/작성자 readback 후 **동일한 격리 `workflow_run` 잡에서** 직접 `HANDOFF_ROUTED` 댓글과 대기 라벨을 기록한다. 기존 Issue 재사용·POST 응답 분실·댓글 성공/라벨 실패도 같은 bot readback으로 보정하며, 실패 시 route 성공을 선언하지 않는다. 새 AI 에이전트 자동 실행·다른 일반챗 자동 수신·PC 복구/설치·예약은 여전히 수행하지 않는다. 실제 실패→route→verified return→원담당 ACK는 자연 발생 증거가 있기 전까지 미검증이다.
 - 실제 GitHub workflow의 활성 동작과 PC 운영 적용·원담당 수신·자원 해제 재평가는 별도 단계로 실증한다.
 
 ### A급 pc-job 공용 자원 대기 연결

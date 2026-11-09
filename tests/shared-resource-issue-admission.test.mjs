@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectSharedIssueAdmission,prepareSharedApprovalIssue}
+import {readFileSync} from 'node:fs';
+import {APPROVAL_ROUTES,inspectSharedIssueAdmission,prepareSharedApprovalIssue}
   from '../shared-resource/issue-admission.mjs';
 import {reportRejectedAdmission,rejectionBody}
   from '../shared-resource/issue-admission-report.mjs';
@@ -135,4 +136,13 @@ test('#1130-style non-UUID chatId is rejected before a Writer B request is publi
   assert.equal(outcome.state,'REJECTED_AT_ADMISSION');
   assert.equal(outcome.code,'REQUEST_MANIFEST_OR_IDENTITY_INVALID');
   assert.throws(()=>prepareSharedApprovalIssue('writer-source-b',invalid),/REQUEST_INVALID/);
+});
+
+test('workflow admission gate includes every registered shared B title when label is absent',()=>{
+  const workflow=readFileSync(new URL('../.github/workflows/pc-shared-issue-admission.yml',import.meta.url),'utf8');
+  for(const route of Object.values(APPROVAL_ROUTES)){
+    assert.ok(workflow.includes(`github.event.issue.title == '${route.title}'`),route.title);
+    const missing=inspectSharedIssueAdmission({title:route.title,labels:[],body:'{}'});
+    assert.equal(missing.code,'EXACT_RESOURCE_LABEL_REQUIRED');
+  }
 });
