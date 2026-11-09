@@ -2,6 +2,7 @@
 // caller. This adapter cannot access the PC, run Writer B, or create Issues.
 import {createHash} from 'node:crypto';
 import {parseHandoff, fingerprintHandoff} from './contract.mjs';
+import {prepareResourceWait} from '../shared-resource/lifecycle.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -18,6 +19,7 @@ const FAILURES = new Set(['WRITER_B_PREFLIGHT_STOP',
 const NON_FAILURES = new Set(['WRITER_B_INSTALLED_VERIFIED', 'WRITER_B_STATE_UNKNOWN']);
 const SETUP_REVIEW_ONLY = 'WRITER_B_SETUP_STOP';
 const EXPECTED_SHARED_BUSY_NOOP = 'WRITER_B_SHARED_INSTALL_BUSY_NOOP_STOP';
+const EXPECTED_CORE_IDLE_DEFER = 'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED';
 const REQUIRED_KEYS = ['schema', 'requestId', 'chatId', 'operation',
   'controlRepository', 'approvalManifestPath', 'approvalManifestSha256'];
 const MAX_COMMENT_ROWS = 500;
@@ -159,6 +161,20 @@ export function prepareWriterBFailureHandoff({event, originIssue, receipt,
   for (const [key, value] of [['REQUEST_ID', request.requestId],
     ['STATUS', result.status], ['CODE', result.code], ['RUN_ID', String(run.runId)],
     ['RETRY', result.retry]]) oneLine(txtBytes, key, value);
+  // New Writer B reporters preserve exact restoration proof in both formats.
+  // Historical reports without this field remain conservative: never infer
+  // ORIGINAL_VERIFIED from a RESTORED-looking status alone.
+  const recoveryLines = txtBytes.split(/\r?\n/).filter(x => x.startsWith('RECOVERY='));
+  if (result.recovery !== undefined) {
+    if (!['ORIGINAL_VERIFIED','RECONCILE_EXACT_REQUEST_NO_RETRY',
+      'READ_ONLY_RECONCILE_LOCK_AND_SOURCE'].includes(result.recovery) ||
+      recoveryLines.length !== 1 || recoveryLines[0] !== `RECOVERY=${result.recovery}`)
+      stop('RECOVERY_PROOF_MISMATCH_STOP');
+  } else if (recoveryLines.length > 0 && (recoveryLines.length !== 1 ||
+      recoveryLines[0] !== 'RECOVERY=NONE')) stop('RECOVERY_PROOF_MISMATCH_STOP');
+  if (result.status === 'WRITER_B_INSTALL_STOP_RESTORED' &&
+      result.recovery !== undefined && result.recovery !== 'ORIGINAL_VERIFIED')
+    stop('RESTORE_PROOF_INVALID');
   if (!verifiedReceipt.comment.body.includes('DELIVERY: RESULT_PAIR_READBACK_VERIFIED\n') ||
       !/^RESULT_CREATED: [0-2]\/2; RESULT_READBACK: 2\/2$/m.test(verifiedReceipt.comment.body) ||
       verifiedReceipt.comment.body.split(/\r?\n/).filter(x =>
@@ -173,15 +189,32 @@ export function prepareWriterBFailureHandoff({event, originIssue, receipt,
     state: 'SETUP_REVIEW_REQUIRED', reportStatus: result.status,
     runId: run.runId, originIssueNumber: originIssue.number,
     pcOperationalWrites: 0, automaticPcRetries: 0});
-  // A contended shared install lock can intentionally decline a second
-  // overlapping Writer B request before claiming or changing PC state.
-  // Its authenticated receipt remains in the owner Issue, but it is not a
-  // distinct repair incident. Recovery-required failures stay eligible.
-  if (result.status === 'WRITER_B_PREFLIGHT_STOP' &&
-      result.code === EXPECTED_SHARED_BUSY_NOOP) return Object.freeze({
-    state: 'NOT_ELIGIBLE', reportStatus: result.status,
-    runId: run.runId, originIssueNumber: originIssue.number,
-    pcOperationalWrites: 0, automaticPcRetries: 0});
+  // Clean resource contention belongs to the shared-resource wait lifecycle,
+  // not to the repair incident queue. Preclaim Core idle and shared lock busy
+  // are untouched; postclaim Core idle is safe only with ORIGINAL_VERIFIED.
+  const preclaimWait = result.status === 'WRITER_B_PREFLIGHT_STOP' &&
+    [EXPECTED_SHARED_BUSY_NOOP, EXPECTED_CORE_IDLE_DEFER].includes(result.code);
+  const restoredWait = result.status === 'WRITER_B_INSTALL_STOP_RESTORED' &&
+    result.code === EXPECTED_CORE_IDLE_DEFER &&
+    result.recovery === 'ORIGINAL_VERIFIED';
+  if (preclaimWait || restoredWait) {
+    const wait = prepareResourceWait({
+      resourceKey:'writer-source',
+      origin:{repository:REPO,issueNumber:originIssue.number,
+        requestId:request.requestId,chatId:request.chatId,
+        sourceSha:run.controlSourceSha,manifestSha256:request.approvalManifestSha256},
+      evidence:{runId:run.runId,status:result.status,code:result.code,
+        resultJsonPath:jsonPath,resultTxtPath:txtPath,
+        resultPairReadbackVerified:true},
+      safePoint:preclaimWait?'UNCLAIMED_UNTOUCHED':'CLAIMED_ORIGINAL_VERIFIED',
+      ...(restoredWait?{recovery:'ORIGINAL_VERIFIED'}:{}),
+      releaseCondition:result.code===EXPECTED_SHARED_BUSY_NOOP?
+        'SHARED_WRITER_LOCK_RELEASE_VERIFIED':'CORE_IDLE_WINDOW_VERIFIED'});
+    return Object.freeze({state:'WAITING_SHARED_RESOURCE',
+      wait, reportStatus:result.status, code:result.code,
+      runId:run.runId,originIssueNumber:originIssue.number,
+      pcOperationalWrites:0,automaticPcRetries:0});
+  }
   if (!FAILURES.has(result.status)) return Object.freeze({state: 'NOT_ELIGIBLE',
     reportStatus: result.status, runId: run.runId, originIssueNumber: originIssue.number,
     pcOperationalWrites: 0, automaticPcRetries: 0});
