@@ -1,0 +1,70 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/asset-r10-alpaca-exclusion-runtime-20261110",
+  "candidateSourceSha": "9856ba04189eae332837b62551cb89577c56b376",
+  "baseHead": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+  "baseConfigSourceSha": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/alpaca-incremental.mjs",
+      "change": "M",
+      "beforeSha256": "0876e48fca8eab41ab1a429a09f437f14c9be960ea5cd661702b75bec2393e45",
+      "afterSha256": "49d2f7de1081257b298b8fecba285dd83b6a3dd486733602dba849712637e7ee",
+      "candidateSha256": "ecc3813ee48bb82a9727600ec7c27f22fcab47f6ebb4771db3e63c797153852e",
+      "insertions": [
+        {
+          "anchor": "export async function collectAlpacaIncremental(base,{fetchImpl=fetch,now=Date.now(),wait=ms=>new Promise(r=>setTimeout(r,ms))}={}){",
+          "position": "after",
+          "text": " return {status:'EXCLUDED_BY_USER',runRequests:0};\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/build-asset-r10-release.mjs",
+      "change": "M",
+      "beforeSha256": "74e9931d824681e3ff5b9fac89cfb79be0e65fd1625dcd5445f09e08da3cd126",
+      "afterSha256": "66a3d806fbc7f7db01eadce4a65b7e17848050fe18e0d14d76a5b328106b4f49"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d"
+    },
+    {
+      "path": "scripts/pc-writer/additional-collection-health.mjs",
+      "sha256": "106a075c8b3a819a005776e106eaef68c470c20e0db2f19357f066a2e1d0ae18"
+    },
+    {
+      "path": "scripts/pc-writer/progressive-publication.mjs",
+      "sha256": "55ff0868d5a85999f622be8dbcc150397edc4eb199ffc6bc0e3c2bfd8e409981"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/alpaca-incremental.mjs",
+          "scripts/pc-writer/build-asset-r10-release.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
