@@ -178,8 +178,41 @@ test('different approved manifest is a drift review, never implicit release', ()
   const result = summarizeResourceRecheckEvidence(w, input);
   assert.equal(result.state, 'SOURCE_DRIFT_REVIEW');
   assert.equal(result.historicalManifestChanged, true);
+  assert.equal(result.historicalApprovalChanged, true);
   assert.equal(result.ownerReplanAuthorized, false);
   assert.equal(result.nextAction, 'OWNER_REVIEW_NEW_APPROVAL_AND_RELEASE_EVIDENCE');
+});
+
+test('pc-job recheck authenticates feature SHA and fingerprint, not Writer manifest', () => {
+  const w = prepareResourceWait({
+    resourceKey:'pc-job-heavy-memory',
+    origin:{repository:'ansqhd5774-Choi/zgmini-pc-control',issueNumber:1201,
+      requestId:'pc-66f858c7-e716-4ffb-a07f-cbc98aebc404',chatId:'chat-1234',
+      sourceSha:'1'.repeat(40),approvalFingerprintSha256:'2'.repeat(64)},
+    evidence:{runId:42709978452,status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
+      resultJsonPath:'results/42709978452-1-seat-6.json',
+      resultTxtPath:'results/42709978452-1-seat-6.txt',
+      resultPairReadbackVerified:true},
+    safePoint:'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+    releaseCondition:'HEAVY_MEMORY_AVAILABLE_VERIFIED'
+  });
+  const input=recheckInput(w);
+  delete input.originReadback.manifestSha256;
+  input.originReadback.requestedSourceSha='1'.repeat(40);
+  input.originReadback.controlSourceSha='a'.repeat(40);
+  input.originReadback.approvalFingerprintSha256='2'.repeat(64);
+  delete input.currentApproval.manifestSha256;
+  input.currentApproval.approvalFingerprintSha256='2'.repeat(64);
+  input.releaseObservation.resourceKey=w.resourceKey;
+  assert.deepEqual(summarizeResourceRecheckEvidence(w,input).missing,[]);
+  assert.equal(summarizeResourceRecheckEvidence(w,input).state,'RECHECK_EVIDENCE_PENDING');
+  input.currentApproval.approvalFingerprintSha256='3'.repeat(64);
+  const drift=summarizeResourceRecheckEvidence(w,input);
+  assert.equal(drift.state,'SOURCE_DRIFT_REVIEW');
+  assert.equal(drift.historicalApprovalChanged,true);
+  assert.equal(drift.historicalManifestChanged,false);
+  input.originReadback.requestedSourceSha='0'.repeat(40);
+  assert.ok(summarizeResourceRecheckEvidence(w,input).missing.includes('ORIGINAL_ISSUE_RUN_RESULT_PAIR'));
 });
 
 test('cross-request, spoofed A operation and result-pair mismatch stay pending', () => {
@@ -196,7 +229,6 @@ test('cross-request, spoofed A operation and result-pair mismatch stay pending',
   ]);
   assert.equal(result.ownerReplanAuthorized, false);
 });
-
 
 test('origin result status and failure code must match the historical wait', () => {
   const w = candidate();

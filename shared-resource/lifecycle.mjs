@@ -125,8 +125,9 @@ export function reviewResourceWait(candidate, check) {
  * Even a complete candidate is NOT proof of lease ownership/release and must
  * never authorize a PC job or a new owner request by itself.
  *
- * 'origin.sourceSha' pins the CONTROL workflow commit; the observed Windows
- * 'configSourceSha' is a DIFFERENT source domain. They must not be compared.
+ * Writer B 'origin.sourceSha' pins the CONTROL workflow commit; pc-job
+ * 'origin.sourceSha' pins the REQUESTED feature commit. The observed Windows
+ * 'configSourceSha' is a third, separate source domain.
  */
 export function summarizeResourceRecheckEvidence(wait, {
   originReadback, releaseObservation, currentApproval
@@ -136,6 +137,15 @@ export function summarizeResourceRecheckEvidence(wait, {
       !/^resource-wait-[a-f0-9]{24}$/.test(wait.waitId ?? '') ||
       wait.automaticPcRetries !== 0) stop('RECHECK_WAIT_INVALID');
   const missing = [];
+  const writerApproval = typeof wait.origin.manifestSha256 === 'string';
+  const originSourceMatches = writerApproval ?
+    originReadback?.controlSourceSha === wait.origin.sourceSha :
+    originReadback?.requestedSourceSha === wait.origin.sourceSha &&
+      SHA40.test(originReadback?.controlSourceSha ?? '');
+  const originApprovalMatches = writerApproval ?
+    originReadback?.manifestSha256 === wait.origin.manifestSha256 :
+    originReadback?.approvalFingerprintSha256 ===
+      wait.origin.approvalFingerprintSha256;
   const exactOrigin = originReadback &&
     originReadback.repository === wait.origin.repository &&
     originReadback.issueNumber === wait.origin.issueNumber &&
@@ -145,8 +155,7 @@ export function summarizeResourceRecheckEvidence(wait, {
     originReadback.code === wait.evidence.code &&
     originReadback.resultJsonPath === wait.evidence.resultJsonPath &&
     originReadback.resultTxtPath === wait.evidence.resultTxtPath &&
-    originReadback.controlSourceSha === wait.origin.sourceSha &&
-    originReadback.manifestSha256 === approvalHash(wait.origin) &&
+    originSourceMatches && originApprovalMatches &&
     originReadback.botReceiptReadbackVerified === true &&
     originReadback.resultPairReadbackVerified === true;
   if (!exactOrigin) missing.push('ORIGINAL_ISSUE_RUN_RESULT_PAIR');
@@ -172,25 +181,28 @@ export function summarizeResourceRecheckEvidence(wait, {
   if (!observed) missing.push('WINDOWS_READONLY_RELEASE_CANDIDATE');
 
   const current = currentApproval;
+  const currentApprovalHash = writerApproval ?
+    current?.manifestSha256 : current?.approvalFingerprintSha256;
   const approved = current &&
     current.currentReadbackVerified === true &&
     SHA40.test(current.controlSourceSha ?? '') &&
     SHA40.test(current.runtimeConfigSourceSha ?? '') &&
     SHA40.test(current.approvedRuntimeConfigSourceSha ?? '') &&
-    SHA64.test(current.manifestSha256 ?? '') &&
+    SHA64.test(currentApprovalHash ?? '') &&
     current.runtimeConfigSourceSha === current.approvedRuntimeConfigSourceSha &&
     (!observed ||
       current.runtimeConfigSourceSha === observation.observedConfigSourceSha);
   if (!approved) missing.push('CURRENT_SOURCE_AND_APPROVAL_READBACK');
 
-  const manifestChanged = approved &&
-    current.manifestSha256 !== approvalHash(wait.origin);
-  const state = manifestChanged && exactOrigin ?
+  const approvalChanged = approved &&
+    currentApprovalHash !== approvalHash(wait.origin);
+  const state = approvalChanged && exactOrigin ?
     'SOURCE_DRIFT_REVIEW' : 'RECHECK_EVIDENCE_PENDING';
   return Object.freeze({
     state, waitId: wait.waitId, resourceKey: wait.resourceKey,
     missing: Object.freeze(missing),
-    historicalManifestChanged: Boolean(manifestChanged),
+    historicalApprovalChanged: Boolean(approvalChanged),
+    historicalManifestChanged: Boolean(writerApproval && approvalChanged),
     releaseVerified: false, ownerReplanAuthorized: false,
     ownerReceipt: 'UNKNOWN', automaticPcRetries: 0,
     nextAction: state === 'SOURCE_DRIFT_REVIEW' ?

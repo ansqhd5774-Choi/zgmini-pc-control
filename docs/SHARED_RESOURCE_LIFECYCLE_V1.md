@@ -96,3 +96,11 @@
 - 이 성공은 **정상 원본의 안전 제외** 증거다. 실제 실패에서 원본 Issue/Run+JSON/TXT 인증 → 전문 중앙 Issue → 검증된 복구 결과 반환 → 원담당이 별도 일반챗에서 직접 수신한 경우는 아직 관측되지 않았다. 입구의 `GITHUB_EVENT_ACTION` 소스 수정 역시 자연 발생한 부적합 승인 Issue의 bot 영수증은 미검증이다.
 - 중앙 #68 최상단에는 [2026-11-10 현재 범위/재개 안내](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6750647072)를 연결해 과거 11월 8일 공유 Writer 설치 계획을 현행 전역 Gate로 오독하지 않게 했다. 기존 이력은 보존했다.
 - 5/5 단계 완료 기준은 변하지 않는다. 새 시험용 PC 작업·인위적 실패·기존 requestId 재실행·예약 검증을 만들어 최종 실증을 당기지 않는다.
+
+
+### #68 대기 재검증의 GitHub 읽기 전용 연결 (2026-11-10, 소스 후보)
+
+- `agent-handoff/resource-recheck-readback.mjs`는 #68에 기록된 단일 봇 대기 댓글을 다시 읽고, 기존 원본 Issue/완료 Run/봇 영수증/JSON·TXT 및 (있을 때만) 별도 PC A급 `shared-resource-release-readonly`의 중첩 `result.resources[resourceKey]` 결과를 대조 함수에 전달한다. 범위가 고정된 GET 콜백을 사용하며, GitHub 작업의 자동 예약·새 workflow·댓글 작성·PC 명령을 추가하지 않는다.
+- 원본 Writer B는 제어 workflow SHA와 승인된 manifest 바이트/고정 ref/SHA-256을 검증한다. pc-job은 **요청 기능 source SHA와 승인 fingerprint**가 원본이다. Controller 설치 SHA·기능 source SHA·PC config의 source SHA를 서로 혼동하지 않는다. 현승인 fingerprint가 변경됐다면 Writer manifest와 동일하게 `SOURCE_DRIFT_REVIEW`로 분류한다.
+- A 관측이 원본 완료 **이전**이거나 요청·Run·영수증·TXT/JSON 필드·자원 키·Task XML 안정성·2회 샘플·현재 운영 source가 맞지 않으면 해제 후보로 받지 않는다. 정상 후보도 별도 lease 소유권 해제 증거가 아니므로 `RECHECK_EVIDENCE_PENDING`, `releaseVerified=false`, `ownerReplanAuthorized=false`, 자동 PC 재시도 0회를 유지한다.
+- 소스 회귀는 Writer B, pc-job, 승인 드리프트, 원본/A 다른 요청, 복제 영수증, 서로 다른 자원, 과거 A 관측, 결과쌍 불일치, 보호 source 드리프트를 다룬다. 이는 **운영 연결을 위한 읽기 전용 후보 코드**이며, 현재 Controller #917 실제 C 복구·A 관측기 설치·자연 자원 대기→해제→원담당 수신 실증은 여전히 미완료다. **총 4/5(80%) 유지**.
