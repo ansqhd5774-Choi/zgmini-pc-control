@@ -136,3 +136,12 @@ test('V1 cannot smuggle a supplemental delta without V2 explicit authorization',
  input.deltaOverlayBytes=Buffer.from('{}');
  assert.throws(()=>authorizeR6RegisteredB(input),/R6_B_DELTA_SCOPE_STOP/);
 });
+
+test('malformed null approval fails closed with the documented approval code',()=>{
+ const input=fixture();
+ input.approvalBytes=Buffer.from('null');
+ const request=JSON.parse(input.event.issue.body);
+ request.approvalManifestSha256=hash(input.approvalBytes);
+ input.event.issue.body=JSON.stringify(request);
+ assert.throws(()=>authorizeR6RegisteredB(input),/R6_B_EFFECT_APPROVAL_STOP/);
+});
