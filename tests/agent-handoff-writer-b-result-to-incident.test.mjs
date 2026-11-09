@@ -81,11 +81,40 @@ test('one bot-verified preflight failure yields a sanitized and deterministic ca
 test('authenticated shared Writer install busy NOOP does not enqueue a repair', () => {
   const item = prepareWriterBFailureHandoff(fixture(result(
     'WRITER_B_PREFLIGHT_STOP', 'WRITER_B_SHARED_INSTALL_BUSY_NOOP_STOP')));
-  assert.equal(item.state, 'NOT_ELIGIBLE');
+  assert.equal(item.state, 'WAITING_SHARED_RESOURCE');
   assert.equal(item.reportStatus, 'WRITER_B_PREFLIGHT_STOP');
+  assert.equal(item.wait.state, 'WAITING_SHARED_RESOURCE');
+  assert.equal(item.wait.safePoint, 'UNCLAIMED_UNTOUCHED');
   assert.equal(item.automaticPcRetries, 0);
   assert.equal(item.pcOperationalWrites, 0);
   assert.equal(Object.hasOwn(item, 'body'), false);
+});
+
+test('Core active clean preclaim yields waiting, not repair', () => {
+  const item = prepareWriterBFailureHandoff(fixture(result(
+    'WRITER_B_PREFLIGHT_STOP', 'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED')));
+  assert.equal(item.state, 'WAITING_SHARED_RESOURCE');
+  assert.equal(item.wait.releaseCondition, 'CORE_IDLE_WINDOW_VERIFIED');
+  assert.equal(item.wait.originalStateVerified, false);
+});
+
+test('postclaim Core deferral waits only with JSON/TXT restoration proof', () => {
+  const restored = {...result('WRITER_B_INSTALL_STOP_RESTORED',
+    'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED'), recovery:'ORIGINAL_VERIFIED'};
+  const f = fixture(restored);
+  f.resultTxt.content += 'RECOVERY=ORIGINAL_VERIFIED\n';
+  const item = prepareWriterBFailureHandoff(f);
+  assert.equal(item.state, 'WAITING_SHARED_RESOURCE');
+  assert.equal(item.wait.safePoint, 'CLAIMED_ORIGINAL_VERIFIED');
+  assert.equal(item.wait.originalStateVerified, true);
+
+  const missing = fixture(restored);
+  assert.throws(() => prepareWriterBFailureHandoff(missing),
+    /RECOVERY_PROOF_MISMATCH_STOP/);
+  const historic = prepareWriterBFailureHandoff(fixture(result(
+    'WRITER_B_INSTALL_STOP_RESTORED',
+    'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED')));
+  assert.equal(historic.state, 'READY_TO_ENQUEUE'); // unproven old result is conservative.
 });
 
 test('verified success and STATE_UNKNOWN cannot become repair incidents', () => {
