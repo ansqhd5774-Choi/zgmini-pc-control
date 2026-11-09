@@ -1,0 +1,104 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "feat/bls-registered-v2-20261109",
+  "candidateSourceSha": "58a8d800738384437d4acc24c9e12fb0fa804df8",
+  "baseHead": "e633b7ceed26cf5ea773b2f31d40d3df4c8a1f5f",
+  "baseConfigSourceSha": "e633b7ceed26cf5ea773b2f31d40d3df4c8a1f5f",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r4-bed-collector.mjs",
+      "change": "M",
+      "beforeSha256": "9a82e226d6da0b95bb88c5acdc967bfbbafbae274594571cc58cc28fe2c4a979",
+      "afterSha256": "32ffd72e1b0e0279abb4d2ac38a7a2188b0e90f32a036394fd97c5120b20ce28"
+    },
+    {
+      "path": "lib/market-score/employment-r4-bed-provider.mjs",
+      "change": "M",
+      "beforeSha256": "5508ca3e0512564a2bfae647aea72da6ff4a757755a1a8fc99dc5f0a1efd7ec0",
+      "afterSha256": "760e645c7e40d1cb6af3e5c21954d85bb50e9a89051e00593f6ce113bf2f16c1"
+    },
+    {
+      "path": "lib/market-score/employment-r4-bed-runtime.mjs",
+      "change": "M",
+      "beforeSha256": "27cfbed51c679e3f0c987cb1eeb2ea9b14a6c81b47dac9c1b2f10a3d4212c3f8",
+      "afterSha256": "d8354de0f64af8556266ca5ced21f17a50b041b65e09dea5cfeaa94c9598610a"
+    },
+    {
+      "path": "lib/market-score/employment-r4-history-worker-domain.mjs",
+      "change": "M",
+      "beforeSha256": "6cfd45fedf7c6f7f5c7dacffe865df55185073df7a33347de8a23cc1958bbc73",
+      "afterSha256": "0bb1adcb0df7e1940b4b7ba8da8a034331ea3bf34373ba4e0b9417f3a6213084"
+    },
+    {
+      "path": "lib/market-score/employment-r4-runtime-trigger.mjs",
+      "change": "M",
+      "beforeSha256": "d7485e16c2fd5487db8187d8d9824b416d82c7a322d9e536df330f0be6dd8af4",
+      "afterSha256": "647f42d092a929df4d3e14fab2eea945c2c868664bd10d954dcb84d94abb7fae"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-collector.mjs",
+      "change": "M",
+      "beforeSha256": "8e9ece6fea8372782b74e4eeb2a911862bfdbf8ffa546d57cc1ec86dbb647240",
+      "afterSha256": "f3a3fa4c69e1469fb59cbcec1dcfa10f09a67f9f606b918221db2cbe4026bb00"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-provider.mjs",
+      "change": "M",
+      "beforeSha256": "63775c4147721b76b917224cce517c71a47a27010ecdc5dbeb56894e6cd48ee3",
+      "afterSha256": "01b37fae6aa24556eea8c01f58836f59311f238058a4797057048e133bdb2f29"
+    },
+    {
+      "path": "lib/market-score/employment-r4-shadow-worker-domain.mjs",
+      "change": "M",
+      "beforeSha256": "78334e4fab4f87e1b08526786da6219c255716ee39206bad1df0e81f75acad58",
+      "afterSha256": "afd18072923519706eff51e6dacf852ef6a7c75d3efcf00f6ac0b7e4cc2f4a53"
+    },
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "9c8462a2150f9b96e974904190a99d105c561620c18833e558868f94d378e3c6",
+      "afterSha256": "5be5155196c8539639f6bb5228d5af145646e0aff7f7c92a86ba3341d83efc39"
+    },
+    {
+      "path": "lib/market-score/employment-r6-contract.mjs",
+      "change": "M",
+      "beforeSha256": "bb140adbf45bc445bcd84d16aa2893fda943d4b3f2b388927d9f8268ca1d7076",
+      "afterSha256": "5775cb93ac1882a06946964832feefb69060d97e3c8c08f301e11419732850c9"
+    },
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "change": "M",
+      "beforeSha256": "38f579c4ad1957d4da56e8d337770fb414b9a00aa5e715b6fe7fb9944c80458f",
+      "afterSha256": "750e4d867b0f357b4ba7603661e9dbaa3d77921e13678488fcbf9d3fd85d4140"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "8487fbaf0fc1a5dc7cc8602491fca2bbf5f284e5b0f293c9d4033dac50162f8b",
+      "afterSha256": "3257e485ac2fc536316306291168559fbbceabadeca6da7381d73acb6a5a3d1a"
+    },
+    {
+      "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+      "change": "M",
+      "beforeSha256": "52a33ebf92ec2314e52569754a06eea93acc3ce4c6d3cb8ccd68b12803e63208",
+      "afterSha256": "40a4cc6f2d0045f5589acf9a8335ad76a60c55efa2e4368b6ff149cc9a2ee8b2"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
