@@ -13,9 +13,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   enqueue-confirmed-failures:
-    # Disabled by default. Uses the already-approved private self-hosted runner;
-    # do not activate before reviewing the source and operational scope.
+    # First stage: source integration only. Even if the repository variable was
+    # previously enabled, this workflow cannot run until a separately reviewed
+    # activation change removes this immutable false condition.
     if: >-
+      false &&
       vars.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
