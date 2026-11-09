@@ -6,14 +6,17 @@ import {createHash} from 'node:crypto';
 export const RESOURCE_WAIT_SCHEMA = 'ZGMINI_SHARED_RESOURCE_WAIT_V1';
 const SHA40 = /^[a-f0-9]{40}$/;
 const SHA64 = /^[a-f0-9]{64}$/;
-const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+// Existing pc-job uses non-UUID "pc-" IDs, while Writer B uses UUIDs.
+const REQUEST_ID = /^[a-z0-9][a-z0-9-]{7,79}$/;
+const CHAT_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 const RESOURCE = /^[a-z][a-z0-9-]{2,63}(?:\/[a-z][a-z0-9-]{2,63})?$/;
 const CODE = /^[A-Z][A-Z0-9_]{3,95}$/;
 const RESULT = /^results\/[a-z0-9][a-z0-9._-]{0,180}\.(json|txt)$/;
 const REPO = /^[a-zA-Z0-9_.-]{1,60}\/[a-zA-Z0-9_.-]{1,100}$/;
 const stop = code => {throw new Error('SHARED_RESOURCE_' + code);};
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const own = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+const approvalHash = origin => origin?.manifestSha256 ??
+  origin?.approvalFingerprintSha256;
 
 /**
  * One record per verified original request; multiple requests may share an
@@ -24,9 +27,11 @@ export function prepareResourceWait({resourceKey, origin, evidence, safePoint,
   if (!RESOURCE.test(resourceKey ?? '') ||
       !origin || !REPO.test(origin.repository ?? '') ||
       !Number.isSafeInteger(origin.issueNumber) || origin.issueNumber < 1 ||
-      !UUID.test(origin.requestId ?? '') || !UUID.test(origin.chatId ?? '') ||
+      !REQUEST_ID.test(origin.requestId ?? '') ||
+      !CHAT_ID.test(origin.chatId ?? '') ||
       !SHA40.test(origin.sourceSha ?? '') ||
-      !SHA64.test(origin.manifestSha256 ?? '') ||
+      !SHA64.test(approvalHash(origin) ?? '') ||
+      (origin.manifestSha256 != null && origin.approvalFingerprintSha256 != null) ||
       !evidence || !Number.isSafeInteger(evidence.runId) ||
       evidence.runId < 1 || !CODE.test(evidence.code ?? '') ||
       !CODE.test(evidence.status ?? '') ||
@@ -44,7 +49,7 @@ export function prepareResourceWait({resourceKey, origin, evidence, safePoint,
     schema: RESOURCE_WAIT_SCHEMA,
     waitId: 'resource-wait-' + digest(identity).slice(0, 24),
     intentKey: 'resource-intent-' +
-      digest([resourceKey, origin.manifestSha256, origin.sourceSha]).slice(0, 24),
+      digest([resourceKey, approvalHash(origin), origin.sourceSha]).slice(0, 24),
     state: 'WAITING_SHARED_RESOURCE',
     resourceKey,
     origin: Object.freeze({...origin}),
@@ -88,13 +93,17 @@ export function reviewResourceWait(candidate, check) {
       candidate.state !== 'WAITING_SHARED_RESOURCE' || !check ||
       !['VERIFIED_RELEASED', 'STILL_BUSY', 'UNVERIFIED'].includes(check.release) ||
       (check.sourceSha != null && !SHA40.test(check.sourceSha)) ||
-      (check.manifestSha256 != null && !SHA64.test(check.manifestSha256)))
+      (check.manifestSha256 != null && !SHA64.test(check.manifestSha256)) ||
+      (check.approvalFingerprintSha256 != null &&
+       !SHA64.test(check.approvalFingerprintSha256)))
     stop('RECHECK_INVALID');
   if (check.release !== 'VERIFIED_RELEASED')
     return Object.freeze({state: 'WAITING_SHARED_RESOURCE',
       waitId: candidate.waitId, automaticPcRetries: 0});
   if (check.sourceSha !== candidate.origin.sourceSha ||
-      check.manifestSha256 !== candidate.origin.manifestSha256)
+      (candidate.origin.manifestSha256 != null ?
+        check.manifestSha256 !== candidate.origin.manifestSha256 :
+        check.approvalFingerprintSha256 !== candidate.origin.approvalFingerprintSha256))
     return Object.freeze({state: 'SOURCE_DRIFT_REVIEW',
       waitId: candidate.waitId, automaticPcRetries: 0,
       nextAction: 'REVALIDATE_EXACT_SOURCE_AND_APPROVAL'});
