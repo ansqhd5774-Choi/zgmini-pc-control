@@ -10,6 +10,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {
  CONTROL_REPO,DATA_ROOT,MAX_BYTES,OPERATION,SOURCE_FILES,SOURCE_ROOT,
  TARGETS,URLS,authorizeManualReceiver,sha256,verifyIssueEvent,
+ verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {performOfficialManualB} from './coordinator.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
@@ -57,6 +58,14 @@ function execute(binary,args){
   encoding:'utf8',maxBuffer:1_000_000,timeout:30_000});
  need(!p.error&&p.status===0,'INFL_MANUAL_B_PROBE_EXEC_STOP');
  return p.stdout.trim();
+}
+function readPinnedManifest(root,relative){
+ const checkout=safeFixedFile(path.join(root,...relative.split('/')),root,8192);
+ const p=spawnSync(exe('git'),['-C',root,'show',`HEAD:${relative}`],{
+  shell:false,windowsHide:true,encoding:null,maxBuffer:16_384,timeout:30_000});
+ need(!p.error&&p.status===0&&Buffer.isBuffer(p.stdout),
+  'INFL_MANUAL_B_MANIFEST_GIT_BLOB_STOP');
+ return verifiedPinnedManifestBytes(checkout,p.stdout);
 }
 function sourceFile(relative){return path.join(SOURCE_ROOT,...relative.split('/'));}
 function checkSourceHome(){
@@ -324,8 +333,7 @@ async function main(){
  const approvedRoot=path.join(env.GITHUB_WORKSPACE,'inflation-manual-control');
  need(execute('git',['-C',approvedRoot,'rev-parse','HEAD'])===env.GITHUB_SHA,
   'INFL_MANUAL_B_CONTROL_HEAD_STOP');
- const file=path.join(approvedRoot,...request.approvalManifestPath.split('/'));
- const bytes=safeFixedFile(file,approvedRoot,8192);
+ const bytes=readPinnedManifest(approvedRoot,request.approvalManifestPath);
  const auth=authorizeManualReceiver({event,env,manifestBytes:bytes});
  const result=await performOfficialManualB(auth,makeWindowsManualAdapter(auth));
  const out=path.join(env.RUNNER_TEMP,'inflation-manual-b-result.json');
