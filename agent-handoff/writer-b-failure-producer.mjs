@@ -1,6 +1,6 @@
-// SOURCE_ONLY: the Writer B workflow is not subscribed to this module yet.
-// GitHub readback + an explicit Issues API dependency are the only I/O. This
-// cannot execute an installer, Controller, PC job, or recovery operation.
+// Metadata-only Writer B workflow_run on the approved isolated runner.
+// Only verified failure evidence may create and directly route a bot Incident;
+// no installer, Controller, PC job, or recovery action is executed.
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
