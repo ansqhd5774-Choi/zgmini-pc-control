@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {processCompletedPcJob} from '../agent-handoff/pc-failure-producer.mjs';
+import {processCompletedWriterB} from '../agent-handoff/writer-b-failure-producer.mjs';
 import {parseHandoff, fingerprintHandoff} from '../agent-handoff/contract.mjs';
 import {prepareHandoff} from '../agent-handoff/route.mjs';
 import {main as runResultBroker} from '../agent-handoff/result-broker.mjs';
@@ -141,4 +143,124 @@ test('unknown PC status cannot be promoted to agent work', async () => {
   assert.equal(result.confirmedFailures, 0);
   assert.equal(result.newIssues, 0);
   assert.equal(f.posts, 0);
+});
+
+test('verified Writer B STOP reaches the same handoff and result contract without a PC retry', async () => {
+  const writerRunId = 42570000003;
+  const writerRequestId = '9b4e50f9-8674-4894-9c5e-8ba454d6f79d';
+  const writerChatId = 'e94b51bd-0c27-4257-b430-c8f69fa6728e';
+  const manifestPath = 'approvals/writer-updates/cross-chain-test.json';
+  const manifest = JSON.stringify({schema: 'ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1',
+    status: 'APPROVED_B', scope: 'PC_WRITER_APPROVED_FILE_OVERLAY_ONLY',
+    runCount: 1, sourceRepository: 'ansqhd5774-Choi/zgmini', candidateSourceSha: repairSha});
+  const manifestDigest = createHash('sha256').update(manifest).digest('hex');
+  const writerRequest = {schema: 'ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1',
+    requestId: writerRequestId, chatId: writerChatId, operation: 'pc-writer-source-install',
+    controlRepository: repo, approvalManifestPath: manifestPath,
+    approvalManifestSha256: manifestDigest};
+  const originIssue = {repository: repo, number: 2403, user: {login: owner},
+    title: 'pc-writer-source-install', labels: [{name: 'pc-writer-b-install'}],
+    body: JSON.stringify(writerRequest)};
+  const writerEvent = {action: 'completed', repository: {full_name: repo, private: true},
+    workflow_run: {name: 'ZGMINI Approved Writer B Source Overlay Once',
+      event: 'issues', actor: {login: owner}, head_repository: {full_name: repo},
+      head_sha: sourceSha, head_branch: 'main', id: writerRunId, run_attempt: 1,
+      created_at: '2026-11-09T01:00:00Z'}};
+  const writerReport = {schema: 'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',
+    requestId: writerRequestId, status: 'WRITER_B_PREFLIGHT_STOP',
+    code: 'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP', sourceSha: null,
+    runId: String(writerRunId), retry: 'READ_ONLY_RECONCILE_NO_REEXECUTE'};
+  const writerText = `REQUEST_ID=${writerRequestId}\nSTATUS=${writerReport.status}\n`+
+    `CODE=${writerReport.code}\nRUN_ID=${writerRunId}\nRETRY=${writerReport.retry}\n`;
+  const receipt = {user: {login: bot},
+    issue_url: `https://api.github.com/repos/${repo}/issues/${originIssue.number}`,
+    body: `<!-- zgmini-writer-b-install:${writerRequestId} -->\n`+
+      `Writer B evidence: **${writerReport.status}** (${writerReport.code})\n`+
+      'DELIVERY: RESULT_PAIR_READBACK_VERIFIED\n' +
+      'RESULT_CREATED: 2/2; RESULT_READBACK: 2/2\n' +
+      `RUN_ID: ${writerRunId}; RETRY: NO_REEXECUTE\n`};
+  const incidents = [];
+  let issueCreates = 0;
+  const io = {
+    readComments: async () => [receipt],
+    readIssue: async n => n === originIssue.number ? originIssue : incidents.find(x => x.number === n),
+    readFile: async (filePath, ref) => {
+      const jsonPath = `results/writer-b-source-install-${writerRequestId}`;
+      const content = filePath === manifestPath ? manifest :
+        filePath === `${jsonPath}.json` ? JSON.stringify(writerReport) :
+        filePath === `${jsonPath}.txt` ? writerText : null;
+      assert.notEqual(content, null);
+      return {path: filePath, ref, content};
+    },
+    listHandoffs: async () => ({repository: repo, complete: true, issues: structuredClone(incidents)}),
+    createHandoff: async prepared => {
+      issueCreates++;
+      const item = {repository: repo, number: 2404, user: {login: bot},
+        title: `agent-handoff ${prepared.incidentId}`, labels: [{name: 'agent-handoff'}],
+        body: prepared.body};
+      incidents.push(item);
+      return item;
+    }
+  };
+  const intake = await processCompletedWriterB(writerEvent, io);
+  assert.equal(intake.state, 'ISSUE_CREATED_VERIFIED');
+  assert.equal(intake.confirmedFailures, 1);
+  assert.equal(intake.newIssues, 1);
+  assert.equal(intake.pcOperationalWrites, 0);
+  assert.equal(intake.automaticPcRetries, 0);
+  const incident = incidents[0];
+  const handoff = parseHandoff(incident.body);
+  assert.equal(handoff.origin.issueNumber, originIssue.number);
+  assert.equal(handoff.origin.sourceSha, sourceSha);
+  assert.equal(handoff.failure.kind, 'COMMON_WRITER');
+  assert.equal(handoff.failure.lastPass, 'NOT_RECORDED');
+  assert.equal(handoff.failure.firstFail, 'NOT_RECORDED');
+  assert.equal(prepareHandoff(incident.body).role, 'COMMON_PROCESS_OWNER');
+  const again = await processCompletedWriterB(writerEvent, io);
+  assert.equal(again.state, 'REUSED_EXISTING');
+  assert.equal(issueCreates, 1);
+
+  const result = {schema: 'ZGMINI_AGENT_HANDOFF_RESULT_V1',
+    resultId: 'result-e2e-writer-0001', incidentId: handoff.incidentId,
+    fingerprint: fingerprintHandoff(handoff),
+    pullRequest: {repository: repo, number: 2501, headSha: repairSha},
+    testRun: {repository: repo, runId: 42570000004, headSha: repairSha}};
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-writer-return-'));
+  const eventFile = path.join(temp, 'event.json');
+  fs.writeFileSync(eventFile, JSON.stringify({action: 'created', repository: {private: true},
+    issue: incident, comment: {user: {login: owner}, body: JSON.stringify(result)}}));
+  const oldFetch = globalThis.fetch;
+  const oldToken = process.env.GITHUB_TOKEN;
+  const ledger = [];
+  let resultWrites = 0;
+  process.env.GITHUB_TOKEN = 'integration-test-placeholder';
+  globalThis.fetch = async (url, init = {}) => {
+    const u = new URL(url);
+    let data;
+    if (u.pathname.endsWith('/issues/2404/comments') && init.method === 'GET') data = ledger;
+    else if (u.pathname.endsWith('/issues/2404/comments') && init.method === 'POST') {
+      resultWrites++;
+      ledger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      data = {id: 2};
+    } else if (u.pathname.endsWith('/pulls/2501')) data = {number: 2501,
+      head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
+    else if (u.pathname.endsWith('/actions/runs/42570000004')) data = {id: 42570000004,
+      head_sha: repairSha, status: 'completed', conclusion: 'success', repository: {full_name: repo}};
+    else throw new Error(`unexpected GitHub API ${u.pathname}`);
+    return {ok: true, status: 200, json: async () => data};
+  };
+  try {
+    const env = {GITHUB_EVENT_PATH: eventFile, GITHUB_REPOSITORY: repo,
+      GITHUB_EVENT_NAME: 'issue_comment', GITHUB_ACTOR: owner};
+    await runResultBroker(env);
+    await runResultBroker(env);
+    assert.equal(resultWrites, 1);
+    assert.match(ledger[0].body, /state: RUNTIME_VERIFICATION_PENDING/);
+    assert.match(ledger[0].body, /Windows\/D1\/API\/UI verification: NOT_VERIFIED/);
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = oldToken;
+    fs.rmSync(temp, {recursive: true, force: true});
+  }
 });
