@@ -25,7 +25,9 @@ jobs:
       cancel-in-progress: false
       queue: max
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
-    timeout-minutes: 16
+    # 6m pre-lock owner observation + existing 6m/90s natural idle bounds,
+    # two 40s official GET ceilings, transaction and result report allowance.
+    timeout-minutes: 20
     defaults:
       run:
         shell: cmd
