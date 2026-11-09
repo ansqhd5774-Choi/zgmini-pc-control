@@ -19,6 +19,8 @@
 - 작업 전 요약: `docs/GENERAL_CHAT_PREWORK.md`. 상태/접수 판정: `docs/AUTOMATION_STATUS_AND_ADMISSION.md`. 과거 실패를 현재 활성 잠금으로 오인하거나 외부 도구 안전 거부를 PC 장애로 확대하지 않는다. 거부된 행동을 다른 도구로 우회하지 않는다.
 - 실행 범위·증거 재사용·BLOCKER 판단은 공통 정본 2절을 따른다. 다른 담당자의 유효한 실PC 결과를 원본 링크와 적용 범위로 재사용하고, 현재 실행에 무관한 전체 경로 진단을 새 선행 조건으로 만들지 않는다. 잘못된 조건은 원래 대기열에서 정정한다.
 - 공용 적용 조정: `docs/CONTROLLER_APPLY_QUEUE.md`. 기능 개발은 병렬로 유지하되 Controller·유지보수기 및 동일 PC Core 운영 source lane에 **실제로 겹치는 쓰기**는 단일 조정 원장과 자원별 적용 담당 한 명으로 순서를 정한다. Core 승인 SHA를 직접 검증하는 보조 기록기의 호환성·사후 실제 기록 결과도 영향 범위에 포함한다. 승인된 누적 변경을 정확한 manifest로 묶거나 순차 적용하고, 서로 다른 담당자를 무기한 기다리지 않는다. 기존 PC lease·승인 검사는 그대로 유지한다.
+- **모든 현재·미래 공용 자원 경합의 동일 수명주기(2026-11-10):** [docs/SHARED_RESOURCE_LIFECYCLE_V1.md](docs/SHARED_RESOURCE_LIFECYCLE_V1.md)를 재사용한다. Writer·Controller·Core source·Runner 메모리/seat/lease·공용 결과/원장 등 **실제로 공유 자원을 쓰는 실행**에서만 승인된 입구/자원 키/원본 요청/결과 JSON·TXT/복구 증거/재계획 상태를 연결한다. 신규 자원·실행 종류는 기존 공통 계약에 인증 어댑터를 등록하고, 기능 전용 우회 대기·임의 재실행·같은 requestId 재사용을 만들지 않는다. Writer B의 청구 전 무변경과 pc-job의 요청 소모 후 작업자 실행 전 무변경, 복구 필요를 구분한다. #68 대기 원장은 PC 잠금·일반챗 자동 수신이 아니며, 자원 해제는 실제 운영·승인·source readback 후 새 고유 요청으로 재계획한다. 문서/CI 통과는 운영 적용 PASS가 아니다. **독립 업무의 전역 Gate로 확대하지 않는다.**
+
 - 신규 기능 공통 경로(R2 #622): 실제 PC 적용 초기에 기존 등록·A급 진단·B급 Writer 수신 지원 범위를 짧게 확인하고, 미지원 경로만 프로세스 총괄의 공통 도구 개선으로 분리한다. 독립 개발은 계속하며 기존 기능 전용 B 수신기를 우회 재목적 사용하지 않는다. 실제 source/파일 해시·잠금·복구가 연결된 최소 manifest를 사용하고 단순 코드 병합을 PC 설치 성공으로 보고하지 않는다. 세부 계약은 `docs/PC_AUTOMATION_STANDARD.md` 2·5·8절을 따른다.
 
 - 한국어로 보고한다. 이 저장소는 비공개 PC 제어 전용이다. 공개 `zgmini`의 개발 source, PC 승인 source, controller source를 구분한다.
