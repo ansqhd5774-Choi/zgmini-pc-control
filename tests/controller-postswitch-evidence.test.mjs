@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyPostSwitchEvidence, verifyControllerFiles,
-  verifyExactPostSwitchInventory,verifySourceBytes} from '../tools/controller-postswitch-evidence.mjs';
+  verifyExactPostSwitchInventory,verifySourceBytes,
+  verifySupervisorSnapshot} from '../tools/controller-postswitch-evidence.mjs';
 
 const sha256 = b => createHash('sha256').update(b).digest('hex');
 const before = 'c09bf6a6f66f229016135020d6ba553ba9a94676';
@@ -136,4 +137,23 @@ test('all 38 declared SHA-256 values also match the exact Git SHA blobs',()=>{
   const corrupted='controller/source-file-15.mjs';
   assert.equal(verifySourceBytes(host,after,(sha,rel)=>
     Buffer.from(rel===corrupted?'corrupted':`${sha}:${rel}`)),false);
+});
+
+test('live supervisor must own six distinct alive child seats and a fresh listener status',()=>{
+  const now=Date.parse('2026-11-09T14:40:45Z');
+  const status={at:'2026-11-09T14:40:44Z',pid:300,sourceSha:after,
+    mode:'LISTENING',children:Array.from({length:6},(_,i)=>({
+      seat:i+1,pid:301+i,alive:true}))};
+  const owner={pid:300,nonce:'11111111-2222-3333-4444-555555555555',bootAt:now-123400};
+  const params={targetSha:after,now,bootAt:owner.bootAt,livePid:()=>true};
+  assert.equal(verifySupervisorSnapshot(status,owner,params),true);
+  assert.equal(verifySupervisorSnapshot({...status,mode:'DRAIN'},owner,params),false);
+  assert.equal(verifySupervisorSnapshot({...status,at:'2026-11-09T14:38:00Z'},owner,params),false);
+  assert.equal(verifySupervisorSnapshot(status,{...owner,pid:999},params),false);
+  assert.equal(verifySupervisorSnapshot(status,{...owner,bootAt:1},params),false);
+  assert.equal(verifySupervisorSnapshot({...status,children:status.children.map(
+    (x,i)=>({...x,seat:i===5?5:x.seat}))},owner,params),false);
+  assert.equal(verifySupervisorSnapshot({...status,children:status.children.map(
+    (x,i)=>({...x,alive:i!==4}))},owner,params),false);
+  assert.equal(verifySupervisorSnapshot(status,owner,{...params,livePid:pid=>pid!==305}),false);
 });
