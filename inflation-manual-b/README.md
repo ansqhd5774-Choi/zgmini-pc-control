@@ -1,8 +1,16 @@
-# Inflation official manual B (source-only candidate)
+# Inflation official manual B — on-demand execution and evidence
 
-This is a dormant, one-shot, exact-scope Windows adapter. It **is not** an
-installed/registered PC operation and does not change the Core scheduler, DB,
-checkpoint, D1, publishing path, credentials or feature formula.
+This is a one-shot, exact-scope Windows B receiver. It was invoked once on
+2026-11-10 KST ([#1177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1177))
+and **safely stopped before an official GET or PC data write**. Its code and
+approval are not evidence of successful data collection or publication. It does
+not change the Core scheduler, DB, checkpoint, D1, publishing path, credentials
+or feature formula.
+
+**Current objective and progress: 23/26 raw inputs, overall inflation 42%.**
+Finish the missing 3 series from two official files, then existing
+local calculation → Writer → D1 → public API/UI. Only after feature completion
+consider first natural automatic observation-update verification.
 
 ## Intended effect under the existing approved feature scope
 
@@ -13,7 +21,7 @@ checkpoint, D1, publishing path, credentials or feature formula.
 3. **Before acquiring the shared Writer B installation mutex**, observe a
    naturally running `ZGMINI-PC-Local-Core` Task whose Task-Engine-linked `node.exe`
    `local-cycle.mjs` PID owns the **exact** E: `local-cycle.lock` in the same
-   run (bounded six-minute read-only observation). This wait cannot occupy
+   run (bounded twelve-minute read-only observation). This wait cannot occupy
    the shared Writer B mutex or block another function's installer. Then
    acquire that mutex, reverify the PC source, GET the two frozen official
    BLS/Census files with finite limits, and parse the workbook on PC.
@@ -31,28 +39,41 @@ re-attested at approval time. An unchanged BLS/Census file does not trigger
 unnecessary rewriting. A partial mutation keeps the shared Writer B lock and
 records exact private recovery metadata; **no automatic retry or rollback**.
 
-## Activation is deliberately absent
+## On-demand manual operation (no 09:00 gate)
 
-- No operation manifest or Issue is shipped. The existing user approval for
-  official inflation inputs and the standing approval for common registration
-  must first be mapped to the exact manifest; a manifest is a technical
-  boundary, not a reason to demand duplicate user consent. Only effects beyond
-  that existing scope require new authorization.
-- GitHub Actions job requires the opt-in variable
-  `ZGMINI_INFLATION_MANUAL_B_ENABLED` with the exact value `true`. Do not turn
-  it on until a scope-pinned B manifest, exact installed PC file preimage and
-  the existing Core lock protection contract have been reconciled.
-- Any unrelated `pc-job`, generic command or scheduled Cron cannot invoke it.
-- This draft must also be checked against the current shared-resource Issue
-  admission/lifecycle registration before activation. Do not create a second
-  parallel admission system or weaken existing workflow guards.
-- This PR is a development artifact, **not** a PC installation or data capture.
-- The operational objective remains official candidate data storage, then
-  existing computation → Writer → D1 → public API/UI verification. The
-  publication steps are outside this B adapter's authority.
+- **Manual** means an explicit user/owner request executed once as soon as
+  authorized and safely runnable. There is **no** 09:00, next-day or daily
+  scheduler prerequisite in this collector. Do not put unfinished collection,
+  calculation or publication behind an automation task's clock.
+- **Natural automatic verification is later work.** The separate ChatGPT
+  task formerly titled `물가지표 재수집·최종 검증`, with 09:00 daily
+  schedule, was paused on 2026-11-10 KST and restricted to first natural
+  observation-update verification **after** function completion. This change
+  does not disable or modify the approved PC Core/Korea schedules.
+- GitHub Actions is **Issue-opened only**, with no Cron. Exact-scope B is
+  gated by the private default-off variable
+  `ZGMINI_INFLATION_MANUAL_B_ENABLED`; it was confirmed `false` after
+  [#1177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1177).
+  Do not enable it for a new attempt until existing result, source/preimage,
+  Task-linked Core lock ownership and B manifest have been reconciled.
+- The single-use `#1177` requestId was consumed; **never rerun/reuse it**.
+  Any next approved on-demand attempt has its own unique Issue/requestId and
+  exact manifest, with no automatic retry or time-based resubmission. Existing
+  user authorization covers its recorded scope; only additional effects
+  beyond that scope require new approval.
+- A preflight safety failure must return its actual non-success status, even
+  if reporting JSON/TXT succeeded. Never treat an Actions green envelope as
+  actual data storage.
+- The receiver has no permission to change Core Task state, source, shared
+  lock ownership, DB, D1 or unrelated files. Its valid scope is two official
+  static GETs, private archived bytes, at most two named raw JSON updates,
+  and evidence readback, with existing exclusive Core/Writer protection.
+- Manual function completion is **raw 26/26 → saved-data calculation → existing
+  Writer result → D1 readback → API and PC/mobile UI validation**. Scheduled
+  natural-update checking is deferred, not part of that completion gate.
 
-Local tests: `node --test inflation-manual-b/*.test.mjs`. Windows live
-side effects remain untested until the separately approved single-use run.
+Local tests: `node --test inflation-manual-b/*.test.mjs`.
+A source-only merge does not install a PC operation or prove its effects.
 
 ## 2026-11-10 preflight evidence (not execution authorization)
 
@@ -75,17 +96,29 @@ side effects remain untested until the separately approved single-use run.
   [run 42642308955](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/42642308955-1-seat-3.json),
   returned `STATE_UNKNOWN / CORE_NO_ACTIVE_TASK_ENGINE`, not a failed Core.
 
-**Next distinct requirement:** before preparing `APPROVED_B`, reconcile the
-current installed source with the four preimages. The dormant receiver now
-contains an exact-path live lock-owner proof: during the authorized one-shot
-it must observe an active Task-linked Core PID that owns the exact E: lock,
-before any official GET, request claim, or data write. No live Windows proof
-has yet been produced; if Core does not naturally run during the bounded
-window, the run fails closed, without starting or disabling the Task.
-The observed `checkpointSource` (`434f30d2...`) differed from the static
-checkout source (`4273137a...`) in #1105; the later stored Writer checkpoint
-mentions `4273137a...`, but neither observation alone resolves the live Task
-chain. Do not retry A #1119 to turn static evidence into Runtime evidence.
+**Latest evidence and next required execution:**
+
+- [PR #1176](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1176)
+  reconciled the B approval manifest with the observed PC-approved source
+  `48d3478030590ca63aaab2435e88c896608c70d3`.
+- [B #1177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1177),
+  run `42714127327`, returned
+  `INFL_MANUAL_B_PREFLIGHT_STOP / INFL_MANUAL_B_CORE_OWNER_NOT_OBSERVED_STOP`
+  within the original six-minute owner observation. Official GET 0; raw
+  JSON writes 0; 23/26 unchanged. Outer Actions success was not B success.
+- [Read-only A #1181](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1181)
+  later observed an E: Core lock and advancing Core/Writer checkpoints; it
+  did not establish Task-engine-linked ownership **during** the B window.
+- [PR #1183](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1183)
+  merged a bounded 12-minute natural owner-observation window, 30-minute
+  total Actions limit, better observation-gap codes and truthful nonzero
+  exit on non-success status. This is **source-only**, not Windows runtime
+  proof or a reason to reexecute #1177.
+- **Next action:** reconcile the actual Task→Core PID→E: lock ownership using
+  approved read-only evidence. If safely proved, request a new exact-scope
+  single-use B for the two official static sources, then read back both
+  archives and at most two approved raw JSON targets. Do not require any
+  clock time, 6-seat global idle or unrelated Controller work as a gate.
 
 The exact operation manifest must remain within the already-approved scope:
 two official static GETs, archive plus at most two named JSON updates/backups,
