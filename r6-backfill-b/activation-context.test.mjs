@@ -23,7 +23,7 @@ const SHA=createHash('sha256').update(M).digest('hex');
 function fixture(callback){
   const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-r6-activation-'));
   try{
-    const root=path.join(workspace,'r6-workflow-control');
+    const root=path.join(workspace,'r6-activation');
     fs.mkdirSync(path.join(root,'r6-backfill-b'),{recursive:true});
     fs.writeFileSync(path.join(root,'r6-backfill-b','activation-pins.json'),
       JSON.stringify({schema:'ZGMINI_R6_B_WORKFLOW_APPROVAL_PINS_V1',
@@ -52,6 +52,17 @@ test('approved activation SHA and manifest bytes create only a read-only proof',
   assert.equal(result.activationSha,A);
   assert.equal(result.pins.approvalManifestSha256,SHA);
   assert.equal(result.executable,false);
+}));
+
+test('activation proof expects exact disabled workflow checkout path',()=>fixture(data=>{
+  const workflow=fs.readFileSync(new URL(
+    '../.github/workflows/pc-employment-r6-backfill-b-once.yml',import.meta.url),'utf8');
+  assert.match(workflow,/path:\s*r6-activation\s*$/m);
+  assert.match(workflow,/false\s*&&/);
+  assert.equal(check(data).verifiedCheckoutRoot,data.root);
+  const wrongPath=path.join(data.workspace,'r6-workflow-control');
+  fs.renameSync(data.root,wrongPath);
+  assert.throws(()=>check(data),{code:'R6_B_ACTIVATION_CHECKOUT_UNAVAILABLE'});
 }));
 
 test('forged Issue pins cannot change reviewed H/S/M',()=>fixture(data=>{
