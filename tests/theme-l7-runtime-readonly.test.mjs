@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
- safeR181ErrorFlow} from '../controller/theme-l7-runtime-readonly.mjs';
+ safeR181ErrorFlow,safeR181HttpErrorFlow} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -302,6 +302,8 @@ test('unapproved R181 source fingerprint is not structurally inspected',()=>{
   const result=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
   assert.deepEqual(result.sources['r181-primary-cycle.mjs'].safeSourceInspection,
    {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],truncated:false});
+  assert.deepEqual(result.sources['r181-primary-cycle.mjs'].safeHttpErrorFlow,
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],lines:[],truncated:false});
   assert.equal(result.ledgers['R181_PRIMARY_LAST_RUN.json'].safeHttpFailure,null);
  }finally{f.close();}
 });
@@ -369,4 +371,41 @@ test('R181 redacted source handles multiline comments, strings and template valu
   'foo','key=','token='])assert.equal(json.includes(forbidden),false,forbidden);
  assert.deepEqual(safeR181ErrorFlow('throw Error("x")\n'.repeat(1000)),
   {status:'UNREADABLE_SOURCE',lines:[]});
+});
+
+test('approved middle R181 error branch is selected only from redacted code tokens',()=>{
+ const lines=Array.from({length:110},()=> 'const field = "ordinary";');
+ lines[34]='const httpResponse = await fetch("https://secret.example/?api_key=PRIVATE_TOKEN");';
+ lines[50]='if (httpResponse.status !== 200) throw new Error(`R181_SPY_HTTP_${httpResponse.status}`);';
+ lines[62]='// throw fetch R181_SPY_HTTP_502 token=SECRET should never select this line';
+ lines[69]='const label="throw fetch response.status R181_SPY_HTTP_503 SECRET";';
+ lines[72]='const multiline=`throw fetch';
+ lines[73]='response.status SECRET`;';
+ lines[78]='const result = await getPublicData();';
+ const source=lines.join('\n');
+ const out=safeR181HttpErrorFlow(source);
+ assert.equal(out.status,'STATIC_SOURCE_FLOW_ONLY');
+ assert.deepEqual(out.sites,[35,51]);
+ assert.ok(out.lines.some(x=>x.line===35));
+ assert.ok(out.lines.some(x=>x.line===51));
+ assert.equal(out.lines.some(x=>x.line===63||x.line===70||x.line===74||x.line===79),false);
+ assert.ok(out.lines.every(x=>x.line>=20&&x.line<=80&&x.pattern.length<=240));
+ const json=JSON.stringify(out);
+ for(const secret of ['PRIVATE_TOKEN','secret.example','api_key','R181_SPY_HTTP_','502',
+  '503','getPublicData','httpResponse','SECRET','httpResponse.status'])
+  assert.equal(json.includes(secret),false,secret);
+ assert.ok(json.length<6500);
+});
+
+test('R181 error branch inventory is bounded and never claims a runtime failure',()=>{
+ const source=Array.from({length:105},()=> 'throw new Error("SECRET_VALUE");').join('\n');
+ const out=safeR181HttpErrorFlow(source);
+ assert.equal(out.status,'STATIC_SOURCE_FLOW_ONLY');
+ assert.equal(out.sites.length,8);
+ assert.equal(out.truncated,true);
+ assert.ok(out.lines.length<=24);
+ assert.ok(out.lines.every(x=>x.line>=20&&x.line<=80));
+ assert.equal(JSON.stringify(out).includes('SECRET_VALUE'),false);
+ assert.deepEqual(safeR181HttpErrorFlow('throw Error("x")\n'.repeat(1000)),
+  {status:'UNREADABLE_SOURCE',sites:[],lines:[],truncated:false});
 });
