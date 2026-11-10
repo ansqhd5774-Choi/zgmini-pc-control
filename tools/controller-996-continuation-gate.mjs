@@ -91,9 +91,17 @@ export function review996ContinuationGate({manifest,manifestProof,consent,physic
       x.nextAction!=='OWNER_REPLAN_REVIEW_REQUIRED')||
     remote.originalIssues.length!==4)
     return fail('C_CONTINUATION_ORIGINAL_ISSUE_RECONCILIATION_INVALID');
-  if(conflicts?.controllerActiveCount!==0||
-    conflicts?.writerActiveCount!==0||
+  // Only maintenance installs and overlapping continuation claims can race
+  // the three lease-directory moves. The long-lived maintenance receiver,
+  // independent Core tasks, and Writer data/source lanes are NOT global idle
+  // requirements. In particular, `writerActiveCount` (when provided for
+  // context) must never become a blanket gate for unrelated work.
+  // The real operator must independently authenticate these scoped physical
+  // observations immediately before each move; this pure review never does.
+  if(conflicts?.scope!=='CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES'||
+    conflicts?.foreignInstallOwnerCount!==0||
     conflicts?.otherContinuationCount!==0||
+    conflicts?.twoSnapshotsIdentical!==true||
     conflicts?.fresh!==true)
     return fail('C_CONTINUATION_SHARED_RESOURCE_CONFLICT_OR_UNKNOWN');
   return Object.freeze({schema:'ZGMINI_CONTROLLER_996_C_CONTINUATION_GATE_V1',
