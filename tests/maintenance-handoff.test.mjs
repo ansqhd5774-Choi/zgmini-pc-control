@@ -65,6 +65,16 @@ test('V1 six-to-seven and V2 seven-to-seven require distinct, exact approvals',(
   'SIX_TO_SEVEN');
  assert.equal(requireHandoffApproval({...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',
   transition:'SEVEN_TO_SEVEN'},targetSha,installedSha),'SEVEN_TO_SEVEN');
+ for(const badSha of [null,undefined,'',0,'not-a-sha','a'.repeat(39),'A'.repeat(40)]){
+  const v2={...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',
+   transition:'SEVEN_TO_SEVEN',installedSha:badSha};
+  assert.throws(()=>requireHandoffApproval(v2,targetSha,badSha),/HANDOFF_APPROVAL_REQUIRED/);
+ }
+ assert.throws(()=>requireHandoffApproval({...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',
+  transition:'SEVEN_TO_SEVEN',targetSha:installedSha},installedSha,installedSha),
+ /HANDOFF_APPROVAL_REQUIRED/);
+ assert.throws(()=>requireHandoffApproval({...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',
+  transition:'SEVEN_TO_SEVEN',targetSha:null},null,installedSha),/HANDOFF_APPROVAL_REQUIRED/);
  for(const approval of [
   {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V1',transition:'SEVEN_TO_SEVEN'},
   {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2'},
