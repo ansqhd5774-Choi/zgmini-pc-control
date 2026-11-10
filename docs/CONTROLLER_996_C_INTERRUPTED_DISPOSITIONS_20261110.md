@@ -1,5 +1,15 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 실제 C 운영 승인 전 신규 GET 인증 어댑터·중단 상태 분류 — 소스 검증 205/205
+
+- **이번 변경은 실제 C 복구 실행기가 아니라 다음 실행기의 읽기 전용 구성요소**다. `tools/controller-996-authenticated-github-get.mjs`는 `api.github.com` 고정 원본에서 계정명+숫자 ID·비공개 제어 저장소를 확인하고, 원본 #996 Issue/댓글 전체 페이지 및 새 불변 Manifest 40hex commit 경로에 한한 **GET 요청**만 제공한다. 토큰을 로깅하지 않고, 외부 리디렉션·응답 URL 변경·예상치 못한 메서드/경로·HTTP 비200·JSON 불일치·초과 크기 스트림을 차단한다. 주입식 `fetchImpl`은 `testOnly:true`에서만 허용한다. 이 함수의 `readOnly:true`는 사용 API가 GET뿐이라는 의미이며 토큰 자체의 서버 쓰기 권한 부재를 증명하지 않는다. 실제 GitHub 인증 호출은 **이 턴 수행하지 않았다**. 독립 가짜 fetch 테스트 8/8 PASS.
+
+- `tools/controller-996-c-physical-disposition-readonly.mjs`는 원본 old C Claim·Install Lease가 남은 상태, 새 Claim 예약, 원본 C 보관 직후, READY 기록 후, 신규 continuation 보관 후, Install Lease 보관 후 등 **6가지 주입 스냅샷 위치**를 구분한다. 모든 경로에서 `executionAuthorized=false`·운영 쓰기/자동 재시도 0을 반환하며, 원본/보관 동시 존재·SHA 변경·활성 Writer·문제 있는 마커·불분명한 이동은 UNKNOWN으로 중단한다. 새 시험 12/12 PASS. 이는 입력을 외부에서 제공받는 **순수 분류기**이므로 실제 원본 Windows의 독립 인증이나 새로운 C 승인 자체가 아니다.
+
+- 기존 전체 #996 Node/정적 회귀 **185/185 → 205/205 PASS**(신규 8+12, 기존 코드 미변경). 신규 4파일 GitHub Draft 브랜치 원격 내용은 로컬 소스와 **4/4 바이트 일치** 확인. 이전 Windows TEMP 시험 **7/7·29/29**은 독립된 네이티브 증거로 유지한다. 실제 운영 PC·Workflow·Backlog·Issue/pc-job 쓰기 **0회**, 운영 **80%→80%·C NO-GO**.
+
+- **후속 P0:** 원본 E: 파일/실제 프로세스·Writer·Lease를 신뢰된 Windows 경로에서 직접 확인하는 물리적 읽기/CAS; 기존 C Claim의 독립된 소유자 provenance; 서로 다른 continuation UUID 사이 **공유 배타적 예약/fencing**(기존 Install 잠금을 마지막까지 보존); 인증 GET과 원본 4개 pc-job의 실결과/Backlog 대조; 동일 부모 `leases` 디렉터리 이동·경합/중단 실증; 실제 source/package/source-lock 해시 봉인 후 원본 #996 Owner의 **별도 정확한 신규 C 승인**. 현재 #996 신규 owner 댓글 **0건**이므로 실제 C 운영 실행/원본 설치 잠금 해제는 금지한다.
+
 ## 2026-11-11 신규 Windows C 단계 TEMP 7/7·29/29 네이티브 실측 — 운영 C NO-GO
 
 - 물리적으로 **별도인 Windows PC**에서 사용자가 신규 `RUN_996_WINDOWS_C_STAGE_TEMP_ONCE.cmd` 실행 후 콘솔 화면을 제출했다. 화면 `ZGMINI_996_WINDOWS_C_STAGE_NATIVE_FIXTURE_V1`, `status=ISOLATED_WINDOWS_C_STAGE_NATIVE_TEST_ONLY`, `casesPassed=7`, `checksPassed=29`, `createdFixtures=7`을 확인했다. **현재 신규 Windows C 단계 격리 fixture 7/7·29/29 PASS**로 수락하며, 아래의 최초 0/7 기록은 실측 전 이력이다.
