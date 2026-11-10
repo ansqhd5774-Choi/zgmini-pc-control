@@ -5,6 +5,7 @@
 현재 업무·브랜치·기존 승인·완료 증거를 보존하고 마지막 유효 완료 지점부터 이어서 수행하라. **이 지침을 받은 일반챗은 자기 원래 기능의 다음 필수 실행을 즉시 진행하라.**
 
 1. 제어 저장소 ansqhd5774-Choi/zgmini-pc-control main의 AGENTS.md·GENERAL_CHAT_START.md·공통 정본에서 필요한 내용을 읽고 현재 업무의 다음 실행으로 진행하라. 지침 확인 보고로 끝내지 마라.
+   - **격리 Writer B 자동 인계(2026-11-10):** 정규 Writer B의 인증된 수리 가능 실패만 별도 Windows CI Runner가 `agent-handoff`로 등록하고 단일 중앙 ChatGPT가 처리한 뒤 원본 GitHub Issue에 결과를 기록한다. `WAIT_RECORDED`·성공은 수리 사건이 아니며, Issue 댓글은 다른 일반챗의 자동 수신/재개가 아니다. 실제 자기 대화 재개 시 원본 Issue를 확인하고 기능 작업을 계속하라. 새 격리 경로의 자연 수리 실패 전체 왕복은 후속 미관측이며 전역 Gate가 아니다. [중앙 계약](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md)과 [PC 공통 정본](PC_AUTOMATION_STANDARD.md)을 따른다.
 2. 다음 실행에 필요한 입력·설치 모듈·경로·승인만 확인하고 기존 공통 등록기·수집/계산/게시기·adapter를 재사용하라. 정상 업무마다 전체 Controller 상태·과거 복구·전체 테스트를 반복 점검하지 마라.
 3. 기존 성공 증거는 내부 진행 전제로 재사용하라. 과거 Controller 복구·설치 재확인을 이번 업무의 신규 성과나 핵심 진전으로 보고하지 마라. 해당 상태가 실제로 바뀌거나 현재 실행을 막을 때만 필요한 범위로 보고하라.
    - 관련 성공 실행물은 [SUCCESS_EVIDENCE_REUSE.md](SUCCESS_EVIDENCE_REUSE.md)에서 필요한 유형만 조회하라. 기존 승인 manifest·고유 Windows Run·원격 JSON/TXT·검증 단계가 연결된 구조를 재사용하고, 과거 before SHA/승인/운영 source를 새 작업에 복사하지 마라. 재사용 가능한 새 공통 패턴이 실증되면 기존 결과 링크를 색인하되, 성공 보고만 위한 신규 Gate·예약·중복 파일은 만들지 마라.
