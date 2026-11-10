@@ -170,6 +170,10 @@ test('synthetic test GET origin may not stand in for independent consent',async(
   const f=fixture();f.current.testOnly=true;
   await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
 });
+test('missing synthetic flag never counts as independent network authentication',async()=>{
+  const f=fixture();f.current.testOnly=undefined;
+  await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
+});
 test('unrecognized reader token identity kind fails closed',async()=>{
   const f=fixture();f.current.readerKind='UNKNOWN_AUTHENTICATION';
   await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
