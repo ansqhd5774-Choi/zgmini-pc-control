@@ -75,6 +75,35 @@ function summarizeRun(row,provider){
  };
 }
 const day=x=>Date.parse(x+'T00:00:00Z');
+const DAY_MS=86400000;
+const WEEK_MS=7*DAY_MS;
+function tenYearStart(week){
+ const d=new Date(`${week}T00:00:00Z`),month=d.getUTCMonth(),dayOfMonth=d.getUTCDate();
+ d.setUTCFullYear(d.getUTCFullYear()-10);
+ if(month===1&&dayOfMonth===29&&d.getUTCMonth()!==1)d.setUTCDate(28);
+ return d.getTime();
+}
+function fullTenYearRawCoverage(weeks,complete){
+ const latest=weeks.at(-1)?.week;
+ if(!latest)return {status:'INSUFFICIENT_RAW_WEEKS',observedRawWeeks:0,requiredRawWeeks:null,referenceWeeks:null};
+ const latestMs=day(latest),referenceWeeks=Math.floor((latestMs-tenYearStart(latest))/WEEK_MS);
+ const requiredRawWeeks=referenceWeeks+56;
+ const result={status:'INSUFFICIENT_RAW_WEEKS',observedRawWeeks:weeks.length,
+  requiredRawWeeks,requiredRows:requiredRawWeeks*51,referenceWeeks,
+  firstRequiredWeek:new Date(latestMs-(requiredRawWeeks-1)*WEEK_MS).toISOString().slice(0,10),
+  latestRequiredWeek:latest,firstFailureWeek:null};
+ if(weeks.length<requiredRawWeeks)return result;
+ const required=weeks.slice(-requiredRawWeeks);
+ for(let i=0;i<required.length;i++){
+  const w=required[i],expected=latestMs-(requiredRawWeeks-1-i)*WEEK_MS;
+  if(day(w.week)!==expected)return {...result,status:'NONCONSECUTIVE_10Y_WEEKS',firstFailureWeek:w.week};
+  if(!complete(w))return {...result,status:'REGION_51_COVERAGE_GAP',firstFailureWeek:w.week};
+  // The approved R6 transform excludes prior four-week averages of zero.
+  if(i>=55&&required[i-52].zeroPriorRegions!==0)
+   return {...result,status:'PRIOR_4W_ZERO_BASE',firstFailureWeek:w.week};
+ }
+ return {...result,status:'RAW_PRECONDITIONS_COMPLETE'};
+}
 function coverage(rows){
  if(!Array.isArray(rows))return {status:'UNKNOWN'};
  const weeks=rows.map(r=>({week:date(r.observation_date),count:safeInt(r.row_count),regions:safeInt(r.region_count),
@@ -102,6 +131,7 @@ function coverage(rows){
   complete51Weeks:weeks.filter(complete).length,incompleteWeeks:weeks.filter(x=>!complete(x)).length,
   latestComplete51Week:latestComplete,latestStrict52WeekCandidate:latestCandidate,
   strict52WeekCandidateCount:eligible,firstWindowBreak:earliestBreak,latestWindowBreak:latestBreak,
+  fullTenYearRawCoverage:fullTenYearRawCoverage(weeks,complete),
   recentIncompleteWeeks:weeks.filter(x=>!complete(x)).slice(-8).reverse().map(x=>({week:x.week,regions:x.regions,rows:x.count,unknownCodes:x.unknown})),
   note:'COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION'};
 }
@@ -159,7 +189,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
   const weekly=db.prepare(`WITH recent_weeks AS (
     SELECT observation_date FROM market_score_employment_r4_shadow_current_v1
     WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
-    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 160
+    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600
    ), region_windows AS (
     SELECT c.observation_date,c.geography_code,
      SUM(c.value) OVER (PARTITION BY c.geography_code ORDER BY c.observation_date
@@ -173,7 +203,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
     SUM(CASE WHEN geography_code NOT IN (${countryMarkers}) THEN 1 ELSE 0 END) AS unknown_code_count,
     SUM(CASE WHEN prior_four_week_total=0 THEN 1 ELSE 0 END) AS zero_prior_region_count
    FROM region_windows
-   GROUP BY observation_date ORDER BY observation_date DESC LIMIT 160`).all(...CORE_STATES);
+   GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600`).all(...CORE_STATES);
   result.stateClaims=coverage(weekly);
   result.status='PASS';result.code='R6_DOL_BED_STORED_EVIDENCE_READONLY';
   return result;
