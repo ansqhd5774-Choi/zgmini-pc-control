@@ -1,0 +1,52 @@
+{
+  "schema": "ZGMINI_996_WINDOWS_C_STAGE_NATIVE_FIXTURE_SCREENSHOT_TRANSCRIPTION_V1",
+  "issue": 996,
+  "observedDate": "2026-11-11",
+  "provenance": {
+    "kind": "user_supplied_separate_windows_pc_console_screenshot",
+    "screenshotSha256": "86ab26ab808fd2027c390c37fc24225736a5506104a1de5dc9ac186fb6f0ebb7",
+    "rawScreenshotUploadedToGitHub": false,
+    "humanOperatorReportedSeparatePhysicalWindowsPc": true,
+    "independentPcIdentityAuthenticated": false,
+    "independentOsWriteAudit": false,
+    "executedZipSha256IndependentlyObserved": false
+  },
+  "package": {
+    "repo": "ansqhd5774-Choi/zgmini-pc-control",
+    "commit": "3fa2c0a665dbec586fff13e5a49f5d29e87332a8",
+    "path": "artifacts/controller-996/zgmini-996-windows-c-stage-native-fixture-r1.zip",
+    "sourceZipSha256": "5f1d054c72f3528525db04e1e5d84615fc5f9e4c90c4cff870b7ab85ca819af8",
+    "sourceBundleContainsProductionOperator": false
+  },
+  "consoleResult": {
+    "schema": "ZGMINI_996_WINDOWS_C_STAGE_NATIVE_FIXTURE_V1",
+    "status": "ISOLATED_WINDOWS_C_STAGE_NATIVE_TEST_ONLY",
+    "casesPassed": 7,
+    "checksPassed": 29,
+    "createdFixtures": 7,
+    "executionAuthorized": false,
+    "operatorReady": false,
+    "originalPcWrites": 0,
+    "workflowPuts": 0,
+    "backlogWrites": 0,
+    "issuePosts": 0,
+    "pcRetries": 0,
+    "cleanupPerformed": false
+  },
+  "interpretation": {
+    "acceptedNativeWindowsFixtureCases": 7,
+    "acceptedFixtureChecks": 29,
+    "isolatedSyntheticFixturesOnly": true,
+    "liveOriginalPcCOperatorValidated": false,
+    "freshOriginalPcCasAndWriterValidated": false,
+    "originalClaimProvenanceValidated": false,
+    "currentBacklogReconciliationValidated": false,
+    "continuationOwnerConsentValidated": false,
+    "windowsDirectoryMoveCrashPowerLossDurabilityValidated": false,
+    "productionCOperationAuthorized": false,
+    "cRecoveryStatus": "NO_GO",
+    "overallOperationalCompletionPercentBefore": 80,
+    "overallOperationalCompletionPercentAfter": 80
+  },
+  "nextRequiredAction": "Implement and independently review authenticated native Windows production C operator with fresh exclusive continuation claim, physical CAS and Writer checks, original provenance, owner-specific consent and job reconciliation; do not execute until separately authorized."
+}
