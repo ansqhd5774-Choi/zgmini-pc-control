@@ -19,7 +19,8 @@ test('temporary ACL fixture rejects production invocation before creating files'
 test('temporary ACL fixture restores on normal and injected failures', () => {
   assert.match(source, /\[switch\]\$InjectFailure/);
   assert.match(source, /\} finally \{/);
-  assert.match(source, /Set-Acl -LiteralPath \$finalPath -AclObject \$originalAcl/);
+  assert.match(source, /\$sourcePresent -xor \$archivePresent/);
+  assert.match(source, /Set-Acl -LiteralPath \$restoreTarget -AclObject \$originalAcl/);
   assert.match(source, /\$afterDacl -ceq \$beforeDacl -and \$afterHash -ceq \$initialHash/);
   assert.match(source, /C996_SECURITY_PROOF_INJECTED_FAILURE/);
 });
