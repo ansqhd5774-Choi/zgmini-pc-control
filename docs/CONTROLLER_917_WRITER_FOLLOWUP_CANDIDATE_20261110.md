@@ -79,3 +79,16 @@
 - 실행 코드 source `776cfcf8a77b9b48f813c59d030fac01922e044d` 및 candidate 원문 `88db8171...`의 나머지 항목을 바꾸지 않고 approved만 true로 고정했다.
 - 새 실행 승인 원문 SHA-256: `fbea40ba0ead0961088891d1187ea9b8a50e352b73fd87ac03616d49940dc860`.
 - 승인 적용 직전 기존 journal 5건/tail, claim owner, 원본 ledger, 최신 config 일치 및 continuation 미시작을 확인했다. 승인 계약 집중 검사 10/10 PASS. 실제 후속 C 실행 결과는 아래 후속 증거로 구분한다.
+## 2026-11-10 후속 C 실제 실행과 최종 정리 전용 후보
+
+- 승인된 source `776cfcf8a77b9b48f813c59d030fac01922e044d`/승인 원문 `fbea40ba...`를 실제 Windows TTY에서 단회 실행했다. 기존 #1215를 연결해 `backlogVerified=true`까지 통과했고 #919 신규 POST는 0건이다.
+- 사후 진단 #1216은 한 번 생성됐으며 Actions `42731249968`, attempt 1, seat 3에서 `PASS / CORE_READONLY_DIAGNOSIS`로 완료됐다. 실제 Controller badad912, 보호 불변, 운영/공급처/D1 쓰기 0. JSON/TXT 원본 두 파일의 Blob·SHA-256도 재조회했다.
+- 다만 C 실행기는 postcheck Issue 생성 직후 `POSTCHECK_OUTCOME_UNKNOWN`으로 중단했다. 원본 ledger 해시는 여전히 동일하며 install lease/원래 claim/후속 claim과 13개 journal 기록은 모두 보존했다. 재제출·자동 재시도·잠금 삭제는 0건이다.
+- 원격 성공 결과가 확인됐으므로 신규 replay/postcheck 없이 보관만 수행하는 별도 finalization 경로를 준비했다. 이전 결과 연결 경로 보완 시 postcheck의 같은 중단 경로까지 함께 대비하지 못했으며, 이번 후보는 Issue 생성 함수를 호출하는 포트 자체를 전달하지 않는다.
+- 코드 source: `e0cf3382b0dc4c8a6d6e2e6bacc171500f318742`. 관련 Windows 로컬 Node 테스트 **131/131 PASS**. 실제 Windows 읽기 전용 prepare 1회도 `POSTSWITCH_APPROVAL_CANDIDATE_READONLY`, `operationalWrites=0`으로 통과했다.
+- 미승인 후보: `approvals/maintenance-recoveries/pc-update-877e10c8-8580-4095-a675-bef9ec032193.postswitch.finalize1216.candidate.json`, `approved:false`, 원문 SHA-256 `e2f4ca8a306ab48eaebaaf3a6996b0f8ec1aaf1f7805a8418b542c1953d063d2`.
+- 이 후보는 원래 owner와 종료된 후속 owner, 기존 13건의 chain tail, 기존 승인 원문/commit/source, #1215/#1216의 유일한 Issue 및 JSON/TXT 4개 원본을 고정한다. `finalize-1216` 하위 claim으로 이중 정리를 차단하고 기존 owner/기록을 덮어쓰지 않는다.
+- 새 사용자 C 승인 후에만 활성 승인 파일의 source/tool hashes를 해당 후보로 고정할 수 있다. 이전 승인을 새 source의 실행 승인으로 자동 확대하지 않는다.
+- 승인 시 효과는 기존 결과 검증 → 현재 보호/전용 6 Runner/Supervisor/Workflow 및 원본 불변 확인 → recovery claim 보관 → install lease 보관 → completion 원문 재조회뿐이다. #919 재실행·새 사후 진단·Controller/Writer 재설치·Core/DB/D1 변경은 없다.
+- 정리 중 결과 불명확이면 `archiveOutcomeUnknown`으로 유지하고 기존 원본/보관 위치를 조회한다. 재실행/삭제/롤백으로 정상처럼 만들지 않는다.
+- 아직 마지막 잠금 보관과 completion 검증이 남아 있어 Controller 7/8, 공통 대기열 4/5 유지다.
