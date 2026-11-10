@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 원본 PC C 사전검증 10핀 2회 읽기 전용 소스 — **실행 전/운영 C NO-GO**
+
+- 원본 PC에서만 사용하도록 제한한 `tools/controller-996-c-original-prewrite-readonly.mjs`와 단위시험 1개를 Draft PR #1222에 추가했다. 기존 C Claim owner·Marker 3개·Install Lease 2개·Backlog·세 Source Manifest **정확히 10개 SHA/파일 식별정보 2회**, 이전 Owner PID 종료·신규 archive/continuation 부재·R1 보호 14/14·R4 Git bytes 84/84를 안전하게 판독하도록 구성했다. **아직 원본 PC에서 신규 소스를 실행한 적은 없고, CLI/CMD/ZIP도 없다.** 모의 입력에서는 진본성 증명이 되지 않는다.
+- 신규 독립 Node 시험 **6/6**, 전체 #996 정적·격리 회귀 **262/262 PASS**, 원격 소스 2파일 바이트 비교 **2/2**. 결과는 항상 `executionAuthorized=false`, 기존 PC 파일 이동·Lock 해제·Workflow PUT·Backlog·Issue 변경 **0**이다. 사전검증 소스 자체를 C급 운영 실행기로 간주하지 않는다.
+- 승인 Manifest에 필요한 원본 SHA **10개 중 고정 증거 5개 확인·현재 C Claim/Marker/Backlog 5개는 현재 원본 PC 재조회 필요**. 과거 R3에는 해시가 콘솔 출력되었으나 현 채팅/정본에는 실제 5개 값이 보존되지 않았다. 없는 해시 추정이나 초기화·재요청 금지. 설치형 A급 Core 조회는 C Claim 소유권을 독립 인증하지 못하며 원본 pc-job #1217/#1219/#1226/#1227은 **4/4 Open·결과 댓글 0/4**로 유지한다.
+- **남은 필수 단일 개발 과제:** 신규 C급 실운영 operator·독립 Claim/Writer 경합 직전 CAS·중단 복구 프로토콜과 실행 바이트/ZIP/Source Lock 봉인 → 미래 정확 Owner 승인 Manifest/댓글 → 기존 PC에서 승인된 단회 C 복구. 별도 PC 네이티브 TEMP 2-process 1/1 PASS는 재검증 불필요. 현재 원본 PC에서 구 C CMD 재시도, 파일 이동, Lease 정리 **금지**. 전체 5단계 수명주기 **4/5 = 80%→80%**, PR Draft, C NO-GO.
+
 ## 2026-11-11 별도 Windows 2-process 고정 예약 경합 실측 1/1 PASS — C 운영 NO-GO
 
 - **실물 PASS:** 사용자가 새 격리 Windows PC에서 `RUN_996_WINDOWS_C_CONCURRENT_FENCE_TEMP_ONCE.cmd` 실행 콘솔을 공유했다. 결과 스키마 `ZGMINI_996_WINDOWS_C_CONCURRENT_FENCE_RESULT_V1`, status `ISOLATED_WINDOWS_C_CONCURRENT_FENCE_TEST_ONLY`, `casesPassed=1`, `processesStarted=2`, `distinctProcessIds=true`, `readyBeforeGo=true`, `fixedReservationAtomicMove=true`, `winners=1`, `busy=1`, `createdFixtures=1`. 이로써 앞선 순차 예약 10-case만으로는 미입증이었던 **서로 다른 Windows PowerShell 실제 프로세스 두 개의 동일 고정 이름 선점/경합**이 **합성 TEMP 범위에서 실측 PASS**다.
