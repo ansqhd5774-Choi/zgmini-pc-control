@@ -1,5 +1,13 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 OFFLINE Git 바이트 검증 R4 소스 봉인 — 운영 NO-GO
+
+- **목적/범위:** 실제 복구·재실행의 승인과 무관하게, 기존 R3 원본 Windows 보존 상태에서 설치 Controller **38개**, Stage **39개**, Maintainer **7개**, 합계 **84개** 파일을 불변 Git 원본과 **읽기 전용으로** 대조할 수 있는 보조 도구를 추가했다. 독립 GitHub REST 조회로 고정 Git commit 3개의 트리 SHA와 각 Git blob 경로·SHA1·크기를 **84/84 대조, 불일치 0**, 중복 제외 원문 Git blob **48종**의 SHA256을 봉인했다.
+- **중요한 설계 교정:** 최초 Git 실행(`git.exe`) 기반 R4 초안은 OS `PATH` 변조·부분 Git clone 등의 불확실성이 있어 **미배포 폐기**했다. 현재 R4는 `git`, 하위 프로세스, 네트워크, PC-job, 로그/원본 파일 쓰기를 전혀 호출하지 않고, 봉인된 오프라인 SHA256 + Git blob SHA1/크기를 실제 원본 E: 파일과 비교한다. 직접 import 호출자가 검증 Manifest SHA를 임의 대체하는 우회도 운영 경로에서 고정 SHA 필수로 차단했다.
+- **별도 5파일 패키지:** `artifacts/controller-996/zgmini-996-git-source-readonly-r4.zip`, **ZIP SHA256 `07874b2cbf4c63ed98f14a464f6491df76829c6a51fe4d8fd5d86be946d1a0a7`**. 파일은 `RUN_996_GIT_SOURCE_READONLY_R4_ONCE.cmd`(SHA256 `4c9f64749e426105e702caacfdb4b7ac93dfb2fcb3dfae4ff665d7d76b1436c2`), `controller-996-git-source-readonly-cli-r4.mjs`(SHA256 `b0f6b834ab82f76e355a1879352d445dfdc7fc6520f7a1d36aed4760c010c4f6`), `controller-996-git-byte-offline-readonly-r4.mjs`(SHA256 `bc5a5e5cb0c6ced192f5a6c3b9898b8ac3e319076e07bd2de3b9d9872ff5facd`), `controller-996-git-byte-offline-manifest-r4.json`(SHA256 `0978bae8a0e260a65a2d690fbee21f751d06bb4bb26d55051d30d081f4619f6f`), `controller-996-git-source-readonly-source-lock-r4.json`(SHA256 `d9671e500891b1935ddd2b12e38fd1a0b4c3a202c541a814afb3cc508543bb2f`)이다. ZIP CRC 검사 **5/5 정상**.
+- **검증 결과:** 전체 소스·격리 fixture 회귀 **157/157 PASS**, GitHub 불변 트리 경로/Blob 메타 **84/84 일치**. 그러나 이는 **Linux/정적 시험**이며, 원본 Windows의 R4 실행 **0건**, 독립 Windows 네이티브 TEMP 이동 시험 **0건**, 신규 C 원문 승인 **0건**이다. ZIP 전체 SHA256은 별도 고정한 뒤 사용자 실행 전에 검산해야 하며, Windows reparse point·경합·파일 변경 시점은 실제 실증이 필요하다. R4가 PASS여도 C 실행 승인이 아님.
+- **작업/권한 경계:** Draft PR #1222의 소스 전용 후보만 갱신한다. 기존 실패한 `RUN_996_NATIVE_C_ONCE.cmd`, R2 CMD를 재사용하지 않는다. 원본 C Claim/Install Lease·Backlog·Workflow·원본 Issue를 이동·변경·재발행하거나 PC 복구를 실행하지 않는다. 네 개 미완료 원본 Job은 성공 처리/자동 재발행 없이 원담당 재계획 검토 상태로 둔다. **전체 운영 진행률 80% → 80%, 실제 C 복구 NO-GO**.
+
 ## 2026-11-11 Codex 사용량 중단 후 재개: 보관 충돌 격리 시뮬레이션
 
 ### 독립 검토 보완 정본 — 원본 승인 누락·경로 불일치 교정 (운영 NO-GO)
