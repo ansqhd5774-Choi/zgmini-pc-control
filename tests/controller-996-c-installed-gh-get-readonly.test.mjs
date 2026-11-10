@@ -62,6 +62,35 @@ test('rejects unlisted endpoints and repeated authentication',async t=>{
   assert.equal(seen.length,2);
 });
 
+test('fixed workflow GET authenticates owner and repository without generic route expansion',async t=>{
+  const endpoint=`repos/${REPO}/actions/workflows/pc-job.yml`;
+  const {client,seen}=fixture(t,{[endpoint]:{
+    id:23123,path:'.github/workflows/pc-job.yml',state:'active',
+  }});
+  assert.equal(client.readWorkflowStateReadOnly(),'active');
+  assert.equal(seen.length,3);
+  for(const call of seen){
+    assert.deepEqual(call.args.slice(0,3),['api','--method','GET']);
+  }
+  await assert.rejects(client.get('actions/workflows/pc-job.yml'),
+    /C_996_INSTALLED_GH_GET_NOT_AUTHORIZED/);
+  await assert.rejects(client.authenticateReadOnly(),
+    /C_996_INSTALLED_GH_AUTH_REUSED/);
+});
+
+test('missing or disabled workflow cannot pass the fixed GET reader',t=>{
+  const endpoint=`repos/${REPO}/actions/workflows/pc-job.yml`;
+  for(const value of [
+    {id:23123,path:'.github/workflows/pc-job.yml',state:'disabled_manually'},
+    {id:23123,path:'other.yml',state:'active'},
+    {path:'.github/workflows/pc-job.yml',state:'active'},
+  ]){
+    const {client}=fixture(t,{[endpoint]:value});
+    assert.throws(()=>client.readWorkflowStateReadOnly(),
+      /C_996_INSTALLED_GH_WORKFLOW_STATE_UNVERIFIED/);
+  }
+});
+
 test('cannot use production entrypoint or arbitrary synthetic path on Linux',()=>{
   assert.throws(()=>create996InstalledGhGetReadOnly(),
     /C_996_INSTALLED_GH_ORIGINAL_WINDOWS_ONLY/);
