@@ -6,8 +6,27 @@
 
 `tools/controller-996-c-transaction.mjs`는 실제 운영 복구 **순서·차단·불확실 상태 규칙**만 표현한다. `simulate996CTransaction`은 테스트에서 전달한 가상 포트만 순차 호출하며, 이 저장소의 파일·GitHub Workflow·Backlog·잠금에 접근하지 않는다. 승인·운영 실행·Windows 검증을 대신하지 않는다.
 
-`validate996CContract`는 실물에서 검증된 상태가 아니라 독립적으로 받은 **후보 진술**만 분류한다. 
+`validate996CContract`는 실물에서 검증된 상태가 아니라 독립적으로 받은 **후보 진술**만 분류한다.
 `approved:true`, `userConsentReceiptVerified:true`, `committedManifestVerified:true`, 임의 `ownerDeadProven`을 외부 입력에 기입하는 행위 자체는 증거가 아니다. 실사용에는 별도의 검증된 Windows 고정 어댑터가 정확한 Git 커밋 manifest, 원시 파일 바이트/owner nonce, GitHub API, 실제 사용자 C 승인 원본을 독립 재검증해야 한다.
+
+## 2026-11-10 원본 Windows 실측과 C급 예외 경계
+
+원본 Windows PC에서 실제 관측된 `ZGMINI_CONTROLLER_996_ORIGINAL_WINDOWS_OBSERVATION_V1` (`2026-11-10T03:02:02.041Z`)은 **18개 중 16개 참**, 다음 두 검증은 정확히 `false`였다.
+
+- `workflowDisableActorVerified=false`: `INTAKE_PAUSED`까지 도달한 설치된 `16064e29...` 유지보수기 소스에는 backlog pause→GitHub Workflow disable API→readback 순서가 있다. 이는 #996 실행의 **제한적 인과 경로**이지 GitHub 독립 actor audit이 아니다.
+- `protectedBaselineVerified=false`: Writer/Task의 장애 이전 스냅샷은 `waitForDrain()` 이후의 `backup()`에서 처음 영구 저장되는데, 이번 실패는 앞 단계다. 역사적 기준을 **복원하거나 만들어내지 않는다.** 다른 실행자의 변경 부재도 주장할 수 없다.
+
+원본 raw digest는 `ledger`, `owner`, `recoveryMarker`, `backlog`, `controllerHost`, `stagedHost`, `maintainerManifest` **정확히 7개**다. 8번째 `protectedSnapshot`은 존재하지 않는다. 최초 원본 관측의 보호 집계 SHA256은 `877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86`이다.
+
+다음 독립 보완은 원본 Windows PC에서 `RUN_996_PROTECTED_READONLY_ONCE.cmd`를 **1회** 실행하여 Writer 3개(`config.json`, `quota-runner.cmd`, `run-local.cmd`)·Task 2개(Core/Korea)의 **개별 SHA256, 실제 Task enabled 값, 전체 존재·집계 일치**를 확인하는 것이다. 이 보완 관측도 쓰기 0, 역사적 기준 생성 0이며, 기존 집계와 다르면 바로 중단한다. **새로운 PC나 블로그 Runner에서 실행하는 작업이 아니다.**
+
+이후 별도의 C급 사용자 승인은 아래를 명시적으로 받아야 한다.
+
+1. `PHASE_SCOPED_EVIDENCE_EXCEPTION`: GitHub Workflow disable actor의 독립 확인 부재와 역사적 보호 기준 복원 불가, 다른 주체의 보호 상태 불변을 입증하지 못함을 **모두 명시 인정**.
+2. #996 동일 request/issue/Controller SHA·유지보수기 SHA, 원본 실측 raw digest 7개, 보호 상태 집계와 개별 해시·Task 상태, 관측 시각을 승인 명세에 고정.
+3. 허용 효과는 **기존 `pc-job` Workflow 1회 활성화 / #996 열린 backlog 창 1회 종료 / 기존 결과 읽기 전용 정리 / 원본 설치 lease 사후 검증 후 보관**뿐. 설치·Core/Korea·Writer 변경·원본 Issue 재게시·동일 requestId 재실행은 허용하지 않는다.
+
+별도 C급 승인 전 **현재 원본 설치 잠금·Workflow disable 상태 유지**. 시뮬레이터에서 `approved:true`를 기입한 것이 실제 실행 권한이 아니다. 16/18을 임의로 18/18로 바꾸는 코드도 없다.
 
 ## 고정 상태 순서
 
@@ -26,16 +45,18 @@
 | 11 | 해당 #996의 원래 install lease만 보관 | 앞선 읽기·보호 결과 모두 PASS | STOP, 추가 archive 금지 |
 | 12 | 독립 최종 재조회 | 접수 active·원본 install lease 보관·원본 SHA 확인 | STOP |
 | 13 | 별도 완료 원장 기록 | 원본 원장 덮어쓰기 없음, 실패 결과 별도 보관 | STOP |
+| 14 | **자기 복구 예약만** 완료 상태로 보관 | 완료 원장 성공 확인 후, CAS로 자기 claim만 archive; 원본 설치 잠금과 구분 | 불명확 시 재시도 없이 독립 재조회 |
+| 15 | 자기 복구 예약 부재/보관 독립 재조회 | 자기 claim 보관 확인, 완료 기록·원본 원장 일치 | STOP, 미확인 완료 주장 금지 |
 
 `simulate996CTransaction`은 각 단계의 `true` 이외 응답을 모두 불확실로 분류한다. 원자 예약을 **시도**한 시점부터 결과가 불명확하더라도 claim 확인 전 재실행하지 않으며, Workflow enable/lease archive **시도 횟수**도 측정한다. 검증된 진짜 실행기에서는 각 성공의 원본 출처와 독립 재조회가 필요하다.
 
 ## 현재 실증 미완료
 
-- #996 Windows 공식 진단 원본 최신값 미수신. 이전 2026-11-10 10:36 KST 관측만 최신으로 재사용하지 않는다.
-- Workflow 중단 행위자와 장애 전 보호 스냅샷은 진단기의 `false/null`로 남아 있다. 추정으로 `true`를 채우지 않는다.
-- 현재 C 승인 명세 없음. 테스트 fixture의 `approved:true`는 가상 정상 분기일 뿐 실제 승인 증거가 아니다.
+- #996 **실제 원본 Windows 16/18 진단은 수신**했고 원본 [Issue #996 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6757779582)에 고정했다. 현재 보호 상태의 **개별 5개 해시 추가 관측은 미수신**.
+- Workflow 중단 행위자와 장애 전 보호 스냅샷은 진단기의 `false/null`로 남아 있다. 명시적 제한 예외 승인 외에 추정으로 `true`를 채우지 않는다.
+- 별도의 실제 C 승인 명세 없음. 테스트 fixture의 `approved:true`는 가상 정상 분기일 뿐 실제 승인 증거가 아니다.
 - Windows 고정 **실제 실행 어댑터는 아직 미구현**. 이 소스 병합·테스트 PASS가 운영 lock 해제·Workflow 활성·복구 성공을 뜻하지 않는다.
 
-다음 필수 경로: 기존 원본 Windows PC 단회 읽기 결과 → 근거 부족 조건 해소 → 독립 C 어댑터/보호 실패 테스트 → 사용자 정확한 C 승인 → 운영 1회 복구 및 JSON/TXT·원장 재조회 → 원래 기능 담당 재계획.
+다음 필수 경로: 기존 원본 Windows PC **보호 5개 개별 관측** → 독립 C 어댑터/보호 실패 테스트 → 사용자 정확한 C 승인 → 운영 1회 복구 및 JSON/TXT·원장 재조회 → 원래 기능 담당 재계획.
 
 전체 공유 수명주기 프로젝트 실증은 4/5(80%)를 유지한다. #917 과거 완료를 이번 신규 진전으로 중복 산정하지 않는다.
