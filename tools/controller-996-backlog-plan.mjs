@@ -59,6 +59,9 @@ export function plan996BacklogWithoutReplay({requestId,pause,cutoffAt,
     const created=at(issue.created_at);
     if(!Number.isFinite(created))return stop('ISSUE_TIMESTAMP_INVALID');
     if(created<start-2000||created>end)continue;
+    // The GitHub REST /issues endpoint includes pull requests as issue rows.
+    // An authentic PR is never an admitted pc-job, even if it has that label.
+    if(issue.pull_request)continue;
     const labels=issue.labels?.map(v=>typeof v==='string'?v:v?.name);
     if(!Array.isArray(labels)||!labels.includes('pc-job'))continue;
     if(issue.repository!==REPO||issue.user?.login!==OWNER||
