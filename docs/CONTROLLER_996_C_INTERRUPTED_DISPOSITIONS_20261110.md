@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 관련 자원만 C 충돌로 판정 — Draft Gate 과잉 조건 수정
+
+- 원본 승인 Maintainer 소스 `16064e29...`의 `tools/maintenance-lock.mjs`와 `tools/update.mjs`를 읽기 전용 확인했다. C 보관은 `pc-maintenance/leases/controller-recovery`·새 continuation·`controller-install` 형제 디렉터리만 변경한다. 일반 Controller Update/R6 Host B/Source Bundle B/R54 B는 **먼저 `controller-install`을 선점**하고, `receiver`는 독립 장기 lease이며 일반 Writer 데이터 lane과 여섯 Runner 활동은 C 보관 디렉터리 자체와 충돌하지 않는다.
+- 새로운 중복 충돌 점검기 파일을 만들지 않았다. 기존 `controller-996-c-original-prewrite-readonly.mjs`는 이전 C/install owner PID 종료, 10파일 SHA/identity 2회, archive·continuation 부재 및 R1 보호 검사를 이미 수행한다. 단, 아직 **신규 원본 PC 실측/실행 직전 CAS 증거가 아니다**.
+- Draft `controller-996-continuation-gate.mjs`의 모든 Writer 유휴 강제 조건을 제거하고 `scope=CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES`, `foreignInstallOwnerCount=0`, `otherContinuationCount=0`, `twoSnapshotsIdentical=true`, `fresh=true`의 **해당 자원 한정** 판독으로 수정했다. unrelated Writer가 활성인 합성 시험은 허용되지만, 외부 소유자·중첩 continuation·불명확 snapshot은 계속 STOP. 이 Gate는 여전히 `executionAuthorized=false`인 순수 shape review로 실제 C 권한이 아니다. 관련 **29/29**, 전체 **268/268 PASS**, 원격 변경 3파일 byte-match **3/3**. 기존 승인 Effect 6개·원본 source/데이터/운영 설정 불변.
+- **남은 실제 필수 작업:** 현장 원본 E:/의 기동 시/각 보관 단계 직전 2회 CAS를 정규 Windows C operator에 결합하고, 고정 배타 예약과 동일 부모 원자적 archive 순서를 구현·봉인 → 정확한 Owner 신규 C 동의 → 기존 PC 1회 C 실행·사후 읽기. 승인 전 기존 잠금 변경·구 CMD 재시도·Workflow PUT·Backlog 재작성 금지. **4/5=80%→80%, PR Draft, C NO-GO**.
+
 ## 2026-11-11 기존 PC 설치형 GitHub GET 인증 연결 — 실행기 미완성/C NO-GO
 
 - `tools/controller-996-c-installed-gh-get-readonly.mjs`로 원본 Windows의 고정 `gh.exe`를 통해 **GET만** 수행하고 기존 인증의 Owner 계정·비공개 Repository ID를 확인하도록 구현했다. 허용 주소는 #996·원본 Issue #1217/#1219/#1226/#1227·전체 댓글 페이지·불변 commit의 C Manifest뿐이며 token 출력/추출·POST/PUT/재발행이 없다. 기존 C 동의 리더와 원본 4건 판독에 주입할 수 있는 실제 Windows 어댑터다. 실 PC에서 신규 어댑터 실행 0회, 사용자 신규 C 승인 0건이다.
