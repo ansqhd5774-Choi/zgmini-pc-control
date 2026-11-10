@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {readWriterBLocalResult,uploadWriterBReport} from './report.mjs';
 import {ACTOR,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE,REQUEST_SCHEMA,
  OPERATION} from './contract.mjs';
@@ -28,7 +29,7 @@ const proof={status:'WRITER_B_SETUP_STOP',code:'WRITER_B_REQUEST_CONTRACT_STOP',
 
 test('report step reads the exact run-local preflight STOP and not an unrelated file',()=>{
  const reads=[];
- const localEnv={...env,RUNNER_TEMP:'/tmp/zgmini-writer-b-run'};
+ const localEnv={...env,RUNNER_TEMP:path.resolve('zgmini-writer-b-run')};
  const rawResult=readWriterBLocalResult({env:localEnv,fsOps:{readFileSync(file){
   reads.push(file);
   if(file.endsWith(`writer-b-preflight-stop-${RUN_ID}.json`))
