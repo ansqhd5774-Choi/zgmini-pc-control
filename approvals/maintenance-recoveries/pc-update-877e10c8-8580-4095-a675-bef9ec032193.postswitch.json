@@ -4,7 +4,7 @@
   "operation": "FORWARD_POSTSWITCH_917",
   "requestId": "pc-update-877e10c8-8580-4095-a675-bef9ec032193",
   "issueNumber": 917,
-  "sourceSha": "776cfcf8a77b9b48f813c59d030fac01922e044d",
+  "sourceSha": "e0cf3382b0dc4c8a6d6e2e6bacc171500f318742",
   "installedShaBefore": "c09bf6a6f66f229016135020d6ba553ba9a94676",
   "targetControllerSha": "badad9124157879d7a645b64f2768113d632355b",
   "evidenceHashes": {
@@ -17,17 +17,17 @@
     "backlog": "e163128540b51bb0c2cd8c9503b9474a59ffce28e24b103fff1be82f07019708"
   },
   "toolHashes": {
-    "tools/controller-postswitch-launcher.mjs": "9acb2802e9b0730813a377e1dcacb2bf620584f83c1fe788538d6bcea8448f5e",
-    "tools/controller-postswitch-approval.mjs": "93cd073e2af8a95e4681c26b7b57c8a81a59d46b8b4866a96b6f758dc939b8d1",
-    "tools/controller-postswitch-operator.mjs": "29d101e787d126a2b9d0313736c9cc9dfa934a3881a2b9d015da03dd919bcfdb",
-    "tools/controller-postswitch-windows.mjs": "33832a1e6e3f48d5710b805b9443204ebad0842e19af995c120fc0245c1622bf",
+    "tools/controller-postswitch-launcher.mjs": "bf0c003b3f8235c04b88b6a7b7b84084d3908085811473ab16afbb6e8af9af02",
+    "tools/controller-postswitch-approval.mjs": "579a7231c1ecbdb96e6afe6f209f391003bbc95943c2f7a186f835cd685a1a59",
+    "tools/controller-postswitch-operator.mjs": "61a81f2fcbe594727b9b26fa25cf44f4120807404839350b0509610638f84d25",
+    "tools/controller-postswitch-windows.mjs": "42edbc9d959b382d920d9da99ed4d31692038e9521eb41987b2206b4392750d7",
     "tools/controller-postswitch-evidence.mjs": "4f3f3b88214f60810d165288be4fc66ff7e267869a356de597447ec3e5f6c0a5",
     "tools/controller-postswitch-writer-readonly.mjs": "a9d059edc0be9b42a18425ec942e7f6d2b39763188abaa57810fc80625ed6fe0",
     "tools/controller-postswitch-preflight.mjs": "5745c5c0539326f7823c08ceaf4708e3c0d9b7152e18ced609f386a4326cc67e",
     "tools/controller-postswitch-backlog.mjs": "0de9a22cf08224c80765b8690dd64a64c89dbe455de1c4a78a06417cb7f28477",
     "tools/controller-postswitch-postcheck.mjs": "1477fae0fd579790e540588ba9c359c1e6bbcf762559c3a2095cd4a7cb08dd73",
     "tools/controller-postswitch-reconciliation.mjs": "80972f232a61b7acaab1b4d2c8a4a4fcf0b0cde37862ec158649cac7cfdc06c3",
-    "tools/controller-postswitch-state.mjs": "4451e8c4485785e1779c5a25290fe10bdb51ff792ddda4f4189b03325425beb4",
+    "tools/controller-postswitch-state.mjs": "f7faeaede3a269028a1972b1f30e2d89e7ceef9722bd43036a3f761a439505bf",
     "tools/update.mjs": "79be7fb3763a8478a7384f924550dfacaadf3b7939726b0fb22854a402e95489",
     "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
     "tools/maintenance-contract.mjs": "98ed143788e8433c93cb558a6e81939e0f7f5387be7b847ee2791406b1184197",
@@ -123,14 +123,14 @@
       "evidenceLevel": "READONLY_CONFIG_BYTES_NOT_LIVE_CORE_PROCESS"
     }
   },
-  "resume": {
-    "schema": "ZGMINI_PC_POSTSWITCH_RESUME_1215_V1",
-    "priorSourceSha": "d82b66206d78b1f9d90f846dce1b67b7f36f6719",
-    "priorApprovalCommitSha": "ec4ffa2b4368c48dca39c294eb6d3735f9a28523",
-    "priorApprovalSha256": "348d69a0662649f93a9de45996647e364dc9a8bfe5891917bd13b128fe1653d2",
+  "finalize": {
+    "schema": "ZGMINI_PC_POSTSWITCH_FINALIZE_EXISTING_RESULTS_V1",
+    "priorSourceSha": "776cfcf8a77b9b48f813c59d030fac01922e044d",
+    "priorApprovalCommitSha": "64de61e0fc04c6833d5c640c2d5c468d8b6b6a92",
+    "priorApprovalSha256": "fbea40ba0ead0961088891d1187ea9b8a50e352b73fd87ac03616d49940dc860",
     "ownerSha256": "f4757f63441e925790f231acb604213662a6e314b7351882cc436090abb68766",
-    "recordCount": 5,
-    "recordTailSha256": "7331a2615c1bf655a6f86981cdf83214cecfbfd6cda5e7a68b55a930a52d78a9",
+    "recordCount": 13,
+    "recordTailSha256": "2d105ab0d861cec67e55ed963cc6a60a7887db68da1586122f1f2547491c824d",
     "originalIssueNumber": 919,
     "replayIssueNumber": 1215,
     "originalRequestId": "pc-290d6501-ab68-4fda-b4c4-473b582fb2f1",
@@ -145,6 +145,23 @@
         "path": "results/42729529997-1-seat-5.txt",
         "blobSha": "e5c1b94da668b2ea03aac7cd5fc69c842a8e93d5",
         "sha256": "922b18dd190608ed071894bf954c52f7fb3ec1ac0ed2e92786fee386de6b18fe"
+      }
+    ],
+    "mode": "FINALIZE_1215_1216_EXISTING_RESULTS",
+    "ownerSourceSha": "d82b66206d78b1f9d90f846dce1b67b7f36f6719",
+    "priorContinuationOwnerSha256": "5bef31c66ae44447995a54c3faba394bc01c588ad25f433e560e642f137579f2",
+    "postcheckIssueNumber": 1216,
+    "postcheckBodySha256": "3e70ee4940766853bed1bab926d8676e494fc4784d0a8e77f6494dcb9f755661",
+    "postcheckResults": [
+      {
+        "path": "results/42731249968-1-seat-3.json",
+        "blobSha": "a9d25ba5eabb4337e4b0211e987bf4bd7b099f93",
+        "sha256": "72f13abaec27fe174cbe83194b8fff7ad703c854a3fce52430c710bdc3b589bd"
+      },
+      {
+        "path": "results/42731249968-1-seat-3.txt",
+        "blobSha": "59814eb539768b4ec899c7a11e27a7dcafa8dfe5",
+        "sha256": "43023268271189d815c94f61a6986955607eeb84666a35c1432d1783231b703c"
       }
     ]
   },

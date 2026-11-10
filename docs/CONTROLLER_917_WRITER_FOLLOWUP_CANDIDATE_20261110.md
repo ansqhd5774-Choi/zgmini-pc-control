@@ -92,3 +92,8 @@
 - 승인 시 효과는 기존 결과 검증 → 현재 보호/전용 6 Runner/Supervisor/Workflow 및 원본 불변 확인 → recovery claim 보관 → install lease 보관 → completion 원문 재조회뿐이다. #919 재실행·새 사후 진단·Controller/Writer 재설치·Core/DB/D1 변경은 없다.
 - 정리 중 결과 불명확이면 `archiveOutcomeUnknown`으로 유지하고 기존 원본/보관 위치를 조회한다. 재실행/삭제/롤백으로 정상처럼 만들지 않는다.
 - 아직 마지막 잠금 보관과 completion 검증이 남아 있어 Controller 7/8, 공통 대기열 4/5 유지다.
+## 2026-11-10 최종 보관 전용 C 승인 반영
+
+- 사용자가 source `e0cf3382b0dc4c8a6d6e2e6bacc171500f318742`로 기존 두 성공 결과의 재검증과 최종 보관만 직접 수행하도록 명시 승인했다.
+- 최초 finalize 후보 원문 `e2f4ca8a...`는 보존하고, 활성 실행 승인에는 approved만 true로 반영했다. 새 승인 원문 SHA-256은 `7afdef3353db724e69d9717671986ea9a31738d049343cd13dde6a7ac43e45a8`이다.
+- 적용 직전 기존 journal 13건/tail, 두 이전 owner, 원본 ledger, 현재 config 일치와 최종 claim/completion 미생성을 확인했다. 승인계약 집중 검사 11/11 PASS. 실제 C 실행 결과는 별도 후속 증거로 판정한다.
