@@ -2,6 +2,13 @@
 
 ## 2026-11-11 Codex 사용량 중단 후 재개: 보관 충돌 격리 시뮬레이션
 
+### 신규 C 독립 승인 원문 조회·Windows TEMP 네이티브 시험 소스 (운영 NO-GO)
+
+- `tools/controller-996-native-continuation-consent-reader.mjs`는 기존 신규 C Shape Gate와 6효과 배열을 공유한다. **별도 신규 C Manifest의 40hex 고정 Git commit·고정 경로** `docs/CONTROLLER_996_C_CONTINUATION_APPROVAL_V1.json`을 raw GitHub GET에서 읽고 base64 canonical/size/Git blob SHA-1/원문 SHA-256·Manifest top-level exact key 집합·원본 #996 Issue owner/title/body schema/requestId/operation/targetControllerSha·원본 전체 댓글 100/page·중복 ID·댓글 두 차례 완전 재조회·작성/수정 시간 일치·고유 신규 소유자 승인 정확본문(Manifest commit SHA 포함)·같은 소유자 모순 승인 및 신규 철회 표시를 검증하는 **읽기 전용 후보 라이브러리**다. 과거 `RECONCILE_INTAKE_PAUSED_ONLY` 승인은 새 범위에 재사용하지 않으며 원본 GitHub 댓글 작성/수정 **0회**. 결과 상태는 `C_CONTINUATION_CONSENT_EVIDENCE_REVIEWED_ONLY`, `executionAuthorized=false`다. 인증된 GET 포트 주입은 향후 작업이며, 모의 포트 테스트 통과를 실제 사용자 승인으로 오인하지 않는다.
+- 실제 GitHub #996 raw REST GET 1페이지 읽기 전용 결과 댓글 **10건**, 과거 C 승인 패턴 **1건**, 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1` **0건**(2026-11-11 확인). 댓글에 작성/수정 시각이 존재함을 확인했다. 신규 불변 Manifest·Operator SHA·ZIP SHA·source-lock SHA·owner 댓글은 **아직 발급되지 않았다**.
+- `tools/TEST_996_WINDOWS_NATIVE_MOVE_FIXTURE.ps1`는 경로 입력을 받지 않고 새 Windows TEMP `zgmini-996-test-native-<GUID>`에서만 `[System.IO.Directory]::Move`의 원본→보관·기존 대상 충돌 거부·중간 중단 후 Install Lock 보존·마지막 Lease 해제 뒤 다른 임시 잠금 생성 경계만 **시험하도록 작성한 소스**다. 시작 시 TEMP 실제 드라이브가 `E:`이거나 `ZGmini` 경로 포함/부모 Reparse Point이면 중단하며, 임의의 recursive cleanup은 수행하지 않고 시험 폴더만 남긴다. 운영 `E:` 원본 경로·실제 승인/업데이트는 접근하지 않는다. **현재 Linux 환경에는 PowerShell이 없어 Windows Native 동작 실행 PASS는 0건**이며, Node 정적 안전 계약 시험 2건만 통과했다. Junction·전원 중단·dir 메타데이터 내구성·동시 프로세스/Writer 유입과 디스크 flush는 별도 격리 Windows 실증이 필요하다.
+- 전체 **소스 회귀 140/140 PASS**(신규 승인 모의 15, Windows PowerShell 정적 2 포함), **원본 Windows 운영 변경 0·Workflow PUT 0·원본 Issue POST 0·PC C 실행 0**, 운영 진행률 **80%→80%**. 실제 C 실행은 여전히 **NO-GO**이며 이전 CMD/승인 재실행을 금지한다.
+
 ### 후속 필수 수정: 실제 설치 배타 잠금 해제는 맨 마지막 (운영 NO-GO)
 
 - 최신 `main` `tools/maintenance-lock.mjs`의 설치 진입 잠금은 **정확히 `leases/controller-install` 디렉터리의 원자적 획득**에 의존하고, 신규 `controller-recovery-continuation-<UUID>` Claim은 그 경로를 대신 보호하지 못한다. 앞선 어댑터의 **oldC → install → continuation** 순서는 원본 Lease를 먼저 없애 다른 설치와 경합할 수 있었다. 신규 C 승인 manifest는 아직 발급되지 않았으며, 실제 실행 순서를 **oldC → continuation → install(마지막 상태 변경)**로 수정했다.

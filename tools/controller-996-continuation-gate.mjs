@@ -5,6 +5,14 @@ const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const ORIGINAL_ISSUES=[1217,1219,1226,1227];
 const MARKERS=['PREPARED','WORKFLOW_ENABLE_ATTEMPTED',
   'BACKLOG_CLOSE_ATTEMPTED'];
+export const CONTINUATION_EFFECTS=Object.freeze([
+  'RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+  'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
+  'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
+  'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+  'VERIFY_DURABLE_READY_TO_RELEASE_INSTALL',
+  'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE',
+]);
 const HEX=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
 const COMMIT=x=>typeof x==='string'&&/^[a-f0-9]{40}$/.test(x);
 const UUID=x=>typeof x==='string'&&
@@ -27,14 +35,7 @@ export function review996ContinuationGate({manifest,manifestProof,consent,physic
     manifest.continuationRequestId===REQ||
     !COMMIT(manifest.operatorCommit)||!HEX(manifest.operatorSha256)||
     !HEX(manifest.packageSha256)||!HEX(manifest.sourceLockSha256)||
-    !same(manifest.effects,[
-      'RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
-      'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
-      'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
-      'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM',
-      'VERIFY_DURABLE_READY_TO_RELEASE_INSTALL',
-      'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE',
-    ])||
+    !same(manifest.effects,CONTINUATION_EFFECTS)||
     manifest.workflowPutCount!==0||manifest.backlogWriteCount!==0||
     manifest.originalRequestRetryCount!==0||manifest.issuePostCount!==0)
     return fail('C_CONTINUATION_NEW_EXACT_SCOPE_MANIFEST_REQUIRED');
