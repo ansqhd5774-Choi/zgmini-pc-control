@@ -33,7 +33,7 @@ function pinnedManifest(m){
     'BACKLOG_CLOSE_ATTEMPTED'];
   const topKeys=['schema','grade','approved','operation','issueNumber',
     'originalRequestId','continuationRequestId','operatorCommit',
-    'operatorSha256','packageSha256','sourceLockSha256','originalPins',
+    'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256','originalPins',
     'effects','workflowPutCount','backlogWriteCount',
     'originalRequestRetryCount','issuePostCount'];
   return m?.schema==='ZGMINI_CONTROLLER_996_CONTINUATION_C_APPROVAL_V1'&&
@@ -42,7 +42,7 @@ function pinnedManifest(m){
     m.operation==='ARCHIVE_INTERRUPTED_C_CLAIM_AND_INSTALL_LEASE'&&
     m.issueNumber===ISSUE&&m.originalRequestId===REQ&&
     UUID(m.continuationRequestId)&&m.continuationRequestId!==REQ&&
-    H40(m.operatorCommit)&&H64(m.operatorSha256)&&
+    H40(m.operatorCommit)&&H64(m.operatorSha256)&&H64(m.bootstrapSha256)&&
     H64(m.packageSha256)&&H64(m.sourceLockSha256)&&
     same(m.effects,CONTINUATION_EFFECTS)&&
     m.workflowPutCount===0&&m.backlogWriteCount===0&&
@@ -66,6 +66,7 @@ export function format996ContinuationConsentBody(manifest,manifestSha256,
     `manifestCommitSha=${manifestCommitSha}`,
     `operatorCommit=${manifest.operatorCommit}`,
     `operatorSha256=${manifest.operatorSha256}`,
+    `bootstrapSha256=${manifest.bootstrapSha256}`,
     `packageSha256=${manifest.packageSha256}`,
     `sourceLockSha256=${manifest.sourceLockSha256}`,
     `effects=${CONTINUATION_EFFECTS.join('|')}`,
@@ -201,6 +202,7 @@ export function create996ContinuationConsentEvidenceReader({githubReader}={}){
       manifestSha256:evidence.manifestSha256,
       continuationRequestId:evidence.manifest.continuationRequestId,
       operatorSha256:evidence.manifest.operatorSha256,
+      bootstrapSha256:evidence.manifest.bootstrapSha256,
       packageSha256:evidence.manifest.packageSha256,
       sourceLockSha256:evidence.manifest.sourceLockSha256,
       consentCommentId:matches[0].id,commentsRead:after.length,
