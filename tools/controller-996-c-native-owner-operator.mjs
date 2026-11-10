@@ -25,6 +25,7 @@ const PACKAGE_REPO='artifacts/controller-996/zgmini-996-c-native-owner-package.z
 const SELF_REPO='tools/controller-996-c-native-owner-operator.mjs';
 const FILES=[
   SELF_REPO,
+  'tools/controller-996-c-native-trusted-bootstrap.mjs',
   'tools/controller-996-c-installed-gh-get-readonly.mjs',
   'tools/controller-996-native-continuation-consent-reader.mjs',
   'tools/controller-996-original-four-jobs-readonly.mjs',
@@ -382,6 +383,7 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
       lastConsent.consentCommentId===consent.consentCommentId&&
       lastConsent.manifestSha256===consent.manifestSha256&&
       lastConsent.operatorSha256===consent.operatorSha256&&
+      lastConsent.bootstrapSha256===consent.bootstrapSha256&&
       lastConsent.sourceLockSha256===consent.sourceLockSha256&&
       lastConsent.packageSha256===consent.packageSha256&&
       lastConsent.rawManifestBytes.equals(consent.rawManifestBytes),
