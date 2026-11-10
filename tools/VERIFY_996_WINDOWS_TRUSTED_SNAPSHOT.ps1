@@ -8,7 +8,10 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SourceLockSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$PackageSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256,
-  [switch]$ReviewOperatorHandoff
+  [switch]$ReviewOperatorHandoff,
+  [ValidatePattern('^[a-f0-9]{64}$')][string]$OuterSha256,
+  [ValidatePattern('^[a-f0-9]{64}$')][string]$LauncherSha256,
+  [ValidatePattern('^[a-f0-9]{64}$')][string]$NodeSha256
 )
 $ErrorActionPreference = 'Stop'
 $snapshot = $null
@@ -54,6 +57,7 @@ try {
       & 'E:\ZGmini\runtime\node.exe' $bootstrapPath $ManifestCommitSha
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } else {
+      if (!$OuterSha256 -or !$LauncherSha256 -or !$NodeSha256) { throw 'C996_SNAPSHOT_LAUNCH_PINS_REQUIRED' }
       $operatorPath = Join-Path $root 'tools\controller-996-c-native-owner-operator.mjs'
       if (!$pins.ContainsKey($operatorPath)) { throw 'C996_SNAPSHOT_OPERATOR_PIN_MISSING' }
       $reply = & 'E:\ZGmini\runtime\node.exe' $bootstrapPath $ManifestCommitSha
@@ -71,6 +75,10 @@ try {
           $proof.operatorSha256 -cne $pins[$operatorPath] -or
           $proof.sourceLockSha256 -cne $SourceLockSha256 -or
           $proof.packageSha256 -cne $PackageSha256 -or
+          $proof.launchPins.outerSha256 -cne $OuterSha256 -or
+          $proof.launchPins.launcherSha256 -cne $LauncherSha256 -or
+          $proof.launchPins.nodeSha256 -cne $NodeSha256 -or
+          $proof.launchPins.helperSha256 -cne $SnapshotHelperSha256 -or
           $proof.executionAuthorized -isnot [bool] -or $proof.executionAuthorized -or
           $proof.operatorStarted -isnot [bool] -or $proof.operatorStarted) {
         throw 'C996_SNAPSHOT_BOOTSTRAP_RECEIPT_INVALID'

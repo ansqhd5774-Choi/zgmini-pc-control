@@ -27,6 +27,8 @@ function candidate(){
     operatorCommit:'d'.repeat(40),operatorSha256:'a'.repeat(64),
     bootstrapSha256:'e'.repeat(64),
     packageSha256:'b'.repeat(64),sourceLockSha256:'c'.repeat(64),
+    launchPins:{outerSha256:'1'.repeat(64),launcherSha256:'2'.repeat(64),
+      helperSha256:'3'.repeat(64),nodeSha256:'4'.repeat(64)},
     originalPins:structuredClone(pins),
     effects:[...CONTINUATION_EFFECTS],workflowPutCount:0,
     backlogWriteCount:0,originalRequestRetryCount:0,issuePostCount:0};
@@ -88,6 +90,15 @@ function fixture(){
     replaceManifest:m=>{bytes=Buffer.from(JSON.stringify(m)+'\n');},
     manifestBytes:()=>bytes};
 }
+
+test('external launcher and runtime pins are mandatory in the exact approval manifest',()=>{
+  for (const key of ['outerSha256','launcherSha256','helperSha256','nodeSha256']) {
+    const manifest=candidate();
+    delete manifest.launchPins[key];
+    assert.throws(()=>format996ContinuationConsentBody(manifest,'a'.repeat(64),COMMIT),
+      {code:'C_996_NEW_CONSENT_MANIFEST_INVALID'});
+  }
+});
 const failure=(f,code)=>assert.rejects(()=>f.reader().readOnce({manifestCommitSha:COMMIT}),
   err=>err?.code===code);
 
@@ -158,6 +169,12 @@ test('new external bootstrap SHA must be explicitly pinned by Owner consent',asy
   const bad=fixture(),invalid=candidate();invalid.bootstrapSha256='unknown';
   bad.replaceManifest(invalid);
   await failure(bad,'C_996_NEW_CONSENT_MANIFEST_INVALID');
+});
+test('changing a launch hash invalidates the prior exact Owner comment',async()=>{
+  const f=fixture(), changed=candidate();
+  changed.launchPins.nodeSha256='9'.repeat(64);
+  f.replaceManifest(changed);
+  await failure(f,'C_996_NEW_CONSENT_AMBIGUOUS_OWNER_APPROVAL');
 });
 test('a Git ref name rather than pinned 40-hex commit is rejected',async()=>{
   const f=fixture();

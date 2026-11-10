@@ -33,7 +33,7 @@ function pinnedManifest(m){
     'BACKLOG_CLOSE_ATTEMPTED'];
   const topKeys=['schema','grade','approved','operation','issueNumber',
     'originalRequestId','continuationRequestId','operatorCommit',
-    'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256','originalPins',
+    'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256','originalPins','launchPins',
     'effects','workflowPutCount','backlogWriteCount',
     'originalRequestRetryCount','issuePostCount'];
   return m?.schema==='ZGMINI_CONTROLLER_996_CONTINUATION_C_APPROVAL_V1'&&
@@ -44,6 +44,9 @@ function pinnedManifest(m){
     UUID(m.continuationRequestId)&&m.continuationRequestId!==REQ&&
     H40(m.operatorCommit)&&H64(m.operatorSha256)&&H64(m.bootstrapSha256)&&
     H64(m.packageSha256)&&H64(m.sourceLockSha256)&&
+    m.launchPins&&same(Object.keys(m.launchPins).sort(),
+      ['helperSha256','launcherSha256','nodeSha256','outerSha256'])&&
+    Object.values(m.launchPins).every(H64)&&
     same(m.effects,CONTINUATION_EFFECTS)&&
     m.workflowPutCount===0&&m.backlogWriteCount===0&&
     m.originalRequestRetryCount===0&&m.issuePostCount===0&&

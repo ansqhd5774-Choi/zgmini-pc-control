@@ -152,7 +152,7 @@ function expectedConsent(m,manifestSha,s2){
 function validateManifest(m){
   const fields=['schema','grade','approved','operation','issueNumber',
     'originalRequestId','continuationRequestId','operatorCommit',
-    'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256',
+    'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256','launchPins',
     'originalPins','effects','workflowPutCount','backlogWriteCount',
     'originalRequestRetryCount','issuePostCount'];
   const pins=['oldC','installOwner','installRecovery','backlog','installed',
@@ -167,6 +167,9 @@ function validateManifest(m){
     h40(m.operatorCommit)&&h64(m.operatorSha256)&&
     h64(m.bootstrapSha256)&&h64(m.packageSha256)&&
     h64(m.sourceLockSha256)&&eq(m.effects,EFFECTS)&&
+    m.launchPins&&eq(Object.keys(m.launchPins).sort(),
+      ['helperSha256','launcherSha256','nodeSha256','outerSha256'])&&
+    Object.values(m.launchPins).every(h64)&&
     m.workflowPutCount===0&&m.backlogWriteCount===0&&
     m.originalRequestRetryCount===0&&m.issuePostCount===0&&
     m.originalPins&&eq(Object.keys(m.originalPins).sort(),pins.sort())&&
@@ -253,6 +256,7 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
       manifestCommitSha,manifestSha256:sha(manifestBytes),
       operatorSha256:m.operatorSha256,bootstrapSha256:m.bootstrapSha256,
       sourceLockSha256:m.sourceLockSha256,packageSha256:m.packageSha256,
+      launchPins:m.launchPins,
       externalOsTrustAnchorVerified:false,operatorStarted:false,
       executionAuthorized:false,originalPcWrites:0,githubWrites:0,
       nextRequired:'OUT_OF_PROCESS_OS_HASH_ANCHOR_AND_IMMUTABLE_SNAPSHOT',

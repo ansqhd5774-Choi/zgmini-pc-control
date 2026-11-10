@@ -171,6 +171,8 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
   const launcherSha = write(launcher, localSource(launcher));
   const helperSha = write('tools/controller-996-windows-source-snapshot.cs', fs.readFileSync(helper));
   const zipSha = write(zipPath, 'fixture bytes');
+  const outerSha = sha(localSource('tools/VERIFY_996_WINDOWS_OUTER_ANCHOR.ps1'));
+  const nodeSha = sha(fs.readFileSync(runtime));
   const commit = 'a'.repeat(40);
   const manifestSha = 'b'.repeat(64);
   const bootstrapSha = write(bootstrap, [
@@ -184,12 +186,14 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
       status:'GIT_AND_LOCAL_BYTES_OBSERVED_ONLY', filesCheckedAtS1:16, filesCheckedAtS2:3,
       effectsChecked:7, ownerConsentCommentId:123, manifestCommitSha:commit, manifestSha256:manifestSha,
       operatorSha256:operatorSha, packageSha256:zipSha, executionAuthorized:false, operatorStarted:false,
+      launchPins:{outerSha256:outerSha,launcherSha256:launcherSha,helperSha256:helperSha,nodeSha256:nodeSha},
     }) + ';',
     'receipt.bootstrapSha256 = sha(new URL(import.meta.url));',
     'receipt.sourceLockSha256 = sha(new URL("./controller-996-c-native-owner-source-lock.json", import.meta.url));',
     'if (mode === "wrong-operator") receipt.operatorSha256 = "0".repeat(64);',
     'if (mode === "wrong-commit") receipt.manifestCommitSha = "0".repeat(40);',
     'if (mode === "authorized") receipt.executionAuthorized = true;',
+    'if (mode === "wrong-launch") receipt.launchPins.nodeSha256 = "0".repeat(64);',
     'console.log(JSON.stringify(receipt));',
   ].join('\n'));
   const files = {[bootstrap]:bootstrapSha, [operator]:operatorSha};
@@ -199,12 +203,11 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
   }
   const lockSha = write(lockPath, JSON.stringify({schema:'ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1',files}));
   const outer = fileURLToPath(new URL('../tools/VERIFY_996_WINDOWS_OUTER_ANCHOR.ps1', import.meta.url));
-  const nodeSha = sha(fs.readFileSync(runtime));
   const run = mode => spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
     ['-NoProfile','-NonInteractive','-File',outer,'-PackageRoot',root,'-ManifestCommitSha',commit,
       '-LauncherSha256',launcherSha,'-NodeSha256',nodeSha,'-BootstrapSha256',bootstrapSha,
       '-SourceLockSha256',lockSha,'-PackageSha256',zipSha,'-SnapshotHelperSha256',helperSha,
-      '-ReviewOperatorHandoff'], {
+      '-ReviewOperatorHandoff','-OuterSha256',outerSha], {
       encoding:'utf8',windowsHide:true,timeout:30000,
       env:{...process.env,ZGMINI_996_TEST_RECEIPT:mode},
     });
@@ -215,7 +218,7 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     executionAuthorized:false,originalPcWrites:0,manifestCommitSha:commit,
     manifestSha256:manifestSha,ownerConsentCommentId:123,
   });
-  for (const mode of ['missing','wrong-operator','wrong-commit','authorized']) {
+  for (const mode of ['missing','wrong-operator','wrong-commit','authorized','wrong-launch']) {
     const blocked = run(mode);
     assert.equal(blocked.status, 2, blocked.stderr + blocked.stdout);
     const receipt = JSON.parse(blocked.stdout);

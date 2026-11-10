@@ -384,4 +384,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - Windows TEMP에서 합성 Bootstrap 결과를 실제 Operator 검토 명령으로 전달했다. 정상 전달 1건과 승인 결과 누락·Operator 해시 불일치·S2 불일치·실행 권한이 섞인 결과 4건의 차단을 확인했다. 실제 GitHub Owner 승인과 운영 효과는 이 시험의 범위에 포함되지 않는다.
 - 운영 실행의 하드 STOP을 유지한다. 운영 경로에 대한 독립 검토를 완료한 뒤 최종 S1/S2와 ZIP을 봉인하고 정확한 Owner 승인 원문을 확인해야 한다. 원본 Windows 복구와 사후검증 전까지 운영 80%를 유지한다.
 
+### Owner 승인 명세와 Windows 실행 파일 고정
+
+- 독립 검토에서 기존 승인 명세에 외부 PowerShell, 내부 PowerShell, 검증 도우미, Node의 해시가 직접 포함되지 않는 점을 확인했다. S2의 `launchPins`에 네 해시를 고정한다. Owner 댓글이 참조하는 Manifest 원본 SHA-256으로 네 값도 승인 범위에 묶인다. 내부 PowerShell은 Bootstrap이 읽은 네 해시와 외부 진입점이 전달한 해시를 대조한 뒤 읽기 전용 Operator를 호출한다.
+- 외부 진입점 자체는 신뢰된 위치에서 로드되어야 한다. 로드 후 파일을 다시 열어 대조한 결과를 최초 로드의 독립 증명으로 사용하지 않는다. Operator의 읽기 전용 응답은 전달받은 ID를 확인하는 결과이며 독립 승인 증거는 GitHub에서 읽은 Owner 원문이다.
+- 봉인 순서는 S1의 Git 원본 바이트 → SourceLock과 ZIP → S2 Manifest → Owner 댓글이다. ZIP은 S2 Manifest나 최종 ZIP 해시를 담지 않는다. Windows 작업 폴더의 줄바꿈 변환을 피하기 위해 ZIP은 S1 Git blob 원본에서 구성한다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.

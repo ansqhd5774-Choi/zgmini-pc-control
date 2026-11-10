@@ -10,7 +10,8 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SourceLockSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$PackageSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256,
-  [switch]$ReviewOperatorHandoff
+  [switch]$ReviewOperatorHandoff,
+  [ValidatePattern('^[a-f0-9]{64}$')][string]$OuterSha256
 )
 $ErrorActionPreference = 'Stop'
 $guard = $null
@@ -32,11 +33,18 @@ try {
   $pins.Add($helper, $SnapshotHelperSha256)
   $pins.Add($launcher, $LauncherSha256)
   $pins.Add('E:\ZGmini\runtime\node.exe', $NodeSha256)
+  if ($ReviewOperatorHandoff) {
+    if (!$OuterSha256 -or !$PSCommandPath) { throw 'C996_ANCHOR_EXTERNAL_PIN_REQUIRED' }
+    $pins.Add([IO.Path]::GetFullPath($PSCommandPath), $OuterSha256)
+  }
   $guard = [Zgmini996WindowsSourceSnapshot]::new($pins)
   # Use a separate Windows PowerShell process. Its ordinary script policy
   # remains in force. The handles above stay open until the child exits.
   $reviewArgs = @()
-  if ($ReviewOperatorHandoff) { $reviewArgs += '-ReviewOperatorHandoff' }
+  if ($ReviewOperatorHandoff) {
+    $reviewArgs += @('-ReviewOperatorHandoff','-OuterSha256',$OuterSha256,
+      '-LauncherSha256',$LauncherSha256,'-NodeSha256',$NodeSha256)
+  }
   & 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -NoProfile -NonInteractive -File $launcher `
     -PackageRoot $root -ManifestCommitSha $ManifestCommitSha -BootstrapSha256 $BootstrapSha256 `
     -SourceLockSha256 $SourceLockSha256 -PackageSha256 $PackageSha256 -SnapshotHelperSha256 $SnapshotHelperSha256 @reviewArgs
