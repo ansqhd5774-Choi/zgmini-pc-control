@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_ORIGINAL_PC_10_PIN_SCREEN_READBACK_V1",
+  "originalRequestId": "pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+  "source": "User-supplied screenshot of a read-only SHA256 PowerShell command on the user-declared original Windows PC",
+  "screenshotSha256": "b54905f5017f91c472e2e3dedfc7a8a4a3ce532e150fc6c10400e40974307b9e",
+  "screenshotRetainedOutsideGit": true,
+  "screenshotFileNotCommitted": true,
+  "screenTranscriptionIndependentReaders": 2,
+  "screenTranscribedHashes": {
+    "oldC": "a6390236b48fdfa13adb7661ec5e9c9ed159f7095ede1972e20dcc6865d2e074",
+    "backlog": "4521688c7d9f0cebbf5a71e1ba71713abc4327a5d9a091ea250f0b001ce44186",
+    "PREPARED": "c29e96c39660da05b1b301c0545c42b4c9757155ff42a897b0fc9fb8e4fdc201",
+    "WORKFLOW_ENABLE_ATTEMPTED": "2b662f6b8fc1235e072cd46e08533e5d03be9cbdc3a49673afbf4ff7e21e063b",
+    "BACKLOG_CLOSE_ATTEMPTED": "9ba544fc261f0cfee73e2db79a99e61a9db9b4d3ecd7fa1dd9e8d1dfc1b4b758"
+  },
+  "previousPinnedHashEvidence": {
+    "installOwner": "d6329b4d82530f9a1ca574647f050fff9243b698bb9dd314975b19ed171e40bc",
+    "installRecovery": "4dc51f7e3a1cd84ce94ddf993e4a1cfbb319b050447dfbb5ccf0c38434a0b09b",
+    "installed": "32403a79fb407cabe8426de7507116847178f734da68a289cc12fa8cf4ca36c9",
+    "stage": "9903d822bca20ae14dcf5a2f6a0d1f44869f29b3c274e9a4a2de226d401069b3",
+    "maintainer": "a5ed876c520a844a33bdf6cc137ac8015f686ed416aff6370389440ad6e3cba5"
+  },
+  "observed": {
+    "screenSha256Rows": 5,
+    "blockedRows": 0,
+    "combinedPins": 10,
+    "allCombinedPins64Hex": true
+  },
+  "limitations": {
+    "originalPcIdentityIndependentlyAuthenticated": false,
+    "physicalSnapshotFreshAtFutureCExecution": false,
+    "historicalOwnerProvenanceIndependentlyAuthenticated": false,
+    "writerControllerConflictsLiveVerified": false,
+    "newOwnerExactConsentVerified": false,
+    "operatorPackageSourceLockFrozen": false
+  },
+  "isApprovalManifest": false,
+  "executionAuthorized": false,
+  "operationalWrites": 0,
+  "workflowPuts": 0,
+  "backlogWrites": 0,
+  "issuePosts": 0,
+  "pcRetries": 0
+}
