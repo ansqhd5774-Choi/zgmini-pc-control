@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,
   validatePostSwitchApproval} from '../tools/controller-postswitch-approval.mjs';
 
@@ -84,4 +87,17 @@ test('altered or incomplete new consent and missing source closure are rejected'
   ap=>{ap.expectedBacklogIssues=[919,919];},
  ]){const ap=followupManifest();edit(ap);assert.throws(()=>checkFollowup(ap));}
  assert.throws(()=>checkFollowup(followupManifest(),followupEvidence(),'0'.repeat(40)),/IDENTITY_INVALID/);
+});
+
+test('committed review candidate stays unapproved and pins exact source file bytes',()=>{
+ const ap=JSON.parse(fs.readFileSync(new URL('../approvals/maintenance-recoveries/'+
+   INCIDENT.requestId+'.postswitch.json',import.meta.url),'utf8'));
+ assert.equal(ap.approved,false);
+ assert.throws(()=>validatePostSwitchApproval(ap,{requestId:INCIDENT.requestId,
+   sourceSha:ap.sourceSha,evidence:{...followupEvidence(),materialHashes:ap.evidenceHashes}}),
+   /IDENTITY_INVALID/);
+ for(const file of TOOL_PATHS){
+  const bytes=execFileSync('git',['show',ap.sourceSha+':'+file],{windowsHide:true});
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),ap.toolHashes[file]);
+ }
 });
