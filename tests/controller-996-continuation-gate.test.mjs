@@ -18,7 +18,8 @@ function valid(){
     operatorCommit:'a'.repeat(40),operatorSha256:'a'.repeat(64),
     packageSha256:'b'.repeat(64),sourceLockSha256:'c'.repeat(64),
     originalPins:structuredClone(pins),
-    effects:['RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+    effects:['CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE',
+      'RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
       'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
       'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
       'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM',
@@ -71,6 +72,14 @@ test('stale consent effects releasing install before continuation are invalid',(
   const r=review996ContinuationGate(x);
   assert.equal(r.code,'C_CONTINUATION_NEW_EXACT_SCOPE_MANIFEST_REQUIRED');
   assert.equal(r.executionAuthorized,false);
+});
+test('fixed proposal-to-reservation and no-cleanup effect must be explicitly approved',()=>{
+  const x=valid();
+  x.manifest.effects=x.manifest.effects.slice(1);
+  assert.equal(check(x).code,'C_CONTINUATION_NEW_EXACT_SCOPE_MANIFEST_REQUIRED');
+  const y=valid();
+  y.manifest.effects[0]='CREATE_AND_REMOVE_C_RESERVATION_AFTER_INSTALL';
+  assert.equal(check(y).code,'C_CONTINUATION_NEW_EXACT_SCOPE_MANIFEST_REQUIRED');
 });
 const check=x=>review996ContinuationGate(x);
 
