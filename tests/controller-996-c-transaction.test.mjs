@@ -101,7 +101,7 @@ function mockPorts(history,{throwAt=null,unknownAt=null}={}){
 }
 
 test('untrusted/missing approval cannot even construct a C execution plan',async()=>{
- const {preflight,approval}=fixture();
+ const {preflight,protectedAttestation,approval}=fixture();
  for(const candidate of [null,{}, {...approval,approved:false},
    {...approval,grade:'B'}, {...approval,requestId:'wrong'},
    {...approval,userConsentReceiptVerified:false},
@@ -112,9 +112,11 @@ test('untrusted/missing approval cannot even construct a C execution plan',async
    {...approval,acceptsNoAllActorsImmutabilityProof:false},
    {...approval,executionScope:'NEW_WINDOWS_SPARE'}]){
   const history=[];
-  const decision=await simulate996CTransaction({preflight,approval:candidate,
+  const decision=await simulate996CTransaction({preflight,protectedAttestation,
+   approval:candidate,
    ports:mockPorts(history)});
   assert.equal(decision.status,'NOT_STARTED');
+  assert.equal(decision.code,'EXPLICIT_PINNED_C_APPROVAL_UNVERIFIED');
   assert.equal(decision.executionAuthorized,false);
   assert.equal(history.length,0);
  }
