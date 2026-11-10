@@ -65,6 +65,48 @@ export function handoffFilePlan(mode,installedFiles,approvedFiles){
   rollbackAdded:mode===sixToSeven?[newRuntimeFile]:[],
  };
 }
+// A previously installed seventh file must be an ordinary, unshared file under
+// the fixed maintenance root. Hash equality alone does not prove write scope:
+// a hard link, symlink or parent junction can alias an unapproved location.
+export function requireDirectInstalledFiles(installRoot,relFiles,io=fs){
+ need(path.isAbsolute(installRoot),'HANDOFF_PATH_ALIAS');
+ const rootStat=io.lstatSync(installRoot);
+ need(rootStat.isDirectory()&&!rootStat.isSymbolicLink(),'HANDOFF_PATH_ALIAS');
+ for(const rel of relFiles){
+  need(typeof rel==='string'&&!path.isAbsolute(rel)
+    &&rel.split('/').every(p=>p&&p!=='.'&&p!=='..'),'HANDOFF_PATH_ALIAS');
+  let current=installRoot;
+  const parts=rel.split('/');
+  for(const part of parts.slice(0,-1)){
+   current=path.join(current,part);
+   const parent=io.lstatSync(current);
+   need(parent.isDirectory()&&!parent.isSymbolicLink(),'HANDOFF_PATH_ALIAS');
+  }
+  const file=io.lstatSync(path.join(current,parts.at(-1)));
+  need(file.isFile()&&!file.isSymbolicLink()&&file.nlink===1,'HANDOFF_PATH_ALIAS');
+ }
+}
+// Old handoff journals are immutable operational evidence. A crashed or
+// unverified handoff cannot be silently superseded by a different target SHA.
+export function requireNoUnfinishedHandoff(installRoot,io=fs){
+ const names=io.readdirSync(installRoot).filter(n=>/^handoff-[a-f0-9]{40}\.json$/.test(n));
+ for(const name of names){
+  let record=null;
+  try{record=JSON.parse(io.readFileSync(path.join(installRoot,name),'utf8'));}
+  catch{need(false,'HANDOFF_PRIOR_RECOVERY_REQUIRED');}
+  need(['PASS','BLOCKED','ROLLED_BACK'].includes(record?.status),
+   'HANDOFF_PRIOR_RECOVERY_REQUIRED');
+ }
+}
+export function requireOwnedInstallGuard(installRoot,guard,io=fs){
+ need(Number.isSafeInteger(guard?.owner?.pid)&&/^[0-9a-f-]{36}$/.test(guard?.owner?.nonce??''),
+  'HANDOFF_UPDATE_ACTIVE');
+ let current=null;
+ try{current=JSON.parse(io.readFileSync(path.join(installRoot,'leases/controller-install/owner.json'),'utf8'));}
+ catch{need(false,'HANDOFF_UPDATE_ACTIVE');}
+ need(current.pid===guard.owner.pid&&current.nonce===guard.owner.nonce,
+  'HANDOFF_UPDATE_ACTIVE');
+}
 const git=a=>execFileSync('git',a,{cwd:repo,windowsHide:true,maxBuffer:3000000});
 // Unrelated docs/results edits do not affect this exact approved handoff.
 export function requireHandoffCheckoutScope(target,runGit=git){
@@ -191,6 +233,15 @@ export async function main(args=process.argv.slice(2)){
  const mode=requireHandoffApproval(approval,target,before.sourceSha);
  const filePlan=handoffFilePlan(mode,before.files,approval.files);
  const installedRuntimeFiles=filePlan.installed;
+ if(mode===sevenToSeven){
+  requireNoUnfinishedHandoff(root);
+  requireDirectInstalledFiles(root,[...installedRuntimeFiles,'MAINTENANCE_INSTALL.json']);
+  for(const rel of ['leases','backups','receivers']){
+   if(rel==='backups'&&!fs.existsSync(path.join(root,rel)))continue;
+   const dir=fs.lstatSync(path.join(root,rel));
+   need(dir.isDirectory()&&!dir.isSymbolicLink(),'HANDOFF_PATH_ALIAS');
+  }
+ }
  if(mode===sixToSeven)
   need(!fs.existsSync(path.join(root,newRuntimeFile)),'HANDOFF_UNMANAGED_TARGET_PRESENT');
  else need(fs.existsSync(path.join(root,newRuntimeFile)),'HANDOFF_EXISTING_DRIFT');
@@ -209,6 +260,10 @@ export async function main(args=process.argv.slice(2)){
  // A missing file, dirty checkout or elevated operator must leave it running.
  const startup=path.join(process.env.APPDATA,'Microsoft/Windows/Start Menu/Programs/Startup/ZGMINI_PC_MAINTENANCE.vbs');
  const oldStartup=fs.readFileSync(startup);
+ if(mode===sevenToSeven){
+  const stat=fs.lstatSync(startup);
+  need(stat.isFile()&&!stat.isSymbolicLink()&&stat.nlink===1,'HANDOFF_PATH_ALIAS');
+ }
  requireOriginalStartupBytes(before,oldStartup);
  const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],{encoding:'utf8',windowsHide:true});
  need(groups.includes('S-1-16-8192')&&!groups.includes('S-1-16-12288'),'HANDOFF_MEDIUM_TOKEN_REQUIRED');
@@ -252,24 +307,40 @@ export async function main(args=process.argv.slice(2)){
  fs.writeFileSync(backup+'/SNAPSHOT.json',JSON.stringify(snapshot,null,2),{flag:'wx'});
  const result={schema:'ZGMINI_MAINTENANCE_HANDOFF_RESULT_V1',targetSha:target,installedShaBefore:before.sourceSha,status:'RUNNING',backup};
  const persist=()=>fs.writeFileSync(record,JSON.stringify({...result,at:new Date().toISOString()},null,2));persist();
- let reservation=null,startupInvoked=false;
+ let reservation=null,sharedGuard=null,startupInvoked=false;
  try{
   requirePriorStopped(priorOwner);need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
+  if(mode===sevenToSeven)
+   requireDirectInstalledFiles(root,[...installedRuntimeFiles,'MAINTENANCE_INSTALL.json']);
+  if(mode===sevenToSeven){
+   // The receiver lease must be released before its replacement can start.
+   // A separate controller-install lease therefore stays held through the
+   // independent Windows CAPTURE, preventing unverified B work in the gap.
+   const {acquireMaintenanceLock}=await import(pathToFileURL(path.join(repo,'tools/maintenance-lock.mjs')));
+   sharedGuard=acquireMaintenanceLock(root,'controller-install');
+   requireOwnedInstallGuard(root,sharedGuard);
+  }
   reservation=reserveReceiverSlot(root+'/leases/receiver');
   reservation.verify();
   requireStopped(priorOwner);
-  need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
+  if(sharedGuard)requireOwnedInstallGuard(root,sharedGuard);
+  else need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
+  if(mode===sevenToSeven)
+   requireDirectInstalledFiles(root,[...installedRuntimeFiles,'MAINTENANCE_INSTALL.json']);
   for(const rel of filePlan.writes){
    // Seven-to-seven only writes byte-different files; never creates or deletes
    // the preexisting seventh module.
    fs.writeFileSync(path.join(root,rel),bytes[rel],
     mode===sixToSeven&&rel===newRuntimeFile?{flag:'wx'}:undefined);
   }
+  if(sharedGuard)requireOwnedInstallGuard(root,sharedGuard);
   for(const rel of nextRuntimeFiles)
    need(sha(fs.readFileSync(path.join(root,rel)))===sha(bytes[rel]),
     'HANDOFF_POSTWRITE_HASH_MISMATCH');
   const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(nextRuntimeFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
+  if(mode===sevenToSeven)
+   requireDirectInstalledFiles(path.dirname(startup),[path.basename(startup)]);
   fs.writeFileSync(startup,startupBytes);
   reservation.verify();
   reservation.release();reservation=null;
@@ -290,6 +361,10 @@ export async function main(args=process.argv.slice(2)){
      catch{need(false,'HANDOFF_RECEIVER_ORIGIN_NOT_PROVEN');}
      requireNewReceiverOrigin(priorOwner,priorProof,current,proof,
        {sourceSha:target,startupSha256:sha(startupBytes)},capture,owner());
+      if(sharedGuard){
+       requireOwnedInstallGuard(root,sharedGuard);
+       sharedGuard.release();sharedGuard=null;
+      }
      result.status='PASS';result.code='STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED';result.receiverPid=current.pid;persist();return result;
     }
    }
@@ -297,9 +372,12 @@ export async function main(args=process.argv.slice(2)){
   throw Object.assign(Error('HANDOFF_ORIGIN_NOT_VERIFIED'),{code:'HANDOFF_ORIGIN_NOT_VERIFIED'});
  }catch(error){
   const prewrite=reservationFailureStatus(error);
-  if(prewrite){
-   result.status=prewrite;
+   if(prewrite){
+    // Once the V2 shared guard was acquired, even a prewrite failure needs
+    // a recovery owner: the prior receiver was already stopped.
+    result.status=sharedGuard?'RECOVERY_REQUIRED':prewrite;
    result.code=error.code;
+    if(sharedGuard)try{requireOwnedInstallGuard(root,sharedGuard);sharedGuard.holdForRecovery();}catch{}
    persist();
    return result;
   }
@@ -323,7 +401,9 @@ export async function main(args=process.argv.slice(2)){
    result.status=rollbackStatus({filesRestored:true,receiverReattested:false});
    result.recoveryState='FILES_RESTORED_RECEIVER_RECONNECT_UNVERIFIED';
   }catch{result.status='RECOVERY_REQUIRED';}
-  result.code=/^[A-Z_]+$/.test(error.code??'')?error.code:'HANDOFF_EXECUTION_ERROR';persist();return result;
+   if(sharedGuard)try{requireOwnedInstallGuard(root,sharedGuard);sharedGuard.holdForRecovery();}
+    catch{result.status='RECOVERY_REQUIRED';}
+   result.code=/^[A-Z_]+$/.test(error.code??'')?error.code:'HANDOFF_EXECUTION_ERROR';persist();return result;
  }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
