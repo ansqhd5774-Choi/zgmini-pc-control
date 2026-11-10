@@ -25,6 +25,7 @@ function candidate(){
     operation:'ARCHIVE_INTERRUPTED_C_CLAIM_AND_INSTALL_LEASE',
     issueNumber:996,originalRequestId:REQ,continuationRequestId:ID,
     operatorCommit:'d'.repeat(40),operatorSha256:'a'.repeat(64),
+    bootstrapSha256:'e'.repeat(64),
     packageSha256:'b'.repeat(64),sourceLockSha256:'c'.repeat(64),
     originalPins:structuredClone(pins),
     effects:[...CONTINUATION_EFFECTS],workflowPutCount:0,
@@ -149,6 +150,14 @@ test('extra manifest operation flags cannot silently expand C authorization',asy
   const f=fixture();const wrong=candidate();wrong.allowDelete=true;
   f.replaceManifest(wrong);
   await failure(f,'C_996_NEW_CONSENT_MANIFEST_INVALID');
+});
+test('new external bootstrap SHA must be explicitly pinned by Owner consent',async()=>{
+  const missing=fixture(),wrong=candidate();delete wrong.bootstrapSha256;
+  missing.replaceManifest(wrong);
+  await failure(missing,'C_996_NEW_CONSENT_MANIFEST_INVALID');
+  const bad=fixture(),invalid=candidate();invalid.bootstrapSha256='unknown';
+  bad.replaceManifest(invalid);
+  await failure(bad,'C_996_NEW_CONSENT_MANIFEST_INVALID');
 });
 test('a Git ref name rather than pinned 40-hex commit is rejected',async()=>{
   const f=fixture();
