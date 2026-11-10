@@ -266,18 +266,25 @@ public static class C996NativeDirectory {
       for(int i=0;i<length;i++)Marshal.WriteByte(buffer,i,0);
       Marshal.WriteIntPtr(buffer,rootOffset,IntPtr.Zero);
       Marshal.WriteInt32(buffer,lenOffset,bytes.Length);Marshal.Copy(bytes,0,IntPtr.Add(buffer,nameOffset),bytes.Length);
-      // Windows cannot rename this directory while child streams are open.
-      // Close them after CAS; detect any namespace/content race in the postcheck.
-      foreach(var stream in streams)stream.Dispose();streams.Clear();
+      // Keep every verified child open without write or delete sharing.
+      // A volume that refuses the directory move in this state is unsupported.
       if(Fixture&&args.ContainsKey("simulateContentDrift")&&
-        (bool)args["simulateContentDrift"]) File.AppendAllText(Path.Combine(source,"owner.json")," ");
+        (bool)args["simulateContentDrift"]) {
+        try { File.AppendAllText(Path.Combine(source,"owner.json")," "); }
+        catch(IOException) { throw new Stop("C996_NATIVE_COMPETING_WRITE_BLOCKED"); }
+        throw new Stop("C996_NATIVE_COMPETING_WRITE_NOT_BLOCKED");
+      }
+      // Child share locks protect the verified files, not insertion of a new
+      // directory entry. No production move until the whole inventory can be
+      // held stable through the namespace operation.
+      Need(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN");
       if(!SetFileInformationByHandle(sourceHandle,3,buffer,(uint)length)){
-        int error=Marshal.GetLastWin32Error();throw new Stop(error==183||error==80?"C996_NATIVE_DESTINATION_EXISTS":"C996_NATIVE_RENAME_UNCERTAIN",error);
+        int error=Marshal.GetLastWin32Error();throw new Stop(error==183||error==80?"C996_NATIVE_DESTINATION_EXISTS":
+          error==5||error==32?"C996_NATIVE_LOCKED_MOVE_UNSUPPORTED":"C996_NATIVE_RENAME_UNCERTAIN",error);
       }
       moveOccurred=true;
       Need(Identity(Info(sourceHandle))==(string)snap["identity"]&&Identity(Info(parent))==parentBefore,"C996_NATIVE_RENAME_IDENTITY_DRIFT");
       // Verify every original file identity and hash after the namespace move.
-      foreach(var s in streams)s.Dispose();streams.Clear();
       using(var after=OpenDir(destination,false,true)){
         var post=Capture(destination,after,streams);SameSnapshot(post,snap);
         return serializer.Serialize(new Dictionary<string,object>{{"ok",true},{"snapshot",post},{"noReplace",true},{"sourceHandleBound",true},{"parentIdentity",parentBefore},{"namespacePowerLossDurabilityProven",false}});
@@ -581,18 +588,33 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
   }catch(e){return stop(safeCode(e),phase);}
 }
 
-// This command only acknowledges receipt at the boundary. It never calls the
+// This command independently revalidates the receipt. It never calls the
 // operational function, even if that function is separately approved later.
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const [mode,manifestCommitSha,manifestSha256,commentId]=process.argv.slice(2);
-  const valid=process.argv.length===6&&mode==='--review-handoff'&&H40(manifestCommitSha)&&
-    H64(manifestSha256)&&/^[1-9][0-9]{0,14}$/.test(commentId);
-  const receipt={
-    status:valid?'OPERATOR_REVIEW_BOUNDARY_REACHED':'OPERATOR_REVIEW_NO_GO',
-    code:valid?'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED':'C_996_OWNER_REVIEW_ARGS_INVALID',
-    executionAuthorized:false,originalPcWrites:0,
-    ...(valid?{manifestCommitSha,manifestSha256,ownerConsentCommentId:Number(commentId)}:{}),
-  };
-  console.log(JSON.stringify(receipt));
-  if(!valid)process.exitCode=2;
+  const [mode,manifestCommitSha]=process.argv.slice(2);
+    try{
+      need(process.argv.length===4&&mode==='--verify-handoff'&&H40(manifestCommitSha),'C_996_OWNER_REVIEW_ARGS_INVALID');
+      const input=fs.readFileSync(0,'utf8');
+      need(input.length<=16384,'C_996_OWNER_HANDOFF_SIZE');
+      const claimed=JSON.parse(input);
+      const {verify996CTrustedBootstrapReadOnly}=await import('./controller-996-c-native-trusted-bootstrap.mjs');
+      const verified=verify996CTrustedBootstrapReadOnly({manifestCommitSha});
+      const keys=['manifestCommitSha','manifestSha256','ownerConsentCommentId','operatorSha256',
+        'bootstrapSha256','sourceLockSha256','packageSha256'];
+      need(verified.status==='GIT_AND_LOCAL_BYTES_OBSERVED_ONLY'&&verified.fixtureOnly!==true&&
+        verified.executionAuthorized===false&&verified.operatorStarted===false&&
+        verified.manifestCommitSha===manifestCommitSha&&keys.every(key=>verified[key]===claimed?.[key])&&
+        ['outerSha256','launcherSha256','helperSha256','nodeSha256'].every(key=>
+          H64(verified.launchPins?.[key])&&verified.launchPins[key]===claimed?.launchPins?.[key]),
+        'C_996_OWNER_HANDOFF_EVIDENCE_DRIFT');
+      console.log(JSON.stringify({status:'OPERATOR_REVIEW_BOUNDARY_REACHED',
+        code:'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED',executionAuthorized:false,
+        originalPcWrites:0,manifestCommitSha,manifestSha256:verified.manifestSha256,
+        ownerConsentCommentId:verified.ownerConsentCommentId}));
+    }catch(e){
+      console.log(JSON.stringify({status:'OPERATOR_REVIEW_NO_GO',
+        code:/^C_996_OWNER_[A-Z0-9_]+$/.test(e?.code??'')?e.code:'C_996_OWNER_HANDOFF_UNVERIFIED',
+        executionAuthorized:false,originalPcWrites:0}));
+      process.exitCode=2;
+    }
 }

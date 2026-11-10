@@ -81,8 +81,12 @@ for (const type of ['directory', 'file']) {
   });
 }
 
-for (const failAt of [null, 'old', 'continuation']) {
-  test('Operator archive primitive preserves install barrier on preceding readback failure: ' + failAt,
+for (const {start, competing} of [
+  {start:'old',competing:false}, {start:'old',competing:true},
+  {start:'continuation',competing:true},
+  {start:'install',competing:false},
+]) {
+  test('Operator preserves install barrier with locked files: ' + start + ' competing=' + competing,
     windowsOnly, () => {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-996-handle-fixture-'));
       const steps = ['old', 'continuation', 'install'];
@@ -93,9 +97,12 @@ for (const failAt of [null, 'old', 'continuation']) {
         fs.mkdirSync(path.join(root, step));
         fs.writeFileSync(path.join(root, step, 'owner.json'), bytes);
       }
+      // Simulate a process interruption with an earlier archive already present.
+      const preceding=steps.slice(0,steps.indexOf(start));
+      for(const step of preceding)fs.renameSync(path.join(root,step),path.join(root,step+'-archive'));
       const attempted = [];
       const run = () => {
-        for (const step of steps) {
+        for (const step of steps.slice(steps.indexOf(start))) {
           attempted.push(step);
           const result = spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
             ['-NoProfile', '-NonInteractive', '-Command', build996OwnerArchiveFixtureScript()], {
@@ -103,27 +110,22 @@ for (const failAt of [null, 'old', 'continuation']) {
                 operation: 'move', root, source: path.join(root, step),
                 destination: path.join(root, step + '-archive'), pins: {'owner.json': sha},
                 ownerMode: 'LIVE_NEW', actorPid: process.pid, nonce,
-                simulateContentDrift: step === failAt,
+                simulateContentDrift: competing,
               }),
               encoding: 'utf8', timeout: 30000, windowsHide: true,
             });
           assert.equal(result.status, 0, result.error?.message ?? result.stderr);
           const receipt = JSON.parse(result.stdout);
-          if (step === failAt) assert.equal(receipt.moveOccurred, true);
+          assert.equal(receipt.moveOccurred, false);
           require996OwnerArchiveReceipt(receipt);
         }
       };
-      if (failAt === null) {
-        run();
-        assert.deepEqual(attempted, steps);
-        assert.equal(fs.existsSync(path.join(root, 'install')), false);
-        assert.equal(fs.readFileSync(path.join(root, 'install-archive', 'owner.json'), 'utf8'), bytes);
-      } else {
-        assert.throws(run, {code: 'C996_NATIVE_SOURCE_CONTENT_DRIFT'});
-        assert.deepEqual(attempted, steps.slice(0, steps.indexOf(failAt) + 1));
-        assert.equal(fs.existsSync(path.join(root, 'install-archive')), false);
-        assert.equal(fs.readFileSync(path.join(root, 'install', 'owner.json'), 'utf8'), bytes);
-        assert.equal(fs.existsSync(path.join(root, failAt + '-archive')), true);
-      }
+      assert.throws(run, {code: competing?'C996_NATIVE_COMPETING_WRITE_BLOCKED':'C996_NATIVE_LOCKED_MOVE_UNSUPPORTED'});
+      assert.deepEqual(attempted, [start]);
+      assert.equal(fs.existsSync(path.join(root, 'install-archive')), false);
+      assert.equal(fs.readFileSync(path.join(root, 'install', 'owner.json'), 'utf8'), bytes);
+      assert.equal(fs.readFileSync(path.join(root, start, 'owner.json'), 'utf8'), bytes);
+      assert.equal(fs.existsSync(path.join(root, start + '-archive')), false);
+      for(const step of preceding)assert.equal(fs.readFileSync(path.join(root,step+'-archive','owner.json'),'utf8'),bytes);
     });
 }

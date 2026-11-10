@@ -402,4 +402,11 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 소스 해시 비교가 끝난 뒤 Owner 댓글을 다시 조회한다. 비교 도중 승인이 철회되거나 댓글이 바뀌면 최종 증거를 반환하기 전에 중단한다. 정상 증거, 다른 Owner, 로컬 Operator 바이트 변조, 소스 대조 도중 승인 철회의 네 가지 시험을 포함해 관련 검사 32/32 통과.
 - 기존 검토 ZIP은 해당 Git 커밋에 고정된 역사 증거로 유지한다. 신규 운영 ZIP·S2 봉인과 운영 진입점 검증은 별도이며 원본 Claim·Lease 변경은 없다.
 
+### 독립 승인 인계 및 검증 파일을 고정한 이동 차단
+
+- 외부 PowerShell의 소스 고정을 유지하면서 Bootstrap 결과를 Operator 검토 진입점에 전달한다. Operator는 GitHub GET 전용 Bootstrap 검증을 다시 수행하고 Owner 댓글 ID, Manifest 및 실행 파일 해시가 같을 때만 검토 경계 응답을 반환한다. 이전의 인수 반향 명령을 제거했다. 승인 철회나 불일치가 발생하면 경계 응답을 반환하지 않는다. 운영 함수의 하드 STOP은 유지한다.
+- 검증한 모든 파일의 읽기 핸들은 쓰기 및 삭제 공유 없이 이동과 사후 대조까지 유지한다. Windows TEMP에서 이 조건의 디렉터리 이동은 거부됐다. 핸들을 닫고 이동하는 재시도 경로를 제거했다. 파일 핸들만으로 새 디렉터리 항목의 삽입까지 막는다는 근거가 없으므로 운영 모드는 이동 전에 `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`으로 차단한다. 참고 [Microsoft Windows 파일 이름 변경 제약](https://learn.microsoft.com/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_file_rename_information).
+- Windows 격리 시험은 첫 보관 실패, 기존 C Claim에서 경쟁 쓰기, 기존 C Claim 보관 후 continuation에서 경쟁 쓰기, 두 Claim 보관 후 Install Lease 이동 시점의 중단 상태를 검증했다. 각 시험에서 Install Lease와 이미 보관된 증거의 바이트를 유지했다. 중단 상태는 TEMP fixture에서 구성했고 원본 Windows 복구는 수행하지 않았다.
+- 안전한 전체 디렉터리 항목 고정·이동의 성공 증거가 필요하므로 S1/SourceLock/최종 C ZIP/S2를 봉인하지 않는다. 전체 운영 80%.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.

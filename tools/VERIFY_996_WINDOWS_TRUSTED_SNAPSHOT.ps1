@@ -83,7 +83,7 @@ try {
           $proof.operatorStarted -isnot [bool] -or $proof.operatorStarted) {
         throw 'C996_SNAPSHOT_BOOTSTRAP_RECEIPT_INVALID'
       }
-      $operatorReply = & 'E:\ZGmini\runtime\node.exe' $operatorPath --review-handoff $ManifestCommitSha $proof.manifestSha256 "$($proof.ownerConsentCommentId)"
+      $operatorReply = $reply | & 'E:\ZGmini\runtime\node.exe' $operatorPath --verify-handoff $ManifestCommitSha
       if ($LASTEXITCODE -ne 0 -or @($operatorReply).Count -ne 1) { throw 'C996_SNAPSHOT_OPERATOR_REVIEW_FAILED' }
       $operatorProof = $operatorReply | ConvertFrom-Json
       if ($operatorProof.status -cne 'OPERATOR_REVIEW_BOUNDARY_REACHED' -or

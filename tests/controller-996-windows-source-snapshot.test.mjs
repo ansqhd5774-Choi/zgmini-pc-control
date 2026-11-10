@@ -180,7 +180,6 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     'import {createHash} from "node:crypto";',
     'const sha = url => createHash("sha256").update(fs.readFileSync(url)).digest("hex");',
     'const mode = process.env.ZGMINI_996_TEST_RECEIPT;',
-    'if (mode === "missing") process.exit(2);',
     'const receipt = ' + JSON.stringify({
       schema:'ZGMINI_CONTROLLER_996_NATIVE_TRUSTED_BOOTSTRAP_REVIEW_V1',
       status:'GIT_AND_LOCAL_BYTES_OBSERVED_ONLY', filesCheckedAtS1:16, filesCheckedAtS2:3,
@@ -194,7 +193,13 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     'if (mode === "wrong-commit") receipt.manifestCommitSha = "0".repeat(40);',
     'if (mode === "authorized") receipt.executionAuthorized = true;',
     'if (mode === "wrong-launch") receipt.launchPins.nodeSha256 = "0".repeat(64);',
-    'console.log(JSON.stringify(receipt));',
+    'export function verify996CTrustedBootstrapReadOnly() {',
+    '  return mode === "revoked-at-operator" ? {status:"BOOTSTRAP_NO_GO"} : receipt;',
+    '}',
+    'if (process.argv[1] && new URL(import.meta.url).pathname.endsWith(process.argv[1].split(/[\\\\/]/).at(-1))) {',
+    '  if (mode === "missing") process.exit(2);',
+    '  console.log(JSON.stringify(receipt));',
+    '}',
   ].join('\n'));
   const files = {[bootstrap]:bootstrapSha, [operator]:operatorSha};
   for (let i = 0; i < 14; i++) {
@@ -225,4 +230,7 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     assert.equal(receipt.operatorStarted, false);
     assert.equal(receipt.code, mode==='missing'?'C996_SNAPSHOT_BOOTSTRAP_REVIEW_FAILED':'C996_SNAPSHOT_BOOTSTRAP_RECEIPT_INVALID');
   }
+  const revoked = run('revoked-at-operator');
+  assert.equal(revoked.status,2,revoked.stderr+revoked.stdout);
+  assert.equal(JSON.parse(revoked.stdout).code,'C996_SNAPSHOT_OPERATOR_REVIEW_FAILED');
 });
