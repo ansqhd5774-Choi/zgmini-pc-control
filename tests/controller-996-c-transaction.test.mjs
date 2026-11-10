@@ -25,7 +25,7 @@ const goodChecks=['ledgerPinned','ownerMatched','ownerDead',
  'supervisorVerified','runnerListComplete','noOtherControllerLeases',
  'stableRawDigests'];
 const steps=['freshReadback','reserveClaim','freshWithOwnClaim','recordPrepared','enableWorkflowOnce',
- 'workflowActiveReadback','closeBacklogCas','fullBacklogDispositionReadback',
+ 'workflowActiveReadback','closeBacklogGuarded','fullBacklogDispositionReadback',
  'independentProtectedPostcheck','recordPreArchive','archiveOriginalLease','finalReadback',
  'completeRecord','archiveOwnClaim','finalOwnClaimReadback'];
 function fixture(){
