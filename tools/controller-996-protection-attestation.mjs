@@ -19,9 +19,14 @@ function readWriterFile(root,name){
  need(fs.lstatSync(root).isDirectory()&&!fs.lstatSync(root).isSymbolicLink(),
   'WRITER_ROOT_UNSAFE');
  const target=path.join(root,name);
- need(fs.lstatSync(target).isFile()&&!fs.lstatSync(target).isSymbolicLink(),
+ let stat;
+ try{stat=fs.lstatSync(target);}catch(e){
+  if(e?.code==='ENOENT')return null; // Original R1 fingerprint omitted absent files.
+  throw e;
+ }
+ need(stat.isFile()&&!stat.isSymbolicLink(),
   'WRITER_PROTECTED_FILE_UNSAFE');
- need(fs.statSync(target).size<=2_000_000,'WRITER_PROTECTED_FILE_TOO_LARGE');
+ need(stat.size<=2_000_000,'WRITER_PROTECTED_FILE_TOO_LARGE');
  return fs.readFileSync(target);
 }
 function readWindowsTask(name){
@@ -47,31 +52,48 @@ function readTaskEnabled(xml){
 export function collect996ProtectedItems({writerRoot=ORIGINAL_ROOTS.writer,
  readFile=readWriterFile,readTask=readWindowsTask,
  now=()=>new Date().toISOString(),expectedFingerprint=ORIGINAL_FINGERPRINT}={}){
- const files={},taskDigests={},taskEnabled={};
+ const files={},writerFileStatus={},taskDigests={},taskEnabled={};
  for(const name of names){
-  const bytes=readFile(writerRoot,name);
+  let bytes;
+  try{bytes=readFile(writerRoot,name);}catch(e){
+   throw Object.assign(Error('WRITER_FILE_OBSERVATION_FAILED'),{
+    code:'WRITER_FILE_OBSERVATION_FAILED',failedItem:name,
+    underlyingCode:e?.code??null});
+  }
+  if(bytes===null||bytes===undefined){
+   writerFileStatus[name]='ABSENT';continue;
+  }
   need(Buffer.isBuffer(bytes),'WRITER_PROTECTED_BYTES_INVALID');
   files[name]=sha(bytes);
+  writerFileStatus[name]='PRESENT';
  }
  for(const name of tasks){
-  const bytes=readTask(name);
+  let bytes;
+  try{bytes=readTask(name);}catch(e){
+   throw Object.assign(Error('PROTECTED_TASK_QUERY_FAILED'),{
+    code:'PROTECTED_TASK_QUERY_FAILED',failedItem:name,
+    underlyingCode:e?.code??null});
+  }
   need(Buffer.isBuffer(bytes),'PROTECTED_TASK_BYTES_INVALID');
   taskDigests[name]=sha(bytes);
   taskEnabled[name]=readTaskEnabled(bytes);
  }
  const protectionNow={files,tasks:taskDigests};
  const fingerprint=sha(Buffer.from(JSON.stringify(protectionNow)));
- const complete=names.every(name=>typeof files[name]==='string')&&
+ const allFivePresent=names.every(name=>typeof files[name]==='string')&&
   tasks.every(name=>typeof taskDigests[name]==='string'&&
    typeof taskEnabled[name]==='boolean');
+ const tasksComplete=tasks.every(name=>typeof taskDigests[name]==='string'&&
+  typeof taskEnabled[name]==='boolean');
  return {
   schema:'ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1',
   requestId:REQUEST_996.requestId,issueNumber:996,observedAt:now(),
-  status:complete&&fingerprint===expectedFingerprint?
+  status:tasksComplete&&fingerprint===expectedFingerprint?
    'CURRENT_ITEMS_MATCH_OBSERVATION':'CURRENT_ITEMS_DIFFER_OR_UNPROVEN',
-  items:{files,taskSha256:taskDigests,taskEnabled},
+  items:{files,writerFileStatus,taskSha256:taskDigests,taskEnabled},
   currentFingerprint:fingerprint,originalObservationFingerprint:expectedFingerprint,
-  fingerprintMatch:fingerprint===expectedFingerprint,allFivePresent:complete,
+  fingerprintMatch:fingerprint===expectedFingerprint,allFivePresent,
+  presentWriterFileCount:Object.keys(files).length,
   historicalBaselineAvailable:false,allActorsImmutableProven:false,
   operationalWrites:0,issuePosts:0,pcRetries:0,executionAuthorized:false,
  };
@@ -88,6 +110,9 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  catch(e){console.log(JSON.stringify({
   schema:'ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1',
   status:'STATE_UNKNOWN',code:/^[A-Z0-9_]+$/.test(e.code??'')?
-   e.code:'PROTECTED_ITEMS_READ_FAILED',operationalWrites:0,issuePosts:0,
+   e.code:'PROTECTED_ITEMS_READ_FAILED',
+  failedItem:[...names,...tasks].includes(e.failedItem)?e.failedItem:null,
+  underlyingCode:/^[A-Z0-9_]+$/.test(e.underlyingCode??'')?
+   e.underlyingCode:null,operationalWrites:0,issuePosts:0,
   pcRetries:0,executionAuthorized:false}));process.exitCode=2;}
 }
