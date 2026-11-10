@@ -11,8 +11,18 @@ import {review996ProtectedR2Evidence} from './controller-996-r2-evidence-review.
 
 const ROOT='E:/ZGmini';
 const GH='C:/Program Files/GitHub CLI/gh.exe';
+const GIT_ROOT='E:/ZGmini/projects/zgmini-pc-control';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
+const CONTROLLER_SHA='badad9124157879d7a645b64f2768113d632355b';
+const TARGET_SHA='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
+const MAINTAINER_SHA='16064e29fea0e53e7769a24d93d75b6f5292cfc0';
+const MAINTAINER_FILES=Object.freeze([
+ 'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+ 'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+ 'tools/update.mjs','tools/maintenance-ancestry.vbs',
+ 'tools/source-bundle-register.mjs',
+]);
 const ORIGINAL_BACKLOG='d48698b6bfe152fdcbea5adf582364334dc8633742cce02e6a1299718304a780';
 const ORIGINAL=Object.freeze({
  ledger:'c6276bcf78ee96d8858e91621c85437abb5377108fe6c5b5681bf9b617743930',
@@ -26,6 +36,9 @@ const MAP=Object.freeze({
  ledger:'automation/pc-maintenance/ledger/'+REQ+'.json',
  controllerHost:'automation/pc-control/host.json',
  stagedHost:'automation/pc-control/backups/controller-update-'+REQ+'/stage/host.json',
+ stage:'automation/pc-control/backups/controller-update-'+REQ+'/stage',
+ controller:'automation/pc-control',
+ maintainer:'automation/pc-maintenance',
  maintainerManifest:'automation/pc-maintenance/MAINTENANCE_INSTALL.json',
  backlog:'automation/pc-maintenance/backlog/'+REQ+'.json',
  own:'automation/pc-maintenance/leases/controller-recovery',
@@ -35,6 +48,7 @@ const MAP=Object.freeze({
 });
 const PHASES=['BACKLOG_CLOSED','ORIGINAL_LEASE_ARCHIVED','FINAL_ARCHIVED'];
 const SHA=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
+const SOURCE_REL=/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const date=x=>typeof x==='string'?Date.parse(x):NaN;
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
@@ -55,6 +69,13 @@ function authenticatedWorkflowRead(){
  const workflow=get('repos/'+REPO+'/actions/workflows/pc-job.yml');
  return workflow?.state;
 }
+function gitSourceRead(commit,rel){
+ need([CONTROLLER_SHA,TARGET_SHA,MAINTAINER_SHA].includes(commit)&&
+  (SOURCE_REL.test(rel)||MAINTAINER_FILES.includes(rel)),
+  'C_POSTCHECK_GIT_SOURCE_PATH_UNSAFE');
+ return execFileSync('git',['show',`${commit}:${rel}`],{
+  cwd:GIT_ROOT,windowsHide:true,timeout:30000,maxBuffer:2_000_000});
+}
 
 function read(root,rel){
  need(typeof rel==='string'&&!path.isAbsolute(rel)&&
@@ -72,6 +93,74 @@ function read(root,rel){
  need(stat.isFile()&&stat.size>0&&stat.size<=2_000_000,
   'C_POSTCHECK_FILE_UNSAFE');
  return fs.readFileSync(current);
+}
+function names(root,rel){
+ need(typeof rel==='string'&&!path.isAbsolute(rel)&&
+  !rel.split(/[\\/]/).some(p=>!p||p==='.'||p==='..'),
+  'C_POSTCHECK_DIRECTORY_PATH_UNSAFE');
+ let current=root;
+ for(const part of [null,...rel.split('/')]){
+  if(part!==null)current=path.join(current,part);
+  const stat=fs.lstatSync(current);
+  need(stat.isDirectory()&&!stat.isSymbolicLink(),
+   'C_POSTCHECK_DIRECTORY_REDIRECT');
+ }
+ return fs.readdirSync(current).sort();
+}
+function verifyPinnedSources({root,host,stagedHost,maintainer,
+ sourceRead,gitCache}){
+ const snapshot=[];
+ const source=(commit,rel)=>{
+  const key=`${commit}:${rel}`;
+  if(!gitCache.has(key)){
+   const bytes=sourceRead(commit,rel);
+   need(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=2_000_000,
+    'C_POSTCHECK_GIT_SOURCE_UNVERIFIED');
+   gitCache.set(key,Buffer.from(bytes));
+  }
+  return gitCache.get(key);
+ };
+ const verifyFile=(folder,rel,pinnedSha,commit,code)=>{
+  const bytes=read(root,`${folder}/${rel}`);
+  need(sha(bytes)===pinnedSha&&bytes.equals(source(commit,rel)),code);
+  snapshot.push([`${folder}/${rel}`,sha(bytes)]);
+ };
+ const verifyMap=(map,folder,commit,code)=>{
+  need(map&&typeof map==='object'&&!Array.isArray(map)&&
+   Object.keys(map).length>=5&&
+   Object.keys(map).every(rel=>SOURCE_REL.test(rel)&&SHA(map[rel])),code);
+  for(const [rel,digest] of Object.entries(map))
+   verifyFile(folder,rel,digest,commit,code);
+  return Object.keys(map).length;
+ };
+ need(host.controllerSourceSha===CONTROLLER_SHA&&
+  stagedHost.controllerSourceSha===TARGET_SHA&&
+  maintainer.schema==='ZGMINI_PC_MAINTENANCE_INSTALL_V1'&&
+  maintainer.sourceSha===MAINTAINER_SHA,
+  'C_POSTCHECK_PINNED_SOURCE_MANIFEST_INVALID');
+ const installed=verifyMap(host.controllerFiles,MAP.controller,
+  CONTROLLER_SHA,'C_POSTCHECK_INSTALLED_CONTROLLER_CODE_DRIFT');
+ const staged=verifyMap(stagedHost.controllerFiles,MAP.stage,
+  TARGET_SHA,'C_POSTCHECK_STAGED_CONTROLLER_CODE_DRIFT');
+ need(JSON.stringify(names(root,MAP.stage))===
+  JSON.stringify(['config','controller','host.json'])&&
+  Object.keys(stagedHost.controllerFiles).length===
+   names(root,MAP.stage+'/config').length+
+   names(root,MAP.stage+'/controller').length&&
+  ['config','controller'].every(folder=>
+   names(root,MAP.stage+'/'+folder).every(name=>
+    Object.hasOwn(stagedHost.controllerFiles,`${folder}/${name}`))),
+  'C_POSTCHECK_STAGE_FILE_SET_DRIFT');
+ need(maintainer.files&&typeof maintainer.files==='object'&&
+  !Array.isArray(maintainer.files)&&
+  Object.keys(maintainer.files).length===MAINTAINER_FILES.length&&
+  MAINTAINER_FILES.every(rel=>SHA(maintainer.files[rel])),
+  'C_POSTCHECK_MAINTAINER_SOURCE_MAP_INVALID');
+ for(const rel of MAINTAINER_FILES)
+  verifyFile(MAP.maintainer,rel,maintainer.files[rel],MAINTAINER_SHA,
+   'C_POSTCHECK_MAINTAINER_CODE_DRIFT');
+ return Object.freeze({installed,staged,maintainer:MAINTAINER_FILES.length,
+  snapshot:JSON.stringify(snapshot)});
 }
 function absent(root,rel){
  const target=path.join(root,...rel.split('/'));
@@ -95,8 +184,16 @@ function claimMarker(root,folder,name,owner){
  return data;
 }
 function inspectPhysical({root,phase,expectedRaw,isOldOwnerAlive,
- readWorkflow,readProtected}){
+ readWorkflow,readProtected,expectedOwnerNonce,expectedOwnerPid,sourceRead}){
  need(PHASES.includes(phase),'C_POSTCHECK_PHASE_INVALID');
+ // The operator's reserved Claim identity is an independent input. A
+ // self-consistent replacement Claim and matching forged markers must never
+ // count as the original C transaction, including AFTER both archives.
+ need(typeof expectedOwnerNonce==='string'&&
+  /^[a-zA-Z0-9-]{1,80}$/.test(expectedOwnerNonce)&&
+  Number.isSafeInteger(expectedOwnerPid)&&expectedOwnerPid>0&&
+  expectedOwnerPid===process.pid,
+  'C_POSTCHECK_EXPECTED_OWN_CLAIM_REQUIRED');
  const oldArchived=phase!=='BACKLOG_CLOSED';
  const ownArchived=phase==='FINAL_ARCHIVED';
  const orig=oldArchived?MAP.originalArchived:MAP.original;
@@ -118,6 +215,9 @@ function inspectPhysical({root,phase,expectedRaw,isOldOwnerAlive,
   Number.isSafeInteger(ownOwner.pid)&&ownOwner.pid>0&&
   typeof ownOwner.nonce==='string'&&/^[a-zA-Z0-9-]{1,80}$/.test(ownOwner.nonce),
   'C_POSTCHECK_OWN_CLAIM_IDENTITY_UNVERIFIED');
+ need(ownOwner.nonce===expectedOwnerNonce&&
+  ownOwner.pid===expectedOwnerPid,
+  'C_POSTCHECK_OWN_CLAIM_OWNER_DRIFT');
  const required=['PREPARED','WORKFLOW_ENABLE_ATTEMPTED','BACKLOG_CLOSE_ATTEMPTED'];
  if(oldArchived)required.push('PRE_ARCHIVE','ORIGINAL_LEASE_ARCHIVE_ATTEMPTED');
  if(ownArchived)required.push('COMPLETE','OWN_CLAIM_ARCHIVE_ATTEMPTED');
@@ -138,6 +238,15 @@ function inspectPhysical({root,phase,expectedRaw,isOldOwnerAlive,
   need(staticDigest[key]===expectedRaw[key],
    'C_POSTCHECK_ORIGINAL_STATIC_FILE_DRIFT');
  }
+ const host=parse(read(root,MAP.controllerHost),
+  'C_POSTCHECK_CONTROLLER_HOST_JSON_INVALID');
+ const stagedHost=parse(read(root,MAP.stagedHost),
+  'C_POSTCHECK_STAGED_HOST_JSON_INVALID');
+ const maintainer=parse(read(root,MAP.maintainerManifest),
+  'C_POSTCHECK_MAINTAINER_JSON_INVALID');
+ const gitCache=new Map();
+ const sources=verifyPinnedSources({root,host,stagedHost,maintainer,
+  sourceRead,gitCache});
  const backlogBytes=read(root,MAP.backlog);
  need(sha(backlogBytes)===close.nextSha,'C_POSTCHECK_BACKLOG_SHA_DRIFT');
  const backlog=parse(backlogBytes,'C_POSTCHECK_BACKLOG_JSON_INVALID');
@@ -167,11 +276,19 @@ function inspectPhysical({root,phase,expectedRaw,isOldOwnerAlive,
    'C_POSTCHECK_ORIGINAL_CHANGED_DURING_READ');
  need(sha(read(root,MAP.backlog))===close.nextSha,
   'C_POSTCHECK_BACKLOG_CHANGED_DURING_READ');
+ const afterSources=verifyPinnedSources({root,host,stagedHost,maintainer,
+  sourceRead,gitCache});
+ need(afterSources.snapshot===sources.snapshot,
+  'C_POSTCHECK_SOURCE_CHANGED_DURING_READ');
  return Object.freeze({
   schema:'ZGMINI_CONTROLLER_996_NATIVE_POSTCHECK_V1',
   status:'READONLY_PHASE_PHYSICAL_STATE_MATCHES_PINNED',
   code:'ORIGINAL_GITHUB_DISPOSITION_AND_C_OPERATOR_STILL_REQUIRED',
   phase,requestId:REQ,originalStaticFilesVerified:4,
+  installedControllerFilesVerified:sources.installed,
+  stagedControllerFilesVerified:sources.staged,
+  maintainerSourceFilesVerified:sources.maintainer,
+  sourceReadbackPasses:2,
   originalLeaseHashesVerified:2,protectedTasksEnabled:2,
   protectedFingerprint:protectedReview.protectedFingerprint,
   backlogSha256:close.nextSha,
@@ -187,12 +304,13 @@ function inspectPhysical({root,phase,expectedRaw,isOldOwnerAlive,
 export function create996NativePostcheck({root=ROOT,testOnly=false,
  expectedRaw=ORIGINAL,readWorkflow=authenticatedWorkflowRead,
  isOldOwnerAlive=processIsAlive,
- readProtected=collect996ProtectedItems}={}){
+ readProtected=collect996ProtectedItems,sourceRead=gitSourceRead}={}){
  if(testOnly){
   need(process.platform!=='win32'&&path.isAbsolute(root)&&
    path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep)&&
    path.basename(root).startsWith('zgmini-996-test-')&&
-   expectedRaw!==ORIGINAL&&readProtected!==collect996ProtectedItems,
+   expectedRaw!==ORIGINAL&&readProtected!==collect996ProtectedItems&&
+   sourceRead!==gitSourceRead,
    'C_POSTCHECK_TEST_ONLY_ROOT_OR_PORT_INVALID');
  }else{
   need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&
@@ -200,17 +318,19 @@ export function create996NativePostcheck({root=ROOT,testOnly=false,
    path.win32.normalize(root).toLowerCase()===path.win32.normalize(ROOT).toLowerCase()&&
    expectedRaw===ORIGINAL&&readProtected===collect996ProtectedItems&&
    readWorkflow===authenticatedWorkflowRead&&
-   isOldOwnerAlive===processIsAlive,
+   isOldOwnerAlive===processIsAlive&&sourceRead===gitSourceRead,
    'C_POSTCHECK_ORIGINAL_WINDOWS_REQUIRED');
  }
  need(expectedRaw&&Object.keys(expectedRaw).length===Object.keys(ORIGINAL).length&&
   Object.keys(ORIGINAL).every(k=>SHA(expectedRaw[k]))&&
   typeof readWorkflow==='function'&&typeof isOldOwnerAlive==='function'&&
-  typeof readProtected==='function','C_POSTCHECK_REQUIRED_READERS_MISSING');
+  typeof readProtected==='function'&&typeof sourceRead==='function',
+  'C_POSTCHECK_REQUIRED_READERS_MISSING');
  return Object.freeze({
-  inspect({phase}={}){
+  inspect({phase,expectedOwnerNonce,expectedOwnerPid}={}){
    try{return inspectPhysical({root,phase,expectedRaw,isOldOwnerAlive,
-    readWorkflow,readProtected});}
+    readWorkflow,readProtected,expectedOwnerNonce,expectedOwnerPid,
+    sourceRead});}
    catch(e){return fail(/^C_[A-Z0-9_]+$/.test(e?.code??'')?
     e.code:'C_POSTCHECK_STATE_OR_READ_UNKNOWN');}
   },

@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_NATIVE_SOURCE_LOCK_R1",
+  "manifestCommitSha": "7cff08ec6b27410baf10d8dc7130edb57b2de8c4",
+  "entry": "controller-996-native-operator.mjs",
+  "files": {
+    "controller-996-backlog-plan.mjs": {"sha256":"4f7d001cb4099fa0a5b19c3cec73269537933d5cbc6e3dbc22636f26a8dfdb3e","imports":[]},
+    "controller-996-backlog-readback.mjs": {"sha256":"84d660802ae9f83a90943d35feafbc9104424eb9040cd966312a999c70b08ae1","imports":["controller-996-backlog-plan.mjs"]},
+    "controller-996-c-consent-verifier.mjs": {"sha256":"4053173f7d880390ea337070318ed70052e2bc3c3c31bc122d9f5a41d9d7298e","imports":[]},
+    "controller-996-c-transaction.mjs": {"sha256":"d1f422f695121ab465a3842615bfde8dfbc7b0ebfd91b804c8a0358661328fb6","imports":[]},
+    "controller-996-native-approval-readiness.mjs": {"sha256":"d542f4821046b0636796bfcf1e0612c6950b7c7cdcdb7625d7126cad182483dd","imports":["controller-996-r2-evidence-review.mjs","controller-996-c-consent-verifier.mjs","controller-996-c-transaction.mjs"]},
+    "controller-996-native-backlog.mjs": {"sha256":"09b080d83e8fcf4ba9be2c21f9de09d259d96c30214575cf21caa76f2904d5bb","imports":["controller-996-c-transaction.mjs"]},
+    "controller-996-native-claims.mjs": {"sha256":"806a308b533b418ed3807fc7359b077ca787df6a6bfb6208f123605f78ff1e16","imports":["controller-996-c-transaction.mjs"]},
+    "controller-996-native-consent-reader.mjs": {"sha256":"51d13e21d98e4f7951c7aa453e99bce60b79a061d5345894b46d5b269c7885a8","imports":[]},
+    "controller-996-native-fresh-preflight.mjs": {"sha256":"bbe70fae44b6497ca76159ffd986456fda69b0f828d2741c27c493fad5803848","imports":["controller-996-windows-observer.mjs","controller-996-protection-attestation.mjs","controller-996-r2-evidence-review.mjs"]},
+    "controller-996-native-github-readonly.mjs": {"sha256":"5ba6a1f52e7fe5e226e5cafaadf87ae287e535cb711b0ccf32e5a13a08a51d58","imports":[]},
+    "controller-996-native-operator.mjs": {"sha256":"74ecd808e2e5d82429b655d85eecca6b8fbdc965fb6970465553063960156037","imports":["controller-996-c-transaction.mjs","controller-996-native-github-readonly.mjs","controller-996-native-consent-reader.mjs","controller-996-native-approval-readiness.mjs","controller-996-native-fresh-preflight.mjs","controller-996-native-claims.mjs","controller-996-native-workflow.mjs","controller-996-native-writer-gate.mjs","controller-996-native-backlog.mjs","controller-996-backlog-readback.mjs","controller-996-native-postcheck.mjs","controller-996-protection-attestation.mjs","controller-996-r2-evidence-review.mjs"]},
+    "controller-996-native-postcheck.mjs": {"sha256":"8966980d4045883fb13e2a92250cbfad56fd7a37e08dac399ec30282b5759c4e","imports":["controller-996-protection-attestation.mjs","controller-996-r2-evidence-review.mjs"]},
+    "controller-996-native-workflow.mjs": {"sha256":"e28f1e2af5cb1c00f28ab576647ccd542c6abb0903df25e9e02c31196e48267b","imports":[]},
+    "controller-996-native-writer-gate.mjs": {"sha256":"b1887e9741f92b467fb93b816853e237b89981ae620ea6952747b920b5f33e0f","imports":["controller-996-c-transaction.mjs"]},
+    "controller-996-protection-attestation.mjs": {"sha256":"4ffb482f535f55e7ac614b08546f8d09a85b66ddc7e0698a4642ed3af275379e","imports":["controller-996-windows-observer.mjs"]},
+    "controller-996-r2-evidence-review.mjs": {"sha256":"c0701bbe9a10e4c22bdd361bcdc9ec7af7a8fb86525e89509e745e5b9214124d","imports":[]},
+    "controller-996-windows-observer.mjs": {"sha256":"471de28cbf5e3f9ff8488e4332862c1949991814da53b5c2145ae1b24ebd3fbd","imports":[]}
+  }
+}

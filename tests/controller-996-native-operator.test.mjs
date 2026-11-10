@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {create996NativeOperator}
+import {create996NativeOperator,review996PrePutOwnerConsent}
  from '../tools/controller-996-native-operator.mjs';
 
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
@@ -11,8 +11,13 @@ const FINGERPRINT='877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29ab
 const ORIGINAL='d48698b6bfe152fdcbea5adf582364334dc8633742cce02e6a1299718304a780';
 const COMMIT='b'.repeat(40);
 const HASH='a'.repeat(64);
-const toRun={manifestCommitSha:COMMIT,originalObservation:{},
- protectedObservation:{}};
+const toRun={manifestCommitSha:COMMIT};
+const pinnedOwnerConsent=Object.freeze({
+ status:'READONLY_PINNED_OWNER_C_CONSENT_REVIEWED',
+ manifestSha256:HASH,manifestCommitSha:COMMIT,originalRequestId:REQ,
+ protectedFingerprint:FINGERPRINT,consentCommentId:123456,
+ executionAuthorized:false,
+});
 
 function fixture(t,overrides={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-996-test-'));
@@ -21,9 +26,7 @@ function fixture(t,overrides={}){
  const events=[];
  const call=(name,result)=>()=>{events.push(name);return result;};
  const ports={
-  approval:call('APPROVAL',{status:'READONLY_APPROVAL_AND_R1_R2_CONTRACT_REVIEWED',
-   manifestSha256:HASH,manifestCommitSha:COMMIT,originalRequestId:REQ,
-   protectedFingerprint:FINGERPRINT,executionAuthorized:false}),
+  approval:call('APPROVAL',pinnedOwnerConsent),
   fresh:call('FRESH',{status:'FRESH_ORIGINAL_WINDOWS_R1_R2_MATCH_PINNED',
    rawDigestsVerified:7,checksVerified:16,protectedFingerprint:FINGERPRINT,
    protectedTasksEnabled:2}),
@@ -47,7 +50,10 @@ function fixture(t,overrides={}){
       resultCode:'GOOD',summaryOnly:false}},
     {originIssue:1002,requestId:'original-2',disposition:'REPLAN',
      verification:{status:'RESULT_PAIR_INCOMPLETE'}}]}),
-  postcheck:phase=>{events.push(phase);return {
+  postcheck:(phase,owner)=>{events.push(phase);
+   assert.equal(owner.nonce,'12345678-abcd-4567-abcd-123456789012');
+   assert.equal(owner.pid,process.pid);
+   return {
    status:'READONLY_PHASE_PHYSICAL_STATE_MATCHES_PINNED',phase,
    originalLeaseArchived:phase!=='BACKLOG_CLOSED',
    ownClaimArchived:phase==='FINAL_ARCHIVED',backlogSha256:HASH};},
@@ -156,6 +162,57 @@ test('Workflow active readback failure does not close backlog or archive lease',
  assert.equal(r.workflowPutAttempts,1);
  assert.equal(r.backlogCloseAttempts,0);
  assert.ok(!events.includes('ARCHIVE_ORIGINAL'));
+});
+
+test('pre-PUT immutable owner consent refresh accepts only the same pinned comment',()=>{
+ assert.equal(review996PrePutOwnerConsent({first:pinnedOwnerConsent,
+  refreshed:{...pinnedOwnerConsent},manifestCommitSha:COMMIT}),true);
+ assert.throws(()=>review996PrePutOwnerConsent({first:pinnedOwnerConsent,
+  refreshed:{...pinnedOwnerConsent,consentCommentId:123457},
+  manifestCommitSha:COMMIT}),/C_OPERATOR_PRE_PUT_CONSENT_IDENTITY_DRIFT/);
+ assert.throws(()=>review996PrePutOwnerConsent({first:pinnedOwnerConsent,
+  refreshed:{...pinnedOwnerConsent,manifestSha256:'c'.repeat(64)},
+  manifestCommitSha:COMMIT}),/C_OPERATOR_PRE_PUT_CONSENT_IDENTITY_DRIFT/);
+ assert.throws(()=>review996PrePutOwnerConsent({first:pinnedOwnerConsent,
+  refreshed:{...pinnedOwnerConsent,manifestCommitSha:'d'.repeat(40)},
+  manifestCommitSha:COMMIT}),/C_OPERATOR_PRE_PUT_CONSENT_IDENTITY_DRIFT/);
+});
+
+test('owner revocation in the sole pre-PUT GET halts with marker preserved and PUT zero',async t=>{
+ let ownerGetRounds=0;
+ const {operator,events}=fixture(t,{beforeWorkflowPut:()=>{
+  events.push('NEW_OWNER_COMMENT_GET');ownerGetRounds++;
+  return review996PrePutOwnerConsent({first:pinnedOwnerConsent,
+   refreshed:{status:'C_NOT_READY',code:'CONSENT_REVOKED',executionAuthorized:false},
+   manifestCommitSha:COMMIT});
+ }});
+ const r=await operator.run(toRun);
+ assert.equal(r.status,'STATE_UNKNOWN_PRESERVE_C_CLAIM_AND_ORIGINAL_LEASE');
+ assert.equal(r.code,'C_OPERATOR_PRE_PUT_CONSENT_REVOKED');
+ assert.equal(r.failedStep,'PRE_PUT_REVALIDATION');
+ assert.equal(r.workflowPutAttempts,0);
+ assert.equal(r.backlogCloseAttempts,0);
+ assert.equal(ownerGetRounds,1);
+ assert.ok(events.includes('WORKFLOW_INTENT'));
+ assert.ok(!events.includes('WORKFLOW_PUT'));
+ assert.ok(!events.includes('ARCHIVE_ORIGINAL'));
+ const again=await operator.run(toRun);
+ assert.equal(again.code,'C_OPERATOR_ALREADY_ATTEMPTED');
+ assert.equal(ownerGetRounds,1);
+});
+
+test('unverified or failed late consent blocks the one-shot Workflow PUT',async t=>{
+ const {operator,events}=fixture(t,{beforeWorkflowPut:()=>{
+  events.push('OWNER_GET_HTTP_FAILED');
+  return review996PrePutOwnerConsent({first:pinnedOwnerConsent,
+   refreshed:{status:'C_NOT_READY',code:'C_GITHUB_READ_FAILED_OR_UNVERIFIABLE'},
+   manifestCommitSha:COMMIT});
+ }});
+ const r=await operator.run(toRun);
+ assert.equal(r.code,'C_OPERATOR_PRE_PUT_CONSENT_UNVERIFIED');
+ assert.equal(r.workflowPutAttempts,0);
+ assert.ok(events.includes('WORKFLOW_INTENT'));
+ assert.ok(!events.includes('WORKFLOW_PUT'));
 });
 
 test('backlog rename/readback uncertainty never issues a second close',async t=>{

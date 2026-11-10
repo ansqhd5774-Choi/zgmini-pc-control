@@ -8,7 +8,8 @@ import {createHash} from 'node:crypto';
 import {RECOVERY_996} from './controller-996-c-transaction.mjs';
 import {create996NativeGitHubReadOnly} from './controller-996-native-github-readonly.mjs';
 import {create996NativeConsentReader} from './controller-996-native-consent-reader.mjs';
-import {review996NativeApprovalReadiness} from './controller-996-native-approval-readiness.mjs';
+import {review996NativePinnedConsentReadiness}
+ from './controller-996-native-approval-readiness.mjs';
 import {create996NativeFreshPreflight,create996NativeOwnedClaimPreflight}
  from './controller-996-native-fresh-preflight.mjs';
 import {create996NativeClaimStore} from './controller-996-native-claims.mjs';
@@ -25,7 +26,7 @@ const ORIGINAL_OWNER_SHA='d6329b4d82530f9a1ca574647f050fff9243b698bb9dd314975b19
 const RECOVERY_MARKER_SHA='4dc51f7e3a1cd84ce94ddf993e4a1cfbb319b050447dfbb5ccf0c38434a0b09b';
 const BACKLOG_ORIGINAL_SHA='d48698b6bfe152fdcbea5adf582364334dc8633742cce02e6a1299718304a780';
 const FP='877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86';
-const APPROVAL='READONLY_APPROVAL_AND_R1_R2_CONTRACT_REVIEWED';
+const APPROVAL='READONLY_PINNED_OWNER_C_CONSENT_REVIEWED';
 const POSTCHECK='READONLY_PHASE_PHYSICAL_STATE_MATCHES_PINNED';
 const IDENTITY='ansqhd5774-Choi';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -51,6 +52,31 @@ const positive=(result,status,code)=>need(result?.status===status,code);
 const safeCode=e=>/^[A-Z0-9_]{4,100}$/.test(e?.code??'')?
  e.code:'C_NATIVE_STAGE_OUTCOME_UNKNOWN';
 
+// A fresh owner re-read must match the exact original immutable approved
+// comment and manifest. Revocation during the transaction is a hard stop.
+export function review996PrePutOwnerConsent({first,refreshed,
+ manifestCommitSha}={}){
+ positive(first,APPROVAL,'C_OPERATOR_FIRST_OWNER_CONSENT_UNVERIFIED');
+ if(refreshed?.status!==APPROVAL)
+  need(false,refreshed?.code==='CONSENT_REVOKED'?
+   'C_OPERATOR_PRE_PUT_CONSENT_REVOKED':
+   'C_OPERATOR_PRE_PUT_CONSENT_UNVERIFIED');
+ need(SHA40.test(manifestCommitSha)&&
+  SHA64.test(first.manifestSha256)&&
+  Number.isSafeInteger(first.consentCommentId)&&first.consentCommentId>0&&
+  first.originalRequestId===REQ&&first.protectedFingerprint===FP&&
+  first.executionAuthorized===false&&
+  first.manifestCommitSha===manifestCommitSha&&
+  refreshed.manifestCommitSha===manifestCommitSha&&
+  refreshed.manifestSha256===first.manifestSha256&&
+  refreshed.consentCommentId===first.consentCommentId&&
+  refreshed.originalRequestId===REQ&&
+  refreshed.protectedFingerprint===FP&&
+  refreshed.executionAuthorized===false,
+  'C_OPERATOR_PRE_PUT_CONSENT_IDENTITY_DRIFT');
+ return true;
+}
+
 function createOriginalBindings(){
  const github=create996NativeGitHubReadOnly();
  const consent=create996NativeConsentReader({githubReader:github});
@@ -63,11 +89,15 @@ function createOriginalBindings(){
  const preflight=create996NativeFreshPreflight();
  const ownedPreflight=create996NativeOwnedClaimPreflight({claimStore:claim});
  const postcheck=create996NativePostcheck();
+ let approvalContext=null,prePutConsentAttempted=false;
  return Object.freeze({
-  approval({manifestCommitSha,originalObservation,protectedObservation}){
+  approval({manifestCommitSha}){
    const evidence=consent.readOnce({manifestCommitSha});
-   return review996NativeApprovalReadiness({originalObservation,
-    protectedObservation,ownerConsentEvidence:evidence});
+   const reviewed=review996NativePinnedConsentReadiness({
+    ownerConsentEvidence:evidence});
+   if(reviewed.status===APPROVAL)approvalContext=Object.freeze({
+    manifestCommitSha,initialApproval:reviewed});
+   return reviewed;
   },
   fresh:()=>preflight.read(),
   reserveClaim:()=>claim.reserveClaim(),
@@ -75,13 +105,12 @@ function createOriginalBindings(){
   record:(name,details)=>claim.recordOnce(name,details),
   prepareWorkflow:()=>workflow.prepareEnableIntent(),
   beforeWorkflowPut(){
-   // A NEW authentication round, current protected Task/Writer read and
-   // disabled Workflow read are required after the durable intent and
-   // immediately before the only PUT. No "signed boolean" substitute.
-   const read=create996NativeGitHubReadOnly();
-   const auth=read.authenticateReadOnly();
-   need(auth.actor===IDENTITY&&auth.repository===REPO&&
-    auth.private===true,'C_OPERATOR_GITHUB_IDENTITY_DRIFT');
+   // Revalidate source/Task/Workflow first. Then make exactly one new
+   // authenticated immutable Git manifest + all original owner comment GET
+   // round immediately before the only possible Workflow PUT. The durable
+   // enable intent already exists; any revocation leaves it untouched.
+   need(approvalContext&&!prePutConsentAttempted,
+    'C_OPERATOR_PRE_PUT_CONSENT_ALREADY_ATTEMPTED_OR_UNBOUND');
    // The installed 7 cooperating Writer sources and the still-open
    // original backlog must be pinned BEFORE re-enabling admission. A
    // later guard just before backlog rename remains independently required.
@@ -95,6 +124,16 @@ function createOriginalBindings(){
     'C_OPERATOR_PRE_PUT_PROTECTED_DRIFT');
    need(workflow.readState()==='disabled_manually',
     'C_OPERATOR_PRE_PUT_WORKFLOW_DRIFT');
+   prePutConsentAttempted=true;
+   const freshReader=create996NativeGitHubReadOnly();
+   const freshConsent=create996NativeConsentReader({
+    githubReader:freshReader});
+   const evidence=freshConsent.readOnce({
+    manifestCommitSha:approvalContext.manifestCommitSha});
+   const refreshed=review996NativePinnedConsentReadiness({
+    ownerConsentEvidence:evidence});
+   review996PrePutOwnerConsent({first:approvalContext.initialApproval,
+    refreshed,manifestCommitSha:approvalContext.manifestCommitSha});
    return true;
   },
   enableWorkflow:ticket=>workflow.enableOnce(ticket),
@@ -112,7 +151,8 @@ function createOriginalBindings(){
     pausedAt:closed.pausedAt,resumedAt:closed.resumedAt,
     replays:closed.replays});
   },
-  postcheck:phase=>postcheck.inspect({phase}),
+  postcheck:(phase,owner)=>postcheck.inspect({phase,
+   expectedOwnerNonce:owner?.nonce,expectedOwnerPid:owner?.pid}),
   archiveOriginal:()=>claim.archiveOriginalLease({
    ownerSha:ORIGINAL_OWNER_SHA,recoveryMarkerSha:RECOVERY_MARKER_SHA}),
   archiveOwn:()=>claim.archiveOwnClaim(),
@@ -173,7 +213,7 @@ export function create996NativeOperator({testOnly=false,
   'C_OPERATOR_NATIVE_PORTS_MISSING');
  let spent=false;
  return Object.freeze({
-  async run({manifestCommitSha,originalObservation,protectedObservation}={}){
+  async run({manifestCommitSha}={}){
    const attempts={workflowPutAttempts:0,backlogCloseAttempts:0,
     originalLeaseArchiveAttempts:0,ownClaimArchiveAttempts:0};
    if(spent)return failure('C_OPERATOR_ALREADY_ATTEMPTED','START',attempts,false);
@@ -182,8 +222,7 @@ export function create996NativeOperator({testOnly=false,
    try{
     need(SHA40.test(manifestCommitSha),
      'C_OPERATOR_PINNED_APPROVAL_COMMIT_REQUIRED');
-    const ready=await ports.approval({manifestCommitSha,originalObservation,
-     protectedObservation});
+    const ready=await ports.approval({manifestCommitSha});
     positive(ready,APPROVAL,'C_OPERATOR_OWNER_CONSENT_UNVERIFIED');
     need(SHA64.test(ready.manifestSha256)&&
      ready.manifestCommitSha===manifestCommitSha&&
@@ -240,7 +279,7 @@ export function create996NativeOperator({testOnly=false,
     const dispositions=summarizeReconciliation(
      await ports.originalDispositions(closed.nextSha));
     step='BACKLOG_PHASE_POSTCHECK';
-    const post=await ports.postcheck('BACKLOG_CLOSED');
+    const post=await ports.postcheck('BACKLOG_CLOSED',claim);
     positive(post,POSTCHECK,'C_OPERATOR_BACKLOG_POSTCHECK_FAILED');
     need(post.phase==='BACKLOG_CLOSED'&&
      post.originalLeaseArchived===false&&post.ownClaimArchived===false&&
@@ -259,7 +298,7 @@ export function create996NativeOperator({testOnly=false,
     need(await ports.archiveOriginal()===true,
      'C_OPERATOR_ORIGINAL_LEASE_ARCHIVE_UNVERIFIED');
     step='ORIGINAL_LEASE_POSTCHECK';
-    const archived=await ports.postcheck('ORIGINAL_LEASE_ARCHIVED');
+    const archived=await ports.postcheck('ORIGINAL_LEASE_ARCHIVED',claim);
     positive(archived,POSTCHECK,
      'C_OPERATOR_ORIGINAL_LEASE_POSTCHECK_FAILED');
     need(archived.phase==='ORIGINAL_LEASE_ARCHIVED'&&
@@ -279,7 +318,7 @@ export function create996NativeOperator({testOnly=false,
     need(await ports.archiveOwn()===true,
      'C_OPERATOR_OWN_CLAIM_ARCHIVE_UNVERIFIED');
     step='FINAL_INDEPENDENT_POSTCHECK';
-    const final=await ports.postcheck('FINAL_ARCHIVED');
+    const final=await ports.postcheck('FINAL_ARCHIVED',claim);
     positive(final,POSTCHECK,'C_OPERATOR_FINAL_POSTCHECK_FAILED');
     need(final.phase==='FINAL_ARCHIVED'&&
      final.originalLeaseArchived===true&&final.ownClaimArchived===true&&

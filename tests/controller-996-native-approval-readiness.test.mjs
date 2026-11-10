@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {build996ConsentComment} from '../tools/controller-996-c-consent-verifier.mjs';
-import {review996NativeApprovalReadiness}
+import {review996NativeApprovalReadiness,review996NativePinnedConsentReadiness}
  from '../tools/controller-996-native-approval-readiness.mjs';
 
 const id='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
@@ -101,6 +101,71 @@ function fixture(){
  };
  return {originalObservation,protectedObservation,ownerConsentEvidence};
 }
+
+// Synthetic test consent only: the simulated owner comment must be re-hashed
+// after every manifest mutation, so the historical pin check itself is tested.
+function reSignSyntheticManifest(f,change){
+ const evidence=f.ownerConsentEvidence;
+ const manifest=JSON.parse(evidence.operatorManifestBytes.toString('utf8'));
+ change(manifest);
+ const bytes=Buffer.from(JSON.stringify(manifest)+'\n');
+ evidence.gitRead.bytes=Buffer.from(bytes);
+ evidence.operatorManifestBytes=Buffer.from(bytes);
+ evidence.commentsReadback.comments[0].body=build996ConsentComment(sha(bytes));
+}
+
+test('pinned owner consent review uses only signed manifest, never synthetic R1/R2 objects',()=>{
+ const f=fixture();
+ const reviewed=review996NativePinnedConsentReadiness({
+  ownerConsentEvidence:f.ownerConsentEvidence});
+ assert.equal(reviewed.status,'READONLY_PINNED_OWNER_C_CONSENT_REVIEWED');
+ assert.equal(reviewed.code,'FRESH_ORIGINAL_WINDOWS_R1_R2_READBACK_STILL_REQUIRED');
+ assert.equal(reviewed.pinnedHistoricalRawDigests,7);
+ assert.equal(reviewed.verifiedPresentWriterFiles,1);
+ assert.equal(reviewed.verifiedProtectedTasks,2);
+ assert.equal(reviewed.historicalRawWindowsObjectsProvided,false);
+ assert.equal(reviewed.liveWindowsReobserved,false);
+ assert.equal(reviewed.executionAuthorized,false);
+ assert.equal(reviewed.operationalWrites,0);
+ assert.equal(reviewed.issuePosts,0);
+ // No originalObservation or protectedObservation is passed to the new API.
+});
+
+test('resigned but altered historical R1/R2 anchors fail independently of valid consent provenance',()=>{
+ const mutants=[
+  m=>{m.evidenceObservedAt='2026-11-10T03:02:03.041Z';},
+  m=>{m.protectedItemsObservedAt='2026-11-10T04:06:44.338Z';},
+  m=>{m.protectionNowFingerprint='a'.repeat(64);},
+  m=>{m.evidenceSha256.ledger='b'.repeat(64);},
+  m=>{m.evidenceSha256.stagedHost='c'.repeat(64);},
+  m=>{m.protectedItemsSha256.files['config.json']='d'.repeat(64);},
+  m=>{m.protectedItemsSha256.tasks['ZGMINI-PC-Local-Core']='e'.repeat(64);},
+  m=>{m.protectedWriterFileStatus['quota-runner.cmd']='PRESENT';
+   m.protectedItemsSha256.files['quota-runner.cmd']='f'.repeat(64);},
+ ];
+ for(const change of mutants){
+  const f=fixture();reSignSyntheticManifest(f,change);
+  const reviewed=review996NativePinnedConsentReadiness({
+   ownerConsentEvidence:f.ownerConsentEvidence});
+  assert.equal(reviewed.status,'C_NOT_READY');
+  assert.equal(reviewed.code,'C_SIGNED_HISTORICAL_R1_R2_PIN_MISMATCH');
+  assert.equal(reviewed.executionAuthorized,false);
+ }
+});
+
+test('missing or forged owner consent never passes pinned historical review',()=>{
+ for(const mutate of [
+  f=>{f.ownerConsentEvidence.commentsReadback.comments=[];},
+  f=>{f.ownerConsentEvidence.originalIssue.user.login='another-owner';},
+  f=>{f.ownerConsentEvidence.gitRead.commitSha='not-an-immutable-sha';},
+ ]){
+  const f=fixture();mutate(f);
+  const reviewed=review996NativePinnedConsentReadiness({
+   ownerConsentEvidence:f.ownerConsentEvidence});
+  assert.equal(reviewed.status,'C_NOT_READY');
+  assert.equal(reviewed.executionAuthorized,false);
+ }
+});
 
 test('synthetic owner-comment fixture and exact real R1/R2 only produce read-only C readiness, never execution',()=>{
  const result=review996NativeApprovalReadiness(fixture());
