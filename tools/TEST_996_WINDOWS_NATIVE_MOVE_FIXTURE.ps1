@@ -5,9 +5,22 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $tempPath = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
-if ([System.IO.Path]::GetPathRoot($tempPath) -ieq 'E:\' -or
+$tempDriveRoot = [System.IO.Path]::GetPathRoot($tempPath)
+if ($tempDriveRoot -ieq 'E:\' -or
   $tempPath -match '(^|[\\/])ZGmini([\\/]|$)') {
   throw 'FIXTURE_TEMP_ROOT_IS_OPERATIONAL_OR_E_DRIVE'
+}
+# A remote/UNC/portable filesystem cannot serve as proof of a same-volume
+# local Windows native move. The fixture is deliberately limited to a local
+# fixed NTFS/ReFS disk outside the original E: volume.
+if ($tempDriveRoot -notmatch '^[A-Za-z]:\\$') {
+  throw 'FIXTURE_TEMP_REMOTE_OR_UNSUPPORTED_VOLUME'
+}
+$tempDrive = [System.IO.DriveInfo]::new($tempDriveRoot)
+if (-not $tempDrive.IsReady -or
+  $tempDrive.DriveType -ne [System.IO.DriveType]::Fixed -or
+  $tempDrive.DriveFormat -notin @('NTFS','ReFS')) {
+  throw 'FIXTURE_TEMP_NOT_LOCAL_FIXED_NTFS_REFS'
 }
 $walk = [System.IO.DirectoryInfo]::new($tempPath)
 while ($null -ne $walk) {

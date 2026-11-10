@@ -11,6 +11,9 @@ test('Windows native fixture source has no operational PC path or input root',()
   assert.match(script,/GetPathRoot\(\$tempPath\)/);
   assert.match(script,/\$tempPath -match/);
   assert.match(script,/FileAttributes\]::ReparsePoint/);
+  assert.match(script,/FIXTURE_TEMP_REMOTE_OR_UNSUPPORTED_VOLUME/);
+  assert.match(script,/DriveType\]::Fixed/);
+  assert.match(script,/DriveFormat -notin @\('NTFS','ReFS'\)/);
   assert.doesNotMatch(script,/E:[\\/]ZGmini|Invoke-RestMethod|gh api/i);
   assert.doesNotMatch(script,/\bparam\s*\(/i);
   assert.match(script,/executionAuthorized=\$false/);

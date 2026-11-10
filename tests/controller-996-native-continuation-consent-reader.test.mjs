@@ -33,24 +33,34 @@ function candidate(){
 function fixture(){
   const manifest=candidate();
   let bytes=Buffer.from(JSON.stringify(manifest)+'\n');
-  const owner={login:OWNER,id:777};
+  const owner={login:OWNER,id:327938088};
   const current={issue:{number:996,user:owner,title:'pc-controller-update',
     body:JSON.stringify({schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',
-      requestId:REQ,operation:'controller-update',
-      targetControllerSha:'9db6fff689c488a59fe8771f013b7c5d3bafc0a8'})},
+      requestId:REQ,chatId:'chat-e29f389d-36fb-41d8-bc27-8f58a3facad9',
+      operation:'controller-update',controlRepository:REPO,
+      targetControllerSha:'9db6fff689c488a59fe8771f013b7c5d3bafc0a8',
+      approvalManifestSha256:'98c76160e08f25187cee2b5d6c5bfa843bb589edc7a9bdd45a6713f92824ed94'}),
+    updated_at:'2026-11-10T05:21:34Z',state:'open'},
     comments:[],secondComments:null,badBlob:false,authorized:true,
-    calls:[],listRounds:0};
+    calls:[],listRounds:0,issueReads:0,commentCountOverride:null,
+    secondIssue:null};
   const approved=()=>({id:9001,user:{...owner},
     body:format996ContinuationConsentBody(manifest,SHA(bytes),COMMIT),
     created_at:'2026-11-11T00:00:00Z',
     updated_at:'2026-11-11T00:00:00Z'});
   current.comments=[approved()];
   const githubReader={
-    authenticateReadOnly:()=>({actor:current.authorized?OWNER:'someone-else',
+    authenticateReadOnly:async()=>({actor:current.authorized?OWNER:'someone-else',
       repository:REPO,private:true,readOnly:true,executionAuthorized:false}),
-    get:url=>{
+    get:async url=>{
       current.calls.push(url);
-      if(url==='issues/996')return {status:200,data:structuredClone(current.issue)};
+      if(url==='issues/996'){
+        current.issueReads++;
+        const issue=current.secondIssue&&current.issueReads>=2?
+          current.secondIssue:current.issue;
+        return {status:200,data:{...structuredClone(issue),
+          comments:current.commentCountOverride??current.comments.length}};
+      }
       if(url===`contents/${PATH}?ref=${COMMIT}`)return {status:200,data:{
         type:'file',path:PATH,encoding:'base64',size:bytes.length,
         sha:current.badBlob?'0'.repeat(40):BLOB(bytes),
@@ -71,12 +81,12 @@ function fixture(){
     replaceManifest:m=>{bytes=Buffer.from(JSON.stringify(m)+'\n');},
     manifestBytes:()=>bytes};
 }
-const failure=(f,code)=>assert.throws(()=>f.reader().readOnce({manifestCommitSha:COMMIT}),
+const failure=(f,code)=>assert.rejects(()=>f.reader().readOnce({manifestCommitSha:COMMIT}),
   err=>err?.code===code);
 
-test('one-shot raw Git+owner comment evidence is review-only, never C authorization',()=>{
+test('one-shot raw Git+owner comment evidence is review-only, never C authorization',async()=>{
   const f=fixture();
-  const reader=f.reader(),r=reader.readOnce({manifestCommitSha:COMMIT});
+  const reader=f.reader(),r=await reader.readOnce({manifestCommitSha:COMMIT});
   assert.equal(r.status,'C_CONTINUATION_CONSENT_EVIDENCE_REVIEWED_ONLY');
   assert.equal(r.executionAuthorized,false);
   assert.equal(r.operationalWrites,0);
@@ -85,86 +95,102 @@ test('one-shot raw Git+owner comment evidence is review-only, never C authorizat
   assert.equal(r.rawManifestBytes.equals(f.manifestBytes()),true);
   assert.equal(r.consentCommentId,9001);
   assert.equal(f.current.calls.filter(x=>x.includes('comments?')).length,2);
-  assert.throws(()=>reader.readOnce({manifestCommitSha:COMMIT}),
+  await assert.rejects(()=>reader.readOnce({manifestCommitSha:COMMIT}),
     {code:'C_996_NEW_CONSENT_REPEATED_READ_DENIED'});
 });
-test('old C approval cannot substitute for new continuation C consent',()=>{
+test('old C approval cannot substitute for new continuation C consent',async()=>{
   const f=fixture();
   f.current.comments[0].body='ZGMINI_CONTROLLER_996_C_CONSENT_V1';
-  failure(f,'C_996_NEW_CONSENT_MISSING_OR_DUPLICATE');
+  await failure(f,'C_996_NEW_CONSENT_MISSING_OR_DUPLICATE');
 });
-test('changed original issue request or title rejects approval provenance',()=>{
+test('changed original issue request or title rejects approval provenance',async()=>{
   const f=fixture();f.current.issue.title='unrelated-request';
-  failure(f,'C_996_NEW_CONSENT_ORIGINAL_ISSUE_BODY_DRIFT');
+  await failure(f,'C_996_NEW_CONSENT_ORIGINAL_ISSUE_BODY_DRIFT');
   const g=fixture();
   const body=JSON.parse(g.current.issue.body);
   body.requestId='different-original-request';
   g.current.issue.body=JSON.stringify(body);
-  failure(g,'C_996_NEW_CONSENT_ORIGINAL_ISSUE_BODY_DRIFT');
+  await failure(g,'C_996_NEW_CONSENT_ORIGINAL_ISSUE_BODY_DRIFT');
 });
-test('wrong Git blob content SHA blocks even if base64 is well-formed',()=>{
+test('previously unchecked original issue fields are pinned byte-for-byte',async()=>{
+  for(const field of ['chatId','controlRepository','approvalManifestSha256']){
+    const f=fixture();const body=JSON.parse(f.current.issue.body);
+    body[field]='changed';f.current.issue.body=JSON.stringify(body);
+    await failure(f,'C_996_NEW_CONSENT_ORIGINAL_ISSUE_BODY_DRIFT');
+  }
+});
+test('missing owner revocation cannot hide behind truncated comment pages',async()=>{
+  const f=fixture();f.current.commentCountOverride=2;
+  await failure(f,'C_996_NEW_CONSENT_COMMENT_TOTAL_MISMATCH');
+});
+test('issue body change during two comment scans is rejected',async()=>{
+  const f=fixture();f.current.secondIssue=structuredClone(f.current.issue);
+  f.current.secondIssue.body+=' ';
+  await failure(f,'C_996_NEW_CONSENT_ISSUE_READBACK_DRIFT');
+});
+test('wrong Git blob content SHA blocks even if base64 is well-formed',async()=>{
   const f=fixture();f.current.badBlob=true;
-  failure(f,'C_996_NEW_CONSENT_GIT_BLOB_DRIFT');
+  await failure(f,'C_996_NEW_CONSENT_GIT_BLOB_DRIFT');
 });
-test('manifest releasing install before continuation fails exact-effects gate',()=>{
+test('manifest releasing install before continuation fails exact-effects gate',async()=>{
   const f=fixture();const wrong=candidate();
   wrong.effects=[...wrong.effects];
   [wrong.effects[3],wrong.effects[5]]=[wrong.effects[5],wrong.effects[3]];
   f.replaceManifest(wrong);
-  failure(f,'C_996_NEW_CONSENT_MANIFEST_INVALID');
+  await failure(f,'C_996_NEW_CONSENT_MANIFEST_INVALID');
 });
-test('extra manifest operation flags cannot silently expand C authorization',()=>{
+test('extra manifest operation flags cannot silently expand C authorization',async()=>{
   const f=fixture();const wrong=candidate();wrong.allowDelete=true;
   f.replaceManifest(wrong);
-  failure(f,'C_996_NEW_CONSENT_MANIFEST_INVALID');
+  await failure(f,'C_996_NEW_CONSENT_MANIFEST_INVALID');
 });
-test('a Git ref name rather than pinned 40-hex commit is rejected',()=>{
+test('a Git ref name rather than pinned 40-hex commit is rejected',async()=>{
   const f=fixture();
-  assert.throws(()=>f.reader().readOnce({manifestCommitSha:'main'}),
+  await assert.rejects(()=>f.reader().readOnce({manifestCommitSha:'main'}),
     {code:'C_996_NEW_CONSENT_COMMIT_NOT_PINNED'});
 });
-test('untrusted GitHub reader identity is rejected',()=>{
+test('untrusted GitHub reader identity is rejected',async()=>{
   const f=fixture();f.current.authorized=false;
-  failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
+  await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
 });
-test('approval from a different user ID is not owner consent',()=>{
+test('approval from a different user ID is not owner consent',async()=>{
   const f=fixture();f.current.comments[0].user.id=42;
-  failure(f,'C_996_NEW_CONSENT_MISSING_OR_DUPLICATE');
+  await failure(f,'C_996_NEW_CONSENT_MISSING_OR_DUPLICATE');
 });
-test('duplicate exact owner approval is rejected',()=>{
+test('duplicate exact owner approval is rejected',async()=>{
   const f=fixture();f.current.comments.push({...f.approved(),id:9002});
-  failure(f,'C_996_NEW_CONSENT_MISSING_OR_DUPLICATE');
+  await failure(f,'C_996_NEW_CONSENT_MISSING_OR_DUPLICATE');
 });
-test('conflicting new C owner approval with different UUID is rejected',()=>{
+test('conflicting new C owner approval with different UUID is rejected',async()=>{
   const f=fixture();f.current.comments.push({...f.approved(),id:9005,
     body:'ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1\n'+
       'continuationRequestId=00000000-0000-4000-8000-000000000000'});
-  failure(f,'C_996_NEW_CONSENT_AMBIGUOUS_OWNER_APPROVAL');
+  await failure(f,'C_996_NEW_CONSENT_AMBIGUOUS_OWNER_APPROVAL');
 });
-test('edited or missing timestamp on the sole approval is rejected',()=>{
+test('edited or missing timestamp on the sole approval is rejected',async()=>{
   for(const stamp of ['2026-11-11T01:00:00Z',null]){
     const f=fixture();f.current.comments[0].updated_at=stamp;
-    failure(f,'C_996_NEW_CONSENT_APPROVAL_EDITED_OR_UNDATED');
+    await failure(f,'C_996_NEW_CONSENT_APPROVAL_EDITED_OR_UNDATED');
   }
 });
-test('an owner revocation marker denies the approval',()=>{
+test('an owner revocation marker denies the approval',async()=>{
   const f=fixture();f.current.comments.push({...f.approved(),id:9003,
     body:'ZGMINI_CONTROLLER_996_CONTINUATION_C_REVOKE_V1\n'+ID});
-  failure(f,'C_996_NEW_CONSENT_REVOKED_OR_AMBIGUOUS');
+  await failure(f,'C_996_NEW_CONSENT_REVOKED_OR_AMBIGUOUS');
 });
-test('comment readback changed between two complete scans is rejected',()=>{
+test('comment readback changed between two complete scans is rejected',async()=>{
   const f=fixture();f.current.secondComments=[{...f.approved(),id:9004}];
-  failure(f,'C_996_NEW_CONSENT_COMMENT_READBACK_DRIFT');
+  await failure(f,'C_996_NEW_CONSENT_COMMENT_READBACK_DRIFT');
 });
-test('duplicate REST comment IDs and incomplete pagination are rejected',()=>{
+test('duplicate REST comment IDs and incomplete pagination are rejected',async()=>{
   const f=fixture();f.current.comments.push({...f.approved(),id:9001,
     body:'unrelated comment'});
-  failure(f,'C_996_NEW_CONSENT_COMMENTS_INVALID');
+  await failure(f,'C_996_NEW_CONSENT_COMMENTS_INVALID');
   const g=fixture();
   g.current.comments=Array.from({length:100},(_,i)=>({
     ...g.approved(),id:9001+i,body:`comment ${i}`}));
   g.current.comments.push({...g.approved(),id:9101});
-  const r=g.reader().readOnce({manifestCommitSha:COMMIT});
+  const r=await g.reader().readOnce({manifestCommitSha:COMMIT});
   assert.equal(r.commentsRead,101);
   assert.equal(g.current.calls.filter(x=>x.includes('comments?')).length,4);
 });

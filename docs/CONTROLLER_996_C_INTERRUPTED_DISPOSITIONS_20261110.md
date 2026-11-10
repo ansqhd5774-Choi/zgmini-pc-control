@@ -2,12 +2,19 @@
 
 ## 2026-11-11 Codex 사용량 중단 후 재개: 보관 충돌 격리 시뮬레이션
 
+### 독립 검토 보완 정본 — 원본 승인 누락·경로 불일치 교정 (운영 NO-GO)
+
+- 신규 C 원문 조회기는 실제 GitHub REST의 비동기 `get/authenticateReadOnly`에 맞춰 전 경로 `async/await`로 동작한다. **원본 #996 Issue body의 7개 필드가 포함된 원문 SHA256** `37caf348eb4fc5440ebfa76a1c1166bb7480dffdd8d054dcb19391816bc72b5a`, 고정 Owner ID, `comments` 공식 총수, 댓글 두 번 전체 페이지와 마지막 원본 Issue 재조회가 모두 같아야만 `C_CONTINUATION_CONSENT_EVIDENCE_REVIEWED_ONLY`를 반환한다. 댓글 단축 응답, 본문의 `chatId/controlRepository/approvalManifestSha256` 변조, 조회 도중 Issue 변경은 각각 차단한다. 포트 주입 단계이므로 실제 인증된 운영 GET 어댑터·새 승인 증빙을 아직 제공하지 않는다.
+- 이전 격리 Linux 시뮬레이션의 **예약 디렉터리 아래 `payload/` 이동**은 Windows 정본 `Directory.Move(source, destination)`의 **직접 보관 경로**와 달랐다. 지금은 양쪽 모두 **구 C Claim → 신규 C Claim → 원본 Install Lease 최종 이동**, 보관 폴더 바로 아래 `owner.json`/Marker를 기준으로 통일하고 회귀시험에서 양쪽 경로·순서를 교차 확인한다. 과거 이 문서 하단의 `payload/`·`AFTER_*_RESERVATION` 기록은 **이전 실험 이력**이며 현행 정본이 아니다. Linux `rename`은 검사·이동 사이 경합에서 이미 존재하는 빈 폴더를 교체할 수 있으므로 **절대 운영 no-replace 보증으로 사용하지 않으며**, 별도 격리 Windows TEMP에서 실제 `.NET Directory.Move` 충돌·중단 시험을 통과해야 한다.
+- Windows 네이티브 fixture는 추가로 UNC/네트워크·이동식·비 NTFS/ReFS TEMP 위치를 차단하고 **원본 E:가 아닌 로컬 고정 디스크**에서만 동작하도록 소스를 제한했다. 안전한 Windows 하드웨어/동시 프로세스 환경에서 실제 실행하기 전까지는 해당 검증 PASS 0건이다.
+- 정적·격리 소스 회귀 **144/144 PASS**(신규 승인 리더 18, Windows 스크립트 정적 2, Linux↔Windows 직접 보관 경로 교차 1 포함). **Windows Native 실측 0**, 원본 C Claim/Install Lease 변경 0, Workflow PUT 0, Issue POST 0, 이전 실행 CMD 재사용 0. 운영 진행률 **80%→80%**, 실제 C 실행 **NO-GO**.
+
 ### 신규 C 독립 승인 원문 조회·Windows TEMP 네이티브 시험 소스 (운영 NO-GO)
 
 - `tools/controller-996-native-continuation-consent-reader.mjs`는 기존 신규 C Shape Gate와 6효과 배열을 공유한다. **별도 신규 C Manifest의 40hex 고정 Git commit·고정 경로** `docs/CONTROLLER_996_C_CONTINUATION_APPROVAL_V1.json`을 raw GitHub GET에서 읽고 base64 canonical/size/Git blob SHA-1/원문 SHA-256·Manifest top-level exact key 집합·원본 #996 Issue owner/title/body schema/requestId/operation/targetControllerSha·원본 전체 댓글 100/page·중복 ID·댓글 두 차례 완전 재조회·작성/수정 시간 일치·고유 신규 소유자 승인 정확본문(Manifest commit SHA 포함)·같은 소유자 모순 승인 및 신규 철회 표시를 검증하는 **읽기 전용 후보 라이브러리**다. 과거 `RECONCILE_INTAKE_PAUSED_ONLY` 승인은 새 범위에 재사용하지 않으며 원본 GitHub 댓글 작성/수정 **0회**. 결과 상태는 `C_CONTINUATION_CONSENT_EVIDENCE_REVIEWED_ONLY`, `executionAuthorized=false`다. 인증된 GET 포트 주입은 향후 작업이며, 모의 포트 테스트 통과를 실제 사용자 승인으로 오인하지 않는다.
 - 실제 GitHub #996 raw REST GET 1페이지 읽기 전용 결과 댓글 **10건**, 과거 C 승인 패턴 **1건**, 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1` **0건**(2026-11-11 확인). 댓글에 작성/수정 시각이 존재함을 확인했다. 신규 불변 Manifest·Operator SHA·ZIP SHA·source-lock SHA·owner 댓글은 **아직 발급되지 않았다**.
 - `tools/TEST_996_WINDOWS_NATIVE_MOVE_FIXTURE.ps1`는 경로 입력을 받지 않고 새 Windows TEMP `zgmini-996-test-native-<GUID>`에서만 `[System.IO.Directory]::Move`의 원본→보관·기존 대상 충돌 거부·중간 중단 후 Install Lock 보존·마지막 Lease 해제 뒤 다른 임시 잠금 생성 경계만 **시험하도록 작성한 소스**다. 시작 시 TEMP 실제 드라이브가 `E:`이거나 `ZGmini` 경로 포함/부모 Reparse Point이면 중단하며, 임의의 recursive cleanup은 수행하지 않고 시험 폴더만 남긴다. 운영 `E:` 원본 경로·실제 승인/업데이트는 접근하지 않는다. **현재 Linux 환경에는 PowerShell이 없어 Windows Native 동작 실행 PASS는 0건**이며, Node 정적 안전 계약 시험 2건만 통과했다. Junction·전원 중단·dir 메타데이터 내구성·동시 프로세스/Writer 유입과 디스크 flush는 별도 격리 Windows 실증이 필요하다.
-- 전체 **소스 회귀 140/140 PASS**(신규 승인 모의 15, Windows PowerShell 정적 2 포함), **원본 Windows 운영 변경 0·Workflow PUT 0·원본 Issue POST 0·PC C 실행 0**, 운영 진행률 **80%→80%**. 실제 C 실행은 여전히 **NO-GO**이며 이전 CMD/승인 재실행을 금지한다.
+- 당시 **소스 회귀 140/140 PASS**(신규 승인 모의 15, Windows PowerShell 정적 2 포함); 이후 수정 최신 결과는 바로 위 독립 검토 보완 정본 **144/144**가 우선이다. **원본 Windows 운영 변경 0·Workflow PUT 0·원본 Issue POST 0·PC C 실행 0**, 운영 진행률 **80%→80%**. 실제 C 실행은 여전히 **NO-GO**이며 이전 CMD/승인 재실행을 금지한다.
 
 ### 후속 필수 수정: 실제 설치 배타 잠금 해제는 맨 마지막 (운영 NO-GO)
 

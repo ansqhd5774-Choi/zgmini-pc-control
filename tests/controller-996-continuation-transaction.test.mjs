@@ -6,6 +6,8 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {simulate996Continuation} from
   '../tools/controller-996-continuation-transaction.mjs';
+import {plan996WindowsArchive} from
+  '../tools/controller-996-windows-archive-adapter.mjs';
 
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const ID='70a4c347-25ea-4fc6-83d2-c0c670115249';
@@ -141,12 +143,27 @@ test('84 Git bytes checked and install lease is final archive step',()=>{
     assert.equal(fs.existsSync(f.relative(f.leaseArchive)),true);
     assert.equal(fs.existsSync(f.relative(f.contArchive)),true);
     assert.equal(fs.existsSync(f.relative(f.cont)),false);
-    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload/owner.json')),true);
-    assert.equal(fs.existsSync(f.relative(f.leaseArchive+'/payload/owner.json')),true);
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/owner.json')),true);
+    assert.equal(fs.existsSync(f.relative(f.leaseArchive+'/owner.json')),true);
     const ready=JSON.parse(fs.readFileSync(f.relative(
-      f.contArchive+'/payload/READY_TO_RELEASE_INSTALL.json'),'utf8'));
+      f.contArchive+'/READY_TO_RELEASE_INSTALL.json'),'utf8'));
     assert.equal(ready.finalReleasePending,true);
     assert.equal(ready.name,'READY_TO_RELEASE_INSTALL');
+  }finally{f.cleanup();}
+});
+test('Linux fixture archive shape agrees with Windows direct-move contract',()=>{
+  const f=fixture();
+  try{
+    const plan=plan996WindowsArchive(ID);
+    const expected=[f.oldCArchive,f.contArchive,f.leaseArchive];
+    assert.deepEqual(plan.steps.map(s=>path.win32.basename(s.destination)),
+      expected.map(s=>path.posix.basename(s)));
+    assert.deepEqual(plan.steps.map(s=>s.name),['oldC','continuation','install']);
+    assert.equal(f.run().status,'C_CONTINUATION_TEST_ARCHIVED_IN_ORDER');
+    for(const rel of expected){
+      assert.equal(fs.existsSync(f.relative(rel+'/owner.json')),true);
+      assert.equal(fs.existsSync(f.relative(rel+'/payload')),false);
+    }
   }finally{f.cleanup();}
 });
 
@@ -247,13 +264,13 @@ test('an existing empty archive directory cannot be overwritten',()=>{
 test('a competing directory created after precheck is never clobbered',()=>{
   const f=fixture();
   try{
-    const r=f.run({beforeArchiveReserve:({toRel})=>{
+    const r=f.run({beforeArchiveMove:({toRel})=>{
       if(toRel===f.oldCArchive){
         fs.mkdirSync(f.relative(toRel));
         fs.writeFileSync(f.relative(toRel+'/sentinel.txt'),'preserve');
       }
     }});
-    assert.equal(r.code,'C_CONTINUATION_ARCHIVE_RESERVATION_TAKEN');
+    assert.equal(r.code,'C_CONTINUATION_ARCHIVE_DESTINATION_TAKEN');
     assert.equal(fs.readFileSync(f.relative(f.oldCArchive+'/sentinel.txt'),'utf8'),
       'preserve');
     assert.equal(fs.existsSync(f.relative(OLD_C)),true);
@@ -261,36 +278,35 @@ test('a competing directory created after precheck is never clobbered',()=>{
   }finally{f.cleanup();}
 });
 
-test('a crash after first archive reservation preserves both original locks',()=>{
+test('a crash before first direct archive move preserves both original locks',()=>{
   const f=fixture();
   try{
-    const r=f.run({failAfter:'AFTER_OLD_C_RESERVATION'});
-    assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_OLD_C_RESERVATION');
+    const r=f.run({failAfter:'BEFORE_OLD_C_MOVE'});
+    assert.equal(r.code,'C_CONTINUATION_INJECTED_BEFORE_OLD_C_MOVE');
     assert.equal(fs.existsSync(f.relative(OLD_C)),true);
     assert.equal(fs.existsSync(f.relative(LEASE)),true);
-    assert.equal(fs.existsSync(f.relative(f.oldCArchive)),true);
-    assert.deepEqual(fs.readdirSync(f.relative(f.oldCArchive)),[]);
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive)),false);
     assert.equal(f.run().code,'C_CONTINUATION_ARCHIVE_OR_ACTIVE_CLAIM_EXISTS');
   }finally{f.cleanup();}
 });
 
-test('a crash after install archive reservation retains install lease',()=>{
+test('a crash before final direct install archive move retains install lease',()=>{
   const f=fixture();
   try{
-    const r=f.run({failAfter:'AFTER_INSTALL_RESERVATION'});
-    assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_INSTALL_RESERVATION');
-    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload/owner.json')),
+    const r=f.run({failAfter:'BEFORE_INSTALL_MOVE'});
+    assert.equal(r.code,'C_CONTINUATION_INJECTED_BEFORE_INSTALL_MOVE');
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/owner.json')),
       true);
     assert.equal(fs.existsSync(f.relative(LEASE)),true);
     assert.equal(fs.existsSync(f.relative(f.contArchive)),true);
-    assert.deepEqual(fs.readdirSync(f.relative(f.leaseArchive)),[]);
+    assert.equal(fs.existsSync(f.relative(f.leaseArchive)),false);
   }finally{f.cleanup();}
 });
 
 test('old C source drift just before move blocks and preserves the source',()=>{
   const f=fixture();
   try{
-    const r=f.run({beforeArchiveReserve:({toRel})=>{
+    const r=f.run({beforeArchiveMove:({toRel})=>{
       if(toRel===f.oldCArchive){
         fs.writeFileSync(f.relative(OLD_C+'/owner.json'),
           JSON.stringify({requestId:REQ,issueNumber:996,pid:99999999,
@@ -300,6 +316,6 @@ test('old C source drift just before move blocks and preserves the source',()=>{
     assert.equal(r.code,'C_CONTINUATION_ARCHIVED_OWNER_SHA_DRIFT');
     assert.equal(fs.existsSync(f.relative(OLD_C)),true);
     assert.equal(fs.existsSync(f.relative(LEASE)),true);
-    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload')),false);
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive)),false);
   }finally{f.cleanup();}
 });

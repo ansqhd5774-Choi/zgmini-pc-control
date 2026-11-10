@@ -76,36 +76,27 @@ const absent=(root,rel)=>{
   try{checked(root,rel,true);return false;}
   catch(e){if(e.code==='ENOENT')return true;throw e;}
 };
-// Test-only no-clobber layout: atomically reserve a NEW archive directory,
-// then move the old directory into its private `payload` child. A pre-existing
-// archive path cannot be silently replaced by rename(2) on POSIX. A crash
-// after reservation intentionally leaves the old directory and reservation
-// untouched, so a second run refuses rather than guessing the disposition.
-// This does NOT provide a Windows production move adapter or a hostile
-// same-user TOCTOU guarantee; those require a separately approved operator.
-function archiveInReservedDirectory(root,fromRel,toRel,
-  {afterReserve=null,beforeReserve=null,verifySource=null}={}){
+// Test-only DIRECT archive layout matching the Windows Directory.Move plan:
+// the original directory becomes the archive directory (NO /payload child).
+// POSIX rename(2) can replace an existing empty directory, so this isolated
+// Linux fixture cannot establish Windows no-replace semantics. Recheck after
+// all fault hooks and use the separate native Windows TEMP fixture as proof.
+// NEVER use this helper on an original Windows PC or an adversarial filesystem.
+function archiveDirectFixture(root,fromRel,toRel,
+  {beforeMove=null,failBeforeMove=null,verifySource=null}={}){
   need(absent(root,toRel),'C_CONTINUATION_ARCHIVE_DESTINATION_EXISTS');
   const from=checked(root,fromRel,true);
   const to=path.join(root,...toRel.split('/'));
-  if(beforeReserve)beforeReserve({fromRel,toRel}); // Only test injection.
-  try{fs.mkdirSync(to,{mode:0o700});}
-  catch(e){if(e.code==='EEXIST')need(false,
-    'C_CONTINUATION_ARCHIVE_RESERVATION_TAKEN');throw e;}
-  const st=fs.lstatSync(to);
-  need(st.isDirectory()&&!st.isSymbolicLink()&&
-    sorted(fs.readdirSync(to)).length===0,
-    'C_CONTINUATION_ARCHIVE_RESERVATION_UNSAFE');
-  if(afterReserve)throw Object.assign(Error('injected'),{
-    code:afterReserve});
+  if(beforeMove)beforeMove({fromRel,toRel}); // Only test injection.
+  need(absent(root,toRel),'C_CONTINUATION_ARCHIVE_DESTINATION_TAKEN');
+  if(failBeforeMove)throw Object.assign(Error('injected'),{
+    code:failBeforeMove});
   if(verifySource)verifySource();
-  const payload=path.join(to,'payload');
-  need(absent(root,toRel+'/payload'),
-    'C_CONTINUATION_ARCHIVE_PAYLOAD_EXISTS');
-  fs.renameSync(checked(root,fromRel,true),payload);
-  need(!fs.existsSync(from)&&fs.lstatSync(payload).isDirectory(),
+  need(absent(root,toRel),'C_CONTINUATION_ARCH_DESTINATION_CHANGED');
+  fs.renameSync(checked(root,fromRel,true),to);
+  need(!fs.existsSync(from)&&fs.lstatSync(to).isDirectory(),
     'C_CONTINUATION_ARCHIVE_MOVE_UNCERTAIN');
-  return toRel+'/payload';
+  return toRel;
 }
 const ensureLive=readLive=>{
   const state=readLive();
@@ -248,7 +239,7 @@ const failure=code=>Object.freeze({status:'C_CONTINUATION_TEST_STATE_UNKNOWN',
 export function simulate996Continuation({testOnly=false,root=null,consent=null,
   independentConsentVerified=false,sourceRead=null,isAlive=null,
   readLive=null,now=()=>new Date().toISOString(),
-  uuid=randomUUID,failAfter=null,beforeArchiveReserve=null}={}){
+  uuid=randomUUID,failAfter=null,beforeArchiveMove=null}={}){
   if(!testOnly||process.platform==='win32')return failure(
     'C_CONTINUATION_PRODUCTION_NOT_APPROVED');
   try{
@@ -265,10 +256,10 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
       typeof sourceRead==='function'&&typeof isAlive==='function'&&
       typeof readLive==='function'&&typeof now==='function'&&
       typeof uuid==='function'&&
-      (beforeArchiveReserve===null||typeof beforeArchiveReserve==='function')&&
-      [null,'AFTER_RESERVE','AFTER_OLD_C_RESERVATION',
+      (beforeArchiveMove===null||typeof beforeArchiveMove==='function')&&
+      [null,'AFTER_RESERVE','BEFORE_OLD_C_MOVE',
         'AFTER_OLD_C_ARCHIVE','AFTER_RELEASE_INTENT',
-        'AFTER_CONTINUATION_ARCHIVE','AFTER_INSTALL_RESERVATION',
+        'AFTER_CONTINUATION_ARCHIVE','BEFORE_INSTALL_MOVE',
         'AFTER_INSTALL_ARCHIVE'].includes(failAfter),
       'C_CONTINUATION_CONSENT_OR_PORT_NOT_VERIFIED');
     const first=inspect(root,consent,sourceRead,isAlive,readLive);
@@ -308,11 +299,11 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
     sameSHA(SHA(file(root,p.owner+'/owner.json')),consent.pins.oldC,'OLD_C');
     writeOnce(root,p.cont,'OLD_C_CLAIM_ARCHIVE_ATTEMPTED.json',{
       source:REQ,oldClaimSha256:consent.pins.oldC,at:now()});
-    const oldCArchived=archiveInReservedDirectory(root,p.owner,p.oldCArchive,{
-      beforeReserve:beforeArchiveReserve,
+    const oldCArchived=archiveDirectFixture(root,p.owner,p.oldCArchive,{
+      beforeMove:beforeArchiveMove,
       verifySource:()=>assertPreserved(root,'oldC',p.owner,consent.pins),
-      afterReserve:failAfter==='AFTER_OLD_C_RESERVATION'?
-        'C_CONTINUATION_INJECTED_AFTER_OLD_C_RESERVATION':null});
+      failBeforeMove:failAfter==='BEFORE_OLD_C_MOVE'?
+        'C_CONTINUATION_INJECTED_BEFORE_OLD_C_MOVE':null});
     assertPreserved(root,'oldC',oldCArchived,consent.pins);
     if(failAfter==='AFTER_OLD_C_ARCHIVE')throw Object.assign(Error('injected'),{
       code:'C_CONTINUATION_INJECTED_AFTER_OLD_C_ARCHIVE'});
@@ -336,14 +327,14 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
     const intentSha=SHA(file(root,p.cont+'/READY_TO_RELEASE_INSTALL.json'));
     if(failAfter==='AFTER_RELEASE_INTENT')throw Object.assign(Error('injected'),{
       code:'C_CONTINUATION_INJECTED_AFTER_RELEASE_INTENT'});
-    const continuationArchived=archiveInReservedDirectory(root,p.cont,p.contArchive);
-    const contPayload=continuationArchived;
-    sameSHA(SHA(file(root,contPayload+'/owner.json')),
+    const continuationArchived=archiveDirectFixture(root,p.cont,p.contArchive);
+    const contArchivedDir=continuationArchived;
+    sameSHA(SHA(file(root,contArchivedDir+'/owner.json')),
       SHA(Buffer.from(JSON.stringify(owner)+'\n')),
       'CONTINUATION_OWNER');
-    sameSHA(SHA(file(root,contPayload+'/READY_TO_RELEASE_INSTALL.json')),
+    sameSHA(SHA(file(root,contArchivedDir+'/READY_TO_RELEASE_INSTALL.json')),
       intentSha,'RELEASE_INTENT');
-    need(stable(entry(root,contPayload+'/READY_TO_RELEASE_INSTALL.json').data)===
+    need(stable(entry(root,contArchivedDir+'/READY_TO_RELEASE_INSTALL.json').data)===
       stable(releaseIntent),'C_CONTINUATION_RELEASE_INTENT_DRIFT');
     if(failAfter==='AFTER_CONTINUATION_ARCHIVE')throw Object.assign(Error('injected'),{
       code:'C_CONTINUATION_INJECTED_AFTER_CONTINUATION_ARCHIVE'});
@@ -352,26 +343,26 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
     need(absent(root,p.oldInstallArchive),
       'C_CONTINUATION_INSTALL_ARCHIVE_DESTINATION_EXISTS');
     assertPreserved(root,'oldC',oldCArchived,consent.pins);
-    sameSHA(SHA(file(root,contPayload+'/READY_TO_RELEASE_INSTALL.json')),
+    sameSHA(SHA(file(root,contArchivedDir+'/READY_TO_RELEASE_INSTALL.json')),
       intentSha,'RELEASE_INTENT');
     sameSHA(SHA(file(root,p.install+'/owner.json')),
       consent.pins.installOwner,'INSTALL_OWNER');
     sameSHA(SHA(file(root,p.install+'/RECOVERY_REQUIRED.json')),
       consent.pins.installRecovery,'INSTALL_RECOVERY');
-    const installArchived=archiveInReservedDirectory(root,p.install,
+    const installArchived=archiveDirectFixture(root,p.install,
       p.oldInstallArchive,{
-        beforeReserve:beforeArchiveReserve,
+        beforeMove:beforeArchiveMove,
         verifySource:()=>assertPreserved(root,'install',p.install,consent.pins),
-        afterReserve:failAfter==='AFTER_INSTALL_RESERVATION'?
-          'C_CONTINUATION_INJECTED_AFTER_INSTALL_RESERVATION':null});
+        failBeforeMove:failAfter==='BEFORE_INSTALL_MOVE'?
+          'C_CONTINUATION_INJECTED_BEFORE_INSTALL_MOVE':null});
     // After this move: read-only postchecks, NO further filesystem writes.
     if(failAfter==='AFTER_INSTALL_ARCHIVE')throw Object.assign(Error('injected'),{
       code:'C_CONTINUATION_INJECTED_AFTER_INSTALL_ARCHIVE'});
     assertPreserved(root,'install',installArchived,consent.pins);
     need(absent(root,p.install)&&absent(root,p.owner)&&absent(root,p.cont),
       'C_CONTINUATION_POSTCHECK_INCOMPLETE');
-    assertPreserved(root,'oldC',p.oldCArchive+'/payload',consent.pins);
-    assertPreserved(root,'install',p.oldInstallArchive+'/payload',consent.pins);
+    assertPreserved(root,'oldC',p.oldCArchive,consent.pins);
+    assertPreserved(root,'install',p.oldInstallArchive,consent.pins);
     return Object.freeze({status:'C_CONTINUATION_TEST_ARCHIVED_IN_ORDER',
       code:'ISOLATED_SIMULATION_ONLY',sourceFiles:second.sourceFiles,
       archivedCClaimBeforeInstallLease:true,

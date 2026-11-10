@@ -9,6 +9,11 @@ const OWNER='ansqhd5774-Choi';
 const ISSUE=996;
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const TARGET='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
+// Pinned independently from the original #996 REST Issue body bytes.
+// A later edit to any original request field, including chatId or approval
+// manifest digest, must STOP rather than silently alter C provenance.
+const ORIGINAL_BODY_SHA256='37caf348eb4fc5440ebfa76a1c1166bb7480dffdd8d054dcb19391816bc72b5a';
+const ORIGINAL_OWNER_ID=327938088;
 const MANIFEST='docs/CONTROLLER_996_C_CONTINUATION_APPROVAL_V1.json';
 const CONSENT='ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1';
 const REVOKE='ZGMINI_CONTROLLER_996_CONTINUATION_C_REVOKE_V1';
@@ -90,11 +95,11 @@ function decodePinnedManifest(response){
   need(pinnedManifest(parsed),'C_996_NEW_CONSENT_MANIFEST_INVALID');
   return {bytes,manifest:parsed,manifestSha256:sha(bytes)};
 }
-function rawComments(githubReader){
+async function rawComments(githubReader){
   const comments=[];
   let finished=false;
   for(let page=1;page<=100;page++){
-    const res=githubReader.get(`issues/${ISSUE}/comments?per_page=100&page=${page}`);
+    const res=await githubReader.get(`issues/${ISSUE}/comments?per_page=100&page=${page}`);
     need(res?.status===200&&Array.isArray(res.data)&&res.data.length<=100,
       'C_996_NEW_CONSENT_COMMENTS_PAGE_UNVERIFIED');
     comments.push(...res.data);
@@ -116,6 +121,10 @@ const readbackProjection=comments=>comments.map(c=>[
 ]);
 const timestampValid=c=>typeof c.created_at==='string'&&
   c.created_at===c.updated_at&&Number.isFinite(Date.parse(c.created_at));
+const issueProjection=i=>[
+  i?.number,i?.title,i?.body,i?.comments,i?.updated_at,i?.state,
+  i?.user?.login,i?.user?.id,
+];
 
 /** One-shot read, TWO full comment readbacks, fixed GitHub origin + path. */
 export function create996ContinuationConsentEvidenceReader({githubReader}={}){
@@ -123,35 +132,48 @@ export function create996ContinuationConsentEvidenceReader({githubReader}={}){
     typeof githubReader.authenticateReadOnly==='function',
     'C_996_NEW_CONSENT_GET_PORT_MISSING');
   let used=false;
-  return Object.freeze({readOnce({manifestCommitSha}={}){
+  return Object.freeze({async readOnce({manifestCommitSha}={}){
     need(!used,'C_996_NEW_CONSENT_REPEATED_READ_DENIED');
     used=true;
     need(H40(manifestCommitSha),'C_996_NEW_CONSENT_COMMIT_NOT_PINNED');
-    const auth=githubReader.authenticateReadOnly();
+    const auth=await githubReader.authenticateReadOnly();
     need(auth?.actor===OWNER&&auth.repository===REPO&&
       auth.private===true&&auth.readOnly===true&&
       auth.executionAuthorized===false,
       'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
-    const issue=githubReader.get(`issues/${ISSUE}`);
+    const issue=await githubReader.get(`issues/${ISSUE}`);
     need(issue?.status===200&&issue.data?.number===ISSUE&&
       issue.data?.user?.login===OWNER&&
-      Number.isSafeInteger(issue.data?.user?.id)&&issue.data.user.id>0,
+      issue.data.user.id===ORIGINAL_OWNER_ID&&
+      Number.isSafeInteger(issue.data?.comments)&&
+      issue.data.comments>=0&&issue.data.comments<=10_000&&
+      issue.data.state==='open'&&
+      typeof issue.data.updated_at==='string',
       'C_996_NEW_CONSENT_ORIGINAL_ISSUE_UNVERIFIED');
     let issueBody;
     try{issueBody=JSON.parse(issue.data.body);}catch{}
     need(issue.data.title==='pc-controller-update'&&
       issueBody?.schema==='ZGMINI_PC_MAINTENANCE_REQUEST_V1'&&
       issueBody.requestId===REQ&&issueBody.operation==='controller-update'&&
-      issueBody.targetControllerSha===TARGET,
+      issueBody.targetControllerSha===TARGET&&
+      typeof issue.data.body==='string'&&
+      sha(Buffer.from(issue.data.body,'utf8'))===ORIGINAL_BODY_SHA256,
       'C_996_NEW_CONSENT_ORIGINAL_ISSUE_BODY_DRIFT');
-    const evidence=decodePinnedManifest(githubReader.get(
+    const evidence=decodePinnedManifest(await githubReader.get(
       `contents/${MANIFEST}?ref=${manifestCommitSha}`));
     const exactBody=format996ContinuationConsentBody(
       evidence.manifest,evidence.manifestSha256,manifestCommitSha);
-    const before=rawComments(githubReader);
-    const after=rawComments(githubReader);
+    const before=await rawComments(githubReader);
+    const after=await rawComments(githubReader);
     need(same(readbackProjection(before),readbackProjection(after)),
       'C_996_NEW_CONSENT_COMMENT_READBACK_DRIFT');
+    const issueAfter=await githubReader.get(`issues/${ISSUE}`);
+    need(issueAfter?.status===200&&
+      same(issueProjection(issue.data),issueProjection(issueAfter.data)),
+      'C_996_NEW_CONSENT_ISSUE_READBACK_DRIFT');
+    need(issue.data.comments===before.length&&
+      issueAfter.data.comments===after.length,
+      'C_996_NEW_CONSENT_COMMENT_TOTAL_MISMATCH');
     const owner=after.filter(c=>c.user.login===OWNER&&
       c.user.id===issue.data.user.id);
     need(!owner.some(c=>c.body.startsWith(REVOKE)),
