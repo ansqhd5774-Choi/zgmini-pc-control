@@ -44,7 +44,10 @@ export function review996ProtectedR2Evidence(r){
   r.presentWriterFileCount!==present||
   r.allFivePresent!==(present===3))return fail('C_R2_FILE_COUNT_DRIFT');
  for(const name of TASKS){
-  if(!SHA(x.taskSha256[name])||typeof x.taskEnabled[name]!=='boolean')
+  // The actual original R2 observed both tasks enabled. A disabled Task
+  // cannot be relabeled as the same protected operational state, even when
+  // the Task XML bytes remain SHA-identical to a supplied manifest.
+  if(!SHA(x.taskSha256[name])||x.taskEnabled[name]!==true)
    return fail('C_R2_PROTECTED_TASK_UNVERIFIED');
   tasks[name]=x.taskSha256[name];
  }
