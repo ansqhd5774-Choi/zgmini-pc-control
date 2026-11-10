@@ -1,0 +1,50 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_WINDOWS_C_CONCURRENT_FENCE_NATIVE_EVIDENCE_V1",
+  "observedDateKst": "2026-11-11",
+  "evidenceKind": "USER_SUPPLIED_SEPARATE_WINDOWS_CONSOLE_SCREENSHOT",
+  "screenshotSha256": "52336ab0bc779ad9ab5d350fcbe0e9211f465cb2c8803fd12f8d26c82c41e76a",
+  "screenshotFilename": "image(20261110-204545).png",
+  "sourceBranch": "codex/controller-996-intake-c-candidate-r1-20261110",
+  "sourceCommitBeforeEvidence": "5bb782e6079da3f6da8a438f717f51f95f510d3b",
+  "parentPs1Sha256": "470c68479a2813f9f27ba68b49e2bbfdc2b463abb39e840948b0ac49dbec03d9",
+  "workerPs1Sha256": "62b3e1ff821028c0af5304640bb3505e782ed7263d95070dac1cba972bffd180",
+  "cmdSha256": "38ee614ff95e0113dd8280e82db57bb6bf361b6f34ecd65b7001a60aceda9987",
+  "isolatedWindowsConsoleResult": {
+    "schema": "ZGMINI_996_WINDOWS_C_CONCURRENT_FENCE_RESULT_V1",
+    "status": "ISOLATED_WINDOWS_C_CONCURRENT_FENCE_TEST_ONLY",
+    "casesPassed": 1,
+    "processesStarted": 2,
+    "distinctProcessIds": true,
+    "readyBeforeGo": true,
+    "fixedReservationAtomicMove": true,
+    "winners": 1,
+    "busy": 1,
+    "createdFixtures": 1,
+    "fixturePathKind": "separate Windows user-local TEMP\\zgmini-996-test-c-fence-<GUID>",
+    "executionAuthorized": false,
+    "operatorReady": false,
+    "originalPcWrites": 0,
+    "workflowPuts": 0,
+    "backlogWrites": 0,
+    "issuePosts": 0,
+    "pcRetries": 0,
+    "cleanupPerformed": false
+  },
+  "evidenceLimitations": [
+    "This is an isolated Windows TEMP test; the original E:\\ZGmini production PC was not operated.",
+    "The zero-side-effect fields are script-reported, not independent OS-level attestations.",
+    "Does not prove original Windows owner/process/Writer state, four original GitHub backlog states, recovery lease lifecycle, reboot durability, or production C authorization.",
+    "Console screenshot is the observed evidence; synthetic fixture and child-process logs were not independently collected."
+  ],
+  "sourceRegressionTests": {
+    "tests": 256,
+    "passed": 256,
+    "failed": 0,
+    "mode": "Node static/synthetic in separate development environment"
+  },
+  "operationalDecision": "C_NO_GO",
+  "operationalProgressBeforePercent": 80,
+  "operationalProgressAfterPercent": 80,
+  "ownerCContinuationConsentObserved": 0,
+  "draftPr": 1222
+}
