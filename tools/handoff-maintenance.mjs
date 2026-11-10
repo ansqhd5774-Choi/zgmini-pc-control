@@ -46,7 +46,13 @@ export function requireHandoffApproval(approval,target,installedSha){
  if(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V1'
     &&approval.transition===undefined)return sixToSeven;
  if(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V2'
-    &&approval.transition===sevenToSeven)return sevenToSeven;
+    &&approval.transition===sevenToSeven){
+  need(/^[a-f0-9]{40}$/.test(installedSha??'')
+    &&/^[a-f0-9]{40}$/.test(approval.installedSha??'')
+    &&/^[a-f0-9]{40}$/.test(target??'')
+    &&installedSha!==target,'HANDOFF_APPROVAL_REQUIRED');
+  return sevenToSeven;
+ }
  need(false,'HANDOFF_APPROVAL_REQUIRED');
 }
 export function approvedRuntimeChanges(mode,installedFiles,approvedFiles){
