@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 단계별 원본 Git 84바이트 R4 재연결 — 282/282 PASS, 실제 C 실행 NO-GO
+
+- 새 단계별 E: 2회 판독기 `controller-996-c-original-stage-readonly.mjs`가 기존 봉인된 R4 `verify996OfflineGitBytesReadOnly`와 원문 `controller-996-git-byte-offline-manifest-r4.json`을 **각 단계의 두 스냅샷마다 재사용**하도록 연결했다. 각 읽기마다 installed 38·staged 39·maintainer 7 = 84 실제 파일이 Git blob·SHA256 원문과 일치해야 하며, 실패·출처 위장·원문 누락 시 STOP. 격리 testOnly는 `sourceBytesVerified=false`, 실제 원본 Windows R4 성공에서만 true로 보고하지만 어떤 경로도 `executionAuthorized=true`를 만들지 않는다. 원본 PC 실측은 여전히 0회.
+- 관련 신규/수정 테스트 **10/10**, 전체 Node **282/282 PASS**. 2개 수정 파일 원격 Git blob SHA byte-match **2/2**. 마지막 source commit `ced9b2482fdb7a33d53eec66d78794b9348a406f`.
+- 남은 운영 P0는 **C 고정 배타 예약의 정확한 소유권/수명 및 승인 Effect**, 각 이동 직전 지금 판독을 호출하는 봉인된 Windows 운영 Operator+ZIP/Source Lock, Owner의 #996 **신규 정확 승인**이다. 현재 신규 Owner 동의 0, 원본 4 jobs Open/결과 0, E: 복구 쓰기 0. 기존 구 C CMD 재시도 금지. **4/5=80%→80%, PR Draft, C NO-GO.**
+
+
 ## 2026-11-11 원본 Windows 단계별 C 읽기/기존 GH Workflow GET 연결 — 281/281 PASS, 운영 C NO-GO
 
 - 신규 `tools/controller-996-c-original-stage-readonly.mjs` 및 9개 격리 테스트: 구 Claim 보관 후 원본→archive fallback, continuation/READY, Install-LAST, 고정 배타 예약 PID·nonce·SHA, 원본 10 pin, 두 번의 파일 SHA+identity, 다른 C continuation, 정상 신규 Install owner(최종 이동 뒤)를 **읽기 전용** 분류한다. 기존 `c-physical-disposition-readonly`만 재사용하고, 실제 이동/보관/권한 부여 기능은 없다. 테스트 synthetic 9/9는 Windows 원본 실측이 아니다.
