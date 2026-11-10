@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 별도 격리 Windows TEMP 네이티브 이동 시험 패키지 R1 — 아직 미실행
+
+- 원본 Windows의 R4 Git 84/84 읽기 전용 확인 이후 남은 **운영과 분리된 Windows `Directory.Move` 원자적 충돌 거부 실증**용 수동 단회 패키지를 봉인했다. `artifacts/controller-996/zgmini-996-isolated-windows-native-temp-fixture-r1.zip` **SHA256 `551046318b4605a4063f910edd65700b2ee6fb212474c8179260591791f7f8dc`**, ZIP 구성 정확히 **2파일**, CRC **2/2 정상**.
+- CMD `RUN_996_ISOLATED_WINDOWS_NATIVE_TEMP_FIXTURE_ONCE.cmd` SHA256 `f1ca16cafbeb60f6389f0dcc70e1e0c9a37ab59b79a89a49620cb573b04d43e8`, 네이티브 소스 `TEST_996_WINDOWS_NATIVE_MOVE_FIXTURE.ps1` SHA256 `6f8436fec7216d278f82558571a7172e5c2d2f7cc0b8b0db357f9ec4a24e613a`. CMD는 고정 Windows PowerShell의 `Get-FileHash`로 PS1을 먼저 검산하고, 기본 실행 정책을 **우회하지 않는** `-NoProfile -NonInteractive -File`로 실행한다. 정책 차단 시 그 상태로 중지한다.
+- **반드시 물리적으로 분리된 격리 Windows PC에서만 수동 실행:** CMD와 PS1 모두 **원본 `E:\ZGmini` 경로가 있으면 중단**한다. 단, `Directory.Exists`의 부재는 접근 거부·마운트 해제에서도 발생할 수 있어 **이 차단 조건만으로 별도 PC 신원 인증은 불가능**하다. 운영자는 물리적으로 분리된 PC임을 먼저 확인해야 한다. PowerShell 소스는 TEMP가 원본 E:·UNC/네트워크·이동식 또는 비 NTFS/ReFS·Reparse Point 경로이면 차단하고, 별도 새 `zgmini-996-test-native-<GUID>` 아래에만 **더미 파일·디렉터리를 생성해** 기존 대상 충돌·중단 후 Install 보존·정상 해제 순서를 시험한다. 자동 삭제·운영 데이터 접촉·CI Runner workflow dispatch·C Operator 호출은 하지 않는다. 출력의 `operatorReady=false`와 `executionAuthorized=false` 유지.
+- 전체 격리 Node/정적 회귀 **160/160 PASS**. 그러나 이 패키지는 **별도 Windows 네이티브 실측 0**, 경합/Crash 내구성 실측 0이며, 본문 R4 원본 Windows 성공 결과를 대체하지 않는다. 실제 Windows 결과/출력·ZIP 해시 검산은 별도 제출 필요하다. 기존 C급 재실행 금지, 운영 진행률 **80%→80%**.
+
 ## 2026-11-11 원본 Windows R4 실측 수신 — 84/84 일치, C 복구는 NO-GO
 
 - 사용자가 원본 Windows에서 실행한 **R4 읽기 전용 CMD 콘솔 화면 1건**을 제출했다. 화면에는 `ZGMINI_CONTROLLER_996_GIT_SOURCE_READONLY_R4`, `SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS`, 설치 **38**, Stage **39**, Maintainer **7**, 합계 **84**, `originalWindowsReadback=true`, `executionAuthorized=false`가 표시됐다. **앞선 아래의 'Windows R4 0건'은 이 결과를 받기 전 이력**이다.

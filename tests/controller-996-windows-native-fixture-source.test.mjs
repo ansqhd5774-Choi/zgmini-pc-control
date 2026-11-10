@@ -6,6 +6,9 @@ const script=fs.readFileSync(new URL(
   '../tools/TEST_996_WINDOWS_NATIVE_MOVE_FIXTURE.ps1',import.meta.url),'utf8');
 
 test('Windows native fixture source has no operational PC path or input root',()=>{
+  assert.match(script,/FIXTURE_ORIGINAL_ZGMINI_ROOT_PRESENT/);
+  assert.match(script,/\[System\.IO\.Path\]::Combine\('E:\\', 'ZGmini'\)/);
+  assert.match(script,/\[System\.IO\.Directory\]::Exists\(\$operationalRoot\)/);
   assert.match(script,/\[System\.IO\.Path\]::GetTempPath\(\)/);
   assert.match(script,/zgmini-996-test-native-/);
   assert.match(script,/GetPathRoot\(\$tempPath\)/);

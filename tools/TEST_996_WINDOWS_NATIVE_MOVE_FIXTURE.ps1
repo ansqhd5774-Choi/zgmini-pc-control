@@ -4,6 +4,13 @@
 # Only a newly generated, checked TEMP fixture is written. No auto-delete.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# This test is for a physically separate Windows machine only. Refuse the
+# known original ZGmini root even when TEMP happens to be a safe C: volume.
+$operationalRoot = [System.IO.Path]::Combine('E:\', 'ZGmini')
+if ([System.IO.Directory]::Exists($operationalRoot) -or
+  [System.IO.File]::Exists($operationalRoot)) {
+  throw 'FIXTURE_ORIGINAL_ZGMINI_ROOT_PRESENT'
+}
 $tempPath = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $tempDriveRoot = [System.IO.Path]::GetPathRoot($tempPath)
 if ($tempDriveRoot -ieq 'E:\' -or
