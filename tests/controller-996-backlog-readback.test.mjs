@@ -8,10 +8,10 @@ const USER='ansqhd5774-Choi';
 const pausedAt='2026-11-10T01:30:00.000Z';
 const resumedAt='2026-11-10T03:15:00.000Z';
 const JOB='pc-5deaa1bc-0acf-4c5b-87a2-33dc0765e2e9';
-function makeIssue(number=1270){return {number,title:'pc-job',
+function makeIssue(number=1270){return {number,title:'core-status',
  user:{login:USER},created_at:'2026-11-10T03:14:59.500Z',
  labels:[{name:'pc-job'}],body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
- requestId:JOB,chatId:'bd1755f9-7cd1-4ceb-bf8c-aac9ca521647',
+ requestId:JOB,chatId:'chat-bd1755f9-7cd1-4ceb-bf8c-aac9ca521647',
  sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
  sourceSha:'a'.repeat(40),operation:'core-status'})};}
 function fixture({marker=true}={}){
@@ -37,6 +37,8 @@ function fixture({marker=true}={}){
   }
   if(route==='issues/1270/comments?per_page=100&page=1')
    return {status:200,data:comments};
+  if(route==='issues/1271/comments?per_page=100&page=1')
+   return {status:200,data:[]};
   if(remote.has(route))return {status:200,data:{type:'file',
    encoding:'base64',path:route.replace('contents/',''),
    content:remote.get(route).toString('base64')}};
@@ -65,6 +67,23 @@ test('missing result marker becomes replan only, never a new pc-job',async()=>{
  assert.equal(r.entries[0].verification.status,'OWNER_REPLAN_REVIEW_REQUIRED');
  assert.equal(r.issuePosts,0);
  assert.equal(f.state.calls.some(x=>x.startsWith('contents/')),false);
+});
+
+test('mixed original seven-field and valid scoped nine-field Issues reconcile without replay',async()=>{
+ const f=fixture({marker:false});
+ const scoped={...makeIssue(1271),title:'writer-install-preimage-readonly',
+  created_at:'2026-11-10T03:15:00.000Z'};
+ scoped.body=JSON.stringify({...JSON.parse(scoped.body),
+  requestId:'pc-20261110-scoped-readonly-1271',
+  operation:'writer-install-preimage-readonly',
+  preimageManifestPath:'approvals/writer-preimage/market-calendar-er1-import-deps6-readonly-20261108.json',
+  preimageManifestSha256:'f'.repeat(64)});
+ f.state.issues=[scoped,makeIssue()];
+ const r=await f.run();
+ assert.equal(r.status,'READONLY_RESULTS_RECONCILED');
+ assert.deepEqual(r.entries.map(x=>x.originIssue),[1270,1271]);
+ assert.ok(r.entries.every(x=>x.verification.status==='OWNER_REPLAN_REVIEW_REQUIRED'));
+ assert.equal(r.issuePosts,0);assert.equal(r.pcRetries,0);
 });
 
 test('missing TXT file does not imply success from JSON or bot comment',async()=>{
