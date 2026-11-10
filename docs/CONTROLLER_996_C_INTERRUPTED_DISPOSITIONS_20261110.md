@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 원본 Windows 단계별 C 읽기/기존 GH Workflow GET 연결 — 281/281 PASS, 운영 C NO-GO
+
+- 신규 `tools/controller-996-c-original-stage-readonly.mjs` 및 9개 격리 테스트: 구 Claim 보관 후 원본→archive fallback, continuation/READY, Install-LAST, 고정 배타 예약 PID·nonce·SHA, 원본 10 pin, 두 번의 파일 SHA+identity, 다른 C continuation, 정상 신규 Install owner(최종 이동 뒤)를 **읽기 전용** 분류한다. 기존 `c-physical-disposition-readonly`만 재사용하고, 실제 이동/보관/권한 부여 기능은 없다. 테스트 synthetic 9/9는 Windows 원본 실측이 아니다.
+- 기존 설치형 GH GET 어댑터 `c-installed-gh-get-readonly.mjs`를 확장하여 **고정 `actions/workflows/pc-job.yml` GET만** Owner/repo ID 인증 후 동기 읽기 하도록 연결했다. 일반 consent-reader GET 포트에는 Workflow 경로를 개방하지 않았고 토큰·POST·PUT 없이 `state='active'` 및 ID/path를 검증한다. 변경 테스트 포함 전체 관련 Node **281/281 PASS**, 새/변경 4파일 원격 Git blob SHA 대조 **4/4**, 마지막 소스 commit `cf43defd36b5e3521163c3f3698dc77eb03086ec`.
+- **아직 필수 불완전:** 이 새 stage reader는 원본 PC에서 한 번도 실행되지 않았고, stage마다 실제 Git 84바이트를 다시 검증하는 연결이 없어 `sourceBytesVerified=false`, `independentAuthentication=false`, `executionAuthorized=false`다. 고정 예약의 exact 효과/영구 보존·operator/package/source-lock SHA와 신규 Owner C 승인 Manifest도 부재. 실제 C 임계 이동 직전 인증된 판독과 생산용 Windows archiver는 아직 없다. **구 C CMD 반복 실행·E: 폴더 이동·잠금 해제·Workflow PUT·Backlog 쓰기·원본 Issue 재발행 금지**. 전체 **4/5=80%→80%, PR Draft, C NO-GO**.
+
+
 ## 2026-11-11 C 단계별 물리 분류 충돌 범위 수정 — 270/270 PASS, 운영 C 대기
 
 - C 단계별 **순수 판독기** `tools/controller-996-c-physical-disposition-readonly.mjs`에서도 과잉 `writerActiveCount/controllerActiveCount===0` Gate를 제거했다. 실제 중복 자원 한정 `scope=CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES`, `foreignInstallOwnerCount=0`, `otherContinuationCount=0`, `twoSnapshotsIdentical=true`, `fresh=true`만 요구한다. unrelated Writer/Core는 통과, 외부 Install owner·중첩 C·불안정 관측은 차단한다. `tests/controller-996-c-physical-disposition-readonly.test.mjs` 및 `tests/controller-996-c-physical-fixture-readback.test.mjs`에서 격리 회귀 추가·수정, 전체 **270/270 PASS**. 3개 원격 Git blob SHA 로컬 일치 **3/3**, 마지막 commit `ac9181f664e619fa3d2e44fdfd81fd71cb0236d3`.
