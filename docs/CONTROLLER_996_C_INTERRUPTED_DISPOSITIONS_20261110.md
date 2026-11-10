@@ -1,5 +1,14 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 Native .NET 자식 내부 C 원본 재검증 보강 — 287/287 PASS, 하드 STOP 유지
+
+- Draft `tools/controller-996-c-native-owner-operator.mjs`의 보존형 이동 설계에서 `moveNoReplace(from,to,{files,ownerMode,actorPid,nonce})`를 보강했다. Windows PowerShell 자식 프로세스 안에서 **동일 leases 부모/원본 reparse 부재/목적지 없음/파일명·개수/모든 원본 SHA256/기존 PID 종료 및 Owner nonce/새 Continuation PID·nonce**를 검사하고 그 즉시 `[IO.Directory]::Move`를 한 번 호출하도록 제안했다. 호출별 pin map은 원본 10 SHA 또는 신규 marker readback으로 제한하며, install 이동을 마지막으로 유지한다.
+- 공식 Microsoft .NET `Directory.Move`는 destination exists/다른 볼륨/사용 중일 때 예외를 반환하나 **SHA 검증과 이름 이동을 하나의 원자적 트랜잭션으로 보증하지 않는다**. 정규 설치는 현재 원본 `controller-install` 잠금이 선점·복구 표시 상태인 동안 진입하지 못하고 중복 C는 fixed reservation으로 배제되지만, 동일 권한의 비협조 외부 쓰기는 아직 별도 증거가 없다. 네이티브 최신 버전 자체의 Windows TEMP 실측 **0회**이므로 PASS를 주장하지 않는다.
+- source-only 관련 테스트 72/72, 전체 #996 Node **287/287 PASS**; 수정 2파일 원격 Git blob SHA byte-match **2/2**, 마지막 source commit `bc50fa0110d7c777658973f535a4c928f01da8cb`. 원본 운영 E: 변경 0.
+- **신뢰 루트 대안:** 기존 B Source Bundle 호출은 원본 `controller-install` 잠금에 의해 순환 대기하므로 금지. 신규 부트스트랩 자체를 사용자가 Windows OS `Get-FileHash`/`certutil`로 미리 독립 해시 확인하고, 그 검증된 **외부 단일 파일**이 최초 다른 로컬 import 전 S2 Owner 동의·manifest·S1 전체 의존 바이트를 인증하는 구조를 다음 필수 구현 후보로 지정한다. 동일 ZIP의 self-check는 독립 신뢰 루트가 아니다. 아직 전용 부트스트랩·봉인 ZIP/SourceLock/S2/new Owner consent 없음.
+- `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` **무조건 하드 STOP 유지**. 강제 차단 삭제·기존 CMD 재실행·운영 Lease 이동 금지. 실제 복구 **4/5=80%→80%, C NO-GO**, PR #1222 Draft.
+
+
 ## 2026-11-11 기존 B급 Source Bundle 재사용 여부 — 원본 Install 순환 대기 확인
 
 - 정규 Maintainer `16064e29...`의 `tools/source-bundle-register.mjs`, `maintenance-apply.mjs`, `update.mjs:applySourceBundleOnly` 원문을 검토했다. B급 Source Bundle 등록은 `sourceExecuted:false` 및 `host.json`의 `HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY` 계약으로, 임의 C 보관 운영기를 검증 후 실행하는 trusted bootstrap이 아니다. 해당 B 업무를 C 권한으로 재해석/재사용하지 않는다.
