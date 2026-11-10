@@ -129,7 +129,7 @@ export function review996CConsent({originalIssue,commentsReadback,gitRead,
    Object.hasOwn(manifest.protectedItemsSha256.files,k))||
   taskNames.some(k=>!isSha256(manifest.protectedItemsSha256.tasks[k]))||
   !exactKeys(manifest.protectedTaskEnabled,taskNames)||
-  taskNames.some(k=>typeof manifest.protectedTaskEnabled[k]!=='boolean'))
+  taskNames.some(k=>manifest.protectedTaskEnabled[k]!==true))
   return fail('C_MANIFEST_SCOPE_OR_EVIDENCE_UNVERIFIED');
  if(commentsReadback?.complete!==true||
   !Array.isArray(commentsReadback.comments)||
