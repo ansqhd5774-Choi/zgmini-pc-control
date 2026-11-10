@@ -46,9 +46,45 @@ test('any changed file or task breaks exact prior fingerprint, no auto repair',(
  assert.equal(result.operationalWrites,0);
 });
 
-test('a missing protected file is an inspection failure, not an absent hash',()=>{
+test('an absent optional Writer file must match the original R1 omission rule',()=>{
  const f=fixture();delete f.writer['run-local.cmd'];
- assert.throws(()=>observe(f),/WRITER_PROTECTED_BYTES_INVALID/);
+ const result=observe(f,{expectedFingerprint:hash(Buffer.from(JSON.stringify({
+  files:Object.fromEntries(filenames.filter(n=>n!=='run-local.cmd')
+   .map(n=>[n,hash(f.writer[n])])),
+  tasks:Object.fromEntries(tasknames.map(n=>[n,hash(f.tasks[n])])),
+ })))});
+ assert.equal(result.status,'CURRENT_ITEMS_MATCH_OBSERVATION');
+ assert.equal(result.items.writerFileStatus['run-local.cmd'],'ABSENT');
+ assert.equal(result.items.files['run-local.cmd'],undefined);
+ assert.equal(result.presentWriterFileCount,2);
+ assert.equal(result.allFivePresent,false);
+ assert.equal(result.fingerprintMatch,true);
+});
+
+test('a newly absent Writer file changes fingerprint and is not claimed unchanged',()=>{
+ const f=fixture();delete f.writer['quota-runner.cmd'];
+ const result=observe(f);
+ assert.equal(result.status,'CURRENT_ITEMS_DIFFER_OR_UNPROVEN');
+ assert.equal(result.fingerprintMatch,false);
+ assert.equal(result.items.writerFileStatus['quota-runner.cmd'],'ABSENT');
+});
+
+test('a file read error reports the failing item and source code',()=>{
+ const f=fixture(),error=Object.assign(Error('no such file'),{code:'ENOENT'});
+ assert.throws(()=>observe(f,{readFile:(_,name)=>{
+  if(name==='quota-runner.cmd')throw error;
+  return f.writer[name];
+ }}),e=>e.code==='WRITER_FILE_OBSERVATION_FAILED'&&
+  e.failedItem==='quota-runner.cmd'&&e.underlyingCode==='ENOENT');
+});
+
+test('a Task query failure identifies the task without claiming a baseline',()=>{
+ const f=fixture(),error=Object.assign(Error('command gone'),{code:'ENOENT'});
+ assert.throws(()=>observe(f,{readTask:name=>{
+  if(name==='ZGMINI-PC-Local-Korea')throw error;
+  return f.tasks[name];
+ }}),e=>e.code==='PROTECTED_TASK_QUERY_FAILED'&&
+  e.failedItem==='ZGMINI-PC-Local-Korea'&&e.underlyingCode==='ENOENT');
 });
 
 test('missing task settings yields unknown instead of an asserted enabled state',()=>{
