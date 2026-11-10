@@ -97,3 +97,17 @@
 - 사용자가 source `e0cf3382b0dc4c8a6d6e2e6bacc171500f318742`로 기존 두 성공 결과의 재검증과 최종 보관만 직접 수행하도록 명시 승인했다.
 - 최초 finalize 후보 원문 `e2f4ca8a...`는 보존하고, 활성 실행 승인에는 approved만 true로 반영했다. 새 승인 원문 SHA-256은 `7afdef3353db724e69d9717671986ea9a31738d049343cd13dde6a7ac43e45a8`이다.
 - 적용 직전 기존 journal 13건/tail, 두 이전 owner, 원본 ledger, 현재 config 일치와 최종 claim/completion 미생성을 확인했다. 승인계약 집중 검사 11/11 PASS. 실제 C 실행 결과는 별도 후속 증거로 판정한다.
+## 2026-11-10 최종 복구 완료 — 실제 C 실행 및 독립 재조회
+
+- 최종 승인 source `e0cf3382b0dc4c8a6d6e2e6bacc171500f318742` / 승인 원문 `7afdef3353db724e69d9717671986ea9a31738d049343cd13dde6a7ac43e45a8`를 실제 Windows TTY에서 단회 실행했다.
+- 실제 결과: `RECOVERY_COMPLETED / POSTSWITCH_FORWARD_RECOVERY_COMPLETED`, `originalLedgerPreserved=true`, `originalRequestRetried=false`, `leaseArchived=true`. 기존 #1215/#1216을 재사용했으며 신규 replay/postcheck 생성은 0건이다.
+- 이후 별도 읽기 전용 재조회가 `PASS / CONTROLLER_POSTSWITCH_FINALIZATION_READBACK_VERIFIED`, 실패 항목 0으로 완료됐다. 원문 증거는 `results/controller-917-finalization-readback-20261110.json`이다.
+- Controller `badad9124157879d7a645b64f2768113d632355b` 및 백업 `c09bf6a6f66f229016135020d6ba553ba9a94676`의 정확한 38/38 파일, 승인된 C 실행기 16개 의존 파일의 Git/실파일 해시를 재조회했다.
+- 원래 7개 material은 보관된 owner/marker 경로까지 포함해 모두 승인 해시와 일치한다. 원본 ledger/backlog/백업은 변경되지 않았고 이전 두 owner 파일과 13개 journal prefix도 보존됐다. 현재 journal은 18건이며 전체 hash chain 검증 PASS다.
+- Core/Korea Task 및 설정 외 보호 파일 불변, 승인된 Writer config 후속 계약 일치, 이란 예약 승인 제거 상태 유지. Supervisor 정상·전용 6 Runner Online·pc-job Workflow active를 독립 조회했다.
+- 원래 install lease와 recovery claim은 삭제하지 않고 `recovery/post-switch/<requestId>.install-lease` 및 `.recovery-claim`에 보관됐다. 해당 원본의 활성 install lease/RECOVERY_REQUIRED marker와 recovery claim은 더 이상 남아 있지 않다. 별도 `.complete.json`의 설치 SHA·원본 ledger 해시·완료 상태도 재조회했다.
+- 원본 실패 ledger의 역사적 `RECOVERY_REQUIRED` 값은 바이트 보존 계약에 따라 남아 있다. 이를 현재 활성 장애로 재분류하지 않으며 별도 완료 기록·보관 검증으로 해소를 판정한다.
+- #919 복구 전달 #1215 한 건과 사후 진단 #1216 한 건을 원격 전수 조회하고 두 JSON/TXT 결과쌍 4개 원문 해시를 재검증했다. 신규 PC 작업·Controller 재설치·Writer 변경·Core 기동/중단·DB/D1 변경은 이 최종 보관에 포함되지 않았다.
+- **#917 Controller 복구 8/8 완료. 해당 공용 설치 대기열 복구 게이트 5/5 완료.** 다른 기능의 개발/설치/게시 완료를 의미하지 않는다.
+- #1213은 skipped였으므로 라이브 Core 실행 source SHA는 별도 미확인으로 유지한다. 이 복구는 해당 증거를 생성하거나 수동 checkout 관측을 라이브 Core 증거로 바꾸지 않았다.
+- #1088/#1160 원담당 브랜치와 main은 변경/병합하지 않았다. 이 PR은 통합 검토용 Draft이며 실제 승인 C 복구 성공과 소스 통합은 구분한다.

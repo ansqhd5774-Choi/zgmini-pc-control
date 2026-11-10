@@ -1,0 +1,81 @@
+{
+  "schema": "ZGMINI_CONTROLLER_917_FINALIZATION_READBACK_V1",
+  "status": "PASS",
+  "code": "CONTROLLER_POSTSWITCH_FINALIZATION_READBACK_VERIFIED",
+  "observedAt": "2026-11-10T01:07:07.208Z",
+  "requestId": "pc-update-877e10c8-8580-4095-a675-bef9ec032193",
+  "sourceSha": "e0cf3382b0dc4c8a6d6e2e6bacc171500f318742",
+  "controllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "backupSha": "c09bf6a6f66f229016135020d6ba553ba9a94676",
+  "completionStatus": "RECOVERY_COMPLETED",
+  "replayIssueNumber": 1215,
+  "postcheckIssueNumber": 1216,
+  "protectedWritesByThisReadback": 0,
+  "operationalWritesByThisReadback": 0,
+  "originalLedgerHistoricalStatus": "RECOVERY_REQUIRED",
+  "materialMatches": {
+    "ledger": true,
+    "owner": true,
+    "marker": true,
+    "currentHost": true,
+    "snapshotHost": true,
+    "protectedBefore": true,
+    "backlog": true
+  },
+  "checks": {
+    "completionVerified": true,
+    "approvalRawPinned": true,
+    "sourceClosureVerified": true,
+    "originalMaterialsPreserved": true,
+    "exact38FileInventories": true,
+    "controller38FilesVerified": true,
+    "backup38FilesVerified": true,
+    "currentControllerShaUnchanged": true,
+    "protectionContractVerified": true,
+    "supervisorHealthy": true,
+    "dedicatedSixRunnersOnline": true,
+    "workflowActive": true,
+    "originalRecoveryOwnersPreserved": true,
+    "originalJournalPrefixPreserved": true,
+    "journalChainVerified": true,
+    "finalOwnerPinned": true,
+    "originalInstallLeaseReleased": true,
+    "originalRecoveryClaimReleased": true,
+    "originalActiveRecoveryMarkerAbsent": true,
+    "replayExactlyOnce": true,
+    "postcheckExactlyOnce": true,
+    "remoteResultPairsVerified": true
+  },
+  "failedChecks": [],
+  "journal": {
+    "count": 18,
+    "lastCode": "RECOVERY_CLAIM_ARCHIVE_INTENT",
+    "lastHash": "051d66b9fae94050fce32f2cb59be0ad51c077e97473d8f08ebb1ab937bd8559"
+  },
+  "results": [
+    {
+      "path": "results/42729529997-1-seat-5.json",
+      "blobSha": "823e307338b4703e79bc452b188afd62a57181e0",
+      "sha256": "b22360c640e854432766fb697513bca5c30b546e1840f9f3ae04c1058fed9361",
+      "verified": true
+    },
+    {
+      "path": "results/42729529997-1-seat-5.txt",
+      "blobSha": "e5c1b94da668b2ea03aac7cd5fc69c842a8e93d5",
+      "sha256": "922b18dd190608ed071894bf954c52f7fb3ec1ac0ed2e92786fee386de6b18fe",
+      "verified": true
+    },
+    {
+      "path": "results/42731249968-1-seat-3.json",
+      "blobSha": "a9d25ba5eabb4337e4b0211e987bf4bd7b099f93",
+      "sha256": "72f13abaec27fe174cbe83194b8fff7ad703c854a3fce52430c710bdc3b589bd",
+      "verified": true
+    },
+    {
+      "path": "results/42731249968-1-seat-3.txt",
+      "blobSha": "59814eb539768b4ec899c7a11e27a7dcafa8dfe5",
+      "sha256": "43023268271189d815c94f61a6986955607eeb84666a35c1432d1783231b703c",
+      "verified": true
+    }
+  ]
+}
