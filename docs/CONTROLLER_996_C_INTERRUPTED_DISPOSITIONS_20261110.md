@@ -84,6 +84,13 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - **후속 설계 방향:** (1) 별도 승인 manifest에 기존 claim/세 marker/원본 lease/백로그 SHA·R3 증거 및 신규 C source SHA를 고정하고, (2) 실행 시작에 기존 Git SHA 원본 38+39+7개를 실제 파일과 읽기 전용 비교하며 다른 활성 Controller 소유자를 배제한 뒤, (3) 충돌 없이 새로운 고유 continuation claim을 원자적으로 확보하는 **신규 C급 일회성 명세**를 작성한다. 앞서 이미 시도된 Workflow PUT/Backlog close/Issue 재발행은 모두 **0회**; 새 Claim의 바이트 단위 사전검사 후에만 원본 install lease 및 구 C claim을 **삭제 없는 별도 보관** 대상으로 삼고 단계별 postcheck를 수행하도록 설계한다. 중간 크래시 시 기존/신규 claim 보존·수동 재판정이 우선이며 자동 재시도하지 않는다.
 - 새 C 실행은 지난 C 동의를 자동 승계하지 않는다. **신규 C급 변경 명세와 소유권 인계에 대한 사용자 승인 전에는 운영 쓰기 0 유지.** 기존 R1/R2/R3/C CMD 재실행 필요 없음. 전체 수명주기 완료율 **4/5 = 80%**로 유지한다.
 
+### 후속 C 단계의 격리 시뮬레이션 (운영 실행기 아님)
+
+- 새로운 `tools/controller-996-continuation-transaction.mjs` 및 `tests/controller-996-continuation-transaction.test.mjs` **소스 전용 후보**를 Draft에 작성한다. 함수의 운영 호출은 무조건 `C_CONTINUATION_PRODUCTION_NOT_APPROVED`로 **PC 접근/쓰기 전에 거부**하고, Linux의 별도 임시 fixture + `testOnly=true`인 경우에만 모의 Claim/디렉터리 보관을 수행한다. CLI, Windows CMD, 사용자 운영 동의 파일은 **없다**.
+- 모의 첫 쓰기 전 원본 38개·Stage 39개·Maintainer 7개의 **총 84개** Git mock bytes를 로컬 파일과 직접 대조한다. 새 고유 UUID continuation Claim을 분리한 다음 구 C Claim을 **먼저** 보관하여 기존 Install Lease 잠금을 유지하고, 원본 Install Lease를 **마지막에** 보관하는 순서를 시험했다. 이후 새 continuation Claim 보관/완료를 분리하며 Workflow PUT, Backlog rename, Issue 게시, 원본 요청 재실행은 각 **0건**이다.
+- 독립 신규 동의 거부, Git 바이트 불일치, 신규 Claim 취득 후 중단, 구 Claim 보관 직후 중단, Install Lease 보관 직후 중단 및 정상 완료 등 **6/6 모의 시험 통과**, 전체 로컬 회귀 **76/76 PASS**. 원본/구 Claim/신규 Claim을 중간 장애 단계에서 보존하고 자동 재실행하지 않는다. 독립 소스 감사의 판정은 **Draft 소스 전용 게시 GO**, 실제 C 운영은 **NO-GO**다.
+- **실제 운영 구현 전 미충족:** (1) 주입식 mock `readLive`/`sourceRead`/동의를 고정된 Git 승인 증거·84파일 실제 `git show`·기존 R1 14/14·현재 GitHub 원본 결과로 교체, (2) 기존 세 marker 내부 `details`의 승인 manifest/ownerNonce/순서 재확인, (3) 보관 대상 경로의 원자적 **no-clobber**, parent directory fsync, 파일 identity CAS/경합 재조회, (4) Claim 취득 이후 각 rename 전에 최신 공통 Writer/Controller 경합·원본 불변 대조와 크래시 회복 시험, (5) 새로운 source-lock과 정확한 C급 사용자 승인. 이 조건을 누락한 시뮬레이션을 복구 도구로 승격하지 않는다.
+
 ## 후속 C 단계 설계 (source-only, 실행 금지)
 
 - 단일 후속 복구는 **이미 시도한 Workflow PUT과 backlog rename을 반복하지 않는다.** 다른 상태가 발견되면 먼저 원인을 분리하며 재시도하지 않는다.
