@@ -89,6 +89,13 @@
   빠졌으면 `PARTIAL_RECEIPT_PENDING`으로 명시하고 해당 intake 실행을 실패
   처리한다. **실패 전수 자동 접수 성공**이라고 말하지 않는다.
 
+## 신설 격리 Windows Writer B intake의 자연 관측 (2026-11-10 KST)
+
+- **기존 중앙 8/8(100%)와 별개 범위:** 이 문서의 #1063→#1068→#1086 및 원본 반환 **기존 중앙 사고 처리 8/8·실제 E2E 1/1 완료** 기록은 유지한다. 새 **독립 격리 Windows 자동 intake 경로**의 5개 검증 항목(정규 트리거·격리 실행, 원본 증거 인증, 안전 대기/중복 분기, 소스 교차흐름 회귀, 신규 자연 수리 가능 사고의 중앙→원본 왕복)은 **4/5(80%)**이다. 이 비율을 전체 ZGMINI 기능 완성률로 쓰지 않는다.
+- **실제 자연 접수:** 별도 CI Runner `zgmini-handoff-ci-spare-01`(label `zgmini-handoff-ci-isolated`)에서 [Workflow Run #42725636209](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42725636209)가 성공했다. 원본 Writer B [Issue #1210](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1210) / Run `42724651597`의 결과 1건을 검증하고 `WAIT_RECORDED`, verifiedResults 1, confirmedFailures 0, newIssues 0, pcOperationalWrites 0, automaticPcRetries 0으로 종료했다. [#68 실제 bot 원장](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6754918074)의 `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`·`WAITING_SHARED_RESOURCE`는 **원본 무변경 안전 대기**이며 수리 가능 Incident가 아니다.
+- **독립 source 검증:** 격리 Windows CI [Run #42755284777](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42755284777) source 시험 230/230 PASS. 이후 `main` `190c0afbcfbc93984fb24211b10c34b0c5e0c179`에서 선택된 교차흐름 **모의시험 64/64 PASS**는 원본→Incident→중앙 결과→원본 회신 분기·멱등/오류 처리에 대한 **소스 모의시험**이다. 이는 실제 신규 자연 장애 왕복을 대체하지 않는다.
+- **남은 1단계(DEFERRED):** 새 격리 intake에서 실제 자연 발생·증거 인증된 **수리 가능 Writer B 실패 1건**을 단일 중앙 예약이 처리해 원본 Issue bot 결과까지 반환하는 전체 왕복은 아직 표본 0건이다. 실제 적격 사건이 생길 때 원본 Issue/Run·Incident·수정 PR/CI·원본 receipt를 한 번 추적한다. 확인만을 위한 인위적 실패·기존 단회 B 재실행·운영 PC 변경·다른 일반챗 자동 깨우기/수신함 생성을 금지한다. 일반챗은 해당 후속 관측 때문에 승인된 독립 기능 작업을 멈추지 않는다. 원본 GitHub 댓글이 돌아와도 실제 PC 적용·타 ChatGPT 채팅 수신 상태는 `UNKNOWN`/별도 검증으로 유지한다.
+
 ## 실행 계획 정본 — 단일 총괄 기준 (2026-11-09 KST)
 
 **최종 목표:** 승인된 공통 장애를 기존 GitHub `agent-handoff` Issue로 접수하고, **하나의 중앙 ChatGPT**가 증거 검증 → 원인에 한정한 수정 → 관련 회귀·PR/CI → 원본 GitHub Issue의 검증된 결과 기록까지 직접 수행한다. PC 운영 반영이 필요한 경우에만 별도 승인·실제 Runtime 검증을 수행한다. **다른 일반 ChatGPT 대화를 자동 기동·재개시키는 것이 현재 완료 조건이 아니다.**
