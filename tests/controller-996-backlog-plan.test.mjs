@@ -42,6 +42,42 @@ test('real #1226/#1227 request shapes with chat-prefixed IDs and descriptive tit
   assert.equal(p.automaticPcRetries,0);
 });
 
+test('actual four pause-window Issue shapes remain review-only after interrupted C readback',()=>{
+  // Two stable authenticated GitHub scans found these four original Issues
+  // between the original PC's observed pausedAt and resumedAt. An empty
+  // replay map is a TEST ASSUMPTION, not proof of the physical backlog map.
+  const a=fixture();
+  a.pause.pausedAt='2026-11-10T01:06:53.751Z';
+  a.cutoffAt='2026-11-10T13:21:26.727Z';
+  const originals=[
+    [1217,'2026-11-10T01:13:35Z','pc-job','core-runtime-source-readonly',
+      'pc-8da91b23-f5d6-4a94-bcd5-13b0dfcdee61'],
+    [1219,'2026-11-10T01:16:07Z',
+      '[테마 T1] R181 실행 Core source SHA 단회 읽기 전용',
+      'core-runtime-source-readonly',
+      'pc-e2710720-1a35-4a75-ab37-4940ecd33edd'],
+    [1226,'2026-11-10T12:57:33Z','core-status','core-status',
+      'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4'],
+    [1227,'2026-11-10T12:58:56Z','pc-job','core-runtime-source-readonly',
+      'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7'],
+  ];
+  a.listing.issues=originals.map(([n,created,title,op,id])=>{
+    const entry=issue(n,id),body=JSON.parse(entry.body);
+    return {...entry,title,created_at:created,body:JSON.stringify({...body,
+      operation:op,sourceSha:'643b7c7c4372ffad552443fc312c6cb1b944e2fc'})};
+  });
+  a.commentsByIssue=Object.fromEntries(originals.map(([n])=>[
+    n,{complete:true,comments:[]}]));
+  const p=plan996BacklogWithoutReplay(a);
+  assert.equal(p.status,'READONLY_DISPOSITIONS_ONLY');
+  assert.equal(p.originalIssueCount,4);
+  assert.deepEqual(p.entries.map(e=>e.originIssue),[1217,1219,1226,1227]);
+  assert.ok(p.entries.every(e=>e.disposition==='OWNER_REPLAN_REVIEW_REQUIRED'));
+  assert.equal(p.executionAuthorized,false);
+  assert.equal(p.issuePostsAuthorized,0);
+  assert.equal(p.automaticPcRetries,0);
+});
+
 test('canonical nine-field writer preimage request is valid without permitting arbitrary extras',()=>{
   const a=fixture();
   const valid={...JSON.parse(a.listing.issues[0].body),
