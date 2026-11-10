@@ -38,6 +38,7 @@ export function review996ContinuationGate({manifest,manifestProof,consent,physic
     !UUID(manifest.continuationRequestId)||
     manifest.continuationRequestId===REQ||
     !COMMIT(manifest.operatorCommit)||!HEX(manifest.operatorSha256)||
+    !HEX(manifest.bootstrapSha256)||
     !HEX(manifest.packageSha256)||!HEX(manifest.sourceLockSha256)||
     !same(manifest.effects,CONTINUATION_EFFECTS)||
     manifest.workflowPutCount!==0||manifest.backlogWriteCount!==0||
@@ -57,6 +58,7 @@ export function review996ContinuationGate({manifest,manifestProof,consent,physic
     !HEX(consent.manifestSha256)||consent.revoked!==false||
     consent.oldConsentReused!==false||
     consent.operatorSha256!==manifest.operatorSha256||
+    consent.bootstrapSha256!==manifest.bootstrapSha256||
     consent.packageSha256!==manifest.packageSha256||
     consent.sourceLockSha256!==manifest.sourceLockSha256)
     return fail('C_CONTINUATION_NEW_CONSENT_NOT_INDEPENDENTLY_VERIFIED');
