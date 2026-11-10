@@ -138,7 +138,7 @@ export function validate996CContract({preflight,protectedAttestation,approval}={
   evidenceChecksPassed:16,evidenceChecksUnproven:unprovenChecks,
   intendedOrder:['FRESH_CAS','ATOMIC_CLAIM','FRESH_CAS_WITH_OWN_CLAIM',
    'DURABLE_PREPARED_RECORD','WORKFLOW_ENABLE_ONCE','WORKFLOW_ACTIVE_READBACK',
-   'BACKLOG_CLOSE_CAS','FULL_ORIGINAL_DISPOSITION_READBACK',
+   'BACKLOG_CLOSE_EXCLUSIVE_GUARDED','FULL_ORIGINAL_DISPOSITION_READBACK',
    'INDEPENDENT_PROTECTED_POSTCHECK','DURABLE_PRE_ARCHIVE_RECORD',
    'ORIGINAL_LEASE_ARCHIVE',
    'FINAL_READBACK_AND_COMPLETE','ARCHIVE_OWN_RECOVERY_CLAIM',
@@ -157,7 +157,7 @@ export async function simulate996CTransaction({preflight,protectedAttestation,ap
  if(contract.status!=='REVIEWED_CONTRACT_ONLY')return contract;
  if(!ports||typeof ports!=='object')return fail('C_NATIVE_ADAPTER_NOT_IMPLEMENTED');
  const names=['freshReadback','reserveClaim','freshWithOwnClaim','recordPrepared',
-  'enableWorkflowOnce','workflowActiveReadback','closeBacklogCas',
+  'enableWorkflowOnce','workflowActiveReadback','closeBacklogGuarded',
   'fullBacklogDispositionReadback','independentProtectedPostcheck',
   'recordPreArchive','archiveOriginalLease','finalReadback','completeRecord',
   'archiveOwnClaim','finalOwnClaimReadback'];
