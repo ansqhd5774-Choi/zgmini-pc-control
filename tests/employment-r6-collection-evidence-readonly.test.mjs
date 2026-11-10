@@ -79,6 +79,26 @@ test('read-only summaries preserve SQLite bytes and hide raw bodies/tokens',t=>{
  assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
 });
 
+test('deployed R6 BACKFILL 530-week ETA539 snapshot is discovered without writes',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);seed(db);
+ db.prepare(`UPDATE market_score_employment_r6_raw_snapshot_v1
+  SET request_key='DOL_ETA539:530w',
+      detail_json=json_set(detail_json,'$.historyWeeks',530)
+  WHERE request_key='DOL_ETA539:600w'`).run();
+ db.close();
+ const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.eta539[0].mode,'BACKFILL');
+ assert.equal(result.eta539[0].historyWeeks,530);
+ assert.equal(result.eta539[0].selectedWeeks,2);
+ assert.equal(result.eta539[0].latestCompleteWeek,'2025-07-26');
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(sha(file),beforeHash);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+});
+
 test('51-region missing week prevents claiming strict 52-week coverage',t=>{
  const {data,file}=fixture(t),db=createDb(file);seed(db,{missingLastCode:'WY'});db.close();
  const r=inspectEmploymentR6CollectionEvidence(data);
