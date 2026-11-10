@@ -40,7 +40,7 @@ function fixture(){
  const itemTasks={'ZGMINI-PC-Local-Core':'4'.repeat(64),
   'ZGMINI-PC-Local-Korea':'5'.repeat(64)};
  const itemEnabled={'ZGMINI-PC-Local-Core':true,
-  'ZGMINI-PC-Local-Korea':false};
+  'ZGMINI-PC-Local-Korea':true};
  const itemFingerprint=createHash('sha256').update(Buffer.from(JSON.stringify({
   files:itemFiles,tasks:itemTasks}))).digest('hex');
  const preflight={schema:'ZGMINI_CONTROLLER_996_ORIGINAL_WINDOWS_OBSERVATION_V1',
@@ -153,6 +153,9 @@ test('raw fingerprint, authority and original C failure phase must match',()=>{
   f=>{f.protectedAttestation.items.writerFileStatus['config.json']='ABSENT';},
   f=>{f.approval.protectedWriterFileStatus['config.json']='ABSENT';},
   f=>{f.protectedAttestation.items.taskEnabled['ZGMINI-PC-Local-Core']=null;},
+  f=>{f.protectedAttestation.items.taskEnabled['ZGMINI-PC-Local-Korea']=false;},
+  f=>{f.protectedAttestation.items.taskEnabled['ZGMINI-PC-Local-Korea']=false;
+      f.approval.protectedTaskEnabled['ZGMINI-PC-Local-Korea']=false;},
   f=>{f.protectedAttestation.historicalBaselineAvailable=true;},
   f=>{f.approval.protectedItemsObservedAt='2026-11-10T03:13:02.041Z';},
  ];
