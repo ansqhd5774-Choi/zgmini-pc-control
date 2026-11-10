@@ -121,11 +121,19 @@ export function resumePostSwitchState({maintenanceRoot,requestId,sourceSha,ledge
   need(sha64(contract?.ownerSha256)&&sha64(contract?.recordTailSha256)&&
     Number.isSafeInteger(contract?.recordCount)&&contract.recordCount>0&&
     digest(raw)===contract.ownerSha256&&owner.requestId===requestId&&
-    owner.sourceSha===contract.priorSourceSha&&owner.ledgerSha256===ledgerSha256&&
+    owner.sourceSha===(contract.ownerSourceSha??contract.priorSourceSha)&&owner.ledgerSha256===ledgerSha256&&
     livePid(owner.pid)===false&&state.count===contract.recordCount&&
     state.lastHash===contract.recordTailSha256&&digest(fs.readFileSync(ledgerFile))===ledgerSha256,
     'POSTSWITCH_RESUME_STATE_DRIFT');
-  const resumeDir=path.join(claimDir,'resume-1215');
+  const finalizing=contract.mode==='FINALIZE_1215_1216_EXISTING_RESULTS';
+  const priorContinuation=path.join(claimDir,'resume-1215/owner.json');
+  if(finalizing){
+    const priorRaw=fs.readFileSync(priorContinuation),prior=json(priorRaw);
+    need(digest(priorRaw)===contract.priorContinuationOwnerSha256&&
+      prior.sourceSha===contract.priorSourceSha&&livePid(prior.pid)===false,
+      'POSTSWITCH_FINALIZE_PRIOR_OWNER_DRIFT');
+  }
+  const resumeDir=path.join(claimDir,finalizing?'finalize-1216':'resume-1215');
   try{fs.mkdirSync(resumeDir);}catch(e){
     if(e.code==='EEXIST')need(false,'POSTSWITCH_RESUME_ALREADY_CLAIMED');throw e;
   }
@@ -137,6 +145,7 @@ export function resumePostSwitchState({maintenanceRoot,requestId,sourceSha,ledge
   function verifyStillHeld(){
     need(digest(fs.readFileSync(ownerFile))===contract.ownerSha256&&
       digest(fs.readFileSync(activeFile))===activeDigest&&
+      (!finalizing||digest(fs.readFileSync(priorContinuation))===contract.priorContinuationOwnerSha256)&&
       digest(fs.readFileSync(ledgerFile))===ledgerSha256,'POSTSWITCH_RESUME_OWNER_DRIFT');
   }
   function append(code,details={}){

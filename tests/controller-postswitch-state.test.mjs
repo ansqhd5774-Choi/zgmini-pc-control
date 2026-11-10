@@ -75,6 +75,24 @@ test('resume refuses live/unknown owner, altered journal, wrong hash or ledger d
    assert.equal(fs.existsSync(path.join(f.root,'leases/controller-recovery/resume-1215')),false);
   }finally{f.done();}}
 });
+
+test('finalization preserves both earlier owner records and has its own exclusive child claim',()=>{
+ const f=resumableFixture();try{
+  const resumed=f.run();
+  const previousFile=path.join(resumed.claimDir,'resume-1215/owner.json');
+  const previous=fs.readFileSync(previousFile);
+  const current=inspectPostSwitchState({maintenanceRoot:f.root,requestId:id});
+  const contract={...f.contract,mode:'FINALIZE_1215_1216_EXISTING_RESULTS',
+    priorSourceSha:'f'.repeat(40),ownerSourceSha:sha40,
+    priorContinuationOwnerSha256:sha256(previous),recordCount:current.count,
+    recordTailSha256:current.lastHash};
+  const final=resumePostSwitchState({...f.opts,sourceSha:'e'.repeat(40),contract,livePid:()=>false});
+  assert(fs.existsSync(path.join(final.claimDir,'finalize-1216/owner.json')));
+  assert.deepEqual(fs.readFileSync(previousFile),previous);
+  assert.deepEqual(fs.readFileSync(path.join(final.claimDir,'owner.json')),f.owner);
+  assert.throws(()=>resumePostSwitchState({...f.opts,sourceSha:'e'.repeat(40),contract,livePid:()=>false}));
+ }finally{f.done();}
+});
 test('unrelated existing C-grade recovery claim excludes this mode',()=>{
   const f=fixture();
   try{

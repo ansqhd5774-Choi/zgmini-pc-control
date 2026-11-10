@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,
+import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,FINALIZE_1216,
   validatePostSwitchApproval} from '../tools/controller-postswitch-approval.mjs';
-import {runApprovedPostSwitch} from '../tools/controller-postswitch-operator.mjs';
+import {runApprovedPostSwitch,finishApprovedPostSwitchResults} from '../tools/controller-postswitch-operator.mjs';
 
 const id=INCIDENT.requestId,old=INCIDENT.oldSha,target=INCIDENT.newSha;
 const source='a'.repeat(40),postSource='b'.repeat(40);
@@ -43,6 +43,33 @@ const goodPorts=()=>{
       originalPreserved:true,archiveVerified:true,claimPreserved:true,
       archiveName:'controller-install.lease'};},
   };};
+
+const finalApproval=()=>({...approval(),writerTransition:structuredClone(WRITER_TRANSITION),
+  writerFollowup:structuredClone(WRITER_FOLLOWUP),finalize:structuredClone(FINALIZE_1216)});
+const finalEvidence=()=>({...evidence(),writerFollowupVerified:true,checks:{...evidence().checks,
+  PROTECTION_UNCHANGED:false,PROTECTION_CONTRACT_VERIFIED:true}});
+test('finalization uses existing results and never submits replay or postcheck',async()=>{
+ const p=goodPorts();
+ const r=await finishApprovedPostSwitchResults({approval:finalApproval(),evidence:finalEvidence(),sourceSha:source,ports:p});
+ assert.equal(r.status,'RECOVERY_COMPLETED');assert.equal(r.originalLedgerPreserved,true);
+ assert.equal(r.postcheckIssueNumber,1216);assert.equal(r.replayIssueNumber,1215);
+ assert(!p.events.includes('backlog'));assert(!p.events.includes('postcheck'));assert(!p.events.includes('claim'));
+ assert(p.events.indexOf('final')<p.events.indexOf('archive'));
+});
+test('finalization protection or original drift keeps archive uncalled',async()=>{
+ for(const edit of [p=>{p.verifyFinal=async()=>({runnerSetVerified:false});},
+   p=>{p.verifyOriginalUnchanged=async()=>false;}]){
+  const p=goodPorts();edit(p);
+  const r=await finishApprovedPostSwitchResults({approval:finalApproval(),evidence:finalEvidence(),sourceSha:source,ports:p});
+  assert.equal(r.status,'RECOVERY_REQUIRED');assert.equal(r.leaseArchived,false);
+  assert(!p.events.includes('archive'));
+ }
+});
+test('archive uncertainty is reported unknown and never as a rollback',async()=>{
+ const p=goodPorts();p.archiveLease=async()=>{throw Error('unknown');};
+ const r=await finishApprovedPostSwitchResults({approval:finalApproval(),evidence:finalEvidence(),sourceSha:source,ports:p});
+ assert.equal(r.leaseArchived,null);assert.equal(r.archiveOutcomeUnknown,true);
+});
 
 test('exact approved source, preimages, tools and postcheck are required',()=>{
   assert.equal(validatePostSwitchApproval(approval(),{requestId:id,sourceSha:source,evidence:evidence()}).approved,true);

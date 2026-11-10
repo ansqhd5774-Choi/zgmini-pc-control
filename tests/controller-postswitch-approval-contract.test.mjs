@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,RESUME_1215,
+import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,RESUME_1215,FINALIZE_1216,
   validatePostSwitchApproval} from '../tools/controller-postswitch-approval.mjs';
 
 const sourceSha='f'.repeat(40);
@@ -81,6 +81,16 @@ test('continuation consent pins #1215, existing owner, journal tail and result h
  for(const edit of [r=>{r.replayIssueNumber=1216;},r=>{r.ownerSha256='0'.repeat(64);},
    r=>{r.recordTailSha256='0'.repeat(64);},r=>{r.results.pop();}]){
   const bad=structuredClone(ap);edit(bad.resume);assert.throws(()=>checkFollowup(bad),/RESUME_CONTRACT_INVALID/);
+ }
+});
+
+test('finalization requires exact two-result contract and refuses mixed resume scope',()=>{
+ const ap={...followupManifest(),finalize:structuredClone(FINALIZE_1216)};
+ assert.equal(checkFollowup(ap).finalize.postcheckIssueNumber,1216);
+ for(const edit of [a=>{a.resume=structuredClone(RESUME_1215);},
+   a=>{a.finalize.postcheckIssueNumber=1217;},a=>{a.finalize.postcheckResults.pop();},
+   a=>{a.finalize.priorContinuationOwnerSha256='0'.repeat(64);}]){
+  const bad=structuredClone(ap);edit(bad);assert.throws(()=>checkFollowup(bad),/FINALIZE_CONTRACT_INVALID/);
  }
 });
 test('altered or incomplete new consent and missing source closure are rejected',()=>{

@@ -199,20 +199,40 @@ export const RESUME_1215=Object.freeze({
     Object.freeze({path:'results/42729529997-1-seat-5.txt',blobSha:'e5c1b94da668b2ea03aac7cd5fc69c842a8e93d5',sha256:'922b18dd190608ed071894bf954c52f7fb3ec1ac0ed2e92786fee386de6b18fe'}),
   ]),
 });
+export const FINALIZE_1216=Object.freeze({...RESUME_1215,
+  schema:'ZGMINI_PC_POSTSWITCH_FINALIZE_EXISTING_RESULTS_V1',
+  mode:'FINALIZE_1215_1216_EXISTING_RESULTS',
+  priorSourceSha:'776cfcf8a77b9b48f813c59d030fac01922e044d',
+  ownerSourceSha:'d82b66206d78b1f9d90f846dce1b67b7f36f6719',
+  priorApprovalCommitSha:'64de61e0fc04c6833d5c640c2d5c468d8b6b6a92',
+  priorApprovalSha256:'fbea40ba0ead0961088891d1187ea9b8a50e352b73fd87ac03616d49940dc860',
+  recordCount:13,recordTailSha256:'2d105ab0d861cec67e55ed963cc6a60a7887db68da1586122f1f2547491c824d',
+  priorContinuationOwnerSha256:'5bef31c66ae44447995a54c3faba394bc01c588ad25f433e560e642f137579f2',
+  postcheckIssueNumber:1216,
+  postcheckBodySha256:'3e70ee4940766853bed1bab926d8676e494fc4784d0a8e77f6494dcb9f755661',
+  postcheckResults:Object.freeze([
+    Object.freeze({path:'results/42731249968-1-seat-3.json',blobSha:'a9d25ba5eabb4337e4b0211e987bf4bd7b099f93',sha256:'72f13abaec27fe174cbe83194b8fff7ad703c854a3fce52430c710bdc3b589bd'}),
+    Object.freeze({path:'results/42731249968-1-seat-3.txt',blobSha:'59814eb539768b4ec899c7a11e27a7dcafa8dfe5',sha256:'43023268271189d815c94f61a6986955607eeb84666a35c1432d1783231b703c'}),
+  ]),
+});
 
 export function validatePostSwitchApproval(approval, {requestId,sourceSha,evidence} = {}) {
   const transitionRequested = Object.hasOwn(approval ?? {}, 'writerTransition');
   const followupRequested = Object.hasOwn(approval ?? {}, 'writerFollowup');
   const resumeRequested = Object.hasOwn(approval ?? {}, 'resume');
+  const finalizeRequested = Object.hasOwn(approval ?? {}, 'finalize');
   need(keysAre(approval, ['schema','approved','operation','requestId','issueNumber',
     'sourceSha','targetControllerSha','installedShaBefore','evidenceHashes',
     'toolHashes','postcheck','expectedBacklogIssues',
     ...(transitionRequested ? ['writerTransition'] : []),
     ...(followupRequested ? ['writerFollowup'] : []),
-    ...(resumeRequested ? ['resume'] : [])]),
+    ...(resumeRequested ? ['resume'] : []),
+    ...(finalizeRequested ? ['finalize'] : [])]),
   'POSTSWITCH_APPROVAL_FIELDS_INVALID');
   if(resumeRequested)need(followupRequested && writerFollowupMatches(approval.resume,RESUME_1215),
     'POSTSWITCH_RESUME_CONTRACT_INVALID');
+  if(finalizeRequested)need(followupRequested&&!resumeRequested&&
+    writerFollowupMatches(approval.finalize,FINALIZE_1216),'POSTSWITCH_FINALIZE_CONTRACT_INVALID');
   if(followupRequested)need(transitionRequested && writerFollowupMatches(approval.writerFollowup) &&
     evidence?.writerFollowupVerified===true,
     'POSTSWITCH_APPROVED_WRITER_FOLLOWUP_UNVERIFIED');

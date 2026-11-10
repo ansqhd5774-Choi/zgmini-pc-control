@@ -7,7 +7,7 @@ import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {INCIDENT,TOOL_PATHS,MATERIAL_KEYS,RESUME_1215,writerFollowupMatches,
+import {INCIDENT,TOOL_PATHS,MATERIAL_KEYS,RESUME_1215,FINALIZE_1216,writerFollowupMatches,
   validatePostSwitchApproval} from './controller-postswitch-approval.mjs';
 import {main as inspectPostSwitch} from './controller-postswitch-evidence.mjs';
 import {main as inspectPreflight,prepareBacklogReadOnly,readAllPages}
@@ -15,7 +15,7 @@ import {main as inspectPreflight,prepareBacklogReadOnly,readAllPages}
 import {exactReplayCandidates} from './controller-postswitch-backlog.mjs';
 import {ensurePostcheckIssue} from './controller-postswitch-postcheck.mjs';
 import {acquirePostSwitchState,resumePostSwitchState,inspectPostSwitchState} from './controller-postswitch-state.mjs';
-import {runApprovedPostSwitch} from './controller-postswitch-operator.mjs';
+import {runApprovedPostSwitch,finishApprovedPostSwitchResults} from './controller-postswitch-operator.mjs';
 
 const maintenance='E:/ZGmini/automation/pc-maintenance';
 const control='E:/ZGmini/automation/pc-control';
@@ -101,6 +101,51 @@ export function verifyResumeReadOnly(resume){
     }
   }
   return {verified:true,operationalWrites:0,replayIssueNumber:1215};
+}
+
+export function verifyFinalizationReadOnly(contract){
+  need(writerFollowupMatches(contract,FINALIZE_1216),'POSTSWITCH_FINALIZE_CONTRACT_INVALID');
+  const raw=git(['show',contract.priorApprovalCommitSha+
+    ':approvals/maintenance-recoveries/'+INCIDENT.requestId+'.postswitch.json']);
+  const prior=JSON.parse(raw);
+  need(digest(raw)===contract.priorApprovalSha256&&prior.approved===true&&
+    prior.sourceSha===contract.priorSourceSha,'POSTSWITCH_FINALIZE_PRIOR_APPROVAL_DRIFT');
+  const dir=path.join(maintenance,'leases/controller-recovery');
+  const ownerRaw=read(path.join(dir,'owner.json'));
+  const previousRaw=read(path.join(dir,'resume-1215/owner.json'));
+  const state=inspectPostSwitchState({maintenanceRoot:maintenance,requestId:INCIDENT.requestId});
+  const dead=pid=>{try{process.kill(pid,0);return false;}catch(e){return e.code==='ESRCH';}};
+  need(digest(ownerRaw)===contract.ownerSha256&&digest(previousRaw)===contract.priorContinuationOwnerSha256&&
+    dead(JSON.parse(ownerRaw).pid)&&dead(JSON.parse(previousRaw).pid)&&
+    state.count===contract.recordCount&&state.lastHash===contract.recordTailSha256&&
+    !fs.existsSync(path.join(dir,'finalize-1216')),'POSTSWITCH_FINALIZE_STATE_DRIFT');
+  const all=issuePages(),original=api('issues/919'),replay=api('issues/1215'),post=api('issues/1216');
+  need(exactReplayCandidates(INCIDENT.requestId,original,all).join(',')==='1215'&&
+    replay.body===original.body&&digest(Buffer.from(replay.body))===contract.replayBodySha256&&
+    digest(Buffer.from(post.body))===contract.postcheckBodySha256&&
+    all.filter(row=>row.title===post.title).length===1&&post.user?.login==='ansqhd5774-Choi'&&
+    post.labels?.some(label=>label.name==='pc-job'),'POSTSWITCH_FINALIZE_ISSUE_DRIFT');
+  const readResult=entries=>{
+    let result=null;
+    for(const entry of entries){
+      const row=api('contents/'+entry.path);
+      need(row.path===entry.path&&row.sha===entry.blobSha&&row.encoding==='base64',
+        'POSTSWITCH_FINALIZE_RESULT_BLOB_DRIFT');
+      const bytes=Buffer.from(row.content.replace(/\s/g,''),'base64');
+      need(digest(bytes)===entry.sha256,'POSTSWITCH_FINALIZE_RESULT_RAW_DRIFT');
+      if(entry.path.endsWith('.json'))result=JSON.parse(bytes);
+    }
+    need(result?.schema==='ZGMINI_PC_RESULT_V1'&&result.status==='PASS'&&
+      result.actualExecutionSha===INCIDENT.newSha&&result.protectedStateUnchanged===true&&
+      result.operationalWrites===0&&result.providerCalls===0&&result.d1Writes===0,
+      'POSTSWITCH_FINALIZE_RESULT_NOT_PASS');
+    return result;
+  };
+  const backlogResult=readResult(contract.results),postcheckResult=readResult(contract.postcheckResults);
+  need(backlogResult.requestId===contract.originalRequestId&&
+    postcheckResult.requestId===INCIDENT.requestId+'-postcheck'&&
+    postcheckResult.operation==='core-status','POSTSWITCH_FINALIZE_RESULT_IDENTITY_DRIFT');
+  return {backlogResult,postcheckResult,operationalWrites:0,verified:true};
 }
 
 /** Reject bot markers with missing/mismatched evidence; no reply is proof alone. */
@@ -212,9 +257,10 @@ function loadApproval(args){
   return {approval:JSON.parse(raw.toString('utf8')),source:args[3]};
 }
 
-function makePorts({approval,evidence,source,preflight,ledger}){
+function makePorts({approval,evidence,source,preflight,ledger,terminalState=null,terminalResults=null}){
   const id=INCIDENT.requestId,paths=materialPaths();
-  let state=null,backlogIssueNumber=null,backlogResult=null,postcheckResult=null;
+  let state=terminalState,backlogIssueNumber=terminalResults?1215:null,
+    backlogResult=terminalResults?.backlogResult??null,postcheckResult=terminalResults?.postcheckResult??null;
   const checked=async()=>{
     stablePreimages(approval);
     const fresh=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
@@ -396,6 +442,17 @@ export async function main(args=process.argv.slice(2),{launcherVerified=false}={
   validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence});
   need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
     'POSTSWITCH_EVIDENCE_FAILED');
+  if(approval.finalize){
+    const terminalResults=verifyFinalizationReadOnly(approval.finalize);
+    await directConfirmation();
+    const terminalState=resumePostSwitchState({maintenanceRoot:maintenance,requestId:id,
+      sourceSha:source,ledgerSha256:approval.evidenceHashes.ledger,contract:approval.finalize});
+    terminalState.append('EXISTING_RESULTS_VERIFIED',{replayIssueNumber:1215,postcheckIssueNumber:1216});
+    const allPorts=makePorts({approval,evidence,source,ledger:json(materialPaths().ledger),terminalState,terminalResults});
+    const ports=Object.fromEntries(['verifyPreconditions','verifyFinal','verifyOriginalUnchanged','archiveLease','persist']
+      .map(key=>[key,allPorts[key]]));
+    return finishApprovedPostSwitchResults({approval,evidence,sourceSha:source,ports});
+  }
   const preflight=await inspectPreflight(['--request-id',id,'--source-sha',source],
     {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null,resume:approval.resume??null});
   need(preflight.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS' &&

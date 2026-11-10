@@ -108,9 +108,9 @@ async function prepareReadOnly(args){
   // closure was verified against the pinned Git commit.
   const {main:inspect}=await import('./controller-postswitch-evidence.mjs');
   const {main:preflight}=await import('./controller-postswitch-preflight.mjs');
-  const {WRITER_TRANSITION,WRITER_FOLLOWUP,RESUME_1215}=await import('./controller-postswitch-approval.mjs');
-  const {verifyResumeReadOnly}=await import('./controller-postswitch-windows.mjs');
-  verifyResumeReadOnly(RESUME_1215);
+  const {WRITER_TRANSITION,WRITER_FOLLOWUP,RESUME_1215,FINALIZE_1216}=await import('./controller-postswitch-approval.mjs');
+  const {verifyFinalizationReadOnly}=await import('./controller-postswitch-windows.mjs');
+  verifyFinalizationReadOnly(FINALIZE_1216);
   // Read-only candidate construction verifies the pinned transition bytes.
   // This does not grant C approval: the emitted manifest stays approved:false.
   const evidence=await inspect(['--request-id',id,'--source-sha',source],
@@ -140,7 +140,7 @@ async function prepareReadOnly(args){
     expectedBacklogIssues:[919],
     writerTransition:{...WRITER_TRANSITION},
     writerFollowup:structuredClone(WRITER_FOLLOWUP),
-    resume:structuredClone(RESUME_1215),
+    finalize:structuredClone(FINALIZE_1216),
     postcheck:{operation:'core-status',sourceRepository:'ansqhd5774-Choi/zgmini',
       sourceBranch:'main',sourceSha:postSourceSha},
   };

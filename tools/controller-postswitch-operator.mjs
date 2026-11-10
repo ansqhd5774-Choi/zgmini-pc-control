@@ -5,6 +5,42 @@ import {forwardRecoveryCandidate,reconcilePostSwitchForward} from './controller-
 
 const need=(ok,code)=>{if(!ok)throw Object.assign(new Error(code),{code});};
 
+/** Finalize only already verified results. This port surface has no replay or
+ * postcheck submission methods; no additional GitHub execution is possible. */
+export async function finishApprovedPostSwitchResults({approval,evidence,sourceSha,ports}){
+  validatePostSwitchApproval(approval,{requestId:INCIDENT.requestId,sourceSha,evidence});
+  need(approval.finalize!==undefined,'POSTSWITCH_FINALIZE_EXPLICIT_CONSENT_REQUIRED');
+  for(const key of ['verifyPreconditions','verifyFinal','verifyOriginalUnchanged','archiveLease','persist'])
+    need(typeof ports?.[key]==='function','POSTSWITCH_FINALIZE_PORT_MISSING');
+  let archiveStarted=false;
+  try{
+    need((await ports.verifyPreconditions())?.verified===true,'POSTSWITCH_FINALIZE_PRECONDITION_FAILED');
+    const final=await ports.verifyFinal();
+    need(final?.currentSourceSha===INCIDENT.newSha&&
+      (final.protectedStateUnchanged===true||final.protectionContractVerified===true)&&
+      final.workflowActive===true&&final.supervisorVerified===true&&
+      final.runnerSetVerified===true&&final.backlogVerified===true,
+      'POSTSWITCH_FINALIZE_READBACK_FAILED');
+    need(await ports.verifyOriginalUnchanged()===true,'POSTSWITCH_FINALIZE_ORIGINAL_DRIFT');
+    await ports.persist({status:'RECOVERY_REQUIRED',code:'POSTSWITCH_FINALIZE_ARCHIVE_INTENT'});
+    archiveStarted=true;
+    const archived=await ports.archiveLease();
+    need(archived?.verified===true&&archived.originalPreserved===true&&
+      archived.archiveVerified===true&&archived.claimPreserved===true,
+      'POSTSWITCH_FINALIZE_ARCHIVE_UNVERIFIED');
+    const report={status:'RECOVERY_COMPLETED',code:'POSTSWITCH_FORWARD_RECOVERY_COMPLETED',
+      originalLedgerPreserved:true,originalRequestRetried:false,leaseArchived:true,
+      archivedLeaseName:archived.archiveName,replayIssueNumber:1215,postcheckIssueNumber:1216};
+    await ports.persist(report);return report;
+  }catch(error){
+    const report={status:'RECOVERY_REQUIRED',code:error?.code??'POSTSWITCH_FINALIZE_OUTCOME_UNKNOWN',
+      leaseArchived:archiveStarted?null:false,archiveOutcomeUnknown:archiveStarted,originalRequestRetried:false};
+    // Once the lease was archived, persist() may itself fail. Do not attempt
+    // a journal append through a moved claim or claim a rollback occurred.
+    return report;
+  }
+}
+
 export async function runApprovedPostSwitch({approval,ledger,evidence,sourceSha,ports}) {
   validatePostSwitchApproval(approval,{requestId:INCIDENT.requestId,sourceSha,evidence});
   need(forwardRecoveryCandidate(ledger,evidence),'POSTSWITCH_ORIGINAL_NOT_ELIGIBLE');
