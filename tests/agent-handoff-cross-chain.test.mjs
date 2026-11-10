@@ -45,6 +45,9 @@ function intakeFixture({status = 'RUNTIME_FAILED', authenticatedReceipt = true} 
   const routingComments = [];
   const io = {
     readReport: async name => name.endsWith('seat-2.json') ? {...pcReport, status} : null,
+    readReportText: async name => name.endsWith('seat-2.txt') ?
+      Object.entries({...pcReport, status}).map(([key,value]) =>
+        `${key}=${value}`).join('\r\n') + '\r\n' : null,
     readComments: async () => authenticatedReceipt ? [{user: {login: bot},
       body: `<!-- zgmini-pc-result:${runId}:${attempt}:2 -->\nverified`,
       issue_url: `https://api.github.com/repos/${repo}/issues/${originalNumber}`}]: [],
