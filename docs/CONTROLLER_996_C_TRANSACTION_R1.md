@@ -38,7 +38,7 @@
 | 4 | 독립 `PREPARED` 복구 원장을 원자적으로 기록 | 원본 원장·승인·claim 지문 불변, 재개 효과 전 | STOP, 기록 불명확 확인 |
 | 5 | 기존 `pc-job` Workflow 활성화 요청 **최대 1회** | 원래 요청의 설치·재실행 없이 승인된 C 효과 | 응답 불명확 시 **재시도 0**, 예약 보관 |
 | 6 | Workflow active 독립 재조회 | 현재 소유권/보호 상태 유지 | STOP |
-| 7 | 원래 backlog의 열린 중단 창만 CAS 종료 | 실제 resume 시각 기록, 원본 백업/시간 창 보존 | STOP |
+| 7 | 원래 backlog의 열린 중단 창만 **독점 소유 조건부 종료** | 별도 C claim·다른 Writer 부재 전제, 직전 원본 SHA 재조회→같은 볼륨 임시 파일/원자 rename→즉시 SHA 재조회, 실제 resume 시각 기록 | STOP |
 | 8 | 중단 창 모든 원본 Issue·결과 JSON/TXT 독립 조회 | **Pause 시작~실제 Resume 후 전체 구간** 재조회, 완전 페이지·고유 ID·기존 결과 확인. **동일 requestId 재게시 0** | STOP, 기존 Issue 원본 유지 |
 | 9 | Core/Korea·Writer·Supervisor·전용 Runner 사후 확인 | 운영 Controller SHA 변화 0 | STOP |
 | 10 | 독립 `PRE_ARCHIVE` 복구 기록 | 보호·Backlog 인증 결과와 원본 lease 해시 고정 | STOP |
@@ -49,6 +49,8 @@
 | 15 | 자기 복구 예약 부재/보관 독립 재조회 | 자기 claim 보관 확인, 완료 기록·원본 원장 일치 | STOP, 미확인 완료 주장 금지 |
 
 `simulate996CTransaction`은 각 단계의 `true` 이외 응답을 모두 불확실로 분류한다. 원자 예약을 **시도**한 시점부터 결과가 불명확하더라도 claim 확인 전 재실행하지 않으며, Workflow enable/lease archive **시도 횟수**도 측정한다. 검증된 진짜 실행기에서는 각 성공의 원본 출처와 독립 재조회가 필요하다.
+
+파일 내용의 SHA를 확인하고 임시 파일을 `renameSync`로 교체하는 행위는 다른 Writer와 경쟁할 경우 **진정한 동시성 CAS가 아니다.** 실제 C 실행기의 7단계는 서로 호환되는 복구 claim의 독점성뿐 아니라 **해당 backlog를 갱신하는 다른 실행자 없음**을 검증하고, 가능하면 서버/파일시스템 수준 원자 조건을 사용해야 한다. 독점성이 증명되지 않으면 변경을 시작하지 않는다. 설치 유지보수기의 기존 `replayR6Backlog`는 원본 요청의 GitHub 재게시와 `issues?since=` 갱신 시각 필터를 사용하므로 #996 복구에서 재사용을 금지한다.
 
 ## 현재 실증 미완료
 
