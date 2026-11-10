@@ -110,6 +110,7 @@ test('changing the remote snapshot between complete passes blocks',async()=>{
 test('synthetic origin or wrong service token identity blocks',async()=>{
   for(const mutate of [
     auth=>{auth.testOnly=true;},
+    auth=>{delete auth.testOnly;},
     auth=>{auth.repositoryId=1;},
     auth=>{auth.actor=OWNER;},
     auth=>{auth.readOnly=false;},
