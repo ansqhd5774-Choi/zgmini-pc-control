@@ -51,6 +51,13 @@ test('a missing task or unknown enabled state cannot be inferred',()=>{
  assert.equal(review996ProtectedR2Evidence(y).code,'C_R2_ITEM_SET_DRIFT');
 });
 
+test('both originally enabled protected Tasks must remain enabled',()=>{
+ for(const task of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']){
+  const x=r2();x.items.taskEnabled[task]=false;
+  assert.equal(review996ProtectedR2Evidence(x).code,'C_R2_PROTECTED_TASK_UNVERIFIED');
+ }
+});
+
 test('declaring historical evidence or approval without source proof is rejected',()=>{
  const x=r2();x.historicalBaselineAvailable=true;
  assert.equal(review996ProtectedR2Evidence(x).code,'C_R2_AUTHORITY_OR_HISTORICAL_GAP_DRIFT');
