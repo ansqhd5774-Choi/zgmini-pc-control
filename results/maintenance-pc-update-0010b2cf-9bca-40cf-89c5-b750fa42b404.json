@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+  "targetControllerSha": "9db6fff689c488a59fe8771f013b7c5d3bafc0a8",
+  "status": "UNKNOWN",
+  "code": "RUNNER_SET_DRIFT",
+  "lastPass": "RECOVERY_REQUIRED",
+  "firstFail": "INTAKE_PAUSED",
+  "actualControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": false
+}
