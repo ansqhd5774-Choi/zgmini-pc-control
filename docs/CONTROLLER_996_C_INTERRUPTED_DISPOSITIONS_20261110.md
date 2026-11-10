@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 고정 예약의 제7 C급 Effect 확정 — Draft 소스 283/283 PASS, 실제 운영 C NO-GO
+
+- 새 운영 C 복구를 위한 **제안 승인 범위**에 `CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE`를 추가했다. 같은 E: leases 부모 아래에서 proposal의 `owner.json` 단회 기록·Flush 후 고정 `controller-recovery-continuation-reservation`으로 원자적 이동하고 성공/실패 후 자동 삭제하지 않는 효과를 별도 표시한다. 단순 테스트가 아니라 실제 E: 영구 기록을 남기는 C급 효과이므로 **기존 6개 Effect의 구 Owner 승인을 확장 해석하지 않는다**. 현재 신규 7개 Effect 승인 0건.
+- `tools/controller-996-continuation-gate.mjs`와 `tests/controller-996-continuation-gate.test.mjs`를 수정했다. 신규 예약 효과가 빠지거나 임의 cleanup 효과가 추가된 동의 제안은 테스트에서 거부된다. 관련 포함 전체 **283/283 PASS**; 원격 변경 2개 파일 Git blob 바이트 일치 **2/2**, 마지막 소스 commit `4bff74dac3a51888480f51e352ad50ab6cebf100`.
+- 실제 Windows 운영 엔트리포인트·실제 코드/ZIP/Source Lock 해시 봉인·해당 SHA를 명시한 #996 신규 Owner 정확 동의는 **아직 존재하지 않는다**. 10개 화면 SHA는 실행 직전 CAS가 아니며, 원본 PC E: 변경 0·GitHub Workflow/Backlog 변경 0. 기존 CMD 재시도 및 현재 Claim/Install 이동 금지. 전체 **4/5=80%→80%**, PR #1222 Draft, **C NO-GO**.
+
+
 ## 2026-11-11 단계별 원본 Git 84바이트 R4 재연결 — 282/282 PASS, 실제 C 실행 NO-GO
 
 - 새 단계별 E: 2회 판독기 `controller-996-c-original-stage-readonly.mjs`가 기존 봉인된 R4 `verify996OfflineGitBytesReadOnly`와 원문 `controller-996-git-byte-offline-manifest-r4.json`을 **각 단계의 두 스냅샷마다 재사용**하도록 연결했다. 각 읽기마다 installed 38·staged 39·maintainer 7 = 84 실제 파일이 Git blob·SHA256 원문과 일치해야 하며, 실패·출처 위장·원문 누락 시 STOP. 격리 testOnly는 `sourceBytesVerified=false`, 실제 원본 Windows R4 성공에서만 true로 보고하지만 어떤 경로도 `executionAuthorized=true`를 만들지 않는다. 원본 PC 실측은 여전히 0회.
