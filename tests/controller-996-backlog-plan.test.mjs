@@ -10,7 +10,7 @@ const issue=(number,id='pc-cf5cd368-7410-4de6-9b2b-9524cd10a5a8')=>({
   user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
   created_at:'2026-11-10T01:35:10.000Z',
   body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',requestId:id,
-    chatId:'ab6520e6-c66b-4d98-890a-fca5b0fc1a3b',operation:'core-status',
+    chatId:'chat-ab6520e6-c66b-4d98-890a-fca5b0fc1a3b',operation:'core-status',
     sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
     sourceSha:'a'.repeat(40)}),
 });
@@ -26,6 +26,49 @@ test('an unexecuted original is for owner replan only; no Issue replay is allowe
   assert.equal(p.issuePostsAuthorized,0);
   assert.equal(p.automaticPcRetries,0);
   assert.equal(p.executionAuthorized,false);
+});
+
+test('real #1226/#1227 request shapes with chat-prefixed IDs and descriptive titles are admitted',()=>{
+  const a=fixture();
+  a.listing.issues=[issue(1227,'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7'),
+    {...issue(1226,'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4'),title:'core-status'}];
+  a.commentsByIssue={1226:{complete:true,comments:[]},1227:{complete:true,comments:[]}};
+  const p=plan996BacklogWithoutReplay(a);
+  assert.equal(p.status,'READONLY_DISPOSITIONS_ONLY');
+  assert.deepEqual(p.entries.map(x=>x.originIssue),[1226,1227]);
+  assert.deepEqual(p.entries.map(x=>x.disposition),
+    ['OWNER_REPLAN_REVIEW_REQUIRED','OWNER_REPLAN_REVIEW_REQUIRED']);
+  assert.equal(p.issuePostsAuthorized,0);
+  assert.equal(p.automaticPcRetries,0);
+});
+
+test('canonical nine-field writer preimage request is valid without permitting arbitrary extras',()=>{
+  const a=fixture();
+  const valid={...JSON.parse(a.listing.issues[0].body),
+    operation:'writer-install-preimage-readonly',
+    preimageManifestPath:'approvals/writer-preimage/market-calendar-er1-import-deps6-readonly-20261108.json',
+    preimageManifestSha256:'a'.repeat(64)};
+  a.listing.issues[0].body=JSON.stringify(valid);
+  assert.equal(plan996BacklogWithoutReplay(a).status,'READONLY_DISPOSITIONS_ONLY');
+  a.listing.issues[0].body=JSON.stringify({...valid,preimageManifestSha256:'bad'});
+  assert.equal(plan996BacklogWithoutReplay(a).code,'ORIGINAL_BODY_INVALID');
+  a.listing.issues[0].body=JSON.stringify({...valid,preimageManifestPath:'../other.json'});
+  assert.equal(plan996BacklogWithoutReplay(a).code,'ORIGINAL_BODY_INVALID');
+  a.listing.issues[0].body=JSON.stringify({...valid,unapprovedKey:true});
+  assert.equal(plan996BacklogWithoutReplay(a).code,'ORIGINAL_BODY_INVALID');
+  a.listing.issues[0].body=JSON.stringify({...valid,operation:'core-status'});
+  assert.equal(plan996BacklogWithoutReplay(a).code,'ORIGINAL_BODY_INVALID');
+});
+
+test('invalid chat ID or source identity stays blocked',()=>{
+  const a=fixture();
+  const valid=JSON.parse(a.listing.issues[0].body);
+  for(const patch of [{chatId:'bad value'},{chatId:'x'.repeat(65)},
+    {sourceRepository:'other/repository'},{sourceBranch:'../../other'},
+    {sourceSha:'invalid'}]){
+    a.listing.issues[0].body=JSON.stringify({...valid,...patch});
+    assert.equal(plan996BacklogWithoutReplay(a).code,'ORIGINAL_BODY_INVALID');
+  }
 });
 
 test('a bot result comment alone is never accepted as verified PC execution',()=>{
