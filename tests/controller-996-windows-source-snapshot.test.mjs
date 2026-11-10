@@ -104,3 +104,47 @@ test('review launcher validates the full fixture before starting Node', {
   assert.match(blocked.stdout,/C996_SNAPSHOT_SHA_MISMATCH/);
   assert.doesNotMatch(blocked.stdout,/FIXTURE_BOOTSTRAP_STARTED/);
 });
+
+test('outer Windows review retains the verified launcher and Node through child exit', {
+  skip: process.platform !== 'win32',
+}, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-996-outer-anchor-'));
+  const toolsDir = path.join(root, 'tools');
+  fs.mkdirSync(toolsDir);
+  const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+  const helperBytes = fs.readFileSync(helper);
+  fs.writeFileSync(path.join(toolsDir, path.basename(helper)), helperBytes);
+  const launcher = path.join(toolsDir, 'VERIFY_996_WINDOWS_TRUSTED_SNAPSHOT.ps1');
+  const fixture = path.join(root, 'fixture.mjs');
+  fs.writeFileSync(fixture, [
+    'import fs from "node:fs";',
+    'for (const target of [process.argv[2], process.execPath]) {',
+    '  try { fs.closeSync(fs.openSync(target, "r+")); process.exit(10); }',
+    '  catch (error) { if (!["EBUSY","EPERM","EACCES"].includes(error.code)) throw error; }',
+    '}',
+    'console.log("LAUNCHER_AND_NODE_WRITE_ACCESS_DENIED");',
+  ].join('\n'));
+  const launcherBytes = Buffer.from([
+    'param($PackageRoot,$ManifestCommitSha,$BootstrapSha256,$SourceLockSha256,$PackageSha256,$SnapshotHelperSha256)',
+    "& 'E:\\ZGmini\\runtime\\node.exe' (Join-Path $PackageRoot 'fixture.mjs') $PSCommandPath",
+    'exit $LASTEXITCODE',
+  ].join('\r\n'));
+  fs.writeFileSync(launcher, launcherBytes);
+  const runtime = 'E:/ZGmini/runtime/node.exe';
+  const runtimeHash = sha(fs.readFileSync(runtime));
+  const outer = fileURLToPath(new URL('../tools/VERIFY_996_WINDOWS_OUTER_ANCHOR.ps1', import.meta.url));
+  const run = (nodeHash, launcherHash) => spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+    ['-NoProfile','-NonInteractive','-File',outer,'-PackageRoot',root,
+      '-ManifestCommitSha','a'.repeat(40),'-BootstrapSha256','a'.repeat(64),
+      '-SourceLockSha256','a'.repeat(64),'-PackageSha256','a'.repeat(64),
+      '-SnapshotHelperSha256',sha(helperBytes),'-LauncherSha256',launcherHash,'-NodeSha256',nodeHash],
+    {encoding:'utf8',windowsHide:true,timeout:30000});
+  const pass = run(runtimeHash, sha(launcherBytes));
+  assert.equal(pass.status, 0, pass.stderr + pass.stdout);
+  assert.match(pass.stdout, /LAUNCHER_AND_NODE_WRITE_ACCESS_DENIED/);
+  for (const blocked of [run('0'.repeat(64), sha(launcherBytes)), run(runtimeHash, '0'.repeat(64))]) {
+    assert.equal(blocked.status, 2, blocked.stderr + blocked.stdout);
+    assert.match(blocked.stdout, /C996_SNAPSHOT_SHA_MISMATCH/);
+    assert.doesNotMatch(blocked.stdout, /LAUNCHER_AND_NODE_WRITE_ACCESS_DENIED/);
+  }
+});

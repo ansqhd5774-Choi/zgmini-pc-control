@@ -44,7 +44,7 @@ public sealed class Zgmini996WindowsSourceSnapshot : IDisposable
         }
         if ((info.Attributes & 0x400) != 0 ||
             ((info.Attributes & 0x10) != 0) != directory ||
-            (!directory && (info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 16000000))) {
+            (!directory && (info.Links != 1 || info.SizeHigh != 0 || info.SizeLow > 160000000))) {
             handle.Dispose();
             throw new IOException("C996_SNAPSHOT_ENTRY_UNSAFE");
         }

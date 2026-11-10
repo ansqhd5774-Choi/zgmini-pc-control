@@ -360,4 +360,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 독립 검토는 PowerShell 진입점의 외부 해시 확인과 실제 로드 사이의 교체 가능성 및 Node 실행 파일의 신뢰 근거를 남은 조건으로 확인했다. Bootstrap의 GitHub GET 전용 범위와 Operator의 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 중단을 유지한다. 기존 S1 검증 수치는 변경 전 커밋의 증거로 보존한다.
 - 다음 필수 작업은 외부에서 고정된 PowerShell 진입점과 Node 바이너리를 실제 로드까지 묶어 검증하는 것이다. 이후 운영 단계 CAS와 함께 검증한 다음에만 S1·S2와 최종 C ZIP을 봉인한다. 전체 운영 진행률 80%다.
 
+### Windows 외부 실행 경로 검증
+
+- `VERIFY_996_WINDOWS_OUTER_ANCHOR.ps1`은 별도로 신뢰된 위치에서 실행하도록 만든 검토용 진입점이다. 외부에서 전달받은 SHA-256으로 helper, 내부 PowerShell 진입점, 고정 Node 실행 파일을 검증한다. Windows 파일 핸들을 자식 종료까지 보유하여 해시 대조와 로드 사이에도 파일을 보호한다. 일반 PowerShell 실행 정책을 유지한다.
+- Windows 검증 3/3. 외부 진입점 시험에서 합성 내부 스크립트가 실제 Node를 시작했고 두 파일의 쓰기 접근이 차단됐다. 내부 스크립트 또는 Node의 기대 SHA가 다르면 자식 실행 전에 중단됐다. 이 시험의 기대 해시는 fixture와 설치된 Node에서 직접 계산했다. 운영 실행에 필요한 외부 신뢰 출처와 Owner 승인은 별도로 확인한다.
+- 남은 기술 작업은 현재 Operator의 `Directory.Move` 직전 경로 검사와 실제 이동을 Windows 원본 디렉터리 핸들에 결합하는 것이다. Operator 차단을 유지하며 원본 이동, S2 및 최종 C ZIP 봉인은 보류한다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.
