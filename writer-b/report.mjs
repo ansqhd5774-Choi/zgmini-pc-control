@@ -150,8 +150,43 @@ async function readback(apiFetch,url,headers,expected){
  }catch{return false;}
 }
 
+function reportHeaders(env){return {
+ accept:'application/vnd.github+json',
+ authorization:'Bearer '+env.GITHUB_TOKEN,
+ 'x-github-api-version':'2022-11-28','content-type':'application/json',
+ 'user-agent':'zgmini-writer-b-source-once'};}
+
+async function reportRejectedRequest({event,env,rawResult,apiFetch}){
+ // The trusted Issue origin was already checked by the strict validator.
+ // Only the run-local preflight contract STOP may receive this receipt.
+ need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20,
+  'WRITER_B_REPORT_TOKEN_STOP');
+ let proof;
+ try{proof=typeof rawResult==='string'&&Buffer.byteLength(rawResult)<=512?
+  JSON.parse(rawResult):null;}catch{proof=null;}
+ need(proof?.status==='WRITER_B_SETUP_STOP'&&
+  proof.code==='WRITER_B_REQUEST_CONTRACT_STOP'&&
+  proof.runId===env.GITHUB_RUN_ID,'WRITER_B_REPORT_REJECTION_PROOF_STOP');
+ // Never reflect the invalid request body, source paths or token into GitHub.
+ // No result pair is fabricated when the request never passed admission.
+ const comment=`<!-- zgmini-writer-b-request-rejected:${env.GITHUB_RUN_ID} -->\n`+
+  'Writer B request: **REJECTED_BEFORE_PC** (WRITER_B_REQUEST_CONTRACT_STOP)\n'+
+  'PC_INSTALL: NOT_EXECUTED; RESULT_PAIR: NOT_CREATED_INVALID_REQUEST\n'+
+  `RUN_ID: ${env.GITHUB_RUN_ID}; RETRY: NO_REEXECUTE\n`;
+ const response=await apiFetch(
+  `https://api.github.com/repos/${CONTROL_REPO}/issues/${event.issue.number}/comments`,
+  {method:'POST',headers:reportHeaders(env),body:JSON.stringify({body:comment})});
+ need(response.status===201,'WRITER_B_REPORT_COMMENT_STOP');
+ return {status:'WRITER_B_SETUP_STOP',code:'WRITER_B_REQUEST_CONTRACT_STOP',
+  deliveryStatus:'REQUEST_REJECTED_BEFORE_PC',created:0,verified:0};
+}
+
 export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
- const req=validateWriterBReportEvent(event,env);
+ let req;
+ try{req=validateWriterBReportEvent(event,env);}catch(error){
+  if(error?.code!=='WRITER_B_REPORT_REQUEST_STOP')throw error;
+  return reportRejectedRequest({event,env,rawResult,apiFetch});
+ }
  need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20,
   'WRITER_B_REPORT_TOKEN_STOP');
  let parsed;
@@ -161,10 +196,7 @@ export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
   req.approvalManifestSha256);
  const json=JSON.stringify(result,null,2)+'\n';
  const txt=textResult(result);
- const headers={accept:'application/vnd.github+json',
-  authorization:'Bearer '+env.GITHUB_TOKEN,
-  'x-github-api-version':'2022-11-28','content-type':'application/json',
-  'user-agent':'zgmini-writer-b-source-once'};
+  const headers=reportHeaders(env);
  let created=0,verified=0;
  for(const [ext,content] of [['json',json],['txt',txt]]){
   const url=`https://api.github.com/repos/${CONTROL_REPO}/contents/`+
