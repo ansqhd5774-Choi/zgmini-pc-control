@@ -47,6 +47,7 @@ export function review996COperatorEvidenceBridge({
     !same(pinned,manifest)||
     m.continuationRequestId!==manifest.continuationRequestId||
     m.operatorSha256!==manifest.operatorSha256||
+    m.bootstrapSha256!==manifest.bootstrapSha256||
     m.packageSha256!==manifest.packageSha256||
     m.sourceLockSha256!==manifest.sourceLockSha256)
     return fail('C_OPERATOR_CONSENT_MANIFEST_MISMATCH');
@@ -65,6 +66,7 @@ export function review996COperatorEvidenceBridge({
     continuationRequestId:m.continuationRequestId,
     manifestSha256:m.manifestSha256,revoked:false,oldConsentReused:false,
     operatorSha256:m.operatorSha256,packageSha256:m.packageSha256,
+    bootstrapSha256:m.bootstrapSha256,
     sourceLockSha256:m.sourceLockSha256};
   const gate=review996ContinuationGate({manifest,
     manifestProof:{status:'IMMUTABLE_GIT_MANIFEST_BYTES_VERIFIED',
