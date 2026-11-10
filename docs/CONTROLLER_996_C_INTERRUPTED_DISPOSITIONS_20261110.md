@@ -1,5 +1,10 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 기존 PC 설치형 GitHub GET 인증 연결 — 실행기 미완성/C NO-GO
+
+- `tools/controller-996-c-installed-gh-get-readonly.mjs`로 원본 Windows의 고정 `gh.exe`를 통해 **GET만** 수행하고 기존 인증의 Owner 계정·비공개 Repository ID를 확인하도록 구현했다. 허용 주소는 #996·원본 Issue #1217/#1219/#1226/#1227·전체 댓글 페이지·불변 commit의 C Manifest뿐이며 token 출력/추출·POST/PUT/재발행이 없다. 기존 C 동의 리더와 원본 4건 판독에 주입할 수 있는 실제 Windows 어댑터다. 실 PC에서 신규 어댑터 실행 0회, 사용자 신규 C 승인 0건이다.
+- 신규 최소 시험 **3/3**, 전체 관련 정적·격리 시험 **265/265 PASS**, 원격 신규 소스 2개 byte-match **2/2**. **기능 완료로 계산하지 않는다.** 남은 실제 필수 구현은 Writer/Controller 현재 Lease·PID·경합 2회 읽기, 실행 직전 SHA CAS, 정확 승인·배포 바이트에 결합된 Windows C 운영 보관 실행 및 실패 시 수동 재판정이다. 기존 운영 파일 변경 0, PR Draft, **4/5=80%→80%, C NO-GO**.
+
 ## 2026-11-11 기존 PC 해시 5개 화면 판독·10핀 후보 완성 — 운영 C NO-GO
 
 - 사용자가 **기존 PC** PowerShell에서 C Claim owner·Backlog·3개 진행 Marker의 SHA256을 읽기 전용으로 조회했고 5줄이 모두 정상 출력되었다. 화면 내 `BLOCKED` 없음. 스크린샷 SHA256 `b54905f5017f91c472e2e3dedfc7a8a4a3ce532e150fc6c10400e40974307b9e`, 독립 판독 2회 동일, 5/5 64hex 일치. 화면 원본 미게시, 비민감 전사와 구 R3/R4 고정 5개를 합친 **총 10개 후보 해시**를 `artifacts/controller-996/zgmini-996-original-windows-10-pin-screen-readback-20261111.json`에 기록하고 원격 바이트 재조회했다.
