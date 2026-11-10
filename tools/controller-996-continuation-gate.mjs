@@ -31,8 +31,9 @@ export function review996ContinuationGate({manifest,manifestProof,consent,physic
       'RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
       'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
       'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
-      'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE',
       'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+      'VERIFY_DURABLE_READY_TO_RELEASE_INSTALL',
+      'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE',
     ])||
     manifest.workflowPutCount!==0||manifest.backlogWriteCount!==0||
     manifest.originalRequestRetryCount!==0||manifest.issuePostCount!==0)

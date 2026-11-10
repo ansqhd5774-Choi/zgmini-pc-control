@@ -8,13 +8,24 @@ import {plan996WindowsArchive,simulate996WindowsArchiveAdapter} from
   '../tools/controller-996-windows-archive-adapter.mjs';
 
 const UUID='70a4c347-25ea-4fc6-83d2-c0c670115249';
+const ORIGINAL='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
+const READY='READY_TO_RELEASE_INSTALL.json';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const FILES={
   oldC:{'owner.json':'old C owner','PREPARED.json':'old C prepared'},
   install:{'owner.json':'old install owner',
     'RECOVERY_REQUIRED.json':'old install recovery'},
-  continuation:{'owner.json':'new C owner',
-    'PREPARED.json':'new C prepared'},
+  continuation:{'owner.json':JSON.stringify({requestId:UUID,
+    nonce:'fixture-nonce'}),
+    'PREPARED.json':'new C prepared',
+    [READY]:JSON.stringify({schema:'ZGMINI_996_CONTINUATION_READY_V1',
+      name:'READY_TO_RELEASE_INSTALL',requestId:UUID,
+      originalRequestId:ORIGINAL,finalReleasePending:true,
+      oldCArchiveOwnerSha256:sha(Buffer.from('old C owner')),
+      installOwnerSha256:sha(Buffer.from('old install owner')),
+      installRecoverySha256:sha(Buffer.from('old install recovery')),
+      ownerNonce:'fixture-nonce',
+      sourceLockSha256:'a'.repeat(64)})},
 };
 function fixture(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-996-test-'));
@@ -61,7 +72,7 @@ test('production usage cannot mutate or invoke a Windows move',()=>{
 });
 test('pure Windows plan has fixed same-volume no-replace paths',()=>{
   const p=plan996WindowsArchive(UUID);
-  assert.deepEqual(p.steps.map(s=>s.name),['oldC','install','continuation']);
+  assert.deepEqual(p.steps.map(s=>s.name),['oldC','continuation','install']);
   assert.equal(p.steps.every(s=>s.source.startsWith('E:\\ZGmini\\')&&
     s.destination.startsWith('E:\\ZGmini\\')&&
     s.intendedNativeOperation==='DOTNET_DIRECTORY_MOVE_NO_REPLACE'),true);
@@ -74,6 +85,8 @@ test('three fixed archive steps run in order with zero operational effects',()=>
     const r=f.run();
     assert.equal(r.status,'C_996_WINDOWS_ARCHIVE_TEST_ONLY_PASS');
     assert.equal(r.steps,3);
+    assert.equal(r.installArchivedLast,true);
+    assert.equal(r.continuationBeforeInstall,true);
     for(const step of f.plan.steps){
       assert.equal(fs.existsSync(f.dir('leases/'+step.name)),false);
       assert.equal(fs.existsSync(f.dir('archives/'+step.name)),true);
@@ -119,19 +132,84 @@ test('interruption after old C archival retains install barrier',()=>{
     assert.equal(f.run().code,'C_996_WINDOWS_ARCHIVE_STATE_UNKNOWN');
   }finally{f.cleanup();}
 });
-test('interruption after install lease archive preserves new continuation claim',()=>{
+test('interruption after continuation archive preserves canonical install lock',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({failAfter:'AFTER_CONTINUATION'});
+    assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_INJECTED_INTERRUPTION');
+    assert.equal(fs.existsSync(f.dir('archives/oldC')),true);
+    assert.equal(fs.existsSync(f.dir('archives/continuation')),true);
+    assert.equal(fs.existsSync(f.dir('leases/install')),true);
+    assert.equal(fs.existsSync(f.dir('archives/install')),false);
+    assert.equal(r.executionAuthorized,false);
+    assert.equal(f.run().code,'C_996_WINDOWS_ARCHIVE_STATE_UNKNOWN');
+  }finally{f.cleanup();}
+});
+test('interruption after last install move archives all three, never retries',()=>{
   const f=fixture();
   try{
     const r=f.run({failAfter:'AFTER_INSTALL'});
     assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_INJECTED_INTERRUPTION');
     assert.equal(fs.existsSync(f.dir('archives/oldC')),true);
+    assert.equal(fs.existsSync(f.dir('archives/continuation')),true);
     assert.equal(fs.existsSync(f.dir('archives/install')),true);
-    assert.equal(fs.existsSync(f.dir('leases/continuation')),true);
-    assert.equal(fs.existsSync(f.dir('archives/continuation')),false);
-    // The test exposes the post-install-release crash window; it does not
-    // assert that production intake is safe or execution is authorized.
-    assert.equal(r.executionAuthorized,false);
+    assert.equal(fs.existsSync(f.dir('leases/install')),false);
     assert.equal(f.run().code,'C_996_WINDOWS_ARCHIVE_STATE_UNKNOWN');
+  }finally{f.cleanup();}
+});
+test('malformed release intent cannot remove install admission barrier',()=>{
+  const f=fixture();
+  try{
+    const content=Buffer.from(JSON.stringify({schema:
+      'ZGMINI_996_CONTINUATION_READY_V1',name:'READY_TO_RELEASE_INSTALL',
+      requestId:UUID,originalRequestId:ORIGINAL,finalReleasePending:false,
+      oldCArchiveOwnerSha256:FILES.oldC['owner.json'],
+      installOwnerSha256:FILES.install['owner.json'],
+      sourceLockSha256:'a'.repeat(64)}));
+    fs.writeFileSync(f.dir('leases/continuation/'+READY),content);
+    f.expected.continuation[READY]=sha(content);
+    const r=f.run();
+    assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_READY_PROOF_INVALID');
+    assert.equal(fs.existsSync(f.dir('leases/install')),true);
+    assert.equal(fs.existsSync(f.dir('archives/continuation')),true);
+    assert.equal(fs.existsSync(f.dir('archives/install')),false);
+  }finally{f.cleanup();}
+});
+test('ready marker nonce and install recovery provenance mismatches block',()=>{
+  for(const field of ['ownerNonce','installRecoverySha256']){
+    const f=fixture();
+    try{
+      const readyPath=f.dir('leases/continuation/'+READY);
+      const ready=JSON.parse(fs.readFileSync(readyPath,'utf8'));
+      ready[field]=field==='ownerNonce'?'wrong-nonce':'b'.repeat(64);
+      const bytes=Buffer.from(JSON.stringify(ready));
+      fs.writeFileSync(readyPath,bytes);
+      f.expected.continuation[READY]=sha(bytes);
+      const r=f.run();
+      assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_READY_PROOF_INVALID');
+      assert.equal(fs.existsSync(f.dir('leases/install')),true);
+    }finally{f.cleanup();}
+  }
+});
+test('a different post-release lease does not overwrite the old archive',()=>{
+  const f=fixture();
+  try{
+    const move=f.port.moveNoReplace;
+    f.port.moveNoReplace=(root,from,to)=>{
+      move(root,from,to);
+      if(from==='leases/install'){
+        fs.mkdirSync(f.dir('leases/install'));
+        fs.writeFileSync(f.dir('leases/install/owner.json'),'next owner');
+      }
+    };
+    const r=f.run();
+    assert.equal(r.status,'C_996_WINDOWS_ARCHIVE_TEST_ONLY_PASS');
+    assert.equal(r.postReleaseDifferentLeaseObserved,true);
+    assert.equal(r.postReleaseOwnerVerified,false);
+    assert.equal(fs.readFileSync(f.dir('archives/install/owner.json'),'utf8'),
+      'old install owner');
+    assert.equal(fs.readFileSync(f.dir('leases/install/owner.json'),'utf8'),
+      'next owner');
   }finally{f.cleanup();}
 });
 test('late Writer conflict after old C archive blocks install release',()=>{
@@ -144,6 +222,20 @@ test('late Writer conflict after old C archive blocks install release',()=>{
     assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_LATE_CONFLICT');
     assert.equal(fs.existsSync(f.dir('archives/oldC')),true);
     assert.equal(fs.existsSync(f.dir('leases/install')),true);
+  }finally{f.cleanup();}
+});
+test('Writer racing at final release keeps the original install lease',()=>{
+  const f=fixture();
+  try{
+    let calls=0;
+    const readLive=()=>({workflowState:'active',protectionVerified:true,
+      controllerConflictCount:0,writerConflictCount:++calls===3?1:0});
+    const r=f.run({readLive});
+    assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_LATE_CONFLICT');
+    assert.equal(fs.existsSync(f.dir('archives/oldC')),true);
+    assert.equal(fs.existsSync(f.dir('archives/continuation')),true);
+    assert.equal(fs.existsSync(f.dir('leases/install')),true);
+    assert.equal(fs.existsSync(f.dir('archives/install')),false);
   }finally{f.cleanup();}
 });
 test('symlink in source is rejected during preflight',()=>{
@@ -189,7 +281,7 @@ test('changing a source SHA during a prior archive blocks later steps',()=>{
         f.dir('leases/install/owner.json'),'tampered');
     });
     const r=f.run();
-    assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_SOURCE_CHANGED');
+    assert.equal(r.code,'C_996_WINDOWS_ARCHIVE_INSTALL_BARRIER_LOST');
     assert.equal(fs.existsSync(f.dir('leases/install')),true);
   }finally{f.cleanup();}
 });

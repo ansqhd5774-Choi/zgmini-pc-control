@@ -21,8 +21,9 @@ function valid(){
     effects:['RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
       'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
       'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
-      'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE',
-      'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM'],
+      'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+      'VERIFY_DURABLE_READY_TO_RELEASE_INSTALL',
+      'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE'],
     workflowPutCount:0,backlogWriteCount:0,
     originalRequestRetryCount:0,issuePostCount:0,
   };
@@ -57,6 +58,19 @@ function valid(){
       otherContinuationCount:0,fresh:true},
   };
 }
+test('stale consent effects releasing install before continuation are invalid',()=>{
+  const x=valid();
+  x.manifest.effects=[
+    'RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+    'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
+    'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
+    'ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE',
+    'ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM',
+  ];
+  const r=review996ContinuationGate(x);
+  assert.equal(r.code,'C_CONTINUATION_NEW_EXACT_SCOPE_MANIFEST_REQUIRED');
+  assert.equal(r.executionAuthorized,false);
+});
 const check=x=>review996ContinuationGate(x);
 
 test('all synthetic requirements only produce a NON-AUTHORIZING review',()=>{

@@ -2,6 +2,13 @@
 
 ## 2026-11-11 Codex 사용량 중단 후 재개: 보관 충돌 격리 시뮬레이션
 
+### 후속 필수 수정: 실제 설치 배타 잠금 해제는 맨 마지막 (운영 NO-GO)
+
+- 최신 `main` `tools/maintenance-lock.mjs`의 설치 진입 잠금은 **정확히 `leases/controller-install` 디렉터리의 원자적 획득**에 의존하고, 신규 `controller-recovery-continuation-<UUID>` Claim은 그 경로를 대신 보호하지 못한다. 앞선 어댑터의 **oldC → install → continuation** 순서는 원본 Lease를 먼저 없애 다른 설치와 경합할 수 있었다. 신규 C 승인 manifest는 아직 발급되지 않았으며, 실제 실행 순서를 **oldC → continuation → install(마지막 상태 변경)**로 수정했다.
+- 격리 `simulate996Continuation`은 신규 Claim의 `READY_TO_RELEASE_INSTALL.json`을 완료 확정(`DONE`)이 아닌 **해제 준비 의도**로 `wx`·fsync·재읽기하고, 구 C Claim 보관 및 신규 Claim 보관 후 `owner.json`·준비 Marker 원문 SHA를 재검증한다. 그다음 보호/Writer 경합·원본 Install Lease 소유권을 다시 확인하고 **Install Lease 보관을 마지막 변경**으로 한다. 이후 쓰기 없는 원본 보관 읽기 검증만 수행하며 모든 중단은 자동 재시작 불가다.
+- `plan996WindowsArchive` 및 테스트 포트도 같은 마지막 Lease 순서를 강제한다. 신규 Claim 보관 후 기존 잠금 보존, 준비 Marker의 소유자 nonce·원본 Install Recovery SHA 불일치 차단, 최종 해제 직전 Writer 유입 시 잠금 보존, 최종 해제 후 새 `controller-install` 경로가 다른 내용으로 다시 존재해도 **구 보관 Lease의 바이트와 현재 경로를 구분**하는 부정 시험을 추가했다. 다른 내용의 Lease가 정당한 새 Writer라는 증빙까지 완료된 것은 아니므로 `postReleaseOwnerVerified=false`로 반환한다. Mutating Linux fixture의 중간 부모 symlink도 차단했다. 실제 Windows `.NET Directory.Move`, journal 원자성과 보존·독립 owner attestation은 아직 검증하지 않았다.
+- 새 집중·전체 회귀 포함 **123/123 PASS**, 기존 운영 PC 원본 변경 **0**, Workflow PUT **0**, 원본 Issue 재게시 **0**, 실PC C급 실행 **0**. **운영 진행률 80%→80%**, 이 단계는 Draft 소스 보완만 GO; 신규 사용자 C 승인·84개 원본 Windows 바이트 검증·실물 잠금 해제 테스트 완료 전에는 운영 **NO-GO**다.
+
 ### 후속 독립 C 동의·Windows 보관 어댑터 소스 검토 (운영 실행 불가)
 
 - `tools/controller-996-continuation-gate.mjs` 및 대응 시험을 추가했다. **이전 `RECONCILE_INTAKE_PAUSED_ONLY` C 동의는 신규 중단 Claim 인계에 사용 불가**하며, 신규 스키마 `ZGMINI_CONTROLLER_996_CONTINUATION_C_APPROVAL_V1`의 고유 UUID·새 불변 manifest 증거·새 정확한 사용자의 승인 영수증·operator/source-lock/ZIP 원문 해시·기존 Claim/세 marker/Lease/Backlog 원문 핀·원본 Windows에서의 Git 84바이트 검증·원본 4 Issue 무재실행 분류·Fresh Writer 경합 부재가 모두 일치해야 검토 후보가 된다. 모든 성공 응답도 `executionAuthorized=false`인 **순수 검토**이며, 이 함수에 전달된 boolean만으로 실PC 변경을 승인하지 않는다. 동의·원본 수정·이슈 재발행 기능은 없다. 집중 **12/12 PASS**.

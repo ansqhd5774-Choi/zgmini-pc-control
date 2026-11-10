@@ -106,14 +106,31 @@ test('production is always rejected before any mutation or PC access',()=>{
   assert.equal(r.backlogWrites,0);
   assert.equal(r.issuePosts,0);
 });
+test('symlinked intermediate test fixture directory is rejected pre-mutation',()=>{
+  const f=fixture();
+  try{
+    const actual=f.relative('real');
+    fs.mkdirSync(actual);
+    const nested=path.join(actual,'zgmini-996-test-nested');
+    fs.mkdirSync(nested);
+    fs.symlinkSync(actual,f.relative('redirect'),'dir');
+    const r=f.run({root:f.relative('redirect/zgmini-996-test-nested')});
+    assert.equal(r.code,'C_CONTINUATION_TEST_ROOT_REJECTED');
+    assert.equal(fs.existsSync(f.relative(OLD_C)),true);
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.equal(fs.existsSync(f.relative(f.cont)),false);
+  }finally{f.cleanup();}
+});
 
-test('test-only 84 Git bytes verified before archive C claim then install lease',()=>{
+test('84 Git bytes checked and install lease is final archive step',()=>{
   const f=fixture();
   try{
     const r=f.run();
     assert.equal(r.status,'C_CONTINUATION_TEST_ARCHIVED_IN_ORDER');
     assert.deepEqual(r.sourceFiles,{installed:38,staged:39,maintainer:7});
     assert.equal(r.archivedCClaimBeforeInstallLease,true);
+    assert.equal(r.continuationClaimBeforeInstallLease,true);
+    assert.equal(r.installLeaseLast,true);
     assert.equal(r.productionExecutable,false);
     assert.equal(r.executionAuthorized,false);
     assert.equal(r.originalRequestRetried,false);
@@ -126,7 +143,10 @@ test('test-only 84 Git bytes verified before archive C claim then install lease'
     assert.equal(fs.existsSync(f.relative(f.cont)),false);
     assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload/owner.json')),true);
     assert.equal(fs.existsSync(f.relative(f.leaseArchive+'/payload/owner.json')),true);
-    assert.equal(fs.existsSync(f.relative(f.contArchive+'/payload/COMPLETE.json')),true);
+    const ready=JSON.parse(fs.readFileSync(f.relative(
+      f.contArchive+'/payload/READY_TO_RELEASE_INSTALL.json'),'utf8'));
+    assert.equal(ready.finalReleasePending,true);
+    assert.equal(ready.name,'READY_TO_RELEASE_INSTALL');
   }finally{f.cleanup();}
 });
 
@@ -174,16 +194,41 @@ test('crash after old C archive retains original install admission barrier',()=>
   }finally{f.cleanup();}
 });
 
-test('crash after install release preserves both archives and continuation claim',()=>{
+test('crash after install release preserves all three archives, no post-write',()=>{
   const f=fixture();
   try{
     const r=f.run({failAfter:'AFTER_INSTALL_ARCHIVE'});
     assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_INSTALL_ARCHIVE');
     assert.equal(fs.existsSync(f.relative(f.oldCArchive)),true);
     assert.equal(fs.existsSync(f.relative(f.leaseArchive)),true);
+    assert.equal(fs.existsSync(f.relative(f.cont)),false);
+    assert.equal(fs.existsSync(f.relative(f.contArchive)),true);
+    assert.equal(r.executionAuthorized,false);
+    assert.equal(f.run().code,'C_CONTINUATION_ARCHIVE_OR_ACTIVE_CLAIM_EXISTS');
+  }finally{f.cleanup();}
+});
+test('crash after new C claim archive retains real install lease lock',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({failAfter:'AFTER_CONTINUATION_ARCHIVE'});
+    assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_CONTINUATION_ARCHIVE');
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.equal(fs.existsSync(f.relative(f.cont)),false);
+    assert.equal(fs.existsSync(f.relative(f.contArchive)),true);
+    assert.equal(fs.existsSync(f.relative(f.leaseArchive)),false);
+    assert.equal(f.run().code,'C_CONTINUATION_ARCHIVE_OR_ACTIVE_CLAIM_EXISTS');
+  }finally{f.cleanup();}
+});
+test('crash after ready marker but before continuation archive keeps install',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({failAfter:'AFTER_RELEASE_INTENT'});
+    assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_RELEASE_INTENT');
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
     assert.equal(fs.existsSync(f.relative(f.cont)),true);
     assert.equal(fs.existsSync(f.relative(f.contArchive)),false);
-    assert.equal(r.executionAuthorized,false);
+    assert.equal(fs.existsSync(f.relative(
+      f.cont+'/READY_TO_RELEASE_INSTALL.json')),true);
   }finally{f.cleanup();}
 });
 
@@ -237,6 +282,7 @@ test('a crash after install archive reservation retains install lease',()=>{
     assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload/owner.json')),
       true);
     assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.equal(fs.existsSync(f.relative(f.contArchive)),true);
     assert.deepEqual(fs.readdirSync(f.relative(f.leaseArchive)),[]);
   }finally{f.cleanup();}
 });

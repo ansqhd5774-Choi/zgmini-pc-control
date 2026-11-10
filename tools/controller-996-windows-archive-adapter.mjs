@@ -11,6 +11,7 @@ import {createHash} from 'node:crypto';
 const ROOT='E:\\ZGmini';
 const ORIGINAL='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const LEASES='E:\\ZGmini\\automation\\pc-maintenance\\leases';
+const READY='READY_TO_RELEASE_INSTALL.json';
 const H64=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
 const UUID=x=>typeof x==='string'&&
   /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(x);
@@ -24,13 +25,15 @@ const error=code=>Object.freeze({status:'C_996_WINDOWS_ARCHIVE_TEST_BLOCKED',
 export function plan996WindowsArchive(continuationId){
   need(UUID(continuationId),
     'C_996_WINDOWS_ARCHIVE_NEW_ID_INVALID');
+  // controller-install is the ONLY canonical installation lock recognized by
+  // maintenance-lock. Its archive MUST be the final state-changing move.
   const dirs=[
     ['oldC',`${LEASES}\\controller-recovery`,
       `${LEASES}\\controller-recovery-archived-${ORIGINAL}`],
-    ['install',`${LEASES}\\controller-install`,
-      `${LEASES}\\controller-install-recovered-${ORIGINAL}`],
     ['continuation',`${LEASES}\\controller-recovery-continuation-${continuationId}`,
       `${LEASES}\\controller-recovery-continuation-archived-${continuationId}`],
+    ['install',`${LEASES}\\controller-install`,
+      `${LEASES}\\controller-install-recovered-${ORIGINAL}`],
   ];
   const steps=dirs.map(([name,from,to])=>{
     need(path.win32.dirname(from)===LEASES&&
@@ -108,6 +111,29 @@ const sameInventory=(observed,expected)=>
   Object.keys(observed).length===Object.keys(expected).length&&
   Object.entries(observed).every(([p,digest])=>
     Object.hasOwn(expected,p)&&expected[p]===digest&&H64(digest));
+function readyToRelease(root,plan,expected){
+  need(sameInventory(inventory(root,'archives/oldC'),expected.oldC)&&
+    sameInventory(inventory(root,'archives/continuation'),expected.continuation),
+  'C_996_WINDOWS_ARCHIVE_PRE_RELEASE_DRIFT');
+  const src=path.join(safeDir(root,'archives/continuation'),READY);
+  let data,owner;
+  try{data=JSON.parse(fs.readFileSync(src,'utf8'));}catch{}
+  try{owner=JSON.parse(fs.readFileSync(path.join(
+    safeDir(root,'archives/continuation'),'owner.json'),'utf8'));}catch{}
+  need(data?.schema==='ZGMINI_996_CONTINUATION_READY_V1'&&
+    data.name==='READY_TO_RELEASE_INSTALL'&&
+    data.requestId===plan.continuationId&&
+    data.originalRequestId===ORIGINAL&&
+    data.finalReleasePending===true&&
+    data.oldCArchiveOwnerSha256===expected.oldC['owner.json']&&
+    data.installOwnerSha256===expected.install['owner.json']&&
+    data.installRecoverySha256===expected.install['RECOVERY_REQUIRED.json']&&
+    typeof owner?.nonce==='string'&&owner.nonce.length>0&&
+    owner.requestId===plan.continuationId&&
+    data.ownerNonce===owner.nonce&&
+    H64(data.sourceLockSha256),
+  'C_996_WINDOWS_ARCHIVE_READY_PROOF_INVALID');
+}
 
 /**
  * Test-only fault injection and behavioral contract; `port.moveNoReplace`
@@ -127,13 +153,14 @@ export function simulate996WindowsArchiveAdapter({testOnly=false,root=null,
       expected&&Object.keys(expected).length===3&&
       typeof readLive==='function'&&
       port&&typeof port.moveNoReplace==='function'&&
-      [null,'AFTER_OLD_C','AFTER_INSTALL'].includes(failAfter),
+      [null,'AFTER_OLD_C','AFTER_CONTINUATION','AFTER_INSTALL'].includes(failAfter),
       'C_996_WINDOWS_ARCHIVE_TEST_PORT_UNVERIFIED');
     const nameMap={oldC:'oldC',install:'install',continuation:'continuation'};
     const local=step=>`leases/${step.name}`;
     const archive=step=>`archives/${step.name}`;
     // Preflight checks ALL three source snapshots; a missing/new archive
     // blocks before any test write, even if only the last step is contested.
+    let postReleaseDifferentLeaseObserved=false;
     for(const step of plan.steps){
       need(Object.hasOwn(nameMap,step.name)&&
         sameInventory(inventory(root,local(step)),expected[step.name])&&
@@ -143,6 +170,13 @@ export function simulate996WindowsArchiveAdapter({testOnly=false,root=null,
         'C_996_WINDOWS_ARCHIVE_DESTINATION_EXISTS');
     }
     for(const step of plan.steps){
+      // This is a contract test, not proof of a durable Windows release
+      // intent. Every operation before the LAST install move must retain
+      // the real canonical admission barrier.
+      if(step.name!=='install')need(
+        sameInventory(inventory(root,'leases/install'),expected.install),
+        'C_996_WINDOWS_ARCHIVE_INSTALL_BARRIER_LOST');
+      else readyToRelease(root,plan,expected);
       const state=readLive();
       need(state?.controllerConflictCount===0&&
         state?.writerConflictCount===0&&
@@ -156,15 +190,26 @@ export function simulate996WindowsArchiveAdapter({testOnly=false,root=null,
       // Supplied port emulates .NET no-replace semantics in a temp fixture.
       // The production Windows implementation MUST NOT accept a JS port.
       port.moveNoReplace(root,local(step),archive(step));
-      need(absent(root,local(step))&&
+      const sourceAbsent=absent(root,local(step));
+      if(step.name==='install'&&!sourceAbsent){
+        // A different canonical directory can appear after #996's final
+        // release. This test cannot authenticate the new owner's legitimacy.
+        need(!sameInventory(inventory(root,local(step)),expected.install),
+          'C_996_WINDOWS_ARCHIVE_ORIGINAL_INSTALL_LEASE_STILL_ACTIVE');
+        postReleaseDifferentLeaseObserved=true;
+      }
+      need((sourceAbsent||step.name==='install')&&
         sameInventory(inventory(root,archive(step)),expected[step.name]),
         'C_996_WINDOWS_ARCHIVE_POSTMOVE_UNKNOWN');
       if((step.name==='oldC'&&failAfter==='AFTER_OLD_C')||
+        (step.name==='continuation'&&failAfter==='AFTER_CONTINUATION')||
         (step.name==='install'&&failAfter==='AFTER_INSTALL'))
         need(false,'C_996_WINDOWS_ARCHIVE_INJECTED_INTERRUPTION');
     }
     return Object.freeze({status:'C_996_WINDOWS_ARCHIVE_TEST_ONLY_PASS',
-      steps:3,oldCBeforeInstall:true,installBeforeContinuation:true,
+      steps:3,oldCBeforeInstall:true,continuationBeforeInstall:true,
+      installArchivedLast:true,
+      postReleaseDifferentLeaseObserved,postReleaseOwnerVerified:false,
       productionExecutable:false,executionAuthorized:false,
       workflowPuts:0,issuePosts:0,pcRetries:0});
   }catch(e){return error(/^C_996_WINDOWS_ARCHIVE_[A-Z0-9_]+$/.test(e?.code??'')?

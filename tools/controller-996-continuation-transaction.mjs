@@ -24,6 +24,23 @@ const UUID=x=>typeof x==='string'&&
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const stable=a=>JSON.stringify(a);
 const sorted=a=>a.slice().sort();
+function safeTestRoot(root){
+  if(typeof root!=='string'||!path.isAbsolute(root))return false;
+  const base=path.resolve(os.tmpdir()),resolved=path.resolve(root);
+  if(!resolved.startsWith(base+path.sep)||
+    !path.basename(resolved).startsWith('zgmini-996-test-'))return false;
+  try{
+    let current=resolved;
+    for(;;){
+      const st=fs.lstatSync(current);
+      if(!st.isDirectory()||st.isSymbolicLink())return false;
+      if(current===base)break;
+      current=path.dirname(current);
+      if(current.length<base.length)return false;
+    }
+    return fs.realpathSync.native(resolved)===resolved;
+  }catch{return false;}
+}
 const relSafe=x=>typeof x==='string'&&!x.includes('\\')&&
   x.split('/').every(p=>p&&p!=='.'&&p!=='..')&&!path.isAbsolute(x);
 const ctrlRel=x=>/^(controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(x);
@@ -235,10 +252,7 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
   if(!testOnly||process.platform==='win32')return failure(
     'C_CONTINUATION_PRODUCTION_NOT_APPROVED');
   try{
-    need(typeof root==='string'&&path.isAbsolute(root)&&
-      path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep)&&
-      path.basename(root).startsWith('zgmini-996-test-')&&
-      fs.lstatSync(root).isDirectory()&&!fs.lstatSync(root).isSymbolicLink(),
+    need(safeTestRoot(root),
       'C_CONTINUATION_TEST_ROOT_REJECTED');
     need(consent?.schema==='ZGMINI_CONTROLLER_996_CONTINUATION_CANDIDATE_V1'&&
       consent.operation==='ARCHIVE_OLD_C_CLAIM_THEN_INSTALL_LEASE'&&
@@ -253,7 +267,8 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
       typeof uuid==='function'&&
       (beforeArchiveReserve===null||typeof beforeArchiveReserve==='function')&&
       [null,'AFTER_RESERVE','AFTER_OLD_C_RESERVATION',
-        'AFTER_OLD_C_ARCHIVE','AFTER_INSTALL_RESERVATION',
+        'AFTER_OLD_C_ARCHIVE','AFTER_RELEASE_INTENT',
+        'AFTER_CONTINUATION_ARCHIVE','AFTER_INSTALL_RESERVATION',
         'AFTER_INSTALL_ARCHIVE'].includes(failAfter),
       'C_CONTINUATION_CONSENT_OR_PORT_NOT_VERIFIED');
     const first=inspect(root,consent,sourceRead,isAlive,readLive);
@@ -301,38 +316,67 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
     assertPreserved(root,'oldC',oldCArchived,consent.pins);
     if(failAfter==='AFTER_OLD_C_ARCHIVE')throw Object.assign(Error('injected'),{
       code:'C_CONTINUATION_INJECTED_AFTER_OLD_C_ARCHIVE'});
+    // The installed Controller's real admission barrier is the canonical
+    // `controller-install` directory. The new C claim does NOT fence other
+    // installers. Archive the new claim before releasing this barrier.
     ensureLive(readLive);
     ownRead();
+    need(absent(root,p.contArchive),
+      'C_CONTINUATION_NEW_CLAIM_ARCHIVE_DESTINATION_EXISTS');
+    const releaseIntent={schema:'ZGMINI_996_CONTINUATION_READY_V1',
+      name:'READY_TO_RELEASE_INSTALL',requestId:consent.requestId,
+      originalRequestId:REQ,ownerNonce:owner.nonce,
+      sourceLockSha256:consent.sourceLockSha256,
+      oldCArchiveOwnerSha256:consent.pins.oldC,
+      installOwnerSha256:consent.pins.installOwner,
+      installRecoverySha256:consent.pins.installRecovery,
+      // This is NOT a DONE marker; the final lease move has not happened.
+      finalReleasePending:true,at:now()};
+    writeOnce(root,p.cont,'READY_TO_RELEASE_INSTALL.json',releaseIntent);
+    const intentSha=SHA(file(root,p.cont+'/READY_TO_RELEASE_INSTALL.json'));
+    if(failAfter==='AFTER_RELEASE_INTENT')throw Object.assign(Error('injected'),{
+      code:'C_CONTINUATION_INJECTED_AFTER_RELEASE_INTENT'});
+    const continuationArchived=archiveInReservedDirectory(root,p.cont,p.contArchive);
+    const contPayload=continuationArchived;
+    sameSHA(SHA(file(root,contPayload+'/owner.json')),
+      SHA(Buffer.from(JSON.stringify(owner)+'\n')),
+      'CONTINUATION_OWNER');
+    sameSHA(SHA(file(root,contPayload+'/READY_TO_RELEASE_INSTALL.json')),
+      intentSha,'RELEASE_INTENT');
+    need(stable(entry(root,contPayload+'/READY_TO_RELEASE_INSTALL.json').data)===
+      stable(releaseIntent),'C_CONTINUATION_RELEASE_INTENT_DRIFT');
+    if(failAfter==='AFTER_CONTINUATION_ARCHIVE')throw Object.assign(Error('injected'),{
+      code:'C_CONTINUATION_INJECTED_AFTER_CONTINUATION_ARCHIVE'});
+    // All remaining writes MUST be limited to exactly the final lease move.
+    ensureLive(readLive);
     need(absent(root,p.oldInstallArchive),
       'C_CONTINUATION_INSTALL_ARCHIVE_DESTINATION_EXISTS');
+    assertPreserved(root,'oldC',oldCArchived,consent.pins);
+    sameSHA(SHA(file(root,contPayload+'/READY_TO_RELEASE_INSTALL.json')),
+      intentSha,'RELEASE_INTENT');
     sameSHA(SHA(file(root,p.install+'/owner.json')),
       consent.pins.installOwner,'INSTALL_OWNER');
     sameSHA(SHA(file(root,p.install+'/RECOVERY_REQUIRED.json')),
       consent.pins.installRecovery,'INSTALL_RECOVERY');
-    writeOnce(root,p.cont,'INSTALL_LEASE_ARCHIVE_ATTEMPTED.json',{
-      source:REQ,oldLeaseSha256:consent.pins.installOwner,at:now()});
     const installArchived=archiveInReservedDirectory(root,p.install,
       p.oldInstallArchive,{
         beforeReserve:beforeArchiveReserve,
         verifySource:()=>assertPreserved(root,'install',p.install,consent.pins),
         afterReserve:failAfter==='AFTER_INSTALL_RESERVATION'?
           'C_CONTINUATION_INJECTED_AFTER_INSTALL_RESERVATION':null});
-    assertPreserved(root,'install',installArchived,consent.pins);
+    // After this move: read-only postchecks, NO further filesystem writes.
     if(failAfter==='AFTER_INSTALL_ARCHIVE')throw Object.assign(Error('injected'),{
       code:'C_CONTINUATION_INJECTED_AFTER_INSTALL_ARCHIVE'});
-    ownRead();
-    need(absent(root,p.contArchive),
-      'C_CONTINUATION_NEW_CLAIM_ARCHIVE_DESTINATION_EXISTS');
-    writeOnce(root,p.cont,'COMPLETE.json',{schema:owner.schema,
-      requestId:consent.requestId,ownerNonce:owner.nonce,at:now()});
-    archiveInReservedDirectory(root,p.cont,p.contArchive);
+    assertPreserved(root,'install',installArchived,consent.pins);
     need(absent(root,p.install)&&absent(root,p.owner)&&absent(root,p.cont),
       'C_CONTINUATION_POSTCHECK_INCOMPLETE');
     assertPreserved(root,'oldC',p.oldCArchive+'/payload',consent.pins);
     assertPreserved(root,'install',p.oldInstallArchive+'/payload',consent.pins);
     return Object.freeze({status:'C_CONTINUATION_TEST_ARCHIVED_IN_ORDER',
       code:'ISOLATED_SIMULATION_ONLY',sourceFiles:second.sourceFiles,
-      archivedCClaimBeforeInstallLease:true,productionExecutable:false,
+      archivedCClaimBeforeInstallLease:true,
+      continuationClaimBeforeInstallLease:true,installLeaseLast:true,
+      productionExecutable:false,
       executionAuthorized:false,originalRequestRetried:false,
       workflowPuts:0,backlogWrites:0,issuePosts:0});
   }catch(e){return failure(/^C_CONTINUATION_[A-Z0-9_]+$/.test(e?.code??'')?
