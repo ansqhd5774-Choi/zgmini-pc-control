@@ -75,7 +75,7 @@ export function create996FourOriginalJobsReadOnlyReader({githubReader}={}){
     need(auth?.repository===REPO&&auth.repositoryId===REPO_ID&&
       auth.ownerAccountId===OWNER_ID&&auth.private===true&&
       auth.readOnly===true&&auth.executionAuthorized===false&&
-      auth.testOnly!==true&&
+      auth.testOnly===false&&
       (auth.kind==='INSTALLATION_REPOSITORY_GET'&&
         auth.actor==='github-app-installation'||
        auth.kind==='OWNER_USER_GET'&&auth.actor===OWNER),
