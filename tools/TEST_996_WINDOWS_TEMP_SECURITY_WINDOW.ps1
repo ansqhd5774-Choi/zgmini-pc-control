@@ -15,7 +15,7 @@ if ([IO.Directory]::Exists('E:\ZGmini') -or [IO.File]::Exists('E:\ZGmini')) {
 }
 $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
 $volume = [IO.Path]::GetPathRoot($temp)
-if ($volume -ieq 'E:\' -or $volume -notmatch '^[a-zA-Z]:\$' -or
+if ($volume -ieq 'E:\' -or $volume -notmatch '^[a-zA-Z]:\\$' -or
     $temp -match '(^|[\\/])ZGmini([\\/]|$)') {
   throw 'C996_SECURITY_PROOF_UNSAFE_TEMP'
 }
@@ -23,6 +23,14 @@ $disk = [IO.DriveInfo]::new($volume)
 if (-not $disk.IsReady -or $disk.DriveType -ne [IO.DriveType]::Fixed -or
     $disk.DriveFormat -notin @('NTFS','ReFS')) {
   throw 'C996_SECURITY_PROOF_UNSUPPORTED_VOLUME'
+}
+# Refuse a TEMP path that resolves through a junction/reparse point.
+$ancestor = [IO.DirectoryInfo]::new($temp)
+while ($null -ne $ancestor) {
+  if (($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw 'C996_SECURITY_PROOF_TEMP_REDIRECT'
+  }
+  $ancestor = $ancestor.Parent
 }
 
 $root = Join-Path $temp ('zgmini-996-acl-fixture-' + [guid]::NewGuid().ToString('N'))
