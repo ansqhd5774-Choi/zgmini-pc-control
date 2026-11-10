@@ -69,8 +69,10 @@ function fixture(t,phase='ORIGINAL'){
   fs.mkdirSync(leases,{recursive:true});
   const live={schema:'ZGMINI_996_PHYSICAL_FIXTURE_LIVE_V1',
     originalRequestId:REQ,conflicts:{workflowState:'active',
-      protectionVerified:true,writerActiveCount:0,
-      controllerActiveCount:0,otherContinuationCount:0}};
+      protectionVerified:true,
+      scope:'CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES',
+      foreignInstallOwnerCount:0,otherContinuationCount:0,
+      twoSnapshotsIdentical:true,fresh:true}};
   fs.writeFileSync(path.join(root,'live.json'),bytes(live));
   const inDir=(key,files)=>write(path.join(leases,NAMES[key]),files);
   switch(phase){
@@ -173,9 +175,18 @@ test('physical source/archive collision never chooses a surviving copy',t=>{
   bounded(r);
 });
 
-test('synthetic active Writer blocks state even with matching source SHA',t=>{
+test('unrelated synthetic Writer activity cannot block a C lease-only disposition',t=>{
   const f=fixture(t);
   f.live.conflicts.writerActiveCount=1;
+  fs.writeFileSync(path.join(f.root,'live.json'),bytes(f.live));
+  const r=run(f);
+  assert.equal(r.status,'C_PHYSICAL_FIXTURE_SNAPSHOT_CLASSIFIED_ONLY');
+  bounded(r);
+});
+
+test('synthetic foreign install owner blocks despite matching source SHA',t=>{
+  const f=fixture(t);
+  f.live.conflicts.foreignInstallOwnerCount=1;
   fs.writeFileSync(path.join(f.root,'live.json'),bytes(f.live));
   const r=run(f);
   assert.equal(r.code,'C_DISPOSITION_CONFLICT_OR_PROTECTION_UNKNOWN');
