@@ -8,7 +8,7 @@
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-runtime-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
-    "inflation-core-lock-observation-readonly": {"grade":"A","timeoutSeconds":390,"resource":"light"},
+    "inflation-core-lock-observation-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536},
     "shared-resource-release-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "writer-b-1063-recovery-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "pc-source-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
