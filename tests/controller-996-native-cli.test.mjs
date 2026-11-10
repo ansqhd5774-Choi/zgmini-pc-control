@@ -199,6 +199,23 @@ test('CMD pins CLI hash and CLI pins entire dependency lock hash',()=>{
  assert.ok(cmd.includes('set "NODE_PATH="'));
 });
 
+test('CMD calls the fixed system hasher directly without nested FOR /F quoting',()=>{
+ const cmd=fs.readFileSync(path.join(toolDir,
+  'RUN_996_NATIVE_C_ONCE.cmd'),'utf8');
+ assert.ok(!/\bfor\s+\/f\b/i.test(cmd),
+  'a nested FOR /F command substitution broke on original Windows');
+ assert.ok(!cmd.includes('usebackq'));
+ assert.ok(cmd.includes('"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -NonInteractive -Command "try {'));
+ assert.ok(cmd.includes('if ($actual -ieq $env:ZGMINI_996_CLI_EXPECTED_SHA256) { exit 0 } else { exit 1 }'));
+ assert.ok(cmd.includes('catch { exit 2 }'));
+ assert.ok(cmd.includes('if errorlevel 1 goto :blocked_cli_integrity'));
+ const hashLine=cmd.split(/\r?\n/).find(line=>line.startsWith('"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile'));
+ assert.ok(hashLine?.endsWith('catch { exit 2 }"'));
+ const hashIndex=cmd.indexOf(hashLine);
+ assert.ok(hashIndex>0&&hashIndex<cmd.indexOf('"%ZGMINI_996_NODE%" "%ZGMINI_996_SCRIPT%"'),
+  'the read-only hash comparison must occur before Node execution');
+});
+
 test('verifier rejects non-test paths, and production cannot use test-only env escape',()=>{
  assert.throws(()=>verify996NativeSourcePackage({folder:toolDir,
   testOnly:true}),/C_CLI_TEST_SOURCE_ROOT_REJECTED/);

@@ -2,6 +2,13 @@
 
 작성일: 2026-11-10. 대상: **기존 원본 Windows PC** `E:/ZGmini`의 #996만. 이 문서·CLI·CMD는 **소스 후보**이며 실제 실행·배포·복구 완료의 증거가 아니다.
 
+## 2026-11-10 원본 Windows 첫 CMD 진입 실패 및 수정
+
+- 원본 운영 PC에서 ZIP `zgmini-996-C-once-source-9ae385c.zip`의 세 고정 파일 CMD/CLI/source-lock SHA는 정상 일치했다. 원본 Node·유지보수 manifest·GitHub CLI 경로도 3/3 존재 확인.
+- 그러나 구 CMD의 `for /f "usebackq"` 안에 중첩된 `"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -Command ...`가 Windows `cmd.exe`에서 잘못 파싱돼 `BLOCKED: C_CLI_SHA256_MISMATCH_OR_UNREADABLE`로 종료했다. **실제 해시 불일치가 아니라 검증기 호출 실패**이며, Node/C Operator 호출 전에 중단됐다. 화면에도 `No C operation attempted`로 표시됨.
+- 구 CMD/ZIP **사용 금지**. `for /f`를 제거하고 시스템 PowerShell을 직접 한 번 호출하여 `Get-FileHash` 결과를 **PowerShell 프로세스 종료 코드**로 판단하도록 수정했다. `exit 0`일 때만 Node 호출, 그 외 모든 반환값은 차단. CLI와 17개 module source-lock 바이트는 변경하지 않음.
+- 구 CMD SHA256 `02586e2cb1a47b622e6bddced091d80a0768aeb0bfdb7aa9d614d991ebac26dd`는 폐기. 수정 CMD SHA256은 `3aecb6cdf5fe9b69719793e58737c73a314f14cf6906a70e92e0267cf703762d`이다. 새 archive 별도 고정/배포, Windows 프롬프트까지 실측은 아직 필요. #996 회귀 **176/176 PASS**, 운영 C 효과 **0**, 실제 복구 진척 **80% 유지**.
+
 ## 고정 입력·허용 범위
 
 - 원본 #996: `pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404`.
@@ -16,7 +23,7 @@
    - lock SHA256: `1761f67e0bf26175b13979692961cbcdff34d6f83a9cf9a5d585ca13a366e653`
    - CLI SHA256: `1fd97d387bac2814fafd8916ed7d07c21d04d0c4facc6ad767bb21817e2cf056`
    - 검증 전 모듈의 정적 import를 실행하지 않으며, 17/17 바이트 해시·파일 유무·경로·내부 참조 완전성이 어긋나면 운영 실행기로 진입하지 않는다.
-   - **남은 배포 차단:** 실제 원본 PC에 전달될 immutable archive 자체의 SHA256/서명/파일 목록과 내려받은 경로를 별도로 고정·재검증하고, 원본 Windows에서 초회 사전 점검 결과를 받아야 한다. 현재 사용자가 다운로드해 실행할 확정 패키지는 아직 없다.
+   - **남은 배포 차단:** 수정된 CMD를 포함하는 새 immutable archive 자체의 SHA256/파일 목록을 별도로 고정·재검증하고, 원본 Windows에서 첫 확인 프롬프트까지 재진입한 결과를 받아야 한다. 실패한 구 archive는 재사용하지 않는다.
 3. 현재 #996 승인 manifest·댓글을 원본 GitHub 인증 GET으로 다시 검증해야 하며, 실제 실행 전 단계별 보호 상태·source·Writer 배타성을 재검증해야 한다. Linux 테스트 결과는 원본 PC의 결과가 아니다.
 
 ## 준비 완료 후의 정확한 단회 절차

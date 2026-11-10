@@ -4,7 +4,7 @@
 
 - **C급 한정 승인 등록 완료:** 원본 Issue [#996 승인 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6759732782), 댓글 ID `6759732782`, 작성자 `ansqhd5774-Choi` / GitHub `author_association=OWNER`, 작성 시각 `2026-11-10T05:21:34Z`. 승인 표식 1개, 철회 표식 0개. 승인 명세는 불변 Git 커밋 `7cff08e…`에 고정되며, 전체 파일 SHA256 `05bf8aa72b438b69d7c86f8798a72ec2c12fe3537489f2153069dabfe0695e7b`를 댓글에서 수락했다. **원본 Windows에서의 인증 GET·실제 운영 실행은 별도 미실시**다.
 - **유효 승인 범위:** `RECONCILE_INTAKE_PAUSED_ONLY`, 최초 원본 Windows PC의 단회 C 복구. 역사적 `workflowDisableActorVerified=false` 및 `protectedBaselineVerified=false`와 다른 행위자의 전체 보호 불변성 미입증 상태를 그대로 수락한다. 이를 `true`로 변경하거나 Controller `9db6fff...` 설치 권한으로 확대하지 않는다.
-- **실제 운영 실행 0건:** 이 승인 댓글은 PC 작업을 자동 실행하지 않는다. `pc-job` Workflow는 원래 복구 대상이므로 실행 진입점이 될 수 없고, 기존 Actions 경로는 production native 모듈이 명시적으로 거부한다. **원본 Windows 직접 실행용 CLI/CMD 소스는 작성됐으나 설치·운영 실증 전**이다. 별도/블로그 Runner 우회 금지.
+- **실제 운영 실행 0건:** 이 승인 댓글은 PC 작업을 자동 실행하지 않는다. `pc-job` Workflow는 원래 복구 대상이므로 실행 진입점이 될 수 없고, 기존 Actions 경로는 production native 모듈이 명시적으로 거부한다. **원본 Windows CMD 최초 시도는 해시 검사 명령의 Windows 인용부호 오류로 Node 호출 이전에 차단**됐으며 C Claim·Workflow·Backlog·lease 변경은 수행하지 않았다. 오류를 수정한 새 패키지의 재검증이 필요하다. 별도/블로그 Runner 우회 금지.
 - **증거 출처 보완:** 원본 과거 R1·R2 전체 JSON을 테스트 fixture로 재구성해 운영 증거로 쓰지 않는다. 불변 Git manifest·소유자 승인 댓글을 검증한 뒤 고정 7개 원본 SHA와 현재 R2의 존재/부재·Task 2개를 대조하고, 최초 변경 직전 원본 Windows에서 실제 R1/R2를 **새 시각으로** 독립 재조회하는 방식으로 수정하였다. 승인 직후 Workflow PUT 전 승인 철회 재확인 및 세 단계 Claim nonce/PID 사후 검증도 추가하였다.
 - 아래 단계별 개발 이력에 기록된 “owner 승인 없음”, 과거 테스트 개수, “실행기 미연결”은 **각 작업을 수행하던 당시의 상태**다. 현재 승인·연결·운영 판정은 이 최신 상태와 아래 표의 수정된 상태를 우선한다. 운영 완료 판정은 여전히 `INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`와 최종 독립 Windows 검증을 요구한다. 전체 실증 진행률은 **4/5 = 80%** 유지.
 
@@ -33,11 +33,11 @@
 | `controller-996-native-fresh-preflight.mjs` | 원본 승인 R1/R2의 역사적 시각을 유지하고, 새로운 원본 Windows 실측의 7 raw SHA·16개 정상 검사·보호 Task 2개 활성화 확인. 자기 Claim 생성 이후는 자기 nonce/PID를 검증하면서 기존 Claim 부재 조건 하나만 예외 처리 | 실행 전/Claim 직후 전용 읽기 모듈. 실제 C 진입점과 운영 재측정은 **미완료** |
 | `controller-996-native-postcheck.mjs` | `BACKLOG_CLOSED`·`ORIGINAL_LEASE_ARCHIVED`·`FINAL_ARCHIVED` 각 단계에서 경로별 원본 lease SHA·자기 Claim/영구 마커·원본 정적 파일 4개 SHA·Backlog 신규 SHA/종료 상태·GitHub Workflow active·현재 R2 지문과 Task enabled를 독립 재조회. 변경 전제와 충돌하는 옛 R1/활성 Claim 전용 검증 함수 재사용 금지 | **물리 상태 확인만 수행하는 읽기 전용 소스**. 원본 GitHub 개별 Job 결과 확인은 단일 실행기의 별도 단계가 담당. 실PC 검증 미실시, 성공해도 `executionAuthorized=false` |
 | `controller-996-native-operator.mjs` | **원본 Windows C 단일 실행기 소스 후보**. 고정 GitHub 원문 승인 → 최신 R1/R2 → 자체 Claim → 영구 마커·단회 Workflow PUT → 현재 보호/GitHub 인증 재조회 → Writer guard 2회 포함 Backlog 단회 close → 원본 Issue/JSON·TXT 재조정 → 단계별 Postcheck → 원본/자체 Claim 순차 보관을 실제 하위 부품 API 반환값에 맞게 연결 | **승인 manifest·댓글 등록 확인**, CLI 소스 연결, 미배포·실제 원본 실행 0건. 테스트 포트는 비 Windows 격리 TEMP에서만 허용. 원본 Windows 통합 검증 및 독립 최종 재조회 미완료 |
-| `controller-996-native-cli.mjs` / `RUN_996_NATIVE_C_ONCE.cmd` | 원본 Windows 설치된 Node·E: 경로·현재 유지보수기 소스·직접 대화형 확인 문자열을 검사하는 단회 C 진입점 후보. 인자·Actions·Runner 우회 거부 및 결과 영수증 출력 | **소스 구현, 원본 PC 미배포·미실행**, 별도 설치 무결성/실제 Windows 사후 확인 필요 |
+| `controller-996-native-cli.mjs` / `RUN_996_NATIVE_C_ONCE.cmd` | 원본 Windows 설치된 Node·E: 경로·현재 유지보수기 소스·직접 대화형 확인 문자열을 검사하는 단회 C 진입점 후보. 인자·Actions·Runner 우회 거부 및 결과 영수증 출력 | 구 CMD 실제 원본 Windows 실행에서 `for /f` PowerShell 인용 실패로 **Node 이전 차단**, 운영 C 작업 0건. `for /f` 제거한 신규 소스·회귀 1건 완료, 새 ZIP 배포/검증 필요 |
 | `controller-996-native-writer-gate.mjs` | 원본 PC 고정 5개 초기 파일 SHA, 사망 owner·원본 install lease, 현재 C claim nonce/PID, 설치된 유지보수기 7개 파일의 실제 SHA와 커밋 Git 원문 대조. 백로그 변경 직전 호출 시 해시 변동 즉시 중단 | **협조적 Writer만** 배제하는 읽기 전용 소스 부품, 실제 C 연결·원본 PC 검증 **미실행** |
 | `controller-996-r2-evidence-review.mjs` | 실제 R2 개별 SHA·존재/부재·Task 활성 상태로 최초 64자리 fingerprint 재계산 및 완료/승인 오인 차단 | 사용자 전달 R2 값 재계산 PASS, 실운영 재실측은 아님 |
 
-2026-11-10 최종 소스 묶음 확인 시점 #996 대상 회귀 **175/175 PASS**. CLI → 17개 의존 모듈과 각 Git 소스의 실제 SHA 바이트 검증, 원본 Controller·Stage·유지보수기 최종 재해시를 추가했다. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
+2026-11-10 CMD Windows 인용 오류 수정 시점 #996 대상 회귀 **176/176 PASS**. CLI → 17개 의존 모듈과 각 Git 소스의 실제 SHA 바이트 검증, 원본 Controller·Stage·유지보수기 최종 재해시를 추가했고, Windows 직접 PowerShell 해시 비교 후 종료 코드로만 통과시키도록 CMD를 교체했다. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
 
 ### 이전 개발 이력 — 추가 관측 R1 ENOENT 진단 및 R2 보완
 
