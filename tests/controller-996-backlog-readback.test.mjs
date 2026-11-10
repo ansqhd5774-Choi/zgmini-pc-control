@@ -1,0 +1,127 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {read996OriginalBacklogEvidence} from '../tools/controller-996-backlog-readback.mjs';
+
+const REPO='ansqhd5774-Choi/zgmini-pc-control';
+const REQUEST='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
+const USER='ansqhd5774-Choi';
+const pausedAt='2026-11-10T01:30:00.000Z';
+const resumedAt='2026-11-10T03:15:00.000Z';
+const JOB='pc-5deaa1bc-0acf-4c5b-87a2-33dc0765e2e9';
+function makeIssue(number=1270){return {number,title:'pc-job',
+ user:{login:USER},created_at:'2026-11-10T03:14:59.500Z',
+ labels:[{name:'pc-job'}],body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+ requestId:JOB,chatId:'bd1755f9-7cd1-4ceb-bf8c-aac9ca521647',
+ sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
+ sourceSha:'a'.repeat(40),operation:'core-status'})};}
+function fixture({marker=true}={}){
+ const state={issues:[makeIssue()],calls:[],unstable:false};
+ const id='123456789',attempt='1',seat='2';
+ const report={schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${id}-${attempt}-seat-${seat}`,
+  requestId:JOB,controlRepository:REPO,seat:2,status:'PASS',code:'OK'};
+ const json=Buffer.from(JSON.stringify(report,null,2)+'\n');
+ const txt=Buffer.from(Object.entries(report).map(([k,v])=>`${k}=${v}`).join('\r\n')+'\r\n');
+ const comments=marker?[{id:511,user:{login:'github-actions[bot]'},
+  body:`<!-- zgmini-pc-result:${id}:${attempt}:${seat} -->\nPASS`}]:[];
+ const remote=new Map([
+  [`contents/results/${id}-${attempt}-seat-${seat}.json`,json],
+  [`contents/results/${id}-${attempt}-seat-${seat}.txt`,txt],
+ ]);
+ const api=async route=>{
+  state.calls.push(route);
+  if(route.startsWith('issues?')){
+   const page=Number(new URLSearchParams(route.slice(7)).get('page'));
+   if(state.unstable&&state.calls.filter(x=>x.startsWith('issues?')).length===2)
+    return {status:200,data:[]};
+   return {status:200,data:page===1?state.issues:[]};
+  }
+  if(route==='issues/1270/comments?per_page=100&page=1')
+   return {status:200,data:comments};
+  if(remote.has(route))return {status:200,data:{type:'file',
+   encoding:'base64',path:route.replace('contents/',''),
+   content:remote.get(route).toString('base64')}};
+  return {status:404,data:{}};
+ };
+ const run=()=>read996OriginalBacklogEvidence({api,pausedAt,resumedAt});
+ return {state,api,run,report,remote,comments,json,txt};
+}
+
+test('two stable issue scans, full comments and both verified result bytes',async()=>{
+ const f=fixture(),r=await f.run();
+ assert.equal(r.status,'READONLY_RESULTS_RECONCILED');
+ assert.equal(r.originalIssueCount,1);
+ assert.equal(r.entries[0].verification.status,'RESULT_PAIR_VERIFIED');
+ assert.equal(r.entries[0].verification.resultStatus,'PASS');
+ assert.equal(r.entries[0].verification.runId,'123456789');
+ assert.equal(r.issuePosts,0);assert.equal(r.pcRetries,0);
+ assert.equal(r.executionAuthorized,false);
+ assert.equal(f.state.calls.filter(x=>x.startsWith('issues?')).length,2);
+ assert.ok(f.state.calls[0].includes('sort=created&direction=desc&per_page=100'));
+ assert.ok(f.state.calls.every(x=>!x.includes('since=')));
+});
+
+test('missing result marker becomes replan only, never a new pc-job',async()=>{
+ const f=fixture({marker:false}),r=await f.run();
+ assert.equal(r.entries[0].verification.status,'OWNER_REPLAN_REVIEW_REQUIRED');
+ assert.equal(r.issuePosts,0);
+ assert.equal(f.state.calls.some(x=>x.startsWith('contents/')),false);
+});
+
+test('missing TXT file does not imply success from JSON or bot comment',async()=>{
+ const f=fixture();f.remote.delete('contents/results/123456789-1-seat-2.txt');
+ const r=await f.run();
+ assert.equal(r.entries[0].verification.status,'RESULT_PAIR_INCOMPLETE');
+ assert.equal(r.entries[0].verification.code,'C_GITHUB_RESULT_FILE_MISSING');
+});
+
+test('mismatched TXT bytes are rejected independently of JSON',async()=>{
+ const f=fixture();f.remote.set('contents/results/123456789-1-seat-2.txt',
+  Buffer.from('status=PASS\r\n'));
+ const r=await f.run();
+ assert.equal(r.entries[0].verification.code,'C_GITHUB_RESULT_PAIR_MISMATCH');
+});
+
+test('report requestId and run/seat identity must match original Issue',async()=>{
+ const f=fixture();f.report.requestId=REQUEST;
+ f.remote.set('contents/results/123456789-1-seat-2.json',
+  Buffer.from(JSON.stringify(f.report)));
+ const r=await f.run();
+ assert.equal(r.entries[0].verification.code,'C_GITHUB_RESULT_IDENTITY_UNPROVEN');
+});
+
+test('PR rows are excluded even when labeled pc-job',async()=>{
+ const f=fixture({marker:false});f.state.issues=[{...makeIssue(),
+  pull_request:{url:'https://api.github.com/repos/example/pulls/1270'}}];
+ const r=await f.run();
+ assert.equal(r.originalIssueCount,0);
+ assert.equal(f.state.calls.some(x=>x.includes('/comments')),false);
+});
+
+test('duplicate, unsorted or unstable pages fail closed',async()=>{
+ const f=fixture();f.state.issues=[makeIssue(),makeIssue()];
+ await assert.rejects(f.run(),/C_GITHUB_ISSUE_PAGE_DUPLICATE_OR_UNSORTED/);
+ const g=fixture();g.state.issues=[makeIssue(),{...makeIssue(1271),
+  created_at:'2026-11-10T03:15:00.000Z'}];
+ await assert.rejects(g.run(),/C_GITHUB_ISSUE_PAGE_DUPLICATE_OR_UNSORTED/);
+ const h=fixture();h.state.unstable=true;
+ await assert.rejects(h.run(),/C_GITHUB_ISSUES_UNSTABLE_BETWEEN_PASSES/);
+});
+
+test('duplicate bot receipt is an error, not a successful result',async()=>{
+ const f=fixture();f.comments.push({...f.comments[0],id:512});
+ await assert.rejects(f.run(),/C_GITHUB_BACKLOG_PLAN_ORIGINAL_RESULT_RECEIPT_AMBIGUOUS/);
+});
+
+test('invalid comment page and repository provenance fail closed',async()=>{
+ const f=fixture();f.state.issues[0].repository='unrelated/repo';
+ await assert.rejects(f.run(),/C_GITHUB_ISSUE_REPO_DRIFT/);
+ const g=fixture();g.comments[0].id=null;
+ await assert.rejects(g.run(),/C_GITHUB_COMMENT_DUPLICATE_OR_INVALID/);
+});
+
+test('invalid pause window is rejected before any GitHub call',async()=>{
+ const f=fixture();
+ await assert.rejects(read996OriginalBacklogEvidence({api:f.api,
+  pausedAt:resumedAt,resumedAt:pausedAt}),/C_GITHUB_PAUSE_WINDOW_INVALID/);
+ assert.equal(f.state.calls.length,0);
+});
