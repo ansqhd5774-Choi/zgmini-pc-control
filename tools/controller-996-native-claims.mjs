@@ -17,6 +17,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const fixedName=n=>typeof n==='string'&&/^[A-Z0-9_]{3,64}$/.test(n);
 const markerNames=new Set(['PREPARED','WORKFLOW_ENABLE_ATTEMPTED',
+ 'BACKLOG_CLOSE_ATTEMPTED',
  'PRE_ARCHIVE','ORIGINAL_LEASE_ARCHIVE_ATTEMPTED',
  'COMPLETE','OWN_CLAIM_ARCHIVE_ATTEMPTED']);
 
