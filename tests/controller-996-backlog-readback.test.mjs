@@ -14,7 +14,7 @@ function makeIssue(number=1270){return {number,title:'core-status',
  requestId:JOB,chatId:'chat-bd1755f9-7cd1-4ceb-bf8c-aac9ca521647',
  sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
  sourceSha:'a'.repeat(40),operation:'core-status'})};}
-function fixture({marker=true}={}){
+function fixture({marker=true,replays={}}={}){
  const state={issues:[makeIssue()],calls:[],unstable:false};
  const id='123456789',attempt='1',seat='2';
  const report={schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${id}-${attempt}-seat-${seat}`,
@@ -44,13 +44,14 @@ function fixture({marker=true}={}){
    content:remote.get(route).toString('base64')}};
   return {status:404,data:{}};
  };
- const run=()=>read996OriginalBacklogEvidence({api,pausedAt,resumedAt});
+ const run=()=>read996OriginalBacklogEvidence({api,pausedAt,resumedAt,replays});
  return {state,api,run,report,remote,comments,json,txt};
 }
 
 test('two stable issue scans, full comments and both verified result bytes',async()=>{
  const f=fixture(),r=await f.run();
- assert.equal(r.status,'READONLY_RESULTS_RECONCILED');
+ assert.equal(r.status,'READONLY_RESULT_PAIRS_VERIFIED');
+ assert.equal(r.verifiedCount,1);assert.equal(r.unresolvedCount,0);
  assert.equal(r.originalIssueCount,1);
  assert.equal(r.entries[0].verification.status,'RESULT_PAIR_VERIFIED');
  assert.equal(r.entries[0].verification.resultStatus,'PASS');
@@ -64,6 +65,8 @@ test('two stable issue scans, full comments and both verified result bytes',asyn
 
 test('missing result marker becomes replan only, never a new pc-job',async()=>{
  const f=fixture({marker:false}),r=await f.run();
+ assert.equal(r.status,'READONLY_VERIFICATION_INCOMPLETE');
+ assert.equal(r.unresolvedCount,1);
  assert.equal(r.entries[0].verification.status,'OWNER_REPLAN_REVIEW_REQUIRED');
  assert.equal(r.issuePosts,0);
  assert.equal(f.state.calls.some(x=>x.startsWith('contents/')),false);
@@ -80,7 +83,7 @@ test('mixed original seven-field and valid scoped nine-field Issues reconcile wi
   preimageManifestSha256:'f'.repeat(64)});
  f.state.issues=[scoped,makeIssue()];
  const r=await f.run();
- assert.equal(r.status,'READONLY_RESULTS_RECONCILED');
+ assert.equal(r.status,'READONLY_VERIFICATION_INCOMPLETE');
  assert.deepEqual(r.entries.map(x=>x.originIssue),[1270,1271]);
  assert.ok(r.entries.every(x=>x.verification.status==='OWNER_REPLAN_REVIEW_REQUIRED'));
  assert.equal(r.issuePosts,0);assert.equal(r.pcRetries,0);
@@ -112,6 +115,7 @@ test('PR rows are excluded even when labeled pc-job',async()=>{
  const f=fixture({marker:false});f.state.issues=[{...makeIssue(),
   pull_request:{url:'https://api.github.com/repos/example/pulls/1270'}}];
  const r=await f.run();
+ assert.equal(r.status,'READONLY_EMPTY_WINDOW_VERIFIED');
  assert.equal(r.originalIssueCount,0);
  assert.equal(f.state.calls.some(x=>x.includes('/comments')),false);
 });
@@ -141,6 +145,55 @@ test('invalid comment page and repository provenance fail closed',async()=>{
 test('invalid pause window is rejected before any GitHub call',async()=>{
  const f=fixture();
  await assert.rejects(read996OriginalBacklogEvidence({api:f.api,
-  pausedAt:resumedAt,resumedAt:pausedAt}),/C_GITHUB_PAUSE_WINDOW_INVALID/);
+  pausedAt:resumedAt,resumedAt:pausedAt,replays:{}}),/C_GITHUB_PAUSE_WINDOW_INVALID/);
  assert.equal(f.state.calls.length,0);
+});
+
+test('missing original Windows replay journal fails before any GitHub read',async()=>{
+ const f=fixture();
+ await assert.rejects(read996OriginalBacklogEvidence({api:f.api,
+  pausedAt,resumedAt}),/C_GITHUB_ORIGINAL_REPLAYS_NOT_PROVIDED/);
+ await assert.rejects(read996OriginalBacklogEvidence({api:f.api,
+  pausedAt,resumedAt,replays:null}),/C_GITHUB_ORIGINAL_REPLAYS_NOT_PROVIDED/);
+ assert.equal(f.state.calls.length,0);
+});
+
+test('DONE replay without independent replay Issue and result proof remains unresolved',async()=>{
+ const replays={'1270':{status:'DONE',originalRequestId:JOB,replayIssueNumber:1279}};
+ const f=fixture({marker:false,replays}),r=await f.run();
+ assert.equal(r.status,'READONLY_VERIFICATION_INCOMPLETE');
+ assert.equal(r.verifiedCount,0);assert.equal(r.unresolvedCount,1);
+ assert.equal(r.entries[0].verification.status,'PRIOR_REPLAY_UNVERIFIED');
+ assert.equal(f.state.calls.some(x=>x.startsWith('contents/')),false);
+ const invalid=fixture({marker:false,replays:{'1270':{status:'DONE',
+  originalRequestId:JOB,replayIssueNumber:'wrong'}}});
+ const bad=await invalid.run();
+ assert.equal(bad.entries[0].verification.status,'JOURNAL_INCONSISTENT');
+});
+
+test('SKIPPED_RESULT_PRESENT without verified original result pair is inconsistent',async()=>{
+ const replays={'1270':{status:'SKIPPED_RESULT_PRESENT'}};
+ const missing=fixture({marker:false,replays}),r=await missing.run();
+ assert.equal(r.status,'READONLY_VERIFICATION_INCOMPLETE');
+ assert.equal(r.entries[0].verification.status,'JOURNAL_INCONSISTENT');
+ const mismatched=fixture({replays});
+ mismatched.remote.set('contents/results/123456789-1-seat-2.txt',
+  Buffer.from('status=PASS\r\n'));
+ const bad=await mismatched.run();
+ assert.equal(bad.entries[0].verification.status,'JOURNAL_INCONSISTENT');
+ const verified=fixture({replays}),v=await verified.run();
+ assert.equal(v.status,'READONLY_RESULT_PAIRS_VERIFIED');
+ assert.equal(v.entries[0].verification.status,'RESULT_PAIR_VERIFIED');
+});
+
+test('mixed verified and unresolved results cannot become globally verified',async()=>{
+ const f=fixture();
+ const other={...makeIssue(1271),created_at:'2026-11-10T03:15:00.000Z'};
+ other.body=JSON.stringify({...JSON.parse(other.body),
+  requestId:'pc-20261110-second-test-1271'});
+ f.state.issues=[other,makeIssue()];
+ const r=await f.run();
+ assert.equal(r.status,'READONLY_VERIFICATION_INCOMPLETE');
+ assert.equal(r.verifiedCount,1);assert.equal(r.unresolvedCount,1);
+ assert.equal(r.entries[1].verification.status,'OWNER_REPLAN_REVIEW_REQUIRED');
 });
