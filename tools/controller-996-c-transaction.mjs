@@ -33,7 +33,9 @@ const expectedChecks=['ledgerPinned','ownerMatched','ownerDead',
 const unprovenChecks=['workflowDisableActorVerified','protectedBaselineVerified'];
 const writerFiles=['config.json','quota-runner.cmd','run-local.cmd'];
 const protectedTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
-const allowedEffects=['ENABLE_EXISTING_PC_JOB_WORKFLOW_ONCE',
+const allowedEffects=['CREATE_AND_ARCHIVE_OWN_C_RECOVERY_CLAIM',
+ 'WRITE_C_SCOPED_AUDIT_AND_ATTEMPT_MARKERS',
+ 'ENABLE_EXISTING_PC_JOB_WORKFLOW_ONCE',
  'CLOSE_VERIFIED_ORIGINAL_PAUSE_WINDOW_ONCE','READ_ONLY_DISPOSITION_NO_REPLAY',
  'ARCHIVE_ONLY_ORIGINAL_INSTALL_LEASE_AFTER_POSTCHECK'];
 
@@ -67,7 +69,8 @@ export function validate996CContract({preflight,protectedAttestation,approval}={
   preflight.status!=='C_EVIDENCE_GAPS'||
   preflight.firstFailedCheck!=='workflowDisableActorVerified'||
   preflight.protectedBaselineSha256!==null||
-  preflight.independentRunnersObserved!==1||
+  !Number.isSafeInteger(preflight.independentRunnersObserved)||
+  preflight.independentRunnersObserved<0||
   preflight.backlogPauseWindowCount!==1||
   preflight.operationalWrites!==0||preflight.issuePosts!==0||
   preflight.pcRetries!==0||preflight.executionAuthorized!==false||
@@ -135,13 +138,17 @@ export function validate996CContract({preflight,protectedAttestation,approval}={
  return Object.freeze({schema:'ZGMINI_CONTROLLER_996_C_TRANSACTION_V1',
   status:'REVIEWED_CONTRACT_ONLY',code:'NATIVE_C_ADAPTER_REQUIRED',
   executionAuthorized:false,sourceOnly:true,
+  completionRecordStatus:'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED',
+  controllerInstallPermitted:false,
   evidenceChecksPassed:16,evidenceChecksUnproven:unprovenChecks,
   intendedOrder:['FRESH_CAS','ATOMIC_CLAIM','FRESH_CAS_WITH_OWN_CLAIM',
-   'DURABLE_PREPARED_RECORD','WORKFLOW_ENABLE_ONCE','WORKFLOW_ACTIVE_READBACK',
+   'DURABLE_PREPARED_RECORD','DURABLE_WORKFLOW_ENABLE_INTENT',
+   'WORKFLOW_ENABLE_ONCE','WORKFLOW_ACTIVE_READBACK',
    'BACKLOG_CLOSE_EXCLUSIVE_GUARDED','FULL_ORIGINAL_DISPOSITION_READBACK',
    'INDEPENDENT_PROTECTED_POSTCHECK','DURABLE_PRE_ARCHIVE_RECORD',
-   'ORIGINAL_LEASE_ARCHIVE',
-   'FINAL_READBACK_AND_COMPLETE','ARCHIVE_OWN_RECOVERY_CLAIM',
+   'DURABLE_ORIGINAL_LEASE_ARCHIVE_INTENT','ORIGINAL_LEASE_ARCHIVE',
+   'FINAL_READBACK_AND_COMPLETE','DURABLE_OWN_CLAIM_ARCHIVE_INTENT',
+   'ARCHIVE_OWN_RECOVERY_CLAIM',
    'FINAL_OWN_CLAIM_READBACK'],
  });
 }
@@ -157,9 +164,11 @@ export async function simulate996CTransaction({preflight,protectedAttestation,ap
  if(contract.status!=='REVIEWED_CONTRACT_ONLY')return contract;
  if(!ports||typeof ports!=='object')return fail('C_NATIVE_ADAPTER_NOT_IMPLEMENTED');
  const names=['freshReadback','reserveClaim','freshWithOwnClaim','recordPrepared',
-  'enableWorkflowOnce','workflowActiveReadback','closeBacklogGuarded',
+  'recordWorkflowEnableIntent','enableWorkflowOnce',
+  'workflowActiveReadback','closeBacklogGuarded',
   'fullBacklogDispositionReadback','independentProtectedPostcheck',
-  'recordPreArchive','archiveOriginalLease','finalReadback','completeRecord',
+  'recordPreArchive','recordOriginalLeaseArchiveIntent','archiveOriginalLease',
+  'finalReadback','completeRecord','recordOwnClaimArchiveIntent',
   'archiveOwnClaim','finalOwnClaimReadback'];
  if(names.some(n=>typeof ports[n]!=='function'))return fail('C_NATIVE_ADAPTER_INCOMPLETE');
  const counters={workflowEnables:0,leaseArchives:0,ownClaimArchives:0,backlogReplays:0,
@@ -191,8 +200,8 @@ export async function simulate996CTransaction({preflight,protectedAttestation,ap
    return Object.freeze({...checkpoint,status:'STATE_UNKNOWN',
     code:claimAttempted?STOP:'C_NOT_STARTED_UNVERIFIED',
     failedStep:name,step:index+1,retryAuthorized:false,
-    claimMustRemain:claimAttempted&&index<13,
-    claimDisposition:!claimAttempted?'NOT_CREATED':index>=13?
+    claimMustRemain:claimAttempted&&index<16,
+    claimDisposition:!claimAttempted?'NOT_CREATED':index>=16?
      'MAY_BE_ARCHIVED_REQUIRE_INDEPENDENT_READBACK':'PRESERVE_IN_PLACE',
     workflowEnables:counters.workflowEnables,
     leaseArchives:counters.leaseArchives,
@@ -202,5 +211,7 @@ export async function simulate996CTransaction({preflight,protectedAttestation,ap
  return Object.freeze({...checkpoint,status:'SIMULATED_TRANSACTION_PASS',
   code:'NO_REAL_WINDOWS_EFFECT',step:'COMPLETE',
   workflowEnables:1,leaseArchives:1,ownClaimArchives:1,
+  completionRecordStatus:'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED',
+  controllerInstallPermitted:false,
   claimMustRemain:false,claimDisposition:'SIMULATED_ARCHIVED'});
 }
