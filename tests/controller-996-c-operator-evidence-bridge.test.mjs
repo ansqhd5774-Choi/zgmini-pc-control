@@ -49,8 +49,9 @@ function valid(){
     replayDispatches:0,originalIssues:[1217,1219,1226,1227].map(issueNumber=>({
       issueNumber,state:'open',resultVerified:false,
       nextAction:'OWNER_REPLAN_REVIEW_REQUIRED'}))};
-  const conflicts={controllerActiveCount:0,writerActiveCount:0,
-    otherContinuationCount:0,fresh:true};
+  const conflicts={scope:'CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES',
+    foreignInstallOwnerCount:0,otherContinuationCount:0,
+    twoSnapshotsIdentical:true,fresh:true,writerActiveCount:0};
   return {manifest,consentEvidence,operatorBytes,packageBytes,
     sourceLockBytes,gitSource,physical,remote,conflicts};
 }
@@ -134,12 +135,17 @@ test('old owner active, archive collision and marker drift block',()=>{
     blocked(x,'C_CONTINUATION_FRESH_PHYSICAL_OR_MARKER_MISMATCH');
   }
 });
-test('late Writer/controller/concurrent C owner is a hard stop',()=>{
-  for(const key of ['writerActiveCount','controllerActiveCount',
-    'otherContinuationCount']){
+test('foreign install/concurrent C owner is a scoped hard stop',()=>{
+  for(const key of ['foreignInstallOwnerCount','otherContinuationCount']){
     const x=valid();x.conflicts[key]=1;
     blocked(x,'C_CONTINUATION_SHARED_RESOURCE_CONFLICT_OR_UNKNOWN');
   }
+});
+test('unrelated Writer activity is not a C lease archive conflict',()=>{
+  const x=valid();x.conflicts.writerActiveCount=6;
+  const r=review(x);
+  assert.equal(r.status,'C_OPERATOR_SOURCE_EVIDENCE_SHAPES_REVIEWED_ONLY');
+  assert.equal(r.executionAuthorized,false);
 });
 test('84 Git bytes not verified on original PC blocks',()=>{
   const x=valid();x.gitSource.originalWindowsReadback=false;
