@@ -1,0 +1,67 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_C_APPROVAL_V1",
+  "approved": true,
+  "grade": "C",
+  "operation": "RECONCILE_INTAKE_PAUSED_ONLY",
+  "executionScope": "ORIGINAL_WINDOWS_ONE_SHOT",
+  "authorizationMode": "PHASE_SCOPED_EVIDENCE_EXCEPTION",
+  "requestId": "pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+  "issueNumber": 996,
+  "controllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "targetSha": "9db6fff689c488a59fe8771f013b7c5d3bafc0a8",
+  "maintainerSha": "16064e29fea0e53e7769a24d93d75b6f5292cfc0",
+  "acceptsUnprovenGitHubDisableActor": true,
+  "acceptsMissingHistoricalProtectedBaseline": true,
+  "acceptsNoAllActorsImmutabilityProof": true,
+  "acceptedGaps": [
+    "workflowDisableActorVerified",
+    "protectedBaselineVerified"
+  ],
+  "allowedEffects": [
+    "CREATE_AND_ARCHIVE_OWN_C_RECOVERY_CLAIM",
+    "WRITE_C_SCOPED_AUDIT_AND_ATTEMPT_MARKERS",
+    "ENABLE_EXISTING_PC_JOB_WORKFLOW_ONCE",
+    "CLOSE_VERIFIED_ORIGINAL_PAUSE_WINDOW_ONCE",
+    "READ_ONLY_DISPOSITION_NO_REPLAY",
+    "ARCHIVE_ONLY_ORIGINAL_INSTALL_LEASE_AFTER_POSTCHECK"
+  ],
+  "phaseScopedSourceProof": {
+    "maintainerSourceSha": "16064e29fea0e53e7769a24d93d75b6f5292cfc0",
+    "failureFirstPhase": "INTAKE_PAUSED",
+    "failureCode": "RUNNER_SET_DRIFT",
+    "reachedBackup": false,
+    "reachedControllerSwitch": false,
+    "claimsIndependentDisableActorAudit": false,
+    "claimsAllActorsProtectedImmutability": false
+  },
+  "evidenceObservedAt": "2026-11-10T03:02:02.041Z",
+  "protectedItemsObservedAt": "2026-11-10T04:06:43.338Z",
+  "protectionNowFingerprint": "877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86",
+  "evidenceSha256": {
+    "ledger": "c6276bcf78ee96d8858e91621c85437abb5377108fe6c5b5681bf9b617743930",
+    "owner": "d6329b4d82530f9a1ca574647f050fff9243b698bb9dd314975b19ed171e40bc",
+    "recoveryMarker": "4dc51f7e3a1cd84ce94ddf993e4a1cfbb319b050447dfbb5ccf0c38434a0b09b",
+    "backlog": "d48698b6bfe152fdcbea5adf582364334dc8633742cce02e6a1299718304a780",
+    "controllerHost": "32403a79fb407cabe8426de7507116847178f734da68a289cc12fa8cf4ca36c9",
+    "stagedHost": "9903d822bca20ae14dcf5a2f6a0d1f44869f29b3c274e9a4a2de226d401069b3",
+    "maintainerManifest": "a5ed876c520a844a33bdf6cc137ac8015f686ed416aff6370389440ad6e3cba5"
+  },
+  "protectedItemsSha256": {
+    "files": {
+      "config.json": "0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453"
+    },
+    "tasks": {
+      "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+      "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1"
+    }
+  },
+  "protectedWriterFileStatus": {
+    "config.json": "PRESENT",
+    "quota-runner.cmd": "ABSENT",
+    "run-local.cmd": "ABSENT"
+  },
+  "protectedTaskEnabled": {
+    "ZGMINI-PC-Local-Core": true,
+    "ZGMINI-PC-Local-Korea": true
+  }
+}
