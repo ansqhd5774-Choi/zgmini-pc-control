@@ -1,4 +1,4 @@
-// #996 C-grade original Windows OWNER operator CANDIDATE — NO CLI.
+// #996 C-grade original Windows OWNER operator CANDIDATE — review CLI only.
 // This file is not installed, approved or executable in the current project.
 // It has no test or synthetic authorization port and never adopts the old
 // C owner. Only a NEW independently read, exact Owner approval AND immutable
@@ -579,4 +579,20 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
       issuePosts:0,automaticRetry:false,cleanupPerformed:false,
     });
   }catch(e){return stop(safeCode(e),phase);}
+}
+
+// This command only acknowledges receipt at the boundary. It never calls the
+// operational function, even if that function is separately approved later.
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+  const [mode,manifestCommitSha,manifestSha256,commentId]=process.argv.slice(2);
+  const valid=process.argv.length===6&&mode==='--review-handoff'&&H40(manifestCommitSha)&&
+    H64(manifestSha256)&&/^[1-9][0-9]{0,14}$/.test(commentId);
+  const receipt={
+    status:valid?'OPERATOR_REVIEW_BOUNDARY_REACHED':'OPERATOR_REVIEW_NO_GO',
+    code:valid?'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED':'C_996_OWNER_REVIEW_ARGS_INVALID',
+    executionAuthorized:false,originalPcWrites:0,
+    ...(valid?{manifestCommitSha,manifestSha256,ownerConsentCommentId:Number(commentId)}:{}),
+  };
+  console.log(JSON.stringify(receipt));
+  if(!valid)process.exitCode=2;
 }

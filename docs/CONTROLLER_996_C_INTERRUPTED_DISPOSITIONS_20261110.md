@@ -378,4 +378,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 같은 네이티브 코드의 TEMP 분기에서 정상 3단계 이동과 앞선 두 보관 단계의 이동 후 무결성 실패를 검증했다. 실패 시험에서는 해당 보관본이 존재했으며, 다음 이동을 시도하지 않아 Install Lease가 원래 위치에 남았다. Windows 관련 시험 11/11 및 Bootstrap·Operator 계약 검사 4/4 통과. TEMP 시험은 격리된 순서 검증이며 운영 Operator의 시작부터 사후 확인까지 실행한 결과는 아니다.
 - Operator의 의존 모듈 로드 전 차단은 유지한다. 다음 작업은 외부 신뢰 진입점에서 정확한 GitHub Owner 승인과 보호된 실행 파일 집합이 Operator 호출까지 이어지는지 격리 검증하는 것이다. 운영 80%를 유지한다.
 
+### Bootstrap에서 Operator 검토 경계까지 연결
+
+- 외부 PowerShell 진입점의 검토 모드는 소스 잠금을 유지한 채 Bootstrap 결과의 Owner 댓글 ID, S2 커밋, Manifest 해시, Operator·Bootstrap·SourceLock·ZIP 해시를 대조한다. 조건이 맞으면 고정된 Operator의 읽기 전용 `--review-handoff`를 호출하고 반환된 ID와 해시를 확인한다. 검토 명령에서 운영 실행 함수로 이어지는 분기는 없다.
+- Windows TEMP에서 합성 Bootstrap 결과를 실제 Operator 검토 명령으로 전달했다. 정상 전달 1건과 승인 결과 누락·Operator 해시 불일치·S2 불일치·실행 권한이 섞인 결과 4건의 차단을 확인했다. 실제 GitHub Owner 승인과 운영 효과는 이 시험의 범위에 포함되지 않는다.
+- 운영 실행의 하드 STOP을 유지한다. 운영 경로에 대한 독립 검토를 완료한 뒤 최종 S1/S2와 ZIP을 봉인하고 정확한 Owner 승인 원문을 확인해야 한다. 원본 Windows 복구와 사후검증 전까지 운영 80%를 유지한다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.

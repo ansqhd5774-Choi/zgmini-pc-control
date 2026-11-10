@@ -7,7 +7,8 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$BootstrapSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SourceLockSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$PackageSha256,
-  [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256
+  [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256,
+  [switch]$ReviewOperatorHandoff
 )
 $ErrorActionPreference = 'Stop'
 $snapshot = $null
@@ -49,8 +50,45 @@ try {
       $savedNodeEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
       [Environment]::SetEnvironmentVariable($name, $null, 'Process')
     }
-    & 'E:\ZGmini\runtime\node.exe' $bootstrapPath $ManifestCommitSha
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if (!$ReviewOperatorHandoff) {
+      & 'E:\ZGmini\runtime\node.exe' $bootstrapPath $ManifestCommitSha
+      if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } else {
+      $operatorPath = Join-Path $root 'tools\controller-996-c-native-owner-operator.mjs'
+      if (!$pins.ContainsKey($operatorPath)) { throw 'C996_SNAPSHOT_OPERATOR_PIN_MISSING' }
+      $reply = & 'E:\ZGmini\runtime\node.exe' $bootstrapPath $ManifestCommitSha
+      if ($LASTEXITCODE -ne 0) { throw 'C996_SNAPSHOT_BOOTSTRAP_REVIEW_FAILED' }
+      if (@($reply).Count -ne 1) { throw 'C996_SNAPSHOT_BOOTSTRAP_RECEIPT_INVALID' }
+      $proof = $reply | ConvertFrom-Json
+      if ($proof.schema -cne 'ZGMINI_CONTROLLER_996_NATIVE_TRUSTED_BOOTSTRAP_REVIEW_V1' -or
+          $proof.status -cne 'GIT_AND_LOCAL_BYTES_OBSERVED_ONLY' -or
+          $proof.filesCheckedAtS1 -ne 16 -or $proof.filesCheckedAtS2 -ne 3 -or $proof.effectsChecked -ne 7 -or
+          $proof.ownerConsentCommentId -isnot [ValueType] -or
+          "$($proof.ownerConsentCommentId)" -cnotmatch '^[1-9][0-9]{0,14}$' -or
+          $proof.manifestSha256 -cnotmatch '^[a-f0-9]{64}$' -or
+          $proof.manifestCommitSha -cne $ManifestCommitSha -or
+          $proof.bootstrapSha256 -cne $BootstrapSha256 -or
+          $proof.operatorSha256 -cne $pins[$operatorPath] -or
+          $proof.sourceLockSha256 -cne $SourceLockSha256 -or
+          $proof.packageSha256 -cne $PackageSha256 -or
+          $proof.executionAuthorized -isnot [bool] -or $proof.executionAuthorized -or
+          $proof.operatorStarted -isnot [bool] -or $proof.operatorStarted) {
+        throw 'C996_SNAPSHOT_BOOTSTRAP_RECEIPT_INVALID'
+      }
+      $operatorReply = & 'E:\ZGmini\runtime\node.exe' $operatorPath --review-handoff $ManifestCommitSha $proof.manifestSha256 "$($proof.ownerConsentCommentId)"
+      if ($LASTEXITCODE -ne 0 -or @($operatorReply).Count -ne 1) { throw 'C996_SNAPSHOT_OPERATOR_REVIEW_FAILED' }
+      $operatorProof = $operatorReply | ConvertFrom-Json
+      if ($operatorProof.status -cne 'OPERATOR_REVIEW_BOUNDARY_REACHED' -or
+          $operatorProof.code -cne 'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED' -or
+          $operatorProof.manifestCommitSha -cne $ManifestCommitSha -or
+          $operatorProof.manifestSha256 -cne $proof.manifestSha256 -or
+          $operatorProof.ownerConsentCommentId -ne $proof.ownerConsentCommentId -or
+          $operatorProof.executionAuthorized -isnot [bool] -or $operatorProof.executionAuthorized -or
+          $null -eq $operatorProof.originalPcWrites -or $operatorProof.originalPcWrites -ne 0) {
+        throw 'C996_SNAPSHOT_OPERATOR_RECEIPT_INVALID'
+      }
+      [Console]::WriteLine([string]$operatorReply)
+    }
   } finally {
     if ($null -ne $snapshot) { $snapshot.Dispose() }
     $lockGuard.Dispose()

@@ -235,6 +235,8 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
       eq(Object.keys(lock).sort(),['schema','files'].sort())&&
       lock.files&&eq(Object.keys(lock.files).sort(),FILES.slice().sort()),
     'C_996_BOOTSTRAP_LOCK_FILES_INVALID');
+    need(lock.files['tools/controller-996-c-native-owner-operator.mjs']===m.operatorSha256,
+      'C_996_BOOTSTRAP_OPERATOR_SHA_DRIFT');
     for(const f of FILES){
       const bytes=localFile(f,2_000_000);
       need(h64(lock.files[f])&&sha(bytes)===lock.files[f]&&
@@ -248,6 +250,9 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
       status:'GIT_AND_LOCAL_BYTES_OBSERVED_ONLY',
       filesCheckedAtS1:FILES.length,filesCheckedAtS2:3,
       effectsChecked:EFFECTS.length,ownerConsentCommentId:approved[0].id,
+      manifestCommitSha,manifestSha256:sha(manifestBytes),
+      operatorSha256:m.operatorSha256,bootstrapSha256:m.bootstrapSha256,
+      sourceLockSha256:m.sourceLockSha256,packageSha256:m.packageSha256,
       externalOsTrustAnchorVerified:false,operatorStarted:false,
       executionAuthorized:false,originalPcWrites:0,githubWrites:0,
       nextRequired:'OUT_OF_PROCESS_OS_HASH_ANCHOR_AND_IMMUTABLE_SNAPSHOT',

@@ -9,7 +9,8 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$BootstrapSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SourceLockSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$PackageSha256,
-  [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256
+  [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256,
+  [switch]$ReviewOperatorHandoff
 )
 $ErrorActionPreference = 'Stop'
 $guard = $null
@@ -34,9 +35,11 @@ try {
   $guard = [Zgmini996WindowsSourceSnapshot]::new($pins)
   # Use a separate Windows PowerShell process. Its ordinary script policy
   # remains in force. The handles above stay open until the child exits.
+  $reviewArgs = @()
+  if ($ReviewOperatorHandoff) { $reviewArgs += '-ReviewOperatorHandoff' }
   & 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -NoProfile -NonInteractive -File $launcher `
     -PackageRoot $root -ManifestCommitSha $ManifestCommitSha -BootstrapSha256 $BootstrapSha256 `
-    -SourceLockSha256 $SourceLockSha256 -PackageSha256 $PackageSha256 -SnapshotHelperSha256 $SnapshotHelperSha256
+    -SourceLockSha256 $SourceLockSha256 -PackageSha256 $PackageSha256 -SnapshotHelperSha256 $SnapshotHelperSha256 @reviewArgs
   exit $LASTEXITCODE
 } catch {
   $message = $_.Exception.GetBaseException().Message
