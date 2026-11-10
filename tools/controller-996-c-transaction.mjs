@@ -109,7 +109,7 @@ export function validate996CContract({preflight,protectedAttestation,approval}={
     !validSha(files[k])||files[k]!==approval.protectedItemsSha256?.files?.[k]:
     Object.hasOwn(files,k)||Object.hasOwn(approval.protectedItemsSha256?.files??{},k)))||
   protectedTasks.some(k=>!validSha(tasks[k])||
-   typeof enabled[k]!=='boolean'||
+   enabled[k]!==true||
    tasks[k]!==approval.protectedItemsSha256?.tasks?.[k]||
    enabled[k]!==approval.protectedTaskEnabled?.[k]))
   return fail('CURRENT_PROTECTED_ITEMS_UNPROVEN');
