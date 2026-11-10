@@ -4,7 +4,8 @@ import {createHash} from 'node:crypto';
 import {execFileSync}from'node:child_process';
 import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus,
   priorRuntimeFiles,nextRuntimeFiles,requireSixToSevenContract,requireSevenToSevenContract,
-  requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan,requireRollbackWindow,
+  requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan,
+  requireDirectInstalledFiles,requireNoUnfinishedHandoff,requireOwnedInstallGuard,requireRollbackWindow,
   requireOriginalStartupBytes,preserveRollbackReservation}from'../tools/handoff-maintenance.mjs';
 import {sourceFiles as bootstrapFiles}from'../tools/bootstrap-maintenance.mjs';
 import {maintenanceOriginFiles}from'../tools/update.mjs';
@@ -133,6 +134,73 @@ test('seven-to-seven rollback plan preserves all original runtime files and neve
  assert.deepEqual(first.installed,priorRuntimeFiles);
  assert.deepEqual(first.writes,nextRuntimeFiles);
  assert.deepEqual(first.rollbackAdded,['tools/source-bundle-register.mjs']);
+});
+test('seven-to-seven rejects symlinks, hardlinks and parent aliases even with matching bytes',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-file-scope-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const target=path.join(temp,'receiver');fs.mkdirSync(path.join(target,'tools'),{recursive:true});
+ const external=path.join(temp,'outside.mjs');fs.writeFileSync(external,'matching bytes');
+ const installed=path.join(target,'tools','update.mjs');
+ fs.writeFileSync(installed,'matching bytes');
+ assert.doesNotThrow(()=>requireDirectInstalledFiles(target,['tools/update.mjs']));
+ const alias=path.join(target,'tools','alias.mjs');
+ fs.linkSync(installed,alias);
+ assert.throws(()=>requireDirectInstalledFiles(target,['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
+ fs.unlinkSync(alias);
+ fs.unlinkSync(installed);
+ fs.symlinkSync(external,installed);
+ assert.throws(()=>requireDirectInstalledFiles(target,['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
+ fs.unlinkSync(installed);
+ fs.rmSync(path.join(target,'tools'),{recursive:true,force:true});
+ fs.symlinkSync(path.dirname(external),path.join(target,'tools'),'dir');
+ assert.throws(()=>requireDirectInstalledFiles(target,['tools/outside.mjs']),/HANDOFF_PATH_ALIAS/);
+});
+test('unfinished prior handoff journal blocks other targets, and completed proof is reusable',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-prior-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const journal=path.join(temp,'handoff-'+'a'.repeat(40)+'.json');
+ assert.doesNotThrow(()=>requireNoUnfinishedHandoff(temp));
+ for(const status of ['RUNNING','RECOVERY_REQUIRED','UNKNOWN']){
+  fs.writeFileSync(journal,JSON.stringify({status}));
+  assert.throws(()=>requireNoUnfinishedHandoff(temp),/HANDOFF_PRIOR_RECOVERY_REQUIRED/);
+ }
+ fs.writeFileSync(journal,'invalid json');
+ assert.throws(()=>requireNoUnfinishedHandoff(temp),/HANDOFF_PRIOR_RECOVERY_REQUIRED/);
+ for(const status of ['PASS','BLOCKED','ROLLED_BACK']){
+  fs.writeFileSync(journal,JSON.stringify({status}));
+  assert.doesNotThrow(()=>requireNoUnfinishedHandoff(temp));
+ }
+});
+test('seven-to-seven keeps a separate B-lease guard after receiver lease release until origin verification',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-live-guard-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(temp,'leases'));
+ const guard=acquireMaintenanceLock(temp,'controller-install');
+ assert.doesNotThrow(()=>requireOwnedInstallGuard(temp,guard));
+ const reservation=reserveReceiverSlot(path.join(temp,'leases','receiver'));
+ reservation.release(); // Receiver must be able to acquire this slot and start.
+ assert.equal(fs.existsSync(path.join(temp,'leases','receiver')),false);
+ assert.throws(()=>acquireMaintenanceLock(temp,'controller-install'),
+  /MAINTENANCE_LOCK_BUSY_OR_RECOVERY_REQUIRED/);
+ guard.holdForRecovery(); // Simulates a failed launch or CAPTURE.
+ assert.equal(fs.existsSync(path.join(temp,'leases','controller-install','RECOVERY_REQUIRED.json')),true);
+ assert.throws(()=>acquireMaintenanceLock(temp,'controller-install'),
+  /MAINTENANCE_LOCK_BUSY_OR_RECOVERY_REQUIRED/);
+});
+test('seven-to-seven B-lease guard refuses changed owner and releases only the exact owner',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-owner-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(temp,'leases'));
+ const guard=acquireMaintenanceLock(temp,'controller-install');
+ const ownerFile=path.join(temp,'leases','controller-install','owner.json');
+ const original=fs.readFileSync(ownerFile);
+ fs.writeFileSync(ownerFile,JSON.stringify({...guard.owner,nonce:'forged-owner'})+'\n');
+ assert.throws(()=>requireOwnedInstallGuard(temp,guard),/HANDOFF_UPDATE_ACTIVE/);
+ assert.throws(()=>guard.release(),/MAINTENANCE_LOCK_OWNER_CHANGED/);
+ fs.writeFileSync(ownerFile,original);
+ assert.doesNotThrow(()=>requireOwnedInstallGuard(temp,guard));
+ guard.release(); // Simulates verified new receiver CAPTURE, not failure.
+ assert.equal(fs.existsSync(path.join(temp,'leases','controller-install')),false);
 });
 test('pre-stop handoff rejects any startup byte drift from installed manifest',()=>{
  const startup=Buffer.from('approved startup vbs\r\n');
