@@ -36,6 +36,14 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 연결된 소스 단위·경합 부정 회귀 **29/29 PASS**(기존 backlog plan/readback 22건 + 새 관측기 7건). 실제 원본 Windows 실행/사후 증거는 아직 **0건**이며 5단계 수명주기 완료율은 **4/5 = 80%**로 유지한다.
 - **남은 별도 증명:** 원본 pause-window 전체 Issue 2회 조회·댓글/JSON/TXT 결과, Workflow 실행 이력, 각 설치 소스 파일의 실제 바이트 단위 postcheck, 격리 Runner 구성, C claim의 독립 provenance·안전한 소유권 인계 규칙. 이 중 하나라도 빠진 상태에서 새 C 복구 실행·lease archive를 승인하지 않는다.
 
+### 후속 단계 구현 — 분리된 중단 상태 읽기 전용 R1 패키지
+
+- Draft #1222에 기존 C R2와 **완전히 별개의** `RUN_996_INTERRUPTED_READONLY_ONCE.cmd`, `controller-996-interrupted-readonly-cli.mjs`, `controller-996-interrupted-readonly-source-lock-r1.json` 및 패키지 시험을 추가했다. 배포 대상은 정확히 **7개 파일**이며 기존 C Operator·R2 ZIP/CMD/소유자 동의 파일은 포함하지 않는다.
+- 다운로드 후보: [`zgmini-996-interrupted-readonly-r1.zip`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/artifacts/controller-996/zgmini-996-interrupted-readonly-r1.zip), ZIP SHA256 `f233a5a9a48f44680c4566e2226707fb72f86769f8d790f53a07d34dadca086c`. 내부 CMD SHA256 `d811bca0d10ff7baf4f747bbf1bc59104e066497c59c2d7a9e254ed827640daa`, CLI SHA256 `418aa7fb41152c81e95a37ffae858741ae23c98fa503f1300fba33250db2fdd7`, source-lock SHA256 `ab2b58f7dc2ef528052add141d81e4d4eb2a7d5cf8b1673d07e1ff50901fee10`.
+- CMD가 고정된 `C:/Windows/System32` PowerShell의 `Get-FileHash`로 CLI를 먼저 검증하고, CLI가 고정된 4개 원본 모듈의 해시·import closure를 확인한 후에만 상태 관측기를 불러온다. 모든 PC 읽기 대상은 원본 Windows `E:/ZGmini`로 고정되어 있고, 실행 패키지는 **원본 설치 폴더 바깥**에 위치해야 한다. 조회 중 실패·경합이면 기존 C claim·install lease를 유지하고 UNKNOWN으로 끝난다. `%TEMP%`가 원본 E:를 가리킬 위험을 제거하기 위해 **TXT·로그·임시 파일·클립보드를 만들지 않고 콘솔에 비민감 JSON만 표시**하며, 필요시 사용자가 콘솔 화면을 전달한다.
+- 신규 패키지 자체 부정 검증 **9/9 PASS**, 기존 관측기/백로그 연결 시험 합계 **38/38 PASS**. ZIP 압축 7개 내부 파일과 로컬 원문 **7/7 일치**, ZIP Git blob 원격·로컬 동일. **이것은 Linux 격리/정적 시험이며 실제 Windows CMD+PowerShell 실측이 아니다.** 원본 PC 읽기 전용 단회 실행은 이 단계에 **포함되지 않았고**, 재실행 명령이나 이전 C 동의로 대체하지 않는다.
+- 패키지 단계의 후속 확인은 (1) Windows CMD 직접 해시 검사의 실제 exit code, (2) 실제 원본 PC에서 관측기 반환, (3) 실행 중 운영 쓰기 0과 상태 미변경 대조다. 그때에도 **Claim 독립 provenance·설치 소스 전체 byte·pause-window 원본 Issue 결과 검증이 별도로 완료되기 전까지 C 복구 재개 NO-GO**다.
+
 ## 후속 C 단계 설계 (source-only, 실행 금지)
 
 - 단일 후속 복구는 **이미 시도한 Workflow PUT과 backlog rename을 반복하지 않는다.** 다른 상태가 발견되면 먼저 원인을 분리하며 재시도하지 않는다.

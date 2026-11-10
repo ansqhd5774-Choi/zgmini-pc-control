@@ -131,5 +131,7 @@ test('CMD hashes only the new read-only CLI and excludes native C execution',()=
  assert.doesNotMatch(executable,/\bfor\s+\/f\b/i);
  assert.doesNotMatch(executable,/"%ZGMINI_NODE%"\s+"%~dp0RUN_996_NATIVE_C_ONCE/i);
  assert.match(cmd,/"%ZGMINI_NODE%"\s+"%ZGMINI_CLI%"/);
- assert.match(cmd,/%TEMP%\\ZGMINI-996-INTERRUPTED-READONLY/);
+ assert.doesNotMatch(executable,/%TEMP%|ZGMINI_RESULT|\s+>\s*"/i);
+ assert.match(cmd,/C:\\Windows\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe/);
+ assert.match(executable,/^pause$/m);
 });
