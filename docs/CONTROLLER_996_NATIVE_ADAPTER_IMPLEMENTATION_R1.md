@@ -12,7 +12,7 @@
 |---|---|---|
 | `controller-996-windows-observer.mjs` | 원본 설치/Stage/원장/GH/6전용 Runner, 원본 16/18 증거 | 실제 읽기 관측 완료 |
 | `controller-996-protection-attestation.mjs` | 최초 관측과 동일하게 존재하는 Writer 파일(최대 3개)만 해시 집계하고, 2개 Task XML 해시·enabled 상태 대조. 누락 Writer·Task별 실패 위치 명시 | 실제 원본 PC R2 **현재 지문 일치** 수신. 역사 기준은 여전히 미입증 |
-| `controller-996-c-consent-verifier.mjs` | GitHub 원본 Issue 작성자·고정 Git manifest 원문·소유자 승인 댓글 SHA 바인딩·철회/중복 차단. R2의 Writer **PRESENT/ABSENT 3개 상태**와 **실제 존재 파일의 SHA만** 승인 객체에 바인딩 | 순수 검증, 실승인 **없음** |
+| `controller-996-c-consent-verifier.mjs` | GitHub 원본 Issue 작성자·고정 Git manifest 원문·소유자 승인 댓글 SHA 바인딩·철회/중복 차단. R2의 Writer **PRESENT/ABSENT 3개 상태**와 **실제 존재 파일의 SHA만** 승인 객체에 바인딩 | 순수 검증, 소스에 **C 승인 명세 후보만 작성**, 실제 owner 댓글 **없음** |
 | `controller-996-native-claims.mjs` | 원본 PC 전용 별도 claim 원자 생성, nonce·영구 시도 마커·원본/자기 claim 보관 | 실제 I/O 하위 부품, **CLI 없음·미설치** |
 | `controller-996-native-workflow.mjs` | 사전 영구 `WORKFLOW_ENABLE_ATTEMPTED`, 같은 프로세스 1회 PUT, 재시작·타임아웃 시 자동 재시도 차단 | 실제 I/O 하위 부품, **승인 실행기 미연결** |
 | `controller-996-native-backlog.mjs` | 원본 E: 고정, 최초 backlog SHA, 영구 `BACKLOG_CLOSE_ATTEMPTED`, Temp fsync·변경 전 2회 SHA·단회 rename·완료 SHA/구조 재조회 | 실제 I/O 하위 부품. **협조적 Writer 가드 소스 준비, 운영 연결·실행 없음** |
@@ -28,7 +28,7 @@
 | `controller-996-native-writer-gate.mjs` | 원본 PC 고정 5개 초기 파일 SHA, 사망 owner·원본 install lease, 현재 C claim nonce/PID, 설치된 유지보수기 7개 파일의 실제 SHA와 커밋 Git 원문 대조. 백로그 변경 직전 호출 시 해시 변동 즉시 중단 | **협조적 Writer만** 배제하는 읽기 전용 소스 부품, 실제 C 연결·원본 PC 검증 **미실행** |
 | `controller-996-r2-evidence-review.mjs` | 실제 R2 개별 SHA·존재/부재·Task 활성 상태로 최초 64자리 fingerprint 재계산 및 완료/승인 오인 차단 | 사용자 전달 R2 값 재계산 PASS, 실운영 재실측은 아님 |
 
-2026-11-10 #996 대상 회귀 **143/143 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
+2026-11-10 #996 대상 회귀 **147/147 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
 
 ### 추가 관측 R1 ENOENT 진단 및 R2 보완
 
@@ -59,11 +59,12 @@
 - **단계별 검증 충돌 해소:** 승인용 R1/R2 역사 관측과 실행 직전의 새 관측은 시각이 달라야 정상이다. 기존 R1 프로브의 복구 Claim 부재·Workflow 비활성·Backlog 미종료 조건은 전체 과정에 재사용할 수 없다. 신규 `native-fresh-preflight`는 첫 쓰기 전 원본 16/18·7 SHA·보호 Task 2개를 대조하고, Claim 생성 직후는 자기 nonce/PID만 인증해 해당 1개 체크를 예외로 허용하되 다른 정상 체크는 유지한다. 시각 역전·소유권 이탈·상태 drift 오류 주입 등 신규 **7/7 PASS**, 전체 **123/123 PASS**. Workflow/Backlog 변경 후에는 별도 단계별 사후 재조회가 필요하다.
 - **단계별 독립 사후 검증 구현:** `controller-996-native-postcheck.mjs`는 Workflow 활성화·Backlog 종료·두 lease 순차 보관이라는 각 단계의 **변경된 정상 상태**에 맞춰 원본 Windows 파일/마커/보호 Task/Workflow GET을 독립 재조회한다. 최종 보관 후에는 활성 자체 Claim을 요구하지 않으며, 이전 원본 owner가 계속 비활성인지 검사한다. 원본 SHA·마커 nonce·Backlog 신규 SHA·Workflow 상태·Task disable·보관 경로 오류 주입 신규 **7/7 PASS**, 누적 **130/130 PASS**. 다만 이는 물리상태 증명으로 한정되며, 원본 GitHub `pc-job` 결과 재조회에서 **개별 미확인 Job을 성공으로 단정하지 않음**. 본 검증만으로 GitHub 재조정·C 트랜잭션·실제 Windows 복구 완료를 선언하지 않는다.
 - **원본 실행기 소스 최초 결합:** `native-operator`는 시뮬레이터의 무조건 boolean 포트를 실제 Claim owner/ticket/Backlog SHA/단계별 상태 영수증으로 분리했다. 실제 원본 GitHub GET의 C 승인 명세·소유자 댓글을 **첫 쓰기 전에** 검증하고, PUT 직전에 GitHub 원본 계정·private repo·설치된 협조 Writer 7개 소스 Git 원문·보호 R2·Workflow disabled 상태를 다시 검증한다. Backlog 종료 뒤 GitHub 주체를 **재인증**한 후 전체 Issue/JSON·TXT 읽기 결과에서 **검증된 PASS와 미확인·실패 재계획을 구별**해 COMPLETE marker에는 건수·해시만 기록한다. 중단 시 자동 재시도/자동 롤백/Issue 새 게시 없음. 격리된 test-only 정상 및 Claim mkdir 실패, PUT 직전 source drift, PUT ACK 손실, Backlog rename 불명확, GitHub 조회 실패, 양측 lease archive 이후 확인 실패 등 **13/13 PASS**, 전체 **143/143 PASS**. 단 실제 승인·실PC Windows 복구 및 외부 독립 최종 검증은 미실시.
+- **승인 명세 후보 작성:** `docs/CONTROLLER_996_C_APPROVAL_R1.json`에 실제 R1 raw SHA 7개·R2 존재 Writer 1개/부재 2개·Task SHA/enabled 2개 및 C effect 6종을 정확히 고정했다. 후보 SHA256은 `05bf8aa72b438b69d7c86f8798a72ec2c12fe3537489f2153069dabfe0695e7b`. **파일 내부 `approved:true`는 소유자 승인이 아니라 소유자가 수락할 정확한 명세 제안**이다. 해당 파일의 불변 Git commit + 원본 #996 소유자 본인의 정확한 SHA 수락 댓글은 아직 없으며, 없는 댓글을 자동으로 작성하지 않는다. 실제 댓글 없음→실행 승인 거부와 합성 단회 댓글→구조 검증 등 신규 **4/4 PASS**, 전체 **147/147 PASS**.
 
 ## 승인 출처 — 현재 엄격한 경계
 
-1. C급 승인 후보 manifest 경로는 `docs/CONTROLLER_996_C_APPROVAL_R1.json`이며, **아직 승인된 파일이 없음**. 현재 코드에는 이 경로의 실제 `approved:true` 배포가 없다.
-2. 향후 원본 GitHub Issue #996 작성자 `ansqhd5774-Choi` 본인이 승인 명세 **전체 바이트 SHA256**을 명시적으로 수락하는 단일 댓글이 필요하다. `build996ConsentComment`는 정확한 댓글 본문을 생성한다. Bot 댓글이나 “승인”이라는 일반 문구는 이 검증을 통과하지 못한다.
+1. C급 승인 후보 manifest 경로는 `docs/CONTROLLER_996_C_APPROVAL_R1.json`이며, **Draft 작업 브랜치에 명세 후보를 작성했다.** 후보의 `approved:true`는 실행 권한을 뜻하지 않는다. 정확한 **불변 Git commit + 원본 Issue 소유자의 C급 수락 댓글이 없어 실제 승인은 여전히 없음**. 운영 파일로 배포되지 않았다.
+2. 원본 GitHub Issue #996 작성자 `ansqhd5774-Choi` 본인이 승인 명세 **전체 바이트 SHA256** `05bf8aa72b438b69d7c86f8798a72ec2c12fe3537489f2153069dabfe0695e7b`를 명시적으로 수락하는 단일 댓글이 필요하다. `build996ConsentComment`는 정확한 댓글 본문을 생성한다. Bot 댓글이나 “승인”이라는 일반 문구는 이 검증을 통과하지 못한다.
 3. 원본 PC의 인증된 GitHub API/`git show <commit>:<path>`로 댓글 작성자, 불변 커밋 바이트, 승인 명세 개별 해시, 역사적 미입증 2개 예외를 다시 검증해야 한다. 외부 JSON에 `approved:true`를 넣는 것만으로는 불가하다.
 4. `review996CConsent()`는 현재도 의도적으로 `executionAuthorized:false`를 반환한다. 실제 운영 권한은 별도 네이티브 오퍼레이터의 전체 보호 검증·승인 재조회·사용자 명시 실행 절차가 끝날 때만 생성된다.
 
