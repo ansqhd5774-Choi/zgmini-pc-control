@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {"path": "scripts/pc-writer/run-local.mjs", "change": "M"},
+    {"path": "scripts/pc-writer/market.mjs", "change": "M"},
+    {"path": "worker/market-input-validation.mjs", "change": "M"},
+    {"path": "worker/candidate-market-operational-store.mjs", "change": "M"},
+    {"path": "lib/score-history/market-batch-provenance-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/market-batch-provenance-read-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/market-input-observation-shadow-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/composite-archive-lineage-link-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/d05-lineage-event-contract-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/d05-lineage-after-archive-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/d05-lineage-event-append-r1.mjs", "change": "A"},
+    {"path": "lib/score-history/d05-lineage-local-record-r1.mjs", "change": "A"}
+  ],
+  "allowOtherPaths": false
+}
