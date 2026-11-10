@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_ISOLATED_WINDOWS_NATIVE_FIXTURE_POLICY_BLOCK_V1",
+  "observationDateKst": "2026-11-11",
+  "source": "USER_SUBMITTED_SEPARATE_WINDOWS_PC_CONSOLE_SCREENSHOT",
+  "screenshotSha256": "28d529af7ddb4b0ea4703eed3a464d7391adb01e0596bfd0eaad1f7c2c8fc82d",
+  "referenceCandidateCommit": "75c0cac7ca1d9cec261fffe3b78b25f1e1eeb07b",
+  "referenceZipSha256": "551046318b4605a4063f910edd65700b2ee6fb212474c8179260591791f7f8dc",
+  "observedConsoleHeader": "#996 ISOLATED WINDOWS TEMP NATIVE MOVE FIXTURE RESULT:",
+  "observedPowerShellFailure": "UnauthorizedAccess",
+  "observedGuidance": "about_Execution_Policies",
+  "status": "BLOCKED_BY_WINDOWS_POWERSHELL_EXECUTION_POLICY",
+  "operatorReportedSeparatePc": true,
+  "operatorZipSha256VerifiedByScreenshot": false,
+  "scriptExecuted": false,
+  "nativeDirectoryMoveTestsRun": 0,
+  "nativeDirectoryMoveTestsPassed": 0,
+  "originalPcWritesIndependentlyAttested": false,
+  "executionPolicyModifiedByProject": false,
+  "permissionBypassAttemptedByProject": false,
+  "operationalCRecoveryAuthorized": false,
+  "nextAuthorizedStep": "READ_ONLY_GET_EXECUTION_POLICY_LIST"
+}

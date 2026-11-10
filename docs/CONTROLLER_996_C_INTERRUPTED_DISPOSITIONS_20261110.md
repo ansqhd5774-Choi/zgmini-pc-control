@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 별도 Windows TEMP 시험 1회 — PowerShell 실행 정책으로 차단
+
+- 사용자는 **별도 물리 Windows PC**에서 `RUN_996_ISOLATED_WINDOWS_NATIVE_TEMP_FIXTURE_ONCE.cmd`를 실행했다고 명시하고 콘솔 화면을 제출했다. 원본 PC에서 발생한 `BLOCKED: ORIGINAL_ZGMINI_ROOT_PRESENT`와 구별된다. 새 PC에서는 CMD가 `#996 ISOLATED WINDOWS TEMP NATIVE MOVE FIXTURE RESULT:`까지 진행했지만, PowerShell이 PS1에 대해 **`UnauthorizedAccess`·`about_Execution_Policies`**를 출력하며 실행을 거부했다. CMD 자체 메시지도 `FIXTURE STOPPED. DO NOT BYPASS EXECUTION POLICY.`였다.
+- **Windows `.NET Directory.Move` 테스트 실제 수행 0건, PASS 0건**. 시험 스크립트의 더미 TEMP 폴더 생성 단계도 시작하지 않았다. CMD 헤더까지 진행된 것으로 보아 내장 소스 SHA 확인 단계는 통과했을 가능성이 높으나, 제출된 사진에 ZIP SHA 검산이나 OS 수준 무쓰기 기록이 없으므로 별도 입증으로 표시하지 않는다. 사용자 화면 SHA256 `28d529af7ddb4b0ea4703eed3a464d7391adb01e0596bfd0eaad1f7c2c8fc82d`와 진단 한계만 `artifacts/controller-996/zgmini-996-native-temp-fixture-policy-block-20261111.json`에 기록하고 사진 원문은 GitHub에 올리지 않는다.
+- **권한 경계:** 실행 정책 우회·변경, `-ExecutionPolicy Bypass`, 외부 명령 통한 임의 스크립트 실행, 관리자 권한 강제 상승은 **시도하지 않는다**. 다음 순서는 별도 Windows PC에서 `Get-ExecutionPolicy -List` **읽기 전용 조회**로 `MachinePolicy`/`UserPolicy`/`Process`/`CurrentUser`/`LocalMachine`의 실제 제한 범위를 보고, 해당 기기 소유자 또는 정책 관리자의 별도 지시를 기다리는 것이다. 정책 차단이 풀렸다는 검증 전에는 같은 CMD를 반복 실행하지 않는다.
+- 원본 Windows의 R4 소스 해시 **84/84 성공 관측은 유효**, 별도 native TEMP 실증은 여전히 **0**, 신규 C 정확승인은 **0**. 실제 C 복구·Claim/Lease 이동·Workflow PUT·Backlog·Issue 변경 전부 **NO-GO**, 운영 진행률 **80%→80%**.
+
 ## 2026-11-11 별도 격리 Windows TEMP 네이티브 이동 시험 패키지 R1 — 아직 미실행
 
 - 원본 Windows의 R4 Git 84/84 읽기 전용 확인 이후 남은 **운영과 분리된 Windows `Directory.Move` 원자적 충돌 거부 실증**용 수동 단회 패키지를 봉인했다. `artifacts/controller-996/zgmini-996-isolated-windows-native-temp-fixture-r1.zip` **SHA256 `551046318b4605a4063f910edd65700b2ee6fb212474c8179260591791f7f8dc`**, ZIP 구성 정확히 **2파일**, CRC **2/2 정상**.
