@@ -77,7 +77,7 @@ test('unavailable source, Task, root or platform cannot pass',async()=>{
   f=>{f.queryTask=()=>Buffer.from('bad');},
   f=>{f.queryTask=()=>{throw Error('access denied');};},
   f=>{f.realpath=()=>{throw Error('unavailable');};},
-  f=>{f.windowMs=330001;},
+  f=>{f.windowMs=210001;},
  ]){
   const f=fixture([active]);modify(f.ctx);
   const got=await observeInflationCoreLock(f.ctx);

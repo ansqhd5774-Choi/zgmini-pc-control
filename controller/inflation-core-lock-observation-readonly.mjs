@@ -10,7 +10,7 @@ import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 const DATA_ROOT=String.raw`E:\ZGmini\data\pc-writer`;
 const CORE_LOCK=path.win32.join(DATA_ROOT,'local-cycle.lock');
 const TASKS=Object.freeze(['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']);
-const WINDOW_MS=330_000; // within the existing 8-minute pc-job workflow
+const WINDOW_MS=210_000; // existing A/heavy <=240s Controller profile
 const INTERVAL_MS=5_000;
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const norm=value=>path.win32.normalize(value).replace(/\\+$/,'').toLowerCase();
