@@ -396,4 +396,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 검토 소스 `3fa23ecb241f22d8694afd3432a1bcefe498cd9a`. Windows에서 ZIP을 풀어 총 21개 항목의 해시가 일치했고, 같은 커밋으로 재생성한 ZIP SHA도 일치했다. 추출한 Operator는 합성 인수로 읽기 전용 검토 응답을 반환했다.
 - [검토 ZIP](../artifacts/controller-996/ZGMINI_996_OWNER_REVIEW.zip)과 [체크섬](../artifacts/controller-996/ZGMINI_996_OWNER_REVIEW_SHA256.json)을 보존한다. 다음 작업은 실제 복구 진입점에 실행 중 고정된 소스와 독립 Owner 승인 증거를 연결하는 것이다. 운영 진행률 80%를 유지한다.
 
+### 실제 Bootstrap 승인 검증의 격리 시험
+
+- 고정 Owner·저장소·원본 Issue, 정확한 승인 댓글, S1 16개와 S2 3개의 Git/로컬 바이트를 확인하는 동일 Bootstrap 검증기를 합성 입력으로 실행했다. 합성 결과는 별도 상태를 반환해 Windows의 Operator 인계 조건을 충족할 수 없다. 운영 CLI의 Windows 및 GET 전용 경로를 유지한다.
+- 소스 해시 비교가 끝난 뒤 Owner 댓글을 다시 조회한다. 비교 도중 승인이 철회되거나 댓글이 바뀌면 최종 증거를 반환하기 전에 중단한다. 정상 증거, 다른 Owner, 로컬 Operator 바이트 변조, 소스 대조 도중 승인 철회의 네 가지 시험을 포함해 관련 검사 32/32 통과.
+- 기존 검토 ZIP은 해당 Git 커밋에 고정된 역사 증거로 유지한다. 신규 운영 ZIP·S2 봉인과 운영 진입점 검증은 별도이며 원본 Claim·Lease 변경은 없다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.

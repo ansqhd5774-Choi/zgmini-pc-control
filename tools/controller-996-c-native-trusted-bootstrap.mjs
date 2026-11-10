@@ -87,10 +87,10 @@ function getJson(route){
     'C_996_BOOTSTRAP_GH_GET_SIZE');
   try{return JSON.parse(raw);}catch{need(false,'C_996_BOOTSTRAP_GH_JSON');}
 }
-function gitBytes(repoPath,commit){
+function gitBytes(readGet,repoPath,commit){
   need(h40(commit)&&[SELF,S2_MANIFEST,S2_LOCK,S2_ZIP,...FILES].includes(repoPath),
     'C_996_BOOTSTRAP_GIT_TARGET_INVALID');
-  const row=getJson(`repos/${REPO}/contents/${repoPath}?ref=${commit}`);
+  const row=readGet(`repos/${REPO}/contents/${repoPath}?ref=${commit}`);
   need(row?.path===repoPath&&row.type==='file'&&row.encoding==='base64'&&
     typeof row.content==='string'&&h40(row.sha)&&
     Number.isSafeInteger(row.size)&&row.size>0&&row.size<=16_000_000,
@@ -115,10 +115,10 @@ function localFile(repoPath,limit){
   'C_996_BOOTSTRAP_LOCAL_SOURCE_UNSAFE');
   return fs.readFileSync(full);
 }
-function comments(){
+function comments(readGet){
   const rows=[],ids=new Set();
   for(let page=1;page<=100;page++){
-    const next=getJson(`repos/${REPO}/issues/996/comments?per_page=100&page=${page}`);
+    const next=readGet(`repos/${REPO}/issues/996/comments?per_page=100&page=${page}`);
     need(Array.isArray(next)&&next.length<=100,'C_996_BOOTSTRAP_COMMENT_PAGE_INVALID');
     for(const c of next){
       need(Number.isSafeInteger(c?.id)&&c.id>0&&!ids.has(c.id)&&
@@ -179,15 +179,34 @@ function validateManifest(m){
 
 /** Read-only authentication candidate; NEVER launches an operator. */
 export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
+  try{originalWindows();}
+  catch(e){return bootstrapFailure(e);}
+  return reviewBootstrapEvidence(manifestCommitSha,getJson,localFile);
+}
+
+// Exercises the same verifier without OS/network/production access. A synthetic
+// result has a separate status and cannot satisfy the Windows handoff.
+export function review996BootstrapFixture({manifestCommitSha,readGet,readLocal}={}){
+  const result=reviewBootstrapEvidence(manifestCommitSha,readGet,readLocal);
+  return Object.freeze({...result,fixtureOnly:true,
+    status:result.status==='GIT_AND_LOCAL_BYTES_OBSERVED_ONLY'?
+      'FIXTURE_GIT_AND_LOCAL_BYTES_MATCHED':result.status});
+}
+
+function bootstrapFailure(e){
+  return blocked(/^C_996_BOOTSTRAP_[A-Z0-9_]+$/.test(e?.code??'')?
+    e.code:'C_996_BOOTSTRAP_READ_OR_STATE_UNKNOWN');
+}
+
+function reviewBootstrapEvidence(manifestCommitSha,readGet,readLocal){
   try{
-    originalWindows();
     need(h40(manifestCommitSha),'C_996_BOOTSTRAP_S2_COMMIT_REQUIRED');
-    const who=getJson('user'),repo=getJson(`repos/${REPO}`);
+    const who=readGet('user'),repo=readGet(`repos/${REPO}`);
     need(who?.login===OWNER&&who.id===OWNER_ID&&
       repo?.id===REPO_ID&&repo.full_name===REPO&&repo.private===true&&
       repo.owner?.login===OWNER&&repo.owner.id===OWNER_ID,
     'C_996_BOOTSTRAP_GITHUB_OWNER_OR_REPO_INVALID');
-    const issue=getJson(`repos/${REPO}/issues/996`);
+    const issue=readGet(`repos/${REPO}/issues/996`);
     need(issue?.number===996&&issue.user?.login===OWNER&&
       issue.user.id===OWNER_ID&&issue.state==='open'&&
       issue.title==='pc-controller-update'&&
@@ -199,11 +218,11 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
       body.targetControllerSha===TARGET&&
       body.schema==='ZGMINI_PC_MAINTENANCE_REQUEST_V1',
     'C_996_BOOTSTRAP_ORIGINAL_BODY_INVALID');
-    const manifestBytes=gitBytes(S2_MANIFEST,manifestCommitSha);
+    const manifestBytes=gitBytes(readGet,S2_MANIFEST,manifestCommitSha);
     let m;try{m=JSON.parse(manifestBytes.toString('utf8'));}catch{}
     validateManifest(m);
     const exact=expectedConsent(m,sha(manifestBytes),manifestCommitSha);
-    const first=comments(),second=comments();
+    const first=comments(readGet),second=comments(readGet);
     const projection=rows=>rows.map(x=>[x.id,x.body,x.user?.login,
       x.user?.id,x.created_at,x.updated_at]);
     need(eq(projection(first),projection(second))&&
@@ -217,21 +236,16 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
     need(approved.length===1&&approved[0].created_at===approved[0].updated_at&&
       Number.isFinite(Date.parse(approved[0].created_at)),
     'C_996_BOOTSTRAP_OWNER_CONSENT_MISSING');
-    const issueAfter=getJson(`repos/${REPO}/issues/996`);
-    need(eq([issue.number,issue.body,issue.state,issue.comments,issue.updated_at],
-      [issueAfter.number,issueAfter.body,issueAfter.state,
-        issueAfter.comments,issueAfter.updated_at]),
-    'C_996_BOOTSTRAP_ISSUE_CHANGED');
-    const selfBytes=localFile(SELF,2_000_000);
+    const selfBytes=readLocal(SELF,2_000_000);
     need(sha(selfBytes)===m.bootstrapSha256&&
-      selfBytes.equals(gitBytes(SELF,m.operatorCommit)),
+      selfBytes.equals(gitBytes(readGet,SELF,m.operatorCommit)),
     'C_996_BOOTSTRAP_BOOTSTRAP_SHA_DRIFT');
-    const lockBytes=localFile(S2_LOCK,100_000);
-    const zipBytes=localFile(S2_ZIP,16_000_000);
+    const lockBytes=readLocal(S2_LOCK,100_000);
+    const zipBytes=readLocal(S2_ZIP,16_000_000);
     need(sha(lockBytes)===m.sourceLockSha256&&
       sha(zipBytes)===m.packageSha256&&
-      lockBytes.equals(gitBytes(S2_LOCK,manifestCommitSha))&&
-      zipBytes.equals(gitBytes(S2_ZIP,manifestCommitSha)),
+      lockBytes.equals(gitBytes(readGet,S2_LOCK,manifestCommitSha))&&
+      zipBytes.equals(gitBytes(readGet,S2_ZIP,manifestCommitSha)),
     'C_996_BOOTSTRAP_S2_SOURCE_DRIFT');
     let lock;try{lock=JSON.parse(lockBytes.toString('utf8'));}catch{}
     need(lock?.schema==='ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1'&&
@@ -241,11 +255,18 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
     need(lock.files['tools/controller-996-c-native-owner-operator.mjs']===m.operatorSha256,
       'C_996_BOOTSTRAP_OPERATOR_SHA_DRIFT');
     for(const f of FILES){
-      const bytes=localFile(f,2_000_000);
+      const bytes=readLocal(f,2_000_000);
       need(h64(lock.files[f])&&sha(bytes)===lock.files[f]&&
-        bytes.equals(gitBytes(f,m.operatorCommit)),
+        bytes.equals(gitBytes(readGet,f,m.operatorCommit)),
       'C_996_BOOTSTRAP_S1_CLOSURE_DRIFT');
     }
+    need(eq(projection(second),projection(comments(readGet))),
+      'C_996_BOOTSTRAP_FINAL_CONSENT_DRIFT');
+    const issueAfter=readGet(`repos/${REPO}/issues/996`);
+    need(eq([issue.number,issue.body,issue.state,issue.comments,issue.updated_at],
+      [issueAfter.number,issueAfter.body,issueAfter.state,
+        issueAfter.comments,issueAfter.updated_at]),
+    'C_996_BOOTSTRAP_ISSUE_CHANGED');
     // Bootstrap has no independent OS trust anchor nor verified immutable
     // process snapshot. Evidence alone NEVER authorizes an operator launch.
     return Object.freeze({
@@ -261,8 +282,7 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
       executionAuthorized:false,originalPcWrites:0,githubWrites:0,
       nextRequired:'OUT_OF_PROCESS_OS_HASH_ANCHOR_AND_IMMUTABLE_SNAPSHOT',
     });
-  }catch(e){return blocked(/^C_996_BOOTSTRAP_[A-Z0-9_]+$/.test(e?.code??'')?
-    e.code:'C_996_BOOTSTRAP_READ_OR_STATE_UNKNOWN');}
+  }catch(e){return bootstrapFailure(e);}
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
