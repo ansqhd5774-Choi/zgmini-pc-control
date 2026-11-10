@@ -79,8 +79,9 @@ export function classify996CPhysicalDisposition({snapshot,pins}={}){
 
   const c=snapshot.conflicts;
   if(c?.workflowState!=='active'||c.protectionVerified!==true||
-    c.writerActiveCount!==0||c.controllerActiveCount!==0||
-    c.otherContinuationCount!==0)
+    c.scope!=='CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES'||
+    c.foreignInstallOwnerCount!==0||c.otherContinuationCount!==0||
+    c.twoSnapshotsIdentical!==true||c.fresh!==true)
     return stop('C_DISPOSITION_CONFLICT_OR_PROTECTION_UNKNOWN');
 
   if(!exactPins(pins?.oldC,OLD)||keys(pins.oldC).length!==OLD.length||
