@@ -1,5 +1,13 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 원본 C Windows 실행기 **불완전 후보** 봉인 — 285/285 PASS, 운영 C NO-GO
+
+- 신규 `tools/controller-996-c-native-owner-operator.mjs` 및 `tests/controller-996-c-native-owner-operator.test.mjs`를 **Draft 소스 후보**로 기록했다. 예상 순서: 새로운 #996 Owner C 동의 + S1 실행기·의존 원문/S2 SourceLock·ZIP Git 해시 → 원본 10핀/R1/R4 → 고정 예약·새 Continuation Claim → 기존 Claim/새 Claim/Install LAST Archive → 읽기 전용 사후 검사. 테스트는 Linux 미승인·인위 승인 인자에서도 운영 쓰기 전 STOP인 경우만 검증한다.
+- **독립 감사 P0:** 로컬 의존 모듈을 최초 검증 전 동적 import하는 부트스트랩 신뢰 순서가 불충분하고, .NET Directory.Move 자식 프로세스 내부에서 이동 직전 원본 inventory SHA·실제 충돌 CAS를 독립 재검증하지 않는다. 스코프 한정 충돌 0의 실제 근거 연결과 최종 이동 뒤 정상 신규 Install owner 분류도 보강·네이티브 실증이 필요하다. SourceLock·ZIP·새 정확 Owner 승인 모두 아직 없다.
+- 이 결함 상태에서 **운영 실행 불가**하도록 `run996NativeOwnerCOnce()` 첫 동적 import 전에 `need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED')` **무조건 하드 STOP**을 넣었다. 이것은 실제 C 승인을 대체하거나 이전 Bridge의 fail-closed를 해제하지 않는다. 무단 운영 사용/하드 STOP 제거 금지. 안전 수정·관련 Windows 격리 테스트·S1/S2 완전 봉인 후 새 Owner 승인에만 진행 가능하다.
+- 신규 2/2, 전체 **285/285 PASS**. 신규 2파일 원격 Git blob SHA byte-match **2/2**, 마지막 Source commit `c6b1702347512931404272b881cbc037c2da37a0`. 원본 PC E: 변경 0·Workflow PUT 0·Backlog 0·기존 pc-job 재발행 0. 전체 **4/5=80%→80%**, PR #1222 Draft, **C NO-GO**.
+
+
 ## 2026-11-11 고정 예약의 제7 C급 Effect 확정 — Draft 소스 283/283 PASS, 실제 운영 C NO-GO
 
 - 새 운영 C 복구를 위한 **제안 승인 범위**에 `CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE`를 추가했다. 같은 E: leases 부모 아래에서 proposal의 `owner.json` 단회 기록·Flush 후 고정 `controller-recovery-continuation-reservation`으로 원자적 이동하고 성공/실패 후 자동 삭제하지 않는 효과를 별도 표시한다. 단순 테스트가 아니라 실제 E: 영구 기록을 남기는 C급 효과이므로 **기존 6개 Effect의 구 Owner 승인을 확장 해석하지 않는다**. 현재 신규 7개 Effect 승인 0건.
