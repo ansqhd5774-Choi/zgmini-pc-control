@@ -154,6 +154,13 @@ test('seven-to-seven rejects symlinks, hardlinks and parent aliases even with ma
  fs.rmSync(path.join(target,'tools'),{recursive:true,force:true});
  fs.symlinkSync(path.dirname(external),path.join(target,'tools'),'dir');
  assert.throws(()=>requireDirectInstalledFiles(target,['tools/outside.mjs']),/HANDOFF_PATH_ALIAS/);
+ const realParent=path.join(temp,'real-parent');
+ fs.mkdirSync(path.join(realParent,'receiver','tools'),{recursive:true});
+ fs.writeFileSync(path.join(realParent,'receiver','tools','update.mjs'),'matching bytes');
+ const linkedParent=path.join(temp,'junction-like-parent');
+ fs.symlinkSync(realParent,linkedParent,'dir');
+ assert.throws(()=>requireDirectInstalledFiles(path.join(linkedParent,'receiver'),
+  ['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
 });
 test('unfinished prior handoff journal blocks other targets, and completed proof is reusable',t=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-prior-'));
