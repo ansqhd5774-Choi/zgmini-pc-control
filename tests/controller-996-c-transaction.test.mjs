@@ -57,9 +57,13 @@ function fixture(){
   schema:'ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1',
   requestId:e.requestId,issueNumber:996,observedAt:protectedObservedAt,
   status:'CURRENT_ITEMS_MATCH_OBSERVATION',
-  items:{files:{...itemFiles},taskSha256:{...itemTasks},taskEnabled:{...itemEnabled}},
+  items:{files:{...itemFiles},
+   writerFileStatus:{'config.json':'PRESENT','quota-runner.cmd':'PRESENT',
+    'run-local.cmd':'PRESENT'},
+   taskSha256:{...itemTasks},taskEnabled:{...itemEnabled}},
   currentFingerprint:itemFingerprint,originalObservationFingerprint:itemFingerprint,
-  fingerprintMatch:true,allFivePresent:true,historicalBaselineAvailable:false,
+  fingerprintMatch:true,allFivePresent:true,presentWriterFileCount:3,
+  historicalBaselineAvailable:false,
   allActorsImmutableProven:false,operationalWrites:0,issuePosts:0,
   pcRetries:0,executionAuthorized:false,
  };
@@ -81,6 +85,7 @@ function fixture(){
   evidenceObservedAt:observedAt,protectionNowFingerprint:itemFingerprint,
   protectedItemsObservedAt:protectedObservedAt,
   protectedItemsSha256:{files:{...itemFiles},tasks:{...itemTasks}},
+  protectedWriterFileStatus:{...protectedAttestation.items.writerFileStatus},
   protectedTaskEnabled:{...itemEnabled},
   evidenceSha256:{...digests},
   allowedEffects:['CREATE_AND_ARCHIVE_OWN_C_RECOVERY_CLAIM',
@@ -144,6 +149,9 @@ test('raw fingerprint, authority and original C failure phase must match',()=>{
   f=>{f.approval.allowedEffects.push('INSTALL_CONTROLLER');},
   f=>{f.protectedAttestation.items.files['config.json']='f'.repeat(64);},
   f=>{f.protectedAttestation.allFivePresent=false;},
+  f=>{f.protectedAttestation.presentWriterFileCount=1;},
+  f=>{f.protectedAttestation.items.writerFileStatus['config.json']='ABSENT';},
+  f=>{f.approval.protectedWriterFileStatus['config.json']='ABSENT';},
   f=>{f.protectedAttestation.items.taskEnabled['ZGMINI-PC-Local-Core']=null;},
   f=>{f.protectedAttestation.historicalBaselineAvailable=true;},
   f=>{f.approval.protectedItemsObservedAt='2026-11-10T03:13:02.041Z';},
@@ -151,6 +159,35 @@ test('raw fingerprint, authority and original C failure phase must match',()=>{
  for(const modify of fixtures){
   const f=fixture();modify(f);
   assert.equal(validate996CContract(f).status,'NOT_STARTED');
+ }
+});
+
+test('actual R2: one Writer hash, two explicitly absent, two enabled Tasks is a valid source-only contract',()=>{
+ const f=fixture();
+ const files={'config.json':'0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453'};
+ const tasks={'ZGMINI-PC-Local-Core':'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028',
+  'ZGMINI-PC-Local-Korea':'1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1'};
+ const status={'config.json':'PRESENT','quota-runner.cmd':'ABSENT','run-local.cmd':'ABSENT'};
+ const enabled={'ZGMINI-PC-Local-Core':true,'ZGMINI-PC-Local-Korea':true};
+ f.preflight.protectionNowFingerprint=protectedFingerprint;
+ f.protectedAttestation.items={files,writerFileStatus:status,
+  taskSha256:tasks,taskEnabled:enabled};
+ Object.assign(f.protectedAttestation,{currentFingerprint:protectedFingerprint,
+  originalObservationFingerprint:protectedFingerprint,allFivePresent:false,
+  presentWriterFileCount:1,observedAt:'2026-11-10T04:06:43.338Z'});
+ Object.assign(f.approval,{protectionNowFingerprint:protectedFingerprint,
+  protectedItemsObservedAt:'2026-11-10T04:06:43.338Z',
+  protectedItemsSha256:{files,tasks},protectedWriterFileStatus:status,
+  protectedTaskEnabled:enabled});
+ assert.equal(validate996CContract(f).status,'REVIEWED_CONTRACT_ONLY');
+ for(const mutate of [
+  x=>{x.protectedAttestation.items.writerFileStatus['run-local.cmd']='PRESENT';},
+  x=>{x.approval.protectedWriterFileStatus['quota-runner.cmd']='PRESENT';},
+  x=>{x.approval.protectedItemsSha256.files['quota-runner.cmd']='f'.repeat(64);},
+  x=>{x.protectedAttestation.items.files['run-local.cmd']='f'.repeat(64);},
+ ]){
+  const altered=structuredClone(f);mutate(altered);
+  assert.equal(validate996CContract(altered).status,'NOT_STARTED');
  }
 });
 
