@@ -14,6 +14,7 @@ const TARGET='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
 // manifest digest, must STOP rather than silently alter C provenance.
 const ORIGINAL_BODY_SHA256='37caf348eb4fc5440ebfa76a1c1166bb7480dffdd8d054dcb19391816bc72b5a';
 const ORIGINAL_OWNER_ID=327938088;
+const REPOSITORY_ID=1442936296;
 const MANIFEST='docs/CONTROLLER_996_C_CONTINUATION_APPROVAL_V1.json';
 const CONSENT='ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1';
 const REVOKE='ZGMINI_CONTROLLER_996_CONTINUATION_C_REVOKE_V1';
@@ -137,9 +138,17 @@ export function create996ContinuationConsentEvidenceReader({githubReader}={}){
     used=true;
     need(H40(manifestCommitSha),'C_996_NEW_CONSENT_COMMIT_NOT_PINNED');
     const auth=await githubReader.authenticateReadOnly();
-    need(auth?.actor===OWNER&&auth.repository===REPO&&
+    // Authenticate the GitHub GET transport independently of the human
+    // account that authored the new C consent. Standard Actions GITHUB_TOKEN
+    // is an app installation token and cannot be treated as the Owner user.
+    const ownerReader=auth?.kind==='OWNER_USER_GET'&&auth.actor===OWNER;
+    const installationReader=auth?.kind==='INSTALLATION_REPOSITORY_GET'&&
+      auth.actor==='github-app-installation';
+    need((ownerReader||installationReader)&&
+      auth.repository===REPO&&auth.repositoryId===REPOSITORY_ID&&
+      auth.ownerAccountId===ORIGINAL_OWNER_ID&&
       auth.private===true&&auth.readOnly===true&&
-      auth.executionAuthorized===false,
+      auth.executionAuthorized===false&&auth.testOnly!==true,
       'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
     const issue=await githubReader.get(`issues/${ISSUE}`);
     need(issue?.status===200&&issue.data?.number===ISSUE&&
