@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 C 단계별 물리 분류 충돌 범위 수정 — 270/270 PASS, 운영 C 대기
+
+- C 단계별 **순수 판독기** `tools/controller-996-c-physical-disposition-readonly.mjs`에서도 과잉 `writerActiveCount/controllerActiveCount===0` Gate를 제거했다. 실제 중복 자원 한정 `scope=CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES`, `foreignInstallOwnerCount=0`, `otherContinuationCount=0`, `twoSnapshotsIdentical=true`, `fresh=true`만 요구한다. unrelated Writer/Core는 통과, 외부 Install owner·중첩 C·불안정 관측은 차단한다. `tests/controller-996-c-physical-disposition-readonly.test.mjs` 및 `tests/controller-996-c-physical-fixture-readback.test.mjs`에서 격리 회귀 추가·수정, 전체 **270/270 PASS**. 3개 원격 Git blob SHA 로컬 일치 **3/3**, 마지막 commit `ac9181f664e619fa3d2e44fdfd81fd71cb0236d3`.
+- 원본 `#996` 새 C 승인 여전히 **0**, 원본 4건 `#1217/#1219/#1226/#1227`는 **4/4 Open·결과 댓글 0/4**. 기존 Owner C 동의는 구 phase 범위 전용. 시험용 Fixture/Stage Helper는 여전히 실행 불가·`executionAuthorized=false`. 기존 PC E: 파일 이동·Lock 해제·Workflow PUT·Backlog·Issue 변경은 **0**.
+- **미구현 필수 연결:** 실제 E:의 단계별 2회 SHA/identity CAS(구 Claim 보관 후 archive 위치 fallback 포함), 고정 `controller-recovery-continuation-reservation` 소유 PID/nonce/수명·정확 C Effect, 각 Native Move 직전 범위 한정 독립 관측, Install-LAST 뒤 신규 정규 Install owner와 보관 원본 구분 → 운영 operator + ZIP + source lock 실제 해시 봉인 → **사용자 신규 정확 C 동의** → 기존 PC 단회 C 복구. 예약 효과가 승인 범위에 명확히 포함되지 않으면 STOP. **전체 4/5=80%→80%, PR Draft, C NO-GO.**
+
+
 ## 2026-11-11 관련 자원만 C 충돌로 판정 — Draft Gate 과잉 조건 수정
 
 - 원본 승인 Maintainer 소스 `16064e29...`의 `tools/maintenance-lock.mjs`와 `tools/update.mjs`를 읽기 전용 확인했다. C 보관은 `pc-maintenance/leases/controller-recovery`·새 continuation·`controller-install` 형제 디렉터리만 변경한다. 일반 Controller Update/R6 Host B/Source Bundle B/R54 B는 **먼저 `controller-install`을 선점**하고, `receiver`는 독립 장기 lease이며 일반 Writer 데이터 lane과 여섯 Runner 활동은 C 보관 디렉터리 자체와 충돌하지 않는다.
