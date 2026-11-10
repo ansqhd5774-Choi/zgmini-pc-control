@@ -24,6 +24,7 @@ const manifestKeys=['schema','approved','grade','operation','executionScope',
  'acceptsNoAllActorsImmutabilityProof','acceptedGaps','allowedEffects',
  'phaseScopedSourceProof','evidenceObservedAt','protectedItemsObservedAt',
  'protectionNowFingerprint','evidenceSha256','protectedItemsSha256',
+ 'protectedWriterFileStatus',
  'protectedTaskEnabled'];
 const causalKeys=['maintainerSourceSha','failureFirstPhase','failureCode',
  'reachedBackup','reachedControllerSwitch',
@@ -114,9 +115,18 @@ export function review996CConsent({originalIssue,commentsReadback,gitRead,
   !exactKeys(manifest.evidenceSha256,rawKeys)||
   rawKeys.some(k=>!isSha256(manifest.evidenceSha256[k]))||
   !exactKeys(manifest.protectedItemsSha256,['files','tasks'])||
-  !exactKeys(manifest.protectedItemsSha256.files,writerNames)||
+  !manifest.protectedItemsSha256.files||
+  typeof manifest.protectedItemsSha256.files!=='object'||
+  Array.isArray(manifest.protectedItemsSha256.files)||
+  !exactKeys(manifest.protectedWriterFileStatus,writerNames)||
   !exactKeys(manifest.protectedItemsSha256.tasks,taskNames)||
-  writerNames.some(k=>!isSha256(manifest.protectedItemsSha256.files[k]))||
+  writerNames.some(k=>!['PRESENT','ABSENT'].includes(
+   manifest.protectedWriterFileStatus[k]))||
+  Object.keys(manifest.protectedItemsSha256.files??{}).length!==
+   writerNames.filter(k=>manifest.protectedWriterFileStatus[k]==='PRESENT').length||
+  writerNames.some(k=>manifest.protectedWriterFileStatus[k]==='PRESENT'?
+   !isSha256(manifest.protectedItemsSha256.files[k]):
+   Object.hasOwn(manifest.protectedItemsSha256.files,k))||
   taskNames.some(k=>!isSha256(manifest.protectedItemsSha256.tasks[k]))||
   !exactKeys(manifest.protectedTaskEnabled,taskNames)||
   taskNames.some(k=>typeof manifest.protectedTaskEnabled[k]!=='boolean'))
