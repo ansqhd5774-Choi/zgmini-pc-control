@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 최신 원본 Issue·소유권 대조 및 신규 C 증거 Bridge — 운영 80%, C NO-GO
+
+- GitHub 원본 #996의 전체 댓글 **10/10**을 다시 읽었다. 과거 `ZGMINI_CONTROLLER_996_C_CONSENT_V1` 1건은 기존 phase-scoped 범위에만 유효하고 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1`는 **0건**이다. 사용자 승인 댓글을 대신 발행하거나 이전 동의를 새 C Claim 소유권 인계로 해석하지 않는다.
+- 원본 `pc-job` [#1217](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1217)·[#1219](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1219)·[#1226](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1226)·[#1227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1227)는 **Open 4/4·결과 댓글 0/4·갱신/재계획 표시 0/4**. 이전 원본 Windows R3의 Backlog `replayCount=0`은 **그 당시 스냅샷**이다. 현재 E: 실물·수집 상태 또는 실행 성공을 증명하지 않으므로 원본 요청 재실행·완료 처리·새 Issue 중복 생성 금지.
+- `tools/controller-996-c-operator-evidence-bridge.mjs`와 집중 시험을 추가했다. **신규 C Owner 동의 리더가 주입한 원문 Manifest 바이트 SHA-256·객체 일치, prospective operator/package/source-lock 실제 Buffer SHA-256, 원본 물리 10종 SHA pin·Git 84종·원본 Job·현재 경합의 기존 gate 형식**을 연결하는 순수 증거 검토다. 독립 감사 후 집중 **13/13**, 전체 #996 회귀 **173/173 PASS**. 주입식 리더 증거와 `contentMatchesCandidate=true`는 독립 실제 인증·현장 CAS 보증이 아니다. `execute996COperator`는 어떤 입력에도 `C_CONTINUATION_PRODUCTION_NOT_APPROVED`를 **파일/네트워크 접근 전에 반환**한다.
+- **남은 단일 소스 과제:** 정규 Windows C operator의 실제 파일·운영 조회 어댑터·독립 기존 Claim provenance·최신 Writer 경합 CAS·stage journal 및 안전한 크래시 복구를 별도 정확 소스/검증으로 구현해야 한다. 현재 **운영 CLI/CMD/ZIP/확정 operator SHA가 없다**. 이를 만든 것처럼 승인 manifest를 채우지 않는다. Windows 네이티브 TEMP 13/13 및 원본 Windows R4 84/84는 해당 범위에만 유효하다. **실제 C 승인 0, E: 이동 0, Workflow PUT 0, Backlog 변경 0, 원본 Issue 게시/pc-job 재시도 0. 운영 진행률 80%→80%, C NO-GO, PR Draft 유지.**
+
 ## 2026-11-11 별도 Windows 네이티브 TEMP 13/13 실측 성공 — 운영 C NO-GO 유지
 
 - 사용자가 **물리적으로 분리된 Windows PC**에서 PowerShell `Process` 범위의 한시적 `RemoteSigned` 설정을 직접 승인·적용하고, 고정 PS1 SHA256 `6f8436fec7216d278f82558571a7172e5c2d2f7cc0b8b0db357f9ec4a24e613a` 및 CMD SHA256 `f1ca16cafbeb60f6389f0dcc70e1e0c9a37ab59b79a89a49620cb573b04d43e8`을 비교한 뒤 **정확한 PS1 1개의 인터넷 출처 표시만 제거**했다. 이 과정에서 전역·영구 실행 정책 변경은 수행하지 않았다. 같은 세션의 수동 CMD 실행 스크린샷에는 `ZGMINI_996_WINDOWS_NATIVE_TEMP_FIXTURE_V1`, `WINDOWS_TEMP_FIXTURE_NATIVE_MOVE_ONLY`, `checksPassed=13`이 나타난다.
