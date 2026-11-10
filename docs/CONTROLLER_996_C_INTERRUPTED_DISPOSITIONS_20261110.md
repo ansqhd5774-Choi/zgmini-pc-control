@@ -28,6 +28,14 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 4. `pc-job` Workflow `active`와 이벤트 실행 이력, 별도 6개 전용 Runner·독립 Runner, 기존 Controller/Stage/Maintainer 실제 파일 바이트·source pin, 보호 Writer/Task 현재 fingerprint. 역사적 `protectedBaselineVerified=false`와 disable actor 미입증은 임의로 true로 바꾸지 않는다.
 5. 다른 승인 설치·복구 Writer 또는 동시 C owner가 있는 경우 즉시 중단. 상태 확인 자체는 설치·Issue 게시·Workflow PUT·backlog rename·lease 이동 0회여야 한다.
 
+### 첫 단계 구현 현황 — source-only narrow observer (2026-11-10)
+
+- Draft #1222에 `tools/controller-996-interrupted-observer.mjs` 및 `tests/controller-996-interrupted-observer.test.mjs`를 신규 추가했다. 기존 봉인된 R2 ZIP, C CMD/CLI, source-lock, 동의 manifest는 **변경하지 않았다**. 이 소스에는 운영용 CLI도 없다.
+- 원본 Windows 고정 `E:/ZGmini`에서만 읽기 전용 호출을 허용하는 **라이브러리 후보**다. 경로·symlink 검사, 6개 원본 파일의 SHA256 고정값, 기존 install lease·신규 C claim 및 세 intent marker, 양쪽 owner PID 생존 여부, backlog closed SHA/시간, 후속 archive marker 부재, GitHub Workflow ID/path/active와 원본 Issue/Runner 이름 6개 존재, 현재 Writer/Task fingerprint를 검사한다. 읽는 도중 원본 파일 해시나 lease/marker 존재 상태가 바뀌어도 즉시 UNKNOWN으로 중단한다.
+- 반환 상태가 `READONLY_INTERRUPTED_PHASE_CONSISTENT`이더라도 `C_CLAIM_PROVENANCE_NOT_EXTERNALLY_PINNED`, `claimProvenanceExternallyPinned=false`, `fullSourceBytePostcheckVerified=false`, `executionAuthorized=false`를 명시한다. 이름 6개를 가진 Runner의 등록 여부만 확인하며 **격리·전용·온라인 준비 상태를 증명하지 않는다**. 원본 C 소유권 승계 또는 archive 승인으로 사용할 수 없다.
+- 연결된 소스 단위·경합 부정 회귀 **29/29 PASS**(기존 backlog plan/readback 22건 + 새 관측기 7건). 실제 원본 Windows 실행/사후 증거는 아직 **0건**이며 5단계 수명주기 완료율은 **4/5 = 80%**로 유지한다.
+- **남은 별도 증명:** 원본 pause-window 전체 Issue 2회 조회·댓글/JSON/TXT 결과, Workflow 실행 이력, 각 설치 소스 파일의 실제 바이트 단위 postcheck, 격리 Runner 구성, C claim의 독립 provenance·안전한 소유권 인계 규칙. 이 중 하나라도 빠진 상태에서 새 C 복구 실행·lease archive를 승인하지 않는다.
+
 ## 후속 C 단계 설계 (source-only, 실행 금지)
 
 - 단일 후속 복구는 **이미 시도한 Workflow PUT과 backlog rename을 반복하지 않는다.** 다른 상태가 발견되면 먼저 원인을 분리하며 재시도하지 않는다.
