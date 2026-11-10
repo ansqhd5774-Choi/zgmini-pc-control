@@ -3,7 +3,8 @@ import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {execFileSync}from'node:child_process';
 import {requireHandoffCheckoutScope,requireStopped,requireNoReplacement,requireReceiverOrigin,requireNewReceiverOrigin,requireCurrentReceiverIdentity,reserveReceiverSlot,reservationFailureStatus,rollbackStatus,
-  priorRuntimeFiles,nextRuntimeFiles,requireSixToSevenContract,requireRollbackWindow,
+  priorRuntimeFiles,nextRuntimeFiles,requireSixToSevenContract,requireSevenToSevenContract,
+  requireHandoffApproval,approvedRuntimeChanges,handoffFilePlan,requireRollbackWindow,
   requireOriginalStartupBytes,preserveRollbackReservation}from'../tools/handoff-maintenance.mjs';
 import {sourceFiles as bootstrapFiles}from'../tools/bootstrap-maintenance.mjs';
 import {maintenanceOriginFiles}from'../tools/update.mjs';
@@ -55,6 +56,83 @@ test('old six-file install is admitted only with exact nine-file handoff source 
  assert.throws(()=>requireSixToSevenContract(old,missing),/HANDOFF_TARGET_FILE_SET_MISMATCH/);
  assert.throws(()=>requireSixToSevenContract(old,{...approved,['tools/update.mjs']:'bad'}),
   /HANDOFF_TARGET_FILE_SET_MISMATCH/);
+});
+test('V1 six-to-seven and V2 seven-to-seven require distinct, exact approvals',()=>{
+ const installedSha='b'.repeat(40),targetSha='c'.repeat(40);
+ const base={targetSha,installedSha,approved:true,scope:'COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'};
+ assert.equal(requireHandoffApproval({...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V1'},targetSha,installedSha),
+  'SIX_TO_SEVEN');
+ assert.equal(requireHandoffApproval({...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',
+  transition:'SEVEN_TO_SEVEN'},targetSha,installedSha),'SEVEN_TO_SEVEN');
+ for(const approval of [
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V1',transition:'SEVEN_TO_SEVEN'},
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2'},
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SIX_TO_SEVEN'},
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',approved:false},
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',installedSha:'d'.repeat(40)},
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',targetSha:'d'.repeat(40)},
+  {...base,schema:'ZGMINI_MAINTENANCE_HANDOFF_V2',transition:'SEVEN_TO_SEVEN',scope:'ANY'},
+ ])assert.throws(()=>requireHandoffApproval(approval,targetSha,installedSha),/HANDOFF_APPROVAL_REQUIRED/);
+});
+test('seven-to-seven checks all seven installed hashes and exact nine target hashes',()=>{
+ const oldHash='a'.repeat(64),newHash='b'.repeat(64);
+ const installed=Object.fromEntries(nextRuntimeFiles.map(name=>[name,oldHash]));
+ const target=Object.fromEntries([...nextRuntimeFiles,
+  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'].map(name=>[name,oldHash]));
+ target['tools/update.mjs']=newHash;
+ assert.doesNotThrow(()=>requireSevenToSevenContract(installed,target));
+ const plan=handoffFilePlan('SEVEN_TO_SEVEN',installed,target);
+ assert.deepEqual(plan.installed,nextRuntimeFiles);
+ assert.deepEqual(plan.writes,['tools/update.mjs']);
+ assert.deepEqual(plan.rollbackAdded,[]);
+ assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',installed,target),['tools/update.mjs']);
+ assert.equal(plan.installed.includes('tools/source-bundle-register.mjs'),true);
+ assert.equal(plan.writes.includes('tools/source-bundle-register.mjs'),false);
+ assert.throws(()=>approvedRuntimeChanges('SEVEN_TO_SEVEN',installed,{...target,['tools/update.mjs']:oldHash}),
+  /HANDOFF_NO_RUNTIME_CHANGE/);
+ const missing={...installed};delete missing['tools/source-bundle-register.mjs'];
+ assert.throws(()=>requireSevenToSevenContract(missing,target),/HANDOFF_INSTALLED_FILE_SET_MISMATCH/);
+ assert.throws(()=>requireSevenToSevenContract({...installed,['tools/unapproved.mjs']:oldHash},target),
+  /HANDOFF_INSTALLED_FILE_SET_MISMATCH/);
+ assert.throws(()=>requireSevenToSevenContract({...installed,['tools/update.mjs']:'bad'},target),
+  /HANDOFF_INSTALLED_FILE_SET_MISMATCH/);
+ const targetMissing={...target};delete targetMissing['tools/handoff-maintenance.mjs'];
+ assert.throws(()=>requireSevenToSevenContract(installed,targetMissing),
+  /HANDOFF_TARGET_FILE_SET_MISMATCH/);
+ assert.throws(()=>requireSevenToSevenContract(installed,{...target,['tools/unapproved.mjs']:oldHash}),
+  /HANDOFF_TARGET_FILE_SET_MISMATCH/);
+ assert.throws(()=>approvedRuntimeChanges('UNKNOWN',installed,target),/HANDOFF_TRANSITION_UNSUPPORTED/);
+});
+test('seven-to-seven rollback plan preserves all original runtime files and never removes an old module',()=>{
+ const installed=Object.fromEntries(nextRuntimeFiles.map((name,index)=>[name,
+  String(index+1).repeat(64)]));
+ const approved=Object.fromEntries([...nextRuntimeFiles,
+  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'].map(name=>[name,installed[name]??'f'.repeat(64)]));
+ approved['tools/update.mjs']='a'.repeat(64);
+ approved['tools/source-bundle-register.mjs']='b'.repeat(64);
+ const plan=handoffFilePlan('SEVEN_TO_SEVEN',installed,approved);
+ assert.equal(plan.installed.length,7);
+ assert.deepEqual(plan.writes,['tools/update.mjs','tools/source-bundle-register.mjs']);
+ assert.deepEqual(plan.rollbackAdded,[]);
+ assert.deepEqual(plan.installed,nextRuntimeFiles);
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-seven-seven-'));
+ try{
+  for(const rel of plan.installed){
+   const source=path.join(temp,'installed',rel),backup=path.join(temp,'backup',rel);
+   fs.mkdirSync(path.dirname(source),{recursive:true});fs.mkdirSync(path.dirname(backup),{recursive:true});
+   fs.writeFileSync(source,installed[rel]);fs.copyFileSync(source,backup);
+  }
+  for(const rel of plan.writes)fs.writeFileSync(path.join(temp,'installed',rel),approved[rel]);
+  for(const rel of plan.installed)fs.copyFileSync(path.join(temp,'backup',rel),
+   path.join(temp,'installed',rel));
+  for(const rel of plan.installed)assert.equal(
+   fs.readFileSync(path.join(temp,'installed',rel),'utf8'),installed[rel]);
+ }finally{fs.rmSync(temp,{recursive:true,force:true});}
+ const six=Object.fromEntries(priorRuntimeFiles.map(name=>[name,'a'.repeat(64)]));
+ const first=handoffFilePlan('SIX_TO_SEVEN',six,approved);
+ assert.deepEqual(first.installed,priorRuntimeFiles);
+ assert.deepEqual(first.writes,nextRuntimeFiles);
+ assert.deepEqual(first.rollbackAdded,['tools/source-bundle-register.mjs']);
 });
 test('pre-stop handoff rejects any startup byte drift from installed manifest',()=>{
  const startup=Buffer.from('approved startup vbs\r\n');
