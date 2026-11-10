@@ -70,12 +70,21 @@ export function handoffFilePlan(mode,installedFiles,approvedFiles){
 // a hard link, symlink or parent junction can alias an unapproved location.
 export function requireDirectInstalledFiles(installRoot,relFiles,io=fs){
  need(path.isAbsolute(installRoot),'HANDOFF_PATH_ALIAS');
- const rootStat=io.lstatSync(installRoot);
- need(rootStat.isDirectory()&&!rootStat.isSymbolicLink(),'HANDOFF_PATH_ALIAS');
+ // Walk from the volume root, not merely the installation directory: on
+ // Windows a parent junction can redirect the entire trusted E: or APPDATA
+ // subtree even when every file below it has the expected approved hash.
+ const absoluteRoot=path.resolve(installRoot),volumeRoot=path.parse(absoluteRoot).root;
+ need(absoluteRoot!==volumeRoot,'HANDOFF_PATH_ALIAS');
+ let ancestor=volumeRoot;
+ for(const part of path.relative(volumeRoot,absoluteRoot).split(path.sep).filter(Boolean)){
+  ancestor=path.join(ancestor,part);
+  const stat=io.lstatSync(ancestor);
+  need(stat.isDirectory()&&!stat.isSymbolicLink(),'HANDOFF_PATH_ALIAS');
+ }
  for(const rel of relFiles){
   need(typeof rel==='string'&&!path.isAbsolute(rel)
     &&rel.split('/').every(p=>p&&p!=='.'&&p!=='..'),'HANDOFF_PATH_ALIAS');
-  let current=installRoot;
+  let current=absoluteRoot;
   const parts=rel.split('/');
   for(const part of parts.slice(0,-1)){
    current=path.join(current,part);
@@ -106,6 +115,15 @@ export function requireOwnedInstallGuard(installRoot,guard,io=fs){
  catch{need(false,'HANDOFF_UPDATE_ACTIVE');}
  need(current.pid===guard.owner.pid&&current.nonce===guard.owner.nonce,
   'HANDOFF_UPDATE_ACTIVE');
+}
+export function requireHandoffProbeGuard(installRoot,guard,target,io=fs){
+ requireOwnedInstallGuard(installRoot,guard,io);
+ let marker=null;
+ try{marker=JSON.parse(io.readFileSync(path.join(installRoot,'HANDOFF_RECEIVER_PROBE_GUARD.json'),'utf8'));}
+ catch{need(false,'HANDOFF_PROBE_GUARD_LOST');}
+ need(marker.schema==='ZGMINI_HANDOFF_RECEIVER_PROBE_V1'
+  &&marker.targetSha===target&&marker.pid===guard.owner.pid
+  &&marker.nonce===guard.owner.nonce,'HANDOFF_PROBE_GUARD_LOST');
 }
 const git=a=>execFileSync('git',a,{cwd:repo,windowsHide:true,maxBuffer:3000000});
 // Unrelated docs/results edits do not affect this exact approved handoff.
@@ -235,6 +253,8 @@ export async function main(args=process.argv.slice(2)){
  const installedRuntimeFiles=filePlan.installed;
  if(mode===sevenToSeven){
   requireNoUnfinishedHandoff(root);
+  need(!fs.existsSync(root+'/HANDOFF_RECEIVER_PROBE_GUARD.json'),
+   'HANDOFF_PRIOR_RECOVERY_REQUIRED');
   requireDirectInstalledFiles(root,[...installedRuntimeFiles,'MAINTENANCE_INSTALL.json']);
   for(const rel of ['leases','backups','receivers']){
    if(rel==='backups'&&!fs.existsSync(path.join(root,rel)))continue;
@@ -319,11 +339,16 @@ export async function main(args=process.argv.slice(2)){
    const {acquireMaintenanceLock}=await import(pathToFileURL(path.join(repo,'tools/maintenance-lock.mjs')));
    sharedGuard=acquireMaintenanceLock(root,'controller-install');
    requireOwnedInstallGuard(root,sharedGuard);
+   fs.writeFileSync(root+'/HANDOFF_RECEIVER_PROBE_GUARD.json',JSON.stringify({
+    schema:'ZGMINI_HANDOFF_RECEIVER_PROBE_V1',targetSha:target,
+    pid:sharedGuard.owner.pid,nonce:sharedGuard.owner.nonce,at:new Date().toISOString(),
+   })+'\n',{flag:'wx',mode:0o600});
+   requireHandoffProbeGuard(root,sharedGuard,target);
   }
   reservation=reserveReceiverSlot(root+'/leases/receiver');
   reservation.verify();
   requireStopped(priorOwner);
-  if(sharedGuard)requireOwnedInstallGuard(root,sharedGuard);
+  if(sharedGuard)requireHandoffProbeGuard(root,sharedGuard,target);
   else need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
   if(mode===sevenToSeven)
    requireDirectInstalledFiles(root,[...installedRuntimeFiles,'MAINTENANCE_INSTALL.json']);
@@ -333,7 +358,7 @@ export async function main(args=process.argv.slice(2)){
    fs.writeFileSync(path.join(root,rel),bytes[rel],
     mode===sixToSeven&&rel===newRuntimeFile?{flag:'wx'}:undefined);
   }
-  if(sharedGuard)requireOwnedInstallGuard(root,sharedGuard);
+  if(sharedGuard)requireHandoffProbeGuard(root,sharedGuard,target);
   for(const rel of nextRuntimeFiles)
    need(sha(fs.readFileSync(path.join(root,rel)))===sha(bytes[rel]),
     'HANDOFF_POSTWRITE_HASH_MISMATCH');
@@ -362,7 +387,12 @@ export async function main(args=process.argv.slice(2)){
      requireNewReceiverOrigin(priorOwner,priorProof,current,proof,
        {sourceSha:target,startupSha256:sha(startupBytes)},capture,owner());
       if(sharedGuard){
-       requireOwnedInstallGuard(root,sharedGuard);
+       requireHandoffProbeGuard(root,sharedGuard,target);
+       // Archive our exact probe marker only after Windows CAPTURE. While the
+       // shared B lease is still held, the receiver returns QUEUED without
+       // claiming any pending B request.
+       fs.renameSync(root+'/HANDOFF_RECEIVER_PROBE_GUARD.json',
+        root+'/handoff-'+target+'.verified-guard.json');
        sharedGuard.release();sharedGuard=null;
       }
      result.status='PASS';result.code='STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED';result.receiverPid=current.pid;persist();return result;
