@@ -5,8 +5,10 @@
 const REQUEST_ID = 'pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
+const SOURCE_REPO = 'ansqhd5774-Choi/zgmini';
 const FIELDS = ['chatId', 'operation', 'requestId', 'schema',
   'sourceBranch', 'sourceRepository', 'sourceSha'];
+const SCOPED_FIELDS = ['preimageManifestPath', 'preimageManifestSha256'];
 const sha40 = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
 const at = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
   ? Date.parse(value) : NaN;
@@ -17,15 +19,31 @@ const stop = code => Object.freeze({schema:'ZGMINI_996_BACKLOG_PLAN_V1',
 function strictRequest(issue) {
   let body;
   try {body=JSON.parse(issue.body);} catch {return null;}
+  if(!body || Array.isArray(body) || typeof body !== 'object')return null;
+  const keys=Object.keys(body);
+  // Match controller/common.mjs: the scoped writer preimage request is the
+  // only admitted nine-field variant. Extra arbitrary Issue keys still fail.
+  const scoped=body.operation==='writer-install-preimage-readonly'&&
+    keys.length===FIELDS.length+SCOPED_FIELDS.length&&
+    SCOPED_FIELDS.every(k=>Object.hasOwn(body,k));
+  const fieldsValid=keys.length===FIELDS.length+
+      (scoped?SCOPED_FIELDS.length:0)&&
+    FIELDS.every(k=>Object.hasOwn(body,k))&&
+    keys.every(k=>FIELDS.includes(k)||(scoped&&SCOPED_FIELDS.includes(k)));
   if(!body || Array.isArray(body) || typeof body !== 'object' ||
-    JSON.stringify(Object.keys(body).sort()) !== JSON.stringify(FIELDS) ||
+    !fieldsValid ||
     body.schema !== 'ZGMINI_PC_JOB_V1' ||
-    !/^[a-z0-9-]{8,80}$/.test(body.requestId ?? '') ||
-    !/^[0-9a-f-]{36}$/.test(body.chatId ?? '') ||
+    !/^[a-z0-9][a-z0-9-]{7,79}$/.test(body.requestId ?? '') ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(body.chatId ?? '') ||
     !sha40(body.sourceSha) ||
-    typeof body.operation !== 'string' ||
-    typeof body.sourceRepository !== 'string' ||
-    typeof body.sourceBranch !== 'string') return null;
+    typeof body.operation !== 'string' || body.operation.length===0 ||
+    body.sourceRepository !== SOURCE_REPO ||
+    typeof body.sourceBranch !== 'string' ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9_./-]{0,159}$/.test(body.sourceBranch)||
+    body.sourceBranch.includes('..') ||
+    body.sourceBranch.endsWith('.lock') ||
+    (scoped&&(!/^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(body.preimageManifestPath??'')||
+      !/^[0-9a-f]{64}$/.test(body.preimageManifestSha256??''))))return null;
   return body;
 }
 
@@ -64,8 +82,10 @@ export function plan996BacklogWithoutReplay({requestId,pause,cutoffAt,
     if(issue.pull_request)continue;
     const labels=issue.labels?.map(v=>typeof v==='string'?v:v?.name);
     if(!Array.isArray(labels)||!labels.includes('pc-job'))continue;
-    if(issue.repository!==REPO||issue.user?.login!==OWNER||
-      issue.title!=='pc-job')return stop('ORIGINAL_ADMISSION_UNVERIFIED');
+    // The real pc-job entrypoint admits by label, owner and request schema;
+    // descriptive Issue titles (e.g. "core-status") are valid.
+    if(issue.repository!==REPO||issue.user?.login!==OWNER)
+      return stop('ORIGINAL_ADMISSION_UNVERIFIED');
     const request=strictRequest(issue);
     if(!request)return stop('ORIGINAL_BODY_INVALID');
     candidateIssues.add(String(issue.number));
