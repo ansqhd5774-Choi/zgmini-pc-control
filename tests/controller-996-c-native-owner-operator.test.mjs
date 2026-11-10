@@ -42,6 +42,14 @@ test('operator is only a conditional source candidate, not old C runner',()=>{
   assert.match(source,/collect996OriginalCPrewriteReadOnly/);
   assert.match(source,/inspect996COriginalStageReadOnly/);
   assert.match(source,/\.NET Directory\.Move|\[IO\.Directory\]::Move/);
+  assert.match(source,/\$expectedNames=@\(\$expect\.PSObject\.Properties\.Name/);
+  assert.match(source,/Get-FileHash -LiteralPath \$f -Algorithm SHA256/);
+  assert.match(source,/ReparsePoint/);
+  assert.match(source,/\$marker\.ownerNonce -cne \$owner\.nonce/);
+  assert.match(source,/Get-Process -Id \(\[int\]\$owner\.pid\)/);
+  assert.match(source,/ownerMode:'DEAD_OLD'/);
+  assert.match(source,/ownerMode:'DEAD_INSTALL'/);
+  assert.match(source,/ownerMode:'LIVE_NEW',actorPid:process\.pid,nonce/);
   assert.match(source,/CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE/);
   assert.match(source,/steps\[2\]\.name==='install'/);
   assert.match(source,/automaticRetry:false/);
