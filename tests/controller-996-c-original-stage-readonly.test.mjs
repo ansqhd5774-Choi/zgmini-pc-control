@@ -170,6 +170,26 @@ test('legitimate new canonical install claim after final release is not moved',t
   assert.equal(result.originalPcWrites,0);
 });
 
+test('a foreign canonical install owner before release cannot pass',t=>{
+  const fix=fixture(t);
+  store(fix.root,`${L}/controller-install/owner.json`,
+    {pid:999,nonce:'foreign-install-owner'});
+  const result=inspect(fix);
+  assert.equal(result.code,'C_STAGE_ORIGINAL_LEASE_SHA_CHANGED');
+  assert.equal(result.executionAuthorized,false);
+});
+
+test('independent maintenance receiver and Writer work are not global-idle gates',t=>{
+  const fix=fixture(t);
+  store(fix.root,`${L}/receiver/owner.json`,
+    {pid:333,nonce:'legitimate-independent-receiver'});
+  store(fix.root,'data/pc-writer/active-job.json',
+    {pid:444,nonce:'separate-writer-data-lane'});
+  const result=inspect(fix,{isAlive:pid=>[777,333,444].includes(pid)});
+  assert.equal(result.status,'C_STAGE_LIVE_INVENTORY_READ_ONLY');
+  assert.equal(result.executionAuthorized,false);
+});
+
 test('unapproved non-TEMP or normal Windows execution is denied on Linux',t=>{
   const fix=fixture(t);
   const result=inspect996COriginalStageReadOnly({root:fix.root,
