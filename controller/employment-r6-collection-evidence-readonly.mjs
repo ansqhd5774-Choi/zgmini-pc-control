@@ -78,7 +78,7 @@ const day=x=>Date.parse(x+'T00:00:00Z');
 function coverage(rows){
  if(!Array.isArray(rows))return {status:'UNKNOWN'};
  const weeks=rows.map(r=>({week:date(r.observation_date),count:safeInt(r.row_count),regions:safeInt(r.region_count),
-  unknown:safeInt(r.unknown_code_count),nonpositive:safeInt(r.nonpositive_count)})).filter(x=>x.week);
+  unknown:safeInt(r.unknown_code_count),zeroPriorRegions:safeInt(r.zero_prior_region_count)})).filter(x=>x.week);
  weeks.sort((a,b)=>a.week.localeCompare(b.week));
  const complete=x=>x?.count===51&&x?.regions===51&&x?.unknown===0;
  let latestCandidate=null,earliestBreak=null,latestBreak=null,eligible=0;
@@ -89,7 +89,9 @@ function coverage(rows){
   if(current.length!==4||previous.length!==4||!consecutive(current)||!consecutive(previous)||
      current.some((x,j)=>day(x.week)-day(previous[j].week)!==52*7*86400000))reason='WEEK_ALIGNMENT_GAP';
   else if([...current,...previous].some(x=>!complete(x)))reason='REGION_51_COVERAGE_GAP';
-  else if(previous.some(x=>x.nonpositive!==0))reason='PRIOR_4W_NONPOSITIVE';
+  // R6 rejects only a zero four-week PRIOR average per state, not an individual
+  // zero-valued weekly observation. The prior window ends at previous[3].
+  else if(previous[3].zeroPriorRegions!==0)reason='PRIOR_4W_ZERO_BASE';
   if(reason){if(!earliestBreak)earliestBreak={week:weeks[i].week,reason};latestBreak={week:weeks[i].week,reason};}
   else{latestCandidate=weeks[i].week;eligible++;}
  }
@@ -154,12 +156,23 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
   stage='STATE_CLAIMS_51_COVERAGE';
   // All geography labels are fixed source constants; only aggregates leave the DB.
   const countryMarkers=CORE_STATES.map(()=>'?').join(',');
-  const weekly=db.prepare(`SELECT observation_date,COUNT(*) AS row_count,
-   COUNT(DISTINCT geography_code) AS region_count,
-   SUM(CASE WHEN geography_code NOT IN (${countryMarkers}) THEN 1 ELSE 0 END) AS unknown_code_count,
-   SUM(CASE WHEN value<=0 THEN 1 ELSE 0 END) AS nonpositive_count
-   FROM market_score_employment_r4_shadow_current_v1
-   WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
+  const weekly=db.prepare(`WITH recent_weeks AS (
+    SELECT observation_date FROM market_score_employment_r4_shadow_current_v1
+    WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
+    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 160
+   ), region_windows AS (
+    SELECT c.observation_date,c.geography_code,
+     SUM(c.value) OVER (PARTITION BY c.geography_code ORDER BY c.observation_date
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_week_total
+    FROM market_score_employment_r4_shadow_current_v1 AS c
+    INNER JOIN recent_weeks AS w ON w.observation_date=c.observation_date
+    WHERE c.logical_series_id='STATE_INITIAL_CLAIMS' AND c.geography_type='STATE'
+   )
+   SELECT observation_date,COUNT(*) AS row_count,
+    COUNT(DISTINCT geography_code) AS region_count,
+    SUM(CASE WHEN geography_code NOT IN (${countryMarkers}) THEN 1 ELSE 0 END) AS unknown_code_count,
+    SUM(CASE WHEN prior_four_week_total=0 THEN 1 ELSE 0 END) AS zero_prior_region_count
+   FROM region_windows
    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 160`).all(...CORE_STATES);
   result.stateClaims=coverage(weekly);
   result.status='PASS';result.code='R6_DOL_BED_STORED_EVIDENCE_READONLY';
