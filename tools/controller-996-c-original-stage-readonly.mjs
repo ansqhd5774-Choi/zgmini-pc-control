@@ -114,8 +114,10 @@ function round(root,id,pins,actorPid,readWorkflow,readProtected,readSource,isAli
   const names=namesFor(id),all=fs.readdirSync(directory(root,LEASES));
   const allowed=new Set([...Object.values(names),
     'controller-recovery-continuation-reservation']);
-  need(!all.some(n=>n.startsWith('controller-recovery-continuation-')&&
-    !allowed.has(n)),'C_STAGE_FOREIGN_CONTINUATION_PRESENT');
+  const foreignContinuations=all.filter(n=>
+    n.startsWith('controller-recovery-continuation-')&&!allowed.has(n));
+  need(foreignContinuations.length===0,
+    'C_STAGE_FOREIGN_CONTINUATION_PRESENT');
   const full={};
   for(const [key,name] of Object.entries(names))
     full[key]=inventory(root,LEASES+'/'+name);
@@ -177,9 +179,13 @@ function round(root,id,pins,actorPid,readWorkflow,readProtected,readSource,isAli
   'C_STAGE_GIT_84_BYTES_UNVERIFIED');
   const workflowState=readWorkflow();
   need(workflowState==='active','C_STAGE_WORKFLOW_NOT_ACTIVE');
-  const canonicalNewOwner=full.install.present&&
-    full.installArchive.present&&
-    !same(full.install.files,pins.classifierPins.install);
+  // Only the exact canonical `controller-install` lease can conflict with
+  // the final release. Receiver, normal Writer and Supervisor leases are
+  // independent and must not become a global-idle admission gate.
+  const foreignInstallOwnerCount=Number(full.install.present&&
+    full.install.files?.['owner.json']!==pins.originalPins.installOwner);
+  const canonicalNewOwner=full.installArchive.present&&
+    foreignInstallOwnerCount===1;
   return {paths:Object.fromEntries(Object.entries(full).map(([k,v])=>
       [k,{present:v.present,files:v.files}])),
     identities:Object.fromEntries(Object.entries(full).map(([k,v])=>[k,v.ids])),
@@ -188,7 +194,9 @@ function round(root,id,pins,actorPid,readWorkflow,readProtected,readSource,isAli
       pid:owner.pid},ready,
     reservation:{sha:res.sha,id:res.identity},
     workflowState,protectionFingerprint:protectedState.protectedFingerprint,
-    sourceBytesSha256:git.sourceBytesSha256,canonicalNewOwner};
+    sourceBytesSha256:git.sourceBytesSha256,canonicalNewOwner,
+    leaseConflicts:{foreignInstallOwnerCount,
+      otherContinuationCount:foreignContinuations.length}};
 }
 
 /** Only a future separately approved operator may use this readback as ONE
@@ -233,7 +241,8 @@ export function inspect996COriginalStageReadOnly({testOnly=false,root=ROOT,
         readOnly:true,twoSnapshotsIdentical:true,fresh:true,
         conflicts:{scope:'CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES',
           workflowState:second.workflowState,protectionVerified:true,
-          foreignInstallOwnerCount:0,otherContinuationCount:0,
+          foreignInstallOwnerCount:second.leaseConflicts.foreignInstallOwnerCount,
+          otherContinuationCount:second.leaseConflicts.otherContinuationCount,
           twoSnapshotsIdentical:true,fresh:true},
         paths:second.paths,continuationOwner:second.owner,ready:second.ready},
       pins:pins.classifierPins,
