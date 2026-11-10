@@ -73,3 +73,9 @@
 - 관련 Windows 로컬 테스트 **126/126 PASS**. 새 source의 실제 Windows 읽기 전용 prepare 1회도 `POSTSWITCH_APPROVAL_CANDIDATE_READONLY`, `operationalWrites=0`으로 통과했다. 새 C 실행은 0회다.
 - 최초 승인은 d82b662의 16개 해시를 고정했다. 새 코드를 기존 승인 원문에 몰래 대입하지 않는다. 새 source/해시의 명시적 C 동의 후에만 해당 후보를 활성 승인으로 고정해 이어받을 수 있다.
 - Controller **7/8**, 공통 대기열 **4/5** 유지. 아직 최종 postcheck/원장 연결/install lease 보관은 완료되지 않았다.
+## 2026-11-10 후속 C 계약 사용자 명시 승인
+
+- 사용자가 #919 재실행 없이 기존 #1215 성공 결과 연결·후속 검사·잠금 보관만 하는 후속 C 계약을 명시적으로 승인했다.
+- 실행 코드 source `776cfcf8a77b9b48f813c59d030fac01922e044d` 및 candidate 원문 `88db8171...`의 나머지 항목을 바꾸지 않고 approved만 true로 고정했다.
+- 새 실행 승인 원문 SHA-256: `fbea40ba0ead0961088891d1187ea9b8a50e352b73fd87ac03616d49940dc860`.
+- 승인 적용 직전 기존 journal 5건/tail, claim owner, 원본 ledger, 최신 config 일치 및 continuation 미시작을 확인했다. 승인 계약 집중 검사 10/10 PASS. 실제 후속 C 실행 결과는 아래 후속 증거로 구분한다.

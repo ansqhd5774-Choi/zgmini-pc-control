@@ -4,7 +4,7 @@
   "operation": "FORWARD_POSTSWITCH_917",
   "requestId": "pc-update-877e10c8-8580-4095-a675-bef9ec032193",
   "issueNumber": 917,
-  "sourceSha": "d82b66206d78b1f9d90f846dce1b67b7f36f6719",
+  "sourceSha": "776cfcf8a77b9b48f813c59d030fac01922e044d",
   "installedShaBefore": "c09bf6a6f66f229016135020d6ba553ba9a94676",
   "targetControllerSha": "badad9124157879d7a645b64f2768113d632355b",
   "evidenceHashes": {
@@ -17,17 +17,17 @@
     "backlog": "e163128540b51bb0c2cd8c9503b9474a59ffce28e24b103fff1be82f07019708"
   },
   "toolHashes": {
-    "tools/controller-postswitch-launcher.mjs": "4cce533d4e53df4fb1804ed0bb29128470da71aac2269ad1dbd0772f208f3f28",
-    "tools/controller-postswitch-approval.mjs": "d680e6080f92759a155578553e09a0c12de57bd339c2e97b09d5cf916142d592",
-    "tools/controller-postswitch-operator.mjs": "abfc8c4f5ed4a1cab5fdb00a19b29d427585606ee14d26275e2aad25f40991bf",
-    "tools/controller-postswitch-windows.mjs": "c63c029b8fb4fa096dad6605f450db882fa42b62924ce47cb57d62fbcda676f9",
+    "tools/controller-postswitch-launcher.mjs": "9acb2802e9b0730813a377e1dcacb2bf620584f83c1fe788538d6bcea8448f5e",
+    "tools/controller-postswitch-approval.mjs": "93cd073e2af8a95e4681c26b7b57c8a81a59d46b8b4866a96b6f758dc939b8d1",
+    "tools/controller-postswitch-operator.mjs": "29d101e787d126a2b9d0313736c9cc9dfa934a3881a2b9d015da03dd919bcfdb",
+    "tools/controller-postswitch-windows.mjs": "33832a1e6e3f48d5710b805b9443204ebad0842e19af995c120fc0245c1622bf",
     "tools/controller-postswitch-evidence.mjs": "4f3f3b88214f60810d165288be4fc66ff7e267869a356de597447ec3e5f6c0a5",
     "tools/controller-postswitch-writer-readonly.mjs": "a9d059edc0be9b42a18425ec942e7f6d2b39763188abaa57810fc80625ed6fe0",
-    "tools/controller-postswitch-preflight.mjs": "24046042f70bcf3d120acd5a63150680b89feaeac4ca370b4211df8f408fc28b",
+    "tools/controller-postswitch-preflight.mjs": "5745c5c0539326f7823c08ceaf4708e3c0d9b7152e18ced609f386a4326cc67e",
     "tools/controller-postswitch-backlog.mjs": "0de9a22cf08224c80765b8690dd64a64c89dbe455de1c4a78a06417cb7f28477",
     "tools/controller-postswitch-postcheck.mjs": "1477fae0fd579790e540588ba9c359c1e6bbcf762559c3a2095cd4a7cb08dd73",
-    "tools/controller-postswitch-reconciliation.mjs": "d322db855325525653f608ac75e0d3c8446f8957d44373b7994ccfb66c881d3b",
-    "tools/controller-postswitch-state.mjs": "7092ee176767f9b154a1c297ecb524df7a8915796cbb9eadfd2db614158328bd",
+    "tools/controller-postswitch-reconciliation.mjs": "80972f232a61b7acaab1b4d2c8a4a4fcf0b0cde37862ec158649cac7cfdc06c3",
+    "tools/controller-postswitch-state.mjs": "4451e8c4485785e1779c5a25290fe10bdb51ff792ddda4f4189b03325425beb4",
     "tools/update.mjs": "79be7fb3763a8478a7384f924550dfacaadf3b7939726b0fb22854a402e95489",
     "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
     "tools/maintenance-contract.mjs": "98ed143788e8433c93cb558a6e81939e0f7f5387be7b847ee2791406b1184197",
@@ -122,6 +122,31 @@
       "configSha256": "0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453",
       "evidenceLevel": "READONLY_CONFIG_BYTES_NOT_LIVE_CORE_PROCESS"
     }
+  },
+  "resume": {
+    "schema": "ZGMINI_PC_POSTSWITCH_RESUME_1215_V1",
+    "priorSourceSha": "d82b66206d78b1f9d90f846dce1b67b7f36f6719",
+    "priorApprovalCommitSha": "ec4ffa2b4368c48dca39c294eb6d3735f9a28523",
+    "priorApprovalSha256": "348d69a0662649f93a9de45996647e364dc9a8bfe5891917bd13b128fe1653d2",
+    "ownerSha256": "f4757f63441e925790f231acb604213662a6e314b7351882cc436090abb68766",
+    "recordCount": 5,
+    "recordTailSha256": "7331a2615c1bf655a6f86981cdf83214cecfbfd6cda5e7a68b55a930a52d78a9",
+    "originalIssueNumber": 919,
+    "replayIssueNumber": 1215,
+    "originalRequestId": "pc-290d6501-ab68-4fda-b4c4-473b582fb2f1",
+    "replayBodySha256": "d2e9d5a4e35e141621536ec7fd123acb3167bdb5acc77b61915db4bd0dfecc8f",
+    "results": [
+      {
+        "path": "results/42729529997-1-seat-5.json",
+        "blobSha": "823e307338b4703e79bc452b188afd62a57181e0",
+        "sha256": "b22360c640e854432766fb697513bca5c30b546e1840f9f3ae04c1058fed9361"
+      },
+      {
+        "path": "results/42729529997-1-seat-5.txt",
+        "blobSha": "e5c1b94da668b2ea03aac7cd5fc69c842a8e93d5",
+        "sha256": "922b18dd190608ed071894bf954c52f7fb3ec1ac0ed2e92786fee386de6b18fe"
+      }
+    ]
   },
   "postcheck": {
     "operation": "core-status",
