@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 기존 B급 Source Bundle 재사용 여부 — 원본 Install 순환 대기 확인
+
+- 정규 Maintainer `16064e29...`의 `tools/source-bundle-register.mjs`, `maintenance-apply.mjs`, `update.mjs:applySourceBundleOnly` 원문을 검토했다. B급 Source Bundle 등록은 `sourceExecuted:false` 및 `host.json`의 `HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY` 계약으로, 임의 C 보관 운영기를 검증 후 실행하는 trusted bootstrap이 아니다. 해당 B 업무를 C 권한으로 재해석/재사용하지 않는다.
+- 더욱이 `update.mjs` Source Bundle 경로는 고정 `controller-install` 잠금을 먼저 획득한다. #996 구 C에서 원본 `controller-install`이 복구 마커와 함께 점유 중이므로 이 B 경로를 준비 단계로 호출하면 **같은 잠금에 순환 대기/실패**한다. 승인 없는 Controller 전체 B 재설치나 다른 브랜치 수정으로 우회하지 않는다.
+- 다음 필수 과제는 **별도 사용자 C급 검증/승인 루트**에서 실행 전에 S1/S2/Owner의 바이트를 인증할 수 있는 최소 정규 bootstrap 경로를 확정하고, 기존 원본 Install 보관 직전 Native CAS/경합 보호를 완성하는 것이다. 아직 하드 STOP 유지, 실 PC 쓰기 0, **4/5=80%→80% C NO-GO**.
+
+
 ## 2026-11-11 C 설치/복구 실제 충돌 스냅샷 연결 — 287/287 PASS, 운영 80% 유지
 
 - `controller-996-c-original-stage-readonly.mjs`의 classifier 충돌 두 필드를 상수 `0`에서 **실제 각 E: 경로 inventory 판독 결과**로 연결했다. `foreignInstallOwnerCount`는 canonical `controller-install/owner.json` 원본 SHA 불일치, `otherContinuationCount`는 확인된 허용 이름 이외의 별도 continuation 존재 개수다. 2회 스냅샷 동일성 검사 후 이 값이 classifier로 전달되며, 원본 Install SHA drift·다른 C 작업은 STOP, 독립 receiver/일반 Writer 활동은 유휴 Gate가 아니다.
