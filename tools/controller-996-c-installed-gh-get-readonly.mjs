@@ -22,7 +22,8 @@ const error=code=>Object.assign(Error(code),{code});
 const allow=endpoint=>typeof endpoint==='string'&&(
   new RegExp(`^issues/${ISSUE}$`).test(endpoint)||
   new RegExp(`^issues/${ISSUE}/comments\\?per_page=100&page=(?:[1-9]|[1-9][0-9]|100)$`).test(endpoint)||
-  new RegExp(`^contents/${MANIFEST.replaceAll('.','\\.')}\\?ref=[a-f0-9]{40}$`).test(endpoint)
+  new RegExp(`^contents/${MANIFEST.replaceAll('.','\\.')}\\?ref=[a-f0-9]{40}$`).test(endpoint)||
+  endpoint==='actions/workflows/pc-job.yml'
 );
 
 function originalWindowsOnly(){
@@ -83,8 +84,7 @@ export function create996InstalledGhGetReadOnly({testOnly=false,
     catch{throw error('C_996_INSTALLED_GH_JSON_INVALID');}
     return Object.freeze({status:200,data});
   };
-  return Object.freeze({
-    async authenticateReadOnly(){
+  const authenticate=()=>{
       need(!attempted,'C_996_INSTALLED_GH_AUTH_REUSED');
       attempted=true;
       const repo=getOnly(`repos/${REPO}`).data;
@@ -99,11 +99,26 @@ export function create996InstalledGhGetReadOnly({testOnly=false,
         ownerAccountId:OWNER_ID,repository:REPO,repositoryId:REPO_ID,
         private:true,readOnly:true,executionAuthorized:false,
         testOnly:testOnly===true});
+  };
+  return Object.freeze({
+    async authenticateReadOnly(){
+      return authenticate();
     },
     async get(endpoint){
-      need(checked&&allow(endpoint),
+      // The workflow read is exposed only through the validated, fixed
+      // readWorkflowStateReadOnly() interface, not the generic consent port.
+      need(checked&&allow(endpoint)&&endpoint!=='actions/workflows/pc-job.yml',
       'C_996_INSTALLED_GH_GET_NOT_AUTHORIZED');
       return getOnly(`repos/${REPO}/${endpoint}`);
+    },
+    readWorkflowStateReadOnly(){
+      if(!checked)authenticate();
+      const value=getOnly(`repos/${REPO}/actions/workflows/pc-job.yml`).data;
+      need(Number.isSafeInteger(value?.id)&&value.id>0&&
+        value.path==='.github/workflows/pc-job.yml'&&
+        value.state==='active',
+      'C_996_INSTALLED_GH_WORKFLOW_STATE_UNVERIFIED');
+      return value.state;
     },
   });
 }
