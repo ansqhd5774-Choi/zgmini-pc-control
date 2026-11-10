@@ -1,5 +1,10 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 기존 PC 해시 5개 화면 판독·10핀 후보 완성 — 운영 C NO-GO
+
+- 사용자가 **기존 PC** PowerShell에서 C Claim owner·Backlog·3개 진행 Marker의 SHA256을 읽기 전용으로 조회했고 5줄이 모두 정상 출력되었다. 화면 내 `BLOCKED` 없음. 스크린샷 SHA256 `b54905f5017f91c472e2e3dedfc7a8a4a3ce532e150fc6c10400e40974307b9e`, 독립 판독 2회 동일, 5/5 64hex 일치. 화면 원본 미게시, 비민감 전사와 구 R3/R4 고정 5개를 합친 **총 10개 후보 해시**를 `artifacts/controller-996/zgmini-996-original-windows-10-pin-screen-readback-20261111.json`에 기록하고 원격 바이트 재조회했다.
+- 이 값들은 사용자 제공 화면 및 과거 고정 증거의 결합이다. **새 원본 PC 독립 실행 신원·최종 실행 직전 동일한 파일 바이트·Writer/Controller 경합·신규 Owner Consent·Operator SHA/ZIP/Source Lock은 아직 미검증**. 이는 승인 Manifest 자체가 아니며 현재 C 운영 쓰기 0, 신규 승인 0, `executionAuthorized=false`다. **사용자에게 동일 5개 SHA 추가 수동 반복 요청은 하지 않는다**. 다음 필수 개발은 운영 C operator·독립 소유권/경합 CAS/중단 회복 프로토콜 및 정확 Source Lock 구현이다. PR Draft, **80%→80%, C NO-GO**.
+
 ## 2026-11-11 원본 PC C 사전검증 10핀 2회 읽기 전용 소스 — **실행 전/운영 C NO-GO**
 
 - 원본 PC에서만 사용하도록 제한한 `tools/controller-996-c-original-prewrite-readonly.mjs`와 단위시험 1개를 Draft PR #1222에 추가했다. 기존 C Claim owner·Marker 3개·Install Lease 2개·Backlog·세 Source Manifest **정확히 10개 SHA/파일 식별정보 2회**, 이전 Owner PID 종료·신규 archive/continuation 부재·R1 보호 14/14·R4 Git bytes 84/84를 안전하게 판독하도록 구성했다. **아직 원본 PC에서 신규 소스를 실행한 적은 없고, CLI/CMD/ZIP도 없다.** 모의 입력에서는 진본성 증명이 되지 않는다.
