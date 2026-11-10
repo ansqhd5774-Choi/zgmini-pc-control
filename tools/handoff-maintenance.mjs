@@ -4,9 +4,9 @@ import fs from 'node:fs';import path from 'node:path';import {createHash,randomU
 import {execFileSync} from 'node:child_process';import {fileURLToPath,pathToFileURL} from 'node:url';
 const root='E:/ZGmini/automation/pc-maintenance';
 const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-// The live receiver is a six-file installation. The approved replacement has
-// seven runtime files; the new module must be installed atomically with its
-// importers, never loaded from an unpinned checkout or an old installation.
+// The initial handoff grows an approved six-file receiver to seven files.
+// Subsequent seven-to-seven handoffs require a separate, explicit V2 approval.
+// Neither mode may load unpinned checkout bytes or mutate an active receiver.
 export const priorRuntimeFiles=Object.freeze([
  'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
@@ -17,6 +17,8 @@ export const nextRuntimeFiles=Object.freeze([...priorRuntimeFiles,
 const newRuntimeFile='tools/source-bundle-register.mjs';
 const handoffSourceFiles=[...nextRuntimeFiles,
  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+const sixToSeven='SIX_TO_SEVEN';
+const sevenToSeven='SEVEN_TO_SEVEN';
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
@@ -24,13 +26,44 @@ export function requireOriginalStartupBytes(installed,bytes){
  need(Buffer.isBuffer(bytes)&&/^[a-f0-9]{64}$/.test(installed?.startupSha256??'')
   &&sha(bytes)===installed.startupSha256,'HANDOFF_STARTUP_DRIFT');
 }
-export function requireSixToSevenContract(installedFiles,approvedFiles){
- const exact=(actual,expected)=>actual&&typeof actual==='object'&&!Array.isArray(actual)
+const exact=(actual,expected)=>actual&&typeof actual==='object'&&!Array.isArray(actual)
   &&Object.keys(actual).length===expected.length
   &&Object.keys(actual).every(name=>expected.includes(name))
   &&expected.every(name=>/^[a-f0-9]{64}$/.test(actual[name]??''));
+export function requireSixToSevenContract(installedFiles,approvedFiles){
  need(exact(installedFiles,priorRuntimeFiles),'HANDOFF_INSTALLED_FILE_SET_MISMATCH');
  need(exact(approvedFiles,handoffSourceFiles),'HANDOFF_TARGET_FILE_SET_MISMATCH');
+}
+export function requireSevenToSevenContract(installedFiles,approvedFiles){
+ need(exact(installedFiles,nextRuntimeFiles),'HANDOFF_INSTALLED_FILE_SET_MISMATCH');
+ need(exact(approvedFiles,handoffSourceFiles),'HANDOFF_TARGET_FILE_SET_MISMATCH');
+}
+export function requireHandoffApproval(approval,target,installedSha){
+ const valid=approval?.targetSha===target&&approval?.installedSha===installedSha
+  &&approval?.approved===true
+  &&['STOPPED_RECEIVER_IN_PLACE_ONLY','COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'].includes(approval?.scope);
+ need(valid,'HANDOFF_APPROVAL_REQUIRED');
+ if(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V1'
+    &&approval.transition===undefined)return sixToSeven;
+ if(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V2'
+    &&approval.transition===sevenToSeven)return sevenToSeven;
+ need(false,'HANDOFF_APPROVAL_REQUIRED');
+}
+export function approvedRuntimeChanges(mode,installedFiles,approvedFiles){
+ if(mode===sixToSeven)requireSixToSevenContract(installedFiles,approvedFiles);
+ else if(mode===sevenToSeven)requireSevenToSevenContract(installedFiles,approvedFiles);
+ else need(false,'HANDOFF_TRANSITION_UNSUPPORTED');
+ const changes=nextRuntimeFiles.filter(rel=>installedFiles[rel]!==approvedFiles[rel]);
+ need(changes.length>0,'HANDOFF_NO_RUNTIME_CHANGE');
+ return changes;
+}
+export function handoffFilePlan(mode,installedFiles,approvedFiles){
+ const changes=approvedRuntimeChanges(mode,installedFiles,approvedFiles);
+ return {
+  installed:mode===sixToSeven?[...priorRuntimeFiles]:[...nextRuntimeFiles],
+  writes:mode===sixToSeven?[...nextRuntimeFiles]:changes,
+  rollbackAdded:mode===sixToSeven?[newRuntimeFile]:[],
+ };
 }
 const git=a=>execFileSync('git',a,{cwd:repo,windowsHide:true,maxBuffer:3000000});
 // Unrelated docs/results edits do not affect this exact approved handoff.
@@ -153,14 +186,18 @@ export async function main(args=process.argv.slice(2)){
  git(['merge-base','--is-ancestor',target,'HEAD']);
  need(git(['branch','--show-current']).toString().trim()==='main','HANDOFF_MAIN_REQUIRED');
  const approval=read(path.join(repo,'approvals/maintenance-handoffs',target+'.json'));
- need(approval.schema==='ZGMINI_MAINTENANCE_HANDOFF_V1'&&approval.targetSha===target&&approval.approved===true&&['STOPPED_RECEIVER_IN_PLACE_ONLY','COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'].includes(approval.scope),'HANDOFF_APPROVAL_REQUIRED');
  const before=read(root+'/MAINTENANCE_INSTALL.json');
  need(before.sourceSha===approval.installedSha,'HANDOFF_INSTALLED_SHA_MISMATCH');
- requireSixToSevenContract(before.files,approval.files);
- need(!fs.existsSync(path.join(root,newRuntimeFile)),'HANDOFF_UNMANAGED_TARGET_PRESENT');
+ const mode=requireHandoffApproval(approval,target,before.sourceSha);
+ const filePlan=handoffFilePlan(mode,before.files,approval.files);
+ const installedRuntimeFiles=filePlan.installed;
+ if(mode===sixToSeven)
+  need(!fs.existsSync(path.join(root,newRuntimeFile)),'HANDOFF_UNMANAGED_TARGET_PRESENT');
+ else need(fs.existsSync(path.join(root,newRuntimeFile)),'HANDOFF_EXISTING_DRIFT');
  need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
  // Verify the installed WMI proof helper before executing it or trusting its receiver record.
- for(const rel of priorRuntimeFiles)need(sha(fs.readFileSync(path.join(root,rel)))===before.files[rel],'HANDOFF_EXISTING_DRIFT');
+ for(const rel of installedRuntimeFiles)
+  need(sha(fs.readFileSync(path.join(root,rel)))===before.files[rel],'HANDOFF_EXISTING_DRIFT');
  const priorOwner=owner();
  need(Number.isSafeInteger(priorOwner?.pid)&&priorOwner.pid>0
    &&/^[0-9a-f-]{36}$/.test(priorOwner.nonce??''),'HANDOFF_RECEIVER_NOT_PROVEN_STOPPED');
@@ -206,7 +243,7 @@ export async function main(args=process.argv.slice(2)){
  // Exact byte snapshots; recovery restores only these approved maintenance files.
  fs.mkdirSync(backup,{recursive:true});
  const snapshot={};
- for(const rel of [...priorRuntimeFiles,'MAINTENANCE_INSTALL.json']){
+ for(const rel of [...installedRuntimeFiles,'MAINTENANCE_INSTALL.json']){
   const b=fs.readFileSync(path.join(root,rel)),dest=path.join(backup,rel);
   fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,b,{flag:'wx'});snapshot[rel]=sha(b);
  }
@@ -222,10 +259,15 @@ export async function main(args=process.argv.slice(2)){
   reservation.verify();
   requireStopped(priorOwner);
   need(!fs.existsSync(root+'/leases/controller-install'),'HANDOFF_UPDATE_ACTIVE');
-  for(const rel of nextRuntimeFiles){
+  for(const rel of filePlan.writes){
+   // Seven-to-seven only writes byte-different files; never creates or deletes
+   // the preexisting seventh module.
    fs.writeFileSync(path.join(root,rel),bytes[rel],
-    rel===newRuntimeFile?{flag:'wx'}:undefined);
+    mode===sixToSeven&&rel===newRuntimeFile?{flag:'wx'}:undefined);
   }
+  for(const rel of nextRuntimeFiles)
+   need(sha(fs.readFileSync(path.join(root,rel)))===sha(bytes[rel]),
+    'HANDOFF_POSTWRITE_HASH_MISMATCH');
   const manifest={...before,sourceSha:target,startupSha256:sha(startupBytes),files:Object.fromEntries(nextRuntimeFiles.map(p=>[p,sha(bytes[p])])),capabilities:{cooperativeStop:true},updatedAt:new Date().toISOString()};
   fs.writeFileSync(root+'/MAINTENANCE_INSTALL.json',JSON.stringify(manifest,null,2)+'\n');
   fs.writeFileSync(startup,startupBytes);
@@ -267,12 +309,12 @@ export async function main(args=process.argv.slice(2)){
    if(reservation){reservation.verify();requireStopped(priorOwner);}
    else requirePriorStopped(priorOwner);
    for(const [rel,hash]of Object.entries(snapshot))need(sha(fs.readFileSync(path.join(backup,rel)))===hash,'HANDOFF_BACKUP_DRIFT');
-   const added=path.join(root,newRuntimeFile);
-   if(fs.existsSync(added)){
+    const added=path.join(root,newRuntimeFile);
+    if(filePlan.rollbackAdded.includes(newRuntimeFile)&&fs.existsSync(added)){
     need(sha(fs.readFileSync(added))===sha(bytes[newRuntimeFile]),'HANDOFF_NEW_FILE_DRIFT');
     fs.unlinkSync(added); // Only the newly added, byte-verified file; never preexisting data.
    }
-   for(const rel of [...priorRuntimeFiles,'MAINTENANCE_INSTALL.json'])
+    for(const rel of [...installedRuntimeFiles,'MAINTENANCE_INSTALL.json'])
     fs.copyFileSync(path.join(backup,rel),path.join(root,rel));
    fs.writeFileSync(startup,oldStartup);
    preserveRollbackReservation(reservation);
