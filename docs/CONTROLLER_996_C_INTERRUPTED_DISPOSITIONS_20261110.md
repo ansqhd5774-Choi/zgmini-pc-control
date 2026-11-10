@@ -1,5 +1,17 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 신규 Windows 동일 부모 이동 TEMP 시험기 — 소스 247/247, 실물 실행 대기
+
+- **실제 운영 구조 차이에 대한 직접 보완:** 기존 별도 Windows 네이티브 7/7·29/29은 `leases→archives`의 다른 부모 이동이었다. 새로운 `tools/TEST_996_WINDOWS_C_SIBLING_NATIVE_ONCE.ps1`은 원본과 같은 상대 경로 `automation/pc-maintenance/leases` 안에서 `controller-recovery→controller-recovery-archived-<원본ID>`, `controller-recovery-continuation-<UUID>→...-archived-<UUID>`, `controller-install→controller-install-recovered-<원본ID>`를 **동일 부모 [IO.Directory]::Move**로 검증하는 별도의 **TEMP 전용 원시 동작 fixture**다. 이미 검증된 기존 Windows 7-case PS1/CMD는 수정하지 않았다.
+
+- Windows 원시 동작 후보는 정상 1, 중단 지점 5, 충돌 1, 합성 Writer 1, marker 변경 1, 예약 1의 **총 10개 GUID-TEMP 시나리오**를 정의한다. 예약 시나리오는 고정 파일 `FileMode.CreateNew` 충돌 및 고유 디렉터리→고정 디렉터리 `Directory.Move` 충돌을 **각각 순차** 검증하며, Windows의 서로 다른 실제 프로세스 간 동시 경합이나 보관/예약 해제 수명주기 검증이 아니다. 실행 후 원본 파일 삭제·자동 cleanup·rollback·retry는 하지 않는다.
+
+- 새 `tools/RUN_996_WINDOWS_C_SIBLING_TEMP_ONCE.cmd`는 **PS1 SHA256 `0a00d432d34a743ab7946ee12d6a379872df48452e5702357bc3c1182f4bfe05`**를 먼저 검증하고서 `-TestOnly`를 사용한다. 실행 정책 우회가 없고 `E:\ZGmini`가 존재하는 PC에서는 중지한다. 이 사실은 운영 PC 신원 증명이나 실제 C 승인 증거가 아니다. ZIP의 별도 SHA256은 `9e30ac6ac8933faa6fa9fe339d00aa3d7682c082fc67572993c8c9a29d79494e`이며 내부 CMD·PS1 2개다. GitHub 신규 파일 3개 원격/로컬 **3/3 바이트 일치**, ZIP 무결성 **2/2 OK**, #996 관련 Node 정적·합성 회귀 **247/247 PASS**.
+
+- **Windows 실제 실행 0회:** 10/10 PASS는 아직 관측되지 않았다. 새 시험기는 과거 C 단계 엔진 전체가 아니라 **동일 부모 rename 원시 동작**만 독립 시험하므로 성공하더라도 운영 C급 실행기/E 드라이브 상태·Writer·과거 Claim 소유권·Backlog 4건·신규 Owner C 승인까지 검증한 것으로 간주하지 않는다. 기존 R3/R4 읽기 전용 원본 증거는 재사용하고 필요한 실제 변경 상태만 새로 확인한다.
+
+- **다음 단일 필수 행동:** 물리적 별도 Windows PC/격리 Runner의 새 ZIP 정확 해시 검사 및 `RUN_996_WINDOWS_C_SIBLING_TEMP_ONCE.cmd` 단회 실행 결과 JSON·시험 source hash 회수 → 실제 C 후보 소유권/fencing 설계와 현장 Writer/Backlog 독립 CAS → 신규 예약 효과를 명시한 별도 Owner 정확 승인 후에만 C급 운영 검토. 현재 실제 C NO-GO·운영 80%→80%.
+
 ## 2026-11-11 C 복구 동시성·원본 4 Job GET 보완 — 소스 242/242, 실제 복구 NO-GO
 
 - **이번 신규 10개 소스/시험 파일은 격리 프로토타입과 GET 전용 판독 구성요소이며 실제 운영 C 실행기가 아니다.** `controller-996-c-exclusive-reservation-fixture.mjs`는 Linux 임시 디렉터리에서 고정 예약 위치의 원자적 생성과 서로 다른 UUID 2개 동시 경합을 검증하여 **1 승자·1 BUSY, 12/12 PASS**를 재현했다. 이는 Windows 현장 독립 CAS나 충돌 후 예약 해제 계약을 증명하지 않는다. **고정 예약 디렉터리는 기존 승인된 Effects에 없는 신규 쓰기 효과**이므로 신규 Owner 정확 승인 전에 운영에 도입할 수 없다.
