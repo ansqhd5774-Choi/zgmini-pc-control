@@ -366,4 +366,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - Windows 검증 3/3. 외부 진입점 시험에서 합성 내부 스크립트가 실제 Node를 시작했고 두 파일의 쓰기 접근이 차단됐다. 내부 스크립트 또는 Node의 기대 SHA가 다르면 자식 실행 전에 중단됐다. 이 시험의 기대 해시는 fixture와 설치된 Node에서 직접 계산했다. 운영 실행에 필요한 외부 신뢰 출처와 Owner 승인은 별도로 확인한다.
 - 남은 기술 작업은 현재 Operator의 `Directory.Move` 직전 경로 검사와 실제 이동을 Windows 원본 디렉터리 핸들에 결합하는 것이다. Operator 차단을 유지하며 원본 이동, S2 및 최종 C ZIP 봉인은 보류한다.
 
+### 원본 디렉터리 핸들 기반 이동 — Windows TEMP 시험
+
+- `TEST_996_WINDOWS_HANDLE_BOUND_ARCHIVE.ps1`은 지정 형식의 TEMP 하위 디렉터리에서만 실행한다. 원본 디렉터리의 볼륨·파일 ID와 자식 파일 ID·SHA-256을 확인하고, 같은 원본 핸들로 `SetFileInformationByHandle`의 덮어쓰기 없는 이동을 요청한다. 상위 디렉터리와 원본 핸들은 보관본 재조회까지 유지한다.
+- Windows 시험 5/5. 같은 디렉터리와 파일 ID 보존, 실제 이동 직전 별도 경로 이름 변경 차단, 동일 바이트의 교체 디렉터리 거부, 파일 내용 변경 거부, 기존 파일 및 디렉터리 보관 대상 보존을 확인했다.
+- Windows가 디렉터리 이동을 허용하려면 자식 파일 읽기 핸들을 먼저 닫아야 했다. 해당 구간의 파일 변경은 보관 후 ID와 SHA 재검사에서 검출한다. 운영 통합에서는 기존 설치 Lease와 Writer 경합 검사를 이동 전까지 유지하고, 보관본이 다르면 Install Lease 해제 단계에 진입하지 않는 동작을 검증해야 한다. 운영 Operator와 원본 Claim·Lease는 그대로다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.
