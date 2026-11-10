@@ -1,5 +1,17 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 실제 별도 Windows 동일 부모 TEMP 네이티브 10/10·328/328 PASS — 운영 C NO-GO
+
+- 사용자가 **별도 Windows PC**에서 실행한 `RUN_996_WINDOWS_C_SIBLING_TEMP_ONCE.cmd` 콘솔 사진의 고정 결과: `ZGMINI_996_WINDOWS_C_SIBLING_NATIVE_FIXTURE_V1`, `ISOLATED_WINDOWS_C_SIBLING_TEST_ONLY`, **casesPassed=10**, **checksPassed=328**, **createdFixtures=10**, `sameParentLeaseMove=true`. 신규 10-case Windows 네이티브 격리 시험은 **이제 실측 PASS**다. 직전 섹션의 ‘실행 대기’는 당시 이력이다.
+
+- 콘솔은 `reservationFileCreateNewSequentialTested=true`와 `reservationDirectoryMoveSequentialTested=true`를 보고한다. 이것은 **단일 프로세스 내 순차 중복 예약 차단**이지 Windows 실제 복구 프로세스 2개의 동시에 시작하는 경합·fencing 증거가 아니다. 동일 부모 `[IO.Directory]::Move`가 별도 Windows의 TEMP fixture 안에서 동작했음을 보인 것이며, 기존 C 단계 엔진 자체나 실제 운영 `E:\ZGmini`의 Claim·Lease 이동 증거가 아니다.
+
+- 사용자 화면 SHA256 `9565d47631cc938e07ab0b6b82f8e0dee171f415fa8b27523cc86903ac126a69`; 비민감 전사 정본은 `artifacts/controller-996/zgmini-996-windows-c-sibling-native-10of10-20261111.json`에 저장한다. CMD가 실행 전 검증하는 PS1 SHA256 `0a00d432d34a743ab7946ee12d6a379872df48452e5702357bc3c1182f4bfe05`. 보고값은 `executionAuthorized=false`, `operatorReady=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`, `cleanupPerformed=false`. 이 0값은 **시험기 자체 보고**이며 OS 감사를 통한 운영 PC 무변경 외부 입증으로 확대하지 않는다. 10개 임시 fixture는 자동 삭제되지 않았다.
+
+- **확인된 다음 결손:** 구 R3/R4의 원본 Windows 읽기 전용 84파일/Backlog 증거를 현재 C 필수 상태에 한정해 최신 판독; 이전 중단된 원본 Claim의 역사적 소유자 증거; 지금의 Writer/Controller/Task와 4개 원본 Backlog GET 합치; 서로 다른 UUID 실제 Windows 복구 경쟁의 단일 고정 배타 예약 실증 및 실패 후 수명주기; 이 추가 신규 Effect를 반영한 source/ZIP/lock 불변 범위와 원본 #996 Owner 신규 정확 승인. **현재 GitHub #996 댓글 10건, 신규 C Consent 0건**. 과거 C 승인 재사용·운영 파일 이동·Workflow/Backlog/Issue 쓰기는 금지한다.
+
+- **진행률:** 기존 네이티브 동일 부모 시험 증거 `NOT_OBSERVED→PASS`; 전체 운영 C급 복구 **80%→80%**, 운영 **NO-GO**, PR **Draft 유지**. 다음 작업은 반복 CMD가 아니라 동일 부모 네이티브 성공을 재사용해 원본 상태/소유권/fencing 통합 후보의 **읽기 전용 구성 및 독립 검증**을 완성하는 것이다.
+
 ## 2026-11-11 신규 Windows 동일 부모 이동 TEMP 시험기 — 소스 247/247, 실물 실행 대기
 
 - **실제 운영 구조 차이에 대한 직접 보완:** 기존 별도 Windows 네이티브 7/7·29/29은 `leases→archives`의 다른 부모 이동이었다. 새로운 `tools/TEST_996_WINDOWS_C_SIBLING_NATIVE_ONCE.ps1`은 원본과 같은 상대 경로 `automation/pc-maintenance/leases` 안에서 `controller-recovery→controller-recovery-archived-<원본ID>`, `controller-recovery-continuation-<UUID>→...-archived-<UUID>`, `controller-install→controller-install-recovered-<원본ID>`를 **동일 부모 [IO.Directory]::Move**로 검증하는 별도의 **TEMP 전용 원시 동작 fixture**다. 이미 검증된 기존 Windows 7-case PS1/CMD는 수정하지 않았다.
