@@ -30,8 +30,8 @@ function createDb(file){
  CREATE INDEX r6_current_date ON market_score_employment_r4_shadow_current_v1(logical_series_id,observation_date DESC);`);
  return db;
 }
-function seed(db,{weeks=56,missingLastCode=null}={}){
- const d='2025-01-04T00:00:00.000Z';
+function seed(db,{weeks=56,missingLastCode=null,startDate='2025-01-04'}={}){
+ const d=`${startDate}T00:00:00.000Z`;
  const insert=db.prepare(`INSERT INTO market_score_employment_r4_shadow_current_v1
   (logical_series_id,geography_type,geography_code,observation_date,value) VALUES(?,?,?,?,?)`);
  db.exec('BEGIN');
@@ -70,6 +70,7 @@ test('read-only summaries preserve SQLite bytes and hide raw bodies/tokens',t=>{
  assert.equal(r.eta539[0].selectedWeeks,2);
  assert.equal(r.eta539[0].firstSelectedWeek,'2025-07-19');
  assert.equal(r.stateClaims.complete51Weeks,56);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'INSUFFICIENT_RAW_WEEKS');
  assert.equal(r.stateClaims.strict52WeekCandidateCount,1);
  assert.equal(r.stateClaims.latestStrict52WeekCandidate,new Date(Date.parse('2025-01-04T00:00:00.000Z')+55*7*86400000).toISOString().slice(0,10));
  assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
@@ -145,6 +146,60 @@ test('an entire zero prior four-week state base prevents a valid score',t=>{
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
  assert.equal(r.stateClaims.firstWindowBreak?.reason,'PRIOR_4W_ZERO_BASE');
+});
+
+test('530 complete weeks cannot satisfy 10-year claims coverage without older stored rows',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:530,startDate:'2015-10-17'});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.sampledWeeks,530);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'INSUFFICIENT_RAW_WEEKS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.requiredRawWeeks,577);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.requiredRows,29427);
+});
+
+test('577 complete, consecutive weeks satisfy raw preconditions without claiming a score',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.sampledWeeks,577);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'RAW_PRECONDITIONS_COMPLETE');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.referenceWeeks,521);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.latestRequiredWeek,'2026-10-31');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstRequiredWeek,'2015-10-17');
+ assert.equal(r.providerCalls,0);
+ assert.equal(r.d1Writes,0);
+});
+
+test('missing one state in 577 weeks rejects ten-year raw coverage',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17',missingLastCode:'WY'});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'REGION_51_COVERAGE_GAP');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+});
+
+test('a whole missing calendar week rejects apparent 577-week count',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:578,startDate:'2015-10-10'});
+ db.prepare("DELETE FROM market_score_employment_r4_shadow_current_v1 WHERE observation_date='2016-03-05'").run();db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'NONCONSECUTIVE_10Y_WEEKS');
+});
+
+test('577 weeks with one zero prior-state 4w base are still not score-ready',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare(`UPDATE market_score_employment_r4_shadow_current_v1 SET value=0
+  WHERE geography_code='WY' AND observation_date IN
+   ('2015-10-17','2015-10-24','2015-10-31','2015-11-07')`).run();db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'PRIOR_4W_ZERO_BASE');
 });
 
 test('WAL database without sidecars remains untouched and unopened',t=>{
