@@ -1,0 +1,31 @@
+{
+  "status": "REVIEW_PACKAGE_ONLY",
+  "sourceCommit": "3fa23ecb241f22d8694afd3432a1bcefe498cd9a",
+  "zipSha256": "ebe687ada9e8ff267433f46450c08cbc30bd240e6fd85613b41023cc4715aa56",
+  "sourceLockSha256": "3a5edc0b4e9bdfd251e6183c56245e6b28f7ed1d7e51e66772dbabe00cdd0dcf",
+  "sourceCount": 16,
+  "productionExecutable": false,
+  "files": {
+    "tools/controller-996-c-installed-gh-get-readonly.mjs": "fc6077ad9e2305085e5c90daa94b4c15e60adeb321289e476ae8b2941d9bdbd5",
+    "tools/controller-996-c-native-owner-operator.mjs": "2a6853d8792947f8718bed06d1b177ff6a073a32e8aef7a04005910147aa47bf",
+    "tools/controller-996-c-native-trusted-bootstrap.mjs": "21e45a365181aa7438f37618dcc83553ee476cf225e423513bc091ee7e4db117",
+    "tools/controller-996-c-original-prewrite-readonly.mjs": "12819591aa0b24ba1bd0f8dd379606f83062a6d8996c62d5e1aaef8abe4b9f3c",
+    "tools/controller-996-c-original-stage-readonly.mjs": "4d16a5393e63e6167b9dea5518f6a1b480c24c0b3213fc32a32e18cfa8342bbb",
+    "tools/controller-996-c-physical-disposition-readonly.mjs": "7f8ea6cf1798a3274ecd7f23524c74fae4dabde136b84201b6680454ddf0faf5",
+    "tools/controller-996-continuation-gate.mjs": "232cf3d79dc08c4e2bf79b48e18bcb23c2d76d6372fae8c021702619e9a2b814",
+    "tools/controller-996-git-byte-offline-manifest-r4.json": "0978bae8a0e260a65a2d690fbee21f751d06bb4bb26d55051d30d081f4619f6f",
+    "tools/controller-996-git-byte-offline-readonly-r4.mjs": "bc5a5e5cb0c6ced192f5a6c3b9898b8ac3e319076e07bd2de3b9d9872ff5facd",
+    "tools/controller-996-interrupted-observer.mjs": "41f935de3fc9f140ba4827eeab203e153c6f55100d69d606e82e9654a318a68b",
+    "tools/controller-996-native-continuation-consent-reader.mjs": "b76d524d2653cfa68679f5e54ce03c34f9b578d363781704d9ee06a343f2c5f0",
+    "tools/controller-996-original-four-jobs-readonly.mjs": "53dd864c22cdee033fcf7d7766801e01940595c972bf7de1f41cb7c4a0e4946e",
+    "tools/controller-996-protection-attestation.mjs": "4ffb482f535f55e7ac614b08546f8d09a85b66ddc7e0698a4642ed3af275379e",
+    "tools/controller-996-r2-evidence-review.mjs": "c0701bbe9a10e4c22bdd361bcdc9ec7af7a8fb86525e89509e745e5b9214124d",
+    "tools/controller-996-windows-archive-adapter.mjs": "2eb6f5674eb6c6ece62b2e05e6353d5aac07a03065e534bdf01578557bb79d00",
+    "tools/controller-996-windows-observer.mjs": "471de28cbf5e3f9ff8488e4332862c1949991814da53b5c2145ae1b24ebd3fbd",
+    "tools/VERIFY_996_WINDOWS_OUTER_ANCHOR.ps1": "2389d7f5e40f3fce693012b5a2a18c052b21425c1333173dc79ecbddd23ed343",
+    "tools/VERIFY_996_WINDOWS_TRUSTED_SNAPSHOT.ps1": "31cb9bec3aa7e65429aa7773670343a352a6c9d4382128f377604c2bf5a3e2b5",
+    "tools/controller-996-windows-source-snapshot.cs": "7b4e2e49f5b7c5091617ccb575f3722e2b60037e543b4d54eb7648a68d42605a",
+    "tools/controller-996-c-native-owner-source-lock.json": "3a5edc0b4e9bdfd251e6183c56245e6b28f7ed1d7e51e66772dbabe00cdd0dcf",
+    "README.txt": "72dc862025dbbe7f68de041386a7cd8b4b88da15f68998fa58c79ce499426108"
+  }
+}

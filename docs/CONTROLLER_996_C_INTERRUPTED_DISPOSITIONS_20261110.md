@@ -390,4 +390,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 외부 진입점 자체는 신뢰된 위치에서 로드되어야 한다. 로드 후 파일을 다시 열어 대조한 결과를 최초 로드의 독립 증명으로 사용하지 않는다. Operator의 읽기 전용 응답은 전달받은 ID를 확인하는 결과이며 독립 승인 증거는 GitHub에서 읽은 Owner 원문이다.
 - 봉인 순서는 S1의 Git 원본 바이트 → SourceLock과 ZIP → S2 Manifest → Owner 댓글이다. ZIP은 S2 Manifest나 최종 ZIP 해시를 담지 않는다. Windows 작업 폴더의 줄바꿈 변환을 피하기 위해 ZIP은 S1 Git blob 원본에서 구성한다.
 
+### Git 원본으로 구성한 Windows 검토 ZIP
+
+- `build-controller-996-owner-review-package.mjs`는 고정 커밋의 Git blob에서 Bootstrap·Operator 공통 SourceLock 16개 및 Windows 도구 3개를 복사한다. 운영 중단 장치가 있는 소스에만 검토 ZIP을 생성하며 S2 승인 명세는 생성하지 않는다.
+- 검토 소스 `3fa23ecb241f22d8694afd3432a1bcefe498cd9a`. Windows에서 ZIP을 풀어 총 21개 항목의 해시가 일치했고, 같은 커밋으로 재생성한 ZIP SHA도 일치했다. 추출한 Operator는 합성 인수로 읽기 전용 검토 응답을 반환했다.
+- [검토 ZIP](../artifacts/controller-996/ZGMINI_996_OWNER_REVIEW.zip)과 [체크섬](../artifacts/controller-996/ZGMINI_996_OWNER_REVIEW_SHA256.json)을 보존한다. 다음 작업은 실제 복구 진입점에 실행 중 고정된 소스와 독립 Owner 승인 증거를 연결하는 것이다. 운영 진행률 80%를 유지한다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.
