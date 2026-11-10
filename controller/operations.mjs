@@ -25,6 +25,7 @@ import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
+import {inspectEmploymentR6CollectionEvidence} from './employment-r6-collection-evidence-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
@@ -113,6 +114,7 @@ export async function runOperation(request,context){
  if(request.operation==='asset-r10-source-readonly')return inspectAssetR10SourceBytes(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='employment-r6-host-cas-readonly')return inspectEmploymentR6HostCas({host});
  if(request.operation==='employment-r6-wal-memory-preflight')return inspectEmploymentR6WalMemoryPreflight({host});
+ if(request.operation==='employment-r6-collection-evidence-readonly')return inspectEmploymentR6CollectionEvidence(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
   if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
