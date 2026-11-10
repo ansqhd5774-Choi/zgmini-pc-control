@@ -13,6 +13,8 @@ test('temporary ACL fixture rejects production invocation before creating files'
   assert.match(source, /C996_SECURITY_PROOF_ORIGINAL_PC_FORBIDDEN/);
   assert.match(source, /zgmini-996-acl-fixture-/);
   assert.match(source, /C996_SECURITY_PROOF_UNSAFE_TEMP/);
+  assert.ok(source.includes('^[a-zA-Z]:\\\\$'), 'drive root must require a literal backslash');
+  assert.match(source, /C996_SECURITY_PROOF_TEMP_REDIRECT/);
   assert.match(source, /C996_SECURITY_PROOF_UNSUPPORTED_VOLUME/);
 });
 
