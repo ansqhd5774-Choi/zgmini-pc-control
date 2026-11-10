@@ -6,6 +6,10 @@ const ORIGINAL_ISSUES=[1217,1219,1226,1227];
 const MARKERS=['PREPARED','WORKFLOW_ENABLE_ATTEMPTED',
   'BACKLOG_CLOSE_ATTEMPTED'];
 export const CONTINUATION_EFFECTS=Object.freeze([
+  // NEW C-grade scope: proposal owner.json is written, then the proposal is
+  // atomically moved to one fixed reservation name and retained forever.
+  // This effect is NOT covered by the old phase-scoped #996 approval.
+  'CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE',
   'RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM',
   'WRITE_SCOPED_DURABLE_RECOVERY_MARKERS',
   'ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE',
