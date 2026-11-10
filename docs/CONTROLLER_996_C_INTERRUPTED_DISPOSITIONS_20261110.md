@@ -1,5 +1,13 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 별도 Windows 2-process 고정 예약 경합 실측 1/1 PASS — C 운영 NO-GO
+
+- **실물 PASS:** 사용자가 새 격리 Windows PC에서 `RUN_996_WINDOWS_C_CONCURRENT_FENCE_TEMP_ONCE.cmd` 실행 콘솔을 공유했다. 결과 스키마 `ZGMINI_996_WINDOWS_C_CONCURRENT_FENCE_RESULT_V1`, status `ISOLATED_WINDOWS_C_CONCURRENT_FENCE_TEST_ONLY`, `casesPassed=1`, `processesStarted=2`, `distinctProcessIds=true`, `readyBeforeGo=true`, `fixedReservationAtomicMove=true`, `winners=1`, `busy=1`, `createdFixtures=1`. 이로써 앞선 순차 예약 10-case만으로는 미입증이었던 **서로 다른 Windows PowerShell 실제 프로세스 두 개의 동일 고정 이름 선점/경합**이 **합성 TEMP 범위에서 실측 PASS**다.
+- **근거:** 사용자 콘솔 스크린샷 SHA256 `52336ab0bc779ad9ab5d350fcbe0e9211f465cb2c8803fd12f8d26c82c41e76a`, 비민감 정규화 결과 `artifacts/controller-996/zgmini-996-windows-c-concurrent-fence-native-1of1-20261111.json`. 사용한 브랜치의 parent SHA256 `470c68479a2813f9f27ba68b49e2bbfdc2b463abb39e840948b0ac49dbec03d9`, worker SHA256 `62b3e1ff821028c0af5304640bb3505e782ed7263d95070dac1cba972bffd180`; CMD는 양 파일을 실행 전후 해시 확인한다. 이 스크린샷은 특정 실행 결과이며 실제 OS 원본 검토 기록이나 fixture 재조회 증거는 아니다.
+- **격리/영향:** 보고값 `executionAuthorized=false`, `operatorReady=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`, `cleanupPerformed=false`. 모두 시험기 자체 보고이며 **독립적인 원본 PC 무변경 감사를 대체하지 않는다**. 자동으로 지운 fixture 없음. 원래 C 단계 엔진 자체, 기존 `E:\ZGmini`의 Claim/Install/Lease, Writer, 원본 GitHub 4 Job, 중단 복구 원장, reboot 후 durability, 승인된 새로운 예약 Effect까지 실증한 것이 아니다.
+- **남은 필수 운영 Gate:** 원본 운영 Windows의 현재 소유권/실행중 프로세스/원장/Writer read-only 판정, 기존 4개 원본 pc-job Issue/Backlog/Workflow의 최신 상태 대조, 향후 C 운영 후보의 고정 예약 효과·수명·충돌 거부·원본 복구 정본 SHA 계약 확정, 그 범위에 대한 **새 Owner 정확 승인**. 승인 전 실제 원본 경로 쓰기/복구/Workflow 변경/Backlog 종료/기존 CMD 재실행 금지.
+- **판정/진행률:** 이번 Windows concurrency native `NOT_OBSERVED→PASS`, 전체 #996 C 운영 **80%→80%, NO-GO**, Draft PR #1222 유지. 아래 'Windows 네이티브 실행 0회' 표기는 **당시 이력**이며 이번 사진으로 동시성 시험의 해당 제한만 해제됐다.
+
 ## 2026-11-11 새 격리 Windows 두 독립 프로세스 고정 예약 경합 시험 — 소스 256/256 PASS, 네이티브 결과 미관측
 
 - **실행 대상: 별도 신규 Windows PC만. 기존 운영 PC에서 실행 금지.** 사용자가 앞서 별도 PC에서 확인한 동일 부모 TEMP 10/10·328/328은 **순차** 예약 시험이었다. 이번에는 `TEST_996_WINDOWS_C_CONCURRENT_FENCE_NATIVE_ONCE.ps1` 부모가 서로 다른 UUID/PID의 Windows PowerShell 5.1 프로세스 두 개를 띄우고, 각 worker가 READY를 보낸 다음 단일 GO 뒤 **같은 고정 예약 디렉터리**에 `[IO.Directory]::Move`를 한 번씩 시도한다. 합격 조건은 WIN 1, BUSY 1, loser proposal 보존, winner owner와 원본 복구·설치 owner SHA256 불변이다.
