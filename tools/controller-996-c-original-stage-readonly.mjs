@@ -10,6 +10,8 @@ import {classify996CPhysicalDisposition} from
   './controller-996-c-physical-disposition-readonly.mjs';
 import {create996InstalledGhGetReadOnly} from
   './controller-996-c-installed-gh-get-readonly.mjs';
+import {verify996OfflineGitBytesReadOnly} from
+  './controller-996-git-byte-offline-readonly-r4.mjs';
 import {collect996ProtectedItems} from './controller-996-protection-attestation.mjs';
 import {review996ProtectedR2Evidence} from './controller-996-r2-evidence-review.mjs';
 
@@ -91,6 +93,12 @@ function inventory(root,rel){
 const nativeWorkflow=()=>
   create996InstalledGhGetReadOnly().readWorkflowStateReadOnly();
 const nativeProtected=()=>review996ProtectedR2Evidence(collect996ProtectedItems());
+const nativeSource=()=>verify996OfflineGitBytesReadOnly({
+  manifestBytes:fs.readFileSync(new URL(
+    './controller-996-git-byte-offline-manifest-r4.json',import.meta.url)),
+  expectedManifestSha256:
+    '0978bae8a0e260a65a2d690fbee21f751d06bb4bb26d55051d30d081f4619f6f',
+});
 const alive=pid=>{try{process.kill(pid,0);return true;}
   catch(e){return e?.code==='ESRCH'?false:null;}};
 function namesFor(id){return {
@@ -101,7 +109,8 @@ function namesFor(id){return {
   install:'controller-install',
   installArchive:`controller-install-recovered-${REQ}`,
 };}
-function round(root,id,pins,actorPid,readWorkflow,readProtected,isAlive){
+function round(root,id,pins,actorPid,readWorkflow,readProtected,readSource,isAlive,
+  requireOriginal){
   const names=namesFor(id),all=fs.readdirSync(directory(root,LEASES));
   const allowed=new Set([...Object.values(names),
     'controller-recovery-continuation-reservation']);
@@ -159,6 +168,13 @@ function round(root,id,pins,actorPid,readWorkflow,readProtected,isAlive){
   const protectedState=readProtected();
   need(protectedState?.status==='CURRENT_PROTECTION_MATCHES_R1',
     'C_STAGE_PROTECTION_UNKNOWN');
+  const git=readSource();
+  need(git?.status==='SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS'&&
+    git.installed===38&&git.staged===39&&git.maintainer===7&&
+    git.total===84&&git.executionAuthorized===false&&
+    git.originalWindowsReadback===requireOriginal&&
+    HEX(git.sourceBytesSha256),
+  'C_STAGE_GIT_84_BYTES_UNVERIFIED');
   const workflowState=readWorkflow();
   need(workflowState==='active','C_STAGE_WORKFLOW_NOT_ACTIVE');
   const canonicalNewOwner=full.install.present&&
@@ -172,14 +188,15 @@ function round(root,id,pins,actorPid,readWorkflow,readProtected,isAlive){
       pid:owner.pid},ready,
     reservation:{sha:res.sha,id:res.identity},
     workflowState,protectionFingerprint:protectedState.protectedFingerprint,
-    canonicalNewOwner};
+    sourceBytesSha256:git.sourceBytesSha256,canonicalNewOwner};
 }
 
 /** Only a future separately approved operator may use this readback as ONE
  * input to its own fresh move-time gate; this function never approves a move. */
 export function inspect996COriginalStageReadOnly({testOnly=false,root=ROOT,
   continuationRequestId,pins,readWorkflow=nativeWorkflow,
-  readProtected=nativeProtected,isAlive=alive,actorPid=process.pid,
+  readProtected=nativeProtected,readSource=nativeSource,
+  isAlive=alive,actorPid=process.pid,
   betweenReads=null}={}){
   try{
     const at=path.resolve(root),temp=path.resolve(os.tmpdir());
@@ -189,20 +206,21 @@ export function inspect996COriginalStageReadOnly({testOnly=false,root=ROOT,
     if(testOnly)need(process.platform!=='win32'&&
       at.startsWith(temp+path.sep)&&path.basename(at).startsWith('zgmini-996-test-')&&
       readWorkflow!==nativeWorkflow&&readProtected!==nativeProtected&&
-      isAlive!==alive&&Number.isSafeInteger(actorPid),
+      readSource!==nativeSource&&isAlive!==alive&&Number.isSafeInteger(actorPid),
       'C_STAGE_TEST_PORT_REJECTED');
     else need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&
       !process.env.RUNNER_NAME&&readWorkflow===nativeWorkflow&&
-      readProtected===nativeProtected&&isAlive===alive&&
+      readProtected===nativeProtected&&readSource===nativeSource&&
+      isAlive===alive&&
       actorPid===process.pid&&betweenReads===null&&
       path.win32.normalize(root).toLowerCase()===
       path.win32.normalize(ROOT).toLowerCase(),
       'C_STAGE_ORIGINAL_WINDOWS_ONLY');
     const first=round(root,continuationRequestId,pins,actorPid,
-      readWorkflow,readProtected,isAlive);
+      readWorkflow,readProtected,readSource,isAlive,!testOnly);
     if(testOnly&&betweenReads)betweenReads();
     const second=round(root,continuationRequestId,pins,actorPid,
-      readWorkflow,readProtected,isAlive);
+      readWorkflow,readProtected,readSource,isAlive,!testOnly);
     need(same(first,second),'C_STAGE_TWO_SNAPSHOTS_DRIFT');
     // A legitimate NEW controller-install owner may appear after original
     // lease release. Never archive/delete/retry or call it the old owner.
@@ -225,6 +243,7 @@ export function inspect996COriginalStageReadOnly({testOnly=false,root=ROOT,
     return result('C_STAGE_LIVE_INVENTORY_READ_ONLY',classification.code,{
       phase:classification.phase,originalWindowsReadback:!testOnly,
       originalFilesPinned:10,twiceIdentical:true,
+      sourceFilesVerified:84,sourceBytesVerified:!testOnly,
       fixedReservationOwnerObserved:true,
       installBarrierRetained:second.paths.install.present,
     });
