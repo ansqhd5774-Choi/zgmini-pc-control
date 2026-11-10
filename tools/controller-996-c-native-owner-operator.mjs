@@ -105,7 +105,7 @@ function writeOnce(dir,name,data){
 }
 // Native .NET Directory.Move is the no-replace primitive tested on an
 // isolated Windows NTFS fixture. Same-parent only. No ExecutionPolicy bypass.
-function moveNoReplace(from,to){
+function moveNoReplace(from,to,{files,ownerMode,actorPid=null,nonce=null}){
   const source=path.win32.normalize(from).toLowerCase();
   const target=path.win32.normalize(to).toLowerCase();
   const parent=path.win32.normalize(LEASES).toLowerCase();
@@ -117,13 +117,50 @@ function moveNoReplace(from,to){
   safeLeaseDirectory(path.basename(from));
   safeLeaseDirectory('');
   need(absent(to),'C_996_OWNER_ARCHIVE_DESTINATION_PRESENT');
-  // All paths are generated from a fixed prefix and strictly checked UUID.
+  // The source inventory is built only from physically rechecked manifest
+  // pins or the new fsynced owner/marker hashes in this module, never a
+  // caller-provided permission port. The native child repeats this CAS.
+  need(files&&typeof files==='object'&&!Array.isArray(files)&&
+    Object.keys(files).length>=1&&Object.keys(files).length<=7&&
+    H64(files['owner.json'])&&Object.entries(files).every(([k,v])=>
+      /^(?:owner|PREPARED|WORKFLOW_ENABLE_ATTEMPTED|BACKLOG_CLOSE_ATTEMPTED|RECOVERY_REQUIRED|OLD_C_CLAIM_ARCHIVE_ATTEMPTED|READY_TO_RELEASE_INSTALL)\.json$/.test(k)&&
+      H64(v))&&
+    ['LIVE_NEW','DEAD_OLD','DEAD_INSTALL'].includes(ownerMode)&&
+    (ownerMode!=='LIVE_NEW'||
+      Number.isSafeInteger(actorPid)&&actorPid>0&&UUID(nonce)),
+  'C_996_OWNER_NATIVE_INVENTORY_INVALID');
   const quoted=x=>`'${x.replaceAll("'","''")}'`;
   const quotedSource=quoted(from.replaceAll('/','\\'));
   const destination=quoted(to.replaceAll('/','\\'));
-  const script=`$s=${quotedSource};$d=${destination};`+
-    `if([IO.Directory]::Exists($d)-or[IO.File]::Exists($d)){throw 'DEST_EXISTS'};`+
-    `[IO.Directory]::Move($s,$d)`;
+  const fixedParent=quoted(LEASES.replaceAll('/','\\'));
+  const json=quoted(JSON.stringify(files));
+  const mode=quoted(ownerMode);
+  const expectedNonce=quoted(nonce??'');
+  const expectedPid=ownerMode==='LIVE_NEW'?actorPid:0;
+  // No writes/logs in the native child except the final Directory.Move.
+  // SHA, reparse, owner PID/nonce, exact entries and destination are checked
+  // inside the child immediately before that move. This is not a proof of
+  // hostile-process atomic snapshot isolation; review hold remains intact.
+  const script=[
+    "$ErrorActionPreference='Stop'",
+    `$s=${quotedSource};$d=${destination};$parent=${fixedParent}`,
+    `$expect=ConvertFrom-Json -InputObject ${json}`,
+    `$mode=${mode};$nonce=${expectedNonce};$actor=${expectedPid}`,
+    "if(-not [string]::Equals([IO.Path]::GetDirectoryName($s),$parent,[StringComparison]::OrdinalIgnoreCase) -or -not [string]::Equals([IO.Path]::GetDirectoryName($d),$parent,[StringComparison]::OrdinalIgnoreCase)){throw 'NOT_SAME_PARENT'}",
+    "foreach($p in @('E:\\','E:\\ZGmini','E:\\ZGmini\\automation','E:\\ZGmini\\automation\\pc-maintenance',$parent,$s)){ $i=Get-Item -LiteralPath $p -Force -ErrorAction Stop; if(-not $i.PSIsContainer -or (($i.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)){throw 'REPARSE_OR_NON_DIRECTORY'} }",
+    "if($null -ne (Get-Item -LiteralPath $d -Force -ErrorAction SilentlyContinue)){throw 'DEST_EXISTS'}",
+    "$expectedNames=@($expect.PSObject.Properties.Name | Sort-Object)",
+    "$actualNames=@(Get-ChildItem -LiteralPath $s -Force | ForEach-Object {$_.Name} | Sort-Object)",
+    "if($actualNames.Count -ne $expectedNames.Count){throw 'INVENTORY_COUNT'}",
+    "for($j=0;$j -lt $actualNames.Count;$j++){if($actualNames[$j] -cne $expectedNames[$j]){throw 'INVENTORY_NAMES'}}",
+    "foreach($n in $expectedNames){$f=Join-Path $s $n;$i=Get-Item -LiteralPath $f -Force -ErrorAction Stop;if($i.PSIsContainer -or (($i.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)){throw 'FILE_REPARSE'};$observed=(Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant();if($observed -cne $expect.$n){throw 'PIN_DRIFT'}}",
+    "$owner=Get-Content -LiteralPath (Join-Path $s 'owner.json') -Raw -Encoding UTF8 | ConvertFrom-Json",
+    "if($null -eq $owner -or $null -eq $owner.pid -or [int]$owner.pid -le 0){throw 'OWNER_PID_INVALID'}",
+    "if($mode -ceq 'LIVE_NEW'){if([int]$owner.pid -ne $actor -or $owner.nonce -cne $nonce -or $null -eq (Get-Process -Id $actor -ErrorAction SilentlyContinue)){throw 'NEW_OWNER_DRIFT'}}",
+    "if($mode -ceq 'DEAD_OLD'){if([string]::IsNullOrEmpty($owner.nonce) -or $null -ne (Get-Process -Id ([int]$owner.pid) -ErrorAction SilentlyContinue)){throw 'OLD_OWNER_LIVE'};foreach($n in @('PREPARED.json','WORKFLOW_ENABLE_ATTEMPTED.json','BACKLOG_CLOSE_ATTEMPTED.json')){$marker=Get-Content -LiteralPath (Join-Path $s $n) -Raw -Encoding UTF8 | ConvertFrom-Json;if($marker.ownerNonce -cne $owner.nonce){throw 'OLD_NONCE_DRIFT'}}}",
+    "if($mode -ceq 'DEAD_INSTALL' -and $null -ne (Get-Process -Id ([int]$owner.pid) -ErrorAction SilentlyContinue)){throw 'INSTALL_OWNER_LIVE'}",
+    "[IO.Directory]::Move($s,$d)",
+  ].join(';');
   try{execFileSync(PS,['-NoProfile','-NonInteractive','-Command',script],{
     encoding:'utf8',windowsHide:true,timeout:30_000,
     maxBuffer:100_000,stdio:['ignore','pipe','pipe'],
@@ -211,12 +248,12 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
   try{
     originalWindows();
     need(H40(manifestCommitSha),'C_996_OWNER_MANIFEST_COMMIT_REQUIRED');
-    // REVIEW HOLD: The dependency import closure has not been authenticated
-    // before the first dynamic import, and the native child-process move does
-    // not yet perform a final source-inventory CAS. This source candidate is
-    // intentionally NEVER an executable C operator, even with a future
-    // signed manifest and exact new Owner consent. Remove this hold only in a
-    // separately reviewed source revision with new owner approval and tests.
+    // REVIEW HOLD: The dependency import closure has not been independently
+    // authenticated before the first dynamic import. The native child now
+    // checks pinned source inventory, but its real Windows race behavior and
+    // original-PC approval binding have not been verified. This candidate is
+    // intentionally NEVER executable, even with a future signed manifest and
+    // exact Owner consent. Remove only after separate review and approval.
     need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED');
     const [{create996InstalledGhGetReadOnly},
       {create996ContinuationConsentEvidenceReader},
@@ -279,7 +316,8 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
       continuationRequestId:id,originalRequestId:REQ,pid:process.pid,
       nonce,at:new Date().toISOString()};
     const reservationOwnerSha256=writeOnce(proposal,'owner.json',reservationOwner);
-    moveNoReplace(proposal,fixed);
+    moveNoReplace(proposal,fixed,{files:{'owner.json':reservationOwnerSha256},
+      ownerMode:'LIVE_NEW',actorPid:process.pid,nonce});
     need(sha(safeFile(path.join(fixed,'owner.json'),16_384))===
       reservationOwnerSha256,'C_996_OWNER_RESERVATION_READBACK_CHANGED');
     phase='CONTINUATION_CLAIM';
@@ -313,7 +351,10 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
         oldClaimSha256:manifest.originalPins.oldC,
         at:new Date().toISOString()});
     stage('ORIGINAL_WITH_CONTINUATION_CLAIM_RESERVED');
-    moveNoReplace(plan.steps[0].source,plan.steps[0].destination);
+    moveNoReplace(plan.steps[0].source,plan.steps[0].destination,{
+      files:classifierPins(manifest.originalPins,c,
+        manifest.sourceLockSha256,readySha256).oldC,
+      ownerMode:'DEAD_OLD'});
     stage('AFTER_OLD_C_ARCHIVED_INSTALL_HELD');
     phase='READY_AND_CONTINUATION_ARCHIVE';
     readySha256=writeOnce(continuation,'READY_TO_RELEASE_INSTALL.json',{
@@ -326,7 +367,9 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
       finalReleasePending:true,at:new Date().toISOString(),
     });
     stage('AFTER_OLD_C_ARCHIVED_READY_NOT_YET_ARCHIVED');
-    moveNoReplace(plan.steps[1].source,plan.steps[1].destination);
+    moveNoReplace(plan.steps[1].source,plan.steps[1].destination,{
+      files:{...c,'READY_TO_RELEASE_INSTALL.json':readySha256},
+      ownerMode:'LIVE_NEW',actorPid:process.pid,nonce});
     stage('AFTER_CONTINUATION_ARCHIVED_READY_INSTALL_HELD');
     phase='INSTALL_ARCHIVE_LAST';
     stage('AFTER_CONTINUATION_ARCHIVED_READY_INSTALL_HELD');
@@ -345,7 +388,10 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
     'C_996_OWNER_FINAL_OWNER_CONSENT_REVOKED_OR_CHANGED');
     checkSourceBundle(manifest,manifestCommitSha);
     stage('AFTER_CONTINUATION_ARCHIVED_READY_INSTALL_HELD');
-    moveNoReplace(plan.steps[2].source,plan.steps[2].destination);
+    moveNoReplace(plan.steps[2].source,plan.steps[2].destination,{
+      files:classifierPins(manifest.originalPins,c,
+        manifest.sourceLockSha256,readySha256).install,
+      ownerMode:'DEAD_INSTALL'});
     // FINAL move above is the last write. Everything below is read-only.
     phase='READONLY_POSTCHECK';
     const result=stage('AFTER_INSTALL_ARCHIVED');
