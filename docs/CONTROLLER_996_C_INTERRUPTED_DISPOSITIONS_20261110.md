@@ -44,6 +44,14 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 신규 패키지 자체 부정 검증 **9/9 PASS**, 기존 관측기/백로그 연결 시험 합계 **38/38 PASS**. ZIP 압축 7개 내부 파일과 로컬 원문 **7/7 일치**, ZIP Git blob 원격·로컬 동일. **이것은 Linux 격리/정적 시험이며 실제 Windows CMD+PowerShell 실측이 아니다.** 원본 PC 읽기 전용 단회 실행은 이 단계에 **포함되지 않았고**, 재실행 명령이나 이전 C 동의로 대체하지 않는다.
 - 패키지 단계의 후속 확인은 (1) Windows CMD 직접 해시 검사의 실제 exit code, (2) 실제 원본 PC에서 관측기 반환, (3) 실행 중 운영 쓰기 0과 상태 미변경 대조다. 그때에도 **Claim 독립 provenance·설치 소스 전체 byte·pause-window 원본 Issue 결과 검증이 별도로 완료되기 전까지 C 복구 재개 NO-GO**다.
 
+### 원본 Windows 실제 관측 수신 및 pause-window 원본 Issue 두 차례 대조
+
+- 사용자가 별도 바탕화면 폴더의 신규 R1 읽기 전용 CMD를 실제 원본 Windows에서 단회 실행한 **콘솔 스크린샷**을 제출했다. `ZGMINI_CONTROLLER_996_INTERRUPTED_READONLY_CLI_V1`, `READONLY_INTERRUPTED_PHASE_CONSISTENT`, `checksPassed=14/checksTotal=14`, `code=C_CLAIM_PROVENANCE_NOT_EXTERNALLY_PINNED`. 이전 C CMD 재실행은 0회다.
+- 실측: `workflowState=active`, `originalLeasePresent=true`, `cClaimPresent=true`, `laterArchiveMarkersPresent=false`; 원본 Backlog 마커와 닫힌 파일 SHA의 일치가 검증됐다. 관측 구간(UTC) `pausedAt=2026-11-10T01:06:53.751Z`, `resumedAt=2026-11-10T13:21:26.727Z`. 결과의 `operationalWrites=0`, `issuePosts=0`, `pcRetries=0`, `executionAuthorized=false`를 보존한다. CLI 자기 보고는 별도의 OS 수준 쓰기 추적 증거가 아니며, 이후 실행자 승인으로 해석하지 않는다.
+- GitHub `repo:ansqhd5774-Choi/zgmini-pc-control is:issue created:2026-11-10T01:06:53Z..2026-11-10T13:21:26Z` 범위 2회 조회와 각 원본 Issue·전체 댓글 2회 GET의 정규화 결과가 일치했다. 구간 내 등록된 `pc-job` 원본은 **4개**: [#1217](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1217) (`core-runtime-source-readonly`), [#1219](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1219) (테마 T1, 동일 operation), [#1226](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1226) (`core-status`), [#1227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1227) (`core-runtime-source-readonly`). 모두 Open·원본 결과 댓글 0건. `#1213/#1215/#1216`은 원본 pause 시작 **이전**에 생성되어 이 구간에서 제외한다.
+- 이 사실은 **실행 결과쌍 JSON/TXT의 부재 또는 실행 자체의 부재를 독립 증명하지 않는다**. 실물 Backlog `replays` 항목의 건수·원본별 결과를 별도 읽기로 확정하기 전까지 4건은 `OWNER_REPLAN_REVIEW_REQUIRED` **후보**이며 `DONE`, `SUCCESS`, 자동 재실행, 새 Issue 생성으로 처리하지 않는다. 네 원본 모양을 `replays={}`로 넣은 새로운 **비운영 가정 시뮬레이션**을 추가하여 전체 관련 회귀 **39/39 PASS**, 운영 결과로 오인하지 않는다.
+- **해제 차단 요소**: (1) C Claim의 외부에서 고정된 owner/PID/nonce provenance 및 소유권 인계, (2) 원본 Backlog 전체 replays·원격 result JSON/TXT와 Run 대조, (3) Controller/Stage/Maintainer 개별 실제 소스 바이트·현재 보호 상태의 별도 완전 사후검증, (4) 겹치는 Writer/Controller 활성 소유자 배제. 미충족 중에는 원본 C Claim·Install Lease 모두 보존하고 Workflow PUT/backlog rename/Issue 재발행/Lease archive 0회를 유지한다.
+
 ## 후속 C 단계 설계 (source-only, 실행 금지)
 
 - 단일 후속 복구는 **이미 시도한 Workflow PUT과 backlog rename을 반복하지 않는다.** 다른 상태가 발견되면 먼저 원인을 분리하며 재시도하지 않는다.
