@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readAllPages,prepareBacklogReadOnly} from '../tools/controller-postswitch-preflight.mjs';
+import {RESUME_1215} from '../tools/controller-postswitch-approval.mjs';
 
 const id='pc-update-877e10c8-8580-4095-a675-bef9ec032193';
 const pause='2026-11-08T12:28:00Z',resume='2026-11-08T12:29:00Z';
@@ -31,6 +32,15 @@ test('one nine-field original is planned with no writes',()=>{
   assert.equal(result.writes,0);
   assert.equal(result.candidateCount,1);
   assert.equal(result.actions[0].action,'RECORD_POSTING_THEN_POST_ONCE');
+});
+
+test('explicit continuation links only existing #1215 without changing original backlog',()=>{
+ const b=backlog(),copy={...original,number:1215,title:`Maintenance replay ${id} original #919`};
+ const plan=prepareBacklogReadOnly({...ports({backlog:b,cloneRows:[copy]}),resume:RESUME_1215});
+ assert.equal(plan.actions[0].action,'LINK_LOST_ACK');
+ assert.equal(plan.actions[0].replayIssueNumber,1215);assert.deepEqual(b.replays,{});
+ for(const copies of [[],[copy,{...copy,number:1216}],[{...copy,number:1216}]])
+  assert.throws(()=>prepareBacklogReadOnly({...ports({cloneRows:copies}),resume:RESUME_1215}));
 });
 test('bot result skips a replay before any POST',()=>{
   const result=prepareBacklogReadOnly(ports({comments:[{user:{login:'github-actions[bot]'},

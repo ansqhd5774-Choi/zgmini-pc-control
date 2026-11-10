@@ -6,6 +6,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
+import {RESUME_1215,writerFollowupMatches} from './controller-postswitch-approval.mjs';
 import {main as inspectPostSwitch} from './controller-postswitch-evidence.mjs';
 import {planPostSwitchBacklogItem, originalIssueInPause,
   verifiedClosedBacklogWindows} from './controller-postswitch-backlog.mjs';
@@ -33,7 +34,7 @@ export function readAllPages(getPage, maxPages=20) {
 
 /** All remote scans must be exhaustive; no search-snippet negative evidence. */
 export function prepareBacklogReadOnly({requestId,backlog,fetchIssues,
-  fetchComments,fetchOriginal,fetchAllIssues}) {
+  fetchComments,fetchOriginal,fetchAllIssues,resume=null}) {
   const windows=verifiedClosedBacklogWindows(backlog,requestId);
   need(typeof fetchIssues==='function' && typeof fetchComments==='function' &&
     typeof fetchOriginal==='function' && typeof fetchAllIssues==='function',
@@ -55,9 +56,18 @@ export function prepareBacklogReadOnly({requestId,backlog,fetchIssues,
     need(original?.number===row.number && original?.created_at===row.created_at,
       'POSTSWITCH_ORIGINAL_ISSUE_DRIFT');
     const comments=readAllPages(page=>fetchComments(row.number,page));
+    let planningBacklog=backlog;
+    if(resume!==null){
+      need(writerFollowupMatches(resume,RESUME_1215)&&row.number===919&&
+        backlog.replays['919']===undefined,'POSTSWITCH_RESUME_BACKLOG_SCOPE_INVALID');
+      planningBacklog=structuredClone(backlog);
+      planningBacklog.replays['919']={status:'POSTING',originalRequestId:resume.originalRequestId};
+    }
     const plan=planPostSwitchBacklogItem({maintenanceRequestId:requestId,
-      original,backlog,cloneIssues:allIssues,originalComments:comments,
+      original,backlog:planningBacklog,cloneIssues:allIssues,originalComments:comments,
       cloneSearchComplete:true,resultReadComplete:true});
+    if(resume!==null)need(plan.action==='LINK_LOST_ACK'&&plan.replayIssueNumber===1215,
+      'POSTSWITCH_RESUME_REPLAY_SCOPE_INVALID');
     actions.push(plan);
   }
   need(Object.keys(backlog.replays).every(key=>
@@ -100,7 +110,7 @@ export async function main(args=process.argv.slice(2), ports={}){
     fetchIssues:(since,page)=>github(`issues?state=all&since=${encodeURIComponent(since)}&per_page=100&page=${page}`),
     fetchComments:(number,page)=>github(`issues/${number}/comments?per_page=100&page=${page}`),
     fetchOriginal:number=>github(`issues/${number}`),
-    fetchAllIssues:page=>github(`issues?state=all&per_page=100&page=${page}`)});
+    fetchAllIssues:page=>github(`issues?state=all&per_page=100&page=${page}`),resume:ports.resume??null});
   return {status:'POSTSWITCH_PREFLIGHT_READONLY_PASS',requestId:id,sourceSha:source,
     actualControllerSha:evidence.actualControllerSha,
     backupControllerSha:evidence.backupSha,

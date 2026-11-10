@@ -88,6 +88,17 @@ test('unverified replay is a hard stop; no postcheck',async()=>{
   assert.equal(calls.includes('postcheck'),false);
 });
 
+test('an explicit resumed exclusive claim proceeds; the same claim without consent is refused',async()=>{
+ for(const resumeApproved of [false,true]){
+  const calls=[],p=ports(calls);
+  p.acquireClaim=async()=>({acquired:true,exclusive:true,preexisting:true,resumed:true});
+  const r=await reconcilePostSwitchForward({ledger:ledger(),evidence:evidence(),ports:p,
+    persist:async()=>{},resumeApproved});
+  assert.equal(r.status,resumeApproved?'FORWARD_RECONCILED':'RECOVERY_REQUIRED');
+  assert.equal(calls.includes('backlog'),resumeApproved);
+ }
+});
+
 test('failed postcheck never reaches final readback or lease archive',async()=>{
   const calls=[];
   const result=await reconcilePostSwitchForward({ledger:ledger(),evidence:evidence(),

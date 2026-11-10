@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
-import {acquirePostSwitchState,inspectPostSwitchState} from '../tools/controller-postswitch-state.mjs';
+import {acquirePostSwitchState,inspectPostSwitchState,resumePostSwitchState} from '../tools/controller-postswitch-state.mjs';
 
 const id='pc-update-877e10c8-8580-4095-a675-bef9ec032193';
 const sha40='badad9124157879d7a645b64f2768113d632355b';
@@ -41,6 +41,39 @@ test('duplicate operator cannot reserve a claim or silently resume',()=>{
     acquirePostSwitchState(f.opts);
     assert.throws(()=>acquirePostSwitchState(f.opts),/POSTSWITCH_RECOVERY_CLAIM_EXISTS/);
   }finally{f.done();}
+});
+
+function resumableFixture(){
+ const f=fixture();const s=acquirePostSwitchState(f.opts);
+ s.append('BACKLOG_POSTING_INTENT',{originalIssueNumber:919});
+ const owner=fs.readFileSync(path.join(s.claimDir,'owner.json'));
+ const snapshot=inspectPostSwitchState({maintenanceRoot:f.root,requestId:id});
+ const contract={ownerSha256:sha256(owner),priorSourceSha:sha40,
+   recordCount:snapshot.count,recordTailSha256:snapshot.lastHash,replayIssueNumber:1215};
+ return {...f,owner,contract,run:patch=>resumePostSwitchState({...f.opts,
+   sourceSha:'f'.repeat(40),contract,livePid:()=>false,...patch})};
+}
+test('explicit resume appends to exact journal without changing original owner or ledger',()=>{
+ const f=resumableFixture();try{
+  const old=fs.readFileSync(path.join(f.root,'recovery/post-switch',id,'000002.json'));
+  const resumed=f.run();resumed.append('RESUME_RESULT_VERIFIED',{issueNumber:1215});
+  assert.deepEqual(fs.readFileSync(path.join(resumed.claimDir,'owner.json')),f.owner);
+  assert.deepEqual(fs.readFileSync(path.join(resumed.stateDir,'000002.json')),old);
+  assert.equal(inspectPostSwitchState({maintenanceRoot:f.root,requestId:id}).count,4);
+  assert.throws(()=>f.run(),/RESUME_STATE_DRIFT|RESUME_ALREADY_CLAIMED/);
+ }finally{f.done();}
+});
+test('resume refuses live/unknown owner, altered journal, wrong hash or ledger drift before claim',()=>{
+ for(const mutate of [
+  f=>({livePid:()=>true}),f=>({livePid:()=>null}),
+  f=>({contract:{...f.contract,ownerSha256:'0'.repeat(64)}}),
+  f=>({contract:{...f.contract,recordTailSha256:'0'.repeat(64)}}),
+  f=>({contract:{...f.contract,priorSourceSha:'0'.repeat(40)}}),
+  f=>{fs.appendFileSync(path.join(f.root,'ledger',id+'.json'),' ');return {};},
+ ]){const f=resumableFixture();try{
+   assert.throws(()=>f.run(mutate(f)),/RESUME_STATE_DRIFT/);
+   assert.equal(fs.existsSync(path.join(f.root,'leases/controller-recovery/resume-1215')),false);
+  }finally{f.done();}}
 });
 test('unrelated existing C-grade recovery claim excludes this mode',()=>{
   const f=fixture();

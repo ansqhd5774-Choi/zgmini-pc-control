@@ -44,7 +44,7 @@ export function forwardRecoveryCandidate(ledger, evidence) {
  * ledger. An interrupted claim may only be inspected, never automatically
  * reacquired or replayed. Both pc-job and postcheck ACK loss are hard stops.
  */
-export async function reconcilePostSwitchForward({ledger, evidence, ports, persist}) {
+export async function reconcilePostSwitchForward({ledger, evidence, ports, persist,resumeApproved=false}) {
   need(forwardRecoveryCandidate(ledger, evidence), 'FORWARD_ORIGINAL_NOT_ELIGIBLE');
   for (const key of ['verifyPreconditions', 'acquireClaim', 'reconcileBacklog', 'postcheck',
     'verifyFinal', 'verifyOriginalUnchanged']) need(typeof ports?.[key] === 'function', 'FORWARD_PORT_MISSING');
@@ -68,7 +68,9 @@ export async function reconcilePostSwitchForward({ledger, evidence, ports, persi
     // its owner; blindly starting this state machine again risks duplication.
     const claim = await ports.acquireClaim({requestId: ledger.requestId,
       ledgerDigest: evidence.materialHashes.ledger});
-    need(claim?.acquired === true && claim?.exclusive === true && claim?.preexisting === false,
+    need(claim?.acquired === true && claim?.exclusive === true &&
+      (claim?.preexisting === false ||
+        (resumeApproved===true&&claim?.preexisting===true&&claim?.resumed===true)),
       'FORWARD_CLAIM_NOT_EXCLUSIVE');
     claimAcquired = true;
     // The claim can be acquired after the read-only snapshot but before the

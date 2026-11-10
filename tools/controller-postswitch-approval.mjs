@@ -182,15 +182,37 @@ export function writerFollowupMatches(value, expected=WRITER_FOLLOWUP) {
   return value===expected;
 }
 
+// Explicit continuation of the single, already completed replay. This scope
+// never authorizes another POST for #919 or removal of the original claim.
+export const RESUME_1215=Object.freeze({
+  schema:'ZGMINI_PC_POSTSWITCH_RESUME_1215_V1',
+  priorSourceSha:'d82b66206d78b1f9d90f846dce1b67b7f36f6719',
+  priorApprovalCommitSha:'ec4ffa2b4368c48dca39c294eb6d3735f9a28523',
+  priorApprovalSha256:'348d69a0662649f93a9de45996647e364dc9a8bfe5891917bd13b128fe1653d2',
+  ownerSha256:'f4757f63441e925790f231acb604213662a6e314b7351882cc436090abb68766',
+  recordCount:5,recordTailSha256:'7331a2615c1bf655a6f86981cdf83214cecfbfd6cda5e7a68b55a930a52d78a9',
+  originalIssueNumber:919,replayIssueNumber:1215,
+  originalRequestId:'pc-290d6501-ab68-4fda-b4c4-473b582fb2f1',
+  replayBodySha256:'d2e9d5a4e35e141621536ec7fd123acb3167bdb5acc77b61915db4bd0dfecc8f',
+  results:Object.freeze([
+    Object.freeze({path:'results/42729529997-1-seat-5.json',blobSha:'823e307338b4703e79bc452b188afd62a57181e0',sha256:'b22360c640e854432766fb697513bca5c30b546e1840f9f3ae04c1058fed9361'}),
+    Object.freeze({path:'results/42729529997-1-seat-5.txt',blobSha:'e5c1b94da668b2ea03aac7cd5fc69c842a8e93d5',sha256:'922b18dd190608ed071894bf954c52f7fb3ec1ac0ed2e92786fee386de6b18fe'}),
+  ]),
+});
+
 export function validatePostSwitchApproval(approval, {requestId,sourceSha,evidence} = {}) {
   const transitionRequested = Object.hasOwn(approval ?? {}, 'writerTransition');
   const followupRequested = Object.hasOwn(approval ?? {}, 'writerFollowup');
+  const resumeRequested = Object.hasOwn(approval ?? {}, 'resume');
   need(keysAre(approval, ['schema','approved','operation','requestId','issueNumber',
     'sourceSha','targetControllerSha','installedShaBefore','evidenceHashes',
     'toolHashes','postcheck','expectedBacklogIssues',
     ...(transitionRequested ? ['writerTransition'] : []),
-    ...(followupRequested ? ['writerFollowup'] : [])]),
+    ...(followupRequested ? ['writerFollowup'] : []),
+    ...(resumeRequested ? ['resume'] : [])]),
   'POSTSWITCH_APPROVAL_FIELDS_INVALID');
+  if(resumeRequested)need(followupRequested && writerFollowupMatches(approval.resume,RESUME_1215),
+    'POSTSWITCH_RESUME_CONTRACT_INVALID');
   if(followupRequested)need(transitionRequested && writerFollowupMatches(approval.writerFollowup) &&
     evidence?.writerFollowupVerified===true,
     'POSTSWITCH_APPROVED_WRITER_FOLLOWUP_UNVERIFIED');

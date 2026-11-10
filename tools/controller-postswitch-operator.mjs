@@ -19,7 +19,7 @@ export async function runApprovedPostSwitch({approval,ledger,evidence,sourceSha,
 
   // Forward reconciliation never touches the old install lease or ledger.
   const forward=await reconcilePostSwitchForward({ledger,evidence,
-    ports, persist:ports.persist});
+    ports, persist:ports.persist,resumeApproved:approval.resume!==undefined});
   if(forward.status!=='FORWARD_RECONCILED')return {
     ...forward, status:'RECOVERY_REQUIRED',leaseArchived:false};
 

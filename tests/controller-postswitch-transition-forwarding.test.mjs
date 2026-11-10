@@ -46,11 +46,11 @@ test('preflight preserves new follow-up identity separately from historical cons
 test('read-only launcher passes its verified transition through to preflight',()=>{
   const source=readFileSync(new URL('../tools/controller-postswitch-launcher.mjs',
     import.meta.url),'utf8');
-  assert.match(source,/const plan=await preflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:WRITER_TRANSITION,writerFollowup:WRITER_FOLLOWUP\}\)/);
+  assert.match(source,/const plan=await preflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:WRITER_TRANSITION,writerFollowup:WRITER_FOLLOWUP,resume:RESUME_1215\}\)/);
 });
 
 test('direct C operator passes the approved transition through to preflight',()=>{
   const source=readFileSync(new URL('../tools/controller-postswitch-windows.mjs',
     import.meta.url),'utf8');
-  assert.match(source,/const preflight=await inspectPreflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:approval\.writerTransition \?\? null,writerFollowup:approval\.writerFollowup \?\? null\}\)/);
+  assert.match(source,/const preflight=await inspectPreflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:approval\.writerTransition \?\? null,writerFollowup:approval\.writerFollowup \?\? null,resume:approval\.resume\?\?null\}\)/);
 });

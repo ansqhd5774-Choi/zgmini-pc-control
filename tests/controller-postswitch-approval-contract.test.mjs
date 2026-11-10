@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,
+import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,RESUME_1215,
   validatePostSwitchApproval} from '../tools/controller-postswitch-approval.mjs';
 
 const sourceSha='f'.repeat(40);
@@ -73,6 +73,15 @@ test('historical C consent cannot authorize later Writer overlays',()=>{
  assert.throws(()=>checkFollowup(followupManifest(),evidence(true)),/FOLLOWUP_UNVERIFIED/);
  const ap=followupManifest();delete ap.writerTransition;
  assert.throws(()=>checkFollowup(ap),/FOLLOWUP_UNVERIFIED/);
+});
+
+test('continuation consent pins #1215, existing owner, journal tail and result hashes',()=>{
+ const ap={...followupManifest(),resume:structuredClone(RESUME_1215)};
+ assert.equal(checkFollowup(ap).resume.replayIssueNumber,1215);
+ for(const edit of [r=>{r.replayIssueNumber=1216;},r=>{r.ownerSha256='0'.repeat(64);},
+   r=>{r.recordTailSha256='0'.repeat(64);},r=>{r.results.pop();}]){
+  const bad=structuredClone(ap);edit(bad.resume);assert.throws(()=>checkFollowup(bad),/RESUME_CONTRACT_INVALID/);
+ }
 });
 test('altered or incomplete new consent and missing source closure are rejected',()=>{
  for(const edit of [

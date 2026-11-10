@@ -7,14 +7,14 @@ import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {INCIDENT,TOOL_PATHS,MATERIAL_KEYS,
+import {INCIDENT,TOOL_PATHS,MATERIAL_KEYS,RESUME_1215,writerFollowupMatches,
   validatePostSwitchApproval} from './controller-postswitch-approval.mjs';
 import {main as inspectPostSwitch} from './controller-postswitch-evidence.mjs';
 import {main as inspectPreflight,prepareBacklogReadOnly,readAllPages}
   from './controller-postswitch-preflight.mjs';
 import {exactReplayCandidates} from './controller-postswitch-backlog.mjs';
 import {ensurePostcheckIssue} from './controller-postswitch-postcheck.mjs';
-import {acquirePostSwitchState} from './controller-postswitch-state.mjs';
+import {acquirePostSwitchState,resumePostSwitchState,inspectPostSwitchState} from './controller-postswitch-state.mjs';
 import {runApprovedPostSwitch} from './controller-postswitch-operator.mjs';
 
 const maintenance='E:/ZGmini/automation/pc-maintenance';
@@ -57,14 +57,50 @@ function issuePages(){
 function commentsFor(issueNumber){
   return readAllPages(page=>api('issues/'+issueNumber+'/comments?per_page=100&page='+page));
 }
-function backlogReadOnly(backlog){
+function backlogReadOnly(backlog,resume=null){
   const id=INCIDENT.requestId;
   return prepareBacklogReadOnly({requestId:id,backlog,
     fetchIssues:(since,page)=>api('issues?state=all&since='+
       encodeURIComponent(since)+'&per_page=100&page='+page),
     fetchComments:(n,page)=>api('issues/'+n+'/comments?per_page=100&page='+page),
     fetchOriginal:n=>api('issues/'+n),
-    fetchAllIssues:page=>api('issues?state=all&per_page=100&page='+page)});
+    fetchAllIssues:page=>api('issues?state=all&per_page=100&page='+page),resume});
+}
+
+export function verifyResumeReadOnly(resume){
+  need(writerFollowupMatches(resume,RESUME_1215),'POSTSWITCH_RESUME_CONTRACT_INVALID');
+  const priorRaw=git(['show',resume.priorApprovalCommitSha+
+    ':approvals/maintenance-recoveries/'+INCIDENT.requestId+'.postswitch.json']);
+  const prior=JSON.parse(priorRaw);
+  need(digest(priorRaw)===resume.priorApprovalSha256&&prior.approved===true&&
+    prior.sourceSha===resume.priorSourceSha,'POSTSWITCH_RESUME_PRIOR_APPROVAL_DRIFT');
+  const state=inspectPostSwitchState({maintenanceRoot:maintenance,requestId:INCIDENT.requestId});
+  const raw=read(path.join(maintenance,'leases/controller-recovery/owner.json'));
+  const owner=JSON.parse(raw);
+  let dead=false;try{process.kill(owner.pid,0);}catch(e){dead=e.code==='ESRCH';}
+  need(dead&&digest(raw)===resume.ownerSha256&&owner.sourceSha===resume.priorSourceSha&&
+    state.count===resume.recordCount&&state.lastHash===resume.recordTailSha256&&
+    !fs.existsSync(path.join(maintenance,'leases/controller-recovery/resume-1215')),
+    'POSTSWITCH_RESUME_STATE_DRIFT');
+  const original=api('issues/919'),replay=api('issues/1215');
+  need(exactReplayCandidates(INCIDENT.requestId,original,issuePages()).join(',')==='1215'&&
+    replay.body===original.body&&digest(Buffer.from(replay.body))===resume.replayBodySha256,
+    'POSTSWITCH_RESUME_REPLAY_UNVERIFIED');
+  for(const entry of resume.results){
+    const row=api('contents/'+entry.path);
+    need(row.path===entry.path&&row.sha===entry.blobSha&&row.encoding==='base64',
+      'POSTSWITCH_RESUME_RESULT_BLOB_DRIFT');
+    const bytes=Buffer.from(row.content.replace(/\s/g,''),'base64');
+    need(digest(bytes)===entry.sha256,'POSTSWITCH_RESUME_RESULT_RAW_DRIFT');
+    if(entry.path.endsWith('.json')){
+      const result=JSON.parse(bytes);
+      need(result.status==='PASS'&&result.requestId===resume.originalRequestId&&
+        result.actualExecutionSha===INCIDENT.newSha&&result.operationalWrites===0&&
+        result.providerCalls===0&&result.d1Writes===0&&result.protectedStateUnchanged===true,
+        'POSTSWITCH_RESUME_RESULT_NOT_PASS');
+    }
+  }
+  return {verified:true,operationalWrites:0,replayIssueNumber:1215};
 }
 
 /** Reject bot markers with missing/mismatched evidence; no reply is proof alone. */
@@ -182,7 +218,7 @@ function makePorts({approval,evidence,source,preflight,ledger}){
   const checked=async()=>{
     stablePreimages(approval);
     const fresh=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
-      {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null});
+      {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null,resume:approval.resume??null});
     validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence:fresh});
     need(fresh.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
       'POSTSWITCH_LIVE_PRECONDITION_FAILED');
@@ -212,6 +248,12 @@ function makePorts({approval,evidence,source,preflight,ledger}){
     },
     acquireClaim:async()=>{
       need(state===null,'POSTSWITCH_CLAIM_DUPLICATE');
+      if(approval.resume){
+        verifyResumeReadOnly(approval.resume);
+        state=resumePostSwitchState({maintenanceRoot:maintenance,requestId:id,
+          ledgerSha256:approval.evidenceHashes.ledger,sourceSha:source,contract:approval.resume});
+        return {acquired:true,exclusive:true,preexisting:true,resumed:true};
+      }
       state=acquirePostSwitchState({maintenanceRoot:maintenance,requestId:id,
         ledgerSha256:approval.evidenceHashes.ledger,sourceSha:source});
       return {acquired:true,exclusive:true,preexisting:false};
@@ -219,12 +261,14 @@ function makePorts({approval,evidence,source,preflight,ledger}){
     reconcileBacklog:async()=>{
       need(state!==null,'POSTSWITCH_CLAIM_REQUIRED');
       state.verifyStillHeld();
-      const fresh=backlogReadOnly(json(paths.backlog));
+      const fresh=backlogReadOnly(json(paths.backlog),approval.resume??null);
       need(fresh.candidateCount===1 && fresh.actions.length===1 &&
         fresh.actions[0].originalIssueNumber===919 &&
         JSON.stringify(fresh.actions)===JSON.stringify(preflight.backlogPlan.actions),
       'POSTSWITCH_BACKLOG_PLAN_DRIFT');
       const action=fresh.actions[0],origin=api('issues/919');
+      if(approval.resume)need(action.action==='LINK_LOST_ACK'&&action.replayIssueNumber===1215,
+        'POSTSWITCH_RESUME_REPOST_FORBIDDEN');
       const originalBody=JSON.parse(origin.body);
       need(originalBody.requestId===action.originalRequestId,
         'POSTSWITCH_BACKLOG_REQUEST_DRIFT');
@@ -348,12 +392,12 @@ export async function main(args=process.argv.slice(2),{launcherVerified=false}={
   need(approval.sourceSha===source,'POSTSWITCH_APPROVAL_SOURCE_MISMATCH');
   pinnedTools(approval,source);
   const evidence=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
-      {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null});
+      {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null,resume:approval.resume??null});
   validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence});
   need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
     'POSTSWITCH_EVIDENCE_FAILED');
   const preflight=await inspectPreflight(['--request-id',id,'--source-sha',source],
-    {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null});
+    {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null,resume:approval.resume??null});
   need(preflight.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS' &&
     preflight.backlogPlan.candidateCount===1 &&
     preflight.backlogPlan.actions[0]?.originalIssueNumber===919,

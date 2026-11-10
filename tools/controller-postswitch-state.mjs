@@ -103,3 +103,53 @@ export function inspectPostSwitchState({maintenanceRoot,requestId}){
   return {exists:true,claimExists:fs.existsSync(claimDir),count:entries.length,
     lastCode:last.code,lastHash:previousHash};
 }
+
+/** Explicitly claimed continuation; preserves the dead owner's bytes and the
+ * entire original journal. A second continuation is rejected atomically. */
+export function resumePostSwitchState({maintenanceRoot,requestId,sourceSha,ledgerSha256,
+  contract,now=()=>new Date().toISOString(),livePid=pid=>{
+    try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}
+  }}){
+  need(path.isAbsolute(maintenanceRoot)&&idOk(requestId)&&sha40(sourceSha)&&sha64(ledgerSha256),
+    'POSTSWITCH_RESUME_ARGUMENTS_INVALID');
+  const claimDir=path.join(maintenanceRoot,'leases/controller-recovery');
+  const stateDir=path.join(maintenanceRoot,'recovery/post-switch',requestId);
+  const ownerFile=path.join(claimDir,'owner.json');
+  const ledgerFile=path.join(maintenanceRoot,'ledger',requestId+'.json');
+  const raw=fs.readFileSync(ownerFile),owner=json(raw);
+  const state=inspectPostSwitchState({maintenanceRoot,requestId});
+  need(sha64(contract?.ownerSha256)&&sha64(contract?.recordTailSha256)&&
+    Number.isSafeInteger(contract?.recordCount)&&contract.recordCount>0&&
+    digest(raw)===contract.ownerSha256&&owner.requestId===requestId&&
+    owner.sourceSha===contract.priorSourceSha&&owner.ledgerSha256===ledgerSha256&&
+    livePid(owner.pid)===false&&state.count===contract.recordCount&&
+    state.lastHash===contract.recordTailSha256&&digest(fs.readFileSync(ledgerFile))===ledgerSha256,
+    'POSTSWITCH_RESUME_STATE_DRIFT');
+  const resumeDir=path.join(claimDir,'resume-1215');
+  try{fs.mkdirSync(resumeDir);}catch(e){
+    if(e.code==='EEXIST')need(false,'POSTSWITCH_RESUME_ALREADY_CLAIMED');throw e;
+  }
+  const active={requestId,sourceSha,pid:process.pid,nonce:randomUUID(),at:now()};
+  const activeFile=path.join(resumeDir,'owner.json');
+  durableNewFile(activeFile,JSON.stringify(active)+'\n');
+  const activeDigest=digest(fs.readFileSync(activeFile));
+  let sequence=state.count,previousHash=state.lastHash;
+  function verifyStillHeld(){
+    need(digest(fs.readFileSync(ownerFile))===contract.ownerSha256&&
+      digest(fs.readFileSync(activeFile))===activeDigest&&
+      digest(fs.readFileSync(ledgerFile))===ledgerSha256,'POSTSWITCH_RESUME_OWNER_DRIFT');
+  }
+  function append(code,details={}){
+    verifyStillHeld();const current=inspectPostSwitchState({maintenanceRoot,requestId});
+    need(/^[A-Z0-9_]+$/.test(code)&&current.count===sequence&&current.lastHash===previousHash,
+      'POSTSWITCH_RESUME_JOURNAL_DRIFT');
+    const record={schema:'ZGMINI_PC_POSTSWITCH_RECORD_V1',requestId,
+      sequence:sequence+1,previousHash,code,details,at:now()};
+    const bytes=JSON.stringify(record)+'\n';
+    durableNewFile(path.join(stateDir,filename(++sequence)),bytes);
+    previousHash=digest(bytes);return record;
+  }
+  append('RECOVERY_CLAIM_RESUMED',{sourceSha,priorSourceSha:contract.priorSourceSha,
+    replayIssueNumber:contract.replayIssueNumber});
+  return {claimDir,stateDir,owner,append,verifyStillHeld};
+}
