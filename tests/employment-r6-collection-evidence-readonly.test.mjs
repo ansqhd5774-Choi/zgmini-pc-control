@@ -123,6 +123,30 @@ test('unrecognized region does not pass merely because 51 rows exist',t=>{
  assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
 });
 
+test('one zero weekly value is valid when the prior four-week sum remains positive',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);
+ const zeroWeek='2025-01-04';
+ db.prepare(`UPDATE market_score_employment_r4_shadow_current_v1 SET value=0
+  WHERE observation_date=? AND geography_code='WY'`).run(zeroWeek);
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.strict52WeekCandidateCount,1);
+ assert.equal(r.stateClaims.firstWindowBreak,null);
+});
+
+test('an entire zero prior four-week state base prevents a valid score',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);
+ db.prepare(`UPDATE market_score_employment_r4_shadow_current_v1 SET value=0
+  WHERE geography_code='WY' AND observation_date IN
+   ('2025-01-04','2025-01-11','2025-01-18','2025-01-25')`).run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
+ assert.equal(r.stateClaims.firstWindowBreak?.reason,'PRIOR_4W_ZERO_BASE');
+});
+
 test('WAL database without sidecars remains untouched and unopened',t=>{
  const {data,storage,file}=fixture(t),db=createDb(file);
  db.exec('PRAGMA journal_mode=WAL');db.close();
