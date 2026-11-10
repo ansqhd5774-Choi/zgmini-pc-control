@@ -48,7 +48,7 @@ function fixture(){
   protectedWriterFileStatus:{'config.json':'PRESENT',
    'quota-runner.cmd':'PRESENT','run-local.cmd':'PRESENT'},
   protectedTaskEnabled:{'ZGMINI-PC-Local-Core':true,
-   'ZGMINI-PC-Local-Korea':false},
+   'ZGMINI-PC-Local-Korea':true},
  };
  const bytes=Buffer.from(`${JSON.stringify(manifest,null,2)}\n`);
  const gitRead={repository:'ansqhd5774-Choi/zgmini-pc-control',
@@ -149,6 +149,7 @@ test('missing two acknowledged gaps, extra effect or evidence fails',()=>{
   f=>{delete f.manifest.protectedItemsSha256.files['config.json'];},
   f=>{f.manifest.protectedWriterFileStatus['config.json']='ABSENT';},
   f=>{f.manifest.protectedTaskEnabled['ZGMINI-PC-Local-Core']=null;},
+  f=>{f.manifest.protectedTaskEnabled['ZGMINI-PC-Local-Korea']=false;},
  ]){
   const f=fixture();mutate(f);rerenderManifest(f);
   assert.equal(review(f).status,'CONSENT_UNVERIFIED');
