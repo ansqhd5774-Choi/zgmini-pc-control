@@ -6,6 +6,8 @@
 
 사용자가 작업 전에 전달할 짧은 지침은 [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)다. 현재 상태와 접수 문제는 [AUTOMATION_STATUS_AND_ADMISSION.md](AUTOMATION_STATUS_AND_ADMISSION.md)로 분류한다. 요약을 읽은 것만으로 최신 정본·실제 상태 확인을 대체하지 않는다.
 
+**2026-11-10 격리 Writer B 인계 반영:** 일반챗은 작업을 시작·재개할 때 최신 `main`의 `AGENTS.md`·이 문서·`PC_AUTOMATION_STANDARD.md` 관련 범위를 확인한다. 승인된 정규 Writer B 실행이 실제 실패하면 격리 Windows Runner가 원본 bot 증거를 검증해 단일 중앙 ChatGPT용 `agent-handoff` Incident를 자동 접수하고, 검증된 해결 결과는 **원본 Issue의 bot receipt**로 돌아온다. 원담당은 실제 자기 대화가 재개됐을 때 해당 원본 Issue와 결과를 읽고 본래 기능의 다음 작업을 수행한다. GitHub 이슈 댓글만으로 다른 일반챗 자동 수신·원담당 재개·PC 설치/게시를 주장하지 않는다. 안전 대기(`WAIT_RECORDED`)·성공·미확정은 수리 실패가 아니며, 실증만을 위한 Writer B 요청을 생성하지 않는다. [중앙 계약과 새 격리 경로의 검증 범위](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md)를 따른다.
+
 완료 단계는 증거와 함께 닫고 다음 필수 실행 하나를 담당·입력·통과 조건과 함께 지정한다. 대기는 기존 ID 하나로 추적하며 같은 상태를 반복 보고하지 않는다. 사용자 중지 시 새 실행과 추적을 중단한다. [단계 종료와 다음 실행](PC_AUTOMATION_STANDARD.md#단계-종료와-다음-실행)을 따른다.
 
 공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md)다. 기존 Runtime 증거는 필요한 대상·시각·source 범위에서 내부 전제로 재사용하고 현재 업무를 실행한다. 정상 업무마다 과거 설치·복구를 다시 확인하거나 이를 ‘가장 중요한 진전’으로 반복 보고하지 않는다. 보고는 이번 수행·검증·실제 미해결 조건·다음 행동에 한정한다.
@@ -32,6 +34,10 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 > ZGMINI PC 검사·진단이 필요하면 먼저 `ansqhd5774-Choi/zgmini-pc-control`의 `docs/GENERAL_CHAT_START.md`를 읽고 허용된 A급 작업을 직접 요청하고 결과까지 확인하라. 사용자가 승인한 범위의 단순 검사마다 재승인이나 CMD 수동 실행을 요구하지 마라.
 
 2026-11-02 실제 ZGMINI 프로젝트 설정에 이 자동 시작 절차를 추가해 저장했고, 기존 지침7509자를 보존한 총7917자 저장값을 다시 열어 확인했다. 이 프로젝트의 새 일반챗은 위 연결 절차를 사용자에게 다시 요구하지 않는다.
+
+**2026-11-10 ChatGPT 프로젝트 공통 지침 동기화 필요:** 위 2026-11-02 저장 확인은 당시 **PC 조회 자동 시작 문구**에 한정된다. 새 격리 Writer B 중앙 인계 절차까지 프로젝트 설정에 반영됐다는 증거는 아니다. 프로젝트 관리자는 ZGMINI **프로젝트 설정 → 프로젝트 지침**에서 기존 R6.0을 보존하고 아래 문장을 추가·저장해야 한다. GitHub 업데이트만으로 기존 일반챗이나 실제 프로젝트 설정이 자동 변경되지 않는다.
+
+> 원담당 일반챗은 업무 시작·재개 시 제어 저장소 최신 main의 AGENTS.md·docs/GENERAL_CHAT_START.md·docs/PC_AUTOMATION_STANDARD.md 관련 내용을 확인한다. 승인된 Writer B의 인증된 수리 가능 실패는 격리 Windows intake → 단일 중앙 ChatGPT 처리 → 원본 GitHub Issue 결과 반환 경로를 따른다. Issue 댓글은 다른 일반챗의 자동 수신·자동 재개나 PC 운영 적용이 아니다. 원담당은 자기 대화가 실제 재개되면 원본 Issue 결과를 확인해 본래 기능 업무를 계속한다. 안전 대기·성공·미확정을 수리 실패로 오분류하지 않고, 새 격리 경로의 자연 수리 가능 실패 전체 왕복 관측은 후속 검증으로 두며 독립 업무의 차단 조건으로 삼지 않는다.
 
 프로젝트 밖의 새 일반챗이 이 저장소를 자동으로 알고 있다고 가정하지 않는다. GitHub 도구 미연결이면 연결이 필요한 범위만 안내한다. Runner 설치만으로 모든 대화에 지침·권한이 자동 주입되지는 않는다.
 

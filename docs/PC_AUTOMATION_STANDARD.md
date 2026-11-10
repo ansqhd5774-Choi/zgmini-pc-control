@@ -69,6 +69,13 @@ BLOCKER는 현재 필수 실행을 실제로 막는 접근 거부·활성 자원
 - GitHub Issue·댓글에 남긴 인계는 **기록**이며 다른 독립 일반챗의 **실제 수신/재개**가 아니다. 원담당이 이 지침·인계를 실제로 받은 경우 자기 대화에서 수신과 다음 필수 실행·결과를 명시하고 진행한다. 별도 GitHub ACK 댓글이나 총괄 완료율을 새로운 실행 Gate로 삼지 않는다. 직접 전달 경로가 없으면 `HANDOFF_RECORDED/OWNER_ACK_UNKNOWN`으로 표시하고 관계없는 업무는 계속한다.
 - 현재 단계가 `READY`면 가능한 승인 행동을 실행하고 대상 결과까지 회수한다. `BLOCKED`면 해당 실행의 `LAST PASS / FIRST FAIL / 정확한 오류 / 담당 / 최소 해제 행동`만 기록하고 그 범위에 한해 대기한다. 이미 유효한 성공 증거·정상 Controller 상태를 반복 검사하여 새 병목을 만들지 않는다.
 
+### 승인된 격리 Writer B 자동 장애 인계 (2026-11-10)
+
+- **입구·격리:** 승인된 `ZGMINI_PC_WRITER_SOURCE_B_REQUEST_V1` 원본 Issue의 정규 Writer B workflow 완료 시 `.github/workflows/agent-handoff-writer-b-failure-intake.yml`이 `workflow_run`을 수신한다. 저장소 opt-in 변수 `ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED == 'true'`인 경우에만 `zgmini-handoff-ci-isolated` 전용 Windows Runner에서 읽기·증거 검증·제한된 GitHub 사건 기록을 수행한다. 이 Runner는 기존 운영 6개 PC Runner/Writer B 설치 실행기와 구분되며 PC 명령·운영 파일/DB 쓰기·자동 재시도를 수행하지 않는다.
+- **인증·분기:** 원본 Issue schema·workflow SHA·고정 manifest SHA-256·bot 결과 marker·해당 Run JSON/TXT 2/2를 대조한다. **확정된 수리 가능 실패만** 동일 fingerprint의 중복을 제거해 `agent-handoff` Incident 1건을 등록·재조회한다. 성공, `WAIT_RECORDED`, `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`, 미확정·증거 부재를 수리 사고로 승격하지 않는다. 기존 requestId·단회 Writer B 실행을 반복하지 않는다.
+- **중앙 처리와 원본 반환:** 기존 단일 중앙 ChatGPT 예약 처리자가 실제 Incident 증거를 검증하고 원인에 한정한 수정·관련 회귀·PR/CI 증거를 남기며, 기존 result broker는 `HANDOFF_RESULT_RECORDED`와 원본 Issue의 `HANDOFF_ORIGIN_RESULT_RECORDED`를 구분해 검증한다. GitHub receipt는 다른 일반챗 자동 알림/자동 재개 또는 실제 PC Runtime·기능 수집→게시 완료의 증거가 아니다. 원담당은 실제 대화 재개 때 원본 Issue를 확인하고 기능 작업을 이어간다. 기존 6 Runner/공용 Writer lock·B급 승인·원본 보호 규칙은 변경하지 않는다.
+- **현행 근거·남은 관측:** 자연 격리 intake [Run #42725636209](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42725636209)는 원본 #1210의 자원 안전대기 1건을 검증해 `WAIT_RECORDED`, 새 Incident 0건, PC 운영 쓰기·자동 재시도 각 0건이었다. 신설 격리 intake의 자연 수리 가능 실패→중앙→원본 Issue **전체 왕복 표본은 아직 0건(DEFERRED)**이며, 과거 중앙 경로의 #1063→#1068 성공 표본과 구분한다. 이 후속 관측을 독립 기능 실행의 전역 Gate로 삼지 않는다. [중앙 인계 정본](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md)을 따른다.
+
 ### 단계 종료와 다음 실행
 
 - 시작하거나 재개할 때 현재 목표의 완료 조건과 마지막 유효 완료 지점을 기록한다. 단계별로 `DONE`, `READY`, `RUNNING`, `STATE_UNKNOWN`, `BLOCKED`, `DEFERRED`를 구분한다. `DONE`에는 증거 링크와 적용 범위를 남긴다. 해당 입력·source·설정·환경의 변경이나 상충 증거가 있을 때만 영향받은 단계를 다시 연다.
