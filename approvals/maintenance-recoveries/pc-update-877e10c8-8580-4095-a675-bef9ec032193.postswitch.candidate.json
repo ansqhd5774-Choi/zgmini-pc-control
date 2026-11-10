@@ -1,0 +1,132 @@
+{
+  "schema": "ZGMINI_PC_POSTSWITCH_RECOVERY_APPROVAL_V1",
+  "approved": false,
+  "operation": "FORWARD_POSTSWITCH_917",
+  "requestId": "pc-update-877e10c8-8580-4095-a675-bef9ec032193",
+  "issueNumber": 917,
+  "sourceSha": "d82b66206d78b1f9d90f846dce1b67b7f36f6719",
+  "installedShaBefore": "c09bf6a6f66f229016135020d6ba553ba9a94676",
+  "targetControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "evidenceHashes": {
+    "ledger": "321be375887895bfa3a3c8056dfd739081f4ebae4e930bd570c7c9934aa95b47",
+    "owner": "3e2d450107c54631414eb9f3f94a4c3562f38d995d7fdcc31181d6aecf33615c",
+    "marker": "180d4ccf0e09c703df1566eb2a81fe7dea6e44d87c00ef5119eb4c789afdf6ba",
+    "currentHost": "32403a79fb407cabe8426de7507116847178f734da68a289cc12fa8cf4ca36c9",
+    "snapshotHost": "28c3fd85ffcd7706dfd3ac57bd67acad47f087295695a8dadf5ea5978f6a1728",
+    "protectedBefore": "fad711eb09b9887a50be24481d963b7682fb8e6dca884d9237fb70bd1ef9d8ee",
+    "backlog": "e163128540b51bb0c2cd8c9503b9474a59ffce28e24b103fff1be82f07019708"
+  },
+  "toolHashes": {
+    "tools/controller-postswitch-launcher.mjs": "4cce533d4e53df4fb1804ed0bb29128470da71aac2269ad1dbd0772f208f3f28",
+    "tools/controller-postswitch-approval.mjs": "d680e6080f92759a155578553e09a0c12de57bd339c2e97b09d5cf916142d592",
+    "tools/controller-postswitch-operator.mjs": "abfc8c4f5ed4a1cab5fdb00a19b29d427585606ee14d26275e2aad25f40991bf",
+    "tools/controller-postswitch-windows.mjs": "c63c029b8fb4fa096dad6605f450db882fa42b62924ce47cb57d62fbcda676f9",
+    "tools/controller-postswitch-evidence.mjs": "4f3f3b88214f60810d165288be4fc66ff7e267869a356de597447ec3e5f6c0a5",
+    "tools/controller-postswitch-writer-readonly.mjs": "a9d059edc0be9b42a18425ec942e7f6d2b39763188abaa57810fc80625ed6fe0",
+    "tools/controller-postswitch-preflight.mjs": "24046042f70bcf3d120acd5a63150680b89feaeac4ca370b4211df8f408fc28b",
+    "tools/controller-postswitch-backlog.mjs": "0de9a22cf08224c80765b8690dd64a64c89dbe455de1c4a78a06417cb7f28477",
+    "tools/controller-postswitch-postcheck.mjs": "1477fae0fd579790e540588ba9c359c1e6bbcf762559c3a2095cd4a7cb08dd73",
+    "tools/controller-postswitch-reconciliation.mjs": "d322db855325525653f608ac75e0d3c8446f8957d44373b7994ccfb66c881d3b",
+    "tools/controller-postswitch-state.mjs": "7092ee176767f9b154a1c297ecb524df7a8915796cbb9eadfd2db614158328bd",
+    "tools/update.mjs": "79be7fb3763a8478a7384f924550dfacaadf3b7939726b0fb22854a402e95489",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-contract.mjs": "98ed143788e8433c93cb558a6e81939e0f7f5387be7b847ee2791406b1184197",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc"
+  },
+  "expectedBacklogIssues": [
+    919
+  ],
+  "writerTransition": {
+    "baselineConfigSha256": "a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037",
+    "priorConfigSha256": "e3e5b6de45cdb63de4056a56784e46c9b0fb8546462089cb5b98c8d42496110c",
+    "currentConfigSha256": "05eeb13d9183480b89413557c7e65c57d818a5d8fc5eaa88261e55cfc409c57a",
+    "priorApprovedSourceSha": "70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9",
+    "approvedSourceSha": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+    "priorWriterBResultBlobSha": "e07389fb660359352109146175eb8fa3f7ae0798",
+    "priorWriterAResultBlobSha": "6baf4fd2d8d6067bc178b7f79a95c4381771c512",
+    "writerBResultBlobSha": "6315e35e980a58a55a6dd8ae11ca53c8e945f42f",
+    "writerAResultBlobSha": "65e7edf335d9492058e5e8d183d9927c9c5ba3c0"
+  },
+  "writerFollowup": {
+    "schema": "ZGMINI_PC_POSTSWITCH_WRITER_FOLLOWUP_V1",
+    "scope": "EXPLICIT_NEW_C_CONSENT_FOR_FOUR_WRITER_B_OVERLAYS",
+    "baselineConfigSha256": "a648e80310f50cf68475195e21a750647629c48b584333520260827c6ff5a037",
+    "priorConfigSha256": "05eeb13d9183480b89413557c7e65c57d818a5d8fc5eaa88261e55cfc409c57a",
+    "currentConfigSha256": "0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453",
+    "sourceSequence": [
+      "75f73d8613550221f8e80b304d67b8b10a228e7f",
+      "4ec0b8c197627ebdb316be8df291e30d7e435784",
+      "144f3b8f673cc3d18f004ddd65f6920d450f0ea6",
+      "48d3478030590ca63aaab2435e88c896608c70d3",
+      "de81749f83c086f5cb0cad7ed1d5cc958de19280"
+    ],
+    "writerB": [
+      {
+        "path": "results/writer-b-source-install-a861da80-8765-4e8c-b5a0-1824764284e2.json",
+        "blobSha": "0d79ca8a7dd75740894df8576ca266e599df8c5d",
+        "rawSha256": "151a27ae60b86c6f89144ab75168c06cf9547085c8905c27dd537a87c0ee6339",
+        "requestId": "a861da80-8765-4e8c-b5a0-1824764284e2",
+        "baseHead": "75f73d8613550221f8e80b304d67b8b10a228e7f",
+        "sourceSha": "4ec0b8c197627ebdb316be8df291e30d7e435784",
+        "candidateSourceSha": "27c02d9b254e92af21b2a5b92a4c0bb152bb5713",
+        "manifestSha256": "3452198846df9e4bb6f2299e3f4be64691ec87d4c9801121db130482c866904c",
+        "changedPath": "scripts/pc-writer/build-asset-r10-release.mjs"
+      },
+      {
+        "path": "results/writer-b-source-install-b86e398c-59dd-485e-a3b1-2596fb5466d2.json",
+        "blobSha": "77d9eb6965a272dc797e7052b62a8e172df5e302",
+        "rawSha256": "bc73d77b72c2d11cb0ba8806adc369100087bfb883d6e9894f806e905f1941a7",
+        "requestId": "b86e398c-59dd-485e-a3b1-2596fb5466d2",
+        "baseHead": "4ec0b8c197627ebdb316be8df291e30d7e435784",
+        "sourceSha": "144f3b8f673cc3d18f004ddd65f6920d450f0ea6",
+        "candidateSourceSha": "27c02d9b254e92af21b2a5b92a4c0bb152bb5713",
+        "manifestSha256": "88c28ab0fbe7ae4683f76a94af907df5ef591623bdec37b01a670914cfa88703",
+        "changedPath": "scripts/pc-writer/run-local.mjs"
+      },
+      {
+        "path": "results/writer-b-source-install-d9cc77ff-acb0-44e0-9f2b-1659efead888.json",
+        "blobSha": "c594b77b96d8b822cce38a36d36bfa562e123be1",
+        "rawSha256": "425d4a06585694c94f612af769e6341153dba9c1e7f9718f279c7111b98a2d50",
+        "requestId": "d9cc77ff-acb0-44e0-9f2b-1659efead888",
+        "baseHead": "144f3b8f673cc3d18f004ddd65f6920d450f0ea6",
+        "sourceSha": "48d3478030590ca63aaab2435e88c896608c70d3",
+        "candidateSourceSha": "66cb996994dbece69f64bb2de51ef6e4c0a874de",
+        "manifestSha256": "0f0e02409e9c206f8c35e1efe7790ce1a80a3e3eb0bcf8bbf4f8931a1587a57c",
+        "changedPath": "scripts/pc-writer/run-local.mjs"
+      },
+      {
+        "path": "results/writer-b-source-install-f18e341c-e37e-4975-8a1b-2fa9818b9fae.json",
+        "blobSha": "e53ccadeecd51929eaa1db38f161c50b03811f06",
+        "rawSha256": "bc03c09f451ea151a22be22cc7b5851c7984754899398a321c7036dbf02a59ad",
+        "requestId": "f18e341c-e37e-4975-8a1b-2fa9818b9fae",
+        "baseHead": "48d3478030590ca63aaab2435e88c896608c70d3",
+        "sourceSha": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+        "candidateSourceSha": "b37c7c029d36c6d29c50a5173018836918db5c78",
+        "manifestSha256": "dc6b0707ae4778ecf99cdcb186a96a0c64aac9441fd42ec09f509640ee1f325c",
+        "changedPaths": [
+          "lib/market-score/employment-r6-formula.mjs",
+          "lib/market-score/employment-r6-feature-engine.mjs",
+          "lib/market-score/employment-r6-one-year-read-model.mjs",
+          "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+          "worker/employment-r6-public-display.mjs"
+        ]
+      }
+    ],
+    "writerA": {
+      "issueNumber": 1202,
+      "path": "results/42722662159-1-seat-2.json",
+      "blobSha": "247bc5dcc61ac7472e8869b92882aa2e29684e38",
+      "requestId": "pc-7fec8790-8160-4bd3-950d-7398da251793",
+      "sourceSha": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+      "configSha256": "0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453",
+      "evidenceLevel": "READONLY_CONFIG_BYTES_NOT_LIVE_CORE_PROCESS"
+    }
+  },
+  "postcheck": {
+    "operation": "core-status",
+    "sourceRepository": "ansqhd5774-Choi/zgmini",
+    "sourceBranch": "main",
+    "sourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc"
+  }
+}

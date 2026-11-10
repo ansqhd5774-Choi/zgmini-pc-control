@@ -91,7 +91,7 @@ test('altered or incomplete new consent and missing source closure are rejected'
 
 test('committed review candidate stays unapproved and pins exact source file bytes',()=>{
  const ap=JSON.parse(fs.readFileSync(new URL('../approvals/maintenance-recoveries/'+
-   INCIDENT.requestId+'.postswitch.json',import.meta.url),'utf8'));
+   INCIDENT.requestId+'.postswitch.candidate.json',import.meta.url),'utf8'));
  assert.equal(ap.approved,false);
  assert.throws(()=>validatePostSwitchApproval(ap,{requestId:INCIDENT.requestId,
    sourceSha:ap.sourceSha,evidence:{...followupEvidence(),materialHashes:ap.evidenceHashes}}),

@@ -20,7 +20,7 @@
 
 `approvals/maintenance-recoveries/pc-update-877e10c8-8580-4095-a675-bef9ec032193.postswitch.json`
 
-- 현재 `approved:false`이며 실행 승인이 아니다.
+- 최초 후보는 `approved:false`로 생성했으며 `.postswitch.candidate.json`에 원문 그대로 보존한다.
 - 원문 SHA-256: `cdebcc4c1d83fa566b136f767ffd0d874fbd34a1f11fb09ea17137cd900c8d57`
 - 원본 #917 보호 기준선과 `writerTransition`은 그대로 보존한다.
 - 독립 `writerFollowup`은 승인 B #1155/#1164/#1172/#1195의 고정 원문/Blob/manifest/source 순서와 최신 config `0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453`에만 한정한다.
@@ -45,4 +45,12 @@
 
 ## 최종 완료 판정
 
-새 사용자 명시 C 승인 및 단회 실제 복구 성공, #919 중복 없음, 원본 원장/백업 보존, install lease/claim 보관 재조회, Controller·Supervisor·전용 6 Runner·후속 결과 확인, RECOVERY_REQUIRED 해소가 모두 필요하다. 현재는 **준비 통과/승인 대기**이며 복구 완료가 아니다.
+새 사용자 명시 C 승인 및 단회 실제 복구 성공, #919 중복 없음, 원본 원장/백업 보존, install lease/claim 보관 재조회, Controller·Supervisor·전용 6 Runner·후속 결과 확인, RECOVERY_REQUIRED 해소가 모두 필요하다. 현재는 **준비 통과/사용자 승인 완료/사용자 직접 실행 대기**이며 복구 완료가 아니다.
+
+## 2026-11-10 사용자 명시 승인 반영
+
+- 사용자가 이 후보 범위의 C급 단회 복구에 명시적으로 “승인”했다.
+- 실행 승인 파일 `.postswitch.json`은 후보의 `approved`만 true로 변경했다. 기존 코드 source 및 16개 파일 해시, 7개 원본 해시, 보호 기준선, 후속 계약, #919 범위는 바꾸지 않았다.
+- 승인된 원문 SHA-256: `348d69a0662649f93a9de45996647e364dc9a8bfe5891917bd13b128fe1653d2`. 최초 후보 해시와 구분한다.
+- 승인 반영 직전 읽기 전용으로 7개 material 불변, 현재 config digest 일치, 기존 recovery claim/record 부재를 확인했다. 실제 C 복구는 아직 실행하지 않았다.
+- 기존 사용자 직접 Windows TTY 및 RECOVER-917 입력 조건은 그대로 유지한다. 승인된 실행물이 준비됐다는 사실을 C 복구 성공으로 보고하지 않는다.

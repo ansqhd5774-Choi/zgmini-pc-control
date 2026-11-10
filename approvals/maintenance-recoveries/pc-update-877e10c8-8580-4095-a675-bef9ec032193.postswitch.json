@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_POSTSWITCH_RECOVERY_APPROVAL_V1",
-  "approved": false,
+  "approved": true,
   "operation": "FORWARD_POSTSWITCH_917",
   "requestId": "pc-update-877e10c8-8580-4095-a675-bef9ec032193",
   "issueNumber": 917,
