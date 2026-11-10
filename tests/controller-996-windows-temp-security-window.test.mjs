@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import {randomUUID} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
@@ -25,6 +27,16 @@ test('temporary ACL fixture restores on normal and injected failures', () => {
   assert.match(source, /Set-Acl -LiteralPath \$restoreTarget -AclObject \$originalAcl/);
   assert.match(source, /\$afterDacl -ceq \$beforeDacl -and \$afterHash -ceq \$initialHash/);
   assert.match(source, /C996_SECURITY_PROOF_INJECTED_FAILURE/);
+});
+
+test('separate-process recovery uses a flushed journal and fixed TEMP root', () => {
+  assert.match(source, /\[switch\]\$RecoverOnly/);
+  assert.match(source, /\$journalStream\.Flush\(\$true\)/);
+  assert.match(source, /C996_SECURITY_PROOF_JOURNAL_INVALID/);
+  assert.match(source, /C996_SECURITY_PROOF_RECOVERY_PATH_AMBIGUOUS/);
+  assert.match(source, /C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT/);
+  assert.match(source, /C996_SECURITY_PROOF_TERMINATION_ROOT_UNSAFE/);
+  assert.match(source, /\[Environment\]::Exit\(17\)/);
 });
 
 test('test fixture distinguishes locked move from move after handle close', () => {
@@ -60,3 +72,37 @@ for (const inject of [false, true]) {
       assert.equal(payload.moveAfterCloseSucceeded, !inject);
     });
 }
+
+test('native TEMP journal recovers ACL after deliberately terminated child',
+  {skip: !onSeparateWindows}, () => {
+    const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+    const root = path.join(os.tmpdir(), `zgmini-996-acl-fixture-${randomUUID().replaceAll('-', '')}`);
+    const aborted = spawnSync(powershell, [
+      '-NoProfile', '-NonInteractive', '-File', fixture,
+      '-TestOnly', '-SimulateChildTermination', '-FixtureRoot', root,
+    ], {
+      encoding: 'utf8', timeout: 30000, windowsHide: true,
+      env: {...process.env, ZGMINI_996_TEMP_TERMINATION_TEST: '1'},
+    });
+    let recovery;
+    try {
+      assert.equal(aborted.status, 17, aborted.stderr || aborted.error?.message);
+      const payload = JSON.parse(aborted.stdout.trim());
+      assert.equal(path.resolve(payload.fixtureRoot), path.resolve(root));
+      assert.equal(payload.executionAuthorized, false);
+    } finally {
+      // A separate process attempts restoration even when the child assertion fails.
+      if (fs.existsSync(path.join(root, 'acl-recovery.json'))) {
+        recovery = spawnSync(powershell, [
+          '-NoProfile', '-NonInteractive', '-File', fixture,
+          '-TestOnly', '-RecoverOnly', '-FixtureRoot', root,
+        ], {encoding: 'utf8', timeout: 30000, windowsHide: true});
+        assert.equal(recovery.status, 0, recovery.stderr || recovery.error?.message);
+        const report = JSON.parse(recovery.stdout.trim());
+        assert.equal(report.ok, true);
+        assert.equal(report.aclRestored, true);
+        assert.equal(report.originalPcWrites, 0);
+      }
+    }
+    assert.ok(recovery, 'recovery journal should exist');
+  });
