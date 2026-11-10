@@ -12,24 +12,24 @@
 |---|---|---|
 | `controller-996-windows-observer.mjs` | 원본 설치/Stage/원장/GH/6전용 Runner, 원본 16/18 증거 | 실제 읽기 관측 완료 |
 | `controller-996-protection-attestation.mjs` | 최초 관측과 동일하게 존재하는 Writer 파일(최대 3개)만 해시 집계하고, 2개 Task XML 해시·enabled 상태 대조. 누락 Writer·Task별 실패 위치 명시 | 실제 원본 PC R2 **현재 지문 일치** 수신. 역사 기준은 여전히 미입증 |
-| `controller-996-c-consent-verifier.mjs` | GitHub 원본 Issue 작성자·고정 Git manifest 원문·소유자 승인 댓글 SHA 바인딩·철회/중복 차단 | 순수 검증, 실승인 **없음** |
+| `controller-996-c-consent-verifier.mjs` | GitHub 원본 Issue 작성자·고정 Git manifest 원문·소유자 승인 댓글 SHA 바인딩·철회/중복 차단. R2의 Writer **PRESENT/ABSENT 3개 상태**와 **실제 존재 파일의 SHA만** 승인 객체에 바인딩 | 순수 검증, 실승인 **없음** |
 | `controller-996-native-claims.mjs` | 원본 PC 전용 별도 claim 원자 생성, nonce·영구 시도 마커·원본/자기 claim 보관 | 실제 I/O 하위 부품, **CLI 없음·미설치** |
 | `controller-996-native-workflow.mjs` | 사전 영구 `WORKFLOW_ENABLE_ATTEMPTED`, 같은 프로세스 1회 PUT, 재시작·타임아웃 시 자동 재시도 차단 | 실제 I/O 하위 부품, **승인 실행기 미연결** |
 | `controller-996-native-backlog.mjs` | 원본 E: 고정, 최초 backlog SHA, 영구 `BACKLOG_CLOSE_ATTEMPTED`, Temp fsync·변경 전 2회 SHA·단회 rename·완료 SHA/구조 재조회 | 실제 I/O 하위 부품. **독립 Writer 배제 증명 어댑터 없음·미실행** |
-| `controller-996-c-transaction.mjs` | 18단계 순서·실패 중단 시뮬레이터, 원본 16/18과 보호 5개 SHA 계약 | 테스트 전용, **운영 호출 금지** |
+| `controller-996-c-transaction.mjs` | 18단계 순서·실패 중단 시뮬레이터, 원본 16/18과 Writer 3경로 존재 상태·존재하는 파일 SHA·필수 Task 2개 SHA 계약 | 테스트 전용, **운영 호출 금지** |
 | `controller-996-backlog-plan.mjs` | 원본 이슈 분류, 같은 requestId 재게시 금지 | 읽기 전용, **실제 resume 전 목록 미수신** |
 | `controller-996-backlog-readback.mjs` | `created_at` 내림차순 전체 관련 페이지 2회 동일성 검증, PR 배제, 댓글 전 페이지, bot marker별 JSON/TXT 원격 내용·requestId·runId·seat·TXT 동일성 검증 | 호출 가능한 읽기 전용 부품. **인증 GitHub GET 어댑터·실제 원본 목록 미연결** |
 | `controller-996-native-github-readonly.mjs` | **기존 원본 PC 전용** 설치 manifest·GitHub 로그인 주체·비공개 제어 저장소 검증 후 고정 Issues/댓글/결과 쌍 GET만 허용. 자격증명 노출·POST·Workflow PUT 경로 없음 | 소스+테스트 검증, 실제 원본 PC 인증 호출 **미실행** |
 | `controller-996-r2-evidence-review.mjs` | 실제 R2 개별 SHA·존재/부재·Task 활성 상태로 최초 64자리 fingerprint 재계산 및 완료/승인 오인 차단 | 사용자 전달 R2 값 재계산 PASS, 실운영 재실측은 아님 |
 
-2026-11-10 #996 대상 회귀 **95/95 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
+2026-11-10 #996 대상 회귀 **97/97 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
 
 ### 추가 관측 R1 ENOENT 진단 및 R2 보완
 
 - 실제 원본 PC에서 `ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1`, `STATE_UNKNOWN`, `code=ENOENT`가 수신되었다. 운영 쓰기·Issue 게시·PC 재시도는 모두 0. **이 결과만으로 미존재 대상 파일·Task를 확정할 수 없다.**
 - 결함: 최초 R1 관측기는 Writer `config.json`·`quota-runner.cmd`·`run-local.cmd`를 **존재할 때만** 집계하였으나, 별도 세부 검사 초판은 3개 모두 필수로 `lstatSync`하여 부재 시 단계 정보 없이 `ENOENT`로 중지했다. 동일 객체의 fingerprints를 비교하려면 두 검사기의 존재/부재 규칙이 같아야 한다.
 - R2는 부재 Writer를 `ABSENT`라고 표시하고 최초 집계와 동일하게 SHA 객체에서 제외한다. 기존에 존재하던 파일이 사라졌으면 집계 지문이 달라져 성공 판정 불가. Task는 여전히 2개가 모두 검증돼야 하며, 실패 시 `PROTECTED_TASK_QUERY_FAILED`와 정확한 Task명·기초 오류 코드를 출력한다. Writer 읽기 자체 실패도 `WRITER_FILE_OBSERVATION_FAILED`와 정확한 대상명을 출력한다.
-- R2는 역사적 기준이 없다는 사실을 바꾸지 않는다. `historicalBaselineAvailable=false`, `allActorsImmutableProven=false` 및 C 실행 미승인은 그대로다. 원본 PC에서 수정된 **새 패키지의 단회 읽기 전용 검사**를 받아야 다음 단계로 진행한다. 기존 R1 ZIP 재실행은 금지.
+- R2는 역사적 기준이 없다는 사실을 바꾸지 않는다. `historicalBaselineAvailable=false`, `allActorsImmutableProven=false` 및 C 실행 미승인은 그대로다. **원본 PC R2 결과는 이미 수신·검증했다.** 기존 R1 ZIP 재실행 또는 동일한 R2의 불필요한 재실행 금지.
 
 ### 원본 Windows R2 실제 수신 및 재계산 (2026-11-10T04:06:43.338Z)
 
@@ -39,6 +39,7 @@
 - 별도 순수 검증기에서 **개별 SHA 3개 → 원본 전체 SHA256 재계산 일치**; 위변조·존재 오인·Task 불명·승인 오인 실패 테스트 5/5 PASS. 이 검증은 사용자 제출 JSON의 내부 일관성만 확인한다. 실제 원본 PC를 인증된 재조회로 확인한 것은 아님.
 - 역사적 부재 `historicalBaselineAvailable=false`, `allActorsImmutableProven=false`, Workflow 중단 행위자 미입증은 유지. 해당 미입증 항목을 true로 뒤집지 않으며 C 승인은 별도로 받아야 함. R2 실행의 `operationalWrites=0`, `issuePosts=0`, `pcRetries=0`, `executionAuthorized=false`.
 - **협조적 Writer만 배제 가능한 범위:** 기존 `controller-install` 원본 마커·owner 사망·digest와 C 별도 claim·설치 소스 상호 확인, 백로그 원본 SHA 및 변경 직전 SHA를 독립 재확인. 외부 비협조 Writer·TOCTOU까지 절대 배타성을 주장하지 않는다. 원본 설치 lease는 백로그 읽기/결과 분류 완료 전에 보관하지 않는다.
+- **실패 방지 변경:** 기존 `c-consent-verifier`/`c-transaction`은 Writer 3개 모두 존재·해시가 있다는 비현실적인 전제를 사용했으므로, 실제 R2(`1 PRESENT`, `2 ABSENT`)를 복구 전 검증에서 영구 차단했다. `protectedWriterFileStatus`를 승인 manifest에 명시하고 `protectedItemsSha256.files`에는 `PRESENT`인 파일만 넣도록 계약을 일치시켰다. 부재 경로에서 임의 SHA를 만들거나 임의로 파일을 설치하지 않는다. 신규 정상/실패 테스트 각 1건 추가, 전체 97/97 통과. 이 조치는 실제 복구나 승인 획득이 아니다.
 
 ## 승인 출처 — 현재 엄격한 경계
 
@@ -54,7 +55,7 @@
 3. 최초 7 raw digest·현재 보호 상태·Runner 6개·원래 설치 owner 사망·별도 C claim 부재를 확인 후 첫 영속 쓰기. 자기 claim 생성 후에는 기존 observer의 `recoveryClaimAbsent`를 재사용할 수 없으므로 **자기 nonce 전용 재검증 경로** 적용.
 4. Workflow enable이 `active`로 증명된 후 **다른 backlog Writer 부재 확인** — 실제 OS·lease·프로세스 기반 독립 검사기 개발은 미완성. Backlog 하위 부품은 `proveExclusiveWriter` 함수 누락·미확인 시 실패하고, SHA 대조·same-directory temp·fsync·rename·신 SHA 재조회까지 소스에서 구현. **이는 원자 CAS가 아니므로 독점성 증명 없이 실행 절대 금지.**
 5. GitHub Issues를 `sort=created`, `direction=desc`, `per_page=100`으로 실제 pause→resume 구간 내 완전 탐색하고 두 번 동일성 검사하도록 소스 구현. 후보별 댓글 전체 페이지, `results/<runId>-<attempt>-seat-<seat>.json/.txt` 둘 모두 원격 GET, 내용·출처·status/ID 교차 검증도 소스 구현. **여전히 실제 GitHub 인증 GET 포트·Windows resume 원본 관측이 연결되지 않음.** 기존 `replayR6Backlog` 금지, 동일 requestId 재발행 0. 결과 확인이 안 된 원본은 담당자 재계획 대상으로 분류.
-6. 보호 대상 5개의 SHA와 Task enabled 값은 **실행 직전, Workflow PUT 직전, 설치 lease 보관 직후, 최종 종료** 단계에서 비교. 독립 Runner 추가 자체는 불필요한 차단 사유가 아님.
+6. 최초 존재/부재 규칙에 따른 **Writer 3개 경로의 상태 + 존재 파일 SHA + Task 2개 SHA/enabled** 값은 **실행 직전, Workflow PUT 직전, 설치 lease 보관 직후, 최종 종료** 단계에서 비교. 부재 파일을 무조건 설치하거나 미검증 상태로 간주하지 않는다. 독립 Runner 추가 자체는 불필요한 차단 사유가 아님.
 7. 완료 상태는 `INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`. 원본 설치 lease는 삭제 없이 보관하고, 자체 C claim도 완료 기록 후 별도 보관·최종 재조회. 영구 시도 마커가 이미 있으면 재실행 불가.
 
 ## 부작용·승인 제한
