@@ -124,6 +124,9 @@ test('test-only 84 Git bytes verified before archive C claim then install lease'
     assert.equal(fs.existsSync(f.relative(f.leaseArchive)),true);
     assert.equal(fs.existsSync(f.relative(f.contArchive)),true);
     assert.equal(fs.existsSync(f.relative(f.cont)),false);
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload/owner.json')),true);
+    assert.equal(fs.existsSync(f.relative(f.leaseArchive+'/payload/owner.json')),true);
+    assert.equal(fs.existsSync(f.relative(f.contArchive+'/payload/COMPLETE.json')),true);
   }finally{f.cleanup();}
 });
 
@@ -181,5 +184,76 @@ test('crash after install release preserves both archives and continuation claim
     assert.equal(fs.existsSync(f.relative(f.cont)),true);
     assert.equal(fs.existsSync(f.relative(f.contArchive)),false);
     assert.equal(r.executionAuthorized,false);
+  }finally{f.cleanup();}
+});
+
+test('an existing empty archive directory cannot be overwritten',()=>{
+  const f=fixture();
+  try{
+    fs.mkdirSync(f.relative(f.oldCArchive));
+    const r=f.run();
+    assert.equal(r.code,'C_CONTINUATION_ARCHIVE_OR_ACTIVE_CLAIM_EXISTS');
+    assert.equal(fs.existsSync(f.relative(OLD_C)),true);
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.deepEqual(fs.readdirSync(f.relative(f.oldCArchive)),[]);
+  }finally{f.cleanup();}
+});
+
+test('a competing directory created after precheck is never clobbered',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({beforeArchiveReserve:({toRel})=>{
+      if(toRel===f.oldCArchive){
+        fs.mkdirSync(f.relative(toRel));
+        fs.writeFileSync(f.relative(toRel+'/sentinel.txt'),'preserve');
+      }
+    }});
+    assert.equal(r.code,'C_CONTINUATION_ARCHIVE_RESERVATION_TAKEN');
+    assert.equal(fs.readFileSync(f.relative(f.oldCArchive+'/sentinel.txt'),'utf8'),
+      'preserve');
+    assert.equal(fs.existsSync(f.relative(OLD_C)),true);
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+  }finally{f.cleanup();}
+});
+
+test('a crash after first archive reservation preserves both original locks',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({failAfter:'AFTER_OLD_C_RESERVATION'});
+    assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_OLD_C_RESERVATION');
+    assert.equal(fs.existsSync(f.relative(OLD_C)),true);
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive)),true);
+    assert.deepEqual(fs.readdirSync(f.relative(f.oldCArchive)),[]);
+    assert.equal(f.run().code,'C_CONTINUATION_ARCHIVE_OR_ACTIVE_CLAIM_EXISTS');
+  }finally{f.cleanup();}
+});
+
+test('a crash after install archive reservation retains install lease',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({failAfter:'AFTER_INSTALL_RESERVATION'});
+    assert.equal(r.code,'C_CONTINUATION_INJECTED_AFTER_INSTALL_RESERVATION');
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload/owner.json')),
+      true);
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.deepEqual(fs.readdirSync(f.relative(f.leaseArchive)),[]);
+  }finally{f.cleanup();}
+});
+
+test('old C source drift just before move blocks and preserves the source',()=>{
+  const f=fixture();
+  try{
+    const r=f.run({beforeArchiveReserve:({toRel})=>{
+      if(toRel===f.oldCArchive){
+        fs.writeFileSync(f.relative(OLD_C+'/owner.json'),
+          JSON.stringify({requestId:REQ,issueNumber:996,pid:99999999,
+            nonce:'changed'}));
+      }
+    }});
+    assert.equal(r.code,'C_CONTINUATION_ARCHIVED_OWNER_SHA_DRIFT');
+    assert.equal(fs.existsSync(f.relative(OLD_C)),true);
+    assert.equal(fs.existsSync(f.relative(LEASE)),true);
+    assert.equal(fs.existsSync(f.relative(f.oldCArchive+'/payload')),false);
   }finally{f.cleanup();}
 });

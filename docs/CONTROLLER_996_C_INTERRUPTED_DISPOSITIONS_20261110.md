@@ -1,5 +1,13 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 Codex 사용량 중단 후 재개: 보관 충돌 격리 시뮬레이션
+
+- 이전 Codex 대화는 `Integrity 996`/`Review 996` 완료, Windows 임시 폴더 소스 시험 **13건 PASS**와 보관 경로 충돌 수정을 진행했다고 보고한 상태에서 사용량 제한으로 중단됐다. **해당 세션의 미커밋 파일/명령 실행 기록은 현재 작업 환경에서 확인할 수 없으며, 이를 GitHub에 게시된 코드·실PC 결과로 간주하지 않는다.** 새 작업은 기존 Draft PR #1222 HEAD `89fc9fbdeef4790533dc834261da7869c4764988`에서 재개한다.
+- 사용량 중단 시점의 Windows archive 경로 충돌과 같은 문제를 **격리 Linux temp-only 시뮬레이션**에서 별도 보강했다. 이전의 `absent(destination)` → `rename(source,destination)`만으로는 POSIX의 기존 빈 디렉터리 교체와 검사·실행 사이 경쟁을 차단할 수 없다. 새 모의 코드는 **독점 `mkdir`로 대상 보관 디렉터리를 예약**한 다음 원본을 그 내부 `payload`로 이동하며, 예약 실패·동일 경로 선점·예약 직후 강제 중단 시 원본 보존 및 자동 재시도 거부를 시험한다.
+- 추가 부정시험 5건: 기존 빈 대상 경로, 사전검사 직후 경쟁 디렉터리 생성, 구 C Claim 보관 예약 직후 중단, Install Lease 보관 예약 직후 중단, 이동 직전 원본 Claim SHA 변경. 집중 **11/11 PASS**, 전체 연결 회귀 **81/81 PASS**. 이는 **실물 Git 84파일 증명·Windows/.NET 이동 보장·운영 C 승인·실PC 복구 증거가 아니다.**
+- 운영용 어댑터는 여전히 별도 구현 대상이다. `Directory.Move`의 Windows 대상-존재 충돌 거부, 파일/디렉터리 정체성 pin, parent flush, 현행 보호/Writer 경합 재검사, 새 정확한 C 동의, 보관 단계별 저널과 비자동 재진입 판정이 필요하다. `simulate996Continuation`은 여전히 운영 호출을 무조건 거부하며, 기존 CMD/ZIP·원본 #996·Claim·Lease·Workflow·Backlog를 건드리지 않았다.
+- **운영 진행률 4/5=80% 유지, 실제 C는 NO-GO.** 다른 Codex 세션의 미커밋 변경은 보존하고, 나중에 동기화할 때 강제 덮어쓰기/리셋 없이 차이를 확인한다.
+
 ## 실제 관측과 범위 (2026-11-10 KST)
 
 - 대상: 원본 Windows `E:/ZGmini`, 원본 [#996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996), `pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404`.
