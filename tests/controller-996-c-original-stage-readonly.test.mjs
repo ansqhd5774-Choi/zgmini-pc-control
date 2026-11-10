@@ -100,6 +100,10 @@ const inspect=(fix,extra={})=>inspect996COriginalStageReadOnly({
   readWorkflow:()=> 'active',
   readProtected:()=>({status:'CURRENT_PROTECTION_MATCHES_R1',
     protectedFingerprint:'b'.repeat(64)}),
+  readSource:()=>({status:'SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS',
+    installed:38,staged:39,maintainer:7,total:84,
+    sourceBytesSha256:'c'.repeat(64),originalWindowsReadback:false,
+    executionAuthorized:false}),
   isAlive:pid=>pid===777,actorPid:777,...extra,
 });
 
@@ -115,6 +119,22 @@ for(const [name,expected] of [
   assert.equal(result.executionAuthorized,false);
   assert.equal(result.originalWindowsReadback,false);
   assert.equal(result.originalPcWrites,0);
+  assert.equal(result.sourceBytesVerified,false);
+});
+
+test('missing or spoofed 84-source-byte check cannot pass stage readback',t=>{
+  const fix=fixture(t);
+  for(const proof of [
+    {status:'SOURCE_BYTES_UNVERIFIED'},
+    {status:'SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS',
+      installed:38,staged:39,maintainer:7,total:84,
+      sourceBytesSha256:'c'.repeat(64),originalWindowsReadback:true,
+      executionAuthorized:false},
+  ]){
+    const result=inspect(fix,{readSource:()=>proof});
+    assert.equal(result.code,'C_STAGE_GIT_84_BYTES_UNVERIFIED');
+    assert.equal(result.executionAuthorized,false);
+  }
 });
 
 test('foreign continuation stops before any mutation',t=>{
