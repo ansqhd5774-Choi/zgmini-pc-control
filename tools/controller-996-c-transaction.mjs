@@ -77,11 +77,13 @@ export function validate996CContract({preflight,protectedAttestation,approval}={
   !validSha(preflight.protectionNowFingerprint)||
   preflight.protectionNowFingerprint!==approval.protectionNowFingerprint)
   return fail('ORIGINAL_WINDOWS_EVIDENCE_MISMATCH');
- // Supplementary read-only proof records each of the three Writer files and
- // two Task XML hashes. It must independently reproduce the aggregate from
- // the first Windows observation without inventing a historical baseline.
+ // The original observer hashes only PRESENT Writer files. ABSENT is an
+ // explicit protected state, not a fabricated SHA and not an automatic block.
+ // Two Task XML hashes remain mandatory in all cases.
  const p=protectedAttestation,items=p?.items;
- const files=items?.files,tasks=items?.taskSha256,enabled=items?.taskEnabled;
+ const files=items?.files,status=items?.writerFileStatus;
+ const tasks=items?.taskSha256,enabled=items?.taskEnabled;
+ const present=writerFiles.filter(k=>status?.[k]==='PRESENT');
  if(p?.schema!=='ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1'||
   p.requestId!==id.requestId||p.issueNumber!==996||
   p.status!=='CURRENT_ITEMS_MATCH_OBSERVATION'||
@@ -89,23 +91,30 @@ export function validate996CContract({preflight,protectedAttestation,approval}={
   p.observedAt!==approval.protectedItemsObservedAt||
   p.currentFingerprint!==preflight.protectionNowFingerprint||
   p.originalObservationFingerprint!==preflight.protectionNowFingerprint||
-  p.fingerprintMatch!==true||p.allFivePresent!==true||
+  p.fingerprintMatch!==true||p.allFivePresent!==(present.length===3)||
+  p.presentWriterFileCount!==present.length||
   p.historicalBaselineAvailable!==false||p.allActorsImmutableProven!==false||
   p.operationalWrites!==0||p.issuePosts!==0||p.pcRetries!==0||
   p.executionAuthorized!==false||
-  !files||!tasks||!enabled||
-  Object.keys(files).length!==writerFiles.length||
+  !files||!status||!tasks||!enabled||
+  Object.keys(status).length!==writerFiles.length||
+  Object.keys(files).length!==present.length||
   Object.keys(tasks).length!==protectedTasks.length||
   Object.keys(enabled).length!==protectedTasks.length||
-  writerFiles.some(k=>!validSha(files[k])||
-   files[k]!==approval.protectedItemsSha256?.files?.[k])||
+  Object.keys(approval.protectedWriterFileStatus??{}).length!==writerFiles.length||
+  Object.keys(approval.protectedItemsSha256?.files??{}).length!==present.length||
+  writerFiles.some(k=>!['PRESENT','ABSENT'].includes(status[k])||
+   status[k]!==approval.protectedWriterFileStatus?.[k]||
+   (status[k]==='PRESENT'?
+    !validSha(files[k])||files[k]!==approval.protectedItemsSha256?.files?.[k]:
+    Object.hasOwn(files,k)||Object.hasOwn(approval.protectedItemsSha256?.files??{},k)))||
   protectedTasks.some(k=>!validSha(tasks[k])||
    typeof enabled[k]!=='boolean'||
    tasks[k]!==approval.protectedItemsSha256?.tasks?.[k]||
    enabled[k]!==approval.protectedTaskEnabled?.[k]))
   return fail('CURRENT_PROTECTED_ITEMS_UNPROVEN');
  const calculated=createHash('sha256').update(Buffer.from(JSON.stringify({
-  files:Object.fromEntries(writerFiles.map(k=>[k,files[k]])),
+  files:Object.fromEntries(present.map(k=>[k,files[k]])),
   tasks:Object.fromEntries(protectedTasks.map(k=>[k,tasks[k]])),
  }))).digest('hex');
  if(calculated!==p.currentFingerprint)
