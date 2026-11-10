@@ -54,3 +54,22 @@
 - 승인된 원문 SHA-256: `348d69a0662649f93a9de45996647e364dc9a8bfe5891917bd13b128fe1653d2`. 최초 후보 해시와 구분한다.
 - 승인 반영 직전 읽기 전용으로 7개 material 불변, 현재 config digest 일치, 기존 recovery claim/record 부재를 확인했다. 실제 C 복구는 아직 실행하지 않았다.
 - 기존 사용자 직접 Windows TTY 및 RECOVER-917 입력 조건은 그대로 유지한다. 승인된 실행물이 준비됐다는 사실을 C 복구 성공으로 보고하지 않는다.
+## 2026-11-10 실제 C 실행 및 #1215 결과 회수
+
+- 사용자의 명시 승인 및 직접 수행 지시에 따라 승인 source d82b662/원문 348d69a0를 실제 Windows TTY에서 한 번 실행했다. 기존 C 확인/사전검사/보호 조건을 제거하거나 isTTY를 위조하지 않았다.
+- 결과는 `RECOVERY_REQUIRED / POSTSWITCH_BACKLOG_POST_OUTCOME_UNKNOWN`. 독립 claim과 append-only 원장 5건은 보존됐고, 원본 install lease도 유지됐다. 공유 잠금 삭제나 최초 C 실행의 재시도는 하지 않았다.
+- 실제로는 복구 전달 Issue #1215가 한 번 생성됐고, Actions `42729529997`, attempt 1, seat 5에서 `PASS / WRITER_APPROVED_PREIMAGE_READONLY`로 끝났다. 실제 Controller badad912, 운영 쓰기·공급처 호출·D1 쓰기 0, 보호 불변이다. JSON/TXT 두 원본 파일의 Blob/SHA-256을 각각 재조회했다. #919 본문과 #1215 본문도 정확히 일치한다.
+- 원본 #917 ledger 원문 SHA-256은 승인값 `321be375...`와 일치한다. 최초 C 실패 결과의 `originalLedgerPreserved:false`는 성공 경로 마지막에서만 true로 설정되는 보고 필드이며, 원장 변경을 관측했다는 뜻이 아니다. 실제 원문 해시 비교를 우선한다.
+- 최초 POST 직후 확인이 UNKNOWN인 정확한 네트워크/목록 지연 원인은 당시 원문 응답이 보존되지 않아 확정하지 않는다. 현재 원격에서는 동일 replay가 #1215 한 건으로 확인된다.
+
+## 제한된 후속 C 후보 — 아직 미승인
+
+- source: `776cfcf8a77b9b48f813c59d030fac01922e044d`
+- 후보: `approvals/maintenance-recoveries/pc-update-877e10c8-8580-4095-a675-bef9ec032193.postswitch.resume1215.candidate.json`
+- 후보 원문 SHA-256: `88db817122118a185fdc0aa707bdf4230e3412ad048065b21286e9af83474312`, `approved:false`
+- 새 `resume` 계약은 이전 승인 원문/commit/source, 기존 claim owner 해시, 5개 기록의 chain tail, #1215 본문과 JSON/TXT 해시를 고정한다. 기존 기록/owner/ledger는 바꾸지 않고 원래 claim 안에 별도 atomic continuation claim을 추가해 이중 이어받기를 차단한다.
+- #919에 대한 신규 POST는 허용하지 않는다. #1215가 유일하고 기존 성공 결과가 일치할 때만 `LINK_LOST_ACK`로 연결한다. 기존 backlog 파일은 쓰지 않으며, 필요한 후속 core-status와 최종 보호/Runner 확인 후 원래 승인된 보관 절차를 수행한다.
+- 기존 claim이 존재하면 무조건 거부하던 일반 경로는 유지한다. 정확한 새 resume 계약이 없는 실행, 기존 owner 생존/불명확, 기록/결과/원본 드리프트, 중복 clone, 두 번째 continuation은 계속 거부한다.
+- 관련 Windows 로컬 테스트 **126/126 PASS**. 새 source의 실제 Windows 읽기 전용 prepare 1회도 `POSTSWITCH_APPROVAL_CANDIDATE_READONLY`, `operationalWrites=0`으로 통과했다. 새 C 실행은 0회다.
+- 최초 승인은 d82b662의 16개 해시를 고정했다. 새 코드를 기존 승인 원문에 몰래 대입하지 않는다. 새 source/해시의 명시적 C 동의 후에만 해당 후보를 활성 승인으로 고정해 이어받을 수 있다.
+- Controller **7/8**, 공통 대기열 **4/5** 유지. 아직 최종 postcheck/원장 연결/install lease 보관은 완료되지 않았다.
