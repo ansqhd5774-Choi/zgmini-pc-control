@@ -1,0 +1,106 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
+
+const helper = fileURLToPath(new URL('../tools/controller-996-windows-source-snapshot.cs', import.meta.url));
+const quote = value => "'" + value.replaceAll("'", "''") + "'";
+
+test('Windows retains the pinned source across a separate Node import and rejects write and rename', {
+  skip: process.platform !== 'win32',
+}, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-996-source-snapshot-'));
+  const dir = path.join(root, 'tools');
+  fs.mkdirSync(dir);
+  const source = path.join(dir, 'fixture.mjs');
+  const content = 'console.log("PINNED_FIXTURE_LOADED");\n';
+  fs.writeFileSync(source, content);
+  const hash = createHash('sha256').update(content).digest('hex');
+  const code = `
+    $ErrorActionPreference = 'Stop'
+    Add-Type -Path ${quote(helper)}
+    $source = ${quote(source)}
+    $dir = ${quote(dir)}
+    $node = ${quote(process.execPath)}
+    $pins = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+    $pins.Add($source, ('0' * 64))
+    function Assert-Blocked([scriptblock]$operation, [string]$label, [string]$expected = '') {
+      try { & $operation } catch {
+        if ($expected -and $_.Exception.GetBaseException().Message -cne $expected) { throw }
+        Write-Output $label
+        return
+      }
+      throw "Unexpected success: $label"
+    }
+    Assert-Blocked { [Zgmini996WindowsSourceSnapshot]::new($pins).Dispose() } 'BAD_PIN_BLOCKED' 'C996_SNAPSHOT_SHA_MISMATCH'
+    $pins[$source] = '${hash}'
+    $writer = [IO.File]::Open($source, 'Open', 'ReadWrite', 'ReadWrite')
+    try {
+      Assert-Blocked { [Zgmini996WindowsSourceSnapshot]::new($pins).Dispose() } 'OPEN_WRITER_BLOCKED' 'C996_SNAPSHOT_OPEN_FAILED_32'
+    } finally { $writer.Dispose() }
+    $snapshot = [Zgmini996WindowsSourceSnapshot]::new($pins)
+    try {
+      Assert-Blocked { [IO.File]::WriteAllText($source, 'changed') } 'WRITE_BLOCKED'
+      Assert-Blocked { [IO.File]::Move($source, $source + '.moved') } 'FILE_RENAME_BLOCKED'
+      Assert-Blocked { [IO.Directory]::Move($dir, $dir + '.moved') } 'PARENT_RENAME_BLOCKED'
+      & $node $source
+      if ($LASTEXITCODE -ne 0) { throw 'FIXTURE_NODE_FAILED' }
+    } finally { $snapshot.Dispose() }
+    [IO.File]::WriteAllText($source, 'after release')
+    Write-Output 'HANDLES_RELEASED'
+  `;
+  const ps = spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(code, 'utf16le').toString('base64')],
+    {encoding:'utf8', windowsHide:true, timeout:30000});
+  assert.equal(ps.status, 0, ps.stderr + ps.stdout);
+  for (const label of ['BAD_PIN_BLOCKED', 'OPEN_WRITER_BLOCKED', 'WRITE_BLOCKED',
+    'FILE_RENAME_BLOCKED', 'PARENT_RENAME_BLOCKED', 'PINNED_FIXTURE_LOADED', 'HANDLES_RELEASED']) {
+    assert.ok(ps.stdout.includes(label), label);
+  }
+  assert.equal(fs.readFileSync(source, 'utf8'), 'after release');
+});
+
+test('review launcher validates the full fixture before starting Node', {
+  skip: process.platform !== 'win32',
+}, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-996-source-launch-'));
+  const sha = value => createHash('sha256').update(value).digest('hex');
+  const write = (relative, content) => {
+    const file = path.join(root, relative);
+    fs.mkdirSync(path.dirname(file), {recursive:true});
+    fs.writeFileSync(file, content);
+    return sha(content);
+  };
+  const bootstrap = 'tools/controller-996-c-native-trusted-bootstrap.mjs';
+  const bootstrapHash = write(bootstrap,
+    'import fs from "node:fs";\n' +
+    'try { fs.appendFileSync(process.argv[1], "unexpected"); process.exit(10); } catch (e) { if (!["EBUSY","EPERM","EACCES"].includes(e.code)) throw e; }\n' +
+    'console.log("FIXTURE_BOOTSTRAP_STARTED_WITH_SOURCE_PINNED");\n');
+  const files = {[bootstrap]:bootstrapHash};
+  for (let i = 0; i < 15; i++) {
+    const relative = 'tools/controller-996-fixture-' + i + '.mjs';
+    files[relative] = write(relative, 'export const fixture = ' + i + ';\n');
+  }
+  const lockHash = write('tools/controller-996-c-native-owner-source-lock.json',
+    JSON.stringify({schema:'ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1',files}));
+  const packageHash = write('artifacts/controller-996/zgmini-996-c-native-owner-package.zip', 'fixture bytes');
+  const launcher = fileURLToPath(new URL('../tools/VERIFY_996_WINDOWS_TRUSTED_SNAPSHOT.ps1', import.meta.url));
+  const run = () => spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+    ['-NoProfile','-NonInteractive','-File',launcher,'-PackageRoot',root,
+      '-ManifestCommitSha','a'.repeat(40),'-BootstrapSha256',bootstrapHash,
+      '-SourceLockSha256',lockHash,'-PackageSha256',packageHash,
+      '-SnapshotHelperSha256',sha(fs.readFileSync(helper))],
+    {encoding:'utf8',windowsHide:true,timeout:30000});
+  const pass = run();
+  assert.equal(pass.status,0,pass.stderr+pass.stdout);
+  assert.match(pass.stdout,/FIXTURE_BOOTSTRAP_STARTED_WITH_SOURCE_PINNED/);
+  fs.appendFileSync(path.join(root,'tools/controller-996-fixture-0.mjs'),'changed');
+  const blocked = run();
+  assert.equal(blocked.status,2,blocked.stderr+blocked.stdout);
+  assert.match(blocked.stdout,/C996_SNAPSHOT_SHA_MISMATCH/);
+  assert.doesNotMatch(blocked.stdout,/FIXTURE_BOOTSTRAP_STARTED/);
+});

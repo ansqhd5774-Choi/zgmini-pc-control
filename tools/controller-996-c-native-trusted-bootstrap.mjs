@@ -255,3 +255,11 @@ export function verify996CTrustedBootstrapReadOnly({manifestCommitSha}={}){
   }catch(e){return blocked(/^C_996_BOOTSTRAP_[A-Z0-9_]+$/.test(e?.code??'')?
     e.code:'C_996_BOOTSTRAP_READ_OR_STATE_UNKNOWN');}
 }
+
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+  const result=process.argv.length===3?
+    verify996CTrustedBootstrapReadOnly({manifestCommitSha:process.argv[2]}):
+    blocked('C_996_BOOTSTRAP_S2_COMMIT_REQUIRED');
+  console.log(JSON.stringify(result));
+  if(result.status==='BOOTSTRAP_NO_GO')process.exitCode=2;
+}

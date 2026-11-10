@@ -353,4 +353,11 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 
 ## 다음 명시적 Gate
 
+### Windows Bootstrap 소스 고정 검증 — 2026-11-11
+
+- `VERIFY_996_WINDOWS_TRUSTED_SNAPSHOT.ps1`은 독립적으로 전달받은 SHA-256으로 helper 바이트를 확인한 뒤 그 바이트를 컴파일한다. SourceLock을 먼저 고정하고 Bootstrap을 포함한 16개 소스와 ZIP을 Windows 파일 핸들로 읽어 SHA-256을 대조한다. Node 프로세스가 종료될 때까지 파일과 상위 디렉터리 핸들을 유지한다.
+- Windows TEMP 시험 2/2. 잘못된 SHA와 선행 쓰기 핸들 거부, 검증 중 파일 쓰기·이름 변경과 상위 디렉터리 이름 변경 차단, Node 실행 중 소스 고정, 의존 파일 변조 시 Node 시작 전 중단을 확인했다. 테스트에서 실행한 Bootstrap은 합성 파일이다.
+- 독립 검토는 PowerShell 진입점의 외부 해시 확인과 실제 로드 사이의 교체 가능성 및 Node 실행 파일의 신뢰 근거를 남은 조건으로 확인했다. Bootstrap의 GitHub GET 전용 범위와 Operator의 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 중단을 유지한다. 기존 S1 검증 수치는 변경 전 커밋의 증거로 보존한다.
+- 다음 필수 작업은 외부에서 고정된 PowerShell 진입점과 Node 바이너리를 실제 로드까지 묶어 검증하는 것이다. 이후 운영 단계 CAS와 함께 검증한 다음에만 S1·S2와 최종 C ZIP을 봉인한다. 전체 운영 진행률 80%다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.
