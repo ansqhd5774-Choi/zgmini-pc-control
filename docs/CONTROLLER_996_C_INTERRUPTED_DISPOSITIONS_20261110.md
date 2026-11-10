@@ -1,5 +1,13 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 신규 Windows C 단계 엔진 후보·7개 TEMP 격리 시험 패키지 R1 — 실측 대기
+
+- `tools/INVOKE_996_WINDOWS_C_ARCHIVE_CANDIDATE.ps1`를 **운영 무조건 STOP**인 시험 전용 PowerShell 단계 엔진으로 추가했다. `-TestOnly`·원본 `E:\ZGmini` 부재·NTFS/ReFS 고정 드라이브의 새 TEMP fixture·부모 Reparse Point 부재를 요구한다. 합성 SHA/inventory·가상 Writer·목적지 충돌을 재확인하고 `[IO.Directory]::Move`로 **old C → continuation → install 최종** 순서의 삭제 없는 이동과 `READY_TO_RELEASE_INSTALL`의 `CreateNew`/`Flush(true)`를 시험하도록 작성했다. 실패·중단 시 자동 재시도·삭제·원상 복구하지 않는다. `Flush(true)`는 파일 기록 보조일 뿐 전원 차단 때의 디렉터리 rename 내구성을 증명하지 않는다.
+- `tools/TEST_996_WINDOWS_C_STAGE_FIXTURE_ONCE.ps1`는 별도 Windows PC의 TEMP 안에 **각각 독립된 7개 GUID root**를 만들어 정상 1·중단 3·기존 archive 충돌 1·합성 Writer 경합 1·원본 marker 변경 1을 새 단계 엔진으로 호출하도록 작성했다. 이 입력은 합성 `expected.json`/`live.json`으로 실제 owner·claim provenance·원본 Git 84개·원본 Writer 경합을 인증하지 않는다. 시험은 `leases→archives` 부모가 달라 운영 `leases` 내부 형제 디렉터리 이동과 정확히 같지 않다. `AFTER_INSTALL` 중단 시 기존 Install 잠금은 이미 보관된 상태이므로 수동 재판정이 필요하다. 모든 TEMP root는 자동 삭제하지 않는다.
+- `tools/RUN_996_WINDOWS_C_STAGE_TEMP_ONCE.cmd`는 **두 PS1의 전체 SHA256을 실행 전에 검산**한다: stage=`7fddd91a5ee0088955cdfc03f3799186ade4d5dfce17193e457f75fcf992e657`, fixture=`2b76e38f785a208a3aefc5d202ec1c478b2f052d244d842e5df024fb2f8cad0b`. PowerShell 정책을 우회하지 않는다. **격리 시험 ZIP** `artifacts/controller-996/zgmini-996-windows-c-stage-native-fixture-r1.zip`, SHA256=`5f1d054c72f3528525db04e1e5d84615fc5f9e4c90c4cff870b7ab85ca819af8`, 구성 정확히 CMD+PS1+PS1 **3파일**, ZIP CRC **3/3 정상**. 이 패키지에는 운영 C 명령이나 원본 PC 대상 실행기가 없다.
+- 신규 단계 엔진/fixture/CMD 정적 회귀 **6+4+2=12/12**, 기존 #996 전체 **185/185 PASS**. 이 숫자는 **Linux 정적 검사**이며 **새 두 PS1의 Windows Native 실측 0/7**이다. 이전 Windows 네이티브 기본 이동 13/13은 별도 이전 패키지의 실증이다. 새 단계 엔진 Windows 실측이 완료된 것처럼 기록하지 않는다.
+- 현재 새 continuation Claim의 실제 배타 취득, 독립 인증된 C owner/정확한 새 승인, 현재 원본 PC CAS·Writer 경합·원본 4 Job 결과/원본 84 Git bytes 런타임 결합, 안전한 전원 중단 회복/운영 C operator·CLI/CMD/ZIP은 **미구현**. 기존 C CMD 재실행, 운영 E: Claim/Install Lease 이동·Workflow PUT·Backlog 변경·원본 Issue 재발행은 모두 **NO-GO**. 전체 운영 진행률 **80%→80%**, PR Draft 유지.
+
 ## 2026-11-11 최신 원본 Issue·소유권 대조 및 신규 C 증거 Bridge — 운영 80%, C NO-GO
 
 - GitHub 원본 #996의 전체 댓글 **10/10**을 다시 읽었다. 과거 `ZGMINI_CONTROLLER_996_C_CONSENT_V1` 1건은 기존 phase-scoped 범위에만 유효하고 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1`는 **0건**이다. 사용자 승인 댓글을 대신 발행하거나 이전 동의를 새 C Claim 소유권 인계로 해석하지 않는다.
