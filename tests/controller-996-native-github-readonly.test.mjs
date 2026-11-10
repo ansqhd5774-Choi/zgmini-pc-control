@@ -37,9 +37,12 @@ test('fixed account and private repository are authenticated before GET',t=>{
  assert.throws(()=>f.gateway.authenticateReadOnly(),/C_GITHUB_READER_ALREADY_AUTHENTICATED/);
 });
 
-test('only fixed issue/comments/results GET routes are allowlisted',t=>{
+test('only fixed issue/comments/results and original owner approval GET routes are allowlisted',t=>{
  const f=fixture(t);f.gateway.authenticateReadOnly();
  for(const route of [
+  'issues/996',
+  'issues/996/comments?per_page=100&page=1',
+  `contents/docs/CONTROLLER_996_C_APPROVAL_R1.json?ref=${'a'.repeat(40)}`,
   'issues?state=all&sort=created&direction=desc&per_page=100&page=1',
   'issues/1270/comments?per_page=100&page=3',
   'contents/results/123456789-1-seat-2.json',
@@ -47,6 +50,9 @@ test('only fixed issue/comments/results GET routes are allowlisted',t=>{
  ])assert.equal(f.gateway.get(route).status,200);
  const count=f.calls.length;
  for(const route of ['issues?since=2026-11-10',
+  'issues/997','issues/996?x=1',
+  'contents/docs/CONTROLLER_996_C_APPROVAL_R1.json?ref=main',
+  'contents/docs/CONTROLLER_996_C_APPROVAL_R1.json?ref=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&x=1',
   'issues/1270/comments','issues/1270/comments?per_page=100&page=0',
   'contents/other/abc.json','issues/1270/comments?per_page=100&page=1&x=POST',
   '../contents/results/123456789-1-seat-2.json','actions/workflows/pc-job.yml/enable',
