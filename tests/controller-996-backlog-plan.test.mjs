@@ -81,4 +81,6 @@ test('unrelated records are ignored while original dispositions stay determinist
   assert.equal(plan996BacklogWithoutReplay(a).originalIssueCount,1);
   const b=fixture();b.listing.issues.push({...issue(1251),labels:[{name:'bug'}]});
   assert.equal(plan996BacklogWithoutReplay(b).originalIssueCount,1);
+  const c=fixture();c.listing.issues.push({...issue(1252),pull_request:{url:'https://api.github.com/pulls/1252'}});
+  assert.equal(plan996BacklogWithoutReplay(c).originalIssueCount,1);
 });
