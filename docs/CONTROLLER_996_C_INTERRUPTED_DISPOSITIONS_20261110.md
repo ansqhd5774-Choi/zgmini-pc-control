@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 C 설치/복구 실제 충돌 스냅샷 연결 — 287/287 PASS, 운영 80% 유지
+
+- `controller-996-c-original-stage-readonly.mjs`의 classifier 충돌 두 필드를 상수 `0`에서 **실제 각 E: 경로 inventory 판독 결과**로 연결했다. `foreignInstallOwnerCount`는 canonical `controller-install/owner.json` 원본 SHA 불일치, `otherContinuationCount`는 확인된 허용 이름 이외의 별도 continuation 존재 개수다. 2회 스냅샷 동일성 검사 후 이 값이 classifier로 전달되며, 원본 Install SHA drift·다른 C 작업은 STOP, 독립 receiver/일반 Writer 활동은 유휴 Gate가 아니다.
+- 관련 신규 테스트 2/2, 단계 판독기 12/12, 전체 `controller-996-*.test.mjs` **287/287 PASS**. 2개 파일 GitHub blob byte-match **2/2**. 마지막 변경 source commit `32c692848e5eeef78e26f02a627bd17fdd5cbeba`.
+- **남은 필수 C BLOCKER:** 별도 신뢰 실행 전 부트스트랩(Owner/S1/S2 확인 후 import), 네이티브 Move의 마지막 원본 PID·nonce·해시 CAS/경합 보호·격리 Windows 실증, SourceLock/ZIP 및 정확 신규 Owner 7-effect 동의. 현재 candidate `run996NativeOwnerCOnce`의 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 강제 STOP **유지**. 실제 기존 PC E: 쓰기 0, C **NO-GO**, 전체 **4/5=80%→80%**. 기존 PC 직접 CMD 재시도 금지.
+
+
 ## 2026-11-11 원본 C Windows 실행기 **불완전 후보** 봉인 — 285/285 PASS, 운영 C NO-GO
 
 - 신규 `tools/controller-996-c-native-owner-operator.mjs` 및 `tests/controller-996-c-native-owner-operator.test.mjs`를 **Draft 소스 후보**로 기록했다. 예상 순서: 새로운 #996 Owner C 동의 + S1 실행기·의존 원문/S2 SourceLock·ZIP Git 해시 → 원본 10핀/R1/R4 → 고정 예약·새 Continuation Claim → 기존 Claim/새 Claim/Install LAST Archive → 읽기 전용 사후 검사. 테스트는 Linux 미승인·인위 승인 인자에서도 운영 쓰기 전 STOP인 경우만 검증한다.
