@@ -143,10 +143,10 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    json_extract(detail_json,'$.parserMeta.selectedWeeks[0]') AS first_selected_week
    FROM market_score_employment_r6_raw_snapshot_v1
    WHERE release_group='DOL_UI_WEEKLY_CLAIMS' AND chunk_index=0
-     AND request_key IN ('DOL_ETA539:600w','DOL_ETA539:112w','DOL_ETA539:60w')
-   ORDER BY retrieved_at DESC LIMIT 3`).all();
+     AND request_key IN ('DOL_ETA539:530w','DOL_ETA539:600w','DOL_ETA539:112w','DOL_ETA539:60w')
+   ORDER BY retrieved_at DESC LIMIT 4`).all();
   result.eta539=snapshots.length?snapshots.map(r=>({
-   mode:r.request_key==='DOL_ETA539:600w'?'BACKFILL':r.request_key==='DOL_ETA539:112w'?'ONE_YEAR':'RELEASE',
+   mode:['DOL_ETA539:530w','DOL_ETA539:600w'].includes(r.request_key)?'BACKFILL':r.request_key==='DOL_ETA539:112w'?'ONE_YEAR':'RELEASE',
    snapshotStoredAt:stamp(r.retrieved_at),httpStatus:safeInt(r.http_status),
    historyWeeks:safeInt(r.history_weeks),selectedWeeks:safeInt(r.selected_weeks),
    firstSelectedWeek:date(r.first_selected_week),latestCompleteWeek:date(r.latest_complete_week),coreCount:safeInt(r.core_count),
