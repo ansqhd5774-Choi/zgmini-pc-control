@@ -16,6 +16,7 @@ function valid(){
     approved:true,grade:'C',operation:'ARCHIVE_INTERRUPTED_C_CLAIM_AND_INSTALL_LEASE',
     issueNumber:996,originalRequestId:REQ,continuationRequestId:ID,
     operatorCommit:'a'.repeat(40),operatorSha256:'a'.repeat(64),
+    bootstrapSha256:'9'.repeat(64),
     packageSha256:'b'.repeat(64),sourceLockSha256:'c'.repeat(64),
     originalPins:structuredClone(pins),
     effects:['CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE',
@@ -38,6 +39,7 @@ function valid(){
       continuationRequestId:ID,manifestSha256:'e'.repeat(64),
       revoked:false,oldConsentReused:false,
       operatorSha256:manifest.operatorSha256,
+      bootstrapSha256:manifest.bootstrapSha256,
       packageSha256:manifest.packageSha256,
       sourceLockSha256:manifest.sourceLockSha256},
     gitSource:{status:'SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS',
@@ -113,7 +115,7 @@ test('revoked or copied old receipt is rejected',()=>{
   }
 });
 test('mismatched source lock or ZIP byte digest stops review',()=>{
-  for(const prop of ['sourceLockSha256','packageSha256','operatorSha256']){
+  for(const prop of ['sourceLockSha256','packageSha256','operatorSha256','bootstrapSha256']){
     const x=valid();x.consent[prop]='f'.repeat(64);
     assert.equal(check(x).code,
       'C_CONTINUATION_NEW_CONSENT_NOT_INDEPENDENTLY_VERIFIED');
