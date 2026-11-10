@@ -5,6 +5,11 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
+import {createHash} from 'node:crypto';
+import {
+  build996OwnerArchiveFixtureScript,
+  require996OwnerArchiveReceipt,
+} from '../tools/controller-996-c-native-owner-operator.mjs';
 
 const script = fileURLToPath(new URL('../tools/TEST_996_WINDOWS_HANDLE_BOUND_ARCHIVE.ps1', import.meta.url));
 
@@ -74,4 +79,51 @@ for (const type of ['directory', 'file']) {
     assert.deepEqual(fs.readdirSync(root).sort(), ['archive', 'source']);
     assert.equal(fs.existsSync(source), true);
   });
+}
+
+for (const failAt of [null, 'old', 'continuation']) {
+  test('Operator archive primitive preserves install barrier on preceding readback failure: ' + failAt,
+    windowsOnly, () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-996-handle-fixture-'));
+      const steps = ['old', 'continuation', 'install'];
+      const nonce = 'fixture-owner';
+      const bytes = JSON.stringify({pid: process.pid, nonce});
+      const sha = createHash('sha256').update(bytes).digest('hex');
+      for (const step of steps) {
+        fs.mkdirSync(path.join(root, step));
+        fs.writeFileSync(path.join(root, step, 'owner.json'), bytes);
+      }
+      const attempted = [];
+      const run = () => {
+        for (const step of steps) {
+          attempted.push(step);
+          const result = spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+            ['-NoProfile', '-NonInteractive', '-Command', build996OwnerArchiveFixtureScript()], {
+              input: JSON.stringify({
+                operation: 'move', root, source: path.join(root, step),
+                destination: path.join(root, step + '-archive'), pins: {'owner.json': sha},
+                ownerMode: 'LIVE_NEW', actorPid: process.pid, nonce,
+                simulateContentDrift: step === failAt,
+              }),
+              encoding: 'utf8', timeout: 30000, windowsHide: true,
+            });
+          assert.equal(result.status, 0, result.error?.message ?? result.stderr);
+          const receipt = JSON.parse(result.stdout);
+          if (step === failAt) assert.equal(receipt.moveOccurred, true);
+          require996OwnerArchiveReceipt(receipt);
+        }
+      };
+      if (failAt === null) {
+        run();
+        assert.deepEqual(attempted, steps);
+        assert.equal(fs.existsSync(path.join(root, 'install')), false);
+        assert.equal(fs.readFileSync(path.join(root, 'install-archive', 'owner.json'), 'utf8'), bytes);
+      } else {
+        assert.throws(run, {code: 'C996_NATIVE_SOURCE_CONTENT_DRIFT'});
+        assert.deepEqual(attempted, steps.slice(0, steps.indexOf(failAt) + 1));
+        assert.equal(fs.existsSync(path.join(root, 'install-archive')), false);
+        assert.equal(fs.readFileSync(path.join(root, 'install', 'owner.json'), 'utf8'), bytes);
+        assert.equal(fs.existsSync(path.join(root, failAt + '-archive')), true);
+      }
+    });
 }

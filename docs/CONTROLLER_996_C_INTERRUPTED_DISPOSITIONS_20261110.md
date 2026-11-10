@@ -372,4 +372,10 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - Windows 시험 5/5. 같은 디렉터리와 파일 ID 보존, 실제 이동 직전 별도 경로 이름 변경 차단, 동일 바이트의 교체 디렉터리 거부, 파일 내용 변경 거부, 기존 파일 및 디렉터리 보관 대상 보존을 확인했다.
 - Windows가 디렉터리 이동을 허용하려면 자식 파일 읽기 핸들을 먼저 닫아야 했다. 해당 구간의 파일 변경은 보관 후 ID와 SHA 재검사에서 검출한다. 운영 통합에서는 기존 설치 Lease와 Writer 경합 검사를 이동 전까지 유지하고, 보관본이 다르면 Install Lease 해제 단계에 진입하지 않는 동작을 검증해야 한다. 운영 Operator와 원본 Claim·Lease는 그대로다.
 
+### Operator 이동 경로 통합 — Windows TEMP 시험
+
+- Operator의 경로 기반 `Directory.Move`를 핸들 기반 이동으로 교체했다. 네이티브 프로세스에서 파일 목록과 SHA-256, Owner PID와 nonce를 확인하고 같은 디렉터리 핸들로 이동한다. 보관 뒤에도 디렉터리와 파일 ID 및 SHA-256을 대조한다. 조회가 실패하면 해당 단계를 중단한다.
+- 같은 네이티브 코드의 TEMP 분기에서 정상 3단계 이동과 앞선 두 보관 단계의 이동 후 무결성 실패를 검증했다. 실패 시험에서는 해당 보관본이 존재했으며, 다음 이동을 시도하지 않아 Install Lease가 원래 위치에 남았다. Windows 관련 시험 11/11 및 Bootstrap·Operator 계약 검사 4/4 통과. TEMP 시험은 격리된 순서 검증이며 운영 Operator의 시작부터 사후 확인까지 실행한 결과는 아니다.
+- Operator의 의존 모듈 로드 전 차단은 유지한다. 다음 작업은 외부 신뢰 진입점에서 정확한 GitHub Owner 승인과 보호된 실행 파일 집합이 Operator 호출까지 이어지는지 격리 검증하는 것이다. 운영 80%를 유지한다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.

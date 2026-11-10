@@ -104,8 +104,201 @@ function writeOnce(dir,name,data){
     'C_996_OWNER_MARKER_READBACK_DRIFT');
   return sha(bytes);
 }
-// Native .NET Directory.Move is the no-replace primitive tested on an
-// isolated Windows NTFS fixture. Same-parent only. No ExecutionPolicy bypass.
+// The fixture renders the same native code, restricted to designated TEMP paths.
+export function build996OwnerArchiveFixtureScript(){
+  return handleArchiveScript(true);
+}
+function handleArchiveScript(fixture=false){
+  return String.raw`
+$ErrorActionPreference = 'Stop'
+try {
+  Add-Type -AssemblyName System.Web.Extensions
+  Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using Microsoft.Win32.SafeHandles;
+using System.Web.Script.Serialization;
+
+public static class C996NativeDirectory {
+  static readonly bool Fixture = __FIXTURE__;
+  const uint ATTR_REPARSE=0x400, ATTR_DIRECTORY=0x10;
+  const uint READ_ATTRIBUTES=0x80, DELETE=0x10000, GENERIC_READ=0x80000000;
+  const uint SHARE_READ=1, SHARE_WRITE=2, OPEN_EXISTING=3;
+  const uint BACKUP_SEMANTICS=0x02000000, OPEN_REPARSE_POINT=0x00200000;
+  [StructLayout(LayoutKind.Sequential)] struct FT {public uint Low;public uint High;}
+  [StructLayout(LayoutKind.Sequential)] struct INFO {
+    public uint Attr;public FT Created;public FT Accessed;public FT Written;
+    public uint Volume;public uint SizeHigh;public uint SizeLow;public uint Links;
+    public uint IndexHigh;public uint IndexLow;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct RENAME {
+    public byte ReplaceIfExists;public IntPtr RootDirectory;
+    public uint FileNameLength;public ushort FileName;
+  }
+  [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+  static extern SafeFileHandle CreateFileW(string name,uint access,uint share,
+    IntPtr security,uint disposition,uint flags,IntPtr template);
+  [DllImport("kernel32.dll",SetLastError=true)]
+  static extern bool GetFileInformationByHandle(SafeFileHandle handle,out INFO info);
+  [DllImport("kernel32.dll",SetLastError=true)]
+  static extern bool SetFileInformationByHandle(SafeFileHandle handle,int cls,
+    IntPtr buffer,uint length);
+  static JavaScriptSerializer serializer=new JavaScriptSerializer();
+  class Stop:Exception {public string Code;public int Native;public Stop(string c,int n=0){Code=c;Native=n;}}
+  static void Need(bool ok,string code){if(!ok)throw new Stop(code);}
+  static INFO Info(SafeFileHandle h){INFO i;if(!GetFileInformationByHandle(h,out i))throw new Stop("C996_NATIVE_IDENTITY_FAILED",Marshal.GetLastWin32Error());return i;}
+  static string Identity(INFO i){return i.Volume.ToString("x8")+":"+(((ulong)i.IndexHigh<<32)|i.IndexLow).ToString("x16");}
+  static string Sha(Stream s){using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(s)).Replace("-","").ToLowerInvariant();}
+  static SafeFileHandle OpenDir(string p,bool moving,bool readMoved=false){
+    var h=CreateFileW(p,READ_ATTRIBUTES|(moving?DELETE:0),SHARE_READ|SHARE_WRITE|(readMoved?4u:0u),
+      IntPtr.Zero,OPEN_EXISTING,BACKUP_SEMANTICS|OPEN_REPARSE_POINT,IntPtr.Zero);
+    if(h.IsInvalid)throw new Stop("C996_NATIVE_DIRECTORY_OPEN_FAILED",Marshal.GetLastWin32Error());
+    var i=Info(h);if((i.Attr&ATTR_REPARSE)!=0||(i.Attr&ATTR_DIRECTORY)==0){h.Dispose();throw new Stop("C996_NATIVE_REPARSE_OR_NOT_DIRECTORY");}return h;
+  }
+  static void HoldParents(string root,string p,List<SafeFileHandle> held){
+    string at=Path.GetPathRoot(p);Need(!String.IsNullOrEmpty(at),"C996_NATIVE_PATH_INVALID");
+    held.Add(OpenDir(at,false));
+    string relative=p.Substring(at.Length);foreach(string part in relative.Split(Path.DirectorySeparatorChar)){
+      if(part.Length==0)continue;at=Path.Combine(at,part);held.Add(OpenDir(at,false));
+    }
+  }
+  static string PathChecked(string root,string p){
+    Need(p!=null&&p.Length<512&&!p.StartsWith(@"\\")&&!p.Contains("/../"),"C996_NATIVE_PATH_INVALID");
+    string f=Path.GetFullPath(p),r=Path.GetFullPath(root).TrimEnd('\\')+"\\";
+    Need(f.StartsWith(r,StringComparison.OrdinalIgnoreCase)&&
+      Path.GetPathRoot(f).Equals(Path.GetPathRoot(r),StringComparison.OrdinalIgnoreCase),"C996_NATIVE_ROOT_ESCAPE");return f;
+  }
+  static Dictionary<string,object> Capture(string p,SafeFileHandle dir,List<FileStream> streams){
+    var initial=Info(dir);var names=Directory.GetFileSystemEntries(p);Array.Sort(names,StringComparer.OrdinalIgnoreCase);
+    Need(names.Length>0&&names.Length<=32,"C996_NATIVE_FILE_SET_INVALID");
+    var files=new SortedDictionary<string,object>(StringComparer.Ordinal);
+    foreach(string file in names){
+      string name=Path.GetFileName(file);Need(name.EndsWith(".json",StringComparison.Ordinal)&&!files.ContainsKey(name),"C996_NATIVE_FILE_NAME_INVALID");
+      var h=CreateFileW(file,GENERIC_READ,SHARE_READ,IntPtr.Zero,OPEN_EXISTING,OPEN_REPARSE_POINT,IntPtr.Zero);
+      if(h.IsInvalid)throw new Stop("C996_NATIVE_FILE_OPEN_FAILED",Marshal.GetLastWin32Error());
+      var info=Info(h);if((info.Attr&(ATTR_REPARSE|ATTR_DIRECTORY))!=0||info.Links!=1){h.Dispose();throw new Stop("C996_NATIVE_FILE_REDIRECT_OR_LINK");}
+      ulong size=((ulong)info.SizeHigh<<32)|info.SizeLow;Need(size>0&&size<=262144,"C996_NATIVE_FILE_SIZE_INVALID");
+      var stream=new FileStream(h,FileAccess.Read);streams.Add(stream);string sha=Sha(stream);
+      Need(Identity(Info(h))==Identity(info),"C996_NATIVE_FILE_IDENTITY_DRIFT");
+      files.Add(name,new Dictionary<string,object>{{"identity",Identity(info)},{"sha256",sha},{"size",size}});
+    }
+    var again=Directory.GetFileSystemEntries(p);Array.Sort(again,StringComparer.OrdinalIgnoreCase);
+    Need(String.Join("\n",names)==String.Join("\n",again)&&Identity(Info(dir))==Identity(initial),"C996_NATIVE_SNAPSHOT_RACE");
+    return new Dictionary<string,object>{{"identity",Identity(initial)},{"files",files}};
+  }
+  static void SameSnapshot(Dictionary<string,object> current,Dictionary<string,object> expected){
+    Need((string)current["identity"]==(string)expected["identity"],"C996_NATIVE_SOURCE_IDENTITY_DRIFT");
+    var a=(SortedDictionary<string,object>)current["files"];var b=(IDictionary<string,object>)expected["files"];
+    Need(a.Count==b.Count,"C996_NATIVE_SOURCE_FILE_SET_DRIFT");
+    foreach(var entry in a){
+      Need(b.ContainsKey(entry.Key),"C996_NATIVE_SOURCE_FILE_SET_DRIFT");
+      var x=(Dictionary<string,object>)entry.Value;var y=(Dictionary<string,object>)b[entry.Key];
+      Need((string)x["identity"]==(string)y["identity"]&&(string)x["sha256"]==(string)y["sha256"]&&
+        Convert.ToUInt64(x["size"])==Convert.ToUInt64(y["size"]),"C996_NATIVE_SOURCE_CONTENT_DRIFT");
+    }
+  }
+  public static string Execute(string raw){
+    var held=new List<SafeFileHandle>();var streams=new List<FileStream>();SafeFileHandle sourceHandle=null;IntPtr buffer=IntPtr.Zero;
+    bool moveOccurred=false;
+    try{
+      Need(raw!=null&&raw.Length<65536,"C996_NATIVE_INPUT_INVALID");
+      var args=serializer.Deserialize<Dictionary<string,object>>(raw);
+      string op=(string)args["operation"],root=(string)args["root"];
+      Need(op=="move","C996_NATIVE_OPERATION_INVALID");
+      string temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar);
+      root=Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+      if (Fixture) {
+      Need(String.Equals(Path.GetDirectoryName(root),temp,StringComparison.OrdinalIgnoreCase)&&
+        System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(root),@"\Azgmini-996-handle-fixture-[A-Za-z0-9]+\z")&&
+        !root.StartsWith(@"E:\ZGmini\",StringComparison.OrdinalIgnoreCase),"C996_NATIVE_TEMP_FIXTURE_REQUIRED");
+      } else {
+        Need(String.Equals(root,@"E:\ZGmini\automation\pc-maintenance\leases",StringComparison.OrdinalIgnoreCase),
+          "C996_NATIVE_ORIGINAL_ROOT_REQUIRED");
+      }
+      string source=PathChecked(root,(string)args["source"]);
+      Need(String.Equals(Path.GetDirectoryName(source),root,StringComparison.OrdinalIgnoreCase),"C996_NATIVE_FIXED_SOURCE_REQUIRED");
+      HoldParents(root,root,held);
+      sourceHandle=OpenDir(source,op=="move");
+      var snap=Capture(source,sourceHandle,streams);
+      string destination=PathChecked(root,(string)args["destination"]);
+      Need(Path.GetDirectoryName(source).Equals(Path.GetDirectoryName(destination),StringComparison.OrdinalIgnoreCase),"C996_NATIVE_PARENT_MISMATCH");
+      Need(!String.Equals(source,destination,StringComparison.OrdinalIgnoreCase),"C996_NATIVE_FIXED_DESTINATION_REQUIRED");
+      var pins=(Dictionary<string,object>)args["pins"];
+      var seen=(SortedDictionary<string,object>)snap["files"];
+      Need(pins.Count==seen.Count&&pins.ContainsKey("owner.json"),"C996_NATIVE_SOURCE_FILE_SET_DRIFT");
+      foreach(var file in seen) {
+        Need(pins.ContainsKey(file.Key)&&
+          (string)((Dictionary<string,object>)file.Value)["sha256"]==(string)pins[file.Key],"C996_NATIVE_SOURCE_CONTENT_DRIFT");
+      }
+      var owner=serializer.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(source,"owner.json")));
+      int pid=Convert.ToInt32(owner["pid"]);
+      Need(pid>0,"C996_NATIVE_OWNER_PID_INVALID");
+      var mode=(string)args["ownerMode"];
+      bool alive;
+      try { using(var process=System.Diagnostics.Process.GetProcessById(pid)) { alive=!process.HasExited; } }
+      catch(ArgumentException) { alive=false; }
+      if(mode=="LIVE_NEW") {
+        Need(alive&&pid==Convert.ToInt32(args["actorPid"])&&
+          (string)owner["nonce"]==(string)args["nonce"],"C996_NATIVE_NEW_OWNER_DRIFT");
+      } else {
+        Need((mode=="DEAD_OLD"||mode=="DEAD_INSTALL")&&!alive,"C996_NATIVE_OLD_OWNER_LIVE_OR_UNKNOWN");
+        if(mode=="DEAD_OLD") {
+          string nonce=(string)owner["nonce"];
+          Need(!String.IsNullOrEmpty(nonce),"C996_NATIVE_OLD_NONCE_DRIFT");
+          foreach(string marker in new[]{"PREPARED","WORKFLOW_ENABLE_ATTEMPTED","BACKLOG_CLOSE_ATTEMPTED"}) {
+            var value=serializer.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(source,marker+".json")));
+            Need((string)value["ownerNonce"]==nonce,"C996_NATIVE_OLD_NONCE_DRIFT");
+          }
+        }
+      }
+      string leaf=Path.GetFileName(destination);Need(leaf.Length>0&&!leaf.Contains(":"),"C996_NATIVE_DESTINATION_INVALID");
+      // All ancestors and the common parent stay open without SHARE_DELETE.
+      // Windows rejected RootDirectory+leaf; use an absolute NT name instead.
+      var parent=held[held.Count-1];var parentBefore=Identity(Info(parent));
+      byte[] bytes=System.Text.Encoding.Unicode.GetBytes(@"\??\"+destination);
+      int nameOffset=Marshal.OffsetOf(typeof(RENAME),"FileName").ToInt32();
+      int rootOffset=Marshal.OffsetOf(typeof(RENAME),"RootDirectory").ToInt32();
+      int lenOffset=Marshal.OffsetOf(typeof(RENAME),"FileNameLength").ToInt32();
+      int length=nameOffset+bytes.Length+2;buffer=Marshal.AllocHGlobal(length);
+      for(int i=0;i<length;i++)Marshal.WriteByte(buffer,i,0);
+      Marshal.WriteIntPtr(buffer,rootOffset,IntPtr.Zero);
+      Marshal.WriteInt32(buffer,lenOffset,bytes.Length);Marshal.Copy(bytes,0,IntPtr.Add(buffer,nameOffset),bytes.Length);
+      // Windows cannot rename this directory while child streams are open.
+      // Close them after CAS; detect any namespace/content race in the postcheck.
+      foreach(var stream in streams)stream.Dispose();streams.Clear();
+      if(Fixture&&args.ContainsKey("simulateContentDrift")&&
+        (bool)args["simulateContentDrift"]) File.AppendAllText(Path.Combine(source,"owner.json")," ");
+      if(!SetFileInformationByHandle(sourceHandle,3,buffer,(uint)length)){
+        int error=Marshal.GetLastWin32Error();throw new Stop(error==183||error==80?"C996_NATIVE_DESTINATION_EXISTS":"C996_NATIVE_RENAME_UNCERTAIN",error);
+      }
+      moveOccurred=true;
+      Need(Identity(Info(sourceHandle))==(string)snap["identity"]&&Identity(Info(parent))==parentBefore,"C996_NATIVE_RENAME_IDENTITY_DRIFT");
+      // Verify every original file identity and hash after the namespace move.
+      foreach(var s in streams)s.Dispose();streams.Clear();
+      using(var after=OpenDir(destination,false,true)){
+        var post=Capture(destination,after,streams);SameSnapshot(post,snap);
+        return serializer.Serialize(new Dictionary<string,object>{{"ok",true},{"snapshot",post},{"noReplace",true},{"sourceHandleBound",true},{"parentIdentity",parentBefore},{"namespacePowerLossDurabilityProven",false}});
+      }
+    }catch(Stop e){return serializer.Serialize(new Dictionary<string,object>{{"ok",false},{"code",e.Code},{"nativeError",e.Native},{"moveOccurred",moveOccurred}});}
+    catch{return serializer.Serialize(new Dictionary<string,object>{{"ok",false},{"code","C996_NATIVE_STORAGE_UNCERTAIN"},{"moveOccurred",moveOccurred}});}
+    finally{if(buffer!=IntPtr.Zero)Marshal.FreeHGlobal(buffer);foreach(var s in streams)s.Dispose();if(sourceHandle!=null)sourceHandle.Dispose();foreach(var h in held)h.Dispose();}
+  }
+}
+'@ -ReferencedAssemblies 'System.Web.Extensions'
+  $raw = [Console]::In.ReadToEnd()
+  $result = [C996NativeDirectory]::Execute($raw)
+  [Console]::Out.WriteLine($result)
+} catch {
+  [Console]::Error.WriteLine($_.Exception.Message)
+  [Console]::Out.WriteLine('{"ok":false,"code":"C996_NATIVE_BRIDGE_UNAVAILABLE"}')
+  exit 2
+}
+`.replace('__FIXTURE__',fixture?'true':'false');
+}
+
 function moveNoReplace(from,to,{files,ownerMode,actorPid=null,nonce=null}){
   const source=path.win32.normalize(from).toLowerCase();
   const target=path.win32.normalize(to).toLowerCase();
@@ -130,44 +323,21 @@ function moveNoReplace(from,to,{files,ownerMode,actorPid=null,nonce=null}){
     (ownerMode!=='LIVE_NEW'||
       Number.isSafeInteger(actorPid)&&actorPid>0&&UUID(nonce)),
   'C_996_OWNER_NATIVE_INVENTORY_INVALID');
-  const quoted=x=>`'${x.replaceAll("'","''")}'`;
-  const quotedSource=quoted(from.replaceAll('/','\\'));
-  const destination=quoted(to.replaceAll('/','\\'));
-  const fixedParent=quoted(LEASES.replaceAll('/','\\'));
-  const json=quoted(JSON.stringify(files));
-  const mode=quoted(ownerMode);
-  const expectedNonce=quoted(nonce??'');
-  const expectedPid=ownerMode==='LIVE_NEW'?actorPid:0;
-  // No writes/logs in the native child except the final Directory.Move.
-  // SHA, reparse, owner PID/nonce, exact entries and destination are checked
-  // inside the child immediately before that move. This is not a proof of
-  // hostile-process atomic snapshot isolation; review hold remains intact.
-  const script=[
-    "$ErrorActionPreference='Stop'",
-    `$s=${quotedSource};$d=${destination};$parent=${fixedParent}`,
-    `$expect=ConvertFrom-Json -InputObject ${json}`,
-    `$mode=${mode};$nonce=${expectedNonce};$actor=${expectedPid}`,
-    "if(-not [string]::Equals([IO.Path]::GetDirectoryName($s),$parent,[StringComparison]::OrdinalIgnoreCase) -or -not [string]::Equals([IO.Path]::GetDirectoryName($d),$parent,[StringComparison]::OrdinalIgnoreCase)){throw 'NOT_SAME_PARENT'}",
-    "foreach($p in @('E:\\','E:\\ZGmini','E:\\ZGmini\\automation','E:\\ZGmini\\automation\\pc-maintenance',$parent,$s)){ $i=Get-Item -LiteralPath $p -Force -ErrorAction Stop; if(-not $i.PSIsContainer -or (($i.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)){throw 'REPARSE_OR_NON_DIRECTORY'} }",
-    "if($null -ne (Get-Item -LiteralPath $d -Force -ErrorAction SilentlyContinue)){throw 'DEST_EXISTS'}",
-    "$expectedNames=@($expect.PSObject.Properties.Name | Sort-Object)",
-    "$actualNames=@(Get-ChildItem -LiteralPath $s -Force | ForEach-Object {$_.Name} | Sort-Object)",
-    "if($actualNames.Count -ne $expectedNames.Count){throw 'INVENTORY_COUNT'}",
-    "for($j=0;$j -lt $actualNames.Count;$j++){if($actualNames[$j] -cne $expectedNames[$j]){throw 'INVENTORY_NAMES'}}",
-    "foreach($n in $expectedNames){$f=Join-Path $s $n;$i=Get-Item -LiteralPath $f -Force -ErrorAction Stop;if($i.PSIsContainer -or (($i.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)){throw 'FILE_REPARSE'};$observed=(Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant();if($observed -cne $expect.$n){throw 'PIN_DRIFT'}}",
-    "$owner=Get-Content -LiteralPath (Join-Path $s 'owner.json') -Raw -Encoding UTF8 | ConvertFrom-Json",
-    "if($null -eq $owner -or $null -eq $owner.pid -or [int]$owner.pid -le 0){throw 'OWNER_PID_INVALID'}",
-    "if($mode -ceq 'LIVE_NEW'){if([int]$owner.pid -ne $actor -or $owner.nonce -cne $nonce -or $null -eq (Get-Process -Id $actor -ErrorAction SilentlyContinue)){throw 'NEW_OWNER_DRIFT'}}",
-    "if($mode -ceq 'DEAD_OLD'){if([string]::IsNullOrEmpty($owner.nonce) -or $null -ne (Get-Process -Id ([int]$owner.pid) -ErrorAction SilentlyContinue)){throw 'OLD_OWNER_LIVE'};foreach($n in @('PREPARED.json','WORKFLOW_ENABLE_ATTEMPTED.json','BACKLOG_CLOSE_ATTEMPTED.json')){$marker=Get-Content -LiteralPath (Join-Path $s $n) -Raw -Encoding UTF8 | ConvertFrom-Json;if($marker.ownerNonce -cne $owner.nonce){throw 'OLD_NONCE_DRIFT'}}}",
-    "if($mode -ceq 'DEAD_INSTALL' -and $null -ne (Get-Process -Id ([int]$owner.pid) -ErrorAction SilentlyContinue)){throw 'INSTALL_OWNER_LIVE'}",
-    "[IO.Directory]::Move($s,$d)",
-  ].join(';');
-  try{execFileSync(PS,['-NoProfile','-NonInteractive','-Command',script],{
-    encoding:'utf8',windowsHide:true,timeout:30_000,
-    maxBuffer:100_000,stdio:['ignore','pipe','pipe'],
-  });}catch{need(false,'C_996_OWNER_NATIVE_MOVE_UNKNOWN');}
+  let receipt;
+  try {
+    receipt=JSON.parse(execFileSync(PS,['-NoProfile','-NonInteractive','-Command',handleArchiveScript()],{
+      input:JSON.stringify({operation:'move',root:LEASES,source:from,destination:to,pins:files,ownerMode,actorPid,nonce}),
+      encoding:'utf8',windowsHide:true,timeout:30_000,maxBuffer:100_000,stdio:['pipe','pipe','pipe'],
+    }));
+  } catch {need(false,'C_996_OWNER_NATIVE_MOVE_UNKNOWN');}
+  require996OwnerArchiveReceipt(receipt);
   need(absent(from)&&fs.lstatSync(to).isDirectory(),
     'C_996_OWNER_NATIVE_MOVE_POSTCHECK_UNKNOWN');
+}
+
+export function require996OwnerArchiveReceipt(receipt){
+  need(receipt?.ok===true&&receipt.sourceHandleBound===true&&receipt.noReplace===true,
+    /^C996_NATIVE_[A-Z0-9_]+$/.test(receipt?.code??'')?receipt.code:'C_996_OWNER_NATIVE_MOVE_UNKNOWN');
 }
 
 function gitContentAtCommit(relFile,commit){
@@ -250,9 +420,9 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
     originalWindows();
     need(H40(manifestCommitSha),'C_996_OWNER_MANIFEST_COMMIT_REQUIRED');
     // REVIEW HOLD: The dependency import closure has not been independently
-    // authenticated before the first dynamic import. The native child now
-    // checks pinned source inventory, but its real Windows race behavior and
-    // original-PC approval binding have not been verified. This candidate is
+    // authenticated before the first dynamic import. The native child passed
+    // isolated Windows archive checks. Original-PC approval and the complete
+    // launcher-to-operator path still need verification. This candidate is
     // intentionally NEVER executable, even with a future signed manifest and
     // exact Owner consent. Remove only after separate review and approval.
     need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED');
