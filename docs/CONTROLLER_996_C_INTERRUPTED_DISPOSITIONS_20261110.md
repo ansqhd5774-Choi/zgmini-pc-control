@@ -60,6 +60,13 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 관련 소스·부정 회귀 **43/43 PASS**(이전 39건 + 새 4건). 이는 원본 Windows 실물 replays·C Claim provenance·설치 소스 postcheck를 대신하지 않는다. 현재 변경은 Draft의 소스 전용이며 기존 R1 읽기 패키지·봉인 ZIP·실행 CMD는 수정하지 않았다.
 - 신규 C 인계는 과거 PID/nonce를 재사용하지 않고 **별도 continuation claim**을 요구한다. 구 C Claim의 SHA/존재·미등록 파일, 모든 marker, 오래된 PID와 새 Writer 경합, 전체 원본 원장/결과쌍을 독립 고정한 다음에야 범위 고정된 새 C 승인 절차를 설계할 수 있다. 원본 C Claim·Install Lease 이동 금지.
 
+### 후속 단회 읽기 전용 증거 R2 — 소스·ZIP 후보, Windows 미실행
+
+- 신규 패키지 `zgmini-996-interrupted-evidence-r2.zip`은 기존 C Operator 또는 이전 R1 상태 관측 CMD를 수정하지 않는 **별도 8파일 ZIP**이다. `RUN_996_INTERRUPTED_EVIDENCE_R2_ONCE.cmd`가 고정 Windows PowerShell에서 CLI SHA를 검사하고, CLI가 봉인된 **5개 모듈과 import closure**를 SHA/source-lock으로 확인한다. 이후 R2 관측기 **자체가 같은 프로세스의 기존 14/14 R1 물리 상태 검사를 재수행**하므로 외부에서 주입한 과거 14/14 JSON은 운영 판정에 사용할 수 없다. 콘솔만 사용하고 TXT·로그·임시·원본 E: 기록을 만들지 않는다.
+- 한 번에 추가 관측할 항목은 **원본 C Claim/세 marker의 각 SHA·파일 identity**, Claim 디렉터리의 미승인 파일 여부, 살아난 기존 PID/새 continuation claim·archive 충돌, **실물 Backlog SHA·replays 건수/원본 Issue 번호/단순 상태/관련 replay Issue 번호**, Controller 설치/Stage/Maintainer 각 파일 바이트와 봉인된 로컬 manifest 해시의 부합이다. Claim nonce/원문 request body/토큰/파일 원문은 출력하지 않는다. 전후 독립 스냅샷의 SHA·mtime/file identity를 대조한다.
+- 반환의 `DONE`은 **재생 원장 문자열**일 뿐 실제 결과 성공이나 재발행 Issue 인증이 아니다(`replayStatusIsNotExecutionProof=true`). `sourceManifestHashPostcheckVerified=true`도 **로컬 봉인 manifest 대비 소스 바이트 일치**만 뜻하며 Git commit 원문과의 완전 교차검증은 아직 수행하지 않아 `fullSourceBytePostcheckVerified=false`다. C Claim의 역사적 작성자·소유권 외부 승인 역시 미완료(`claimProvenanceExternallyPinned=false`), 모든 경우 `executionAuthorized=false`, 운영 쓰기 0이다.
+- R2 ZIP SHA256 `dec06d8d402f68e84eb06893ed8db532e4d799cb4d6b68a3c292a8ad8d44fca9`; 내부 구성 8개·원문 바이트 **8/8 일치**. CMD SHA256 `7f62991a8d50aa5a27bebd37c8d5999a71230eb68716c2f3d6bdf7581d7e5c90`, CLI SHA256 `1dfb2f0101a6406ba6bf7dc8acb8ec8f14cc31fdf02a02afa825ff733b9b6dfe`, source-lock SHA256 `cef975fbfcf0c608144a5d3de9162e0fb05e4ec1aada0b72cba2f5a9328b6ce6`. 관련 소스 단위·패키지 부정 시험 **13/13 PASS**, 기존 총 43건과 합계 **56/56 PASS**. **원본 Windows의 R2 실행·실제 결과는 아직 0건**이다. R2 실행 결과를 받더라도 C 재실행·Claim/Lease 이전은 별도 승인 없이는 금지한다.
+
 ## 후속 C 단계 설계 (source-only, 실행 금지)
 
 - 단일 후속 복구는 **이미 시도한 Workflow PUT과 backlog rename을 반복하지 않는다.** 다른 상태가 발견되면 먼저 원인을 분리하며 재시도하지 않는다.
