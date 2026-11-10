@@ -53,6 +53,13 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - 이 사실은 **실행 결과쌍 JSON/TXT의 부재 또는 실행 자체의 부재를 독립 증명하지 않는다**. 실물 Backlog `replays` 항목의 건수·원본별 결과를 별도 읽기로 확정하기 전까지 4건은 `OWNER_REPLAN_REVIEW_REQUIRED` **후보**이며 `DONE`, `SUCCESS`, 자동 재실행, 새 Issue 생성으로 처리하지 않는다. 네 원본 모양을 `replays={}`로 넣은 새로운 **비운영 가정 시뮬레이션**을 추가하여 전체 관련 회귀 **39/39 PASS**, 운영 결과로 오인하지 않는다.
 - **해제 차단 요소**: (1) C Claim의 외부에서 고정된 owner/PID/nonce provenance 및 소유권 인계, (2) 원본 Backlog 전체 replays·원격 result JSON/TXT와 Run 대조, (3) Controller/Stage/Maintainer 개별 실제 소스 바이트·현재 보호 상태의 별도 완전 사후검증, (4) 겹치는 Writer/Controller 활성 소유자 배제. 미충족 중에는 원본 C Claim·Install Lease 모두 보존하고 Workflow PUT/backlog rename/Issue 재발행/Lease archive 0회를 유지한다.
 
+### 중단 후 독립 리뷰로 보강한 소스 판정 (추가 운영 실행 없음)
+
+- 순수 GitHub 결과 대조기 `read996OriginalBacklogEvidence`의 `replays={}` 기본값은 **미전달된 실물 원장을 임의의 빈 재생 원장으로 취급**할 수 있었다. 이를 제거하고 호출자가 명시적 `replays` 객체를 제공하지 않으면 `C_GITHUB_ORIGINAL_REPLAYS_NOT_PROVIDED`로 GitHub 조회 전 중단한다. 명시적 빈 map 자체는 **실물 검증 증거가 아니며**, 독립 Windows SHA pin이 여전히 필요하다.
+- 종전 최상위 `READONLY_RESULTS_RECONCILED`는 `DONE` 재발행·결과쌍 부재가 미검증이어도 완료처럼 읽힐 위험이 있었다. 결과쌍 **전부 입증**(`READONLY_RESULT_PAIRS_VERIFIED`), **미입증 포함**(`READONLY_VERIFICATION_INCOMPLETE`), **요청 0건의 빈 구간**(`READONLY_EMPTY_WINDOW_VERIFIED`)을 분리하고 `verifiedCount/unresolvedCount`를 반환한다. `DONE`은 실제 replay Issue 및 결과가 검증되기 전 `PRIOR_REPLAY_UNVERIFIED`, `SKIPPED_RESULT_PRESENT`인데 원본 결과쌍이 없거나 불일치하면 `JOURNAL_INCONSISTENT`다. 모두 `executionAuthorized=false`, Issue 게시·PC 재시도 0.
+- 관련 소스·부정 회귀 **43/43 PASS**(이전 39건 + 새 4건). 이는 원본 Windows 실물 replays·C Claim provenance·설치 소스 postcheck를 대신하지 않는다. 현재 변경은 Draft의 소스 전용이며 기존 R1 읽기 패키지·봉인 ZIP·실행 CMD는 수정하지 않았다.
+- 신규 C 인계는 과거 PID/nonce를 재사용하지 않고 **별도 continuation claim**을 요구한다. 구 C Claim의 SHA/존재·미등록 파일, 모든 marker, 오래된 PID와 새 Writer 경합, 전체 원본 원장/결과쌍을 독립 고정한 다음에야 범위 고정된 새 C 승인 절차를 설계할 수 있다. 원본 C Claim·Install Lease 이동 금지.
+
 ## 후속 C 단계 설계 (source-only, 실행 금지)
 
 - 단일 후속 복구는 **이미 시도한 Workflow PUT과 backlog rename을 반복하지 않는다.** 다른 상태가 발견되면 먼저 원인을 분리하며 재시도하지 않는다.
