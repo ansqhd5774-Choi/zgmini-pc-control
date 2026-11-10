@@ -1,5 +1,15 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 신규 Windows C 단계 TEMP 7/7·29/29 네이티브 실측 — 운영 C NO-GO
+
+- 물리적으로 **별도인 Windows PC**에서 사용자가 신규 `RUN_996_WINDOWS_C_STAGE_TEMP_ONCE.cmd` 실행 후 콘솔 화면을 제출했다. 화면 `ZGMINI_996_WINDOWS_C_STAGE_NATIVE_FIXTURE_V1`, `status=ISOLATED_WINDOWS_C_STAGE_NATIVE_TEST_ONLY`, `casesPassed=7`, `checksPassed=29`, `createdFixtures=7`을 확인했다. **현재 신규 Windows C 단계 격리 fixture 7/7·29/29 PASS**로 수락하며, 아래의 최초 0/7 기록은 실측 전 이력이다.
+
+- 사용자 스크린샷 SHA256 `86ab26ab808fd2027c390c37fc24225736a5506104a1de5dc9ac186fb6f0ebb7`; 원문 화면은 GitHub에 저장하지 않고 `artifacts/controller-996/zgmini-996-windows-c-stage-native-7of7-20261111.json`에 비민감 전사·적용 범위·한계만 기록했다. 화면에는 `executionAuthorized=false`, `operatorReady=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`, `cleanupPerformed=false`. 0건 수치는 **fixture 실행기 자체 보고**이며 외부 OS 감사·원본 PC 실물 무변경 독립 증거는 아니다. 합성 TEMP root 7개는 자동 정리되지 않았다.
+
+- 새 PowerShell source에 내장된 디렉터리 이동·충돌 차단·중간 중단 조건을 **실제 Windows에서** 통과했지만, 합성 `expected.json`/`live.json`을 사용하므로 원본 84 Git 파일의 현재 상태, 원본 C Claim·Install Lease 소유권, 새로운 배타적 Claim 취득, 현재 Writer 경합, Backlog 4개 원본 Job의 결과쌍, 정확한 신규 Owner 동의·전원 중단 시 디렉터리 내구성, 운영 C operator는 **검증되지 않았다**. 사용자의 실제 PC ZIP 전체 SHA256 외부 독립 검산 화면도 없으므로 소스 확정 범위를 초과해 주장하지 않는다.
+
+- 실제 GitHub 원본 #996 재조회는 **Open·댓글 10건, 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1` 0건**, #1217/#1219/#1226/#1227 **Open 4/4·결과 댓글 0/4**. 기존 `ZGMINI_CONTROLLER_996_C_CONSENT_V1`는 이전 phase-scoped 동의여서 새 운영 C 허가가 아니다. 실제 `E:\\ZGmini` 보관 이동·Workflow PUT·Backlog 변경·원본 Issue POST·pc-job 재시도 금지. **운영 C NO-GO, 전체 진행률 80%→80%, PR Draft 유지.**
+
 ## 2026-11-11 신규 Windows C 단계 엔진 후보·7개 TEMP 격리 시험 패키지 R1 — 실측 대기
 
 - `tools/INVOKE_996_WINDOWS_C_ARCHIVE_CANDIDATE.ps1`를 **운영 무조건 STOP**인 시험 전용 PowerShell 단계 엔진으로 추가했다. `-TestOnly`·원본 `E:\ZGmini` 부재·NTFS/ReFS 고정 드라이브의 새 TEMP fixture·부모 Reparse Point 부재를 요구한다. 합성 SHA/inventory·가상 Writer·목적지 충돌을 재확인하고 `[IO.Directory]::Move`로 **old C → continuation → install 최종** 순서의 삭제 없는 이동과 `READY_TO_RELEASE_INSTALL`의 `CreateNew`/`Flush(true)`를 시험하도록 작성했다. 실패·중단 시 자동 재시도·삭제·원상 복구하지 않는다. `Flush(true)`는 파일 기록 보조일 뿐 전원 차단 때의 디렉터리 rename 내구성을 증명하지 않는다.
