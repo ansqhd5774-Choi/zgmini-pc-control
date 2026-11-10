@@ -23,10 +23,11 @@
 | `controller-996-native-consent-reader.mjs` | 인증 GET 포트로 **원본 #996**, 승인 manifest의 **정확한 Git 커밋 콘텐츠**, 승인 댓글 전 페이지를 조회. Base64 size·Git blob SHA1·댓글 중복/불완전 목록을 검증하며 `review996CConsent`에 넘길 읽기 전용 원문 증거 생성 | 소스+테스트 검증, **실제 승인 manifest·사용자 작성자 댓글 없음** |
 | `controller-996-native-approval-readiness.mjs` | **원본 R1 관측 + 현재 R2 보호 지문 + GitHub 원본 소유자 SHA 고정 승인 증거**를 순서대로 검증한 뒤 C 트랜잭션 계약에 입력. 승인 없거나 값이 어긋나면 `C_NOT_READY`, 모두 일치해도 `executionAuthorized=false` | 순수 읽기 전용 연결. 실제 owner 승인·원본 PC 인증 관측·C 실행 진입점 **없음** |
 | `controller-996-native-fresh-preflight.mjs` | 원본 승인 R1/R2의 역사적 시각을 유지하고, 새로운 원본 Windows 실측의 7 raw SHA·16개 정상 검사·보호 Task 2개 활성화 확인. 자기 Claim 생성 이후는 자기 nonce/PID를 검증하면서 기존 Claim 부재 조건 하나만 예외 처리 | 실행 전/Claim 직후 전용 읽기 모듈. 실제 C 진입점과 운영 재측정은 **미완료** |
+| `controller-996-native-postcheck.mjs` | `BACKLOG_CLOSED`·`ORIGINAL_LEASE_ARCHIVED`·`FINAL_ARCHIVED` 각 단계에서 경로별 원본 lease SHA·자기 Claim/영구 마커·원본 정적 파일 4개 SHA·Backlog 신규 SHA/종료 상태·GitHub Workflow active·현재 R2 지문과 Task enabled를 독립 재조회. 변경 전제와 충돌하는 옛 R1/활성 Claim 전용 검증 함수 재사용 금지 | **물리 상태 확인만 수행하는 읽기 전용 소스**. 원본 GitHub 개별 Job의 처리 결과 검증·설치된 전체 소스 7개 재해시·실제 C 실행기·실PC 검증은 별도로 남음. 성공해도 `executionAuthorized=false` |
 | `controller-996-native-writer-gate.mjs` | 원본 PC 고정 5개 초기 파일 SHA, 사망 owner·원본 install lease, 현재 C claim nonce/PID, 설치된 유지보수기 7개 파일의 실제 SHA와 커밋 Git 원문 대조. 백로그 변경 직전 호출 시 해시 변동 즉시 중단 | **협조적 Writer만** 배제하는 읽기 전용 소스 부품, 실제 C 연결·원본 PC 검증 **미실행** |
 | `controller-996-r2-evidence-review.mjs` | 실제 R2 개별 SHA·존재/부재·Task 활성 상태로 최초 64자리 fingerprint 재계산 및 완료/승인 오인 차단 | 사용자 전달 R2 값 재계산 PASS, 실운영 재실측은 아님 |
 
-2026-11-10 #996 대상 회귀 **123/123 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
+2026-11-10 #996 대상 회귀 **130/130 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
 
 ### 추가 관측 R1 ENOENT 진단 및 R2 보완
 
@@ -55,6 +56,7 @@
 - `controller-996-native-approval-readiness.mjs`는 위 증거가 갖춰질 경우 **R2 보호 상태 검증 → SHA 바인딩된 owner 승인 검증 → 원본 R1과 C 계약 검증**을 합성해 `READONLY_APPROVAL_AND_R1_R2_CONTRACT_REVIEWED`만 반환하도록 추가했다. 가짜 승인 fixtures, 승인 누락, R1/R2 값 변조, 역사적 미입증 항목 삭제, PC·네트워크 운영 호출 존재 검사를 각각 통과했다. 추가 **4건**, 전체 **116/116 PASS**. 유효한 테스트용 승인도 운영 실행 권한을 발급하지 않는다.
 - 독립 소스 검토 후 실제 R2에서 **두 보호 Task 모두 enabled=true**였던 조건을 `r2-evidence-review`, `c-consent-verifier`, `c-transaction`에 명시했다. Task가 disabled로 바뀐 상태를 승인 manifest 안에 거짓으로 동기화해 통과시키는 경로를 차단한다. 테스트 승인 댓글은 실제 owner 승인이 아닌 **synthetic fixture**이며, 합성 검증은 인증된 원본 Windows 최신 재조회 없이 실행 권한이 되지 않는다.
 - **단계별 검증 충돌 해소:** 승인용 R1/R2 역사 관측과 실행 직전의 새 관측은 시각이 달라야 정상이다. 기존 R1 프로브의 복구 Claim 부재·Workflow 비활성·Backlog 미종료 조건은 전체 과정에 재사용할 수 없다. 신규 `native-fresh-preflight`는 첫 쓰기 전 원본 16/18·7 SHA·보호 Task 2개를 대조하고, Claim 생성 직후는 자기 nonce/PID만 인증해 해당 1개 체크를 예외로 허용하되 다른 정상 체크는 유지한다. 시각 역전·소유권 이탈·상태 drift 오류 주입 등 신규 **7/7 PASS**, 전체 **123/123 PASS**. Workflow/Backlog 변경 후에는 별도 단계별 사후 재조회가 필요하다.
+- **단계별 독립 사후 검증 구현:** `controller-996-native-postcheck.mjs`는 Workflow 활성화·Backlog 종료·두 lease 순차 보관이라는 각 단계의 **변경된 정상 상태**에 맞춰 원본 Windows 파일/마커/보호 Task/Workflow GET을 독립 재조회한다. 최종 보관 후에는 활성 자체 Claim을 요구하지 않으며, 이전 원본 owner가 계속 비활성인지 검사한다. 원본 SHA·마커 nonce·Backlog 신규 SHA·Workflow 상태·Task disable·보관 경로 오류 주입 신규 **7/7 PASS**, 누적 **130/130 PASS**. 다만 이는 물리상태 증명으로 한정되며, 원본 GitHub `pc-job` 결과 재조회에서 **개별 미확인 Job을 성공으로 단정하지 않음**. 본 검증만으로 GitHub 재조정·C 트랜잭션·실제 Windows 복구 완료를 선언하지 않는다.
 
 ## 승인 출처 — 현재 엄격한 경계
 
