@@ -85,7 +85,9 @@ function fixture(phase){
     originalRequestId:REQ,continuationRequestId:ID,
     readOnly:true,twoSnapshotsIdentical:true,fresh:true,
     conflicts:{workflowState:'active',protectionVerified:true,
-      writerActiveCount:0,controllerActiveCount:0,otherContinuationCount:0},
+      scope:'CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES',
+      foreignInstallOwnerCount:0,otherContinuationCount:0,
+      twoSnapshotsIdentical:true,fresh:true},
     paths,continuationOwner,ready,
   },pins:clone(PINS)};
 }
@@ -129,13 +131,25 @@ test('missing snapshot, stale CAS, changed original request, and wrong UUID stop
   }
 });
 
-test('active Writer, Controller, another continuation or protection drift stop',()=>{
-  for(const alter of [c=>{c.writerActiveCount=1;},
-    c=>{c.controllerActiveCount=1;},c=>{c.otherContinuationCount=1;},
-    c=>{c.workflowState='disabled';},c=>{c.protectionVerified=false;}]){
+test('only overlapping installation or continuation conflicts and protection drift stop',()=>{
+  for(const alter of [c=>{c.foreignInstallOwnerCount=1;},
+    c=>{c.otherContinuationCount=1;},
+    c=>{c.scope='ALL_WRITERS';},c=>{c.twoSnapshotsIdentical=false;},
+    c=>{c.fresh=false;},c=>{c.workflowState='disabled';},
+    c=>{c.protectionVerified=false;}]){
     const x=fixture('CONT');alter(x.snapshot.conflicts);
     reject(x,'C_DISPOSITION_CONFLICT_OR_PROTECTION_UNKNOWN');
   }
+});
+
+test('unrelated Writer and Core activity never becomes a blanket C archive gate',()=>{
+  const x=fixture('CONT');
+  x.snapshot.conflicts.writerActiveCount=7;
+  x.snapshot.conflicts.controllerActiveCount=6;
+  const r=classify(x);
+  assert.equal(r.phase,PHASE.AFTER_CONT);
+  assert.equal(r.status,'C_DISPOSITION_SNAPSHOT_CLASSIFIED_ONLY');
+  assertBounded(r);
 });
 
 test('untrusted or missing original and continuation SHA pins stop',()=>{
