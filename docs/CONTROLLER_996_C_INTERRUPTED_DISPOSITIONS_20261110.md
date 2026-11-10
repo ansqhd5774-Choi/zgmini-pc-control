@@ -1,5 +1,17 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 C 복구 동시성·원본 4 Job GET 보완 — 소스 242/242, 실제 복구 NO-GO
+
+- **이번 신규 10개 소스/시험 파일은 격리 프로토타입과 GET 전용 판독 구성요소이며 실제 운영 C 실행기가 아니다.** `controller-996-c-exclusive-reservation-fixture.mjs`는 Linux 임시 디렉터리에서 고정 예약 위치의 원자적 생성과 서로 다른 UUID 2개 동시 경합을 검증하여 **1 승자·1 BUSY, 12/12 PASS**를 재현했다. 이는 Windows 현장 독립 CAS나 충돌 후 예약 해제 계약을 증명하지 않는다. **고정 예약 디렉터리는 기존 승인된 Effects에 없는 신규 쓰기 효과**이므로 신규 Owner 정확 승인 전에 운영에 도입할 수 없다.
+
+- `controller-996-c-physical-fixture-readback.mjs`는 운영과 같이 동일 부모 `leases`에서 6개 합성 중단 상태를 실제 파일 바이트 SHA256로 재확인하고 하드링크·심볼릭링크·Writer 변경·다른 UUID·이중 판독 드리프트를 차단한다. **Linux 임시 경로 합성 12/12 PASS**로 실제 원본 Windows 독립 관측/동일 부모 Native MOVE 실증은 아니다. 과거 Windows TEMP 7/7·29/29은 실제 네이티브 증거이지만 부모 위치가 운영과 다르다.
+
+- `controller-996-authenticated-github-get.mjs`는 GitHub Actions 기본 **설치형 `GITHUB_TOKEN`**을 `GET /installation/repositories`로 확인하도록 보완했고, Owner 개인 사용자 GET와 구분한다. `controller-996-native-continuation-consent-reader.mjs`는 설치형 GET 독립 판독과 **실제 Owner 작성 신규 승인 댓글**을 별개로 요구한다. `controller-996-original-four-jobs-readonly.mjs`는 #1217/#1219/#1226/#1227 원본 requestId·chatId·operation·source SHA와 결과 댓글을 두 번 GET하는 **읽기 전용 분류기**이며 실제 서버의 전체 Backlog/Writer 대조가 아니다. 원본 4개 Issue의 **본문 JSON 의미 필드**를 검증하며 임의의 공백/필드 순서까지 고정하는 원문 바이트 SHA는 아니다.
+
+- 독립 감사 P0에 따라 두 reader에서 `auth.testOnly===false`를 반드시 확인하고 누락 플래그/시험용 출처를 실패 처리했다. **이번 전체 #996 정적/합성 회귀 242/242 PASS**, 위 10개 신규/수정 파일 원격 브랜치와 로컬 내용 **10/10 일치**. 실제 인증 토큰으로 GET 호출·실제 Windows 원본 상태 조회·보관 이동·Workflow PUT·Backlog 변경·Issue POST·pc-job 재실행은 **모두 0회**. 별도 신규 C 승인 **0건**이므로 **Draft/운영 C NO-GO, 전체 운영 80%→80%**.
+
+- **다음 필수 P0:** 운영 PC 신뢰된 독립 물리 관측과 Writer/Backlog provenance → 실제 Windows 동일 부모 원자 이동 및 복수 C 시도 배타성/재시작 검증 → 새 reservation 효과를 포함한 정확한 변경 범위·불변 소스/패키지/Lock 해시 봉인 → 원본 #996 Owner의 별도 정확 승인. 현재 운영 실행·기존 C Consent 재사용은 금지한다.
+
 ## 2026-11-11 실제 C 운영 승인 전 신규 GET 인증 어댑터·중단 상태 분류 — 소스 검증 205/205
 
 - **이번 변경은 실제 C 복구 실행기가 아니라 다음 실행기의 읽기 전용 구성요소**다. `tools/controller-996-authenticated-github-get.mjs`는 `api.github.com` 고정 원본에서 계정명+숫자 ID·비공개 제어 저장소를 확인하고, 원본 #996 Issue/댓글 전체 페이지 및 새 불변 Manifest 40hex commit 경로에 한한 **GET 요청**만 제공한다. 토큰을 로깅하지 않고, 외부 리디렉션·응답 URL 변경·예상치 못한 메서드/경로·HTTP 비200·JSON 불일치·초과 크기 스트림을 차단한다. 주입식 `fetchImpl`은 `testOnly:true`에서만 허용한다. 이 함수의 `readOnly:true`는 사용 API가 GET뿐이라는 의미이며 토큰 자체의 서버 쓰기 권한 부재를 증명하지 않는다. 실제 GitHub 인증 호출은 **이 턴 수행하지 않았다**. 독립 가짜 fetch 테스트 8/8 PASS.
