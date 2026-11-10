@@ -42,6 +42,7 @@ function fixture(){
       approvalManifestSha256:'98c76160e08f25187cee2b5d6c5bfa843bb589edc7a9bdd45a6713f92824ed94'}),
     updated_at:'2026-11-10T05:21:34Z',state:'open'},
     comments:[],secondComments:null,badBlob:false,authorized:true,
+    readerKind:'OWNER_USER_GET',testOnly:false,
     calls:[],listRounds:0,issueReads:0,commentCountOverride:null,
     secondIssue:null};
   const approved=()=>({id:9001,user:{...owner},
@@ -50,8 +51,13 @@ function fixture(){
     updated_at:'2026-11-11T00:00:00Z'});
   current.comments=[approved()];
   const githubReader={
-    authenticateReadOnly:async()=>({actor:current.authorized?OWNER:'someone-else',
-      repository:REPO,private:true,readOnly:true,executionAuthorized:false}),
+    authenticateReadOnly:async()=>({kind:current.readerKind,
+      actor:!current.authorized?'someone-else':
+        current.readerKind==='INSTALLATION_REPOSITORY_GET'?
+          'github-app-installation':OWNER,
+      ownerAccountId:327938088,repository:REPO,repositoryId:1442936296,
+      private:true,readOnly:true,executionAuthorized:false,
+      testOnly:current.testOnly}),
     get:async url=>{
       current.calls.push(url);
       if(url==='issues/996'){
@@ -151,6 +157,21 @@ test('a Git ref name rather than pinned 40-hex commit is rejected',async()=>{
 });
 test('untrusted GitHub reader identity is rejected',async()=>{
   const f=fixture();f.current.authorized=false;
+  await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
+});
+test('installation GET identity is separate from human owner consent',async()=>{
+  const f=fixture();f.current.readerKind='INSTALLATION_REPOSITORY_GET';
+  const r=await f.reader().readOnce({manifestCommitSha:COMMIT});
+  assert.equal(r.status,'C_CONTINUATION_CONSENT_EVIDENCE_REVIEWED_ONLY');
+  assert.equal(r.consentCommentId,9001);
+  assert.equal(r.executionAuthorized,false);
+});
+test('synthetic test GET origin may not stand in for independent consent',async()=>{
+  const f=fixture();f.current.testOnly=true;
+  await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
+});
+test('unrecognized reader token identity kind fails closed',async()=>{
+  const f=fixture();f.current.readerKind='UNKNOWN_AUTHENTICATION';
   await failure(f,'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
 });
 test('approval from a different user ID is not owner consent',async()=>{
