@@ -54,8 +54,9 @@ function valid(){
       replayDispatches:0,originalIssues:[1217,1219,1226,1227].map(issueNumber=>({
         issueNumber,state:'open',resultVerified:false,
         nextAction:'OWNER_REPLAN_REVIEW_REQUIRED'}))},
-    conflicts:{controllerActiveCount:0,writerActiveCount:0,
-      otherContinuationCount:0,fresh:true},
+    conflicts:{scope:'CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES',
+      foreignInstallOwnerCount:0,otherContinuationCount:0,
+      twoSnapshotsIdentical:true,fresh:true,writerActiveCount:0},
   };
 }
 test('stale consent effects releasing install before continuation are invalid',()=>{
@@ -134,10 +135,23 @@ test('four unresolved issues cannot be marked successful or replayed',()=>{
   const y=valid();y.remote.replayDispatches=1;
   assert.equal(check(y).code,'C_CONTINUATION_ORIGINAL_ISSUE_RECONCILIATION_INVALID');
 });
-test('late Writer or Controller contention blocks the review',()=>{
-  for(const prop of ['writerActiveCount','controllerActiveCount',
-    'otherContinuationCount']){
+test('foreign install owner or overlapping C contention blocks the review',()=>{
+  for(const prop of ['foreignInstallOwnerCount','otherContinuationCount']){
     const x=valid();x.conflicts[prop]=1;
+    assert.equal(check(x).code,
+      'C_CONTINUATION_SHARED_RESOURCE_CONFLICT_OR_UNKNOWN');
+  }
+});
+test('unrelated Writer activity does not block lease-only recovery review',()=>{
+  const x=valid();x.conflicts.writerActiveCount=9;
+  const r=check(x);
+  assert.equal(r.status,'C_CONTINUATION_EVIDENCE_SHAPES_REVIEWED_ONLY');
+  assert.equal(r.executionAuthorized,false);
+});
+test('unscoped, stale, or single-snapshot conflict evidence is rejected',()=>{
+  for(const [key,value] of [['scope','ALL_WRITERS'],['fresh',false],
+    ['twoSnapshotsIdentical',false],['foreignInstallOwnerCount',undefined]]){
+    const x=valid();x.conflicts[key]=value;
     assert.equal(check(x).code,
       'C_CONTINUATION_SHARED_RESOURCE_CONFLICT_OR_UNKNOWN');
   }
