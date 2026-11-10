@@ -116,8 +116,12 @@ async function verifyReportPair(api,entry,marker){
  * times must come from independently pinned original-Windows readback.
  * No incomplete query is converted into successful evidence. */
 export async function read996OriginalBacklogEvidence({api,pausedAt,resumedAt,
- replays={}}={}){
+ replays}={}){
  need(typeof api==='function','C_GITHUB_AUTHENTICATED_READER_REQUIRED');
+ // An omitted replay journal is UNKNOWN, never an empty journal.
+ // The caller must independently pin the ORIGINAL Windows backlog bytes.
+ need(replays!==null&&typeof replays==='object'&&!Array.isArray(replays),
+  'C_GITHUB_ORIGINAL_REPLAYS_NOT_PROVIDED');
  const start=at(pausedAt),end=at(resumedAt);
  need(Number.isFinite(start)&&Number.isFinite(end)&&end>=start,
   'C_GITHUB_PAUSE_WINDOW_INVALID');
@@ -143,14 +147,41 @@ export async function read996OriginalBacklogEvidence({api,pausedAt,resumedAt,
   const markers=comments.filter(c=>c.user?.login==='github-actions[bot]')
    .map(c=>receipt.exec(c.body)).filter(Boolean);
   need(markers.length<=1,'C_GITHUB_RESULT_RECEIPT_AMBIGUOUS');
-  const verification=markers.length?
-   await verifyReportPair(api,entry,markers[0]):
-   Object.freeze({status:entry.disposition,code:'NO_VERIFIED_RESULT_PAIR'});
+  const journal=replays[String(entry.originIssue)];
+  let verification;
+  if(journal?.status==='DONE'){
+   // A posted replay requires independent identity and result verification
+   // of the *replay Issue*. A result on the original Issue is not enough.
+   verification=Number.isSafeInteger(journal.replayIssueNumber)&&
+    journal.replayIssueNumber>0?
+    Object.freeze({status:'PRIOR_REPLAY_UNVERIFIED',
+     code:'C_GITHUB_PRIOR_REPLAY_RESULT_UNVERIFIED'}):
+    Object.freeze({status:'JOURNAL_INCONSISTENT',
+     code:'C_GITHUB_PRIOR_REPLAY_ISSUE_INVALID'});
+  }else if(!markers.length){
+   verification=journal?.status==='SKIPPED_RESULT_PRESENT'?
+    Object.freeze({status:'JOURNAL_INCONSISTENT',
+     code:'C_GITHUB_SKIPPED_RESULT_UNVERIFIED'}):
+    Object.freeze({status:'OWNER_REPLAN_REVIEW_REQUIRED',
+     code:'NO_VERIFIED_RESULT_PAIR'});
+  }else{
+   const pair=await verifyReportPair(api,entry,markers[0]);
+   verification=journal?.status==='SKIPPED_RESULT_PRESENT'&&
+    pair.status!=='RESULT_PAIR_VERIFIED'?
+    Object.freeze({status:'JOURNAL_INCONSISTENT',
+     code:'C_GITHUB_SKIPPED_RESULT_PAIR_INCOMPLETE'}):pair;
+  }
   entries.push(Object.freeze({originIssue:entry.originIssue,
    requestId:entry.requestId,disposition:entry.disposition,verification}));
  }
+ const verifiedCount=entries.filter(entry=>
+  entry.verification.status==='RESULT_PAIR_VERIFIED').length;
+ const unresolvedCount=entries.length-verifiedCount;
+ const status=entries.length===0?'READONLY_EMPTY_WINDOW_VERIFIED':
+  unresolvedCount===0?'READONLY_RESULT_PAIRS_VERIFIED':
+   'READONLY_VERIFICATION_INCOMPLETE';
  return Object.freeze({schema:'ZGMINI_996_GITHUB_READBACK_V1',
-  status:'READONLY_RESULTS_RECONCILED',originalIssueCount:entries.length,
+  status,originalIssueCount:entries.length,verifiedCount,unresolvedCount,
   entries:Object.freeze(entries),listingComplete:true,commentsComplete:true,
   issueScans:2,issuePosts:0,pcRetries:0,executionAuthorized:false});
 }
