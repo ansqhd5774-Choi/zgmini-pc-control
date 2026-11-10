@@ -60,6 +60,23 @@ function safeDir(root,rel){
   }
   return at;
 }
+function safeFixtureRoot(root){
+  if(typeof root!=='string'||!path.isAbsolute(root))return false;
+  const base=path.resolve(os.tmpdir()),resolved=path.resolve(root);
+  if(!resolved.startsWith(base+path.sep)||
+      !path.basename(resolved).startsWith('zgmini-996-test-'))return false;
+  try{
+    let current=resolved;
+    for(;;){
+      const st=fs.lstatSync(current);
+      if(!st.isDirectory()||st.isSymbolicLink())return false;
+      if(current===base)break;
+      current=path.dirname(current);
+      if(current.length<base.length)return false;
+    }
+    return fs.realpathSync.native(resolved)===resolved;
+  }catch{return false;}
+}
 function absent(root,rel){
   safeDir(root,path.posix.dirname(rel));
   const dest=path.join(root,...rel.split('/'));
@@ -102,11 +119,7 @@ export function simulate996WindowsArchiveAdapter({testOnly=false,root=null,
   if(!testOnly||process.platform==='win32')return error(
     'C_996_WINDOWS_ARCHIVE_PRODUCTION_DISABLED');
   try{
-    need(typeof root==='string'&&path.isAbsolute(root)&&
-      path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep)&&
-      path.basename(root).startsWith('zgmini-996-test-')&&
-      fs.lstatSync(root).isDirectory()&&
-      !fs.lstatSync(root).isSymbolicLink(),
+    need(safeFixtureRoot(root),
     'C_996_WINDOWS_ARCHIVE_FIXTURE_INVALID');
     need(plan?.schema==='ZGMINI_CONTROLLER_996_WINDOWS_ARCHIVE_PLAN_V1'&&
       plan.executionAuthorized===false&&

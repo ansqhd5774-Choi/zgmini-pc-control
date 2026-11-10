@@ -131,6 +131,7 @@ test('interruption after install lease archive preserves new continuation claim'
     // The test exposes the post-install-release crash window; it does not
     // assert that production intake is safe or execution is authorized.
     assert.equal(r.executionAuthorized,false);
+    assert.equal(f.run().code,'C_996_WINDOWS_ARCHIVE_STATE_UNKNOWN');
   }finally{f.cleanup();}
 });
 test('late Writer conflict after old C archive blocks install release',()=>{
@@ -164,6 +165,20 @@ test('a symlinked archive parent is rejected before any move',()=>{
     assert.equal(fs.existsSync(f.dir('leases/oldC')),true);
     assert.equal(fs.existsSync(f.dir('leases/install')),true);
     assert.equal(fs.readdirSync(f.dir('other-archives')).length,0);
+  }finally{f.cleanup();}
+});
+test('a symlinked intermediate fixture parent is rejected before any move',()=>{
+  const f=fixture();
+  try{
+    const actual=f.dir('actual');
+    const nested=path.join(actual,'zgmini-996-test-nested');
+    fs.mkdirSync(nested,{recursive:true});
+    fs.symlinkSync(actual,f.dir('redirect'),'dir');
+    const fakeRoot=f.dir('redirect/zgmini-996-test-nested');
+    assert.equal(f.run({root:fakeRoot}).code,
+      'C_996_WINDOWS_ARCHIVE_FIXTURE_INVALID');
+    assert.equal(fs.existsSync(f.dir('leases/oldC')),true);
+    assert.equal(fs.existsSync(f.dir('leases/install')),true);
   }finally{f.cleanup();}
 });
 test('changing a source SHA during a prior archive blocks later steps',()=>{
