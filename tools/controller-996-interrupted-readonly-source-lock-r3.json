@@ -1,0 +1,33 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_INTERRUPTED_READONLY_SOURCE_LOCK_R3",
+  "requestId": "pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+  "entries": [
+    "controller-996-interrupted-observer.mjs",
+    "controller-996-interrupted-evidence-r3.mjs"
+  ],
+  "files": {
+    "controller-996-interrupted-observer.mjs": {
+      "sha256": "41f935de3fc9f140ba4827eeab203e153c6f55100d69d606e82e9654a318a68b",
+      "imports": [
+        "controller-996-protection-attestation.mjs",
+        "controller-996-r2-evidence-review.mjs"
+      ]
+    },
+    "controller-996-protection-attestation.mjs": {
+      "sha256": "4ffb482f535f55e7ac614b08546f8d09a85b66ddc7e0698a4642ed3af275379e",
+      "imports": ["controller-996-windows-observer.mjs"]
+    },
+    "controller-996-r2-evidence-review.mjs": {
+      "sha256": "c0701bbe9a10e4c22bdd361bcdc9ec7af7a8fb86525e89509e745e5b9214124d",
+      "imports": []
+    },
+    "controller-996-windows-observer.mjs": {
+      "sha256": "471de28cbf5e3f9ff8488e4332862c1949991814da53b5c2145ae1b24ebd3fbd",
+      "imports": []
+    },
+    "controller-996-interrupted-evidence-r3.mjs": {
+      "sha256": "c13933f7aa953403d48c90cf08eb764dd4fc1ed2f323046fba0faef23fa3b8b7",
+      "imports": ["controller-996-interrupted-observer.mjs"]
+    }
+  }
+}
