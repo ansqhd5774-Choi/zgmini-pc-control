@@ -148,7 +148,7 @@ export function create996ContinuationConsentEvidenceReader({githubReader}={}){
       auth.repository===REPO&&auth.repositoryId===REPOSITORY_ID&&
       auth.ownerAccountId===ORIGINAL_OWNER_ID&&
       auth.private===true&&auth.readOnly===true&&
-      auth.executionAuthorized===false&&auth.testOnly!==true,
+      auth.executionAuthorized===false&&auth.testOnly===false,
       'C_996_NEW_CONSENT_GITHUB_ORIGIN_UNVERIFIED');
     const issue=await githubReader.get(`issues/${ISSUE}`);
     need(issue?.status===200&&issue.data?.number===ISSUE&&
