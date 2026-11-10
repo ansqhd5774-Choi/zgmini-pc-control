@@ -7,6 +7,162 @@
 - 부트스트랩은 GitHub 고정 Owner/repo ID, #996 원문 SHA, 새 Owner C 동의 댓글 이중 조회, S1 의존성 16종·S2 Manifest/SourceLock/ZIP의 Git/로컬 bytes 핀을 조회하도록 설계했으나 **원본 Windows GET 실행 실측 0**, 외부 OS `Get-FileHash` 신뢰 앵커 **0**, 동일 불변 snapshot 인계 **미구현**이다. 현재 SourceLock·승인 Manifest·완성 C ZIP을 봉인하거나 기존 운영 설치/복구 경로를 사용했다는 뜻이 아니다.
 - 전체 #996 Linux 회귀 **292/292 PASS**(격리·모의 및 소스 검사이며 운영 Windows 실행 입증이 아님). 신규 회귀는 정확한 SourceLock **16개** 공유·Owner 댓글 필드 순서가 다시 어긋나면 실패하도록 고정했다. 원본 C Claim·Install Lease·파일/원장 보존, Workflow PUT **0**, Backlog 변경 **0**, 원본 4개 Issue 재발행·재시도 **0**, 운영 PC 신규 쓰기 **0**. 기존 소스/PR은 Draft 개발 브랜치 전용. **다음 필수 과제**는 외부 OS 신뢰 앵커와 immutable handoff 설계/봉인 및 신규 명시 Owner C 승인과 실제 Windows CAS 검증이며, 그 전 **C NO-GO**, 운영 전체 단계 **4/5 = 80% → 80%**.
 
+## 2026-11-11 Native .NET 자식 내부 C 원본 재검증 보강 — 287/287 PASS, 하드 STOP 유지
+
+- Draft `tools/controller-996-c-native-owner-operator.mjs`의 보존형 이동 설계에서 `moveNoReplace(from,to,{files,ownerMode,actorPid,nonce})`를 보강했다. Windows PowerShell 자식 프로세스 안에서 **동일 leases 부모/원본 reparse 부재/목적지 없음/파일명·개수/모든 원본 SHA256/기존 PID 종료 및 Owner nonce/새 Continuation PID·nonce**를 검사하고 그 즉시 `[IO.Directory]::Move`를 한 번 호출하도록 제안했다. 호출별 pin map은 원본 10 SHA 또는 신규 marker readback으로 제한하며, install 이동을 마지막으로 유지한다.
+- 공식 Microsoft .NET `Directory.Move`는 destination exists/다른 볼륨/사용 중일 때 예외를 반환하나 **SHA 검증과 이름 이동을 하나의 원자적 트랜잭션으로 보증하지 않는다**. 정규 설치는 현재 원본 `controller-install` 잠금이 선점·복구 표시 상태인 동안 진입하지 못하고 중복 C는 fixed reservation으로 배제되지만, 동일 권한의 비협조 외부 쓰기는 아직 별도 증거가 없다. 네이티브 최신 버전 자체의 Windows TEMP 실측 **0회**이므로 PASS를 주장하지 않는다.
+- source-only 관련 테스트 72/72, 전체 #996 Node **287/287 PASS**; 수정 2파일 원격 Git blob SHA byte-match **2/2**, 마지막 source commit `bc50fa0110d7c777658973f535a4c928f01da8cb`. 원본 운영 E: 변경 0.
+- **신뢰 루트 대안:** 기존 B Source Bundle 호출은 원본 `controller-install` 잠금에 의해 순환 대기하므로 금지. 신규 부트스트랩 자체를 사용자가 Windows OS `Get-FileHash`/`certutil`로 미리 독립 해시 확인하고, 그 검증된 **외부 단일 파일**이 최초 다른 로컬 import 전 S2 Owner 동의·manifest·S1 전체 의존 바이트를 인증하는 구조를 다음 필수 구현 후보로 지정한다. 동일 ZIP의 self-check는 독립 신뢰 루트가 아니다. 아직 전용 부트스트랩·봉인 ZIP/SourceLock/S2/new Owner consent 없음.
+- `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` **무조건 하드 STOP 유지**. 강제 차단 삭제·기존 CMD 재실행·운영 Lease 이동 금지. 실제 복구 **4/5=80%→80%, C NO-GO**, PR #1222 Draft.
+
+
+## 2026-11-11 기존 B급 Source Bundle 재사용 여부 — 원본 Install 순환 대기 확인
+
+- 정규 Maintainer `16064e29...`의 `tools/source-bundle-register.mjs`, `maintenance-apply.mjs`, `update.mjs:applySourceBundleOnly` 원문을 검토했다. B급 Source Bundle 등록은 `sourceExecuted:false` 및 `host.json`의 `HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY` 계약으로, 임의 C 보관 운영기를 검증 후 실행하는 trusted bootstrap이 아니다. 해당 B 업무를 C 권한으로 재해석/재사용하지 않는다.
+- 더욱이 `update.mjs` Source Bundle 경로는 고정 `controller-install` 잠금을 먼저 획득한다. #996 구 C에서 원본 `controller-install`이 복구 마커와 함께 점유 중이므로 이 B 경로를 준비 단계로 호출하면 **같은 잠금에 순환 대기/실패**한다. 승인 없는 Controller 전체 B 재설치나 다른 브랜치 수정으로 우회하지 않는다.
+- 다음 필수 과제는 **별도 사용자 C급 검증/승인 루트**에서 실행 전에 S1/S2/Owner의 바이트를 인증할 수 있는 최소 정규 bootstrap 경로를 확정하고, 기존 원본 Install 보관 직전 Native CAS/경합 보호를 완성하는 것이다. 아직 하드 STOP 유지, 실 PC 쓰기 0, **4/5=80%→80% C NO-GO**.
+
+
+## 2026-11-11 C 설치/복구 실제 충돌 스냅샷 연결 — 287/287 PASS, 운영 80% 유지
+
+- `controller-996-c-original-stage-readonly.mjs`의 classifier 충돌 두 필드를 상수 `0`에서 **실제 각 E: 경로 inventory 판독 결과**로 연결했다. `foreignInstallOwnerCount`는 canonical `controller-install/owner.json` 원본 SHA 불일치, `otherContinuationCount`는 확인된 허용 이름 이외의 별도 continuation 존재 개수다. 2회 스냅샷 동일성 검사 후 이 값이 classifier로 전달되며, 원본 Install SHA drift·다른 C 작업은 STOP, 독립 receiver/일반 Writer 활동은 유휴 Gate가 아니다.
+- 관련 신규 테스트 2/2, 단계 판독기 12/12, 전체 `controller-996-*.test.mjs` **287/287 PASS**. 2개 파일 GitHub blob byte-match **2/2**. 마지막 변경 source commit `32c692848e5eeef78e26f02a627bd17fdd5cbeba`.
+- **남은 필수 C BLOCKER:** 별도 신뢰 실행 전 부트스트랩(Owner/S1/S2 확인 후 import), 네이티브 Move의 마지막 원본 PID·nonce·해시 CAS/경합 보호·격리 Windows 실증, SourceLock/ZIP 및 정확 신규 Owner 7-effect 동의. 현재 candidate `run996NativeOwnerCOnce`의 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 강제 STOP **유지**. 실제 기존 PC E: 쓰기 0, C **NO-GO**, 전체 **4/5=80%→80%**. 기존 PC 직접 CMD 재시도 금지.
+
+
+## 2026-11-11 원본 C Windows 실행기 **불완전 후보** 봉인 — 285/285 PASS, 운영 C NO-GO
+
+- 신규 `tools/controller-996-c-native-owner-operator.mjs` 및 `tests/controller-996-c-native-owner-operator.test.mjs`를 **Draft 소스 후보**로 기록했다. 예상 순서: 새로운 #996 Owner C 동의 + S1 실행기·의존 원문/S2 SourceLock·ZIP Git 해시 → 원본 10핀/R1/R4 → 고정 예약·새 Continuation Claim → 기존 Claim/새 Claim/Install LAST Archive → 읽기 전용 사후 검사. 테스트는 Linux 미승인·인위 승인 인자에서도 운영 쓰기 전 STOP인 경우만 검증한다.
+- **독립 감사 P0:** 로컬 의존 모듈을 최초 검증 전 동적 import하는 부트스트랩 신뢰 순서가 불충분하고, .NET Directory.Move 자식 프로세스 내부에서 이동 직전 원본 inventory SHA·실제 충돌 CAS를 독립 재검증하지 않는다. 스코프 한정 충돌 0의 실제 근거 연결과 최종 이동 뒤 정상 신규 Install owner 분류도 보강·네이티브 실증이 필요하다. SourceLock·ZIP·새 정확 Owner 승인 모두 아직 없다.
+- 이 결함 상태에서 **운영 실행 불가**하도록 `run996NativeOwnerCOnce()` 첫 동적 import 전에 `need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED')` **무조건 하드 STOP**을 넣었다. 이것은 실제 C 승인을 대체하거나 이전 Bridge의 fail-closed를 해제하지 않는다. 무단 운영 사용/하드 STOP 제거 금지. 안전 수정·관련 Windows 격리 테스트·S1/S2 완전 봉인 후 새 Owner 승인에만 진행 가능하다.
+- 신규 2/2, 전체 **285/285 PASS**. 신규 2파일 원격 Git blob SHA byte-match **2/2**, 마지막 Source commit `c6b1702347512931404272b881cbc037c2da37a0`. 원본 PC E: 변경 0·Workflow PUT 0·Backlog 0·기존 pc-job 재발행 0. 전체 **4/5=80%→80%**, PR #1222 Draft, **C NO-GO**.
+
+
+## 2026-11-11 고정 예약의 제7 C급 Effect 확정 — Draft 소스 283/283 PASS, 실제 운영 C NO-GO
+
+- 새 운영 C 복구를 위한 **제안 승인 범위**에 `CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE`를 추가했다. 같은 E: leases 부모 아래에서 proposal의 `owner.json` 단회 기록·Flush 후 고정 `controller-recovery-continuation-reservation`으로 원자적 이동하고 성공/실패 후 자동 삭제하지 않는 효과를 별도 표시한다. 단순 테스트가 아니라 실제 E: 영구 기록을 남기는 C급 효과이므로 **기존 6개 Effect의 구 Owner 승인을 확장 해석하지 않는다**. 현재 신규 7개 Effect 승인 0건.
+- `tools/controller-996-continuation-gate.mjs`와 `tests/controller-996-continuation-gate.test.mjs`를 수정했다. 신규 예약 효과가 빠지거나 임의 cleanup 효과가 추가된 동의 제안은 테스트에서 거부된다. 관련 포함 전체 **283/283 PASS**; 원격 변경 2개 파일 Git blob 바이트 일치 **2/2**, 마지막 소스 commit `4bff74dac3a51888480f51e352ad50ab6cebf100`.
+- 실제 Windows 운영 엔트리포인트·실제 코드/ZIP/Source Lock 해시 봉인·해당 SHA를 명시한 #996 신규 Owner 정확 동의는 **아직 존재하지 않는다**. 10개 화면 SHA는 실행 직전 CAS가 아니며, 원본 PC E: 변경 0·GitHub Workflow/Backlog 변경 0. 기존 CMD 재시도 및 현재 Claim/Install 이동 금지. 전체 **4/5=80%→80%**, PR #1222 Draft, **C NO-GO**.
+
+
+## 2026-11-11 단계별 원본 Git 84바이트 R4 재연결 — 282/282 PASS, 실제 C 실행 NO-GO
+
+- 새 단계별 E: 2회 판독기 `controller-996-c-original-stage-readonly.mjs`가 기존 봉인된 R4 `verify996OfflineGitBytesReadOnly`와 원문 `controller-996-git-byte-offline-manifest-r4.json`을 **각 단계의 두 스냅샷마다 재사용**하도록 연결했다. 각 읽기마다 installed 38·staged 39·maintainer 7 = 84 실제 파일이 Git blob·SHA256 원문과 일치해야 하며, 실패·출처 위장·원문 누락 시 STOP. 격리 testOnly는 `sourceBytesVerified=false`, 실제 원본 Windows R4 성공에서만 true로 보고하지만 어떤 경로도 `executionAuthorized=true`를 만들지 않는다. 원본 PC 실측은 여전히 0회.
+- 관련 신규/수정 테스트 **10/10**, 전체 Node **282/282 PASS**. 2개 수정 파일 원격 Git blob SHA byte-match **2/2**. 마지막 source commit `ced9b2482fdb7a33d53eec66d78794b9348a406f`.
+- 남은 운영 P0는 **C 고정 배타 예약의 정확한 소유권/수명 및 승인 Effect**, 각 이동 직전 지금 판독을 호출하는 봉인된 Windows 운영 Operator+ZIP/Source Lock, Owner의 #996 **신규 정확 승인**이다. 현재 신규 Owner 동의 0, 원본 4 jobs Open/결과 0, E: 복구 쓰기 0. 기존 구 C CMD 재시도 금지. **4/5=80%→80%, PR Draft, C NO-GO.**
+
+
+## 2026-11-11 원본 Windows 단계별 C 읽기/기존 GH Workflow GET 연결 — 281/281 PASS, 운영 C NO-GO
+
+- 신규 `tools/controller-996-c-original-stage-readonly.mjs` 및 9개 격리 테스트: 구 Claim 보관 후 원본→archive fallback, continuation/READY, Install-LAST, 고정 배타 예약 PID·nonce·SHA, 원본 10 pin, 두 번의 파일 SHA+identity, 다른 C continuation, 정상 신규 Install owner(최종 이동 뒤)를 **읽기 전용** 분류한다. 기존 `c-physical-disposition-readonly`만 재사용하고, 실제 이동/보관/권한 부여 기능은 없다. 테스트 synthetic 9/9는 Windows 원본 실측이 아니다.
+- 기존 설치형 GH GET 어댑터 `c-installed-gh-get-readonly.mjs`를 확장하여 **고정 `actions/workflows/pc-job.yml` GET만** Owner/repo ID 인증 후 동기 읽기 하도록 연결했다. 일반 consent-reader GET 포트에는 Workflow 경로를 개방하지 않았고 토큰·POST·PUT 없이 `state='active'` 및 ID/path를 검증한다. 변경 테스트 포함 전체 관련 Node **281/281 PASS**, 새/변경 4파일 원격 Git blob SHA 대조 **4/4**, 마지막 소스 commit `cf43defd36b5e3521163c3f3698dc77eb03086ec`.
+- **아직 필수 불완전:** 이 새 stage reader는 원본 PC에서 한 번도 실행되지 않았고, stage마다 실제 Git 84바이트를 다시 검증하는 연결이 없어 `sourceBytesVerified=false`, `independentAuthentication=false`, `executionAuthorized=false`다. 고정 예약의 exact 효과/영구 보존·operator/package/source-lock SHA와 신규 Owner C 승인 Manifest도 부재. 실제 C 임계 이동 직전 인증된 판독과 생산용 Windows archiver는 아직 없다. **구 C CMD 반복 실행·E: 폴더 이동·잠금 해제·Workflow PUT·Backlog 쓰기·원본 Issue 재발행 금지**. 전체 **4/5=80%→80%, PR Draft, C NO-GO**.
+
+
+## 2026-11-11 C 단계별 물리 분류 충돌 범위 수정 — 270/270 PASS, 운영 C 대기
+
+- C 단계별 **순수 판독기** `tools/controller-996-c-physical-disposition-readonly.mjs`에서도 과잉 `writerActiveCount/controllerActiveCount===0` Gate를 제거했다. 실제 중복 자원 한정 `scope=CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES`, `foreignInstallOwnerCount=0`, `otherContinuationCount=0`, `twoSnapshotsIdentical=true`, `fresh=true`만 요구한다. unrelated Writer/Core는 통과, 외부 Install owner·중첩 C·불안정 관측은 차단한다. `tests/controller-996-c-physical-disposition-readonly.test.mjs` 및 `tests/controller-996-c-physical-fixture-readback.test.mjs`에서 격리 회귀 추가·수정, 전체 **270/270 PASS**. 3개 원격 Git blob SHA 로컬 일치 **3/3**, 마지막 commit `ac9181f664e619fa3d2e44fdfd81fd71cb0236d3`.
+- 원본 `#996` 새 C 승인 여전히 **0**, 원본 4건 `#1217/#1219/#1226/#1227`는 **4/4 Open·결과 댓글 0/4**. 기존 Owner C 동의는 구 phase 범위 전용. 시험용 Fixture/Stage Helper는 여전히 실행 불가·`executionAuthorized=false`. 기존 PC E: 파일 이동·Lock 해제·Workflow PUT·Backlog·Issue 변경은 **0**.
+- **미구현 필수 연결:** 실제 E:의 단계별 2회 SHA/identity CAS(구 Claim 보관 후 archive 위치 fallback 포함), 고정 `controller-recovery-continuation-reservation` 소유 PID/nonce/수명·정확 C Effect, 각 Native Move 직전 범위 한정 독립 관측, Install-LAST 뒤 신규 정규 Install owner와 보관 원본 구분 → 운영 operator + ZIP + source lock 실제 해시 봉인 → **사용자 신규 정확 C 동의** → 기존 PC 단회 C 복구. 예약 효과가 승인 범위에 명확히 포함되지 않으면 STOP. **전체 4/5=80%→80%, PR Draft, C NO-GO.**
+
+
+## 2026-11-11 관련 자원만 C 충돌로 판정 — Draft Gate 과잉 조건 수정
+
+- 원본 승인 Maintainer 소스 `16064e29...`의 `tools/maintenance-lock.mjs`와 `tools/update.mjs`를 읽기 전용 확인했다. C 보관은 `pc-maintenance/leases/controller-recovery`·새 continuation·`controller-install` 형제 디렉터리만 변경한다. 일반 Controller Update/R6 Host B/Source Bundle B/R54 B는 **먼저 `controller-install`을 선점**하고, `receiver`는 독립 장기 lease이며 일반 Writer 데이터 lane과 여섯 Runner 활동은 C 보관 디렉터리 자체와 충돌하지 않는다.
+- 새로운 중복 충돌 점검기 파일을 만들지 않았다. 기존 `controller-996-c-original-prewrite-readonly.mjs`는 이전 C/install owner PID 종료, 10파일 SHA/identity 2회, archive·continuation 부재 및 R1 보호 검사를 이미 수행한다. 단, 아직 **신규 원본 PC 실측/실행 직전 CAS 증거가 아니다**.
+- Draft `controller-996-continuation-gate.mjs`의 모든 Writer 유휴 강제 조건을 제거하고 `scope=CONTROLLER_INSTALL_AND_C_RECOVERY_LEASES`, `foreignInstallOwnerCount=0`, `otherContinuationCount=0`, `twoSnapshotsIdentical=true`, `fresh=true`의 **해당 자원 한정** 판독으로 수정했다. unrelated Writer가 활성인 합성 시험은 허용되지만, 외부 소유자·중첩 continuation·불명확 snapshot은 계속 STOP. 이 Gate는 여전히 `executionAuthorized=false`인 순수 shape review로 실제 C 권한이 아니다. 관련 **29/29**, 전체 **268/268 PASS**, 원격 변경 3파일 byte-match **3/3**. 기존 승인 Effect 6개·원본 source/데이터/운영 설정 불변.
+- **남은 실제 필수 작업:** 현장 원본 E:/의 기동 시/각 보관 단계 직전 2회 CAS를 정규 Windows C operator에 결합하고, 고정 배타 예약과 동일 부모 원자적 archive 순서를 구현·봉인 → 정확한 Owner 신규 C 동의 → 기존 PC 1회 C 실행·사후 읽기. 승인 전 기존 잠금 변경·구 CMD 재시도·Workflow PUT·Backlog 재작성 금지. **4/5=80%→80%, PR Draft, C NO-GO**.
+
+## 2026-11-11 기존 PC 설치형 GitHub GET 인증 연결 — 실행기 미완성/C NO-GO
+
+- `tools/controller-996-c-installed-gh-get-readonly.mjs`로 원본 Windows의 고정 `gh.exe`를 통해 **GET만** 수행하고 기존 인증의 Owner 계정·비공개 Repository ID를 확인하도록 구현했다. 허용 주소는 #996·원본 Issue #1217/#1219/#1226/#1227·전체 댓글 페이지·불변 commit의 C Manifest뿐이며 token 출력/추출·POST/PUT/재발행이 없다. 기존 C 동의 리더와 원본 4건 판독에 주입할 수 있는 실제 Windows 어댑터다. 실 PC에서 신규 어댑터 실행 0회, 사용자 신규 C 승인 0건이다.
+- 신규 최소 시험 **3/3**, 전체 관련 정적·격리 시험 **265/265 PASS**, 원격 신규 소스 2개 byte-match **2/2**. **기능 완료로 계산하지 않는다.** 남은 실제 필수 구현은 Writer/Controller 현재 Lease·PID·경합 2회 읽기, 실행 직전 SHA CAS, 정확 승인·배포 바이트에 결합된 Windows C 운영 보관 실행 및 실패 시 수동 재판정이다. 기존 운영 파일 변경 0, PR Draft, **4/5=80%→80%, C NO-GO**.
+
+## 2026-11-11 기존 PC 해시 5개 화면 판독·10핀 후보 완성 — 운영 C NO-GO
+
+- 사용자가 **기존 PC** PowerShell에서 C Claim owner·Backlog·3개 진행 Marker의 SHA256을 읽기 전용으로 조회했고 5줄이 모두 정상 출력되었다. 화면 내 `BLOCKED` 없음. 스크린샷 SHA256 `b54905f5017f91c472e2e3dedfc7a8a4a3ce532e150fc6c10400e40974307b9e`, 독립 판독 2회 동일, 5/5 64hex 일치. 화면 원본 미게시, 비민감 전사와 구 R3/R4 고정 5개를 합친 **총 10개 후보 해시**를 `artifacts/controller-996/zgmini-996-original-windows-10-pin-screen-readback-20261111.json`에 기록하고 원격 바이트 재조회했다.
+- 이 값들은 사용자 제공 화면 및 과거 고정 증거의 결합이다. **새 원본 PC 독립 실행 신원·최종 실행 직전 동일한 파일 바이트·Writer/Controller 경합·신규 Owner Consent·Operator SHA/ZIP/Source Lock은 아직 미검증**. 이는 승인 Manifest 자체가 아니며 현재 C 운영 쓰기 0, 신규 승인 0, `executionAuthorized=false`다. **사용자에게 동일 5개 SHA 추가 수동 반복 요청은 하지 않는다**. 다음 필수 개발은 운영 C operator·독립 소유권/경합 CAS/중단 회복 프로토콜 및 정확 Source Lock 구현이다. PR Draft, **80%→80%, C NO-GO**.
+
+## 2026-11-11 원본 PC C 사전검증 10핀 2회 읽기 전용 소스 — **실행 전/운영 C NO-GO**
+
+- 원본 PC에서만 사용하도록 제한한 `tools/controller-996-c-original-prewrite-readonly.mjs`와 단위시험 1개를 Draft PR #1222에 추가했다. 기존 C Claim owner·Marker 3개·Install Lease 2개·Backlog·세 Source Manifest **정확히 10개 SHA/파일 식별정보 2회**, 이전 Owner PID 종료·신규 archive/continuation 부재·R1 보호 14/14·R4 Git bytes 84/84를 안전하게 판독하도록 구성했다. **아직 원본 PC에서 신규 소스를 실행한 적은 없고, CLI/CMD/ZIP도 없다.** 모의 입력에서는 진본성 증명이 되지 않는다.
+- 신규 독립 Node 시험 **6/6**, 전체 #996 정적·격리 회귀 **262/262 PASS**, 원격 소스 2파일 바이트 비교 **2/2**. 결과는 항상 `executionAuthorized=false`, 기존 PC 파일 이동·Lock 해제·Workflow PUT·Backlog·Issue 변경 **0**이다. 사전검증 소스 자체를 C급 운영 실행기로 간주하지 않는다.
+- 승인 Manifest에 필요한 원본 SHA **10개 중 고정 증거 5개 확인·현재 C Claim/Marker/Backlog 5개는 현재 원본 PC 재조회 필요**. 과거 R3에는 해시가 콘솔 출력되었으나 현 채팅/정본에는 실제 5개 값이 보존되지 않았다. 없는 해시 추정이나 초기화·재요청 금지. 설치형 A급 Core 조회는 C Claim 소유권을 독립 인증하지 못하며 원본 pc-job #1217/#1219/#1226/#1227은 **4/4 Open·결과 댓글 0/4**로 유지한다.
+- **남은 필수 단일 개발 과제:** 신규 C급 실운영 operator·독립 Claim/Writer 경합 직전 CAS·중단 복구 프로토콜과 실행 바이트/ZIP/Source Lock 봉인 → 미래 정확 Owner 승인 Manifest/댓글 → 기존 PC에서 승인된 단회 C 복구. 별도 PC 네이티브 TEMP 2-process 1/1 PASS는 재검증 불필요. 현재 원본 PC에서 구 C CMD 재시도, 파일 이동, Lease 정리 **금지**. 전체 5단계 수명주기 **4/5 = 80%→80%**, PR Draft, C NO-GO.
+
+## 2026-11-11 별도 Windows 2-process 고정 예약 경합 실측 1/1 PASS — C 운영 NO-GO
+
+- **실물 PASS:** 사용자가 새 격리 Windows PC에서 `RUN_996_WINDOWS_C_CONCURRENT_FENCE_TEMP_ONCE.cmd` 실행 콘솔을 공유했다. 결과 스키마 `ZGMINI_996_WINDOWS_C_CONCURRENT_FENCE_RESULT_V1`, status `ISOLATED_WINDOWS_C_CONCURRENT_FENCE_TEST_ONLY`, `casesPassed=1`, `processesStarted=2`, `distinctProcessIds=true`, `readyBeforeGo=true`, `fixedReservationAtomicMove=true`, `winners=1`, `busy=1`, `createdFixtures=1`. 이로써 앞선 순차 예약 10-case만으로는 미입증이었던 **서로 다른 Windows PowerShell 실제 프로세스 두 개의 동일 고정 이름 선점/경합**이 **합성 TEMP 범위에서 실측 PASS**다.
+- **근거:** 사용자 콘솔 스크린샷 SHA256 `52336ab0bc779ad9ab5d350fcbe0e9211f465cb2c8803fd12f8d26c82c41e76a`, 비민감 정규화 결과 `artifacts/controller-996/zgmini-996-windows-c-concurrent-fence-native-1of1-20261111.json`. 사용한 브랜치의 parent SHA256 `470c68479a2813f9f27ba68b49e2bbfdc2b463abb39e840948b0ac49dbec03d9`, worker SHA256 `62b3e1ff821028c0af5304640bb3505e782ed7263d95070dac1cba972bffd180`; CMD는 양 파일을 실행 전후 해시 확인한다. 이 스크린샷은 특정 실행 결과이며 실제 OS 원본 검토 기록이나 fixture 재조회 증거는 아니다.
+- **격리/영향:** 보고값 `executionAuthorized=false`, `operatorReady=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`, `cleanupPerformed=false`. 모두 시험기 자체 보고이며 **독립적인 원본 PC 무변경 감사를 대체하지 않는다**. 자동으로 지운 fixture 없음. 원래 C 단계 엔진 자체, 기존 `E:\ZGmini`의 Claim/Install/Lease, Writer, 원본 GitHub 4 Job, 중단 복구 원장, reboot 후 durability, 승인된 새로운 예약 Effect까지 실증한 것이 아니다.
+- **남은 필수 운영 Gate:** 원본 운영 Windows의 현재 소유권/실행중 프로세스/원장/Writer read-only 판정, 기존 4개 원본 pc-job Issue/Backlog/Workflow의 최신 상태 대조, 향후 C 운영 후보의 고정 예약 효과·수명·충돌 거부·원본 복구 정본 SHA 계약 확정, 그 범위에 대한 **새 Owner 정확 승인**. 승인 전 실제 원본 경로 쓰기/복구/Workflow 변경/Backlog 종료/기존 CMD 재실행 금지.
+- **추가 최신 GitHub GET 관측(2026-11-11):** 원본 4 pc-job Issue **#1217/#1219/#1226/#1227 전부 open, 댓글 각각 0**. 4건의 본문 JSON requestId/chatId/operation/sourceSha `643b7c7c4372ffad552443fc312c6cb1b944e2fc` 및 Owner `ansqhd5774-Choi`/ID `327938088`가 핀과 일치했고, 별도 comments API도 각각 0건이다. 원본 중단 #996은 open·댓글 **10건**이며 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1` 신규 정확 승인 **0건**으로 확인. 이 관측은 GitHub 연결 GET의 시점별 스냅샷이며 아직 원본 PC Runtime/원장 및 Backlog 상태의 독립 증거가 아니다. 조회 중 Issue/Workflow/Backlog/PC 쓰기 없음.
+- **판정/진행률:** 이번 Windows concurrency native `NOT_OBSERVED→PASS`, 전체 #996 C 운영 **80%→80%, NO-GO**, Draft PR #1222 유지. 아래 'Windows 네이티브 실행 0회' 표기는 **당시 이력**이며 이번 사진으로 동시성 시험의 해당 제한만 해제됐다.
+
+## 2026-11-11 새 격리 Windows 두 독립 프로세스 고정 예약 경합 시험 — 소스 256/256 PASS, 네이티브 결과 미관측
+
+- **실행 대상: 별도 신규 Windows PC만. 기존 운영 PC에서 실행 금지.** 사용자가 앞서 별도 PC에서 확인한 동일 부모 TEMP 10/10·328/328은 **순차** 예약 시험이었다. 이번에는 `TEST_996_WINDOWS_C_CONCURRENT_FENCE_NATIVE_ONCE.ps1` 부모가 서로 다른 UUID/PID의 Windows PowerShell 5.1 프로세스 두 개를 띄우고, 각 worker가 READY를 보낸 다음 단일 GO 뒤 **같은 고정 예약 디렉터리**에 `[IO.Directory]::Move`를 한 번씩 시도한다. 합격 조건은 WIN 1, BUSY 1, loser proposal 보존, winner owner와 원본 복구·설치 owner SHA256 불변이다.
+- **실행 보호:** `E:\ZGmini` 존재 시 effect 전 STOP, 고정 로컬 NTFS/ReFS `%TEMP%` GUID 내부만 쓰기, reparse 검사, `-TestOnly`, PS1 두 개의 정확한 SHA256 사전·사후 검증, 원본 PC/Workflow/Backlog/Issue 쓰기 0, rollback/kill/retry/자동 cleanup 0. CMD의 파일 단위 `Unblock-File`은 검증된 두 PS1에만 적용하고, 실행 정책을 변경하거나 Bypass하지 않는다. 부모 SHA256 `470c68479a2813f9f27ba68b49e2bbfdc2b463abb39e840948b0ac49dbec03d9`, worker SHA256 `62b3e1ff821028c0af5304640bb3505e782ed7263d95070dac1cba972bffd180`. 배포용 별도 TEMP ZIP `zgmini-996-c-concurrent-fence-windows-temp-r1.zip` SHA256 `aafdcd46a1e5d1cfdcce1b605901dd69453b19e42307e92bb5b82498a0804614`, 내부 3개 파일 압축 검사 3/3 OK.
+- **소스/검증:** 새 파일 4개 `tools/TEST_996_WINDOWS_C_CONCURRENT_FENCE_NATIVE_ONCE.ps1`, `tools/INVOKE_996_WINDOWS_C_CONCURRENT_FENCE_WORKER_TEST.ps1`, `tools/RUN_996_WINDOWS_C_CONCURRENT_FENCE_TEMP_ONCE.cmd`, `tests/controller-996-windows-c-concurrent-fence-bundle.test.mjs`를 **전용 Draft PR #1222의 작업 브랜치에만 반영**. 원격/로컬 바이트 4/4 일치, 관련 Node 회귀 256/256 PASS (신규 9/9), Windows PowerShell 직접 실행 0회. 기존 10-case 시험기와 승인 원본 운영 파일은 수정하지 않았다.
+- **Runner 확인:** 격리 Windows Runner 라벨 `zgmini-handoff-ci-isolated`는 존재하지만 현행 워크플로 67개에 **신규 #996 PowerShell 경합 시험을 실행하는 승인 경로는 없음**. 새 Workflow를 임의 설치·활성화하거나 기존 pc-job/블로그 Runner를 우회 이용하지 않는다. 즉시 실측하려면 기존과 같은 **신규 PC에서만 단회 수동 CMD**가 필요하다.
+- **한계/판정:** 이 시험은 실제 Windows의 단일 고정 이름 원자 예약 경쟁만 검증하며, 새 C Effect의 승인·원본 Windows 현재 소유권/Writer/Backlog 판독·중단 후 lease 수명·재부팅 내구성·C 운영 실행기의 준비를 증명하지 않는다. **전체 운영 복구 80%→80%, C NO-GO, 신규 #996 Owner 정확 승인 0, PR Draft 유지.** 다음 필수 행동: 새 PC TEMP 동시성 실측 1회 후 JSON/콘솔 원본 관측을 정본에 갱신하고, 원본 C 필수 상태의 최신 읽기 전용 증거를 마련한 다음 정확 승인을 재검토한다.
+
+## 2026-11-11 실제 별도 Windows 동일 부모 TEMP 네이티브 10/10·328/328 PASS — 운영 C NO-GO
+
+- 사용자가 **별도 Windows PC**에서 실행한 `RUN_996_WINDOWS_C_SIBLING_TEMP_ONCE.cmd` 콘솔 사진의 고정 결과: `ZGMINI_996_WINDOWS_C_SIBLING_NATIVE_FIXTURE_V1`, `ISOLATED_WINDOWS_C_SIBLING_TEST_ONLY`, **casesPassed=10**, **checksPassed=328**, **createdFixtures=10**, `sameParentLeaseMove=true`. 신규 10-case Windows 네이티브 격리 시험은 **이제 실측 PASS**다. 직전 섹션의 ‘실행 대기’는 당시 이력이다.
+
+- 콘솔은 `reservationFileCreateNewSequentialTested=true`와 `reservationDirectoryMoveSequentialTested=true`를 보고한다. 이것은 **단일 프로세스 내 순차 중복 예약 차단**이지 Windows 실제 복구 프로세스 2개의 동시에 시작하는 경합·fencing 증거가 아니다. 동일 부모 `[IO.Directory]::Move`가 별도 Windows의 TEMP fixture 안에서 동작했음을 보인 것이며, 기존 C 단계 엔진 자체나 실제 운영 `E:\ZGmini`의 Claim·Lease 이동 증거가 아니다.
+
+- 사용자 화면 SHA256 `9565d47631cc938e07ab0b6b82f8e0dee171f415fa8b27523cc86903ac126a69`; 비민감 전사 정본은 `artifacts/controller-996/zgmini-996-windows-c-sibling-native-10of10-20261111.json`에 저장한다. CMD가 실행 전 검증하는 PS1 SHA256 `0a00d432d34a743ab7946ee12d6a379872df48452e5702357bc3c1182f4bfe05`. 보고값은 `executionAuthorized=false`, `operatorReady=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`, `cleanupPerformed=false`. 이 0값은 **시험기 자체 보고**이며 OS 감사를 통한 운영 PC 무변경 외부 입증으로 확대하지 않는다. 10개 임시 fixture는 자동 삭제되지 않았다.
+
+- **확인된 다음 결손:** 구 R3/R4의 원본 Windows 읽기 전용 84파일/Backlog 증거를 현재 C 필수 상태에 한정해 최신 판독; 이전 중단된 원본 Claim의 역사적 소유자 증거; 지금의 Writer/Controller/Task와 4개 원본 Backlog GET 합치; 서로 다른 UUID 실제 Windows 복구 경쟁의 단일 고정 배타 예약 실증 및 실패 후 수명주기; 이 추가 신규 Effect를 반영한 source/ZIP/lock 불변 범위와 원본 #996 Owner 신규 정확 승인. **현재 GitHub #996 댓글 10건, 신규 C Consent 0건**. 과거 C 승인 재사용·운영 파일 이동·Workflow/Backlog/Issue 쓰기는 금지한다.
+
+- **진행률:** 기존 네이티브 동일 부모 시험 증거 `NOT_OBSERVED→PASS`; 전체 운영 C급 복구 **80%→80%**, 운영 **NO-GO**, PR **Draft 유지**. 다음 작업은 반복 CMD가 아니라 동일 부모 네이티브 성공을 재사용해 원본 상태/소유권/fencing 통합 후보의 **읽기 전용 구성 및 독립 검증**을 완성하는 것이다.
+
+## 2026-11-11 신규 Windows 동일 부모 이동 TEMP 시험기 — 소스 247/247, 실물 실행 대기
+
+- **실제 운영 구조 차이에 대한 직접 보완:** 기존 별도 Windows 네이티브 7/7·29/29은 `leases→archives`의 다른 부모 이동이었다. 새로운 `tools/TEST_996_WINDOWS_C_SIBLING_NATIVE_ONCE.ps1`은 원본과 같은 상대 경로 `automation/pc-maintenance/leases` 안에서 `controller-recovery→controller-recovery-archived-<원본ID>`, `controller-recovery-continuation-<UUID>→...-archived-<UUID>`, `controller-install→controller-install-recovered-<원본ID>`를 **동일 부모 [IO.Directory]::Move**로 검증하는 별도의 **TEMP 전용 원시 동작 fixture**다. 이미 검증된 기존 Windows 7-case PS1/CMD는 수정하지 않았다.
+
+- Windows 원시 동작 후보는 정상 1, 중단 지점 5, 충돌 1, 합성 Writer 1, marker 변경 1, 예약 1의 **총 10개 GUID-TEMP 시나리오**를 정의한다. 예약 시나리오는 고정 파일 `FileMode.CreateNew` 충돌 및 고유 디렉터리→고정 디렉터리 `Directory.Move` 충돌을 **각각 순차** 검증하며, Windows의 서로 다른 실제 프로세스 간 동시 경합이나 보관/예약 해제 수명주기 검증이 아니다. 실행 후 원본 파일 삭제·자동 cleanup·rollback·retry는 하지 않는다.
+
+- 새 `tools/RUN_996_WINDOWS_C_SIBLING_TEMP_ONCE.cmd`는 **PS1 SHA256 `0a00d432d34a743ab7946ee12d6a379872df48452e5702357bc3c1182f4bfe05`**를 먼저 검증하고서 `-TestOnly`를 사용한다. 실행 정책 우회가 없고 `E:\ZGmini`가 존재하는 PC에서는 중지한다. 이 사실은 운영 PC 신원 증명이나 실제 C 승인 증거가 아니다. ZIP의 별도 SHA256은 `9e30ac6ac8933faa6fa9fe339d00aa3d7682c082fc67572993c8c9a29d79494e`이며 내부 CMD·PS1 2개다. GitHub 신규 파일 3개 원격/로컬 **3/3 바이트 일치**, ZIP 무결성 **2/2 OK**, #996 관련 Node 정적·합성 회귀 **247/247 PASS**.
+
+- **Windows 실제 실행 0회:** 10/10 PASS는 아직 관측되지 않았다. 새 시험기는 과거 C 단계 엔진 전체가 아니라 **동일 부모 rename 원시 동작**만 독립 시험하므로 성공하더라도 운영 C급 실행기/E 드라이브 상태·Writer·과거 Claim 소유권·Backlog 4건·신규 Owner C 승인까지 검증한 것으로 간주하지 않는다. 기존 R3/R4 읽기 전용 원본 증거는 재사용하고 필요한 실제 변경 상태만 새로 확인한다.
+
+- **다음 단일 필수 행동:** 물리적 별도 Windows PC/격리 Runner의 새 ZIP 정확 해시 검사 및 `RUN_996_WINDOWS_C_SIBLING_TEMP_ONCE.cmd` 단회 실행 결과 JSON·시험 source hash 회수 → 실제 C 후보 소유권/fencing 설계와 현장 Writer/Backlog 독립 CAS → 신규 예약 효과를 명시한 별도 Owner 정확 승인 후에만 C급 운영 검토. 현재 실제 C NO-GO·운영 80%→80%.
+
+## 2026-11-11 C 복구 동시성·원본 4 Job GET 보완 — 소스 242/242, 실제 복구 NO-GO
+
+- **이번 신규 10개 소스/시험 파일은 격리 프로토타입과 GET 전용 판독 구성요소이며 실제 운영 C 실행기가 아니다.** `controller-996-c-exclusive-reservation-fixture.mjs`는 Linux 임시 디렉터리에서 고정 예약 위치의 원자적 생성과 서로 다른 UUID 2개 동시 경합을 검증하여 **1 승자·1 BUSY, 12/12 PASS**를 재현했다. 이는 Windows 현장 독립 CAS나 충돌 후 예약 해제 계약을 증명하지 않는다. **고정 예약 디렉터리는 기존 승인된 Effects에 없는 신규 쓰기 효과**이므로 신규 Owner 정확 승인 전에 운영에 도입할 수 없다.
+
+- `controller-996-c-physical-fixture-readback.mjs`는 운영과 같이 동일 부모 `leases`에서 6개 합성 중단 상태를 실제 파일 바이트 SHA256로 재확인하고 하드링크·심볼릭링크·Writer 변경·다른 UUID·이중 판독 드리프트를 차단한다. **Linux 임시 경로 합성 12/12 PASS**로 실제 원본 Windows 독립 관측/동일 부모 Native MOVE 실증은 아니다. 과거 Windows TEMP 7/7·29/29은 실제 네이티브 증거이지만 부모 위치가 운영과 다르다.
+
+- `controller-996-authenticated-github-get.mjs`는 GitHub Actions 기본 **설치형 `GITHUB_TOKEN`**을 `GET /installation/repositories`로 확인하도록 보완했고, Owner 개인 사용자 GET와 구분한다. `controller-996-native-continuation-consent-reader.mjs`는 설치형 GET 독립 판독과 **실제 Owner 작성 신규 승인 댓글**을 별개로 요구한다. `controller-996-original-four-jobs-readonly.mjs`는 #1217/#1219/#1226/#1227 원본 requestId·chatId·operation·source SHA와 결과 댓글을 두 번 GET하는 **읽기 전용 분류기**이며 실제 서버의 전체 Backlog/Writer 대조가 아니다. 원본 4개 Issue의 **본문 JSON 의미 필드**를 검증하며 임의의 공백/필드 순서까지 고정하는 원문 바이트 SHA는 아니다.
+
+- 독립 감사 P0에 따라 두 reader에서 `auth.testOnly===false`를 반드시 확인하고 누락 플래그/시험용 출처를 실패 처리했다. **이번 전체 #996 정적/합성 회귀 242/242 PASS**, 위 10개 신규/수정 파일 원격 브랜치와 로컬 내용 **10/10 일치**. 실제 인증 토큰으로 GET 호출·실제 Windows 원본 상태 조회·보관 이동·Workflow PUT·Backlog 변경·Issue POST·pc-job 재실행은 **모두 0회**. 별도 신규 C 승인 **0건**이므로 **Draft/운영 C NO-GO, 전체 운영 80%→80%**.
+
+- **다음 필수 P0:** 운영 PC 신뢰된 독립 물리 관측과 Writer/Backlog provenance → 실제 Windows 동일 부모 원자 이동 및 복수 C 시도 배타성/재시작 검증 → 새 reservation 효과를 포함한 정확한 변경 범위·불변 소스/패키지/Lock 해시 봉인 → 원본 #996 Owner의 별도 정확 승인. 현재 운영 실행·기존 C Consent 재사용은 금지한다.
+
+## 2026-11-11 실제 C 운영 승인 전 신규 GET 인증 어댑터·중단 상태 분류 — 소스 검증 205/205
+
+- **이번 변경은 실제 C 복구 실행기가 아니라 다음 실행기의 읽기 전용 구성요소**다. `tools/controller-996-authenticated-github-get.mjs`는 `api.github.com` 고정 원본에서 계정명+숫자 ID·비공개 제어 저장소를 확인하고, 원본 #996 Issue/댓글 전체 페이지 및 새 불변 Manifest 40hex commit 경로에 한한 **GET 요청**만 제공한다. 토큰을 로깅하지 않고, 외부 리디렉션·응답 URL 변경·예상치 못한 메서드/경로·HTTP 비200·JSON 불일치·초과 크기 스트림을 차단한다. 주입식 `fetchImpl`은 `testOnly:true`에서만 허용한다. 이 함수의 `readOnly:true`는 사용 API가 GET뿐이라는 의미이며 토큰 자체의 서버 쓰기 권한 부재를 증명하지 않는다. 실제 GitHub 인증 호출은 **이 턴 수행하지 않았다**. 독립 가짜 fetch 테스트 8/8 PASS.
+
+- `tools/controller-996-c-physical-disposition-readonly.mjs`는 원본 old C Claim·Install Lease가 남은 상태, 새 Claim 예약, 원본 C 보관 직후, READY 기록 후, 신규 continuation 보관 후, Install Lease 보관 후 등 **6가지 주입 스냅샷 위치**를 구분한다. 모든 경로에서 `executionAuthorized=false`·운영 쓰기/자동 재시도 0을 반환하며, 원본/보관 동시 존재·SHA 변경·활성 Writer·문제 있는 마커·불분명한 이동은 UNKNOWN으로 중단한다. 새 시험 12/12 PASS. 이는 입력을 외부에서 제공받는 **순수 분류기**이므로 실제 원본 Windows의 독립 인증이나 새로운 C 승인 자체가 아니다.
+
+- 기존 전체 #996 Node/정적 회귀 **185/185 → 205/205 PASS**(신규 8+12, 기존 코드 미변경). 신규 4파일 GitHub Draft 브랜치 원격 내용은 로컬 소스와 **4/4 바이트 일치** 확인. 이전 Windows TEMP 시험 **7/7·29/29**은 독립된 네이티브 증거로 유지한다. 실제 운영 PC·Workflow·Backlog·Issue/pc-job 쓰기 **0회**, 운영 **80%→80%·C NO-GO**.
+
+- **후속 P0:** 원본 E: 파일/실제 프로세스·Writer·Lease를 신뢰된 Windows 경로에서 직접 확인하는 물리적 읽기/CAS; 기존 C Claim의 독립된 소유자 provenance; 서로 다른 continuation UUID 사이 **공유 배타적 예약/fencing**(기존 Install 잠금을 마지막까지 보존); 인증 GET과 원본 4개 pc-job의 실결과/Backlog 대조; 동일 부모 `leases` 디렉터리 이동·경합/중단 실증; 실제 source/package/source-lock 해시 봉인 후 원본 #996 Owner의 **별도 정확한 신규 C 승인**. 현재 #996 신규 owner 댓글 **0건**이므로 실제 C 운영 실행/원본 설치 잠금 해제는 금지한다.
+
+## 2026-11-11 신규 Windows C 단계 TEMP 7/7·29/29 네이티브 실측 — 운영 C NO-GO
+
+- 물리적으로 **별도인 Windows PC**에서 사용자가 신규 `RUN_996_WINDOWS_C_STAGE_TEMP_ONCE.cmd` 실행 후 콘솔 화면을 제출했다. 화면 `ZGMINI_996_WINDOWS_C_STAGE_NATIVE_FIXTURE_V1`, `status=ISOLATED_WINDOWS_C_STAGE_NATIVE_TEST_ONLY`, `casesPassed=7`, `checksPassed=29`, `createdFixtures=7`을 확인했다. **현재 신규 Windows C 단계 격리 fixture 7/7·29/29 PASS**로 수락하며, 아래의 최초 0/7 기록은 실측 전 이력이다.
+
+- 사용자 스크린샷 SHA256 `86ab26ab808fd2027c390c37fc24225736a5506104a1de5dc9ac186fb6f0ebb7`; 원문 화면은 GitHub에 저장하지 않고 `artifacts/controller-996/zgmini-996-windows-c-stage-native-7of7-20261111.json`에 비민감 전사·적용 범위·한계만 기록했다. 화면에는 `executionAuthorized=false`, `operatorReady=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`, `cleanupPerformed=false`. 0건 수치는 **fixture 실행기 자체 보고**이며 외부 OS 감사·원본 PC 실물 무변경 독립 증거는 아니다. 합성 TEMP root 7개는 자동 정리되지 않았다.
+
+- 새 PowerShell source에 내장된 디렉터리 이동·충돌 차단·중간 중단 조건을 **실제 Windows에서** 통과했지만, 합성 `expected.json`/`live.json`을 사용하므로 원본 84 Git 파일의 현재 상태, 원본 C Claim·Install Lease 소유권, 새로운 배타적 Claim 취득, 현재 Writer 경합, Backlog 4개 원본 Job의 결과쌍, 정확한 신규 Owner 동의·전원 중단 시 디렉터리 내구성, 운영 C operator는 **검증되지 않았다**. 사용자의 실제 PC ZIP 전체 SHA256 외부 독립 검산 화면도 없으므로 소스 확정 범위를 초과해 주장하지 않는다.
+
+- 실제 GitHub 원본 #996 재조회는 **Open·댓글 10건, 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1` 0건**, #1217/#1219/#1226/#1227 **Open 4/4·결과 댓글 0/4**. 기존 `ZGMINI_CONTROLLER_996_C_CONSENT_V1`는 이전 phase-scoped 동의여서 새 운영 C 허가가 아니다. 실제 `E:\\ZGmini` 보관 이동·Workflow PUT·Backlog 변경·원본 Issue POST·pc-job 재시도 금지. **운영 C NO-GO, 전체 진행률 80%→80%, PR Draft 유지.**
+
 ## 2026-11-11 신규 Windows C 단계 엔진 후보·7개 TEMP 격리 시험 패키지 R1 — 실측 대기
 
 - `tools/INVOKE_996_WINDOWS_C_ARCHIVE_CANDIDATE.ps1`를 **운영 무조건 STOP**인 시험 전용 PowerShell 단계 엔진으로 추가했다. `-TestOnly`·원본 `E:\ZGmini` 부재·NTFS/ReFS 고정 드라이브의 새 TEMP fixture·부모 Reparse Point 부재를 요구한다. 합성 SHA/inventory·가상 Writer·목적지 충돌을 재확인하고 `[IO.Directory]::Move`로 **old C → continuation → install 최종** 순서의 삭제 없는 이동과 `READY_TO_RELEASE_INSTALL`의 `CreateNew`/`Flush(true)`를 시험하도록 작성했다. 실패·중단 시 자동 재시도·삭제·원상 복구하지 않는다. `Flush(true)`는 파일 기록 보조일 뿐 전원 차단 때의 디렉터리 rename 내구성을 증명하지 않는다.
