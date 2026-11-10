@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,
+import {INCIDENT,MATERIAL_KEYS,TOOL_PATHS,WRITER_TRANSITION,WRITER_FOLLOWUP,
   validatePostSwitchApproval} from '../tools/controller-postswitch-approval.mjs';
 
 const sourceSha='f'.repeat(40);
@@ -52,4 +52,36 @@ test('extraneous approval and transition fields fail exact schema',()=>{
   assert.throws(()=>check(approval,true),/POSTSWITCH_APPROVED_WRITER_TRANSITION_MISMATCH/);
   const extra=manifest(true);extra.unsanctioned=true;
   assert.throws(()=>check(extra,true),/POSTSWITCH_APPROVAL_FIELDS_INVALID/);
+});
+
+const followupManifest=()=>({...manifest(true),writerFollowup:structuredClone(WRITER_FOLLOWUP)});
+const followupEvidence=()=>({...evidence(true),writerFollowupVerified:true});
+const checkFollowup=(ap=followupManifest(),ev=followupEvidence(),sha=sourceSha)=>
+ validatePostSwitchApproval(ap,{requestId:INCIDENT.requestId,sourceSha:sha,evidence:ev});
+test('new C contract explicitly binds four B receipts and exact latest config hash',()=>{
+ const ap=checkFollowup();
+ assert.equal(ap.writerFollowup.writerB.length,4);
+ assert.equal(ap.writerFollowup.currentConfigSha256,
+   '0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453');
+ assert.deepEqual(ap.writerTransition,WRITER_TRANSITION);
+});
+test('historical C consent cannot authorize later Writer overlays',()=>{
+ assert.throws(()=>checkFollowup(manifest(true)),/NEW_CONSENT_REQUIRED/);
+ assert.throws(()=>checkFollowup(followupManifest(),evidence(true)),/FOLLOWUP_UNVERIFIED/);
+ const ap=followupManifest();delete ap.writerTransition;
+ assert.throws(()=>checkFollowup(ap),/FOLLOWUP_UNVERIFIED/);
+});
+test('altered or incomplete new consent and missing source closure are rejected',()=>{
+ for(const edit of [
+  ap=>{ap.writerFollowup.currentConfigSha256='0'.repeat(64);},
+  ap=>{ap.writerFollowup.writerB.pop();},
+  ap=>{ap.writerFollowup.writerB[0].blobSha='0'.repeat(40);},
+  ap=>{ap.writerFollowup.writerA.blobSha='0'.repeat(40);},
+  ap=>{ap.writerFollowup.sourceSequence.reverse();},
+  ap=>{ap.writerFollowup.extra=true;},
+  ap=>{delete ap.toolHashes['tools/controller-postswitch-writer-readonly.mjs'];},
+  ap=>{ap.approved=false;},
+  ap=>{ap.expectedBacklogIssues=[919,919];},
+ ]){const ap=followupManifest();edit(ap);assert.throws(()=>checkFollowup(ap));}
+ assert.throws(()=>checkFollowup(followupManifest(),followupEvidence(),'0'.repeat(40)),/IDENTITY_INVALID/);
 });

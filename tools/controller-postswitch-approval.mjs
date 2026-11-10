@@ -25,6 +25,7 @@ export const TOOL_PATHS = Object.freeze([
   'tools/controller-postswitch-operator.mjs',
   'tools/controller-postswitch-windows.mjs',
   'tools/controller-postswitch-evidence.mjs',
+  'tools/controller-postswitch-writer-readonly.mjs',
   'tools/controller-postswitch-preflight.mjs',
   'tools/controller-postswitch-backlog.mjs',
   'tools/controller-postswitch-postcheck.mjs',
@@ -162,13 +163,39 @@ export const WRITER_FOLLOWUP_CANDIDATE = Object.freeze({
   }),
 });
 
+// This is a separate consent scope; historical writerTransition stays immutable.
+export const WRITER_FOLLOWUP = Object.freeze({
+  schema:'ZGMINI_PC_POSTSWITCH_WRITER_FOLLOWUP_V1',
+  scope:'EXPLICIT_NEW_C_CONSENT_FOR_FOUR_WRITER_B_OVERLAYS',
+  baselineConfigSha256:WRITER_TRANSITION.baselineConfigSha256,
+  priorConfigSha256:WRITER_TRANSITION.currentConfigSha256,
+  currentConfigSha256:WRITER_FOLLOWUP_CANDIDATE.configShaAnchors.atDe,
+  sourceSequence:WRITER_FOLLOWUP_CANDIDATE.sourceSequence,
+  writerB:WRITER_FOLLOWUP_CANDIDATE.writerB,
+  writerA:WRITER_FOLLOWUP_CANDIDATE.aObservations.atDeReadOnly,
+});
+export function writerFollowupMatches(value, expected=WRITER_FOLLOWUP) {
+  if(Array.isArray(expected))return Array.isArray(value) &&
+    value.length===expected.length && expected.every((v,i)=>writerFollowupMatches(value[i],v));
+  if(object(expected))return keysAre(value,Object.keys(expected)) &&
+    Object.entries(expected).every(([k,v])=>writerFollowupMatches(value[k],v));
+  return value===expected;
+}
+
 export function validatePostSwitchApproval(approval, {requestId,sourceSha,evidence} = {}) {
   const transitionRequested = Object.hasOwn(approval ?? {}, 'writerTransition');
+  const followupRequested = Object.hasOwn(approval ?? {}, 'writerFollowup');
   need(keysAre(approval, ['schema','approved','operation','requestId','issueNumber',
     'sourceSha','targetControllerSha','installedShaBefore','evidenceHashes',
     'toolHashes','postcheck','expectedBacklogIssues',
-    ...(transitionRequested ? ['writerTransition'] : [])]),
+    ...(transitionRequested ? ['writerTransition'] : []),
+    ...(followupRequested ? ['writerFollowup'] : [])]),
   'POSTSWITCH_APPROVAL_FIELDS_INVALID');
+  if(followupRequested)need(transitionRequested && writerFollowupMatches(approval.writerFollowup) &&
+    evidence?.writerFollowupVerified===true,
+    'POSTSWITCH_APPROVED_WRITER_FOLLOWUP_UNVERIFIED');
+  else need(evidence?.writerFollowupVerified!==true,
+    'POSTSWITCH_WRITER_FOLLOWUP_NEW_CONSENT_REQUIRED');
   if (transitionRequested) {
     need(keysAre(approval.writerTransition, Object.keys(WRITER_TRANSITION)) &&
       Object.entries(WRITER_TRANSITION).every(([key,value])=>

@@ -182,7 +182,7 @@ function makePorts({approval,evidence,source,preflight,ledger}){
   const checked=async()=>{
     stablePreimages(approval);
     const fresh=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
-      {writerTransition:approval.writerTransition ?? null});
+      {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null});
     validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence:fresh});
     need(fresh.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
       'POSTSWITCH_LIVE_PRECONDITION_FAILED');
@@ -348,12 +348,12 @@ export async function main(args=process.argv.slice(2),{launcherVerified=false}={
   need(approval.sourceSha===source,'POSTSWITCH_APPROVAL_SOURCE_MISMATCH');
   pinnedTools(approval,source);
   const evidence=await inspectPostSwitch(['--request-id',id,'--source-sha',source],
-      {writerTransition:approval.writerTransition ?? null});
+      {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null});
   validatePostSwitchApproval(approval,{requestId:id,sourceSha:source,evidence});
   need(evidence.status==='READONLY_POSTSWITCH_EVIDENCE_VERIFIED',
     'POSTSWITCH_EVIDENCE_FAILED');
   const preflight=await inspectPreflight(['--request-id',id,'--source-sha',source],
-    {writerTransition:approval.writerTransition ?? null});
+    {writerTransition:approval.writerTransition ?? null,writerFollowup:approval.writerFollowup ?? null});
   need(preflight.status==='POSTSWITCH_PREFLIGHT_READONLY_PASS' &&
     preflight.backlogPlan.candidateCount===1 &&
     preflight.backlogPlan.actions[0]?.originalIssueNumber===919,

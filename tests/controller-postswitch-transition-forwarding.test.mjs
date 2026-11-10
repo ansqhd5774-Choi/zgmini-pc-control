@@ -34,14 +34,23 @@ test('preflight without an approved transition retains strict drift rejection',a
   }),{code:'PROTECTED_STATE_DRIFT'});
 });
 
+test('preflight preserves new follow-up identity separately from historical consent',async()=>{
+ const transition={historical:true},followup={latest:true};
+ await inspectPreflightEvidence(args,{writerTransition:transition,writerFollowup:followup,
+  inspect:async(_args,options)=>{
+   assert.equal(options.writerTransition,transition);
+   assert.equal(options.writerFollowup,followup);
+  }});
+});
+
 test('read-only launcher passes its verified transition through to preflight',()=>{
   const source=readFileSync(new URL('../tools/controller-postswitch-launcher.mjs',
     import.meta.url),'utf8');
-  assert.match(source,/const plan=await preflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:WRITER_TRANSITION\}\)/);
+  assert.match(source,/const plan=await preflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:WRITER_TRANSITION,writerFollowup:WRITER_FOLLOWUP\}\)/);
 });
 
 test('direct C operator passes the approved transition through to preflight',()=>{
   const source=readFileSync(new URL('../tools/controller-postswitch-windows.mjs',
     import.meta.url),'utf8');
-  assert.match(source,/const preflight=await inspectPreflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:approval\.writerTransition \?\? null\}\)/);
+  assert.match(source,/const preflight=await inspectPreflight\(\['--request-id',id,'--source-sha',source\],\s*\{writerTransition:approval\.writerTransition \?\? null,writerFollowup:approval\.writerFollowup \?\? null\}\)/);
 });

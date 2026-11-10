@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {WRITER_FOLLOWUP_CANDIDATE, WRITER_TRANSITION}
+import {WRITER_FOLLOWUP_CANDIDATE, WRITER_TRANSITION, writerFollowupMatches}
   from './controller-postswitch-approval.mjs';
 
 const control = 'E:/ZGmini/automation/pc-control';
@@ -163,6 +163,29 @@ export function verifyWriterProtectionEvidence({baseline, current,
 export function verifyWriterProtectionTransition(proof = {}) {
   return verifyWriterProtectionEvidence(proof) &&
     verifySourceOnlyConfigEvolution(proof.currentConfigRaw, proof.transition);
+}
+
+// Reuse all historical assertions after reversing only the independently
+// checked source chain. Neither config nor PROTECTED_BEFORE is written.
+export function verifyWriterFollowupRecoveryEvidence({historicalProof,followup,proof}={}) {
+  if(!writerFollowupMatches(followup) ||
+    proof?.status!=='READONLY_WRITER_PROTECTION_CANDIDATE_VERIFIED' ||
+    proof.code!=='WRITER_PROTECTION_PINNED_EVIDENCE_MATCH' ||
+    proof.writerBReceiptCount!==4 || proof.operationalWrites!==0 ||
+    proof.cApprovalAuthorized!==false || proof.liveCoreSourceVerified!==false ||
+    proof.historicalCConsentVerifiedHere!==false)return false;
+  const raw=historicalProof?.currentConfigRaw;
+  const analysis=analyzeWriterFollowupSourceCandidate(raw);
+  if(analysis.status!=='SOURCE_ONLY_CHAIN_CANDIDATE_VERIFIED' ||
+    JSON.stringify(proof.digestStages)!==JSON.stringify(analysis.stages) ||
+    !verifyWriterFollowupProtectedSnapshot(historicalProof.baseline,historicalProof.current))return false;
+  const text=raw.toString('utf8');
+  const hit=[...text.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)][0];
+  const restored=Buffer.from(text.slice(0,hit.index)+hit[0].replace(hit[1],
+    WRITER_TRANSITION.approvedSourceSha)+text.slice(hit.index+hit[0].length),'utf8');
+  const current=structuredClone(historicalProof.current);
+  current.files['config.json']=WRITER_TRANSITION.currentConfigSha256;
+  return verifyWriterProtectionTransition({...historicalProof,current,currentConfigRaw:restored});
 }
 
 const gitBlobDigest = raw => createHash('sha1')
@@ -488,7 +511,7 @@ function readGitHub(route) {
     {encoding: 'utf8', windowsHide: true, timeout: 30000, maxBuffer: 3e6}));
 }
 
-export async function main(args = process.argv.slice(2), {writerTransition = null} = {}) {
+export async function main(args = process.argv.slice(2), {writerTransition = null, writerFollowup = null} = {}) {
   need(process.platform === 'win32' && !process.env.GITHUB_ACTIONS && !process.env.RUNNER_NAME,
     'POSTSWITCH_OPERATOR_WINDOWS_REQUIRED');
   need(args.length === 4 && args[0] === '--request-id' && args[2] === '--source-sha' &&
@@ -558,6 +581,7 @@ export async function main(args = process.argv.slice(2), {writerTransition = nul
   // and every closed maintenance pause interval. All these port calls are reads.
   let protectionVerified = false, protectionCode = null;
   let protectionContractVerified = false;
+  let writerFollowupVerified = false;
   let currentInventoryComplete = false, snapshotInventoryComplete = false;
   if (baselineExists && backlogVerified) {
     try {
@@ -569,7 +593,7 @@ export async function main(args = process.argv.slice(2), {writerTransition = nul
       const {ports} = makePorts(data, data.issueNumber, {recoveryOperator: true});
       try {
         await ports.prepareRecovery();
-        need(writerTransition === null, 'POSTSWITCH_WRITER_TRANSITION_UNEXPECTED');
+        need(writerTransition === null && writerFollowup === null, 'POSTSWITCH_WRITER_TRANSITION_UNEXPECTED');
         protectionVerified = true;
       } catch (error) {
         if (error?.code !== 'PROTECTED_STATE_DRIFT' || writerTransition === null)
@@ -585,12 +609,22 @@ export async function main(args = process.argv.slice(2), {writerTransition = nul
         const writerA2 = verifiedGitHubResult(WRITER_A2_RESULT_PATH,
           writerTransition?.writerAResultBlobSha);
         const currentConfigRaw = fs.readFileSync(WRITER_CONFIG_PATH);
-        protectionContractVerified = verifyWriterProtectionTransition({
+        const historicalProof={
           baseline:json(baselinePath),current,transition:writerTransition,
           writerB,writerA,writerBBlobSha:writerTransition.priorWriterBResultBlobSha,
           writerABlobSha:writerTransition.priorWriterAResultBlobSha,
           writerB2,writerA2,writerB2BlobSha:writerTransition.writerBResultBlobSha,
-          writerA2BlobSha:writerTransition.writerAResultBlobSha,currentConfigRaw});
+          writerA2BlobSha:writerTransition.writerAResultBlobSha,currentConfigRaw};
+        if(writerFollowup!==null){
+          need(writerFollowupMatches(writerFollowup),'POSTSWITCH_WRITER_FOLLOWUP_CONTRACT_INVALID');
+          const {inspectLocalWriterProtectionReadOnly}=await import('./controller-postswitch-writer-readonly.mjs');
+          const proof=await inspectLocalWriterProtectionReadOnly({
+            readConfigRaw:()=>currentConfigRaw,readBaseline:()=>json(baselinePath),
+            readCurrent:()=>current});
+          writerFollowupVerified=verifyWriterFollowupRecoveryEvidence({
+            historicalProof,followup:writerFollowup,proof});
+          protectionContractVerified=writerFollowupVerified;
+        }else protectionContractVerified = verifyWriterProtectionTransition(historicalProof);
         need(protectionContractVerified,'POSTSWITCH_WRITER_CONTRACT_NOT_VERIFIED');
       }
     } catch (error) {protectionCode = /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code :
@@ -633,7 +667,7 @@ export async function main(args = process.argv.slice(2), {writerTransition = nul
       protectedBefore: baselineExists ? digest(fs.readFileSync(baselinePath)) : null,
       backlog: digest(backlogRaw)},
     backlogReplayStates: replayStates,
-    protectionCode, protectionContractVerified,
+    protectionCode, protectionContractVerified, writerFollowupVerified,
     exactInventories, exactSourceBytes, otherControlLeaseCount, operationalWrites: 0};
 }
 
