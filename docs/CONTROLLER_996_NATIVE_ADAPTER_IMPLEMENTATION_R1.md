@@ -21,10 +21,11 @@
 | `controller-996-backlog-readback.mjs` | `created_at` 내림차순 전체 관련 페이지 2회 동일성 검증, PR 배제, 댓글 전 페이지, bot marker별 JSON/TXT 원격 내용·requestId·runId·seat·TXT 동일성 검증 | 호출 가능한 읽기 전용 부품. **인증 GitHub GET 어댑터·실제 원본 목록 미연결** |
 | `controller-996-native-github-readonly.mjs` | **기존 원본 PC 전용** 설치 manifest·GitHub 로그인 주체·비공개 제어 저장소 검증 후 고정 Issues/댓글/결과 쌍 GET만 허용. 자격증명 노출·POST·Workflow PUT 경로 없음 | 소스+테스트 검증, 실제 원본 PC 인증 호출 **미실행** |
 | `controller-996-native-consent-reader.mjs` | 인증 GET 포트로 **원본 #996**, 승인 manifest의 **정확한 Git 커밋 콘텐츠**, 승인 댓글 전 페이지를 조회. Base64 size·Git blob SHA1·댓글 중복/불완전 목록을 검증하며 `review996CConsent`에 넘길 읽기 전용 원문 증거 생성 | 소스+테스트 검증, **실제 승인 manifest·사용자 작성자 댓글 없음** |
+| `controller-996-native-approval-readiness.mjs` | **원본 R1 관측 + 현재 R2 보호 지문 + GitHub 원본 소유자 SHA 고정 승인 증거**를 순서대로 검증한 뒤 C 트랜잭션 계약에 입력. 승인 없거나 값이 어긋나면 `C_NOT_READY`, 모두 일치해도 `executionAuthorized=false` | 순수 읽기 전용 연결. 실제 owner 승인·원본 PC 인증 관측·C 실행 진입점 **없음** |
 | `controller-996-native-writer-gate.mjs` | 원본 PC 고정 5개 초기 파일 SHA, 사망 owner·원본 install lease, 현재 C claim nonce/PID, 설치된 유지보수기 7개 파일의 실제 SHA와 커밋 Git 원문 대조. 백로그 변경 직전 호출 시 해시 변동 즉시 중단 | **협조적 Writer만** 배제하는 읽기 전용 소스 부품, 실제 C 연결·원본 PC 검증 **미실행** |
 | `controller-996-r2-evidence-review.mjs` | 실제 R2 개별 SHA·존재/부재·Task 활성 상태로 최초 64자리 fingerprint 재계산 및 완료/승인 오인 차단 | 사용자 전달 R2 값 재계산 PASS, 실운영 재실측은 아님 |
 
-2026-11-10 #996 대상 회귀 **111/111 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
+2026-11-10 #996 대상 회귀 **116/116 PASS**. 운영 `Workflow` PUT, PC lease 보관, backlog 갱신, 설치, Issue 재게시 등 실제 효과 **0**. 소스 브랜치는 미배포 Draft PR #1222.
 
 ### 추가 관측 R1 ENOENT 진단 및 R2 보완
 
@@ -50,6 +51,8 @@
 - `makePorts()` 직접 사용 및 외부/구버전 비협조 Writer는 해당 설치 잠금에 의한 보장이 없다. 따라서 `proveExclusiveWriter`는 **검증된 현재 설치 코드가 협조하는 Writer 경로만** 확인한다. 원본 install lease SHA와 dead PID, own claim nonce·PID, 설치 원문 소스 무결성, backlog SHA, 다른 recovery claim 부재, 최종 rename 직전 재확인 중 하나라도 불확실하면 중단한다. OS 수준의 완전한 CAS·전역 배타성을 주장하지 않는다.
 - 새 GET 어댑터의 가짜 네트워크 응답·Git blob 변조·404·댓글 중복·페이지 오류 회귀 후 전체 **103/103 PASS**. 실제 원본 PC 읽기 호출과 원본 영구 쓰기 **0건**, 다음 소스 검증 없이 운영 C를 실행하지 않는다.
 - 독립 `controller-996-native-writer-gate.mjs`를 추가했다. 기존 R1 raw SHA 다섯 개를 고정하고, 실제 C claim nonce/PID 및 원본 owner 사망, 현재 설치 `MAINTENANCE_INSTALL.json` 7개 관리 source와 Git 원문을 다시 확인한다. 성공해도 모든 외부 프로세스의 OS 수준 독점성을 뜻하지 않으며, 오직 **정상 설치된 협조적 Writer 경로의 차단 근거**로만 사용한다. 원본 ledger/lease/marker/backlog source drift·symlink·owner 재활성화·내 claim 이탈·현재 설치 소스 변경 실패 케이스 포함 추가 8개 테스트, 전체 **111/111 PASS**. 최종 backlog rename 전에 동일 함수를 재호출하는 기존 `native-backlog`의 삽입점에 연결 가능하지만 운영 승인·실PC 연결은 아직 없음.
+- `controller-996-native-approval-readiness.mjs`는 위 증거가 갖춰질 경우 **R2 보호 상태 검증 → SHA 바인딩된 owner 승인 검증 → 원본 R1과 C 계약 검증**을 합성해 `READONLY_APPROVAL_AND_R1_R2_CONTRACT_REVIEWED`만 반환하도록 추가했다. 가짜 승인 fixtures, 승인 누락, R1/R2 값 변조, 역사적 미입증 항목 삭제, PC·네트워크 운영 호출 존재 검사를 각각 통과했다. 추가 **4건**, 전체 **116/116 PASS**. 유효한 테스트용 승인도 운영 실행 권한을 발급하지 않는다.
+- 독립 소스 검토 후 실제 R2에서 **두 보호 Task 모두 enabled=true**였던 조건을 `r2-evidence-review`, `c-consent-verifier`, `c-transaction`에 명시했다. Task가 disabled로 바뀐 상태를 승인 manifest 안에 거짓으로 동기화해 통과시키는 경로를 차단한다. 테스트 승인 댓글은 실제 owner 승인이 아닌 **synthetic fixture**이며, 합성 검증은 인증된 원본 Windows 최신 재조회 없이 실행 권한이 되지 않는다.
 
 ## 승인 출처 — 현재 엄격한 경계
 
@@ -61,7 +64,7 @@
 ## 실제 실행기 연결 전에 남은 필수 구현
 
 1. 원본 Windows 보호 대상의 실측·개별 해시·Task enabled 값 확보, 최초 집계 지문 `877bcd2a...` 재계산 일치. **완료 (R2 사용자 제공, 독립 실PC 인증 전)**.
-2. 승인 manifest를 Git 고정 커밋으로 독립 조회하고 #996 owner 승인 댓글의 작성자·SHA·철회 여부를 검증하는 **네이티브 인증 진입점** 작성. 고정 GitHub GET 어댑터는 소스 구현 완료, 전체 C 트랜잭션 연결·실제 출처 검증은 미완료. 오프라인 단순 boolean 전달 금지.
+2. 승인 manifest를 Git 고정 커밋으로 독립 조회하고 #996 owner 승인 댓글의 작성자·SHA·철회 여부를 검증하는 **네이티브 인증 진입점** 작성. 고정 GitHub GET·동의 읽기·R1/R2 승인 합성 어댑터는 소스 구현 완료. **실제 승인 출처·C 영속 트랜잭션 최종 연결은 미완료**이며 오프라인 단순 boolean 전달 금지.
 3. 최초 7 raw digest·현재 보호 상태·Runner 6개·원래 설치 owner 사망·별도 C claim 부재를 확인 후 첫 영속 쓰기. 자기 claim 생성 후에는 기존 observer의 `recoveryClaimAbsent`를 재사용할 수 없으므로 **자기 nonce 전용 재검증 경로** 적용.
 4. Workflow enable이 `active`로 증명된 후 **알려진 협조적 backlog Writer 배제 확인** — 설치 source·PID·lease/claim·원본 SHA 읽기 전용 가드까지 소스 구현, 실제 OS original PC에서의 적용·최종 C 실행기 연결은 미완성. Backlog 하위 부품은 `proveExclusiveWriter` 함수 누락·미확인 시 실패하고, SHA 대조·same-directory temp·fsync·rename·신 SHA 재조회까지 소스에서 구현. **이는 원자 CAS가 아니므로 검증 범위를 넘어선 독점성 주장 없이 운영 적용 시 별도 확인이 필요.**
 5. GitHub Issues를 `sort=created`, `direction=desc`, `per_page=100`으로 실제 pause→resume 구간 내 완전 탐색하고 두 번 동일성 검사하도록 소스 구현. 후보별 댓글 전체 페이지, `results/<runId>-<attempt>-seat-<seat>.json/.txt` 둘 모두 원격 GET, 내용·출처·status/ID 교차 검증도 소스 구현. **인증 GET 포트는 개발 완료, 네이티브 전체 트랜잭션 및 실제 Windows resume 원본 관측은 미연결.** 기존 `replayR6Backlog` 금지, 동일 requestId 재발행 0. 결과 확인이 안 된 원본은 담당자 재계획 대상으로 분류.
