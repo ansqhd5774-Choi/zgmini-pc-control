@@ -1,5 +1,12 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 별도 Windows 네이티브 TEMP 13/13 실측 성공 — 운영 C NO-GO 유지
+
+- 사용자가 **물리적으로 분리된 Windows PC**에서 PowerShell `Process` 범위의 한시적 `RemoteSigned` 설정을 직접 승인·적용하고, 고정 PS1 SHA256 `6f8436fec7216d278f82558571a7172e5c2d2f7cc0b8b0db357f9ec4a24e613a` 및 CMD SHA256 `f1ca16cafbeb60f6389f0dcc70e1e0c9a37ab59b79a89a49620cb573b04d43e8`을 비교한 뒤 **정확한 PS1 1개의 인터넷 출처 표시만 제거**했다. 이 과정에서 전역·영구 실행 정책 변경은 수행하지 않았다. 같은 세션의 수동 CMD 실행 스크린샷에는 `ZGMINI_996_WINDOWS_NATIVE_TEMP_FIXTURE_V1`, `WINDOWS_TEMP_FIXTURE_NATIVE_MOVE_ONLY`, `checksPassed=13`이 나타난다.
+- 소스의 `Assert-Test` 경로를 독립 대조하면 **정상 6 + 기존 목적지 충돌 3 + old C 보관 직후 중단 1 + continuation 보관 직후 중단 1 + 새 Install 잠금 재생성 2 = 총 13건**이다. 실제 Windows `.NET Directory.Move` 기본 동작에 대해 대상 기존 경로 덮어쓰기 거부·원본 보존·Install 마지막 이동을 **13/13 성공 관측**으로 인정한다. 출력은 `installedRootTouched=false`, `executionAuthorized=false`, `originalPcWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `operatorReady=false`, `cleanupPerformed=false`; 수치는 실행기의 자기 보고이며 별도 OS 쓰기 추적 증거는 아니다.
+- 화면 SHA256 `ec3eabbc4ce85bdd3266f7beaf732137d2d334c14d1ea076fee7eff7cb518c93`. 결과·출처·검증 한계는 `artifacts/controller-996/zgmini-996-native-temp-fixture-success-20261111.json`에 기록하고 스크린샷 원본은 GitHub에 저장하지 않는다. 시험이 만든 `zgmini-996-test-native-<GUID>` TEMP 폴더는 **자동 삭제되지 않고 남아 있으므로 증거 보존 중 임의 정리하지 않는다**. 테스트 ZIP 전체 SHA256을 사용자가 별도 확인했다는 화면은 없다.
+- **입증 범위 한정:** 이는 운영 `E:\ZGmini` C Claim/Lease의 실물 이동이나 정확한 트랜잭션/전원 중단 내구성, 원본 PC 소유권, 원본 4 Job 결과쌍의 존재, 현재 Writer 무경합, 새 C 승인 **어느 것도 검증하지 않는다**. R4 원본 Windows의 Git 84/84 원본 소스 관측은 별도 성공 증거다. #996 신규 정확 Owner 승인 댓글은 **0**, C 재실행 권한 없음, 원본 Claim·Install Lease 이동과 Workflow PUT·Backlog·Issue 변경 금지. 전체 운영 진행률 **80%→80%**, 실제 C는 **NO-GO**.
+
 ## 2026-11-11 별도 Windows TEMP 시험 1회 — PowerShell 실행 정책으로 차단
 
 - 사용자는 **별도 물리 Windows PC**에서 `RUN_996_ISOLATED_WINDOWS_NATIVE_TEMP_FIXTURE_ONCE.cmd`를 실행했다고 명시하고 콘솔 화면을 제출했다. 원본 PC에서 발생한 `BLOCKED: ORIGINAL_ZGMINI_ROOT_PRESENT`와 구별된다. 새 PC에서는 CMD가 `#996 ISOLATED WINDOWS TEMP NATIVE MOVE FIXTURE RESULT:`까지 진행했지만, PowerShell이 PS1에 대해 **`UnauthorizedAccess`·`about_Execution_Policies`**를 출력하며 실행을 거부했다. CMD 자체 메시지도 `FIXTURE STOPPED. DO NOT BYPASS EXECUTION POLICY.`였다.
