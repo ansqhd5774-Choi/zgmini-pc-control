@@ -24,10 +24,13 @@ const goodChecks=['ledgerPinned','ownerMatched','ownerDead',
  'workflowDisabled','originalIssuePinned','dedicatedRunnersReady',
  'supervisorVerified','runnerListComplete','noOtherControllerLeases',
  'stableRawDigests'];
-const steps=['freshReadback','reserveClaim','freshWithOwnClaim','recordPrepared','enableWorkflowOnce',
- 'workflowActiveReadback','closeBacklogGuarded','fullBacklogDispositionReadback',
- 'independentProtectedPostcheck','recordPreArchive','archiveOriginalLease','finalReadback',
- 'completeRecord','archiveOwnClaim','finalOwnClaimReadback'];
+const steps=['freshReadback','reserveClaim','freshWithOwnClaim','recordPrepared',
+ 'recordWorkflowEnableIntent','enableWorkflowOnce','workflowActiveReadback',
+ 'closeBacklogGuarded','fullBacklogDispositionReadback',
+ 'independentProtectedPostcheck','recordPreArchive',
+ 'recordOriginalLeaseArchiveIntent','archiveOriginalLease','finalReadback',
+ 'completeRecord','recordOwnClaimArchiveIntent','archiveOwnClaim',
+ 'finalOwnClaimReadback'];
 function fixture(){
  const e=RECOVERY_996,digests={...rawEvidence};
  // A consistent synthetic 5-item snapshot exercises the contract; the real
@@ -80,7 +83,9 @@ function fixture(){
   protectedItemsSha256:{files:{...itemFiles},tasks:{...itemTasks}},
   protectedTaskEnabled:{...itemEnabled},
   evidenceSha256:{...digests},
-  allowedEffects:['ENABLE_EXISTING_PC_JOB_WORKFLOW_ONCE',
+  allowedEffects:['CREATE_AND_ARCHIVE_OWN_C_RECOVERY_CLAIM',
+   'WRITE_C_SCOPED_AUDIT_AND_ATTEMPT_MARKERS',
+   'ENABLE_EXISTING_PC_JOB_WORKFLOW_ONCE',
    'CLOSE_VERIFIED_ORIGINAL_PAUSE_WINDOW_ONCE','READ_ONLY_DISPOSITION_NO_REPLAY',
    'ARCHIVE_ONLY_ORIGINAL_INSTALL_LEASE_AFTER_POSTCHECK'],
  };
@@ -123,7 +128,7 @@ test('raw fingerprint, authority and original C failure phase must match',()=>{
   f=>{f.preflight.checks.protectedBaselineVerified=true;},
   f=>{f.preflight.protectedBaselineSha256='a'.repeat(64);},
   f=>{f.preflight.status='READONLY_VERIFIED';},
-  f=>{f.preflight.independentRunnersObserved=0;},
+  f=>{f.preflight.independentRunnersObserved=-1;},
   f=>{f.preflight.backlogPauseWindowCount=2;},
   f=>{f.preflight.pcRetries=1;},
   f=>{f.preflight.protectionNowFingerprint='b'.repeat(64);},
@@ -160,11 +165,20 @@ test('actual Windows R1 pins 7 raw digests and missing baseline, not 8',()=>{
  assert.equal(noProtectedEvidence.code,'CURRENT_PROTECTED_ITEMS_UNPROVEN');
 });
 
+test('unrelated Runner count is not a seventh-seat admission gate',()=>{
+ for(const unrelatedCount of [0,1,2,8]){
+  const f=fixture();f.preflight.independentRunnersObserved=unrelatedCount;
+  assert.equal(validate996CContract(f).status,'REVIEWED_CONTRACT_ONLY');
+ }
+});
+
 test('approved fixture only verifies contract; it grants no runtime authority',()=>{
  const decision=validate996CContract(fixture());
  assert.equal(decision.status,'REVIEWED_CONTRACT_ONLY');
  assert.equal(decision.executionAuthorized,false);
  assert.equal(decision.sourceOnly,true);
+ assert.equal(decision.controllerInstallPermitted,false);
+ assert.equal(decision.completionRecordStatus,'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED');
  assert.equal(decision.evidenceChecksPassed,16);
  assert.deepEqual(decision.evidenceChecksUnproven,
   ['workflowDisableActorVerified','protectedBaselineVerified']);
@@ -192,6 +206,7 @@ test('simulation always sequences workflow, backlog, independent check, archive'
  assert.equal(decision.backlogReplays,0);
  assert.equal(decision.originalRetries,0);
  assert.equal(decision.controllerInstalls,0);
+ assert.equal(decision.completionRecordStatus,'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED');
 });
 
 test('each injected stage failure halts without executing any later stage',async()=>{
@@ -203,12 +218,12 @@ test('each injected stage failure halts without executing any later stage',async
   assert.equal(result.failedStep,steps[i]);
   assert.deepEqual(history,steps.slice(0,i+1));
   assert.equal(result.retryAuthorized,false);
-  assert.equal(result.claimMustRemain,i>=1&&i<13);
-  assert.equal(result.claimDisposition,i<1?'NOT_CREATED':i>=13?
+  assert.equal(result.claimMustRemain,i>=1&&i<16);
+  assert.equal(result.claimDisposition,i<1?'NOT_CREATED':i>=16?
    'MAY_BE_ARCHIVED_REQUIRE_INDEPENDENT_READBACK':'PRESERVE_IN_PLACE');
-  assert.equal(result.workflowEnables,i>=4?1:0);
-  assert.equal(result.leaseArchives,i>=10?1:0);
-  assert.equal(result.ownClaimArchives,i>=13?1:0);
+  assert.equal(result.workflowEnables,i>=5?1:0);
+  assert.equal(result.leaseArchives,i>=12?1:0);
+  assert.equal(result.ownClaimArchives,i>=16?1:0);
   assert.equal(result.originalRetries,0);
  }
 });
@@ -217,7 +232,7 @@ test('uncertain workflow enable result leaves claim and stops instead of retry',
  const history=[];
  const result=await simulate996CTransaction({...fixture(),
   ports:mockPorts(history,{unknownAt:'enableWorkflowOnce'})});
- assert.deepEqual(history,steps.slice(0,5));
+ assert.deepEqual(history,steps.slice(0,6));
  assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.failedStep,'enableWorkflowOnce');
  assert.equal(result.claimMustRemain,true);
