@@ -45,6 +45,8 @@ function fixture(){
    'quota-runner.cmd':h(2),'run-local.cmd':h(3)},
    tasks:{'ZGMINI-PC-Local-Core':h(4),
     'ZGMINI-PC-Local-Korea':h(5)}},
+  protectedWriterFileStatus:{'config.json':'PRESENT',
+   'quota-runner.cmd':'PRESENT','run-local.cmd':'PRESENT'},
   protectedTaskEnabled:{'ZGMINI-PC-Local-Core':true,
    'ZGMINI-PC-Local-Korea':false},
  };
@@ -145,10 +147,34 @@ test('missing two acknowledged gaps, extra effect or evidence fails',()=>{
   f=>{f.manifest.allowedEffects.splice(1,1);},
   f=>{f.manifest.evidenceSha256.protectedSnapshot=h(6);},
   f=>{delete f.manifest.protectedItemsSha256.files['config.json'];},
+  f=>{f.manifest.protectedWriterFileStatus['config.json']='ABSENT';},
   f=>{f.manifest.protectedTaskEnabled['ZGMINI-PC-Local-Core']=null;},
  ]){
   const f=fixture();mutate(f);rerenderManifest(f);
   assert.equal(review(f).status,'CONSENT_UNVERIFIED');
+ }
+});
+
+test('manifest preserves actual R2 absent Writer paths without fictitious SHA',()=>{
+ const f=fixture();
+ delete f.manifest.protectedItemsSha256.files['quota-runner.cmd'];
+ delete f.manifest.protectedItemsSha256.files['run-local.cmd'];
+ f.manifest.protectedWriterFileStatus['quota-runner.cmd']='ABSENT';
+ f.manifest.protectedWriterFileStatus['run-local.cmd']='ABSENT';
+ rerenderManifest(f);
+ assert.equal(review(f).status,'CONSENT_PROVENANCE_REVIEWED_ONLY');
+ for(const mutate of [
+  x=>{x.manifest.protectedItemsSha256.files['run-local.cmd']=h(3);},
+  x=>{x.manifest.protectedWriterFileStatus['run-local.cmd']='PRESENT';},
+  x=>{x.manifest.protectedItemsSha256.files=null;},
+ ]){
+  const altered=fixture();
+  delete altered.manifest.protectedItemsSha256.files['quota-runner.cmd'];
+  delete altered.manifest.protectedItemsSha256.files['run-local.cmd'];
+  altered.manifest.protectedWriterFileStatus['quota-runner.cmd']='ABSENT';
+  altered.manifest.protectedWriterFileStatus['run-local.cmd']='ABSENT';
+  mutate(altered);rerenderManifest(altered);
+  assert.equal(review(altered).status,'CONSENT_UNVERIFIED');
  }
 });
 
