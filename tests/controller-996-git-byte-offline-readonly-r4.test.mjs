@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import {verify996OfflineGitBytesReadOnly} from
   '../tools/controller-996-git-byte-offline-readonly-r4.mjs';
 
@@ -76,6 +77,23 @@ test('offline R4 library refuses Linux non-fixture production access',()=>{
   const r=verify996OfflineGitBytesReadOnly();
   assert.equal(r.code,'C_996_OFFLINE_ORIGINAL_WINDOWS_REQUIRED');
   assert.equal(r.executionAuthorized,false);
+});
+test('user R4 readback digest equals immutable 84-file Git manifest snapshot',()=>{
+  const raw=fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)),
+    '../tools/controller-996-git-byte-offline-manifest-r4.json'));
+  assert.equal(hash(raw),
+    '0978bae8a0e260a65a2d690fbee21f751d06bb4bb26d55051d30d081f4619f6f');
+  const m=JSON.parse(raw.toString('utf8'));
+  const bases={installed:C,staged:STAGE,maintainer:M};
+  const all=[];
+  for(const kind of ['installed','staged','maintainer']){
+    for(const rel of Object.keys(m.files[kind]).sort()){
+      all.push([`${bases[kind]}/${rel}`,m.files[kind][rel].sha256]);
+    }
+  }
+  assert.equal(all.length,84);
+  assert.equal(hash(Buffer.from(JSON.stringify(all))),
+    'b7ca1f00f3d171dae91cc3559aef861b5b8299770ce86e5b6323def1f301f46d');
 });
 test('production direct-import cannot select a custom Git manifest digest',()=>{
   const r=verify996OfflineGitBytesReadOnly({

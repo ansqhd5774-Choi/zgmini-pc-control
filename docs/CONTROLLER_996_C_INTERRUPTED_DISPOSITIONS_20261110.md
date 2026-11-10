@@ -1,5 +1,13 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 원본 Windows R4 실측 수신 — 84/84 일치, C 복구는 NO-GO
+
+- 사용자가 원본 Windows에서 실행한 **R4 읽기 전용 CMD 콘솔 화면 1건**을 제출했다. 화면에는 `ZGMINI_CONTROLLER_996_GIT_SOURCE_READONLY_R4`, `SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS`, 설치 **38**, Stage **39**, Maintainer **7**, 합계 **84**, `originalWindowsReadback=true`, `executionAuthorized=false`가 표시됐다. **앞선 아래의 'Windows R4 0건'은 이 결과를 받기 전 이력**이다.
+- 화면 `gitBlobManifestSha256` **`0978bae8a0e260a65a2d690fbee21f751d06bb4bb26d55051d30d081f4619f6f`**는 봉인된 Git 48종 원문 Manifest와 일치했다. 화면 `sourceBytesSha256` **`b7ca1f00f3d171dae91cc3559aef861b5b8299770ce86e5b6323def1f301f46d`**는 봉인된 84개 로컬 경로·SHA256 배열의 JSON 해시를 **별도 오프라인 재계산해 완전 일치**했다. 사용자 스크린샷 SHA256은 `215c8f70d06a8029eda14c554a84c2ad1b56fbdc570f0aab06d10a335832fb18`이며 GitHub에는 사진 원문이 아닌 비민감 전사·한계만 `artifacts/controller-996/zgmini-996-r4-windows-screenshot-readback.json`으로 기록한다.
+- 출력의 `operationalWrites=0`, `workflowPuts=0`, `backlogWrites=0`, `issuePosts=0`, `pcRetries=0`은 **CLI의 자체 보고**다. 사진만으로 물리적 PC 신원을 외부 인증하거나 OS 수준 쓰기 0을 단정하지 않는다. **사진에는 실행한 ZIP/CMD SHA256 검산 결과가 없으므로 사용자 PC의 패키지 바이트 동일성도 별도 미입증**이다. 읽은 시점 이후 소스가 바뀌지 않았다는 증거도 아니다. **기존 C Claim/Install Lease 보존, 원본 Job 4건 자동 재실행 금지** 유지.
+- 2026-11-11 기준 원본 Issue #996은 Open·댓글 **10건**, 신규 `ZGMINI_CONTROLLER_996_CONTINUATION_C_CONSENT_V1` 댓글 **0건**이었다. 원본 Job [#1217](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1217)·[#1219](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1219)·[#1226](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1226)·[#1227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1227)은 Open/결과 댓글 0건을 유지한다. 원본의 실물 replay/결과쌍 및 독립 Claim provenance가 완료됐다는 뜻은 아니다.
+- **다음 관문:** 운영 `E:`를 건드리지 않는 **별도 격리 Windows의 TEMP 네이티브 `Directory.Move` 충돌 시험**(아직 실측 0)과 원본 Claim/Lease 소유자·경합·Backlog 실물 상태 최신 확인, 별도 불변 Manifest/Owner 신규 정확승인이 필요하다. 실제 C 복구·Lease 이동·Workflow 변경·원본 Job 종료 **NO-GO**, 운영 전체 진행률 **80%→80%**.
+
 ## 2026-11-11 OFFLINE Git 바이트 검증 R4 소스 봉인 — 운영 NO-GO
 
 - **목적/범위:** 실제 복구·재실행의 승인과 무관하게, 기존 R3 원본 Windows 보존 상태에서 설치 Controller **38개**, Stage **39개**, Maintainer **7개**, 합계 **84개** 파일을 불변 Git 원본과 **읽기 전용으로** 대조할 수 있는 보조 도구를 추가했다. 독립 GitHub REST 조회로 고정 Git commit 3개의 트리 SHA와 각 Git blob 경로·SHA1·크기를 **84/84 대조, 불일치 0**, 중복 제외 원문 Git blob **48종**의 SHA256을 봉인했다.
