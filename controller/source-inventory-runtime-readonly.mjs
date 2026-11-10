@@ -3,6 +3,7 @@
 // DECLARED/ENABLED/CALENDAR_ELIGIBLE are separate audits, not inferred here.
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {gunzipSync} from 'node:zlib';
 
@@ -19,6 +20,11 @@ const TABLES=Object.freeze({
 });
 const BATCH_KEYS=Object.freeze(['macro','credit','supply','fundFlows','bisDsr','bisTc','rates']);
 const CENSUS_2027_DIAGNOSTIC_KEY='release-calendar:census:diagnostic:2027';
+// The collector writes this fixed family; marketOperationalStore appends the
+// UTC collection day to the SQLite primary key (key:YYYY-MM-DD).
+const TREASURY_TAWS_INPUT_PREFIX='release-calendar:treasury:taws:';
+const TREASURY_TAWS_MAX_TEXT_BYTES=6*1024*1024;
+const TREASURY_TAWS_SOURCE_URL='https://www.treasurydirect.gov/TA_WS/securities/search';
 const CENSUS_DIAGNOSTIC_STATUSES=new Set(['READY','READY_WITH_FALLBACK','SOURCE_FAILED']);
 const CENSUS_DIAGNOSTIC_CODES=new Set([
  'HTTP_400','HTTP_401','HTTP_403','HTTP_404','HTTP_408','HTTP_429',
@@ -68,6 +74,58 @@ function census2027DiagnosticSummary(encoded,storedAt){
   return {status:'OBSERVED',year:2027,collectionStatus:body.status,
    attempts,attemptedAt:stamp(body.attemptedAt),storedAt:integer(storedAt)};
  }catch{return {status:'UNREADABLE_OR_INVALID',year:2027};}
+}
+
+// Only bounded verification metadata is exposed. Never return the TA_WS rows,
+// CUSIPs, source URL, raw response, unexpected fields or decode errors.
+function treasuryTawsInputSummary(encoded,storedAt,batchKey){
+ try{
+  if(typeof batchKey!=='string'||
+     !/^release-calendar:treasury:taws:20\d{2}-\d{2}-\d{2}$/.test(batchKey)||
+     typeof encoded!=='string'||Buffer.byteLength(encoded)>20_000_000)
+   return {status:'UNREADABLE_OR_INVALID'};
+  const decoded=encoded.startsWith('gzip:')?
+   gunzipSync(Buffer.from(encoded.slice(5),'base64'),{maxOutputLength:16_000_000}).toString('utf8'):encoded;
+  if(Buffer.byteLength(decoded)>16_000_000)return {status:'UNREADABLE_OR_INVALID'};
+  const body=JSON.parse(decoded);
+  const validDay=d=>typeof d==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(d)&&
+   Number.isFinite(Date.parse(d+'T00:00:00Z'))&&
+   new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
+  if(!object(body)||!validDay(body.fromDate)||!validDay(body.toDate)||
+     !validDay(batchKey.slice(TREASURY_TAWS_INPUT_PREFIX.length))||
+     batchKey.slice(TREASURY_TAWS_INPUT_PREFIX.length)!==body.toDate||
+     Date.parse(body.toDate)-Date.parse(body.fromDate)>=365*86400000||
+     body.toDate<body.fromDate||body.sourceUrl!==TREASURY_TAWS_SOURCE_URL||
+     !Number.isSafeInteger(body.awardedCount)||
+     body.awardedCount<1||body.awardedCount>2000||
+     typeof body.text!=='string'||
+     Buffer.byteLength(body.text)>TREASURY_TAWS_MAX_TEXT_BYTES)
+   return {status:'UNREADABLE_OR_INVALID'};
+  const rows=JSON.parse(body.text);
+  if(!Array.isArray(rows)||rows.length<1||rows.length>2000)
+   return {status:'UNREADABLE_OR_INVALID'};
+  let eligibleAwardedRows=0;
+  for(const r of rows){
+   if(!object(r)||typeof r.competitiveAuctionCloseDate!=='string'||
+      !/^20\d{2}-\d{2}-\d{2}T00:00:00(?:\.0+)?Z?$/.test(r.competitiveAuctionCloseDate))
+    return {status:'UNREADABLE_OR_INVALID'};
+   const day=r.competitiveAuctionCloseDate.slice(0,10);
+   if(!validDay(day))return {status:'UNREADABLE_OR_INVALID'};
+   if(day<body.fromDate||day>body.toDate)continue;
+   // Match the collector parser's string-only ratio contract. A numeric JSON
+   // value is not an awarded result in the approved parser.
+   const ratio=typeof r.bidToCoverRatio==='string'?r.bidToCoverRatio.trim():'';
+   if(!ratio||ratio.toLowerCase()==='null')continue;
+   if(!/^\d+(?:\.\d+)?$/.test(ratio))return {status:'UNREADABLE_OR_INVALID'};
+   eligibleAwardedRows++;
+  }
+  return {status:'OBSERVED',storedAt:integer(storedAt),fromDate:body.fromDate,
+   toDate:body.toDate,rawRowCount:rows.length,storedAwardedCount:body.awardedCount,
+   eligibleAwardedRows,eligibleCountMatchesStored:eligibleAwardedRows===body.awardedCount,
+   textBytes:Buffer.byteLength(body.text),
+   textSha256:createHash('sha256').update(body.text).digest('hex'),
+   scope:'ELIGIBLE_RESULT_COUNT_NOT_FULL_PARSER_REVALIDATION'};
+ }catch{return {status:'UNREADABLE_OR_INVALID'};}
 }
 
 function safePath(p,root,filesystem){
@@ -125,7 +183,8 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    observedTableCount:found,targetTableCount:Object.keys(TABLES).length,
    tableAvailability:Object.fromEntries(Object.entries(TABLES).map(([k,v])=>[k,tables.has(v)])),
    batch:null,employment:null,employmentR6:null,breadth:null,breadthUniverse:null,
-   earningsUniverse:null,consumption:null,publicFeeds:null,census2027Diagnostic:null};
+   earningsUniverse:null,consumption:null,publicFeeds:null,census2027Diagnostic:null,
+   treasuryTawsInput:null};
   if(has('batch')){
    queryStage='BATCH';
    const all=row('SELECT COUNT(*) AS n,MAX(stored_at) AS latest FROM market_input_batches_v1');
@@ -138,6 +197,11 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    }
    out.batch={storedBatches:integer(all.n),latestStoredAt:integer(all.latest),knownFamilies:known,
     distinctSeriesInsideBodies:'NOT_INSPECTED'};
+   queryStage='TREASURY_TAWS_FIXED_INPUT';
+   const taws=db.prepare('SELECT batch_key,body,stored_at FROM market_input_batches_v1 WHERE batch_key LIKE ? ORDER BY stored_at DESC LIMIT 1')
+    .get(TREASURY_TAWS_INPUT_PREFIX+'%');
+   out.treasuryTawsInput=taws?
+    treasuryTawsInputSummary(taws.body,taws.stored_at,taws.batch_key):{status:'NOT_STORED'};
   }
   if(has('employment')){
    queryStage='EMPLOYMENT_R4';
