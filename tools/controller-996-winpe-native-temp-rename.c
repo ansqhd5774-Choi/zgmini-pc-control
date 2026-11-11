@@ -89,6 +89,9 @@ static bool c996_no_reparse_ancestors(const WCHAR *full_path)
     size_t count = wcslen(full_path);
     if (count < 3 || count >= C996_N || full_path[1] != L':' ||
         full_path[2] != L'\\') return false;
+    /* GetTempPathW normally includes a trailing separator. Inspect its
+     * directory name, not a potentially invalid trailing-separator spelling. */
+    while (count > 3 && full_path[count - 1] == L'\\') --count;
     if (FAILED(StringCchCopyW(cursor, C996_N, full_path))) return false;
     for (size_t i = 3; i <= count; ++i) {
         if (cursor[i] == L'\\' || cursor[i] == L'\0') {
