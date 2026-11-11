@@ -57,34 +57,41 @@ export function classification(files, logs) {
   return commitEvidence ? 'LOGS_PRESENT_STAGE_UNPROVEN' : 'COMMIT_LOG_NOT_ESTABLISHED';
 }
 function codeOf(e) { return e && typeof e.code === 'string' ? e.code.slice(0,50) : 'UNEXPECTED_ERROR'; }
-function statNoLink(p) {
-  // Reject reparse/junction traversal in every known path ancestor, not just leaf.
-  let cur = path.win32.resolve(p);
+export function statNoLink(p,progress=()=>{}) {
+  // Existing no-follow validation is unchanged. Report only bounded relative
+  // depth and operation, never a raw path or OS error message.
+  let cur = path.win32.resolve(p), depth=0;
   while (true) {
+    progress('PATH_LSTAT',depth);
     const s = fs.lstatSync(cur);
     if (s.isSymbolicLink()) throw Object.assign(new Error('REPARSE_LINK_STOP'),{code:'REPARSE_LINK_STOP'});
     const parent=path.win32.dirname(cur);
-    if (parent===cur) return fs.lstatSync(p);
-    cur=parent;
+    if (parent===cur) {
+      progress('LEAF_RECHECK',0);
+      return fs.lstatSync(p);
+    }
+    cur=parent;depth++;
   }
 }
-function safeInputFile(p) {
+function safeInputFile(p,progress=()=>{}) {
   // Fixed paths only; caller never supplies a path or traversal component.
-  const s = statNoLink(p);
+  const s = statNoLink(p,progress);
   if (!s.isFile()) throw Object.assign(new Error('NOT_A_REGULAR_FILE'),{code:'NOT_A_REGULAR_FILE'});
   return s;
 }
-async function hashFile(p) {
-  const s = safeInputFile(p), h = crypto.createHash('sha256');
+async function hashFile(p,progress=()=>{}) {
+  const s = safeInputFile(p,progress), h = crypto.createHash('sha256');
   let bytes=0;
+  progress('STREAM_READ',null);
   for await (const b of fs.createReadStream(p)) {bytes+=b.length;h.update(b);}
+  progress('HASH_COMPLETE',null);
   return {bytes,sha256:h.digest('hex'),mtimeMs:s.mtimeMs};
 }
-async function validatePins(onAttempt=()=>{}) {
+async function validatePins(onAttempt=()=>{},onProgress=()=>{}) {
   const items=[];
   for (const entry of FIXED) {
     onAttempt(entry.id);
-    const v=await hashFile(entry.file);
+    const v=await hashFile(entry.file,onProgress);
     items.push({id:entry.id,matched:v.bytes===entry.bytes && v.sha256===entry.sha,bytes:v.bytes,sha256:v.sha256});
     if (!items.at(-1).matched) throw Object.assign(new Error('PIN_MISMATCH'),{code:'PIN_MISMATCH'});
   }
@@ -154,18 +161,26 @@ async function main() {
     out=path.win32.join(outputTemp,'C996_R5_READONLY_'+report.runId.replaceAll('-',''));
     fs.mkdirSync(out,{recursive:false});
     report.inspectStep='PRE_INPUT_HASH';
-    report.inputs=await validatePins(id=>{report.inspectId=id;});
+    report.inputs=await validatePins(id=>{report.inspectId=id;},(operation,depth)=>{
+      report.inspectOperation=operation;report.inspectDepth=depth;
+    });
     report.inspectStep='EVIDENCE_METADATA';report.inspectId=null;
+    report.inspectOperation=null;report.inspectDepth=null;
     for(const x of FIXED_TXT) {report.inspectId=x.id;report.fixedEvidence.push(await metadataFile(x));}
     report.inspectStep='LOG_DISCOVERY';report.inspectId=null;
+    report.inspectOperation=null;report.inspectDepth=null;
     const selected=selectLogs();
     report.inspectStep='LOG_READ';report.inspectId=null;
     for(const x of selected) {report.inspectId=x.id;report.logs.push(await inspectLog(x));}
     report.inspectStep='POST_INPUT_HASH';report.inspectId=null;
-    const after=await validatePins(id=>{report.inspectId=id;});
+    report.inspectOperation=null;report.inspectDepth=null;
+    const after=await validatePins(id=>{report.inspectId=id;},(operation,depth)=>{
+      report.inspectOperation=operation;report.inspectDepth=depth;
+    });
     if(after.some((x,i)=>x.sha256!==report.inputs[i].sha256)) throw Object.assign(new Error('POST_HASH_MISMATCH'),{code:'POST_HASH_MISMATCH'});
     report.inputHashesUnchanged=after.length;
     report.inspectStep='DONE';report.inspectId=null;
+    report.inspectOperation=null;report.inspectDepth=null;
     report.code=classification(report.fixedEvidence,report.logs);
     report.status=report.code==='LOGS_PRESENT_STAGE_UNPROVEN'?'COMPLETE':'PARTIAL';
   } catch(e) {
