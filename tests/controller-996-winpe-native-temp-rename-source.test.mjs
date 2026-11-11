@@ -32,6 +32,15 @@ test('Windows native primitive is handle-based FileRenameInfo without replacemen
   assert.doesNotMatch(src,/\bMoveFileExW\s*\(|\bMoveFileW\s*\(|\bRemoveDirectoryW\s*\(|\bDeleteFileW\s*\(/);
 });
 
+test('Win32 87 absolute-path probe is interactive TEMP-only and never a fallback',()=>{
+  assert.match(src,/#if defined\(C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY\) &&/);
+  assert.match(src, /!defined\(C996_NATIVE_INTERACTIVE_TEMP_TEST_ONLY\)/);
+  assert.match(src, /#ifdef C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY[\s\S]+?new_name = archive;/);
+  assert.match(src, /#ifdef C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY\s+rename_info->RootDirectory = NULL;\s+#else\s+rename_info->RootDirectory = root_handle;/);
+  assert.match(src, /rename_info->ReplaceIfExists = FALSE;/);
+  assert.match(src, /C996_NATIVE_TEMP_MODE:ABSOLUTE_NULL_ROOT_DIAGNOSTIC_ONLY/);
+});
+
 test('renamed-but-not-verified remains UNKNOWN with no automated fallback',()=>{
   assert.match(src,/RENAME_RESULT_UNKNOWN/);
   assert.match(src,/RENAME_DENIED_OR_COLLISION/);
