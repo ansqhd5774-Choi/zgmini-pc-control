@@ -135,3 +135,20 @@ test('expiry, future issuance and oversized window all fail with no execution ca
   assert.throws(()=>encode996CanonicalOfflineHandoff(m),
     /C996_SIGNED_HANDOFF_MANIFEST_INVALID/);
 });
+test('forged caller clock inside signed window cannot establish a trusted offline expiry',()=>{
+  // The signed window is historic. A caller may still pass a clock reading
+  // inside it, as an offline WinPE system clock is not a trusted time source.
+  // Even a cryptographically valid signature MUST NOT become C authorization.
+  const raw=encode996CanonicalOfflineHandoff(makeManifest());
+  const untrustedClockReading='2026-11-11T12:05:00Z';
+  const result=review(raw,{observedAt:untrustedClockReading});
+  assert.equal(result.signatureCryptographicallyVerified,true);
+  assert.equal(result.offlineClockTrusted,false);
+  assert.equal(result.trustedOwnerKeyEstablished,false);
+  assert.equal(result.ownerApprovalVerified,false);
+  assert.equal(result.evidenceAuthenticated,false);
+  assert.equal(result.executionAuthorized,false);
+  assert.equal(result.productionExecutable,false);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(result.automaticRetry,false);
+});
