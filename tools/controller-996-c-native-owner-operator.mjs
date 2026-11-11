@@ -274,6 +274,19 @@ public static class C996NativeDirectory {
         catch(IOException) { throw new Stop("C996_NATIVE_COMPETING_WRITE_BLOCKED"); }
         throw new Stop("C996_NATIVE_COMPETING_WRITE_NOT_BLOCKED");
       }
+      // TEMP-only negative proof: an unpinned child can be created while
+      // parent and each originally pinned child handle are still held. The
+      // fixture refuses to archive; never remove this guard for production.
+      if(Fixture&&args.ContainsKey("simulateNamespaceInsert")&&
+        (bool)args["simulateNamespaceInsert"]) {
+        string extra=Path.Combine(source,"competing.json");
+        try {
+          using(var stream=new FileStream(extra,FileMode.CreateNew,FileAccess.Write,FileShare.None)){
+            stream.WriteByte(123);stream.WriteByte(125);stream.Flush(true);
+          }
+        } catch(IOException) { throw new Stop("C996_NATIVE_COMPETING_INSERT_BLOCKED"); }
+        throw new Stop("C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED");
+      }
       // Child share locks protect the verified files, not insertion of a new
       // directory entry. No production move until the whole inventory can be
       // held stable through the namespace operation.
