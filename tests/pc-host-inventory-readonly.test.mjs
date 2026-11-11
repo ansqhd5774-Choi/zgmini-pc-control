@@ -52,8 +52,8 @@ test('VM presence probe is pinned to six public C: standard paths only',()=>{
   assert.equal(new Set(FIXED_VM_PATHS.map(x=>x[0])).size,6);
   for(const [id,filename] of FIXED_VM_PATHS){
     assert.match(id,/^[A-Z_]+$/);
-    assert.match(filename,/^C:\\\\/);
-    assert.doesNotMatch(filename,/Users|AppData|\\.\\.|E:\\\\/);
+    assert.match(filename,/^C:\\/);
+    assert.doesNotMatch(filename,/Users|AppData|\\.\\.|E:\\/);
   }
 });
 test('read-only VM inventory reports present, missing, symlink, IO unknown distinctly',()=>{
