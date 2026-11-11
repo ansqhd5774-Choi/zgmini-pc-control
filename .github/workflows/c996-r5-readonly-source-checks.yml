@@ -37,3 +37,9 @@ jobs:
           if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" (echo C996_OWNER_TEST_RUNNER_STOP & exit /b 11)
           if exist "E:\ZGmini" (echo C996_OWNER_TEST_ORIGINAL_ROOT_FORBIDDEN & exit /b 12)
           node --test tests/controller-996-c-native-owner-operator.test.mjs
+
+      - name: C996 TEMP-only namespace insertion negative proof
+        run: |
+          if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" (echo C996_NAMESPACE_TEST_RUNNER_STOP & exit /b 13)
+          if exist "E:\ZGmini" (echo C996_NAMESPACE_TEST_ORIGINAL_ROOT_FORBIDDEN & exit /b 14)
+          node --test --test-name-pattern="native TEMP fixture proves sibling insertion" tests/controller-996-windows-handle-bound-archive.test.mjs
