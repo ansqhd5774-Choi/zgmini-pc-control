@@ -37,7 +37,7 @@ test('temporary ACL fixture restores on normal and injected failures', () => {
   assert.match(source, /\$afterDacl -ceq \$beforeDacl -and \$afterHash -ceq \$initialHash/);
   assert.match(source, /C996_SECURITY_PROOF_INJECTED_FAILURE/);
   assert.match(nativeSource, /SetSecurityDescriptorSddlForm\(originalDacl, Dacl\)/);
-  assert.match(nativeSource, /GetSecurityDescriptorSddlForm\(Dacl\) == originalDacl/);
+  assert.match(nativeSource, /daclMatches = afterDacl == originalDacl/);
   assert.match(nativeSource, /C996_SECURITY_PROOF_INJECTED_FAILURE/);
 });
 
@@ -132,7 +132,10 @@ for(const scenario of ['termination','timeout'])test('native TEMP journal recove
       if(scenario==='timeout')assert.equal(aborted.error?.code,'ETIMEDOUT',aborted.stderr);
       else assert.equal(aborted.status, 17, aborted.stderr || aborted.error?.message);
       const payload = JSON.parse(aborted.stdout.trim());
-      assert.equal(path.resolve(payload.fixtureRoot), path.resolve(root));
+      // Windows may return the same TEMP directory as an 8.3 short name or
+      // its expanded long name. Resolve both to the actual filesystem path.
+      assert.equal(fs.realpathSync.native(payload.fixtureRoot).toLowerCase(),
+        fs.realpathSync.native(root).toLowerCase());
       assert.equal(payload.executionAuthorized, false);
     } finally {
       // A separate process attempts restoration even when the child assertion fails.
