@@ -4,7 +4,7 @@
 
 **공통 정본:** [docs/PC_AUTOMATION_STANDARD.md](docs/PC_AUTOMATION_STANDARD.md) (2026-11-05 개정). 현재 업무를 수행하고 이번 결과를 보고한다. 과거 설치·복구 증거는 필요한 범위에서 재사용하며 신규 성과로 반복 보고하지 않는다.
 
-**시작 지침:** [docs/GENERAL_CHAT_START.md](docs/GENERAL_CHAT_START.md) · [허용목록](config/operations.json)
+**시작 지침:** [docs/GENERAL_CHAT_START.md](docs/GENERAL_CHAT_START.md) · [두 PC 운영·프로세스 정본](docs/PC_OPERATING_SYSTEMS_CANONICAL.md) · [허용목록](config/operations.json)
 
 **여러 작업의 공용 설치:** [적용 대기열 운영 방침](docs/CONTROLLER_APPLY_QUEUE.md). 독립 개발·실행은 병렬로, 공용 Controller·유지보수기 및 동일 PC Core 운영 checkout의 공유 변경만 단일 원장·자원별 담당으로 조정한다.
 
