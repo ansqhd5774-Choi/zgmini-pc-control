@@ -158,8 +158,16 @@ async function main() {
   }
   if(out) {
     const txt=['schema='+report.schema,'host='+report.host,'status='+report.status,'code='+report.code,'inputs='+report.inputs.filter(x=>x.matched).length+'/5','logs='+report.logs.length,'rootCauseStage=UNKNOWN','operationalWrites=0','rawLogIncluded=false','See JSON for sanitized counts; do not upload raw DISM logs.',''].join('\r\n');
-    const json=JSON.stringify(report,null,2)+'\n';
-    if (Buffer.byteLength(json,'utf8')>32768) throw new Error('REPORT_SIZE_BOUND_EXCEEDED');
+    let json=JSON.stringify(report,null,2)+'\n';
+    if (Buffer.byteLength(json,'utf8')>32768) {
+      report.logs=report.logs.map(({directory,name,bytes,sha256,counts})=>({directory,name,bytes,sha256,counts}));
+      report.status='PARTIAL';report.code='REPORT_SIZE_LIMIT';
+      json=JSON.stringify(report,null,2)+'\n';
+    }
+    if (Buffer.byteLength(json,'utf8')>32768) {
+      report.logs=[];report.status='PARTIAL';report.code='REPORT_SIZE_LIMIT';
+      json=JSON.stringify(report,null,2)+'\n';
+    }
     fs.writeFileSync(path.win32.join(out,'summary.json'),json,{flag:'wx'});
     fs.writeFileSync(path.win32.join(out,'summary.txt'),txt,{flag:'wx'});
     console.log('C996_READONLY '+report.status+' code='+report.code+' logs='+report.logs.length);
