@@ -18,22 +18,26 @@ test('dismount alone cannot establish an exclusive file-system namespace',()=>{
   assert.equal(result.status,'UNSUPPORTED_METHOD');
   assert.equal(result.code,'C996_DISMOUNT_IS_NOT_EXCLUSIVE');
 });
-test('existing ZGMINI PC WinPE boot proposes two guarded offline phases',()=>{
+test('existing ZGMINI PC selects one offline WinPE boot without granting C Owner approval',()=>{
   const result=plan996OfflineRecovery({continuationId,method:'EXISTING_ZGMINI_PC_WINPE_BOOT'});
-  assert.equal(result.status,'OWNER_DECISION_REQUIRED');
+  assert.equal(result.status,'OWNER_FINAL_APPROVAL_REQUIRED');
   assert.equal(result.productionExecutable,false);
-  assert.deepEqual(result.steps.map(step=>step.name),['oldC','ownC','install']);
+  assert.deepEqual(result.steps.map(step=>step.name),['oldC','continuation','install']);
   assert.deepEqual(result.legacySingleSessionSteps.map(step=>step.name),
     ['oldC','continuation','install']);
-  assert.equal(result.twoBootReview.legacySingleSessionPlanExecutable,false);
-  assert.equal(result.twoBootReview.currentOperatorCompatible,false);
-  assert.equal(result.singleBootAlternative.winpeBootCount,1);
+  assert.notEqual(result.steps[0].destination,result.legacySingleSessionSteps[0].destination);
+  assert.equal(result.twoBootAlternative.legacySingleSessionPlanExecutable,false);
+  assert.equal(result.twoBootAlternative.currentOperatorCompatible,false);
+  assert.equal(result.selectedBootReview.winpeBootCount,1);
+  assert.equal(result.selectedWinpeBootCount,1);
+  assert.equal(result.designSelection,'SINGLE_WINPE_BOOT_BOUNDED_SIGNED_OFFLINE');
+  assert.equal(result.signedHandoffMode,'SHORT_LIVED_OFFLINE_PINNED_PUBLIC_KEY');
   assert.equal(result.ownerDecisions.length,6);
   assert.equal(result.selectedBootImageVerified,false);
   assert.equal(result.nativeMoverSelected,false);
   assert.equal(result.winPePowerShellAssumed,false);
   assert.equal(result.driveLetterTrusted,false);
-  assert.equal(result.code,'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED');
+  assert.equal(result.code,'C996_SINGLE_BOOT_BOUNDED_SIGNED_OWNER_APPROVAL_REQUIRED');
   assert.deepEqual(result.pcTopology,{physicalPcCount:2,
     existingPcName:'기존 ZGMINI PC',queuePcName:'공통 대기열 PC',
     recoveryBootPc:'기존 ZGMINI PC',bootEnvironment:'WinPE',
@@ -46,7 +50,7 @@ test('supplied offline=true and owner consent flags never authorize this planner
   const result=plan996OfflineRecovery({continuationId,method:'EXISTING_ZGMINI_PC_WINPE_BOOT',
     approved:true,offline:true,volumeLockVerified:true});
   assert.equal(result.executionAuthorized,false);
-  assert.equal(result.status,'OWNER_DECISION_REQUIRED');
+  assert.equal(result.status,'OWNER_FINAL_APPROVAL_REQUIRED');
 });
 test('no selected method requests a specific decision and rejects unsafe identifiers',()=>{
   assert.equal(plan996OfflineRecovery({continuationId}).code,'C996_OFFLINE_METHOD_NOT_SELECTED');
@@ -103,6 +107,16 @@ test('single boot never assumes WinPE .NET or original Windows E: mapping',()=>{
   assert.equal(single.executionAuthorized,false);
   assert.equal(single.productionExecutable,false);
   assert.equal(single.originalPcWrites,0);
+  assert.equal(single.selectedConsentMode,'SHORT_LIVED_SIGNED_OFFLINE');
+  assert.equal(single.prebootOnlineApprovalAndRevocationReadbackRequired,true);
+  assert.equal(single.winpeNetworkRequiredForConsent,false);
+  assert.equal(single.revocationDuringWinpeAvailable,false);
+  assert.equal(single.signatureAlgorithmCandidate,'RSA_PSS_SHA256');
+  assert.equal(single.signatureVerificationImplemented,false);
+  assert.equal(single.pinnedOwnerPublicKeyVerified,false);
+  assert.equal(single.offlineExpiryAndClockTrustVerified,false);
+  assert.equal(single.offlineValiditySeconds,null);
+  assert.equal(single.finalOwnerCApprovalGranted,false);
 });
 test('old interrupted C claim does not take the new online C claim archive destination',()=>{
   assert.notEqual(twoBoot.oldClaimArchive.destination,twoBoot.newClaimArchive.destination);
