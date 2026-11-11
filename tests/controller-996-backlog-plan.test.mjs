@@ -67,12 +67,17 @@ test('actual four pause-window Issue shapes remain review-only after interrupted
       operation:op,sourceSha:'643b7c7c4372ffad552443fc312c6cb1b944e2fc'})};
   });
   a.commentsByIssue=Object.fromEntries(originals.map(([n])=>[
-    n,{complete:true,comments:[]}]));
+    n,{complete:true,comments:n===1227?[{
+      id:6781491296,user:{login:'ansqhd5774-Choi'},
+      body:'D05 diagnostic: AUTOMATION_BLOCKED / PC_JOB_INTAKE_NOT_OBSERVED; no bot receipt'
+    }]:[]}]));
   const p=plan996BacklogWithoutReplay(a);
   assert.equal(p.status,'READONLY_DISPOSITIONS_ONLY');
   assert.equal(p.originalIssueCount,4);
   assert.deepEqual(p.entries.map(e=>e.originIssue),[1217,1219,1226,1227]);
   assert.ok(p.entries.every(e=>e.disposition==='OWNER_REPLAN_REVIEW_REQUIRED'));
+  assert.equal(a.commentsByIssue[1227].comments.length,1);
+  assert.equal(p.entries.find(e=>e.originIssue===1227).disposition,'OWNER_REPLAN_REVIEW_REQUIRED');
   assert.equal(p.executionAuthorized,false);
   assert.equal(p.issuePostsAuthorized,0);
   assert.equal(p.automaticPcRetries,0);
@@ -162,4 +167,18 @@ test('unrelated records are ignored while original dispositions stay determinist
   assert.equal(plan996BacklogWithoutReplay(b).originalIssueCount,1);
   const c=fixture();c.listing.issues.push({...issue(1252),pull_request:{url:'https://api.github.com/pulls/1252'}});
   assert.equal(plan996BacklogWithoutReplay(c).originalIssueCount,1);
+});
+
+test('an Owner diagnostic comment never becomes bot receipt or replay consent',()=>{
+  const a=fixture();
+  a.commentsByIssue[1250].comments=[{
+    id:6781491296,user:{login:'ansqhd5774-Choi'},
+    body:'D05 AUT0MATION_BLOCKED / PC_JOB_INTAKE_NOT_OBSERVED; no verified pc-job receipt'
+  }];
+  const p=plan996BacklogWithoutReplay(a);
+  assert.equal(p.status,'READONLY_DISPOSITIONS_ONLY');
+  assert.equal(p.entries[0].disposition,'OWNER_REPLAN_REVIEW_REQUIRED');
+  assert.equal(p.issuePostsAuthorized,0);
+  assert.equal(p.executionAuthorized,false);
+  assert.equal(p.automaticPcRetries,0);
 });
