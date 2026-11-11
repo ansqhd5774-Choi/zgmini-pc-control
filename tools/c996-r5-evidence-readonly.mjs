@@ -33,7 +33,7 @@ const LOG_DIRS = Object.freeze([
   {id:'R5_LOGS',dir:path.win32.join(ROOT,'logs')}
 ]);
 const MAX_LOG_BYTES = 64 * 1024 * 1024;
-const MAX_LOGS = 32;
+const MAX_LOGS = 16;
 
 export function allowedLogName(name) {
   return typeof name === 'string' && /^[A-Za-z0-9_.-]{1,96}\.log$/i.test(name) &&
@@ -127,7 +127,7 @@ async function inspectLog(x) {
       const code=eventCode(line);
       if (code) {
         counts[code]=(counts[code]||0)+1;
-        if (events.length<40) events.push({line:lines,code,at:logTimestamp(line)});
+        if (events.length<8) events.push({line:lines,code,at:logTimestamp(line)});
       }
     }
   } finally {rl.close();stream.destroy();}
@@ -158,7 +158,9 @@ async function main() {
   }
   if(out) {
     const txt=['schema='+report.schema,'host='+report.host,'status='+report.status,'code='+report.code,'inputs='+report.inputs.filter(x=>x.matched).length+'/5','logs='+report.logs.length,'rootCauseStage=UNKNOWN','operationalWrites=0','rawLogIncluded=false','See JSON for sanitized counts; do not upload raw DISM logs.',''].join('\r\n');
-    fs.writeFileSync(path.win32.join(out,'summary.json'),JSON.stringify(report,null,2)+'\n',{flag:'wx'});
+    const json=JSON.stringify(report,null,2)+'\n';
+    if (Buffer.byteLength(json,'utf8')>32768) throw new Error('REPORT_SIZE_BOUND_EXCEEDED');
+    fs.writeFileSync(path.win32.join(out,'summary.json'),json,{flag:'wx'});
     fs.writeFileSync(path.win32.join(out,'summary.txt'),txt,{flag:'wx'});
     console.log('C996_READONLY '+report.status+' code='+report.code+' logs='+report.logs.length);
     console.log('RESULT_DIR='+out);
