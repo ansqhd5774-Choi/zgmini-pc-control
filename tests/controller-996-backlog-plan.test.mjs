@@ -173,7 +173,7 @@ test('an Owner diagnostic comment never becomes bot receipt or replay consent',(
   const a=fixture();
   a.commentsByIssue[1250].comments=[{
     id:6781491296,user:{login:'ansqhd5774-Choi'},
-    body:'D05 AUT0MATION_BLOCKED / PC_JOB_INTAKE_NOT_OBSERVED; no verified pc-job receipt'
+    body:'D05 AUTOMATION_BLOCKED / PC_JOB_INTAKE_NOT_OBSERVED; no verified pc-job receipt'
   }];
   const p=plan996BacklogWithoutReplay(a);
   assert.equal(p.status,'READONLY_DISPOSITIONS_ONLY');
