@@ -49,6 +49,49 @@ export function plan996WindowsArchive(continuationId){
     executionAuthorized:false});
 }
 
+/**
+ * Review the requested exclusion mechanism without touching a volume or
+ * declaring caller-provided observations to be live OS evidence.
+ */
+export function plan996OfflineRecovery({continuationId,method}={}){
+  const plan=plan996WindowsArchive(continuationId);
+  const common={
+    schema:'ZGMINI_CONTROLLER_996_OFFLINE_METHOD_REVIEW_V1',
+    originalRequestId:ORIGINAL,continuationId,
+    intendedCompletion:'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED',
+    steps:plan.steps,executionAuthorized:false,productionExecutable:false,
+    operationalWrites:0,workflowPuts:0,backlogWrites:0,issuePosts:0,
+  };
+  if(method==='LOCK_VOLUME_THEN_PATH_RENAME'){
+    return Object.freeze({...common,status:'UNSUPPORTED_METHOD',
+      code:'C996_VOLUME_LOCK_DISALLOWS_PATH_RENAME',
+      reason:'OPEN_FILES_PREVENT_LOCK_AND_LOCKED_VOLUME_REQUIRES_VOLUME_HANDLE_IO'});
+  }
+  if(method==='DISMOUNT_WITHOUT_EXCLUSIVE_HOST'){
+    return Object.freeze({...common,status:'UNSUPPORTED_METHOD',
+      code:'C996_DISMOUNT_IS_NOT_EXCLUSIVE',
+      reason:'OTHER_ACCESS_CAN_REMOUNT_THE_VOLUME'});
+  }
+  if(method!=='SEPARATE_OFFLINE_HOST'){
+    return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
+      code:'C996_OFFLINE_METHOD_NOT_SELECTED'});
+  }
+  return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
+    code:'C996_OFFLINE_DOWNTIME_AND_TRUSTED_HOST_APPROVAL_REQUIRED',
+    ownerDecisions:Object.freeze([
+      'STOP_ORIGINAL_WINDOWS_WRITERS_AND_APPROVE_DOWNTIME',
+      'SELECT_TRUSTED_SEPARATE_BOOT_OR_HOST_WITH_SOLE_VOLUME_ACCESS',
+      'PIN_VOLUME_ID_AND_SERIAL_WITHOUT_ASSUMING_DRIVE_LETTER',
+      'APPROVE_EXACT_SIGNED_TOOL_AND_OFFLINE_CONSENT_VERIFICATION',
+      'PRESERVE_LIVE_OWNER_REVOCATION_CHECK_OR_APPROVE_EXACT_OFFLINE_VALIDITY',
+    ]),
+    preservation:Object.freeze(['VOLUME_ID','FILE_IDS','SHA256','ACL','PATH_MAPPING']),
+    onlineReadbackRequired:Object.freeze(['ORIGINAL_CONTROLLER','PROTECTED_WRITER',
+      'PC_JOB_WORKFLOW','CLOSED_BACKLOG','FOUR_ORIGINAL_JOB_DISPOSITIONS']),
+    nextEffect:'NONE_UNTIL_EXACT_OWNER_SCOPE_AND_NATIVE_PROOF',
+  });
+}
+
 const relSafe=x=>typeof x==='string'&&x.length>0&&
   !x.includes('\\')&&!path.isAbsolute(x)&&
   x.split('/').every(p=>p&&p!=='.'&&p!=='..');

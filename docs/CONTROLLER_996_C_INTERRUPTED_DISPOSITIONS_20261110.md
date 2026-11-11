@@ -353,6 +353,13 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 
 ## 다음 명시적 Gate
 
+### 오프라인 독점 복구 후보 검토 — 34f9dc2 후속
+
+- `plan996OfflineRecovery`는 기존 3개 보관 경로와 Install Lease 최종 순서를 재사용하고, 실행 권한을 부여하지 않는 방법 검토 결과를 반환한다. 볼륨 잠금 유지 중 경로 rename은 `C996_VOLUME_LOCK_DISALLOWS_PATH_RENAME`, 단순 dismount는 `C996_DISMOUNT_IS_NOT_EXCLUSIVE`로 거부한다. Microsoft 규격상 열린 파일이 있으면 볼륨 잠금이 실패하며 잠금 후에는 해당 볼륨 핸들로만 접근할 수 있다. [FSCTL_LOCK_VOLUME](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-fsctl_lock_volume), [FSCTL_DISMOUNT_VOLUME](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-fsctl_dismount_volume).
+- 가능한 후보는 설치 Windows를 종료하고 신뢰된 별도 복구 OS 또는 호스트가 대상 볼륨을 단독으로 사용하는 방식이다. 현재 온라인 실행기의 고정 Node·gh 경로, PID 및 예약 관측, 최종 Owner 승인 재조회는 해당 환경에 맞춰 구현해야 한다. 드라이브 문자 대신 볼륨 GUID·serial과 파일 ID를 고정하며, 원본 SHA-256·ACL·상대 경로와 보관본을 대조해야 한다.
+- Owner 범위 결정이 필요한 항목은 운영 중단·외부 부팅·복귀, 단독 접근할 복구 환경, 정확한 실행물, 최종 승인 철회 재조회 유지 또는 명시적 단회 오프라인 승인 유효기간이다. 현재의 승인 보장을 캐시된 `approved=true`로 대신하지 않는다.
+- 이번 방법 검토·기존 경로 회귀 7/7 PASS. 이전 격리 Windows TEMP 10/10 및 네이티브 6/6 증거는 해당 커밋 범위에서 재사용하며 재실행하지 않았다. 새 오프라인 환경의 독점 보관 성공은 미검증이다. 원본 운영 중단·볼륨 lock/dismount·Claim/Lease 이동은 수행하지 않았다. 최종 C ZIP 및 S2 봉인은 보류하며 운영 80% 유지.
+
 ### Windows Bootstrap 소스 고정 검증 — 2026-11-11
 
 - `VERIFY_996_WINDOWS_TRUSTED_SNAPSHOT.ps1`은 독립적으로 전달받은 SHA-256으로 helper 바이트를 확인한 뒤 그 바이트를 컴파일한다. SourceLock을 먼저 고정하고 Bootstrap을 포함한 16개 소스와 ZIP을 Windows 파일 핸들로 읽어 SHA-256을 대조한다. Node 프로세스가 종료될 때까지 파일과 상위 디렉터리 핸들을 유지한다.
