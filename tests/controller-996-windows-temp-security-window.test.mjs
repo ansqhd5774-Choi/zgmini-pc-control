@@ -13,6 +13,7 @@ const source = fs.readFileSync(fixture, 'utf8');
 test('temporary ACL fixture rejects production invocation before creating files', () => {
   assert.match(source, /if \(-not \$TestOnly\) \{ throw 'C996_SECURITY_PROOF_TEST_ONLY_REQUIRED' \}/);
   assert.match(source, /C996_SECURITY_PROOF_ORIGINAL_PC_FORBIDDEN/);
+  assert.match(source, /-not \$AllowOriginalPcTempOnly/);
   assert.match(source, /zgmini-996-acl-fixture-/);
   assert.match(source, /C996_SECURITY_PROOF_UNSAFE_TEMP/);
   assert.ok(source.includes('^[a-zA-Z]:\\\\$'), 'drive root must require a literal backslash');
@@ -48,14 +49,17 @@ test('test fixture distinguishes locked move from move after handle close', () =
   assert.match(source, /originalPcWrites = 0/);
 });
 
-const onSeparateWindows = process.platform === 'win32' &&
-  !fs.existsSync('E:\\ZGmini') &&
+const originalPcPresent = fs.existsSync('E:\\ZGmini');
+const explicitOriginalPcTempConsent = process.env.ZGMINI_996_TEMP_ONLY_ON_ORIGINAL_PC === '1';
+const onApprovedWindows = process.platform === 'win32' &&
+  (!originalPcPresent || explicitOriginalPcTempConsent) &&
   fs.existsSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+const originalPcFlag = originalPcPresent ? ['-AllowOriginalPcTempOnly'] : [];
 for (const inject of [false, true]) {
   test(`native TEMP ACL restoration (${inject ? 'injected failure' : 'normal'})`,
-    {skip: !onSeparateWindows}, () => {
+    {skip: !onApprovedWindows}, () => {
       const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-      const args = ['-NoProfile', '-NonInteractive', '-File', fixture, '-TestOnly'];
+      const args = ['-NoProfile', '-NonInteractive', '-File', fixture, '-TestOnly', ...originalPcFlag];
       if (inject) args.push('-InjectFailure');
       const result = spawnSync(powershell, args, {
         encoding: 'utf8', timeout: 30000, windowsHide: true,
@@ -74,12 +78,12 @@ for (const inject of [false, true]) {
 }
 
 test('native TEMP journal recovers ACL after deliberately terminated child',
-  {skip: !onSeparateWindows}, () => {
+  {skip: !onApprovedWindows}, () => {
     const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
     const root = path.join(os.tmpdir(), `zgmini-996-acl-fixture-${randomUUID().replaceAll('-', '')}`);
     const aborted = spawnSync(powershell, [
       '-NoProfile', '-NonInteractive', '-File', fixture,
-      '-TestOnly', '-SimulateChildTermination', '-FixtureRoot', root,
+      '-TestOnly', ...originalPcFlag, '-SimulateChildTermination', '-FixtureRoot', root,
     ], {
       encoding: 'utf8', timeout: 30000, windowsHide: true,
       env: {...process.env, ZGMINI_996_TEMP_TERMINATION_TEST: '1'},
@@ -95,7 +99,7 @@ test('native TEMP journal recovers ACL after deliberately terminated child',
       if (fs.existsSync(path.join(root, 'acl-recovery.json'))) {
         recovery = spawnSync(powershell, [
           '-NoProfile', '-NonInteractive', '-File', fixture,
-          '-TestOnly', '-RecoverOnly', '-FixtureRoot', root,
+          '-TestOnly', ...originalPcFlag, '-RecoverOnly', '-FixtureRoot', root,
         ], {encoding: 'utf8', timeout: 30000, windowsHide: true});
         assert.equal(recovery.status, 0, recovery.stderr || recovery.error?.message);
         const report = JSON.parse(recovery.stdout.trim());
