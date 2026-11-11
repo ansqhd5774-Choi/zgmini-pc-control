@@ -17,6 +17,13 @@
 #ifndef _WIN64
 #error "This TEMP-only test requires the pinned Windows x64 architecture"
 #endif
+/* The absolute-path probe is diagnostic-only, never a production fallback.
+ * Win32 accepts NULL RootDirectory with an absolute destination; the default
+ * handle-relative candidate remains unchanged unless BOTH test macros exist. */
+#if defined(C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY) && \
+    !defined(C996_NATIVE_INTERACTIVE_TEMP_TEST_ONLY)
+#error "Absolute TEMP probe requires the explicit interactive TEST-only mode"
+#endif
 #define WIN32_LEAN_AND_MEAN
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0602
@@ -150,10 +157,9 @@ int wmain(int argc, WCHAR **argv)
     HANDLE archive_handle = INVALID_HANDLE_VALUE;
     c996_file_identity root_id = {0}, source_id = {0}, archive_id = {0};
     FILE_RENAME_INFO *rename_info = NULL;
-    const WCHAR *new_leaf = L"archive";
-    size_t leaf_bytes = wcslen(new_leaf) * sizeof(WCHAR);
-    size_t info_bytes = offsetof(FILE_RENAME_INFO, FileName) + leaf_bytes +
-                        sizeof(WCHAR);
+    const WCHAR *new_name = L"archive";
+    size_t name_bytes;
+    size_t info_bytes;
     int outcome = 2;
 
     if (argc != 3 || wcscmp(argv[1], L"--test-token") != 0 ||
@@ -172,6 +178,18 @@ int wmain(int argc, WCHAR **argv)
         !c996_no_reparse_ancestors(root) ||
         !c996_no_reparse_ancestors(source))
         return c996_stop("FIXTURE_UNSAFE");
+
+#ifdef C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY
+    /* Dedicated Windows A/B probe after the relative-root Win32 call returned
+     * 87 on this host. The destination is EXACTLY the validated fixture path,
+     * not the process working directory. This cannot prove offline handle
+     * confinement, so it must never be promoted to a C-grade operator. */
+    new_name = archive;
+    puts("C996_NATIVE_TEMP_MODE:ABSOLUTE_NULL_ROOT_DIAGNOSTIC_ONLY");
+#endif
+    name_bytes = wcslen(new_name) * sizeof(WCHAR);
+    info_bytes = offsetof(FILE_RENAME_INFO, FileName) + name_bytes +
+                 sizeof(WCHAR);
 
     root_handle = c996_open_dir(root, FILE_READ_ATTRIBUTES | FILE_TRAVERSE,
                                 FILE_SHARE_READ | FILE_SHARE_WRITE);
@@ -202,9 +220,13 @@ int wmain(int argc, WCHAR **argv)
         goto done;
     }
     rename_info->ReplaceIfExists = FALSE;
+#ifdef C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY
+    rename_info->RootDirectory = NULL;
+#else
     rename_info->RootDirectory = root_handle;
-    rename_info->FileNameLength = (DWORD)leaf_bytes;
-    memcpy(rename_info->FileName, new_leaf, leaf_bytes);
+#endif
+    rename_info->FileNameLength = (DWORD)name_bytes;
+    memcpy(rename_info->FileName, new_name, name_bytes);
     if (!SetFileInformationByHandle(source_handle, FileRenameInfo,
                                     rename_info, (DWORD)info_bytes)) {
         /* Preserve the FIRST Win32 failure before later diagnostics or
