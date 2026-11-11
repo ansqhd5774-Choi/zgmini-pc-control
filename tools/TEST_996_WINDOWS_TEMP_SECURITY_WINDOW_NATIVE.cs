@@ -147,11 +147,16 @@ internal static class Program
     private static bool Restore(string target, string expectedHash, string originalDacl)
     {
         AssertTarget(target, expectedHash);
-        var acl = File.GetAccessControl(target);
+        // .NET Framework recommends a fresh FileSecurity for applying saved SDDL.
+        // Reusing the mutated target descriptor can preserve its added ACEs.
+        var acl = new FileSecurity();
         acl.SetSecurityDescriptorSddlForm(originalDacl, Dacl);
         File.SetAccessControl(target, acl);
-        return File.GetAccessControl(target).GetSecurityDescriptorSddlForm(Dacl) == originalDacl &&
-            Hash(target) == expectedHash;
+        bool daclMatches = File.GetAccessControl(target).GetSecurityDescriptorSddlForm(Dacl) == originalDacl;
+        bool bytesMatch = Hash(target) == expectedHash;
+        if (!daclMatches) Console.Error.WriteLine("C996_SECURITY_PROOF_RESTORE_DACL_MISMATCH");
+        if (!bytesMatch) Console.Error.WriteLine("C996_SECURITY_PROOF_RESTORE_BYTES_MISMATCH");
+        return daclMatches && bytesMatch;
     }
 
     private static int Recover(string root)
