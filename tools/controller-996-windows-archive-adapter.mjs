@@ -277,6 +277,77 @@ export function simulate996TwoBootRecovery({continuationId,events=[]}={}){
     executionAuthorized:false,operationalWrites:0,automaticRetry:false});
 }
 
+// Synthetic ONE-boot review, not an authorization or a substitute for signed
+// handoff verification, WinPE evidence, native file-ID readback, or C Owner
+// consent. Every event below is untrusted, caller-supplied test data.
+export function simulate996SingleBootRecovery({continuationId,events=[]}={}){
+  const plan=plan996SingleBootRecovery(continuationId);
+  const fail=(code,completed=0)=>Object.freeze({status:'SYNTHETIC_BLOCKED',
+    code,completed,installLeaseReleaseAuthorized:false,
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+  if(!Array.isArray(events)||events.length>3)
+    return fail('C996_SINGLE_BOOT_EVENTS_INVALID');
+  const bootEpochs=new Set();
+  let ownerNonce=null,sourceSha=null,readySha=null;
+  for(let i=0;i<events.length;i++){
+    const e=events[i];
+    if(!e||e.phase!==plan.phases[i].id)
+      return fail('C996_SINGLE_BOOT_PHASE_ORDER_INVALID',i);
+    if(typeof e.bootEpoch!=='string'||e.bootEpoch.length<8||
+      bootEpochs.has(e.bootEpoch))
+      return fail('C996_SINGLE_BOOT_BOOT_EPOCH_INVALID',i);
+    bootEpochs.add(e.bootEpoch);
+    if(i===0){
+      if(e.oldCAtOriginal!==true||e.installLeaseHeld!==true||
+        e.workflowState!=='active'||e.backlogClosed!==true||
+        e.fourJobsVerified!==true||e.admissionProtected!==true||
+        e.sixMatchingRunnersOffline!==true||e.runnerAutoStartHeld!==true||
+        e.workflowPutCount!==0||e.backlogWriteCount!==0||
+        e.issuePostCount!==0||!UUID(e.ownerNonce)||
+        !H64(e.sourceSha256)||!H64(e.readyMarkerSha256)||
+        e.signedHandoffVerified!==true||
+        e.ownerApprovalFreshOrBoundedVerified!==true)
+        return fail('C996_SINGLE_BOOT_ONLINE_PREPARE_UNVERIFIED',i);
+      ownerNonce=e.ownerNonce;sourceSha=e.sourceSha256;
+      readySha=e.readyMarkerSha256;
+    }else if(i===1){
+      if(e.ownerNonce!==ownerNonce||e.sourceSha256!==sourceSha||
+        e.readyMarkerSha256!==readySha||
+        e.signedHandoffVerified!==true||
+        e.ownerApprovalFreshOrBoundedVerified!==true||
+        e.bootImageVerified!==true||e.nativeX64MoverVerified!==true||
+        e.volumeIdentityPinned!==true||
+        e.installLeaseHeldUntilFinalMove!==true||
+        !Array.isArray(e.moves)||e.moves.length!==3)
+        return fail('C996_SINGLE_BOOT_WINPE_HANDOFF_OR_MOVES_UNVERIFIED',i);
+      for(let j=0;j<3;j++){
+        const actual=e.moves[j],expected=plan.phases[1].moves[j];
+        if(!actual||actual.name!==expected.name||
+          actual.source!==expected.source||
+          actual.destination!==expected.destination||
+          actual.destinationAbsentBefore!==true||
+          actual.sourceAbsentAfter!==true||actual.noReplace!==true||
+          !/^[a-f0-9]{32}$/.test(actual.sourceFileId)||
+          actual.archiveFileId!==actual.sourceFileId||
+          !/^[a-f0-9]{16}$/.test(actual.sourceVolumeSerial)||
+          actual.archiveVolumeSerial!==actual.sourceVolumeSerial)
+          return fail('C996_SINGLE_BOOT_MOVE_ORDER_OR_IDENTITY_FAILED',i);
+      }
+    }else if(e.installLeaseArchived!==true||
+      e.archivesVerified!==true||e.controllerUnchanged!==true||
+      e.protectedItemsUnchanged!==true||e.workflowState!=='active'||
+      e.backlogClosed!==true||e.fourJobsVerified!==true||
+      e.runnerPostcheckBeforeResume!==true||
+      e.sourceSha256!==sourceSha){
+      return fail('C996_SINGLE_BOOT_FINAL_READBACK_UNVERIFIED',i);
+    }
+  }
+  return Object.freeze({status:events.length===3?
+      'SYNTHETIC_SEQUENCE_REVIEWED_ONLY':'SYNTHETIC_INCOMPLETE',
+    completed:events.length,installLeaseReleaseAuthorized:false,
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+}
+
 const relSafe=x=>typeof x==='string'&&x.length>0&&
   !x.includes('\\')&&!path.isAbsolute(x)&&
   x.split('/').every(p=>p&&p!=='.'&&p!=='..');
