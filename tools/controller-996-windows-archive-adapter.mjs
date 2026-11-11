@@ -82,24 +82,31 @@ export function plan996OfflineRecovery({continuationId,method}={}){
     return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
       code:'C996_OFFLINE_METHOD_NOT_SELECTED'});
   }
+  // Owner delegated DESIGN selection, not C-grade operation authorization.
+  // Choose one WinPE boot + bounded signed offline handoff to avoid depending
+  // on unverified WinPE NIC/TLS connectivity during original-PC downtime.
+  const singleBootReview=plan996SingleBootRecovery(continuationId);
   const twoBootReview=plan996TwoBootRecovery(continuationId);
-  return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
-    code:'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED',
-    // The legacy one-session three-move path collides with the online C claim.
-    // Retain it as rejected history; expose ONLY two-boot moves as the proposal.
+  return Object.freeze({...common,status:'OWNER_FINAL_APPROVAL_REQUIRED',
+    code:'C996_SINGLE_BOOT_BOUNDED_SIGNED_OWNER_APPROVAL_REQUIRED',
+    designSelection:'SINGLE_WINPE_BOOT_BOUNDED_SIGNED_OFFLINE',
+    selectedWinpeBootCount:1,
+    signedHandoffMode:'SHORT_LIVED_OFFLINE_PINNED_PUBLIC_KEY',
+    // The original single-session plan collided with the online C claim's
+    // archive; the selected new plan uses a disjoint interrupted-old-C path.
     legacySingleSessionSteps:plan.steps,
-    steps:Object.freeze(twoBootReview.phases.flatMap(phase=>phase.moves)),
-    twoBootReview,
-    singleBootAlternative:plan996SingleBootRecovery(continuationId),
+    steps:Object.freeze(singleBootReview.phases.flatMap(phase=>phase.moves)),
+    selectedBootReview:singleBootReview,
+    twoBootAlternative:twoBootReview,
     selectedBootImageVerified:false,nativeMoverSelected:false,
     winPePowerShellAssumed:false,driveLetterTrusted:false,
     ownerDecisions:Object.freeze([
-      'STOP_ORIGINAL_WINDOWS_WRITERS_AND_APPROVE_DOWNTIME',
-      'SELECT_EXISTING_ZGMINI_PC_WINPE_WITH_SOLE_VOLUME_ACCESS',
-      'INSPECT_BOOT_IMAGE_POWER_SHELL_DOTNET_OR_NATIVE_WIN32_CAPABILITY',
+      'FINAL_OWNER_SCOPE_APPROVAL_BEFORE_ANY_C_OR_DOWNTIME',
+      'DRAIN_SIX_MATCHING_RUNNERS_AND_PIN_PREBOOT_GITHUB_STATE',
+      'VERIFY_WINPE_NATIVE_X64_AND_PIN_EXACT_EXECUTABLE_HASH',
       'PIN_VOLUME_ID_AND_SERIAL_WITHOUT_ASSUMING_DRIVE_LETTER',
-      'APPROVE_EXACT_SIGNED_TOOL_AND_OFFLINE_CONSENT_VERIFICATION',
-      'PRESERVE_LIVE_OWNER_REVOCATION_CHECK_OR_APPROVE_EXACT_OFFLINE_VALIDITY',
+      'VERIFY_SIGNED_HANDOFF_WITH_INDEPENDENT_PINNED_PUBLIC_KEY',
+      'APPROVE_EXACT_EXPIRY_AND_TRUSTED_OFFLINE_TIME_OR_STOP',
     ]),
     preservation:Object.freeze(['VOLUME_ID','FILE_IDS','SHA256','ACL','PATH_MAPPING']),
     onlineReadbackRequired:Object.freeze(['ORIGINAL_CONTROLLER','PROTECTED_WRITER',
@@ -204,6 +211,16 @@ export function plan996SingleBootRecovery(continuationId){
     status:'SOURCE_ONLY_NOT_EXECUTABLE',executionAuthorized:false,
     productionExecutable:false,physicalPcCount:2,additionalPcRequired:false,
     existingPcName:pc,queuePcName:'공통 대기열 PC',winpeBootCount:1,
+    selectedConsentMode:'SHORT_LIVED_SIGNED_OFFLINE',
+    prebootOnlineApprovalAndRevocationReadbackRequired:true,
+    winpeNetworkRequiredForConsent:false,
+    revocationDuringWinpeAvailable:false,
+    signatureAlgorithmCandidate:'RSA_PSS_SHA256',
+    signatureVerificationImplemented:false,
+    pinnedOwnerPublicKeyVerified:false,
+    offlineExpiryAndClockTrustVerified:false,
+    offlineValiditySeconds:null, // Exact short window requires final Owner scope.
+    finalOwnerCApprovalGranted:false,
     phases:Object.freeze(phases),oldClaimArchive:oldC,
     continuationArchive:continuation,installArchive:install,
     currentOperatorCompatible:false,
