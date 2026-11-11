@@ -55,3 +55,11 @@
 4. 실제 WinPE 및 원본 PC 실측·Owner 권한·최종 C급 승인 전까지 C 운영 동작 0건 유지. 최초 상태 모호성 C_GITHUB_BACKLOG_PLAN_ORIGINAL_BODY_INVALID / ORIGINAL_JOB_DISPOSITIONS는 원 ID 보존, 재실행·임의 정리 금지.
 
 **이번 회귀:** 유효한 RSA-PSS 서명이라도 호출자가 과거의 창 안 시각을 공급하면 offlineClockTrusted/ownerApprovalVerified/executionAuthorized가 모두 거짓인 시나리오 추가, 관련 14/14 PASS. **실제 총괄 복구율 4/5 = 80% 유지, C급 NO-GO**.
+
+### 2026-11-11 17:18 기본 ADK 경로 조회 — 공통 대기열 PC
+
+- 사용자 제공 Windows 10 19045.6466 CMD 화면에서 기존 기본 경로의 *.wim 검색은 **지정된 경로를 찾을 수 없습니다**. 이는 기본 ADK WinPE 디렉터리의 부재 관찰이며 PC 전체 WinPE 이미지 부재·WinPE 설치 실패를 입증하지 않는다.
+- 최신 main config/operations.json에 공통 대기열 PC WinPE 이미지 조회 A급 operation은 없음. 승인되지 않은 pc-job 인수·원격 shell·별도 Runner workflow로 우회하지 않는다.
+- 다음 유효 준비: **공통 대기열 PC에만** Microsoft 공식 ADK Deployment Tools + 동일 버전 WinPE add-on 설치 여부 확인/준비. 2026-11-12 Microsoft 공식 제공 10.1.26100.9457(September 2026)은 Windows 10 포함 대상판으로 게시됨. 공식 출처 https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install. WinPE 베이스 이미지 Winpe.wim은 Copype 준비 시 새 작업 폴더의 Media/Sources/boot.wim으로 복사된다(https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/copype-command-line-options).
+- 설치가 끝나기 전까지 boot.wim 가정/USB 포맷/WinPE 부팅 금지. 설치·이미지 존재는 사용자 직접 화면 또는 해당 PC의 승인된 증거로 확인. Windows 일반 CNG 시험은 WinPE 증거로 승격 금지.
+- **실제 총괄 복구 80% 유지, C NO-GO, 운영 PC/E: 영향 0**.
