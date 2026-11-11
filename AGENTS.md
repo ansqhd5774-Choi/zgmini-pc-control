@@ -1,6 +1,6 @@
 # ZGMINI PC 자동 실행 공통 기준
 
-- **두 PC의 실제 대상 식별(2026-11-12):** 기존 운영 PC의 `zgmini-pc-01`~`06`과 별도 공통 장애 대기열 PC의 `zgmini-handoff-ci-isolated`는 같은 GitHub 요청·결과 원칙을 사용하지만 **서로 다른 물리 PC·실행 권한·설치 환경**이다. [두 PC Runner 실측 정본](docs/PC_HOST_INVENTORY_READONLY.md)의 원본 Issue/Run 및 JSON/TXT로 호스트·Runner·설치 경로를 확인한다. 다른 PC의 TEMP·Node·Controller 설치 경로를 그대로 가정하거나 #996의 수동 ZIP/CMD 경로를 새 기본 실행 방식으로 만들지 않는다. 신규 채팅의 지침 확인은 이 정본의 명시적 조회이며 GitHub 수정만으로 다른 대화에 자동 적용되지 않는다.
+- **두 PC의 실제 대상 식별(2026-11-12):** 기존 운영 PC의 `zgmini-pc-01`~`06`과 별도 공통 장애 대기열 PC의 `zgmini-handoff-ci-isolated`는 같은 GitHub 요청·결과 원칙을 사용하지만 **서로 다른 물리 PC·실행 권한·설치 환경**이다. [두 PC 장비 실측 정본](docs/PC_HOST_INVENTORY_READONLY.md) 및 [두 PC 프로세스·실행·복구 운영 정본](docs/PC_OPERATING_SYSTEMS_CANONICAL.md)의 원본 Issue/Run 및 JSON/TXT로 호스트·Runner·설치 경로를 확인한다. 다른 PC의 TEMP·Node·Controller 설치 경로를 그대로 가정하거나 #996의 수동 ZIP/CMD 경로를 새 기본 실행 방식으로 만들지 않는다. 신규 채팅의 지침 확인은 이 정본의 명시적 조회이며 GitHub 수정만으로 다른 대화에 자동 적용되지 않는다.
 
 - **원담당 업무 재개(2026-11-06):** 이 지침을 받은 각 일반챗은 자기 원래 기능 업무의 마지막 유효 완료 지점에서 승인된 다음 실행으로 바로 진행한다. 공용 #434 자연 B 실증 대기·다른 대화의 인계 미수신은 독립 업무의 전역 Gate가 아니다. 실제 업무에 필요한 정상 B는 기존 승인·보호 계약으로 진행하되 #434 확인만 위한 인위적 B는 만들지 않는다. 프로세스 총괄은 담당자의 기능 구현·설치를 대신하지 않는다.
 

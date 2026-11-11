@@ -11,7 +11,7 @@
 - 기본적 Runner/호스트 검증은 기존 도구에서 재사용한다. 운영 PC는 호스트 PC + zgmini-pc-01~06, 공통 인계 PC는 DESKTOP-N62L0NG + zgmini-handoff-ci-spare-01 고정.
 
 ## 실측 필드와 정보 최소화
-- Windows 표준 CIM 읽기 전용 Win32_Process: **전체 프로세스 개수 + 지정한 실행 프로세스 이름/PID/PPID/session/Working Set MiB(최대 60)**.
+- Windows 표준 CIM 읽기 전용 Win32_Process: **전체 프로세스 개수 + 지정한 프로세스 이름별 전체 집계(processCounts) + 실행 프로세스 이름/PID/PPID/session/Working Set MiB(최대 60 상세)**. 상세 60개는 Runner.Listener/Worker → WScript → Node → PowerShell → CMD 순 우선한다. 전체 지정 프로세스가 60개를 넘더라도 이름별 전체 집계는 보존한다.
 - 동일 CIM의 ZGMINI/Actions Runner 관련 서비스명·상태·시작 형태(최대 24).
 - 이름이 ZGMINI로 시작하는 예약 작업 이름·상태(최대 48). 명령·인수·트리거 원문은 읽거나 게시하지 않는다.
 - 사용자 Startup 폴더에서 ZGMINI로 시작하는 **파일 이름만**(최대 24). 파일 본문, 전체 경로, 계정명은 반환하지 않는다.

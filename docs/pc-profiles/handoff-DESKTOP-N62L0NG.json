@@ -1,0 +1,127 @@
+{
+  "schema": "ZGMINI_PC_OPERATING_PROFILE_SNAPSHOT_V1",
+  "note": "Observed values are timestamped; no credentials, command lines, secrets or private data are captured.",
+  "role": "handoff",
+  "hostname": "DESKTOP-N62L0NG",
+  "identity": {
+    "source": "separately validated GitHub self-hosted Runner and Node os.hostname()",
+    "allowedRunnerNames": [
+      "zgmini-handoff-ci-spare-01"
+    ],
+    "configuredRunnerLabel": "zgmini-handoff-ci-isolated",
+    "hardwareObservedRunner": "zgmini-handoff-ci-spare-01",
+    "processObservedRunner": "zgmini-handoff-ci-spare-01"
+  },
+  "execution": {
+    "kind": "windows-service-auto",
+    "scope": "isolated GitHub evidence verification, intake, de-duplication, incident/result brokering and source tests; no operating DB/Writer/Controller access",
+    "authorization": "only validated GitHub metadata operations; C/user-direct system changes",
+    "gitHubControlRepo": "ansqhd5774-Choi/zgmini-pc-control",
+    "actualRuntimeNode": {
+      "version": "v22.23.4",
+      "arch": "x64",
+      "executableAtApprovedOperatingPath": false
+    },
+    "installedLayout": {
+      "zgminiRoot": false,
+      "operatingNode": false,
+      "controller": false,
+      "controlCheckout": false
+    },
+    "resultDelivery": "GitHub private verified JSON/TXT pair and original Issue receipt; no automatic independent ChatGPT resume"
+  },
+  "hardware": {
+    "observedAtUtc": null,
+    "os": {
+      "platform": "win32",
+      "version": "Windows 10 Home",
+      "release": "10.0.19045",
+      "arch": "x64"
+    },
+    "cpu": {
+      "model": "Intel(R) Core(TM) i5-7300HQ CPU @ 2.50GHz",
+      "logicalCount": 4
+    },
+    "memory": {
+      "totalMiB": 16301,
+      "freeMiB": 4632
+    },
+    "drives": [
+      {
+        "drive": "C:",
+        "present": true,
+        "capacityMiB": 243306,
+        "freeMiB": 53797
+      },
+      {
+        "drive": "E:",
+        "present": true,
+        "capacityMiB": 198690,
+        "freeMiB": 173364
+      }
+    ],
+    "issueCreatedAtUtc": "2026-11-11T21:15:58Z",
+    "observationTimeNote": "Hardware result does not itself publish an exact capture timestamp; Issue creation time is not an observation timestamp."
+  },
+  "process": {
+    "observedAtUtc": "2026-11-11T21:38:07.5101341Z",
+    "totalCount": 275,
+    "selectedNameCount": 56,
+    "allSelectedNameCounts": [
+      {
+        "name": "cmd.exe",
+        "count": 11
+      },
+      {
+        "name": "conhost.exe",
+        "count": 27
+      },
+      {
+        "name": "node.exe",
+        "count": 10
+      },
+      {
+        "name": "powershell.exe",
+        "count": 2
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "count": 5
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "count": 1
+      }
+    ],
+    "detailedSamplesReported": 56,
+    "samplesTruncated": false,
+    "serviceStatus": "OK",
+    "services": [
+      {
+        "name": "actions.runner.ansqhd5774-Choi-zgmini-pc-control.zgmini-handoff-ci-spare-01",
+        "state": "Running",
+        "startMode": "Auto"
+      }
+    ],
+    "taskStatus": "OK",
+    "tasks": [],
+    "startupStatus": "OK",
+    "startup": []
+  },
+  "safety": {
+    "dataWrites": 0,
+    "automaticRetries": 0,
+    "rawCommandLinesCaptured": false,
+    "c996RecoveryStatus": "not changed by inventory; C NO-GO remains separate"
+  },
+  "evidence": {
+    "hardwareIssueUrl": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1245",
+    "hardwareRunId": "43101563767",
+    "hardwareJson": "results/pc-host-inventory-43101563767-1-handoff.json",
+    "hardwareTxt": "results/pc-host-inventory-43101563767-1-handoff.txt",
+    "processIssueUrl": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1254",
+    "processRunId": "43104715561",
+    "processJson": "results/pc-process-inventory-43104715561-1-handoff.json",
+    "processTxt": "results/pc-process-inventory-43104715561-1-handoff.txt"
+  }
+}

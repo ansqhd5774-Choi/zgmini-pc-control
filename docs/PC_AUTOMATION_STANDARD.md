@@ -10,6 +10,8 @@
 
 현재 목적·전용 브랜치·승인·미완료 단계·유효 증거를 유지한다. 제어 저장소 HEAD, 실제 Controller 설치 SHA, 유지보수기 source SHA, PC Core 실행 checkout HEAD·승인 `config.source`·이를 참조하는 보조 실행기의 승인 SHA, 검사 대상 SHA를 구분한다. 과거 SHA·PID·설치 상태를 현재값으로 가정하지 않는다.
 
+두 대의 실PC는 [장비 인벤토리](PC_HOST_INVENTORY_READONLY.md)와 [PC별 프로세스·자동 시작·실행 운영 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)으로 역할/Runner/Node/경로를 구분한다. 실제 설치·수집·게시 성공 여부는 각 업무 원본 Run/결과로 판단한다.
+
 공용 설치가 필요하면 [CONTROLLER_APPLY_QUEUE.md](CONTROLLER_APPLY_QUEUE.md)와 [원장 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68), 업데이트가 필요하면 [CONTROLLER_AUTO_UPDATE.md](CONTROLLER_AUTO_UPDATE.md)를 참조한다. 정상 업무마다 과거 장애 문서·전체 설치 이력·전체 테스트를 다시 조사하지 않는다.
 
 ## 2. 일반 작업 실행
