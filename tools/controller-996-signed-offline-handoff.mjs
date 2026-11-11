@@ -45,6 +45,46 @@ const blocked=code=>Object.freeze({
   productionExecutable:false,operationalWrites:0,automaticRetry:false,
 });
 
+/**
+ * Deterministic PUBLIC-key representation for the future WinPE Bcrypt import.
+ * This only establishes SPKI <-> RSA public BLOB consistency on the caller's
+ * key. It neither pins a real Owner trust anchor nor exports a private key.
+ */
+export function derive996CngRsaPublicBlob(ownerPublicKeyPem){
+  if(typeof ownerPublicKeyPem!=='string'||
+    ownerPublicKeyPem.length===0||ownerPublicKeyPem.length>8192)
+    throw Error('C996_CNG_PUBLIC_KEY_INVALID');
+  let key,jwk;
+  try{
+    key=createPublicKey(ownerPublicKeyPem);
+    jwk=key.export({format:'jwk'});
+  }catch{throw Error('C996_CNG_PUBLIC_KEY_INVALID');}
+  if(key.asymmetricKeyType!=='rsa'||jwk.kty!=='RSA'||
+    typeof jwk.n!=='string'||typeof jwk.e!=='string'||
+    !/^[A-Za-z0-9_-]+$/.test(jwk.n)||
+    !/^[A-Za-z0-9_-]+$/.test(jwk.e))
+    throw Error('C996_CNG_PUBLIC_KEY_INVALID');
+  const modulus=Buffer.from(jwk.n,'base64url');
+  const exponent=Buffer.from(jwk.e,'base64url');
+  if(modulus.length<256||modulus.length>1024||
+    (modulus[0]&0x80)===0||
+    !exponent.equals(Buffer.from([0x01,0x00,0x01])))
+    throw Error('C996_CNG_PUBLIC_KEY_INVALID');
+  const blob=Buffer.alloc(24+exponent.length+modulus.length);
+  blob.writeUInt32LE(0x31415352,0); // BCRYPT_RSAPUBLIC_MAGIC (RSA1)
+  blob.writeUInt32LE(modulus.length*8,4);
+  blob.writeUInt32LE(exponent.length,8);
+  blob.writeUInt32LE(modulus.length,12);
+  // cbPrime1 and cbPrime2 remain zero for a PUBLIC-only key.
+  exponent.copy(blob,24);
+  modulus.copy(blob,24+exponent.length);
+  return Object.freeze({
+    rsaPublicBlob:blob,spkiSha256:sha(key.export({type:'spki',format:'der'})),
+    rsaPublicBlobSha256:sha(blob),
+    ownerTrustAuthenticated:false,executionAuthorized:false,
+  });
+}
+
 // Fixed exact-byte manifest serialization. Rejects unknown fields, alternate
 // ordering/whitespace, duplicate JSON keys, non-UTC timestamps, and paths not
 // matching the existing #996 one-boot source-only recovery plan.
