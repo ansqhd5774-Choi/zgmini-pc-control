@@ -8,6 +8,14 @@
 - 현재 #996 WinPE 복구 계획은 **기존 ZGMINI PC를 기존 Windows 대신 WinPE로 재부팅**하는 후보이며, PC 추가 구매·세 번째 PC·E:를 별도 새 호스트로 옮기는 계획이 아니다. 운영 중단·원본 E: 변경은 정확한 최종 승인 전까지 금지한다.
 - 아래 과거 증거에 포함된 '원본 PC', '별도 Windows', '새 PC', '호스트' 표현은 당시 기록을 보존한 것이며 현재 장비 수 또는 공식 명칭을 재정의하지 않는다. 향후 실행 계획·보고·지시문에는 이 두 공식 PC 명칭만 사용한다.
 
+## 2026-11-11 두 차례 WinPE 부팅 인계 설계 — SOURCE/TEST ONLY, 운영 80% 유지
+
+- **물리 PC는 총 2대만 사용한다.** `기존 ZGMINI PC`에서 **WinPE 1차 → 기존 Windows 복귀 → WinPE 2차 → 기존 Windows 최종 재조회**를 검토한다. `공통 대기열 PC`는 두 번째 PC로 유지하되 이 복구의 새로운 물리적 호스트가 아니다. 실제 PC 부팅/운영 중단/원본 E: 변경은 **최종 Owner C급 승인 전 금지**.
+- **실패 선행 원인 교정:** 구 C Claim 보관 대상 `leases/controller-recovery-archived-<original>`는 새 온라인 C Claim이 최종 보관할 고정 이름과 **충돌**한다. 새 2회 부팅 후보는 중단된 구 C Claim만 `leases/controller-recovery-interrupted-<original>`로 별도 보관하고, 새 온라인 C Claim의 기존 `controller-recovery-archived-<original>` 목적지는 보존한다. **새 보관 경로도 새로운 C 효과이므로 정확한 Owner manifest/S2 승인 범위에 포함해야 한다.** 과거 단회 3단계 시뮬레이션 경로는 역사적 시험 증거일 뿐 운영 실행 가능 계획이 아니다.
+- **1차 WinPE:** 구 Claim만 보관하고 `controller-install` Lease 및 비활성 Workflow 유지. **기존 Windows 중간 단계:** Workflow/Backlog·원본 pc-job 4건·새 Job 소비 차단을 증명하고 `READY_FOR_SECOND_BOOT` handoff를 영속적으로 봉인, Install Lease 유지. **2차 WinPE:** 별도 부팅 Epoch·서명된 nonce/SourceLock/중간 handoff·유효 Owner 승인·직전 경합을 검증한 후 Install Lease 보관 및 새 C Claim 최종 보관. **Windows 최종 단계:** 원래 Controller·보호 원장/파일·Workflow·Backlog·원본 Job 4건 다시 읽어 동일성 확인.
+- `plan996TwoBootRecovery`와 `simulate996TwoBootRecovery`는 **검토·합성 시뮬레이션 전용**이다. 호출자 제공 `verified=true`는 OS 증거가 아니며 이 코드에는 WinPE 설치·Windows 실물 E: 이동·GitHub 변경·운영 CLI가 없다. 모든 반환에 `executionAuthorized=false`, 실제 쓰기 0을 명시한다.
+- 소스·검사 **2파일** 변경, 관련 집중 회귀 **33/33 PASS**(기존 18 + 이번 15), 구문 통과 및 원격 UTF-8 파일 일치 2/2. 개발 커밋 `a1782c919a8f1b473fbcfdf53489500270516962`, `b26bb05f45f7e29819f2e4c791dc02b9c85ac14e`. 이 검사는 **실물 Windows/WinPE 네이티브 복구 입증이 아니다.** 아직 단회 복구 실행기·독립 신뢰 루트·부팅간 지속 handoff·추가 Owner 동의가 없다. #996 **4/5=80%→80%**, Draft PR #1222, C NO-GO 유지.
+
 ## 2026-11-11 GET-only C 신뢰 부트스트랩 후보 및 Owner 동의 계약 결합 — 운영 80% 유지
 
 - 정규 원본 PC C 실행기는 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`로 **의존성 로드 전 무조건 중단**한다. 새 `tools/controller-996-c-native-trusted-bootstrap.mjs`는 별도 **GET-only 증거 조회 후보**이며, Operator import/launch·운영 `E:` 쓰기·GitHub Issue/Workflow/Backlog 쓰기를 하지 않는다. `externalOsTrustAnchorVerified=false`, `executionAuthorized=false`를 명시하므로 실행 권한은 아직 없다.
