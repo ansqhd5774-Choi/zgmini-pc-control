@@ -63,3 +63,18 @@
 - 다음 유효 준비: **공통 대기열 PC에만** Microsoft 공식 ADK Deployment Tools + 동일 버전 WinPE add-on 설치 여부 확인/준비. 2026-11-12 Microsoft 공식 제공 10.1.26100.9457(September 2026)은 Windows 10 포함 대상판으로 게시됨. 공식 출처 https://learn.microsoft.com/en-us/windows-hardware/get-started/adk-install. WinPE 베이스 이미지 Winpe.wim은 Copype 준비 시 새 작업 폴더의 Media/Sources/boot.wim으로 복사된다(https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/copype-command-line-options).
 - 설치가 끝나기 전까지 boot.wim 가정/USB 포맷/WinPE 부팅 금지. 설치·이미지 존재는 사용자 직접 화면 또는 해당 PC의 승인된 증거로 확인. Windows 일반 CNG 시험은 WinPE 증거로 승격 금지.
 - **실제 총괄 복구 80% 유지, C NO-GO, 운영 PC/E: 영향 0**.
+
+
+### 2026-11-12 공통 대기열 PC ADK/WinPE 실측 — 권한 경계에서 중단
+
+- PC 식별 PASS: 실제 hostname `DESKTOP-N62L0NG`, Windows 10 Home `10.0.19045` / 64비트. 이번 작업은 공통 대기열 PC에서만 수행했으며 기존 운영 PC 및 `E:\ZGmini`에 접근·변경하지 않음.
+- ADK Deployment Tools 및 Windows PE add-on 설치 PASS: Windows Kits 레지스트리의 KitsRoot10을 기준으로 설치 위치를 탐색함. 설치 구성요소 버전은 양쪽 모두 `10.1.26100.9457`.
+- 확인한 설치 root: `C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit`. `Deployment Tools\DandISetEnv.bat`, `Windows Preinstallation Environment\copype.cmd`, amd64 DISM/Oscdimg, `Windows Preinstallation Environment\amd64\en-us\winpe.wim` 모두 존재. DISM 파일 버전 `10.0.26100.9457`, Microsoft Authenticode 서명 Valid. 이는 설치 도구의 버전이며 WIM 내부 OS 버전으로 사용하지 않음.
+- 기존 일반 CMD의 copype 명령 해석 실패는 설치 누락으로 분류하지 않음. 이 진단 프로세스에만 WinPERoot/DISMRoot/OSCDImgRoot 및 PATH를 설정한 후 `where copype.cmd`가 위 공식 파일을 해석함. 사용자/시스템 환경변수 영구 변경 0.
+- 공식 `DandISetEnv.bat` 내용을 확인한 결과 마지막에 `WimMountAdkSetupamd64.exe /repair`가 포함됨. 관리자·드라이버 변경 승인이 없는 현재 단계에서는 해당 BAT를 실행하지 않음. `copype.cmd`에도 read-only WIM mount/unmount가 포함됨.
+- 실제 최초 로컬 도구 실패: amd64 ADK DISM의 `/English /Get-WimInfo /WimFile:<설치된 원본 winpe.wim> /Index:1`가 **740 / Elevated permissions are required to run DISM**으로 종료. 세션 관리자 권한 False. 권한 부족 시 중단하라는 사용자 요청에 따라 권한 상승·재시도·이미지 생성 단계는 수행하지 않음.
+- 설치된 **원본 winpe.wim만** 읽기 전용 SHA-256 확인: `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`, 크기 **340134390 bytes**. 경로는 위 root의 `Windows Preinstallation Environment\amd64\en-us\winpe.wim`. 이 값은 생성한 boot.wim의 해시가 아니며 실제 선택·승인된 부팅 이미지도 아님.
+- 결과: PC/ADK/WinPE 파일 존재 PASS, copype 환경 **경로 해석 PASS·정식 BAT 실행/생성 미실행**, boot.wim 생성 **NOT_RUN_PERMISSION_BLOCKED**, 이미지 index/내부 아키텍처/버전 **UNVERIFIED**. amd64 디렉터리 이름이나 도구 버전을 이미지 메타데이터 검증으로 대체하지 않음.
+- 신규 설치/재설치/재부팅/USB 제작/기존 파일 삭제·덮어쓰기/Controller·Runner 중단/Workflow·Backlog·Claim·Lease 변경/C급 실제 복구 **모두 0건**. 운영 PC 변경 **0건**.
+- 다음 필수 작업: 공통 대기열 PC에서 승인된 관리자 실행 컨텍스트를 확보한 뒤, 드라이버 repair의 별도 효과를 검토하고 공식 copype를 **새로운 TEMP 작업 경로에 단회** 실행. 성공 후 생성 boot.wim의 DISM index 목록·선택 index·x64·내부 버전·경로·크기·SHA-256을 검증한다. 현재 740은 Windows 권한 경계이며 설치 실패나 WinPE CNG 실패가 아님. WinPE 실제 부팅/CNG·Owner 키·시간/철회 검증과 구분한다.
+- **전체 80% 유지 / C NO-GO / executionAuthorized=false**.
