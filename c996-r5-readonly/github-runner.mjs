@@ -102,6 +102,14 @@ export function readCollectorResult(output,hostname,ctx) {
   return selectSafeReport(raw,ctx,hostname);
 }
 
+export function collectorPreoutputStopCode(stderr,exitCode) {
+  // Only the collector's own fixed diagnostic format, never raw stderr or logs.
+  const s=typeof stderr==='string'?stderr.trim():'';
+  const match=s.match(/^C996_READONLY STOPPED code=(WRONG_HOST|TEMP_ROOT_MISMATCH); no files written$/);
+  if(exitCode===2 && match) return match[1];
+  return 'COLLECTOR_RESULT_NOT_EMITTED';
+}
+
 export function runCollector(ctx,hostname) {
   if(hostname!==HOST) {
     return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',...ctx,host:hostname,
@@ -120,8 +128,12 @@ export function runCollector(ctx,hostname) {
       stop('COLLECTOR_EXIT_MISMATCH');
     return report;
   } catch(e) {
+    const safeCode=child.error?'COLLECTOR_PROCESS_ERROR':
+      e.code==='RESULT_DIRECTORY_NOT_REPORTED'?
+      collectorPreoutputStopCode(child.stderr,child.status):
+      e.code||'COLLECTOR_STOPPED';
     return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',...ctx,host:hostname,
-      status:'BLOCKED',code:e.code||'COLLECTOR_STOPPED',pinCount:0,logCount:0,
+      status:'BLOCKED',code:safeCode,pinCount:0,logCount:0,
       sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
       rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,
       operationalWrites:0,automaticRetries:0,rawLogIncluded:false,pins:[],logs:[]};
