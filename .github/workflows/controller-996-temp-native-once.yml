@@ -53,7 +53,7 @@ jobs:
         run: |
           @echo off
           set "C996_NODE=%RUNNER_TEMP%\..\..\externals\node20\bin\node.exe"
-          "%C996_NODE%" -e "const fs=require('fs'),p=require('path'); for(const k of ['RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP']) {const v=process.env[k];if(!v)throw Error('C996_TEMP_PATH_UNSET_'+k);const full=p.win32.resolve(v),parsed=p.win32.parse(full);if(parsed.root.toLowerCase()!=='c:\\')throw Error('C996_TEMP_NON_C_VOLUME_'+k);if(!fs.existsSync(full)||!fs.statSync(full).isDirectory())throw Error('C996_TEMP_PATH_MISSING_'+k);let current=full;while(true){if(fs.lstatSync(current).isSymbolicLink())throw Error('C996_TEMP_PATH_REPARSE_'+k);const parent=p.win32.dirname(current);if(parent===current)break;current=parent;}const real=fs.realpathSync.native(full);if(real.toLowerCase()!==full.toLowerCase())throw Error('C996_TEMP_PATH_REDIRECT_'+k);}"
+          "%C996_NODE%" -e "const fs=require('fs'),p=require('path'); for(const k of ['RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP']) {const v=process.env[k];if(!v)throw Error('C996_TEMP_PATH_UNSET_'+k);const full=p.win32.resolve(v),parsed=p.win32.parse(full);if(parsed.root.toLowerCase()!=='c:\\')throw Error('C996_TEMP_NON_C_VOLUME_'+k);if(!fs.existsSync(full)||!fs.statSync(full).isDirectory())throw Error('C996_TEMP_PATH_MISSING_'+k);let current=full;while(true){if(fs.lstatSync(current).isSymbolicLink())throw Error('C996_TEMP_PATH_REPARSE_'+k);const parent=p.win32.dirname(current);if(parent===current)break;current=parent;}const real=fs.realpathSync(full);if(p.win32.parse(real).root.toLowerCase()!=='c:\\')throw Error('C996_TEMP_REAL_VOLUME_DENIED_'+k);}"
           if errorlevel 1 exit /b 37
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
