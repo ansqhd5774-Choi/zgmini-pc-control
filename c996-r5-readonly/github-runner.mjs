@@ -51,7 +51,13 @@ export function selectSafeReport(raw,ctx,hostname) {
       stop('HASH_REPORT_STOP');
     return {id:v.id,matched:v.matched===true,bytes:v.bytes,sha256:v.sha256};
   });
-  if(pins.length>5)stop('HASH_REPORT_STOP');
+  const pinIds=['ADK_WIM','FINAL_WIM','TEST_ISO','BIOS_BCD','UEFI_BCD'];
+  if(pins.length>5 || new Set(pins.map(x=>x.id)).size!==pins.length)
+    stop('HASH_REPORT_STOP');
+  if(raw.status==='COMPLETE' && (pins.length!==5 ||
+    !pinIds.every(id=>pins.some(p=>p.id===id && p.matched)) ||
+    raw.inputHashesUnchanged!==5))
+    stop('COMPLETE_HASH_PROOF_REQUIRED');
   const logs=(raw.logs||[]).map(v=>{
     if(!/^[A-Za-z0-9_.-]{1,96}\.log$/i.test(v.name||'') ||
       !/^[a-f0-9]{64}$/.test(v.sha256||'') || !Number.isSafeInteger(v.bytes) ||
