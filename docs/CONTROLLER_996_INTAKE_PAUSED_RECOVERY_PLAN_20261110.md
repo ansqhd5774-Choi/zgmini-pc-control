@@ -214,3 +214,14 @@
 - 신규 결과: guard-tests.json, cleanup-result.json, poststop-mount-state.txt, poststop-query-result.json, summary.json. guard source SHA256 `9c7e2667c7a03d9c52a9c4a62b650cc2573c27ae3a56bda7504f4b0caf7713ff`; 회귀 결과 SHA256 `27ee855f65d91435d7b9803fd5cc5df793fa999dd3a4d5e6901c7b3356881b04`.
 - 다음 필수 작업은 활성 DISM 로그의 잠금/공유 및 증거 보존 계약을 읽기 전용으로 분류하고, **고정 실패 증거와 사용 중 로그를 분리하는 사전검사 보정**을 검토하는 것. 잠금 해제를 이유로 DISM/Runner를 종료하지 않음. 중단 상태에서 승인된 이미지 처분/ISO 단회 경로를 임의 재개하지 않음.
 - 운영 PC/E:/USB/부팅/Runner/Workflow/Backlog/Claim/Lease 변경 0. 실제 WinPE/CNG/Owner/시간/철회 검증 0. **전체 80% / C NO-GO 유지**.
+
+
+### 2026-11-12 PRECHECK 활성 DISM 로그 공유 오류 — 수정 결정 (실행 미확인)
+
+- 원본 실패 실측 `2c9f28dad57206f6725737eadf695d1a3b2087c9`: `MOUNT_NEW_WIM.dism.log` 읽기 공유 오류로 PRECHECK exit 1. `/Discard`/신규 ISO 0회, 기존 mount Index 1/RW/Ok, guard 회귀 14/14 PASS, 고정 보호 10/10·기존 작업본 입력 4/4 PASS. 잠금 보유 프로세스/PID·로그 쓰기 진행 여부는 **UNKNOWN**. 이번 결정은 실제 Windows 실행 결과가 아니다.
+- **검증 계약 최소 보정:** 생성 중 변경될 수 있는 `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_TEST_ONLY_0cadf11c99594b999cd2b64b553ebc6f\MOUNT_NEW_WIM.dism.log` **정확히 1파일**만 *변동 운영 로그*로 분류하고 불변 해시 요구에서 제외한다. 로그를 삭제·강제 오픈·잠금 해제하거나 내용/무변경을 PASS라고 주장하지 않는다. 로그의 정확한 경로와 존재·파일 형식·메타데이터·해시 가능/불가 및 원문 오류를 결과에 명시한다. 별도 새 작업의 DISM `/LogPath`는 이전 실패 로그와 겹치지 않는 신규 TEMP 로그로 지정한다. 다른 파일의 해시 읽기 오류는 자동 면제하지 않고 STOP.
+- 보호 10/10 + 기존 작업본 입력 4/4 + EXE 고정 SHA, mount→WIM→Index1/RW/Ok, EXE 복사 0/미기록 파일 0/원본 WIM 불변, 기존 attempt·증거 보존, symlink/junction/unknown 태그 차단 등 **기존 필수 보호는 생략하지 않는다**. 파일 목록에서 해당 로그를 제외할 때도 경로가 허용 루트 내부의 **정확한 파일명**인지 검증하고 신규 의심 파일은 여전히 STOP.
+- **활성 작업 안전:** `MOUNT_NEW_WIM.dism.log` 잠금만으로 보유자나 WIM 손상을 단정하지 않는다. 실행 직전 읽기 전용 프로세스/서비스 작업 여부와 DISM 현재 mount mapping을 필요한 범위에서 확인한다. 동일 WIM을 실제로 서비스하는 다른 작업이 진행 중이거나 프로세스 소유를 판별할 수 없고 동시 변경 가능성이 남으면 STOP. 잠금 강제 해제·DISM/Runner 종료·전체 cleanup/자동 재실행 금지.
+- 원본 `cleanup-attempt.started`를 재사용하지 않고 **새 준비본**에만 검사 수정·집중 회귀와 새 고유 단계 식별자를 적용한다. 기존 사용자 승인은 앞서 정확히 지정한 단일 mount의 `/Discard` 1회 및 별도 신규 ISO-only 1회 범위를 벗어나지 않으며, **실제 0회였다는 점과 새 실행 사전 상태를 입증한 뒤에만** 다음 단계 진행 가능성을 판단한다. 불일치나 도구 접근 불가 시 미실행 유지.
+- 실제 성공 후에만 mount gone·고정 해시·입력/ISO·WIM SHA·LogPath 분리 결과를 재확인한다. `/Discard`/ISO/WinPE/Owner 승인 성공은 현재 미확인. 공통 전체 **80% / C NO-GO** 유지.
+- 근거: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/deployment-troubleshooting-and-log-files 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-image-management-command-line-options-s14.
