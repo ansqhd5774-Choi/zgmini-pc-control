@@ -129,3 +129,29 @@ for (const {start, competing} of [
       for(const step of preceding)assert.equal(fs.readFileSync(path.join(root,step+'-archive','owner.json'),'utf8'),bytes);
     });
 }
+
+
+test('native TEMP fixture proves sibling insertion remains possible under pinned file handles',windowsOnly,()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-996-handle-fixture-'));
+  const source=path.join(root,'source'),destination=path.join(root,'archive');
+  fs.mkdirSync(source);
+  const nonce='fixture-owner';
+  const bytes=JSON.stringify({pid:process.pid,nonce});
+  fs.writeFileSync(path.join(source,'owner.json'),bytes);
+  const pin=createHash('sha256').update(bytes).digest('hex');
+  const x=spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+    ['-NoProfile','-NonInteractive','-Command',build996OwnerArchiveFixtureScript()],{
+      input:JSON.stringify({operation:'move',root,source,destination,
+        pins:{'owner.json':pin},ownerMode:'LIVE_NEW',
+        actorPid:process.pid,nonce,simulateNamespaceInsert:true}),
+      encoding:'utf8',timeout:30000,windowsHide:true,
+    });
+  assert.equal(x.status,0,x.error?.message??x.stderr);
+  const receipt=JSON.parse(x.stdout);
+  assert.equal(receipt.ok,false);
+  assert.equal(receipt.code,'C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED');
+  assert.equal(receipt.moveOccurred,false);
+  assert.equal(fs.existsSync(destination),false);
+  assert.equal(fs.readFileSync(path.join(source,'owner.json'),'utf8'),bytes);
+  assert.equal(fs.readFileSync(path.join(source,'competing.json'),'utf8'),'{}');
+});
