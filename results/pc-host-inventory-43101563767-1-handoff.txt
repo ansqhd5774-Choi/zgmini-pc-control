@@ -1,0 +1,14 @@
+schema=ZGMINI_PC_HOST_INVENTORY_RESULT_V1
+requestId=bce34bb6-935d-4de6-beb0-2f0b6164ac70
+runId=43101563767
+attempt=1
+role=handoff
+host=DESKTOP-N62L0NG
+runner=zgmini-handoff-ci-spare-01
+expectedLabel=zgmini-handoff-ci-isolated
+status=PASS
+code=READONLY_HOST_INVENTORY_COLLECTED
+operationalWrites=0
+automaticRetries=0
+memory.totalMiB=16301
+memory.freeMiB=4632
