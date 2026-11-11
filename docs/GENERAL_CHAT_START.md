@@ -1,5 +1,17 @@
 # 새 일반챗의 자동 작업 시작
 
+## 2026-11-12 실행 전 경로 확인 — 신규 대화 공통 5단계
+
+1. **최신 정본 학습:** `main`의 [AGENTS.md](../AGENTS.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)를 업무 관련 범위에서 직접 조회한다. 이 문서·[GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)와 기존 기능별 브랜치·승인·마지막 실증을 대조한다. 이 절차만 보고하고 멈추지 않는다.
+2. **PC 대상 고정:** `PC`(운영 Windows 11, `zgmini-pc-control`, 6 Runner, 운영 Node/Controller 설치)와 `DESKTOP-N62L0NG`(격리 Windows 10, `zgmini-handoff-ci-isolated`, 1 ZGMINI 전용 Runner, pinned Node 22)를 구분한다. 2026-11-12 전체 Listener 수는 7개/5개로 각 ZGMINI 전용 좌석 수 6/1과 다르다. 서로 다른 설치 경로·권한을 복제하지 않는다.
+3. **기존 작업 경로 사용:** 운영 A급은 `pc-job` Issue→Actions→고정 Controller, B급은 기존 승인 manifest/독립 수신기, 공통 오류 접수·인계는 격리 Runner의 기존 Workflow로 처리한다. 이미 검증된 방식이 있으면 새 ZIP·CMD·Runner·예약을 기본 대체 수단으로 설계하지 않는다. 사용자가 승인한 기존 CMD 수동 경로는 무단 폐기하지 않는다.
+4. **검증된 회수:** 각 업무의 원본 Issue/Run/attempt·실제 Runner/host·작업 status/code·JSON/TXT 원격 readback을 확인한다. queued/CI 성공/원본 댓글을 실제 기능 성공·다른 일반챗 자동 수신으로 오인하지 않는다. 불명확 결과는 기존 증거부터 재조회하며 같은 requestId를 자동 재실행하지 않는다.
+5. **실행과 보호:** 현재 승인 범위의 기능 작업은 즉시 계속하되, C급 #996 NO-GO, Core/Writer/DB/Task/산식·원자료/승인 게시 구조를 근거 없이 변경하지 않는다. 예약 자동 갱신 검증은 개별 기능 완료 후 후속이다. 완료 보고에는 전체 목표 진행률·새 결과 증거·남은 실제 문제·다음 실행만 포함한다.
+
+**유의:** 위 문서가 GitHub에 있다고 ChatGPT 프로젝트 지침이 자동 수정되는 것은 아니다. 프로젝트 설정에 반영이 필요한 경우 기존 지침을 보존하고 이 시작 절차를 별도로 갱신해야 한다.
+
+---
+
 **두 물리 PC의 실행 대상:** 운영 6 Runner가 있는 기존 PC와 격리 `zgmini-handoff-ci-isolated` Runner가 있는 공통 장애 인계 PC의 장비·실행 환경은 동일하지 않다. [PC별 실제 Runner 인벤토리](PC_HOST_INVENTORY_READONLY.md) 및 [PC별 프로세스·자동 시작·실행·복구 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)를 확인하고, 기존 성공된 GitHub Issue→Runner→JSON/TXT 구조를 해당 PC에 맞게 재사용한다. PC별 절대 경로·권한·Node 설치를 복제했다고 가정하지 않으며, 경로 불일치가 확인되면 그 작업만 제한한다. 기존 전체 업무의 전역 Gate나 C급 NO-GO를 새로 만들지 않는다.
 
 2026-11-06 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
