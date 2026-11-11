@@ -190,7 +190,13 @@ test('single-WinPE proposal disjoins the old-C destination and stops on unapprov
   assert.notEqual(singleBoot.oldClaimArchive.destination,twoBoot.newClaimArchive.destination);
   assert.match(singleBoot.phases[0].workflow,/NO_UNAPPROVED_PUT/);
   assert.match(singleBoot.phases[0].backlog,/NO_UNAPPROVED_WRITE/);
-  assert.match(singleBoot.phases[0].admission,/FENCE_MUST_BE_PROVEN/);
+  assert.equal(singleBoot.phases[0].admission,
+    'DRAIN_MATCHING_RUNNERS_THEN_OFFLINE_KEEP_WORKFLOW_ACTIVE');
+  assert.equal(singleBoot.phases[2].runner,
+    'REMAIN_OFFLINE_UNTIL_POSTCHECK_AND_RESUME_WITHIN_24H');
+  assert.equal(singleBoot.admissionReviewModule,
+    'tools/controller-996-offline-admission-review.mjs');
+  assert.equal(singleBoot.githubQueueMaxHours,24);
   assert.equal(singleBoot.currentOperatorCompatible,false);
   assert.ok(singleBoot.currentOperatorBlockers.includes('REAL_PC_JOB_ADMISSION_FENCE_NOT_PROVEN'));
 });
