@@ -11,7 +11,7 @@ export const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 export const HOST = 'DESKTOP-N62L0NG';
 export const SCHEMA = 'ZGMINI_C996_R5_READONLY_REQUEST_V1';
 export const OPERATION = 'c996-r5-commit-log-readonly';
-const LABEL = 'pc-c996-r5-readonly';
+const ISSUE_TITLE = 'pc-c996-r5-readonly';
 const MAX_BYTES = 32768;
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const COLLECTOR = path.join(MODULE_DIR,'collector.mjs');
@@ -23,7 +23,7 @@ export function validateEvent(event,env) {
     env.GITHUB_EVENT_NAME!=='issues' || event.action!=='opened' ||
     event.repository?.full_name!==REPO || event.repository?.private!==true ||
     event.issue?.user?.login!=='ansqhd5774-Choi' ||
-    !event.issue?.labels?.some(x=>x.name===LABEL) ||
+    event.issue?.title!==ISSUE_TITLE ||
     !Number.isSafeInteger(event.issue.number) || event.issue.number<1) stop('ISSUE_AUTH_STOP');
   let body;
   try {body=JSON.parse(event.issue.body);}catch {stop('REQUEST_JSON_STOP');}
