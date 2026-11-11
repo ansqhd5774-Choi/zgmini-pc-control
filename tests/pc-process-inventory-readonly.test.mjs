@@ -28,7 +28,8 @@ test('exact read-only schema, owner, roles and run provenance',()=>{
 test('sanitize output keeps only bounded whitelisted Windows process metadata',()=>{
  const result=sanitizeProbe({schema:'ZGMINI_PC_PROCESS_PROBE_V1',
   observedAtUtc:'2026-11-12T10:00:00Z',totalProcessCount:151,
-  selectedProcessCount:2,processes:[
+  selectedProcessCount:84,processCounts:[{name:'Runner.Listener.exe',count:6},
+   {name:'node.exe',count:10},{name:'cmd.exe',count:16},{name:'conhost.exe',count:39}],processes:[
   {name:'Runner.Listener.exe',pid:44,ppid:3,session:1,workingSetMiB:84,commandLine:'super-secret'},
   {name:'node.exe',pid:46,ppid:44,session:1,workingSetMiB:31,
    path:'C:\\Users\\secret'}],services:[{name:'actions.runner.zgmini-pc-03',
@@ -37,6 +38,8 @@ test('sanitize output keeps only bounded whitelisted Windows process metadata',(
   taskStatus:'OK',startup:['ZGMINI_PC_CONTROL.vbs'],startupStatus:'OK'});
  assert.equal(result.processes.length,2);
  assert.equal(result.totalProcessCount,151);
+ assert.equal(result.processCounts.find(x=>x.name==='Runner.Listener.exe').count,6);
+ assert.equal(result.processListTruncated,true);
  assert.doesNotMatch(JSON.stringify(result),/super-secret|C:\\Users|SECRET/);
  assert.equal(result.services[0].startMode,'Auto');
  assert.equal(result.tasks[0].state,'Ready');
