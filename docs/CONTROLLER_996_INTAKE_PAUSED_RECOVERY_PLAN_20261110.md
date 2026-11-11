@@ -36,3 +36,22 @@
 - GitHub Issue/댓글만 있고 원본 Windows 최신 재조회·C 직접 승인·독립 종료 결과가 없는 경우.
 
 이 후보는 복구 성공이 아니다. 전체 공통 실패→중앙 route→verified return→원담당 수신 일반화 실증은 **4/5(80%)**, #917 자체 복구는 **8/8 완료** 상태를 유지한다. 예약 자동 갱신 확인은 기능 완성 이후의 별도 후속이다.
+
+## 2026-11-12 WinPE 후보 및 신뢰시간 판정 — 최신 작업 우선순위
+
+이 절은 위 초기 원본 Windows CMD 단회 복구 계획 이후의 변경된 **후보 설계**를 기록한다. 초기 runbook·과거 승인·CMD가 실제 C급 재실행을 자동 허가하지 않는다. 운영 접근은 차단된 채 source-only 검증만 수행한다.
+
+- 물리적 PC는 **기존 ZGMINI 운영 PC 1대**와 **공통 대기열 PC 1대**로 구분한다. 공통 대기열 PC의 Windows 10/Visual Studio 2026/SDK 네이티브 CNG 시험은 C996_CNG_WINDOWS_TEMP_CRYPTO_PASS_NOT_OWNER_OR_WINPE_PROOF 성공이며, 실제 선택된 WinPE 이미지·원본 E: 파일·승인 공개키·권한·시계를 검증하지 않았다.
+- 최신 후보는 **기존 PC WinPE 단일 부팅**을 전제로 old C archive → continuation → install LAST 순서를 고정하고, 서명된 manifest(RSA-PSS SHA256 Salt32)·원본 파일 ID/볼륨·독립 Owner trust anchor·만료/철회 freshness를 조건으로 한다. 이는 실운영 승인이나 부팅 지시가 아니다.
+- **서명된 issuedAt/expiresAt은 값의 무결성만 증명**한다. WinPE 오프라인 OS 시각은 변경·회귀 가능하며 신뢰시각이 별도로 없으면 만료 집행이 불가능하다. 부팅 직전 승인 확인 후 발생한 철회도 WinPE 오프라인에서는 탐지 불가. 따라서 offlineClockTrusted=false, ownerApprovalVerified=false, executionAuthorized=false 유지. 근거: https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-setsystemtime 및 https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/client-clock-reverts-to-previous-time.
+- 최신 main 공통 지침과 #996 소스 조사 범위에서 **독립 등록된 실제 Owner 공개키/SPKI pin 미확인**. Caller 제공 공개키+지문과 테스트 메모리 RSA 키는 Owner 인증이 아니다. 실제 PC 저장소에 없는 것으로 단정하지 않으며, 접근·추출·새 키 설치는 승인 전 금지.
+- boot.wim의 실제 선정 파일·index·SHA256도 미확정(DEFERRED_IMAGE_NOT_SELECTED). 기존 PC 또는 공통 대기열 PC 재부팅, 운영 E: 쓰기, 기존 CMD 재실행, Workflow 변경, backlog disposition 처리 모두 **0건**.
+
+### 다음 최소 순서
+
+1. 공통 대기열 PC에서 이미 준비된 **WinPE boot.wim 실제 파일 경로**를 읽기 전용으로 확인한다. 없으면 이미지 미선정으로 기록. 있다면 DISM Get-ImageInfo로 index 목록→실제 선택 index와 x64 확인, certutil SHA256으로 이미지 식별만 한다. 이는 CNG/원본 E: 실환경 검증이 아니다.
+2. 기존 Owner 키를 **독립된 신뢰 등록 경로**에서 확인하고 공개키/SPKI pin만 검증한다. 없으면 신규 독립 trust anchor의 명시적 승인·등록이 먼저다. 테스트키 승격 금지.
+3. 승인 철회와 실제 만료를 보장하려면 WinPE **인증된 온라인 시간·철회 재조회** 경로를 검증한다(네트워크 드라이버·TLS·신뢰시각 의존성 포함). 불가능하면 오프라인 단회 C급 실행 **NO-GO**. 물리 승인/nonce가 시간을 대체한다고 주장하지 않는다. 위험 수용과 보장 완화는 새 Owner 명시 결정이 있어야 한다.
+4. 실제 WinPE 및 원본 PC 실측·Owner 권한·최종 C급 승인 전까지 C 운영 동작 0건 유지. 최초 상태 모호성 C_GITHUB_BACKLOG_PLAN_ORIGINAL_BODY_INVALID / ORIGINAL_JOB_DISPOSITIONS는 원 ID 보존, 재실행·임의 정리 금지.
+
+**이번 회귀:** 유효한 RSA-PSS 서명이라도 호출자가 과거의 창 안 시각을 공급하면 offlineClockTrusted/ownerApprovalVerified/executionAuthorized가 모두 거짓인 시나리오 추가, 관련 14/14 PASS. **실제 총괄 복구율 4/5 = 80% 유지, C급 NO-GO**.
