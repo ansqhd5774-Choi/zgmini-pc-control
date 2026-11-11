@@ -57,7 +57,7 @@ jobs:
           if errorlevel 1 exit /b 37
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: e03173cd34a4d3ea37b956d7e35fa335494bb0e3
+          ref: 80b22b09333207362b07d681165cbeea453c4d0f
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -65,7 +65,7 @@ jobs:
       - name: Verify exact source and available Windows C sharp compiler
         run: |
           @echo off
-          node -e "const fs=require('fs'),crypto=require('crypto');const expected={'tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW.ps1':'6E8E78FF2584731495E49FF8F9326ECB8F806C8C4668814DEDB629A393661461','tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW_NATIVE.cs':'B2E56BE4599C32A7F379B9BD66DACFEA5780D8CA2CC340800C2C6948380B09AA','tests/controller-996-windows-temp-security-window.test.mjs':'94546C5F84990B85DB42B0E4EF440955FE57139C76C94C1581A31F5CA636A8E9'};for(const [p,sha] of Object.entries(expected)){if(!fs.existsSync(p))throw Error('C996_TEMP_REQUIRED_SOURCE_MISSING_'+p);const bytes=fs.readFileSync(p),text=bytes.toString('utf8');if(!Buffer.from(text,'utf8').equals(bytes))throw Error('C996_TEMP_SOURCE_NOT_UTF8_'+p);const normalized=text.replace(/\r\n/g,'\n');if(normalized.includes('\r'))throw Error('C996_TEMP_SOURCE_UNEXPECTED_CR_'+p);const got=crypto.createHash('sha256').update(normalized,'utf8').digest('hex').toUpperCase();if(got!==sha)throw Error('C996_TEMP_SOURCE_SHA256_MISMATCH_'+p);}if(fs.existsSync('E:\\ZGmini'))throw Error('C996_TEMP_ORIGINAL_PC_FORBIDDEN');"
+          node -e "const fs=require('fs'),crypto=require('crypto');const expected={'tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW.ps1':'6E8E78FF2584731495E49FF8F9326ECB8F806C8C4668814DEDB629A393661461','tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW_NATIVE.cs':'67AD3506886EEDC51B89035B01B692FB0DC6B7F3FFA587039DD76D374B94C21A','tests/controller-996-windows-temp-security-window.test.mjs':'94546C5F84990B85DB42B0E4EF440955FE57139C76C94C1581A31F5CA636A8E9'};for(const [p,sha] of Object.entries(expected)){if(!fs.existsSync(p))throw Error('C996_TEMP_REQUIRED_SOURCE_MISSING_'+p);const bytes=fs.readFileSync(p),text=bytes.toString('utf8');if(!Buffer.from(text,'utf8').equals(bytes))throw Error('C996_TEMP_SOURCE_NOT_UTF8_'+p);const normalized=text.replace(/\r\n/g,'\n');if(normalized.includes('\r'))throw Error('C996_TEMP_SOURCE_UNEXPECTED_CR_'+p);const got=crypto.createHash('sha256').update(normalized,'utf8').digest('hex').toUpperCase();if(got!==sha)throw Error('C996_TEMP_SOURCE_SHA256_MISMATCH_'+p);}if(fs.existsSync('E:\\ZGmini'))throw Error('C996_TEMP_ORIGINAL_PC_FORBIDDEN');"
           if errorlevel 1 exit /b 41
           if not exist "%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" (echo C996_TEMP_NATIVE_COMPILER_MISSING & exit /b 42)
           if exist "%RUNNER_TEMP%\zgmini-996-native-%GITHUB_RUN_ID%.exe" (echo C996_TEMP_NATIVE_OUTPUT_ALREADY_EXISTS & exit /b 43)
