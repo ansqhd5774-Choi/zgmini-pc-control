@@ -1,0 +1,33 @@
+name: ZGMINI C996 R5 Queue Readonly
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: c996-r5-readonly-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  exact-host-readonly:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      contains(github.event.issue.labels.*.name, 'pc-c996-r5-readonly')
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Collect fixed C996 R5 evidence and verify GitHub result pair
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node c996-r5-readonly/github-runner.mjs
