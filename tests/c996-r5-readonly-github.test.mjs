@@ -143,3 +143,21 @@ test('read denial stage includes only allowlisted file ID, never absolute path',
     assert.throws(()=>selectSafeReport(bad,ctx,HOST),/INSPECTION_STEP_INVALID/);
   }
 });
+
+test('safe EPERM path progress reports operation and bounded relative depth only',()=>{
+  const ctx={requestId:uuid,issueNumber:1500,runId:'1',attempt:'1'};
+  const r=raw();r.status='STOPPED';r.code='EPERM';
+  r.inputs=[];r.logs=[];r.inspectStep='PRE_INPUT_HASH';r.inspectId='FINAL_WIM';
+  r.inspectOperation='PATH_LSTAT';r.inspectDepth=3;
+  const out=selectSafeReport(r,ctx,HOST);
+  assert.equal(out.inspectOperation,'PATH_LSTAT');
+  assert.equal(out.inspectDepth,3);
+  assert.doesNotMatch(JSON.stringify(out),/AppData|C:\\\\Users/);
+  for(const changes of [
+    {inspectOperation:'TAKE_OWNERSHIP'},
+    {inspectDepth:-1},{inspectDepth:25},{inspectDepth:'C:\\\\secret'},
+    {inspectOperation:'STREAM_READ',inspectDepth:3},
+    {inspectOperation:'PATH_LSTAT',inspectDepth:null},
+    {inspectOperation:'STREAM_READ',inspectDepth:null,inspectStep:'LOG_READ'}
+  ]) assert.throws(()=>selectSafeReport({...r,...changes},ctx,HOST),/INSPECTION_OPERATION_INVALID/);
+});
