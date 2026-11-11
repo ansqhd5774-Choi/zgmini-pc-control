@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateEvent,selectSafeReport,runCollector,uploadVerifiedPair,REPO,HOST,SCHEMA,OPERATION}
+import {validateEvent,selectSafeReport,runCollector,collectorPreoutputStopCode,uploadVerifiedPair,REPO,HOST,SCHEMA,OPERATION}
   from '../c996-r5-readonly/github-runner.mjs';
 
 const uuid='ef64077e-61ab-40a0-abcd-a46d31f4e727';
@@ -109,4 +109,13 @@ test('COMPLETE requires original 5/5 pin evidence and post-read comparison',()=>
     const r=structuredClone(base);change(r);
     assert.throws(()=>selectSafeReport(r,ctx,HOST));
   }
+});
+
+test('collector early STOP returns only explicit allowlisted code',()=>{
+  assert.equal(collectorPreoutputStopCode('C996_READONLY STOPPED code=TEMP_ROOT_MISMATCH; no files written\n',2),'TEMP_ROOT_MISMATCH');
+  assert.equal(collectorPreoutputStopCode('C996_READONLY STOPPED code=WRONG_HOST; no files written',2),'WRONG_HOST');
+  for (const [stderr,exitCode] of [
+    ['secret private path',2],['C996_READONLY STOPPED code=PIN_MISMATCH; no files written',2],
+    ['C996_READONLY STOPPED code=TEMP_ROOT_MISMATCH; no files written',0]
+  ]) assert.equal(collectorPreoutputStopCode(stderr,exitCode),'COLLECTOR_RESULT_NOT_EMITTED');
 });
