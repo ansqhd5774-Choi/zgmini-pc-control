@@ -32,3 +32,8 @@ jobs:
             echo C996_QUEUE_HOST_MATCH=FALSE
             exit /b 5
           )
+      - name: Test C996 fail-closed owner candidate (isolated Windows, no write)
+        run: |
+          if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" (echo C996_OWNER_TEST_RUNNER_STOP & exit /b 11)
+          if exist "E:\ZGmini" (echo C996_OWNER_TEST_ORIGINAL_ROOT_FORBIDDEN & exit /b 12)
+          node --test tests/controller-996-c-native-owner-operator.test.mjs
