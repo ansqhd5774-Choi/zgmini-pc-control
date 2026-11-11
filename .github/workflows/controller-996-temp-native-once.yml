@@ -1,4 +1,4 @@
-name: ZGMINI #996 TEMP-only Windows native proof (owner labeled)
+name: "ZGMINI #996 TEMP-only Windows native proof (owner labeled)"
 
 on:
   pull_request:
@@ -27,8 +27,7 @@ jobs:
       github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      vars.ZGMINI_996_TEMP_NATIVE_ONCE_ENABLED == 'true' &&
-      vars.ZGMINI_996_TEMP_NATIVE_RUNNER_NAME != ''
+      vars.ZGMINI_996_TEMP_NATIVE_ONCE_ENABLED == 'true'
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 8
     defaults:
@@ -37,15 +36,35 @@ jobs:
     steps:
       - name: Require separately approved Windows runner before checkout
         env:
-          APPROVED_RUNNER_NAME: ${{ vars.ZGMINI_996_TEMP_NATIVE_RUNNER_NAME }}
+          APPROVED_RUNNER_NAME: zgmini-handoff-ci-spare-01
+          APPROVED_MACHINE_NAME: DESKTOP-N62L0NG
         run: |
           @echo off
           if /I not "%RUNNER_NAME%"=="%APPROVED_RUNNER_NAME%" (echo C996_TEMP_RUNNER_IDENTITY_DENIED & exit /b 31)
+          if /I not "%COMPUTERNAME%"=="%APPROVED_MACHINE_NAME%" (echo C996_TEMP_MACHINE_IDENTITY_DENIED & exit /b 35)
           if exist "E:\ZGmini" (echo C996_TEMP_ORIGINAL_E_DRIVE_FORBIDDEN & exit /b 32)
           if /I "%ZGMINI_996_TEMP_ONLY_ON_ORIGINAL_PC%"=="1" (echo C996_TEMP_ORIGINAL_PC_OVERRIDE_FORBIDDEN & exit /b 33)
           for %%P in ("%RUNNER_TEMP%" "%GITHUB_WORKSPACE%" "%TEMP%" "%TMP%") do (
             if /I "%%~dP"=="E:" (echo C996_TEMP_E_DRIVE_FORBIDDEN & exit /b 34)
           )
+      - name: Refuse redirected or non-C workspace and TEMP before checkout
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($key in @('RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP')) {
+            $value = [Environment]::GetEnvironmentVariable($key)
+            if ([string]::IsNullOrWhiteSpace($value)) { throw 'C996_TEMP_PATH_UNSET' }
+            $full = [IO.Path]::GetFullPath($value)
+            if ($full -cnotmatch '^[Cc]:\\') { throw 'C996_TEMP_NON_C_VOLUME' }
+            $ancestor = [IO.DirectoryInfo]::new($full)
+            if (-not $ancestor.Exists) { throw 'C996_TEMP_PATH_MISSING' }
+            while ($null -ne $ancestor) {
+              if (($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'C996_TEMP_PATH_REPARSE'
+              }
+              $ancestor = $ancestor.Parent
+            }
+          }
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: 9c291bc02b983393d7f133c71a1a8aeb8858373b
@@ -92,7 +111,7 @@ jobs:
           $result = Get-Content -LiteralPath $out -Raw
           $required = @{tests=10;pass=10;fail=0;cancelled=0;skipped=0;todo=0}
           foreach ($name in $required.Keys) {
-            $line = '^# ' + $name + ' ' + $required[$name] + '$'
+            $line = '^# ' + $name + ' ' + $required[$name] + '\r?$'
             if ($result -notmatch ('(?m)' + $line)) { throw ('C996_TEMP_TAP_SUMMARY_INVALID_' + $name) }
           }
           if ($exit -ne 0) { throw 'C996_TEMP_NODE_EXIT_FAILED' }
