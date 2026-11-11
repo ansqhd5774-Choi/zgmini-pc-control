@@ -207,6 +207,12 @@ int wmain(int argc, WCHAR **argv)
     memcpy(rename_info->FileName, new_leaf, leaf_bytes);
     if (!SetFileInformationByHandle(source_handle, FileRenameInfo,
                                     rename_info, (DWORD)info_bytes)) {
+        /* Preserve the FIRST Win32 failure before later diagnostics or
+         * CloseHandle can overwrite the thread's last-error value.
+         * This is an evidence-only change, never a retry or fallback. */
+        DWORD rename_error = GetLastError();
+        fprintf(stderr, "C996_NATIVE_TEMP_WIN32_ERROR:%lu\n",
+                (unsigned long)rename_error);
         outcome = c996_stop("RENAME_DENIED_OR_COLLISION");
         goto done;
     }
