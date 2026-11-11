@@ -198,3 +198,19 @@
 - **성공 판정:** ISO SHA256/크기, 수정 WIM·내장 EXE SHA256, DISM index/arch/image metadata, BIOS/UEFI BCD 해시, 신규 mount 종료 및 기존 보호 해시를 확인한 후에만 `ISO_ONLY_PASS`로 표기. 실제 WinPE 부팅, CNG 6사례, Owner 신뢰/서명·offline clock/철회, 최종 #996 C급 복구 성공과 구분. 성공 또는 실패를 작업 후 측정 전까지 선언하지 않음.
 - **전면 제외:** 원본 운영 PC, `E:`, USB, 부팅/재부팅, 서비스/Runner, Workflow·Backlog·Claim·Lease, 실제 C급 관리자 복구, 테스트키의 Owner 키 승격. 전체 공통 복구 보고 기준 **80% / C NO-GO** 유지, ISO 결과 도착 뒤에만 진척 변경 검토.
 - 근거: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/mount-and-modify-a-windows-image-using-dism.
+
+
+### 2026-11-12 승인 c74064b 후 가드 보정·단일 해제 준비 실제 결과 — 활성 로그 공유 오류로 STOP
+
+- 사용자 직접 지시 및 승인 커밋 `c74064b35899648313df933c5bcf9f84f7a64d9c` 마지막 절 확인. 최신 main AGENTS/공통 실행 지침 관련 범위를 재확인. 기존 실패 스크립트 재실행 0. 별도 신규 root `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_R2_f7a131b4bb7a4149a854bd0ee3ea7447`에서 가드·회귀·단회 실행 준비.
+- 기존 실패 스크립트를 직접 읽고 별도 WIM_READ_GUARD.ps1 구현: CreateFileW(OPEN_REPARSE_POINT, desiredAccess=0) + GetFileInformationByHandleEx(FileAttributeTagInfo)로 대상 자체의 태그 확인. C: 경로와 모든 조상을 검사. 정확한 DISM mapping으로 검증한 mount 내부 **읽기**에서만 WIM=0x80000008 허용; 외부 입력/복사 목적지, symlink=0xA000000C/junction=0xA0000003/unknown 태그는 계속 거부.
+- 준비 회귀의 최초 오류: PowerShell의 signed hex literal→UInt32 직접 cast가 범위를 벗어나 exit 1. Convert.ToUInt32(hex,16)로 새 준비본을 수정한 후 **14/14 PASS**: 정상/WIM 읽기, 외부·미검증·목적지 WIM 거부, symlink/junction/unknown/missing-tag 거부, inside/sibling/..escape/root 경계, 실제 startnet WIM 태그 읽기. 이미지 동작 전 개발 검사에서 발견·수정한 오류이며 실제 해제 시도와 구분.
+- 새 단회 cleanup-attempt.started 후 관리자 사전 검사: host DESKTOP-N62L0NG, 입력 EXE 고정 SHA 일치, 보호 입력 **10/10**, 기존 실패 작업본 BCD/WIM/boot.sdi **4/4** 해시 일치(BCD 2개 포함). WIM SHA `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`, EXE SHA `b2b1af8accc55d95b5e11bc68664a45af19887d56f09cd9231bce2dfd6a8e218`.
+- **최초 실제 처분 준비 실패:** PRECHECK에서 기존 실패 root 최상위 증거 파일들을 Get-FileHash로 읽던 중 `MOUNT_NEW_WIM.dism.log`가 다른 프로세스에서 사용 중이어서 읽기 공유 오류. 원문 `The process cannot access the file '...\MOUNT_NEW_WIM.dism.log' because it is being used by another process.` 관리자 스크립트 exit **1**, cleanup-result.status=STOPPED, discardAttempts=**0**. HRESULT/정확한 잠금 보유 PID는 이번 출력에서 미수집이므로 특정 Win32 숫자나 주체로 단정하지 않음.
+- 준비기가 사용 중인 DISM 로그까지 고정 해시 증거 대상으로 포함해 사전 검사가 막힌 것이며, WIM 내용 손상이나 승인 해제 실패를 입증한 것은 아님. 프로세스 종료·잠금 해제·파일 공유 우회·같은 스크립트 재실행 없음.
+- 승인된 “오류/불일치 즉시 STOP”에 따라 **/Discard 0, /Commit 0, WIM baseline 전개 0, 신규 copype/ISO 시도 0**. 별도 BUILD_NEW_ISO_ONCE.ps1 준비본은 구문검사만 했고 실행하지 않음. 기존 root/증거를 삭제·덮어쓰거나 실패 마커를 재사용하지 않음.
+- 중단 후 별도 관리자 **읽기 전용** /Get-MountedImageInfo exit **0**. 정확한 잔여 mount는 여전히 `...\C996_ISO_TEST_ONLY_0cadf11c99594b999cd2b64b553ebc6f\image-mount`, Image File 같은 root의 `WinPE_amd64\media\sources\boot.wim`, **Index 1 / RW Yes / Status Ok**. 활성 mount 1개 유지. 전체 파일·미기록 변경 대조 단계에 도달하지 못했으므로 그 조건을 PASS로 선언하지 않음.
+- ISO/최종 수정 WIM/내장 EXE **새 산출물 없음**, SHA256 **해당 없음**. 위 두 해시는 입력 식별값일 뿐 새 ISO 성공 증거가 아님.
+- 신규 결과: guard-tests.json, cleanup-result.json, poststop-mount-state.txt, poststop-query-result.json, summary.json. guard source SHA256 `9c7e2667c7a03d9c52a9c4a62b650cc2573c27ae3a56bda7504f4b0caf7713ff`; 회귀 결과 SHA256 `27ee855f65d91435d7b9803fd5cc5df793fa999dd3a4d5e6901c7b3356881b04`.
+- 다음 필수 작업은 활성 DISM 로그의 잠금/공유 및 증거 보존 계약을 읽기 전용으로 분류하고, **고정 실패 증거와 사용 중 로그를 분리하는 사전검사 보정**을 검토하는 것. 잠금 해제를 이유로 DISM/Runner를 종료하지 않음. 중단 상태에서 승인된 이미지 처분/ISO 단회 경로를 임의 재개하지 않음.
+- 운영 PC/E:/USB/부팅/Runner/Workflow/Backlog/Claim/Lease 변경 0. 실제 WinPE/CNG/Owner/시간/철회 검증 0. **전체 80% / C NO-GO 유지**.
