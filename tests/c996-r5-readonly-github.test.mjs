@@ -16,7 +16,9 @@ function fixture(){
 function raw(){return {schema:'C996_R5_LOG_EVIDENCE_READONLY_V1',host:HOST,
   status:'COMPLETE',code:'LOGS_PRESENT_STAGE_UNPROVEN',rawLogIncluded:false,
   operationalWrites:0,discardAttempts:0,isoAttempts:0,
-  inputs:[{id:'FINAL_WIM',bytes:341652286,sha256:'a'.repeat(64),matched:true}],
+  inputHashesUnchanged:5,
+  inputs:['ADK_WIM','FINAL_WIM','TEST_ISO','BIOS_BCD','UEFI_BCD'].map((id,i)=>
+    ({id,bytes:1000+i,sha256:'a'.repeat(64),matched:true})),
   logs:[{name:'COMMIT_NEW_WIM.dism.log',directory:'ISO_ATTEMPT',lines:12,
     bytes:900,sha256:'b'.repeat(64),counts:{COMMIT_REQUEST:1},
     events:[{code:'COMMIT_REQUEST',line:5,at:'11/12/2026 03:01:02',raw:'PRIVATE LINE'}]}]};}
@@ -47,7 +49,7 @@ test('issue authenticity and event provenance are checked',()=>{
 test('collector output rebuild drops raw text and paths',()=>{
  const r=raw();r.absolute='C:\\Users\\secret';r.logs[0].events[0].raw='TOP SECRET';
  const s=selectSafeReport(r,ctx,HOST);
- assert.equal(s.pinCount,1);assert.equal(s.logCount,1);
+ assert.equal(s.pinCount,5);assert.equal(s.logCount,1);
  assert.doesNotMatch(JSON.stringify(s),/TOP SECRET|C:\\Users\\secret/);
  assert.equal(s.rootCauseStage,'UNKNOWN');assert.equal(s.operationalWrites,0);
 });
@@ -94,4 +96,17 @@ test('readback mismatch never creates issue success comment',async()=>{
 });
 test('missing GitHub token stops before any upload',async()=>{
  await assert.rejects(uploadVerifiedPair(selectSafeReport(raw(),ctx,HOST),'',async()=>{}),/TOKEN_MISSING/);
+});
+
+test('COMPLETE requires original 5/5 pin evidence and post-read comparison',()=>{
+  const base=raw(),ctx={requestId:uuid,issueNumber:1500,runId:'1',attempt:'1'};
+  for(const change of [
+    r=>r.inputs.pop(),
+    r=>r.inputs[0].matched=false,
+    r=>r.inputs[4].id=r.inputs[3].id,
+    r=>r.inputHashesUnchanged=4
+  ]) {
+    const r=structuredClone(base);change(r);
+    assert.throws(()=>selectSafeReport(r,ctx,HOST));
+  }
 });
