@@ -6,7 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {simulate996Continuation} from
   '../tools/controller-996-continuation-transaction.mjs';
-import {plan996WindowsArchive} from
+import {plan996SingleBootRecovery} from
   '../tools/controller-996-windows-archive-adapter.mjs';
 
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
@@ -86,7 +86,7 @@ function fixture(){
     pausedAt,resumedAt,pins};
   const relative=rel=>path.join(root,...rel.split('/'));
   const cont=`${M}/leases/controller-recovery-continuation-${ID}`;
-  const oldCArchive=`${M}/leases/controller-recovery-archived-${REQ}`;
+  const oldCArchive=`${M}/leases/controller-recovery-interrupted-${REQ}`;
   const leaseArchive=`${M}/leases/controller-install-recovered-${REQ}`;
   const contArchive=`${M}/leases/controller-recovery-continuation-archived-${ID}`;
   const run=options=>simulate996Continuation({testOnly:true,root,consent,
@@ -133,6 +133,8 @@ test('84 Git bytes checked and install lease is final archive step',()=>{
     assert.equal(r.archivedCClaimBeforeInstallLease,true);
     assert.equal(r.continuationClaimBeforeInstallLease,true);
     assert.equal(r.installLeaseLast,true);
+    assert.equal(r.winPePhaseBoundaryProven,false);
+    assert.equal(r.nativeWindowsMoveProven,false);
     assert.equal(r.productionExecutable,false);
     assert.equal(r.executionAuthorized,false);
     assert.equal(r.originalRequestRetried,false);
@@ -151,14 +153,21 @@ test('84 Git bytes checked and install lease is final archive step',()=>{
     assert.equal(ready.name,'READY_TO_RELEASE_INSTALL');
   }finally{f.cleanup();}
 });
-test('Linux fixture archive shape agrees with Windows direct-move contract',()=>{
+test('Linux fixture archive paths and order agree with single WinPE boot proposal',()=>{
   const f=fixture();
   try{
-    const plan=plan996WindowsArchive(ID);
+    const plan=plan996SingleBootRecovery(ID);
+    assert.equal(plan.winpeBootCount,1);
+    assert.equal(plan.productionExecutable,false);
+    assert.equal(plan.phases[0].moves.length,0);
+    assert.equal(plan.phases[2].moves.length,0);
     const expected=[f.oldCArchive,f.contArchive,f.leaseArchive];
-    assert.deepEqual(plan.steps.map(s=>path.win32.basename(s.destination)),
+    const moves=plan.phases[1].moves;
+    assert.deepEqual(moves.map(s=>path.win32.basename(s.destination)),
       expected.map(s=>path.posix.basename(s)));
-    assert.deepEqual(plan.steps.map(s=>s.name),['oldC','continuation','install']);
+    assert.deepEqual(moves.map(s=>s.name),['oldC','continuation','install']);
+    assert.equal(path.win32.basename(moves[0].destination),
+      `controller-recovery-interrupted-${REQ}`);
     assert.equal(f.run().status,'C_CONTINUATION_TEST_ARCHIVED_IN_ORDER');
     for(const rel of expected){
       assert.equal(fs.existsSync(f.relative(rel+'/owner.json')),true);
