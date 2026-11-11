@@ -60,6 +60,10 @@ export function plan996OfflineRecovery({continuationId,method}={}){
     originalRequestId:ORIGINAL,continuationId,
     intendedCompletion:'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED',
     steps:plan.steps,executionAuthorized:false,productionExecutable:false,
+    pcTopology:Object.freeze({physicalPcCount:2,
+      existingPcName:'기존 ZGMINI PC',queuePcName:'공통 대기열 PC',
+      recoveryBootPc:'기존 ZGMINI PC',bootEnvironment:'WinPE',
+      additionalPcRequired:false}),
     operationalWrites:0,workflowPuts:0,backlogWrites:0,issuePosts:0,
   };
   if(method==='LOCK_VOLUME_THEN_PATH_RENAME'){
@@ -72,15 +76,15 @@ export function plan996OfflineRecovery({continuationId,method}={}){
       code:'C996_DISMOUNT_IS_NOT_EXCLUSIVE',
       reason:'OTHER_ACCESS_CAN_REMOUNT_THE_VOLUME'});
   }
-  if(method!=='SEPARATE_OFFLINE_HOST'){
+  if(method!=='EXISTING_ZGMINI_PC_WINPE_BOOT'){
     return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
       code:'C996_OFFLINE_METHOD_NOT_SELECTED'});
   }
   return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
-    code:'C996_OFFLINE_DOWNTIME_AND_TRUSTED_HOST_APPROVAL_REQUIRED',
+    code:'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED',
     ownerDecisions:Object.freeze([
       'STOP_ORIGINAL_WINDOWS_WRITERS_AND_APPROVE_DOWNTIME',
-      'SELECT_TRUSTED_SEPARATE_BOOT_OR_HOST_WITH_SOLE_VOLUME_ACCESS',
+      'SELECT_EXISTING_ZGMINI_PC_WINPE_WITH_SOLE_VOLUME_ACCESS',
       'PIN_VOLUME_ID_AND_SERIAL_WITHOUT_ASSUMING_DRIVE_LETTER',
       'APPROVE_EXACT_SIGNED_TOOL_AND_OFFLINE_CONSENT_VERIFICATION',
       'PRESERVE_LIVE_OWNER_REVOCATION_CHECK_OR_APPROVE_EXACT_OFFLINE_VALIDITY',
