@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticate,validateSeat,SCHEMA,TITLE,REPOSITORY,toText} from '../tools/pc-host-inventory-readonly.mjs';
+import {authenticate,validateSeat,SCHEMA,TITLE,REPOSITORY,toText,probeFixedVmPrograms,FIXED_VM_PATHS} from '../tools/pc-host-inventory-readonly.mjs';
 function fixture(role='operating'){
  const body={schema:SCHEMA,operation:'host-inventory-readonly',
   requestId:'37f4c567-4f2a-4746-b811-2209af71bfb8',role};
@@ -45,4 +45,43 @@ test('text report contains no paths, tokens, or raw memory dump',()=>{
   memory:{totalMiB:16000,freeMiB:1200}});
  assert.match(text,/memory.totalMiB=16000/);
  assert.doesNotMatch(text,/E:\\|TOKEN|PRIVATE|AppData/);
+});
+
+test('VM presence probe is pinned to six public C: standard paths only',()=>{
+  assert.equal(FIXED_VM_PATHS.length,6);
+  assert.equal(new Set(FIXED_VM_PATHS.map(x=>x[0])).size,6);
+  for(const [id,filename] of FIXED_VM_PATHS){
+    assert.match(id,/^[A-Z0-9_]+$/);
+    assert.match(filename,/^C:\\/);
+    assert.doesNotMatch(filename,/Users|AppData|\\.\\.|E:\\/);
+  }
+});
+test('read-only VM inventory reports present, missing, symlink, IO unknown distinctly',()=>{
+  const seen=[];
+  const probe=probeFixedVmPrograms(filename=>{
+    seen.push(filename);
+    const index=seen.length-1;
+    if(index===0)return {isSymbolicLink:()=>false,isFile:()=>true};
+    if(index===1)return {isSymbolicLink:()=>true,isFile:()=>true};
+    if(index===2)return {isSymbolicLink:()=>false,isFile:()=>false};
+    const e=new Error('do not disclose native path');
+    e.code=index===3?'ENOENT':index===4?'EPERM':'EIO';
+    throw e;
+  });
+  assert.deepEqual(seen,FIXED_VM_PATHS.map(x=>x[1]));
+  assert.deepEqual(probe.programs.map(x=>x.status),[
+    'FILE_PRESENT','LINK_NOT_ATTESTED','NOT_A_FILE',
+    'ABSENT_AT_FIXED_PATH','UNKNOWN_ACCESS_OR_IO','UNKNOWN_ACCESS_OR_IO'
+  ]);
+  assert.equal(probe.pathCount,6);
+  assert.equal(probe.runtimeBoot,'NOT_EXECUTED');
+  assert.equal(probe.virtualizationCpuFirmware,'NOT_CHECKED');
+  assert.equal(probe.operationalWrites,0);
+  assert.doesNotMatch(JSON.stringify(probe),/do not disclose|Program Files|AppData|C:\\\\/);
+});
+test('VM absence at fixed paths never claims there is no VM software anywhere',()=>{
+  const inventory=probeFixedVmPrograms(()=>{const e=new Error('not found');e.code='ENOENT';throw e;});
+  assert.equal(inventory.unlistedOrPortableInstalls,'NOT_CHECKED');
+  assert.equal(inventory.verdict,'PRESENCE_ONLY_NOT_BOOT_OR_HARDWARE_PROOF');
+  assert.ok(inventory.programs.every(x=>x.status==='ABSENT_AT_FIXED_PATH'));
 });

@@ -56,6 +56,46 @@ function disk(root){
    capacityMiB:Number(s.blocks*s.bsize/mib),freeMiB:Number(s.bavail*s.bsize/mib)};
  }catch{return {drive:root.slice(0,2),present:true,capacityMiB:null,freeMiB:null};}
 }
+
+/*
+ * #996 WinPE runtime feasibility — fixed known installation paths only.
+ * Presence is NOT VM operability, hardware virtualization support,
+ * ISO boot permission, secure boot evidence, or C-grade execution.
+ * Never traverses a user directory, runs a binary or reads configuration.
+ */
+export const FIXED_VM_PATHS=Object.freeze([
+  ['VIRTUALBOX','C:\\Program Files\\Oracle\\VirtualBox\\VBoxManage.exe'],
+  ['QEMU','C:\\Program Files\\qemu\\qemu-system-x86_64.exe'],
+  ['VMWARE_WORKSTATION_X64','C:\\Program Files\\VMware\\VMware Workstation\\vmware.exe'],
+  ['VMWARE_WORKSTATION_X86','C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware.exe'],
+  ['VMWARE_PLAYER','C:\\Program Files (x86)\\VMware\\VMware Player\\vmplayer.exe'],
+  ['HYPERV_CONNECT','C:\\Windows\\System32\\vmconnect.exe']
+]);
+export function probeFixedVmPrograms(lstat=fs.lstatSync) {
+  const programs=FIXED_VM_PATHS.map(([id,filename])=>{
+    let status;
+    try {
+      const stat=lstat(filename);
+      status=stat.isSymbolicLink()?'LINK_NOT_ATTESTED':
+        stat.isFile()?'FILE_PRESENT':'NOT_A_FILE';
+    } catch(e) {
+      status=e?.code==='ENOENT'||e?.code==='ENOTDIR'?
+        'ABSENT_AT_FIXED_PATH':'UNKNOWN_ACCESS_OR_IO';
+    }
+    return {id,status};
+  });
+  return {
+    scope:'STANDARD_C_PATHS_ONLY',
+    verdict:'PRESENCE_ONLY_NOT_BOOT_OR_HARDWARE_PROOF',
+    pathCount:FIXED_VM_PATHS.length,
+    programs,
+    unlistedOrPortableInstalls:'NOT_CHECKED',
+    virtualizationCpuFirmware:'NOT_CHECKED',
+    runtimeBoot:'NOT_EXECUTED',
+    operationalWrites:0
+  };
+}
+
 export function collectInventory(ctx,env=process.env){
  const hostname=clean(os.hostname(),64).toUpperCase();
  const runnerName=clean(env.RUNNER_NAME,80);
@@ -89,7 +129,8 @@ export function collectInventory(ctx,env=process.env){
    operatingNode:fs.existsSync('E:\\ZGmini\\runtime\\node.exe'),
    controller:fs.existsSync('E:\\ZGmini\\automation\\pc-control'),
    controlCheckout:fs.existsSync('E:\\ZGmini\\projects\\zgmini-pc-control')
-  }};
+  },
+  ...(ctx.role==='handoff'?{winpeVmPrograms:probeFixedVmPrograms()}:{})};
 }
 export function toText(r){
  const lines=['schema='+r.schema,'requestId='+r.requestId,'runId='+r.runId,
