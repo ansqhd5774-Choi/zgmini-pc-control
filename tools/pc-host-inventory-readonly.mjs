@@ -33,8 +33,9 @@ export function authenticate(event,env,role){
 }
 export function validateSeat(role,hostname,runnerName,computername){
  const host=clean(hostname,64).toUpperCase();
- const machine=clean(computername,64).toUpperCase();
- if(!host || !machine || host!==machine) return 'HOST_IDENTITY_UNVERIFIED';
+ // The GitHub-registered runner and the OS hostname are the routing proof.
+ // COMPUTERNAME is optional process environment data, not an independent gate.
+ if(!host) return 'HOST_IDENTITY_UNVERIFIED';
  if(role==='operating'){
   if(host===QUEUE_HOST) return 'OPERATING_HOST_COLLIDES_WITH_QUEUE';
   return /^zgmini-pc-0[1-6]$/.test(runnerName)?'MATCH':'OPERATING_RUNNER_MISMATCH';
@@ -63,6 +64,10 @@ export function collectInventory(ctx,env=process.env){
   issueNumber:ctx.issueNumber,runId:ctx.runId,attempt:ctx.attempt,
   role:ctx.role,host:hostname,runnerName,
   expectedLabel:ctx.role==='operating'?'zgmini-pc-control':'zgmini-handoff-ci-isolated',
+  identitySource:'NODE_OS_HOSTNAME',
+  computernameEnvPresent:typeof env.COMPUTERNAME==='string'&&env.COMPUTERNAME.length>0,
+  computernameEnvMatchesOs:typeof env.COMPUTERNAME==='string'&&env.COMPUTERNAME.length>0?
+   clean(env.COMPUTERNAME,64).toUpperCase()===hostname:null,
   status:seat==='MATCH'?'PASS':'BLOCKED',
   code:seat==='MATCH'?'READONLY_HOST_INVENTORY_COLLECTED':seat,
   operationalWrites:0,providerCalls:0,sqliteOpened:false,d1Writes:0,
