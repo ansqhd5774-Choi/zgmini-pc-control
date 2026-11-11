@@ -21,7 +21,7 @@ test('existing ZGMINI PC WinPE boot proposes two guarded offline phases',()=>{
   const result=plan996OfflineRecovery({continuationId,method:'EXISTING_ZGMINI_PC_WINPE_BOOT'});
   assert.equal(result.status,'OWNER_DECISION_REQUIRED');
   assert.equal(result.productionExecutable,false);
-  assert.deepEqual(result.steps.map(step=>step.name),['oldC','install','ownC']);
+  assert.deepEqual(result.steps.map(step=>step.name),['oldC','ownC','install']);
   assert.deepEqual(result.legacySingleSessionSteps.map(step=>step.name),
     ['oldC','continuation','install']);
   assert.equal(result.twoBootReview.legacySingleSessionPlanExecutable,false);
@@ -118,7 +118,7 @@ test('online stage retains installation lease and requires job-admission proof b
   assert.equal(twoBoot.phases[1].admission,
     'PROVE_GITHUB_PC_JOB_ADMISSION_FENCE_OR_STOP');
   assert.equal(twoBoot.phases[1].handoff,'READY_FOR_SECOND_BOOT');
-  assert.deepEqual(twoBoot.phases[2].moves.map(m=>m.name),['install','ownC']);
+  assert.deepEqual(twoBoot.phases[2].moves.map(m=>m.name),['ownC','install']);
   assert.deepEqual(twoBoot.phases[3].moves,[]);
 });
 test('partial synthetic trace is incomplete and never releases install barrier',()=>{
