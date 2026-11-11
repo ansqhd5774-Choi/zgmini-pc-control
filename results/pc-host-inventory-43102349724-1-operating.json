@@ -1,0 +1,60 @@
+{
+  "schema": "ZGMINI_PC_HOST_INVENTORY_RESULT_V1",
+  "requestId": "9c9a2415-143b-428d-9b77-f8b4cdf132b6",
+  "issueNumber": 1249,
+  "runId": "43102349724",
+  "attempt": "1",
+  "role": "operating",
+  "host": "PC",
+  "runnerName": "zgmini-pc-03",
+  "expectedLabel": "zgmini-pc-control",
+  "identitySource": "NODE_OS_HOSTNAME",
+  "computernameEnvPresent": false,
+  "computernameEnvMatchesOs": null,
+  "status": "PASS",
+  "code": "READONLY_HOST_INVENTORY_COLLECTED",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "sqliteOpened": false,
+  "d1Writes": 0,
+  "automaticRetries": 0,
+  "os": {
+    "platform": "win32",
+    "version": "Windows 11 Pro",
+    "release": "10.0.26300",
+    "arch": "x64"
+  },
+  "cpu": {
+    "model": "11th Gen Intel(R) Core(TM) i5-11400H @ 2.70GHz",
+    "logicalCount": 12
+  },
+  "memory": {
+    "totalMiB": 16122,
+    "freeMiB": 1036
+  },
+  "disks": [
+    {
+      "drive": "C:",
+      "present": true,
+      "capacityMiB": 487153,
+      "freeMiB": 46064
+    },
+    {
+      "drive": "E:",
+      "present": true,
+      "capacityMiB": 1907694,
+      "freeMiB": 1580840
+    }
+  ],
+  "node": {
+    "version": "v24.19.0",
+    "arch": "x64",
+    "executableAtApprovedOperatingPath": true
+  },
+  "installedLayout": {
+    "zgminiRoot": true,
+    "operatingNode": true,
+    "controller": true,
+    "controlCheckout": true
+  }
+}
