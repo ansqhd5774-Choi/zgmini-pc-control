@@ -25,6 +25,20 @@ const allow=endpoint=>typeof endpoint==='string'&&(
   new RegExp(`^contents/${MANIFEST.replaceAll('.','\\.')}\\?ref=[a-f0-9]{40}$`).test(endpoint)||
   endpoint==='actions/workflows/pc-job.yml'
 );
+// Additional fixed GET surfaces for the #996 admission review ONLY. Never
+// expose them through the general consent reader's get(endpoint) method.
+const inventoryRoute=endpoint=>
+  /^actions\/runners\?per_page=100&page=(?:[1-9]|1[0-9]|20)$/.test(endpoint);
+const runsRoute=endpoint=>
+  /^actions\/workflows\/pc-job\.yml\/runs\?status=(?:queued|in_progress|waiting)&per_page=100&page=(?:[1-9]|1[0-9]|20)$/.test(endpoint);
+const ensurePage=(obj,key,page,total)=>{
+  need(Number.isSafeInteger(obj?.total_count)&&obj.total_count>=0&&
+    obj.total_count<=2000&&Array.isArray(obj[key])&&obj[key].length<=100&&
+    (total===null||total===obj.total_count),
+  'C_996_INSTALLED_GH_PAGE_INVALID');
+  need(page===1||obj[key].length>0,'C_996_INSTALLED_GH_PAGE_MISSING');
+  return obj.total_count;
+};
 
 function originalWindowsOnly(){
   need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&
@@ -68,7 +82,9 @@ export function create996InstalledGhGetReadOnly({testOnly=false,
     need(typeof route==='string'&&
       (/^(?:user|repos\/ansqhd5774-Choi\/zgmini-pc-control)$/.test(route)||
         route.startsWith(`repos/${REPO}/`)&&
-          allow(route.slice(`repos/${REPO}/`.length))),
+          (allow(route.slice(`repos/${REPO}/`.length))||
+            inventoryRoute(route.slice(`repos/${REPO}/`.length))||
+            runsRoute(route.slice(`repos/${REPO}/`.length)))),
     'C_996_INSTALLED_GH_ROUTE_DENIED');
     let raw;
     try{
@@ -119,6 +135,64 @@ export function create996InstalledGhGetReadOnly({testOnly=false,
         value.state==='active',
       'C_996_INSTALLED_GH_WORKFLOW_STATE_UNVERIFIED');
       return value.state;
+    },
+    readPcJobRunnersReadOnly(){
+      if(!checked)authenticate();
+      const found=[],ids=new Set();let total=null;
+      for(let page=1;page<=20;page++){
+        const data=getOnly(`repos/${REPO}/actions/runners?per_page=100&page=${page}`).data;
+        total=ensurePage(data,'runners',page,total);
+        for(const row of data.runners){
+          need(Number.isSafeInteger(row?.id)&&row.id>0&&!ids.has(row.id)&&
+            typeof row.name==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(row.name)&&
+            ['online','offline'].includes(row.status)&&
+            typeof row.busy==='boolean'&&Array.isArray(row.labels)&&
+            row.labels.length>0&&row.labels.length<=40,
+          'C_996_INSTALLED_GH_RUNNER_ROW_INVALID');
+          const labels=[];
+          for(const item of row.labels){
+            need(Number.isSafeInteger(item?.id)&&item.id>0&&
+              typeof item.name==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(item.name)&&
+              !labels.includes(item.name),
+            'C_996_INSTALLED_GH_RUNNER_LABEL_INVALID');
+            labels.push(item.name);
+          }
+          ids.add(row.id);found.push(Object.freeze({id:row.id,name:row.name,
+            status:row.status,busy:row.busy,labels:Object.freeze(labels)}));
+        }
+        if(found.length===total)break;
+        need(data.runners.length===100&&page<20,
+          'C_996_INSTALLED_GH_RUNNER_PAGINATION_INCOMPLETE');
+      }
+      need(found.length===total,'C_996_INSTALLED_GH_RUNNER_PAGINATION_INCOMPLETE');
+      return Object.freeze({schema:'ZGMINI_996_PC_JOB_RUNNER_GET_V1',
+        status:'RUNNER_INVENTORY_GET_ONLY',totalCount:total,
+        runners:Object.freeze(found),executionAuthorized:false});
+    },
+    readPcJobRunsReadOnly(){
+      if(!checked)authenticate();
+      const counts={};
+      for(const status of ['queued','in_progress','waiting']){
+        let total=null,collected=0;const ids=new Set();
+        for(let page=1;page<=20;page++){
+          const data=getOnly(`repos/${REPO}/actions/workflows/pc-job.yml/runs?status=${status}&per_page=100&page=${page}`).data;
+          total=ensurePage(data,'workflow_runs',page,total);
+          for(const run of data.workflow_runs){
+            need(Number.isSafeInteger(run?.id)&&run.id>0&&!ids.has(run.id)&&
+              run.status===status&&run.event==='issues',
+            'C_996_INSTALLED_GH_WORKFLOW_RUN_INVALID');
+            ids.add(run.id);collected++;
+          }
+          if(collected===total)break;
+          need(data.workflow_runs.length===100&&page<20,
+            'C_996_INSTALLED_GH_RUN_PAGINATION_INCOMPLETE');
+        }
+        need(collected===total,'C_996_INSTALLED_GH_RUN_PAGINATION_INCOMPLETE');
+        counts[status]=total;
+      }
+      return Object.freeze({schema:'ZGMINI_996_PC_JOB_RUNS_GET_V1',
+        status:'WORKFLOW_RUNS_GET_ONLY',counts:Object.freeze(counts),
+        executionAuthorized:false});
     },
   });
 }
