@@ -27,3 +27,10 @@ Title: pc-host-inventory-readonly
 각 PC의 실제 Issue/Run, Runner/호스트, 읽기 전용 결과, 원격 JSON/TXT 2/2 확인, 미확인 항목을 구분한 조사표 작성. queued, BLOCKED, 소스 병합을 실측 PASS로 간주하지 않는다. 실행 정본 3종은 실제 결과가 확보된 뒤에만 필요한 참조를 추가한다.
 
 현재 이 문서는 후보 브랜치의 제안이며, Workflow가 정식 승인·병합되기 전에는 Issue를 생성해도 진단 실행이 보장되지 않는다.
+
+
+## 2026-11-12 실PC 1차 결과 및 정확한 후속 조치
+- 격리 PC #1245 / Run 43101563767: PASS, host DESKTOP-N62L0NG, runner zgmini-handoff-ci-spare-01, Windows 10 Home 19045, Intel Core i5-7300HQ(4 logical), RAM 16301 MiB/free 4632 MiB, C: 243306/53797 MiB, E: 198690/173364 MiB, Node v22.23.4. 실제 JSON/TXT 2/2 원격 readback, 운영 쓰기 0.
+- 운영 PC #1247 / Run 43101700919: BLOCKED/HOST_IDENTITY_UNVERIFIED, Node os.hostname()=PC, Runner zgmini-pc-05, 운영 쓰기 0, JSON/TXT 2/2 원격 readback. CPU·RAM·OS·디스크는 아직 수집하지 못함. #1247 재실행 금지.
+- 최초 구현은 별도의 COMPUTERNAME 환경변수 값을 Node os.hostname()와 반드시 일치하도록 요구했다. 이 값의 누락 또는 불일치는 실제 GitHub 등록 Runner + OS API hostname으로 식별된 경로를 불필요하게 막을 수 있다. 환경변수는 참고 사실로만 기록하고 **등록 Runner 이름+고정 라벨+OS hostname+두 PC 상호 배제**를 실질 호스트 검증 기준으로 유지한다.
+- 수정 코드·테스트 검증 뒤 새 고유 Issue 1건으로 운영 PC의 읽기 전용 결과를 새로 수집한다. 기존 #1247의 BLOCKED 원본은 보존하며 #996 C급 NO-GO는 별개로 유지한다.
