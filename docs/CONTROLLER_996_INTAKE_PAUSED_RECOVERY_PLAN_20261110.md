@@ -122,3 +122,18 @@
 - 읽기 전용 바이트 비교: BIOS 632바이트 차이(4096바이트 hive 헤더 밖 579), UEFI 641바이트 차이(헤더 밖 588), 파일 크기 각각 16384 불변. 따라서 **헤더/체크섬만 변경됐다고 단정할 수 없음**. BCD enum 호출의 hive 내부 메타데이터 정규화인지 다른 효과인지, 개별 설정 값 변화 여부는 아직 독립 판별하지 않음. 명령에 /set·/delete·/create는 없었으나 /enum을 바이트 무변경이라고 주장한 보장은 철회한다.
 - 원본 ADK 및 TEMP BCD를 덮어쓰거나 복구하지 않고 증거 보존. 시스템 BCD에는 접근하지 않음. 다음 진단은 외부 BCD를 Windows hive API에 다시 로드하지 않는 **오프라인 읽기 전용 파서**로 원본/TEMP의 키·값·보안 메타데이터를 분리 대조하는 것. 원인 확인 전 TEMP BCD 바이트 불변/부팅 준비 완료를 선언하지 않음.
 - 후속 WinPE test-only harness의 E: 미접근·시험키/Owner 분리 및 부팅 승인 경계 유지. 운영 PC/E: 접근·변경 0, Workflow/Backlog/Claim/Lease/Runner 변경 0. **전체 80% / C NO-GO**, 정적 이미지 생성 PASS와 BCD 경로 검토 PASS를 보존하고 BCD 무변경성은 UNVERIFIED로 구분.
+
+
+### 2026-11-12 BCD 오프라인 구조 비교 완료 — 부팅 값 동일, 내부 ACL/메타데이터 차이
+
+- 기존 BCD를 Windows registry/BCD API로 재로드하지 않고 Node 24의 fs.readFileSync/Buffer만 사용하는 한정 hive 파서로 ADK 원본과 TEMP 복사본을 비교함. 신규 TEMP 보고 폴더 외 쓰기 0. 파싱 전후 원본/TEMP 파일 각각 SHA-256 동일 확인.
+- BIOS hive 65 keys/45 values, UEFI hive 66 keys/46 values를 순회. 각 key의 class, 값 이름/type/raw data, security descriptor, NK flags/lastWrite/accessBits를 분리 비교. 미지원 big-data/volatile key 또는 범위·서명·개수·순환 오류 시 실패하도록 구현. 이 한정 파서는 범용 포렌식 라이브러리 인증이나 악성 hive 전체 보장을 제공하지 않음. 레이아웃 참고: https://github.com/williballenthin/python-registry/blob/master/Registry/RegistryParse.py
+- 양쪽 **ROOT/Objects 이하 모든 key 및 모든 raw 값 동일**. 따라서 기존 bootmgr/loader/ramdisk 설정에 대해 이번 바이트 drift에서 부팅 값 변경은 발견되지 않음.
+- 값 변경은 양쪽 모두 **ROOT/Description의 KeyName 1개**. 원본의 24-byte REG_SZ raw data에서 TEMP의 `BCD00000001` UTF-16 문자열로 바뀜. 원본 raw 내용을 정상 문자열이었다고 가정하지 않음.
+- 보안 descriptor 차이는 BIOS 55개/UEFI 56개 key. 비교된 unique descriptor pair는 동일: 원본 `O:BAG:BAD:(A;CI;KA;;;SY)(A;CI;KA;;;BA)(A;CI;KR;;;WD)(A;CI;KR;;;RC)S:NO_ACCESS_CONTROL` → TEMP `O:BAG:BAD:(A;;CCSWRPRCWD;;;BA)(A;;KA;;;SY)S:NO_ACCESS_CONTROL`. Owner/Group BA는 유지되고 DACL의 ACE·상속 표시는 실제로 다름. **보안 메타데이터가 바뀐 상태이므로 완전 무변경 또는 단순 체크섬 갱신이라고 주장하지 않음.** 이 차이는 hive 내부 ACL이며 파일시스템 ACL과 구분함.
+- NK flags/accessBits/lastWrite 등도 차이가 있음. 관측 패턴은 hive 로딩 시 이름/보안/키 메타데이터 처리가 일어난 가설과 일치하지만, 호출 전후 OS 추적을 수집하지 않았으므로 원인 프로세스를 확정하거나 모든 차이가 무해하다고 선언하지 않음. 원본 ADK/TEMP BCD 복원·재조회·덮어쓰기 없음.
+- 파서 확인 **8/8 PASS**: BIOS/UEFI 각각 동일 입력 일치, 메모리 내 winload 경로 1-byte 변조 탐지, 잘린 hive 거부, 실제 원본/TEMP 모든 boot-object raw 값 동일 대조. 대조군 변조는 메모리에서만 수행. Windows hive API를 사용한 독립 2차 파서 검증은 아님.
+- 로컬 증거: `C:\Users\ansqh\AppData\Local\Temp\C996_BCD_OFFLINE_0aa219f584804b7cb930176b255a4728\comparison-detailed.json`, SHA256 `a6587baed011ada1d84431655c616898ad763226103784543c0c56d206a2c645`; `parser-checks.json`, SHA256 `83a3daea027a3d44ce4be105c61873f8eaba9d6dc30c5ec50f69d9eee114682d`. 비교 코드 SHA256 `f1f3564f42794ea7928ad55e556c694569785cb436dd55ad02a96088bf6c2f1f`.
+- **현재 판정:** WinPE 이미지 정적 생성 PASS, BCD 부팅 값 일치 PASS, BCD byte identity FAIL(의도치 않은 내부 ACL/메타데이터 차이 관측), WinPE 부팅·Secure Boot 대상 호환·CNG NOT_TESTED. 수정/재생성으로 이력을 덮지 않고 현재 TEMP 증거를 보존한다.
+- 다음 필수 개발은 기존 일반 Windows harness를 재목적 실행하지 않는 **E: 미접근 WinPE test-only CNG harness 설계/정적 검토**. 실제 부팅 전에 별도 실행 환경 식별, 이미지 provenance, 테스트키/Owner 분리, 시간/철회 경계를 확정한다. USB/ISO 제작·재부팅·기존 PC C 실행은 여전히 승인 범위 밖.
+- 운영 PC/E: 접근·변경 0, Controller/Runner/Workflow/Backlog/Claim/Lease 변경 0. **전체 80% / C NO-GO / executionAuthorized=false 유지**.
