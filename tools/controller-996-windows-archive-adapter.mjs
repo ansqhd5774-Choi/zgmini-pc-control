@@ -1,8 +1,10 @@
 // #996 Windows archive adapter DESIGN CANDIDATE — SOURCE/TEST ONLY.
 // NEVER invokes .NET Directory.Move, PowerShell, CMD or an original PC path.
 // The exact immutable, consent-bound Windows implementation is separate work.
-// The intended native primitive is [System.IO.Directory]::Move(source,dest),
-// which refuses an already-existing destination and cross-volume moves.
+// .NET Directory.Move is only a candidate native primitive. Base WinPE is
+// NOT assumed to contain .NET/PowerShell; verify the chosen image's optional
+// components or select a separately pinned Win32 mover before C consent.
+// A WinPE drive letter is never accepted as a volume identity.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -89,9 +91,12 @@ export function plan996OfflineRecovery({continuationId,method}={}){
     steps:Object.freeze(twoBootReview.phases.flatMap(phase=>phase.moves)),
     twoBootReview,
     singleBootAlternative:plan996SingleBootRecovery(continuationId),
+    selectedBootImageVerified:false,nativeMoverSelected:false,
+    winPePowerShellAssumed:false,driveLetterTrusted:false,
     ownerDecisions:Object.freeze([
       'STOP_ORIGINAL_WINDOWS_WRITERS_AND_APPROVE_DOWNTIME',
       'SELECT_EXISTING_ZGMINI_PC_WINPE_WITH_SOLE_VOLUME_ACCESS',
+      'INSPECT_BOOT_IMAGE_POWER_SHELL_DOTNET_OR_NATIVE_WIN32_CAPABILITY',
       'PIN_VOLUME_ID_AND_SERIAL_WITHOUT_ASSUMING_DRIVE_LETTER',
       'APPROVE_EXACT_SIGNED_TOOL_AND_OFFLINE_CONSENT_VERIFICATION',
       'PRESERVE_LIVE_OWNER_REVOCATION_CHECK_OR_APPROVE_EXACT_OFFLINE_VALIDITY',
@@ -142,6 +147,9 @@ export function plan996TwoBootRecovery(continuationId){
     existingPcName:pc,queuePcName:'공통 대기열 PC',winpeBootCount:2,
     phases:Object.freeze(phases),oldClaimArchive:oldC,
     newClaimArchive:ownC,installArchive:install,
+    selectedBootImageVerified:false,nativeMoverSelected:false,
+    winPePowerShellAssumed:false,driveLetterTrusted:false,
+    verifiedVolumeIdentity:null,
     legacySingleSessionPlanExecutable:false,
     currentOperatorCompatible:false,
     currentOperatorBlockers:Object.freeze([
@@ -197,6 +205,12 @@ export function plan996SingleBootRecovery(continuationId){
     phases:Object.freeze(phases),oldClaimArchive:oldC,
     continuationArchive:continuation,installArchive:install,
     currentOperatorCompatible:false,
+    // WinPE base image does not guarantee .NET/PowerShell modules, and E:
+    // from original Windows does not establish WinPE volume identity.
+    selectedBootImageVerified:false,nativeMoverSelected:false,
+    winPePowerShellAssumed:false,driveLetterTrusted:false,
+    bootCapabilityDecision:'OWNER_MUST_PIN_AND_VERIFY_CHOSEN_WINPE_IMAGE',
+    verifiedVolumeIdentity:null,
     admissionReviewModule:'tools/controller-996-offline-admission-review.mjs',
     githubQueueMaxHours:24,
     currentOperatorBlockers:Object.freeze([
