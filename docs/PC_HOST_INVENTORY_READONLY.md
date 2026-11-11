@@ -1,5 +1,7 @@
 # ZGMINI 두 Windows PC — Runner 기반 운영·장비 정본
 
+**실제 프로세스·Windows 서비스·예약·자동 시작 및 역할의 최신 정본:** [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md). 아래 오래된 시험 메모의 미확인·후보 표현은 당시 기록이며 후단 최종 실측과 이 운영 정본을 우선한다.
+
 ## 목적
 기존 운영 PC와 별도 공통 장애 인계 PC를 실제 Runner 결과로 구분한다. 기존 Issue → Actions → 고정 self-hosted Windows Runner → 제한된 JSON/TXT 원격 재조회 구조를 재사용한다.
 
