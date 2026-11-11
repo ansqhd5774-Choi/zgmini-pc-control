@@ -141,8 +141,16 @@ async function main() {
   let out=null;
   try {
     if(process.platform!=='win32'||os.hostname().toUpperCase()!==TARGET_HOST||process.arch!=='x64') throw Object.assign(new Error('WRONG_HOST'),{code:'WRONG_HOST'});
-    if(path.win32.normalize(os.tmpdir()).toLowerCase()!==path.win32.normalize(TEMP).toLowerCase()) throw Object.assign(new Error('TEMP_ROOT_MISMATCH'),{code:'TEMP_ROOT_MISMATCH'});
-    out=path.win32.join(TEMP,'C996_R5_READONLY_'+report.runId.replaceAll('-',''));
+    // R5 input paths stay pinned under the original user TEMP. A self-hosted
+    // Runner may use a different Windows identity and therefore a different
+    // OS TEMP; use it only for NEW diagnostic output, never as an input root.
+    const outputTemp=path.win32.resolve(os.tmpdir());
+    if(outputTemp.slice(0,3).toUpperCase()!=='C:\\' || outputTemp===path.win32.parse(outputTemp).root)
+      throw Object.assign(new Error('OUTPUT_TEMP_NOT_C_DRIVE'),{code:'OUTPUT_TEMP_NOT_C_DRIVE'});
+    const outputBaseStat=statNoLink(outputTemp);
+    if(!outputBaseStat.isDirectory())
+      throw Object.assign(new Error('OUTPUT_TEMP_NOT_DIRECTORY'),{code:'OUTPUT_TEMP_NOT_DIRECTORY'});
+    out=path.win32.join(outputTemp,'C996_R5_READONLY_'+report.runId.replaceAll('-',''));
     fs.mkdirSync(out,{recursive:false});
     report.inputs=await validatePins();
     for(const x of FIXED_TXT) report.fixedEvidence.push(await metadataFile(x));

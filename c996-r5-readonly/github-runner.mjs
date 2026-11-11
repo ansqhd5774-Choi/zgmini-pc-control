@@ -90,11 +90,26 @@ function resultText(r) {
 function bounded(value) {const s=typeof value==='string'?value:JSON.stringify(value,null,2)+'\n';
   if(Buffer.byteLength(s,'utf8')>MAX_BYTES)stop('RESULT_TOO_LARGE');return s;}
 
+export function isAllowedOutputDirectory(dir,temp) {
+  if(typeof dir!=='string'||typeof temp!=='string')return false;
+  const absolute=path.win32.resolve(dir),base=path.win32.resolve(temp);
+  return absolute===dir && base.slice(0,3).toUpperCase()==='C:\\' &&
+    path.win32.dirname(absolute).toLowerCase()===base.toLowerCase() &&
+    /^C996_R5_READONLY_[a-f0-9]{32}$/.test(path.win32.basename(absolute));
+}
+
 export function readCollectorResult(output,hostname,ctx) {
-  const marker=/^RESULT_DIR=(C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_R5_READONLY_[a-f0-9]{32})\r?$/m;
-  const m=typeof output==='string'&&output.match(marker);
-  if(!m)stop('RESULT_DIRECTORY_NOT_REPORTED');
-  const dir=m[1];
+  const lines=typeof output==='string'?
+    output.split(/\r?\n/).filter(x=>x.startsWith('RESULT_DIR=')):[];
+  if(lines.length!==1)stop('RESULT_DIRECTORY_NOT_REPORTED');
+  const dir=lines[0].slice('RESULT_DIR='.length);
+  if(!isAllowedOutputDirectory(dir,os.tmpdir()))stop('RESULT_DIRECTORY_NOT_ALLOWED');
+  const st=fs.lstatSync(dir);
+  if(!st.isDirectory()||st.isSymbolicLink())stop('RESULT_DIRECTORY_NOT_ALLOWED');
+  const parent=path.win32.dirname(dir);
+  if(fs.realpathSync.native(parent).toLowerCase()!==
+     fs.realpathSync.native(os.tmpdir()).toLowerCase())
+    stop('RESULT_DIRECTORY_NOT_ALLOWED');
   const p=path.win32.join(dir,'summary.json');
   const s=fs.lstatSync(p);
   if(!s.isFile()||s.isSymbolicLink()||s.size>MAX_BYTES)stop('RESULT_FILE_INVALID');
@@ -105,7 +120,7 @@ export function readCollectorResult(output,hostname,ctx) {
 export function collectorPreoutputStopCode(stderr,exitCode) {
   // Only the collector's own fixed diagnostic format, never raw stderr or logs.
   const s=typeof stderr==='string'?stderr.trim():'';
-  const match=s.match(/^C996_READONLY STOPPED code=(WRONG_HOST|TEMP_ROOT_MISMATCH); no files written$/);
+  const match=s.match(/^C996_READONLY STOPPED code=(WRONG_HOST|TEMP_ROOT_MISMATCH|OUTPUT_TEMP_NOT_C_DRIVE|OUTPUT_TEMP_NOT_DIRECTORY); no files written$/);
   if(exitCode===2 && match) return match[1];
   return 'COLLECTOR_RESULT_NOT_EMITTED';
 }
