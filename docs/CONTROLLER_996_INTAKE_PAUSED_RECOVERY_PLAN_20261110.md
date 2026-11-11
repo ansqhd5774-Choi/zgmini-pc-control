@@ -333,3 +333,14 @@
 - 새 WIM mount/ISO·WIM·BCD 수정/자동 repair/export/recommit/재생성/USB/부팅 **0**. 기존 ISO_ONLY_PASS는 생성·해시 범위로 그대로 보존. WinPE 실제 DLL 로드/CNG 6사례/Owner 승인/신뢰시각/철회는 미검증.
 - 다음 필수 작업: 기존 빌드·Commit 로그와 공식 metadata 처리 계약을 **읽기 전용으로 조사하여 소실 발생 경로와 보존 전략을 검토**. 보존 필드 복사/자동 복구/새 이미지 제작은 이번 진단 승인에 포함되지 않으며 수행하지 않음.
 - **전체 80% / C NO-GO 유지**. 운영 PC/E:/USB/Runner/Workflow/Backlog/Claim/Lease 변경 0. 이번 GitHub 최소 변경은 계획 문서 1개와 비민감 결과 TXT/JSON 2개뿐.
+
+
+### 2026-11-12 Codex 사용량 초과 대응 — XML drift 원인 분석과 증거 한계 (GitHub-only)
+
+- **접근/실행:** 사용자 보고상 Codex 사용량 한도 초과로 새 PC 로컬 Codex에 추가 지시/실행 불가. 본 ChatGPT가 연결된 GitHub 커밋 `42ac6611eb45c36038f0a2c97c0f20ea35e05395`의 실제 JSON/TXT/계획을 직접 대조했다. 원격 Desktop Commander 등록 PC는 현재 OFFLINE이며 이것을 공통 대기열 PC와 동일하다고 가정하지 않았다. 로컬 TEMP의 Commit 원문 로그를 **읽거나 실행하지 못했다**. GitHub의 성공 기록과 원본 PC 직접 실행을 구분한다.
+- **기존 사실 재사용:** 원본 WIM image-information XML buffer 2306 bytes, 최종 1708 bytes(차이 -598). ADK WIMGAPI 동일 read-only getter 2/2와 동일 DISM 2/2 결과가 일치. 원본 WINDOWS/EDITIONID=WindowsPE, INSTALLATIONTYPE=WindowsPE, PRODUCTTYPE=WinNT, 빈 PRODUCTSUITE 노드, LANGUAGES LANGUAGE/DEFAULT=en-US, VERSION/BRANCH=ge_release가 최종 XML에는 없음. NAME, ARCH=9, numeric VERSION은 동일. `IMAGE_METADATA_DRIFT_CONFIRMED`; DISM 출력 문제만은 아니다.
+- **인과관계 보수적 판정:** 최종 WIM이 ISO 생성 전후 같은 SHA였다는 기존 기록은 **ISO-only 제작 단계에서 호스트측 최종 WIM 파일이 변경되지 않았음**을 지지한다. ISO 안에 실제 내장된 WIM을 독립 추출한 검증은 아직 없다. 메타데이터 소실이 초기 copype 직후 이미 발생했는지, 신규 mount 후/EXE 복사 후 변화인지, DISM `/Commit` 중 변경됐는지는 **중간 상태 XML 측정이 없어 불명확**하다. Commit에 귀속하거나 특정 Microsoft 버그라고 주장하지 않는다.
+- **읽기 전용 로그 조사 우선순위(가능할 때만):** 기존 ISO R5 root의 `result.json`, mount/Commit 관련 별도 DISM `.log`, `FINAL_INDEX_1.txt`, `make-iso.txt`, 새 메타데이터 비교 JSON/TXT를 원본 보존한 채 시간·실제 명령·exit·로그에 기록된 메타데이터 처리 이벤트로 단계별 대응시킨다. 핵심 최초 확인 대상은 `copype` 직후 입력 WIM과 ISO pipeline `/Mount-Image` 직전/직후, `/Unmount-Image /Commit` 직후 및 `/ISO` 직전의 **기존에 이미 기록된** ImageInfo/XML 존재 여부다. 해당 시점 기록이 없으면 `STAGE_UNKNOWN`으로 남긴다. 최근 로그 부재를 추정값으로 메우지 않는다.
+- **가능 원인 구분 (모두 가설):** (A) copype의 read-only mount/unmount 및 staging 중 metadata 정규화, (B) 신규 DISM mount/commit의 image XML 갱신, (C) ISO-only 스크립트가 이미지 정보에 관여하는 별도 명령을 호출, (D) 판정/로그가 다른 WIM 또는 index를 가리키는 대상 불일치. 위 (D)는 고정 SHA·index1 기록 때문에 가능성이 낮아 보이나, 하위 명령 입력 경로로 재확인하기 전 배제하지 않는다. B를 공식 동작/결함으로 확정하지 않는다.
+- **다음 필수 실행의 최소 단위:** 현재는 GitHub에 포함되지 않은 **기존 로컬 Commit/DISM 로그의 읽기 전용 회수** 또는 승인된 로컬 실행 연결 확보가 필요하다. 모든 중간 단계가 기록되지 않았다면 추가 실험은 별도 격리 TEMP에서 원본과 매 단계 XML/SHA를 관측하는 재현 설계를 먼저 검토한다(현재 재실험/새 ISO/원본 WIM 수정은 승인하지 않음). 전체 XML 원문이나 키·시스템 원본 자료를 GitHub/채팅에 올리지 않고 필드 유무·요약·파일 해시/시각과 실패 코드만 최소 공개한다.
+- **현 상태:** ISO_ONLY_PASS(기존 실행의 ISO 생성·해시)는 유지하되 `IMAGE_METADATA_DRIFT_CONFIRMED`, `ROOT_CAUSE_STAGE_UNKNOWN`, `WINPE_RUNTIME_NOT_TESTED`. 실제 부팅·CNG 6/6·신뢰 Owner 키·시간/철회·C급 복구는 전혀 검증되지 않음. 새 PC 추가 실행 0, WIM/ISO/BCD/운영 PC/E:/USB/Runner/Workflow/Claim/Lease 변경 0. 공통 자동 인계 실증 진행률 4/5=80%, C NO-GO.
