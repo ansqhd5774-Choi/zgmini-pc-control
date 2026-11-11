@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {plan996OfflineRecovery,plan996TwoBootRecovery,
-  plan996SingleBootRecovery,simulate996TwoBootRecovery}
+  plan996SingleBootRecovery,simulate996TwoBootRecovery,
+  simulate996SingleBootRecovery}
   from '../tools/controller-996-windows-archive-adapter.mjs';
 
 const continuationId='70a4c347-25ea-4fc6-83d2-c0c670115249';
@@ -228,5 +229,104 @@ test('both boot designs remain source-only: no native boot or C write is authori
     assert.equal(p.workflowPuts,0);
     assert.equal(p.backlogWrites,0);
     assert.equal(p.issuePosts,0);
+  }
+});
+
+const singleMoves=()=>singleBoot.phases[1].moves.map((step,i)=>({
+  name:step.name,source:step.source,destination:step.destination,
+  sourceFileId:String(i+1).repeat(32),archiveFileId:String(i+1).repeat(32),
+  sourceVolumeSerial:'1'.repeat(16),archiveVolumeSerial:'1'.repeat(16),
+  destinationAbsentBefore:true,sourceAbsentAfter:true,noReplace:true,
+}));
+const singleTrace=()=>[
+  {phase:'ORIGINAL_WINDOWS_PREPARE',bootEpoch:'windows-original-01',
+    oldCAtOriginal:true,installLeaseHeld:true,workflowState:'active',
+    backlogClosed:true,fourJobsVerified:true,admissionProtected:true,
+    sixMatchingRunnersOffline:true,runnerAutoStartHeld:true,
+    workflowPutCount:0,backlogWriteCount:0,issuePostCount:0,
+    ownerNonce:testNonce,sourceSha256:testSource,
+    readyMarkerSha256:testReady,signedHandoffVerified:true,
+    ownerApprovalFreshOrBoundedVerified:true},
+  {phase:'WINPE_SINGLE_BOOT',bootEpoch:'winpe-original-02',
+    ownerNonce:testNonce,sourceSha256:testSource,
+    readyMarkerSha256:testReady,signedHandoffVerified:true,
+    ownerApprovalFreshOrBoundedVerified:true,bootImageVerified:true,
+    nativeX64MoverVerified:true,volumeIdentityPinned:true,
+    installLeaseHeldUntilFinalMove:true,moves:singleMoves()},
+  {phase:'ORIGINAL_WINDOWS_READBACK',bootEpoch:'windows-original-03',
+    installLeaseArchived:true,archivesVerified:true,
+    controllerUnchanged:true,protectedItemsUnchanged:true,
+    workflowState:'active',backlogClosed:true,fourJobsVerified:true,
+    runnerPostcheckBeforeResume:true,sourceSha256:testSource},
+];
+const simulateSingle=events=>simulate996SingleBootRecovery({continuationId,events});
+
+test('single boot review accepts only a complete ordered synthetic sequence without granting C authority',()=>{
+  for(let n=0;n<3;n++){
+    const partial=simulateSingle(singleTrace().slice(0,n));
+    assert.equal(partial.status,'SYNTHETIC_INCOMPLETE');
+    assert.equal(partial.completed,n);
+    assert.equal(partial.installLeaseReleaseAuthorized,false);
+  }
+  const result=simulateSingle(singleTrace());
+  assert.equal(result.status,'SYNTHETIC_SEQUENCE_REVIEWED_ONLY');
+  assert.equal(result.completed,3);
+  assert.equal(result.executionAuthorized,false);
+  assert.equal(result.installLeaseReleaseAuthorized,false);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(result.automaticRetry,false);
+});
+test('single boot halts on unapproved online effect, unprotected admission, or invalid handoff pin',()=>{
+  for(const [field,value] of [
+    ['sixMatchingRunnersOffline',false],['runnerAutoStartHeld',false],
+    ['installLeaseHeld',false],['workflowPutCount',1],
+    ['fourJobsVerified',false],['signedHandoffVerified',false],
+    ['sourceSha256','invalid-sha'],
+  ]){
+    const altered=singleTrace();altered[0][field]=value;
+    assert.equal(simulateSingle(altered).code,
+      'C996_SINGLE_BOOT_ONLINE_PREPARE_UNVERIFIED');
+  }
+  for(const [field,value] of [
+    ['readyMarkerSha256','c'.repeat(64)],
+    ['sourceSha256','c'.repeat(64)],
+    ['ownerApprovalFreshOrBoundedVerified',false],
+    ['volumeIdentityPinned',false],['bootImageVerified',false],
+  ]){
+    const altered=singleTrace();altered[1][field]=value;
+    assert.equal(simulateSingle(altered).code,
+      'C996_SINGLE_BOOT_WINPE_HANDOFF_OR_MOVES_UNVERIFIED');
+  }
+});
+test('single boot refuses a missing, reordered, replaced, or mismatched WinPE move',()=>{
+  for(const change of [
+    moves=>moves.pop(),
+    moves=>moves.reverse(),
+    moves=>{moves[1].destinationAbsentBefore=false;},
+    moves=>{moves[0].noReplace=false;},
+    moves=>{moves[1].archiveFileId='f'.repeat(32);},
+    moves=>{moves[2].archiveVolumeSerial='f'.repeat(16);},
+  ]){
+    const altered=singleTrace();change(altered[1].moves);
+    const reviewed=simulateSingle(altered);
+    assert.ok(['C996_SINGLE_BOOT_WINPE_HANDOFF_OR_MOVES_UNVERIFIED',
+      'C996_SINGLE_BOOT_MOVE_ORDER_OR_IDENTITY_FAILED'].includes(reviewed.code));
+    assert.equal(reviewed.executionAuthorized,false);
+    assert.equal(reviewed.operationalWrites,0);
+    assert.equal(reviewed.automaticRetry,false);
+  }
+});
+test('single boot rejects phase reuse, extra phases, and unsafe final readback',()=>{
+  const reordered=singleTrace();reordered[1].phase='ORIGINAL_WINDOWS_READBACK';
+  assert.equal(simulateSingle(reordered).code,'C996_SINGLE_BOOT_PHASE_ORDER_INVALID');
+  const repeated=singleTrace();repeated[2].bootEpoch=repeated[0].bootEpoch;
+  assert.equal(simulateSingle(repeated).code,'C996_SINGLE_BOOT_BOOT_EPOCH_INVALID');
+  assert.equal(simulateSingle([...singleTrace(),singleTrace()[0]]).code,
+    'C996_SINGLE_BOOT_EVENTS_INVALID');
+  for(const field of ['installLeaseArchived','archivesVerified',
+    'protectedItemsUnchanged','runnerPostcheckBeforeResume']){
+    const drift=singleTrace();drift[2][field]=false;
+    assert.equal(simulateSingle(drift).code,
+      'C996_SINGLE_BOOT_FINAL_READBACK_UNVERIFIED');
   }
 });
