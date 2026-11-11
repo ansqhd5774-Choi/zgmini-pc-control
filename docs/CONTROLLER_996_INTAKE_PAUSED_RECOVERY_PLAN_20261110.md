@@ -185,3 +185,16 @@
 - 결과 보관: 위 새 TEMP의 result.json(최초 실패), failure-mount-status.txt(정확한 활성 mount), INPUT_INDEX_1.txt, readonly-poststop.json(10/10 및 2/2 해시 보호), stop-summary.json. 기존 TEMP 증거 수정/삭제 0.
 - 다음 최소 조치는 **실패 상태 보존 후 명시된 mount 후속 처분과 태그 구분 가드 수정의 별도 승인 범위 확인**. 승인 없이 기존 실패 스크립트 재실행, 실패 mount의 /Discard 또는 Commit, 기존 증거 덮어쓰기, 새로운 ISO 재시작을 하지 않음.
 - **ISO 생성 미완료 / 실제 부팅·CNG·Owner 승인 검증 0 / 전체 80% / C NO-GO 유지**.
+
+
+### 2026-11-12 Owner 승인 — 잔여 단일 WIM 해제·가드 보정·신규 ISO 1회
+
+- 사용자에게 다음 작업 범위를 명시한 뒤, 사용자가 이 대화에서 **"승인"**으로 답함: 기존 ISO 실패 작업본의 정확히 한 WIM mount를 사전 재확인 후 `/Discard` 1회 해제, 정상 WIM reparse 태그 검사 오류 최소 수정·회귀, **새 고유 C: TEMP 작업본**에서 ISO-only 1회 신규 시도. 이전 절의 실패 후 `/Discard`/재시도 금지에 대한 **이 한정된 신규 명시 승인**이며 포괄적 PC 시스템/보안 변경 또는 원본 #996 C 복구 승인이 아님.
+- **실행 담당/접근:** `DESKTOP-N62L0NG`의 로컬 Codex, 정상 관리자 실행 컨텍스트로만 수행. 이 ChatGPT/GitHub 문서 갱신은 Windows 실행이 아니며 작업 자동 전달·자동 수행을 뜻하지 않음.
+- **처분 대상 1개:** `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_TEST_ONLY_0cadf11c99594b999cd2b64b553ebc6f\image-mount`, 이 root의 `WinPE_amd64\media\sources\boot.wim`, DISM **Index 1 / Mounted Read/Write Yes / Status Ok**. 실행 직전 별도 읽기 전용 DISM 전체 mount 목록에서 이 경로와 원본 WIM·index·상태가 정확히 일치하고 중복/기타 mount 영향이 없으며 EXE 복사 0·임의 변경/미기록 파일 0을 입증한다. 보호 입력 10/10, 신규 BCD 2/2, 입력 WIM `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`, EXE `b2b1af8accc55d95b5e11bc68664a45af19887d56f09cd9231bce2dfd6a8e218`를 대조한다. 하나라도 불일치하면 **STOP, 어떠한 해제도 하지 않음**.
+- 모두 일치하는 경우 위 **MountDir 하나만** `DISM /Unmount-Image /MountDir:<정확한 위 경로> /Discard` 단회 수행. `/Commit`, `/Cleanup-Wim`, 다른 mount 해제, 시스템 원본 WIM/ADK/기존 BCD 교체·삭제, 증거 폴더 정리 금지. 사후에는 mount가 사라졌는지, 작업본 WIM·보호 입력 10/10·신규 BCD 2/2 해시와 실패 증거 보존을 확인하고 JSON/TXT 기록.
+- **가드 보정:** Windows 로컬 TEMP의 기존 `BUILD_TEST_ISO.ps1` 원본을 보존하고 코드·현재 검사를 직접 읽은 뒤 **별도 신규 준비본**을 수정. DISM의 정확한 WIM mount mapping이 확인된 경계 **안쪽의 WIM-projected 항목**에 한해 `IO_REPARSE_TAG_WIM=0x80000008` 허용. 외부 입력 EXE·목적지 경로·검증되지 않은 경계에는 적용하지 않음. `SYMLINK=0xA000000C`, `MOUNT_POINT=0xA0000003`, 기타/미확인 태그와 경계 이탈은 계속 STOP. 전역 ReparsePoint 검사 제거 금지. 정상·위험 태그 부정 회귀 후 진행.
+- **새 ISO 1회:** 앞선 단일 mount 해제와 가드 검증이 PASS인 경우에만 **새 고유 TEMP root와 별도 attempt ID**로 공식 `copype amd64`, 신규 작업본 index1 WIM 마운트, 고정 SHA EXE 1개를 `\Tools\c996_winpe_cng_test.exe`에 복사/내장 SHA 검사, 승인된 성공 시에만 신규 마운트를 `/Commit`, `MakeWinPEMedia /ISO` 1회. 구 작업본 재실행·마커 재사용·오류 시 자동 `/Discard`/정리/재시도 0. 최초 실패 시 원본 증거·mount 상태·input/output SHA를 보존하고 STOP.
+- **성공 판정:** ISO SHA256/크기, 수정 WIM·내장 EXE SHA256, DISM index/arch/image metadata, BIOS/UEFI BCD 해시, 신규 mount 종료 및 기존 보호 해시를 확인한 후에만 `ISO_ONLY_PASS`로 표기. 실제 WinPE 부팅, CNG 6사례, Owner 신뢰/서명·offline clock/철회, 최종 #996 C급 복구 성공과 구분. 성공 또는 실패를 작업 후 측정 전까지 선언하지 않음.
+- **전면 제외:** 원본 운영 PC, `E:`, USB, 부팅/재부팅, 서비스/Runner, Workflow·Backlog·Claim·Lease, 실제 C급 관리자 복구, 테스트키의 Owner 키 승격. 전체 공통 복구 보고 기준 **80% / C NO-GO** 유지, ISO 결과 도착 뒤에만 진척 변경 검토.
+- 근거: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/mount-and-modify-a-windows-image-using-dism.
