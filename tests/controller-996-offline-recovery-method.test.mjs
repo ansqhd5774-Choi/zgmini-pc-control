@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {plan996OfflineRecovery,plan996TwoBootRecovery,simulate996TwoBootRecovery}
+import {plan996OfflineRecovery,plan996TwoBootRecovery,
+  plan996SingleBootRecovery,simulate996TwoBootRecovery}
   from '../tools/controller-996-windows-archive-adapter.mjs';
 
 const continuationId='70a4c347-25ea-4fc6-83d2-c0c670115249';
@@ -24,6 +25,8 @@ test('existing ZGMINI PC WinPE boot proposes two guarded offline phases',()=>{
   assert.deepEqual(result.legacySingleSessionSteps.map(step=>step.name),
     ['oldC','continuation','install']);
   assert.equal(result.twoBootReview.legacySingleSessionPlanExecutable,false);
+  assert.equal(result.twoBootReview.currentOperatorCompatible,false);
+  assert.equal(result.singleBootAlternative.winpeBootCount,1);
   assert.equal(result.ownerDecisions.length,5);
   assert.equal(result.code,'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED');
   assert.deepEqual(result.pcTopology,{physicalPcCount:2,
@@ -52,10 +55,12 @@ const twoBoot=plan996TwoBootRecovery(continuationId);
 const trace=()=>[
   {phase:'WINPE_FIRST_BOOT',bootEpoch:'boot-epoch-01',
     oldCArchiveDestination:twoBoot.oldClaimArchive.destination,
-    oldCArchived:true,installLeaseHeld:true,workflowState:'disabled_manually'},
+    oldCArchived:true,installLeaseHeld:true,workflowState:'active',
+    workflowPutCount:0,backlogWriteCount:0},
   {phase:'ORIGINAL_WINDOWS_RESTORE',bootEpoch:'boot-epoch-02',
     installLeaseHeld:true,workflowState:'active',backlogClosed:true,
-    fourJobsVerified:true,admissionProtected:true,ownerNonce:testNonce,
+    fourJobsVerified:true,admissionProtected:true,workflowPutCount:0,
+    backlogWriteCount:0,issuePostCount:0,ownerNonce:testNonce,
     sourceSha256:testSource,readyMarkerSha256:testReady},
   {phase:'WINPE_SECOND_BOOT',bootEpoch:'boot-epoch-03',
     installLeaseArchived:true,ownClaimArchived:true,ownerNonce:testNonce,
@@ -85,13 +90,14 @@ test('old interrupted C claim does not take the new online C claim archive desti
   assert.match(twoBoot.oldClaimArchive.destination,/controller-recovery-interrupted-/);
   assert.match(twoBoot.newClaimArchive.destination,/controller-recovery-archived-/);
   assert.deepEqual(twoBoot.phases[0].moves.map(m=>m.name),['oldC']);
-  assert.equal(twoBoot.phases[0].workflow,'disabled_manually');
+  assert.equal(twoBoot.phases[0].workflow,'READBACK_NO_MUTATION');
   assert.equal(twoBoot.phases[0].installLease,'HELD');
 });
 test('online stage retains installation lease and requires job-admission proof before second WinPE',()=>{
   assert.deepEqual(twoBoot.phases[1].moves,[]);
   assert.equal(twoBoot.phases[1].installLease,'HELD');
-  assert.equal(twoBoot.phases[1].admission,'VERIFY_NO_JOB_CONSUMPTION');
+  assert.equal(twoBoot.phases[1].admission,
+    'PROVE_GITHUB_PC_JOB_ADMISSION_FENCE_OR_STOP');
   assert.equal(twoBoot.phases[1].handoff,'READY_FOR_SECOND_BOOT');
   assert.deepEqual(twoBoot.phases[2].moves.map(m=>m.name),['install','ownC']);
   assert.deepEqual(twoBoot.phases[3].moves,[]);
@@ -105,10 +111,10 @@ test('partial synthetic trace is incomplete and never releases install barrier',
     assert.equal(result.operationalWrites,0);
   }
 });
-test('first boot refuses early install release or online workflow',()=>{
+test('first boot refuses early install release or unapproved workflow effect',()=>{
   const altered=trace();altered[0].installLeaseHeld=false;
   assert.equal(simulate(altered).code,'C996_TWO_BOOT_FIRST_BOOT_GUARD_FAILED');
-  const altered2=trace();altered2[0].workflowState='active';
+  const altered2=trace();altered2[0].workflowPutCount=1;
   assert.equal(simulate(altered2).code,'C996_TWO_BOOT_FIRST_BOOT_GUARD_FAILED');
 });
 test('online handoff rejects missing four original jobs, admission proof, or early install release',()=>{
@@ -118,6 +124,10 @@ test('online handoff rejects missing four original jobs, admission proof, or ear
   }
   const altered=trace();altered[1].readyMarkerSha256='missing';
   assert.equal(simulate(altered).code,'C996_TWO_BOOT_ONLINE_HANDOFF_UNVERIFIED');
+  for(const field of ['workflowPutCount','backlogWriteCount','issuePostCount']){
+    const writing=trace();writing[1][field]=1;
+    assert.equal(simulate(writing).code,'C996_TWO_BOOT_ONLINE_HANDOFF_UNVERIFIED');
+  }
 });
 test('out-of-order, repeated boot epoch, or oversized trace is blocked without effects',()=>{
   const order=trace();order[1].phase='WINPE_SECOND_BOOT';
@@ -155,4 +165,43 @@ test('a full synthetic trace is review-only and grants neither PC writes nor C a
   assert.equal(reviewed.executionAuthorized,false);
   assert.equal(reviewed.operationalWrites,0);
   assert.equal(reviewed.automaticRetry,false);
+});
+
+const singleBoot=plan996SingleBootRecovery(continuationId);
+test('single-WinPE alternative uses exactly the two named PCs and one WinPE boot',()=>{
+  assert.equal(singleBoot.physicalPcCount,2);
+  assert.equal(singleBoot.additionalPcRequired,false);
+  assert.equal(singleBoot.existingPcName,'기존 ZGMINI PC');
+  assert.equal(singleBoot.queuePcName,'공통 대기열 PC');
+  assert.equal(singleBoot.winpeBootCount,1);
+  assert.deepEqual(singleBoot.phases.map(p=>p.os),['Windows','WinPE','Windows']);
+  assert.ok(singleBoot.phases.every(p=>p.pc==='기존 ZGMINI PC'));
+});
+test('single-WinPE plan retains the old C claim and install lease until offline move',()=>{
+  assert.equal(singleBoot.phases[0].originalOldClaim,'RETAIN_UNTIL_WINPE');
+  assert.equal(singleBoot.phases[0].installLease,'HELD');
+  assert.deepEqual(singleBoot.phases[0].moves,[]);
+  assert.deepEqual(singleBoot.phases[1].moves.map(m=>m.name),
+    ['oldC','continuation','install']);
+  assert.equal(singleBoot.phases[1].installLease,'HELD_UNTIL_LAST_MOVE');
+  assert.equal(singleBoot.phases[2].installLease,'ARCHIVED');
+});
+test('single-WinPE proposal disjoins the old-C destination and stops on unapproved effects',()=>{
+  assert.notEqual(singleBoot.oldClaimArchive.destination,twoBoot.newClaimArchive.destination);
+  assert.match(singleBoot.phases[0].workflow,/NO_UNAPPROVED_PUT/);
+  assert.match(singleBoot.phases[0].backlog,/NO_UNAPPROVED_WRITE/);
+  assert.match(singleBoot.phases[0].admission,/FENCE_MUST_BE_PROVEN/);
+  assert.equal(singleBoot.currentOperatorCompatible,false);
+  assert.ok(singleBoot.currentOperatorBlockers.includes('REAL_PC_JOB_ADMISSION_FENCE_NOT_PROVEN'));
+});
+test('both boot designs remain source-only: no native boot or C write is authorized',()=>{
+  for(const p of [singleBoot,twoBoot]){
+    assert.equal(p.status,'SOURCE_ONLY_NOT_EXECUTABLE');
+    assert.equal(p.productionExecutable,false);
+    assert.equal(p.executionAuthorized,false);
+    assert.equal(p.originalPcWrites,0);
+    assert.equal(p.workflowPuts,0);
+    assert.equal(p.backlogWrites,0);
+    assert.equal(p.issuePosts,0);
+  }
 });
