@@ -1,5 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {summarizeAutomation} from '../tools/automation-status.mjs';
+import {dedicatedPcRunnerRows} from '../tools/update.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -36,4 +38,25 @@ for(const key of ['controllerFilesVerified','supervisorAlive','supervisorIdentit
 test('unreadable lease fails closed but does not claim Runtime failure',()=>{
  const r=summarizeAutomation({...healthy(),lockReadbackCode:'UNAVAILABLE'});
  assert.equal(r.state,'STATE_UNKNOWN');assert.equal(r.runtimeState,'HEALTHY');
+});
+test('six owned Runner seats remain online when unrelated queue Runner exists',()=>{
+ const seats=Array.from({length:6},(_,i)=>({
+   name:`zgmini-pc-0${i+1}`,status:'online',busy:false,
+ }));
+ const unrelated={name:'zgmini-handoff-ci-spare-01',status:'online',busy:false};
+ const rows=[unrelated,...seats];
+ assert.equal(dedicatedPcRunnerRows(rows,{requireOnline:true})?.length,6);
+ assert.equal(summarizeAutomation({...healthy(),
+   runnerSetOnline:dedicatedPcRunnerRows(rows,{requireOnline:true})!==null})
+   .runtimeState,'HEALTHY');
+ for(const changed of [
+   rows.filter(r=>r.name!=='zgmini-pc-06'),
+   [...rows,{...seats[0]}],
+   rows.map(r=>r.name==='zgmini-pc-03'?{...r,status:'offline'}:r),
+ ])assert.equal(dedicatedPcRunnerRows(changed,{requireOnline:true}),null);
+});
+test('status collector actually uses the existing six-seat selector',()=>{
+ const source=fs.readFileSync(new URL('../tools/automation-status.mjs',import.meta.url),'utf8');
+ assert.match(source,/runnerSetOnline:dedicatedPcRunnerRows\(rows,\{requireOnline:true\}\)!==null/);
+ assert.doesNotMatch(source,/runnerSetOnline:rows\?\.length===6/);
 });
