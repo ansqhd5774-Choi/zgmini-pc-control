@@ -179,7 +179,7 @@ export function plan996SingleBootRecovery(continuationId){
       workflow:'GET_VERIFY_ACTIVE_OR_STOP_NO_UNAPPROVED_PUT',
       backlog:'GET_VERIFY_CLOSED_OR_STOP_NO_UNAPPROVED_WRITE',
       jobs:'GET_VERIFY_FOUR_NO_AUTO_REPLAY',
-      admission:'REAL_PC_JOB_ADMISSION_FENCE_MUST_BE_PROVEN',
+      admission:'DRAIN_MATCHING_RUNNERS_THEN_OFFLINE_KEEP_WORKFLOW_ACTIVE',
       handoff:'SIGNED_DURABLE_READY_FOR_FINAL_WINPE_REQUIRED'},
     {id:'WINPE_SINGLE_BOOT',pc,os:'WinPE',
       moves:[oldC,continuation,install],
@@ -187,6 +187,7 @@ export function plan996SingleBootRecovery(continuationId){
       installLease:'HELD_UNTIL_LAST_MOVE'},
     {id:'ORIGINAL_WINDOWS_READBACK',pc,os:'Windows',moves:[],
       requires:'CONTROLLER_PROTECTED_ITEMS_WORKFLOW_BACKLOG_JOBS_AND_ARCHIVE_RECEIPTS',
+      runner:'REMAIN_OFFLINE_UNTIL_POSTCHECK_AND_RESUME_WITHIN_24H',
       installLease:'ARCHIVED'},
   ].map(phase=>Object.freeze({...phase,moves:Object.freeze(phase.moves)}));
   return Object.freeze({schema:'ZGMINI_CONTROLLER_996_SINGLE_WINPE_BOOT_REVIEW_V1',
@@ -196,6 +197,8 @@ export function plan996SingleBootRecovery(continuationId){
     phases:Object.freeze(phases),oldClaimArchive:oldC,
     continuationArchive:continuation,installArchive:install,
     currentOperatorCompatible:false,
+    admissionReviewModule:'tools/controller-996-offline-admission-review.mjs',
+    githubQueueMaxHours:24,
     currentOperatorBlockers:Object.freeze([
       'C_OWNER_OPERATOR_PREIMPORT_HARD_STOP',
       'NEW_OWNER_SCOPE_AND_SIGNED_OFFLINE_HANDOFF_MISSING',
