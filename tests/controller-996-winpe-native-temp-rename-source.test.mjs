@@ -35,5 +35,6 @@ test('Windows native primitive is handle-based FileRenameInfo without replacemen
 test('renamed-but-not-verified remains UNKNOWN with no automated fallback',()=>{
   assert.match(src,/RENAME_RESULT_UNKNOWN/);
   assert.match(src,/RENAME_DENIED_OR_COLLISION/);
+  assert.match(src,/if \(!SetFileInformationByHandle\([\s\S]+?DWORD rename_error = GetLastError\(\);[\s\S]+?C996_NATIVE_TEMP_WIN32_ERROR:%lu/);
   assert.doesNotMatch(src,/system\s*\(|WinExec\s*\(|ShellExecute\s*\(/);
 });
