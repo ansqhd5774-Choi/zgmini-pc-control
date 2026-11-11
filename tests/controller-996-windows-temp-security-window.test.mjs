@@ -9,6 +9,8 @@ import test from 'node:test';
 
 const fixture = fileURLToPath(new URL('../tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW.ps1', import.meta.url));
 const source = fs.readFileSync(fixture, 'utf8');
+const nativeSource = fs.readFileSync(fileURLToPath(
+  new URL('../tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW_NATIVE.cs', import.meta.url)), 'utf8');
 
 test('temporary ACL fixture rejects production invocation before creating files', () => {
   assert.match(source, /if \(-not \$TestOnly\) \{ throw 'C996_SECURITY_PROOF_TEST_ONLY_REQUIRED' \}/);
@@ -19,6 +21,12 @@ test('temporary ACL fixture rejects production invocation before creating files'
   assert.ok(source.includes('^[a-zA-Z]:\\\\$'), 'drive root must require a literal backslash');
   assert.match(source, /C996_SECURITY_PROOF_TEMP_REDIRECT/);
   assert.match(source, /C996_SECURITY_PROOF_UNSUPPORTED_VOLUME/);
+  assert.match(nativeSource, /C996_SECURITY_PROOF_TEST_ONLY_REQUIRED/);
+  assert.match(nativeSource, /C996_SECURITY_PROOF_ISOLATION_REQUIRED/);
+  assert.match(nativeSource, /C996_SECURITY_PROOF_TEMP_REDIRECT/);
+  assert.match(nativeSource, /C996_SECURITY_PROOF_UNSAFE_TEMP/);
+  assert.match(nativeSource, /DESKTOP-N62L0NG/);
+  assert.match(nativeSource, /zgmini-handoff-ci-spare-01/);
 });
 
 test('temporary ACL fixture restores on normal and injected failures', () => {
@@ -28,6 +36,9 @@ test('temporary ACL fixture restores on normal and injected failures', () => {
   assert.match(source, /Set-Acl -LiteralPath \$restoreTarget -AclObject \$originalAcl/);
   assert.match(source, /\$afterDacl -ceq \$beforeDacl -and \$afterHash -ceq \$initialHash/);
   assert.match(source, /C996_SECURITY_PROOF_INJECTED_FAILURE/);
+  assert.match(nativeSource, /SetSecurityDescriptorSddlForm\(originalDacl, Dacl\)/);
+  assert.match(nativeSource, /GetSecurityDescriptorSddlForm\(Dacl\) == originalDacl/);
+  assert.match(nativeSource, /C996_SECURITY_PROOF_INJECTED_FAILURE/);
 });
 
 test('separate-process recovery uses a flushed journal and fixed TEMP root', () => {
@@ -38,6 +49,9 @@ test('separate-process recovery uses a flushed journal and fixed TEMP root', () 
   assert.match(source, /C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT/);
   assert.match(source, /C996_SECURITY_PROOF_TERMINATION_ROOT_UNSAFE/);
   assert.match(source, /\[Environment\]::Exit\(17\)/);
+  assert.match(nativeSource, /stream.Flush\(true\)/);
+  assert.match(nativeSource, /Environment.Exit\(17\)/);
+  assert.match(nativeSource, /C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT/);
 });
 
 test('test fixture distinguishes locked move from move after handle close', () => {
@@ -47,21 +61,32 @@ test('test fixture distinguishes locked move from move after handle close', () =
   assert.match(source, /\$moveSucceeded = \$true/);
   assert.match(source, /executionAuthorized = \$false/);
   assert.match(source, /originalPcWrites = 0/);
+  assert.match(nativeSource, /FileShare.Read/);
+  assert.match(nativeSource, /Directory.Move\(source, archive\)/);
+  assert.match(nativeSource, /handle.Dispose\(\)/);
+  assert.match(nativeSource, /originalPcWrites/);
 });
 
+const nativeExe = process.env.ZGMINI_996_NATIVE_EXE || null;
 const originalPcPresent = fs.existsSync('E:\\ZGmini');
-const explicitOriginalPcTempConsent = process.env.ZGMINI_996_TEMP_ONLY_ON_ORIGINAL_PC === '1';
+if (process.platform === 'win32' && process.env.GITHUB_ACTIONS === 'true' && !nativeExe) {
+  throw new Error('C996_TEMP_NATIVE_EXECUTABLE_REQUIRED');
+}
 const onApprovedWindows = process.platform === 'win32' &&
-  (!originalPcPresent || explicitOriginalPcTempConsent) &&
-  fs.existsSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
-const originalPcFlag = originalPcPresent ? ['-AllowOriginalPcTempOnly'] : [];
-const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+  !originalPcPresent && !!nativeExe && fs.existsSync(nativeExe);
+const nativeArgs = {
+  '-InjectFailure':'--inject-failure',
+  '-PreexistingReadRule':'--preexisting-read-rule',
+  '-SimulateChildTermination':'--simulate-child-termination',
+  '-SimulateChildTimeout':'--simulate-child-timeout',
+  '-RecoverOnly':'--recover-only',
+};
 const newRoot = () => path.join(os.tmpdir(), `zgmini-996-acl-fixture-${randomUUID().replaceAll('-', '')}`);
 function runFixture(root, args, timeout=30000) {
-  return spawnSync(powershell, [
-    '-NoProfile','-NonInteractive','-File',fixture,'-TestOnly',...originalPcFlag,
-    '-FixtureRoot',root,...args,
-  ], {encoding:'utf8',timeout,windowsHide:true,
+  assert.ok(nativeExe, 'C996_TEMP_NATIVE_EXECUTABLE_REQUIRED');
+  const argumentsList = ['--test-only','--fixture-root',root,...args.map(arg => nativeArgs[arg])];
+  assert.ok(argumentsList.every(Boolean), 'unmapped native fixture argument');
+  return spawnSync(nativeExe,argumentsList,{encoding:'utf8',timeout,windowsHide:true,
     env:{...process.env,ZGMINI_996_TEMP_TERMINATION_TEST:'1'}});
 }
 function recover(root) {
