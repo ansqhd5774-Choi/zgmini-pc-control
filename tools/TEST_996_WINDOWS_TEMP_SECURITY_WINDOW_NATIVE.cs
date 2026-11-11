@@ -11,6 +11,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 internal static class Program
@@ -22,6 +23,13 @@ internal static class Program
     private static readonly FileSystemAccessRule ReadRule = new FileSystemAccessRule(
         Users, FileSystemRights.ReadData, AccessControlType.Allow);
     private static readonly byte[] InitialBytes = Encoding.UTF8.GetBytes("{\"fixture\":true}");
+
+    // Legacy Win32 ACL setter is considered ONLY for exact rollback of a
+    // synthetic TEMP fixture whose original descriptor lacks auto-inherit.
+    [DllImport("advapi32.dll", EntryPoint = "SetFileSecurityW",
+        CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetFileSecurityW(string filename, uint securityInformation,
+        byte[] securityDescriptor);
 
     [DataContract]
     private sealed class Journal
@@ -160,6 +168,25 @@ internal static class Program
         File.SetAccessControl(target, acl);
         string afterDacl = File.GetAccessControl(target).GetSecurityDescriptorSddlForm(Dacl);
         bool daclMatches = afterDacl == originalDacl;
+        if (!daclMatches)
+        {
+            var first = new RawSecurityDescriptor(originalDacl);
+            var current = new RawSecurityDescriptor(afterDacl);
+            // The modern setter may normalize one OS-owned metadata bit.
+            // Never mask the difference in the final equality assertion.
+            if ((first.ControlFlags ^ current.ControlFlags) ==
+                    ControlFlags.DiscretionaryAclAutoInherited &&
+                (first.ControlFlags & ControlFlags.DiscretionaryAclAutoInherited) == 0)
+            {
+                var originalBinary = new byte[first.BinaryLength];
+                first.GetBinaryForm(originalBinary, 0);
+                if (!SetFileSecurityW(target, 0x00000004u, originalBinary))
+                    Console.Error.WriteLine("C996_SECURITY_PROOF_LEGACY_SET_DACL_FAILED_" +
+                        Marshal.GetLastWin32Error());
+                afterDacl = File.GetAccessControl(target).GetSecurityDescriptorSddlForm(Dacl);
+                daclMatches = afterDacl == originalDacl;
+            }
+        }
         bool bytesMatch = Hash(target) == expectedHash;
         if (!daclMatches)
         {
