@@ -15,23 +15,28 @@ test('dismount alone cannot establish an exclusive file-system namespace',()=>{
   assert.equal(result.status,'UNSUPPORTED_METHOD');
   assert.equal(result.code,'C996_DISMOUNT_IS_NOT_EXCLUSIVE');
 });
-test('separate offline host plan keeps existing three moves and install last',()=>{
-  const result=plan996OfflineRecovery({continuationId,method:'SEPARATE_OFFLINE_HOST'});
+test('existing ZGMINI PC WinPE boot keeps three moves and install last',()=>{
+  const result=plan996OfflineRecovery({continuationId,method:'EXISTING_ZGMINI_PC_WINPE_BOOT'});
   assert.equal(result.status,'OWNER_DECISION_REQUIRED');
   assert.equal(result.productionExecutable,false);
   assert.deepEqual(result.steps.map(step=>step.name),['oldC','continuation','install']);
   assert.equal(result.ownerDecisions.length,5);
+  assert.equal(result.code,'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED');
+  assert.deepEqual(result.pcTopology,{physicalPcCount:2,
+    existingPcName:'기존 ZGMINI PC',queuePcName:'공통 대기열 PC',
+    recoveryBootPc:'기존 ZGMINI PC',bootEnvironment:'WinPE',
+    additionalPcRequired:false});
   assert.deepEqual(result.preservation,['VOLUME_ID','FILE_IDS','SHA256','ACL','PATH_MAPPING']);
   assert.equal(result.intendedCompletion,'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED');
   for(const field of ['operationalWrites','workflowPuts','backlogWrites','issuePosts'])assert.equal(result[field],0);
 });
 test('supplied offline=true and owner consent flags never authorize this planner',()=>{
-  const result=plan996OfflineRecovery({continuationId,method:'SEPARATE_OFFLINE_HOST',
+  const result=plan996OfflineRecovery({continuationId,method:'EXISTING_ZGMINI_PC_WINPE_BOOT',
     approved:true,offline:true,volumeLockVerified:true});
   assert.equal(result.executionAuthorized,false);
   assert.equal(result.status,'OWNER_DECISION_REQUIRED');
 });
 test('no selected method requests a specific decision and rejects unsafe identifiers',()=>{
   assert.equal(plan996OfflineRecovery({continuationId}).code,'C996_OFFLINE_METHOD_NOT_SELECTED');
-  assert.throws(()=>plan996OfflineRecovery({continuationId:'../old-claim',method:'SEPARATE_OFFLINE_HOST'}));
+  assert.throws(()=>plan996OfflineRecovery({continuationId:'../old-claim',method:'EXISTING_ZGMINI_PC_WINPE_BOOT'}));
 });
