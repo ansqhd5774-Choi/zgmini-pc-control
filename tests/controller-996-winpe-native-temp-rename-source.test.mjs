@@ -15,6 +15,7 @@ test('build requires x64 TEST-only macro and rejects original ZGMINI E: machine'
   assert.match(src,/GetFileAttributesW\(L"E:\\\\ZGmini"\)/);
   assert.match(src,/GetTempPathW/);
   assert.match(src,/C996_FIXTURE_PREFIX/);
+  assert.match(src,/while \(count > 3 && full_path\[count - 1\] == L'\\\\'\) --count;/);
 });
 
 test('Windows native primitive is handle-based FileRenameInfo without replacement',()=>{
