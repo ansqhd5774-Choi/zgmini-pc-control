@@ -9,8 +9,15 @@ const dir=path.dirname(fileURLToPath(import.meta.url));
 const source=fs.readFileSync(path.resolve(dir,
   '../tools/controller-996-c-native-owner-operator.mjs'),'utf8');
 
-test('outside original Windows, no consent or caller flag can cross first write',async()=>{
-  assert.notEqual(process.platform,'win32');
+test('outside original Windows or under isolated CI, no caller flag can cross first write',async()=>{
+  // Windows source checks run on the separate handoff PC. Never use this
+  // test as an authorization to run the real operating-PC C entrypoint.
+  assert.ok(process.platform!=='win32'||(
+    process.env.GITHUB_ACTIONS==='true'&&
+    process.env.RUNNER_NAME==='zgmini-handoff-ci-spare-01'&&
+    process.env.COMPUTERNAME==='DESKTOP-N62L0NG'&&
+    !fs.existsSync('E:\\ZGmini')),
+  'C996_NATIVE_SOURCE_TEST_MUST_BE_ISOLATED');
   for(const args of [undefined,{},
     {manifestCommitSha:'a'.repeat(40)},
     {manifestCommitSha:'a'.repeat(40),testOnly:true,
