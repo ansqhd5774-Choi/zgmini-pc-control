@@ -52,18 +52,25 @@ static bool c996_missing(DWORD code)
 static bool c996_expected_machine(void)
 {
     WCHAR machine[64];
+#ifndef C996_NATIVE_INTERACTIVE_TEMP_TEST_ONLY
     WCHAR runner[80];
-    DWORD machine_length = (DWORD)(sizeof machine / sizeof machine[0]);
     DWORD runner_length;
+#endif
+    DWORD machine_length = (DWORD)(sizeof machine / sizeof machine[0]);
     if (!GetComputerNameW(machine, &machine_length) ||
         _wcsicmp(machine, L"DESKTOP-N62L0NG") != 0)
         return false;
+#ifndef C996_NATIVE_INTERACTIVE_TEMP_TEST_ONLY
+    /* GitHub Runner mode uses its pinned environment identity. A direct
+     * interactive test is a DIFFERENT explicitly compiled TEMP-only mode;
+     * never tell an interactive user to spoof RUNNER_NAME. */
     runner_length = GetEnvironmentVariableW(L"RUNNER_NAME", runner,
                                             (DWORD)(sizeof runner / sizeof runner[0]));
     if (runner_length == 0 ||
         runner_length >= (DWORD)(sizeof runner / sizeof runner[0]) ||
         wcscmp(runner, L"zgmini-handoff-ci-spare-01") != 0)
         return false;
+#endif
 
     /* A missing path must be proved to be absent, not access-denied. */
     if (GetFileAttributesW(L"E:\\ZGmini") != INVALID_FILE_ATTRIBUTES)
