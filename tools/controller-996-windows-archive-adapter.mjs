@@ -230,7 +230,9 @@ export function simulate996TwoBootRecovery({continuationId,events=[]}={}){
   const plan=plan996TwoBootRecovery(continuationId);
   const fail=(code,completed=0)=>Object.freeze({status:'SYNTHETIC_BLOCKED',
     code,completed,installLeaseReleaseAuthorized:false,
-    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false,
+    evidenceAuthenticated:false,ownerApprovalVerified:false,
+    signatureCryptographicallyVerified:false});
   if(!Array.isArray(events)||events.length>4)
     return fail('C996_TWO_BOOT_EVENTS_INVALID');
   const seenBootEpochs=new Set();
@@ -274,7 +276,9 @@ export function simulate996TwoBootRecovery({continuationId,events=[]}={}){
   return Object.freeze({status:events.length===4?
       'SYNTHETIC_SEQUENCE_REVIEWED_ONLY':'SYNTHETIC_INCOMPLETE',
     completed:events.length,installLeaseReleaseAuthorized:false,
-    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false,
+    evidenceAuthenticated:false,ownerApprovalVerified:false,
+    signatureCryptographicallyVerified:false});
 }
 
 // Synthetic ONE-boot review, not an authorization or a substitute for signed
@@ -284,7 +288,9 @@ export function simulate996SingleBootRecovery({continuationId,events=[]}={}){
   const plan=plan996SingleBootRecovery(continuationId);
   const fail=(code,completed=0)=>Object.freeze({status:'SYNTHETIC_BLOCKED',
     code,completed,installLeaseReleaseAuthorized:false,
-    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false,
+    evidenceAuthenticated:false,ownerApprovalVerified:false,
+    signatureCryptographicallyVerified:false});
   if(!Array.isArray(events)||events.length>3)
     return fail('C996_SINGLE_BOOT_EVENTS_INVALID');
   const bootEpochs=new Set();
@@ -345,7 +351,9 @@ export function simulate996SingleBootRecovery({continuationId,events=[]}={}){
   return Object.freeze({status:events.length===3?
       'SYNTHETIC_SEQUENCE_REVIEWED_ONLY':'SYNTHETIC_INCOMPLETE',
     completed:events.length,installLeaseReleaseAuthorized:false,
-    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false,
+    evidenceAuthenticated:false,ownerApprovalVerified:false,
+    signatureCryptographicallyVerified:false});
 }
 
 const relSafe=x=>typeof x==='string'&&x.length>0&&
