@@ -158,7 +158,10 @@ function inspect(root,consent,gitShow,isAlive,readLive){
   const install=`${prefix}/leases/controller-install`;
   const cont=`${prefix}/leases/controller-recovery-continuation-${consent.requestId}`;
   const contArchive=`${prefix}/leases/controller-recovery-continuation-archived-${consent.requestId}`;
-  const oldCArchive=`${prefix}/leases/controller-recovery-archived-${REQ}`;
+  // The single WinPE boot proposal archives the interrupted ORIGINAL claim
+  // here; `controller-recovery-archived-*` is reserved for a distinct online
+  // C owner in the alternative two-boot flow. Never reuse that destination.
+  const oldCArchive=`${prefix}/leases/controller-recovery-interrupted-${REQ}`;
   const oldInstallArchive=`${prefix}/leases/controller-install-recovered-${REQ}`;
   need(absent(root,cont)&&absent(root,contArchive)&&
     absent(root,oldCArchive)&&absent(root,oldInstallArchive),
@@ -367,6 +370,10 @@ export function simulate996Continuation({testOnly=false,root=null,consent=null,
       code:'ISOLATED_SIMULATION_ONLY',sourceFiles:second.sourceFiles,
       archivedCClaimBeforeInstallLease:true,
       continuationClaimBeforeInstallLease:true,installLeaseLast:true,
+      // This Linux TEMP run models archive bytes/order only. It DOES NOT
+      // implement the Windows PREPARE -> WinPE -> READBACK phase boundaries,
+      // verify real Owner consent, or attest a native no-replace move.
+      winPePhaseBoundaryProven:false,nativeWindowsMoveProven:false,
       productionExecutable:false,
       executionAuthorized:false,originalRequestRetried:false,
       workflowPuts:0,backlogWrites:0,issuePosts:0});
