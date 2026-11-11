@@ -245,3 +245,13 @@
 - 최신 증거 root `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_R4_b934fb8dea714fb0bed5a60c8faf4fc7`: cleanup-result.json(STOPPED, discardAttempts=0), guard-tests.json, exact-log-tests.json, longpath-tests.json, metadata-walk-diagnosis.json(정확한 거부 경로/코드), poststop-protected-checks.json(23/23). R3 root의 activity-observation.json 및 BASELINE_READBACK.txt도 보존. ISO 준비본은 구문검사만 했고 실행하지 않음.
 - 다음 필수 작업: RtBackup을 포함한 **읽기 권한 경계에서 원본 대비 검증을 완료할 승인된 방법**을 결정. 현재 “지정 로그 1개만 제외” 범위를 확대하거나 권한을 바꾸지 않은 상태에서는 미검증 항목을 생략해 /Discard/ISO로 진행하지 않음.
 - **전체 복구율 80% / C NO-GO 유지**. 로그 예외/가드 회귀 성공과 단일 WIM 해제·ISO 생성 성공을 구분. 운영 PC/E:/USB/Runner/Workflow/Backlog/Claim/Lease 변경 0.
+
+
+### 2026-11-12 RtBackup 대조 가능성 판단 — 공식 DISM 범위와 안전한 최단 경로 (source-only)
+
+- 근거 실행 [f01edfae3f328bea88066bd221896ad034589e68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/f01edfae3f328bea88066bd221896ad034589e68): 읽기 시 동일 Win32 5가 baseline-readback과 기존 mount 양쪽의 `Windows\System32\LogFiles\WMI\RtBackup`에서 관측됨. 나머지 관련 회귀 22/22 PASS, 보호/고정 23/23 해시 동일; /Discard=0, ISO=0. **둘 다 접근 거부는 내용 동일성의 증거가 아니다.**
+- 공식 DISM `/List-Image /ImageFile:<WIM> /Index:1`은 **원본 아카이브 파일·폴더 목록만** 반환하고, `/Get-MountedImageInfo`는 **등록된 mount의 경로·WIM·index·RW·상태만** 반환한다. 해당 두 명령으로 마운트의 *미기록 변경 파일 0개* 또는 RtBackup 내부 바이트 동일성을 인증할 수 없다. `/Apply-Image /Verify`는 원본 이미지 전개 성공이며 다른 마운트의 overlay 변경 없음을 증명하지 않는다. 출처: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-image-management-command-line-options-s14 .
+- 정상 Microsoft DISM `/Unmount-Image /MountDir:<exact> /Discard`는 **마운트 변경을 WIM 원본에 반영하지 않고 버리는** 공식 절차다(https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/mount-and-modify-a-windows-image-using-dism). 단, 예상치 못한 **마운트 내부 미저장 수정의 유무**와 이 명령의 **격리된 TEMP 원본 보존 효과**는 서로 다른 주장이다. 원본 WIM pre/post SHA 검증은 원본 바이트 보존 증거일 뿐 마운트가 애초 완전히 일치했다는 증명은 아니다.
+- **검증 전략 결정:** WinPE TEMP의 모든 보안 제한 경로에 대해 ACL 우회·소유권 취득·특권 활성화·오류 무시·제외 확대를 하지 않는다. 보안 보호 폴더를 반복 순회하는 전수 스캐너 개발도 중단. 마지막 문서 승인 c74064b의 `미기록 변경 0` 사전조건은 미입증 상태이므로 **현재 상태에서 /Discard를 바로 실행하지 않는다**. WIMMount overlay의 미기록 변경 내역을 알려주는 신뢰 가능한 공식 읽기 전용 API나 기록을 실제로 확보할 때만 기존 조건을 통과시킨다. 문서에서 발견하지 못한 비공식 경로를 추정해 PASS 처리하지 않는다.
+- **명시적인 대안 결정이 필요한 경우:** 사용자에게 정확히 위 **1개 C: TEMP 실패 WIM mount**에 대해서만 사전 전수 무변경 입증을 **포기하되** 원본 WIM SHA, 올바른 mount 식별/다른 활성 쓰기 없음, 기존 기록·증거 보존 및 `/Discard` 이후 동일 원본 SHA·mount gone을 필수 조건으로 대체하는 선택지를 제시한다. 이는 기존 승인 조건을 바꾸는 것이므로 `계속해라`만으로 자동 확정하지 않는다. 운영 PC·E:·USB·워크플로/Runner/Claim/Lease·C급 실행에는 일절 확장되지 않는다.
+- 현 시점 실제 Windows 신규 실행 0, 접수 복원 0, 전체 복구율 **80% / C NO-GO**, 다음 업무 담당은 공통 대기열 PC 로컬 Codex가 **기존 증거의 신뢰 가능한 변경 추적 가능 여부만 읽기 전용으로 판정**하거나 Owner의 위 정확한 TEMP 폐기 승인 변경을 받는 것이다. 동일 실패 도구 반복·중복 마운트 금지.
