@@ -242,6 +242,72 @@ export function plan996SingleBootRecovery(continuationId){
   });
 }
 
+// The signed #996 manifest uses the ORIGINAL Windows E: paths as stable
+// contract identifiers. WinPE may mount the very same volume under a different
+// letter. Only a trusted native volume-GUID / FILE_ID_INFO resolver may turn
+// these volume-relative names into operational handles. Never concatenate the
+// untrusted WinPE drive letter with a signed Windows absolute path.
+//
+// This function is PURE and accepts caller-supplied, UNAUTHENTICATED fields.
+// It preserves the existing signed manifest schema; it cannot grant C access.
+export function review996WinpeVolumeRelativeMoves({
+  continuationId,volumeGuid,volumeSerial,moves,
+}={}){
+  const deny=code=>Object.freeze({
+    schema:'ZGMINI_996_WINPE_VOLUME_RELATIVE_REVIEW_V1',
+    status:'SOURCE_ONLY_BLOCKED',code,executionAuthorized:false,
+    volumeIdentityAuthenticated:false,ownerApprovalVerified:false,
+    operationalWrites:0,automaticRetry:false,
+  });
+  const prefix='\\\\?\\Volume{',suffix='}\\';
+  const guidPattern=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
+  if(typeof volumeGuid!=='string'||!volumeGuid.startsWith(prefix)||
+    !volumeGuid.endsWith(suffix)||
+    !guidPattern.test(volumeGuid.slice(prefix.length,-suffix.length))||
+    typeof volumeSerial!=='string'||!/^[a-f0-9]{16}$/.test(volumeSerial))
+    return deny('C996_WINPE_VOLUME_BINDING_INVALID');
+  let expected;
+  try{expected=plan996SingleBootRecovery(continuationId).phases[1].moves;}
+  catch{return deny('C996_WINPE_CONTINUATION_INVALID');}
+  if(!Array.isArray(moves)||moves.length!==expected.length)
+    return deny('C996_WINPE_MOVE_INVENTORY_INVALID');
+  const paths=[];
+  for(let i=0;i<expected.length;i++){
+    const pin=moves[i],step=expected[i];
+    if(!pin||Object.keys(pin).sort().join('|')!==
+      'name|source|sourceFileId|sourceVolumeSerial|destination'.split('|').sort().join('|')||
+      pin.name!==step.name||pin.source!==step.source||
+      pin.destination!==step.destination||
+      typeof pin.sourceFileId!=='string'||!/^[a-f0-9]{32}$/.test(pin.sourceFileId)||
+      pin.sourceVolumeSerial!==volumeSerial)
+      return deny('C996_WINPE_MOVE_IDENTITY_OR_PATH_DRIFT');
+    // Use a known volume root, NOT any WinPE drive letter. Reject anything
+    // outside the fixed #996 maintenance lease directory by construction.
+    const sourceRelative=path.win32.relative('E:\\',step.source);
+    const destinationRelative=path.win32.relative('E:\\',step.destination);
+    if([sourceRelative,destinationRelative].some(rel=>
+      !rel.startsWith('ZGmini\\automation\\pc-maintenance\\leases\\')||
+      rel.includes('..')||path.win32.isAbsolute(rel)))
+      return deny('C996_WINPE_RELATIVE_PATH_INVALID');
+    paths.push(Object.freeze({
+      name:step.name,sourceRelative,destinationRelative,
+      sourceFileId:pin.sourceFileId,sourceVolumeSerial:volumeSerial,
+    }));
+  }
+  return Object.freeze({
+    schema:'ZGMINI_996_WINPE_VOLUME_RELATIVE_REVIEW_V1',
+    status:'SOURCE_ONLY_RELATIVE_PATHS_REVIEWED',
+    volumeGuid,volumeSerial,
+    paths:Object.freeze(paths),
+    // Operating paths must be derived later from trusted GUID+FILE_ID_INFO
+    // handle queries in an independently approved native WinPE executable.
+    actualWinpeDriveLetter:null,nativeVolumeHandle:null,
+    volumeIdentityAuthenticated:false,ownerApprovalVerified:false,
+    executionAuthorized:false,productionExecutable:false,
+    operationalWrites:0,automaticRetry:false,
+  });
+}
+
 // Synthetic trace review only. Caller assertions are NOT runtime evidence.
 export function simulate996TwoBootRecovery({continuationId,events=[]}={}){
   const plan=plan996TwoBootRecovery(continuationId);
