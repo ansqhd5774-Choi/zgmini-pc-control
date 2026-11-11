@@ -12,7 +12,7 @@
 
 ## 2026-11-11 — #996 원본 4개 PC 작업 GET-only 두 번 대조
 
-- 기존 GitHub 플러그인 실조회에서 Issue **#1217, #1219, #1226, #1227**은 모두 `OPEN`이며 결과 댓글 수는 각각 `0, 0, 0, 1`이었다. #1227 댓글 1건은 D05 진단 의견이고 원본 PC Job의 성공 증거가 아니다. 생성일 및 관련 사건의 정확한 paused/resumed 구간 포함 여부는 **미입증**이다.
+- 기존 GitHub 플러그인 실조회에서 Issue **#1217, #1219, #1226, #1227**은 모두 `OPEN`이며 결과 댓글 수는 각각 `0, 0, 0, 1`이었다. #1227 댓글 1건은 D05 진단 의견이고 원본 PC Job의 성공 증거가 아니다. 원본 pause/resume 구간(`2026-11-10T01:06:53.751Z`~`2026-11-10T13:21:26.727Z`)과 이 네 건의 구간 포함 여부는 **기존 R1·R3 Windows 실증 및 GitHub 이중 조회 기록에서 이미 확인됐다**(아래 'R3 원본 Windows 실증 성공' 참조). 기존 R3 당시 댓글 0건이었고 이번 재조회에서 #1227에 진단 댓글 1건이 추가됐다. 실물 결과 성공 4건은 여전히 미입증이다.
 - 별도 C급 처리는 하지 않고 기존 `gh.exe --method GET` Reader의 고정 URL 4개만 사용하여 `number`, REST id, Owner actor, `pc-job` label, JSON schema, 원본 `requestId`, operation, `chatId`, source repo/branch/SHA, 상태/시간/댓글 수 및 **본문 SHA256만** 조회한다. 원본 Issue 본문, token, 자격 정보는 출력하지 않는다.
 - Runner 기준선 Collector는 4개 Issue 수신 결과도 다른 GitHub/로컬 증거와 함께 두 번 대조한다. 상태·본문·댓글 수·갱신 시간 등이 변하면 `C996_ADMISSION_BRIDGE_SNAPSHOT_DRIFT`로 거부한다. 원본 4건의 dispositions는 `originalDispositionsVerified:false`다. **조회가 성공해도 Owner 승인·4개 요청 재실행/종료·C 이행 권한이 생기지 않는다.**
 - 제목을 `pc-job`으로 강제하지 않으며, 기존 승인된 `chat-UUID` 및 추가 preimage 본문 필드도 임의 금지하지 않는다. 원본 #996 당시 `C_GITHUB_BACKLOG_PLAN_ORIGINAL_BODY_INVALID` 원인 재발 방지를 위해 정확한 정본 파서를 유지해야 한다.
