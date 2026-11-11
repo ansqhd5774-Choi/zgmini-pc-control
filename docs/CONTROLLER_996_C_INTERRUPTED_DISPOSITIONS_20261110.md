@@ -8,6 +8,14 @@
 - 현재 #996 WinPE 복구 계획은 **기존 ZGMINI PC를 기존 Windows 대신 WinPE로 재부팅**하는 후보이며, PC 추가 구매·세 번째 PC·E:를 별도 새 호스트로 옮기는 계획이 아니다. 운영 중단·원본 E: 변경은 정확한 최종 승인 전까지 금지한다.
 - 아래 과거 증거에 포함된 '원본 PC', '별도 Windows', '새 PC', '호스트' 표현은 당시 기록을 보존한 것이며 현재 장비 수 또는 공식 명칭을 재정의하지 않는다. 향후 실행 계획·보고·지시문에는 이 두 공식 PC 명칭만 사용한다.
 
+## 2026-11-11 Runner 등록 및 Watchdog 원본 읽기 전용 연결 — C NO-GO
+
+- 기존 `tools/controller-996-c-installed-gh-get-readonly.mjs`의 고정 Owner/repo 인증 및 설치된 `gh.exe --method GET` 방식에 **전용 메서드** `readPcJobRunnersReadOnly`·`readPcJobRunsReadOnly`를 추가했다. 추가 API 범위는 Repo `actions/runners?per_page=100&page=N`, `actions/workflows/pc-job.yml/runs?status=queued|in_progress|waiting&per_page=100&page=N`로 제한하고 페이지별 `total_count`, 고유 ID, 100건 정상 페이지, 라벨 객체→name 정규화, run status/event를 확인한다. 기존 범용 `get()`에는 새 경로 권한을 주지 않는다. 403/404/페이지 누락은 NOT_FOUND 정상값이 아니라 GET 실패/UNKNOWN이다.
+- GitHub REST Runner 응답에는 실제 물리 PC 명칭이 없다. 기존 `tools/update.mjs`가 사용 중인 정확한 6개 Runner 명칭 `zgmini-pc-01`~`zgmini-pc-06`을 유지하고, 새로운 `tools/controller-996-local-runner-readonly.mjs`가 **기존 ZGMINI PC** `pc-control/runners/01..06/.runner`의 Agent ID·이름을 읽어 원격 GET의 ID와 대조하도록 별도 리더를 작성했다. 파일 원문·URL·토큰은 결과로 반환하지 않는다. 원본 PC 실제 실행 관측과 외부 신뢰 앵커는 아직 0건이다.
+- 기존 로그인 자동 시작은 `Startup/ZGMINI_PC_CONTROL.vbs` → `runner-watchdog-startup.vbs` → `runner-watchdog.mjs` → Supervisor → 6 Runner 구조다. 이미 설치된 `pc-watchdog/PAUSE`는 새 Watchdog 시작을 막으며, `pc-control/DRAIN`은 새 Supervisor 재시작을 중단한다. **둘 다 기존 실행 중인 Runner를 종료시키지 않으므로** 향후 정확한 Owner C 승인 창에 기존 Drain·Supervisor 종료·두 마커의 원래 상태 백업·최종 복귀를 결합해야 한다. 재부팅 후 Watchdog가 `PAUSE`를 보존하는 것이 새 시작 차단의 핵심이며, 코드 수정만으로 실제 설치 상태를 바꾸지 않는다.
+- `pc-watchdog/PAUSE`와 `pc-control/DRAIN` 생성·제거, Supervisor 중단, 기존 PC 재부팅, 원본 E: 변경은 모두 **현재 금지된 운영 효과**다. `ZGMINI_PC_MAINTENANCE.vbs` 독립 Receiver는 Watchdog PAUSE의 범위 밖이므로 Install Lease 보관 후 공유 B 경합이 생기지 않는지 별도 실증이 필요하다. 이를 숨기고 C 승인/실행 가능 판정을 내리지 않는다.
+- 새/변경 6파일 관련 테스트는 기존 집중 48 + 조회 리더 신규 5 + 로컬 Reader 신규 6 + Admission 교정 1 = **65/65 PASS**. 실제 Windows Runner·서비스 중단/재부팅/Workflow 수정 **0**, #996 원본 Lease/Claim 이동 **0**. PR #1222 Draft 및 운영 **4/5=80%→80%, C NO-GO** 유지. 다음 단계는 읽기 전용 실제 PC 증거와 Owner 승인 효과가 완비된 WinPE 실행 manifest/부팅 인계 계약의 연결이다.
+
 ## 2026-11-11 기존 GitHub 대기 활용 입구 검토 — Source 전용, 운영 80% 유지
 
 - `.github/workflows/pc-job.yml`은 Owner의 `pc-job` Issue `opened`를 `[self-hosted,Windows,X64,zgmini-pc-control]` Runner로 전달한다. `controller/engine.mjs`의 실행 Lease는 기존 `controller-install`만으로 작업 접수를 막지 않는다. **기존 Workflow 비활성화/재활성화는 해당 창의 opened 이벤트를 자동 재생하지 않으므로 신규 복구 대기열 없이 그대로 사용해서는 안 된다.**
