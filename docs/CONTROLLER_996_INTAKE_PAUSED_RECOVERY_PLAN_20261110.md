@@ -225,3 +225,23 @@
 - 원본 `cleanup-attempt.started`를 재사용하지 않고 **새 준비본**에만 검사 수정·집중 회귀와 새 고유 단계 식별자를 적용한다. 기존 사용자 승인은 앞서 정확히 지정한 단일 mount의 `/Discard` 1회 및 별도 신규 ISO-only 1회 범위를 벗어나지 않으며, **실제 0회였다는 점과 새 실행 사전 상태를 입증한 뒤에만** 다음 단계 진행 가능성을 판단한다. 불일치나 도구 접근 불가 시 미실행 유지.
 - 실제 성공 후에만 mount gone·고정 해시·입력/ISO·WIM SHA·LogPath 분리 결과를 재확인한다. `/Discard`/ISO/WinPE/Owner 승인 성공은 현재 미확인. 공통 전체 **80% / C NO-GO** 유지.
 - 근거: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/deployment-troubleshooting-and-log-files 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-image-management-command-line-options-s14.
+
+
+### 2026-11-12 로그 1개 제외·진행 작업 판별·회귀 후 실행 준비 — RtBackup 권한 경계에서 STOP
+
+- 최신 사용자 지시와 main 공통 지침, 브랜치 최신 결정(`7616366dd40860387f685f539dab5101d720bb46`), 기존 단일 해제/신규 ISO 승인 `c74064b35899648313df933c5bcf9f84f7a64d9c`을 적용. 기존 실패 스크립트/마커 재실행 없음. 새 단계 식별자 R3/R4를 사용하고 모든 산출물은 신규 C: 사용자 TEMP 아래에 보존.
+- 관리자 읽기 전용 관측: 관련 dism.exe/dismhost.exe/oscdimg.exe 등 별도 작업 프로세스 없음. 기존 ADK wimserv.exe PID 2864의 명령행 `wimserv.exe 61b108e2-bee1-491f-a00b-dca70c56c776`를 식별. 5초 2표본 CPU user/kernel time·읽기/쓰기 횟수·전송 바이트가 모두 동일, 지정 로그 4262 bytes/수정 시각도 동일. 실행 직전 추가 3초 카운터 동일 재확인. **이 관측 범위에서 진행 중인 이미지 작업은 확인되지 않음**; 프로세스·드라이버 종료/잠금 해제 없음.
+- 제외 대상은 기존 실패 root의 `MOUNT_NEW_WIM.dism.log` 전체 경로 **정확히 1개**뿐. root 최상위 알려진 증거 14개를 allowlist로 확인하고 고정 해시 13개/변동 로그 1개로 분리. 같은 이름의 다른 위치·미기록 파일·다른 읽기 오류는 STOP. 로그 metadata만 보존하고 해시 가능/불가를 새로 강제 시험하거나 무변경 PASS로 표기하지 않음.
+- 집중 회귀 **6/6 PASS**: 잠긴 로그 reader 호출 0, 동일 basename 외부 경로 거부, 알려지지 않은 증거 거부, 다른 파일 읽기 오류 거부, 보호 pin 불일치 거부, 정상 pin 허용. 기존 WIM tag/경계 회귀 **14/14 PASS**.
+- 보호 입력 **10/10**, 기존 실패 작업본 입력 **4/4**, exact mount→WIM→Index1/RW/Ok 확인 뒤, 별도 새 TEMP baseline-readback에 원본 WIM을 DISM /Apply-Image /Verify /NoRpFix로 전개 **exit 0**. 이는 원본 WIM 읽기 및 새 검증 폴더 생성이지 추가 WIM mount 또는 ISO 시도가 아님.
+- R3 파일 전수 대조 중 metadata API가 path-not-found로 STOP. 읽기 전용 진단에서 **실제 존재하는 262자 경로**에 일반 CreateFileW 경로는 Win32 **3**, 동일 경로의 확장 길이 형태는 성공함을 확인. 기존 준비본을 보존하고, 새 R4 준비본에 canonical C: 경로 검증 후 native no-follow metadata API에만 `\\?\` 접두를 적용. 시스템 LongPaths 정책·ACL 변경 없음. 장경로/native 경계 회귀 **2/2 PASS**를 추가하여 **관련 회귀 총 22/22 PASS**. 준비본 문자열 생성 구문 오류도 parser 단계에서 차단·수정했으며 이미지 처분을 실행하지 않은 개발 오류로 보존.
+- R4 전수 대조는 **ReadFileAttributeTagInfo 접근 거부**에서 STOP. 추가 관리자 읽기 전용 metadata 진단으로, 원본 검증 전개본과 잔여 mount **각각 20215개 항목**의 metadata를 읽은 뒤 두 경우 모두 **`Windows\System32\LogFiles\WMI\RtBackup` / Win32 5 / Access denied**를 관측. 이 20215는 전체 파일 내용 검증 PASS 수가 아니라 진단 중 읽힌 metadata 항목 수.
+- 정확한 경로:
+  - baseline: `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_R3_35a4a9f48c7344acaf8dae28eb71181f\baseline-readback\Windows\System32\LogFiles\WMI\RtBackup`
+  - mount: `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_TEST_ONLY_0cadf11c99594b999cd2b64b553ebc6f\image-mount\Windows\System32\LogFiles\WMI\RtBackup`
+- RtBackup은 승인된 로그 예외가 아님. **추가 제외·TakeOwn·DACL 변경·backup privilege 활성화·오류 무시·강제 열기 없음**. 전체 파일/미기록 변경 0 검증은 미완료이므로 해제 조건 PASS로 승격하지 않음.
+- 실제 운영 효과 집계: **/Discard 0회, 신규 ISO 작업 시작 0회, 신규 copype/Commit 0회, USB/부팅/CNG/Owner 검증 0회**. 잔여 단일 mount Index1/RW/Ok는 그대로 보존. 기존 준비본 및 실패 증거 삭제/수정 0.
+- 사후 보호 재대조 **23/23 일치**(입력 10개 + 고정 실패 증거 13개). 로그 1개는 지시대로 제외되며 이 숫자에 포함하지 않음. 입력 EXE SHA `b2b1af8accc55d95b5e11bc68664a45af19887d56f09cd9231bce2dfd6a8e218`, 기존 WIM SHA `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`. ISO/최종 수정 WIM/내장 EXE 신규 SHA는 산출물 미생성으로 해당 없음.
+- 최신 증거 root `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_R4_b934fb8dea714fb0bed5a60c8faf4fc7`: cleanup-result.json(STOPPED, discardAttempts=0), guard-tests.json, exact-log-tests.json, longpath-tests.json, metadata-walk-diagnosis.json(정확한 거부 경로/코드), poststop-protected-checks.json(23/23). R3 root의 activity-observation.json 및 BASELINE_READBACK.txt도 보존. ISO 준비본은 구문검사만 했고 실행하지 않음.
+- 다음 필수 작업: RtBackup을 포함한 **읽기 권한 경계에서 원본 대비 검증을 완료할 승인된 방법**을 결정. 현재 “지정 로그 1개만 제외” 범위를 확대하거나 권한을 바꾸지 않은 상태에서는 미검증 항목을 생략해 /Discard/ISO로 진행하지 않음.
+- **전체 복구율 80% / C NO-GO 유지**. 로그 예외/가드 회귀 성공과 단일 WIM 해제·ISO 생성 성공을 구분. 운영 PC/E:/USB/Runner/Workflow/Backlog/Claim/Lease 변경 0.
