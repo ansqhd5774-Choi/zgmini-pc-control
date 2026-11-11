@@ -15,8 +15,10 @@
 
 typedef struct {
     bool exists;
-    uint32_t volume_serial;
-    uint64_t file_id;
+    /* FILE_ID_INFO: 64-bit VolumeSerialNumber and 128-bit FileId. */
+    uint64_t volume_serial;
+    uint64_t file_id_low;
+    uint64_t file_id_high;
 } c996_file_identity;
 
 typedef enum {
@@ -35,7 +37,8 @@ c996_rename_resolution c996_resolve_rename(
     c996_file_identity archived,
     c996_file_identity expected)
 {
-    if (!expected.exists || expected.file_id == UINT64_C(0))
+    if (!expected.exists || (expected.file_id_low == UINT64_C(0) &&
+                             expected.file_id_high == UINT64_C(0)))
         return C996_RENAME_STOP_BAD_EXPECTATION;
     if (source.exists && archived.exists)
         return C996_RENAME_STOP_BOTH;
@@ -44,7 +47,8 @@ c996_rename_resolution c996_resolve_rename(
 
     const c996_file_identity actual = source.exists ? source : archived;
     if (actual.volume_serial != expected.volume_serial ||
-        actual.file_id != expected.file_id)
+        actual.file_id_low != expected.file_id_low ||
+        actual.file_id_high != expected.file_id_high)
         return C996_RENAME_STOP_IDENTITY;
 
     return source.exists ? C996_RENAME_PENDING : C996_RENAME_DONE;
@@ -97,15 +101,17 @@ c996_three_resolution c996_resolve_three(
 
 int main(void)
 {
-    const c996_file_identity expected = {true, UINT32_C(0x87654321),
-                                          UINT64_C(0x1234000000005678)};
-    const c996_file_identity absent = {false, 0, 0};
-    const c996_file_identity other_id = {true, UINT32_C(0x87654321),
-                                          UINT64_C(0x1234000000005679)};
-    const c996_file_identity other_volume = {true, UINT32_C(0x87654320),
-                                              UINT64_C(0x1234000000005678)};
-    const c996_file_identity invalid = {true, UINT32_C(0x87654321), 0};
-    const c996_file_identity missing_expectation = {false, 0, 0};
+    const c996_file_identity expected = {true, UINT64_C(0x1000000087654321),
+        UINT64_C(0x1234000000005678), UINT64_C(0xFEDCBA9876543210)};
+    const c996_file_identity absent = {false, 0, 0, 0};
+    const c996_file_identity other_id = {true, UINT64_C(0x1000000087654321),
+        UINT64_C(0x1234000000005679), UINT64_C(0xFEDCBA9876543210)};
+    const c996_file_identity other_high_id = {true, UINT64_C(0x1000000087654321),
+        UINT64_C(0x1234000000005678), UINT64_C(0xFEDCBA9876543211)};
+    const c996_file_identity other_volume = {true, UINT64_C(0x1000000087654320),
+        UINT64_C(0x1234000000005678), UINT64_C(0xFEDCBA9876543210)};
+    const c996_file_identity invalid = {true, UINT64_C(0x1000000087654321), 0, 0};
+    const c996_file_identity missing_expectation = {false, 0, 0, 0};
 
     assert(c996_resolve_rename(expected, absent, expected) ==
            C996_RENAME_PENDING);
@@ -121,6 +127,10 @@ int main(void)
            C996_RENAME_STOP_IDENTITY);
     assert(c996_resolve_rename(absent, other_id, expected) ==
            C996_RENAME_STOP_IDENTITY);
+    assert(c996_resolve_rename(other_high_id, absent, expected) ==
+           C996_RENAME_STOP_IDENTITY);
+    assert(c996_resolve_rename(absent, other_high_id, expected) ==
+           C996_RENAME_STOP_IDENTITY);
     assert(c996_resolve_rename(other_volume, absent, expected) ==
            C996_RENAME_STOP_IDENTITY);
     assert(c996_resolve_rename(absent, other_volume, expected) ==
@@ -132,8 +142,10 @@ int main(void)
 
     const c996_file_identity pins[3] = {
         expected,
-        {true, UINT32_C(0x87654321), UINT64_C(0x1234000000005680)},
-        {true, UINT32_C(0x87654321), UINT64_C(0x1234000000005681)},
+        {true, UINT64_C(0x1000000087654321), UINT64_C(0x1234000000005680),
+            UINT64_C(0xFEDCBA9876543210)},
+        {true, UINT64_C(0x1000000087654321), UINT64_C(0x1234000000005681),
+            UINT64_C(0xFEDCBA9876543210)},
     };
     c996_file_identity sources[3] = {pins[0], pins[1], pins[2]};
     c996_file_identity archives[3] = {absent, absent, absent};
