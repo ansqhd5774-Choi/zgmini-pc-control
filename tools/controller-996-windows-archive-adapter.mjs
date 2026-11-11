@@ -88,6 +88,7 @@ export function plan996OfflineRecovery({continuationId,method}={}){
     legacySingleSessionSteps:plan.steps,
     steps:Object.freeze(twoBootReview.phases.flatMap(phase=>phase.moves)),
     twoBootReview,
+    singleBootAlternative:plan996SingleBootRecovery(continuationId),
     ownerDecisions:Object.freeze([
       'STOP_ORIGINAL_WINDOWS_WRITERS_AND_APPROVE_DOWNTIME',
       'SELECT_EXISTING_ZGMINI_PC_WINPE_WITH_SOLE_VOLUME_ACCESS',
@@ -121,10 +122,12 @@ export function plan996TwoBootRecovery(continuationId){
   const pc='기존 ZGMINI PC';
   const phases=[
     {id:'WINPE_FIRST_BOOT',pc,os:'WinPE',moves:[oldC],
-      workflow:'disabled_manually',installLease:'HELD'},
+      workflow:'READBACK_NO_MUTATION',installLease:'HELD'},
     {id:'ORIGINAL_WINDOWS_RESTORE',pc,os:'Windows',moves:[],
-      workflow:'ENABLE_ONCE_AND_VERIFY',backlog:'CLOSE_ONCE_AND_VERIFY',
-      originalJobs:'VERIFY_FOUR',admission:'VERIFY_NO_JOB_CONSUMPTION',
+      workflow:'GET_VERIFY_ACTIVE_OR_STOP_NO_UNAPPROVED_PUT',
+      backlog:'GET_VERIFY_CLOSED_OR_STOP_NO_UNAPPROVED_WRITE',
+      originalJobs:'GET_VERIFY_FOUR_NO_AUTO_REPLAY',
+      admission:'PROVE_GITHUB_PC_JOB_ADMISSION_FENCE_OR_STOP',
       handoff:'READY_FOR_SECOND_BOOT',installLease:'HELD'},
     {id:'WINPE_SECOND_BOOT',pc,os:'WinPE',moves:[install,ownC],
       requires:'SIGNED_BOOT_EPOCH_NONCE_SOURCE_PINS_AND_ONLINE_HANDOFF',
@@ -140,9 +143,66 @@ export function plan996TwoBootRecovery(continuationId){
     phases:Object.freeze(phases),oldClaimArchive:oldC,
     newClaimArchive:ownC,installArchive:install,
     legacySingleSessionPlanExecutable:false,
+    currentOperatorCompatible:false,
+    currentOperatorBlockers:Object.freeze([
+      'C_OWNER_OPERATOR_PREIMPORT_HARD_STOP',
+      'ONLINE_PREFLIGHT_REQUIRES_OLD_C_CLAIM_AT_ORIGINAL_PATH',
+      'CURRENT_OWNER_CONSENT_FORBIDS_NEW_WORKFLOW_AND_BACKLOG_WRITES',
+      'ACTIVE_PC_JOB_ISSUE_ADMISSION_FENCE_NOT_PROVEN',
+      'READY_FOR_SECOND_BOOT_DURABLE_SIGNED_HANDOFF_NOT_IMPLEMENTED',
+    ]),
     ownerApprovalRequired:true,onlineAdmissionProofRequired:true,
     bootHandoffSignatureRequired:true,sourceLockRequired:true,
     originalPcWrites:0,workflowPuts:0,backlogWrites:0,issuePosts:0,
+  });
+}
+
+// Alternative with ONE WinPE boot on the existing ZGMINI PC. The online
+// preparation effects are NOT granted by this pure plan: they require a new
+// exact C Owner scope and an independently proven pc-job admission fence.
+export function plan996SingleBootRecovery(continuationId){
+  const legacy=plan996WindowsArchive(continuationId);
+  const oldC=Object.freeze({...legacy.steps[0],
+    destination:`${LEASES}\\controller-recovery-interrupted-${ORIGINAL}`});
+  const continuation=legacy.steps[1],install=legacy.steps[2];
+  need(new Set([oldC.destination,continuation.destination,
+    install.destination]).size===3&&
+    [oldC,continuation,install].every(step=>
+      path.win32.dirname(step.source)===LEASES&&
+      path.win32.dirname(step.destination)===LEASES),
+    'C996_SINGLE_BOOT_ARCHIVE_PATH_UNSAFE');
+  const pc='기존 ZGMINI PC';
+  const phases=[
+    {id:'ORIGINAL_WINDOWS_PREPARE',pc,os:'Windows',moves:[],
+      originalOldClaim:'RETAIN_UNTIL_WINPE',installLease:'HELD',
+      continuation:'NEW_DISJOINT_C_CLAIM_ONLY_WITH_EXACT_OWNER_APPROVAL',
+      workflow:'GET_VERIFY_ACTIVE_OR_STOP_NO_UNAPPROVED_PUT',
+      backlog:'GET_VERIFY_CLOSED_OR_STOP_NO_UNAPPROVED_WRITE',
+      jobs:'GET_VERIFY_FOUR_NO_AUTO_REPLAY',
+      admission:'REAL_PC_JOB_ADMISSION_FENCE_MUST_BE_PROVEN',
+      handoff:'SIGNED_DURABLE_READY_FOR_FINAL_WINPE_REQUIRED'},
+    {id:'WINPE_SINGLE_BOOT',pc,os:'WinPE',
+      moves:[oldC,continuation,install],
+      requires:'OFFLINE_OWNER_APPROVAL_SOURCE_PINS_VOLUME_ID_AND_SIGNED_READY',
+      installLease:'HELD_UNTIL_LAST_MOVE'},
+    {id:'ORIGINAL_WINDOWS_READBACK',pc,os:'Windows',moves:[],
+      requires:'CONTROLLER_PROTECTED_ITEMS_WORKFLOW_BACKLOG_JOBS_AND_ARCHIVE_RECEIPTS',
+      installLease:'ARCHIVED'},
+  ].map(phase=>Object.freeze({...phase,moves:Object.freeze(phase.moves)}));
+  return Object.freeze({schema:'ZGMINI_CONTROLLER_996_SINGLE_WINPE_BOOT_REVIEW_V1',
+    status:'SOURCE_ONLY_NOT_EXECUTABLE',executionAuthorized:false,
+    productionExecutable:false,physicalPcCount:2,additionalPcRequired:false,
+    existingPcName:pc,queuePcName:'공통 대기열 PC',winpeBootCount:1,
+    phases:Object.freeze(phases),oldClaimArchive:oldC,
+    continuationArchive:continuation,installArchive:install,
+    currentOperatorCompatible:false,
+    currentOperatorBlockers:Object.freeze([
+      'C_OWNER_OPERATOR_PREIMPORT_HARD_STOP',
+      'NEW_OWNER_SCOPE_AND_SIGNED_OFFLINE_HANDOFF_MISSING',
+      'REAL_PC_JOB_ADMISSION_FENCE_NOT_PROVEN',
+    ]),
+    originalPcWrites:0,workflowPuts:0,backlogWrites:0,issuePosts:0,
+    originalRequestRetries:0,automaticRetry:false,
   });
 }
 
@@ -167,12 +227,14 @@ export function simulate996TwoBootRecovery({continuationId,events=[]}={}){
     if(i===0){
       if(e.oldCArchiveDestination!==plan.oldClaimArchive.destination||
         e.oldCArchived!==true||e.installLeaseHeld!==true||
-        e.workflowState!=='disabled_manually')
+        !['active','disabled_manually'].includes(e.workflowState)||
+        e.workflowPutCount!==0||e.backlogWriteCount!==0)
         return fail('C996_TWO_BOOT_FIRST_BOOT_GUARD_FAILED',i);
     }else if(i===1){
       if(e.installLeaseHeld!==true||e.workflowState!=='active'||
         e.backlogClosed!==true||e.fourJobsVerified!==true||
-        e.admissionProtected!==true||!UUID(e.ownerNonce)||
+        e.admissionProtected!==true||e.workflowPutCount!==0||
+        e.backlogWriteCount!==0||e.issuePostCount!==0||!UUID(e.ownerNonce)||
         !H64(e.sourceSha256)||!H64(e.readyMarkerSha256))
         return fail('C996_TWO_BOOT_ONLINE_HANDOFF_UNVERIFIED',i);
       onlineNonce=e.ownerNonce;readySha=e.readyMarkerSha256;
