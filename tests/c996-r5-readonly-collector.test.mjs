@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {allowedLogName,eventCode,logTimestamp,classification,TARGET_HOST} from '../c996-r5-readonly/collector.mjs';
+import {fileURLToPath} from 'node:url';
+import {allowedLogName,eventCode,logTimestamp,classification,TARGET_HOST,statNoLink} from '../c996-r5-readonly/collector.mjs';
 test('exact target PC is pinned',()=>assert.equal(TARGET_HOST,'DESKTOP-N62L0NG'));
 test('known DISM log basenames are accepted',()=>{
   assert.equal(allowedLogName('COMMIT_NEW_WIM.dism.log'),true);
@@ -21,3 +22,13 @@ test('timestamps are limited to brackets',()=>{
 });
 test('commit log absent never implies full validation',()=>assert.equal(classification([],[]),'COMMIT_LOG_NOT_ESTABLISHED'));
 test('identified commit log still does not claim drift stage known',()=>assert.equal(classification([], [{name:'COMMIT_NEW_WIM.dism.log',counts:{}}]),'LOGS_PRESENT_STAGE_UNPROVEN'));
+
+test('unchanged no-follow lstat path traversal emits bounded progress markers',()=>{
+ const steps=[];
+ const st=statNoLink(fileURLToPath(import.meta.url),(operation,depth)=>steps.push({operation,depth}));
+ assert.equal(st.isFile(),true);
+ assert.deepEqual(steps[0],{operation:'PATH_LSTAT',depth:0});
+ assert.deepEqual(steps.at(-1),{operation:'LEAF_RECHECK',depth:0});
+ assert.ok(steps.some(x=>x.operation==='PATH_LSTAT'&&x.depth>=1));
+ assert.ok(steps.every(x=>Number.isSafeInteger(x.depth)&&x.depth>=0&&x.depth<=24));
+});
