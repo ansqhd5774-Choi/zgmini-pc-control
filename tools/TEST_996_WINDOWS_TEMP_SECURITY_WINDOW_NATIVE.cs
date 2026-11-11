@@ -46,6 +46,12 @@ internal static class Program
             return BitConverter.ToString(sha.ComputeHash(data)).Replace("-", "");
     }
 
+    private static string ShaText(string value)
+    {
+        using (var sha = SHA256.Create())
+            return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(value))).Replace("-", "");
+    }
+
     private static bool IsReparse(string path)
     {
         return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
@@ -152,9 +158,25 @@ internal static class Program
         var acl = new FileSecurity();
         acl.SetSecurityDescriptorSddlForm(originalDacl, Dacl);
         File.SetAccessControl(target, acl);
-        bool daclMatches = File.GetAccessControl(target).GetSecurityDescriptorSddlForm(Dacl) == originalDacl;
+        string afterDacl = File.GetAccessControl(target).GetSecurityDescriptorSddlForm(Dacl);
+        bool daclMatches = afterDacl == originalDacl;
         bool bytesMatch = Hash(target) == expectedHash;
-        if (!daclMatches) Console.Error.WriteLine("C996_SECURITY_PROOF_RESTORE_DACL_MISMATCH");
+        if (!daclMatches)
+        {
+            Console.Error.WriteLine("C996_SECURITY_PROOF_RESTORE_DACL_MISMATCH");
+            try
+            {
+                var a = new RawSecurityDescriptor(originalDacl);
+                var b = new RawSecurityDescriptor(afterDacl);
+                Console.Error.WriteLine("C996_RESTORE_DIAG_V1 beforeHash=" + ShaText(originalDacl) +
+                    " afterHash=" + ShaText(afterDacl) +
+                    " beforeLength=" + originalDacl.Length + " afterLength=" + afterDacl.Length +
+                    " beforeFlags=" + ((int)a.ControlFlags) + " afterFlags=" + ((int)b.ControlFlags) +
+                    " beforeAceCount=" + (a.DiscretionaryAcl == null ? -1 : a.DiscretionaryAcl.Count) +
+                    " afterAceCount=" + (b.DiscretionaryAcl == null ? -1 : b.DiscretionaryAcl.Count));
+            }
+            catch { Console.Error.WriteLine("C996_RESTORE_DIAG_UNAVAILABLE"); }
+        }
         if (!bytesMatch) Console.Error.WriteLine("C996_SECURITY_PROOF_RESTORE_BYTES_MISMATCH");
         return daclMatches && bytesMatch;
     }
