@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {run996NativeOwnerCOnce} from '../tools/controller-996-c-native-owner-operator.mjs';
+import {run996NativeOwnerCOnce,require996OwnerArchiveReceipt} from '../tools/controller-996-c-native-owner-operator.mjs';
 
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const source=fs.readFileSync(path.resolve(dir,
@@ -57,4 +57,42 @@ test('operator is only a conditional source candidate, not old C runner',()=>{
   assert.doesNotMatch(source,/'-ExecutionPolicy'\s*,\s*'(?:Bypass|Unrestricted)'/i);
   assert.doesNotMatch(source,/\b(?:rmSync|unlinkSync|rmdirSync|renameSync)\s*\(/);
   assert.doesNotMatch(source,/export\s+(?:async\s+)?function\s+execute996COperator/);
+});
+
+test('native post-move receipt requires the exact pinned child inventory',()=>{
+  const pins={'owner.json':'a'.repeat(64),
+    'READY_TO_RELEASE_INSTALL.json':'b'.repeat(64)};
+  const file=(last,sha)=>({identity:'00000001:000000000000000'+last,
+    sha256:sha,size:31});
+  const receipt={ok:true,sourceHandleBound:true,noReplace:true,
+    parentIdentity:'00000001:0000000000000001',
+    snapshot:{identity:'00000001:0000000000000002',files:{
+      'owner.json':file('3',pins['owner.json']),
+      'READY_TO_RELEASE_INSTALL.json':file('4',pins['READY_TO_RELEASE_INSTALL.json']),
+    }}};
+  assert.doesNotThrow(()=>require996OwnerArchiveReceipt(receipt,pins));
+  const cases=[
+    {...receipt,snapshot:null},
+    {...receipt,parentIdentity:null},
+    {...receipt,snapshot:{...receipt.snapshot,files:{
+      'owner.json':receipt.snapshot.files['owner.json']}}},
+    {...receipt,snapshot:{...receipt.snapshot,files:{...receipt.snapshot.files,
+      'extra.json':file('5','c'.repeat(64))}}},
+    {...receipt,snapshot:{...receipt.snapshot,files:{...receipt.snapshot.files,
+      'owner.json':{...receipt.snapshot.files['owner.json'],sha256:'c'.repeat(64)}}}},
+    {...receipt,snapshot:{...receipt.snapshot,files:{...receipt.snapshot.files,
+      'owner.json':{...receipt.snapshot.files['owner.json'],size:0}}}},
+    {...receipt,snapshot:{...receipt.snapshot,files:{...receipt.snapshot.files,
+      'owner.json':{...receipt.snapshot.files['owner.json'],identity:
+        receipt.snapshot.files['READY_TO_RELEASE_INSTALL.json'].identity}}}},
+  ];
+  for(const candidate of cases){
+    assert.throws(()=>require996OwnerArchiveReceipt(candidate,pins),
+      {code:'C_996_OWNER_NATIVE_POSTMOVE_RECEIPT_DRIFT'});
+  }
+  assert.throws(()=>require996OwnerArchiveReceipt(
+    {...receipt,ok:false,code:'C996_NATIVE_LOCKED_MOVE_UNSUPPORTED'},pins),
+    {code:'C996_NATIVE_LOCKED_MOVE_UNSUPPORTED'});
+  assert.throws(()=>require996OwnerArchiveReceipt(receipt,{}),
+    {code:'C_996_OWNER_NATIVE_POSTMOVE_RECEIPT_DRIFT'});
 });
