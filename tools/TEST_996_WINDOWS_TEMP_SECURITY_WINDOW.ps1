@@ -9,6 +9,8 @@ param(
   [switch]$RecoverOnly,
   [string]$FixtureRoot,
   [switch]$SimulateChildTermination,
+  [switch]$SimulateChildTimeout,
+  [switch]$PreexistingReadRule,
   [switch]$AllowOriginalPcTempOnly
 )
 Set-StrictMode -Version Latest
@@ -57,8 +59,25 @@ function Assert-FixtureRoot([string]$candidate) {
   return $resolved
 }
 
+function Assert-RestoreTarget([string]$file, [string]$expectedHash) {
+  $dir = [IO.DirectoryInfo]::new([IO.Path]::GetDirectoryName($file))
+  if (($dir.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+      ([IO.File]::GetAttributes($file) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+      (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -cne $expectedHash) {
+    throw 'C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT'
+  }
+}
+
+function Assert-ExactLayout([string]$fixture, [bool]$sourcePresent, [bool]$archivePresent) {
+  if (-not ($sourcePresent -xor $archivePresent) -or
+      [IO.Directory]::Exists((Join-Path $fixture 'source')) -ne $sourcePresent -or
+      [IO.Directory]::Exists((Join-Path $fixture 'archive')) -ne $archivePresent) {
+    throw 'C996_SECURITY_PROOF_RECOVERY_PATH_AMBIGUOUS'
+  }
+}
+
 if ($RecoverOnly) {
-  if ($InjectFailure -or $SimulateChildTermination) {
+  if ($InjectFailure -or $SimulateChildTermination -or $SimulateChildTimeout -or $PreexistingReadRule) {
     throw 'C996_SECURITY_PROOF_RECOVERY_MODE_CONFLICT'
   }
   $recoveryRoot = Assert-FixtureRoot $FixtureRoot
@@ -80,39 +99,43 @@ if ($RecoverOnly) {
   $movedFile = Join-Path $recoveryRoot 'archive\owner.json'
   $oldExists = [IO.File]::Exists($oldFile)
   $movedExists = [IO.File]::Exists($movedFile)
-  if ($oldExists -eq $movedExists) {
-    throw 'C996_SECURITY_PROOF_RECOVERY_PATH_AMBIGUOUS'
-  }
+  Assert-ExactLayout $recoveryRoot $oldExists $movedExists
   $restoreTarget = $(if ($oldExists) { $oldFile } else { $movedFile })
-  $targetDirectory = [IO.DirectoryInfo]::new([IO.Path]::GetDirectoryName($restoreTarget))
-  if (($targetDirectory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-      ([IO.File]::GetAttributes($restoreTarget) -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-      (Get-FileHash -LiteralPath $restoreTarget -Algorithm SHA256).Hash -cne $saved.beforeHash) {
-    throw 'C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT'
-  }
+  Assert-RestoreTarget $restoreTarget $saved.beforeHash
   $section = [Security.AccessControl.AccessControlSections]::Access
-  $recoveryAcl = Get-Acl -LiteralPath $restoreTarget
-  $recoveryAcl.SetSecurityDescriptorSddlForm([string]$saved.beforeDacl,$section)
-  Set-Acl -LiteralPath $restoreTarget -AclObject $recoveryAcl
-  $restoredDacl = (Get-Acl -LiteralPath $restoreTarget).GetSecurityDescriptorSddlForm($section)
-  $recovered = ($restoredDacl -ceq $saved.beforeDacl -and
-    (Get-FileHash -LiteralPath $restoreTarget -Algorithm SHA256).Hash -ceq $saved.beforeHash)
+  $recovered = $false
+  try {
+    $recoveryAcl = Get-Acl -LiteralPath $restoreTarget
+    $recoveryAcl.SetSecurityDescriptorSddlForm([string]$saved.beforeDacl,$section)
+    Set-Acl -LiteralPath $restoreTarget -AclObject $recoveryAcl
+    $restoredDacl = (Get-Acl -LiteralPath $restoreTarget).GetSecurityDescriptorSddlForm($section)
+    $recovered = ($restoredDacl -ceq $saved.beforeDacl -and
+      (Get-FileHash -LiteralPath $restoreTarget -Algorithm SHA256).Hash -ceq $saved.beforeHash -and
+      [IO.File]::Exists($oldFile) -eq $oldExists -and [IO.File]::Exists($movedFile) -eq $movedExists)
+  } catch { $recovered = $false }
   [ordered]@{
     schema='ZGMINI_996_TEMP_SECURITY_RECOVERY_V1'
     scope='ISOLATED_WINDOWS_TEMP_ONLY'
     ok=[bool]$recovered
     recoveryAttempted=$true
     aclRestored=[bool]$recovered
+    pathDisposition=$(if ($oldExists) { 'SOURCE' } else { 'ARCHIVE' })
+    errorCode=$(if ($recovered) { $null } else { 'C996_SECURITY_PROOF_RESTORE_FAILED' })
     executionAuthorized=$false
     originalPcWrites=0
   } | ConvertTo-Json -Compress
   if (-not $recovered) { exit 2 }
   exit 0
 }
-if ($InjectFailure -and $SimulateChildTermination) {
+if (@(@($InjectFailure,$SimulateChildTermination,$SimulateChildTimeout) | Where-Object { $_ }).Count -gt 1) {
   throw 'C996_SECURITY_PROOF_FAILURE_MODE_CONFLICT'
 }
-if ($SimulateChildTermination) {
+if ($SimulateChildTermination -or $SimulateChildTimeout) {
+  if ($env:ZGMINI_996_TEMP_TERMINATION_TEST -cne '1') {
+    throw 'C996_SECURITY_PROOF_TERMINATION_NOT_AUTHORIZED'
+  }
+}
+if (-not [string]::IsNullOrWhiteSpace($FixtureRoot) -or $SimulateChildTermination -or $SimulateChildTimeout) {
   if ([string]::IsNullOrWhiteSpace($FixtureRoot)) {
     throw 'C996_SECURITY_PROOF_TERMINATION_ROOT_REQUIRED'
   }
@@ -124,9 +147,6 @@ if ($SimulateChildTermination) {
     throw 'C996_SECURITY_PROOF_TERMINATION_ROOT_UNSAFE'
   }
 } else {
-  if (-not [string]::IsNullOrWhiteSpace($FixtureRoot)) {
-    throw 'C996_SECURITY_PROOF_ROOT_ARGUMENT_NOT_ALLOWED'
-  }
   $root = Join-Path $temp ('zgmini-996-acl-fixture-' + [guid]::NewGuid().ToString('N'))
 }
 $source = Join-Path $root 'source'
@@ -135,6 +155,15 @@ $archive = Join-Path $root 'archive'
 $original = Join-Path $source 'owner.json'
 $initialBytes = [Text.Encoding]::UTF8.GetBytes('{"fixture":true}')
 [IO.File]::WriteAllBytes($original,$initialBytes)
+$users = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
+$rule = [Security.AccessControl.FileSystemAccessRule]::new(
+  $users,[Security.AccessControl.FileSystemRights]::ReadData,
+  [Security.AccessControl.AccessControlType]::Allow)
+if ($PreexistingReadRule) {
+  $seedAcl = Get-Acl -LiteralPath $original
+  $seedAcl.AddAccessRule($rule)
+  Set-Acl -LiteralPath $original -AclObject $seedAcl
+}
 $initialHash = (Get-FileHash -LiteralPath $original -Algorithm SHA256).Hash
 $originalAcl = Get-Acl -LiteralPath $original
 $daclPart = [Security.AccessControl.AccessControlSections]::Access
@@ -155,6 +184,7 @@ try {
   $journalStream.Flush($true)
 } finally { $journalStream.Dispose() }
 $changed = $false
+$alreadyPresent = $false
 $restored = $false
 $moveSucceeded = $false
 $lockedMoveBlocked = $false
@@ -165,16 +195,20 @@ $handle = $null
 try {
   # Scope the temporary ACL modification to this one synthetic owner.json.
   $acl = Get-Acl -LiteralPath $original
-  $users = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
-  $rule = [Security.AccessControl.FileSystemAccessRule]::new(
-    $users,[Security.AccessControl.FileSystemRights]::ReadData,
-    [Security.AccessControl.AccessControlType]::Allow)
-  $acl.AddAccessRule($rule)
-  Set-Acl -LiteralPath $original -AclObject $acl
+  $matching = @($acl.GetAccessRules($true,$false,[Security.Principal.SecurityIdentifier]) |
+    Where-Object {
+      $_.IdentityReference -eq $users -and $_.AccessControlType -eq $rule.AccessControlType -and
+      ($_.FileSystemRights -band $rule.FileSystemRights) -eq $rule.FileSystemRights
+    })
+  $alreadyPresent = $matching.Count -gt 0
+  if (-not $alreadyPresent) {
+    $acl.AddAccessRule($rule)
+    Set-Acl -LiteralPath $original -AclObject $acl
+  }
   $changed = ((Get-Acl -LiteralPath $original).GetSecurityDescriptorSddlForm($daclPart) -cne $beforeDacl)
-  if (-not $changed) { throw 'C996_SECURITY_PROOF_ACL_CHANGE_NOT_OBSERVED' }
+  if (-not $changed -and -not $alreadyPresent) { throw 'C996_SECURITY_PROOF_ACL_CHANGE_NOT_OBSERVED' }
 
-  if ($SimulateChildTermination) {
+  if ($SimulateChildTermination -or $SimulateChildTimeout) {
     # Only the isolated Windows test parent may request this branch.
     # Terminate without executing finally. The next process must use
     # -RecoverOnly with the recorded fixtureRoot to restore the saved DACL.
@@ -188,6 +222,7 @@ try {
       originalPcWrites=0
     } | ConvertTo-Json -Compress))
     [Console]::Out.Flush()
+    if ($SimulateChildTimeout) { Start-Sleep -Seconds 45 }
     [Environment]::Exit(17)
   }
 
@@ -221,18 +256,26 @@ try {
     $archiveFile = Join-Path $archive 'owner.json'
     $archivePresent = [IO.File]::Exists($archiveFile)
     if ($sourcePresent -xor $archivePresent) {
+      Assert-ExactLayout $root $sourcePresent $archivePresent
       $restoreTarget = $(if ($sourcePresent) { $original } else { $archiveFile })
+      Assert-RestoreTarget $restoreTarget $initialHash
       Set-Acl -LiteralPath $restoreTarget -AclObject $originalAcl
       $afterDacl = (Get-Acl -LiteralPath $restoreTarget).GetSecurityDescriptorSddlForm($daclPart)
       $afterHash = (Get-FileHash -LiteralPath $restoreTarget -Algorithm SHA256).Hash
+      Assert-ExactLayout $root ([IO.File]::Exists($original)) ([IO.File]::Exists($archiveFile))
+      if ([IO.File]::Exists($original) -ne $sourcePresent -or
+          [IO.File]::Exists($archiveFile) -ne $archivePresent) {
+        throw 'C996_SECURITY_PROOF_RECOVERY_PATH_AMBIGUOUS'
+      }
       $restored = ($afterDacl -ceq $beforeDacl -and $afterHash -ceq $initialHash)
     }
+    if (-not $restored) { $primaryError = 'C996_SECURITY_PROOF_RESTORE_FAILED' }
   } catch {
     $primaryError = 'C996_SECURITY_PROOF_RESTORE_FAILED'
   }
 }
 
-$ok = $restored -and $changed -and (
+$ok = $restored -and ($changed -or $alreadyPresent) -and (
   ($InjectFailure -and $expectedFailure -and -not $moveSucceeded) -or
   (-not $InjectFailure -and $moveSucceeded -and $lockedMoveBlocked -and $null -eq $primaryError))
 $result = [ordered]@{
@@ -240,6 +283,7 @@ $result = [ordered]@{
   scope = 'ISOLATED_WINDOWS_TEMP_ONLY'
   ok = [bool]$ok
   aclChanged = [bool]$changed
+  aclAlreadyPresent = [bool]$alreadyPresent
   aclRestored = [bool]$restored
   lockedMoveBlocked = [bool]$lockedMoveBlocked
   moveAfterCloseSucceeded = [bool]$moveSucceeded
@@ -250,6 +294,8 @@ $result = [ordered]@{
   backlogWrites = 0
   processTerminationRecoveryProven = $false
   fixtureRoot = $root
+  pathDisposition = $(if ($sourcePresent -and -not $archivePresent) { 'SOURCE' }
+    elseif ($archivePresent -and -not $sourcePresent) { 'ARCHIVE' } else { 'AMBIGUOUS' })
   errorCode = $(if ($ok) { $null } else { $primaryError })
 }
 $result | ConvertTo-Json -Compress -Depth 4

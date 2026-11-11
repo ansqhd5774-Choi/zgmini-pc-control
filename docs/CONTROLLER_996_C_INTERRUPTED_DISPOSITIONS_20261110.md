@@ -409,4 +409,11 @@ Draft #1222에서 순수 소스 `controller-996-backlog-plan.mjs`와 회귀시�
 - Windows 격리 시험은 첫 보관 실패, 기존 C Claim에서 경쟁 쓰기, 기존 C Claim 보관 후 continuation에서 경쟁 쓰기, 두 Claim 보관 후 Install Lease 이동 시점의 중단 상태를 검증했다. 각 시험에서 Install Lease와 이미 보관된 증거의 바이트를 유지했다. 중단 상태는 TEMP fixture에서 구성했고 원본 Windows 복구는 수행하지 않았다.
 - 안전한 전체 디렉터리 항목 고정·이동의 성공 증거가 필요하므로 S1/SourceLock/최종 C ZIP/S2를 봉인하지 않는다. 전체 운영 80%.
 
+### TEMP ACL 복구 시험 보강
+
+- LAST PASS는 핸들을 유지한 이동 거부와 Install Lease 보존이다. 이동의 FIRST FAIL은 `C996_NATIVE_LOCKED_MOVE_UNSUPPORTED`이며, 운영은 전체 항목 고정이 입증되지 않아 `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`으로 차단한다. TEMP의 읽기 권한 추가는 파일 공유 제약이나 원본 디렉터리의 경쟁 삽입·삭제를 해결하지 않는다.
+- 부모 시험이 자식 실행 전에 고유 TEMP 경로를 확보한다. 30초 초과·비정상 종료 후 기록된 DACL 복구를 실행하고, 해시 및 source/archive 위치를 함께 확인한다. 기존의 동일한 명시적 허용 권한은 변경 없이 유효한 상태로 분류한다. 복구 전 내용 불일치에는 `C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT`, 복구 적용 또는 재확인 실패에는 `C996_SECURITY_PROOF_RESTORE_FAILED`를 반환한다.
+- 정적·승인 회귀 33건 통과, PowerShell 구문 확인 완료. 네이티브 ACL 6건은 별도 승인 환경 미확보로 미실행이다. 원본 PC의 `PSSecurityException`은 `RemoteSigned`, 인터넷 출처 표시, 서명 없음에서 발생한 실행 전 차단이다. 원본 정책을 유지하고, 별도 승인된 격리 Windows에서 신뢰된 게시자가 Authenticode 서명한 정확한 시험 파일을 검증하는 경로를 사용한다.
+- 기존 Lease는 계약을 따르는 Writer를 막는다. 임의 프로세스의 파일 교체·삽입·삭제까지 막는 OS 수준 보장은 입증되지 않았다. 기존 보관 효과를 유지하려면 별도 실행 신원 및 원본·상위 경로의 쓰기 배제 범위를 Owner가 검토해야 한다. 현재 C 실행 차단 및 운영 80%를 유지한다.
+
 **현재 Gate = 원본 C Claim의 외부 provenance·안전한 소유권 인계, 실물 Backlog replays/결과쌍, 개별 설치 소스 전체 바이트 검증.** 원본 Windows 중단 단계의 14/14 읽기 전용 관측과 GitHub Actions 277개 조회까지 완료했으나, 이 Gate 전에는 신규 C 운영 실행·원본 Lease archive가 **NO-GO**다. 소스 설계·테스트·GitHub 원격 조회는 4/5(80%) 실제 수명주기 완료로 계산하지 않는다.

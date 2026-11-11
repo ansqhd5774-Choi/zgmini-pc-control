@@ -55,58 +55,86 @@ const onApprovedWindows = process.platform === 'win32' &&
   (!originalPcPresent || explicitOriginalPcTempConsent) &&
   fs.existsSync('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
 const originalPcFlag = originalPcPresent ? ['-AllowOriginalPcTempOnly'] : [];
-for (const inject of [false, true]) {
-  test(`native TEMP ACL restoration (${inject ? 'injected failure' : 'normal'})`,
+const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+const newRoot = () => path.join(os.tmpdir(), `zgmini-996-acl-fixture-${randomUUID().replaceAll('-', '')}`);
+function runFixture(root, args, timeout=30000) {
+  return spawnSync(powershell, [
+    '-NoProfile','-NonInteractive','-File',fixture,'-TestOnly',...originalPcFlag,
+    '-FixtureRoot',root,...args,
+  ], {encoding:'utf8',timeout,windowsHide:true,
+    env:{...process.env,ZGMINI_996_TEMP_TERMINATION_TEST:'1'}});
+}
+function recover(root) {
+  assert.equal(fs.existsSync(path.join(root,'acl-recovery.json')),true,'missing durable recovery journal');
+  const result=runFixture(root,['-RecoverOnly']);
+  assert.equal(result.status,0,result.stderr||result.stdout||result.error?.message);
+  const report=JSON.parse(result.stdout.trim());
+  assert.equal(report.ok,true);
+  assert.equal(report.aclRestored,true);
+  assert.equal(report.originalPcWrites,0);
+  return report;
+}
+for (const [name, args] of [
+  ['normal', []], ['injected failure', ['-InjectFailure']],
+  ['preexisting rule', ['-PreexistingReadRule']],
+]) {
+  test(`native TEMP ACL restoration (${name})`,
     {skip: !onApprovedWindows}, () => {
-      const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-      const args = ['-NoProfile', '-NonInteractive', '-File', fixture, '-TestOnly', ...originalPcFlag];
-      if (inject) args.push('-InjectFailure');
-      const result = spawnSync(powershell, args, {
-        encoding: 'utf8', timeout: 30000, windowsHide: true,
-      });
+      const root = newRoot();
+      const result = runFixture(root,args);
+      if (result.status!==0 && fs.existsSync(path.join(root,'acl-recovery.json'))) recover(root);
       assert.equal(result.status, 0, result.stderr || result.error?.message);
       const payload = JSON.parse(result.stdout.trim());
       assert.equal(payload.scope, 'ISOLATED_WINDOWS_TEMP_ONLY');
       assert.equal(payload.ok, true);
-      assert.equal(payload.aclChanged, true);
+      assert.equal(payload.aclChanged, !payload.aclAlreadyPresent);
+      if(name==='preexisting rule')assert.equal(payload.aclAlreadyPresent,true);
       assert.equal(payload.aclRestored, true);
       assert.equal(payload.executionAuthorized, false);
       assert.equal(payload.originalPcWrites, 0);
-      assert.equal(payload.injectedFailureRecovered, inject);
-      assert.equal(payload.moveAfterCloseSucceeded, !inject);
+      assert.equal(payload.injectedFailureRecovered, name==='injected failure');
+      assert.equal(payload.moveAfterCloseSucceeded, name!=='injected failure');
+      assert.equal(payload.pathDisposition, name==='injected failure'?'SOURCE':'ARCHIVE');
     });
 }
 
-test('native TEMP journal recovers ACL after deliberately terminated child',
+for(const scenario of ['termination','timeout'])test('native TEMP journal recovers ACL after '+scenario,
   {skip: !onApprovedWindows}, () => {
-    const powershell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-    const root = path.join(os.tmpdir(), `zgmini-996-acl-fixture-${randomUUID().replaceAll('-', '')}`);
-    const aborted = spawnSync(powershell, [
-      '-NoProfile', '-NonInteractive', '-File', fixture,
-      '-TestOnly', ...originalPcFlag, '-SimulateChildTermination', '-FixtureRoot', root,
-    ], {
-      encoding: 'utf8', timeout: 30000, windowsHide: true,
-      env: {...process.env, ZGMINI_996_TEMP_TERMINATION_TEST: '1'},
-    });
+    const root = newRoot();
+    const aborted = runFixture(root,[scenario==='timeout'?'-SimulateChildTimeout':'-SimulateChildTermination']);
     let recovery;
     try {
-      assert.equal(aborted.status, 17, aborted.stderr || aborted.error?.message);
+      if(scenario==='timeout')assert.equal(aborted.error?.code,'ETIMEDOUT',aborted.stderr);
+      else assert.equal(aborted.status, 17, aborted.stderr || aborted.error?.message);
       const payload = JSON.parse(aborted.stdout.trim());
       assert.equal(path.resolve(payload.fixtureRoot), path.resolve(root));
       assert.equal(payload.executionAuthorized, false);
     } finally {
       // A separate process attempts restoration even when the child assertion fails.
-      if (fs.existsSync(path.join(root, 'acl-recovery.json'))) {
-        recovery = spawnSync(powershell, [
-          '-NoProfile', '-NonInteractive', '-File', fixture,
-          '-TestOnly', ...originalPcFlag, '-RecoverOnly', '-FixtureRoot', root,
-        ], {encoding: 'utf8', timeout: 30000, windowsHide: true});
-        assert.equal(recovery.status, 0, recovery.stderr || recovery.error?.message);
-        const report = JSON.parse(recovery.stdout.trim());
-        assert.equal(report.ok, true);
-        assert.equal(report.aclRestored, true);
-        assert.equal(report.originalPcWrites, 0);
-      }
+      if (fs.existsSync(path.join(root, 'acl-recovery.json'))) recovery=recover(root);
     }
     assert.ok(recovery, 'recovery journal should exist');
+    assert.equal(recovery.pathDisposition,'SOURCE');
+    assert.equal(fs.existsSync(path.join(root,'archive')),false);
+  });
+
+test('native TEMP recovery refuses changed source bytes before applying the journal ACL',
+  {skip: !onApprovedWindows}, () => {
+    const root = newRoot();
+    const aborted = runFixture(root,['-SimulateChildTermination']);
+    const owner = path.join(root,'source','owner.json');
+    const bytes = Buffer.from('{"fixture":true}');
+    try {
+      assert.equal(aborted.status,17,aborted.stderr||aborted.error?.message);
+      fs.appendFileSync(owner,' ');
+      const blocked=runFixture(root,['-RecoverOnly']);
+      assert.notEqual(blocked.status,0);
+      assert.match(blocked.stderr,/C996_SECURITY_PROOF_RECOVERY_SOURCE_DRIFT/);
+      assert.deepEqual(fs.readFileSync(owner),Buffer.concat([bytes,Buffer.from(' ')]));
+    } finally {
+      if(fs.existsSync(path.join(root,'acl-recovery.json'))){
+        fs.writeFileSync(owner,bytes);
+        recover(root);
+      }
+    }
   });
