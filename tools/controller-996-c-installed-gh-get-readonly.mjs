@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
@@ -17,6 +18,12 @@ const NODE='E:/ZGmini/runtime/node.exe';
 const BODY_MAX=8_000_000;
 const ISSUE='(?:996|1217|1219|1226|1227)';
 const MANIFEST='docs/CONTROLLER_996_C_CONTINUATION_APPROVAL_V1.json';
+const ORIGINAL_PC_JOBS=Object.freeze([
+  {number:1217,requestId:'pc-8da91b23-f5d6-4a94-bcd5-13b0dfcdee61',operation:'core-runtime-source-readonly'},
+  {number:1219,requestId:'pc-e2710720-1a35-4a75-ab37-4940ecd33edd',operation:'core-runtime-source-readonly'},
+  {number:1226,requestId:'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4',operation:'core-status'},
+  {number:1227,requestId:'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7',operation:'core-runtime-source-readonly'},
+]);
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const error=code=>Object.assign(Error(code),{code});
 const allow=endpoint=>typeof endpoint==='string'&&(
@@ -193,6 +200,40 @@ export function create996InstalledGhGetReadOnly({testOnly=false,
       return Object.freeze({schema:'ZGMINI_996_PC_JOB_RUNS_GET_V1',
         status:'WORKFLOW_RUNS_GET_ONLY',counts:Object.freeze(counts),
         executionAuthorized:false});
+    },
+    readOriginalPcJobIssuesReadOnly(){
+      if(!checked)authenticate();
+      const issues=ORIGINAL_PC_JOBS.map(spec=>{
+        const data=getOnly(`repos/${REPO}/issues/${spec.number}`).data;
+        need(data?.number===spec.number&&Number.isSafeInteger(data.id)&&
+          data.id>0&&data.user?.login===OWNER&&data.user.id===OWNER_ID&&
+          ['open','closed'].includes(data.state)&&
+          Array.isArray(data.labels)&&
+          data.labels.some(item=>item?.name==='pc-job')&&
+          Number.isSafeInteger(data.comments)&&data.comments>=0&&
+          typeof data.body==='string'&&Buffer.byteLength(data.body,'utf8')<=16_384&&
+          Number.isFinite(Date.parse(data.created_at))&&
+          Number.isFinite(Date.parse(data.updated_at)),
+        'C_996_INSTALLED_GH_ORIGINAL_ISSUE_INVALID');
+        let body;try{body=JSON.parse(data.body);}
+        catch{throw error('C_996_INSTALLED_GH_ORIGINAL_BODY_INVALID');}
+        need(body?.schema==='ZGMINI_PC_JOB_V1'&&
+          body.requestId===spec.requestId&&body.operation===spec.operation&&
+          typeof body.chatId==='string'&&body.chatId.startsWith('chat-')&&
+          body.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+          body.sourceBranch==='main'&&
+          /^[a-f0-9]{40}$/.test(body.sourceSha),
+        'C_996_INSTALLED_GH_ORIGINAL_BODY_INVALID');
+        return Object.freeze({number:spec.number,id:data.id,requestId:spec.requestId,
+          operation:spec.operation,state:data.state,
+          commentCount:data.comments,createdAt:data.created_at,
+          updatedAt:data.updated_at,
+          bodySha256:createHash('sha256').update(data.body).digest('hex')});
+      });
+      return Object.freeze({schema:'ZGMINI_996_ORIGINAL_PC_JOB_GET_V1',
+        status:'ORIGINAL_ISSUES_GET_ONLY',issues:Object.freeze(issues),
+        // Issue state/body is not a verified C disposition or an Owner C approval.
+        dispositionsVerified:false,executionAuthorized:false});
     },
   });
 }
