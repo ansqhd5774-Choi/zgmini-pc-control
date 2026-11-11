@@ -22,7 +22,9 @@ const PS_SCRIPT=[
  "$ErrorActionPreference = 'Stop'",
  "$names = @('Runner.Listener.exe','Runner.Worker.exe','node.exe','wscript.exe','cscript.exe','powershell.exe','pwsh.exe','cmd.exe','conhost.exe','git.exe','gh.exe','python.exe','pythonw.exe','dism.exe','dismhost.exe','oscdimg.exe','wrangler.exe')",
  "$processes = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)",
- "$selected = @($processes | Where-Object { $names -contains $_.Name } | Sort-Object Name,ProcessId | Select-Object -First 60 | ForEach-Object {",
+ "$filtered = @($processes | Where-Object { $names -contains $_.Name })",
+ "$counts = @($filtered | Group-Object Name | Sort-Object Name | ForEach-Object { [pscustomobject]@{name=[string]$_.Name;count=[int]$_.Count} })",
+ "$selected = @($filtered | Sort-Object @{Expression={ if ($_.Name -match '(?i)^Runner\\.') {0} elseif ($_.Name -match '(?i)^(wscript|cscript)\\.exe$') {1} elseif ($_.Name -match '(?i)^node\\.exe$') {2} elseif ($_.Name -match '(?i)^(powershell|pwsh)\\.exe$') {3} elseif ($_.Name -match '(?i)^cmd\\.exe$') {4} else {5} }},Name,ProcessId | Select-Object -First 60 | ForEach-Object {",
  " [pscustomobject]@{name=[string]$_.Name;pid=[int]$_.ProcessId;ppid=[int]$_.ParentProcessId;session=[int]$_.SessionId;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576)}",
  "})",
  "$services=@()",
@@ -34,7 +36,7 @@ const PS_SCRIPT=[
  "$startup=@()",
  "$startupStatus='OK'",
  "try { $folder=Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Startup'; if (Test-Path -LiteralPath $folder -PathType Container) { $startup=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^ZGMINI[-_. ]' } | Select-Object -First 24 | ForEach-Object { [string]$_.Name }) } } catch { $startupStatus='UNAVAILABLE' }",
- "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=@($processes | Where-Object { $names -contains $_.Name }).Count;processes=@($selected);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
+ "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
  "$result | ConvertTo-Json -Compress -Depth 8"
 ].join('; ');
 
@@ -66,6 +68,12 @@ export function sanitizeProbe(raw){
    return {name,pid:p.pid,ppid:p.ppid,session:smallInt(p.session,1000),
     workingSetMiB:smallInt(p.workingSetMiB,200000)};
  });
+ const processCounts=safeList(raw.processCounts,24).map(p=>{
+  const name=simple(p?.name,60);
+  if(!KNOWN_PROCESSES.has(name.toLowerCase())||smallInt(p.count,100000)===null)
+   fail('PROBE_PROCESS_COUNT_INVALID');
+  return {name,count:p.count};
+ });
  const services=safeList(raw.services,24).map(s=>{
   const name=simple(s?.name,110);
   if(!/^(actions\.runner\.|zgmini)/i.test(name))fail('PROBE_SERVICE_NOT_ALLOWLISTED');
@@ -86,7 +94,7 @@ export function sanitizeProbe(raw){
     String(raw.observedAtUtc).slice(0,32):null,
   totalProcessCount:smallInt(raw.totalProcessCount,100000),
   selectedProcessCount:smallInt(raw.selectedProcessCount,100000),
-  processes,services,serviceStatus:mode(raw.serviceStatus),
+  processes,processCounts,services,serviceStatus:mode(raw.serviceStatus),
   tasks,taskStatus:mode(raw.taskStatus),startup,startupStatus:mode(raw.startupStatus),
   processListTruncated:smallInt(raw.selectedProcessCount,100000)>processes.length};
 }
