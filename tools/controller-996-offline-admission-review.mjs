@@ -6,6 +6,8 @@ import {createHash} from 'node:crypto';
 const ORIGINAL_PC='기존 ZGMINI PC';
 const QUEUE_PC='공통 대기열 PC';
 const ROUTE_LABEL='zgmini-pc-control';
+const REQUIRED_RUNNERS=Object.freeze(Array.from({length:6},(_,n)=>
+  `zgmini-pc-${String(n+1).padStart(2,'0')}`));
 const EXPECTED_PC_JOB_WORKFLOW_SHA256=
   '76621ee9180d01a2a82e68ed35ffb0f86f5e51474d4f1aae008377aab5f81232';
 const QUEUE_MAX_MS=24*60*60*1000; // GitHub self-hosted Actions queue limit.
@@ -14,6 +16,7 @@ const codes=Object.freeze({
   routing:'C996_ADMISSION_WORKFLOW_ROUTING_CHANGED',
   inventory:'C996_ADMISSION_RUNNER_INVENTORY_INCOMPLETE',
   foreign:'C996_ADMISSION_MATCHING_RUNNER_ON_OTHER_PC',
+  local:'C996_ADMISSION_LOCAL_RUNNER_IDENTITY_UNVERIFIED',
   online:'C996_ADMISSION_RUNNER_NOT_OFFLINE',
   running:'C996_ADMISSION_RUNNER_OR_JOB_NOT_DRAINED',
   startup:'C996_ADMISSION_WINDOWS_RESTART_NOT_FENCED',
@@ -48,6 +51,7 @@ export function review996PcJobWorkflowSource(workflowText){
 export function review996OfflinePcJobAdmission({
   stage='PRE_OFFLINE',workflowText,workflowState,
   workflowMutationCount,runnerInventoryComplete,runnerRows,
+  localRunnerBindings,localRunnerBindingsVerified,
   runningJobs,drainConfirmed,windowsAutoStartHeld,
   offlineStartAt,plannedResumeAt,oldestQueuedAt,
   postReadbackVerified,runnerResumeOccurred,
@@ -67,7 +71,21 @@ export function review996OfflinePcJobAdmission({
     matching.some(row=>!Number.isSafeInteger(row.id)||row.id<=0||
       !['self-hosted','Windows','X64'].every(tag=>row.labels.includes(tag))))
     return deny(codes.inventory);
-  if(matching.some(row=>row.machine!==ORIGINAL_PC))return deny(codes.foreign);
+  // The GitHub runners endpoint does NOT return a physical PC identity.
+  // Unexpected matching runner names could execute jobs from another PC.
+  if(matching.length!==REQUIRED_RUNNERS.length||
+    matching.some(row=>!REQUIRED_RUNNERS.includes(row.name))||
+    new Set(matching.map(row=>row.name)).size!==REQUIRED_RUNNERS.length)
+    return deny(codes.foreign);
+  // Local installed .runner / Supervisor IDs require their own trusted OS
+  // observation; NEVER infer machine ownership from GitHub's names alone.
+  if(localRunnerBindingsVerified!==true||!Array.isArray(localRunnerBindings)||
+    localRunnerBindings.length!==REQUIRED_RUNNERS.length||
+    !REQUIRED_RUNNERS.every(name=>{
+      const matches=localRunnerBindings.filter(binding=>binding?.name===name);
+      const remote=matching.find(row=>row.name===name);
+      return matches.length===1&&matches[0].id===remote?.id;
+    }))return deny(codes.local);
   if(matching.some(row=>row.status!=='offline'))return deny(codes.online);
   if(matching.some(row=>row.busy!==false)||runningJobs!==0||
     drainConfirmed!==true)return deny(codes.running);
