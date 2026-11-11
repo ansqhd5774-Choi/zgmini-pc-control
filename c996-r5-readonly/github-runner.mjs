@@ -79,10 +79,19 @@ export function selectSafeReport(raw,ctx,hostname) {
   if((inspectStep!==null&&!allowedSteps.includes(inspectStep)) ||
     (inspectId!==null&&!allowedIds.includes(inspectId)))
     stop('INSPECTION_STEP_INVALID');
+  const ops=['PATH_LSTAT','LEAF_RECHECK','STREAM_READ','HASH_COMPLETE'];
+  const inspectOperation=raw.inspectOperation??null,inspectDepth=raw.inspectDepth??null;
+  if((inspectOperation!==null&&!ops.includes(inspectOperation)) ||
+     (inspectDepth!==null&&(!Number.isSafeInteger(inspectDepth)||inspectDepth<0||inspectDepth>24)) ||
+     (inspectOperation==='PATH_LSTAT'&&inspectDepth===null) ||
+     (inspectOperation!=='PATH_LSTAT'&&inspectDepth!==null) ||
+     (inspectOperation!==null&&!['PRE_INPUT_HASH','POST_INPUT_HASH'].includes(inspectStep)))
+    stop('INSPECTION_OPERATION_INVALID');
   return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',
     requestId:ctx.requestId,issueNumber:ctx.issueNumber,runId:ctx.runId,attempt:ctx.attempt,
     host:hostname,code:raw.code,status:raw.status,logCount:logs.length,
-    pinCount:pins.filter(x=>x.matched).length,inspectStep,inspectId,sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
+    pinCount:pins.filter(x=>x.matched).length,inspectStep,inspectId,
+    inspectOperation,inspectDepth,sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
     rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,operationalWrites:0,
     automaticRetries:0,rawLogIncluded:false,pins,logs};
 }
@@ -91,7 +100,9 @@ function resultText(r) {
   return ['schema='+r.schema,'requestId='+r.requestId,'runId='+r.runId,
     'attempt='+r.attempt,'host='+r.host,'status='+r.status,'code='+r.code,
     'pinCount='+r.pinCount+'/5','logCount='+r.logCount,
-    'inspectStep='+(r.inspectStep??'UNKNOWN'),'inspectId='+(r.inspectId??'NONE'),'rootCauseStage=UNKNOWN',
+    'inspectStep='+(r.inspectStep??'UNKNOWN'),'inspectId='+(r.inspectId??'NONE'),
+    'inspectOperation='+(r.inspectOperation??'UNKNOWN'),
+    'inspectDepth='+(r.inspectDepth??'NONE'),'rootCauseStage=UNKNOWN',
     'operationalWrites=0','rawLogIncluded=false',''].join('\r\n');
 }
 function bounded(value) {const s=typeof value==='string'?value:JSON.stringify(value,null,2)+'\n';
