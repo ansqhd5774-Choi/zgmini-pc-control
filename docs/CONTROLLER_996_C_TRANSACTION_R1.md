@@ -66,3 +66,20 @@
 다음 필수 경로: 기존 원본 Windows PC **보호 5개 개별 관측** → 독립 C 어댑터/보호 실패 테스트 → 사용자 정확한 C 승인 → 운영 1회 복구 및 JSON/TXT·원장 재조회 → 원래 기능 담당 재계획.
 
 전체 공유 수명주기 프로젝트 실증은 4/5(80%)를 유지한다. #917 과거 완료를 이번 신규 진전으로 중복 산정하지 않는다.
+
+## 2026-11-11 추가 결정 — 실제 Claim·Lease 디렉터리 경합 차단 (C NO-GO)
+
+이 절은 기존 승인·관측 이력을 삭제하지 않는다. 현재 운영 복구는 **4/5(80%)**, 원본 복구 영속 쓰기는 **0건**이다. 격리 Windows TEMP 네이티브 ACL/종료 복구 6/6 PASS(#42955714333)는 운영 Claim/Lease 보관의 독점성을 입증하지 않는다.
+
+**현재 원본 증거 재사용:** Issue #996의 최초 R1 16/18(`C_EVIDENCE_GAPS`)과 R2 보호 상태 지문 일치는 해당 관측 시각의 증거다. 허용 A operation에는 #996 전용 Claim·Lease·DACL 조회가 없으므로 임의 pc-job을 생성하지 않는다. #996의 `PHASE_SCOPED_EVIDENCE_EXCEPTION` 승인은 승인된 특정 manifest에 한정한다.
+
+**LAST PASS / FIRST FAIL**
+- 원본 읽기 진단과 별도 TEMP 시험은 유효. `controller-996-c-native-owner-operator.mjs`의 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 및 `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`은 아직 **의도적 하드 STOP**이다.
+- 확인된 2중 문제: `FileShare.Read`로 검증 child 파일 핸들을 유지하면 Windows 디렉터리 보관 rename이 거부된다. 핸들을 닫으면 파일 변경·신규 entry 삽입 경쟁이 가능하다. 고정 예약 획득의 Win 1/Busy 1 시험은 archive 독점성을 증명하지 않는다.
+- 디렉터리 ACL은 하위 파일에 이미 열린 쓰기 핸들의 권한을 소급 회수하지 않는다. 원본 source와 자식 파일의 온라인 임시 ACL 수정은 기존 비협조 writer 핸들 제거가 별도로 입증되지 않으면 전체 복구의 안전성 증명이 아니다.
+
+**우선 설계:** 운영 Writer·관련 예약의 원본 E: 접근을 정지하고, 다른 인스턴스가 해당 볼륨에 쓰지 못하는 **오프라인 독점 복구**를 별도로 검증·승인받는 방안. 그 환경에서만 파일 ID·원문 SHA/ACL·목적지 부재의 두 차례 읽기를 확인하고, 자식 핸들 종료→동일 볼륨 비덮어쓰기 보관→사후 파일 ID·SHA·ACL·경로 검증을 하도록 기존 3단계 보관 계획을 수정한다. 각 단계의 사전 기록·단회 효과·실패 시 `STATE_UNKNOWN`은 유지한다.
+
+**온라인 대안:** 승인된 maintenance freeze와 모든 기존 writer 핸들 정리, 디렉터리 신규 항목 생성 및 자식 파일 수정 차단 ACL, 보관 후 ACL 원본 복구를 함께 검증해야 한다. ACL만 걸고 하드 STOP을 없애는 변경은 허용하지 않는다.
+
+**결정·승인 구분:** 오프라인 PC 운영 중단·독점 E: 접근·원본 archive 이동, 또는 온라인 원본 ACL/Writer 중단은 기존 C 승인 명세와 다른 운영 효과이므로 Owner의 명시적 범위 결정과 정확한 승인·source 봉인이 먼저 필요하다. 결정을 받은 뒤 별도 Windows TEMP에서 신규 entry 삽입/child 핸들/이동/중단 복구와 동적 import 이전 검증을 완료할 때까지 운영 실행 두 STOP 유지. 최종 결과는 `INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`로만 판정한다.
