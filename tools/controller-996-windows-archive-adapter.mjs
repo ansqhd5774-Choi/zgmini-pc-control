@@ -80,8 +80,14 @@ export function plan996OfflineRecovery({continuationId,method}={}){
     return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
       code:'C996_OFFLINE_METHOD_NOT_SELECTED'});
   }
+  const twoBootReview=plan996TwoBootRecovery(continuationId);
   return Object.freeze({...common,status:'OWNER_DECISION_REQUIRED',
     code:'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED',
+    // The legacy one-session three-move path collides with the online C claim.
+    // Retain it as rejected history; expose ONLY two-boot moves as the proposal.
+    legacySingleSessionSteps:plan.steps,
+    steps:Object.freeze(twoBootReview.phases.flatMap(phase=>phase.moves)),
+    twoBootReview,
     ownerDecisions:Object.freeze([
       'STOP_ORIGINAL_WINDOWS_WRITERS_AND_APPROVE_DOWNTIME',
       'SELECT_EXISTING_ZGMINI_PC_WINPE_WITH_SOLE_VOLUME_ACCESS',
@@ -94,6 +100,100 @@ export function plan996OfflineRecovery({continuationId,method}={}){
       'PC_JOB_WORKFLOW','CLOSED_BACKLOG','FOUR_ORIGINAL_JOB_DISPOSITIONS']),
     nextEffect:'NONE_UNTIL_EXACT_OWNER_SCOPE_AND_NATIVE_PROOF',
   });
+}
+
+// Source-only proposal: two WinPE boots on the SAME existing ZGMINI PC.
+// Never use this proposal as a C execution/Owner-consent port.
+export function plan996TwoBootRecovery(continuationId){
+  const legacy=plan996WindowsArchive(continuationId);
+  const oldC=Object.freeze({...legacy.steps[0],
+    destination:`${LEASES}\\controller-recovery-interrupted-${ORIGINAL}`});
+  const ownC=Object.freeze({name:'ownC',source:legacy.steps[0].source,
+    destination:`${LEASES}\\controller-recovery-archived-${ORIGINAL}`,
+    intendedNativeOperation:'DOTNET_DIRECTORY_MOVE_NO_REPLACE'});
+  const install=legacy.steps[2];
+  // The old single-session destination is also the new online claim's
+  // archive path. Reusing it causes C_RECOVERY_ALREADY_ARCHIVED_OR_COMPLETED.
+  need(oldC.destination!==ownC.destination&&
+    path.win32.dirname(oldC.destination)===LEASES&&
+    path.win32.dirname(ownC.destination)===LEASES,
+    'C996_TWO_BOOT_CLAIM_ARCHIVE_COLLISION');
+  const pc='기존 ZGMINI PC';
+  const phases=[
+    {id:'WINPE_FIRST_BOOT',pc,os:'WinPE',moves:[oldC],
+      workflow:'disabled_manually',installLease:'HELD'},
+    {id:'ORIGINAL_WINDOWS_RESTORE',pc,os:'Windows',moves:[],
+      workflow:'ENABLE_ONCE_AND_VERIFY',backlog:'CLOSE_ONCE_AND_VERIFY',
+      originalJobs:'VERIFY_FOUR',admission:'VERIFY_NO_JOB_CONSUMPTION',
+      handoff:'READY_FOR_SECOND_BOOT',installLease:'HELD'},
+    {id:'WINPE_SECOND_BOOT',pc,os:'WinPE',moves:[install,ownC],
+      requires:'SIGNED_BOOT_EPOCH_NONCE_SOURCE_PINS_AND_ONLINE_HANDOFF',
+      installLease:'ARCHIVE_AFTER_ONLINE_READY'},
+    {id:'ORIGINAL_WINDOWS_READBACK',pc,os:'Windows',moves:[],
+      requires:'ORIGINAL_CONTROLLER_WORKFLOW_BACKLOG_PROTECTED_FILES_AND_JOB_RECEIPTS',
+      installLease:'ARCHIVED'},
+  ].map(p=>Object.freeze({...p,moves:Object.freeze(p.moves)}));
+  return Object.freeze({schema:'ZGMINI_CONTROLLER_996_TWO_BOOT_REVIEW_V1',
+    status:'SOURCE_ONLY_NOT_EXECUTABLE',executionAuthorized:false,
+    productionExecutable:false,physicalPcCount:2,additionalPcRequired:false,
+    existingPcName:pc,queuePcName:'공통 대기열 PC',winpeBootCount:2,
+    phases:Object.freeze(phases),oldClaimArchive:oldC,
+    newClaimArchive:ownC,installArchive:install,
+    legacySingleSessionPlanExecutable:false,
+    ownerApprovalRequired:true,onlineAdmissionProofRequired:true,
+    bootHandoffSignatureRequired:true,sourceLockRequired:true,
+    originalPcWrites:0,workflowPuts:0,backlogWrites:0,issuePosts:0,
+  });
+}
+
+// Synthetic trace review only. Caller assertions are NOT runtime evidence.
+export function simulate996TwoBootRecovery({continuationId,events=[]}={}){
+  const plan=plan996TwoBootRecovery(continuationId);
+  const fail=(code,completed=0)=>Object.freeze({status:'SYNTHETIC_BLOCKED',
+    code,completed,installLeaseReleaseAuthorized:false,
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
+  if(!Array.isArray(events)||events.length>4)
+    return fail('C996_TWO_BOOT_EVENTS_INVALID');
+  const seenBootEpochs=new Set();
+  let onlineNonce=null,readySha=null,sourceSha=null;
+  for(let i=0;i<events.length;i++){
+    const e=events[i];
+    if(!e||e.phase!==plan.phases[i].id)
+      return fail('C996_TWO_BOOT_PHASE_ORDER_INVALID',i);
+    if(typeof e.bootEpoch!=='string'||e.bootEpoch.length<8||
+      seenBootEpochs.has(e.bootEpoch))
+      return fail('C996_TWO_BOOT_BOOT_EPOCH_INVALID',i);
+    seenBootEpochs.add(e.bootEpoch);
+    if(i===0){
+      if(e.oldCArchiveDestination!==plan.oldClaimArchive.destination||
+        e.oldCArchived!==true||e.installLeaseHeld!==true||
+        e.workflowState!=='disabled_manually')
+        return fail('C996_TWO_BOOT_FIRST_BOOT_GUARD_FAILED',i);
+    }else if(i===1){
+      if(e.installLeaseHeld!==true||e.workflowState!=='active'||
+        e.backlogClosed!==true||e.fourJobsVerified!==true||
+        e.admissionProtected!==true||!UUID(e.ownerNonce)||
+        !H64(e.sourceSha256)||!H64(e.readyMarkerSha256))
+        return fail('C996_TWO_BOOT_ONLINE_HANDOFF_UNVERIFIED',i);
+      onlineNonce=e.ownerNonce;readySha=e.readyMarkerSha256;
+      sourceSha=e.sourceSha256;
+    }else if(i===2){
+      if(e.installLeaseArchived!==true||e.ownClaimArchived!==true||
+        e.ownerNonce!==onlineNonce||e.readyMarkerSha256!==readySha||
+        e.sourceSha256!==sourceSha||e.signedHandoffVerified!==true||
+        e.ownerApprovalFreshOrBoundedVerified!==true)
+        return fail('C996_TWO_BOOT_SECOND_BOOT_GUARD_FAILED',i);
+    }else if(e.installLeaseArchived!==true||e.ownClaimArchived!==true||
+        e.workflowState!=='active'||e.backlogClosed!==true||
+        e.controllerUnchanged!==true||e.protectedItemsUnchanged!==true||
+        e.fourJobsVerified!==true||e.sourceSha256!==sourceSha){
+      return fail('C996_TWO_BOOT_FINAL_READBACK_UNVERIFIED',i);
+    }
+  }
+  return Object.freeze({status:events.length===4?
+      'SYNTHETIC_SEQUENCE_REVIEWED_ONLY':'SYNTHETIC_INCOMPLETE',
+    completed:events.length,installLeaseReleaseAuthorized:false,
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false});
 }
 
 const relSafe=x=>typeof x==='string'&&x.length>0&&
