@@ -1,5 +1,14 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 — 기존 A급 조회의 실증 한계 및 WinPE 기능 가정 교정
+
+- 기존 승인 `config/operations.json`에서 A급 `runner-smoke`/`core-status`/`core-runtime-source-readonly`를 확인했지만 세 작업 모두 Runner 6개 전체의 등록 ID·Supervisor PID·Watchdog·Workflow/lease를 한 번에 증명하지 못한다. `tools/automation-status.mjs`는 읽기 전용 고정 경로 도구이나 `docs/AUTOMATION_STATUS_AND_ADMISSION.md`에 따라 **기존 설치된 pc-job A급 operation이 아니다**. 새 Issue·기존 #1217/#1219/#1226/#1227 재요청은 하지 않았다.
+- 현재 GitHub 연결의 Runner 목록 endpoint는 접근 거부되었고, queued 집계값과 목록 길이가 불일치했으므로 이 도구 결과만으로 실제 Runner 운영을 판정하지 않는다. 이전 R1/R3의 원본 pause-window 증거(4개 Issue 포함, `replays={}` 물리 확인)는 재사용한다.
+- `tools/controller-996-windows-archive-adapter.mjs`의 기존 `.NET Directory.Move`는 WinPE에서 보장된 실행 수단이 **아니다**. Microsoft WinPE 선택 구성요소 문서에 따라 실제 부팅 이미지에서 WinPE-WMI/NetFX/Scripting/PowerShell 추가 여부를 확인하거나 별도 고정 Win32 실행기 채택을 검토해야 한다. 원본 Windows `E:`도 WinPE에서 같은 문자라고 가정할 수 없으므로 볼륨 ID/serial을 확인한다. 공식 참고: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-add-packages--optional-components-reference?view=windows-11
+- WinPE one/two boot 순수 계획에 `selectedBootImageVerified:false`, `nativeMoverSelected:false`, `winPePowerShellAssumed:false`, `driveLetterTrusted:false`를 명시했다. 실제 부팅 이미지/볼륨 바이트 증거 없음·Owner 최종 승인 없음·C 실행기 미완성은 그대로 유지한다.
+- 현재 관련 source-only 회귀 **77/77 PASS**. 운영 중단·WinPE 부팅·Runner 정지·Workflow mutation·E:·Claim/Lease 변경 모두 0. 진행률 **80% 유지, C NO-GO**.
+
+
 ## 2026-11-11 — 기존 PC Runner 인계 기준선 통합(읽기 전용·비운영)
 
 - 기존 설치 `gh.exe --method GET` Reader와 기존 ZGMINI PC의 `pc-control/runners/01..06/.runner` 로컬 Reader를 `tools/controller-996-runner-admission-bridge.mjs`에서 연결한다. 물리 PC 호칭은 **기존 ZGMINI PC** 및 **공통 대기열 PC** 2개만 쓴다.
