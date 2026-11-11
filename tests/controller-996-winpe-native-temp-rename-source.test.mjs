@@ -12,6 +12,7 @@ test('build requires x64 TEST-only macro and rejects original ZGMINI E: machine'
   assert.match(src,/#ifndef _WIN64[\s\S]+?#error/);
   assert.match(src,/GetComputerNameW/);
   assert.match(src,/GetEnvironmentVariableW\(L"RUNNER_NAME"/);
+  assert.match(src,/#ifndef C996_NATIVE_INTERACTIVE_TEMP_TEST_ONLY/);
   assert.match(src,/GetFileAttributesW\(L"E:\\\\ZGmini"\)/);
   assert.match(src,/GetTempPathW/);
   assert.match(src,/C996_FIXTURE_PREFIX/);
