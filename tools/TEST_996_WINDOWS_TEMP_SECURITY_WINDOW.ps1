@@ -1,5 +1,6 @@
 # #996: TEMP-only Windows proof for a scoped, reversible ACL change.
-# NEVER call this against the original Windows PC or E:\ZGmini.
+# Original-PC exception is TEMP-only and requires an explicit user-approved
+# switch. E:\ZGmini data, leases, locks, workflows and security stay untouched.
 # This test is not an authorized Controller C operator.
 [CmdletBinding()]
 param(
@@ -7,13 +8,15 @@ param(
   [switch]$InjectFailure,
   [switch]$RecoverOnly,
   [string]$FixtureRoot,
-  [switch]$SimulateChildTermination
+  [switch]$SimulateChildTermination,
+  [switch]$AllowOriginalPcTempOnly
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if (-not $TestOnly) { throw 'C996_SECURITY_PROOF_TEST_ONLY_REQUIRED' }
-if ([IO.Directory]::Exists('E:\ZGmini') -or [IO.File]::Exists('E:\ZGmini')) {
+if (([IO.Directory]::Exists('E:\ZGmini') -or [IO.File]::Exists('E:\ZGmini')) -and
+    -not $AllowOriginalPcTempOnly) {
   throw 'C996_SECURITY_PROOF_ORIGINAL_PC_FORBIDDEN'
 }
 $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
