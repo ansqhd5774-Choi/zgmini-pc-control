@@ -78,3 +78,22 @@
 - 신규 설치/재설치/재부팅/USB 제작/기존 파일 삭제·덮어쓰기/Controller·Runner 중단/Workflow·Backlog·Claim·Lease 변경/C급 실제 복구 **모두 0건**. 운영 PC 변경 **0건**.
 - 다음 필수 작업: 공통 대기열 PC에서 승인된 관리자 실행 컨텍스트를 확보한 뒤, 드라이버 repair의 별도 효과를 검토하고 공식 copype를 **새로운 TEMP 작업 경로에 단회** 실행. 성공 후 생성 boot.wim의 DISM index 목록·선택 index·x64·내부 버전·경로·크기·SHA-256을 검증한다. 현재 740은 Windows 권한 경계이며 설치 실패나 WinPE CNG 실패가 아님. WinPE 실제 부팅/CNG·Owner 키·시간/철회 검증과 구분한다.
 - **전체 80% 유지 / C NO-GO / executionAuthorized=false**.
+
+
+### 2026-11-12 WinPE 생성 및 정적 검증 PASS — 사용자 관리자 실행 후 로컬 재대조
+
+이 절은 바로 앞 740 권한 중단 이후의 새 결과이며, 기존 실패 관측은 이력으로 보존한다.
+
+- 사용자 관리자 PowerShell에서 준비된 `C996_WINPE_STATIC_1d65d75de40e4fd18b4f11c0decca065.cmd`를 단회 실행. 공통 대기열 PC hostname `DESKTOP-N62L0NG`를 로컬 재확인하고 실제 산출물·로그를 직접 읽어 대조함.
+- 새 작업 폴더: `C:\Users\ansqh\AppData\Local\Temp\C996_WINPE_STATIC_1d65d75de40e4fd18b4f11c0decca065`. 기존 폴더 존재 시 중단하는 실행 계약이며, 시스템/사용자 환경변수 영구 변경·DandISetEnv 드라이버 /repair 호출 없이 프로세스 한정 도구 경로로 **Microsoft 공식 copype amd64**를 실행함.
+- `copype.txt`: staging → read-only mount → boot 파일 복사 → unmount → **Successfully staged**. DISM index 목록/선택 index 세부 조회 모두 **The operation completed successfully**. mount 디렉터리의 실제 자식 항목 0개도 확인. 전체 시스템 마운트 상태를 새로 조회한 것은 아님.
+- **PC 식별 PASS / ADK PASS / WinPE add-on PASS / copype 실행 환경 PASS / boot.wim 생성 PASS / 정적 검증 PASS**.
+- 실제 파일: 위 작업 폴더의 `WinPE_amd64\media\sources\boot.wim`.
+- 이미지 index 목록은 **1개(Index 1)**, 선택 index **1**, Name **Microsoft Windows PE (amd64)**, Architecture **x64**, Version **10.0.26100**, ServicePack Build **1**, Edition/Installation **WindowsPE**, 기본 언어 **en-US**.
+- 도구 DISM 버전 **10.0.26100.9457**과 이미지 내부 버전 **10.0.26100**을 구분한다. DISM의 이미지 전개 크기 **2,009,251,937 bytes**와 실제 WIM 파일 크기 **340,134,390 bytes**를 구분한다.
+- SHA-256: **fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197**. 관리자 실행 certutil 출력과 별도 로컬 Get-FileHash 결과가 일치하며 설치 원본 winpe.wim 해시와도 동일함.
+- DISM 원본 필드 **WIM Bootable : No**도 보존한다. 파일명 boot.wim·정적 검증 PASS만으로 실제 부팅 가능성이나 WinPE 부팅 성공을 선언하지 않는다. 해당 메타데이터의 부팅 구성 적합성은 후속 검토 범위이며 이번 작업에서 이미지/BCD를 수정하지 않음.
+- 최초 실제 실패 코드는 이전 **740 / 관리자 권한 부족**으로 보존. 이번 관리자 실행의 copype·DISM 2회·certutil은 스크립트의 각 종료코드 검사 통과, `STATIC_IMAGE_VALIDATION=PASS`. WinPE 부팅/CNG **NOT_TESTED**, Owner 인증·신뢰시각·철회 실증 **미완료**.
+- 운영 PC 접근·변경 **0건**, 운영 E:\ZGmini 접근/변경 0건. 기존 Controller/Runner 중단, Workflow·Backlog·Claim·Lease 변경, 재부팅·USB/ISO 제작, C급 실제 복구 0건.
+- 다음 필수 작업: 선택된 이 이미지의 boot 구성/메타데이터 적합성을 검토하고, Owner trust anchor 및 인증된 시간·철회 조건과 함께 별도 WinPE 부팅·CNG 검증 계획을 확정한다. 재부팅/부팅 미디어 제작/운영 C 효과는 이번 정적 검증의 승인 범위가 아니다.
+- **WinPE 정적 준비 완료 / 전체 #996 진행률 80% 유지 / C NO-GO / executionAuthorized=false**.
