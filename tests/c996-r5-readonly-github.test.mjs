@@ -129,3 +129,17 @@ test('Runner TEMP may differ from source user TEMP but must be C-only and exact'
   assert.equal(isAllowedOutputDirectory(root+'\\..\\other\\C996_R5_READONLY_'+id,root),false);
   assert.equal(isAllowedOutputDirectory(root+'\\C996_R5_READONLY_'+id+'.json',root),false);
 });
+
+test('read denial stage includes only allowlisted file ID, never absolute path',()=>{
+  const ctx={requestId:uuid,issueNumber:1500,runId:'1',attempt:'1'};
+  const r=raw();r.status='STOPPED';r.code='EPERM';r.inspectStep='PRE_INPUT_HASH';r.inspectId='ADK_WIM';
+  r.inputs=[];r.logs=[];r.inputHashesUnchanged=undefined;
+  const result=selectSafeReport(r,ctx,HOST);
+  assert.equal(result.inspectStep,'PRE_INPUT_HASH');
+  assert.equal(result.inspectId,'ADK_WIM');
+  assert.doesNotMatch(JSON.stringify(result),/AppData|C:\\\\Users/);
+  for(const [step,id] of [['ARBITRARY','ADK_WIM'],['PRE_INPUT_HASH','C:\\\\secret']]){
+    const bad=structuredClone(r);bad.inspectStep=step;bad.inspectId=id;
+    assert.throws(()=>selectSafeReport(bad,ctx,HOST),/INSPECTION_STEP_INVALID/);
+  }
+});

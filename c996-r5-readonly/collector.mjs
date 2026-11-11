@@ -80,9 +80,10 @@ async function hashFile(p) {
   for await (const b of fs.createReadStream(p)) {bytes+=b.length;h.update(b);}
   return {bytes,sha256:h.digest('hex'),mtimeMs:s.mtimeMs};
 }
-async function validatePins() {
+async function validatePins(onAttempt=()=>{}) {
   const items=[];
   for (const entry of FIXED) {
+    onAttempt(entry.id);
     const v=await hashFile(entry.file);
     items.push({id:entry.id,matched:v.bytes===entry.bytes && v.sha256===entry.sha,bytes:v.bytes,sha256:v.sha256});
     if (!items.at(-1).matched) throw Object.assign(new Error('PIN_MISMATCH'),{code:'PIN_MISMATCH'});
@@ -152,13 +153,19 @@ async function main() {
       throw Object.assign(new Error('OUTPUT_TEMP_NOT_DIRECTORY'),{code:'OUTPUT_TEMP_NOT_DIRECTORY'});
     out=path.win32.join(outputTemp,'C996_R5_READONLY_'+report.runId.replaceAll('-',''));
     fs.mkdirSync(out,{recursive:false});
-    report.inputs=await validatePins();
-    for(const x of FIXED_TXT) report.fixedEvidence.push(await metadataFile(x));
+    report.inspectStep='PRE_INPUT_HASH';
+    report.inputs=await validatePins(id=>{report.inspectId=id;});
+    report.inspectStep='EVIDENCE_METADATA';report.inspectId=null;
+    for(const x of FIXED_TXT) {report.inspectId=x.id;report.fixedEvidence.push(await metadataFile(x));}
+    report.inspectStep='LOG_DISCOVERY';report.inspectId=null;
     const selected=selectLogs();
-    for(const x of selected) report.logs.push(await inspectLog(x));
-    const after=await validatePins();
+    report.inspectStep='LOG_READ';report.inspectId=null;
+    for(const x of selected) {report.inspectId=x.id;report.logs.push(await inspectLog(x));}
+    report.inspectStep='POST_INPUT_HASH';report.inspectId=null;
+    const after=await validatePins(id=>{report.inspectId=id;});
     if(after.some((x,i)=>x.sha256!==report.inputs[i].sha256)) throw Object.assign(new Error('POST_HASH_MISMATCH'),{code:'POST_HASH_MISMATCH'});
     report.inputHashesUnchanged=after.length;
+    report.inspectStep='DONE';report.inspectId=null;
     report.code=classification(report.fixedEvidence,report.logs);
     report.status=report.code==='LOGS_PRESENT_STAGE_UNPROVEN'?'COMPLETE':'PARTIAL';
   } catch(e) {
