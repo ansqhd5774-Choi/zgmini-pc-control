@@ -97,3 +97,17 @@
 - 운영 PC 접근·변경 **0건**, 운영 E:\ZGmini 접근/변경 0건. 기존 Controller/Runner 중단, Workflow·Backlog·Claim·Lease 변경, 재부팅·USB/ISO 제작, C급 실제 복구 0건.
 - 다음 필수 작업: 선택된 이 이미지의 boot 구성/메타데이터 적합성을 검토하고, Owner trust anchor 및 인증된 시간·철회 조건과 함께 별도 WinPE 부팅·CNG 검증 계획을 확정한다. 재부팅/부팅 미디어 제작/운영 C 효과는 이번 정적 검증의 승인 범위가 아니다.
 - **WinPE 정적 준비 완료 / 전체 #996 진행률 80% 유지 / C NO-GO / executionAuthorized=false**.
+
+
+### 2026-11-12 부팅 파일 정적 검토 및 WinPE CNG 시험 재사용 경계
+
+- 새 WinPE 작업 폴더에서 boot.wim, BIOS BCD/boot.sdi/bootmgr, UEFI bootx64.efi/BCD, bootbins의 bootmgfw.efi/bootmgfw_EX.efi/efisys.bin/efisys_EX.bin/etfsboot.com **11/11 존재**를 읽기 전용으로 확인. 파일 존재가 실제 부팅 성공을 뜻하지 않음.
+- bootx64.efi 및 bootmgfw.efi Authenticode Valid, issuer Microsoft Windows Production PCA 2011. bootmgfw_EX.efi Valid, issuer Windows UEFI CA 2023. 공통 대기열 PC에서 검증한 서명 상태일 뿐 실제 부팅 대상의 Secure Boot db/dbx 승인·철회 상태를 증명하지 않음. bootex/부팅 체인 선택 미확정.
+- BIOS BCD SHA256 `ba146660b06aedbea6e5892378569507c7c3b9387c7bd06a33d58d0fb7dfaa94`; UEFI BCD SHA256 `877fa52824b660d096aa79263bb150058ea77b1d59f8fc4804ae2fa42708b2a9`. 서로 다른 저장소의 해시를 단순 불일치 실패로 처리하지 않음.
+- `bcdedit /store <생성 TEMP의 media\Boot\BCD> /enum all` 단회 읽기 조회 결과 **Access is denied / exit 1**. 기존 DISM 740과 별개의 후속 권한 실패. 내용 미확인으로 BIOS/UEFI ramdisk device/osdevice·boot.sdi 경로·winpe yes·loader 경로·선택 index 연계 PASS는 보류. 권한 상승·시스템 BCD 변경·재시도 없음.
+- Microsoft Copype 문서는 작업용 파일 집합 생성과 Winpe.wim→Boot.wim 이름 변경을 설명하며, MakeWinPEMedia를 실제 부팅 미디어 제작 단계로 구분함. /bootex는 2023 CA 서명 부팅 파일 선택 옵션. 이번에는 MakeWinPEMedia, USB/ISO 제작, 부팅 항목 편집, 재부팅을 실행하지 않음. 출처: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/copype-command-line-options 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/makewinpemedia-command-line-options
+- 기존 CNG 시험기 소스 검토: `tests/controller-996-cng-windows-temp-harness.c`는 GetComputerNameW로 DESKTOP-N62L0NG를 강제하고 `E:\ZGmini` 존재를 조회함. WinPE 환경으로 승인 없이 그대로 옮기거나 guard를 단순 제거하지 않음. 이번 E: 미접근 요구와 WinPE 런타임 식별 계약에 맞는 **별도 test-only harness**가 필요함.
+- WinPE 시험기 설계 조건: 원본 운영 볼륨 경로 조회/열기/쓰기 0, 메모리 내 공개 시험 벡터만 사용, x64/WinPE 환경 식별 및 선택 이미지 provenance 연결, 테스트키는 Owner 키로 승격하지 않음. 유효 RSA-PSS/SHA256/Salt32와 manifest/signature/pin 변조·잘못된 salt/padding 거부를 확인하되 ownerApprovalVerified=false/offlineClockTrusted=false/executionAuthorized=false 유지. 정적 빌드 의존성 검토와 런타임 출력의 의미를 분리. 현재 그 별도 시험기의 구현·컴파일·실제 WinPE 실행은 미수행.
+- 다음 필수 작업 1개: 사용자 관리자 컨텍스트에서 **생성 TEMP의 BIOS/UEFI BCD 두 개에 대한 /enum all 읽기만** 완료하고 반환된 경로/플래그를 검토. 로컬 전용 읽기 준비 파일 `C:\Users\ansqh\C996_BCD_READONLY_f9ff26781fd541c7bc0d23aef9164c41.cmd` 생성(미실행), 출력은 새로운 TEMP 폴더에만 저장. 권한 오류 시 자동 재시도·정리 없음.
+- 이후 별도 test-only WinPE harness와 부팅 검증 계획을 리뷰하고, 대상 PC·미디어·Secure Boot 체인·운영 볼륨 미접근 보호를 확정한 명시 범위 전에는 부팅하지 않음. Owner trust anchor·신뢰시간/철회 미검증 상태 유지.
+- **운영 PC/E: 접근·변경 0, 기존 Controller/Runner/Workflow/Backlog/Claim/Lease 변경 0. WinPE 정적 이미지 PASS 유지, 부팅 적합성 PARTIAL, 실제 WinPE/CNG 미실증. 전체 80% / C NO-GO 유지.**
