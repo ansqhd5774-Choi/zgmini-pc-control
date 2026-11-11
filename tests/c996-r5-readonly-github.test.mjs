@@ -7,8 +7,8 @@ const uuid='ef64077e-61ab-40a0-abcd-a46d31f4e727';
 const ctx={requestId:uuid,issueNumber:1500,runId:'42700000001',attempt:'1'};
 function fixture(){
   return {event:{action:'opened',repository:{full_name:REPO,private:true},
-    issue:{number:1500,user:{login:'ansqhd5774-Choi'},
-      labels:[{name:'pc-c996-r5-readonly'}],
+    issue:{number:1500,title:'pc-c996-r5-readonly',user:{login:'ansqhd5774-Choi'},
+      labels:[],
       body:JSON.stringify({schema:SCHEMA,requestId:uuid,operation:OPERATION,host:HOST})}},
     env:{GITHUB_REPOSITORY:REPO,GITHUB_ACTOR:'ansqhd5774-Choi',
       GITHUB_EVENT_NAME:'issues',GITHUB_RUN_ID:ctx.runId,GITHUB_RUN_ATTEMPT:ctx.attempt}};
@@ -39,7 +39,7 @@ test('issue authenticity and event provenance are checked',()=>{
   f=>f.event.issue.user.login='attacker',f=>f.event.repository.private=false,
   f=>f.event.repository.full_name='other/repo',f=>f.env.GITHUB_ACTOR='other',
   f=>f.env.GITHUB_EVENT_NAME='issue_comment',f=>f.event.action='labeled',
-  f=>f.event.issue.labels=[]
+  f=>f.event.issue.title='other-work'
  ]){
   const f=fixture();mutate(f);assert.throws(()=>validateEvent(f.event,f.env));
  }
