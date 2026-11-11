@@ -1,0 +1,300 @@
+{
+  "schema": "C996_WIM_METADATA_COMPARISON_V1",
+  "planCommit": "956552747a07151bef8804416f1c124ed1473de8",
+  "host": "DESKTOP-N62L0NG",
+  "classification": "IMAGE_METADATA_DRIFT_CONFIRMED",
+  "dismPresentationMismatch": false,
+  "rootCause": "NOT_ESTABLISHED_BY_READONLY_COMPARISON",
+  "isoOnlyPassPreserved": true,
+  "dismVersion": "10.0.26100.9457 (WinBuild.160101.0800)",
+  "wimgapiVersion": "10.0.26100.9457 (WinBuild.160101.0800)",
+  "wimgapiSha256": "9f1046ec92e82d9d48b9010e6e3d4aac16e3e068661f9d8273b88321b5d7593c",
+  "probeSha256": "a808269f275fcc00c80fe5d13bee913008c2c1cb377ac396031806ec0a8e9792",
+  "dismCommands": [
+    {
+      "arguments": "/English /Get-ImageInfo /ImageFile:<source> /Index:1",
+      "exitCode": 0,
+      "input": "ADK_SOURCE"
+    },
+    {
+      "arguments": "/English /Get-ImageInfo /ImageFile:<final> /Index:1",
+      "exitCode": 0,
+      "input": "FINAL_WIM"
+    }
+  ],
+  "wimgapiCalls": [
+    "WIMCreateFile WIM_GENERIC_READ=0x80000000 WIM_OPEN_EXISTING=3 flags=0",
+    "WIMSetTemporaryPath new diagnostic scratch only",
+    "WIMLoadImage index=1",
+    "WIMGetImageInformation Unicode XML",
+    "LocalFree and WIMCloseHandle"
+  ],
+  "apiResults": {
+    "source": {
+      "exitCode": 0,
+      "unicodeXmlBytes": 2306,
+      "xmlSha256": "7fd94f303582c07d3eb9fb1696e11d3378e5427c56e87868711e346d949ff1c5",
+      "bufferFreed": true,
+      "imageClosed": true,
+      "fileClosed": true,
+      "fields": {
+        "NAME": {
+          "present": true,
+          "value": "Microsoft Windows PE (amd64)",
+          "xml": "<NAME>Microsoft Windows PE (amd64)</NAME>"
+        },
+        "ARCH": {
+          "present": true,
+          "value": "9",
+          "xml": "<ARCH>9</ARCH>"
+        },
+        "VERSION": {
+          "present": true,
+          "value": "1002610010ge_release",
+          "xml": "<VERSION><MAJOR>10</MAJOR><MINOR>0</MINOR><BUILD>26100</BUILD><SPBUILD>1</SPBUILD><SPLEVEL>0</SPLEVEL><BRANCH>ge_release</BRANCH></VERSION>"
+        },
+        "EDITIONID": {
+          "present": true,
+          "value": "WindowsPE",
+          "xml": "<EDITIONID>WindowsPE</EDITIONID>"
+        },
+        "INSTALLATIONTYPE": {
+          "present": true,
+          "value": "WindowsPE",
+          "xml": "<INSTALLATIONTYPE>WindowsPE</INSTALLATIONTYPE>"
+        },
+        "PRODUCTTYPE": {
+          "present": true,
+          "value": "WinNT",
+          "xml": "<PRODUCTTYPE>WinNT</PRODUCTTYPE>"
+        },
+        "PRODUCTSUITE": {
+          "present": true,
+          "value": "",
+          "xml": "<PRODUCTSUITE></PRODUCTSUITE>"
+        },
+        "LANGUAGES": {
+          "present": true,
+          "value": "en-USen-US",
+          "xml": "<LANGUAGES><LANGUAGE>en-US</LANGUAGE><DEFAULT>en-US</DEFAULT></LANGUAGES>"
+        },
+        "DEFAULT": {
+          "present": true,
+          "value": "en-US",
+          "xml": "<DEFAULT>en-US</DEFAULT>"
+        }
+      }
+    },
+    "final": {
+      "exitCode": 0,
+      "unicodeXmlBytes": 1708,
+      "xmlSha256": "b61ddbae3ef62a5d1ff653a4e7174394e1bf190a034ff1eddd750c4cb6279c1d",
+      "bufferFreed": true,
+      "imageClosed": true,
+      "fileClosed": true,
+      "fields": {
+        "NAME": {
+          "present": true,
+          "value": "Microsoft Windows PE (amd64)",
+          "xml": "<NAME>Microsoft Windows PE (amd64)</NAME>"
+        },
+        "ARCH": {
+          "present": true,
+          "value": "9",
+          "xml": "<ARCH>9</ARCH>"
+        },
+        "VERSION": {
+          "present": true,
+          "value": "1002610010",
+          "xml": "<VERSION><MAJOR>10</MAJOR><MINOR>0</MINOR><BUILD>26100</BUILD><SPBUILD>1</SPBUILD><SPLEVEL>0</SPLEVEL></VERSION>"
+        },
+        "EDITIONID": {
+          "present": false,
+          "value": null,
+          "xml": null
+        },
+        "INSTALLATIONTYPE": {
+          "present": false,
+          "value": null,
+          "xml": null
+        },
+        "PRODUCTTYPE": {
+          "present": false,
+          "value": null,
+          "xml": null
+        },
+        "PRODUCTSUITE": {
+          "present": false,
+          "value": null,
+          "xml": null
+        },
+        "LANGUAGES": {
+          "present": false,
+          "value": null,
+          "xml": null
+        },
+        "DEFAULT": {
+          "present": false,
+          "value": null,
+          "xml": null
+        }
+      }
+    }
+  },
+  "fieldComparison": [
+    {
+      "field": "NAME",
+      "sourcePresent": true,
+      "sourceValue": "Microsoft Windows PE (amd64)",
+      "finalPresent": true,
+      "finalValue": "Microsoft Windows PE (amd64)",
+      "equal": true,
+      "missingFromFinal": false
+    },
+    {
+      "field": "ARCH",
+      "sourcePresent": true,
+      "sourceValue": "9",
+      "finalPresent": true,
+      "finalValue": "9",
+      "equal": true,
+      "missingFromFinal": false
+    },
+    {
+      "field": "VERSION",
+      "sourcePresent": true,
+      "sourceValue": "1002610010ge_release",
+      "finalPresent": true,
+      "finalValue": "1002610010",
+      "equal": false,
+      "missingFromFinal": false
+    },
+    {
+      "field": "EDITIONID",
+      "sourcePresent": true,
+      "sourceValue": "WindowsPE",
+      "finalPresent": false,
+      "finalValue": null,
+      "equal": false,
+      "missingFromFinal": true
+    },
+    {
+      "field": "INSTALLATIONTYPE",
+      "sourcePresent": true,
+      "sourceValue": "WindowsPE",
+      "finalPresent": false,
+      "finalValue": null,
+      "equal": false,
+      "missingFromFinal": true
+    },
+    {
+      "field": "PRODUCTTYPE",
+      "sourcePresent": true,
+      "sourceValue": "WinNT",
+      "finalPresent": false,
+      "finalValue": null,
+      "equal": false,
+      "missingFromFinal": true
+    },
+    {
+      "field": "PRODUCTSUITE",
+      "sourcePresent": true,
+      "sourceValue": "",
+      "finalPresent": false,
+      "finalValue": null,
+      "equal": false,
+      "missingFromFinal": true
+    },
+    {
+      "field": "LANGUAGES",
+      "sourcePresent": true,
+      "sourceValue": "en-USen-US",
+      "finalPresent": false,
+      "finalValue": null,
+      "equal": false,
+      "missingFromFinal": true
+    },
+    {
+      "field": "DEFAULT",
+      "sourcePresent": true,
+      "sourceValue": "en-US",
+      "finalPresent": false,
+      "finalValue": null,
+      "equal": false,
+      "missingFromFinal": true
+    }
+  ],
+  "additionalVersionDifference": {
+    "sourcePresent": true,
+    "finalValue": null,
+    "finalPresent": false,
+    "path": "/IMAGE/WINDOWS/VERSION/BRANCH",
+    "sourceValue": "ge_release"
+  },
+  "inputsBefore": [
+    {
+      "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Assessment and Deployment Kit\\Windows Preinstallation Environment\\amd64\\en-us\\winpe.wim",
+      "bytes": 340134390,
+      "sha256": "fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\WinPE_amd64\\media\\sources\\boot.wim",
+      "bytes": 341652286,
+      "sha256": "e1397e3ea4e49ee08981fc210415b66b534b2358343ce7e985b996df84d17dbe"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\iso\\C996_WINPE_CNG_TEST_ONLY.iso",
+      "bytes": 399980544,
+      "sha256": "63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\WinPE_amd64\\media\\Boot\\BCD",
+      "bytes": 16384,
+      "sha256": "ba146660b06aedbea6e5892378569507c7c3b9387c7bd06a33d58d0fb7dfaa94"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\WinPE_amd64\\media\\EFI\\Microsoft\\Boot\\BCD",
+      "bytes": 16384,
+      "sha256": "877fa52824b660d096aa79263bb150058ea77b1d59f8fc4804ae2fa42708b2a9"
+    }
+  ],
+  "inputsAfter": [
+    {
+      "path": "C:\\Program Files (x86)\\Windows Kits\\10\\Assessment and Deployment Kit\\Windows Preinstallation Environment\\amd64\\en-us\\winpe.wim",
+      "bytes": 340134390,
+      "sha256": "fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\WinPE_amd64\\media\\sources\\boot.wim",
+      "bytes": 341652286,
+      "sha256": "e1397e3ea4e49ee08981fc210415b66b534b2358343ce7e985b996df84d17dbe"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\iso\\C996_WINPE_CNG_TEST_ONLY.iso",
+      "bytes": 399980544,
+      "sha256": "63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\WinPE_amd64\\media\\Boot\\BCD",
+      "bytes": 16384,
+      "sha256": "ba146660b06aedbea6e5892378569507c7c3b9387c7bd06a33d58d0fb7dfaa94"
+    },
+    {
+      "path": "C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\WinPE_amd64\\media\\EFI\\Microsoft\\Boot\\BCD",
+      "bytes": 16384,
+      "sha256": "877fa52824b660d096aa79263bb150058ea77b1d59f8fc4804ae2fa42708b2a9"
+    }
+  ],
+  "inputHashesPreserved": 5,
+  "newMounts": 0,
+  "wimWrites": 0,
+  "isoWrites": 0,
+  "bcdWrites": 0,
+  "automaticRepairAttempts": 0,
+  "firstFailureCode": null,
+  "winpeBootExecuted": false,
+  "cngExecuted": false,
+  "ownerApprovalVerified": false,
+  "recoveryPercent": 80,
+  "cRecovery": "NO_GO"
+}

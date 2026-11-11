@@ -1,0 +1,23 @@
+ZGMINI #996 READ-ONLY WIM METADATA COMPARISON
+Plan: 956552747a07151bef8804416f1c124ed1473de8
+Host: DESKTOP-N62L0NG
+Classification: IMAGE_METADATA_DRIFT_CONFIRMED
+DISM source/final exit codes: 0 / 0
+Official WIMGAPI source/final getter: success / success
+Edition / WINDOWS/EDITIONID: source present WindowsPE; final absent
+Installation / WINDOWS/INSTALLATIONTYPE: source present WindowsPE; final absent
+ProductType / WINDOWS/PRODUCTTYPE: source present WinNT; final absent
+ProductSuite / WINDOWS/PRODUCTSUITE: source present EMPTY ELEMENT; final absent
+Languages / WINDOWS/LANGUAGES: source present LANGUAGE=en-US DEFAULT=en-US; final absent
+Default / WINDOWS/LANGUAGES/DEFAULT: source present en-US; final absent
+VERSION/BRANCH: source present ge_release; final absent
+NAME unchanged: Microsoft Windows PE (amd64)
+ARCH unchanged: 9 (DISM x64)
+VERSION numeric fields unchanged: MAJOR=10 MINOR=0 BUILD=26100 SPBUILD=1 SPLEVEL=0
+XML buffers freed; image/file handles closed for both reads.
+ISO/source/final WIM/BIOS BCD/UEFI BCD hashes: 5/5 unchanged.
+First execution failure: NONE. No mount, mutation, repair, regeneration or boot.
+The missing nodes are confirmed image-information XML drift, not only a DISM presentation mismatch.
+This does not establish the exact cause/stage, loss of filesystem/registry payload, boot failure, or harmlessness.
+Existing ISO_ONLY_PASS remains preserved; runtime CNG and Owner validation NOT TESTED.
+Overall recovery: 80%; C NO-GO.

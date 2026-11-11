@@ -306,3 +306,30 @@
 - WIM XML fields가 final에서 사라지고 input에 존재했다면 `IMAGE_METADATA_DRIFT_CONFIRMED`; XML에는 값이 있는데 DISM에만 undefined이면 `DISM_PRESENTATION_MISMATCH`; 조회 불가 또는 서로 상충하면 `METADATA_STATE_UNKNOWN`. 어느 경우도 ISO/원본 WIM의 자동 메타데이터 repair, 재압축, export/commit, 복구용 set, 파일 덮어쓰기를 수행하지 않는다. 동일 getter 비교 결과만으로 부팅 성공을 주장하지 않는다.
 - `ISO_ONLY_PASS` 자체는 이미 고유 실행/해시 근거가 있어 완료로 보존한다. **WinPE 실제 부팅, 시험 EXE의 DLL 로드·6개 CNG 케이스는 미실행**이다. 물리 부팅/USB/VM 설치/승인되지 않은 다른 런타임 테스트는 별도 정확한 환경·허용 경로·복귀·운영 볼륨 미접근의 범위 확정 전 실행하지 않는다. Owner 공개키·인증된 시간/철회 조건은 별도의 C급 운영 NO-GO로 유지한다. 전체 공통 4/5=80% 유지.
 - 공식 출처: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/wim/dd834949(v=msdn.10) 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/wim/dd851934(v=msdn.10) 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/dism-image-management-command-line-options-s14 .
+
+
+### 2026-11-12 WinPE 메타데이터 읽기 전용 실측 — IMAGE_METADATA_DRIFT_CONFIRMED
+
+- 계획 커밋 `956552747a07151bef8804416f1c124ed1473de8`의 마지막 절 실행. 기존 ISO_ONLY_PASS 산출물은 보존하고 새 진단 root `C:\Users\ansqh\AppData\Local\Temp\C996_METADATA_READONLY_d4b2a8fa52b643c6a50ec8891e23beb4`에만 probe/scratch/결과 작성.
+- 공통 대기열 host DESKTOP-N62L0NG 재확인. ADK 원본 WIM(340134390 bytes, SHA `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`), final WIM(341652286 bytes, SHA `e1397e3ea4e49ee08981fc210415b66b534b2358343ce7e985b996df84d17dbe`), 기존 ISO(399980544 bytes, SHA `63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588`) 및 BIOS/UEFI BCD의 사전/사후 **5/5 해시 동일**.
+- **동일 ADK DISM 10.0.26100.9457**의 `/English /Get-ImageInfo /ImageFile:<source or final> /Index:1`를 양쪽에 실행, 새 개별 LogPath/scratch 사용. source/final **exit 0/0**. source Edition/Installation=WindowsPE, ProductType=WinNT, ProductSuite=빈 표시, Languages=en-US(Default); final은 5개 모두 <undefined> 재현.
+- **동일 공식 ADK WIMGAPI 10.0.26100.9457 (Microsoft 서명 Valid)**를 사용한 별도 동일 getter로 양쪽 조회. WIMCreateFile **WIM_GENERIC_READ 0x80000000 / WIM_OPEN_EXISTING 3 / flags0**, 새 임시 처리 경로, WIMLoadImage index1, WIMGetImageInformation만 호출. write handle·WIMSetImageInformation·mount API 없음. Unicode XML buffer LocalFree 및 image/file WIMCloseHandle은 양쪽 모두 성공(**6/6 cleanup 상태 true**). WIMGAPI getter **2/2 성공**, source/final XML buffer size **2306/1708 bytes**.
+- **실제 image-information XML 필드 비교:**
+
+| 필드 / XML 경로 | ADK 원본 | 최종 WIM |
+|---|---|---|
+| Edition / WINDOWS/EDITIONID | 존재, WindowsPE | **노드 없음** |
+| Installation / WINDOWS/INSTALLATIONTYPE | 존재, WindowsPE | **노드 없음** |
+| ProductType / WINDOWS/PRODUCTTYPE | 존재, WinNT | **노드 없음** |
+| ProductSuite / WINDOWS/PRODUCTSUITE | **빈 요소로 존재** | **노드 없음** |
+| Languages / WINDOWS/LANGUAGES | 존재, LANGUAGE=en-US·DEFAULT=en-US | **부모 노드 없음** |
+| DEFAULT / WINDOWS/LANGUAGES/DEFAULT | 존재, en-US | **노드 없음** |
+
+- 추가 XML 차이: VERSION/BRANCH 원본 ge_release 존재, final 노드 없음. NAME=Microsoft Windows PE (amd64), ARCH=9(DISM x64), VERSION 숫자 **MAJOR10/MINOR0/BUILD26100/SPBUILD1/SPLEVEL0**는 동일. 원본의 빈 ProductSuite 요소와 최종 요소 부재를 같은 값으로 처리하지 않음.
+- **판정 IMAGE_METADATA_DRIFT_CONFIRMED:** 최종 WIM의 **정보 XML 자체에서** 원본의 필드들이 사라졌고 DISM 출력과 일치하므로 DISM_PRESENTATION_MISMATCH가 아님. 조회 성공/동일 getter/원본·최종 필드 존재를 확보했으므로 전체 판정을 METADATA_STATE_UNKNOWN으로 남기지 않음. 단, **정확한 소실 원인·단계는 미확정**이며 Commit/DISM 특정 결함으로 단정하지 않음. 파일시스템·내부 Windows 레지스트리 payload 손실/부팅 실패 또는 무해성의 증거로 확대하지 않음.
+- **실행 최초 실패 코드 없음(null)**. DISM source/final 0/0, WIMGAPI source/final success/success. 메타데이터 drift는 진단 결과이지 읽기 API 실행 실패를 감춘 PASS가 아님.
+- 추적 결과: `artifacts/controller-996/zgmini-996-wim-metadata-readonly-20261112.json` 및 같은 이름 TXT. JSON은 요청된 필드/선택 XML 조각·정확한 source/final 식별값·코드/메모리 해제·사전/사후 SHA만 포함. **전체 image-information XML은 로컬에만 보존하고 GitHub에 업로드하지 않음**. 로컬 JSON SHA256 `1de1c955a4a08d554d3de6b57d29836f40b9475b9dd8e5406f9d002157843b6c`, TXT SHA256 `9b5bac9f28eda78ed1e14a75ed3892c5f9ae76539f846a0713e71298aef17445`.
+- 임시 probe READ_WIM_METADATA.ps1 SHA256 `a808269f275fcc00c80fe5d13bee913008c2c1cb377ac396031806ec0a8e9792`. WIMGAPI 이미지 정보 getter 명세: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/wim/dd834949(v=msdn.10) ; read-only open 명세: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/wim/dd851934(v=msdn.10) .
+- 새 WIM mount/ISO·WIM·BCD 수정/자동 repair/export/recommit/재생성/USB/부팅 **0**. 기존 ISO_ONLY_PASS는 생성·해시 범위로 그대로 보존. WinPE 실제 DLL 로드/CNG 6사례/Owner 승인/신뢰시각/철회는 미검증.
+- 다음 필수 작업: 기존 빌드·Commit 로그와 공식 metadata 처리 계약을 **읽기 전용으로 조사하여 소실 발생 경로와 보존 전략을 검토**. 보존 필드 복사/자동 복구/새 이미지 제작은 이번 진단 승인에 포함되지 않으며 수행하지 않음.
+- **전체 80% / C NO-GO 유지**. 운영 PC/E:/USB/Runner/Workflow/Backlog/Claim/Lease 변경 0. 이번 GitHub 최소 변경은 계획 문서 1개와 비민감 결과 TXT/JSON 2개뿐.
