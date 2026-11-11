@@ -1,6 +1,6 @@
 # 새 일반챗의 자동 작업 시작
 
-**두 물리 PC의 실행 대상:** 운영 6 Runner가 있는 기존 PC와 격리 `zgmini-handoff-ci-isolated` Runner가 있는 공통 장애 인계 PC의 장비·실행 환경은 동일하지 않다. [PC별 실제 Runner 인벤토리와 원본 증거](PC_HOST_INVENTORY_READONLY.md)를 확인하고, 기존 성공된 GitHub Issue→Runner→JSON/TXT 구조를 해당 PC에 맞게 재사용한다. PC별 절대 경로·권한·Node 설치를 복제했다고 가정하지 않으며, 경로 불일치가 확인되면 그 작업만 제한한다. 기존 전체 업무의 전역 Gate나 C급 NO-GO를 새로 만들지 않는다.
+**두 물리 PC의 실행 대상:** 운영 6 Runner가 있는 기존 PC와 격리 `zgmini-handoff-ci-isolated` Runner가 있는 공통 장애 인계 PC의 장비·실행 환경은 동일하지 않다. [PC별 실제 Runner 인벤토리](PC_HOST_INVENTORY_READONLY.md) 및 [PC별 프로세스·자동 시작·실행·복구 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)를 확인하고, 기존 성공된 GitHub Issue→Runner→JSON/TXT 구조를 해당 PC에 맞게 재사용한다. PC별 절대 경로·권한·Node 설치를 복제했다고 가정하지 않으며, 경로 불일치가 확인되면 그 작업만 제한한다. 기존 전체 업무의 전역 Gate나 C급 NO-GO를 새로 만들지 않는다.
 
 2026-11-06 개정: 현재 업무의 마지막 유효 완료 지점부터 다음 실행으로 진행한다. 지침 확인만 보고하고 멈추지 않는다. 기존 증거 재사용과 이번 신규 성과를 구분한다.
 
