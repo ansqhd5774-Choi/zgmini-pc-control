@@ -169,3 +169,19 @@
 공식 근거: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-mount-and-customize 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-create-usb-bootable-drive.
 
 **이번 승인에서 허용된 신규 쓰기는 공통 대기열 PC의 새 C: TEMP 작업본/ISO/최소 결과뿐**. 원본 PC/E:·USB·서비스/Runner·GitHub Workflow·원본 Claim/Lease 변경 0. 실제 총괄 #996 복구율 **80%**, C급 **NO-GO** 유지.
+
+
+### 2026-11-12 테스트 전용 ISO 생성 단회 실제 실행 — WIM reparse 검사에서 STOP
+
+- 위 ISO 승인 절을 그대로 입력 계약으로 사용. host DESKTOP-N62L0NG 재확인, 입력 EXE SHA256 `b2b1af8accc55d95b5e11bc68664a45af19887d56f09cd9231bce2dfd6a8e218` 일치 후 새 C: 사용자 TEMP 작업 폴더 `C:\Users\ansqh\AppData\Local\Temp\C996_ISO_TEST_ONLY_0cadf11c99594b999cd2b64b553ebc6f`에서만 작업.
+- 정상 UAC 경로로 별도 관리자 pwsh 프로세스 시작. 새로운 attempt.started를 CreateNew로 생성하여 동일 스크립트 자동 재실행 거부. 공식 copype amd64 **exit 0**; 신규 WIM index 목록·index 1 상세 DISM **exit 0**; 해당 신규 WIM의 독립 mount **exit 0**.
+- 입력 이미지: Index 1, Microsoft Windows PE (amd64), x64, Version 10.0.26100 / ServicePack Build 1, WindowsPE, en-US. 입력 WIM 크기 340134390 bytes, SHA256 `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`. DISM 10.0.26100.9457. WIM Bootable No 필드도 보존.
+- **최초 실패 stage=COPY_SINGLE_EXE**, code=`PRECONDITION_OR_SCRIPT_ERROR`, 관리자 스크립트 최종 exit **1**. 원문 `Reparse input rejected: ...\image-mount\Windows\System32\startnet.cmd`. Snapshot 검사가 마운트 내부 파일의 ReparsePoint를 일괄 거부하여 EXE 복사 전에 중단. DISM/복사/ISO 도구 자체 실패로 재분류하지 않음.
+- 중단 후 읽기 전용 fsutil query **exit 0**, startnet.cmd Attributes Archive/SparseFile/ReparsePoint, tag **0x80000008**. 공식 MS-FSCC 정의는 IO_REPARSE_TAG_WIM, WIM Mount filter용임. 준비 스크립트가 합법적인 WIM projection과 임의 symlink/junction을 구분하지 못한 과도한 가드가 원인. 단순히 모든 reparse를 허용하는 수정으로 대체하지 않음. 근거: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4
+- 실패 시 임의 /Discard·cleanup·재시도 금지 계약을 준수하여 **Unmount/Discard/Commit/MakeWinPEMedia 모두 미실행**, EXE 복사 **0**. 새 ISO **없음**, 최종 수정 WIM **미생성**, 내장 EXE SHA **해당 없음**. 기존 입력 EXE 해시는 유지되며 이를 내장 성공 해시로 기재하지 않음.
+- 정확한 잔여 mount: 위 새 폴더의 `image-mount`, Image File `WinPE_amd64\media\sources\boot.wim`, Index **1**, Mounted Read/Write **Yes**, Status **Ok**. 실패 후 DISM /Get-MountedImageInfo 읽기 조회 결과로 확인. 자동 해제하지 않은 활성 mount이므로 새 이미지 작업을 중복 시작하지 않음.
+- 입력/증거 보호 사후 재대조: ADK 원본 copype/MakeWinPEMedia/DISM/winpe.wim/BIOS·UEFI BCD 및 기존 TEMP WIM/BCD·입력 EXE **10/10 해시 일치**. 신규 작업본 BIOS/UEFI BCD **2/2 일치**. 신규 boot.wim은 아직 입력 해시와 동일. bcdedit 실행 0. 운영 PC/E:/USB 접근·변경 0, 서비스/Runner/Workflow/Backlog/Claim/Lease 변경 0.
+- 이번 로컬 신규 파일/작업: BUILD_TEST_ISO.ps1, attempt.started, result.json, readonly-poststop.json, stop-summary.json, copype/DISM 진단 로그, 신규 WinPE 작업본·scratch·image-mount/iso 폴더. Windows 이미지 작업이 수행하는 DISM 마운트 상태 등록은 승인된 마운트 단계의 결과이며 별도 보안/서비스 설정 변경을 수행하지 않음.
+- 결과 보관: 위 새 TEMP의 result.json(최초 실패), failure-mount-status.txt(정확한 활성 mount), INPUT_INDEX_1.txt, readonly-poststop.json(10/10 및 2/2 해시 보호), stop-summary.json. 기존 TEMP 증거 수정/삭제 0.
+- 다음 최소 조치는 **실패 상태 보존 후 명시된 mount 후속 처분과 태그 구분 가드 수정의 별도 승인 범위 확인**. 승인 없이 기존 실패 스크립트 재실행, 실패 mount의 /Discard 또는 Commit, 기존 증거 덮어쓰기, 새로운 ISO 재시작을 하지 않음.
+- **ISO 생성 미완료 / 실제 부팅·CNG·Owner 승인 검증 0 / 전체 80% / C NO-GO 유지**.
