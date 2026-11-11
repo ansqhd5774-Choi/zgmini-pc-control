@@ -2,6 +2,8 @@
 // Requires an independently authenticated read port; this pure helper cannot
 // prove its provenance. No replay, result promotion, Issue post or C grant.
 
+import {createHash} from 'node:crypto';
+
 const OWNER='ansqhd5774-Choi';
 const OWNER_ID=327938088;
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -19,6 +21,12 @@ const EXPECTED=Object.freeze([
 ]);
 const BODY_KEYS=['chatId','operation','requestId','schema','sourceBranch',
   'sourceRepository','sourceSha'];
+// Exactly one existing human-authored diagnosis on #1227 is not a pc-job
+// receipt. No other comment, edited comment, or bot receipt is accepted.
+const D05_DIAGNOSTIC=Object.freeze({
+  issueNumber:1227, id:6781491296,
+  bodySha256:'3808532bddb28fe398139bce3dc016a336bced84a7951467cbb26edf6b349b30'
+});
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const sorted=x=>x.slice().sort();
@@ -44,7 +52,7 @@ export function create996FourOriginalJobsReadOnlyReader({githubReader}={}){
       const i=issue?.data;
       need(issue?.status===200&&i?.number===number&&
         i.user?.login===OWNER&&i.user?.id===OWNER_ID&&
-        i.state==='open'&&i.comments===0&&!i.pull_request&&
+        i.state==='open'&&i.comments===(number===1227?1:0)&&!i.pull_request&& 
         i.labels?.some(x=>(typeof x==='string'?x:x?.name)==='pc-job'),
       'C_996_ORIGINAL_JOBS_STATUS_OR_ORIGIN_DRIFT');
       let body;
@@ -58,12 +66,23 @@ export function create996FourOriginalJobsReadOnlyReader({githubReader}={}){
       'C_996_ORIGINAL_JOBS_REQUEST_BYTES_DRIFT');
       const comments=await githubReader.get(
         `issues/${number}/comments?per_page=100&page=1`);
-      need(comments?.status===200&&Array.isArray(comments.data)&&
-        comments.data.length===0,
-      'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
+      need(comments?.status===200&&Array.isArray(comments.data),
+        'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
+      const diagnostic=number===D05_DIAGNOSTIC.issueNumber;
+      if(diagnostic){
+        const only=comments.data[0];
+        need(comments.data.length===1&&only?.id===D05_DIAGNOSTIC.id&&
+          only?.user?.login===OWNER&&only.user.id===OWNER_ID&&
+          typeof only.body==='string'&&
+          createHash('sha256').update(only.body,'utf8').digest('hex')===
+            D05_DIAGNOSTIC.bodySha256,
+          'C_996_ORIGINAL_JOBS_UNRECOGNIZED_DIAGNOSTIC_COMMENT');
+      }else need(comments.data.length===0,
+        'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
       rows.push(Object.freeze({issueNumber:number,requestId,
         nextAction:'OWNER_REPLAN_REVIEW_REQUIRED',
         state:'open',resultVerified:false,
+        commentEvidence:diagnostic?'PINNED_OWNER_DIAGNOSTIC_NOT_RECEIPT':'NO_COMMENTS',
         issueUpdatedAt:i.updated_at??null}));
     }
     return rows;
