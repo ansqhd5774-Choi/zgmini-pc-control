@@ -43,3 +43,9 @@ jobs:
           if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" (echo C996_NAMESPACE_TEST_RUNNER_STOP & exit /b 13)
           if exist "E:\ZGmini" (echo C996_NAMESPACE_TEST_ORIGINAL_ROOT_FORBIDDEN & exit /b 14)
           node --test --test-name-pattern="native TEMP fixture proves sibling insertion" tests/controller-996-windows-handle-bound-archive.test.mjs
+
+      - name: C996 offline signed path to volume-relative review (no OS writes)
+        run: |
+          if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" (echo C996_OFFLINE_REVIEW_RUNNER_STOP & exit /b 15)
+          if exist "E:\ZGmini" (echo C996_OFFLINE_REVIEW_ORIGINAL_ROOT_FORBIDDEN & exit /b 16)
+          node --test tests/controller-996-offline-recovery-method.test.mjs
