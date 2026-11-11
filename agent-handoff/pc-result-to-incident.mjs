@@ -114,6 +114,30 @@ const textMatches=(txt,key,value)=>typeof txt==='string'&&
   txt.split(/\r?\n/).filter(x=>x.startsWith(`${key}=`)).length===1&&
   txt.split(/\r?\n/).includes(`${key}=${value}`);
 
+// A PC failure becomes a repair Incident only after both published artifacts
+// agree on its identity and failure. Keep this separate from the BLOCKED
+// resource-wait no-mutation proof below.
+const FAILURE_PAIR_FIELDS = Object.freeze([
+  'schema', 'jobId', 'requestId', 'chatId', 'seat', 'controlRepository',
+  'controlSourceSha', 'sourceRepository', 'sourceBranch', 'requestedSourceSha',
+  'operation', 'status', 'code', 'lastPass', 'firstFail', 'finishedAt'
+]);
+
+export function verifyPcFailureResultPair({report, resultTxt}) {
+  if (resultTxt === null) return Object.freeze({state: 'EVIDENCE_PAIR_MISSING'});
+  if (typeof resultTxt !== 'string' || !resultTxt.length)
+    stop('FAILURE_RESULT_TEXT_INVALID');
+  if (!report || !SUPPORTED_FAILURES.has(report.status))
+    stop('FAILURE_RESULT_STATUS_INVALID');
+  for (const key of FAILURE_PAIR_FIELDS) {
+    const value = report[key];
+    if (!['string', 'number'].includes(typeof value) ||
+        !textMatches(resultTxt, key, String(value)))
+      stop('FAILURE_RESULT_PAIR_MISMATCH_STOP');
+  }
+  return Object.freeze({state: 'RESULT_PAIR_VERIFIED'});
+}
+
 /** Called only after the producer has read BOTH immutable files from GitHub. */
 export function preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt}){
   // Reuse the existing strict owner/report identity validator. It must find

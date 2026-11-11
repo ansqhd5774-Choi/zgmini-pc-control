@@ -27,12 +27,14 @@ const report = (status = 'FAIL') => ({schema: 'ZGMINI_PC_RESULT_V1',
   lastPass: 'SOURCE_CHECKED', firstFail: 'RUNTIME_IMPORT', finishedAt: '2026-11-08T23:00:00Z'});
 const comments = () => [{user: {login: bot}, body: `<!-- zgmini-pc-result:${runId}:${attempt}:4 -->\nverified`,
   issue_url: `https://api.github.com/repos/${repo}/issues/1009`}];
+const textReport = r => Object.entries(r).map(([key, value]) => `${key}=${value}`).join('\r\n') + '\r\n';
 const fixture = (status = 'FAIL') => {
   const issues = [];
   let posts = 0;
   let routeCalls = 0;
   const io = {
     readReport: async p => p.endsWith('seat-4.json') ? report(status) : null,
+    readReportText: async p => p.endsWith('seat-4.txt') ? textReport(report(status)) : null,
     readComments: async () => comments(),
     readIssue: async n => n === 1009 ? issue() : issues.find(x => x.number === n),
     listHandoffs: async () => ({repository: repo, complete: true, issues: structuredClone(issues)}),
@@ -68,6 +70,48 @@ test('completed six-seat run emits exactly one sanitized handoff for one confirm
   assert.equal(f.routeCalls, 2);
   assert.equal(repeated.newIssues, 0);
   assert.equal(f.posts, 1);
+});
+
+test('PC failure without the immutable TXT pair stays pending and never posts', async () => {
+  const f = fixture();
+  f.io.readReportText = async () => null;
+  const outcome = await processCompletedPcJob(event(), f.io);
+  assert.equal(outcome.state, 'PARTIAL_FAILURE_EVIDENCE_PENDING');
+  assert.equal(outcome.failureProofPending, 1);
+  assert.equal(outcome.confirmedFailures, 0);
+  assert.equal(f.posts, 0);
+  assert.equal(f.routeCalls, 0);
+});
+
+test('PC failure without a configured TXT reader stops before posting', async () => {
+  const f = fixture();
+  delete f.io.readReportText;
+  await assert.rejects(processCompletedPcJob(event(), f.io), /FAILURE_TEXT_READER_MISSING/);
+  assert.equal(f.posts, 0);
+});
+
+test('mismatched and duplicate TXT failure fields stop before incident creation', async () => {
+  for (const modify of [
+    txt => txt.replace('status=FAIL', 'status=PASS'),
+    txt => txt.replace('requestId=' + request().requestId, 'requestId=pc-other-id'),
+    txt => txt.replace('firstFail=RUNTIME_IMPORT', 'firstFail=OTHER'),
+    txt => txt + 'code=CONTROLLER_IMPORT_FAILED\r\n'
+  ]) {
+    const f = fixture();
+    f.io.readReportText = async () => modify(textReport(report()));
+    await assert.rejects(processCompletedPcJob(event(), f.io),
+      /FAILURE_RESULT_PAIR_MISMATCH_STOP/);
+    assert.equal(f.posts, 0);
+    assert.equal(f.routeCalls, 0);
+  }
+});
+
+test('RUNTIME_FAILED with a verified JSON/TXT pair routes once', async () => {
+  const f = fixture('RUNTIME_FAILED');
+  const outcome = await processCompletedPcJob(event(), f.io);
+  assert.equal(outcome.newIssues, 1);
+  assert.equal(outcome.routesRecorded, 1);
+  assert.equal(outcome.failureProofPending, 0);
 });
 
 test('STATE_UNKNOWN, BLOCKED and PASS are non-eligible and never generate Issues', async () => {

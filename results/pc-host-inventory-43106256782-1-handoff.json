@@ -1,0 +1,95 @@
+{
+  "schema": "ZGMINI_PC_HOST_INVENTORY_RESULT_V1",
+  "requestId": "b729d658-90f4-4219-9970-88b16a0f391c",
+  "issueNumber": 1259,
+  "runId": "43106256782",
+  "attempt": "1",
+  "role": "handoff",
+  "host": "DESKTOP-N62L0NG",
+  "runnerName": "zgmini-handoff-ci-spare-01",
+  "expectedLabel": "zgmini-handoff-ci-isolated",
+  "identitySource": "NODE_OS_HOSTNAME",
+  "computernameEnvPresent": true,
+  "computernameEnvMatchesOs": true,
+  "status": "PASS",
+  "code": "READONLY_HOST_INVENTORY_COLLECTED",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "sqliteOpened": false,
+  "d1Writes": 0,
+  "automaticRetries": 0,
+  "os": {
+    "platform": "win32",
+    "version": "Windows 10 Home",
+    "release": "10.0.19045",
+    "arch": "x64"
+  },
+  "cpu": {
+    "model": "Intel(R) Core(TM) i5-7300HQ CPU @ 2.50GHz",
+    "logicalCount": 4
+  },
+  "memory": {
+    "totalMiB": 16301,
+    "freeMiB": 5183
+  },
+  "disks": [
+    {
+      "drive": "C:",
+      "present": true,
+      "capacityMiB": 243306,
+      "freeMiB": 53783
+    },
+    {
+      "drive": "E:",
+      "present": true,
+      "capacityMiB": 198690,
+      "freeMiB": 173364
+    }
+  ],
+  "node": {
+    "version": "v22.23.4",
+    "arch": "x64",
+    "executableAtApprovedOperatingPath": false
+  },
+  "installedLayout": {
+    "zgminiRoot": false,
+    "operatingNode": false,
+    "controller": false,
+    "controlCheckout": false
+  },
+  "winpeVmPrograms": {
+    "scope": "STANDARD_C_PATHS_ONLY",
+    "verdict": "PRESENCE_ONLY_NOT_BOOT_OR_HARDWARE_PROOF",
+    "pathCount": 6,
+    "programs": [
+      {
+        "id": "VIRTUALBOX",
+        "status": "ABSENT_AT_FIXED_PATH"
+      },
+      {
+        "id": "QEMU",
+        "status": "ABSENT_AT_FIXED_PATH"
+      },
+      {
+        "id": "VMWARE_WORKSTATION_X64",
+        "status": "ABSENT_AT_FIXED_PATH"
+      },
+      {
+        "id": "VMWARE_WORKSTATION_X86",
+        "status": "ABSENT_AT_FIXED_PATH"
+      },
+      {
+        "id": "VMWARE_PLAYER",
+        "status": "ABSENT_AT_FIXED_PATH"
+      },
+      {
+        "id": "HYPERV_CONNECT",
+        "status": "ABSENT_AT_FIXED_PATH"
+      }
+    ],
+    "unlistedOrPortableInstalls": "NOT_CHECKED",
+    "virtualizationCpuFirmware": "NOT_CHECKED",
+    "runtimeBoot": "NOT_EXECUTED",
+    "operationalWrites": 0
+  }
+}

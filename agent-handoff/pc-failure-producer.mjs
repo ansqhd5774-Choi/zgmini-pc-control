@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {preparePcFailureHandoff,preparePcSharedResourceWait,
-  reconcileHandoffInventory} from './pc-result-to-incident.mjs';
+  reconcileHandoffInventory, verifyPcFailureResultPair} from './pc-result-to-incident.mjs';
 import {persistResourceWait} from './resource-wait-ledger.mjs';
 import {routeVerifiedBotIssue} from './bot-direct-route.mjs';
 
@@ -72,7 +72,7 @@ export async function processCompletedPcJob(event, {
   const result = {state: 'SCAN_COMPLETED', runId: run.runId, attempt: run.attempt,
     reportsObserved: 0, confirmedFailures: 0, newIssues: 0, reusedIssues: 0,
     routesRecorded: 0, routesReused: 0,
-    waitsRecorded:0,waitsReused:0,waitProofPending:0,
+    waitsRecorded:0,waitsReused:0,waitProofPending:0,failureProofPending:0,
     missingReceipts: 0, pcOperationalWrites: 0, automaticPcRetries: 0};
   const confirmRoute = async (prepared, number) => {
     if (typeof routeHandoff !== 'function') stop('ROUTE_NOT_CONFIGURED');
@@ -120,6 +120,12 @@ export async function processCompletedPcJob(event, {
     // authenticated original request agrees with the published result.
     if (prepared.state === 'NOT_ELIGIBLE') continue;
     if (prepared.state !== 'READY_TO_ENQUEUE') stop('STATE_DRIFT');
+    if (typeof readReportText !== 'function') stop('FAILURE_TEXT_READER_MISSING');
+    const resultTxt = await readReportText(resultPath.replace(/\.json$/, '.txt'));
+    const pair = verifyPcFailureResultPair({report, resultTxt});
+    if (pair.state === 'EVIDENCE_PAIR_MISSING') {
+      result.failureProofPending++; continue;
+    }
     result.confirmedFailures++;
     const inventory = await listHandoffs();
     const decision = reconcileHandoffInventory(prepared, inventory);
@@ -149,6 +155,7 @@ export async function processCompletedPcJob(event, {
   }
   if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
   else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
+  else if (result.failureProofPending) result.state = 'PARTIAL_FAILURE_EVIDENCE_PENDING';
   else if (result.waitProofPending) result.state = 'PARTIAL_WAIT_EVIDENCE_PENDING';
   else if (result.waitsRecorded || result.waitsReused)
     result.state = 'WAITING_SHARED_RESOURCE_RECORDED';
@@ -232,7 +239,8 @@ export async function main(env = process.env) {
     readResourceWaitComment:id=>request(`issues/comments/${id}`)
   });
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (['PARTIAL_RECEIPT_PENDING','PARTIAL_WAIT_EVIDENCE_PENDING',
+  if (['PARTIAL_RECEIPT_PENDING','PARTIAL_FAILURE_EVIDENCE_PENDING',
+    'PARTIAL_WAIT_EVIDENCE_PENDING',
     'NO_PUBLISHED_RESULTS'].includes(report.state)) process.exitCode = 1;
   return report;
 }

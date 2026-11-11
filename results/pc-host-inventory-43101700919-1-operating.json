@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_PC_HOST_INVENTORY_RESULT_V1",
+  "requestId": "4c1df5b5-4e61-42d8-aefc-3f9af4d6af48",
+  "issueNumber": 1247,
+  "runId": "43101700919",
+  "attempt": "1",
+  "role": "operating",
+  "host": "PC",
+  "runnerName": "zgmini-pc-05",
+  "expectedLabel": "zgmini-pc-control",
+  "status": "BLOCKED",
+  "code": "HOST_IDENTITY_UNVERIFIED",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "sqliteOpened": false,
+  "d1Writes": 0,
+  "automaticRetries": 0
+}

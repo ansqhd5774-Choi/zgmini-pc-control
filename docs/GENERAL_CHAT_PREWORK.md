@@ -1,10 +1,24 @@
 # 일반챗 작업 전 공통 지침
 
-2026-11-08 R2 Writer B 경합 보완. 상세 정본: docs/PC_AUTOMATION_STANDARD.md.
+2026-11-08 R2 Writer B 경합 보완 / **2026-11-12 두 PC 실측·신규 대화 실행 표준 추가**. 상세 정본: [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md).
 
 현재 업무·브랜치·기존 승인·완료 증거를 보존하고 마지막 유효 완료 지점부터 이어서 수행하라. **이 지침을 받은 일반챗은 자기 원래 기능의 다음 필수 실행을 즉시 진행하라.**
 
+## 신규 일반챗 필수 시작·두 PC 구분 (2026-11-12)
+
+1. GitHub `ansqhd5774-Choi/zgmini-pc-control` 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)를 업무 관련 범위에서 **실제 조회**하고 기존 기능의 마지막 유효 단계부터 수행하라. 프로젝트/대화 지침이 자동 갱신됐다고 가정하지 마라.
+2. 실제 PC를 작업별로 구분하라. **운영 PC = 호스트 `PC`, Windows 11, Runner `zgmini-pc-01`~`06`, label `zgmini-pc-control`, `E:\ZGmini` Controller/고정 Node**. **공통 대기열 PC = `DESKTOP-N62L0NG`, Windows 10, Runner `zgmini-handoff-ci-spare-01`, label `zgmini-handoff-ci-isolated`, pinned Node 22 및 GitHub 인계·CI 전담**. 두 PC의 절대 경로·설치·권한·프로세스 관리 구조가 같다고 가정하지 마라.
+3. 작업 요청 전에 기존 성공된 **Issue → Actions → 해당 Runner → 승인된 실행기 → JSON/TXT·원본 Issue 결과**를 확인해 재사용하라. 운영 A는 기존 pc-job, B는 독립 승인 Writer/유지보수기, 공통 장애 인계는 기존 격리 Workflow를 사용한다. 새 ZIP/CMD·Runner·예약을 임의 제작하지 마라. 기존 승인된 수동 CMD 경로를 없애거나 우회 재설계하지도 마라.
+4. `runId`/`attempt`/Runner/host/실제 status·code 및 **원격 JSON/TXT 2/2**를 구분 확인하라. `queued`를 Offline으로, CI PASS를 실PC 완료로, GitHub 댓글을 다른 일반챗 자동 수신으로 취급하지 마라. 오류·STATE_UNKNOWN은 기존 원본 증거부터 확인하며 자동 재실행 0회다.
+5. 보호된 Core·Writer·DB·Task·승인 산식·D1/API/UI·#996 C급 NO-GO는 별도 승인·실제 검증 없이 변경하지 마라. 공통 인계는 원담당 기능 완료를 대신하지 않는다. 예약 자동 갱신 검증은 기능별 실제 수집·계산·저장·게시·UI 완료 이후의 후속이다. 담당 업무 전체 진행률·새 증거·미해결 항목·다음 필수 실행만 보고하라.
+
+**실측 근거:** [운영 PC JSON](pc-profiles/operating-PC.json), [대기열 PC JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json). 2026-11-12 관측 PID·RAM·Listener 수는 시점성 데이터이며 ZGMINI Runner 구성(6/1)을 전체 Listener 수(7/5)와 혼동하지 마라.
+
+---
+
+
 1. 제어 저장소 ansqhd5774-Choi/zgmini-pc-control main의 AGENTS.md·GENERAL_CHAT_START.md·공통 정본에서 필요한 내용을 읽고 현재 업무의 다음 실행으로 진행하라. 지침 확인 보고로 끝내지 마라.
+   - **격리 Writer B 자동 인계(2026-11-10):** 정규 Writer B의 인증된 수리 가능 실패만 별도 Windows CI Runner가 `agent-handoff`로 등록하고 단일 중앙 ChatGPT가 처리한 뒤 원본 GitHub Issue에 결과를 기록한다. `WAIT_RECORDED`·성공은 수리 사건이 아니며, Issue 댓글은 다른 일반챗의 자동 수신/재개가 아니다. 실제 자기 대화 재개 시 원본 Issue를 확인하고 기능 작업을 계속하라. 새 격리 경로의 자연 수리 실패 전체 왕복은 후속 미관측이며 전역 Gate가 아니다. [중앙 계약](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md)과 [PC 공통 정본](PC_AUTOMATION_STANDARD.md)을 따른다.
 2. 다음 실행에 필요한 입력·설치 모듈·경로·승인만 확인하고 기존 공통 등록기·수집/계산/게시기·adapter를 재사용하라. 정상 업무마다 전체 Controller 상태·과거 복구·전체 테스트를 반복 점검하지 마라.
 3. 기존 성공 증거는 내부 진행 전제로 재사용하라. 과거 Controller 복구·설치 재확인을 이번 업무의 신규 성과나 핵심 진전으로 보고하지 마라. 해당 상태가 실제로 바뀌거나 현재 실행을 막을 때만 필요한 범위로 보고하라.
    - 관련 성공 실행물은 [SUCCESS_EVIDENCE_REUSE.md](SUCCESS_EVIDENCE_REUSE.md)에서 필요한 유형만 조회하라. 기존 승인 manifest·고유 Windows Run·원격 JSON/TXT·검증 단계가 연결된 구조를 재사용하고, 과거 before SHA/승인/운영 source를 새 작업에 복사하지 마라. 재사용 가능한 새 공통 패턴이 실증되면 기존 결과 링크를 색인하되, 성공 보고만 위한 신규 Gate·예약·중복 파일은 만들지 마라.

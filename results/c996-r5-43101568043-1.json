@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_C996_R5_GITHUB_RESULT_V1",
+  "requestId": "0c26f9b8-70b6-4aeb-a073-6dfa8c1e91c7",
+  "issueNumber": 1246,
+  "runId": "43101568043",
+  "attempt": "1",
+  "host": "DESKTOP-N62L0NG",
+  "code": "EPERM",
+  "status": "STOPPED",
+  "logCount": 0,
+  "pinCount": 0,
+  "inspectStep": "PRE_INPUT_HASH",
+  "inspectId": "FINAL_WIM",
+  "sourceClassification": "IMAGE_METADATA_DRIFT_CONFIRMED",
+  "rootCauseStage": "UNKNOWN",
+  "isoOnlyPassPreserved": true,
+  "operationalWrites": 0,
+  "automaticRetries": 0,
+  "rawLogIncluded": false,
+  "pins": [],
+  "logs": []
+}

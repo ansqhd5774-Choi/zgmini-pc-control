@@ -1,0 +1,14 @@
+schema=ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1
+requestId=45f9ea5b-f886-4c4c-9d41-7b58f2e04d9a
+role=operating
+runId=43105674675
+attempt=1
+host=PC
+runner=zgmini-pc-06
+status=PASS
+code=PROCESS_INVENTORY_COLLECTED
+observedAtUtc=2026-11-11T21:45:02.899Z
+totalProcessCount=431
+selectedProcessCount=82
+operationalWrites=0
+automaticRetries=0

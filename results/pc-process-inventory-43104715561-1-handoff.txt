@@ -1,0 +1,14 @@
+schema=ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1
+requestId=a7b62358-e941-4ed7-9de3-0b4e79af252c
+role=handoff
+runId=43104715561
+attempt=1
+host=DESKTOP-N62L0NG
+runner=zgmini-handoff-ci-spare-01
+status=PASS
+code=PROCESS_INVENTORY_COLLECTED
+observedAtUtc=2026-11-11T21:38:01.842Z
+totalProcessCount=275
+selectedProcessCount=56
+operationalWrites=0
+automaticRetries=0

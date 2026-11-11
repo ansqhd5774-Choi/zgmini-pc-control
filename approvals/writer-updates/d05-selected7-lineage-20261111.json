@@ -1,0 +1,122 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/dashboard-score-daily-r1",
+  "candidateSourceSha": "55b83b8394244fb8d510dadedcca3aaafaa57a75",
+  "baseHead": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+  "baseConfigSourceSha": "de81749f83c086f5cb0cad7ed1d5cc958de19280",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "ebd49bfb8e6f946286eeff771144baa972d422e3753479bd6d513f49f1e51eec",
+      "afterSha256": "fdc641e3c6585a1e9690b0cc4a9cbe10d8bbb025154bfc40523b7c05b56e80ed"
+    },
+    {
+      "path": "scripts/pc-writer/market.mjs",
+      "change": "M",
+      "beforeSha256": "76575288e19228559b7edb149524cb1bc8482374bcdb50f09b9e6ac1c9ca5a99",
+      "afterSha256": "192b4c3aa2e3237ffe73200d0c713e20d7f89ced53e3fb1d156fb857de6925fd"
+    },
+    {
+      "path": "worker/market-input-validation.mjs",
+      "change": "M",
+      "beforeSha256": "ecededc78c8510881913ca4f50d7217f902a44c18ff457e2705520566b96aaf3",
+      "afterSha256": "f029c8bd370dd8f40b0e203d33553904c1765277b89161e05f1ac694112095d6"
+    },
+    {
+      "path": "worker/candidate-market-operational-store.mjs",
+      "change": "M",
+      "beforeSha256": "05cbaeacdccf397383944affb6112170fc9d9b910b2619292f363174ce60b912",
+      "afterSha256": "6b57a121709e9725109aa6c3c502624b63eb32b5b117fd67aad4f7f57a17b28e"
+    },
+    {
+      "path": "lib/score-history/market-batch-provenance-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "7a2ae14ee841d5305edeb53cefe0e6e8d83255457bc290e2c22dfc532bbacdc2"
+    },
+    {
+      "path": "lib/score-history/market-batch-provenance-read-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "1132572c528d772a92dc1f2732660898efe808fec2011aba5418b2deb9f21a08"
+    },
+    {
+      "path": "lib/score-history/market-input-observation-shadow-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a57b724904110de5ce97de1eea88e327bb14d170aaa4d572f7f7564039d3283e"
+    },
+    {
+      "path": "lib/score-history/composite-archive-lineage-link-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "d0723d49166cc32e44e67953f3c2cea400edb3b9ac9f1468615699d7fe2586d5"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-event-contract-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "d379412bb5365a639e57b63614bd83d3b5bef71b8ca86a861624c57a281c865e"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-after-archive-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "d865e471523fb3edc4edd4e7271b786f1be675bdf11192129a28577fb7d956b5"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-event-append-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c7fc2263c5c04de222aeaffaa3144681a9774cd012dd540793c0917d3d0404ce"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-local-record-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "8a862d2ece6a56d9757ac01868bd8f54a8e691f2ed27bf868a722b1e814e7ac9"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-wsh-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "core-wsh-inner-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}

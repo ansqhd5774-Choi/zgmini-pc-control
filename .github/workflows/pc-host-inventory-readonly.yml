@@ -1,0 +1,84 @@
+name: ZGMINI Two-PC Host Inventory Readonly
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tools/pc-host-inventory-readonly.mjs'
+      - 'tests/pc-host-inventory-readonly.test.mjs'
+      - '.github/workflows/pc-host-inventory-readonly.yml'
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: pc-host-inventory-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  inventory-source-tests:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == 'ansqhd5774-Choi/zgmini-pc-control'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify fixed inventory admission and host isolation
+        run: node --test tests/pc-host-inventory-readonly.test.mjs
+  operating-pc-inventory:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-host-inventory-readonly' &&
+      contains(github.event.issue.body, '"role":"operating"') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Collect operating PC fixed read-only host inventory
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" tools/pc-host-inventory-readonly.mjs operating'
+  handoff-pc-inventory:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-host-inventory-readonly' &&
+      contains(github.event.issue.body, '"role":"handoff"') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Collect isolated handoff PC fixed read-only host inventory
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/pc-host-inventory-readonly.mjs handoff
