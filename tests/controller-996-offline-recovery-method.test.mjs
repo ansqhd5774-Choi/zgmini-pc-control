@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {plan996OfflineRecovery,plan996TwoBootRecovery,
   plan996SingleBootRecovery,simulate996TwoBootRecovery,
-  simulate996SingleBootRecovery}
+  simulate996SingleBootRecovery,review996WinpeVolumeRelativeMoves}
   from '../tools/controller-996-windows-archive-adapter.mjs';
 
 const continuationId='70a4c347-25ea-4fc6-83d2-c0c670115249';
@@ -358,4 +358,71 @@ test('no caller-supplied approval flags become authenticated evidence in either 
       assert.equal(result.installLeaseReleaseAuthorized,false);
     }
   }
+});
+
+
+const reviewVolume=changes=>review996WinpeVolumeRelativeMoves({
+  continuationId,
+  volumeGuid:'\\\\?\\Volume{33333333-3333-4333-8333-333333333333}\\',
+  volumeSerial:'1'.repeat(16),
+  moves:plan996SingleBootRecovery(continuationId).phases[1].moves
+    .map((step,i)=>({name:step.name,source:step.source,
+      destination:step.destination,sourceFileId:String(i+1).repeat(32),
+      sourceVolumeSerial:'1'.repeat(16)})),
+  ...changes,
+});
+
+test('WinPE source-only review derives signed E: identifiers into volume-relative lease names',()=>{
+  const reviewed=reviewVolume({});
+  assert.equal(reviewed.status,'SOURCE_ONLY_RELATIVE_PATHS_REVIEWED');
+  assert.deepEqual(reviewed.paths.map(x=>x.name),['oldC','continuation','install']);
+  assert.ok(reviewed.paths.every(x=>
+    x.sourceRelative.startsWith('ZGmini\\automation\\pc-maintenance\\leases\\')&&
+    x.destinationRelative.startsWith('ZGmini\\automation\\pc-maintenance\\leases\\')&&
+    !x.sourceRelative.includes(':')&&!x.destinationRelative.includes(':')));
+  for(const field of ['volumeIdentityAuthenticated','ownerApprovalVerified',
+    'executionAuthorized','productionExecutable','automaticRetry'])
+    assert.equal(reviewed[field],false);
+  assert.equal(reviewed.actualWinpeDriveLetter,null);
+  assert.equal(reviewed.nativeVolumeHandle,null);
+  assert.equal(reviewed.operationalWrites,0);
+});
+
+test('WinPE review rejects malformed volume GUIDs and unpinned device/serial changes',()=>{
+  for(const volumeGuid of [
+    'E:\\','\\\\?\\Volume{'+ 'a'.repeat(36) +'}\\',
+    '\\\\?\\Volume{33333333-3333-4333-8333-333333333333}',
+    '\\\\?\\Volume{33333333-3333-4333-8333-333333333333}\\extra\\',
+  ])assert.equal(reviewVolume({volumeGuid}).code,
+    'C996_WINPE_VOLUME_BINDING_INVALID');
+  for(const volumeSerial of ['','1'.repeat(15),'Z'.repeat(16)])
+    assert.equal(reviewVolume({volumeSerial}).code,
+      'C996_WINPE_VOLUME_BINDING_INVALID');
+});
+
+test('WinPE review refuses unsigned path substitution, reordered moves and changed file identity',()=>{
+  const good=reviewVolume({});
+  for(const change of [
+    moves=>moves.reverse(),
+    moves=>{moves[0].source=moves[0].source.replace('E:', 'C:');},
+    moves=>{moves[0].destination+='\\other';},
+    moves=>{moves[1].sourceVolumeSerial='0'.repeat(16);},
+    moves=>{moves[2].sourceFileId='0'.repeat(31);},
+    moves=>{moves[2].extra='unapproved';},
+  ]){
+    const moves=good.paths.map((x,i)=>({
+      name:x.name,
+      source:plan996SingleBootRecovery(continuationId).phases[1].moves[i].source,
+      destination:plan996SingleBootRecovery(continuationId).phases[1].moves[i].destination,
+      sourceFileId:x.sourceFileId,sourceVolumeSerial:x.sourceVolumeSerial,
+    }));
+    change(moves);
+    const result=reviewVolume({moves});
+    assert.equal(result.code,'C996_WINPE_MOVE_IDENTITY_OR_PATH_DRIFT');
+    assert.equal(result.executionAuthorized,false);
+    assert.equal(result.operationalWrites,0);
+  }
+  assert.equal(reviewVolume({moves:[]}).code,'C996_WINPE_MOVE_INVENTORY_INVALID');
+  assert.equal(reviewVolume({continuationId:'wrong'}).code,'C996_WINPE_CONTINUATION_INVALID');
+  assert.equal(reviewVolume({approved:true,executionAuthorized:true}).executionAuthorized,false);
 });
