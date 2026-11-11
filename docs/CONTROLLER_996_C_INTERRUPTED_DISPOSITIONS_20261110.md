@@ -1,5 +1,15 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 — 기존 PC Runner 인계 기준선 통합(읽기 전용·비운영)
+
+- 기존 설치 `gh.exe --method GET` Reader와 기존 ZGMINI PC의 `pc-control/runners/01..06/.runner` 로컬 Reader를 `tools/controller-996-runner-admission-bridge.mjs`에서 연결한다. 물리 PC 호칭은 **기존 ZGMINI PC** 및 **공통 대기열 PC** 2개만 쓴다.
+- 인증된 GitHub repo의 Workflow active 상태, `zgmini-pc-control` 라벨의 정확한 6개 Runner(ID·이름·Windows/X64 라벨·상태·busy), 로컬 등록 6개의 ID·이름, Watchdog 설치 해시, PAUSE·DRAIN 존재, workflow pc-job queued/in_progress/waiting 건수를 비교한다. GH 조회는 고정 경로 GET만 사용한다.
+- Collector는 GH/로컬 전체 조회를 두 번 시행하고 정렬한 Runner 식별·상태·라벨·Job 건수·로컬 등록·표식이 변경되면 `C996_ADMISSION_BRIDGE_SNAPSHOT_DRIFT`로 fail-closed 한다. 조회 실패·누락·불일치도 fail-closed 한다. 두 번의 GET도 원자적 스냅샷을 보장하지 않는다.
+- 결과는 `ZGMINI_996_RUNNER_ADMISSION_BASELINE_V1`, `BASELINE_OBSERVED_READ_ONLY`, `stableConsecutiveReads:2`, `admissionEligible:false`, `executionAuthorized:false`다. Runner 프로세스 종료·Owner 최종 C 승인·Workflow 원본 SHA 독립 인증·개별 #996 원본 Job TTL·4개 원본 disposition은 증명하지 않는다. PAUSE/DRAIN 존재는 실행 중 프로세스 중단과 동일하지 않다.
+- 테스트: 기존 65건 + 이번 8건 = **73/73 통과**(Linux TEMP 합성·코드 회귀). 실제 기존 ZGMINI PC 운영 Collector 호출, 실제 WinPE, 운영 중단, E: 원본 및 Claim·Lease 변경은 **0건**. 이 합성 회귀는 실증 대체가 아니다.
+- 다음 필수 행동: 설치된 읽기 전용 Reader의 실제 결과를 승인된 A급/고정 GET 경로로 회수·대조하고, 그 이후에도 C급 복구는 최종 Owner 승인 전까지 NO-GO를 유지한다. 운영 복구 진행률 **80% 유지**.
+
+
 ## 물리 PC 명칭 정본 — 사용자 확정 (2026-11-11)
 
 - 실제 물리 컴퓨터는 **정확히 2대**이며 공식 호칭은 **기존 ZGMINI PC**와 **공통 대기열 PC**다. 이 명칭 외에 '기본 PC', '전용 PC', '격리 PC', '복구 PC', '제3 호스트'를 신규 장비명으로 만들지 않는다.
