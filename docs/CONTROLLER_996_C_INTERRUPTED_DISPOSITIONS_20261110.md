@@ -8,6 +8,14 @@
 - 현재 #996 WinPE 복구 계획은 **기존 ZGMINI PC를 기존 Windows 대신 WinPE로 재부팅**하는 후보이며, PC 추가 구매·세 번째 PC·E:를 별도 새 호스트로 옮기는 계획이 아니다. 운영 중단·원본 E: 변경은 정확한 최종 승인 전까지 금지한다.
 - 아래 과거 증거에 포함된 '원본 PC', '별도 Windows', '새 PC', '호스트' 표현은 당시 기록을 보존한 것이며 현재 장비 수 또는 공식 명칭을 재정의하지 않는다. 향후 실행 계획·보고·지시문에는 이 두 공식 PC 명칭만 사용한다.
 
+## 2026-11-11 기존 GitHub 대기 활용 입구 검토 — Source 전용, 운영 80% 유지
+
+- `.github/workflows/pc-job.yml`은 Owner의 `pc-job` Issue `opened`를 `[self-hosted,Windows,X64,zgmini-pc-control]` Runner로 전달한다. `controller/engine.mjs`의 실행 Lease는 기존 `controller-install`만으로 작업 접수를 막지 않는다. **기존 Workflow 비활성화/재활성화는 해당 창의 opened 이벤트를 자동 재생하지 않으므로 신규 복구 대기열 없이 그대로 사용해서는 안 된다.**
+- 기존 `tools/update.mjs`의 승인된 `pauseIntake/waitForDrain/resumeIntake/reconcileBacklog` 경로는 참고 가능한 공통 구현이나, #996 구 원본 Issue 4건은 자동 재발행 금지이고 일반 Backlog 검사는 원본 7필드만 허용하여 승인된 preimage 9필드 요청을 거부할 수 있다. 해당 도구를 C 권한으로 실행하거나 기존 Backlog 원장을 재작성하지 않았다.
+- **더 작은 설계 후보:** 정확한 Owner 승인·실물 진단 후 **기존 ZGMINI PC**의 해당 Runner를 작업 drain 뒤 Offline으로 유지하되 GitHub Workflow는 Active로 보존한다. 그러면 새 pc-job Actions 실행은 기존 GitHub 대기 기능을 사용할 수 있지만, GitHub 공식 self-hosted 한도 **24시간을 초과하면 실패**한다. **공통 대기열 PC** 등 다른 PC에 동일 매칭 Runner가 있으면 안전 경로가 아니므로 STOP. 기존 Windows 복귀 후 원본·Claim·Lease·Workflow·Job 영수증 최종 재조회 완료 전에 Supervisor/Runner가 자동 시작해선 안 된다.
+- Source-only `tools/controller-996-offline-admission-review.mjs`는 현재 정확한 Workflow 원문 SHA256·작업 라벨·Runner 전수 목록·다른 PC 매칭·Drain·오프라인·자동 재시작·24시간·복귀 전 최종 확인 조건을 검토한다. 입력된 `offline=true` 및 `verified=true`는 **인증된 OS/GitHub 증거가 아니며** 결과는 무조건 `executionAuthorized=false`, `evidenceAuthenticated=false`이다. 승인된 Windows Runner 중단/재개 실행기와 현장 증명은 아직 미구현.
+- 신규 입구 테스트 11건 + 기존 복구 37건 = 관련 회귀 **48/48 PASS**. Workflow 수정 0, 신규 대기열 0, 원본 PC 효과 0, 현재 기존 ZGMINI PC·공통 대기열 PC 두 대만 유지, PR #1222 Draft·C NO-GO·운영 #996 **4/5=80%→80%**. 다음 필수 개발은 기존 설치된 Runner의 실제 label/자동 시작 경로와 서명된 부팅 전후 핸드오프를 정확한 C 실행 계약에 연결하는 일이며, 운영 중단·원본 변경은 최종 승인 전 금지.
+
 ## 2026-11-11 현재 C 실행기 충돌 및 WinPE 1회 후보 — C NO-GO
 
 - **2회 WinPE 안의 현재 실행 적합성 = BLOCKED.** `controller-996-c-native-owner-operator.mjs`는 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`로 무조건 중단하며, `controller-996-continuation-gate.mjs`는 원래 위치의 구 C Claim을 요구한다. 기존 2회 안은 WinPE 1차에서 이를 보관해 다음 Windows 단계 진입 조건을 깨뜨린다. `ENABLE_ONCE`/`CLOSE_ONCE`처럼 무조건 Workflow/Backlog를 수정하는 계획도 현재 Owner 계약의 쓰기 0건과 충돌한다. 해당 문구를 GET 상태 재조회·미완료 시 STOP으로 교정했다.
