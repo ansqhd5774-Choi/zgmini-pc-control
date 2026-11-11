@@ -377,3 +377,14 @@
 - **실행 게이트:** 해당 Runner가 **실제로 DESKTOP-N62L0NG에 등록됐다는 증거는 아직 없음**. PR #1237는 main 미병합, 이번 PR CI [Run #43097205808](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43097205808)는 확인 시 `queued`·판정 미확정. 이 단계에서 고유 A Issue를 만들면 main의 수신 workflow가 없어 접수되지 않을 수 있으므로 새 요청은 생성하지 않음. `main` 실제 배포와 Runner 호스트/실제 수행을 구분한다.
 - **완료 기준:** PR Source CI PASS, 호스트/label 실제 등록·접수 가능 상태 확인 → 새 유일 Issue 1개 제출 → 실제 Windows JSON/TXT 2/2 원격 재조회 → Commit/DISM 로그를 단계별 분석. 실행이 불가하면 `AUTOMATION_BLOCKED`로 보고하고 기존 CMD·동일 고유 요청을 무조건 재실행하지 않는다. C 운영 복구는 승인된 별도 정규 C 경로만 사용.
 - 현재 추가 실제 WIM/ISO/BCD 실행 0, 운영 PC/E:/USB/Runner/Workflow/Backlog/Claim/Lease 변경 0. 기존 `ISO_ONLY_PASS` 및 `IMAGE_METADATA_DRIFT_CONFIRMED`, root-cause `STAGE_UNKNOWN`, 공통 자동 인계 실증 4/5=80%, C NO-GO 유지.
+
+
+### 2026-11-12 고정 GitHub Issue 단회 요청 #1238 — CLI 없는 표준 자동 회수 등록
+
+- 이전 임시 ZIP/CMD 방식은 즉시 창이 닫히고 임의 TEMP 결과를 수동으로 찾아야 했으며 실제 자동 결과 전송 경로도 없어서 **사용 중지**. 기존 출력/실행의 결과는 `STATE_UNKNOWN`으로 보존하고 다시 실행하거나 삭제하지 않는다.
+- 기존 증거 재사용: 사용자가 지정·확인한 독립 `zgmini-handoff-ci-spare-01` / label `zgmini-handoff-ci-isolated`는 공통 대기열 PC `DESKTOP-N62L0NG`용이다. 이는 과거 호스트 지정 증거이며 **이번 현재 Runner 온라인·할당·실제 작업 성공 증거는 별도**다.
+- 신규 단회 GitHub용 source PR [#1237](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1237)을 **`main`에 squash 병합**: `7895604bee3de8e8d32ccfa65578a6799d6d5e28`. 등록 소스 `c996-r5-readonly/collector.mjs`, `github-runner.mjs`, `.github/workflows/pc-c996-r5-readonly.yml`, source 테스트 2개. source Node collector 11/11 PASS, 최신 직접 평가된 순수 JS 검증 35/35 PASS. **Windows 전체 CI** Run [#43098346998](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43098346998)은 마지막 조회에서 `queued`, job 0. 이는 테스트 통과도 Runtime 실패도 아니다.
+- 고정 Issue 이벤트는 **정확한 제목** `pc-c996-r5-readonly` 및 owner/private/body `ZGMINI_C996_R5_READONLY_REQUEST_V1`/`operation=c996-r5-commit-log-readonly`/`host=DESKTOP-N62L0NG`/고유 UUID를 동시에 검증하므로 새로운 label 등록이나 임의 `pc-job` CMD 주입을 요구하지 않는다. 기존 self-hosted isolated Runner만 실행 가능, 실제 host 불일치면 WIM 미접근 `BLOCKED`.
+- 원본 사용자 계정으로 생성된 [Issue #1238](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1238), requestId **`a66d9e6d-17dd-43cf-bedb-8f56a336cadf`** 단 1건 제출 및 정확한 schema/host/issue 사용자 readback 확인. **이 요청만 추적**, timeout·Runner offline에서 동일 요청 재생성/새 UUID 제출·임의 커맨드 우회 금지.
+- 실행 성공 시 결과는 main `results/c996-r5-<runId>-<attempt>.json/.txt` **2/2 GET 동일바이트 검증 후** Issue #1238 bot 결과 댓글이 생성돼야 한다. 콜렉터는 기존 ADK WIM·final WIM·ISO·BCD 2개 사전/사후 SHA 5/5와 기존 Commit 로그의 비민감 이벤트 수만 읽는다. 실측 첫 실패 코드/호스트/원본 SHA를 JSON/TXT로 재조회하고 그때만 발생 stage 범위를 좁힌다.
+- 현재 Issue #1238 **댓글 0개**, Runner Job 실행 결과 미수신; `CMD_LOG_EVIDENCE_RECEIVED` 미표시. 원본 `/Discard` 1회·`ISO_ONLY_PASS` 성과 보존, `IMAGE_METADATA_DRIFT_CONFIRMED`, `ROOT_CAUSE_STAGE_UNKNOWN`, C NO-GO, 자동 인계 **4/5=80%**. 새 운영 PC/E:/USB/Runner/Controller/Workflow/Backlog/Claim/Lease 변경 0.
