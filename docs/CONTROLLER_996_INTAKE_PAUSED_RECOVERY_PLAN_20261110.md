@@ -111,3 +111,14 @@
 - 다음 필수 작업 1개: 사용자 관리자 컨텍스트에서 **생성 TEMP의 BIOS/UEFI BCD 두 개에 대한 /enum all 읽기만** 완료하고 반환된 경로/플래그를 검토. 로컬 전용 읽기 준비 파일 `C:\Users\ansqh\C996_BCD_READONLY_f9ff26781fd541c7bc0d23aef9164c41.cmd` 생성(미실행), 출력은 새로운 TEMP 폴더에만 저장. 권한 오류 시 자동 재시도·정리 없음.
 - 이후 별도 test-only WinPE harness와 부팅 검증 계획을 리뷰하고, 대상 PC·미디어·Secure Boot 체인·운영 볼륨 미접근 보호를 확정한 명시 범위 전에는 부팅하지 않음. Owner trust anchor·신뢰시간/철회 미검증 상태 유지.
 - **운영 PC/E: 접근·변경 0, 기존 Controller/Runner/Workflow/Backlog/Claim/Lease 변경 0. WinPE 정적 이미지 PASS 유지, 부팅 적합성 PARTIAL, 실제 WinPE/CNG 미실증. 전체 80% / C NO-GO 유지.**
+
+
+### 2026-11-12 BIOS/UEFI BCD 관리자 조회 완료 및 바이트 drift 관측
+
+- 사용자 관리자 실행의 실제 로그 폴더 `C:\Users\ansqh\AppData\Local\Temp\C996_BCD_READONLY_89dab58353224693a2e2f9093bf370ed`에서 result.txt, bios-bcd.txt, uefi-bcd.txt를 직접 읽음. `BCD_READONLY_QUERY=PASS`로 두 /enum all 호출 종료코드 검사를 통과.
+- 양쪽 {bootmgr} default/displayorder={default}; {default} device/osdevice=`ramdisk=[boot]\sources\boot.wim,{7619dcc8-fafe-11d9-b411-000476eba25f}`, systemroot=\windows, winpe=Yes. ramdisk options는 ramdisksdidevice=boot, ramdisksdipath=\boot\boot.sdi. 실제 media\Boot\boot.sdi 존재 확인. BIOS loader는 \windows\system32\boot\winload.exe, UEFI는 \windows\system32\boot\winload.efi. 이 외부 BCD 출력 자체에는 WIM index 값이 없으므로 내부 boot index와의 실제 부팅 연결을 새로 입증했다고 하지 않음.
+- **BCD 표시된 경로/WinPE 플래그 정적 검토 PASS**, 실제 부팅/Secure Boot 승인·CNG는 미실행.
+- 별도 사후 해시에서 TEMP BIOS BCD는 `247c0bad51c04adf996977cb9245188d181f833729967762143d4a081af9e7dc`, UEFI BCD는 `3eb6f65e2e6b72d1b99ceeda6aa60523299150f6085be4867b0d351f9f29269f`로 변경됨. 이전 사전 해시는 현재 설치 ADK 원본 BCD 해시와 계속 일치. boot.wim은 `fbcbdb1c6651ab3a69384e9d4f95f2c02321318603849453b252e21e827c8197`로 불변.
+- 읽기 전용 바이트 비교: BIOS 632바이트 차이(4096바이트 hive 헤더 밖 579), UEFI 641바이트 차이(헤더 밖 588), 파일 크기 각각 16384 불변. 따라서 **헤더/체크섬만 변경됐다고 단정할 수 없음**. BCD enum 호출의 hive 내부 메타데이터 정규화인지 다른 효과인지, 개별 설정 값 변화 여부는 아직 독립 판별하지 않음. 명령에 /set·/delete·/create는 없었으나 /enum을 바이트 무변경이라고 주장한 보장은 철회한다.
+- 원본 ADK 및 TEMP BCD를 덮어쓰거나 복구하지 않고 증거 보존. 시스템 BCD에는 접근하지 않음. 다음 진단은 외부 BCD를 Windows hive API에 다시 로드하지 않는 **오프라인 읽기 전용 파서**로 원본/TEMP의 키·값·보안 메타데이터를 분리 대조하는 것. 원인 확인 전 TEMP BCD 바이트 불변/부팅 준비 완료를 선언하지 않음.
+- 후속 WinPE test-only harness의 E: 미접근·시험키/Owner 분리 및 부팅 승인 경계 유지. 운영 PC/E: 접근·변경 0, Workflow/Backlog/Claim/Lease/Runner 변경 0. **전체 80% / C NO-GO**, 정적 이미지 생성 PASS와 BCD 경로 검토 PASS를 보존하고 BCD 무변경성은 UNVERIFIED로 구분.
