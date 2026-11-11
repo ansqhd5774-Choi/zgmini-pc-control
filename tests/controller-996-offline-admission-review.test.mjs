@@ -7,12 +7,15 @@ import {review996PcJobWorkflowSource,review996OfflinePcJobAdmission}
 const workflowText=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
 const start='2026-11-11T00:00:00.000Z';
 const future='2026-11-11T08:00:00.000Z';
-const row=id=>({id,name:`pc-runner-${id}`,
-  machine:'기존 ZGMINI PC',status:'offline',busy:false,
+const row=id=>({id,name:`zgmini-pc-${String(id).padStart(2,'0')}`,
+  status:'offline',busy:false,
   labels:['self-hosted','Windows','X64','zgmini-pc-control']});
 const fixture=()=>({stage:'PRE_OFFLINE',workflowText,workflowState:'active',
   workflowMutationCount:0,runnerInventoryComplete:true,
   runnerRows:Array.from({length:6},(_,i)=>row(i+1)),runningJobs:0,
+  localRunnerBindings:Array.from({length:6},(_,i)=>({id:i+1,
+    name:`zgmini-pc-${String(i+1).padStart(2,'0')}`})),
+  localRunnerBindingsVerified:true,
   drainConfirmed:true,windowsAutoStartHeld:true,
   offlineStartAt:start,plannedResumeAt:future});
 const review=changes=>review996OfflinePcJobAdmission({...fixture(),...changes});
@@ -57,14 +60,26 @@ test('incomplete inventory and missing runner route fail without effects',()=>{
 });
 test('matching runner on common queue PC cannot accept the original PC job',()=>{
   const rows=fixture().runnerRows;
-  rows[2].machine='공통 대기열 PC';
+  rows.push({...row(7),name:'zgmini-handoff-ci-isolated'});
   assert.equal(review({runnerRows:rows}).code,
     'C996_ADMISSION_MATCHING_RUNNER_ON_OTHER_PC');
 });
+test('GitHub names alone never prove local machine identity',()=>{
+  assert.equal(review({localRunnerBindingsVerified:false}).code,
+    'C996_ADMISSION_LOCAL_RUNNER_IDENTITY_UNVERIFIED');
+  const altered=fixture().localRunnerBindings;
+  altered[0].id=998;
+  assert.equal(review({localRunnerBindings:altered}).code,
+    'C996_ADMISSION_LOCAL_RUNNER_IDENTITY_UNVERIFIED');
+  assert.equal(review({localRunnerBindings:[]}).code,
+    'C996_ADMISSION_LOCAL_RUNNER_IDENTITY_UNVERIFIED');
+});
 test('live matching runner, busy runner or undrained job blocks offline cutover',()=>{
+  const online=fixture().runnerRows;online[0]={...online[0],status:'online'};
+  const busy=fixture().runnerRows;busy[0]={...busy[0],busy:true};
   for(const changes of [
-    {runnerRows:[{...row(1),status:'online'}]},
-    {runnerRows:[{...row(1),busy:true}]},
+    {runnerRows:online},
+    {runnerRows:busy},
     {runningJobs:1},
     {drainConfirmed:false},
   ]){
