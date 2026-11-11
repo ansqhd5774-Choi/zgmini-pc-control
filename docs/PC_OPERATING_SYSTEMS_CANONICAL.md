@@ -58,7 +58,7 @@
 4. 정기 기능 실행은 Windows ZGMINI 예약 작업이며, Core 공유 lock, Writer/DB, 공급자 호출/TTL/D1 게시의 각 기존 보호 계약을 따른다. **GitHub 소스 병합 자체가 실제 PC 기능 배포/갱신은 아니다.**
 5. Watchdog은 Supervisor PID/heartbeat·출처 해시·PAUSE/DRAIN/lease/Workflow를 확인한 뒤 제한적으로 재시작하며, 임의 Runner 전체 종료, 운영 DB 초기화, Core lock 삭제를 하지 않는다.
 
-[실PC 관측: Issue #1255 / Run 43104881778, 2026-11-12 KST] 전체 Windows 프로세스 430개, 지정 명칭 프로세스 84개. 최초 상세 60개만 반환되어 Runner 명칭별 PID 누락: 이 부분은 #1256의 프로세스 우선순위 수정과 후속 증거를 적용한다.
+[실PC 최종 관측: Issue #1258 / Run 43105674675, 2026-11-12 06:45 KST] 전체 Windows 프로세스 431개, 지정 명칭 프로세스 82개. 종류별 정확한 개수: Runner.Listener.exe 7, Runner.Worker.exe 1, wscript.exe 4, node.exe 14, powershell.exe 2, cmd.exe 16, conhost.exe 38. 상세 PID/PPID 60개는 Runner 우선순위로 일부만 전달했으나 위 명칭별 개수는 전체 82개를 집계한 값이다. 기존 #1255 / Run 43104881778의 상세 Runner 누락은 원본 이력으로 보존한다.
 - ZGMINI 예약 작업 총 15: Running 1 / Ready 11 / Disabled 3.
 - Running: ZGMINI-PC-Local-Core.
 - Ready: ZGMINI-PC-Breadth-R10V9-Publication; ZGMINI-PC-Breadth-R10V9-Shadow; ZGMINI-PC-Configured-Themes; ZGMINI-PC-GetMarketHistory-ETF; ZGMINI-PC-Local-Korea; ZGMINI-PC-MarketParquet-ETF; ZGMINI-PC-Theme-Biotech; ZGMINI-PC-Theme-Data-Center-Power; ZGMINI-PC-Theme-Nine-R47-Private; ZGMINI-PC-Theme-Nine-R54-Public; ZGMINI-PC-US-Breadth-R1.
@@ -97,7 +97,7 @@
 - 장비 실측 정본: docs/PC_HOST_INVENTORY_READONLY.md.
 - 기존 PC 하드웨어: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1249; results/pc-host-inventory-43102349724-1-operating.json
 - 격리 PC 하드웨어: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1245; results/pc-host-inventory-43101563767-1-handoff.json
-- 기존 PC 프로세스 최초: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1255; results/pc-process-inventory-43104881778-1-operating.json
+- 기존 PC 프로세스 최종: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1258; results/pc-process-inventory-43105674675-1-operating.json 및 .txt. 과거 #1255는 Runner 우선 집계 보완 전 이력.
 - 격리 PC 프로세스: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1254; results/pc-process-inventory-43104715561-1-handoff.json
 - 실측기: tools/pc-host-inventory-readonly.mjs, tools/pc-process-inventory-readonly.mjs, 각 고정 Workflow 및 tests/.
 - Startup/Watchdog 운영 계약: docs/INSTALL_AND_ROLLBACK.md, docs/RUNNER_RECOVERY.md.
@@ -109,4 +109,4 @@
 
 이 문서의 '전체'는 **운영에 필요한 범위의 확인된 PC 정보**를 뜻한다. 보안상 토큰/키, 환경변수 전체 원문, 계정 정보, 전체 명령줄, 사용자 개인 파일, IP/MAC, 시리얼번호, 운영 원자료/DB는 수집·GitHub 업로드하지 않는다. 목록은 시점성 스냅샷으로 PID·작업 수·가용 메모리는 변경된다.
 
-현재 미검증: 격리 PC의 다른 Runner.Listener 4개 소유자, 두 PC의 각 모든 Runner 설치/시작 인과관계, 실제 부팅 후 복구 자연 시험, 현시점 전체 Windows 서비스/일반 프로세스 전체 목록, 프로세스별 실제 CPU 사용률, 실제 배포·수집·D1 성공 여부, 현재 Controller 설치 SHA. 필요한 장애가 발생했을 때만 해당 범위를 별도로 확인한다.
+현재 미검증: 격리 PC의 다른 Runner.Listener 4개 소유자, 운영 PC의 7개 Listener 중 개별 Runner 이름/PID 1:1 소유 확인(6개 ZGMINI 구성·별도 akkigo-boja 서비스 기록은 존재), 두 PC의 각 모든 Runner 설치/시작 인과관계, 실제 부팅 후 복구 자연 시험, 현시점 전체 Windows 서비스/일반 프로세스 전체 목록, 프로세스별 실제 CPU 사용률, 실제 배포·수집·D1 성공 여부, 현재 Controller 설치 SHA. 필요한 장애가 발생했을 때만 해당 범위를 별도로 확인한다.
