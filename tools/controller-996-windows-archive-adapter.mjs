@@ -134,7 +134,9 @@ export function plan996TwoBootRecovery(continuationId){
       originalJobs:'GET_VERIFY_FOUR_NO_AUTO_REPLAY',
       admission:'PROVE_GITHUB_PC_JOB_ADMISSION_FENCE_OR_STOP',
       handoff:'READY_FOR_SECOND_BOOT',installLease:'HELD'},
-    {id:'WINPE_SECOND_BOOT',pc,os:'WinPE',moves:[install,ownC],
+    // Keep the canonical install admission barrier until every C claim is
+    // archived. The install lease MUST be the final state-changing move.
+    {id:'WINPE_SECOND_BOOT',pc,os:'WinPE',moves:[ownC,install],
       requires:'SIGNED_BOOT_EPOCH_NONCE_SOURCE_PINS_AND_ONLINE_HANDOFF',
       installLease:'ARCHIVE_AFTER_ONLINE_READY'},
     {id:'ORIGINAL_WINDOWS_READBACK',pc,os:'Windows',moves:[],
