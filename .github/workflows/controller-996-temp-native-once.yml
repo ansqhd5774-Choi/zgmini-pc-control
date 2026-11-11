@@ -1,0 +1,100 @@
+name: ZGMINI #996 TEMP-only Windows native proof (owner labeled)
+
+on:
+  pull_request:
+    types: [labeled]
+
+# The workflow stays inert without a specific Owner label and repository
+# variables. It never authorizes the C-grade production operator.
+permissions:
+  contents: read
+
+concurrency:
+  group: zgmini-996-temp-native-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  temp-native-once:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event_name == 'pull_request' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'zgmini-996-native-once' &&
+      github.event.pull_request.number == 1222 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      vars.ZGMINI_996_TEMP_NATIVE_ONCE_ENABLED == 'true' &&
+      vars.ZGMINI_996_TEMP_NATIVE_RUNNER_NAME != ''
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 8
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Require separately approved Windows runner before checkout
+        env:
+          APPROVED_RUNNER_NAME: ${{ vars.ZGMINI_996_TEMP_NATIVE_RUNNER_NAME }}
+        run: |
+          @echo off
+          if /I not "%RUNNER_NAME%"=="%APPROVED_RUNNER_NAME%" (echo C996_TEMP_RUNNER_IDENTITY_DENIED & exit /b 31)
+          if exist "E:\ZGmini" (echo C996_TEMP_ORIGINAL_E_DRIVE_FORBIDDEN & exit /b 32)
+          if /I "%ZGMINI_996_TEMP_ONLY_ON_ORIGINAL_PC%"=="1" (echo C996_TEMP_ORIGINAL_PC_OVERRIDE_FORBIDDEN & exit /b 33)
+          for %%P in ("%RUNNER_TEMP%" "%GITHUB_WORKSPACE%" "%TEMP%" "%TMP%") do (
+            if /I "%%~dP"=="E:" (echo C996_TEMP_E_DRIVE_FORBIDDEN & exit /b 34)
+          )
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 9c291bc02b983393d7f133c71a1a8aeb8858373b
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact source and effective Windows execution policy
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = Join-Path $env:GITHUB_WORKSPACE 'tools\TEST_996_WINDOWS_TEMP_SECURITY_WINDOW.ps1'
+          $test = Join-Path $env:GITHUB_WORKSPACE 'tests\controller-996-windows-temp-security-window.test.mjs'
+          $expected = @{
+            $script = '6E8E78FF2584731495E49FF8F9326ECB8F806C8C4668814DEDB629A393661461'
+            $test = '3D7D5181F5A8803311C0A1BC7934D2BDBCFA353C343CCD043A692A60F4B95869'
+          }
+          foreach ($file in $expected.Keys) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw 'C996_TEMP_REQUIRED_SOURCE_MISSING' }
+            if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -cne $expected[$file]) { throw 'C996_TEMP_SOURCE_SHA256_MISMATCH' }
+          }
+          if (Test-Path -LiteralPath 'E:\ZGmini') { throw 'C996_TEMP_ORIGINAL_PC_FORBIDDEN' }
+          if ($env:ZGMINI_996_TEMP_ONLY_ON_ORIGINAL_PC -eq '1') { throw 'C996_TEMP_ORIGINAL_PC_OVERRIDE_FORBIDDEN' }
+          $policy = Get-ExecutionPolicy
+          if ($policy -notin @('RemoteSigned','AllSigned')) { throw 'C996_TEMP_EXECUTION_POLICY_UNSUPPORTED' }
+          $signature = Get-AuthenticodeSignature -LiteralPath $script
+          $zone = Get-Item -LiteralPath $script -Stream Zone.Identifier -ErrorAction SilentlyContinue
+          if ($signature.Status -ne 'Valid' -and ($policy -eq 'AllSigned' -or $null -ne $zone)) {
+            throw 'C996_TEMP_SIGNATURE_ORIGIN_POLICY_BLOCKED'
+          }
+          $windowsPowershell = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
+          if (-not (Test-Path -LiteralPath $windowsPowershell)) { throw 'C996_TEMP_POWERSHELL_MISSING' }
+          if ((Get-AuthenticodeSignature -LiteralPath $windowsPowershell).Status -ne 'Valid') {
+            throw 'C996_TEMP_SYSTEM_POWERSHELL_SIGNATURE_INVALID'
+          }
+          Write-Output 'C996_TEMP_SOURCE_AND_POLICY_PASS'
+      - name: Run exactly ten TEMP-only tests and check zero skips
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = Join-Path $env:RUNNER_TEMP ('zgmini-996-temp-native-' + $env:GITHUB_RUN_ID + '.tap')
+          & node --test --test-concurrency=1 --test-reporter=tap 'tests/controller-996-windows-temp-security-window.test.mjs' *> $out
+          $exit = $LASTEXITCODE
+          $result = Get-Content -LiteralPath $out -Raw
+          $required = @{tests=10;pass=10;fail=0;cancelled=0;skipped=0;todo=0}
+          foreach ($name in $required.Keys) {
+            $line = '^# ' + $name + ' ' + $required[$name] + '$'
+            if ($result -notmatch ('(?m)' + $line)) { throw ('C996_TEMP_TAP_SUMMARY_INVALID_' + $name) }
+          }
+          if ($exit -ne 0) { throw 'C996_TEMP_NODE_EXIT_FAILED' }
+          Write-Output 'C996_TEMP_NATIVE_10_PASS_0_SKIP'
+          Write-Output 'C996_TEMP_PRODUCTION_C_NOT_AUTHORIZED'
