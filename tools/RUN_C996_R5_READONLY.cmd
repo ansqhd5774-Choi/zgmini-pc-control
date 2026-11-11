@@ -1,15 +1,11 @@
 @echo off
 setlocal DisableDelayedExpansion
-if /I not "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
-  echo C996_READONLY STOPPED code=WRONG_HOST
-  exit /b 20
-)
-where node.exe >nul 2>&1
-if errorlevel 1 (
-  echo C996_READONLY STOPPED code=NODE_NOT_FOUND
-  exit /b 21
-)
-node "%~dp0c996-r5-evidence-readonly.mjs"
-set "RC=%ERRORLEVEL%"
-echo C996_READONLY exit=%RC%
-exit /b %RC%
+echo C996_LEGACY_CMD_SUPERSEDED
+echo.
+echo This former manual CMD has no verified GitHub result uploader.
+echo Do not use it for C996 collection or assume it completed.
+echo Follow the approved GitHub Issue workflow after exact Runner host verification.
+echo No WIM, ISO, BCD or log file was accessed by this deprecated launcher.
+echo.
+pause
+exit /b 2
