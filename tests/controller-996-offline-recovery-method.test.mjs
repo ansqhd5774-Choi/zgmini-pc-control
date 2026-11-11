@@ -27,7 +27,11 @@ test('existing ZGMINI PC WinPE boot proposes two guarded offline phases',()=>{
   assert.equal(result.twoBootReview.legacySingleSessionPlanExecutable,false);
   assert.equal(result.twoBootReview.currentOperatorCompatible,false);
   assert.equal(result.singleBootAlternative.winpeBootCount,1);
-  assert.equal(result.ownerDecisions.length,5);
+  assert.equal(result.ownerDecisions.length,6);
+  assert.equal(result.selectedBootImageVerified,false);
+  assert.equal(result.nativeMoverSelected,false);
+  assert.equal(result.winPePowerShellAssumed,false);
+  assert.equal(result.driveLetterTrusted,false);
   assert.equal(result.code,'C996_EXISTING_ZGMINI_PC_WINPE_APPROVAL_REQUIRED');
   assert.deepEqual(result.pcTopology,{physicalPcCount:2,
     existingPcName:'기존 ZGMINI PC',queuePcName:'공통 대기열 PC',
@@ -83,6 +87,21 @@ test('two-boot proposal uses exactly the two named physical PCs and same reboot 
   assert.ok(twoBoot.phases.every(p=>p.pc==='기존 ZGMINI PC'));
   assert.equal(twoBoot.executionAuthorized,false);
   assert.equal(twoBoot.originalPcWrites,0);
+  assert.equal(twoBoot.selectedBootImageVerified,false);
+  assert.equal(twoBoot.winPePowerShellAssumed,false);
+  assert.equal(twoBoot.verifiedVolumeIdentity,null);
+});
+
+test('single boot never assumes WinPE .NET or original Windows E: mapping',()=>{
+  const single=plan996SingleBootRecovery(continuationId);
+  assert.equal(single.selectedBootImageVerified,false);
+  assert.equal(single.nativeMoverSelected,false);
+  assert.equal(single.winPePowerShellAssumed,false);
+  assert.equal(single.driveLetterTrusted,false);
+  assert.equal(single.verifiedVolumeIdentity,null);
+  assert.equal(single.executionAuthorized,false);
+  assert.equal(single.productionExecutable,false);
+  assert.equal(single.originalPcWrites,0);
 });
 test('old interrupted C claim does not take the new online C claim archive destination',()=>{
   assert.notEqual(twoBoot.oldClaimArchive.destination,twoBoot.newClaimArchive.destination);
