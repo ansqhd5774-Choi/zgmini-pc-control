@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateEvent,selectSafeReport,runCollector,collectorPreoutputStopCode,uploadVerifiedPair,REPO,HOST,SCHEMA,OPERATION}
+import {validateEvent,selectSafeReport,runCollector,collectorPreoutputStopCode,isAllowedOutputDirectory,uploadVerifiedPair,REPO,HOST,SCHEMA,OPERATION}
   from '../c996-r5-readonly/github-runner.mjs';
 
 const uuid='ef64077e-61ab-40a0-abcd-a46d31f4e727';
@@ -118,4 +118,14 @@ test('collector early STOP returns only explicit allowlisted code',()=>{
     ['secret private path',2],['C996_READONLY STOPPED code=PIN_MISMATCH; no files written',2],
     ['C996_READONLY STOPPED code=TEMP_ROOT_MISMATCH; no files written',0]
   ]) assert.equal(collectorPreoutputStopCode(stderr,exitCode),'COLLECTOR_RESULT_NOT_EMITTED');
+});
+
+test('Runner TEMP may differ from source user TEMP but must be C-only and exact',()=>{
+  const id='a'.repeat(32);
+  const root='C:\\RunnerIdentity\\AppData\\Local\\Temp';
+  assert.equal(isAllowedOutputDirectory(root+'\\C996_R5_READONLY_'+id,root),true);
+  assert.equal(isAllowedOutputDirectory('C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_R5_READONLY_'+id,root),false);
+  assert.equal(isAllowedOutputDirectory('E:\\other\\C996_R5_READONLY_'+id,'E:\\other'),false);
+  assert.equal(isAllowedOutputDirectory(root+'\\..\\other\\C996_R5_READONLY_'+id,root),false);
+  assert.equal(isAllowedOutputDirectory(root+'\\C996_R5_READONLY_'+id+'.json',root),false);
 });
