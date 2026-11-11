@@ -121,8 +121,5 @@ async function run(){
   ' code='+report.code+' runId='+ctx.runId);
  if(report.status!=='PASS')process.exitCode=2;
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===path.resolve(new URL(import.meta.url).pathname)){
- // Windows paths differ from URL pathnames: use a direct file URL comparison below.
-}
 import {fileURLToPath} from 'node:url';
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await run();
