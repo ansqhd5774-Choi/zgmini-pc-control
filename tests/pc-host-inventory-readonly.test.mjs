@@ -33,7 +33,10 @@ test('strict host and runner identity, never conflate the two PCs',()=>{
   'MATCH');
  assert.equal(validateSeat('handoff','OTHER','zgmini-handoff-ci-spare-01','OTHER'),
   'HANDOFF_HOST_MISMATCH');
- assert.equal(validateSeat('operating','A','zgmini-pc-01','B'),'HOST_IDENTITY_UNVERIFIED');
+ assert.equal(validateSeat('operating','A','zgmini-pc-01','B'),'MATCH');
+ assert.equal(validateSeat('operating','PC','zgmini-pc-05',''),'MATCH');
+ assert.equal(validateSeat('handoff','DESKTOP-N62L0NG','zgmini-handoff-ci-spare-01',''),'MATCH');
+ assert.equal(validateSeat('operating','','zgmini-pc-01',''),'HOST_IDENTITY_UNVERIFIED');
 });
 test('text report contains no paths, tokens, or raw memory dump',()=>{
  const text=toText({schema:'R',requestId:'id',runId:'1',attempt:'1',role:'handoff',
