@@ -137,3 +137,20 @@
 - **현재 판정:** WinPE 이미지 정적 생성 PASS, BCD 부팅 값 일치 PASS, BCD byte identity FAIL(의도치 않은 내부 ACL/메타데이터 차이 관측), WinPE 부팅·Secure Boot 대상 호환·CNG NOT_TESTED. 수정/재생성으로 이력을 덮지 않고 현재 TEMP 증거를 보존한다.
 - 다음 필수 개발은 기존 일반 Windows harness를 재목적 실행하지 않는 **E: 미접근 WinPE test-only CNG harness 설계/정적 검토**. 실제 부팅 전에 별도 실행 환경 식별, 이미지 provenance, 테스트키/Owner 분리, 시간/철회 경계를 확정한다. USB/ISO 제작·재부팅·기존 PC C 실행은 여전히 승인 범위 밖.
 - 운영 PC/E: 접근·변경 0, Controller/Runner/Workflow/Backlog/Claim/Lease 변경 0. **전체 80% / C NO-GO / executionAuthorized=false 유지**.
+
+
+### 2026-11-12 WinPE 전용 CNG test-only 구현 및 공통 대기열 PC 정적 빌드
+
+- 완료 기준점 `e722fe85aeeffadfc86f016d6bed1b8fe44a0712`의 BCD 오프라인 비교를 재사용. BCD 재조회/수정, WIM 마운트/수정, USB/ISO 생성, 부팅/재부팅 없이 진행.
+- 신규 `tools/controller-996-winpe-cng-test.c`: 기존 순수 `controller-996-winpe-cng-handoff-verify.c`를 그대로 include하여 재사용. 기존 Windows harness는 변경/실행/재목적 사용하지 않음. 별도 WinPE 전용 test-only 빌드 매크로와 x64 강제, C operator 매크로 거부.
+- 환경 식별은 Microsoft 공식 `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\WinPE` 한 경로에 `RegOpenKeyExW(KEY_QUERY_VALUE | KEY_WOW64_64KEY)`와 RegCloseKey만 사용. 누락/접근 거부/기타 오류는 종료코드 2와 registryStatus로 fail-closed. 컴퓨터 이름/드라이브 열거/운영 볼륨/파일 경로 조회·변경 없음. 존재 마커는 위조 가능하므로 환경 관측일 뿐 부팅 무결성·이미지 provenance·Owner trust 증거 아님. 근거: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/whats-new-in-windows-pe-s14 및 https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regopenkeyexw
+- 신규 공개 벡터 header `tests/c996_winpe_cng_public_vectors.h`: 기존 test-only generator로 만든 합성 메모리 RSA 키의 **공개 출력만** 고정. 개인키 생성은 test fixture 프로세스 메모리에 한정되고 내보내거나 Owner 인증키로 등록/승격하지 않음. WinPE EXE에는 키 생성·서명·파일 입력 기능이 없고 내장 공개 벡터만 사용. header SHA256 `2d0af82c0ced9810ea95c141df8397ea77d0bec623b6f40fc06ec57cfba6eb32`.
+- 시험 사례 **6개**: 정상 RSA-PSS/SHA256/Salt32 검증, manifest 변조, signature 변조, 공개 blob SHA256 pin 변조, 잘못된 salt(0), PKCS1 padding 거부. 모든 반환에서 ownerApprovalVerified/offlineClockTrusted/executionAuthorized/operationalWrites의 0을 검사하고 결과도 Owner·부팅 무결성·이미지 바인딩·철회 인증으로 승격하지 않음.
+- 신규 build-only CMD는 VS Installer vswhere로 VS 2026 [18.0,19.0) x64 C++ 도구를 찾고 별도 새 C: TEMP output에서 빌드. **/W4 /WX /TC /O2 /MT /GS /guard:cf**, link **/MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /INCREMENTAL:NO**. MFC/ATL/CLR 없음. EXE 실행 명령 없음.
+- 실제 host `DESKTOP-N62L0NG`, Visual Studio 2026 Developer Command Prompt **18.12.0**, MSVC dumpbin **14.52.37029.0**. 컴파일·링크 **exit 0**, /WX에서 경고 0. 최초 준비 실패는 vswhere 공백 경로 인용 **exit 1**이며 인용 수정 후 최초 실제 cl 빌드 성공. 실패 이력을 숨기거나 무수정 재시도하지 않음.
+- 실제 EXE **148992 bytes**, SHA256 **b2b1af8accc55d95b5e11bc68664a45af19887d56f09cd9231bce2dfd6a8e218**. 직접 DLL 의존성 **3개: bcrypt.dll, ADVAPI32.dll, KERNEL32.dll**. MSVCP/VCRUNTIME/UCRT/MFC/ATL 동적 의존성 없음. PE 직접 파싱으로 Machine 0x8664, PE32+ 0x20b, console subsystem 3, CLR descriptor RVA/size=0 검증.
+- /MT 정적 CRT 때문에 KERNEL32의 CreateFileW 등 CRT 지원 import가 존재함. **EXE 전체에 파일 API import가 없다고 주장하지 않음**. 시험기/재사용 primitive 소스에는 파일/드라이브 API 호출 및 운영 경로 접근이 없으며 런타임 호출 추적은 미실시. printf/puts 표준 출력은 CRT를 사용함.
+- 새 회귀 **11/11 PASS**(소스 경계/내장 벡터 6개/빌드 계약/실제 PE 검사), 기존 관련 회귀 **8 PASS + 1 SKIP**, 합계 **20 tests / 19 PASS / 0 FAIL / 1 SKIP**. SKIP은 non-Windows cc stub 검사(해당 호스트 cc 부재)이며 native x64 MSVC 빌드는 별도로 통과. 기존 vector-generator 시험의 Windows URL.pathname 자식 실행 오류를 fileURLToPath로 최소 수정.
+- 소스·시험 파일은 `%TEMP%\zgmini-996-cng-bundle-b9b2dfe5529541b0a89d9f69db658ca3`, EXE/OBJ/build/dependents/imports/headers/sha256/result 및 static-evidence.json은 `%TEMP%\zgmini-996-winpe-cng-build-18624-8721`. 파일을 재생성/다운로드한 다른 EXE의 해시로 이 결과를 대체하지 않음. 원본 순수 verifier 수정 0.
+- **실행한 WinPE EXE 0회 / 실제 WinPE CNG 성공 미실증**. 선택된 이미지의 OS DLL/export 실존과 로드 성공·registry marker 관측·6-case 실제 CNG는 다음 승인된 WinPE test-only 런타임 단계에서 확인할 것. 실제 부팅·미디어 생성·선택 boot.wim 변경은 수행하지 않음.
+- 운영 PC/E: 접근·변경 0, BCD/WIM 변경 0, Controller/Runner/Workflow/Backlog/Claim/Lease/C급 복구 0. **전체 80% / C NO-GO / Owner 승인·신뢰시간·철회 미검증 유지**.

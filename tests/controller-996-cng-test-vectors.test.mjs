@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {constants,createHash,createPublicKey,verify} from 'node:crypto';
 
 const script=new URL('./generate-controller-996-cng-vectors.mjs',import.meta.url);
@@ -19,7 +20,7 @@ test('ephemeral C test fixture verifies with identical RSA key under Node and re
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-996-cng-bundle-'));
   try{
     fs.mkdirSync(path.join(root,'tests'));
-    const child=spawnSync(process.execPath,[script.pathname,root],{
+    const child=spawnSync(process.execPath,[fileURLToPath(script),root],{
       encoding:'utf8',timeout:15000,
     });
     assert.equal(child.status,0,child.stderr);
@@ -53,3 +54,4 @@ test('ephemeral C test fixture verifies with identical RSA key under Node and re
     fs.rmSync(root,{recursive:true,force:false});
   }
 });
+
