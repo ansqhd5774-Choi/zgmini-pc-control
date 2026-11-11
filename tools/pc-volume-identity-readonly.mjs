@@ -68,9 +68,9 @@ export function buildFixedVolumeProbe(mode,csSource){
   ['VOLUME_ROOT','C:\\'],['ZGMINI','C:\\Windows'],
   ['LEASES','C:\\Windows\\System32'],
  ];
- const calls=['[Console]::Out.WriteLine("VOLUME_GUID="+[ZGmini996VolumeReadOnly]::VolumeGuid(@"'+root+'"))'];
+ const calls=["[Console]::Out.WriteLine('VOLUME_GUID='+[ZGmini996VolumeReadOnly]::VolumeGuid('"+root+"'))"];
  for(const [key,fixed] of entries)
-   calls.push('[Console]::Out.WriteLine("'+key+'="+[ZGmini996VolumeReadOnly]::Identity(@"'+fixed+'"))');
+   calls.push("[Console]::Out.WriteLine('"+key+"='+[ZGmini996VolumeReadOnly]::Identity('"+fixed+"'))");
  return "$ErrorActionPreference='Stop'\ntry {\nAdd-Type -TypeDefinition @'\n"+
    csSource+"\n'@\n"+calls.join('\n')+
    "\n} catch { [Console]::Out.WriteLine('NATIVE_STOP'); exit 2 }\n";
