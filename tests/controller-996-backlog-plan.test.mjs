@@ -51,20 +51,24 @@ test('actual four pause-window Issue shapes remain review-only after interrupted
   a.cutoffAt='2026-11-10T13:21:26.727Z';
   const originals=[
     [1217,'2026-11-10T01:13:35Z','pc-job','core-runtime-source-readonly',
-      'pc-8da91b23-f5d6-4a94-bcd5-13b0dfcdee61'],
+      'pc-8da91b23-f5d6-4a94-bcd5-13b0dfcdee61',
+      'chat-67a52680-bdae-4afb-8047-7dee6264e503'],
     [1219,'2026-11-10T01:16:07Z',
       '[테마 T1] R181 실행 Core source SHA 단회 읽기 전용',
       'core-runtime-source-readonly',
-      'pc-e2710720-1a35-4a75-ab37-4940ecd33edd'],
+      'pc-e2710720-1a35-4a75-ab37-4940ecd33edd',
+      'chat-a6d121b8-b770-4dcd-a4ca-26a6cae3e531'],
     [1226,'2026-11-10T12:57:33Z','core-status','core-status',
-      'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4'],
+      'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4',
+      'chat-fed29d4e-d3da-4363-a1b8-398da674d6a5'],
     [1227,'2026-11-10T12:58:56Z','pc-job','core-runtime-source-readonly',
-      'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7'],
+      'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7',
+      'chat-94ed8b6e-9bb8-4afd-a6f1-9e96f5893a76'],
   ];
-  a.listing.issues=originals.map(([n,created,title,op,id])=>{
+  a.listing.issues=originals.map(([n,created,title,op,id,chatId])=>{
     const entry=issue(n,id),body=JSON.parse(entry.body);
     return {...entry,title,created_at:created,body:JSON.stringify({...body,
-      operation:op,sourceSha:'643b7c7c4372ffad552443fc312c6cb1b944e2fc'})};
+      chatId,operation:op,sourceSha:'643b7c7c4372ffad552443fc312c6cb1b944e2fc'})};
   });
   a.commentsByIssue=Object.fromEntries(originals.map(([n])=>[
     n,{complete:true,comments:n===1227?[{
