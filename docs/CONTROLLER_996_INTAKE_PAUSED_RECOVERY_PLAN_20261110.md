@@ -365,3 +365,15 @@
 - 해당 Node 소스의 최종 Git blob SHA `85c8fe399882e0e09a02469a186975a3703fd311`을 ZIP 내부 스크립트와 로컬 `git hash-object`가 **정확히 일치**함을 확인. 컨테이너 Node 22 `node --check` 성공, 순수 회귀 **11/11 PASS**, 비Windows 호스트 강제 STOP(입력/출력 변경 없음) 확인. **이는 실제 Windows R5 로그 실행·원격 증거 회수 PASS가 아니다.**
 - 별도 전달용 고정 ZIP `ZGMINI_C996_R5_Readonly_CMD.zip`, 6267 bytes, SHA256 `1ca835345543cebac3d541a1d7ca6e424a8c1cacea245eff338d8f400af9ff00`. 기존 공통 PC용 자동 회수 operation이 없어 자동 전달은 현재 `AUTOMATION_BLOCKED`. 다른 Runner 임의 실행/재설치 금지. 필요한 경우 **대상 공통 대기열 PC에서만** ZIP을 풀고 CMD 1회 실행하는 예외 경로를 제공하며 결과 파일 2개 또는 승인된 보고 경로에서 회수.
 - 현재 산출물: GitHub 소스와 독립 테스트+ZIP 준비 완료. **Windows 실행 0 / 원격 TXT·JSON 회수 0**. 기존 ISO_ONLY_PASS 보존, metadata drift 확인, stage 미확정. 전체 공통 진행률 **80% / C NO-GO** 및 운영 PC/E:/USB/Runner/Workflow/Claim/Lease 변경 0.
+
+
+### 2026-11-12 수동 CMD 파일 발견 실패 정정 — GitHub 표준 자동 회수로 전환
+
+- 사용자 실측: 앞서 제공된 `ZGMINI_C996_R5_Readonly_CMD.zip`의 `RUN_C996_R5_READONLY.cmd` 실행 창이 곧바로 닫혔고, 사용자는 결과 파일을 찾을 수 없었다. **실제 해당 1회 실행 결과는 STATE_UNKNOWN**이며, 사용자의 조작 문제로 간주하지 않는다.
+- 실패 구조: 과거 CMD는 `where node.exe` 의존, 종료코드 반환 후 즉시 창 종료(`pause`/상태 표시/Explorer/자동 게시 없음). 출력은 일회성 `%TEMP%\C996_R5_READONLY_<UUID>\summary.json/.txt`였고 GitHub 결과 자동 업로드가 **없었다**. 이전 source 회귀 11/11 PASS는 Windows 실제 완료나 파일 반환 성공을 뜻하지 않는다.
+- GitHub `main`의 `docs/GENERAL_CHAT_START.md`·`docs/PC_AUTOMATION_STANDARD.md`·`docs/SUCCESS_EVIDENCE_REUSE.md`, 대표 A 실제 성공 #882를 다시 대조. 정본은 고유 Issue/requestId → 승인된 고정 Windows Runner/operation → GitHub 결과 JSON/TXT **2/2 원격 동일바이트 확인** → 실제 status/code 판정. 사용자에게 매번 임시 파일 찾아 전달하도록 요구하지 않는다.
+- **정정:** 기존 `tools/RUN_C996_R5_READONLY.cmd`는 브랜치 commit `6f1788cf10490388cd8efa0ff1946bf0cf580686`에서 **deprecated/즉시 STOP + 창 유지**로 변경. 기존에 다운로드된 ZIP 안 CMD가 자동으로 갱신되는 것은 아니므로 **그 ZIP 재실행 금지**. 원본 R5 성공 ISO/WIM/BCD, 로컬 이전 실행 결과 및 증거를 삭제·초기화하지 않는다.
+- 새 독립 브랜치 `fix/c996-queue-r5-readonly-github-20261112`, **Draft PR #1237**. GitHub `issues.opened` + 전용 `pc-c996-r5-readonly` 라벨 + 고정 JSON schema/owner/private 확인 + `zgmini-handoff-ci-isolated` self-hosted Windows Runner 후보. Node 도구는 PC hostname **DESKTOP-N62L0NG**가 일치하지 않으면 WIM/ISO/로그 접근 없이 BLOCKED. 읽기 요약 32KiB 제한; `results/c996-r5-<runId>-<attempt>.json/.txt` 고유 파일에 자동 게시하고 GET readback 2/2 후에만 원본 Issue 댓글로 결과 연결. 자동 재실행·원문 로그 업로드 없음.
+- **실행 게이트:** 해당 Runner가 **실제로 DESKTOP-N62L0NG에 등록됐다는 증거는 아직 없음**. PR #1237는 main 미병합, 이번 PR CI [Run #43097205808](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43097205808)는 확인 시 `queued`·판정 미확정. 이 단계에서 고유 A Issue를 만들면 main의 수신 workflow가 없어 접수되지 않을 수 있으므로 새 요청은 생성하지 않음. `main` 실제 배포와 Runner 호스트/실제 수행을 구분한다.
+- **완료 기준:** PR Source CI PASS, 호스트/label 실제 등록·접수 가능 상태 확인 → 새 유일 Issue 1개 제출 → 실제 Windows JSON/TXT 2/2 원격 재조회 → Commit/DISM 로그를 단계별 분석. 실행이 불가하면 `AUTOMATION_BLOCKED`로 보고하고 기존 CMD·동일 고유 요청을 무조건 재실행하지 않는다. C 운영 복구는 승인된 별도 정규 C 경로만 사용.
+- 현재 추가 실제 WIM/ISO/BCD 실행 0, 운영 PC/E:/USB/Runner/Workflow/Backlog/Claim/Lease 변경 0. 기존 `ISO_ONLY_PASS` 및 `IMAGE_METADATA_DRIFT_CONFIRMED`, root-cause `STAGE_UNKNOWN`, 공통 자동 인계 실증 4/5=80%, C NO-GO 유지.
