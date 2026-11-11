@@ -27,6 +27,7 @@ function validDay(value){
 
 function fixedError(code,exists=false){
  return {status:'UNPROVEN',code,exists,eventCount:null,distinctCalculatedDates:null,
+  evidenceLevel:'SELF_CONSISTENT_LOCAL_LEDGER_ONLY_NOT_LIVE_EXECUTION',
   earliestCalculatedAt:null,latestCalculatedAt:null,latestRecordedAt:null,
   currentApprovedSourceEventCount:null,byteLength:null,sha256:null,
   aclEvidence:'NOT_VERIFIED_BY_NODE_FS',backupEvidence:'NOT_VERIFIED',
@@ -118,6 +119,7 @@ export function inspectD05LineageReadonly(dataRoot,{fileSystem=fs,approvedSource
       row.runtimeSourceSha===approvedSourceSha)currentCount++;
   }
   return {status:'PASS',code:'D05_LEDGER_SANITIZED_READONLY_VERIFIED',exists:true,
+   evidenceLevel:'SELF_CONSISTENT_LOCAL_LEDGER_ONLY_NOT_LIVE_EXECUTION',
    eventCount:lines.length,distinctCalculatedDates:dates.size,
    earliestCalculatedAt:earliest,latestCalculatedAt:latest,latestRecordedAt:latestRecorded,
    currentApprovedSourceEventCount:approvedSourceSha===null?null:currentCount,
