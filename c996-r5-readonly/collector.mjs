@@ -145,7 +145,7 @@ async function main() {
     // Runner may use a different Windows identity and therefore a different
     // OS TEMP; use it only for NEW diagnostic output, never as an input root.
     const outputTemp=path.win32.resolve(os.tmpdir());
-    if(!/^C:\\\\[^\\]+/i.test(outputTemp) || outputTemp===path.win32.parse(outputTemp).root)
+    if(outputTemp.slice(0,3).toUpperCase()!=='C:\\' || outputTemp===path.win32.parse(outputTemp).root)
       throw Object.assign(new Error('OUTPUT_TEMP_NOT_C_DRIVE'),{code:'OUTPUT_TEMP_NOT_C_DRIVE'});
     const outputBaseStat=statNoLink(outputTemp);
     if(!outputBaseStat.isDirectory())
