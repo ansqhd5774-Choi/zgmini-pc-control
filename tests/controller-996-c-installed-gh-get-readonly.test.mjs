@@ -174,3 +174,54 @@ test('workflow run evidence with wrong event, status or partial response blocks'
       /C_996_INSTALLED_GH_(?:WORKFLOW_RUN_INVALID|RUN_PAGINATION_INCOMPLETE)/);
   }
 });
+
+const originals=[
+  {number:1217,requestId:'pc-8da91b23-f5d6-4a94-bcd5-13b0dfcdee61',operation:'core-runtime-source-readonly'},
+  {number:1219,requestId:'pc-e2710720-1a35-4a75-ab37-4940ecd33edd',operation:'core-runtime-source-readonly'},
+  {number:1226,requestId:'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4',operation:'core-status'},
+  {number:1227,requestId:'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7',operation:'core-runtime-source-readonly'},
+];
+const originalFixture=()=>Object.fromEntries(originals.map(spec=>[
+  repoRoute(`issues/${spec.number}`),{
+    number:spec.number,id:500000+spec.number,
+    user:{login:OWNER,id:327938088},state:'open',
+    labels:[{name:'pc-job'}],comments:spec.number===1227?1:0,
+    created_at:'2026-11-10T01:00:00Z',updated_at:'2026-11-11T01:00:00Z',
+    body:JSON.stringify({schema:'ZGMINI_PC_JOB_V1',
+      requestId:spec.requestId,operation:spec.operation,
+      chatId:'chat-a6d121b8-b770-4dcd-a4ca-26a6cae3e531',
+      sourceRepository:'ansqhd5774-Choi/zgmini',sourceBranch:'main',
+      sourceSha:'643b7c7c4372ffad552443fc312c6cb1b944e2fc',
+      secret:'DO_NOT_PUBLISH_SECRET'}),
+  },
+]));
+test('four fixed original Issue GETs retain identity and exclude raw contents',t=>{
+  const {client,seen}=fixture(t,originalFixture());
+  const out=client.readOriginalPcJobIssuesReadOnly();
+  assert.equal(out.issues.length,4);
+  assert.deepEqual(out.issues.map(x=>x.number),[1217,1219,1226,1227]);
+  assert.equal(out.issues[3].commentCount,1);
+  assert.equal(out.dispositionsVerified,false);
+  assert.equal(out.executionAuthorized,false);
+  assert.equal(JSON.stringify(out).includes('DO_NOT_PUBLISH_SECRET'),false);
+  assert.equal(seen.length,6);
+  assert.ok(seen.every(x=>x.args[2]==='GET'));
+});
+test('original Issue body, author and label mismatches cannot be trusted',t=>{
+  for(const change of ['requestId','actor','label','schema']){
+    const overrides=originalFixture(),key=repoRoute('issues/1217');
+    if(change==='requestId'){
+      const value=JSON.parse(overrides[key].body);value.requestId='wrong';
+      overrides[key].body=JSON.stringify(value);
+    }
+    if(change==='actor')overrides[key].user.id=1;
+    if(change==='label')overrides[key].labels=[];
+    if(change==='schema'){
+      const value=JSON.parse(overrides[key].body);value.schema='wrong';
+      overrides[key].body=JSON.stringify(value);
+    }
+    const {client}=fixture(t,overrides);
+    assert.throws(()=>client.readOriginalPcJobIssuesReadOnly(),
+      /C_996_INSTALLED_GH_ORIGINAL_(?:ISSUE|BODY)_INVALID/,change);
+  }
+});
