@@ -73,10 +73,16 @@ export function selectSafeReport(raw,ctx,hostname) {
     return {directory:v.directory,name:v.name,bytes:v.bytes,sha256:v.sha256,counts};
   });
   if(logs.length>16) stop('LOG_REPORT_STOP');
+  const allowedSteps=['PRE_INPUT_HASH','EVIDENCE_METADATA','LOG_DISCOVERY','LOG_READ','POST_INPUT_HASH','DONE'];
+  const allowedIds=[...pinIds,'ISO_RESULT','FINAL_INDEX_1','MAKE_ISO','MOUNT_STATUS','DISCARD_RESULT','ISO_PASS','R5_ROOT','ISO_ATTEMPT','ISO_LOGS','R5_LOGS'];
+  const inspectStep=raw.inspectStep??null,inspectId=raw.inspectId??null;
+  if((inspectStep!==null&&!allowedSteps.includes(inspectStep)) ||
+    (inspectId!==null&&!allowedIds.includes(inspectId)))
+    stop('INSPECTION_STEP_INVALID');
   return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',
     requestId:ctx.requestId,issueNumber:ctx.issueNumber,runId:ctx.runId,attempt:ctx.attempt,
     host:hostname,code:raw.code,status:raw.status,logCount:logs.length,
-    pinCount:pins.filter(x=>x.matched).length,sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
+    pinCount:pins.filter(x=>x.matched).length,inspectStep,inspectId,sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
     rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,operationalWrites:0,
     automaticRetries:0,rawLogIncluded:false,pins,logs};
 }
@@ -84,7 +90,8 @@ export function selectSafeReport(raw,ctx,hostname) {
 function resultText(r) {
   return ['schema='+r.schema,'requestId='+r.requestId,'runId='+r.runId,
     'attempt='+r.attempt,'host='+r.host,'status='+r.status,'code='+r.code,
-    'pinCount='+r.pinCount+'/5','logCount='+r.logCount,'rootCauseStage=UNKNOWN',
+    'pinCount='+r.pinCount+'/5','logCount='+r.logCount,
+    'inspectStep='+(r.inspectStep??'UNKNOWN'),'inspectId='+(r.inspectId??'NONE'),'rootCauseStage=UNKNOWN',
     'operationalWrites=0','rawLogIncluded=false',''].join('\r\n');
 }
 function bounded(value) {const s=typeof value==='string'?value:JSON.stringify(value,null,2)+'\n';
