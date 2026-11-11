@@ -106,8 +106,14 @@ export function runCollector(ctx,hostname) {
   }
   const child=spawnSync(process.execPath,[COLLECTOR],{cwd:MODULE_DIR,encoding:'utf8',
     timeout:180000,maxBuffer:16384,shell:false,windowsHide:true});
-  try { return readCollectorResult(child.stdout,hostname,ctx); }
-  catch(e) {
+  try {
+    const report=readCollectorResult(child.stdout,hostname,ctx);
+    if(child.error || !Number.isInteger(child.status) ||
+       (report.status==='COMPLETE' && child.status!==0) ||
+       (report.status!=='COMPLETE' && child.status!==2))
+      stop('COLLECTOR_EXIT_MISMATCH');
+    return report;
+  } catch(e) {
     return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',...ctx,host:hostname,
       status:'BLOCKED',code:e.code||'COLLECTOR_STOPPED',pinCount:0,logCount:0,
       sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
