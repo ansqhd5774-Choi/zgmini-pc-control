@@ -1,5 +1,16 @@
 # #996 — C 복구 중 ORIGINAL_JOB_DISPOSITIONS 중단 인계
 
+## 2026-11-11 — 기존 ZGMINI PC 실제 상태 조회 수신 및 7개 Runner 오판 교정
+
+- 사용자가 **기존 ZGMINI PC**에서 기존 `tools/automation-status.mjs`를 직접 읽기 전용으로 단회 실행한 콘솔 결과를 공유했다. `ZGMINI_PC_AUTOMATION_STATUS_V1`, `observedAt=2026-11-11T14:18:15.348Z`(UTC), `workflowState=active`, `maintenanceState=HEALTHY`, `receiverStatus=LISTENING`, `diagnostics=[]`였다. 보고된 `operationalWrites=0`, `providerCalls=0`, `dbD1Writes=0`은 도구의 자기 보고이며 OS 독립 추적 증거는 아니다.
+- 실제 GitHub 응답의 Runner 총 7개 중 **`zgmini-pc-01`~`zgmini-pc-06` 6개 모두 online/busy=false**이고 독립 `zgmini-handoff-ci-spare-01`도 online/busy=false였다. 여기에 새 물리 PC가 있다는 뜻은 아니며 사용자가 확정한 PC 2대 명칭은 그대로다.
+- 상태 도구의 기존 `runnerSetOnline: rows.length===6` 조건은 이 7개 응답에서 반드시 false라 `runtimeState=UNVERIFIED`, `controllerState=UNVERIFIED`의 **확인된 원인 중 하나**였다. 실제 Supervisor PID·identity·heartbeat·Controller source 검증 값은 요약 출력에 독립 공개되지 않아 다른 원인 배제는 불가하다. `diagnostics=[]`만으로 모든 상태 검사가 PASS라는 뜻은 아니다.
+- 공유 `tools/update.mjs`에 **이미 존재하는** `dedicatedPcRunnerRows(rows,{requireOnline:true})`를 읽기 전용 상태 도구가 재사용하도록 최소 1조건을 수정했다. 별도 Runner는 원래 6개 Runner 건강도 판정에서만 제외하며 Runner 등록·라벨·Workflow·기존 C source를 변경하지 않는다. 관련 테스트에는 7 Runner 정상·6중 누락/중복/오프라인 거부 및 실제 코드 연결 검사를 추가했다.
+- 기존 ZGMINI PC의 실제 설치 잠금은 여전히 **`held=true`, `recoveryRequired=true`**다. 이 값은 상태 출력의 Runner 개수 오판과 **별개의 진짜 #996 복구 차단**이며 수정하지 않았다. 현재 PC checkout 실행 파일에 브랜치 수정이 배포됐다는 증거도 없다.
+- 수정된 소스·테스트는 `node --check` 통과, 관련 기존 #996 검증 **77/77 PASS**. 신규 `automation-status.test.mjs` 전체 실행은 현 Linux 단편 workspace에서 `tools/maintenance-lock.mjs` 의존성 부재(`ERR_MODULE_NOT_FOUND`)로 **미실행**이며 성공으로 보고하지 않는다. 원격 전체 checkout 회귀 확인이 남았다.
+- 운영 복구 **80% 유지, C NO-GO**. 기존 ZGMINI PC의 작업 중단/재부팅/E:·Claim·Lease 수정/Runner 중단/GitHub Issue 재생·Workflow 변경 **0건**.
+
+
 ## 2026-11-11 — 기존 A급 조회의 실증 한계 및 WinPE 기능 가정 교정
 
 - 기존 승인 `config/operations.json`에서 A급 `runner-smoke`/`core-status`/`core-runtime-source-readonly`를 확인했지만 세 작업 모두 Runner 6개 전체의 등록 ID·Supervisor PID·Watchdog·Workflow/lease를 한 번에 증명하지 못한다. `tools/automation-status.mjs`는 읽기 전용 고정 경로 도구이나 `docs/AUTOMATION_STATUS_AND_ADMISSION.md`에 따라 **기존 설치된 pc-job A급 operation이 아니다**. 새 Issue·기존 #1217/#1219/#1226/#1227 재요청은 하지 않았다.
