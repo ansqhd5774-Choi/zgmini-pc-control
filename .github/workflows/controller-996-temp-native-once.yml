@@ -4,8 +4,8 @@ on:
   pull_request:
     types: [labeled]
 
-# The workflow stays inert without a specific Owner label and repository
-# variables. It never authorizes the C-grade production operator.
+# Owner/label/variable/source pin and machine guards remain mandatory.
+# This is not an authorization to run the production C operator.
 permissions:
   contents: read
 
@@ -34,7 +34,7 @@ jobs:
       run:
         shell: cmd
     steps:
-      - name: Require separately approved Windows runner before checkout
+      - name: Require separately approved isolated Windows machine before checkout
         env:
           APPROVED_RUNNER_NAME: zgmini-handoff-ci-spare-01
           APPROVED_MACHINE_NAME: DESKTOP-N62L0NG
@@ -47,73 +47,40 @@ jobs:
           for %%P in ("%RUNNER_TEMP%" "%GITHUB_WORKSPACE%" "%TEMP%" "%TMP%") do (
             if /I "%%~dP"=="E:" (echo C996_TEMP_E_DRIVE_FORBIDDEN & exit /b 34)
           )
-      - name: Refuse redirected or non-C workspace and TEMP before checkout
-        shell: powershell
+          where node >NUL 2>&1
+          if errorlevel 1 (echo C996_TEMP_NODE_UNAVAILABLE_BEFORE_CHECKOUT & exit /b 36)
+      - name: Refuse redirected or non-C workspace and TEMP before checkout (Node, no ps1)
         run: |
-          $ErrorActionPreference = 'Stop'
-          foreach ($key in @('RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP')) {
-            $value = [Environment]::GetEnvironmentVariable($key)
-            if ([string]::IsNullOrWhiteSpace($value)) { throw 'C996_TEMP_PATH_UNSET' }
-            $full = [IO.Path]::GetFullPath($value)
-            if ($full -cnotmatch '^[Cc]:\\') { throw 'C996_TEMP_NON_C_VOLUME' }
-            $ancestor = [IO.DirectoryInfo]::new($full)
-            if (-not $ancestor.Exists) { throw 'C996_TEMP_PATH_MISSING' }
-            while ($null -ne $ancestor) {
-              if (($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-                throw 'C996_TEMP_PATH_REPARSE'
-              }
-              $ancestor = $ancestor.Parent
-            }
-          }
+          @echo off
+          node -e "const fs=require('fs'),p=require('path'); for(const k of ['RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP']) {const v=process.env[k];if(!v)throw Error('C996_TEMP_PATH_UNSET_'+k);const full=p.win32.resolve(v),parsed=p.win32.parse(full);if(parsed.root.toLowerCase()!=='c:\\')throw Error('C996_TEMP_NON_C_VOLUME_'+k);if(!fs.existsSync(full)||!fs.statSync(full).isDirectory())throw Error('C996_TEMP_PATH_MISSING_'+k);let current=full;while(true){if(fs.lstatSync(current).isSymbolicLink())throw Error('C996_TEMP_PATH_REPARSE_'+k);const parent=p.win32.dirname(current);if(parent===current)break;current=parent;}const real=fs.realpathSync.native(full);if(real.toLowerCase()!==full.toLowerCase())throw Error('C996_TEMP_PATH_REDIRECT_'+k);}"
+          if errorlevel 1 exit /b 37
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 9c291bc02b983393d7f133c71a1a8aeb8858373b
+          ref: 2a99eab34ca9a088d1d05deedc44db448a2b6ae1
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Verify exact source and effective Windows execution policy
-        shell: powershell
+      - name: Verify exact source and available Windows C sharp compiler
         run: |
-          $ErrorActionPreference = 'Stop'
-          $script = Join-Path $env:GITHUB_WORKSPACE 'tools\TEST_996_WINDOWS_TEMP_SECURITY_WINDOW.ps1'
-          $test = Join-Path $env:GITHUB_WORKSPACE 'tests\controller-996-windows-temp-security-window.test.mjs'
-          $expected = @{
-            $script = '6E8E78FF2584731495E49FF8F9326ECB8F806C8C4668814DEDB629A393661461'
-            $test = '3D7D5181F5A8803311C0A1BC7934D2BDBCFA353C343CCD043A692A60F4B95869'
-          }
-          foreach ($file in $expected.Keys) {
-            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw 'C996_TEMP_REQUIRED_SOURCE_MISSING' }
-            if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -cne $expected[$file]) { throw 'C996_TEMP_SOURCE_SHA256_MISMATCH' }
-          }
-          if (Test-Path -LiteralPath 'E:\ZGmini') { throw 'C996_TEMP_ORIGINAL_PC_FORBIDDEN' }
-          if ($env:ZGMINI_996_TEMP_ONLY_ON_ORIGINAL_PC -eq '1') { throw 'C996_TEMP_ORIGINAL_PC_OVERRIDE_FORBIDDEN' }
-          $policy = Get-ExecutionPolicy
-          if ($policy -notin @('RemoteSigned','AllSigned')) { throw 'C996_TEMP_EXECUTION_POLICY_UNSUPPORTED' }
-          $signature = Get-AuthenticodeSignature -LiteralPath $script
-          $zone = Get-Item -LiteralPath $script -Stream Zone.Identifier -ErrorAction SilentlyContinue
-          if ($signature.Status -ne 'Valid' -and ($policy -eq 'AllSigned' -or $null -ne $zone)) {
-            throw 'C996_TEMP_SIGNATURE_ORIGIN_POLICY_BLOCKED'
-          }
-          $windowsPowershell = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-          if (-not (Test-Path -LiteralPath $windowsPowershell)) { throw 'C996_TEMP_POWERSHELL_MISSING' }
-          if ((Get-AuthenticodeSignature -LiteralPath $windowsPowershell).Status -ne 'Valid') {
-            throw 'C996_TEMP_SYSTEM_POWERSHELL_SIGNATURE_INVALID'
-          }
-          Write-Output 'C996_TEMP_SOURCE_AND_POLICY_PASS'
-      - name: Run exactly ten TEMP-only tests and check zero skips
-        shell: powershell
+          @echo off
+          node -e "const fs=require('fs'),crypto=require('crypto');const expected={'tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW.ps1':'6E8E78FF2584731495E49FF8F9326ECB8F806C8C4668814DEDB629A393661461','tools/TEST_996_WINDOWS_TEMP_SECURITY_WINDOW_NATIVE.cs':'1D0D847A5E561C76FDEBAFA11056CFFAA4EB7E951594FD0B2A80D2BC3BF835C0','tests/controller-996-windows-temp-security-window.test.mjs':'94546C5F84990B85DB42B0E4EF440955FE57139C76C94C1581A31F5CA636A8E9'};for(const [p,sha] of Object.entries(expected)){if(!fs.existsSync(p))throw Error('C996_TEMP_REQUIRED_SOURCE_MISSING_'+p);const got=crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').toUpperCase();if(got!==sha)throw Error('C996_TEMP_SOURCE_SHA256_MISMATCH_'+p);}if(fs.existsSync('E:\\ZGmini'))throw Error('C996_TEMP_ORIGINAL_PC_FORBIDDEN');"
+          if errorlevel 1 exit /b 41
+          if not exist "%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" (echo C996_TEMP_NATIVE_COMPILER_MISSING & exit /b 42)
+          if exist "%RUNNER_TEMP%\zgmini-996-native-%GITHUB_RUN_ID%.exe" (echo C996_TEMP_NATIVE_OUTPUT_ALREADY_EXISTS & exit /b 43)
+      - name: Compile signed-system-compiler native TEMP-only test fixture
         run: |
-          $ErrorActionPreference = 'Stop'
-          $out = Join-Path $env:RUNNER_TEMP ('zgmini-996-temp-native-' + $env:GITHUB_RUN_ID + '.tap')
-          & node --test --test-concurrency=1 --test-reporter=tap 'tests/controller-996-windows-temp-security-window.test.mjs' *> $out
-          $exit = $LASTEXITCODE
-          $result = Get-Content -LiteralPath $out -Raw
-          $required = @{tests=10;pass=10;fail=0;cancelled=0;skipped=0;todo=0}
-          foreach ($name in $required.Keys) {
-            $line = '^# ' + $name + ' ' + $required[$name] + '\r?$'
-            if ($result -notmatch ('(?m)' + $line)) { throw ('C996_TEMP_TAP_SUMMARY_INVALID_' + $name) }
-          }
-          if ($exit -ne 0) { throw 'C996_TEMP_NODE_EXIT_FAILED' }
-          Write-Output 'C996_TEMP_NATIVE_10_PASS_0_SKIP'
-          Write-Output 'C996_TEMP_PRODUCTION_C_NOT_AUTHORIZED'
+          @echo off
+          "%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:exe /r:System.Core.dll /r:System.Runtime.Serialization.dll /out:"%RUNNER_TEMP%\zgmini-996-native-%GITHUB_RUN_ID%.exe" "tools\TEST_996_WINDOWS_TEMP_SECURITY_WINDOW_NATIVE.cs"
+          if errorlevel 1 exit /b 44
+      - name: Run exactly ten tests and require six native passes (no PowerShell scripts)
+        run: |
+          @echo off
+          set "ZGMINI_996_NATIVE_EXE=%RUNNER_TEMP%\zgmini-996-native-%GITHUB_RUN_ID%.exe"
+          set "C996_TAP=%RUNNER_TEMP%\zgmini-996-temp-native-%GITHUB_RUN_ID%.tap"
+          node --test --test-concurrency=1 --test-reporter=tap "tests/controller-996-windows-temp-security-window.test.mjs" > "%C996_TAP%" 2>&1
+          if errorlevel 1 (type "%C996_TAP%" & echo C996_TEMP_NODE_EXIT_FAILED & exit /b 45)
+          node -e "const fs=require('fs');const s=fs.readFileSync(process.env.C996_TAP,'utf8');for(const [k,v] of Object.entries({tests:10,pass:10,fail:0,cancelled:0,skipped:0,todo:0})){if(!new RegExp('^# '+k+' '+v+'\\r?$','m').test(s))throw Error('C996_TEMP_TAP_SUMMARY_INVALID_'+k);}"
+          if errorlevel 1 (type "%C996_TAP%" & exit /b 46)
+          echo C996_TEMP_NATIVE_10_PASS_0_SKIP
+          echo C996_TEMP_PRODUCTION_C_NOT_AUTHORIZED
