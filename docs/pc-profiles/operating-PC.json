@@ -36,7 +36,7 @@
     "resultDelivery": "GitHub private verified JSON/TXT pair and original Issue receipt; no automatic independent ChatGPT resume"
   },
   "hardware": {
-    "observedAtUtc": "from hardware Run 43102349724",
+    "observedAtUtc": null,
     "os": {
       "platform": "win32",
       "version": "Windows 11 Pro",
@@ -64,7 +64,9 @@
         "capacityMiB": 1907694,
         "freeMiB": 1580840
       }
-    ]
+    ],
+    "issueCreatedAtUtc": "2026-11-11T21:21:31Z",
+    "observationTimeNote": "Hardware result does not itself publish an exact capture timestamp; Issue creation time is not an observation timestamp."
   },
   "process": {
     "observedAtUtc": "2026-11-11T21:45:12.3980202Z",
