@@ -47,12 +47,13 @@ jobs:
           for %%P in ("%RUNNER_TEMP%" "%GITHUB_WORKSPACE%" "%TEMP%" "%TMP%") do (
             if /I "%%~dP"=="E:" (echo C996_TEMP_E_DRIVE_FORBIDDEN & exit /b 34)
           )
-          where node >NUL 2>&1
-          if errorlevel 1 (echo C996_TEMP_NODE_UNAVAILABLE_BEFORE_CHECKOUT & exit /b 36)
+          set "C996_NODE=%RUNNER_TEMP%\..\..\externals\node20\bin\node.exe"
+          if not exist "%C996_NODE%" (echo C996_TEMP_RUNNER_BUNDLED_NODE_MISSING & exit /b 36)
       - name: Refuse redirected or non-C workspace and TEMP before checkout (Node, no ps1)
         run: |
           @echo off
-          node -e "const fs=require('fs'),p=require('path'); for(const k of ['RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP']) {const v=process.env[k];if(!v)throw Error('C996_TEMP_PATH_UNSET_'+k);const full=p.win32.resolve(v),parsed=p.win32.parse(full);if(parsed.root.toLowerCase()!=='c:\\')throw Error('C996_TEMP_NON_C_VOLUME_'+k);if(!fs.existsSync(full)||!fs.statSync(full).isDirectory())throw Error('C996_TEMP_PATH_MISSING_'+k);let current=full;while(true){if(fs.lstatSync(current).isSymbolicLink())throw Error('C996_TEMP_PATH_REPARSE_'+k);const parent=p.win32.dirname(current);if(parent===current)break;current=parent;}const real=fs.realpathSync.native(full);if(real.toLowerCase()!==full.toLowerCase())throw Error('C996_TEMP_PATH_REDIRECT_'+k);}"
+          set "C996_NODE=%RUNNER_TEMP%\..\..\externals\node20\bin\node.exe"
+          "%C996_NODE%" -e "const fs=require('fs'),p=require('path'); for(const k of ['RUNNER_TEMP','GITHUB_WORKSPACE','TEMP','TMP']) {const v=process.env[k];if(!v)throw Error('C996_TEMP_PATH_UNSET_'+k);const full=p.win32.resolve(v),parsed=p.win32.parse(full);if(parsed.root.toLowerCase()!=='c:\\')throw Error('C996_TEMP_NON_C_VOLUME_'+k);if(!fs.existsSync(full)||!fs.statSync(full).isDirectory())throw Error('C996_TEMP_PATH_MISSING_'+k);let current=full;while(true){if(fs.lstatSync(current).isSymbolicLink())throw Error('C996_TEMP_PATH_REPARSE_'+k);const parent=p.win32.dirname(current);if(parent===current)break;current=parent;}const real=fs.realpathSync.native(full);if(real.toLowerCase()!==full.toLowerCase())throw Error('C996_TEMP_PATH_REDIRECT_'+k);}"
           if errorlevel 1 exit /b 37
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
