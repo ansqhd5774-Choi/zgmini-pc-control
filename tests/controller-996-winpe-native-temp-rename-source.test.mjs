@@ -25,6 +25,7 @@ test('Windows native primitive is handle-based FileRenameInfo without replacemen
   assert.match(src,/ReplaceIfExists\s*=\s*FALSE/);
   assert.match(src,/RootDirectory\s*=\s*root_handle/);
   assert.match(src,/SetFileInformationByHandle\(source_handle, FileRenameInfo/);
+  assert.match(src,/archive_handle\s*=\s*c996_open_dir\(archive,[\s\S]+?FILE_SHARE_DELETE\)/);
   assert.match(src,/C996_RENAME_DONE/);
   assert.doesNotMatch(src,/\bMoveFileExW\s*\(|\bMoveFileW\s*\(|\bRemoveDirectoryW\s*\(|\bDeleteFileW\s*\(/);
 });
