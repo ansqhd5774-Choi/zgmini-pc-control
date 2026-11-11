@@ -105,9 +105,9 @@ static bool c996_no_reparse_ancestors(const WCHAR *full_path)
     return true;
 }
 
-static HANDLE c996_open_dir(const WCHAR *name, DWORD desired)
+static HANDLE c996_open_dir(const WCHAR *name, DWORD desired, DWORD share)
 {
-    return CreateFileW(name, desired, FILE_SHARE_READ | FILE_SHARE_WRITE,
+    return CreateFileW(name, desired, share,
                        NULL, OPEN_EXISTING,
                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
                        NULL);
@@ -163,8 +163,10 @@ int wmain(int argc, WCHAR **argv)
         !c996_no_reparse_ancestors(source))
         return c996_stop("FIXTURE_UNSAFE");
 
-    root_handle = c996_open_dir(root, FILE_READ_ATTRIBUTES | FILE_TRAVERSE);
-    source_handle = c996_open_dir(source, DELETE | FILE_READ_ATTRIBUTES);
+    root_handle = c996_open_dir(root, FILE_READ_ATTRIBUTES | FILE_TRAVERSE,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE);
+    source_handle = c996_open_dir(source, DELETE | FILE_READ_ATTRIBUTES,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE);
     if (!c996_identity(root_handle, &root_id) ||
         !c996_identity(source_handle, &source_id) ||
         root_id.volume_serial != source_id.volume_serial) {
@@ -199,7 +201,13 @@ int wmain(int argc, WCHAR **argv)
         goto done;
     }
 
-    archive_handle = c996_open_dir(archive, FILE_READ_ATTRIBUTES);
+    /* The source handle still has DELETE access to this SAME file identity.
+     * The verification open must share DELETE to satisfy Windows' symmetric
+     * share checks. The original held source handle itself still does NOT
+     * share DELETE, preventing a competing DELETE open in this test window. */
+    archive_handle = c996_open_dir(archive, FILE_READ_ATTRIBUTES,
+                                   FILE_SHARE_READ | FILE_SHARE_WRITE |
+                                   FILE_SHARE_DELETE);
     if (!c996_identity(archive_handle, &archive_id) ||
         c996_resolve_rename((c996_file_identity){0}, archive_id, source_id) !=
             C996_RENAME_DONE ||
