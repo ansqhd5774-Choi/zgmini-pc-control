@@ -337,14 +337,33 @@ function moveNoReplace(from,to,{files,ownerMode,actorPid=null,nonce=null}){
       encoding:'utf8',windowsHide:true,timeout:30_000,maxBuffer:100_000,stdio:['pipe','pipe','pipe'],
     }));
   } catch {need(false,'C_996_OWNER_NATIVE_MOVE_UNKNOWN');}
-  require996OwnerArchiveReceipt(receipt);
+  require996OwnerArchiveReceipt(receipt,files);
   need(absent(from)&&fs.lstatSync(to).isDirectory(),
     'C_996_OWNER_NATIVE_MOVE_POSTCHECK_UNKNOWN');
 }
 
-export function require996OwnerArchiveReceipt(receipt){
+// A native success flag is not enough: the move receipt must carry an
+// independently parseable, exact post-move child inventory matching the
+// pre-move approved SHA-256 pins. This does not attest namespace exclusivity
+// or authorize production execution; the upstream C hard STOP remains.
+export function require996OwnerArchiveReceipt(receipt,pins){
   need(receipt?.ok===true&&receipt.sourceHandleBound===true&&receipt.noReplace===true,
     /^C996_NATIVE_[A-Z0-9_]+$/.test(receipt?.code??'')?receipt.code:'C_996_OWNER_NATIVE_MOVE_UNKNOWN');
+  const id=x=>typeof x==='string'&&/^[a-f0-9]{8}:[a-f0-9]{16}$/.test(x);
+  const snapshot=receipt.snapshot,observed=snapshot?.files;
+  const entries=observed&&typeof observed==='object'&&!Array.isArray(observed)?
+    Object.entries(observed):[];
+  need(id(snapshot?.identity)&&id(receipt.parentIdentity)&&
+    pins&&typeof pins==='object'&&!Array.isArray(pins)&&
+    Object.keys(pins).length>=1&&Object.keys(pins).length<=7&&
+    entries.length===Object.keys(pins).length&&
+    entries.every(([name,file])=>Object.hasOwn(pins,name)&&
+      H64(pins[name])&&file&&typeof file==='object'&&!Array.isArray(file)&&
+      id(file.identity)&&file.identity!==snapshot.identity&&
+      file.sha256===pins[name]&&
+      Number.isSafeInteger(file.size)&&file.size>0&&file.size<=262144)&&
+    new Set(entries.map(([,file])=>file.identity)).size===entries.length,
+    'C_996_OWNER_NATIVE_POSTMOVE_RECEIPT_DRIFT');
 }
 
 function gitContentAtCommit(relFile,commit){
