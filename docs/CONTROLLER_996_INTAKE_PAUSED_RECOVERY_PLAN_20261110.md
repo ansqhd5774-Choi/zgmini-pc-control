@@ -154,3 +154,18 @@
 - 소스·시험 파일은 `%TEMP%\zgmini-996-cng-bundle-b9b2dfe5529541b0a89d9f69db658ca3`, EXE/OBJ/build/dependents/imports/headers/sha256/result 및 static-evidence.json은 `%TEMP%\zgmini-996-winpe-cng-build-18624-8721`. 파일을 재생성/다운로드한 다른 EXE의 해시로 이 결과를 대체하지 않음. 원본 순수 verifier 수정 0.
 - **실행한 WinPE EXE 0회 / 실제 WinPE CNG 성공 미실증**. 선택된 이미지의 OS DLL/export 실존과 로드 성공·registry marker 관측·6-case 실제 CNG는 다음 승인된 WinPE test-only 런타임 단계에서 확인할 것. 실제 부팅·미디어 생성·선택 boot.wim 변경은 수행하지 않음.
 - 운영 PC/E: 접근·변경 0, BCD/WIM 변경 0, Controller/Runner/Workflow/Backlog/Claim/Lease/C급 복구 0. **전체 80% / C NO-GO / Owner 승인·신뢰시간·철회 미검증 유지**.
+
+## 2026-11-12 공통 대기열 PC 테스트 전용 ISO 생성 승인 범위
+
+사용자가 직전 제안(공통 대기열 PC에서 **ISO 생성만**, USB/부팅·원본 운영 PC 변경 없음)에 "계속해라"로 진행을 승인함. **이 승인 범위는 ISO 생성 준비 작업 한정**이며 WinPE 실행, 운영 PC 부팅, C급 원복, Owner 승인/키, Workflow/Backlog, 실제 원본 E: 접근까지 확대하지 않는다. 이 ChatGPT는 공통 대기열 Windows에서 직접 실행할 수 없으므로 해당 PC의 로컬 Codex가 아래 최소 단계를 실제 수행하고 결과를 전달해야 한다. GitHub 문서 등록이 로컬 Codex 실행 또는 자동 전달 증거는 아니다.
+
+1. 호스트 DESKTOP-N62L0NG와 기존 VS/ADK/WinPE 도구 위치, 입력 EXE SHA256 `b2b1af8accc55d95b5e11bc68664a45af19887d56f09cd9231bce2dfd6a8e218` 확인. 입력이 불일치하면 STOP, 임의 재빌드로 이전 실증 대체 금지.
+2. 새로운 **C: 사용자 TEMP 하위** 고유 작업 폴더에 공식 `copype amd64`로 ISO 전용 새 WinPE 작업본을 만든다. 이미 존재하는 이전 작업본·기존 BCD·WIM·원본 ADK를 덮어쓰거나 정리하지 않는다.
+3. 작업본의 BIOS/UEFI BCD·boot.wim·boot.sdi 입력 SHA256/파일크기를 보존한다. `bcdedit /store ... /enum`조차 기존 TEMP BCD에 hive 내부 ACL/메타데이터 변화를 일으킨 실측이 있으므로 이번 생성 경로에서 사용하지 않는다. 읽기 전용 오프라인 파서 결과는 재사용, 원인 미확정 드리프트를 무해 판정하지 않는다.
+4. 공식 DISM으로 **이번 신규 작업본의 boot.wim만** 명시 인덱스 확인 후 독립 마운트하고, EXE 단일 바이트 그대로 `\Tools\c996_winpe_cng_test.exe`에 추가한다. Startnet.cmd/Winpeshl.ini 자동 실행·드라이버·계정/보안 설정·기존 BCD 값 변경 없음. 마운트 안팎 EXE SHA 동일 확인 후 성공할 때만 `/Unmount-Image /Commit`; 실패 시 임의 `/Discard`/cleanup/재시도하지 않고 정확한 마운트 상태와 원본 해시 기록 후 STOP.
+5. 새 작업본에 대해 Microsoft 공식 `MakeWinPEMedia /ISO`로 **ISO 파일만** 별도 신규 C: TEMP 경로에 생성. `/UFD`·Diskpart·USB 포맷·ISO 굽기·부팅 항목 변경·PC 재부팅 금지. `/bootex`는 실제 UEFI/Secure Boot 2023 CA 체인 검증 없이 자동 선택하거나 호환 성공으로 주장하지 않는다.
+6. ISO/최종 WIM/내장 EXE의 각 SHA256·크기·DISM 이미지 정보, 신규 BCD 전후 비교, mount 상태, 실행/쓰기 범위를 TXT/JSON에 최소 요약한다. ISO 생성 성공은 **WinPE 런타임·bcrypt.dll 실제 로드·CNG 6/6·Owner 승인·clock/revocation·C급 복구** 중 어떤 것도 PASS로 승격하지 않는다.
+
+공식 근거: https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-mount-and-customize 및 https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/winpe-create-usb-bootable-drive.
+
+**이번 승인에서 허용된 신규 쓰기는 공통 대기열 PC의 새 C: TEMP 작업본/ISO/최소 결과뿐**. 원본 PC/E:·USB·서비스/Runner·GitHub Workflow·원본 Claim/Lease 변경 0. 실제 총괄 #996 복구율 **80%**, C급 **NO-GO** 유지.
