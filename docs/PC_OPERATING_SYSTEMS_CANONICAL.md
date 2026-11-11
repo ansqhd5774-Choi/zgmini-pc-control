@@ -2,6 +2,8 @@
 
 기준일: 2026-11-12 KST. **이 문서는 신규 일반챗이 먼저 읽을 장비별 운영 정본**이다. 기능별 승인·해시·자원 잠금·실행 절차는 기존 AGENTS.md, PC_AUTOMATION_STANDARD.md가 우선한다. 장비 정보는 **당시 관측값**이며 현재 상태의 영구 보장이 아니다.
 
+**장비별 기계 판독용 고정 스냅샷:** [운영 PC 프로필](pc-profiles/operating-PC.json) · [공통 대기열 PC 프로필](pc-profiles/handoff-DESKTOP-N62L0NG.json). 두 JSON의 모든 실측값은 기존 GitHub 원본 결과 링크에 연결되어 있으며, PID·가용 메모리·프로세스 수는 관측 당시 값으로 취급한다.
+
 ## 0. 두 PC 및 증거 분류
 - 기존 운영 PC: 호스트 PC, Windows 11 Pro, 데이터 수집·저장·계산·승인된 게시가 실제 수행되는 PC.
 - 공통 대기열 PC: 호스트 DESKTOP-N62L0NG, Windows 10 Home, GitHub 메타데이터 전용 자동 장애 접수·검증·인계 및 격리 CI 실행 PC.
