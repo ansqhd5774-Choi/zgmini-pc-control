@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
+import {spawnSync} from 'node:child_process';
 import {authenticateVolumeIssue,originalPcGate,buildFixedVolumeProbe,
  decodeFixedVolumeResponse,probeFixedVolume,volumeText,SCHEMA,TITLE}
  from '../tools/pc-volume-identity-readonly.mjs';
@@ -103,7 +104,20 @@ test('native read-only Win32 proof runs on isolated Windows fixture only',t=>{
   t.skip('requires existing isolated Windows GitHub Runner');return;
  }
  assert.equal(fs.existsSync('E:\\ZGmini'),false);
- const proof=probeFixedVolume('handoff-fixture');
+ const proof=probeFixedVolume('handoff-fixture',{spawn:(exe,args,opts)=>{
+  const child=spawnSync(exe,args,opts);
+  if(child.status!==0){
+   const error=String(child.stderr||'').replace(/[A-Za-z]:\\[^\\s]+/g,'[path]');
+   const output=String(child.stdout||'').replace(/[A-Za-z]:\\[^\\s]+/g,'[path]');
+   console.log('C996_READONLY_DIAG='+JSON.stringify({
+    exit:child.status,compilerCodes:[...new Set(error.match(/CS[0-9]{4}/g)||[])],
+    parser:/ParserError/.test(error),addType:/Add-Type/.test(error),
+    nativeStop:output.includes('NATIVE_STOP'),errorExcerpt:error.slice(0,640),
+    outputKind:output.slice(0,80),
+   }));
+  }
+  return child;
+ }});
  assert.equal(proof.status,'PASS',proof.code);
  assert.equal(proof.directoryFileIds?.length,undefined);
  assert.equal(Object.keys(proof.directories).length,3);
