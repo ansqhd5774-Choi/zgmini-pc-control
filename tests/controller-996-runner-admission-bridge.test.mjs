@@ -8,6 +8,12 @@ import {
 
 const names=Array.from({length:6},(_,i)=>
   `zgmini-pc-${String(i+1).padStart(2,'0')}`);
+const originals=[
+  [1217,'pc-8da91b23-f5d6-4a94-bcd5-13b0dfcdee61','core-runtime-source-readonly'],
+  [1219,'pc-e2710720-1a35-4a75-ab37-4940ecd33edd','core-runtime-source-readonly'],
+  [1226,'pc-60ed9565-9b87-4099-a4d2-db9235a3cfd4','core-status'],
+  [1227,'pc-6f7a24d4-823d-4648-b2c3-a645a352bef7','core-runtime-source-readonly'],
+];
 function sample({offline=false,pause=false,drain=false}={}){
   return {
     workflowState:'active',
@@ -22,6 +28,12 @@ function sample({offline=false,pause=false,drain=false}={}){
     },
     remoteRuns:{schema:'ZGMINI_996_PC_JOB_RUNS_GET_V1',
       status:'WORKFLOW_RUNS_GET_ONLY',counts:{queued:2,in_progress:0,waiting:0}},
+    originalJobs:{schema:'ZGMINI_996_ORIGINAL_PC_JOB_GET_V1',
+      status:'ORIGINAL_ISSUES_GET_ONLY',issues:originals.map(([number,requestId,operation])=>({
+        number,id:600000+number,requestId,operation,state:'open',commentCount:0,
+        bodySha256:'a'.repeat(64),createdAt:'2026-11-10T01:00:00Z',
+        updatedAt:'2026-11-11T01:00:00Z',
+      }))},
     localRunner:{schema:'ZGMINI_996_LOCAL_RUNNER_IDENTITY_READONLY_V1',
       status:'LOCAL_RUNNER_REGISTRATION_OBSERVED_ONLY',
       pcName:'기존 ZGMINI PC',startupAndWatchdogHashesMatch:true,
@@ -39,6 +51,8 @@ test('six exact local and GitHub registration pairs remain observed only',()=>{
   assert.equal(evidence.existingPcName,'기존 ZGMINI PC');
   assert.equal(evidence.queuePcName,'공통 대기열 PC');
   assert.deepEqual(evidence.counts,{queued:2,inProgress:0,waiting:0});
+  assert.equal(evidence.originalIssues.length,4);
+  assert.equal(evidence.originalDispositionsVerified,false);
   assert.equal(evidence.allOffline,false);
   assert.equal(evidence.markersObserved,false);
   for(const field of ['admissionEligible','processExitProven',
@@ -105,7 +119,8 @@ test('stable repeated GitHub/local reads can ignore harmless row ordering',()=>{
 });
 
 test('two-read drift in Runner status, workflow jobs and markers blocks',()=>{
-  for(const scenario of ['status','busy','queue','pause','drain','labels']){
+  for(const scenario of ['status','busy','queue','pause','drain','labels',
+    'issueState','issueBody','issueComment']){
     const first=sample(),second=sample();
     if(scenario==='status')second.remoteRunners.runners[1].status='offline';
     if(scenario==='busy')second.remoteRunners.runners[1].busy=true;
@@ -113,9 +128,21 @@ test('two-read drift in Runner status, workflow jobs and markers blocks',()=>{
     if(scenario==='pause')second.localRunner.watchdogPausePresent=true;
     if(scenario==='drain')second.localRunner.controllerDrainPresent=true;
     if(scenario==='labels')second.remoteRunners.runners[6].labels.push('misc');
+    if(scenario==='issueState')second.originalJobs.issues[0].state='closed';
+    if(scenario==='issueBody')second.originalJobs.issues[0].bodySha256='b'.repeat(64);
+    if(scenario==='issueComment')second.originalJobs.issues[0].commentCount=1;
     assert.throws(()=>verify996RunnerAdmissionSnapshotStable(first,second),
       /C996_ADMISSION_BRIDGE_SNAPSHOT_DRIFT/,scenario);
   }
+});
+
+test('missing or substituted original Issue cannot satisfy baseline',()=>{
+  const removed=sample();removed.originalJobs.issues.pop();
+  assert.throws(()=>review996RunnerAdmissionReceipts(removed),
+    /C996_ADMISSION_BRIDGE_ORIGINAL_ISSUES_INVALID/);
+  const switched=sample();switched.originalJobs.issues[2].requestId='wrong';
+  assert.throws(()=>review996RunnerAdmissionReceipts(switched),
+    /C996_ADMISSION_BRIDGE_ORIGINAL_ISSUES_INVALID/);
 });
 
 test('production entrypoint cannot run on Linux or inject synthetic I/O',()=>{
