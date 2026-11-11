@@ -8,6 +8,14 @@
 - 현재 #996 WinPE 복구 계획은 **기존 ZGMINI PC를 기존 Windows 대신 WinPE로 재부팅**하는 후보이며, PC 추가 구매·세 번째 PC·E:를 별도 새 호스트로 옮기는 계획이 아니다. 운영 중단·원본 E: 변경은 정확한 최종 승인 전까지 금지한다.
 - 아래 과거 증거에 포함된 '원본 PC', '별도 Windows', '새 PC', '호스트' 표현은 당시 기록을 보존한 것이며 현재 장비 수 또는 공식 명칭을 재정의하지 않는다. 향후 실행 계획·보고·지시문에는 이 두 공식 PC 명칭만 사용한다.
 
+## 2026-11-11 현재 C 실행기 충돌 및 WinPE 1회 후보 — C NO-GO
+
+- **2회 WinPE 안의 현재 실행 적합성 = BLOCKED.** `controller-996-c-native-owner-operator.mjs`는 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`로 무조건 중단하며, `controller-996-continuation-gate.mjs`는 원래 위치의 구 C Claim을 요구한다. 기존 2회 안은 WinPE 1차에서 이를 보관해 다음 Windows 단계 진입 조건을 깨뜨린다. `ENABLE_ONCE`/`CLOSE_ONCE`처럼 무조건 Workflow/Backlog를 수정하는 계획도 현재 Owner 계약의 쓰기 0건과 충돌한다. 해당 문구를 GET 상태 재조회·미완료 시 STOP으로 교정했다.
+- **GitHub 신규 pc-job 접수 위험:** `.github/workflows/pc-job.yml`의 Issues `opened` 트리거는 Workflow 활성 시 새 Issue를 받을 수 있다. `controller-install` Lease 또는 모의 `admissionProtected:true`만으로 접수 차단을 증명할 수 없다. 신규 작업이 소비되지 않는 **실제 승인된 admission 보호 계약**이 실증되기 전에는 어느 오프라인 안도 실행 불가다.
+- **부팅 횟수를 줄이는 대안(선택 미확정):** 기존 ZGMINI PC의 **Windows 사전 준비·구 C Claim 유지·새 별도 continuation C Claim과 영속 승인 handoff 확보 → WinPE 1회에서 구 C Claim→신규 continuation Claim→Install Lease(마지막) 보관 → 기존 Windows 사후 재조회**. `공통 대기열 PC`는 기존 두 번째 PC로 유지한다. 새 경로·작업·다운타임과 OS 간 동의/SourceLock/signature 검증은 정확한 최종 Owner C 승인 및 Windows 실증이 필요하다.
+- `plan996SingleBootRecovery`는 **소스 전용 설계 후보**이며 native 실행기/부트 USB/영속 서명 인계 구현이 아니다. 2회 안도 차단 사유를 명시한 비교 후보로 보존한다. 어느 안도 `executionAuthorized`를 true로 만들지 않는다.
+- 이번 관련 회귀 **37/37 PASS** (기존 18 및 새 설계 19), `tools/controller-996-windows-archive-adapter.mjs`와 `tests/controller-996-offline-recovery-method.test.mjs`만 추가 수정. **원본 PC·Workflow·Backlog·원본 Issue 변경 0, 실제 C 복구 4/5=80%→80%, Draft PR #1222, C 실행 차단** 유지.
+
 ## 2026-11-11 두 차례 WinPE 부팅 인계 설계 — SOURCE/TEST ONLY, 운영 80% 유지
 
 - **물리 PC는 총 2대만 사용한다.** `기존 ZGMINI PC`에서 **WinPE 1차 → 기존 Windows 복귀 → WinPE 2차 → 기존 Windows 최종 재조회**를 검토한다. `공통 대기열 PC`는 두 번째 PC로 유지하되 이 복구의 새로운 물리적 호스트가 아니다. 실제 PC 부팅/운영 중단/원본 E: 변경은 **최종 Owner C급 승인 전 금지**.
