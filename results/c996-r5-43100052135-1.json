@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_C996_R5_GITHUB_RESULT_V1",
+  "requestId": "6a64e58b-4924-4dc0-ab75-6b1687f1dd98",
+  "issueNumber": 1240,
+  "runId": "43100052135",
+  "attempt": "1",
+  "host": "DESKTOP-N62L0NG",
+  "status": "BLOCKED",
+  "code": "TEMP_ROOT_MISMATCH",
+  "pinCount": 0,
+  "logCount": 0,
+  "sourceClassification": "IMAGE_METADATA_DRIFT_CONFIRMED",
+  "rootCauseStage": "UNKNOWN",
+  "isoOnlyPassPreserved": true,
+  "operationalWrites": 0,
+  "automaticRetries": 0,
+  "rawLogIncluded": false,
+  "pins": [],
+  "logs": []
+}
