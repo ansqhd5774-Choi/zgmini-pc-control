@@ -14,7 +14,7 @@ jobs:
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       github.actor == 'ansqhd5774-Choi' &&
-      contains(github.event.issue.labels.*.name, 'pc-c996-r5-readonly')
+      github.event.issue.title == 'pc-c996-r5-readonly'
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 5
     defaults:
