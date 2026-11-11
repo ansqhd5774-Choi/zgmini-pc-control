@@ -330,3 +330,18 @@ test('single boot rejects phase reuse, extra phases, and unsafe final readback',
       'C996_SINGLE_BOOT_FINAL_READBACK_UNVERIFIED');
   }
 });
+
+test('no caller-supplied approval flags become authenticated evidence in either boot simulator',()=>{
+  for(const [run,makeTrace] of [[simulate,trace],[simulateSingle,singleTrace]]){
+    const complete=run(makeTrace());
+    const incomplete=run([]);
+    const blocked=run('invalid-events');
+    for(const result of [complete,incomplete,blocked]){
+      assert.equal(result.evidenceAuthenticated,false);
+      assert.equal(result.ownerApprovalVerified,false);
+      assert.equal(result.signatureCryptographicallyVerified,false);
+      assert.equal(result.executionAuthorized,false);
+      assert.equal(result.installLeaseReleaseAuthorized,false);
+    }
+  }
+});
