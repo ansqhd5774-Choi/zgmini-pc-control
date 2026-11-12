@@ -170,6 +170,17 @@
 - **공식 파일 외부 공개 경로 점검(운영 수집 아님):** BLS 고정 원문 `https://download.bls.gov/pub/time.series/cu/cu.data.12.USHousing`을 공용 웹 읽기로 확인하였고 `CUSR0000SEHA` 및 `CUSR0000SEHC01` 행이 실제 존재한다. 현재 원본 PC CPI INVALID를 공급자 소실이라고 단정하지 않는다. Census 고정 XLSX는 사용한 웹 문서 읽기 도구가 바이너리 형식으로 지원하지 않아 **원문 파싱 검증 미실시**; 이를 공급자 다운로드 실패나 원자료 비정상으로 판정하지 않는다. [기존 manual-B 정본](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/inflation-manual-b/README.md)의 Task→Node→E: lock owner 관측 결손이 먼저 해결되어야 기존 승인 1회 B를 안전 실행 가능. 09:00 시각 Gate는 없다.
 - **중앙 자동화 직접 점검:** 기존 `Automation_9a403a04a8ac8191a331e94f9abeb1b4` 활성 `true`, 최신 Run `8000c8d1-a4d8-8329-b5c9-96c87dd8db05` `completed/NO_WORK`, `requires_user_action=false`. 추가 예약·인위적 실패·#996 C 실행/Workflow/Backlog/Claim/Lease 변경 0. 중앙 8/8 DONE, 격리 E2E 4/5 DEFERRED, #996 80% NO-GO 유지.
 
+
+### 0.16 2026-11-13 물가 B #1336 교차 검토 및 중앙 대기열 현행 판정
+
+- **현행 GitHub 교차 검사:** 제어 저장소 `main=1ab6a6147b62f265aeafdd32af0db545e5ba48c7` 시점의 기존 `APPROVED_B` 승인 JSON과 [Draft PR #1336](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336)의 새 JSON을 필드 전수 대조했다. 키 목록 동일; 변경은 `status: APPROVED_B→DRAFT_NOT_APPROVED`, `sourceSha: 48d3478030590ca63aaab2435e88c896608c70d3→05d7ae49e0a84cbeebd90ef4de6dd7284094bf97` 정확히 2개뿐. sourceFiles 4/4, providerUrls·targetFiles·단회·Core lease·모든 제한 쓰기 플래그 불변. PR은 OPEN/DRAFT, 승인 리뷰/운영 실행 아님.
+- **신뢰된 source provenance 경계:** 기존 운영 PC [A #1326](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1326)는 `05d7...` 로컬 설정/체크아웃 근거이지만 원격 원본 확인이 아니다. 기존 설치 A [#1332](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1332) / [Run #43272851686](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43272851686)은 `inventoryTruncated=true`, `candidates=[]`, `runtimeSourceVerified=false`; 조회 재실행이나 0 후보=부재 판단 금지. `zgmini` REST commit 조회에서 `05d7...`은 `422 No commit found`이며 이는 로컬/별도 원격 출처 가능성을 배제하지 않는다. **승인 Owner가 출처/정확한 PC 바이트의 신뢰 기준을 먼저 판정**해야 한다.
+- **활성 조건·영향 범위:** 격리 [Run #43279174086](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43279174086)의 B Workflow 조건은 false. [#1334](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1334) CPI #22/#23 INVALID·Census #28 MISSING, PPI #24 203건 유효 보존. #996 C 설치 NO-GO는 Writer B 전역 Gate가 아니며 B 자체 Core 소유권·원본 보호 검사 유지. 원래 B [#1177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1177) 재접수 금지. 물가 기능 42%, 23/26 raw·4/7 공개 변동 없음.
+- **실제 인계 행동:** 총괄이 [PR #1336](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336)에 GitHub **COMMENT review #5880042912**를 등록하여 두 필드 승인 범위와 원격 출처 미입증·중복 A 배제를 명시했다. 이것은 `APPROVE` review가 아니며 PR 상태·manifest·Workflow·Runner·PC·DB·D1를 바꾸지 않는다. 댓글은 다른 ChatGPT 원담당의 실제 수신/기동을 증명하지 않는다.
+- **중앙 현재 상태:** `repo:... is:open label:handoff-agent-pending` 검색 0건, 기존 `agent-handoff` open 8건은 역사적 건. 공통 중앙 **8/8 DONE**, 신설 격리 Writer B 자연 전체 왕복 **4/5 DEFERRED**, 공유 자원 수명주기 **4/5 DEFERRED**, #996 C **NO-GO** 각각 유지. 자연 수리 사건 0건인데 인위적 B/장애 생성·전역 업무 중지 금지.
+- **다음 필수 실행(물가 B 원담당/승인 Owner):** 현 PC `05d7...` 신뢰 출처·기존 동일 효과·정확한 승인 source 해시 검토 → 신규 `APPROVED_B` 여부 명시 결정. 실제 승인 이후에만 manifest Git blob/SHA256 및 B opt-in 정규 활성 확인 → 새 고유 단회 B에서 내장 12분 Core owner 검사→공식 BLS·Census GET→CPI 복구/PPI 203건 보존/Census 저장·readback. 총괄의 중앙 8/8을 이 승인에 대한 추가 Gate로 만들지 않는다. 예약 자연검증은 기능 완료 후 후속이다.
+
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
