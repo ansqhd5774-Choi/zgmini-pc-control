@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {createHash,constants,generateKeyPairSync,sign} from 'node:crypto';
 import {plan996SingleBootRecovery}
   from '../tools/controller-996-windows-archive-adapter.mjs';
-import {encode996CanonicalOfflineHandoff,review996SignedOfflineHandoff}
+import {encode996CanonicalOfflineHandoff,review996SignedOfflineHandoff,
+  review996OnlineVolumePinsForHandoff}
   from '../tools/controller-996-signed-offline-handoff.mjs';
 
 // Ephemeral memory-only TEST key. Never store or accept it as Owner trust.
@@ -151,4 +152,70 @@ test('forged caller clock inside signed window cannot establish a trusted offlin
   assert.equal(result.productionExecutable,false);
   assert.equal(result.operationalWrites,0);
   assert.equal(result.automaticRetry,false);
+});
+
+const fixedOnline=()=>({
+  schema:'ZGMINI_PC_VOLUME_IDENTITY_PROBE_V1',
+  status:'PASS',code:'VOLUME_IDS_READONLY_OBSERVED',
+  volumeGuid:makeManifest().volumeGuid,volumeSerial:'1'.repeat(16),
+  directories:Object.fromEntries([
+    ['VOLUME_ROOT','4'],['ZGMINI','5'],['AUTOMATION','6'],
+    ['MAINTENANCE','7'],['LEASES','8'],['OLD_C','1'],['INSTALL','3'],
+  ].map(([k,c])=>[k,{state:'PRESENT',fileId128:c.repeat(32)}])),
+  source:'WIN32_GET_VOLUME_NAME_AND_FILE_ID_INFO',
+  offlineVolumeVerified:false,cExecutionAuthorized:false,
+  operationalWrites:0,automaticRetries:0,
+  requestId:'e741024c-47c5-40ca-b9d1-fbb250e79e42',
+  runId:'43124923743',issueNumber:1265,attempt:'1',
+  role:'operating',host:'pc',runnerName:'zgmini-pc-05',
+});
+const prebootReview=(online=fixedOnline(),manifest=makeManifest())=>
+  review996OnlineVolumePinsForHandoff({
+    onlineObservation:online,signedManifest:manifest,
+  });
+
+test('fixed real-readback shape only compares two original signed file IDs, never enables C',()=>{
+  const result=prebootReview();
+  assert.equal(result.status,'SOURCE_ONLY_TWO_ORIGINAL_PINS_MATCH');
+  assert.equal(result.matchedOriginalDirectoryCount,7);
+  assert.equal(result.matchedSignedMoveCount,2);
+  for(const field of [
+    'continuationClaimIdVerified','onlineEvidenceAuthenticated',
+    'signatureCryptographicallyVerified','offlineVolumeVerified',
+    'ownerApprovalVerified','executionAuthorized','automaticRetry',
+  ])assert.equal(result[field],false);
+  assert.equal(result.operationalWrites,0);
+});
+test('preboot snapshot rejects false origin, changed original IDs, missing paths and serial drift',()=>{
+  const check=(edit,expected)=>{
+    const observation=fixedOnline();
+    edit(observation);
+    const result=prebootReview(observation);
+    assert.equal(result.code,expected);
+    assert.equal(result.executionAuthorized,false);
+  };
+  for(const edit of [
+    x=>{x.runId='43124923744';},
+    x=>{x.requestId='11111111-1111-4111-8111-111111111111';},
+    x=>{x.runnerName='zgmini-handoff-ci-spare-01';},
+    x=>{x.host='DESKTOP-N62L0NG';},
+    x=>{x.cExecutionAuthorized=true;},
+  ])check(edit,'C996_PREBOOT_ONLINE_RECEIPT_INVALID');
+  for(const edit of [
+    x=>{x.directories.OLD_C.fileId128='a'.repeat(31);},
+    x=>{x.directories.INSTALL.state='ABSENT';},
+    x=>{delete x.directories.MAINTENANCE;},
+    x=>{x.directories.OLD_C.fileId128=x.directories.INSTALL.fileId128;},
+  ])check(edit,'C996_PREBOOT_VOLUME_FILE_IDS_INVALID');
+  check(x=>{x.volumeSerial='2'.repeat(16);},
+    'C996_PREBOOT_SIGNED_VOLUME_MISMATCH');
+  const mismatched=makeManifest();
+  mismatched.moves[0].sourceFileId='f'.repeat(32);
+  assert.equal(prebootReview(fixedOnline(),mismatched).code,
+    'C996_PREBOOT_SIGNED_SOURCE_ID_MISMATCH');
+  const altered=makeManifest();altered.volumeGuid=altered.volumeGuid.replace('Volume{','volume{');
+  assert.equal(prebootReview(fixedOnline(),altered).code,
+    'C996_PREBOOT_SIGNED_MANIFEST_INVALID');
+  assert.equal(prebootReview(fixedOnline(),null).code,
+    'C996_PREBOOT_SIGNED_MANIFEST_MISSING');
 });
