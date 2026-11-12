@@ -1,6 +1,6 @@
 # ZGMINI 단일 ChatGPT 총괄 — 공통 장애 대기열 실행 계약
 
-상태(2026-11-09 KST): **자연 Writer B 공통 장애 1건을 자동 접수 → 중앙 해결 → 격리 러너 CI → 정식 원본 Issue 결과 반환까지 E2E 1/1 실증 완료.** 중앙 처리 계획 8/8=100% (실증 1건 기준). 원본 기능 설치 0/4·Core 복구 후 자연 정규 cycle 미확인은 별도 관리한다. PR/CI·결과 영수증은 다른 ChatGPT의 자동 수신 또는 개별 기능 설치·D1/API/UI 운영 적용 증거가 아니다.
+상태(2026-11-09 KST): **자연 Writer B 공통 장애 1건을 자동 접수 → 중앙 해결 → 격리 러너 CI → 정식 원본 Issue 결과 반환까지 E2E 1/1 실증 완료.** 중앙 처리 계획 8/8=100% (실증 1건 기준). 원본 기능 설치 0/4(2026-11-09 당시)·Core 복구 직후 자연 정규 cycle 미확인은 당시 별도 관리 항목이었다. 이후 네 기능의 신규 설치 성공 4/4 이력은 문서 말미의 2026-11-12 증거를 우선한다. PR/CI·결과 영수증은 다른 ChatGPT의 자동 수신 또는 개별 기능 설치·D1/API/UI 운영 적용 증거가 아니다.
 
 ## 사용자 최종 역할 지시
 
@@ -118,7 +118,7 @@
 | 7 | 승인된 PC Job/Writer B의 **자연 발생 유효 실패** → 증거 대조 → 단일 Incident Issue 자동 등록·중복 방지·재조회 | **완료(Writer B 1건 RUNTIME)** — #1063 원본 Run 42617811190 실패, bot #1068 자동 생성·원본 requestId/code/증거 대조·동일 incident 검색 1건 |
 | 8 | 중앙 ChatGPT가 실제 사건을 선택하여 원인 수정·회귀·정확한 PR/CI·원본 Issue 결과 기록까지 수행하고 필요한 운영 적용을 별도 판정 | **완료(Writer B 1건 AGENT E2E)** — #1086 수정/32회 로컬 회귀·격리 CI 42637013508 성공, #1087 Core/lock 실PC 복구, broker 영수증 #1068/#1063 각 1건. broker state는 `RUNTIME_VERIFICATION_PENDING`; 기능 설치 별도 |
 
-- **중앙 인계 8개 마일스톤: 8/8 = 100%, 자연 Writer B 공통 사고 처리 E2E 표본 1/1.** 실제 #1063→#1068 자동 접수, #1086 수정·격리 CI 성공, #1087 원본 PC Core Enabled/lock finalized, broker 인증 댓글 2/2가 서로 다른 증거다. **각 기능 후속 설치 성공 0/4, 복구 후 Core 정규 cycle 미관측**이며 전체 ZGMINI 운영 기능 완료로 표현하지 않는다. 다음 자연 사고에 대한 반복 재현 성공률은 아직 측정되지 않았다.
+- **중앙 인계 8개 마일스톤: 8/8 = 100%, 자연 Writer B 공통 사고 처리 E2E 표본 1/1.** 실제 #1063→#1068 자동 접수, #1086 수정·격리 CI 성공, #1087 원본 PC Core Enabled/lock finalized, broker 인증 댓글 2/2가 서로 다른 증거다. **2026-11-09 당시 각 기능 후속 설치 성공 0/4, 복구 직후 Core 정규 cycle 미관측**이며 전체 ZGMINI 운영 기능 완료로 표현하지 않는다. 다음 자연 사고에 대한 반복 재현 성공률은 아직 측정되지 않았다.
 - **ChatGPT 구조 제약:** 중앙 ChatGPT가 다른 일반 ChatGPT의 대화 ID를 지정해 그 대화에 Tasks를 설치하거나 대화를 깨우는 지원 경로는 확인되지 않았다. `origin.chatId`는 원 사고 추적용이며 실제 `chat_ref`와 별개다. 다른 일반챗마다 최초 1회 Tasks 연결, PR 알림 브리지, Work 전용 MCP Events는 현재 **비채택·완료조건 제외**한다. 이 제약을 회피했다고 주장하지 않는다.
 - **#1041 중앙 판정 완료(2026-11-09 KST):** #1041은 사람이 작성한 #1030 읽기 전용 Writer insertion **프리뷰 안전 중단** 인계로, 자연 PC Job/정규 Writer B 설치 장애 자동 접수 실증이 아니다. 원본 상태 `BLOCKED / WRITER_B_INSERT_ANCHOR_MATCH_STOP`, 결과 JSON/TXT 2/2, PC source·Task·DB·D1·Provider 쓰기/호출 0. #792의 승인된 단일 Core 훅 after SHA-256과 #1012의 실제 Windows A 조회 파일 SHA-256이 `2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d`로 일치한다. **#1012는 특정 checkout 파일/bridge 존재 증거일 뿐 현재 실행 중 Core launcher 연결·gate 활성 증거는 아니다**. #1022 HEAD/config 조회를 파일 SHA 직접 증거로 오인하지 않는다. 최신 owner 댓글의 R2 이중 hook 중복 위험에 따라 신규 설치·재시도는 보류한다. 중앙 총괄이 #1041에 `CENTRAL_TRIAGE_RECORDED` 댓글 [#1041 comment 6739037534](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1041#issuecomment-6739037534)를 남기고 읽기 재조회했으며, 완료된 판정의 무한 재처리 방지를 위해 `handoff-agent-pending`만 제거했다. `agent-handoff` 라벨과 Issue(open), 원본 #1030, 기존 원장은 보존. 무수정 판정을 result-broker의 `HANDOFF_RESULT_RECORDED`/운영 해결로 승격하지 않는다. 현행 broker의 자동 원본 반환 대상은 인증된 pc-job/Writer B **소스 설치** Issue로, #1030 프리뷰는 해당 계약과 다르다.
 
@@ -128,9 +128,9 @@
 
 **다음 필수 실행과 인수 조건**
 
-1. **다음 실제 실행:** 중앙 인계 E2E 1건 성공은 보존하고 과거 검증을 다시 돌리지 않는다. 현재 공유 Writer B #1063 복구 후 원담당 4개 기능의 신규 설치/활성 증거 및 자연 Core cycle 관측을 확인한다. 동일 Treasury manifest 중복 접수 #1090(실행 job skipped)/#1092(신규 정상 제목 B 진행)는 원래 Run/JSON/TXT로 구별한다. 기능 처리와 무관한 원담당 재개 ACK Gate를 새로 만들지 않는다. 4건 후속 결과 확보 뒤 승인된 공유 잠금/복구 프로세스 재발 방지 패치·회귀를 수행한다. 예약 갱신 검증은 기능 완료 뒤만 한다.
+1. **다음 필수 사건(2026-11-12 현재):** 중앙 인계 E2E 8/8 및 #1063 공용 복구·원본 반환 증거를 재사용한다. 후속 정규 Writer B 신규 설치 네 건은 #1095·#1132·#1144·#1195의 서로 다른 실제 Run 및 JSON/TXT로 이미 **4/4 확인**했으므로, 2026-11-09 당시 0/4를 현재 미설치·재요청 근거로 사용하지 않는다. `handoff-agent-pending`이 0건일 때는 기존 중앙 자동화의 `NO_WORK`를 유지한다. 새로운 **자연 발생한 인증된 수리 가능 Writer B 실패**가 접수될 때만 기존 격리 Runner의 원본 receipt·JSON/TXT·bot 직접 라우팅 영수증 → 중앙 실제 최소 수정/PR/성공 CI → 원본 Issue 반환 영수증을 교차 검증해 신설 격리 경로의 **4/5(DEFERRED)** 마지막 항목을 판정한다. 실제 새 공용 재발 장애가 없으면 예방 패치·재설치·공용 lock 변경을 새로운 선행 Gate로 만들지 않는다. 각 기능의 현재 source/수집·계산·저장·게시 검증은 각 원담당이 진행하며 예약 자연 갱신 검증은 기능 완료 후 후속으로 둔다.
 2. **이미 판정된 #1041:** 새로운 실제 근거가 없으면 중복 훅 설치·불필요한 Writer 진단 코드 개조·추가 수동 반환을 반복하지 않는다. 원담당 물가지표 기능은 독립적으로 기존 Core launcher/gate를 승인된 경로로 확인하고 수집·게시를 진행한다. 총괄은 그 소유 영역을 변경하지 않는다.
-3. **보고 계약:** 중앙 인계 E2E 마일스톤 8/8(100%)는 실제 Writer B 사고 1건의 접수·중앙 해결·정식 반환 범위만 뜻한다. 원본 기능 설치 0/4, Core 자연 실행 미관측, 다른 챗 수신 `UNKNOWN`, broker `RUNTIME_VERIFICATION_PENDING`을 반드시 별도 기재한다. 사건별 LAST PASS/FIRST FAIL·PR/CI·실제 Runtime 적용·원본 Issue readback 분리를 유지한다.
+3. **보고 계약:** 중앙 인계 E2E 마일스톤 8/8(100%)는 기존 자연 Writer B 사고 1건의 접수·중앙 해결·정식 반환 범위만 뜻한다. 후속 신규 소스 설치 성공 **이력 4/4**는 현재 실행 중 source·원자료/계산/게시·각 기능 완료가 아니며, 신설 격리 Writer B 신규 적격 자연 사고 왕복 **4/5(DEFERRED)**와 별개다. 다른 챗 수신 `UNKNOWN`, broker `RUNTIME_VERIFICATION_PENDING`은 그대로 구분한다. 사건별 LAST PASS/FIRST FAIL·PR/CI·실제 Runtime 적용·원본 Issue readback을 분리하고 과거 관측 0/4를 현재 장애로 보고하지 않는다.
 
 ## 수정된 증거와 남은 필수 단계
 
