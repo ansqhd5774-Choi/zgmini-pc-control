@@ -347,8 +347,26 @@ test('actual compiled x64 FileIdInfo reader preserves original native ID across 
 });
 
 
-const PINNED_ONLINE_ID=JSON.parse(fs.readFileSync(new URL(
-  '../results/pc-volume-identity-43124923743-1-operating.json',import.meta.url),'utf8'));
+// Deliberately SYNTHETIC native IDs and GUID. Metadata mirrors the fixed
+// historical A receipt format, but no operational E: directory IDs are copied.
+// Exact runtime evidence remains in the main-branch Run #43124923743.
+const PINNED_ONLINE_ID={
+  schema:'ZGMINI_PC_VOLUME_IDENTITY_PROBE_V1',
+  status:'PASS',code:'VOLUME_IDS_READONLY_OBSERVED',
+  issueNumber:1265,runId:'43124923743',
+  requestId:'e741024c-47c5-40ca-b9d1-fbb250e79e42',
+  attempt:'1',role:'operating',host:'pc',runnerName:'zgmini-pc-05',
+  source:'WIN32_GET_VOLUME_NAME_AND_FILE_ID_INFO',
+  volumeGuid:'\\\\?\\Volume{aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa}\\',
+  volumeSerial:'1111111111111111',
+  directories:Object.fromEntries([
+    'VOLUME_ROOT','ZGMINI','AUTOMATION','MAINTENANCE','LEASES',
+    'OLD_C','INSTALL',
+  ].map((k,i)=>[k,{state:'PRESENT',
+    fileId128:(i+1).toString(16).padStart(32,'0')}])),
+  offlineVolumeVerified:false,ownerApprovalVerified:false,
+  cExecutionAuthorized:false,operationalWrites:0,automaticRetries:0,
+};
 const FAKE_CONTINUATION='70a4c347-25ea-4fc6-83d2-c0c670115249';
 const FAKE_ID='9'.repeat(32);
 const fakeSignedNativeSourceManifest=()=>({
