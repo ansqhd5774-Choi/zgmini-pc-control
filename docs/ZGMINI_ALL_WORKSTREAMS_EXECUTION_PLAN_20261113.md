@@ -42,7 +42,7 @@
 ### P1 — 승인·기존 등록 확인이 필요한 정확한 실행
 
 - **물가 단회 B:** [#1336](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336) `DRAFT_NOT_APPROVED` 상태인 신규 manifest를 기존 승인된 효과에 한해 owner 판정. 기존 B [#1177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1177)는 소유권 관측 STOP으로 **소비됨**. 명시 승인·원본 SHA256·변경 4파일 해시·기존 Writer 독점 잠금·Workflow opt-in이 맞을 때만 **새 고유 단회 requestId 1건**; 미승인 opt-in 변경/재시도 금지. Core Task→Node→실제 E: lock 소유권 관측은 **기존 B 내부 12분 보호 로직**을 재사용하고, 못 보면 STOP. A/heavy 210초 observer 설치·#996 C 복구·09:00 실행 시각은 기본 Gate가 아님.
-- **Controller 읽기 operation:** 시장 `source-inventory-runtime-readonly`, D05 `d05-lineage-readonly`, 고용 R6 필요 A 중 **현재 설치에 없는 operation만** 기존 등록기·allowlist·유지보수기와 정규 source/manifest/승인으로 검토. `main` 전체를 운영에 덮어쓰지 않고 정확한 영향·버전·전후 해시·부작용을 원담당/공유 적용 owner가 검증한다. #996 원본 C 잠금과 동일 대상 파일 쓰기가 실제 충돌하는 경우 **그 설치만** 보류한다.
+- **Controller 읽기 operation (2026-11-13 실제 Git 바이트 감사 완료):** 운영 설치 Controller `badad9124157879d7a645b64f2768113d632355b`의 `config/operations.json`은 **31개**, 제어 `main=1ab6a6147b62f265aeafdd32af0db545e5ba48c7`은 **37개**. 추가된 6개 A는 **`d05-lineage-readonly` / `employment-r6-collection-evidence-readonly` / `inflation-core-lock-observation-readonly` / `shared-resource-release-readonly` / `source-inventory-runtime-readonly` / `writer-b-1063-recovery-readonly`**; 기존 31개 operation 삭제/내용 변경 **0개**. GitHub `controller/` 디렉터리 두 ref의 파일 blob 직접 대조는 **13개 파일 차이(기존 5개 변경·신규 8개, 이 중 `.test.mjs` 1개 비배포)**, 추가 `config/operations.json` 1개. 핵심 `controller/operations.mjs`가 새 모듈을 정적 import하므로 3개 기능의 신규 파일만 선별 덮어쓰기 불가. 테스트 비배포 처리는 기존 [PR #1333](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1333) main 병합 범위를 재사용. **이는 SOURCE_ONLY 설치 차이 확인이지 12개 Runtime 파일+설정의 승인·실설치나 #996 lock 해제 증거가 아니다.** 공통 단일 owner가 실제 설치 Maintainer/현재 lease·원본 해시·기존 승인·최소 누적 영향과 정확한 manifest를 판단; 실제 #996과 겹치는 공유 쓰기만 보류하고 이미 설치된 A·독립 개발은 지속.
 
 ### P2 — 기능별 실제 수집·계산·공개 완료 (공유 쓰기는 순차)
 
@@ -87,7 +87,7 @@
 | 단계 | 실제 실행/증거 | 담당·판정 |
 |---|---|---|
 | T-01 (완료) | 기존 10개 테마를 구성하는 PC 저장 피드 6개 식별, 원담당 #1009; GetMarketHistory 공개 카탈로그 14/14 종목 존재는 **가격 품질/공개 라이선스/701일 동일 세션/공급자 이용권 증거가 아님** | 테마 원담당 · DONE |
-| T-02 | 설치된 기존 승인 read-only operation으로 6개 저장 피드·R178 checkpoint·R181 실제 `FIRST FAIL`/실패 코드·Source/StoredAt·노후화 여부 원본 확보. 지원하지 않는 operation만 등록 검토 | 테마 원담당 · EVIDENCE_PENDING |
+| T-02 | **기존 승인 A 진단 실행 완료**: [#1338](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1338) / [Run #43293983366](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43293983366) `PASS/L7_RUNTIME_READONLY_INVENTORY`, 원격 JSON/TXT 2/2, 보호·원자료·D1 쓰기 0. 이전 [#1298](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1298) 대비 R181 source SHA·Task SHA·R181 STOP ledger 바이트/시각 **동일**(2026-11-12T05:00:14.317Z), reason 고정 안전 단서 `HTTP/R181/SPY`, 정확한 HTTP code/FIRST FAIL은 **미노출**; R179 `PUBLIC_API_ROLLING_MISMATCH`, R183 `PUBLISHER_CHILD_FAILED_REVIEW`도 그대로. 다음은 원담당이 승인된 원본 진단 경계 내 안전한 실패 code/stage와 **독립 6개 피드·R178 checkpoint** 증거를 확보. 일반 [#1337](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1337)의 **R7 archive** score/이력 갱신은 이 **L7 테마** 작업의 실증으로 합산 금지. | 테마 원담당 · **A 조회 DONE / 실제 원인·6피드 EVIDENCE_PENDING** (20% 유지) |
 | T-03 | 기존 PC 공급자와 승인 API 권한/무료 사용·재배포 적법성·14종×701 거래일 동일 세션/마지막 뉴욕 정규장 1h 봉 완전성·조정주가를 검증; 모호하면 출시 STOP, 무단 가입/유료 과금 금지 | 테마 원담당 · 미완료 |
 | T-04 | 승인 원본만 수집→SQLite 원자료 보존→기존 10테마 산식으로 저장자료 계산→로컬 결과 readback(각 0/null/stale 구분) | 테마 원담당 · 미완료 |
 | T-05 | 기존 Writer/D1→`/api/theme-fear-greed`와 PC/모바일 공개 10/10 정상 여부·날짜/version·축/마지막 점 검증 | 테마 원담당 · 미완료 |
