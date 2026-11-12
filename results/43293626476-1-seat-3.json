@@ -1,0 +1,332 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43293626476-1-seat-3",
+  "requestId": "pc-1345ae6d-5c83-4c2d-88a2-2d3b731e2d90",
+  "startedAt": "2026-11-12T19:46:53.445Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+  "sourceBranch": "main",
+  "operation": "fear-greed-archive-status",
+  "seat": 3,
+  "status": "PASS",
+  "code": "FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-c4b76bd9-297b-4c93-bf6f-2f73ae8fe761",
+  "pcOperationalApprovedSha": "05d7ae49e0a84cbeebd90ef4de6dd7284094bf97",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "FEAR_GREED_ARCHIVE_READONLY_DIAGNOSIS",
+    "task": {
+      "hasExecAction": true,
+      "commandBase": "wscript.exe",
+      "actionSha256": "c80e02f58b1e118189cd7d2c63df56a3d0b1fb94a793f6dfe62041714fab0f3a",
+      "referencedScripts": [
+        {
+          "relativePath": "ZGmini/data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+          "exists": true,
+          "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+          "references": {
+            "archiveRun": true,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+          "exists": true,
+          "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+          "exists": true,
+          "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        },
+        {
+          "relativePath": "ZGmini/data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+          "exists": true,
+          "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1",
+          "references": {
+            "archiveRun": false,
+            "archiveCore": false,
+            "verifiedChecksR9": false,
+            "quotaRunner": false,
+            "localCycle": false
+          }
+        }
+      ]
+    },
+    "local": {
+      "sqliteOpened": true,
+      "status": "READ",
+      "currentPublic": {
+        "status": "verified",
+        "score": 41.4857142857143,
+        "observedAt": "2026-11-12T19:26:08.000Z",
+        "storedAt": 1794511641920
+      },
+      "original": {
+        "status": "READ",
+        "days": 5,
+        "pointCount": 108,
+        "latest": {
+          "date": "2026-11-06",
+          "count": 14,
+          "lastAt": "2026-11-06T23:59:54.000Z",
+          "storedAt": 1794011426473
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-06",
+            "count": 14,
+            "lastAt": "2026-11-06T23:59:54.000Z",
+            "storedAt": 1794011426473
+          },
+          {
+            "date": "2026-11-05",
+            "count": 3,
+            "lastAt": "2026-11-05T08:25:46.000Z",
+            "storedAt": 1793868467624
+          },
+          {
+            "date": "2026-11-04",
+            "count": 46,
+            "lastAt": "2026-11-04T23:59:55.000Z",
+            "storedAt": 1793839057428
+          },
+          {
+            "date": "2026-11-03",
+            "count": 44,
+            "lastAt": "2026-11-03T23:59:48.000Z",
+            "storedAt": 1793752370492
+          },
+          {
+            "date": "2026-10-30",
+            "count": 1,
+            "lastAt": "2026-10-30T23:59:48.000Z",
+            "storedAt": 1793443731294
+          }
+        ]
+      },
+      "checks": {
+        "status": "READ",
+        "days": 6,
+        "pointCount": 108,
+        "latest": {
+          "date": "2026-11-07",
+          "count": 2,
+          "lastAt": "2026-11-07T00:30:02.951Z",
+          "storedAt": 1794011402951
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-07",
+            "count": 2,
+            "lastAt": "2026-11-07T00:30:02.951Z",
+            "storedAt": 1794011402951
+          },
+          {
+            "date": "2026-11-06",
+            "count": 12,
+            "lastAt": "2026-11-06T23:50:04.862Z",
+            "storedAt": 1794009004862
+          },
+          {
+            "date": "2026-11-05",
+            "count": 5,
+            "lastAt": "2026-11-05T08:45:04.235Z",
+            "storedAt": 1793868304235
+          },
+          {
+            "date": "2026-11-04",
+            "count": 46,
+            "lastAt": "2026-11-04T23:55:05.106Z",
+            "storedAt": 1793836505106
+          },
+          {
+            "date": "2026-11-03",
+            "count": 42,
+            "lastAt": "2026-11-03T23:50:04.711Z",
+            "storedAt": 1793749804711
+          },
+          {
+            "date": "2026-11-01",
+            "count": 1,
+            "lastAt": "2026-11-01T11:30:08.551Z",
+            "storedAt": 1793532608551
+          }
+        ]
+      },
+      "composite": {
+        "status": "READ",
+        "days": 11,
+        "pointCount": 48,
+        "latest": {
+          "date": "2026-11-12",
+          "count": 6,
+          "lastAt": "2026-11-12T18:17:56.780Z",
+          "storedAt": 1794507476780
+        },
+        "recentDates": [
+          {
+            "date": "2026-11-12",
+            "count": 6,
+            "lastAt": "2026-11-12T18:17:56.780Z",
+            "storedAt": 1794507476780
+          },
+          {
+            "date": "2026-11-11",
+            "count": 4,
+            "lastAt": "2026-11-11T12:00:07.468Z",
+            "storedAt": 1794398407468
+          },
+          {
+            "date": "2026-11-10",
+            "count": 7,
+            "lastAt": "2026-11-10T22:25:43.292Z",
+            "storedAt": 1794349543292
+          },
+          {
+            "date": "2026-11-09",
+            "count": 5,
+            "lastAt": "2026-11-09T22:05:43.878Z",
+            "storedAt": 1794261943878
+          },
+          {
+            "date": "2026-11-08",
+            "count": 1,
+            "lastAt": "2026-11-08T13:20:20.047Z",
+            "storedAt": 1794144020047
+          },
+          {
+            "date": "2026-11-07",
+            "count": 3,
+            "lastAt": "2026-11-07T01:20:18.112Z",
+            "storedAt": 1794014418112
+          },
+          {
+            "date": "2026-11-06",
+            "count": 4,
+            "lastAt": "2026-11-06T23:40:23.701Z",
+            "storedAt": 1794008423701
+          }
+        ]
+      }
+    },
+    "archiveTrace": {
+      "alignment": {
+        "status": "HISTORY_DIVERGENCE",
+        "currentObservedNewerThanOriginal": true,
+        "currentStoredNewerThanCheck": true,
+        "cause": "UNKNOWN"
+      },
+      "sidecar": {
+        "evidence": "OBSERVED_UNATTESTED",
+        "candidates": [
+          {
+            "name": "last-run.json",
+            "evidence": "UNATTESTED_LEDGER",
+            "sha256": "952775f461823643c52aab78d82d52fff0af80dd3562b225345d6ed2184a4be2",
+            "modifiedAt": "2026-11-12T19:42:00.153Z",
+            "reportedStatus": "BLOCKED",
+            "code": null,
+            "lastPass": null,
+            "firstFail": null,
+            "reason": null,
+            "at": "2026-11-12T19:41:57.430Z",
+            "failureHints": {
+              "evidence": "UNATTESTED_CATEGORICAL_HINTS",
+              "hasStage": false,
+              "hasError": false,
+              "hasReason": true,
+              "categories": [
+                "SOURCE_OR_APPROVAL"
+              ],
+              "reportedBlockSubtype": "UNKNOWN"
+            },
+            "reportedShaRelation": {
+              "evidence": "UNATTESTED_LEDGER_FIELDS",
+              "actualPresent": false,
+              "approvedPresent": false,
+              "relation": "UNKNOWN"
+            }
+          }
+        ]
+      },
+      "sidecarSourceGate": {
+        "evidence": "UNATTESTED_STATIC_SOURCE_AND_LEDGER",
+        "scriptStatus": [
+          {
+            "file": "archive-run.mjs",
+            "status": "CHANGED",
+            "modifiedAfterLedger": false
+          },
+          {
+            "file": "run-original-then-archive.vbs",
+            "status": "MATCH",
+            "modifiedAfterLedger": false
+          }
+        ],
+        "ledgerStatus": "READ",
+        "sameLedgerSnapshot": true,
+        "reasonShape": "STRING",
+        "reasonConcepts": [
+          "SOURCE",
+          "SHA"
+        ],
+        "matchingErrorSite": "NOT_CHECKED",
+        "matchedScript": null,
+        "siteLine": null,
+        "gatePatternCategories": [],
+        "matchedGateCategories": [],
+        "operationalWrites": 0,
+        "providerCalls": 0,
+        "d1Writes": 0
+      },
+      "publicationLedger": {
+        "evidence": "UNATTESTED_LEDGER",
+        "reportedStatus": null,
+        "at": "2026-11-12T19:46:20.503Z",
+        "modifiedAt": "2026-11-12T19:46:20.508Z",
+        "sha256": "852094c940f25635f0439d60846c73fbd276a545949cbb676bceef41e49b3d31",
+        "scope": "GLOBAL_PUBLICATION_ONLY"
+      }
+    },
+    "sqliteOpened": true,
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "scope": "READ_ONLY_NO_PROVIDER_NO_PUBLICATION"
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d",
+  "protectedAfterSha256": "4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d",
+  "actualExecutionSha": "badad9124157879d7a645b64f2768113d632355b",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-12T19:46:59.413Z",
+  "durationMs": 5968
+}
