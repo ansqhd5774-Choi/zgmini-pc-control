@@ -107,7 +107,7 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
     if (u.pathname.endsWith(`/issues/${incidentNumber}/comments`) && method === 'GET') value = ledger;
     else if (u.pathname.endsWith(`/issues/${incidentNumber}/comments`) && method === 'POST') {
       writes++;
-      ledger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      ledger.push({user: {login: bot}, issue_url: `https://api.github.com/repos/${repo}/issues/${incidentNumber}`, body: JSON.parse(init.body).body});
       value = {id: 1};
     } else if (u.pathname.endsWith('/pulls/2500')) value = {number: 2500,
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
@@ -116,7 +116,7 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
     else if (u.pathname.endsWith(`/issues/${originalNumber}`)) value = original;
     else if (u.pathname.endsWith(`/issues/${originalNumber}/comments`) && method === 'GET') value = originLedger;
     else if (u.pathname.endsWith(`/issues/${originalNumber}/comments`) && method === 'POST') {
-      originLedger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      originLedger.push({user: {login: bot}, issue_url: `https://api.github.com/repos/${repo}/issues/${originalNumber}`, body: JSON.parse(init.body).body});
       value = {id: 3};
     }
     else throw new Error(`unrecognized mock route ${u.pathname}`);
@@ -269,7 +269,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     if (u.pathname.endsWith('/issues/2404/comments') && init.method === 'GET') data = ledger;
     else if (u.pathname.endsWith('/issues/2404/comments') && init.method === 'POST') {
       resultWrites++;
-      ledger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      ledger.push({user: {login: bot}, issue_url: `https://api.github.com/repos/${repo}/issues/2404`, body: JSON.parse(init.body).body});
       data = {id: 2};
     } else if (u.pathname.endsWith('/pulls/2501')) data = {number: 2501,
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
@@ -282,7 +282,7 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     else if (u.pathname.endsWith('/issues/2403')) data = originIssue;
     else if (u.pathname.endsWith('/issues/2403/comments') && init.method === 'GET') data = originLedger;
     else if (u.pathname.endsWith('/issues/2403/comments') && init.method === 'POST') {
-      originLedger.push({user: {login: bot}, body: JSON.parse(init.body).body});
+      originLedger.push({user: {login: bot}, issue_url: `https://api.github.com/repos/${repo}/issues/2403`, body: JSON.parse(init.body).body});
       data = {id: 4};
     }
     else throw new Error(`unexpected GitHub API ${u.pathname}`);
