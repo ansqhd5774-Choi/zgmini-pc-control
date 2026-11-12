@@ -71,6 +71,14 @@ export function verifyAgentResult(handoff, result, pr, run, {featureSourceReposi
   if (!run || run.id !== result.testRun.runId || run.head_sha !== result.testRun.headSha ||
       run.head_sha !== pr.head.sha || run.status !== 'completed' || run.conclusion !== 'success' ||
       run.repository?.full_name !== expectedRepository) throw new Error('RESULT_TEST_RUN_PROVENANCE_STOP');
+  // A matching SHA with an unrelated successful job is not evidence that the
+  // proposed fix passed the approved PR CI. For the control repository the
+  // isolated handoff workflow is the actual reviewed repair-evidence lane.
+  // Feature repository PR checks remain independently owned and may vary.
+  if (run.event !== 'pull_request' ||
+      (expectedRepository === 'ansqhd5774-Choi/zgmini-pc-control' &&
+       run.name !== 'ZGMINI Agent Handoff PR Evidence CI'))
+    throw new Error('RESULT_TEST_WORKFLOW_NOT_AUTHORIZED');
   return Object.freeze({state: 'RUNTIME_VERIFICATION_PENDING', ownerAcknowledged: false,
     confirmed: ['PR_HEAD_SHA', 'GITHUB_ACTION_CONCLUSION'], operationalWrites: 0});
 }
