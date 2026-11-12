@@ -144,3 +144,45 @@ test('base handoff label lost while applying state label fails final readback',a
   await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),/LABEL_READBACK_STOP/);
   assert.equal(f.postCount,1);
 });
+
+test('conflicting bot route receipt is evidence drift, not permission to append another',async()=>{
+  const f=fixture();
+  f.comments.push({user:{login:bot},
+    body:'HANDOFF_ROUTED\nincidentId: handoff-other\nfingerprint: stale'});
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_RECEIPT_CONFLICT_STOP/);
+  assert.equal(f.postCount,0);
+  assert.equal(f.labelCount,0);
+  assert.equal(f.comments.length,1);
+});
+
+test('conflicting duplicate marker cannot be upgraded to a pending route',async()=>{
+  const f=fixture();
+  f.comments.push({user:{login:bot},
+    body:'HANDOFF_DUPLICATE_REUSED\nfingerprint: other'});
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_RECEIPT_CONFLICT_STOP/);
+  assert.equal(f.postCount,0);
+  assert.equal(f.labelCount,0);
+});
+
+test('duplicate exact bot route receipts do not count as single verified return',async()=>{
+  const f=fixture();
+  await routeVerifiedBotIssue(prepared(),1200,f.io);
+  f.comments.push(structuredClone(f.comments[0]));
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_RECEIPT_CONFLICT_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.labelCount,1);
+});
+
+test('untrusted user marker is ignored and does not block authorized bot routing',async()=>{
+  const f=fixture();
+  f.comments.push({user:{login:'untrusted-user'},
+    body:'HANDOFF_ROUTED\nincidentId: invented'});
+  const r=await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(r.state,'ROUTE_RECORDED');
+  assert.equal(f.postCount,1);
+  assert.equal(f.labelCount,1);
+  assert.equal(f.comments.length,2);
+});
