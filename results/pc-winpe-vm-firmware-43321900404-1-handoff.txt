@@ -1,0 +1,10 @@
+schema=ZGMINI_PC_WINPE_VM_FIRMWARE_RESULT_V1
+requestId=6b8045cb-0e48-4b9a-9db1-6c8bced7fa21
+runId=43321900404
+attempt=1
+status=PASS
+code=VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED
+bootAuthorized=false
+cExecutionAuthorized=false
+operationalWrites=0
+automaticRetries=0
