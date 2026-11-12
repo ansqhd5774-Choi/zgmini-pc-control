@@ -9,6 +9,7 @@ import {
   validateControllerConfigTransition,controllerAdmissionForPurpose,
   requestFingerprint,dedupeUpdateRequest,newUpdateLedger,transitionLedger,
   validateInfrastructureDelta,validateControllerOnlyInstallDelta,
+  deployableControllerTreePaths,isControllerSourceTestPath,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -65,6 +66,39 @@ test('previous full-repo infrastructure gate blocks unrelated merged workflows, 
     /CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED/);
   assert.throws(()=>validateControllerOnlyInstallDelta(['../evil'],allowFiles),
     /CONTROLLER_ONLY_DIFF_INVALID/);
+});
+
+test('only exact colocated .test.mjs stays in Git/CI; updater stages deployment modules exclusively',()=>{
+  const sourceOnly='controller/inflation-core-lock-observation-readonly.test.mjs';
+  const paths=['config/operations.json','controller/common.mjs',
+    'controller/engine.mjs','controller/entry.mjs','controller/operations.mjs',
+    sourceOnly];
+  assert.equal(isControllerSourceTestPath(sourceOnly),true);
+  assert.equal(isControllerSourceTestPath('controller/engine.mjs'),false);
+  assert.equal(isControllerSourceTestPath('controller/nested/other.test.mjs'),false);
+  assert.equal(isControllerSourceTestPath('controller/engine.spec.mjs'),false);
+  assert.deepEqual(deployableControllerTreePaths(paths),paths.slice(0,-1));
+  assert.throws(()=>deployableControllerTreePaths([...paths,'controller/engine.spec.mjs']),
+    /TARGET_TREE_PATH/);
+  assert.throws(()=>deployableControllerTreePaths([...paths,'controller/nested/other.test.mjs']),
+    /TARGET_TREE_PATH/);
+  assert.throws(()=>deployableControllerTreePaths([...paths,sourceOnly]),
+    /TARGET_TREE_PATH/);
+  assert.throws(()=>deployableControllerTreePaths([sourceOnly]),
+    /TARGET_TREE_PATH/);
+  const installed=[{path:'config/operations.json',sha256:HASH_A},
+    {path:'controller/operations.mjs',sha256:HASH_B}];
+  assert.equal(validateControllerOnlyInstallDelta([...installed.map(f=>f.path),
+    sourceOnly,'.github/workflows/other-source-only.yml'],installed),true);
+  assert.throws(()=>validateControllerOnlyInstallDelta([...installed.map(f=>f.path),
+    sourceOnly,'controller/unknown.mjs'],installed),/ALLOWFILE_DIFF_MISMATCH/);
+  assert.throws(()=>validateControllerOnlyInstallDelta([...installed.map(f=>f.path),
+    '.github/workflows/pc-job.yml'],installed),
+    /CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED/);
+  const updater=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+  assert.match(updater,/deployableControllerTreePaths\(listing\)/);
+  assert.match(updater,/plannedFiles=deployed/);
+  assert.doesNotMatch(updater,/plannedFiles=listing/);
 });
 
 test('scope-only Controller B manifest is explicit and rejects wrong grade, profile, or mixed infrastructure acceptance',()=>{

@@ -209,6 +209,21 @@ const optionalManifestKeys=raw=>[...MANIFEST_KEYS,...
 // diff. New readonly adapters must not require replacing this maintainer just
 // to append another filename. Keep paths confined to controller modules.
 const installablePath=p=>p==='config/operations.json'||(typeof p==='string'&&/^controller\/[a-z][a-z0-9-]*\.mjs$/.test(p));
+// Source-only colocated Node tests are never Controller runtime modules.
+// They must be covered by source CI but not staged, approved, or deployed
+// into the live six-seat Controller. Nothing else is silently excluded.
+export const isControllerSourceTestPath=p=>typeof p==='string'&&
+  /^controller\/[a-z][a-z0-9-]*\.test\.mjs$/.test(p);
+export function deployableControllerTreePaths(paths){
+  if(!Array.isArray(paths)||paths.length<5||
+     new Set(paths).size!==paths.length||
+     paths.some(p=>!installablePath(p)&&!isControllerSourceTestPath(p)))
+    throw Error('TARGET_TREE_PATH');
+  const deployed=paths.filter(p=>!isControllerSourceTestPath(p));
+  if(deployed.length<5)throw Error('TARGET_TREE_PATH');
+  return deployed;
+}
+
 const PURPOSE_SCOPE=Object.freeze({
   "fear-greed-archive-status":"FEAR_GREED_ARCHIVE_READONLY",
   "employment-r6-readonly-adapter":"EMPLOYMENT_R6_READONLY_RUNNER",
@@ -553,8 +568,8 @@ export function validateControllerOnlyInstallDelta(paths,allowFiles){
   throw Error('CONTROLLER_ONLY_DIFF_INVALID');
  if(paths.includes('.github/workflows/pc-job.yml'))
   throw Error('CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED');
- const installed=paths.filter(p=>p.startsWith('controller/')||
-  p.startsWith('config/')).sort();
+ const installed=paths.filter(p=>(p.startsWith('controller/')||
+  p.startsWith('config/'))&&!isControllerSourceTestPath(p)).sort();
  const declared=allowFiles.map(f=>f.path).sort();
  if(JSON.stringify(installed)!==JSON.stringify(declared))
   throw Error('ALLOWFILE_DIFF_MISMATCH');

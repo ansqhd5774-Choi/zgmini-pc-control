@@ -1,0 +1,46 @@
+name: ZGMINI Controller Maintenance Source Tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tools/maintenance-contract.mjs'
+      - 'tools/update.mjs'
+      - 'tests/maintenance-contract.test.mjs'
+      - 'tests/controller-heavy-only-install.test.mjs'
+      - 'tests/maintenance-apply.test.mjs'
+      - '.github/workflows/controller-maintenance-source-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: zgmini-controller-maintenance-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run scoped maintenance update and heavy-readonly regression tests
+        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs
+      - name: Confirm source-only isolated CI host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=TRUE
+          ) else (
+            echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=FALSE
+            exit /b 5
+          )

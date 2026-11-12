@@ -13,7 +13,8 @@ import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-app
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
-  validateControllerOnlyInstallDelta,
+  validateControllerOnlyInstallDelta,deployableControllerTreePaths,
+  isControllerSourceTestPath,
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
@@ -1192,11 +1193,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     need(infraPr.merged===true&&validSha(infraPr.merge_commit_sha),'INFRA_APPROVAL_PR_NOT_MERGED');
     git(['merge-base','--is-ancestor',infraPr.merge_commit_sha,manifest.targetSha]);
    }
-   const changed=diff.filter(p=>p.startsWith('controller/')||p.startsWith('config/')).sort();
+   const changed=diff.filter(p=>(p.startsWith('controller/')||p.startsWith('config/'))&&
+    !isControllerSourceTestPath(p)).sort();
    const declared=manifest.allowFiles?.map(x=>x.path).sort();
    need(Array.isArray(declared)&&JSON.stringify(changed)===JSON.stringify(declared),'ALLOWFILE_DIFF_MISMATCH');
    const listing=git(['ls-tree','-r','--name-only',manifest.targetSha,'--','controller','config']).trim().split(/\r?\n/).filter(Boolean);
-   need(listing.length>=5&&listing.every(p=>/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p)),'TARGET_TREE_PATH');
+   // Only exact colocated source tests stay in Git and CI, never on the live host.
+   // Unknown Controller tree entries continue to fail closed.
+   const deployed=deployableControllerTreePaths(listing);
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
    validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
@@ -1207,7 +1211,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     need(/^[a-f0-9]{64}$/.test(item.sha256),'ALLOWFILE_HASH');
     need(sha256(git(['show',manifest.targetSha+':'+item.path],{encoding:null}))===item.sha256,'ALLOWFILE_HASH_MISMATCH');
    }
-   plannedFiles=listing;
+   plannedFiles=deployed;
    const pr=github('pulls/'+manifest.approval.ref.split('/').pop());
    need(pr.merged===true&&validSha(pr.merge_commit_sha),'APPROVAL_PR_NOT_MERGED');
    need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,manifest.targetSha]).trim()==='','APPROVAL_PR_TARGET_MISMATCH');
