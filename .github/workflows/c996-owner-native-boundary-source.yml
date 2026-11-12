@@ -4,11 +4,13 @@ on:
     branches: [codex/controller-996-intake-c-candidate-r1-20261110]
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
+      - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
+      - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
 permissions:
   contents: read
@@ -48,5 +50,5 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Verify C996 native candidate fail-closed boundaries (no C execution)
-        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs
+      - name: Verify C996 candidate boundaries and isolated TEMP insertion negative test (no C execution)
+        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs
