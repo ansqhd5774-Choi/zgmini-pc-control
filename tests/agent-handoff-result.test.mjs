@@ -19,6 +19,7 @@ function setup() {
   const pr = {number: 920, head: {sha: 'b'.repeat(40), repo: {full_name: 'ansqhd5774-Choi/zgmini-pc-control'}},
     base: {repo: {full_name: 'ansqhd5774-Choi/zgmini-pc-control'}}, state: 'open'};
   const run = {id: 42450377234, head_sha: 'b'.repeat(40), status: 'completed', conclusion: 'success',
+    event: 'pull_request', name: 'ZGMINI Agent Handoff PR Evidence CI',
     repository: {full_name: 'ansqhd5774-Choi/zgmini-pc-control'}};
   return {handoff, result, pr, run};
 }
@@ -70,6 +71,30 @@ test('rejects failed or different-SHA GitHub run', () => {
   const mismatched = structuredClone(run); mismatched.head_sha = 'c'.repeat(40);
   assert.throws(() => verifyAgentResult(handoff, result, pr, mismatched), /RESULT_TEST_RUN_PROVENANCE_STOP/);
 });
+
+test('control repo repair result rejects unrelated successful PR workflows at the same SHA', () => {
+  const {handoff,result,pr,run}=setup();
+  for(const name of ['C996 R5 Readonly Source Checks','Unrelated Workflow']){
+    const unrelated={...run,name};
+    assert.throws(()=>verifyAgentResult(handoff,result,pr,unrelated),
+      /RESULT_TEST_WORKFLOW_NOT_AUTHORIZED/);
+  }
+});
+
+test('a successful non-PR workflow with matching SHA is not a repair CI', () => {
+  const {handoff,result,pr,run}=setup();
+  for(const event of ['push','issues','workflow_dispatch']){
+    assert.throws(()=>verifyAgentResult(handoff,result,pr,{...run,event}),
+      /RESULT_TEST_WORKFLOW_NOT_AUTHORIZED/);
+  }
+});
+
+test('the approved control PR CI remains acceptable by its actual workflow name', () => {
+  const {handoff,result,pr,run}=setup();
+  assert.equal(verifyAgentResult(handoff,result,pr,run).state,
+    'RUNTIME_VERIFICATION_PENDING');
+});
+
 test('rejects oversized results and malformed IDs', () => {
   const {result} = setup();
   assert.throws(() => parseAgentResult('x'.repeat(4097)), /RESULT_BODY_SIZE_STOP/);
@@ -273,6 +298,7 @@ async function simulatePublicFeature({invalidOriginal = false, wrongSource = fal
   if (forkPr) pr.head.repo.full_name = 'third-party/fork';
   const run = structuredClone(seed.run);
   run.repository.full_name = 'ansqhd5774-Choi/zgmini';
+  run.name = 'Node.js CI';
   if (wrongSha) run.head_sha = 'c'.repeat(40);
   if (failedCi) run.conclusion = 'failure';
   const origin = {number: 1009, user: {login: invalidOriginal ? 'intruder' : 'ansqhd5774-Choi'},
