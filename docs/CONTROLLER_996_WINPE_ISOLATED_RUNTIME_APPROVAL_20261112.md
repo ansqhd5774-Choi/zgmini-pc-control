@@ -46,3 +46,11 @@
 - 기존 표준 VM 실행 파일 경로 6/6 `ABSENT_AT_FIXED_PATH`: VirtualBox/QEMU/VMware/Hyper-V 관리 도구. 사용자/포터블 등 다른 위치 `NOT_CHECKED`이므로 '이 PC 어디에도 VM 없음'으로 표현하지 않는다. `vmOperationallyTested=false`, `winpeBooted=false`, `bootAuthorized=false`, `cExecutionAuthorized=false`, `operationalWrites=0`, 자동 재시도 0.
 - **남은 실제 효과 승인 경계**: 기존 표준/포터블 VM이 가용하지 않다면 *격리 PC만* 대상인 VM Base Package 설치(관리자·가상화 드라이버/네트워크/재부팅 가능), 네트워크/USB/공유폴더/호스트 디스크 미부착 VM 생성, ISO read-only 부착 및 1회 WinPE 부팅이 모두 **별도 Owner 승인 대상**이다. #1252의 원본 사용자 TEMP ISO `EPERM`도 남아 있어 Runner의 권한 확대/ACL 우회로 해결하지 않는다. 실제 ISO 접근·서명·hash·WIM drift 안전성 확인 없이 부팅 불가.
 - **이번 A급의 판정은 `VM_HARDWARE_FEATURES_PRESENT_ONLY`**. `ISO_ONLY_PASS`와 #996 **80%, C NO-GO**를 유지하며 원본 운영 PC의 WinPE/C 복구 승인으로 확대하지 않는다. 설치·부팅·실PC 변경 0.
+
+## 2026-11-13 — 사용자 TEST_ONLY 승인 수신 및 현재 실행 경계
+
+- **사용자 승인 기록:** [#996 승인 인계 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6837208822). 승인 종류는 공통 대기열 PC `DESKTOP-N62L0NG`의 격리 VM/필요시 무료 VirtualBox Base 설치·가상화 드라이버·단일 고정 SHA ISO 1회 WinPE 부팅 **TEST_ONLY**다. 기존 문서의 `INSTALL/BOOT NOT AUTHORIZED`는 2026-11-12 당시 이력이며, **2026-11-13 사용자 효과 승인은 수신했다**. 이는 운영 C 수행 허가가 아니다.
+- **실행 상태:** `APPROVAL_RECORDED / TEST_ONLY_EXECUTION_PENDING`. 이전 `ISO_ONLY_PASS`, Win32 네이티브 21/21 격리 시험, firmware PASS를 재사용한다. ISO `EPERM`, WIM XML drift 원인 미확정, 실제 WinPE guest boot/CNG 결과 부재는 지속된다.
+- **기존 실행 가능 범위 확인:** `main`의 `config/operations.json`에 WinPE/VM 관리자 설치 operation은 확인되지 않았으며, `pc-winpe-vm-firmware-readonly`는 읽기 전용이다. 이 대화에서 연결된 Remote Desktop Commander에는 `pc` 1대만 오프라인으로 표시되고 승인 대상 `DESKTOP-N62L0NG`의 직접 제어 기기는 보이지 않았다. 이는 격리 GitHub Runner 자체의 오프라인을 뜻하지 않는다. GitHub CI/Issue만으로 호스트 관리자 설치를 시작할 사전 허용 경로를 가정하지 않는다.
+- **실제 다음 실행:** 소유자가 원래 호스트에서 사용 가능한 승인된 로컬 관리자 실행 컨텍스트/기존 VM 실행기/ISO 정상 ACL을 확인한 다음, 위 정확한 TEST_ONLY 절차를 기존 정규 경로로 1회만 수행한다. 비승인 원격 shell, 임의 workflow/CMD 자동 수신기, ACL 우회, ISO 재작성·재시도는 금지한다. 실패 시 FIRST FAIL 및 원본 보존을 인계한다.
+- **변경 금지:** 운영 PC 재부팅·C claim/lease/archive·Controller/Writer·Workflow/DB/D1 변경 및 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`, `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN` STOP 완화 없음. #996 실제 C 복구는 **80% / NO-GO**.
