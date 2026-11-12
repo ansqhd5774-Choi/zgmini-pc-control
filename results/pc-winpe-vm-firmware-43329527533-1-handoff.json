@@ -1,0 +1,79 @@
+{
+  "schema": "ZGMINI_PC_WINPE_VM_FIRMWARE_RESULT_V1",
+  "status": "PASS",
+  "code": "VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED",
+  "firmware": {
+    "VM_MONITOR": true,
+    "SLAT": true,
+    "FIRMWARE_ENABLED": true,
+    "HYPERVISOR_PRESENT": false
+  },
+  "readiness": "VM_HARDWARE_FEATURES_PRESENT_ONLY",
+  "vmPrograms": [
+    {
+      "id": "VIRTUALBOX",
+      "status": "FILE_PRESENT"
+    },
+    {
+      "id": "QEMU",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "VMWARE_WORKSTATION_X64",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "VMWARE_WORKSTATION_X86",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "VMWARE_PLAYER",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "HYPERV_CONNECT",
+      "status": "ABSENT_AT_FIXED_PATH"
+    }
+  ],
+  "vmDiscovery": {
+    "status": "PARTIAL",
+    "code": "VM_DISCOVERY_REGISTRY_PARTIAL",
+    "registered": [
+      "VIRTUALBOX"
+    ],
+    "executableInPath": [],
+    "registryScanPartial": true,
+    "scope": "UNINSTALL_REGISTRY_AND_CURRENT_RUNNER_PATH",
+    "executableOperabilityVerified": false,
+    "portableOutsidePathChecked": false
+  },
+  "vmUserEvidence": {
+    "scope": "FIXED_C996_OWNER_VM_METADATA_ONLY",
+    "status": "SCOPED_READONLY",
+    "runnerUserIsOwner": false,
+    "runnerProfileMatchesOwner": false,
+    "registry": "ACCESS_DENIED",
+    "vmDirectory": "ACCESS_DENIED",
+    "vmConfig": "ACCESS_DENIED",
+    "xmlContentsRead": false,
+    "profileEnumerated": false,
+    "operationalWrites": 0
+  },
+  "vmPathsMode": "STANDARD_C_PATHS_ONLY",
+  "portableInstalls": "NOT_CHECKED",
+  "binaryPresentAtFixedPath": true,
+  "vmOperationallyTested": false,
+  "vmInstalledByProbe": false,
+  "winpeBooted": false,
+  "bootAuthorized": false,
+  "cExecutionAuthorized": false,
+  "operationalWrites": 0,
+  "automaticRetries": 0,
+  "requestId": "79bf071a-2435-4cb5-8f94-74d80b0e3b17",
+  "issueNumber": 1346,
+  "runId": "43329527533",
+  "attempt": "1",
+  "role": "handoff",
+  "host": "DESKTOP-N62L0NG",
+  "runner": "zgmini-handoff-ci-spare-01"
+}
