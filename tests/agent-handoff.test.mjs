@@ -98,7 +98,9 @@ test('rejects skips, terminal repeats and unknown states', () => {
 async function simulateBroker({untrustedActor = false, loseComment = false,
   loseCommentAck = false, loseLabel = false, loseLabelAck = false,
   tamperIssue = false, forgedPartialReceipt = false, existingLabels = [],
-  action = 'opened', labelName = 'agent-handoff', expectRejected = false} = {}) {
+  action = 'opened', labelName = 'agent-handoff', expectRejected = false,
+  conflictingLabelOnComment = false, conflictingLabelOnLabel = false,
+  expectConflictPosts = null} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
   const issueTitle = 'agent-handoff handoff-123456789abc';
@@ -127,11 +129,13 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
       const body = JSON.parse(request.body).body;
       if (!loseComment) comments.push({
         user: {login: 'github-actions[bot]'}, issue_url:issueUrl, body});
+      if (conflictingLabelOnComment) labels.push('handoff-duplicate');
       if (loseCommentAck) throw Error('SIMULATED_COMMENT_ACK_LOST');
       value = {id: 1};
     } else if (uri.pathname.endsWith('/issues/2001/labels') && method === 'POST') {
       posts.push('label');
       if (!loseLabel) labels.push(...JSON.parse(request.body).labels);
+      if (conflictingLabelOnLabel) labels.push('handoff-duplicate');
       if (loseLabelAck) throw Error('SIMULATED_LABEL_ACK_LOST');
       value = labels.map((name) => ({name}));
     } else if (uri.pathname.endsWith('/issues/2001') && method === 'GET') {
@@ -148,6 +152,9 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     if (untrustedActor || expectRejected) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_EVENT_NOT_ALLOWED/);
       assert.equal(posts.length, 0);
+    } else if (expectConflictPosts !== null) {
+      await assert.rejects(runIssueBroker(env), /HANDOFF_LABEL_CONFLICT_STOP/);
+      assert.deepEqual(posts, expectConflictPosts);
     } else if (loseComment) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_COMMENT_READBACK_STOP/);
       assert.equal(labels.length, 1+existingLabels.length);
@@ -203,4 +210,19 @@ test('broker refuses Issue drift between opened event and routing write',async()
 });
 test('broker never accepts only a matching marker/fingerprint as full bot receipt',async()=>{
   await simulateBroker({forgedPartialReceipt:true});
+});
+
+test('owner incident already labeled duplicate cannot be routed into pending repair',async()=>{
+  await simulateBroker({existingLabels:['handoff-duplicate'],
+    expectConflictPosts:[]});
+});
+
+test('owner routing stops if opposite label arrives after the bot receipt',async()=>{
+  await simulateBroker({conflictingLabelOnComment:true,
+    expectConflictPosts:['comment']});
+});
+
+test('owner routing refuses final success if duplicate label races with pending label',async()=>{
+  await simulateBroker({conflictingLabelOnLabel:true,
+    expectConflictPosts:['comment','label']});
 });
