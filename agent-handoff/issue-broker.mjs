@@ -73,7 +73,19 @@ export async function main(env = process.env) {
   const outcome = prepareHandoff(event.issue.body, await listPreviousBodies(event.issue.number));
   const duplicate = outcome.state === 'DUPLICATE_REUSED';
   const stateLabel = duplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
+  // The owner-origin route must enforce the same exclusive disposition as
+  // the bot-origin route; otherwise a duplicate can remain in the repair lane.
+  const oppositeLabel = duplicate ? 'handoff-agent-pending' : 'handoff-duplicate';
+  const assertExclusive = issue => {
+    if (issue?.labels?.some(label => label.name === oppositeLabel))
+      throw new Error('HANDOFF_LABEL_CONFLICT_STOP');
+  };
   const marker = duplicate ? 'HANDOFF_DUPLICATE_REUSED' : 'HANDOFF_ROUTED';
+  const route = `/repos/${REPOSITORY}/issues/${event.issue.number}`;
+  const initial = await api(route);
+  if (!exactOwnerIssue(initial, event.issue))
+    throw new Error('HANDOFF_ISSUE_DRIFT_STOP');
+  assertExclusive(initial);
   // Never mistake an existing label for proof of the bot result receipt.
   const lines = duplicate
     ? ['HANDOFF_DUPLICATE_REUSED', `fingerprint: ${outcome.fingerprint}`, 'newAgentDispatches: 0', 'PC retries: 0']
@@ -95,10 +107,10 @@ export async function main(env = process.env) {
     if (!await hasVerifiedComment(event.issue.number, receiptBody))
       throw new Error('HANDOFF_COMMENT_READBACK_STOP');
   }
-  const route = `/repos/${REPOSITORY}/issues/${event.issue.number}`;
   const current = await api(route);
   if (!exactOwnerIssue(current, event.issue))
     throw new Error('HANDOFF_ISSUE_DRIFT_STOP');
+  assertExclusive(current);
   if (!current.labels.some(label => label.name === stateLabel)) {
     try {
       await api(route+'/labels', {method:'POST', body:{labels:[stateLabel]}});
@@ -106,11 +118,13 @@ export async function main(env = process.env) {
       const afterUncertain = await api(route);
       if (!exactOwnerIssue(afterUncertain, event.issue, stateLabel))
         throw new Error('HANDOFF_LABEL_POST_OUTCOME_UNKNOWN');
+      assertExclusive(afterUncertain);
     }
   }
   const after = await api(route);
   if (!exactOwnerIssue(after, event.issue, stateLabel))
     throw new Error('HANDOFF_LABEL_READBACK_STOP');
+  assertExclusive(after);
   process.stdout.write(`${alreadyRecorded ? 'HANDOFF_ALREADY_RECORDED' : duplicate ? 'HANDOFF_DUPLICATE_REUSED' : 'HANDOFF_ROUTED_PENDING_AGENT'}\n`);
 }
 
