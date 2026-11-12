@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {summarizeAutomation} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -36,4 +36,20 @@ for(const key of ['controllerFilesVerified','supervisorAlive','supervisorIdentit
 test('unreadable lease fails closed but does not claim Runtime failure',()=>{
  const r=summarizeAutomation({...healthy(),lockReadbackCode:'UNAVAILABLE'});
  assert.equal(r.state,'STATE_UNKNOWN');assert.equal(r.runtimeState,'HEALTHY');
+});
+
+const operatingSeats=()=>Array.from({length:6},(_,i)=>({
+ name:'zgmini-pc-0'+(i+1),status:'online',busy:false,
+}));
+test('automation status accepts six operating seats plus an independent handoff runner',()=>{
+ assert.equal(dedicatedPcRunnersOnline([
+  ...operatingSeats(),{name:'zgmini-handoff-ci-spare-01',status:'online',busy:true},
+ ]),true);
+});
+test('automation status rejects missing, offline or duplicated operating seats',()=>{
+ const seats=operatingSeats();
+ assert.equal(dedicatedPcRunnersOnline(seats.slice(0,5)),false);
+ assert.equal(dedicatedPcRunnersOnline([...seats.slice(0,2),{...seats[2],status:'offline'},...seats.slice(3)]),false);
+ assert.equal(dedicatedPcRunnersOnline([...seats,{...seats[0]}]),false);
+ assert.equal(dedicatedPcRunnersOnline(null),false);
 });
