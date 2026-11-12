@@ -44,3 +44,9 @@ jobs:
             echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=FALSE
             exit /b 5
           )
+      - name: Read one nonsecret GitHub variable for inflation B opt-in (no PC access)
+        env:
+          INFLATION_B_ENABLED_BOOL: ${{ vars.ZGMINI_INFLATION_MANUAL_B_ENABLED == 'true' }}
+        run: |
+          echo INFLATION_B_REPO_VARIABLE_ENABLED=%INFLATION_B_ENABLED_BOOL%
+
