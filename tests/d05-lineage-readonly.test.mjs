@@ -91,7 +91,29 @@ test('D05 symbolic link and bounded-size violations fail closed',t=>{
  fs.writeFileSync(file,JSON.stringify(row('2026-11-10'))+'\n');
  assert.equal(inspectD05LineageReadonly(root,{maxLedgerBytes:1}).code,'D05_LEDGER_SIZE_UNPROVEN');
  const target=path.join(root,'outside.jsonl');fs.writeFileSync(target,'sensitive');
- fs.rmSync(file);fs.symlinkSync(target,file);
+ fs.rmSync(file);
+ try{
+  fs.symlinkSync(target,file);
+ }catch(error){
+  // The isolated Windows CI account has no symlink privilege. Keep the
+  // same rejection assertion, using a fabricated lstat result only there.
+  if(!['EPERM','EACCES','ENOTSUP'].includes(error?.code))throw error;
+  fs.writeFileSync(file,'not-a-link');
+  const simulatedFileSystem={...fs,
+   lstatSync(location,options){
+    const actual=fs.lstatSync(location,options);
+    if(path.resolve(location)!==path.resolve(file))return actual;
+    return new Proxy(actual,{get(stat,key,receiver){
+     if(key==='isSymbolicLink')return ()=>true;
+     return Reflect.get(stat,key,receiver);
+    }});
+   },
+   openSync(){throw Error('SYMLINK_WAS_FOLLOWED');},
+  };
+  assert.equal(inspectD05LineageReadonly(root,
+   {fileSystem:simulatedFileSystem}).code,'D05_LEDGER_FILE_UNPROVEN');
+  return;
+ }
  assert.equal(inspectD05LineageReadonly(root).code,'D05_LEDGER_FILE_UNPROVEN');
 });
 
