@@ -47,8 +47,13 @@ export function reviewOwnerHandoffReturn({
     request.operation==='pc-writer-source-install'&&
     request.controlRepository===REPO;
   if(!pc&&!writer)forbidden('OWNER_ORIGIN_SCOPE_DENIED');
-  const returned=originComments.filter(c=>isBotReceipt(
-    c,originIssue.number,'HANDOFF_ORIGIN_RESULT_RECORDED'));
+  // A bot return marker in the original Issue with a different issue_url
+  // is an evidence conflict, not a clean "no result yet".
+  const returned=originComments.filter(c=>c?.user?.login===BOT&&
+    typeof c.body==='string'&&
+    c.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n'));
+  if(returned.some(c=>c.issue_url!==issueURL(originIssue.number)))
+    forbidden('OWNER_ORIGIN_RECEIPT_WRONG_ISSUE');
   if(returned.length===0)return Object.freeze({
     state:'NO_RETURNED_RESULT',originIssue:originIssue.number,
     ownerChatReceived:'UNKNOWN',runtimeVerified:false,
