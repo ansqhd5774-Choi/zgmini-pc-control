@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
+import {collectAutomationStatus} from './automation-status.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -98,6 +99,43 @@ export function sanitizeProbe(raw){
   tasks,taskStatus:mode(raw.taskStatus),startup,startupStatus:mode(raw.startupStatus),
   processListTruncated:smallInt(raw.selectedProcessCount,100000)>processes.length};
 }
+
+const SHA40=/^[a-f0-9]{40}$/;
+const asSha=x=>typeof x==='string'&&SHA40.test(x)?x:null;
+const asBool=x=>typeof x==='boolean'?x:null;
+// Only fixed, bounded fields leave the operating PC. Never return a full
+// owner/lease/claim object, source path, nonce, credential or environment.
+export function sanitizeMaintenanceStatus(raw){
+ const diagnostics=Array.isArray(raw?.diagnostics)?raw.diagnostics:[];
+ const lockKnown=Boolean(raw?.installLock&&typeof raw.installLock==='object'&&
+  !diagnostics.includes('INSTALL_LEASE_UNAVAILABLE'));
+ const sourceSha=asSha(raw?.maintenanceSourceSha);
+ const sourceVerified=asBool(raw?.maintenanceFilesVerified);
+ const held=lockKnown?asBool(raw.installLock.held):null;
+ const recoveryRequired=lockKnown?asBool(raw.installLock.recoveryRequired):null;
+ const observedAt=typeof raw?.observedAt==='string'&&
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/.test(raw.observedAt)?
+  raw.observedAt.slice(0,32):null;
+ return {
+  status:sourceSha&&sourceVerified===true&&held!==null&&
+   recoveryRequired!==null?'PASS':'STATE_UNKNOWN',
+  code:sourceSha?'MAINTENANCE_SOURCE_READONLY':'MAINTENANCE_SOURCE_UNVERIFIED',
+  observedAtUtc:observedAt,maintenanceSourceSha:sourceSha,
+  maintenanceFilesVerified:sourceVerified,
+  actualControllerSha:asSha(raw?.actualControllerSha),
+  controllerFilesVerified:asBool(raw?.controllerFilesVerified),
+  installLockReadbackVerified:lockKnown,
+  installLockHeld:held,installLockRecoveryRequired:recoveryRequired,
+  receiverStatus:raw?.receiverStatus==='LISTENING'?'LISTENING':'UNVERIFIED',
+  workflowState:raw?.workflowState==='active'?'active':'UNVERIFIED',
+  operationalWrites:0,providerCalls:0,d1Writes:0
+ };
+}
+function collectMaintenanceStatusReadonly(){
+ try{return sanitizeMaintenanceStatus(collectAutomationStatus([]));}
+ catch{return sanitizeMaintenanceStatus(null);}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -112,22 +150,24 @@ export function collect(role,ctx,env=process.env){
  if(identity!=='MATCH'||(role==='operating'&&host!=='PC')){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
+ const withMaintenance=role==='operating'?{...base,
+  maintenance:collectMaintenanceStatusReadonly()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
-  return {...base,status:'PARTIAL',code:'POWERSHELL_NOT_AVAILABLE'};
+  return {...withMaintenance,status:'PARTIAL',code:'POWERSHELL_NOT_AVAILABLE'};
  const encoded=Buffer.from(PS_SCRIPT,'utf16le').toString('base64');
  const proc=spawnSync(ps,['-NoLogo','-NoProfile','-NonInteractive',
   '-EncodedCommand',encoded],{encoding:'utf8',windowsHide:true,timeout:45000,
   maxBuffer:MAX_BYTES,shell:false,env:{...env}});
  if(proc.error||proc.status!==0)
-   return {...base,status:'PARTIAL',code:proc.error?.code==='ETIMEDOUT'?
+   return {...withMaintenance,status:'PARTIAL',code:proc.error?.code==='ETIMEDOUT'?
     'PROCESS_PROBE_TIMEOUT':'PROCESS_PROBE_UNAVAILABLE'};
  try{
   const parsed=JSON.parse(proc.stdout.replace(/^\uFEFF/,'').trim());
   const snapshot=sanitizeProbe(parsed);
-  return {...base,status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',snapshot};
- }catch{return {...base,status:'PARTIAL',code:'PROCESS_REPORT_INVALID'};}
+  return {...withMaintenance,status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',snapshot};
+ }catch{return {...withMaintenance,status:'PARTIAL',code:'PROCESS_REPORT_INVALID'};}
 }
 export function toText(r){
  return ['schema='+r.schema,'requestId='+r.requestId,'role='+r.role,
@@ -136,6 +176,9 @@ export function toText(r){
   'observedAtUtc='+r.observedAtUtc,
   'totalProcessCount='+(r.snapshot?.totalProcessCount??'UNKNOWN'),
   'selectedProcessCount='+(r.snapshot?.selectedProcessCount??'UNKNOWN'),
+  'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
+  'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 async function main(){
