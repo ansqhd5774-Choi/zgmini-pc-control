@@ -145,6 +145,16 @@
 
 **다음 단일 필수 결정(#996 C Owner):** 온라인 디렉터리 핸들만으로는 배타성이 성립하지 않으므로, 기존 **동일 기존 ZGMINI PC를 WinPE로 부팅하는 오프라인 독점 설계** 또는 독립적으로 입증 가능한 실제 namespace 단독 접근 수단 중 하나를 선택하여 **격리 시뮬레이션/원본 신원·Owner C 승인 조건**을 검증한다. 기존 R3/R4와 지난 7/7·29/29은 재사용하며 동일 명령·기존 requestId를 다시 실행하지 않는다. #996 C NO-GO는 이 공유 설치 효과에 한정; 중앙 8/8 DONE, 신규 격리 자연 Writer B E2E 4/5 DEFERRED, 다른 기능 무관 독립 진행 유지.
 
+### 0.13 2026-11-13 중앙 NO_WORK와 WinPE 승인 경계
+
+**원래 중앙 목표 판단:** 기존 중앙 인계 8/8 DONE이며, 4/5 격리 Writer B 자연 적격 장애 실증은 미래 DEFERRED로 유지한다. [기존 중앙 자동화](https://chatgpt.com/) `Automation_9a403a04a8ac8191a331e94f9abeb1b4` 최신 2026-11-13 KST 실행은 `completed/NO_WORK`, 새 적격 인계 0, 새 처리 0, 운영 쓰기 0. 기존 `agent-handoff` 열린 사건 8건은 역사적 분류·원담당 처리 기록이며 `handoff-agent-pending` 미처리 0건. 최근 24h PC/Writer B intake workflow `failure/timed_out` 0건은 원본 자동화가 조회 범위를 완성한 결과다. 새 사건을 만들어 5/5 실증을 앞당기지 않는다.
+
+**#996 C 담당으로 넘길 실제 미완료 범위(중앙 업무 선행조건 아님):** C 원담당 Draft [#1222](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1222)의 namespace 동시 삽입 결함은 [기존 격리 Windows native #43254827851](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43254827851)에서 TEMPorary synthetic fixture 음성시험으로 재현, 생산 C 진입/이동 두 STOP 불변. 그 다음 기존 ZGMINI PC **WinPE 오프라인** 설계로 전환하려면 [별도 C WinPE TEST_ONLY 승인/운영 현황 문서](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/docs/CONTROLLER_996_WINPE_ISOLATED_RUNTIME_APPROVAL_20261112.md)를 따름. 공통 대기열 PC ISO `ISO_ONLY_PASS`, 가상화 펌웨어 `VirtualizationFirmwareEnabled=true`는 이전 실측 완료. **실제 VM boot·WinPE CNG 6/6은 NOT_TESTED**, 기존 VM 고정 경로 6/6 ABSENT지만 portable 전수 미조사, 원본 사용자 TEMP 접근 `EPERM`. 새 VM 설치·드라이버·호스트 부팅/사용자 ISO ACL 변경은 별도 사용자 승인 없이는 불허. 이번 사용자 ‘계속해라’는 범위 밖 C 관리자 효과에 대한 별도 승인으로 해석하지 않는다.
+
+**WinPE 이미지 별도 원본 문제:** [WIMGAPI 비민감 비교 JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/artifacts/controller-996/zgmini-996-wim-metadata-readonly-20261112.json)은 ADK SOURCE XML 2306 bytes → FINAL WIM XML 1708 bytes, `EDITIONID/INSTALLATIONTYPE/PRODUCTTYPE/PRODUCTSUITE/LANGUAGES/DEFAULT` 누락 및 `VERSION.BRANCH` 소실이 `IMAGE_METADATA_DRIFT_CONFIRMED`임을 입증하나 **최초 변경 단계와 WinPE 부팅 실패는 입증하지 않는다**. Microsoft [DISM 공식 image mount/commit/export 명세](https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/mount-and-modify-a-windows-image-using-dism)는 image modification·commit·export를 개별 단계로 분리한다. 실제 이 ISO의 export 단계 수행 여부는 불명확하므로 export가 원인이라고 단정하거나 원본 WIM을 재생성·보정하지 않는다. C 담당이 후속 승인을 받아 실제 원본 WIM 단계 진단이 필요할 때는 **기존 source SHA·검증된 원본 해시·동일 사용자의 정상 허용 읽기 전용 경로**에서만 최초 drift 위치를 찾는다. 새 Gate 추가나 자동 VM 설치와 묶지 않는다.
+
+**단일 다음 작업 선정:** 총괄은 본래 업무에서 신규 인증된 자연 인계 사건이 나타날 때까지 `NO_WORK/DONE` 유지; C 복구는 **#996 Owner의 별도 승인/독립 실행기 정본 작업**으로 계속한다. 과거 R3/R4·CI 성공 재실행, #996 C 원본 Windows 명령 재실행, WinPE VM 설치·리부트, 새로운 예약/Runner/Controller 불필요. 주기가 도래하는 자동화만 기존 한 개를 재사용한다.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
