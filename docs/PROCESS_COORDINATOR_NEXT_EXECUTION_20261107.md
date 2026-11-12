@@ -87,6 +87,14 @@
 - 판정 기준: GPT R6.0 + 제어 저장소 `main`의 AGENTS.md, GENERAL_CHAT_START.md, PC_AUTOMATION_STANDARD.md, GENERAL_CHAT_PREWORK.md
 - 이번 기록은 실제 소스/원장 읽기 전용 조사다. Controller/Reader/PC/DB/게시/예약을 수정하거나 새 요청을 제출하지 않았다.
 
+### 0.8 2026-11-13 완료 전환 — 운영 상태 조회기 main 병합
+
+**이번 확정 완료:** [#1324](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1324) 3파일 SOURCE_ONLY 개선은 Draft→검토 가능→정규 squash merge까지 완료. `main` **`5c65bd0944004c4620483386889039a864f95dd3`**로 실제 반영되고 3파일 blob 원격 재조회가 일치했다. 격리 CI [#43247186728](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43247186728)의 `tests/automation-status.test.mjs` **14/14 PASS** 및 독립 격리 호스트 증명, [#43247186807](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43247186807) 기존 C996 소스 시험 **27/27 PASS**. 전체 GitHub Runner 개수로 운영 여섯 좌석을 잘못 판정하던 코드를 기존 `dedicatedPcRunnerRows` 함수로 한정 변경했다. [#68 최종 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6828002969).
+
+**운영 적용 여부:** PC 설치·Controller/maintainer source 교체 **없음**. 기존 설치 SHA와 운영 상태를 이 `main` SHA로 바꾸어 주장하지 않는다. 이 소스 수정은 #996의 이전 C 시도 원장/잠금 해제·Workflow 복구를 실행하지 않는다.
+
+**다음 필수 실행 하나 — #996 원본 C 담당:** 기존 C 시도 이후 original Windows claim/lease·Workflow·Backlog·ledger/보호 fingerprint의 인증된 읽기 결과를 확보한다. 설치 Controller `badad912…`에는 이를 일괄 제공하는 A급 없음. 소유자/실행기에서 **기존 승인된 경로가 실제 확인될 때만** 고유 read-only 요청을 등록·Run/JSON/TXT 2/2 반환 확인; 접근 불가능하면 이 하나만 `PC_READBACK_PENDING/AUTOMATION_BLOCKED`로 보존. 새 C 명령, 기존 requestId 재요청, 기존 잠금 해제, Workflow PUT, 임의 새 CMD·임의 shell, 새 감시 예약 금지. 기타 독립 작업과 기존 중앙 자동화(8/8)는 진행한다. 격리 Writer B 자연 적격 실패 E2E 및 자원 실제 해제 관측은 **별도 DEFERRED 4/5**이고 전체 업무 선행조건이 아니다.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
