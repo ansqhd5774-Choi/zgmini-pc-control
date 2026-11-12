@@ -1,4 +1,6 @@
 import test from 'node:test';
+// Exercise the approved 7/9-field backlog contract through the existing isolated maintenance CI suite.
+import './maintenance-backlog-request.test.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {applyApprovedUpdate,maintenanceFailureCode} from '../tools/maintenance-apply.mjs';
