@@ -310,7 +310,7 @@ test('untrusted or malformed origin receipt cannot redirect readback to arbitrar
   const f=fixture(),trace=[];mutation(f);
   await assert.rejects(readAndReviewOwnerReturn({
    originIssueNumber:1063,io:mockedReadIO(f,trace)
-  }),/OWNER_(ORIGIN_RECEIPT_WRONG_ISSUE|INCIDENT_READBACK_NUMBER_MISMATCH|ORIGIN_RETURN_FIELDS_INVALID|MULTIPLE_ORIGIN_RETURNS_REVIEW|UNEXPECTED_ISSUE_READ)/);
+  }),/(OWNER_(ORIGIN_RECEIPT_WRONG_ISSUE|INCIDENT_READBACK_NUMBER_MISMATCH|ORIGIN_RETURN_FIELDS_INVALID|MULTIPLE_ORIGIN_RETURNS_REVIEW)|UNEXPECTED_ISSUE_READ)/);
   assert.equal(trace.some(v=>v[0]==='run'),false);
  }
 });
