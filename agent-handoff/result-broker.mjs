@@ -60,7 +60,10 @@ async function inspectExistingResult(issueNumber, resultId, digest, expectedBody
       if (row.user?.login !== BOT || typeof row.body !== 'string' ||
           !row.body.startsWith('HANDOFF_RESULT_RECORDED\n')) continue;
       const lines = row.body.split('\n');
-      if (!lines.includes(`resultId: ${resultId}`)) continue;
+      // One handoff Issue represents one incident. A second valid-looking
+      // resultId is a competing repair decision, not another first result.
+      if (!lines.includes(`resultId: ${resultId}`))
+        throw new Error('RESULT_INCIDENT_ALREADY_RECORDED_STOP');
       if (!lines.includes(`digest: ${digest}`)) throw new Error('RESULT_ID_COLLISION_STOP');
       if (!completeReceipt(row, issueNumber, expectedBody))
         throw new Error('RESULT_RECEIPT_BINDING_STOP');
@@ -81,7 +84,10 @@ async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNum
       if (row.user?.login !== BOT || typeof row.body !== 'string' ||
           !row.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n')) continue;
       const lines = row.body.split('\n');
-      if (!lines.includes(`resultId: ${result.resultId}`)) continue;
+      // The owner review contract accepts one original return. A second
+      // resultId would make even an earlier verified return unreadable.
+      if (!lines.includes(`resultId: ${result.resultId}`))
+        throw new Error('RESULT_ORIGIN_ALREADY_RETURNED_STOP');
       if (!lines.includes(`digest: ${digest}`))
         throw new Error('RESULT_ORIGIN_ID_COLLISION_STOP');
       if (!lines.includes(`incidentId: ${result.incidentId}`) ||
