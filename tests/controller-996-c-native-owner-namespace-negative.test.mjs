@@ -60,3 +60,69 @@ test('native TEMP fixture demonstrates insertion can race pinned file handles wi
     fs.rmSync(dir,{recursive:true,force:true});
   }
 });
+
+
+test('isolated TEMP probes whether exclusive directory share zero blocks an independent child insertion', {
+  skip: !hostAllowed && 'Only the existing isolated handoff Windows Runner',
+}, () => {
+  const temp=fs.realpathSync.native(os.tmpdir());
+  assert.equal(path.win32.parse(temp).root.toLowerCase(),'c:\\');
+  const root=fs.mkdtempSync(path.join(temp,'zgmini-996-exclusive-dir-probe-'));
+  const source=path.join(root,'source');
+  const child=path.join(source,'independent-child.json');
+  const powershell=path.join(process.env.WINDIR,'System32','WindowsPowerShell','v1.0','powershell.exe');
+  // This is a separate OS process, not a second managed call in the lock holder.
+  const script=String.raw`
+$ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+public static class C996ExclusiveDirProbe {
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+ private static extern SafeFileHandle CreateFileW(string name,uint access,uint share,
+  IntPtr security,uint disposition,uint flags,IntPtr template);
+ public static string Probe(string directory,string node,string childScript) {
+  using(var handle=CreateFileW(directory,0x80,0,IntPtr.Zero,3,0x02000000|0x00200000,IntPtr.Zero)) {
+   if(handle.IsInvalid)return "EXCLUSIVE_OPEN_FAILED_"+Marshal.GetLastWin32Error();
+   var p=new ProcessStartInfo();
+   p.FileName=node;p.Arguments="-e \""+childScript+"\"";
+   p.UseShellExecute=false;p.CreateNoWindow=true;
+   p.RedirectStandardOutput=true;p.RedirectStandardError=true;
+   using(var competing=Process.Start(p)) {
+    if(competing==null)return "CHILD_START_FAILED";
+    if(!competing.WaitForExit(7000)){competing.Kill();competing.WaitForExit();return "CHILD_TIMEOUT";}
+    return competing.ExitCode==0?"CHILD_INSERT_SUCCEEDED":"CHILD_INSERT_DENIED_"+competing.ExitCode;
+   }
+  }
+ }
+}
+'@ -ReferencedAssemblies 'System.Core'
+$inputObject=ConvertFrom-Json ([Console]::In.ReadToEnd())
+[Console]::WriteLine([C996ExclusiveDirProbe]::Probe(
+ $inputObject.directory,$inputObject.node,$inputObject.script))
+`;
+  try {
+    fs.mkdirSync(source);
+    assert.equal(fs.existsSync(powershell),true);
+    const pathBase64=Buffer.from(child,'utf8').toString('base64');
+    const childScript="require('node:fs').writeFileSync(Buffer.from('"+
+      pathBase64+"','base64').toString('utf8'),'{}',{flag:'wx'})";
+    const result=spawnSync(powershell,['-NoProfile','-NonInteractive','-Command',script],{
+      input:JSON.stringify({directory:source,node:process.execPath,script:childScript}),
+      encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:100000});
+    assert.equal(result.error,undefined,result.error?.message);
+    assert.equal(result.status,0,String(result.stderr).slice(-1800));
+    const status=String(result.stdout).trim().split(/\r?\n/).at(-1);
+    // A directory share lock is not assumed to make child namespace insertion
+    // exclusive. A surprising block is a separate research outcome, not C approval.
+    assert.equal(status,'CHILD_INSERT_SUCCEEDED',
+      'Exclusive-directory insertion outcome: '+status);
+    assert.equal(fs.readFileSync(child,'utf8'),'{}');
+    assert.equal(fs.existsSync(path.join(root,'destination')),false);
+  } finally {
+    assert.ok(path.basename(root).startsWith('zgmini-996-exclusive-dir-probe-'));
+    fs.rmSync(root,{recursive:true,force:true});
+  }
+});
