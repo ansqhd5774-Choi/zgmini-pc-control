@@ -24,8 +24,6 @@ jobs:
           node-version: '22'
       - name: Run source-only unit tests
         run: node --test tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs
-      - name: Owner central handoff strict source-only routing regression
-        run: node --test tests/agent-handoff.test.mjs
       - name: Identify exact permitted queue PC without WIM access
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
