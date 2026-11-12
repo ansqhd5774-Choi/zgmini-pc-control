@@ -126,3 +126,45 @@ $inputObject=ConvertFrom-Json ([Console]::In.ReadToEnd())
     fs.rmSync(root,{recursive:true,force:true});
   }
 });
+
+
+test('WinPE-style native FILE_ID_INFO identifies the same directory across a rename and rejects a replaced name', {
+  skip: !hostAllowed && 'Only the existing isolated handoff Windows Runner',
+}, () => {
+  const tmp=fs.realpathSync.native(os.tmpdir());
+  assert.equal(path.win32.parse(tmp).root.toLowerCase(),'c:\\');
+  const root=fs.mkdtempSync(path.join(tmp,'zgmini-996-native-id-fixture-'));
+  const source=path.join(root,'source');
+  const archive=path.join(root,'archive');
+  const powershell=path.join(process.env.WINDIR,'System32','WindowsPowerShell','v1.0','powershell.exe');
+  const script="\n$ErrorActionPreference='Stop'\nAdd-Type -TypeDefinition @'\nusing System;\nusing System.Runtime.InteropServices;\nusing Microsoft.Win32.SafeHandles;\npublic static class C996WinpeNativeIdTest {\n [StructLayout(LayoutKind.Sequential)]\n public struct FileIdInfo {\n  public UInt64 VolumeSerialNumber;\n  [MarshalAs(UnmanagedType.ByValArray, SizeConst=16)]\n  public byte[] FileId;\n }\n [DllImport(\"kernel32.dll\",CharSet=CharSet.Unicode,SetLastError=true)]\n private static extern SafeFileHandle CreateFileW(string name,uint access,uint share,\n  IntPtr security,uint disposition,uint flags,IntPtr template);\n [DllImport(\"kernel32.dll\",SetLastError=true)]\n [return:MarshalAs(UnmanagedType.Bool)]\n private static extern bool GetFileInformationByHandleEx(SafeFileHandle handle,\n  int infoClass,out FileIdInfo info,uint size);\n public static string ReadOnlyId(string directory) {\n  using(var h=CreateFileW(directory,0x80,7,IntPtr.Zero,3,0x02000000|0x00200000,IntPtr.Zero)){\n   if(h.IsInvalid)throw new InvalidOperationException(\"OPEN_FAILED_\"+Marshal.GetLastWin32Error());\n   FileIdInfo info;\n   if(!GetFileInformationByHandleEx(h,18,out info,(uint)Marshal.SizeOf(typeof(FileIdInfo))))\n    throw new InvalidOperationException(\"FILE_ID_INFO_FAILED_\"+Marshal.GetLastWin32Error());\n   if(info.FileId==null||info.FileId.Length!=16)\n    throw new InvalidOperationException(\"FILE_ID_INFO_INVALID\");\n   return info.VolumeSerialNumber.ToString(\"x16\")+\"|\"+\n    BitConverter.ToString(info.FileId).Replace(\"-\",\"\").ToLowerInvariant();\n  }\n }\n}\n'@\n$inputObject=ConvertFrom-Json ([Console]::In.ReadToEnd())\n[Console]::WriteLine([C996WinpeNativeIdTest]::ReadOnlyId($inputObject.path))\n";
+  const observe=directory=>{
+    const proc=spawnSync(powershell,['-NoProfile','-NonInteractive','-Command',script],{
+      input:JSON.stringify({path:directory}),encoding:'utf8',
+      windowsHide:true,timeout:30000,maxBuffer:120000});
+    assert.equal(proc.error,undefined,proc.error?.message);
+    assert.equal(proc.status,0,String(proc.stderr).slice(-800));
+    const result=String(proc.stdout).trim().split(/\r?\n/).at(-1);
+    assert.match(result,/^[0-9a-f]{16}\|[0-9a-f]{32}$/);
+    return result.split('|');
+  };
+  try{
+    fs.mkdirSync(source);
+    assert.equal(fs.existsSync(powershell),true);
+    const [serialBefore,idBefore]=observe(source);
+    fs.renameSync(source,archive);
+    const [serialAfter,idAfter]=observe(archive);
+    assert.equal(serialAfter,serialBefore);
+    assert.equal(idAfter,idBefore);
+    // Keep original archive in place: a replacement has a different native ID.
+    fs.mkdirSync(source);
+    const [serialReplaced,idReplaced]=observe(source);
+    assert.equal(serialReplaced,serialBefore);
+    assert.notEqual(idReplaced,idBefore);
+    assert.equal(fs.readdirSync(root).sort().join(','),'archive,source');
+    // This is a local NTFS/Windows native API fixture, not WinPE boot proof.
+  }finally{
+    assert.ok(path.basename(root).startsWith('zgmini-996-native-id-fixture-'));
+    fs.rmSync(root,{recursive:true,force:true});
+  }
+});
