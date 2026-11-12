@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -92,4 +92,54 @@ test('missing lease evidence is unknown even if fallback marker claims it is hel
  assert.equal(out.installLockRecoveryRequired,null);
  assert.equal(sanitizeMaintenanceStatus(null).status,'STATE_UNKNOWN');
  assert.equal(sanitizeMaintenanceStatus({maintenanceSourceSha:'invalid'}).maintenanceSourceSha,null);
+});
+
+const pinned996=()=>({
+ lockBefore:{held:true,recoveryRequired:true,ownerPid:4567},
+ lockAfter:{held:true,recoveryRequired:true,ownerPid:4567},
+ first:{
+  owner:Buffer.from(JSON.stringify({pid:4567,nonce:'11111111-2222-4333-8444-555555555555',
+   at:'2026-11-12T20:32:30.000Z'})),
+  marker:Buffer.from(JSON.stringify({requestOwnerPid:4567,nonce:'11111111-2222-4333-8444-555555555555',
+   at:'2026-11-12T20:32:32.000Z'})),
+  ledger:Buffer.from(JSON.stringify({requestId:'pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404',
+   issueNumber:996,targetSha:'9db6fff689c488a59fe8771f013b7c5d3bafc0a8',
+   updatedAt:'2026-11-12T20:32:33.000Z'}))
+ }
+});
+test('fixed 996 lease snapshots correlate only owner marker and pinned original ledger',()=>{
+ const x=pinned996();x.second={...x.first};
+ const result=classify996LeaseCorrelation(x);
+ assert.equal(result.status,'CORRELATED');
+ assert.equal(result.ownerPid,4567);
+ assert.equal(result.ownerMarkerIdentityMatched,true);
+ assert.equal(result.ledger996Matched,true);
+ assert.equal(result.ledgerMarkerTimeMatched,true);
+ for(const sha of ['ownerSha256','markerSha256','ledgerSha256'])
+  assert.match(result[sha],/^[0-9a-f]{64}$/);
+ assert.doesNotMatch(JSON.stringify(result),/11111111|targetSha|owner\\.json|nonce|owner\\.at|ZGmini/i);
+});
+test('mismatched original request and changed file snapshots never claim C996 ownership',()=>{
+ const base=pinned996();
+ const wrong={...base,second:{...base.first},
+  first:{...base.first,ledger:Buffer.from(JSON.stringify({requestId:'another-request',
+   issueNumber:996,targetSha:'9db6fff689c488a59fe8771f013b7c5d3bafc0a8',
+   updatedAt:'2026-11-12T20:32:33.000Z'}))}};
+ wrong.second={...wrong.first};
+ assert.equal(classify996LeaseCorrelation(wrong).status,'STATE_UNKNOWN');
+ assert.equal(classify996LeaseCorrelation(wrong).ledger996Matched,false);
+ const drifting={...base,second:{...base.first,
+  marker:Buffer.from('changed between snapshots')}};
+ assert.equal(classify996LeaseCorrelation(drifting).code,'C996_ORIGINAL_SNAPSHOT_UNVERIFIED');
+ assert.equal(classify996LeaseCorrelation({
+  ...base,lockAfter:{held:false,recoveryRequired:false}}).status,'STATE_UNKNOWN');
+});
+test('read-only collector fails closed without fixed local files',()=>{
+ const result=inspect996LeaseCorrelation({
+  lock:()=>({held:true,recoveryRequired:true,ownerPid:4567}),
+  stat:()=>{throw Error('offline');},
+  read:()=>{throw Error('no file');}});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'C996_ORIGINAL_FILES_UNAVAILABLE');
+ assert.equal(result.operationalWrites,0);
 });
