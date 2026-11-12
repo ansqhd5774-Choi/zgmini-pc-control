@@ -1,5 +1,10 @@
 name: ZGMINI C996 Owner Native Boundary Source Checks
 on:
+  push:
+    branches: [codex/controller-996-intake-c-candidate-r1-20261110]
+    paths:
+      - 'tests/controller-996-c-native-owner-operator.test.mjs'
+      - '.github/workflows/c996-owner-native-boundary-source.yml'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
@@ -15,10 +20,14 @@ jobs:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
-      github.event.pull_request.number == 1222 &&
-      github.event.pull_request.draft == true &&
-      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.number == 1222 &&
+        github.event.pull_request.draft == true &&
+        github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+        github.event.pull_request.head.repo.full_name == github.repository) ||
+       (github.event_name == 'push' &&
+        github.ref == 'refs/heads/codex/controller-996-intake-c-candidate-r1-20261110' &&
+        github.actor == 'ansqhd5774-Choi'))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 4
     defaults:
@@ -34,7 +43,7 @@ jobs:
           echo C996_SOURCE_ONLY_ISOLATED_HOST=TRUE
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
