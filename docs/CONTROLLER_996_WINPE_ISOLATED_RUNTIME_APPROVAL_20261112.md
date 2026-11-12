@@ -183,3 +183,15 @@
 - **원본 값:** `runnerUserIsOwner=false`, `runnerProfileMatchesOwner=false`, `registry=ACCESS_DENIED`, `vmDirectory=ACCESS_DENIED`, `vmConfig=ACCESS_DENIED`, `operationalWrites=0`. 기존 격리 Runner 서비스 사용자와 Windows `ansqh` 대화형 사용자는 다른 계정·프로필이며 사용자 VM 고정 경로의 메타데이터 읽기도 거부된다. **이 상태에서 Runner 측 `VBoxManage` 실행이나 Windows 서비스 계정 강제 변경/ACL 우회 금지**. 독립적인 기존 사용자 CMD `VM_FILE_MISSING`은 보존; Runner ACCESS_DENIED만으로 원본 파일 존재·NTFS ACL 원인 확정 불가.
 - **진행 및 실제 문제:** `FIXED_A_READBACK_PASS / RUNNER_CONTEXT_MISMATCH_CONFIRMED / OWNER_VM_CONFIG_MISSING_ON_USER_VIEW / PRIVILEGE_ESCALATION_NOT_EXECUTED / VM_BOOT_NOT_EXECUTED`. 현재 연결된 도구로는 대상 호스트 대화형 관리자 UAC 토큰 획득 불가능. 사용자 직접 관리자 승인/정상 연결 없이 권한을 높였다고 주장할 수 없다. 권한 문제만 해결해도 존재하지 않는 `.vbox` 자동 복구로 승격 불가.
 - **다음 실제 행동/PC:** 공통 대기열 PC 사용자 세션의 VM 등록 참조와 `.vbox` 파일 정상 복구는 독립적인 사용자 승인 정규 경로로 진행; 기존 Runner의 새 A 결과는 재사용하고 중복 사진/명령 반복 요구 없음. 운영 PC `PC` 작업 없음, #996 C `NO-GO` 유지.
+
+## 2026-11-13 — 고아 VM 등록의 Oracle 정규 Remove Only 처리 경로
+
+**현재 독립 원본 증거:** Windows 대화형 사용자 `ansqh`의 `VBoxManage list vms`는 `"<inaccessible>" {ef4ba42b-1b14-49fc-8a0d-67d55250c720}`를 표시; 원본 사용자 `dir`는 예상 VM 폴더에서 파일 미발견, `VirtualBox.xml`은 이 UUID의 `C:\Users\ansqh\VirtualBox VMs\ZGMINI-C996-WinPE-TestOnly\ZGMINI-C996-WinPE-TestOnly.vbox`를 참조. Runner A #1346는 같은 PC에서 서비스 계정·프로필 불일치와 해당 경로 ACCESS_DENIED만 확인. 두 개의 실패를 동일 ACL 원인으로 단정하지 않는다.
+
+**C급 운영 작업과 분리된 TEST_ONLY 고아 등록 복구 후보:**
+- **실행 PC:** 공통 대기열 Windows `DESKTOP-N62L0NG`, 사용자 `ansqh`의 기존 VirtualBox 7.2 Manager.
+- Oracle 공식 7.2 안내 `https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/working-with-vms.html`: 머신 선택 → Remove → **Remove Only** 선택지는 VirtualBox 등록 목록에서만 제거하고 VM 파일을 삭제하지 않는다. `Delete All Files`/삭제 옵션 금지. `VBoxManage unregistervm <uuid>`도 `--delete` 없이는 등록 해제만 한다(`https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/vboxmanage.html`).
+- **전제:** Manager에 해당 UUID/유일한 `<inaccessible>` VM임을 확인하고 등록 해제 동작의 정확한 대상이 새 TEST_ONLY 한 대일 때만 수행. 다른 VM 존재·로그/파일 소실·복구 파일 존재가 뒤늦게 발견되면 STOP하고 보존. 다른 VM/원본 WinPE ISO/운영 PC 접근 금지.
+- **후속 진전:** 등록만 정리한 뒤 VM을 **기존 기본 경로와 분리된 일반 사용자 쓰기 가능한 디렉터리**에서 `VBoxManage createvm --basefolder=...`로 한 번 새로 만들고, 즉시 같은 사용자 `showvminfo`와 `.vbox` 존재를 읽어서 검증한다. 원래 VM 등록의 UUID가 제거됐다는 증거가 없으면 중복 등록/새 VM 생성 금지. 새로운 VM 설정 파일 보존이 실패하면 **STOP**; Windows Defender/폴더 정책/로그를 정규 사용자 진단으로 확인하고 ACL·관리자 무차별 확대 금지.
+- **자동화 증거:** [main PR #1345](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1345) 25/25+27/27 CI PASS 및 [A #1346](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1346) / [Run #43329527533](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43329527533) JSON/TXT 2/2 PASS는 재사용한다. 이 조회는 **관리자 권한 부여 및 TEST_ONLY VM 복구 성공의 증거가 아님**.
+- **현재 상태:** `INACCESSIBLE_VM_ORPHAN / RECOVERY_ACTION_NOT_EXECUTED / WINPE_BOOT_NOT_EXECUTED`, 운영 C `NO-GO`. RDC 대상 연결 없음(기존 `pc` 오프라인만 확인), 사용량 아끼기 위해 반복 호출 금지.
