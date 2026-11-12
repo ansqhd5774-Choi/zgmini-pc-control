@@ -100,7 +100,8 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   tamperIssue = false, forgedPartialReceipt = false, existingLabels = [],
   action = 'opened', labelName = 'agent-handoff', expectRejected = false,
   conflictingLabelOnComment = false, conflictingLabelOnLabel = false,
-  expectConflictPosts = null} = {}) {
+  expectConflictPosts = null, existingBotReceipt = null,
+  expectReceiptError = null} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
   const issueTitle = 'agent-handoff handoff-123456789abc';
@@ -116,6 +117,27 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     user:{login:'github-actions[bot]'},issue_url:issueUrl,
     body:'HANDOFF_ROUTED\nfingerprint: '+prepareHandoff(json()).fingerprint
   });
+  const outcome = prepareHandoff(json());
+  const expectedReceipt = [
+    'HANDOFF_ROUTED', 'incidentId: '+outcome.incidentId,
+    'fingerprint: '+outcome.fingerprint, 'role: '+outcome.role,
+    'state: '+outcome.state, 'checkpoint: '+outcome.checkpoint,
+    'PC retries: 0', 'operationalWrites: 0',
+    'Automatic AI execution and original ChatGPT conversation wake-up: NOT_CONFIGURED'
+  ].join('\n');
+  const pushBot = body => comments.push({
+    user:{login:'github-actions[bot]'},issue_url:issueUrl,body});
+  if (existingBotReceipt === 'duplicate-exact') {
+    pushBot(expectedReceipt);pushBot(expectedReceipt);
+  } else if (existingBotReceipt === 'conflicting-route') {
+    pushBot(expectedReceipt.replace('fingerprint: '+outcome.fingerprint,
+      'fingerprint: '+'f'.repeat(64)));
+  } else if (existingBotReceipt === 'conflicting-duplicate') {
+    pushBot(['HANDOFF_DUPLICATE_REUSED', 'fingerprint: '+outcome.fingerprint,
+      'newAgentDispatches: 0','PC retries: 0'].join('\n'));
+  } else if (existingBotReceipt === 'unrelated-human') {
+    comments.push({user:{login:'someone-else'},issue_url:issueUrl,body:expectedReceipt});
+  }
   const labels = ['agent-handoff',...existingLabels];
   const posts = [];
   globalThis.fetch = async (url, request = {}) => {
@@ -155,6 +177,9 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     } else if (expectConflictPosts !== null) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_LABEL_CONFLICT_STOP/);
       assert.deepEqual(posts, expectConflictPosts);
+    } else if (expectReceiptError !== null) {
+      await assert.rejects(runIssueBroker(env), new RegExp(expectReceiptError));
+      assert.deepEqual(posts, []);
     } else if (loseComment) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_COMMENT_READBACK_STOP/);
       assert.equal(labels.length, 1+existingLabels.length);
@@ -168,7 +193,7 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
       await runIssueBroker(env);
       await runIssueBroker(env);
       assert.deepEqual(posts, ['comment', ...(existingLabels.includes('handoff-agent-pending') ? [] : ['label'])]);
-      assert.equal(comments.length, forgedPartialReceipt ? 2 : 1);
+      assert.equal(comments.length, forgedPartialReceipt || existingBotReceipt === 'unrelated-human' ? 2 : 1);
     }
   } finally {
     globalThis.fetch = previousFetch;
@@ -225,4 +250,23 @@ test('owner routing stops if opposite label arrives after the bot receipt',async
 test('owner routing refuses final success if duplicate label races with pending label',async()=>{
   await simulateBroker({conflictingLabelOnLabel:true,
     expectConflictPosts:['comment','label']});
+});
+
+test('owner broker rejects two identical complete bot route receipts before writes',async()=>{
+  await simulateBroker({existingBotReceipt:'duplicate-exact',
+    expectReceiptError:'HANDOFF_COMMENT_DUPLICATE_STOP'});
+});
+
+test('owner broker rejects a competing completed route decision before writes',async()=>{
+  await simulateBroker({existingBotReceipt:'conflicting-route',
+    expectReceiptError:'HANDOFF_COMMENT_CONFLICT_STOP'});
+});
+
+test('owner broker rejects a competing duplicate disposition before writes',async()=>{
+  await simulateBroker({existingBotReceipt:'conflicting-duplicate',
+    expectReceiptError:'HANDOFF_COMMENT_CONFLICT_STOP'});
+});
+
+test('human quote of a route receipt is not authenticated bot evidence',async()=>{
+  await simulateBroker({existingBotReceipt:'unrelated-human'});
 });
