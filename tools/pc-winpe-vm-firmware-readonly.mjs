@@ -169,6 +169,7 @@ export function probeVmDiscovery({
 
 export function probeVmFirmware({
  platform=process.platform,spawn=spawnSync,vmProbe=probeFixedVmPrograms,
+ discoveryProbe=probeVmDiscovery,
 }={}){
  if(platform!=='win32')return blocked('VM_WINDOWS_ONLY');
  let p;
@@ -187,6 +188,9 @@ export function probeVmFirmware({
  if(vm?.scope!=='STANDARD_C_PATHS_ONLY'||vm.pathCount!==6||
     !Array.isArray(vm.programs)||vm.programs.length!==6)
     return blocked('VM_FIXED_PATH_PROBE_INVALID');
+ let discovery;
+ try{discovery=discoveryProbe({platform});}
+ catch{discovery=Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_UNAVAILABLE'});}
  const readiness=Object.values(firmware).some(x=>x===null)?'VM_FIRMWARE_UNKNOWN':
    !firmware.FIRMWARE_ENABLED?'VM_FIRMWARE_DISABLED':
    !firmware.VM_MONITOR||!firmware.SLAT?'VM_CPU_FEATURES_NOT_CONFIRMED':
@@ -196,7 +200,7 @@ export function probeVmFirmware({
   status:'PASS',code:'VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED',
   firmware,readiness,
   vmPrograms:vm.programs.map(x=>({id:x.id,status:x.status})),
-  vmDiscovery:probeVmDiscovery({platform}),
+  vmDiscovery:discovery,
   vmPathsMode:'STANDARD_C_PATHS_ONLY',portableInstalls:'NOT_CHECKED',
   binaryPresentAtFixedPath:vm.programs.some(x=>x.status==='FILE_PRESENT'),
   vmOperationallyTested:false,vmInstalledByProbe:false,winpeBooted:false,
