@@ -3,6 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseHandoff} from './contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contract.mjs';
+import {centralResultReceipt, originResultReceipt} from './result-receipts.mjs';
 
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 const PUBLIC_FEATURE_REPOSITORY = 'ansqhd5774-Choi/zgmini';
@@ -223,15 +224,7 @@ export async function main(env = process.env) {
   ]);
   const verified = verifyAgentResult(handoff, result, pr, run, {featureSourceRepository});
   const originalIssue = await verifiedOriginIssue(handoff, event.issue.number);
-  const comment = [
-    'HANDOFF_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
-    `incidentId: ${result.incidentId}`, `fingerprint: ${result.fingerprint}`,
-    `origin: ${handoff.origin.repository}#${handoff.origin.issueNumber}`,
-    `pr: ${repo}#${result.pullRequest.number}`, `prHeadSha: ${result.pullRequest.headSha}`,
-    `testRunId: ${result.testRun.runId}`, `state: ${verified.state}`,
-    'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
-    'PC retries: 0', 'operationalWrites: 0'
-  ].join('\n');
+  const comment = centralResultReceipt(handoff,result,digest,repo,verified);
   const alreadyRecorded = await inspectExistingResult(
     event.issue.number, result.resultId, digest, comment);
   if (!alreadyRecorded) {
@@ -248,14 +241,7 @@ export async function main(env = process.env) {
       throw new Error('RESULT_COMMENT_READBACK_STOP');
   }
   if (originalIssue !== null) {
-    const receipt = [
-      'HANDOFF_ORIGIN_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
-      `incidentId: ${result.incidentId}`, `handoffIssue: ${event.issue.number}`,
-      `fixPr: ${repo}#${result.pullRequest.number}`, `prHeadSha: ${result.pullRequest.headSha}`,
-      `testRunId: ${result.testRun.runId}`, `state: ${verified.state}`,
-      'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
-      'PC retries: 0', 'operationalWrites: 0'
-    ].join('\n');
+    const receipt = originResultReceipt(result,digest,repo,verified,event.issue.number);
     const delivered = await inspectOriginReceipt(
       originalIssue, result, digest, event.issue.number, receipt);
     if (!delivered) {
