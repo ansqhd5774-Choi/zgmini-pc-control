@@ -188,6 +188,45 @@ test('completed but skipped irrelevant Issue has no Writer B receipt', async () 
   assert.equal(state.calls.file.length, 0);
 });
 
+test('failed source workflow without a Writer B receipt is visible, never silent NO_WORK', async () => {
+  for (const conclusion of ['failure', 'timed_out']) {
+    const {io, state} = fixture();
+    state.comments = [];
+    const e = event();
+    e.workflow_run.conclusion = conclusion;
+    await assert.rejects(() => processCompletedWriterB(e, io),
+      /WRITER_B_HANDOFF_PRODUCER_FAILED_RUN_RECEIPT_ABSENT/);
+    assert.equal(state.calls.create, 0);
+    assert.equal(state.calls.file.length, 0);
+    assert.equal(state.calls.route, 0);
+  }
+});
+
+test('unrelated completed source workflow with no receipt remains benign', async () => {
+  for (const conclusion of ['success', 'skipped']) {
+    const {io, state} = fixture();
+    state.comments = [];
+    const e = event();
+    e.workflow_run.conclusion = conclusion;
+    const result = await processCompletedWriterB(e, io);
+    assert.equal(result.state, 'NO_VERIFIED_WRITER_B_RECEIPT');
+    assert.equal(result.newIssues, 0);
+    assert.equal(state.calls.file.length, 0);
+    assert.equal(state.calls.create, 0);
+  }
+});
+
+test('verified failed source workflow keeps normal evidence-based routing', async () => {
+  const {io, state} = fixture();
+  const e = event();
+  e.workflow_run.conclusion = 'failure';
+  const result = await processCompletedWriterB(e, io);
+  assert.equal(result.state, 'ISSUE_CREATED_VERIFIED');
+  assert.equal(result.confirmedFailures, 1);
+  assert.equal(state.calls.route, 1);
+  assert.equal(result.automaticPcRetries, 0);
+});
+
 test('wrong actor, workflow or repeated attempt never reaches GitHub I/O', async () => {
   const {io, state} = fixture();
   for (const modify of [

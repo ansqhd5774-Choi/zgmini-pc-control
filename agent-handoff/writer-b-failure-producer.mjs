@@ -59,7 +59,15 @@ export async function processCompletedWriterB(event, {
   // skipped Writer B job, so absence of its exact bot receipt is not failure.
   const comments = await readComments(run.since);
   const receipt = findWriterBReceipt(comments, run.runId);
-  if (!receipt) return Object.freeze({...initial, state: 'NO_VERIFIED_WRITER_B_RECEIPT'});
+  if (!receipt) {
+    // A failed/timed-out source workflow with no authenticated bot receipt is
+    // an evidence gap, not a successful empty scan. Never invent an Incident
+    // or retry the PC task; make the isolated intake failure observable.
+    if (['failure', 'timed_out'].includes(event.workflow_run.conclusion))
+      stop('FAILED_RUN_RECEIPT_ABSENT');
+    // Unrelated Issue events may legitimately skip the Writer B source job.
+    return Object.freeze({...initial, state: 'NO_VERIFIED_WRITER_B_RECEIPT'});
+  }
 
   const originIssue = await readIssue(receipt.issueNumber);
   const manifestPath = authorizedManifestPath(originIssue);
