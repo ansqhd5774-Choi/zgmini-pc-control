@@ -61,12 +61,16 @@ export function buildFixedVolumeProbe(mode,csSource){
  const root=mode==='operating'?'E:\\':'C:\\';
  const entries=mode==='operating'?[
   ['VOLUME_ROOT','E:\\'],['ZGMINI','E:\\ZGmini'],
+  ['AUTOMATION','E:\\ZGmini\\automation'],
+  ['MAINTENANCE','E:\\ZGmini\\automation\\pc-maintenance'],
   ['LEASES','E:\\ZGmini\\automation\\pc-maintenance\\leases'],
   ['OLD_C','E:\\ZGmini\\automation\\pc-maintenance\\leases\\controller-recovery'],
   ['INSTALL','E:\\ZGmini\\automation\\pc-maintenance\\leases\\controller-install'],
  ]:[
   ['VOLUME_ROOT','C:\\'],['ZGMINI','C:\\Windows'],
-  ['LEASES','C:\\Windows\\System32'],
+  ['AUTOMATION','C:\\Windows\\System32'],
+  ['MAINTENANCE','C:\\Windows\\System32\\drivers'],
+  ['LEASES','C:\\Windows\\System32\\drivers\\etc'],
  ];
  const calls=["[Console]::Out.WriteLine('VOLUME_GUID='+[ZGmini996VolumeReadOnly]::VolumeGuid('"+root+"'))"];
  for(const [key,fixed] of entries)
@@ -77,8 +81,8 @@ export function buildFixedVolumeProbe(mode,csSource){
 }
 export function decodeFixedVolumeResponse(stdout,mode){
  const keys=mode==='operating'?
-  ['VOLUME_GUID','VOLUME_ROOT','ZGMINI','LEASES','OLD_C','INSTALL']:
-  ['VOLUME_GUID','VOLUME_ROOT','ZGMINI','LEASES'];
+  ['VOLUME_GUID','VOLUME_ROOT','ZGMINI','AUTOMATION','MAINTENANCE','LEASES','OLD_C','INSTALL']:
+  ['VOLUME_GUID','VOLUME_ROOT','ZGMINI','AUTOMATION','MAINTENANCE','LEASES'];
  if(typeof stdout!=='string')return fail('VOLUME_NATIVE_OUTPUT_INVALID');
  const lines=stdout.trim().split(/\r?\n/),rows={};
  if(lines.length!==keys.length)return fail('VOLUME_NATIVE_OUTPUT_INVALID');
@@ -92,7 +96,8 @@ export function decodeFixedVolumeResponse(stdout,mode){
    if(!ID.test(rows[k])&&
      !(mode==='operating'&&['OLD_C','INSTALL'].includes(k)&&rows[k]==='ABSENT'))
      return fail('VOLUME_ID_INVALID');
- if(!ID.test(rows.VOLUME_ROOT)||!ID.test(rows.ZGMINI)||!ID.test(rows.LEASES))
+ if(['VOLUME_ROOT','ZGMINI','AUTOMATION','MAINTENANCE','LEASES']
+   .some(k=>!ID.test(rows[k])))
    return fail('VOLUME_REQUIRED_PATH_MISSING');
  const serial=rows.VOLUME_ROOT.slice(0,16);
  if(keys.slice(1).some(k=>rows[k]!=='ABSENT'&&rows[k].slice(0,16)!==serial))
