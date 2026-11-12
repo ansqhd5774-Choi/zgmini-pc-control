@@ -84,3 +84,12 @@
 - **최소 수정:** 재다운로드·이동·ACL 변경 없이 `dir /b "%USERPROFILE%\Downloads\VirtualBox*.exe"`로 다운로드 위치의 실제 파일명을 확인한 다음, 발견된 **정확한 경로/파일명**으로 `certutil -hashfile "<full-path>" SHA256`을 실행한다. Downloads에 없으면 정상 파일 탐색기로 EXE의 실제 전체 경로 확인. 파일이 발견되지 않으면 STOP.
 - **통과 조건:** 파일 SHA256 예상 값과 전체 64자리 일치, Windows 속성의 유효한 Oracle America, Inc. 디지털 서명 확인. 이 두 검증이 끝나기 전에는 관리자 설치 실행 금지. 이는 로컬 사용자가 제공한 출력에 의해 확인할 사항이며 ChatGPT는 PC 파일을 직접 검사했다고 주장하지 않는다.
 - **현 상태:** `INSTALLER_PATH_NOT_RESOLVED / HASH_NOT_MEASURED / SIGNATURE_NOT_MEASURED / INSTALL_NOT_STARTED / VM_BOOT_NOT_STARTED`. 기존 운영 PC `PC` 작업 없음, RDC 사용 없음. TEST_ONLY 승인 유지 및 #996 C 운영 복구 `NO-GO` 불변.
+
+## 2026-11-13 — VirtualBox 7.2.22 설치 완료 화면 수신 및 설치 후 A급 조회
+
+- **실행 PC:** 공통 대기열 PC `DESKTOP-N62L0NG` (현재 사용자가 사용 중인 PC); 기존 운영 PC `PC`에서 실행 없음.
+- **사용자 이미지 증거:** `Oracle VirtualBox 7.2.22 Installer` 대화창에서 `Oracle VirtualBox 7.2.22 has been installed.` 메시지 표시, `Start Oracle VirtualBox 7.2.22?` 체크, `Finish` 버튼 활성. 이는 **로컬 설치 마법사의 설치 완료 증거**지만, `Finish` 실제 클릭·VirtualBox Manager 첫 실행·최종 설치 파일 SHA256/Authenticode는 아직 미관측. 사용자 이미지 파일을 GitHub에 업로드하거나 개인 파일을 참조하는 경로를 남기지 않는다.
+- **읽기 전용 Runner 재조회 신규 승인 요청:** [Issue #1343](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1343), 고유 `requestId=6b8045cb-0e48-4b9a-9db1-6c8bced7fa21`, 기존 `pc-winpe-vm-firmware-readonly`, `role=handoff`, `scope=C996_ISOLATED_VM_PREFLIGHT`. 기존 격리 Runner `zgmini-handoff-ci-spare-01`의 정확한 호스트·가상화·표준 경로·등록 프로그램 진단만 하며 설치/부팅/작업 PC 쓰기 0. Issue에 결과가 아직 도착하지 않았다면 **`RUNTIME_RESULT_PENDING`**, 원본 requestId로 재발행하지 않는다. Run ID와 원본 JSON/TXT는 실제 확인된 후에만 기재한다.
+- **사용자 다음 UI 한 단계:** 설치 대화창 `Finish` 누르고 체크된 Oracle VirtualBox 7.2.22 Manager 시작 확인. Manager가 열렸다고 VM을 즉시 시작하거나 새 디스크/어댑터를 추가하지 않는다. WinPE 시험 VM의 필수 사전 설정은 RAM 2048MiB, vCPU 1, unattended install OFF, virtual HDD NONE, NIC NONE, USB OFF, 공유폴더·clipboard·drag/drop OFF, 고정 ISO read-only 광학 매체 연결·실측 SHA 검증 후 **1회** 부팅. 공식 GUI 가이드: `https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/create-vm.html`.
+- **ISO 입력 경로는 기존 파일만:** `C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886\\iso\\C996_WINPE_CNG_TEST_ONLY.iso`, 기대 SHA256 `63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588`. 기존 격리 Runner 다른 Windows 세션의 TEMP `EPERM`을 권한 우회로 해결하지 않는다.
+- **현재 상태:** `USER_SCREENSHOT_INSTALL_WIZARD_COMPLETE`, `MANAGER_LAUNCH_UNVERIFIED`, `A_RESULT_PENDING`, `VM_CREATED=false [NOT_OBSERVED]`, `WINPE_BOOTED=false [NOT_OBSERVED]`, `CNG_6_NOT_OBSERVED`. C `NO-GO` 불변. RDC 호출 0, 운영 PC 변경 0.
