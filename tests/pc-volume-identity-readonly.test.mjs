@@ -19,8 +19,9 @@ const validRequest=()=>({
 const guid='\\\\?\\Volume{33333333-3333-4333-8333-333333333333}\\';
 const id=(k)=>'1'.repeat(16)+':'+String(k).repeat(32);
 const response=(mode='operating', overrides={})=>{
- const data={VOLUME_GUID:guid,VOLUME_ROOT:id(1),ZGMINI:id(2),LEASES:id(3)};
- if(mode==='operating')Object.assign(data,{OLD_C:id(4),INSTALL:id(5)});
+ const data={VOLUME_GUID:guid,VOLUME_ROOT:id(1),ZGMINI:id(2),
+  AUTOMATION:id(3),MAINTENANCE:id(4),LEASES:id(5)};
+ if(mode==='operating')Object.assign(data,{OLD_C:id(6),INSTALL:id(7)});
  Object.assign(data,overrides);
  return Object.entries(data).map(([k,v])=>k+'='+v).join('\r\n')+'\r\n';
 };
@@ -74,13 +75,13 @@ test('fixed response checks GUID, 128-bit IDs, same-volume serial, missing C',()
  const proof=decodeFixedVolumeResponse(response(),'operating');
  assert.equal(proof.status,'PASS');
  assert.equal(proof.source,'WIN32_GET_VOLUME_NAME_AND_FILE_ID_INFO');
- assert.equal(Object.keys(proof.directories).length,5);
+ assert.equal(Object.keys(proof.directories).length,7);
  assert.equal(proof.volumeSerial,'1'.repeat(16));
  const lowercase=decodeFixedVolumeResponse(response('operating',
   {VOLUME_GUID:guid.replace('Volume{','volume{')}),'operating');
  assert.equal(lowercase.status,'PASS');
  assert.equal(lowercase.volumeGuid,guid);
- assert.equal(proof.directories.INSTALL.fileId128,'5'.repeat(32));
+ assert.equal(proof.directories.INSTALL.fileId128,'7'.repeat(32));
  assert.equal(proof.offlineVolumeVerified,false);
  assert.equal(proof.cExecutionAuthorized,false);
  assert.equal(proof.operationalWrites,0);
@@ -124,7 +125,7 @@ test('native read-only Win32 proof runs on isolated Windows fixture only',t=>{
  }});
  assert.equal(proof.status,'PASS',proof.code);
 
- assert.equal(Object.keys(proof.directories).length,3);
+ assert.equal(Object.keys(proof.directories).length,5);
  assert.equal(proof.offlineVolumeVerified,false);
  assert.equal(proof.operationalWrites,0);
 });
