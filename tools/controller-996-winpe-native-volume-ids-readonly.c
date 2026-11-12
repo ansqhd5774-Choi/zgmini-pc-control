@@ -264,3 +264,88 @@ c996_source_only_read_status c996_source_only_collect_eight_ids(
   *out=observation;
   return C996_NATIVE_ID_READ_COMPLETE_UNTRUSTED;
 }
+
+
+/*
+ * Machine-readable *UNTRUSTED* source receipt. The eight entries are fixed
+ * names; no caller-defined JSON keys, arbitrary paths or trust assertions.
+ * The formatter does not establish WinPE boot, source authenticity, or C
+ * approval. Output is assembled in a private buffer before being released.
+ */
+static int c996_fixed_ascii_hex(const char *value, size_t count) {
+  size_t i;
+  if(!value || strlen(value)!=count) return 0;
+  for(i=0;i<count;++i)
+    if(!((value[i]>='0'&&value[i]<='9') ||
+         (value[i]>='a'&&value[i]<='f'))) return 0;
+  return 1;
+}
+int c996_source_only_encode_untrusted_native_receipt(
+    const c996_source_only_volume_observation *observation,
+    char *destination, size_t destinationChars) {
+  char buffer[4096];
+  char escapedGuid[128];
+  size_t i,j=0;
+  HRESULT hr;
+  if(!destination || destinationChars<2 || destinationChars>8192) return 0;
+  destination[0]='\0';
+  if(!observation || observation->idsCollected!=C996_FIXED_ID_COUNT ||
+     observation->isSourceOnlyObservation!=1 ||
+     observation->winpeBootAuthenticated!=0 ||
+     observation->ownerSignatureVerified!=0 ||
+     observation->offlineClockTrusted!=0 ||
+     observation->volumeGuidAuthenticated!=0 ||
+     observation->cExecutionAuthorized!=0 ||
+     observation->operationalWrites!=0 ||
+     !c996_valid_volume_guid(observation->untrustedVolumeGuid) ||
+     !c996_fixed_ascii_hex(observation->volumeSerial,16)) return 0;
+  ZeroMemory(escapedGuid,sizeof(escapedGuid));
+  for(i=0;i<C996_FIXED_GUID_CHARS;++i) {
+    WCHAR c=observation->untrustedVolumeGuid[i];
+    if(c>127 || j>=sizeof(escapedGuid)-3) return 0;
+    if(c==L'\\') escapedGuid[j++]='\\';
+    escapedGuid[j++]=(char)c;
+  }
+  escapedGuid[j]='\0';
+  for(i=0;i<C996_FIXED_ID_COUNT;++i) {
+    size_t k;
+    const c996_source_only_native_id *entry=&observation->directories[i];
+    if(!observation->fixedKey[i] ||
+       strcmp(observation->fixedKey[i],c996_fixed_keys[i])!=0 ||
+       !c996_fixed_ascii_hex(entry->fileId128,32) ||
+       !c996_fixed_ascii_hex(entry->volumeSerial,16) ||
+       strcmp(entry->volumeSerial,observation->volumeSerial)!=0 ||
+       entry->isReparse!=0) return 0;
+    for(k=0;k<i;++k)
+      if(strcmp(entry->fileId128,
+          observation->directories[k].fileId128)==0) return 0;
+  }
+  hr=StringCchPrintfA(buffer,sizeof(buffer),
+    "{\"schema\":\"ZGMINI_CONTROLLER_996_NATIVE_IDS_UNTRUSTED_V1\","
+    "\"source\":\"WIN32_NATIVE_SOURCE_ONLY_UNTRUSTED\","
+    "\"untrustedVolumeGuid\":\"%s\",\"volumeSerial\":\"%s\","
+    "\"directories\":{",
+    escapedGuid,observation->volumeSerial);
+  if(FAILED(hr)) return 0;
+  for(i=0;i<C996_FIXED_ID_COUNT;++i) {
+    char entry[240];
+    const c996_source_only_native_id *item=&observation->directories[i];
+    hr=StringCchPrintfA(entry,sizeof(entry),
+      "%s\"%s\":{\"fileId128\":\"%s\",\"volumeSerial\":\"%s\","
+      "\"isReparse\":false}",
+      i?",":"",c996_fixed_keys[i],item->fileId128,item->volumeSerial);
+    if(FAILED(hr) ||
+       FAILED(StringCchCatA(buffer,sizeof(buffer),entry))) return 0;
+  }
+  if(FAILED(StringCchCatA(buffer,sizeof(buffer),
+    "},\"idsCollected\":8,\"readOnly\":true,"
+    "\"winpeBootAuthenticated\":false,"
+    "\"ownerSignatureVerified\":false,"
+    "\"offlineClockTrusted\":false,"
+    "\"volumeGuidAuthenticated\":false,"
+    "\"cExecutionAuthorized\":false,"
+    "\"operationalWrites\":0}"))) return 0;
+  hr=StringCchCopyA(destination,destinationChars,buffer);
+  if(FAILED(hr)){destination[0]='\0';return 0;}
+  return 1;
+}
