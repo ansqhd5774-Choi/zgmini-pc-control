@@ -80,8 +80,96 @@ export function parseWmi(stdout){
  }
  return Object.freeze(out);
 }
+// SECOND, independent read-only discovery: registered Windows software and
+// exact VM application filenames on the existing Runner's PATH only.
+// No file-system traversal, program execution, binaries loaded or output paths.
+// NONE means "not found in the TWO checked scopes", not "not installed".
+export const VM_DISCOVERY_QUERY=[
+ "$ErrorActionPreference='Stop'",
+ "$known=@('VIRTUALBOX','QEMU','VMWARE')",
+ "$reg=@()",
+ "$partial=$false",
+ "$hives=@('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',",
+ " 'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',",
+ " 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*')",
+ "foreach($hive in $hives) {",
+ " try {",
+ "  $items=@(Get-ItemProperty -Path $hive -ErrorAction Stop)",
+ "  foreach($item in $items) {",
+ "   $name=[string]$item.DisplayName",
+ "   if($name -match '(?i)virtualbox') {$reg+= 'VIRTUALBOX'}",
+ "   elseif($name -match '(?i)\\bqemu\\b') {$reg+='QEMU'}",
+ "   elseif($name -match '(?i)vmware (workstation|player)') {$reg+='VMWARE'}",
+ "  }",
+ " }catch{ $partial=$true }",
+ "}",
+ "$pathApps=@()",
+ "$commands=@(",
+ " @('VIRTUALBOX','VBoxManage.exe'),",
+ " @('QEMU','qemu-system-x86_64.exe'),",
+ " @('VMWARE','vmware.exe'),",
+ " @('VMWARE','vmplayer.exe'))",
+ "foreach($item in $commands){",
+ " try {",
+ "  $found=Get-Command -Name $item[1] -CommandType Application -ErrorAction Stop",
+ "  if($null -ne $found){$pathApps+=$item[0]}",
+ " }catch{}",
+ "}",
+ "$reg=@($reg|Sort-Object -Unique)",
+ "$pathApps=@($pathApps|Sort-Object -Unique)",
+ "if($reg.Count -eq 0){$reg=@('NONE')}",
+ "if($pathApps.Count -eq 0){$pathApps=@('NONE')}",
+ "[Console]::Out.WriteLine('REGISTERED='+($reg -join ','))",
+ "[Console]::Out.WriteLine('IN_PATH='+($pathApps -join ','))",
+ "[Console]::Out.WriteLine('REGISTRY_PARTIAL='+($partial.ToString().ToLowerInvariant()))",
+].join('\n');
+
+export function parseVmDiscovery(stdout){
+ if(typeof stdout!=='string')return null;
+ const lines=stdout.trim().split(/\r?\n/);
+ if(lines.length!==3)return null;
+ const prefix=['REGISTERED=','IN_PATH=','REGISTRY_PARTIAL='];
+ for(let i=0;i<3;i++)if(!lines[i].startsWith(prefix[i]))return null;
+ const parse=value=>{
+  const names=value.split(',');
+  if(names.length===1&&names[0]==='NONE')return [];
+  if(names.length===0||names.length>3||
+     names.some(x=>!['VIRTUALBOX','QEMU','VMWARE'].includes(x))||
+     new Set(names).size!==names.length)return null;
+  return names;
+ };
+ const registered=parse(lines[0].slice(prefix[0].length));
+ const inPath=parse(lines[1].slice(prefix[1].length));
+ const partial=lines[2].slice(prefix[2].length);
+ if(!registered||!inPath||!['true','false'].includes(partial))return null;
+ return Object.freeze({registered,executableInPath:inPath,
+  registryScanPartial:partial==='true',scope:'UNINSTALL_REGISTRY_AND_CURRENT_RUNNER_PATH',
+  executableOperabilityVerified:false,portableOutsidePathChecked:false});
+}
+export function probeVmDiscovery({
+ platform=process.platform,spawn=spawnSync,
+}={}){
+ if(platform!=='win32')return Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_WINDOWS_ONLY'});
+ let child;
+ try{
+  child=spawn(PS,['-NoProfile','-NonInteractive','-EncodedCommand',
+      Buffer.from(VM_DISCOVERY_QUERY,'utf16le').toString('base64')],{
+      encoding:'utf8',windowsHide:true,timeout:25000,maxBuffer:8000,
+      shell:false,stdio:['ignore','pipe','pipe'],
+  });
+ }catch{return Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_UNAVAILABLE'});}
+ if(child?.error||child?.status!==0)
+   return Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_UNAVAILABLE'});
+ const parsed=parseVmDiscovery(child.stdout);
+ if(!parsed)return Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_RESPONSE_INVALID'});
+ return Object.freeze({status:parsed.registryScanPartial?'PARTIAL':'PASS',
+   code:parsed.registryScanPartial?'VM_DISCOVERY_REGISTRY_PARTIAL':
+     'VM_DISCOVERY_SCOPED_OBSERVED',...parsed});
+}
+
 export function probeVmFirmware({
  platform=process.platform,spawn=spawnSync,vmProbe=probeFixedVmPrograms,
+ discoveryProbe=probeVmDiscovery,
 }={}){
  if(platform!=='win32')return blocked('VM_WINDOWS_ONLY');
  let p;
@@ -100,6 +188,9 @@ export function probeVmFirmware({
  if(vm?.scope!=='STANDARD_C_PATHS_ONLY'||vm.pathCount!==6||
     !Array.isArray(vm.programs)||vm.programs.length!==6)
     return blocked('VM_FIXED_PATH_PROBE_INVALID');
+ let discovery;
+ try{discovery=discoveryProbe({platform});}
+ catch{discovery=Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_UNAVAILABLE'});}
  const readiness=Object.values(firmware).some(x=>x===null)?'VM_FIRMWARE_UNKNOWN':
    !firmware.FIRMWARE_ENABLED?'VM_FIRMWARE_DISABLED':
    !firmware.VM_MONITOR||!firmware.SLAT?'VM_CPU_FEATURES_NOT_CONFIRMED':
@@ -109,6 +200,7 @@ export function probeVmFirmware({
   status:'PASS',code:'VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED',
   firmware,readiness,
   vmPrograms:vm.programs.map(x=>({id:x.id,status:x.status})),
+  vmDiscovery:discovery,
   vmPathsMode:'STANDARD_C_PATHS_ONLY',portableInstalls:'NOT_CHECKED',
   binaryPresentAtFixedPath:vm.programs.some(x=>x.status==='FILE_PRESENT'),
   vmOperationallyTested:false,vmInstalledByProbe:false,winpeBooted:false,
