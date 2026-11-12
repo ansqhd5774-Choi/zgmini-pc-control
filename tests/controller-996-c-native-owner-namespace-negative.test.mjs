@@ -247,3 +247,77 @@ test('native fixed eight-ID WinPE reader builds as x64 object when isolated MSVC
     fs.rmSync(output,{recursive:true,force:true});
   }
 });
+
+
+test('actual compiled x64 FileIdInfo reader preserves original native ID across safe isolated TEMP rename',{
+  skip: !hostAllowed && 'Only existing isolated Windows Runner may run this TEMP-only harness',
+},(t)=>{
+  const pf86=process.env['ProgramFiles(x86)'];
+  if(!pf86)return t.skip('MSVC not installed');
+  const vswhere=path.join(pf86,'Microsoft Visual Studio','Installer','vswhere.exe');
+  if(!fs.existsSync(vswhere))return t.skip('vswhere not installed');
+  const vs=spawnSync(vswhere,['-latest','-products','*',
+    '-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+    '-property','installationPath'],{
+      encoding:'utf8',windowsHide:true,timeout:12000,maxBuffer:8000});
+  if(vs.status!==0||vs.error)return t.skip('MSVC discovery unavailable');
+  const rootVs=String(vs.stdout).trim().split(/\r?\n/)[0]||'';
+  const dev=path.join(rootVs,'Common7','Tools','VsDevCmd.bat');
+  if(!rootVs||!fs.existsSync(dev))return t.skip('native x64 toolchain unavailable');
+  const temp=fs.realpathSync.native(os.tmpdir());
+  assert.equal(path.win32.parse(temp).root.toLowerCase(),'c:\\');
+  const build=fs.mkdtempSync(path.join(temp,'zgmini-996-native-reader-build-'));
+  const root=fs.mkdtempSync(path.join(temp,'zgmini-996-native-reader-fixture-'));
+  const source=path.join(root,'source');
+  const archive=path.join(root,'archive');
+  try{
+    fs.mkdirSync(source);
+    const exe=path.join(build,'read-id-temp.exe');
+    const nativeSource=fileURLToPath(new URL(
+      './c996_winpe_native_volume_id_temp_harness.c',import.meta.url));
+    for(const input of [dev,nativeSource,exe])
+      assert.doesNotMatch(input,/[\r\n"&|<>]/);
+    const batch=path.join(build,'build-temp-reader.cmd');
+    fs.writeFileSync(batch,[
+      '@echo off','setlocal EnableExtensions DisableDelayedExpansion',
+      'call "'+dev+'" -arch=x64 -host_arch=x64 >nul',
+      'if errorlevel 1 exit /b 51',
+      'cl.exe /nologo /W4 /WX /TC /O2 /MT /GS '+
+        '/DC996_NATIVE_VOLUME_ID_TEMP_HARNESS_ONLY=1 '+
+        '/D_WIN32_WINNT=0x0A00 /Fe:"'+exe+'" "'+nativeSource+'" '+
+        '/link /MACHINE:X64 /SUBSYSTEM:CONSOLE /DYNAMICBASE /NXCOMPAT /INCREMENTAL:NO',
+      'if errorlevel 1 exit /b 52','exit /b 0',
+    ].join('\r\n')+'\r\n',{flag:'wx'});
+    const compiler=spawnSync(process.env.ComSpec||'cmd.exe',['/d','/c',batch],{
+      encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:100000});
+    assert.equal(compiler.error,undefined,compiler.error?.message);
+    assert.equal(compiler.status,0,'native TEMP build error: '+
+      String(compiler.stdout).slice(-1800)+' '+String(compiler.stderr).slice(-1200));
+    assert.ok(fs.statSync(exe).isFile());
+    const observe=where=>{
+      const proc=spawnSync(exe,[where],{
+        encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:16000});
+      assert.equal(proc.error,undefined,proc.error?.message);
+      assert.equal(proc.status,0,String(proc.stderr)+' '+String(proc.stdout));
+      const match=String(proc.stdout).trim().match(
+        /^C996_NATIVE_ID_TEMP_PASS:([0-9a-f]{16}):([0-9a-f]{32})$/);
+      assert.ok(match,'unknown native receipt');
+      return {serial:match[1],id:match[2]};
+    };
+    const before=observe(source);
+    fs.renameSync(source,archive);
+    const after=observe(archive);
+    assert.deepEqual(after,before);
+    fs.mkdirSync(source);
+    const replaced=observe(source);
+    assert.equal(replaced.serial,before.serial);
+    assert.notEqual(replaced.id,before.id);
+    assert.deepEqual(fs.readdirSync(root).sort(),['archive','source']);
+    // This is an isolated Windows TEMP C execution, never a WinPE boot.
+  }finally{
+    assert.ok(path.basename(root).startsWith('zgmini-996-native-reader-fixture-'));
+    assert.ok(path.basename(build).startsWith('zgmini-996-native-reader-build-'));
+    fs.rmSync(root,{recursive:true,force:true});
+    fs.rmSync(build,{recursive:true,force:true});
+  }
+});
