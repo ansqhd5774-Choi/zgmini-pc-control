@@ -1,7 +1,7 @@
 # #996 WinPE TEST_ONLY ISO — 격리 런타임 실행 결정서
 
 기준일: 2026-11-12 KST
-상태: **SOURCE/RESEARCH ONLY — INSTALL/BOOT NOT AUTHORIZED**
+상태: **2026-11-13 APPROVAL_RECORDED / TEST_ONLY_EXECUTION_PENDING** (아래 2026-11-12 승인 전 기록은 이력으로 보존)
 대상: **공통 대기열 PC `DESKTOP-N62L0NG` 단일 호스트**
 범위 밖: 기존 운영 PC `PC`, E:\ZGmini, Controller/Writer/DB/Workflow/Backlog/Claim/Lease, USB·물리 부팅.
 
@@ -30,7 +30,7 @@
 6. PASS 판정은 **VM 실제 시작 / guest WinPE marker / EXE 6/6 / 원본 해시 불변 / 호스트 볼륨 미부착 / 종료 후 상태**를 독립 증거로 확인한 경우에만. 부팅/marker 실패/비승인 디스크 탐지/CPU·RAM 부족/권한 오류는 즉시 `STOP`, 재시도 0. 오류를 해결하기 위해 새 WIM/ISO·DISM Commit·ACL·드라이버 변경을 자동 수행하지 않는다.
 7. 종료 시 게스트 전원 종료·해당 실행 로그와 테스트 결과를 저장하고 원본 ISO/WIM/BCD·PC 경로 불변 확인. VM이나 설치 파일·로그를 승인 없이 삭제·초기화하지 않는다.
 
-## 명시적으로 여전히 미승인·미완료
+## 2026-11-12 당시 미승인·미완료 이력 (2026-11-13 승인 이전)
 
 - **현재 부팅/VM 생성/VirtualBox 설치/드라이버·재부팅/ISO 파일 재작성 전부 0건.**
 - VM에서 CNG 6/6이 성공하더라도 이는 **테스트 벡터** 검증일 뿐, 원래 #996 C급 복구에 필요한 진짜 Owner 신뢰 공개키/SPKI, 승인, 인증된 시간·철회 freshness, 운영 PC 원본 원장/lease/설치 source/복구 승인 검증을 대신하지 않는다.
@@ -54,3 +54,13 @@
 - **기존 실행 가능 범위 확인:** `main`의 `config/operations.json`에 WinPE/VM 관리자 설치 operation은 확인되지 않았으며, `pc-winpe-vm-firmware-readonly`는 읽기 전용이다. 이 대화에서 연결된 Remote Desktop Commander에는 `pc` 1대만 오프라인으로 표시되고 승인 대상 `DESKTOP-N62L0NG`의 직접 제어 기기는 보이지 않았다. 이는 격리 GitHub Runner 자체의 오프라인을 뜻하지 않는다. GitHub CI/Issue만으로 호스트 관리자 설치를 시작할 사전 허용 경로를 가정하지 않는다.
 - **실제 다음 실행:** 소유자가 원래 호스트에서 사용 가능한 승인된 로컬 관리자 실행 컨텍스트/기존 VM 실행기/ISO 정상 ACL을 확인한 다음, 위 정확한 TEST_ONLY 절차를 기존 정규 경로로 1회만 수행한다. 비승인 원격 shell, 임의 workflow/CMD 자동 수신기, ACL 우회, ISO 재작성·재시도는 금지한다. 실패 시 FIRST FAIL 및 원본 보존을 인계한다.
 - **변경 금지:** 운영 PC 재부팅·C claim/lease/archive·Controller/Writer·Workflow/DB/D1 변경 및 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`, `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN` STOP 완화 없음. #996 실제 C 복구는 **80% / NO-GO**.
+
+## 2026-11-13 — 실행 패키지 및 PC 단일 수동 단계
+
+**실제 작업 호스트:** 공통 대기열 Windows 10 Home `DESKTOP-N62L0NG`. **운영 PC `PC` 작업은 없음.** GitHub 원장·소스 기록은 특정 Windows 호스트를 실행 대상으로 하지 않는다.
+
+1. 기존 [#1270](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1270) 원본 결과: `VM_MONITOR=true`, `SLAT=true`, `FIRMWARE_ENABLED=true`, `HYPERVISOR_PRESENT=false`, 설치 기본경로 6종 `ABSENT_AT_FIXED_PATH`, 등록 프로그램/Runner PATH `NONE`이나 레지스트리 조회는 `PARTIAL`. **이 증거를 재실행하지 않는다.** VM 미설치 확정이 아닌 '검사 범위 내 미발견'.
+2. 공식 Oracle 현재 확인된 **VirtualBox Base Windows 7.2.22** (`VirtualBox-7.2.22-175245-Win.exe`, 2026-10-20 배포, 약 170MB)만 후보로 삼는다. 사용자는 **공식 Oracle 다운로드 페이지** `https://www.oracle.com/virtualization/technologies/vm/downloads/virtualbox-downloads.html`에서 Windows Base Package를 선택한다. 별도 Extension Pack 다운로드/설치 금지. 설치 실행 전에 Oracle 게시 `SHA256SUMS`의 해당 파일 항목과 실제 다운로드 SHA256, Windows Authenticode 서명(Oracle 발행자)을 서로 비교한다. **현재 실행 PC에서 직접 검증한 SHA·서명은 아직 없다**. 공식 페이지의 최신 버전이 바뀐 경우 해당 후보를 자동 설치하지 않는다.
+3. 기존 격리 Runner는 `pc-winpe-vm-firmware-readonly`와 기타 승인된 메타데이터/CI 경로만 제공한다. `config/operations.json`에 `virtualbox-install`·`winpe-vm-boot`는 없고 연결된 RDC에는 대상 장치가 등록된 상태가 아니다. **RDC 호출 낭비·임의 Workflow shell·Runner 서비스 계정 설치·권한 우회는 하지 않는다.** 설치/드라이버의 **로컬 UAC 관리자 조작은 호스트 소유자가 직접 수행**하고 예상하지 못한 시스템 변경·재부팅이 요구되면 STOP 및 원래 사용자 승인 효과를 재평가한다.
+4. 설치 전 기존 VM 프로그램이 정상적으로 있으면 중복 설치 금지. 설치 후 새 VM은 정확히 1개/2048MiB/vCPU 1/NIC·USB·공유·clipboard·DnD·host/raw 디스크 전부 없음/HDD 없음. 원본 사용자 프로필 아래의 **기존** ISO `C996_WINPE_CNG_TEST_ONLY.iso`는 고정 SHA256 `63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588`, 크기 `399980544`만 허용. 원본 사용자 TEMP의 고정 파일은 원래 소유자 컨텍스트만 사용한다. Runner `EPERM`을 우회하지 않는다.
+5. **실행 확인 상태:** 이번에는 VirtualBox 설치·WinPE boot·CNG test를 수행하지 않았으므로 `VM_INSTALL_NOT_OBSERVED / GUEST_BOOT_NOT_OBSERVED / CNG_6_NOT_OBSERVED`. 실제 설치 파일 서명·해시 확인과 승인된 로컬 관리자 실행이 가능한 증거가 확보된 이후에만 단회 부팅을 진행한다. **C급 운영 복구 80%·NO-GO**와 두 native STOP은 불변. 실패 결과를 다른 Runner·PC로 바꿔 우회하지 않는다.
