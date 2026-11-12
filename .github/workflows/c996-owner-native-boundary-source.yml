@@ -5,6 +5,8 @@ on:
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
+      - 'tools/controller-996-winpe-native-volume-ids-readonly.c'
+      - 'tests/c996_winpe_native_volume_id_temp_harness.c'
       - 'tools/controller-996-native-approval-readiness.mjs'
       - 'tests/controller-996-native-approval-readiness.test.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
+      - 'tools/controller-996-winpe-native-volume-ids-readonly.c'
+      - 'tests/c996_winpe_native_volume_id_temp_harness.c'
       - 'tools/controller-996-native-approval-readiness.mjs'
       - 'tests/controller-996-native-approval-readiness.test.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
