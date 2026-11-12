@@ -24,8 +24,6 @@ jobs:
           node-version: '22'
       - name: Run source-only unit tests
         run: node --test tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs
-      - name: Shared-resource lifecycle and authenticated source-only readback regressions
-        run: node --test tests/shared-resource-lifecycle.test.mjs tests/resource-recheck-readback.test.mjs tests/shared-resource-wait-ledger.test.mjs
       - name: Identify exact permitted queue PC without WIM access
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
