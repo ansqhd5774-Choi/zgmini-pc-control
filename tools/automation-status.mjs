@@ -3,11 +3,16 @@ import fs from 'node:fs';import path from 'node:path';
 import {execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
-import {maintenanceNextAction} from './update.mjs';
+import {maintenanceNextAction,dedicatedPcRunnerRows} from './update.mjs';
 const control='E:/ZGmini/automation/pc-control',maintenance='E:/ZGmini/automation/pc-maintenance';
 const repo='ansqhd5774-Choi/zgmini-pc-control',gh='C:/Program Files/GitHub CLI/gh.exe';
 const read=f=>JSON.parse(fs.readFileSync(f,'utf8'));
 const hash=b=>createHash('sha256').update(b).digest('hex');
+// Only the six ZGMINI operating seats determine Controller runtime health.
+// Independently registered handoff/other runners must not falsify this status.
+export function dedicatedPcRunnersOnline(rows){
+ return dedicatedPcRunnerRows(rows,{requireOnline:true})!==null;
+}
 export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFileSync){
  // Verified final pre-upgrade Windows six-file source (464 POSTFF V2).
  // A newer source must carry its seventh runtime module, even if its manifest
@@ -78,7 +83,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   supervisorIdentityVerified:Boolean(owner?.nonce&&owner.pid===supervisor?.pid&&supervisor.sourceSha===host?.controllerSourceSha),
   supervisorFresh:Date.now()-Date.parse(supervisor?.at??'')>=0&&Date.now()-Date.parse(supervisor?.at??'')<45000,
   supervisorChildrenVerified:supervisor?.mode==='LISTENING'&&supervisor?.children?.length===6&&Array.from({length:6},(_,i)=>i+1).every(seat=>supervisor.children.filter(c=>c.seat===seat&&c.alive===true&&live(c.pid)===true).length===1),
-  runnerSetOnline:rows?.length===6&&Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1)).every(n=>rows.some(r=>r.name===n&&r.status==='online')),
+  runnerSetOnline:dedicatedPcRunnersOnline(rows),
   workflowState:workflow,installedOperations:operations};
  Object.assign(state,{maintenanceFilesVerified:maintenanceVerified===true,
   receiverIdentityVerified:Boolean(receiverOwner?.nonce&&receiver?.pid===receiverOwner.pid&&live(receiverOwner.pid)===true),
