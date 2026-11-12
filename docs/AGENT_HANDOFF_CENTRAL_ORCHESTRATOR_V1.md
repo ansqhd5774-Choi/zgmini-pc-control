@@ -191,3 +191,10 @@
 각 Run은 기존 원본 bot 댓글에도 `RESULT_PAIR_READBACK_VERIFIED`, `RESULT_CREATED=2/2`, `RESULT_READBACK=2/2`로 기록됐다. 신규 설치의 manifest SHA256/변경 경로·결과 source SHA는 고유 원본 JSON에 보존된다. 네 SHA는 **각 설치 당시의 로컬 overlay**로서 서로 동일한 현재 운영 HEAD가 아니다. 신규 설치 이력 성공 ≠ 지금 실행 중 Core Task의 source 인증, 원자료/SQLite 계산·저장 완료, D1/API/UI 게시 검증 또는 원담당 ChatGPT 대화의 자동 수신/재개 증거. 특정 기능의 남은 데이터·산식·게시 검증은 그 기능 원담당이 실제 저장·Runtime checkpoint를 기준으로 수행한다.
 
 **정정된 총괄 다음 필수 사건:** 4개 기능을 전부 미설치라고 보고 재요청하거나 소비된 #1063/#1064/#1066/#1081을 반복하지 않는다. 현재 `handoff-agent-pending` 미처리 새 사건이 없다면 `NO_WORK`를 보존한다. 새로운 **자연 발생한 인증된 수리 가능 장애**에 한해 격리 Writer B direct-route의 실제 봇 영수증 → 중앙 최소 수리·PR/CI → 원본 Issue 검증된 반환을 1건 검증해 신설 격리 경로의 마지막 4/5(DEFERRED)를 마감한다. 다른 일반챗 자동 기동, 기능별 최종 게시 완료, 공통 #996 C급 NO-GO는 이 판정의 선행 Gate나 성공 증거로 혼동하지 않는다.
+
+## 2026-11-12 — 입구 Workflow 실패 관측 보완 (기존 중앙 자동화, 비실행)
+
+- **실제 연결 누락 해소:** Writer B 자동 접수의 인증된 bot receipt 없는 원본 `failure/timed_out`는 [PR #1286](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1286)으로 `WRITER_B_HANDOFF_PRODUCER_FAILED_RUN_RECEIPT_ABSENT`를 명시적으로 실패 처리한다. 이 경우 신뢰할 원본 결과가 없으므로 `agent-handoff` Issue도 없으며, **Incident만 검색하는 중앙 자동화는 접수 실패를 놓칠 수 있다**.
+- **단일 자동화 실제 수정:** 기존 `ZGMINI 공통 인계 중앙 처리`(`Automation_9a403a04a8ac8191a331e94f9abeb1b4`)의 저장 prompt만 2026-11-12 13:35 KST 갱신, 저장·재조회 완료. 기존 일정/활성 상태/대화별 Task 수·권한 불변. 유효 Issue 검색 뒤 최근 약 24시간의 `ZGMINI Agent Handoff Writer B Failure Intake`/ `ZGMINI Agent Handoff PC Failure Intake` 실패 Run을 읽기 전용으로 살펴 `INTAKE_EVIDENCE_GAP` 또는 `AUTOMATION_BLOCKED`를 별도 보고한다. 실패 로그만으로 가짜 수리 Incident·PC 재실행을 만들지 않고, 정상 `SKIPPED`나 source-only CI 실패를 수리 가능 자연 사고로 격상하지 않는다.
+- **현재 조회:** GitHub Actions `status=failure` 원격 조회 138개를 2페이지 모두 확인. 2026-11-12 13:36 KST 기준 최근 24시간 실패 14개 중 **위 두 접수 Workflow 실패는 0개**; 이전 2026-11-09 PC 접수 실패 3개는 이력으로 보존하며 자동 재시도하지 않는다. 이 읽기 검증은 **수정된 자동화가 다음 자연 실행에서 실제 이 분기를 처리했다는 증거가 아니다**.
+- **진행률 불변:** 기존 중앙 8/8 완료, 별도 격리 Writer B 신규 자연 적격 사고 자동 접수·중앙 처리·원본 반환 **4/5(DEFERRED)**. #996 C NO-GO와 개별 기능 게시 미검증은 별개. 새 전역 Gate/Runner/예약/Workflow/운영 PC/DB/원자료/D1 작업 **0건**.
