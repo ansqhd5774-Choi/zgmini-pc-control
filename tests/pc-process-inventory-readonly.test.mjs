@@ -117,7 +117,7 @@ test('fixed 996 lease snapshots correlate only owner marker and pinned original 
  assert.equal(result.ledgerMarkerTimeMatched,true);
  for(const sha of ['ownerSha256','markerSha256','ledgerSha256'])
   assert.match(result[sha],/^[0-9a-f]{64}$/);
- assert.doesNotMatch(JSON.stringify(result),/11111111|targetSha|owner\.json|nonce|owner\.at|E:\\\\/ZGmini/);
+ assert.doesNotMatch(JSON.stringify(result),/11111111|targetSha|owner\\.json|nonce|owner\\.at|ZGmini/i);
 });
 test('mismatched original request and changed file snapshots never claim C996 ownership',()=>{
  const base=pinned996();
