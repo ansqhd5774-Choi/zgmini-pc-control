@@ -233,3 +233,16 @@ test('opposite label introduced during label update cannot report successful rou
   assert.equal(f.postCount,1);
   assert.equal(f.comments.length,1);
 });
+
+test('isolated bot routing ignores earlier labeled pull requests in the Issue inventory',async()=>{
+  const f=fixture();
+  const prior={...structuredClone(f.created),number:1199,
+    user:{login:'ansqhd5774-Choi'},
+    pull_request:{url:'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/pulls/1199'}};
+  f.io.listHandoffs=async()=>({repository:repo,complete:true,
+    issues:[prior,structuredClone(f.created)]});
+  const result=await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(result.marker,'HANDOFF_ROUTED');
+  assert.equal(f.postCount,1);
+  assert.equal(f.created.labels.some(label=>label.name==='handoff-agent-pending'),true);
+});

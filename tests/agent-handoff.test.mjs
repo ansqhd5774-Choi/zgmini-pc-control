@@ -101,7 +101,7 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   action = 'opened', labelName = 'agent-handoff', expectRejected = false,
   conflictingLabelOnComment = false, conflictingLabelOnLabel = false,
   expectConflictPosts = null, existingBotReceipt = null,
-  expectReceiptError = null} = {}) {
+  expectReceiptError = null, previousIssues = [], expectedDuplicate = false} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
   const issueTitle = 'agent-handoff handoff-123456789abc';
@@ -118,7 +118,10 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     body:'HANDOFF_ROUTED\nfingerprint: '+prepareHandoff(json()).fingerprint
   });
   const outcome = prepareHandoff(json());
-  const expectedReceipt = [
+  const expectedReceipt = expectedDuplicate ? [
+    'HANDOFF_DUPLICATE_REUSED', 'fingerprint: '+outcome.fingerprint,
+    'newAgentDispatches: 0', 'PC retries: 0'
+  ].join('\n') : [
     'HANDOFF_ROUTED', 'incidentId: '+outcome.incidentId,
     'fingerprint: '+outcome.fingerprint, 'role: '+outcome.role,
     'state: '+outcome.state, 'checkpoint: '+outcome.checkpoint,
@@ -144,7 +147,7 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     const method = request.method ?? 'GET';
     const uri = new URL(url);
     let value;
-    if (uri.pathname.endsWith('/issues') && method === 'GET') value = [];
+    if (uri.pathname.endsWith('/issues') && method === 'GET') value = previousIssues;
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') value = comments;
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       posts.push('comment');
@@ -192,7 +195,8 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     } else {
       await runIssueBroker(env);
       await runIssueBroker(env);
-      assert.deepEqual(posts, ['comment', ...(existingLabels.includes('handoff-agent-pending') ? [] : ['label'])]);
+      const targetLabel = expectedDuplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
+      assert.deepEqual(posts, ['comment', ...(existingLabels.includes(targetLabel) ? [] : ['label'])]);
       assert.equal(comments.length, forgedPartialReceipt || existingBotReceipt === 'unrelated-human' ? 2 : 1);
     }
   } finally {
@@ -269,4 +273,23 @@ test('owner broker rejects a competing duplicate disposition before writes',asyn
 
 test('human quote of a route receipt is not authenticated bot evidence',async()=>{
   await simulateBroker({existingBotReceipt:'unrelated-human'});
+});
+
+test('owner intake ignores an earlier third-party handoff Issue with the same fingerprint',async()=>{
+  await simulateBroker({previousIssues:[{
+    number:1999,user:{login:'untrusted-user'},labels:[{name:'agent-handoff'}],body:json(),
+  }]});
+});
+
+test('owner intake ignores an earlier labeled PR even if created by an authorized user',async()=>{
+  await simulateBroker({previousIssues:[{
+    number:1998,user:{login:'ansqhd5774-Choi'},labels:[{name:'agent-handoff'}],
+    pull_request:{url:'https://api.github.com/repos/example/example/pulls/1998'},body:json(),
+  }]});
+});
+
+test('owner intake still deduplicates against an earlier genuine owner Incident',async()=>{
+  await simulateBroker({previousIssues:[{
+    number:1997,user:{login:'ansqhd5774-Choi'},labels:[{name:'agent-handoff'}],body:json(),
+  }],expectedDuplicate:true});
 });

@@ -38,7 +38,12 @@ async function listPreviousBodies(currentIssue) {
     const rows = await api(`/repos/${REPOSITORY}/issues?state=all&labels=agent-handoff&per_page=100&page=${page}`);
     if (!Array.isArray(rows)) throw new Error('HANDOFF_LEDGER_INVALID');
     // The lowest issue number wins even when two opens race concurrently.
-    for (const issue of rows) if (issue.number < currentIssue && typeof issue.body === 'string') bodies.push(issue.body);
+    // The issues endpoint also lists PRs and may include third-party Issues.
+    // Only authorized, real Incidents can claim a prior fingerprint.
+    for (const issue of rows) if (issue.number < currentIssue && !issue.pull_request &&
+      ['ansqhd5774-Choi', 'github-actions[bot]'].includes(issue.user?.login) &&
+      issue.labels?.some(label => label.name === 'agent-handoff') &&
+      typeof issue.body === 'string') bodies.push(issue.body);
     if (rows.length < 100) return bodies;
   }
   throw new Error('HANDOFF_LEDGER_SCAN_LIMIT_STOP');
