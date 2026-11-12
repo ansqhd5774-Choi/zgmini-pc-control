@@ -9,6 +9,29 @@
 - **상태 정의:** `DONE`=해당 승인 기능 범위의 실측 완료; `RUNNING/READY`=실제 실행 또는 승인된 독립 실행 가능; `APPROVAL_PENDING`=정확한 신규 효과에 필수 승인 없음; `NOT_REGISTERED`=원하는 operation만 운영 Controller에 없음; `STATE_UNKNOWN`=증거가 부족함; `BLOCKED`=해당 필수 실행에 실제 권한/자원/검증 실패; `DEFERRED`=자연 사건/장래 관찰을 요구하는 별도 후속.
 - **진행률 비혼합:** 아래의 %·n/m은 각 기능 담당자가 확정한 고유 분모다. 서로 평균하거나 PR/CI/문서/예약 결과를 원자료·공개 점수 완료로 환산하지 않는다. 완료 증거의 재검증은 source·config·Runtime 변경 또는 충돌 증거가 있는 범위에서만 한다.
 
+## 0.1. 매 작업의 실행 PC·환경 명시 (2026-11-13 사용자 지시)
+
+- **프로젝트·대화의 실행 PC를 한 대로 고정하지 않는다.** 각 작업을 계획하거나 다음 단계를 보고할 때 실행 장소를 작업 단위로 지정한다. 실제 실행을 관측하지 못한 경우 '완료' 대신 `미실행/미확인`으로 표시한다.
+- 보고 형식은 **`작업 / 실행 PC 또는 환경 / 실제 결과·증거 / 현재 문제 / 다음 필수 실행 / 범위별 진행률`**. 두 PC를 연달아 사용하는 업무는 작업을 둘로 나누고 각각 명시한다. 채팅 접속 PC, Remote Desktop Commander 등록 이름, GitHub Runner 호스트 이름을 검증 없이 같은 장치라고 가정하지 않는다.
+- **운영 PC `PC`:** Windows 11 Pro, `zgmini-pc-01..06` (`zgmini-pc-control`), 승인된 운영 원자료·Controller·Writer 설치/조회. 단, 승인·등록·공유 lease 충돌 상태는 별도 확인한다.
+- **공통 대기열 PC `DESKTOP-N62L0NG`:** Windows 10 Home, `zgmini-handoff-ci-spare-01` (`zgmini-handoff-ci-isolated`), 승인된 격리 인계/읽기·소스 시험 및 #996 **TEST_ONLY** WinPE VM 시험. 운영 PC의 E:·Controller/lease/DB에 접근시키지 않는다.
+- **GitHub/웹:** 브랜치·PR·이슈·실행 원장·CI 결과·공개 API/UI 조회 등 특정 물리 PC가 필요한 작업이 아닐 때 `GitHub/웹(특정 PC 없음)`으로 기록한다.
+- **대상 불명확·접근 불가:** `대상 PC 미확정` 또는 `DESKTOP-N62L0NG 원격 조작 경로 미확인`처럼 실제 문제를 적는다. 외부 원격 제어에서 한 장치가 오프라인이라는 이유만으로 다른 GitHub Runner 오프라인이나 사용자 현재 채팅 PC 부재를 확정하지 않는다.
+
+**현재 #996 후속 작업별 PC 지정 (사용자 TEST_ONLY 승인 후):**
+
+| 순서 | 다음 작업 | 실행 PC/환경 | 현재 판정 |
+|---|---|---|---|
+| 1 | 승인 범위·기존 이미지/펌웨어/Runner readback 재사용 | GitHub(물리 PC 없음) | 기존 증거 있음·반복 시험 불필요 |
+| 2 | 원래 사용자 계정의 기존 VM 설치·ISO 정상 접근·해시 확인 | **공통 대기열 PC `DESKTOP-N62L0NG`** | VM 표준 6경로 없음·원본 TEMP Runner EPERM·직접 조작 경로 미확인 |
+| 3 | 필요한 경우 무료 VirtualBox Base 공식 서명·버전 확인 후 설치 | **공통 대기열 PC `DESKTOP-N62L0NG`** | 사용자 TEST_ONLY 효과 승인 확보·실제 설치 미실행 |
+| 4 | 호스트 디스크·네트워크·USB 격리 VM 1개, 고정 SHA ISO 읽기 전용 부착 및 1회 부팅·CNG 6건 | **공통 대기열 PC `DESKTOP-N62L0NG`** | 미실행·WinPE boot PASS 주장 금지 |
+| 5 | 호스트 원본 해시 불변·게스트 결과·종료 상태 회수, 원장 갱신 | 공통 대기열 PC(원본 증거) → **GitHub**(회수·인계) | 실물 시험 이후에만 판정 |
+| 6 | 운영 #996 C 원본 claim/lease 및 승인된 복구의 별도 독립 판단 | **기존 운영 PC `PC`**(승인된 원본 조회만) | C `NO-GO`·TEST_ONLY 승인으로 운영 복구 불가 |
+
+- 현재 사용자 진술은 **이 ChatGPT 채팅이 공통 대기열 PC에서 진행 중**이라는 것이며, 이 사실이 별도 Remote Desktop Commander 연결·관리 권한·파일 접근을 보증하지 않는다. 대상 PC를 분명히 밝혀야 하지만 작업/대화를 한 호스트로 고정하지 않는다.
+- #996 사용자 TEST_ONLY 승인: [원장 #996 승인](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6837208822). 대상 PC 정정: [#996 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6837339312). 승인된 범위 밖 관리자 원격 명령·ISO/ACL 우회·운영 C급 변경 불가.
+
 ## 1. 전체 상태판 — 실제 다음 단계의 출발점
 
 | 업무 / 책임 | 마지막 인정 완료점(원본 출처) | 잔여 비율 / 상태 | 다음 실제 필수 실행 1개 | 범위 밖 병목 |
