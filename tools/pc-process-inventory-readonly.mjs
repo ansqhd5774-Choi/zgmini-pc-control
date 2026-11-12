@@ -8,6 +8,8 @@ import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
+import {maintenanceLockStatus} from './maintenance-lock.mjs';
+import {createHash} from 'node:crypto';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -136,6 +138,78 @@ function collectMaintenanceStatusReadonly(){
  catch{return sanitizeMaintenanceStatus(null);}
 }
 
+
+const C996_ID='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
+const C996_TARGET='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
+const MAINTENANCE_ROOT='E:/ZGmini/automation/pc-maintenance';
+const sha256=b=>createHash('sha256').update(b).digest('hex');
+const c996Unknown=code=>({status:'STATE_UNKNOWN',code,
+ ownerPid:null,ownerMarkerIdentityMatched:false,ledger996Matched:false,
+ ledgerMarkerTimeMatched:false,unchangedAcrossReads:false,
+ ownerSha256:null,markerSha256:null,ledgerSha256:null,
+ operationalWrites:0,providerCalls:0,d1Writes:0});
+// Return a bounded read-only correlation result. Neither the raw owner nonce,
+// original ledger/body, absolute paths nor recovery marker is published.
+export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}={}){
+ if(lockBefore?.held!==true||lockBefore?.recoveryRequired!==true||
+    lockAfter?.held!==true||lockAfter?.recoveryRequired!==true)
+  return c996Unknown('C996_ACTIVE_RECOVERY_LEASE_NOT_VERIFIED');
+ if(!first||!second||!['owner','marker','ledger'].every(k=>
+    Buffer.isBuffer(first[k])&&Buffer.isBuffer(second[k])&&
+    first[k].length>0&&first[k].length<=32768&&
+    first[k].equals(second[k])))
+  return c996Unknown('C996_ORIGINAL_SNAPSHOT_UNVERIFIED');
+ let owner,marker,ledger;
+ try{
+  owner=JSON.parse(first.owner.toString('utf8'));
+  marker=JSON.parse(first.marker.toString('utf8'));
+  ledger=JSON.parse(first.ledger.toString('utf8'));
+ }catch{return c996Unknown('C996_ORIGINAL_JSON_UNVERIFIED');}
+ const pid=Number.isSafeInteger(owner?.pid)&&owner.pid>0?owner.pid:null;
+ const nonceOk=typeof owner?.nonce==='string'&&
+  /^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(owner.nonce);
+ const ownerMarkerIdentityMatched=Boolean(pid&&nonceOk&&marker?.nonce===owner.nonce&&
+  marker?.requestOwnerPid===pid&&lockBefore.ownerPid===pid&&lockAfter.ownerPid===pid);
+ const ledger996Matched=ledger?.requestId===C996_ID&&ledger?.issueNumber===996&&
+  ledger?.targetSha===C996_TARGET;
+ const tLedger=Date.parse(ledger?.updatedAt??''),tMarker=Date.parse(marker?.at??''),
+  tOwner=Date.parse(owner?.at??'');
+ const ledgerMarkerTimeMatched=Number.isFinite(tLedger)&&
+  Number.isFinite(tMarker)&&Number.isFinite(tOwner)&&
+  Math.abs(tLedger-tMarker)<5000&&tOwner<=tMarker;
+ const matched=ownerMarkerIdentityMatched&&ledger996Matched&&ledgerMarkerTimeMatched;
+ return {status:matched?'CORRELATED':'STATE_UNKNOWN',
+  code:matched?'C996_LEASE_IDENTITY_CORRELATED':'C996_LEASE_IDENTITY_UNPROVEN',
+  ownerPid:ownerMarkerIdentityMatched?pid:null,
+  ownerMarkerIdentityMatched,ledger996Matched,ledgerMarkerTimeMatched,
+  unchangedAcrossReads:true,
+  ownerSha256:sha256(first.owner),markerSha256:sha256(first.marker),
+  ledgerSha256:sha256(first.ledger),
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect996LeaseCorrelation({
+ read=fs.readFileSync,stat=fs.lstatSync,
+ lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install')}={}){
+ try{
+  const before=lock();
+  if(before?.held!==true||before?.recoveryRequired!==true)
+   return c996Unknown('C996_ACTIVE_RECOVERY_LEASE_NOT_VERIFIED');
+  const fixed={
+   owner:path.join(MAINTENANCE_ROOT,'leases/controller-install/owner.json'),
+   marker:path.join(MAINTENANCE_ROOT,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   ledger:path.join(MAINTENANCE_ROOT,'ledger',C996_ID+'.json')
+  };
+  const snapshot=()=>Object.fromEntries(Object.entries(fixed).map(([k,f])=>{
+   const st=stat(f);
+   if(!st.isFile()||st.size<1||st.size>32768)
+    throw Error('C996_FIXED_ORIGINAL_FILE_INVALID');
+   return [k,read(f)];
+  }));
+  const first=snapshot(),second=snapshot(),after=lock();
+  return classify996LeaseCorrelation({lockBefore:before,lockAfter:after,first,second});
+ }catch{return c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE');}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -151,7 +225,8 @@ export function collect(role,ctx,env=process.env){
   return {...base,status:'BLOCKED',code:identity==='MATCH'?'HOST_NOT_CANONICAL':identity};
  }
  const withMaintenance=role==='operating'?{...base,
-  maintenance:collectMaintenanceStatusReadonly()}:base;
+  maintenance:collectMaintenanceStatusReadonly(),
+  c996LeaseCorrelation:inspect996LeaseCorrelation()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
@@ -179,6 +254,8 @@ export function toText(r){
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
+  'c996LeaseCorrelation='+(r.c996LeaseCorrelation?.status??'NOT_APPLICABLE'),
+  'c996LeaseCorrelationCode='+(r.c996LeaseCorrelation?.code??'NOT_APPLICABLE'),
   'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 async function main(){
