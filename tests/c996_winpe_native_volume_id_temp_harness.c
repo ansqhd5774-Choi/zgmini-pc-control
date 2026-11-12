@@ -67,6 +67,38 @@ static int c996_check_temp_path(const WCHAR *input,WCHAR full[512]){
   }
   return 1;
 }
+/*
+ * This optional test emits eight SYNTHETIC values to verify the formatter.
+ * It intentionally does not pretend that eight real operating dirs were
+ * observed, and cannot run on another host or outside the fixed TEMP prefix.
+ */
+static int c996_emit_synthetic_only(void) {
+  c996_source_only_volume_observation specimen;
+  char output[4096];
+  size_t i;
+  static const WCHAR fakeGuid[] =
+    L"\\\\?\\Volume{aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa}\\";
+  ZeroMemory(&specimen,sizeof(specimen));
+  specimen.idsCollected=C996_FIXED_ID_COUNT;
+  specimen.isSourceOnlyObservation=1;
+  if(FAILED(StringCchCopyW(specimen.untrustedVolumeGuid,
+                           C996_FIXED_GUID_CHARS+1,fakeGuid)) ||
+     FAILED(StringCchCopyA(specimen.volumeSerial,17,
+                           "1111111111111111"))) return 0;
+  for(i=0;i<C996_FIXED_ID_COUNT;++i) {
+    c996_source_only_native_id *item=&specimen.directories[i];
+    specimen.fixedKey[i]=c996_fixed_keys[i];
+    if(FAILED(StringCchPrintfA(item->fileId128,33,"%032x",
+                               (unsigned int)(i+1))) ||
+       FAILED(StringCchCopyA(item->volumeSerial,17,
+                             specimen.volumeSerial)))return 0;
+    item->isReparse=0;
+  }
+  if(!c996_source_only_encode_untrusted_native_receipt(
+       &specimen,output,sizeof(output)))return 0;
+  printf("C996_NATIVE_SYNTHETIC_SOURCE_RECEIPT:%s\n",output);
+  return 1;
+}
 int wmain(int argc,WCHAR **argv){
   WCHAR full[512];
   HANDLE h=INVALID_HANDLE_VALUE;
@@ -77,7 +109,9 @@ int wmain(int argc,WCHAR **argv){
   WCHAR parentRoot[512];
   WCHAR leaf[40];
   WCHAR *sep;
-  if(argc!=2||!c996_is_isolated_pc()||
+  const int synthetic=argc==3 &&
+    wcscmp(argv[2],L"--emit-untrusted-synthetic-8")==0;
+  if((argc!=2&&!synthetic)||!c996_is_isolated_pc()||
      !c996_check_temp_path(argv[1],full)){
     puts("C996_NATIVE_ID_TEMP_STOP:HOST_OR_PATH_UNAUTHORIZED");
     return 2;
@@ -118,5 +152,9 @@ int wmain(int argc,WCHAR **argv){
   }
   printf("C996_NATIVE_ID_TEMP_PASS:%s:%s\n",
          native.volumeSerial,native.fileId128);
+  if(synthetic && !c996_emit_synthetic_only()){
+    puts("C996_NATIVE_ID_TEMP_STOP:UNTRUSTED_FORMATTER_INVALID");
+    return 7;
+  }
   return 0;
 }
