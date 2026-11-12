@@ -1,0 +1,43 @@
+name: ZGMINI C996 Owner Native Boundary Source Checks
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tests/controller-996-c-native-owner-operator.test.mjs'
+      - '.github/workflows/c996-owner-native-boundary-source.yml'
+permissions:
+  contents: read
+concurrency:
+  group: zgmini-c996-owner-native-boundary-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  boundary-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.number == 1222 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Prove isolated non-operating host before checkout
+        run: |
+          @echo off
+          if /I not "%COMPUTERNAME%"=="DESKTOP-N62L0NG" exit /b 5
+          if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" exit /b 6
+          if exist "E:\ZGmini" exit /b 7
+          echo C996_SOURCE_ONLY_ISOLATED_HOST=TRUE
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify C996 native candidate fail-closed boundaries (no C execution)
+        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs
