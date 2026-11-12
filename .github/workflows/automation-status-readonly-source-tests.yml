@@ -1,0 +1,43 @@
+name: ZGMINI Automation Status Readonly Source Tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tools/automation-status.mjs'
+      - 'tests/automation-status.test.mjs'
+      - '.github/workflows/automation-status-readonly-source-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: zgmini-automation-status-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run automation status read-only regression tests
+        run: node --test --test-concurrency=1 tests/automation-status.test.mjs
+      - name: Confirm isolated CI host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo AUTOMATION_STATUS_SOURCE_ONLY_ISOLATED_HOST=TRUE
+          ) else (
+            echo AUTOMATION_STATUS_SOURCE_ONLY_ISOLATED_HOST=FALSE
+            exit /b 5
+          )
