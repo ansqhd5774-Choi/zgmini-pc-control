@@ -1,0 +1,348 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43165369066-1-seat-3",
+  "requestId": "pc-996-theme-r181-unblock-20261112-01",
+  "startedAt": "2026-11-12T06:03:00.136Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+  "sourceBranch": "main",
+  "operation": "theme-l7-runtime-readonly",
+  "seat": 3,
+  "status": "PASS",
+  "code": "L7_RUNTIME_READONLY_INVENTORY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-zgmini-common-unblock-20261112",
+  "pcOperationalApprovedSha": "d560eb857c0f8a9a53dffbfd899e60ee29c697ab",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "L7_RUNTIME_READONLY_INVENTORY",
+    "operationalReadiness": "NOT_ASSERTED",
+    "sourceDirectory": "PRESENT",
+    "sources": {
+      "r181-primary-cycle.mjs": {
+        "present": true,
+        "sha256": "be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62",
+        "bytes": 7089,
+        "modifiedAt": "2026-10-21T10:31:51.066Z",
+        "safeSourceInspection": {
+          "status": "STRUCTURE_ONLY",
+          "sites": [
+            {
+              "line": 11,
+              "kinds": [
+                "THROW_STATEMENT"
+              ]
+            },
+            {
+              "line": 17,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 28,
+              "kinds": [
+                "CATCH_CLAUSE"
+              ]
+            },
+            {
+              "line": 36,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 55,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 58,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 61,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 64,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 65,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 66,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 69,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 79,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 81,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 82,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 84,
+              "kinds": [
+                "HTTP_STATUS_CHECK"
+              ]
+            },
+            {
+              "line": 88,
+              "kinds": [
+                "REASON_ASSIGNMENT",
+                "HTTP_STATUS_CHECK",
+                "CATCH_CLAUSE"
+              ]
+            }
+          ],
+          "truncated": true
+        },
+        "safeErrorFlow": {
+          "status": "REDACTED_ERROR_FLOW",
+          "lines": [
+            {
+              "line": 7,
+              "pattern": "const   ID16 = STR , ID17 = ID4 . ID18 ( ID16 , STR );"
+            },
+            {
+              "line": 8,
+              "pattern": "const   ID19 = ID4 . ID18 ( ID16 , STR , STR );"
+            },
+            {
+              "line": 9,
+              "pattern": "const   ID20 = ID4 . ID18 ( ID16 , STR , STR );"
+            },
+            {
+              "line": 10,
+              "pattern": "const   ID21 = ID4 . ID18 ( ID16 , STR , STR );"
+            },
+            {
+              "line": 11,
+              "pattern": "const   ID22 = ID23 =>{ throw   Error ( STR + ID23 )};"
+            },
+            {
+              "line": 12,
+              "pattern": "const   ID24 = ID25 => JSON . ID26 ( ID2 . ID27 ( ID25 , STR ));"
+            },
+            {
+              "line": 13,
+              "pattern": "const   ID28 =( ID25 , ID29 )=>{ const   ID30 = ID25 + STR + ID31 . ID32 + STR ; try { ID2 . ID33 ( ID30 , JSON . ID34 ( ID29 , null , NUM )+ STR ,{ ID35 : STR }); ID2 . ID36 ( ID30 , ID25 )} finally { if ( ID2 . ID37 ( ID30 )) ID2 . ID38"
+            },
+            {
+              "line": 14,
+              "pattern": "const   ID39 = new   ID40 . ID41 ( STR ,{ ID42 : STR , ID43 : STR , ID44 : STR , ID45 : STR });"
+            },
+            {
+              "line": 15,
+              "pattern": "const   ID46 = ID47 =>{ const   ID48 = ID49 . ID50 ( ID39 . ID51 ( ID47 ). ID52 ( ID53 =>[ ID53 . ID54 , ID53 . ID55 ])); return   TPL };"
+            },
+            {
+              "line": 16,
+              "pattern": "const   ID56 = ID57 => new   ID58 ( ID58 . ID26 ( ID57 + STR )- NUM ). ID59 (). ID60 ( NUM , NUM );"
+            },
+            {
+              "line": 17,
+              "pattern": "const   status ={ ID61 : STR , status : STR , ID62 : new   ID58 (). ID59 (), ID63 : NUM , ID64 : NUM , ID65 : NUM , ID66 : NUM , ID67 : NUM , ID68 : NUM , ID69 : false , ID70 :{}, ID71 :[]};"
+            },
+            {
+              "line": 18,
+              "pattern": "let   ID72 = false ;"
+            },
+            {
+              "line": 19,
+              "pattern": "try {"
+            },
+            {
+              "line": 81,
+              "pattern": "status . status = STR ;"
+            },
+            {
+              "line": 82,
+              "pattern": "status . ID159 = ID147 . ID52 ( ID53 => ID53 . ID155 );"
+            },
+            {
+              "line": 83,
+              "pattern": "}"
+            },
+            {
+              "line": 84,
+              "pattern": "ID90 . ID91 [ ID94 ]={ ID62 : status . ID62 , status : status . status , ID160 : ID125 , ID145 : status . ID145 ?? null , ID71 : status . ID71 , ID63 : status . ID63 };"
+            },
+            {
+              "line": 85,
+              "pattern": ""
+            },
+            {
+              "line": 86,
+              "pattern": "ID28 ( ID19 , ID90 );"
+            },
+            {
+              "line": 87,
+              "pattern": "}"
+            },
+            {
+              "line": 88,
+              "pattern": "} catch ( ID88 ){ status . status = STR ; status . reason = String ( ID88 ?. message ?? ID88 ). ID60 ( NUM , NUM ); ID31 . ID161 = NUM }"
+            },
+            {
+              "line": 89,
+              "pattern": "finally { if ( ID72 ) try { ID2 . ID38 ( ID21 )} catch {};"
+            },
+            {
+              "line": 90,
+              "pattern": "try { ID28 ( ID20 , status )} catch ( ID88 ){ ID162 . error ( STR ); ID31 . ID161 = NUM }}"
+            },
+            {
+              "line": 91,
+              "pattern": "ID162 . ID163 ( JSON . ID34 ({ status : status . status , ID63 : status . ID63 , ID71 : status . ID71 , reason : status . reason ?? null , ID65 : status . ID65 }));"
+            }
+          ]
+        }
+      },
+      "r179-publish-core.mjs": {
+        "present": true,
+        "sha256": "f9ea0a1bfaf52909b7a434b65ba93887f56660bc979a3cb7e0992597bc9f3b68",
+        "bytes": 10822,
+        "modifiedAt": "2026-10-23T07:34:43.700Z"
+      },
+      "r171-publish.mjs": {
+        "present": true,
+        "sha256": "d6b921acd2b935360a4f1df2ce7329b4fdde0d999dddd5ee3f7f6169c9046ba8",
+        "bytes": 6389,
+        "modifiedAt": "2026-10-23T07:34:43.713Z"
+      }
+    },
+    "ledgers": {
+      "R181_PRIMARY_LAST_RUN.json": {
+        "present": true,
+        "status": "STOP",
+        "resultCode": null,
+        "dates": {},
+        "times": {},
+        "modifiedAt": "2026-11-12T05:00:14.317Z",
+        "diagnostic": {
+          "status": "CANDIDATES_WITHOUT_SAFE_VALUE",
+          "fields": [
+            {
+              "path": "reason",
+              "type": "string"
+            }
+          ],
+          "values": [],
+          "reasonProfiles": [
+            {
+              "path": "reason",
+              "status": "FIXED_SIGNALS",
+              "signals": [
+                "HTTP",
+                "R181",
+                "SPY"
+              ]
+            }
+          ],
+          "truncated": false
+        },
+        "safeHttpFailure": null
+      },
+      "ZGMINI_R179_PUBLICATION_LAST_RUN.json": {
+        "present": true,
+        "status": "PUBLIC_API_ROLLING_MISMATCH",
+        "resultCode": null,
+        "dates": {},
+        "times": {},
+        "modifiedAt": "2026-10-30T05:21:24.013Z",
+        "diagnostic": {
+          "status": "SAFE_VALUES_FOUND",
+          "fields": [
+            {
+              "path": "observedDate",
+              "type": "string"
+            }
+          ],
+          "values": [
+            {
+              "path": "observedDate",
+              "value": "2026-10-28"
+            }
+          ],
+          "reasonProfiles": [],
+          "truncated": false
+        }
+      },
+      "R183_PUBLICATION_RETRY_LAST_RUN.json": {
+        "present": true,
+        "status": "PUBLISHER_CHILD_FAILED_REVIEW",
+        "resultCode": null,
+        "dates": {},
+        "times": {},
+        "modifiedAt": "2026-10-30T05:21:24.052Z",
+        "diagnostic": {
+          "status": "UNKNOWN",
+          "fields": [],
+          "values": [],
+          "reasonProfiles": [],
+          "truncated": false
+        }
+      }
+    },
+    "task": {
+      "status": "XML_READ",
+      "enabled": null,
+      "referencesKnownCollector": true,
+      "referencesExistingRoot": true,
+      "actionSha256": "4bdbfeaa9dff719ba6e8c48a4b0c94c8deef70e3b8e849de73c4a73fd18965fe"
+    },
+    "collectionAndPublicationNotExecuted": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "3de32a05ebd7c9316f4e5719d7d2c15df0954ae4910e551b3463fecced6ce8b6",
+  "protectedAfterSha256": "3de32a05ebd7c9316f4e5719d7d2c15df0954ae4910e551b3463fecced6ce8b6",
+  "actualExecutionSha": "badad9124157879d7a645b64f2768113d632355b",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-12T06:03:03.997Z",
+  "durationMs": 3861
+}
