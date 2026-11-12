@@ -202,18 +202,70 @@ test('failed source workflow without a Writer B receipt is visible, never silent
   }
 });
 
-test('unrelated completed source workflow with no receipt remains benign', async () => {
-  for (const conclusion of ['success', 'skipped']) {
-    const {io, state} = fixture();
-    state.comments = [];
-    const e = event();
-    e.workflow_run.conclusion = conclusion;
-    const result = await processCompletedWriterB(e, io);
-    assert.equal(result.state, 'NO_VERIFIED_WRITER_B_RECEIPT');
-    assert.equal(result.newIssues, 0);
-    assert.equal(state.calls.file.length, 0);
-    assert.equal(state.calls.create, 0);
+test('unrelated skipped source workflow with no receipt remains benign', async () => {
+  const {io, state} = fixture();
+  state.comments = [];
+  const e = event();
+  e.workflow_run.conclusion = 'skipped';
+  const result = await processCompletedWriterB(e, io);
+  assert.equal(result.state, 'NO_VERIFIED_WRITER_B_RECEIPT');
+  assert.equal(result.newIssues, 0);
+  assert.equal(state.calls.file.length, 0);
+  assert.equal(state.calls.create, 0);
+});
+
+const rejectedComment = () => ({user:{login:bot},
+  issue_url:`https://api.github.com/repos/${repo}/issues/874`,
+  body:`<!-- zgmini-writer-b-request-rejected:${runId} -->\\n` +
+    'Writer B request: **REJECTED_BEFORE_PC** (WRITER_B_REQUEST_CONTRACT_STOP)\\n' +
+    'PC_INSTALL: NOT_EXECUTED; RESULT_PAIR: NOT_CREATED_INVALID_REQUEST\\n' +
+    `RUN_ID: ${runId}; RETRY: NO_REEXECUTE\\n`});
+
+test('verified pre-PC admission rejection is safe, not a missing result failure', async () => {
+  for (const conclusion of ['success','failure']) {
+    const {io,state}=fixture();
+    state.comments=[rejectedComment()];
+    const e=event();e.workflow_run.conclusion=conclusion;
+    const result=await processCompletedWriterB(e,io);
+    assert.equal(result.state,'REJECTED_BEFORE_PC');
+    assert.equal(result.newIssues,0);
+    assert.equal(result.confirmedFailures,0);
+    assert.equal(state.calls.file.length,0);
+    assert.equal(state.calls.create,0);
+    assert.equal(state.calls.route,0);
   }
+});
+
+test('successful source job without either verified reporter receipt fails closed',async()=>{
+  const {io,state}=fixture();
+  state.comments=[];
+  const e=event();e.workflow_run.conclusion='success';
+  await assert.rejects(processCompletedWriterB(e,io),
+    /WRITER_B_HANDOFF_PRODUCER_SUCCESSFUL_RUN_RECEIPT_ABSENT/);
+  assert.equal(state.calls.create,0);
+  assert.equal(state.calls.route,0);
+});
+
+test('forged, malformed or duplicate rejection cannot mask failed source run',async()=>{
+  for(const modify of [
+    c=>{c.user.login='untrusted-user';},
+    c=>{c.issue_url='https://api.github.com/repos/other/repo/issues/874';},
+    c=>{c.body=c.body.replace('PC_INSTALL: NOT_EXECUTED','PC_INSTALL: DONE');},
+    c=>{c.body=c.body.replace(`RUN_ID: ${runId}`, 'RUN_ID: 1');},
+  ]){
+    const {io,state}=fixture();state.comments=[rejectedComment()];
+    modify(state.comments[0]);
+    const e=event();e.workflow_run.conclusion='failure';
+    await assert.rejects(processCompletedWriterB(e,io),
+      /WRITER_B_HANDOFF_PRODUCER_FAILED_RUN_RECEIPT_ABSENT/);
+    assert.equal(state.calls.create,0);
+  }
+  const {io,state}=fixture();
+  state.comments=[rejectedComment(),rejectedComment()];
+  const e=event();e.workflow_run.conclusion='failure';
+  await assert.rejects(processCompletedWriterB(e,io),
+    /WRITER_B_HANDOFF_PRODUCER_REJECTION_RECEIPT_DUPLICATE/);
+  assert.equal(state.calls.create,0);
 });
 
 test('verified failed source workflow keeps normal evidence-based routing', async () => {
