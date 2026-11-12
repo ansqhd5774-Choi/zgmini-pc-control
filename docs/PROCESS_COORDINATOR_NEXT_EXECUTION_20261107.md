@@ -125,6 +125,16 @@
 
 **종료 범위:** 새 권한·Runner/PC 작업·C 실행·Workflow/Backlog·Claim/Lease·DB/D1 변경 0. 중앙 인계 8/8 DONE, 격리 자연 E2E 4/5 DEFERRED, C NO-GO. 추가 문서 Gate나 무조건적 전체 Runner 대기는 생성하지 않는다.
 
+### 0.11 2026-11-13 #996 이중 STOP 소스 회귀 실측
+
+**완료 범위: 기존 단일 C 담당의 SOURCE_ONLY 보안 회귀, 실제 운영 C 복구 아님.** Draft [#1222](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1222) 코드는 `run996NativeOwnerCOnce` 첫 import 전 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`가 항상 정지하고, `handleArchiveScript(fixture=false)`에는 `Need(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN")`이 있어 production rename을 독립적으로 차단한다. 보호를 **변경·제거하지 않고** 이전 테스트가 놓친 두 번째 분기를 회귀 테스트 한 건으로 추가: [test commit `c89cd79d`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/c89cd79d81a229ddfe19e46007be2b6223d9d70a). CI의 신뢰 경계를 격리 Runner `DESKTOP-N62L0NG` 하나로 고정하고 checkout 전 호스트·E:\ 경로 가드를 실행: [workflow commit `489f7b06`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/489f7b0639bdec45a4ed650e0bb530abf152255d).
+
+**실제 Runner 검증:** [Run #43253442308](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43253442308), job 131305193969 `completed/success`, `C996_SOURCE_ONLY_ISOLATED_HOST=TRUE`, 원담당 관련 Node tests **4/4 PASS, fail 0**. GitHub 원본 테스트/Workflow는 최종 HEAD의 원격 SHA로 재조회했다. 이 값은 C급 운영 원자 보관·native 경합 해결·실제 OS 파일 이동 PASS가 아니고 **fail-closed 분기의 지속 확인**이다. [원본 #996 owner 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6828659175) 완료; 다른 ChatGPT 일반챗이 자동 수신한 것은 아님.
+
+**현재 실제 LAST PASS/FIRST FAIL:** LAST PASS 기존 original Windows R3·R4 84/84 + 별도 TEMP fixture 7/7·29/29 + 이번 소스 안전검사 4/4. FIRST FAIL은 네이티브 namespace에 새 파일을 동시 추가하는 시나리오의 원자적 보호 부재(`C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`), 독립 provenance·continuation C 신규 승인/실시간 OS 증거 미확보. 해결 가능한 구현 효과는 **단일 C Owner**에게 한정. 동일 공유 설치 보호 범위 외 일반 기능은 기존 승인 업무 진행, 인위적 실패 사건 생성/구 C 명령 반복·lock 변경 불필요.
+
+**상태 불변:** 중앙 인계 8/8 DONE, 격리 Writer B E2E 4/5 DEFERRED, 공유 자원 수명주기 4/5 DEFERRED, #996 C NO-GO, 실운영 쓰기 0. 다음 필수 C step은 **새 namespace entry 경합을 봉쇄할 수 있는 승인 가능한 OS 배타 구조를 source-only/격리 PC에서 실증하고, owner 신규 C 승인 전 두 STOP 유지**.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
