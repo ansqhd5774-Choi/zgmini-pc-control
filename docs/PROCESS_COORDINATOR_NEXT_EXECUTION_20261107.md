@@ -95,6 +95,28 @@
 
 **다음 필수 실행 하나 — #996 원본 C 담당:** 기존 C 시도 이후 original Windows claim/lease·Workflow·Backlog·ledger/보호 fingerprint의 인증된 읽기 결과를 확보한다. 설치 Controller `badad912…`에는 이를 일괄 제공하는 A급 없음. 소유자/실행기에서 **기존 승인된 경로가 실제 확인될 때만** 고유 read-only 요청을 등록·Run/JSON/TXT 2/2 반환 확인; 접근 불가능하면 이 하나만 `PC_READBACK_PENDING/AUTOMATION_BLOCKED`로 보존. 새 C 명령, 기존 requestId 재요청, 기존 잠금 해제, Workflow PUT, 임의 새 CMD·임의 shell, 새 감시 예약 금지. 기타 독립 작업과 기존 중앙 자동화(8/8)는 진행한다. 격리 Writer B 자연 적격 실패 E2E 및 자원 실제 해제 관측은 **별도 DEFERRED 4/5**이고 전체 업무 선행조건이 아니다.
 
+### 0.9 2026-11-13 원본 C 사후 검증 완료점 재사용 및 실제 잔여
+
+> **이번 작업에서 확인한 기존 완료 증거 — 구 §0.2 P1·§0.8의 `#996 post-C Windows 증거 전체 미확보`를 정정한다.** 이 항목들은 새로운 운영 수행이 아니라 **기존 C 담당 브랜치의 원본 사용자 Windows 보고를 교차 재조회하여 증거를 재사용**한 것이다. 다시 R1/R2/R3/R4 CMD를 요구하거나 84개 파일 재검증을 진행하지 않는다.
+
+| 사실·최초 관측 | 원본 증거 및 확인 범위 | 현재 판정 |
+| --- | --- | --- |
+| **R3 기존 ZGMINI PC 사후 읽기 성공** (2026-11-10 KST) | [#996 C 전용 사후 원장](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/docs/CONTROLLER_996_C_INTERRUPTED_DISPOSITIONS_20261110.md#r3-원본-windows-실증-성공-및-기존-issue-재계획-판정--2026-11-10-kst) `READONLY_EVIDENCE_SNAPSHOT_CONSISTENT`, Controller 38/Stage 39/Maintainer 7 manifest, 원본 replay journal `{}` SHA256 및 `replayCount=0` 실PC 콘솔 보고. 이전 #996 C claim/원장·source manifest 일치 범위 확인 | **이력 확인 DONE**; 신규 소유자 claim 외부 provenance·전체 파일 원본 바이트 postcheck는 당시 미확인 |
+| **R4 원본 Windows Git source 검증** (2026-11-11 KST) | [R4 비민감 원본 화면 전사](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/artifacts/controller-996/zgmini-996-r4-windows-screenshot-readback.json) `SOURCE_BYTES_MATCH_PINNED_GIT_COMMITS`, 38+39+7 **84/84**, 오프라인 SHA256 manifest/source digest 일치 | **해당 시점 파일 바이트 검증 완료**. 실행 ZIP/CMD 자체·화면의 물리 PC 신원/현재 시각까지의 불변은 보장하지 않음 |
+| **운영 PC Workflow·Receiver 조회** (2026-11-11T14:18:15Z) | 동일 [C 중단 인계 원장](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/docs/CONTROLLER_996_C_INTERRUPTED_DISPOSITIONS_20261110.md): `workflowState=active`, `maintenanceState=HEALTHY`, `receiverStatus=LISTENING`, 전용 6 Runner online·idle | **해당 시점 실제 PC 조회 PASS 범위**; `installLock.held=true,recoveryRequired=true`였으므로 C 복구/잠금 해제는 NO-GO |
+| **별도 Windows TEMP 단독 원자 이동 fixture** (2026-11-11 KST) | [7/7 cases·29/29 checks 화면 전사](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/artifacts/controller-996/zgmini-996-windows-c-stage-native-7of7-20261111.json) | 합성 TEMP 환경 PASS; 원본 운영 E: 이동·정전 내구성·native production operator PASS 아님 |
+| **원본 미실행 요청 4건** (이번 GitHub 직접 재조회) | [#1217](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1217)·[#1219](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1219)·[#1226](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1226)·[#1227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1227): **4/4 OPEN**, `pc-job` 라벨, 원래 요청 schema 존재, 인증된 PC result bot 영수증 **0/4** (진단 댓글은 결과가 아님). 실PC R3에는 pause 구간 중 원본 job **0건 실행**과 backlog replay `0` 보고 | **`OWNER_REPLAN_REVIEW_REQUIRED` 후보**, 원본 requestId를 다시 제출하지 않음. 기능 원담당이 현재 실행 필요성·승인/source/operation 확인 후 **새 고유 ID만** 결정 |
+
+**실제 남은 C급 차단점(정확히 이 범위):** (a) 기존 C claim의 새로운 프로세스에 대한 **독립 소유권/provenance 검증과 원자적 continuation 배타권**, (b) C 변경 직전의 **신선한 원본 PC lease/Workflow/Backlog·Writer 충돌·보호 fingerprint 재조회**, (c) 기존 코드를 수정한 독립 C 네이티브 실행기의 봉인·보호·충돌/복구 검증, (d) 위 효과와 정확히 일치하는 **신규 사용자 C급 명시 승인**. 이전 `ZGMINI_CONTROLLER_996_C_CONSENT_V1`를 새 복구 권한으로 자동 전환하지 않는다. 기존 백업/lease/claim 보존, C 명령 재실행·Workflow PUT·기존 원본 job 재실행 금지.
+
+### 0.9.1 담당 분리 및 실행 순서
+
+1. **중앙 총괄·GitHub 접수(즉시 독립):** 기존 단일 ChatGPT 시간당 자동화·격리 Runner의 정상 접수 유지. 최근 적격 실패 증거가 확인되면 그 고유 원본 1건만 중앙 처리하고 성공 CI·원본 Issue bot 영수증까지 1회 검증한다. **자연 인증 실패 5번째 실증은 미래 DEFERRED**. GitHub 실패 History `NO_PUBLISHED_RESULTS`은 예외/실패 원본으로 분류하고 임의 새 Incident를 만들지 않는다.
+2. **#996 단일 C 담당(병렬, 범위 한정):** 2026-11-10 R3, 11-11 R4/7·29 TEMP를 **LAST PASS로 고정**. 과거 사후 관측이 없다는 이유로 PC/CMD 반복 요청 금지. 기존 [#1222 Draft](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1222)의 안전 하드 STOP/원장/Native 후보를 평가해 위 (a)-(d) 실제 결손만 처리한다. 새 C 효과 승인·신선한 원본 PC 증거 전 운영 변경 **0**.
+3. **각 기능 원담당(독립 병렬):** 원본 4건의 필요성을 자기 기능의 완료 지점에서 판단. `core-runtime-source-readonly` 3건, `core-status` 1건의 **이전 요청**을 재발행하지 않고 필요 시 현재 설치 allowlist/승인 SHA·새 고유 requestId로 정규 A 1회 신청한다. 이 요청들을 전부 해야 중앙 #996가 완료된다고 간주하지 않음. 완료된 R10 재작업 없음.
+
+**진행률 유지:** 공통 중앙 8/8 DONE(100%), 격리 Writer B 4/5 DEFERRED(80%), 공유 자원 수명주기 4/5 DEFERRED(80%), #996 C NO-GO. 위 R3/R4를 새 완료 건수로 중복 산정하지 않는다.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
