@@ -45,7 +45,7 @@ export function describeResourceRecheck(resourceKey) {
     scope:known?.scope ?? 'UNREGISTERED_RESOURCE_SCOPE',
     requiredRuntimeProof:known?.proof ??
       'REGISTER_EXACT_RESOURCE_READBACK_ADAPTER',
-    runtimeProofRegistered:Boolean(known),
+    proofRequirementKnown:Boolean(known),
     independentReadOnlyPlanningAllowed:true,
     genericReleaseHintAuthorizesExecution:false,
   });
