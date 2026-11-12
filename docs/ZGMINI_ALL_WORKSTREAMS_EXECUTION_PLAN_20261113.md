@@ -87,6 +87,13 @@
 - **정확한 상태 갱신:** 직전 P1.4의 `#996 lock owner unknown`은 **이제 해소됨(원본 동일성에 근거한 연관성)**. 이는 owner PID의 현시점 생존/배타적 네임스페이스 보호/Workflow 전체 보존 또는 C 운영 복구 성공을 의미하지 않는다. **#996 C `NO-GO` 및 `SHARED_INSTALL_ONLY / ACTIVE_RECOVERY_LEASE` 계속.** 동일 공유 Controller/maintenance B·C 적용은 Owner의 승인·안전성 검증 전 금지; 무관한 31개 운영 A·독립 기능 수집/검증은 계속. 기존 #917 11/10 복구 완료 증거 재사용, 재실행 금지.
 - **다음 담당 한 단계:** #996 단일 C Owner는 위 검증된 original fingerprint/연관성을 **재사용**하고, 기존 C 네이티브 `C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED` 실제 FIRST FAIL에 대해 OS namespace 삽입을 차단할 수 있는 정규 오프라인 WinPE 또는 증명 가능한 독점 원시 동작을 격리 검증. source/정확한 새 C 승인·C 직전 fresh owner/lease/보호 검증 뒤에만 운영 복구 검토. 총괄 Owner는 공유설치 대기만 유지하며 신규 절차·모의 사고·자원 release를 임의 Gate로 만들지 않는다.
 
+### P1.6 — #996 온라인 부모 디렉터리 독점 핸들 대안도 부정 실증 (2026-11-13 KST)
+
+- **실행:** 단일 C 원담당 기존 후보 브랜치 `codex/controller-996-intake-c-candidate-r1-20261110`에 [commit `3744fa1e`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/3744fa1e13ffee2ee4458f04604429fbb2d95652). 변경은 **기존 소스 전용 네이티브 부정 테스트 파일 1개(+66행)**만; C 후보 실행기 원래 blob `2708a3a93d3b1be8ef10ff4e36f62d71d15d9b20` 및 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`, `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN` 두 STOP 불변.
+- **기존 격리 Windows 실증:** [Run #43304286248](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43304286248), `completed/success`; `DESKTOP-N62L0NG`, `zgmini-handoff-ci-spare-01`에 호스트/E: 보호 가드 PASS, 기존 Source CI의 네이티브 음성 테스트 step PASS. 자체 TEMP의 C# `CreateFileW`가 **부모 디렉터리를 `dwShareMode=0`**으로 열어 핸들을 보유한 가운데 **별도 Node OS 프로세스**가 새 `independent-child.json`을 `wx`로 생성하여 검증 성공. 원본 운영 파일·archive/rename/Workflow/lease 쓰기 0. Source CI PASS는 **대안 실패의 부정 실증**이지 C 운영 복구 통과가 아니다.
+- **유효한 결론:** 기존 자식 핸들의 `C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED` 외에 부모 exclusive share=0도 새 namespace 삽입 배타성을 보장하지 못함. 온라인 공유 폴더 핸들 옵션만으로 해결하는 추정은 폐기. #996 original Owner/lease 연관성은 위 P1.5의 운영 A 원본으로 이미 검증되어 있으므로 반복 확인 Gate 생성 금지. **남은 FIRST FAIL `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`; 운영 C `NO-GO` 유지.**
+- **실제 다음 필수 실행 / 담당:** #996 단일 C Owner가 기 작성 WinPE 단일 부팅 **오프라인 배타 실행** 또는 효과가 입증되는 OS namespace 독점 대안을 기존 승인 경로에서 좁혀 검증. WinPE/부팅/관리자 작업 및 신규 C continuation은 원본 장치·owner·신규 승인 등 C급 조건 충족 전 실행 금지. 격리 PC 고정 VM 프로그램 부재 실측은 운영 PC 단일 부팅 WinPE의 불가 판정이 아니다. #68 공통 설치 Owner는 활성 #996 복구 잠금과 동일 공유 파일 쓰기만 대기, 6개 기능의 독립 작업을 차단하지 않음.
+
 ### P2 — 기능별 실제 수집·계산·공개 완료 (공유 쓰기는 순차)
 
 - 물가 승인 B 결과 / 테마 승인 Reader / 고용 DOL / Treasury 감사 / D05 원본 모두 **기존 공급자·수집기·계산기·Writer**로 연결. PC 원자료와 결과는 로컬에 보존하고 D1에는 승인된 공개 projection·최소 checkpoint만 게시한다.
