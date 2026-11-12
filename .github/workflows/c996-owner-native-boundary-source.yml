@@ -5,12 +5,16 @@ on:
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
+      - 'tools/controller-996-native-approval-readiness.mjs'
+      - 'tests/controller-996-native-approval-readiness.test.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
+      - 'tools/controller-996-native-approval-readiness.mjs'
+      - 'tests/controller-996-native-approval-readiness.test.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
 permissions:
   contents: read
@@ -51,4 +55,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify C996 candidate boundaries and isolated TEMP insertion negative test (no C execution)
-        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs
+        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs
