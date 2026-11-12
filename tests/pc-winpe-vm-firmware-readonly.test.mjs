@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import {authenticateVmRequest,handoffSeat,parseWmi,probeVmFirmware,
- WMI_QUERY,toVmText,TITLE,SCHEMA} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
+ WMI_QUERY,VM_DISCOVERY_QUERY,parseVmDiscovery,probeVmDiscovery,
+ toVmText,TITLE,SCHEMA} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const owner='ansqhd5774-Choi';
@@ -67,7 +68,7 @@ test('firmware observation does not imply existing VM software, boot or C author
    assert.deepEqual(args.slice(0,2),['-NoProfile','-NonInteractive']);
    assert.equal(opts.shell,false);
    return {status:0,stdout:wmi(['true','true','true','false'])};
-  },vmProbe:fakeVm,
+  },vmProbe:fakeVm,discoveryProbe:()=>({status:'PASS',code:'TEST_ONLY'}),
  });
  assert.equal(called,true);
  assert.equal(result.status,'PASS');
@@ -79,7 +80,7 @@ test('firmware observation does not imply existing VM software, boot or C author
  assert.equal(result.operationalWrites,0);
  const off=probeVmFirmware({platform:'win32',
   spawn:()=>({status:0,stdout:wmi(['true','true','false','false'])}),
-  vmProbe:fakeVm});
+  vmProbe:fakeVm,discoveryProbe:()=>({status:'PASS',code:'TEST_ONLY'})});
  assert.equal(off.readiness,'VM_FIRMWARE_DISABLED');
 });
 test('WMI access failures and malformed response are unknown, no fabricated zeros',()=>{
@@ -88,13 +89,13 @@ test('WMI access failures and malformed response are unknown, no fabricated zero
   {spawn:()=>({status:0,stdout:'invalid'}),expected:'VM_WMI_OUTPUT_INVALID'},
  ];
  for(const {spawn,expected} of inputs){
-  let x=probeVmFirmware({platform:'win32',spawn,vmProbe:fakeVm});
+  let x=probeVmFirmware({platform:'win32',spawn,vmProbe:fakeVm,discoveryProbe:()=>({status:'PASS',code:'TEST_ONLY'})});
   assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.code,expected);
   assert.equal(x.bootAuthorized,false);
  }
  const unknown=probeVmFirmware({platform:'win32',
   spawn:()=>({status:0,stdout:wmi(['unknown','true','true','false'])}),
-  vmProbe:fakeVm});
+  vmProbe:fakeVm,discoveryProbe:()=>({status:'PASS',code:'TEST_ONLY'})});
  assert.equal(unknown.readiness,'VM_FIRMWARE_UNKNOWN');
  assert.equal(probeVmFirmware({platform:'linux'}).code,'VM_WINDOWS_ONLY');
  const t=toVmText({...unknown,requestId:'id',runId:'1',attempt:'1'});
@@ -112,4 +113,53 @@ test('real handoff Runner reads native WMI only; no VM starts',t=>{
  assert.equal(result.winpeBooted,false);
  assert.equal(result.bootAuthorized,false);
  assert.equal(result.operationalWrites,0);
+});
+
+
+test('registered VM/PATH search uses only fixed application names and registry read calls',()=>{
+ for(const token of ['Get-ItemProperty','Get-Command -Name','VBoxManage.exe',
+  'qemu-system-x86_64.exe','vmware.exe','vmplayer.exe'])
+  assert.ok(VM_DISCOVERY_QUERY.includes(token));
+ for(const forbidden of ['Invoke-Expression','Start-Process','New-VM',
+  'Set-ItemProperty','Remove-Item','Install-','Get-ChildItem','Restart-Computer',
+  'Start-VM','E:\\ZGmini','WIM','Set-ExecutionPolicy'])
+  assert.equal(VM_DISCOVERY_QUERY.includes(forbidden),false,forbidden);
+});
+test('scoped discovery cannot claim missing portable installs or VM execution',()=>{
+ const p=parseVmDiscovery('REGISTERED=VIRTUALBOX,QEMU\r\nIN_PATH=VMWARE\r\nREGISTRY_PARTIAL=false\r\n');
+ assert.deepEqual(p.registered,['VIRTUALBOX','QEMU']);
+ assert.deepEqual(p.executableInPath,['VMWARE']);
+ assert.equal(p.scope,'UNINSTALL_REGISTRY_AND_CURRENT_RUNNER_PATH');
+ assert.equal(p.portableOutsidePathChecked,false);
+ assert.equal(p.executableOperabilityVerified,false);
+ const missing=parseVmDiscovery('REGISTERED=NONE\r\nIN_PATH=NONE\r\nREGISTRY_PARTIAL=true\r\n');
+ assert.deepEqual(missing.registered,[]);
+ assert.equal(missing.registryScanPartial,true);
+ for(const invalid of [
+  'REGISTERED=UNKNOWN\r\nIN_PATH=NONE\r\nREGISTRY_PARTIAL=false\r\n',
+  'REGISTERED=VIRTUALBOX,VIRTUALBOX\r\nIN_PATH=NONE\r\nREGISTRY_PARTIAL=false\r\n',
+  'REGISTERED=NONE\r\nIN_PATH=NONE\r\nREGISTRY_PARTIAL=yes\r\n',
+  'REGISTERED=NONE\r\nIN_PATH=NONE\r\nREGISTRY_PARTIAL=false\r\nEXTRA=1',
+ ]) assert.equal(parseVmDiscovery(invalid),null);
+});
+test('VM/PATH probe handles partial registry and malformed data without invented absences',()=>{
+ let called=0;
+ const ok=probeVmDiscovery({platform:'win32',
+  spawn:(exe,args,opts)=>{
+   called++;
+   assert.equal(exe,'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+   assert.equal(opts.shell,false);
+   return {status:0,stdout:'REGISTERED=NONE\r\nIN_PATH=QEMU\r\nREGISTRY_PARTIAL=false\r\n'};
+  }});
+ assert.equal(called,1);
+ assert.equal(ok.status,'PASS');
+ assert.deepEqual(ok.executableInPath,['QEMU']);
+ const partial=probeVmDiscovery({platform:'win32',spawn:()=>({
+  status:0,stdout:'REGISTERED=NONE\r\nIN_PATH=NONE\r\nREGISTRY_PARTIAL=true\r\n',
+ })});
+ assert.equal(partial.status,'PARTIAL');
+ assert.equal(probeVmDiscovery({platform:'win32',spawn:()=>({
+  status:0,stdout:'ERROR: invalid output',
+ })}).status,'STATE_UNKNOWN');
+ assert.equal(probeVmDiscovery({platform:'linux'}).status,'STATE_UNKNOWN');
 });
