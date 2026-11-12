@@ -18,6 +18,39 @@ const digest = value => createHash('sha256').update(JSON.stringify(value)).diges
 const approvalHash = origin => origin?.manifestSha256 ??
   origin?.approvalFingerprintSha256;
 
+
+// Resource-specific *review descriptions*, not release grants.
+// A generic GitHub comment or idle Runner cannot prove these distinct
+// operating resources are free. New resources require a readback adapter,
+// but unrelated work remains independent of every one of these locks.
+const RESOURCE_RECHECK_SCOPES = Object.freeze({
+  'writer-source':Object.freeze({
+    scope:'WRITER_SOURCE_LEASE',proof:'WRITER_LOCK_AND_CORE_WINDOW_CURRENT'}),
+  'controller-install':Object.freeze({
+    scope:'CONTROLLER_INSTALL_LEASE',
+    proof:'INSTALL_OWNER_STAGE_AND_NAMESPACE_EXCLUSIVITY_CURRENT'}),
+  'pc-job-heavy-memory':Object.freeze({
+    scope:'HEAVY_MEMORY_CAPACITY',
+    proof:'CURRENT_RUNNER_CAPACITY_AND_OWN_REQUEST_LEASE'}),
+  'pc-job-seat':Object.freeze({
+    scope:'RUNNER_SEAT_LEASE',proof:'CURRENT_SEAT_OWNER_AND_REQUEST'}),
+  'result-upload':Object.freeze({
+    scope:'RESULT_PUBLICATION',proof:'REMOTE_RESULT_PAIR_AND_RECEIPT'}),
+});
+export function describeResourceRecheck(resourceKey) {
+  if (!RESOURCE.test(resourceKey ?? '')) stop('RESOURCE_KEY_INVALID');
+  const known = RESOURCE_RECHECK_SCOPES[resourceKey];
+  return Object.freeze({
+    resourceKey,
+    scope:known?.scope ?? 'UNREGISTERED_RESOURCE_SCOPE',
+    requiredRuntimeProof:known?.proof ??
+      'REGISTER_EXACT_RESOURCE_READBACK_ADAPTER',
+    proofRequirementKnown:Boolean(known),
+    independentReadOnlyPlanningAllowed:true,
+    genericReleaseHintAuthorizesExecution:false,
+  });
+}
+
 /**
  * One record per verified original request; multiple requests may share an
  * intentKey and a resourceKey. Never use an Issue comment as a PC lock.
@@ -198,8 +231,26 @@ export function summarizeResourceRecheckEvidence(wait, {
     currentApprovalHash !== approvalHash(wait.origin);
   const state = approvalChanged && exactOrigin ?
     'SOURCE_DRIFT_REVIEW' : 'RECHECK_EVIDENCE_PENDING';
+  // Drafting a plan is not claiming a freed lease. Source-only evidence
+  // can guide the owner's next *review* while every PC mutation remains
+  // behind the original resource-specific runtime approval boundary.
+  const planReviewState = !exactOrigin ? 'ORIGINAL_EVIDENCE_REVIEW_REQUIRED' :
+    !approved ? 'CURRENT_SOURCE_REVIEW_REQUIRED' :
+    approvalChanged ? 'SOURCE_DRIFT_REVIEW' :
+    'SOURCE_PLAN_CANDIDATE_REVIEWABLE';
+  const releaseEvidenceState = observed ?
+    'TWO_SAMPLE_CANDIDATE_ONLY' : 'RELEASE_EVIDENCE_UNVERIFIED';
+  const planning = Object.freeze({
+    state:planReviewState,
+    readOnlyDraftAllowed:true,
+    sourceCandidateComplete:Boolean(exactOrigin && approved && !approvalChanged),
+    resourceReleaseRequiredForPlanning:false,
+    ownerReplanAuthorized:false,pcExecutionAuthorized:false,
+  });
   return Object.freeze({
     state, waitId: wait.waitId, resourceKey: wait.resourceKey,
+    planning, resourceScope:describeResourceRecheck(wait.resourceKey),
+    releaseEvidenceState,
     missing: Object.freeze(missing),
     historicalApprovalChanged: Boolean(approvalChanged),
     historicalManifestChanged: Boolean(writerApproval && approvalChanged),

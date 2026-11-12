@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {prepareResourceWait, reconcileResourceWait, reviewResourceWait, summarizeResourceRecheckEvidence}
+import {prepareResourceWait, reconcileResourceWait, reviewResourceWait, summarizeResourceRecheckEvidence, describeResourceRecheck}
   from '../shared-resource/lifecycle.mjs';
 
 const uuid = '9b4e50f9-8674-4894-9c5e-8ba454d6f79d';
@@ -260,4 +260,82 @@ test('Windows config source must match the current approved runtime scope', () =
   const result = summarizeResourceRecheckEvidence(w, input);
   assert.equal(result.state, 'RECHECK_EVIDENCE_PENDING');
   assert.ok(result.missing.includes('CURRENT_SOURCE_AND_APPROVAL_READBACK'));
+});
+
+
+test('separate idle-source plan drafting from runtime replan/PC authorization',()=>{
+  const w=candidate();
+  const result=summarizeResourceRecheckEvidence(w,recheckInput(w));
+  assert.equal(result.state,'RECHECK_EVIDENCE_PENDING');
+  assert.equal(result.planning.state,'SOURCE_PLAN_CANDIDATE_REVIEWABLE');
+  assert.equal(result.planning.sourceCandidateComplete,true);
+  assert.equal(result.planning.readOnlyDraftAllowed,true);
+  assert.equal(result.planning.resourceReleaseRequiredForPlanning,false);
+  assert.equal(result.planning.ownerReplanAuthorized,false);
+  assert.equal(result.planning.pcExecutionAuthorized,false);
+  assert.equal(result.releaseEvidenceState,'TWO_SAMPLE_CANDIDATE_ONLY');
+  assert.equal(result.ownerReplanAuthorized,false);
+  assert.equal(result.releaseVerified,false);
+  assert.equal(result.automaticPcRetries,0);
+});
+
+test('no current release observation leaves read-only plan review available',()=>{
+  const w=candidate();
+  const values=recheckInput(w);
+  delete values.releaseObservation;
+  const result=summarizeResourceRecheckEvidence(w,values);
+  assert.equal(result.state,'RECHECK_EVIDENCE_PENDING');
+  assert.equal(result.releaseEvidenceState,'RELEASE_EVIDENCE_UNVERIFIED');
+  assert.deepEqual(result.missing,['WINDOWS_READONLY_RELEASE_CANDIDATE']);
+  assert.equal(result.planning.state,'SOURCE_PLAN_CANDIDATE_REVIEWABLE');
+  assert.equal(result.planning.resourceReleaseRequiredForPlanning,false);
+  assert.equal(result.releaseVerified,false);
+  assert.equal(result.planning.pcExecutionAuthorized,false);
+});
+
+test('source drift or missing origin is visible to planning without issuing approval',()=>{
+  const w=candidate();
+  const drift=recheckInput(w);
+  drift.currentApproval.manifestSha256='f'.repeat(64);
+  const changed=summarizeResourceRecheckEvidence(w,drift);
+  assert.equal(changed.state,'SOURCE_DRIFT_REVIEW');
+  assert.equal(changed.planning.state,'SOURCE_DRIFT_REVIEW');
+  assert.equal(changed.planning.sourceCandidateComplete,false);
+  assert.equal(changed.planning.readOnlyDraftAllowed,true);
+  assert.equal(changed.ownerReplanAuthorized,false);
+  const miss=recheckInput(w);
+  miss.originReadback.botReceiptReadbackVerified=false;
+  const unknown=summarizeResourceRecheckEvidence(w,miss);
+  assert.equal(unknown.planning.state,'ORIGINAL_EVIDENCE_REVIEW_REQUIRED');
+  assert.equal(unknown.planning.sourceCandidateComplete,false);
+  miss.originReadback.botReceiptReadbackVerified=true;
+  miss.currentApproval.currentReadbackVerified=false;
+  const noCurrent=summarizeResourceRecheckEvidence(w,miss);
+  assert.equal(noCurrent.planning.state,'CURRENT_SOURCE_REVIEW_REQUIRED');
+  assert.equal(noCurrent.planning.pcExecutionAuthorized,false);
+});
+
+test('release proof requirements are exact resource-specific, not a global gate',()=>{
+  const names={
+    'writer-source':['WRITER_SOURCE_LEASE','WRITER_LOCK_AND_CORE_WINDOW_CURRENT'],
+    'controller-install':['CONTROLLER_INSTALL_LEASE','INSTALL_OWNER_STAGE_AND_NAMESPACE_EXCLUSIVITY_CURRENT'],
+    'pc-job-heavy-memory':['HEAVY_MEMORY_CAPACITY','CURRENT_RUNNER_CAPACITY_AND_OWN_REQUEST_LEASE'],
+    'pc-job-seat':['RUNNER_SEAT_LEASE','CURRENT_SEAT_OWNER_AND_REQUEST'],
+    'result-upload':['RESULT_PUBLICATION','REMOTE_RESULT_PAIR_AND_RECEIPT'],
+  };
+  for(const [key,[scope,proof]] of Object.entries(names)){
+    const result=describeResourceRecheck(key);
+    assert.equal(result.resourceKey,key);
+    assert.equal(result.scope,scope);
+    assert.equal(result.requiredRuntimeProof,proof);
+    assert.equal(result.proofRequirementKnown,true);
+    assert.equal(result.independentReadOnlyPlanningAllowed,true);
+    assert.equal(result.genericReleaseHintAuthorizesExecution,false);
+  }
+  const unknown=describeResourceRecheck('core-future-source');
+  assert.equal(unknown.scope,'UNREGISTERED_RESOURCE_SCOPE');
+  assert.equal(unknown.proofRequirementKnown,false);
+  assert.equal(unknown.requiredRuntimeProof,'REGISTER_EXACT_RESOURCE_READBACK_ADAPTER');
+  assert.equal(unknown.independentReadOnlyPlanningAllowed,true);
+  assert.throws(()=>describeResourceRecheck('../unsafe'),/RESOURCE_KEY_INVALID/);
 });
