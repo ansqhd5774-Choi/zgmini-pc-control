@@ -36,3 +36,13 @@
 - VM에서 CNG 6/6이 성공하더라도 이는 **테스트 벡터** 검증일 뿐, 원래 #996 C급 복구에 필요한 진짜 Owner 신뢰 공개키/SPKI, 승인, 인증된 시간·철회 freshness, 운영 PC 원본 원장/lease/설치 source/복구 승인 검증을 대신하지 않는다.
 - 진행률 `4/5=80%` / `C NO-GO` / `executionAuthorized=false` 유지.
 - 다음 실행을 위한 **Owner의 별도 명시 결정**: "공통 대기열 PC에 VirtualBox 무료 Base 설치(필요할 때만), 관련 관리자·가상화 드라이버 효과, 격리된 단일 VM 생성 및 고정 해시 WinPE ISO 1회 시험 부팅"을 허용할지. 일부만 승인한 경우 승인 효과 안에서만 수행.
+
+
+## 2026-11-12 — 격리 PC 가상화 펌웨어 실제 A급 실측 (이전 '미확인' 부분 갱신)
+
+- 기존 장비 인벤토리 Workflow를 재사용하는 고정 A급 `pc-winpe-vm-firmware-readonly` 조회를 구현했다. 소스 [PR #1267](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1267) **squash 병합 `020df63b5424bcdb02e47d06ddf7ab36f382dbde`**, 격리 Runner 원본 [CI #43128580083](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43128580083) **19/19 PASS (0 FAIL/SKIP)**.
+- A급 단회 요청 [Issue #1268](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1268), `requestId=fe4b60dc-9353-40a2-9f79-1092a6361d40`. 실제 [Run 43128803972](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43128803972), job `130887550261` **COMPLETED/SUCCESS**, `DESKTOP-N62L0NG / zgmini-handoff-ci-spare-01`, `PASS / VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED`. 검증된 원격 결과쌍 `results/pc-winpe-vm-firmware-43128803972-1-handoff.json` (blob `729046caf9bd50346e97ad33f0743687dd743af4`)와 `.txt` (blob `78c221c7ef6fff30fa1f2b4d04f4eab51efaeff1`) **2/2 직접 재조회**.
+- Microsoft의 읽기 전용 WMI: `Win32_Processor.VMMonitorModeExtensions=true`, `SecondLevelAddressTranslationExtensions=true`, `VirtualizationFirmwareEnabled=true`, `Win32_ComputerSystem.HypervisorPresent=false`. **가상화 펌웨어 활성화는 확인됐으므로 이 항목을 다시 검사하기 위해 BIOS/Windows 설정 변경할 필요 없음**. 단, 게스트 WinPE 부팅 가능성을 입증하는 것은 아니다.
+- 기존 표준 VM 실행 파일 경로 6/6 `ABSENT_AT_FIXED_PATH`: VirtualBox/QEMU/VMware/Hyper-V 관리 도구. 사용자/포터블 등 다른 위치 `NOT_CHECKED`이므로 '이 PC 어디에도 VM 없음'으로 표현하지 않는다. `vmOperationallyTested=false`, `winpeBooted=false`, `bootAuthorized=false`, `cExecutionAuthorized=false`, `operationalWrites=0`, 자동 재시도 0.
+- **남은 실제 효과 승인 경계**: 기존 표준/포터블 VM이 가용하지 않다면 *격리 PC만* 대상인 VM Base Package 설치(관리자·가상화 드라이버/네트워크/재부팅 가능), 네트워크/USB/공유폴더/호스트 디스크 미부착 VM 생성, ISO read-only 부착 및 1회 WinPE 부팅이 모두 **별도 Owner 승인 대상**이다. #1252의 원본 사용자 TEMP ISO `EPERM`도 남아 있어 Runner의 권한 확대/ACL 우회로 해결하지 않는다. 실제 ISO 접근·서명·hash·WIM drift 안전성 확인 없이 부팅 불가.
+- **이번 A급의 판정은 `VM_HARDWARE_FEATURES_PRESENT_ONLY`**. `ISO_ONLY_PASS`와 #996 **80%, C NO-GO**를 유지하며 원본 운영 PC의 WinPE/C 복구 승인으로 확대하지 않는다. 설치·부팅·실PC 변경 0.
