@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import {authenticateVmRequest,handoffSeat,parseWmi,probeVmFirmware,
  WMI_QUERY,VM_DISCOVERY_QUERY,parseVmDiscovery,probeVmDiscovery,
- toVmText,TITLE,SCHEMA} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
+ toVmText,probeRunnerConsoleProfile,TITLE,SCHEMA} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const owner='ansqhd5774-Choi';
@@ -162,4 +162,36 @@ test('VM/PATH probe handles partial registry and malformed data without invented
   status:0,stdout:'ERROR: invalid output',
  })}).status,'STATE_UNKNOWN');
  assert.equal(probeVmDiscovery({platform:'linux'}).status,'STATE_UNKNOWN');
+});
+
+test('runner-context comparison only emits scoped booleans, never user secrets',()=>{
+ const owner=probeRunnerConsoleProfile({platform:'win32',
+  username:()=> 'ansqh',userProfile:'C:\\Users\\ansqh'});
+ assert.equal(owner.status,'PASS');
+ assert.equal(owner.accountNameMatchesConsole,true);
+ assert.equal(owner.profilePathMatchesConsole,true);
+ assert.equal(owner.sameWindowsPrincipalVerified,false);
+ assert.equal(owner.vmRegistrySharedVerified,false);
+ assert.equal(owner.vmRegistrationAuthorized,false);
+ const service=probeRunnerConsoleProfile({platform:'win32',
+  username:()=> 'NETWORK SERVICE',userProfile:'C:\\Windows\\ServiceProfiles\\NetworkService'});
+ assert.equal(service.accountNameMatchesConsole,false);
+ assert.equal(service.profilePathMatchesConsole,false);
+ const serialized=JSON.stringify(service);
+ for(const forbidden of ['NETWORK SERVICE','ServiceProfiles','ansqh','C:\\Users','SID','token'])
+  assert.equal(serialized.includes(forbidden),false,forbidden);
+});
+test('runner-context unavailable or non-Windows never grants VM registration',()=>{
+ for(const x of [
+  {platform:'linux',username:()=> 'ansqh',userProfile:'C:\\Users\\ansqh'},
+  {platform:'win32',username:()=> {throw Error('local secret');},userProfile:'C:\\Users\\ansqh'},
+  {platform:'win32',username:()=> 'ansqh',userProfile:undefined},
+ ]) {
+  const result=probeRunnerConsoleProfile(x);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.vmRegistrationAuthorized,false);
+  assert.equal(result.sameWindowsPrincipalVerified,false);
+  assert.equal(result.accountNameMatchesConsole,null);
+  assert.doesNotMatch(JSON.stringify(result),/local secret|ansqh|ServiceProfiles/);
+ }
 });
