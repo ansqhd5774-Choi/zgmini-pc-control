@@ -26,6 +26,11 @@
 
 **인증된 GitHub GET 입력 연결(2026-11-12):** 기존 승인된 Node 22 읽기 실행환경에서는 `agent-handoff/owner-return-github-io.mjs`의 `createOwnerReturnGithubReadIo({token, fetchImpl})`를 기존 `readAndReviewOwnerReturn`의 `io`에 전달할 수 있다. 토큰은 기존 허용된 환경/권한에서만 사용하고 GitHub Issue·채팅·로그에 출력하지 않는다. 이 어댑터는 `GET`만 수행하며, 원본 Issue의 전체 댓글 수/페이지/수정시각을 대조하고 허용된 PR·Run 저장소만 조회한다. **이 소스를 추가했다고 기존 PC Runner에 새로운 작업이 자동 설치되거나 ChatGPT 커넥터에서 JavaScript 함수가 자동 실행되는 것은 아니다.** GitHub 연결 ChatGPT에서는 기존 읽기 도구로 같은 자료를 조회해 근거별로 대조한다. 실제 원담당 대화 재개 및 운영 기능 적용 성공은 별도 확인한다.
 
+
+**중앙 결과 → 원담당 마지막 유효 지점 연결(2026-11-12, 소스 전용):** `agent-handoff/owner-continuation-review.mjs`의 `readAndReviewOwnerContinuation({originIssueNumber, io, ownerPlan, sourceReadback})`는 위의 **기존 인증된 원본 GitHub 반환 조회**를 재사용하고, 별도로 전달된 기능 원담당의 단계별 계획·마지막 완료 증거와 현재 source/승인 조회값을 읽기 전용으로 비교한다. `ownerPlan={originIssue,steps:[{id,status,evidenceRef,sourceSha},...]}`의 상태는 `DONE|READY|BLOCKED|DEFERRED`이며 DONE은 자기 단계의 실제 증거 참조 및 source SHA를 요구한다. `sourceReadback={originIssue,currentSourceSha,approvedSourceSha,sourceEvidenceRef,approvalEvidenceRef}`는 기존 승인된 GitHub/운영 조회 경로에서 원담당이 확보한 자료만 입력한다. 각 단계 이름과 완료 순서는 원담당의 **원기능 승인 계획**이 결정하며 중앙 도구가 새 수집/게시 순서나 권한을 만들지 않는다.
+
+`NO_RETURNED_RESULT`는 독립 기능 작업의 차단 근거가 아니다. 반환 성공이라도 `lastKnownCheckpoint=OTHER`나 `RUNTIME_VERIFICATION_PENDING`은 실PC 기능 완료가 아니다. 단계·원본 증거가 부족하면 `OWNER_PLAN_EVIDENCE_REQUIRED`/`OWNER_SOURCE_EVIDENCE_REQUIRED`, 실제 현재 source와 승인 SHA 불일치는 `OWNER_SOURCE_PAIR_REVIEW_REQUIRED`, 과거 완료 SHA와의 차이는 `OWNER_CHECKPOINT_IMPACT_REVIEW_REQUIRED`로 **해당 영향만** 검토한다. 일치하면 `OWNER_NEXT_STEP_REVIEWABLE`로 후보 다음 단계만 표시하며, `DONE` 전체 주장도 최종 저장·D1/API/UI 확인을 대신하지 않는다. 이 모듈은 전달된 원담당 checkpoint/source 증거의 출처를 자체 인증하지 못하므로 **모든 상태에서** `ownerCheckpointAuthenticated=false`, `runtimeVerified=false`, `executionAuthorized=false`, PC 자동 재실행/운영 쓰기 0을 유지한다. 원담당이 기존 실제 Runtime 증거와 승인에 따라 직접 다음 필수 기능 단계를 수행하고 결과를 회수한다. 타 ChatGPT 자동 수신·Runner 자동 설치·새 예약이 아니다.
+
 완료 단계는 증거와 함께 닫고 다음 필수 실행 하나를 담당·입력·통과 조건과 함께 지정한다. 대기는 기존 ID 하나로 추적하며 같은 상태를 반복 보고하지 않는다. 사용자 중지 시 새 실행과 추적을 중단한다. [단계 종료와 다음 실행](PC_AUTOMATION_STANDARD.md#단계-종료와-다음-실행)을 따른다.
 
 공통 정본은 [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md)다. 기존 Runtime 증거는 필요한 대상·시각·source 범위에서 내부 전제로 재사용하고 현재 업무를 실행한다. 정상 업무마다 과거 설치·복구를 다시 확인하거나 이를 ‘가장 중요한 진전’으로 반복 보고하지 않는다. 보고는 이번 수행·검증·실제 미해결 조건·다음 행동에 한정한다.
