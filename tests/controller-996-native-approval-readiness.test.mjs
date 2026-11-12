@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {build996ConsentComment} from '../tools/controller-996-c-consent-verifier.mjs';
-import {review996NativeApprovalReadiness,review996NativePinnedConsentReadiness}
+import {review996NativeApprovalReadiness,review996NativePinnedConsentReadiness,review996LatestOperatingLeaseEvidence}
  from '../tools/controller-996-native-approval-readiness.mjs';
 
 const id='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
@@ -218,4 +218,79 @@ test('readiness composition exposes no native PC writes or GitHub network port',
   '../tools/controller-996-native-approval-readiness.mjs',import.meta.url)),'utf8');
  assert.doesNotMatch(source,/\b(?:writeFileSync|renameSync|unlinkSync|mkdirSync|rmSync|cpSync|execFileSync|spawnSync)\s*\(/);
  assert.doesNotMatch(source,/\b(?:fetch|https\.request|http\.request|process\.kill)\s*\(/);
+});
+
+
+// Verified live GitHub Run #43303078533 / Issue #1342 output fields copied
+// as a bounded source-only fixture; original JSON/TXT must be independently
+// fetched and authenticated at any future C execution boundary.
+const latestFixture=()=>({
+ schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+ role:'operating',host:'PC',runnerName:'zgmini-pc-04',
+ requestId:'4d0c757e-7cd1-4dfb-a227-8cf9b1fc3405',
+ issueNumber:1342,runId:'43303078533',attempt:'1',
+ status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',
+ operationalWrites:0,providerCalls:0,d1Writes:0,automaticRetries:0,
+ maintenance:{
+  status:'PASS',maintenanceFilesVerified:true,
+  maintenanceSourceSha:'16064e29fea0e53e7769a24d93d75b6f5292cfc0',
+  actualControllerSha:'badad9124157879d7a645b64f2768113d632355b',
+  installLockReadbackVerified:true,installLockHeld:true,
+  installLockRecoveryRequired:true,operationalWrites:0,providerCalls:0,d1Writes:0,
+ },
+ c996LeaseCorrelation:{
+  status:'CORRELATED',code:'C996_LEASE_IDENTITY_CORRELATED',
+  ownerPid:46568,ownerMarkerIdentityMatched:true,ledger996Matched:true,
+  ledgerMarkerTimeMatched:true,unchangedAcrossReads:true,
+  ownerSha256:digests.owner,markerSha256:digests.recoveryMarker,
+  ledgerSha256:digests.ledger,
+  operationalWrites:0,providerCalls:0,d1Writes:0,
+ },
+});
+
+test('three previously pinned original #996 bytes match exact later operating A fixture without authorizing C',()=>{
+ const r=review996LatestOperatingLeaseEvidence({operatingSnapshot:latestFixture()});
+ assert.equal(r.status,'SOURCE_ONLY_ORIGINAL_LEASE_FINGERPRINTS_MATCH');
+ assert.equal(r.matchedCount,3);
+ assert.equal(r.historicalPinCount,3);
+ assert.equal(r.sourceReceiptIssueNumber,1342);
+ assert.equal(r.sourceReceiptRunId,'43303078533');
+ for(const name of [
+  'callerReceiptAuthenticated','ownerPidCurrentlyAliveVerified',
+  'workflowActiveVerified','protectedItemsFreshlyVerified',
+  'ownerCConsentVerified','offlineNamespaceExclusiveVerified',
+  'executionAuthorized'])assert.equal(r[name],false);
+ assert.equal(r.operationalWrites,0);
+ assert.equal(r.automaticRetries,0);
+ assert.doesNotMatch(JSON.stringify(r),/ownerPid":46568|nonce|ownerSha256|ledgerSha256|markerSha256/i);
+});
+
+test('any drift of later runtime lease fingerprints, source, host, or correlation is refused',()=>{
+ const variants=[
+  s=>{s.c996LeaseCorrelation.ownerSha256='a'.repeat(64);},
+  s=>{s.c996LeaseCorrelation.markerSha256='b'.repeat(64);},
+  s=>{s.c996LeaseCorrelation.ledgerSha256='c'.repeat(64);},
+  s=>{s.maintenance.actualControllerSha='0'.repeat(40);},
+  s=>{s.maintenance.maintenanceFilesVerified=false;},
+  s=>{s.maintenance.installLockHeld=false;},
+  s=>{s.maintenance.installLockRecoveryRequired=false;},
+  s=>{s.c996LeaseCorrelation.ledger996Matched=false;},
+  s=>{s.c996LeaseCorrelation.unchangedAcrossReads=false;},
+  s=>{s.c996LeaseCorrelation.ownerPid=null;},
+  s=>{s.status='PARTIAL';},
+  s=>{s.role='handoff';},
+  s=>{s.host='DESKTOP-N62L0NG';},
+  s=>{s.runnerName='zgmini-handoff-ci-spare-01';},
+  s=>{s.attempt='2';},
+  s=>{s.operationalWrites=1;},
+  s=>{s.maintenance.d1Writes=1;},
+ ];
+ for(const modify of variants){
+  const s=latestFixture();modify(s);
+  const r=review996LatestOperatingLeaseEvidence({operatingSnapshot:s});
+  assert.equal(r.status,'SOURCE_ONLY_BLOCKED');
+  assert.equal(r.executionAuthorized,false);
+  assert.equal(r.operationalWrites,0);
+ }
+ assert.equal(review996LatestOperatingLeaseEvidence({}).status,'SOURCE_ONLY_BLOCKED');
 });
