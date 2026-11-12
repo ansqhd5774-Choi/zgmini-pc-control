@@ -50,7 +50,16 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
     const comments = await listIssueComments(issueNumber);
     if (!Array.isArray(comments) || comments.length > 400)
       stop('COMMENT_INVENTORY_INCOMPLETE');
-    return comments.some(item => item?.user?.login === BOT && item.body === receipt);
+    // A competing bot route receipt on the same Issue is not an empty ledger.
+    // Never append a second "success" marker or accept an ambiguous duplicate.
+    // Unrelated human discussion and other bot comments remain untouched.
+    const routes = comments.filter(item =>
+      item?.user?.login === BOT && typeof item.body === 'string' &&
+      (item.body.startsWith('HANDOFF_ROUTED\n') ||
+       item.body.startsWith('HANDOFF_DUPLICATE_REUSED\n')));
+    if (routes.length > 1 || routes.some(item => item.body !== receipt))
+      stop('ROUTE_RECEIPT_CONFLICT_STOP');
+    return routes.length === 1;
   };
   const existed = await hasReceipt();
   if (!existed) {
