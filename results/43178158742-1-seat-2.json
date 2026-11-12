@@ -1,0 +1,72 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43178158742-1-seat-2",
+  "requestId": "pc-r10-quota-post-b-20261112-07",
+  "startedAt": "2026-11-12T07:50:10.484Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+  "sourceBranch": "main",
+  "operation": "alpaca-quota-readonly",
+  "seat": 2,
+  "status": "BLOCKED",
+  "code": "ALPACA_LEDGER_ABSENT",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-zgmini-controller-coordination-20261112",
+  "pcOperationalApprovedSha": "84df5e80f4bcdadd2a274d6f55a90290426c2406",
+  "exitCode": 0,
+  "result": {
+    "status": "BLOCKED",
+    "code": "ALPACA_LEDGER_ABSENT",
+    "scope": "READ_ONLY_NO_PROVIDER_NO_SQLITE_NO_PUBLICATION",
+    "accountWide30Percent": "UNVERIFIED",
+    "baseAgreement": "UNVERIFIED",
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "sourceInventory": {
+      "state": "SOURCE_BYTES_AND_CONFIG_READ",
+      "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+      "moduleDirectory": "scripts/pc-writer",
+      "configApprovedSha": "84df5e80f4bcdadd2a274d6f55a90290426c2406",
+      "configState": "SOURCE_SHA_READ",
+      "runtimeBindingVerified": false,
+      "modules": [
+        {
+          "name": "quota-fetch.mjs",
+          "state": "PRESENT",
+          "sha256": "5ff750e1abf607e4a207bed16c20394406ca2ba8fe4ca42e2c514a155c87818b",
+          "bytes": 5828
+        },
+        {
+          "name": "quota-policy.mjs",
+          "state": "PRESENT",
+          "sha256": "c8deabedb7e0d3611fc416da49ca630647ffb06c68ef2838132f843abb6e920d",
+          "bytes": 4502
+        },
+        {
+          "name": "quota-ledger.mjs",
+          "state": "PRESENT",
+          "sha256": "379f56dd94dc8df8ca6ef46331a4fd831495759bddcc9cee22b0159c65559efe",
+          "bytes": 4769
+        }
+      ],
+      "complete": true
+    }
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "fcaa6b46045a1add0780634e894415bf7342160cefbe0a5cc116fe00ea0183b2",
+  "protectedAfterSha256": "fcaa6b46045a1add0780634e894415bf7342160cefbe0a5cc116fe00ea0183b2",
+  "actualExecutionSha": "badad9124157879d7a645b64f2768113d632355b",
+  "next": "RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST",
+  "finishedAt": "2026-11-12T07:50:15.802Z",
+  "durationMs": 5319
+}
