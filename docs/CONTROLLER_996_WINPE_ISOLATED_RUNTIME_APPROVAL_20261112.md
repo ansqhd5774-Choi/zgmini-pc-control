@@ -163,3 +163,14 @@
 - **다음 단일 읽기 실행/동일 PC의 원래 `ansqh` 사용자 CMD:** `"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" list vms`. 결과에 등록된 정확한 이름·UUID `ef4ba42b-1b14-49fc-8a0d-67d55250c720`가 있는지 확인. `list vms`가 비어 있으면 **등록이 보이지 않는 현재 상태**로 분류하고 `VBOX_USER_HOME`과 실행 Windows 사용자 및 원래 `.vbox` 존재 여부만 읽기 전용으로 판정한 뒤 조치를 결정한다. 해당 VM이 나타나면 `showvminfo <관측된 UUID>`로 상세 설정을 먼저 읽고, 그 이후 정확한 수정 명령을 다시 계획한다. UUID가 불일치하면 임의 수정 금지.
 - **Runner:** 기존 `zgmini-handoff-ci-spare-01`의 고정 A는 VM 설치 바이너리·펌웨어만 확인하며 Windows interactive 사용자 `VirtualBox.xml` 목록 검증을 제공하지 않는다. 다른 서비스 계정에 임의 VBoxManage 실행 금지.
 - **상태:** `LAST_PASS=USER_CMD_CREATEVM_REGISTERED` / `FIRST_FAIL=VBOX_E_OBJECT_NOT_FOUND` / `VM_REGISTRATION_STATE_UNKNOWN` / `ISOLATION_NOT_APPLIED` / `GUEST_BOOT_NOT_EXECUTED`. C급 실제 운영 복구 `NO-GO` 유지, 기존 운영 PC `PC` 변경 0, RDC 사용 0.
+
+## 2026-11-13 — 손상 또는 누락된 VM 등록 참조 READONLY 확인
+
+- **실행 대상 PC:** 공통 대기열 PC `DESKTOP-N62L0NG`, 사용자가 직접 실행한 `C:\Users\ansqh` Windows CMD 4줄 스크린샷. 이번 증거는 사용자 제출 실측이며 GitHub Runner 측 명령 실행 결과 아님.
+- **원본 관측 1:** `VBoxManage list vms` 결과 `"<inaccessible>" {ef4ba42b-1b14-49fc-8a0d-67d55250c720}`. UUID는 최초 `createvm --register` 성공 당시 값과 같으므로 해당 등록이 목록에 존재하지만 정상 구성으로 로드되지 않음. 이 단계는 `VM_REGISTERED_BUT_INACCESSIBLE`, VM 생성 성공을 철회하거나 두 번째 VM을 생성할 이유가 아님.
+- **원본 관측 2:** 같은 UUID `showvminfo --machinereadable` -> `The object functionality is limited`, `E_ACCESSDENIED (0x80070005)`, `MachineWrap`. 이것만으로 NTFS ACL 거부를 확정하지 않는다. 실제 VM 정의 XML 경로 누락/변경·접근 불가능성·다른 저장소 문제 등을 구분해야 한다.
+- **원본 관측 3:** `echo VBOX_USER_HOME=%VBOX_USER_HOME%`는 문자 그대로 치환되지 않은 값을 반환해 이 CMD 컨텍스트에서 변수 **미설정**; `if exist "%USERPROFILE%\\VirtualBox VMs\\ZGMINI-C996-WinPE-TestOnly\\ZGMINI-C996-WinPE-TestOnly.vbox"` 결과 `VM_FILE_MISSING`. 경로 오타/다른 폴더/실제 소실을 구분할 추가 원본 조회 필요. 다른 사용자별 등록 소유권을 확인한 증거는 아님.
+- **공식 출처:** `https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/Troubleshooting.html`은 Windows 사용자 `%USERPROFILE%\\.VirtualBox\\VirtualBox.xml`에서 VM 레지스트리가 각각의 `.vbox` 파일을 참조함을 설명하고, 파일 XML 직접 수정을 권장하지 않는다.
+- **다음 단일 승인 A/read-only 진단 (같은 사용자의 CMD):** VM 폴더의 파일 목록 `dir /a "%USERPROFILE%\\VirtualBox VMs\\ZGMINI-C996-WinPE-TestOnly"`와 UUID 해당 등록 포인터만 `findstr /i /c:"ef4ba42b-1b14-49fc-8a0d-67d55250c720" "%USERPROFILE%\\.VirtualBox\\VirtualBox.xml"`로 확인. **VirtualBox.xml 전체 내용·다른 VM 정보·불필요한 경로 출력 수집 금지**. 결과는 경로·파일 존재 여부만으로 판정하고 수정은 그다음에 결정.
+- **STOP:** `createvm` 중복 실행, `unregistervm`, `registervm`, `modifyvm` 반복, XML 편집·이동·삭제·백업 복원, NTFS 권한 변경, ISO 부착 및 WinPE 부팅 금지. 지정 대상 외 다른 VM/PC 영향 없음.
+- **상태:** `LAST_PASS=CREATEVM_REGISTERED`, `FIRST_FAIL=MODIFYVM_VBOX_E_OBJECT_NOT_FOUND`, `CURRENT=INACCESSIBLE_UUID_MATCH / VM_FILE_MISSING`, `ROOT_CAUSE_NOT_ESTABLISHED`, `WINPE_BOOT_NOT_EXECUTED`. #996 실제 C급 운영 복구 `NO-GO` 유지, RDC 호출 0.
