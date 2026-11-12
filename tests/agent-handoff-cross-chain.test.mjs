@@ -112,7 +112,9 @@ test('verified PC FAIL crosses bot Issue, routing contract and owner result read
     } else if (u.pathname.endsWith('/pulls/2500')) value = {number: 2500,
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
     else if (u.pathname.endsWith('/actions/runs/42570000002')) value = {id: 42570000002,
-      head_sha: repairSha, status: 'completed', conclusion: 'success', repository: {full_name: repo}};
+      head_sha: repairSha, status: 'completed', conclusion: 'success',
+      event: 'pull_request', name: 'ZGMINI Agent Handoff PR Evidence CI',
+      repository: {full_name: repo}};
     else if (u.pathname.endsWith(`/issues/${originalNumber}`)) value = original;
     else if (u.pathname.endsWith(`/issues/${originalNumber}/comments`) && method === 'GET') value = originLedger;
     else if (u.pathname.endsWith(`/issues/${originalNumber}/comments`) && method === 'POST') {
@@ -274,7 +276,9 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     } else if (u.pathname.endsWith('/pulls/2501')) data = {number: 2501,
       head: {sha: repairSha, repo: {full_name: repo}}, base: {repo: {full_name: repo}}, state: 'open'};
     else if (u.pathname.endsWith('/actions/runs/42570000004')) data = {id: 42570000004,
-      head_sha: repairSha, status: 'completed', conclusion: 'success', repository: {full_name: repo}};
+      head_sha: repairSha, status: 'completed', conclusion: 'success',
+      event: 'pull_request', name: 'ZGMINI Agent Handoff PR Evidence CI',
+      repository: {full_name: repo}};
     else if (u.pathname.endsWith('/actions/runs/42570000003')) data = {id: writerRunId,
       name: 'ZGMINI Approved Writer B Source Overlay Once', head_sha: sourceSha,
       head_branch: 'main', event: 'issues', actor: {login: owner},
