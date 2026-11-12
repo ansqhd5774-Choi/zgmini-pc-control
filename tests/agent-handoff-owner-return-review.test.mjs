@@ -383,7 +383,7 @@ function mockedAuthenticatedGithub(f,{changeOriginDuringRead=false,missingPage=f
    value=incident;
   }else if(path.startsWith(part+'/issues/')&&
     path.endsWith('/comments')){
-   const number=Number(path.split('/')[4]);
+   const number=Number(path.split('/')[5]);
    const list=collections[number];
    if(!list)throw Error('UNEXPECTED_ISSUE_COMMENT_GET');
    const page=Number(u.searchParams.get('page'));
