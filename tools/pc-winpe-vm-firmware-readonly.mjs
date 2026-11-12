@@ -228,9 +228,77 @@ export function probePinnedOwnerVmEvidence({
  });
 }
 
+
+// #996 existing interactive Runner.Listener scope: count sessions and owner match.
+// No process path, command line, raw owner, token, repo name or credentials leave PC.
+export const RUNNER_OWNER_QUERY=[
+ "$ErrorActionPreference='Stop'",
+ "$items=@(Get-CimInstance -ClassName Win32_Process -Filter \"Name='Runner.Listener.exe'\" -ErrorAction Stop)",
+ "if($items.Count -gt 12){exit 2}",
+ "$matched=0;$other=0;$unknown=0;$interactive=0;$service=0",
+ "foreach($p in $items){",
+ " if([int]$p.SessionId -eq 0){$service++;continue}",
+ " $interactive++",
+ " try {",
+ "  $o=Invoke-CimMethod -InputObject $p -MethodName GetOwner -ErrorAction Stop",
+ "  if([int]$o.ReturnValue -ne 0){$unknown++}",
+ "  elseif([string]$o.User -ieq 'ansqh'){$matched++}",
+ "  else{$other++}",
+ " } catch {$unknown++}",
+ "}",
+ "[Console]::Out.WriteLine('RUNNERS_TOTAL='+$items.Count)",
+ "[Console]::Out.WriteLine('SESSION_0='+$service)",
+ "[Console]::Out.WriteLine('SESSION_INTERACTIVE='+$interactive)",
+ "[Console]::Out.WriteLine('OWNER_MATCH='+$matched)",
+ "[Console]::Out.WriteLine('OWNER_OTHER='+$other)",
+ "[Console]::Out.WriteLine('OWNER_UNKNOWN='+$unknown)",
+].join('\n');
+export function parseRunnerOwnerCounts(stdout){
+ if(typeof stdout!=='string')return null;
+ const lines=stdout.trim().split(/\r?\n/);
+ const keys=['RUNNERS_TOTAL','SESSION_0','SESSION_INTERACTIVE',
+  'OWNER_MATCH','OWNER_OTHER','OWNER_UNKNOWN'];
+ if(lines.length!==keys.length)return null;
+ const vals=[];
+ for(let i=0;i<keys.length;i++){
+  const prefix=keys[i]+'=';
+  if(!lines[i].startsWith(prefix))return null;
+  const value=lines[i].slice(prefix.length);
+  if(!/^(0|[1-9]\d*)$/.test(value))return null;
+  vals.push(Number(value));
+  if(!Number.isSafeInteger(vals[i])||vals[i]>12)return null;
+ }
+ const [total,service,interactive,match,other,unknown]=vals;
+ if(total!==service+interactive||interactive!==match+other+unknown)return null;
+ return Object.freeze({status:'PASS',scope:'RUNNER_LISTENER_OWNER_BOOLEAN_ONLY',
+  totalRunnerListeners:total,serviceSessionCount:service,
+  interactiveSessionCount:interactive,interactiveOwnerMatchCount:match,
+  interactiveOtherOwnerCount:other,interactiveOwnerUnknownCount:unknown,
+  ownerNamesExposed:false,repoRegistrationsVerified:false,
+  operationalWrites:0});
+}
+export function probeRunnerOwnerCounts({
+ platform=process.platform,spawn=spawnSync,
+}={}){
+ if(platform!=='win32')return Object.freeze({
+  status:'STATE_UNKNOWN',code:'RUNNER_OWNER_WINDOWS_ONLY'});
+ let child;
+ try{child=spawn(PS,['-NoProfile','-NonInteractive','-EncodedCommand',
+   Buffer.from(RUNNER_OWNER_QUERY,'utf16le').toString('base64')],{
+   encoding:'utf8',windowsHide:true,timeout:25000,maxBuffer:1800,
+   shell:false,stdio:['ignore','pipe','pipe'],
+  });}
+ catch{return Object.freeze({status:'STATE_UNKNOWN',code:'RUNNER_OWNER_PROBE_UNAVAILABLE'});}
+ if(child?.error||child?.status!==0)return Object.freeze({
+  status:'STATE_UNKNOWN',code:'RUNNER_OWNER_PROBE_UNAVAILABLE'});
+ return parseRunnerOwnerCounts(child.stdout)??Object.freeze({
+  status:'STATE_UNKNOWN',code:'RUNNER_OWNER_OUTPUT_INVALID'});
+}
+
 export function probeVmFirmware({
  platform=process.platform,spawn=spawnSync,vmProbe=probeFixedVmPrograms,
  discoveryProbe=probeVmDiscovery,ownerProbe=probePinnedOwnerVmEvidence,
+ runnerOwnerProbe=probeRunnerOwnerCounts,
 }={}){
  if(platform!=='win32')return blocked('VM_WINDOWS_ONLY');
  let p;
@@ -252,6 +320,9 @@ export function probeVmFirmware({
  let discovery;
  try{discovery=discoveryProbe({platform});}
  catch{discovery=Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_UNAVAILABLE'});}
+ let interactiveRunnerEvidence;
+ try{interactiveRunnerEvidence=runnerOwnerProbe();}
+ catch{interactiveRunnerEvidence={status:'STATE_UNKNOWN',code:'RUNNER_OWNER_PROBE_UNAVAILABLE'};}
  let vmUserEvidence;
  try{vmUserEvidence=ownerProbe();}catch{vmUserEvidence={scope:'FIXED_C996_OWNER_VM_METADATA_ONLY',status:'UNKNOWN_IO'};}
  const readiness=Object.values(firmware).some(x=>x===null)?'VM_FIRMWARE_UNKNOWN':
@@ -263,7 +334,7 @@ export function probeVmFirmware({
   status:'PASS',code:'VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED',
   firmware,readiness,
   vmPrograms:vm.programs.map(x=>({id:x.id,status:x.status})),
-  vmDiscovery:discovery,vmUserEvidence,
+  vmDiscovery:discovery,vmUserEvidence,interactiveRunnerEvidence,
   vmPathsMode:'STANDARD_C_PATHS_ONLY',portableInstalls:'NOT_CHECKED',
   binaryPresentAtFixedPath:vm.programs.some(x=>x.status==='FILE_PRESENT'),
   vmOperationallyTested:false,vmInstalledByProbe:false,winpeBooted:false,
