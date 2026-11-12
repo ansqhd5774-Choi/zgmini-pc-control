@@ -1,0 +1,59 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/asset-r10-alpaca-exclusion-runtime-20261110",
+  "candidateSourceSha": "9eae7d4815853ab6207b4eceedd4de52ea49ac45",
+  "baseHead": "84df5e80f4bcdadd2a274d6f55a90290426c2406",
+  "baseConfigSourceSha": "84df5e80f4bcdadd2a274d6f55a90290426c2406",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/additional-collection-health.mjs",
+      "change": "M",
+      "beforeSha256": "106a075c8b3a819a005776e106eaef68c470c20e0db2f19357f066a2e1d0ae18",
+      "afterSha256": "e6bc50d4bd1028f2ceefdf63d3d3585f9e828c92c0c660c03e53ac6f85d730a0"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d"
+    },
+    {
+      "path": "scripts/pc-writer/build-asset-r10-release.mjs",
+      "sha256": "66a3d806fbc7f7db01eadce4a65b7e17848050fe18e0d14d76a5b328106b4f49"
+    },
+    {
+      "path": "scripts/pc-writer/progressive-publication.mjs",
+      "sha256": "55ff0868d5a85999f622be8dbcc150397edc4eb199ffc6bc0e3c2bfd8e409981"
+    },
+    {
+      "path": "scripts/pc-writer/alpaca-incremental.mjs",
+      "sha256": "49d2f7de1081257b298b8fecba285dd83b6a3dd486733602dba849712637e7ee"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/additional-collection-health.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
