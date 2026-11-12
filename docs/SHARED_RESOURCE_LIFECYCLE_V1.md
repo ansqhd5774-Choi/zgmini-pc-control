@@ -26,6 +26,33 @@
 
 `resourceKey`, `originIssue`, `requestId`, `chatId`(허용되는 익명 식별자), `sourceSha`, `manifestSha256`, `runId`, `resultCode`, `safePoint`, `owner/precedingIssue`(확인 시에만), `releaseCondition`, 인증 결과 링크/해시, `automaticPcRetries=0`, `ownerReceipt=UNKNOWN`, `nextAction`. 지문으로 동일 이벤트 중복 접수를 막되 서로 다른 원본 요청은 각자 보존한다.
 
+## 2026-11-12 상태·자원 범위 분리 — 운영 중단 시에도 가능한 업무
+
+**해제 검증은 동일한 공유 자원을 다시 점유·수정하기 직전의 조건이다.** 자료 분석, 기존 결과 조회, 코드 개발, PR/CI, 새 요청의 읽기 전용 설계에 모든 잠금 해제를 요구하지 않는다. #68은 조정 이력이고 PC lease/승인/다른 ChatGPT 대화의 자동 알림이 아니다. 현재 모든 기능 작업이 중지됐다면 새로운 자연 장애·대기 해제 재실증을 필수 선행 Gate로 설정하지 않는다.
+
+| 업무·판정 | 필요한 증거 | 허용하는 효과 |
+| --- | --- | --- |
+| **읽기 전용 계획 초안** | 현재 알려진 원본 Issue/Run/결과·source/승인 후보. 부족하면 `ORIGINAL_EVIDENCE_REVIEW_REQUIRED` 또는 `CURRENT_SOURCE_REVIEW_REQUIRED` 표시 | **계획/리뷰/테스트 가능**, PC 작업 재실행·잠금 해제·새 승인 생성 불가 |
+| **Source 검토 후보** | 원본 결과쌍·영수증 및 현재 source/승인 후보의 읽기 교차검사. 일치해도 순수 함수 입력 자체는 인증된 runtime 증명이 아님 | `SOURCE_PLAN_CANDIDATE_REVIEWABLE` (source-only)만, `READY_FOR_OWNER_REPLAN` 아님 |
+| **소스·승인 변경** | 기존 approval fingerprint와 새 실제 source 차이 | `SOURCE_DRIFT_REVIEW`로 과거 manifest 재사용 중단. 원담당이 변경 범위 검토 |
+| **자원 실제 해제 및 원담당 재계획** | **해당 자원**의 현행 소유자/lease/대기 상태, 인증된 Windows/원격 결과쌍, 최신 승인 source·효과·시간의 유효성. 동일 리소스별 확정된 검증 어댑터 필요 | 증명되기 전에는 `RECHECK_EVIDENCE_PENDING`, `releaseVerified=false`, `ownerReplanAuthorized=false`. 별도 보호 경로에서만 `READY_FOR_OWNER_REPLAN` 허용 |
+| **새 운영 실행** | 자원 해제뿐 아니라 새로운 고유 요청, 기존 정규 A/B/C 승인·원본 보호·lease 충돌 없음 | 원담당이 별도 실행. 계획 검토·#68 댓글은 **실행권한이 아님** |
+
+`shared-resource/lifecycle.mjs`의 `describeResourceRecheck(resourceKey)`는 아래 **증거 종류**만 알려준다. `proofRequirementKnown=true`는 필요한 증거 이름을 아는 상태이며, **실제 런타임 검증기 설치나 release 증명이 아니다**. 등록되지 않은 자원은 `UNREGISTERED_RESOURCE_SCOPE`로 표시하지만, 독립 조회/개발을 전역 차단하지 않는다.
+
+| 자원 키 | 독립 검증할 현행 상태 |
+| --- | --- |
+| `writer-source` | Writer install lock + Core 유휴 구간 |
+| `controller-install` | 유지보수 owner/단계 + namespace/설치 lease 독점 |
+| `pc-job-heavy-memory` | 해당 Runner 현재 가용 메모리와 자기 request lease |
+| `pc-job-seat` | 해당 seat 실제 점유자·요청 |
+| `result-upload` | 해당 공개 결과쌍과 원격 bot 영수증 |
+| 신규/알 수 없는 자원 | 해당 원담당이 정확한 읽기 어댑터를 기존 공통 경로에 등록. 다른 자원·기능은 그대로 |
+
+**진행률 분리:** 범용 수명주기 설계/코드/회귀가 정상 완료됐는지와 **실제 PC에서 자연 대기→해제→새 요청 판단을 관측한 것**은 다른 측정이다. 기존 1–4단계의 source·원장·CI 증거는 재사용하고, 5단계 실운영 왕복은 `DEFERRED/RUNTIME_NOT_OBSERVED`로 기록한다. 모든 작업 중단 상태를 인위적 실패·가짜 release·재요청으로 바꾸지 않는다. 기능별 독립 진행을 이 단계 때문에 중단시키지 않는다.
+
+**#68 최신 상태 해석:** 기존 Issue 본문의 2026-11-10 `pc-job disabled_manually`는 당시 특정 Controller 복구 관측으로, 현재 모든 PC Job의 영구 차단 판정이 아니다. 실제 2026-11-12 [#1272](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1272) `runner-smoke` [Run #43135674103](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43135674103)은 기존 운영 PC에서 PASS, JSON/TXT 2/2 재조회됐다. 이 성공만으로 #996 설치 lease 해제·새 C 실행 승인·모든 Reader 기능 가용을 주장하지 않는다. 지금의 설치 lease 소유자/복구 상황은 새 인증된 관련 Runtime 증거가 나오기 전 `STATE_UNKNOWN/RECHECK_PENDING`으로 보존한다.
+
 ## 실행 계획과 측정 기준
 
 1. **[1/5] 범용 위험 전수 분류·계약 확정**: 기존 Controller, Writer, Core, Runner, 결과 업로드의 입구/대기/복구/반환을 매핑하고 실제 위험 및 불변식 문서화.
