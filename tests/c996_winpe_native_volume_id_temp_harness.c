@@ -72,7 +72,11 @@ int wmain(int argc,WCHAR **argv){
   HANDLE h=INVALID_HANDLE_VALUE;
   FILE_ID_INFO info;
   c996_source_only_native_id native;
+  c996_source_only_native_id viaAncestors;
   c996_source_only_native_id rejected;
+  WCHAR parentRoot[512];
+  WCHAR leaf[40];
+  WCHAR *sep;
   if(argc!=2||!c996_is_isolated_pc()||
      !c996_check_temp_path(argv[1],full)){
     puts("C996_NATIVE_ID_TEMP_STOP:HOST_OR_PATH_UNAUTHORIZED");
@@ -93,8 +97,21 @@ int wmain(int argc,WCHAR **argv){
   }
   CloseHandle(h);
   ZeroMemory(&native,sizeof(native));
+  ZeroMemory(&viaAncestors,sizeof(viaAncestors));
   ZeroMemory(&rejected,sizeof(rejected));
+  if(FAILED(StringCchCopyW(parentRoot,512,full))){
+    puts("C996_NATIVE_ID_TEMP_STOP:SOURCE_PATH_COPY_FAILED");return 6;
+  }
+  sep=wcsrchr(parentRoot,L'\\');
+  if(!sep || wcslen(sep+1)>=40 ||
+     FAILED(StringCchCopyW(leaf,40,sep+1))){
+    puts("C996_NATIVE_ID_TEMP_STOP:FIXED_LEAF_INVALID");return 6;
+  }
+  sep[1]=L'\0';
   if(!c996_read_fixed_directory(full,info.VolumeSerialNumber,&native)||
+     !c996_read_fixed_component_chain(parentRoot,leaf,
+                                      info.VolumeSerialNumber,&viaAncestors)||
+     strcmp(native.fileId128,viaAncestors.fileId128)!=0 ||
      c996_read_fixed_directory(full,info.VolumeSerialNumber ^ 1u,&rejected)){
     puts("C996_NATIVE_ID_TEMP_STOP:SERIAL_OR_REPARSE_GUARD_FAILED");
     return 5;
