@@ -124,6 +124,8 @@
 
 **중앙 예약 지시문 정합성(2026-11-09 KST):** 기존 단일 task `Automation_9a403a04a8ac8191a331e94f9abeb1b4`의 저장된 prompt를 이 계획의 단계 7(자연 유효 장애 자동 접수), 8(중앙 해결→원본 Issue 반환)에 맞춰 업데이트·재조회했다. 구형 '7번 = 다른 일반 ChatGPT 자동 재개' 문구는 제거했고, #1041을 비대상/DEFERRED로 분류하도록 명시했다. task ID·기존 일정·활성 상태는 유지하며 추가 대화별 task 0건. 이전 실제 예약 Run `4f285e2a-b46c-8327-b2ff-351ffecadebd`는 #1041 1건을 조회·자동 수정 제외한 것으로 확인됐다. **프롬프트 수정 후 자연 예약 실행 결과는 아직 미검증**이며, 이것을 7·8단계 실증으로 세지 않는다.
 
+> **2026-11-12 후속 증거 정정:** 아래 2026-11-09 당시의 4개 기능 신규 설치 대기·0/4 설명은 **역사적 상태**입니다. 네 기능에서 각각 후속 정규 Writer B 설치 성공 결과가 확인됐으므로 더 이상 4건 전체를 미설치로 취급하지 않습니다. 정확한 실PC source·게시 완료는 별개이며, 아래 `2026-11-12 — 4개 기능 후속 Writer B 설치 증거` 절이 현재 증거 범위와 다음 행동을 갱신합니다.
+
 **다음 필수 실행과 인수 조건**
 
 1. **다음 실제 실행:** 중앙 인계 E2E 1건 성공은 보존하고 과거 검증을 다시 돌리지 않는다. 현재 공유 Writer B #1063 복구 후 원담당 4개 기능의 신규 설치/활성 증거 및 자연 Core cycle 관측을 확인한다. 동일 Treasury manifest 중복 접수 #1090(실행 job skipped)/#1092(신규 정상 제목 B 진행)는 원래 Run/JSON/TXT로 구별한다. 기능 처리와 무관한 원담당 재개 ACK Gate를 새로 만들지 않는다. 4건 후속 결과 확보 뒤 승인된 공유 잠금/복구 프로세스 재발 방지 패치·회귀를 수행한다. 예약 갱신 검증은 기능 완료 뒤만 한다.
@@ -174,3 +176,18 @@
 - **과거 라벨 시각 추론 주의:** #1272에서도 `pc-job` 라벨 timeline 기록은 Issue 생성 약 1초 뒤였지만 `issues.opened` Job은 실제 정상 실행됐다. 그러므로 이전 #1217/#1227에서 생성 약 2초 뒤 라벨 이벤트만을 근거로 누락 원인을 확정하지 않는다. 과거 실패 요청을 자동 재실행하지 않고, 신규 A급은 [공통 시작 정본](GENERAL_CHAT_START.md)의 단일 Issue 생성 계약을 따른다.
 
 **다음 필수 사건:** 신규 적격 자연 실패가 실제 들어오면 원본 요청·workflow_run·bot receipt·JSON/TXT 2/2와 direct-route 영수증을 대조하고, 중앙 수리→원본 반환의 진짜 신규 E2E를 1건 검증한다. 장애가 없으면 `NO_WORK`를 유지하며 정상 PASS를 오류로 조작하지 않는다.
+
+## 2026-11-12 — 4개 기능 후속 Writer B 설치 증거 (실제 원본 결과 재조회)
+
+2026-11-09 #1063 공용 복구 직후 기록된 `원담당 기능 신규 설치 0/4`는 **그 시점의 관측**이다. 2026-11-12 중앙 총괄은 이후 **각기 다른 새 고유 요청의 Windows 설치 결과**를 원격 `results/writer-b-source-install-<requestId>.json`과 `.txt` **각각 2/2 GET 및 내용 일치**로 재조회했다. 원래 실패·경합 요청을 PASS로 소급 변경하지 않으며 네 기능의 **후속 설치 성공 이력 4/4**만 다음 표에서 확정한다.
+
+| 기능 원담당 | 신규 원본 Issue / Run | JSON/TXT 일치 결과 | 설치 시점 source SHA / 파일 범위 |
+| --- | --- | --- | --- |
+| 물가지표 (원본 #1081의 후속) | [#1095](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1095) / `42636781846` | `WRITER_B_INSTALLED_VERIFIED / WRITER_B_INSTALL_VERIFIED` | `4273137a85adcc90c863a27f703baa749b05cb64` / 2파일 |
+| 국채 시장 캘린더 (원본 #1064의 후속) | [#1132](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1132) / `42690541955` | 동일 verified code | `70d2d1dbd8180255133bdd7fc925ae07bb8d6cc9` / 4파일 |
+| 자산 R10 (원본 #1066의 후속) | [#1144](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1144) / `42699676718` | 동일 verified code | `75f73d8613550221f8e80b304d67b8b10a228e7f` / 2파일 |
+| 고용 R6 (원본 #1063 복구 후 **별도 변경 범위**) | [#1195](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1195) / `42721416977` | 동일 verified code | `de81749f83c086f5cb0cad7ed1d5cc958de19280` / 5파일 |
+
+각 Run은 기존 원본 bot 댓글에도 `RESULT_PAIR_READBACK_VERIFIED`, `RESULT_CREATED=2/2`, `RESULT_READBACK=2/2`로 기록됐다. 신규 설치의 manifest SHA256/변경 경로·결과 source SHA는 고유 원본 JSON에 보존된다. 네 SHA는 **각 설치 당시의 로컬 overlay**로서 서로 동일한 현재 운영 HEAD가 아니다. 신규 설치 이력 성공 ≠ 지금 실행 중 Core Task의 source 인증, 원자료/SQLite 계산·저장 완료, D1/API/UI 게시 검증 또는 원담당 ChatGPT 대화의 자동 수신/재개 증거. 특정 기능의 남은 데이터·산식·게시 검증은 그 기능 원담당이 실제 저장·Runtime checkpoint를 기준으로 수행한다.
+
+**정정된 총괄 다음 필수 사건:** 4개 기능을 전부 미설치라고 보고 재요청하거나 소비된 #1063/#1064/#1066/#1081을 반복하지 않는다. 현재 `handoff-agent-pending` 미처리 새 사건이 없다면 `NO_WORK`를 보존한다. 새로운 **자연 발생한 인증된 수리 가능 장애**에 한해 격리 Writer B direct-route의 실제 봇 영수증 → 중앙 최소 수리·PR/CI → 원본 Issue 검증된 반환을 1건 검증해 신설 격리 경로의 마지막 4/5(DEFERRED)를 마감한다. 다른 일반챗 자동 기동, 기능별 최종 게시 완료, 공통 #996 C급 NO-GO는 이 판정의 선행 Gate나 성공 증거로 혼동하지 않는다.
