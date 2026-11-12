@@ -30,7 +30,8 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
     stop('INVENTORY_INCOMPLETE');
   const earlier = inventory.issues.filter(item =>
     item?.repository === REPOSITORY && positive(item.number) &&
-    item.number < issueNumber && [OWNER,BOT].includes(item.user?.login) &&
+    item.number < issueNumber && !item.pull_request &&
+    [OWNER,BOT].includes(item.user?.login) &&
     item.labels?.some(label => label.name === 'agent-handoff') &&
     typeof item.body === 'string').map(item => item.body);
   const outcome = prepareHandoff(verified.body, earlier);
