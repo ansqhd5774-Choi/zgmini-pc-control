@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -63,4 +63,33 @@ test('no implicit cross-host worker execution',()=>{
  const out=collect('operating',{requestId:'id',issueNumber:2,runId:'2',attempt:'1'},
   {RUNNER_NAME:'zgmini-handoff-ci-spare-01'});
  assert.equal(out.status,'BLOCKED');
+});
+
+test('operating maintainer status exposes only bounded hashes and safe lease booleans',()=>{
+ const raw={maintenanceSourceSha:'a'.repeat(40),actualControllerSha:'b'.repeat(40),
+  maintenanceFilesVerified:true,controllerFilesVerified:true,
+  installLock:{held:true,recoveryRequired:true,owner:{nonce:'SECRET_NONCE'}},
+  diagnostics:[],receiverStatus:'LISTENING',workflowState:'active',
+  observedAt:'2026-11-13T01:02:03.123Z',privatePath:'E:/SECRET',
+  token:'super-secret'};
+ const out=sanitizeMaintenanceStatus(raw);
+ assert.equal(out.status,'PASS');
+ assert.equal(out.maintenanceSourceSha,'a'.repeat(40));
+ assert.equal(out.actualControllerSha,'b'.repeat(40));
+ assert.equal(out.installLockHeld,true);
+ assert.equal(out.installLockRecoveryRequired,true);
+ assert.equal(out.observedAtUtc,'2026-11-13T01:02:03.123Z');
+ assert.equal(out.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(out),/SECRET|nonce|token|privatePath|owner|E:\\//i);
+});
+test('missing lease evidence is unknown even if fallback marker claims it is held',()=>{
+ const out=sanitizeMaintenanceStatus({maintenanceSourceSha:'a'.repeat(40),
+  maintenanceFilesVerified:true,installLock:{held:true,recoveryRequired:true},
+  diagnostics:['INSTALL_LEASE_UNAVAILABLE']});
+ assert.equal(out.status,'STATE_UNKNOWN');
+ assert.equal(out.installLockReadbackVerified,false);
+ assert.equal(out.installLockHeld,null);
+ assert.equal(out.installLockRecoveryRequired,null);
+ assert.equal(sanitizeMaintenanceStatus(null).status,'STATE_UNKNOWN');
+ assert.equal(sanitizeMaintenanceStatus({maintenanceSourceSha:'invalid'}).maintenanceSourceSha,null);
 });
