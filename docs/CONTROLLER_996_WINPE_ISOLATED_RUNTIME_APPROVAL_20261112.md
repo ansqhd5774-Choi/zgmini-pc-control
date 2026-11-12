@@ -140,3 +140,17 @@
 - **Runner 검증 구분:** 기존 격리 `zgmini-handoff-ci-spare-01`는 `pc-winpe-vm-firmware-readonly` 및 `pc-host-inventory-readonly`로 VirtualBox **바이너리 존재/설치 등록/펌웨어**를 확인할 수 있으나, 승인된 두 Workflow 모두 `VBoxManage list vms`·현재 사용자 `VirtualBox.xml`·`.vbox` 사용자 프로필을 조회하지 않는다. Runner 자체는 명령 실행 가능하지만 `VBoxManage createvm/list vms/modifyvm` 허용 작업이 없고 Windows 서비스 사용자와 대화형 사용자 로그온 동일성 미입증; 반복 A를 수행해도 **사용자 세션의 VM 생성 사실은 검증되지 않는다**. 임의 원격 셸/사용자 폴더 ACL 우회 없이 **이번 원본 사용자 CMD 성공 출력은 독립적 유효 증거로 인정**한다. 추가 Runner 조회를 완료 Gate로 만들지 않는다.
 - **다음 필수 작업 / 실행 PC:** 공통 대기열 PC `DESKTOP-N62L0NG`에서 **이미 등록된 단일 VM만** 설정: RAM 2048MiB/1CPU/BIOS/네트워크 1~4 전부 OFF, USB OFF, Clipboard·DnD OFF, 공유폴더 없음, 가상 하드디스크·raw host disk 없음, 이전 SHA256 PASS 기존 ISO를 읽기 전용 광학매체로 연결. 변경 후 `VBoxManage showvminfo "ZGMINI-C996-WinPE-TestOnly" --details` 혹은 VirtualBox GUI Settings/Storage/Network를 **대화형 사용자 계정에서** 확인. 네트워크/USB·host 디스크 연결 또는 비인가 설치 효과 확인 시 STOP. 앞서 사용자 UI의 50GB Disk Size는 **취소된 생성 마법사 화면**으로, 이번 `createvm`에서 VDI를 생성했다는 뜻은 아님.
 - **현 상태:** `VM_REGISTERED_USER_CMD_PASS / DISKLESS_ISOLATION_NOT_ATTESTED / ISO_ATTACHMENT_NOT_OBSERVED / GUEST_BOOT_NOT_OBSERVED / CNG_6_NOT_OBSERVED`. ISO SHA256 PASS·VirtualBox 설치 원본 A #1343 2/2 PASS 재사용. 운영 PC `PC` 변경 없음, RDC 사용 없음, C급 실제 복구 `NO-GO` 불변.
+
+## 2026-11-13 — VM 등록 후 7.2 정확한 격리 설정 명령 확정
+
+- **대상 실행 PC:** 공통 대기열 PC `DESKTOP-N62L0NG`, 사용자 `ansqh` 대화형 CMD. 운영 PC `PC` 작업 없음. 완료된 사용자 콘솔 `createvm` 성공 출력 보존, 다시 생성하지 않는다.
+- **7.2 공식 사양 직접 확인:** `https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/vboxmanage.html` `modifyvm`은 VM 전원이 꺼져 있을 때 사용 가능; `--memory`, `--cpus`, `--firmware`, `--boot1..4`, `--nic1..8`, `--usb-ohci/ehci/xhci`, `--clipboard-mode`, `--clipboard-file-transfers`, `--drag-and-drop`, `--audio-enabled`, `--mouse`, `--keyboard` 범위. 공식 8NIC 안내: `https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/networkingdetails.html`. 네트워크 8개 전부 `none` 지정이 4개 GUI만 해제하는 것보다 명확하다.
+- **원래 사용자 계정에서 1회 실행 안내 명령** (VM 설정 창이 닫히고 VM 전원이 꺼진 상태에서만):
+
+```bat
+"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" modifyvm "ZGMINI-C996-WinPE-TestOnly" --memory 2048 --cpus 1 --firmware bios --boot1 dvd --boot2 none --boot3 none --boot4 none --nic1 none --nic2 none --nic3 none --nic4 none --nic5 none --nic6 none --nic7 none --nic8 none --usb-ohci off --usb-ehci off --usb-xhci off --mouse ps2 --keyboard ps2 --clipboard-mode disabled --clipboard-file-transfers disabled --drag-and-drop disabled --audio-enabled off
+```
+
+- 이 명령은 `ZGMINI-C996-WinPE-TestOnly` 1개 VM 정의의 설정만 변경하고 VM이나 가상 HDD/ISO를 생성·부팅·삭제하지 않는다. **실행 출력은 아직 미수신**이므로 `ISOLATION_MODIFY_NOT_OBSERVED`. VM 상태가 running/saved, 명령 미지원, 권한 오류 시 STOP하고 정확한 FIRST FAIL을 확인한다. CMD 실패를 성공으로 간주하고 이어서 광학매체를 붙이지 않는다.
+- **다음 단계 조건부**: 위 `modifyvm` 성공을 받은 후 IDE 광학 controller **없음**을 확인하고 기존 사용자 ISO SHA PASS를 재사용해 ISO를 읽기 전용 광학 매체로 연결. `VBoxManage showvminfo`에서 메모리·CPU·BIOS/부팅·네트워크 1~8 `none`, USB OFF, HDD/raw disk NONE, shared folders none, 정확한 ISO 경로/이미지 여부를 검사한 후에만 TEST_ONLY 단회 부팅을 판단한다.
+- **승인 경계:** C급 실제 운영 복구 `NO-GO`; 운영 `PC`·공유 저장·예약·Runner 계정 전환 없음; RDC 사용하지 않음.
