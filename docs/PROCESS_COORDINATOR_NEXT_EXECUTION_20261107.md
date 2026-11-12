@@ -155,6 +155,13 @@
 
 **단일 다음 작업 선정:** 총괄은 본래 업무에서 신규 인증된 자연 인계 사건이 나타날 때까지 `NO_WORK/DONE` 유지; C 복구는 **#996 Owner의 별도 승인/독립 실행기 정본 작업**으로 계속한다. 과거 R3/R4·CI 성공 재실행, #996 C 원본 Windows 명령 재실행, WinPE VM 설치·리부트, 새로운 예약/Runner/Controller 불필요. 주기가 도래하는 자동화만 기존 한 개를 재사용한다.
 
+### 0.14 2026-11-13 후속 직접 재조회 — #996 R5 읽기 실패 범위 및 중앙 무작업 판정
+
+- **중앙 큐 현재 GitHub 검색:** `label:handoff-agent-pending is:open` 0건, `label:agent-handoff is:open` 8건. 새 인증된 수리 가능 Incident의 원본이 없으므로 중앙 본업은 `NO_WORK`; 8건의 과거 이력을 새 사건으로 다시 접수하거나 Writer B 실패를 인위적으로 만들지 않는다. 4/5 자연 실증은 `DEFERRED`이며 완료를 허위로 선언하지 않는다.
+- **C996 R5의 정확한 실패 경계:** 원본 [Issue #1252](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1252)의 [Run 43103166518](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43103166518) 원격 [JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/c996-r5-43103166518-1.json)과 TXT는 `STOPPED/EPERM`, `PRE_INPUT_HASH → FINAL_WIM → PATH_LSTAT`, `pinCount=0`, `logCount=0`, `rootCauseStage=UNKNOWN`, `operationalWrites=0`, `automaticRetries=0`을 확인한다. **이 실행은 원인 분석 완료나 WIM 변형 단계의 실측이 아니다.** 같은 Runner·경로에서 재시도하지 않고 기존 ID·실패 증거를 보존한다.
+- **이미 존재하는 소스 범위:** C Owner 브랜치 `tools/BUILD_996_WINPE_CNG_TEST_ONLY.cmd`는 EXE 컴파일·dumpbin·해시 생성만 수행한다. 이 소스가 WIM mount/commit/export 또는 ISO 제작을 수행했다는 증거는 없다. `tools/c996-r5-evidence-readonly.mjs`는 기존 파일/로그 확인 전용이지만 실제 Runner는 첫 WIM 경로에서 `EPERM`으로 종료됐다. 원본 사용자 세션에서 시행된 ISO 생성의 정확한 DISM 단계 순서·중간 WIM 관측값은 현재 제공된 GitHub 증거로는 확인되지 않는다. `IMAGE_METADATA_DRIFT_CONFIRMED`와 `ISO_ONLY_PASS`를 보존하고 부팅 실패·원인 단계 추정을 하지 않는다.
+- **다음 필수 행동의 담당/승인 분리:** 중앙은 현재 `NO_WORK/DONE`이며 기존 자동화만 유지. 별도 단일 #996 C Owner는 **새 승인 없이 운영 복구/VM 설치·부팅을 하지 않고**, 기존 원본 단계별 로그·해시가 정상 인가 경로로 이미 존재하는 경우에만 최초 drift 단계를 추적한다. 그러한 증거가 없다면 기존 WinPE TEST_ONLY 별도 효과 승인 결정 또는 다른 검증된 배타 설계를 우선해야 한다. 안전 STOP 2개, 원본 Claim/Lease·Workflow/Backlog, 운영 PC/DB 보호 유지. #996는 독립 기능들의 전역 Gate가 아니다.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
