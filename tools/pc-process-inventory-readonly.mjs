@@ -114,7 +114,7 @@ export function sanitizeMaintenanceStatus(raw){
  const held=lockKnown?asBool(raw.installLock.held):null;
  const recoveryRequired=lockKnown?asBool(raw.installLock.recoveryRequired):null;
  const observedAt=typeof raw?.observedAt==='string'&&
-  /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/.test(raw.observedAt)?
+  /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/.test(raw.observedAt)?
   raw.observedAt.slice(0,32):null;
  return {
   status:sourceSha&&sourceVerified===true&&held!==null&&
