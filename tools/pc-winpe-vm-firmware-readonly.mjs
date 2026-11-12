@@ -167,9 +167,70 @@ export function probeVmDiscovery({
      'VM_DISCOVERY_SCOPED_OBSERVED',...parsed});
 }
 
+
+// #996 existing VM: metadata-only, fixed owner profile and exact paths.
+// Does not read XML contents, enumerate directories, execute VBoxManage,
+// request privileges, touch ACLs or modify any installed VM.
+export const C996_FIXED_OWNER_VM=Object.freeze({
+ owner:'ansqh',
+ profile:String.raw`C:\Users\ansqh`,
+ registry:String.raw`C:\Users\ansqh\.VirtualBox\VirtualBox.xml`,
+ vmDirectory:String.raw`C:\Users\ansqh\VirtualBox VMs\ZGMINI-C996-WinPE-TestOnly`,
+ vmConfig:String.raw`C:\Users\ansqh\VirtualBox VMs\ZGMINI-C996-WinPE-TestOnly\ZGMINI-C996-WinPE-TestOnly.vbox`,
+});
+export function pinnedVmPathState(absolute,kind,{lstat=fs.lstatSync}={}){
+ const fixed=path.win32.resolve(absolute);
+ if(!fixed.toLowerCase().startsWith('c:\\users\\ansqh\\'))return 'PATH_SCOPE_DENIED';
+ const parsed=path.win32.parse(fixed);
+ const sections=path.win32.relative(parsed.root,fixed).split(path.win32.sep);
+ let target=parsed.root;
+ for(let i=0;i<sections.length;i++){
+  target=path.win32.join(target,sections[i]);
+  let st;
+  try{st=lstat(target);}
+  catch(e){
+   if(e?.code==='ENOENT'||e?.code==='ENOTDIR')return 'MISSING';
+   if(e?.code==='EACCES'||e?.code==='EPERM')return 'ACCESS_DENIED';
+   return 'UNKNOWN_IO';
+  }
+  if(st.isSymbolicLink())return 'REPARSE_STOP';
+  if(i<sections.length-1){
+   if(!st.isDirectory())return 'NOT_DIRECTORY';
+  }else return kind==='file'?
+   (st.isFile()?'FILE_PRESENT':'NOT_FILE'):
+   (st.isDirectory()?'DIRECTORY_PRESENT':'NOT_DIRECTORY');
+ }
+ return 'UNKNOWN_IO';
+}
+export function probePinnedOwnerVmEvidence({
+ platform=process.platform,username,profile=process.env.USERPROFILE,
+ lstat=fs.lstatSync,
+}={}){
+ if(platform!=='win32')return Object.freeze({
+  scope:'FIXED_C996_OWNER_VM_METADATA_ONLY',status:'WINDOWS_ONLY',
+  runnerUserIsOwner:null,runnerProfileMatchesOwner:null,
+ });
+ let user=username;
+ if(user===undefined){
+  try{user=os.userInfo().username;}catch{user=null;}
+ }
+ const ownerMatch=typeof user==='string'?user.toLowerCase()===C996_FIXED_OWNER_VM.owner:null;
+ const profileMatch=typeof profile==='string'?
+  path.win32.normalize(profile).toLowerCase()===C996_FIXED_OWNER_VM.profile.toLowerCase():null;
+ const lookup=(p,k)=>pinnedVmPathState(p,k,{lstat});
+ return Object.freeze({
+  scope:'FIXED_C996_OWNER_VM_METADATA_ONLY',status:'SCOPED_READONLY',
+  runnerUserIsOwner:ownerMatch,runnerProfileMatchesOwner:profileMatch,
+  registry:lookup(C996_FIXED_OWNER_VM.registry,'file'),
+  vmDirectory:lookup(C996_FIXED_OWNER_VM.vmDirectory,'directory'),
+  vmConfig:lookup(C996_FIXED_OWNER_VM.vmConfig,'file'),
+  xmlContentsRead:false,profileEnumerated:false,operationalWrites:0,
+ });
+}
+
 export function probeVmFirmware({
  platform=process.platform,spawn=spawnSync,vmProbe=probeFixedVmPrograms,
- discoveryProbe=probeVmDiscovery,
+ discoveryProbe=probeVmDiscovery,ownerProbe=probePinnedOwnerVmEvidence,
 }={}){
  if(platform!=='win32')return blocked('VM_WINDOWS_ONLY');
  let p;
@@ -191,6 +252,8 @@ export function probeVmFirmware({
  let discovery;
  try{discovery=discoveryProbe({platform});}
  catch{discovery=Object.freeze({status:'STATE_UNKNOWN',code:'VM_DISCOVERY_UNAVAILABLE'});}
+ let vmUserEvidence;
+ try{vmUserEvidence=ownerProbe();}catch{vmUserEvidence={scope:'FIXED_C996_OWNER_VM_METADATA_ONLY',status:'UNKNOWN_IO'};}
  const readiness=Object.values(firmware).some(x=>x===null)?'VM_FIRMWARE_UNKNOWN':
    !firmware.FIRMWARE_ENABLED?'VM_FIRMWARE_DISABLED':
    !firmware.VM_MONITOR||!firmware.SLAT?'VM_CPU_FEATURES_NOT_CONFIRMED':
@@ -200,7 +263,7 @@ export function probeVmFirmware({
   status:'PASS',code:'VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED',
   firmware,readiness,
   vmPrograms:vm.programs.map(x=>({id:x.id,status:x.status})),
-  vmDiscovery:discovery,
+  vmDiscovery:discovery,vmUserEvidence,
   vmPathsMode:'STANDARD_C_PATHS_ONLY',portableInstalls:'NOT_CHECKED',
   binaryPresentAtFixedPath:vm.programs.some(x=>x.status==='FILE_PRESENT'),
   vmOperationallyTested:false,vmInstalledByProbe:false,winpeBooted:false,
