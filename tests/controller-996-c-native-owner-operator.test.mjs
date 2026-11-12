@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {run996NativeOwnerCOnce,require996OwnerArchiveReceipt} from '../tools/controller-996-c-native-owner-operator.mjs';
+import {run996NativeOwnerCOnce,require996OwnerArchiveReceipt,build996OwnerArchiveFixtureScript} from '../tools/controller-996-c-native-owner-operator.mjs';
 
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const source=fs.readFileSync(path.resolve(dir,
@@ -103,3 +103,21 @@ test('native post-move receipt requires the exact pinned child inventory',()=>{
   assert.throws(()=>require996OwnerArchiveReceipt(receipt,{}),
     {code:'C_996_OWNER_NATIVE_POSTMOVE_RECEIPT_DRIFT'});
 });
+
+
+test('namespace insertion remains unproven and native production move stays independently blocked',()=>{
+  const fixture=build996OwnerArchiveFixtureScript();
+  // This is source/fixture inspection only: NEVER execute a move or native C.
+  assert.match(fixture,/static readonly bool Fixture = true;/);
+  assert.match(fixture,/C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED/);
+  assert.match(fixture,/Need\(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN"\);/);
+  const productionDefault=source.indexOf('handleArchiveScript()]');
+  const nativeStop=source.indexOf('Need(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN");');
+  const renameCall=source.indexOf('SetFileInformationByHandle(sourceHandle,3,');
+  assert.ok(productionDefault>0&&nativeStop>0&&renameCall>nativeStop);
+  assert.match(source,/function handleArchiveScript\(fixture=false\)/);
+  assert.match(source,/if\(Fixture&&args\.ContainsKey\("simulateNamespaceInsert"\)/);
+  assert.match(source,/need\(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED'\)/);
+  assert.doesNotMatch(source,/handleArchiveScript\(true\)\]\s*,\s*\{/);
+});
+
