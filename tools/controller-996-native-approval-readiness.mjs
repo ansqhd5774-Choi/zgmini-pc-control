@@ -131,3 +131,68 @@ export function review996NativeApprovalReadiness({originalObservation,
   issuePosts:0,pcRetries:0,
  });
 }
+
+
+/**
+ * Read-only continuity check between the historically pinned #996 C sources
+ * and a later, separately collected operating-PC process inventory receipt.
+ *
+ * The caller's JSON is NOT authenticated here: the invoker must independently
+ * verify the exact remote Issue/Run/attempt and JSON/TXT bytes. Matching
+ * fingerprints cannot authorize C, establish a live owner PID, prove runner
+ * drain, or replace an independent current protected-items readback.
+ */
+export function review996LatestOperatingLeaseEvidence({operatingSnapshot}={}){
+ const deny=code=>Object.freeze({
+  schema:'ZGMINI_CONTROLLER_996_LATEST_LEASE_CONTINUITY_REVIEW_V1',
+  status:'SOURCE_ONLY_BLOCKED',code,
+  pinnedOriginalBytesMatched:false,callerReceiptAuthenticated:false,
+  ownerPidCurrentlyAliveVerified:false,workflowActiveVerified:false,
+  protectedItemsFreshlyVerified:false,ownerCConsentVerified:false,
+  offlineNamespaceExclusiveVerified:false,executionAuthorized:false,
+  operationalWrites:0,automaticRetries:0,
+ });
+ const s=operatingSnapshot,m=s?.maintenance,c=s?.c996LeaseCorrelation;
+ const originalHashes=PINNED.raw;
+ const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+ if(s?.schema!=='ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1'||
+   s.role!=='operating'||s.host!=='PC'||
+   !/^zgmini-pc-0[1-6]$/.test(s.runnerName??'')||
+   !uuid.test(s.requestId??'')||
+   !Number.isSafeInteger(s.issueNumber)||s.issueNumber<=0||
+   !/^[1-9][0-9]*$/.test(String(s.runId??''))||
+   s.attempt!=='1'||s.status!=='PASS'||
+   s.code!=='PROCESS_INVENTORY_COLLECTED'||
+   s.operationalWrites!==0||s.providerCalls!==0||
+   s.d1Writes!==0||s.automaticRetries!==0)
+   return deny('C996_LATEST_OPERATING_RECEIPT_INVALID');
+ if(m?.status!=='PASS'||m.maintenanceFilesVerified!==true||
+   m.maintenanceSourceSha!=='16064e29fea0e53e7769a24d93d75b6f5292cfc0'||
+   m.actualControllerSha!=='badad9124157879d7a645b64f2768113d632355b'||
+   m.installLockReadbackVerified!==true||
+   m.installLockHeld!==true||m.installLockRecoveryRequired!==true||
+   m.operationalWrites!==0||m.providerCalls!==0||m.d1Writes!==0)
+   return deny('C996_LATEST_MAINTENANCE_OR_INSTALL_LOCK_DRIFT');
+ if(c?.status!=='CORRELATED'||c.code!=='C996_LEASE_IDENTITY_CORRELATED'||
+   c.ownerMarkerIdentityMatched!==true||c.ledger996Matched!==true||
+   c.ledgerMarkerTimeMatched!==true||c.unchangedAcrossReads!==true||
+   !Number.isSafeInteger(c.ownerPid)||c.ownerPid<=0||
+   c.operationalWrites!==0||c.providerCalls!==0||c.d1Writes!==0)
+   return deny('C996_LATEST_CLAIM_CORRELATION_NOT_PROVEN');
+ if(c.ownerSha256!==originalHashes.owner||
+   c.markerSha256!==originalHashes.recoveryMarker||
+   c.ledgerSha256!==originalHashes.ledger)
+   return deny('C996_LATEST_ORIGINAL_RAW_BYTES_CHANGED');
+ return Object.freeze({
+  schema:'ZGMINI_CONTROLLER_996_LATEST_LEASE_CONTINUITY_REVIEW_V1',
+  status:'SOURCE_ONLY_ORIGINAL_LEASE_FINGERPRINTS_MATCH',
+  code:'C996_THREE_PINNED_ORIGINAL_RAW_HASHES_UNCHANGED',
+  historicalPinCount:3,matchedCount:3,
+  sourceReceiptIssueNumber:s.issueNumber,sourceReceiptRunId:String(s.runId),
+  // This does not attest when a submitted observation was actually produced.
+  callerReceiptAuthenticated:false,ownerPidCurrentlyAliveVerified:false,
+  workflowActiveVerified:false,protectedItemsFreshlyVerified:false,
+  ownerCConsentVerified:false,offlineNamespaceExclusiveVerified:false,
+  executionAuthorized:false,operationalWrites:0,automaticRetries:0,
+ });
+}
