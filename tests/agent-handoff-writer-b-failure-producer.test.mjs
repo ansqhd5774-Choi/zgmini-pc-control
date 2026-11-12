@@ -216,10 +216,10 @@ test('unrelated skipped source workflow with no receipt remains benign', async (
 
 const rejectedComment = () => ({user:{login:bot},
   issue_url:`https://api.github.com/repos/${repo}/issues/874`,
-  body:`<!-- zgmini-writer-b-request-rejected:${runId} -->\\n` +
-    'Writer B request: **REJECTED_BEFORE_PC** (WRITER_B_REQUEST_CONTRACT_STOP)\\n' +
-    'PC_INSTALL: NOT_EXECUTED; RESULT_PAIR: NOT_CREATED_INVALID_REQUEST\\n' +
-    `RUN_ID: ${runId}; RETRY: NO_REEXECUTE\\n`});
+  body:`<!-- zgmini-writer-b-request-rejected:${runId} -->\n` +
+    'Writer B request: **REJECTED_BEFORE_PC** (WRITER_B_REQUEST_CONTRACT_STOP)\n' +
+    'PC_INSTALL: NOT_EXECUTED; RESULT_PAIR: NOT_CREATED_INVALID_REQUEST\n' +
+    `RUN_ID: ${runId}; RETRY: NO_REEXECUTE\n`});
 
 test('verified pre-PC admission rejection is safe, not a missing result failure', async () => {
   for (const conclusion of ['success','failure']) {
