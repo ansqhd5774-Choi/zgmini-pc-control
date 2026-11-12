@@ -22,6 +22,23 @@ const MANIFEST_PATH = /^approvals\/writer-updates\/[a-z0-9][a-z0-9._-]{0,95}\.js
 
 const stop = code => { throw new Error(`WRITER_B_HANDOFF_PRODUCER_${code}`); };
 const positive = value => Number.isSafeInteger(value) && value > 0;
+const rejectedWriterBReceipt = runId =>
+  `<!-- zgmini-writer-b-request-rejected:${runId} -->\n` +
+  'Writer B request: **REJECTED_BEFORE_PC** (WRITER_B_REQUEST_CONTRACT_STOP)\n' +
+  'PC_INSTALL: NOT_EXECUTED; RESULT_PAIR: NOT_CREATED_INVALID_REQUEST\n' +
+  `RUN_ID: ${runId}; RETRY: NO_REEXECUTE\n`;
+
+// A contract rejection is deliberately emitted instead of a Writer B result
+// pair. Verify the exact source reporter contract, bot author and origin URL.
+function hasVerifiedRejection(comments, runId) {
+  const expected = rejectedWriterBReceipt(runId);
+  const matches = comments.filter(c =>
+    c?.user?.login === BOT && c.body === expected &&
+    /^https:\/\/api\.github\.com\/repos\/ansqhd5774-Choi\/zgmini-pc-control\/issues\/[1-9][0-9]*$/.test(c.issue_url ?? ''));
+  if (matches.length > 1) stop('REJECTION_RECEIPT_DUPLICATE');
+  return matches.length === 1;
+}
+
 
 function authorizedManifestPath(originIssue) {
   if (originIssue?.repository !== REPO ||
@@ -60,11 +77,16 @@ export async function processCompletedWriterB(event, {
   const comments = await readComments(run.since);
   const receipt = findWriterBReceipt(comments, run.runId);
   if (!receipt) {
-    // A failed/timed-out source workflow with no authenticated bot receipt is
-    // an evidence gap, not a successful empty scan. Never invent an Incident
-    // or retry the PC task; make the isolated intake failure observable.
+    // Invalid Writer B admission emits a distinct authenticated rejection
+    // receipt but no install result pair. Never mark that safe refusal broken.
+    if (hasVerifiedRejection(comments, run.runId))
+      return Object.freeze({...initial, state: 'REJECTED_BEFORE_PC'});
+    // A completed Writer B job cannot silently succeed without either
+    // reporter receipt. Keep failures visible without PC retries or guesses.
     if (['failure', 'timed_out'].includes(event.workflow_run.conclusion))
       stop('FAILED_RUN_RECEIPT_ABSENT');
+    if (event.workflow_run.conclusion === 'success')
+      stop('SUCCESSFUL_RUN_RECEIPT_ABSENT');
     // Unrelated Issue events may legitimately skip the Writer B source job.
     return Object.freeze({...initial, state: 'NO_VERIFIED_WRITER_B_RECEIPT'});
   }
