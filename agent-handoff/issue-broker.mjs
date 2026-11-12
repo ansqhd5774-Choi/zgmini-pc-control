@@ -45,15 +45,27 @@ async function listPreviousBodies(currentIssue) {
 }
 
 async function hasVerifiedComment(issueNumber, expectedBody) {
-  // Read back the complete deterministic bot receipt in the exact Issue.
-  // A partial marker/fingerprint is not enough to prove delivery.
+  // A matching receipt is valid only when there is exactly one complete bot
+  // route decision in the original Issue. A second, contradictory decision
+  // must not be masked by returning early on the first matching comment.
   const issueUrl = `${API}/repos/${REPOSITORY}/issues/${issueNumber}`;
+  let matching = 0;
   for (let page = 1; page <= 4; page++) {
     const comments = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
     if (!Array.isArray(comments)) throw new Error('HANDOFF_COMMENT_LEDGER_INVALID');
-    if (comments.some((item) => item.user?.login === 'github-actions[bot]' &&
-        item.issue_url === issueUrl && item.body === expectedBody)) return true;
-    if (comments.length < 100) return false;
+    for (const item of comments) {
+      if (item.user?.login !== 'github-actions[bot]' ||
+          typeof item.body !== 'string') continue;
+      // Retain the existing recovery behavior for incomplete bot markers.
+      // Only a structured route decision competes with the expected receipt.
+      const completeRoute = item.body.startsWith('HANDOFF_ROUTED\nincidentId: ') ||
+        item.body.startsWith('HANDOFF_DUPLICATE_REUSED\nfingerprint: ');
+      if (!completeRoute) continue;
+      if (item.issue_url !== issueUrl || item.body !== expectedBody)
+        throw new Error('HANDOFF_COMMENT_CONFLICT_STOP');
+      if (++matching > 1) throw new Error('HANDOFF_COMMENT_DUPLICATE_STOP');
+    }
+    if (comments.length < 100) return matching === 1;
   }
   throw new Error('HANDOFF_COMMENT_SCAN_LIMIT_STOP');
 }
