@@ -10,6 +10,8 @@ on:
       - 'tests/pc-volume-identity-readonly.test.mjs'
       - 'tools/pc-volume-identity-readonly.mjs'
       - 'tools/pc-volume-identity-win32-readonly.cs'
+      - 'tools/pc-winpe-vm-firmware-readonly.mjs'
+      - 'tests/pc-winpe-vm-firmware-readonly.test.mjs'
       - '.github/workflows/pc-host-inventory-readonly.yml'
 permissions:
   contents: write
@@ -37,7 +39,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify fixed inventory admission and host isolation
-        run: node --test tests/pc-host-inventory-readonly.test.mjs tests/pc-volume-identity-readonly.test.mjs
+        run: node --test tests/pc-host-inventory-readonly.test.mjs tests/pc-volume-identity-readonly.test.mjs tests/pc-winpe-vm-firmware-readonly.test.mjs
   operating-pc-inventory:
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
@@ -109,3 +111,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" tools/pc-volume-identity-readonly.mjs'
+
+  handoff-c996-winpe-vm-firmware:
+    if: >-
+      github.event_name == 'issues' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-winpe-vm-firmware-readonly' &&
+      contains(github.event.issue.body, '"scope":"C996_ISOLATED_VM_PREFLIGHT"') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Collect fixed VM firmware flags on existing isolated PC without install
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/pc-winpe-vm-firmware-readonly.mjs
