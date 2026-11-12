@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import {build996OwnerArchiveFixtureScript} from '../tools/controller-996-c-native-owner-operator.mjs';
 
 const hostAllowed = process.platform==='win32' &&
@@ -216,9 +217,7 @@ test('native fixed eight-ID WinPE reader builds as x64 object when isolated MSVC
   const output=fs.mkdtempSync(path.join(tmp,'zgmini-996-native-reader-build-'));
   try{
     const object=path.join(output,'reader.obj');
-    const reader=path.fileURLToPath
-      ? path.fileURLToPath(nativeVolumeReaderPath)
-      : decodeURIComponent(nativeVolumeReaderPath.pathname.replace(/^\/([A-Z]:)/i,'$1'));
+    const reader=fileURLToPath(nativeVolumeReaderPath);
     const command='call "'+dev+'" -arch=x64 -host_arch=x64 >nul && '+
       'cl.exe /nologo /W4 /WX /TC /c /D_WIN32_WINNT=0x0A00 '+
       '/Fo:"'+object+'" "'+reader+'"';
