@@ -264,8 +264,12 @@ test('actual compiled x64 FileIdInfo reader preserves original native ID across 
   const rootVs=String(vs.stdout).trim().split(/\r?\n/)[0]||'';
   const dev=path.join(rootVs,'Common7','Tools','VsDevCmd.bat');
   if(!rootVs||!fs.existsSync(dev))return t.skip('native x64 toolchain unavailable');
-  const temp=fs.realpathSync.native(os.tmpdir());
+  // GetTempPathW chooses TMP before TEMP; Node os.tmpdir() can choose a
+  // different spelling/variable. Bind this test to the Win32 selection order.
+  const temp=process.env.TMP||process.env.TEMP;
+  assert.ok(temp,'Windows TMP/TEMP required for isolated native test');
   assert.equal(path.win32.parse(temp).root.toLowerCase(),'c:\\');
+  assert.equal(path.win32.parse(fs.realpathSync.native(temp)).root.toLowerCase(),'c:\\');
   const build=fs.mkdtempSync(path.join(temp,'zgmini-996-native-reader-build-'));
   const root=fs.mkdtempSync(path.join(temp,'zgmini-996-native-reader-fixture-'));
   const source=path.join(root,'source');
