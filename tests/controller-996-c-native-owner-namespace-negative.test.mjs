@@ -218,10 +218,23 @@ test('native fixed eight-ID WinPE reader builds as x64 object when isolated MSVC
   try{
     const object=path.join(output,'reader.obj');
     const reader=fileURLToPath(nativeVolumeReaderPath);
-    const command='call "'+dev+'" -arch=x64 -host_arch=x64 >nul && '+
+    // cmd.exe /c quoting differs for paths with spaces. Use an isolated
+    // fixed TEMP script rather than a nested command-line string.
+    for(const v of [dev,reader,object])
+      assert.doesNotMatch(v,/[\r\n"&|<>]/);
+    const batch=path.join(output,'compile-reader.cmd');
+    const contents=[
+      '@echo off',
+      'setlocal EnableExtensions DisableDelayedExpansion',
+      'call "'+dev+'" -arch=x64 -host_arch=x64 >nul',
+      'if errorlevel 1 exit /b 51',
       'cl.exe /nologo /W4 /WX /TC /c /D_WIN32_WINNT=0x0A00 '+
-      '/Fo:"'+object+'" "'+reader+'"';
-    const c=spawnSync(process.env.ComSpec||'cmd.exe',['/d','/c',command],{
+        '/Fo:"'+object+'" "'+reader+'"',
+      'if errorlevel 1 exit /b 52',
+      'exit /b 0',
+    ].join('\r\n')+'\r\n';
+    fs.writeFileSync(batch,contents,{flag:'wx'});
+    const c=spawnSync(process.env.ComSpec||'cmd.exe',['/d','/c',batch],{
       encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:100000});
     assert.equal(c.error,undefined,c.error?.message);
     assert.equal(c.status,0,'isolated native object compile failed: '+
