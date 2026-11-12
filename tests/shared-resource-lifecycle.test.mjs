@@ -328,13 +328,13 @@ test('release proof requirements are exact resource-specific, not a global gate'
     assert.equal(result.resourceKey,key);
     assert.equal(result.scope,scope);
     assert.equal(result.requiredRuntimeProof,proof);
-    assert.equal(result.runtimeProofRegistered,true);
+    assert.equal(result.proofRequirementKnown,true);
     assert.equal(result.independentReadOnlyPlanningAllowed,true);
     assert.equal(result.genericReleaseHintAuthorizesExecution,false);
   }
   const unknown=describeResourceRecheck('core-future-source');
   assert.equal(unknown.scope,'UNREGISTERED_RESOURCE_SCOPE');
-  assert.equal(unknown.runtimeProofRegistered,false);
+  assert.equal(unknown.proofRequirementKnown,false);
   assert.equal(unknown.requiredRuntimeProof,'REGISTER_EXACT_RESOURCE_READBACK_ADAPTER');
   assert.equal(unknown.independentReadOnlyPlanningAllowed,true);
   assert.throws(()=>describeResourceRecheck('../unsafe'),/RESOURCE_KEY_INVALID/);
