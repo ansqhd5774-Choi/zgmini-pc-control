@@ -1,5 +1,59 @@
 # ZGMINI 프로세스 총괄 — 2026-11-07 잔여 실행 계획
 
+## 0. 2026-11-13 실행 기준 — 기존 이력보다 우선하는 현행 계획
+
+> **목표 고정:** 수리 가능한 실제 PC Job/Writer B 공통 장애를 GitHub 원본 증거로 접수하고 **단일 중앙 ChatGPT**가 원인 확인·최소 수정·회귀/PR·CI·원본 Issue 결과 영수증까지 책임지는 기존 공통 대기열을 운영한다. 문서 정리나 #996 복구, 여섯 기능 개발을 중앙 장애 인계의 완료조건에 끼워 넣지 않는다. 이 절은 옛 §1~4의 기록을 삭제하지 않고 **현재 판정만 대체**한다. 정본은 최신 `main`의 AGENTS.md·docs/GENERAL_CHAT_START.md·docs/PC_AUTOMATION_STANDARD.md·docs/PC_OPERATING_SYSTEMS_CANONICAL.md와 Issue #68이다. 작성 시 확인한 `main` SHA `445509c06555d179b33dfbc04cbf90c2f4091b46`; 현 브랜치는 크게 분기되었으므로 재기준화·강제 병합·reset/rebase 없이 **이 계획 파일만 수정**한다.
+
+### 0.1 완료 근거 / 진행률 / 범위
+
+| 독립 범위 | 기존 완료 증거 | 현재 판정 | 기능 완료와 혼동 금지 |
+| --- | --- | --- | --- |
+| 단일 중앙 공통 장애 인계 | 자연 Writer B #1063→#1068, 수정 PR #1086·성공 CI·중앙/원본 bot 결과 2/2, 중앙 인계 정본 | **8/8=100%, DONE** | 다른 일반 ChatGPT 자동 수신·PC 운영 설치는 별도 |
+| 격리 Windows 자동 Writer B intake | 격리 Runner 정규 트리거, 원본 인증·안전대기/중복, 소스 교차흐름; 격리 실PC #1210→Run #42725636209 WAIT_RECORDED | **4/5=80%, 5단계 자연 적격 실패 왕복 DEFERRED** | 없는 장애를 인위적으로 만들지 않음 |
+| 공유 자원 수명주기 | PR #1274 main, 격리 source-only 59/59 PASS, Issue #68 | **4/5=80%, 자원 대기→실제 해제→원담당 재계획 DEFERRED** | 중앙 격리 인계의 4/5와 다른 분모 |
+| #996 C급 복구 | #996/#68 원본, 후속 읽기 전용 #1295 Run #43164525583 | **NO-GO/STATE_UNKNOWN**, 동일 공유 설치만 한정 | A급 전체·Writer B 전체 금지 아님 |
+| R10 Alpaca 제외 | PC B #1320, A #1321/#1323, Production Run #43234497571 | **5/5=100%, DONE** | 재검증·재설치 불필요 |
+
+2026-11-12 [#68 공통 차단 범위 정정](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6815766251), [#996 후속 확인](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6815967006), [R10 완료](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6826099930), [중앙 자동화 상태](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6827035097) 참조. 과거 #434의 E: 0건 자연 B 실증은 사용자 지시로 완료 Gate에서 **REMOVED_BY_USER**이며 새 관측 대기를 부활시키지 않는다.
+
+### 0.2 실행 순서 — 다음 필수 작업과 검증 기준
+
+| 순서·담당 | 즉시 실행할 입력 및 최소 조치 | PASS와 STOP/다음 분기 |
+| --- | --- | --- |
+| **P0 총괄 / 지금** | #996 기존 C 시도 원본 Issue·Run·결과와 GitHub Workflow/Backlog의 **현재** 읽기 전용 상태, 기존 A #1295의 bot 결과·JSON/TXT를 대조. LAST_PASS/FIRST_FAIL, 현재 실제 변경 여부, PC 현장 미확인 부분을 분리. 기존 #1217/#1219/#1226/#1227 자동 재발행 금지 | GitHub readback은 `GITHUB_READBACK_ONLY`; 원본 Windows 운영 상태 미확인은 `PC_READBACK_PENDING`으로 보존. Workflow PUT/백로그 종료 **시도**를 실제 성공으로 승격하지 않음 |
+| **P1 총괄 / 실행 가능한 범위** | C 재실행 전에 설치된 기존 허용 A급만 확인하고, 이미 존재하는 원본 PC readback에서 post-C Workflow·claim·lease·marker·ledger/보호 fingerprint를 대조. 추가 PC 조회가 필수이지만 설치 지원/접수 불명확하면 그 operation만 `AUTOMATION_BLOCKED` | 변경 전후 바이트·원본 ID·Owner/승인·복구 경로 모두 확인해야 다음 C 후보를 평가. #996 같은 명령 재실행·lock 강제 해제·C 추가 요청·보안 우회 금지 |
+| **P2 중앙 예약 담당 / 별도 점검** | 기존 「ZGMINI 공통 인계 중앙 처리」 예약의 `is_enabled=true` 복원 증거를 재사용. 이전 `requires_user_action=true`는 그대로 보존, **복원 이후 새로운 Run ID와 결과**만 1회 확인. 기존 task/프롬프트·시간당 일정 유지 | 새 실행의 실제 NO_WORK/처리 증거가 있어야 RUNNING 판정. 활성 토글만으로 매시간 성공이라고 단정하지 않음. 새 자동화 생성 금지 |
+| **P3 단일 중앙 / 자연 사건 발생 시만** | 격리 Writer B intake의 신규 인증 적격 실패 1건: 원본 Issue/Run·bot receipt·고정 manifest SHA·JSON/TXT 2/2 검증 → 최소 수정/관련 회귀·PR/성공 CI → 중앙 및 원본 bot `HANDOFF_RESULT_RECORDED` readback | 실제 E2E 전체 왕복이면 격리 경로 5/5. `WAIT_RECORDED`·성공·UNKNOWN은 제외, 인위적 B·같은 ID 재실행/새 수신함 생성 금지. **DEFERRED는 다른 작업의 Gate가 아님** |
+| **P4 공통 Controller 도구 담당 / 실제 필요 시** | 시장 Treasury `source-inventory-runtime-readonly`, D05 `d05-lineage-readonly`의 설치 Controller 미지원 범위를 확인. 이미 승인된 공통 등록/유지보수 정본을 재사용해 미지원 operation만 source-only 수정·테스트·별도 manifest/승인 경로로 검증 | 지원되지 않는 A만 `NOT_REGISTERED`. 문서/PR/CI는 PC 설치 PASS가 아니다. #996 동일 공유 설치와 충돌할 때만 해당 변경 직렬화 |
+
+### 0.3 #996 오류에 대한 현재 분리 판정
+
+- **실제 LAST PASS:** #1295 pc-job Issue→Workflow→Runner Job→bot receipt 및 원격 JSON/TXT 2/2까지 전송 경로 실증. 해당 operation 자체는 `STATE_UNKNOWN/CORE_NO_ACTIVE_TASK_ENGINE`이므로 `runtimeSourceVerified=false`. 이 결과는 공유 설치 잠금 해제도 Core 정상 동작 증거도 아님.
+- **실제 FIRST FAIL:** #996 C 시도 `C_GITHUB_BACKLOG_PLAN_ORIGINAL_BODY_INVALID`, 단계 `ORIGINAL_JOB_DISPOSITIONS` 보고. Workflow 변경 1회·Backlog 종료 1회 **시도**했으나 실제 성공 미확정. 과거 원장에 `RUNNER_SET_DRIFT` 및 `INTAKE_PAUSED`가 있으며 서로 다른 관측 범위를 섞지 않는다.
+- **필수 증거:** 같은 고유 C claim/Owner·원본 lease·Workflow 상태·각 backlog Issue 현재 state/label/body/댓글·복구 marker/ledger와 현장 보호 원본. GitHub 기록만 확인되는 경우 PC 현장 복구 완료 주장 금지.
+- **안전 제한:** 기존 C 실행 패키지 재실행·추가 C 승인 추정·원본 requestId 복제·강제 unlock/rollback/Workflow PUT·보안정책 수정·운영 PC/DB/D1 변경 금지. 보호 조건 불명확이면 정확한 해당 단계만 `BLOCKED`.
+
+### 0.4 원담당 여섯 기능의 비차단 진행 기준
+
+| 기능 | 마지막 유효 완료 지점 | 원담당이 #996 없이 지금 할 수 있는 다음 실행 | 실제 선행조건이 필요한 효과 |
+| --- | --- | --- | --- |
+| 물가 | 보고 42%; 19개 기존+신규7개 중 4개 값 확보 | BLS 2·Census 1 공식 파일의 발표/관측일과 로컬 결손 정리, 허용된 단회 수집 준비 | 실제 공유 DB 쓰기/PC 수집에 충돌 확인 시 해당 lane만 판단 |
+| 시장 캘린더 | 보고 95%; 수집·게시 기존 증거 | Treasury 1년 원본 감사 범위·건수·지문을 기존 결과와 대조 | 설치 미지원 `source-inventory-runtime-readonly`는 승인된 공통 등록 뒤 1회 |
+| 테마 공포탐욕 | 보고 20%; 6개 저장 피드 식별, 공개 0/10 | R178 체크포인트/6개 피드 Reader 기존 코드 검토, R181 첫 실패 원인 분리 | 실제 Reader/Writer/D1 적용 때 해당 권한·source 검증 |
+| 고용 R6 | 보고 87.5%; DOL 진단 13/13 PASS | 미접수 구 #1217/#1227 재실행하지 않고 신규 접수 상태/공식 DOL 관측 진단 | 필요한 신규 A 결과가 실제 거부되면 해당 operation만 차단 |
+| R10 | #1320 B·#1323 Writer·공개 결과 | **완료**, 추가 필수 작업 없음 | 자연 예약 갱신은 별도 후속 |
+| D05 | Writer B #1234·A #1235 성공, 1년치 0/68 | 기존 소스 12파일·Task 증거 재사용, #1236 A Reader 후보/회귀 검토 | `d05-lineage-readonly` Controller 등록과 실제 PC 조회 후 수집/저장 |
+
+### 0.5 종료·보고 규칙
+
+- 중앙 인계 전체 **8/8 DONE**과 새 격리 경로 **4/5 DEFERRED**를 섞거나 둘 중 하나를 다른 기능 전체 진행률로 표현하지 않는다.
+- 이번 실행의 완료 여부는 **(1) 이 계획 실제 Git 커밋, (2) 변경 파일 원격 readback, (3) P0 기존 GitHub 원본 readback 및 미확인 범위 기록**으로 평가한다. P1 현장 접근이 없더라도 P2/P4 등 독립 일을 계속한다.
+- 새 사건·권한·소스 변화가 없는 한 오래된 성공 재검증, 문서만 반복 갱신, 정규 예약 검증을 기능 완료 선행조건으로 만들지 않는다.
+- 최종 보고: 이번 작업의 수행/검증/실제 문제/다음 **단일 필수 행동**, 원본 링크와 단계별 진행률. 다른 ChatGPT 대화의 자동 수신이나 Production 배포 완료 추정 금지.
+
+---
+
+
 - 기준 브랜치: `codex/controller-ops-lessons-20261105`
 - 판정 기준: GPT R6.0 + 제어 저장소 `main`의 AGENTS.md, GENERAL_CHAT_START.md, PC_AUTOMATION_STANDARD.md, GENERAL_CHAT_PREWORK.md
 - 이번 기록은 실제 소스/원장 읽기 전용 조사다. Controller/Reader/PC/DB/게시/예약을 수정하거나 새 요청을 제출하지 않았다.
