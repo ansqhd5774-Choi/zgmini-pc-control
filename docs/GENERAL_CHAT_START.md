@@ -68,6 +68,11 @@ GitHub 도구가 `ansqhd5774-Choi/zgmini-pc-control`에 접근할 수 있어야 
 
 이것은 형식 예시이며 placeholder 그대로 요청하지 않는다. create_issue 도구의 `repository_full_name`, `title`, `body`, `labels` 등 실제 schema를 따른다.
 
+
+**접수 유실 방지 — Issue 생성과 라벨은 반드시 한 번의 요청으로:** 기존 `.github/workflows/pc-job.yml`은 `issues.opened`에서 `pc-job` 라벨이 **이미 포함된 경우에만** 운영 A급 Job을 시작한다. 따라서 GitHub `create_issue`를 사용할 때 `title="pc-job"`, `labels=["pc-job"]`, 검증된 본문을 **같은 API 호출에 넣는다**. Issue를 먼저 생성한 뒤 라벨을 나중에 붙이는 방식은 `opened` 실행을 복구하지 못한다. `pc-job` 외의 작업도 각 등록된 정확한 title/label/schema 계약을 따른다. 본 규칙은 새 Runner/Workflow·자동 재실행 요구가 아니다.
+
+**실측 구분(2026-11-12):** 과거 #1213은 `ZGMINI PC Job` Run `42726083946`이 `skipped`, #1217·#1227은 당시 `issues` 이벤트 전체 검색 범위에서 해당 `ZGMINI PC Job` 실행이 확인되지 않았으며 원본 결과 영수증도 없다. 둘 다 Issue 생성 2초 뒤 `pc-job` 라벨 이벤트가 있었다. 단, #1231은 유사한 후속 라벨 기록이 있으면서도 Run `42925346948` 성공이므로 **라벨 이벤트 시각만으로 과거 사건의 단독 원인을 확정하지 않는다**. 결과 없는 원본은 `AUTOMATION_BLOCKED/PC_JOB_INTAKE_NOT_OBSERVED` 또는 `STATE_UNKNOWN`으로 범위를 한정하고 같은 requestId를 재실행하지 않는다. 후속 읽기가 실제 필요하면 **새 고유 A급 요청**을 검증된 동일 요청+라벨 생성 절차로 별도 진행한다.
+
 5. **이번에 생성한 고유 Issue 번호·requestId 하나**만 추적한다. `pc-job`은 댓글이 없어도 해당 Issue의 Actions 실행 상태를 확인하고, `pc-maintenance`는 Actions가 아닌 독립 유지보수기 요청으로서 사용 가능한 기존 원장·결과 증거를 확인한다. 진행 중이면 예상 완료 시점이나 실제 상태 변화에 맞춰 제한적으로 재조회한다. queued/offline은 곧바로 실패가 아니다. #68 전체 댓글·다른 업무 Issue들을 주기적으로 전량 조회하거나 같은 요청을 새로 만들지 않는다.
 6. 결과 회수는 댓글을 보조 알림으로 사용하고 **고정 결과 파일의 원격 재조회**를 우선한다. 일반 `pc-job`은 해당 Actions 실행의 `runId`/`attempt`/`seat`를 확인해 `results/<runId>-<attempt>-seat-<seat>.json/.txt`를 조회한다. `pc-maintenance`는 고유 `requestId`에 대응하는 `results/maintenance-<requestId>.json/.txt`와 영속 원장·댓글의 `REPORT_UPLOAD`를 구분해 대조한다. 댓글이 없으면 **`pc-job`에만** 해당 Actions run/jobs/logs를 확인한다. `pc-maintenance`에는 Actions jobs/logs가 없으므로 고정 결과쌍과 승인된 원장 조회 경로를 사용하고, 그 경로가 없으면 전달 상태 미확인으로 기록한다. 원격 전달 여부가 불명확해도 이미 확인된 PC 실행 `PASS`/`FAIL`/`BLOCKED`를 덮어쓰지 않고 **실행 상태와 결과 전달 상태를 분리**해 다음 확인 조건을 남긴다. 댓글 작성만으로 다른 GitHub Workflow나 독립 ChatGPT 대화가 자동 재개된다고 가정하지 않는다.
 
