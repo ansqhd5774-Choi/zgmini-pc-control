@@ -181,6 +181,13 @@
 - **다음 필수 실행(물가 B 원담당/승인 Owner):** 현 PC `05d7...` 신뢰 출처·기존 동일 효과·정확한 승인 source 해시 검토 → 신규 `APPROVED_B` 여부 명시 결정. 실제 승인 이후에만 manifest Git blob/SHA256 및 B opt-in 정규 활성 확인 → 새 고유 단회 B에서 내장 12분 Core owner 검사→공식 BLS·Census GET→CPI 복구/PPI 203건 보존/Census 저장·readback. 총괄의 중앙 8/8을 이 승인에 대한 추가 Gate로 만들지 않는다. 예약 자연검증은 기능 완료 후 후속이다.
 
 
+### 0.17 2026-11-13 Census XLSX 순서 의존 파서 결함 — 실제 독립 브랜치 후보
+
+- **재현된 코드 결함(본래 운영 PC가 아닌 합성 fixture):** `zgmini/main`의 공용 `lib/diagnostic-layer/xlsx-lite.mjs::readXlsxWorkbook`는 `.rels` XML의 `Id`가 `Target`보다 먼저 등장해야 하는 정규식으로 Workbook 관계를 파싱한다. 실제로 Python/openpyxl이 생성한 정상 XLSX의 `Target` 선행 속성 순서에서 이 정규식은 관계 **0개**, 순서 독립 방식은 **3개**를 판독했다. 이는 XLSX 파서의 형식 취약점 검증이며 **Census 공식 파일 바이트·실제 해당 파일 파싱 성공/실패는 미검증**이다. 실제 파일을 구하는 도구가 없다는 이유만으로 운영 수집 성공이나 실패를 주장하지 않는다.
+- **소스 개선 후보 구현 및 원격 확인:** `zgmini/main=643b7c7c4372ffad552443fc312c6cb1b944e2fc`에서 새 독립 브랜치 [`codex/xlsx-lite-relationship-order-safe-20261113`](https://github.com/ansqhd5774-Choi/zgmini/tree/codex/xlsx-lite-relationship-order-safe-20261113) 생성. 공용 파서의 관계 속성 읽기를 순서 독립으로 수정한 [`2d9567d4`](https://github.com/ansqhd5774-Choi/zgmini/commit/2d9567d4f288999e9821f160c8d7d258e618d41b), 기존 물가 압축 XLSX fixture에 `Target` 선행 관계 회귀 1건을 추가한 [`c52c8074`](https://github.com/ansqhd5774-Choi/zgmini/commit/c52c8074fe06b3d7733a2b21bbd49425bff4e688) 2파일만 수정. GitHub 원격 두 blob 재조회 PASS. 관계 추출을 모사한 독립 4개 사례(Id 선행/Target 선행/openpyxl 유사/Id 누락 거부) 4/4 PASS. **Node 전체 테스트/실제 공식 XLSX readXlsxWorkbook 통합 실행 미실시**; 구현 후보를 승인된 PC 런타임 성공으로 부풀리지 않는다.
+- **Owner 경계와 실행 선후:** [물가 원담당 #1177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1177#issuecomment-6832980202)에 실제 변경 branch/SHA·LAST PASS/FIRST FAIL·필요한 `node --test ...inflation-causal-candidate-manual-official-r1.test.mjs`·기존 xlsx-lite 호출부 회귀 검증을 명시 인계. 공통 모듈 수정은 물가 B manifest의 승인 대상 파일에 포함되므로 **원담당이 수정본 적용 여부·관련 영향·승인 source/파일 SHA 재고정을 독립 결정**해야 한다. 기존 `05d7…` 4/4 동일 PR #1336을 수정 후보가 이미 설치된 것처럼 취급하지 않는다. 해당 Repo 기존 PR CI가 `ubuntu-latest`를 호출하므로 미승인 hosted Runner를 사용하지 않도록 신규 PR은 만들지 않고 개발 브랜치/인계만 보존.
+- **총괄 상태:** 중앙 8/8 DONE, 격리 자연 E2E 4/5 DEFERRED, 공유 자원 수명주기 4/5 DEFERRED, #996 C NO-GO 유지. 운영 Core/Writer 잠금·PC 원자료/DB/D1·Workflow 변수·원본 승인 manifest·기존 #1177 요청/Controller 설치 등 변경 0. 물가 기능 42%, raw 23/26, 공개 4/7 유지. 다음 단일 필수 실행은 물가 원담당의 **후보 통합 영향·회귀 검증 및 정확한 새 manifest 판단**이며, 중앙은 새 적격 사건 없으면 NO_WORK 상태에서 승인/운영 효과를 임의 대행하지 않는다.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
