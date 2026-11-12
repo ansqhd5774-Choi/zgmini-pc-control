@@ -4,6 +4,7 @@ import {fingerprintHandoff,parseHandoff} from '../agent-handoff/contract.mjs';
 import {resultDigest,verifyAgentResult} from '../agent-handoff/result-contract.mjs';
 import {originResultReceipt,centralResultReceipt} from '../agent-handoff/result-receipts.mjs';
 import {reviewOwnerHandoffReturn,readAndReviewOwnerReturn} from '../agent-handoff/owner-return-review.mjs';
+import {createOwnerReturnGithubReadIo} from '../agent-handoff/owner-return-github-io.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',OWNER='ansqhd5774-Choi',BOT='github-actions[bot]';
 const url=n=>'https://api.github.com/repos/'+REPO+'/issues/'+n;
@@ -345,4 +346,133 @@ test('failed PR or CI provenance cannot be treated as a reviewed original result
   originIssueNumber:1063,io:mockedReadIO(f,trace)
  }),/RESULT_TEST_RUN_PROVENANCE_STOP/);
  assert.equal(trace.length,6);
+});
+
+
+function mockedAuthenticatedGithub(f,{changeOriginDuringRead=false,missingPage=false,
+  responseStatus=200}={}){
+ const base='https://api.github.com/repos/'+REPO;
+ const source=structuredClone(f);
+ const original={...source.originIssue,comments:source.originComments.length,
+   updated_at:'2026-11-12T02:00:00Z'};
+ const incident={...source.incidentIssue,comments:source.incidentComments.length,
+   updated_at:'2026-11-12T02:00:00Z'};
+ const collections={
+  [source.originIssue.number]:source.originComments.map((c,i)=>({...c,id:10001+i})),
+  [source.incidentIssue.number]:source.incidentComments.map((c,i)=>({...c,id:20001+i})),
+ };
+ const trace=[],counts=new Map();
+ const failStatus=responseStatus;
+ const read=async(url,options)=>{
+  const u=new URL(url);
+  const path=u.pathname;
+  trace.push({url,method:options?.method,headers:options?.headers});
+  assert.equal(options?.method,'GET');
+  assert.equal(options?.redirect,'error');
+  assert.equal(options?.headers?.Authorization,'Bearer test-connector-token');
+  assert.equal(u.origin,'https://api.github.com');
+  if(failStatus!==200)
+   return new Response('denied',{status:failStatus});
+  const part='/repos/'+REPO;
+  let value;
+  if(path===part+'/issues/'+source.originIssue.number){
+   const n=(counts.get(path)||0)+1;counts.set(path,n);
+   value={...original,...(changeOriginDuringRead&&n>1?
+     {updated_at:'2026-11-12T02:01:00Z'}:{})};
+  }else if(path===part+'/issues/'+source.incidentIssue.number){
+   value=incident;
+  }else if(path.startsWith(part+'/issues/')&&
+    path.endsWith('/comments')){
+   const number=Number(path.split('/')[5]);
+   const list=collections[number];
+   if(!list)throw Error('UNEXPECTED_ISSUE_COMMENT_GET');
+   const page=Number(u.searchParams.get('page'));
+   assert.equal(u.searchParams.get('per_page'),'100');
+   value=missingPage&&page===2?[]:list.slice((page-1)*100,page*100);
+  }else if(path===part+'/pulls/1086'){
+   value=source.pullRequest;
+  }else if(path===part+'/actions/runs/42637013508'){
+   value=source.testRun;
+  }else{
+   throw Error('UNEXPECTED_GITHUB_GET_PATH');
+  }
+  return new Response(JSON.stringify(value),{
+   status:200,headers:{'content-type':'application/json'}});
+ };
+ return {read,trace};
+}
+const authIo=(fetchImpl)=>createOwnerReturnGithubReadIo({
+ token:'test-connector-token',fetchImpl});
+test('authenticated GET adapter actually feeds original-owner return review without mutation',async()=>{
+ const mock=mockedAuthenticatedGithub(fixture());
+ const result=await readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:authIo(mock.read)});
+ assert.equal(result.state,'RETURN_EVIDENCE_REVIEWABLE');
+ assert.equal(result.incidentIssue,1068);
+ assert.equal(result.ownerChatReceived,'UNKNOWN');
+ assert.equal(result.executionAuthorized,false);
+ assert.equal(mock.trace.length,8);
+ assert.ok(mock.trace.every(t=>t.method==='GET'));
+ assert.ok(mock.trace.every(t=>!t.url.includes('Bearer')));
+ assert.equal(mock.trace.filter(t=>t.url.includes('/pulls/')).length,1);
+ assert.equal(mock.trace.filter(t=>t.url.includes('/actions/runs/')).length,1);
+});
+test('authenticated readback of no-returned-result stops without any Incident/PR/Run GET',async()=>{
+ const f=fixture();f.originComments=[];
+ const mock=mockedAuthenticatedGithub(f);
+ const value=await readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:authIo(mock.read)});
+ assert.equal(value.state,'NO_RETURNED_RESULT');
+ assert.equal(mock.trace.length,3);
+ assert.ok(mock.trace.every(x=>x.url.includes('/issues/1063')));
+});
+test('authenticated GitHub GET follows all 100-item pages and checks exact count',async()=>{
+ const f=fixture();
+ const filler=Array.from({length:100},(_,i)=>comment(OWNER,1063,'ordinary-comment-'+i));
+ f.originComments=[...filler,...f.originComments];
+ const mock=mockedAuthenticatedGithub(f);
+ const value=await readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:authIo(mock.read)});
+ assert.equal(value.state,'RETURN_EVIDENCE_REVIEWABLE');
+ assert.equal(mock.trace.filter(t=>t.url.includes('/issues/1063/comments')).length,2);
+ const missing=mockedAuthenticatedGithub(f,{missingPage:true});
+ await assert.rejects(readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:authIo(missing.read)
+ }),/OWNER_GITHUB_READ_COMMENTS_TRUNCATED/);
+});
+test('auth GET fails closed on a changing Issue or unauthorized GitHub response',async()=>{
+ const f=fixture();
+ for(const opts of [{changeOriginDuringRead:true},{responseStatus:403}]){
+  const mock=mockedAuthenticatedGithub(f,opts);
+  await assert.rejects(readAndReviewOwnerReturn({
+   originIssueNumber:1063,io:authIo(mock.read)
+  }),/OWNER_GITHUB_READ_(COMMENTS_CHANGED_DURING_READ|HTTP_NOT_OK)/);
+  assert.equal(mock.trace.some(t=>t.method!=='GET'),false);
+ }
+});
+test('read-only adapter rejects invalid tokens/repositories/PR and run IDs without fetch',async()=>{
+ const fetches=[];
+ const fetchImpl=async(...args)=>{fetches.push(args);throw Error('unexpected network');};
+ assert.throws(()=>createOwnerReturnGithubReadIo({token:'bad',fetchImpl}),
+  /OWNER_GITHUB_READ_AUTH_INPUT_INVALID/);
+ const io=authIo(fetchImpl);
+ await assert.rejects(io.readPullRequest('attacker/repo',1086),
+  /OWNER_GITHUB_READ_PR_SCOPE_STOP/);
+ await assert.rejects(io.readRun(REPO,0),/OWNER_GITHUB_READ_RUN_SCOPE_STOP/);
+ await assert.rejects(io.readIssue('1063'),/OWNER_GITHUB_READ_ISSUE_NUMBER_INVALID/);
+ assert.equal(fetches.length,0);
+});
+test('forged comment URL or duplicate GitHub ID never yields a complete ledger',async()=>{
+ const f=fixture();
+ f.originComments[0].issue_url=url(9999);
+ const bad=mockedAuthenticatedGithub(f);
+ await assert.rejects(readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:authIo(bad.read)
+ }),/OWNER_GITHUB_READ_COMMENT_IDENTITY_STOP/);
+ const q=fixture();
+ q.originComments.push(structuredClone(q.originComments[0]));
+ const dup=mockedAuthenticatedGithub(q);
+ await assert.rejects(readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:authIo(dup.read)
+ }),/OWNER_MULTIPLE_ORIGIN_RETURNS_REVIEW/);
 });
