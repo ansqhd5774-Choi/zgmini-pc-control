@@ -1,0 +1,50 @@
+{
+  "schema": "ZGMINI_PC_VOLUME_IDENTITY_PROBE_V1",
+  "status": "PASS",
+  "code": "VOLUME_IDS_READONLY_OBSERVED",
+  "volumeGuid": "\\\\?\\Volume{795c117a-c2a0-414c-99ba-cbe0ec1106dc}\\",
+  "volumeSerial": "828acc418acc3387",
+  "directories": {
+    "VOLUME_ROOT": {
+      "state": "PRESENT",
+      "fileId128": "05000000000005000000000000000000"
+    },
+    "ZGMINI": {
+      "state": "PRESENT",
+      "fileId128": "ac020000000006000000000000000000"
+    },
+    "AUTOMATION": {
+      "state": "PRESENT",
+      "fileId128": "ec562f00000004000000000000000000"
+    },
+    "MAINTENANCE": {
+      "state": "PRESENT",
+      "fileId128": "a57c2f00000003000000000000000000"
+    },
+    "LEASES": {
+      "state": "PRESENT",
+      "fileId128": "c97c2f00000001000000000000000000"
+    },
+    "OLD_C": {
+      "state": "PRESENT",
+      "fileId128": "627d300000000b010000000000000000"
+    },
+    "INSTALL": {
+      "state": "PRESENT",
+      "fileId128": "10263000000008000000000000000000"
+    }
+  },
+  "source": "WIN32_GET_VOLUME_NAME_AND_FILE_ID_INFO",
+  "offlineVolumeVerified": false,
+  "ownerApprovalVerified": false,
+  "cExecutionAuthorized": false,
+  "operationalWrites": 0,
+  "automaticRetries": 0,
+  "requestId": "e741024c-47c5-40ca-b9d1-fbb250e79e42",
+  "runId": "43124923743",
+  "issueNumber": 1265,
+  "attempt": "1",
+  "role": "operating",
+  "host": "pc",
+  "runnerName": "zgmini-pc-05"
+}

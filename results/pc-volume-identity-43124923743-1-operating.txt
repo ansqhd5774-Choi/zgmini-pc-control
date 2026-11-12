@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_VOLUME_IDENTITY_PROBE_V1
+requestId=e741024c-47c5-40ca-b9d1-fbb250e79e42
+runId=43124923743
+attempt=1
+role=operating
+status=PASS
+code=VOLUME_IDS_READONLY_OBSERVED
+operationalWrites=0
+automaticRetries=0
