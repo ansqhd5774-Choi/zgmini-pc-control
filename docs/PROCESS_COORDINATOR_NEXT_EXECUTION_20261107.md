@@ -117,6 +117,14 @@
 
 **진행률 유지:** 공통 중앙 8/8 DONE(100%), 격리 Writer B 4/5 DEFERRED(80%), 공유 자원 수명주기 4/5 DEFERRED(80%), #996 C NO-GO. 위 R3/R4를 새 완료 건수로 중복 산정하지 않는다.
 
+### 0.10 2026-11-13 #996 Native Owner C 안전 차단 정확 판정
+
+**실제 코드 조사(운영 효과 0):** 기존 C Owner [Draft #1222](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1222) `tools/controller-996-c-native-owner-operator.mjs`의 현재 소스를 직접 읽고 서로 독립인 두 실행 거부가 있음을 확인했다. `run996NativeOwnerCOnce`는 첫 dynamic import 이전 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`를 무조건 반환한다. 별도로 native `handleArchiveScript(fixture=false)`는 `Need(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN")`로 실제 운영 경로의 디렉터리 이동을 거부한다. 첫 STOP만 제거해도 두 번째는 남고, 이 보호를 무단 제거해서는 안 된다. Native child는 원래 파일들의 핸들·해시를 보유하지만 **새 자식 파일명의 동시 추가 차단**은 입증되지 않았다. 기존 테스트의 FIRST STOP assertion은 확인했고 SECOND STOP assertion은 미구현; 격리/합성 시험으로 namespace·경합·중단 복구 안전을 먼저 평가해야 한다.
+
+**실행 인계:** [#996 Owner 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6828414347)로 정확한 파일/차단코드/최소 다음 소스 검토를 전달. GitHub 댓글은 원담당 ChatGPT 대화가 자동 수신했다는 뜻이 아니다. C 담당의 신규 명시 승인·현재 원본 Windows 실측·신뢰된 package/source 전부 미확정; 기존 승인 `ZGMINI_CONTROLLER_996_C_CONSENT_V1`는 신규 continuation 효과 승인으로 승계 불가. 수집/계산/게시 및 다른 독립 업무는 계속한다.
+
+**종료 범위:** 새 권한·Runner/PC 작업·C 실행·Workflow/Backlog·Claim/Lease·DB/D1 변경 0. 중앙 인계 8/8 DONE, 격리 자연 E2E 4/5 DEFERRED, C NO-GO. 추가 문서 Gate나 무조건적 전체 Runner 대기는 생성하지 않는다.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
