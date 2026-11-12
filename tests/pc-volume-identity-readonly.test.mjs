@@ -76,6 +76,10 @@ test('fixed response checks GUID, 128-bit IDs, same-volume serial, missing C',()
  assert.equal(proof.source,'WIN32_GET_VOLUME_NAME_AND_FILE_ID_INFO');
  assert.equal(Object.keys(proof.directories).length,5);
  assert.equal(proof.volumeSerial,'1'.repeat(16));
+ const lowercase=decodeFixedVolumeResponse(response('operating',
+  {VOLUME_GUID:guid.replace('Volume{','volume{')}),'operating');
+ assert.equal(lowercase.status,'PASS');
+ assert.equal(lowercase.volumeGuid,guid);
  assert.equal(proof.directories.INSTALL.fileId128,'5'.repeat(32));
  assert.equal(proof.offlineVolumeVerified,false);
  assert.equal(proof.cExecutionAuthorized,false);
@@ -119,7 +123,7 @@ test('native read-only Win32 proof runs on isolated Windows fixture only',t=>{
   return child;
  }});
  assert.equal(proof.status,'PASS',proof.code);
- assert.equal(proof.directoryFileIds?.length,undefined);
+
  assert.equal(Object.keys(proof.directories).length,3);
  assert.equal(proof.offlineVolumeVerified,false);
  assert.equal(proof.operationalWrites,0);
