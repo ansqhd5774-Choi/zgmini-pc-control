@@ -50,7 +50,8 @@ function fixture({writer=true}={}){
     head:{sha:'b'.repeat(40),repo:{full_name:REPO}},
     base:{repo:{full_name:REPO}}};
   const testRun={id:42637013508,head_sha:'b'.repeat(40),status:'completed',
-    conclusion:'success',repository:{full_name:REPO}};
+    conclusion:'success',event:'pull_request',
+    name:'ZGMINI Agent Handoff PR Evidence CI',repository:{full_name:REPO}};
   const verified=verifyAgentResult(handoff,result,pullRequest,testRun);
   const digest=resultDigest(result);
   return {originIssue,originComments:[
