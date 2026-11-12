@@ -164,3 +164,74 @@ test('original Owner and exact known operation scope must not drift',()=>{
     /OWNER_(ORIGIN_ISSUE_INVALID|ORIGIN_SCOPE_DENIED|ORIGIN_JSON_INVALID)/);
  }
 });
+
+
+test('historical #1063/#1068 verified bot receipt bytes remain backward compatible',()=>{
+ const f=fixture();
+ const h=parseHandoff(JSON.stringify({
+  schema:'ZGMINI_AGENT_HANDOFF_V1',
+  incidentId:'handoff-19daa86467b1dacba669d1ff',
+  origin:{repository:REPO,issueNumber:1063,
+   requestId:'bd435d7c-2939-457f-907c-98d551f6b8cf',
+   chatId:'85876f3c-ff19-42c5-89aa-7de5adbe09cf',branch:'main',
+   sourceSha:'1b828e20c46fad1f26d6332d77e72a68fc0f4eb9',
+   checkpoint:'OTHER'},
+  failure:{kind:'COMMON_WRITER',code:'WRITER_B_CORE_REENABLE_SOURCE_PAIR_STOP',
+   lastPass:'NOT_RECORDED',firstFail:'NOT_RECORDED',
+   fileRefs:[
+    'approvals/writer-updates/employment-r6-backfill-window-collector-20261109.json',
+    'results/writer-b-source-install-bd435d7c-2939-457f-907c-98d551f6b8cf.json',
+    'results/writer-b-source-install-bd435d7c-2939-457f-907c-98d551f6b8cf.txt'],
+   evidenceIssueNumber:1063}
+ }));
+ const result={
+  schema:'ZGMINI_AGENT_HANDOFF_RESULT_V1',
+  resultId:'result-1063-writer-b-reconcile-20261109',
+  incidentId:h.incidentId,
+  fingerprint:'2a7aee646f209e983f6f732219839800eb5c1e0f9d5aec45d672288d634ecb7d',
+  pullRequest:{repository:REPO,number:1086,
+   headSha:'f723f776c60f30d0d6a68a333319b5d895333111'},
+  testRun:{repository:REPO,runId:42637013508,
+   headSha:'f723f776c60f30d0d6a68a333319b5d895333111'}
+ };
+ assert.equal(fingerprintHandoff(h),result.fingerprint);
+ assert.equal(resultDigest(result),'30f067e915dcd053547650108bcbeb5af7c93e8d45488ff445b386d9f9631bfd');
+ f.incidentIssue.body=JSON.stringify(h);
+ f.incidentComments=[
+  comment(OWNER,1068,JSON.stringify(result)),
+  comment(BOT,1068,[
+   'HANDOFF_RESULT_RECORDED',
+   'resultId: result-1063-writer-b-reconcile-20261109',
+   'digest: 30f067e915dcd053547650108bcbeb5af7c93e8d45488ff445b386d9f9631bfd',
+   'incidentId: handoff-19daa86467b1dacba669d1ff',
+   'fingerprint: 2a7aee646f209e983f6f732219839800eb5c1e0f9d5aec45d672288d634ecb7d',
+   'origin: ansqhd5774-Choi/zgmini-pc-control#1063',
+   'pr: ansqhd5774-Choi/zgmini-pc-control#1086',
+   'prHeadSha: f723f776c60f30d0d6a68a333319b5d895333111',
+   'testRunId: 42637013508',
+   'state: RUNTIME_VERIFICATION_PENDING',
+   'ChatGPT owner received: UNKNOWN',
+   'Windows/D1/API/UI verification: NOT_VERIFIED',
+   'PC retries: 0','operationalWrites: 0'].join('\n'))
+ ];
+ f.originComments=[comment(BOT,1063,[
+  'HANDOFF_ORIGIN_RESULT_RECORDED',
+  'resultId: result-1063-writer-b-reconcile-20261109',
+  'digest: 30f067e915dcd053547650108bcbeb5af7c93e8d45488ff445b386d9f9631bfd',
+  'incidentId: handoff-19daa86467b1dacba669d1ff',
+  'handoffIssue: 1068',
+  'fixPr: ansqhd5774-Choi/zgmini-pc-control#1086',
+  'prHeadSha: f723f776c60f30d0d6a68a333319b5d895333111',
+  'testRunId: 42637013508',
+  'state: RUNTIME_VERIFICATION_PENDING',
+  'ChatGPT owner received: UNKNOWN',
+  'Windows/D1/API/UI verification: NOT_VERIFIED',
+  'PC retries: 0','operationalWrites: 0'].join('\n'))];
+ f.pullRequest.head.sha=result.pullRequest.headSha;
+ f.testRun.head_sha=result.testRun.headSha;
+ const review=check(f);
+ assert.equal(review.state,'RETURN_EVIDENCE_REVIEWABLE');
+ assert.equal(review.brokerState,'RUNTIME_VERIFICATION_PENDING');
+ assert.equal(review.ownerChatReceived,'UNKNOWN');
+ assert.equal(review.executionAuthorized,false);
+});
