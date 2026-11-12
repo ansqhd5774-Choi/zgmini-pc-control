@@ -44,6 +44,18 @@
 | R10 | #1320 B·#1323 Writer·공개 결과 | **완료**, 추가 필수 작업 없음 | 자연 예약 갱신은 별도 후속 |
 | D05 | Writer B #1234·A #1235 성공, 1년치 0/68 | 기존 소스 12파일·Task 증거 재사용, #1236 A Reader 후보/회귀 검토 | `d05-lineage-readonly` Controller 등록과 실제 PC 조회 후 수집/저장 |
 
+### 0.6 실제 실행 기록 — #996 GitHub 원본 readback (2026-11-13 기준)
+
+**실행 1/2: GitHub 측 P0 완료 — `GITHUB_READBACK_ONLY`.** 작업은 읽기 전용이며 운영 PC·Workflow·Backlog·DB/D1·Runner 쓰기와 과거 requestId 재실행은 0건이다.
+
+1. 원본 [#996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996)는 `open`/`pc-maintenance`, 마지막 저장 댓글은 [2026-11-12 원본 조회 분리 판정](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6815967006). 현재 GitHub Issue 본문·댓글에는 **새로운 C 실행 사후 PC 현장 snapshot/복구 PASS가 없음**. 이 부재는 Windows 상태를 직접 판정한 것이 아니다.
+2. 기존 Backlog 원본 [#1217](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1217) / [#1219](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1219) / [#1226](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1226) / [#1227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1227) **4/4 GitHub Issue open, 현재 label `pc-job`, 원본 JSON schema `ZGMINI_PC_JOB_V1`**. GitHub bot PC 결과 영수증은 0/4; #1217과 #1227의 사용자 진단 댓글은 실행 결과 영수증이 아님. 4개 원본 Issue를 새 요청으로 복제·재발행하지 않았다. **GitHub 문제 형식 일치만으로 C 실행 당시 body bytes/error 원인을 확정하지 않음**.
+3. 독립 [A급 #1295 / Run #43164525583](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1295)는 bot 댓글·[JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/43164525583-1-seat-1.json)·[TXT](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/43164525583-1-seat-1.txt) **2/2 원격 재조회**. 동일 requestId·`STATE_UNKNOWN/CORE_NO_ACTIVE_TASK_ENGINE`, LAST_PASS `ALLOWLISTED_WORKER_STARTED`, FIRST_FAIL `ALLOWLISTED_OPERATION`, `runtimeSourceVerified=false`, `operationalWrites=0`, `protectedStateUnchanged=true`. **GitHub 접수/Runner 실행은 PASS 범위지만 live Core source는 미입증**.
+4. 과거 #996 [maintenance JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/maintenance-pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404.json) 재조회: `UNKNOWN/RUNNER_SET_DRIFT`, LAST_PASS `RECOVERY_REQUIRED`, FIRST_FAIL `INTAKE_PAUSED`, `protectedStateUnchanged=false`. 이는 **후속 C 시도 이후 live 복구 결론이 아닌 당시 결과**다.
+5. GitHub 커넥터에서 현재 `pc-job.yml` Workflow enable/disable의 **관리 상태 직접 조회는 미지원**이었다. 4개 backlog 현재 `open`과 새 A급 성공 이력으로 현재 workflow 전체 활성·C 시도 부작용 없음·PC 설치 잠금 해제를 추론하지 않는다.
+
+**실행 2/2 — 다음 하나의 필수 작업 (P1):** #996 원본 Windows에서 **이미 승인된 기존 읽기 전용 진단 경로**가 현재 C 시도 이후 claim/lease·Workflow·Backlog·원장·보호 fingerprint를 제공하는지 설치 기능/승인·last result를 먼저 대조한다. 접근 가능하면 **새 작업 재실행이 아니라**, 필요한 새 고유 A 요청 1회에 한해 원본 Issue·Run·JSON/TXT를 회수하고 현장과 GitHub 양쪽의 변경 시도/실제 결과를 매칭한다. 설치된 allowlist에 적합한 조회가 없거나 승인 경계가 불명확하면 **P1만 `AUTOMATION_BLOCKED/PC_READBACK_PENDING`**, C급 조작·새 도구 설치·동일 C requestId 재실행은 금지하고 P2/P4 독립 업무를 이어간다.
+
 ### 0.5 종료·보고 규칙
 
 - 중앙 인계 전체 **8/8 DONE**과 새 격리 경로 **4/5 DEFERRED**를 섞거나 둘 중 하나를 다른 기능 전체 진행률로 표현하지 않는다.
