@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import {authenticateVmRequest,handoffSeat,parseWmi,probeVmFirmware,
  WMI_QUERY,VM_DISCOVERY_QUERY,parseVmDiscovery,probeVmDiscovery,
- toVmText,TITLE,SCHEMA} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
+ toVmText,TITLE,SCHEMA,C996_FIXED_OWNER_VM,
+ pinnedVmPathState,probePinnedOwnerVmEvidence} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const owner='ansqhd5774-Choi';
@@ -162,4 +163,73 @@ test('VM/PATH probe handles partial registry and malformed data without invented
   status:0,stdout:'ERROR: invalid output',
  })}).status,'STATE_UNKNOWN');
  assert.equal(probeVmDiscovery({platform:'linux'}).status,'STATE_UNKNOWN');
+});
+
+test('fixed C996 user profile metadata returns status codes without exposing user files',()=>{
+ const dir={isDirectory:()=>true,isFile:()=>false,isSymbolicLink:()=>false};
+ const file={isDirectory:()=>false,isFile:()=>true,isSymbolicLink:()=>false};
+ const lstat=p=>{
+  if(p===C996_FIXED_OWNER_VM.vmConfig){
+   const e=new Error('missing');e.code='ENOENT';throw e;
+  }
+  return p===C996_FIXED_OWNER_VM.registry?file:dir;
+ };
+ const out=probePinnedOwnerVmEvidence({
+  platform:'win32',username:'SYSTEM',profile:String.raw`C:\Windows\System32\config\systemprofile`,lstat,
+ });
+ assert.equal(out.runnerUserIsOwner,false);
+ assert.equal(out.runnerProfileMatchesOwner,false);
+ assert.equal(out.registry,'FILE_PRESENT');
+ assert.equal(out.vmDirectory,'DIRECTORY_PRESENT');
+ assert.equal(out.vmConfig,'MISSING');
+ assert.equal(out.xmlContentsRead,false);
+ assert.equal(out.profileEnumerated,false);
+ assert.equal(out.operationalWrites,0);
+ assert.equal(JSON.stringify(out).includes('C:\\Users\\ansqh'),false);
+ const realUser=probePinnedOwnerVmEvidence({
+  platform:'win32',username:'ansqh',profile:C996_FIXED_OWNER_VM.profile,lstat,
+ });
+ assert.equal(realUser.runnerUserIsOwner,true);
+ assert.equal(realUser.runnerProfileMatchesOwner,true);
+ assert.equal(probePinnedOwnerVmEvidence({platform:'linux'}).status,'WINDOWS_ONLY');
+});
+test('fixed C996 metadata denies non-fixed paths, links and arbitrary filesystem reads',()=>{
+ let visited=0;
+ const dir={isDirectory:()=>true,isFile:()=>false,isSymbolicLink:()=>false};
+ const link={isDirectory:()=>false,isFile:()=>false,isSymbolicLink:()=>true};
+ assert.equal(pinnedVmPathState(String.raw`C:\Users\other\Desktop\secret.txt`,'file',{lstat:()=>{
+  visited++;return dir;
+ }}),'PATH_SCOPE_DENIED');
+ assert.equal(visited,0);
+ const observed=pinnedVmPathState(C996_FIXED_OWNER_VM.vmConfig,'file',{
+  lstat:p=>{
+   visited++;
+   return p===C996_FIXED_OWNER_VM.vmDirectory?link:dir;
+  },
+ });
+ assert.equal(observed,'REPARSE_STOP');
+ const access=pinnedVmPathState(C996_FIXED_OWNER_VM.vmConfig,'file',{
+  lstat:p=>{
+   if(p===C996_FIXED_OWNER_VM.vmConfig){
+    const e=new Error('denied');e.code='EACCES';throw e;
+   }
+   return dir;
+  },
+ });
+ assert.equal(access,'ACCESS_DENIED');
+});
+test('fixed VM metadata is supplemental, not automatic authorization or VM boot',()=>{
+ const r=probeVmFirmware({
+  platform:'win32',
+  spawn:()=>({status:0,stdout:wmi(['true','true','true','false'])}),
+  vmProbe:fakeVm,
+  discoveryProbe:()=>({status:'PASS',code:'TEST_ONLY'}),
+  ownerProbe:()=>({scope:'FIXED_C996_OWNER_VM_METADATA_ONLY',
+   status:'SCOPED_READONLY',vmConfig:'MISSING',operationalWrites:0}),
+ });
+ assert.equal(r.vmUserEvidence.vmConfig,'MISSING');
+ assert.equal(r.vmOperationallyTested,false);
+ assert.equal(r.bootAuthorized,false);
+ assert.equal(r.cExecutionAuthorized,false);
+ assert.equal(r.operationalWrites,0);
 });
