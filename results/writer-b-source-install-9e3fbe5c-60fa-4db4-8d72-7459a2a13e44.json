@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "9e3fbe5c-60fa-4db4-8d72-7459a2a13e44",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "84df5e80f4bcdadd2a274d6f55a90290426c2406",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "d560eb857c0f8a9a53dffbfd899e60ee29c697ab",
+  "candidateSourceSha": "9856ba04189eae332837b62551cb89577c56b376",
+  "manifestSha256": "2295f1b344a9c494016a25abaa206436b5863af2cbd9b25f1ea4c5bfc092cdb6",
+  "baseTreeOid": "a91560cfa40df64eb13ce25d26b696ced7503d33",
+  "preparedTreeOid": "eea2c73a3a386a2d58c7c7bb8e29531b941ae70a",
+  "provenanceSha256": "61ab7d5cf66052c691c58984a0868d7f65a1ef2202f772ee96f692d13ee0e9ea",
+  "runId": "43174588398",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/alpaca-incremental.mjs",
+    "scripts/pc-writer/build-asset-r10-release.mjs"
+  ]
+}
