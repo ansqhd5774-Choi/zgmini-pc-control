@@ -10,6 +10,8 @@ import {randomUUID,createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {build996OwnerArchiveFixtureScript} from '../tools/controller-996-c-native-owner-operator.mjs';
+import {review996UntrustedNativeIdReceipt} from '../tools/controller-996-winpe-native-receipt-review.mjs';
+import {plan996SingleBootRecovery} from '../tools/controller-996-windows-archive-adapter.mjs';
 
 const hostAllowed = process.platform==='win32' &&
   process.env.GITHUB_ACTIONS==='true' &&
@@ -317,6 +319,24 @@ test('actual compiled x64 FileIdInfo reader preserves original native ID across 
     assert.equal(replaced.serial,before.serial);
     assert.notEqual(replaced.id,before.id);
     assert.deepEqual(fs.readdirSync(root).sort(),['archive','source']);
+    const synthetic=spawnSync(exe,[source,'--emit-untrusted-synthetic-8'],{
+      encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:16000});
+    assert.equal(synthetic.error,undefined,synthetic.error?.message);
+    assert.equal(synthetic.status,0,String(synthetic.stdout)+' '+String(synthetic.stderr));
+    const marker='C996_NATIVE_SYNTHETIC_SOURCE_RECEIPT:';
+    const receiptLine=String(synthetic.stdout).trim().split(/\r?\n/)
+      .find(line=>line.startsWith(marker));
+    assert.ok(receiptLine,'C formatter must emit bounded synthetic JSON');
+    const receipt=Buffer.from(receiptLine.slice(marker.length),'utf8');
+    const untrusted=review996UntrustedNativeIdReceipt({rawReceipt:receipt});
+    assert.equal(untrusted.status,'SOURCE_ONLY_UNTRUSTED_RECEIPT_SHAPE_VALID');
+    assert.equal(untrusted.nativeDirectoryCount,8);
+    assert.equal(untrusted.executionAuthorized,false);
+    assert.equal(untrusted.offlineBootVerified,false);
+    const decoded=JSON.parse(receipt.toString('utf8'));
+    assert.equal(decoded.source,'WIN32_NATIVE_SOURCE_ONLY_UNTRUSTED');
+    assert.equal(decoded.ownerSignatureVerified,false);
+    assert.equal(decoded.winpeBootAuthenticated,false);
     // This is an isolated Windows TEMP C execution, never a WinPE boot.
   }finally{
     assert.ok(path.basename(root).startsWith('zgmini-996-native-reader-fixture-'));
@@ -324,4 +344,99 @@ test('actual compiled x64 FileIdInfo reader preserves original native ID across 
     fs.rmSync(root,{recursive:true,force:true});
     fs.rmSync(build,{recursive:true,force:true});
   }
+});
+
+
+const PINNED_ONLINE_ID=JSON.parse(fs.readFileSync(new URL(
+  '../results/pc-volume-identity-43124923743-1-operating.json',import.meta.url),'utf8'));
+const FAKE_CONTINUATION='70a4c347-25ea-4fc6-83d2-c0c670115249';
+const FAKE_ID='9'.repeat(32);
+const fakeSignedNativeSourceManifest=()=>({
+  schema:'ZGMINI_CONTROLLER_996_SIGNED_OFFLINE_HANDOFF_V1',
+  algorithm:'RSA_PSS_SHA256_SALT32',
+  scope:'ARCHIVE_OLD_C_THEN_CONTINUATION_THEN_INSTALL_NO_REPLACE',
+  originalRequestId:'pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404',
+  continuationId:FAKE_CONTINUATION,winpeBootCount:1,
+  existingPcName:'기존 ZGMINI PC',queuePcName:'공통 대기열 PC',
+  ownerKeySpkiSha256:'a'.repeat(64),
+  ownerNonce:'11111111-1111-4111-8111-111111111111',
+  bootEpoch:'22222222-2222-4222-8222-222222222222',
+  machineBindingSha256:'b'.repeat(64),
+  volumeGuid:PINNED_ONLINE_ID.volumeGuid,
+  volumeSerial:PINNED_ONLINE_ID.volumeSerial,
+  sourceSha256:'c'.repeat(64),bootImageSha256:'d'.repeat(64),
+  nativeMoverSha256:'e'.repeat(64),workflowSha256:'f'.repeat(64),
+  protectedStateSha256:'1'.repeat(64),runnerAdmissionSha256:'2'.repeat(64),
+  originalJobsSha256:'3'.repeat(64),
+  issuedAt:'2026-11-12T00:00:00Z',expiresAt:'2026-11-12T00:20:00Z',
+  moves:plan996SingleBootRecovery(FAKE_CONTINUATION).phases[1].moves.map((m,i)=>({
+    name:m.name,source:m.source,destination:m.destination,
+    sourceFileId:i===0?PINNED_ONLINE_ID.directories.OLD_C.fileId128:
+      i===2?PINNED_ONLINE_ID.directories.INSTALL.fileId128:FAKE_ID,
+    sourceVolumeSerial:PINNED_ONLINE_ID.volumeSerial,
+  })),
+});
+const nativeUntrustedFixture=()=>({
+  schema:'ZGMINI_CONTROLLER_996_NATIVE_IDS_UNTRUSTED_V1',
+  source:'WIN32_NATIVE_SOURCE_ONLY_UNTRUSTED',
+  untrustedVolumeGuid:PINNED_ONLINE_ID.volumeGuid,
+  volumeSerial:PINNED_ONLINE_ID.volumeSerial,
+  directories:Object.fromEntries([
+    ...Object.entries(PINNED_ONLINE_ID.directories).map(([k,v])=>
+      [k,{fileId128:v.fileId128,volumeSerial:PINNED_ONLINE_ID.volumeSerial,
+        isReparse:false}]),
+    ['CONTINUATION',{fileId128:FAKE_ID,volumeSerial:PINNED_ONLINE_ID.volumeSerial,
+      isReparse:false}],
+  ]),
+  idsCollected:8,readOnly:true,winpeBootAuthenticated:false,
+  ownerSignatureVerified:false,offlineClockTrusted:false,
+  volumeGuidAuthenticated:false,cExecutionAuthorized:false,
+  operationalWrites:0,
+});
+const reviewUntrustedFixture=(fixture=nativeUntrustedFixture(),
+  manifest=fakeSignedNativeSourceManifest())=>
+    review996UntrustedNativeIdReceipt({
+      rawReceipt:Buffer.from(JSON.stringify(fixture)),
+      onlineObservation:PINNED_ONLINE_ID,signedManifest:manifest,
+    });
+test('native source-only JSON must be untrusted despite correct eight-directory structure',()=>{
+  const result=reviewUntrustedFixture();
+  assert.equal(result.status,'SOURCE_ONLY_UNTRUSTED_EIGHT_IDS_MATCH_PINNED_INPUTS');
+  assert.equal(result.matchedFixedCount,7);
+  assert.equal(result.matchedSignedMoveCount,3);
+  for(const field of ['nativeReceiptAuthenticated','offlineBootVerified',
+    'ownerTrustAnchorVerified','ownerApprovalVerified','offlineClockTrusted',
+    'executionAuthorized']) assert.equal(result[field],false);
+  assert.equal(result.operationalWrites,0);
+});
+test('native JSON bridge refuses altered directory, fake boot approval, duplicate or bad raw bytes',()=>{
+  const changes=[
+    x=>{x.directories.ZGMINI.fileId128='0'.repeat(32);},
+    x=>{x.directories.CONTINUATION.fileId128='e'.repeat(32);},
+    x=>{x.directories.AUTOMATION.isReparse=true;},
+    x=>{x.directories.CONTINUATION.fileId128=x.directories.INSTALL.fileId128;},
+    x=>{delete x.directories.LEASES;},
+    x=>{x.directories.UNEXPECTED={...x.directories.ZGMINI};},
+    x=>{x.volumeSerial='0'.repeat(16);},
+    x=>{x.untrustedVolumeGuid='C:\\';},
+    x=>{x.winpeBootAuthenticated=true;},
+    x=>{x.ownerSignatureVerified=true;},
+    x=>{x.cExecutionAuthorized=true;},
+    x=>{x.operationalWrites=1;},
+    x=>{x.extraField='anything';},
+  ];
+  for(const modify of changes){
+    const a=nativeUntrustedFixture();modify(a);
+    const result=reviewUntrustedFixture(a);
+    assert.equal(result.status,'SOURCE_ONLY_BLOCKED');
+    assert.equal(result.executionAuthorized,false);
+  }
+  const raw=Buffer.from(JSON.stringify(nativeUntrustedFixture()));
+  const forged=Buffer.from(raw.toString('utf8').replace(
+    '"readOnly":true','"readOnly":true,"readOnly":true'));
+  assert.equal(review996UntrustedNativeIdReceipt({rawReceipt:forged}).status,
+    'SOURCE_ONLY_BLOCKED');
+  assert.equal(review996UntrustedNativeIdReceipt({rawReceipt:Buffer.from([255])}).status,
+    'SOURCE_ONLY_BLOCKED');
+  assert.equal(review996UntrustedNativeIdReceipt({}).executionAuthorized,false);
 });
