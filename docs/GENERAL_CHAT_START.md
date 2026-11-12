@@ -8,6 +8,11 @@
 4. **검증된 회수:** 각 업무의 원본 Issue/Run/attempt·실제 Runner/host·작업 status/code·JSON/TXT 원격 readback을 확인한다. queued/CI 성공/원본 댓글을 실제 기능 성공·다른 일반챗 자동 수신으로 오인하지 않는다. 불명확 결과는 기존 증거부터 재조회하며 같은 requestId를 자동 재실행하지 않는다.
 5. **실행과 보호:** 현재 승인 범위의 기능 작업은 즉시 계속하되, C급 #996 NO-GO, Core/Writer/DB/Task/산식·원자료/승인 게시 구조를 근거 없이 변경하지 않는다. 예약 자동 갱신 검증은 개별 기능 완료 후 후속이다. 완료 보고에는 전체 목표 진행률·새 결과 증거·남은 실제 문제·다음 실행만 포함한다.
 
+<!-- zgmini-six-workstream-no-global-block-20261112 -->
+**#996 장애로 인한 전체 업무 중단 금지 — 2026-11-12 원본 재대조:** 6개 기능(물가·시장 캘린더·테마 공포탐욕·고용·R10 Alpaca 제외·D05)이 #996 복구를 일괄 선행 조건으로 두고 3일간 정체됐다. **이 판정은 잘못된 범위 확장이다.** #996의 C급 `NO-GO` 및 과거 `blockScope=SHARED_INSTALL_ONLY`는 원본 Controller C 복구·정확히 동일한 공유 설치/잠금 쓰기 범위에만 적용한다. 기능 전체의 개발·기존 데이터 검증·공식 자료 확보·소스 테스트·독립 결과 조회를 정지시키지 않는다. 현재 설치 Controller의 작업별 allowlist와 실제 Workflow/원본 결과를 따로 대조한다. 예를 들어 기존 `core-status`·`core-runtime-source-readonly`는 등록된 작업이며, 새 `source-inventory-runtime-readonly`·`d05-lineage-readonly`는 이전 Controller `badad912…`에 미등록이므로 **그 조회만** 새 설치 전 미지원이다. 기존 정상 실행 증거는 [#1272](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1272)의 2026-11-12 운영 PC `runner-smoke` PASS/JSON·TXT 2/2, [#1234](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1234)의 Writer B 설치 VERIFIED, [#1235](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1235)의 A급 조회 PASS다. 이들 성공은 #996 C 잠금 해제 증거가 아니다.
+
+**기능별 바로 실행할 범위/실제 대기 지점:** [#68에 확인·기록한 6개 기능 분리표](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6815766251)를 참고한다. 해당 업무의 원담당은 자기 브랜치·마지막 완료 증거를 재사용하고 **독립적으로 승인된 다음 기능 실행 1개를 실제 수행**한다. 특정 PC 작업이 막혔다면 정확한 operation/설치 여부/lease/Run/firstFail만 해당 단계에 `AUTOMATION_BLOCKED` 또는 `BLOCKED`로 기록한다. #996 `NO-GO`, 다른 채팅 수신 미확인, 공통 자연 장애 실증 4/5만으로 전체 기능 진행률을 묶거나 매번 동일한 계획서만 갱신하지 않는다. #996 C급 원본 실행·복구는 기존 단일 C 담당과 명시 승인·복구 증거가 있어야 하며 **이 문구가 설치·잠금 해제·중복 요청을 허가하지 않는다.** GitHub 문서·댓글 수정은 다른 일반챗을 자동 재개시키지 않는다.
+
 **유의:** 위 문서가 GitHub에 있다고 ChatGPT 프로젝트 지침이 자동 수정되는 것은 아니다. 프로젝트 설정에 반영이 필요한 경우 기존 지침을 보존하고 이 시작 절차를 별도로 갱신해야 한다.
 
 ---
