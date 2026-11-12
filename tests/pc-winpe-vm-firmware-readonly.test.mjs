@@ -5,7 +5,8 @@ import os from 'node:os';
 import {authenticateVmRequest,handoffSeat,parseWmi,probeVmFirmware,
  WMI_QUERY,VM_DISCOVERY_QUERY,parseVmDiscovery,probeVmDiscovery,
  toVmText,TITLE,SCHEMA,C996_FIXED_OWNER_VM,
- pinnedVmPathState,probePinnedOwnerVmEvidence} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
+ pinnedVmPathState,probePinnedOwnerVmEvidence,
+ RUNNER_OWNER_QUERY,parseRunnerOwnerCounts,probeRunnerOwnerCounts} from '../tools/pc-winpe-vm-firmware-readonly.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control';
 const owner='ansqhd5774-Choi';
@@ -232,4 +233,64 @@ test('fixed VM metadata is supplemental, not automatic authorization or VM boot'
  assert.equal(r.bootAuthorized,false);
  assert.equal(r.cExecutionAuthorized,false);
  assert.equal(r.operationalWrites,0);
+});
+
+test('fixed interactive Runner count only exposes owner equality, not identity',()=>{
+ const stdout=['RUNNERS_TOTAL=5','SESSION_0=1','SESSION_INTERACTIVE=4',
+  'OWNER_MATCH=3','OWNER_OTHER=0','OWNER_UNKNOWN=1'].join('\r\n')+'\r\n';
+ const p=parseRunnerOwnerCounts(stdout);
+ assert.equal(p.status,'PASS');
+ assert.equal(p.totalRunnerListeners,5);
+ assert.equal(p.interactiveSessionCount,4);
+ assert.equal(p.interactiveOwnerMatchCount,3);
+ assert.equal(p.interactiveOwnerUnknownCount,1);
+ assert.equal(p.repoRegistrationsVerified,false);
+ assert.equal(p.ownerNamesExposed,false);
+ assert.equal(p.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(p),/ansqh|processpath|token|credential|githuburl/i);
+});
+test('Runner owner parser rejects malformed, unknown and impossible counts',()=>{
+ for(const value of [
+  'RUNNERS_TOTAL=5',
+  'RUNNERS_TOTAL=13\r\nSESSION_0=0\r\nSESSION_INTERACTIVE=13\r\nOWNER_MATCH=13\r\nOWNER_OTHER=0\r\nOWNER_UNKNOWN=0',
+  'RUNNERS_TOTAL=5\r\nSESSION_0=1\r\nSESSION_INTERACTIVE=4\r\nOWNER_MATCH=5\r\nOWNER_OTHER=0\r\nOWNER_UNKNOWN=0',
+  'RUNNERS_TOTAL=5\r\nSESSION_0=1\r\nSESSION_INTERACTIVE=3\r\nOWNER_MATCH=3\r\nOWNER_OTHER=0\r\nOWNER_UNKNOWN=0',
+  'RUNNERS_TOTAL=5\r\nSESSION_0=1\r\nSESSION_INTERACTIVE=4\r\nOWNER_MATCH=3\r\nOWNER_OTHER=0\r\nOWNER_UNKNOWN=1\r\nUSER=ansqh',
+  'RUNNERS_TOTAL=5\r\nSESSION_0=1\r\nSESSION_INTERACTIVE=4\r\nOWNER_MATCH=3\r\nOWNER_OTHER=-1\r\nOWNER_UNKNOWN=2',
+ ])assert.equal(parseRunnerOwnerCounts(value),null,value);
+});
+test('fixed WMI Runner owner probe is bounded read-only and fail closed',()=>{
+ for(const allowed of ['Win32_Process','Runner.Listener.exe','Invoke-CimMethod',
+   'GetOwner','SessionId','USER_MATCH','ansqh'].filter(x=>x!=='USER_MATCH'))
+  assert.ok(RUNNER_OWNER_QUERY.includes(allowed),allowed);
+ for(const forbidden of ['New-Item','Set-Acl','Set-Item','Start-Process',
+   'Stop-Process','Register-ScheduledTask','Start-VM','VBoxManage',
+   'CommandLine','ExecutablePath','Password','Get-Credential','RunAs'])
+  assert.equal(RUNNER_OWNER_QUERY.includes(forbidden),false,forbidden);
+ const good=probeRunnerOwnerCounts({platform:'win32',spawn:(exe,args,opts)=>{
+  assert.deepEqual(args.slice(0,2),['-NoProfile','-NonInteractive']);
+  assert.equal(opts.shell,false);
+  assert.ok(opts.timeout<=25000);
+  return {status:0,stdout:[
+   'RUNNERS_TOTAL=5','SESSION_0=1','SESSION_INTERACTIVE=4',
+   'OWNER_MATCH=4','OWNER_OTHER=0','OWNER_UNKNOWN=0'].join('\n')};
+ }});
+ assert.equal(good.interactiveOwnerMatchCount,4);
+ assert.equal(probeRunnerOwnerCounts({platform:'linux'}).status,'STATE_UNKNOWN');
+ assert.equal(probeRunnerOwnerCounts({platform:'win32',spawn:()=>({
+  status:1,stdout:'Access denied'})}).status,'STATE_UNKNOWN');
+});
+test('WMI Runner identity is advisory; does not grant any VM authority',()=>{
+ const probe=probeVmFirmware({platform:'win32',
+  spawn:()=>({status:0,stdout:wmi(['true','true','true','false'])}),
+  vmProbe:fakeVm,discoveryProbe:()=>({status:'PASS',code:'FIXED'}),
+  ownerProbe:()=>({status:'SCOPED_READONLY'}),
+  runnerOwnerProbe:()=>({status:'PASS',interactiveOwnerMatchCount:4,
+   repoRegistrationsVerified:false,operationalWrites:0}),
+ });
+ assert.equal(probe.interactiveRunnerEvidence.interactiveOwnerMatchCount,4);
+ assert.equal(probe.interactiveRunnerEvidence.repoRegistrationsVerified,false);
+ assert.equal(probe.bootAuthorized,false);
+ assert.equal(probe.cExecutionAuthorized,false);
+ assert.equal(probe.operationalWrites,0);
 });
