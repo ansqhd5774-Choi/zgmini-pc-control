@@ -76,3 +76,11 @@
 - **설치 전 STOP:** 파일명/해시 다름, 디지털 서명 유효하지 않음·발행자 Oracle America, Inc. 아님, 실제 파일 경로 불확실, 출처 불분명. 실행/관리자 UAC 승인/시스템 설정 변경을 하지 않는다.
 - **일치 시에만 호스트 Owner 직접 진행:** 기존 파일 탐색기에서 파일 속성·디지털 서명 확인, 다운로드 폴더의 기존 Windows `certutil -hashfile "VirtualBox-7.2.22-175245-Win.exe" SHA256`로 해시 확인, 공식 대화형 installer 실행. 원래 설치 위치 `C:\\Program Files\\Oracle\\VirtualBox`만 사용. 필수가 아닌 USB/Networking/Python/Extension Pack 불설치, 갱신 자동화/유료 소프트웨어 추가 불허. 필수 Oracle base/core 드라이버의 관리자 승인 외에 예상치 못한 재부팅·설정 변경 요구가 있으면 STOP.
 - **상태:** `USER_REPORTED_INSTALLER_DOWNLOADED / SHA_SIGNATURE_PENDING / INSTALL_NOT_OBSERVED / WINPE_BOOT_NOT_OBSERVED`. ISO 생성 완료 증거 재사용, VM 생성·ISO 변경·원본 운영 lease 복구는 여전히 0건. #996 C `NO-GO` 유지.
+
+## 2026-11-13 — 사용자 최초 certutil 경로 실패 (호스트 스크린샷)
+
+- **실행 PC:** 공통 대기열 PC `DESKTOP-N62L0NG` (사용자 현재 채팅 PC). **근거 종류:** 사용자가 직접 제공한 CMD 스크린샷, GitHub Runner 원격 실행 결과 아님.
+- **첫 실패:** 현재 디렉터리 `C:\Users\ansqh`에서 파일명만 인자로 `certutil -hashfile "VirtualBox-7.2.22-175245-Win.exe" SHA256` 실행 → `0x80070002 (WIN32:2 ERROR_FILE_NOT_FOUND)`. 설치 파일이 현재 디렉터리에 존재하지 않는다는 뜻이며 다운로드/설치 실패 또는 해시 불일치가 아님.
+- **최소 수정:** 재다운로드·이동·ACL 변경 없이 `dir /b "%USERPROFILE%\Downloads\VirtualBox*.exe"`로 다운로드 위치의 실제 파일명을 확인한 다음, 발견된 **정확한 경로/파일명**으로 `certutil -hashfile "<full-path>" SHA256`을 실행한다. Downloads에 없으면 정상 파일 탐색기로 EXE의 실제 전체 경로 확인. 파일이 발견되지 않으면 STOP.
+- **통과 조건:** 파일 SHA256 예상 값과 전체 64자리 일치, Windows 속성의 유효한 Oracle America, Inc. 디지털 서명 확인. 이 두 검증이 끝나기 전에는 관리자 설치 실행 금지. 이는 로컬 사용자가 제공한 출력에 의해 확인할 사항이며 ChatGPT는 PC 파일을 직접 검사했다고 주장하지 않는다.
+- **현 상태:** `INSTALLER_PATH_NOT_RESOLVED / HASH_NOT_MEASURED / SIGNATURE_NOT_MEASURED / INSTALL_NOT_STARTED / VM_BOOT_NOT_STARTED`. 기존 운영 PC `PC` 작업 없음, RDC 사용 없음. TEST_ONLY 승인 유지 및 #996 C 운영 복구 `NO-GO` 불변.
