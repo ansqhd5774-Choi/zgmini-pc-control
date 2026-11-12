@@ -6,6 +6,7 @@ import path from 'node:path';
 import {parseHandoff, fingerprintHandoff} from '../agent-handoff/contract.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from '../agent-handoff/result-contract.mjs';
 import {main as runResultBroker, assertWorkflowResultRepository} from '../agent-handoff/result-broker.mjs';
+import {centralResultReceipt, originResultReceipt} from '../agent-handoff/result-receipts.mjs';
 
 function setup() {
   const handoff = parseHandoff(JSON.stringify({schema: 'ZGMINI_AGENT_HANDOFF_V1', incidentId: 'handoff-123456789abc',
@@ -113,7 +114,7 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
   invalidOriginalAuthor = false, wrongOriginalRequest = false,
   originPostFailsOnce = false, writerOrigin = false, wrongWriterSource = false,
   centralAckLost = false, originAckLost = false, partialCentral = false,
-  partialOrigin = false} = {}) {
+  partialOrigin = false, priorCentralResult = false, priorOriginResult = false} = {}) {
   let {handoff, result, pr, run} = setup();
   if (botOrigin) {
     const candidate = structuredClone(handoff);
@@ -146,6 +147,13 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
     body: `HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${'0'.repeat(64)}`}] :
     partialCentral ? [{user:{login:'github-actions[bot]'},issue_url:commentIssueUrl,
       body:`HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${resultDigest(result)}`}] : [];
+  if (priorCentralResult) {
+    const prior = {...result, resultId:'result-earlier-repair-0001'};
+    const body = centralResultReceipt(handoff,prior,resultDigest(prior),
+      'ansqhd5774-Choi/zgmini-pc-control',{state:'RUNTIME_VERIFICATION_PENDING'});
+    comments.push({user:{login:'github-actions[bot]'},
+      issue_url:commentIssueUrl,body});
+  }
   const originComments = writerOrigin ? [{user: {login: 'github-actions[bot]'},
     issue_url: 'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/1009',
     body: [`<!-- zgmini-writer-b-install:${handoff.origin.requestId} -->`,
@@ -153,6 +161,13 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       'DELIVERY: RESULT_PAIR_READBACK_VERIFIED',
       'RESULT_CREATED: 2/2; RESULT_READBACK: 2/2',
       'RUN_ID: 42570000003; RETRY: NO_REEXECUTE'].join('\n')}] : [];
+  if (priorOriginResult) {
+    const prior = {...result, resultId:'result-earlier-repair-0001'};
+    const body = originResultReceipt(prior,resultDigest(prior),
+      'ansqhd5774-Choi/zgmini-pc-control',{state:'RUNTIME_VERIFICATION_PENDING'},2001);
+    originComments.push({user:{login:'github-actions[bot]'},
+      issue_url:originIssueUrl,body});
+  }
   if (partialOrigin) originComments.push({user:{login:'github-actions[bot]'},
     issue_url:originIssueUrl,
     body:`HANDOFF_ORIGIN_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${resultDigest(result)}\nincidentId: ${result.incidentId}\nhandoffIssue: 2001`});
@@ -212,7 +227,15 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
     else if (botBadTitle || botForeignOrigin || botMissingEvidence)
       await assert.rejects(runResultBroker(env), /RESULT_BOT_INCIDENT_BINDING_STOP/);
     else if (collision) await assert.rejects(runResultBroker(env), /RESULT_ID_COLLISION_STOP/);
-    else if (lostComment) await assert.rejects(runResultBroker(env), /RESULT_COMMENT_READBACK_STOP/);
+    else if (priorCentralResult) {
+      await assert.rejects(runResultBroker(env), /RESULT_INCIDENT_ALREADY_RECORDED_STOP/);
+      assert.deepEqual(seen, []);
+      assert.equal(comments.length,1);
+    } else if (priorOriginResult) {
+      await assert.rejects(runResultBroker(env), /RESULT_ORIGIN_ALREADY_RETURNED_STOP/);
+      assert.deepEqual(seen, ['comment']);
+      assert.equal(originComments.length,1);
+    } else if (lostComment) await assert.rejects(runResultBroker(env), /RESULT_COMMENT_READBACK_STOP/);
     else if (invalidOriginalAuthor || wrongOriginalRequest) {
       await assert.rejects(runResultBroker(env),
         /RESULT_ORIGIN_ISSUE_NOT_AUTHORIZED|RESULT_ORIGIN_REQUEST_BINDING_STOP/);
@@ -248,6 +271,10 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
 test('result broker records one verified comment and remains idempotent', async () => simulate());
 test('result broker fails closed if GitHub result comment disappears', async () => simulate({lostComment: true}));
 test('result broker blocks same ID with different payload', async () => simulate({collision: true}));
+test('second repair resultId on the same incident cannot overwrite the first return',async()=>
+  simulate({priorCentralResult:true}));
+test('second repair resultId cannot write a competing return to the original Issue',async()=>
+  simulate({botOrigin:true,priorOriginResult:true}));
 test('result broker rejects untrusted issue comment actor', async () => simulate({unauthorized: true}));
 test('result broker accepts a bound bot-created intake with an authenticated owner result',
   async () => simulate({botOrigin: true}));
