@@ -12,7 +12,7 @@ const REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const TITLE='pc-volume-identity-readonly';
 export const SCHEMA='ZGMINI_PC_VOLUME_IDENTITY_REQUEST_V1';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-const GUID=/^\\\\\?\\Volume\{[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\}\\$/;
+const GUID=/^\\\\\?\\Volume\{[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\}\\$/i;
 const ID=/^[a-f0-9]{16}:[a-f0-9]{32}$/;
 const PS='C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 const NODE='E:\\ZGmini\\runtime\\node.exe';
@@ -102,7 +102,7 @@ export function decodeFixedVolumeResponse(stdout,mode){
    schema:'ZGMINI_PC_VOLUME_IDENTITY_PROBE_V1',
    status:partial?'STATE_UNKNOWN':'PASS',
    code:partial?'VOLUME_ORIGINAL_C_DIR_MISSING':'VOLUME_IDS_READONLY_OBSERVED',
-   volumeGuid:rows.VOLUME_GUID,volumeSerial:serial,
+   volumeGuid:rows.VOLUME_GUID.replace(/\\volume\{/i,'\\Volume{'),volumeSerial:serial,
    directories:Object.fromEntries(keys.slice(1).map(k=>[k,
      rows[k]==='ABSENT'?{state:'ABSENT'}:
       {state:'PRESENT',fileId128:rows[k].slice(17)}])),
