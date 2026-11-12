@@ -40,6 +40,7 @@ typedef struct c996_source_only_volume_observation {
   const char *fixedKey[C996_FIXED_ID_COUNT];
   c996_source_only_native_id directories[C996_FIXED_ID_COUNT];
   char volumeSerial[17];
+  WCHAR untrustedVolumeGuid[C996_FIXED_GUID_CHARS + 1];
   int idsCollected; /* 8 only on success, otherwise 0 */
   int isSourceOnlyObservation;
   int winpeBootAuthenticated;
@@ -81,8 +82,10 @@ static int c996_valid_uuid(const WCHAR *uuid) {
       if (uuid[i] != L'-') return 0;
     } else if (!c996_hex_digit(uuid[i])) return 0;
   }
-  /* Reject null or all-zero IDs and non-v4/v7 continuation IDs. */
-  if (uuid[14] != L'4' && uuid[14] != L'7') return 0;
+  /* Only new v4/v7 continuation IDs with RFC 4122 variant are allowed. */
+  if ((uuid[14] != L'4' && uuid[14] != L'7') ||
+      (uuid[19] != L'8' && uuid[19] != L'9' &&
+       uuid[19] != L'a' && uuid[19] != L'b')) return 0;
   return 1;
 }
 /* Exactly \\?\Volume{8-4-4-4-12}\; no drive letters or suffixes. */
@@ -112,6 +115,7 @@ static int c996_expected_serial(const char *hex, ULONGLONG *serial) {
     else return 0;
     x=(x<<4)|value;
   }
+  if(x==0) return 0;
   *serial=x;
   return 1;
 }
@@ -218,6 +222,9 @@ c996_source_only_read_status c996_source_only_collect_eight_ids(
         return C996_NATIVE_ID_READ_BLOCKED;
   }
   c996_serial_hex(expectedSerial,observation.volumeSerial);
+  hr=StringCchCopyW(observation.untrustedVolumeGuid,
+                    C996_FIXED_GUID_CHARS + 1,untrustedVolumeGuid);
+  if(FAILED(hr)) return C996_NATIVE_ID_READ_BLOCKED;
   observation.idsCollected=C996_FIXED_ID_COUNT;
   /* All trust fields remain zero, even after eight successful reads. */
   *out=observation;
