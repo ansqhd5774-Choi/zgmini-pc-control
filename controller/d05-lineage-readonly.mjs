@@ -136,3 +136,17 @@ export function inspectD05LineageReadonly(dataRoot,{fileSystem=fs,approvedSource
   return fixedError('D05_LEDGER_IO_UNPROVEN');
  }finally{if(handle!==undefined)try{fileSystem.closeSync(handle);}catch{}}
 }
+
+/** Keep the pc-job envelope aligned with the sanitized ledger verdict.
+ * A successful A-grade transport is not proof that a private D05 ledger exists.
+ * Preserve the fixed internal failure code without exposing private content.
+ */
+export function summarizeD05LineageOperation(lineage){
+ const verified=lineage?.status==='PASS'&&
+  lineage.code==='D05_LEDGER_SANITIZED_READONLY_VERIFIED';
+ return {status:verified?'PASS':'BLOCKED',
+  code:verified?'D05_READONLY_DIAGNOSIS':
+   typeof lineage?.code==='string'&&/^D05_[A-Z0-9_]{1,80}$/.test(lineage.code)
+    ?lineage.code:'D05_LINEAGE_UNPROVEN',
+  lineage,providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0};
+}

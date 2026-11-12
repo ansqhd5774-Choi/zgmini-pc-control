@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectD05LineageReadonly} from '../controller/d05-lineage-readonly.mjs';
+import {inspectD05LineageReadonly,summarizeD05LineageOperation} from '../controller/d05-lineage-readonly.mjs';
 
 const SHA_A='a'.repeat(40),SHA_B='b'.repeat(40);
 
@@ -105,4 +105,35 @@ test('D05 reader rejects arbitrary root, approved source and budget',()=>{
 test('D05 missing data root is distinct from missing lineage file',t=>{
  const {root}=fixture(t);
  assert.equal(inspectD05LineageReadonly(path.join(root,'missing')).code,'D05_DATA_ROOT_ABSENT');
+});
+
+test('D05 A result envelope must not promote missing and malformed ledgers to PASS',t=>{
+ const {root,dir,file}=fixture(t);fs.mkdirSync(dir,{recursive:true});
+ const absent=summarizeD05LineageOperation(inspectD05LineageReadonly(root));
+ assert.equal(absent.status,'BLOCKED');
+ assert.equal(absent.code,'D05_LEDGER_ABSENT');
+ assert.equal(absent.lineage.status,'UNPROVEN');
+ assert.equal(absent.operationalWrites,0);
+ fs.writeFileSync(file,'{malformed}\n');
+ const invalid=summarizeD05LineageOperation(inspectD05LineageReadonly(root));
+ assert.equal(invalid.status,'BLOCKED');
+ assert.equal(invalid.code,'D05_LEDGER_ROW_UNPROVEN');
+ assert.equal(invalid.lineage.status,'UNPROVEN');
+ assert.equal(invalid.providerCalls,0);
+ assert.equal(invalid.d1Writes,0);
+});
+
+test('D05 A result envelope succeeds only for sanitized verified evidence',t=>{
+ const {root,dir,file}=fixture(t);fs.mkdirSync(dir,{recursive:true});
+ fs.writeFileSync(file,JSON.stringify(row('2026-11-10'))+'\n');
+ const report=summarizeD05LineageOperation(inspectD05LineageReadonly(root,{approvedSourceSha:SHA_A}));
+ assert.equal(report.status,'PASS');
+ assert.equal(report.code,'D05_READONLY_DIAGNOSIS');
+ assert.equal(report.lineage.code,'D05_LEDGER_SANITIZED_READONLY_VERIFIED');
+ assert.equal(report.lineage.eventCount,1);
+ assert.equal(report.sqliteOpened,false);
+ assert.equal(report.operationalWrites,0);
+ const strange=summarizeD05LineageOperation({status:'PASS',code:'UNRECOGNIZED'});
+ assert.equal(strange.status,'BLOCKED');
+ assert.equal(strange.code,'D05_LINEAGE_UNPROVEN');
 });
