@@ -37,6 +37,14 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
   const duplicate = outcome.state === 'DUPLICATE_REUSED';
   const marker = duplicate ? 'HANDOFF_DUPLICATE_REUSED' : 'HANDOFF_ROUTED';
   const stateLabel = duplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
+  // A duplicate and a pending repair are mutually exclusive dispositions.
+  // Do not silently add a new label to an inconsistent existing Issue.
+  const oppositeLabel = duplicate ? 'handoff-agent-pending' : 'handoff-duplicate';
+  const assertExclusiveLabel = issue => {
+    if (issue?.labels?.some(label => label.name === oppositeLabel))
+      stop('ROUTE_LABEL_CONFLICT_STOP');
+  };
+  assertExclusiveLabel(verified);
   const lines = duplicate
     ? ['HANDOFF_DUPLICATE_REUSED', `fingerprint: ${outcome.fingerprint}`,
       'newAgentDispatches: 0', 'PC retries: 0']
@@ -76,6 +84,7 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
       current.title !== `agent-handoff ${prepared.incidentId}` ||
       !current.labels?.some(label => label.name === 'agent-handoff'))
     stop('ISSUE_DRIFT_STOP');
+  assertExclusiveLabel(current);
   if (!current.labels?.some(label => label.name === stateLabel)) {
     await addIssueLabel(issueNumber, stateLabel);
     const after = await readIssue(issueNumber);
@@ -85,6 +94,7 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
         !after.labels?.some(label => label.name === 'agent-handoff') ||
         !after.labels?.some(label => label.name === stateLabel))
       stop('LABEL_READBACK_STOP');
+    assertExclusiveLabel(after);
   }
   return Object.freeze({state: existed ? 'ROUTE_REUSED' : 'ROUTE_RECORDED',
     issueNumber, marker, fingerprint:outcome.fingerprint, pcOperationalWrites:0,
