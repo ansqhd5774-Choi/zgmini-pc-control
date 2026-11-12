@@ -67,3 +67,12 @@
 3. 기존 격리 Runner는 `pc-winpe-vm-firmware-readonly`와 기타 승인된 메타데이터/CI 경로만 제공한다. `config/operations.json`에 `virtualbox-install`·`winpe-vm-boot`는 없고 연결된 RDC에는 대상 장치가 등록된 상태가 아니다. **RDC 호출 낭비·임의 Workflow shell·Runner 서비스 계정 설치·권한 우회는 하지 않는다.** 설치/드라이버의 **로컬 UAC 관리자 조작은 호스트 소유자가 직접 수행**하고 예상하지 못한 시스템 변경·재부팅이 요구되면 STOP 및 원래 사용자 승인 효과를 재평가한다.
 4. 설치 전 기존 VM 프로그램이 정상적으로 있으면 중복 설치 금지. 설치 후 새 VM은 정확히 1개/2048MiB/vCPU 1/NIC·USB·공유·clipboard·DnD·host/raw 디스크 전부 없음/HDD 없음. 원본 사용자 프로필 아래의 **기존** ISO `C996_WINPE_CNG_TEST_ONLY.iso`는 고정 SHA256 `63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588`, 크기 `399980544`만 허용. 원본 사용자 TEMP의 고정 파일은 원래 소유자 컨텍스트만 사용한다. Runner `EPERM`을 우회하지 않는다.
 5. **실행 확인 상태:** 이번에는 VirtualBox 설치·WinPE boot·CNG test를 수행하지 않았으므로 `VM_INSTALL_NOT_OBSERVED / GUEST_BOOT_NOT_OBSERVED / CNG_6_NOT_OBSERVED`. 실제 설치 파일 서명·해시 확인과 승인된 로컬 관리자 실행이 가능한 증거가 확보된 이후에만 단회 부팅을 진행한다. **C급 운영 복구 80%·NO-GO**와 두 native STOP은 불변. 실패 결과를 다른 Runner·PC로 바꿔 우회하지 않는다.
+
+## 2026-11-13 — 사용자 설치 파일 다운로드 후 진행상태
+
+- **대상:** 공통 대기열 PC `DESKTOP-N62L0NG` (사용자 현재 채팅 PC). 운영 PC `PC` 작업 없음.
+- **사용자 직접 보고:** Oracle VirtualBox 설치 파일 **다운로드 완료**, 아직 설치 실행 대기 중. 파일의 실제 저장 위치·바이트·다운로드 SHA256·Authenticode/서명은 **미관측**. 사용자 보고를 GitHub Runner 실측으로 오인하지 않는다.
+- **검증 기준:** Windows Base `VirtualBox-7.2.22-175245-Win.exe`, 공개 패키지 3자 출처 SHA256 `afd0ff1656cbe04ed88ce619594ae021419d97cce89fa9bdc443e9a963f1713f` [Chocolatey 확인](https://community.chocolatey.org/packages/virtualbox/7.2.22). [Oracle 공식 패키지](https://www.oracle.com/virtualization/technologies/vm/downloads/virtualbox-downloads.html) 및 [Oracle Windows 설치 문서](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/installation.html) 확인. **원본 Oracle SHA256SUMS 직접 바이트 재조회는 미성공**, 제3자 해시+로컬 실제 해시 및 디지털 서명 유효성을 함께 확인한다.
+- **설치 전 STOP:** 파일명/해시 다름, 디지털 서명 유효하지 않음·발행자 Oracle America, Inc. 아님, 실제 파일 경로 불확실, 출처 불분명. 실행/관리자 UAC 승인/시스템 설정 변경을 하지 않는다.
+- **일치 시에만 호스트 Owner 직접 진행:** 기존 파일 탐색기에서 파일 속성·디지털 서명 확인, 다운로드 폴더의 기존 Windows `certutil -hashfile "VirtualBox-7.2.22-175245-Win.exe" SHA256`로 해시 확인, 공식 대화형 installer 실행. 원래 설치 위치 `C:\\Program Files\\Oracle\\VirtualBox`만 사용. 필수가 아닌 USB/Networking/Python/Extension Pack 불설치, 갱신 자동화/유료 소프트웨어 추가 불허. 필수 Oracle base/core 드라이버의 관리자 승인 외에 예상치 못한 재부팅·설정 변경 요구가 있으면 STOP.
+- **상태:** `USER_REPORTED_INSTALLER_DOWNLOADED / SHA_SIGNATURE_PENDING / INSTALL_NOT_OBSERVED / WINPE_BOOT_NOT_OBSERVED`. ISO 생성 완료 증거 재사용, VM 생성·ISO 변경·원본 운영 lease 복구는 여전히 0건. #996 C `NO-GO` 유지.
