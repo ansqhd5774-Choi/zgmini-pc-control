@@ -32,3 +32,9 @@ jobs:
             echo C996_QUEUE_HOST_MATCH=FALSE
             exit /b 5
           )
+
+      - name: C996 real original PC receipt to signed preboot pins (source-only)
+        run: |
+          if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" (echo C996_PIN_BRIDGE_RUNNER_DENIED & exit /b 17)
+          if exist "E:\ZGmini" (echo C996_PIN_BRIDGE_ORIGINAL_ROOT_FORBIDDEN & exit /b 18)
+          node --test tests/controller-996-signed-offline-handoff.test.mjs tests/controller-996-live-volume-readback-proof.test.mjs
