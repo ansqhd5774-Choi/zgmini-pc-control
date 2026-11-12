@@ -62,6 +62,13 @@
 - **#996은 독립 사고로 계속 NO-GO:** #917의 당시 원본 lease 해소가 #996의 이후 C 잠금까지 해제했다는 뜻은 아니다. #996의 사후 claim·현재 install lease/Workflow/Backlog·Owner는 최근 원본 PC에서 **재확인 전 UNKNOWN**, C native namespace 안전 미입증·새 승인 부재는 유지한다.
 - **실제 다음 한 단계:** 공통 설치 단일 Owner가 기존 승인된 Windows 읽기 경로로 **현재 유지보수기 설치 SHA/7파일 해시·원본 #996 lease/claim/소유권·현재 Controller beforeSHA**를 확인. 기존 설치 `config/operations.json`에 총괄 진단 A가 없으므로 현 31개 일반 pc-job A로 유지보수기 현재 설치 확인을 주장하거나 미등록 A를 제출하지 않는다. 정규 고정 승인 진단 경로가 없으면 **해당 설치 확인만 `AUTOMATION_BLOCKED/READBACK_PENDING`**으로 남기고, 기존 기능 A·독립 기능 업무는 계속한다. 새 유지보수기 B 적용은 위 확인·정확한 효과 승인·보호 완료 후에만 검토.
 
+### P1.3 — 기존 승인 A Workflow 재사용으로 실제 유지보수기 상태 조회 연결 (2026-11-13)
+
+- **실제 확인된 조회 공백:** 고정 `tools/automation-status.mjs`는 운영 PC의 `MAINTENANCE_INSTALL.json` source SHA·파일 해시·Controller SHA·설치 lease·receiver/workflow를 **읽기 전용**으로 관측하지만, 일반 `pc-job` 31개 A 목록에 등록되지 않았다. Remote Desktop Commander 연결 장치는 이번 조회 시 `pc` **Offline**으로 확인; 이것은 GitHub self-hosted 6 Runner의 Offline 증거가 아니며 RDC 설치·접속을 요구하지 않는다. 기존 `pc-process-inventory-readonly`는 운영 PC용 등록 Workflow이며 특정 운영 파일을 직접 변경하지 않는 고정 A 원본 조회를 제공한다.
+- **기존 경로 최소 source 보강:** [Draft PR #1339](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1339), 브랜치 `fix/pc-process-maintainer-readonly-20261113`. 기존 `.github/workflows/pc-process-inventory-readonly.yml`/자체 운영 Runner를 재사용하고, `tools/pc-process-inventory-readonly.mjs`에서 기존 `collectAutomationStatus([])`의 값 중 정확히 허용된 SHA40, integrity boolean, readback-verified lease held/recoveryRequired, Receiver/Workflow 상태만 투영. 원본 nonce/owner/경로/명령행/키/환경변수 미공개. 위조 fallback lease는 `STATE_UNKNOWN` 처리; 단위 검사 두 건 추가.
+- **검증 상태:** 첫 커밋 `4851d601` CI에서 테스트 정규식 문법 오류 확인 후 테스트 파일만 수정해 `f1b344c5` 반영. 정확한 새 [격리 Windows process CI Run #43300786055](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43300786055)는 해당 기록 시점 **queued**; [별도 C996 source CI #43300786073](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43300786073)은 success이나 본 A 소스 회귀 합격 대체 불가. **CI 통과·정확한 diff/owner 승인 전 main 병합 금지**, 운영 A Issue·PC 유지보수/Controller 설치·C/lease 쓰기 0.
+- **다음 실행:** 격리 PR CI의 새 HEAD PASS 및 변경 파일을 readback → 승인된 최소 main 반영 → 기존 `pc-process-inventory-readonly` **운영 role 1회 Issue**를 owner·fixed schema·새 requestId로 접수 → 운영 `PC` 고유 Run + JSON/TXT 2/2 원격 readback → source·lease가 검증될 때만 #68 단일 설치 담당이 공유 자원 충돌/실제 B 범위를 판정. 이 A 결과가 C의 전체 claim/namespace 안전을 증명하지 않으며 #996은 별도 Owner NO-GO. 불명확 상태는 원본 요청 회수만, 동일 ID 재실행 금지.
+
 ### P2 — 기능별 실제 수집·계산·공개 완료 (공유 쓰기는 순차)
 
 - 물가 승인 B 결과 / 테마 승인 Reader / 고용 DOL / Treasury 감사 / D05 원본 모두 **기존 공급자·수집기·계산기·Writer**로 연결. PC 원자료와 결과는 로컬에 보존하고 D1에는 승인된 공개 projection·최소 checkpoint만 게시한다.
