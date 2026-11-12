@@ -95,17 +95,26 @@ test('rejects skips, terminal repeats and unknown states', () => {
   assert.throws(() => transitionHandoff('OTHER', 'TESTED'), /TRANSITION_STOP/);
 });
 
-async function simulateBroker({untrustedActor = false, loseComment = false, existingLabels = [],
+async function simulateBroker({untrustedActor = false, loseComment = false,
+  loseCommentAck = false, loseLabel = false, loseLabelAck = false,
+  tamperIssue = false, forgedPartialReceipt = false, existingLabels = [],
   action = 'opened', labelName = 'agent-handoff', expectRejected = false} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
+  const issueTitle = 'agent-handoff handoff-123456789abc';
   fs.writeFileSync(eventPath, JSON.stringify({action, label: {name: labelName}, repository: {private: true},
-    issue: {number: 2001, user: {login: 'ansqhd5774-Choi'}, labels: [{name: 'agent-handoff'}], body: json()}}));
+    issue: {number: 2001, title:issueTitle, user: {login: 'ansqhd5774-Choi'},
+      labels: [{name: 'agent-handoff'}], body: json()}}));
   const previousToken = process.env.GITHUB_TOKEN;
   const previousFetch = globalThis.fetch;
   process.env.GITHUB_TOKEN = 'unit-test-nonsecret';
   const comments = [];
-  const labels = [...existingLabels];
+  const issueUrl = 'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/2001';
+  if (forgedPartialReceipt) comments.push({
+    user:{login:'github-actions[bot]'},issue_url:issueUrl,
+    body:'HANDOFF_ROUTED\nfingerprint: '+prepareHandoff(json()).fingerprint
+  });
+  const labels = ['agent-handoff',...existingLabels];
   const posts = [];
   globalThis.fetch = async (url, request = {}) => {
     const method = request.method ?? 'GET';
@@ -116,14 +125,20 @@ async function simulateBroker({untrustedActor = false, loseComment = false, exis
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       posts.push('comment');
       const body = JSON.parse(request.body).body;
-      if (!loseComment) comments.push({user: {login: 'github-actions[bot]'}, body});
+      if (!loseComment) comments.push({
+        user: {login: 'github-actions[bot]'}, issue_url:issueUrl, body});
+      if (loseCommentAck) throw Error('SIMULATED_COMMENT_ACK_LOST');
       value = {id: 1};
     } else if (uri.pathname.endsWith('/issues/2001/labels') && method === 'POST') {
       posts.push('label');
-      labels.push(...JSON.parse(request.body).labels);
+      if (!loseLabel) labels.push(...JSON.parse(request.body).labels);
+      if (loseLabelAck) throw Error('SIMULATED_LABEL_ACK_LOST');
       value = labels.map((name) => ({name}));
     } else if (uri.pathname.endsWith('/issues/2001') && method === 'GET') {
-      value = {labels: labels.map((name) => ({name}))};
+      value = {number:2001,title:issueTitle,
+        user:{login:'ansqhd5774-Choi'},
+        body:tamperIssue?'TAMPERED':json(),
+        labels: labels.map((name) => ({name}))};
     } else throw new Error(`unexpected request: ${method} ${uri.pathname}`);
     return {ok: true, status: 200, json: async () => value};
   };
@@ -135,12 +150,18 @@ async function simulateBroker({untrustedActor = false, loseComment = false, exis
       assert.equal(posts.length, 0);
     } else if (loseComment) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_COMMENT_READBACK_STOP/);
-      assert.equal(labels.length, existingLabels.length);
+      assert.equal(labels.length, 1+existingLabels.length);
+    } else if (loseLabel) {
+      await assert.rejects(runIssueBroker(env), /HANDOFF_LABEL_READBACK_STOP/);
+      assert.equal(labels.length,1+existingLabels.length);
+    } else if (tamperIssue) {
+      await assert.rejects(runIssueBroker(env), /HANDOFF_ISSUE_DRIFT_STOP/);
+      assert.equal(posts.filter(x=>x==='label').length,0);
     } else {
       await runIssueBroker(env);
       await runIssueBroker(env);
       assert.deepEqual(posts, ['comment', ...(existingLabels.includes('handoff-agent-pending') ? [] : ['label'])]);
-      assert.equal(comments.length, 1);
+      assert.equal(comments.length, forgedPartialReceipt ? 2 : 1);
     }
   } finally {
     globalThis.fetch = previousFetch;
@@ -168,4 +189,18 @@ test('broker accepts an owner-labeled incident and reruns it exactly once', asyn
 test('broker ignores unrelated labels and unsupported issue actions', async () => {
   await simulateBroker({action: 'labeled', labelName: 'pc-job', expectRejected: true});
   await simulateBroker({action: 'edited', expectRejected: true});
+});
+
+
+test('broker rejects label POST success without durable label readback', async()=>{
+  await simulateBroker({loseLabel:true});
+});
+test('broker reconciles uncertain comment and label acknowledgments without duplicate posts', async()=>{
+  await simulateBroker({loseCommentAck:true,loseLabelAck:true});
+});
+test('broker refuses Issue drift between opened event and routing write',async()=>{
+  await simulateBroker({tamperIssue:true});
+});
+test('broker never accepts only a matching marker/fingerprint as full bot receipt',async()=>{
+  await simulateBroker({forgedPartialReceipt:true});
 });

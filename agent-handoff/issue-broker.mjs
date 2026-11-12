@@ -44,16 +44,26 @@ async function listPreviousBodies(currentIssue) {
   throw new Error('HANDOFF_LEDGER_SCAN_LIMIT_STOP');
 }
 
-async function hasVerifiedComment(issueNumber, marker, fingerprint) {
+async function hasVerifiedComment(issueNumber, expectedBody) {
+  // Read back the complete deterministic bot receipt in the exact Issue.
+  // A partial marker/fingerprint is not enough to prove delivery.
+  const issueUrl = `${API}/repos/${REPOSITORY}/issues/${issueNumber}`;
   for (let page = 1; page <= 4; page++) {
     const comments = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
     if (!Array.isArray(comments)) throw new Error('HANDOFF_COMMENT_LEDGER_INVALID');
     if (comments.some((item) => item.user?.login === 'github-actions[bot]' &&
-        typeof item.body === 'string' && item.body.startsWith(`${marker}\n`) &&
-        item.body.split('\n').includes(`fingerprint: ${fingerprint}`))) return true;
+        item.issue_url === issueUrl && item.body === expectedBody)) return true;
     if (comments.length < 100) return false;
   }
   throw new Error('HANDOFF_COMMENT_SCAN_LIMIT_STOP');
+}
+
+function exactOwnerIssue(current, original, stateLabel) {
+  return current?.number === original.number &&
+    current.user?.login === 'ansqhd5774-Choi' &&
+    current.title === original.title && current.body === original.body &&
+    current.labels?.some(label => label.name === 'agent-handoff') &&
+    (stateLabel == null || current.labels.some(label => label.name === stateLabel));
 }
 
 export async function main(env = process.env) {
@@ -64,23 +74,43 @@ export async function main(env = process.env) {
   const duplicate = outcome.state === 'DUPLICATE_REUSED';
   const stateLabel = duplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
   const marker = duplicate ? 'HANDOFF_DUPLICATE_REUSED' : 'HANDOFF_ROUTED';
-  // Never mistake a label for proof that the result comment was delivered.
-  // A lost POST response is recovered by reading the original issue ledger.
-  const alreadyRecorded = await hasVerifiedComment(event.issue.number, marker, outcome.fingerprint);
+  // Never mistake an existing label for proof of the bot result receipt.
   const lines = duplicate
     ? ['HANDOFF_DUPLICATE_REUSED', `fingerprint: ${outcome.fingerprint}`, 'newAgentDispatches: 0', 'PC retries: 0']
     : ['HANDOFF_ROUTED', `incidentId: ${outcome.incidentId}`, `fingerprint: ${outcome.fingerprint}`,
       `role: ${outcome.role}`, `state: ${outcome.state}`, `checkpoint: ${outcome.checkpoint}`,
       'PC retries: 0', 'operationalWrites: 0',
       'Automatic AI execution and original ChatGPT conversation wake-up: NOT_CONFIGURED'];
+  const receiptBody = lines.join('\n');
+  const alreadyRecorded = await hasVerifiedComment(event.issue.number, receiptBody);
   if (!alreadyRecorded) {
-    await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`, {method: 'POST', body: {body: lines.join('\n')}});
-    if (!await hasVerifiedComment(event.issue.number, marker, outcome.fingerprint)) throw new Error('HANDOFF_COMMENT_READBACK_STOP');
+    try {
+      await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`,
+        {method: 'POST', body: {body: receiptBody}});
+    } catch {
+      // POST may have succeeded even if its response was lost. No blind retry.
+      if (!await hasVerifiedComment(event.issue.number, receiptBody))
+        throw new Error('HANDOFF_COMMENT_POST_OUTCOME_UNKNOWN');
+    }
+    if (!await hasVerifiedComment(event.issue.number, receiptBody))
+      throw new Error('HANDOFF_COMMENT_READBACK_STOP');
   }
-  const current = await api(`/repos/${REPOSITORY}/issues/${event.issue.number}`);
-  if (!current.labels?.some((label) => label.name === stateLabel)) {
-    await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/labels`, {method: 'POST', body: {labels: [stateLabel]}});
+  const route = `/repos/${REPOSITORY}/issues/${event.issue.number}`;
+  const current = await api(route);
+  if (!exactOwnerIssue(current, event.issue))
+    throw new Error('HANDOFF_ISSUE_DRIFT_STOP');
+  if (!current.labels.some(label => label.name === stateLabel)) {
+    try {
+      await api(route+'/labels', {method:'POST', body:{labels:[stateLabel]}});
+    } catch {
+      const afterUncertain = await api(route);
+      if (!exactOwnerIssue(afterUncertain, event.issue, stateLabel))
+        throw new Error('HANDOFF_LABEL_POST_OUTCOME_UNKNOWN');
+    }
   }
+  const after = await api(route);
+  if (!exactOwnerIssue(after, event.issue, stateLabel))
+    throw new Error('HANDOFF_LABEL_READBACK_STOP');
   process.stdout.write(`${alreadyRecorded ? 'HANDOFF_ALREADY_RECORDED' : duplicate ? 'HANDOFF_DUPLICATE_REUSED' : 'HANDOFF_ROUTED_PENDING_AGENT'}\n`);
 }
 
