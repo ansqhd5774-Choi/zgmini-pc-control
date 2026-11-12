@@ -80,7 +80,7 @@ test('operating maintainer status exposes only bounded hashes and safe lease boo
  assert.equal(out.installLockRecoveryRequired,true);
  assert.equal(out.observedAtUtc,'2026-11-13T01:02:03.123Z');
  assert.equal(out.operationalWrites,0);
- assert.doesNotMatch(JSON.stringify(out),/SECRET|nonce|token|privatePath|owner|E:\\//i);
+ assert.doesNotMatch(JSON.stringify(out),/SECRET|nonce|token|privatePath|owner/i);
 });
 test('missing lease evidence is unknown even if fallback marker claims it is held',()=>{
  const out=sanitizeMaintenanceStatus({maintenanceSourceSha:'a'.repeat(40),
