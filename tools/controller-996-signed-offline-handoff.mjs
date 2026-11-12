@@ -127,6 +127,76 @@ export function encode996CanonicalOfflineHandoff(data){
   return out;
 }
 
+// The #1265 fixed A-grade observation is the first real ORIGINAL Windows
+// E: GUID/serial/FILE_ID_INFO readback, NOT signed preboot Owner evidence.
+// This comparison never reads a PC or the network and does not authenticate
+// GitHub delivery, an offline WinPE rebind, or the continuation C claim.
+// The immutable receipt is intentionally referenced, NOT copied, here.
+const ORIGINAL_VOLUME_READBACK=Object.freeze({
+  issueNumber:1265,runId:'43124923743',
+  requestId:'e741024c-47c5-40ca-b9d1-fbb250e79e42',
+});
+const ONLINE_DIR_KEYS=Object.freeze([
+  'VOLUME_ROOT','ZGMINI','AUTOMATION','MAINTENANCE','LEASES','OLD_C','INSTALL',
+]);
+export function review996OnlineVolumePinsForHandoff({
+  onlineObservation,signedManifest,
+}={}){
+  const block=code=>Object.freeze({
+    schema:'ZGMINI_CONTROLLER_996_ONLINE_VOLUME_PIN_REVIEW_V1',
+    status:'SOURCE_ONLY_BLOCKED',code,
+    matchedSignedMoveCount:0,continuationClaimIdVerified:false,
+    onlineEvidenceAuthenticated:false,signatureCryptographicallyVerified:false,
+    offlineVolumeVerified:false,ownerApprovalVerified:false,
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false,
+  });
+  const v=onlineObservation;
+  if(!v||v.schema!=='ZGMINI_PC_VOLUME_IDENTITY_PROBE_V1'||
+    v.status!=='PASS'||v.code!=='VOLUME_IDS_READONLY_OBSERVED'||
+    v.issueNumber!==ORIGINAL_VOLUME_READBACK.issueNumber||
+    String(v.runId)!==ORIGINAL_VOLUME_READBACK.runId||
+    v.requestId!==ORIGINAL_VOLUME_READBACK.requestId||
+    String(v.attempt)!=='1'||String(v.host).toUpperCase()!=='PC'||
+    !/^zgmini-pc-0[1-6]$/.test(v.runnerName||'')||
+    v.source!=='WIN32_GET_VOLUME_NAME_AND_FILE_ID_INFO'||
+    v.cExecutionAuthorized!==false||v.offlineVolumeVerified!==false||
+    v.operationalWrites!==0||v.automaticRetries!==0)
+    return block('C996_PREBOOT_ONLINE_RECEIPT_INVALID');
+  const observed=v.directories;
+  if(!H16(v.volumeSerial)||typeof v.volumeGuid!=='string'||
+    !/^\\\\\?\\Volume\{[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\}\\$/.test(v.volumeGuid)||
+    !observed||typeof observed!=='object'||Array.isArray(observed)||
+    Object.keys(observed).sort().join('|')!==[...ONLINE_DIR_KEYS].sort().join('|')||
+    ONLINE_DIR_KEYS.some(k=>observed[k]?.state!=='PRESENT'||
+      !H32(observed[k]?.fileId128))||
+    new Set(ONLINE_DIR_KEYS.map(k=>observed[k].fileId128)).size!==ONLINE_DIR_KEYS.length)
+    return block('C996_PREBOOT_VOLUME_FILE_IDS_INVALID');
+  if(!signedManifest||typeof signedManifest!=='object')
+    return block('C996_PREBOOT_SIGNED_MANIFEST_MISSING');
+  try{encode996CanonicalOfflineHandoff(signedManifest);}
+  catch{return block('C996_PREBOOT_SIGNED_MANIFEST_INVALID');}
+  if(signedManifest.volumeGuid!==v.volumeGuid||
+    signedManifest.volumeSerial!==v.volumeSerial)
+    return block('C996_PREBOOT_SIGNED_VOLUME_MISMATCH');
+  // Move 0 (old C) and move 2 (install lease) are the only currently
+  // observed signed source identities. The continuation claim is absent
+  // from this original A-grade readback and MUST NOT be inferred.
+  if(signedManifest.moves[0].sourceFileId!==observed.OLD_C.fileId128||
+     signedManifest.moves[2].sourceFileId!==observed.INSTALL.fileId128)
+    return block('C996_PREBOOT_SIGNED_SOURCE_ID_MISMATCH');
+  return Object.freeze({
+    schema:'ZGMINI_CONTROLLER_996_ONLINE_VOLUME_PIN_REVIEW_V1',
+    status:'SOURCE_ONLY_TWO_ORIGINAL_PINS_MATCH',
+    originalReadbackRunId:ORIGINAL_VOLUME_READBACK.runId,
+    matchedOriginalDirectoryCount:ONLINE_DIR_KEYS.length,
+    matchedSignedMoveCount:2,
+    continuationClaimIdVerified:false,
+    onlineEvidenceAuthenticated:false,signatureCryptographicallyVerified:false,
+    offlineVolumeVerified:false,ownerApprovalVerified:false,
+    executionAuthorized:false,operationalWrites:0,automaticRetry:false,
+  });
+}
+
 /**
  * Confirms only *cryptographic self-consistency* against a caller-provided
  * key/pin. The actual Owner trust anchor, genuine clock and WinPE runtime
