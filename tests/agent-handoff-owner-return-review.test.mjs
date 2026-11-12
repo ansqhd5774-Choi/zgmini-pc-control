@@ -116,7 +116,7 @@ test('origin bot receipt must be exact with correct issue URL and no duplicate',
   f=>{f.originComments[0].issue_url=url(9999);},
  ]){
   const f=changes(mutate);
-  assert.throws(()=>check(f),/OWNER_(ORIGIN_RECEIPT_NOT_EXACT|MULTIPLE_ORIGIN_RETURNS_REVIEW)/);
+  assert.throws(()=>check(f),/OWNER_(ORIGIN_RECEIPT_NOT_EXACT|ORIGIN_RECEIPT_WRONG_ISSUE|MULTIPLE_ORIGIN_RETURNS_REVIEW)/);
  }
 });
 test('owner result and incident are bound to exact author, title, request ID and issue',()=>{
