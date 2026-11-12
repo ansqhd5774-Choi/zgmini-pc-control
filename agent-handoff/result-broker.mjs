@@ -41,24 +41,38 @@ async function api(resource, {method = 'GET', body} = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-async function inspectExistingResult(issueNumber, resultId, digest) {
+// A routing receipt is complete only when the persisted bot comment is
+// byte-for-byte the expected record in the exact original Issue. An ID/hash
+// pair is a collision index, never sufficient proof of delivery.
+const receiptIssueUrl = number =>
+  `${API}/repos/${REPOSITORY}/issues/${number}`;
+function completeReceipt(row, number, expectedBody) {
+  return row.user?.login === BOT && row.issue_url === receiptIssueUrl(number) &&
+    row.body === expectedBody;
+}
+async function inspectExistingResult(issueNumber, resultId, digest, expectedBody) {
+  let verified = false;
   for (let page = 1; page <= 4; page++) {
     const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
     if (!Array.isArray(rows)) throw new Error('RESULT_COMMENT_LEDGER_STOP');
     for (const row of rows) {
-      if (row.user?.login !== 'github-actions[bot]' || typeof row.body !== 'string' ||
+      if (row.user?.login !== BOT || typeof row.body !== 'string' ||
           !row.body.startsWith('HANDOFF_RESULT_RECORDED\n')) continue;
       const lines = row.body.split('\n');
       if (!lines.includes(`resultId: ${resultId}`)) continue;
       if (!lines.includes(`digest: ${digest}`)) throw new Error('RESULT_ID_COLLISION_STOP');
-      return true;
+      if (!completeReceipt(row, issueNumber, expectedBody))
+        throw new Error('RESULT_RECEIPT_BINDING_STOP');
+      if (verified) throw new Error('RESULT_RECEIPT_DUPLICATE_STOP');
+      verified = true;
     }
-    if (rows.length < 100) return false;
+    if (rows.length < 100) return verified;
   }
   throw new Error('RESULT_COMMENT_SCAN_LIMIT_STOP');
 }
 
-async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNumber) {
+async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNumber, expectedBody) {
+  let verified = false;
   for (let page = 1; page <= 4; page++) {
     const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
     if (!Array.isArray(rows)) throw new Error('RESULT_ORIGIN_LEDGER_STOP');
@@ -67,14 +81,17 @@ async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNum
           !row.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n')) continue;
       const lines = row.body.split('\n');
       if (!lines.includes(`resultId: ${result.resultId}`)) continue;
-      if (!lines.includes(`digest: ${digest}`)) throw new Error('RESULT_ORIGIN_ID_COLLISION_STOP');
+      if (!lines.includes(`digest: ${digest}`))
+        throw new Error('RESULT_ORIGIN_ID_COLLISION_STOP');
       if (!lines.includes(`incidentId: ${result.incidentId}`) ||
-          !lines.includes(`handoffIssue: ${handoffIssueNumber}`)) {
+          !lines.includes(`handoffIssue: ${handoffIssueNumber}`))
         throw new Error('RESULT_ORIGIN_RECEIPT_BINDING_STOP');
-      }
-      return true;
+      if (!completeReceipt(row, issueNumber, expectedBody))
+        throw new Error('RESULT_ORIGIN_RECEIPT_BINDING_STOP');
+      if (verified) throw new Error('RESULT_ORIGIN_RECEIPT_DUPLICATE_STOP');
+      verified = true;
     }
-    if (rows.length < 100) return false;
+    if (rows.length < 100) return verified;
   }
   throw new Error('RESULT_ORIGIN_LEDGER_SCAN_LIMIT_STOP');
 }
@@ -197,7 +214,6 @@ export async function main(env = process.env) {
   const result = parseAgentResult(event.comment.body);
   assertWorkflowResultRepository(result);
   const digest = resultDigest(result);
-  const alreadyRecorded = await inspectExistingResult(event.issue.number, result.resultId, digest);
   const featureSourceRepository = await verifiedFeatureSourceRepository(handoff);
   const repo = result.pullRequest.repository;
   const read = repo === PUBLIC_FEATURE_REPOSITORY ? publicEvidence : api;
@@ -216,25 +232,44 @@ export async function main(env = process.env) {
     'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
     'PC retries: 0', 'operationalWrites: 0'
   ].join('\n');
+  const alreadyRecorded = await inspectExistingResult(
+    event.issue.number, result.resultId, digest, comment);
   if (!alreadyRecorded) {
-    await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`, {method: 'POST', body: {body: comment}});
-    if (!await inspectExistingResult(event.issue.number, result.resultId, digest)) throw new Error('RESULT_COMMENT_READBACK_STOP');
+    try {
+      await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`,
+        {method: 'POST', body: {body: comment}});
+    } catch {
+      // A POST response may be lost after GitHub stored the comment.
+      // Reconcile the exact bot receipt; never blindly post it again.
+      if (!await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
+        throw new Error('RESULT_COMMENT_POST_OUTCOME_UNKNOWN');
+    }
+    if (!await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
+      throw new Error('RESULT_COMMENT_READBACK_STOP');
   }
   if (originalIssue !== null) {
-    const delivered = await inspectOriginReceipt(originalIssue, result, digest, event.issue.number);
+    const receipt = [
+      'HANDOFF_ORIGIN_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
+      `incidentId: ${result.incidentId}`, `handoffIssue: ${event.issue.number}`,
+      `fixPr: ${repo}#${result.pullRequest.number}`, `prHeadSha: ${result.pullRequest.headSha}`,
+      `testRunId: ${result.testRun.runId}`, `state: ${verified.state}`,
+      'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
+      'PC retries: 0', 'operationalWrites: 0'
+    ].join('\n');
+    const delivered = await inspectOriginReceipt(
+      originalIssue, result, digest, event.issue.number, receipt);
     if (!delivered) {
-      const receipt = [
-        'HANDOFF_ORIGIN_RESULT_RECORDED', `resultId: ${result.resultId}`, `digest: ${digest}`,
-        `incidentId: ${result.incidentId}`, `handoffIssue: ${event.issue.number}`,
-        `fixPr: ${repo}#${result.pullRequest.number}`, `prHeadSha: ${result.pullRequest.headSha}`,
-        `testRunId: ${result.testRun.runId}`, `state: ${verified.state}`,
-        'ChatGPT owner received: UNKNOWN', 'Windows/D1/API/UI verification: NOT_VERIFIED',
-        'PC retries: 0', 'operationalWrites: 0'
-      ].join('\n');
-      await api(`/repos/${REPOSITORY}/issues/${originalIssue}/comments`, {method: 'POST', body: {body: receipt}});
-      if (!await inspectOriginReceipt(originalIssue, result, digest, event.issue.number)) {
-        throw new Error('RESULT_ORIGIN_COMMENT_READBACK_STOP');
+      try {
+        await api(`/repos/${REPOSITORY}/issues/${originalIssue}/comments`,
+          {method: 'POST', body: {body: receipt}});
+      } catch {
+        if (!await inspectOriginReceipt(originalIssue, result, digest,
+          event.issue.number, receipt))
+          throw new Error('RESULT_ORIGIN_POST_OUTCOME_UNKNOWN');
       }
+      if (!await inspectOriginReceipt(originalIssue, result, digest,
+        event.issue.number, receipt))
+        throw new Error('RESULT_ORIGIN_COMMENT_READBACK_STOP');
     }
     process.stdout.write('HANDOFF_RESULT_RETURNED_TO_ORIGIN_PENDING_RUNTIME\n');
     return;

@@ -86,7 +86,9 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
   botOrigin = false, botBadTitle = false, botForeignOrigin = false,
   botMissingEvidence = false, untrustedIssueAuthor = false,
   invalidOriginalAuthor = false, wrongOriginalRequest = false,
-  originPostFailsOnce = false, writerOrigin = false, wrongWriterSource = false} = {}) {
+  originPostFailsOnce = false, writerOrigin = false, wrongWriterSource = false,
+  centralAckLost = false, originAckLost = false, partialCentral = false,
+  partialOrigin = false} = {}) {
   let {handoff, result, pr, run} = setup();
   if (botOrigin) {
     const candidate = structuredClone(handoff);
@@ -112,8 +114,13 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
   const originalToken = process.env.GITHUB_TOKEN;
   const originalFetch = globalThis.fetch;
   const seen = [];
+  const commentIssueUrl = 'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/2001';
+  const originIssueUrl = 'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/1009';
   const comments = collision ? [{user: {login: 'github-actions[bot]'},
-    body: `HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${'0'.repeat(64)}`}]: [];
+    issue_url: commentIssueUrl,
+    body: `HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${'0'.repeat(64)}`}] :
+    partialCentral ? [{user:{login:'github-actions[bot]'},issue_url:commentIssueUrl,
+      body:`HANDOFF_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${resultDigest(result)}`}] : [];
   const originComments = writerOrigin ? [{user: {login: 'github-actions[bot]'},
     issue_url: 'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/1009',
     body: [`<!-- zgmini-writer-b-install:${handoff.origin.requestId} -->`,
@@ -121,6 +128,9 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       'DELIVERY: RESULT_PAIR_READBACK_VERIFIED',
       'RESULT_CREATED: 2/2; RESULT_READBACK: 2/2',
       'RUN_ID: 42570000003; RETRY: NO_REEXECUTE'].join('\n')}] : [];
+  if (partialOrigin) originComments.push({user:{login:'github-actions[bot]'},
+    issue_url:originIssueUrl,
+    body:`HANDOFF_ORIGIN_RESULT_RECORDED\nresultId: ${result.resultId}\ndigest: ${resultDigest(result)}\nincidentId: ${result.incidentId}\nhandoffIssue: 2001`});
   const originalIssue = {number: 1009,
     user: {login: invalidOriginalAuthor ? 'untrusted-user' : 'ansqhd5774-Choi'},
     title: writerOrigin ? 'pc-writer-source-install' : 'pc-job',
@@ -141,7 +151,9 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
     if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') value = comments;
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       seen.push('comment');
-      if (!lostComment) comments.push({user: {login: 'github-actions[bot]'}, body: JSON.parse(request.body).body});
+      if (!lostComment) comments.push({user: {login: 'github-actions[bot]'},
+        issue_url: commentIssueUrl, body: JSON.parse(request.body).body});
+      if (centralAckLost) return {ok:false,status:503};
       value = {id: 1};
     } else if (uri.pathname.endsWith('/pulls/920')) value = pr;
     else if (uri.pathname.endsWith('/actions/runs/42450377234')) value = run;
@@ -159,7 +171,9 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
         failOriginalPost = false;
         return {ok: false, status: 503};
       }
-      originComments.push({user: {login: 'github-actions[bot]'}, body: JSON.parse(request.body).body});
+      originComments.push({user: {login: 'github-actions[bot]'},
+        issue_url: originIssueUrl, body: JSON.parse(request.body).body});
+      if (originAckLost) return {ok:false,status:503};
       value = {id: 2};
     }
     else throw new Error(`unexpected GitHub API ${uri.pathname}`);
@@ -178,12 +192,18 @@ async function simulate({lostComment = false, collision = false, unauthorized = 
       await assert.rejects(runResultBroker(env),
         /RESULT_ORIGIN_ISSUE_NOT_AUTHORIZED|RESULT_ORIGIN_REQUEST_BINDING_STOP/);
     } else if (originPostFailsOnce) {
-      await assert.rejects(runResultBroker(env), /RESULT_GITHUB_API_503_STOP/);
+      await assert.rejects(runResultBroker(env), /RESULT_ORIGIN_POST_OUTCOME_UNKNOWN/);
       await runResultBroker(env);
       await runResultBroker(env);
       assert.deepEqual(seen, ['comment', 'origin-comment', 'origin-comment']);
       assert.equal(comments.length, 1);
       assert.equal(originComments.length, 1);
+    } else if (partialCentral) {
+      await assert.rejects(runResultBroker(env), /RESULT_RECEIPT_BINDING_STOP/);
+      assert.deepEqual(seen, []);
+    } else if (partialOrigin) {
+      await assert.rejects(runResultBroker(env), /RESULT_ORIGIN_RECEIPT_BINDING_STOP/);
+      assert.deepEqual(seen, ['comment']);
     } else if (wrongWriterSource) {
       await assert.rejects(runResultBroker(env), /RESULT_WRITER_SOURCE_PROVENANCE_STOP/);
       assert.deepEqual(seen, []);
@@ -212,6 +232,14 @@ test('result broker prevents return to mismatched original request ID',
   async () => simulate({botOrigin: true, wrongOriginalRequest: true}));
 test('result broker repairs a partial original return without duplicating central record',
   async () => simulate({botOrigin: true, originPostFailsOnce: true}));
+test('central result POST response lost after persistence is reconciled without duplication',
+  async()=>simulate({centralAckLost:true}));
+test('original Issue result POST response lost after persistence is reconciled without duplication',
+  async()=>simulate({botOrigin:true,originAckLost:true}));
+test('result-id and digest alone cannot authenticate a partial central bot receipt',
+  async()=>simulate({partialCentral:true}));
+test('origin result-id and digest alone cannot authenticate a partial original bot receipt',
+  async()=>simulate({botOrigin:true,partialOrigin:true}));
 test('Writer B original result checks the authenticated completed control workflow source SHA',
   async () => simulate({botOrigin: true, writerOrigin: true}));
 test('Writer B original result rejects wrong workflow SHA before any comment write',
@@ -279,14 +307,18 @@ async function simulatePublicFeature({invalidOriginal = false, wrongSource = fal
     if (uri.pathname.endsWith('/issues/1009/comments') && method === 'GET')
       return {ok: true, json: async () => originLedger};
     if (uri.pathname.endsWith('/issues/1009/comments') && method === 'POST') {
-      originLedger.push({user: {login: 'github-actions[bot]'}, body: JSON.parse(options.body).body});
+      originLedger.push({user: {login: 'github-actions[bot]'},
+        issue_url:'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/1009',
+        body: JSON.parse(options.body).body});
       return {ok: true, json: async () => ({id: 2})};
     }
     if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET')
       return {ok: true, json: async () => ledger};
     if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       writes.push(JSON.parse(options.body).body);
-      ledger.push({user: {login: 'github-actions[bot]'}, body: writes.at(-1)});
+      ledger.push({user: {login: 'github-actions[bot]'},
+        issue_url:'https://api.github.com/repos/ansqhd5774-Choi/zgmini-pc-control/issues/2001',
+        body: writes.at(-1)});
       return {ok: true, json: async () => ({id: 1})};
     }
     throw new Error(`unexpected GitHub API ${uri.pathname}`);
