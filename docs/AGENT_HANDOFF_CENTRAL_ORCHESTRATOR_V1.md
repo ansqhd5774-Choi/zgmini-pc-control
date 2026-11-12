@@ -163,3 +163,14 @@
   검증을 추가하고 재조회했다. 최신 관측 접수 `agent-handoff`는 0건이므로
   실제 처리 성공으로 평가하지 않는다.
 - Writer B 정상/건너뜀 및 자연 실패 자동접수→중앙 처리→정식 결과 반환의 첫 표본을 확인했다. [#1068 정식 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1068#issuecomment-6742864318), [#1063 원본 receipt](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1063#issuecomment-6742864978), 격리 CI Run `42637013508`이다. 검증만을 위한 인위적 실패·기존 Writer B 요청 재실행·별도 chat 자동 수신함을 만들지 않는다. 이전 다중 대화 Draft의 `queue=null`/별도 Windows DB 미연결은 본 단일 중앙 intake의 완료 Gate가 아니다.
+
+
+## 2026-11-12 — 실제 운영 PC Job 정상 접수 → 격리 Windows 자동 분류 E2E 추가 증거
+
+- **원본 및 접수:** [Issue #1272](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1272)의 정식 A급 `runner-smoke`는 제목·본문·`pc-job` 라벨을 **동일한 `create_issue` 요청에 포함**해 생성했다. 기존 `pc-job.yml`의 [Run #43135674103](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43135674103)은 `approved-pc-job` **COMPLETED/SUCCESS**, 운영 seat 5의 `PASS/RUNNER_COMMAND_EXECUTED` 결과를 반환했다. bot 원본 영수증은 #1272 댓글 `6811802425`.
+- **원격 결과 2/2:** `main/results/43135674103-1-seat-5.json` (Git blob `ba931db629092f010eb8da3039315bf36d7da5d4`) 및 `.txt` (blob `daac01f71cd8e33d13ed2fb04ed816c916ef08ad`)를 직접 다시 읽어 요청·Run·seat·source SHA·status/code·보호 전후 해시를 검증했다. `operationalWrites=0`, `providerCalls=0`, `d1Writes=0`, `sqliteOpened=false`, `protectedStateUnchanged=true`. 허용된 임시 제어 작업공간의 `controlWorkspaceWrites=true`와 운영 데이터 쓰기 0건을 혼동하지 않는다.
+- **독립 격리 자동 intake 실제 실행:** 이 정상 PC Job 완료가 기존 `.github/workflows/agent-handoff-pc-failure-intake.yml`의 [Run #43135735255](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43135735255), job `130910514386`을 자동 트리거했다. **COMPLETED/SUCCESS**이며 실제 `pc-failure-producer.mjs` 로그는 `SCAN_COMPLETED`, `runId=43135674103`, `reportsObserved=1`, `confirmedFailures=0`, `newIssues=0`, `reusedIssues=0`, `missingReceipts=0`, `failureProofPending=0`, `pcOperationalWrites=0`, `automaticPcRetries=0`. 따라서 **정상 원본을 실패 Incident로 잘못 등록하지 않는 분기**가 실제 격리 Runner에서 검증됐다.
+- **증거 범위 분리:** 이는 승인된 **PC Job 정상 → 자동 A급 인계 분류/무변경 종료** E2E 1회 실증이지, *수리 가능한 새로운 실패*의 중앙 처리·결과 반환이 아니다. 기존 단일 중앙 E2E **8/8**과 신설 격리 **Writer B** 자연 수리 가능 사건 왕복 **4/5(80%, DEFERRED)**는 각각 유지한다. 이 8/8·4/5를 합산하지 않으며 #996 Controller C급 NO-GO를 해제하지 않는다.
+- **과거 라벨 시각 추론 주의:** #1272에서도 `pc-job` 라벨 timeline 기록은 Issue 생성 약 1초 뒤였지만 `issues.opened` Job은 실제 정상 실행됐다. 그러므로 이전 #1217/#1227에서 생성 약 2초 뒤 라벨 이벤트만을 근거로 누락 원인을 확정하지 않는다. 과거 실패 요청을 자동 재실행하지 않고, 신규 A급은 [공통 시작 정본](GENERAL_CHAT_START.md)의 단일 Issue 생성 계약을 따른다.
+
+**다음 필수 사건:** 신규 적격 자연 실패가 실제 들어오면 원본 요청·workflow_run·bot receipt·JSON/TXT 2/2와 direct-route 영수증을 대조하고, 중앙 수리→원본 반환의 진짜 신규 E2E를 1건 검증한다. 장애가 없으면 `NO_WORK`를 유지하며 정상 PASS를 오류로 조작하지 않는다.
