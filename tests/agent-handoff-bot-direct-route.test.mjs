@@ -186,3 +186,50 @@ test('untrusted user marker is ignored and does not block authorized bot routing
   assert.equal(f.labelCount,1);
   assert.equal(f.comments.length,2);
 });
+
+test('pending route refuses an already-duplicate Issue without writing a receipt',async()=>{
+  const f=fixture();
+  f.created.labels.push({name:'handoff-duplicate'});
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_LABEL_CONFLICT_STOP/);
+  assert.equal(f.postCount,0);
+  assert.equal(f.labelCount,0);
+});
+
+test('duplicate route refuses an Issue already marked for specialist repair',async()=>{
+  const f=fixture();
+  f.created.labels.push({name:'handoff-agent-pending'});
+  f.io.listHandoffs=async()=>({repository:repo,complete:true,
+    issues:[{...structuredClone(f.created),number:1199},
+      structuredClone(f.created)]});
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_LABEL_CONFLICT_STOP/);
+  assert.equal(f.postCount,0);
+  assert.equal(f.labelCount,0);
+});
+
+test('conflicting label observed after a valid receipt stops before adding a pending label',async()=>{
+  const f=fixture();
+  const read=f.io.readIssue;
+  let reads=0;
+  f.io.readIssue=async number=>{
+    if(++reads===2)f.created.labels.push({name:'handoff-duplicate'});
+    return read(number);
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_LABEL_CONFLICT_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.labelCount,0);
+});
+
+test('opposite label introduced during label update cannot report successful routing',async()=>{
+  const f=fixture();
+  f.io.addIssueLabel=async(number,label)=>{
+    assert.equal(number,1200);
+    f.created.labels.push({name:label},{name:'handoff-duplicate'});
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_LABEL_CONFLICT_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.comments.length,1);
+});
