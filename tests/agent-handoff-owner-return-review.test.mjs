@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {fingerprintHandoff,parseHandoff} from '../agent-handoff/contract.mjs';
 import {resultDigest,verifyAgentResult} from '../agent-handoff/result-contract.mjs';
 import {originResultReceipt,centralResultReceipt} from '../agent-handoff/result-receipts.mjs';
-import {reviewOwnerHandoffReturn} from '../agent-handoff/owner-return-review.mjs';
+import {reviewOwnerHandoffReturn,readAndReviewOwnerReturn} from '../agent-handoff/owner-return-review.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',OWNER='ansqhd5774-Choi',BOT='github-actions[bot]';
 const url=n=>'https://api.github.com/repos/'+REPO+'/issues/'+n;
@@ -234,4 +234,115 @@ test('historical #1063/#1068 verified bot receipt bytes remain backward compatib
  assert.equal(review.brokerState,'RUNTIME_VERIFICATION_PENDING');
  assert.equal(review.ownerChatReceived,'UNKNOWN');
  assert.equal(review.executionAuthorized,false);
+});
+
+
+function mockedReadIO(f,trace){
+ const source=structuredClone(f);
+ return {
+  readIssue:async n=>{
+   trace.push(['issue',n]);
+   if(n===source.originIssue.number)return source.originIssue;
+   if(n===source.incidentIssue.number)return source.incidentIssue;
+   throw Error('UNEXPECTED_ISSUE_READ');
+  },
+  readIssueComments:async n=>{
+   trace.push(['comments',n]);
+   if(n===source.originIssue.number)
+     return {complete:source.originCommentsComplete,comments:source.originComments};
+   if(n===source.incidentIssue.number)
+     return {complete:source.incidentCommentsComplete,comments:source.incidentComments};
+   throw Error('UNEXPECTED_COMMENTS_READ');
+  },
+  readPullRequest:async (repo,n)=>{
+   trace.push(['pr',repo,n]);
+   if(repo!==REPO||n!==source.pullRequest.number)
+     throw Error('UNEXPECTED_PR_READ');
+   return source.pullRequest;
+  },
+  readRun:async (repo,n)=>{
+   trace.push(['run',repo,n]);
+   if(repo!==REPO||n!==source.testRun.id)
+     throw Error('UNEXPECTED_RUN_READ');
+   return source.testRun;
+  },
+ };
+}
+test('owner readback connects only original Issue to the exact associated Incident, PR and CI',async()=>{
+ const f=fixture(),trace=[];
+ const x=await readAndReviewOwnerReturn({originIssueNumber:1063,io:mockedReadIO(f,trace)});
+ assert.equal(x.state,'RETURN_EVIDENCE_REVIEWABLE');
+ assert.deepEqual(trace,[
+  ['issue',1063],['comments',1063],['issue',1068],['comments',1068],
+  ['pr',REPO,1086],['run',REPO,42637013508]]);
+ assert.equal(x.ownerChatReceived,'UNKNOWN');
+ assert.equal(x.executionAuthorized,false);
+ assert.equal(x.suppliedGithubInputsAuthenticated,false);
+ assert.equal(x.automaticPcRetries,0);
+});
+test('no return receipt needs no unrelated Incident/PR/CI reads and never indicates delivery',async()=>{
+ const f=fixture(),trace=[];
+ f.originComments=[];
+ const x=await readAndReviewOwnerReturn({originIssueNumber:1063,io:mockedReadIO(f,trace)});
+ assert.equal(x.state,'NO_RETURNED_RESULT');
+ assert.deepEqual(trace,[['issue',1063],['comments',1063]]);
+ assert.equal(x.runtimeVerified,false);
+ assert.equal(x.executionAuthorized,false);
+});
+test('incomplete origin or Incident comment pagination stops before further review',async()=>{
+ for(const field of ['originCommentsComplete','incidentCommentsComplete']){
+  const f=fixture(),trace=[];f[field]=false;
+  await assert.rejects(readAndReviewOwnerReturn({
+   originIssueNumber:1063,io:mockedReadIO(f,trace)
+  }),/OWNER_(ORIGIN|INCIDENT)_COMMENTS_INCOMPLETE/);
+  assert.equal(trace.some(v=>v[0]==='run'),false);
+ }
+});
+test('untrusted or malformed origin receipt cannot redirect readback to arbitrary issue',async()=>{
+ for(const mutation of [
+  f=>{f.originComments[0].issue_url=url(9999);},
+  f=>{f.originComments[0].body=f.originComments[0].body.replace(
+    'handoffIssue: 1068','handoffIssue: 9999');},
+  f=>{f.originComments[0].body=f.originComments[0].body.replace(
+    'handoffIssue: 1068','handoffIssue: 1063');},
+  f=>{f.originComments.push(structuredClone(f.originComments[0]));},
+ ]){
+  const f=fixture(),trace=[];mutation(f);
+  await assert.rejects(readAndReviewOwnerReturn({
+   originIssueNumber:1063,io:mockedReadIO(f,trace)
+  }),/(OWNER_(ORIGIN_RECEIPT_WRONG_ISSUE|INCIDENT_READBACK_NUMBER_MISMATCH|ORIGIN_RETURN_FIELDS_INVALID|MULTIPLE_ORIGIN_RETURNS_REVIEW)|UNEXPECTED_ISSUE_READ)/);
+  assert.equal(trace.some(v=>v[0]==='run'),false);
+ }
+});
+test('owner result missing or incomplete must not trigger PR/CI fetch',async()=>{
+ for(const mutation of [
+  f=>{f.incidentComments[0].issue_url=url(1001);},
+  f=>{f.incidentComments.splice(0,1);},
+  f=>{f.incidentComments.push(structuredClone(f.incidentComments[0]));},
+ ]){
+  const f=fixture(),trace=[];mutation(f);
+  await assert.rejects(readAndReviewOwnerReturn({
+   originIssueNumber:1063,io:mockedReadIO(f,trace)
+  }),/OWNER_RESULT_COMMENT_MISSING_OR_DUPLICATE/);
+  assert.equal(trace.some(v=>v[0]==='pr'||v[0]==='run'),false);
+ }
+});
+test('readback rejects invalid input and missing IO without assuming a successful empty state',async()=>{
+ const f=fixture(),trace=[],io=mockedReadIO(f,trace);
+ for(const original of [0,NaN,'1063',1068.5]){
+  await assert.rejects(readAndReviewOwnerReturn({
+   originIssueNumber:original,io
+  }),/OWNER_READ_IO_INVALID/);
+ }
+ await assert.rejects(readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:{...io,readRun:undefined}
+ }),/OWNER_READ_IO_INVALID/);
+ assert.deepEqual(trace,[]);
+});
+test('failed PR or CI provenance cannot be treated as a reviewed original result',async()=>{
+ const f=fixture(),trace=[];f.testRun.conclusion='failure';
+ await assert.rejects(readAndReviewOwnerReturn({
+  originIssueNumber:1063,io:mockedReadIO(f,trace)
+ }),/RESULT_TEST_RUN_PROVENANCE_STOP/);
+ assert.equal(trace.length,6);
 });

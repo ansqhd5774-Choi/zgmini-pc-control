@@ -123,3 +123,60 @@ export function reviewOwnerHandoffReturn({
     operationalWrites:0,automaticPcRetries:0,
   });
 }
+
+
+// Connect the existing GitHub read-only tools to the pure reviewer.
+// The injected io must fetch AUTHENTICATED, FULLY PAGINATED GitHub results;
+// it must not supply caller-fabricated Issue/PR/Run data. No writes or retries.
+// The original Issue number is the only caller-selected locator. Everything
+// else is obtained from exact, correlated bot/owner receipts.
+export async function readAndReviewOwnerReturn({originIssueNumber,io}={}){
+  if(!safeIssue(originIssueNumber)||!io||
+     ['readIssue','readIssueComments','readPullRequest','readRun']
+      .some(k=>typeof io[k]!=='function'))
+    forbidden('OWNER_READ_IO_INVALID');
+  const original=await io.readIssue(originIssueNumber);
+  if(original?.number!==originIssueNumber)
+    forbidden('OWNER_ORIGIN_READBACK_NUMBER_MISMATCH');
+  const returned=await io.readIssueComments(originIssueNumber);
+  if(!commentsValid(returned?.comments,returned?.complete))
+    forbidden('OWNER_ORIGIN_COMMENTS_INCOMPLETE');
+  const originComments=returned.comments;
+  const matching=originComments.filter(c=>c?.user?.login===BOT&&
+    typeof c.body==='string'&&c.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n'));
+  // An unverified "no result" must not hide a corrupted origin or an
+  // incomplete scan. The pure reviewer validates the original request first.
+  if(matching.length===0)return reviewOwnerHandoffReturn({
+    originIssue:original,originComments,originCommentsComplete:true,
+  });
+  if(matching.length!==1)forbidden('OWNER_MULTIPLE_ORIGIN_RETURNS_REVIEW');
+  if(matching[0].issue_url!==issueURL(originIssueNumber))
+    forbidden('OWNER_ORIGIN_RECEIPT_WRONG_ISSUE');
+  const id=matching[0].body.match(/^handoffIssue: ([1-9][0-9]{0,15})$/m);
+  const resultId=matching[0].body.match(/^resultId: (result-[a-z0-9-]{12,80})$/m);
+  if(!id||!resultId||!safeIssue(Number(id[1]))||
+     Number(id[1])===originIssueNumber)
+    forbidden('OWNER_ORIGIN_RETURN_FIELDS_INVALID');
+  const incidentNumber=Number(id[1]);
+  const incident=await io.readIssue(incidentNumber);
+  if(incident?.number!==incidentNumber)
+    forbidden('OWNER_INCIDENT_READBACK_NUMBER_MISMATCH');
+  const candidate=await io.readIssueComments(incidentNumber);
+  if(!commentsValid(candidate?.comments,candidate?.complete))
+    forbidden('OWNER_INCIDENT_COMMENTS_INCOMPLETE');
+  const incidentComments=candidate.comments;
+  const ownerResults=incidentComments.filter(c=>knownResult(c,resultId[1],incidentNumber));
+  if(ownerResults.length!==1)
+    forbidden('OWNER_RESULT_COMMENT_MISSING_OR_DUPLICATE');
+  const result=parseAgentResult(ownerResults[0].body);
+  // No arbitrary repo or URL is accepted by the result schema.
+  // These calls fetch *read-only* PR/CI facts with the existing GitHub tools.
+  const pr=await io.readPullRequest(
+    result.pullRequest.repository,result.pullRequest.number);
+  const run=await io.readRun(result.testRun.repository,result.testRun.runId);
+  return reviewOwnerHandoffReturn({
+    originIssue:original,originComments,originCommentsComplete:true,
+    incidentIssue:incident,incidentComments,incidentCommentsComplete:true,
+    pullRequest:pr,testRun:run,
+  });
+}
