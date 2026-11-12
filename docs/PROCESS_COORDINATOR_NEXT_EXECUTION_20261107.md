@@ -63,6 +63,23 @@
 - 새 사건·권한·소스 변화가 없는 한 오래된 성공 재검증, 문서만 반복 갱신, 정규 예약 검증을 기능 완료 선행조건으로 만들지 않는다.
 - 최종 보고: 이번 작업의 수행/검증/실제 문제/다음 **단일 필수 행동**, 원본 링크와 단계별 진행률. 다른 ChatGPT 대화의 자동 수신이나 Production 배포 완료 추정 금지.
 
+
+### 0.7 2026-11-13 후속 실행 — 중앙 자동화 재검증·Runner 조회기 수정
+
+**P2 중앙 예약 첫 재개 실행 실증:**
+- 기존 자동화 `Automation_9a403a04a8ac8191a331e94f9abeb1b4`는 `is_enabled=true`. 2026-11-12T15:18:25Z~15:22:08Z **첫 재개 후 Run `0f2947c8-2bbc-8329-a5a8-3735717a5cb3` `completed`, `requires_user_action=false`**. 신규 `agent-handoff` 없음(기존 8개 사건만), GitHub/PC 수리 쓰기 0건. 결과 전달 상태는 `unknown`이며 타 일반챗 자동 재개는 증명되지 않음.
+- 자동화 최초 Run은 접수 Workflow 실패·시간초과 조회가 미완료라 완전한 `NO_WORK`를 보장하지 않았다. 총괄이 별도 읽기 전용으로 저장소 `actions/runs?status=failure&per_page=100`, `...status=timed_out&per_page=100`를 조회했다. failure 전체 140개 중 조회 100개, 100번째 실행 시각 2026-11-04T22:29:35Z(요구한 최근 24시간보다 이전), timed_out 전체 0개. **2026-11-11T15:23Z~2026-11-12T15:23Z 접수 Workflow 2개(PC/Writer B) 중 failure/timed_out 0건**. 이 범위에서 검증된 신규 수리 대상 없음, 과거 11/09 실패는 최신 사건으로 소급 선정하지 않음.
+- 기존 중앙 자동화 **새 예약 없음·기존 시간당 일정 유지**. 효율 개선을 위해 실패/시간초과 API 상태 필터→workflow 이름·24시간 경계→결과/receipt 확인, 첫 페이지가 조회 범위를 다 덮지 못하면 추가 페이지·미확정 처리 규칙만 동일 작업 프롬프트에 삽입·저장·재조회했다. 자연 발생 신규 실패 확인 의무와 보안 제한은 불변.
+
+**공통 진단기 실제 오류에 대한 최소 수정:**
+- 최신 `main` `tools/automation-status.mjs`의 `rows?.length===6`은 GitHub에 전용 운영 Runner 6좌석과 별도 격리 Runner 1대가 등록된 상황에서 `runnerSetOnline=false` 오탐이 될 수 있다. 동일 `main`의 `tools/update.mjs::dedicatedPcRunnerRows`는 이미 **운영 6개 이름 정확히 한 번씩** 확인해 독립 격리 Runner를 제외하는 정본 구현이다.
+- main 기준 별도 브랜치 `codex/automation-status-dedicated-six-r1-20261113`에 해당 구현을 재사용하고 `tests/automation-status.test.mjs`를 보강. 기존 격리 PC의 무료 CI만 사용하는 `.github/workflows/automation-status-readonly-source-tests.yml` 최소 1개 추가. **[Draft PR #1324](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1324)** 최종 HEAD `f7a52fde359aa574c803449ab9f0fa2547482592`, 3파일 변경, FORCE push/rebase 없음.
+- 새 전용 [Run #43247186728](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43247186728) **14/14 PASS**, `AUTOMATION_STATUS_SOURCE_ONLY_ISOLATED_HOST=TRUE`, 여섯 운영 Runner + 격리 Runner 정상/운영 누락·오프라인·중복 거부 검사 포함. 기존 [#996 source CI Run #43247186807](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43247186807) **27/27 PASS**. 두 결과는 같은 새 HEAD의 SOURCE_ONLY 검증이지 `main` 병합·Windows 운영 설치/복구는 아니다.
+- PC 설치 정책/Source/계산기·DB/D1/예약/Workflow 실행 경로 변경 0건. 병합·실제 Windows 유지보수기 등록은 **별도 적용 담당의 기존 승인 절차**로만 진행한다. 즉시 #996 C급 NO-GO를 해제하거나 `AUTOMATION_STATUS`를 설치 A급으로 간주하지 않는다.
+
+**남은 단일 필수 행동과 종료조건:** #996 이전 C 시도의 **post-C Windows 원본 상태**를 기존 승인된 정규 읽기 전용 수단으로 회수해 `claim/lease/Workflow/backlog/ledger/protected fingerprint`를 GitHub 원본과 대조한다. 현재 설치 Controller config에는 이를 완결하는 A급 operation이 없어 `PC_READBACK_PENDING / AUTOMATION_BLOCKED`로 한정한다. 새 임의 shell/C재실행/lock 해제는 하지 않는다. 자연 Writer B 5번째 실증 및 자원 수명주기 5번째 실증은 `DEFERRED`로 유지하고 독립 기능 진행을 차단하지 않는다.
+
+
 ---
 
 
