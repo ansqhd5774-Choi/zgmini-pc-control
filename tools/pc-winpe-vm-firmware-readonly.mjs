@@ -167,6 +167,28 @@ export function probeVmDiscovery({
      'VM_DISCOVERY_SCOPED_OBSERVED',...parsed});
 }
 
+// C996 host-context preflight: compare only the fixed, already-observed
+// interactive console profile. Never emit account names, paths, SID or token.
+// A name/profile match is NOT a Windows access-token or VM registry attestation.
+export function probeRunnerConsoleProfile({
+ platform=process.platform,username=()=>os.userInfo().username,
+ userProfile=process.env.USERPROFILE,
+}={}){
+ const base={scope:'RUNNER_PROCESS_CONTEXT_VS_FIXED_CONSOLE_PROFILE',
+  accountNameMatchesConsole:null,profilePathMatchesConsole:null,
+  sameWindowsPrincipalVerified:false,vmRegistrySharedVerified:false,
+  vmRegistrationAuthorized:false};
+ if(platform!=='win32')return Object.freeze({...base,status:'STATE_UNKNOWN',code:'RUNNER_CONTEXT_WINDOWS_ONLY'});
+ let name;
+ try{name=username();}catch{return Object.freeze({...base,status:'STATE_UNKNOWN',code:'RUNNER_CONTEXT_UNAVAILABLE'});}
+ if(typeof name!=='string'||!name||typeof userProfile!=='string'||!userProfile)
+   return Object.freeze({...base,status:'STATE_UNKNOWN',code:'RUNNER_CONTEXT_UNAVAILABLE'});
+ const accountNameMatchesConsole=name.toLowerCase()==='ansqh';
+ const profilePathMatchesConsole=path.win32.normalize(userProfile).toLowerCase()==='c:\\users\\ansqh';
+ return Object.freeze({...base,status:'PASS',code:'RUNNER_CONTEXT_SCOPED_OBSERVED',
+  accountNameMatchesConsole,profilePathMatchesConsole});
+}
+
 export function probeVmFirmware({
  platform=process.platform,spawn=spawnSync,vmProbe=probeFixedVmPrograms,
  discoveryProbe=probeVmDiscovery,
@@ -201,6 +223,7 @@ export function probeVmFirmware({
   firmware,readiness,
   vmPrograms:vm.programs.map(x=>({id:x.id,status:x.status})),
   vmDiscovery:discovery,
+  runnerConsoleProfile:probeRunnerConsoleProfile({platform}),
   vmPathsMode:'STANDARD_C_PATHS_ONLY',portableInstalls:'NOT_CHECKED',
   binaryPresentAtFixedPath:vm.programs.some(x=>x.status==='FILE_PRESENT'),
   vmOperationallyTested:false,vmInstalledByProbe:false,winpeBooted:false,
