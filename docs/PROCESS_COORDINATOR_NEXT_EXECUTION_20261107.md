@@ -135,6 +135,16 @@
 
 **상태 불변:** 중앙 인계 8/8 DONE, 격리 Writer B E2E 4/5 DEFERRED, 공유 자원 수명주기 4/5 DEFERRED, #996 C NO-GO, 실운영 쓰기 0. 다음 필수 C step은 **새 namespace entry 경합을 봉쇄할 수 있는 승인 가능한 OS 배타 구조를 source-only/격리 PC에서 실증하고, owner 신규 C 승인 전 두 STOP 유지**.
 
+### 0.12 2026-11-13 C996 TEMP 네이티브 namespace 삽입 경합 재현
+
+**C 원담당/격리 Runner 실증 결과 — 운영 실행과 분리.** 원본 `tools/controller-996-c-native-owner-operator.mjs`를 **수정하지 않고** `build996OwnerArchiveFixtureScript()`의 `Fixture=true` 모드로 공통 대기열 PC `DESKTOP-N62L0NG`의 고유 `%TEMP%` fixture만 사용. 기존 `owner.json` 열린 SHA/identity 핸들이 있어도 `simulateNamespaceInsert:true`가 **새 `competing.json` 파일을 생성**할 수 있음이 실측됐다. C# 결과 `C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED`, `moveOccurred=false`·원본 JSON 동일·목표 디렉터리 미생성을 Node assertions 확인. 실제 두 개 외부 Writer의 병렬 경합 시험은 아니며, 코드 자체에 삽입을 시뮬레이션한 실물 Windows 파일 시스템 음성 사례다.
+
+- 신규 TEMP-only 재현 [테스트 커밋 `d44eb0c8`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/d44eb0c8d3db57795fe3def4073a75375e91bc63), 격리 CI 경로 반영 [`7a0a11e0`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/commit/7a0a11e0cc4fac62272b9bc5c06382209a89774a).
+- 실제 [Windows Run #43254827851](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43254827851), Job 131310108901 **COMPLETED/SUCCESS**; host guard PASS, Node **5/5 PASS / 0 FAIL**. **이 PASS는 결함 재현/운영 차단 유지 PASS**이며 운영 C급 설치·배타성 해소 아님.
+- [#996 담당 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6828878228) 완료. `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`, `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN` **두 안전 STOP 불변**. 원본 PC C/Workflow/Backlog/lease/Claim·원본 요청 재실행 변경 0.
+
+**다음 단일 필수 결정(#996 C Owner):** 온라인 디렉터리 핸들만으로는 배타성이 성립하지 않으므로, 기존 **동일 기존 ZGMINI PC를 WinPE로 부팅하는 오프라인 독점 설계** 또는 독립적으로 입증 가능한 실제 namespace 단독 접근 수단 중 하나를 선택하여 **격리 시뮬레이션/원본 신원·Owner C 승인 조건**을 검증한다. 기존 R3/R4와 지난 7/7·29/29은 재사용하며 동일 명령·기존 requestId를 다시 실행하지 않는다. #996 C NO-GO는 이 공유 설치 효과에 한정; 중앙 8/8 DONE, 신규 격리 자연 Writer B E2E 4/5 DEFERRED, 다른 기능 무관 독립 진행 유지.
+
 ## 1. 기존 5건 판정 — 4/5 완료(80%)
 
 | ID | 상태 | 재사용 근거 |
