@@ -1,0 +1,55 @@
+{
+  "schema": "ZGMINI_PC_WINPE_VM_FIRMWARE_RESULT_V1",
+  "status": "PASS",
+  "code": "VM_FIRMWARE_FIXED_PATHS_READONLY_OBSERVED",
+  "firmware": {
+    "VM_MONITOR": true,
+    "SLAT": true,
+    "FIRMWARE_ENABLED": true,
+    "HYPERVISOR_PRESENT": false
+  },
+  "readiness": "VM_HARDWARE_FEATURES_PRESENT_ONLY",
+  "vmPrograms": [
+    {
+      "id": "VIRTUALBOX",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "QEMU",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "VMWARE_WORKSTATION_X64",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "VMWARE_WORKSTATION_X86",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "VMWARE_PLAYER",
+      "status": "ABSENT_AT_FIXED_PATH"
+    },
+    {
+      "id": "HYPERV_CONNECT",
+      "status": "ABSENT_AT_FIXED_PATH"
+    }
+  ],
+  "vmPathsMode": "STANDARD_C_PATHS_ONLY",
+  "portableInstalls": "NOT_CHECKED",
+  "binaryPresentAtFixedPath": false,
+  "vmOperationallyTested": false,
+  "vmInstalledByProbe": false,
+  "winpeBooted": false,
+  "bootAuthorized": false,
+  "cExecutionAuthorized": false,
+  "operationalWrites": 0,
+  "automaticRetries": 0,
+  "requestId": "fe4b60dc-9353-40a2-9f79-1092a6361d40",
+  "issueNumber": 1268,
+  "runId": "43128803972",
+  "attempt": "1",
+  "role": "handoff",
+  "host": "DESKTOP-N62L0NG",
+  "runner": "zgmini-handoff-ci-spare-01"
+}
