@@ -174,6 +174,46 @@ static int c996_read_fixed_directory(
   return 1;
 }
 
+/*
+ * Validate EVERY fixed ancestor, not just the final child. A reparse in
+ * ZGmini, automation, maintenance or leases must never be silently followed
+ * on a deeper path. These are repeatable observations, NOT an atomic namespace
+ * lock: a real C move still requires an authorized offline exclusive boot.
+ */
+static int c996_read_fixed_component_chain(
+    const WCHAR *volumeGuid, const WCHAR *relative,
+    ULONGLONG expectedSerial, c996_source_only_native_id *out) {
+  WCHAR prefix[C996_FIXED_MAX_PATH];
+  c996_source_only_native_id observed;
+  const WCHAR *next;
+  HRESULT hr;
+  if (!volumeGuid || !relative || !out) return 0;
+  hr=StringCchCopyW(prefix,C996_FIXED_MAX_PATH,volumeGuid);
+  if (FAILED(hr) || !c996_read_fixed_directory(prefix,expectedSerial,&observed))
+    return 0;
+  next=relative;
+  while (*next) {
+    const WCHAR *slash=wcschr(next,L'\\');
+    size_t count=slash ? (size_t)(slash-next) : wcslen(next);
+    if (!count || count > 160) return 0;
+    /* The only permitted relative names are compiled fixed constants. */
+    if ((count==1 && next[0]==L'.') ||
+        (count==2 && next[0]==L'.' && next[1]==L'.'))
+      return 0;
+    hr=StringCchCatNW(prefix,C996_FIXED_MAX_PATH,next,count);
+    if (FAILED(hr) ||
+        !c996_read_fixed_directory(prefix,expectedSerial,&observed))
+      return 0;
+    if (!slash) break;
+    hr=StringCchCatW(prefix,C996_FIXED_MAX_PATH,L"\\");
+    if (FAILED(hr)) return 0;
+    next=slash+1;
+    if (!*next) return 0;
+  }
+  *out=observed;
+  return 1;
+}
+
 /* Caller must verify the exact JSON/bytes and trust evidence independently. */
 c996_source_only_read_status c996_source_only_collect_eight_ids(
     const WCHAR *untrustedVolumeGuid,
@@ -181,7 +221,6 @@ c996_source_only_read_status c996_source_only_collect_eight_ids(
     const WCHAR *untrustedContinuationUuid,
     c996_source_only_volume_observation *out) {
   c996_source_only_volume_observation observation;
-  WCHAR fullPath[C996_FIXED_MAX_PATH];
   WCHAR continuationPath[C996_FIXED_MAX_PATH];
   ULONGLONG expectedSerial;
   size_t i,j;
@@ -207,13 +246,9 @@ c996_source_only_read_status c996_source_only_collect_eight_ids(
       if(FAILED(hr)) return C996_NATIVE_ID_READ_BLOCKED;
       relative=continuationPath;
     }
-    hr=StringCchCopyW(fullPath,C996_FIXED_MAX_PATH,untrustedVolumeGuid);
-    if(FAILED(hr)) return C996_NATIVE_ID_READ_BLOCKED;
-    hr=StringCchCatW(fullPath,C996_FIXED_MAX_PATH,relative);
-    if(FAILED(hr)) return C996_NATIVE_ID_READ_BLOCKED;
     observation.fixedKey[i]=c996_fixed_keys[i];
-    if(!c996_read_fixed_directory(fullPath,expectedSerial,
-                                 &observation.directories[i]))
+    if(!c996_read_fixed_component_chain(untrustedVolumeGuid,relative,
+          expectedSerial,&observation.directories[i]))
       return C996_NATIVE_ID_READ_BLOCKED;
     /* Detect duplicated directory identities, not merely repeated names. */
     for(j=0;j<i;++j)
