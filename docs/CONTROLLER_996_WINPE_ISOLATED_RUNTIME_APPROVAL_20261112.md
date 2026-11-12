@@ -154,3 +154,12 @@
 - 이 명령은 `ZGMINI-C996-WinPE-TestOnly` 1개 VM 정의의 설정만 변경하고 VM이나 가상 HDD/ISO를 생성·부팅·삭제하지 않는다. **실행 출력은 아직 미수신**이므로 `ISOLATION_MODIFY_NOT_OBSERVED`. VM 상태가 running/saved, 명령 미지원, 권한 오류 시 STOP하고 정확한 FIRST FAIL을 확인한다. CMD 실패를 성공으로 간주하고 이어서 광학매체를 붙이지 않는다.
 - **다음 단계 조건부**: 위 `modifyvm` 성공을 받은 후 IDE 광학 controller **없음**을 확인하고 기존 사용자 ISO SHA PASS를 재사용해 ISO를 읽기 전용 광학 매체로 연결. `VBoxManage showvminfo`에서 메모리·CPU·BIOS/부팅·네트워크 1~8 `none`, USB OFF, HDD/raw disk NONE, shared folders none, 정확한 ISO 경로/이미지 여부를 검사한 후에만 TEST_ONLY 단회 부팅을 판단한다.
 - **승인 경계:** C급 실제 운영 복구 `NO-GO`; 운영 `PC`·공유 저장·예약·Runner 계정 전환 없음; RDC 사용하지 않음.
+
+## 2026-11-13 — VBoxManage modifyvm 등록 VM 검색 FIRST FAIL
+
+- **실행 PC/증거:** 공통 대기열 PC `DESKTOP-N62L0NG`, 원래 사용자 `C:\Users\ansqh` CMD 스크린샷. 앞선 동일 사용자 CMD의 `createvm --register`는 성공 문구·UUID `ef4ba42b-1b14-49fc-8a0d-67d55250c720`·기본 VM 경로를 반환했음. **현재 증거만으로 실제 등록 상태 영속성은 미확정**.
+- **FIRST FAIL:** `"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" modifyvm "ZGMINI-C996-WinPE-TestOnly" --memory 2048 ...` 실행 직후 `Could not find a registered machine named 'ZGMINI-C996-WinPE-TestOnly'`, `VBOX_E_OBJECT_NOT_FOUND (0x80bb0001)`, `FindMachine(...)` 오류. `modifyvm`의 새 RAM/CPU/BIOS/NIC/USB/clipboard 설정은 **미적용**. 원인으로 이름 문자열 불일치·사용자 계정별 VirtualBox.xml 등록 범위·설정 경로 변경 등이 가능하지만 어느 것도 확정하지 않는다.
+- **즉시 STOP:** `createvm` 재실행·`registervm`·`unregistervm`·VM 파일 이동/삭제/재생성/ACL 변경·`modifyvm` 반복·ISO 연결·guest boot 금지. 기존 성공 등록 명령과 새 실패의 상충 증거를 우선 해소.
+- **다음 단일 읽기 실행/동일 PC의 원래 `ansqh` 사용자 CMD:** `"C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" list vms`. 결과에 등록된 정확한 이름·UUID `ef4ba42b-1b14-49fc-8a0d-67d55250c720`가 있는지 확인. `list vms`가 비어 있으면 **등록이 보이지 않는 현재 상태**로 분류하고 `VBOX_USER_HOME`과 실행 Windows 사용자 및 원래 `.vbox` 존재 여부만 읽기 전용으로 판정한 뒤 조치를 결정한다. 해당 VM이 나타나면 `showvminfo <관측된 UUID>`로 상세 설정을 먼저 읽고, 그 이후 정확한 수정 명령을 다시 계획한다. UUID가 불일치하면 임의 수정 금지.
+- **Runner:** 기존 `zgmini-handoff-ci-spare-01`의 고정 A는 VM 설치 바이너리·펌웨어만 확인하며 Windows interactive 사용자 `VirtualBox.xml` 목록 검증을 제공하지 않는다. 다른 서비스 계정에 임의 VBoxManage 실행 금지.
+- **상태:** `LAST_PASS=USER_CMD_CREATEVM_REGISTERED` / `FIRST_FAIL=VBOX_E_OBJECT_NOT_FOUND` / `VM_REGISTRATION_STATE_UNKNOWN` / `ISOLATION_NOT_APPLIED` / `GUEST_BOOT_NOT_EXECUTED`. C급 실제 운영 복구 `NO-GO` 유지, 기존 운영 PC `PC` 변경 0, RDC 사용 0.
