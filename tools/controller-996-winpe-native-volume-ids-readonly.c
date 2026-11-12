@@ -236,7 +236,6 @@ c996_source_only_read_status c996_source_only_collect_eight_ids(
   for(i=0;i<C996_FIXED_ID_COUNT;++i) {
     const WCHAR *relative=c996_fixed_relative_paths[
        i<7 ? i : 0];
-    ZeroMemory(fullPath,sizeof(fullPath));
     if(i==7) {
       hr=StringCchCopyW(continuationPath,C996_FIXED_MAX_PATH,
                         c996_continuation_prefix);
