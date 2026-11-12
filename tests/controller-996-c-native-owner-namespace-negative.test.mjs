@@ -168,3 +168,70 @@ test('WinPE-style native FILE_ID_INFO identifies the same directory across a ren
     fs.rmSync(root,{recursive:true,force:true});
   }
 });
+
+
+const nativeVolumeReaderPath=new URL(
+  '../tools/controller-996-winpe-native-volume-ids-readonly.c',import.meta.url);
+
+test('eight pinned WinPE directory identities can only be collected by an inert native reader',()=>{
+  const source=fs.readFileSync(nativeVolumeReaderPath,'utf8');
+  assert.match(source,/#if defined\(C996_ENABLE_C_GRADE_OPERATOR\)\s*#error/);
+  assert.match(source,/#define C996_FIXED_ID_COUNT 8/);
+  for(const key of ['VOLUME_ROOT','ZGMINI','AUTOMATION','MAINTENANCE',
+                    'LEASES','OLD_C','INSTALL','CONTINUATION'])
+    assert.ok(source.includes('"'+key+'"'),'missing fixed '+key);
+  assert.match(source,/c996_valid_volume_guid\(untrustedVolumeGuid\)/);
+  assert.match(source,/c996_valid_uuid\(untrustedContinuationUuid\)/);
+  assert.match(source,/c996_expected_serial\(untrustedVolumeSerial/);
+  assert.match(source,/CreateFileW\(fullPath,FILE_READ_ATTRIBUTES,/);
+  assert.match(source,/FILE_FLAG_BACKUP_SEMANTICS\|FILE_FLAG_OPEN_REPARSE_POINT/);
+  assert.match(source,/GetFileInformationByHandleEx\(h,FileAttributeTagInfo,/);
+  assert.match(source,/GetFileInformationByHandleEx\(h,FileIdInfo,/);
+  assert.match(source,/FILE_ATTRIBUTE_REPARSE_POINT/);
+  assert.match(source,/C996_NATIVE_ID_READ_COMPLETE_UNTRUSTED/);
+  assert.match(source,/observation\.idsCollected=C996_FIXED_ID_COUNT/);
+  assert.match(source,/observation\.isSourceOnlyObservation=1/);
+  assert.doesNotMatch(source,/\b(?:SetFileInformationByHandle|MoveFileExW|WriteFile|DeleteFileW|RemoveDirectoryW|CreateDirectoryW|ShellExecuteW|WinExec|RegSetValueExW|ExitWindowsEx)\s*\(/);
+  assert.doesNotMatch(source,/(?:^|\n)\s*(?:int|void)\s+main\s*\(/);
+  assert.doesNotMatch(source,/executionAuthorized\s*=\s*(?:true|1)/i);
+});
+
+test('native fixed eight-ID WinPE reader builds as x64 object when isolated MSVC is installed',{
+  skip: !hostAllowed && 'Only existing isolated Windows C: TEMP runner may compile',
+},(t)=>{
+  const pf86=process.env['ProgramFiles(x86)'];
+  if(!pf86) return t.skip('MSVC installation root unavailable; no fallback install');
+  const vswhere=path.join(pf86,'Microsoft Visual Studio','Installer','vswhere.exe');
+  if(!fs.existsSync(vswhere)) return t.skip('vswhere not installed, no new compiler installation');
+  const vs=spawnSync(vswhere,['-latest','-products','*',
+    '-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+    '-property','installationPath'],{
+    encoding:'utf8',windowsHide:true,timeout:12000,maxBuffer:8000});
+  if(vs.status!==0||vs.error) return t.skip('MSVC discovery not available');
+  const root=String(vs.stdout).trim().split(/\r?\n/)[0]||'';
+  const dev=path.join(root,'Common7','Tools','VsDevCmd.bat');
+  if(!root||!fs.existsSync(dev))return t.skip('x64 MSVC tools not installed');
+  const tmp=fs.realpathSync.native(os.tmpdir());
+  assert.equal(path.win32.parse(tmp).root.toLowerCase(),'c:\\');
+  const output=fs.mkdtempSync(path.join(tmp,'zgmini-996-native-reader-build-'));
+  try{
+    const object=path.join(output,'reader.obj');
+    const reader=path.fileURLToPath
+      ? path.fileURLToPath(nativeVolumeReaderPath)
+      : decodeURIComponent(nativeVolumeReaderPath.pathname.replace(/^\/([A-Z]:)/i,'$1'));
+    const command='call "'+dev+'" -arch=x64 -host_arch=x64 >nul && '+
+      'cl.exe /nologo /W4 /WX /TC /c /D_WIN32_WINNT=0x0A00 '+
+      '/Fo:"'+object+'" "'+reader+'"';
+    const c=spawnSync(process.env.ComSpec||'cmd.exe',['/d','/c',command],{
+      encoding:'utf8',windowsHide:true,timeout:60000,maxBuffer:100000});
+    assert.equal(c.error,undefined,c.error?.message);
+    assert.equal(c.status,0,'isolated native object compile failed: '+
+      String(c.stdout).slice(-1700)+' '+String(c.stderr).slice(-1700));
+    assert.equal(fs.statSync(object).isFile(),true);
+    assert.ok(fs.statSync(object).size>100);
+    // Compile only. This intentionally does not execute or trust any WinPE C operator.
+  }finally{
+    assert.ok(path.basename(output).startsWith('zgmini-996-native-reader-build-'));
+    fs.rmSync(output,{recursive:true,force:true});
+  }
+});
