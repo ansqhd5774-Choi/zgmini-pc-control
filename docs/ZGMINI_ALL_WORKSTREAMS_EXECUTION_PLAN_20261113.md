@@ -2,6 +2,15 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 59차 — 운영 6좌석/격리 PC Runner 진단 출력 혼선 실제 소스 수정
+
+- **원인·정확한 위험:** [Draft Controller status PR #1360](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1360)의 `dedicatedPcRunnersOnline()`은 기존부터 이름 정확히 `zgmini-pc-01`~`06`만 판정하지만, `collectAutomationStatus().runners` 원래 출력은 **같은 GitHub 저장소의 모든 등록 Runner**를 출력했다. 별도 `zgmini-handoff-ci-spare-01` 격리 PC가 운영 PC 상태표에 잘못 포함돼 #1351 6좌석 상태 판정/인계에 혼동 위험이 있었다. 이 구체적 소스 간극을 확인해 중앙이 자신이 소유하는 기존 PR에서 수정.
+- **SOURCE_ONLY 실제 코드 수정:** 제어 PR #1360의 기존 2파일만 변경: `tools/automation-status.mjs`는 새 `operatingPcRunnerEvidence(rows)`를 통해 정확히 6개 이름만 고정 순서로 반환, 개별 `registration=SINGLE|MISSING|DUPLICATE`, `status=online|offline|null`, `busy=true|false|null` 안전 읽기 출력. GitHub Runner query 및 기존 `summarizeAutomation` HEALTHY/Watcher/Guardian/재기동/임대·승인 판단 전부 **불변**, 외부 추가 Runner와 민감한 원본 필드 출력 불가. `tests/automation-status.test.mjs` 2개 회귀 추가(격리 Runner 제외/누락·중복·잘못된 필드 null). 최종 PR 브랜치 HEAD `c3d70811261b13176b74836ab81e545be6a84cd9`, open Draft, 2파일.
+- **동일 환경 신규 Windows 검증:** [격리 Windows SOURCE_ONLY CI Run #43509255855](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43509255855) / Job `132174972407` = `node --test --test-concurrency=1 tests/automation-status.test.mjs`, **24/24 PASS, FAIL 0, `AUTOMATION_STATUS_SOURCE_ONLY_ISOLATED_HOST=TRUE`**. 격리 PC Runner가 실제 CI 작업을 처리했다는 특정 시각 증거이나 운영 PC 6 Runner 상태나 현재 Controller 배포 증거는 아님. 관련 C996 CI [#43509255909](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43509255909)는 별도 27검사, 이 24검사와 합산하지 않음.
+- **실제 운영 #1351 유지:** Run #43429486924 / Job `131899103441` 마지막 재조회 `queued/conclusion=null`, Windows 결과 0. #996 C80% NO-GO는 공유 설치에만 한정, 현행 운영 PC Watchdog/Supervisor/Runner 6/lease `STATE_UNKNOWN`. 59차 새 소스와 격리 CI는 승인 없는 PC 설치·등록·운영 A 증거 아님. #1351 중복 요청/기존 job 재실행/강제 재기동/lock 삭제/RDC/DB·D1·Cloudflare·Runner 등록 변경 0.
+- **유휴 작업자:** 사용자가 1명 별도 유휴 작업자가 있음을 알림. 기존 6개 전담의 소유 구현·공유 Controller 쓰기에 임의 투입하지 않고, 충돌 없는 독립 검증 필요 시 원본·범위를 명시해 사용자에게 인계. 유휴라는 사실만으로 GitHub Issue 전달·ChatGPT 대화 자동 재개·실행을 완료로 간주하지 않음.
+- **다음 필수 실행 한 개(중앙 승인 운영 PC Owner):** 기존 설치/허용된 read-only 원본 경로에서 운영 6 Runner Online/Busy, Watchdog/Guardian STOP/PAUSE/DRAIN, Supervisor PID/heartbeat 및 #996 설치 lease·actual installed SHA를 현재 시각 한 번 검증해 #1351 Job 배정 불가 원인 LAST PASS/FIRST FAIL을 분리. 확인 전에는 원인 단정/비인가 Controller 업데이트 없음. 기능 진행 42/95/87.5/20/25/75, 6개 단순평균 **57.4%→57.4%**(종단 완료 아니며 이번 CI의 완료율 아님).
+
 ## 2026-11-14 58차 — 유휴 일반챗 6개 재개 지시 준비 / 현행 PC 미배정 원본 계약 좁히기
 
 - **시작:** 사용자가 일반챗 담당자 6개 모두 중앙 58차 지시 수신 전까지 대기 중이라고 명시. GitHub #68 댓글은 타 대화의 자동 수신이 아니므로 중앙에 실행 계약을 먼저 기록하고 사용자에게 **공통 전달문 1개**를 제공한다. 사용자 전달 후 각 원담당이 실제로 해당 대화에서 실행한다. 최초 실제 수신·실행은 회신으로 판단.
