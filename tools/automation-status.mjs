@@ -117,7 +117,7 @@ export function summarizeSupervisorReadOnly({supervisor=null,owner=null,state}){
  const pid=x=>Number.isSafeInteger(x)&&x>0?x:null;
  const rawAt=supervisor?.at;
  const heartbeatAt=typeof rawAt==='string'&&
-  /^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$/.test(rawAt)&&
+  /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(rawAt)&&
   Number.isFinite(Date.parse(rawAt))&&
   new Date(Date.parse(rawAt)).toISOString()===rawAt?rawAt:null;
  return {heartbeatAt,statusPid:pid(supervisor?.pid),ownerPid:pid(owner?.pid),
