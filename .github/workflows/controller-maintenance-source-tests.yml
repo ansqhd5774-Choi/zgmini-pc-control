@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Run scoped maintenance update and heavy-readonly regression tests
+      - name: Verify controller maintenance and pc-job late-label intake regression
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/pc-job-late-label-intake.test.mjs tests/preimage-manifest-contract.test.mjs
       - name: Confirm source-only isolated CI host
         run: |
