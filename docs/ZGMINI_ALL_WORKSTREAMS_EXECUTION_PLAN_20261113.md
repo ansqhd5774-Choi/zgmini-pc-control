@@ -2,6 +2,28 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 72차 — 7개 실제 일반챗 고정·물가 67차 신규 완료·B 승인 분기 분리
+
+**사용자 최신 명시:** 실제 업무 전달 가능한 일반챗은 아래 7개뿐. 별도의 ‘운영 PC 담당자’, ‘Controller 적용 담당자’, ‘D05 담당자’, ‘C급 Owner’, ‘B 승인 담당자’를 새 ChatGPT 대화나 8번째/9번째 작업자로 **가정·신설·전달·수신 주장하지 않는다**. GitHub Issue/댓글은 다른 일반챗의 자동 수신을 의미하지 않으며, 새 지시는 총괄이 사용자에게 전달문으로 제공하고 사용자가 전담 대화에 직접 전달한다.
+
+| 고정 일반챗 | 정확한 담당 대화·브랜치 | 실제 책임·최초 인계 위치 |
+| --- | --- | --- |
+| **1 물가지표** | `물가지표-fix/economic12-inflation-legacy4-r35-20261021` | CPI/PPI·Census 원자료/파서·저장·26개 계산·승인된 공개. B Draft #1336의 **기술 자료** 제공, 임의 승인/실행 금지 |
+| **2 시장 캘린더** | `시장 캘린더-codex/zgmini-gpt-workspace-20261025` | Treasury/FOMC 등 캘린더 및 365일 원문 감사, API 연계 |
+| **3 테마 공포탐욕** | `테마공탐-codex/theme-fear-greed-integration-20261025` | R181/T1 원본·피드 6개·10테마 계산/게시 |
+| **4 고용지표** | `고용지표 - codex/employment-1y-reader-r1` | DOL/BED·51개 지역×577주 원본·29개 결과 |
+| **5 API–사이트 연결** | `API-사이트 연결-codex/api-site-integration-r1-20261026` | D1 5키·API·정확 Deployment/Production 연결 |
+| **6 UIUX 전문가** | `UIUX 전문가-codex/ui-improvements` | PC·모바일 8화면, PR #1068 정규 검토 |
+| **7 독립 지원 담당자** | `독립 지원 담당자` (사용자 추가 브랜치 미지정) | 사용자가 전달·허용한 **독립 read-only 지원**: 운영 Runner 6석/기존 #1351 증거 회수 경로 또는 D05 원자료 계보 감사 등 공통 진단. **전용 브랜치·운영 권한·실행 완료를 임의 가정하지 않음**, 실제 인계된 작업 1개씩 수행 |
+
+**총괄(현재 대화)의 직접 책임 — 별도 ‘8번째 일반챗 작업자’ 아님:** #68 원장·7개 담당 인계·공통 Controller source/승인·설치 경계 조정, #996 C급 NO-GO·Writer B 자동 인계·공유 lease 수명주기 추적, 독립 지원이 없는 공통 문제의 최초 원인 분류. D05 실증 0/68은 7번 독립 지원 **다음 후보**로 지정해 잔여 목록에 유지하되, 7번의 현재 할당·권한을 확인하지 않고 새 업무를 자동 실행했다고 기록하지 않음. 실제 B/C 운영 효과의 권한은 사용자/기존 정규 승인 계약이 통제하며, 가상의 승인 Owner로 넘기지 않음.
+
+**물가 67차 최신 유효 완료점(기존 42% 기능 진행률 보존):** 원담당 GitHub [#68/6867149081](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6867149081), 기능 전용 브랜치 `656b5025f0175186b87c078ec92b7926aebefcc7` (이전 `d4d82f17`보다 4 commits ahead, 변경 **파서+테스트 2파일**). CPI #22/#23 공식 BLS 2025-10 `-`+X 결측의 API형 fixture에서 과거 `BLS_CANDIDATE_VALUE_OR_DUPLICATE` 5/6 재현→결측만 제외/중복 차단 보존→새 6/6 + 순수 검증 10/10 PASS. exact blob `7438dfff403116170f83b67f1b8f3b2cd14b1676`(파서), `e804951cf600c6c3f7990ad8e0bbb7520c1dc11c`(시험). **실PC API 원본 바이트·운영 적용·#22/#23 INVALID 해소 검증 아님**, #28 MISSING, #24 PPI 203 유효 유지.
+
+**동일 원자료지만 별개 실행 경로 — #1336 승인 검토 결과:** 새 수정 `inflation-causal-candidate-bls3.mjs`는 BLS 등록 **API POST** 파서. 반면 [Draft PR #1336](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336) 단회 B는 `inflation-causal-candidate-manual-official-r1.mjs`의 공식 정적 **TSV GET** 및 Census XLSX GET만 고정 4소스파일로 승인 검토하며, 정적 파서는 이미 `raw==='-'`·각주 X를 누락 이력으로 별도 보존함. 새 API 파서의 fix/HEAD `656b`는 B manifest의 고정 4파일과 별개이고 **B source pin은 과거 운영 PC `05d7ae49…`**. 기존 [B PR #1131](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1131)의 manifest와 비교해 Draft #1336의 2필드 `status`/ `sourceSha`만 다름·4파일 sha256·2GET·2JSON·timeout/size·잠금·DB/D1 쓰기 금지 불변. 40/42차 `TECHNICAL_REVIEW_GO` 재사용; 다만 `DRAFT_NOT_APPROVED`, 마지막 opt-in false, 현재 PC SHA 미실측, 기존 #1177 소비, **새 명시 승인/정규 실행 NO-GO**. [이번 별도 리뷰 댓글 #1336/6867262225](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336#issuecomment-6867262225) 기록. 소스 검토를 사용자 승인/운영 효과로 승격하지 않음.
+
+**다음 필수 중앙 실행 한 가지:** 기존 사용자가 지시를 전달했다고 한 운영 PC read-only 진단은 **실제 7번 독립 지원 담당자에게 전달되었는지 불확실**하므로 별도 ‘운영 PC 담당 일반챗’ 결과를 자동 대기하지 않는다. 7번에게 기존 승인된 #1351/Runner6 라벨·Online/Busy·Listener·Supervisor 현장 증거 회수만 명시 인계하고, 접근 권한이 없다면 `AUTOMATION_BLOCKED`로 종료; 실제 결과가 오면 본 총괄에서 원본 Run/Job과 대조. D05는 그 뒤 독립 지원의 차기 후보로 인계. 기능별 원담당 1~6에게 중복 새 지시 없음. 전체 진행률 **57.4%→57.4%**, 물가 **42%→42%**, #996 **80% NO-GO**, 공통 인계/자원 4/5 DEFERRED, 운영 DB/D1/PC/Runner/Cloudflare 변경 0.
+
 ## 2026-11-14 71차 — Core lock 생산자/소비자 교차회귀 격리 Windows 86/86 PASS
 
 - **정확한 새 기여:** 70차 공통 A급 소스 감사의 신형 `inflation-core-lock-observation-readonly`와 `core-runtime-source-readonly` 의미상 호환성 위협을, 가짜 `lockOwner` 값만 넣는 시험에서 **실제 두 export 호출**로 검증하는 non-operational regression test 추가. 구판 producer처럼 `lockOwner` 누락이면 PASS 거부를 직접 증명. 실제 Windows Core/DB를 실행하지 않고 고정 synthetic Task Engine/PID/WMI/lock 샘플을 주입.
