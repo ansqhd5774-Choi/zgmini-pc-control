@@ -47,3 +47,28 @@ test('renamed-but-not-verified remains UNKNOWN with no automated fallback',()=>{
   assert.match(src,/if \(!SetFileInformationByHandle\([\s\S]+?DWORD rename_error = GetLastError\(\);[\s\S]+?C996_NATIVE_TEMP_WIN32_ERROR:%lu/);
   assert.doesNotMatch(src,/system\s*\(|WinExec\s*\(|ShellExecute\s*\(/);
 });
+
+
+test('independent ntdll relative-root probe is TEMP-only, mutually exclusive, and cannot authorize C',()=>{
+  assert.match(src,/#if defined\(C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY\) &&/);
+  assert.match(src,/defined\(C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY\)/);
+  assert.match(src,/#error "Mutually exclusive TEMP rename diagnostics"/);
+  assert.match(src,/#error "Native NT rename diagnostic is TEMP-only"/);
+  assert.match(src,/#define C996_NT_FILE_RENAME_INFORMATION_CLASS 10u/);
+  assert.match(src,/GetModuleHandleW\(L"ntdll\.dll"\)/);
+  assert.match(src,/GetProcAddress\([\s\S]*?"NtSetInformationFile"\)/);
+  assert.match(src,/native_rename\(source_handle, &io_status,[\s\S]*?C996_NT_FILE_RENAME_INFORMATION_CLASS\)/);
+  assert.match(src,/native_status != 0 \|\| io_status\.result\.Status != 0/);
+  assert.match(src,/C996_NATIVE_TEMP_NTSTATUS:/);
+  assert.match(src,/C996_NATIVE_TEMP_MODE:NTDLL_RELATIVE_ROOT_DIAGNOSTIC_ONLY/);
+  assert.match(src,/#error "Production native #996 C operator is intentionally unavailable"/);
+  // Never silently route failed handle-relative native operations to the
+  // unanchored Win32 absolute-path diagnostic.
+  const at=src.indexOf('    native_status = native_rename(');
+  const end=src.indexOf('\n#else\n    if (!SetFileInformationByHandle(',at);
+  assert.ok(at>0&&end>at);
+  assert.doesNotMatch(src.slice(at,end),/SetFileInformationByHandle\(/);
+  assert.match(src.slice(end),/#else[\s\S]*?SetFileInformationByHandle\(source_handle, FileRenameInfo/);
+  assert.match(src,/c996_resolve_rename\(\(c996_file_identity\)\{0\}, archive_id, source_id\)/);
+  assert.doesNotMatch(src,/C996_ENABLE_C_GRADE_OPERATOR/);
+});
