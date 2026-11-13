@@ -64,6 +64,29 @@ test('bot-created incident is directly routed in isolated intake exactly once',a
   assert.equal(f.created.labels.filter(x=>x.name==='handoff-agent-pending').length,1);
 });
 
+test('closed historic bot incident refuses route before any receipt or label',async()=>{
+  const f=fixture();
+  f.created.state='closed';
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /BOT_ISSUE_CLOSED_STOP/);
+  assert.equal(f.postCount,0);
+  assert.equal(f.labelCount,0);
+});
+
+test('closed after a verified receipt refuses the pending-agent state label',async()=>{
+  const f=fixture();let reads=0;
+  const original=f.io.readIssue;
+  f.io.readIssue=async number=>{
+    if(++reads===2)f.created.state='closed';
+    return original(number);
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /BOT_ISSUE_CLOSED_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.labelCount,0);
+  assert.equal(f.created.state,'closed');
+});
+
 test('wrong origin, changed title or body cannot be routed',async()=>{
   for(const alter of [
     f=>{f.created.user.login='ansqhd5774-Choi';},
