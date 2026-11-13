@@ -2,6 +2,18 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 75차 — 중앙 총괄 직접 Watchdog 미래 heartbeat 결함 수정·격리 Windows CI PASS
+
+- **담당 책임 분리:** 사용자가 기존 7번 독립 지원에 D05 후속 조사를 실제 전달함. 이는 중앙 총괄 대기/대체가 아님. 중앙은 본 대화에서 직접 공통 PC 자동화 안전결함 source 수정·관련 회귀·PR/CI·원장 검증을 독립 수행. 1~6 원담당 인계 반복 없음. 7번 D05 실행 결과는 아직 미수신.
+- **중복 수정 회피:** 처음 확인한 운영 Runner6 고정 label 불일치 진단 공백은 이미 기존 총괄 Draft [PR #1360](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1360) HEAD 677ea94822d2659469a77c8cecdb3b913973f0cf에 routeLabelState/MISSING/UNKNOWN + assignmentCandidateAtObservation로 구현·격리 CI 26/26 PASS 완료됨. 이를 새 PR로 반복하지 않고 기존 완료 증거 보존. 운영 실제 Runner 현시각은 여전히 미확인.
+- **신규 실제 소스 결함:** main tools/runner-watchdog.mjs::decide의 `now-Date.parse(heartbeat)<45000`는 **미래 heartbeat도 HEALTHY로 허용**하여 살아 있는 Supervisor의 상태를 거짓 정상으로 기록할 수 있음. 런타임의 실제 2026-11-14 원인으로 확인된 것이 아니라 main source의 분리된 재현 가능한 결함. 복구/중지 여부를 결정하는 live PID 검사는 유지하되, age가 finite/0 이상/45,000ms 미만일 때만 HEALTHY. 미래·malformed·stale이면 BLOCKED_LIVE_OR_UNKNOWN으로 안전 거부, Runner 강제 재시작/lease 정리 금지 유지.
+- **최소 소스 변경 완료:** 제어 main 69e25a08a903dc8e52ef1093ec15837de4c20858에서 별도 전용 브랜치 `codex/watchdog-future-heartbeat-failclosed-20261114` 생성. 정확히 3파일 `tools/runner-watchdog.mjs`, `tests/runner-watchdog.test.mjs`, 기존 `.github/workflows/automation-status-readonly-source-tests.yml` (기존 격리 Windows CI의 경로 및 테스트 명령만 추가). [Draft PR #1363](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1363) HEAD `1c65c42cc180038f5f18ff1236f8226fbbbdf97f`, main 대비 3 commits ahead/0 behind/3파일, 본 소스 분리. 새 Runner, Scheduler, Workflow 생성 없음.
+- **실제 격리 CI 원격 확인:** [Run 43528126110](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43528126110) / Job `132238830982`, `completed/success`, stdout `# tests 19/# pass 19/# fail 0/# skipped 0`, 신규 미래 heartbeat testcase `ok 19`, `AUTOMATION_STATUS_SOURCE_ONLY_ISOLATED_HOST=TRUE`; 호스트 DESKTOP-N62L0NG의 기존 격리 Runner. [C996 source CI 43528126187](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43528126187) success는 별개 기능 검증으로 Watchdog 19/19와 혼동하지 않음.
+- **운영·승인 경계:** PR #1363 SOURCE_FIX_CI_PASS/OPEN_DRAFT/NOT_MERGED/NOT_INSTALLED. 기존 #1351 Run 43429486924 queued, 운영 Runner6 registry 접근은 AUTOMATION_BLOCKED/STATE_UNKNOWN이며 PR 테스트로 수리되지 않음. #996 C80%/NO-GO·관리 lease/원본 보호·정규 설치 명시 승인 유지. Watchdog 소스 패치를 PC 운영 파일에 복사·재시작하지 않았음. Provider/DB/D1/Task/Cloudflare/운영 Runner/Controller 변경 0.
+- **다음 중앙 행동 1개:** #1363 source-only 안전 리뷰 및 기존 7개 담당 공유 설치 계획과 변경 파일 경합 여부를 확인, 별도 정규 승인/설치가 허용되기 전까지 Draft 보존. Runner live read 경로 확보 시에만 현재 6좌석/Watchdog/Supervisor 상태를 인증 회수해 #1351 최초 원인 분류. D05 계보 검증은 7번 독립 지원이 별도 진행; 총괄은 그 업무를 대신 반복하지 않음.
+- **진행률:** 이번 중앙 소스 수정·CI 직접 실행 **0%→100%**, ZGMINI 전체 **57.4%→57.4%**, #996 80%/NO-GO, 운영 Runner 0/6 current verified.
+
+
 ## 2026-11-14 74차 — 7번 독립 지원 Runner 실측 접근 차단 확정 / D05 독립 진행 분리
 
 - **7번 회신 실제 수신:** 사용자로부터 [#68/6867342698](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6867342698) 원본 전달받음. USER_HANDOFF_CONFIRMED에서 OWNER_RESULT_RECEIVED로 이동. 7번 조사 자체는 100%, 운영 Runner 현장 확인은 **0/6**; AUTOMATION_BLOCKED(RUNNER_LIVE_READ_PATH_UNAVAILABLE)/STATE_UNKNOWN. 7번은 실제 고정된 7개 일반챗 중 한 대화이며 운영 PC 별도 담당자·C/B 승인 일반챗을 추가 생성하지 않음.
