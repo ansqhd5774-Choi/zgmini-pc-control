@@ -34,6 +34,82 @@ export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFil
 const need=(b,c)=>{if(!b)throw Object.assign(Error(c),{code:c});};
 const live=pid=>{if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
 
+const watchdogRoot='E:/ZGmini/automation/pc-watchdog';
+const WATCHDOG_STATES=new Set(['HEALTHY','PAUSED','PAUSED_WORKFLOW','STARTING',
+ 'BLOCKED','BLOCKED_LIVE_OR_UNKNOWN','BLOCKED_RESTART_LIMIT','BLOCKED_SPAWN_ERROR']);
+/**
+ * Fixed-layout, read-only supplement to Controller/Runner status.
+ * The watchdog state file is historical until timestamp and PID are checked.
+ * A PAUSE marker does not mean existing Runner listeners were stopped.
+ * Never returns source text, guardian marker text, raw lease names or secrets.
+ * No control flow in summarizeAutomation() depends on this supplement.
+ */
+export function inspectWatchdogReadOnly({filesystem=fs,watchdogHome=watchdogRoot,
+ controllerHome=control,maintenanceHome=maintenance,clock=Date.now,
+ pidAlive=live}={}){
+ const diagnostics=[];
+ const fixedJson=(file,code,maxBytes)=>{
+  try{
+   const st=filesystem.lstatSync(file);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>maxBytes)throw Error('UNVERIFIED');
+   const value=JSON.parse(filesystem.readFileSync(file,'utf8'));
+   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('INVALID_JSON');
+   return value;
+  }catch{diagnostics.push(code);return null;}
+ };
+ const present=(file,code)=>{
+  try{
+   const st=filesystem.lstatSync(file);
+   if(st.isSymbolicLink())throw Error('SYMLINK_UNVERIFIED');
+   return true;
+  }catch(e){
+   if(e?.code==='ENOENT')return false;
+   diagnostics.push(code);return null;
+  }
+ };
+ const stateFile=fixedJson(path.join(watchdogHome,'STATUS.json'),
+  'WATCHDOG_STATUS_UNVERIFIED',16384);
+ const receiver=fixedJson(path.join(watchdogHome,'receiver','owner.json'),
+  'WATCHDOG_RECEIVER_UNVERIFIED',4096);
+ const flags={
+  guardianStop:present(path.join(watchdogHome,'GUARDIAN_STOP.txt'),'GUARDIAN_STOP_UNVERIFIED'),
+  watchdogPause:present(path.join(watchdogHome,'PAUSE'),'WATCHDOG_PAUSE_UNVERIFIED'),
+  controllerDrain:present(path.join(controllerHome,'DRAIN'),'CONTROLLER_DRAIN_UNVERIFIED'),
+  controllerInstallLease:present(path.join(maintenanceHome,'leases','controller-install'),'CONTROLLER_INSTALL_LEASE_UNVERIFIED'),
+ };
+ let otherControllerLeases=null;
+ try{
+  const leaseRoot=path.join(controllerHome,'leases'),st=filesystem.lstatSync(leaseRoot);
+  if(!st.isDirectory()||st.isSymbolicLink())throw Error('LEASE_DIRECTORY_UNVERIFIED');
+  otherControllerLeases=filesystem.readdirSync(leaseRoot).some(x=>
+   x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
+ }catch{diagnostics.push('OTHER_CONTROLLER_LEASES_UNVERIFIED');}
+ const state=WATCHDOG_STATES.has(stateFile?.state)?stateFile.state:null;
+ const at=typeof stateFile?.at==='string'&&
+  /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(stateFile.at)&&
+  Number.isFinite(Date.parse(stateFile.at))&&
+  new Date(Date.parse(stateFile.at)).toISOString()===stateFile.at?stateFile.at:null;
+ const now=clock();
+ const elapsed=at!==null&&Number.isFinite(now)?now-Date.parse(at):null;
+ const fresh=elapsed===null?null:elapsed>=0&&elapsed<60000;
+ const pid=Number.isSafeInteger(stateFile?.pid)&&stateFile.pid>0?stateFile.pid:null;
+ const ownerPid=Number.isSafeInteger(receiver?.pid)&&receiver.pid>0?receiver.pid:null;
+ const inhibitors=[
+  ['GUARDIAN_STOP',flags.guardianStop],
+  ['WATCHDOG_PAUSE',flags.watchdogPause],
+  ['CONTROLLER_DRAIN',flags.controllerDrain],
+  ['CONTROLLER_INSTALL_LEASE',flags.controllerInstallLease],
+  ['OTHER_CONTROLLER_LEASES',otherControllerLeases],
+ ].filter(([,value])=>value===true).map(([name])=>name);
+ return {evidenceScope:'READONLY_WATCHDOG_MARKERS_NOT_RECOVERY_AUTHORIZATION',
+  observedAt:at,state,fresh,processAlive:pid===null?null:pidAlive(pid),
+  receiverPidMatches:pid===null||ownerPid===null?null:pid===ownerPid,
+  guardianStop:flags.guardianStop,watchdogPause:flags.watchdogPause,
+  controllerDrain:flags.controllerDrain,
+  controllerInstallLease:flags.controllerInstallLease,
+  otherControllerLeases,inhibitors,diagnostics};
+}
+
 export function summarizeAutomation(s){
  const base=maintenanceNextAction(s);
  const healthy=s.controllerFilesVerified===true&&s.supervisorAlive===true&&s.supervisorIdentityVerified===true&&
@@ -73,6 +149,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
  const rows=observe('RUNNERS_QUERY_UNAVAILABLE',()=>github('actions/runners?per_page=100').runners);
  const workflow=observe('WORKFLOW_QUERY_UNAVAILABLE',()=>github('actions/workflows/pc-job.yml').state);
  const operations=observe('INSTALLED_OPERATIONS_UNAVAILABLE',()=>Object.keys(read(control+'/config/operations.json').operations));
+ const watchdog=inspectWatchdogReadOnly();
  const ledger=args.length?observe('REQUEST_LEDGER_UNAVAILABLE',()=>read(maintenance+'/ledger/'+args[1]+'.json')):null;
  const state={actualControllerSha:host?.controllerSourceSha??null,
   installedReadbackCode:verified===true?null:'CONTROLLER_FILES_UNVERIFIED',
@@ -95,6 +172,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   installLock:state.installLock,workflowState:workflow,
   receiverObservedAt:receiver?.at??null,receiverStatus:receiver?.status??null,maintenanceFilesVerified:state.maintenanceFilesVerified,
   runners:rows?.map(x=>({name:x.name,status:x.status,busy:x.busy}))??null,
+  watchdog,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
   diagnostics:codes,operationalWrites:0,providerCalls:0,dbD1Writes:0};
 }
