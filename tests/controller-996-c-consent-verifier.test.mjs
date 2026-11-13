@@ -126,6 +126,36 @@ test('user consent marker is explicit owner-authored and unique',()=>{
  }
 });
 
+test('historic prose mentioning the consent marker is not a duplicate receipt',()=>{
+ const f=fixture();
+ // Reproduces the owner audit narrative after the original consent:
+ // it mentions an old consent but does not grant a new C continuation.
+ f.commentsReadback.comments.push({id:2001,
+  user:{login:'ansqhd5774-Choi'},
+  body:'The old `ZGMINI_CONTROLLER_996_C_CONSENT_V1` receipt is phase-scoped only. '+
+   'No continuation C approval is granted by this audit note.',
+  created_at:'2026-11-13T02:00:00Z'});
+ f.commentsReadback.comments.push({id:2002,
+  user:{login:'github-actions[bot]'},
+  body:'Audit: a prior ZGMINI_CONTROLLER_996_C_CONSENT_V1 comment exists.',
+  created_at:'2026-11-13T02:01:00Z'});
+ const result=review(f);
+ assert.equal(result.status,'CONSENT_PROVENANCE_REVIEWED_ONLY');
+ assert.equal(result.consentCommentId,999);
+ assert.equal(result.executionAuthorized,false);
+ assert.equal(result.pcWritesAuthorized,0);
+ assert.equal(result.workflowEnablesAuthorized,0);
+});
+
+test('additional first-line owner consent remains a fail-closed conflict',()=>{
+ const f=fixture();
+ f.commentsReadback.comments.push({id:2003,
+  user:{login:'ansqhd5774-Choi'},
+  body:'ZGMINI_CONTROLLER_996_C_CONSENT_V1\nconflicting scope',
+  created_at:'2026-11-13T02:00:00Z'});
+ assert.equal(review(f).code,'CONSENT_MISSING_OR_CONFLICTING');
+});
+
 test('subsequent owner revocation blocks reviewed consent',()=>{
  const f=fixture();f.commentsReadback.comments.push({id:1001,
   user:{login:'ansqhd5774-Choi'},
