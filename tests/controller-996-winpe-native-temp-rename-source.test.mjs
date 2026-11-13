@@ -65,7 +65,7 @@ test('independent ntdll relative-root probe is TEMP-only, mutually exclusive, an
   // Never silently route failed handle-relative native operations to the
   // unanchored Win32 absolute-path diagnostic.
   const at=src.indexOf('native_status = native_rename(');
-  const end=src.indexOf('\n#else\n    if (!SetFileInformationByHandle(',at);
+  const end=src.indexOf('#else',at);
   assert.ok(at>0&&end>at);
   assert.doesNotMatch(src.slice(at,end),/SetFileInformationByHandle\(/);
   assert.match(src.slice(end),/#else[\s\S]*?SetFileInformationByHandle\(source_handle, FileRenameInfo/);
