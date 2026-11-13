@@ -2,6 +2,16 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 74차 — 7번 독립 지원 Runner 실측 접근 차단 확정 / D05 독립 진행 분리
+
+- **7번 회신 실제 수신:** 사용자로부터 [#68/6867342698](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6867342698) 원본 전달받음. USER_HANDOFF_CONFIRMED에서 OWNER_RESULT_RECEIVED로 이동. 7번 조사 자체는 100%, 운영 Runner 현장 확인은 **0/6**; AUTOMATION_BLOCKED(RUNNER_LIVE_READ_PATH_UNAVAILABLE)/STATE_UNKNOWN. 7번은 실제 고정된 7개 일반챗 중 한 대화이며 운영 PC 별도 담당자·C/B 승인 일반챗을 추가 생성하지 않음.
+- **이번 독립 GitHub readback:** [#1351](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351) Run [43429486924](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43429486924) queued/conclusion=null/attempt=1, Job 131899103441 queued/conclusion=null/steps=0, Artifact 0. 연결 도구 전용 run/job collection 조회는 성공; GitHub connector fetch의 runner 목록 및 개별 job 상세 URL은 허용 endpoint 검사에서 400 거부. Repo permissions.admin=true 메타정보는 있으나 **연결 도구 allowlist 때문에 실제 GitHub Runner 등록/Online/Busy 상태를 읽지 못함**. HTTP 400은 GitHub Runner 자체의 장애 증거가 아님.
+- **정본/대기열 확인:** main 69e25a08a903dc8e52ef1093ec15837de4c20858, 중앙 기존 브랜치 4cd700ae34971daec62a65cc17027d829b22a5e5. 기존 pc-job workflow는 self-hosted, Windows, X64, zgmini-pc-control 라벨 고정. GitHub actions/runs?status=queued 조회 12건 중 운영 pc-job은 기존 #1351 1건, 나머지 11건은 기존 69차 감사를 재사용; 운영 12좌석 필요/전체 Runner 점유로 해석 금지. GitHub actions/runs?event=issues 최근 100 중 pc-job은 #1351 1건. 동시기 다른 completed workflow 4개는 job skipped로 실제 PC Worker 성공 영수증이 아님. 2026-11-12 Listener 7개 및 격리 Windows CI #1362 PASS는 2026-11-14 운영 Runner 생존 증거가 아님.
+- **FIRST FAIL 범위:** GITHUB_CONNECTOR_RUNNER_LIST_ENDPOINT_NOT_ALLOWLISTED. 현재 Runner Offline/라벨 불일치/Guardian·Watchdog·Supervisor 중지/Controller Runtime 실패는 미확정. #1351의 기존 Run만 추적; 신규 Job/기존 rerun/Runner 재시작/CMD/RDC/lease 삭제/Controller 설치/비승인 B/C·DB/D1·Cloudflare 변경은 0.
+- **다음 행동 분리:** 공통 Runner live 상태는 승인된 실제 PC 읽기 경로 또는 GitHub의 적격 상태 조회 경로가 확보되는 때 6좌석 등록·4라벨·Online/Busy·Listener 소유·Supervisor heartbeat를 동시각 확인하고 #1351과 대조. 경로 부재는 이 단계에만 AUTOMATION_BLOCKED/STATE_UNKNOWN으로 보존한다. **7번의 다음 독립 후보 D05 0/68**은 사용자가 별도로 실제 전달하면 기존 [#1206](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1206), [#1228](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1228), [#1229](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1229), Writer B [#1234](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1234)의 기존 source/checkpoint/lineage만 읽기 전용 대조. 신규 d05-lineage-readonly A의 운영 설치는 미확인이고 구 Controller는 미등록이므로 새 pc-job을 요청하지 않음. 현재 D05 인계 자체는 미전달/미실행.
+- **진행:** 74차 회신 및 경로 판정·원장 갱신만 100%, 전체 기능 **57.4%→57.4%**, 물가 42%, #996 C 80% NO-GO, Runner 현장 0/6. 기존 1~6 원담당 중복 지시 없음.
+
+
 ## 2026-11-14 73차 — 7번 독립 지원 실제 사용자 전달 확인 / #1336 최신 main 범위 감사
 
 - **실제 사용자 전달:** 유일한 **7번 일반챗 독립 지원 담당자**에게 72차 원본 #1351/Run `43429486924`/Job `131899103441` 운영 Runner6 읽기 전용 지시가 **사용자에 의해 전달됨**. 상태는 `USER_HANDOFF_CONFIRMED`(해당 챗 실제 답변·실PC 수행/영수증 확인 전); ‘별도의 운영 PC 관리자’/‘8번째 담당’ 생성·자동 수신·완료 주장 금지. 기존 1~6 원담당에게 추가 지시 불필요. 다음 D05(0/68) 지원은 7번의 Runner 결과 후 별도 인계 후보, 지금 중복 투입하지 않음.
