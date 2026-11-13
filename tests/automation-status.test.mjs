@@ -72,12 +72,55 @@ test('missing, duplicate, and malformed seats remain explicit without false onli
  const rows=[...seats.slice(0,5),{...seats[0],status:'online',busy:true},
   {name:'zgmini-handoff-ci-spare-01',status:'online',busy:false}];
  const result=operatingPcRunnerEvidence(rows);
- assert.deepEqual(result[0],{name:'zgmini-pc-01',registration:'DUPLICATE',status:null,busy:null});
- assert.deepEqual(result[5],{name:'zgmini-pc-06',registration:'MISSING',status:null,busy:null});
+ assert.deepEqual(result[0],{name:'zgmini-pc-01',registration:'DUPLICATE',
+  status:null,busy:null,routeLabelState:'UNKNOWN',missingRouteLabels:[],
+  assignmentCandidateAtObservation:null});
+ assert.deepEqual(result[5],{name:'zgmini-pc-06',registration:'MISSING',
+  status:null,busy:null,routeLabelState:'UNKNOWN',missingRouteLabels:[],
+  assignmentCandidateAtObservation:null});
  assert.equal(dedicatedPcRunnersOnline(rows),false);
  const malformed=operatingPcRunnerEvidence([{name:'zgmini-pc-01',status:'READY',busy:'false'}]);
- assert.deepEqual(malformed[0],{name:'zgmini-pc-01',registration:'SINGLE',status:null,busy:null});
+ assert.deepEqual(malformed[0],{name:'zgmini-pc-01',registration:'SINGLE',
+  status:null,busy:null,routeLabelState:'UNKNOWN',missingRouteLabels:[],
+  assignmentCandidateAtObservation:null});
  assert.equal(operatingPcRunnerEvidence(null),null);
+});
+const requiredLabels=()=>['self-hosted','Windows','X64','zgmini-pc-control']
+ .map(name=>({name}));
+test('operating six-seat report checks exact routing labels without returning unrelated metadata',()=>{
+ const rows=operatingSeats().map(x=>({...x,labels:[...requiredLabels(),{name:'PRIVATE-TEAM'}]}));
+ rows.push({name:'zgmini-handoff-ci-spare-01',status:'online',busy:false,
+  labels:[{name:'OTHER-ONLY'}],token:'SHOULD_NOT_LEAK'});
+ const status=operatingPcRunnerEvidence(rows);
+ assert.equal(status.length,6);
+ assert.ok(status.every(x=>x.routeLabelState==='MATCHED'&&
+  x.assignmentCandidateAtObservation===true&&x.missingRouteLabels.length===0));
+ assert.equal(status[0].registration,'SINGLE');
+ assert.doesNotMatch(JSON.stringify(status),/PRIVATE-TEAM|OTHER-ONLY|SHOULD_NOT_LEAK/);
+ assert.equal(dedicatedPcRunnersOnline(rows),true);
+});
+test('routing-label missing, offline, busy and unreadable metadata fail closed independently',()=>{
+ const seats=operatingSeats().map(x=>({...x,labels:requiredLabels()}));
+ seats[0].labels=[...requiredLabels().slice(0,3),{name:'other-custom'}];
+ seats[1].status='offline';
+ seats[2].busy=true;
+ delete seats[3].labels;
+ seats[4].status='BROKEN';
+ seats[5].labels=[...requiredLabels().slice(0,3),{name:42}];
+ const status=operatingPcRunnerEvidence(seats);
+ assert.deepEqual(status[0].missingRouteLabels,['zgmini-pc-control']);
+ assert.equal(status[0].routeLabelState,'MISSING');
+ assert.equal(status[0].assignmentCandidateAtObservation,false);
+ assert.equal(status[1].routeLabelState,'MATCHED');
+ assert.equal(status[1].assignmentCandidateAtObservation,false);
+ assert.equal(status[2].assignmentCandidateAtObservation,false);
+ for(const i of [3,5]){
+  assert.equal(status[i].routeLabelState,'UNKNOWN');
+  assert.equal(status[i].assignmentCandidateAtObservation,null);
+ }
+ assert.equal(status[4].routeLabelState,'MATCHED');
+ assert.equal(status[4].assignmentCandidateAtObservation,null);
+ assert.deepEqual(status[5].missingRouteLabels,[]);
 });
 
 // Filesystem double exposes only lstat/read/readdir. It cannot mutate the PC,
