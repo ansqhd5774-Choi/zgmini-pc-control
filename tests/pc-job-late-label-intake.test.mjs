@@ -40,7 +40,8 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
 });
 
 test('labeled workflow admission is independently gated from opened single-run entry',()=>{
- const jobExpression=wf.split('  approved-pc-job:\n    if: >-\n')[1]?.split('\n    # Late-label entry')[0];
+ const jobExpression=wf.replace(/\r\n/g,'\n')
+  .split('  approved-pc-job:\n    if: >-\n')[1]?.split('\n    # Late-label entry')[0];
  assert.ok(jobExpression,'expected fixed self-hosted job admission');
  assert.match(jobExpression,/github\.event\.action == 'opened' \|\|/);
  assert.match(jobExpression,/github\.event\.action == 'labeled'/);
