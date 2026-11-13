@@ -25,7 +25,7 @@ jobs:
       - name: Checkout exact Draft PR #1361 source SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 6286a7deeed0f17e25cb4148835a4539f3523db7
+          ref: aa5032ee5646ae352e87f63d72917885157d6db6
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -34,7 +34,7 @@ jobs:
         run: |
           for /f %%S in ('git rev-parse HEAD') do set TEST_SHA=%%S
           echo TEST_SHA=%TEST_SHA%
-          if /I not "%TEST_SHA%"=="6286a7deeed0f17e25cb4148835a4539f3523db7" exit /b 2
+          if /I not "%TEST_SHA%"=="aa5032ee5646ae352e87f63d72917885157d6db6" exit /b 2
           node --version
           node --test tests/employment-r6-collection-evidence-readonly.test.mjs
       - name: Verify isolated source-only Windows host
