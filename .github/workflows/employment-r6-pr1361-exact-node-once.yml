@@ -1,0 +1,47 @@
+name: Employment R6 PR1361 Exact Source Tests (one-shot)
+on:
+  push:
+    branches:
+      - 'test/employment-r6-pr1361-exact-head-node-20261114'
+    paths:
+      - '.github/workflows/employment-r6-pr1361-exact-node-once.yml'
+permissions:
+  contents: read
+concurrency:
+  group: zgmini-employment-pr1361-source-once
+  cancel-in-progress: false
+jobs:
+  r6-reader-node:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.ref == 'refs/heads/test/employment-r6-pr1361-exact-head-node-20261114'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout exact Draft PR #1361 source SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 6286a7deeed0f17e25cb4148835a4539f3523db7
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact source and run employment R6 Reader Node tests
+        run: |
+          for /f %%S in ('git rev-parse HEAD') do set TEST_SHA=%%S
+          echo TEST_SHA=%TEST_SHA%
+          if /I not "%TEST_SHA%"=="6286a7deeed0f17e25cb4148835a4539f3523db7" exit /b 2
+          node --version
+          node --test tests/employment-r6-collection-evidence-readonly.test.mjs
+      - name: Verify isolated source-only Windows host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo R6_SOURCE_ONLY_ISOLATED_HOST=TRUE
+          ) else (
+            echo R6_SOURCE_ONLY_ISOLATED_HOST=FALSE
+            exit /b 5
+          )
