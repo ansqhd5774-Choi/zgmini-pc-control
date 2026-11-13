@@ -27,7 +27,9 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
  assert.match(wf,/types: \[opened, labeled\]/);
  assert.match(wf,/github\.event\.issue\.user\.login == 'ansqhd5774-Choi'/);
  assert.match(wf,/github\.event\.action == 'opened'/);
- assert.match(wf,/github\.event\.action == 'labeled' && github\.event\.label\.name == 'pc-job'/);
+ assert.match(wf,/github\.event\.action == 'labeled' &&\s*github\.event\.label\.name == 'pc-job' &&\s*vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
+ assert.match(wf,/github\.event\.action == 'opened' \|\|/);
+ assert.match(wf,/Late-label entry is opt-in only after matching fixed Controller/);
  assert.match(wf,/contains\(github\.event\.issue\.labels\.\*\.name, 'pc-job'\)/);
  assert.match(wf,/github\.actor == 'ansqhd5774-Choi'/);
  assert.match(wf,/cancel-in-progress: false/);
@@ -35,6 +37,17 @@ test('workflow accepts exactly owner opened or pc-job labeled and retains pinned
  assert.match(wf,/controller\\entry\.mjs/);
  assert.match(wf,/controller\\upload\.mjs/);
  assert.doesNotMatch(wf,/workflow_dispatch:|repository_dispatch:|schedule:/);
+});
+
+test('labeled workflow admission is independently gated from opened single-run entry',()=>{
+ const jobExpression=wf.split('  approved-pc-job:\n    if: >-\n')[1]?.split('\n    # Late-label entry')[0];
+ assert.ok(jobExpression,'expected fixed self-hosted job admission');
+ assert.match(jobExpression,/github\.event\.action == 'opened' \|\|/);
+ assert.match(jobExpression,/github\.event\.action == 'labeled'/);
+ assert.match(jobExpression,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'true'/);
+ assert.doesNotMatch(jobExpression,/vars\.ZGMINI_PC_JOB_LATE_LABEL_ENABLED == 'false'/);
+ assert.match(jobExpression,/github\.event\.issue\.user\.login == 'ansqhd5774-Choi'/);
+ assert.match(jobExpression,/github\.actor == 'ansqhd5774-Choi'/);
 });
 
 test('installed Controller entry and scope stager require exact label and issue owner',()=>{
