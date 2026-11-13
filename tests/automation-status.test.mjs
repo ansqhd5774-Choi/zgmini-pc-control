@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import path from 'node:path';
-import {summarizeAutomation,dedicatedPcRunnersOnline,inspectWatchdogReadOnly,summarizeSupervisorReadOnly} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -55,6 +55,30 @@ test('automation status rejects missing, offline or duplicated operating seats',
  assert.equal(dedicatedPcRunnersOnline(null),false);
 });
 
+
+test('runner status report includes exactly six fixed operating seats, not other registered computers',()=>{
+ const seats=operatingSeats(),rows=[...seats,
+  {name:'zgmini-handoff-ci-spare-01',status:'online',busy:true,secret:'PRIVATE'},
+  {name:'unrelated-listener',status:'online',busy:false}];
+ const result=operatingPcRunnerEvidence(rows);
+ assert.equal(result.length,6);
+ assert.deepEqual(result.map(x=>x.name),seats.map(x=>x.name));
+ assert.ok(result.every(x=>x.registration==='SINGLE'&&x.status==='online'&&x.busy===false));
+ assert.doesNotMatch(JSON.stringify(result),/handoff|unrelated|PRIVATE/);
+ assert.equal(dedicatedPcRunnersOnline(rows),true);
+});
+test('missing, duplicate, and malformed seats remain explicit without false online claim',()=>{
+ const seats=operatingSeats();
+ const rows=[...seats.slice(0,5),{...seats[0],status:'online',busy:true},
+  {name:'zgmini-handoff-ci-spare-01',status:'online',busy:false}];
+ const result=operatingPcRunnerEvidence(rows);
+ assert.deepEqual(result[0],{name:'zgmini-pc-01',registration:'DUPLICATE',status:null,busy:null});
+ assert.deepEqual(result[5],{name:'zgmini-pc-06',registration:'MISSING',status:null,busy:null});
+ assert.equal(dedicatedPcRunnersOnline(rows),false);
+ const malformed=operatingPcRunnerEvidence([{name:'zgmini-pc-01',status:'READY',busy:'false'}]);
+ assert.deepEqual(malformed[0],{name:'zgmini-pc-01',registration:'SINGLE',status:null,busy:null});
+ assert.equal(operatingPcRunnerEvidence(null),null);
+});
 
 // Filesystem double exposes only lstat/read/readdir. It cannot mutate the PC,
 // start a Supervisor, create requests or inspect private marker text.
