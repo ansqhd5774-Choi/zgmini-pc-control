@@ -101,7 +101,9 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   action = 'opened', labelName = 'agent-handoff', expectRejected = false,
   conflictingLabelOnComment = false, conflictingLabelOnLabel = false,
   expectConflictPosts = null, existingBotReceipt = null,
-  expectReceiptError = null, previousIssues = [], expectedDuplicate = false} = {}) {
+  expectReceiptError = null, previousIssues = [], expectedDuplicate = false,
+  issueState = 'open', closeBeforeComment = false, closeOnComment = false,
+  expectedClosedPosts = null} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
   const issueTitle = 'agent-handoff handoff-123456789abc';
@@ -143,18 +145,23 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   }
   const labels = ['agent-handoff',...existingLabels];
   const posts = [];
+  let currentIssueState = issueState;
   globalThis.fetch = async (url, request = {}) => {
     const method = request.method ?? 'GET';
     const uri = new URL(url);
     let value;
     if (uri.pathname.endsWith('/issues') && method === 'GET') value = previousIssues;
-    else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') value = comments;
+    else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') {
+      if (closeBeforeComment) currentIssueState = 'closed';
+      value = comments;
+    }
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       posts.push('comment');
       const body = JSON.parse(request.body).body;
       if (!loseComment) comments.push({
         user: {login: 'github-actions[bot]'}, issue_url:issueUrl, body});
       if (conflictingLabelOnComment) labels.push('handoff-duplicate');
+      if (closeOnComment) currentIssueState = 'closed';
       if (loseCommentAck) throw Error('SIMULATED_COMMENT_ACK_LOST');
       value = {id: 1};
     } else if (uri.pathname.endsWith('/issues/2001/labels') && method === 'POST') {
@@ -164,7 +171,7 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
       if (loseLabelAck) throw Error('SIMULATED_LABEL_ACK_LOST');
       value = labels.map((name) => ({name}));
     } else if (uri.pathname.endsWith('/issues/2001') && method === 'GET') {
-      value = {number:2001,title:issueTitle,
+      value = {number:2001,title:issueTitle,state:currentIssueState,
         user:{login:'ansqhd5774-Choi'},
         body:tamperIssue?'TAMPERED':json(),
         labels: labels.map((name) => ({name}))};
@@ -177,6 +184,9 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     if (untrustedActor || expectRejected) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_EVENT_NOT_ALLOWED/);
       assert.equal(posts.length, 0);
+    } else if (expectedClosedPosts !== null) {
+      await assert.rejects(runIssueBroker(env), /HANDOFF_ISSUE_CLOSED_STOP/);
+      assert.deepEqual(posts, expectedClosedPosts);
     } else if (expectConflictPosts !== null) {
       await assert.rejects(runIssueBroker(env), /HANDOFF_LABEL_CONFLICT_STOP/);
       assert.deepEqual(posts, expectConflictPosts);
@@ -292,4 +302,18 @@ test('owner intake still deduplicates against an earlier genuine owner Incident'
   await simulateBroker({previousIssues:[{
     number:1997,user:{login:'ansqhd5774-Choi'},labels:[{name:'agent-handoff'}],body:json(),
   }],expectedDuplicate:true});
+});
+
+// An owner-authored Issue can be closed after the original `issues.opened`
+// event but before an eligible labeled replay; the stored Issue wins.
+test('owner broker does not post a route or pending label to a closed Incident',async()=>{
+  await simulateBroker({issueState:'closed',expectedClosedPosts:[]});
+});
+
+test('owner broker stops if closure occurs while scanning route receipts',async()=>{
+  await simulateBroker({closeBeforeComment:true,expectedClosedPosts:[]});
+});
+
+test('owner broker never posts a pending label if Incident closes after route receipt',async()=>{
+  await simulateBroker({closeOnComment:true,expectedClosedPosts:['comment']});
 });
