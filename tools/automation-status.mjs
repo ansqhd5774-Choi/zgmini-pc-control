@@ -85,6 +85,8 @@ export function inspectWatchdogReadOnly({filesystem=fs,watchdogHome=watchdogRoot
    x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
  }catch{diagnostics.push('OTHER_CONTROLLER_LEASES_UNVERIFIED');}
  const state=WATCHDOG_STATES.has(stateFile?.state)?stateFile.state:null;
+ const blockedCode=state==='BLOCKED'&&typeof stateFile?.code==='string'&&
+  /^[A-Z_]{1,64}$/.test(stateFile.code)?stateFile.code:null;
  const at=typeof stateFile?.at==='string'&&
   /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(stateFile.at)&&
   Number.isFinite(Date.parse(stateFile.at))&&
@@ -102,12 +104,29 @@ export function inspectWatchdogReadOnly({filesystem=fs,watchdogHome=watchdogRoot
   ['OTHER_CONTROLLER_LEASES',otherControllerLeases],
  ].filter(([,value])=>value===true).map(([name])=>name);
  return {evidenceScope:'READONLY_WATCHDOG_MARKERS_NOT_RECOVERY_AUTHORIZATION',
-  observedAt:at,state,fresh,processAlive:pid===null?null:pidAlive(pid),
+  observedAt:at,state,blockedCode,fresh,processAlive:pid===null?null:pidAlive(pid),
   receiverPidMatches:pid===null||ownerPid===null?null:pid===ownerPid,
   guardianStop:flags.guardianStop,watchdogPause:flags.watchdogPause,
   controllerDrain:flags.controllerDrain,
   controllerInstallLease:flags.controllerInstallLease,
   otherControllerLeases,inhibitors,diagnostics};
+}
+
+/** Non-sensitive Supervisor evidence; does not alter health or recovery verdicts. */
+export function summarizeSupervisorReadOnly({supervisor=null,owner=null,state}){
+ const pid=x=>Number.isSafeInteger(x)&&x>0?x:null;
+ const rawAt=supervisor?.at;
+ const heartbeatAt=typeof rawAt==='string'&&
+  /^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$/.test(rawAt)&&
+  Number.isFinite(Date.parse(rawAt))&&
+  new Date(Date.parse(rawAt)).toISOString()===rawAt?rawAt:null;
+ return {heartbeatAt,statusPid:pid(supervisor?.pid),ownerPid:pid(owner?.pid),
+  ownerProcessAlive:state.supervisorAlive??null,
+  identityVerified:state.supervisorIdentityVerified===true,
+  heartbeatFresh:heartbeatAt===null?null:state.supervisorFresh===true,
+  childrenVerified:Array.isArray(supervisor?.children)?state.supervisorChildrenVerified===true:null,
+  childCount:Array.isArray(supervisor?.children)?supervisor.children.length:null,
+  mode:supervisor?.mode==='LISTENING'?'LISTENING':null};
 }
 
 export function summarizeAutomation(s){
@@ -172,6 +191,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   installLock:state.installLock,workflowState:workflow,
   receiverObservedAt:receiver?.at??null,receiverStatus:receiver?.status??null,maintenanceFilesVerified:state.maintenanceFilesVerified,
   runners:rows?.map(x=>({name:x.name,status:x.status,busy:x.busy}))??null,
+  supervisor:summarizeSupervisorReadOnly({supervisor,owner,state}),
   watchdog,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
   diagnostics:codes,operationalWrites:0,providerCalls:0,dbD1Writes:0};
