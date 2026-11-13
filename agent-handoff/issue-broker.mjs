@@ -102,6 +102,7 @@ export async function main(env = process.env) {
   const initial = await api(route);
   if (!exactOwnerIssue(initial, event.issue))
     throw new Error('HANDOFF_ISSUE_DRIFT_STOP');
+  if (initial.state !== 'open') throw new Error('HANDOFF_ISSUE_CLOSED_STOP');
   assertExclusive(initial);
   // Never mistake an existing label for proof of the bot result receipt.
   const lines = duplicate
@@ -113,6 +114,13 @@ export async function main(env = process.env) {
   const receiptBody = lines.join('\n');
   const alreadyRecorded = await hasVerifiedComment(event.issue.number, receiptBody);
   if (!alreadyRecorded) {
+    // A coordinator may have disposed the Incident during comment inventory.
+    // Recheck before writing a new routing receipt; never replay a closed Issue.
+    const prePost = await api(route);
+    if (!exactOwnerIssue(prePost, event.issue))
+      throw new Error('HANDOFF_ISSUE_DRIFT_STOP');
+    if (prePost.state !== 'open') throw new Error('HANDOFF_ISSUE_CLOSED_STOP');
+    assertExclusive(prePost);
     try {
       await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`,
         {method: 'POST', body: {body: receiptBody}});
@@ -127,6 +135,7 @@ export async function main(env = process.env) {
   const current = await api(route);
   if (!exactOwnerIssue(current, event.issue))
     throw new Error('HANDOFF_ISSUE_DRIFT_STOP');
+  if (current.state !== 'open') throw new Error('HANDOFF_ISSUE_CLOSED_STOP');
   assertExclusive(current);
   if (!current.labels.some(label => label.name === stateLabel)) {
     try {
@@ -135,12 +144,14 @@ export async function main(env = process.env) {
       const afterUncertain = await api(route);
       if (!exactOwnerIssue(afterUncertain, event.issue, stateLabel))
         throw new Error('HANDOFF_LABEL_POST_OUTCOME_UNKNOWN');
+      if (afterUncertain.state !== 'open') throw new Error('HANDOFF_ISSUE_CLOSED_STOP');
       assertExclusive(afterUncertain);
     }
   }
   const after = await api(route);
   if (!exactOwnerIssue(after, event.issue, stateLabel))
     throw new Error('HANDOFF_LABEL_READBACK_STOP');
+  if (after.state !== 'open') throw new Error('HANDOFF_ISSUE_CLOSED_STOP');
   assertExclusive(after);
   process.stdout.write(`${alreadyRecorded ? 'HANDOFF_ALREADY_RECORDED' : duplicate ? 'HANDOFF_DUPLICATE_REUSED' : 'HANDOFF_ROUTED_PENDING_AGENT'}\n`);
 }
