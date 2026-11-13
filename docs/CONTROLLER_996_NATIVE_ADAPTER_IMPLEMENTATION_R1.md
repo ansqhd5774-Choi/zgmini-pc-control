@@ -1,5 +1,14 @@
 # #996 C급 복구 — 원본 Windows 실행기 개발 현황 (2026-11-10)
 
+## 2026-11-13 — MSVC x64 실제 C TEMP 실행물 빌드·검증 28/28 PASS
+
+- **실행 환경:** 현재 사용자 채팅은 기존 운영 PC `PC`. 실제 빌드·런타임 검증은 공통 대기열 PC `DESKTOP-N62L0NG`의 승인된 기존 `zgmini-handoff-ci-spare-01` 격리 GitHub Runner가 수행. Windows `C:\TEMP` 하위의 무작위 TEST_ONLY fixture 및 컴파일 임시 디렉터리만 사용. 운영 PC `PC`의 `E:\ZGmini`, Core/Writer/Controller, 원자료/DB/lease/예약/운영 source에는 접근·쓰기·삭제 없음.
+- **기존 실측/직접 실행:** `tests/controller-996-native-c-compiled-temp.test.mjs`가 Windows 10 공통 큐 호스트/Runner/아키텍처 x64/기존 E: 운영 경로 부재를 검증하고, 머신 설치 `vswhere.exe`로 Visual Studio v18 도구 체인을 찾아 `cl.exe`를 `/W4 /WX /utf-8 /TC /O2 /MT /GS /guard:cf`, `/DC996_NATIVE_TEMP_TEST_ONLY=1`, `/DC996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY=1` 및 고정 x64·DEP/ASLR 옵션으로 사용. 실행물은 임시 TEMP 안에만 생성하며 테스트 후 해당 신규 synthetic fixture만 정리. `/utf-8`은 호스트 cp949에서 소스 주석 때문에 발생한 `C4819 → C2220`을 경고 정책 유지한 상태로 해결한 것.
+- **최종 PASS:** [GitHub Run #43369233908](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43369233908) / job `131700843278` / source `c2e2e354eb4a46b813bc195cc0732e7c3424b530`: `C996_NATIVE_C_BUILD_PASS`; `C996_NATIVE_C_SUCCESS_RC=0`; `C996_NATIVE_C_ROOT_RELATIVE_PASS`; `C996_NATIVE_C_EXISTING_DESTINATION_PRESERVED_PASS`, 기존 C# P/Invoke `C996_NT_POSITIVE=NT_SUCCESS`, `C996_NT_COLLISION=NT_STATUS_C0000035`; `C996_NT_TEMP_ROOT_RELATIVE_NO_REPLACE_PASS`. **TAP 28/28 PASS, 0 fail, 0 skipped.**
+- **중간 FIRST FAIL / 복구:** 첫 격리 Runner에는 일반 사용자 환경과 다른 `ProgramFiles(x86)` 표현 때문에 VSWhere 탐색 실패 [Run #43368896887](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43368896887), 이후 고정 머신 경로로 해결. 다음 [Run #43369067344](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43369067344) 컴파일러는 실제 실행됐지만 기본 cp949에서 `C4819 → C2220`, `/utf-8` 추가 후 최종 실증 PASS. 오류 억제, `/WX` 제거, 반복 production CMD 실행 없음.
+- **계약·증거의 한계:** 이 성공은 **실제 Windows x64의 테스트 C 실행물**이 기존 대상 파일을 보존하는 디렉터리 rename을 수행한다는 범위에 한정됨. 별도의 WinPE x64 호환 빌드, 원본 운영 볼륨 정확한 GUID/Serial/File ID 재바인딩, 단독/오프라인 namespace 제어, *경쟁자의 신규 child 삽입 불가*, 실제 Owner 신뢰 anchor·서명·오프라인 시각·철회 검증은 입증하지 않음. 과거 격리 경쟁 삽입 성공 증거와 `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`·`C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` STOP을 보존. 완료된 TEST_ONLY WinPE CNG 6/6은 반복하지 않는다.
+- **다음 필수 실행:** 이미 PASS한 핸들 상대경로 rename primitive는 재사용하고, 오프라인 **전체 namespace 불변/외부 writer 배제**를 격리 런타임에서 별도로 실증한다. 이어서 Owner C 승인 범위·서명/원본 PC 사전 검증을 정규 승인된 실행 경로로 확인하고, 실제 운영 PC에는 해당 명시적 C급 승인 전 어떤 복구도 적용하지 않는다.
+
 
 ## 2026-11-13 — NT 핸들 상대경로 TEMP 실측: 오류 87 우회 후보 27/27 PASS
 
