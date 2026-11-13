@@ -2,6 +2,15 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 36차 — 전담 3개 Lane 병렬 검증, 서브에이전트 실행 경계
+
+- **사용자 지시:** 공유 PC 설치·잠금 같은 충돌 쓰기는 단일 소유자만 수행하고, 독립 조회·검증·인계는 가능한 즉시 병렬화. 이번 회차는 운영 Runner(5개 원본), #996 C Owner(5개 원본), 공통 중앙 인계(4개 원본)의 **3개 논리 전담 Lane / GitHub 조회 14건을 병렬 수행**. 소스·운영 환경 변경 0건. 서로 다른 Reviewer/Owner가 실제 독립 ChatGPT 대화에서 실행됐다는 주장은 하지 않음.
+- **외부 전담 실행기 한계:** 기존 활성 자동화 `Automation_270004067b3881919b5996a5d1470506`(#996)과 `Automation_9a403a04a8ac8191a331e94f9abeb1b4`(중앙 인계)를 사용자 요청에 따라 모두 즉시 실행 요청했지만, 서비스는 양쪽 모두 `success:true / Ready to run in this conversation / inline_run`을 반환. **이는 독립 서브에이전트 동시 실행 성공의 증거가 아니며**, 실제 수행한 병렬 작업은 이 대화의 GitHub 읽기 작업. 기존 예약은 유지하며 중복 예약/새 Runner를 생성하지 않음.
+- **Lane A 운영 Runner · 총괄 직접 읽기:** [#1351/Run #43429486924](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43429486924) 현재 `queued`, Job `131899103441` `runner_id=0`, `runner_name=""`, steps=0, artifact=0. 요구 label 정확히 `self-hosted,Windows,X64,zgmini-pc-control`; 진단 `AUTOMATION_PENDING/RUNNER_NOT_ASSIGNED`. 현재 운영 PC 로그인/Watchdog/설치 임대 소유 실시간 조회 불가. 이미 생성된 원본 작업 재실행·중복 Issue 금지.
+- **Lane B #996 C Owner · 기존 전담 브랜치:** Owner branch HEAD `91b317f6b8070aa48f762516f4e1d60b6e90bb8c`, Draft [PR #1222](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1222) 미병합. 실제 독립 서명/철회·오프라인 namespace 배타성·native CAS의 후속 증거 없음. 기존 [C급 미승인 단일 WinPE 승인 범위](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/codex/controller-996-intake-c-candidate-r1-20261110/docs/CONTROLLER_996_SINGLE_BOOT_C_APPROVAL_SCOPE_PROPOSAL_20261113.md) 원문은 `UNAPPROVED_PROPOSAL/SOURCE_ONLY/C_NO_GO`. 35차 역사적 PID 교차판독 증거를 재사용. `80%/NO-GO`, 새 C 실행·잠금 정리 0.
+- **Lane C 중앙 인계 · 기존 전담 자동화:** 최신 control `main=9479db7b5904a31c4943b8a06980e11df94022e1`; open `agent-handoff` 0건. 새 실제 수리 가능 장애 `NO_WORK`. 최근 GitHub `issue_comment` 기동이 `skipped`인 것은 대상 아닌 이벤트 필터와 양립하므로 접수 Workflow 실패라고 단정하지 않음. 중앙 8/8 DONE, Writer B 신규 자연 E2E 4/5 DEFERRED; #68 공유 수명주기 4/5와 혼합 금지.
+- **담당 고정 및 다음 독립 필수 실행:** A 운영 PC의 등록된 Runner/Guardian Owner는 **기존 승인된 읽기 전용 진입 경로가 실제 복구될 때** #1351 원본 Run readback을 회수; B C Owner는 신규 C 정확 동의·trust/revocation·오프라인 native 배타성/CAS 충족 전 운영 진입하지 않음; C 중앙 Owner는 신규 인증된 사건이 발생한 경우에만 원본 증거 확인·수리·원본 반환. 총괄은 결과를 #68과 전담 인계에 취합하되 타 대화가 실제 수신했다고 주장하지 않음. 다음 작업도 GitHub 승인 Runner/기존 격리 CI 우선, Remote Desktop Commander 전체 사용 금지.
+
 ## 2026-11-14 35차 — #996 잠금 연관성과 원래 owner Node 프로세스 스냅샷 분리 증거
 
 - **출발 상태:** 제어 `main=9479db7b5904a31c4943b8a06980e11df94022e1`, 총괄 브랜치 앞선 `4e5d8112e02c57f4ab18b30bf1c58bd50b0b93bd`. 34차 [PR #1358](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1358) 소스 개선/격리 CI **330/330 PASS** 완료 증거를 재사용하며 재시험/재병합하지 않음. 중앙 열린 `agent-handoff` 0건(P0 `NO_WORK`), 신규 Writer B 자연 E2E 4/5 `DEFERRED`, 별도 공통 자원 수명주기 4/5 `DEFERRED`.
