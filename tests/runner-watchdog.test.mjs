@@ -23,3 +23,12 @@ test('dead lease is archived intact; live or reused PID is never removed',()=>{
  assert.equal(fs.readFileSync(path.join(archived,'owner.json'),'utf8'),bytes);
  assert.equal(fs.existsSync(lease),false);
 });
+
+test('future heartbeat cannot certify a live Supervisor as healthy',()=>{
+ const now=Date.parse('2026-11-14T00:00:00.000Z'),owner={pid:123};
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now+1).toISOString(),now}),'BLOCKED_LIVE_OR_UNKNOWN');
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now+60000).toISOString(),now}),'BLOCKED_LIVE_OR_UNKNOWN');
+ assert.equal(decide({owner,live:true,heartbeat:'invalid-timestamp',now}),'BLOCKED_LIVE_OR_UNKNOWN');
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now-44999).toISOString(),now}),'HEALTHY');
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now-45000).toISOString(),now}),'BLOCKED_LIVE_OR_UNKNOWN');
+});
