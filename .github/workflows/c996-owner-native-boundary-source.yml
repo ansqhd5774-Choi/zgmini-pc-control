@@ -66,5 +66,5 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Verify C996 candidate boundaries and isolated TEMP insertion negative test (no C execution)
+      - name: Verify C996 boundary and NT TEMP no-replace runtime proof (no operating C effect)
         run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs tests/controller-996-winpe-native-nt-relative-temp.test.mjs
