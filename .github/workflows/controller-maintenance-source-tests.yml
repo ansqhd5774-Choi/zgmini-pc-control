@@ -7,6 +7,10 @@ on:
       - 'tools/update.mjs'
       - 'tests/maintenance-contract.test.mjs'
       - 'tests/controller-heavy-only-install.test.mjs'
+      - 'controller/entry.mjs'
+      - 'controller/preimage-manifest-stager.mjs'
+      - '.github/workflows/pc-job.yml'
+      - 'tests/pc-job-late-label-intake.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
       - '.github/workflows/controller-maintenance-source-tests.yml'
 permissions:
@@ -35,7 +39,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run scoped maintenance update and heavy-readonly regression tests
-        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs
+        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/pc-job-late-label-intake.test.mjs tests/preimage-manifest-contract.test.mjs
       - name: Confirm source-only isolated CI host
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
