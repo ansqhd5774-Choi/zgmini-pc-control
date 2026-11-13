@@ -14,17 +14,33 @@ export function dedicatedPcRunnersOnline(rows){
  return dedicatedPcRunnerRows(rows,{requireOnline:true})!==null;
 }
 // Only these six operational seats belong in a shared-repository status report.
-// Keep missing/duplicate seats explicit without returning unrelated runner metadata.
+// The current GitHub job uses these fixed labels, not arbitrary registration
+// metadata. A routing candidate at this snapshot does not prove assignment
+// or receipt of an earlier queued job.
 const operatingNames=Object.freeze(Array.from({length:6},(_,i)=>`zgmini-pc-0${i+1}`));
+const requiredRoutingLabels=Object.freeze(['self-hosted','windows','x64','zgmini-pc-control']);
 export function operatingPcRunnerEvidence(rows){
  if(!Array.isArray(rows))return null;
  return operatingNames.map(name=>{
   const matches=rows.filter(x=>x?.name===name);
-  if(matches.length!==1)return {name,registration:matches.length===0?'MISSING':'DUPLICATE',status:null,busy:null};
+  if(matches.length!==1)return {
+   name,registration:matches.length===0?'MISSING':'DUPLICATE',status:null,busy:null,
+   routeLabelState:'UNKNOWN',missingRouteLabels:[],assignmentCandidateAtObservation:null,
+  };
   const row=matches[0];
-  return {name,registration:'SINGLE',
-   status:row.status==='online'||row.status==='offline'?row.status:null,
-   busy:typeof row.busy==='boolean'?row.busy:null};
+  const status=row.status==='online'||row.status==='offline'?row.status:null;
+  const busy=typeof row.busy==='boolean'?row.busy:null;
+  const labels=Array.isArray(row.labels)&&row.labels.every(x=>typeof x?.name==='string')?
+   new Set(row.labels.map(x=>x.name.toLowerCase())):null;
+  const missingRouteLabels=labels===null?[]:
+   requiredRoutingLabels.filter(label=>!labels.has(label));
+  const routeLabelState=labels===null?'UNKNOWN':
+   missingRouteLabels.length?'MISSING':'MATCHED';
+  const assignmentCandidateAtObservation=status==='offline'||busy===true||
+   routeLabelState==='MISSING'?false:
+   status==='online'&&busy===false&&routeLabelState==='MATCHED'?true:null;
+  return {name,registration:'SINGLE',status,busy,routeLabelState,
+   missingRouteLabels,assignmentCandidateAtObservation};
  });
 }
 export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFileSync){
