@@ -2,6 +2,21 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 실행 보정 — 신규 실제 증거 (기존 R1 기록 보존)
+
+> **대상:** 프로세스 총괄 작업, 최신 control `main=ce23591b2ae6606556ca0069125b1538882b4023`. 이 보정은 기존 완료 업무를 재시작시키거나 운영 C/B 권한을 확대하지 않는다. 이 브랜치의 계획은 실PC Runtime의 정본이 아니며, 공유 작업은 원래 #68의 단일 담당을 따른다.
+
+| 실행 Lane | LAST PASS / 새 관측 | 미확보 FIRST FAIL·상태 | 다음 필수 행동 / 담당·PC |
+|---|---|---|---|
+| 중앙 공통 인계 | 기존 8/8 DONE 유지. bot 종료 사건 PR [#1354](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1354) 및 owner 종료 사건 PR [#1355](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1355) **main 반영**, #1355 격리 [Run #43455350868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43455350868) **317/317 PASS**, open `agent-handoff` 0건 | 신설 격리 Writer B 신규 자연 유효 실패 왕복 **4/5 DEFERRED** (신규 사건 0) | 인증된 자연 장애가 실제 접수된 때만 총괄이 수정→CI→원본 반환. 평시 `NO_WORK`; 인위적 장애·재요청 금지. 실행 PC: GitHub + 별도 격리 PC `DESKTOP-N62L0NG` |
+| #1351 운영 A | 기존 [Issue #1351](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351) / [Run #43429486924](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43429486924), job `131899103441`, label `zgmini-pc-control`, `queued / runner_id=0`. 과거 #1342의 실Runner `zgmini-pc-04` 성공은 별도 시점 | 현재 운영 6 Runner 온라인/세션·Watchdog 원인 **UNKNOWN**; GitHub 접수 완료 ≠ 실Windows 실행. 원격 데스크톱 사용 필요 증거 없음 | 원래 Job의 상태 변경 시 고유 Runner·기존 Issue 결과 TXT/JSON 2/2 확인. 승인된 관리/건강 조회 이외 다른 도구를 통한 PC 조작 금지. 담당: 공통 실행·운영 PC `PC` |
+| #996 C | 격리 실제 NT class 10 경쟁 시험 [Run #43439435316](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43439435316) **29/29 PASS**, 경쟁시 `STATUS_ACCESS_DENIED` 실측 | `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN`; `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`. **80% NO-GO**, 운영 복구 미실행 | C Owner가 오프라인 독점·신뢰된 승인 서명/시각/철회·실제 CAS 보호 증거를 별도 확보. 격리 source/TEST_ONLY는 `DESKTOP-N62L0NG`, 운영 C는 정확한 별도 승인 후 `PC`에서만. 총괄은 공유 조정만 |
+| #1352 후행 라벨 | [Draft PR #1352](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1352) source-only 회귀 PASS | 운영 설치/Controller compatibility 미증명 | C Owner/단일 적용 owner가 source–runtime diff 및 실제 적용 필요성 검증. 다른 활성 Controller 공유 설치 쓰기와 병렬화 금지 |
+| #434 유지보수기 중복 보고 | **신규 확보된 자연 B 후보 증거:** [#476](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/476), [#538](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/538), [#637](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/637), [#703](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/703)의 기존 정규 B 댓글은 각 1건씩 `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, `REPORT_UPLOAD: VERIFIED`. #476/#637/#703 실제 `results/maintenance-<requestId>.json` + `.txt` **각 2/2 재조회** 및 요청/설치 SHA 일치 | `reportUploadStatus=VERIFIED` **PC 영속 원장 내부값** 및 `E:\\ZGmini`의 요청별 `MAINTENANCE_<requestId>.{txt,json}` **신규 0건**은 원격 결과와 댓글만으로 미입증. #464 자기 인계와 각 후보의 실제 설치 source/시점 일치도 최종 증거로 별도 확인 필요 | **새 B 생성 금지.** 기존 정상 B의 해당 `requestId` 한 건을 선택해 승인된 Windows 읽기 증거로 원장/정확한 E 파일 존재만 확인하면 #434 최종 판정. 담당: 공통 유지보수기 Owner / 운영 PC `PC`. 조건 미확보 시 4/5(80%) 유지 |
+| 6개 기능 독립 Lane | 원본 R1 각 기능의 LAST PASS 보존; R10 Alpaca 제외 5/5 DONE | #996/자연 대기·타 대화 미수신은 기능 전체 차단 사유 아님 | 물가/테마/고용/시장 캘린더/D05 담당이 각 고유 마지막 checkpoint부터 허용된 P0 원자료·소스·조회/계산·게시를 계속. 실제 동일 PC 파일/lease 공유 쓰기만 단일 조정 |
+
+**운영 방식 고정:** 기본 경로는 GitHub Issue → 기존 Actions/자체 Runner → 정확한 JSON/TXT·댓글 원격 회수. `Remote Desktop Commander` 같은 외부 원격 도구를 임의 진단·복구 우회로 사용하거나 사용자 승인 요청을 반복하지 않는다. C급 효과·보호 잠금·Worker/Core/DB/예약·운영 데이터·D1/DNS를 임의 변경하지 않는다. 구역별 완료 기준을 합산해 가짜 전체 완료율을 만들지 않는다.
+
 ## 0. 최종 목표와 작업 분류
 
 - **기능 완료의 실체:** 승인된 PC 공급자 원자료 GET → 원자료와 관측일·source SHA·checkpoint를 로컬에 저장·재조회 → 저장 원자료만으로 계산 → 로컬 결과 저장 → 승인된 공개 결과만 D1 게시 → Production API 및 PC/모바일 UI의 값·단위·결측·날짜·sourceVersion·storedAt 검증. 데이터가 없는 경우 0으로 위장하지 않는다.
