@@ -34,9 +34,14 @@ test('compiled x64 C TEMP-only NT root-relative rename and existing archive refu
 },()=>{
   const temp=fs.realpathSync.native(os.tmpdir());
   assert.ok(isSafeTemp(temp),'Untrusted TEMP root');
-  const where=path.join(process.env['ProgramFiles(x86)']||'',
-    'Microsoft','Visual Studio','Installer','vswhere.exe');
-  assert.ok(fs.existsSync(where),'C996_NATIVE_C_TOOLCHAIN_VSWHERE_UNAVAILABLE');
+  const candidates=[
+    path.join(process.env['ProgramFiles(x86)']||'C:\\Program Files (x86)',
+      'Microsoft','Visual Studio','Installer','vswhere.exe'),
+    'C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe',
+    'C:\\Program Files\\Microsoft Visual Studio\\Installer\\vswhere.exe',
+  ];
+  const where=candidates.find(x=>fs.existsSync(x));
+  assert.ok(where,'C996_NATIVE_C_TOOLCHAIN_VSWHERE_UNAVAILABLE');
   const found=execFixed(where,['-latest','-products','*','-version','[18.0,19.0)',
     '-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
     '-property','installationPath']);
