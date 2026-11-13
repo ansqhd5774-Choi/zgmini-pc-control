@@ -17,6 +17,16 @@
 #ifndef _WIN64
 #error "This TEMP-only test requires the pinned Windows x64 architecture"
 #endif
+/* A second, independent native-NT handle-relative diagnostic. Never use it
+ * as a fallback if Win32 returned 87 and never compile it into a C operator. */
+#if defined(C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY) && \
+    defined(C996_NATIVE_ABSOLUTE_TEMP_DIAGNOSTIC_ONLY)
+#error "Mutually exclusive TEMP rename diagnostics"
+#endif
+#if defined(C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY) && \
+    !defined(C996_NATIVE_TEMP_TEST_ONLY)
+#error "Native NT rename diagnostic is TEMP-only"
+#endif
 /* The absolute-path probe is diagnostic-only, never a production fallback.
  * Win32 accepts NULL RootDirectory with an absolute destination; the default
  * handle-relative candidate remains unchanged unless BOTH test macros exist. */
@@ -43,6 +53,21 @@
 
 #define C996_N MAX_PATH
 #define C996_FIXTURE_PREFIX L"zgmini-996-winpe-fixture-"
+
+/* ntdll!NtSetInformationFile uses FileRenameInformation (NT class 10), NOT
+ * Win32 FILE_INFO_BY_HANDLE_CLASS FileRenameInfo (class 3). Its documented
+ * FILE_RENAME_INFORMATION uses the same field offsets as FILE_RENAME_INFO.
+ * The explicit fixed class and dynamic lookup are isolated diagnostic code.
+ * It does NOT establish volume exclusivity, Owner trust or WinPE support. */
+#ifdef C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY
+typedef struct c996_native_io_status_block {
+    union { LONG Status; PVOID Pointer; } result;
+    ULONG_PTR Information;
+} c996_native_io_status_block;
+typedef LONG (NTAPI *c996_nt_set_information_file)(
+    HANDLE, c996_native_io_status_block *, PVOID, ULONG, ULONG);
+#define C996_NT_FILE_RENAME_INFORMATION_CLASS 10u
+#endif
 
 static int c996_stop(const char *code)
 {
@@ -227,6 +252,31 @@ int wmain(int argc, WCHAR **argv)
 #endif
     rename_info->FileNameLength = (DWORD)name_bytes;
     memcpy(rename_info->FileName, new_name, name_bytes);
+
+#ifdef C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY
+    {
+        HMODULE module = GetModuleHandleW(L"ntdll.dll");
+        c996_nt_set_information_file native_rename = module ?
+            (c996_nt_set_information_file)GetProcAddress(
+                module, "NtSetInformationFile") : NULL;
+        c996_native_io_status_block io_status = {0};
+        LONG native_status;
+        if (native_rename == NULL) {
+            outcome = c996_stop("NTDLL_RENAME_API_UNAVAILABLE");
+            goto done;
+        }
+        puts("C996_NATIVE_TEMP_MODE:NTDLL_RELATIVE_ROOT_DIAGNOSTIC_ONLY");
+        native_status = native_rename(source_handle, &io_status,
+            rename_info, (ULONG)info_bytes,
+            C996_NT_FILE_RENAME_INFORMATION_CLASS);
+        if (native_status != 0 || io_status.result.Status != 0) {
+            fprintf(stderr, "C996_NATIVE_TEMP_NTSTATUS:%08lx\n",
+                    (unsigned long)(uint32_t)native_status);
+            outcome = c996_stop("NTDLL_RENAME_DENIED_OR_UNCERTAIN");
+            goto done;
+        }
+    }
+#else
     if (!SetFileInformationByHandle(source_handle, FileRenameInfo,
                                     rename_info, (DWORD)info_bytes)) {
         /* Preserve the FIRST Win32 failure before later diagnostics or
@@ -238,6 +288,7 @@ int wmain(int argc, WCHAR **argv)
         outcome = c996_stop("RENAME_DENIED_OR_COLLISION");
         goto done;
     }
+#endif
 
     /* The source handle still has DELETE access to this SAME file identity.
      * The verification open must share DELETE to satisfy Windows' symmetric
