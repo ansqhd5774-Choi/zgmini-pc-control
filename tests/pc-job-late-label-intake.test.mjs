@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {executeJob} from '../controller/engine.mjs';
 import {stagePreimageManifest} from '../controller/preimage-manifest-stager.mjs';
 
 const wf=fs.readFileSync(new URL('../.github/workflows/pc-job.yml',import.meta.url),'utf8');
@@ -45,6 +49,38 @@ test('installed Controller entry and scope stager require exact label and issue 
  // the fixed A operation twice; concurrency remains serialized per Issue.
  assert.match(engine,/DUPLICATE_REUSED_NO_EXECUTION/);
  assert.match(engine,/request-['"]\+request\.requestId/);
+});
+
+test('repeated labeled delivery reuses existing requestId ledger without another worker execution',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'pc-late-label-repeat-'));
+ try{
+  const approvedPolicy={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+   sourceRepository:'ansqhd5774-Choi/zgmini',seats:6,
+   operations:{'core-runtime-source-readonly':{grade:'A',resource:'light',timeoutSeconds:60}}};
+  const host={controllerSourceSha:'b'.repeat(40),dataRoot:path.join(root,'data')};
+  const ledger=path.join(root,'ledger',request.requestId+'.json');
+  fs.mkdirSync(path.dirname(ledger),{recursive:true});
+  const digest=createHash('sha256').update(JSON.stringify(request)).digest('hex');
+  const prior={status:'PASS',code:'CORE_READONLY_DIAGNOSIS',
+   lastPass:'ALLOWLISTED_OPERATION_COMPLETED',firstFail:null};
+  fs.writeFileSync(ledger,JSON.stringify({payloadSha:digest,report:prior}),{flag:'wx'});
+  for(const runId of ['999901','999902']){
+   const outcome=await executeJob(request,{root,policy:approvedPolicy,host,seat:1,runId});
+   assert.equal(outcome.report.reused,true);
+   assert.equal(outcome.report.reuseCode,'DUPLICATE_REUSED_NO_EXECUTION');
+   assert.equal(outcome.report.code,prior.code);
+   assert.equal(outcome.report.status,'PASS');
+   assert.equal(outcome.report.operationalWrites,0);
+   assert.equal(fs.existsSync(path.join(outcome.workspace,'worker-result.json')),false);
+   assert.equal(fs.existsSync(outcome.file),true);
+  }
+  const changed={...request,sourceSha:'c'.repeat(40)};
+  const refused=await executeJob(changed,{root,policy:approvedPolicy,host,seat:1,runId:'999903'});
+  assert.equal(refused.report.status,'BLOCKED');
+  assert.equal(refused.report.code,'DUPLICATE_REQUEST_PAYLOAD_CHANGED');
+  assert.equal(fs.existsSync(path.join(refused.workspace,'worker-result.json')),false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(ledger,'utf8')),{payloadSha:digest,report:prior});
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
 test('preimage intake accepts labeled pc-job A without inventing scope or issuing network fetch',async()=>{
