@@ -40,7 +40,7 @@ test('installed Controller entry and scope stager require exact label and issue 
  assert.match(entry,/EVENT_NOT_ALLOWED/);
  assert.match(stager,/event\?\.action==='opened'/);
  assert.match(stager,/event\?\.action==='labeled'&&event\?\.label\?\.name==='pc-job'/);
- assert.match(stager,/event\.issue\?\.user\?\.login!=='ansqhd5774-Choi'/);
+ assert.match(stager,/event\?\.issue\?\.user\?\.login!=='ansqhd5774-Choi'/);
  // Existing requestId ledger means repeated original labels cannot execute
  // the fixed A operation twice; concurrency remains serialized per Issue.
  assert.match(engine,/DUPLICATE_REUSED_NO_EXECUTION/);
