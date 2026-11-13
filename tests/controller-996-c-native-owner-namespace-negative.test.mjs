@@ -586,17 +586,31 @@ $i=ConvertFrom-Json ([Text.Encoding]::UTF8.GetString(
     });
     timer=setTimeout(()=>child.kill(),25000);
     await waitReady;
-    // The other process holds both handles; move is orchestrated by Node.
-    fs.renameSync(source,archive);
+    // This uses Win32 Node rename, NOT the production NT C operator. Keep
+    // both outcomes as bounded evidence: a sharing violation is itself a
+    // fail-closed observed boundary, not proof of native-C atomicity.
+    let moved=false,moveCode=null;
+    try{fs.renameSync(source,archive);moved=true;}
+    catch(e){
+      assert.ok(['EPERM','EACCES','EBUSY'].includes(e?.code),
+        'Unexpected TEMP rename outcome: '+String(e));
+      moveCode=e.code;
+    }
     fs.writeFileSync(goFile,'1',{flag:'wx'});
     const code=await done;
     assert.equal(code,0,'native child exit '+code+' '+stderr.slice(-1200));
     assert.match(stdout,/C996_PREOPENED_PARENT_NT=00000000/);
     assert.match(stdout,/C996_PREOPENED_CHILD_NT=00000000/);
-    assert.equal(fs.existsSync(source),false);
-    assert.equal(fs.readFileSync(path.join(archive,'parent-late.txt')).length,0);
-    assert.equal(fs.readFileSync(path.join(archive,'nested','nested-late.txt')).length,0);
-    // Even a successful isolated race grants ZERO C execution authority.
+    const finalDir=moved?archive:source;
+    assert.equal(fs.existsSync(source),!moved);
+    assert.equal(fs.existsSync(archive),moved);
+    assert.equal(fs.readFileSync(path.join(finalDir,'parent-late.txt')).length,0);
+    assert.equal(fs.readFileSync(path.join(finalDir,'nested','nested-late.txt')).length,0);
+    console.log('C996_PREOPENED_TEMP_RENAME_OUTCOME='+
+      (moved?'WIN32_RENAMED_INSERTS_PERSIST':'WIN32_MOVE_DENIED_'+moveCode));
+    console.log('C996_PREOPENED_PARENT_NT=00000000 CHILD_NT=00000000');
+    // No conclusion about the NT class-10 move while these handles are held.
+    // Neither result grants C execution authority or an operational move.
   }finally{
     if(timer)clearTimeout(timer);
     if(child&&!child.killed)child.kill();
