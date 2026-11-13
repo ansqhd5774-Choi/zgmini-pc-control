@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import path from 'node:path';
-import {summarizeAutomation,dedicatedPcRunnersOnline,inspectWatchdogReadOnly} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline,inspectWatchdogReadOnly,summarizeSupervisorReadOnly} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -167,4 +167,47 @@ test('invalid JSON or future timestamps never become fresh READY evidence',()=>{
  const future=watchdogFixture({status:{at:'2026-11-14T02:00:00.000Z',pid:2026,state:'HEALTHY'}});
  assert.equal(future.result.state,'HEALTHY');
  assert.equal(future.result.fresh,false);
+});
+
+test('watchdog BLOCKED cause is reported only when it is a safe diagnostic code',()=>{
+ const base={at:'2026-11-14T01:00:00.000Z',pid:2026,state:'BLOCKED'};
+ const diagnosed=watchdogFixture({status:{...base,code:'CONTROLLER_HASH_MISMATCH'}}).result;
+ assert.equal(diagnosed.blockedCode,'CONTROLLER_HASH_MISMATCH');
+ const unsafe=watchdogFixture({status:{...base,code:'SECRET:token-value'}}).result;
+ assert.equal(unsafe.blockedCode,null);
+ const healthyStatus=watchdogFixture({status:{...base,state:'HEALTHY',code:'STALE_ERROR'}}).result;
+ assert.equal(healthyStatus.blockedCode,null);
+});
+
+test('read-only supervisor evidence identifies owner and heartbeat without private fields',()=>{
+ const supervisor={pid:37,at:'2026-11-14T01:00:00.000Z',mode:'LISTENING',
+  children:[{seat:1},{seat:2}],sourceSha:'SHOULD_NOT_LEAK'};
+ const owner={pid:37,nonce:'PRIVATE_NONCE'};
+ const state={supervisorAlive:true,supervisorIdentityVerified:true,
+  supervisorFresh:true,supervisorChildrenVerified:false};
+ const result=summarizeSupervisorReadOnly({supervisor,owner,state});
+ assert.deepEqual(result,{heartbeatAt:'2026-11-14T01:00:00.000Z',
+  statusPid:37,ownerPid:37,ownerProcessAlive:true,identityVerified:true,
+  heartbeatFresh:true,childrenVerified:false,childCount:2,mode:'LISTENING'});
+ assert.equal(JSON.stringify(result).includes('PRIVATE_NONCE'),false);
+ assert.equal(JSON.stringify(result).includes('SHOULD_NOT_LEAK'),false);
+});
+
+test('missing or malformed supervisor timestamp remains unverified',()=>{
+ const noEvidence=summarizeSupervisorReadOnly({state:{}});
+ assert.equal(noEvidence.heartbeatAt,null);
+ assert.equal(noEvidence.heartbeatFresh,null);
+ assert.equal(noEvidence.childrenVerified,null);
+ assert.equal(noEvidence.ownerPid,null);
+ const invalid=summarizeSupervisorReadOnly({
+  supervisor:{pid:-2,at:'2026-11-14T01:00:00Z',mode:'INVALID',children:[]},
+  owner:{pid:-1},
+  state:{supervisorAlive:null,supervisorFresh:true,supervisorIdentityVerified:false,supervisorChildrenVerified:true},
+ });
+ assert.equal(invalid.heartbeatAt,null);
+ assert.equal(invalid.heartbeatFresh,null);
+ assert.equal(invalid.ownerPid,null);
+ assert.equal(invalid.statusPid,null);
+ assert.equal(invalid.childCount,0);
+ assert.equal(invalid.mode,null);
 });
