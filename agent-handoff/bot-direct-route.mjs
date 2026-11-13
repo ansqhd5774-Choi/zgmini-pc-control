@@ -68,7 +68,10 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
       item?.user?.login === BOT && typeof item.body === 'string' &&
       (item.body.startsWith('HANDOFF_ROUTED\n') ||
        item.body.startsWith('HANDOFF_DUPLICATE_REUSED\n')));
-    if (routes.length > 1 || routes.some(item => item.body !== receipt))
+    const expectedIssueUrl =
+      `https://api.github.com/repos/${REPOSITORY}/issues/${issueNumber}`;
+    if (routes.length > 1 || routes.some(item =>
+      item.issue_url !== expectedIssueUrl || item.body !== receipt))
       stop('ROUTE_RECEIPT_CONFLICT_STOP');
     return routes.length === 1;
   };
