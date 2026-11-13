@@ -1,0 +1,79 @@
+schema=ZGMINI_C996_WINPE_TEST_ONLY_RESULT_V1
+evidence_kind=TEXT_NORMALIZED_FROM_EXISTING_RUN_LOGS_AND_GUEST_SCREEN
+target_host=DESKTOP-N62L0NG
+interactive_windows_user_match=PASS
+runner_name=ansqh-tistory-publisher
+runner_repo=ansqhd5774-Choi/nhunnhun_blog
+runner_branch=codex/c996-vbox-user-readonly-once-20261113
+vm_uuid=03620b4b-7ca3-47a0-9a20-df8818ee068f
+vm_scope=ISOLATED_TEST_ONLY_NO_HOST_DISK_OR_NETWORK
+test_iso_sha256_expected=63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588
+
+run_owner_access=43339104646
+job_owner_access=131602661937
+owner_interactive_session=PASS
+owner_pinned_host=PASS
+owner_vm_access=PASS
+vm_memory_mib=2048
+vm_cpus=1
+vm_firmware=BIOS
+vm_pretest_state=running
+vm_nic_1_to_4=none
+vm_usb=off
+
+run_guest_boot=43339375970
+job_guest_boot=131603556754
+guest_screenshot_command=PASS
+guest_boot_x_ram_prompt=PASS
+guest_boot_source=SCREEN_VISUAL_OBSERVATION_NOT_GUEST_STDOUT
+guest_boot_artifact_id=13998013091
+
+run_cng_once=43339714153
+job_cng_once=131604668753
+guest_command_sent_once=PASS
+guest_executable=X:\Tools\c996_winpe_cng_test.exe
+guest_cng_screen=6_OF_6
+guest_cng_result_source=SCREEN_VISUAL_OBSERVATION_NOT_GUEST_STDOUT
+guest_environment_marker_observed=1
+guest_boot_integrity_proven=0
+guest_image_binding_verified=0
+guest_owner_approval_verified=0
+guest_offline_clock_trusted=0
+guest_revocation_verified=0
+guest_execution_authorized=0
+guest_operational_writes=0
+cng_artifact_id=13999500066
+
+run_exit_status=43340021424
+job_exit_status=131605711419
+guest_exit_query=EXISTING_WINPE_CMD_NO_TEST_RERUN
+guest_cng_exit_code=0
+guest_exit_source=SCREEN_VISUAL_OBSERVATION_NOT_GUEST_STDOUT
+exit_artifact_id=13998378879
+
+run_graceful_shutdown=43340339111
+job_graceful_shutdown=131606782146
+guest_wpeutil_shutdown_once=SENT
+vm_poweroff_readback=PASS
+iso_sha256_unchanged_readback=PASS
+iso_sha256_verified=63d6dccf67e470c28842cc3eccbcd552275588b921a969a076d6fe4788e4c588
+
+status_test_only=DONE
+status_controller_operating_c=NO_GO
+remaining_blocker_owner=C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED
+remaining_blocker_namespace=C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN
+operating_pc_PC_modified=false
+owner_spki_proof_provided=false
+native_cas_atomicity_proven=false
+no_cng_rerun_required=true
+
+# Source Run links
+# https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43339104646
+# https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43339375970
+# https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43339714153
+# https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43340021424
+# https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43340339111
+# TXT is a normalized report, not a byte-for-byte dump of WinPE stdout.
+# For this one-shot isolated WinPE VM, guest stdout was not bridged to the Runner.
+# Do not misrepresent the original screenshot observation as native stdout.
+# No archive download or screenshot transfer required to consume this permanent TXT.
