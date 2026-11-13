@@ -64,7 +64,7 @@ test('independent ntdll relative-root probe is TEMP-only, mutually exclusive, an
   assert.match(src,/#error "Production native #996 C operator is intentionally unavailable"/);
   // Never silently route failed handle-relative native operations to the
   // unanchored Win32 absolute-path diagnostic.
-  const at=src.indexOf('    native_status = native_rename(');
+  const at=src.indexOf('native_status = native_rename(');
   const end=src.indexOf('\n#else\n    if (!SetFileInformationByHandle(',at);
   assert.ok(at>0&&end>at);
   assert.doesNotMatch(src.slice(at,end),/SetFileInformationByHandle\(/);
