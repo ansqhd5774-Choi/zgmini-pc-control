@@ -55,6 +55,33 @@ test('preimage intake accepts labeled pc-job A without inventing scope or issuin
  assert.equal(calls,0);
 });
 
+test('labeled scoped preimage stages only approved hash-bound bytes without token forwarding',async()=>{
+ const {createHash}=await import('node:crypto');
+ const approval={schema:'ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1',status:'APPROVED_A_READONLY',
+  scope:'PC_WRITER_APPROVED_SOURCE_PREIMAGE',sourceRoot:'projects/zgmini-earnings-history-pc-release',
+  files:[{path:'scripts/pc-writer/run-local.mjs',change:'M'}],allowOtherPaths:false};
+ const bytes=Buffer.from(JSON.stringify(approval));
+ const hash=createHash('sha256').update(bytes).digest('hex');
+ const scoped={...request,operation:'writer-install-preimage-readonly',
+  preimageManifestPath:'approvals/writer-preimage/inflation-candidates-7-r1.json',
+  preimageManifestSha256:hash};
+ const labeled=event();labeled.issue.body=JSON.stringify(scoped);
+ const token='test-only-scoped-preimage-credential-00001';
+ let calls=0,observedUrl='';
+ const staged=await stagePreimageManifest({env:{...env,GITHUB_SHA:'b'.repeat(40),GITHUB_TOKEN:token},
+  event:labeled,policy:{...policy,operations:{...policy.operations,'writer-install-preimage-readonly':{grade:'A'}}},
+  fetchImpl:async(url,options)=>{
+   calls++;observedUrl=url;
+   assert.equal(options.method,'GET');
+   assert.equal(options.headers.Authorization,'Bearer '+token);
+   return {ok:true,text:async()=>JSON.stringify({type:'file',encoding:'base64',content:bytes.toString('base64')})};
+  }});
+ assert.equal(calls,1);
+ assert.match(observedUrl,/\\?ref=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb$/);
+ assert.equal(staged.manifestSha256,hash);
+ assert.equal(JSON.stringify(staged).includes(token),false);
+});
+
 test('late-label intake rejects unrelated labels, foreign owner, foreign actor, missing label and edits',async()=>{
  const invalid=[
   {env,event:event('labeled','other')},
