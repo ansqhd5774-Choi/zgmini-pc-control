@@ -216,8 +216,16 @@ int wmain(int argc, WCHAR **argv)
     info_bytes = offsetof(FILE_RENAME_INFO, FileName) + name_bytes +
                  sizeof(WCHAR);
 
+#ifdef C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY
+    /* NT relative rename needs rights to add a directory entry under the
+     * pinned TEMP parent. Pinned ROOT+SOURCE handles are still required. */
+    root_handle = c996_open_dir(root, FILE_READ_ATTRIBUTES | FILE_TRAVERSE |
+                                FILE_ADD_SUBDIRECTORY,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE);
+#else
     root_handle = c996_open_dir(root, FILE_READ_ATTRIBUTES | FILE_TRAVERSE,
                                 FILE_SHARE_READ | FILE_SHARE_WRITE);
+#endif
     source_handle = c996_open_dir(source, DELETE | FILE_READ_ATTRIBUTES,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE);
     if (!c996_identity(root_handle, &root_id) ||
