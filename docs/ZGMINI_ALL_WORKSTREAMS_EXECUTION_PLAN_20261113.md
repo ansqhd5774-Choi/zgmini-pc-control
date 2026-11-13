@@ -2,6 +2,17 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 31차 실증 반영 — 운영 PC 실행 차단의 정확한 경계
+
+- **30차 코드 완료를 재사용:** #996 과거 C 동의 영수증의 일반 감사 문장 오판 수정 [PR #1357](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1357)은 **C 전담 브랜치에 병합**됐다. 전담 HEAD `91b317f6b8070aa48f762516f4e1d60b6e90bb8c`; 기존 격리 CI [Run #43473278180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43473278180), Job `132050467994`, `DESKTOP-N62L0NG` **40/40 PASS, 0 fail/skip**. source fix는 `DONE`; 실제 운영 C 복구 **80%/NO-GO**. 구체적으로 신규 continuation Owner C 승인·trust/revocation, 독립 offline namespace exclusive 및 native preimport/CAS의 현재 운영 증거가 없어 #1222는 Draft/main 미병합. WinPE 6/6·기존 29/29·새 40/40 재시험 금지.
+- **#1351 고유 PC Job 최신:** [Run #43429486924](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43429486924) Job `131899103441`는 `queued, runner_id=0, runner_name=""`. 이 Job은 이미 `issues.opened`로 생성됐으며 [.github/workflows/pc-job.yml](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/.github/workflows/pc-job.yml)의 `pc-request-<issueNumber>` 고유 그룹을 사용한다. 요청 중복이나 후행 라벨 문제로 판단하지 않는다. GitHub 연결에서 Runner online/busy 관리 목록 API는 열리지 않아 운영 PC의 **현재** Windows 로그인/Guardian/Watchdog/lease 소유는 `AUTOMATION_BLOCKED/READBACK_PENDING`. 기존 [RUNNER_RECOVERY.md](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/docs/RUNNER_RECOVERY.md)는 전원·로그인 세션 없이는 watchdog이 동작하지 않는다고 설명한다. 이 구조를 강제 종료·잠금 삭제·새 예약·PC 재등록으로 우회하지 않는다.
+- **#1352 독립 대기:** [Draft PR #1352](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1352)의 late-label 수집은 격리 98/98 PASS이지만 Controller 동시 설치 SHA·기존 B 승인과 `ZGMINI_PC_JOB_LATE_LABEL_ENABLED` opt-in 전 **Draft 유지**. 이미 queued인 #1351 작업을 해결하는 변경이 아니므로 이를 미배정 원인 수정으로 병합하지 않는다.
+- **공통 중앙 처리:** 8/8 DONE, open `agent-handoff` 0건; 신규 자연 Writer B E2E 4/5 DEFERRED. 과거 완료 실증을 다시 실행하거나 자연 실패를 만들지 않는다.
+- **#434 사용자 지시 우선:** 2026-11-08 제외된 E: 중복 보고서 신규 0건 확인은 필수 Gate가 아니다. 다음 구체 작업은 이미 등록된 Runner/Guardian 상태의 승인된 원본 재조회이며, 가능할 때만 영속 원장 관련 읽기 증거를 얻는다. #434의 대기는 독립 기능 작업의 전역 Gate가 아니다.
+- **PC별 다음 실제 단계:** 운영 `PC`: 기존 6 Runner/로그인/Watchdog 현재 상태의 **승인된 읽기 경로** 확보 후 기존 #1351 결과 2/2 회수(미확보 시 해당 Lane만 `AUTOMATION_BLOCKED`). 별도 격리 `DESKTOP-N62L0NG`: 이미 승인된 서로 독립인 source CI만 필요한 변경에서 활용. C 전담 Owner: 정확한 continuation C 승인 및 보호 안전 증거 전 실제 C 실행 금지. 총괄: 독립 원담당 기능의 수집·계산·게시를 #1351·#996 대기로 일괄 중지하지 않는다.
+
+> 이 상단 정본이 아래 2026-11-13 원본 R1의 당시 WinPE 미실행·이전 Source SHAs·#434 E: Gate 등의 역사 상태보다 **후속 업무 판정에서 우선**한다. 아래 과거 증거와 승인 이력을 삭제하지 않는다.
+
 ## 2026-11-14 후속 실행 정정 — 사용자 삭제한 #434 검증 Gate 재도입 금지
 
 **사용자 이전 직접 지시 재적용:** 2026-11-08 `#434 E: 중복 보고서 생성 0건 확인 삭제`. 이 의미는 **E: 원본 파일 삭제 명령이 아니라, E: 중복 보고서 신규 0건을 실측 확인하는 검증 항목을 #434 작업 목록에서 제외**하는 것이다. 해당 값이 실제로 검증됐다고 주장하지 않으며, 과거 원장·파일을 임의 수정/삭제하지 않는다. 아래 2026-11-06/11-13 역사적 계획의 해당 선행 조건은 **현재 실행 지시로 사용하지 않는다**.
