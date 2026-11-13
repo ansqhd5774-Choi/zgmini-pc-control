@@ -93,6 +93,51 @@ test('missing comment proof stops before label',async()=>{
   assert.equal(f.labelCount,0);
 });
 
+
+test('label POST acknowledgement lost after GitHub write is recovered without another POST',async()=>{
+  const f=fixture();const original=f.io.addIssueLabel;
+  f.io.addIssueLabel=async(number,label)=>{
+    await original(number,label);
+    throw Error('LABEL_POST_ACK_LOST_AFTER_WRITE');
+  };
+  const result=await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(result.state,'ROUTE_RECORDED');
+  assert.equal(f.postCount,1);assert.equal(f.labelCount,1);
+  assert.equal(f.created.labels.filter(x=>x.name==='handoff-agent-pending').length,1);
+  const resumed=await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(resumed.state,'ROUTE_REUSED');
+  assert.equal(f.postCount,1);assert.equal(f.labelCount,1);
+});
+
+test('label POST rejection before GitHub write does not fabricate routing success',async()=>{
+  const f=fixture();const original=f.io.addIssueLabel;let attempts=0;
+  f.io.addIssueLabel=async(number,label)=>{
+    attempts++;
+    if(attempts===1)throw Error('LABEL_POST_NO_WRITE');
+    return original(number,label);
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /LABEL_POST_OUTCOME_UNKNOWN/);
+  assert.equal(f.postCount,1);assert.equal(attempts,1);
+  assert.equal(f.created.labels.some(x=>x.name==='handoff-agent-pending'),false);
+  const resumed=await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(resumed.state,'ROUTE_REUSED');
+  assert.equal(f.postCount,1);assert.equal(attempts,2);assert.equal(f.labelCount,1);
+});
+
+test('lost label POST acknowledgment with competing duplicate state refuses routing',async()=>{
+  const f=fixture();
+  f.io.addIssueLabel=async(number,label)=>{
+    assert.equal(number,1200);
+    f.created.labels.push({name:label},{name:'handoff-duplicate'});
+    throw Error('LABEL_POST_ACK_LOST_CONFLICT');
+  };
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_LABEL_CONFLICT_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.comments.length,1);
+});
+
 test('label readback failure preserves comment and resumes only missing label',async()=>{
   const f=fixture();f.loseNextLabel();
   await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
