@@ -2,6 +2,13 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 34차 실제 공통 대기열 소스 개선 — source main 반영 완료
+
+- **상위 목표 진행:** 실제 #68 자원 대기 원본 PC Job의 `run_attempt`가 원격 결과의 `jobId`와 일치하는지 직접 검증하지 않던 공통 readback 경계 결함을 수정. 기존 Draft [#1180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1180)의 2파일 수정 blob을 **동일하게** 최신 main `dd209ae3915e2d6552122a86134827a8239812b4`에서 이식하고, 기존 agent-handoff 격리 CI 테스트 목록에 정확한 해당 회귀 1개만 추가(총 3파일). [PR #1358](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1358) squash merge **`9479db7b5904a31c4943b8a06980e11df94022e1`**, main 원격 3파일 blob 동일 재조회.
+- **정확한 실증:** 기존 `agent-handoff-ci` 승인 라벨·별도 격리 Windows Runner `zgmini-handoff-ci-spare-01`에서 [Run #43477891778](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43477891778) **330/330 PASS, fail 0, skip 0**. 로그에서 신규 불일치 거부/정상 회차 유지 두 시험 실제 실행 확인. 별도 C996 Source [Run #43477798760](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43477798760) PASS는 대상 시험 증거로 대체하지 않음.
+- **상태·경계:** 공통 readback `SOURCE_MERGED`, 실제 Writer B 자연 자원 해제 왕복 **4/5 DEFERRED**, 기존 중앙 인계 **8/8 DONE**. #1351 [Run #43429486924](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43429486924)는 재조회 시 여전히 `queued`/Runner 미배정, 원본 결과 없음. #996 운영 C는 **80%/NO-GO**. 운영 PC, 설치 잠금, Controller, DB, Workflow 실행기·Task, 원본 Job 재시도·신규 PC Job 변경 0. 새 소스 병합은 실PC 승인·설치/복구가 아니다.
+- **다음 필수 실행:** 운영 PC 원 담당자가 기존 승인된 `RUNNER_RECOVERY.md` 범위에서 현재 6 Runner/로그인·Watchdog·install lease 소유를 직접 읽고 기존 #1351 Job 배정 결과를 회수. 별도 C Owner는 continuation C 승인·offline namespace exclusive·native CAS 보호 증거가 충분하기 전 운영 복구 금지. 중앙 인계는 신규 자연 적격 사건 발생 시에만 P0 진행; 기존 Draft #1180은 역사 이력을 보존하고 중복 적용 금지.
+
 ## 2026-11-14 31차 실증 반영 — 운영 PC 실행 차단의 정확한 경계
 
 - **30차 코드 완료를 재사용:** #996 과거 C 동의 영수증의 일반 감사 문장 오판 수정 [PR #1357](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1357)은 **C 전담 브랜치에 병합**됐다. 전담 HEAD `91b317f6b8070aa48f762516f4e1d60b6e90bb8c`; 기존 격리 CI [Run #43473278180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43473278180), Job `132050467994`, `DESKTOP-N62L0NG` **40/40 PASS, 0 fail/skip**. source fix는 `DONE`; 실제 운영 C 복구 **80%/NO-GO**. 구체적으로 신규 continuation Owner C 승인·trust/revocation, 독립 offline namespace exclusive 및 native preimport/CAS의 현재 운영 증거가 없어 #1222는 Draft/main 미병합. WinPE 6/6·기존 29/29·새 40/40 재시험 금지.
