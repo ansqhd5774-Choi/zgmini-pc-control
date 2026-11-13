@@ -56,7 +56,8 @@ function intakeFixture({status = 'RUNTIME_FAILED', authenticatedReceipt = true} 
     routeHandoff: (prepared,number) => routeVerifiedBotIssue(prepared,number,{
       readIssue:n=>io.readIssue(n),listHandoffs:()=>io.listHandoffs(),
       listIssueComments:async()=>routingComments,
-      postIssueComment:async(n,body)=>{routingComments.push({user:{login:bot},body});},
+      postIssueComment:async(n,body)=>{routingComments.push({user:{login:bot},
+        issue_url:`https://api.github.com/repos/${repo}/issues/${n}`,body});},
       addIssueLabel:async(n,label)=>{incidents.find(x=>x.number===n).labels.push({name:label});}
     }),
     createHandoff: async prepared => {
@@ -219,7 +220,8 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
     routeHandoff: (prepared,number) => routeVerifiedBotIssue(prepared,number,{
       readIssue:n=>io.readIssue(n),listHandoffs:()=>io.listHandoffs(),
       listIssueComments:async()=>routingComments,
-      postIssueComment:async(n,body)=>{routingComments.push({user:{login:bot},body});},
+      postIssueComment:async(n,body)=>{routingComments.push({user:{login:bot},
+        issue_url:`https://api.github.com/repos/${repo}/issues/${n}`,body});},
       addIssueLabel:async(n,label)=>{incidents.find(x=>x.number===n).labels.push({name:label});}
     }),
     createHandoff: async prepared => {

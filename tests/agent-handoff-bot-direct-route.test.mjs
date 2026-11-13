@@ -31,7 +31,9 @@ function fixture() {
     postIssueComment:async (number, receipt) => {
       assert.equal(number,1200); postCount++;
       if(failPostBeforeWrite)throw Error('POST_NO_WRITE');
-      comments.push({user:{login:bot},body:receipt});
+      comments.push({user:{login:bot},
+        issue_url:'https://api.github.com/repos/'+repo+'/issues/'+number,
+        body:receipt});
       if(failPostAfterWrite)throw Error('ACK_LOST');
     },
     addIssueLabel:async (number, label) => {
@@ -100,6 +102,17 @@ test('wrong origin, changed title or body cannot be routed',async()=>{
       /BOT_ISSUE_READBACK_STOP/);
     assert.equal(f.postCount,0);assert.equal(f.labelCount,0);
   }
+});
+
+test('bot receipt bound to a different issue cannot authorize reuse',async()=>{
+  const f=fixture();
+  await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(f.comments.length,1);
+  f.comments[0].issue_url='https://api.github.com/repos/'+repo+'/issues/1199';
+  await assert.rejects(routeVerifiedBotIssue(prepared(),1200,f.io),
+    /ROUTE_RECEIPT_CONFLICT_STOP/);
+  assert.equal(f.postCount,1);
+  assert.equal(f.labelCount,1);
 });
 
 test('ambiguous comment POST acknowledges readback without duplicate',async()=>{
