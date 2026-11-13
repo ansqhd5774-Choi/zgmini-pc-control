@@ -87,13 +87,24 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
     stop('ISSUE_DRIFT_STOP');
   assertExclusiveLabel(current);
   if (!current.labels?.some(label => label.name === stateLabel)) {
-    await addIssueLabel(issueNumber, stateLabel);
+    const expectedLabelReadback = issue =>
+      issue?.repository === REPOSITORY && issue.number === issueNumber &&
+      issue.user?.login === BOT && issue.body === prepared.body &&
+      issue.title === `agent-handoff ${prepared.incidentId}` &&
+      issue.labels?.some(label => label.name === 'agent-handoff') &&
+      issue.labels?.some(label => label.name === stateLabel);
+    try {
+      await addIssueLabel(issueNumber, stateLabel);
+    } catch {
+      // A lost label POST response can follow a successful GitHub write.
+      // Reconcile the exact Issue/label instead of repeating the POST.
+      const afterUncertain = await readIssue(issueNumber);
+      if (!expectedLabelReadback(afterUncertain))
+        stop('LABEL_POST_OUTCOME_UNKNOWN');
+      assertExclusiveLabel(afterUncertain);
+    }
     const after = await readIssue(issueNumber);
-    if (after?.repository !== REPOSITORY || after.number !== issueNumber ||
-        after.user?.login !== BOT || after.body !== prepared.body ||
-        after.title !== `agent-handoff ${prepared.incidentId}` ||
-        !after.labels?.some(label => label.name === 'agent-handoff') ||
-        !after.labels?.some(label => label.name === stateLabel))
+    if (!expectedLabelReadback(after))
       stop('LABEL_READBACK_STOP');
     assertExclusiveLabel(after);
   }
