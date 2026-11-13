@@ -2,6 +2,14 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 후속 실행 정정 — 사용자 삭제한 #434 검증 Gate 재도입 금지
+
+**사용자 이전 직접 지시 재적용:** 2026-11-08 `#434 E: 중복 보고서 생성 0건 확인 삭제`. 이 의미는 **E: 원본 파일 삭제 명령이 아니라, E: 중복 보고서 신규 0건을 실측 확인하는 검증 항목을 #434 작업 목록에서 제외**하는 것이다. 해당 값이 실제로 검증됐다고 주장하지 않으며, 과거 원장·파일을 임의 수정/삭제하지 않는다. 아래 2026-11-06/11-13 역사적 계획의 해당 선행 조건은 **현재 실행 지시로 사용하지 않는다**.
+
+**#434의 다음 실제 판정:** [#476](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/476)의 자연 승인 B는 2026-11-06 유지보수기 V2 전환보다 나중에 실행됐고, 해당 Issue의 봇 결과와 원격 JSON/TXT 2/2가 `SUCCEEDED / REPORT_UPLOAD: VERIFIED` 및 동일 요청 댓글 1건을 보인다. 설치 당시 참조 source `4f076a…`의 `tools/maintenance-agent.mjs` Git blob `63cfde736d20f2b166c01b477adfdc010962c8d1`에는 원격 업로드 readback 후 영속 원장 `reportUploadStatus=VERIFIED`를 저장하는 계약이 있다. **PC 영속 ledger의 직접 readback은 아직 없으므로 이것을 실물 PASS라고 선언하지 않는다.** 이미 승인된 운영 PC 진단이 정상 기동해 해당 필드를 제공할 때에만 별도 확인한다. 새 B, 새 범용 A, 사용자 CMD, 외부 원격 데스크톱 도구, 새 Runner/예약을 만들지 않으며, **#434 4/5(DEFERRED)를 다른 기능의 Gate로 다시 배치하지 않는다.** 삭제된 E: 0건 검증을 다음 필수 행동에 포함하거나 자동화로 부활시키지 않는다.
+
+**핵심 다음 행동의 순서(전역 차단 금지):** 운영 `PC`의 기존 [#1351 Run 43429486924](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43429486924)는 `queued/runner_id=0`이므로 해당 원본 작업만 `AUTOMATION_PENDING`; Runner 배정 시 기존 고유 증거 회수. 독립 격리 `DESKTOP-N62L0NG`은 source-only 승인 CI/검증 지속. #996 실제 C 복구는 기존 Owner의 오프라인 독점·신뢰 서명/철회·원자적 CAS 증명 전 `NO-GO`. 중앙 8/8 완료, 신설 Writer B 4/5 자연 사건 DEFERRED는 변경 없음.
+
 ## 2026-11-14 실행 보정 — 신규 실제 증거 (기존 R1 기록 보존)
 
 > **대상:** 프로세스 총괄 작업, 최신 control `main=ce23591b2ae6606556ca0069125b1538882b4023`. 이 보정은 기존 완료 업무를 재시작시키거나 운영 C/B 권한을 확대하지 않는다. 이 브랜치의 계획은 실PC Runtime의 정본이 아니며, 공유 작업은 원래 #68의 단일 담당을 따른다.
