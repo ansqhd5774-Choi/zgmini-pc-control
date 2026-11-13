@@ -130,6 +130,8 @@ export async function processCompletedWriterB(event, {
   };
   const decision = reconcileHandoffInventory(prepared, await listHandoffs());
   if (decision.state === 'REUSE_EXISTING') {
+    if (decision.closed) return Object.freeze({...observed,
+      state: 'REUSED_CLOSED_EXISTING', reusedIssues: 1});
     await confirmRoute(decision.issueNumber);
     return Object.freeze({...observed, state: 'REUSED_EXISTING', reusedIssues: 1});
   }
@@ -140,6 +142,8 @@ export async function processCompletedWriterB(event, {
     // A lost POST response is ambiguous, never automatically re-POST.
     const after = reconcileHandoffInventory(prepared, await listHandoffs());
     if (after.state !== 'REUSE_EXISTING') stop('POST_OUTCOME_UNKNOWN');
+    if (after.closed) return Object.freeze({...observed,
+      state: 'POST_RECONCILED_CLOSED_EXISTING', reusedIssues: 1});
     await confirmRoute(after.issueNumber);
     return Object.freeze({...observed, state: 'POST_RECONCILED', reusedIssues: 1});
   }
