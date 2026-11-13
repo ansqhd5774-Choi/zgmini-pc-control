@@ -24,6 +24,8 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
       !verified.labels?.some(label => label.name === 'agent-handoff')) {
     stop('BOT_ISSUE_READBACK_STOP');
   }
+  // A resolved Incident must never gain a fresh HANDOFF_ROUTED receipt.
+  if (verified.state === 'closed') stop('BOT_ISSUE_CLOSED_STOP');
   const inventory = await listHandoffs();
   if (inventory?.repository !== REPOSITORY || inventory.complete !== true ||
       !Array.isArray(inventory.issues) || inventory.issues.length > 500)
@@ -86,6 +88,9 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
       !current.labels?.some(label => label.name === 'agent-handoff'))
     stop('ISSUE_DRIFT_STOP');
   assertExclusiveLabel(current);
+  // A coordinator can close the Issue after the receipt readback. Do not
+  // append a pending-agent label to an already disposed historic Incident.
+  if (current.state === 'closed') stop('BOT_ISSUE_CLOSED_STOP');
   if (!current.labels?.some(label => label.name === stateLabel)) {
     const expectedLabelReadback = issue =>
       issue?.repository === REPOSITORY && issue.number === issueNumber &&
