@@ -1,7 +1,7 @@
 name: ZGMINI C996 Owner Native Boundary Source Checks
 on:
   push:
-    branches: [codex/controller-996-intake-c-candidate-r1-20261110]
+    branches: [codex/controller-996-intake-c-candidate-r1-20261110, codex/c996-consent-ci-proof-20261114]
     paths:
       - 'tests/controller-996-c-native-owner-operator.test.mjs'
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
@@ -46,7 +46,8 @@ jobs:
         github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
         github.event.pull_request.head.repo.full_name == github.repository) ||
        (github.event_name == 'push' &&
-        github.ref == 'refs/heads/codex/controller-996-intake-c-candidate-r1-20261110' &&
+        (github.ref == 'refs/heads/codex/controller-996-intake-c-candidate-r1-20261110' ||
+         github.ref == 'refs/heads/codex/c996-consent-ci-proof-20261114') &&
         github.actor == 'ansqhd5774-Choi'))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 4
@@ -69,4 +70,8 @@ jobs:
         with:
           node-version: '22'
       - name: Verify C996 boundary and NT TEMP no-replace runtime proof (no operating C effect)
+        if: github.ref != 'refs/heads/codex/c996-consent-ci-proof-20261114'
         run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs tests/controller-996-winpe-native-nt-relative-temp.test.mjs tests/controller-996-native-c-compiled-temp.test.mjs
+      - name: Verify original C consent receipt parsing only (SOURCE_ONLY, no C effect)
+        if: github.ref == 'refs/heads/codex/c996-consent-ci-proof-20261114'
+        run: node --test --test-concurrency=1 tests/controller-996-c-consent-verifier.test.mjs
