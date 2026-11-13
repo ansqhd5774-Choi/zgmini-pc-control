@@ -7,6 +7,7 @@ on:
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
       - 'tools/controller-996-winpe-native-temp-rename.c'
       - 'tests/controller-996-winpe-native-temp-rename-source.test.mjs'
+      - 'tests/controller-996-winpe-native-nt-relative-temp.test.mjs'
       - 'tools/controller-996-winpe-native-volume-ids-readonly.c'
       - 'tools/controller-996-winpe-native-receipt-review.mjs'
       - 'tests/c996_winpe_native_volume_id_temp_harness.c'
@@ -20,6 +21,7 @@ on:
       - 'tests/controller-996-c-native-owner-namespace-negative.test.mjs'
       - 'tools/controller-996-winpe-native-temp-rename.c'
       - 'tests/controller-996-winpe-native-temp-rename-source.test.mjs'
+      - 'tests/controller-996-winpe-native-nt-relative-temp.test.mjs'
       - 'tools/controller-996-winpe-native-volume-ids-readonly.c'
       - 'tools/controller-996-winpe-native-receipt-review.mjs'
       - 'tests/c996_winpe_native_volume_id_temp_harness.c'
@@ -65,4 +67,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify C996 candidate boundaries and isolated TEMP insertion negative test (no C execution)
-        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs
+        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs tests/controller-996-winpe-native-nt-relative-temp.test.mjs
