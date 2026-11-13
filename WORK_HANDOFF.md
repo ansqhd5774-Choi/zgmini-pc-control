@@ -1,6 +1,7 @@
 # ZGMINI — 대화 간 작업 인계 (WORK_HANDOFF)
 
 - **2026-11-14 다음 실행 진입점:** [전체 통합 실행계획 2026-11-14 실제 증거 보정](docs/ZGMINI_ALL_WORKSTREAMS_EXECUTION_PLAN_20261113.md)의 최상단 보정 절과 제어 최신 `main` 정본을 먼저 대조한다. 아래 2026-11-06 `#434 자연 B가 아직 없음`처럼 보이는 과거 스냅샷은 최신 실행 판정이 아니다. #476/#538/#637/#703의 정규 B 결과 댓글 및 #476/#637/#703의 원격 JSON/TXT 존재는 확인됐으나, E: 신규 보고서 0건·PC 영속 ledger 내부값은 아직 미실증. 중앙 인계 8/8 DONE, 신설 Writer B 4/5 DEFERRED, #1351 `queued`, #996 C 80% NO-GO 유지. Remote Desktop Commander 사용 금지, 기존 승인 GitHub/Runner만 사용.
+- **2026-11-14 사용자 제외 지시 재적용:** 2026-11-08 사용자 요청으로 `#434 E: 신규 중복 보고서 0건 실측 확인`은 **검증 목록에서 삭제된 항목**이다. 아래 2026-11-06 과거 기록에 남은 해당 Gate를 앞으로 재도입하거나 PC 조회·사용자 CMD 요구에 사용하지 않는다. #434는 기존 자연 B #476 성공/2/2/댓글 1건을 재사용하지만 요청별 PC ledger 직접 readback은 미확보이므로 **4/5(DEFERRED)**를 성공으로 승격하지 않는다. 이 후속 항목은 독립 기능의 실행 Gate가 아니다. [최신 보정](docs/ZGMINI_ALL_WORKSTREAMS_EXECUTION_PLAN_20261113.md)을 먼저 본다. 원본 E: 파일 삭제·운영 변경 0.
 - 기록 기준일: **2026-11-05 KST**
 - 저장소: `ansqhd5774-Choi/zgmini-pc-control`
 - 전용 보관 브랜치: `codex/controller-ops-lessons-20261105`
