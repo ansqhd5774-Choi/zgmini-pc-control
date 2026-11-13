@@ -77,7 +77,7 @@ test('labeled scoped preimage stages only approved hash-bound bytes without toke
    return {ok:true,text:async()=>JSON.stringify({type:'file',encoding:'base64',content:bytes.toString('base64')})};
   }});
  assert.equal(calls,1);
- assert.match(observedUrl,/\\?ref=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb$/);
+ assert.equal(new URL(observedUrl).searchParams.get('ref'),'b'.repeat(40));
  assert.equal(staged.manifestSha256,hash);
  assert.equal(JSON.stringify(staged).includes(token),false);
 });
