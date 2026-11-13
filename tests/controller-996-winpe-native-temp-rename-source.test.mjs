@@ -55,6 +55,7 @@ test('independent ntdll relative-root probe is TEMP-only, mutually exclusive, an
   assert.match(src,/#error "Mutually exclusive TEMP rename diagnostics"/);
   assert.match(src,/#error "Native NT rename diagnostic is TEMP-only"/);
   assert.match(src,/#define C996_NT_FILE_RENAME_INFORMATION_CLASS 10u/);
+  assert.match(src,/FILE_READ_ATTRIBUTES \| FILE_TRAVERSE \|[\s\S]*?FILE_ADD_SUBDIRECTORY/);
   assert.match(src,/GetModuleHandleW\(L"ntdll\.dll"\)/);
   assert.match(src,/GetProcAddress\([\s\S]*?"NtSetInformationFile"\)/);
   assert.match(src,/native_rename\(source_handle, &io_status,[\s\S]*?C996_NT_FILE_RENAME_INFORMATION_CLASS\)/);
