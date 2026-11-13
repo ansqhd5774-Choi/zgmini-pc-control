@@ -139,6 +139,37 @@ test('same run is idempotent: on repeat no second Issue POST', async () => {
   assert.equal(state.calls.create, 1);
 });
 
+test('closed historic Writer B Incident deduplicates without a new pending route',async()=>{
+  const {io,state}=fixture();
+  await processCompletedWriterB(event(),io);
+  state.created[0].state='closed';
+  const again=await processCompletedWriterB(event(),io);
+  assert.equal(again.state,'REUSED_CLOSED_EXISTING');
+  assert.equal(again.reusedIssues,1);
+  assert.equal(again.routesRecorded,0);
+  assert.equal(again.routesReused,0);
+  assert.equal(state.calls.create,1);
+  assert.equal(state.calls.route,1);
+  assert.equal(state.created[0].state,'closed');
+});
+
+test('lost incident POST acknowledgement after coordinator closure does not route',async()=>{
+  const {io,state}=fixture();
+  state.failAfterPost=true;
+  const prior=io.createHandoff;
+  io.createHandoff=async prepared=>{
+    try{return await prior(prepared);}
+    finally{if(state.created.length)state.created[0].state='closed';}
+  };
+  const outcome=await processCompletedWriterB(event(),io);
+  assert.equal(outcome.state,'POST_RECONCILED_CLOSED_EXISTING');
+  assert.equal(outcome.reusedIssues,1);
+  assert.equal(outcome.routesRecorded,0);
+  assert.equal(outcome.routesReused,0);
+  assert.equal(state.calls.create,1);
+  assert.equal(state.calls.route,0);
+});
+
 test('successful Writer B and uncertain result do not enqueue', async () => {
   for (const [status, code] of [
     ['WRITER_B_INSTALLED_VERIFIED', 'WRITER_B_INSTALL_VERIFIED'],

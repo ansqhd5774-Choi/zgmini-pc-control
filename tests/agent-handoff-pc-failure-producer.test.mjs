@@ -72,6 +72,20 @@ test('completed six-seat run emits exactly one sanitized handoff for one confirm
   assert.equal(f.posts, 1);
 });
 
+test('closed PC failure Incident deduplicates without resurrecting a route',async()=>{
+  const f=fixture();
+  await processCompletedPcJob(event(),f.io);
+  f.issues[0].state='closed';
+  const again=await processCompletedPcJob(event(),f.io);
+  assert.equal(again.reusedIssues,1);
+  assert.equal(again.newIssues,0);
+  assert.equal(again.routesReused,0);
+  assert.equal(again.routesRecorded,0);
+  assert.equal(f.posts,1);
+  assert.equal(f.routeCalls,1);
+  assert.equal(f.issues[0].state,'closed');
+});
+
 test('PC failure without the immutable TXT pair stays pending and never posts', async () => {
   const f = fixture();
   f.io.readReportText = async () => null;

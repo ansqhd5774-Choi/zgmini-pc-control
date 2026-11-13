@@ -94,6 +94,19 @@ test('common writer/controller and unknown failure classes retain precise classi
   }
 });
 
+test('closed authenticated incident remains the same dedup anchor without implying a new route', () => {
+  const prepared=preparePcFailureHandoff(input());
+  const item={repository:repo,number:2001,state:'closed',
+    user:{login:'github-actions[bot]'},body:prepared.body,
+    labels:[{name:'agent-handoff'}]};
+  const inventory={repository:repo,complete:true,issues:[item]};
+  assert.deepEqual(reconcileHandoffInventory(prepared,inventory),
+    {state:'REUSE_EXISTING',issueNumber:2001,closed:true});
+  item.state='open';
+  assert.deepEqual(reconcileHandoffInventory(prepared,inventory),
+    {state:'REUSE_EXISTING',issueNumber:2001});
+});
+
 test('inventory reuses exact incident, refuses collision and incomplete scans', () => {
   const prepared = preparePcFailureHandoff(input());
   const inventory = {repository: repo, complete: true, issues: []};

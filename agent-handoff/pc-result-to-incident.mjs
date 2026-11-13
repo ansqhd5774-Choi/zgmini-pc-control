@@ -204,7 +204,10 @@ export function reconcileHandoffInventory(prepared, inventory) {
     const candidate = parseHandoff(matches[0].body);
     if (fingerprintHandoff(candidate) !== prepared.fingerprint ||
         JSON.stringify(candidate) !== prepared.body) stop('INCIDENT_COLLISION_STOP');
-    return Object.freeze({state: 'REUSE_EXISTING', issueNumber: matches[0].number});
+    return Object.freeze({state: 'REUSE_EXISTING', issueNumber: matches[0].number,
+      // Closed incidents remain in the dedup inventory, but must never be
+      // routed again as a pending repair when an old workflow is reobserved.
+      ...(matches[0].state === 'closed' ? {closed: true} : {})});
   }
   return Object.freeze({state: 'CREATE_CANDIDATE_ONLY', incidentId: prepared.incidentId});
 }

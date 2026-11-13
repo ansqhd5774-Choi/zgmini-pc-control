@@ -130,7 +130,9 @@ export async function processCompletedPcJob(event, {
     const inventory = await listHandoffs();
     const decision = reconcileHandoffInventory(prepared, inventory);
     if (decision.state === 'REUSE_EXISTING') {
-      await confirmRoute(prepared, decision.issueNumber);
+      // A closed original incident is already disposed. Keep its fingerprint
+      // as a dedup anchor without writing an obsolete pending-agent route.
+      if (!decision.closed) await confirmRoute(prepared, decision.issueNumber);
       result.reusedIssues++; continue;
     }
     let created;
@@ -139,7 +141,7 @@ export async function processCompletedPcJob(event, {
       // Lost POST response: read the ledger once, never blindly POST again.
       const after = reconcileHandoffInventory(prepared, await listHandoffs());
       if (after.state !== 'REUSE_EXISTING') stop('POST_OUTCOME_UNKNOWN');
-      await confirmRoute(prepared, after.issueNumber);
+      if (!after.closed) await confirmRoute(prepared, after.issueNumber);
       result.reusedIssues++;
       continue;
     }
