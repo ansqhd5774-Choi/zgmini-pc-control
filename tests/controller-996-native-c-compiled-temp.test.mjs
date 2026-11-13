@@ -16,7 +16,7 @@ const hostAllowed=process.platform==='win32' &&
   !fs.existsSync('E:/ZGmini');
 
 const expectedFlags=[
-  '/nologo','/W4','/WX','/TC','/O2','/MT','/GS','/guard:cf',
+  '/nologo','/W4','/WX','/utf-8','/TC','/O2','/MT','/GS','/guard:cf',
   '/DC996_NATIVE_TEMP_TEST_ONLY=1',
   '/DC996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY=1',
   '/D_WIN32_WINNT=0x0A00',
