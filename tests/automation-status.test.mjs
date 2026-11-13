@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {summarizeAutomation,dedicatedPcRunnersOnline} from '../tools/automation-status.mjs';
+import path from 'node:path';
+import {summarizeAutomation,dedicatedPcRunnersOnline,inspectWatchdogReadOnly} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -52,4 +53,118 @@ test('automation status rejects missing, offline or duplicated operating seats',
  assert.equal(dedicatedPcRunnersOnline([...seats.slice(0,2),{...seats[2],status:'offline'},...seats.slice(3)]),false);
  assert.equal(dedicatedPcRunnersOnline([...seats,{...seats[0]}]),false);
  assert.equal(dedicatedPcRunnersOnline(null),false);
+});
+
+
+// Filesystem double exposes only lstat/read/readdir. It cannot mutate the PC,
+// start a Supervisor, create requests or inspect private marker text.
+function watchdogFixture({
+ status={at:'2026-11-14T01:00:00.000Z',pid:2026,state:'HEALTHY'},
+ receiver={pid:2026,nonce:'test-only'},
+ flags=[],otherLeases=[],badStatus=false,symlink=null,
+ clock=()=>Date.parse('2026-11-14T01:00:15.000Z'),pidAlive=()=>true,
+}={}){
+ const home=path.join('fixture','watchdog');
+ const ctl=path.join('fixture','control');
+ const mtn=path.join('fixture','maintenance');
+ const statusFile=path.join(home,'STATUS.json');
+ const receiverFile=path.join(home,'receiver','owner.json');
+ const markerPaths={
+  guardianStop:path.join(home,'GUARDIAN_STOP.txt'),
+  watchdogPause:path.join(home,'PAUSE'),
+  controllerDrain:path.join(ctl,'DRAIN'),
+  controllerInstallLease:path.join(mtn,'leases','controller-install'),
+ };
+ const docs=new Map();
+ if(status!==null)docs.set(statusFile,badStatus?'[bad-json':JSON.stringify(status));
+ if(receiver!==null)docs.set(receiverFile,JSON.stringify(receiver));
+ for(const k of flags)docs.set(markerPaths[k],'PRIVATE_MARKER_CONTENT_DO_NOT_RETURN');
+ const leases=path.join(ctl,'leases');
+ const dirs=new Map([[leases,['supervisor',...otherLeases]]]);
+ const missing=()=>Object.assign(Error('not found'),{code:'ENOENT'});
+ const filesystem={
+  lstatSync(p){
+   if(docs.has(p))return {
+    isFile:()=>true,isDirectory:()=>false,isSymbolicLink:()=>p===markerPaths[symlink],
+    size:Buffer.byteLength(docs.get(p)),
+   };
+   if(dirs.has(p))return {
+    isFile:()=>false,isDirectory:()=>true,isSymbolicLink:()=>false,size:0,
+   };
+   throw missing();
+  },
+  readFileSync(p){if(!docs.has(p))throw missing();return docs.get(p);},
+  readdirSync(p){if(!dirs.has(p))throw missing();return dirs.get(p);},
+ };
+ const result=inspectWatchdogReadOnly({filesystem,watchdogHome:home,
+  controllerHome:ctl,maintenanceHome:mtn,clock,pidAlive});
+ return {result,docs,markerPaths};
+}
+
+test('watchdog marker source remains independent of healthy six-runner verdict',()=>{
+ const {result}=watchdogFixture();
+ assert.equal(result.state,'HEALTHY');
+ assert.equal(result.observedAt,'2026-11-14T01:00:00.000Z');
+ assert.equal(result.fresh,true);
+ assert.equal(result.processAlive,true);
+ assert.equal(result.receiverPidMatches,true);
+ assert.deepEqual(result.inhibitors,[]);
+ assert.deepEqual(result.diagnostics,[]);
+ assert.equal(result.evidenceScope,'READONLY_WATCHDOG_MARKERS_NOT_RECOVERY_AUTHORIZATION');
+ assert.equal(summarizeAutomation({...healthy(),watchdog:result}).runtimeState,'HEALTHY');
+});
+
+test('guardian STOP, PAUSE, DRAIN, install lease and other leases have separate origins',()=>{
+ const {result,docs}=watchdogFixture({status:{at:'2026-11-14T01:00:00.000Z',pid:2026,state:'PAUSED'},
+  flags:['guardianStop','watchdogPause','controllerDrain','controllerInstallLease'],
+  otherLeases:['job-other','supervisor.dead-archived']});
+ assert.equal(result.state,'PAUSED');
+ assert.equal(result.fresh,true);
+ assert.equal(result.guardianStop,true);
+ assert.equal(result.watchdogPause,true);
+ assert.equal(result.controllerDrain,true);
+ assert.equal(result.controllerInstallLease,true);
+ assert.equal(result.otherControllerLeases,true);
+ assert.deepEqual(result.inhibitors,['GUARDIAN_STOP','WATCHDOG_PAUSE',
+  'CONTROLLER_DRAIN','CONTROLLER_INSTALL_LEASE','OTHER_CONTROLLER_LEASES']);
+ assert.equal(JSON.stringify(result).includes('PRIVATE_MARKER_CONTENT_DO_NOT_RETURN'),false);
+ assert.equal(JSON.stringify(result).includes('job-other'),false);
+ assert.equal(docs.size,6);
+});
+
+test('historical HEALTHY watchdog state is not current process proof',()=>{
+ const {result}=watchdogFixture({
+  status:{at:'2026-11-14T01:00:00.000Z',pid:22,state:'HEALTHY'},
+  receiver:{pid:23,nonce:'other'},
+  clock:()=>Date.parse('2026-11-14T01:02:00.000Z'),pidAlive:()=>false,
+ });
+ assert.equal(result.state,'HEALTHY');
+ assert.equal(result.fresh,false);
+ assert.equal(result.processAlive,false);
+ assert.equal(result.receiverPidMatches,false);
+ assert.equal(result.guardianStop,false);
+ assert.deepEqual(result.inhibitors,[]);
+});
+
+test('unreadable watchdog status is UNKNOWN, and a symlink marker is not safe absence',()=>{
+ const {result}=watchdogFixture({status:null,receiver:null,
+  flags:['watchdogPause'],symlink:'watchdogPause'});
+ assert.equal(result.state,null);
+ assert.equal(result.observedAt,null);
+ assert.equal(result.fresh,null);
+ assert.equal(result.processAlive,null);
+ assert.equal(result.receiverPidMatches,null);
+ assert.equal(result.watchdogPause,null);
+ assert.ok(result.diagnostics.includes('WATCHDOG_STATUS_UNVERIFIED'));
+ assert.ok(result.diagnostics.includes('WATCHDOG_RECEIVER_UNVERIFIED'));
+ assert.ok(result.diagnostics.includes('WATCHDOG_PAUSE_UNVERIFIED'));
+ assert.deepEqual(result.inhibitors,[]);
+});
+test('invalid JSON or future timestamps never become fresh READY evidence',()=>{
+ const bad=watchdogFixture({badStatus:true});
+ assert.equal(bad.result.state,null);
+ assert.ok(bad.result.diagnostics.includes('WATCHDOG_STATUS_UNVERIFIED'));
+ const future=watchdogFixture({status:{at:'2026-11-14T02:00:00.000Z',pid:2026,state:'HEALTHY'}});
+ assert.equal(future.result.state,'HEALTHY');
+ assert.equal(future.result.fresh,false);
 });
