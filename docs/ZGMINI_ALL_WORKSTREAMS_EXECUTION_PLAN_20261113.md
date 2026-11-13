@@ -2,6 +2,14 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 71차 — Core lock 생산자/소비자 교차회귀 격리 Windows 86/86 PASS
+
+- **정확한 새 기여:** 70차 공통 A급 소스 감사의 신형 `inflation-core-lock-observation-readonly`와 `core-runtime-source-readonly` 의미상 호환성 위협을, 가짜 `lockOwner` 값만 넣는 시험에서 **실제 두 export 호출**로 검증하는 non-operational regression test 추가. 구판 producer처럼 `lockOwner` 누락이면 PASS 거부를 직접 증명. 실제 Windows Core/DB를 실행하지 않고 고정 synthetic Task Engine/PID/WMI/lock 샘플을 주입.
+- **소스 결과:** 제어 main `69e25a08a903dc8e52ef1093ec15837de4c20858` 기준 신규 독립 브랜치 `codex/controller-core-lock-contract-test-20261114`. [Draft PR #1362](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1362) HEAD `05b06db9284a96e189d7d82db291f820f6372735`; `tests/controller-core-lock-source-contract.test.mjs` 신규 1개 + 기존 `.github/workflows/controller-maintenance-source-tests.yml`의 **격리 source CI 명령/path만 보완** 1개, 총 2파일. 운영 Controller 코드, 기존 승인/산식/데이터/Runner 설정 변경 없음.
+- **정확한 CI:** [Run #43524297092](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43524297092)/Job `132226093404` `completed/success`, 원본 stdout `# tests 86, # pass 86, # fail 0, # skipped 0`, 신규 양쪽 회귀 `ok 1/ok 2`; `CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=TRUE` (별도 PC `DESKTOP-N62L0NG`). 자동 트리거된 C996 source CI는 별도, 운영 C 승인·복구 성공 아님. `SOURCE_ONLY_CI_PASS / PR_DRAFT / NOT_MERGED / NOT_INSTALLED`로 기록; 41차 13파일 후보/Owner 설치권한을 대체하지 않음.
+- **운영 P0 그대로:** [#1351](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351) Run `43429486924` / Job `131899103441` `queued/conclusion=null`; 최신 6 Runner 등록/4개 label/online/busy/Listener 현장 영수증 미접수. 운영 Owner에게 69차 읽기 전용 지시 **사용자가 전달 완료**, 실제 답변 미수신. 물가 67차 원담당 브랜치 `d4d82f17173324564e9a8128dc5d23c75f09b406` 신규 #22 raw→parser FIRST FAIL 보고 미수신, 42%; 다른 5 일반챗은 대기. 중복 지시·임의 PC Job/rerun/실행기·DB/D1/Cloudflare 변경 0.
+- **진행/다음 1개:** 중앙 이번 소스 회귀 추가·격리 CI·원격 증거 기록 100%, **전체 ZGMINI 기능 57.4%→57.4%**, #996 C80%/NO-GO, 자연 인계 및 공유 자원 4/5 DEFERRED. 다음 실제 실행은 **운영 PC Owner의 #1351/Runner6 현재 상태 인증 readback 수신→원인 분류**이며 #1362 테스트를 그 선행 Gate로 만들지 않음.
+
 ## 2026-11-14 69차 — P0 운영 Job 실측 재확인·과거 52차 전수 감사 재사용·승인 경로 분기 보존
 
 - **사용자 업무 지정:** 프로세스 총괄 계속 작업; 다른 원담당 일반챗 지시는 **실제 다음 실행이 바뀐 경우에만** 사용자에게 전달문 제공. 사용자에게 명시되지 않은 새 담당대화 자동수신·실행 주장 금지. 67차 물가 지시는 사용자 전달 완료, 68차 `USER_HANDOFF_CONFIRMED`; 실제 담당자 브랜치·#68의 신규 raw→parser 재현 결과 없음. 다른 5개 기능 담당에게 중복 지시 0.
