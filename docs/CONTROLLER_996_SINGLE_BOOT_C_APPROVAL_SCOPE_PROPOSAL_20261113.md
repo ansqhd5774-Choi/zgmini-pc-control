@@ -62,3 +62,11 @@
 5. WinPE 부팅과 C 보관은 그때 승인된 운영자의 단회 경로에서만 허용. 실패 시 중복 재실행 없이 기존 ledger/ID/체크포인트 readback, `STATE_UNKNOWN`과 공유 설치 잠금 보존.
 
 **현재 판정:** `OWNER_C_NOT_GRANTED / WINPE_RUNTIME_UNPROVEN / C_NO_GO`. 원본 보호/Runner 및 독립 기능의 정상 운영을 이 제안서 때문에 새로 중단하지 않는다. **본 제안서는 시뮬레이션/코드 진행률도 아닌 승인 전 요구사항 분리 작업**이다.
+
+## 2026-11-13 — WinPE TEST_ONLY 실증 완료 반영 / 운영 C 승인 범위 유지
+
+**원본 추가 실증:** 별도 공통 대기열 Windows 10 PC `DESKTOP-N62L0NG`에서 기존 사용자 세션 Runner `ansqh-tistory-publisher`를 사용해 **정확히 1회** 격리 WinPE 부팅·CNG test-only 실행·종료를 확인. 게스트 `X:\Windows\System32>` 표시 [Run #43339375970](https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43339375970), CNG 화면 `6 OF 6` [#43339714153](https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43339714153), 종료 코드 `0` [#43340021424](https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43340021424), VM `poweroff` 및 원본 ISO SHA256 불변 [#43340339111](https://github.com/ansqhd5774-Choi/nhunnhun_blog/actions/runs/43340339111) PASS. 영구 텍스트 원장은 [control main `results/c996-winpe-test-only-20261113-verified.txt`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/c996-winpe-test-only-20261113-verified.txt), #996 원장 [댓글 6840486828](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6840486828).
+
+**이 문서의 이전 `WINPE_RUNTIME_UNPROVEN`은 2026-11-13 테스트 이전 이력이다.** 현재 `TEST_ONLY_WINPE_BOOT_AND_CNG_6_6_PASS`로 범위를 수정한다. **별개의 운영 C급 오프라인 실행기·Volume GUID/Serial/FILE_ID 재바인딩·WIM 메타데이터 완전성·Owner trust 및 서명/시각/철회·namespace no-replace 원자성은 이 시험에서 입증되지 않았다.** 격리 VM은 운영 PC의 E: 원본 볼륨을 부착하지 않았고, 게스트 자체도 `bootIntegrityProven=0`, `imageBindingVerified=0`, `ownerApprovalVerified=0`, `offlineClockTrusted=0`, `revocationVerified=0`, `executionAuthorized=0`, `operationalWrites=0`으로 명시했다.
+
+**다음 승인과 독립 기술 필수 입력:** 운영 PC `PC`의 정확한 효과가 고정된 신규 Owner C manifest/서명·신뢰 anchor, 네이티브 오프라인 x64 mover 빌드 해시 및 원본 볼륨 식별, 운영 중단/복귀 창·Runner/Writer/Workflow/원장 보존 범위, 예외 없는 pre/postcheck. 이전 continuation C 승인 또는 TEST_ONLY 동의는 해당 단일 부팅 운영 효과의 승인으로 사용하지 않는다. `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`, `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN` 무조건 STOP을 변경하지 않는다. 이 문서 수정으로 C 코드/VM/운영 PC 실제 효과 0.
