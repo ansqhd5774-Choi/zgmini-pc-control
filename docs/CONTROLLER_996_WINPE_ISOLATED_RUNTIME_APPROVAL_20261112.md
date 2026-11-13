@@ -275,3 +275,12 @@
 - **다음 필수 1회 콘솔 확인 (VM 내부, 호스트 CMD 아님):** VirtualBox에서 열린 `ZGMINI-C996-WinPE-TestOnly` 게스트 창 화면을 보고 WinPE 콘솔 `X:\Windows\System32>` 또는 `X:\>` 프롬프트가 실제 표시되는지 확인한다. 실패/BCD 오류/접근 불가/부팅 반복이면 **STOP**하고 화면에 실제 표시된 오류만 공유. 정상 WinPE CLI라면 `X:\Tools\c996_winpe_cng_test.exe`를 **게스트 콘솔에서 단 한 번 실행**하여 여섯 사례의 출력 및 종료 상태를 검증한다. 사전 확인 없이 원본 WinPE 이미지·ISO·WinPE startnet.cmd·UEFI/BIOS·가상 디스크·USB·호스트 설정을 변경하지 않는다.
 - **종료 코드:** WinPE 테스트 프로그램 실행 후 `echo %ERRORLEVEL%`은 같은 줄에 연결하지 말고 **다음 별도 입력 줄로** 확인한다(CMD는 같은 줄의 `%ERRORLEVEL%` 선확장 문제 있음). 결과가 에러면 무조건 반복 시험하지 않는다. 인가된 C급 PC 운영 복구의 증거로 확대하지 않는다.
 - **상태:** `VM_START_CMD_PASS`, `GUEST_WINPE_BOOT_UNKNOWN`, `CNG_6_NOT_OBSERVED`, `GLOBAL_SHARE_EMPTY_NOT_ATTESTED`; 기존 운영 PC `PC` 영향 0, #996 실제 C급 복구 `NO-GO`.
+
+## 2026-11-13 — HOST_CMD_X_DRIVE_NOT_FOUND / CNG 결과 무효
+
+- **실측 실행 장소:** 공통 대기열 Windows PC `DESKTOP-N62L0NG`, 사용자가 올린 CMD 화면의 프롬프트 `C:\Users\ansqh>`. 이번 실행은 VirtualBox guest `X:\Windows\System32>`가 **아닌 HOST Windows CMD**였다.
+- **원본 실행:** `cmd /v:on /c "X:\Tools\c996_winpe_cng_test.exe & echo C996_CNG_EXIT_CODE=!ERRORLEVEL!"`. 원본 오류 `시스템이 지정된 드라이브를 찾을 수 없습니다.` 뒤 `C996_CNG_EXIT_CODE=0`. HOST에 `X:` 가상 WinPE RAM 디스크가 없으므로 **CNG EXE는 실행되지 않음**. 기존 명령이 `& echo`를 연속 실행하면서 오류를 덮어 후행 성공처럼 오해하게 만드는 **오진 명령 결함**도 확인. `C996_CNG_EXIT_CODE=0`을 CNG 검증 결과로 절대 사용하지 않는다.
+- **Last PASS:** 사용자가 앞서 올린 원본 명령 `VBoxManage startvm 03620b4b-7ca3-47a0-9a20-df8818ee068f --type gui`에서 `C996_VM_START_PASS`: VirtualBox VM 전원 ON 성공. **WinPE guest 실제 부팅 성공, X: 표시, 내부 CNG 6/6, guest 종료 상태는 여전히 미확인**.
+- **FIRST FAIL:** `HOST_SHELL_INSTEAD_OF_GUEST` / `X_DRIVE_NOT_FOUND`; WinPE/CNG 런타임 자체의 FAIL이 아님. 필요한 USER-GUEST 콘솔 제어를 인증된 도구가 지원하지 못해 `AUTOMATION_BLOCKED`. PC 운영 Controller C 복구 `NO-GO` 유지.
+- **사용자 조작 최소화:** 사용자가 반복 CMD/스크린샷 전달에 피로를 명시했으므로 **추가 HOST CMD를 요구하지 않는다**. 기존 격리 GitHub Runner는 Windows 서비스/다른 프로필에서 실행되어 기존 `ansqh` VirtualBox VM 레지스트리 접근이 불가능([#1346](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1346)); 다른 블로그 Runner의 임의 권한 변경·VM 제어 삽입 및 사용자 UAC/NTFS 우회 불허. 사용자의 TEST_ONLY 작업 승인은 Windows 대화형 원격 제어 세션 생성과 별개다. 연결된 RDC는 대상 PC를 제공하지 않음.
+- **다음 필수 작업:** VM 게스트 콘솔을 직접 확인할 수 있는 **정식 사용자 세션 원격 제어** 또는 안전한 단일 사용자 승인 실행 경로 확보. 가능해진 경우 현재 부팅된 VM 안에서 WinPE X: 프롬프트와 CNG 실행 파일을 먼저 확인하고 6개 시험을 **게스트 콘솔에서** 1회만 수행. 출력/에러레벨 판정은 후행 echo가 앞선 오류를 가리지 않도록 분리. 확보 전 재부팅/ISO 재작성/HDD·network·USB 추가·원격 관리자 쉘 금지.
