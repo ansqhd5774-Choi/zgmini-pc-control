@@ -552,6 +552,22 @@ public static class C996PreopenedNamespaceProbe {
   }
  }
  public static void Run(string source,string nested,string goFile) {
+  if(nested=="#CONTROL#") {
+   // Independent no-competitor positive control: the native NT class-10
+   // buffer/root-handle contract itself must first prove it can rename.
+   IntPtr m=CreateFileW(source,0x10080,7,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
+   Need(m!=new IntPtr(-1),"CONTROL_MOVE_OPEN_"+Marshal.GetLastWin32Error());
+   try {
+    IntPtr r=CreateFileW(Path.GetDirectoryName(source),0xA4,7,
+     IntPtr.Zero,3,0x02200000,IntPtr.Zero);
+    Need(r!=new IntPtr(-1),"CONTROL_ROOT_OPEN_"+Marshal.GetLastWin32Error());
+    try{
+     Console.WriteLine("C996_PREOPENED_CONTROL_NT_CLASS10="+
+      RenameNtClass10(m,r,"control-archive"));
+    }finally{CloseHandle(r);}
+   }finally{CloseHandle(m);}
+   return;
+  }
   // FILE_ADD_FILE|FILE_READ_ATTRIBUTES, full share including DELETE
   IntPtr s=CreateFileW(source,0x82,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero);
   Need(s!=new IntPtr(-1),"SOURCE_HANDLE_OPEN_"+Marshal.GetLastWin32Error());
@@ -571,8 +587,8 @@ public static class C996PreopenedNamespaceProbe {
      IntPtr m=CreateFileW(source,0x10080,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero);
      Need(m!=new IntPtr(-1),"NATIVE_MOVE_HANDLE_"+Marshal.GetLastWin32Error());
      try {
-      IntPtr r=CreateFileW(Path.GetDirectoryName(source),0x84,7,
-       IntPtr.Zero,3,0x02000000,IntPtr.Zero);
+      IntPtr r=CreateFileW(Path.GetDirectoryName(source),0xA4,7,
+       IntPtr.Zero,3,0x02200000,IntPtr.Zero);
       Need(r!=new IntPtr(-1),"NATIVE_ROOT_HANDLE_"+Marshal.GetLastWin32Error());
       try {
        Console.WriteLine("C996_PREOPENED_NT_CLASS10_RENAME="+
@@ -653,6 +669,28 @@ $i=ConvertFrom-Json ([Text.Encoding]::UTF8.GetString(
     assert.equal(fs.readFileSync(path.join(finalDir,'nested','nested-late.txt')).length,0);
     if(postStatus==='00000000')
       assert.equal(fs.readFileSync(path.join(finalDir,'after-native-rename.txt')).length,0);
+    // A native failure cannot be attributed to competing handles unless the
+    // SAME NtSetInformationFile class-10 call first passes an unopposed move.
+    const controlSource=path.join(root,'control-source');
+    const controlArchive=path.join(root,'control-archive');
+    fs.mkdirSync(controlSource);
+    const controlInput=Buffer.from(JSON.stringify({
+      source:controlSource,nested:'#CONTROL#',goFile
+    }),'utf8').toString('base64');
+    const control=spawnSync(ps,['-NoProfile','-NonInteractive','-Command',script],{
+      windowsHide:true,encoding:'utf8',timeout:15000,maxBuffer:15000,
+      env:{...process.env,C996_PREOPENED_INPUT:controlInput},
+    });
+    assert.equal(control.error,undefined,control.error?.message);
+    assert.equal(control.status,0,String(control.stderr).slice(-1200));
+    const controlStatus=String(control.stdout).match(
+      /C996_PREOPENED_CONTROL_NT_CLASS10=([0-9A-F]{8})/)?.[1];
+    assert.match(controlStatus??'',/^[0-9A-F]{8}$/);
+    console.log('C996_PREOPENED_CONTROL_NT_CLASS10='+controlStatus);
+    assert.equal(controlStatus,'00000000',
+      'native NT class-10 unopposed control must succeed before comparing races');
+    assert.equal(fs.existsSync(controlSource),false);
+    assert.equal(fs.existsSync(controlArchive),true);
     console.log('C996_PREOPENED_TEMP_RENAME_OUTCOME='+
       (moved?'WIN32_RENAMED_INSERTS_PERSIST':'WIN32_MOVE_DENIED_'+moveCode));
     console.log('C996_PREOPENED_PARENT_NT=00000000 CHILD_NT=00000000');
