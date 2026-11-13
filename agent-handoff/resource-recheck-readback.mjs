@@ -73,6 +73,8 @@ function originCandidate(wait,origin){
   const result=parsed(json,wait.evidence.resultJsonPath);
   const resultText=content(txt,wait.evidence.resultTxtPath);
   if(!result||resultText===null)return null;
+  if(!writer&&result.jobId!==
+     `run-${run.id}-${run.run_attempt}-seat-${result.seat}`)return null;
   let prepared;
   try{
     if(writer){
