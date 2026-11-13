@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
-import {spawnSync} from 'node:child_process';
+import {spawnSync,spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {build996OwnerArchiveFixtureScript} from '../tools/controller-996-c-native-owner-operator.mjs';
 import {review996UntrustedNativeIdReceipt} from '../tools/controller-996-winpe-native-receipt-review.mjs';
@@ -457,4 +457,150 @@ test('native JSON bridge refuses altered directory, fake boot approval, duplicat
   assert.equal(review996UntrustedNativeIdReceipt({rawReceipt:Buffer.from([255])}).status,
     'SOURCE_ONLY_BLOCKED');
   assert.equal(review996UntrustedNativeIdReceipt({}).executionAuthorized,false);
+});
+
+
+test('preopened source and nested directory handles can create children after TEMP rename', {
+  skip: !hostAllowed && 'Only isolated Windows handoff Runner C: TEMP; never original PC',
+}, async () => {
+  // A real competing OS process retains TWO native handles across an actual
+  // directory rename. No C recovery operator, admin ACL or E: is touched.
+  const temp=fs.realpathSync.native(os.tmpdir());
+  assert.equal(path.win32.parse(temp).root.toLowerCase(),'c:\\');
+  const root=fs.mkdtempSync(path.join(temp,'zgmini-996-preopen-nt-race-'));
+  const source=path.join(root,'source');
+  const nested=path.join(source,'nested');
+  const archive=path.join(root,'archive');
+  const goFile=path.join(root,'go.token');
+  const ps=path.join(process.env.WINDIR,'System32','WindowsPowerShell','v1.0','powershell.exe');
+  const script=String.raw`$ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Runtime.InteropServices;
+public static class C996PreopenedNamespaceProbe {
+ [StructLayout(LayoutKind.Sequential)]
+ struct UNICODE_STRING {
+  public ushort Length,MaximumLength;
+  public IntPtr Buffer;
+ }
+ [StructLayout(LayoutKind.Sequential)]
+ struct OBJECT_ATTRIBUTES {
+  public uint Length;
+  public IntPtr RootDirectory,ObjectName;
+  public uint Attributes;
+  public IntPtr SecurityDescriptor,SecurityQualityOfService;
+ }
+ [StructLayout(LayoutKind.Sequential)]
+ struct IO_STATUS_BLOCK {
+  public IntPtr Status,Information;
+ }
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+ static extern IntPtr CreateFileW(string name,uint access,uint share,
+  IntPtr security,uint disposition,uint flags,IntPtr template);
+ [DllImport("kernel32.dll",SetLastError=true)]
+ static extern bool CloseHandle(IntPtr handle);
+ [DllImport("ntdll.dll")]
+ static extern uint NtCreateFile(out IntPtr handle,uint desiredAccess,
+  ref OBJECT_ATTRIBUTES attributes,out IO_STATUS_BLOCK ios,
+  IntPtr allocationSize,uint fileAttributes,uint shareAccess,
+  uint createDisposition,uint createOptions,IntPtr eaBuffer,uint eaLength);
+ static void Need(bool ok,string error) {
+  if(!ok)throw new InvalidOperationException(error);
+ }
+ static string CreateRelative(IntPtr directory,string name) {
+  var u=new UNICODE_STRING();
+  u.Buffer=Marshal.StringToHGlobalUni(name);
+  u.Length=(ushort)(name.Length*2);
+  u.MaximumLength=(ushort)(u.Length+2);
+  IntPtr up=Marshal.AllocHGlobal(Marshal.SizeOf(typeof(UNICODE_STRING)));
+  try {
+   Marshal.StructureToPtr(u,up,false);
+   var a=new OBJECT_ATTRIBUTES();
+   a.Length=(uint)Marshal.SizeOf(typeof(OBJECT_ATTRIBUTES));
+   a.RootDirectory=directory;
+   a.ObjectName=up;
+   a.Attributes=0x40;
+   IO_STATUS_BLOCK io;IntPtr h;
+   uint status=NtCreateFile(out h,0x40100000,ref a,out io,IntPtr.Zero,
+    0x80,7,2,0x60,IntPtr.Zero,0);
+   if(status==0)CloseHandle(h);
+   return status.ToString("X8");
+  } finally {
+   Marshal.FreeHGlobal(up);
+   Marshal.FreeHGlobal(u.Buffer);
+  }
+ }
+ public static void Run(string source,string nested,string goFile) {
+  // FILE_ADD_FILE|FILE_READ_ATTRIBUTES, full share including DELETE
+  IntPtr s=CreateFileW(source,0x82,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero);
+  Need(s!=new IntPtr(-1),"SOURCE_HANDLE_OPEN_"+Marshal.GetLastWin32Error());
+  try {
+   IntPtr c=CreateFileW(nested,0x82,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero);
+   Need(c!=new IntPtr(-1),"CHILD_HANDLE_OPEN_"+Marshal.GetLastWin32Error());
+   try {
+    Console.WriteLine("C996_PREOPENED_READY");
+    Console.Out.Flush();
+    for(int i=0;i<400&&!File.Exists(goFile);i++)Thread.Sleep(25);
+    Need(File.Exists(goFile),"RENAME_SIGNAL_MISSING");
+    Console.WriteLine("C996_PREOPENED_PARENT_NT="+CreateRelative(s,"parent-late.txt"));
+    Console.WriteLine("C996_PREOPENED_CHILD_NT="+CreateRelative(c,"nested-late.txt"));
+   } finally {CloseHandle(c);}
+  } finally {CloseHandle(s);}
+ }
+}
+'@
+$i=ConvertFrom-Json ([Text.Encoding]::UTF8.GetString(
+ [Convert]::FromBase64String($env:C996_PREOPENED_INPUT)))
+[C996PreopenedNamespaceProbe]::Run($i.source,$i.nested,$i.goFile)
+`;
+  let child=null,timer=null;
+  try{
+    assert.equal(fs.existsSync('E:/ZGmini'),false);
+    fs.mkdirSync(source);fs.mkdirSync(nested);
+    assert.equal(fs.existsSync(ps),true);
+    const input=Buffer.from(JSON.stringify({source,nested,goFile}),'utf8').toString('base64');
+    child=spawn(ps,['-NoProfile','-NonInteractive','-Command',script],{
+      windowsHide:true,
+      env:{...process.env,C996_PREOPENED_INPUT:input},
+      stdio:['ignore','pipe','pipe'],
+    });
+    let stdout='',stderr='',ready=false;
+    const done=new Promise((resolve,reject)=>{
+      child.on('error',reject);
+      child.stdout.on('data',d=>{stdout+=d.toString('utf8');});
+      child.stderr.on('data',d=>{stderr+=d.toString('utf8');});
+      child.on('close',(code)=>resolve(code));
+    });
+    const waitReady=new Promise((resolve,reject)=>{
+      child.stdout.on('data',()=>{if(!ready&&stdout.includes('C996_PREOPENED_READY')){
+        ready=true;resolve();
+      }});
+      child.on('error',reject);
+      child.on('close',code=>{
+        if(!ready)reject(Error('PREOPENED_HANDLE_NOT_READY rc='+code+
+          ' out='+stdout.slice(-500)+' err='+stderr.slice(-1200)));
+      });
+    });
+    timer=setTimeout(()=>child.kill(),25000);
+    await waitReady;
+    // The other process holds both handles; move is orchestrated by Node.
+    fs.renameSync(source,archive);
+    fs.writeFileSync(goFile,'1',{flag:'wx'});
+    const code=await done;
+    assert.equal(code,0,'native child exit '+code+' '+stderr.slice(-1200));
+    assert.match(stdout,/C996_PREOPENED_PARENT_NT=00000000/);
+    assert.match(stdout,/C996_PREOPENED_CHILD_NT=00000000/);
+    assert.equal(fs.existsSync(source),false);
+    assert.equal(fs.readFileSync(path.join(archive,'parent-late.txt')).length,0);
+    assert.equal(fs.readFileSync(path.join(archive,'nested','nested-late.txt')).length,0);
+    // Even a successful isolated race grants ZERO C execution authority.
+  }finally{
+    if(timer)clearTimeout(timer);
+    if(child&&!child.killed)child.kill();
+    assert.ok(path.basename(root).startsWith('zgmini-996-preopen-nt-race-'));
+    fs.rmSync(root,{recursive:true,force:true});
+  }
 });
