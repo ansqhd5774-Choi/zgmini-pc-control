@@ -507,6 +507,24 @@ public static class C996PreopenedNamespaceProbe {
   ref OBJECT_ATTRIBUTES attributes,out IO_STATUS_BLOCK ios,
   IntPtr allocationSize,uint fileAttributes,uint shareAccess,
   uint createDisposition,uint createOptions,IntPtr eaBuffer,uint eaLength);
+ [DllImport("ntdll.dll")]
+ static extern uint NtSetInformationFile(IntPtr handle,out IO_STATUS_BLOCK ios,
+  IntPtr information,uint length,uint informationClass);
+ static string RenameNtClass10(IntPtr sourceHandle,IntPtr rootHandle,string destination) {
+  byte[] nameBytes=Encoding.Unicode.GetBytes(destination);
+  // x64 FILE_RENAME_INFORMATION: ReplaceIfExists@0, RootDirectory@8,
+  // FileNameLength@16, UTF-16 FileName@20.
+  IntPtr p=Marshal.AllocHGlobal(20+nameBytes.Length);
+  try {
+   for(int i=0;i<20;i++)Marshal.WriteByte(p,i,0);
+   Marshal.WriteIntPtr(p,8,rootHandle);
+   Marshal.WriteInt32(p,16,nameBytes.Length);
+   Marshal.Copy(nameBytes,0,IntPtr.Add(p,20),nameBytes.Length);
+   IO_STATUS_BLOCK io;
+   return NtSetInformationFile(sourceHandle,out io,p,
+    (uint)(20+nameBytes.Length),10).ToString("X8");
+  } finally {Marshal.FreeHGlobal(p);}
+ }
  static void Need(bool ok,string error) {
   if(!ok)throw new InvalidOperationException(error);
  }
@@ -547,6 +565,23 @@ public static class C996PreopenedNamespaceProbe {
     Need(File.Exists(goFile),"RENAME_SIGNAL_MISSING");
     Console.WriteLine("C996_PREOPENED_PARENT_NT="+CreateRelative(s,"parent-late.txt"));
     Console.WriteLine("C996_PREOPENED_CHILD_NT="+CreateRelative(c,"nested-late.txt"));
+    if(File.ReadAllText(goFile).Trim()=="WIN32_DENIED") {
+     // The source and child handles above predate this independent native
+     // rename attempt. This is the exact NT class 10 boundary, TEST_ONLY.
+     IntPtr m=CreateFileW(source,0x10080,7,IntPtr.Zero,3,0x02000000,IntPtr.Zero);
+     Need(m!=new IntPtr(-1),"NATIVE_MOVE_HANDLE_"+Marshal.GetLastWin32Error());
+     try {
+      IntPtr r=CreateFileW(Path.GetDirectoryName(source),0x84,7,
+       IntPtr.Zero,3,0x02000000,IntPtr.Zero);
+      Need(r!=new IntPtr(-1),"NATIVE_ROOT_HANDLE_"+Marshal.GetLastWin32Error());
+      try {
+       Console.WriteLine("C996_PREOPENED_NT_CLASS10_RENAME="+
+        RenameNtClass10(m,r,"archive"));
+       Console.WriteLine("C996_PREOPENED_POST_NT_INSERT="+
+        CreateRelative(s,"after-native-rename.txt"));
+      } finally {CloseHandle(r);}
+     } finally {CloseHandle(m);}
+    }
    } finally {CloseHandle(c);}
   } finally {CloseHandle(s);}
  }
@@ -596,21 +631,35 @@ $i=ConvertFrom-Json ([Text.Encoding]::UTF8.GetString(
         'Unexpected TEMP rename outcome: '+String(e));
       moveCode=e.code;
     }
-    fs.writeFileSync(goFile,'1',{flag:'wx'});
+    fs.writeFileSync(goFile,moved?'WIN32_MOVED':'WIN32_DENIED',{flag:'wx'});
     const code=await done;
     assert.equal(code,0,'native child exit '+code+' '+stderr.slice(-1200));
     assert.match(stdout,/C996_PREOPENED_PARENT_NT=00000000/);
     assert.match(stdout,/C996_PREOPENED_CHILD_NT=00000000/);
-    const finalDir=moved?archive:source;
-    assert.equal(fs.existsSync(source),!moved);
-    assert.equal(fs.existsSync(archive),moved);
+    let nativeStatus=null,postStatus=null;
+    if(!moved){
+      nativeStatus=stdout.match(/C996_PREOPENED_NT_CLASS10_RENAME=([0-9A-F]{8})/)?.[1];
+      postStatus=stdout.match(/C996_PREOPENED_POST_NT_INSERT=([0-9A-F]{8})/)?.[1];
+      assert.match(nativeStatus??'',/^[0-9A-F]{8}$/);
+      assert.match(postStatus??'',/^[0-9A-F]{8}$/);
+      // Invalid-parameter is a broken probe, never a protective outcome.
+      assert.notEqual(nativeStatus,'C000000D');
+    }
+    const nativeMoved=nativeStatus==='00000000';
+    const finalDir=(moved||nativeMoved)?archive:source;
+    assert.equal(fs.existsSync(source),!(moved||nativeMoved));
+    assert.equal(fs.existsSync(archive),moved||nativeMoved);
     assert.equal(fs.readFileSync(path.join(finalDir,'parent-late.txt')).length,0);
     assert.equal(fs.readFileSync(path.join(finalDir,'nested','nested-late.txt')).length,0);
+    if(postStatus==='00000000')
+      assert.equal(fs.readFileSync(path.join(finalDir,'after-native-rename.txt')).length,0);
     console.log('C996_PREOPENED_TEMP_RENAME_OUTCOME='+
       (moved?'WIN32_RENAMED_INSERTS_PERSIST':'WIN32_MOVE_DENIED_'+moveCode));
     console.log('C996_PREOPENED_PARENT_NT=00000000 CHILD_NT=00000000');
-    // No conclusion about the NT class-10 move while these handles are held.
-    // Neither result grants C execution authority or an operational move.
+    if(nativeStatus)console.log('C996_PREOPENED_NT_CLASS10_RENAME='+nativeStatus+
+      ' POST_NT_INSERT='+postStatus+' FINAL='+(nativeMoved?'ARCHIVE':'SOURCE'));
+    // This is still a live Windows TEMP test, never an offline/Owner approval.
+    // No status from this probe authorizes operating-PC C-grade mutation.
   }finally{
     if(timer)clearTimeout(timer);
     if(child&&!child.killed)child.kill();
