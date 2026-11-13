@@ -14,6 +14,8 @@ on:
       - 'tests/c996_winpe_native_volume_id_temp_harness.c'
       - 'tools/controller-996-native-approval-readiness.mjs'
       - 'tests/controller-996-native-approval-readiness.test.mjs'
+      - 'tests/controller-996-c-consent-verifier.test.mjs'
+      - 'tools/controller-996-c-consent-verifier.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
   pull_request:
     types: [opened, synchronize, reopened]
@@ -29,6 +31,8 @@ on:
       - 'tests/c996_winpe_native_volume_id_temp_harness.c'
       - 'tools/controller-996-native-approval-readiness.mjs'
       - 'tests/controller-996-native-approval-readiness.test.mjs'
+      - 'tests/controller-996-c-consent-verifier.test.mjs'
+      - 'tools/controller-996-c-consent-verifier.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
 permissions:
   contents: read
@@ -69,4 +73,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify C996 boundary and NT TEMP no-replace runtime proof (no operating C effect)
-        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs tests/controller-996-winpe-native-nt-relative-temp.test.mjs tests/controller-996-native-c-compiled-temp.test.mjs
+        run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs tests/controller-996-winpe-native-nt-relative-temp.test.mjs tests/controller-996-native-c-compiled-temp.test.mjs tests/controller-996-c-consent-verifier.test.mjs
