@@ -221,10 +221,31 @@ test('unapproved data path and symbolic core file fail without opening SQLite',t
  const {data,storage,file}=fixture(t);
  assert.equal(inspectEmploymentR6CollectionEvidence(storage).code,'R6_EVIDENCE_DATA_ROOT_DENIED');
  const other=path.join(storage,'other.sqlite');const db=createDb(other);db.close();
- fs.symlinkSync(other,file);
- const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
+ // CI Windows runners do not have symlink privilege. Simulate a symbolic
+ // SQLite entry at the filesystem boundary without changing real files.
+ let simulatedSymlinkChecks=0;
+ const filesystem={
+  ...fs,
+  lstatSync(target,...args){
+   if(path.basename(String(target)).toLowerCase()==='core.sqlite'){
+    simulatedSymlinkChecks++;
+    return Object.create(fs.lstatSync(other),{isSymbolicLink:{value:()=>true}});
+   }
+   return fs.lstatSync(target,...args);
+  },
+  realpathSync(target,...args){
+   if(path.basename(String(target)).toLowerCase()==='core.sqlite')return fs.realpathSync(other);
+   return fs.realpathSync(target,...args);
+  },
+ };
+ const r=inspectEmploymentR6CollectionEvidence(data,{
+  filesystem,openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');},
+ });
  assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_DB_MISSING_OR_UNSAFE');
  assert.equal(r.sqliteOpened,false);
+ assert.equal(simulatedSymlinkChecks,1);
+ assert.equal(fs.existsSync(file),false);
 });
 
 test('a missing calendar week among only 576 stored weeks reports the absent date',t=>{
