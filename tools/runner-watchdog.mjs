@@ -16,7 +16,13 @@ const write=(p,x)=>{const tmp=p+'.'+randomUUID()+'.tmp';fs.writeFileSync(tmp,JSO
 export function alive(pid){if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}}
 export function decide({paused,owner,live,heartbeat,now=Date.now()}){
  if(paused)return 'PAUSED';
- if(owner&&live!==false)return live===true&&heartbeat&&now-Date.parse(heartbeat)<45000?'HEALTHY':'BLOCKED_LIVE_OR_UNKNOWN';
+ if(owner&&live!==false){
+  // Reject future, malformed, and stale heartbeat timestamps. An unknown
+  // live Supervisor is never terminated or force-recovered by this decision.
+  const age=typeof heartbeat==='string'&&Number.isFinite(now)?now-Date.parse(heartbeat):NaN;
+  return live===true&&Number.isFinite(age)&&age>=0&&age<45000?
+   'HEALTHY':'BLOCKED_LIVE_OR_UNKNOWN';
+ }
  return 'RECOVER';
 }
 export function archiveDeadLease(directory,isAlive=alive,destination=null){
