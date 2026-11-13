@@ -136,11 +136,16 @@ export function review996CConsent({originalIssue,commentsReadback,gitRead,
   commentsReadback.comments.length>10_000)
   return fail('CONSENT_COMMENT_PAGINATION_UNVERIFIED');
  const receiptHash=digest(gitRead.bytes);
- const matchingPrefix=commentsReadback.comments.filter(c=>
-  typeof c?.body==='string'&&c.body.includes('ZGMINI_CONTROLLER_996_C_CONSENT_V1'));
- if(matchingPrefix.length!==1)
+ // Prose mentioning an old consent is not a second consent receipt.
+ // A real receipt must have the exact marker as its first line; duplicate
+ // first-line receipts still fail closed below.
+ const receiptHeader='ZGMINI_CONTROLLER_996_C_CONSENT_V1';
+ const matchingReceipts=commentsReadback.comments.filter(c=>
+  typeof c?.body==='string'&&
+  c.body.replace(/\r\n/g,'\n').trim().split('\n',1)[0]===receiptHeader);
+ if(matchingReceipts.length!==1)
   return fail('CONSENT_MISSING_OR_CONFLICTING');
- const comment=matchingPrefix[0];
+ const comment=matchingReceipts[0];
  if(comment?.user?.login!==owner||
   !Number.isSafeInteger(comment?.id)||comment.id<1||
   comment.body.replace(/\r\n/g,'\n').trim()!==build996ConsentComment(receiptHash))
