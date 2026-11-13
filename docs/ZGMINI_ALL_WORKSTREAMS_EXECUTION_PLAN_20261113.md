@@ -2,6 +2,14 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 68차 — 물가 지시 실제 사용자 전달 확인·기존 41차 Controller 감사 재사용·운영 #1351 미배정 증거 보존
+
+- **이번 사용자 신규 사실:** 사용자는 67차 **물가지표 원담당 전용 지시문**을 해당 일반챗에 전달했으며 다른 5개 기능 담당은 대기 중이라고 직접 알림. 전달문에서 `fix/economic12-inflation-legacy4-r35-20261021@d4d82f17173324564e9a8128dc5d23c75f09b406`, 42%, 과거 A #1334/#22·23 INVALID/#28 MISSING/#24 PPI203을 명시, 실제 공식 BLS raw→parser #22 FIRST FAIL 재현·최소 수정·targeted 시험·#68 결과 반환을 요구. 이것은 **USER_HANDOFF_CONFIRMED**이지 **OWNER_ACKNOWLEDGED / OWNER_EXECUTED / NEW_RAW_OBSERVED**가 아님. 추가 신규 5개 일반챗 지시·원담당을 강제 깨우는 업무 0.
+- **이번 최신 원격 readback:** 제어 main `69e25a08a903dc8e52ef1093ec15837de4c20858`, 기능 main `643b7c7c4372ffad552443fc312c6cb1b944e2fc`, 물가 브랜치 `d4d82f17173324564e9a8128dc5d23c75f09b406` 그대로; #68에는 67차 중앙 이후 **새 물가 고유 실행 결과 0**. 운영 #1351 Run `43429486924` `queued/conclusion=null/attempt=1`, Job `131899103441` `queued/conclusion=null`, 인증 Runner/Windows steps/JSON/TXT 0. 물가 B [Draft #1336](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336)는 open/Draft/미병합. 기능 진행률 42%/전체 57.4% 유지.
+- **불필요한 사전감사 재수행 배제:** 41차 [`CONTROLLER_READER_A_SOURCE_DIFF_PREFLIGHT_20261114.md`](CONTROLLER_READER_A_SOURCE_DIFF_PREFLIGHT_20261114.md)는 이미 소스 `config/operations.json` 31→37 (기존 31/31 불변), 6개 신규 A, 정확한 런타임 후보 **13파일(12 Controller + config)**, 정적 import 30개 target 존재, 기존 모듈 5개 변경까지 입증했음. 최신 재조회에서 해당 ops blob `c906683afd487762f5bc32f50a199679df200dc3`, Controller `operations.mjs` blob `b507697ce089254cd61932f1d5b703b48f93e0db` 동일. 새 소스 결함·승인·PC 설치 결과 없음; 41차 감사 재작업·불필요한 신규 설치 요청 금지.
+- **실제 다음 하나 — 중앙 운영 PC 단일 Owner:** 기존 승인된 read-only PC 수단에서 현행 `zgmini-pc-01..06` 등록 4필수 라벨, online/busy, Listener 및 원본 #1351 배정/수신 결과를 같은 관측 시각에 인증 회수. 실제 첫 실패 분류 후에만 관련 Watchdog/Guardian/Supervisor/#996 lease 범위 조회. 현재 GitHub 연결에서는 해당 Runner registry 관리 API 접근 불가, 이전 격리 CI PASS와 2026-11-12 운영 스냅샷은 현시각 Runner 상태가 아님. 이 단계만 `AUTOMATION_BLOCKED/STATE_UNKNOWN`, Controller 내부 Runtime 실패로 선언 금지. 웹 공개 `/api/release-calendar` 별도 1회 읽기는 응답에 접근 불가했고 Production 동치/갱신 PASS 아님.
+- **보호/결과:** #1351 새 pc-job·rerun/Runner 강제 재시작·Controller 설치·B/C/lock 해제·원자료/SQLite/D1/Cloudflare 변경 0. #996 C 80%/NO-GO, 독립 Writer B 4/5/DEFERRED, 공유 자원 4/5/DEFERRED. **68차 중앙 handoff/readback 정합 확인만 완료, 전체 기능 57.4%→57.4% / 운영 장애 미해결.**
+
 ## 2026-11-14 67차 — 원담당 인계 오류 정정·물가 현장 A 영수증 재사용·중앙 현재 배정 병목 분리
 
 - **이번 사용자 작업 지시:** 일반챗 후속 지시는 사용자가 직접 해당 대화에 전달한다. GitHub #68 댓글만으로 타 ChatGPT 대화의 실제 수신·실행을 주장하지 말 것. 동일 65차 지시를 여섯 곳에 무조건 반복하지 않는다. 별도 전달이 필요한 **물가지표 원담당**에는 현재 물가 전용 작업을 명시하고 결과 수신 전 UIUX 보고를 물가 완료로 계산하지 않는다.
