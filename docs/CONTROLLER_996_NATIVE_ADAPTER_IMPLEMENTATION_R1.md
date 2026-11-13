@@ -1,5 +1,17 @@
 # #996 C급 복구 — 원본 Windows 실행기 개발 현황 (2026-11-10)
 
+
+## 2026-11-13 — NT 핸들 상대경로 TEMP 실측: 오류 87 우회 후보 27/27 PASS
+
+**테스트 대상:** 공통 대기열 PC `DESKTOP-N62L0NG`의 기존 `zgmini-handoff-ci-spare-01` 격리 Windows Runner. **채팅은 기존 운영 PC `PC`에서 이어졌지만, 운영 PC로 실행을 이전하지 않았으며 운영 `E:\ZGmini` 및 실제 #996 C급 복구 효과는 0건.** 이전 격리 WinPE CNG 6/6/종료·ISO 불변 증거는 재사용하고, WinPE 부팅·CNG 재실행 없음.
+
+**Last PASS / FIRST FAIL:**
+- 기존 `SetFileInformationByHandle(FileRenameInfo=3)`와 검증된 `RootDirectory` 핸들·상대 leaf 조합이 이전 Windows 격리 시험에서 **Win32 87**로 거부됐다. 이 결과만으로 단일 인자의 문서상 위반을 확정하지 않는다. 절대경로와 `RootDirectory=NULL` 조합의 성공은 경로 고정 및 온라인 namespace 경쟁을 입증하지 못한다.
+- 공식 Microsoft `NtSetInformationFile(FileRenameInformation=10)` 및 `FILE_RENAME_INFORMATION`의 상대 이름+RootDirectory 모델을 사용한 **TEMP 전용 독립 증거**를 추가했다. `tools/controller-996-winpe-native-temp-rename.c`에는 `C996_NATIVE_NT_RELATIVE_TEMP_DIAGNOSTIC_ONLY`와 x64/`C996_NATIVE_TEMP_TEST_ONLY` 가드, 진단 모드 상호배타성, `GetModuleHandleW(ntdll)`+ 고정 `NtSetInformationFile` 클래스 10 경로를 추가. Win32 경로로 자동 fallback하지 않는다. 새 진단 모드는 독립 운영 C 기능이 아니며 원래 x64 WinPE C 바이너리를 빌드하거나 재설치하지 않았다.
+- [격리 Windows Run #43346317508](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43346317508), job `131626483982`, branch commit `6f852f5b511dbf62c43ee40e55774e1909232c9f`: **TAP 27/27 PASS, 0 fail, 0 skip**. `tests/controller-996-winpe-native-nt-relative-temp.test.mjs`는 기존 Node/PowerShell C# P/Invoke를 통해 `NtSetInformationFile`을 실제 Windows x64 TEMP의 새 격리 디렉터리에 호출한다. `C996_NT_POSITIVE=NT_SUCCESS`, `C996_NT_COLLISION=NT_STATUS_C0000035`, `C996_NT_TEMP_ROOT_RELATIVE_NO_REPLACE_PASS`를 표준 출력으로 직접 회수했다. 원본 source `proof.json`의 바이트가 새 archive에 보존됐고, 이미 존재하던 별도 `archive2`는 변경되지 않았다. 시험 디렉터리 내 1회 작업이고 HOST `E:` 원자료·DB·Workflow·Controller/lease·운영 Task 접근 0.
+- **현재 아직 미입증:** Windows C# P/Invoke의 실제 시스템콜 PASS가 **소스 C 바이너리 빌드·WinPE 실행 호환성**이나 **게스트 실물 운영 볼륨 경로 동일성·namespace 삽입 배제·단독 오프라인 volume ownership·서명 Owner SPKI/철회/신뢰시각**을 증명하지 않는다. 과거 경쟁 프로세스의 child insertion 가능 negative proof를 상쇄할 수 없다. `C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN` 및 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 무조건 STOP 유지. `executionAuthorized=false`, `operationalWrites=0`, 운영 C `NO-GO`.
+- **다음 최소 필수 기술 실행:** 이 성공한 네이티브 **핸들 상대경로 무교체 원자 이름 변경 primitive**는 재사용하되, **동일한 오프라인 namespace에 Writer/다른 생성자가 신규 child를 삽입하지 못함**을 원본 volume 접근권·Owner 서명·진짜 WinPE 상태와 별개로 실증해야 한다. 이후에야 고정 x64 native mover 바이트 빌드·해시와 정확한 C 효과 새 승인 scope를 검토한다. 실물 원본 PC에서 실험적 rename, lock 제거, 운영 재부팅·PC Job 재발행 금지.
+
 ## 최신 승인·실행 상태 (2026-11-10 05:21:34 UTC 이후)
 
 - **C급 한정 승인 등록 완료:** 원본 Issue [#996 승인 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6759732782), 댓글 ID `6759732782`, 작성자 `ansqhd5774-Choi` / GitHub `author_association=OWNER`, 작성 시각 `2026-11-10T05:21:34Z`. 승인 표식 1개, 철회 표식 0개. 승인 명세는 불변 Git 커밋 `7cff08e…`에 고정되며, 전체 파일 SHA256 `05bf8aa72b438b69d7c86f8798a72ec2c12fe3537489f2153069dabfe0695e7b`를 댓글에서 수락했다. **원본 Windows에서의 인증 GET·실제 운영 실행은 별도 미실시**다.
