@@ -13,6 +13,20 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 export function dedicatedPcRunnersOnline(rows){
  return dedicatedPcRunnerRows(rows,{requireOnline:true})!==null;
 }
+// Only these six operational seats belong in a shared-repository status report.
+// Keep missing/duplicate seats explicit without returning unrelated runner metadata.
+const operatingNames=Object.freeze(Array.from({length:6},(_,i)=>`zgmini-pc-0${i+1}`));
+export function operatingPcRunnerEvidence(rows){
+ if(!Array.isArray(rows))return null;
+ return operatingNames.map(name=>{
+  const matches=rows.filter(x=>x?.name===name);
+  if(matches.length!==1)return {name,registration:matches.length===0?'MISSING':'DUPLICATE',status:null,busy:null};
+  const row=matches[0];
+  return {name,registration:'SINGLE',
+   status:row.status==='online'||row.status==='offline'?row.status:null,
+   busy:typeof row.busy==='boolean'?row.busy:null};
+ });
+}
 export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFileSync){
  // Verified final pre-upgrade Windows six-file source (464 POSTFF V2).
  // A newer source must carry its seventh runtime module, even if its manifest
@@ -190,7 +204,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   actualControllerSha:state.actualControllerSha,maintenanceSourceSha:installed?.sourceSha??null,
   installLock:state.installLock,workflowState:workflow,
   receiverObservedAt:receiver?.at??null,receiverStatus:receiver?.status??null,maintenanceFilesVerified:state.maintenanceFilesVerified,
-  runners:rows?.map(x=>({name:x.name,status:x.status,busy:x.busy}))??null,
+  runners:operatingPcRunnerEvidence(rows),
   supervisor:summarizeSupervisorReadOnly({supervisor,owner,state}),
   watchdog,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
