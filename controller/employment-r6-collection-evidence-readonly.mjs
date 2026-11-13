@@ -92,15 +92,24 @@ function fullTenYearRawCoverage(weeks,complete){
   requiredRawWeeks,requiredRows:requiredRawWeeks*51,referenceWeeks,
   firstRequiredWeek:new Date(latestMs-(requiredRawWeeks-1)*WEEK_MS).toISOString().slice(0,10),
   latestRequiredWeek:latest,firstFailureWeek:null};
- if(weeks.length<requiredRawWeeks)return result;
- const required=weeks.slice(-requiredRawWeeks);
- for(let i=0;i<required.length;i++){
-  const w=required[i],expected=latestMs-(requiredRawWeeks-1-i)*WEEK_MS;
-  if(day(w.week)!==expected)return {...result,status:'NONCONSECUTIVE_10Y_WEEKS',firstFailureWeek:w.week};
-  if(!complete(w))return {...result,status:'REGION_51_COVERAGE_GAP',firstFailureWeek:w.week};
-  // The approved R6 transform excludes prior four-week averages of zero.
-  if(i>=55&&required[i-52].zeroPriorRegions!==0)
-   return {...result,status:'PRIOR_4W_ZERO_BASE',firstFailureWeek:w.week};
+ // Match the required calendar weeks explicitly. A count of 576 stored weeks
+ // must still expose the earliest absent week, not just "insufficient".
+ const byWeek=new Map(weeks.map(w=>[w.week,w]));
+ const firstRequiredMs=latestMs-(requiredRawWeeks-1)*WEEK_MS;
+ for(let i=0;i<requiredRawWeeks;i++){
+  const expectedMs=firstRequiredMs+i*WEEK_MS;
+  const expectedWeek=new Date(expectedMs).toISOString().slice(0,10);
+  const w=byWeek.get(expectedWeek);
+  if(!w)return {...result,
+   status:weeks.length<requiredRawWeeks?'INSUFFICIENT_RAW_WEEKS':'NONCONSECUTIVE_10Y_WEEKS',
+   firstFailureWeek:expectedWeek};
+  if(!complete(w))return {...result,status:'REGION_51_COVERAGE_GAP',firstFailureWeek:expectedWeek};
+  // Preserve the approved four-week prior-zero exclusion unchanged.
+  if(i>=55){
+   const priorWeek=new Date(expectedMs-52*WEEK_MS).toISOString().slice(0,10);
+   if(byWeek.get(priorWeek)?.zeroPriorRegions!==0)
+    return {...result,status:'PRIOR_4W_ZERO_BASE',firstFailureWeek:expectedWeek};
+  }
  }
  return {...result,status:'RAW_PRECONDITIONS_COMPLETE'};
 }
@@ -204,7 +213,20 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
     SUM(CASE WHEN prior_four_week_total=0 THEN 1 ELSE 0 END) AS zero_prior_region_count
    FROM region_windows
    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600`).all(...CORE_STATES);
-  result.stateClaims=coverage(weekly);
+  const stateClaims=coverage(weekly);
+  const rawGap=stateClaims.fullTenYearRawCoverage;
+  if(rawGap?.status==='REGION_51_COVERAGE_GAP'&&date(rawGap.firstFailureWeek)){
+   // Return only the fixed 51 public jurisdiction codes that are absent.
+   // Query exactly one reported failure week; never emit raw records/values.
+   const present=db.prepare(`SELECT DISTINCT geography_code
+    FROM market_score_employment_r4_shadow_current_v1
+    WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
+     AND observation_date=? AND geography_code IN (${countryMarkers})`
+   ).all(rawGap.firstFailureWeek,...CORE_STATES);
+   const have=new Set(present.map(r=>r.geography_code));
+   rawGap.missingRegionCodes=CORE_STATES.filter(code=>!have.has(code));
+  }
+  result.stateClaims=stateClaims;
   result.status='PASS';result.code='R6_DOL_BED_STORED_EVIDENCE_READONLY';
   return result;
  }catch{

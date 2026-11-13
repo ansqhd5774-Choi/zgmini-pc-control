@@ -180,6 +180,7 @@ test('missing one state in 577 weeks rejects ten-year raw coverage',t=>{
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'REGION_51_COVERAGE_GAP');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+ assert.deepEqual(r.stateClaims.fullTenYearRawCoverage.missingRegionCodes,['WY']);
 });
 
 test('a whole missing calendar week rejects apparent 577-week count',t=>{
@@ -189,6 +190,7 @@ test('a whole missing calendar week rejects apparent 577-week count',t=>{
  const r=inspectEmploymentR6CollectionEvidence(data);
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'NONCONSECUTIVE_10Y_WEEKS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2016-03-05');
 });
 
 test('577 weeks with one zero prior-state 4w base are still not score-ready',t=>{
@@ -223,4 +225,33 @@ test('unapproved data path and symbolic core file fail without opening SQLite',t
  const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
  assert.equal(r.status,'STATE_UNKNOWN');
  assert.equal(r.sqliteOpened,false);
+});
+
+test('a missing calendar week among only 576 stored weeks reports the absent date',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("DELETE FROM market_score_employment_r4_shadow_current_v1 WHERE observation_date='2016-03-05'").run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const gap=r.stateClaims.fullTenYearRawCoverage;
+ assert.equal(r.status,'PASS');
+ assert.equal(gap.observedRawWeeks,576);
+ assert.equal(gap.status,'INSUFFICIENT_RAW_WEEKS');
+ assert.equal(gap.firstFailureWeek,'2016-03-05');
+ assert.equal(gap.missingRegionCodes,undefined);
+});
+
+test('an unknown geography code cannot mask the missing fixed region',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET geography_code='ZZ' WHERE geography_code='WY' AND observation_date='2026-10-31'").run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const gap=r.stateClaims.fullTenYearRawCoverage;
+ assert.equal(gap.status,'REGION_51_COVERAGE_GAP');
+ assert.equal(gap.firstFailureWeek,'2026-10-31');
+ assert.deepEqual(gap.missingRegionCodes,['WY']);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY|SECRET_DO_NOT_OUTPUT|TOKEN_SECRET/i);
+ assert.equal(r.providerCalls,0);
+ assert.equal(r.operationalWrites,0);
 });
