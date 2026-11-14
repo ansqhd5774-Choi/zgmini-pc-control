@@ -59,3 +59,18 @@ test('no fault: source-order fixture can reach a journal',t=>{
   assert.equal(state.receiverAlive,false);
   assert.equal(fs.existsSync(path.join(root,'handoff-target.json')),true);
 });
+
+test('timeout fixture: receiver may accept a delayed stop after operator has exited',t=>{
+  const root=isolatedFixture(t);
+  let err;
+  try{modelPreJournal(root,'timeout');}catch(e){err=e;}
+  assert.equal(err?.state?.receiverAlive,true);
+  const request=path.join(root,'STOP_REQUEST.json');
+  assert.equal(fs.existsSync(request),true);
+  // Synthetic delayed poll corresponding to the accepted STOP rename in receiver code.
+  fs.renameSync(request,path.join(root,'STOP_HANDLED-fixture-nonce.json'));
+  err.state.receiverAlive=false;
+  assert.equal(fs.existsSync(path.join(root,'STOP_HANDLED-fixture-nonce.json')),true);
+  assert.equal(fs.existsSync(path.join(root,'handoff-target.json')),false);
+  assert.equal(err.state.receiverAlive,false);
+});
