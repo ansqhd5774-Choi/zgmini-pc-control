@@ -1,6 +1,9 @@
 // #996 historical C protection vs. later approved Writer B: SOURCE-ONLY review.
 // This module never authenticates GitHub evidence, accesses Windows, mutates
 // files, grants C consent, or changes the existing pre-import hard STOP.
+// Writer B #1320 approved a JS source overlay, NOT a writer/config.json edit.
+// #1321 observed config SHA on fixed checkout; attribution of that change
+// to a specific approved operation remains UNKNOWN.
 import {createHash} from 'node:crypto';
 
 const SHA=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
@@ -75,6 +78,8 @@ export function review996ApprovedWriterTransitionReadOnly({historical,writerInst
   writerReadback.result?.evidenceLevel!=='FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS'||
   writerReadback.result?.runtimeSourceVerified!==false||
   writerReadback.result?.sourceHead!==PINS.writerInstalledSourceSha||
+  writerReadback.result?.sourceIdentityConsistent!==false||
+  writerReadback.result?.coreTaskSourceLinked!==false||
   writerReadback.result?.r6Config?.status!=='PASS'||
   writerReadback.result?.r6Config?.configSha256!==PINS.currentConfigSha||
   writerReadback.protectedStateUnchanged!==true||
@@ -111,13 +116,19 @@ export function review996ApprovedWriterTransitionReadOnly({historical,writerInst
 
  return Object.freeze({
   schema:'ZGMINI_996_APPROVED_WRITER_TRANSITION_SOURCE_REVIEW_V1',
-  status:'MATCHING_APPROVED_WRITER_TRANSITION_METADATA_ONLY',
-  code:'C996_BRIDGE_PROVENANCE_AND_LIVE_C_CONSENT_STILL_REQUIRED',
+  status:'MATCHING_POST_INSTALL_OBSERVATIONS_ONLY',
+  code:'C996_BRIDGE_CONFIG_CHANGE_ATTRIBUTION_UNVERIFIED',
   historicalConfigSha256:PINS.historicalConfigSha,
   currentConfigSha256:PINS.currentConfigSha,
   currentFingerprint:PINS.currentFingerprint,
   coreKoreaTaskHashesUnchanged:true,
   historicalConsentStillPinned:true,
+  writerBApprovedOnlySourceOverlay:true,
+  writerBConfigEditApproved:false,
+  configChangeAttributionVerified:false,
+  readbackProtectedDigestIsConfigSha:false,
+  sourceIdentityConsistent:false,
+  coreTaskSourceLinked:false,
   independentlyAuthenticatedGithubReadback:false,
   originalWindowsDoubleReadVerified:false,
   currentLiveProtectionAuthorized:false,
