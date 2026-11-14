@@ -8,14 +8,15 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {protection} from '../tools/install-runner-watchdog.mjs';
 import {TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE,
-  APPROVED_CONTROLLER_SHA,
-  parseCanonicalBody,validateRequest,decideUpgradeState,error} from './contract.mjs';
+  APPROVED_CONTROLLER_SHA,NEXT_TARGET,NEXT_SOURCE_SHA,
+  parseCanonicalBody,validateRequest,validateR3Request,decideUpgradeState,error} from './contract.mjs';
 
 const repoRoot=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
 const maintenance='E:/ZGmini/automation/pc-maintenance';
 const controller='E:/ZGmini/automation/pc-control';
-const manifestFile=path.join(repoRoot,'approvals/watchdog-upgrades',TARGET+'-r2.json');
+const manifestFor=body=>path.join(repoRoot,'approvals/watchdog-upgrades',
+ body.targetSha===NEXT_TARGET?NEXT_TARGET+'.json':TARGET+'-r2.json');
 const sourceFile=path.join(repoRoot,'tools/runner-watchdog.mjs');
 const installedFile=path.join(home,'runner-watchdog.mjs');
 const installedManifest=path.join(home,'INSTALL.json');
@@ -104,13 +105,14 @@ export function verifyApprovedControllerHost(host,expected=APPROVED_CONTROLLER_S
  return true;
 }
 export function verifyWatchdogUpgradeSnapshot({sourceBytes,installBytes,
-  sourceHash,install,owner,status,aliveOwner,existingClaim,now=Date.now()}){
- if(digest(sourceBytes)!==ORIGINAL||sourceHash!==ORIGINAL)
+  sourceHash,install,owner,status,aliveOwner,existingClaim,now=Date.now(),
+  expectedSourceSha=ORIGINAL,expectedScope=INITIAL_SCOPE}){
+ if(digest(sourceBytes)!==expectedSourceSha||sourceHash!==expectedSourceSha)
   throw error('WATCHDOG_B_PREIMAGE_SHA_MISMATCH');
- if(install.sha256!==ORIGINAL||install.scope!==INITIAL_SCOPE)
+ if(install.sha256!==expectedSourceSha||install.scope!==expectedScope)
   throw error('WATCHDOG_B_PREIMAGE_INSTALL_MISMATCH');
  if(decideUpgradeState({existingClaim,installedDigest:sourceHash,
-   expectedDigest:ORIGINAL,status,owner,ownerAlive:aliveOwner,now})!=='READY')
+   expectedDigest:expectedSourceSha,status,owner,ownerAlive:aliveOwner,now})!=='READY')
   throw error('WATCHDOG_B_ACTIVE_OWNER_OR_CAS_STOP');
  if(!Buffer.isBuffer(installBytes)||installBytes.length<10)
   throw error('WATCHDOG_B_PREIMAGE_MANIFEST_INVALID');
@@ -125,15 +127,21 @@ export async function execute(){
  if(!eventPath||!path.isAbsolute(eventPath))throw error('WATCHDOG_B_EVENT_MISSING');
  const event=readJSON(eventPath);
  const body=parseCanonicalBody(event?.issue?.body);
- const approvalBytes=fs.readFileSync(manifestFile),approval=JSON.parse(approvalBytes);
+ const approvalBytes=fs.readFileSync(manifestFor(body)),approval=JSON.parse(approvalBytes);
  const newBytes=fs.readFileSync(sourceFile);
  requireDirectory(home);
  requireFile(installedFile);requireFile(installedManifest);
  const oldBytes=fs.readFileSync(installedFile);
  const oldManifestBytes=fs.readFileSync(installedManifest);
  const installed=JSON.parse(oldManifestBytes);
- const request=validateRequest(event,body,approval,installed,
-   digest(newBytes),digest(approvalBytes));
+ const r3=body.targetSha===NEXT_TARGET;
+ const oldSha=r3?REPLACEMENT:ORIGINAL;
+ const nextSha=r3?NEXT_SOURCE_SHA:REPLACEMENT;
+ const targetSha=r3?NEXT_TARGET:TARGET;
+ const oldScope=r3?FINAL_SCOPE:INITIAL_SCOPE;
+ const request=r3
+  ?validateR3Request(event,body,approval,installed,digest(newBytes),digest(approvalBytes))
+  :validateRequest(event,body,approval,installed,digest(newBytes),digest(approvalBytes));
  if(!Number.isSafeInteger(request.issueNumber)||request.issueNumber<1)
   throw error('WATCHDOG_B_ISSUE_NUMBER_INVALID');
  if(fs.existsSync(path.join(maintenance,'leases/controller-install'))
@@ -156,15 +164,16 @@ export async function execute(){
  const claim=path.join(requests,request.requestId+'.json');
  verifyWatchdogUpgradeSnapshot({sourceBytes:oldBytes,installBytes:oldManifestBytes,
   sourceHash:digest(oldBytes),install:installed,owner,status,
-  aliveOwner:alive(owner?.pid),existingClaim:fs.existsSync(claim)});
+  aliveOwner:alive(owner?.pid),existingClaim:fs.existsSync(claim),
+  expectedSourceSha:oldSha,expectedScope:oldScope});
  const originalSourceAcl=localAcl(installedFile);
  const originalManifestAcl=localAcl(installedManifest);
  // Preflight is complete: this B request becomes single-use BEFORE any write.
  fs.mkdirSync(requests,{recursive:true});
  const attempt={schema:'ZGMINI_PC_WATCHDOG_B_RESULT_V1',
   requestId:request.requestId,issueNumber:request.issueNumber,
-  targetSha:TARGET,installedSourceSha256Before:ORIGINAL,
-  targetSourceSha256:REPLACEMENT,status:'RUNNING',code:'WATCHDOG_B_ATTEMPT_CLAIMED',
+  targetSha,installedSourceSha256Before:oldSha,
+  targetSourceSha256:nextSha,status:'RUNNING',code:'WATCHDOG_B_ATTEMPT_CLAIMED',
   writes:0,at:new Date().toISOString()};
  writeOnce(claim,attempt);
  let stage='CLAIMED';
@@ -181,7 +190,7 @@ export async function execute(){
   const backupManifest=path.join(backup,'INSTALL.json');
   fs.writeFileSync(backupCode,oldBytes,{flag:'wx'});
   fs.writeFileSync(backupManifest,oldManifestBytes,{flag:'wx'});
-  if(digest(fs.readFileSync(backupCode))!==ORIGINAL
+  if(digest(fs.readFileSync(backupCode))!==oldSha
     ||!fs.readFileSync(backupManifest).equals(oldManifestBytes))
     throw error('WATCHDOG_B_BACKUP_MISMATCH');
   stage='BACKUP_VERIFIED';
@@ -194,16 +203,16 @@ export async function execute(){
     ||localAcl(stagedManifest)!==originalManifestAcl)
     throw error('WATCHDOG_B_STAGED_ACL_MISMATCH');
   fs.writeFileSync(stagedScript,newBytes);
-  const updated={...installed,sha256:REPLACEMENT,scope:FINAL_SCOPE,
-    approvedTargetSourceSha:TARGET,upgradedAt:new Date().toISOString()};
+  const updated={...installed,sha256:nextSha,scope:FINAL_SCOPE,
+    approvedTargetSourceSha:targetSha,upgradedAt:new Date().toISOString()};
   fs.writeFileSync(stagedManifest,JSON.stringify(updated,null,2)+'\n');
-  if(digest(fs.readFileSync(stagedScript))!==REPLACEMENT
+  if(digest(fs.readFileSync(stagedScript))!==nextSha
     ||localAcl(stagedScript)!==originalSourceAcl
     ||localAcl(stagedManifest)!==originalManifestAcl)
     throw error('WATCHDOG_B_STAGED_BYTES_OR_ACL_MISMATCH');
   stage='STAGED';
   // At-time-of-use safeguards: do not update during someone else's change.
-  if(digest(fs.readFileSync(installedFile))!==ORIGINAL
+  if(digest(fs.readFileSync(installedFile))!==oldSha
     ||!fs.readFileSync(installedManifest).equals(oldManifestBytes)
     ||fs.existsSync(path.join(maintenance,'leases/controller-install'))
     ||fs.existsSync(path.join(home,'PAUSE'))
@@ -214,8 +223,8 @@ export async function execute(){
   fs.renameSync(stagedManifest,installedManifest);
   stage='SOURCE_AND_MANIFEST_REPLACED';
   const result=readJSON(installedManifest);
-  if(digest(fs.readFileSync(installedFile))!==REPLACEMENT
-    ||result.sha256!==REPLACEMENT||result.scope!==FINAL_SCOPE
+  if(digest(fs.readFileSync(installedFile))!==nextSha
+    ||result.sha256!==nextSha||result.scope!==FINAL_SCOPE
     ||localAcl(installedFile)!==originalSourceAcl
     ||localAcl(installedManifest)!==originalManifestAcl
     ||digest(fs.readFileSync(startup))!==installed.startupSha256

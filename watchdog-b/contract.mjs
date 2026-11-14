@@ -71,3 +71,47 @@ export function decideUpgradeState({existingClaim,installedDigest,expectedDigest
    ||ownerAlive!==true)return 'WATCHDOG_NOT_HEALTHY_BLOCK';
  return 'READY';
 }
+
+// R3 is the SAME fixed two-file Windows Watchdog B lane, not a new Runner or
+// maintainer self-update authorization. Historical V1/V2 are immutable.
+export const NEXT_TARGET='a2ec241d98a2ca93508443deb5b4688ecbccb905';
+export const NEXT_SOURCE_SHA='3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072';
+export const R3_REQUEST_ID='pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b';
+export const R3_MANIFEST_SCHEMA='ZGMINI_PC_WATCHDOG_B_MANIFEST_V3';
+export function validateR3Request(event,body,approval,installed,sourceDigest,approvalDigest){
+ if(event?.action!=='opened'||event?.repository?.full_name!==REPO
+   ||event.repository.private!==true||event?.sender?.login!=='ansqhd5774-Choi'
+   ||event?.issue?.user?.login!=='ansqhd5774-Choi'
+   ||event?.issue?.title!==ISSUE_TITLE
+   ||!Array.isArray(event.issue.labels)
+   ||!event.issue.labels.some(item=>item?.name==='pc-maintenance'))
+   throw error('WATCHDOG_R3_UNTRUSTED_EVENT');
+ if(!exact(body,['schema','requestId','operation','targetSha','approvalManifestSha256'])
+   ||body.schema!==REQUEST_SCHEMA||body.operation!==OP
+   ||body.requestId!==R3_REQUEST_ID||body.targetSha!==NEXT_TARGET
+   ||!sha.test(body.approvalManifestSha256??''))
+   throw error('WATCHDOG_R3_REQUEST_CONTRACT');
+ if(!exact(approval,['schema','approved','scope','installedSha256','targetSha',
+   'targetSha256','fromScope','toScope','allowedFiles','operation','approvalBasis',
+   'revision','expectedControllerSha','protectionPolicy','sourceIssueNumber'])
+   ||approval.schema!==R3_MANIFEST_SCHEMA||approval.approved!==true
+   ||approval.scope!==SCOPE||approval.operation!==OP||approval.revision!==3
+   ||approval.expectedControllerSha!==APPROVED_CONTROLLER_SHA
+   ||approval.protectionPolicy!==PROTECTION_POLICY
+   ||approval.targetSha!==NEXT_TARGET||approval.installedSha256!==REPLACEMENT
+   ||approval.targetSha256!==NEXT_SOURCE_SHA
+   ||approval.fromScope!==FINAL_SCOPE||approval.toScope!==FINAL_SCOPE
+   ||approval.sourceIssueNumber!==1378
+   ||JSON.stringify(approval.allowedFiles)!==JSON.stringify([
+     'pc-watchdog/runner-watchdog.mjs','pc-watchdog/INSTALL.json'])
+   ||approvalDigest!==body.approvalManifestSha256
+   ||sourceDigest!==NEXT_SOURCE_SHA)
+   throw error('WATCHDOG_R3_APPROVAL_MISMATCH');
+ if(!installed||installed.sha256!==REPLACEMENT
+   ||installed.scope!==FINAL_SCOPE||installed.approvedTargetSourceSha!==TARGET
+   ||!sha.test(installed.startupSha256??'')
+   ||!sha.test(installed.priorStartupSha256??''))
+   throw error('WATCHDOG_R3_INSTALLED_PREIMAGE_MISMATCH');
+ return Object.freeze({requestId:body.requestId,
+   issueNumber:event.issue.number,targetSha:NEXT_TARGET});
+}
