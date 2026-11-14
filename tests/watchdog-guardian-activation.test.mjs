@@ -98,3 +98,12 @@ test('fixed identity witness does not contain process-tree termination or arbitr
  assert.doesNotMatch(helper,/taskkill\s+\/T/i);
  assert.equal((helper.match(/\.Terminate\(0\)/g)||[]).length,1);
 });
+
+test('immutable production B manifest pins exact submitted helper and runner bytes',()=>{
+ const approved=JSON.parse(fs.readFileSync(path.join(root,
+  'approvals/watchdog-activations/d01229adacc3c23f50bb119d146e291ff7e15012.json')));
+ assert.equal(approved.approved,true);
+ assert.equal(approved.activationScriptSha256,scriptDigest);
+ assert.equal(approved.guardianHelperSha256,helperDigest);
+ assert.equal(approved.effect,'ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART');
+});
