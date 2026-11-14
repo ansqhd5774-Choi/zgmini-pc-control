@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V2",
+  "approved": true,
+  "scope": "ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY",
+  "targetSha": "d01229adacc3c23f50bb119d146e291ff7e15012",
+  "installedSha256": "d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8",
+  "installedScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "guardianHelperSha256": "ba4890ca8c8dd7ba4d885d88aff000443a58d1a8b1c9d01f386e10b3e0aa3bbe",
+  "activationScriptSha256": "200127a124815538590b1ffc61ac10d951759aef841bbde534971b44b97f9b2b",
+  "stageRequestId": "pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1",
+  "oldStageIssueNumber": 1376,
+  "expectedControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "effect": "ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART",
+  "approvalBasis": "Same-purpose existing B approval / docs/PC_AUTOMATION_STANDARD.md section 5. Consumed V1 #1381 returned BLOCKED/WATCHDOG_ACTIVATION_UNKNOWN, #1383 observed PRECLAIM/NO_CLAIM_NO_ACTIVATION, and #1385 observed the sole failed Windows WMI origin predicate COMMAND_EXACT while exact Watchdog ExecutablePath, target script inclusion, WScript parent, Startup, same SID/session, creation order and age >=600 seconds were valid. V2 modifies only command-line parsing to require exactly approved Node executable plus exactly one approved Watchdog script argument, allowing Windows-native quotes/whitespace variations but rejecting flags/extra arguments. All other identity, medium token, Controller, staged source, Guardian, protection and no-retry guards remain. This permits only one exact independent Watchdog process exit and Guardian restart; never Runner self-handoff of maintainer or Controller, DB/D1 or process-tree mutation. Original V1 manifest and consumed #1381 preserved."
+}

@@ -20,8 +20,8 @@ const rep='ansqhd5774-Choi/zgmini-pc-control';
 const name='pc-watchdog-guardian-activate';
 const schema='ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1';
 const idRe=/^pc-watchdog-activate-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-const APPROVED_REQUEST_ID='pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4';
-const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'.json');
+const APPROVED_REQUEST_ID='pc-watchdog-activate-7e6ef57f-620b-498a-998f-05c9e953b4a2';
+const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'-r2.json');
 const helper=path.join(root,'watchdog-b/guardian-rotate.vbs');
 const stageRequestId='pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1';
 const digest=b=>createHash('sha256').update(b).digest('hex');
@@ -55,7 +55,7 @@ export function validateActivation(event,body,approval,rawApprovalDigest,helperD
  if(!exact(approval,['schema','approved','scope','targetSha','installedSha256',
   'installedScope','guardianHelperSha256','activationScriptSha256','stageRequestId','oldStageIssueNumber',
   'expectedControllerSha','effect','approvalBasis'])
-  ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V1'
+  ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V2'
   ||approval.approved!==true
   ||approval.scope!=='ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY'
   ||approval.targetSha!==TARGET||approval.installedSha256!==REPLACEMENT
@@ -87,9 +87,12 @@ export function statusReady({owner,status,now=Date.now(),source,manifest,stage})
  return true;
 }
 function witness(mode,pid){
- const output=execFileSync('C:/Windows/System32/cscript.exe',
-  ['//NoLogo',helper,mode,String(pid)],{encoding:'utf8',windowsHide:true,
-    timeout:15000,maxBuffer:512}).trim();
+ let output;
+ try{
+  output=execFileSync('C:/Windows/System32/cscript.exe',
+   ['//NoLogo',helper,mode,String(pid)],{encoding:'utf8',windowsHide:true,
+     timeout:15000,maxBuffer:512}).trim();
+ }catch{fail('WATCHDOG_ACTIVATION_WMI_'+mode+'_DENIED');}
  const expected={PROBE:'WATCHDOG_ROTATION_VERIFIED',
   ACTIVATE:'WATCHDOG_ROTATION_SIGNALLED',
   ATTEST:'WATCHDOG_RUNTIME_ATTESTED'}[mode];
@@ -136,8 +139,11 @@ export async function execute(){
  verifyApprovedControllerHost(load(path.join(control,'host.json')));
  // An elevated Runner cannot be allowed to bypass the exact medium-user
  // Guardian identity contract for a B action.
- const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],
-  {encoding:'utf8',windowsHide:true,timeout:15000});
+ let groups;
+ try{
+  groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],
+   {encoding:'utf8',windowsHide:true,timeout:15000});
+ }catch{fail('WATCHDOG_ACTIVATION_TOKEN_READ_FAILED');}
  if(!groups.includes('S-1-16-8192')||groups.includes('S-1-16-12288'))
   fail('WATCHDOG_ACTIVATION_MEDIUM_TOKEN_REQUIRED');
  // Read-only Win32_Process proof of exact Node + WScript startup ancestry,
