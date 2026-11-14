@@ -248,7 +248,7 @@
     "windowsInstallation": "NOT_RUN",
     "runtimeResults": "NOT_RUN",
     "controllerOnlyDryRun": {
-      "classification": "SOURCE_ONLY_SIMULATION_NOT_PC_CI",
+      "classification": "SOURCE_ONLY_FILE_DIFF_SIMULATION_NOT_OPERATION_ADMISSION",
       "expectedFiles": 15,
       "actualFiles": 15,
       "sourceOnlyNonDeploy": [
@@ -282,8 +282,57 @@
           "name": "duplicate-allowfile",
           "result": "ALLOWFILE_DIFF_MISMATCH"
         }
+      ],
+      "warning": "6/6 covers file diff and live workflow only. It did not test config transition and cannot be used alone as install readiness."
+    },
+    "configTransitionDryRun": {
+      "classification": "SOURCE_ONLY_JS_MIRROR_OF_CURRENT_MAINTENANCE_CONTRACT_NOT_WINDOWS_EXECUTION",
+      "oldConfigGitBlob": "d22d18bd9b252cbaa5e6b8e082377a872630b2b3",
+      "targetConfigGitBlob": "c906683afd487762f5bc32f50a199679df200dc3",
+      "oldOperationCount": 31,
+      "targetOperationCount": 37,
+      "addedOperations": [
+        "d05-lineage-readonly",
+        "inflation-core-lock-observation-readonly",
+        "shared-resource-release-readonly",
+        "writer-b-1063-recovery-readonly",
+        "source-inventory-runtime-readonly",
+        "employment-r6-collection-evidence-readonly"
+      ],
+      "existingOperationsChanged": 0,
+      "requiredPurpose": "pc-controller-heavy-readonly",
+      "requiredResourceProfile": "HEAVY_READONLY_240_1536",
+      "passed": 5,
+      "failed": 0,
+      "scenarios": [
+        {
+          "name": "original-light-purpose",
+          "expected": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A",
+          "actual": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A"
+        },
+        {
+          "name": "corrected-heavy-purpose",
+          "expected": "PASS",
+          "actual": "PASS"
+        },
+        {
+          "name": "existing-operation-drift",
+          "expected": "CONTROLLER_EXISTING_OPERATION_CHANGED",
+          "actual": "CONTROLLER_EXISTING_OPERATION_CHANGED"
+        },
+        {
+          "name": "seat-change",
+          "expected": "CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED",
+          "actual": "CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED"
+        },
+        {
+          "name": "memory-threshold-relaxation",
+          "expected": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A",
+          "actual": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A"
+        }
       ]
-    }
+    },
+    "installContractReadiness": "SOURCE_CONTRACT_PROFILE_MATCHED_ONLY__NOT_NATIVE_VALIDATION_OR_RUNTIME"
   },
   "sourceProvenance": {
     "stability": "PR #1367 merged at 8e2736a62a90798afe159ef4d96a8713265ca021; only common, supervisor, core-runtime-source-readonly, core-runtime-source-wmi",
@@ -306,11 +355,11 @@
     "Git blobs are separate from raw SHA-256; both identifiers are recorded",
     "Source code and manifest are not a live Windows proof"
   ],
-  "nextAction": "Existing independent Windows Owner completes approved 7-to-7 maintainer handoff; in parallel, source Owner establishes existing standing and original module approval lineage and creates a native approved 15-file B manifest only for pinned controllerOnlyInstall scope after live installedSha check. Run exactly one authorized Controller install with native safety guards and fresh readback. No ad hoc pc-job/Runner self-handoff.",
+  "nextAction": "Source owner map all previously merged source PRs/approvals for 6 new bounded A read-only operations and 15 changed files under standard section 5 standing approval, then prepare exact native ZGMINI_PC_UPDATE_V1 B manifest with purpose pc-controller-heavy-readonly and PC-approved postSourceSha. Independent Windows Owner first finishes already-approved 7-to-7 maintenance handoff; no GitHub Runner self-install; no new pc-maintenance Issue until all conditions met.",
   "installModeCandidate": {
     "mode": "controllerOnlyInstall",
-    "purpose": "pc-controller-maintenance",
-    "scope": "CONTROLLER_CONFIG_ONLY",
+    "purpose": "pc-controller-heavy-readonly",
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE",
     "sourceContract": "tools/maintenance-contract.mjs validateControllerOnlyInstallDelta; tools/update.mjs controlled stage path",
     "liveWorkflowPath": ".github/workflows/pc-job.yml",
     "liveWorkflowOldGitBlob": "33fb720e970593d14d2832935ac51f29d52ec2b4",
@@ -318,6 +367,10 @@
     "liveWorkflowUnchanged": true,
     "sourceOnlyTestExclusion": true,
     "requiresNativeApprovalAfterHandoff": true,
-    "assumptions": "GitHub source-only compare; local Windows installer must independently verify exact diff, policy, current source, receiver and protection"
+    "assumptions": "GitHub source-only compare; local Windows installer must independently verify exact diff, policy, current source, receiver and protection",
+    "previousPurposeRejected": "pc-controller-maintenance",
+    "previousPurposeRejectCode": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A",
+    "resourceAdmission": "HEAVY_READONLY_240_1536",
+    "postOperation": "core-status"
   }
 }
