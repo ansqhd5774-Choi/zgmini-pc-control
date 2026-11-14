@@ -19,6 +19,14 @@ export function decide({paused,owner,live,heartbeat,now=Date.now()}){
  if(owner&&live!==false)return live===true&&heartbeat&&now-Date.parse(heartbeat)<45000?'HEALTHY':'BLOCKED_LIVE_OR_UNKNOWN';
  return 'RECOVER';
 }
+export function pauseReasons({operatorPause,controllerDrain,installLease,otherControlLease}){
+ return [
+  ...(operatorPause?['OPERATOR_PAUSE']:[]),
+  ...(controllerDrain?['CONTROLLER_DRAIN']:[]),
+  ...(installLease?['CONTROLLER_INSTALL_LEASE']:[]),
+  ...(otherControlLease?['OTHER_CONTROLLER_LEASE']:[]),
+ ];
+}
 export function archiveDeadLease(directory,isAlive=alive,destination=null){
  if(!fs.existsSync(directory))return null;
  const original=fs.readFileSync(path.join(directory,'owner.json'));
@@ -59,23 +67,31 @@ export async function main(){
    const ownerFile=path.join(control,'leases/supervisor/owner.json');
    const owner=fs.existsSync(ownerFile)?read(ownerFile):null;
    const hb=fs.existsSync(path.join(control,'SUPERVISOR_STATUS.json'))?read(path.join(control,'SUPERVISOR_STATUS.json')):null;
-   const paused=fs.existsSync(path.join(home,'PAUSE'))||fs.existsSync(path.join(control,'DRAIN'))
-    ||fs.existsSync(path.join(maintenance,'leases/controller-install'))
-    ||fs.readdirSync(path.join(control,'leases')).some(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-'));
-   const state=decide({paused,owner,live:owner?alive(owner.pid):false,heartbeat:hb?.pid===owner?.pid?hb?.at:null});
+   const reasons=pauseReasons({
+    operatorPause:fs.existsSync(path.join(home,'PAUSE')),
+    controllerDrain:fs.existsSync(path.join(control,'DRAIN')),
+    installLease:fs.existsSync(path.join(maintenance,'leases/controller-install')),
+    otherControlLease:fs.readdirSync(path.join(control,'leases')).some(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-')),
+   });
+   const supervisorAlive=owner?alive(owner.pid):false;
+   const state=decide({paused:reasons.length>0,owner,live:supervisorAlive,heartbeat:hb?.pid===owner?.pid?hb?.at:null});
    if(state==='HEALTHY'){
     healthySince??=Date.now();
     if(Date.now()-healthySince>600000&&history.length){history=[];write(path.join(home,'RESTART_HISTORY.json'),history);}
     status(state,{supervisorPid:owner.pid,heartbeatAt:hb.at});return;
    }
    healthySince=null;
-   if(state!=='RECOVER'){status(state,{supervisorPid:owner?.pid??null,heartbeatAt:hb?.at??null});return;}
+   if(state!=='RECOVER'){status(state,{supervisorPid:owner?.pid??null,
+    supervisorAlive,heartbeatAt:hb?.at??null,recoverySuppressedBy:reasons});return;}
    if(!workflowActive()){status('PAUSED_WORKFLOW');return;}
    history=history.filter(x=>Date.now()-x<3600000);
    if(history.length>=3){status('BLOCKED_RESTART_LIMIT');return;}
    const sourceSha=verifyController();
    // Recheck update and owner immediately before recovery; no process is killed.
-   if(fs.existsSync(path.join(maintenance,'leases/controller-install'))){status('PAUSED');return;}
+   if(fs.existsSync(path.join(maintenance,'leases/controller-install'))){
+    status('PAUSED',{supervisorPid:owner?.pid??null,supervisorAlive,
+     heartbeatAt:hb?.at??null,recoverySuppressedBy:['CONTROLLER_INSTALL_LEASE']});return;
+   }
    fs.mkdirSync(path.join(home,'archives'),{recursive:true});
    const archived=archiveDeadLease(path.join(control,'leases/supervisor'),alive,path.join(home,'archives','supervisor-'+Date.now()+'-'+randomUUID()));
    history.push(Date.now());write(path.join(home,'RESTART_HISTORY.json'),history);

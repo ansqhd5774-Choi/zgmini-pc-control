@@ -18,6 +18,36 @@
 
 ## 일반챗 확인 순서
 
+### Supervisor 종료와 설치 복구 잠금이 함께 남은 경우
+
+GitHub Offline, 현재 Supervisor PID 종료, 최신 watchdog의 PAUSED를 함께
+확인한다. PAUSE·DRAIN·controller-install·다른 Controller lease 중 실제 원인을
+대조한다. 이 상태에서는 죽은 Supervisor 자체가 자동 복구 대상이어도 설치
+보호 조건이 재시작을 억제한다. PAUSED를 GitHub 인증 오류나 Busy로 해석하지 않는다.
+
+소스의 STATUS 출력은 `supervisorAlive`와 `recoverySuppressedBy`를 포함한다.
+원인은 OPERATOR_PAUSE, CONTROLLER_DRAIN, CONTROLLER_INSTALL_LEASE,
+OTHER_CONTROLLER_LEASE이며 여러 원인을 모두 보존한다. 기존 설치본에 이 필드가
+없으면 코드가 적용됐다고 가정하지 않는다.
+
+2026-11-14 10:23 KST 실PC 관측에서 운영 6좌석 Offline, Supervisor PID 45080
+종료, watchdog PID 14596 생존/PAUSED, PAUSE와 DRAIN 부재를 확인했다.
+watchdog 바이트는 기존 INSTALL.json과 일치했다. 남아 있는 #996 install lease
+원본 owner SHA와 Backlog SHA는 기존 기록과 일치했고 Workflow는 active였다.
+이 관측의 직접 연결은 #996 설치 잠금으로 재시작 억제 → 운영 Runner Offline
+→ #1351 Job 미배정이다. Supervisor 최초 종료 원인은 미확정이다.
+원본 근거는 [#68 실측 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6869314747)과
+[#1351](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351#issuecomment-6869319033)에 있다.
+
+이 경우 설치 복구의 승인·독점 접근 계약을 적용한다. 연결만 되살리려고
+controller-install을 삭제하거나 Listener를 별도로 기동하지 않는다.
+공용 복구 담당은 #996의 정확한 C 실행물·Owner 승인·사후 검증을 완료하고,
+이어 watchdog/Supervisor/6좌석의 실제 복귀와 기존 #1351 결과를 회수한다.
+기능별 독립 소스 수정·기존 데이터 검증은 해당 기능 담당이 계속한다.
+
+위 STATUS 소스 보완은 Draft 후보이며 2026-11-14 관측 당시 운영 설치에
+반영되지 않았다. 상태 설명 보완을 Runner 복구 성공으로 보고하지 않는다.
+
 1. GitHub의 6개 Runner Online·busy 및 최근 요청 결과를 확인한다.
 2. 실패 시 현재 허용된 PC 접근 경로로 `pc-watchdog/STATUS.json`, Supervisor heartbeat, lease를 확인한다. Offline이라면 새 Issue를 반복 생성하지 않는다.
 3. `BLOCKED`의 정확한 code만 해결한다. Core 잠금 삭제·전체 node 종료·Runner 재등록은 금지한다.
