@@ -51,7 +51,7 @@ export function validateActivation(event,body,approval,rawApprovalDigest,helperD
   ||body.approvalManifestSha256!==rawApprovalDigest)
   fail('WATCHDOG_ACTIVATION_REQUEST_INVALID');
  if(!exact(approval,['schema','approved','scope','targetSha','installedSha256',
-  'installedScope','guardianHelperSha256','stageRequestId','oldStageIssueNumber',
+  'installedScope','guardianHelperSha256','activationScriptSha256','stageRequestId','oldStageIssueNumber',
   'expectedControllerSha','effect','approvalBasis'])
   ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V1'
   ||approval.approved!==true
@@ -59,6 +59,7 @@ export function validateActivation(event,body,approval,rawApprovalDigest,helperD
   ||approval.targetSha!==TARGET||approval.installedSha256!==REPLACEMENT
   ||approval.installedScope!==FINAL_SCOPE
   ||approval.guardianHelperSha256!==helperDigest
+  ||approval.activationScriptSha256!==digest(fs.readFileSync(fileURLToPath(import.meta.url)))
   ||approval.stageRequestId!==stageRequestId||approval.oldStageIssueNumber!==1376
   ||approval.expectedControllerSha!==APPROVED_CONTROLLER_SHA
   ||approval.effect!=='ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART')
