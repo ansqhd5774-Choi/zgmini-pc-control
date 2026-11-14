@@ -229,12 +229,16 @@
     }
   ],
   "approval": {
-    "status": "NOT_ESTABLISHED_FOR_COMPOSITE_15_FILES",
+    "status": "B_MANIFEST_DRAFT_CREATED_NOT_MERGED_OR_EXECUTED",
     "grade": null,
     "ref": null,
-    "scope": null,
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE",
     "operation": "NO_REQUEST",
-    "warning": "Existing standing policy and merged source commits do not by themselves approve the cumulative 15-file B install. No approvalManifestSha256/requestId may be derived from this candidate."
+    "warning": "Existing standing policy and merged source commits do not by themselves approve the cumulative 15-file B install. No approvalManifestSha256/requestId may be derived from this candidate.",
+    "reviewManifestPath": "approvals/controller-updates/8e2736a62a90798afe159ef4d96a8713265ca021.json",
+    "reviewManifestBranch": "codex/controller-cumulative-15file-plan-20261115",
+    "purpose": "pc-controller-heavy-readonly",
+    "grantBoundary": "B manifest present only in Draft PR branch. Not in default main, not accepted by running maintainer, no request created. Need strict source review, safe merged approval, and actual Windows handoff."
   },
   "checks": {
     "sourceRawSha256": "15/15 from exact GitHub base64 raw bytes, verified JS SHA-256 known vector",
@@ -332,7 +336,11 @@
         }
       ]
     },
-    "installContractReadiness": "SOURCE_CONTRACT_PROFILE_MATCHED_ONLY__NOT_NATIVE_VALIDATION_OR_RUNTIME"
+    "installContractReadiness": "SOURCE_CONTRACT_PROFILE_MATCHED_ONLY__NOT_NATIVE_VALIDATION_OR_RUNTIME",
+    "allowFilesFingerprintSha256": "7b47be818184a7ca39af8239d8fc3c7481168ad2c9f6a62e71bd95889cda52b2",
+    "validatedAgainstHistoricalManifest": "b77... and badad... matching sha256(JSON.stringify(path-sorted allowFiles)) algorithm; hash independently confirmed with abc SHA-256 vector",
+    "postSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+    "postSourceEvidence": "Existing #1351 sourceBranch main sourceSha 643b7... and GitHub ansqhd5774-Choi/zgmini main ref same, PC #1351 status STATE_UNKNOWN is not a postcheck PASS"
   },
   "sourceProvenance": {
     "stability": "PR #1367 merged at 8e2736a62a90798afe159ef4d96a8713265ca021; only common, supervisor, core-runtime-source-readonly, core-runtime-source-wmi",
@@ -346,7 +354,149 @@
       "writer-1063",
       "shared-dispatch/config"
     ],
-    "requireOriginalApprovals": true
+    "requireOriginalApprovals": true,
+    "fileSourcePRs": [
+      {
+        "path": "config/operations.json",
+        "domain": "shared-dispatch-config",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1236",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1218",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1211",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1212",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1125",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/970"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/common.mjs",
+        "domain": "controller-stability",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/core-runtime-source-readonly.mjs",
+        "domain": "controller-stability-core-readonly",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/600"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/core-runtime-source-wmi.mjs",
+        "domain": "controller-stability-core-wmi",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/600"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/d05-lineage-readonly.mjs",
+        "domain": "d05",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1236",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1302"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+        "domain": "employment-r6",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1218",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1221"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/inflation-core-lock-observation-readonly.mjs",
+        "domain": "inflation",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1211",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1212"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/operations.mjs",
+        "domain": "shared-dispatch",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1236",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1218",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1211",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1125",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/970",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1302"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/release-calendar-runtime-readonly.mjs",
+        "domain": "calendar",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1052"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/shared-resource-release-readonly.mjs",
+        "domain": "shared-resource",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1125"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/source-inventory-runtime-readonly.mjs",
+        "domain": "calendar-source-inventory",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/970",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/978",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1191"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/supervisor.mjs",
+        "domain": "controller-stability",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/theme-l7-runtime-readonly.mjs",
+        "domain": "theme-l7",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1034"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/writer-b-1063-recovery-readonly.mjs",
+        "domain": "writer-1063",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/writer-b-1063-task-probe.mjs",
+        "domain": "writer-1063",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079"
+        ],
+        "sourceOnlyProvenance": true
+      }
+    ],
+    "approvalPolicy": "2026-11-03 standing approval docs/PC_AUTOMATION_STANDARD.md §5, same-purpose limited readonly A source registration and protected controller B. Per module limits retained; source PR merge does not itself equal PC authorization."
   },
   "limits": [
     "No PC install, no Issue with pc-maintenance label, no GitHub Actions self-handoff",
@@ -355,7 +505,7 @@
     "Git blobs are separate from raw SHA-256; both identifiers are recorded",
     "Source code and manifest are not a live Windows proof"
   ],
-  "nextAction": "Source owner map all previously merged source PRs/approvals for 6 new bounded A read-only operations and 15 changed files under standard section 5 standing approval, then prepare exact native ZGMINI_PC_UPDATE_V1 B manifest with purpose pc-controller-heavy-readonly and PC-approved postSourceSha. Independent Windows Owner first finishes already-approved 7-to-7 maintenance handoff; no GitHub Runner self-install; no new pc-maintenance Issue until all conditions met.",
+  "nextAction": "Review Draft PR #1368's exact heavy A-grade Controller-only B manifest and 15 file source lineage; merge only after owner reviews all approval/PC preconditions. Existing authorized independent Windows Operator must first complete 7-to-7 handoff (target c2e6744...) with live readback. Then new and unique pc-maintenance issue under existing receiver after live old source/lease/backup verification. No bypass.",
   "installModeCandidate": {
     "mode": "controllerOnlyInstall",
     "purpose": "pc-controller-heavy-readonly",
