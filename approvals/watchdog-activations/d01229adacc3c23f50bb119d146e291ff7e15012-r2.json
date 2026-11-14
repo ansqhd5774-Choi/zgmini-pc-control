@@ -6,7 +6,7 @@
   "installedSha256": "d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8",
   "installedScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
   "guardianHelperSha256": "ba4890ca8c8dd7ba4d885d88aff000443a58d1a8b1c9d01f386e10b3e0aa3bbe",
-  "activationScriptSha256": "21f343df47704837d7c90979c19a5bd25b9f76462053c703e23e60dc06a31785",
+  "activationScriptSha256": "200127a124815538590b1ffc61ac10d951759aef841bbde534971b44b97f9b2b",
   "stageRequestId": "pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1",
   "oldStageIssueNumber": 1376,
   "expectedControllerSha": "badad9124157879d7a645b64f2768113d632355b",
