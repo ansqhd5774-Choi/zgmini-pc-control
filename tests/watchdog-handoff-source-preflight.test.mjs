@@ -9,6 +9,7 @@ import {
 } from '../watchdog-b/handoff-1378-source-preflight.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const hasRel=(actual,rel)=>String(actual).replaceAll('\\','/').endsWith(rel);
 const A=Object.freeze({
  schema:'ZGMINI_WATCHDOG_HANDOFF_FIRSTFAIL_A_RESULT_V1',
  requestId:'pc-watchdog-handoff-a-0b27cd23-0d35-4cf0-8bf1-d583713d9a5d',
@@ -72,7 +73,7 @@ test('same original source and manifest are NOT enough when checkout HEAD lacks 
 });
 test('missing post-target approval file is identified without rerunning Windows B',()=>{
  const io=restrictedRead((operation,file)=>{
-  if(operation==='stat'&&file.endsWith(HANDOFF_APPROVAL_REL)){
+  if(operation==='stat'&&hasRel(file,HANDOFF_APPROVAL_REL)){
    const e=Error('EXACT_FIXTURE_MISSING');e.code='ENOENT';throw e;
   }
  });
@@ -83,7 +84,7 @@ test('missing post-target approval file is identified without rerunning Windows 
 });
 test('manifest raw digest mismatch blocks even if JSON fields are still readable',()=>{
  const io=restrictedRead((operation,file)=>{
-  if(operation==='read'&&file.endsWith(HANDOFF_APPROVAL_REL)){
+  if(operation==='read'&&hasRel(file,HANDOFF_APPROVAL_REL)){
    const bytes=fs.readFileSync(file);
    return Buffer.from(bytes.toString('utf8').replace('  "scope"', '   "scope"'));
   }
@@ -96,7 +97,7 @@ test('manifest raw digest mismatch blocks even if JSON fields are still readable
 test('one bad approved source file is pinpointed, never masked by other eight valid files',()=>{
  const file='tools/update.mjs';
  const io=restrictedRead((operation,p)=>
-  operation==='read'&&p.endsWith(file)?Buffer.from('tampered'):undefined);
+  operation==='read'&&hasRel(p,file)?Buffer.from('tampered'):undefined);
  const r=prove({io});
  assert.equal(r.verifiedFiles,8);assert.equal(r.status,'SOURCE_REPAIR_PREWORK_REQUIRED');
  assert.deepEqual(r.failures,[{code:'PINNED_FILE_RAW_SHA256_DRIFT',file}]);
@@ -104,7 +105,7 @@ test('one bad approved source file is pinpointed, never masked by other eight va
 test('missing approved file and approval failure are both reported in one source pass',()=>{
  const io=restrictedRead((op,p)=>{
   if(op!=='stat')return;
-  if(p.endsWith(HANDOFF_APPROVAL_REL)||p.endsWith('tools/maintenance-lock.mjs')){
+  if(hasRel(p,HANDOFF_APPROVAL_REL)||hasRel(p,'tools/maintenance-lock.mjs')){
    const e=Error('missing');e.code='ENOENT';throw e;
   }
  });
