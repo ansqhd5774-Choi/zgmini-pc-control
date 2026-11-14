@@ -56,7 +56,7 @@ export function classifyKnown1378(result){
   return 'EXISTING_CLAIM_OR_RECEIVER_CHANGE_OWNER_RECONCILE';
  if(result.bridgeStatus==='BLOCKED'&&result.bridgeCode==='ENOENT'
    &&result.checkout==='MAIN_TARGET_NOT_ANCESTOR')
-  return 'PRIORITIZE_SOURCE_CHECKOUT_REPAIR';
+  return 'PRIORITIZE_ISOLATED_SOURCE_STAGE';
  return 'FIRST_FAIL_CHANGED_OWNER_RECONCILE';
 }
 // One-pass fixed-source result. Does NOT authorize an install or handoff.
