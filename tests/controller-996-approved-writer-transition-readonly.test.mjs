@@ -34,7 +34,8 @@ function input(){
    protectedStateUnchanged:true,protectedBeforeSha256:'4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d',
    protectedAfterSha256:'4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d',
    result:{evidenceLevel:'FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS',runtimeSourceVerified:false,
-    sourceHead:source,r6Config:{status:'PASS',configSha256:currentSha}}},
+    sourceHead:source,sourceIdentityConsistent:false,coreTaskSourceLinked:false,
+    r6Config:{status:'PASS',configSha256:currentSha}}},
   current:{schema:'ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1',requestId:req,
    issueNumber:996,status:'CURRENT_ITEMS_DIFFER_OR_UNPROVEN',
    originalObservationFingerprint:oldFp,currentFingerprint:newFp,
@@ -48,7 +49,11 @@ function input(){
 test('approved Writer change metadata matches but never unlocks C',()=>{
  const x=input();assert.equal(sha({files:x.current.items.files,tasks}),newFp);
  const r=review(x);
- assert.equal(r.status,'MATCHING_APPROVED_WRITER_TRANSITION_METADATA_ONLY');
+ assert.equal(r.status,'MATCHING_POST_INSTALL_OBSERVATIONS_ONLY');
+ assert.equal(r.code,'C996_BRIDGE_CONFIG_CHANGE_ATTRIBUTION_UNVERIFIED');
+ assert.equal(r.configChangeAttributionVerified,false);
+ assert.equal(r.writerBConfigEditApproved,false);
+ assert.equal(r.readbackProtectedDigestIsConfigSha,false);
  assert.equal(r.evidenceAuthenticated,false);
  assert.equal(r.originalWindowsDoubleReadVerified,false);
  assert.equal(r.exactNewCConsentVerified,false);
@@ -75,6 +80,10 @@ test('readback mismatch and false live runtime claim are rejected',()=>{
  const z=input();z.writerReadback.protectedBeforeSha256='a'.repeat(64);
  z.writerReadback.protectedAfterSha256='a'.repeat(64);
  assert.equal(review(z).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
+ const k=input();k.writerReadback.result.sourceIdentityConsistent=true;
+ assert.equal(review(k).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
+ const m=input();m.writerReadback.result.coreTaskSourceLinked=true;
+ assert.equal(review(m).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
 });
 test('task changed, disabled task, or additional file cannot pass',()=>{
  const x=input();x.current.items.taskSha256['ZGMINI-PC-Local-Core']='f'.repeat(64);
