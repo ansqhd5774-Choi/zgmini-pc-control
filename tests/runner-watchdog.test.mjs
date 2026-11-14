@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
+import {createHash} from 'node:crypto';
 import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass,validateHandoffStaging,verifyHandoffIsolatedSource} from '../tools/runner-watchdog.mjs';
 test('fresh heartbeat is required for healthy status',()=>{
  const now=Date.now(),owner={pid:123};
@@ -126,7 +127,7 @@ test('only an exact GitHub private main ancestry and nine hash-pinned files are 
   'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
   'tools/maintenance-ancestry.vbs','tools/source-bundle-register.mjs',
   'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
- const {createHash}=await import('node:crypto');
+
  const hash=b=>createHash('sha256').update(b).digest('hex');
  const files={};
  for(const rel of rels){
