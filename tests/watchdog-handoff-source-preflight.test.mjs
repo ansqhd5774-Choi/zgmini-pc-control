@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {
@@ -19,6 +21,17 @@ const A=Object.freeze({
  receiverSource:'PRIOR',receiverState:'LISTENING',
  checkout:'MAIN_TARGET_NOT_ANCESTOR',operationalWrites:0
 });
+// Windows Actions checkout can convert JSON manifest LF to CRLF. The approved
+// production isolated clone pins core.autocrlf=false: use Git HEAD's exact raw
+// object bytes for the baseline, NEVER normalize a production hash mismatch.
+const approvedManifestGitRaw=execFileSync('git',['show','HEAD:'+HANDOFF_APPROVAL_REL],
+ {cwd:root,encoding:null,windowsHide:true,timeout:15000});
+const manifestDigest=createHash('sha256').update(approvedManifestGitRaw).digest('hex');
+const actualIo={
+ lstatSync:filename=>fs.lstatSync(filename),
+ readFileSync:filename=>hasRel(filename,HANDOFF_APPROVAL_REL)
+  ?approvedManifestGitRaw:fs.readFileSync(filename)
+};
 function gitReady(cwd,args){
  assert.equal(cwd,root);
  if(args[0]==='branch')return 'main';
@@ -31,12 +44,11 @@ function gitReady(cwd,args){
  }
  throw Error('UNEXPECTED_GIT_COMMAND');
 }
-const prove=(options={})=>inspectHandoff1378Source({root,runGit:gitReady,...options});
+const prove=(options={})=>inspectHandoff1378Source({root,runGit:gitReady,io:actualIo,...options});
 const names=r=>r.failures.map(x=>x.code);
 const restrictedRead=(change)=>({
- ...fs,
- lstatSync(file){return change('stat',file)??fs.lstatSync(file);},
- readFileSync(file){return change('read',file)??fs.readFileSync(file);}
+ lstatSync(file){return change('stat',file)??actualIo.lstatSync(file);},
+ readFileSync(file){return change('read',file)??actualIo.readFileSync(file);}
 });
 
 test('actual checked out nine maintenance source files exactly match immutable approved manifest bytes',()=>{
@@ -51,6 +63,7 @@ test('actual checked out nine maintenance source files exactly match immutable a
  assert.equal(r.handoffClaimCreated,false);assert.equal(r.receiverProcessChanged,false);
  assert.equal(HANDOFF_FILE_SET.length,9);
  assert.equal(HANDOFF_APPROVAL_SHA256.length,64);
+ assert.equal(manifestDigest,HANDOFF_APPROVAL_SHA256);
  assert.equal(HANDOFF_TARGET.length,40);
 });
 test('consumes only the one original #1389 A evidence, never approves an unrelated result',()=>{
