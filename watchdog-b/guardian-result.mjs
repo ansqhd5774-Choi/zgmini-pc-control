@@ -7,7 +7,8 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TITLE='pc-watchdog-guardian-activate';
-const SCRIPT='d01229adacc3c23f50bb119d146e291ff7e15012';
+const SCRIPT='a2ec241d98a2ca93508443deb5b4688ecbccb905';
+const APPROVED_REQUEST_ID='pc-watchdog-activate-31390a2f-c503-4ff1-9858-a960bbc07a0d';
 const ID=/^pc-watchdog-activate-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const gh='C:/Program Files/GitHub CLI/gh.exe';
 const fail=c=>{throw Object.assign(new Error(c),{code:c});};
@@ -56,7 +57,8 @@ function main(){
   ||event.issue?.user?.login!=='ansqhd5774-Choi'
   ||event.issue?.title!==TITLE)fail('WATCHDOG_ACTIVATION_REPORT_ACTOR_DENIED');
  const body=JSON.parse(event.issue.body);
- if(!ID.test(body.requestId??'')||body.targetSha!==SCRIPT)
+ if(!ID.test(body.requestId??'')||body.requestId!==APPROVED_REQUEST_ID
+  ||body.targetSha!==SCRIPT)
   fail('WATCHDOG_ACTIVATION_REPORT_REQUEST_INVALID');
  let raw='';
  try{raw=fs.readFileSync(path.join(process.env.RUNNER_TEMP,
