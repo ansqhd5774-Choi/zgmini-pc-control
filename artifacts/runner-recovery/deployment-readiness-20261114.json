@@ -1,0 +1,74 @@
+{
+  "schema": "ZGMINI_CONTROLLER_DEPLOYMENT_READINESS_V1",
+  "observedAt": "2026-11-14T01:55:30.541Z",
+  "status": "BLOCKED_BEFORE_INSTALL_REQUEST",
+  "installedSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "candidateSourceSha": "c493e484843fe7166b315ed4a40854e29f6558e3",
+  "installedFilesVerified": 38,
+  "requestedRuntimeFiles": [
+    {
+      "path": "controller/common.mjs",
+      "installedSha256": "47bc1e9e7d35a3b970fc85e92e12f8e5ad4cf42f625b1fe242cfc3c1ad5a4cd6",
+      "candidateSha256": "b040624236282476fb0a4ac3d2cd401845a595be94b4cebc58e42549b71ba31e"
+    },
+    {
+      "path": "controller/supervisor.mjs",
+      "installedSha256": "999fa10a8aa21b31a8d06cea3989a79a273a2ec25555a281956b4bfc62b225c7",
+      "candidateSha256": "b57e3d18f6c79c3faa62b56f28f6f8a3432fb451f9b843c786e2f8b3bafc3d6f"
+    },
+    {
+      "path": "controller/core-runtime-source-readonly.mjs",
+      "installedSha256": "14fed6d7a2509251bd388473ce8f62162278ee140d3f225978a2cabd4d1ff91e",
+      "candidateSha256": "37b068476df5d9d6a971d47918bc0d969ea4676b397cc7bb845caff31bccea60"
+    },
+    {
+      "path": "controller/core-runtime-source-wmi.mjs",
+      "installedSha256": "0a49f6826e15e86776c2ff36348368edc1877724de7c9c9ba69c14a6ba401e29",
+      "candidateSha256": "7beee6b04843c14a3b21c52579f871f9d437b688c531e98edfdfe0659226c691"
+    }
+  ],
+  "cumulativeControllerChanges": [
+    "config/operations.json",
+    "controller/common.mjs",
+    "controller/core-runtime-source-readonly.mjs",
+    "controller/core-runtime-source-wmi.mjs",
+    "controller/employment-r6-collection-evidence-readonly.mjs",
+    "controller/inflation-core-lock-observation-readonly.mjs",
+    "controller/inflation-core-lock-observation-readonly.test.mjs",
+    "controller/operations.mjs",
+    "controller/release-calendar-runtime-readonly.mjs",
+    "controller/shared-resource-release-readonly.mjs",
+    "controller/source-inventory-runtime-readonly.mjs",
+    "controller/supervisor.mjs",
+    "controller/theme-l7-runtime-readonly.mjs",
+    "controller/writer-b-1063-recovery-readonly.mjs",
+    "controller/writer-b-1063-task-probe.mjs"
+  ],
+  "outsideRequestedRuntimeScope": [
+    "config/operations.json",
+    "controller/employment-r6-collection-evidence-readonly.mjs",
+    "controller/inflation-core-lock-observation-readonly.mjs",
+    "controller/inflation-core-lock-observation-readonly.test.mjs",
+    "controller/operations.mjs",
+    "controller/release-calendar-runtime-readonly.mjs",
+    "controller/shared-resource-release-readonly.mjs",
+    "controller/source-inventory-runtime-readonly.mjs",
+    "controller/theme-l7-runtime-readonly.mjs",
+    "controller/writer-b-1063-recovery-readonly.mjs",
+    "controller/writer-b-1063-task-probe.mjs"
+  ],
+  "originalInstallLeasePresent": true,
+  "originalRecoveryClaimPresent": true,
+  "originalRequestStatus": "RECOVERY_REQUIRED",
+  "originalRequestFirstFail": "INTAKE_PAUSED",
+  "originalLedgerSha256": "c6276bcf78ee96d8858e91621c85437abb5377108fe6c5b5681bf9b617743930",
+  "installedOwnerSha256": "d6329b4d82530f9a1ca574647f050fff9243b698bb9dd314975b19ed171e40bc",
+  "cOperatorStillHardStopped": true,
+  "installRequestsSubmitted": 0,
+  "controllerFilesWritten": 0,
+  "claimsArchived": 0,
+  "workflowWrites": 0,
+  "backlogWrites": 0,
+  "nextRequiredAction": "COMPLETE_VERIFIED_996_CONTINUATION_BEFORE_NEW_CONTROLLER_INSTALL",
+  "permissionNote": "Current user authorized runtime installation; this is an implementation and existing-recovery-state blocker, not a repeated B approval request."
+}
