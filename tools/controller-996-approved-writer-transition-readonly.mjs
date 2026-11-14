@@ -140,3 +140,69 @@ export function review996ApprovedWriterTransitionReadOnly({historical,writerInst
   executionAuthorized:false,operationalWrites:0,
  });
 }
+
+
+/**
+ * Reproduce the exact #1320 Writer B config.source-only CAS in memory.
+ * Inputs are *untrusted* raw backup bytes and its local preimage metadata.
+ * Never accesses E:, checks actor signatures, writes files, or grants C.
+ * Never returns a copy or a JSON serialization of the input config.
+ */
+export function inspect996WriterBConfigBackupCasReadOnly({
+ originalConfigBytes,preimage,
+}={}){
+ const reject=code=>Object.freeze({
+  schema:'ZGMINI_996_WRITER_B_CONFIG_BACKUP_CAS_REVIEW_V1',
+  status:'BACKUP_CAS_NOT_ATTESTED',code,
+  evidenceAuthenticated:false,configChangeAttributionVerified:false,
+  originalWindowsDoubleReadVerified:false,executionAuthorized:false,
+  operationalWrites:0,
+ });
+ if(!Buffer.isBuffer(originalConfigBytes)||
+  originalConfigBytes.length<2||originalConfigBytes.length>65536)
+  return reject('C996_BACKUP_SOURCE_BYTES_MISSING_OR_UNSAFE');
+ const beforeSha=createHash('sha256').update(originalConfigBytes).digest('hex');
+ if(preimage?.head!==PINS.writerBaseHead||
+  !SHA(preimage?.originalConfigSha256)||
+  beforeSha!==preimage.originalConfigSha256)
+  return reject('C996_BACKUP_PREIMAGE_SHA_OR_SOURCE_MISMATCH');
+ const text=originalConfigBytes.toString('utf8');
+ if(!Buffer.from(text,'utf8').equals(originalConfigBytes))
+  return reject('C996_BACKUP_CONFIG_NOT_CANONICAL_UTF8');
+ const occurrences=[...text.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)];
+ if(occurrences.length!==1||occurrences[0][1]!==PINS.writerBaseHead)
+  return reject('C996_BACKUP_CONFIG_SOURCE_CAS_PRECONDITION');
+ const found=occurrences[0];
+ const updated=text.slice(0,found.index)+
+  found[0].replace(PINS.writerBaseHead,PINS.writerInstalledSourceSha)+
+  text.slice(found.index+found[0].length);
+ try{
+  const oldConfig=JSON.parse(text),newConfig=JSON.parse(updated);
+  if(!oldConfig||Array.isArray(oldConfig)||typeof oldConfig!=='object'||
+   oldConfig.source!==PINS.writerBaseHead||
+   JSON.stringify({...oldConfig,source:PINS.writerInstalledSourceSha})!==
+    JSON.stringify(newConfig))
+   return reject('C996_BACKUP_CONFIG_NON_SOURCE_CHANGE');
+ }catch{
+  return reject('C996_BACKUP_CONFIG_INVALID_JSON');
+ }
+ const candidateSha=createHash('sha256').update(Buffer.from(updated,'utf8')).digest('hex');
+ const afterMatches=candidateSha===PINS.currentConfigSha;
+ return Object.freeze({
+  schema:'ZGMINI_996_WRITER_B_CONFIG_BACKUP_CAS_REVIEW_V1',
+  status:afterMatches?'MATCHING_UNAUTHENTICATED_CAS_BYTES_ONLY':
+   'BACKUP_CAS_RESULT_DIFFERS_FROM_POSTCHECK',
+  code:afterMatches?'C996_LOCAL_SOURCE_ONLY_CAS_BYTES_HASH_MATCH':
+   'C996_LOCAL_SOURCE_ONLY_CAS_BYTES_HASH_MISMATCH',
+  backupSha256:beforeSha,
+  calculatedAfterSha256:candidateSha,
+  matchesPrior1318ConfigObservation:
+   beforeSha==='ecc758f88fe8b4fdc3e2da7e752e694950bfb48327c7f17819258559e90f8c85',
+  calculatedAfterMatches1321:afterMatches,
+  backupPreimageHashMatched:true,
+  writerBConfigSourceCasContracted:true,
+  evidenceAuthenticated:false,configChangeAttributionVerified:false,
+  originalWindowsDoubleReadVerified:false,executionAuthorized:false,
+  operationalWrites:0,
+ });
+}
