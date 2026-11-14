@@ -53,7 +53,7 @@ function verifyController(){
 // A signed-looking Issue body alone is NEVER authority. The authenticated GitHub
 // author, existing label, immutable raw approval bytes, and installed source
 // must match. This admits only a fixed local Windows operator, not commands.
-export function validateHandoffIntent(issue,body,approval,installed,rawDigest){
+export function validateHandoffApprovalIdentity(issue,body,approval,rawDigest){
  const keys=['schema','requestId','operation','targetSha','approvalManifestSha256'];
  if(!strictKeys(body,keys)||body.schema!==handoffSchema
    ||body.operation!=='maintenance-handoff'
@@ -69,11 +69,35 @@ export function validateHandoffIntent(issue,body,approval,installed,rawDigest){
    ||approval.transition!=='SEVEN_TO_SEVEN'||approval.approved!==true
    ||approval.scope!=='COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'
    ||approval.targetSha!==body.targetSha
-   ||approval.installedSha!==installed?.sourceSha
+   ||!sha40.test(approval.installedSha??'')
    ||!sha64.test(rawDigest??'')
    ||body.approvalManifestSha256!==rawDigest)
    code('HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH');
  return Object.freeze({requestId:body.requestId,targetSha:body.targetSha});
+}
+export function validateHandoffIntent(issue,body,approval,installed,rawDigest){
+ const admitted=validateHandoffApprovalIdentity(issue,body,approval,rawDigest);
+ if(approval.installedSha!==installed?.sourceSha)
+  code('HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH');
+ return admitted;
+}
+// Existing receipt replay must not depend on the *former* installed source SHA.
+// No subprocess is permitted in this branch. It authenticates the exact
+// GitHub request and signed-off manifest, then checks the durable local claim.
+export function validateExistingHandoffReceipt(issue,body,approval,rawDigest,receipt,issueNumber){
+ const admitted=validateHandoffApprovalIdentity(issue,body,approval,rawDigest);
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<1
+   ||issue?.number!==issueNumber
+   ||receipt?.schema!=='ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1'
+   ||receipt.requestId!==admitted.requestId
+   ||receipt.issueNumber!==issueNumber
+   ||receipt.targetSha!==admitted.targetSha
+   ||!['RUNNING','PASS','BLOCKED','RECOVERY_REQUIRED',
+       'AUTOMATION_BLOCKED','STATE_UNKNOWN'].includes(receipt.status)
+   ||(receipt.status!=='RUNNING'
+      &&(!receipt.code||safeCode(receipt.code)!==receipt.code)))
+   code('HANDOFF_LEDGER_REQUEST_DRIFT');
+ return admitted;
 }
 function ghRead(args){
  return execFileSync(gh,args,{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1000000});
@@ -93,7 +117,7 @@ export function verifyHandoffPass({report,ledger,installed,targetSha,exitCode}){
    code('HANDOFF_PASS_RUNTIME_READBACK_MISMATCH');
  return true;
 }
-function prepareHandoff(issue){
+function readHandoffApproval(issue){
  let body;
  try{body=JSON.parse(issue.body??'');}
  catch{code('HANDOFF_REQUEST_CONTRACT_INVALID');}
@@ -104,9 +128,13 @@ function prepareHandoff(issue){
  if(!metadata.isFile()||metadata.isSymbolicLink()||metadata.nlink!==1||metadata.size>16000)
    code('HANDOFF_APPROVAL_PATH_INVALID');
  const approvalBytes=fs.readFileSync(approvalFile);
- const approval=JSON.parse(approvalBytes.toString('utf8'));
+ return {body,approval:JSON.parse(approvalBytes.toString('utf8')),
+   rawDigest:sha(approvalBytes)};
+}
+function prepareHandoff(issue){
+ const {body,approval,rawDigest}=readHandoffApproval(issue);
  const installed=read(path.join(maintenance,'MAINTENANCE_INSTALL.json'));
- const admitted=validateHandoffIntent(issue,body,approval,installed,sha(approvalBytes));
+ const admitted=validateHandoffIntent(issue,body,approval,installed,rawDigest);
  if(git(['branch','--show-current']).trim()!=='main')
    code('HANDOFF_OPERATOR_SOURCE_BRANCH');
  try{git(['merge-base','--is-ancestor',admitted.targetSha,'HEAD']);}
@@ -203,14 +231,16 @@ export async function main(){
    issueNumber=intents[0].number;
    const issue=JSON.parse(ghRead(['issue','view',String(issueNumber),'--repo',repo,
      '--json','number,title,state,author,labels,body']));
-   const plan=prepareHandoff(issue);
-   const dir=path.join(home,'handoff-attempts');fs.mkdirSync(dir,{recursive:true});
-   receiptFile=path.join(dir,plan.admitted.requestId+'.json');
+   // Reconcile an existing one-use claim BEFORE the prior-installed-source
+   // preflight; that SHA legitimately changes after a successful 7-to-7 handoff.
+   // This branch can only re-post a durable receipt, never run the operator.
+   const previous=readHandoffApproval(issue);
+   const dir=path.join(home,'handoff-attempts');
+   receiptFile=path.join(dir,previous.body.requestId+'.json');
    if(fs.existsSync(receiptFile)){
     const receipt=read(receiptFile);
-    // Recovery may deliver an existing result but never repeat installation.
-    if(receipt.issueNumber!==issueNumber||receipt.targetSha!==plan.admitted.targetSha)
-      code('HANDOFF_LEDGER_REQUEST_DRIFT');
+    validateExistingHandoffReceipt(issue,previous.body,previous.approval,
+      previous.rawDigest,receipt,issueNumber);
     if(receipt.status==='RUNNING'){
      // After this watchdog process restarted, the old child may still be
      // running. Never retry or assert failure; preserve and report unknown.
@@ -223,6 +253,8 @@ export async function main(){
     if(receipt.status&&receipt.code)postHandoffReceipt(issueNumber,receipt);
     return;
    }
+   const plan=prepareHandoff(issue);
+   fs.mkdirSync(dir,{recursive:true});
    const initial={schema:'ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1',
      requestId:plan.admitted.requestId,issueNumber,targetSha:plan.admitted.targetSha,
      status:'RUNNING',at:new Date().toISOString()};
