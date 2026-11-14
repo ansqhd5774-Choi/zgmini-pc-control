@@ -17,6 +17,7 @@ on:
       - 'tests/watchdog-b-upgrade.test.mjs'
       - 'tests/watchdog-b-protection-r2.test.mjs'
       - 'tests/watchdog-guardian-activation.test.mjs'
+      - 'tests/watchdog-activation-first-fail.test.mjs'
       - 'approvals/watchdog-activations/**'
       - '.github/workflows/pc-watchdog-guardian-activate-once.yml'
       - 'tests/watchdog-protected-drift.test.mjs'
@@ -52,7 +53,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run scoped maintenance and Controller runtime safety regressions
-        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs
+        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         run: |
           node --check watchdog-b/contract.mjs
@@ -61,6 +62,7 @@ jobs:
           node --check watchdog-b/protected-drift-readonly.mjs
           node --check watchdog-b/guardian-activation.mjs
           node --check watchdog-b/guardian-result.mjs
+          node --check watchdog-b/activation-first-fail-readonly.mjs
       - name: Parse WMI Guardian helper and reject invalid PID without process effects
         run: |
           cscript //NoLogo watchdog-b\guardian-rotate.vbs PROBE NOT_A_PID > "%RUNNER_TEMP%\watchdog-guardian-denied.txt"
