@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_MANIFEST_V2",
+  "approved": true,
+  "scope": "CONTROL_WATCHDOG_HANDOFF_BRIDGE_B_V1",
+  "installedSha256": "8c50a37274976e640747b0d378ef64c063b3e0b57b2a68a5f5e6f9137c659bce",
+  "targetSha": "d01229adacc3c23f50bb119d146e291ff7e15012",
+  "targetSha256": "d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8",
+  "fromScope": "RUNNER_RECOVERY_ONLY",
+  "toScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "allowedFiles": [
+    "pc-watchdog/runner-watchdog.mjs",
+    "pc-watchdog/INSTALL.json"
+  ],
+  "operation": "watchdog-b-upgrade",
+  "approvalBasis": "#1372 Windows Run 43631797304 returned BLOCKED/WATCHDOG_B_PROTECTED_STATE_DRIFT writes=0. #1374 Windows Run 43632362343 proved historical first-install protection differences only in CONTROLLER_HOST, RETIRED_IRAN_TASK and WRITER_CONFIG, with no operational writes. Preserve original historical snapshot immutable. New B scope is unchanged: exact Watchdog runtime source from PR #1370 and its own manifest only; protect fixed installed controller badad912, exact currently approved Iranian retirement absence, original protected key presence and current pre/post fingerprints, original Watchdog source/Guardian ACL/owner. Existing standing 2026-11-03 same-purpose B repair policy in docs/PC_AUTOMATION_STANDARD.md section 5; original R1 manifest remains immutable and already consumed by #1372. No maintenance handoff, process kill, Controller or Writer writes.",
+  "revision": 2,
+  "expectedControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "protectionPolicy": "CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE"
+}
