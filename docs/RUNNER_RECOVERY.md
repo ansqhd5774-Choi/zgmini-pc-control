@@ -74,6 +74,26 @@ Online으로 복귀했고, 기존 #1351이 같은 Run/Job으로 실행되어 JSO
   억제한다. Supervisor가 다시 종료되면 연결이 재차 끊길 수 있다.
   신규 Controller 설치와 #996 C급 복구는 아직 완료되지 않았다.
 
+### 재발 방지 후보와 진단 한계 (2026-11-14, 미설치)
+
+- Supervisor의 상태 파일 `writeJson`은 임시 파일 생성 또는 rename 오류를
+  호출자에 전달하며, 기존 Supervisor에는 이 오류의 처리 경계가 없었다.
+  일시적 `EPERM`/`EACCES`/`EBUSY`가 전체 프로세스를 종료할 수 있는 코드 경로를
+  보완했다. 이 경로가 과거 PID 45080 종료의 실제 원인이었는지는 미확정이다.
+- 보완은 Supervisor heartbeat 쓰기에만 적용한다. 일시적 실패 시 기존 heartbeat를
+  갱신하지 않고 다음 정상 tick에서 기록을 시도한다. 최초 경고에는 비민감 오류
+  코드만 남긴다. 설치기의 신선도 검사와 원장·lease 쓰기 실패 처리는 유지한다.
+- Windows 직접 조회에서 Core 상태 RUNNING(4)과 `GetInstances(0).Count=0`이
+  동시에 관측됐다. 이후 READY(3)도 관측됐다. 예약 실행 상태와 인스턴스
+  목록 가시성을 구분해야 하며, 이전 #1351 당시의 상세 원인까지 소급 확정하지 않는다.
+- [Microsoft GetInstances 문서](https://learn.microsoft.com/en-us/windows/win32/taskschd/registeredtask-getinstances)는
+  호출자의 보안 컨텍스트에 따라 인스턴스가 제한됨을 명시한다. 자동 권한 상승이나
+  무관한 Node 프로세스로의 대체를 하지 않는다. 변경된 읽기 진단은 전후 Task 상태,
+  가시 인스턴스 수, 상태 전환을 구분하고 출처 미확인은 계속 `STATE_UNKNOWN`이다.
+- 관련 40건 및 기존 설치·결과 회수 회귀 70건 PASS. Windows 읽기 전용 후보 실행
+  증거는 `artifacts/runner-recovery/recurrence-prevention-review-20261114.json`에 있다.
+  코드 후보 테스트·직접 읽기 실행은 운영 설치 또는 #996 C 복구 완료가 아니다.
+
 위 STATUS 소스 보완은 Draft 후보이며 2026-11-14 관측 당시 운영 설치에
 반영되지 않았다. 상태 설명 보완을 Runner 복구 성공으로 보고하지 않는다.
 

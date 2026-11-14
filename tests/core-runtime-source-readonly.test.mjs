@@ -22,6 +22,30 @@ test('live TaskEngine ancestry + exact sanitized E marker proves runtime',()=>{
 test('no running Core task remains unknown',()=>{
  assert.equal(classifyCoreSnapshot({...snapshot,engines:[]},{realpath}).status,'STATE_UNKNOWN');
 });
+
+test('running task with no visible instance never implies stopped Core or source PASS',()=>{
+ const r=classifyCoreSnapshot({...snapshot,engines:[],runningInstances:0,
+  taskStateBefore:4,taskStateAfter:4},{realpath});
+ assert.equal(r.code,'CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE');
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.runtimeSourceVerified,false);
+ assert.equal(r.taskObservation.stoppedProven,false);
+ assert.equal(r.taskObservation.securityContextMayLimitVisibility,true);
+});
+
+test('natural cycle completion and unavailable engine are distinct inconclusive observations',()=>{
+ for(const [before,after,count,code] of [
+  [4,3,0,'CORE_TASK_STATE_CHANGED_DURING_PROBE'],
+  [3,3,0,'CORE_TASK_NOT_RUNNING_AT_SNAPSHOT'],
+  [4,4,1,'CORE_TASK_ENGINE_PID_UNAVAILABLE'],
+  [0,0,0,'CORE_TASK_STATE_UNKNOWN'],
+ ]){
+  const r=classifyCoreSnapshot({...snapshot,engines:[],runningInstances:count,
+   taskStateBefore:before,taskStateAfter:after},{realpath});
+  assert.equal(r.code,code);assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.runtimeSourceVerified,false);
+ }
+});
 test('unrelated Node or missing parent record cannot prove source',()=>{
  const fake={...snapshot,processes:snapshot.processes.map(p=>p.pid===30?{...p,parentPid:999}:p)};
  assert.equal(classifyCoreSnapshot(fake,{realpath}).runtimeSourceVerified,false);
@@ -75,7 +99,7 @@ test('non-Windows host never tries probe',()=>{
 });
 
 function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',
- runningCount=1,creationDate=null}){
+ runningCount=1,creationDate=null,taskStates=[4,4]}){
  const source=fs.readFileSync(new URL('../controller/core-runtime-source-wmi.mjs',import.meta.url),'utf8');
  const records=[
   {ProcessId:10,ParentProcessId:1,Name:'taskeng.exe',CommandLine:'service',CreationDate:null},
@@ -87,6 +111,8 @@ function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',
  function Enumerator(rows){this.rows=rows;this.i=0;this.atEnd=()=>this.i>=this.rows.length;
   this.moveNext=()=>{this.i++;};this.item=()=>this.rows[this.i];}
  const task={GetInstances:()=>({Count:runningCount,Item:()=>({EnginePID:10})})};
+ let stateIndex=0;
+ Object.defineProperty(task,'State',{get:()=>taskStates[Math.min(stateIndex++,taskStates.length-1)]});
  const context={
   ActiveXObject:function(){return {Connect:()=>{},GetFolder:()=>({GetTask:()=>task})};},
   GetObject:()=>({ExecQuery:()=>records}),
@@ -96,6 +122,13 @@ function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',
  vm.runInNewContext(source,context,{timeout:1000});
  return {snapshot:JSON.parse(printed),printed};
 }
+
+test('actual JScript reports scheduler transitions without leaking commands',()=>{
+ const {snapshot:s,printed}=simulateWsh({command:'ignored',runningCount:0,taskStates:[4,3]});
+ assert.equal(s.taskStateBefore,4);assert.equal(s.taskStateAfter,3);
+ assert.equal(classifyCoreSnapshot(s,{realpath}).code,'CORE_TASK_STATE_CHANGED_DURING_PROBE');
+ assert.doesNotMatch(printed,/SECRET_NEVER_PRINT|CommandLine/);
+});
 test('actual JScript WMI serialization returns only fixed enums and no raw commands',()=>{
  const cmd=String.raw`"E:\ZGmini\runtime\node.exe" "E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs" --publish`;
  const {snapshot:s,printed}=simulateWsh({command:cmd});

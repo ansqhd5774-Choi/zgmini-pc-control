@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_RUNNER_RECURRENCE_PREVENTION_REVIEW_V1",
+  "observedAt": "2026-11-14T01:51:50.548Z",
+  "installedSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "installedControllerFilesVerified": 38,
+  "candidateInstalled": false,
+  "readOnlyWindowsProbe": {
+    "status": "STATE_UNKNOWN",
+    "code": "CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE",
+    "runtimeSourceVerified": false,
+    "taskObservation": {
+      "stateBefore": 4,
+      "stateAfter": 4,
+      "visibleRunningInstances": 0,
+      "stoppedProven": false,
+      "securityContextMayLimitVisibility": true
+    },
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "tests": {
+    "focused": {
+      "passed": 40,
+      "failed": 0,
+      "skipped": 0
+    },
+    "regression": {
+      "passed": 70,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "rootCauseScope": {
+    "supervisorOriginalExitReason": "UNCONFIRMED",
+    "heartbeatWriteCanTerminateSupervisor": "SOURCE_CONFIRMED_FAILURE_PATH",
+    "schedulerInstanceEnumerationCanBeEmptyWhileTaskRunning": "OBSERVED_ON_ORIGINAL_WINDOWS"
+  },
+  "limitations": [
+    "CANDIDATE_SOURCE_NOT_INSTALLED",
+    "ORIGINAL_996_INSTALL_LEASE_PRESERVED",
+    "AUTOMATIC_RESTART_STILL_SUPPRESSED_BY_INSTALL_LEASE"
+  ]
+}
