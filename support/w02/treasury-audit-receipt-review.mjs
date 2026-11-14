@@ -54,18 +54,30 @@ export function reviewTreasuryAuditReceipt(receipt, opts = {}) {
       receipt.actualExecutionSha !== CONTROL_SHA) {
     return empty('A_RECEIPT_IDENTITY_OR_INSTALLED_SOURCE_MISMATCH');
   }
-  if (receipt.status !== 'PASS' ||
-      receipt.code !== 'SOURCE_INVENTORY_STORED_READONLY' ||
-      receipt.exitCode !== 0 || receipt.firstFail !== null ||
-      receipt.operationalWrites !== 0 || receipt.providerCalls !== 0 ||
-      receipt.d1Writes !== 0 ||
-      receipt.result?.status !== 'PASS' ||
-      receipt.result?.code !== 'SOURCE_INVENTORY_STORED_READONLY' ||
-      receipt.result?.core?.status !== 'PASS' ||
-      receipt.result?.core?.code !== 'STORED_INVENTORY_READONLY' ||
-      receipt.result?.operationalWrites !== 0 ||
-      receipt.result?.providerCalls !== 0 ||
-      receipt.result?.d1Writes !== 0) {
+  // The installed inventory operation has a two-DB top-level gate: even a
+  // valid core Treasury audit becomes STATE_UNKNOWN if the unrelated history
+  // WAL sidecars were checkpointed away. Preserve the known core evidence,
+  // but NEVER call the whole operation PASS or the W02 feature complete.
+  const noWrites = receipt.exitCode === 0 &&
+      receipt.operationalWrites === 0 && receipt.providerCalls === 0 &&
+      receipt.d1Writes === 0 && receipt.protectedStateUnchanged === true &&
+      receipt.result?.operationalWrites === 0 &&
+      receipt.result?.providerCalls === 0 && receipt.result?.d1Writes === 0 &&
+      receipt.result?.core?.status === 'PASS' &&
+      receipt.result?.core?.code === 'STORED_INVENTORY_READONLY';
+  const fullPass = noWrites && receipt.status === 'PASS' &&
+      receipt.code === 'SOURCE_INVENTORY_STORED_READONLY' &&
+      receipt.firstFail === null && receipt.result?.status === 'PASS' &&
+      receipt.result?.code === 'SOURCE_INVENTORY_STORED_READONLY';
+  const unrelatedHistoryWalUnknown = noWrites &&
+      receipt.status === 'STATE_UNKNOWN' &&
+      receipt.code === 'SOURCE_INVENTORY_PARTIAL_READONLY' &&
+      receipt.firstFail === 'ALLOWLISTED_OPERATION' &&
+      receipt.result?.status === 'STATE_UNKNOWN' &&
+      receipt.result?.code === 'SOURCE_INVENTORY_PARTIAL_READONLY' &&
+      receipt.result?.history?.status === 'STATE_UNKNOWN' &&
+      receipt.result?.history?.code === 'WAL_SIDECARS_ABSENT_UNVERIFIED';
+  if (!fullPass && !unrelatedHistoryWalUnknown) {
     return empty('A_RECEIPT_STATUS_OR_NO_WRITE_PROOF_MISSING');
   }
   const v = receipt.result.core.treasuryTawsInput;
@@ -101,7 +113,12 @@ export function reviewTreasuryAuditReceipt(receipt, opts = {}) {
     eligibleAwardedRows: v.eligibleAwardedRows,
   });
   return Object.freeze({
-    ...empty('PRIVATE_TAWS_INPUT_AUDIT_REVIEWABLE', 'REVIEWABLE'),
+    ...empty(unrelatedHistoryWalUnknown
+      ? 'PRIVATE_TAWS_CORE_AUDIT_HISTORY_WAL_UNVERIFIED'
+      : 'PRIVATE_TAWS_INPUT_AUDIT_REVIEWABLE',
+      unrelatedHistoryWalUnknown ? 'CORE_ONLY_REVIEWABLE' : 'REVIEWABLE'),
+    historyDbAuditCompleted: !unrelatedHistoryWalUnknown,
+    unrelatedHistoryStatus: unrelatedHistoryWalUnknown ? 'WAL_SIDECARS_ABSENT_UNVERIFIED' : null,
     fromDate: v.fromDate,
     toDate: v.toDate,
     storedAt: v.storedAt,
