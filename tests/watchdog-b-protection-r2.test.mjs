@@ -43,3 +43,18 @@ test('exact existing Controller source and each installed Controller file remain
   controllerFiles:{'../outside.mjs':hash('original-runtime')}},ctrl,read),
   /WATCHDOG_B_CONTROLLER_FILE_HASH_DRIFT/);
 });
+
+// Regression for #1374's actual unchanged Core/Korea task categories:
+// syntactically valid but *different* digests must not pass the R2 check.
+test('Core and Korea Task SHA drift cannot be masked by valid SHA format',()=>{
+ for(const task of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']){
+  const changed=state();
+  changed.current[task]=hash('unapproved-'+task);
+  assert.throws(()=>requireCurrentProtection(changed),
+    /WATCHDOG_B_CORE_KOREA_TASK_DRIFT/);
+  const missing=state();
+  delete missing.historical[task];
+  assert.throws(()=>requireCurrentProtection(missing),
+    /WATCHDOG_B_CORE_KOREA_TASK_DRIFT/);
+ }
+});
