@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import {REPO,ISSUE_TITLE,parseCanonicalBody} from './contract.mjs';
 const sha=value=>createHash('sha256').update(value).digest('hex');
 const statusCodes=new Set(['STAGED','BLOCKED','RECOVERY_REQUIRED','STATE_UNKNOWN']);
@@ -69,7 +70,7 @@ async function main(){
    'Staged != active. No Watchdog process termination.'].join('\n')]);
  console.log(JSON.stringify({status:'RESULT_RECORDED',requestId:id,code:result.code}));
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===path.resolve(new URL(import.meta.url).pathname)){
+if(process.argv[1]&&path.resolve(process.argv[1])===path.resolve(fileURLToPath(import.meta.url))){
  await main().catch(e=>{console.log(JSON.stringify({
   status:'RESULT_DELIVERY_BLOCKED',code:e.code??'WATCHDOG_B_DELIVERY_ERROR'}));process.exitCode=1;});
 }
