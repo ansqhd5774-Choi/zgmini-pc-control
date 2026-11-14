@@ -1,12 +1,12 @@
 # 새 일반챗의 자동 작업 시작
 
-## 2026-11-12 실행 전 경로 확인 — 신규 대화 공통 5단계
+## 2026-11-15 마지막 완료점부터 실행 — 신규 대화 최초 진입 5단계
 
-1. **최신 정본 학습:** `main`의 [AGENTS.md](../AGENTS.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)를 업무 관련 범위에서 직접 조회한다. 이 문서·[GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)와 기존 기능별 브랜치·승인·마지막 실증을 대조한다. 이 절차만 보고하고 멈추지 않는다.
+1. **마지막 완료점 계승:** **신규 대화 첫 진입에만** `main`의 [AGENTS.md](../AGENTS.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)의 관련 범위와 이 문서·[GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)를 확인한다. **같은 대화에서 계속하라는 요청에는 문서·과거 검사·전체 PR을 재조회하지 않는다.** 이전 기능별 브랜치·승인·마지막 유효 실증을 재사용하고 미완료 필수 실행 하나를 바로 진행한다. 관련 변경·상충 증거가 있을 때만 영향 범위를 확인한다.
 2. **PC 대상 고정:** `PC`(운영 Windows 11, `zgmini-pc-control`, 6 Runner, 운영 Node/Controller 설치)와 `DESKTOP-N62L0NG`(격리 Windows 10, `zgmini-handoff-ci-isolated`, 1 ZGMINI 전용 Runner, pinned Node 22)를 구분한다. 2026-11-12 전체 Listener 수는 7개/5개로 각 ZGMINI 전용 좌석 수 6/1과 다르다. 서로 다른 설치 경로·권한을 복제하지 않는다.
 3. **기존 작업 경로 사용:** 운영 A급은 `pc-job` Issue→Actions→고정 Controller, B급은 기존 승인 manifest/독립 수신기, 공통 오류 접수·인계는 격리 Runner의 기존 Workflow로 처리한다. 이미 검증된 방식이 있으면 새 ZIP·CMD·Runner·예약을 기본 대체 수단으로 설계하지 않는다. 사용자가 승인한 기존 CMD 수동 경로는 무단 폐기하지 않는다.
 4. **검증된 회수:** 각 업무의 원본 Issue/Run/attempt·실제 Runner/host·작업 status/code·JSON/TXT 원격 readback을 확인한다. queued/CI 성공/원본 댓글을 실제 기능 성공·다른 일반챗 자동 수신으로 오인하지 않는다. 불명확 결과는 기존 증거부터 재조회하며 같은 requestId를 자동 재실행하지 않는다.
-5. **실행과 보호:** 현재 승인 범위의 기능 작업은 즉시 계속하되, C급 #996 NO-GO, Core/Writer/DB/Task/산식·원자료/승인 게시 구조를 근거 없이 변경하지 않는다. 예약 자동 갱신 검증은 개별 기능 완료 후 후속이다. 완료 보고에는 전체 목표 진행률·새 결과 증거·남은 실제 문제·다음 실행만 포함한다.
+5. **실행과 보호:** 현재 승인 범위의 기능 작업은 즉시 계속한다. #996은 2026-11-15 C 접수·잠금 복구 완료(`INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`)이며 원본 C 재실행 금지, 중단된 Controller 신규 설치는 별도 미완료다. Core/Writer/DB/Task/산식·원자료/승인 게시 구조를 근거 없이 변경하지 않는다. 예약 자동 갱신 검증은 개별 기능 완료 후 후속이다. 완료 보고에는 전체 목표 진행률·새 결과 증거·남은 실제 문제·다음 실행만 포함한다.
 
 <!-- zgmini-six-workstream-no-global-block-20261112 -->
 **#996 장애로 인한 전체 업무 중단 금지 — 2026-11-12 원본 재대조:** 6개 기능(물가·시장 캘린더·테마 공포탐욕·고용·R10 Alpaca 제외·D05)이 #996 복구를 일괄 선행 조건으로 두고 3일간 정체됐다. **이 판정은 잘못된 범위 확장이다.** #996의 C급 `NO-GO` 및 과거 `blockScope=SHARED_INSTALL_ONLY`는 원본 Controller C 복구·정확히 동일한 공유 설치/잠금 쓰기 범위에만 적용한다. 기능 전체의 개발·기존 데이터 검증·공식 자료 확보·소스 테스트·독립 결과 조회를 정지시키지 않는다. 현재 설치 Controller의 작업별 allowlist와 실제 Workflow/원본 결과를 따로 대조한다. 예를 들어 기존 `core-status`·`core-runtime-source-readonly`는 등록된 작업이며, 새 `source-inventory-runtime-readonly`·`d05-lineage-readonly`는 이전 Controller `badad912…`에 미등록이므로 **그 조회만** 새 설치 전 미지원이다. 기존 정상 실행 증거는 [#1272](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1272)의 2026-11-12 운영 PC `runner-smoke` PASS/JSON·TXT 2/2, [#1234](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1234)의 Writer B 설치 VERIFIED, [#1235](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1235)의 A급 조회 PASS다. 이들 성공은 #996 C 잠금 해제 증거가 아니다.
