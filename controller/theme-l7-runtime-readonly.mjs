@@ -287,6 +287,58 @@ export function safeR181HttpErrorFlow(source){
   truncated:candidates.length>sites.length||selected.size>24};
 }
 
+// Approved R181 pinned-source evidence only; never returns URL, body or token.
+export function safeR181QueryNameInventory(source){
+ if(typeof source!=='string'||Buffer.byteLength(source,'utf8')>8192||
+  source.includes('\0'))return {status:'UNREADABLE_SOURCE'};
+ // Remove comments, including inline, without touching quoted URL strings.
+ let text='',mode='CODE',quote='',escaped=false;
+ for(let i=0;i<source.length;i++){
+  const c=source[i],next=source[i+1]??'';
+  if(mode==='LINE'){
+   if(c==='\n'){text+='\n';mode='CODE';}else text+=' ';
+   continue;
+  }
+  if(mode==='BLOCK'){
+   if(c==='*'&&next==='/'){text+='  ';i++;mode='CODE';}
+   else text+=c==='\n'?'\n':' ';
+   continue;
+  }
+  if(mode==='STRING'){
+   text+=c;
+   if(escaped){escaped=false;continue}
+   if(c==='\\'){escaped=true;continue}
+   if(c===quote)mode='CODE';
+   continue;
+  }
+  if(c==='/'&&next==='/'){text+='  ';i++;mode='LINE';continue}
+  if(c==='/'&&next==='*'){text+='  ';i++;mode='BLOCK';continue}
+  text+=c;
+  if(c==='"'||c==="'"||c.charCodeAt(0)===96){mode='STRING';quote=c}
+ }
+ const found=new Set();
+ const patterns=[
+  /[?&](symbol|symbols|source|sources|ticker|tickers|dataset|datasets)=/gi,
+  /\b(?:searchParams|params|queryParams)\s*\.\s*(?:set|append)\s*\(\s*['"](symbol|symbols|source|sources|ticker|tickers|dataset|datasets)['"]/gi,
+ ];
+ for(const pattern of patterns)
+  for(const hit of text.matchAll(pattern))found.add(hit[1].toLowerCase());
+ // A regular bar object with a symbol field is not a URL query initializer.
+ const initializers=/\bnew\s+URLSearchParams\s*\(\s*\{([\s\S]{0,800}?)\}\s*\)/g;
+ const property=/(?:^|,)\s*(?:['"](symbol|symbols|source|sources|ticker|tickers|dataset|datasets)['"]|(symbol|symbols|source|sources|ticker|tickers|dataset|datasets))\s*(?::|(?=,|$))/gi;
+ for(const initializer of text.matchAll(initializers))
+  for(const hit of initializer[1].matchAll(property))
+   found.add((hit[1]??hit[2]).toLowerCase());
+ const flag=names=>names.some(name=>found.has(name))?
+  'STATIC_NAME_OBSERVED':'NOT_OBSERVED';
+ return {status:'STATIC_SOURCE_ONLY',
+  legacyTicker:flag(['symbol','symbols']),
+  legacyDataset:flag(['source','sources']),
+  modernTicker:flag(['ticker','tickers']),
+  modernDataset:flag(['dataset','datasets']),
+  runtimeRequestVerified:false};
+}
+
 function valueType(value){
  if(value===null)return 'null';
  if(Array.isArray(value))return 'array';
@@ -360,6 +412,9 @@ function sourceState(base,name){
   result.safeHttpErrorFlow=digest===APPROVED_R181_SHA&&bytes.length<=8192?
    safeR181HttpErrorFlow(bytes.toString('utf8')):
    {status:'SOURCE_PIN_OR_SIZE_MISMATCH',sites:[],lines:[],truncated:false};
+  result.safeQueryNameInventory=digest===APPROVED_R181_SHA&&bytes.length<=8192?
+   safeR181QueryNameInventory(bytes.toString('utf8')):
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH'};
  }
  return result;
 }
