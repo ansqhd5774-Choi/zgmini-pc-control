@@ -10,6 +10,18 @@ const maintenance='E:/ZGmini/automation/pc-maintenance';
 const home='E:/ZGmini/automation/pc-watchdog';
 const gh='C:/Program Files/GitHub CLI/gh.exe';
 const node='E:/ZGmini/runtime/node.exe';
+const repo='ansqhd5774-Choi/zgmini-pc-control';
+const sourceRoot='E:/ZGmini/projects/zgmini-pc-control';
+const handoffTitle='pc-maintenance-handoff';
+const handoffSchema='ZGMINI_MAINTENANCE_HANDOFF_REQUEST_V1';
+const handoffScope='RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1';
+const sha40=/^[a-f0-9]{40}$/,sha64=/^[a-f0-9]{64}$/;
+const requestIdPattern=/^pc-handoff-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+const strictKeys=(obj,keys)=>obj&&typeof obj==='object'&&!Array.isArray(obj)
+  &&Object.keys(obj).length===keys.length&&keys.every(k=>Object.hasOwn(obj,k));
+const code=x=>{throw Object.assign(Error(x),{code:x});};
+const safeCode=x=>/^[A-Z][A-Z0-9_]{2,100}$/.test(String(x??''))?String(x):'HANDOFF_UNCLASSIFIED';
+
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(p,'utf8'));
 const write=(p,x)=>{const tmp=p+'.'+randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(x,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,p);};
@@ -37,6 +49,87 @@ function verifyController(){
   if(!p.startsWith(path.resolve(control)+path.sep)||sha(fs.readFileSync(p))!==hash)throw Error('CONTROLLER_HASH_MISMATCH');
  }
  return host.controllerSourceSha;
+}
+// A signed-looking Issue body alone is NEVER authority. The authenticated GitHub
+// author, existing label, immutable raw approval bytes, and installed source
+// must match. This admits only a fixed local Windows operator, not commands.
+export function validateHandoffIntent(issue,body,approval,installed,rawDigest){
+ const keys=['schema','requestId','operation','targetSha','approvalManifestSha256'];
+ if(!strictKeys(body,keys)||body.schema!==handoffSchema
+   ||body.operation!=='maintenance-handoff'
+   ||!requestIdPattern.test(body.requestId??'')
+   ||!sha40.test(body.targetSha??'')
+   ||!sha64.test(body.approvalManifestSha256??''))code('HANDOFF_REQUEST_CONTRACT_INVALID');
+ const labels=issue?.labels;
+ if(issue?.title!==handoffTitle||issue?.state!=='OPEN'
+   ||issue?.author?.login!=='ansqhd5774-Choi'
+   ||!Array.isArray(labels)||!labels.some(label=>label?.name==='pc-maintenance'))
+   code('HANDOFF_REQUEST_ACTOR_OR_LABEL_DENIED');
+ if(!approval||approval.schema!=='ZGMINI_MAINTENANCE_HANDOFF_V2'
+   ||approval.transition!=='SEVEN_TO_SEVEN'||approval.approved!==true
+   ||approval.scope!=='COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE'
+   ||approval.targetSha!==body.targetSha
+   ||approval.installedSha!==installed?.sourceSha
+   ||!sha64.test(rawDigest??'')
+   ||body.approvalManifestSha256!==rawDigest)
+   code('HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH');
+ return Object.freeze({requestId:body.requestId,targetSha:body.targetSha});
+}
+function ghRead(args){
+ return execFileSync(gh,args,{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1000000});
+}
+function git(args){
+ return execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:200000});
+}
+// A child's printed PASS is insufficient: require the independent local
+// install ledger and installed receiver source to agree with the exact target.
+export function verifyHandoffPass({report,ledger,installed,targetSha,exitCode}){
+ if(report?.status!=='PASS'||exitCode!==0
+   ||ledger?.schema!=='ZGMINI_MAINTENANCE_HANDOFF_RESULT_V1'
+   ||ledger.status!=='PASS'||ledger.targetSha!==targetSha
+   ||ledger.code!=='STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED'
+   ||!Number.isSafeInteger(ledger.receiverPid)||ledger.receiverPid<=0
+   ||installed?.sourceSha!==targetSha)
+   code('HANDOFF_PASS_RUNTIME_READBACK_MISMATCH');
+ return true;
+}
+function prepareHandoff(issue){
+ let body;
+ try{body=JSON.parse(issue.body??'');}
+ catch{code('HANDOFF_REQUEST_CONTRACT_INVALID');}
+ if(!strictKeys(body,['schema','requestId','operation','targetSha','approvalManifestSha256'])
+   ||!sha40.test(body.targetSha??''))code('HANDOFF_REQUEST_CONTRACT_INVALID');
+ const approvalFile=path.join(sourceRoot,'approvals/maintenance-handoffs',body.targetSha+'.json');
+ const metadata=fs.lstatSync(approvalFile);
+ if(!metadata.isFile()||metadata.isSymbolicLink()||metadata.nlink!==1||metadata.size>16000)
+   code('HANDOFF_APPROVAL_PATH_INVALID');
+ const approvalBytes=fs.readFileSync(approvalFile);
+ const approval=JSON.parse(approvalBytes.toString('utf8'));
+ const installed=read(path.join(maintenance,'MAINTENANCE_INSTALL.json'));
+ const admitted=validateHandoffIntent(issue,body,approval,installed,sha(approvalBytes));
+ if(git(['branch','--show-current']).trim()!=='main')
+   code('HANDOFF_OPERATOR_SOURCE_BRANCH');
+ try{git(['merge-base','--is-ancestor',admitted.targetSha,'HEAD']);}
+ catch{code('HANDOFF_OPERATOR_SOURCE_NOT_ANCESTOR');}
+ const script=path.join(sourceRoot,'tools/handoff-maintenance.mjs');
+ if(sha(fs.readFileSync(script))!==approval.files?.['tools/handoff-maintenance.mjs'])
+   code('HANDOFF_OPERATOR_SCRIPT_HASH_MISMATCH');
+ if(fs.existsSync(path.join(maintenance,'leases/controller-install')))
+   code('HANDOFF_OPERATOR_INSTALL_LEASE_BUSY');
+ return {admitted,script};
+}
+function postHandoffReceipt(issueNumber,receipt){
+ const marker='zgmini-handoff-once:'+receipt.requestId;
+ // A lost acknowledgement is reconciled before posting; never re-execute.
+ const prior=JSON.parse(ghRead(['issue','view',String(issueNumber),'--repo',repo,'--json','comments']));
+ if(prior.comments?.some(c=>String(c.body??'').includes(marker)))return;
+ const body=['<!-- '+marker+' -->',
+   'ZGMINI independent Windows handoff result',
+   'requestId='+receipt.requestId,
+   'targetSha='+receipt.targetSha,
+   'status='+receipt.status,
+   'code='+safeCode(receipt.code)].join('\n');
+ ghRead(['issue','comment',String(issueNumber),'--repo',repo,'--body',body]);
 }
 export async function main(){
  const installed=read(path.join(home,'INSTALL.json'));
@@ -87,6 +180,92 @@ export async function main(){
    }finally{fs.closeSync(out);}
   }catch(e){status('BLOCKED',{code:/^[A-Z_]+$/.test(e.message)?e.message:'WATCHDOG_CHECK_FAILED'});}
  }
+ // This optional capability is activated only by a separately verified,
+ // approved watchdog install; historical RUNNER_RECOVERY_ONLY installations
+ // stay unchanged even if a checkout file is updated.
+ let handoffActive=false;
+ async function pollHandoff(){
+  if(handoffActive||installed.scope!==handoffScope)return;
+  if(process.platform!=='win32'||process.env.GITHUB_ACTIONS||process.env.RUNNER_NAME)return;
+  handoffActive=true;
+  let issueNumber=null,receiptFile=null;
+  try{
+   // Paused/active Controller transitions are never used as a handoff window.
+   if(fs.existsSync(path.join(home,'PAUSE'))||fs.existsSync(path.join(control,'DRAIN'))
+     ||fs.existsSync(path.join(maintenance,'leases/controller-install')))return;
+   const listed=JSON.parse(ghRead(['issue','list','--repo',repo,'--label','pc-maintenance',
+     '--state','open','--limit','1000','--json','number,title']));
+   if(!Array.isArray(listed))code('HANDOFF_ISSUE_LIST_INVALID');
+   const intents=listed.filter(q=>q?.title===handoffTitle);
+   if(!intents.length)return;
+   if(intents.length!==1||!Number.isSafeInteger(intents[0].number))
+     code('HANDOFF_MULTIPLE_OR_INVALID_INTENTS');
+   issueNumber=intents[0].number;
+   const issue=JSON.parse(ghRead(['issue','view',String(issueNumber),'--repo',repo,
+     '--json','number,title,state,author,labels,body']));
+   const plan=prepareHandoff(issue);
+   const dir=path.join(home,'handoff-attempts');fs.mkdirSync(dir,{recursive:true});
+   receiptFile=path.join(dir,plan.admitted.requestId+'.json');
+   if(fs.existsSync(receiptFile)){
+    const receipt=read(receiptFile);
+    // Recovery may deliver an existing result but never repeat installation.
+    if(receipt.issueNumber!==issueNumber||receipt.targetSha!==plan.admitted.targetSha)
+      code('HANDOFF_LEDGER_REQUEST_DRIFT');
+    if(receipt.status==='RUNNING'){
+     // After this watchdog process restarted, the old child may still be
+     // running. Never retry or assert failure; preserve and report unknown.
+     const unknown={...receipt,status:'STATE_UNKNOWN',
+       code:'HANDOFF_INTERRUPTED_RECONCILE',at:new Date().toISOString()};
+     write(receiptFile,unknown);
+     postHandoffReceipt(issueNumber,unknown);
+     return;
+    }
+    if(receipt.status&&receipt.code)postHandoffReceipt(issueNumber,receipt);
+    return;
+   }
+   const initial={schema:'ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1',
+     requestId:plan.admitted.requestId,issueNumber,targetSha:plan.admitted.targetSha,
+     status:'RUNNING',at:new Date().toISOString()};
+   // Durable single-use claim before the subprocess is launched. Unknown
+   // outcomes after a crash are reconciled, NEVER automatically retried.
+   fs.writeFileSync(receiptFile,JSON.stringify(initial)+'\n',{flag:'wx',mode:0o600});
+   const result=await new Promise(resolve=>{
+    const child=spawn(node,[plan.script,'--source-sha',plan.admitted.targetSha],
+      {cwd:sourceRoot,windowsHide:true,stdio:['ignore','pipe','pipe']});
+    let output='',limit=false;
+    child.stdout.on('data',b=>{if(output.length+String(b).length>16384)limit=true;
+      else output+=String(b);});
+    child.stderr.on('data',()=>{}); // No operator stderr or secrets in GitHub.
+    child.on('error',()=>resolve({status:'STATE_UNKNOWN',code:'HANDOFF_SPAWN_UNCERTAIN'}));
+    child.on('close',(exitCode,signal)=>{
+     if(limit||signal)return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_OUTCOME_UNCERTAIN'});
+     try{
+      const lines=output.trim().split(/\r?\n/),json=JSON.parse(lines[lines.length-1]);
+      if(json.targetSha!==plan.admitted.targetSha||!['PASS','BLOCKED',
+          'RECOVERY_REQUIRED','AUTOMATION_BLOCKED'].includes(json.status))
+        return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_OUTCOME_UNCERTAIN'});
+      if(json.status==='PASS'){
+       try{
+        verifyHandoffPass({report:json,
+         ledger:read(path.join(maintenance,'handoff-'+plan.admitted.targetSha+'.json')),
+         installed:read(path.join(maintenance,'MAINTENANCE_INSTALL.json')),
+         targetSha:plan.admitted.targetSha,exitCode});
+       }catch{return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_PASS_RUNTIME_READBACK_MISMATCH'});}
+      }
+      return resolve({status:json.status,code:safeCode(json.code??'HANDOFF_UNKNOWN')});
+     }catch{return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_OUTCOME_UNCERTAIN'});}
+    });
+   });
+   const receipt={...initial,...result,at:new Date().toISOString()};
+   write(receiptFile,receipt);
+   postHandoffReceipt(issueNumber,receipt);
+  }catch(error){
+   const c=safeCode(error?.code??error?.message);
+   write(path.join(home,'HANDOFF_STATUS.json'),{at:new Date().toISOString(),
+     status:'BLOCKED',code:c,issueNumber});
+  }finally{handoffActive=false;}
+ }
  await tick();setInterval(tick,15000);
+ void pollHandoff();setInterval(()=>{void pollHandoff();},60000);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{process.exitCode=1;});
