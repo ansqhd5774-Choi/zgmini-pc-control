@@ -1,6 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
-import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass} from '../tools/runner-watchdog.mjs';
+import {decide,archiveDeadLease,validateHandoffIntent,
+ validateHandoffApprovalIdentity,validateExistingHandoffReceipt,verifyHandoffPass}
+ from '../tools/runner-watchdog.mjs';
 test('fresh heartbeat is required for healthy status',()=>{
  const now=Date.now(),owner={pid:123};
  assert.equal(decide({owner,live:true,heartbeat:new Date(now).toISOString(),now}),'HEALTHY');
@@ -100,4 +102,63 @@ test('operator stdout PASS requires independent persisted Windows install proof'
   const x=JSON.parse(JSON.stringify(good));mutate(x);
   assert.throws(()=>verifyHandoffPass(x),/HANDOFF_PASS_RUNTIME_READBACK_MISMATCH/);
  }
+});
+
+const replayNumber=1378;
+const replayReceipt=()=>({schema:'ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1',
+ requestId,issueNumber:replayNumber,targetSha:fixedSha,
+ status:'PASS',code:'STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED',
+ at:'2026-11-15T00:00:00.000Z'});
+const replayInput=()=>{
+ const p=validIntent();p.issue.number=replayNumber;
+ return {...p,receipt:replayReceipt(),issueNumber:replayNumber};
+};
+const replay=x=>validateExistingHandoffReceipt(x.issue,x.body,x.approval,
+ x.rawDigest,x.receipt,x.issueNumber);
+test('completed handoff receipt can be authenticated after installed source changes',()=>{
+ const p=replayInput();p.installed.sourceSha=p.body.targetSha;
+ assert.deepEqual({...replay(p)},{requestId,targetSha:fixedSha});
+ assert.throws(()=>validateHandoffIntent(p.issue,p.body,p.approval,
+   p.installed,p.rawDigest),/HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
+});
+test('replay validates GitHub owner, label and manifest bytes without relying on old installed sha',()=>{
+ for(const mutate of [
+  p=>{p.issue.author.login='unauthorized';},
+  p=>{p.issue.labels=[];},
+  p=>{p.issue.state='CLOSED';},
+  p=>{p.body.approvalManifestSha256='a'.repeat(64);},
+  p=>{p.approval.approved=false;},
+  p=>{p.approval.targetSha='0'.repeat(40);},
+  p=>{p.body.operation='arbitrary-exec';},
+ ]){const p=replayInput();mutate(p);
+  assert.throws(()=>replay(p),/HANDOFF_REQUEST|HANDOFF_APPROVAL/);
+ }
+});
+test('replay binds durable receipt to exact issue, request and terminal state',()=>{
+ for(const mutate of [
+  p=>{p.issue.number=2000;},
+  p=>{p.receipt.issueNumber=2000;},
+  p=>{p.receipt.requestId='pc-handoff-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';},
+  p=>{p.receipt.targetSha=oldSha;},
+  p=>{p.receipt.schema='WRONG';},
+  p=>{p.receipt.status='MAINTENANCE_RUN';},
+  p=>{p.receipt.code='SOME CODE WITH SPACES';},
+  p=>{delete p.receipt.code;},
+ ]){const p=replayInput();mutate(p);
+  assert.throws(()=>replay(p),/HANDOFF_LEDGER_REQUEST_DRIFT/);
+ }
+});
+test('RUNNING claim is reconcilable without authorizing another process execution',()=>{
+ const p=replayInput();p.receipt={schema:'ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1',
+  requestId,issueNumber:replayNumber,targetSha:fixedSha,
+  status:'RUNNING',at:'2026-11-15T00:00:00.000Z'};
+ assert.deepEqual({...replay(p)},{requestId,targetSha:fixedSha});
+});
+test('code order visits existing receipt before historical preimage preflight',()=>{
+ const source=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ const claim=source.indexOf('if(fs.existsSync(receiptFile))');
+ const prior=source.indexOf('const previous=readHandoffApproval(issue);');
+ const preflight=source.lastIndexOf('const plan=prepareHandoff(issue);');
+ assert.ok(prior>0&&claim>prior&&preflight>claim);
+ assert.ok(source.includes('validateExistingHandoffReceipt(issue,previous.body'));
 });
