@@ -77,18 +77,18 @@ test('four exact original jobs unresolved, never replayed or promoted',async()=>
     /C_996_ORIGINAL_JOBS_REPEATED_READ_DENIED/);
 });
 
-test('closed Issue or nonzero declared comments cannot pass',async()=>{
+test('closed Issue and incomplete declared comment inventory cannot pass',async()=>{
   for(const n of [1217,1219,1226,1227]){
     const f=makeFixture();f.state.issues.get(n).state='closed';
     await blocked(f,'C_996_ORIGINAL_JOBS_STATUS_OR_ORIGIN_DRIFT');
     const g=makeFixture();g.state.issues.get(n).comments=n===1227?2:1;
-    await blocked(g,'C_996_ORIGINAL_JOBS_STATUS_OR_ORIGIN_DRIFT');
+    await blocked(g,'C_996_ORIGINAL_JOBS_COMMENT_INVENTORY_UNVERIFIED');
   }
 });
 
 test('actual comment not treated as empty merely because Issue claims zero',async()=>{
   const f=makeFixture();f.state.comments.set(1219,[{id:1,body:'bot result'}]);
-  await blocked(f,'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
+  await blocked(f,'C_996_ORIGINAL_JOBS_COMMENT_INVENTORY_UNVERIFIED');
 });
 
 test('user, label and exact source scope drift are blocked',async()=>{
@@ -131,29 +131,42 @@ test('reader has no mutation or execution methods',()=>{
   const f=makeFixture();assert.deepEqual(Object.keys(f.reader),['readOnce']);
 });
 
-test('only the original pinned D05 comment is classified as not a receipt',async()=>{
+test('changed diagnostic is inventoried without becoming verified execution or approval',async()=>{
   for(const change of [
     f=>{f.state.comments.get(1227)[0].body+=' changed';},
     f=>{f.state.comments.get(1227)[0].id++;},
     f=>{f.state.comments.get(1227)[0].user.id=1;},
     f=>{f.state.comments.get(1227)[0].user.login='github-actions[bot]';},
-    f=>{f.state.comments.get(1227).push(structuredClone(D05_COMMENT));},
-    f=>{f.state.comments.set(1227,[]);}
   ]){
     const f=makeFixture();change(f);
-    await blocked(f,'C_996_ORIGINAL_JOBS_UNRECOGNIZED_DIAGNOSTIC_COMMENT');
+    const r=await f.reader.readOnce();
+    assert.equal(r.status,'FOUR_ORIGINAL_JOBS_INVENTORIED_GET_ONLY');
+    assert.equal(r.entries.find(x=>x.issueNumber===1227).commentEvidence,'UNVERIFIED_COMMENTS_NOT_AUTHORITY');
+    assert.ok(r.entries.every(x=>x.resultVerified===false));
+    assert.equal(r.executionAuthorized,false);assert.equal(r.pcRetries,0);
   }
 });
-test('D05 comment appearing on another issue remains a strict failure',async()=>{
+test('later handoff comment on another issue is not a recovery authorization',async()=>{
   const f=makeFixture();
   f.state.issues.get(1219).comments=1;
   f.state.comments.set(1219,[structuredClone(D05_COMMENT)]);
-  await blocked(f,'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
+  const r=await f.reader.readOnce();
+  assert.equal(r.status,'FOUR_ORIGINAL_JOBS_INVENTORIED_GET_ONLY');
+  assert.equal(r.entries.find(x=>x.issueNumber===1219).commentEvidence,'UNVERIFIED_COMMENTS_NOT_AUTHORITY');
+  assert.equal(r.executionAuthorized,false);assert.equal(r.issuePosts,0);
 });
 test('D05 comment edited between the two remote snapshots must stop',async()=>{
   const f=makeFixture();
   f.state.afterFirstPass=state=>{
     state.comments.get(1227)[0].body+=' altered';
   };
-  await blocked(f,'C_996_ORIGINAL_JOBS_UNRECOGNIZED_DIAGNOSTIC_COMMENT');
+  await blocked(f,'C_996_ORIGINAL_JOBS_READBACK_CHANGED');
+});
+
+test('duplicate comment IDs and truncated inventories remain rejected',async()=>{
+ for(const mutate of [
+  f=>f.state.comments.get(1227).push(structuredClone(D05_COMMENT)),
+  f=>f.state.comments.set(1227,[]),
+  f=>{f.state.issues.get(1227).comments=2;f.state.comments.get(1227).push(structuredClone(D05_COMMENT));},
+ ]){const f=makeFixture();mutate(f);await blocked(f,'C_996_ORIGINAL_JOBS_COMMENT_INVENTORY_UNVERIFIED');}
 });

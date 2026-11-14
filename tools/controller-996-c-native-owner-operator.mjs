@@ -63,7 +63,7 @@ const stop=(code,phase='NO_WRITE')=>Object.freeze({
   cleanupPerformed:false,workflowPuts:0,backlogWrites:0,
   issuePosts:0,originalRequestRetries:0,
 });
-const safeCode=e=>/^(?:C_996_OWNER|C996_NATIVE)_[A-Z0-9_]+$/.test(e?.code??'')?
+const safeCode=e=>/^(?:C_996|C996_NATIVE)_[A-Z0-9_]+$/.test(e?.code??'')?
   e.code:'C_996_OWNER_STATE_UNKNOWN';
 const rel=x=>typeof x==='string'&&!x.includes('\\')&&
   !path.isAbsolute(x)&&x.split('/').every(p=>p&&p!=='.'&&p!=='..');
@@ -662,7 +662,7 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
     checkSourceBundle(manifest,manifestCommitSha);
     const jobs=await create996FourOriginalJobsReadOnlyReader({
       githubReader:create996InstalledGhGetReadOnly()}).readOnce();
-    need(jobs?.status==='FOUR_ORIGINAL_JOBS_UNRESOLVED_GET_ONLY'&&
+    need(['FOUR_ORIGINAL_JOBS_UNRESOLVED_GET_ONLY','FOUR_ORIGINAL_JOBS_INVENTORIED_GET_ONLY'].includes(jobs?.status)&&
       jobs.originalIssueCount===4,
       'C_996_OWNER_ORIGINAL_JOBS_UNVERIFIED');
     const [{collect996OriginalCPrewriteReadOnly},

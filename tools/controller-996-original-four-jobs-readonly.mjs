@@ -52,7 +52,7 @@ export function create996FourOriginalJobsReadOnlyReader({githubReader}={}){
       const i=issue?.data;
       need(issue?.status===200&&i?.number===number&&
         i.user?.login===OWNER&&i.user?.id===OWNER_ID&&
-        i.state==='open'&&i.comments===(number===1227?1:0)&&!i.pull_request&& 
+        i.state==='open'&&Number.isSafeInteger(i.comments)&&i.comments>=0&&i.comments<=100&&!i.pull_request&&
         i.labels?.some(x=>(typeof x==='string'?x:x?.name)==='pc-job'),
       'C_996_ORIGINAL_JOBS_STATUS_OR_ORIGIN_DRIFT');
       let body;
@@ -68,21 +68,30 @@ export function create996FourOriginalJobsReadOnlyReader({githubReader}={}){
         `issues/${number}/comments?per_page=100&page=1`);
       need(comments?.status===200&&Array.isArray(comments.data),
         'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
-      const diagnostic=number===D05_DIAGNOSTIC.issueNumber;
+      need(comments.data.length===i.comments&&comments.data.every(c=>
+        Number.isSafeInteger(c.id)&&c.id>0&&Number.isSafeInteger(c.user?.id)&&
+        typeof c.user.login==='string'&&typeof c.body==='string'&&c.body.length<=131072)&&
+        new Set(comments.data.map(c=>c.id)).size===comments.data.length,
+        'C_996_ORIGINAL_JOBS_COMMENT_INVENTORY_UNVERIFIED');
+      const diagnostic=number===D05_DIAGNOSTIC.issueNumber&&comments.data.length===1;
+      let knownDiagnostic=false;
       if(diagnostic){
         const only=comments.data[0];
-        need(comments.data.length===1&&only?.id===D05_DIAGNOSTIC.id&&
+        knownDiagnostic=only?.id===D05_DIAGNOSTIC.id&&
           only?.user?.login===OWNER&&only.user.id===OWNER_ID&&
           typeof only.body==='string'&&
           createHash('sha256').update(only.body,'utf8').digest('hex')===
-            D05_DIAGNOSTIC.bodySha256,
-          'C_996_ORIGINAL_JOBS_UNRECOGNIZED_DIAGNOSTIC_COMMENT');
-      }else need(comments.data.length===0,
-        'C_996_ORIGINAL_JOBS_RECEIPT_OR_COMMENT_PRESENT');
+            D05_DIAGNOSTIC.bodySha256;
+      }
+      // Comments may be legitimate later handoffs or receipts. Inventory them
+      // without treating their contents as authorization or verified success.
       rows.push(Object.freeze({issueNumber:number,requestId,
         nextAction:'OWNER_REPLAN_REVIEW_REQUIRED',
         state:'open',resultVerified:false,
-        commentEvidence:diagnostic?'PINNED_OWNER_DIAGNOSTIC_NOT_RECEIPT':'NO_COMMENTS',
+        commentEvidence:knownDiagnostic?'PINNED_OWNER_DIAGNOSTIC_NOT_RECEIPT':
+          comments.data.length?'UNVERIFIED_COMMENTS_NOT_AUTHORITY':'NO_COMMENTS',
+        commentInventory:comments.data.map(c=>({id:c.id,authorId:c.user.id,
+          bodySha256:createHash('sha256').update(c.body,'utf8').digest('hex')})),
         issueUpdatedAt:i.updated_at??null}));
     }
     return rows;
@@ -101,6 +110,7 @@ export function create996FourOriginalJobsReadOnlyReader({githubReader}={}){
     'C_996_ORIGINAL_JOBS_GITHUB_GET_ORIGIN_UNVERIFIED');
     const first=await scan(),second=await scan();
     need(same(first,second),'C_996_ORIGINAL_JOBS_READBACK_CHANGED');
-    return result('FOUR_ORIGINAL_JOBS_UNRESOLVED_GET_ONLY',second);
+    return result(second.some(x=>x.commentEvidence==='UNVERIFIED_COMMENTS_NOT_AUTHORITY')?
+      'FOUR_ORIGINAL_JOBS_INVENTORIED_GET_ONLY':'FOUR_ORIGINAL_JOBS_UNRESOLVED_GET_ONLY',second);
   }});
 }
