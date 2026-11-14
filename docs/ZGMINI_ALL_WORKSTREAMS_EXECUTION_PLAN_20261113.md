@@ -14,7 +14,7 @@
 
 ### 운영 Controller 15파일 상세 인벤토리 (설치 승인은 별도)
 
-- **수정 런타임 6:** `controller/common.mjs`, `controller/core-runtime-source-readonly.mjs`, `controller/core-runtime-source-wmi.mjs`, `controller/operations.mjs`, `controller/release-calendar-runtime-readonly.mjs`, `controller/supervisor.mjs`, `controller/theme-l7-runtime-readonly.mjs` 중 비교 기준 실제 **수정 7**; 나머지 별도 목록 아래 참조.
+- **수정 런타임 7:** `controller/common.mjs`, `controller/core-runtime-source-readonly.mjs`, `controller/core-runtime-source-wmi.mjs`, `controller/operations.mjs`, `controller/release-calendar-runtime-readonly.mjs`, `controller/supervisor.mjs`, `controller/theme-l7-runtime-readonly.mjs` 중 비교 기준 실제 **수정 7**; 나머지 별도 목록 아래 참조.
 - **신규 런타임 7:** `controller/d05-lineage-readonly.mjs`, `controller/employment-r6-collection-evidence-readonly.mjs`, `controller/inflation-core-lock-observation-readonly.mjs`, `controller/shared-resource-release-readonly.mjs`, `controller/source-inventory-runtime-readonly.mjs`, `controller/writer-b-1063-recovery-readonly.mjs`, `controller/writer-b-1063-task-probe.mjs`. 따라서 런타임 **7 modified + 7 added = 14**.
 - **설정 1:** `config/operations.json` modified (이전 31개 vs 현 source 37개 operation 차이의 등록 범위 승인 별도 확인).
 - **비배포 테스트 1:** `controller/inflation-core-lock-observation-readonly.test.mjs` added, 운영 설치 대상 **아님**.
