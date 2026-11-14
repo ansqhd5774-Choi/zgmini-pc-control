@@ -1,0 +1,27 @@
+{
+  "s2": "94cb242c6603ce02ae9826ce62a8ae81ef20c0c0",
+  "finishedAt": "2026-11-14T16:58:33.077Z",
+  "exit": 0,
+  "result": {
+    "schema": "ZGMINI_CONTROLLER_996_NATIVE_OWNER_C_RESULT_V1",
+    "status": "INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED",
+    "code": "C_RECOVERY_EFFECTS_PERFORMED_NO_AUTOMATIC_JOB_REPLAY",
+    "sourceLocked": true,
+    "ownerConsentReadbackId": 6881040211,
+    "completedArchiveMoves": 3,
+    "fixedReservationPreserved": true,
+    "originalInstallSucceeded": false,
+    "actualControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+    "activeIntakeReadbackVerified": true,
+    "closedBacklogReadbackVerified": true,
+    "originalRequestRetries": 0,
+    "workflowPuts": 0,
+    "backlogWrites": 0,
+    "issuePosts": 0,
+    "automaticRetry": false,
+    "cleanupPerformed": false
+  },
+  "stderrPresent": false,
+  "errorCode": null,
+  "automaticRetry": false
+}

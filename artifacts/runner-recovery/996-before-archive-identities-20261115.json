@@ -1,0 +1,48 @@
+{
+  "observedAt": "2026-11-14T16:57:38.964Z",
+  "allCanonicalPathsPresent": true,
+  "records": [
+    {
+      "name": "oldC",
+      "source": "E:\\ZGmini\\automation\\pc-maintenance\\leases\\controller-recovery",
+      "destination": "E:\\ZGmini\\automation\\pc-maintenance\\leases\\controller-recovery-archived-pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+      "directoryId": "75153818784922978",
+      "aclHash": "4b5724d4d98b10d54c399487ec8955b3bd3472d1790a36e7ab86b0d53b972998",
+      "files": {
+        "BACKLOG_CLOSE_ATTEMPTED.json": {
+          "sha256": "9ba544fc261f0cfee73e2db79a99e61a9db9b4d3ecd7fa1dd9e8d1dfc1b4b758",
+          "fileId": "2814749770284440"
+        },
+        "PREPARED.json": {
+          "sha256": "c29e96c39660da05b1b301c0545c42b4c9757155ff42a897b0fc9fb8e4fdc201",
+          "fileId": "2533274793573782"
+        },
+        "WORKFLOW_ENABLE_ATTEMPTED.json": {
+          "sha256": "2b662f6b8fc1235e072cd46e08533e5d03be9cbdc3a49673afbf4ff7e21e063b",
+          "fileId": "2251799816863127"
+        },
+        "owner.json": {
+          "sha256": "a6390236b48fdfa13adb7661ec5e9c9ed159f7095ede1972e20dcc6865d2e074",
+          "fileId": "1970324840152469"
+        }
+      }
+    },
+    {
+      "name": "install",
+      "source": "E:\\ZGmini\\automation\\pc-maintenance\\leases\\controller-install",
+      "destination": "E:\\ZGmini\\automation\\pc-maintenance\\leases\\controller-install-recovered-pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+      "directoryId": "2251799816840720",
+      "aclHash": "4b5724d4d98b10d54c399487ec8955b3bd3472d1790a36e7ab86b0d53b972998",
+      "files": {
+        "RECOVERY_REQUIRED.json": {
+          "sha256": "4dc51f7e3a1cd84ce94ddf993e4a1cfbb319b050447dfbb5ccf0c38434a0b09b",
+          "fileId": "1970324840152392"
+        },
+        "owner.json": {
+          "sha256": "d6329b4d82530f9a1ca574647f050fff9243b698bb9dd314975b19ed171e40bc",
+          "fileId": "2251799816840721"
+        }
+      }
+    }
+  ]
+}

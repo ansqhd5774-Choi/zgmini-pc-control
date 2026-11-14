@@ -234,6 +234,24 @@ Runner·계약·적용·인계 회귀 90건 PASS, 원격 바이트 일치를 확
 
 설치 도구는 `tools/install-runner-watchdog.mjs`다. 기존 설치가 있으면 중단하며 반복 설치하지 않는다. 기존 Startup 원본과 보호 해시는 `pc-watchdog/STARTUP_BEFORE.vbs`, `PROTECTION_BEFORE.json`에 보존된다. 감시만 일시 중지할 때는 `pc-watchdog/PAUSE`를 사용하며 기존 Runner는 종료하지 않는다.
 
+## #996 최종 C 복구 완료 (2026-11-15 KST)
+
+실제 Owner 댓글 `6881040211`과 S2 `94cb242c6603ce02ae9826ce62a8ae81ef20c0c0`로
+단회 실행한 결과 `INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`를 확인했다.
+원본 Claim·continuation·Install Lease는 삭제 없이 세 디렉터리로 보관됐다.
+독립 재조회에서 원본 6파일의 ID/SHA, 원본 두 디렉터리의 ID/ACL 보존과
+보호 상태·84개 source bytes 유지, Workflow active·Backlog 기존 닫힘을 확인했다.
+원본 설치는 성공으로 처리하지 않으며 Controller는 `badad912…` 그대로다.
+
+설치 lease `held=false`, watchdog `HEALTHY`, 유지보수 receiver `LISTENING`,
+운영 Runner 6개 Online이다. fixed C reservation은 계약대로 보존한다.
+이전의 C hard STOP/Owner 승인 대기/잠금 잔존 보고를 현재 상태로 재사용하거나
+복구 CMD를 다시 실행하지 않는다. 완료 증거:
+[최종 실행·독립 검증 기록](CONTROLLER_996_FINAL_C_EXECUTION.md).
+
+이는 최소 유지보수기 후보 `103a38b…`나 4파일 Controller 후보의 설치 완료가 아니다.
+해당 후속 설치는 별도 정확한 인계/승인/계보 계약을 따른다.
+
 ## 실PC 증거
 
 - 2026-11-03 KST: 기존 6개 Offline 확인 → watchdog이 종료된 Supervisor lease 보관 → 기존 source `c491d95f…`로 6개 Online 복구.

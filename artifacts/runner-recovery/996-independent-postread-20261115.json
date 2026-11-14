@@ -1,0 +1,74 @@
+{
+  "status": "INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED",
+  "s2": "94cb242c6603ce02ae9826ce62a8ae81ef20c0c0",
+  "verifiedAt": "2026-11-14T16:59:08.372Z",
+  "independentReadback": true,
+  "originalInstallSucceeded": false,
+  "actualControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "archives": [
+    {
+      "name": "oldC",
+      "sourceAbsent": true,
+      "archivePresent": true,
+      "files": 4
+    },
+    {
+      "name": "continuation",
+      "sourceAbsent": true,
+      "archivePresent": true,
+      "files": 4
+    },
+    {
+      "name": "install",
+      "sourceAbsent": true,
+      "archivePresent": true,
+      "files": 2
+    }
+  ],
+  "oldArchiveOriginalBytesMatch": true,
+  "originalFileIdsAndDirectoryAclPreserved": true,
+  "fixedReservationPreserved": true,
+  "backlogUnchangedClosed": true,
+  "workflowActive": true,
+  "sourceBytesVerified": true,
+  "protectedStateUnchanged": true,
+  "runnerSeats": [
+    {
+      "name": "zgmini-pc-01",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "name": "zgmini-pc-02",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "name": "zgmini-pc-03",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "name": "zgmini-pc-04",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "name": "zgmini-pc-05",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "name": "zgmini-pc-06",
+      "status": "online",
+      "busy": false
+    }
+  ],
+  "operationalWrites": 0,
+  "pcRetries": 0,
+  "workflowPuts": 0,
+  "backlogWrites": 0,
+  "providerCalls": 0,
+  "dbWrites": 0,
+  "d1Writes": 0
+}

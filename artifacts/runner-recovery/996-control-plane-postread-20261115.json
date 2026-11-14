@@ -1,0 +1,17 @@
+{
+  "observedAt": "2026-11-14T17:01:17.826Z",
+  "installLock": {
+    "held": false
+  },
+  "watchdog": {
+    "state": "HEALTHY",
+    "at": "2026-11-14T17:01:13.509Z",
+    "supervisorPid": 23200
+  },
+  "receiver": {
+    "status": "LISTENING",
+    "at": "2026-11-14T17:01:17.346Z",
+    "pid": 23860
+  },
+  "mutations": 0
+}

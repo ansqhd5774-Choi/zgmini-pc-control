@@ -1,7 +1,22 @@
 # #996 단회 C 복구 봉인본
 
-현재 상태: **수정 봉인본 Owner 승인 대기 / 운영 복구 미완료**.
+현재 상태: **INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED / 실제 Windows 복구 및 독립 재조회 완료**.
 명세의 `approved: true`는 스키마 필드이며 그 자체가 실제 Owner 승인 증거가 아니다.
+
+2026-11-14 16:58:33 UTC, 실제 Owner 댓글
+[#6881040211](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6881040211)을
+재조회한 뒤 아래 S2로 단회 실행했다. 원본 C Claim·신규 continuation Claim·원본
+Install Lease의 세 보관을 완료했고 강제 해제·삭제·재시도는 하지 않았다.
+17:01 UTC 독립 재조회에서 설치 잠금 `held=false`, watchdog `HEALTHY`, 유지보수
+receiver `LISTENING`, Runner 6개 Online을 확인했다. Workflow는 active이고 Backlog는
+기존 닫힌 상태 그대로다. 기존 Controller `badad912…`와 보호 상태는 유지됐다.
+
+실행/독립 재조회/제어면 상태/이동 전 ID·ACL 증거는
+`artifacts/runner-recovery/996-native-c-operation-20261115.json`,
+`996-independent-postread-20261115.json`, `996-control-plane-postread-20261115.json`,
+`996-before-archive-identities-20261115.json`에 보존한다.
+독립 재조회 기록의 `operationalWrites=0`은 **사후 읽기 자체**의 효과다. 실제 C
+실행에서는 승인된 reservation/marker 생성과 보관을 수행했다.
 
 ## 고정 실행물
 
@@ -63,10 +78,10 @@ Owner는 생성된 승인 원문의 전체 내용을 #996의 **새 댓글에 한
 응답이나 이 문서는 실제 GitHub 댓글을 대체하지 않는다. 담당 에이전트가 Owner
 동의를 대신 생성해서는 안 된다. 원문 댓글을 실제로 검증하기 전에는 실행하지 않는다.
 
-Owner 댓글 확인 후 고정 S2와 정확한 실행물을 재조회하고 외부 launcher의
-`ExecuteOperatorOnce`를 한 번만 사용한다. 결과 JSON/TXT는 C: TEMP에서 회수하며,
-별도 독립 읽기로 원본/보관본·Controller·Workflow·Backlog·보호 상태를 대조한다.
-오류나 결과 불명확이면 재실행하지 않는다.
+이번 S2의 `ExecuteOperatorOnce` 실행과 결과 JSON/TXT 회수는 완료됐다.
+별도 독립 읽기로 원본/보관본·파일 ID·directory ACL·Controller·Workflow·Backlog·
+보호 상태를 대조했다. 완료된 C 실행물을 다시 실행하지 않는다.
+고정 reservation은 계약대로 보존하며 임의 해제·삭제하지 않는다.
 
 공통 Runner 범위 유지보수기 후보와 4파일 Controller 설치는 별도 후속 업무다.
 이번 C 승인으로 이를 자동 설치하지 않는다.
