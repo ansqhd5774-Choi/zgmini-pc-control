@@ -39,11 +39,40 @@ watchdog 바이트는 기존 INSTALL.json과 일치했다. 남아 있는 #996 in
 원본 근거는 [#68 실측 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6869314747)과
 [#1351](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351#issuecomment-6869319033)에 있다.
 
-이 경우 설치 복구의 승인·독점 접근 계약을 적용한다. 연결만 되살리려고
-controller-install을 삭제하거나 Listener를 별도로 기동하지 않는다.
-공용 복구 담당은 #996의 정확한 C 실행물·Owner 승인·사후 검증을 완료하고,
-이어 watchdog/Supervisor/6좌석의 실제 복귀와 기존 #1351 결과를 회수한다.
+설치 잠금 해제와 기존 Controller 연결 복구를 구분한다. #996 C급 보관을
+모든 기존 작업의 전역 선행 조건으로 만들지 않는다. controller-install을
+삭제하거나 Listener만 별도로 기동하는 방식은 사용하지 않는다.
+
+사용자가 승인한 기존 Controller 연결 복구는 다음 범위에서 별도로 진행할 수 있다.
+
+1. 설치 manifest와 정확한 Git 원본 바이트로 기존 실행 파일 전체를 검증한다.
+2. Supervisor owner의 종료, 설치/C owner의 종료, 동시 복구 부재를 확인한다.
+   PAUSE/DRAIN, Workflow 상태 및 대기 중 요청의 실제 실행 효과도 확인한다.
+3. 기존 검증된 watchdog의 보관 함수를 사용해 종료된 **일반 Supervisor lease만**
+   보관한다. #996 C Claim·Install Lease·원장·Backlog는 보존한다.
+4. 기존 설치된 Supervisor 정상 진입점을 한 번 실행한다. 새 요청이나 재실행 없이
+   6좌석 연결과 기존 요청의 실제 결과 JSON·TXT·댓글을 확인한다.
+5. 설치 파일·#996 원본·Core/Korea 보호 지문을 사후 대조한다.
+
+이 절차는 감시기의 설치 잠금 검사를 우회하도록 변경하거나 신규 설치를 허용하는
+절차가 아니다. 설치 복구에는 기존 C급 승인·독점 접근 계약을 계속 적용한다.
 기능별 독립 소스 수정·기존 데이터 검증은 해당 기능 담당이 계속한다.
+
+### 2026-11-14 기존 연결 복구 결과
+
+10:35 KST 기존 Controller `badad9124157879d7a645b64f2768113d632355b`의
+38개 파일을 검증한 뒤 위 절차로 Supervisor를 기동했다. 운영 Runner 6개는
+Online으로 복귀했고, 기존 #1351이 같은 Run/Job으로 실행되어 JSON·TXT가 회수됐다.
+중복 요청은 없으며 #996 원본·설치 파일·보호 지문은 변경되지 않았다.
+
+- 실행/회수: [#1351 실제 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351#issuecomment-6869476984)
+- 실제 진단: `STATE_UNKNOWN / CORE_NO_ACTIVE_TASK_ENGINE`. Actions 성공을
+  Core 실행 출처 확인 PASS로 해석하지 않는다. 별도 Task Scheduler 조회에서
+  Core는 RUNNING이었다. 해당 진단 코드만으로 Core 정지를 단정하지 않는다.
+- 근거: `artifacts/runner-recovery/existing-controller-reconnection-20261114.json`.
+- 남은 제한: 설치된 watchdog은 #996 Install Lease가 존재하면 자동 재시작을
+  억제한다. Supervisor가 다시 종료되면 연결이 재차 끊길 수 있다.
+  신규 Controller 설치와 #996 C급 복구는 아직 완료되지 않았다.
 
 위 STATUS 소스 보완은 Draft 후보이며 2026-11-14 관측 당시 운영 설치에
 반영되지 않았다. 상태 설명 보완을 Runner 복구 성공으로 보고하지 않는다.

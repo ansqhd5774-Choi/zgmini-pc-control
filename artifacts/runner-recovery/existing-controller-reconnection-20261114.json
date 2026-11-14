@@ -1,0 +1,86 @@
+{
+  "schema": "ZGMINI_EXISTING_CONTROLLER_RECONNECTION_EVIDENCE_V1",
+  "observedAt": "2026-11-14T01:41:52.270Z",
+  "status": "RUNNERS_RECONNECTED_RESULT_PAIR_RETRIEVED",
+  "controllerSourceSha": "badad9124157879d7a645b64f2768113d632355b",
+  "controllerFilesVerified": 38,
+  "supervisorPid": 23200,
+  "supervisorLeaseArchive": "E:/ZGmini/automation/pc-watchdog/archives/supervisor-connectivity-1794620118775-abafdc64-9dee-4c1a-9248-7d15dfdb5a91",
+  "supervisorLeaseArchives": 1,
+  "originalCClaimArchives": 0,
+  "originalInstallLeaseArchives": 0,
+  "original996FilesUnchanged": true,
+  "controllerFilesUnchanged": true,
+  "protectedFingerprintUnchanged": true,
+  "originalInstallBarrierRetained": true,
+  "runners": [
+    {
+      "id": 2,
+      "name": "zgmini-pc-01",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "id": 3,
+      "name": "zgmini-pc-02",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "id": 4,
+      "name": "zgmini-pc-03",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "id": 5,
+      "name": "zgmini-pc-04",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "id": 6,
+      "name": "zgmini-pc-05",
+      "status": "online",
+      "busy": false
+    },
+    {
+      "id": 7,
+      "name": "zgmini-pc-06",
+      "status": "online",
+      "busy": false
+    }
+  ],
+  "job": {
+    "runId": 43429486924,
+    "jobId": 131899103441,
+    "status": "completed",
+    "conclusion": "success",
+    "runner": "zgmini-pc-04",
+    "duplicateRequests": 0
+  },
+  "operationResult": {
+    "requestId": "pc-8ff3a2e8-1bc9-4470-81ad-7789fc0b2b13",
+    "operation": "core-runtime-source-readonly",
+    "status": "STATE_UNKNOWN",
+    "code": "CORE_NO_ACTIVE_TASK_ENGINE",
+    "lastPass": "ALLOWLISTED_WORKER_STARTED",
+    "firstFail": "ALLOWLISTED_OPERATION",
+    "actualExecutionSha": "badad9124157879d7a645b64f2768113d632355b",
+    "protectedStateUnchanged": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "operationalWrites": 0
+  },
+  "resultPair": {
+    "jsonSha256": "5b1faf0bb57796c787526bafa5fd713ab9bd500798caee3c7bad98397d717251",
+    "txtSha256": "3148e34ff933bf45cf3ac05e7b14a1943cd2eb3b41dd6f6945b3f1af5663e347",
+    "verified": true
+  },
+  "limitations": [
+    "INSTALL_LEASE_STILL_BLOCKS_AUTOMATIC_SUPERVISOR_RESTART",
+    "NEW_CONTROLLER_INSTALLATION_REMAINS_BLOCKED",
+    "CORE_RUNTIME_SOURCE_QUERY_RETURNED_STATE_UNKNOWN"
+  ]
+}
