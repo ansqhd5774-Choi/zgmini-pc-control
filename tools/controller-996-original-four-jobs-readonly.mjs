@@ -21,8 +21,8 @@ const EXPECTED=Object.freeze([
 ]);
 const BODY_KEYS=['chatId','operation','requestId','schema','sourceBranch',
   'sourceRepository','sourceSha'];
-// Exactly one existing human-authored diagnosis on #1227 is not a pc-job
-// receipt. No other comment, edited comment, or bot receipt is accepted.
+// Recognize the historical diagnosis for reporting only. Later comments are
+// inventoried as unverified data and cannot authorize, replay or complete jobs.
 const D05_DIAGNOSTIC=Object.freeze({
   issueNumber:1227, id:6781491296,
   bodySha256:'3808532bddb28fe398139bce3dc016a336bced84a7951467cbb26edf6b349b30'
