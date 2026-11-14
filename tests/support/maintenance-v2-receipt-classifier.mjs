@@ -6,7 +6,7 @@ export function classifyHandoffReceipt(e, config = {}) {
   const TARGET = config.targetSha || 'c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7';
   const result = (status, reason, next) => ({status, reason, next, operationalPass: status === 'HANDOFF_VERIFIED'});
   if (!e || typeof e !== 'object' || Array.isArray(e)) return result('INVALID_EVIDENCE','Receipt must be an object','OWNER_READ_ONLY_REVIEW');
-  const bools = ['attemptObserved','journalPresent','stopRequestPresent','stopHandledPresent','priorReceiverAlive','operatorAlive','runtimeHashesVerified','receiverOriginVerified','protectionPreserved','runnerSeatsVerified','installLeaseClear','remoteReportPresent'];
+  const bools = ['attemptObserved','journalPresent','stopRequestPresent','stopHandledPresent','priorReceiverAlive','operatorAlive','runtimeHashesVerified','receiverOriginVerified','protectionPreserved','runnerSeatsVerified','installLeaseClear','remoteReportPresent','ownerReceiptVerified'];
   if (bools.some(key => e[key] != null && typeof e[key] !== 'boolean')) return result('INVALID_EVIDENCE','Malformed tri-state evidence','OWNER_READ_ONLY_REVIEW');
   const statuses = ['PASS','BLOCKED','RUNNING','RECOVERY_REQUIRED','ROLLED_BACK'];
   if (e.journalStatus != null && !statuses.includes(e.journalStatus)) return result('INVALID_EVIDENCE','Unexpected journal status','OWNER_READ_ONLY_REVIEW');
@@ -26,7 +26,7 @@ export function classifyHandoffReceipt(e, config = {}) {
   }
   if (e.stopRequestPresent === true && e.journalPresent !== true) return result('STOP_PENDING_OR_TIMEOUT','Delayed cooperative stop remains possible','OWNER_READ_ONLY_REVIEW');
   if (e.journalStatus === 'BLOCKED') {
-    if (e.priorReceiverAlive === true && e.stopRequestPresent === false && e.stopHandledPresent === false && e.installedSourceSha === OLD && e.protectionPreserved === true) {
+    if (e.priorReceiverAlive === true && e.stopRequestPresent === false && e.stopHandledPresent === false && e.installedSourceSha === OLD && e.protectionPreserved === true && e.ownerReceiptVerified === true) {
       return result('PREFLIGHT_BLOCKED_UNTOUCHED','Preflight blocked with observed old receiver and unchanged protection','NO_AUTO_RETRY');
     }
     return result('BLOCKED_SIDE_EFFECTS_UNKNOWN','Blocked label cannot prove no state transition','OWNER_READ_ONLY_REVIEW');
@@ -35,7 +35,7 @@ export function classifyHandoffReceipt(e, config = {}) {
     const verified = e.journalPresent === true && e.installedSourceSha === TARGET &&
       e.runtimeHashesVerified === true && e.receiverOriginVerified === true &&
       e.protectionPreserved === true && e.runnerSeatsVerified === true &&
-      e.installLeaseClear === true;
+      e.installLeaseClear === true && e.ownerReceiptVerified === true;
     if (!verified && e.receiverOriginVerified !== true) return result('PASS_BUT_RECEIVER_UNVERIFIED','Journal PASS lacks independent Windows receiver-origin verification','OWNER_READ_ONLY_REVIEW');
     if (!verified) return result('PASS_EVIDENCE_INCOMPLETE','One or more required bytes/protection/runner/lease proofs missing','OWNER_READ_ONLY_REVIEW');
     if (e.remoteReportPresent === false) return result('UPLOAD_GAP','Local proof available but remote receipt absent; never replay handoff','RECOVER_EXISTING_RECEIPT');
