@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
-import {decide,archiveDeadLease,validateHandoffIntent} from '../tools/runner-watchdog.mjs';
+import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass} from '../tools/runner-watchdog.mjs';
 test('fresh heartbeat is required for healthy status',()=>{
  const now=Date.now(),owner={pid:123};
  assert.equal(decide({owner,live:true,heartbeat:new Date(now).toISOString(),now}),'HEALTHY');
@@ -80,5 +80,24 @@ test('a merged source without exact B approval, scope or raw file bytes does not
  ]){
   const value=validIntent();mutation(value);
   assert.throws(()=>admit(value),/HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
+ }
+});
+
+test('operator stdout PASS requires independent persisted Windows install proof',()=>{
+ const good={report:{status:'PASS'},
+   ledger:{schema:'ZGMINI_MAINTENANCE_HANDOFF_RESULT_V1',status:'PASS',
+    targetSha:fixedSha,code:'STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED',
+    receiverPid:4365},
+   installed:{sourceSha:fixedSha},targetSha:fixedSha,exitCode:0};
+ assert.equal(verifyHandoffPass(good),true);
+ for(const mutate of [
+   value=>{value.exitCode=1;},
+   value=>{value.ledger.targetSha=oldSha;},
+   value=>{value.ledger.status='RUNNING';},
+   value=>{value.ledger.receiverPid=null;},
+   value=>{value.installed.sourceSha=oldSha;},
+ ]){
+  const x=JSON.parse(JSON.stringify(good));mutate(x);
+  assert.throws(()=>verifyHandoffPass(x),/HANDOFF_PASS_RUNTIME_READBACK_MISMATCH/);
  }
 });
