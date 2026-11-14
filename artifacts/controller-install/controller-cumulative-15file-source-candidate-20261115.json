@@ -241,12 +241,49 @@
     "oldSourceRawSha256": "8/8 modified baseline files; new file old=null",
     "sourceGitBlobSha": "15/15 target and 8/8 old from GitHub contents",
     "sourceTreeDiff": "15 deployable / 1 non-deploy test / 0 controller deletions",
-    "infrastructureDelta": "NOT_EXHAUSTIVELY_REVIEWED_716_COMMITS",
+    "infrastructureDelta": "ControllerOnlyInstall mode excludes unrelated scripts/workflows; exact live pc-job.yml unchanged at pinned old and target. No whole-repo infrastructure approval asserted.",
     "moduleApprovals": "PENDING_PER_DOMAIN",
     "sourceCI": "PR #1367 related CI 2/2 PASS, not cumulative per-module B approval",
     "windowsSimulation": "NOT_RUN",
     "windowsInstallation": "NOT_RUN",
-    "runtimeResults": "NOT_RUN"
+    "runtimeResults": "NOT_RUN",
+    "controllerOnlyDryRun": {
+      "classification": "SOURCE_ONLY_SIMULATION_NOT_PC_CI",
+      "expectedFiles": 15,
+      "actualFiles": 15,
+      "sourceOnlyNonDeploy": [
+        "controller/inflation-core-lock-observation-readonly.test.mjs"
+      ],
+      "deletedControllerFiles": 0,
+      "passed": 6,
+      "failed": 0,
+      "scenarios": [
+        {
+          "name": "exact-cumulative-15",
+          "result": "PASS"
+        },
+        {
+          "name": "outdated-four-files",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        },
+        {
+          "name": "missing-one-file",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        },
+        {
+          "name": "test-file-added-to-allow",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        },
+        {
+          "name": "live-workflow-drift",
+          "result": "CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED"
+        },
+        {
+          "name": "duplicate-allowfile",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        }
+      ]
+    }
   },
   "sourceProvenance": {
     "stability": "PR #1367 merged at 8e2736a62a90798afe159ef4d96a8713265ca021; only common, supervisor, core-runtime-source-readonly, core-runtime-source-wmi",
@@ -269,5 +306,18 @@
     "Git blobs are separate from raw SHA-256; both identifiers are recorded",
     "Source code and manifest are not a live Windows proof"
   ],
-  "nextAction": "Existing independent Windows Owner completes verified 7-to-7 maintenance handoff; in parallel, source owner resolves domain approval refs and full infrastructure diff, then creates exact native ZGMINI_PC_UPDATE_V1 approval manifest tied to verified current installedSha. All uncertainty fails closed."
+  "nextAction": "Existing independent Windows Owner completes approved 7-to-7 maintainer handoff; in parallel, source Owner establishes existing standing and original module approval lineage and creates a native approved 15-file B manifest only for pinned controllerOnlyInstall scope after live installedSha check. Run exactly one authorized Controller install with native safety guards and fresh readback. No ad hoc pc-job/Runner self-handoff.",
+  "installModeCandidate": {
+    "mode": "controllerOnlyInstall",
+    "purpose": "pc-controller-maintenance",
+    "scope": "CONTROLLER_CONFIG_ONLY",
+    "sourceContract": "tools/maintenance-contract.mjs validateControllerOnlyInstallDelta; tools/update.mjs controlled stage path",
+    "liveWorkflowPath": ".github/workflows/pc-job.yml",
+    "liveWorkflowOldGitBlob": "33fb720e970593d14d2832935ac51f29d52ec2b4",
+    "liveWorkflowTargetGitBlob": "33fb720e970593d14d2832935ac51f29d52ec2b4",
+    "liveWorkflowUnchanged": true,
+    "sourceOnlyTestExclusion": true,
+    "requiresNativeApprovalAfterHandoff": true,
+    "assumptions": "GitHub source-only compare; local Windows installer must independently verify exact diff, policy, current source, receiver and protection"
+  }
 }
