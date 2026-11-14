@@ -1,0 +1,77 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_CONTINUATION_C_APPROVAL_V1",
+  "grade": "C",
+  "approved": true,
+  "operation": "ARCHIVE_INTERRUPTED_C_CLAIM_AND_INSTALL_LEASE",
+  "issueNumber": 996,
+  "originalRequestId": "pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404",
+  "continuationRequestId": "45111324-4e7f-462b-ac7e-858b122bf801",
+  "operatorCommit": "32f5e518ada323f2744d5d0854b7e5cafc736864",
+  "operatorSha256": "d7134c1501edbe61416bd556f2b8ebad528cf6fdd73f9346721785b8dca52467",
+  "bootstrapSha256": "4827b8a14005c8b07056bec2a831f2890eae293c4561168557b9e552a5394e7d",
+  "packageSha256": "239c84e3ba91febf16f6030c517f988cfcb8416981240b6da6dd11f8277765d5",
+  "sourceLockSha256": "28958530cccea9c220e309b6256f2152fc34c7a2c03660d71f0b2c74db24f847",
+  "launchPins": {
+    "outerSha256": "9a5a2af0d79734204e79ab16729766d84133c4b58d5baa77ab9d9f447bb018ce",
+    "launcherSha256": "74c7b0d3443f1263b97663c4ff83229a9b4c4e4c0cbf6c74dfb93fa498dafb75",
+    "helperSha256": "7b4e2e49f5b7c5091617ccb575f3722e2b60037e543b4d54eb7648a68d42605a",
+    "nodeSha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237"
+  },
+  "originalPins": {
+    "oldC": "a6390236b48fdfa13adb7661ec5e9c9ed159f7095ede1972e20dcc6865d2e074",
+    "installOwner": "d6329b4d82530f9a1ca574647f050fff9243b698bb9dd314975b19ed171e40bc",
+    "installRecovery": "4dc51f7e3a1cd84ce94ddf993e4a1cfbb319b050447dfbb5ccf0c38434a0b09b",
+    "backlog": "4521688c7d9f0cebbf5a71e1ba71713abc4327a5d9a091ea250f0b001ce44186",
+    "installed": "32403a79fb407cabe8426de7507116847178f734da68a289cc12fa8cf4ca36c9",
+    "stage": "9903d822bca20ae14dcf5a2f6a0d1f44869f29b3c274e9a4a2de226d401069b3",
+    "maintainer": "a5ed876c520a844a33bdf6cc137ac8015f686ed416aff6370389440ad6e3cba5",
+    "PREPARED": "c29e96c39660da05b1b301c0545c42b4c9757155ff42a897b0fc9fb8e4fdc201",
+    "WORKFLOW_ENABLE_ATTEMPTED": "2b662f6b8fc1235e072cd46e08533e5d03be9cbdc3a49673afbf4ff7e21e063b",
+    "BACKLOG_CLOSE_ATTEMPTED": "9ba544fc261f0cfee73e2db79a99e61a9db9b4d3ecd7fa1dd9e8d1dfc1b4b758"
+  },
+  "effects": [
+    "CREATE_AND_PRESERVE_FIXED_C_RESERVATION_VIA_ATOMIC_PROPOSAL_MOVE",
+    "RESERVE_INDEPENDENT_CONTINUATION_C_CLAIM",
+    "WRITE_SCOPED_DURABLE_RECOVERY_MARKERS",
+    "ARCHIVE_ABANDONED_C_CLAIM_NO_DELETE",
+    "ARCHIVE_INDEPENDENT_CONTINUATION_C_CLAIM",
+    "VERIFY_DURABLE_READY_TO_RELEASE_INSTALL",
+    "ARCHIVE_ORIGINAL_INSTALL_LEASE_LAST_NO_DELETE"
+  ],
+  "workflowPutCount": 0,
+  "backlogWriteCount": 0,
+  "originalRequestRetryCount": 0,
+  "issuePostCount": 0,
+  "protectionBaseline": {
+    "schema": "ZGMINI_CONTROLLER_996_MANIFEST_PROTECTION_BASELINE_V1",
+    "historicalFingerprint": "877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86",
+    "fingerprint": "0ef53711fe5da97f4614b962e81a393e3532a8f912d201a86cdc068502f99904",
+    "items": {
+      "files": {
+        "config.json": "53533eab16c0d62301450129cfe81aefcd7a56a45c97a20d536b32c526c3d72a"
+      },
+      "writerFileStatus": {
+        "config.json": "PRESENT",
+        "quota-runner.cmd": "ABSENT",
+        "run-local.cmd": "ABSENT"
+      },
+      "taskSha256": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1"
+      },
+      "taskEnabled": {
+        "ZGMINI-PC-Local-Core": true,
+        "ZGMINI-PC-Local-Korea": true
+      }
+    },
+    "evidence": [
+      {
+        "repository": "ansqhd5774-Choi/zgmini-pc-control",
+        "issueNumber": 1321,
+        "commit": "1516477f7046ca024194a5b5a8f8dfd5d7fc96b5",
+        "path": "results/43233846597-1-seat-5.json",
+        "sha256": "6ced7e9579abaa34c76b2f647c15e44b70b2e8cdaff53719e749a856cfe3a0de"
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1",
+  "files": {
+    "tools/controller-996-c-installed-gh-get-readonly.mjs": "2500740aed70dcb0db45d74e52d67410a29b11b86e327ff831ec82c72f83e302",
+    "tools/controller-996-c-native-owner-operator.mjs": "d7134c1501edbe61416bd556f2b8ebad528cf6fdd73f9346721785b8dca52467",
+    "tools/controller-996-c-native-trusted-bootstrap.mjs": "4827b8a14005c8b07056bec2a831f2890eae293c4561168557b9e552a5394e7d",
+    "tools/controller-996-c-original-prewrite-readonly.mjs": "33f8b7611f41bf92f6fafc69a1a1fa46a11b4f3a8f68ea579f103bc540134ac3",
+    "tools/controller-996-c-original-stage-readonly.mjs": "998f934fa2c5004efa626b5faf95e30632e4b3fcffd7bef2987d867e7e888364",
+    "tools/controller-996-c-physical-disposition-readonly.mjs": "7f8ea6cf1798a3274ecd7f23524c74fae4dabde136b84201b6680454ddf0faf5",
+    "tools/controller-996-continuation-gate.mjs": "b53109af7aa4db283a776eca8221b53aa702ff2eaf1c04f80df4319e1ce8f7dc",
+    "tools/controller-996-git-byte-offline-manifest-r4.json": "0978bae8a0e260a65a2d690fbee21f751d06bb4bb26d55051d30d081f4619f6f",
+    "tools/controller-996-git-byte-offline-readonly-r4.mjs": "bc5a5e5cb0c6ced192f5a6c3b9898b8ac3e319076e07bd2de3b9d9872ff5facd",
+    "tools/controller-996-interrupted-observer.mjs": "9e2a0b8273b23be11c1964cf6857197911cde0fd4e781c2da6d7ca6d2ac9557b",
+    "tools/controller-996-native-continuation-consent-reader.mjs": "2a3ea4c3aa714302afa63febbf2ba805c3b3434c461d2f11a0ee237a515d0dd7",
+    "tools/controller-996-original-four-jobs-readonly.mjs": "33ac660f19eac3d47b284c9e66437feb0b88495bd99a83e37f1283f11ba6dfdc",
+    "tools/controller-996-protection-attestation.mjs": "4ffb482f535f55e7ac614b08546f8d09a85b66ddc7e0698a4642ed3af275379e",
+    "tools/controller-996-r2-evidence-review.mjs": "dbd7cac110bd63fd30a9f0465323e181e6cb4b9d542f5d0900d2dbaaa2a1c4c4",
+    "tools/controller-996-windows-archive-adapter.mjs": "09d2c351616e624f52bc99fdd770792fe2e4b5caeab95eba63cf6a389e8c622a",
+    "tools/controller-996-windows-observer.mjs": "471de28cbf5e3f9ff8488e4332862c1949991814da53b5c2145ae1b24ebd3fbd"
+  }
+}
