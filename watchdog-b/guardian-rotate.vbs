@@ -54,11 +54,12 @@ Function AgeSeconds(value)
  AgeSeconds=DateDiff("s",timeValue,Now())
  If Err.Number<>0 Then AgeSeconds=-1
 End Function
-If WScript.Arguments.Count<>1 Then Deny
-If Not PidOk(WScript.Arguments(0)) Then Deny
+If WScript.Arguments.Count<>2 Then Deny
+If UCase(CStr(WScript.Arguments(0)))<>"PROBE" And UCase(CStr(WScript.Arguments(0)))<>"ACTIVATE" Then Deny
+If Not PidOk(WScript.Arguments(1)) Then Deny
 Dim svc,watch,guardian,watchPid,guardianPid,nodePath,scriptPath
 Dim startupPath,cmdExpected,watchBorn,guardianBorn,watchSid,guardianSid,elapsed,rc
-watchPid=CLng(WScript.Arguments(0))
+watchPid=CLng(WScript.Arguments(1))
 Err.Clear
 Set svc=GetObject("winmgmts:\\.\root\cimv2")
 If Err.Number<>0 Then Deny
@@ -80,7 +81,7 @@ If Not PidOk(watch.ParentProcessId) Then Deny
 guardianPid=CLng(watch.ParentProcessId)
 Set guardian=OnlyProcess(svc,guardianPid)
 If guardian Is Nothing Then Deny
-If Right(LCase(Replace(CStr(guardian.ExecutablePath),"/","\")),11)<>"\wscript.exe" Then Deny
+If Right(LCase(Replace(CStr(guardian.ExecutablePath),"/","\")),12)<>"\wscript.exe" Then Deny
 startupPath=LCase(CreateObject("WScript.Shell").ExpandEnvironmentStrings("%APPDATA%")) & "\microsoft\windows\start menu\programs\startup\zgmini_pc_control.vbs"
 If InStr(LCase(CStr(guardian.CommandLine)),startupPath)=0 Then Deny
 guardianBorn=Created(guardian)
@@ -88,6 +89,7 @@ guardianSid=OwnerSid(guardian)
 If guardianBorn="" Or guardianSid<>watchSid Or guardianBorn>watchBorn Then Deny
 If CStr(guardian.SessionId)<>CStr(watch.SessionId) Then Deny
 If Err.Number<>0 Then Deny
+If UCase(CStr(WScript.Arguments(0)))="PROBE" Then WScript.Echo "WATCHDOG_ROTATION_VERIFIED" : WScript.Quit 0
 ' The WMI object was selected by exact PID+parent+creation+owner+commandline.
 ' Terminate this single watchdog only. Never use Taskkill /T or process tree.
 Err.Clear
