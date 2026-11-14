@@ -1,6 +1,37 @@
 # ZGMINI 전체 작업 통합 실행계획 — 2026-11-13 (R1)
 
 
+## 2026-11-15 최신 정정 R3 — #1367 실제 main 병합 및 누적 Controller 설치 범위 15파일
+
+> **최신 R3를 R2 및 그 아래 모든 11/14 과거 상태 문구보다 우선 적용.** 본 R3는 신규 GitHub 원격 실증에 의해 바뀐 설치 경계만 수정하며 #996 C 복구의 완료, 6 Runner readback, 유지보수기 실제 미설치, 독립 기능의 진행률과 권한은 그대로 유지한다.
+
+### R2 이후 확정된 새 증거
+
+1. Controller 안정성 [PR #1367](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367)은 **main 병합 완료**. Merge SHA `8e2736a62a90798afe159ef4d96a8713265ca021`. 소스 변경은 `controller/common.mjs`, `supervisor.mjs`, `core-runtime-source-wmi.mjs`, `core-runtime-source-readonly.mjs` **운영 런타임 4파일**, **테스트 2파일**, **기존 CI Workflow 1파일**. Source CI [43623279983](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43623279983), [43623279883](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43623279883) **2/2 성공**. 기존 R2의 'Draft/CI 미확인'은 **과거 상태**.
+2. 그러나 기존 PC Controller source `badad9124157879d7a645b64f2768113d632355b`와 최신 통합 main `8e2736a62a90798afe159ef4d96a8713265ca021` 사이 비교는 **716 commits ahead**, GitHub API 비교 출력에서 `controller/` 아래 **15개 파일(운영 런타임 변경/추가 14개 + 비배포 테스트 1개)**, `config/operations.json` 변경 **1개**를 확인. **운영 설치 영향 후보는 15파일(런타임14+config1)로 분류**하고 비배포 테스트 1파일은 설치 대상에서 제외한다. GitHub compare API는 전체 repository file 목록 300개까지만 반환했으므로 전체 716 commits/전체 저장소 영향의 완전한 파일 목록이라고 주장하지 않는다. Controller/config 파일별 위 관측은 [중앙 #68 정확 인벤토리](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6881785184)와 일치.
+3. **절대 금지할 혼동:** PR #1367이 변경한 '안정성 런타임 4파일' ≠ 기존 운영 설치 Controller에서 현 main으로 이전할 때의 '누적 배포 영향 15파일'. 4파일 allowFiles로 main 전체를 배포하려는 시도, 승인 누락 모듈을 암묵 포함, 승인 전 Core/Writer/다른 기능 덮어쓰기 금지.
+4. 유지보수기 [#1365](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1365) source `c2e6744b...` 및 [#1366](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1366) V2 승인 `0358dfcb...`는 계속 main 병합 **완료**. 그러나 승인된 독립 Windows Operator 7→7 실제 인계 **0회**, 이후 Controller 운영 설치도 **0회**. #996 C 복구 100% 완료는 설치 성공이 아님.
+
+### 운영 Controller 15파일 상세 인벤토리 (설치 승인은 별도)
+
+- **수정 런타임 6:** `controller/common.mjs`, `controller/core-runtime-source-readonly.mjs`, `controller/core-runtime-source-wmi.mjs`, `controller/operations.mjs`, `controller/release-calendar-runtime-readonly.mjs`, `controller/supervisor.mjs`, `controller/theme-l7-runtime-readonly.mjs` 중 비교 기준 실제 **수정 7**; 나머지 별도 목록 아래 참조.
+- **신규 런타임 7:** `controller/d05-lineage-readonly.mjs`, `controller/employment-r6-collection-evidence-readonly.mjs`, `controller/inflation-core-lock-observation-readonly.mjs`, `controller/shared-resource-release-readonly.mjs`, `controller/source-inventory-runtime-readonly.mjs`, `controller/writer-b-1063-recovery-readonly.mjs`, `controller/writer-b-1063-task-probe.mjs`. 따라서 런타임 **7 modified + 7 added = 14**.
+- **설정 1:** `config/operations.json` modified (이전 31개 vs 현 source 37개 operation 차이의 등록 범위 승인 별도 확인).
+- **비배포 테스트 1:** `controller/inflation-core-lock-observation-readonly.test.mjs` added, 운영 설치 대상 **아님**.
+
+### 수정된 실행 의존성과 실제 완료 기준
+
+**P0:** 기존 운영 PC Owner는 승인된 독립 Windows Operator에서 기존 유지보수기 source `16064e29...`→V2 target `c2e6744...` 7→7 단일 인계를 실제 실행하고 설치 SHA/Receiver Windows origin/7파일 해시/Runner 6/6/ACL/lease/보호를 사후 확인한다. 현재 이 대화의 사용 가능한 연결에는 그 Operator 실행 경로가 없어서 `AUTOMATION_BLOCKED(INDEPENDENT_WINDOWS_HANDOFF_EXECUTION_PATH_UNAVAILABLE)`. 임의 CMD·A급 pc-job·격리 Runner로 우회 금지.
+
+**P1:** *P0 실제 성공 이후* 기존 Controller `badad912...`→현 main 변경 15개 배포 대상의 **모듈별 승인/의존성**을 분해해 현장 실제 preimage·main ancestry·CAS·B manifest·Owner를 고정한다. 새 4파일 안정성 코드만 보고 나머지 11개를 묵시 승인하지 않는다. 필요시 승인된 최소 단계별 설치를 설계하고, 실제 설치·새 source SHA·기능별 A allowlist/JSON/TXT·6 Runner·Workflow·Backlog·보호를 확인한다.
+
+**병렬:** W01~W06 독립 공식 원자료/라이선스/테스트/소스/웹 작업은 계속. #996 복구나 Controller 공유 설치가 모든 독립 업무의 선행 조건이라는 잘못된 전역 Gate 금지. 사용자 승인 없는 새 담당·예약·권한·운영 쓰기 금지.
+
+**실행 진척:** 소스 3개 PR #1365/#1366/#1367 main 병합과 CI PASS까지 확인. 새 Windows 유지보수기 인계 0회, 새 Controller 설치 0회, 이번 최신 계획 정정 자체는 운영 변경 0. 전체 제품 E2E 완료율 UNKNOWN.
+
+---
+
+
 ## 2026-11-15 최신 현황 갱신 R2 — #996 복구 이후 실행계획
 
 > **최신 상태 우선:** 이 절이 기존 11/14 및 본문 아래 과거 기록의 #1351 미배정, #996 80% NO-GO, Runner 6/6 Offline, 유지보수기 소스 미병합 상태를 갱신한다. 원본 이력·승인·실패 기록은 삭제하지 않는다. 운영 실측 기준은 2026-11-15 02:01 KST까지의 독립 readback이며 지속 정상이나 서비스 전체 완료를 추정하지 않는다.
