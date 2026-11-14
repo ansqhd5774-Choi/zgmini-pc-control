@@ -36,6 +36,26 @@ export function validateRequest(request,policy){
 }
 export function under(root,relative){const resolved=path.resolve(root,relative);need(resolved.startsWith(path.resolve(root)+path.sep),'PATH_OUTSIDE_JOB');return resolved;}
 export function writeJson(file,value){const tmp=file+'.'+crypto.randomUUID()+'.tmp';fs.writeFileSync(tmp,JSON.stringify(value,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);}
+// A transient heartbeat write failure must not terminate all Runner seats.
+// Only the Supervisor uses this wrapper; lease/ledger writes remain strict.
+export function createSupervisorStatusWriter({write=writeJson,
+ report=value=>process.stderr.write(JSON.stringify(value)+'\n')}={}){
+ let reported=false;
+ return (file,value)=>{
+  try{write(file,value);reported=false;return true;}
+  catch(error){
+   if(!['EACCES','EPERM','EBUSY'].includes(error?.code))throw error;
+   if(!reported){
+    reported=true;
+    report({code:'SUPERVISOR_HEARTBEAT_WRITE_BLOCKED',ioCode:error.code,
+     heartbeatUpdated:false});
+   }
+   // Do not synthesize a fresh heartbeat or relax the installer's freshness
+   // check. The next normal tick may publish again; no job is replayed.
+   return false;
+  }
+ };
+}
 export function errorCode(error){return /^[A-Z0-9_]{1,100}$/.test(error?.code??'')?error.code:'INTERNAL_EXECUTION_ERROR';}
 export async function readAllPages(readPage,{maxPages=100}={}){
  const out=[];
