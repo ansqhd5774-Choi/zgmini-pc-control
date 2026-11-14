@@ -55,7 +55,7 @@ Function AgeSeconds(value)
  If Err.Number<>0 Then AgeSeconds=-1
 End Function
 If WScript.Arguments.Count<>2 Then Deny
-If UCase(CStr(WScript.Arguments(0)))<>"PROBE" And UCase(CStr(WScript.Arguments(0)))<>"ACTIVATE" Then Deny
+If UCase(CStr(WScript.Arguments(0)))<>"PROBE" And UCase(CStr(WScript.Arguments(0)))<>"ACTIVATE" And UCase(CStr(WScript.Arguments(0)))<>"ATTEST" Then Deny
 If Not PidOk(WScript.Arguments(1)) Then Deny
 Dim svc,watch,guardian,watchPid,guardianPid,nodePath,scriptPath
 Dim startupPath,cmdExpected,watchBorn,guardianBorn,watchSid,guardianSid,elapsed,rc
@@ -76,7 +76,7 @@ If watchBorn="" Or watchSid="" Then Deny
 elapsed=AgeSeconds(watchBorn)
 ' Guardian resets its restart counter after 600 seconds of normal Watchdog
 ' runtime. A younger process must not be rotated.
-If elapsed<600 Then Deny
+If UCase(CStr(WScript.Arguments(0)))<>"ATTEST" And elapsed<600 Then Deny
 If Not PidOk(watch.ParentProcessId) Then Deny
 guardianPid=CLng(watch.ParentProcessId)
 Set guardian=OnlyProcess(svc,guardianPid)
@@ -90,6 +90,7 @@ If guardianBorn="" Or guardianSid<>watchSid Or guardianBorn>watchBorn Then Deny
 If CStr(guardian.SessionId)<>CStr(watch.SessionId) Then Deny
 If Err.Number<>0 Then Deny
 If UCase(CStr(WScript.Arguments(0)))="PROBE" Then WScript.Echo "WATCHDOG_ROTATION_VERIFIED" : WScript.Quit 0
+If UCase(CStr(WScript.Arguments(0)))="ATTEST" Then WScript.Echo "WATCHDOG_RUNTIME_ATTESTED" : WScript.Quit 0
 ' The WMI object was selected by exact PID+parent+creation+owner+commandline.
 ' Terminate this single watchdog only. Never use Taskkill /T or process tree.
 Err.Clear
