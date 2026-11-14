@@ -8,13 +8,14 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {protection} from '../tools/install-runner-watchdog.mjs';
 import {TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE,
+  APPROVED_CONTROLLER_SHA,
   parseCanonicalBody,validateRequest,decideUpgradeState,error} from './contract.mjs';
 
 const repoRoot=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
 const maintenance='E:/ZGmini/automation/pc-maintenance';
 const controller='E:/ZGmini/automation/pc-control';
-const manifestFile=path.join(repoRoot,'approvals/watchdog-upgrades',TARGET+'.json');
+const manifestFile=path.join(repoRoot,'approvals/watchdog-upgrades',TARGET+'-r2.json');
 const sourceFile=path.join(repoRoot,'tools/runner-watchdog.mjs');
 const installedFile=path.join(home,'runner-watchdog.mjs');
 const installedManifest=path.join(home,'INSTALL.json');
@@ -56,6 +57,51 @@ function localAcl(file){
  if(entries.length===0||entries.some(row=>row.length>300))
   throw error('WATCHDOG_B_ACL_PARSE_UNCERTAIN');
  return entries.sort().join('|');
+}
+// Source-approved Controller identity is checked at transaction time; the
+// historical first-install Watchdog protection snapshot is NOT reset/replaced.
+export function requireCurrentProtection({historical,current}){
+ if(!historical||typeof historical!=='object'||Array.isArray(historical)
+   ||!current||typeof current!=='object'||Array.isArray(current))
+   throw error('WATCHDOG_B_PROTECTION_SCHEMA_INVALID');
+ const fixed=new Set([
+  'ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea',
+  'ZGMINI-PC-Iran-Progress-R13',
+  'E:/ZGmini/data/pc-writer/config.json',
+  'E:/ZGmini/data/pc-writer/quota-runner.cmd',
+  'E:/ZGmini/data/pc-writer/run-local.cmd',
+  'E:/ZGmini/automation/pc-control/host.json']);
+ if([...Object.keys(historical),...Object.keys(current)]
+    .some(key=>!fixed.has(key))
+   ||Object.keys(historical).some(key=>!Object.hasOwn(current,key))
+   ||current['ZGMINI-PC-Iran-Progress-R13']!=='APPROVED_RETIRED_ABSENT'
+   ||!(/^[a-f0-9]{64}$/.test(current['ZGMINI-PC-Local-Core']??''))
+   ||!(/^[a-f0-9]{64}$/.test(current['ZGMINI-PC-Local-Korea']??''))
+   ||!(/^[a-f0-9]{64}$/.test(
+      current['E:/ZGmini/automation/pc-control/host.json']??'')))
+   throw error('WATCHDOG_B_PROTECTED_SHAPE_OR_IRAN_INVALID');
+ for(const [key,value] of Object.entries(current)){
+  if(key==='ZGMINI-PC-Iran-Progress-R13')continue;
+  if(!/^[a-f0-9]{64}$/.test(String(value??'')))
+   throw error('WATCHDOG_B_PROTECTED_VALUE_INVALID');
+ }
+ return true;
+}
+export function verifyApprovedControllerHost(host,expected=APPROVED_CONTROLLER_SHA,
+  readSource=(rel)=>fs.readFileSync(path.join(controller,rel))){
+ if(host?.controllerSourceSha!==expected
+   ||!host.controllerFiles||typeof host.controllerFiles!=='object'
+   ||Array.isArray(host.controllerFiles)
+   ||Object.keys(host.controllerFiles).length===0)
+  throw error('WATCHDOG_B_APPROVED_CONTROLLER_SHA_DRIFT');
+ for(const [relative,expectedHash] of Object.entries(host.controllerFiles)){
+  const exactPath=path.resolve(controller,relative);
+  if(!exactPath.startsWith(path.resolve(controller)+path.sep)
+    ||!(/^[a-f0-9]{64}$/.test(expectedHash))
+    ||digest(readSource(relative))!==expectedHash)
+   throw error('WATCHDOG_B_CONTROLLER_FILE_HASH_DRIFT');
+ }
+ return true;
 }
 export function verifyWatchdogUpgradeSnapshot({sourceBytes,installBytes,
   sourceHash,install,owner,status,aliveOwner,existingClaim,now=Date.now()}){
@@ -99,9 +145,10 @@ export async function execute(){
  requireFile(startup);
  if(digest(fs.readFileSync(startup))!==installed.startupSha256)
   throw error('WATCHDOG_B_GUARDIAN_STARTUP_DRIFT');
- const protectionBefore=readJSON(path.join(home,'PROTECTION_BEFORE.json'));
- if(JSON.stringify(protectionBefore)!==JSON.stringify(protection()))
-  throw error('WATCHDOG_B_PROTECTED_STATE_DRIFT');
+ const historicalProtection=readJSON(path.join(home,'PROTECTION_BEFORE.json'));
+ const protectionBefore=protection();
+ requireCurrentProtection({historical:historicalProtection,current:protectionBefore});
+ verifyApprovedControllerHost(readJSON(path.join(controller,'host.json')));
  const owner=readJSON(path.join(home,'receiver/owner.json'));
  const status=readJSON(path.join(home,'STATUS.json'));
  const requests=path.join(home,'upgrades');
