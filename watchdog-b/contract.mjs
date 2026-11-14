@@ -4,11 +4,13 @@ export const REPO='ansqhd5774-Choi/zgmini-pc-control';
 export const ISSUE_TITLE='pc-watchdog-b-upgrade';
 export const OP='watchdog-b-upgrade';
 export const REQUEST_SCHEMA='ZGMINI_PC_WATCHDOG_B_REQUEST_V1';
-export const MANIFEST_SCHEMA='ZGMINI_PC_WATCHDOG_B_MANIFEST_V1';
+export const MANIFEST_SCHEMA='ZGMINI_PC_WATCHDOG_B_MANIFEST_V2';
 export const SCOPE='CONTROL_WATCHDOG_HANDOFF_BRIDGE_B_V1';
 export const INITIAL_SCOPE='RUNNER_RECOVERY_ONLY';
 export const FINAL_SCOPE='RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1';
 export const TARGET='d01229adacc3c23f50bb119d146e291ff7e15012';
+export const APPROVED_CONTROLLER_SHA='badad9124157879d7a645b64f2768113d632355b';
+export const PROTECTION_POLICY='CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE';
 export const ORIGINAL='8c50a37274976e640747b0d378ef64c063b3e0b57b2a68a5f5e6f9137c659bce';
 export const REPLACEMENT='d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8';
 const sha=/^[0-9a-f]{64}$/;
@@ -38,9 +40,12 @@ export function validateRequest(event,body,approval,installed,sourceDigest,appro
    ||!sha.test(body.approvalManifestSha256??''))
    throw error('WATCHDOG_B_REQUEST_CONTRACT');
  if(!exact(approval,['schema','approved','scope','installedSha256','targetSha',
-   'targetSha256','fromScope','toScope','allowedFiles','operation','approvalBasis'])
+   'targetSha256','fromScope','toScope','allowedFiles','operation','approvalBasis',
+   'revision','expectedControllerSha','protectionPolicy'])
    ||approval.schema!==MANIFEST_SCHEMA||approval.approved!==true
    ||approval.scope!==SCOPE||approval.operation!==OP
+   ||approval.revision!==2||approval.expectedControllerSha!==APPROVED_CONTROLLER_SHA
+   ||approval.protectionPolicy!==PROTECTION_POLICY
    ||approval.targetSha!==TARGET||approval.installedSha256!==ORIGINAL
    ||approval.targetSha256!==REPLACEMENT
    ||approval.fromScope!==INITIAL_SCOPE||approval.toScope!==FINAL_SCOPE
