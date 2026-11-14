@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_MANIFEST_V3",
+  "approved": true,
+  "scope": "CONTROL_WATCHDOG_HANDOFF_BRIDGE_B_V1",
+  "installedSha256": "d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8",
+  "targetSha": "a2ec241d98a2ca93508443deb5b4688ecbccb905",
+  "targetSha256": "3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072",
+  "fromScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "toScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "allowedFiles": [
+    "pc-watchdog/runner-watchdog.mjs",
+    "pc-watchdog/INSTALL.json"
+  ],
+  "operation": "watchdog-b-upgrade",
+  "approvalBasis": "2026-11-15 standing B same-purpose maintenance/Watchdog correction per docs/PC_AUTOMATION_STANDARD.md section 5. #1376 installed and #1387 Guardian-attested live Watchdog source d0d788..., existing #1378 handoff remain original. Operating A #1389 returned HEALTHY_NEW_SCOPE, bridge BLOCKED/ENOENT, claim NOT_CLAIMED, local developer checkout MAIN_TARGET_NOT_ANCESTOR, receiver PRIOR; no protected writes. Source PR #1390 merged main a2ec241... changes only Watchdog approved handoff source acquisition to unique private GitHub main clone under TEMP, exact target V2 source 9 SHA256 and original single-use #1378 ledger. This R3 authorizes ONLY one same-scope fixed two-file approved Watchdog source+INSTALL stage via existing PC Runner; must prove live healthy owner, original installed bytes/scope, approved Controller source, Core/Korea/Iran-retired/Writer protection CAS, Guardian startup ACLs, unique request ledger/backups. It does not authorize Caller/Runner to stop or replace maintenance receiver, auto-retry #1378, force-update developer project source, or edit Controller/DB/D1. Stage is not active until separately Guardian-attested normal new Watchdog process.",
+  "revision": 3,
+  "expectedControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "protectionPolicy": "CURRENT_CAS_WITH_HISTORICAL_KEY_PRESENCE",
+  "sourceIssueNumber": 1378
+}
