@@ -81,6 +81,18 @@ function ghRead(args){
 function git(args){
  return execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:200000});
 }
+// A child's printed PASS is insufficient: require the independent local
+// install ledger and installed receiver source to agree with the exact target.
+export function verifyHandoffPass({report,ledger,installed,targetSha,exitCode}){
+ if(report?.status!=='PASS'||exitCode!==0
+   ||ledger?.schema!=='ZGMINI_MAINTENANCE_HANDOFF_RESULT_V1'
+   ||ledger.status!=='PASS'||ledger.targetSha!==targetSha
+   ||ledger.code!=='STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED'
+   ||!Number.isSafeInteger(ledger.receiverPid)||ledger.receiverPid<=0
+   ||installed?.sourceSha!==targetSha)
+   code('HANDOFF_PASS_RUNTIME_READBACK_MISMATCH');
+ return true;
+}
 function prepareHandoff(issue){
  let body;
  try{body=JSON.parse(issue.body??'');}
@@ -232,8 +244,14 @@ export async function main(){
       if(json.targetSha!==plan.admitted.targetSha||!['PASS','BLOCKED',
           'RECOVERY_REQUIRED','AUTOMATION_BLOCKED'].includes(json.status))
         return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_OUTCOME_UNCERTAIN'});
-      if(json.status==='PASS'&&exitCode!==0)
-        return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_EXIT_STATUS_CONFLICT'});
+      if(json.status==='PASS'){
+       try{
+        verifyHandoffPass({report:json,
+         ledger:read(path.join(maintenance,'handoff-'+plan.admitted.targetSha+'.json')),
+         installed:read(path.join(maintenance,'MAINTENANCE_INSTALL.json')),
+         targetSha:plan.admitted.targetSha,exitCode});
+       }catch{return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_PASS_RUNTIME_READBACK_MISMATCH'});}
+      }
       return resolve({status:json.status,code:safeCode(json.code??'HANDOFF_UNKNOWN')});
      }catch{return resolve({status:'STATE_UNKNOWN',code:'HANDOFF_OUTCOME_UNCERTAIN'});}
     });
