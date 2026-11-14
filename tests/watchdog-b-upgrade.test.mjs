@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseCanonicalBody,validateRequest,decideUpgradeState,
-  TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE} from '../watchdog-b/contract.mjs';
+  TARGET,ORIGINAL,REPLACEMENT,INITIAL_SCOPE,FINAL_SCOPE,
+  NEXT_TARGET,NEXT_SOURCE_SHA,R3_REQUEST_ID,R3_MANIFEST_SCHEMA,validateR3Request} from '../watchdog-b/contract.mjs';
+import {verifyWatchdogUpgradeSnapshot} from '../watchdog-b/upgrade.mjs';
 const digest='a'.repeat(64);
 const requestId='pc-watchdog-b-12345678-abcd-4123-8234-abcdef012345';
 function fixture(){
@@ -79,4 +81,62 @@ test('owner healthy, fresh and no existing claim are mandatory',()=>{
  assert.equal(decideUpgradeState({...x,ownerAlive:false}),'WATCHDOG_NOT_HEALTHY_BLOCK');
  assert.equal(decideUpgradeState({...x,status:{...x.status,at:new Date(t-100000).toISOString()}}),'WATCHDOG_NOT_HEALTHY_BLOCK');
  assert.equal(decideUpgradeState({...x,status:{...x.status,state:'PAUSED'}}),'WATCHDOG_NOT_HEALTHY_BLOCK');
+});
+
+function fixtureR3(){
+ const x=fixture();
+ x.body={schema:'ZGMINI_PC_WATCHDOG_B_REQUEST_V1',
+  requestId:R3_REQUEST_ID,operation:'watchdog-b-upgrade',
+  targetSha:NEXT_TARGET,approvalManifestSha256:digest};
+ x.approval={...x.approval,
+  schema:R3_MANIFEST_SCHEMA,installedSha256:REPLACEMENT,
+  targetSha:NEXT_TARGET,targetSha256:NEXT_SOURCE_SHA,
+  fromScope:FINAL_SCOPE,toScope:FINAL_SCOPE,revision:3,
+  sourceIssueNumber:1378};
+ x.installed={...x.installed,scope:FINAL_SCOPE,sha256:REPLACEMENT,
+  approvedTargetSourceSha:TARGET};
+ x.sourceDigest=NEXT_SOURCE_SHA;
+ return x;
+}
+const admitR3=x=>validateR3Request(x.event,x.body,x.approval,x.installed,
+ x.sourceDigest,x.approvalDigest);
+test('fixed R3 permits exactly one Watchdog 2-file same-scope B upgrade',()=>{
+ const x=fixtureR3();
+ assert.deepEqual(admitR3(x),{
+  requestId:R3_REQUEST_ID,issueNumber:1401,targetSha:NEXT_TARGET});
+});
+test('R3 refuses source, installed preimage, scope, manifest or request replay drift',()=>{
+ const mutations=[
+  x=>x.body.requestId='pc-watchdog-b-12345678-abcd-4123-8234-abcdef012345',
+  x=>x.body.targetSha=TARGET,
+  x=>x.body.command='cmd.exe',
+  x=>x.approval.revision=2,
+  x=>x.approval.sourceIssueNumber=1379,
+  x=>x.approval.targetSha256='0'.repeat(64),
+  x=>x.approval.allowedFiles.push('tools/handoff-maintenance.mjs'),
+  x=>x.approval.toScope=INITIAL_SCOPE,
+  x=>x.installed.sha256=ORIGINAL,
+  x=>x.installed.approvedTargetSourceSha=NEXT_TARGET,
+  x=>x.installed.scope=INITIAL_SCOPE,
+  x=>x.sourceDigest=REPLACEMENT,
+  x=>x.approvalDigest='f'.repeat(64),
+  x=>x.event.sender.login='other',
+ ];
+ for(const mutate of mutations){
+  const x=fixtureR3();mutate(x);
+  assert.throws(()=>admitR3(x),/WATCHDOG_R3_/);
+ }
+});
+test('R3 snapshot CAS uses exact installed R2 bytes and existing health, no new process kill',()=>{
+ const bytes=Buffer.from('preimage');
+ const sample={sourceBytes:bytes,installBytes:Buffer.from('{"ok":true}'),
+  sourceHash:REPLACEMENT,install:{sha256:REPLACEMENT,scope:FINAL_SCOPE},
+  owner:{pid:123},status:{state:'HEALTHY',pid:123,
+   at:new Date('2026-11-15T00:00:00Z').toISOString()},
+  aliveOwner:true,existingClaim:false,now:Date.parse('2026-11-15T00:00:01Z'),
+  expectedSourceSha:REPLACEMENT,expectedScope:FINAL_SCOPE};
+ assert.throws(()=>verifyWatchdogUpgradeSnapshot(sample),
+  /WATCHDOG_B_PREIMAGE_SHA_MISMATCH/);
+ assert.throws(()=>verifyWatchdogUpgradeSnapshot({...sample,existingClaim:true}),
+  /WATCHDOG_B_PREIMAGE_SHA_MISMATCH/);
 });
