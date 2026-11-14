@@ -35,6 +35,7 @@
     var service = new ActiveXObject('Schedule.Service');
     service.Connect();
     var task = service.GetFolder('\\').GetTask('ZGMINI-PC-Local-Core');
+    var taskStateBefore = integer(task.State);
     var running = task.GetInstances(0);
     var engines = [], engineSeen = {};
     for (var i = 1; i <= running.Count; i += 1) {
@@ -75,7 +76,10 @@
         '","createdAtMs":' +
         (created===null?'null':created) + '}');
     }
-    done('{"ok":true,"runningInstances":' + Number(running.Count) +
+    var taskStateAfter = integer(task.State);
+    done('{"ok":true,"taskStateBefore":' + (taskStateBefore===null?'null':taskStateBefore) +
+      ',"taskStateAfter":' + (taskStateAfter===null?'null':taskStateAfter) +
+      ',"runningInstances":' + Number(running.Count) +
       ',"engines":[' + engines.join(',') + '],"processes":['+
       processes.join(',') + ']}', 0);
   } catch (error) {
