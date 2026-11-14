@@ -59,7 +59,7 @@ const stop=(code,phase='NO_WRITE')=>Object.freeze({
   cleanupPerformed:false,workflowPuts:0,backlogWrites:0,
   issuePosts:0,originalRequestRetries:0,
 });
-const safeCode=e=>/^C_996_OWNER_[A-Z0-9_]+$/.test(e?.code??'')?
+const safeCode=e=>/^(?:C_996_OWNER|C996_NATIVE)_[A-Z0-9_]+$/.test(e?.code??'')?
   e.code:'C_996_OWNER_STATE_UNKNOWN';
 const rel=x=>typeof x==='string'&&!x.includes('\\')&&
   !path.isAbsolute(x)&&x.split('/').every(p=>p&&p!=='.'&&p!=='..');
@@ -320,6 +320,125 @@ public static class C996NativeDirectory {
 `.replace('__FIXTURE__',fixture?'true':'false');
 }
 
+export function build996OwnerTransactionalArchiveFixtureScript(){
+  return transactionalArchiveScript(true);
+}
+
+// The real and TEMP variants share this exact native CAS implementation.
+// Only the compiled root boundary differs. The operational entry remains
+// independently blocked above the first import/write pending final approval.
+function transactionalArchiveScript(fixture=false){
+  return String.raw`
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
+Add-Type -AssemblyName System.Web.Extensions
+Add-Type -TypeDefinition @'
+using System;using System.IO;using System.Collections.Generic;
+using System.Runtime.InteropServices;using System.Security.Cryptography;
+using System.Web.Script.Serialization;using Microsoft.Win32.SafeHandles;
+public static class C996TransactionalArchive {
+ static readonly bool Fixture=__FIXTURE__;
+ const uint Reparse=0x400,DirectoryAttribute=0x10,ReadAttributes=0x80,ReadControl=0x20000;
+ const uint GenericRead=0x80000000,GenericWrite=0x40000000;
+ [StructLayout(LayoutKind.Sequential)]struct FT {public uint Low,High;}
+ [StructLayout(LayoutKind.Sequential)]struct InfoData {public uint Attr;public FT Created,Accessed,Written;public uint Volume,SizeHigh,SizeLow,Links,IndexHigh,IndexLow;}
+ [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]struct FindData {public uint Attr;public FT Created,Accessed,Written;public uint SizeHigh,SizeLow,Reserved0,Reserved1;[MarshalAs(UnmanagedType.ByValTStr,SizeConst=260)]public string Name;[MarshalAs(UnmanagedType.ByValTStr,SizeConst=14)]public string Alternate;}
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern SafeFileHandle CreateFileW(string p,uint a,uint s,IntPtr security,uint d,uint flags,IntPtr template);
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern SafeFileHandle CreateFileTransactedW(string p,uint a,uint s,IntPtr security,uint d,uint flags,IntPtr template,IntPtr tx,IntPtr version,IntPtr extended);
+ [DllImport("kernel32.dll",SetLastError=true)]static extern bool GetFileInformationByHandle(SafeFileHandle h,out InfoData i);
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern bool MoveFileTransactedW(string a,string b,IntPtr progress,IntPtr data,uint flags,IntPtr tx);
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern IntPtr FindFirstFileTransactedW(string p,int level,out FindData data,int search,IntPtr filter,uint flags,IntPtr tx);
+ [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern bool FindNextFileW(IntPtr h,out FindData data);
+ [DllImport("kernel32.dll")]static extern bool FindClose(IntPtr h);
+ [DllImport("kernel32.dll")]static extern bool CloseHandle(IntPtr h);
+ [DllImport("KtmW32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern IntPtr CreateTransaction(IntPtr a,IntPtr b,uint c,uint d,uint e,uint timeout,string description);
+ [DllImport("KtmW32.dll",SetLastError=true)]static extern bool CommitTransaction(IntPtr h);
+ [DllImport("KtmW32.dll",SetLastError=true)]static extern bool RollbackTransaction(IntPtr h);
+ [DllImport("advapi32.dll",SetLastError=true)]static extern uint GetSecurityInfo(IntPtr h,int type,uint flags,out IntPtr owner,out IntPtr group,out IntPtr dacl,out IntPtr sacl,out IntPtr descriptor);
+ [DllImport("advapi32.dll")]static extern uint GetSecurityDescriptorLength(IntPtr p);
+ [DllImport("kernel32.dll")]static extern IntPtr LocalFree(IntPtr p);
+ static readonly JavaScriptSerializer Json=new JavaScriptSerializer();
+ class Stop:Exception {public string Code;public int Native;public Stop(string c,int n=0){Code=c;Native=n;}}
+ static void Need(bool ok,string code){if(!ok)throw new Stop(code);}
+ static string Hash(byte[] bytes){using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(bytes)).Replace("-","").ToLowerInvariant();}
+ static InfoData Info(SafeFileHandle h){InfoData i;if(!GetFileInformationByHandle(h,out i))throw new Stop("C996_NATIVE_TX_IDENTITY_FAILED",Marshal.GetLastWin32Error());return i;}
+ static string Id(InfoData i){return i.Volume.ToString("x8")+":"+(((ulong)i.IndexHigh<<32)|i.IndexLow).ToString("x16");}
+ static string Acl(SafeFileHandle h){IntPtr a,b,c,d,sd;uint e=GetSecurityInfo(h.DangerousGetHandle(),1,7,out a,out b,out c,out d,out sd);Need(e==0,"C996_NATIVE_TX_ACL_UNAVAILABLE");try{uint size=GetSecurityDescriptorLength(sd);Need(size>0&&size<=65536,"C996_NATIVE_TX_ACL_INVALID");var bytes=new byte[size];Marshal.Copy(sd,bytes,0,(int)size);return Hash(bytes);}finally{LocalFree(sd);}}
+ static SafeFileHandle Open(string p,bool directory,IntPtr tx){
+  uint access=directory?ReadAttributes|ReadControl:GenericRead|(tx!=IntPtr.Zero?GenericWrite:0);
+  uint flags=0x00200000u|(directory?0x02000000u:0);
+  var h=tx==IntPtr.Zero?CreateFileW(p,access,7,IntPtr.Zero,3,flags,IntPtr.Zero):CreateFileTransactedW(p,access,1,IntPtr.Zero,3,flags,IntPtr.Zero,tx,IntPtr.Zero,IntPtr.Zero);
+  if(h.IsInvalid){int error=Marshal.GetLastWin32Error();h.Dispose();throw new Stop("C996_NATIVE_TX_OPEN_FAILED",error);}
+  var i=Info(h);if((i.Attr&Reparse)!=0||((i.Attr&DirectoryAttribute)!=0)!=directory||(!directory&&(i.Links!=1||i.SizeHigh!=0||i.SizeLow==0||i.SizeLow>262144))){h.Dispose();throw new Stop("C996_NATIVE_TX_UNSAFE_ENTRY");}return h;
+ }
+ static void HoldParents(string parent,List<SafeFileHandle> held){
+  string at=Path.GetPathRoot(parent);foreach(string part in new string[]{""}.ConcatParts(parent.Substring(at.Length))){
+   if(part.Length>0)at=Path.Combine(at,part);
+   var h=CreateFileW(at,ReadAttributes,3,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
+   if(h.IsInvalid){int e=Marshal.GetLastWin32Error();h.Dispose();throw new Stop("C996_NATIVE_TX_PARENT_OPEN_FAILED",e);}
+   var i=Info(h);if((i.Attr&Reparse)!=0||(i.Attr&DirectoryAttribute)==0){h.Dispose();throw new Stop("C996_NATIVE_TX_PARENT_REDIRECT");}held.Add(h);
+  }
+ }
+ static string[] Names(string dir,IntPtr tx){
+  var names=new List<string>();
+  if(tx==IntPtr.Zero){foreach(string p in System.IO.Directory.GetFileSystemEntries(dir))names.Add(Path.GetFileName(p));}
+  else{FindData data;IntPtr f=FindFirstFileTransactedW(Path.Combine(dir,"*"),0,out data,0,IntPtr.Zero,0,tx);if(f==new IntPtr(-1))throw new Stop("C996_NATIVE_TX_ENUMERATION_FAILED",Marshal.GetLastWin32Error());try{do{if(data.Name!="."&&data.Name!="..")names.Add(data.Name);}while(FindNextFileW(f,out data));Need(Marshal.GetLastWin32Error()==18,"C996_NATIVE_TX_ENUMERATION_INCOMPLETE");}finally{FindClose(f);}}
+  Need(names.Count>0&&names.Count<=7,"C996_NATIVE_TX_FILE_SET_INVALID");names.Sort(StringComparer.Ordinal);return names.ToArray();
+ }
+ static Dictionary<string,object> Capture(string dir,IntPtr tx,List<FileStream> held,out byte[] owner){
+  owner=null;using(var d=Open(dir,true,tx)){
+   var result=new Dictionary<string,object>();result["identity"]=Id(Info(d));result["aclSha256"]=Acl(d);
+   var files=new SortedDictionary<string,object>(StringComparer.Ordinal);string[] before=Names(dir,tx);
+   foreach(string name in before){Need(System.Text.RegularExpressions.Regex.IsMatch(name,@"\A(?:owner|[A-Z0-9_]{3,64})\.json\z"),"C996_NATIVE_TX_FILE_NAME_INVALID");
+    var h=Open(Path.Combine(dir,name),false,tx);FileStream stream;try{stream=new FileStream(h,tx==IntPtr.Zero?FileAccess.Read:FileAccess.ReadWrite);}catch{h.Dispose();throw;}
+    bool retain=false;try{var i=Info(h);byte[] bytes=new byte[i.SizeLow];int at=0,n;while(at<bytes.Length&&(n=stream.Read(bytes,at,bytes.Length-at))>0)at+=n;Need(at==bytes.Length&&stream.ReadByte()==-1,"C996_NATIVE_TX_SHORT_READ");
+     files.Add(name,new Dictionary<string,object>{{"identity",Id(i)},{"sha256",Hash(bytes)},{"size",i.SizeLow},{"aclSha256",Acl(h)}});Need(Id(Info(h))==Id(i),"C996_NATIVE_TX_FILE_IDENTITY_DRIFT");if(name=="owner.json")owner=bytes;
+     if(tx!=IntPtr.Zero){held.Add(stream);retain=true;}
+    }finally{if(!retain)stream.Dispose();}
+   }
+   Need(String.Join("\n",before)==String.Join("\n",Names(dir,tx)),"C996_NATIVE_TX_NAMESPACE_DRIFT");result["files"]=files;return result;
+  }
+ }
+ static void VerifyPins(Dictionary<string,object> snapshot,Dictionary<string,object> pins){
+  var files=(SortedDictionary<string,object>)snapshot["files"];Need(files.Count==pins.Count&&pins.ContainsKey("owner.json"),"C996_NATIVE_TX_PIN_SET_DRIFT");foreach(var e in files)Need(pins.ContainsKey(e.Key)&&(string)((Dictionary<string,object>)e.Value)["sha256"]==(string)pins[e.Key],"C996_NATIVE_TX_PIN_BYTES_DRIFT");
+ }
+ static void Owner(byte[] bytes,Dictionary<string,object> args){
+  var owner=Json.Deserialize<Dictionary<string,object>>(System.Text.Encoding.UTF8.GetString(bytes));int pid=Convert.ToInt32(owner["pid"]);Need(pid>0,"C996_NATIVE_TX_OWNER_INVALID");
+  string mode=(string)args["ownerMode"];
+  if(mode=="LIVE_NEW"){Need(pid==Convert.ToInt32(args["actorPid"])&&owner.ContainsKey("nonce")&&(string)owner["nonce"]==(string)args["nonce"],"C996_NATIVE_TX_OWNER_CHANGED");try{Need(!System.Diagnostics.Process.GetProcessById(pid).HasExited,"C996_NATIVE_TX_OWNER_NOT_LIVE");}catch(ArgumentException){throw new Stop("C996_NATIVE_TX_OWNER_NOT_LIVE");}}
+  else{Need(mode=="DEAD_OLD"||mode=="DEAD_INSTALL","C996_NATIVE_TX_OWNER_MODE_INVALID");try{var p=System.Diagnostics.Process.GetProcessById(pid);Need(p.HasExited,"C996_NATIVE_TX_OLD_OWNER_ALIVE");}catch(ArgumentException){}}
+ }
+ public static string Run(string raw){
+  IntPtr tx=IntPtr.Zero;bool committed=false,attempted=false;var parents=new List<SafeFileHandle>();var streams=new List<FileStream>();
+  try{
+   Need(raw!=null&&raw.Length<=65536,"C996_NATIVE_TX_INPUT_INVALID");var a=Json.Deserialize<Dictionary<string,object>>(raw);Need((string)a["operation"]=="move","C996_NATIVE_TX_OPERATION_INVALID");
+   string root=Path.GetFullPath((string)a["root"]).TrimEnd('\\');string temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\');
+   if(Fixture)Need(String.Equals(Path.GetDirectoryName(root),temp,StringComparison.OrdinalIgnoreCase)&&System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(root),@"\Azgmini-996-txf-cas-[A-Za-z0-9]+\z"),"C996_NATIVE_TX_TEMP_ONLY");
+   else Need(String.Equals(root,@"E:\ZGmini\automation\pc-maintenance\leases",StringComparison.OrdinalIgnoreCase),"C996_NATIVE_TX_ORIGINAL_ROOT_REQUIRED");
+   string source=Path.GetFullPath((string)a["source"]),destination=Path.GetFullPath((string)a["destination"]);
+   Need(String.Equals(Path.GetDirectoryName(source),root,StringComparison.OrdinalIgnoreCase)&&String.Equals(Path.GetDirectoryName(destination),root,StringComparison.OrdinalIgnoreCase)&&!String.Equals(source,destination,StringComparison.OrdinalIgnoreCase),"C996_NATIVE_TX_PATH_INVALID");
+   HoldParents(root,parents);byte[] owner;var before=Capture(source,IntPtr.Zero,streams,out owner);var pins=(Dictionary<string,object>)a["pins"];VerifyPins(before,pins);Owner(owner,a);
+   tx=CreateTransaction(IntPtr.Zero,IntPtr.Zero,0,0,0,15000,"ZGMINI #996 single archive CAS");Need(tx!=IntPtr.Zero&&tx!=new IntPtr(-1),"C996_NATIVE_TX_UNAVAILABLE");
+   if(!MoveFileTransactedW(source,destination,IntPtr.Zero,IntPtr.Zero,0,tx))throw new Stop("C996_NATIVE_TX_STAGE_FAILED",Marshal.GetLastWin32Error());
+   if(a.ContainsKey("fixtureInsert")){Need(Fixture,"C996_NATIVE_TX_FIXTURE_ONLY");using(var h=CreateFileTransactedW(Path.Combine(destination,"INJECTED.json"),GenericWrite,7,IntPtr.Zero,1,0,IntPtr.Zero,tx,IntPtr.Zero,IntPtr.Zero)){Need(!h.IsInvalid,"C996_NATIVE_TX_FIXTURE_INSERT_FAILED");using(var s=new FileStream(h,FileAccess.Write)){s.WriteByte(1);}}}
+   byte[] stagedOwner;var staged=Capture(destination,tx,streams,out stagedOwner);VerifyPins(staged,pins);Owner(stagedOwner,a);Need(Json.Serialize(before)==Json.Serialize(staged),"C996_NATIVE_TX_ID_OR_ACL_DRIFT");
+   if(a.ContainsKey("fixtureTerminateAfterCas")){Need(Fixture,"C996_NATIVE_TX_FIXTURE_ONLY");Environment.Exit(17);}
+   // Transacted writer handles pin content until commit, after the full
+   // namespace, expected bytes, identities, ACL and owner checks succeed.
+   attempted=true;if(!CommitTransaction(tx))throw new Stop("C996_NATIVE_TX_COMMIT_UNKNOWN",Marshal.GetLastWin32Error());committed=true;
+   foreach(var s in streams)s.Dispose();streams.Clear();
+   byte[] afterOwner;var after=Capture(destination,IntPtr.Zero,streams,out afterOwner);Need(Json.Serialize(before)==Json.Serialize(after),"C996_NATIVE_TX_POSTCHECK_UNKNOWN");
+   return Json.Serialize(new Dictionary<string,object>{{"ok",true},{"strategy","WINDOWS_TXF_CAS_V1"},{"transactionCommitted",true},{"transactionIdentityVerified",true},{"pinsVerifiedBeforeCommit",true},{"aclPreserved",true},{"noReplace",true},{"sourceHandleBound",false},{"snapshot",after},{"sourceIdentity",before["identity"]},{"parentIdentity",Id(Info(parents[parents.Count-1]))},{"namespacePowerLossDurabilityProven",false}});
+  }catch(Stop e){bool rolled=false;if(tx!=IntPtr.Zero&&tx!=new IntPtr(-1)&&!committed)rolled=RollbackTransaction(tx);return Json.Serialize(new Dictionary<string,object>{{"ok",false},{"code",e.Code},{"nativeError",e.Native},{"transactionCommitted",committed},{"commitAttempted",attempted},{"rollbackConfirmed",rolled}});}
+  catch{bool rolled=false;if(tx!=IntPtr.Zero&&tx!=new IntPtr(-1)&&!committed)rolled=RollbackTransaction(tx);return Json.Serialize(new Dictionary<string,object>{{"ok",false},{"code","C996_NATIVE_TX_OUTCOME_UNKNOWN"},{"transactionCommitted",committed},{"commitAttempted",attempted},{"rollbackConfirmed",rolled}});}
+  finally{foreach(var s in streams)s.Dispose();if(tx!=IntPtr.Zero&&tx!=new IntPtr(-1))CloseHandle(tx);foreach(var h in parents)h.Dispose();}
+ }
+}
+public static class C996PathParts {public static IEnumerable<string> ConcatParts(this string[] first,string rest){foreach(string s in first)yield return s;foreach(string s in rest.Split('\\'))if(s.Length>0)yield return s;}}
+'@ -ReferencedAssemblies 'System.Web.Extensions'
+[Console]::WriteLine([C996TransactionalArchive]::Run([Console]::In.ReadToEnd()))
+`.replace('__FIXTURE__',fixture?'true':'false');
+}
+
 function moveNoReplace(from,to,{files,ownerMode,actorPid=null,nonce=null}){
   const source=path.win32.normalize(from).toLowerCase();
   const target=path.win32.normalize(to).toLowerCase();
@@ -346,28 +465,35 @@ function moveNoReplace(from,to,{files,ownerMode,actorPid=null,nonce=null}){
   'C_996_OWNER_NATIVE_INVENTORY_INVALID');
   let receipt;
   try {
-    receipt=JSON.parse(execFileSync(PS,['-NoProfile','-NonInteractive','-Command',handleArchiveScript()],{
+    receipt=JSON.parse(execFileSync(PS,['-NoProfile','-NonInteractive','-Command',transactionalArchiveScript()],{
       input:JSON.stringify({operation:'move',root:LEASES,source:from,destination:to,pins:files,ownerMode,actorPid,nonce}),
       encoding:'utf8',windowsHide:true,timeout:30_000,maxBuffer:100_000,stdio:['pipe','pipe','pipe'],
     }));
   } catch {need(false,'C_996_OWNER_NATIVE_MOVE_UNKNOWN');}
   require996OwnerArchiveReceipt(receipt,files);
+  need(receipt.strategy==='WINDOWS_TXF_CAS_V1','C_996_OWNER_TRANSACTIONAL_RECEIPT_REQUIRED');
   need(absent(from)&&fs.lstatSync(to).isDirectory(),
     'C_996_OWNER_NATIVE_MOVE_POSTCHECK_UNKNOWN');
 }
 
 // A native success flag is not enough: the move receipt must carry an
 // independently parseable, exact post-move child inventory matching the
-// pre-move approved SHA-256 pins. This does not attest namespace exclusivity
-// or authorize production execution; the upstream C hard STOP remains.
+// pre-move approved SHA-256 pins. TxF also requires the commit, identity and
+// ACL attestations from the pinned native child. Neither receipt authorizes
+// production execution; the upstream C hard STOP remains.
 export function require996OwnerArchiveReceipt(receipt,pins){
-  need(receipt?.ok===true&&receipt.sourceHandleBound===true&&receipt.noReplace===true,
+  const transactional=receipt?.strategy==='WINDOWS_TXF_CAS_V1';
+  need(receipt?.ok===true&&receipt.noReplace===true&&
+    (transactional?receipt.transactionCommitted===true&&receipt.transactionIdentityVerified===true&&
+      receipt.pinsVerifiedBeforeCommit===true&&receipt.aclPreserved===true:
+      receipt.sourceHandleBound===true),
     /^C996_NATIVE_[A-Z0-9_]+$/.test(receipt?.code??'')?receipt.code:'C_996_OWNER_NATIVE_MOVE_UNKNOWN');
   const id=x=>typeof x==='string'&&/^[a-f0-9]{8}:[a-f0-9]{16}$/.test(x);
   const snapshot=receipt.snapshot,observed=snapshot?.files;
   const entries=observed&&typeof observed==='object'&&!Array.isArray(observed)?
     Object.entries(observed):[];
   need(id(snapshot?.identity)&&id(receipt.parentIdentity)&&
+    (!transactional||receipt.sourceIdentity===snapshot.identity&&H64(snapshot.aclSha256))&&
     pins&&typeof pins==='object'&&!Array.isArray(pins)&&
     Object.keys(pins).length>=1&&Object.keys(pins).length<=7&&
     entries.length===Object.keys(pins).length&&
@@ -375,6 +501,7 @@ export function require996OwnerArchiveReceipt(receipt,pins){
       H64(pins[name])&&file&&typeof file==='object'&&!Array.isArray(file)&&
       id(file.identity)&&file.identity!==snapshot.identity&&
       file.sha256===pins[name]&&
+      (!transactional||H64(file.aclSha256))&&
       Number.isSafeInteger(file.size)&&file.size>0&&file.size<=262144)&&
     new Set(entries.map(([,file])=>file.identity)).size===entries.length,
     'C_996_OWNER_NATIVE_POSTMOVE_RECEIPT_DRIFT');

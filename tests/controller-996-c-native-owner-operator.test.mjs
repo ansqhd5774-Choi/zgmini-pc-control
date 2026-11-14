@@ -111,13 +111,29 @@ test('namespace insertion remains unproven and native production move stays inde
   assert.match(fixture,/static readonly bool Fixture = true;/);
   assert.match(fixture,/C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED/);
   assert.match(fixture,/Need\(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN"\);/);
-  const productionDefault=source.indexOf('handleArchiveScript()]');
+  const productionDefault=source.indexOf('transactionalArchiveScript()]');
   const nativeStop=source.indexOf('Need(Fixture,"C996_NATIVE_NAMESPACE_ATOMICITY_UNPROVEN");');
   const renameCall=source.indexOf('SetFileInformationByHandle(sourceHandle,3,');
   assert.ok(productionDefault>0&&nativeStop>0&&renameCall>nativeStop);
+  assert.match(source,/receipt\.strategy==='WINDOWS_TXF_CAS_V1'/);
   assert.match(source,/function handleArchiveScript\(fixture=false\)/);
   assert.match(source,/if\(Fixture&&args\.ContainsKey\("simulateNamespaceInsert"\)/);
   assert.match(source,/need\(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED'\)/);
   assert.doesNotMatch(source,/handleArchiveScript\(true\)\]\s*,\s*\{/);
+});
+
+test('transactional backend preserves archive ordering and the final independent consent check',()=>{
+ const body=source.slice(source.indexOf('export async function run996NativeOwnerCOnce'));
+ const stop=body.indexOf("need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED')");
+ assert.ok(stop>=0&&stop<body.indexOf('import('));
+ const old=body.indexOf('moveNoReplace(plan.steps[0].source');
+ const own=body.indexOf('moveNoReplace(plan.steps[1].source');
+ const install=body.indexOf('moveNoReplace(plan.steps[2].source');
+ assert.ok(old>stop&&own>old&&install>own);
+ const finalConsent=body.indexOf('const lastConsent=');
+ assert.ok(finalConsent>own&&finalConsent<install);
+ assert.ok(body.indexOf('C_996_OWNER_FINAL_OWNER_CONSENT_REVOKED_OR_CHANGED',finalConsent)<install);
+ assert.match(source,/transactionalArchiveScript\(\)\]/);
+ assert.match(source,/pinsVerifiedBeforeCommit===true/);
 });
 

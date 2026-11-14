@@ -145,6 +145,39 @@ SHA·ACL을 transaction 내부에서 대조한 뒤 commit하는 운영 어댑터
 새 상시 사용을 권장하지 않으므로, 현재는 고정 Windows/NTFS의 일회성 복구 후보만
 검토한다. watchdog·Controller의 상시 의존성에는 추가하지 않았다.
 
+### 실제 Operator 이동 함수 연결 후 검증 (2026-11-14, 운영 C 차단 유지)
+
+`controller-996-c-native-owner-operator.mjs`의 `moveNoReplace`를 TxF-CAS
+구현에 연결했다. TEMP builder와 운영 후보는 동일한 네이티브 코드를 사용하며,
+컴파일된 root 제한만 다르다. 원래 Claim→continuation→Install Lease 최종 보관
+순서와 마지막 Owner 승인 재조회는 보존한다. **각 이동이 별도 transaction**이며,
+앞선 TEMP의 세 이동 동시 commit 시험을 전체 Operator의 원자성 증거로 혼용하지 않는다.
+
+네이티브 구현은 원본 inventory·ID·ACL·hash를 관측하고 잠정 rename한 뒤,
+transaction 내부에서 정확한 파일 목록·ID·ACL·승인 hash·owner를 다시 검증한다.
+transacted writer handle을 commit까지 유지하며, 검증 실패는 rollback한다.
+실제 commit·transaction identity·pins-before-commit·ACL 증거가 없는 영수증은
+운영 호출자가 받지 않는다. 불명확한 commit이나 사후 차이는 재실행하지 않는다.
+
+- 같은 구현의 Windows TEMP 10건 PASS: 정상, 잘못된 hash, 추가 파일, 목적지
+  충돌, transaction 안 삽입, 기존 writer, 잘못된 nonce, 생존한 구 owner, hardlink,
+  CAS 검증 직후 프로세스 종료. 마지막 경우 사용자 finally 없이 원본이 보존됐다.
+- Windows 소스/승인 전달 경계 4건, Bootstrap 합성 4건, 소스 계약 4건 PASS.
+  `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED` 강제 차단은 유지한다.
+- 원본 Windows의 추가 **읽기**에서 prewrite가
+  `C_996_PREWRITE_R1_LIVE_PROTECTION_UNVERIFIED`로 거부됐다. 항목 대조 결과
+  Core/Korea Task hash와 enabled 상태는 동일하고 Writer config hash만 다르다.
+- 현재 config hash `53533eab…`는 [#1321 사후 진단](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1321)의
+  `results/43233846597-1-seat-5.json`과 일치한다. 해당 진단은
+  [#1320 R10 B 적용](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1320) 후의 PASS다.
+  승인 manifest 원문 hash도 #1320 요청과 일치한다. 이것을 운영 손상으로 해석하거나
+  config를 과거 값으로 되돌리지 않는다. 과거 R2와 현재 승인 상태의 보호 기준을
+  정확한 C 명세에 연결해야 하며, 현재 fingerprint를 무조건 허용하도록 바꾸지 않는다.
+
+근거: `artifacts/runner-recovery/996-txf-operator-cas-20261114.json`.
+원본 Claim·Install Lease·Workflow·Backlog·Controller는 변경하지 않았다.
+최종 SourceLock/ZIP/S2 및 실제 운영 C 실행은 아직 미완료다.
+
 위 STATUS 소스 보완은 Draft 후보이며 2026-11-14 관측 당시 운영 설치에
 반영되지 않았다. 상태 설명 보완을 Runner 복구 성공으로 보고하지 않는다.
 

@@ -1,0 +1,52 @@
+{
+  "schema": "ZGMINI_996_TXF_OPERATOR_CAS_EVIDENCE_V1",
+  "observedAt": "2026-11-14T02:48:55.918Z",
+  "status": "NATIVE_CAS_CONNECTED_C_EXECUTION_STILL_BLOCKED",
+  "tests": {
+    "nativeCasPassed": 10,
+    "windowsSourceBoundaryPassed": 4,
+    "bootstrapFixturePassed": 4,
+    "sourceContractsPassed": 4,
+    "failed": 0
+  },
+  "nativeSourceSha256": "2d1ef178582a6de4368c08c91fa518d1b3633b658c502380f38e2635ad1df909",
+  "operationalWrites": 0,
+  "originalClaimsMoved": 0,
+  "controllerInstalls": 0,
+  "executionAuthorized": false,
+  "originalPrewrite": {
+    "status": "C_ORIGINAL_PREWRITE_NOT_READY",
+    "code": "C_996_PREWRITE_R1_LIVE_PROTECTION_UNVERIFIED",
+    "detailCode": "C_INTERRUPTED_CURRENT_PROTECTION_UNVERIFIED"
+  },
+  "protectionDifference": {
+    "historicalFingerprint": "877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86",
+    "currentFingerprint": "0ef53711fe5da97f4614b962e81a393e3532a8f912d201a86cdc068502f99904",
+    "changedItem": "writer/config.json",
+    "historicalSha256": "0be419f66002bbf0016aceac4c89a8307d1a81d42bd4e9ef637a3633a4775453",
+    "currentSha256": "53533eab16c0d62301450129cfe81aefcd7a56a45c97a20d536b32c526c3d72a",
+    "coreAndKoreaTaskHashesMatchHistorical": true,
+    "coreAndKoreaTasksEnabled": true
+  },
+  "priorRuntimeEvidence": {
+    "writerIssue": 1320,
+    "approvalPr": 1319,
+    "manifestPath": "approvals/writer-updates/r10-retired-health-onefile-20261112.json",
+    "manifestSha256": "bb22635ea23de806be241bc1c205d319ad6b17a9b42f3d0fb4d7f06655ac9c9a",
+    "manifestMatchesWriterRequest": true,
+    "postcheckIssue": 1321,
+    "resultPath": "results/43233846597-1-seat-5.json",
+    "resultSha256": "6ced7e9579abaa34c76b2f647c15e44b70b2e8cdaff53719e749a856cfe3a0de",
+    "resultTxtSha256": "fca13305efed4b90961448ba8d1a77e9a6e560df2cb3e8aeb17f48dab6980133",
+    "status": "PASS",
+    "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+    "configSha256": "53533eab16c0d62301450129cfe81aefcd7a56a45c97a20d536b32c526c3d72a",
+    "finishedAt": "2026-11-12T14:07:10.725Z"
+  },
+  "limitations": [
+    "C_FRONTEND_HARD_STOP_RETAINED",
+    "NEW_SOURCELOCK_AND_C_PACKAGE_NOT_SEALED",
+    "CURRENT_PROTECTION_BASELINE_NOT_ADOPTED_AUTOMATICALLY",
+    "ORIGINAL_E_VOLUME_TRANSACTION_NOT_EXECUTED"
+  ]
+}
