@@ -24,12 +24,15 @@ function input(){
    protectedTaskEnabled:{...enabled}},
   writerInstall:{schema:'ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1',requestId:'8f5a44a7-9d5d-4f2c-8736-8ff015f57d91',
    status:'WRITER_B_INSTALLED_VERIFIED',code:'WRITER_B_INSTALL_VERIFIED',
-   localOnly:true,sourceSha:source,
+   localOnly:true,sourceSha:source,runId:'43233138112',mode:'LOCAL_OVERLAY',
+   baseHead:'84df5e80f4bcdadd2a274d6f55a90290426c2406',
+   candidateSourceSha:'9eae7d4815853ab6207b4eceedd4de52ea49ac45',
    manifestSha256:'bb22635ea23de806be241bc1c205d319ad6b17a9b42f3d0fb4d7f06655ac9c9a',
    changedPaths:['scripts/pc-writer/additional-collection-health.mjs']},
   writerReadback:{requestId:'pc-r10-retired-health-after-b-20261112-11',
    status:'PASS',code:'WRITER_APPROVED_PREIMAGE_READONLY',pcOperationalApprovedSha:source,
-   protectedStateUnchanged:true,protectedBeforeSha256:'a'.repeat(64),protectedAfterSha256:'a'.repeat(64),
+   protectedStateUnchanged:true,protectedBeforeSha256:'4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d',
+   protectedAfterSha256:'4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d',
    result:{evidenceLevel:'FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS',runtimeSourceVerified:false,
     sourceHead:source,r6Config:{status:'PASS',configSha256:currentSha}}},
   current:{schema:'ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1',requestId:req,
@@ -61,12 +64,17 @@ test('unrelated Writer B path or wrong manifest is rejected',()=>{
  assert.equal(review(x).code,'C996_BRIDGE_WRITER_B_SOURCE_OR_SCOPE_DRIFT');
  const y=input();y.writerInstall.manifestSha256='b'.repeat(64);
  assert.equal(review(y).code,'C996_BRIDGE_WRITER_B_SOURCE_OR_SCOPE_DRIFT');
+ const z=input();z.writerInstall.runId='000';
+ assert.equal(review(z).code,'C996_BRIDGE_WRITER_B_SOURCE_OR_SCOPE_DRIFT');
 });
 test('readback mismatch and false live runtime claim are rejected',()=>{
  const x=input();x.writerReadback.result.r6Config.configSha256=historicalSha;
  assert.equal(review(x).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
  const y=input();y.writerReadback.result.evidenceLevel='LIVE_CORE_PROCESS';
  assert.equal(review(y).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
+ const z=input();z.writerReadback.protectedBeforeSha256='a'.repeat(64);
+ z.writerReadback.protectedAfterSha256='a'.repeat(64);
+ assert.equal(review(z).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
 });
 test('task changed, disabled task, or additional file cannot pass',()=>{
  const x=input();x.current.items.taskSha256['ZGMINI-PC-Local-Core']='f'.repeat(64);
