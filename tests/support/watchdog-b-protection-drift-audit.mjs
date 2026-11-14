@@ -28,6 +28,8 @@ export function compareWatchdogProtectionSnapshots(before,current){
   if(extraBefore.length||extraCurrent.length){
     return {...invalid,unexpectedKeyCount:extraBefore.length+extraCurrent.length};
   }
+  const required=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea','ZGMINI-PC-Iran-Progress-R13'];
+  if(required.some(k=>!Object.hasOwn(before,k)||!Object.hasOwn(current,k)))return invalid;
   for(const obj of [before,current]){
     if(Object.entries(obj).some(([k,v])=>!validValue(k,v)))return invalid;
   }
