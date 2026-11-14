@@ -57,6 +57,17 @@ export function dedicatedPcRunnerRows(rows,{requireOnline=false,requireIdle=fals
  }
  return selected;
 }
+// Reject paginated or incomplete GitHub Runner snapshots before touching
+// workflow state or maintenance leases; an unobserved page can hide a duplicate.
+export function requireCompleteRunnerInventory(response){
+ need(Array.isArray(response?.runners)&&Number.isSafeInteger(response?.total_count)
+   &&response.total_count===response.runners.length,'RUNNER_INVENTORY_INCOMPLETE');
+ const selected=dedicatedPcRunnerRows(response.runners);
+ need(selected!==null,'RUNNER_SET_DRIFT');
+ need(selected.every(row=>typeof row.busy==='boolean'
+   &&['online','offline'].includes(row.status)),'RUNNER_STATE_INVALID');
+ return selected;
+}
 const sha256=x=>createHash('sha256').update(x).digest('hex');
 const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
 // Accept the same optional preimage manifest scope as controller/common.mjs.
@@ -1126,7 +1137,7 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const stageRoot=path.join(backupRoot,'stage');
  const snapshotRoot=path.join(backupRoot,'snapshot');
  let plannedFiles=[],protectedBefore,prevalidationBaseline,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
- const apiRunners=()=>github('actions/runners?per_page=100').runners;
+ const apiRunners=()=>requireCompleteRunnerInventory(github('actions/runners?per_page=100'));
  const runnersCorrect=rows=>dedicatedPcRunnerRows(rows)!==null;
  const available=rows=>dedicatedPcRunnerRows(rows,{requireOnline:true,requireIdle:true})!==null;
  const waitForReconnect=async(pid,sourceSha,code)=>{
@@ -2072,9 +2083,14 @@ async function applyR6HostOnly(requestId,packageFile){
    'R6_HOST_WORKFLOW_DISABLE_NOT_CONFIRMED');
   let quiet=0;
   for(let n=0;n<180;n++){
-   const rows=github('actions/runners?per_page=100').runners;
-   const seats=dedicatedPcRunnerRows(rows);
+   const inventory=github('actions/runners?per_page=100');
+   need(Array.isArray(inventory?.runners)&&Number.isSafeInteger(inventory?.total_count)
+     &&inventory.total_count===inventory.runners.length,
+     'R6_HOST_RUNNER_INVENTORY_INCOMPLETE');
+   const seats=dedicatedPcRunnerRows(inventory.runners);
    need(seats!==null,'R6_HOST_RUNNER_SET_DRIFT');
+   need(seats.every(row=>typeof row.busy==='boolean'
+     &&['online','offline'].includes(row.status)),'R6_HOST_RUNNER_STATE_INVALID');
    const active=['in_progress','queued','waiting'].reduce((sum,status)=>
      sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
    const leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
