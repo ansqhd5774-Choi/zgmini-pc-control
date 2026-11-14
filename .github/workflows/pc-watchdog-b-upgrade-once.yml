@@ -21,7 +21,8 @@ jobs:
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       (github.event.issue.title == 'pc-watchdog-b-upgrade' ||
        github.event.issue.title == 'pc-watchdog-protected-drift-readonly' ||
-       github.event.issue.title == 'pc-watchdog-activation-first-fail-readonly') &&
+       github.event.issue.title == 'pc-watchdog-activation-first-fail-readonly' ||
+       github.event.issue.title == 'pc-watchdog-handoff-status-readonly') &&
       contains(github.event.issue.labels.*.name, 'pc-maintenance') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
@@ -63,3 +64,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\activation-first-fail-readonly.mjs"'
+      - name: Read only the exact existing maintenance handoff 1378 result
+        if: github.event.issue.title == 'pc-watchdog-handoff-status-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\handoff-firstfail-readonly.mjs"'
