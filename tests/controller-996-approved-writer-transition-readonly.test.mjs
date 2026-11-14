@@ -46,13 +46,14 @@ function input(){
     'quota-runner.cmd':'ABSENT','run-local.cmd':'ABSENT'},taskSha256:{...tasks},taskEnabled:{...enabled}}},
  };
 }
-test('approved Writer change metadata matches but never unlocks C',()=>{
+test('Writer B source overlay and config.source CAS remain observational for C',()=>{
  const x=input();assert.equal(sha({files:x.current.items.files,tasks}),newFp);
  const r=review(x);
  assert.equal(r.status,'MATCHING_POST_INSTALL_OBSERVATIONS_ONLY');
  assert.equal(r.code,'C996_BRIDGE_CONFIG_CHANGE_ATTRIBUTION_UNVERIFIED');
  assert.equal(r.configChangeAttributionVerified,false);
- assert.equal(r.writerBConfigEditApproved,false);
+ assert.equal(r.writerBConfigSourceCasContracted,true);
+ assert.equal(r.writerBUnrestrictedConfigEditApproved,false);
  assert.equal(r.readbackProtectedDigestIsConfigSha,false);
  assert.equal(r.evidenceAuthenticated,false);
  assert.equal(r.originalWindowsDoubleReadVerified,false);
