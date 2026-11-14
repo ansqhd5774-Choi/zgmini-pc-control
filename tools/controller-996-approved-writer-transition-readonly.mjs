@@ -1,9 +1,10 @@
 // #996 historical C protection vs. later approved Writer B: SOURCE-ONLY review.
 // This module never authenticates GitHub evidence, accesses Windows, mutates
 // files, grants C consent, or changes the existing pre-import hard STOP.
-// Writer B #1320 approved a JS source overlay, NOT a writer/config.json edit.
-// #1321 observed config SHA on fixed checkout; attribution of that change
-// to a specific approved operation remains UNKNOWN.
+// Writer B #1320 approved a one-file JS overlay; the standard installer
+// also permits an exact config.source-only CAS to the prepared local SHA.
+// #1321 observed a config SHA on fixed checkout, but the exact historical
+// config hash transition and original Windows source lineage remain UNKNOWN.
 import {createHash} from 'node:crypto';
 
 const SHA=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
@@ -123,8 +124,9 @@ export function review996ApprovedWriterTransitionReadOnly({historical,writerInst
   currentFingerprint:PINS.currentFingerprint,
   coreKoreaTaskHashesUnchanged:true,
   historicalConsentStillPinned:true,
-  writerBApprovedOnlySourceOverlay:true,
-  writerBConfigEditApproved:false,
+  writerBApprovedSourceOverlayFiles:1,
+  writerBConfigSourceCasContracted:true,
+  writerBUnrestrictedConfigEditApproved:false,
   configChangeAttributionVerified:false,
   readbackProtectedDigestIsConfigSha:false,
   sourceIdentityConsistent:false,
