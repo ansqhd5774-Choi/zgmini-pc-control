@@ -40,6 +40,30 @@ const controlRepository='ansqhd5774-Choi/zgmini-pc-control';
 const gh='C:/Program Files/GitHub CLI/gh.exe';
 const node='E:/ZGmini/runtime/node.exe';
 const requiredRunners=Array.from({length:6},(_,n)=>`zgmini-pc-0${n+1}`);
+// The maintained resource is six uniquely named PC seats, not every Runner
+// registered in this repository. Keep unrelated isolated seats outside it.
+export function dedicatedPcRunnerRows(rows,{requireOnline=false,requireIdle=false}={}) {
+ if(!Array.isArray(rows))return null;
+ const selected=[];
+ for(const name of requiredRunners){
+  const matches=rows.filter(row=>row?.name===name);
+  if(matches.length!==1)return null;
+  const row=matches[0];
+  if(requireOnline&&row.status!=='online')return null;
+  if(requireIdle&&row.busy!==false)return null;
+  selected.push(row);
+ }
+ return selected;
+}
+export function requireCompleteRunnerInventory(response){
+ need(Array.isArray(response?.runners)&&Number.isSafeInteger(response?.total_count)
+   &&response.total_count===response.runners.length,'RUNNER_INVENTORY_INCOMPLETE');
+ const selected=dedicatedPcRunnerRows(response.runners);
+ need(selected!==null,'RUNNER_SET_DRIFT');
+ need(selected.every(row=>typeof row.busy==='boolean'
+   &&['online','offline'].includes(row.status)),'RUNNER_STATE_INVALID');
+ return selected;
+}
 const sha256=x=>createHash('sha256').update(x).digest('hex');
 const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1088,9 +1112,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  const stageRoot=path.join(backupRoot,'stage');
  const snapshotRoot=path.join(backupRoot,'snapshot');
  let plannedFiles=[],protectedBefore,prevalidationBaseline,oldOwner,pausedByUs=false,postIssueNumber,reconnectStartedAt=0;
- const apiRunners=()=>github('actions/runners?per_page=100').runners;
- const runnersCorrect=rows=>rows?.length===6&&requiredRunners.every(n=>rows.some(x=>x.name===n));
- const available=rows=>runnersCorrect(rows)&&rows.every(x=>x.status==='online'&&!x.busy);
+ const apiRunners=()=>requireCompleteRunnerInventory(github('actions/runners?per_page=100'));
+ const runnersCorrect=rows=>dedicatedPcRunnerRows(rows)!==null;
+ const available=rows=>dedicatedPcRunnerRows(rows,{requireOnline:true,requireIdle:true})!==null;
  const waitForReconnect=async(pid,sourceSha,code)=>{
   const deadline=Date.now()+600000;
   let stable=0;
@@ -2033,10 +2057,13 @@ async function applyR6HostOnly(requestId,packageFile){
    'R6_HOST_WORKFLOW_DISABLE_NOT_CONFIRMED');
   let quiet=0;
   for(let n=0;n<180;n++){
-   const rows=github('actions/runners?per_page=100').runners;
-   need(Array.isArray(rows)&&rows.length===6
-     &&requiredRunners.every(name=>rows.some(row=>row.name===name)),
-     'R6_HOST_RUNNER_SET_DRIFT');
+   const inventory=github('actions/runners?per_page=100');
+   need(Array.isArray(inventory?.runners)&&inventory.total_count===inventory.runners.length,
+     'R6_HOST_RUNNER_INVENTORY_INCOMPLETE');
+   const rows=dedicatedPcRunnerRows(inventory.runners);
+   need(rows!==null,'R6_HOST_RUNNER_SET_DRIFT');
+   need(rows.every(row=>typeof row.busy==='boolean'
+     &&['online','offline'].includes(row.status)),'R6_HOST_RUNNER_STATE_INVALID');
    const active=['in_progress','queued','waiting'].reduce((sum,status)=>
      sum+(github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0),0);
    const leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
