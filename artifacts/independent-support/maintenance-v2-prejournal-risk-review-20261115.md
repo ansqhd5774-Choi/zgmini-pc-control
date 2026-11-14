@@ -1,5 +1,11 @@
 # ZGMINI 독립 기술지원 S0/S1/S3 — 유지보수기 V2 인계 전 원장 미기록 구간 사전 감사
 
+## 2026-11-15 최신 추적 갱신 — 29차 승인 소스 main 병합
+
+- [29차 최신 #68 기록](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6882234852)에 따라 [PR #1368](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1368)은 **main 병합** `0a01e39f8bc40c594238808fe06b5014f96b9aa5`. Controller 15파일의 native `ZGMINI_PC_UPDATE_V1` B 승인 명세는 `approvals/controller-updates/8e2736a62a90798afe159ef4d96a8713265ca021.json`에 별도로 확정. 역사적 후보 JSON의 `DRAFT_NOT_APPROVED` 문구는 후보 자체의 분류로 남지만 **실제 B 승인 명세는 main 병합 완료**.
+- Controller 15파일 계보·승인 재감사는 이제 29차 완료점이며 이 지원 작업에서 재실행하지 않음. **Windows 유지보수기 7→7 인계 0회, Controller 실제 설치 0회**는 최신 기록상 유지. 본 보고의 STOP→백업→journal 위험 후보는 V2 인계 코드에 관한 독립 사전 감사로 계속 유효하나, 새 Runtime 장애 실증이 아님.
+
+
 - 날짜: 2026-11-15 KST
 - 구분: `SUPPORT_ONLY / SOURCE_READ_ONLY_AUDIT / SYNTHETIC_FAILURE_MODEL`
 - 기존 총괄: 29차 COORD; 중앙 [#68/6881854907](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6881854907)
