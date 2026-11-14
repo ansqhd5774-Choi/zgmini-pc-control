@@ -676,11 +676,23 @@ W02 최신 담당 보고 [Treasury R44 감사/후속](https://github.com/ansqhd5
 - 로컬 원본 `sourceVersion/sourceStoredAt`, 관측일, 계산일, 게시일, checksum을 분리한다. 변경·결측·stale을 구분하고 마지막 유효 공개 점수 보존.
 - 게시 `DONE`은 원본 저장/readback → 계산 readback → 정식 게시 ledger → D1/API raw·score source/시각 일치 → PC/모바일 UI 값·단위·결측·마지막 점/날짜 확인 후에만 기록. HTTP 200만으로 완료 금지.
 
-### P3 — 공통 C #996은 독립 별도 소유
+### P3 — 공통 C #996은 독립 별도 소유 (2026-11-15 실운영 목표 우선)
 
-- 단일 #996 담당은 이미 얻은 R3/R4, 격리 native 부정 시험을 재사용하고 `C_GITHUB_BACKLOG_PLAN_ORIGINAL_BODY_INVALID`(과거 C 실행의 FIRST FAIL)과 독립 native namespace 삽입 미봉쇄(`C996_NATIVE_COMPETING_INSERT_NOT_BLOCKED`)의 실제 원본·원인을 구분.
-- 사후 Workflow/backlog/claim/lease/protected before/after가 현재 **확인되지 않은 효과**는 `STATE_UNKNOWN`으로 보존. 기존 C 승인 이력을 새 무제한 승인으로 해석하지 않는다.
-- 안전한 original owner 보호·경합 CAS·권한·manifest·독립 음성 시험이 정식 검증되고 **명시적인 새로운 C 승인**이 있을 때만 실제 복구 검토. PC 백업/잠금/DB/원장 삭제, 강제 rebase/clean, 다른 도구로 안전 거부 우회 금지.
+**최종 목표:** 현재 설치 Controller를 유지한 상태에서 #996의 원래 `controller-recovery` C claim과 `controller-install` install lease를 정확한 C 승인·원본 바이트 CAS로 정규 보관하고, watchdog의 `CONTROLLER_INSTALL_LEASE` 차단이 해소된 뒤 Supervisor·운영 6 Runner 자동 복귀 능력과 원본 보호 불변을 실PC에서 확인한다. `#996 운영 복구 0/1·NO-GO`; 격리 Writer B `4/5=80%`를 #996 복구율로 표시하지 않는다.
+
+**재사용할 실물 증거와 이미 완료된 효과(재실행 금지):**
+- #917은 2026-11-10 역사적 `RECOVERY_COMPLETED` 및 원래 install lease 해제 완료. #996의 다른 위상에 #917 복구 명령을 무조건 적용하지 않는다.
+- #996 Backlog는 `resumedAt=2026-11-10T13:21:26.727Z`, `replays={}`; Workflow는 active. 과거 계획의 Workflow enable/Backlog resume를 다시 실행하거나 해당 작업을 미완료로 재등록하지 않는다.
+- #1351에서 2026-11-14 기존 Supervisor 정상 경로로 6개 운영 Runner 연결 및 원래 Run 결과 회수 완료. 기존 #996 C claim/install lease는 보존. watchdog 자동 복구는 install lease가 존재하면 PAUSED이며 연결 성공이 정상 감시 복구는 아니다.
+- #1222의 실제 Operator에 Windows TxF-CAS `moveNoReplace` 연결 및 TEMP 10건 PASS(동일 구현의 제한된 격리 증거). 추가 WinPE/네이티브/합성 검사를 진행률로 계산하거나 무한 재요청하지 않는다.
+
+**지금의 실제 FIRST BLOCKER 두 계층:**
+1. **신선한 원본 보호 기준 불일치:** `tools/controller-996-interrupted-observer.mjs`는 2026-11-10 R1 지문 `877bcd2a...`와만 대조한다. 2026-11-12 승인된 Writer R10 B #1320 이후 `writer/config.json`은 `53533eab...`, 현 지문 `0ef53711...`로 변경됐고 #1321 정식 사후 결과와 일치한다. 이 차이를 보호 손상이나 C 승인으로 간주하지 않는다. 기존 승인 #1319/#1320/#1321의 정확한 원본·manifest·postcheck provenance를 C 전담이 확인하고 **승인된 현재 보호 기준**에 결합하는 최소 소스 수정/신규 정확한 C manifest에만 반영한다. 원본 Writer를 이전 해시로 복원하거나 단순 허용목록 추가로 보호 검사를 무력화하지 않는다.
+2. **운영 진입 하드 STOP 및 새 Owner 승인:** `tools/controller-996-c-native-owner-operator.mjs`의 `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`는 여전히 무조건 STOP. native TxF-CAS 분리 시험만으로 Operator 전체 preimport/source/원본 핸들·서명·신뢰시각·철회/복구 Owner 동의가 검증된 것은 아니다. 과거 phase-scoped C 동의를 continuation/새 실제 효과 승인으로 승격하지 않는다. 안전 조건을 충족할 실행 경로가 없다면 해당 설계는 `BLOCKED`로 확정하고 다른 안전한 정규 경로의 명시적 설계 결정 없이는 추가 테스트를 만들지 않는다.
+
+**실제 다음 실행 순서:** (A) 위 보호 기준의 승인된 원본 사실관계 및 현재 운영 효과를 **최소 정규 Operator 구현**에 반영 → (B) 불필요한 WinPE 전체 교체 대신 **원래 C claim → continuation claim → install lease 마지막**의 실제 허용 효과와 보관·사후검증을 Owner 명세에 정확히 고정 → (C) 신규 C consent/소스·manifest·CAS 안전 Gate가 충족될 때만 기존 인증 운영 PC 단일 소유자가 실제 단회 실행 → (D) #996 설치 잠금 해소 및 watchdog/Runner·원본 보호 실측. 현 상태에서는 (C) **금지**, C 운영 쓰기 0. 반대로 승인이 필요한 정확한 조건이 미충족이면 C 작업을 `BLOCKED`로 종료하고 P0/P2 독립 기능을 계속한다.
+
+**반복 작업 중단 규칙:** 기존 40/40·10/10·Runner 6 Online·#917 완료/Backlog resume를 다시 시험해 새 성과로 기록하지 않는다. 기존 C 실행기 보조 테스트/문서/PR 수 증가는 운영 진척 0. #996 진척은 원본 lease·claim 보관, watchdog 복귀, 실PC 사후 보호 불변의 운영 상태 변화로만 갱신한다. 원본 lock 삭제·강제 우회·무승인 Workflow/Writer/DB/D1 변경 금지.
 
 ### P4 — 종료 후 후속 (기능 완료의 별도 Gate 아님)
 
