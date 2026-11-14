@@ -39,7 +39,7 @@ const bounded = (x, max) => Number.isSafeInteger(x) && x > 0 && x <= max;
 export function reviewTreasuryAuditReceipt(receipt, opts = {}) {
   if (!opts || typeof opts !== 'object' ||
       typeof opts.expectedRequestId !== 'string' ||
-      !/^pc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{8}$/.test(opts.expectedRequestId) ||
+      !/^pc-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(opts.expectedRequestId) ||
       !SHA40.test(opts.expectedSourceSha ?? '')) {
     return empty('ORIGINAL_REQUEST_IDENTITY_REQUIRED');
   }
