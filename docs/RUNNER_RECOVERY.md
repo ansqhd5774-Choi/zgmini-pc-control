@@ -199,6 +199,28 @@ manifest 검증과 별도 실행 경계가 충족돼야 한다.
 
 근거: `artifacts/runner-recovery/996-proposed-baseline-readiness-20261115.json`.
 이 기록은 최종 SourceLock/ZIP/S2 또는 운영 복구 완료 증거가 아니다.
+
+### 원본 Install Lease 최종 보관 순서의 Windows TEMP 검증
+
+`tests/controller-996-native-archive-sequence.test.mjs`는 실제 Operator와 동일한
+네이티브 TxF-CAS builder를 호출하되 고정된 C: TEMP fixture만 사용한다.
+기존 C Claim→continuation Claim→Install Lease 순서에서 정상 완료, 첫 보관 후 중단,
+continuation 보관 중 프로세스 종료·변조, 두 번째 보관 후 중단, Install 보관 중
+프로세스 종료·변조·목적지 충돌 8건을 검사했다. 모두 PASS이며, 실패·중단 시
+원본 Install 경로·owner 바이트·파일/디렉터리 ID·ACL이 보존됐다. 앞서 완료한
+보관은 되돌리거나 삭제하지 않았다. 정상 완료에서만 마지막 Install을 보관한다.
+
+이는 전체 Owner Operator 실행이나 실제 승인 인증 시험이 아니다. 기존 Linux
+시뮬레이터는 Windows에서 의도적으로 거부되고, 별도 PC 전용 소스 시험은 원본
+E: 존재 시 거부한다. 해당 추가 suite 호출의 실패를 PASS로 변경하거나 이 TEMP
+검증으로 전체 C 승인이 완료됐다고 해석하지 않는다.
+
+재발 방지용 최소 유지보수기 후보는 설치 source `16064e29…`에서 분리한
+`103a38b4b3643c68fec47c861fe2ac9a0bfa1b42`다. runtime 변경은 `tools/update.mjs`
+한 파일이며, 여섯 운영 좌석의 유일성·상태와 API 목록 완전성을 확인한다.
+Runner·계약·적용·인계 회귀 90건 PASS, 원격 바이트 일치를 확인했다. 미설치이며
+원본 #996 lease가 있는 동안 인계하지 않는다. 별도 4파일 Controller 후보의
+승인 PR 계보 조건도 아직 충족되지 않았으므로 설치를 요청하지 않는다.
 원본 Claim·Install Lease·Workflow·Backlog·Controller는 변경하지 않았다.
 최종 SourceLock/ZIP/S2 및 실제 운영 C 실행은 아직 미완료다.
 
