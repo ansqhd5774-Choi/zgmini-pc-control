@@ -1,5 +1,65 @@
 # ZGMINI 전체 작업 통합 실행계획 — 2026-11-13 (R1)
 
+
+## 2026-11-15 최신 현황 갱신 R2 — #996 복구 이후 실행계획
+
+> **최신 상태 우선:** 이 절이 기존 11/14 및 본문 아래 과거 기록의 #1351 미배정, #996 80% NO-GO, Runner 6/6 Offline, 유지보수기 소스 미병합 상태를 갱신한다. 원본 이력·승인·실패 기록은 삭제하지 않는다. 운영 실측 기준은 2026-11-15 02:01 KST까지의 독립 readback이며 지속 정상이나 서비스 전체 완료를 추정하지 않는다.
+
+### 1. 상태별 정정
+
+| 구분 | 이전 상태 | 최신 검증 | 신규 실행 여부 |
+| --- | --- | --- | --- |
+| #1351 원본 PC Job | queued / Runner 미배정 | 원본 Run 43429486924·Job 131899103441 배정/실행/JSON·TXT 회수 완료, 당시 운영 Runner 6/6 Online | **DONE. 동일 Job 재실행 금지**. 단 내용은 STATE_UNKNOWN / CORE_NO_ACTIVE_TASK_ENGINE |
+| #996 C급 잠금 복구 | 80%, NO-GO | 11/15 실제 Windows 단회 C 성공: INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED, 3개 Claim/Lease 삭제 없이 보관, ID/ACL/SHA 보호, installLock held=false | **복구 범위 100% DONE**. 실패한 원본 Controller 신규 설치까지 성공한 것이 아님 |
+| Watchdog/Receiver | PAUSED / 연결 장애 | 02:01 KST 읽기: Watchdog HEALTHY, Receiver LISTENING, 운영 Runner 6/6 online busy=false | 마지막 관측 당시 정상, 상시 안정성 미증명 |
+| 유지보수기 안전 수정 | 별도 후보 103a38b 미설치 | PR #1365 변경 2파일 main 병합 source SHA c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7, 관련 CI 2/2 PASS | source PASS. 운영 Windows 인계 0회 |
+| 승인 V2 유지보수기 인계 | 미작성 | PR #1366 승인 V2 SEVEN_TO_SEVEN manifest main 병합 0358dfcb1134c2eff5ab7e2d1a331883cea83a73 | 승인 정본 확보, Windows 인계 미실행 |
+| 신규 Controller 개선 | 구형 Controller 31→37 operation 차이 | Draft PR #1367 현재 main 기준 런타임 4파일·테스트 2파일 격리 HEAD 31edf3628cba4ae0cf0aa867c74f928d1492b20d | 현 HEAD CI / Owner 결정 / 별도 B승인 / PC 설치 미완료 |
+| Core Task 실행 | Runner 연결 장애로 판단 불가 | #1351 A 진단 STATE_UNKNOWN, 별도 Task Scheduler RUNNING 관측 | 실제 수집 엔진 정상·정지 모두 미확정; 새로운 Controller code/source 증거와 분리 |
+
+**근거:** [#996 완료](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6881130462), [독립 사후 검증](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/e065f2e0bae4b76bd234aec181ff9a6c9e3d5e75/artifacts/runner-recovery/996-independent-postread-20261115.json), [제어면](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/e065f2e0bae4b76bd234aec181ff9a6c9e3d5e75/artifacts/runner-recovery/996-control-plane-postread-20261115.json), [#1351 진단 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1351#issuecomment-6869476984), [#68 V2 source/승인](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6881614609), [Controller PR #1367](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367).
+
+### 2. 기존 10개 항목 + 누락됐던 W05/W06 현행 잔여 작업
+
+| 이전 항목 | 진행률의 정확한 의미 | 남은 실행과 완료 기준 | 우선 |
+| --- | --- | --- | --- |
+| 01 Runner 및 #1351 | 기존 복구 100% | 완료 범위 닫기. Core 진단 불확실성은 별도 | DONE |
+| 02 Controller 신규 operation | 설치 미완료 | PR #1367 현재 HEAD CI→정확 승인/계보→유지보수기 인계 후 별도 Controller 4파일 안전 설치→실제 A operation JSON/TXT | P1 |
+| 03 W01 물가 | 역사 42%; 23/26 저장·4/7 공개 | **최종 목표는 30개 후보 평가/채택 및 사용자 승인 종합 산식**. #22/#23 INVALID·#28 MISSING, [B Draft #1336](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1336) 승인/opt-in 없음; 원자료 확보→저장→산식→D1/API/UI. 기존 #24 PPI 203개월/단일 2026-09 값 일치 재사용 | P0 독립·B 승인 대기 |
+| 04 W02 시장 | **Treasury 부분기능만 95/100**, 전체 캘린더 미산정 | 신규 source-inventory A 실제 Controller 등록→365일 원문 감사, ER1·FOMC·공식 일정/권리 확대는 별도 최종 목표 | P1 |
+| 05 W03 테마 | **T1 공개 10개 이관 단계 20%**, 전체 163테마 미산정 | R181 현장 최초 실패 원장/소스 인계→10개 실제 자동 수집·저장·게시 복구→P1/P4/P2/P3 순서로 163테마 확대 | P0 |
+| 06 W04 고용 R6 | 역사 7/8 (87.5%), 과거 28/29 READY | 51지역·연속주 첫 결손 실측; [#1361](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1361) 소스 후보 미설치. 29개 공식자료·PIT·점수/1년 차트→D1/API/UI | P0 독립 |
+| 07 D05 계보 | 실증 0/68 | 설치 A 등록 확인→원본/백업/checkpoint 68개 비교→실제 빠진 것만 승인 수집. 신규 8번째 담당 또는 W07 영구 전담 임의 지정 금지 | P1 |
+| 08 #996 C | **보관 복구 범위 100%** | 기존 보관본·예약 보호. 신규 Controller 설치는 02 별도이며 #996 다시 실행하지 않음 | DONE |
+| 09 Writer B 자동 인계 | 기존 4/5 | 실제 적격 자연 사고에서만 접수→처리→원담당 재개 마지막 종단 실증. 가짜 사고 생성 금지 | DEFERRED |
+| 10 공유자원 lifecycle | 기존 4/5 | 실제 해제/Owner 재배정 사건 발생 시에만 마지막 단계 처리 | DEFERRED |
+| **신규 00 유지보수기 인계** | main source+V2 승인 완료, **운영 설치 0** | 현재 임계 경로 Windows 7→7 단회 인계·새 설치 SHA/Receiver/보호 검증 | **P0** |
+| **추가 W05 API–사이트** | 역사 75% (부분 단계 3/4); D1/API 실값 대조 **0/5** | 승인 D1 5키 같은 시점 readback→Production API/사이트 표시·버전·시각 정합; 기존 실적침체 R1~R6 목표 별도 보존 | P0 독립 |
+| **추가 W06 UIUX** | 역사 25%; Production **0/8** | [#1070](https://github.com/ansqhd5774-Choi/zgmini/pull/1070) 390px Mock FIRST FAIL 해결·1440 QA, [#1068](https://github.com/ansqhd5774-Choi/zgmini/pull/1068) 선택 병합 Owner GO/HOLD→Cloudflare exact 배포→4페이지 1440/390 8뷰와 동시 API 정합 | P0 독립 |
+
+**진행률 분모:** 6개 역사 수치 42/95/20/87.5/75/25는 서로 다른 기능 **부분 단계**다. 57.4% 산술평균은 전체 제품 완료율이 아니다. 사용자 확정 상위 최종목표 기준 전체 ZGMINI E2E 진척률은 **미산정/UNKNOWN**, 이번 갱신으로 기능 운영률 상승을 선언하지 않는다.
+
+### 3. 다음 실제 조치(실행 순서 고정)
+
+**P0 — 승인된 유지보수기 인계: 단일 운영 PC Owner**
+1. main 병합된 V2 정확 source c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7 및 승인 manifest 재사용, 이전 설치 source 16064e29fea0e53e7769a24d93d75b6f5292cfc0을 설치 직전 실PC 재조회.
+2. 기존 **독립 Windows 중간 무결성 Operator**로 7파일 raw SHA/Receiver PID·nonce·origin/Startup·ACL/lease/보호 preflight 후 기존 정규 tools/handoff-maintenance.mjs 7→7 **단회** 실행.
+3. 새 MAINTENANCE_INSTALL.sourceSha, 설치 바이트·Receiver Windows origin·6개 운영 Runner·보호 원본을 실제 postread. **현재 연결에서 독립 Windows Operator 실행 경로 미제공: AUTOMATION_BLOCKED(INDEPENDENT_WINDOWS_HANDOFF_EXECUTION_PATH_UNAVAILABLE).** GitHub Actions Runner/A급 job/격리 PC 또는 Remote Desktop Commander로 우회 금지.
+
+**P1 — Controller 정확 4파일 갱신: 기존 중앙 Owner**
+1. #1367 정확 HEAD CI·source GO/HOLD, 31→37 누락 등록과 old/new current source 차이 분리.
+2. 유지보수기 실제 인계 성공 **이후** 4 런타임 파일만 정규 B 승인/manifest/원본 preimage/lock/Owner 경계 고정하여 별도 설치 1회.
+3. 새 운영 Controller SHA·Runner 6개·Workflow/Backlog/보호 및 필요한 6개 A readback을 실제 JSON/TXT로 증명. 소스 병합/CI를 설치 완료로 대체하지 않는다.
+
+**기능 병렬:** W01 #1336 정규 승인 검토+30후보 조사, W02 공식 일정/ER1/FOMC 소스, W03 R181 정확 최초 실패, W04 51지역×주 자료, W05 실D1 5키, W06 #1070 Mock CI→선택 main 통합·배포. 독립 작업을 전체 공유 Controller 설치 완료 때까지 대기시키지 않는다. 실제 생산 데이터 변경은 기능별 승인 범위만.
+
+**운영자·예약 보호:** 실제 기능 6개 W01~W06, 독립 지원 W07, 별도 COORD만. 임의 신규 담당·가짜 incident·중복 pc-job·#996 재실행 생성 금지. 사용자 승인 없이 기존 예약/활성·일정·지시문 변경 금지.
+
+**이번 보고 진행률:** 11/14 상태 13개 트랙 재분류 및 정본 갱신 100%. **실제 신규 PC 설치·수집·계산·D1 게시·Production 배포 0건** (이번 문서 작업 기준).
+
+---
+
+
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
 ## 2026-11-14 79차 — 사용자 제공 6개 기능 상위 목표 복원 완료 및 예약 기준 분모 고정
