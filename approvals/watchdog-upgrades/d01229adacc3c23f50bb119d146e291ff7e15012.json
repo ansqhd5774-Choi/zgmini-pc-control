@@ -1,0 +1,16 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_MANIFEST_V1",
+  "approved": true,
+  "scope": "CONTROL_WATCHDOG_HANDOFF_BRIDGE_B_V1",
+  "installedSha256": "8c50a37274976e640747b0d378ef64c063b3e0b57b2a68a5f5e6f9137c659bce",
+  "targetSha": "d01229adacc3c23f50bb119d146e291ff7e15012",
+  "targetSha256": "d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8",
+  "fromScope": "RUNNER_RECOVERY_ONLY",
+  "toScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "allowedFiles": [
+    "pc-watchdog/runner-watchdog.mjs",
+    "pc-watchdog/INSTALL.json"
+  ],
+  "operation": "watchdog-b-upgrade",
+  "approvalBasis": "Existing 2026-11-03 standing B same-purpose controller/maintenance policy handoff and bounded subsequent correction (docs/PC_AUTOMATION_STANDARD.md section 5); user requested implementation of already merged PR #1370's fixed authenticated Watchdog bridge. This grants only exact one-time Windows operating Runner installation of Watchdog code and its own INSTALL manifest. Separate maintainer 7-to-7 and Controller B are NOT authorized to run inside this workflow; they retain independent Operator and exact approved manifests. Runtime preimage SHA and actual host identity must match; otherwise stop. Source target is immutable merged PR #1370; upgrade is staged until future natural Watchdog Guardian restart. Not permission to kill an active watchdog."
+}
