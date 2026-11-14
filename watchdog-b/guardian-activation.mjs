@@ -87,9 +87,12 @@ export function statusReady({owner,status,now=Date.now(),source,manifest,stage})
  return true;
 }
 function witness(mode,pid){
- const output=execFileSync('C:/Windows/System32/cscript.exe',
-  ['//NoLogo',helper,mode,String(pid)],{encoding:'utf8',windowsHide:true,
-    timeout:15000,maxBuffer:512}).trim();
+ let output;
+ try{
+  output=execFileSync('C:/Windows/System32/cscript.exe',
+   ['//NoLogo',helper,mode,String(pid)],{encoding:'utf8',windowsHide:true,
+     timeout:15000,maxBuffer:512}).trim();
+ }catch{fail('WATCHDOG_ACTIVATION_WMI_'+mode+'_DENIED');}
  const expected={PROBE:'WATCHDOG_ROTATION_VERIFIED',
   ACTIVATE:'WATCHDOG_ROTATION_SIGNALLED',
   ATTEST:'WATCHDOG_RUNTIME_ATTESTED'}[mode];
@@ -136,8 +139,11 @@ export async function execute(){
  verifyApprovedControllerHost(load(path.join(control,'host.json')));
  // An elevated Runner cannot be allowed to bypass the exact medium-user
  // Guardian identity contract for a B action.
- const groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],
-  {encoding:'utf8',windowsHide:true,timeout:15000});
+ let groups;
+ try{
+  groups=execFileSync('C:/Windows/System32/whoami.exe',['/groups'],
+   {encoding:'utf8',windowsHide:true,timeout:15000});
+ }catch{fail('WATCHDOG_ACTIVATION_TOKEN_READ_FAILED');}
  if(!groups.includes('S-1-16-8192')||groups.includes('S-1-16-12288'))
   fail('WATCHDOG_ACTIVATION_MEDIUM_TOKEN_REQUIRED');
  // Read-only Win32_Process proof of exact Node + WScript startup ancestry,
