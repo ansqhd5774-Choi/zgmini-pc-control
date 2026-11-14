@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {review996ApprovedWriterTransitionReadOnly as review} from '../tools/controller-996-approved-writer-transition-readonly.mjs';
+import {review996ApprovedWriterTransitionReadOnly as review, inspect996WriterBConfigBackupCasReadOnly as inspectBackup} from '../tools/controller-996-approved-writer-transition-readonly.mjs';
 
 const req='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const core='dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028';
@@ -108,4 +108,63 @@ test('missing inputs and malicious permissive data fail closed',()=>{
  assert.equal(review(x).executionAuthorized,false);
  const y=input();y.writerReadback.protectedStateUnchanged=false;
  assert.equal(review(y).code,'C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
+});
+
+
+const baseWriterSource='84df5e80f4bcdadd2a274d6f55a90290426c2406';
+const installedWriterSource='05d7ae49e0a84cbeebd90ef4de6dd7284094bf97';
+const byteSha=bytes=>createHash('sha256').update(bytes).digest('hex');
+const syntheticBackup=()=>Buffer.from(
+ '{\r\n  "source": "'+baseWriterSource+'",\r\n'+
+ '  "employmentR6AutoCollection": true,\r\n'+
+ '  "employmentR6OneYearAutoPublication": true\r\n}\r\n','utf8');
+const backupCase=(bytes)=>({
+ originalConfigBytes:bytes,
+ preimage:{head:baseWriterSource,originalConfigSha256:byteSha(bytes)},
+});
+test('Writer B backup source CAS reproduces exact bytes but does not prove real receipt',()=>{
+ const bytes=syntheticBackup(),copy=Buffer.from(bytes);
+ const report=inspectBackup(backupCase(bytes));
+ assert.equal(report.status,'BACKUP_CAS_RESULT_DIFFERS_FROM_POSTCHECK');
+ assert.equal(report.code,'C996_LOCAL_SOURCE_ONLY_CAS_BYTES_HASH_MISMATCH');
+ assert.equal(report.backupSha256,byteSha(bytes));
+ assert.equal(report.calculatedAfterSha256,
+  byteSha(Buffer.from(bytes.toString('utf8').replace(
+   baseWriterSource,installedWriterSource),'utf8')));
+ assert.equal(report.backupPreimageHashMatched,true);
+ assert.equal(report.calculatedAfterMatches1321,false);
+ assert.equal(report.evidenceAuthenticated,false);
+ assert.equal(report.configChangeAttributionVerified,false);
+ assert.equal(report.executionAuthorized,false);
+ assert.equal(report.operationalWrites,0);
+ assert.ok(bytes.equals(copy),'input bytes must remain unchanged');
+ assert.equal('originalConfigBytes' in report,false);
+});
+test('Writer B backup refuses wrong preimage checksum or source revision',()=>{
+ const bytes=syntheticBackup(),x=backupCase(bytes);
+ x.preimage.originalConfigSha256='f'.repeat(64);
+ assert.equal(inspectBackup(x).code,'C996_BACKUP_PREIMAGE_SHA_OR_SOURCE_MISMATCH');
+ const y=backupCase(bytes);y.preimage.head='0'.repeat(40);
+ assert.equal(inspectBackup(y).code,'C996_BACKUP_PREIMAGE_SHA_OR_SOURCE_MISMATCH');
+});
+test('Writer B backup refuses source drift, duplicate source and invalid JSON',()=>{
+ const a=Buffer.from('{"source":"'+installedWriterSource+'"}');
+ assert.equal(inspectBackup(backupCase(a)).code,
+  'C996_BACKUP_CONFIG_SOURCE_CAS_PRECONDITION');
+ const b=Buffer.from('{"source":"'+baseWriterSource+'","source":"'+baseWriterSource+'"}');
+ assert.equal(inspectBackup(backupCase(b)).code,
+  'C996_BACKUP_CONFIG_SOURCE_CAS_PRECONDITION');
+ const c=Buffer.from('{"source":"'+baseWriterSource+'",BROKEN}');
+ assert.equal(inspectBackup(backupCase(c)).code,'C996_BACKUP_CONFIG_INVALID_JSON');
+});
+test('Writer B backup refuses unsafe byte inputs and never authorizes operation',()=>{
+ assert.equal(inspectBackup().executionAuthorized,false);
+ assert.equal(inspectBackup({originalConfigBytes:'secret'}).code,
+  'C996_BACKUP_SOURCE_BYTES_MISSING_OR_UNSAFE');
+ const invalid=Buffer.from([0xff,0xfe,0xfd]);
+ assert.equal(inspectBackup(backupCase(invalid)).code,
+  'C996_BACKUP_CONFIG_NOT_CANONICAL_UTF8');
+ const oversize=Buffer.alloc(65537,0x20);
+ assert.equal(inspectBackup(backupCase(oversize)).code,
+  'C996_BACKUP_SOURCE_BYTES_MISSING_OR_UNSAFE');
 });
