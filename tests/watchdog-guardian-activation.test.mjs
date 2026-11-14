@@ -96,7 +96,8 @@ test('fixed identity witness does not contain process-tree termination or arbitr
  assert.match(helper,/wscript\.exe/);
  assert.match(helper,/guardian\.SessionId/);
  assert.match(helper,/WATCHDOG_RUNTIME_ATTESTED/);
- assert.doesNotMatch(helper,/taskkill\s+\/T/i);
+ const executableLines=helper.split(/\r?\n/).filter(line=>!/^\s*'/.test(line)).join('\n');
+ assert.doesNotMatch(executableLines,/taskkill\s+\/T/i);
  assert.equal((helper.match(/\.Terminate\(0\)/g)||[]).length,1);
 });
 
