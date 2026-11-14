@@ -1,0 +1,49 @@
+{
+  "schema": "ZGMINI_996_TXF_TEMP_EVIDENCE_V1",
+  "observedAt": "2026-11-14T02:28:25.775Z",
+  "status": "WINDOWS_TEMP_FEASIBILITY_VERIFIED_NOT_OPERATIONAL_ADAPTER",
+  "testSource": "tests/controller-996-txf-archive.test.mjs",
+  "testSourceSha256": "632904d1cc91b105c6ce7f57709a4cd57eece1115b0ccc95ff65037927bfca4f",
+  "tests": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scope": "C_DRIVE_SYNTHETIC_TEMP_ONLY",
+  "cases": [
+    "COMMIT_THREE_MOVES",
+    "ROLLBACK_THREE_MOVES",
+    "INDEPENDENT_INSERT_WITH_POSITIVE_CONTROL",
+    "DESTINATION_COLLISION_NO_OVERWRITE",
+    "KILLED_TRANSACTION_OWNER_ROLLBACK",
+    "PREOPENED_RELATIVE_DIRECTORY_HANDLE_CONFLICT"
+  ],
+  "preopenedHandle": {
+    "stagedMoves": 2,
+    "lastMoveWin32Error": 6800,
+    "relativeInsertNtStatus": "00000000",
+    "transaction": "ROLLED_BACK",
+    "originalDirectoryIdsPreserved": true,
+    "originalFileIdsPreserved": true,
+    "originalFileBytesPreserved": true,
+    "aclPreserved": true,
+    "admissionAllowed": false
+  },
+  "operationalWrites": 0,
+  "originalClaimsMoved": 0,
+  "workflowWrites": 0,
+  "backlogWrites": 0,
+  "controllerInstalls": 0,
+  "executionAuthorized": false,
+  "remaining": [
+    "EXPECTED_PIN_VERIFICATION_INSIDE_OPERATIONAL_TRANSACTION",
+    "PINNED_OWNER_AND_OPERATOR_INTEGRATION",
+    "ORIGINAL_VOLUME_RUNTIME_VALIDATION",
+    "FINAL_SOURCELOCK_PACKAGE_AND_EXACT_APPROVAL"
+  ],
+  "limitations": [
+    "DIRECTORY_ENUMERATION_ALONE_IS_NOT_ISOLATION",
+    "TXF_IS_NOT_A_NEW_PERSISTENT_RUNTIME_DEPENDENCY",
+    "EXISTING_C_HARD_STOP_RETAINED"
+  ]
+}

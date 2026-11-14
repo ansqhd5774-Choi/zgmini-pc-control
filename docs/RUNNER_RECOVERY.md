@@ -116,6 +116,35 @@ Online으로 복귀했고, 기존 #1351이 같은 Run/Job으로 실행되어 JSO
 - 남은 최초 운영 차단은 디렉터리 이동 경계의 신규 파일 삽입 배제다. 핸들을 닫고
   이동한 후 검산하는 방식으로 이를 PASS 처리하거나 원본 잠금을 해제하지 않는다.
 
+### 트랜잭션 이동의 Windows TEMP 실증 (2026-11-14, 운영 어댑터 아님)
+
+`tests/controller-996-txf-archive.test.mjs`는 기존 운영 경로를 열지 않고 C: TEMP에서
+독립 프로세스와 Windows TxF API를 검사한다. 세 디렉터리의 rename을 잠정 적용하고
+한 번에 commit 또는 rollback하는 시험이다. 일반 rename 뒤 사후 검사로 실패를
+발견하는 방식과 달리, commit 전에는 외부에서 원래 Install 경로가 계속 보인다.
+
+- 정상 commit, 명시 rollback, 독립 프로세스 삽입, 목적지 충돌, transaction owner
+  강제 종료, 이미 열린 디렉터리 핸들을 통한 NT 상대경로 삽입을 구분한다.
+- 직접 삽입 시험은 동일 child가 transaction 밖에서 먼저 성공하는 양성 대조를
+  통과해야 한다. 단순 호출 실패를 namespace 배제로 판정하지 않는다.
+- 이미 열린 쓰기용 디렉터리 핸들이 있으면 세 번째 잠정 이동이 Windows 오류
+  6800(`ERROR_TRANSACTIONAL_CONFLICT`)으로 거부됐다. 앞선 두 이동도 rollback되고
+  원본 세 경로·owner 원문 바이트·파일/디렉터리 ID·ACL이 보존됐다. 경쟁자는 여전히
+  원본에 쓸 수 있으므로 이 경우 실행을 허용하지 않는 것이 정상이다.
+- 정상 commit과 rollback/중단의 원문 바이트·파일 ID·ACL 보존도 검사한다.
+
+이 시험은 **실제 #996 C Operator의 CAS 구현이 아니다.** 실제 기대 파일 목록·ID·
+SHA·ACL을 transaction 내부에서 대조한 뒤 commit하는 운영 어댑터 연결과 검증이
+남아 있다. 원본 E:의 transaction 동작, 실제 Owner 승인 및 최종 패키지도 미검증이다.
+기존 C hard STOP과 운영 Claim·Lease는 유지한다.
+
+[Microsoft TxF 규격](https://learn.microsoft.com/en-us/windows/win32/fileio/programming-considerations-for-transacted-fileio-)
+상 directory enumeration만으로 격리가 보장되지는 않는다. 위 제한된 이동 실증을
+모든 파일시스템 변경의 배제 보장으로 확대하지 않는다. 또한 Microsoft는
+[MoveFileTransacted](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefiletransacteda)의
+새 상시 사용을 권장하지 않으므로, 현재는 고정 Windows/NTFS의 일회성 복구 후보만
+검토한다. watchdog·Controller의 상시 의존성에는 추가하지 않았다.
+
 위 STATUS 소스 보완은 Draft 후보이며 2026-11-14 관측 당시 운영 설치에
 반영되지 않았다. 상태 설명 보완을 Runner 복구 성공으로 보고하지 않는다.
 
