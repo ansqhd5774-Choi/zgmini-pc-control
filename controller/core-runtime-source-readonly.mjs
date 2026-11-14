@@ -26,7 +26,24 @@ export function classifyCoreSnapshot(snapshot,{realpath=fs.realpathSync.native,
    !Array.isArray(snapshot?.processes)||snapshot.processes.length>8192)
   return unknown('CORE_PROCESS_SNAPSHOT_UNAVAILABLE');
  const engines=new Set(snapshot.engines.filter(validPid));
- if(!engines.size)return unknown('CORE_NO_ACTIVE_TASK_ENGINE');
+ if(!engines.size){
+  // GetInstances is security-context filtered. An empty list does not prove
+  // the task stopped; a regular scheduled cycle may also finish mid-probe.
+  // Preserve UNKNOWN rather than substituting unrelated Node processes.
+  const validState=x=>Number.isInteger(x)&&x>=0&&x<=4;
+  if(validState(snapshot.taskStateBefore)&&validState(snapshot.taskStateAfter)){
+   const before=snapshot.taskStateBefore,after=snapshot.taskStateAfter;
+   const code=before!==after?'CORE_TASK_STATE_CHANGED_DURING_PROBE':
+    snapshot.runningInstances>0?'CORE_TASK_ENGINE_PID_UNAVAILABLE':
+    after===4?'CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE':
+    after===0?'CORE_TASK_STATE_UNKNOWN':'CORE_TASK_NOT_RUNNING_AT_SNAPSHOT';
+   return {...unknown(code),taskObservation:{stateBefore:before,stateAfter:after,
+    visibleRunningInstances:Number.isSafeInteger(snapshot.runningInstances)&&
+     snapshot.runningInstances>=0?snapshot.runningInstances:null,
+    stoppedProven:false,securityContextMayLimitVisibility:true}};
+  }
+  return unknown('CORE_NO_ACTIVE_TASK_ENGINE');
+ }
  const byPid=new Map();
  for(const p of snapshot.processes){
   if(p.pid===0)continue;
