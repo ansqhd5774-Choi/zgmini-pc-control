@@ -22,8 +22,13 @@ const A=Object.freeze({
 function gitReady(cwd,args){
  assert.equal(cwd,root);
  if(args[0]==='branch')return 'main';
+ if(args[0]==='remote')return 'https://github.com/ansqhd5774-Choi/zgmini-pc-control.git';
  if(args[0]==='merge-base')return '';
  if(args[0]==='status')return '';
+ if(args[0]==='show'){
+  assert.equal(args[1].slice(0,HANDOFF_TARGET.length),HANDOFF_TARGET);
+  return fs.readFileSync(path.join(root,args[1].split(':')[1]));
+ }
  throw Error('UNEXPECTED_GIT_COMMAND');
 }
 const prove=(options={})=>inspectHandoff1378Source({root,runGit:gitReady,...options});
@@ -38,7 +43,8 @@ test('actual checked out nine maintenance source files exactly match immutable a
  const r=prove();
  assert.equal(r.status,'SOURCE_BYTES_READY_OWNER_APPROVAL_AND_RUNTIME_REQUIRED');
  assert.equal(r.approvalVerified,true);
- assert.equal(r.verifiedFiles,9);assert.equal(r.totalFiles,9);
+ assert.equal(r.verifiedFiles,9);assert.equal(r.targetFilesVerified,9);
+ assert.equal(r.isolatedOriginVerified,true);assert.equal(r.totalFiles,9);
  assert.deepEqual(r.failures,[]);
  assert.equal(r.checkoutBranch,'main');assert.equal(r.targetAncestor,true);
  assert.equal(r.controllerInstalled,false);assert.equal(r.operationalWrites,0);
@@ -48,7 +54,7 @@ test('actual checked out nine maintenance source files exactly match immutable a
  assert.equal(HANDOFF_TARGET.length,40);
 });
 test('consumes only the one original #1389 A evidence, never approves an unrelated result',()=>{
- assert.equal(classifyKnown1378(A),'PRIORITIZE_SOURCE_CHECKOUT_REPAIR');
+ assert.equal(classifyKnown1378(A),'PRIORITIZE_ISOLATED_SOURCE_STAGE');
  for(const bad of [
   {...A,requestId:'pc-watchdog-handoff-a-aaaa1111-bbbb-4ccc-8ddd-eeeeeeeeeeee'},
   {...A,handoffIssueNumber:1387},{...A,watchdog:'UNKNOWN_OR_STALE'},
@@ -127,6 +133,30 @@ test('non-main checkout blocks even when all raw hashes are valid',()=>{
   ?'support/test':gitReady(cwd,args)});
  assert.deepEqual(names(r),['CHECKOUT_NOT_MAIN']);
  assert.equal(r.status,'SOURCE_REPAIR_PREWORK_REQUIRED');
+});
+test('isolation origin cannot be substituted by another repository or host',()=>{
+ const r=prove({runGit:(cwd,args)=>args[0]==='remote'
+  ?'https://github.com/attacker/zgmini-pc-control.git':gitReady(cwd,args)});
+ assert.equal(r.status,'SOURCE_REPAIR_PREWORK_REQUIRED');
+ assert.deepEqual(names(r),['ISOLATED_ORIGIN_DENIED']);
+ assert.equal(r.isolatedOriginVerified,false);
+});
+test('target commit raw bytes are checked separately from working tree bytes',()=>{
+ const r=prove({runGit:(cwd,args)=>args[0]==='show'
+  &&args[1].endsWith(':tools/handoff-maintenance.mjs')
+   ?Buffer.from('invalid-target-blob'):gitReady(cwd,args)});
+ assert.equal(r.status,'SOURCE_REPAIR_PREWORK_REQUIRED');
+ assert.equal(r.targetFilesVerified,8);
+ assert.deepEqual(r.failures,[{
+  code:'TARGET_COMMIT_BLOB_SHA256_DRIFT',file:'tools/handoff-maintenance.mjs'
+ }]);
+});
+test('no binary git show object is treated as approval proof',()=>{
+ const r=prove({runGit:(cwd,args)=>args[0]==='show'
+  ?'text-formatted-output':gitReady(cwd,args)});
+ assert.equal(r.status,'SOURCE_REPAIR_PREWORK_REQUIRED');
+ assert.equal(r.targetFilesVerified,0);
+ assert.equal(names(r).filter(x=>x==='TARGET_COMMIT_BLOB_SHA256_DRIFT').length,9);
 });
 test('read-only surface exposes no command execution, credentials, overwrite or runtime certificate',()=>{
  const r=prove();
