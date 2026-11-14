@@ -1,0 +1,89 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "badad9124157879d7a645b64f2768113d632355b",
+  "targetSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "7107e7447a1aef27cc7bbd11c91cbd74b7f52676d3fabeb6fde2601cfc3b9b9f"
+    },
+    {
+      "path": "controller/common.mjs",
+      "sha256": "b040624236282476fb0a4ac3d2cd401845a595be94b4cebc58e42549b71ba31e"
+    },
+    {
+      "path": "controller/core-runtime-source-readonly.mjs",
+      "sha256": "37b068476df5d9d6a971d47918bc0d969ea4676b397cc7bb845caff31bccea60"
+    },
+    {
+      "path": "controller/core-runtime-source-wmi.mjs",
+      "sha256": "7beee6b04843c14a3b21c52579f871f9d437b688c531e98edfdfe0659226c691"
+    },
+    {
+      "path": "controller/d05-lineage-readonly.mjs",
+      "sha256": "69117b9f4fdee3b0befa36d1e2e1d7d81ab3796260fc72172df33332d9b03661"
+    },
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "cbc193b6d5b6d788df544c28c3a79ea5e3675bb6f24366c75eb2589b6b8a5cff"
+    },
+    {
+      "path": "controller/inflation-core-lock-observation-readonly.mjs",
+      "sha256": "9e63564a621f98257f0472030698052411e01efa5d04fee8dff8d6982d644ed2"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "e7bc7cc2ba89fd4fbdaaa811a176f597ac6ca48a4eda2def2d0b35fefb87df3b"
+    },
+    {
+      "path": "controller/release-calendar-runtime-readonly.mjs",
+      "sha256": "3d878edc7e497045b6b7027a57f01c55f03325ed51f69058dc543803a3a86aa4"
+    },
+    {
+      "path": "controller/shared-resource-release-readonly.mjs",
+      "sha256": "4bfa6131205b0c2e68fa10aa3f809d0be30361a63d58c1ccc433d63375b278c5"
+    },
+    {
+      "path": "controller/source-inventory-runtime-readonly.mjs",
+      "sha256": "d319459497f5afb6fc00d31402960d917670b82a13c724dcb9e57266bf6f78a1"
+    },
+    {
+      "path": "controller/supervisor.mjs",
+      "sha256": "b57e3d18f6c79c3faa62b56f28f6f8a3432fb451f9b843c786e2f8b3bafc3d6f"
+    },
+    {
+      "path": "controller/theme-l7-runtime-readonly.mjs",
+      "sha256": "46432c772c4b18c8f84d3c134b6c762bf04a4d5ed489574cc76effaf4e91e56a"
+    },
+    {
+      "path": "controller/writer-b-1063-recovery-readonly.mjs",
+      "sha256": "de9dccb21052f019aaffe1c55b16b48f6143cab71da8fd188d1354170cbeb5ed"
+    },
+    {
+      "path": "controller/writer-b-1063-task-probe.mjs",
+      "sha256": "8416cc09b76b5d13559cb6383b13f8f282b7a0b0f663d84a581fcf789a51e655"
+    }
+  ],
+  "purpose": "pc-controller-heavy-readonly",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367",
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE"
+  },
+  "checks": {
+    "targetSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+    "status": "PASS",
+    "manifestSha256": "7b47be818184a7ca39af8239d8fc3c7481168ad2c9f6a62e71bd95889cda52b2"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "badad9124157879d7a645b64f2768113d632355b"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc"
+}
