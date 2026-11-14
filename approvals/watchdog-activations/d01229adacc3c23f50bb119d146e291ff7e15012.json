@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V1",
+  "approved": true,
+  "scope": "ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY",
+  "targetSha": "d01229adacc3c23f50bb119d146e291ff7e15012",
+  "installedSha256": "d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8",
+  "installedScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "guardianHelperSha256": "2034b3fa3a6744b07ab831ff8b436842b9fd1b58233bb2b1a5098cbe62ace13f",
+  "activationScriptSha256": "b2d109a91e10434905efed6fcfe766e86988bf0f870897a6a2bba4c3c191979a",
+  "stageRequestId": "pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1",
+  "oldStageIssueNumber": 1376,
+  "expectedControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "effect": "ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART",
+  "approvalBasis": "2026-11-15 same-purpose standing B repair authorization in docs/PC_AUTOMATION_STANDARD.md section 5. Stage proven in #1376 Run 43633660101 with exact two-file write and JSON/TXT 2/2. Existing Guardian already restarts the Watchdog on a single controlled exit; the staged new bridge remains inactive until Guardian starts the replacement. This one-shot activation grants only an exact WMI-attested Guardian-owned independent Watchdog PID exit under medium-user token after >600 s healthy runtime, never a process tree, Controller, Runner, supervisor, maintenance receiver, Task, Core, DB or D1 mutation. Source/Guardian/host checks, immutable stage receipt, durable single-use ledger and new-process origin attestation are mandatory; fail closed without retry."
+}
