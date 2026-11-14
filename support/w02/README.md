@@ -35,3 +35,40 @@ node --test support/w02/treasury-audit-receipt-review.test.mjs
 이 테스트는 **합성 결과만 사용**하고 운영 PC·네트워크·파일 쓰기를 실행하지 않는다. 기존 승인된 실제 A 결과는 반드시 W02 원담당이 원본 Issue/Actions/JSON+TXT로 회수해야 한다.
 
 [앞서 준비한 최초 단회 감사 문서](../../docs/W02_TAWS_365D_FINAL_AUDIT_OWNER_ONEPASS_20261115.md)
+
+## 2026-11-15 두 DB 판정 병목 해결 및 3단계 메타데이터 연결 (지원 소스만)
+
+**기존 W02 마지막 5% 선행 실행은 변하지 않는다.** W02 원담당은 설치된 `source-inventory-runtime-readonly` A를 **새로운 요청 중복 없이 1회만** 사용하고 실제 결과를 회수한다.
+
+실제 설치 [`inspectSourceInventory()`](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/8e2736a62a90798afe159ef4d96a8713265ca021/controller/source-inventory-runtime-readonly.mjs)는 `core.sqlite`와 **무관한** `history.sqlite`를 함께 조회한다. `history` WAL `-wal/-shm` sidecar가 정상 체크포인트로 제거되면 `core.treasuryTawsInput`이 `OBSERVED`여도 최상위 `STATE_UNKNOWN/SOURCE_INVENTORY_PARTIAL_READONLY`가 나올 수 있다. **실제 PC에서 발생했다고 주장하지 않음; 설치 소스 분기의 가능한 장애**.
+
+지원 판정기의 새로운 보수적 결과:
+
+- 최상위와 내부 `PASS`, 원본 요청·Controller SHA, 비변경 보호, `core`의 365일 원문·건수·해시가 모두 유효하면 `REVIEWABLE/PRIVATE_TAWS_INPUT_AUDIT_REVIEWABLE`.
+- 최상위 `STATE_UNKNOWN/SOURCE_INVENTORY_PARTIAL_READONLY`라도 **오로지** `history.status=STATE_UNKNOWN`, `history.code=WAL_SIDECARS_ABSENT_UNVERIFIED`, `core.status=PASS`, `core.code=STORED_INVENTORY_READONLY`, `protectedStateUnchanged=true`, 모든 쓰기/제공자 호출 0 및 내용 유효 조건일 때 `CORE_ONLY_REVIEWABLE/PRIVATE_TAWS_CORE_AUDIT_HISTORY_WAL_UNVERIFIED`.
+- 그 밖의 history 오류, 실제 보호 drift, 원문 건수 불일치, Core 실패는 이전대로 보수적 `UNVERIFIED`. `CORE_ONLY_REVIEWABLE`은 **A 전체 PASS를 대체하지 않으며**, DB를 건드리거나 새 Controller 설치·작업 재실행을 요청하지 않는다.
+
+### 기존 PC raw 결과 + 승인된 D1 행 + 공개 API JSON의 **동일 시점 메타데이터** 대조
+
+[`treasury-three-lane-reconcile.mjs`](./treasury-three-lane-reconcile.mjs) 에 있는 독립 함수는 원담당이 **이미 확보한** 승인 증거를 인수로 받을 뿐 API를 호출하거나 SQL을 실행하지 않는다.
+
+```js
+import {reconcileTreasurySameCycle} from './support/w02/treasury-three-lane-reconcile.mjs';
+const result = reconcileTreasurySameCycle(
+  originalPcAResultJson,
+  existingApprovedD1OutputRowMetadata, // kind, feed_key, snapshot_key, stored_at (본문 제외)
+  existingPublicReleaseCalendarJson,
+  {
+    expectedRequestId: originalRequestId,
+    expectedSourceSha: originalSourceSha,
+    apiUrl: 'https://zgmini.kr/api/release-calendar',
+  },
+);
+```
+
+- PC private `storedAt`, D1 `output/release-calendar/current` `stored_at`, 공개 `updatedAt` 및 `sources.treasury.checkedAt`를 정확한 millisecond로 대조한다.
+- 정상 메타데이터 결합: `METADATA_ALIGNED/PC_D1_API_METADATA_SAME_CYCLE_REVIEWABLE`. WAL로 history 전체 A가 미검증이면 `CORE_ONLY_METADATA_ALIGNED/PC_CORE_AND_D1_API_METADATA_ALIGNED_HISTORY_WAL_UNKNOWN`. 둘 다 `featureCompletionApproved=false`, `d1BodyEqualityVerified=false`, `productionUiVerified=false`, `publicReadOriginAuthenticated=false`를 유지한다.
+- 날짜/건수/출처 불일치면 첫 오류 하나를 분류한다. TA_WS 원문 낙찰 **436행**과 공개 Treasury **입찰+공고 894행** 등은 애초에 같은 행 집합이 아니므로 숫자끼리 직접 등치시키지 않는다.
+- 동일 타임스탬프는 **본문 데이터가 같다는 증거가 아니며**, 코드에 입력한 공개 JSON과 D1 메타데이터가 실제 Owner 승인 경로로 확보됐다는 인증도 하지 않는다. 기존 생산 D1 본문·실제 홈페이지 PC/모바일 UI 검증과 최종 W02 완료 결정은 원담당 몫이다. 이 도구를 새 운영 Gate로 만들지 않는다.
+
+**네이티브 Node 22.16.0 단독 시험:** `node --test support/w02/treasury-audit-receipt-review.test.mjs support/w02/treasury-three-lane-reconcile.test.mjs` ⇒ **37/37 PASS** (22+15, FAIL 0). 로컬 시험 Git blob SHA와 GitHub에 제출한 각 4개 .mjs 파일 원격 SHA 일치. GitHub Actions/실Windows A/실제 D1 SELECT·API GET 결과는 **실행하지 않았다**.
