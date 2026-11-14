@@ -211,11 +211,11 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
   }
   const lockSha = write(lockPath, JSON.stringify({schema:'ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1',files}));
   const outer = fileURLToPath(new URL('../tools/VERIFY_996_WINDOWS_OUTER_ANCHOR.ps1', import.meta.url));
-  const run = mode => spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
+  const run = (mode,execute=false) => spawnSync('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',
     ['-NoProfile','-NonInteractive','-File',outer,'-PackageRoot',root,'-ManifestCommitSha',commit,
       '-LauncherSha256',launcherSha,'-NodeSha256',nodeSha,'-BootstrapSha256',bootstrapSha,
       '-SourceLockSha256',lockSha,'-PackageSha256',zipSha,'-SnapshotHelperSha256',helperSha,
-      '-ReviewOperatorHandoff','-OuterSha256',outerSha], {
+      execute?'-ExecuteOperatorOnce':'-ReviewOperatorHandoff','-OuterSha256',outerSha], {
       encoding:'utf8',windowsHide:true,timeout:30000,
       env:{...process.env,ZGMINI_996_TEST_RECEIPT:mode},
     });
@@ -226,6 +226,10 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     executionAuthorized:false,originalPcWrites:0,manifestCommitSha:commit,
     manifestSha256:manifestSha,ownerConsentCommentId:123,
   });
+  const syntheticExecution=run('matching',true);
+  assert.equal(syntheticExecution.status,2,syntheticExecution.stderr+syntheticExecution.stdout);
+  assert.equal(JSON.parse(syntheticExecution.stdout).code,'C_996_OWNER_AUTHENTICATION_SOURCE_UNTRUSTED');
+  assert.equal(JSON.parse(syntheticExecution.stdout).originalPcWrites,0);
   for (const mode of ['missing','wrong-operator','wrong-commit','authorized','wrong-launch']) {
     const blocked = run(mode);
     assert.equal(blocked.status, 2, blocked.stderr + blocked.stdout);

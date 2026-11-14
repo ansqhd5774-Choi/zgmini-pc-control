@@ -11,11 +11,13 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$PackageSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256,
   [switch]$ReviewOperatorHandoff,
+  [switch]$ExecuteOperatorOnce,
   [ValidatePattern('^[a-f0-9]{64}$')][string]$OuterSha256
 )
 $ErrorActionPreference = 'Stop'
 $guard = $null
 try {
+  if ($ReviewOperatorHandoff -and $ExecuteOperatorOnce) { throw 'C996_ANCHOR_MODE_CONFLICT' }
   if ($env:GITHUB_ACTIONS -or $env:RUNNER_NAME) { throw 'C996_ANCHOR_DIRECT_WINDOWS_ONLY' }
   $root = [IO.Path]::GetFullPath($PackageRoot).TrimEnd('\')
   $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
@@ -33,7 +35,7 @@ try {
   $pins.Add($helper, $SnapshotHelperSha256)
   $pins.Add($launcher, $LauncherSha256)
   $pins.Add('E:\ZGmini\runtime\node.exe', $NodeSha256)
-  if ($ReviewOperatorHandoff) {
+  if ($ReviewOperatorHandoff -or $ExecuteOperatorOnce) {
     if (!$OuterSha256 -or !$PSCommandPath) { throw 'C996_ANCHOR_EXTERNAL_PIN_REQUIRED' }
     $pins.Add([IO.Path]::GetFullPath($PSCommandPath), $OuterSha256)
   }
@@ -41,8 +43,9 @@ try {
   # Use a separate Windows PowerShell process. Its ordinary script policy
   # remains in force. The handles above stay open until the child exits.
   $reviewArgs = @()
-  if ($ReviewOperatorHandoff) {
-    $reviewArgs += @('-ReviewOperatorHandoff','-OuterSha256',$OuterSha256,
+  if ($ReviewOperatorHandoff -or $ExecuteOperatorOnce) {
+    if ($ExecuteOperatorOnce) { $reviewArgs += '-ExecuteOperatorOnce' } else { $reviewArgs += '-ReviewOperatorHandoff' }
+    $reviewArgs += @('-OuterSha256',$OuterSha256,
       '-LauncherSha256',$LauncherSha256,'-NodeSha256',$NodeSha256)
   }
   & 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -NoProfile -NonInteractive -File $launcher `

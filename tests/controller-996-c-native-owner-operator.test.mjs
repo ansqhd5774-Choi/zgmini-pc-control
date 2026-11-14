@@ -36,10 +36,11 @@ test('outside original Windows or under isolated CI, no caller flag can cross fi
 });
 
 test('operator is only a conditional source candidate, not old C runner',()=>{
-  const guard=source.indexOf("need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED')");
+  const guard=source.indexOf('need(sealedOwnerEntry?.manifestCommitSha===manifestCommitSha');
   const importAt=source.indexOf("import('./controller-996-c-installed-gh-get-readonly.mjs')");
   assert.ok(guard>0&&importAt>guard,
-    'unconditional review hold must run before any local dependency import');
+    'private sealed Owner entry must be checked before any local dependency import');
+  assert.match(source,/sealedOwnerEntry\.bootstrapSha256===TRUSTED_BOOTSTRAP_SHA256/);
   assert.match(source,/C_996_OWNER_MANIFEST_COMMIT_REQUIRED/);
   assert.match(source,/create996ContinuationConsentEvidenceReader/);
   assert.match(source,/checkSourceBundle\(manifest,manifestCommitSha\)/);
@@ -118,13 +119,14 @@ test('namespace insertion remains unproven and native production move stays inde
   assert.match(source,/receipt\.strategy==='WINDOWS_TXF_CAS_V1'/);
   assert.match(source,/function handleArchiveScript\(fixture=false\)/);
   assert.match(source,/if\(Fixture&&args\.ContainsKey\("simulateNamespaceInsert"\)/);
-  assert.match(source,/need\(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED'\)/);
+  assert.match(source,/let sealedOwnerEntry=null/);
+  assert.match(source,/'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED'/);
   assert.doesNotMatch(source,/handleArchiveScript\(true\)\]\s*,\s*\{/);
 });
 
 test('transactional backend preserves archive ordering and the final independent consent check',()=>{
  const body=source.slice(source.indexOf('export async function run996NativeOwnerCOnce'));
- const stop=body.indexOf("need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED')");
+ const stop=body.indexOf('need(sealedOwnerEntry?.manifestCommitSha===manifestCommitSha');
  assert.ok(stop>=0&&stop<body.indexOf('import('));
  const old=body.indexOf('moveNoReplace(plan.steps[0].source');
  const own=body.indexOf('moveNoReplace(plan.steps[1].source');

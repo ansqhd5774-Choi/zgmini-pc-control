@@ -1,4 +1,4 @@
-// #996 C-grade original Windows OWNER operator CANDIDATE — review CLI only.
+// #996 C-grade original Windows OWNER operator CANDIDATE.
 // This file is not installed, approved or executable in the current project.
 // It has no test or synthetic authorization port and never adopts the old
 // C owner. Only a NEW independently read, exact Owner approval AND immutable
@@ -24,6 +24,10 @@ const LOCAL_PACKAGE=path.resolve(DIR,'../artifacts/controller-996/zgmini-996-c-n
 const LOCK_REPO='tools/controller-996-c-native-owner-source-lock.json';
 const PACKAGE_REPO='artifacts/controller-996/zgmini-996-c-native-owner-package.zip';
 const SELF_REPO='tools/controller-996-c-native-owner-operator.mjs';
+// Reviewed builtins-only verifier. Caller-supplied lock/receipt pins cannot
+// replace this authentication implementation with a synthetic verifier.
+const TRUSTED_BOOTSTRAP_SHA256='4827b8a14005c8b07056bec2a831f2890eae293c4561168557b9e552a5394e7d';
+let sealedOwnerEntry=null; // Set only by the authenticated CLI path below.
 const FILES=[
   SELF_REPO,
   'tools/controller-996-c-native-trusted-bootstrap.mjs',
@@ -421,6 +425,7 @@ public static class C996TransactionalArchive {
    if(!MoveFileTransactedW(source,destination,IntPtr.Zero,IntPtr.Zero,0,tx))throw new Stop("C996_NATIVE_TX_STAGE_FAILED",Marshal.GetLastWin32Error());
    if(a.ContainsKey("fixtureInsert")){Need(Fixture,"C996_NATIVE_TX_FIXTURE_ONLY");using(var h=CreateFileTransactedW(Path.Combine(destination,"INJECTED.json"),GenericWrite,7,IntPtr.Zero,1,0,IntPtr.Zero,tx,IntPtr.Zero,IntPtr.Zero)){Need(!h.IsInvalid,"C996_NATIVE_TX_FIXTURE_INSERT_FAILED");using(var s=new FileStream(h,FileAccess.Write)){s.WriteByte(1);}}}
    byte[] stagedOwner;var staged=Capture(destination,tx,streams,out stagedOwner);VerifyPins(staged,pins);Owner(stagedOwner,a);Need(Json.Serialize(before)==Json.Serialize(staged),"C996_NATIVE_TX_ID_OR_ACL_DRIFT");
+   if(a.ContainsKey("fixtureExternalRace")){Need(Fixture,"C996_NATIVE_TX_FIXTURE_ONLY");File.WriteAllText(Path.Combine(root,"race-ready.json"),"ready");var until=DateTime.UtcNow.AddSeconds(10);while(!File.Exists(Path.Combine(root,"race-done.json"))){Need(DateTime.UtcNow<until,"C996_NATIVE_TX_FIXTURE_RACE_TIMEOUT");System.Threading.Thread.Sleep(10);}}
    if(a.ContainsKey("fixtureTerminateAfterCas")){Need(Fixture,"C996_NATIVE_TX_FIXTURE_ONLY");Environment.Exit(17);}
    // Transacted writer handles pin content until commit, after the full
    // namespace, expected bytes, identities, ACL and owner checks succeed.
@@ -628,13 +633,13 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
   try{
     originalWindows();
     need(H40(manifestCommitSha),'C_996_OWNER_MANIFEST_COMMIT_REQUIRED');
-    // REVIEW HOLD: The dependency import closure has not been independently
-    // authenticated before the first dynamic import. The native child passed
-    // isolated Windows archive checks. Original-PC approval and the complete
-    // launcher-to-operator path still need verification. This candidate is
-    // intentionally NEVER executable, even with a future signed manifest and
-    // exact Owner consent. Remove only after separate review and approval.
-    need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED');
+    // No caller flag, test receipt or direct import can authorize a write.
+    // The CLI verifies the builtins-only authentication source, installs the
+    // pinned-byte loader, and independently reads exact human Owner consent.
+    need(sealedOwnerEntry?.manifestCommitSha===manifestCommitSha&&
+      sealedOwnerEntry.bootstrapSha256===TRUSTED_BOOTSTRAP_SHA256&&
+      sealedOwnerEntry.operatorSha256===sha(safeFile(path.join(DIR,path.basename(SELF_REPO)),2_000_000)),
+      'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED');
     const [{create996InstalledGhGetReadOnly},
       {create996ContinuationConsentEvidenceReader},
       {create996FourOriginalJobsReadOnlyReader}]=await Promise.all([
@@ -645,6 +650,13 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
     const consentReader=create996ContinuationConsentEvidenceReader({
       githubReader:create996InstalledGhGetReadOnly()});
     const consent=await consentReader.readOnce({manifestCommitSha});
+    need(consent?.consentCommentId===sealedOwnerEntry.ownerConsentCommentId&&
+      consent.manifestSha256===sealedOwnerEntry.manifestSha256&&
+      consent.operatorSha256===sealedOwnerEntry.operatorSha256&&
+      consent.bootstrapSha256===sealedOwnerEntry.bootstrapSha256&&
+      consent.sourceLockSha256===sealedOwnerEntry.sourceLockSha256&&
+      consent.packageSha256===sealedOwnerEntry.packageSha256,
+      'C_996_OWNER_EXACT_EXECUTION_CONSENT_CHANGED');
     let manifest;try{manifest=JSON.parse(consent.rawManifestBytes.toString('utf8'));}
     catch{need(false,'C_996_OWNER_CONSENT_MANIFEST_INVALID');}
     checkSourceBundle(manifest,manifestCommitSha);
@@ -780,27 +792,35 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
       'C_996_OWNER_INSTALL_POSTCHECK_UNKNOWN');
     return Object.freeze({
       schema:'ZGMINI_CONTROLLER_996_NATIVE_OWNER_C_RESULT_V1',
-      status:'C_ARCHIVES_POSTCHECKED_ONLY',
+      status:'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED',
       code:'C_RECOVERY_EFFECTS_PERFORMED_NO_AUTOMATIC_JOB_REPLAY',
       sourceLocked:true,ownerConsentReadbackId:consent.consentCommentId,
       completedArchiveMoves:3,fixedReservationPreserved:true,
+      originalInstallSucceeded:false,
+      actualControllerSha:'badad9124157879d7a645b64f2768113d632355b',
+      activeIntakeReadbackVerified:true,closedBacklogReadbackVerified:true,
       originalRequestRetries:0,workflowPuts:0,backlogWrites:0,
       issuePosts:0,automaticRetry:false,cleanupPerformed:false,
     });
   }catch(e){return stop(safeCode(e),phase);}
 }
 
-// This command independently revalidates the receipt. It never calls the
-// operational function, even if that function is separately approved later.
+// Review is read-only. Execution is a separate explicit mode and accepts only
+// the fixed authentication verifier, exact Owner comment and pinned imports.
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const [mode,manifestCommitSha]=process.argv.slice(2);
     try{
-      need(process.argv.length===4&&mode==='--verify-handoff'&&H40(manifestCommitSha),'C_996_OWNER_REVIEW_ARGS_INVALID');
+      need(process.argv.length===4&&['--verify-handoff','--execute-once'].includes(mode)&&H40(manifestCommitSha),'C_996_OWNER_REVIEW_ARGS_INVALID');
       const input=fs.readFileSync(0,'utf8');
       need(input.length<=16384,'C_996_OWNER_HANDOFF_SIZE');
       const claimed=JSON.parse(input);
       need(claimed?.fixtureOnly!==true&&claimed?.executionAuthorized===false&&
         claimed?.operatorStarted===false,'C_996_OWNER_HANDOFF_EVIDENCE_DRIFT');
+      if(mode==='--execute-once'){
+        originalWindows();
+        need(claimed.bootstrapSha256===TRUSTED_BOOTSTRAP_SHA256,
+          'C_996_OWNER_AUTHENTICATION_SOURCE_UNTRUSTED');
+      }
       const imports=pin996ReviewImports(claimed);
       try{
       const {verify996CTrustedBootstrapReadOnly}=await import('./controller-996-c-native-trusted-bootstrap.mjs');
@@ -813,7 +833,14 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
         ['outerSha256','launcherSha256','helperSha256','nodeSha256'].every(key=>
           H64(verified.launchPins?.[key])&&verified.launchPins[key]===claimed?.launchPins?.[key]),
         'C_996_OWNER_HANDOFF_EVIDENCE_DRIFT');
-      console.log(JSON.stringify({status:'OPERATOR_REVIEW_BOUNDARY_REACHED',
+      if(mode==='--execute-once'){
+        sealedOwnerEntry=Object.freeze({...verified});
+        try{
+          const result=await run996NativeOwnerCOnce({manifestCommitSha});
+          console.log(JSON.stringify(result));
+          if(result.status!=='INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED')process.exitCode=2;
+        }finally{sealedOwnerEntry=null;}
+      }else console.log(JSON.stringify({status:'OPERATOR_REVIEW_BOUNDARY_REACHED',
         code:'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED',executionAuthorized:false,
         originalPcWrites:0,manifestCommitSha,manifestSha256:verified.manifestSha256,
         ownerConsentCommentId:verified.ownerConsentCommentId}));

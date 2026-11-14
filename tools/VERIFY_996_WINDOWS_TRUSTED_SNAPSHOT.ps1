@@ -9,6 +9,7 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$PackageSha256,
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-f0-9]{64}$')][string]$SnapshotHelperSha256,
   [switch]$ReviewOperatorHandoff,
+  [switch]$ExecuteOperatorOnce,
   [ValidatePattern('^[a-f0-9]{64}$')][string]$OuterSha256,
   [ValidatePattern('^[a-f0-9]{64}$')][string]$LauncherSha256,
   [ValidatePattern('^[a-f0-9]{64}$')][string]$NodeSha256
@@ -17,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 $snapshot = $null
 $savedNodeEnvironment = @{}
 try {
+  if ($ReviewOperatorHandoff -and $ExecuteOperatorOnce) { throw 'C996_SNAPSHOT_MODE_CONFLICT' }
   if ($env:GITHUB_ACTIONS -or $env:RUNNER_NAME) { throw 'C996_SNAPSHOT_DIRECT_WINDOWS_ONLY' }
   $root = [IO.Path]::GetFullPath($PackageRoot)
   $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
@@ -53,7 +55,7 @@ try {
       $savedNodeEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
       [Environment]::SetEnvironmentVariable($name, $null, 'Process')
     }
-    if (!$ReviewOperatorHandoff) {
+    if (!$ReviewOperatorHandoff -and !$ExecuteOperatorOnce) {
       & 'E:\ZGmini\runtime\node.exe' $bootstrapPath $ManifestCommitSha
       if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } else {
@@ -83,7 +85,24 @@ try {
           $proof.operatorStarted -isnot [bool] -or $proof.operatorStarted) {
         throw 'C996_SNAPSHOT_BOOTSTRAP_RECEIPT_INVALID'
       }
-      $operatorReply = $reply | & 'E:\ZGmini\runtime\node.exe' $operatorPath --verify-handoff $ManifestCommitSha
+      $operatorMode = if ($ExecuteOperatorOnce) { '--execute-once' } else { '--verify-handoff' }
+      $operatorReply = $reply | & 'E:\ZGmini\runtime\node.exe' $operatorPath $operatorMode $ManifestCommitSha
+      $operatorExit = $LASTEXITCODE
+      if ($ExecuteOperatorOnce) {
+        if (@($operatorReply).Count -ne 1) { throw 'C996_SNAPSHOT_OPERATOR_OUTCOME_UNKNOWN' }
+        $outcome = $operatorReply | ConvertFrom-Json
+        # Preserve partial-operation phase/code verbatim; never retry or clean up.
+        if ($operatorExit -ne 0) { [Console]::WriteLine([string]$operatorReply); exit 2 }
+        if ($outcome.status -cne 'INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED' -or
+            $outcome.completedArchiveMoves -ne 3 -or
+            $outcome.ownerConsentReadbackId -ne $proof.ownerConsentCommentId -or
+            $outcome.actualControllerSha -cne 'badad9124157879d7a645b64f2768113d632355b' -or
+            $outcome.originalInstallSucceeded -ne $false -or
+            $outcome.activeIntakeReadbackVerified -ne $true -or
+            $outcome.closedBacklogReadbackVerified -ne $true) { throw 'C996_SNAPSHOT_OPERATOR_OUTCOME_UNKNOWN' }
+        [Console]::WriteLine([string]$operatorReply)
+        exit 0
+      }
       if ($LASTEXITCODE -ne 0 -or @($operatorReply).Count -ne 1) { throw 'C996_SNAPSHOT_OPERATOR_REVIEW_FAILED' }
       $operatorProof = $operatorReply | ConvertFrom-Json
       if ($operatorProof.status -cne 'OPERATOR_REVIEW_BOUNDARY_REACHED' -or

@@ -74,7 +74,7 @@ function storedZip(entries) {
   return Buffer.concat([...local, index, end]);
 }
 
-export function build996OwnerReviewPackage({repository, sourceCommit, outputDirectory}) {
+export function build996OwnerReviewPackage({repository, sourceCommit, outputDirectory, executionCandidate=false}) {
   need(/^[a-f0-9]{40}$/.test(sourceCommit ?? ''), 'C996_REVIEW_FULL_COMMIT_REQUIRED');
   const git = (...args) => execFileSync('git', ['--no-replace-objects', ...args], {
     cwd: repository, windowsHide: true, maxBuffer: 2_000_000,
@@ -87,15 +87,16 @@ export function build996OwnerReviewPackage({repository, sourceCommit, outputDire
   const operatorBytes = readBlob(OPERATOR);
   const operatorPaths = lockedPaths(operatorBytes, OPERATOR, /const FILES=\[([\s\S]*?)\];/);
   need(JSON.stringify(bootstrapPaths) === JSON.stringify(operatorPaths), 'C996_REVIEW_SOURCE_LIST_DRIFT');
-  need(operatorBytes.toString().includes("need(false,'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED')"),
+  need(operatorBytes.toString().includes('sealedOwnerEntry?.manifestCommitSha===manifestCommitSha')&&
+    operatorBytes.toString().includes("'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED'"),
     'C996_REVIEW_OPERATOR_HOLD_REQUIRED');
   const entries = new Map([...bootstrapPaths, ...LAUNCH].map(relative => [relative, readBlob(relative)]));
   const lock = json({schema:'ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1',
     files:Object.fromEntries(bootstrapPaths.map(relative => [relative, sha(entries.get(relative))]))});
   entries.set(LOCK, lock);
   entries.set('README.txt', Buffer.from(
-    '#996 read-only review bundle\nSource: ' + sourceCommit +
-    '\nOperator hold is enabled. No S2 manifest, Owner approval or production entry is supplied.\n'));
+    '#996 '+(executionCandidate?'sealed execution candidate':'read-only review bundle')+'\nSource: ' + sourceCommit +
+    '\nExact S2 manifest and independent human Owner consent are required. This ZIP is not consent.\n'));
   const zip = storedZip(entries);
   const root = fs.realpathSync.native(os.tmpdir());
   const parent = fs.realpathSync.native(path.dirname(path.resolve(outputDirectory)));
@@ -103,14 +104,15 @@ export function build996OwnerReviewPackage({repository, sourceCommit, outputDire
   need(!path.isAbsolute(rel) && rel !== '..' && !rel.startsWith('..' + path.sep),
     'C996_REVIEW_OUTPUT_TEMP_REQUIRED');
   fs.mkdirSync(outputDirectory);
-  const zipFile = path.join(outputDirectory, 'ZGMINI_996_OWNER_REVIEW.zip');
+  const zipFile = path.join(outputDirectory, executionCandidate?'zgmini-996-c-native-owner-package.zip':'ZGMINI_996_OWNER_REVIEW.zip');
   fs.writeFileSync(zipFile, zip, {flag:'wx'});
   const report = {
-    status:'REVIEW_PACKAGE_ONLY', sourceCommit, zipSha256:sha(zip), sourceLockSha256:sha(lock),
+    status:executionCandidate?'SEALED_CANDIDATE_OWNER_APPROVAL_REQUIRED':'REVIEW_PACKAGE_ONLY', sourceCommit, zipSha256:sha(zip), sourceLockSha256:sha(lock),
     sourceCount:bootstrapPaths.length, productionExecutable:false,
     files:Object.fromEntries([...entries].map(([relative, bytes]) => [relative, sha(bytes)])),
   };
   fs.writeFileSync(path.join(outputDirectory, 'ZGMINI_996_OWNER_REVIEW_SHA256.json'), json(report), {flag:'wx'});
+  if(executionCandidate)fs.writeFileSync(path.join(outputDirectory,'controller-996-c-native-owner-source-lock.json'),lock,{flag:'wx'});
   return {zipFile, ...report};
 }
 
