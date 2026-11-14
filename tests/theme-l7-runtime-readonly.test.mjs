@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
- safeR181ErrorFlow,safeR181HttpErrorFlow} from '../controller/theme-l7-runtime-readonly.mjs';
+ safeR181ErrorFlow,safeR181HttpErrorFlow,safeR181QueryNameInventory} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -408,4 +408,56 @@ test('R181 error branch inventory is bounded and never claims a runtime failure'
  assert.equal(JSON.stringify(out).includes('SECRET_VALUE'),false);
  assert.deepEqual(safeR181HttpErrorFlow('throw Error("x")\n'.repeat(1000)),
   {status:'UNREADABLE_SOURCE',sites:[],lines:[],truncated:false});
+});
+
+test('R181 fixed query-name inventory detects legacy names but never returns query values',()=>{
+ const source="const url='https://provider.example/query?symbol=SPY&source=STOCKS&token=PRIVATE_KEY';";
+ const out=safeR181QueryNameInventory(source);
+ assert.deepEqual(out,{status:'STATIC_SOURCE_ONLY',
+  legacyTicker:'STATIC_NAME_OBSERVED',legacyDataset:'STATIC_NAME_OBSERVED',
+  modernTicker:'NOT_OBSERVED',modernDataset:'NOT_OBSERVED',
+  runtimeRequestVerified:false});
+ for(const secret of ['PRIVATE_KEY','STOCKS','SPY','provider.example'])
+  assert.equal(JSON.stringify(out).includes(secret),false);
+});
+
+test('R181 query names distinguish modern URLSearchParams and mixed query construction',()=>{
+ const modern=safeR181QueryNameInventory(
+  "const p=new URLSearchParams({ticker:'SPY',dataset:'DAILY'});p.set('tickers','X');");
+ assert.deepEqual([modern.legacyTicker,modern.legacyDataset],
+  ['NOT_OBSERVED','NOT_OBSERVED']);
+ assert.deepEqual([modern.modernTicker,modern.modernDataset],
+  ['STATIC_NAME_OBSERVED','STATIC_NAME_OBSERVED']);
+ const mixed=safeR181QueryNameInventory(
+  "const old='/q?symbols=SPY'; const p=new URLSearchParams({source,ticker});");
+ assert.equal(mixed.legacyTicker,'STATIC_NAME_OBSERVED');
+ assert.equal(mixed.legacyDataset,'STATIC_NAME_OBSERVED');
+ assert.equal(mixed.modernTicker,'STATIC_NAME_OBSERVED');
+});
+
+test('R181 query-name inspection ignores comments and bar response fields',()=>{
+ const s=[
+  "// const url='?symbol=SPY&source=SECRET';",
+  "/* p.set('symbol','SECRET');new URLSearchParams({dataset:'X'}) */",
+  "const row={symbol:'SPY',source:'PROVENANCE',dataset:'VENDOR'};",
+  "const h='https://host.example/api'; // params.set('source','SECRET')",
+ ].join('\n');
+ const out=safeR181QueryNameInventory(s);
+ for(const k of ['legacyTicker','legacyDataset','modernTicker','modernDataset'])
+  assert.equal(out[k],'NOT_OBSERVED');
+ assert.equal(out.runtimeRequestVerified,false);
+});
+
+test('R181 query-name inspection is pinned and bounded: never executes or authorizes HTTP',()=>{
+ assert.deepEqual(safeR181QueryNameInventory('X'.repeat(8193)),
+  {status:'UNREADABLE_SOURCE'});
+ assert.deepEqual(safeR181QueryNameInventory('one\0two'),
+  {status:'UNREADABLE_SOURCE'});
+ const f=fixture();try{
+  const out=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+  assert.deepEqual(out.sources['r181-primary-cycle.mjs'].safeQueryNameInventory,
+   {status:'SOURCE_PIN_OR_SIZE_MISMATCH'});
+  assert.equal(out.providerCalls,0);
+  assert.equal(out.operationalWrites,0);
+ }finally{f.close();}
 });
