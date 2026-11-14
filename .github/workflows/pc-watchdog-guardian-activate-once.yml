@@ -1,0 +1,52 @@
+# Exactly one approved Guardian-owned Watchdog process may be rotated.
+# This is NOT a maintenance receiver handoff or Controller install job.
+name: ZGMINI Guardian Watchdog Activation B Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-watchdog-b-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  guardian-watchdog-activation-b:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-watchdog-guardian-activate' &&
+      contains(github.event.issue.labels.*.name, 'pc-maintenance') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Checkout approved exact private source
+        id: checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: watchdog-activation-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Activate only confirmed Guardian-owned Watchdog, never process tree
+        id: activate
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-activation-control\watchdog-b\guardian-activation.mjs" > "%RUNNER_TEMP%\watchdog-activation-apply.json"'
+      - name: Create-only JSON TXT and originating Issue report
+        if: always() && steps.checkout.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-activation-control\watchdog-b\guardian-result.mjs"'
