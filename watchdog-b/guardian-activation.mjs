@@ -20,6 +20,7 @@ const rep='ansqhd5774-Choi/zgmini-pc-control';
 const name='pc-watchdog-guardian-activate';
 const schema='ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1';
 const idRe=/^pc-watchdog-activate-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+const APPROVED_REQUEST_ID='pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4';
 const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'.json');
 const helper=path.join(root,'watchdog-b/guardian-rotate.vbs');
 const stageRequestId='pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1';
@@ -47,6 +48,7 @@ export function validateActivation(event,body,approval,rawApprovalDigest,helperD
   fail('WATCHDOG_ACTIVATION_EVENT_DENIED');
  if(!exact(body,['schema','requestId','operation','targetSha','approvalManifestSha256'])
   ||body.schema!==schema||!idRe.test(body.requestId??'')
+  ||body.requestId!==APPROVED_REQUEST_ID
   ||body.operation!=='watchdog-guardian-activate'||body.targetSha!==TARGET
   ||body.approvalManifestSha256!==rawApprovalDigest)
   fail('WATCHDOG_ACTIVATION_REQUEST_INVALID');
