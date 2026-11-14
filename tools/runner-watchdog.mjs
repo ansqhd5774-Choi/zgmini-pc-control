@@ -87,8 +87,9 @@ function ghRead(args){
  return execFileSync(gh,args,{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1000000});
 }
 function git(cwd,args){
- return execFileSync('git',args,{cwd,encoding:'utf8',windowsHide:true,timeout:30000,
-  maxBuffer:200000,env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
+ return execFileSync('git',args,{cwd,encoding:args[0]==='show'?null:'utf8',
+  windowsHide:true,timeout:30000,maxBuffer:3000000,
+  env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
 }
 export function validateHandoffStaging(issue,body){
  if(issue?.title!==handoffTitle||issue?.state!=='OPEN'
