@@ -20,8 +20,8 @@ const rep='ansqhd5774-Choi/zgmini-pc-control';
 const name='pc-watchdog-guardian-activate';
 const schema='ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1';
 const idRe=/^pc-watchdog-activate-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-const APPROVED_REQUEST_ID='pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4';
-const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'.json');
+const APPROVED_REQUEST_ID='pc-watchdog-activate-7e6ef57f-620b-498a-998f-05c9e953b4a2';
+const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'-r2.json');
 const helper=path.join(root,'watchdog-b/guardian-rotate.vbs');
 const stageRequestId='pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1';
 const digest=b=>createHash('sha256').update(b).digest('hex');
@@ -55,7 +55,7 @@ export function validateActivation(event,body,approval,rawApprovalDigest,helperD
  if(!exact(approval,['schema','approved','scope','targetSha','installedSha256',
   'installedScope','guardianHelperSha256','activationScriptSha256','stageRequestId','oldStageIssueNumber',
   'expectedControllerSha','effect','approvalBasis'])
-  ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V1'
+  ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V2'
   ||approval.approved!==true
   ||approval.scope!=='ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY'
   ||approval.targetSha!==TARGET||approval.installedSha256!==REPLACEMENT
