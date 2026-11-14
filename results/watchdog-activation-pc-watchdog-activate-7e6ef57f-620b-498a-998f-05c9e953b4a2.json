@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1",
+  "requestId": "pc-watchdog-activate-7e6ef57f-620b-498a-998f-05c9e953b4a2",
+  "issueNumber": 1387,
+  "targetSha": "d01229adacc3c23f50bb119d146e291ff7e15012",
+  "runId": "43637418425",
+  "attempt": "1",
+  "status": "PASS",
+  "code": "WATCHDOG_GUARDIAN_NEW_RUNTIME_ATTESTED",
+  "watchdogFileWrites": 0,
+  "newProcessAttested": true
+}
