@@ -13,7 +13,7 @@ const fixture = () => ({
   controlSourceSha: control, actualExecutionSha: control,
   requestedSourceSha: source, sourceRepository: 'ansqhd5774-Choi/zgmini',
   sourceBranch: 'main', status: 'PASS', code: 'SOURCE_INVENTORY_STORED_READONLY',
-  exitCode: 0, firstFail: null, providerCalls: 0, d1Writes: 0, operationalWrites: 0,
+  exitCode: 0, firstFail: null, providerCalls: 0, d1Writes: 0, operationalWrites: 0, protectedStateUnchanged: true,
   result: {
     status: 'PASS', code: 'SOURCE_INVENTORY_STORED_READONLY',
     providerCalls: 0, d1Writes: 0, operationalWrites: 0,
@@ -131,4 +131,53 @@ test('leap year 365-day inclusive window with 364 days accepted', () => {
     storedAt: Date.parse('2024-02-29T13:02:04Z'),
   });
   assert.equal(code(r), 'PRIVATE_TAWS_INPUT_AUDIT_REVIEWABLE');
+});
+
+test('unrelated history DB WAL absence preserves core evidence without PASS', () => {
+  const r = fixture();
+  r.status = 'STATE_UNKNOWN'; r.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.firstFail = 'ALLOWLISTED_OPERATION';
+  r.result.status = 'STATE_UNKNOWN'; r.result.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.result.history = {status: 'STATE_UNKNOWN', code: 'WAL_SIDECARS_ABSENT_UNVERIFIED'};
+  const out = review(r, opts);
+  assert.equal(out.status, 'CORE_ONLY_REVIEWABLE');
+  assert.equal(out.code, 'PRIVATE_TAWS_CORE_AUDIT_HISTORY_WAL_UNVERIFIED');
+  assert.equal(out.storedAwardedCount, 436);
+  assert.equal(out.historyDbAuditCompleted, false);
+  assert.equal(out.finalFeatureCompletionApproved, false);
+  assert.equal(out.productionEquivalenceVerified, false);
+});
+
+test('same partial history status but missing approved postcheck cannot pass', () => {
+  const r = fixture();
+  r.status = 'STATE_UNKNOWN'; r.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.firstFail = 'ALLOWLISTED_OPERATION';
+  r.result.status = 'STATE_UNKNOWN'; r.result.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.result.history = {status: 'STATE_UNKNOWN', code: 'WAL_SIDECARS_ABSENT_UNVERIFIED'};
+  r.protectedStateUnchanged = false;
+  assert.equal(code(r), 'A_RECEIPT_STATUS_OR_NO_WRITE_PROOF_MISSING');
+});
+
+test('unrelated history corruption is not the narrow WAL checkpoint exemption', () => {
+  const r = fixture();
+  r.status = 'STATE_UNKNOWN'; r.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.firstFail = 'ALLOWLISTED_OPERATION';
+  r.result.status = 'STATE_UNKNOWN'; r.result.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.result.history = {status: 'STATE_UNKNOWN', code: 'READONLY_QUERY_FAILED'};
+  assert.equal(code(r), 'A_RECEIPT_STATUS_OR_NO_WRITE_PROOF_MISSING');
+});
+
+test('history-WAL partial with anomalous core counts does not turn into PASS', () => {
+  const r = fixture();
+  r.status = 'STATE_UNKNOWN'; r.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.firstFail = 'ALLOWLISTED_OPERATION';
+  r.result.status = 'STATE_UNKNOWN'; r.result.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
+  r.result.history = {status: 'STATE_UNKNOWN', code: 'WAL_SIDECARS_ABSENT_UNVERIFIED'};
+  r.result.core.treasuryTawsInput.eligibleCountMatchesStored = false;
+  assert.equal(code(r), 'PRIVATE_TAWS_COUNT_FLAG_CONTRADICTION');
+});
+
+test('ordinary PASS also requires protected resource unchanged proof', () => {
+  const r = fixture(); delete r.protectedStateUnchanged;
+  assert.equal(code(r), 'A_RECEIPT_STATUS_OR_NO_WRITE_PROOF_MISSING');
 });
