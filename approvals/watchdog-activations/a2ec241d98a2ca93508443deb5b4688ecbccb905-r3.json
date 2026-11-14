@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V3",
+  "approved": true,
+  "scope": "ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY",
+  "targetSha": "a2ec241d98a2ca93508443deb5b4688ecbccb905",
+  "installedSha256": "3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072",
+  "installedScope": "RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1",
+  "guardianHelperSha256": "ba4890ca8c8dd7ba4d885d88aff000443a58d1a8b1c9d01f386e10b3e0aa3bbe",
+  "activationScriptSha256": "a1f426c12392389dbfb5ef50ab5c17d44543a5bd74ef3e40903954682df199ab",
+  "stageRequestId": "pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b",
+  "oldStageIssueNumber": 1393,
+  "expectedControllerSha": "badad9124157879d7a645b64f2768113d632355b",
+  "effect": "ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART",
+  "approvalBasis": "Existing same-purpose B source activation standing approval docs/PC_AUTOMATION_STANDARD.md section 5. One-time Windows Watchdog R3 source staging #1393 Run 43639988809 yielded STAGED with exact approved source sha256 3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072, 2-only installed files, result JSON/TXT. Source change #1390 merges isolated temp checkout to fix #1389 ENOENT/stale local dev source while preserving original #1378. This exact R3 activation grants only ONE already-running WScript-Guardian-owned Watchdog Node PID exit followed by natural Guardian restart and new-origin attestation. No process-tree kill, no maintenance receiver self-update by Runner, no source checkout force-reset and no Controller/Core/DB/D1 effects. All prior installed SHA, stage receipt, medium-token, original approved Controller source, live protected state CAS and process identity criteria remain fixed. Previous #1387 activation remains completed, never retried."
+}

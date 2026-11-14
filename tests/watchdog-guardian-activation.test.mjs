@@ -8,9 +8,9 @@ import {validateActivation,statusReady} from '../watchdog-b/guardian-activation.
 import {normalizeResult} from '../watchdog-b/guardian-result.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const digest=buf=>createHash('sha256').update(buf).digest('hex');
-const target='d01229adacc3c23f50bb119d146e291ff7e15012';
-const replacement='d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8';
-const requestId='pc-watchdog-activate-7e6ef57f-620b-498a-998f-05c9e953b4a2';
+const target='a2ec241d98a2ca93508443deb5b4688ecbccb905';
+const replacement='3f99ea3357c6731cc9000bde1273db915cb07ba5fa480718194deb6330c29072';
+const requestId='pc-watchdog-activate-31390a2f-c503-4ff1-9858-a960bbc07a0d';
 const helperDigest=digest(fs.readFileSync(path.join(root,'watchdog-b/guardian-rotate.vbs')));
 const scriptDigest=digest(fs.readFileSync(path.join(root,'watchdog-b/guardian-activation.mjs')));
 function fixture(){
@@ -22,14 +22,14 @@ function fixture(){
   body:{schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1',
     requestId,operation:'watchdog-guardian-activate',targetSha:target,
     approvalManifestSha256:'a'.repeat(64)},
-  approval:{schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V2',
+  approval:{schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V3',
     approved:true,scope:'ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY',
     targetSha:target,installedSha256:replacement,
     installedScope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1',
     guardianHelperSha256:helperDigest,
     activationScriptSha256:scriptDigest,
-    stageRequestId:'pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1',
-    oldStageIssueNumber:1376,
+    stageRequestId:'pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b',
+    oldStageIssueNumber:1393,
     expectedControllerSha:'badad9124157879d7a645b64f2768113d632355b',
     effect:'ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART',approvalBasis:'approved'},
   digest:'a'.repeat(64)
@@ -67,8 +67,8 @@ test('on-disk STAGED and recent matching healthy owner are required',()=>{
   manifest:{sha256:replacement,scope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1',
     approvedTargetSourceSha:target},
   stage:{schema:'ZGMINI_PC_WATCHDOG_B_RESULT_V1',
-    requestId:'pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1',
-    issueNumber:1376,targetSha:target,targetSourceSha256:replacement,
+    requestId:'pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b',
+    issueNumber:1393,targetSha:target,targetSourceSha256:replacement,
     status:'STAGED',writes:2}};
  assert.equal(statusReady(x),true);
  for(const mutate of [
@@ -103,7 +103,7 @@ test('fixed identity witness does not contain process-tree termination or arbitr
 
 test('immutable production B manifest pins exact submitted helper and runner bytes',()=>{
  const approved=JSON.parse(fs.readFileSync(path.join(root,
-  'approvals/watchdog-activations/d01229adacc3c23f50bb119d146e291ff7e15012-r2.json')));
+  'approvals/watchdog-activations/a2ec241d98a2ca93508443deb5b4688ecbccb905-r3.json')));
  assert.equal(approved.approved,true);
  assert.equal(approved.activationScriptSha256,scriptDigest);
  assert.equal(approved.guardianHelperSha256,helperDigest);
