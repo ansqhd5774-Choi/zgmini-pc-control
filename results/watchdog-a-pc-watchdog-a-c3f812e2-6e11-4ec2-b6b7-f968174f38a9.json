@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_PROTECTED_DRIFT_A_RESULT_V1",
+  "requestId": "pc-watchdog-a-c3f812e2-6e11-4ec2-b6b7-f968174f38a9",
+  "failedIssueNumber": 1372,
+  "status": "PASS",
+  "code": "WATCHDOG_A_PROTECTED_KEYS_CHANGED",
+  "changed": [
+    {
+      "category": "CONTROLLER_HOST",
+      "change": "CHANGED"
+    },
+    {
+      "category": "RETIRED_IRAN_TASK",
+      "change": "CHANGED"
+    },
+    {
+      "category": "WRITER_CONFIG",
+      "change": "CHANGED"
+    }
+  ],
+  "writes": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "runId": "43632362343",
+  "changedCount": 3
+}
