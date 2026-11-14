@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_WATCHDOG_ACTIVATION_FIRST_FAIL_A_RESULT_V1",
+  "requestId": "pc-watchdog-activation-a-d72c68af-90a7-4e66-9352-891da25ed371",
+  "failedIssueNumber": 1381,
+  "status": "PASS",
+  "code": "WATCHDOG_ACTIVATION_A_STOPPED_PRECLAIM",
+  "newProcessVerified": false,
+  "claim": "PRECLAIM",
+  "source": "STAGED",
+  "origin": "NOT_ATTESTED",
+  "probe": "DENIED",
+  "guardian": "NO_STOP_MARKER",
+  "effect": "NO_CLAIM_NO_ACTIVATION",
+  "originMismatches": [
+    "COMMAND_EXACT"
+  ],
+  "firstOriginMismatch": "COMMAND_EXACT",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0
+}
