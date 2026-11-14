@@ -43,6 +43,11 @@ async function main(){
  let result;
  try{result=read(path.join(process.env.RUNNER_TEMP,'watchdog-b-apply.json'));}
  catch{result={status:'STATE_UNKNOWN',code:'WATCHDOG_B_RESULT_MISSING',writes:0};}
+ if(result.status==='STAGED'&&
+   (result.requestId!==id||result.issueNumber!==event.issue.number
+    ||result.targetSha!==request.targetSha||result.writes!==2
+    ||result.code!=='WATCHDOG_B_APPROVED_SOURCE_STAGED_AWAITING_NATURAL_RESTART'))
+   result={status:'STATE_UNKNOWN',code:'WATCHDOG_B_STAGED_RECEIPT_MISMATCH',writes:0};
  if(!statusCodes.has(result.status)
   ||!Number.isSafeInteger(result.writes)||result.writes<0||result.writes>2
   ||!/^[A-Z][A-Z0-9_]{2,90}$/.test(result.code??''))
