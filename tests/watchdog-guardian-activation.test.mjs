@@ -10,7 +10,7 @@ const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const digest=buf=>createHash('sha256').update(buf).digest('hex');
 const target='d01229adacc3c23f50bb119d146e291ff7e15012';
 const replacement='d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8';
-const requestId='pc-watchdog-activate-f84b9d1a-124a-4a19-91c7-e8e27286efba';
+const requestId='pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4';
 const helperDigest=digest(fs.readFileSync(path.join(root,'watchdog-b/guardian-rotate.vbs')));
 const scriptDigest=digest(fs.readFileSync(path.join(root,'watchdog-b/guardian-activation.mjs')));
 function fixture(){
@@ -45,6 +45,7 @@ test('untrusted actors, arbitrary operations and widened scope never authorize p
   x=>{x.event.issue.labels=[];},
   x=>{x.event.issue.title='pc-controller-update';},
   x=>{x.body.requestId='bad';},
+  x=>{x.body.requestId='pc-watchdog-activate-aaaa1111-1a11-4a11-8a11-aaaaaaaa1111';},
   x=>{x.body.operation='terminate-process';},
   x=>{x.body.command='cmd.exe';},
   x=>{x.approval.approved=false;},
