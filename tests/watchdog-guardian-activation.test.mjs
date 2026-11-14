@@ -10,7 +10,7 @@ const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const digest=buf=>createHash('sha256').update(buf).digest('hex');
 const target='d01229adacc3c23f50bb119d146e291ff7e15012';
 const replacement='d0d788996c15a94dcd1db540b9c624f950b3ce827589fdadc56a593f1b71cfc8';
-const requestId='pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4';
+const requestId='pc-watchdog-activate-7e6ef57f-620b-498a-998f-05c9e953b4a2';
 const helperDigest=digest(fs.readFileSync(path.join(root,'watchdog-b/guardian-rotate.vbs')));
 const scriptDigest=digest(fs.readFileSync(path.join(root,'watchdog-b/guardian-activation.mjs')));
 function fixture(){
@@ -22,7 +22,7 @@ function fixture(){
   body:{schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1',
     requestId,operation:'watchdog-guardian-activate',targetSha:target,
     approvalManifestSha256:'a'.repeat(64)},
-  approval:{schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V1',
+  approval:{schema:'ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V2',
     approved:true,scope:'ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY',
     targetSha:target,installedSha256:replacement,
     installedScope:'RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1',
@@ -103,9 +103,16 @@ test('fixed identity witness does not contain process-tree termination or arbitr
 
 test('immutable production B manifest pins exact submitted helper and runner bytes',()=>{
  const approved=JSON.parse(fs.readFileSync(path.join(root,
-  'approvals/watchdog-activations/d01229adacc3c23f50bb119d146e291ff7e15012.json')));
+  'approvals/watchdog-activations/d01229adacc3c23f50bb119d146e291ff7e15012-r2.json')));
  assert.equal(approved.approved,true);
  assert.equal(approved.activationScriptSha256,scriptDigest);
  assert.equal(approved.guardianHelperSha256,helperDigest);
  assert.equal(approved.effect,'ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART');
+});
+
+test('WMI Guardian helper uses exact argv token parser and never broad flag acceptance',()=>{
+ const src=fs.readFileSync(path.join(root,'watchdog-b/guardian-rotate.vbs'),'utf8');
+ assert.match(src,/Function ExactWatchdogArgs\(binary,script,raw\)/);
+ assert.match(src,/tail=LCase\(script\)/);
+ assert.match(src,/If Not ExactWatchdogArgs\(nodePath,scriptPath,watch\.CommandLine\) Then Deny/);
 });
