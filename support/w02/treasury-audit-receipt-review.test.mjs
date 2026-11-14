@@ -133,6 +133,7 @@ test('leap year 365-day inclusive window with 364 days accepted', () => {
   assert.equal(code(r), 'PRIVATE_TAWS_INPUT_AUDIT_REVIEWABLE');
 });
 
+
 test('unrelated history DB WAL absence preserves core evidence without PASS', () => {
   const r = fixture();
   r.status = 'STATE_UNKNOWN'; r.code = 'SOURCE_INVENTORY_PARTIAL_READONLY';
