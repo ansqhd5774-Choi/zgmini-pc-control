@@ -27,7 +27,7 @@
 
 **원칙:** 새 일반챗은 기존 운영체계를 임의 재설계하지 않고 마지막 유효 완료 지점에서 현재 기능 작업을 계속한다. 이는 현재 업무에 관련된 가벼운 확인 절차이며 새로운 전역 Gate가 아니다.
 
-1. **대화 시작·재개:** 제어 저장소 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), 이 지침 및 [두 PC 운영 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)의 관련 부분을 실제 조회한다. 기존 담당 브랜치·승인·미완료 단계·유효한 실PC 증거를 대조한다. [운영 PC 실측 JSON](pc-profiles/operating-PC.json), [격리 PC 실측 JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json)은 증거 범위 내에서 참고한다. GitHub 수정만으로 새 ChatGPT 대화에 지침이 자동 주입됐다고 주장하지 않는다.
+1. **대화 시작·재개:** **신규 대화 첫 진입 때만** 제어 저장소 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), 이 지침 및 [두 PC 운영 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)의 필요한 부분을 확인한다. **같은 대화의 후속 작업은 첫 단계부터 재개하지 말고** 마지막 유효 완료점·기존 승인·미완료 필수 실행 하나를 승계한다. 관련 source·설정·PC 실행 환경에 변화 또는 상충 증거가 있을 때만 변경된 부분을 다시 확인한다. 기존 담당 브랜치·승인·미완료 단계·유효한 실PC 증거를 재사용한다. [운영 PC 실측 JSON](pc-profiles/operating-PC.json), [격리 PC 실측 JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json)은 증거 범위 내에서 참고한다. GitHub 수정만으로 새 ChatGPT 대화에 지침이 자동 주입됐다고 주장하지 않는다.
 2. **대상 PC 선택:**
    - 기존 **운영 PC**: 호스트 `PC`, Windows 11 Pro, 전용 Runner `zgmini-pc-01`~`06`, label `zgmini-pc-control`, Node `E:\ZGmini\runtime\node.exe`, Controller `E:\ZGmini\automation\pc-control`. GitHub 승인 A급 진단, 별도 승인 B급 Writer/Controller 적용, 로컬 데이터 수집·계산·저장·게시 관련 작업을 담당한다. Windows 사용자 로그인 Startup·Guardian·Watchdog·Supervisor 및 독립 유지보수기 계약을 따른다.
    - 별도 **공통 대기열 PC**: 호스트 `DESKTOP-N62L0NG`, Windows 10 Home, 전용 Runner `zgmini-handoff-ci-spare-01`, label `zgmini-handoff-ci-isolated`, pinned setup-node 22. 원본 GitHub 결과 검증·수리 가능 장애 접수·중복 제거·인계/결과 중개·격리 CI만 수행한다. 운영 PC의 `E:\ZGmini` Controller 설치 루트가 없으므로 기존 PC 경로·DB·운영 권한을 그대로 가정하지 않는다.
@@ -36,9 +36,9 @@
 4. **실행 전 최소 대조:** 해당 요청의 actor·schema·고유 requestId·repo/branch/source SHA·승인 manifest·실제 설치 상태와 관련 자원만 확인한다. [성공 사례 재사용 정본](SUCCESS_EVIDENCE_REUSE.md)의 승인/Windows Issue·Run/원격 결과를 활용한다. 기존 경로의 지원 범위가 부족하면 실제 미지원 지점을 입증한 뒤 공통 도구를 최소 수정·시험/PR·실PC 검증으로 확장한다. 독립 업무를 불필요한 공통 복구나 전역 검사의 대기로 묶지 않는다.
 5. **실행/결과/재시도:** `queued`는 Runner Offline이나 성공과 동의어가 아니다. GitHub CI PASS도 기능 PC 실행 PASS를 증명하지 않는다. Run ID/attempt·실행 Runner/host·status/code/lastPass/firstFail·**원격 JSON/TXT 2/2 readback과 원본 Issue 댓글**을 구분해 검증한다. BLOCKED·STATE_UNKNOWN·결과 누락은 기존 요청부터 조사하고 동일 requestId 자동 재실행 0회를 유지한다. Watchdog 복구는 원본 PC 작업 재실행과 다르다.
 6. **중앙 장애 인계:** 수리 가능한 확인된 실패만 기존 `agent-handoff` 경로로 접수한다. 총괄은 공통 프로세스 장애를 처리하고 원담당의 기능 개발/설치를 대신하지 않는다. GitHub 댓글은 다른 일반챗 자동 수신/재개가 아니다. 실제 원담당 대화가 재개되면 원본 Issue를 조회한다.
-7. **보호·최종 완료:** 이 PC별 문서화만으로 #996의 C급 NO-GO/ISO_ONLY_PASS, 기존 Task·Core/Writer/DB·원자료·TTL·산식·승인된 D1/API/UI 계약을 변경하지 않는다. C급 관리자·보안·시스템 변경은 사용자 직접 수행한다. 기능 완료는 실제 **수집→PC 원자료 저장→계산→로컬 결과 저장→승인된 게시→API→PC/모바일 UI** 증거로 판정한다. 예약 자동 갱신 검증은 관련 기능 완료 후 후속 단계다. 전체 진행률·이번 실증·남은 실제 문제·다음 필수 작업만 보고한다.
+7. **보호·최종 완료:** #996 C급 접수·잠금 복구는 2026-11-15 `INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`로 완료되었고 최초 Controller 신규 설치는 ABORTED다. 이 결과를 새 NO-GO 판정이나 C 재실행 근거로 삼지 않는다. 이 PC별 문서화만으로 기존 Task·Core/Writer/DB·원자료·TTL·산식·승인된 D1/API/UI 계약을 변경하지 않는다. C급 관리자·보안·시스템 변경은 사용자 직접 수행한다. 기능 완료는 실제 **수집→PC 원자료 저장→계산→로컬 결과 저장→승인된 게시→API→PC/모바일 UI** 증거로 판정한다. 예약 자동 갱신 검증은 관련 기능 완료 후 후속 단계다. 전체 진행률·이번 실증·남은 실제 문제·다음 필수 작업만 보고한다.
 
-**검증 기준:** 새로운 대화가 실제 GitHub 정본을 읽고, 적절한 Runner와 기존 Workflow를 선택하며, 원격 결과를 회수하는지 별도 재현으로 확인한다. 문서 병합만으로 프로젝트 설정 동기화·대화 간 자동 인계를 주장하지 않는다.
+**검증 기준:** 신규 대화에서 기존 정본·실행 증거를 실제 업무에 재사용하고 적절한 Runner·Workflow를 선택해 필요한 결과를 회수했는지 **그 실행 증거로만** 판단한다. 새 대화라는 이유만으로 별도 전체 재현·건강 검사를 만들지 않는다. 문서 병합만으로 프로젝트 설정 동기화·대화 간 자동 인계를 주장하지 않는다.
 
 
 마지막 유효 완료 지점과 다음 필수 실행을 정하고 그 실행에 필요한 입력·설치 모듈·경로·승인만 확인한다. 기존 공통 등록기·수집기·계산기·게시기·adapter를 우선 재사용한다. 설정으로 가능한 일을 새 Controller 설치·기능별 CMD·예약 복제로 확대하지 않는다. 기술적 근거 없이 기능·테마·ETF 수량 상한이나 목표 개수를 추가하지 않는다.

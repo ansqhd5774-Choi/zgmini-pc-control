@@ -4,13 +4,13 @@
 
 현재 업무·브랜치·기존 승인·완료 증거를 보존하고 마지막 유효 완료 지점부터 이어서 수행하라. **이 지침을 받은 일반챗은 자기 원래 기능의 다음 필수 실행을 즉시 진행하라.**
 
-## 신규 일반챗 필수 시작·두 PC 구분 (2026-11-12)
+## 마지막 완료점부터 재개·두 PC 구분 (2026-11-15)
 
-1. GitHub `ansqhd5774-Choi/zgmini-pc-control` 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)를 업무 관련 범위에서 **실제 조회**하고 기존 기능의 마지막 유효 단계부터 수행하라. 프로젝트/대화 지침이 자동 갱신됐다고 가정하지 마라.
+1. **신규 대화 첫 진입에 한해** GitHub `ansqhd5774-Choi/zgmini-pc-control` 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)의 관련 부분을 확인하라. 같은 대화의 후속 작업에는 과거 PR·진단·설치 결과를 처음부터 재검사하지 말고 기존 기능의 **마지막 유효 완료 지점 다음 실행 하나**를 수행하라. 해당 source·설정·실행 환경이 바뀌거나 상충 증거가 나타날 때만 영향 범위를 재검증하라. 프로젝트/대화 지침이 자동 갱신됐다고 가정하지 마라.
 2. 실제 PC를 작업별로 구분하라. **운영 PC = 호스트 `PC`, Windows 11, Runner `zgmini-pc-01`~`06`, label `zgmini-pc-control`, `E:\ZGmini` Controller/고정 Node**. **공통 대기열 PC = `DESKTOP-N62L0NG`, Windows 10, Runner `zgmini-handoff-ci-spare-01`, label `zgmini-handoff-ci-isolated`, pinned Node 22 및 GitHub 인계·CI 전담**. 두 PC의 절대 경로·설치·권한·프로세스 관리 구조가 같다고 가정하지 마라.
 3. 작업 요청 전에 기존 성공된 **Issue → Actions → 해당 Runner → 승인된 실행기 → JSON/TXT·원본 Issue 결과**를 확인해 재사용하라. 운영 A는 기존 pc-job, B는 독립 승인 Writer/유지보수기, 공통 장애 인계는 기존 격리 Workflow를 사용한다. 새 ZIP/CMD·Runner·예약을 임의 제작하지 마라. 기존 승인된 수동 CMD 경로를 없애거나 우회 재설계하지도 마라.
 4. `runId`/`attempt`/Runner/host/실제 status·code 및 **원격 JSON/TXT 2/2**를 구분 확인하라. `queued`를 Offline으로, CI PASS를 실PC 완료로, GitHub 댓글을 다른 일반챗 자동 수신으로 취급하지 마라. 오류·STATE_UNKNOWN은 기존 원본 증거부터 확인하며 자동 재실행 0회다.
-5. 보호된 Core·Writer·DB·Task·승인 산식·D1/API/UI·#996 C급 NO-GO는 별도 승인·실제 검증 없이 변경하지 마라. 공통 인계는 원담당 기능 완료를 대신하지 않는다. 예약 자동 갱신 검증은 기능별 실제 수집·계산·저장·게시·UI 완료 이후의 후속이다. 담당 업무 전체 진행률·새 증거·미해결 항목·다음 필수 실행만 보고하라.
+5. #996 C급 접수·잠금 복구는 2026-11-15 완료(`INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`)이며 원본 요청을 재실행하지 마라. 미완료 Controller 설치는 별도로 취급하고, 보호된 Core·Writer·DB·Task·승인 산식·D1/API/UI는 별도 승인·실제 검증 없이 변경하지 마라. 공통 인계는 원담당 기능 완료를 대신하지 않는다. 예약 자동 갱신 검증은 기능별 실제 수집·계산·저장·게시·UI 완료 이후의 후속이다. 담당 업무 전체 진행률·새 증거·미해결 항목·다음 필수 실행만 보고하라.
 
 **실측 근거:** [운영 PC JSON](pc-profiles/operating-PC.json), [대기열 PC JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json). 2026-11-12 관측 PID·RAM·Listener 수는 시점성 데이터이며 ZGMINI Runner 구성(6/1)을 전체 Listener 수(7/5)와 혼동하지 마라.
 
