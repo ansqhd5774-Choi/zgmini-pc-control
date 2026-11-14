@@ -2,7 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
-import {execFileSync,spawn} from 'node:child_process';
+import {execFileSync,execFile,spawn} from 'node:child_process';
+import os from 'node:os';
 import {pathToFileURL} from 'node:url';
 
 const control='E:/ZGmini/automation/pc-control';
@@ -11,7 +12,14 @@ const home='E:/ZGmini/automation/pc-watchdog';
 const gh='C:/Program Files/GitHub CLI/gh.exe';
 const node='E:/ZGmini/runtime/node.exe';
 const repo='ansqhd5774-Choi/zgmini-pc-control';
-const sourceRoot='E:/ZGmini/projects/zgmini-pc-control';
+const isolatedSourceRoot=path.join(os.tmpdir(),'zgmini-watchdog-handoff-checkouts');
+const handoffApprovedFiles=Object.freeze([
+ 'tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+ 'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs',
+ 'tools/update.mjs','tools/maintenance-ancestry.vbs',
+ 'tools/source-bundle-register.mjs','tools/bootstrap-maintenance.mjs',
+ 'tools/handoff-maintenance.mjs',
+]);
 const handoffTitle='pc-maintenance-handoff';
 const handoffSchema='ZGMINI_MAINTENANCE_HANDOFF_REQUEST_V1';
 const handoffScope='RUNNER_RECOVERY_AND_MAINTENANCE_HANDOFF_V1';
@@ -78,8 +86,101 @@ export function validateHandoffIntent(issue,body,approval,installed,rawDigest){
 function ghRead(args){
  return execFileSync(gh,args,{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1000000});
 }
-function git(args){
- return execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:200000});
+function git(cwd,args){
+ return execFileSync('git',args,{cwd,encoding:args[0]==='show'?null:'utf8',
+  windowsHide:true,timeout:30000,maxBuffer:3000000,
+  env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}});
+}
+export function validateHandoffStaging(issue,body){
+ if(issue?.title!==handoffTitle||issue?.state!=='OPEN'
+  ||issue?.author?.login!=='ansqhd5774-Choi'
+  ||!Array.isArray(issue.labels)||!issue.labels.some(x=>x?.name==='pc-maintenance')
+  ||!strictKeys(body,['schema','requestId','operation','targetSha','approvalManifestSha256'])
+  ||body.schema!==handoffSchema||body.operation!=='maintenance-handoff'
+  ||!requestIdPattern.test(body.requestId??'')
+  ||!sha40.test(body.targetSha??'')||!sha64.test(body.approvalManifestSha256??''))
+  code('HANDOFF_SOURCE_STAGING_REQUEST_DENIED');
+ return Object.freeze({requestId:body.requestId,targetSha:body.targetSha});
+}
+export function verifyHandoffIsolatedSource({
+ checkout, approval, approvalBytes, body, installed, gitRun=git,
+ readBytes=p=>fs.readFileSync(p)
+}){
+ const admitted=validateHandoffIntent({
+  title:handoffTitle,state:'OPEN',author:{login:'ansqhd5774-Choi'},
+  labels:[{name:'pc-maintenance'}],
+ },body,approval,installed,sha(approvalBytes));
+ if(!checkout||!path.isAbsolute(checkout))
+  code('HANDOFF_SOURCE_ISOLATED_PATH_INVALID');
+ if(String(gitRun(checkout,['branch','--show-current'])).trim()!=='main')
+  code('HANDOFF_SOURCE_ISOLATED_NOT_MAIN');
+ try{gitRun(checkout,['merge-base','--is-ancestor',admitted.targetSha,'HEAD']);}
+ catch{code('HANDOFF_SOURCE_ISOLATED_ANCESTRY_DENIED');}
+ const origin=String(gitRun(checkout,['remote','get-url','origin'])).trim();
+ if(!['https://github.com/'+repo+'.git','https://github.com/'+repo,
+       'git@github.com:'+repo+'.git','git@github.com:'+repo].includes(origin))
+  code('HANDOFF_SOURCE_ISOLATED_ORIGIN_DENIED');
+ const refs=[...handoffApprovedFiles,'approvals/maintenance-handoffs/'+admitted.targetSha+'.json'];
+ if(String(gitRun(checkout,['status','--porcelain','--',...refs])).trim()!=='')
+  code('HANDOFF_SOURCE_ISOLATED_DIRTY');
+ if(!approval.files||Object.keys(approval.files).length!==handoffApprovedFiles.length
+   ||!handoffApprovedFiles.every(rel=>sha64.test(approval.files[rel]??'')))
+  code('HANDOFF_SOURCE_ISOLATED_FILE_PLAN_DENIED');
+ for(const rel of handoffApprovedFiles){
+  const filename=path.join(checkout,rel),stat=fs.lstatSync(filename);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1
+    ||stat.size>2_000_000||stat.size<1
+    ||sha(readBytes(filename))!==approval.files[rel])
+   code('HANDOFF_SOURCE_ISOLATED_HASH_DENIED');
+  if(sha(gitRun(checkout,['show',admitted.targetSha+':'+rel]))
+    !==approval.files[rel])
+   code('HANDOFF_SOURCE_ISOLATED_TARGET_HASH_DENIED');
+ }
+ return {admitted,script:path.join(checkout,'tools/handoff-maintenance.mjs'),cwd:checkout};
+}
+async function createHandoffSourceCheckout(requestId){
+ const dir=isolatedSourceRoot;
+ if(fs.existsSync(dir)){
+  const stat=fs.lstatSync(dir);
+  if(!stat.isDirectory()||stat.isSymbolicLink())
+   code('HANDOFF_SOURCE_ISOLATED_ROOT_ALIAS');
+ }else fs.mkdirSync(dir,{recursive:true});
+ const checkout=path.join(dir,requestId);
+ if(fs.existsSync(checkout))code('HANDOFF_SOURCE_ISOLATED_REUSED');
+ const result=await new Promise((resolve,reject)=>{
+  // Exact trusted private repo, isolated temp destination, new checkout.
+  // Neither E:/ZGmini/projects nor the installed Controller/Receiver is changed.
+  const env={...process.env,GIT_TERMINAL_PROMPT:'0',GIT_CONFIG_COUNT:'1',
+   GIT_CONFIG_KEY_0:'core.autocrlf',GIT_CONFIG_VALUE_0:'false'};
+  execFile(gh,['repo','clone',repo,checkout,'--','--single-branch','--branch','main'],
+   {cwd:dir,env,windowsHide:true,timeout:120000,maxBuffer:250000},
+   error=>error?reject(Object.assign(Error('HANDOFF_SOURCE_CLONE_FAILED'),
+     {code:'HANDOFF_SOURCE_CLONE_FAILED'})):resolve(true));
+ });
+ if(result!==true)code('HANDOFF_SOURCE_CLONE_FAILED');
+ const check=fs.lstatSync(checkout);
+ if(!check.isDirectory()||check.isSymbolicLink())code('HANDOFF_SOURCE_ISOLATED_PATH_ALIAS');
+ const gitDir=fs.lstatSync(path.join(checkout,'.git'));
+ if(!gitDir.isDirectory()||gitDir.isSymbolicLink())
+  code('HANDOFF_SOURCE_ISOLATED_GIT_ALIAS');
+ return checkout;
+}
+async function prepareHandoff(issue,body){
+ const checkout=await createHandoffSourceCheckout(body.requestId);
+ const approvalFile=path.join(checkout,'approvals/maintenance-handoffs',
+  body.targetSha+'.json');
+ const metadata=fs.lstatSync(approvalFile);
+ if(!metadata.isFile()||metadata.isSymbolicLink()||metadata.nlink!==1
+   ||metadata.size>16000||metadata.size<10)
+  code('HANDOFF_SOURCE_APPROVAL_PATH_DENIED');
+ const approvalBytes=fs.readFileSync(approvalFile);
+ const approval=JSON.parse(approvalBytes.toString('utf8'));
+ const installed=read(path.join(maintenance,'MAINTENANCE_INSTALL.json'));
+ const plan=verifyHandoffIsolatedSource({
+  checkout,approval,approvalBytes,body,installed});
+ if(fs.existsSync(path.join(maintenance,'leases/controller-install')))
+  code('HANDOFF_OPERATOR_INSTALL_LEASE_BUSY');
+ return plan;
 }
 // A child's printed PASS is insufficient: require the independent local
 // install ledger and installed receiver source to agree with the exact target.
@@ -92,31 +193,6 @@ export function verifyHandoffPass({report,ledger,installed,targetSha,exitCode}){
    ||installed?.sourceSha!==targetSha)
    code('HANDOFF_PASS_RUNTIME_READBACK_MISMATCH');
  return true;
-}
-function prepareHandoff(issue){
- let body;
- try{body=JSON.parse(issue.body??'');}
- catch{code('HANDOFF_REQUEST_CONTRACT_INVALID');}
- if(!strictKeys(body,['schema','requestId','operation','targetSha','approvalManifestSha256'])
-   ||!sha40.test(body.targetSha??''))code('HANDOFF_REQUEST_CONTRACT_INVALID');
- const approvalFile=path.join(sourceRoot,'approvals/maintenance-handoffs',body.targetSha+'.json');
- const metadata=fs.lstatSync(approvalFile);
- if(!metadata.isFile()||metadata.isSymbolicLink()||metadata.nlink!==1||metadata.size>16000)
-   code('HANDOFF_APPROVAL_PATH_INVALID');
- const approvalBytes=fs.readFileSync(approvalFile);
- const approval=JSON.parse(approvalBytes.toString('utf8'));
- const installed=read(path.join(maintenance,'MAINTENANCE_INSTALL.json'));
- const admitted=validateHandoffIntent(issue,body,approval,installed,sha(approvalBytes));
- if(git(['branch','--show-current']).trim()!=='main')
-   code('HANDOFF_OPERATOR_SOURCE_BRANCH');
- try{git(['merge-base','--is-ancestor',admitted.targetSha,'HEAD']);}
- catch{code('HANDOFF_OPERATOR_SOURCE_NOT_ANCESTOR');}
- const script=path.join(sourceRoot,'tools/handoff-maintenance.mjs');
- if(sha(fs.readFileSync(script))!==approval.files?.['tools/handoff-maintenance.mjs'])
-   code('HANDOFF_OPERATOR_SCRIPT_HASH_MISMATCH');
- if(fs.existsSync(path.join(maintenance,'leases/controller-install')))
-   code('HANDOFF_OPERATOR_INSTALL_LEASE_BUSY');
- return {admitted,script};
 }
 function postHandoffReceipt(issueNumber,receipt){
  const marker='zgmini-handoff-once:'+receipt.requestId;
@@ -203,13 +279,16 @@ export async function main(){
    issueNumber=intents[0].number;
    const issue=JSON.parse(ghRead(['issue','view',String(issueNumber),'--repo',repo,
      '--json','number,title,state,author,labels,body']));
-   const plan=prepareHandoff(issue);
+   let body;
+   try{body=JSON.parse(issue.body??'');}
+   catch{code('HANDOFF_SOURCE_STAGING_REQUEST_DENIED');}
+   const admitted=validateHandoffStaging(issue,body);
    const dir=path.join(home,'handoff-attempts');fs.mkdirSync(dir,{recursive:true});
-   receiptFile=path.join(dir,plan.admitted.requestId+'.json');
+   receiptFile=path.join(dir,admitted.requestId+'.json');
    if(fs.existsSync(receiptFile)){
     const receipt=read(receiptFile);
     // Recovery may deliver an existing result but never repeat installation.
-    if(receipt.issueNumber!==issueNumber||receipt.targetSha!==plan.admitted.targetSha)
+    if(receipt.issueNumber!==issueNumber||receipt.targetSha!==admitted.targetSha)
       code('HANDOFF_LEDGER_REQUEST_DRIFT');
     if(receipt.status==='RUNNING'){
      // After this watchdog process restarted, the old child may still be
@@ -224,14 +303,24 @@ export async function main(){
     return;
    }
    const initial={schema:'ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1',
-     requestId:plan.admitted.requestId,issueNumber,targetSha:plan.admitted.targetSha,
-     status:'RUNNING',at:new Date().toISOString()};
-   // Durable single-use claim before the subprocess is launched. Unknown
-   // outcomes after a crash are reconciled, NEVER automatically retried.
+     requestId:admitted.requestId,issueNumber,targetSha:admitted.targetSha,
+     status:'RUNNING',phase:'SOURCE_PREPARING',at:new Date().toISOString()};
+   // Durable one-use claim BEFORE temporary source preparation. A clone
+   // failure is terminal BLOCKED; no automatic retries, force pulls or resets.
    fs.writeFileSync(receiptFile,JSON.stringify(initial)+'\n',{flag:'wx',mode:0o600});
+   let plan;
+   try{plan=await prepareHandoff(issue,body);}
+   catch(e){
+    const failed={...initial,status:'BLOCKED',phase:'SOURCE_STAGING_FAILED',
+      code:safeCode(e?.code??e?.message),at:new Date().toISOString()};
+    write(receiptFile,failed);
+    postHandoffReceipt(issueNumber,failed);
+    return;
+   }
+   write(receiptFile,{...initial,phase:'OPERATOR_INVOCATION'});
    const result=await new Promise(resolve=>{
     const child=spawn(node,[plan.script,'--source-sha',plan.admitted.targetSha],
-      {cwd:sourceRoot,windowsHide:true,stdio:['ignore','pipe','pipe']});
+      {cwd:plan.cwd,windowsHide:true,stdio:['ignore','pipe','pipe']});
     let output='',limit=false;
     child.stdout.on('data',b=>{if(output.length+String(b).length>16384)limit=true;
       else output+=String(b);});
