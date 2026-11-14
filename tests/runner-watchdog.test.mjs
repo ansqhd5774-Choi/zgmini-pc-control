@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
-import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass} from '../tools/runner-watchdog.mjs';
+import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass,validateHandoffStaging,verifyHandoffIsolatedSource} from '../tools/runner-watchdog.mjs';
 test('fresh heartbeat is required for healthy status',()=>{
  const now=Date.now(),owner={pid:123};
  assert.equal(decide({owner,live:true,heartbeat:new Date(now).toISOString(),now}),'HEALTHY');
@@ -100,4 +100,71 @@ test('operator stdout PASS requires independent persisted Windows install proof'
   const x=JSON.parse(JSON.stringify(good));mutate(x);
   assert.throws(()=>verifyHandoffPass(x),/HANDOFF_PASS_RUNTIME_READBACK_MISMATCH/);
  }
+});
+
+test('handoff source acquisition rejects untrusted Issue before any clone',()=>{
+ const p=validIntent();
+ assert.deepEqual(validateHandoffStaging(p.issue,p.body),
+  {requestId:p.body.requestId,targetSha:p.body.targetSha});
+ for(const change of [
+  x=>{x.issue.author.login='outsider';},
+  x=>{x.issue.title='unrelated';},
+  x=>{x.issue.labels=[];},
+  x=>{x.issue.state='CLOSED';},
+  x=>{x.body.targetSha='../code';},
+  x=>{x.body.shell='cmd.exe';}
+ ]){
+  const x=validIntent();change(x);
+  assert.throws(()=>validateHandoffStaging(x.issue,x.body),
+   /HANDOFF_SOURCE_STAGING_REQUEST_DENIED/);
+ }
+});
+test('only an exact GitHub private main ancestry and nine hash-pinned files are accepted',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-wdog-isolated-'));
+ const target=fixedSha;
+ const rels=['tools/maintenance-contract.mjs','tools/maintenance-apply.mjs',
+  'tools/maintenance-agent.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
+  'tools/maintenance-ancestry.vbs','tools/source-bundle-register.mjs',
+  'tools/bootstrap-maintenance.mjs','tools/handoff-maintenance.mjs'];
+ const {createHash}=await import('node:crypto');
+ const hash=b=>createHash('sha256').update(b).digest('hex');
+ const files={};
+ for(const rel of rels){
+  fs.mkdirSync(path.dirname(path.join(root,rel)),{recursive:true});
+  const bytes=Buffer.from('approved:'+rel);
+  fs.writeFileSync(path.join(root,rel),bytes);
+  files[rel]=hash(bytes);
+ }
+ const p=validIntent();
+ const approvalBytes=Buffer.from('manifest approval stub');
+ p.body.approvalManifestSha256=hash(approvalBytes);
+ p.rawDigest=hash(approvalBytes);
+ p.approval.files=files;
+ const origin='https://github.com/ansqhd5774-Choi/zgmini-pc-control.git';
+ const gitRun=(cwd,args)=>{
+  if(args[0]==='branch')return 'main';
+  if(args[0]==='merge-base')return '';
+  if(args[0]==='remote')return origin;
+  if(args[0]==='status')return '';
+  if(args[0]==='show')return fs.readFileSync(path.join(root,args[1].split(':')[1]));
+  throw Error('unexpected git command');
+ };
+ try{
+  const got=verifyHandoffIsolatedSource({checkout:root,approval:p.approval,
+   approvalBytes,body:p.body,installed:p.installed,gitRun});
+  assert.equal(got.cwd,root);
+  assert.equal(got.admitted.targetSha,target);
+  assert.throws(()=>verifyHandoffIsolatedSource({checkout:root,
+   approval:p.approval,approvalBytes,body:p.body,installed:p.installed,
+   gitRun:(cwd,args)=>args[0]==='remote'?'https://github.com/outsider/repo.git':gitRun(cwd,args)}),
+   /HANDOFF_SOURCE_ISOLATED_ORIGIN_DENIED/);
+  assert.throws(()=>verifyHandoffIsolatedSource({checkout:root,
+   approval:p.approval,approvalBytes,body:p.body,installed:p.installed,
+   gitRun:(cwd,args)=>args[0]==='status'?' M tools/handoff-maintenance.mjs':gitRun(cwd,args)}),
+   /HANDOFF_SOURCE_ISOLATED_DIRTY/);
+  fs.writeFileSync(path.join(root,'tools/handoff-maintenance.mjs'),'tampered');
+  assert.throws(()=>verifyHandoffIsolatedSource({checkout:root,
+   approval:p.approval,approvalBytes,body:p.body,installed:p.installed,gitRun}),
+   /HANDOFF_SOURCE_ISOLATED_HASH_DENIED/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
