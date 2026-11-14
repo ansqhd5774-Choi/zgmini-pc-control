@@ -17,6 +17,10 @@ const PINS=Object.freeze({
  currentFingerprint:'0ef53711fe5da97f4614b962e81a393e3532a8f912d201a86cdc068502f99904',
  currentConfigSha:'53533eab16c0d62301450129cfe81aefcd7a56a45c97a20d536b32c526c3d72a',
  writerRequestId:'8f5a44a7-9d5d-4f2c-8736-8ff015f57d91',
+ writerRunId:'43233138112',
+ writerBaseHead:'84df5e80f4bcdadd2a274d6f55a90290426c2406',
+ writerCandidateSha:'9eae7d4815853ab6207b4eceedd4de52ea49ac45',
+ readbackProtectedSha:'4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d',
  writerManifestSha:'bb22635ea23de806be241bc1c205d319ad6b17a9b42f3d0fb4d7f06655ac9c9a',
  writerInstalledSourceSha:'05d7ae49e0a84cbeebd90ef4de6dd7284094bf97',
  readbackRequestId:'pc-r10-retired-health-after-b-20261112-11',
@@ -52,6 +56,10 @@ export function review996ApprovedWriterTransitionReadOnly({historical,writerInst
  if(writerInstall?.schema!=='ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1')
   return fail('C996_BRIDGE_WRITER_RESULT_SCHEMA_UNEXPECTED');
  if(writerInstall.requestId!==PINS.writerRequestId||
+  writerInstall.runId!==PINS.writerRunId||
+  writerInstall.mode!=='LOCAL_OVERLAY'||
+  writerInstall.baseHead!==PINS.writerBaseHead||
+  writerInstall.candidateSourceSha!==PINS.writerCandidateSha||
   writerInstall.manifestSha256!==PINS.writerManifestSha||
   writerInstall.status!=='WRITER_B_INSTALLED_VERIFIED'||
   writerInstall.code!=='WRITER_B_INSTALL_VERIFIED'||
@@ -71,6 +79,7 @@ export function review996ApprovedWriterTransitionReadOnly({historical,writerInst
   writerReadback.result?.r6Config?.configSha256!==PINS.currentConfigSha||
   writerReadback.protectedStateUnchanged!==true||
   !SHA(writerReadback.protectedBeforeSha256)||
+  writerReadback.protectedBeforeSha256!==PINS.readbackProtectedSha||
   writerReadback.protectedBeforeSha256!==writerReadback.protectedAfterSha256)
   return fail('C996_BRIDGE_WRITER_READBACK_NOT_PINNED');
 
