@@ -15,6 +15,7 @@ on:
       - 'tests/runner-watchdog.test.mjs'
       - 'watchdog-b/**'
       - 'tests/watchdog-b-upgrade.test.mjs'
+      - 'tests/watchdog-protected-drift.test.mjs'
       - 'approvals/watchdog-upgrades/**'
       - '.github/workflows/pc-watchdog-b-upgrade-once.yml'
       - 'tests/maintenance-contract.test.mjs'
@@ -47,12 +48,13 @@ jobs:
         with:
           node-version: '22'
       - name: Run scoped maintenance and Controller runtime safety regressions
-        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs
+        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-protected-drift.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         run: |
           node --check watchdog-b/contract.mjs
           node --check watchdog-b/upgrade.mjs
           node --check watchdog-b/report.mjs
+          node --check watchdog-b/protected-drift-readonly.mjs
       - name: Confirm source-only isolated CI host
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
