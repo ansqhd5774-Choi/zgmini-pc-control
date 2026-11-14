@@ -20,7 +20,7 @@ const encode=value=>Buffer.from(JSON.stringify(value)+'\n');
 const read=relative=>fs.readFileSync(new URL('../'+relative,import.meta.url));
 const listing=JSON.parse(read('artifacts/controller-996/ZGMINI_996_OWNER_REVIEW_SHA256.json'));
 
-function fixture(){
+function fixture({withProtectionBaseline=false}={}){
   const sourcePaths=Object.keys(listing.files).filter(key=>key.startsWith('tools/controller-996-')&&
     (key.endsWith('.mjs')||key.endsWith('.json'))&&key!==lock);
   assert.equal(sourcePaths.length,16);
@@ -41,6 +41,17 @@ function fixture(){
       .map(key=>[key,'1'.repeat(64)])),
     effects:[...CONTINUATION_EFFECTS],workflowPutCount:0,backlogWriteCount:0,originalRequestRetryCount:0,issuePostCount:0,
   };
+  if(withProtectionBaseline){
+    const files={'config.json':'53533eab16c0d62301450129cfe81aefcd7a56a45c97a20d536b32c526c3d72a'};
+    const tasks={'ZGMINI-PC-Local-Core':'dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028',
+      'ZGMINI-PC-Local-Korea':'1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1'};
+    manifest.protectionBaseline={schema:'ZGMINI_CONTROLLER_996_MANIFEST_PROTECTION_BASELINE_V1',
+      historicalFingerprint:'877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86',
+      fingerprint:sha(Buffer.from(JSON.stringify({files,tasks}))),items:{files,
+        writerFileStatus:{'config.json':'PRESENT','quota-runner.cmd':'ABSENT','run-local.cmd':'ABSENT'},
+        taskSha256:tasks,taskEnabled:{'ZGMINI-PC-Local-Core':true,'ZGMINI-PC-Local-Korea':true}},
+      evidence:[{repository,issueNumber:1321,commit:S1,path:'results/43233846597-1-seat-5.json',sha256:'b'.repeat(64)}]};
+  }
   const manifestBytes=encode(manifest);
   files.set(manifestPath,manifestBytes);
   const issued='2026-11-11T00:00:00Z';
@@ -53,7 +64,7 @@ function fixture(){
       approvalManifestSha256:'98c76160e08f25187cee2b5d6c5bfa843bb589edc7a9bdd45a6713f92824ed94'})};
   const routes=[];
   let scans=0;
-  return {routes,manifest, run({revokeAtEnd=false,corruptLocal=false,wrongOwner=false}={}){
+  return {routes,manifest,files, run({revokeAtEnd=false,corruptLocal=false,wrongOwner=false}={}){
     return review996BootstrapFixture({manifestCommitSha:S2,
       readLocal:relative=>corruptLocal&&relative===operator?
         Buffer.concat([files.get(relative),Buffer.from(' ')]):files.get(relative),
@@ -89,6 +100,26 @@ test('Bootstrap verifies exact Owner comment and all Git and local bytes without
   assert.equal(result.filesCheckedAtS2,3);
   assert.deepEqual(result.launchPins,f.manifest.launchPins);
   assert.equal(f.routes.at(-2),prefix+'/issues/996/comments?per_page=100&page=1');
+});
+
+test('full manifest consent binds a successor protection baseline without authorizing the fixture',()=>{
+  const result=fixture({withProtectionBaseline:true}).run();
+  assert.equal(result.status,'FIXTURE_GIT_AND_LOCAL_BYTES_MATCHED',result.code);
+  assert.equal(result.fixtureOnly,true);assert.equal(result.executionAuthorized,false);
+});
+test('successor baseline does not bypass missing Owner or approval revocation',()=>{
+  const missing=fixture({withProtectionBaseline:true}).run({wrongOwner:true});
+  assert.equal(missing.code,'C_996_BOOTSTRAP_OWNER_CONSENT_MISSING');
+  const revoked=fixture({withProtectionBaseline:true}).run({revokeAtEnd:true});
+  assert.equal(revoked.code,'C_996_BOOTSTRAP_FINAL_CONSENT_DRIFT');
+  assert.equal(missing.executionAuthorized,false);assert.equal(revoked.executionAuthorized,false);
+});
+test('tampered successor protection aggregate is rejected before operator handoff',()=>{
+  const f=fixture({withProtectionBaseline:true});
+  const changed=JSON.parse(f.files.get(manifestPath));changed.protectionBaseline.fingerprint='c'.repeat(64);
+  f.files.set(manifestPath,encode(changed));
+  const result=f.run();assert.equal(result.status,'BOOTSTRAP_NO_GO');
+  assert.equal(result.code,'C_996_BOOTSTRAP_PROTECTION_BASELINE_INVALID');
 });
 
 for(const [options,code] of [

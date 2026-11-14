@@ -13,6 +13,57 @@ const fail=code=>Object.freeze({schema:'ZGMINI_CONTROLLER_996_R2_REVIEW_V1',
  status:'EVIDENCE_UNVERIFIED',code,executionAuthorized:false,
  operationalWrites:0,issuePosts:0,pcRetries:0});
 
+const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&
+ JSON.stringify(Object.keys(value).sort())===JSON.stringify([...keys].sort());
+function canonicalItems(x){
+ if(!exact(x,['files','writerFileStatus','taskSha256','taskEnabled'])||
+  !exact(x.writerFileStatus,FILES)||!exact(x.taskSha256,TASKS)||!exact(x.taskEnabled,TASKS)||
+  !x.files||typeof x.files!=='object'||Array.isArray(x.files))return null;
+ const files={},tasks={};
+ for(const name of FILES){
+  if(x.writerFileStatus[name]==='PRESENT'){
+   if(!SHA(x.files[name]))return null;files[name]=x.files[name];
+  }else if(x.writerFileStatus[name]!=='ABSENT'||Object.hasOwn(x.files,name))return null;
+ }
+ if(Object.keys(x.files).length!==Object.keys(files).length)return null;
+ for(const name of TASKS){if(!SHA(x.taskSha256[name])||x.taskEnabled[name]!==true)return null;tasks[name]=x.taskSha256[name];}
+ return {files,tasks};
+}
+// Data validation only. Authority comes from the separate Owner consent to
+// the exact complete C manifest; no caller boolean can authorize a write.
+export function validate996ManifestProtectionBaseline(b){
+ if(!exact(b,['schema','historicalFingerprint','fingerprint','items','evidence'])||
+  b.schema!=='ZGMINI_CONTROLLER_996_MANIFEST_PROTECTION_BASELINE_V1'||
+  b.historicalFingerprint!==PIN||!SHA(b.fingerprint))return false;
+ const items=canonicalItems(b.items);
+ if(!items||sha(Buffer.from(JSON.stringify(items)))!==b.fingerprint)return false;
+ return Array.isArray(b.evidence)&&b.evidence.length>=1&&b.evidence.length<=4&&b.evidence.every(e=>
+  exact(e,['repository','issueNumber','commit','path','sha256'])&&
+  e.repository==='ansqhd5774-Choi/zgmini-pc-control'&&
+  Number.isSafeInteger(e.issueNumber)&&e.issueNumber>0&&
+  /^[a-f0-9]{40}$/.test(e.commit??'')&&SHA(e.sha256)&&
+  /^results\/[a-zA-Z0-9][a-zA-Z0-9_-]{1,119}\.json$/.test(e.path??''));
+}
+export function review996ManifestProtectedEvidence(r,baseline){
+ if(!validate996ManifestProtectionBaseline(baseline))return fail('C_R2_MANIFEST_BASELINE_INVALID');
+ if(r?.schema!=='ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1'||
+  r.requestId!==REQUEST||r.issueNumber!==996||!Number.isFinite(Date.parse(r.observedAt))||
+  r.operationalWrites!==0||r.issuePosts!==0||r.pcRetries!==0||r.executionAuthorized!==false||
+  r.historicalBaselineAvailable!==false||r.allActorsImmutableProven!==false)
+  return fail('C_R2_MANIFEST_OBSERVATION_INVALID');
+ const items=canonicalItems(r.items);
+ if(!items||sha(Buffer.from(JSON.stringify(items)))!==r.currentFingerprint||
+  r.currentFingerprint!==baseline.fingerprint||
+  JSON.stringify(items)!==JSON.stringify(canonicalItems(baseline.items))||
+  FILES.some(name=>r.items.writerFileStatus[name]!==baseline.items.writerFileStatus[name]))
+  return fail('C_R2_MANIFEST_BASELINE_MISMATCH');
+ return Object.freeze({schema:'ZGMINI_CONTROLLER_996_R2_REVIEW_V1',
+  status:'CURRENT_PROTECTION_MATCHES_MANIFEST_BASELINE',protectedFingerprint:baseline.fingerprint,
+  historicalFingerprint:PIN,historicalFingerprintMatches:baseline.fingerprint===PIN,
+  enabledTasks:2,protectedTasksVerified:2,baselineAuthority:'EXACT_OWNER_MANIFEST_CONSENT_REQUIRED',
+  evidenceAuthenticated:false,executionAuthorized:false,operationalWrites:0,issuePosts:0,pcRetries:0});
+}
+
 export function review996ProtectedR2Evidence(r){
  if(r?.schema!=='ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1'||
   r.requestId!==REQUEST||r.issueNumber!==996||

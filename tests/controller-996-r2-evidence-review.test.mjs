@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {review996ProtectedR2Evidence} from '../tools/controller-996-r2-evidence-review.mjs';
+import {review996ProtectedR2Evidence,review996ManifestProtectedEvidence,
+ validate996ManifestProtectionBaseline} from '../tools/controller-996-r2-evidence-review.mjs';
+import {createHash} from 'node:crypto';
 
 const r2=()=>({
  schema:'ZGMINI_CONTROLLER_996_PROTECTED_ITEMS_READONLY_V1',
@@ -63,4 +65,38 @@ test('declaring historical evidence or approval without source proof is rejected
  assert.equal(review996ProtectedR2Evidence(x).code,'C_R2_AUTHORITY_OR_HISTORICAL_GAP_DRIFT');
  const y=r2();y.executionAuthorized=true;
  assert.equal(review996ProtectedR2Evidence(y).code,'C_R2_AUTHORITY_OR_HISTORICAL_GAP_DRIFT');
+});
+
+function successor(){
+ const current=r2();current.items.files['config.json']='53533eab16c0d62301450129cfe81aefcd7a56a45c97a20d536b32c526c3d72a';
+ current.currentFingerprint=createHash('sha256').update(JSON.stringify({files:current.items.files,tasks:current.items.taskSha256})).digest('hex');
+ current.status='CURRENT_ITEMS_DIFFER_OR_UNPROVEN';current.fingerprintMatch=false;
+ return {current,baseline:{schema:'ZGMINI_CONTROLLER_996_MANIFEST_PROTECTION_BASELINE_V1',
+  historicalFingerprint:current.originalObservationFingerprint,fingerprint:current.currentFingerprint,
+  items:structuredClone(current.items),evidence:[{repository:'ansqhd5774-Choi/zgmini-pc-control',
+   issueNumber:1321,commit:'a'.repeat(40),path:'results/43233846597-1-seat-5.json',sha256:'b'.repeat(64)}]}};
+}
+test('manifest baseline compares current items without rewriting historical R2 or granting authority',()=>{
+ const {current,baseline}=successor();
+ assert.equal(review996ProtectedR2Evidence(current).status,'EVIDENCE_UNVERIFIED');
+ const r=review996ManifestProtectedEvidence(current,baseline);
+ assert.equal(r.status,'CURRENT_PROTECTION_MATCHES_MANIFEST_BASELINE');
+ assert.equal(r.historicalFingerprintMatches,false);assert.equal(r.executionAuthorized,false);
+ assert.equal(r.evidenceAuthenticated,false);assert.equal(r.baselineAuthority,'EXACT_OWNER_MANIFEST_CONSENT_REQUIRED');
+});
+test('changed current bytes, hidden absent files and disabled tasks cannot match a manifest baseline',()=>{
+ for(const change of [x=>x.items.files['config.json']='c'.repeat(64),
+  x=>x.items.files['quota-runner.cmd']='c'.repeat(64),x=>x.items.taskEnabled['ZGMINI-PC-Local-Core']=false]){
+  const {current,baseline}=successor();change(current);
+  assert.equal(review996ManifestProtectedEvidence(current,baseline).status,'EVIDENCE_UNVERIFIED');
+ }
+});
+test('baseline validation rejects malformed provenance, forged aggregates and permission flags',()=>{
+ for(const change of [b=>b.approved=true,b=>b.fingerprint='c'.repeat(64),b=>b.items.taskEnabled['ZGMINI-PC-Local-Korea']=false,
+  b=>b.evidence=[],b=>b.evidence[0].path='results/../../secret.json',b=>b.evidence[0].repository='other/repo',
+  b=>b.items.files['run-local.cmd']='c'.repeat(64)]){
+  const {current,baseline}=successor();change(baseline);
+  assert.equal(validate996ManifestProtectionBaseline(baseline),false);
+  assert.equal(review996ManifestProtectedEvidence(current,baseline).code,'C_R2_MANIFEST_BASELINE_INVALID');
+ }
 });

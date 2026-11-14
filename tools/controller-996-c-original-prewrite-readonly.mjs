@@ -147,15 +147,15 @@ const realAlive=pid=>{
 /**
  * Two *read-only* physical observations. Original Windows mode uses only
  * hardwired paths, GH/Windows protection checks and sealed R4 Git bytes.
- * The Linux TEMP fixture allows tests but never claims original-PC evidence.
+ * The TEMP fixture allows tests but never claims original-PC evidence.
  * No caller-supplied readback can ever produce `executionAuthorized=true`.
  */
 export function collect996OriginalCPrewriteReadOnly({testOnly=false,
-  root=ROOT,isAlive=realAlive,r1=null,r4=null,betweenSnapshots=null}={}){
+  root=ROOT,isAlive=realAlive,r1=null,r4=null,betweenSnapshots=null,protectionBaseline=null}={}){
   try{
     const temp=path.resolve(os.tmpdir()),at=path.resolve(root);
     if(testOnly){
-      need(process.platform!=='win32'&&path.isAbsolute(root)&&
+      need(path.isAbsolute(root)&&
         at.startsWith(temp+path.sep)&&
         path.basename(at).startsWith('zgmini-996-test-')&&
         isAlive!==realAlive&&typeof r1==='function'&&
@@ -171,7 +171,7 @@ export function collect996OriginalCPrewriteReadOnly({testOnly=false,
     }
     const firstPresence=presence(root),first=readPinned(root);
     physicalContract(first,isAlive);
-    const oldR1=testOnly?r1():collect996InterruptedEvidence();
+    const oldR1=testOnly?r1():collect996InterruptedEvidence({protectionBaseline});
     need(oldR1?.status==='READONLY_INTERRUPTED_PHASE_CONSISTENT'&&
       oldR1.checksPassed===14&&oldR1.checksTotal===14&&
       oldR1.workflowState==='active'&&
@@ -206,6 +206,8 @@ export function collect996OriginalCPrewriteReadOnly({testOnly=false,
       filesReadTwice:10,sourceBytesReadAgain:84,
       oldOwnersObservedDead:true,backlogReplayCount:0,
       protectedR1ChecksPassed:14,
+      protectionBaselineMode:protectionBaseline===null?'HISTORICAL_R1':'OWNER_MANIFEST_REQUIRED',
+      protectedFingerprint:oldR1.protectedFingerprint??null,
       independentOwnerHandoffVerified:false,
       exactNewConsentVerified:false,writerControllerConflictVerified:false,
       prewriteCasAuthorized:false,executionAuthorized:false,

@@ -1,6 +1,7 @@
 // #996 continuation C preflight consistency review — PURE / SOURCE ONLY.
 // All inputs must be independently fetched and authenticated by a future
 // operator. This review NEVER authorizes a Windows filesystem mutation.
+import {validate996ManifestProtectionBaseline} from './controller-996-r2-evidence-review.mjs';
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const ORIGINAL_ISSUES=[1217,1219,1226,1227];
 const MARKERS=['PREPARED','WORKFLOW_ENABLE_ATTEMPTED',
@@ -29,6 +30,9 @@ const fail=code=>Object.freeze({schema:'ZGMINI_CONTROLLER_996_C_CONTINUATION_GAT
 /** Candidate plan validator; an actual operator MUST do fresh physical CAS. */
 export function review996ContinuationGate({manifest,manifestProof,consent,physical,
   gitSource,remote,conflicts}={}){
+  if(manifest&&Object.hasOwn(manifest,'protectionBaseline')&&
+    !validate996ManifestProtectionBaseline(manifest.protectionBaseline))
+    return fail('C_CONTINUATION_PROTECTION_BASELINE_INVALID');
   // Old phase-scoped C approval cannot grant authority to archive the
   // abandoned owner claim or release an install lease in a new process.
   if(manifest?.schema!=='ZGMINI_CONTROLLER_996_CONTINUATION_C_APPROVAL_V1'||

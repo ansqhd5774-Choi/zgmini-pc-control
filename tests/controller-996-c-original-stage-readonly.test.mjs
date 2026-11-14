@@ -137,6 +137,18 @@ test('missing or spoofed 84-source-byte check cannot pass stage readback',t=>{
   }
 });
 
+test('stage compares the manifest protection fingerprint on both observations without approving C',t=>{
+ const fix=fixture(t);
+ const extra={protectionBaseline:{fingerprint:'d'.repeat(64)},
+  readProtected:()=>({status:'CURRENT_PROTECTION_MATCHES_MANIFEST_BASELINE',protectedFingerprint:'d'.repeat(64)})};
+ const good=inspect(fix,extra);
+ assert.equal(good.status,'C_STAGE_LIVE_INVENTORY_READ_ONLY');
+ assert.equal(good.protectionBaselineMode,'OWNER_MANIFEST_REQUIRED');
+ assert.equal(good.originalWindowsReadback,false);assert.equal(good.executionAuthorized,false);
+ const bad=inspect(fix,{...extra,protectionBaseline:{fingerprint:'e'.repeat(64)}});
+ assert.equal(bad.code,'C_STAGE_PROTECTION_UNKNOWN');
+});
+
 test('foreign continuation stops before any mutation',t=>{
   const fix=fixture(t);
   fs.mkdirSync(path.join(fix.root,...(

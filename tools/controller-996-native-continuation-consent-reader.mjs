@@ -3,6 +3,7 @@
 // execution or authority is granted by any successful read.
 import {createHash} from 'node:crypto';
 import {CONTINUATION_EFFECTS} from './controller-996-continuation-gate.mjs';
+import {validate996ManifestProtectionBaseline} from './controller-996-r2-evidence-review.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
@@ -36,6 +37,10 @@ function pinnedManifest(m){
     'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256','originalPins','launchPins',
     'effects','workflowPutCount','backlogWriteCount',
     'originalRequestRetryCount','issuePostCount'];
+  if(m&&Object.hasOwn(m,'protectionBaseline')){
+    if(!validate996ManifestProtectionBaseline(m.protectionBaseline))return false;
+    topKeys.push('protectionBaseline');
+  }
   return m?.schema==='ZGMINI_CONTROLLER_996_CONTINUATION_C_APPROVAL_V1'&&
     same(Object.keys(m).sort(),topKeys.sort())&&
     m.grade==='C'&&m.approved===true&&

@@ -615,6 +615,7 @@ function classifierPins(original,continuation,sourceLockSha256,readySha256){
 function phases(continuationId,manifest,reservationOwnerSha256,continuation,
   expected){
   return {continuationRequestId:continuationId,
+    protectionBaseline:manifest.protectionBaseline??null,
     pins:{originalPins:manifest.originalPins,reservationOwnerSha256,
       classifierPins:classifierPins(manifest.originalPins,continuation,
         manifest.sourceLockSha256,expected.readySha256)}};
@@ -660,7 +661,7 @@ export async function run996NativeOwnerCOnce({manifestCommitSha}={}){
       import('./controller-996-windows-archive-adapter.mjs'),
     ]);
     const preflight=()=>{
-      const r=collect996OriginalCPrewriteReadOnly();
+      const r=collect996OriginalCPrewriteReadOnly({protectionBaseline:manifest.protectionBaseline??null});
       need(r.status==='C_ORIGINAL_PREWRITE_FILE_PINS_OBSERVED_ONLY'&&
         r.originalWindowsReadback===true&&r.filesReadTwice===10&&
         r.sourceBytesReadAgain===84&&r.oldOwnersObservedDead===true&&

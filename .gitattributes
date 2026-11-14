@@ -2,3 +2,6 @@
 *.vbs text eol=lf
 approval/ER1_PC_OPERATION_APPROVAL.json text eol=lf
 approvals/maintenance-recoveries/*.json text eol=lf
+tools/controller-996-git-byte-offline-manifest-r4.json text eol=lf
+tools/controller-996-c-native-owner-source-lock.json text eol=lf
+docs/CONTROLLER_996_C_CONTINUATION_APPROVAL_V1.json text eol=lf

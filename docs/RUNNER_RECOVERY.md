@@ -175,6 +175,30 @@ transacted writer handle을 commit까지 유지하며, 검증 실패는 rollback
   정확한 C 명세에 연결해야 하며, 현재 fingerprint를 무조건 허용하도록 바꾸지 않는다.
 
 근거: `artifacts/runner-recovery/996-txf-operator-cas-20261114.json`.
+
+### 승인된 후속 보호 상태 연결 (2026-11-15, 읽기 전용)
+
+현재 Writer config는 #1320 B 적용 후 #1321의 실제 저장 재조회 해시와 일치한다.
+과거 R2 보호 해시와 다르다는 이유로 이를 복원하지 않는다. 선택적
+`protectionBaseline`은 파일·Task 전체 목록과 fingerprint, 고정 commit의 증거 경로를
+정확한 C manifest에 포함한다. 과거 R2 검사는 유지하며, 새 기준의 형식 검증이나
+관측 성공은 Owner 승인 또는 증거 인증을 뜻하지 않는다. Owner 원문 승인에 묶인
+manifest 검증과 별도 실행 경계가 충족돼야 한다.
+
+- 원본 PC 읽기에서 파일 10개 두 차례 대조, 설치·staged·유지보수 소스 84개,
+  보호 검사 14개를 확인했다. `C_ORIGINAL_PREWRITE_FILE_PINS_OBSERVED_ONLY`이며
+  `executionAuthorized=false`, 운영 쓰기 0건이다.
+- R4 봉인 JSON의 개발 checkout CRLF 변환을 확인했다. 기대 SHA를 변경하지 않고
+  Git 원문 LF 바이트로 되돌렸으며 봉인 파일 3개에 LF checkout 규칙을 추가했다.
+- 관련 검증 65건 PASS: 보호 기준·Owner 변조/철회·Windows 소스 경계 37건과
+  관측·prewrite·stage TEMP 검사 28건. TEMP 포트는 원본 E: 경로를 거부한다.
+- 설치된 유지보수기는 저장소 Runner 총수가 정확히 6개여야 한다고 검사한다.
+  별도 격리 Runner가 존재하면 `RUNNER_SET_DRIFT`가 재발할 수 있다. 여섯 운영
+  이름의 유일성·Online·Busy 검사로 범위를 제한하는 최소 수정과 검증된 유지보수기
+  인계가 필요하다. 현재 C lease가 남은 동안 인계나 새 설치 요청을 수행하지 않는다.
+
+근거: `artifacts/runner-recovery/996-proposed-baseline-readiness-20261115.json`.
+이 기록은 최종 SourceLock/ZIP/S2 또는 운영 복구 완료 증거가 아니다.
 원본 Claim·Install Lease·Workflow·Backlog·Controller는 변경하지 않았다.
 최종 SourceLock/ZIP/S2 및 실제 운영 C 실행은 아직 미완료다.
 

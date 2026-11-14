@@ -149,12 +149,38 @@ function expectedConsent(m,manifestSha,s2){
     'backlogWriteCount=0','originalRequestRetryCount=0','issuePostCount=0',
   ].join('\n');
 }
+function validProtectionBaseline(b){
+  const exact=(x,keys)=>x&&typeof x==='object'&&!Array.isArray(x)&&eq(Object.keys(x).sort(),[...keys].sort());
+  const files=['config.json','quota-runner.cmd','run-local.cmd'];
+  const tasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
+  if(!exact(b,['schema','historicalFingerprint','fingerprint','items','evidence'])||
+    b.schema!=='ZGMINI_CONTROLLER_996_MANIFEST_PROTECTION_BASELINE_V1'||
+    b.historicalFingerprint!=='877bcd2a2abbf34452c09fc96a15b28d0309a32b45687f8dace37ae5e29abb86'||!h64(b.fingerprint)||
+    !exact(b.items,['files','writerFileStatus','taskSha256','taskEnabled'])||
+    !exact(b.items.writerFileStatus,files)||!exact(b.items.taskSha256,tasks)||!exact(b.items.taskEnabled,tasks)||
+    !b.items.files||typeof b.items.files!=='object'||Array.isArray(b.items.files))return false;
+  const f={},t={};
+  for(const n of files){if(b.items.writerFileStatus[n]==='PRESENT'){
+    if(!h64(b.items.files[n]))return false;f[n]=b.items.files[n];
+  }else if(b.items.writerFileStatus[n]!=='ABSENT'||Object.hasOwn(b.items.files,n))return false;}
+  if(Object.keys(f).length!==Object.keys(b.items.files).length)return false;
+  for(const n of tasks){if(!h64(b.items.taskSha256[n])||b.items.taskEnabled[n]!==true)return false;t[n]=b.items.taskSha256[n];}
+  return sha(Buffer.from(JSON.stringify({files:f,tasks:t})))===b.fingerprint&&
+    Array.isArray(b.evidence)&&b.evidence.length>=1&&b.evidence.length<=4&&b.evidence.every(e=>
+      exact(e,['repository','issueNumber','commit','path','sha256'])&&e.repository===REPO&&
+      Number.isSafeInteger(e.issueNumber)&&e.issueNumber>0&&h40(e.commit)&&h64(e.sha256)&&
+      /^results\/[a-zA-Z0-9][a-zA-Z0-9_-]{1,119}\.json$/.test(e.path??''));
+}
 function validateManifest(m){
   const fields=['schema','grade','approved','operation','issueNumber',
     'originalRequestId','continuationRequestId','operatorCommit',
     'operatorSha256','bootstrapSha256','packageSha256','sourceLockSha256','launchPins',
     'originalPins','effects','workflowPutCount','backlogWriteCount',
     'originalRequestRetryCount','issuePostCount'];
+  if(m&&Object.hasOwn(m,'protectionBaseline')){
+    need(validProtectionBaseline(m.protectionBaseline),'C_996_BOOTSTRAP_PROTECTION_BASELINE_INVALID');
+    fields.push('protectionBaseline');
+  }
   const pins=['oldC','installOwner','installRecovery','backlog','installed',
     'stage','maintainer','PREPARED','WORKFLOW_ENABLE_ATTEMPTED',
     'BACKLOG_CLOSE_ATTEMPTED'];

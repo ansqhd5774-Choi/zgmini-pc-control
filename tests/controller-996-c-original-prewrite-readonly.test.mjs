@@ -67,6 +67,12 @@ test('ten physical files are pinned twice but C execution is NEVER approved',t=>
   assert.equal(result.originalPcWrites,0);
 });
 
+test('TEMP fixture permission never applies to the original operating root',()=>{
+ const r=run('E:/ZGmini');
+ assert.equal(r.code,'C_996_PREWRITE_TEST_ROOT_OR_PORT_REJECTED');
+ assert.equal(r.executionAuthorized,false);
+});
+
 test('unapproved archive destination stops before any C change',t=>{
   const {root}=fixture(t);
   fs.mkdirSync(path.join(root,...(

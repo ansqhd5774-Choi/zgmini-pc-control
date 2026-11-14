@@ -8,7 +8,7 @@ import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {collect996ProtectedItems} from './controller-996-protection-attestation.mjs';
-import {review996ProtectedR2Evidence} from './controller-996-r2-evidence-review.mjs';
+import {review996ProtectedR2Evidence,review996ManifestProtectedEvidence} from './controller-996-r2-evidence-review.mjs';
 
 const REQ='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -128,7 +128,9 @@ function nativeLive(){
  return {workflowState:workflow?.state,namedRunnersObserved:6,
   additionalRunnersObserved:runners.runners.length-6,authenticated:true};
 }
-const nativeProtected=()=>review996ProtectedR2Evidence(collect996ProtectedItems());
+const nativeProtected=baseline=>baseline===null||baseline===undefined?
+ review996ProtectedR2Evidence(collect996ProtectedItems()):
+ review996ManifestProtectedEvidence(collect996ProtectedItems(),baseline);
 const failure=(code,checks=[])=>Object.freeze({
  schema:'ZGMINI_CONTROLLER_996_INTERRUPTED_OBSERVATION_V1',
  requestId:REQ,status:'STATE_UNKNOWN_PRESERVE_C_CLAIM_AND_ORIGINAL_LEASE',
@@ -136,7 +138,7 @@ const failure=(code,checks=[])=>Object.freeze({
  fullSourceBytePostcheckVerified:false,executionAuthorized:false,
  operationalWrites:0,issuePosts:0,pcRetries:0,
 });
-function assess({raw,exists,live,protection,isAlive,pin}){
+function assess({raw,exists,live,protection,isAlive,pin,protectionBaseline}){
  const checks=[];const verify=(name,ok)=>{
   checks.push(Object.freeze({name,passed:ok===true}));
   need(ok===true,'C_INTERRUPTED_'+name+'_UNVERIFIED');
@@ -200,8 +202,10 @@ function assess({raw,exists,live,protection,isAlive,pin}){
  verify('NAMED_RUNNER_INVENTORY',live.namedRunnersObserved===6&&
   Number.isSafeInteger(live.additionalRunnersObserved)&&
   live.additionalRunnersObserved>=0);
- verify('CURRENT_PROTECTION',protection?.status==='CURRENT_PROTECTION_MATCHES_R1'&&
-  protection.protectedFingerprint===FP&&protection.enabledTasks===2);
+ verify('CURRENT_PROTECTION',(protectionBaseline===null?
+  protection?.status==='CURRENT_PROTECTION_MATCHES_R1'&&protection.protectedFingerprint===FP:
+  protection?.status==='CURRENT_PROTECTION_MATCHES_MANIFEST_BASELINE'&&
+    protection.protectedFingerprint===protectionBaseline?.fingerprint)&&protection.enabledTasks===2);
  verify('STATIC_MANIFESTS',value.controllerHost.controllerSourceSha===
   'badad9124157879d7a645b64f2768113d632355b'&&
   value.stagedHost.controllerSourceSha===
@@ -213,6 +217,8 @@ function assess({raw,exists,live,protection,isAlive,pin}){
   code:'C_CLAIM_PROVENANCE_NOT_EXTERNALLY_PINNED',
   checks:Object.freeze(checks),
   checksPassed:checks.length,checksTotal:checks.length,
+  protectionBaselineMode:protectionBaseline===null?'HISTORICAL_R1':'OWNER_MANIFEST_REQUIRED',
+  protectedFingerprint:protection.protectedFingerprint,
   backlogSha256:raw.backlog.sha,
   pausedAt:backlog.pausedAt,resumedAt:backlog.resumedAt,
   originalLeasePresent:true,cClaimPresent:true,
@@ -225,10 +231,10 @@ function assess({raw,exists,live,protection,isAlive,pin}){
 // No production CLI. All test ports are rejected on the original Windows.
 export function collect996InterruptedEvidence({root=ROOT,testOnly=false,
  readLive=nativeLive,readProtected=nativeProtected,isAlive=pidAlive,
- pin=PIN}={}){
+ pin=PIN,protectionBaseline=null}={}){
  try{
   if(testOnly){
-   need(process.platform!=='win32'&&path.isAbsolute(root)&&
+   need(path.isAbsolute(root)&&
     path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep)&&
     path.basename(root).startsWith('zgmini-996-test-')&&
     readLive!==nativeLive&&readProtected!==nativeProtected&&isAlive!==pidAlive&&
@@ -253,7 +259,7 @@ export function collect996InterruptedEvidence({root=ROOT,testOnly=false,
   const raw=read();
   const exists={};
   for(const p of [...LEASES,...LATER.map(markerPath)])exists[p]=checkedPresence(root,p);
-  const live=readLive(),protection=readProtected();
+  const live=readLive(),protection=readProtected(protectionBaseline);
   const again=read();
   need(Object.keys(raw).every(k=>raw[k].sha===again[k].sha),
    'C_INTERRUPTED_FILES_CHANGED_DURING_READ');
@@ -262,7 +268,7 @@ export function collect996InterruptedEvidence({root=ROOT,testOnly=false,
    afterExists[p]=checkedPresence(root,p);
   need(Object.keys(exists).every(p=>exists[p]===afterExists[p]),
    'C_INTERRUPTED_LEASE_OR_MARKER_CHANGED_DURING_READ');
-  return assess({raw,exists,live,protection,isAlive,pin});
+  return assess({raw,exists,live,protection,isAlive,pin,protectionBaseline});
  }catch(e){
   return failure(/^C_INTERRUPTED_[A-Z0-9_]+$/.test(e?.code??'')?
    e.code:'C_INTERRUPTED_READ_OR_STATE_UNKNOWN');

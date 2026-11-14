@@ -107,6 +107,21 @@ test('exact interrupted state is read-only phase-consistent, never recovery auth
  }finally{f.dispose();}
 });
 
+test('explicit manifest-baseline comparison stays distinct from historical R1 and never authorizes',()=>{
+ const f=fixture();try{
+  const r=f.run({protectionBaseline:{fingerprint:'b'.repeat(64)},
+   readProtected:()=>({status:'CURRENT_PROTECTION_MATCHES_MANIFEST_BASELINE',
+    protectedFingerprint:'b'.repeat(64),enabledTasks:2})});
+  assert.equal(r.status,'READONLY_INTERRUPTED_PHASE_CONSISTENT');
+  assert.equal(r.protectionBaselineMode,'OWNER_MANIFEST_REQUIRED');
+  assert.equal(r.executionAuthorized,false);
+  const mismatch=f.run({protectionBaseline:{fingerprint:'c'.repeat(64)},
+   readProtected:()=>({status:'CURRENT_PROTECTION_MATCHES_MANIFEST_BASELINE',
+    protectedFingerprint:'b'.repeat(64),enabledTasks:2})});
+  assert.equal(mismatch.code,'C_INTERRUPTED_CURRENT_PROTECTION_UNVERIFIED');
+ }finally{f.dispose();}
+});
+
 test('backlog digest drift stops without retry or lease archive',()=>{
  const f=fixture();
  try{
@@ -146,7 +161,13 @@ test('missing or symlinked C claim never silently becomes eligible',()=>{
   const full=path.join(f.root,...rel.split('/'));
   fs.renameSync(full,full+'.preserved');
   assert.equal(f.run().status,'STATE_UNKNOWN_PRESERVE_C_CLAIM_AND_ORIGINAL_LEASE');
-  fs.symlinkSync(full+'.preserved',full);
+  if(process.platform==='win32'){
+   // An unprivileged Windows junction exercises the same ancestor-reparse
+   // rejection without enabling Developer Mode or changing OS privileges.
+   fs.renameSync(full+'.preserved',full);
+   const claim=path.dirname(full),saved=claim+'.preserved';
+   fs.renameSync(claim,saved);fs.symlinkSync(saved,claim,'junction');
+  }else fs.symlinkSync(full+'.preserved',full);
   assert.equal(f.run().code,'C_INTERRUPTED_PATH_REDIRECT');
  }finally{f.dispose();}
 });
