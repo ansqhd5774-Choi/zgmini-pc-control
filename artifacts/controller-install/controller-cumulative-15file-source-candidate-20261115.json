@@ -1,0 +1,526 @@
+{
+  "schema": "ZGMINI_CONTROLLER_CUMULATIVE_SOURCE_CANDIDATE_V1",
+  "status": "DRAFT_NOT_APPROVED",
+  "generatedFor": "2026-11-15 KST / ZGMINI process coordination 29 follow-up",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "installedSha": "badad9124157879d7a645b64f2768113d632355b",
+  "installedShaEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/996#issuecomment-6881130462",
+  "installedStateCaveat": "Historical #996 postread, MUST verify live MAINTENANCE_INSTALL/host source, original raw bytes, lease and Receiver immediately before any operation",
+  "targetSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "targetSourcePR": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367",
+  "targetMainAncestry": "GitHub remote compare ahead 716 behind 0 on 2026-11-15; no claim of exhaustive repository file list beyond target controller/config tree",
+  "handoffPrerequisite": {
+    "installedMaintainerSha": "16064e29fea0e53e7769a24d93d75b6f5292cfc0",
+    "targetMaintainerSha": "c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7",
+    "manifest": "approvals/maintenance-handoffs/c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7.json",
+    "actualWindowsHandoff": "NOT_RUN",
+    "path": "INDEPENDENT_WINDOWS_OPERATOR_ONLY"
+  },
+  "sourceInventory": {
+    "controllerFilesBefore": 37,
+    "controllerFilesAfter": 45,
+    "deployableAdded": 7,
+    "deployableModified": 7,
+    "configModified": 1,
+    "deployableTotal": 15,
+    "sourceOnlyTestsAdded": [
+      "controller/inflation-core-lock-observation-readonly.test.mjs"
+    ],
+    "controllerRemoved": [],
+    "sourceEvidence": "GitHub old+target controller directory snapshots and explicit config/operations.json file readback"
+  },
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "7107e7447a1aef27cc7bbd11c91cbd74b7f52676d3fabeb6fde2601cfc3b9b9f"
+    },
+    {
+      "path": "controller/common.mjs",
+      "sha256": "b040624236282476fb0a4ac3d2cd401845a595be94b4cebc58e42549b71ba31e"
+    },
+    {
+      "path": "controller/core-runtime-source-readonly.mjs",
+      "sha256": "37b068476df5d9d6a971d47918bc0d969ea4676b397cc7bb845caff31bccea60"
+    },
+    {
+      "path": "controller/core-runtime-source-wmi.mjs",
+      "sha256": "7beee6b04843c14a3b21c52579f871f9d437b688c531e98edfdfe0659226c691"
+    },
+    {
+      "path": "controller/d05-lineage-readonly.mjs",
+      "sha256": "69117b9f4fdee3b0befa36d1e2e1d7d81ab3796260fc72172df33332d9b03661"
+    },
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "cbc193b6d5b6d788df544c28c3a79ea5e3675bb6f24366c75eb2589b6b8a5cff"
+    },
+    {
+      "path": "controller/inflation-core-lock-observation-readonly.mjs",
+      "sha256": "9e63564a621f98257f0472030698052411e01efa5d04fee8dff8d6982d644ed2"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "e7bc7cc2ba89fd4fbdaaa811a176f597ac6ca48a4eda2def2d0b35fefb87df3b"
+    },
+    {
+      "path": "controller/release-calendar-runtime-readonly.mjs",
+      "sha256": "3d878edc7e497045b6b7027a57f01c55f03325ed51f69058dc543803a3a86aa4"
+    },
+    {
+      "path": "controller/shared-resource-release-readonly.mjs",
+      "sha256": "4bfa6131205b0c2e68fa10aa3f809d0be30361a63d58c1ccc433d63375b278c5"
+    },
+    {
+      "path": "controller/source-inventory-runtime-readonly.mjs",
+      "sha256": "d319459497f5afb6fc00d31402960d917670b82a13c724dcb9e57266bf6f78a1"
+    },
+    {
+      "path": "controller/supervisor.mjs",
+      "sha256": "b57e3d18f6c79c3faa62b56f28f6f8a3432fb451f9b843c786e2f8b3bafc3d6f"
+    },
+    {
+      "path": "controller/theme-l7-runtime-readonly.mjs",
+      "sha256": "46432c772c4b18c8f84d3c134b6c762bf04a4d5ed489574cc76effaf4e91e56a"
+    },
+    {
+      "path": "controller/writer-b-1063-recovery-readonly.mjs",
+      "sha256": "de9dccb21052f019aaffe1c55b16b48f6143cab71da8fd188d1354170cbeb5ed"
+    },
+    {
+      "path": "controller/writer-b-1063-task-probe.mjs",
+      "sha256": "8416cc09b76b5d13559cb6383b13f8f282b7a0b0f663d84a581fcf789a51e655"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "config/operations.json",
+      "change": "MODIFIED",
+      "domain": "shared-dispatch-config",
+      "oldSha256": "103dbdb47b60642d3883161303013ee3fcaffc5250ed7044e4dfb09e31c2de0e",
+      "targetSha256": "7107e7447a1aef27cc7bbd11c91cbd74b7f52676d3fabeb6fde2601cfc3b9b9f",
+      "oldGitBlob": "d22d18bd9b252cbaa5e6b8e082377a872630b2b3",
+      "targetGitBlob": "c906683afd487762f5bc32f50a199679df200dc3"
+    },
+    {
+      "path": "controller/common.mjs",
+      "change": "MODIFIED",
+      "domain": "controller-stability",
+      "oldSha256": "47bc1e9e7d35a3b970fc85e92e12f8e5ad4cf42f625b1fe242cfc3c1ad5a4cd6",
+      "targetSha256": "b040624236282476fb0a4ac3d2cd401845a595be94b4cebc58e42549b71ba31e",
+      "oldGitBlob": "8eb3d0f9f80522d1dbf5d4eaa9edda72af1bb45f",
+      "targetGitBlob": "46bac30d7f64c6e84e09cb5063a7b6db2b77ab68"
+    },
+    {
+      "path": "controller/core-runtime-source-readonly.mjs",
+      "change": "MODIFIED",
+      "domain": "controller-stability-core-readonly",
+      "oldSha256": "14fed6d7a2509251bd388473ce8f62162278ee140d3f225978a2cabd4d1ff91e",
+      "targetSha256": "37b068476df5d9d6a971d47918bc0d969ea4676b397cc7bb845caff31bccea60",
+      "oldGitBlob": "6e11effce48a1bf6c4d85493cd23523746d49dc2",
+      "targetGitBlob": "f01997834b2ab42a73be3388f5bbb42b416b49be"
+    },
+    {
+      "path": "controller/core-runtime-source-wmi.mjs",
+      "change": "MODIFIED",
+      "domain": "controller-stability-core-wmi",
+      "oldSha256": "0a49f6826e15e86776c2ff36348368edc1877724de7c9c9ba69c14a6ba401e29",
+      "targetSha256": "7beee6b04843c14a3b21c52579f871f9d437b688c531e98edfdfe0659226c691",
+      "oldGitBlob": "d02267dca6756b64cd4aff6ba38b648b05c24503",
+      "targetGitBlob": "e16ed801b954b524150853545da45f620af64d49"
+    },
+    {
+      "path": "controller/d05-lineage-readonly.mjs",
+      "change": "ADDED",
+      "domain": "d05",
+      "oldSha256": null,
+      "targetSha256": "69117b9f4fdee3b0befa36d1e2e1d7d81ab3796260fc72172df33332d9b03661",
+      "oldGitBlob": null,
+      "targetGitBlob": "43eaf1b976b3584b3f18739366d7122ec59bb9d4"
+    },
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "change": "ADDED",
+      "domain": "employment-r6",
+      "oldSha256": null,
+      "targetSha256": "cbc193b6d5b6d788df544c28c3a79ea5e3675bb6f24366c75eb2589b6b8a5cff",
+      "oldGitBlob": null,
+      "targetGitBlob": "2daa4e03b6affe5fd44c68311eca57ddee614b0e"
+    },
+    {
+      "path": "controller/inflation-core-lock-observation-readonly.mjs",
+      "change": "ADDED",
+      "domain": "inflation",
+      "oldSha256": null,
+      "targetSha256": "9e63564a621f98257f0472030698052411e01efa5d04fee8dff8d6982d644ed2",
+      "oldGitBlob": null,
+      "targetGitBlob": "82ac34052ef22edbecd8ab7348fe76bffcb3d583"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "change": "MODIFIED",
+      "domain": "shared-dispatch",
+      "oldSha256": "ea775e484353063b455f42aaf31357e89521788fff1b6e0501cab4c2920b5ef8",
+      "targetSha256": "e7bc7cc2ba89fd4fbdaaa811a176f597ac6ca48a4eda2def2d0b35fefb87df3b",
+      "oldGitBlob": "f6ef5a4dccf9b1b09f50db6edfa61004e6503b44",
+      "targetGitBlob": "b507697ce089254cd61932f1d5b703b48f93e0db"
+    },
+    {
+      "path": "controller/release-calendar-runtime-readonly.mjs",
+      "change": "MODIFIED",
+      "domain": "calendar",
+      "oldSha256": "12cc75f6d2ceb2cc76ff5405ad1cb239ab2138dece3b7d538feb026e54d3d361",
+      "targetSha256": "3d878edc7e497045b6b7027a57f01c55f03325ed51f69058dc543803a3a86aa4",
+      "oldGitBlob": "cf5e8e82ef1013db4726ae82c14482d10178dd71",
+      "targetGitBlob": "1470cd93cf0e0887d55a1351305be5c4edfc7c6e"
+    },
+    {
+      "path": "controller/shared-resource-release-readonly.mjs",
+      "change": "ADDED",
+      "domain": "shared-resource",
+      "oldSha256": null,
+      "targetSha256": "4bfa6131205b0c2e68fa10aa3f809d0be30361a63d58c1ccc433d63375b278c5",
+      "oldGitBlob": null,
+      "targetGitBlob": "9eb5f752f6fbfc3f48d3bd2e7a5d7cbc5a816039"
+    },
+    {
+      "path": "controller/source-inventory-runtime-readonly.mjs",
+      "change": "ADDED",
+      "domain": "calendar-source-inventory",
+      "oldSha256": null,
+      "targetSha256": "d319459497f5afb6fc00d31402960d917670b82a13c724dcb9e57266bf6f78a1",
+      "oldGitBlob": null,
+      "targetGitBlob": "db9e9c8347277287cc6ef10bad310be125314d52"
+    },
+    {
+      "path": "controller/supervisor.mjs",
+      "change": "MODIFIED",
+      "domain": "controller-stability",
+      "oldSha256": "999fa10a8aa21b31a8d06cea3989a79a273a2ec25555a281956b4bfc62b225c7",
+      "targetSha256": "b57e3d18f6c79c3faa62b56f28f6f8a3432fb451f9b843c786e2f8b3bafc3d6f",
+      "oldGitBlob": "97d75224d2badc575fa0bd4dad23175ff8b3c720",
+      "targetGitBlob": "06e3b291c583d4ad134d03c139dbfe858a892e57"
+    },
+    {
+      "path": "controller/theme-l7-runtime-readonly.mjs",
+      "change": "MODIFIED",
+      "domain": "theme-l7",
+      "oldSha256": "cae9f1370fa77639567c69fcda979f9cbc270f9bcd2ba77d1b11cecb172aa368",
+      "targetSha256": "46432c772c4b18c8f84d3c134b6c762bf04a4d5ed489574cc76effaf4e91e56a",
+      "oldGitBlob": "be5b9a6a6657f95f472b91b57461bf1e3ded2614",
+      "targetGitBlob": "a841aef7547345090a0af209cd426590ede9b035"
+    },
+    {
+      "path": "controller/writer-b-1063-recovery-readonly.mjs",
+      "change": "ADDED",
+      "domain": "writer-1063",
+      "oldSha256": null,
+      "targetSha256": "de9dccb21052f019aaffe1c55b16b48f6143cab71da8fd188d1354170cbeb5ed",
+      "oldGitBlob": null,
+      "targetGitBlob": "b67a3dcf57fd54d7b6977a9bb867a62442bd5a56"
+    },
+    {
+      "path": "controller/writer-b-1063-task-probe.mjs",
+      "change": "ADDED",
+      "domain": "writer-1063",
+      "oldSha256": null,
+      "targetSha256": "8416cc09b76b5d13559cb6383b13f8f282b7a0b0f663d84a581fcf789a51e655",
+      "oldGitBlob": null,
+      "targetGitBlob": "c7102b4a60293ceadc80916469a75bfcd69b821d"
+    }
+  ],
+  "approval": {
+    "status": "B_MANIFEST_DRAFT_CREATED_NOT_MERGED_OR_EXECUTED",
+    "grade": null,
+    "ref": null,
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE",
+    "operation": "NO_REQUEST",
+    "warning": "Existing standing policy and merged source commits do not by themselves approve the cumulative 15-file B install. No approvalManifestSha256/requestId may be derived from this candidate.",
+    "reviewManifestPath": "approvals/controller-updates/8e2736a62a90798afe159ef4d96a8713265ca021.json",
+    "reviewManifestBranch": "codex/controller-cumulative-15file-plan-20261115",
+    "purpose": "pc-controller-heavy-readonly",
+    "grantBoundary": "B manifest present only in Draft PR branch. Not in default main, not accepted by running maintainer, no request created. Need strict source review, safe merged approval, and actual Windows handoff."
+  },
+  "checks": {
+    "sourceRawSha256": "15/15 from exact GitHub base64 raw bytes, verified JS SHA-256 known vector",
+    "oldSourceRawSha256": "8/8 modified baseline files; new file old=null",
+    "sourceGitBlobSha": "15/15 target and 8/8 old from GitHub contents",
+    "sourceTreeDiff": "15 deployable / 1 non-deploy test / 0 controller deletions",
+    "infrastructureDelta": "ControllerOnlyInstall mode excludes unrelated scripts/workflows; exact live pc-job.yml unchanged at pinned old and target. No whole-repo infrastructure approval asserted.",
+    "moduleApprovals": "PENDING_PER_DOMAIN",
+    "sourceCI": "PR #1367 related CI 2/2 PASS, not cumulative per-module B approval",
+    "windowsSimulation": "NOT_RUN",
+    "windowsInstallation": "NOT_RUN",
+    "runtimeResults": "NOT_RUN",
+    "controllerOnlyDryRun": {
+      "classification": "SOURCE_ONLY_FILE_DIFF_SIMULATION_NOT_OPERATION_ADMISSION",
+      "expectedFiles": 15,
+      "actualFiles": 15,
+      "sourceOnlyNonDeploy": [
+        "controller/inflation-core-lock-observation-readonly.test.mjs"
+      ],
+      "deletedControllerFiles": 0,
+      "passed": 6,
+      "failed": 0,
+      "scenarios": [
+        {
+          "name": "exact-cumulative-15",
+          "result": "PASS"
+        },
+        {
+          "name": "outdated-four-files",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        },
+        {
+          "name": "missing-one-file",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        },
+        {
+          "name": "test-file-added-to-allow",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        },
+        {
+          "name": "live-workflow-drift",
+          "result": "CONTROLLER_ONLY_LIVE_WORKFLOW_CHANGED"
+        },
+        {
+          "name": "duplicate-allowfile",
+          "result": "ALLOWFILE_DIFF_MISMATCH"
+        }
+      ],
+      "warning": "6/6 covers file diff and live workflow only. It did not test config transition and cannot be used alone as install readiness."
+    },
+    "configTransitionDryRun": {
+      "classification": "SOURCE_ONLY_JS_MIRROR_OF_CURRENT_MAINTENANCE_CONTRACT_NOT_WINDOWS_EXECUTION",
+      "oldConfigGitBlob": "d22d18bd9b252cbaa5e6b8e082377a872630b2b3",
+      "targetConfigGitBlob": "c906683afd487762f5bc32f50a199679df200dc3",
+      "oldOperationCount": 31,
+      "targetOperationCount": 37,
+      "addedOperations": [
+        "d05-lineage-readonly",
+        "inflation-core-lock-observation-readonly",
+        "shared-resource-release-readonly",
+        "writer-b-1063-recovery-readonly",
+        "source-inventory-runtime-readonly",
+        "employment-r6-collection-evidence-readonly"
+      ],
+      "existingOperationsChanged": 0,
+      "requiredPurpose": "pc-controller-heavy-readonly",
+      "requiredResourceProfile": "HEAVY_READONLY_240_1536",
+      "passed": 5,
+      "failed": 0,
+      "scenarios": [
+        {
+          "name": "original-light-purpose",
+          "expected": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A",
+          "actual": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A"
+        },
+        {
+          "name": "corrected-heavy-purpose",
+          "expected": "PASS",
+          "actual": "PASS"
+        },
+        {
+          "name": "existing-operation-drift",
+          "expected": "CONTROLLER_EXISTING_OPERATION_CHANGED",
+          "actual": "CONTROLLER_EXISTING_OPERATION_CHANGED"
+        },
+        {
+          "name": "seat-change",
+          "expected": "CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED",
+          "actual": "CONTROLLER_CONFIG_WRITE_OR_SEATS_CHANGED"
+        },
+        {
+          "name": "memory-threshold-relaxation",
+          "expected": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A",
+          "actual": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A"
+        }
+      ]
+    },
+    "installContractReadiness": "SOURCE_CONTRACT_PROFILE_MATCHED_ONLY__NOT_NATIVE_VALIDATION_OR_RUNTIME",
+    "allowFilesFingerprintSha256": "7b47be818184a7ca39af8239d8fc3c7481168ad2c9f6a62e71bd95889cda52b2",
+    "validatedAgainstHistoricalManifest": "b77... and badad... matching sha256(JSON.stringify(path-sorted allowFiles)) algorithm; hash independently confirmed with abc SHA-256 vector",
+    "postSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+    "postSourceEvidence": "Existing #1351 sourceBranch main sourceSha 643b7... and GitHub ansqhd5774-Choi/zgmini main ref same, PC #1351 status STATE_UNKNOWN is not a postcheck PASS"
+  },
+  "sourceProvenance": {
+    "stability": "PR #1367 merged at 8e2736a62a90798afe159ef4d96a8713265ca021; only common, supervisor, core-runtime-source-readonly, core-runtime-source-wmi",
+    "otherFamilies": [
+      "d05",
+      "employment-r6",
+      "inflation",
+      "calendar",
+      "shared-resource",
+      "theme-l7",
+      "writer-1063",
+      "shared-dispatch/config"
+    ],
+    "requireOriginalApprovals": true,
+    "fileSourcePRs": [
+      {
+        "path": "config/operations.json",
+        "domain": "shared-dispatch-config",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1236",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1218",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1211",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1212",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1125",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/970"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/common.mjs",
+        "domain": "controller-stability",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/core-runtime-source-readonly.mjs",
+        "domain": "controller-stability-core-readonly",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/600"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/core-runtime-source-wmi.mjs",
+        "domain": "controller-stability-core-wmi",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/600"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/d05-lineage-readonly.mjs",
+        "domain": "d05",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1236",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1302"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+        "domain": "employment-r6",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1218",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1221"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/inflation-core-lock-observation-readonly.mjs",
+        "domain": "inflation",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1211",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1212"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/operations.mjs",
+        "domain": "shared-dispatch",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1236",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1218",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1211",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1125",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/970",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1302"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/release-calendar-runtime-readonly.mjs",
+        "domain": "calendar",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1052"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/shared-resource-release-readonly.mjs",
+        "domain": "shared-resource",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1125"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/source-inventory-runtime-readonly.mjs",
+        "domain": "calendar-source-inventory",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/970",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/978",
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1191"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/supervisor.mjs",
+        "domain": "controller-stability",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1367"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/theme-l7-runtime-readonly.mjs",
+        "domain": "theme-l7",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1034"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/writer-b-1063-recovery-readonly.mjs",
+        "domain": "writer-1063",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079"
+        ],
+        "sourceOnlyProvenance": true
+      },
+      {
+        "path": "controller/writer-b-1063-task-probe.mjs",
+        "domain": "writer-1063",
+        "mergedSourcePRs": [
+          "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1079"
+        ],
+        "sourceOnlyProvenance": true
+      }
+    ],
+    "approvalPolicy": "2026-11-03 standing approval docs/PC_AUTOMATION_STANDARD.md §5, same-purpose limited readonly A source registration and protected controller B. Per module limits retained; source PR merge does not itself equal PC authorization."
+  },
+  "limits": [
+    "No PC install, no Issue with pc-maintenance label, no GitHub Actions self-handoff",
+    "No change to Controller or Core runtime, D1, SQLite, supplier calls, Task Scheduler, Runner, Startup, secrets",
+    "Source-only tests are never staged into operating Controller",
+    "Git blobs are separate from raw SHA-256; both identifiers are recorded",
+    "Source code and manifest are not a live Windows proof"
+  ],
+  "nextAction": "Review Draft PR #1368's exact heavy A-grade Controller-only B manifest and 15 file source lineage; merge only after owner reviews all approval/PC preconditions. Existing authorized independent Windows Operator must first complete 7-to-7 handoff (target c2e6744...) with live readback. Then new and unique pc-maintenance issue under existing receiver after live old source/lease/backup verification. No bypass.",
+  "installModeCandidate": {
+    "mode": "controllerOnlyInstall",
+    "purpose": "pc-controller-heavy-readonly",
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE",
+    "sourceContract": "tools/maintenance-contract.mjs validateControllerOnlyInstallDelta; tools/update.mjs controlled stage path",
+    "liveWorkflowPath": ".github/workflows/pc-job.yml",
+    "liveWorkflowOldGitBlob": "33fb720e970593d14d2832935ac51f29d52ec2b4",
+    "liveWorkflowTargetGitBlob": "33fb720e970593d14d2832935ac51f29d52ec2b4",
+    "liveWorkflowUnchanged": true,
+    "sourceOnlyTestExclusion": true,
+    "requiresNativeApprovalAfterHandoff": true,
+    "assumptions": "GitHub source-only compare; local Windows installer must independently verify exact diff, policy, current source, receiver and protection",
+    "previousPurposeRejected": "pc-controller-maintenance",
+    "previousPurposeRejectCode": "CONTROLLER_NEW_OPERATION_NOT_READONLY_A",
+    "resourceAdmission": "HEAVY_READONLY_240_1536",
+    "postOperation": "core-status"
+  }
+}
