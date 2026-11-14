@@ -14,6 +14,7 @@ const FAILED_REQUEST='pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4'
 const TITLE_SCHEMA='ZGMINI_WATCHDOG_ACTIVATION_FIRST_FAIL_A_V1';
 const ID=/^pc-watchdog-activation-a-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const script=path.join(path.dirname(fileURLToPath(import.meta.url)),'guardian-rotate.vbs');
+const detailScript=path.join(path.dirname(fileURLToPath(import.meta.url)),'guardian-origin-readonly.vbs');
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const fail=c=>{throw Object.assign(new Error(c),{code:c});};
 const read=file=>JSON.parse(fs.readFileSync(file,'utf8'));
@@ -75,6 +76,33 @@ function observeMode(mode,pid){
   return s===({ATTEST:'WATCHDOG_RUNTIME_ATTESTED',PROBE:'WATCHDOG_ROTATION_VERIFIED'}[mode]);
  }catch{return false;}
 }
+export function parseOriginProof(raw){
+ const keys=['WATCH_PRESENT','NODE_PATH','COMMAND_EXACT','COMMAND_CONTAINS',
+  'PARENT_PRESENT','PARENT_WSCRIPT','PARENT_STARTUP','OWNER_SID',
+  'SESSION','PARENT_BEFORE','AGE_600'];
+ const parts=String(raw).trim().split('|');
+ if(parts.length!==keys.length+1||parts[0]!=='PROOF')
+  throw fail('WATCHDOG_ACTIVATION_A_ORIGIN_PROOF_INVALID');
+ const mismatches=[];
+ for(let i=0;i<keys.length;i++){
+  const expected=keys[i]+'=';
+  const value=parts[i+1];
+  if(value===expected+'0')mismatches.push(keys[i]);
+  else if(value!==expected+'1')
+   throw fail('WATCHDOG_ACTIVATION_A_ORIGIN_PROOF_INVALID');
+ }
+ return mismatches;
+}
+function originMismatches(pid){
+ try{
+  const output=execFileSync('C:/Windows/System32/cscript.exe',
+   ['//NoLogo',detailScript,String(pid)],{encoding:'utf8',windowsHide:true,
+     timeout:15000,maxBuffer:2000});
+  return parseOriginProof(output);
+ }catch{
+  return ['ORIGIN_DIAGNOSTIC_UNAVAILABLE'];
+ }
+}
 function main(){
  if(process.platform!=='win32'||os.hostname().toLowerCase()!=='pc'
   ||process.env.GITHUB_ACTIONS!=='true'||!process.env.RUNNER_NAME
@@ -90,6 +118,7 @@ function main(){
   code:'WATCHDOG_ACTIVATION_A_FIRST_FAIL_READ',
   newProcessVerified:false,claim:'UNKNOWN',source:'UNKNOWN',origin:'UNKNOWN',
   probe:'UNKNOWN',guardian:'UNKNOWN',effect:'UNKNOWN',
+  originMismatches:[],firstOriginMismatch:null,
   operationalWrites:0,providerCalls:0,d1Writes:0};
  try{
   const claimFile=path.join(ROOT,'activations',FAILED_REQUEST+'.json');
@@ -101,10 +130,12 @@ function main(){
     ===SOURCE_SHA&&installed.sha256===SOURCE_SHA;
   const origin=Number.isSafeInteger(owner.pid)&&observeMode('ATTEST',owner.pid);
   const probe=Number.isSafeInteger(owner.pid)&&observeMode('PROBE',owner.pid);
+  const problems=originMismatches(owner.pid);
   const delta=classifyActivation({claim,oldKnown:Boolean(claim?.oldPid),
    currentOwner:owner,currentStatus:status,newSourceValid:sourceValid,
    attest:origin,probe,guardStopped:fs.existsSync(path.join(ROOT,'GUARDIAN_STOP.txt'))});
-  Object.assign(response,{claim:delta.stage,source:delta.source,origin:delta.origin,
+  Object.assign(response,{originMismatches:problems,firstOriginMismatch:problems[0]??null,
+   claim:delta.stage,source:delta.source,origin:delta.origin,
    probe:delta.probe,guardian:delta.guard,effect:delta.effect,
    newProcessVerified:delta.effect==='NEW_WATCHDOG_ATTESTED',
    code:delta.effect==='NO_CLAIM_NO_ACTIVATION'?'WATCHDOG_ACTIVATION_A_STOPPED_PRECLAIM':
@@ -116,11 +147,14 @@ function main(){
   'schema='+response.schema,'requestId='+requestId,'status='+response.status,
   'code='+response.code,'claim='+response.claim,'effect='+response.effect,
   'source='+response.source,'origin='+response.origin,'probe='+response.probe,
-  'guardian='+response.guardian,'operationalWrites=0',''].join('\r\n')));
+  'guardian='+response.guardian,'originMismatches='+response.originMismatches.join(','),
+  'operationalWrites=0',''].join('\r\n')));
  github(['issue','comment',String(event.issue.number),'--repo',REPO,'--body',
   ['Watchdog activation #1381 exact first-fail READ-ONLY: '+response.code,
    'Claim: '+response.claim+'; Effect: '+response.effect,
    'Origin: '+response.origin+'; Probe: '+response.probe+'; Guardian: '+response.guardian,
+   'First mismatched origin: '+(response.firstOriginMismatch??'NONE'),
+   'All mismatched origin categories: '+response.originMismatches.join(','),
    'Result JSON/TXT: '+stem+'.json / '+stem+'.txt',
    'Existing B activation was not retried; operational writes 0.'].join('\n')]);
  console.log(JSON.stringify({status:response.status,code:response.code,

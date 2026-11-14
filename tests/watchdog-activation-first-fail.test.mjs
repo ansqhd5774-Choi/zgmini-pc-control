@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {verifyA,classifyActivation} from '../watchdog-b/activation-first-fail-readonly.mjs';
+import {verifyA,classifyActivation,parseOriginProof} from '../watchdog-b/activation-first-fail-readonly.mjs';
 const requestId='pc-watchdog-activation-a-c6d327a1-d5a4-4d23-8dbb-1c4c3eef8194';
 const body={schema:'ZGMINI_WATCHDOG_ACTIVATION_FIRST_FAIL_A_V1',
  requestId,operation:'watchdog-activation-first-fail-readonly',failedIssueNumber:1381};
@@ -35,4 +35,15 @@ test('consumed claim remains uncertain unless a different healthy Guardian-backe
  assert.equal(actual.effect,'NEW_WATCHDOG_ATTESTED');
  assert.throws(()=>classifyActivation({claim:{...claim,requestId:'other'}}),
   /WATCHDOG_ACTIVATION_A_LEDGER_INVALID/);
+});
+
+test('one bounded origin matrix reveals the first failed Guardian predicate only',()=>{
+ const keys=['WATCH_PRESENT','NODE_PATH','COMMAND_EXACT','COMMAND_CONTAINS',
+  'PARENT_PRESENT','PARENT_WSCRIPT','PARENT_STARTUP','OWNER_SID',
+  'SESSION','PARENT_BEFORE','AGE_600'];
+ const line='PROOF|'+keys.map(k=>k+'='+(['PARENT_STARTUP','OWNER_SID'].includes(k)?'0':'1')).join('|');
+ assert.deepEqual(parseOriginProof(line),['PARENT_STARTUP','OWNER_SID']);
+ assert.throws(()=>parseOriginProof('PROOF|WATCH_PRESENT=1'),/WATCHDOG_ACTIVATION_A_ORIGIN_PROOF_INVALID/);
+ assert.throws(()=>parseOriginProof(line.replace('COMMAND_EXACT=1','COMMAND_EXACT=UNKNOWN')),
+  /WATCHDOG_ACTIVATION_A_ORIGIN_PROOF_INVALID/);
 });
