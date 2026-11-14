@@ -15,6 +15,8 @@ on:
       - 'tools/controller-996-native-approval-readiness.mjs'
       - 'tests/controller-996-native-approval-readiness.test.mjs'
       - 'tests/controller-996-c-consent-verifier.test.mjs'
+      - 'tools/controller-996-approved-writer-transition-readonly.mjs'
+      - 'tests/controller-996-approved-writer-transition-readonly.test.mjs'
       - 'tools/controller-996-c-consent-verifier.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
   pull_request:
@@ -32,6 +34,8 @@ on:
       - 'tools/controller-996-native-approval-readiness.mjs'
       - 'tests/controller-996-native-approval-readiness.test.mjs'
       - 'tests/controller-996-c-consent-verifier.test.mjs'
+      - 'tools/controller-996-approved-writer-transition-readonly.mjs'
+      - 'tests/controller-996-approved-writer-transition-readonly.test.mjs'
       - 'tools/controller-996-c-consent-verifier.mjs'
       - '.github/workflows/c996-owner-native-boundary-source.yml'
 permissions:
@@ -74,3 +78,37 @@ jobs:
           node-version: '22'
       - name: Verify C996 boundary and NT TEMP no-replace runtime proof (no operating C effect)
         run: node --test --test-concurrency=1 tests/controller-996-c-native-owner-operator.test.mjs tests/controller-996-c-native-owner-namespace-negative.test.mjs tests/controller-996-native-approval-readiness.test.mjs tests/controller-996-winpe-native-temp-rename-source.test.mjs tests/controller-996-winpe-native-nt-relative-temp.test.mjs tests/controller-996-native-c-compiled-temp.test.mjs tests/controller-996-c-consent-verifier.test.mjs
+
+  approved-writer-metadata-source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.number == 1364 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'codex/controller-996-intake-c-candidate-r1-20261110' &&
+      github.event.pull_request.head.ref == 'codex/c996-writer-protection-metadata-r1-20261114'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Verify isolated non-operating PC before reading PR source
+        run: |
+          @echo off
+          if /I not "%COMPUTERNAME%"=="DESKTOP-N62L0NG" exit /b 5
+          if /I not "%RUNNER_NAME%"=="zgmini-handoff-ci-spare-01" exit /b 6
+          if exist "E:\\ZGmini" exit /b 7
+          echo C996_METADATA_SOURCE_ONLY_ISOLATED_HOST=TRUE
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Run only C996 approved Writer metadata fail-closed regression
+        run: node --test --test-concurrency=1 tests/controller-996-approved-writer-transition-readonly.test.mjs
