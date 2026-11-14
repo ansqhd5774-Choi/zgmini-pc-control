@@ -2,6 +2,41 @@
 
 > **용도:** 프로세스 총괄 브랜치의 실행 순서·역할·완료 기준을 한곳에 고정한다. 이 문서는 **업무 조정 문서**이며 운영 PC 설치, B/C 승인, 기존 산식·수집 주기·DB·D1·Cloudflare 배포 또는 타 대화 실행을 승인하지 않는다. 실제 실행·관측·출처는 최신 제어 `main`의 `AGENTS.md`, `docs/GENERAL_CHAT_START.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/PC_OPERATING_SYSTEMS_CANONICAL.md`, 기존 기능별 브랜치/승인, 정확한 PC JSON/TXT·Runtime·D1/API/UI를 우선한다.
 
+## 2026-11-14 78차 — 사용자 직접 제공 시장 캘린더 최종 목표·Treasury 별도 95% 확정
+
+**상위 목표 출처:** 2026-11-14 사용자 직접 전달 「ZGMINI 시장 캘린더 — 브랜치 작업계획서 및 최종 목표 보고」. 현재 담당 W02 `codex/zgmini-gpt-workspace-20261025`. 사용자 본문을 현재 목표 인식에 반영하며 과거 77차의 'W02 사용자 목표 미확정'은 **이 항목에 한해** 해소했다. 76차의 일괄 최종 목표 판정은 여전히 철회 상태이고 다른 담당자의 목표 확인에 이 사실을 전파하지 않는다.
+
+### A. W02 상위 최종 목적 (전체 콘텐츠 범위 / 완료율 미산정)
+
+`https://zgmini.kr/market-calendar/`에서 공식 **미국·적격 한국/기타 국가의 경제지표 발표, 중앙은행·주요 금융시장 이벤트, 기업별 실적 예정 및 정정 일정**을 통합 제공. 날짜·국가·유형·검색어 필터, 통합 주/월·오늘·이전/다음·남은 시간, 승인 별점 1~3개, PC·모바일 화면을 연결한다. 발표 전 예정일·확정 여부·장전/장후·시각, 발표 후 출처가 확보된 실제값·이전값·권리 확인 예상값·단위·대상 기간을 구분한다. 공식 공급원·일정 수를 임의로 고정하지 않으며 **무료 사용·보관·가공·공개 재배포 권리**가 확인된 소스부터 단계적으로 확장한다.
+
+완료 방식: **공급원 확인/권리·일정 검증 → 승인 운영 PC 수집 → SQLite 원자료·갱신·정정 이력 보존 → 저장 자료 기반 일정 통합·중복 제거·중요도 계산/로컬 결과 확인 → 승인 D1 게시·D1 readback → Production Cloudflare API → `/market-calendar/`의 PC·모바일 실제 표시/검색·별점 검증**. 방문자 GET은 이미 게시된 결과만 읽는다. 권리 미확인 데이터는 미연결로 표시하고 추정 자료를 창작하지 않는다.
+
+상위 정본: [시장 캘린더 범위·사용자 완성 기준](https://github.com/ansqhd5774-Choi/zgmini/blob/codex/zgmini-gpt-workspace-20261025/docs/MARKET_CALENDAR_PROJECT_SCOPE_AND_HANDOFF_20261027.md). 이 문서가 고정된 출처 수나 전수 완료 분모를 부여하지 않으므로 **시장 캘린더 전체 서비스 완료율 = UNKNOWN/미산정**. 과거 사용자 D+30 지시는 역사적 실시 범위로 보존하되 사용자 이번 명시 상위 목적과 충돌/축소하지 않게 구분.
+
+### B. 현재 독립 기능 — Treasury TA_WS 최근 365일 (95/100점 유지)
+
+[Treasury R6.1 100점 단계 계획](https://github.com/ansqhd5774-Choi/zgmini/blob/codex/market-calendar-treasury-cache-private-code-r1-20261109/docs/market-calendar-treasury-annual-execution-plan-r1.md): 코드/회귀 `20/20`(45/45 CI), 실제 Writer 설치 `15/15`(#1132), PC 수집·checkpoint `25/25`(#1135), 해당 시점 D1 재조회 `20/20`, 해당 시점 Production API/UI `15/15`, **운영 PC 내부 비공개 TA_WS 365일 원문 메타 독립 A 조회 `0/5`**. 합계 **95/100**. 과거 운영 증거를 현재 동일 version·신선도라고 표현하지 않는다. 이 진행률은 **Treasury 기능 하나**의 마지막 감사 단계이며 W02 전체 서비스 완료율이 아니다.
+
+W02 최신 담당 보고 [Treasury R44 감사/후속](https://github.com/ansqhd5774-Choi/zgmini/blob/codex/zgmini-gpt-workspace-20261025/docs/MARKET_CALENDAR_TREASURY_TAWS_AUDIT_R44_20261114.md): 마지막 확인된 운영 설치 Controller에는 `source-inventory-runtime-readonly` 신규 A **미등록**(과거 #1023 `OPERATION_NOT_ALLOWED`), 현시점 설치 상태 `INSTALLATION_NOT_VERIFIED`; 이미 설치됐다고 가정하거나 미승인 A를 발행하지 않는다. 이 A의 실제 현장 등록/SHA/allowlist/공유 lease 보호를 기존 공용 단일 Controller 적용 역할 내에서 인증하는 것이 다음 선행 행동이다. **새로운 제8 담당자는 만들지 않으며** 현재 7개 일반챗·총괄의 기존 권한 경계 안에서 처리한다. 운영 #1351 `queued` 상태와 #996 C `NO-GO`를 중복 PC 요청·무승인 shared install·강제 lock 해제의 근거로 삼지 않는다.
+
+실제 A 설치/등록이 인증된 다음 W02가 기존 `pc-job` 승인 경로로 독립 원문 A **1회** 실행 → 365일(양끝 포함 364일 차)·원문행·적격건·저장 시각·SHA256·SQLite/WAL·JSON/TXT 2/2 재조회 → 해당 결과와 D1 version/stored_at·공개 API/PC/모바일 화면 정합성을 연결. 전체 5점 획득 여부는 이 실증을 거쳐서만 판정한다.
+
+### C. Treasury 외 잔여 콘텐츠 및 별도 승인 범위
+
+- **2027 FOMC 전략회의:** 기능 Draft [PR #1063](https://github.com/ansqhd5774-Choi/zgmini/pull/1063) `open/draft/unmerged`; source/CI 완료는 main 병합/Production PASS 아님. `fed_fomc=SOURCE_FAILED`의 당시 첫 HTTP·parser 오류코드는 저장되지 않아 원인 단정 금지.
+- **기업 실적 ER1 자동 별점:** [ER1 별도 계획](https://github.com/ansqhd5774-Choi/zgmini/blob/codex/zgmini-gpt-workspace-20261025/docs/MARKET_CALENDAR_ER1_STARS_AUTO_COMPLETION_PLAN_20261108.md); 승인 기준 `★★★ >=97`, `★★ >=85 && <97`, `★ <85`, 결측 `-`. 월간 원자료→승인 PC 자동 계산→로컬 저장→D1/API/UI 새값 정합은 별도 마일스톤. 연간 FHS-R3 공개 등급이나 **R43 시장 중요도 상위 5% 연구**로 ER1 별점을 대체/덮어쓰기 금지.
+- **공식 실적·중앙은행·한국/추가 국가 확대:** 적법한 무료 저장/파생·재배포 권리 확인 및 기존 수집·게시 구조 적합성을 검증해 순차 확대. 승인되지 않은 공급원 사용 금지.
+
+### D. 작업 브랜치·예약 입력 정합성
+
+이번 원격 GitHub 비교에서 W02 브랜치 `07bdf9e0beb60f1f2b0c674acec0297f20a04cad`는 `main` 대비 **ahead 484 / behind 559**(조회 시점). 해당 전용 브랜치 전체 merge/rebase/reset 금지. 최소 소스 변경을 현행 main 및 승인 경로에 맞춰 선택 반영한다. 최신 SHA는 실제 실행 직전에 재조회한다.
+
+**예약 신규 대화에 넣을 3개 독립 목표:** ① 위 상위 **통합 시장 캘린더 완성 목적**(절대 Treasury로 대체하지 않음), ② **Treasury 95/100·독립 원문 감사 잔여 5점** 및 ER1/FOMC/확장 별도 마일스톤, ③ **최신 중앙 directive/마지막 원담당 SHA·승인·현장 설치 증거**로 다음 작업만 갱신. 이 78차는 예약을 생성·승인·동작 확인한 증거가 아니다.
+
+**이번 수행:** 사용자 제공 목표와 기능 브랜치 상위 문서/TA_WS 문서/R6.1 원본/ER1 별도 계획/PR #1063/실제 branch divergence 대조 후 중앙 **목표 인식 기록**만 갱신. Treasury **95%→95%**, 시장 캘린더 전체 완료율 **미산정 유지**. 기존 ZGMINI 6트랙 참고평균 57.4%는 제품 전체 완료율 아님. 소스 코드·PC/Runner/Controller·DB/D1/Cloudflare·승인·예약 변경 **0**.
+
+
 ## 2026-11-14 77차 — 76차 '최종 목적 확정' 판정 철회 / 사용자 원지시 복원 우선
 
 **정정 상태: 76차 결론은 목표 확정본이 아니라 `OBJECTIVE_AUDIT_RETRACTED_PENDING_USER_ORIGINAL`이다. GPT 예약·담당자 신규 시작 지시의 상위 목표나 100% 완료 분모로 인용하지 말 것.** 76차 내용은 당시 잘못된 판단의 이력을 위해 보존하며, 승인된 제품 목적의 근거로 사용하지 않는다.
