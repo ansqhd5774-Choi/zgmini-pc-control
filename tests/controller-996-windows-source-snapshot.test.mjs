@@ -180,6 +180,7 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     'import {createHash} from "node:crypto";',
     'const sha = url => createHash("sha256").update(fs.readFileSync(url)).digest("hex");',
     'const mode = process.env.ZGMINI_996_TEST_RECEIPT;',
+    'if (mode === "unsealed-import" && process.argv.includes("--verify-handoff")) await import("./controller-996-unsealed-fixture.mjs");',
     'const receipt = ' + JSON.stringify({
       schema:'ZGMINI_CONTROLLER_996_NATIVE_TRUSTED_BOOTSTRAP_REVIEW_V1',
       status:'GIT_AND_LOCAL_BYTES_OBSERVED_ONLY', filesCheckedAtS1:16, filesCheckedAtS2:3,
@@ -194,6 +195,7 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     'if (mode === "authorized") receipt.executionAuthorized = true;',
     'if (mode === "wrong-launch") receipt.launchPins.nodeSha256 = "0".repeat(64);',
     'export function verify996CTrustedBootstrapReadOnly() {',
+    '  if (mode === "fixture-at-operator") return {...receipt,fixtureOnly:true};',
     '  return mode === "revoked-at-operator" ? {status:"BOOTSTRAP_NO_GO"} : receipt;',
     '}',
     'if (process.argv[1] && new URL(import.meta.url).pathname.endsWith(process.argv[1].split(/[\\\\/]/).at(-1))) {',
@@ -201,6 +203,7 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
     '  console.log(JSON.stringify(receipt));',
     '}',
   ].join('\n'));
+  write('tools/controller-996-unsealed-fixture.mjs','console.log("UNSEALED_MODULE_EXECUTED");\nexport {};\n');
   const files = {[bootstrap]:bootstrapSha, [operator]:operatorSha};
   for (let i = 0; i < 14; i++) {
     const relative = 'tools/controller-996-handoff-fixture-' + i + '.mjs';
@@ -233,4 +236,10 @@ test('Windows handoff reaches the real read-only Operator only for a matching Bo
   const revoked = run('revoked-at-operator');
   assert.equal(revoked.status,2,revoked.stderr+revoked.stdout);
   assert.equal(JSON.parse(revoked.stdout).code,'C996_SNAPSHOT_OPERATOR_REVIEW_FAILED');
+  for(const mode of ['unsealed-import','fixture-at-operator']){
+    const denied=run(mode);
+    assert.equal(denied.status,2,denied.stderr+denied.stdout);
+    assert.equal(JSON.parse(denied.stdout).code,'C996_SNAPSHOT_OPERATOR_REVIEW_FAILED');
+    assert.doesNotMatch(denied.stdout,/UNSEALED_MODULE_EXECUTED|OPERATOR_REVIEW_BOUNDARY_REACHED/);
+  }
 });

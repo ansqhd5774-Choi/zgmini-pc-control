@@ -94,6 +94,28 @@ Online으로 복귀했고, 기존 #1351이 같은 Run/Job으로 실행되어 JSO
   증거는 `artifacts/runner-recovery/recurrence-prevention-review-20261114.json`에 있다.
   코드 후보 테스트·직접 읽기 실행은 운영 설치 또는 #996 C 복구 완료가 아니다.
 
+### #996 후속 구현 및 4파일 분리 (2026-11-14)
+
+- 실제 Backlog 원장은 `resumedAt=2026-11-10T13:21:26.727Z`, `replays={}`이며
+  pause window는 종료돼 있다. 미종료 Backlog라는 후속 조사 문구를 현재 상태로
+  재사용하지 않는다. 원래 원장의 `intakePaused`는 과거 실패 당시 기록이다.
+- 기존 Operator의 **읽기 전용 handoff 모드**는 source-lock의 16개 파일을 검산한
+  뒤 모듈 바이트를 메모리에 보존한다. Node 동기 로더가 그 바이트를 직접 공급하고,
+  목록 밖 import와 합성 승인 반환을 차단한다. 이는 외부 Windows 핸들 고정을
+  대체하거나 Owner 승인·네이티브 이동 안전성을 증명하지 않는다.
+- Windows TEMP 4개 검사 및 Bootstrap 합성 4개 검사 PASS. 기존
+  `C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED`와 네이티브 namespace
+  하드 STOP은 유지한다. C 실행, 원본 보관, 최종 SourceLock/ZIP 봉인은 미실행이다.
+- 설치된 `badad9124157879d7a645b64f2768113d632355b`를 기준으로 별도 브랜치
+  `codex/runner-runtime-fourfile-20261114`에 필요한 변경만 이식했다. 후보 커밋
+  `02d866913aa73802bbca0bd353e9021216532b75`의 Controller/config diff는 정확히
+  4파일이고, 작업 목록·다른 실행 모듈은 동일하다. 해당 후보 검사 20개 PASS.
+- 이 분리 커밋은 아직 승인 PR 병합·main 계보 검증·설치 manifest 검증을 통과한
+  운영 목표 SHA가 아니다. 현행 설치기의 승인 PR merge commit과 target SHA
+  계보 조건도 충족해야 한다. 4파일 분리만으로 설치 가능하다고 판정하지 않는다.
+- 남은 최초 운영 차단은 디렉터리 이동 경계의 신규 파일 삽입 배제다. 핸들을 닫고
+  이동한 후 검산하는 방식으로 이를 PASS 처리하거나 원본 잠금을 해제하지 않는다.
+
 위 STATUS 소스 보완은 Draft 후보이며 2026-11-14 관측 당시 운영 설치에
 반영되지 않았다. 상태 설명 보완을 Runner 복구 성공으로 보고하지 않는다.
 

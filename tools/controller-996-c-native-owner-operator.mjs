@@ -6,7 +6,8 @@
 // boundary. An interruption is STATE_UNKNOWN: no retry, rollback or cleanup.
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {registerHooks,isBuiltin} from 'node:module';
 import {createHash,randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
@@ -431,6 +432,47 @@ function checkSourceBundle(manifest,manifestCommitSha){
   return {operator,packageBytes,lockBytes};
 }
 
+// Review-only import boundary. The independently pinned outer Windows
+// launcher retains source handles. In addition, return the validated bytes
+// directly to Node's synchronous loader instead of reading the paths again.
+// This is NOT Owner consent and never enables the operational C function.
+function pin996ReviewImports(claimed){
+  need(typeof registerHooks==='function'&&H64(claimed?.sourceLockSha256),
+    'C_996_OWNER_PINNED_LOADER_UNAVAILABLE');
+  const lockBytes=safeFile(LOCAL_LOCK,100_000);
+  need(sha(lockBytes)===claimed.sourceLockSha256,'C_996_OWNER_HANDOFF_LOCK_DRIFT');
+  let lock;try{lock=JSON.parse(lockBytes.toString('utf8'));}catch{}
+  need(lock?.schema==='ZGMINI_CONTROLLER_996_NATIVE_OWNER_SOURCE_LOCK_V1'&&
+    lock.files&&Object.keys(lock.files).length===16,
+    'C_996_OWNER_HANDOFF_LOCK_INVALID');
+  const sources=new Map();
+  for(const [relative,expected] of Object.entries(lock.files)){
+    need(/^tools\/controller-996-[a-z0-9-]+\.(mjs|json)$/.test(relative)&&H64(expected),
+      'C_996_OWNER_HANDOFF_IMPORT_PATH_INVALID');
+    const full=path.join(DIR,path.basename(relative));
+    const bytes=safeFile(full,2_000_000);
+    need(sha(bytes)===expected,'C_996_OWNER_HANDOFF_IMPORT_BYTES_DRIFT');
+    if(relative.endsWith('.mjs'))sources.set(pathToFileURL(full).href,bytes.toString('utf8'));
+  }
+  for(const [relative,pin] of [
+    [SELF_REPO,claimed.operatorSha256],
+    ['tools/controller-996-c-native-trusted-bootstrap.mjs',claimed.bootstrapSha256],
+  ])need(H64(pin)&&lock.files[relative]===pin,'C_996_OWNER_HANDOFF_ENTRY_PIN_DRIFT');
+  return registerHooks({
+    resolve(specifier,context,nextResolve){
+      if(specifier.startsWith('node:')&&isBuiltin(specifier))return nextResolve(specifier,context);
+      let url;try{url=new URL(specifier,context.parentURL).href;}catch{}
+      need(sources.has(url),'C_996_OWNER_UNSEALED_IMPORT');
+      return {url,shortCircuit:true};
+    },
+    load(url,context,nextLoad){
+      if(url.startsWith('node:')&&isBuiltin(url))return nextLoad(url,context);
+      need(sources.has(url),'C_996_OWNER_UNSEALED_IMPORT');
+      return {format:'module',source:sources.get(url),shortCircuit:true};
+    },
+  });
+}
+
 function classifierPins(original,continuation,sourceLockSha256,readySha256){
   const oldC={
     'owner.json':original.oldC,
@@ -629,6 +671,10 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
       const input=fs.readFileSync(0,'utf8');
       need(input.length<=16384,'C_996_OWNER_HANDOFF_SIZE');
       const claimed=JSON.parse(input);
+      need(claimed?.fixtureOnly!==true&&claimed?.executionAuthorized===false&&
+        claimed?.operatorStarted===false,'C_996_OWNER_HANDOFF_EVIDENCE_DRIFT');
+      const imports=pin996ReviewImports(claimed);
+      try{
       const {verify996CTrustedBootstrapReadOnly}=await import('./controller-996-c-native-trusted-bootstrap.mjs');
       const verified=verify996CTrustedBootstrapReadOnly({manifestCommitSha});
       const keys=['manifestCommitSha','manifestSha256','ownerConsentCommentId','operatorSha256',
@@ -643,6 +689,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
         code:'C_996_OWNER_PREIMPORT_AND_NATIVE_CAS_NOT_ATTESTED',executionAuthorized:false,
         originalPcWrites:0,manifestCommitSha,manifestSha256:verified.manifestSha256,
         ownerConsentCommentId:verified.ownerConsentCommentId}));
+      }finally{imports.deregister();}
     }catch(e){
       console.log(JSON.stringify({status:'OPERATOR_REVIEW_NO_GO',
         code:/^C_996_OWNER_[A-Z0-9_]+$/.test(e?.code??'')?e.code:'C_996_OWNER_HANDOFF_UNVERIFIED',
