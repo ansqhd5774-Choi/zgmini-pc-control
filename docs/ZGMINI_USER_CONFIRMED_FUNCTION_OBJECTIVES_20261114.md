@@ -62,7 +62,7 @@
 - **전용 브랜치:** `codex/api-site-integration-r1-20261026`, 조회 HEAD `ec14386eacc3e56039301a7e32c3313628391571`.
 - **현재 5개 검사:** ① 물가 19 `/api/inflation-causal-inputs`, ② 신규 물가 7 `/api/inflation-candidate-inputs`, ③ 시장 `/api/release-calendar`, ④ 테마 `/api/theme-fear-greed`, ⑤ 고용 `/api/employment-r6/observations`. 기존 승인 D1 정확키·sourceVersion/sourceStoredAt/stored_at·body SHA 및 Reader 변환 후 실제 공개 JSON을 비교한다. body SHA와 변환 JSON SHA 단순 동일성 강제 금지.
 - **현재 75% = 4단계 3개 완료:** API/Reader 계약, 과거 Production HTTP/JSON, 기존 비교기 테스트 **11/11 PASS**. **남은 4단계 = 동시점 D1 5개 실제 row의 저장시각·SHA와 Production API·exact Deployment SHA 대조**. 전체 5키 현재 실증 0/5.
-- **오래된 원목표 별도 보존:** `/earnings-recession/`에서 승인 E1-R4 기존 위험 점수 4요소를 유지하면서 권리 확인된 정보성 기업 실적 지표를 **개수 제한 없이 추가하는 R1~R6 계획**은 **미완료/별도 범위**. 현재 다기능 동치 검증 75%로 원목표 완료 선언 금지. 이 분리는 **원목표 폐기를 승인한 것이 아님**.
+- **오래된 원목표 별도 보존:** `/earnings-recession/`에서 승인 E1-R4 기존 위험 점수 4요소를 유지하면서 권리 확인된 정보성 기업 실적 지표를 **개수 제한 없이 추가하는 R1~R6 계획**은 **별도 범위/현행 완료 여부 미판정**. 현재 다기능 동치 검증 75%로 원목표 완료 선언 금지. 이 분리는 **원목표 폐기를 승인한 것이 아님**.
 - **다음 의존:** 기존 승인된 D1/Cloudflare 읽기 소유자가 5키 비민감 읽기 영수증·출처시각·대응 API·exact Production Deployment 인계. W05는 불일치가 확정되었을 때만 범위 좁은 실제 수정을 담당하며 무승인 D1/Cloudflare 쓰기를 수행하지 않음.
 - **근거:** [2026-11-14 현행 계획](https://github.com/ansqhd5774-Choi/zgmini/blob/codex/api-site-integration-r1-20261026/docs/API_SITE_R1_ACTIVE_WORK_PLAN_20261114.md), [기존 실적 침체 R1~R6](https://github.com/ansqhd5774-Choi/zgmini/blob/codex/api-site-integration-r1-20261026/docs/EARNINGS_RECESSION_COMPANION_API_SITE_INTEGRATION_PLAN_R1_20261026.md).
 
