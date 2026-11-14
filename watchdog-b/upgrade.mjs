@@ -80,6 +80,13 @@ export function requireCurrentProtection({historical,current}){
    ||!(/^[a-f0-9]{64}$/.test(
       current['E:/ZGmini/automation/pc-control/host.json']??'')))
    throw error('WATCHDOG_B_PROTECTED_SHAPE_OR_IRAN_INVALID');
+ // Core and Korea Task XML must remain byte-for-byte identical to their
+ // immutable first-install protection digests. Only the previously approved
+ // Writer/Controller/Iran transitions may differ from the historical record.
+ for(const task of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']){
+  if(!Object.hasOwn(historical,task)||historical[task]!==current[task])
+   throw error('WATCHDOG_B_CORE_KOREA_TASK_DRIFT');
+ }
  for(const [key,value] of Object.entries(current)){
   if(key==='ZGMINI-PC-Iran-Progress-R13')continue;
   if(!/^[a-f0-9]{64}$/.test(String(value??'')))
