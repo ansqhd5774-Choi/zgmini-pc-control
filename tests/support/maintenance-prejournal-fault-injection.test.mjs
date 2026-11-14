@@ -11,7 +11,7 @@ function isolatedFixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-support-prejournal-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   fs.mkdirSync(path.join(root,'runtime'),{recursive:true});
-  for(let i=0;i<7;i++)fs.writeFileSync(path.join(root,'runtime',\`file-\${i}.mjs\`),\`baseline-\${i}\n\`);
+  for(let i=0;i<7;i++)fs.writeFileSync(path.join(root,'runtime',`file-${i}.mjs`),`baseline-${i}\n`);
   fs.writeFileSync(path.join(root,'MAINTENANCE_INSTALL.json'),'{\"sourceSha\":\"baseline\"}\n');
   fs.writeFileSync(path.join(root,'Startup.vbs'),'startup baseline\n');
   return root;
@@ -29,8 +29,8 @@ function modelPreJournal(root, failAt) {
   if(failAt==='mkdir')throw Object.assign(Error('SIMULATED_BACKUP_MKDIR_EACCES'),{state});
   fs.mkdirSync(backup,{recursive:true});
   for(let i=0;i<7;i++) {
-    const source=path.join(root,'runtime',\`file-\${i}.mjs\`);
-    const dest=path.join(backup,\`file-\${i}.mjs\`);
+    const source=path.join(root,'runtime',`file-${i}.mjs`);
+    const dest=path.join(backup,`file-${i}.mjs`);
     if(failAt==='snapshot'&&i===3)throw Object.assign(Error('SIMULATED_SNAPSHOT_ENOSPC'),{state});
     fs.copyFileSync(source,dest,fs.constants.COPYFILE_EXCL);
   }
@@ -41,7 +41,7 @@ function modelPreJournal(root, failAt) {
   return state;
 }
 for(const failAt of ['timeout','mkdir','snapshot','startup','journal']){
-  test(\`fixture \${failAt}: post-stop failure boundary does not provide durable journal\`,t=>{
+  test(`fixture ${failAt}: post-stop failure boundary does not provide durable journal`,t=>{
     const root=isolatedFixture(t);
     let error;
     try{modelPreJournal(root,failAt);}catch(e){error=e;}
