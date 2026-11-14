@@ -54,6 +54,23 @@ Function AgeSeconds(value)
  AgeSeconds=DateDiff("s",timeValue,Now())
  If Err.Number<>0 Then AgeSeconds=-1
 End Function
+' WMI command-line quoting differs by Windows launcher. Accept only exact
+' Node executable and exactly one exact Watchdog script argument, with or
+' without surrounding quotes and arbitrary inter-token spaces. No flags.
+Function ExactWatchdogArgs(binary,script,raw)
+ Dim line,first,tail
+ line=LCase(Trim(Replace(CStr(raw),vbTab," ")))
+ first=Chr(34) & LCase(binary) & Chr(34)
+ If Left(line,Len(first))=first Then
+  tail=Trim(Mid(line,Len(first)+1))
+ ElseIf Left(line,Len(LCase(binary)))=LCase(binary) Then
+  tail=Trim(Mid(line,Len(binary)+1))
+ Else
+  ExactWatchdogArgs=False
+  Exit Function
+ End If
+ ExactWatchdogArgs=(tail=(Chr(34) & LCase(script) & Chr(34)) Or tail=LCase(script))
+End Function
 If WScript.Arguments.Count<>2 Then Deny
 If UCase(CStr(WScript.Arguments(0)))<>"PROBE" And UCase(CStr(WScript.Arguments(0)))<>"ACTIVATE" And UCase(CStr(WScript.Arguments(0)))<>"ATTEST" Then Deny
 If Not PidOk(WScript.Arguments(1)) Then Deny
@@ -69,7 +86,7 @@ nodePath="e:\zgmini\runtime\node.exe"
 scriptPath="e:\zgmini\automation\pc-watchdog\runner-watchdog.mjs"
 cmdExpected=Chr(34) & nodePath & Chr(34) & " " & Chr(34) & scriptPath & Chr(34)
 If LCase(Replace(CStr(watch.ExecutablePath),"/","\"))<>nodePath Then Deny
-If LCase(Trim(CStr(watch.CommandLine)))<>cmdExpected Then Deny
+If Not ExactWatchdogArgs(nodePath,scriptPath,watch.CommandLine) Then Deny
 watchBorn=Created(watch)
 watchSid=OwnerSid(watch)
 If watchBorn="" Or watchSid="" Then Deny
