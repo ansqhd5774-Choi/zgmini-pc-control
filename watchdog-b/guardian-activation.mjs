@@ -10,7 +10,8 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {protection} from '../tools/install-runner-watchdog.mjs';
 import {requireCurrentProtection,verifyApprovedControllerHost} from './upgrade.mjs';
-import {TARGET,REPLACEMENT,FINAL_SCOPE,APPROVED_CONTROLLER_SHA} from './contract.mjs';
+import {NEXT_TARGET as TARGET,NEXT_SOURCE_SHA as REPLACEMENT,
+ FINAL_SCOPE,APPROVED_CONTROLLER_SHA} from './contract.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const home='E:/ZGmini/automation/pc-watchdog';
@@ -20,10 +21,10 @@ const rep='ansqhd5774-Choi/zgmini-pc-control';
 const name='pc-watchdog-guardian-activate';
 const schema='ZGMINI_PC_WATCHDOG_ACTIVATION_B_REQUEST_V1';
 const idRe=/^pc-watchdog-activate-[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-const APPROVED_REQUEST_ID='pc-watchdog-activate-7e6ef57f-620b-498a-998f-05c9e953b4a2';
-const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'-r2.json');
+const APPROVED_REQUEST_ID='pc-watchdog-activate-31390a2f-c503-4ff1-9858-a960bbc07a0d';
+const approvalFile=path.join(root,'approvals/watchdog-activations',TARGET+'-r3.json');
 const helper=path.join(root,'watchdog-b/guardian-rotate.vbs');
-const stageRequestId='pc-watchdog-b-a8063bdf-2bd7-4690-9c75-9726a00e6fe1';
+const stageRequestId='pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b';
 const digest=b=>createHash('sha256').update(b).digest('hex');
 const fail=c=>{throw Object.assign(new Error(c),{code:c});};
 const load=p=>JSON.parse(fs.readFileSync(p,'utf8'));
@@ -55,14 +56,14 @@ export function validateActivation(event,body,approval,rawApprovalDigest,helperD
  if(!exact(approval,['schema','approved','scope','targetSha','installedSha256',
   'installedScope','guardianHelperSha256','activationScriptSha256','stageRequestId','oldStageIssueNumber',
   'expectedControllerSha','effect','approvalBasis'])
-  ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V2'
+  ||approval.schema!=='ZGMINI_PC_WATCHDOG_ACTIVATION_B_MANIFEST_V3'
   ||approval.approved!==true
   ||approval.scope!=='ONE_GUARDIAN_WATCHDOG_PROCESS_ACTIVATION_ONLY'
   ||approval.targetSha!==TARGET||approval.installedSha256!==REPLACEMENT
   ||approval.installedScope!==FINAL_SCOPE
   ||approval.guardianHelperSha256!==helperDigest
   ||approval.activationScriptSha256!==digest(fs.readFileSync(fileURLToPath(import.meta.url)))
-  ||approval.stageRequestId!==stageRequestId||approval.oldStageIssueNumber!==1376
+  ||approval.stageRequestId!==stageRequestId||approval.oldStageIssueNumber!==1393
   ||approval.expectedControllerSha!==APPROVED_CONTROLLER_SHA
   ||approval.effect!=='ONE_EXACT_WATCHDOG_PROCESS_EXIT_GUARDIAN_RESTART')
   fail('WATCHDOG_ACTIVATION_APPROVAL_INVALID');
@@ -80,7 +81,7 @@ export function statusReady({owner,status,now=Date.now(),source,manifest,stage})
   ||manifest.scope!==FINAL_SCOPE||manifest.approvedTargetSourceSha!==TARGET)
   fail('WATCHDOG_ACTIVATION_STAGED_SHA_MISMATCH');
  if(stage?.schema!=='ZGMINI_PC_WATCHDOG_B_RESULT_V1'
-  ||stage.requestId!==stageRequestId||stage.issueNumber!==1376
+  ||stage.requestId!==stageRequestId||stage.issueNumber!==1393
   ||stage.targetSha!==TARGET||stage.targetSourceSha256!==REPLACEMENT
   ||stage.status!=='STAGED'||stage.writes!==2)
   fail('WATCHDOG_ACTIVATION_PRIOR_STAGE_INVALID');
