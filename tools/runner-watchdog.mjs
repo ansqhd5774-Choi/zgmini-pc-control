@@ -75,10 +75,9 @@ export function validateHandoffIntent(issue,body,approval,installed,rawDigest){
    code('HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH');
  return Object.freeze({requestId:body.requestId,targetSha:body.targetSha});
 }
-function gh(args){
- return execFileSync(ghPath,args,{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1000000});
+function ghRead(args){
+ return execFileSync(gh,args,{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:1000000});
 }
-const ghPath=gh;
 function git(args){
  return execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:200000});
 }
@@ -110,7 +109,7 @@ function prepareHandoff(issue){
 function postHandoffReceipt(issueNumber,receipt){
  const marker='zgmini-handoff-once:'+receipt.requestId;
  // A lost acknowledgement is reconciled before posting; never re-execute.
- const prior=JSON.parse(gh(['issue','view',String(issueNumber),'--repo',repo,'--json','comments']));
+ const prior=JSON.parse(ghRead(['issue','view',String(issueNumber),'--repo',repo,'--json','comments']));
  if(prior.comments?.some(c=>String(c.body??'').includes(marker)))return;
  const body=['<!-- '+marker+' -->',
    'ZGMINI independent Windows handoff result',
@@ -118,7 +117,7 @@ function postHandoffReceipt(issueNumber,receipt){
    'targetSha='+receipt.targetSha,
    'status='+receipt.status,
    'code='+safeCode(receipt.code)].join('\n');
- gh(['issue','comment',String(issueNumber),'--repo',repo,'--body',body]);
+ ghRead(['issue','comment',String(issueNumber),'--repo',repo,'--body',body]);
 }
 export async function main(){
  const installed=read(path.join(home,'INSTALL.json'));
@@ -182,7 +181,7 @@ export async function main(){
    // Paused/active Controller transitions are never used as a handoff window.
    if(fs.existsSync(path.join(home,'PAUSE'))||fs.existsSync(path.join(control,'DRAIN'))
      ||fs.existsSync(path.join(maintenance,'leases/controller-install')))return;
-   const listed=JSON.parse(gh(['issue','list','--repo',repo,'--label','pc-maintenance',
+   const listed=JSON.parse(ghRead(['issue','list','--repo',repo,'--label','pc-maintenance',
      '--state','open','--limit','1000','--json','number,title']));
    if(!Array.isArray(listed))code('HANDOFF_ISSUE_LIST_INVALID');
    const intents=listed.filter(q=>q?.title===handoffTitle);
@@ -190,7 +189,7 @@ export async function main(){
    if(intents.length!==1||!Number.isSafeInteger(intents[0].number))
      code('HANDOFF_MULTIPLE_OR_INVALID_INTENTS');
    issueNumber=intents[0].number;
-   const issue=JSON.parse(gh(['issue','view',String(issueNumber),'--repo',repo,
+   const issue=JSON.parse(ghRead(['issue','view',String(issueNumber),'--repo',repo,
      '--json','number,title,state,author,labels,body']));
    const plan=prepareHandoff(issue);
    const dir=path.join(home,'handoff-attempts');fs.mkdirSync(dir,{recursive:true});
@@ -200,7 +199,15 @@ export async function main(){
     // Recovery may deliver an existing result but never repeat installation.
     if(receipt.issueNumber!==issueNumber||receipt.targetSha!==plan.admitted.targetSha)
       code('HANDOFF_LEDGER_REQUEST_DRIFT');
-    if(receipt.status==='RUNNING')return;
+    if(receipt.status==='RUNNING'){
+     // After this watchdog process restarted, the old child may still be
+     // running. Never retry or assert failure; preserve and report unknown.
+     const unknown={...receipt,status:'STATE_UNKNOWN',
+       code:'HANDOFF_INTERRUPTED_RECONCILE',at:new Date().toISOString()};
+     write(receiptFile,unknown);
+     postHandoffReceipt(issueNumber,unknown);
+     return;
+    }
     if(receipt.status&&receipt.code)postHandoffReceipt(issueNumber,receipt);
     return;
    }
