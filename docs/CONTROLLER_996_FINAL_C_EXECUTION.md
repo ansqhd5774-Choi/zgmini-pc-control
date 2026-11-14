@@ -1,15 +1,15 @@
 # #996 단회 C 복구 봉인본
 
-현재 상태: **OWNER_CONSENT_MISSING / 운영 미실행**.
+현재 상태: **수정 봉인본 Owner 승인 대기 / 운영 복구 미완료**.
 명세의 `approved: true`는 스키마 필드이며 그 자체가 실제 Owner 승인 증거가 아니다.
 
 ## 고정 실행물
 
-- S1 source: `32f5e518ada323f2744d5d0854b7e5cafc736864`
-- S2 manifest/package commit: `7516a8e8138707ef639cecfe81bb183495851c64`
-- manifest SHA-256: `4a1e4ac62708d4e463d0df98bf1480f155ecc765798da5d4ee1ece86b3e8a030`
-- SourceLock SHA-256: `28958530cccea9c220e309b6256f2152fc34c7a2c03660d71f0b2c74db24f847`
-- ZIP SHA-256: `239c84e3ba91febf16f6030c517f988cfcb8416981240b6da6dd11f8277765d5`
+- S1 source: `e1731720ebea0921c51e7cc2470e0b15312271cc`
+- S2 manifest/package commit: `94cb242c6603ce02ae9826ce62a8ae81ef20c0c0`
+- manifest SHA-256: `90cb0e789437da8417cf068bbaa1defdd2b2a61e3220d38581f0a5441009b2be`
+- SourceLock SHA-256: `0805ceadc928333bad3f3c993008c7793226cea277ba26c057078c6b9d194739`
+- ZIP SHA-256: `55144dc25f5fbad757f07966af5015f09e485d702611fcdf032fab207dcd047d`
 
 ZIP은 새 S1에서 다시 생성했다. 독립 두 번 생성한 ZIP/SourceLock이 같으며,
 압축 해제한 21개 항목의 원본 해시와 S2 원격 3파일의 원문 바이트를 대조했다.
@@ -35,6 +35,19 @@ ZIP은 새 S1에서 다시 생성했다. 독립 두 번 생성한 ZIP/SourceLock
 이미 닫힌 Backlog를 다시 닫거나 Workflow를 다시 활성화하지 않는다.
 
 ## 검증과 승인 등록
+
+직전 S2 `7516a8e…`는 실제 Owner 댓글 `6880843117` 확인 후 한 번 호출했으나
+`BLOCKED_BEFORE_C_WRITE / C_996_OWNER_STATE_UNKNOWN / NO_WRITE`로 중단됐다.
+읽기 전용 재현에서 원인은 `C_996_ORIGINAL_JOBS_STATUS_OR_ORIGIN_DRIFT`였다.
+이전 구현이 #1217 댓글 0개·#1227 댓글 1개를 고정했으나, 실제로는 정상 인수인계
+댓글이 각각 2개였다. 원본 요청의 identity/source 검사는 유지하면서 댓글의 전체
+목록·ID·본문 hash를 두 번 관측하도록 수정했다. 댓글을 실행 승인·완료 증거로
+사용하지 않으며 원본 요청 재실행은 0건이다. 이후 오류 코드도 숨기지 않는다.
+
+수정 관련 검사 20건 PASS. 새 ZIP의 실제 읽기 전용 검사에서 전체 Git/로컬 source,
+4개 원본 Issue, 원본 PC prewrite를 모두 확인했다. 원본 10개 pin과 84개 source는
+직전 관측과 같고, Claim·Install Lease·Workflow·Backlog는 변경되지 않았다.
+수정본에는 새 continuation ID를 사용하며 직전 실행물은 재사용하지 않는다.
 
 변경 후 Windows 네이티브/경합/순서/실행 경계 시험 24건 PASS, Windows 외부 source
 snapshot/handoff 4건 PASS, 별도 Operator 계약 4건 PASS. 기존 Bootstrap/Owner
