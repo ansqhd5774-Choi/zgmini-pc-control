@@ -23,16 +23,21 @@ export const SOURCE_FILES=Object.freeze([
 ]);
 // V2 deliberately allows unrelated approved checkout HEAD changes, but not
 // changes to the effective execution closure. These four SHA-256 bytes were
-// verified on the real PC (#1434/#1435, 2026-11-15), and the pinned collector
-// only imports node:crypto + xlsx-lite; the store imports Node builtins + the
-// pinned collector; xlsx-lite has no nonbuiltin imports. local-cycle is pinned
+// verified on the real PC (#1434/#1435, 2026-11-15) EXCEPT the XLSX
+// parser: V2 requires the explicitly corrected attribute-order parser from
+// W01 PR #1089 (blob 62e028e..., SHA-256 d80c6a...), NOT the old installed
+// XLSX parser (44d4c2...). Until a separately approved source installation
+// puts that exact corrected parser on PC, V2 fails before GET or any write.
+// The pinned collector imports node:crypto + xlsx-lite; the store imports
+// Node builtins + the pinned collector; xlsx-lite has no nonbuiltin imports.
+// local-cycle is pinned
 // separately to preserve the shared Core lock contract. Changing any module
 // or introducing a new import requires a separately reviewed source policy,
 // never an editable manifest hash alone.
 export const V2_EXECUTABLE_SHA256=Object.freeze([
  '53c01bbc129e1c4c5ff129d37fae8e0ff801c30bfe50a6ad0ab1227d394a5ed6',
  '3ef346bd5e240cdcdbd741a0f62b665bba42bf33556e37a6efa359f07de834ec',
- '44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a',
+ 'd80c6a705d4d15be0b1381a04e0b26b50053eb4f87d37b5da64ccb340841e4b0',
  '2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d',
 ]);
 export const URLS=Object.freeze({
