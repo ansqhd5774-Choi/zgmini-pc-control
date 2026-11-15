@@ -8,11 +8,12 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {
- CONTROL_REPO,DATA_ROOT,MAX_BYTES,OPERATION,SOURCE_FILES,SOURCE_ROOT,
+ APPROVAL_SCHEMA_V2,CONTROL_REPO,DATA_ROOT,MAX_BYTES,OPERATION,SOURCE_FILES,SOURCE_ROOT,
  TARGETS,URLS,authorizeManualReceiver,sha256,verifyIssueEvent,
  verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {performOfficialManualB} from './coordinator.mjs';
+import {verifyCoreTaskEvent129} from './core-task-event-owner-proof.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
  from '../r17-writer-b/r17-b-claim.mjs';
 import {coreReadyForMaintenance,coreMaintenanceWindowBlockCode}
@@ -23,6 +24,10 @@ import {awaitNaturalCoreIdle,MAX_POST_PREPARE_IDLE_WAIT_MS}
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const PROBE=path.join(ROOT,'..','r17-writer-b','r17-b-windows-probe.js');
 const CORE_OWNER_PROBE=path.join(ROOT,'core-lock-owner-probe.js');
+// The alternate proof is read-only and never enables the Windows Event Log.
+// An absent/denied/disabled TaskScheduler Operational channel is a hard STOP.
+const EVENT_TOOL=path.join(process.env.SystemRoot??String.raw`C:\Windows`,
+ 'System32','wevtutil.exe');
 const SHARED_LOCK=String.raw`E:\ZGmini\data\pc-writer\writer-source-install.lock`;
 const CORE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
 const JOURNAL_ROOT=String.raw`E:\ZGmini\data\pc-writer\inflation-manual-b-once`;
@@ -102,9 +107,23 @@ function taskProbe(){
 }
 
 // An idle snapshot alone does not establish which physical file Core locks.
+function readCoreTask129Events(){
+ need(fs.existsSync(EVENT_TOOL),'INFL_MANUAL_B_EVENT129_READER_UNAVAILABLE');
+ const result=spawnSync(EVENT_TOOL,[
+  'qe','Microsoft-Windows-TaskScheduler/Operational',
+  '/q:*[System[(EventID=129)]]','/rd:true','/c:64','/f:xml',
+ ],{shell:false,windowsHide:true,encoding:'utf8',
+  maxBuffer:300_000,timeout:15_000});
+ need(!result.error&&result.status===0&&
+  typeof result.stdout==='string'&&result.stdout.length<300_000,
+  'INFL_MANUAL_B_EVENT129_READER_UNAVAILABLE');
+ return result.stdout;
+}
 // Require a naturally active Task-linked Core Node PID to own the E: lock at
 // least once in THIS bounded B run. No Task start, disable, or forced cycle.
-async function observeLiveCoreLockOwner(){
+// V2 may use the TaskScheduler event-129 process-launch record to prove the
+// same PID even when GetInstances(0) hides an elevated task from this Runner.
+async function observeLiveCoreLockOwner(approvalSchema){
  const deadline=Date.now()+CORE_OWNER_OBSERVATION_MS;
  let sawTaskInstance=false,sawRelatedCore=false,sawCoreLock=false;
  while(Date.now()<deadline){
@@ -138,8 +157,23 @@ async function observeLiveCoreLockOwner(){
    try{ownerProof=JSON.parse(execute('cscript',
     ['//NoLogo','//E:JScript',CORE_OWNER_PROBE,String(lock.pid)]));}
    catch{fail('INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');}
-   need(ownerProof?.ok===true&&ownerProof.linked===true,
-    'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+   need(ownerProof?.ok===true,
+    'INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');
+   if(ownerProof.linked!==true){
+    // V1 always retains its original EnginePID ancestry protection.
+    need(approvalSchema===APPROVAL_SCHEMA_V2,
+     'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+    // No guessed ownership: event PID, immutable task name, approved Node
+    // executable, process creation instant and current lock PID must concur.
+    const event=verifyCoreTaskEvent129({
+     xml:readCoreTask129Events(),lockPid:lock.pid,lockAt:lock.at,
+     taskRunning:ownerProof.taskRunning,
+     ownerCoreMatched:ownerProof.ownerCoreMatched,
+     ownerCreatedAtMs:ownerProof.ownerCreatedAtMs,
+    });
+    need(event.ok===true,
+     'INFL_MANUAL_B_CORE_OWNER_EVENT129_UNVERIFIED_STOP');
+   }
    // A vanished or replaced lock is not proof of the observed owner.
    need(fs.existsSync(CORE_LOCK)&&
     fs.readFileSync(CORE_LOCK,'utf8')===lockBytes,
@@ -235,7 +269,9 @@ export function makeWindowsManualAdapter(auth){
    }
   },
   async readSourcePreimage(){return sourcePreimage(auth);},
-  async proveActiveCoreLock(){await observeLiveCoreLockOwner();},
+  async proveActiveCoreLock(){
+   await observeLiveCoreLockOwner(auth.manifest.schema);
+  },
   async fetchExactSources(){
    source??=await import(pathToFileURL(sourceFile(SOURCE_MJS)).href);
    return officialBytes(source);
