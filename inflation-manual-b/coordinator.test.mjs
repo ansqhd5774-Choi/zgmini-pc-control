@@ -167,9 +167,19 @@ function authV2(){
   approvalManifestSha256:sha256(f.bytes)});
  return authorizeManualReceiver({event:f.event,env:f.env,manifestBytes:f.bytes});
 }
-function preimageV2(a,sourceHead='c'.repeat(40)){
+// Exact clean PC config/Writer checkout observed in A #1432/#1434/#1435.
+function preimageV2(a,sourceHead='20ffdb53622393c5f957299f6713fe1149920964'){
  return {...preimage(a),sourceHead,configSource:sourceHead,sourceClean:true};
 }
+test('old V1 correctly rejects the actual approved-PC HEAD drift',async()=>{
+ const a=auth(),{io,calls}=adapter(a);
+ io.readSourcePreimage=()=>preimageV2(a);
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
+ assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
+ assert(!calls.includes('download')&&!calls.includes('store'));
+});
+
 test('V2 permits unrelated clean checkout HEAD drift only with four pinned files',async()=>{
  const a=authV2(),{io,calls}=adapter(a);
  io.readSourcePreimage=()=>preimageV2(a);
