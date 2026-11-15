@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "d8f280644649a2a7830d6a09a7217f0f5df92760",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "a58ff9e7383319a91f0ce321f07a2beadda554921b79b8a066eca80e9917200f",
+  "insertions": [
+    {
+      "anchor": "import {appendD1Diagnostic} from './d1-diagnostics.mjs';",
+      "position": "after",
+      "text": "import {r44D1Readback} from './market-calendar-r44-d1-readback.mjs';\n"
+    },
+    {
+      "anchor": "  const er1FeedReadbacks=[];",
+      "position": "after",
+      "text": "  const r44FeedReadbacks=[];\n  const recordR44Readback=(row,d1Row)=>{\n   const evidence=r44D1Readback(row,d1Row);\n   if(evidence)r44FeedReadbacks.push(evidence);\n  };\n"
+    },
+    {
+      "anchor": "    assertER1ReadbackConsistent(recordER1Readback(row,existing));return;",
+      "position": "before",
+      "text": "    recordR44Readback(row,existing);\n"
+    },
+    {
+      "anchor": "    recordER1Readback(row,existing);return;",
+      "position": "before",
+      "text": "    recordR44Readback(row,existing);\n"
+    },
+    {
+      "anchor": "   recordER1Readback(row,check);",
+      "position": "after",
+      "text": "   recordR44Readback(row,check);\n"
+    },
+    {
+      "anchor": "  // Independent, bounded publication lane for PC-archived real CNN scores.",
+      "position": "before",
+      "text": "  report.deltaR44D1=r44FeedReadbacks[0]??{status:'R44_OUTPUT_NOT_SEEN'};\n"
+    }
+  ]
+}
