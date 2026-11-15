@@ -53,6 +53,23 @@ export function inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem=fs}={}){
  const reportedInput=collection.state==='READY'&&
   ['READY_PRIVATE','CACHED_PRIVATE'].includes(inputStatus)&&
   count(input.rowCount)===4894&&count(input.usableTickerCount)!==null;
+ const published=w.deltaR44D1??{};
+ const publishedStatus=value(published.status,new Set(['MATCHED','D1_ROW_MISSING',
+  'REMOTE_NEWER_PRESERVED','NOT_MATCHED','R44_OUTPUT_NOT_SEEN']));
+ const sha64=val=>typeof val==='string'&&/^[a-f0-9]{64}$/.test(val)?val:null;
+ const localStoredAt=Number.isSafeInteger(published.localStoredAt)&&published.localStoredAt>0?
+  published.localStoredAt:null;
+ const d1StoredAt=Number.isSafeInteger(published.d1StoredAt)&&published.d1StoredAt>0?
+  published.d1StoredAt:null;
+ const localSha=sha64(published.localBodySha256),remoteSha=sha64(published.d1BodySha256);
+ const writerMode=w.mode==='PUBLISH'?'PUBLISH':w.mode==='DRY_RUN'?'DRY_RUN':null;
+ const writerStatus=status(w.status);
+ const exactReadback=reportedLocalReadback&&writerMode==='PUBLISH'&&
+  ['VERIFIED','VERIFIED_WITH_GAPS'].includes(writerStatus)&&
+  published.key===FEED_KEY&&publishedStatus==='MATCHED'&&
+  localStoredAt!==null&&localStoredAt===d1StoredAt&&
+  localSha!==null&&localSha===remoteSha&&
+  !failures.some(x=>x?.id==='feed:'+FEED_KEY);
  const bothRead=collection.state==='READY'&&writer.state==='READY';
  return {
   status:bothRead?'PASS':'STATE_UNKNOWN',
@@ -66,8 +83,8 @@ export function inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem=fs}={}){
    sourceAsOf:input.asOf==='2026-11-03'?'2026-11-03':null},
   writer:{checkpointState:writer.state,at:writerAt,
    source:SHA40.test(w.source??'')?w.source:null,
-   mode:w.mode==='PUBLISH'?'PUBLISH':w.mode==='DRY_RUN'?'DRY_RUN':null,
-   status:status(w.status),deltaStatus:outputStatus,
+   mode:writerMode,
+   status:writerStatus,deltaStatus:outputStatus,
    calendarTickerCount:calendarTickers,coveredTickerCount:coveredTickers,
    counts:consistent?Object.fromEntries(keys.map(key=>[key,gradeCounts[key]])):null,
    reportedLocalReadback,
@@ -76,7 +93,12 @@ export function inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem=fs}={}){
   lastWriterStartedAfterLastCollectionStart:collectionAt&&writerAt?
    Date.parse(writerAt)>=Date.parse(collectionAt):null,
   independentRawShaReadback:false,independentSqliteOutputReadback:false,
-  d1PerKeyReadback:'NOT_RECORDED',productionApiUiVerified:false,
+  d1PerKeyReadback:exactReadback?'VERIFIED_AT_WRITER_PUBLISH_TIME':
+   publishedStatus??'NOT_RECORDED',
+  d1Readback:{status:publishedStatus,localStoredAt,d1StoredAt,
+   localBodySha256:localSha,d1BodySha256:remoteSha,
+   exactMatchAtWriterTime:exactReadback,verificationScope:'AT_WRITER_PUBLISH_TIME'},
+  productionApiUiVerified:false,
   providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false
  };
 }
