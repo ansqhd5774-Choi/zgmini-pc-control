@@ -1,0 +1,118 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "adaf71f6d462fb54ad516fccbf509f89e94a64f4",
+  "baseHead": "20ffdb53622393c5f957299f6713fe1149920964",
+  "baseConfigSourceSha": "20ffdb53622393c5f957299f6713fe1149920964",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-calendar-deltascreener-public.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "2bc62faa6908c6eeb554354d14bc97a00a71aadbc3658fc231785a638a0627d0"
+    },
+    {
+      "path": "lib/market-calendar-deltascreener-snapshot.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "6f1ab00d8d056f765375aa1582a9c0fff7b441f5b9a92b9fd5fafc02d77e901d"
+    },
+    {
+      "path": "lib/market-calendar-r44-marketcap.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "7fbd226f0e50e3f855ff4f6164e6b384a06ca4ced3d81dcc77c416b66c3bec3c"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "3257e485ac2fc536316306291168559fbbceabadeca6da7381d73acb6a5a3d1a",
+      "afterSha256": "93888fa594ef28dc44b81f144bbd5bc962d89152c1374b0efd467b44f83349db",
+      "candidateSha256": "291fa2d3799b7026fa722cde5a2dc733ed4f81ca0d23407a8bb1fe61e2dea456",
+      "insertions": [
+        {
+          "anchor": "import {collectReleaseCalendar} from './release-calendar.mjs';",
+          "position": "after",
+          "text": "import {collectPinnedDeltaOnce} from './market-calendar-deltascreener-input.mjs';\nimport {publicFeedStore} from '../../worker/public-feed-store.mjs';\n"
+        },
+        {
+          "anchor": "  let result,releaseCalendar={status:'SKIPPED_KOREA_LANE',providerRequests:0},sectorFearGreedEtf={status:'SKIPPED_KOREA_LANE',providerRequests:0};",
+          "position": "after",
+          "text": "  let deltaScreener={status:'SKIPPED_KOREA_LANE',providerRequests:0};\n"
+        },
+        {
+          "anchor": "   try{releaseCalendar=await collectReleaseCalendar(core,{fetchImpl:globalThis.fetch});}catch{releaseCalendar={status:'FAILED_PRESERVE_EXISTING',providerRequests:0};}",
+          "position": "after",
+          "text": "   // Immutable one-shot dated source is isolated from live Core collection.\n   try{deltaScreener=await collectPinnedDeltaOnce({store:publicFeedStore(core),fetchImpl:globalThis.fetch,now:Date.now()});}\n   catch{deltaScreener={status:'FAILED_PREVIOUS_INPUT_PRESERVED',providerRequests:0};}\n"
+        },
+        {
+          "anchor": "  report.releaseCalendar=releaseCalendar;",
+          "position": "after",
+          "text": "  report.deltaScreener=deltaScreener;\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/market-calendar-deltascreener-input.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "2d5fd0e27b60f5bec308495462b1cd1b65ffb1402421c87aa66d9484d1b8612f"
+    },
+    {
+      "path": "scripts/pc-writer/market-calendar-deltascreener-output.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "762a074eb6301ce1325334a414f33662799703772ba9806b10c9f4f701f88411"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "fdc641e3c6585a1e9690b0cc4a9cbe10d8bbb025154bfc40523b7c05b56e80ed",
+      "afterSha256": "a58ff9e7383319a91f0ce321f07a2beadda554921b79b8a066eca80e9917200f",
+      "candidateSha256": "6b9ec04304db8feb0d7ee1d89a661341ab675f442a6d364ff8ff8f3a029af5e1",
+      "insertions": [
+        {
+          "anchor": " await attemptOutput(report,'market-calendar-er1-future',async()=>{",
+          "position": "before",
+          "text": " // R44 market-cap from pinned private CSV, independently of ER1 score.\n await attemptOutput(report,'market-calendar-r44-delta',async()=>{\n  const {publicFeedStore}=await import('../../worker/public-feed-store.mjs');\n  const {refreshSavedDeltaR44Output}=await import('./market-calendar-deltascreener-output.mjs');\n  report.deltaR44=await refreshSavedDeltaR44Output({store:publicFeedStore(core),now,pcHome:base});\n });\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-wsh-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "core-wsh-inner-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
