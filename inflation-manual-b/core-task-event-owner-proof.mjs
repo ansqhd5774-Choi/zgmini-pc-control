@@ -12,14 +12,11 @@ const EVENT=/\<Event(?:\s[^>]*)?\>[\s\S]*?\<\/Event\>/g;
 const date=x=>typeof x==='string'&&
  /^20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(x)&&
  Number.isFinite(Date.parse(x))?Date.parse(x):null;
-const attr=(s,key)=>{
- const escaped=key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- return new RegExp('\\\\b'+escaped+'="([^"]{1,200})"').exec(s)?.[1]??null;
-};
-const value=(s,key)=>{
- const escaped=key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- return new RegExp('<Data\\\\s+Name="'+escaped+'">([^<]{1,320})<\\\\/Data>').exec(s)?.[1]??null;
-};
+// Only the three fixed documented Event 129 fields are used. No dynamic
+// regex construction, external XPath, event text or untrusted XML commands.
+const taskName=xml=>/<Data Name="TaskName">([^<]{1,320})<\/Data>/.exec(xml)?.[1]??null;
+const imagePath=xml=>/<Data Name="Path">([^<]{1,320})<\/Data>/.exec(xml)?.[1]??null;
+const eventPid=xml=>/<Data Name="ProcessID">([1-9][0-9]{0,9})<\/Data>/.exec(xml)?.[1]??null;
 const norm=x=>typeof x==='string'?x.replace(/\//g,'\\').replace(/^"|"$/g,'').toLowerCase():null;
 const reason=(code)=>Object.freeze({ok:false,code});
 export function verifyCoreTaskEvent129({
@@ -42,9 +39,9 @@ export function verifyCoreTaskEvent129({
    !/<Provider\s+Name="Microsoft-Windows-TaskScheduler"/.test(event)||
    !/<Channel>Microsoft-Windows-TaskScheduler\/Operational<\/Channel>/.test(event))
    continue;
-  const name=value(event,'TaskName');
-  const image=value(event,'Path');
-  const pid=value(event,'ProcessID');
+  const name=taskName(event);
+  const image=imagePath(event);
+  const pid=eventPid(event);
   const timestamp=/<TimeCreated\s+SystemTime="([^"]{1,80})"/.exec(event)?.[1]??null;
   const when=date(timestamp);
   if(name!==CORE_EVENT129_TASK||
