@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {authorizationFixture,REQUEST_ID} from './fixture.mjs';
-import {authorizeManualReceiver,DATA_ROOT,MAX_BYTES,SOURCE_FILES} from './contract.mjs';
+import {APPROVAL_SCHEMA_V2,SOURCE_POLICY_V2,authorizeManualReceiver,
+ DATA_ROOT,MAX_BYTES,SOURCE_FILES,sha256} from './contract.mjs';
 import {performOfficialManualB,verifyOfficialBytes,verifyManualOutcome,
  verifyManualPreimage} from './coordinator.mjs';
 
@@ -151,4 +152,61 @@ test('source size and result attempts outside scope are rejected',()=>{
  const a=auth();assert.throws(()=>verifyManualPreimage(a.manifest,
   {...preimage(a),otherWriterActive:true}),
   e=>e.code==='INFL_MANUAL_B_PC_PREIMAGE_STOP');
+});
+
+function authV2(){
+ const f=authorizationFixture();
+ const m=JSON.parse(f.bytes.toString('utf8'));
+ m.schema=APPROVAL_SCHEMA_V2;
+ m.sourcePolicy=SOURCE_POLICY_V2;
+ delete m.sourceSha;
+ f.bytes=Buffer.from(JSON.stringify(m));
+ f.event.issue.body=JSON.stringify({...f.request,
+  approvalManifestSha256:sha256(f.bytes)});
+ return authorizeManualReceiver({event:f.event,env:f.env,manifestBytes:f.bytes});
+}
+function preimageV2(a,sourceHead='c'.repeat(40)){
+ return {...preimage(a),sourceHead,configSource:sourceHead,sourceClean:true};
+}
+test('V2 permits unrelated clean checkout HEAD drift only with four pinned files',async()=>{
+ const a=authV2(),{io,calls}=adapter(a);
+ io.readSourcePreimage=()=>preimageV2(a);
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.status,'INFL_MANUAL_B_SAVED_VERIFIED');
+ assert.deepEqual(calls.slice(0,4),['livecore','lock','download','parse']);
+ assert(calls.includes('readback'));
+});
+test('V2 rejects tracked dirty, wrong configured SHA and changed pinned files before GET',async()=>{
+ const a=authV2();
+ for(const change of [
+  p=>{p.sourceClean=false;},
+  p=>{p.sourceClean=undefined;},
+  p=>{p.sourceHead='d'.repeat(40);},
+  p=>{p.sourceHead='bad-sha';p.configSource='bad-sha';},
+  p=>{p.sourceFiles[SOURCE_FILES[2]]='d'.repeat(64);},
+  p=>{delete p.sourceFiles[SOURCE_FILES[0]];},
+  p=>{p.otherWriterActive=true;},
+ ]){
+  const {io,calls}=adapter(a);
+  io.readSourcePreimage=()=>{const p=preimageV2(a);change(p);return p;};
+  const r=await performOfficialManualB(a,io);
+  assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
+  assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
+  assert(!calls.includes('download')&&!calls.includes('claim')&&
+   !calls.includes('store'));
+  assert.equal(calls.at(-1),'release:false');
+ }
+});
+test('V2 late checkout drift keeps one-shot ledger untouched and never writes',async()=>{
+ const a=authV2(),{io,calls}=adapter(a);let seen=0;
+ io.readSourcePreimage=()=>{
+  seen++;const p=preimageV2(a);
+  if(seen===2)p.configSource='d'.repeat(40);
+  return p;
+ };
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
+ assert(calls.includes('journal:CLAIMED_UNTOUCHED_STOP'));
+ assert(!calls.includes('store'));
+ assert.equal(calls.at(-1),'release:false');
 });
