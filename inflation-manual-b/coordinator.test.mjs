@@ -222,3 +222,18 @@ test('V2 late checkout drift keeps one-shot ledger untouched and never writes',a
  assert(!calls.includes('store'));
  assert.equal(calls.at(-1),'release:false');
 });
+
+test('V2 rejects the actual old PC XLSX parser SHA before official provider GET',async()=>{
+ const a=authV2(),{io,calls}=adapter(a);
+ io.readSourcePreimage=()=>{
+  const p=preimageV2(a);
+  p.sourceFiles[SOURCE_FILES[2]]=
+   '44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a';
+  return p;
+ };
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
+ assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
+ assert(!calls.includes('download')&&!calls.includes('store')&&!calls.includes('claim'));
+ assert.equal(calls.at(-1),'release:false');
+});
