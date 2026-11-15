@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
-import {classifyRecovery,archiveUntouched} from '../tools/maintenance-recovery.mjs';
+import {classifyRecovery,archiveUntouched,verifyOperatingRunners} from '../tools/maintenance-recovery.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
 const state=()=>({identityVerified:true,ownerAlive:false,
  ledger:{status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'RECEIVED',installedShaBefore:sha,intakePaused:false,workflowEnabled:true},
@@ -54,4 +54,20 @@ test('second recovery cannot compete for single reservation',()=>{
   assert.throws(()=>archiveUntouched(f),{code:'EEXIST'});
   assert.ok(fs.existsSync(path.join(f.root,'leases/controller-install')));
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
+
+const operating=()=>Array.from({length:6},(_,i)=>({name:'zgmini-pc-0'+(i+1),status:'online',busy:false}));
+test('six operating runners pass with or without isolated runner',()=>{
+ const six=operating();const isolated={name:'DESKTOP-N62L0NG',status:'online',busy:true};
+ assert.deepEqual(verifyOperatingRunners(six),{runnerSetVerified:true,runnersIdle:true});
+ assert.deepEqual(verifyOperatingRunners([...six,isolated]),{runnerSetVerified:true,runnersIdle:true});
+});
+test('operating runner duplicates, missing, offline and busy fail closed',()=>{
+ const six=operating();
+ for(const rows of [[...six,six[0]],six.slice(1),six.map((x,i)=>i===0?{...x,status:'offline'}:x)]){
+  assert.equal(verifyOperatingRunners(rows).runnerSetVerified,false);
+ }
+ const busy=six.map((x,i)=>i===0?{...x,busy:true}:x);
+ assert.equal(verifyOperatingRunners(busy).runnersIdle,false);
+ assert.equal(verifyOperatingRunners(null).runnerSetVerified,false);
 });
