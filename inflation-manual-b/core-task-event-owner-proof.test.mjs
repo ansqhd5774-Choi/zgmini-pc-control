@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {verifyCoreTaskEvent129}
+import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof}
  from './core-task-event-owner-proof.mjs';
 
 // Sanitized fixture only. Never read the host's TaskScheduler log in tests.
@@ -145,4 +145,18 @@ test('WSH cannot approve an unrelated Node, absent task state, or unverified cre
   assert.equal(p.ownerCoreMatched&&p.taskRunning&&Number.isSafeInteger(p.ownerCreatedAtMs),
    false);
  }
+});
+
+test('V2 event fallback observation gate is reachable with GetInstances filtered',()=>{
+ // Reproduce actual #1461 shape: 0/38 visible Task instances, Core lock present.
+ const filtered={instances:0,relatedProcesses:0};
+ assert.equal(shouldAttemptCoreOwnerProof(true,filtered,true),true);
+ assert.equal(shouldAttemptCoreOwnerProof(false,filtered,true),false);
+ // The gate never accepts a missing lock or unknown legacy Task linkage.
+ assert.equal(shouldAttemptCoreOwnerProof(true,filtered,false),false);
+ assert.equal(shouldAttemptCoreOwnerProof(false,{instances:1,relatedProcesses:0},true),false);
+ assert.equal(shouldAttemptCoreOwnerProof(false,{instances:1,relatedProcesses:1},true),true);
+ // Passing the gate is not ownership proof; matching 129 + live identity
+ // remains mandatory and fails closed when the event is absent.
+ assert.equal(proof('NO EVENT 129').ok,false);
 });
