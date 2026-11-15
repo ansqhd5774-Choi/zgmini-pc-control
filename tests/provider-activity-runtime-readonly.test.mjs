@@ -83,3 +83,9 @@ test('safe hostnames only; unknown domains remain unverified',()=>fixture(({d,wr
  const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.hiddenHosts,1);
  assert.equal(x.hosts.length,1);assert.equal(x.status,'STATE_UNKNOWN');
 }));
+
+test('successful cycle events with no network requests do not imply active providers',()=>fixture(({d,write})=>{
+ write([event('2026-11-15T12:00:00Z',{})]);
+ const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');
+ assert.equal(x.code,'PROVIDER_ACTIVITY_NO_OBSERVED_HOSTS');assert.equal(x.activeEndpointCount,null);
+}));
