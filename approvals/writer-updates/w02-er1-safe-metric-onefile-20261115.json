@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
-  "status": "DRAFT_NOT_APPROVED",
+  "status": "APPROVED_B",
   "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "sourceBranch": "fix/w02-er1-safe-optional-metric-decoding-20261115",
