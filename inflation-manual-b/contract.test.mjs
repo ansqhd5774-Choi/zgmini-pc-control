@@ -151,3 +151,19 @@ test('V2 rejects exact-shape but newly signed arbitrary executable hash',()=>{
  const v1=manifest();v1.sourceFiles[1].sha256='e'.repeat(64);
  assert.equal(validateApprovalManifest(v1),v1);
 });
+
+test('V2 requires corrected official Census XLSX parser, old PC parser never approved',()=>{
+ const p=manifest();
+ const v2={...p,schema:APPROVAL_SCHEMA_V2,
+  sourcePolicy:SOURCE_POLICY_V2,
+  sourceFiles:p.sourceFiles.map((entry,i)=>({...entry,
+   sha256:V2_EXECUTABLE_SHA256[i]}))};
+ delete v2.sourceSha;
+ assert.equal(v2.sourceFiles[2].sha256,
+  'd80c6a705d4d15be0b1381a04e0b26b50053eb4f87d37b5da64ccb340841e4b0');
+ const oldInstalled=structuredClone(v2);
+ oldInstalled.sourceFiles[2].sha256=
+  '44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a';
+ code(()=>validateApprovalManifest(oldInstalled),'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
+ assert.equal(validateApprovalManifest(v2),v2);
+});
