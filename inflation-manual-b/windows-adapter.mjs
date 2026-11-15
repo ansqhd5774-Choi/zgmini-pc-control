@@ -13,7 +13,8 @@ import {
  verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {performOfficialManualB} from './coordinator.mjs';
-import {verifyCoreTaskEvent129} from './core-task-event-owner-proof.mjs';
+import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof}
+ from './core-task-event-owner-proof.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
  from '../r17-writer-b/r17-b-claim.mjs';
 import {coreReadyForMaintenance,coreMaintenanceWindowBlockCode}
@@ -134,7 +135,11 @@ async function observeLiveCoreLockOwner(approvalSchema){
   need(probe.enabled===true,
    'INFL_MANUAL_B_CORE_OWNER_PROBE_UNVERIFIED_STOP');
   if(probe.unknownProcessLines>0){await delay(1500);continue;}
-  if(probe.instances>0&&probe.relatedProcesses>0&&fs.existsSync(CORE_LOCK)){
+  // The V2 event fallback MUST be reachable when GetInstances(0) is
+  // security-context filtered (0 visible instances). The exact Task/Node
+  // PID, command, creation time and lock still have to pass below.
+  if(shouldAttemptCoreOwnerProof(approvalSchema===APPROVAL_SCHEMA_V2,
+   probe,fs.existsSync(CORE_LOCK))){
    let lockBytes,lock;
    try{
     const stat=fs.lstatSync(CORE_LOCK);
