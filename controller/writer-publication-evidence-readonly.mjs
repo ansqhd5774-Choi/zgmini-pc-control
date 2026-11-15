@@ -120,7 +120,7 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
  const result={status:'STATE_UNKNOWN',code:'ER1_WRITER_EVIDENCE_UNAVAILABLE',
   observedAt:new Date().toISOString(),evidenceLevel:'LOCAL_WRITER_AND_OUTPUT_READONLY',
   writer:null,er1Future:null,ledger:null,
-  deltaR44:inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem}),
+  deltaR44:null,
   output:{key:null,state:'NOT_OBSERVED',storedAt:null,bodySha256:null},
   d1:{perKeyReadback:'NOT_RECORDED',matchedToLocal:false,
    productionVerified:false,publicApiUiVerified:false,
@@ -128,6 +128,7 @@ export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
   localOutputVerified:false,globalLedgerVerified:false,
   providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return result;
+ result.deltaR44=inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem});
  const output=readOutput(dataRoot,{fileSystem});
  result.sqliteOpened=output.sqliteOpened===true;
  result.output={key:OUT_KEY.test(output.key??'')?output.key:null,state:output.state,
