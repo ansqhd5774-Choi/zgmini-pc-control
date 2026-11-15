@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
 import {verifyCoreTaskEvent129}
  from './core-task-event-owner-proof.mjs';
 
@@ -82,4 +84,64 @@ test('Task event log is strictly bounded; no arbitrary logs or unbounded parse',
  const many='<Events>'+Array.from({length:65},()=>event({pid:999})
   .replace('<Events>','').replace('</Events>','')).join('')+'</Events>';
  assert.equal(proof(many).code,'INFL_MANUAL_B_EVENT129_LOG_TOO_LARGE');
+});
+
+function runSanitizedWshProbe({visibleEngines=[],taskState=4,command=null,
+ taskEnabled=true,created='20261115'+'230000.000000+540'}={}){
+ const js=fs.readFileSync(new URL('./core-lock-owner-probe.js',import.meta.url),'utf8');
+ const node=String.raw`E:\ZGmini\runtime\node.exe`;
+ const script=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
+ const cmd=command??('"'+node+'" "'+script+'" --publish');
+ const rows=[{ProcessId:4321,ParentProcessId:777,Name:'node.exe',
+  CommandLine:cmd,CreationDate:created},
+ {ProcessId:777,ParentProcessId:1,Name:'cmd.exe',CommandLine:'',CreationDate:created}];
+ const output=[];
+ function Enumerator(items){
+  let cursor=0;
+  this.atEnd=()=>cursor>=items.length;
+  this.moveNext=()=>{cursor++;};
+  this.item=()=>items[cursor];
+ }
+ const task={
+  Enabled:taskEnabled,State:taskState,
+  GetInstances:()=>({Count:visibleEngines.length,
+   Item:i=>({EnginePID:visibleEngines[i-1]})}),
+ };
+ const sandbox={
+  WScript:{Arguments:{length:1,Item:()=>String(4321)},Echo:x=>output.push(x)},
+  ActiveXObject:()=>({Connect:()=>{},GetFolder:()=>({GetTask:()=>task})}),
+  GetObject:()=>({ExecQuery:()=>rows}),
+  Enumerator,
+ };
+ vm.runInNewContext(js,sandbox,{timeout:2000});
+ assert.equal(output.length,1);
+ return JSON.parse(output[0]);
+}
+test('WSH owner probe returns sanitized live identity despite security-filtered instances',()=>{
+ const p=runSanitizedWshProbe();
+ assert.equal(p.ok,true);
+ assert.equal(p.linked,false);
+ assert.equal(p.taskRunning,true);
+ assert.equal(p.ownerCoreMatched,true);
+ assert.ok(Number.isSafeInteger(p.ownerCreatedAtMs));
+ assert.equal(JSON.stringify(p).includes('node.exe'),false);
+ assert.equal(JSON.stringify(p).includes('4321'),false);
+});
+test('legacy EnginePID chain stays linked when the actual Task PID is visible',()=>{
+ const p=runSanitizedWshProbe({visibleEngines:[4321]});
+ assert.equal(p.linked,true);
+ assert.equal(p.ownerCoreMatched,true);
+});
+test('WSH cannot approve an unrelated Node, absent task state, or unverified creation',()=>{
+ for(const opts of [
+  {command:'node.exe unrelated.js'},
+  {command:'"E:\\ZGmini\\runtime\\node.exe" "E:\\other\\local-cycle.mjs" --publish'},
+  {taskState:3},
+  {taskEnabled:false},
+  {created:'invalid'}
+ ]){
+  const p=runSanitizedWshProbe(opts);
+  assert.equal(p.ownerCoreMatched&&p.taskRunning&&Number.isSafeInteger(p.ownerCreatedAtMs),
+   false);
+ }
 });
