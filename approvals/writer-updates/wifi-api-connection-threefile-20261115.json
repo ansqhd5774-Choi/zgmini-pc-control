@@ -1,0 +1,71 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "143a26285e8b21a34fabef7a5802cb41f4c4a447",
+  "baseHead": "fb222ee3c3293d334709c21d4846fcfddc497c8a",
+  "baseConfigSourceSha": "fb222ee3c3293d334709c21d4846fcfddc497c8a",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "23a7f5b6ec56c08a9fef21b10976e45e6e8d939912429d9839381d819f0d5f91",
+      "afterSha256": "2230171690ad4874c39bd94e4abdc644d36b143d5fc90cf3766deb3c7e79ef73",
+      "candidateSha256": "f1ecea35d1fa20594d0b40b8ff17530e79b7272b5441cbc7764aebcf5a666a82",
+      "insertions": [
+        {
+          "anchor": " report.collectionHealth={normal:health.normal,total:health.total,status:health.status};",
+          "position": "after",
+          "text": " await attemptOutput(report,'api-connection-health-snapshot',async()=>{\n  const {storeLocalApiConnectionHealth}=await import('./api-connection-health.mjs');\n  report.apiConnectionHealth=await storeLocalApiConnectionHealth(core,base,now);\n });\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/api-connection-health.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "b38332f6cb3f00e5bf93c410adc781b5f2595b88947e306e765b189e7ac10079"
+    },
+    {
+      "path": "worker/api-connection-health.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "77b08ec8d3d46dd104f61f9a27a3aeba732073b61a3b1a0c3134ef4caefbfa52"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-wsh-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "core-wsh-inner-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
