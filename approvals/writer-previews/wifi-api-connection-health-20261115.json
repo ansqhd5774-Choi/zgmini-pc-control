@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "fb222ee3c3293d334709c21d4846fcfddc497c8a",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "23a7f5b6ec56c08a9fef21b10976e45e6e8d939912429d9839381d819f0d5f91",
+  "insertions": [
+    {
+      "anchor": " report.collectionHealth={normal:health.normal,total:health.total,status:health.status};",
+      "position": "after",
+      "text": " await attemptOutput(report,'api-connection-health-snapshot',async()=>{\n  const {storeLocalApiConnectionHealth}=await import('./api-connection-health.mjs');\n  report.apiConnectionHealth=await storeLocalApiConnectionHealth(core,base,now);\n });\n"
+    }
+  ]
+}
