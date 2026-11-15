@@ -1,0 +1,93 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43677990737-1-seat-6",
+  "requestId": "pc-ec1e610c-35bc-4528-90ec-4fae9db174a2",
+  "startedAt": "2026-11-15T04:43:34.283Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "d60a6be5e54fb5e7b450f74c4fd1f45b4f874dbb",
+  "sourceBranch": "main",
+  "operation": "writer-publication-evidence-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "ER1_WRITER_METADATA_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-3926d39d-adef-426c-9d8f-981abd29fa4c",
+  "pcOperationalApprovedSha": "4f9b36015a0631960cab40a4346eea6958e46342",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "ER1_WRITER_METADATA_READONLY",
+    "observedAt": "2026-11-15T04:43:36.307Z",
+    "evidenceLevel": "LOCAL_WRITER_AND_OUTPUT_READONLY",
+    "writer": {
+      "at": "2026-11-15T04:40:09.901Z",
+      "source": "4f9b36015a0631960cab40a4346eea6958e46342",
+      "mode": "PUBLISH",
+      "status": "VERIFIED"
+    },
+    "er1Future": {
+      "status": "NO_NEW_OUTPUT",
+      "months": [
+        {
+          "month": "2026-11",
+          "status": "MONTH_SOURCE_INVALID_ADAPTER_ER1_FORECAST_SAVED_METRIC_INVALID",
+          "sqliteDays": null,
+          "privateDays": null,
+          "scoreableIssuers": null
+        },
+        {
+          "month": "2026-12",
+          "status": "SAVED_MONTH_INCOMPLETE",
+          "sqliteDays": null,
+          "privateDays": null,
+          "scoreableIssuers": null
+        }
+      ],
+      "failures": []
+    },
+    "ledger": {
+      "state": "READY",
+      "status": "VERIFIED",
+      "at": "2026-11-15T04:42:05.493Z",
+      "sourceMatchesWriter": true
+    },
+    "output": {
+      "key": "market-calendar:earnings-er1-score-2026-11-public",
+      "state": "READ",
+      "storedAt": 1794546027801,
+      "bodySha256": "0675aada329b09eaed5644d9dea4d090626c664dd216d4551474dccbe7914b51"
+    },
+    "d1": {
+      "perKeyReadback": "VERIFIED",
+      "matchedToLocal": true,
+      "productionVerified": false,
+      "publicApiUiVerified": false,
+      "verificationScope": "AT_WRITER_PUBLISH_TIME",
+      "evidenceState": "VERIFIED",
+      "observedAt": "2026-11-15T04:41:40.598Z",
+      "d1StoredAt": 1794546027801,
+      "d1BodySha256": "0675aada329b09eaed5644d9dea4d090626c664dd216d4551474dccbe7914b51"
+    },
+    "localOutputVerified": true,
+    "globalLedgerVerified": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "e7626098184e253729dbeb189b5e38741338fc484660230545789851efb980cd",
+  "protectedAfterSha256": "e7626098184e253729dbeb189b5e38741338fc484660230545789851efb980cd",
+  "actualExecutionSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-15T04:43:37.816Z",
+  "durationMs": 3533
+}
