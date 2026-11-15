@@ -60,3 +60,30 @@ test('an invalid path returns an explicit state without reading host files',()=>
  assert.equal(result.writer.checkpointState,'INVALID_ROOT');
  assert.equal(result.operationalWrites,0);
 });
+
+test('R44 exact Writer D1 receipt is verified only with identical key, epoch and SHA',()=>{
+ const f=fixture();try{
+  const sha='a'.repeat(64);
+  f.write('local-collection-last-run.json',{at:'2026-11-15T13:20:00Z',
+   deltaScreener:{status:'CACHED_PRIVATE',rowCount:4894,usableTickerCount:4838,
+    asOf:'2026-11-03'}});
+  const base={at:'2026-11-15T13:30:00Z',mode:'PUBLISH',status:'VERIFIED',
+   deltaR44:{status:'UNCHANGED',calendarTickers:3035,coveredTickers:2750,
+    counts:{one:2553,two:181,three:16,missing:283,conflicting:2}},
+   deltaR44D1:{key:'market-calendar:earnings-marketcap-r44-2026-11-public',
+    status:'MATCHED',localStoredAt:1794790000000,d1StoredAt:1794790000000,
+    localBodySha256:sha,d1BodySha256:sha},failures:[]};
+  f.write('local-writer-last-run.json',base);
+  const r=inspectDeltaR44CheckpointEvidence(f.root);
+  assert.equal(r.d1PerKeyReadback,'VERIFIED_AT_WRITER_PUBLISH_TIME');
+  assert.equal(r.d1Readback.exactMatchAtWriterTime,true);
+  assert.equal(r.productionApiUiVerified,false);
+  f.write('local-writer-last-run.json',{...base,deltaR44D1:{...base.deltaR44D1,
+   d1BodySha256:'b'.repeat(64)}});
+  const mismatched=inspectDeltaR44CheckpointEvidence(f.root);
+  assert.equal(mismatched.d1Readback.exactMatchAtWriterTime,false);
+  assert.equal(mismatched.d1PerKeyReadback,'MATCHED');
+  f.write('local-writer-last-run.json',{...base,mode:'DRY_RUN'});
+  assert.equal(inspectDeltaR44CheckpointEvidence(f.root).d1Readback.exactMatchAtWriterTime,false);
+ }finally{f.close();}
+});
