@@ -1,0 +1,93 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43679540741-1-seat-6",
+  "requestId": "pc-981cbf38-35ad-4ea0-8494-4a71c2059d6a",
+  "startedAt": "2026-11-15T05:05:24.100Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "84b889687a1d23f81a182a6d5b62100027386a9f",
+  "sourceBranch": "main",
+  "operation": "writer-publication-evidence-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "ER1_WRITER_METADATA_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-f1863be2-7924-4357-a0bb-8e9381b6a48b",
+  "pcOperationalApprovedSha": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "ER1_WRITER_METADATA_READONLY",
+    "observedAt": "2026-11-15T05:05:25.946Z",
+    "evidenceLevel": "LOCAL_WRITER_AND_OUTPUT_READONLY",
+    "writer": {
+      "at": "2026-11-15T05:00:30.238Z",
+      "source": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+      "mode": "PUBLISH",
+      "status": "VERIFIED"
+    },
+    "er1Future": {
+      "status": "UPDATED",
+      "months": [
+        {
+          "month": "2026-11",
+          "status": "READY_OUTPUT",
+          "sqliteDays": 28,
+          "privateDays": 2,
+          "scoreableIssuers": 352
+        },
+        {
+          "month": "2026-12",
+          "status": "SAVED_MONTH_INCOMPLETE",
+          "sqliteDays": null,
+          "privateDays": null,
+          "scoreableIssuers": null
+        }
+      ],
+      "failures": []
+    },
+    "ledger": {
+      "state": "READY",
+      "status": "VERIFIED",
+      "at": "2026-11-15T05:03:04.154Z",
+      "sourceMatchesWriter": true
+    },
+    "output": {
+      "key": "market-calendar:earnings-er1-score-2026-11-public",
+      "state": "READ",
+      "storedAt": 1794718830678,
+      "bodySha256": "11acd6d8eede7f659fc0d898ceb0a2cdd892520385e03e3092dd21d6dbe6bfa6"
+    },
+    "d1": {
+      "perKeyReadback": "VERIFIED",
+      "matchedToLocal": true,
+      "productionVerified": false,
+      "publicApiUiVerified": false,
+      "verificationScope": "AT_WRITER_PUBLISH_TIME",
+      "evidenceState": "VERIFIED",
+      "observedAt": "2026-11-15T05:02:22.806Z",
+      "d1StoredAt": 1794718830678,
+      "d1BodySha256": "11acd6d8eede7f659fc0d898ceb0a2cdd892520385e03e3092dd21d6dbe6bfa6"
+    },
+    "localOutputVerified": true,
+    "globalLedgerVerified": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "3004b58a5dfe1b5cfeac54c54ea564238af01b038ab5b53a240c951586cbb9c7",
+  "protectedAfterSha256": "3004b58a5dfe1b5cfeac54c54ea564238af01b038ab5b53a240c951586cbb9c7",
+  "actualExecutionSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-15T05:05:27.493Z",
+  "durationMs": 3393
+}
