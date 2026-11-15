@@ -9,6 +9,9 @@ export const ISSUE_LABEL='pc-writer-b-install';
 export const OPERATION='inflation-official-manual';
 export const REQUEST_SCHEMA='ZGMINI_INFLATION_OFFICIAL_MANUAL_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_INFLATION_OFFICIAL_MANUAL_B_APPROVAL_V1';
+// New approvals must opt in explicitly; V1 remains source-SHA exact.
+export const APPROVAL_SCHEMA_V2='ZGMINI_INFLATION_OFFICIAL_MANUAL_B_APPROVAL_V2';
+export const SOURCE_POLICY_V2='CLEAN_CONFIGURED_HEAD_AND_FIXED_IMPORT_CLOSURE';
 export const SCOPE='INFLATION_OFFICIAL_STATIC_TWO_RAW_JSON_ONLY';
 export const SOURCE_ROOT=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
 export const DATA_ROOT=String.raw`E:\ZGmini\data\pc-writer`;
@@ -39,6 +42,10 @@ const APPROVAL_KEYS=['schema','status','scope','sourceRoot','sourceSha',
  'coreLeaseMode',
  'allowDbWrites','allowD1Writes','allowTaskChanges','allowSourceChanges',
  'allowOtherWrites'];
+// V2 replaces the *whole-checkout* SHA pin with a clean checkout bound to the
+// approved config SHA and the exact four effective module hashes. V2 is a new
+// approval schema, never an implicit fallback for a failed V1 preimage.
+const APPROVAL_KEYS_V2=APPROVAL_KEYS.filter(k=>k!=='sourceSha').concat('sourcePolicy');
 const authenticated=new WeakSet();
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const need=(condition,code)=>{if(!condition)fail(code);};
@@ -64,10 +71,15 @@ export function verifiedPinnedManifestBytes(worktreeBytes,blobBytes){
 }
 
 export function validateApprovalManifest(m){
- need(exact(m,APPROVAL_KEYS),'INFL_MANUAL_B_MANIFEST_FIELDS_STOP');
- need(m.schema===APPROVAL_SCHEMA&&m.status==='APPROVED_B'&&
-  m.scope===SCOPE&&m.sourceRoot===SOURCE_ROOT&&
-  SHA40.test(m.sourceSha??'')&&m.runCount===1&&
+ const v1=m?.schema===APPROVAL_SCHEMA;
+ const v2=m?.schema===APPROVAL_SCHEMA_V2;
+ need(exact(m,v2?APPROVAL_KEYS_V2:APPROVAL_KEYS),
+  'INFL_MANUAL_B_MANIFEST_FIELDS_STOP');
+ need((v1&&SHA40.test(m.sourceSha??''))||
+  (v2&&m.sourcePolicy===SOURCE_POLICY_V2),
+  'INFL_MANUAL_B_MANIFEST_SOURCE_POLICY_STOP');
+ need(m.status==='APPROVED_B'&&
+  m.scope===SCOPE&&m.sourceRoot===SOURCE_ROOT&&m.runCount===1&&
   m.coreLeaseMode==='EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK'&&
   m.timeoutMs===40_000&&fixed(m.providerUrls,URLS)&&
   fixed(m.targetFiles,TARGETS)&&fixed(m.maxBytes,MAX_BYTES)&&
