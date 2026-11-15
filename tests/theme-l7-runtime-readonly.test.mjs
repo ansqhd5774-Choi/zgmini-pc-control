@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
- safeR181ErrorFlow,safeR181HttpErrorFlow} from '../controller/theme-l7-runtime-readonly.mjs';
+ safeR181ErrorFlow,safeR181HttpErrorFlow,safeRecordedR181HttpFailure} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -408,4 +408,46 @@ test('R181 error branch inventory is bounded and never claims a runtime failure'
  assert.equal(JSON.stringify(out).includes('SECRET_VALUE'),false);
  assert.deepEqual(safeR181HttpErrorFlow('throw Error("x")\n'.repeat(1000)),
   {status:'UNREADABLE_SOURCE',sites:[],lines:[],truncated:false});
+});
+
+test('W03 R181 pinned STOP exposes only an already recorded non-OK integer HTTP code',()=>{
+ for(const [numeric,group] of [[301,'REDIRECT_3XX'],[401,'CLIENT_4XX'],
+  [403,'CLIENT_4XX'],[429,'CLIENT_4XX'],[503,'SERVER_5XX']]){
+  const result=safeRecordedR181HttpFailure({
+   status:'STOP',httpStatus:numeric,reason:'private provider URL and token',
+   credential:'SHOULD_NOT_LEAK'
+  },{sourcePinned:true});
+  assert.deepEqual(result,{source:'PINNED_R181_LEDGER_HTTP_STATUS',
+   status:numeric,group});
+  assert.equal(JSON.stringify(result).includes('SHOULD_NOT_LEAK'),false);
+ }
+});
+
+test('W03 R181 unknown, malformed, successful, unpinned, or non-STOP HTTP values never leak',()=>{
+ const invalid=[undefined,null,'429',200,299,99,600,429.5,-1,NaN,
+  Infinity,{value:429},[429],true];
+ for(const value of invalid){
+  assert.equal(safeRecordedR181HttpFailure({
+   status:'STOP',httpStatus:value,reason:'secret'
+  },{sourcePinned:true}),null);
+ }
+ assert.equal(safeRecordedR181HttpFailure({status:'STOP',httpStatus:429}),null);
+ assert.equal(safeRecordedR181HttpFailure({status:'READY',httpStatus:429},
+  {sourcePinned:true}),null);
+ assert.equal(safeRecordedR181HttpFailure(null,{sourcePinned:true}),null);
+});
+
+test('W03 R181 unpinned installed source cannot assert recorded HTTP proof',()=>{
+ const f=fixture();
+ try{
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+   JSON.stringify({status:'STOP',httpStatus:403,reason:'SPY HTTP 403'}));
+  const result=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+  const ledger=result.ledgers['R181_PRIMARY_LAST_RUN.json'];
+  assert.equal(ledger.recordedHttpFailure,null);
+  assert.equal(ledger.safeHttpFailure,null);
+  assert.equal(result.sources[names[0]].sha256.length,64);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+ }finally{f.close();}
 });
