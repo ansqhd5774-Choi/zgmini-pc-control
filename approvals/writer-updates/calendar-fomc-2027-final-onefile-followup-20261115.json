@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
-  "status": "DRAFT_NOT_APPROVED",
+  "status": "APPROVED_B",
   "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "sourceBranch": "support/w02-2027-fomc-owner-onepass-20261115",
