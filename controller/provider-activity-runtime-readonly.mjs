@@ -102,8 +102,9 @@ export function inspectProviderActivity(dataRoot,{now=Date.now(),fileSystem=fs}=
   lastRunRequests:x.lastRunRequests,lastRunResponses:x.lastRunResponses,
   statusCounts:x.statusCounts,
  }));
- const limited=partialTail||partialRows||bad>0||duplicated>0||hiddenHosts>0||hosts.size>MAX_HOSTS;
- return {status:limited?'STATE_UNKNOWN':'PASS',code:limited?'PROVIDER_ACTIVITY_PARTIAL':'PROVIDER_ACTIVITY_OBSERVED',
+ const noObservedHosts=hosts.size===0;
+ const limited=partialTail||partialRows||bad>0||duplicated>0||hiddenHosts>0||hosts.size>MAX_HOSTS||noObservedHosts;
+ return {status:limited?'STATE_UNKNOWN':'PASS',code:noObservedHosts?'PROVIDER_ACTIVITY_NO_OBSERVED_HOSTS':limited?'PROVIDER_ACTIVITY_PARTIAL':'PROVIDER_ACTIVITY_OBSERVED',
   source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',scope:'FIXED_LOCAL_JSONL_ONLY',
   evidenceLevel:'FETCH_WRAPPER_HTTP_ONLY_NOT_PARSER_OR_STORAGE_PROOF',
   now:iso(now),windowDays:WINDOW_DAYS,observedWindowStart:iso(from),
@@ -111,6 +112,6 @@ export function inspectProviderActivity(dataRoot,{now=Date.now(),fileSystem=fs}=
   tailTruncated:partialTail,linesTruncated:partialRows,invalidRows:bad,duplicateLines:duplicated,
   hiddenHosts,observedHostCount:hosts.size,hostsReturned:resultHosts.length,hosts:resultHosts,
   allActiveEndpointsVerified:false,activeEndpointCount:null,
-  missingCollectorCoverage:['ALPACA_CHILD_PROCESS','SUPPLY_R10_CHILD_PROCESS','SECTOR_CHILD_PROCESS','DOL_OR_BLS_SOURCE_HTTP_NOT_IN_PARENT_WRAPPER'],
+  missingCollectorCoverage:['ALPACA_CHILD_PROCESS','SUPPLY_R10_CHILD_PROCESS','SECTOR_CHILD_PROCESS','DOL_OR_BLS_INDEPENDENT_COLLECTORS_UNVERIFIED'],
   providerCalls:0,operationalWrites:0,d1Writes:0,sqliteOpened:false};
 }
