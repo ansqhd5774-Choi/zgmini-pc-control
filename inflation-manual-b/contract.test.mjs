@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  APPROVAL_SCHEMA_V2,DATA_ROOT,MAX_BYTES,SOURCE_POLICY_V2,TARGETS,
- V2_EXECUTABLE_SHA256,
+ V2_EXECUTABLE_SHA256,V2_EXECUTABLE_SHA256_EXISTING,
  authorizeManualReceiver,assertAuthorizedManualReceiver,
  sha256,validateApprovalManifest,verifiedPinnedManifestBytes,
 } from './contract.mjs';
@@ -152,18 +152,22 @@ test('V2 rejects exact-shape but newly signed arbitrary executable hash',()=>{
  assert.equal(validateApprovalManifest(v1),v1);
 });
 
-test('V2 requires corrected official Census XLSX parser, old PC parser never approved',()=>{
+test('V2 accepts only the two exact scoped four-file closures',()=>{
  const p=manifest();
  const v2={...p,schema:APPROVAL_SCHEMA_V2,
   sourcePolicy:SOURCE_POLICY_V2,
   sourceFiles:p.sourceFiles.map((entry,i)=>({...entry,
-   sha256:V2_EXECUTABLE_SHA256[i]}))};
+   sha256:V2_EXECUTABLE_SHA256_EXISTING[i]}))};
  delete v2.sourceSha;
  assert.equal(v2.sourceFiles[2].sha256,
-  'd80c6a705d4d15be0b1381a04e0b26b50053eb4f87d37b5da64ccb340841e4b0');
- const oldInstalled=structuredClone(v2);
- oldInstalled.sourceFiles[2].sha256=
-  '44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a';
- code(()=>validateApprovalManifest(oldInstalled),'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
+  '44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a');
  assert.equal(validateApprovalManifest(v2),v2);
+ const corrected=structuredClone(v2);
+ corrected.sourceFiles[2].sha256=V2_EXECUTABLE_SHA256[2];
+ assert.equal(validateApprovalManifest(corrected),corrected);
+ const unknown=structuredClone(v2);unknown.sourceFiles[2].sha256='d'.repeat(64);
+ code(()=>validateApprovalManifest(unknown),'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
+ const nonParserDrift=structuredClone(corrected);
+ nonParserDrift.sourceFiles[0].sha256='e'.repeat(64);
+ code(()=>validateApprovalManifest(nonParserDrift),'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
 });
