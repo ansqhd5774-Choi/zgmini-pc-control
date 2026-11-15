@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/w02-er1-first-invalid-source-stage-20261115",
+  "candidateSourceSha": "a8ef4264689c2df16bb137c03ccd1d1d1a89f0f6",
+  "baseHead": "55e62c19672d03e93bfa573c56ba4bab1d28e979",
+  "baseConfigSourceSha": "55e62c19672d03e93bfa573c56ba4bab1d28e979",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+      "change": "M",
+      "beforeSha256": "f13accdeed8601b898343eb09331470f4d6783ca94af22022543be7ea7e2b66e",
+      "afterSha256": "aa75821a58fa3cee3e6f712943d7636f6bfcec72362bdfb76d081a643b803a49"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/release-calendar.mjs",
+      "sha256": "a69164fd804642c64b82da3a31556f4209130861428853023ab096b7a3517298"
+    },
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "sha256": "383dbf3e66b2291be30c8dc3d96e91030e827e64bea5bed9fc74b758d0cbd4b2"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
