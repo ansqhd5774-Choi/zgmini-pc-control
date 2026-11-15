@@ -76,12 +76,16 @@ function checkSourceHome(){
 function sourcePreimage(auth){
  checkSourceHome();
  const head=execute('git',['-C',SOURCE_ROOT,'rev-parse','HEAD']);
+ // Tracked worktree mutations are never approved by a V2 manifest. This
+ // check is paired with exact four-module hashes and repeated pre-write.
+ const sourceClean=execute('git',['-C',SOURCE_ROOT,'status',
+  '--porcelain=v1','--untracked-files=no']).length===0;
  const config=JSON.parse(safeFixedFile(CONFIG,DATA_ROOT,131_072).toString('utf8'));
  const modules=Object.fromEntries(SOURCE_FILES.map(name=>[name,
   sha256(safeFixedFile(sourceFile(name),SOURCE_ROOT,2_000_000))]));
  const owner=fs.readFileSync(SHARED_LOCK,'utf8');
  need(owner===auth.request.requestId,'INFL_MANUAL_B_SHARED_OWNER_STOP');
- return {sourceRoot:SOURCE_ROOT,sourceHead:head,
+ return {sourceRoot:SOURCE_ROOT,sourceHead:head,sourceClean,
   configSource:config.source,sourceFiles:modules,dataRoot:DATA_ROOT,
   otherWriterActive:false};
 }
