@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- DATA_ROOT,MAX_BYTES,TARGETS,authorizeManualReceiver,assertAuthorizedManualReceiver,
+ APPROVAL_SCHEMA_V2,DATA_ROOT,MAX_BYTES,SOURCE_POLICY_V2,TARGETS,
+ authorizeManualReceiver,assertAuthorizedManualReceiver,
  sha256,validateApprovalManifest,verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {manifest,authorizationFixture} from './fixture.mjs';
@@ -89,4 +90,43 @@ test('requestId and manifest path cannot be arbitrary inputs',()=>{
   f.event.issue.body=JSON.stringify(r);
   code(()=>authorizeManualReceiver({event:f.event,env:f.env,
    manifestBytes:f.bytes}),'INFL_MANUAL_B_REQUEST_SCOPE_STOP');}
+});
+
+test('V2 approval is explicit: unchanged V1 pins and fixed effects',()=>{
+ const prior=manifest();
+ assert.equal(validateApprovalManifest(prior),prior);
+ const v2={...prior,schema:APPROVAL_SCHEMA_V2,
+  sourcePolicy:SOURCE_POLICY_V2};
+ delete v2.sourceSha;
+ assert.equal(validateApprovalManifest(v2),v2);
+ assert.deepEqual(v2.sourceFiles,prior.sourceFiles);
+ assert.deepEqual(v2.providerUrls,prior.providerUrls);
+ assert.deepEqual(v2.targetFiles,prior.targetFiles);
+ for(const change of [
+  m=>{m.sourcePolicy='ALLOW_ANY_SOURCE';},
+  m=>{m.sourceSha='1'.repeat(40);},
+  m=>{m.allowSourceChanges=true;},
+  m=>{m.runCount=2;},
+  m=>{m.sourceFiles[1].sha256='f'.repeat(64);m.sourceFiles.pop();},
+ ]){
+  const altered=structuredClone(v2);change(altered);
+  assert.throws(()=>validateApprovalManifest(altered));
+ }
+ const tamperedV1={...prior,sourcePolicy:SOURCE_POLICY_V2};
+ code(()=>validateApprovalManifest(tamperedV1),
+  'INFL_MANUAL_B_MANIFEST_FIELDS_STOP');
+});
+test('V2 still requires owner Issue and signed exact manifest blob',()=>{
+ const f=authorizationFixture();
+ const m={...manifest(),schema:APPROVAL_SCHEMA_V2,
+  sourcePolicy:SOURCE_POLICY_V2};
+ delete m.sourceSha;
+ const bytes=Buffer.from(JSON.stringify(m));
+ const req={...f.request,approvalManifestSha256:sha256(bytes)};
+ f.event.issue.body=JSON.stringify(req);
+ assert.equal(authorizeManualReceiver({event:f.event,env:f.env,
+  manifestBytes:bytes}).manifest.schema,APPROVAL_SCHEMA_V2);
+ const changed=Buffer.from(bytes.toString('utf8')+' ');
+ code(()=>authorizeManualReceiver({event:f.event,env:f.env,
+  manifestBytes:changed}),'INFL_MANUAL_B_MANIFEST_HASH_STOP');
 });
