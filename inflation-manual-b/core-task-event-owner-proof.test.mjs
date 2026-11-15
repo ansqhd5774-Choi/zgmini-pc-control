@@ -109,7 +109,8 @@ function runSanitizedWshProbe({visibleEngines=[],taskState=4,command=null,
  };
  const sandbox={
   WScript:{Arguments:{length:1,Item:()=>String(4321)},Echo:x=>output.push(x)},
-  ActiveXObject:()=>({Connect:()=>{},GetFolder:()=>({GetTask:()=>task})}),
+  // WSH invokes the COM creator with new; an arrow mock is not constructible.
+  ActiveXObject:function(){return {Connect:()=>{},GetFolder:()=>({GetTask:()=>task})};},
   GetObject:()=>({ExecQuery:()=>rows}),
   Enumerator,
  };
