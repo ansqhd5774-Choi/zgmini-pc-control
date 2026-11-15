@@ -19,6 +19,14 @@ const imagePath=xml=>/<Data Name="Path">([^<]{1,320})<\/Data>/.exec(xml)?.[1]??n
 const eventPid=xml=>/<Data Name="ProcessID">([1-9][0-9]{0,9})<\/Data>/.exec(xml)?.[1]??null;
 const norm=x=>typeof x==='string'?x.replace(/\//g,'\\').replace(/^"|"$/g,'').toLowerCase():null;
 const reason=(code)=>Object.freeze({ok:false,code});
+// A V2 approval can attempt the independent event+WMI identity proof even
+// when GetInstances(0) hides the Core Task. This is ONLY an observation gate,
+// not an authorization to accept a lock owner without exact Event 129 proof.
+// V1 must retain its existing visible Task/related process requirement.
+export function shouldAttemptCoreOwnerProof(isV2,probe,lockPresent){
+ return lockPresent===true&&(isV2===true||
+  (probe?.instances>0&&probe?.relatedProcesses>0));
+}
 export function verifyCoreTaskEvent129({
  xml,lockPid,lockAt,ownerCreatedAtMs,taskRunning,ownerCoreMatched,now=Date.now(),
 }={}){
