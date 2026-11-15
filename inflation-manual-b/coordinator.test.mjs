@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {authorizationFixture,REQUEST_ID} from './fixture.mjs';
 import {APPROVAL_SCHEMA_V2,SOURCE_POLICY_V2,V2_EXECUTABLE_SHA256,
+ V2_EXECUTABLE_SHA256_EXISTING,
  authorizeManualReceiver,DATA_ROOT,MAX_BYTES,SOURCE_FILES,sha256} from './contract.mjs';
 import {performOfficialManualB,verifyOfficialBytes,verifyManualOutcome,
  verifyManualPreimage} from './coordinator.mjs';
@@ -223,17 +224,45 @@ test('V2 late checkout drift keeps one-shot ledger untouched and never writes',a
  assert.equal(calls.at(-1),'release:false');
 });
 
-test('V2 rejects the actual old PC XLSX parser SHA before official provider GET',async()=>{
+
+function authV2Existing(){
+ const f=authorizationFixture();
+ const m=JSON.parse(f.bytes.toString('utf8'));
+ m.schema=APPROVAL_SCHEMA_V2;m.sourcePolicy=SOURCE_POLICY_V2;
+ m.sourceFiles=m.sourceFiles.map((entry,i)=>({...entry,
+  sha256:V2_EXECUTABLE_SHA256_EXISTING[i]}));
+ delete m.sourceSha;
+ f.bytes=Buffer.from(JSON.stringify(m));
+ f.event.issue.body=JSON.stringify({...f.request,
+  approvalManifestSha256:sha256(f.bytes)});
+ return authorizeManualReceiver({event:f.event,env:f.env,manifestBytes:f.bytes});
+}
+test('V2 accepts pinned installed old XLSX when official preflight parses',async()=>{
+ const a=authV2Existing(),{io,calls}=adapter(a);
+ io.readSourcePreimage=()=>preimageV2(a);
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.status,'INFL_MANUAL_B_SAVED_VERIFIED');
+ assert(calls.includes('download')&&calls.includes('readback'));
+});
+test('V2 old parser bad official workbook fails before claim or data write',async()=>{
+ const a=authV2Existing(),{io,calls}=adapter(a);
+ io.readSourcePreimage=()=>preimageV2(a);
+ io.preflightParse=()=>{throw Object.assign(new Error('old parser cannot read workbook'),
+  {code:'INFL_MANUAL_B_XLSX_IMPORT_STOP'});};
+ const r=await performOfficialManualB(a,io);
+ assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
+ assert.equal(r.code,'INFL_MANUAL_B_XLSX_IMPORT_STOP');
+ assert(!calls.includes('claim')&&!calls.includes('store'));
+ assert.equal(calls.at(-1),'release:false');
+});
+test('V2 corrected-parser manifest cannot silently run against old PC parser',async()=>{
  const a=authV2(),{io,calls}=adapter(a);
  io.readSourcePreimage=()=>{
   const p=preimageV2(a);
-  p.sourceFiles[SOURCE_FILES[2]]=
-   '44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a';
+  p.sourceFiles[SOURCE_FILES[2]]=V2_EXECUTABLE_SHA256_EXISTING[2];
   return p;
  };
  const r=await performOfficialManualB(a,io);
- assert.equal(r.status,'INFL_MANUAL_B_PREFLIGHT_STOP');
  assert.equal(r.code,'INFL_MANUAL_B_PC_PREIMAGE_STOP');
- assert(!calls.includes('download')&&!calls.includes('store')&&!calls.includes('claim'));
- assert.equal(calls.at(-1),'release:false');
+ assert(!calls.includes('download')&&!calls.includes('claim')&&!calls.includes('store'));
 });
