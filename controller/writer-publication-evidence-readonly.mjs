@@ -59,11 +59,68 @@ function readLedger(dataRoot,filename,{fileSystem=fs}={}){
   return {state:'READY',value:o};
  }catch{return {state:'INVALID'};}
 }
+
+/**
+ * R44 evidence from already written, bounded PC report files. Unlike the
+ * legacy ER1 helper this never opens SQLite, so it cannot create WAL sidecars.
+ * Reports are evidence of producer behavior, not independent DB/D1 readbacks.
+ */
+export function inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem=fs}={}){
+ const collection=readLedger(dataRoot,'local-collection-last-run.json',{fileSystem});
+ const writer=readLedger(dataRoot,'local-writer-last-run.json',{fileSystem});
+ const c=collection.state==='READY'?collection.value:{};
+ const w=writer.state==='READY'?writer.value:{};
+ const inputStatuses=new Set(['READY_PRIVATE','CACHED_PRIVATE','EXISTING_INPUT_INVALID_PRESERVED',
+  'FAILED_PREVIOUS_INPUT_PRESERVED','SKIPPED_KOREA_LANE']);
+ const outputStatuses=new Set(['READY_OUTPUT','UNCHANGED','NEWER_OUTPUT_PRESERVED',
+  'SOURCE_INPUT_MISSING','SOURCE_INPUT_INVALID_PRESERVED','SOURCE_CSV_INVALID_PRESERVED',
+  'SOURCE_COVERAGE_INVALID','SAVED_MONTH_INVALID_PRESERVED','SAVED_MONTH_INCOMPLETE',
+  'NO_MATCHED_MARKETCAP']);
+ const pick=(s,allowed)=>allowed.has(s)?s:null;
+ const input=c.deltaScreener??{};
+ const output=w.deltaR44??{};
+ const counts=output.counts??{};
+ const keys=['one','two','three','missing','conflicting'];
+ const validCounts=keys.every(k=>safeCount(counts[k])!==null);
+ const calendarTickers=safeCount(output.calendarTickers);
+ const coveredTickers=safeCount(output.coveredTickers);
+ const consistent=validCounts&&calendarTickers!==null&&coveredTickers!==null&&
+  counts.one+counts.two+counts.three===coveredTickers&&
+  coveredTickers+counts.missing+counts.conflicting===calendarTickers;
+ const collectionAt=safeTime(c.at),writerAt=safeTime(w.at);
+ const isOutputReported=consistent&&['READY_OUTPUT','UNCHANGED'].includes(output.status);
+ const feedKey='market-calendar:earnings-marketcap-r44-2026-11-public';
+ const failedStages=Array.isArray(w.failures)?w.failures:[];
+ return {
+  status:collection.state==='READY'&&writer.state==='READY'?'PASS':'STATE_UNKNOWN',
+  evidenceLevel:'PC_CHECKPOINT_REPORTS_ONLY_NO_SQLITE_OPEN',
+  input:{checkpointState:collection.state,at:collectionAt,
+   status:pick(input.status,inputStatuses),
+   rowCount:safeCount(input.rowCount),usableTickerCount:safeCount(input.usableTickerCount),
+   sourceAsOf:input.asOf==='2026-11-03'?'2026-11-03':null},
+  writer:{checkpointState:writer.state,at:writerAt,
+   source:SHA40.test(w.source??'')?w.source:null,
+   mode:w.mode==='PUBLISH'?'PUBLISH':w.mode==='DRY_RUN'?'DRY_RUN':null,
+   status:safeStatus(w.status),deltaStatus:pick(output.status,outputStatuses),
+   calendarTickerCount:calendarTickers,coveredTickerCount:coveredTickers,
+   counts:consistent?Object.fromEntries(keys.map(k=>[k,counts[k]])):null,
+   reportedLocalReadback:isOutputReported,
+   failedOutputStage:failedStages.some(x=>x?.id==='market-calendar-r44-delta'),
+   failedFeedStage:failedStages.some(x=>x?.id==='feed:'+feedKey)},
+  lastWriterStartedAfterLastCollectionStart:collectionAt&&writerAt?
+   Date.parse(writerAt)>=Date.parse(collectionAt):null,
+  independentRawShaReadback:false,independentSqliteOutputReadback:false,
+  d1PerKeyReadback:'NOT_RECORDED',productionApiUiVerified:false,
+  providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false,
+ };
+}
+
 export function inspectWriterPublicationEvidence(dataRoot,{fileSystem=fs,
  readOutput=readER1LocalOutput}={}){
  const result={status:'STATE_UNKNOWN',code:'ER1_WRITER_EVIDENCE_UNAVAILABLE',
   observedAt:new Date().toISOString(),evidenceLevel:'LOCAL_WRITER_AND_OUTPUT_READONLY',
   writer:null,er1Future:null,ledger:null,
+  deltaR44:inspectDeltaR44CheckpointEvidence(dataRoot,{fileSystem}),
   output:{key:null,state:'NOT_OBSERVED',storedAt:null,bodySha256:null},
   d1:{perKeyReadback:'NOT_RECORDED',matchedToLocal:false,
    productionVerified:false,publicApiUiVerified:false,
