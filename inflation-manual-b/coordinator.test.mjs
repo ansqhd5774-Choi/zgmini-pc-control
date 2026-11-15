@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {authorizationFixture,REQUEST_ID} from './fixture.mjs';
-import {APPROVAL_SCHEMA_V2,SOURCE_POLICY_V2,authorizeManualReceiver,
- DATA_ROOT,MAX_BYTES,SOURCE_FILES,sha256} from './contract.mjs';
+import {APPROVAL_SCHEMA_V2,SOURCE_POLICY_V2,V2_EXECUTABLE_SHA256,
+ authorizeManualReceiver,DATA_ROOT,MAX_BYTES,SOURCE_FILES,sha256} from './contract.mjs';
 import {performOfficialManualB,verifyOfficialBytes,verifyManualOutcome,
  verifyManualPreimage} from './coordinator.mjs';
 
@@ -159,6 +159,8 @@ function authV2(){
  const m=JSON.parse(f.bytes.toString('utf8'));
  m.schema=APPROVAL_SCHEMA_V2;
  m.sourcePolicy=SOURCE_POLICY_V2;
+ m.sourceFiles=m.sourceFiles.map((entry,i)=>({...entry,
+  sha256:V2_EXECUTABLE_SHA256[i]}));
  delete m.sourceSha;
  f.bytes=Buffer.from(JSON.stringify(m));
  f.event.issue.body=JSON.stringify({...f.request,
