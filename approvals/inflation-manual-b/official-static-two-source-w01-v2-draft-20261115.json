@@ -14,7 +14,7 @@
     },
     {
       "path": "lib/diagnostic-layer/xlsx-lite.mjs",
-      "sha256": "d80c6a705d4d15be0b1381a04e0b26b50053eb4f87d37b5da64ccb340841e4b0"
+      "sha256": "44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a"
     },
     {
       "path": "scripts/pc-writer/local-cycle.mjs",
