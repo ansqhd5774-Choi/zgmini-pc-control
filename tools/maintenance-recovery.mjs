@@ -71,6 +71,14 @@ export function archiveUntouched({root:base,requestId,ownerBytes,markerBytes,led
  }finally{if(!keep){need(json(claimFile).nonce===claimNonce,'RECOVERY_CLAIM_CHANGED');fs.unlinkSync(claimFile);fs.rmdirSync(claim);}}
 }
 
+export function verifyOperatingRunners(rows){
+ const names=Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1));
+ if(!Array.isArray(rows))return {runnerSetVerified:false,runnersIdle:false};
+ const operating=rows.filter(x=>names.includes(x.name));
+ return {runnerSetVerified:operating.length===6&&names.every(n=>operating.filter(x=>x.name===n&&x.status==='online').length===1),
+  runnersIdle:operating.length===6&&operating.every(x=>x.busy===false)};
+}
+
 function observe(requestId){
  const ledgerFile=path.join(root,'ledger',requestId+'.json');
  const ledgerBytes=fs.readFileSync(ledgerFile),ledger=JSON.parse(ledgerBytes);
@@ -95,13 +103,12 @@ function observe(requestId){
   issue.user?.login==='ansqhd5774-Choi'&&issue.title==='pc-controller-update'&&
   body?.requestId===requestId&&body?.targetControllerSha===ledger.targetSha;
  const rows=github('actions/runners?per_page=100').runners;
- const names=Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1));
+ const operatingRunners=verifyOperatingRunners(rows);
  const state={ledger,identityVerified,ownerAlive:alive(owner.pid),actualSha:host.controllerSourceSha,controllerVerified,
   maintenanceVerified,backupExists:fs.existsSync(path.join(control,'backups','controller-update-'+requestId)),
   backlogExists:fs.existsSync(path.join(root,'backlog',requestId+'.json')),
   workflow:github('actions/workflows/pc-job.yml').state,
-  runnerSetVerified:rows.length===6&&names.every(n=>rows.some(x=>x.name===n&&x.status==='online')),
-  runnersIdle:rows.every(x=>x.busy===false),
+  ...operatingRunners,
   otherLeaseCount:fs.readdirSync(path.join(control,'leases')).filter(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-')).length};
  return {state,ownerBytes,markerBytes,ledgerBytes};
 }
