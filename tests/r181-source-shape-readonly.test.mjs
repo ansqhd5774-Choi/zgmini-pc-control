@@ -114,6 +114,27 @@ test('reporter rejects forged source text in shape token field',()=>{
   assert.equal(sanitizeR181ShapeResult(malicious,x.request,x.env).status,
     'STATE_UNKNOWN');
 });
+test('imported R181 primary module is sanitized, never returns executable source',()=>{
+  const x=fixture(),shape=classifyR181SourceForFixture(source());
+  const dependencySource=[
+    "const secret='GMH_API_KEY_PRIVATE_xxxxx';",
+    "function buildUrl(ticker){return 'https://getmarkethistory.com/api/v1/foo/'+ticker;}",
+    "export {buildUrl};",
+  ].join('\n');
+  shape.dependency={filename:'r181-primary.mjs',sha256:'a'.repeat(64),
+    bytes:dependencySource.length,shape:classifyR181SourceForFixture(dependencySource)};
+  const r={schema:'ZGMINI_R181_SHAPE_RESULT_V1',status:'PASS',
+    code:'R181_SOURCE_SHAPE_READONLY',requestId:x.request.requestId,shape};
+  const clean=sanitizeR181ShapeResult(r,x.request,x.env);
+  assert.equal(clean.status,'PASS');
+  assert.equal(clean.shape.dependency.sha256,'a'.repeat(64));
+  assert.equal(JSON.stringify(clean).includes('GMH_API_KEY_PRIVATE'),false);
+  assert.equal(JSON.stringify(clean).includes('https://getmarkethistory.com'),false);
+  const invalid={...r,shape:{...shape,dependency:{...shape.dependency,
+    filename:'custom-unapproved.mjs'}}};
+  assert.equal(sanitizeR181ShapeResult(invalid,x.request,x.env).status,
+    'STATE_UNKNOWN');
+});
 test('existing B workflow routes only explicit source-shape title',()=>{
   const here=path.dirname(fileURLToPath(import.meta.url));
   const workflow=fs.readFileSync(path.join(here,'..','.github','workflows',
