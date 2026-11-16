@@ -87,7 +87,7 @@ function ledger(name,io={}){
  const status=typeof o?.status==='string'&&/^[A-Z0-9_]{1,80}$/.test(o.status)?
   o.status:'UNKNOWN';
  const dates=Object.fromEntries(['observationDate','observedDate','baseObservationDate',
-  'confirmedObservationDate'].map(k=>[k,date(o[k])]));
+  'confirmedObservationDate'].map(k=>[k,date(o?.[k])]));
  return {status,dates,modifiedAt:null};
 }
 export function countStorageNames(names){
