@@ -399,3 +399,23 @@ test('invalid and partial endpoint log cannot claim comprehensive HTTP coverage'
    'user:pass@api':{requests:1,statuses:{200:1}}}}})],now);
  assert.equal(forged.status,'STATE_UNKNOWN');
 });
+
+test('recent real HTTP 200 with unverified cadence is safe in exact A roster projection',()=>{
+ const host={host:'data.alpaca.markets',monitored:true,monitoringState:'normal',
+  reason:'RECENT_2XX_CADENCE_UNVERIFIED',lastAttemptAt:'2026-11-16T00:00:11.478Z',
+  last2xxRunAt:'2026-11-16T00:00:11.478Z',lastRunStatuses:{200:1},
+  secret:'PRIVATE_CREDENTIAL'};
+ const raw={status:'PASS',source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',
+  scope:'FIXED_LOCAL_JSONL_ONLY',now:'2026-11-16T14:34:00Z',
+  windowDays:14,monitoredHostCount:1,monitoredHostsReturned:1,
+  omittedHosts:0,http:{normal:1,failed:0,unknown:0,total:1},hosts:[host]};
+ const projected=projectObservedProviderHosts(raw);
+ assert.equal(projected.status,'PASS');
+ assert.deepEqual(projected.http,{normal:1,failed:0,unknown:0,total:1});
+ assert.equal(projected.hosts[0].reason,'RECENT_2XX_CADENCE_UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(projected),/PRIVATE_CREDENTIAL/);
+ assert.equal(projected.providerCalls,0);
+ assert.equal(projected.operationalWrites,0);
+ assert.equal(projectObservedProviderHosts({...raw,hosts:[
+  {...host,reason:'RECENT_2XX_SECRET_COMMAND'}]}).status,'STATE_UNKNOWN');
+});
