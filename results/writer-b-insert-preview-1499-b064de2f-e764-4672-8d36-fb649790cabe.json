@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "b064de2f-e764-4672-8d36-fb649790cabe",
+  "chatId": "52bb79f0-5c53-43f6-8a97-2bdd28d99dd3",
+  "issueNumber": 1499,
+  "status": "BLOCKED",
+  "code": "WRITER_B_INSERT_ANCHOR_MATCH_STOP",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0
+}
