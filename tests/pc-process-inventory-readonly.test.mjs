@@ -1,6 +1,7 @@
 import test from 'node:test';
+import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -304,4 +305,24 @@ test('#1501 current runtime and independent maintenance health are distinct from
  assert.equal(unknown.runtimeState,'UNVERIFIED');
  assert.equal(unknown.maintenanceState,'UNVERIFIED');
  assert.equal(unknown.automationState,'PARTIAL_OR_UNVERIFIED');
+});
+test('#1501 isolate runtime signal that prevents healthy classification',()=>{
+ const sample={controllerFilesVerified:true,supervisorAlive:false,
+  supervisorIdentityVerified:false,supervisorFresh:false,
+  supervisorChildrenVerified:false,runnerSetOnline:true,workflowState:'active',
+  nonce:'SECRET_NONCE',ownerPid:4567};
+ const signals=safeRuntimeSignals(sample);
+ assert.deepEqual(signals,{
+  controllerFilesVerified:true,supervisorAlive:false,
+  supervisorIdentityVerified:false,supervisorFresh:false,
+  supervisorChildrenVerified:false,runnerSetOnline:true,workflowActive:true});
+ const projected=sanitizeRuntimeSignals(signals);
+ assert.deepEqual(projected,signals);
+ assert.doesNotMatch(JSON.stringify(projected),/SECRET|nonce|ownerPid|4567/);
+ const unknown=safeRuntimeSignals({workflowState:'ERROR',
+  supervisorAlive:'yes',runnerSetOnline:'online'});
+ assert.equal(unknown.supervisorAlive,null);
+ assert.equal(unknown.runnerSetOnline,null);
+ assert.equal(unknown.workflowActive,null);
+ assert.equal(sanitizeRuntimeSignals({supervisorAlive:'false'}).supervisorAlive,null);
 });
