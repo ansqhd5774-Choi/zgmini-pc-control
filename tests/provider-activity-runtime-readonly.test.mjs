@@ -149,3 +149,20 @@ test('host list and status counters never disclose raw response URL, header or c
  assert.ok(!serialized.includes('TOPSECRET'));
  assert.ok(!serialized.includes('responseUrl'));
 }));
+
+test('more than 128 newer one-off hosts do not evict the 32 repeated HTTP hosts',()=>fixture(({d,write})=>{
+ const repeatedNames=Array.from({length:32},(_,i)=>'repeat'+i+'.provider.org');
+ const repeated=Object.fromEntries(repeatedNames.map(name=>[name,host({'200':1})]));
+ const oneOff=Object.fromEntries(Array.from({length:160},(_,i)=>['once'+i+'.provider.org',host({'200':1})]));
+ write([event('2026-11-14T12:00:00Z',repeated),
+  event('2026-11-15T11:00:00Z',repeated),
+  event('2026-11-15T12:00:00Z',oneOff)]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.observedHostCount,192);
+ assert.equal(out.monitoredHostCount,32);
+ assert.equal(out.monitoredHostsReturned,32);
+ assert.deepEqual(out.hosts.filter(x=>x.monitored).map(x=>x.host).sort(),repeatedNames.sort());
+ assert.deepEqual(out.http,{normal:32,failed:0,unknown:0,total:32});
+ assert.equal(out.status,'STATE_UNKNOWN'); // full 192-host log exceeds the bounded trust envelope
+ assert.equal(out.omittedHosts,128);
+}));
