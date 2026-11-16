@@ -36,7 +36,7 @@ export function verifyCensusBCollectorResult(result){
   'W01_CENSUS_B_COLLECTOR_RESULT_STOP');
  return result;
 }
-const safeCode=e=>/^W01_CENSUS_B_[A-Z0-9_]{3,90}$/.test(e?.code??'')?
+const safeCode=e=>/^(?:W01_CENSUS_B|INFL_MANUAL_B)_[A-Z0-9_]{3,90}$/.test(e?.code??'')?
  e.code:'W01_CENSUS_B_IO_UNVERIFIED_STOP';
 export async function performCensusApiB(proof,io){
  assertCensusBAuthorized(proof);
