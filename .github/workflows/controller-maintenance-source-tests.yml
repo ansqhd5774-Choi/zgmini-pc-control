@@ -14,6 +14,8 @@ on:
       - 'tools/r181-primary-route-candidate.mjs'
       - 'tools/r181-primary-b-transaction.mjs'
       - 'tools/r181-primary-b-entry.mjs'
+      - 'tools/r181-existing-task-once.mjs'
+      - 'tools/r181-existing-task-report.mjs'
       - 'tools/r181-primary-b-report.mjs'
       - 'tools/r181-protected-b-transaction.mjs'
       - 'tools/r181-source-shape-readonly.mjs'
@@ -39,6 +41,7 @@ on:
       - 'tests/maintenance-contract.test.mjs'
       - 'tests/r181-pinned-route-candidate.test.mjs'
       - 'tests/r181-primary-route-b.test.mjs'
+      - 'tests/r181-existing-task-once.test.mjs'
       - 'tests/r181-protected-b-transaction.test.mjs'
       - 'tests/r181-source-shape-readonly.test.mjs'
       - 'tests/r181-protected-b-windows-io.test.mjs'
@@ -88,6 +91,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-source-shape-readonly.test.mjs
       - name: Verify W03 actual r181-primary.mjs B route, fixed source and Windows protection
         run: node --test --test-concurrency=1 tests/r181-primary-route-b.test.mjs
+      - name: Verify W03 bounded start of existing R181 Task with one-shot journal
+        run: node --test --test-concurrency=1 tests/r181-existing-task-once.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes

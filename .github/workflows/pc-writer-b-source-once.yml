@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-primary-route-install') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.sha }}
           path: writer-b-control
           # R181 pins a reviewed code ancestor; generic Writer B stays shallow.
-          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install') && '0' || '1' }}
+          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once') && '0' || '1' }}
           persist-credentials: false
       - name: Approve exact manifest before candidate checkout
         if: github.event.issue.title == 'pc-writer-source-install'
@@ -80,6 +80,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-primary-b-report.mjs"'
+      - name: Launch existing registered R181 collector exactly once by approved Windows Task
+        if: github.event.issue.title == 'r181-existing-task-run-once'
+        id: r181task
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-existing-task-once.mjs"'
+      - name: Record one-shot R181 Task run acceptance without asserting data collection
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-existing-task-run-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-existing-task-report.mjs"'
       - name: Inspect fixed R181 URL shape without source disclosure or provider calls
         if: github.event.issue.title == 'r181-source-shape-readonly'
         id: r181shape
