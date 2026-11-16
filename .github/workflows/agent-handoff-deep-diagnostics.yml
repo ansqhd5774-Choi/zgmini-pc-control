@@ -1,0 +1,40 @@
+name: ZGMINI Handoff Deep Evidence Diagnostics R2
+on:
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  actions: read
+  issues: write
+# Serialize both diagnostic writers to the shared evidence ledger.
+concurrency:
+  group: zgmini-proactive-diagnostics-ledger
+  cancel-in-progress: false
+jobs:
+  handoff-evidence-and-conditional-simulation:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'schedule') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.actor == 'ansqhd5774-Choi'))
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Read verified seven-day backlog and publish bounded evidence only
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/deep-diagnostics-runner.mjs

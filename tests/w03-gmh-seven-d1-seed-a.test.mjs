@@ -84,6 +84,31 @@ test('D1 base and rolling seed compare 7x252 and emit no score or raw bar values
  assert.equal(diff.mismatchedScores,1);
  assert.equal(diff.maxScoreDifference,3);
 });
+test('R32 is read only as a separate 9-theme model, never mistaken for PAIR50 parity',()=>{
+ const baseline=seed();
+ const r32={status:'READY',version:'THEME_LEGACY_NINE_R37_PUBLIC_V1',
+  methodologyVersion:'ETF_ONLY_T40_R20_V40_ADAPTIVE_R2_DATED_ISSUER_AUM_R32',
+  observationDate:'2026-10-28',
+  themes:Array.from({length:9},(_,i)=>({theme:'R32_'+i,
+   history:days.map(date=>({date,score:75}))}))};
+ const got=compareD1Seed(candidate(),row(baseline),
+  row(rolling(baseline)),row(r32));
+ assert.equal(got.r32Present,true);
+ assert.equal(got.r32VersionMatch,true);
+ assert.equal(got.r32MethodologyMatch,true);
+ assert.equal(got.r32ObservationDate,'2026-10-28');
+ assert.equal(got.r32History252Valid,true);
+ assert.match(got.r32BodySha256,/^[a-f0-9]{64}$/);
+ assert.equal(got.comparedScores,1764);
+ assert.equal(got.mismatchedScores,0);
+ assert.equal(got.r32NonRegressionVerified,false);
+ assert.equal(got.d1Writes,0);
+ assert.ok(!JSON.stringify(got).includes('"score":75'));
+ const missing=compareD1Seed(candidate(),row(baseline),row(rolling(baseline)));
+ assert.equal(missing.r32Present,false);
+ assert.equal(missing.r32History252Valid,false);
+ assert.equal(missing.r32BodySha256,null);
+});
 test('stale or absent D1 base cannot be described as compatible and never writes',()=>{
  const a=compareD1Seed(candidate(),null,null);
  assert.equal(a.seedPresent,false);
@@ -117,11 +142,15 @@ test('isolated Windows compute/data read-only plan cannot leak D1 raw content',a
  assert.equal(sanitize(bad,request(),env()).status,'STATE_UNKNOWN');
  assert.ok(!JSON.stringify(safe).includes('"score":50'));
 });
-test('D1 source reads two fixed SELECTs and never issues credential refresh',()=>{
+test('D1 source reads three fixed SELECTs including R32 and never writes',()=>{
  const s=readFileSync(new URL('../tools/w03-gmh-seven-d1-seed-a.mjs',
   import.meta.url),'utf8');
  assert.ok(s.includes('SELECT body,stored_at FROM market_public_snapshots_v1'));
  assert.ok(s.includes('SELECT body,stored_at FROM public_feed_snapshots_v1'));
+ assert.ok(s.includes("const R32_KEY='theme-legacy-nine-r37'"));
+ assert.ok(s.includes('params:[R32_KEY]'));
+ assert.ok(s.includes('rows.length===3'));
+ assert.doesNotMatch(s,/db\.prepare\(\s*['\"](?:UPDATE|INSERT|DELETE)/i);
  assert.ok(s.includes('apiToken:null'));
  assert.ok(s.includes('W03_GMH_D1_OAUTH_REFRESH_FORBIDDEN_STOP'));
  assert.ok(s.includes('mod.client(binding,token).request(binding.core,statements)'));

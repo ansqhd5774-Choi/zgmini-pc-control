@@ -169,3 +169,70 @@ test('dedicated JScript witness reports empty Task instances versus task/WMI err
  assert.equal(invoke({wmiFails:true}).wmiStatus,'ERROR');
  assert.doesNotMatch(JSON.stringify(invoke({wmiFails:true})),/private|CommandLine|5000/);
 });
+
+
+test('initial absent lock stays LOCK_NOT_VERIFIED, not a fabricated lock race',async()=>{
+ const f=fixture();
+ let reads=0;
+ f.ctx.readLock=()=>{reads++;return {status:'ABSENT'};};
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_LOCK_NOT_VERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_LOCK_NOT_VERIFIED');
+ assert.equal(r.stage,'LOCK');
+ assert.equal(r.lock.before,'ABSENT');
+ assert.equal(r.lock.after,'ABSENT');
+ assert.equal(r.lock.same,null);
+ assert.equal(reads,2);
+ assert.equal(f.seen.length,0);
+});
+
+test('invalid first lock followed by a valid lock remains initial lock verification failure',async()=>{
+ const f=fixture();
+ let reads=0;
+ f.ctx.readLock=()=>++reads===1?{status:'INVALID'}:
+  {status:'PRESENT',pid:5000,at:start+20000,hash:'LATER'};
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_LOCK_NOT_VERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_LOCK_NOT_VERIFIED');
+ assert.equal(r.lock.same,null);
+ assert.equal(r.probeCounts.event,0);
+});
+
+test('lock replacement after independent reader failure preserves first failed reader step',async()=>{
+ const f=fixture({failEvent:true,secondHash:'CHANGED'});
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_LOCK_SNAPSHOT_RACE');
+ assert.equal(r.firstFailCode,'INFL_E129_READER_UNAVAILABLE');
+ assert.equal(r.stage,'READER');
+ assert.equal(r.lock.same,false);
+ assert.equal(r.status,'STATE_UNKNOWN');
+});
+
+test('unavailable final lock is readback uncertainty, not fabricated replacement',async()=>{
+ const f=fixture({owner:{...initial,ownerCreatedAtMs:start}});
+ let reads=0;
+ f.ctx.readLock=()=>++reads===1?
+  {status:'PRESENT',pid:5000,at:start+20000,hash:'LOCK'}:
+  {status:'UNAVAILABLE'};
+ const r=await run(f);
+ assert.equal(r.rawBDirect.ok,true);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_READBACK_UNVERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_LOCK_READBACK_UNVERIFIED');
+ assert.equal(r.lock.same,null);
+ assert.equal(r.stage,'AFTER_LOCK');
+});
+
+test('exception in lock recheck is UNKNOWN while initial errors keep their first fail',async()=>{
+ const f=fixture({failWmi:true});
+ let reads=0;
+ f.ctx.readLock=()=>{
+  if(++reads===1)return {status:'PRESENT',pid:5000,at:start+20000,hash:'LOCK'};
+  throw Error('private lock readback message');
+ };
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_LOCK_READBACK_UNVERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_TASK_OR_WMI_UNAVAILABLE');
+ assert.equal(r.stage,'WMI');
+ assert.doesNotMatch(JSON.stringify(r),/private lock readback message/);
+});
