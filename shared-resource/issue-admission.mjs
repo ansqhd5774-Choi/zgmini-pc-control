@@ -36,6 +36,7 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   'r181-source-shape-readonly',
   'r181-saved-ledger-readonly',
   'w03-r179-stored-handoff-readonly',
+  'w03-r179-guard-shape-readonly',
   'w03-r179-readback-guard-install',
   'r181-primary-route-install',
   'r181-existing-task-run-once',
