@@ -290,6 +290,41 @@ export async function inspectInflationEvent129Once({
     if(out.firstFailCode===out.code)out.stage='AFTER_LOCK';
    }
   }
+  // A one-shot observer can still report Event129 reader/encoding/field
+  // coverage when Core is idle. This is NOT a B ownership proof.
+  if(out.status!=='PASS'&&out.probeCounts.event===0&&clock()-start<=68000){
+   snapshot(out,clock,'EVENT129_COVERAGE_ONLY');
+   out.probeCounts.event++;
+   try{
+    const coverage=execute(EVENT_TOOL,['qe','Microsoft-Windows-TaskScheduler/Operational',
+     '/q:*[System[(EventID=129)]]','/rd:true','/c:64','/f:xml'],
+     {timeout:12000,maxBuffer:MAX_XML});
+    out.reader=statusOf(coverage);
+    if(out.reader==='OK'){
+     const dec=decode(coverage.stdout);
+     out.encoding=dec.encoding;out.bom=dec.bom;
+     const rawText=coverage.stdout.toString('utf8');
+     const extra=describeEvent129(rawText,before?.pid,
+      owner?.ownerCreatedAtMs,before?.at,clock);
+     const bound=before?.status==='PRESENT';
+     const witnessed=bound&&Number.isSafeInteger(owner?.ownerCreatedAtMs);
+     out.event={total:extra.total,systemMatch:extra.systemMatch,
+      taskMatch:extra.taskMatch,fieldsPresent:extra.fieldsPresent,
+      fieldCounts:extra.fieldCounts,pidMatch:bound?extra.pidMatch:null,
+      timeParsed:witnessed?extra.timeParsed:null,
+      withinTime:witnessed?extra.withinTime:null,
+      timeDeltaMs:witnessed?extra.timeDeltaMs:null,
+      candidateCount:extra.candidateCount};
+     if(dec.ok){
+      const auxiliary=describeEvent129(dec.text,before?.pid,
+       owner?.ownerCreatedAtMs,before?.at,clock);
+      out.supplemental={parsed:auxiliary.parsed,
+       coreCandidates:auxiliary.taskMatch,
+       onlySupplemental:auxiliary.taskMatch>0&&extra.taskMatch===0};
+     }
+    }
+   }catch{out.reader='ERROR';}
+  }
   // Must never advertise success without a stable lock, nor confuse an auxiliary parse with B.
   if(clock()-start>80000){out.status='STATE_UNKNOWN';out.code='INFL_E129_TIME_BUDGET_STOP';}
  }
