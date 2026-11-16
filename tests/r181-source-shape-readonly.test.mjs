@@ -55,6 +55,26 @@ test('malicious identifiers and literals never appear in de-identified output',(
       'API_TOKEN_SUPER_SECRET','sk-special','getmarkethistory.com',
       '/api/v1/bars/stocks/'])assert.equal(out.includes(secret),false);
 });
+test('import-path discovery and URL parts expose only fixed masked evidence',()=>{
+  const body=[
+    "import {urlBuilder} from './r167-cycle.mjs';",
+    "import fs from 'node:fs';",
+    "const root='https://getmarkethistory.com';",
+    "const request='?source=stocks&symbol=SPY';",
+    "const API_SECRET_ACCESS='the-private-token-must-not-appear';",
+  ].join('\n');
+  const report=classifyR181SourceForFixture(body);
+  assert.ok(report.importFiles.some(x=>
+    x.basename==='r167-cycle.mjs'&&x.kind==='RELATIVE_MODULE'));
+  assert.ok(report.literalSignalsByLine.some(x=>
+    x.signals.includes('HOST_GMH')));
+  assert.ok(report.literalSignalsByLine.some(x=>
+    x.signals.includes('SOURCE_PARAM')&&
+    x.signals.includes('SYMBOL_PARAM')));
+  const serialized=JSON.stringify(report);
+  assert.equal(serialized.includes('the-private-token-must-not-appear'),false);
+  assert.equal(serialized.includes('https://getmarkethistory.com'),false);
+});
 test('pinned real classifier refuses synthetic and unexpected bytes',()=>{
   assert.throws(()=>classifyPinnedR181Source(Buffer.from(source())),
     e=>e.code==='R181_INSPECT_SOURCE_SIZE_STOP');
