@@ -286,3 +286,22 @@ test('#1501 backlog refuses wrong schema, invalid windows, symlink, missing owne
   read:()=>{throw Error('must not read');}});
  assert.equal(unsafe.code,'C1501_BACKLOG_UNSAFE_DIRECTORY');
 });
+test('#1501 current runtime and independent maintenance health are distinct from workflow and lease',()=>{
+ const base={maintenanceSourceSha:'a'.repeat(40),maintenanceFilesVerified:true,
+  actualControllerSha:'b'.repeat(40),
+  installLock:{held:true,recoveryRequired:true},diagnostics:[],
+  workflowState:'active',runtimeState:'HEALTHY',
+  maintenanceState:'HEALTHY',automationState:'HEALTHY',nonce:'secret'};
+ const ok=sanitizeMaintenanceStatus(base);
+ assert.equal(ok.runtimeState,'HEALTHY');
+ assert.equal(ok.maintenanceState,'HEALTHY');
+ assert.equal(ok.automationState,'HEALTHY');
+ assert.equal(ok.workflowState,'active');
+ assert.equal(ok.installLockHeld,true);
+ assert.doesNotMatch(JSON.stringify(ok),/nonce|secret/i);
+ const unknown=sanitizeMaintenanceStatus({...base,runtimeState:'COMPROMISED',
+  maintenanceState:'COMPROMISED',automationState:'COMPROMISED'});
+ assert.equal(unknown.runtimeState,'UNVERIFIED');
+ assert.equal(unknown.maintenanceState,'UNVERIFIED');
+ assert.equal(unknown.automationState,'PARTIAL_OR_UNVERIFIED');
+});
