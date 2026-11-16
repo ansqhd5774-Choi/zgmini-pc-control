@@ -29,6 +29,11 @@ on:
       - 'tools/r181-saved-ledger-report.mjs'
       - 'tools/w03-r179-stored-handoff-readonly.mjs'
       - 'tools/w03-r179-stored-handoff-report.mjs'
+      - 'tools/w03-r179-seven-readback-b.mjs'
+      - 'tools/w03-r179-seven-readback-windows-io.mjs'
+      - 'tools/w03-r179-seven-readback-entry.mjs'
+      - 'tools/w03-r179-seven-readback-report.mjs'
+      - 'tests/w03-r179-seven-readback-b.test.mjs'
       - 'tests/w03-r179-stored-handoff.test.mjs'
       - 'tools/r181-protected-b-windows-io.mjs'
       - 'tools/r181-protected-b-entry.mjs'
@@ -95,6 +100,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
       - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
         run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
+      - name: Verify W03 exact R179 seven-versus-ten B source contract and isolated transaction simulation
+        run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-b.test.mjs
       - name: Verify W03 R179 stored handoff source/ledger/privacy before running existing PC-only publisher
         run: node --test --test-concurrency=1 tests/w03-r179-stored-handoff.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only
