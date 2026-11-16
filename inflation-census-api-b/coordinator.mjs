@@ -43,7 +43,7 @@ export async function performCensusApiB(proof,io){
  need(io&&METHODS.every(name=>typeof io[name]==='function'),
   'W01_CENSUS_B_IO_CONTRACT_STOP');
  let writer=false,core=false,claimed=false,writeIntent=false,retain=false;
- let firstFail=null,phase='PREFLIGHT';
+ let firstFail=null,phase='PREFLIGHT',outcome=null;
  try{
   await io.proveLiveCoreLockOwner();phase='CORE_OWNER_VERIFIED';
   await io.acquireSharedWriterLease(proof.request.requestId);writer=true;
@@ -64,7 +64,7 @@ export async function performCensusApiB(proof,io){
   await io.verifySavedReadback(output);
   writeIntent=false;phase='READBACK_VERIFIED';
   await io.journalPhase('COMPLETED');
-  return {status:'PASS',code:'W01_CENSUS_B_SAVED_READBACK',
+  outcome={status:'PASS',code:'W01_CENSUS_B_SAVED_READBACK',
    requestId:proof.request.requestId,sourceSha:proof.manifest.installedSourceSha,
    providerCalls:2,stored:output.completed[0].status,
    publicWrites:0,d1Writes:0,taskChanges:0,
@@ -75,7 +75,7 @@ export async function performCensusApiB(proof,io){
   if(claimed)try{
    await io.journalPhase(retain?'RECOVERY_REQUIRED':'CLAIMED_UNTOUCHED_STOP');
   }catch{retain=true;firstFail='W01_CENSUS_B_JOURNAL_UNVERIFIED_STOP';}
-  return {status:retain?'STATE_UNKNOWN':'STOP',
+  outcome={status:retain?'STATE_UNKNOWN':'STOP',
    code:firstFail,requestId:proof.request.requestId,
    sourceSha:proof.manifest.installedSourceSha,
    lastPass:phase,providerCalls:writeIntent?null:0,
@@ -87,11 +87,13 @@ export async function performCensusApiB(proof,io){
     // Do not release the shared Writer mutex when the Core lease ownership
     // cannot be proven. This is for the original request's recovery owner.
     retain=true;firstFail='W01_CENSUS_B_CORE_RELEASE_UNVERIFIED_STOP';
+    outcome={...outcome,status:'STATE_UNKNOWN',code:firstFail,providerCalls:null};
    }
   }
   if(writer){
    try{await io.releaseSharedWriterLease({requestId:proof.request.requestId,retain});}
-   catch{firstFail='W01_CENSUS_B_WRITER_RELEASE_UNVERIFIED_STOP';}
+   catch{firstFail='W01_CENSUS_B_WRITER_RELEASE_UNVERIFIED_STOP';
+    outcome={...outcome,status:'STATE_UNKNOWN',code:firstFail,providerCalls:null};}
   }
- }
+ } return outcome;
 }
