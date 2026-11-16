@@ -15,6 +15,7 @@ import {inspectUsBreadthR17Runtime} from './us-breadth-r17-runtime-readonly.mjs'
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectDeltaR44CheckpointEvidence} from './market-calendar-r44-runtime-readonly.mjs';
+import {inspectR44ExistingInputAudit} from './market-calendar-r44-input-audit-readonly.mjs';
 import {inspectR44ProductionReadonly} from './market-calendar-r44-production-readonly.mjs';
 import {inspectER1NovemberAvailability} from './market-calendar-er1-nov30-availability-readonly.mjs';
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
@@ -114,6 +115,7 @@ export async function runOperation(request,context){
  }
  if(request.operation==='source-inventory-runtime-readonly')return inspectSourceInventory(dataRoot);
  if(request.operation==='market-calendar-r44-runtime-readonly')return inspectDeltaR44CheckpointEvidence(dataRoot);
+ if(request.operation==='market-calendar-r44-input-audit-readonly')return inspectR44ExistingInputAudit(dataRoot);
  if(request.operation==='market-calendar-r44-production-readonly')return inspectR44ProductionReadonly();
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
