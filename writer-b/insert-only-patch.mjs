@@ -11,7 +11,7 @@ const sha256=x=>createHash('sha256').update(x).digest('hex');
 // and still require the exact 64-hex PC preimage + approved after SHA at B.
 const SEC_CORE_PATH='scripts/pc-writer/collect-local.mjs';
 const SEC_CORE_SELECTORS=Object.freeze({
- '@zgmini:sec-core:entry':/^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+collectLocal\s*\(/,
+ '@zgmini:sec-core:entry':/^\s*(?:export\s+)?(?:default\s+)?async\s+function\s+collectLocal\s*\(/,
  '@zgmini:sec-core:quota':/^\s*(?:const|let)\s+quota\s*=\s*createQuotaFetch\s*\(/
 });
 export function insertionAnchorIndices(lines,anchor,{filePath=null}={}){
