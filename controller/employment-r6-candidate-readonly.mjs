@@ -28,6 +28,9 @@ const PIT_FIELDS=['coreCurrentRows','coreHistoryRevisions','coreCurrentKeys',
   'coreMissingHistoryKeysWithConsistentCandidateMetadata',
   'coreMissingHistoryKeysWithoutConsistentCandidateMetadata'];
 const count=n=>Number.isSafeInteger(n)&&n>=0?n:null;
+const dateOnly=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)
+  &&Number.isFinite(Date.parse(x+'T00:00:00Z'))
+  &&new Date(x+'T00:00:00Z').toISOString().slice(0,10)===x?x:null;
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const safe=code=>/^[A-Z0-9_]{1,100}$/.test(code??'')?code:'R6_CONTROLLER_INTERNAL_ERROR';
@@ -158,7 +161,8 @@ export async function inspectEmploymentR6Candidate(request,context){
     const walPreflight=Object.fromEntries(['coreWalMode','candidateWalMode',
       'coreWalSidecarsPreexisting','candidateWalSidecarsPreexisting'].map(k=>[k,body.walPreflight?.[k]===true]));
     return {status:body.status,code:body.code,actualExecutionSha:request.sourceSha,
-      sourceBundleSha:request.sourceSha,sqliteOpened:body.sqliteOpened===true,
+      sourceBundleSha:request.sourceSha,asOfDate:dateOnly(body.asOfDate),
+      sqliteOpened:body.sqliteOpened===true,
       summary,pit,indicators,bodyDigest:HASH.test(body.bodyDigest??'')?body.bodyDigest:null,
       walPreflight,promotionApproved:false,
       memoryTelemetry:{...child.memoryTelemetry,
