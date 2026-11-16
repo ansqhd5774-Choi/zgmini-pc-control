@@ -63,10 +63,10 @@ export function safeRuntimeSignals(state){
 // URLs, credentials or execution paths. A 403 does NOT prove six offline seats.
 export function classifyRunnerQueryError(error){
  const msg=String(error?.stderr??error?.message??'');
- if(/\\bHTTP\\s*403\\b|\\b403\\s+Forbidden\\b/i.test(msg))return 'HTTP_403_FORBIDDEN';
- if(/\\bHTTP\\s*401\\b|\\b401\\s+Unauthorized\\b/i.test(msg))return 'HTTP_401_UNAUTHORIZED';
- if(/\\bHTTP\\s*404\\b|\\b404\\s+Not Found\\b/i.test(msg))return 'HTTP_404_NOT_FOUND';
- if(/\\bHTTP\\s*429\\b|\\b429\\s+Too Many Requests\\b/i.test(msg))return 'HTTP_429_LIMITED';
+ if(/\bHTTP\s*403\b|\b403\s+Forbidden\b/i.test(msg))return 'HTTP_403_FORBIDDEN';
+ if(/\bHTTP\s*401\b|\b401\s+Unauthorized\b/i.test(msg))return 'HTTP_401_UNAUTHORIZED';
+ if(/\bHTTP\s*404\b|\b404\s+Not Found\b/i.test(msg))return 'HTTP_404_NOT_FOUND';
+ if(/\bHTTP\s*429\b|\b429\s+Too Many Requests\b/i.test(msg))return 'HTTP_429_LIMITED';
  if(error?.code==='ETIMEDOUT')return 'REQUEST_TIMEOUT';
  return 'RUNNER_QUERY_ERROR_OTHER';
 }
