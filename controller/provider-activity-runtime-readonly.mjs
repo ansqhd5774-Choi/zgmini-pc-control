@@ -55,13 +55,20 @@ export function classifyObservedHttpHost(x,now){
  // overdue clock. The unverified cadence stays visible in the reason.
  const last2xxFresh=successes>0&&x.lastAttemptAt!==null&&
   age>=0&&age<=24*3600_000;
+ // Census BFS CSV is an official monthly on-demand history source. An
+ // observed successful batch in the existing 14-day cohort remains
+ // reachable even without daily requests. Never override hard errors.
+ const monthlyBfsEvidence=x.host==='cdn.www.census.gov'&&
+  repeated&&x.lastAttemptAt!==null&&age>=0&&
+  age<=15*86400_000&&successes>0&&lastOutcome==='success';
  const monitoringState=!repeated?'unknown':
   confirmedHttpError?'failed':
-  nonPeriodicStale?'unknown':
-  overdue&&!last2xxFresh?'unknown':
+  nonPeriodicStale&&!monthlyBfsEvidence?'unknown':
+  overdue&&!last2xxFresh&&!monthlyBfsEvidence?'unknown':
   successes>0?'normal':'unknown';
  const reason=!repeated?'NOT_REPEATED':
   monitoringState==='failed'?'LAST_HTTP_ERROR':
+  monthlyBfsEvidence?'MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW':
   overdue&&last2xxFresh?'RECENT_2XX_CADENCE_UNVERIFIED':
   overdue?'ESTIMATED_CADENCE_OVERDUE':
   nonPeriodicStale?'NO_VERIFIED_SCHEDULE_OVER_36H':

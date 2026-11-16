@@ -419,3 +419,24 @@ test('recent real HTTP 200 with unverified cadence is safe in exact A roster pro
  assert.equal(projectObservedProviderHosts({...raw,hosts:[
   {...host,reason:'RECENT_2XX_SECRET_COMMAND'}]}).status,'STATE_UNKNOWN');
 });
+
+test('bounded monthly Census source evidence is allowed in sanitised 32-host roster',()=>{
+ const h={host:'cdn.www.census.gov',monitored:true,monitoringState:'normal',
+  reason:'MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW',
+  lastAttemptAt:'2026-11-03T21:00:36.518Z',
+  last2xxRunAt:'2026-11-03T21:00:36.518Z',
+  lastRunStatuses:{200:1},rawSecret:'DO_NOT_PRINT'};
+ const raw={status:'PASS',source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',
+  scope:'FIXED_LOCAL_JSONL_ONLY',now:'2026-11-16T14:34:00Z',
+  windowDays:14,monitoredHostCount:1,monitoredHostsReturned:1,
+  omittedHosts:0,http:{normal:1,failed:0,unknown:0,total:1},hosts:[h]};
+ const result=projectObservedProviderHosts(raw);
+ assert.equal(result.rosterComplete,true);
+ assert.deepEqual(result.http,{normal:1,failed:0,unknown:0,total:1});
+ assert.equal(result.hosts[0].reason,'MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW');
+ assert.equal(result.providerCalls,0);assert.equal(result.operationalWrites,0);
+ assert.ok(!JSON.stringify(result).includes('DO_NOT_PRINT'));
+ const tampered=projectObservedProviderHosts({...raw,hosts:[{...h,
+  reason:'MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW_SECRET'}]});
+ assert.equal(tampered.status,'STATE_UNKNOWN');
+});

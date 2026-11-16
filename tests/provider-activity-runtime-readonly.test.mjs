@@ -235,13 +235,33 @@ test('fresh latest HTTP 503 stays failed despite burst-derived cadence',()=>fixt
  assert.equal(x.http.failed,1);
  assert.equal(x.hosts[0].reason,'LAST_HTTP_ERROR');
 }));
-test('13-day-old Census CDN 200 remains unverified without a proved monthly due schedule',()=>fixture(({d,write})=>{
+test('13-day-old Census BFS monthly CDN 200 is within observed monthly window',()=>fixture(({d,write})=>{
  write([
   event('2026-11-02T21:00:00Z',{'cdn.www.census.gov':host({'200':1})}),
   event('2026-11-03T21:00:00Z',{'cdn.www.census.gov':host({'200':1})}),
  ]);
  const out=inspectProviderActivity(d,{now:NOW});
- assert.equal(out.http.unknown,1);
+ assert.equal(out.http.unknown,0);
+ assert.equal(out.http.normal,1);
+ assert.equal(out.hosts[0].reason,'MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW');
+}));
+
+test('monthly Census CDN cannot be green on last real 503',()=>fixture(({d,write})=>{
+ write([
+  event('2026-11-02T21:00:00Z',{'cdn.www.census.gov':host({'200':1})}),
+  event('2026-11-03T21:00:00Z',{'cdn.www.census.gov':host({'503':1})})
+ ]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.http.failed,1);
  assert.equal(out.http.normal,0);
- assert.equal(out.hosts[0].reason,'NO_VERIFIED_SCHEDULE_OVER_36H');
+ assert.equal(out.hosts[0].reason,'LAST_HTTP_ERROR');
+}));
+test('monthly Census CDN 2xx older than observed-window limit is not falsely green',()=>fixture(({d,write})=>{
+ write([
+  event('2026-10-20T21:00:00Z',{'cdn.www.census.gov':host({'200':1})}),
+  event('2026-10-21T21:00:00Z',{'cdn.www.census.gov':host({'200':1})})
+ ]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.http.normal,0);
+ assert.equal(out.hosts.find(x=>x.host==='cdn.www.census.gov')?.monitoringState==='normal',false);
 }));

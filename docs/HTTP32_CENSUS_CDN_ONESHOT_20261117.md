@@ -27,3 +27,12 @@
 - 테스트: `tests/http32-census-cdn-once.test.mjs`
 - 실행 워크플로: `.github/workflows/pc-census-cdn-connectivity-once.yml`
 - 상태: 소스 준비, CI/병합/운영 Issue/실제 HTTP 응답 아직 확인 전
+
+## 실제 운영 실행 결과 — 2026-11-17 01:07 KST
+- 승인자 소유 Issue: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1797
+- Windows PC Run: https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43903908465
+- 운영 로그 검증: `HTTP32_CENSUS_CDN_ONCE` → `status=PASS`, `code=HTTP_200_CSV_FROM_OPERATING_PC`, `httpStatus=200`, `contentType=CSV`, `observedAt=2026-11-16T16:07:56.551Z`.
+- 헤더 `Last-Modified=2026-11-12T15:00:01Z`, `providerCalls=1`, `automaticRetries=0`, `operationalWrites=d1Writes=0`, `collectorRun=false`, `scheduleChanged=false`.
+- **검증 결론:** 운영 PC에서 Census CDN 직접 연결 성공. 이전 HTTP 31/32의 마지막 미확인은 최근 호출 부재(월간 자료)로 인한 감시 판정임을 분리했다.
+- **다음 최소 수정:** 14일 관측 대상에 포함된 공식 월간 BFS CDN만 36시간 일간 검사에서 제외해 마지막 2xx 실측이 있으면 정상, 실제 503·네트워크 오류는 실패로 분류. 현재 수집기/Task/HTTP 로그/DB는 변경하지 않음.
+- 새로운 배포의 HTTP 32/32는 운영 PC/사이트에서 원장 재조회 후에만 확정.
