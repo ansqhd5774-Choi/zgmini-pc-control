@@ -18,7 +18,7 @@ const event=()=>({repository:{full_name:REPO,private:true},
   user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-writer-b-install'}],
   body:JSON.stringify(req())}});
 const specimen=(lines)=>{
- const src=lines.join('\n');
+ const src=[...lines,...Array(12).fill('// fixture line padding')].join('\n');
  const bytes=Buffer.from(src);
  assert.ok(bytes.length<10822);
  return Buffer.from(src+' '.repeat(10822-bytes.length));
