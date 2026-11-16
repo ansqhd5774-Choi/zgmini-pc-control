@@ -225,9 +225,50 @@ export function classify1501LeaseCorrelation(snapshot){
  return as1501(classify996LeaseCorrelation(snapshot,
   {requestId:C1501_ID,issueNumber:1501,targetSha:C1501_TARGET}));
 }
+const SAFE_RECOVERY_PHASES=new Set([
+ 'RECEIVED','VALIDATED','STAGED','INTAKE_PAUSED','DRAINED','BACKED_UP',
+ 'SUPERVISOR_STOPPED','SWITCHED','RECONNECTED','INTAKE_RESUMED',
+ 'BACKLOG_RECONCILED','POSTCHECK_PENDING','PASS','BLOCKED','ROLLED_BACK',
+ 'RECOVERY_REQUIRED']);
+const SAFE_RECOVERY_STATUS=new Set(['RUNNING','UNKNOWN','PASS','BLOCKED',
+ 'ROLLED_BACK','RECOVERY_REQUIRED']);
+const safeOperation=s=>typeof s==='string'&&/^[a-zA-Z][a-zA-Z0-9]{0,63}$/.test(s)?s:null;
+const safeFlag=x=>typeof x==='boolean'?x:null;
+// A PID probe cannot prove process identity, because Windows can recycle PIDs.
+// Never interpret a visible PID as ownership of the original maintenance lease.
+function pidObservation(pid,signal=process.kill){
+ if(!Number.isSafeInteger(pid)||pid<=0)return 'UNKNOWN';
+ try{signal(pid,0);return 'PID_PRESENT_IDENTITY_UNVERIFIED';}
+ catch(e){return e?.code==='ESRCH'?'PID_NOT_PRESENT':'UNKNOWN';}
+}
+export function classify1501RecoveryCheckpoint({lockBefore,lockAfter,first,second},
+ {signal=process.kill,backupPresent=null,backlogPresent=null}={}){
+ const correlation=classify1501LeaseCorrelation({lockBefore,lockAfter,first,second});
+ const empty={...correlation,ledgerPhase:null,ledgerFirstFail:null,
+  ledgerStatus:null,ledgerFailureOperation:null,ledgerIntakePaused:null,
+  ledgerWorkflowEnabled:null,ownerPidObservation:'UNKNOWN',
+  backupPresent:null,backlogPresent:null,eligibleForAutomaticRelease:false};
+ if(correlation.status!=='CORRELATED')return empty;
+ let ledger;
+ try{ledger=JSON.parse(first.ledger.toString('utf8'));}catch{return empty;}
+ return {...empty,
+  ledgerPhase:SAFE_RECOVERY_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:SAFE_RECOVERY_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  ledgerStatus:SAFE_RECOVERY_STATUS.has(ledger.status)?ledger.status:null,
+  ledgerFailureOperation:safeOperation(ledger.failureOperation),
+  ledgerIntakePaused:safeFlag(ledger.intakePaused),
+  ledgerWorkflowEnabled:safeFlag(ledger.workflowEnabled),
+  ownerPidObservation:pidObservation(correlation.ownerPid,signal),
+  backupPresent:safeFlag(backupPresent),backlogPresent:safeFlag(backlogPresent),
+  eligibleForAutomaticRelease:false};
+}
+function fixedPathExists(p,stat=fs.lstatSync){
+ try{stat(p);return true;}catch(e){return e?.code==='ENOENT'?false:null;}
+}
 export function inspect1501LeaseCorrelation({
  read=fs.readFileSync,stat=fs.lstatSync,
- lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install')}={}){
+ lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install'),
+ signal=process.kill}={}){
  try{
   const before=lock();
   if(before?.held!==true||before?.recoveryRequired!==true)
@@ -239,12 +280,20 @@ export function inspect1501LeaseCorrelation({
   };
   const snapshot=()=>Object.fromEntries(Object.entries(fixed).map(([k,f])=>{
    const st=stat(f);
-   if(!st.isFile()||st.size<1||st.size>32768)
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>32768)
     throw Error('C1501_FIXED_ORIGINAL_FILE_INVALID');
-   return [k,read(f)];
+   const bytes=read(f);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)throw Error('C1501_FILE_READ_MISMATCH');
+   return [k,bytes];
   }));
   const first=snapshot(),second=snapshot(),after=lock();
-  return classify1501LeaseCorrelation({lockBefore:before,lockAfter:after,first,second});
+  const data=classify1501RecoveryCheckpoint({lockBefore:before,lockAfter:after,
+   first,second},{
+    signal,backupPresent:fixedPathExists(
+     path.join('E:/ZGmini/automation/pc-control/backups','controller-update-'+C1501_ID),stat),
+    backlogPresent:fixedPathExists(
+     path.join(MAINTENANCE_ROOT,'backlog',C1501_ID+'.json'),stat)});
+  return data;
  }catch{return as1501(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
 }
 
