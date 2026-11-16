@@ -151,7 +151,8 @@ test('dedicated R181 workflow titles are not falsely rejected by shared ingress'
  const workflow=readFileSync(new URL('../.github/workflows/pc-writer-b-source-once.yml',
   import.meta.url),'utf8');
  const titles=['r181-protected-route-install','r181-source-shape-readonly',
-  'r181-saved-ledger-readonly','r181-primary-route-install',
+  'r181-saved-ledger-readonly','w03-r179-stored-handoff-readonly',
+  'r181-primary-route-install',
   'r181-existing-task-run-once'];
  for(const title of titles){
   assert.ok(workflow.includes("github.event.issue.title == '"+title+"'"),

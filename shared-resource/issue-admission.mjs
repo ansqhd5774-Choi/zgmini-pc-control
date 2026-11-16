@@ -35,6 +35,7 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   'r181-protected-route-install',
   'r181-source-shape-readonly',
   'r181-saved-ledger-readonly',
+  'w03-r179-stored-handoff-readonly',
   'r181-primary-route-install',
   'r181-existing-task-run-once',
 ]));
