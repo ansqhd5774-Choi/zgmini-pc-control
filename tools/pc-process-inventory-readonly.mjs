@@ -141,6 +141,8 @@ function collectMaintenanceStatusReadonly(){
 
 const C996_ID='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const C996_TARGET='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
+const C1501_ID='pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b';
+const C1501_TARGET='b2ff49dd14a09ebeba482e2ae9a84530e00f094f';
 const MAINTENANCE_ROOT='E:/ZGmini/automation/pc-maintenance';
 const sha256=b=>createHash('sha256').update(b).digest('hex');
 const c996Unknown=code=>({status:'STATE_UNKNOWN',code,
@@ -150,7 +152,8 @@ const c996Unknown=code=>({status:'STATE_UNKNOWN',code,
  operationalWrites:0,providerCalls:0,d1Writes:0});
 // Return a bounded read-only correlation result. Neither the raw owner nonce,
 // original ledger/body, absolute paths nor recovery marker is published.
-export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}={}){
+export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}={},
+ {requestId=C996_ID,issueNumber=996,targetSha=C996_TARGET}={}){
  if(lockBefore?.held!==true||lockBefore?.recoveryRequired!==true||
     lockAfter?.held!==true||lockAfter?.recoveryRequired!==true)
   return c996Unknown('C996_ACTIVE_RECOVERY_LEASE_NOT_VERIFIED');
@@ -170,8 +173,8 @@ export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}=
   /^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(owner.nonce);
  const ownerMarkerIdentityMatched=Boolean(pid&&nonceOk&&marker?.nonce===owner.nonce&&
   marker?.requestOwnerPid===pid&&lockBefore.ownerPid===pid&&lockAfter.ownerPid===pid);
- const ledger996Matched=ledger?.requestId===C996_ID&&ledger?.issueNumber===996&&
-  ledger?.targetSha===C996_TARGET;
+ const ledger996Matched=ledger?.requestId===requestId&&ledger?.issueNumber===issueNumber&&
+  ledger?.targetSha===targetSha;
  const tLedger=Date.parse(ledger?.updatedAt??''),tMarker=Date.parse(marker?.at??''),
   tOwner=Date.parse(owner?.at??'');
  const ledgerMarkerTimeMatched=Number.isFinite(tLedger)&&
@@ -210,6 +213,41 @@ export function inspect996LeaseCorrelation({
  }catch{return c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE');}
 }
 
+// Fixed #1501 probe uses the same double-read, exact-identity and timestamp
+// evidence as #996. This is an independent read-only comparison, not evidence
+// that an old recovery issue remains the owner of a CURRENT lease.
+const as1501=row=>{
+ const {ledger996Matched,...rest}=row;
+ return {...rest,code:rest.code.replace(/^C996_/,'C1501_'),
+  ledger1501Matched:ledger996Matched};
+};
+export function classify1501LeaseCorrelation(snapshot){
+ return as1501(classify996LeaseCorrelation(snapshot,
+  {requestId:C1501_ID,issueNumber:1501,targetSha:C1501_TARGET}));
+}
+export function inspect1501LeaseCorrelation({
+ read=fs.readFileSync,stat=fs.lstatSync,
+ lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install')}={}){
+ try{
+  const before=lock();
+  if(before?.held!==true||before?.recoveryRequired!==true)
+   return as1501(c996Unknown('C996_ACTIVE_RECOVERY_LEASE_NOT_VERIFIED'));
+  const fixed={
+   owner:path.join(MAINTENANCE_ROOT,'leases/controller-install/owner.json'),
+   marker:path.join(MAINTENANCE_ROOT,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   ledger:path.join(MAINTENANCE_ROOT,'ledger',C1501_ID+'.json')
+  };
+  const snapshot=()=>Object.fromEntries(Object.entries(fixed).map(([k,f])=>{
+   const st=stat(f);
+   if(!st.isFile()||st.size<1||st.size>32768)
+    throw Error('C1501_FIXED_ORIGINAL_FILE_INVALID');
+   return [k,read(f)];
+  }));
+  const first=snapshot(),second=snapshot(),after=lock();
+  return classify1501LeaseCorrelation({lockBefore:before,lockAfter:after,first,second});
+ }catch{return as1501(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -226,7 +264,8 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
-  c996LeaseCorrelation:inspect996LeaseCorrelation()}:base;
+  c996LeaseCorrelation:inspect996LeaseCorrelation(),
+  c1501LeaseCorrelation:inspect1501LeaseCorrelation()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
