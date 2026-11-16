@@ -6,7 +6,7 @@
   "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
   "installedShaObserved": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
   "installedEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1788#issuecomment-6921161113",
-  "targetSha": "d051cf82dc9c4463612fe95a1641d2c24b7c80e4",
+  "targetSha": "a21b928f0c058ff6e7daf8a33dcfb613c9adc4df",
   "targetSourcePRs": [
     "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1783",
     "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1785"
@@ -48,15 +48,15 @@
     },
     {
       "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
-      "sha256": "c5477cf94c5efd5467c8009c47a8b4afa117d215baea45162995df48bacd1555"
+      "sha256": "6d4f4a25503ea46bed4a5827325611bc98c3db6828c7b637289cc19557430db5"
     }
   ],
   "knownCumulativeChange": {
-    "commitsAheadOfObservedInstalled": 121,
-    "allRepositoryPathsChanged": 148,
+    "commitsAheadOfObservedInstalled": 163,
+    "allRepositoryPathsChanged": 161,
     "controllerConfigPathsChanged": 6,
     "compareBase": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
-    "compareHead": "d051cf82dc9c4463612fe95a1641d2c24b7c80e4"
+    "compareHead": "a21b928f0c058ff6e7daf8a33dcfb613c9adc4df"
   },
   "recoveryState": {
     "issue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1745",
@@ -120,19 +120,26 @@
       "paths": [
         "controller/theme-nine-r32-raw-coverage-readonly.mjs"
       ]
+    },
+    {
+      "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1809",
+      "mergeSha": "a21b928f0c058ff6e7daf8a33dcfb613c9adc4df",
+      "paths": [
+        "controller/theme-nine-r32-raw-coverage-readonly.mjs"
+      ]
     }
   ],
   "checks": {
     "sourceCommitAndSixFileHashesVerified": true,
     "configOperationsRetained": 42,
     "newOperationReadOnly": true,
-    "sourceCI": "SUCCESS_AT_PR1808",
+    "sourceCI": "SUCCESS_AT_PR1809",
     "maintenanceInstallApproved": false,
     "maintenanceReconciliationComplete": false,
     "pc64SymbolReadback": false
   },
-  "sourceProvenanceNotice": "Source-only preflight: six target file bytes and sorted SHA256 fingerprint pinned to immutable merge d051cf82. NOT an approved B manifest. Shared owner must reconcile maintenance #1745 recovery before a new B install; current main may independently advance.",
-  "normalizedChangedFilesFingerprintSha256": "bdb8e940cfcffbf769964e06e957fa42b0581115d62612bfd1c2a45a851f199e",
+  "sourceProvenanceNotice": "This six-file exact SHA256 fingerprint is source-only pinned at immutable merge a21b928f. It is NOT a B approval manifest and excludes source-only test files; compare output also includes controller/inflation-event129-evidence-readonly.test.mjs, which is not asserted to be a deployed controller executable. Shared owner must verify complete actual install file selection, #1745 recovery/lease, all independent approvals and current PC installed SHA before B.",
+  "normalizedChangedFilesFingerprintSha256": "1d2fb4aaf841cf637eebb7b3ac04c161654c1a815481f5414c4cc3a042437c3c",
   "fingerprintContract": "SHA256(JSON.stringify(sorted([{path,sha256}], lexicographic path ascending)) from maintenance-contract manifestFingerprint",
   "includedSourceFixCandidate": {
     "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1793",
@@ -140,11 +147,17 @@
     "requiresTargetShaRefresh": false
   },
   "lastSourceIntegrityFix": {
-    "sourcePr": 1808,
-    "sourceOnlyMergedSha": "d051cf82dc9c4463612fe95a1641d2c24b7c80e4",
-    "ciSourceRun": 43980325874,
-    "ciReadonlyRun": 43980325870,
-    "scope": "R35 checkpoint URL start/end binding",
+    "sourcePr": 1809,
+    "sourceOnlyMergedSha": "a21b928f0c058ff6e7daf8a33dcfb613c9adc4df",
+    "ciSourceRun": 43982401612,
+    "ciReadonlyRun": 43982401658,
+    "scope": "R23 fixed baseline GET window and collection checkpoint",
     "status": "CI_SUCCESS_SOURCE_ONLY"
-  }
+  },
+  "targetHistory": [
+    {
+      "supersededSha": "d051cf82dc9c4463612fe95a1641d2c24b7c80e4",
+      "reason": "PR1809 fixed R23 baseline source-window integrity; immutable historic SHA retained"
+    }
+  ]
 }
