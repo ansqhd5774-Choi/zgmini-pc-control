@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
- safeR181ErrorFlow,safeR181HttpErrorFlow,safeRecordedR181HttpFailure} from '../controller/theme-l7-runtime-readonly.mjs';
+ safeR181ErrorFlow,safeR181HttpErrorFlow,safeRecordedR181HttpFailure,
+ safeR181LedgerCoverage} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -450,4 +451,52 @@ test('W03 R181 unpinned installed source cannot assert recorded HTTP proof',()=>
   assert.equal(result.providerCalls,0);
   assert.equal(result.d1Writes,0);
  }finally{f.close();}
+});
+
+
+test('R181 fixed 14-symbol ledger coverage projects only bounded metadata, never secrets',()=>{
+ const symbols=['SPY','BOTZ','ROBO','SKYY','CLOU','DRIV','NLR','URA',
+  'ITA','SHLD','FINX','ARKF','CIBR','BUG'];
+ const coverage=Object.fromEntries(symbols.map(symbol=>[symbol,
+  {bars:701,latest15NY:'2026-11-13',close:12345,token:'DO_NOT_LEAK'}]));
+ const raw={status:'LOCAL_PRIMARY_STORED',at:'2026-11-16T05:29:30.439Z',
+  providerCalls:14,coverage,apiKey:'TOP_SECRET',sourceUrl:'https://private'};
+ const out=safeR181LedgerCoverage(raw,{sourcePinned:true});
+ assert.equal(out.status,'LEDGER_REPORTED_COMPLETE');
+ assert.equal(out.matchingSymbols,14);
+ assert.equal(out.unexpectedSymbolCount,0);
+ assert.equal(out.evidence,'LEDGER_METADATA_ONLY_NOT_SQLITE_VERIFIED');
+ assert.equal(out.symbols[0].symbol,'SPY');
+ assert.equal(out.symbols[0].bars,701);
+ for(const v of ['DO_NOT_LEAK','TOP_SECRET','12345','https://private'])
+  assert.equal(JSON.stringify(out).includes(v),false);
+ assert.equal(safeR181LedgerCoverage(raw).status,'NOT_ATTESTED');
+ assert.equal(safeR181LedgerCoverage({...raw,status:'STOP'},{sourcePinned:true}).status,
+  'NOT_ATTESTED');
+});
+test('R181 ledger coverage never elevates missing, extra or malformed bars to verified',()=>{
+ const symbols=['SPY','BOTZ','ROBO','SKYY','CLOU','DRIV','NLR','URA',
+  'ITA','SHLD','FINX','ARKF','CIBR','BUG'];
+ const coverage=Object.fromEntries(symbols.map(symbol=>[symbol,
+  {bars:701,latest15NY:'2026-11-13'}]));
+ const raw={status:'LOCAL_PRIMARY_STORED',at:'2026-11-16T05:29:30Z',
+  providerCalls:14,coverage};
+ for(const invalid of [
+  {...coverage,SPY:null},
+  {...coverage,SPY:{bars:1.5,latest15NY:'2026-11-13'}},
+  {...coverage,SPY:{bars:1,latest15NY:'2026-02-30'}},
+  {...coverage,SPY:{bars:1,latest15NY:'SECRET_TOKEN'}},
+  Object.fromEntries(Object.entries(coverage).filter(([symbol])=>symbol!=='SPY')),
+  {...coverage,OTHER:coverage.SPY},
+ ]){
+  const out=safeR181LedgerCoverage({...raw,coverage:invalid},{sourcePinned:true});
+  assert.equal(out.status,'LEDGER_REPORTED_INCOMPLETE');
+  assert.equal(out.evidence,'LEDGER_METADATA_ONLY_NOT_SQLITE_VERIFIED');
+  assert.equal(JSON.stringify(out).includes('SECRET_TOKEN'),false);
+  assert.equal(JSON.stringify(out).includes('OTHER'),false);
+ }
+ assert.equal(safeR181LedgerCoverage({...raw,coverage:null},{sourcePinned:true}).status,
+  'LEDGER_COVERAGE_ABSENT');
+ assert.equal(safeR181LedgerCoverage({...raw,providerCalls:'14'},{sourcePinned:true}).status,
+  'LEDGER_REPORTED_INCOMPLETE');
 });
