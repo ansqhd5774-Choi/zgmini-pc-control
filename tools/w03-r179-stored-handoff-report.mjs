@@ -21,6 +21,7 @@ const ATTEST=['rightsAttested','sourceRawShaVerified','sqliteCheckpointVerified'
  'history252Verified','publisherExecuted','d1Readback','sqliteOpened'];
 const EXT_KEYS=['sqlite','db','parquet','json','ndjson','csv','other'];
 const days=x=>x===null||typeof x==='string'&&/^\d{4}-\d\d-\d\d$/.test(x)&&
+ Number.isFinite(Date.parse(x+'T00:00:00Z'))&&
  new Date(x+'T00:00:00Z').toISOString().slice(0,10)===x;
 const no=code=>{throw Object.assign(Error(code),{code});};
 const requireTrue=(v,code)=>{if(!v)no(code);};
