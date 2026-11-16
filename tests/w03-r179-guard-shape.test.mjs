@@ -73,16 +73,19 @@ test('output and reporter redact raw code and fail closed on malformed shape',()
   'if(got.length!==7)throw Error("PUBLIC_API_ROLLING_MISMATCH");']);
  const output=execute({event:event(),env:env(),inspect:()=>
   classifyR179Static(bytes,sha(bytes))});
- const safe=sanitize(output,req(),env());
+ // Synthetic bytes cannot be attested as the real pinned PC source.
+ assert.equal(sanitize(output,req(),env()).status,'STATE_UNKNOWN');
+ const pinnedEnvelope={...output,payload:{...output.payload,sourceSha256:PIN}};
+ const safe=sanitize(pinnedEnvelope,req(),env());
  assert.equal(safe.status,'PASS');
  assert.equal(safe.payload.exactOldCount,1);
  assert.equal(safe.payload.publisherExecuted,false);
  assert.equal(safe.payload.sourceOnly,true);
  assert.equal(safe.payload.pcWrites,0);
- const untrusted={...output,payload:{...output.payload,
+ const untrusted={...pinnedEnvelope,payload:{...pinnedEnvelope.payload,
   comparisons:[...output.payload.comparisons,{nameClass:'TOKEN_LEAK',
    operator:'===',count:7,line:1,nearRollingMarker:true}]}};
  assert.equal(sanitize(untrusted,req(),env()).status,'STATE_UNKNOWN');
- const drift={...output,payload:{...output.payload,sourceSha256:'bad'}};
+ const drift={...pinnedEnvelope,payload:{...pinnedEnvelope.payload,sourceSha256:'bad'}};
  assert.equal(sanitize(drift,req(),env()).status,'STATE_UNKNOWN');
 });
