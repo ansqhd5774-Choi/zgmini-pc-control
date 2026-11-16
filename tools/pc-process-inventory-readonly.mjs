@@ -486,6 +486,113 @@ export function inspect1501BacklogReadonly({
  }catch{return backlogUnknown('C1501_BACKLOG_UNAVAILABLE');}
 }
 
+// Three exact observed HTTP hosts only; method/path remains one-way hashed.
+// No full URL, credentials, paths, body, or other providers are published.
+const FIXED_TARGET_HOSTS=['data.sec.gov','data.alpaca.markets','cdn.www.census.gov'];
+const FIXED_ENDPOINT_LOG='E:/ZGmini/data/pc-writer/provider-endpoint-events.jsonl';
+const FIXED_ENDPOINT_MAX_BYTES=8*1024*1024;
+const FIXED_ENDPOINT_MAX_ROWS=16000;
+const HASH32=/^[a-f0-9]{32}$/;
+const ENDPOINT_STATUS=/^(?:[1-5][0-9]{2}|NETWORK_ERROR|PROVIDER_QUOTA_GUARD)$/;
+const endpointUnknown=(code)=>({status:'STATE_UNKNOWN',code,
+ scope:'FIXED_THREE_OBSERVED_HOSTS_ONLY',source:'PC_ENDPOINT_PATH_HASH_LOG',
+ hosts:[],endpointCoverageVerified:false,providerCalls:0,operationalWrites:0,d1Writes:0});
+export function projectTargetEndpointStatus(lines,now=Date.now(),{partialTail=false,rowsTruncated=false}={}){
+ if(!Number.isSafeInteger(now)||now<0||!Array.isArray(lines)||lines.length>FIXED_ENDPOINT_MAX_ROWS)
+  return endpointUnknown('ENDPOINT_INPUT_INVALID');
+ const from=now-14*86400000;
+ const matched=new Map(FIXED_TARGET_HOSTS.map(host=>[host,new Map()]));
+ let invalid=0,seenEvents=0;
+ for(const line of lines){
+  if(typeof line!=='string'||line.length>200000){invalid++;continue;}
+  if(!line.trim())continue;
+  let record;try{record=JSON.parse(line);}catch{invalid++;continue;}
+  const at=Date.parse(record?.at??'');
+  if(!Number.isFinite(at)||at>now+60000){invalid++;continue;}
+  if(at<from)continue;
+  if(record.endpointPaths===null||typeof record.endpointPaths!=='object'||
+    Array.isArray(record.endpointPaths)){invalid++;continue;}
+  seenEvents++;
+  for(const host of FIXED_TARGET_HOSTS){
+   const routes=record.endpointPaths[host];
+   if(routes===undefined)continue;
+   if(!routes||typeof routes!=='object'||Array.isArray(routes)||
+     Object.keys(routes).length>128){invalid++;continue;}
+   const dest=matched.get(host);
+   for(const [hash,row] of Object.entries(routes)){
+    if(!HASH32.test(hash)||!row||!Number.isSafeInteger(row.requests)||
+      row.requests<1||row.requests>50000||!row.statuses||
+      typeof row.statuses!=='object'||Array.isArray(row.statuses)||
+      Object.keys(row.statuses).length>20){invalid++;continue;}
+    const statuses=Object.entries(row.statuses);
+    if(!statuses.length||statuses.some(([k,v])=>!ENDPOINT_STATUS.test(k)||
+      !Number.isSafeInteger(v)||v<0)||
+      statuses.reduce((sum,[,v])=>sum+v,0)!==row.requests){invalid++;continue;}
+    const old=dest.get(hash);
+    const successful=statuses.some(([k,v])=>k.startsWith('2')&&v>0);
+    const failed404=statuses.some(([k,v])=>k==='404'&&v>0);
+    const merged={hash,lastAt:at,lastStatuses:Object.fromEntries(statuses),
+      totalRequests:(old?.totalRequests??0)+row.requests,
+      last2xxAt:successful?Math.max(old?.last2xxAt??0,at):(old?.last2xxAt??null),
+      last404At:failed404?Math.max(old?.last404At??0,at):(old?.last404At??null)};
+    if(old&&at<old.lastAt){
+      merged.lastAt=old.lastAt;merged.lastStatuses=old.lastStatuses;
+    }
+    dest.set(hash,merged);
+   }
+  }
+ }
+ const hosts=FIXED_TARGET_HOSTS.map(host=>{
+  const all=[...matched.get(host).values()].sort((a,b)=>a.hash.localeCompare(b.hash));
+  const safe=all.slice(0,40);
+  return {host,endpointCount:all.length,returnedCount:safe.length,
+   truncated:all.length>40,
+   endpointHashes:safe.map(row=>({hash:row.hash,
+    lastAt:new Date(row.lastAt).toISOString(),
+    lastStatuses:row.lastStatuses,totalRequests:row.totalRequests,
+    last2xxAt:row.last2xxAt?new Date(row.last2xxAt).toISOString():null,
+    last404At:row.last404At?new Date(row.last404At).toISOString():null}))};
+ });
+ const partial=partialTail||rowsTruncated||invalid>0||hosts.some(h=>h.truncated);
+ const observed=hosts.some(h=>h.endpointCount>0);
+ return {status:observed&&!partial?'OBSERVED':'STATE_UNKNOWN',
+  code:!observed?'ENDPOINT_NO_OBSERVATIONS':partial?'ENDPOINT_PARTIAL':'ENDPOINT_HASH_STATUS_READBACK',
+  scope:'FIXED_THREE_OBSERVED_HOSTS_ONLY',source:'PC_ENDPOINT_PATH_HASH_LOG',
+  windowDays:14,seenEvents,invalidEvents:invalid,
+  partialTail,rowsTruncated,
+  endpointCoverageVerified:false,hosts,
+  providerCalls:0,operationalWrites:0,d1Writes:0};
+}
+function readTargetEndpointStatus(){
+ try{
+  const root=path.dirname(FIXED_ENDPOINT_LOG);
+  const d=fs.lstatSync(root),f=fs.lstatSync(FIXED_ENDPOINT_LOG);
+  if(!d.isDirectory()||d.isSymbolicLink()||!f.isFile()||f.isSymbolicLink()||
+    f.size<1)return endpointUnknown('ENDPOINT_LOG_UNAVAILABLE');
+  const fd=fs.openSync(FIXED_ENDPOINT_LOG,'r');
+  let buffer,partialTail=false,changed=false;
+  try{
+   const before=fs.fstatSync(fd),length=Math.min(before.size,FIXED_ENDPOINT_MAX_BYTES);
+   partialTail=before.size>length;buffer=Buffer.alloc(length);
+   let used=0;
+   while(used<length){
+    const n=fs.readSync(fd,buffer,used,length-used,before.size-length+used);
+    if(n<=0)throw Error('SHORT_READ');
+    used+=n;
+   }
+   const after=fs.fstatSync(fd);
+   changed=before.size!==after.size||before.mtimeMs!==after.mtimeMs;
+  }finally{fs.closeSync(fd);}
+  if(changed)return endpointUnknown('ENDPOINT_LOG_CHANGED');
+  let lines=buffer.toString('utf8').split('\n');
+  if(partialTail)lines.shift();
+  lines.pop();
+  const rowsTruncated=lines.length>FIXED_ENDPOINT_MAX_ROWS;
+  if(rowsTruncated)lines=lines.slice(-FIXED_ENDPOINT_MAX_ROWS);
+  return projectTargetEndpointStatus(lines,Date.now(),{partialTail,rowsTruncated});
+ }catch{return endpointUnknown('ENDPOINT_LOG_UNAVAILABLE');}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -505,7 +612,8 @@ export function collect(role,ctx,env=process.env){
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
   observedHttpHostRoster:readObservedProviderHosts(),
-  c1501Backlog:inspect1501BacklogReadonly()}:base;
+  c1501Backlog:inspect1501BacklogReadonly(),
+  targetEndpointStatus:readTargetEndpointStatus()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))

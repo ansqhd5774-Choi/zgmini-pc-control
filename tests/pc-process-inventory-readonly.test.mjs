@@ -1,7 +1,7 @@
 import test from 'node:test';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -359,4 +359,43 @@ test('runner query HTTP 403 emits read-only forbidden classification, no fabrica
  assert.doesNotMatch(JSON.stringify(x),/SECRET|token/);
  assert.equal(sanitizeDedicatedRunnerEvidence({diagnostics:['RUNNERS_QUERY_UNAVAILABLE'],
   runnerQueryError:'PRIVATE'}).queryFailureReason,null);
+});
+
+test('three fixed hosts preserve hashed endpoint 404 receipts without paths or credentials',()=>{
+ const NOW=Date.parse('2026-11-16T13:10:00Z');
+ const hash='a'.repeat(32),other='b'.repeat(32);
+ const lines=[
+  JSON.stringify({at:'2026-11-16T11:05:00Z',endpointPaths:{
+   'data.sec.gov':{[hash]:{requests:2,statuses:{200:1,404:1}}},
+   'cdn.www.census.gov':{[other]:{requests:1,statuses:{200:1}}},
+   'private.example.org':{[other]:{requests:1,statuses:{500:1}}},
+   },secret:'DO_NOT_PUBLISH',url:'https://data.sec.gov/secret-path?token=x'}),
+  JSON.stringify({at:'2026-11-16T11:06:00Z',endpointPaths:{
+   'data.sec.gov':{[hash]:{requests:1,statuses:{404:1}}}}},
+  )];
+ const q=projectTargetEndpointStatus(lines,NOW);
+ assert.equal(q.status,'OBSERVED');
+ assert.equal(q.hosts.length,3);
+ assert.equal(q.hosts[0].host,'data.sec.gov');
+ assert.equal(q.hosts[0].endpointCount,1);
+ assert.deepEqual(q.hosts[0].endpointHashes[0].lastStatuses,{'404':1});
+ assert.equal(q.hosts[0].endpointHashes[0].last2xxAt,'2026-11-16T11:05:00.000Z');
+ assert.equal(q.hosts[0].endpointHashes[0].last404At,'2026-11-16T11:06:00.000Z');
+ assert.equal(q.endpointCoverageVerified,false);
+ assert.doesNotMatch(JSON.stringify(q),/DO_NOT_PUBLISH|private\.example|secret-path|token|https:\/\//);
+});
+test('invalid and partial endpoint log cannot claim comprehensive HTTP coverage',()=>{
+ const now=Date.parse('2026-11-16T13:10:00Z');
+ const bad=projectTargetEndpointStatus(['{"at": "garbage"}'],now);
+ assert.equal(bad.status,'STATE_UNKNOWN');
+ assert.equal(bad.invalidEvents,1);
+ const partial=projectTargetEndpointStatus([JSON.stringify({
+  at:'2026-11-16T13:00:00Z',endpointPaths:{'data.sec.gov':{
+   ['c'.repeat(32)]:{requests:1,statuses:{200:1}}}}})],now,{partialTail:true});
+ assert.equal(partial.status,'STATE_UNKNOWN');
+ assert.equal(partial.endpointCoverageVerified,false);
+ const forged=projectTargetEndpointStatus([JSON.stringify({
+  at:'2026-11-16T13:00:00Z',endpointPaths:{'data.sec.gov':{
+   'user:pass@api':{requests:1,statuses:{200:1}}}}})],now);
+ assert.equal(forged.status,'STATE_UNKNOWN');
 });
