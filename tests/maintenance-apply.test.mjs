@@ -338,6 +338,52 @@ test('an uncertain backlog replay is not retried and never stops active requeued
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'RECOVERY_REQUIRED');
  assert.equal(r.code,'BACKLOG_REPLAY_OUTCOME_UNKNOWN');assert.ok(!f.events.includes('restore'));
 });
+test('W02 #1501 regression: confirmed reconnect with failed intake acknowledgement never restores',async()=>{
+ const f=fixture({resumeIntake:async()=>{throw Object.assign(
+  Error('API reply not confirmed'),{code:'WORKFLOW_ENABLE_NOT_CONFIRMED'});}});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.code,'WORKFLOW_ENABLE_NOT_CONFIRMED');
+ assert.equal(r.firstFail,'RECONNECTED');
+ assert.equal(r.failureOperation,'resumeIntake');
+ assert.equal(r.actualInstalledSha,null);
+ assert.equal(r.next,'RECONCILE_WORKFLOW_BACKLOG_AND_INSTALLED_SHA_NO_AUTOMATIC_ROLLBACK');
+ assert.equal(f.installed,target);
+ assert.equal(f.paused,true);
+ assert.ok(!f.events.includes('restore'));
+ assert.ok(!f.events.includes('reconnectPrevious'));
+ assert.ok(!f.events.includes('replay-missed-issues'));
+});
+test('post-resume backlog readback failure must not kill a possibly active intake',async()=>{
+ const f=fixture({reconcileBacklog:async()=>{throw Error('unknown private backlog I/O');}});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.code,'UPDATE_BACKLOG_FAILED');
+ assert.equal(r.firstFail,'INTAKE_RESUMED');
+ assert.equal(r.failureOperation,'reconcileBacklog');
+ assert.equal(r.next,'RECONCILE_WORKFLOW_BACKLOG_AND_INSTALLED_SHA_NO_AUTOMATIC_ROLLBACK');
+ assert.equal(f.installed,target);
+ assert.equal(f.paused,false);
+ assert.ok(!f.events.includes('restore'));
+ assert.ok(!f.events.includes('reconnectPrevious'));
+});
+test('journal write failure after successful reconnect does not provoke a second host mutation',async()=>{
+ const f=fixture();
+ const original=f.port.persist;
+ let failed=false;
+ f.port.persist=async row=>{
+  if(!failed&&row.phase==='RECONNECTED'){failed=true;throw Error('private journal write failed');}
+  return original(row);
+ };
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.firstFail,'RECONNECTED');
+ assert.equal(r.code,'UPDATE_RECONNECT_FAILED');
+ assert.equal(f.installed,target);
+ assert.ok(failed);
+ assert.ok(!f.events.includes('restore'));
+ assert.ok(!f.events.includes('reconnectPrevious'));
+});
 test('interrupted journal is only reconciled; never silently retried',async()=>{
  const f=fixture();await f.port.persist({requestId:request.requestId,fingerprint:f.port.fingerprint(request),phase:'SWITCHED',status:'RUNNING'});
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'RECOVERY_REQUIRED');assert.ok(!f.events.includes('switch'));
