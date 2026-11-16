@@ -52,6 +52,7 @@ function io(overrides={}){
   proveLiveCoreLockOwner:async()=>calls.push('core-owner'),
   acquireSharedWriterLease:async()=>calls.push('writer-acquire'),
   readPcPreimage:async()=>{calls.push('preimage');return preimage();},
+  preflightProviderReadOnly:async()=>calls.push('provider-preflight'),
   assertCoreIdle:async()=>calls.push('idle'),
   acquireCoreLease:async()=>calls.push('core-acquire'),
   verifyCoreLease:async()=>calls.push('core-verify'),
@@ -69,7 +70,7 @@ test('approved Census request executes only after live Core owner, shared lock, 
  assert.equal(r.status,'PASS');
  assert.equal(r.providerCalls,2);
  assert.equal(r.stored,'SAVED_READBACK');
- assert.deepEqual(calls,['core-owner','writer-acquire','preimage','idle',
+ assert.deepEqual(calls,['core-owner','writer-acquire','preimage','provider-preflight','idle',
   'core-acquire','core-verify','preimage','claim','journal:CLAIMED',
   'collect','core-verify','readback','journal:COMPLETED',
   'core-release','writer-release:false']);
@@ -210,3 +211,25 @@ test('Census raw provenance pins exact saved document hashes, never a different 
  assert.throws(()=>verifyCensusDocumentProvenance({...doc,provenance:[]},read),
   /W01_CENSUS_B_PROVENANCE_SHAPE_STOP/);
 });
+
+test('Census key absence terminates before Core lease, journal claim and provider GET',async()=>{
+ const {calls,api}=io({preflightProviderReadOnly:async()=>{
+  throw Object.assign(new Error('key absent'),{
+   code:'W01_CENSUS_B_CENSUS_KEY_UNAVAILABLE_STOP'});
+ }});
+ const out=await performCensusApiB(proof(),api);
+ assert.equal(out.status,'STOP');
+ assert.equal(out.code,'W01_CENSUS_B_CENSUS_KEY_UNAVAILABLE_STOP');
+ assert.equal(out.providerCalls,0);
+ assert.deepEqual(calls,['core-owner','writer-acquire','preimage','writer-release:false']);
+});
+test('Census credential preflight uses pinned local-env and passes only its scoped key',async()=>{
+ const fs=await import('node:fs');
+ const path=await import('node:path');
+ const code=fs.readFileSync(path.join(import.meta.dirname,'windows-adapter.mjs'),'utf8');
+ assert.match(code,/async preflightProviderReadOnly\(\)/);
+ assert.match(code,/providers\.CENSUS_API_KEY\.trim\(\)\.length>0/);
+ assert.match(code,/providerEnv:\{CENSUS_API_KEY:censusKey\}/);
+ assert.doesNotMatch(code,/providerEnv:env,quotaFetch/);
+});
+
