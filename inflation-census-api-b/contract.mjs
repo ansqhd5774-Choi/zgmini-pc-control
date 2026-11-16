@@ -85,9 +85,9 @@ export function authorizeCensusB({event,env,manifestBytes}){
   'W01_CENSUS_B_MANIFEST_DIGEST_STOP');
  let manifest;try{manifest=JSON.parse(manifestBytes);}catch{
   stop('W01_CENSUS_B_MANIFEST_JSON_STOP');}
+ // The approval file is a later commit than its reviewed code ancestor.
+ // The Windows adapter must prove ancestor and an unchanged executable diff.
  validateCensusBManifest(manifest);
- need(manifest.controlSourceSha===env.GITHUB_SHA,
-  'W01_CENSUS_B_CONTROL_SHA_STOP');
  const proof=Object.freeze({request:Object.freeze(request),
   manifest:Object.freeze({...manifest,sourceFilesSha256:Object.freeze({...manifest.sourceFilesSha256})}),
   controlSha:env.GITHUB_SHA});
