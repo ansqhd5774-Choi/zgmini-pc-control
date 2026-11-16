@@ -2,10 +2,7 @@ name: ZGMINI Handoff Queue Control Board
 on:
   workflow_run:
     workflows:
-      - ZGMINI Agent Handoff Intake
       - ZGMINI Handoff Queue Candidate Selector
-      - ZGMINI Agent Handoff PC Failure Intake
-      - ZGMINI Agent Handoff Writer B Failure Intake
     types: [completed]
   workflow_dispatch: {}
 permissions:
