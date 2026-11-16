@@ -22,15 +22,20 @@ test('BEA exact D1 readback and original CSV hash are mandatory',()=>{
    'D1_RESULT=WRITE_SUBMITTED'),'bea-unit-profit-once'),/PUBLICATION_RESULT_NOT_VERIFIED/);
 });
 test('QFR exact stored checkpoint is validated and only identical prior is reusable',()=>{
- const raw=['MODE=APPLY_EXPLICIT','SOURCE_VERSION='+'b'.repeat(64),
-   'RAW_ZIP_SHA256='+'c'.repeat(64),'PREFLIGHT_SOURCE_PIN=VERIFIED',
-   'SOURCE_STORED_AT=1793112733108','D1_RESULT=ALREADY_STORED',
+ const key='detail:earnings-recession-indicators:census-qfr-mfg-margin:v1';
+ const raw=['MODE=APPLY_EXPLICIT','SNAPSHOT_KEY='+key,'SOURCE_GATES=PASS',
+   'SOURCE_HTTP_REQUESTS=0','PC_SQLITE_WRITES=0',
+   'SOURCE_VERSION='+'b'.repeat(64),'RAW_ZIP_SHA256='+'c'.repeat(64),
+   'PREFLIGHT_SOURCE_PIN=VERIFIED','SOURCE_STORED_AT=1793112733108',
+   'D1_RESULT=ALREADY_STORED','D1_READBACK=PREVIOUS_IDENTICAL',
    'RESULT=PASS_QFR_D1_ALREADY_STORED'].join('\n');
- assert.equal(parsePublisherLog(raw,'census-qfr-margin-once').d1Result,'ALREADY_STORED');
+ const evidence=parsePublisherLog(raw,'census-qfr-margin-once',key);
+ assert.equal(evidence.d1Result,'ALREADY_STORED');
+ assert.equal(evidence.key,key);
  assert.throws(()=>parsePublisherLog(raw+'\nSOURCE_VERSION='+'a'.repeat(64),
-   'census-qfr-margin-once'),/PUBLICATION_RESULT_TXT_INVALID/);
+   'census-qfr-margin-once',key),/PUBLICATION_RESULT_TXT_INVALID/);
  assert.throws(()=>parsePublisherLog(raw.replace('SOURCE_STORED_AT=1793112733108',
-   'SOURCE_STORED_AT=0'),'census-qfr-margin-once'),/PUBLICATION_RESULT_CHECKPOINT_INVALID/);
+   'SOURCE_STORED_AT=0'),'census-qfr-margin-once',key),/PUBLICATION_RESULT_CHECKPOINT_INVALID/);
 });
 test('second-resolution result files cannot share a dry-run/apply UTC second',()=>{
  assert.equal(millisecondsToNextUtcSecond(1793112733000),1050);
@@ -76,7 +81,9 @@ test('static workflow stays gated and cannot overwrite existing A or maintenance
  assert.doesNotMatch(yml,/pc-job\.yml|pc-maintenance/);
  const executor=source('tools/publication-executor.mjs');
  assert.match(executor,/fs\.mkdirSync\(active\)/);
- assert.match(executor,/phase\.phase==='APPLYING'\?'UNVERIFIED':'STOP'/);
+ assert.match(executor,/phase\.phase==='APPLYING'/);
+ assert.match(executor,/noWriteVerified\?'NO_WRITE_STOP':'UNVERIFIED'/);
+ assert.match(executor,/:'STOP'/);
  assert.match(executor,/phase\.phase==='PASS'/);
  assert.match(executor,/\['--dry-run'\]/);
  assert.match(executor,/\[\.\.\.invocation\.flags\]/);
@@ -161,4 +168,50 @@ test('QFR proven pre-write drift is BLOCKED but any ambiguous apply remains UNKN
  assert.match(executor,/noWriteVerified=true/);
  assert.match(executor,/noWriteVerified\?'NO_WRITE_STOP':'UNVERIFIED'/);
  assert.match(executor,/applied\.exitCode===1&&!applied\.timedOut&&!applied\.truncated/);
+});
+
+test('QFR apply result proves the actual key, no side effects and exact D1 outcome',()=>{
+ const key='detail:earnings-recession-indicators:census-qfr-mfg-margin:v1';
+ const fields=[
+  ['MODE','APPLY_EXPLICIT'],['SNAPSHOT_KEY',key],['SOURCE_GATES','PASS'],
+  ['SOURCE_HTTP_REQUESTS','0'],['PC_SQLITE_WRITES','0'],
+  ['SOURCE_VERSION','a'.repeat(64)],['RAW_ZIP_SHA256','b'.repeat(64)],
+  ['SOURCE_STORED_AT','1793112733108'],['PREFLIGHT_SOURCE_PIN','VERIFIED'],
+  ['D1_RESULT','READBACK_VERIFIED'],['D1_READBACK','EXACT'],
+  ['RESULT','PASS_QFR_D1_EXACT_READBACK'],
+ ];
+ const fixture=(changes={})=>fields.map(([name,value])=>
+  name+'='+(Object.hasOwn(changes,name)?changes[name]:value)).join('\r\n');
+ const evidence=parsePublisherLog(fixture(),'census-qfr-margin-once',key);
+ assert.equal(evidence.key,key);
+ assert.equal(evidence.d1Result,'READBACK_VERIFIED');
+ for(const [field,value] of [
+  ['SNAPSHOT_KEY','detail:unapproved-key'],
+  ['MODE','READ_ONLY_PREFLIGHT'],
+  ['SOURCE_GATES','FAIL'],
+  ['SOURCE_HTTP_REQUESTS','1'],
+  ['PC_SQLITE_WRITES','1'],
+  ['D1_RESULT','ALREADY_STORED'],
+  ['RESULT','PASS_QFR_D1_ALREADY_STORED'],
+  ['D1_READBACK','PREVIOUS_IDENTICAL'],
+ ]){
+  assert.throws(()=>parsePublisherLog(fixture({[field]:value}),
+    'census-qfr-margin-once',key),/PUBLICATION_QFR_APPLY_EVIDENCE_INVALID/);
+ }
+ assert.throws(()=>parsePublisherLog(fixture(),
+   'census-qfr-margin-once','detail:incorrect-approved-key'),
+   /PUBLICATION_QFR_APPLY_EVIDENCE_INVALID/);
+ assert.throws(()=>parsePublisherLog(fixture(),
+   'census-qfr-margin-once'),/PUBLICATION_QFR_APPLY_EVIDENCE_INVALID/);
+ assert.throws(()=>parsePublisherLog(fixture()+'\nERROR=QFR_D1_PUBLISHER_FAILED',
+   'census-qfr-margin-once',key),/PUBLICATION_QFR_APPLY_EVIDENCE_INVALID/);
+ assert.throws(()=>parsePublisherLog(fixture({PREFLIGHT_SOURCE_PIN:'MISSING'}),
+   'census-qfr-margin-once',key),/PUBLICATION_QFR_APPLY_PIN_MISSING/);
+ const duplicate=parsePublisherLog(fixture({D1_RESULT:'ALREADY_STORED',
+   D1_READBACK:'PREVIOUS_IDENTICAL',RESULT:'PASS_QFR_D1_ALREADY_STORED'}),
+   'census-qfr-margin-once',key);
+ assert.equal(duplicate.d1Result,'ALREADY_STORED');
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/request\.operation,invocation\.snapshotKey\)/);
+ assert.match(executor,/\.\.\.evidence,\.\.\.\(bea\?\{key:invocation\.snapshotKey\}:\{\}\)/);
 });
