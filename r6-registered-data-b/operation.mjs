@@ -230,7 +230,7 @@ export async function acquireCoreLockBounded(pcHome,requestId,{
  }
 }
 
-function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
+export function claimOnce(pcHome,{requestId,approvalManifestSha256},mode){
  // An already consumed legacy date claim must never become replayable after
  // switching to per-request claims. Read-only lookup; preserve all old files.
  let existing;
@@ -424,9 +424,15 @@ export async function runR6RegisteredOnce({env=process.env}={}){
  need(sha(approvalBytes)===request.approvalManifestSha256&&
   sha(fs.readFileSync(path.join(controlRoot,...relative.split('/'))))===sha(approvalBytes),
   'R6_B_APPROVAL_WORKTREE_STOP');
+ const parsedApproval=JSON.parse(approvalBytes.toString('utf8'));
+ // DOL-only manual collection has its own exact source/file/effect approval.
+ // This branch never loads BLS overlay, BLS keys, publisher, or a scheduler.
+ if(parsedApproval?.schema==='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1'){
+  const {runDolManualOnce}=await import('./dol-manual-v1.mjs');
+  return runDolManualOnce({event,env,approvalBytes});
+ }
  const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';
  const overlayBytes=git(['show',`HEAD:${overlayPath}`]);
- const parsedApproval=JSON.parse(approvalBytes.toString('utf8'));
  const deltaOverlayBytes=[R6_B_APPROVAL_V2,R6_B_APPROVAL_V3]
   .includes(parsedApproval?.schema)?
   git(['show',`HEAD:${R6_B_DELTA_OVERLAY_PATH}`]):null;
