@@ -175,3 +175,30 @@ test('dedicated R181 workflow titles are not falsely rejected by shared ingress'
  // Generic shared Writer B routing is not loosened.
  assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
 });
+
+test('dedicated W04 R6 manual B request is not falsely rejected by shared intake',async()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/pc-employment-r6-registered-data-once.yml',
+  import.meta.url),'utf8');
+ const title='pc-employment-r6-registered-data-once';
+ assert.ok(workflow.includes("github.event.issue.title == '"+title+"'"));
+ assert.ok(workflow.includes("contains(github.event.issue.labels.*.name, 'pc-writer-b-install')"));
+ const exact={...issue(title),
+  body:JSON.stringify({schema:'ZGMINI_R6_REGISTERED_DATA_B_REQUEST_V1',
+   requestId:'6ebd5330-9950-4fcf-94c3-64cf392e4ac2',
+   chatId:'12cf700f-384d-4bbb-b401-7ac56be203e7',
+   operation:'employment-r6-registered-data-once',
+   approvalManifestSha256:'8'.repeat(64)})};
+ const result=inspectSharedIssueAdmission(exact);
+ assert.deepEqual(result,{state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
+ let posted=0;
+ const ev={...event(title),issue:exact};
+ const report=await reportRejectedAdmission(ev,{
+  listComments:async()=>[],postComment:async()=>{posted++;},
+  getComment:async()=>null
+ });
+ assert.equal(report.state,'UNMANAGED');
+ assert.equal(posted,0);
+ const invalid=inspectSharedIssueAdmission({...exact,title:'not-an-approved-r6-route'});
+ assert.equal(invalid.state,'REJECTED_AT_ADMISSION');
+ assert.equal(invalid.code,'EXACT_ISSUE_TITLE_REQUIRED');
+});

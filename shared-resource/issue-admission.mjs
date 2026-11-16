@@ -32,6 +32,9 @@ export const APPROVAL_ROUTES=Object.freeze({
 // pc-writer-b-source-once.yml, not by this shared generic Writer B intake.
 // A shared label alone is not a reason to mark these requests rejected.
 const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
+  // The exact W04 DOL manual B workflow owns this request; a shared B label
+  // must not produce a contradictory generic rejection after it is accepted.
+  'pc-employment-r6-registered-data-once',
   'r181-protected-route-install',
   'r181-source-shape-readonly',
   'r181-saved-ledger-readonly',

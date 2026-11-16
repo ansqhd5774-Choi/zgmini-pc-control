@@ -31,6 +31,15 @@ const error=code=>Object.assign(new Error(code),{code});
 const need=(condition,code)=>{if(!condition)throw error(code);};
 const same=(a,b)=>typeof a==='string'&&typeof b==='string'&&
  path.win32.normalize(a).toLowerCase()===path.win32.normalize(b).toLowerCase();
+// Only bounded step identifiers are exported on an unexpected runtime error.
+// Raw exception messages, provider responses and local paths never leave PC.
+const FAILURE_STAGES=new Set(['PREFLIGHT','COLLECT_OR_PUBLISH','MODULE_LOAD',
+ 'LOCAL_RUNTIME_SETUP','COLLECTOR_EXECUTION','SQLITE_READBACK','CLEANUP']);
+const classifyFailure=(cause,stage)=>{
+ const code=cause?.code;
+ return CODE.test(code??'')?code:
+  `R6_DOL_${FAILURE_STAGES.has(stage)?stage:'COLLECT_OR_PUBLISH'}_STOP`;
+};
 
 export function authorizeDolManual({event,env,approvalBytes}={}){
  need(env?.GITHUB_REPOSITORY===R6_B_REPO&&env.GITHUB_EVENT_NAME==='issues'&&
@@ -76,8 +85,9 @@ export function authorizeDolManual({event,env,approvalBytes}={}){
 }
 
 export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
- sourceRoot=R6_B_SOURCE,lock}={}){
+ sourceRoot=R6_B_SOURCE,lock,onStage=()=>{}}={}){
  need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
+ onStage('MODULE_LOAD');
  const root=pathToFileURL(path.join(sourceRoot,'scripts','pc-writer')+path.sep);
  const mod=name=>import(new URL(name,root).href);
  const {localDatabase}=await mod('local-db.mjs');
@@ -85,6 +95,7 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  const {installLocalRuntime}=await mod('local-env.mjs');
  const {runEmploymentR6CollectionStep}=await import(pathToFileURL(path.join(
   sourceRoot,'lib','market-score','employment-r6-collector.mjs')).href);
+ onStage('LOCAL_RUNTIME_SETUP');
  const originalFetch=globalThis.fetch;
  const quota=createQuotaFetch({base:pcHome,originalFetch,mode:'enforce'});
  const db=localDatabase(path.join(pcHome,'storage','core.sqlite'));
@@ -92,6 +103,7 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  let output;
  const hooks=installLocalRuntime({DB:db});
  try{
+  onStage('COLLECTOR_EXECUTION');
   output=await runEmploymentR6CollectionStep({
    db,env:{DB:db},fetchImpl:(url,init)=>quota.fetch(url,init),
    mode:'ONE_YEAR',groups:[GROUP],
@@ -102,6 +114,7 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    Number.isSafeInteger(output.providerRequests)&&
    output.providerRequests>=0&&output.providerRequests<=2,
    'R6_DOL_PROVIDER_SCOPE_STOP');
+  onStage('SQLITE_READBACK');
   const core=await db.prepare(`
    SELECT COUNT(DISTINCT c.logical_series_id) AS n,
     COUNT(*) AS rows
@@ -146,7 +159,13 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    nationalSeriesSaved:nationalSeries,nationalRowsSaved:nationalRows,
    stateRowsSaved:stateRows,
   };
- }finally{hooks.deregister();db.close();}
+ }finally{
+  // Do not overwrite a collector/readback failure stage merely because
+  // normal cleanup was attempted. Mark CLEANUP only on cleanup exceptions.
+  try{hooks.deregister();}
+  catch(cause){onStage('CLEANUP');throw cause;}
+  finally{try{db.close();}catch(cause){onStage('CLEANUP');throw cause;}}
+ }
 }
 
 export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
@@ -161,6 +180,7 @@ export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
   sourceFeatures:null,chartReadyFeatures:null,nationalSeriesSaved:null,
   nationalRowsSaved:null,stateRowsSaved:null,retry:'NO_AUTO_RETRY'};
  let lock=null,claimed=false,claimAttempted=false,lastPass='SOURCE_UNVERIFIED',outcome;
+ let failureStage='PREFLIGHT';
  try{
   const overlay={files:FILES.map(p=>({path:p,afterSha256:auth.approval.fileHashes[p]}))};
   verify({sourceRoot,pcHome,approvedSha:auth.approval.installedSourceSha,overlay});
@@ -170,12 +190,13 @@ export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
   claimAttempted=true;
   claim(pcHome,{requestId:auth.request.requestId,
    approvalManifestSha256:auth.request.approvalManifestSha256},'ONE_YEAR');
-  claimed=true;lastPass='ONE_SHOT_CLAIMED';
-  const value=await run({auth,sourceRoot,pcHome,lock});
+  claimed=true;lastPass='ONE_SHOT_CLAIMED';failureStage='COLLECT_OR_PUBLISH';
+  const value=await run({auth,sourceRoot,pcHome,lock,
+   onStage:stage=>{if(FAILURE_STAGES.has(stage))failureStage=stage;}});
   outcome={...base,...value,lastPass:'COLLECT_READBACK',
    firstFail:value.status==='STATE_UNKNOWN'?'COLLECT_OR_PUBLISH':null};
  }catch(cause){
-  const code=CODE.test(cause?.code??'')?cause.code:'R6_DOL_UNCLASSIFIED_STOP';
+  const code=classifyFailure(cause,failureStage);
   const unknown=claimed||code==='R6_B_CORE_LOCK_UNKNOWN'||
    (claimAttempted&&!['R6_B_REQUEST_ALREADY_CLAIMED',
     'R6_B_CLAIM_CREATE_STOP'].includes(code));
