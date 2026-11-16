@@ -5,9 +5,13 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
-import {R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,
- acquireCoreLockBounded,verifyInstalledR6Overlay,claimOnce,
- R6_B_SOURCE,R6_B_HOME} from './operation.mjs';
+// No dependency on the entrypoint: it awaits this module at top-level.
+const R6_B_REPO='ansqhd5774-Choi/zgmini-pc-control';
+const R6_B_TITLE='pc-employment-r6-registered-data-once';
+const R6_B_LABEL='pc-writer-b-install';
+const R6_B_SCHEMA='ZGMINI_R6_REGISTERED_DATA_B_REQUEST_V1';
+const R6_B_SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
+const R6_B_HOME=String.raw`E:\ZGmini\data\pc-writer`;
 
 export const DOL_MANUAL_SCHEMA='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1';
 const GROUP='DOL_UI_WEEKLY_CLAIMS';
@@ -146,8 +150,9 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
 }
 
 export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
- pcHome=R6_B_HOME,verify=verifyInstalledR6Overlay,
- acquire=acquireCoreLockBounded,claim=claimOnce,run=runInstalledDolManual}={}){
+ pcHome=R6_B_HOME,verify,acquire,claim,run=runInstalledDolManual}={}){
+ need(typeof verify==='function'&&typeof acquire==='function'&&
+  typeof claim==='function','R6_DOL_ADAPTER_MISSING');
  const base={schema:'ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1',
   requestId:auth.request.requestId,sourceSha:auth.approval.installedSourceSha,
   mode:'ONE_YEAR',status:'STATE_UNKNOWN',code:'R6_DOL_NOT_STARTED',
@@ -185,7 +190,9 @@ export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
  return outcome;
 }
 
-export async function runDolManualOnce({event,env,approvalBytes}={}){
+export async function runDolManualOnce({
+ event,env,approvalBytes,verify,acquire,claim
+}={}){
  const auth=authorizeDolManual({event,env,approvalBytes});
- return performDolManual({auth});
+ return performDolManual({auth,verify,acquire,claim});
 }
