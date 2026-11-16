@@ -330,7 +330,8 @@ async function execute(){
     fs.writeFileSync(ledgerPath,JSON.stringify(phase,null,2)+'\n',{flag:'wx'});
     const logDirectory=resultDirectoryFor(request.requestId);
     const bea=request.operation==='bea-unit-profit-once';
-    const outputDir=bea?logDirectory:path.join(publisherRoot,'scripts','pc-writer');
+    // Both publishers now write to the B request's bounded evidence directory.
+    const outputDir=logDirectory;
     const prefix=bea?'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_':
       'EARNINGS_CENSUS_QFR_R4_D1_RESULT_';
     const preflightLogBefore=new Set(fs.readdirSync(outputDir)
