@@ -17,7 +17,7 @@ function manifest(){
   sourceFilesSha256:Object.fromEntries(CENSUS_B_SOURCE_FILES.map(x=>[x,H])),
   providerEndpoint:CENSUS_B_ENDPOINT,selector:'MTM/TI/SA/US',
   targetFile:CENSUS_B_TARGET,maxProviderGets:2,maxRawArchives:2,
-  maxOutputFiles:1,coreLeaseMode:'EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK_VERIFIED_OWNER',
+  maxOutputFiles:1,maxBackupFiles:1,coreLeaseMode:'EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK_VERIFIED_OWNER',
   allowQuotaLedgerWrites:true,allowProviderCalls:true,
   allowDatabaseWrites:false,allowD1Writes:false,allowSourceChanges:false,
   allowTaskChanges:false,allowScheduleChanges:false,allowOtherWrites:false};
@@ -50,6 +50,7 @@ test('default-off and unknown effects are denied',()=>{
   x=>x.status='DRAFT_NOT_APPROVED',
   x=>x.maxProviderGets=3,
   x=>x.maxOutputFiles=2,
+  x=>x.maxBackupFiles=2,
   x=>x.allowD1Writes=true,
   x=>x.allowDatabaseWrites=true,
   x=>x.allowOtherWrites=true,
