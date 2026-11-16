@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {analyzeR44ExistingInput,inspectR44ExistingInputAudit} from
+ '../controller/market-calendar-r44-input-audit-readonly.mjs';
+const header='ticker,name,exchange,sector,industry,country,price,mktCap';
+const csv=rows=>[header,...rows].join('\n')+'\n';
+const rows=[
+ 'DAC,Danaos,NYSE,Industrials,Marine,US,100,2802626256',
+ 'META,Meta,NASDAQ,,,US,0,25000000000',
+ 'GOOG,Alphabet,NASDAQ,Technology,Internet,US,200,3409323404043',
+ 'GOOGL,Alphabet,NASDAQ,Technology,Internet,US,200,3401168208750',
+ 'BRK-B,Berkshire,NYSE,Financials,Insurance,US,500,860000000000',
+ 'OTC1,Unlisted,OTC,Finance,Banks,US,50,30000000000'
+];
+test('fixed source audit: separate exact market-cap grading from metadata-only exclusions',()=>{
+ const x=analyzeR44ExistingInput(csv(rows),['DAC','META','GOOG','BRK.B','ABSENT']);
+ assert.equal(x.rawRows,6);
+ assert.equal(x.validListedTickers,4);
+ assert.equal(x.metadataRejectedWithCap,1);
+ assert.equal(x.metadataCandidates,1);
+ assert.equal(x.aliasCandidates,1);
+ assert.equal(x.maskedShareClassCandidates,1);
+ assert.equal(x.coveredTickerCount,2);
+ assert.deepEqual(x.counts,{one:1,two:0,three:1,missing:3,conflicting:0});
+ assert.equal(x.grades.get('DAC'),1);
+ assert.equal(x.grades.get('GOOG'),3);
+ assert.equal(x.grades.get('META'),null);
+});
+test('both share classes on calendar produce existing 2-conflict result',()=>{
+ const x=analyzeR44ExistingInput(csv(rows),['GOOG','GOOGL']);
+ assert.deepEqual(x.counts,{one:0,two:0,three:0,missing:0,conflicting:2});
+ assert.equal(x.maskedShareClassCandidates,0);
+});
+test('duplicate ticker never becomes a metadata recovery candidate',()=>{
+ const x=analyzeR44ExistingInput(csv([
+  'AA,One,NYSE,Tech,Tech,US,5,10000000000',
+  'AA,Two,NYSE,Tech,Tech,US,5,10000000000',
+  'BB,NoPrice,NYSE,Tech,Tech,US,0,10000000000'
+ ]),['AA','BB']);
+ assert.equal(x.strictDuplicateTickerConflicts,1);
+ assert.equal(x.rawCapDuplicateConflicts,1);
+ assert.deepEqual(x.counts,{one:0,two:0,three:0,missing:2,conflicting:0});
+ assert.equal(x.metadataCandidates,1);
+});
+test('strict CSV contract refuses malformed input or unsafe ticker',()=>{
+ assert.throws(()=>analyzeR44ExistingInput('ticker,mktCap\nDAC,1\n',['DAC']),
+  /R44_CSV_HEADER_INVALID/);
+ assert.throws(()=>analyzeR44ExistingInput(csv(rows),['../escape']),
+  /R44_CALENDAR_TICKERS_INVALID/);
+ assert.throws(()=>analyzeR44ExistingInput(csv(['DAC,broken']),['DAC']),
+  /R44_CSV_WIDTH_INVALID/);
+});
+test('no root means no filesystem access or source disclosure',()=>{
+ const x=inspectR44ExistingInputAudit('relative-not-authorized');
+ assert.equal(x.status,'STATE_UNKNOWN');
+ assert.equal(x.code,'R44_FIXED_ROOT_INVALID');
+ assert.equal(x.sqliteOpened,false);
+ assert.equal(x.providerCalls,0);
+ assert.equal(x.dbWrites,0);
+ assert.equal(x.d1Writes,0);
+ assert.equal(x.operationalWrites,0);
+ assert.equal(x.rawExposed,false);
+ assert.equal(x.formulaModified,false);
+ assert.ok(!Object.hasOwn(x,'grades'));
+});
