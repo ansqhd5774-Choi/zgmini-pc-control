@@ -103,7 +103,15 @@ test('checkpoint path reference outside immutable manifest is rejected',t=>{
 test('raw symlink is rejected without following outside data root',t=>{
  const f=fixture(t),file=f.files['legacy-nine-r35-delta-SPY'];
  const outside=path.join(path.dirname(f.dataRoot),'private.txt');fs.writeFileSync(outside,'sensitive');
- fs.rmSync(file);fs.symlinkSync(outside,file);
+ fs.rmSync(file);
+ try{fs.symlinkSync(outside,file);}catch(error){
+  // Non-admin Windows CI accounts may lack SeCreateSymbolicLinkPrivilege.
+  // Do not downgrade the application's mandatory reject-on-link logic.
+  if(process.platform==='win32'&&['EPERM','EACCES'].includes(error?.code)){
+   t.skip('Windows CI cannot create symlinks; production source still rejects links');return;
+  }
+  throw error;
+ }
  const r=audit(f);assert.equal(r.status,'BLOCKED');assert.equal(r.code,'R32_COVERAGE_UNSAFE_PATH');
  assert.equal(r.providerCalls,0);assert.doesNotMatch(JSON.stringify(r),/sensitive/);
 });
