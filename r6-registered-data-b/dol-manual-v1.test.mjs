@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA} from './dol-manual-v1.mjs';
+import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA,createApprovedDolManualCollectorOptions} from './dol-manual-v1.mjs';
 import {readFileSync} from 'node:fs';
 import {sanitizeR6BResult} from './report.mjs';
 
@@ -187,4 +187,29 @@ test('generic pre-claim failure stays BLOCKED without claiming or retrying',asyn
  assert.equal(result.code,'R6_DOL_PREFLIGHT_STOP');
  assert.equal(result.firstFail,'PREFLIGHT');
  assert.doesNotMatch(JSON.stringify(result),/UNSAFE_SOURCE_PATH/);
+});
+
+test('sealed DOL B authorization supplies manual intent only for scoped ONE_YEAR collection',()=>{
+ const auth=authorizeDolManual(fixture());
+ const fetchImpl=async()=>{};
+ const db={prepare(){}};
+ const options=createApprovedDolManualCollectorOptions({auth,db,fetchImpl});
+ assert.equal(options.executionIntent,'AUTHORIZED_MANUAL');
+ assert.equal(options.mode,'ONE_YEAR');
+ assert.deepEqual(options.groups,['DOL_UI_WEEKLY_CLAIMS']);
+ assert.equal(options.db,db);
+ assert.equal(options.fetchImpl,fetchImpl);
+ assert.equal(options.manualApprovalEvidence.requestId,auth.request.requestId);
+ assert.equal(options.manualApprovalEvidence.approvalManifestSha256,auth.request.approvalManifestSha256);
+ assert.equal(options.manualApprovalEvidence.maxDolCalls,2);
+ assert.deepEqual(Object.keys(options.manualApprovalEvidence).sort(),[
+  'approvalManifestSha256','groupName','maxDolCalls','mode','requestId','schema','scope','status',
+ ].sort());
+ for(const changed of [
+  {approval:{...auth.approval,groupName:'BLS_JOLTS'}},
+  {approval:{...auth.approval,maxDolCalls:3}},
+  {request:{...auth.request,requestId:'bad'}},
+  {request:{...auth.request,approvalManifestSha256:'bad'}},
+ ]) assert.throws(()=>createApprovedDolManualCollectorOptions({auth:{...auth,...changed},db,fetchImpl}),
+  /R6_DOL_MANUAL_INTENT_STOP/);
 });

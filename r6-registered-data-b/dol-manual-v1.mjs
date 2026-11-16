@@ -84,6 +84,28 @@ export function authorizeDolManual({event,env,approvalBytes}={}){
  return {request,approval};
 }
 
+// Authorization and manifest bytes are verified by authorizeDolManual before
+// the one-shot claim. Only this dedicated B entrypoint passes manual intent.
+export function createApprovedDolManualCollectorOptions({auth,db,fetchImpl}={}){
+ need(auth?.approval?.schema===DOL_MANUAL_SCHEMA&&auth.approval.status==='APPROVED_B'
+  &&auth.approval.scope==='EMPLOYMENT_R6_DOL_MANUAL_SQLITE_ONCE'
+  &&auth.approval.mode==='ONE_YEAR'&&auth.approval.groupName===GROUP
+  &&auth.approval.maxDolCalls===2&&UUID.test(auth?.request?.requestId??'')
+  &&SHA64.test(auth?.request?.approvalManifestSha256??''),
+  'R6_DOL_MANUAL_INTENT_STOP');
+ return {
+  db,env:{DB:db},fetchImpl,mode:'ONE_YEAR',groups:[GROUP],
+  executionIntent:'AUTHORIZED_MANUAL',
+  manualApprovalEvidence:{
+   schema:auth.approval.schema,status:auth.approval.status,
+   scope:auth.approval.scope,mode:auth.approval.mode,
+   groupName:auth.approval.groupName,maxDolCalls:auth.approval.maxDolCalls,
+   requestId:auth.request.requestId,
+   approvalManifestSha256:auth.request.approvalManifestSha256,
+  },
+ };
+}
+
 export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  sourceRoot=R6_B_SOURCE,lock,onStage=()=>{}}={}){
  need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
@@ -104,10 +126,9 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
  const hooks=installLocalRuntime({DB:db});
  try{
   onStage('COLLECTOR_EXECUTION');
-  output=await runEmploymentR6CollectionStep({
-   db,env:{DB:db},fetchImpl:(url,init)=>quota.fetch(url,init),
-   mode:'ONE_YEAR',groups:[GROUP],
-  });
+  output=await runEmploymentR6CollectionStep(createApprovedDolManualCollectorOptions({
+   auth,db,fetchImpl:(url,init)=>quota.fetch(url,init),
+  }));
   need(lock.held(),'R6_DOL_CORE_LOCK_LOST');
   const groups=output.groupResults??[];
   need(groups.length<=1&&groups.every(x=>x.groupName===GROUP)&&
