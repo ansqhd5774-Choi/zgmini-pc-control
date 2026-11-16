@@ -76,7 +76,8 @@ export function evaluateWorkUpdate(issue,comments,sourceComment) {
   const newer=all.filter(c=>c.id>sourceComment.id);
   const duplicated=all.filter(c=>c.id===sourceComment.id);
   if(duplicated.length!==1)stop('SOURCE_DUPLICATED');
-  if(newer.length)stop('NEWER_OWNER_UPDATE_EXISTS');
+  if(newer.length&&!verifiedReceiptFor(comments,existing,sourceComment.id,issueUrl))
+    stop('NEWER_OWNER_UPDATE_EXISTS');
   let latest=null;
   const ids=new Set();
   for(const c of previous){
