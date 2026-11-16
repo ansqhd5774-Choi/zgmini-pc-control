@@ -136,12 +136,20 @@ export async function applyApprovedUpdate(request, port) {
     const firstFail=ledger.phase,reason=maintenanceFailureCode(error,failureOperation);
     const details=(status,nextAction)=>failureDetails({status,failureOperation,
       intakeAttempted,backup,supervisorStopped,switched,nextAction});
+    // Once the new six-Runner tree has reconnected, an intake API timeout
+    // or journal failure has an UNKNOWN effect. The workflow may already be
+    // enabled and queued Issues may already be claimed. Never stop that tree
+    // or overwrite host.json via an automatic rollback on this boundary.
+    // Reconcile the exact existing request/lease in the independent operator.
+    const intakeBoundaryUncertain=ledger.phase==='RECONNECTED'||
+      ledger.phase==='INTAKE_RESUMED';
     // A network timeout while a postcheck may still be running is not evidence
     // of diagnostic failure. In particular, do not stop its active Runner.
-    if((ledger.phase==='POSTCHECK_PENDING' && ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason)) ||
-      (ledger.phase==='INTAKE_RESUMED' && reason.startsWith('BACKLOG_'))) {
-      const nextAction=reason==='BACKLOG_REPLAY_OUTCOME_UNKNOWN'
-        ?'RECONCILE_QUEUED_ISSUES_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY'
+    if(intakeBoundaryUncertain ||
+      (ledger.phase==='POSTCHECK_PENDING' &&
+       ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason))) {
+      const nextAction=intakeBoundaryUncertain
+        ?'RECONCILE_WORKFLOW_BACKLOG_AND_INSTALLED_SHA_NO_AUTOMATIC_ROLLBACK'
         :'RECONCILE_POSTCHECK_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY';
       await record('RECOVERY_REQUIRED',{status:'RECOVERY_REQUIRED',code:reason,firstFail,
         actualInstalledSha:null,intakePaused:paused,next:nextAction,...details('RECOVERY_REQUIRED',nextAction)});
