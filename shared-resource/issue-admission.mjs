@@ -47,6 +47,7 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   'w03-r179-readback-guard-install',
   'r181-primary-route-install',
   'r181-existing-task-run-once',
+  'w01-census-m3-api-once',
 ]));
 const stop=code=>{throw new Error('SHARED_ISSUE_ADMISSION_'+code);};
 const exactKeys=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&
