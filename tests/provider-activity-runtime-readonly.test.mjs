@@ -45,10 +45,16 @@ test('no log means unknown, not healthy',()=>fixture(({d})=>{
  const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.activeEndpointCount,null);
 }));
 
-test('reject symlinked source',()=>fixture(({d,file})=>{
+test('reject symlinked source',t=>fixture(({d,file})=>{
  const external=path.join(os.tmpdir(),'zgmini-symlink-'+process.pid+'.jsonl');fs.writeFileSync(external,'{}\n');
- try{fs.symlinkSync(external,file);const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.code,'UNSAFE_LOG_FILE');}
- finally{fs.rmSync(external,{force:true});}
+ try{
+  try{fs.symlinkSync(external,file);}
+  catch(error){
+   if(error.code==='EPERM'||error.code==='EACCES'){t.skip('Windows CI symlink creation not permitted');return;}
+   throw error;
+  }
+  const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.code,'UNSAFE_LOG_FILE');
+ }finally{fs.rmSync(external,{force:true});}
 }));
 
 test('truncated last append and malformed JSON never pass as full evidence',()=>fixture(({d,file})=>{
@@ -88,4 +94,58 @@ test('successful cycle events with no network requests do not imply active provi
  write([event('2026-11-15T12:00:00Z',{})]);
  const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');
  assert.equal(x.code,'PROVIDER_ACTIVITY_NO_OBSERVED_HOSTS');assert.equal(x.activeEndpointCount,null);
+}));
+
+
+test('observed HTTP 32-host cohort returns exact names and 29/1/2 evidence replay',()=>fixture(({d,write})=>{
+ const domains=Array.from({length:32},(_,i)=>'api'+String(i).padStart(2,'0')+'.provider.example.org');
+ const first=Object.fromEntries(domains.map(name=>[name,host({'200':1})]));
+ const second=Object.fromEntries(domains.filter((_,i)=>i!==2).map((name,i)=>[
+  name,host({[name===domains[0]?'503':name===domains[1]?'429':'200']:1})]));
+ write([event('2026-11-10T12:00:00.000Z',{[domains[2]]:host({'200':1})}),
+  event('2026-11-11T12:00:00.000Z',first),event('2026-11-15T12:00:00.000Z',second)]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.monitoredHostCount,32);
+ assert.equal(out.monitoredHostsReturned,32);
+ assert.deepEqual(out.http,{normal:29,failed:1,unknown:2,total:32});
+ assert.deepEqual(out.hosts.filter(x=>x.monitored).map(x=>x.host).sort(),domains);
+ assert.equal(out.hosts.find(x=>x.host===domains[0]).lastRunStatuses['503'],1);
+ assert.equal(out.hosts.find(x=>x.host===domains[0]).monitoringState,'failed');
+ assert.equal(out.hosts.find(x=>x.host===domains[1]).monitoringState,'unknown');
+ assert.equal(out.hosts.find(x=>x.host===domains[2]).reason,'NO_VERIFIED_SCHEDULE_OVER_36H');
+ assert.equal(out.providerCalls,0);assert.equal(out.operationalWrites,0);
+}));
+test('one-off hosts cannot displace the 32-member repeated monitoring roster',()=>fixture(({d,write})=>{
+ const repeated=Object.fromEntries(Array.from({length:32},(_,i)=>['repeated'+i+'.provider.org',host({'200':1})]));
+ const singleton=Object.fromEntries(Array.from({length:64},(_,i)=>['oneoff'+i+'.provider.org',host({'200':1})]));
+ write([event('2026-11-14T12:00:00Z',repeated),event('2026-11-15T12:00:00Z',{...repeated,...singleton})]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.monitoredHostCount,32);
+ assert.equal(out.monitoredHostsReturned,32);
+ assert.equal(out.http.normal,32);
+ assert.equal(out.hostsReturned,64);
+ assert.equal(out.omittedHosts,32);
+ assert.equal(out.status,'STATE_UNKNOWN');
+}));
+test('publisher cadence heuristic can flag healthy provider as unknown rather than confirmed failure',()=>fixture(({d,write})=>{
+ const rows=Array.from({length:7},(_,i)=>event(new Date(Date.parse('2026-11-06T12:00:00Z')+i*86400000).toISOString(),
+  {'monthly.provider.org':host({'200':1})}));
+ write(rows);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.monitoredHostCount,1);
+ assert.equal(out.http.failed,0);
+ assert.equal(out.http.unknown,1);
+ assert.equal(out.hosts[0].reason,'ESTIMATED_CADENCE_OVERDUE');
+ assert.equal(out.hosts[0].lastRunStatuses['200'],1);
+}));
+test('host list and status counters never disclose raw response URL, header or credential',()=>fixture(({d,write})=>{
+ write([event('2026-11-14T12:00:00Z',{'sec-data.gov':host({'200':1})}),
+ {...event('2026-11-15T12:00:00Z',{'sec-data.gov':host({'404':1})}),
+  responseUrl:'https://sec-data.gov/?api_key=SEC-PRIVATE-KEY',authorization:'Bearer TOPSECRET'}]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ const serialized=JSON.stringify(out);
+ assert.equal(out.http.failed,1);
+ assert.ok(!serialized.includes('SEC-PRIVATE-KEY'));
+ assert.ok(!serialized.includes('TOPSECRET'));
+ assert.ok(!serialized.includes('responseUrl'));
 }));
