@@ -48,6 +48,17 @@ export function summarizeAutomation(s){
   intakeNote:'GitHub read access and Runner health do not prove this chat may submit a maintenance request.'};
 }
 
+// Fixed non-sensitive observations from the installed automation status.
+// Neither PID, nonce, owner path, command line nor environment is included.
+export function safeRuntimeSignals(state){
+ const names=['controllerFilesVerified','supervisorAlive','supervisorIdentityVerified',
+  'supervisorFresh','supervisorChildrenVerified','runnerSetOnline'];
+ const flags=Object.fromEntries(names.map(k=>[k,
+  typeof state?.[k]==='boolean'?state[k]:null]));
+ return {...flags,workflowActive:state?.workflowState==='active'?true:
+  ['disabled_manually','disabled_inactivity'].includes(state?.workflowState)?false:null};
+}
+
 export function collectAutomationStatus(args=process.argv.slice(2)){
  need(process.platform==='win32','STATUS_WINDOWS_REQUIRED');
  need(args.length===0||(args.length===2&&args[0]==='--request-id'&&/^pc-[a-z0-9-]{8,76}$/.test(args[1])),'STATUS_ARGS');
@@ -93,6 +104,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   freshnessSeconds:45,collectorSource:'tools/automation-status.mjs',...summarizeAutomation(state),
   actualControllerSha:state.actualControllerSha,maintenanceSourceSha:installed?.sourceSha??null,
   installLock:state.installLock,workflowState:workflow,
+  runtimeSignals:safeRuntimeSignals(state),
   receiverObservedAt:receiver?.at??null,receiverStatus:receiver?.status??null,maintenanceFilesVerified:state.maintenanceFilesVerified,
   runners:rows?.map(x=>({name:x.name,status:x.status,busy:x.busy}))??null,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
