@@ -79,11 +79,13 @@ test('50B fixed scenario counts only graded unique calendar tickers at USD bound
   'DUP,One,NYSE,Tech,Apps,US,10,999999999999',
   'DUP,Two,NYSE,Tech,Apps,US,10,999999999999'
  ]),['LOW','EDGE','HIGH','TOP','OTC1','DUP','ABS']);
- assert.deepEqual(a.counts,{one:0,two:3,three:1,missing:3,conflicting:0});
+ assert.deepEqual(a.counts,{one:0,two:1,three:3,missing:3,conflicting:0});
  assert.deepEqual(a.threshold50B,{cutoffUsd:50000000000,calendarTickerCount:3});
  assert.equal(a.grades.get('LOW'),2);
- assert.equal(a.grades.get('EDGE'),2);
+ assert.equal(a.grades.get('EDGE'),3);
+ assert.equal(a.grades.get('HIGH'),3);
  assert.equal(a.grades.get('TOP'),3);
+ assert.equal(a.counts.three,a.threshold50B.calendarTickerCount);
 });
 test('50B scenario excludes share-class collisions even if both caps exceed cutoff',()=>{
  const a=analyzeR44ExistingInput(csv(rows),['GOOG','GOOGL','DAC']);

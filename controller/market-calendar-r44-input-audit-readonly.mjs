@@ -59,7 +59,7 @@ function csvRows(csv){
 }
 const issuer=t=>t==='GOOG'||t==='GOOGL'?'ALPHABET':
  /^BRK[.\-][AB]$/.test(t)?'BERKSHIRE':t;
-const importance=cap=>cap>=200000000000?3:cap>=20000000000?2:1;
+const importance=cap=>cap>=50000000000?3:cap>=20000000000?2:1;
 
 // Pure, deterministic audit, usable on mock rows without any PC access.
 // "Candidates" are possible corrections only, never automatically applied.
@@ -162,9 +162,10 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
  }
  if(Object.values(missingReasons).reduce((sum,n)=>sum+n,0)!==counts.missing)
   fail('R44_MISSING_REASON_COUNT_MISMATCH');
- if(atLeast50BCalendarTickers<counts.three||
-   atLeast50BCalendarTickers>counts.two+counts.three)
-  fail('R44_50B_SCENARIO_OUT_OF_RANGE');
+ // Under the approved 50B/20B grading contract the 50B cohort is
+ // precisely the 3-star cohort, not merely a subset of the old 2-star tier.
+ if(atLeast50BCalendarTickers!==counts.three)
+  fail('R44_50B_GRADE_COUNT_MISMATCH');
  return {
   rawRows:rows.length,validListedTickers:strict.size,invalidRows,nonListedRows,
   strictDuplicateTickerConflicts:strictConflicts.size,rawCapDuplicateConflicts:rawConflicts.size,
