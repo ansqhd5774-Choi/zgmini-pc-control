@@ -13,7 +13,8 @@ import {
  verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {performOfficialManualB} from './coordinator.mjs';
-import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof}
+import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
+ shouldWaitForV2OwnerEvidence}
  from './core-task-event-owner-proof.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
  from '../r17-writer-b/r17-b-claim.mjs';
@@ -127,6 +128,7 @@ function readCoreTask129Events(){
 async function observeLiveCoreLockOwner(approvalSchema){
  const deadline=Date.now()+CORE_OWNER_OBSERVATION_MS;
  let sawTaskInstance=false,sawRelatedCore=false,sawCoreLock=false;
+ let sawEvent129Mismatch=false;
  while(Date.now()<deadline){
   const probe=taskProbe();
   sawTaskInstance||=probe.instances>0;
@@ -168,6 +170,13 @@ async function observeLiveCoreLockOwner(approvalSchema){
     // V1 always retains its original EnginePID ancestry protection.
     need(approvalSchema===APPROVAL_SCHEMA_V2,
      'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+    // Korea shares this lock with Core; its valid owner is not permission
+    // to store, but is not a reason to consume a one-shot B request early.
+    // Wait for a naturally running Core within the original 12m bound.
+    if(shouldWaitForV2OwnerEvidence({isV2:true,linked:false,
+     taskRunning:ownerProof.taskRunning})){
+     await delay(1500);continue;
+    }
     // No guessed ownership: event PID, immutable task name, approved Node
     // executable, process creation instant and current lock PID must concur.
     const event=verifyCoreTaskEvent129({
@@ -176,6 +185,12 @@ async function observeLiveCoreLockOwner(approvalSchema){
      ownerCoreMatched:ownerProof.ownerCoreMatched,
      ownerCreatedAtMs:ownerProof.ownerCreatedAtMs,
     });
+    if(!event.ok&&shouldWaitForV2OwnerEvidence({
+     isV2:true,linked:false,taskRunning:ownerProof.taskRunning,
+     eventCode:event.code})){
+     sawEvent129Mismatch=true;
+     await delay(1500);continue;
+    }
     need(event.ok===true,
      'INFL_MANUAL_B_CORE_OWNER_EVENT129_UNVERIFIED_STOP');
    }
@@ -189,6 +204,8 @@ async function observeLiveCoreLockOwner(approvalSchema){
  }
  // Distinguish an active E: Core lock from a missing Task engine window.
  // These bounded flags disclose no PID, command line, path or raw content.
+ if(sawEvent129Mismatch)
+  fail('INFL_MANUAL_B_CORE_OWNER_EVENT129_UNVERIFIED_STOP');
  if(sawCoreLock&&!sawTaskInstance)
   fail('INFL_MANUAL_B_CORE_TASK_INSTANCE_GAP_STOP');
  if(sawCoreLock&&!sawRelatedCore)
