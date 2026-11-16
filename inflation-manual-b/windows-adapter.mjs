@@ -99,7 +99,7 @@ function sourcePreimage(auth){
   otherWriterActive:false};
 }
 
-function taskProbe(){
+export function taskProbe(){
  let proof;
  try{proof=JSON.parse(execute('cscript',['//NoLogo',PROBE]));}
  catch{fail('INFL_MANUAL_B_CORE_PROBE_JSON_STOP');}
@@ -127,8 +127,11 @@ function readCoreTask129Events(){
 // least once in THIS bounded B run. No Task start, disable, or forced cycle.
 // V2 may use the TaskScheduler event-129 process-launch record to prove the
 // same PID even when GetInstances(0) hides an elevated task from this Runner.
-async function observeLiveCoreLockOwner(approvalSchema){
- const deadline=Date.now()+CORE_OWNER_OBSERVATION_MS;
+export async function observeLiveCoreLockOwner(approvalSchema,{maxObservationMs=CORE_OWNER_OBSERVATION_MS}={}){
+ need(Number.isInteger(maxObservationMs)&&maxObservationMs>=30_000&&
+  maxObservationMs<=CORE_OWNER_OBSERVATION_MS,
+  'INFL_MANUAL_B_CORE_OWNER_WINDOW_SCOPE_STOP');
+ const deadline=Date.now()+maxObservationMs;
  let sawTaskInstance=false,sawRelatedCore=false,sawCoreLock=false;
  let sawEvent129Mismatch=false;
  while(Date.now()<deadline){
