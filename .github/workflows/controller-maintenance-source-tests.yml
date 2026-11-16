@@ -173,7 +173,7 @@ jobs:
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
-        run: node --test --test-concurrency=1 inflation-census-api-b/contract.test.mjs
+        run: node --test --test-concurrency=1 inflation-census-api-b/contract.test.mjs inflation-census-api-b/coordinator.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         run: |
           node --check watchdog-b/contract.mjs
