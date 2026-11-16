@@ -42,15 +42,21 @@ export function classifyObservedHttpHost(x,now){
  const lastOutcome=successes>0&&failed===0?'success':failed>0&&successes===0?'failure':'mixed';
  const rawState=!repeated?'excluded':overdue?'stale':nonPeriodicStale?'unknown':
   lastOutcome==='failure'||lastOutcome==='mixed'?'failed':'normal';
- // A 429/quota guard by itself never means that the host connection is down.
+ // A host that responds 2xx in the last batch is connected even if
+ // another optional SEC frame path returns 404. Individual 404 responses
+ // remain in lastRunStatuses for source-level completeness checks.
+ // 404-only, 429 and quota-only batches do not prove a usable connection.
  const confirmedHttpError=Object.entries(last).some(([code,count])=>count>0&&
-  (code==='NETWORK_ERROR'||(/^[45][0-9]{2}$/.test(code)&&code!=='429')));
- const monitoringState=rawState==='normal'?'normal':rawState==='failed'&&confirmedHttpError?'failed':'unknown';
+  (code==='NETWORK_ERROR'||(/^[45][0-9]{2}$/.test(code)&&
+   code!=='404'&&code!=='429')));
+ const monitoringState=rawState==='excluded'||rawState==='stale'||rawState==='unknown'
+  ?'unknown':confirmedHttpError?'failed':successes>0?'normal':'unknown';
  const reason=!repeated?'NOT_REPEATED':
   overdue?'ESTIMATED_CADENCE_OVERDUE':
   nonPeriodicStale?'NO_VERIFIED_SCHEDULE_OVER_36H':
-  rawState==='failed'?confirmedHttpError?'LAST_HTTP_ERROR':'QUOTA_OR_UNCLASSIFIED':
-  rawState==='normal'?'RECENT_2XX':'EVIDENCE_UNKNOWN';
+  monitoringState==='failed'?'LAST_HTTP_ERROR':
+  monitoringState==='normal'?'RECENT_2XX':
+  rawState==='failed'?'QUOTA_OR_UNCLASSIFIED':'EVIDENCE_UNKNOWN';
  return {repeated,monitoringState,reason,expectedIntervalMs:cadence,
   cadenceSupported,lastOutcome,lastRunStatuses:last};
 }
