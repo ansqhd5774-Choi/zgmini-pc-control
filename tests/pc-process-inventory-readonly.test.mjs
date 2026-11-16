@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -142,4 +142,37 @@ test('read-only collector fails closed without fixed local files',()=>{
  assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.code,'C996_ORIGINAL_FILES_UNAVAILABLE');
  assert.equal(result.operationalWrites,0);
+});
+test('fixed 1501 lease snapshot distinguishes current owner from unrelated C996 ledger',()=>{
+ const p=pinned996(),o=JSON.parse(p.first.owner.toString('utf8'));
+ const ledger={requestId:'pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b',
+  issueNumber:1501,targetSha:'b2ff49dd14a09ebeba482e2ae9a84530e00f094f',
+  updatedAt:'2026-11-12T20:32:33.000Z'};
+ const x={...p,first:{...p.first,ledger:Buffer.from(JSON.stringify(ledger))}};
+ x.second={...x.first};
+ const ok=classify1501LeaseCorrelation(x);
+ assert.equal(ok.status,'CORRELATED');
+ assert.equal(ok.code,'C1501_LEASE_IDENTITY_CORRELATED');
+ assert.equal(ok.ledger1501Matched,true);
+ assert.equal(ok.ownerMarkerIdentityMatched,true);
+ assert.equal(ok.ledgerMarkerTimeMatched,true);
+ assert.equal(Object.hasOwn(ok,'ledger996Matched'),false);
+ assert.equal(classify996LeaseCorrelation(x).status,'STATE_UNKNOWN');
+ const late={...x,first:{...x.first,ledger:Buffer.from(JSON.stringify({...ledger,
+  updatedAt:'2026-11-16T12:00:00.000Z'}))}};
+ late.second={...late.first};
+ const mis=classify1501LeaseCorrelation(late);
+ assert.equal(mis.status,'STATE_UNKNOWN');
+ assert.equal(mis.ledger1501Matched,true);
+ assert.equal(mis.ledgerMarkerTimeMatched,false);
+ assert.doesNotMatch(JSON.stringify(mis),/95a0c24a|b2ff49dd|11111111|nonce|ZGmini/i);
+});
+test('fixed 1501 operation never follows user-controlled path or mutates files',()=>{
+ const q=inspect1501LeaseCorrelation({lock:()=>({held:true,recoveryRequired:true,ownerPid:42}),
+  stat:()=>{throw Error('no mounted ledger');},
+  read:()=>{throw Error('unexpected read');}});
+ assert.equal(q.status,'STATE_UNKNOWN');
+ assert.equal(q.code,'C1501_ORIGINAL_FILES_UNAVAILABLE');
+ assert.equal(q.operationalWrites,0);
+ assert.equal(Object.hasOwn(q,'ledger996Matched'),false);
 });
