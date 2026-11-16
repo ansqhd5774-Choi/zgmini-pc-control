@@ -4,13 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parsePublisherLog,nextLedgerPhase,millisecondsToNextUtcSecond,
-  publicationCheckpointReport} from '../tools/publication-executor.mjs';
+  publicationCheckpointReport,validateBeaStoredPreflight} from '../tools/publication-executor.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const source=file=>fs.readFileSync(path.join(root,file),'utf8');
 
 test('BEA exact D1 readback and original CSV hash are mandatory',()=>{
- const raw=['MODE=EXPLICIT_APPLY','SOURCE_SHA256='+'a'.repeat(64),
+ const raw=['MODE=EXPLICIT_APPLY','SOURCE_ORIGIN=PC_IMMUTABLE_ARCHIVE',
+   'SOURCE_HTTP_REQUESTS=0','STORED_RAW_READBACK=VERIFIED','SOURCE_SHA256='+'a'.repeat(64),
    'SOURCE_STORED_AT=1793112733108','D1_RESULT=READBACK_VERIFIED',
    'RESULT=PASS_BEA_UNIT_READBACK_VERIFIED'].join('\r\n');
  assert.deepEqual(parsePublisherLog(raw,'bea-unit-profit-once'),{
@@ -78,4 +79,25 @@ test('static workflow stays gated and cannot overwrite existing A or maintenance
  assert.match(executor,/\[\.\.\.invocation\.flags\]/);
  assert.match(executor,/publisherFiles/);
  assert.doesNotMatch(executor,/shell:true|execSync\(|powershell|wrangler deploy/i);
+});
+
+test('BEA preflight and apply must reuse manifest pinned source without provider GET',()=>{
+ const pin='e'.repeat(64);
+ const raw=['MODE=READ_ONLY_PREFLIGHT','SOURCE_SHA256='+pin,
+  'SOURCE_ORIGIN=PC_IMMUTABLE_ARCHIVE','SOURCE_HTTP_REQUESTS=0',
+  'STORED_RAW_READBACK=VERIFIED','D1_WRITES=0','RAW_LOCAL_WRITES=0',
+  'RESULT=PASS_BEA_UNIT_PREFLIGHT_ONLY'].join('\n');
+ assert.equal(validateBeaStoredPreflight(raw,pin),true);
+ assert.throws(()=>validateBeaStoredPreflight(raw,'f'.repeat(64)),
+   /PUBLICATION_BEA_PREFLIGHT_SOURCE_MISMATCH/);
+ assert.throws(()=>validateBeaStoredPreflight(raw.replace('SOURCE_HTTP_REQUESTS=0',
+   'SOURCE_HTTP_REQUESTS=1'),pin),/PUBLICATION_BEA_PREFLIGHT_SOURCE_MISMATCH/);
+ const changed=raw.replace('STORED_RAW_READBACK=VERIFIED','STORED_RAW_READBACK=UNVERIFIED');
+ assert.throws(()=>validateBeaStoredPreflight(changed,pin),
+   /PUBLICATION_BEA_PREFLIGHT_SOURCE_MISMATCH/);
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/ZGMINI_EARNINGS_BEA_UNIT_SOURCE_SHA:invocation.sourceSha256/);
+ assert.match(executor,/evidence.sourceVersion!==invocation.sourceSha256/);
+ assert.match(executor,/providerCalls:0/);
+ assert.doesNotMatch(executor,/providerCalls:request.operation==='bea-unit-profit-once'\?2:0/);
 });

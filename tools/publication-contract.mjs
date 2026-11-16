@@ -21,6 +21,7 @@ const OPS=Object.freeze({
     provider:'FRED_CSV',
     sourceFiles:Object.freeze([
       'scripts/pc-writer/EARNINGS_BEA_UNIT_PROFIT_R1_ONCE.mjs',
+      'scripts/pc-writer/EARNINGS_BEA_UNIT_STORED_RAW_R1.mjs',
       'scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs',
       'scripts/pc-writer/d1.mjs',
       'scripts/pc-writer/d1-transient.mjs',
@@ -83,9 +84,12 @@ export function validatePublicationApproval(request,bytes){
   if(sha256(bytes)!==request.approvalManifestSha256)throw Error('PUBLICATION_MANIFEST_HASH_MISMATCH');
   let approval;
   try{approval=JSON.parse(bytes.toString());}catch{throw Error('PUBLICATION_MANIFEST_JSON_INVALID');}
+  const bea=request.operation==='bea-unit-profit-once';
   exact(approval,['schema','requestId','operation','sourceRepository','publisherSha',
-    'operationalSha','snapshotKey','publisherFiles','approval','execution'],
+    'operationalSha','snapshotKey','publisherFiles','approval','execution',
+    ...(bea?['sourceSha256']:[])],
     'PUBLICATION_MANIFEST_FIELDS_INVALID');
+  if(bea)required(approval.sourceSha256,SHA256,'PUBLICATION_BEA_SOURCE_PIN_INVALID');
   const spec=operationSpec(request.operation);
   if(approval.schema!==APPROVAL_SCHEMA||approval.requestId!==request.requestId
     ||approval.operation!==request.operation||approval.sourceRepository!==SOURCE_REPOSITORY
@@ -105,7 +109,8 @@ export function validatePublicationApproval(request,bytes){
     ||approval.execution.maxD1Keys!==1||approval.execution.provider!==spec.provider)
     throw Error('PUBLICATION_EXECUTION_SCOPE_INVALID');
   return Object.freeze({request,approval:Object.freeze(approval),
-    invocation:Object.freeze({script:spec.script,flags:spec.flags,snapshotKey:spec.snapshotKey})});
+    invocation:Object.freeze({script:spec.script,flags:spec.flags,
+      snapshotKey:spec.snapshotKey,sourceSha256:bea?approval.sourceSha256:null})});
 }
 
 export function validatePublisherFileDigests(validated,actual){

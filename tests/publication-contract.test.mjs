@@ -14,7 +14,8 @@ const fixture=(operation='census-qfr-margin-once')=>{
    operationalSha:'b'.repeat(40),snapshotKey:spec.snapshotKey,
    publisherFiles:Object.fromEntries(spec.sourceFiles.map(name=>[name,'c'.repeat(64)])),
    approval:{grade:'B',scope:spec.approvalScope,actor:ACTOR,issueNumber:84},
-   execution:{mode:'ONCE',maxAutomaticRetries:0,maxD1Keys:1,provider:spec.provider}};
+   execution:{mode:'ONCE',maxAutomaticRetries:0,maxD1Keys:1,provider:spec.provider},
+   ...(operation==='bea-unit-profit-once'?{sourceSha256:'f'.repeat(64)}:{})};
  const bytes=JSON.stringify(approval);
  const request={schema:REQUEST_SCHEMA,requestId:REQUEST_ID,
    chatId:'chat-12f7e7d2-2ed8-4efe-baca-e3624a84097c',operation,
@@ -34,6 +35,10 @@ test('only BEA and QFR are admitted with fixed scripts, explicit write flags and
  assert.deepEqual(b.invocation.flags,['--apply','--confirm-census-qfr-d1-write']);
  assert.notEqual(a.invocation.snapshotKey,b.invocation.snapshotKey);
  assert.match(a.invocation.script,/EARNINGS_BEA_UNIT_PROFIT_R1_ONCE\.mjs$/);
+ assert.equal(a.invocation.sourceSha256,'f'.repeat(64));
+ assert.equal(b.invocation.sourceSha256,null);
+ assert.ok(operationSpec('bea-unit-profit-once').sourceFiles
+   .includes('scripts/pc-writer/EARNINGS_BEA_UNIT_STORED_RAW_R1.mjs'));
  assert.match(b.invocation.script,/EARNINGS_CENSUS_QFR_R4_D1_ONCE\.mjs$/);
 });
 test('wrong actor, public repository, label, event or extra request fields are blocked',()=>{
@@ -125,4 +130,16 @@ test('only exact single-key D1 readback (or identical prior stored) can pass',()
   x=>x.d1Result='WRITE_SUBMITTED',x=>x.sourceStoredAt=0]){
   const d=structuredClone(data);edit(d);
   assert.throws(()=>validatePublicationReadback(v,d),/PUBLICATION_D1_READBACK_NOT_VERIFIED/);}
+});
+
+test('BEA source SHA is immutable manifest-pinned while QFR rejects unexpected source pin',()=>{
+ const missing=fixture('bea-unit-profit-once');
+ delete missing.approval.sourceSha256;repin(missing);
+ assert.throws(()=>admitted(missing),/PUBLICATION_MANIFEST_FIELDS_INVALID/);
+ const malformed=fixture('bea-unit-profit-once');
+ malformed.approval.sourceSha256='not-a-sha';repin(malformed);
+ assert.throws(()=>admitted(malformed),/PUBLICATION_BEA_SOURCE_PIN_INVALID/);
+ const unexpected=fixture('census-qfr-margin-once');
+ unexpected.approval.sourceSha256='d'.repeat(64);repin(unexpected);
+ assert.throws(()=>admitted(unexpected),/PUBLICATION_MANIFEST_FIELDS_INVALID/);
 });

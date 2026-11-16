@@ -20,7 +20,7 @@ const ERROR=/^[A-Z0-9_]{1,96}$/;
 const now=()=>new Date().toISOString();
 const code=e=>ERROR.test(String(e?.message??''))?e.message:'PUBLICATION_OPERATION_FAILED';
 
-export function parsePublisherLog(text,operation){
+function parseLogRows(text){
   if(typeof text!=='string'||Buffer.byteLength(text)>32768)throw Error('PUBLICATION_RESULT_TXT_INVALID');
   const rows={};
   for(const line of text.split(/\r?\n/)){
@@ -31,6 +31,30 @@ export function parsePublisherLog(text,operation){
       throw Error('PUBLICATION_RESULT_TXT_INVALID');
     rows[key]=value;
   }
+  return rows;
+}
+
+export function validateBeaStoredPreflight(text,sourceSha){
+  if(!SHA256.test(sourceSha??''))throw Error('PUBLICATION_BEA_SOURCE_PIN_INVALID');
+  const rows=parseLogRows(text);
+  if(rows.RESULT!=='PASS_BEA_UNIT_PREFLIGHT_ONLY'
+    ||rows.MODE!=='READ_ONLY_PREFLIGHT'
+    ||rows.SOURCE_SHA256!==sourceSha
+    ||rows.SOURCE_ORIGIN!=='PC_IMMUTABLE_ARCHIVE'
+    ||rows.SOURCE_HTTP_REQUESTS!=='0'
+    ||rows.STORED_RAW_READBACK!=='VERIFIED'
+    ||rows.D1_WRITES!=='0'||rows.RAW_LOCAL_WRITES!=='0')
+    throw Error('PUBLICATION_BEA_PREFLIGHT_SOURCE_MISMATCH');
+  return true;
+}
+
+export function parsePublisherLog(text,operation){
+  const rows=parseLogRows(text);
+  if(operation==='bea-unit-profit-once'
+    &&(rows.SOURCE_ORIGIN!=='PC_IMMUTABLE_ARCHIVE'
+      ||rows.SOURCE_HTTP_REQUESTS!=='0'
+      ||rows.STORED_RAW_READBACK!=='VERIFIED'))
+    throw Error('PUBLICATION_BEA_NOT_STORED_SOURCE');
   const expectedResult=operation==='bea-unit-profit-once'
     ?['PASS_BEA_UNIT_READBACK_VERIFIED','PASS_BEA_UNIT_ALREADY_STORED']
     :['PASS_QFR_D1_EXACT_READBACK','PASS_QFR_D1_ALREADY_STORED'];
@@ -230,16 +254,22 @@ async function execute(){
       phase:'READY',updatedAt:now(),firstFail:null};
     fs.writeFileSync(ledgerPath,JSON.stringify(phase,null,2)+'\n',{flag:'wx'});
     const logDirectory=resultDirectoryFor(request.requestId);
+    const bea=request.operation==='bea-unit-profit-once';
+    const preflightLogBefore=bea?new Set(fs.readdirSync(logDirectory)
+      .filter(file=>file.startsWith('EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_'))):null;
     const childEnv={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
       PATH:process.env.PATH,TEMP:process.env.RUNNER_TEMP, TMP:process.env.RUNNER_TEMP,
       USERPROFILE:process.env.USERPROFILE,
       ZGMINI_PC_HOME:PC_BASE,
       ZGMINI_EARNINGS_C_OPERATIONAL_ROOT:operationalRoot,
-      ZGMINI_EARNINGS_C_LOG_DIR:logDirectory};
+      ZGMINI_EARNINGS_C_LOG_DIR:logDirectory,
+      ...(bea?{ZGMINI_EARNINGS_BEA_UNIT_SOURCE_SHA:invocation.sourceSha256}:{})};
     const script=path.join(publisherRoot,...invocation.script.split('/'));
     const preflight=await runFixedChild(script,['--dry-run'],childEnv,PREFLIGHT_TIMEOUT_MS);
     if(preflight.exitCode!==0||preflight.timedOut||preflight.truncated)
       throw Error('PUBLICATION_PREFLIGHT_FAILED');
+    if(bea)validateBeaStoredPreflight(readNewResult(logDirectory,
+      'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_',preflightLogBefore),invocation.sourceSha256);
     // Both pinned publishers use second-resolution, exclusive result filenames.
     // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
     const fenceAt=Date.now();
@@ -255,13 +285,15 @@ async function execute(){
     if(applied.exitCode!==0||applied.timedOut||applied.truncated)
       throw Error('PUBLICATION_APPLY_RESULT_UNKNOWN');
     const evidence=parsePublisherLog(readNewResult(outputDir,prefix,before),request.operation);
+    if(bea&&evidence.sourceVersion!==invocation.sourceSha256)
+      throw Error('PUBLICATION_BEA_APPLY_SOURCE_MISMATCH');
     validatePublicationReadback(validated,{...evidence,key:invocation.snapshotKey});
     phase=nextLedgerPhase(phase,'READBACK_PASS');writeAtomic(ledgerPath,phase);
     report={...report,status:'PASS',code:'PUBLICATION_SINGLE_KEY_READBACK_VERIFIED',
       d1Result:evidence.d1Result,sourceVersion:evidence.sourceVersion,
       ...publicationCheckpointReport(request.operation,evidence),
       d1Writes:evidence.d1Result==='READBACK_VERIFIED'?1:0,
-      providerCalls:request.operation==='bea-unit-profit-once'?2:0};
+      providerCalls:0};
     // Only a fully verified operation releases its lease; archive owner evidence.
     fs.renameSync(active,path.join(SAFE_ROOT,'leases','complete-'+request.requestId));
     leasePath=null;
