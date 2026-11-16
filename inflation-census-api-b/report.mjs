@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {CENSUS_B_REPO,authorizeCensusB} from './contract.mjs';
 const OUTPUT='ZGMINI_W01_CENSUS_M3_API_B_RESULT_V1';
 const RUN=/^\d{1,18}$/;
-const CODE=/^(?:W01_CENSUS_B|INFL_MANUAL_B)_[A-Z0-9_]{3,90}$/;
+const CODE=/^(?:W01_CENSUS_B|INFL_MANUAL_B|WRITER_B_CORE)_[A-Z0-9_]{3,90}$/;
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const need=(yes,code)=>{if(!yes)fail(code);};
 const CONTROL_ROOT=path.join(path.dirname(fileURLToPath(import.meta.url)),'..');
