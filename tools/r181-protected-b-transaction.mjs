@@ -89,7 +89,7 @@ export async function runApprovedR181ProtectedB(proof,io){
   need(object(io)&&IO_KEYS.every(k=>typeof io[k]==='function'),
     'R181_B_TRUSTED_IO_REQUIRED');
   const requestId=proof.request.requestId;
-  let acquired=false,claimed=false,attempted=false,retain=false;
+  let acquired=false,claimRequested=false,claimed=false,attempted=false,retain=false;
   let before=null,after=null,candidate=null,stage='LOCK';
   let out=result('R181_B_STATE_UNKNOWN','R181_B_NOT_EXECUTED');
   try{
@@ -109,6 +109,9 @@ export async function runApprovedR181ProtectedB(proof,io){
     candidate={beforeSha256:sha(before),afterSha256:sha(after),
       changedByteCount:3};
     stage='ONE_SHOT_CLAIM';
+    // The durable one-shot journal may be partially created if the IO
+    // throws. Never label that outcome a safely repeatable preflight STOP.
+    claimRequested=true;
     await io.claimOnce(requestId,proof.manifestSha256);claimed=true;
     stage='BACKUP';
     const backup=await io.backupAndVerify(R181_B_TARGET,requestId);
@@ -133,7 +136,13 @@ export async function runApprovedR181ProtectedB(proof,io){
     }
   }catch(error){
     const code=safeCode(error);
-    if(!acquired&&!claimed)out=result('R181_B_PREFLIGHT_STOP',code);
+    if(claimRequested&&!claimed){
+      // The original requestId might already be consumed. Hold the lock
+      // and ask the authorized recovery owner to read the original journal.
+      retain=true;
+      out=result('R181_B_RECOVERY_REQUIRED','R181_B_CLAIM_OUTCOME_UNKNOWN',{
+        recovery:'READ_ONLY_RECONCILE_NO_REPLAY'});
+    }else if(!acquired&&!claimed)out=result('R181_B_PREFLIGHT_STOP',code);
     else if(!claimed)out=result('R181_B_PREFLIGHT_STOP',code);
     else{
       // Never clobber external changes. On uncertainty retain the exact
