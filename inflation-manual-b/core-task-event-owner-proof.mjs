@@ -23,6 +23,12 @@ const reason=(code)=>Object.freeze({ok:false,code});
 // when GetInstances(0) hides the Core Task. This is ONLY an observation gate,
 // not an authorization to accept a lock owner without exact Event 129 proof.
 // V1 must retain its existing visible Task/related process requirement.
+// V2 never treats mere Task Engine ancestry as permission for a different
+// local-cycle lane/command. V1 retains its legacy visible-engine contract.
+export function shouldAcceptVisibleCoreOwner(isV2,ownerProof){
+ return ownerProof?.linked===true&&
+  (isV2!==true||ownerProof.ownerCoreMatched===true);
+}
 export function shouldAttemptCoreOwnerProof(isV2,probe,lockPresent){
  return lockPresent===true&&(isV2===true||
   (probe?.instances>0&&probe?.relatedProcesses>0));
