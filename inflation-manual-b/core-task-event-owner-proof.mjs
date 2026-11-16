@@ -27,6 +27,18 @@ export function shouldAttemptCoreOwnerProof(isV2,probe,lockPresent){
  return lockPresent===true&&(isV2===true||
   (probe?.instances>0&&probe?.relatedProcesses>0));
 }
+// A non-Core lock owner or an unmatched recent Task event can be transient
+// because Korea and Core share local-cycle.lock. V2 waits ONLY for these
+// inconclusive, bounded observations; it never authorizes a provider GET.
+// An unreadable event log, failed WMI or malformed lock remains a hard stop.
+export function shouldWaitForV2OwnerEvidence({
+ isV2,linked,taskRunning,eventCode,
+}={}){
+ return isV2===true&&linked===false&&(
+  taskRunning===false||
+  (taskRunning===true&&
+   eventCode==='INFL_MANUAL_B_EVENT129_TASK_PID_NOT_VERIFIED'));
+}
 export function verifyCoreTaskEvent129({
  xml,lockPid,lockAt,ownerCreatedAtMs,taskRunning,ownerCoreMatched,now=Date.now(),
 }={}){
