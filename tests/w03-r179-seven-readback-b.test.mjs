@@ -21,7 +21,7 @@ const request=(bytes)=>({schema:REQUEST_SCHEMA,operation:OP,
  requestId:'a9f304a0-810c-46b8-935b-2e4ad944d75f',
  chatId:'25acc496-3bb0-457c-a220-63bdf9bd657c',
  controlRepository:REPO,approvalManifestPath:
- 'approvals/w03-r179-guard/r179-readback-v1.json',
+ 'approvals/w03-r179-guard/r179-readback-v1-20261116.json',
  approvalManifestSha256:sha(bytes)});
 const env=()=>({GITHUB_REPOSITORY:REPO,GITHUB_EVENT_NAME:'issues',
  GITHUB_EVENT_ACTION:'opened',GITHUB_RUN_ATTEMPT:'1',
