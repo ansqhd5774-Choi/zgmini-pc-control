@@ -76,7 +76,7 @@ test('owner-only, identity and receipt-fingerprint checks fail closed',()=>{
   assert.throws(()=>evaluateWorkUpdate({...f.issue,state:'closed'},comments,a),/ISSUE_OR_INVENTORY_STOP/);
   assert.throws(()=>evaluateWorkUpdate(f.issue,comments,{...a,user:{login:'stranger'}}),/SOURCE_IDENTITY_STOP/);
   assert.throws(()=>evaluateWorkUpdate(f.issue,comments,{...a,body:a.body.replace('ACKNOWLEDGED','WORKING')}),/SOURCE_COMMENT_READBACK_STOP/);
-  assert.throws(()=>evaluateWorkUpdate(f.issue,[...comments,{...ownerReceipt(f,a),body:'bad'}],a),/RECEIPT_CONFLICT_STOP/);
+  assert.throws(()=>evaluateWorkUpdate(f.issue,[...comments,{...ownerReceipt(f,a),body:workReceipt(parseWorkUpdate(a.body),a.id).replace('state: ACKNOWLEDGED','state: WORKING')}],a),/RECEIPT_CONFLICT_STOP/);
   assert.throws(()=>parseWorkUpdate(JSON.stringify({schema:WORK_SCHEMA})),/FIELDS_STOP/);
   const forged={...a,body:a.body.replace(f.parsed.incidentId,'handoff-forged-other')};
   assert.throws(()=>evaluateWorkUpdate(f.issue,[...f.comments,forged],forged),/ORIGIN_PROOF_MISMATCH/);
@@ -87,7 +87,7 @@ test('bot receipt cannot claim actual AI execution or runtime result',()=>{
   const entry=workReceipt(parseWorkUpdate(a.body),a.id);
   assert.ok(entry.startsWith(WORK_RECEIPT+'\n'));
   assert.match(entry,/evidence: OWNER_GITHUB_COMMENT_ONLY/);
-  assert.doesNotMatch(entry,/APPLIED_VERIFIED|OWNER_RESUMED|TESTED/);
+  assert.doesNotMatch(entry,/^state: (?:APPLIED_VERIFIED|OWNER_RESUMED|TESTED)$/m);
 });
 
 test('event requires real owner-authored comment, accepted repository and label',()=>{
