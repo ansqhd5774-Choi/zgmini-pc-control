@@ -186,3 +186,27 @@ test('Census-specific B natural-owner and idle waits leave time for two official
  assert.match(workflow,/timeout-minutes: 12/);
  assert.ok(5*60_000+3*60_000+2*20_000<12*60_000);
 });
+
+test('Census raw provenance pins exact saved document hashes, never a different valid archive',async()=>{
+ const {verifyCensusDocumentProvenance}=await import('./windows-adapter.mjs');
+ const a='a'.repeat(64),b='b'.repeat(64);
+ const name=y=>`census-m3-mtm-${y}-${y===2025?a:b}.json`;
+ const doc={provenance:[
+  {year:2025,sourceSha256:a,archive:'raw/'+name(2025)},
+  {year:2026,sourceSha256:b,archive:'raw/'+name(2026)}]};
+ const read=n=>new Map([[name(2025),a],[name(2026),b]]).get(n)??null;
+ assert.equal(verifyCensusDocumentProvenance(doc,read),true);
+ assert.throws(()=>verifyCensusDocumentProvenance(doc,n=>n===name(2025)?b:read(n)),
+  /W01_CENSUS_B_PROVENANCE_SHA_STOP/);
+ assert.throws(()=>verifyCensusDocumentProvenance(doc,()=>null),
+  /W01_CENSUS_B_PROVENANCE_SHA_STOP/);
+ assert.throws(()=>verifyCensusDocumentProvenance({
+  provenance:[doc.provenance[0],{...doc.provenance[0]}]},read),
+  /W01_CENSUS_B_PROVENANCE_SHAPE_STOP/);
+ assert.throws(()=>verifyCensusDocumentProvenance({
+  provenance:[{...doc.provenance[0],archive:'raw/something-else.json'},
+   doc.provenance[1]]},read),
+  /W01_CENSUS_B_PROVENANCE_PATH_STOP/);
+ assert.throws(()=>verifyCensusDocumentProvenance({...doc,provenance:[]},read),
+  /W01_CENSUS_B_PROVENANCE_SHAPE_STOP/);
+});
