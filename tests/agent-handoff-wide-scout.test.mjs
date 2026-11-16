@@ -5,7 +5,7 @@ import {
   WIDE_POLICY,evaluateWideSnapshot,reportDecision,renderWideReport,snapshotMarker,
   CONTROL_REPO,OWNER
 } from '../agent-handoff/wide-scout.mjs';
-import {validateWideEvent,scoutWide} from '../agent-handoff/wide-scout-runner.mjs';
+import {validateWideEvent,scoutWide,RUN_STATUS_PARTITIONS} from '../agent-handoff/wide-scout-runner.mjs';
 const now=Date.parse('2026-11-16T15:00:00Z');
 const recent='2026-11-16T14:00:00Z';
 const older='2026-08-16T12:00:00Z';
@@ -155,4 +155,21 @@ test('event identity and owner provenance are strict',()=>{
   assert.doesNotThrow(()=>validateWideEvent(w,{...env,GITHUB_EVENT_NAME:'workflow_run'}));
   assert.throws(()=>validateWideEvent({...w,workflow_run:{...w.workflow_run,
     actor:{login:'attacker'}}},{...env,GITHUB_EVENT_NAME:'workflow_run'}),/WORKFLOW_PROVENANCE/);
+});
+
+test('status-partition coverage prevents a newest-300-only blind spot',()=>{
+  assert.deepEqual(RUN_STATUS_PARTITIONS,[
+    'failure','timed_out','cancelled','action_required',
+    'queued','waiting','in_progress','pending'
+  ]);
+  assert.equal(WIDE_POLICY.maxRuns,1600);
+  const report=evaluateWideSnapshot(snapshot({
+    runs:[run(3,recent,{conclusion:'failure'})],
+    coverage:[{status:'failure',count:200,complete:false},
+      {status:'cancelled',count:10,complete:true}],
+    complete:{runs:false,issues:true,pulls:true}
+  }),now);
+  assert.equal(report.inventory.complete.runs,false);
+  assert.equal(report.inventory.statusCoverage[0].complete,false);
+  assert.match(renderWideReport(report),/failure=200\(미완전\)/);
 });
