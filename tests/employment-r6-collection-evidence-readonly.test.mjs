@@ -219,8 +219,24 @@ test('unapproved data path and symbolic core file fail without opening SQLite',t
  const {data,storage,file}=fixture(t);
  assert.equal(inspectEmploymentR6CollectionEvidence(storage).code,'R6_EVIDENCE_DATA_ROOT_DENIED');
  const other=path.join(storage,'other.sqlite');const db=createDb(other);db.close();
- fs.symlinkSync(other,file);
- const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
+ let filesystem=fs;
+ try{fs.symlinkSync(other,file);}
+ catch(error){
+  if(!['EPERM','EACCES'].includes(error?.code))throw error;
+  // Isolated Windows CI users may lack symlink creation privileges.
+  // Simulate the same lstat+realpath contract without relaxing the guard.
+  filesystem={...fs,
+   lstatSync(target){
+    if(target===file)return Object.assign(Object.create(fs.lstatSync(other)),{
+     isSymbolicLink:()=>true,
+    });
+    return fs.lstatSync(target);
+   },
+   realpathSync(target){return target===file?other:fs.realpathSync(target);},
+  };
+ }
+ const r=inspectEmploymentR6CollectionEvidence(data,{filesystem,
+  openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
  assert.equal(r.status,'STATE_UNKNOWN');
  assert.equal(r.sqliteOpened,false);
 });
