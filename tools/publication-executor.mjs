@@ -48,6 +48,36 @@ export function validateBeaStoredPreflight(text,sourceSha){
   return true;
 }
 
+// A QFR dry-run proves the exact immutable snapshot, not just that a script exited 0.
+export function validateQfrStoredPreflight(text,expectedKey){
+  const rows=parseLogRows(text);
+  const storedAt=rows.SOURCE_STORED_AT;
+  if(rows.RESULT!=='PASS_QFR_D1_PREFLIGHT_NO_REMOTE_ACCESS'
+    ||rows.MODE!=='READ_ONLY_PREFLIGHT'
+    ||rows.SNAPSHOT_KEY!==expectedKey
+    ||rows.SOURCE_GATES!=='PASS'
+    ||rows.SOURCE_FRESHNESS!=='FRESH'
+    ||rows.SOURCE_HTTP_REQUESTS!=='0'
+    ||rows.PC_SQLITE_WRITES!=='0'
+    ||rows.D1_QUERIES!=='0'||rows.D1_WRITES!=='0'
+    ||!SHA256.test(rows.SOURCE_VERSION??'')
+    ||!SHA256.test(rows.RAW_ZIP_SHA256??'')
+    ||typeof storedAt!=='string'||!/^[1-9][0-9]*$/.test(storedAt)
+    ||!Number.isSafeInteger(Number(storedAt)))
+    throw Error('PUBLICATION_QFR_PREFLIGHT_SOURCE_MISMATCH');
+  return Object.freeze({sourceVersion:rows.SOURCE_VERSION,
+    rawZipSha256:rows.RAW_ZIP_SHA256,sourceStoredAt:Number(storedAt)});
+}
+
+export function validateQfrApplySource(preflight,evidence){
+  if(!preflight||!evidence
+    ||evidence.sourceVersion!==preflight.sourceVersion
+    ||evidence.rawZipSha256!==preflight.rawZipSha256
+    ||evidence.sourceStoredAt!==preflight.sourceStoredAt)
+    throw Error('PUBLICATION_QFR_APPLY_SOURCE_MISMATCH');
+  return true;
+}
+
 export function parsePublisherLog(text,operation){
   const rows=parseLogRows(text);
   if(operation==='bea-unit-profit-once'
@@ -60,11 +90,16 @@ export function parsePublisherLog(text,operation){
     :['PASS_QFR_D1_EXACT_READBACK','PASS_QFR_D1_ALREADY_STORED'];
   if(!expectedResult.includes(rows.RESULT)||!['READBACK_VERIFIED','ALREADY_STORED'].includes(rows.D1_RESULT))
     throw Error('PUBLICATION_RESULT_NOT_VERIFIED');
+  if(operation==='census-qfr-margin-once'
+    &&(!SHA256.test(rows.RAW_ZIP_SHA256??'')
+      ||rows.PREFLIGHT_SOURCE_PIN!=='VERIFIED'))
+    throw Error('PUBLICATION_QFR_APPLY_PIN_MISSING');
   const sourceVersion=operation==='bea-unit-profit-once'?rows.SOURCE_SHA256:rows.SOURCE_VERSION;
   const sourceStoredAt=Number(rows.SOURCE_STORED_AT);
   if(!SHA256.test(sourceVersion??'')||!Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0)
     throw Error('PUBLICATION_RESULT_CHECKPOINT_INVALID');
-  return Object.freeze({status:'PASS',d1Result:rows.D1_RESULT,sourceVersion,sourceStoredAt});
+  return Object.freeze({status:'PASS',d1Result:rows.D1_RESULT,sourceVersion,sourceStoredAt,
+    ...(operation==='census-qfr-margin-once'?{rawZipSha256:rows.RAW_ZIP_SHA256}:{})});
 }
 
 export function millisecondsToNextUtcSecond(now){
@@ -255,8 +290,11 @@ async function execute(){
     fs.writeFileSync(ledgerPath,JSON.stringify(phase,null,2)+'\n',{flag:'wx'});
     const logDirectory=resultDirectoryFor(request.requestId);
     const bea=request.operation==='bea-unit-profit-once';
-    const preflightLogBefore=bea?new Set(fs.readdirSync(logDirectory)
-      .filter(file=>file.startsWith('EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_'))):null;
+    const outputDir=bea?logDirectory:path.join(publisherRoot,'scripts','pc-writer');
+    const prefix=bea?'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_':
+      'EARNINGS_CENSUS_QFR_R4_D1_RESULT_';
+    const preflightLogBefore=new Set(fs.readdirSync(outputDir)
+      .filter(file=>file.startsWith(prefix)&&file.endsWith('.txt')));
     const childEnv={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
       PATH:process.env.PATH,TEMP:process.env.RUNNER_TEMP, TMP:process.env.RUNNER_TEMP,
       USERPROFILE:process.env.USERPROFILE,
@@ -268,25 +306,30 @@ async function execute(){
     const preflight=await runFixedChild(script,['--dry-run'],childEnv,PREFLIGHT_TIMEOUT_MS);
     if(preflight.exitCode!==0||preflight.timedOut||preflight.truncated)
       throw Error('PUBLICATION_PREFLIGHT_FAILED');
-    if(bea)validateBeaStoredPreflight(readNewResult(logDirectory,
-      'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_',preflightLogBefore),invocation.sourceSha256);
+    const preflightEvidence=readNewResult(outputDir,prefix,preflightLogBefore);
+    const qfrPin=bea?null:validateQfrStoredPreflight(preflightEvidence,invocation.snapshotKey);
+    if(bea)validateBeaStoredPreflight(preflightEvidence,invocation.sourceSha256);
     // Both pinned publishers use second-resolution, exclusive result filenames.
     // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
     const fenceAt=Date.now();
     await new Promise(resolve=>setTimeout(resolve,millisecondsToNextUtcSecond(fenceAt)));
     phase=nextLedgerPhase(phase,'PREFLIGHT_PASS');writeAtomic(ledgerPath,phase);
-    const outputDir=request.operation==='bea-unit-profit-once'?logDirectory:
-      path.join(publisherRoot,'scripts','pc-writer');
-    const prefix=request.operation==='bea-unit-profit-once'? 'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_':
-      'EARNINGS_CENSUS_QFR_R4_D1_RESULT_';
-    const before=new Set(fs.readdirSync(outputDir).filter(f=>f.startsWith(prefix)));
+    const before=new Set(fs.readdirSync(outputDir)
+      .filter(f=>f.startsWith(prefix)&&f.endsWith('.txt')));
     phase=nextLedgerPhase(phase,'APPLY_START');writeAtomic(ledgerPath,phase);
-    const applied=await runFixedChild(script,[...invocation.flags],childEnv,APPLY_TIMEOUT_MS);
+    // The B executor alone derives these pins from its verified, unique preflight file.
+    // User Issue fields cannot inject or override publisher environment checkpoints.
+    const applyEnv=bea?childEnv:{...childEnv,
+      ZGMINI_EARNINGS_QFR_SOURCE_VERSION:qfrPin.sourceVersion,
+      ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin.rawZipSha256,
+      ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String(qfrPin.sourceStoredAt)};
+    const applied=await runFixedChild(script,[...invocation.flags],applyEnv,APPLY_TIMEOUT_MS);
     if(applied.exitCode!==0||applied.timedOut||applied.truncated)
       throw Error('PUBLICATION_APPLY_RESULT_UNKNOWN');
     const evidence=parsePublisherLog(readNewResult(outputDir,prefix,before),request.operation);
     if(bea&&evidence.sourceVersion!==invocation.sourceSha256)
       throw Error('PUBLICATION_BEA_APPLY_SOURCE_MISMATCH');
+    if(!bea)validateQfrApplySource(qfrPin,evidence);
     validatePublicationReadback(validated,{...evidence,key:invocation.snapshotKey});
     phase=nextLedgerPhase(phase,'READBACK_PASS');writeAtomic(ledgerPath,phase);
     report={...report,status:'PASS',code:'PUBLICATION_SINGLE_KEY_READBACK_VERIFIED',
