@@ -6,7 +6,7 @@ export const APPROVED_VBS_CHAIN_FILES=Object.freeze({
  CUTOVER_VBS:Object.freeze({path:'E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs',
   sha256:'bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01'}),
  ARCHIVE_NODE:Object.freeze({path:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-run.mjs',
-  sha256:'ce07af0b5e8d17625644e204f2815c754aff2468bc5434ac13c0dadcecd907'}),
+  sha256:'ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907'}),
  ARCHIVE_CORE_NODE:Object.freeze({path:'E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\archive-core-r10.mjs',
   sha256:'e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84'}),
 });
