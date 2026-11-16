@@ -11,11 +11,12 @@ on:
 permissions:
   contents: read
   issues: read
-concurrency:
-  group: zgmini-handoff-control-board
-  cancel-in-progress: false
 jobs:
   authenticated-readonly-board:
+    concurrency:
+      group: zgmini-handoff-control-board
+      cancel-in-progress: false
+      queue: max
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
