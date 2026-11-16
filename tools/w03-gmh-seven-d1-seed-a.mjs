@@ -11,6 +11,7 @@ import {verifyCandidate,APPROVED_SOURCE_SHA,REPO}
 import {readSavedCandidate,validateCandidate,PRIVATE_SHA,MANIFEST_SHA}
  from './w03-gmh-seven-public-compat-a.mjs';
 
+export { REPO };
 export const TITLE='w03-gmh-seven-d1-seed-readonly';
 export const SCHEMA='ZGMINI_W03_GMH_D1_SEED_REQUEST_V1';
 export const OUTPUT='ZGMINI_W03_GMH_D1_SEED_RESULT_V1';
