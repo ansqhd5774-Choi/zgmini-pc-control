@@ -43,6 +43,7 @@ export async function performCensusApiB(proof,io){
  need(io&&METHODS.every(name=>typeof io[name]==='function'),
   'W01_CENSUS_B_IO_CONTRACT_STOP');
  let writer=false,core=false,claimed=false,writeIntent=false,retain=false;
+ let coreAcquireAttempted=false,claimAttempted=false;
  let firstFail=null,phase='PREFLIGHT',outcome=null;
  try{
   await io.proveLiveCoreLockOwner();phase='CORE_OWNER_VERIFIED';
@@ -50,10 +51,12 @@ export async function performCensusApiB(proof,io){
   const preimage=await io.readPcPreimage();
   verifyCensusBPreimage(proof.manifest,preimage);phase='SOURCE_VERIFIED';
   await io.assertCoreIdle();
+  coreAcquireAttempted=true;
   await io.acquireCoreLease(proof.request.requestId);core=true;
   await io.verifyCoreLease(proof.request.requestId);
   // Recheck live source and exclusive Core ownership before the one-way claim.
   verifyCensusBPreimage(proof.manifest,await io.readPcPreimage());
+  claimAttempted=true;
   await io.claimOnce(proof.request.requestId);claimed=true;
   await io.journalPhase('CLAIMED');
   // After this boundary the call may have hit the provider or changed private
@@ -62,8 +65,9 @@ export async function performCensusApiB(proof,io){
   const output=verifyCensusBCollectorResult(await io.collectAndReadback());
   await io.verifyCoreLease(proof.request.requestId);
   await io.verifySavedReadback(output);
-  writeIntent=false;phase='READBACK_VERIFIED';
+  phase='READBACK_VERIFIED';
   await io.journalPhase('COMPLETED');
+  writeIntent=false;
   outcome={status:'PASS',code:'W01_CENSUS_B_SAVED_READBACK',
    requestId:proof.request.requestId,sourceSha:proof.manifest.installedSourceSha,
    providerCalls:2,stored:output.completed[0].status,
@@ -71,7 +75,8 @@ export async function performCensusApiB(proof,io){
    replay:'FORBIDDEN'};
  }catch(e){
   firstFail=safeCode(e);
-  retain=claimed&&writeIntent;
+  retain=(claimed&&writeIntent)||(coreAcquireAttempted&&!core)||
+   (claimAttempted&&!claimed);
   if(claimed)try{
    await io.journalPhase(retain?'RECOVERY_REQUIRED':'CLAIMED_UNTOUCHED_STOP');
   }catch{retain=true;firstFail='W01_CENSUS_B_JOURNAL_UNVERIFIED_STOP';}
