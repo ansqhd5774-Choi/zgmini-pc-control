@@ -154,7 +154,7 @@ export function inspectProviderActivity(dataRoot,{now=Date.now(),fileSystem=fs}=
   total:monitored.length};
  const noObservedHosts=hosts.size===0;
  const limited=partialTail||partialRows||bad>0||duplicated>0||hiddenHosts>0||
-   hosts.size>MAX_HOSTS||monitored.length>MAX_RETURNED_HOSTS||noObservedHosts;
+   hosts.size>MAX_HOSTS||hosts.size>MAX_RETURNED_HOSTS||monitored.length>MAX_RETURNED_HOSTS||noObservedHosts;
  return {status:limited?'STATE_UNKNOWN':'PASS',code:noObservedHosts?'PROVIDER_ACTIVITY_NO_OBSERVED_HOSTS':limited?'PROVIDER_ACTIVITY_PARTIAL':'PROVIDER_ACTIVITY_OBSERVED',
   source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',scope:'FIXED_LOCAL_JSONL_ONLY',
   evidenceLevel:'FETCH_WRAPPER_HTTP_ONLY_NOT_PARSER_OR_STORAGE_PROOF',
