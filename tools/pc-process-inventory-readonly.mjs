@@ -354,7 +354,8 @@ const HTTP_CODE=/^(?:[1-5][0-9]{2}|NETWORK_ERROR|PROVIDER_QUOTA_GUARD)$/;
 const HOST_STATE=new Set(['normal','failed','unknown']);
 const HOST_REASON=new Set([
  'NOT_REPEATED','ESTIMATED_CADENCE_OVERDUE','NO_VERIFIED_SCHEDULE_OVER_36H',
- 'LAST_HTTP_ERROR','QUOTA_OR_UNCLASSIFIED','RECENT_2XX','EVIDENCE_UNKNOWN']);
+ 'LAST_HTTP_ERROR','QUOTA_OR_UNCLASSIFIED','RECENT_2XX',
+ 'RECENT_2XX_CADENCE_UNVERIFIED','EVIDENCE_UNKNOWN']);
 const safeIso=v=>typeof v==='string'&&Number.isFinite(Date.parse(v))
  ?new Date(v).toISOString():null;
 const unknownHostEvidence=code=>({status:'STATE_UNKNOWN',code,
