@@ -18,7 +18,20 @@
       (isFinite(vbsCreatedAtMs)&&vbsCreatedAtMs>946684800000?
        String(Math.floor(vbsCreatedAtMs)):'null') +
       ',"approvedLauncherKinds":' +
-      JSON.stringify(launcherKinds instanceof Array?launcherKinds:[]) + '}');
+      serializeLauncherKinds(launcherKinds) + '}');
+  }
+  // WSH JScript 5.x may not expose JSON.stringify. Emit only pinned enums.
+  function serializeLauncherKinds(kinds) {
+    if (!(kinds instanceof Array)) return '[]';
+    var allowed = {TASK_VBS: true, CUTOVER_VBS: true,
+      ARCHIVE_NODE: true, ARCHIVE_CORE_NODE: true};
+    var values = [];
+    for (var i = 0; i < kinds.length; i++) {
+      var kind = String(kinds[i]);
+      if (!Object.prototype.hasOwnProperty.call(allowed, kind)) return '[]';
+      values.push('"' + kind + '"');
+    }
+    return '[' + values.join(',') + ']';
   }
   function createdAt(raw) {
     var stamp = String(raw || '');
