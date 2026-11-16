@@ -18,6 +18,12 @@ export function prepareAiCase(issue, comments, explicitPath=null) {
   if(verdict.state!=='ALREADY_SELECTED') stop('SELECTOR_PROOF_REQUIRED');
   const request=parseHandoff(issue.body);
   if(!REPAIRABLE_KINDS.has(request.failure.kind)) stop('FAILURE_KIND_STOP');
+  // A recovery/lease/state-unknown incident is an operational evidence gap,
+  // not proof that another source edit would repair the operating PC.
+  if(request.failure.code==='BACKLOG_OR_RECOVERY_NOT_VERIFIED' ||
+    request.failure.code.includes('STATE_UNKNOWN') ||
+    request.failure.code.includes('RECOVERY_REQUIRED'))
+    stop('RUNTIME_EVIDENCE_REQUIRED');
   const expected=selectionReceipt(request,fingerprintHandoff(request));
   const issueUrl='https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+issue.number;
   if(comments.filter(c=>c.user?.login===HANDOFF_BOT &&
