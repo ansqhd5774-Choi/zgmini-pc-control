@@ -101,8 +101,7 @@ export async function runApprovedR181ProtectedB(proof,io){
     if(prepared.status!=='PREPARED_CANDIDATE_ONLY'){
       out=result('R181_B_PREFLIGHT_STOP',prepared.code,{
         beforeSha256:Buffer.isBuffer(before)?sha(before):null});
-      return out;
-    }
+    }else{
     after=prepared.getPrivateCandidateBytes();
     need(after.length===before.length+3&&
       prepared.candidateSha256===sha(after),
@@ -116,8 +115,8 @@ export async function runApprovedR181ProtectedB(proof,io){
     need(Buffer.isBuffer(backup)&&backup.equals(before),
       'R181_B_BACKUP_VERIFY_STOP');
     stage='FINAL_CAS';
-    need(Buffer.isBuffer(await io.readPinnedFile(R181_B_TARGET))&&
-      sha(await io.readPinnedFile(R181_B_TARGET))===candidate.beforeSha256,
+    const finalBytes=await io.readPinnedFile(R181_B_TARGET);
+    need(Buffer.isBuffer(finalBytes)&&finalBytes.equals(before),
       'R181_B_FINAL_CAS_STOP');
     await io.journal(requestId,'BACKUP_VERIFIED');
     stage='SWITCH';
@@ -131,6 +130,7 @@ export async function runApprovedR181ProtectedB(proof,io){
     await io.journal(requestId,'APPLIED_VERIFIED');
     out=result('R181_B_APPLIED_VERIFIED','R181_B_SINGLE_ROUTE_APPLIED',
       {...candidate,applied:true,changedFileCount:1,backupVerified:true});
+    }
   }catch(error){
     const code=safeCode(error);
     if(!acquired&&!claimed)out=result('R181_B_PREFLIGHT_STOP',code);
