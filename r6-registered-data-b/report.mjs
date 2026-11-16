@@ -69,6 +69,7 @@ export function sanitizeR6BResult(raw,request,env){
   sourceSha:null,mode:null,providerRequests:null,blsRequests:null,
   dolRequests:null,groupResults:[],sqlite:'UNVERIFIED',publication:'UNVERIFIED',
   sourceStoredAt:null,sourceFeatures:null,chartReadyFeatures:null,
+  nationalSeriesSaved:null,nationalRowsSaved:null,stateRowsSaved:null,
   lastPass:null,firstFail:null,
   runId:RUN.test(env?.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
   retry:'READ_EXISTING_REQUEST_NO_REEXECUTE'};
@@ -79,7 +80,7 @@ export function sanitizeR6BResult(raw,request,env){
  const simple={...base,status:raw.status,code:raw.code,
   lastPass:['SOURCE_VERIFIED','REGISTERED_KEY_PRESENT','D1_READONLY_PREFLIGHT',
    'ONE_SHOT_CLAIMED',
-   'PUBLISH_READBACK'].includes(raw.lastPass)?raw.lastPass:null,
+   'PUBLISH_READBACK','COLLECT_READBACK'].includes(raw.lastPass)?raw.lastPass:null,
   firstFail:['PREFLIGHT','COLLECT_OR_PUBLISH','CORE_LOCK_RELEASE']
    .includes(raw.firstFail)?raw.firstFail:null};
  if(!['SUCCESS','PARTIAL','NOOP'].includes(raw.status))return simple;
@@ -102,6 +103,34 @@ export function sanitizeR6BResult(raw,request,env){
   return {...simple,sourceSha:raw.sourceSha,mode:raw.mode,
    providerRequests:0,blsRequests:0,dolRequests:0,
    groupResults:groups,sqlite:'UNCHANGED',publication:'NOT_ATTEMPTED'};
+ }
+ // W04 one-shot DOL manual collection: no BLS, D1, schedules, or
+ // score promotion. It is not the legacy collect-and-publish workflow.
+ if(raw.mode==='ONE_YEAR'&&raw.blsRequests===0&&
+   raw.publication==='NOT_ATTEMPTED'){
+  const validNumber=x=>Number.isSafeInteger(x)&&x>=0;
+  const onlyDol=groups.length===1&&
+   groups[0].groupName==='DOL_UI_WEEKLY_CLAIMS'&&
+   groups[0].providerRequests===raw.dolRequests;
+  const counts=validNumber(raw.nationalSeriesSaved)&&raw.nationalSeriesSaved<=4&&
+   validNumber(raw.nationalRowsSaved)&&raw.nationalRowsSaved<=10000&&
+   validNumber(raw.stateRowsSaved)&&raw.stateRowsSaved<=35000;
+  const success=raw.status==='SUCCESS'&&raw.code==='R6_DOL_MANUAL_COLLECTED'&&
+   groups[0]?.status==='SUCCESS'&&raw.nationalSeriesSaved===4&&
+   raw.stateRowsSaved>0;
+  const partial=raw.status==='PARTIAL'&&raw.code==='R6_DOL_MANUAL_PARTIAL'&&
+   groups[0]?.status==='PARTIAL';
+  if(!onlyDol||!counts||raw.sqlite!=='COLLECTOR_RECORDED'||
+    raw.dolRequests!==2||!(success||partial)||
+    raw.sourceStoredAt!==null||raw.sourceFeatures!==null||
+    raw.chartReadyFeatures!==null)return base;
+  return {...simple,sourceSha:raw.sourceSha,mode:raw.mode,
+   providerRequests:raw.providerRequests,blsRequests:0,dolRequests:raw.dolRequests,
+   groupResults:groups,sqlite:'COLLECTOR_RECORDED',
+   publication:'NOT_ATTEMPTED',
+   nationalSeriesSaved:raw.nationalSeriesSaved,
+   nationalRowsSaved:raw.nationalRowsSaved,
+   stateRowsSaved:raw.stateRowsSaved};
  }
  const validNumber=x=>Number.isSafeInteger(x)&&x>=0&&x<=100000;
  if(!((raw.status==='SUCCESS'&&raw.code==='R6_B_COLLECT_PUBLISH_VERIFIED')||
@@ -134,6 +163,9 @@ export function r6BTextResult(result){return [
  `SOURCE_STORED_AT=${result.sourceStoredAt??'UNVERIFIED'}`,
  `SOURCE_FEATURES=${result.sourceFeatures??'UNVERIFIED'}`,
  `CHART_READY_FEATURES=${result.chartReadyFeatures??'UNVERIFIED'}`,
+ `NATIONAL_SERIES_SAVED=${result.nationalSeriesSaved??'UNVERIFIED'}`,
+ `NATIONAL_ROWS_SAVED=${result.nationalRowsSaved??'UNVERIFIED'}`,
+ `STATE_ROWS_SAVED=${result.stateRowsSaved??'UNVERIFIED'}`,
  `LAST_PASS=${result.lastPass??'UNVERIFIED'}`,
  `FIRST_FAIL=${result.firstFail??'NONE'}`,
  `RUN_ID=${result.runId??'UNVERIFIED'}`,
