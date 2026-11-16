@@ -12,6 +12,7 @@ on:
       - 'tools/maintenance-contract.mjs'
       - 'tools/r181-pinned-route-candidate.mjs'
       - 'tools/r181-protected-b-transaction.mjs'
+      - 'tools/r181-protected-b-windows-io.mjs'
       - 'tools/update.mjs'
       - 'tools/runner-watchdog.mjs'
       - 'tests/runner-watchdog.test.mjs'
@@ -29,6 +30,7 @@ on:
       - 'tests/maintenance-contract.test.mjs'
       - 'tests/r181-pinned-route-candidate.test.mjs'
       - 'tests/r181-protected-b-transaction.test.mjs'
+      - 'tests/r181-protected-b-windows-io.test.mjs'
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
       - 'inflation-manual-b/**'
@@ -65,6 +67,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-pinned-route-candidate.test.mjs
       - name: Verify W03 protected PC-only R181 B contract without operational effects
         run: node --test --test-concurrency=1 tests/r181-protected-b-transaction.test.mjs
+      - name: Verify W03 fixed Windows B IO is inert without a registered operation
+        run: node --test --test-concurrency=1 tests/r181-protected-b-windows-io.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
