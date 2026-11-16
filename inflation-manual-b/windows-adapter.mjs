@@ -16,6 +16,8 @@ import {performOfficialManualB} from './coordinator.mjs';
 import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
  shouldAcceptVisibleCoreOwner,shouldWaitForV2OwnerEvidence}
  from './core-task-event-owner-proof.mjs';
+import {coreVbsTaskEventCandidates,verifyCoreVbsTaskWitness,
+ assertPinnedVbsLaunchers} from './core-task-vbs-chain-proof.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
  from '../r17-writer-b/r17-b-claim.mjs';
 import {coreReadyForMaintenance,coreMaintenanceWindowBlockCode}
@@ -186,12 +188,37 @@ async function observeLiveCoreLockOwner(approvalSchema){
     }
     // No guessed ownership: event PID, immutable task name, approved Node
     // executable, process creation instant and current lock PID must concur.
-    const event=verifyCoreTaskEvent129({
-     xml:readCoreTask129Events(),lockPid:lock.pid,lockAt:lock.at,
+    const eventsXml=readCoreTask129Events();
+    let event=verifyCoreTaskEvent129({
+     xml:eventsXml,lockPid:lock.pid,lockAt:lock.at,
      taskRunning:ownerProof.taskRunning,
      ownerCoreMatched:ownerProof.ownerCoreMatched,
      ownerCreatedAtMs:ownerProof.ownerCreatedAtMs,
     });
+    // Core Task launches wscript.exe, which launches the Core Node through
+    // immutable VBS wrappers. Do not accept Event129 alone or a node.exe name.
+    // A live WMI parent chain, exact Task PID and pinned launcher file bytes
+    // are ALL mandatory. This branch is V2-only; V1 stays untouched.
+    if(!event.ok&&approvalSchema===APPROVAL_SCHEMA_V2){
+     for(const candidate of coreVbsTaskEventCandidates(eventsXml)){
+      let witness;
+      try{witness=JSON.parse(execute('cscript',
+       ['//NoLogo','//E:JScript',CORE_OWNER_PROBE,
+        String(lock.pid),String(candidate.pid)]));}
+      catch{fail('INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');}
+      const linked=verifyCoreVbsTaskWitness({
+       candidate,witness,lockAt:lock.at,
+       ownerCreatedAtMs:ownerProof.ownerCreatedAtMs,
+       taskRunning:ownerProof.taskRunning,
+       ownerCoreMatched:ownerProof.ownerCoreMatched,
+      });
+      if(!linked.ok)continue;
+      assertPinnedVbsLaunchers(witness.approvedLauncherKinds,
+       file=>sha256(safeFixedFile(file,DATA_ROOT,2_000_000)));
+      event=linked;
+      break;
+     }
+    }
     if(!event.ok&&shouldWaitForV2OwnerEvidence({
      isV2:true,linked:false,taskRunning:ownerProof.taskRunning,
      eventCode:event.code})){
