@@ -1,7 +1,7 @@
 import test from 'node:test';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -325,4 +325,27 @@ test('#1501 isolate runtime signal that prevents healthy classification',()=>{
  assert.equal(unknown.runnerSetOnline,null);
  assert.equal(unknown.workflowActive,null);
  assert.equal(sanitizeRuntimeSignals({supervisorAlive:'false'}).supervisorAlive,null);
+});
+test('runner-query missing cannot be misreported as actual offline six seats',()=>{
+ const q=sanitizeDedicatedRunnerEvidence({diagnostics:['RUNNERS_QUERY_UNAVAILABLE'],runners:null});
+ assert.equal(q.queryState,'QUERY_UNAVAILABLE');
+ assert.equal(q.allSixOnline,null);
+ assert.deepEqual(q.runners.map(x=>x.status),Array(6).fill('UNVERIFIED'));
+ const rows=Array.from({length:6},(_,i)=>({
+  name:'zgmini-pc-0'+(i+1),status:'online',busy:false,token:'HIDDEN'}));
+ const x=sanitizeDedicatedRunnerEvidence({runners:rows});
+ assert.equal(x.queryState,'QUERY_RETURNED');
+ assert.equal(x.allSixOnline,true);
+ assert.equal(x.runners.length,6);
+ assert.doesNotMatch(JSON.stringify(x),/HIDDEN|token/);
+ const partial=sanitizeDedicatedRunnerEvidence({runners:[
+  ...rows.slice(0,4),{...rows[4],status:'offline'},rows[5],rows[5]]});
+ assert.equal(partial.allSixOnline,false);
+ assert.equal(partial.runners[4].status,'offline');
+ assert.equal(partial.runners[5].status,'DUPLICATE');
+ const unknown=sanitizeDedicatedRunnerEvidence({runners:[{name:'zgmini-pc-01',
+  status:'SUSPICIOUS',busy:'maybe',password:'SECRET'}]});
+ assert.equal(unknown.runners[0].status,'UNVERIFIED');
+ assert.equal(unknown.runners[0].busy,null);
+ assert.doesNotMatch(JSON.stringify(unknown),/SECRET|password/);
 });

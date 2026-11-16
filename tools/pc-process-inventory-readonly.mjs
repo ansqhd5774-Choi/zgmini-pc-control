@@ -119,6 +119,28 @@ export function sanitizeRuntimeSignals(input){
  }
  return result;
 }
+// Exact six operating seats. Never publish raw runner objects, GitHub IDs,
+// IP addresses, command lines, or arbitrary diagnostic strings.
+const REQUIRED_OPERATING_RUNNERS=Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1));
+export function sanitizeDedicatedRunnerEvidence(raw){
+ const diag=Array.isArray(raw?.diagnostics)?raw.diagnostics:[];
+ const unavailable=diag.includes('RUNNERS_QUERY_UNAVAILABLE');
+ const items=Array.isArray(raw?.runners)?raw.runners:null;
+ const queryState=unavailable?'QUERY_UNAVAILABLE':items?'QUERY_RETURNED':'QUERY_UNVERIFIED';
+ const rows=REQUIRED_OPERATING_RUNNERS.map(name=>{
+  const matches=items?items.filter(x=>x?.name===name):[];
+  const observed=matches.length===1?matches[0]:null;
+  return {name,status:!items?'UNVERIFIED':matches.length===0?'MISSING':
+   matches.length>1?'DUPLICATE':observed?.status==='online'?'online':
+   observed?.status==='offline'?'offline':'UNVERIFIED',
+   busy:observed&&typeof observed.busy==='boolean'?observed.busy:null};
+ });
+ const allSixOnline=queryState==='QUERY_RETURNED'&&
+  rows.every(x=>x.status==='online');
+ return {queryState,allSixOnline:queryState==='QUERY_RETURNED'?allSixOnline:null,
+  returnedRowCount:items&&Number.isSafeInteger(items.length)?items.length:null,
+  runners:rows,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
 export function sanitizeMaintenanceStatus(raw){
  const diagnostics=Array.isArray(raw?.diagnostics)?raw.diagnostics:[];
  const lockKnown=Boolean(raw?.installLock&&typeof raw.installLock==='object'&&
@@ -150,6 +172,7 @@ export function sanitizeMaintenanceStatus(raw){
   maintenanceState:raw?.maintenanceState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
   automationState:raw?.automationState==='HEALTHY'?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
   runtimeSignals:sanitizeRuntimeSignals(raw?.runtimeSignals),
+  dedicatedRunnerEvidence:sanitizeDedicatedRunnerEvidence(raw),
   operationalWrites:0,providerCalls:0,d1Writes:0
  };
 }
