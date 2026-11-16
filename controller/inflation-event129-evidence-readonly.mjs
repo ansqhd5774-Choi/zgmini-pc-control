@@ -34,7 +34,8 @@ const basic=()=>({status:'STATE_UNKNOWN',code:'INFL_E129_NOT_OBSERVED_WITHIN_LIM
  task:{definition:'NOT_EVALUATED',instance:'NOT_EVALUATED'},
  wmi:{status:'NOT_EVALUATED',ownerFound:null,coreMatched:null},
  event:{total:null,systemMatch:null,taskMatch:null,fieldsPresent:null,
-  pidMatch:null,timeParsed:null,withinTime:null,candidateCount:null},
+  fieldCounts:{TaskName:null,Path:null,ProcessID:null,TimeCreated:null},
+  pidMatch:null,timeParsed:null,withinTime:null,timeDeltaMs:null,candidateCount:null},
  lock:{before:'NOT_EVALUATED',after:'NOT_EVALUATED',same:null},
  snapshots:[],probeCounts:{event:0,taskDefinition:0,wmi:0,lockReads:0}});
 const legal=(v,codes)=>codes.includes(v)?v:'UNAVAILABLE';
@@ -57,7 +58,8 @@ function decode(bytes){
 // This is auxiliary structure/coverage analysis ONLY; it never authorizes a B proof.
 export function describeEvent129(xml,lockPid,ownerCreatedAtMs,lockAt,clock=Date.now){
  const out={parsed:false,total:0,systemMatch:0,taskMatch:0,
-  fieldsPresent:0,pidMatch:0,timeParsed:0,withinTime:0,candidateCount:0};
+  fieldsPresent:0,pidMatch:0,timeParsed:0,withinTime:0,timeDeltaMs:null,
+  fieldCounts:{TaskName:0,Path:0,ProcessID:0,TimeCreated:0},candidateCount:0};
  if(typeof xml!=='string'||xml.length<30||xml.length>=MAX_XML)return out;
  const roots=[...xml.matchAll(/<Event(?:\s[^>]*)?>[\s\S]*?<\/Event>/g)];
  if(roots.length>MAX_EVENTS){out.total=MAX_EVENTS;return out;}
@@ -69,6 +71,13 @@ export function describeEvent129(xml,lockPid,ownerCreatedAtMs,lockAt,clock=Date.
    !/<Provider\s+Name="Microsoft-Windows-TaskScheduler"/.test(e)||
    !/<Channel>Microsoft-Windows-TaskScheduler\/Operational<\/Channel>/.test(e))continue;
   out.systemMatch++;
+  for(const [field,regexp] of [
+   ['TaskName',/<Data Name="TaskName">[^<]+<\/Data>/],
+   ['Path',/<Data Name="Path">[^<]+<\/Data>/],
+   ['ProcessID',/<Data Name="ProcessID">[^<]+<\/Data>/],
+   ['TimeCreated',/<TimeCreated\s+SystemTime="[^"]+"/]]){
+   if(regexp.test(e))out.fieldCounts[field]++;
+  }
   if(!e.includes('<Data Name="TaskName">\\ZGMINI-PC-Local-Core</Data>'))continue;
   out.taskMatch++;
   const p=/<Data Name="Path">([^<]{1,320})<\/Data>/.exec(e)?.[1];
@@ -82,6 +91,7 @@ export function describeEvent129(xml,lockPid,ownerCreatedAtMs,lockAt,clock=Date.
    Date.parse(timestamp):NaN;
   if(!Number.isFinite(t))continue;
   out.timeParsed++;
+  out.timeDeltaMs??=delta(t,ownerCreatedAtMs);
   if(Number.isSafeInteger(ownerCreatedAtMs)&&Number.isSafeInteger(lockAt)&&
    Math.abs(t-ownerCreatedAtMs)<=30000&&t<=lockAt+5000&&lockAt-t<=3600000&&
    ownerCreatedAtMs<=lockAt+5000&&clock()>=lockAt)out.withinTime++;
@@ -176,8 +186,9 @@ export async function inspectInflationEvent129Once({
   eventsText=bytes.toString('utf8'); // EXACT current B encoding behavior (no repair).
   const extra=describeEvent129(eventsText,before.pid,owner.ownerCreatedAtMs,before.at,clock);
   out.event={total:extra.total,systemMatch:extra.systemMatch,taskMatch:extra.taskMatch,
-   fieldsPresent:extra.fieldsPresent,pidMatch:extra.pidMatch,timeParsed:extra.timeParsed,
-   withinTime:extra.withinTime,candidateCount:extra.candidateCount};
+   fieldsPresent:extra.fieldsPresent,fieldCounts:extra.fieldCounts,
+   pidMatch:extra.pidMatch,timeParsed:extra.timeParsed,
+   withinTime:extra.withinTime,timeDeltaMs:extra.timeDeltaMs,candidateCount:extra.candidateCount};
   if(decoded.ok){
    const aux=describeEvent129(decoded.text,before.pid,owner.ownerCreatedAtMs,before.at,clock);
    out.supplemental={parsed:aux.parsed,coreCandidates:aux.taskMatch,

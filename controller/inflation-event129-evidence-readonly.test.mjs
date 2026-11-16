@@ -123,3 +123,49 @@ test('event auxiliary classification is not a proof and detects missing field',(
  const bad=describeEvent129(event().replace('ProcessID','Other'),5000,start,start+20000,clock);
  assert.equal(bad.fieldsPresent,0);
 });
+
+test('UTF8 BOM remains a valid raw B event while UTF16BE stays auxiliary only',async()=>{
+ const text=event();
+ const utf8=Buffer.concat([Buffer.from([239,187,191]),Buffer.from(text)]);
+ const a=await run(fixture({xml:utf8,owner:{...initial,ownerCreatedAtMs:start}}));
+ assert.equal(a.bom,'UTF8');assert.equal(a.rawBDirect.ok,true);
+ const le=Buffer.from(text,'utf16le'),be=Buffer.alloc(le.length);
+ for(let i=0;i<le.length;i+=2){be[i]=le[i+1];be[i+1]=le[i];}
+ const b=await run(fixture({xml:Buffer.concat([Buffer.from([254,255]),be])}));
+ assert.equal(b.bom,'UTF16BE');assert.equal(b.supplemental.onlySupplemental,true);
+ assert.equal(b.rawBDirect.ok,false);assert.equal(b.status,'STATE_UNKNOWN');
+});
+test('field presence and time delta are bounded separate diagnostic counters',()=>{
+ const out=describeEvent129(event(),5000,start,start+20000,clock);
+ assert.deepEqual(out.fieldCounts,{TaskName:1,Path:1,ProcessID:1,TimeCreated:1});
+ assert.equal(out.timeDeltaMs,0);
+ const missing=describeEvent129(event().replace('TimeCreated SystemTime','Unknown Time'),5000,start,start+20000,clock);
+ assert.equal(missing.fieldCounts.TimeCreated,0);
+});
+test('dedicated JScript witness reports empty Task instances versus task/WMI errors',async()=>{
+ const fs=await import('node:fs'),vm=await import('node:vm');
+ const code=fs.readFileSync(new URL('./inflation-core-owner-diagnostic-probe.mjs',import.meta.url),'utf8');
+ function invoke({instances=0,taskFails=false,wmiFails=false}={}){
+  const result=[];
+  const script={WScript:{Arguments:{length:1,Item:()=>String(5000)},Echo:x=>result.push(x)},
+   ActiveXObject:function(){return{Connect:()=>{},GetFolder:()=>({
+    GetTask:()=>({Enabled:true,State:4,GetInstances:()=>{
+     if(taskFails)throw Error('private task error');
+     return {Count:instances,Item:()=>({EnginePID:5000})};
+    }})})};},
+   GetObject:()=>{if(wmiFails)throw Error('private wmi error');return{
+    ExecQuery:()=>[{ProcessId:5000,ParentProcessId:9000,Name:'node.exe',
+     CommandLine:'"E:\\ZGmini\\runtime\\node.exe" "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release\\scripts\\pc-writer\\local-cycle.mjs" --publish',
+     CreationDate:'20261115230010.000000+540'}]};},
+   Enumerator:function(a){let n=0;this.atEnd=()=>n>=a.length;
+    this.moveNext=()=>n++;this.item=()=>a[n];}};
+  vm.runInNewContext(code,script,{timeout:2000});
+  return JSON.parse(result[0]);
+ }
+ const empty=invoke();
+ assert.equal(empty.taskInstanceStatus,'EMPTY');
+ assert.equal(empty.wmiStatus,'OK');assert.equal(empty.ownerFound,true);
+ assert.equal(invoke({taskFails:true}).taskInstanceStatus,'ERROR');
+ assert.equal(invoke({wmiFails:true}).wmiStatus,'ERROR');
+ assert.doesNotMatch(JSON.stringify(invoke({wmiFails:true})),/private|CommandLine|5000/);
+});
