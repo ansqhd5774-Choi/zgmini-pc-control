@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
- shouldWaitForV2OwnerEvidence}
+ shouldAcceptVisibleCoreOwner,shouldWaitForV2OwnerEvidence}
  from './core-task-event-owner-proof.mjs';
 
 // Sanitized fixture only. Never read the host's TaskScheduler log in tests.
@@ -216,5 +216,15 @@ test('Korea wait never accepts a lookalike script, extra args, or unknown owner'
   assert.equal(p.ownerKoreaMatched,false);
   assert.equal(shouldWaitForV2OwnerEvidence({isV2:true,linked:false,
    taskRunning:true,ownerKoreaMatched:p.ownerKoreaMatched}),false);
+ }
+});
+
+test('V2 visible Task ancestry alone cannot authenticate a Korea or modified Core command',()=>{
+ const bad={linked:true,ownerCoreMatched:false,ownerKoreaMatched:true};
+ assert.equal(shouldAcceptVisibleCoreOwner(true,bad),false);
+ assert.equal(shouldAcceptVisibleCoreOwner(false,bad),true); // V1 unmodified
+ assert.equal(shouldAcceptVisibleCoreOwner(true,{linked:true,ownerCoreMatched:true}),true);
+ for(const linked of [false,null,undefined]){
+  assert.equal(shouldAcceptVisibleCoreOwner(true,{linked,ownerCoreMatched:true}),false);
  }
 });
