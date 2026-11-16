@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {summarizeAutomation,dedicatedPcRunnersOnline} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -52,4 +52,13 @@ test('automation status rejects missing, offline or duplicated operating seats',
  assert.equal(dedicatedPcRunnersOnline([...seats.slice(0,2),{...seats[2],status:'offline'},...seats.slice(3)]),false);
  assert.equal(dedicatedPcRunnersOnline([...seats,{...seats[0]}]),false);
  assert.equal(dedicatedPcRunnersOnline(null),false);
+});
+test('runner API permission failures are distinct from offline runner status',()=>{
+ assert.equal(classifyRunnerQueryError({stderr:Buffer.from('gh: Forbidden (HTTP 403)\nsecret token')}),'HTTP_403_FORBIDDEN');
+ assert.equal(classifyRunnerQueryError({stderr:Buffer.from('HTTP 404')}),'HTTP_404_NOT_FOUND');
+ assert.equal(classifyRunnerQueryError({code:'ETIMEDOUT'}),'REQUEST_TIMEOUT');
+ assert.equal(classifyRunnerQueryError({message:'sensitive-data should never leak'}),'RUNNER_QUERY_ERROR_OTHER');
+ const v=safeRuntimeSignals({...healthy(),runnerSetOnline:null});
+ assert.equal(v.runnerSetOnline,null);
+ assert.equal(summarizeAutomation({...healthy(),runnerSetOnline:null}).runtimeState,'UNVERIFIED');
 });
