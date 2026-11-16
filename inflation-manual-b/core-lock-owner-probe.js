@@ -3,11 +3,12 @@
 // Legacy EnginePID linked proof is unchanged; additional sanitized evidence
 // enables an EVENT-129 identity proof when GetInstances(0) is security filtered.
 (function () {
-  function output(ok, linked, running, ownerMatched, createdAtMs) {
+  function output(ok, linked, running, ownerMatched, koreaMatched, createdAtMs) {
     WScript.Echo('{"ok":' + (ok ? 'true' : 'false') +
       ',"linked":' + (linked ? 'true' : 'false') +
       ',"taskRunning":' + (running ? 'true' : 'false') +
       ',"ownerCoreMatched":' + (ownerMatched ? 'true' : 'false') +
+      ',"ownerKoreaMatched":' + (koreaMatched ? 'true' : 'false') +
       ',"ownerCreatedAtMs":' +
       (isFinite(createdAtMs) && createdAtMs > 946684800000 ?
        String(Math.floor(createdAtMs)) : 'null') + '}');
@@ -29,13 +30,19 @@
     var command = String(raw || '').replace(/^\s+|\s+$/g,'');
     return /^(?:"E:\\ZGmini\\runtime\\node\.exe"|E:\\ZGmini\\runtime\\node\.exe)\s+(?:"E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release\\scripts\\pc-writer\\local-cycle\.mjs"|E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release\\scripts\\pc-writer\\local-cycle\.mjs)\s+--publish$/i.test(command);
   }
+  // Korea uses the SAME local-cycle lock as Core. Exact command recognition
+  // can justify bounded re-observation, NEVER acceptance as Core ownership.
+  function strictKoreaCommand(raw) {
+    var command = String(raw || '').replace(/^\s+|\s+$/g,'');
+    return /^(?:"E:\\ZGmini\\runtime\\node\.exe"|E:\\ZGmini\\runtime\\node\.exe)\s+(?:"E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release\\scripts\\pc-writer\\local-cycle\.mjs"|E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release\\scripts\\pc-writer\\local-cycle\.mjs)\s+(?:--korea(?:\s+--publish)?|--publish\s+--korea)$/i.test(command);
+  }
   try {
     if (WScript.Arguments.length !== 1) {
-      output(false, false, false, false, null); return;
+      output(false, false, false, false, false, null); return;
     }
     var lockPidText = String(WScript.Arguments.Item(0));
     if (!/^[1-9][0-9]{0,9}$/.test(lockPidText)) {
-      output(false, false, false, false, null); return;
+      output(false, false, false, false, false, null); return;
     }
     var lockPid = Number(lockPidText);
     var scheduler = new ActiveXObject('Schedule.Service');
@@ -44,7 +51,7 @@
     var taskRunning = Number(task.State) === 4;
     var running = task.GetInstances(0);
     if (!task.Enabled) {
-      output(true, false, false, false, null); return;
+      output(true, false, false, false, false, null); return;
     }
     var engines = {};
     for (var i = 1; i <= running.Count; i += 1) {
@@ -65,12 +72,13 @@
         node: String(process.Name || '').toLowerCase() === 'node.exe',
         core: cmd.toLowerCase().indexOf('local-cycle.mjs') !== -1,
         matched: strictCoreCommand(cmd),
+        koreaMatched: strictKoreaCommand(cmd),
         createdAtMs: createdAt(process.CreationDate)
       };
     }
     var owner = processes[String(lockPid)];
     if (!owner || !owner.node || !owner.core) {
-      output(true, false, taskRunning, false, null); return;
+      output(true, false, taskRunning, false, false, null); return;
     }
     var seen = {}, current = lockPid, linked = false;
     for (var depth = 0; depth < 96; depth += 1) {
@@ -82,8 +90,8 @@
       current = record.parent;
     }
     output(true, linked, taskRunning, owner.matched && owner.node,
-      owner.createdAtMs);
+      owner.koreaMatched && owner.node,owner.createdAtMs);
   } catch (ignored) {
-    output(false, false, false, false, null);
+    output(false, false, false, false, false, null);
   }
 }());
