@@ -1,0 +1,45 @@
+name: ZGMINI Handoff Queue Control Board
+on:
+  workflow_run:
+    workflows:
+      - ZGMINI Agent Handoff Intake
+      - ZGMINI Handoff Queue Candidate Selector
+      - ZGMINI Agent Handoff PC Failure Intake
+      - ZGMINI Agent Handoff Writer B Failure Intake
+    types: [completed]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  issues: read
+concurrency:
+  group: zgmini-handoff-control-board
+  cancel-in-progress: false
+jobs:
+  authenticated-readonly-board:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true' &&
+      ((github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.actor.login == 'ansqhd5774-Choi') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.actor == 'ansqhd5774-Choi'))
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 6
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Classify authenticated backlog, priority, owner receipts and review age
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node agent-handoff/queue-board-runner.mjs
