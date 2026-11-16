@@ -142,7 +142,7 @@ export function makeWindowsCensusApiBAdapter(proof){
  const journalFile=path.join(JOURNAL,requestId,'journal.jsonl');
  return {
   async proveLiveCoreLockOwner(){
-   await observeLiveCoreLockOwner(APPROVAL_SCHEMA_V2,{maxObservationMs:6*60_000});
+   await observeLiveCoreLockOwner(APPROVAL_SCHEMA_V2,{maxObservationMs:5*60_000});
   },
   async acquireSharedWriterLease(id){
    need(id===requestId,'W01_CENSUS_B_WRITER_OWNER_STOP');
@@ -158,7 +158,7 @@ export function makeWindowsCensusApiBAdapter(proof){
     sample:()=>({probe:taskProbe(),lock:fs.existsSync(CENSUS_B_CORE_LOCK)}),
     wait:delay,clock:Date.now,isReady:coreReadyForMaintenance,
     blockCode:coreMaintenanceWindowBlockCode
-   });
+   },{windowMs:3*60_000});
   },
   async acquireCoreLease(id){
    need(id===requestId&&writer!==null&&!core,
