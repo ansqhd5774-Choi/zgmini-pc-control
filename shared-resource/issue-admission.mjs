@@ -43,6 +43,7 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   'w03-gmh-seven-history-manual-once',
   'w03-gmh-seven-private-score-once',
   'w03-gmh-seven-public-compat-readonly',
+  'w03-gmh-seven-d1-seed-readonly',
   'w03-r179-readback-guard-install',
   'r181-primary-route-install',
   'r181-existing-task-run-once',

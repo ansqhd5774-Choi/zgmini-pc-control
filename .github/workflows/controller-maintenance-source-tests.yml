@@ -41,6 +41,10 @@ on:
       - 'tools/w03-gmh-seven-public-compat-a.mjs'
       - 'tools/w03-gmh-seven-public-compat-report.mjs'
       - 'tests/w03-gmh-seven-public-compat-a.test.mjs'
+      - 'tools/w03-gmh-seven-d1-seed-a.mjs'
+      - 'tools/w03-gmh-seven-d1-seed-preflight.mjs'
+      - 'tools/w03-gmh-seven-d1-seed-report.mjs'
+      - 'tests/w03-gmh-seven-d1-seed-a.test.mjs'
       - 'tools/w03-r179-guard-shape-readonly.mjs'
       - 'tools/w03-r179-guard-shape-report.mjs'
       - 'tools/w03-r179-stored-handoff-report.mjs'
@@ -116,6 +120,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
+      - name: Verify W03 immutable D1 seed and rolling read-only overlap without credential refresh
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-d1-seed-a.test.mjs
       - name: Verify W03 pinned 7x252 vs public base/R32 read-only comparison
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
       - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
