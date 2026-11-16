@@ -144,11 +144,12 @@ test('board returns complete deterministic aggregate and non-executable GitHub l
 });
 test('runner requires authenticated workflow provenance and never grants arbitrary triggers',()=>{
   const event={repository:{full_name:HANDOFF_REPOSITORY,private:true},
-    action:'completed',workflow_run:{name:'ZGMINI Agent Handoff Intake',
+    action:'completed',workflow_run:{name:'ZGMINI Handoff Queue Candidate Selector',
       conclusion:'success',actor:{login:HANDOFF_OWNER},head_branch:'main'}};
   const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
     GITHUB_EVENT_NAME:'workflow_run'};
   assert.doesNotThrow(()=>validateBoardEvent(event,env));
+  assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,actor:{login:'untrusted'}}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,head_branch:'other'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,repository:{...event.repository,private:false}},env),/EVENT_SCOPE_STOP/);
