@@ -15,6 +15,8 @@ const DAYS=Object.freeze(Array.from({length:30},(_,i)=>
 const HEADER=['ticker','name','exchange','sector','industry','country','price','mktCap'];
 const LISTED=new Set(['NASDAQ','NYSE','AMEX','NCM','NMS','NYQ','NGM','ASE','XNYS','CBOE']);
 const TICKER=/^[A-Z0-9][A-Z0-9.\-]{0,11}$/;
+// Calendar vendor accepts the full legacy 1..12 character symbol contract.
+const EVENT_TICKER=/^[A-Z0-9.\-]{1,12}$/;
 const DECIMAL=/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 const sha=s=>createHash('sha256').update(Buffer.from(s,'utf8')).digest('hex');
 const positive=s=>typeof s==='string'&&DECIMAL.test(s.trim())&&
@@ -147,7 +149,7 @@ function parseSavedDay(text,day){
   if(!Array.isArray(body[bucket])||body[bucket].length>5000)
    fail('R44_SAVED_DAY_BUCKET_INVALID');
   for(const row of body[bucket]){
-   if(!row||!TICKER.test(row.symbol)||typeof row.name!=='string'||
+   if(!row||!EVENT_TICKER.test(row.symbol)||typeof row.name!=='string'||
       !row.name.trim()||row.name.length>200||seen.has(row.symbol))
     fail('R44_SAVED_DAY_ROW_INVALID');
    seen.add(row.symbol);tickers.push(row.symbol);
