@@ -152,6 +152,7 @@ test('dedicated R181 workflow titles are not falsely rejected by shared ingress'
   import.meta.url),'utf8');
  const titles=['r181-protected-route-install','r181-source-shape-readonly',
   'r181-saved-ledger-readonly','w03-r179-stored-handoff-readonly',
+  'w03-r179-guard-shape-readonly',
   'w03-r179-readback-guard-install',
   'r181-primary-route-install',
   'r181-existing-task-run-once'];

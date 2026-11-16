@@ -28,6 +28,8 @@ on:
       - 'tools/r181-saved-ledger-readonly.mjs'
       - 'tools/r181-saved-ledger-report.mjs'
       - 'tools/w03-r179-stored-handoff-readonly.mjs'
+      - 'tools/w03-r179-guard-shape-readonly.mjs'
+      - 'tools/w03-r179-guard-shape-report.mjs'
       - 'tools/w03-r179-stored-handoff-report.mjs'
       - 'tools/w03-r179-seven-readback-b.mjs'
       - 'tools/w03-r179-seven-readback-windows-io.mjs'
@@ -37,6 +39,7 @@ on:
       - 'tests/w03-r179-seven-readback-approval.test.mjs'
       - 'approvals/w03-r179-guard/**'
       - 'tests/w03-r179-stored-handoff.test.mjs'
+      - 'tests/w03-r179-guard-shape.test.mjs'
       - 'tools/r181-protected-b-windows-io.mjs'
       - 'tools/r181-protected-b-entry.mjs'
       - 'tools/r181-protected-b-report.mjs'
@@ -98,6 +101,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
+      - name: Verify W03 R179 fixed operator-shape read-only A and redaction
+        run: node --test --test-concurrency=1 tests/w03-r179-guard-shape.test.mjs
       - name: Verify W03 R181 exact saved-ledger source-only A metadata and privacy contract
         run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
       - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
