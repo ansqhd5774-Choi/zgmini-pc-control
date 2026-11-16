@@ -76,7 +76,7 @@ test('reader denial, task failure, WMI failure remain distinct and no GET occurs
   ['failEvent','INFL_E129_READER_UNAVAILABLE']]){
   const f=fixture({[key]:true}),r=await run(f);
   assert.equal(r.code,code);assert.equal(r.status,'STATE_UNKNOWN');
-  assert.equal(r.probeCounts.event,key==='failEvent'?1:0);
+  assert.equal(r.probeCounts.event,1);
  }
 });
 test('empty event and incomplete EventData do not become actual owner mismatch',async()=>{
@@ -101,7 +101,7 @@ test('racing lock overrides direct success without removing proof evidence',asyn
 test('unexecuted checks are null/NOT_EVALUATED not false',async()=>{
  const r=await run(fixture({failTask:true}));
  assert.equal(r.rawBDirect.ok,null);assert.equal(r.rawBVbs.ok,null);
- assert.equal(r.encoding,'NOT_EVALUATED');
+ assert.equal(r.encoding,'UTF-8');assert.equal(r.reader,'OK');
  assert.equal(r.wmi.ownerFound,null);
 });
 test('bounded sanitized reporting never emits PID, paths, commands, XML or secrets',async()=>{
@@ -183,7 +183,9 @@ test('initial absent lock stays LOCK_NOT_VERIFIED, not a fabricated lock race',a
  assert.equal(r.lock.after,'ABSENT');
  assert.equal(r.lock.same,null);
  assert.equal(reads,2);
- assert.equal(f.seen.length,0);
+ assert.equal(f.seen.filter(a=>a[0]==='qe').length,1);
+ assert.equal(f.seen.filter(a=>a[0]==='//NoLogo').length,0);
+ assert.equal(r.event.pidMatch,null);
 });
 
 test('invalid first lock followed by a valid lock remains initial lock verification failure',async()=>{
@@ -195,7 +197,7 @@ test('invalid first lock followed by a valid lock remains initial lock verificat
  assert.equal(r.code,'INFL_E129_LOCK_NOT_VERIFIED');
  assert.equal(r.firstFailCode,'INFL_E129_LOCK_NOT_VERIFIED');
  assert.equal(r.lock.same,null);
- assert.equal(r.probeCounts.event,0);
+ assert.equal(r.probeCounts.event,1);
 });
 
 test('lock replacement after independent reader failure preserves first failed reader step',async()=>{
@@ -235,4 +237,117 @@ test('exception in lock recheck is UNKNOWN while initial errors keep their first
  assert.equal(r.firstFailCode,'INFL_E129_TASK_OR_WMI_UNAVAILABLE');
  assert.equal(r.stage,'WMI');
  assert.doesNotMatch(JSON.stringify(r),/private lock readback message/);
+});
+
+
+test('current live WMI Core link follows actual B V2 shortcut and skips Event129',async()=>{
+ const f=fixture({owner:{...initial,linked:true,ownerCoreMatched:true}});
+ const r=await run(f);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.code,'INFL_E129_CURRENT_WMI_LINK_OBSERVED');
+ assert.equal(r.wmi.linked,true);
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.rawBVbs.ok,null);
+ assert.equal(r.reader,'NOT_EVALUATED');
+ assert.equal(r.probeCounts.event,0);
+ assert.equal(r.lock.same,true);
+ assert.equal(r.authorizesB,false);
+});
+test('linked WMI owner with wrong Core command remains a B safety denial, not Event129',async()=>{
+ const f=fixture({owner:{...initial,linked:true,ownerCoreMatched:false}});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LINKED_OWNER_SCRIPT_UNVERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_LINKED_OWNER_SCRIPT_UNVERIFIED');
+ assert.equal(r.rawBDirect.code,'NOT_EVALUATED');
+ assert.equal(r.probeCounts.event,1);
+});
+test('Korea shared-lock owner is a bounded one-shot observation, not Event129 mismatch',async()=>{
+ const f=fixture({owner:{...initial,ownerKoreaMatched:true,ownerCoreMatched:false}});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_NON_CORE_LOCK_OWNER_OBSERVED');
+ assert.equal(r.wmi.koreaMatched,true);
+ assert.equal(r.probeCounts.event,1);
+ assert.equal(r.rawBVbs.ok,null);
+});
+test('Task not running at snapshot does not become Event129 proof failure',async()=>{
+ const f=fixture({owner:{...initial,taskRunning:false,ownerCoreMatched:false}});
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_CORE_TASK_NOT_RUNNING_AT_SNAPSHOT');
+ assert.equal(r.wmi.taskRunning,false);
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.probeCounts.event,1);
+});
+test('stale Core lock older than one hour rejects owner but retains log coverage',async()=>{
+ const f=fixture({lockAt:start-3600000});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_AGE_OUT_OF_WINDOW');
+ assert.equal(r.stage,'LOCK');
+ assert.equal(r.probeCounts.wmi,0);
+ assert.equal(r.probeCounts.event,1);
+ assert.equal(r.lock.same,true);
+});
+test('future lock timestamp is not a proven owner',async()=>{
+ const f=fixture({lockAt:start+26000});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_AGE_OUT_OF_WINDOW');
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.probeCounts.event,1);
+});
+test('current diagnostic process cannot certify its own PID as B Core owner',async()=>{
+ const f=fixture();
+ let reads=0;
+ f.ctx.readLock=()=>({status:'PRESENT',pid:process.pid,at:start+20000,
+  hash:++reads===1?'SAME':'SAME'});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_SELF_OWNER_UNVERIFIED');
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.probeCounts.wmi,0);
+ assert.equal(r.lock.same,true);
+ assert.doesNotMatch(JSON.stringify(r),/"(?:pid|lockPid|CommandLine)"\s*:/i);
+});
+
+
+test('idle Core still reports UTF16LE event reader and auxiliary structure, not B ownership',async()=>{
+ const x=event(),f=fixture({xml:Buffer.concat([Buffer.from([255,254]),Buffer.from(x,'utf16le')])});
+ f.ctx.readLock=()=>({status:'ABSENT'});
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_LOCK_NOT_VERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_LOCK_NOT_VERIFIED');
+ assert.equal(r.reader,'OK');
+ assert.equal(r.bom,'UTF16LE');
+ assert.equal(r.encoding,'UTF-16LE');
+ assert.equal(r.supplemental.parsed,true);
+ assert.equal(r.supplemental.coreCandidates,1);
+ assert.equal(r.supplemental.onlySupplemental,true);
+ assert.equal(r.event.pidMatch,null);
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.rawBVbs.ok,null);
+ assert.equal(r.probeCounts.event,1);
+ assert.equal(r.probeCounts.taskDefinition,0);
+ assert.equal(r.probeCounts.wmi,0);
+ assert.equal(r.probeCounts.lockReads,2);
+});
+test('earlier Task error stays firstFail when log reader is also denied',async()=>{
+ const f=fixture({failTask:true,failEvent:true}),r=await run(f);
+ assert.equal(r.code,'INFL_E129_TASK_DEFINITION_UNAVAILABLE');
+ assert.equal(r.firstFailCode,'INFL_E129_TASK_DEFINITION_UNAVAILABLE');
+ assert.equal(r.stage,'TASK');
+ assert.equal(r.reader,'ERROR');
+ assert.equal(r.probeCounts.event,1);
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.rawBVbs.ok,null);
+ assert.equal(r.lock.same,true);
+});
+test('independent coverage never repeats Event129 after an attempted direct B proof',async()=>{
+ const f=fixture({xml:'<Events></Events>'});
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_NOT_OBSERVED_WITHIN_LIMIT');
+ assert.equal(r.probeCounts.event,1);
+ assert.equal(f.seen.filter(a=>a[0]==='qe').length,1);
+ assert.equal(r.rawBDirect.ok,false);
 });
