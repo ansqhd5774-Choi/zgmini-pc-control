@@ -99,7 +99,7 @@ export function validateQfrPinnedNoWrite(text,preflight,expectedKey){
   return true;
 }
 
-export function parsePublisherLog(text,operation){
+export function parsePublisherLog(text,operation,expectedKey){
   const rows=parseLogRows(text);
   if(operation==='bea-unit-profit-once'
     &&(rows.SOURCE_ORIGIN!=='PC_IMMUTABLE_ARCHIVE'
@@ -111,16 +111,33 @@ export function parsePublisherLog(text,operation){
     :['PASS_QFR_D1_EXACT_READBACK','PASS_QFR_D1_ALREADY_STORED'];
   if(!expectedResult.includes(rows.RESULT)||!['READBACK_VERIFIED','ALREADY_STORED'].includes(rows.D1_RESULT))
     throw Error('PUBLICATION_RESULT_NOT_VERIFIED');
-  if(operation==='census-qfr-margin-once'
-    &&(!SHA256.test(rows.RAW_ZIP_SHA256??'')
-      ||rows.PREFLIGHT_SOURCE_PIN!=='VERIFIED'))
-    throw Error('PUBLICATION_QFR_APPLY_PIN_MISSING');
+  if(operation==='census-qfr-margin-once'){
+    if(!SHA256.test(rows.RAW_ZIP_SHA256??'')
+      ||rows.PREFLIGHT_SOURCE_PIN!=='VERIFIED')
+      throw Error('PUBLICATION_QFR_APPLY_PIN_MISSING');
+    // Only evidence from the exact, approved QFR apply can certify the D1 key.
+    // BEA has a different MODE contract and retains its existing validation.
+    if(rows.SNAPSHOT_KEY!==expectedKey
+      ||rows.MODE!=='APPLY_EXPLICIT'
+      ||rows.SOURCE_GATES!=='PASS'
+      ||rows.SOURCE_HTTP_REQUESTS!=='0'
+      ||rows.PC_SQLITE_WRITES!=='0'
+      ||rows.ERROR!==undefined
+      ||!(rows.D1_RESULT==='READBACK_VERIFIED'
+        &&rows.RESULT==='PASS_QFR_D1_EXACT_READBACK'
+        &&rows.D1_READBACK==='EXACT'
+        ||rows.D1_RESULT==='ALREADY_STORED'
+        &&rows.RESULT==='PASS_QFR_D1_ALREADY_STORED'
+        &&rows.D1_READBACK==='PREVIOUS_IDENTICAL'))
+      throw Error('PUBLICATION_QFR_APPLY_EVIDENCE_INVALID');
+  }
   const sourceVersion=operation==='bea-unit-profit-once'?rows.SOURCE_SHA256:rows.SOURCE_VERSION;
   const sourceStoredAt=Number(rows.SOURCE_STORED_AT);
   if(!SHA256.test(sourceVersion??'')||!Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0)
     throw Error('PUBLICATION_RESULT_CHECKPOINT_INVALID');
   return Object.freeze({status:'PASS',d1Result:rows.D1_RESULT,sourceVersion,sourceStoredAt,
-    ...(operation==='census-qfr-margin-once'?{rawZipSha256:rows.RAW_ZIP_SHA256}:{})});
+    ...(operation==='census-qfr-margin-once'?{
+      key:rows.SNAPSHOT_KEY,rawZipSha256:rows.RAW_ZIP_SHA256}:{})});
 }
 
 export function millisecondsToNextUtcSecond(now){
@@ -356,11 +373,14 @@ async function execute(){
       }
       throw Error('PUBLICATION_APPLY_RESULT_UNKNOWN');
     }
-    const evidence=parsePublisherLog(readNewResult(outputDir,prefix,before),request.operation);
+    const evidence=parsePublisherLog(readNewResult(outputDir,prefix,before),
+      request.operation,invocation.snapshotKey);
     if(bea&&evidence.sourceVersion!==invocation.sourceSha256)
       throw Error('PUBLICATION_BEA_APPLY_SOURCE_MISMATCH');
     if(!bea)validateQfrApplySource(qfrPin,evidence);
-    validatePublicationReadback(validated,{...evidence,key:invocation.snapshotKey});
+    // QFR must forward the actual parsed key, not manufacture the expected key.
+    validatePublicationReadback(validated,{
+      ...evidence,...(bea?{key:invocation.snapshotKey}:{})});
     phase=nextLedgerPhase(phase,'READBACK_PASS');writeAtomic(ledgerPath,phase);
     report={...report,status:'PASS',code:'PUBLICATION_SINGLE_KEY_READBACK_VERIFIED',
       d1Result:evidence.d1Result,sourceVersion:evidence.sourceVersion,
