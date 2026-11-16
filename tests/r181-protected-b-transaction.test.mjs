@@ -77,7 +77,7 @@ test('modified manifest bytes, replay event and unexpected target are refused',(
   code(()=>authorizeR181ProtectedB(a));
   const b=make();b.env.GITHUB_RUN_ATTEMPT='2';
   code(()=>authorizeR181ProtectedB(b));
-  const c=make();c.manifest.controlSourceSha='b'.repeat(40);
+  const c=make();c.manifest.controlSourceSha='not-a-sha';
   c.manifestBytes=Buffer.from(JSON.stringify(c.manifest));
   c.request.approvalManifestSha256=sha(c.manifestBytes);
   c.event.issue.body=JSON.stringify(c.request);
