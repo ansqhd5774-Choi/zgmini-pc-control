@@ -128,6 +128,10 @@ test('workflow_run owner verification and explicit manual trigger only',()=>{
   assert.throws(()=>validateTrigger({...event,workflow_run:{...event.workflow_run,conclusion:'failure'}},env));
   assert.doesNotThrow(()=>validateTrigger({repository:event.repository,sender:{login:owner}},
     {...env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_ACTOR:owner}));
+  assert.doesNotThrow(()=>validateTrigger({repository:event.repository,ref:'refs/heads/main'},
+    {...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}));
+  assert.throws(()=>validateTrigger({repository:event.repository,ref:'refs/heads/other'},
+    {...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}));
   assert.throws(()=>validateTrigger({repository:event.repository,sender:{login:'attacker'}},
     {...env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_ACTOR:owner}));
 });
