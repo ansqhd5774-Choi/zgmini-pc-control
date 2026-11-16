@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
+import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {createHash} from 'node:crypto';
 
@@ -298,6 +299,69 @@ export function inspect1501LeaseCorrelation({
  }catch{return as1501(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
 }
 
+// Fixed read-only HTTP request log projection. The source module is the
+// already-tested Controller A adapter, loaded from the exact Git checkout.
+// No caller input, secrets, URLs, query paths, or raw log lines are returned.
+const HTTP_OBSERVATION_ROOT='E:/ZGmini/data';
+const HOST=/^(?=.{4,180}$)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
+const HTTP_CODE=/^(?:[1-5][0-9]{2}|NETWORK_ERROR|PROVIDER_QUOTA_GUARD)$/;
+const HOST_STATE=new Set(['normal','failed','unknown']);
+const HOST_REASON=new Set([
+ 'NOT_REPEATED','ESTIMATED_CADENCE_OVERDUE','NO_VERIFIED_SCHEDULE_OVER_36H',
+ 'LAST_HTTP_ERROR','QUOTA_OR_UNCLASSIFIED','RECENT_2XX','EVIDENCE_UNKNOWN']);
+const safeIso=v=>typeof v==='string'&&Number.isFinite(Date.parse(v))
+ ?new Date(v).toISOString():null;
+const unknownHostEvidence=code=>({status:'STATE_UNKNOWN',code,
+ source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',monitoredCount:null,
+ rosterComplete:false,http:null,hosts:[],providerCalls:0,operationalWrites:0,d1Writes:0});
+export function projectObservedProviderHosts(raw){
+ if(!raw||raw.source!=='PC_COLLECTION_EVENTS_FETCH_WRAPPER'||
+  raw.scope!=='FIXED_LOCAL_JSONL_ONLY'||
+  !Number.isSafeInteger(raw.monitoredHostCount)||raw.monitoredHostCount<0||
+  !Number.isSafeInteger(raw.monitoredHostsReturned)||
+  raw.monitoredHostsReturned<0||raw.monitoredHostsReturned>64||
+  !Array.isArray(raw.hosts)||raw.hosts.length>64)
+  return unknownHostEvidence('OBSERVED_HOST_INPUT_INVALID');
+ const rows=raw.hosts.filter(x=>x?.monitored===true);
+ const seen=new Set(),hosts=[];
+ for(const x of rows){
+  if(!HOST.test(x.host??'')||seen.has(x.host)||
+    !HOST_STATE.has(x.monitoringState)||!HOST_REASON.has(x.reason)||
+    !x.lastRunStatuses||typeof x.lastRunStatuses!=='object'||
+    Object.keys(x.lastRunStatuses).length>20||
+    Object.entries(x.lastRunStatuses).some(([k,v])=>!HTTP_CODE.test(k)||
+      !Number.isSafeInteger(v)||v<0)||
+    (x.lastAttemptAt!==null&&!safeIso(x.lastAttemptAt))||
+    (x.last2xxRunAt!==null&&!safeIso(x.last2xxRunAt)))
+    return unknownHostEvidence('OBSERVED_HOST_ITEM_INVALID');
+  seen.add(x.host);
+  hosts.push({host:x.host,monitoringState:x.monitoringState,reason:x.reason,
+   lastAttemptAt:safeIso(x.lastAttemptAt),last2xxRunAt:safeIso(x.last2xxRunAt),
+   lastRunStatuses:Object.fromEntries(Object.entries(x.lastRunStatuses).sort())});
+ }
+ hosts.sort((a,b)=>a.host.localeCompare(b.host));
+ const complete=rows.length===raw.monitoredHostsReturned&&
+  rows.length===raw.monitoredHostCount&&raw.omittedHosts===0;
+ const counts={normal:hosts.filter(x=>x.monitoringState==='normal').length,
+  failed:hosts.filter(x=>x.monitoringState==='failed').length,
+  unknown:hosts.filter(x=>x.monitoringState==='unknown').length,total:hosts.length};
+ const consistent=raw.http?.normal===counts.normal&&raw.http?.failed===counts.failed&&
+  raw.http?.unknown===counts.unknown&&raw.http?.total===raw.monitoredHostCount;
+ return {status:complete&&consistent&&raw.status==='PASS'?'PASS':'STATE_UNKNOWN',
+  code:complete&&consistent?'OBSERVED_HTTP_COHORT_READBACK':'OBSERVED_HTTP_COHORT_PARTIAL',
+  source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',
+  scope:'OBSERVED_REPEATED_HTTP_HOSTS_NOT_APPROVED_API_ENDPOINTS',
+  observedAt:safeIso(raw.now),windowDays:raw.windowDays===14?14:null,
+  monitoredCount:raw.monitoredHostCount,rosterComplete:complete&&consistent,
+  http:consistent?counts:null,hosts,
+  sourceCoverage:raw.status==='PASS'?'PASS':'PARTIAL_OR_UNKNOWN',
+  providerCalls:0,operationalWrites:0,d1Writes:0};
+}
+function readObservedProviderHosts(){
+ try{return projectObservedProviderHosts(inspectProviderActivity(HTTP_OBSERVATION_ROOT));}
+ catch{return unknownHostEvidence('HTTP_DIAGNOSTIC_READ_FAILED');}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -315,7 +379,8 @@ export function collect(role,ctx,env=process.env){
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
-  c1501LeaseCorrelation:inspect1501LeaseCorrelation()}:base;
+  c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
+  observedHttpHostRoster:readObservedProviderHosts()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
