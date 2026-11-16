@@ -3,7 +3,7 @@
   "status": "PENDING_B_APPROVAL",
   "scope": "W01_CENSUS_M3_MTM_TI_RAW_ONLY_2_GET",
   "operation": "w01-census-m3-api-once",
-  "controlSourceSha": "d0b59ea089f6fd529ad3e9b9293f4cc0765629e5",
+  "controlSourceSha": "8531d63eb03a78ca343048bc2650d973bd3a64e5",
   "installedSourceSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
   "dataRoot": "E:\\ZGmini\\data\\pc-writer",

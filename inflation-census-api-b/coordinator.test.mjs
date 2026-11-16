@@ -169,7 +169,7 @@ test('native B interface shares exact Core owner verifier and never creates Task
  assert.match(code,/observeLiveCoreLockOwner\(APPROVAL_SCHEMA_V2/);
  assert.match(code,/awaitNaturalCoreIdle/);
  assert.match(code,/acquireInstallLock/);
- assert.match(code,/runInflationCandidateOnce\(\{approved:true/);
+ assert.match(code,/runInflationCandidateOnce\(\{\s*approved:true/);
  assert.match(code,/groups:\['census'\]/);
  assert.match(code,/mode:'enforce'/);
  assert.match(workflow,/github\.event\.issue\.title == 'w01-census-m3-api-once'/);
@@ -233,3 +233,30 @@ test('Census credential preflight uses pinned local-env and passes only its scop
  assert.doesNotMatch(code,/providerEnv:env,quotaFetch/);
 });
 
+test('SAVED_READBACK is bound to the Census GET invocation, not a prior valid stored document',async()=>{
+ const {verifyCensusBReadbackWindow}=await import('./windows-adapter.mjs');
+ const begin=Date.parse('2026-11-17T01:20:00.000Z');
+ const end=begin+35_000;
+ const testWindow=sourceStoredAt=>verifyCensusBReadbackWindow({
+  status:'SAVED_READBACK',sourceStoredAt,startedAt:begin,finishedAt:end});
+ assert.equal(testWindow('2026-11-17T01:20:00.000Z'),true);
+ assert.equal(testWindow('2026-11-17T01:20:35.000Z'),true);
+ assert.throws(()=>testWindow('2026-11-16T01:20:20.000Z'),
+  /W01_CENSUS_B_STORED_AT_PREVIOUS_RUN_STOP/);
+ assert.throws(()=>testWindow('2026-11-17T01:20:35.001Z'),
+  /W01_CENSUS_B_STORED_AT_PREVIOUS_RUN_STOP/);
+ assert.throws(()=>testWindow('not-a-date'),/W01_CENSUS_B_STORED_AT_INVALID_STOP/);
+ assert.throws(()=>verifyCensusBReadbackWindow({
+  status:'SAVED_READBACK',sourceStoredAt:'2026-11-17T01:20:10.000Z',
+  startedAt:end,finishedAt:begin}),
+  /W01_CENSUS_B_STORED_AT_PREVIOUS_RUN_STOP/);
+});
+test('UNCHANGED preserves the last-good saved_at without claiming this-run freshness',async()=>{
+ const {verifyCensusBReadbackWindow}=await import('./windows-adapter.mjs');
+ assert.equal(verifyCensusBReadbackWindow({status:'UNCHANGED',
+  sourceStoredAt:'2025-12-01T00:00:00.000Z',startedAt:Date.now(),
+  finishedAt:Date.now()+1000}),true);
+ assert.throws(()=>verifyCensusBReadbackWindow({
+  status:'INVALID',sourceStoredAt:'2026-11-17T00:00:00.000Z',
+  startedAt:0,finishedAt:1}),/W01_CENSUS_B_STORED_AT_INVALID_STOP/);
+});
