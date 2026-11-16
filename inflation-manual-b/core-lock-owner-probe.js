@@ -3,6 +3,17 @@
 // Legacy EnginePID linked proof is unchanged; additional sanitized evidence
 // enables an EVENT-129 identity proof when GetInstances(0) is security filtered.
 (function () {
+  function launcherKindsJson(kinds) {
+    if (!(kinds instanceof Array) || kinds.length > 12) return '[]';
+    var encoded = [];
+    for (var i = 0; i < kinds.length; i++) {
+      var kind = kinds[i];
+      if (kind !== 'TASK_VBS' && kind !== 'CUTOVER_VBS' &&
+        kind !== 'ARCHIVE_NODE' && kind !== 'ARCHIVE_CORE_NODE') return '[]';
+      encoded.push('"' + kind + '"');
+    }
+    return '[' + encoded.join(',') + ']';
+  }
   function output(ok, linked, running, ownerMatched, koreaMatched, createdAtMs,
     vbsLinked, vbsCreatedAtMs, launcherKinds) {
     WScript.Echo('{"ok":' + (ok ? 'true' : 'false') +
@@ -18,7 +29,7 @@
       (isFinite(vbsCreatedAtMs)&&vbsCreatedAtMs>946684800000?
        String(Math.floor(vbsCreatedAtMs)):'null') +
       ',"approvedLauncherKinds":' +
-      JSON.stringify(launcherKinds instanceof Array?launcherKinds:[]) + '}');
+      launcherKindsJson(launcherKinds) + '}');
   }
   function createdAt(raw) {
     var stamp = String(raw || '');

@@ -88,9 +88,22 @@ function runProbe(opts={}){
   (opts.badPid?9999:8000))},Echo:x=>out.push(x)},
   ActiveXObject:function(){return{Connect:()=>{},GetFolder:()=>({GetTask:()=>task})};},
   GetObject:()=>({ExecQuery:()=>records}),Enumerator};
+ // Windows Script Host JScript 5.x may not provide the ES5 JSON intrinsic.
+ if(opts.noJson)sandbox.JSON=undefined;
  vm.runInNewContext(script,sandbox,{timeout:2000});
  return JSON.parse(out[0]);
 }
+test('JScript without native JSON still emits safe owner evidence and rejects impostors',()=>{
+ const valid=runProbe({noJson:true});
+ assert.equal(valid.ok,true);
+ assert.equal(valid.taskVbsLinked,true);
+ assert.deepEqual([...valid.approvedLauncherKinds],
+  ['ARCHIVE_NODE','CUTOVER_VBS','TASK_VBS']);
+ for(const change of [{gone:true},{badParent:true},{badCommand:true},
+  {badPid:true},{idle:true}])
+  assert.equal(runProbe({noJson:true,...change}).taskVbsLinked,false,
+   JSON.stringify(change));
+});
 test('actual WSH script connects the trusted VBS hierarchy to the lock Node',()=>{
  const result=runProbe();
  assert.equal(result.taskVbsLinked,true);
