@@ -32,7 +32,7 @@ const safeCode=e=>/^R181_(?:B_)?[A-Z0-9_]{3,100}$/.test(e?.code??'')?
 // The external, trusted B admission must also verify a merged approval,
 // exact event source commit, and installed Windows execution registration.
 // This check alone never creates a PC job, authorizes a shell, or installs code.
-export function authorizeR181ProtectedB({event,env,manifestBytes}){
+export function authorizeR181PrimaryProtectedB({event,env,manifestBytes}){
   need(env?.GITHUB_REPOSITORY===REPO&&env.GITHUB_EVENT_NAME==='issues'&&
     env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_ACTOR===ACTOR&&
     env.GITHUB_RUN_ATTEMPT==='1'&&SHA40.test(env.GITHUB_SHA??'')&&
@@ -85,7 +85,7 @@ const result=(status,code,more={})=>Object.freeze({
   status,code,applied:false,providerCalls:0,dbWrites:0,d1Writes:0,
   taskChanges:0,otherFileWrites:0,...more,
 });
-export async function runApprovedR181ProtectedB(proof,io){
+export async function runApprovedR181PrimaryProtectedB(proof,io){
   need(authorized.has(proof),'R181_PRIMARY_B_AUTH_REQUIRED');
   need(object(io)&&IO_KEYS.every(k=>typeof io[k]==='function'),
     'R181_PRIMARY_B_TRUSTED_IO_REQUIRED');
