@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_INFLATION_OFFICIAL_MANUAL_B_APPROVAL_V2",
-  "status": "APPROVED_B",
+  "status": "DRAFT_NOT_APPROVED",
   "scope": "INFLATION_OFFICIAL_STATIC_TWO_RAW_JSON_ONLY",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
   "sourceFiles": [
