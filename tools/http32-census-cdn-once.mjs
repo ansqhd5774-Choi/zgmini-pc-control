@@ -73,6 +73,6 @@ async function main(){
  console.log('HTTP32_CENSUS_CDN_ONCE='+JSON.stringify(proof));
  if(proof.status!=='PASS')process.exitCode=3;
 }
-if(process.argv[1]&&new URL(import.meta.url).pathname.replace(/\\/g,'/').toLowerCase().endsWith('/'+process.argv[1].replace(/\\/g,'/').split('/').at(-1).toLowerCase())){
+if(process.argv[1]&&new globalThis.URL(import.meta.url).pathname.replace(/\\/g,'/').toLowerCase().endsWith('/'+process.argv[1].replace(/\\/g,'/').split('/').at(-1).toLowerCase())){
  await main();
 }
