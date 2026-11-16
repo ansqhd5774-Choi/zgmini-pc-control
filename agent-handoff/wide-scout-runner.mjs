@@ -81,23 +81,45 @@ async function paged(resource,maxPages,stopAfterOlder,now){
   }
   return {items:result,complete};
 }
+export const RUN_STATUS_PARTITIONS=Object.freeze([
+  'failure','timed_out','cancelled','action_required',
+  'queued','waiting','in_progress','pending'
+]);
 async function recentRuns(now){
-  const after=new Date(now-WIDE_POLICY.lookbackDays*86400000)
-    .toISOString().slice(0,10);
-  const result=[];
-  let complete=false;
-  for(let page=1;page<=3;page++){
-    const x=await request('actions/runs?created='+encodeURIComponent('>='+after)+
-      '&per_page=100&page='+page);
-    if(!Array.isArray(x?.workflow_runs))stop('RUN_PAGINATION');
-    result.push(...x.workflow_runs);
-    if(x.workflow_runs.length<100){complete=true;break;}
-    const earliest=Date.parse(x.workflow_runs.at(-1)?.created_at||'');
-    if(Number.isFinite(earliest)&&earliest<now-WIDE_POLICY.lookbackDays*86400000){
-      complete=true;break;
+  const cutoff=now-WIDE_POLICY.lookbackDays*86400000;
+  const after=new Date(cutoff).toISOString().slice(0,10);
+  const batches=await Promise.all(RUN_STATUS_PARTITIONS.map(async status=>{
+    const items=[];let complete=false;
+    for(let page=1;page<=2;page++){
+      const x=await request('actions/runs?status='+encodeURIComponent(status)+
+        '&created='+encodeURIComponent('>='+after)+'&per_page=100&page='+page);
+      if(!Array.isArray(x?.workflow_runs))stop('RUN_PAGINATION_'+status);
+      items.push(...x.workflow_runs);
+      if(x.workflow_runs.length<100){complete=true;break;}
+      const oldest=Date.parse(x.workflow_runs.at(-1)?.created_at||'');
+      if(Number.isFinite(oldest)&&oldest<cutoff){complete=true;break;}
+    }
+    return {status,items,complete};
+  }));
+  // A run may transition while parallel GitHub queries are in flight.
+  // Keep the latest available state, but do not declare the inventory complete.
+  const map=new Map();let complete=batches.every(x=>x.complete);
+  const rank={completed:4,in_progress:3,waiting:2,queued:1,pending:0};
+  for(const batch of batches){
+    for(const run of batch.items){
+      if(!Number.isSafeInteger(run?.id)||run.id<1)stop('RUN_IDENTITY');
+      const prev=map.get(run.id);
+      if(prev){
+        complete=false;
+        if((rank[run.status]??-1)>(rank[prev.status]??-1))map.set(run.id,run);
+      }else map.set(run.id,run);
     }
   }
-  return {items:result,complete};
+  const items=[...map.values()].sort((a,b)=>
+    Date.parse(b.created_at)-Date.parse(a.created_at)||b.id-a.id);
+  return {items,complete,coverage:batches.map(x=>({
+    status:x.status,count:x.items.length,complete:x.complete
+  }))};
 }
 async function readWorkflows(){
   const values=[];
@@ -124,7 +146,7 @@ export async function scoutWide(io,now){
   ]);
   const report=evaluateWideSnapshot({
     runs:runs.items,issues:issues.items,pulls:pulls.items,
-    workflows,scheduleRunCount:schedules,
+    workflows,scheduleRunCount:schedules,coverage:runs.coverage,
     complete:{runs:runs.complete,issues:issues.complete,pulls:pulls.complete}
   },now);
   const textReport=renderWideReport(report);
