@@ -18,7 +18,7 @@ function approval(){
   coreLock:CENSUS_B_CORE_LOCK,writerLock:CENSUS_B_WRITER_LOCK,
   sourceFilesSha256:files(),providerEndpoint:CENSUS_B_ENDPOINT,
   selector:'MTM/TI/SA/US',targetFile:CENSUS_B_TARGET,
-  maxProviderGets:2,maxRawArchives:2,maxOutputFiles:1,
+  maxProviderGets:2,maxRawArchives:2,maxOutputFiles:1,maxBackupFiles:1,
   coreLeaseMode:'EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK_VERIFIED_OWNER',
   allowQuotaLedgerWrites:true,allowProviderCalls:true,allowDatabaseWrites:false,
   allowD1Writes:false,allowSourceChanges:false,allowTaskChanges:false,
