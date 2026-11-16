@@ -236,3 +236,75 @@ test('exception in lock recheck is UNKNOWN while initial errors keep their first
  assert.equal(r.stage,'WMI');
  assert.doesNotMatch(JSON.stringify(r),/private lock readback message/);
 });
+
+
+test('current live WMI Core link follows actual B V2 shortcut and skips Event129',async()=>{
+ const f=fixture({owner:{...initial,linked:true,ownerCoreMatched:true}});
+ const r=await run(f);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.code,'INFL_E129_CURRENT_WMI_LINK_OBSERVED');
+ assert.equal(r.wmi.linked,true);
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.rawBVbs.ok,null);
+ assert.equal(r.reader,'NOT_EVALUATED');
+ assert.equal(r.probeCounts.event,0);
+ assert.equal(r.lock.same,true);
+ assert.equal(r.authorizesB,false);
+});
+test('linked WMI owner with wrong Core command remains a B safety denial, not Event129',async()=>{
+ const f=fixture({owner:{...initial,linked:true,ownerCoreMatched:false}});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LINKED_OWNER_SCRIPT_UNVERIFIED');
+ assert.equal(r.firstFailCode,'INFL_E129_LINKED_OWNER_SCRIPT_UNVERIFIED');
+ assert.equal(r.rawBDirect.code,'NOT_EVALUATED');
+ assert.equal(r.probeCounts.event,0);
+});
+test('Korea shared-lock owner is a bounded one-shot observation, not Event129 mismatch',async()=>{
+ const f=fixture({owner:{...initial,ownerKoreaMatched:true,ownerCoreMatched:false}});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_NON_CORE_LOCK_OWNER_OBSERVED');
+ assert.equal(r.wmi.koreaMatched,true);
+ assert.equal(r.probeCounts.event,0);
+ assert.equal(r.rawBVbs.ok,null);
+});
+test('Task not running at snapshot does not become Event129 proof failure',async()=>{
+ const f=fixture({owner:{...initial,taskRunning:false,ownerCoreMatched:false}});
+ const r=await run(f);
+ assert.equal(r.code,'INFL_E129_CORE_TASK_NOT_RUNNING_AT_SNAPSHOT');
+ assert.equal(r.wmi.taskRunning,false);
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.probeCounts.event,0);
+});
+test('stale Core lock older than one hour stops before WMI and event reader',async()=>{
+ const f=fixture({lockAt:start-3600000});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_AGE_OUT_OF_WINDOW');
+ assert.equal(r.stage,'LOCK');
+ assert.equal(r.probeCounts.wmi,0);
+ assert.equal(r.probeCounts.event,0);
+ assert.equal(r.lock.same,true);
+});
+test('future lock timestamp is not a proven owner',async()=>{
+ const f=fixture({lockAt:start+26000});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_AGE_OUT_OF_WINDOW');
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.probeCounts.event,0);
+});
+test('current diagnostic process cannot certify its own PID as B Core owner',async()=>{
+ const f=fixture();
+ let reads=0;
+ f.ctx.readLock=()=>({status:'PRESENT',pid:process.pid,at:start+20000,
+  hash:++reads===1?'SAME':'SAME'});
+ const r=await run(f);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'INFL_E129_LOCK_SELF_OWNER_UNVERIFIED');
+ assert.equal(r.rawBDirect.ok,null);
+ assert.equal(r.probeCounts.wmi,0);
+ assert.equal(r.lock.same,true);
+ assert.equal(JSON.stringify(r).includes(String(process.pid)),false);
+});
