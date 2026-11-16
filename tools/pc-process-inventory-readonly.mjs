@@ -364,6 +364,83 @@ function readObservedProviderHosts(){
  catch{return unknownHostEvidence('HTTP_DIAGNOSTIC_READ_FAILED');}
 }
 
+// Read the ORIGINAL #1501 immutable-intent backlog only. Summary never
+// contains request bodies, URL paths, owner nonces, or credentials.
+const C1501_BACKLOG_FILE=path.join(MAINTENANCE_ROOT,'backlog',C1501_ID+'.json');
+const BACKLOG_LIMIT=1024*1024;
+const backlogUnknown=code=>({status:'STATE_UNKNOWN',code,
+ schema:'ZGMINI_PC_BACKLOG_WINDOW_READONLY_V1',originalRequestIssue:1501,
+ windowCount:null,openWindowCount:null,replayCount:null,
+ windows:[],replays:[],rosterTruncated:false,
+ stateHash:null,mutationAllowed:false,operationalWrites:0,providerCalls:0,d1Writes:0});
+const validBacklogTime=s=>typeof s==='string'&&Number.isFinite(Date.parse(s))
+ ?new Date(s).toISOString():null;
+export function classify1501BacklogBytes(first,second){
+ if(!Buffer.isBuffer(first)||!Buffer.isBuffer(second)||first.length===0||
+  first.length>BACKLOG_LIMIT||!first.equals(second))
+  return backlogUnknown('C1501_BACKLOG_SNAPSHOT_CHANGED_OR_UNREADABLE');
+ let v;try{v=JSON.parse(first.toString('utf8'));}catch{
+  return backlogUnknown('C1501_BACKLOG_JSON_INVALID');}
+ if(v?.schema!=='ZGMINI_PC_BACKLOG_V1')
+  return backlogUnknown('C1501_BACKLOG_SCHEMA_INVALID');
+ const raw=Array.isArray(v.windows)?v.windows:[{pausedAt:v.pausedAt,resumedAt:v.resumedAt}];
+ if(raw.length<1||raw.length>8)
+  return backlogUnknown('C1501_BACKLOG_WINDOWS_INVALID');
+ const windows=[];
+ for(let i=0;i<raw.length;i++){
+  const pausedAt=validBacklogTime(raw[i]?.pausedAt);
+  const resumedAt=raw[i]?.resumedAt==null?null:validBacklogTime(raw[i].resumedAt);
+  if(!pausedAt||(raw[i]?.resumedAt!=null&&!resumedAt)||
+   (resumedAt&&Date.parse(resumedAt)<Date.parse(pausedAt))||
+   (i>0&&Date.parse(pausedAt)<Date.parse(windows.at(-1).pausedAt)))
+   return backlogUnknown('C1501_BACKLOG_WINDOW_INVALID');
+  windows.push({index:i+1,pausedAt,resumedAt});
+ }
+ const replays=v.replays??{};
+ if(!replays||typeof replays!=='object'||Array.isArray(replays)||
+   Object.keys(replays).length>2000)
+  return backlogUnknown('C1501_BACKLOG_REPLAYS_INVALID');
+ const permitted=new Set(['DONE','SKIPPED_RESULT_PRESENT','POSTING']);
+ const rows=[];
+ let done=0,skipped=0,posting=0,other=0;
+ for(const [key,item] of Object.entries(replays)){
+  if(!/^[1-9][0-9]{0,9}$/.test(key)||typeof item!=='object'||item===null||
+   Array.isArray(item))return backlogUnknown('C1501_BACKLOG_REPLAY_ITEM_INVALID');
+  const state=permitted.has(item.status)?item.status:'OTHER_UNVERIFIED';
+  if(state==='DONE')done++;else if(state==='SKIPPED_RESULT_PRESENT')skipped++;
+  else if(state==='POSTING')posting++;else other++;
+  rows.push({issueNumber:Number(key),status:state});
+ }
+ rows.sort((a,b)=>a.issueNumber-b.issueNumber);
+ const open=windows.filter(w=>w.resumedAt===null).length;
+ return {schema:'ZGMINI_PC_BACKLOG_WINDOW_READONLY_V1',status:'PASS',
+  code:'C1501_BACKLOG_WINDOW_READBACK_VERIFIED',originalRequestIssue:1501,
+  stateHash:sha256(first),windowCount:windows.length,openWindowCount:open,
+  windows,replayCount:rows.length,
+  replayCounts:{done,skippedResultPresent:skipped,posting,otherUnverified:other},
+  replays:rows.slice(0,32),rosterTruncated:rows.length>32,
+  mutationAllowed:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect1501BacklogReadonly({
+ correlation=inspect1501LeaseCorrelation,
+ stat=fs.lstatSync,read=fs.readFileSync}={}){
+ if(correlation()?.status!=='CORRELATED')
+  return backlogUnknown('C1501_BACKLOG_OWNER_UNVERIFIED');
+ try{
+  const dir=stat(path.dirname(C1501_BACKLOG_FILE));
+  if(!dir.isDirectory()||dir.isSymbolicLink())
+   return backlogUnknown('C1501_BACKLOG_UNSAFE_DIRECTORY');
+  const item=stat(C1501_BACKLOG_FILE);
+  if(!item.isFile()||item.isSymbolicLink()||
+   item.size<=0||item.size>BACKLOG_LIMIT)
+   return backlogUnknown('C1501_BACKLOG_UNSAFE_FILE');
+  const first=read(C1501_BACKLOG_FILE),second=read(C1501_BACKLOG_FILE);
+  if(!Buffer.isBuffer(first)||first.length!==item.size)
+   return backlogUnknown('C1501_BACKLOG_READ_SIZE_DRIFT');
+  return classify1501BacklogBytes(first,second);
+ }catch{return backlogUnknown('C1501_BACKLOG_UNAVAILABLE');}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -382,7 +459,8 @@ export function collect(role,ctx,env=process.env){
   maintenance:collectMaintenanceStatusReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
-  observedHttpHostRoster:readObservedProviderHosts()}:base;
+  observedHttpHostRoster:readObservedProviderHosts(),
+  c1501Backlog:inspect1501BacklogReadonly()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
