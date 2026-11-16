@@ -13,7 +13,7 @@ const fakeR6=`import fs from 'node:fs';import path from 'node:path';
 const args=process.argv.slice(2);const get=k=>args[args.indexOf(k)+1];
 const out=get('--output-dir');
 const result={kind:'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1',status:'PASS',
-  code:'EMPLOYMENT_R6_READONLY_STAGE_COMPLETED',sqliteOpened:true,
+  code:'EMPLOYMENT_R6_READONLY_STAGE_COMPLETED',sqliteOpened:true,asOfDate:'2026-11-02',
   providerCalls:0,d1Writes:0,promotionApproved:false,publicationStatus:'NOT_REQUESTED',
   summary:{sourceFeatures:1,UNTRUSTED_RAW:'PRIVATE_VALUE'},
   pit:{coreCurrentKeysMissingHistory:4,
@@ -66,6 +66,7 @@ test('approved fixture runs in workspace and output projection does not leak raw
   const result=await inspectEmploymentR6Candidate(f.request,f);
   assert.equal(result.status,'PASS');
   assert.equal(result.actualExecutionSha,SHA);
+  assert.equal(result.asOfDate,'2026-11-02');
   assert.equal(result.sqliteOpened,true);
   assert.equal(result.summary.sourceFeatures,1);
   assert.deepEqual({
@@ -174,4 +175,21 @@ test('new History-only counts reject negative, non-integer, and raw source field
   assert.equal(result.operationalWrites,0);
   assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
   assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
+});
+test('History count as-of date fails closed on impossible calendar dates',async t=>{
+  const f=fixture(t);
+  const content=fs.readFileSync(f.script,'utf8')
+    .replace("asOfDate:'2026-11-02'","asOfDate:'2026-13-52'");
+  fs.writeFileSync(f.script,content);
+  const files={[ENTRY]:hash(Buffer.from(content))};
+  const bytes=Buffer.from(JSON.stringify({files})+'\n');
+  fs.writeFileSync(path.join(f.host.approvedSources[SHA].root,'manifest.json'),bytes);
+  f.host.approvedSources[SHA].manifestSha256=hash(bytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'PASS');
+  assert.equal(result.asOfDate,null);
+  assert.equal(result.pit.coreHistoryAsOfUniqueKeys,123);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+  assert.equal(result.operationalWrites,0);
 });
