@@ -7,7 +7,9 @@ on:
       - 'controller/supervisor.mjs'
       - 'controller/core-runtime-source-readonly.mjs'
       - 'controller/provider-activity-runtime-readonly.mjs'
+      - 'controller/http32-two-host-checkpoints-readonly.mjs'
       - 'tests/provider-activity-runtime-readonly.test.mjs'
+      - 'tests/http32-two-host-checkpoints-readonly.test.mjs'
       - 'controller/theme-l7-runtime-readonly.mjs'
       - 'controller/core-runtime-source-wmi.mjs'
       - 'controller/inflation-event129-evidence-readonly.mjs'
@@ -123,6 +125,8 @@ jobs:
           node-version: '22'
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
+      - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
+        run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted
