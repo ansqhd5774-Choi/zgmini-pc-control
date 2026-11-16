@@ -150,10 +150,27 @@ test('workflow stays owner/schedule gated on isolated Windows without write to c
   assert.match(workflow,/zgmini-handoff-ci-isolated/);
   assert.match(workflow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(workflow,/deep-diagnostics-runner.mjs/);
-  assert.doesNotMatch(workflow,/contents: write|actions: write|pull_request:|workflow_run:/);
+  assert.match(workflow,/workflow_run:/);assert.match(workflow,/issues:/);assert.match(workflow,/push:/);
+  assert.match(workflow,/types: \[labeled\]/);
+  assert.doesNotMatch(workflow,/contents: write|actions: write|pull_request:/);
   const event={repository:{private:true,full_name:repo},schedule:DEEP_POLICY.schedule};
   const env={GITHUB_REPOSITORY:repo,GITHUB_EVENT_PATH:'event.json',
     GITHUB_REF:'refs/heads/main',GITHUB_EVENT_NAME:'schedule'};
   assert.doesNotThrow(()=>validateDeepEvent(event,env));
   assert.throws(()=>validateDeepEvent({...event,schedule:'* * * * *'},env),/CRON/);
+});
+
+test('R2 fallback gate refuses untrusted events and accepts authorized source receipts',()=>{
+  const e={repository:{private:true,full_name:repo}};
+  const base={GITHUB_REPOSITORY:repo,GITHUB_EVENT_PATH:'event.json',GITHUB_REF:'refs/heads/main'};
+  const run={...e,action:'completed',workflow_run:{name:'ZGMINI Handoff Queue Candidate Selector',
+    conclusion:'success',actor:{login:owner},head_branch:'main'}};
+  assert.doesNotThrow(()=>validateDeepEvent(run,{...base,GITHUB_EVENT_NAME:'workflow_run'}));
+  assert.throws(()=>validateDeepEvent({...run,workflow_run:{...run.workflow_run,conclusion:'skipped'}},{...base,GITHUB_EVENT_NAME:'workflow_run'}),/FALLBACK_WORKFLOW/);
+  assert.throws(()=>validateDeepEvent({...run,workflow_run:{...run.workflow_run,name:'untrusted'}},{...base,GITHUB_EVENT_NAME:'workflow_run'}),/FALLBACK_WORKFLOW/);
+  const issue={...e,action:'labeled',label:{name:'handoff-agent-pending'},issue:{state:'open',user:{login:owner},labels:[{name:'agent-handoff'}]}};
+  assert.doesNotThrow(()=>validateDeepEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:owner}));
+  assert.throws(()=>validateDeepEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:'attacker'}),/FALLBACK_ISSUE/);
+  assert.doesNotThrow(()=>validateDeepEvent({...e,ref:'refs/heads/main'},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}));
+  assert.throws(()=>validateDeepEvent({...e,ref:'refs/heads/main',deleted:true},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}),/FALLBACK_PUSH/);
 });
