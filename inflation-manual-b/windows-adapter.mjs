@@ -174,7 +174,8 @@ async function observeLiveCoreLockOwner(approvalSchema){
     // to store, but is not a reason to consume a one-shot B request early.
     // Wait for a naturally running Core within the original 12m bound.
     if(shouldWaitForV2OwnerEvidence({isV2:true,linked:false,
-     taskRunning:ownerProof.taskRunning})){
+     taskRunning:ownerProof.taskRunning,
+     ownerKoreaMatched:ownerProof.ownerKoreaMatched})){
      await delay(1500);continue;
     }
     // No guessed ownership: event PID, immutable task name, approved Node
