@@ -26,6 +26,9 @@ jobs:
       github.event.pull_request.user.login == 'ansqhd5774-Choi'
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 3
+    defaults:
+      run:
+        shell: cmd
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
