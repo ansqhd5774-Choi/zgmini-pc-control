@@ -28,6 +28,28 @@ const FAILURE_CODES=new Set([
  'DOL_NATIONAL_SERIES_INCOMPLETE','DOL_NATIONAL_INVALID_DATA',
 ]);
 const safeInt=x=>Number.isSafeInteger(x)&&x>=0?x:null;
+// Project ONLY fixed, public-safe metadata from an already-stored National
+// HTTP attempt. The body, error message, URL, query, raw digest, and tokens
+// remain sealed in PC SQLite and never leave this A-grade read-only diagnosis.
+const NATIONAL_FORMATS=new Set(['NATIONAL_XML','WEEK_FRAGMENT','HTML','OTHER_MARKUP','TEXT','EMPTY','UNAVAILABLE']);
+const NATIONAL_TYPES=new Set(['application/xml','text/xml','text/html','text/plain','OTHER','MISSING']);
+const NATIONAL_FAILURES=new Set(['DOL_NATIONAL_HTTP_FAILED','DOL_NATIONAL_REQUEST_FAILED',
+ 'DOL_NATIONAL_NO_VALID_ROWS','DOL_NATIONAL_SERIES_INCOMPLETE','DOL_NATIONAL_INVALID_DATA']);
+function safeNationalResponse(value){
+ if(!object(value))return null;
+ const count=value.parsedNationalSeriesCount;
+ return {
+  httpStatus:Number.isSafeInteger(value.httpStatus)&&value.httpStatus>=100&&value.httpStatus<=599?value.httpStatus:null,
+  contentTypeCategory:NATIONAL_TYPES.has(value.contentTypeCategory)?value.contentTypeCategory:'UNKNOWN',
+  responseFormat:NATIONAL_FORMATS.has(value.responseFormat)?value.responseFormat:'UNKNOWN',
+  bodyPresent:Number.isSafeInteger(value.bodyCharLength)?value.bodyCharLength>0:null,
+  parsedNationalSeriesCount:Number.isSafeInteger(count)&&count>=0&&count<=4?count:null,
+  requestFailureCode:NATIONAL_FAILURES.has(value.requestFailureCode)?value.requestFailureCode:null,
+  validationFailureCode:NATIONAL_FAILURES.has(value.validationFailureCode)?value.validationFailureCode:null,
+  latestNationalObservationDate:date(value.latestNationalObservationDate),
+ };
+}
+
 const date=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(x)?x:null;
 const stamp=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}T[\d:.]+Z$/.test(x)?x:null;
 const noWrite=()=>({providerCalls:0,d1Writes:0,operationalWrites:0});
@@ -78,6 +100,7 @@ function summarizeRun(row,provider){
   missingSeriesCount:Array.isArray(detail?.missingSeries)?missing.length:null,
   knownMissingSeries:safeMissing.slice(0,12),
   latestInitialClaimsObservationDate:provider==='dol'?date(detail?.latestInitialClaimsObservationDate):null,
+  ...(provider==='dol'?{nationalResponse:safeNationalResponse(detail?.nationalResponseEvidence)}:{}),
  };
 }
 const day=x=>Date.parse(x+'T00:00:00Z');
