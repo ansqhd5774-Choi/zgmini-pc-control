@@ -73,10 +73,24 @@ test('symlinks and malformed ledger values cannot escape or leak the boundary',(
  const f=fixture();try{
   const link=path.join(f.l7,names[0]);
   fs.unlinkSync(link);
-  fs.symlinkSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),link);
-  assert.throws(()=>inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot}),
-   {code:'L7_READONLY_ENTRY_NOT_REGULAR'});
-  fs.unlinkSync(link);fs.writeFileSync(link,'// a normal source');
+  // The isolated Windows CI account may lack SeCreateSymbolicLinkPrivilege.
+  // Skip only the fixture operation in that environment; the application
+  // always rejects symlinks if they are present. Preserve the malformed
+  // ledger checks regardless of host privileges.
+  let linkCreated=false;
+  try{
+   fs.symlinkSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),link);
+   linkCreated=true;
+  }catch(error){
+   if(process.platform!=='win32'||!['EPERM','EACCES'].includes(error?.code))
+    throw error;
+  }
+  if(linkCreated){
+   assert.throws(()=>inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot}),
+    {code:'L7_READONLY_ENTRY_NOT_REGULAR'});
+   fs.unlinkSync(link);
+  }
+  fs.writeFileSync(link,'// a normal source');
   fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
    '{"status":"secret","observationDate":"2026-13-99","token":"SECRET"}');
   const out=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot,
