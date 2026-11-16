@@ -169,7 +169,7 @@ test('native B interface shares exact Core owner verifier and never creates Task
  assert.match(code,/observeLiveCoreLockOwner\(APPROVAL_SCHEMA_V2/);
  assert.match(code,/awaitNaturalCoreIdle/);
  assert.match(code,/acquireInstallLock/);
- assert.match(code,/runInflationCandidateOnce\(\{approved:true/);
+ assert.match(code,/runInflationCandidateOnce\(\{\s*approved:true/);
  assert.match(code,/groups:\['census'\]/);
  assert.match(code,/mode:'enforce'/);
  assert.match(workflow,/github\.event\.issue\.title == 'w01-census-m3-api-once'/);
