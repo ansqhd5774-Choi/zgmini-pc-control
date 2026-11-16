@@ -32,10 +32,10 @@ export function shouldAttemptCoreOwnerProof(isV2,probe,lockPresent){
 // inconclusive, bounded observations; it never authorizes a provider GET.
 // An unreadable event log, failed WMI or malformed lock remains a hard stop.
 export function shouldWaitForV2OwnerEvidence({
- isV2,linked,taskRunning,eventCode,
+ isV2,linked,taskRunning,ownerKoreaMatched,eventCode,
 }={}){
  return isV2===true&&linked===false&&(
-  taskRunning===false||
+  ownerKoreaMatched===true||taskRunning===false||
   (taskRunning===true&&
    eventCode==='INFL_MANUAL_B_EVENT129_TASK_PID_NOT_VERIFIED'));
 }
