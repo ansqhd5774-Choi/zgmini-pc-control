@@ -21,11 +21,12 @@ permissions:
   actions: read
   pull-requests: read
   issues: write
-concurrency:
-  group: zgmini-proactive-diagnostics-ledger
-  cancel-in-progress: false
 jobs:
   read-only-extended-monitor:
+    concurrency:
+      group: zgmini-proactive-diagnostics-ledger
+      cancel-in-progress: false
+      queue: max
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
