@@ -16,7 +16,13 @@ const result={kind:'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1',status:'PASS',
   code:'EMPLOYMENT_R6_READONLY_STAGE_COMPLETED',sqliteOpened:true,
   providerCalls:0,d1Writes:0,promotionApproved:false,publicationStatus:'NOT_REQUESTED',
   summary:{sourceFeatures:1,UNTRUSTED_RAW:'PRIVATE_VALUE'},
-  pit:{coreCurrentKeysMissingHistory:4},
+  pit:{coreCurrentKeysMissingHistory:4,
+    coreHistoryAsOfUniqueKeys:123,coreHistoryPriorRevisionKeys:9,
+    coreHistoryPriorRevisionRows:11,coreHistoryAmbiguousLatestKeys:2,
+    coreHistorySameInstantAdditionalRows:3,candidateHistoryAsOfUniqueKeys:42,
+    candidateHistoryPriorRevisionKeys:5,candidateHistoryPriorRevisionRows:7,
+    candidateHistoryAmbiguousLatestKeys:1,candidateHistorySameInstantAdditionalRows:4,
+    sensitiveHistorySourceHash:'SECRET_DO_NOT_LEAK'},
   indicators:Array.from({length:29},(_,i)=>({id:'FEATURE_'+i,rawStatus:'READY',
    chartStatus:'READY',scoreStatus:'READY'})),
   bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};
@@ -62,6 +68,21 @@ test('approved fixture runs in workspace and output projection does not leak raw
   assert.equal(result.actualExecutionSha,SHA);
   assert.equal(result.sqliteOpened,true);
   assert.equal(result.summary.sourceFeatures,1);
+  assert.deepEqual({
+    coreUnique:result.pit.coreHistoryAsOfUniqueKeys,
+    corePriorKeys:result.pit.coreHistoryPriorRevisionKeys,
+    corePriorRows:result.pit.coreHistoryPriorRevisionRows,
+    coreAmbiguous:result.pit.coreHistoryAmbiguousLatestKeys,
+    coreSameInstant:result.pit.coreHistorySameInstantAdditionalRows,
+    candidateUnique:result.pit.candidateHistoryAsOfUniqueKeys,
+    candidatePriorKeys:result.pit.candidateHistoryPriorRevisionKeys,
+    candidatePriorRows:result.pit.candidateHistoryPriorRevisionRows,
+    candidateAmbiguous:result.pit.candidateHistoryAmbiguousLatestKeys,
+    candidateSameInstant:result.pit.candidateHistorySameInstantAdditionalRows,
+  },{coreUnique:123,corePriorKeys:9,corePriorRows:11,coreAmbiguous:2,
+    coreSameInstant:3,candidateUnique:42,candidatePriorKeys:5,
+    candidatePriorRows:7,candidateAmbiguous:1,candidateSameInstant:4});
+  assert.equal(Object.hasOwn(result.pit,'sensitiveHistorySourceHash'),false);
   assert.equal(Object.hasOwn(result.summary,'UNTRUSTED_RAW'),false);
   assert.equal(result.providerCalls,0);assert.equal(result.d1Writes,0);
   assert.equal(result.promotionApproved,false);
@@ -128,4 +149,29 @@ test('an approved child cannot claim PASS without all 29 validated public status
   assert.equal(result.actualExecutionSha,SHA);
   assert.equal(JSON.stringify(result).includes('PRIVATE_VALUE'),false);
 });
-
+test('new History-only counts reject negative, non-integer, and raw source fields',async t=>{
+  const f=fixture(t);
+  const content=fs.readFileSync(f.script,'utf8').replace(
+    "candidateHistoryPriorRevisionRows:7,",
+    "candidateHistoryPriorRevisionRows:-1,")
+    .replace("coreHistoryPriorRevisionRows:11,","coreHistoryPriorRevisionRows:1.2,")
+    .replace("candidateHistoryAmbiguousLatestKeys:1,","candidateHistoryAmbiguousLatestKeys:'SECRET_DO_NOT_LEAK',");
+  fs.writeFileSync(f.script,content);
+  const files={[ENTRY]:hash(Buffer.from(content))};
+  const manifestBytes=Buffer.from(JSON.stringify({files})+'\n');
+  const approved=f.host.approvedSources[SHA];
+  fs.writeFileSync(path.join(approved.root,'manifest.json'),manifestBytes);
+  approved.manifestSha256=hash(manifestBytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'PASS');
+  assert.equal(result.pit.coreHistoryPriorRevisionRows,null);
+  assert.equal(result.pit.candidateHistoryPriorRevisionRows,null);
+  assert.equal(result.pit.candidateHistoryAmbiguousLatestKeys,null);
+  assert.equal(result.pit.coreHistoryPriorRevisionKeys,9);
+  assert.equal(result.pit.candidateHistorySameInstantAdditionalRows,4);
+  assert.equal(JSON.stringify(result).includes('SECRET_DO_NOT_LEAK'),false);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
+  assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
+});
