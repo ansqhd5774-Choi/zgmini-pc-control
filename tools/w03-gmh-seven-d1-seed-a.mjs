@@ -17,6 +17,9 @@ export const SCHEMA='ZGMINI_W03_GMH_D1_SEED_REQUEST_V1';
 export const OUTPUT='ZGMINI_W03_GMH_D1_SEED_RESULT_V1';
 const SEED_KEY='public:theme-etf-only:r1';
 const ROLLING_KEY='theme-etf-only-rolling';
+const R32_KEY='theme-legacy-nine-r37';
+const R32_VERSION='THEME_LEGACY_NINE_R37_PUBLIC_V1';
+const R32_METHOD='ETF_ONLY_T40_R20_V40_ADAPTIVE_R2_DATED_ISSUER_AUM_R32';
 const METHOD='ETF_ONLY_T40_R20_V40_PAIR50';
 const SEED_VERSION='THEME_ETF_ONLY_R144_252_PUBLIC_V1';
 const ROLLING_VERSION='THEME_ETF_ROLLING_R178';
@@ -99,9 +102,10 @@ function seedHash(seed){
   theme:t.theme,etfs:t.etfs,history:t.history
  })))));
 }
-export function compareD1Seed(candidate,seedRow,rollingRow){
+export function compareD1Seed(candidate,seedRow,rollingRow,r32Row=null){
  validateCandidate(candidate);
- const seed=safeJson(seedRow),rolling=safeJson(rollingRow);
+ const seed=safeJson(seedRow),rolling=safeJson(rollingRow),
+  r32=safeJson(r32Row,1_000_000);
  const valid=validSeed(seed,candidate),rollingPresent=rollingRow!==null;
  let compared=0,shared=new Set(),mismatches=0,maxDiff=0;
  if(valid)for(let i=0;i<7;i++){
@@ -118,6 +122,13 @@ export function compareD1Seed(candidate,seedRow,rollingRow){
  const rollingBaseMatches=rollingPresent&&oldHash&&
   HEX64.test(rolling?.baseHash??'')?rolling.baseHash===oldHash:null;
  const lastRow=rolling?.lineage;
+ const r32History252Valid=Array.isArray(r32?.themes)&&
+  r32.themes.length===9&&r32.themes.every(t=>Array.isArray(t?.history)&&
+   t.history.length===252&&t.history.every((p,i)=>
+    day(p?.date)&&score(p?.score)&&
+    (i===0||p.date>t.history[i-1].date)));
+ // Independent R32 methodology must not be treated as PAIR50 parity.
+
  const result={
   schema:'ZGMINI_W03_GMH_D1_SEED_FACTS_V1',
   source:'EXISTING_PC_D1_CORE_READ_ONLY',
@@ -144,6 +155,16 @@ export function compareD1Seed(candidate,seedRow,rollingRow){
   rollingPrimaryGmh:rolling?.lineage?.primarySource===
    'GETMARKETHISTORY_1H_CLOSE',
   rollingSecondaryNone:lastRow?.secondarySource===null,
+  r32Present:r32Row!==null,
+  r32Status:status(r32?.status),
+  r32VersionMatch:r32?.version===R32_VERSION,
+  r32MethodologyMatch:r32?.methodologyVersion===R32_METHOD,
+  r32ObservationDate:day(r32?.observationDate)?r32.observationDate:null,
+  r32StoredAt:Number.isSafeInteger(Number(r32Row?.stored_at))?
+   Number(r32Row.stored_at):null,
+  r32BodySha256:r32Row&&typeof r32Row.body==='string'?
+   SHA(Buffer.from(r32Row.body)):null,
+  r32History252Valid,
   publicationAuthorized:false,d1SeedCasVerified:false,
   r32NonRegressionVerified:false,
   d1ReadOnly:true,providerCalls:0,d1Writes:0,publicWrites:0
@@ -171,28 +192,32 @@ export async function readActualD1({sourceRoot,imports}={}){
    'AppData/Roaming/xdg.config/.wrangler/config/default.toml'),
   refresh:()=>fail('W03_GMH_D1_OAUTH_REFRESH_FORBIDDEN_STOP')});}
  catch{fail('W03_GMH_D1_AUTH_UNAVAILABLE_NO_REFRESH_STOP');}
- // Exactly two fixed SELECTs in a single read-class D1 query batch.
+ // Exactly three fixed SELECTs in a single read-class D1 query batch.
+ // Read R32 model separately without altering legacy seed or rolling.
  const statements=[
   {sql:'SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=?',
    params:[SEED_KEY]},
   {sql:"SELECT body,stored_at FROM public_feed_snapshots_v1 WHERE kind='output' AND feed_key=? AND snapshot_key='current'",
-   params:[ROLLING_KEY]}
+   params:[ROLLING_KEY]},
+  {sql:"SELECT body,stored_at FROM public_feed_snapshots_v1 WHERE kind='output' AND feed_key=? AND snapshot_key='current'",
+   params:[R32_KEY]}
  ];
  let rows;
  try{rows=await mod.client(binding,token).request(binding.core,statements);}
  catch{fail('W03_GMH_D1_READ_UNAVAILABLE_NO_REPLAY_STOP');}
- need(Array.isArray(rows)&&rows.length===2&&
+ need(Array.isArray(rows)&&rows.length===3&&
   rows.every(x=>Array.isArray(x?.results)),
   'W03_GMH_D1_RESULT_CONTRACT_STOP');
  return {seed:rows[0].results[0]??null,
-  rolling:rows[1].results[0]??null};
+  rolling:rows[1].results[0]??null,
+  r32:rows[2].results[0]??null};
 }
 export async function execute({event,env,sourceRoot,
  load=readSavedCandidate,query=readActualD1}={}){
  const req=authorize(event,env);
  need(process.platform==='win32','W03_GMH_D1_WINDOWS_ONLY_STOP');
  const candidate=load(),data=await query({sourceRoot});
- const facts=compareD1Seed(candidate,data.seed,data.rolling);
+ const facts=compareD1Seed(candidate,data.seed,data.rolling,data.r32);
  return {schema:OUTPUT,status:'PASS',code:'W03_GMH_D1_EXISTING_SEED_READONLY',
   requestId:req.requestId,runId:env.GITHUB_RUN_ID??null,
   controlSha:env.GITHUB_SHA,
