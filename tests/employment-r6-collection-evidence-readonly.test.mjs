@@ -261,3 +261,60 @@ test('DOL national error categories remain diagnostic without leaking arbitrary 
   assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|privateToken|nationalResponseEvidence/i);
  }
 });
+
+test('W04 manual National response diagnosis classifies stored 200 TEXT without leaking source body',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T10:14:15.554Z',
+  2,5712,0,0,0,'DOL_NATIONAL_NO_VALID_ROWS',
+  JSON.stringify({mode:'ONE_YEAR',missingSeries:[
+   'INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE'],
+   nationalResponseEvidence:{
+    httpStatus:200,contentTypeCategory:'text/plain',responseFormat:'TEXT',
+    bodyCharLength:42,parsedNationalSeriesCount:0,
+    latestNationalObservationDate:null,
+    bodySha256:'DO_NOT_OUTPUT_PRIVATE_DIGEST',
+    sourceUrl:'SECRET_DO_NOT_OUTPUT',token:'SECRET_DO_NOT_OUTPUT'
+   },error:'SECRET_DO_NOT_OUTPUT'}));
+ db.close();
+ const before=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.dol.ONE_YEAR.status,'PARTIAL');
+ assert.equal(result.dol.ONE_YEAR.failureCode,'DOL_NATIONAL_NO_VALID_ROWS');
+ assert.deepEqual(result.dol.ONE_YEAR.nationalResponse,{
+  httpStatus:200,contentTypeCategory:'text/plain',responseFormat:'TEXT',
+  bodyPresent:true,parsedNationalSeriesCount:0,
+  requestFailureCode:null,validationFailureCode:null,latestNationalObservationDate:null,
+ });
+ assert.equal(sha(file),before);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+ assert.equal(result.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|DO_NOT_OUTPUT_PRIVATE_DIGEST|sourceUrl|token|bodySha256|error/i);
+});
+
+test('W04 National raw diagnostic rejects arbitrary formats and unbounded error codes',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T10:14:15.554Z',
+  2,5712,0,0,0,'SECRET_DO_NOT_OUTPUT',
+  JSON.stringify({mode:'ONE_YEAR',nationalResponseEvidence:{
+   httpStatus:200,contentTypeCategory:'text/html;token=SECRET_DO_NOT_OUTPUT',
+   responseFormat:'MALICIOUS_FORMAT_SECRET_DO_NOT_OUTPUT',bodyCharLength:500,
+   parsedNationalSeriesCount:999,requestFailureCode:'SECRET_DO_NOT_OUTPUT',
+   validationFailureCode:'SECRET_DO_NOT_OUTPUT',
+   latestNationalObservationDate:'2026-11-14'
+  }}));
+ db.close();
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.dol.ONE_YEAR.failureCode,'OTHER');
+ assert.deepEqual(result.dol.ONE_YEAR.nationalResponse,{
+  httpStatus:200,contentTypeCategory:'UNKNOWN',responseFormat:'UNKNOWN',
+  bodyPresent:true,parsedNationalSeriesCount:null,
+  requestFailureCode:null,validationFailureCode:null,
+  latestNationalObservationDate:'2026-11-14',
+ });
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|MALICIOUS_FORMAT/);
+});
