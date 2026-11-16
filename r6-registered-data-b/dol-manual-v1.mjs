@@ -191,8 +191,8 @@ export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
 }
 
 export async function runDolManualOnce({
- event,env,approvalBytes,verify,acquire,claim
+ event,env,approvalBytes,verify,acquire,claim,run
 }={}){
  const auth=authorizeDolManual({event,env,approvalBytes});
- return performDolManual({auth,verify,acquire,claim});
+ return performDolManual({auth,verify,acquire,claim,run});
 }
