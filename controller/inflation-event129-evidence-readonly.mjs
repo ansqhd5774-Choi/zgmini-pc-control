@@ -88,6 +88,8 @@ export function classifyEvent129ReaderShape(bytes,rawText,auxText=rawText){
   result.status='INCOMPLETE_EVENT_XML';
  else if(/<[A-Za-z_][\w.-]*:Event(?=[\s>])/.test(auxiliary))
   result.status='PREFIXED_EVENT_NOT_B_RECOGNIZED';
+ else if(auxEventRoots>0&&exact===0)
+  result.status='AUX_EVENT_ROOT_NOT_B_RECOGNIZED';
  else if(/<Events(?:\s[^>]*)?>\s*<\/Events>/.test(auxiliary))
   result.status='EMPTY_EVENTS_CONTAINER';
  else if(/<\?xml\b|<[A-Za-z_][\w:.-]*(?:\s|>)/.test(auxiliary))
