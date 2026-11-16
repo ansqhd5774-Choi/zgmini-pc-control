@@ -42,7 +42,7 @@ test('static classifier distinguishes one, absent, multiple old-route literals',
   assert.equal(one.runtimeUrlVerified,false);
   assert.equal(one.providerCalls,0);
   for(const [variant,expected] of [
-    [original.replace('/api/v1/bars/stocks/','/api/v1/bars/'+ 'stocks/'),'ZERO'],
+    [original.replace('/api/v1/bars/stocks/',"'/api/v1/bars/' + 'stocks/'"),'ZERO'],
     [original+"\nconst backup='/api/v1/bars/stocks/';",'MULTIPLE']]){
     assert.equal(classifyR181SourceForFixture(variant).legacyRouteCountBucket,expected);
   }
