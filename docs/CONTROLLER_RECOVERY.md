@@ -58,7 +58,7 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 
 ### 부분 전환 중단의 명시적 rollback
 
-`tools/controller-rollback-recovery.mjs`는 설치 전 취소와 다른 고정 경로 복구 도구다. 기존 실패 요청을 재실행하지 않으며 원본 ledger를 덮어쓰지 않는다. BACKED_UP/SUPERVISOR_STOPPED/SWITCHED/RECONNECTED 단계만 대상으로 한다. POSTCHECK_PENDING 이후는 기존 결과 확인으로 돌리고 rollback하지 않는다.
+`tools/controller-rollback-recovery.mjs`는 설치 전 취소와 다른 고정 경로 복구 도구다. 기존 실패 요청을 재실행하지 않으며 원본 ledger를 덮어쓰지 않는다. BACKED_UP/SUPERVISOR_STOPPED/SWITCHED 단계는 원장·백업·보호 상태가 검증될 때만 복구 대상이다. **RECONNECTED 이후는 새 Controller와 접수 상태가 이미 살아 있을 수 있으므로 자동 백업 복원을 수행하지 않는다.** 이 단계는 먼저 기존 ledger의 실패 원인, 실제 설치 SHA, host.json의 누적 승인 등록, Supervisor/Runner, `pc-job.yml` 활성 상태와 backlog를 읽기 전용으로 대조한다. `INTAKE_RESUMED`/BACKLOG_RECONCILED/POSTCHECK_PENDING 이후도 기존 결과를 확정할 때까지 임의 롤백하지 않는다.
 
 실행에는 `approvals/maintenance-recoveries/<기존요청ID>.rollback.json`의 커밋된 `ZGMINI_PC_ROLLBACK_APPROVAL_V1` 명세가 필요하다. approved, requestId, sourceSha, toolSha256, ledgerSha256, ownerSha256, markerSha256, snapshotHostSha256, protectionSha256과 files를 고정한다. files는 복구 도구/update/maintenance-apply/maintenance-contract/maintenance-lock 5개 파일의 path·sha256이다. Git source와 실제 바이트를 모두 대조한다. 기존 요청의 승인 manifest·요청자·열린 Issue도 재검증한다.
 
