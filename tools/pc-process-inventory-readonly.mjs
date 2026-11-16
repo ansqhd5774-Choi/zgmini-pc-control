@@ -129,7 +129,8 @@ export function sanitizeMaintenanceStatus(raw){
   installLockReadbackVerified:lockKnown,
   installLockHeld:held,installLockRecoveryRequired:recoveryRequired,
   receiverStatus:raw?.receiverStatus==='LISTENING'?'LISTENING':'UNVERIFIED',
-  workflowState:raw?.workflowState==='active'?'active':'UNVERIFIED',
+  workflowState:['active','disabled_manually','disabled_inactivity'].includes(raw?.workflowState)
+   ?raw.workflowState:'UNVERIFIED',
   operationalWrites:0,providerCalls:0,d1Writes:0
  };
 }
