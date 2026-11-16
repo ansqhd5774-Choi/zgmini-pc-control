@@ -5,6 +5,8 @@ import vm from 'node:vm';
 import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
  shouldAcceptVisibleCoreOwner,shouldWaitForV2OwnerEvidence}
  from './core-task-event-owner-proof.mjs';
+// Run the pinned VBS-to-Core ownership chain tests in the existing W01 CI suite.
+import './core-task-vbs-chain-proof.test.mjs';
 
 // Sanitized fixture only. Never read the host's TaskScheduler log in tests.
 const eventAt=Date.parse('2026-11-15T14:00:00.000Z');
