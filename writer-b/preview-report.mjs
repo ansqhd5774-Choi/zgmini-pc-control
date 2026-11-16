@@ -29,7 +29,7 @@ export function sanitizePreview(raw,req,num){
   const anchorSafe=raw.code==='WRITER_B_INSERT_ANCHOR_MATCH_STOP'&&
    HASH.test(raw.beforeSha256??'')&&
    /^[a-f0-9]{40}$/i.test(raw.baseHead??'')&&
-   /^scripts\\/pc-writer\\/[a-z0-9][a-z0-9._-]{0,127}\\.mjs$/i.test(raw.filePath??'')&&
+   /^scripts\/pc-writer\/[a-z0-9][a-z0-9._-]{0,127}\.mjs$/i.test(raw.filePath??'')&&
    Array.isArray(raw.anchorEvidence)&&raw.anchorEvidence.length>=1&&
    raw.anchorEvidence.length<=16&&raw.anchorEvidence.every((row,i)=>
     row&&typeof row==='object'&&!Array.isArray(row)&&
