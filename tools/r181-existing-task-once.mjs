@@ -25,6 +25,7 @@ const ROOT='E:\\ZGmini\\data\\pc-writer\\r181-task-run-once';
 const SHARED='E:\\ZGmini\\data\\pc-writer\\writer-source-install.lock';
 const RESULT='r181-existing-task-result.json';
 const SCHEMA='ZGMINI_R181_TASK_ONCE_RESULT_V1';
+const authorized=new WeakSet();
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/i,SHA64=/^[a-f0-9]{64}$/i;
 const MANIFEST=/^approvals\/r181-task-once\/r181-task-[a-z0-9-]{6,64}\.json$/;
@@ -122,8 +123,10 @@ export function authorizeExistingR181Task({event,env,manifestBytes}){
   a.allowD1Writes===false&&a.allowTaskRegistrationChanges===false&&
   a.allowScheduleChanges===false&&a.allowOtherOperations===false,
   'R181_TASK_APPROVAL_DENIED');
- return Object.freeze({request:Object.freeze(req),manifest:Object.freeze(a),
+ const proof=Object.freeze({request:Object.freeze(req),manifest:Object.freeze(a),
   controlSha:env.GITHUB_SHA});
+ authorized.add(proof);
+ return proof;
 }
 function fixedSourceDigest(file,bytes){
  const parent=path.win32.dirname(TARGET);
@@ -162,6 +165,8 @@ function queryTaskXml(){
 // even when the exit status is ambiguous.
 export function requestExistingR181TaskOnce({exe}){
  need(process.platform==='win32','R181_TASK_WINDOWS_ONLY_STOP');
+ const pinned=path.win32.join(process.env.SystemRoot??'C:\\Windows','System32','schtasks.exe');
+ need(exe===pinned,'R181_TASK_EXECUTABLE_SCOPE_STOP');
  const r=spawnSync(exe,['/Run','/TN',TASK],{
    encoding:'buffer',shell:false,windowsHide:true,timeout:30000,
    maxBuffer:4096});
@@ -172,7 +177,7 @@ export async function runAuthorizedR181Task(proof,{sourceDigest=fixedSourceDiges
  taskXml=queryTaskXml,launch=requestExistingR181TaskOnce,
  acquire=acquireInstallLock,claim=createInstallJournal,
  release=releaseInstallClaim}={}){
- need(proof?.manifest?.operation===OPERATION&&
+ need(authorized.has(proof)&&proof.manifest.operation===OPERATION&&
   proof.manifest.taskName===TASK,'R181_TASK_PROOF_REQUIRED');
  const id=proof.request.requestId;
  let lease=null,claimed=false,attempted=false,retain=false;
