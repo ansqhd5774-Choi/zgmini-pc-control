@@ -1,0 +1,28 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "1727de98-ea99-42bd-a4dc-a9fffd578b9b",
+  "chatId": "bcb4ab60-71d5-4435-86b6-96f9d0e0ce3e",
+  "issueNumber": 1514,
+  "status": "BLOCKED",
+  "code": "WRITER_B_INSERT_ANCHOR_MATCH_STOP",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0,
+  "beforeSha256": "79754fad2480faab9a845d20b621c1e7b0d4e21f735bff3deab5fe0f65264557",
+  "baseHead": "6705548e6ee67a775955fe59d4c030987451e015",
+  "filePath": "scripts/pc-writer/api-connection-health.mjs",
+  "anchorEvidence": [
+    {
+      "index": 0,
+      "exactCount": 0,
+      "trimmedCount": 1
+    },
+    {
+      "index": 1,
+      "exactCount": 0,
+      "trimmedCount": 1
+    }
+  ]
+}
