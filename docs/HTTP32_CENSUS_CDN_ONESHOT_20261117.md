@@ -36,3 +36,12 @@
 - **검증 결론:** 운영 PC에서 Census CDN 직접 연결 성공. 이전 HTTP 31/32의 마지막 미확인은 최근 호출 부재(월간 자료)로 인한 감시 판정임을 분리했다.
 - **다음 최소 수정:** 14일 관측 대상에 포함된 공식 월간 BFS CDN만 36시간 일간 검사에서 제외해 마지막 2xx 실측이 있으면 정상, 실제 503·네트워크 오류는 실패로 분류. 현재 수집기/Task/HTTP 로그/DB는 변경하지 않음.
 - 새로운 배포의 HTTP 32/32는 운영 PC/사이트에서 원장 재조회 후에만 확정.
+
+## 최종 완료 — 2026-11-17 01:22 KST
+
+- 실제 PC 단회 HTTP 200/CSV: [Issue #1797](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1797) / [Run 43903908465](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43903908465), providerCalls=1, operationalWrites=0.
+- 월간 감시 분리 변경: [PC PR #1800](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1800), 병합 SHA `a50590d8db253993b89caf12b3fe5ab2f8faee19`, Controller/Process Inventory/C996 CI 3/3 PASS.
+- 실제 Windows 읽기 전용 최종 검증: [Issue #1801](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1801) / [Run 43906701802](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43906701802), `results/pc-process-inventory-43906701802-1-operating.json`.
+- 결과: `2026-11-16T16:22:39.528Z`, `rosterComplete=true`, `http={normal:32,failed:0,unknown:0,total:32}`, `status=PASS`, `operationalWrites=providerCalls=d1Writes=0`. Census `MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW`, 마지막 기존 Fetch-wrapper HTTP 200 시각 `2026-11-03T21:00:36.518Z`.
+- 공개 `https://zgmini.kr/api/api-connection-health?http32_verify=fe8a27b1e0e80fbc` HTTP 200, `status=healthy`, `api=14/14`, `http=32/32`, `checkedAt=2026-11-16T16:17:31.335Z`.
+- **완료 범위:** 현재 14일 반복 관측 HTTP 32개 호스트의 연결 상태 확인. 이는 32개 정규 수집기·D1 저장 완료의 동의어는 아님. 14일 rolling 호스트 분모는 시간이 지나면 바뀔 수 있음. 추가 재시도·예약 생성·Cloudflare 로그인·D1 감사 불필요.
