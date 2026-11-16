@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parsePublisherLog,nextLedgerPhase,millisecondsToNextUtcSecond,
   publicationCheckpointReport,validateBeaStoredPreflight,
-  validateQfrStoredPreflight,validateQfrApplySource} from '../tools/publication-executor.mjs';
+  validateQfrStoredPreflight,validateQfrApplySource,validateQfrPinnedNoWrite} from '../tools/publication-executor.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const source=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -62,6 +62,7 @@ test('operation state transitions fail closed on ambiguous apply or timeout',()=
  assert.equal(unknown.firstFail,'PUBLICATION_APPLY_RESULT_UNKNOWN');
  assert.throws(()=>nextLedgerPhase(unknown,'APPLY_START'),/PUBLICATION_LEDGER_TRANSITION_REJECTED/);
  assert.equal(nextLedgerPhase(applying,'READBACK_PASS').phase,'PASS');
+ assert.equal(nextLedgerPhase(applying,'NO_WRITE_STOP',{code:'PUBLICATION_QFR_SOURCE_DRIFT_NO_WRITE'}).phase,'BLOCKED');
  assert.equal(nextLedgerPhase(preflight,'STOP',{code:'SOURCE_DRIFT'}).phase,'BLOCKED');
 });
 test('static workflow stays gated and cannot overwrite existing A or maintenance channels',()=>{
@@ -135,4 +136,29 @@ test('QFR dry-run pins exact version, raw ZIP SHA and stored timestamp',()=>{
  assert.match(executor,/ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin\.rawZipSha256/);
  assert.match(executor,/ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String\(qfrPin\.sourceStoredAt\)/);
  assert.match(executor,/validateQfrApplySource\(qfrPin,evidence\)/);
+});
+
+test('QFR proven pre-write drift is BLOCKED but any ambiguous apply remains UNKNOWN',()=>{
+ const key='detail:earnings-recession-indicators:census-qfr-mfg-margin:v1';
+ const pinned={sourceVersion:'a'.repeat(64),rawZipSha256:'b'.repeat(64),
+   sourceStoredAt:1793112733108};
+ const result=['MODE=APPLY_EXPLICIT','SNAPSHOT_KEY='+key,'SOURCE_GATES=PASS',
+   'SOURCE_HTTP_REQUESTS=0','SOURCE_VERSION='+'c'.repeat(64),
+   'RAW_ZIP_SHA256='+'b'.repeat(64),'SOURCE_STORED_AT=1793112733108',
+   'D1_QUERIES=0','D1_WRITES=0','ERROR=QFR_PUBLISH_SOURCE_DRIFT',
+   'RESULT=FAIL_QFR_D1_NO_VERIFIED_PUBLICATION'].join('\n');
+ assert.equal(validateQfrPinnedNoWrite(result,pinned,key),true);
+ for(const [needle,replacement] of [['D1_WRITES=0','D1_WRITES=1'],
+   ['ERROR=QFR_PUBLISH_SOURCE_DRIFT','ERROR=OTHER'],
+   ['MODE=APPLY_EXPLICIT','MODE=READ_ONLY_PREFLIGHT']]){
+   assert.throws(()=>validateQfrPinnedNoWrite(result.replace(needle,replacement),pinned,key),
+     /PUBLICATION_QFR_NO_WRITE_EVIDENCE_INVALID/);
+ }
+ assert.throws(()=>validateQfrPinnedNoWrite(
+   result.replace('SOURCE_VERSION='+'c'.repeat(64),'SOURCE_VERSION='+'a'.repeat(64)),
+   pinned,key),/PUBLICATION_QFR_NO_WRITE_EVIDENCE_INVALID/);
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/noWriteVerified=true/);
+ assert.match(executor,/noWriteVerified\?'NO_WRITE_STOP':'UNVERIFIED'/);
+ assert.match(executor,/applied\.exitCode===1&&!applied\.timedOut&&!applied\.truncated/);
 });
