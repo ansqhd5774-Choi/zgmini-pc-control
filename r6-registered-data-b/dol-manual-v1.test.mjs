@@ -146,9 +146,16 @@ test('sanitized manual 3-of-4 output retains only bounded counts, no raw',()=>{
 
 test('the manual module never imports the top-level awaiting operation entrypoint',async()=>{
  const source=readFileSync(new URL('./dol-manual-v1.mjs',import.meta.url),'utf8');
- assert.doesNotMatch(source,/from ['"]\\.\\/operation\\.mjs['"]/);
+ assert.equal(source.includes("from './operation.mjs'"),false);
  const input=fixture(),o=inject();
  const done=await runDolManualOnce({...input,...o});
  assert.equal(done.status,'PARTIAL');
  assert.deepEqual(o.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
+});
+
+test('missing sealed adapters cannot execute a provider request',async()=>{
+ const auth=authorizeDolManual(fixture());
+ await assert.rejects(
+  performDolManual({auth}),
+  e=>e.code==='R6_DOL_ADAPTER_MISSING');
 });
