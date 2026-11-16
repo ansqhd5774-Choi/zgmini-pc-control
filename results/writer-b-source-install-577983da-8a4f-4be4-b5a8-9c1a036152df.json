@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "577983da-8a4f-4be4-b5a8-9c1a036152df",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "f4ab6f4e6bdbebb8f6958be88b5c9e194df8329b",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "94266d04d9d732b871314c5e214d07509f9e8c82",
+  "candidateSourceSha": "0d038d837e353ff4a6e8b4f30553054526870bf2",
+  "manifestSha256": "6d74b8acfe7c349c6fe886c7955af4464816bffdb58cb9a20ddf7851238d16fa",
+  "baseTreeOid": "e2a0743dc794935d09548395d2d1d156ad1a90a0",
+  "preparedTreeOid": "e7fde859a52ea42da4cb5ee7d224d3cbc36aa23d",
+  "provenanceSha256": "78bcd73cc0f1a44e6350fb9e0943e5cf19fc81004c9cb95ee5268c9533b88b21",
+  "runId": "43829473029",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-calendar-taxonomy-public.mjs",
+    "scripts/pc-writer/market-calendar-taxonomy-output.mjs",
+    "scripts/pc-writer/run-local.mjs"
+  ]
+}
