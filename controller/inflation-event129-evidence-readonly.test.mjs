@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectInflationEvent129Once,describeEvent129}
+import {inspectInflationEvent129Once,describeEvent129,classifyEvent129ReaderShape}
  from './inflation-event129-evidence-readonly.mjs';
 import {APPROVED_VBS_CHAIN_FILES} from './inflation-vbs-b-proof.mjs';
 const start=Date.parse('2026-11-15T14:00:00.000Z'),clock=()=>start+25000;
@@ -350,4 +350,77 @@ test('independent coverage never repeats Event129 after an attempted direct B pr
  assert.equal(r.probeCounts.event,1);
  assert.equal(f.seen.filter(a=>a[0]==='qe').length,1);
  assert.equal(r.rawBDirect.ok,false);
+});
+
+
+test('reader shape differentiates an empty stdout from empty Event XML container',()=>{
+ const empty=classifyEvent129ReaderShape(Buffer.alloc(0),'');
+ const container=classifyEvent129ReaderShape(Buffer.from('<Events></Events>'),'<Events></Events>');
+ assert.equal(empty.status,'EMPTY_STDOUT');
+ assert.equal(empty.byteBand,'ZERO');
+ assert.equal(empty.bEventRoots,0);
+ assert.equal(container.status,'EMPTY_EVENTS_CONTAINER');
+ assert.equal(container.bEventRoots,0);
+});
+test('recognized unprefixed Event root is only a reader shape, not owner evidence',()=>{
+ const xml=event();
+ const s=classifyEvent129ReaderShape(Buffer.from(xml),xml);
+ assert.equal(s.status,'B_EVENT_ROOT_OBSERVED');
+ assert.equal(s.bEventRoots,1);
+ assert.equal(s.auxEventRoots,1);
+ assert.equal(typeof s.xmlDeclaration,'boolean');
+ assert.equal(s.byteBand,'UP_TO_1K');
+ assert.equal(JSON.stringify(s).includes('5000'),false);
+});
+test('prefix-qualified Event is distinguished from B regex with no raw XML export',()=>{
+ const xml='<Events><e:Event xmlns:e="urn:x"><e:EventID>129</e:EventID></e:Event></Events>';
+ const s=classifyEvent129ReaderShape(Buffer.from(xml),xml);
+ assert.equal(s.status,'PREFIXED_EVENT_NOT_B_RECOGNIZED');
+ assert.equal(s.bEventRoots,0);
+ assert.equal(s.auxEventRoots,1);
+ assert.doesNotMatch(JSON.stringify(s),/urn:x|e:EventID|e:Event/);
+});
+test('an incomplete Event XML record is a format state, never a Core PID mismatch',()=>{
+ const xml='<Events><Event xmlns="urn:example"><EventID>129</EventID>';
+ const s=classifyEvent129ReaderShape(Buffer.from(xml),xml);
+ assert.equal(s.status,'INCOMPLETE_EVENT_XML');
+ assert.equal(s.bEventRoots,0);
+ assert.equal(s.auxEventRoots,1);
+});
+test('non-XML stdout and whitespace are independent fixed states',()=>{
+ const whitespace=classifyEvent129ReaderShape(Buffer.from(' \r\n\t'),' \r\n\t');
+ const broken=classifyEvent129ReaderShape(Buffer.from('ERROR_PRIVATE_MESSAGE'),'ERROR_PRIVATE_MESSAGE');
+ assert.equal(whitespace.status,'WHITESPACE_ONLY');
+ assert.equal(broken.status,'NON_XML_STDOUT');
+ assert.doesNotMatch(JSON.stringify(broken),/ERROR_PRIVATE_MESSAGE/);
+});
+test('UTF16LE without BOM is auxiliary evidence only, never a successful raw B proof',async()=>{
+ const xml=event(),f=fixture({xml:Buffer.from(xml,'utf16le')});
+ const r=await run(f);
+ assert.equal(r.reader,'OK');
+ assert.equal(r.bom,'NONE');
+ assert.equal(r.readerShape.suspectedEncoding,'POSSIBLE_UTF16LE_NO_BOM');
+ assert.equal(r.readerShape.status,'AUX_EVENT_ROOT_NOT_B_RECOGNIZED');
+ assert.equal(r.readerShape.bEventRoots,0);
+ assert.equal(r.readerShape.auxEventRoots,1);
+ assert.equal(r.rawBDirect.ok,false);
+ assert.equal(r.supplemental.onlySupplemental,true);
+ assert.equal(r.status,'STATE_UNKNOWN');
+});
+test('valid Event reader with empty records retains bounded UNKNOWN and reports shape',async()=>{
+ const f=fixture({xml:'<Events></Events>'});
+ const r=await run(f);
+ assert.equal(r.readerShape.status,'EMPTY_EVENTS_CONTAINER');
+ assert.equal(r.firstFailCode,'INFL_E129_NOT_OBSERVED_WITHIN_LIMIT');
+ assert.equal(r.rawBDirect.ok,false);
+ assert.equal(r.probeCounts.event,1);
+ assert.equal(r.authorizesB,false);
+});
+test('reader failure does not fabricate a parsed reader envelope',async()=>{
+ const f=fixture({failEvent:true}),r=await run(f);
+ assert.equal(r.code,'INFL_E129_READER_UNAVAILABLE');
+ assert.equal(r.readerShape.status,'NOT_EVALUATED');
+ assert.equal(r.readerShape.byteBand,'NOT_EVALUATED');
+ assert.equal(r.readerShape.bEventRoots,null);
+ assert.equal(r.probeCounts.event,1);
 });

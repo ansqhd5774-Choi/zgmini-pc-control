@@ -28,6 +28,8 @@ const basic=()=>({status:'STATE_UNKNOWN',code:'INFL_E129_NOT_OBSERVED_WITHIN_LIM
  providerCalls:0,operationalWrites:0,d1Writes:0,sqliteOpened:false,
  stage:'START',firstFailCode:null,reader:'NOT_EVALUATED',
  encoding:'NOT_EVALUATED',bom:'NOT_EVALUATED',
+ readerShape:{status:'NOT_EVALUATED',byteBand:'NOT_EVALUATED',suspectedEncoding:'NOT_EVALUATED',
+  bEventRoots:null,auxEventRoots:null,xmlDeclaration:null},
  rawBDirect:{ok:null,code:'NOT_EVALUATED'},
  rawBVbs:{ok:null,code:'NOT_EVALUATED',candidates:[]},
  supplemental:{parsed:null,coreCandidates:null,onlySupplemental:false},
@@ -56,6 +58,56 @@ function decode(bytes){
   return {ok:true,encoding:encoding.toUpperCase(),bom,text};
  }catch{return {ok:false,encoding:'UNSUPPORTED',bom,text:null};}
 }
+// Fixed, non-content-bearing summary. A clean reader exit does NOT mean a
+// matching Event129 existed, nor that the B regex understood the XML.
+export function classifyEvent129ReaderShape(bytes,rawText,auxText=rawText){
+ const count=Buffer.isBuffer(bytes)?bytes.length:0;
+ const byteBand=count===0?'ZERO':count<=1024?'UP_TO_1K':
+  count<=16384?'UP_TO_16K':count<=262144?'UP_TO_256K':'UP_TO_300K';
+ const sample=Buffer.isBuffer(bytes)?bytes.subarray(0,Math.min(256,count)):Buffer.alloc(0);
+ let oddNul=0,evenNul=0;
+ for(let i=0;i<sample.length;i++)if(sample[i]===0)(i%2?oddNul++:evenNul++);
+ const pairs=Math.floor(sample.length/2);
+ const suspect=pairs>=8&&oddNul>=pairs*.45&&evenNul<=pairs*.1?
+  'POSSIBLE_UTF16LE_NO_BOM':
+  pairs>=8&&evenNul>=pairs*.45&&oddNul<=pairs*.1?
+  'POSSIBLE_UTF16BE_NO_BOM':'NONE';
+ const raw=typeof rawText==='string'?rawText:'';
+ const auxiliary=typeof auxText==='string'?auxText:raw;
+ const exact=(raw.match(/<Event(?:\s[^>]*)?>[\s\S]*?<\/Event>/g)||[]).length;
+ const auxiliaryTags=(auxiliary.match(/<(?:[A-Za-z_][\w.-]*:)?Event(?=[\s>])/g)||[]).length;
+ const bEventRoots=Math.min(MAX_EVENTS,exact);
+ const auxEventRoots=Math.min(MAX_EVENTS,auxiliaryTags);
+ const result={status:'NOT_EVALUATED',byteBand,suspectedEncoding:suspect,
+  bEventRoots,auxEventRoots,xmlDeclaration:/^\s*<\?xml\b/.test(auxiliary)};
+ if(count===0)result.status='EMPTY_STDOUT';
+ else if(auxiliary.trim().length===0)result.status='WHITESPACE_ONLY';
+ else if(auxEventRoots>0&&exact>0)result.status='B_EVENT_ROOT_OBSERVED';
+ else if(/<(?:[A-Za-z_][\w.-]*:)?Event(?=[\s>])/.test(auxiliary)&&
+  !/<\/(?:[A-Za-z_][\w.-]*:)?Event\s*>/.test(auxiliary))
+  result.status='INCOMPLETE_EVENT_XML';
+ else if(/<[A-Za-z_][\w.-]*:Event(?=[\s>])/.test(auxiliary))
+  result.status='PREFIXED_EVENT_NOT_B_RECOGNIZED';
+ else if(auxEventRoots>0&&exact===0)
+  result.status='AUX_EVENT_ROOT_NOT_B_RECOGNIZED';
+ else if(/<Events(?:\s[^>]*)?>\s*<\/Events>/.test(auxiliary))
+  result.status='EMPTY_EVENTS_CONTAINER';
+ else if(/<\?xml\b|<[A-Za-z_][\w:.-]*(?:\s|>)/.test(auxiliary))
+  result.status='XML_WITHOUT_B_EVENT_ROOT';
+ else result.status='NON_XML_STDOUT';
+ return result;
+}
+function auxiliaryEventText(bytes,decoded){
+ if(!decoded.ok)return null;
+ const raw=decoded.text;
+ if(decoded.bom!=='NONE')return raw;
+ const possible=classifyEvent129ReaderShape(bytes,'',raw).suspectedEncoding;
+ if(possible==='NONE')return raw;
+ try{return new TextDecoder(possible==='POSSIBLE_UTF16LE_NO_BOM'?
+  'utf-16le':'utf-16be',{fatal:true}).decode(bytes);}
+ catch{return raw;}
+}
+
 // This is auxiliary structure/coverage analysis ONLY; it never authorizes a B proof.
 export function describeEvent129(xml,lockPid,ownerCreatedAtMs,lockAt,clock=Date.now){
  const out={parsed:false,total:0,systemMatch:0,taskMatch:0,
@@ -214,13 +266,15 @@ export async function inspectInflationEvent129Once({
   const decoded=decode(bytes);
   out.encoding=decoded.encoding;out.bom=decoded.bom;
   eventsText=bytes.toString('utf8'); // EXACT current B encoding behavior (no repair).
+  const auxiliaryText=auxiliaryEventText(bytes,decoded);
+  out.readerShape=classifyEvent129ReaderShape(bytes,eventsText,auxiliaryText??eventsText);
   const extra=describeEvent129(eventsText,before.pid,owner.ownerCreatedAtMs,before.at,clock);
   out.event={total:extra.total,systemMatch:extra.systemMatch,taskMatch:extra.taskMatch,
    fieldsPresent:extra.fieldsPresent,fieldCounts:extra.fieldCounts,
    pidMatch:extra.pidMatch,timeParsed:extra.timeParsed,
    withinTime:extra.withinTime,timeDeltaMs:extra.timeDeltaMs,candidateCount:extra.candidateCount};
   if(decoded.ok){
-   const aux=describeEvent129(decoded.text,before.pid,owner.ownerCreatedAtMs,before.at,clock);
+   const aux=describeEvent129(auxiliaryText,before.pid,owner.ownerCreatedAtMs,before.at,clock);
    out.supplemental={parsed:aux.parsed,coreCandidates:aux.taskMatch,
     onlySupplemental:aux.taskMatch>0&&extra.taskMatch===0};
   }
@@ -304,6 +358,8 @@ export async function inspectInflationEvent129Once({
      const dec=decode(coverage.stdout);
      out.encoding=dec.encoding;out.bom=dec.bom;
      const rawText=coverage.stdout.toString('utf8');
+     const auxiliaryText=auxiliaryEventText(coverage.stdout,dec);
+     out.readerShape=classifyEvent129ReaderShape(coverage.stdout,rawText,auxiliaryText??rawText);
      const extra=describeEvent129(rawText,before?.pid,
       owner?.ownerCreatedAtMs,before?.at,clock);
      const bound=before?.status==='PRESENT';
@@ -316,7 +372,7 @@ export async function inspectInflationEvent129Once({
       timeDeltaMs:witnessed?extra.timeDeltaMs:null,
       candidateCount:extra.candidateCount};
      if(dec.ok){
-      const auxiliary=describeEvent129(dec.text,before?.pid,
+      const auxiliary=describeEvent129(auxiliaryText,before?.pid,
        owner?.ownerCreatedAtMs,before?.at,clock);
       out.supplemental={parsed:auxiliary.parsed,
        coreCandidates:auxiliary.taskMatch,
