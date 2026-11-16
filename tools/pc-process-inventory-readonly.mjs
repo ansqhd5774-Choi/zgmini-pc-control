@@ -9,6 +9,7 @@ import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
+import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {createHash} from 'node:crypto';
 
@@ -612,6 +613,7 @@ export function collect(role,ctx,env=process.env){
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
   observedHttpHostRoster:readObservedProviderHosts(),
+  http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
   c1501Backlog:inspect1501BacklogReadonly(),
   targetEndpointStatus:readTargetEndpointStatus()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
