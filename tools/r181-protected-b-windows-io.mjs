@@ -8,9 +8,12 @@ import {createHash} from 'node:crypto';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
   from '../r17-writer-b/r17-b-claim.mjs';
 import {R181_B_TARGET} from './r181-protected-b-transaction.mjs';
+import {R181_PRIMARY_B_TARGET} from './r181-primary-b-transaction.mjs';
 
 const SHARED_LOCK='E:\\ZGmini\\data\\pc-writer\\writer-source-install.lock';
 const JOURNAL_ROOT='E:\\ZGmini\\data\\pc-writer\\r181-protected-b-once';
+const PRIMARY_JOURNAL_ROOT='E:\\ZGmini\\data\\pc-writer\\r181-primary-b-once';
+const TARGETS=new Set([R181_B_TARGET,R181_PRIMARY_B_TARGET]);
 const SOURCE_PARENT='E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167';
 const SHA=bytes=>createHash('sha256').update(bytes).digest('hex');
 const SAFE_ID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -37,7 +40,7 @@ function aclDigest(file){
   return SHA(Buffer.from(normalizeR181Acl(r.stdout,file)));
 }
 function readRegular(file){
-  need(file===R181_B_TARGET,'R181_B_FIXED_PATH_ONLY_STOP');
+  need(TARGETS.has(file),'R181_B_FIXED_PATH_ONLY_STOP');
   need(path.win32.dirname(file).toLowerCase()===SOURCE_PARENT.toLowerCase(),
     'R181_B_SOURCE_PARENT_STOP');
   const parent=fs.realpathSync.native(SOURCE_PARENT);
@@ -60,7 +63,7 @@ function flushFile(file){
   try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
 }
 function replaceProtected(target,bytes,suffix,expectedBefore,expectedAcl){
-  need(target===R181_B_TARGET&&Buffer.isBuffer(bytes)&&
+  need(TARGETS.has(target)&&Buffer.isBuffer(bytes)&&
     bytes.length>0&&bytes.length<=8192,'R181_B_REPLACE_SCOPE_STOP');
   const tmp=target+'.r181-b-'+suffix+'.tmp';
   need(!fs.existsSync(tmp),'R181_B_TEMP_COLLISION_STOP');
@@ -89,7 +92,10 @@ function replaceProtected(target,bytes,suffix,expectedBefore,expectedAcl){
 }
 
 // No target or root override: exact fixed contract controls the real PC path.
-export function createR181ProtectedWindowsIo(){
+export function createR181ProtectedWindowsIo(profile='CYCLE'){
+  need(profile==='CYCLE'||profile==='PRIMARY','R181_B_PROFILE_DENIED');
+  const fixedTarget=profile==='PRIMARY'?R181_PRIMARY_B_TARGET:R181_B_TARGET;
+  const journalRoot=profile==='PRIMARY'?PRIMARY_JOURNAL_ROOT:JOURNAL_ROOT;
   need(process.platform==='win32','R181_B_WINDOWS_ONLY_STOP');
   let currentId=null,lease=null,claimed=false,before=null,acl=null;
   let backedUp=false,lastCandidate=null,backupPath=null;
@@ -106,26 +112,27 @@ export function createR181ProtectedWindowsIo(){
     async acquireSharedWriterLease(id){
       need(currentId===null&&SAFE_ID.test(id),
         'R181_B_ALREADY_LOCKED_STOP');
-      need(path.win32.dirname(R181_B_TARGET)===SOURCE_PARENT,
+      need(path.win32.dirname(fixedTarget)===SOURCE_PARENT,
         'R181_B_FIXED_PARENT_STOP');
       fs.realpathSync.native(SOURCE_PARENT);
-      lease=acquireInstallLock({journalRoot:JOURNAL_ROOT,requestId:id,
+      lease=acquireInstallLock({journalRoot:journalRoot,requestId:id,
         sharedLock:SHARED_LOCK});
       currentId=id;
     },
     async readPinnedFile(target){
       checkLock();
+      need(target===fixedTarget,'R181_B_PROFILE_TARGET_DENIED');
       return readRegular(target);
     },
     async claimOnce(id,manifestSha){
       checkId(id);checkLock();
       need(!claimed&&/^[a-f0-9]{64}$/i.test(manifestSha),
         'R181_B_CLAIM_SCOPE_STOP');
-      createInstallJournal({journalRoot:JOURNAL_ROOT,requestId:id,
+      createInstallJournal({journalRoot:journalRoot,requestId:id,
         sharedLock:SHARED_LOCK,fd:lease.fd});
       claimed=true;
       // Only the approved manifest digest is durably retained.
-      const fd=fs.openSync(path.win32.join(JOURNAL_ROOT,id,'approval.sha256'),'wx');
+      const fd=fs.openSync(path.win32.join(journalRoot,id,'approval.sha256'),'wx');
       try{
         fs.writeSync(fd,manifestSha+'\n');
         fs.fsyncSync(fd);
@@ -133,7 +140,7 @@ export function createR181ProtectedWindowsIo(){
     },
     async backupAndVerify(target,id){
       checkId(id);checkLock();
-      need(claimed&&!backedUp&&target===R181_B_TARGET,
+      need(claimed&&!backedUp&&target===fixedTarget,
         'R181_B_BACKUP_SCOPE_STOP');
       before=readRegular(target);
       acl=aclDigest(target);
@@ -149,7 +156,7 @@ export function createR181ProtectedWindowsIo(){
     async journal(id,phase){
       checkId(id);checkLock();
       need(claimed&&SAFE_PHASE.test(phase),'R181_B_JOURNAL_SCOPE_STOP');
-      const fd=fs.openSync(path.win32.join(JOURNAL_ROOT,id,'journal.jsonl'),'a');
+      const fd=fs.openSync(path.win32.join(journalRoot,id,'journal.jsonl'),'a');
       try{
         fs.writeSync(fd,JSON.stringify({phase,at:new Date().toISOString()})+'\n');
         fs.fsyncSync(fd);
@@ -157,6 +164,7 @@ export function createR181ProtectedWindowsIo(){
     },
     async replaceAtomically(target,bytes,id){
       checkId(id);checkLock();
+      need(target===fixedTarget,'R181_B_PROFILE_TARGET_DENIED');
       need(claimed&&backedUp&&before!==null&&
         Buffer.isBuffer(bytes)&&bytes.length===before.length+3,
         'R181_B_REPLACE_UNPREPARED_STOP');
@@ -167,7 +175,7 @@ export function createR181ProtectedWindowsIo(){
     },
     async restoreAtomically(target,bytes,id){
       checkId(id);checkLock();
-      need(claimed&&backedUp&&target===R181_B_TARGET&&
+      need(claimed&&backedUp&&target===fixedTarget&&
         Buffer.isBuffer(bytes)&&bytes.equals(before)&&
         lastCandidate!==null&&readRegular(target).equals(lastCandidate)&&
         fs.readFileSync(backupPath).equals(before),
