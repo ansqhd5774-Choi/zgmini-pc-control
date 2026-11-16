@@ -45,7 +45,7 @@
 - 이는 **내부 점검 후보**이지 사용자가 승인한 SLA나 실제 담당자 귀책/시스템 장애 판정이 아니다.
 
 ## 실제 실행과 갱신
-- 새 `.github/workflows/agent-handoff-queue-board.yml`은 기존 인계·선별 Actions의 *성공적인 종료*를 받아 최신 `main`에서 읽기 전용으로 실행한다.
+- 새 `.github/workflows/agent-handoff-queue-board.yml`은 기존 접수 Workflow 다음에 실행되는 **후보 선별 Actions의 성공 종료 1종**만 받아 최신 `main`에서 읽기 전용으로 실행한다. 중복 인계 이벤트에 따른 관제판 과잉 실행을 방지한다.
 - GitHub Actions에서 `ZGMINI Handoff Queue Control Board`를 수동 실행해도 동일한 최신 스냅샷을 얻는다. 새 ChatGPT 예약·타이머는 없다.
 - 기존 `ZGMINI_AGENT_HANDOFF_ENABLED=true` 승인 조건을 유지한다. 기존 비활성 상태를 이 배포에서 임의로 변경하지 않는다.
 - 대상은 원본 Issue 100건 이하, 댓글 400개 이하 및 전부 재조회. 초과·누락·변경 경합은 요약을 성공한 척하지 않고 안전 중단한다.
