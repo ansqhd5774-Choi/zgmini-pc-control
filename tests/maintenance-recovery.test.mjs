@@ -20,7 +20,7 @@ test('status and recovery verify both pre-handoff six and post-handoff seven exa
  const manifest=(files,sourceSha=files.length===original.length?oldSha:targetSha)=>({
   schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha,files:Object.fromEntries(
   files.map(p=>[p,createHash('sha256').update(data[p]).digest('hex')]))});
- const readBytes=p=>data[path.relative('/fixture',p)];
+ const readBytes=p=>data[path.relative('/fixture',p).split(path.sep).join('/')];
  for(const validate of [recoveryInventory,statusInventory]){
   assert.equal(validate(manifest(original),'/fixture',readBytes),true);
   assert.equal(validate(manifest(next),'/fixture',readBytes),true);
