@@ -224,3 +224,40 @@ test('unapproved data path and symbolic core file fail without opening SQLite',t
  assert.equal(r.status,'STATE_UNKNOWN');
  assert.equal(r.sqliteOpened,false);
 });
+
+test('DOL national error categories remain diagnostic without leaking arbitrary error text',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T08:00:00.000Z',
+  2,51,0,0,0,'DOL_NATIONAL_HTTP_FAILED',
+  JSON.stringify({mode:'RELEASE',nationalResponseEvidence:{httpStatus:503},
+    privateToken:'SECRET_DO_NOT_OUTPUT'}));
+ db.close();
+ const testCodes=[
+  ['DOL_NATIONAL_HTTP_FAILED','DOL_NATIONAL_HTTP_FAILED'],
+  ['DOL_NATIONAL_REQUEST_FAILED','DOL_NATIONAL_REQUEST_FAILED'],
+  ['DOL_NATIONAL_NO_VALID_ROWS','DOL_NATIONAL_NO_VALID_ROWS'],
+  ['DOL_NATIONAL_SERIES_INCOMPLETE','DOL_NATIONAL_SERIES_INCOMPLETE'],
+  ['DOL_NATIONAL_INVALID_DATA','DOL_NATIONAL_INVALID_DATA'],
+  ['DOL_RELEASE_OBSERVATION_STALE','DOL_RELEASE_OBSERVATION_STALE'],
+  ['HTTP_503_SECRET_DO_NOT_OUTPUT','OTHER'],
+ ];
+ for(const [stored,expected] of testCodes){
+  const writing=new DatabaseSync(file);
+  writing.prepare(`UPDATE market_score_employment_r4_shadow_runs_v1 SET failure_code=?
+   WHERE provider='EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS'
+    AND json_extract(detail_json,'$.mode')='RELEASE'`).run(stored);
+  writing.close();
+  const beforeHash=sha(file);
+  const result=inspectEmploymentR6CollectionEvidence(data);
+  assert.equal(result.status,'PASS');
+  assert.equal(result.dol.RELEASE.failureCode,expected,stored);
+  assert.equal(result.dol.RELEASE.providerRequests,2);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(sha(file),beforeHash,'read-only diagnosis must preserve storage bytes');
+  assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|privateToken|nationalResponseEvidence/i);
+ }
+});

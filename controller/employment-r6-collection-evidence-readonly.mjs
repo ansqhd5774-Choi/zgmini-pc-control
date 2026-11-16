@@ -20,7 +20,13 @@ const CORE_STATES=Object.freeze([
  'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
 ]);
 const DOL_IDS=new Set(['INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE','STATE_INITIAL_CLAIMS']);
-const FAILURE_CODES=new Set(['SERIES_PARTIAL','DOL_ETA539_SOURCE_FAILED','ROW_REJECTED','NO_OBSERVATIONS','DOL_RELEASE_OBSERVATION_STALE']);
+// Synchronize with the installed R6 national-claims collector's fixed failure categories.
+// Preserve only recognized codes; never expose unbounded provider/error text.
+const FAILURE_CODES=new Set([
+ 'SERIES_PARTIAL','DOL_ETA539_SOURCE_FAILED','ROW_REJECTED','NO_OBSERVATIONS','DOL_RELEASE_OBSERVATION_STALE',
+ 'DOL_NATIONAL_HTTP_FAILED','DOL_NATIONAL_REQUEST_FAILED','DOL_NATIONAL_NO_VALID_ROWS',
+ 'DOL_NATIONAL_SERIES_INCOMPLETE','DOL_NATIONAL_INVALID_DATA',
+]);
 const safeInt=x=>Number.isSafeInteger(x)&&x>=0?x:null;
 const date=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(x)?x:null;
 const stamp=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}T[\d:.]+Z$/.test(x)?x:null;
