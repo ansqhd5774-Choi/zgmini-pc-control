@@ -45,10 +45,16 @@ test('no log means unknown, not healthy',()=>fixture(({d})=>{
  const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.activeEndpointCount,null);
 }));
 
-test('reject symlinked source',()=>fixture(({d,file})=>{
+test('reject symlinked source',t=>fixture(({d,file})=>{
  const external=path.join(os.tmpdir(),'zgmini-symlink-'+process.pid+'.jsonl');fs.writeFileSync(external,'{}\n');
- try{fs.symlinkSync(external,file);const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.code,'UNSAFE_LOG_FILE');}
- finally{fs.rmSync(external,{force:true});}
+ try{
+  try{fs.symlinkSync(external,file);}
+  catch(error){
+   if(error.code==='EPERM'||error.code==='EACCES'){t.skip('Windows CI symlink creation not permitted');return;}
+   throw error;
+  }
+  const x=inspectProviderActivity(d,{now:NOW});assert.equal(x.status,'STATE_UNKNOWN');assert.equal(x.code,'UNSAFE_LOG_FILE');
+ }finally{fs.rmSync(external,{force:true});}
 }));
 
 test('truncated last append and malformed JSON never pass as full evidence',()=>fixture(({d,file})=>{
@@ -96,7 +102,8 @@ test('observed HTTP 32-host cohort returns exact names and 29/1/2 evidence repla
  const first=Object.fromEntries(domains.map(name=>[name,host({'200':1})]));
  const second=Object.fromEntries(domains.filter((_,i)=>i!==2).map((name,i)=>[
   name,host({[name===domains[0]?'503':name===domains[1]?'429':'200']:1})]));
- write([event('2026-11-11T12:00:00.000Z',first),event('2026-11-15T12:00:00.000Z',second)]);
+ write([event('2026-11-10T12:00:00.000Z',{[domains[2]]:host({'200':1})}),
+  event('2026-11-11T12:00:00.000Z',first),event('2026-11-15T12:00:00.000Z',second)]);
  const out=inspectProviderActivity(d,{now:NOW});
  assert.equal(out.monitoredHostCount,32);
  assert.equal(out.monitoredHostsReturned,32);
