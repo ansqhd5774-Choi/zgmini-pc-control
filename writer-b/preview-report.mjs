@@ -23,8 +23,27 @@ export function sanitizePreview(raw,req,num){
   raw.chatId!==req.chatId||raw.issueNumber!==num|| 
   ['pcSourceWrites','taskWrites','dbWrites','d1Writes','providerCalls']
    .some(k=>raw[k]!==0))return safe;
- if(raw.status==='BLOCKED'&&CODE.test(raw.code??''))
-  return {...safe,code:raw.code};
+ if(raw.status==='BLOCKED'&&CODE.test(raw.code??'')){
+  // Only an already SHA-matched PC preimage may produce anchor diagnostics.
+  // No raw source, arbitrary errors, or caller-provided text may be uploaded.
+  const anchorSafe=raw.code==='WRITER_B_INSERT_ANCHOR_MATCH_STOP'&&
+   HASH.test(raw.beforeSha256??'')&&
+   /^[a-f0-9]{40}$/i.test(raw.baseHead??'')&&
+   /^scripts\\/pc-writer\\/[a-z0-9][a-z0-9._-]{0,127}\\.mjs$/i.test(raw.filePath??'')&&
+   Array.isArray(raw.anchorEvidence)&&raw.anchorEvidence.length>=1&&
+   raw.anchorEvidence.length<=16&&raw.anchorEvidence.every((row,i)=>
+    row&&typeof row==='object'&&!Array.isArray(row)&&
+    Object.keys(row).length===3&&
+    row.index===i&&
+    Number.isInteger(row.exactCount)&&row.exactCount>=0&&row.exactCount<=3&&
+    Number.isInteger(row.trimmedCount)&&row.trimmedCount>=0&&row.trimmedCount<=3);
+  return {...safe,code:raw.code,...(anchorSafe?{
+   beforeSha256:raw.beforeSha256,baseHead:raw.baseHead,filePath:raw.filePath,
+   anchorEvidence:raw.anchorEvidence.map(row=>({
+    index:row.index,exactCount:row.exactCount,trimmedCount:row.trimmedCount
+   }))
+  }:{})};
+ }
  if(raw.status!=='PASS_READONLY'||raw.code!=='WRITER_B_INSERT_PREVIEW_VERIFIED'||
   !HASH.test(raw.beforeSha256??'')||!HASH.test(raw.afterSha256??'')||
   !HASH.test(raw.taskXmlSha256??'')||
