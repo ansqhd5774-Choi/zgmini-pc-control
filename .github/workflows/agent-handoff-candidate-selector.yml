@@ -29,6 +29,9 @@ jobs:
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.actor.login == 'ansqhd5774-Choi') ||
        (github.event_name == 'workflow_dispatch' &&
+        github.actor == 'ansqhd5774-Choi') ||
+       (github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
         github.actor == 'ansqhd5774-Choi'))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 5
