@@ -6,6 +6,7 @@ import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.m
 import {inspectWriterPublicationEvidence} from './writer-publication-evidence-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
+import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
 import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs';
 import {inspectSharedResourceReleaseReadonly} from './shared-resource-release-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
@@ -91,6 +92,8 @@ export async function runOperation(request,context){
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
  if(request.operation==='inflation-core-lock-observation-readonly')
   return observeInflationCoreLock({queryTask});
+ if(request.operation==='inflation-event129-evidence-readonly')
+  return inspectInflationEvent129Once();
  if(request.operation==='shared-resource-release-readonly')return inspectSharedResourceReleaseReadonly({dataRoot,queryTask});
   if(request.operation==='writer-b-1063-recovery-readonly')return inspectWriterB1063Recovery();
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
