@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -216,4 +216,45 @@ test('workflow state distinguishes current active and manual disable without exp
  assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'disabled_manually'}).workflowState,'disabled_manually');
  assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'disabled_inactivity'}).workflowState,'disabled_inactivity');
  assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'SECRET_TOKEN'}).workflowState,'UNVERIFIED');
+});
+test('project repeated HTTP host names only, never raw tokens, one-off, or URL paths',()=>{
+ const raw={status:'PASS',source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',scope:'FIXED_LOCAL_JSONL_ONLY',
+  now:'2026-11-16T12:00:00Z',windowDays:14,monitoredHostCount:2,
+  monitoredHostsReturned:2,omittedHosts:0,
+  http:{normal:1,failed:1,unknown:0,total:2},
+  hosts:[
+   {host:'api.example.gov',monitored:true,monitoringState:'normal',reason:'RECENT_2XX',
+    lastAttemptAt:'2026-11-16T11:00:00Z',last2xxRunAt:'2026-11-16T11:00:00Z',
+    lastRunStatuses:{200:1},token:'DO_NOT_LEAK',url:'https://secret/path?key=secret'},
+   {host:'status.example.gov',monitored:true,monitoringState:'failed',
+    reason:'LAST_HTTP_ERROR',lastAttemptAt:'2026-11-16T11:10:00Z',
+    last2xxRunAt:null,lastRunStatuses:{503:2}},
+   {host:'only-once.example.gov',monitored:false,monitoringState:'unknown',
+    reason:'NOT_REPEATED',lastAttemptAt:'2026-11-16T11:00:00Z',
+    last2xxRunAt:null,lastRunStatuses:{200:1}}
+  ]};
+ const projected=projectObservedProviderHosts(raw);
+ assert.equal(projected.status,'PASS');
+ assert.equal(projected.monitoredCount,2);
+ assert.equal(projected.rosterComplete,true);
+ assert.deepEqual(projected.http,{normal:1,failed:1,unknown:0,total:2});
+ assert.deepEqual(projected.hosts.map(x=>x.host),['api.example.gov','status.example.gov']);
+ assert.doesNotMatch(JSON.stringify(projected),/DO_NOT_LEAK|only-once|secret\/path|token|https:\/\//i);
+ assert.equal(projected.providerCalls,0);assert.equal(projected.operationalWrites,0);
+});
+test('partial or malformed observed HTTP evidence does not assert validated connection health',()=>{
+ const row={status:'STATE_UNKNOWN',source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',
+  scope:'FIXED_LOCAL_JSONL_ONLY',now:'2026-11-16T12:00:00Z',windowDays:14,
+  monitoredHostCount:2,monitoredHostsReturned:1,omittedHosts:1,
+  http:{normal:2,failed:0,unknown:0,total:2},
+  hosts:[{host:'api.example.gov',monitored:true,monitoringState:'normal',reason:'RECENT_2XX',
+   lastAttemptAt:'2026-11-16T11:00:00Z',last2xxRunAt:'2026-11-16T11:00:00Z',
+   lastRunStatuses:{200:1}}]};
+ const partial=projectObservedProviderHosts(row);
+ assert.equal(partial.status,'STATE_UNKNOWN');
+ assert.equal(partial.rosterComplete,false);
+ assert.equal(partial.hosts.length,1);
+ assert.equal(partial.http,null);
+ assert.equal(projectObservedProviderHosts({...row,hosts:[{...row.hosts[0],
+  host:'user:password@api.example.gov'}]}).status,'STATE_UNKNOWN');
 });
