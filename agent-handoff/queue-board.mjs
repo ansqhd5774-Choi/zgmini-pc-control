@@ -130,6 +130,6 @@ export function renderBoardMarkdown(board){
     '- 인수 표시는 GitHub 계정 댓글 영수증만 확인합니다. 특정 일반챗 자동 실행·수신/운영 적용을 증명하지 않습니다.',
     '- 지연 표시는 '+REVIEW_POLICY.ackHours+'/'+REVIEW_POLICY.workHours+'/'+REVIEW_POLICY.evidenceHours+
       '시간 경과 검토 후보입니다. 계약상 SLA 위반이 아닙니다.',
-    '- 이 스냅샷은 이벤트 또는 사용자가 GitHub Actions에서 수동 실행할 때 갱신됩니다. 상시 타이머나 새 예약은 없습니다.');
+    '- 이 스냅샷은 후보 선별·인수/결과 Workflow 성공 후, 수동 실행 또는 15분 간격 GitHub 예약 실행 시 갱신됩니다. 예약은 지연되거나 누락될 수 있습니다.');
   return out.join('\n')+'\n';
 }
