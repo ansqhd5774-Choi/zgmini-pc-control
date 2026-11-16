@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -134,6 +134,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-seven-readback-report.mjs"'
+      - name: Authenticate fixed manual seven-theme GMH historical collector source
+        if: github.event.issue.title == 'w03-gmh-seven-history-manual-once'
+        id: w03gmhmanualpreflight
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-preflight.mjs"'
+      - name: Checkout exact approved GMH-only private collector candidate
+        if: github.event.issue.title == 'w03-gmh-seven-history-manual-once' && steps.w03gmhmanualpreflight.outcome == 'success'
+        id: w03gmhmanualsource
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhmanualpreflight.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Execute exact approved manual GMH saved historical pages only
+        if: github.event.issue.title == 'w03-gmh-seven-history-manual-once' && steps.w03gmhmanualsource.outcome == 'success'
+        id: w03gmhmanualrun
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-once.mjs"'
+      - name: Create-only redacted private GMH historical checkpoint pair
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-history-manual-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-report.mjs"'
       - name: Create-only sanitized result and originating Issue comment
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-source-install'
         env:
