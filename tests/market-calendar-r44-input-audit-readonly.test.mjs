@@ -69,6 +69,27 @@ test('missing reasons partition the existing CSV rather than imputing any star',
  assert.equal(a.grades.get('ABS'),null);
  assert.equal(a.grades.get('FULL'),1);
 });
+test('50B fixed scenario counts only graded unique calendar tickers at USD boundary',()=>{
+ const a=analyzeR44ExistingInput(csv([
+  'LOW,Low,NYSE,Tech,Apps,US,10,49999999999',
+  'EDGE,Exact,NYSE,Tech,Apps,US,10,50000000000',
+  'HIGH,High,NASDAQ,Tech,Apps,US,10,199999999999',
+  'TOP,Top,NASDAQ,Tech,Apps,US,10,200000000000',
+  'OTC1,Unlisted,OTC,Tech,Apps,US,10,999999999999',
+  'DUP,One,NYSE,Tech,Apps,US,10,999999999999',
+  'DUP,Two,NYSE,Tech,Apps,US,10,999999999999'
+ ]),['LOW','EDGE','HIGH','TOP','OTC1','DUP','ABS']);
+ assert.deepEqual(a.counts,{one:0,two:3,three:1,missing:3,conflicting:0});
+ assert.deepEqual(a.threshold50B,{cutoffUsd:50000000000,calendarTickerCount:3});
+ assert.equal(a.grades.get('LOW'),2);
+ assert.equal(a.grades.get('EDGE'),2);
+ assert.equal(a.grades.get('TOP'),3);
+});
+test('50B scenario excludes share-class collisions even if both caps exceed cutoff',()=>{
+ const a=analyzeR44ExistingInput(csv(rows),['GOOG','GOOGL','DAC']);
+ assert.deepEqual(a.counts,{one:1,two:0,three:0,missing:0,conflicting:2});
+ assert.deepEqual(a.threshold50B,{cutoffUsd:50000000000,calendarTickerCount:0});
+});
 test('strict CSV contract refuses malformed input or unsafe ticker',()=>{
  assert.throws(()=>analyzeR44ExistingInput('ticker,mktCap\nDAC,1\n',['DAC']),
   /R44_CSV_HEADER_INVALID/);
@@ -88,5 +109,6 @@ test('no root means no filesystem access or source disclosure',()=>{
  assert.equal(x.operationalWrites,0);
  assert.equal(x.rawExposed,false);
  assert.equal(x.formulaModified,false);
+ assert.equal(x.threshold50B,null);
  assert.ok(!Object.hasOwn(x,'grades'));
 });
