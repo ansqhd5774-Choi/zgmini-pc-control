@@ -112,3 +112,10 @@ test('ambiguous entry function declaration never selects one silently',()=>{
  assert.throws(()=>applyApprovedInsertions(original,inserts,{filePath:PATH}),
  {code:'WRITER_B_INSERT_ANCHOR_MATCH_STOP'});
 });
+
+
+test('synchronous Core function is refused before inserting awaited import',()=>{
+ const original=Buffer.from(source().replace('export async function','export function'));
+ assert.throws(()=>applyApprovedInsertions(original,inserts,{filePath:PATH}),
+ {code:'WRITER_B_INSERT_ANCHOR_MATCH_STOP'});
+});
