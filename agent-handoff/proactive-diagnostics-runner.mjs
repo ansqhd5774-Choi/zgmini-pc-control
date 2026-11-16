@@ -21,13 +21,28 @@ export function validateScoutEvent(event,env){
     event.repository.private!==true||env.GITHUB_REPOSITORY!==REPO||
     typeof env.GITHUB_EVENT_PATH!=='string'||!env.GITHUB_EVENT_PATH)
     stop('SCOPE_STOP');
+  if(env.GITHUB_REF!=='refs/heads/main')stop('MAIN_REF_STOP');
   if(env.GITHUB_EVENT_NAME==='schedule'){
-    if(env.GITHUB_REF!=='refs/heads/main'||event.schedule!==SCOUT_POLICY.schedule)
-      stop('SCHEDULE_STOP');
+    if(event.schedule!==SCOUT_POLICY.schedule)stop('SCHEDULE_STOP');
   }else if(env.GITHUB_EVENT_NAME==='workflow_dispatch'){
-    if(env.GITHUB_REF!=='refs/heads/main'||
-      event.sender?.login!==OWNER||env.GITHUB_ACTOR!==OWNER)
+    if(event.sender?.login!==OWNER||env.GITHUB_ACTOR!==OWNER)
       stop('DISPATCH_STOP');
+  }else if(env.GITHUB_EVENT_NAME==='workflow_run'){
+    const run=event.workflow_run;
+    if(event.action!=='completed'||run?.conclusion!=='success'||
+      !['ZGMINI Handoff Queue Candidate Selector',
+        'ZGMINI Agent Handoff PR Evidence CI'].includes(run.name)||
+      run.actor?.login!==OWNER||
+      (run.name==='ZGMINI Handoff Queue Candidate Selector'&&
+       run.head_branch!=='main'))stop('FALLBACK_WORKFLOW_STOP');
+  }else if(env.GITHUB_EVENT_NAME==='issues'){
+    if(event.action!=='labeled'||event.label?.name!=='handoff-agent-pending'||
+      event.issue?.state!=='open'||event.issue?.user?.login!==OWNER||
+      !event.issue?.labels?.some?.(x=>x.name==='agent-handoff')||
+      env.GITHUB_ACTOR!==OWNER)stop('FALLBACK_ISSUE_STOP');
+  }else if(env.GITHUB_EVENT_NAME==='push'){
+    if(event.ref!=='refs/heads/main'||event.deleted===true||
+      env.GITHUB_ACTOR!==OWNER)stop('FALLBACK_PUSH_STOP');
   }else stop('EVENT_TYPE_STOP');
 }
 function assertLedger(issue){
