@@ -109,6 +109,25 @@ function readSourcePreimage(requestId){
   sourceClean:clean,writerLeaseOwned:lockOwner===requestId,
   coreTaskEnabled:task.enabled===true,sourceFilesSha256};
 }
+// The saved document must name the exact raw response bytes. A different
+// older valid archive is NOT evidence for this document's provenance.
+export function verifyCensusDocumentProvenance(doc,hashForArchive){
+ need(typeof hashForArchive==='function'&&Array.isArray(doc?.provenance)&&
+  doc.provenance.length===2,'W01_CENSUS_B_PROVENANCE_SHAPE_STOP');
+ const years=new Set();
+ for(const item of doc.provenance){
+  need(Number.isInteger(item?.year)&&item.year>=2000&&item.year<=2100&&
+   HASH.test(item.sourceSha256??'')&&!years.has(item.year),
+   'W01_CENSUS_B_PROVENANCE_SHAPE_STOP');
+  years.add(item.year);
+  const name='census-m3-mtm-'+item.year+'-'+item.sourceSha256+'.json';
+  need(item.archive==='raw/'+name,
+   'W01_CENSUS_B_PROVENANCE_PATH_STOP');
+  need(hashForArchive(name)===item.sourceSha256,
+   'W01_CENSUS_B_PROVENANCE_SHA_STOP');
+ }
+ return true;
+}
 function checkedArchive(doc){
  need(doc?.schemaVersion===1&&doc.provider==='US_CENSUS_M3'&&
   doc.selector==='MTM/TI'&&doc.unit==='USD_MILLION_SA_NOMINAL'&&
@@ -119,6 +138,10 @@ function checkedArchive(doc){
    typeof x?.value==='number'&&Number.isFinite(x.value)&&x.value>=0),
   'W01_CENSUS_B_SAVED_SCHEMA_STOP');
  const dir=path.join(CENSUS_B_DATA_ROOT,'inflation-causal-candidates-r1','raw');
+ verifyCensusDocumentProvenance(doc,name=>{
+  try{return sha(fixedFile(path.join(dir,name),CENSUS_B_DATA_ROOT,5_000_000));}
+  catch{return null;}
+ });
  const year=new Date().getUTCFullYear();
  for(const y of [year-1,year]){
   const matched=fs.readdirSync(dir).filter(n=>
