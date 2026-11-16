@@ -115,7 +115,7 @@ test('reporter rejects forged source text in shape token field',()=>{
     'STATE_UNKNOWN');
 });
 test('imported R181 primary module is sanitized, never returns executable source',()=>{
-  const x=fixture(),shape=classifyR181SourceForFixture(source());
+  const x=fixture(),shape={...classifyR181SourceForFixture(source())};
   const dependencySource=[
     "const secret='GMH_API_KEY_PRIVATE_xxxxx';",
     "function buildUrl(ticker){return 'https://getmarkethistory.com/api/v1/foo/'+ticker;}",
