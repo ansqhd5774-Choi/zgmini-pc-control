@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_R6_REGISTERED_DATA_B_RESULT_V1",
+  "requestId": "b56d7ba6-8c43-4ed3-8c3e-9de057082bc2",
+  "approvalManifestSha256": "4f841aaabf2fe75a929430622f92fb446679b5e830ebbb667a0a8d56e239cb57",
+  "status": "PARTIAL",
+  "code": "R6_DOL_MANUAL_PARTIAL",
+  "sourceSha": "5b43c3cc9da75143481f310bb45a76f919d5b040",
+  "mode": "ONE_YEAR",
+  "providerRequests": 2,
+  "blsRequests": 0,
+  "dolRequests": 2,
+  "groupResults": [
+    {
+      "groupName": "DOL_UI_WEEKLY_CLAIMS",
+      "status": "PARTIAL",
+      "providerRequests": 2,
+      "failureCode": "DOL_NATIONAL_SOURCE_UNAVAILABLE"
+    }
+  ],
+  "sqlite": "COLLECTOR_RECORDED",
+  "publication": "NOT_ATTEMPTED",
+  "sourceStoredAt": null,
+  "sourceFeatures": null,
+  "chartReadyFeatures": null,
+  "nationalSeriesSaved": 0,
+  "nationalRowsSaved": 0,
+  "stateRowsSaved": 5712,
+  "lastPass": "COLLECT_READBACK",
+  "firstFail": null,
+  "runId": "43874476126",
+  "retry": "READ_EXISTING_REQUEST_NO_REEXECUTE"
+}
