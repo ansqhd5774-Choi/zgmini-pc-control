@@ -1,0 +1,78 @@
+{
+  "schema": "ZGMINI_W03_R32_CONTROLLER_CUMULATIVE_PREFLIGHT_V1",
+  "status": "SOURCE_ONLY_CANDIDATE_NOT_APPROVAL_OR_INSTALL",
+  "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE",
+  "purpose": "pc-controller-heavy-readonly",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "installedShaObserved": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+  "installedEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1788#issuecomment-6921161113",
+  "targetSha": "018d45e0582fc1b17eb6904333d0bd7b90dbfb1f",
+  "targetSourcePRs": [
+    "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1783",
+    "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1785"
+  ],
+  "sourceOnlyValidation": {
+    "existingOperations": 42,
+    "existingOperationsChanged": 0,
+    "newOperations": [
+      {
+        "name": "theme-nine-r32-raw-coverage-readonly",
+        "grade": "A",
+        "resource": "heavy",
+        "timeoutSeconds": 240,
+        "minimumFreeMiB": 1536
+      }
+    ],
+    "existingPolicyFieldsChanged": 0
+  },
+  "verifiedTargetFileSha256": [
+    {
+      "path": "config/operations.json",
+      "sha256": "c1df0c32b43fe96669cfd664a7988ad3dce65aab455c423c0d363b028e4de672"
+    },
+    {
+      "path": "controller/http32-two-host-checkpoints-readonly.mjs",
+      "sha256": "ed1154d7e146368a0786bffa108558d9d0fa985738c6022929b2d5e4b4687baa"
+    },
+    {
+      "path": "controller/inflation-event129-evidence-readonly.mjs",
+      "sha256": "621ed556c08f294ddd353dcbc4a524fc09de91f2cbca61ca8f7d25478b372e38"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "8cef8d286ce4a657cc7e38ce5e00eda850b1b7b5c4f114ceab3795f88adb0b79"
+    },
+    {
+      "path": "controller/provider-activity-runtime-readonly.mjs",
+      "sha256": "1a40ac4e08aaabfe5a461fad3b5d103c1eb8d3e68aea9bcb9d3bf4f82294bec7"
+    },
+    {
+      "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
+      "sha256": "816c0132dd9504586c3bf46f6438ceaf74401c03286c70b9c72e40bf7712ba39"
+    }
+  ],
+  "knownCumulativeChange": {
+    "commitsAheadOfObservedInstalled": 83,
+    "allRepositoryPathsChanged": 107,
+    "controllerConfigPathsChanged": 6,
+    "compareBase": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+    "compareHead": "018d45e0582fc1b17eb6904333d0bd7b90dbfb1f"
+  },
+  "recoveryState": {
+    "issue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1745",
+    "state": "RECOVERY_REQUIRED_UNRESOLVED",
+    "latestSeparateCoreStatus": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1788",
+    "separateAStatus": "PASS",
+    "maintenanceResultNotReclassified": true
+  },
+  "pending": [
+    "Shared Controller owner verifies any newer installed SHA and existing maintenance ledger/lease/recovery",
+    "Assign exact merged source PR approval for every non-W03 cumulative change (HTTP32, inflation, provider activity)",
+    "Prepare and independently verify official approvals/controller-updates/<targetSha>.json with complete B terms, preimage, SHA256 and after snapshot",
+    "Check maintenance receiver's current installed source and allowed target status, preserve other owners and protected jobs",
+    "Use official pc-maintenance once with new request ID; verify six fresh runners, protected state, and post A",
+    "Only after actual installed Controller SHA is verified, run registered 64-symbol R32 A query when memory >=1536MiB"
+  ],
+  "neverUseAsOfficialApproval": true,
+  "operationalEffects": "NONE"
+}
