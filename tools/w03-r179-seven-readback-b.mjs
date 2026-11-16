@@ -91,7 +91,7 @@ const expectedIo=['acquire','read','claim','backup','journal','replace','restore
 const result=(status,code,details={})=>Object.freeze({
  status,code,applied:false,providerCalls:0,sqliteWrites:0,d1Writes:0,
  taskChanges:0,otherSourceWrites:0,...details});
-export async function runApprovedGuard(proof,io){
+export async function runApprovedGuard(proof,io,{prepare=prepareExactGuardCandidate}={}){
  need(approved.has(proof),'W03_R179_B_PROOF_REQUIRED');
  need(io&&expectedIo.every(k=>typeof io[k]==='function'),
   'W03_R179_B_IO_CONTRACT_STOP');
@@ -103,7 +103,7 @@ export async function runApprovedGuard(proof,io){
   await io.acquire(id);locked=true;stage='PIN';
   before=await io.read(TARGET);
   // Never weaken production source pin, regardless of test dependency injection.
-  candidate=prepareExactGuardCandidate(before,BEFORE_SHA);
+  candidate=prepare(before,BEFORE_SHA);
   after=candidate.getCandidateBytes();
   stage='CLAIM';claimBegun=true;
   await io.claim(id,proof.manifestSha256);claimed=true;
