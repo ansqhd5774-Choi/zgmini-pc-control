@@ -8,6 +8,7 @@ import {authenticateR181InspectEvent}
   from './r181-source-shape-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const RUN=/^\d{1,18}$/;
+const SHA64=/^[a-f0-9]{64}$/;
 const SAFE_SHAPE=/^[ A-Za-z0-9()[\]{}:;,.=+?!<>*/%-]{0,180}$/;
 const SAFE_CODE=/^R181_INSPECT_[A-Z0-9_]{3,80}$/;
 const STOP=code=>{throw Object.assign(Error(code),{code});};
@@ -81,6 +82,19 @@ export function sanitizeR181ShapeResult(raw,request,env){
     literalSignalsByLine:s.literalSignalsByLine.map(x=>({line:x.line,signals:[...x.signals]})),
     runtimeUrlVerified:false,http404SubtypeVerified:false,
   };
+  if(s.dependency!==undefined){
+    const d=s.dependency;
+    if(d?.filename!=='r181-primary.mjs'||!SHA64.test(d.sha256??'')||
+      !Number.isInteger(d.bytes)||d.bytes<1||d.bytes>32768||
+      d.shape?.dependency!==undefined)return out;
+    // Reuse exactly the same allowlist validation for the imported module.
+    const clean=sanitizeR181ShapeResult({schema:out.schema,
+      requestId:request.requestId,status:'PASS',
+      code:'R181_SOURCE_SHAPE_READONLY',shape:d.shape},request,env);
+    if(clean.status!=='PASS')return out;
+    shape.dependency={filename:'r181-primary.mjs',sha256:d.sha256,
+      bytes:d.bytes,shape:clean.shape};
+  }
   return {...out,status:'PASS',code:'R181_SOURCE_SHAPE_READONLY',shape};
 }
 function txt(r){return [
