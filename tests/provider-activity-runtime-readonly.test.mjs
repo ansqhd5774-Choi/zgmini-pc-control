@@ -138,13 +138,49 @@ test('publisher cadence heuristic can flag healthy provider as unknown rather th
  assert.equal(out.hosts[0].reason,'ESTIMATED_CADENCE_OVERDUE');
  assert.equal(out.hosts[0].lastRunStatuses['200'],1);
 }));
+
+test('SEC mixed 7x200 and 2x404 is reachable but keeps each endpoint failure',()=>fixture(({d,write})=>{
+ write([event('2026-11-14T12:00:00Z',{'data.sec.gov':host({'200':9})}),
+  event('2026-11-15T12:00:00Z',{'data.sec.gov':host({'200':7,'404':2})})]);
+ const x=inspectProviderActivity(d,{now:NOW});
+ assert.deepEqual(x.http,{normal:1,failed:0,unknown:0,total:1});
+ assert.equal(x.hosts[0].reason,'RECENT_2XX');
+ assert.deepEqual(x.hosts[0].lastRunStatuses,{'200':7,'404':2});
+ assert.equal(x.hosts[0].lastRunResponses.client4xx,2);
+}));
+test('SEC 404-only is unknown connection, not a proved outage or green',()=>fixture(({d,write})=>{
+ write([event('2026-11-14T12:00:00Z',{'data.sec.gov':host({'200':1})}),
+  event('2026-11-15T12:00:00Z',{'data.sec.gov':host({'404':2})})]);
+ const x=inspectProviderActivity(d,{now:NOW});
+ assert.deepEqual(x.http,{normal:0,failed:0,unknown:1,total:1});
+ assert.deepEqual(x.hosts[0].lastRunStatuses,{'404':2});
+}));
+test('mixed 2xx and 400/401/403/410/5xx or network error remains failure',()=>fixture(({d,write})=>{
+ for(const code of ['400','401','403','410','500','503','NETWORK_ERROR']){
+  write([event('2026-11-14T12:00:00Z',{'data.sec.gov':host({'200':1})}),
+   event('2026-11-15T12:00:00Z',{'data.sec.gov':host({'200':1,[code]:1})})]);
+  const x=inspectProviderActivity(d,{now:NOW});
+  assert.deepEqual(x.http,{normal:0,failed:1,unknown:0,total:1},code);
+  assert.equal(x.hosts[0].reason,'LAST_HTTP_ERROR',code);
+ }
+}));
+test('429 mixed with 2xx is connected, quota guard only remains unverified',()=>fixture(({d,write})=>{
+ write([event('2026-11-14T12:00:00Z',{'data.sec.gov':host({'200':1})}),
+  event('2026-11-15T12:00:00Z',{'data.sec.gov':host({'200':1,'429':1})})]);
+ assert.equal(inspectProviderActivity(d,{now:NOW}).http.normal,1);
+ write([event('2026-11-14T12:00:00Z',{'data.sec.gov':host({'200':1})}),
+  event('2026-11-15T12:00:00Z',{'data.sec.gov':host({PROVIDER_QUOTA_GUARD:1})})]);
+ const x=inspectProviderActivity(d,{now:NOW});
+ assert.deepEqual(x.http,{normal:0,failed:0,unknown:1,total:1});
+}));
+
 test('host list and status counters never disclose raw response URL, header or credential',()=>fixture(({d,write})=>{
  write([event('2026-11-14T12:00:00Z',{'sec-data.gov':host({'200':1})}),
  {...event('2026-11-15T12:00:00Z',{'sec-data.gov':host({'404':1})}),
   responseUrl:'https://sec-data.gov/?api_key=SEC-PRIVATE-KEY',authorization:'Bearer TOPSECRET'}]);
  const out=inspectProviderActivity(d,{now:NOW});
  const serialized=JSON.stringify(out);
- assert.equal(out.http.failed,1);
+ assert.equal(out.http.failed,0);\n assert.equal(out.http.unknown,1);\n assert.equal(out.hosts[0].lastRunStatuses['404'],1);
  assert.ok(!serialized.includes('SEC-PRIVATE-KEY'));
  assert.ok(!serialized.includes('TOPSECRET'));
  assert.ok(!serialized.includes('responseUrl'));
