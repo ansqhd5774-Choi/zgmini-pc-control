@@ -34,7 +34,7 @@ export function sanitizeR181ShapeResult(raw,request,env){
     s.runtimeUrlVerified!==false||s.http404SubtypeVerified!==false||
     s.providerCalls!==0||s.operationalWrites!==0||
     s.sqliteOpened!==false||s.d1Writes!==0||
-    !Array.isArray(s.safeShapeLines)||s.safeShapeLines.length>36||
+    !Array.isArray(s.safeShapeLines)||s.safeShapeLines.length>70||
     !s.safeShapeLines.every(x=>Number.isInteger(x.line)&&
       x.line>=1&&x.line<=200&&typeof x.shape==='string'&&
       SAFE_SHAPE.test(x.shape)))return out;
@@ -50,11 +50,35 @@ export function sanitizeR181ShapeResult(raw,request,env){
   if(!s.features||typeof s.features!=='object'||
     Object.keys(s.features).sort().join(',')!==allowedFeatures.sort().join(',')||
     allowedFeatures.some(k=>typeof s.features[k]!=='boolean'))return out;
+  const importKinds=new Set(['NODE_BUILTIN','OTHER_IMPORT','RELATIVE_MODULE']);
+  if(!Array.isArray(s.importFiles)||s.importFiles.length>15||
+    !s.importFiles.every(x=>Number.isInteger(x.line)&&x.line>=1&&x.line<=15&&
+      importKinds.has(x.kind)&&
+      (x.basename===undefined||x.basename===null||
+      (typeof x.basename==='string'&&
+      /^[a-z0-9][a-z0-9.-]{1,72}\.mjs$/i.test(x.basename)))&&
+      (x.parentDepth===undefined||
+       (Number.isInteger(x.parentDepth)&&x.parentDepth>=0&&x.parentDepth<=10))
+    ))return out;
+  const allowedSignals=new Set(['HOST_GMH','PATH_API','PATH_V1','PATH_V2',
+    'PATH_BARS','PATH_QUERY','PATH_STOCKS','PATH_ETF','PATH_HOURLY',
+    'PATH_ONE_HOUR','DATASET_PARAM','TICKER_PARAM','SYMBOL_PARAM',
+    'SOURCE_PARAM','GRANULARITY_PARAM','QUERY_QUESTION']);
+  if(!Array.isArray(s.literalSignalsByLine)||
+    s.literalSignalsByLine.length>30||
+    !s.literalSignalsByLine.every(x=>Number.isInteger(x.line)&&
+      x.line>=1&&x.line<=66&&Array.isArray(x.signals)&&
+      x.signals.length<=16&&x.signals.every(z=>allowedSignals.has(z))))
+    return out;
   const shape={
     classification:s.legacyRouteCountBucket,
     literalHints:Object.fromEntries(allowedHints.map(k=>[k,s.literalHints[k]])),
     features:Object.fromEntries(allowedFeatures.map(k=>[k,s.features[k]])),
     safeShapeLines:s.safeShapeLines.map(x=>({line:x.line,shape:x.shape})),
+    importFiles:s.importFiles.map(x=>({line:x.line,kind:x.kind,
+      ...(x.basename?{basename:x.basename}:{}),
+      ...(x.parentDepth!==undefined?{parentDepth:x.parentDepth}:{})})),
+    literalSignalsByLine:s.literalSignalsByLine.map(x=>({line:x.line,signals:[...x.signals]})),
     runtimeUrlVerified:false,http404SubtypeVerified:false,
   };
   return {...out,status:'PASS',code:'R181_SOURCE_SHAPE_READONLY',shape};
@@ -81,7 +105,7 @@ export async function reportR181Shape({event,env,raw,fetchApi=fetch}){
     RUN.test(env.GITHUB_RUN_ID??''),
     'R181_INSPECT_REPORT_AUTH_STOP');
   let data=null;
-  try{data=typeof raw==='string'&&Buffer.byteLength(raw)<=12500?
+  try{data=typeof raw==='string'&&Buffer.byteLength(raw)<=24000?
     JSON.parse(raw):null;}catch{}
   const r=sanitizeR181ShapeResult(data,request,env);
   const headers={accept:'application/vnd.github+json',
