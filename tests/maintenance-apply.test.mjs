@@ -3,7 +3,7 @@ import test from 'node:test';
 import './maintenance-backlog-request.test.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {applyApprovedUpdate,maintenanceFailureCode} from '../tools/maintenance-apply.mjs';
+import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
 import {readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
 import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
@@ -387,4 +387,38 @@ test('journal write failure after successful reconnect does not provoke a second
 test('interrupted journal is only reconciled; never silently retried',async()=>{
  const f=fixture();await f.port.persist({requestId:request.requestId,fingerprint:f.port.fingerprint(request),phase:'SWITCHED',status:'RUNNING'});
  const r=await applyApprovedUpdate(request,f.port);assert.equal(r.status,'RECOVERY_REQUIRED');assert.ok(!f.events.includes('switch'));
+});
+
+test('W02 #1501: RECONNECTED/RECOVERY_REQUIRED never starts standalone rollback',async()=>{
+ const calls=[],rows=[];
+ const ports={};
+ for(const key of ['prepareRecovery','verifyBackup','restore','reconnectPrevious',
+   'verifyPrevious','resumeIntake','reconcileBacklog'])
+  ports[key]=async()=>{calls.push(key);return true;};
+ const original={requestId:'pc-update-original-1501-fixture',status:'RECOVERY_REQUIRED',
+   phase:'RECOVERY_REQUIRED',firstFail:'RECONNECTED',installedShaBefore:previous};
+ const snapshot=structuredClone(original);
+ const result=await reconcileInterruptedRollback(original,ports,async row=>rows.push(row));
+ assert.equal(result.status,'RECOVERY_REQUIRED');
+ assert.equal(result.code,'RECOVERY_RECONNECTED_INTAKE_READBACK_REQUIRED');
+ assert.equal(result.originalPhase,'RECONNECTED');
+ assert.equal(result.originalRequestRetried,false);
+ assert.deepEqual(original,snapshot);
+ assert.deepEqual(calls,[]);
+ assert.equal(rows.length,1);
+ assert.equal(result.mutationStarted,undefined);
+});
+test('interrupted RUNNING at RECONNECTED preserves the existing Controller until intake resolved',async()=>{
+ const calls=[],port={};
+ for(const key of ['prepareRecovery','verifyBackup','restore','reconnectPrevious',
+   'verifyPrevious','resumeIntake','reconcileBacklog'])
+  port[key]=async()=>{calls.push(key);return true;};
+ const rows=[],result=await reconcileInterruptedRollback(
+   {requestId:'pc-update-connecting-fixture',status:'RUNNING',
+    phase:'RECONNECTED',installedShaBefore:previous},
+   port,async row=>rows.push(row));
+ assert.equal(result.status,'RECOVERY_REQUIRED');
+ assert.equal(result.code,'RECOVERY_RECONNECTED_INTAKE_READBACK_REQUIRED');
+ assert.equal(rows.length,1);
+ assert.deepEqual(calls,[]);
 });
