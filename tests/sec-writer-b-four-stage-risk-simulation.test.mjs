@@ -7,7 +7,7 @@ const H=value=>sha256(Buffer.from(value));
 const PC_HEAD='f59e999082fd3b21893f0f74fc1913441ec80bba';
 const NEW_MAIN='27c76e799f07d54b1a9cd2c41243fb12360c59a0';
 const A_PREIMAGE=[
- ['scripts/pc-writer/quota-fetch.mjs','5ff750e1abf607e4a207bed16c20394406ca2ba8fe4ca2e514a155c87818b'],
+ ['scripts/pc-writer/quota-fetch.mjs','5ff750e1abf607e4a207bed16c20394406ca2ba8fe4ca42e2c514a155c87818b'],
  ['scripts/pc-writer/collect-local.mjs','588624ec4e7ac3a944abb3971663091e087cea70ec8324d1c9cfc137a7386e99'],
  ['scripts/pc-writer/collect-sec-fund-flow-pit.mjs','08638e14deb937386e8ed0440eefa32bb91ad440338680b4d89363c693e30611'],
  ['scripts/pc-writer/backfill-sec-fund-flow-raw-r1.mjs','3916fbed8a4e4b9f5f6c9c9efbbdff3382de0df9e5995bd0039ac91aa1f5b233'],
