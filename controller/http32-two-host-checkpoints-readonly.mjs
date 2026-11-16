@@ -10,7 +10,8 @@ const MAX_BYTES=16384;
 const ALLOWED_ROOT_FILES=Object.freeze({
  alpacaReport:['local-asset-bubble-r10-alpaca-collection.json'],
  alpacaCheckpoint:['asset-r10-alpaca','incremental-checkpoint.json'],
- monthlyBackfill:['local-monthly-one-year-backfill-last-run.json']
+ monthlyBackfill:['local-monthly-one-year-backfill-last-run.json'],
+ coreCycle:['local-cycle-last-run.json']
 });
 const isDate=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&
  Number.isFinite(Date.parse(x+'T00:00:00Z'));
@@ -55,7 +56,9 @@ export function inspectHttp32TwoHostCheckpoints({
  const ar=safeJson(root,ALLOWED_ROOT_FILES.alpacaReport,fileSystem);
  const ac=safeJson(root,ALLOWED_ROOT_FILES.alpacaCheckpoint,fileSystem);
  const br=safeJson(root,ALLOWED_ROOT_FILES.monthlyBackfill,fileSystem);
+ const cr=safeJson(root,ALLOWED_ROOT_FILES.coreCycle,fileSystem);
  const a=ar.value??{},c=ac.value??{},b=br.value??{},chart=b.chart??{};
+ const cycle=cr.value??{},progressive=cycle.progressive??{};
  const checked=time(a.checkedAt);
  const age=checked?now-Date.parse(checked):null;
  const aligned=isDate(a.requestEnd)&&isDate(c.through)&&a.requestEnd===c.through;
@@ -75,6 +78,22 @@ export function inspectHttp32TwoHostCheckpoints({
     storageVerified:a.storageVerified===true,checkpointAligned:aligned,
     cacheEvidenceVerified:alpacaEvidence,
     runRequests:safeInteger(a.runRequests),
+    coreCycleReadState:cr.state,
+    coreCycleAt:time(cycle.at),
+    coreCycleLane:cycle.lane==='core'?'core':cycle.lane==='korea'?'korea':'UNVERIFIED',
+    coreCycleStatus:reportStatus(cycle.status,[
+     'COMPLETE','COMPLETE_WITH_COLLECTION_GAPS','PUBLICATION_NOT_VERIFIED'
+    ]),
+    coreAlpacaStatus:reportStatus(cycle.alpacaIncremental?.status,[
+     'CACHED','NO_NEW_WINDOW','COLLECTED_PENDING_VALIDATION',
+     'DEFERRED_QUOTA','BLOCKED','FAILED_PREVIOUS_INPUTS_PRESERVED',
+     'SKIPPED_KOREA_LANE'
+    ]),
+    coreAlpacaRunRequests:safeInteger(cycle.alpacaIncremental?.runRequests),
+    coreAuxiliaryStartedAt:time(progressive.auxiliaryStartedAt),
+    coreAuxiliaryStatus:reportStatus(progressive.auxiliaryStatus,[
+     'COMPLETE','FAILED_PREVIOUS_INPUTS_PRESERVED'
+    ]),
     note:'R10_CACHE_NOT_PROOF_OF_ALL_ALPACA_COLLECTORS'},
    {host:'cdn.www.census.gov',source:'PC_MONTHLY_ONE_YEAR_BACKFILL_LOCAL',
     reportReadState:br.state,
