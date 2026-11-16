@@ -13,6 +13,13 @@ const STATUS=new Set(['PASS','BLOCKED','FAIL']);
 const SUMMARY_FIELDS=['sourceFeatures','recentlyObservedFeatures','chartReadyFeatures',
   'chartPartialFeatures','scoredFeatures','recentlyScoredFeatures'];
 const PIT_FIELDS=['coreCurrentRows','coreHistoryRevisions','coreCurrentKeys',
+  // Fixed count-only History lineage fields; never return revision rows,
+  // source hashes, raw observations, paths, or availability timestamps.
+  'coreHistoryAsOfUniqueKeys','coreHistoryPriorRevisionKeys',
+  'coreHistoryPriorRevisionRows','coreHistoryAmbiguousLatestKeys',
+  'coreHistorySameInstantAdditionalRows','candidateHistoryAsOfUniqueKeys',
+  'candidateHistoryPriorRevisionKeys','candidateHistoryPriorRevisionRows',
+  'candidateHistoryAmbiguousLatestKeys','candidateHistorySameInstantAdditionalRows',
   'coreCurrentKeysMissingHistory','missingKeysWithCandidateHistory',
   'missingKeysWithMatchingCandidateValueAndHash','candidateCurrentKeys',
   'candidateNewKeys','candidateOverlapMatchingKeys',
