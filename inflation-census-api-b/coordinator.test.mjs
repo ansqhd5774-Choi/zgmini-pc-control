@@ -174,3 +174,15 @@ test('native B interface shares exact Core owner verifier and never creates Task
  assert.match(workflow,/github\.event\.issue\.title == 'w01-census-m3-api-once'/);
  assert.doesNotMatch(code,/\/Create\b|\/Run\b|New-ScheduledTask/);
 });
+
+test('Census-specific B natural-owner and idle waits leave time for two official GETs under 12-minute shared job cap',async()=>{
+ const fs=await import('node:fs');
+ const path=await import('node:path');
+ const root=path.resolve(import.meta.dirname,'..');
+ const code=fs.readFileSync(path.join(root,'inflation-census-api-b','windows-adapter.mjs'),'utf8');
+ const workflow=fs.readFileSync(path.join(root,'.github','workflows','pc-writer-b-source-once.yml'),'utf8');
+ assert.match(code,/maxObservationMs:5\*60_000/);
+ assert.match(code,/windowMs:3\*60_000/);
+ assert.match(workflow,/timeout-minutes: 12/);
+ assert.ok(5*60_000+3*60_000+2*20_000<12*60_000);
+});
