@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -257,4 +257,32 @@ test('partial or malformed observed HTTP evidence does not assert validated conn
  assert.equal(partial.http,null);
  assert.equal(projectObservedProviderHosts({...row,hosts:[{...row.hosts[0],
   host:'user:password@api.example.gov'}]}).status,'STATE_UNKNOWN');
+});
+test('#1501 open paused backlog window and durable replays summarize without raw content',()=>{
+ const raw=Buffer.from(JSON.stringify({schema:'ZGMINI_PC_BACKLOG_V1',
+  windows:[{pausedAt:'2026-11-16T00:35:00Z',resumedAt:null}],
+  replays:{'1503':{status:'POSTING',body:'SECRET_TOKEN'},
+   '1508':{status:'SKIPPED_RESULT_PRESENT',command:'secret cmd'},
+   '1510':{status:'DONE'}},token:'SECRET_TOKEN'}));
+ const x=classify1501BacklogBytes(raw,raw);
+ assert.equal(x.status,'PASS');assert.equal(x.openWindowCount,1);
+ assert.equal(x.windowCount,1);assert.equal(x.replayCount,3);
+ assert.deepEqual(x.replayCounts,{done:1,skippedResultPresent:1,posting:1,otherUnverified:0});
+ assert.deepEqual(x.replays.map(z=>z.issueNumber),[1503,1508,1510]);
+ assert.equal(x.mutationAllowed,false);
+ assert.doesNotMatch(JSON.stringify(x),/SECRET_TOKEN|secret cmd|nonce|body/i);
+ assert.equal(classify1501BacklogBytes(raw,Buffer.from('drift')).status,'STATE_UNKNOWN');
+});
+test('#1501 backlog refuses wrong schema, invalid windows, symlink, missing owner',()=>{
+ const build=v=>Buffer.from(JSON.stringify(v));
+ assert.equal(classify1501BacklogBytes(build({schema:'OTHER'}),build({schema:'OTHER'})).status,'STATE_UNKNOWN');
+ const invalid=build({schema:'ZGMINI_PC_BACKLOG_V1',windows:[{pausedAt:'x',resumedAt:null}]});
+ assert.equal(classify1501BacklogBytes(invalid,invalid).status,'STATE_UNKNOWN');
+ const q=inspect1501BacklogReadonly({correlation:()=>({status:'STATE_UNKNOWN'}),
+  stat:()=>{throw Error('must not read');},read:()=>{throw Error('must not read');}});
+ assert.equal(q.code,'C1501_BACKLOG_OWNER_UNVERIFIED');
+ const unsafe=inspect1501BacklogReadonly({correlation:()=>({status:'CORRELATED'}),
+  stat:()=>({isDirectory:()=>false,isSymbolicLink:()=>true}),
+  read:()=>{throw Error('must not read');}});
+ assert.equal(unsafe.code,'C1501_BACKLOG_UNSAFE_DIRECTORY');
 });
