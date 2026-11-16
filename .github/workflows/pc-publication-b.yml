@@ -1,0 +1,46 @@
+name: ZGMINI PC Publication B - Approval Gated
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-pc-publication-b-single-lane
+  cancel-in-progress: false
+jobs:
+  approved-publication-b:
+    # PROPOSAL ONLY: disabled until separately approved activation and Windows proof.
+    # Repo variable alone is NOT approval: raw manifest + owner's Issue comment
+    # + exact clean dual-source proof must also pass inside the executor.
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      contains(github.event.issue.labels.*.name, 'pc-publication') &&
+      vars.ZGMINI_B_PUBLICATION_APPLY_ENABLED == 'true'
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout private B contract
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          clean: false
+          persist-credentials: false
+      - name: Checkout public publisher main independently
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: main
+          fetch-depth: 0
+          path: publisher
+          clean: false
+          persist-credentials: false
+      - name: Verify explicit B approval and run one pinned sidecar
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ZGMINI_EARNINGS_C_OPERATIONAL_ROOT: ${{ vars.ZGMINI_EARNINGS_C_OPERATIONAL_ROOT }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\tools\publication-executor.mjs"'
