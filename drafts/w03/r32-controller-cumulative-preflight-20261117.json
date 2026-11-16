@@ -6,7 +6,7 @@
   "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
   "installedShaObserved": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
   "installedEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1788#issuecomment-6921161113",
-  "targetSha": "018d45e0582fc1b17eb6904333d0bd7b90dbfb1f",
+  "targetSha": "2dcc092127f829a652bf62597838ef5f349e1ea3",
   "targetSourcePRs": [
     "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1783",
     "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1785"
@@ -48,15 +48,15 @@
     },
     {
       "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
-      "sha256": "816c0132dd9504586c3bf46f6438ceaf74401c03286c70b9c72e40bf7712ba39"
+      "sha256": "f6df1b3adc6ca78719a7401eb5a65038c3efcd511412388e94c471fd6eea2ec8"
     }
   ],
   "knownCumulativeChange": {
-    "commitsAheadOfObservedInstalled": 83,
-    "allRepositoryPathsChanged": 107,
+    "commitsAheadOfObservedInstalled": 99,
+    "allRepositoryPathsChanged": 127,
     "controllerConfigPathsChanged": 6,
     "compareBase": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
-    "compareHead": "018d45e0582fc1b17eb6904333d0bd7b90dbfb1f"
+    "compareHead": "2dcc092127f829a652bf62597838ef5f349e1ea3"
   },
   "recoveryState": {
     "issue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1745",
@@ -106,24 +106,30 @@
       "paths": [
         "controller/theme-nine-r32-raw-coverage-readonly.mjs"
       ]
+    },
+    {
+      "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1793",
+      "mergeSha": "2dcc092127f829a652bf62597838ef5f349e1ea3",
+      "paths": [
+        "controller/theme-nine-r32-raw-coverage-readonly.mjs"
+      ]
     }
   ],
   "checks": {
     "sourceCommitAndSixFileHashesVerified": true,
     "configOperationsRetained": 42,
     "newOperationReadOnly": true,
-    "sourceCI": "SUCCESS",
+    "sourceCI": "SUCCESS_AT_PR1793",
     "maintenanceInstallApproved": false,
     "maintenanceReconciliationComplete": false,
     "pc64SymbolReadback": false
   },
-  "sourceProvenanceNotice": "Fingerprints and PR references are source-preflight evidence only. Do not use this draft as approvals/controller-updates manifest; must refresh exact target SHA and six file hashes after PR #1793 is merged, then independently verify B authorization and original recovery ledger.",
-  "normalizedChangedFilesFingerprintSha256": "323162568d5bce51d4a4e5797c5ba9fa2f25752bc28d721ab7171a0b7278b622",
+  "sourceProvenanceNotice": "Six-file target SHA256 and fingerprint correspond EXACTLY to immutable target 2dcc0921; only deployment path differences counted. Not a B approval manifest; existing shared Controller owner must reconcile #1745 recovery and verify all cumulative change approvals/source hashes and current PC install preimage before signing/installing.",
+  "normalizedChangedFilesFingerprintSha256": "198af64c6885fc114d61d86054c8807d7abc013ccaa76f6e4daeb1a5b504dcf9",
   "fingerprintContract": "SHA256(JSON.stringify(sorted([{path,sha256}], lexicographic path ascending)) from maintenance-contract manifestFingerprint",
   "includedSourceFixCandidate": {
     "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1793",
-    "branch": "fix/w03-r32-missing-ny-day-samples-20261117",
-    "status": "DRAFT_CI_QUEUED_NOT_IN_INSTALLED_OR_TARGET_SHA",
-    "requiresTargetShaRefresh": true
+    "status": "MERGED_AND_CI_PASS_SOURCE_ONLY",
+    "requiresTargetShaRefresh": false
   }
 }
