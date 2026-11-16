@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -175,4 +175,37 @@ test('fixed 1501 operation never follows user-controlled path or mutates files',
  assert.equal(q.code,'C1501_ORIGINAL_FILES_UNAVAILABLE');
  assert.equal(q.operationalWrites,0);
  assert.equal(Object.hasOwn(q,'ledger996Matched'),false);
+});
+test('1501 recovery checkpoint preserves phase and PID existence without claiming safe release',()=>{
+ const x=pinned996();
+ x.first.ledger=Buffer.from(JSON.stringify({
+  requestId:'pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b',
+  issueNumber:1501,targetSha:'b2ff49dd14a09ebeba482e2ae9a84530e00f094f',
+  status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'RECONNECTED',
+  failureOperation:'resumeIntake',intakePaused:true,workflowEnabled:false,
+  updatedAt:'2026-11-12T20:32:33.000Z',token:'SECRET_TOKEN'}));
+ x.second={...x.first};
+ const z=classify1501RecoveryCheckpoint(x,{
+  signal:(pid,flag)=>{assert.equal(pid,4567);assert.equal(flag,0);},
+  backupPresent:true,backlogPresent:false});
+ assert.equal(z.status,'CORRELATED');
+ assert.equal(z.ledgerPhase,'RECOVERY_REQUIRED');
+ assert.equal(z.ledgerFirstFail,'RECONNECTED');
+ assert.equal(z.ledgerFailureOperation,'resumeIntake');
+ assert.equal(z.ownerPidObservation,'PID_PRESENT_IDENTITY_UNVERIFIED');
+ assert.equal(z.backupPresent,true);
+ assert.equal(z.backlogPresent,false);
+ assert.equal(z.eligibleForAutomaticRelease,false);
+ assert.doesNotMatch(JSON.stringify(z),/SECRET_TOKEN|nonce|targetSha|requestId|ZGmini/i);
+ const absent=classify1501RecoveryCheckpoint(x,{
+  signal:()=>{const e=new Error('not found');e.code='ESRCH';throw e;}});
+ assert.equal(absent.ownerPidObservation,'PID_NOT_PRESENT');
+ assert.equal(absent.eligibleForAutomaticRelease,false);
+});
+test('1501 recovery checkpoint refuses to interpret uncorrelated or malformed phase',()=>{
+ const x=pinned996();x.second={...x.first};
+ const no=classify1501RecoveryCheckpoint(x,{signal:()=>{throw Error('should not probe');}});
+ assert.equal(no.status,'STATE_UNKNOWN');
+ assert.equal(no.ownerPidObservation,'UNKNOWN');
+ assert.equal(no.ledgerPhase,null);
 });
