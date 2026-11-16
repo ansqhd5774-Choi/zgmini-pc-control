@@ -12,6 +12,8 @@ on:
       - 'tests/theme-l7-runtime-readonly.test.mjs'
       - 'tests/supervisor-status-write.test.mjs'
       - 'tools/maintenance-contract.mjs'
+      - 'shared-resource/issue-admission.mjs'
+      - 'tests/shared-resource-issue-admission.test.mjs'
       - 'tools/r181-pinned-route-candidate.mjs'
       - 'tools/r181-primary-route-candidate.mjs'
       - 'tools/r181-primary-b-transaction.mjs'
@@ -88,6 +90,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
       - name: Verify W03 R181 exact saved-ledger source-only A metadata and privacy contract
         run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
+      - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
+        run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only
         run: node --test --test-concurrency=1 tests/r181-pinned-route-candidate.test.mjs
       - name: Verify W03 protected PC-only R181 B contract without operational effects

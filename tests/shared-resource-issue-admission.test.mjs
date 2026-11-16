@@ -146,3 +146,26 @@ test('workflow admission gate includes every registered shared B title when labe
     assert.equal(missing.code,'EXACT_RESOURCE_LABEL_REQUIRED');
   }
 });
+
+test('dedicated R181 workflow titles are not falsely rejected by shared ingress',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/pc-writer-b-source-once.yml',
+  import.meta.url),'utf8');
+ const titles=['r181-protected-route-install','r181-source-shape-readonly',
+  'r181-saved-ledger-readonly','r181-primary-route-install',
+  'r181-existing-task-run-once'];
+ for(const title of titles){
+  assert.ok(workflow.includes("github.event.issue.title == '"+title+"'"),
+   'dedicated workflow exact title missing '+title);
+  const admission=inspectSharedIssueAdmission({...issue(title),
+   body:JSON.stringify({schema:'WRONG_BODY_FOR_SHARED_B'})});
+  assert.equal(admission.state,'UNMANAGED');
+  assert.equal(admission.code,'DEDICATED_EXACT_WORKFLOW_ROUTE');
+ }
+ // Same label plus unregistered title still produces a meaningful rejection.
+ const unknown=inspectSharedIssueAdmission({...issue('invalid-operation'),
+  body:JSON.stringify({schema:'WRONG_BODY'})});
+ assert.equal(unknown.code,'EXACT_ISSUE_TITLE_REQUIRED');
+ assert.equal(unknown.state,'REJECTED_AT_ADMISSION');
+ // Generic shared Writer B routing is not loosened.
+ assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
+});
