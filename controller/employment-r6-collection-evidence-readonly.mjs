@@ -53,6 +53,20 @@ function safeNationalResponse(value){
 }
 
 const date=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(x)?x:null;
+// Only fixed public jurisdiction codes and date-only Current metadata leave SQLite.
+// This does NOT establish when an observation was actually available (TRUE_PIT).
+export function projectR6RegionLatestDates(rows){
+ const known=new Map();
+ for(const row of Array.isArray(rows)?rows:[]){
+  if(CORE_STATES.includes(row?.geography_code)){
+   known.set(row.geography_code,date(row?.latest_observation_date));
+  }
+ }
+ const regions=CORE_STATES.map(code=>({code,latestObservationDate:known.get(code)??null}));
+ return {scope:'CURRENT_ONLY_NOT_PIT',verifiedRegionCount:regions.filter(x=>x.latestObservationDate!==null).length,
+  missingRegionCount:regions.filter(x=>x.latestObservationDate===null).length,
+  regions};
+}
 const stamp=x=>typeof x==='string'&&/^20\d{2}-\d{2}-\d{2}T[\d:.]+Z$/.test(x)?x:null;
 const noWrite=()=>({providerCalls:0,d1Writes:0,operationalWrites:0});
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
@@ -82,8 +96,15 @@ function preflight(file,root,filesystem){
  if(header.toString('ascii',0,16)!==SQLITE_MAGIC||![1,2].includes(header[18])||![1,2].includes(header[19]))
   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_HEADER_INVALID'};
  if(header[18]===2||header[19]===2){
-  if(!['-wal','-shm'].every(ext=>safeEntry(file+ext,root,filesystem)?.stat.isFile()))
+  const wal=!!safeEntry(file+'-wal',root,filesystem)?.stat.isFile();
+  const shm=!!safeEntry(file+'-shm',root,filesystem)?.stat.isFile();
+  // A clean last-close checkpoint can remove both files. A partial pair is
+  // a different uncertain state. Neither authorizes immutable=1 or creating
+  // files in the operating DB directory as part of an A-grade read.
+  if(!wal&&!shm)
    return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_ABSENT'};
+  if(!wal||!shm)
+   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_PARTIAL'};
  }
  return {status:'PASS',path:entry.real};
 }
@@ -236,6 +257,16 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    FROM region_windows
    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600`).all(...CORE_STATES);
   result.stateClaims=coverage(weekly);
+  // Fixed 51-jurisdiction latest Current dates; no values, paths, raw bodies,
+  // or History revisions. Caller must not infer TRUE_PIT eligibility.
+  stage='STATE_CLAIMS_REGION_LATEST_CURRENT';
+  const latestByRegion=db.prepare(`SELECT geography_code,
+    MAX(observation_date) AS latest_observation_date
+   FROM market_score_employment_r4_shadow_current_v1
+   WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
+     AND geography_code IN (${countryMarkers})
+   GROUP BY geography_code`).all(...CORE_STATES);
+  result.stateClaims.regionLatest=projectR6RegionLatestDates(latestByRegion);
   result.status='PASS';result.code='R6_DOL_BED_STORED_EVIDENCE_READONLY';
   return result;
  }catch{
