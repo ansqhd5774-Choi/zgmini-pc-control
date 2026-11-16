@@ -49,12 +49,22 @@ export function classifyObservedHttpHost(x,now){
  const confirmedHttpError=Object.entries(last).some(([code,count])=>count>0&&
   (code==='NETWORK_ERROR'||(/^[45][0-9]{2}$/.test(code)&&
    code!=='404'&&code!=='429')));
- const monitoringState=rawState==='excluded'||rawState==='stale'||rawState==='unknown'
-  ?'unknown':confirmedHttpError?'failed':successes>0?'normal':'unknown';
+ // The observed inter-request median is not an authorized provider
+ // schedule: hourly burst gaps cannot make today's successful 2xx a broken
+ // connection. Only recent (<=24h) concrete 2xx can override an *inferred*
+ // overdue clock. The unverified cadence stays visible in the reason.
+ const last2xxFresh=successes>0&&x.lastAttemptAt!==null&&
+  age>=0&&age<=24*3600_000;
+ const monitoringState=!repeated?'unknown':
+  confirmedHttpError?'failed':
+  nonPeriodicStale?'unknown':
+  overdue&&!last2xxFresh?'unknown':
+  successes>0?'normal':'unknown';
  const reason=!repeated?'NOT_REPEATED':
+  monitoringState==='failed'?'LAST_HTTP_ERROR':
+  overdue&&last2xxFresh?'RECENT_2XX_CADENCE_UNVERIFIED':
   overdue?'ESTIMATED_CADENCE_OVERDUE':
   nonPeriodicStale?'NO_VERIFIED_SCHEDULE_OVER_36H':
-  monitoringState==='failed'?'LAST_HTTP_ERROR':
   monitoringState==='normal'?'RECENT_2XX':
   rawState==='failed'?'QUOTA_OR_UNCLASSIFIED':'EVIDENCE_UNKNOWN';
  return {repeated,monitoringState,reason,expectedIntervalMs:cadence,
