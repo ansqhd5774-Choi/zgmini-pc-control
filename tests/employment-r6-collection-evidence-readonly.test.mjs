@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectEmploymentR6CollectionEvidence} from '../controller/employment-r6-collection-evidence-readonly.mjs';
+import {inspectEmploymentR6CollectionEvidence,projectR6RegionLatestDates} from '../controller/employment-r6-collection-evidence-readonly.mjs';
 
 const STATES=['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 const sha=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -361,4 +361,72 @@ test('official DOL HTTP-200 source unavailability remains redacted and exact in 
  assert.equal(result.providerCalls,0);
  assert.equal(result.d1Writes,0);
  assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|PRIVATE_DIGEST_DO_NOT_OUTPUT|sourceUrl|bodySha256/);
+});
+
+test('PIT-04-01 fixed 51-jurisdiction Current latest dates do not imply PIT readiness',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ seed(db,{missingLastCode:'WY'});db.close();
+ const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const dates=r.stateClaims?.regionLatest;
+ const latest=new Date(Date.parse('2025-01-04T00:00:00.000Z')+55*7*86400000).toISOString().slice(0,10);
+ const previous=new Date(Date.parse('2025-01-04T00:00:00.000Z')+54*7*86400000).toISOString().slice(0,10);
+ assert.equal(r.status,'PASS');
+ assert.equal(dates.scope,'CURRENT_ONLY_NOT_PIT');
+ assert.equal(dates.verifiedRegionCount,51);
+ assert.equal(dates.missingRegionCount,0);
+ assert.equal(dates.regions.length,51);
+ assert.deepEqual(dates.regions.map(x=>x.code),STATES);
+ assert.equal(dates.regions.find(x=>x.code==='WY').latestObservationDate,previous);
+ assert.equal(dates.regions.find(x=>x.code==='DC').latestObservationDate,latest);
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].regions,50);
+ assert.equal(r.providerCalls,0);assert.equal(r.operationalWrites,0);assert.equal(r.d1Writes,0);
+ assert.equal(sha(file),beforeHash);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY_SHOULD_NOT_LEAK|SECRET_DO_NOT_OUTPUT|TRUE_PIT_READY/);
+});
+
+test('PIT-04-01 unknown regions are never projected and missing official codes stay null',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET geography_code='ZZ' WHERE geography_code='DC'").run();
+ db.close();
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ const latest=result.stateClaims.regionLatest;
+ assert.equal(result.status,'PASS');
+ assert.equal(latest.scope,'CURRENT_ONLY_NOT_PIT');
+ assert.equal(latest.regions.length,51);
+ assert.equal(latest.verifiedRegionCount,50);
+ assert.equal(latest.missingRegionCount,1);
+ assert.equal(latest.regions.find(x=>x.code==='DC').latestObservationDate,null);
+ assert.equal(latest.regions.find(x=>x.code==='AL').latestObservationDate,'2025-01-04');
+ assert(!JSON.stringify(latest).includes('ZZ'));
+});
+
+test('PIT-04-01 sanitized dates reject malformed stored text and unapproved codes',()=>{
+ const report=projectR6RegionLatestDates([
+  {geography_code:'AL',latest_observation_date:'2025-01-04'},
+  {geography_code:'DC',latest_observation_date:'PRIVATE_RAW_BODY_SHOULD_NOT_LEAK'},
+  {geography_code:'ZZ',latest_observation_date:'2025-01-04'}]);
+ assert.equal(report.regions.length,51);
+ assert.equal(report.verifiedRegionCount,1);
+ assert.equal(report.missingRegionCount,50);
+ assert.equal(report.regions.find(x=>x.code==='DC').latestObservationDate,null);
+ assert(!JSON.stringify(report).includes('ZZ'));
+ assert(!JSON.stringify(report).includes('PRIVATE_RAW_BODY_SHOULD_NOT_LEAK'));
+});
+
+test('a partially present WAL sidecar pair remains fail-closed and no sidecar is created',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ db.exec('PRAGMA journal_mode=WAL');db.close();
+ fs.writeFileSync(file+'-wal',Buffer.from('fixture-not-a-valid-WAL'));
+ const beforeFiles=fs.readdirSync(storage).sort(),beforeHash=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('MUST_NOT_OPEN');}});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'R6_EVIDENCE_WAL_SIDECARS_PARTIAL');
+ assert.equal(result.sqliteOpened,false);
+ assert.equal(result.stateClaims,null);
+ assert.equal(sha(file),beforeHash);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
 });
