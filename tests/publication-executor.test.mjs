@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parsePublisherLog,nextLedgerPhase,millisecondsToNextUtcSecond,
-  publicationCheckpointReport,validateBeaStoredPreflight} from '../tools/publication-executor.mjs';
+  publicationCheckpointReport,validateBeaStoredPreflight,
+  validateQfrStoredPreflight,validateQfrApplySource} from '../tools/publication-executor.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const source=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -22,6 +23,7 @@ test('BEA exact D1 readback and original CSV hash are mandatory',()=>{
 });
 test('QFR exact stored checkpoint is validated and only identical prior is reusable',()=>{
  const raw=['MODE=APPLY_EXPLICIT','SOURCE_VERSION='+'b'.repeat(64),
+   'RAW_ZIP_SHA256='+'c'.repeat(64),'PREFLIGHT_SOURCE_PIN=VERIFIED',
    'SOURCE_STORED_AT=1793112733108','D1_RESULT=ALREADY_STORED',
    'RESULT=PASS_QFR_D1_ALREADY_STORED'].join('\n');
  assert.equal(parsePublisherLog(raw,'census-qfr-margin-once').d1Result,'ALREADY_STORED');
@@ -100,4 +102,37 @@ test('BEA preflight and apply must reuse manifest pinned source without provider
  assert.match(executor,/evidence.sourceVersion!==invocation.sourceSha256/);
  assert.match(executor,/providerCalls:0/);
  assert.doesNotMatch(executor,/providerCalls:request.operation==='bea-unit-profit-once'\?2:0/);
+});
+
+test('QFR dry-run pins exact version, raw ZIP SHA and stored timestamp',()=>{
+ const key='detail:earnings-recession-indicators:census-qfr-mfg-margin:v1';
+ const raw=['MODE=READ_ONLY_PREFLIGHT','SNAPSHOT_KEY='+key,'SOURCE_GATES=PASS',
+   'SOURCE_FRESHNESS=FRESH','SOURCE_HTTP_REQUESTS=0','PC_SQLITE_WRITES=0',
+   'D1_QUERIES=0','D1_WRITES=0','SOURCE_VERSION='+'a'.repeat(64),
+   'RAW_ZIP_SHA256='+'b'.repeat(64),'SOURCE_STORED_AT=1793112733108',
+   'RESULT=PASS_QFR_D1_PREFLIGHT_NO_REMOTE_ACCESS'].join('\\n');
+ const pin=validateQfrStoredPreflight(raw,key);
+ assert.deepEqual(pin,{sourceVersion:'a'.repeat(64),
+   rawZipSha256:'b'.repeat(64),sourceStoredAt:1793112733108});
+ for(const [field,value] of [['SOURCE_VERSION','c'.repeat(63)],['RAW_ZIP_SHA256','X'],
+   ['SOURCE_STORED_AT','0'],['D1_WRITES','1'],['SNAPSHOT_KEY','different'],
+   ['SOURCE_FRESHNESS','STALE']]){
+   const changed=raw.replace(field+'='+raw.split('\\n').find(x=>x.startsWith(field+'=')).split('=')[1],
+     field+'='+value);
+   assert.throws(()=>validateQfrStoredPreflight(changed,key),
+     /PUBLICATION_QFR_PREFLIGHT_SOURCE_MISMATCH/);
+ }
+ const apply={sourceVersion:pin.sourceVersion,rawZipSha256:pin.rawZipSha256,
+   sourceStoredAt:pin.sourceStoredAt};
+ assert.equal(validateQfrApplySource(pin,apply),true);
+ for(const [field,value] of [['sourceVersion','c'.repeat(64)],
+   ['rawZipSha256','c'.repeat(64)],['sourceStoredAt',1793112733109]])
+   assert.throws(()=>validateQfrApplySource(pin,{...apply,[field]:value}),
+     /PUBLICATION_QFR_APPLY_SOURCE_MISMATCH/);
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/validateQfrStoredPreflight\\(preflightEvidence,invocation\\.snapshotKey\\)/);
+ assert.match(executor,/ZGMINI_EARNINGS_QFR_SOURCE_VERSION:qfrPin\\.sourceVersion/);
+ assert.match(executor,/ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin\\.rawZipSha256/);
+ assert.match(executor,/ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String\\(qfrPin\\.sourceStoredAt\\)/);
+ assert.match(executor,/validateQfrApplySource\\(qfrPin,evidence\\)/);
 });
