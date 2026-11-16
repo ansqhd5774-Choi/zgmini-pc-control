@@ -1,0 +1,69 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "b2ff49dd14a09ebeba482e2ae9a84530e00f094f",
+  "targetSha": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "16d2a56f8404028a59db78847a572de86ef503fc2139144d1f928c569bcb093c"
+    },
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "ccb9a5ceca1cf7e6852b0844116e27985378cd832dfe7e77e103cfa6d673997d"
+    },
+    {
+      "path": "controller/inflation-core-owner-diagnostic-probe.mjs",
+      "sha256": "ee7881216d6c7111a186b25db0091aba9028bf785b98d30505f608493dca247b"
+    },
+    {
+      "path": "controller/inflation-event129-b-proof.mjs",
+      "sha256": "085946319237bb78a9f92b3e6c6b11c5c55bb8d393bcf5f924e91ec8af63302f"
+    },
+    {
+      "path": "controller/inflation-event129-evidence-readonly.mjs",
+      "sha256": "796b1ad0a6f646ccdbbdefda4197593eec02af41601342d610dd94a914e0d80e"
+    },
+    {
+      "path": "controller/inflation-vbs-b-proof.mjs",
+      "sha256": "ba421a53e29ff422b38945c0baad396ad23c5337634470ea208c821b1bbe78e2"
+    },
+    {
+      "path": "controller/market-calendar-r44-input-audit-readonly.mjs",
+      "sha256": "8c4a15602262fdeab10600adcb7057298acd7d873e72a1bb3c335df58c9bcddf"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "b1b159aafc511127c4d086e7f87d4e07dcd541d2bfe48e87dfb8eebc666406ba"
+    },
+    {
+      "path": "controller/provider-activity-runtime-readonly.mjs",
+      "sha256": "16d24684ed08b5ed2771bf377d64c97ab5fa4ad9430bc94ffadab788fc1c0f16"
+    },
+    {
+      "path": "controller/theme-l7-runtime-readonly.mjs",
+      "sha256": "77d70340cb9dc594a217a95338bc02cf0e037756c10442b9630f89898337edba"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1724",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+    "status": "PASS",
+    "manifestSha256": "7e5940717b25c54f60a0aa3e1ce8f9122eeb6fc36c91ca1f3f6474330535331e"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "b2ff49dd14a09ebeba482e2ae9a84530e00f094f"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "5b43c3cc9da75143481f310bb45a76f919d5b040"
+}
