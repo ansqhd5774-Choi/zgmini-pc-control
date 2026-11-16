@@ -45,3 +45,13 @@
 - 결과: `2026-11-16T16:22:39.528Z`, `rosterComplete=true`, `http={normal:32,failed:0,unknown:0,total:32}`, `status=PASS`, `operationalWrites=providerCalls=d1Writes=0`. Census `MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW`, 마지막 기존 Fetch-wrapper HTTP 200 시각 `2026-11-03T21:00:36.518Z`.
 - 공개 `https://zgmini.kr/api/api-connection-health?http32_verify=fe8a27b1e0e80fbc` HTTP 200, `status=healthy`, `api=14/14`, `http=32/32`, `checkedAt=2026-11-16T16:17:31.335Z`.
 - **완료 범위:** 현재 14일 반복 관측 HTTP 32개 호스트의 연결 상태 확인. 이는 32개 정규 수집기·D1 저장 완료의 동의어는 아님. 14일 rolling 호스트 분모는 시간이 지나면 바뀔 수 있음. 추가 재시도·예약 생성·Cloudflare 로그인·D1 감사 불필요.
+
+## 유지 상태 재검증 — 2026-11-17 08:17 KST
+
+- 사용자 후속 "계속해라"에 따라 운영 상태가 실제로 유지되는지 단회 재조회. 새로운 수집 코드·예약·배포 없음.
+- 사이트 조회: https://zgmini.kr/api/api-connection-health?postcheck=20261117T0815KST — HTTP 200, `status=healthy`, `api=14/14`, `http=32/32`, `checkedAt=2026-11-16T23:10:13.435Z` (08:10:13 KST).
+- 실제 Windows PC 공식 A: [Issue #1802](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1802), [Run #43977911377](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43977911377), [원장 JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/pc-process-inventory-43977911377-1-operating.json).
+- `observedAtUtc=2026-11-16T23:17:53.522Z` (08:17:53 KST), `status=PASS`, `rosterComplete=true`, `http={normal:32,failed:0,unknown:0,total:32}`, `providerCalls=0`, `operationalWrites=0`, `d1Writes=0`.
+- 마지막 관측 HTTP 2xx의 경과 시각: **30개 호스트 24시간 이내**, `ecos.bok.or.kr` **약 59.7시간 전**, 월간 `cdn.www.census.gov` **약 314.3시간 전**. 보존된 월간 예외와 승인된 관측 주기 정책에 따른 정상 연결 판정이며, 32개 전부 최근 24시간 통신했다는 뜻은 아님.
+- 주요 개별 확인: `data.alpaca.markets` 마지막 200 `2026-11-16T20:07:19.588Z`; `data.sec.gov` 최근 200×7/선택 프레임 404×2; `cdn.www.census.gov` 과거 로깅 200×1과 별도 PC 단회 GET #1797의 200 확인. API 정상 숫자를 공급자별 원자료 최신성/저장 완료로 해석하지 않는다.
+- **판정:** 기존 완료 후 유지 검증도 PC·사이트 양측 PASS. 지금 추가 코드 변경 또는 인위적 수집 요청을 만들 이유 없음.
