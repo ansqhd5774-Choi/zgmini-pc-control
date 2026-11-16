@@ -70,6 +70,12 @@ test('operation state transitions fail closed on ambiguous apply or timeout',()=
  assert.equal(nextLedgerPhase(applying,'NO_WRITE_STOP',{code:'PUBLICATION_QFR_SOURCE_DRIFT_NO_WRITE'}).phase,'BLOCKED');
  assert.equal(nextLedgerPhase(preflight,'STOP',{code:'SOURCE_DRIFT'}).phase,'BLOCKED');
 });
+test('QFR B reads unique result files from the approved request directory, never source checkout',()=>{
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/const outputDir=logDirectory;/);
+ assert.match(executor,/ZGMINI_EARNINGS_C_LOG_DIR:logDirectory/);
+ assert.doesNotMatch(executor,/outputDir=bea\?logDirectory:path\.join\(publisherRoot/);
+});
 test('static workflow stays gated and cannot overwrite existing A or maintenance channels',()=>{
  const yml=source('.github/workflows/pc-publication-b.yml');
  assert.match(yml,/vars\.ZGMINI_B_PUBLICATION_APPLY_ENABLED == 'true'/);
