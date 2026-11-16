@@ -6,7 +6,7 @@ import {assessPriority,sortAdvisoryQueue,hoursSince} from '../agent-handoff/queu
 import {selectionReceipt,orderedPendingIssues,HANDOFF_REPOSITORY,HANDOFF_BOT,HANDOFF_OWNER} from '../agent-handoff/queue-selector.mjs';
 import {WORK_SCHEMA,workReceipt} from '../agent-handoff/work-progress-contract.mjs';
 import {evaluateQueueItem,compileQueueBoard,renderBoardMarkdown} from '../agent-handoff/queue-board.mjs';
-import {validateBoardEvent,collectBoard} from '../agent-handoff/queue-board-runner.mjs';
+import {validateBoardEvent,collectBoard,BOARD_CRON} from '../agent-handoff/queue-board-runner.mjs';
 
 const now=Date.parse('2026-11-16T12:30:00Z');
 const url=n=>'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n;
@@ -139,7 +139,7 @@ test('board returns complete deterministic aggregate and non-executable GitHub l
   assert.equal(board.operationalWrites,0);
   const md=renderBoardMarkdown(board);
   assert.match(md,/#3102/);
-  assert.match(md,/상시 타이머나 새 예약은 없습니다/);
+  assert.match(md,/15분 간격 GitHub 예약 실행/);
   assert.throws(()=>compileQueueBoard([{issue:a.issue,comments:a.comments},{issue:a.issue,comments:a.comments}],now),/DUPLICATE/);
 });
 test('runner requires authenticated workflow provenance and never grants arbitrary triggers',()=>{
@@ -149,12 +149,19 @@ test('runner requires authenticated workflow provenance and never grants arbitra
   const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
     GITHUB_EVENT_NAME:'workflow_run'};
   assert.doesNotThrow(()=>validateBoardEvent(event,env));
-  assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env),/RUN_PROVENANCE_STOP/);
+  assert.doesNotThrow(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env));
+  assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'Untrusted Pipeline'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,actor:{login:'untrusted'}}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,head_branch:'other'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,repository:{...event.repository,private:false}},env),/EVENT_SCOPE_STOP/);
   assert.doesNotThrow(()=>validateBoardEvent({repository:event.repository,sender:{login:HANDOFF_OWNER}},
     {...env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_ACTOR:HANDOFF_OWNER}));
+  const scheduled={repository:event.repository,schedule:BOARD_CRON};
+  const scheduleEnv={...env,GITHUB_EVENT_NAME:'schedule',GITHUB_REF:'refs/heads/main'};
+  assert.doesNotThrow(()=>validateBoardEvent(scheduled,scheduleEnv));
+  assert.throws(()=>validateBoardEvent({...scheduled,schedule:'* * * * *'},scheduleEnv),/SCHEDULE_PROVENANCE_STOP/);
+  assert.throws(()=>validateBoardEvent(scheduled,{...scheduleEnv,GITHUB_REF:'refs/heads/dev'}),/SCHEDULE_PROVENANCE_STOP/);
+  assert.throws(()=>validateBoardEvent({...scheduled,repository:{...scheduled.repository,private:false}},scheduleEnv),/EVENT_SCOPE_STOP/);
 });
 test('read-only collector uses exact inventory/readback and fails when issue changes',async()=>{
   const f=fixture();
@@ -167,13 +174,16 @@ test('read-only collector uses exact inventory/readback and fails when issue cha
   await assert.rejects(()=>collectBoard({...io,readIssue:async()=>({...f.issue,state:'closed'})},now),
     /ISSUE_DRIFT_RESCAN_REQUIRED/);
 });
-test('board GitHub workflow is isolated, owner-limited, read-only, and not scheduled',()=>{
+test('board GitHub workflow is isolated, origin-guarded, read-only, and has a bounded schedule',()=>{
   const p=new URL('../.github/workflows/agent-handoff-queue-board.yml',import.meta.url);
   const flow=readFileSync(p,'utf8');
   assert.match(flow,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
   assert.match(flow,/issues: read/);
   assert.match(flow,/workflow_dispatch:/);
-  assert.doesNotMatch(flow,/schedule:|contents: write|issues: write|zgmini-pc-control\]/);
+  assert.match(flow,/schedule:\s*\n\s*- cron: '7,22,37,52 \* \* \* \*'/);
+  assert.match(flow,/github\.event_name == 'schedule'/);
+  assert.match(flow,/ZGMINI Agent Handoff Intake/);
+  assert.doesNotMatch(flow,/contents: write|issues: write|zgmini-pc-control\]/);
   assert.match(flow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(flow,/node agent-handoff\/queue-board-runner.mjs/);
 });
