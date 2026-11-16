@@ -58,7 +58,7 @@ export function authorizeR181ProtectedB({event,env,manifestBytes}){
   catch{fail('R181_B_MANIFEST_JSON_DENIED');}
   need(exact(m,APPROVAL_KEYS)&&m.schema===R181_B_APPROVAL_SCHEMA&&
     m.status==='APPROVED_B'&&m.scope===R181_B_SCOPE&&
-    m.operation===R181_B_OPERATION&&m.controlSourceSha===env.GITHUB_SHA&&
+    m.operation===R181_B_OPERATION&&SHA40.test(m.controlSourceSha)&&
     m.targetPath===R181_B_TARGET&&
     m.beforeSha256===PINNED_R181_SHA256&&m.patchId===R181_B_PATCH&&
     m.runCount===1&&
@@ -67,7 +67,8 @@ export function authorizeR181ProtectedB({event,env,manifestBytes}){
     'R181_B_APPROVAL_DENIED');
   const proof=Object.freeze({
     request:Object.freeze(req),manifest:Object.freeze(m),
-    sourceSha:env.GITHUB_SHA,issueNumber:event.issue.number,
+    sourceSha:env.GITHUB_SHA,approvedCodeSha:m.controlSourceSha,
+    issueNumber:event.issue.number,
     manifestSha256:req.approvalManifestSha256,
   });
   authorized.add(proof);
