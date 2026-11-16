@@ -2,7 +2,7 @@
 import {createHash} from 'node:crypto';
 export const WIDE_POLICY=Object.freeze({
   version:'ZGMINI_GITHUB_WIDE_SCOUT_R3',lookbackDays:7,
-  maxRuns:300,maxIssues:150,maxPulls:100,maxComments:400,
+  maxRuns:1600,maxIssues:150,maxPulls:100,maxComments:400,
   maxFindings:25,minReportHours:6,ledgerIssue:1743,
   schedule:'14,29,44,59 * * * *'
 });
@@ -25,7 +25,7 @@ function validateArray(arr,max,kind){
 function entry(kind,id,at,link,meaning){
   return {kind,id,at,link,meaning};
 }
-export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCount,complete},now){
+export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCount,complete,coverage=[]},now){
   if(!Number.isFinite(now)||now<Date.UTC(2020,0,1))stop('CLOCK');
   validateArray(runs,WIDE_POLICY.maxRuns,'RUN');
   validateArray(issues,WIDE_POLICY.maxIssues,'ISSUE');
@@ -34,6 +34,7 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
   if(workflows.length!==3||!Number.isSafeInteger(scheduleRunCount)||
       scheduleRunCount<0||!complete||typeof complete!=='object')stop('SCOPE');
   const cutoff=now-WIDE_POLICY.lookbackDays*86400000;
+  if(!Array.isArray(coverage)||coverage.length>8)stop('COVERAGE_INVENTORY');
   const seenRuns=new Set(),seenIssues=new Set(),seenPrs=new Set();
   const observations=[];
   let failed=0,stale=0,cancelled=0,actionRequired=0,old=0,issuesDue=0,prsDue=0;
@@ -100,7 +101,7 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
     version:WIDE_POLICY.version,cutoff:new Date(cutoff).toISOString(),
     inventory:{runs:runs.length,issues:issues.length,pulls:pulls.length,
       complete:{runs:complete.runs===true,issues:complete.issues===true,pulls:complete.pulls===true},
-      oldExcluded:old},
+      oldExcluded:old,statusCoverage:coverage.map(x=>({status:x.status,count:x.count,complete:x.complete===true}))},
     counts:{failedHandledByR1:failed,delayedRuns:stale,cancelled,actionRequired,
       pendingHandoffs:issuesDue,waitingPRs:prsDue},
     schedule:{observedRuns:scheduleRunCount,workflows:workflowStatus},
@@ -149,6 +150,7 @@ export function renderWideReport(report){
     '- 관측 건수: 실행 '+report.inventory.runs+' / Issue '+report.inventory.issues+
       ' / PR '+report.inventory.pulls,
     '- 7일 초과 제외: '+report.inventory.oldExcluded,
+    '- 상태별 검색: '+(report.inventory.statusCoverage.length?report.inventory.statusCoverage.map(x=>x.status+'='+x.count+(x.complete?'':'(미완전)')).join(', '):'미제공'),
     '- 실패 및 시간 초과: '+report.counts.failedHandledByR1+' (개별 진단은 R1 담당)',
     '- 장시간 대기·실행 중: '+report.counts.delayedRuns,
     '- 취소된 실행: '+report.counts.cancelled,
