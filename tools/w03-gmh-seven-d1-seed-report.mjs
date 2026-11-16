@@ -38,6 +38,11 @@ function safeFacts(x){
   !safeTime(x.rollingStoredAt)||!date(x.rollingObservationDate)||
   !(x.rollingBaseHashMatches===null||bool(x.rollingBaseHashMatches))||
   !bool(x.rollingPrimaryGmh)||!bool(x.rollingSecondaryNone)||
+   !bool(x.r32Present)||
+   !['READY','UNAVAILABLE','OTHER_OR_UNKNOWN'].includes(x.r32Status)||
+   !bool(x.r32VersionMatch)||!bool(x.r32MethodologyMatch)||
+   !date(x.r32ObservationDate)||!safeTime(x.r32StoredAt)||
+   !hash(x.r32BodySha256)||!bool(x.r32History252Valid)||
   x.publicationAuthorized!==false||x.d1SeedCasVerified!==false||
   x.r32NonRegressionVerified!==false||x.d1ReadOnly!==true||
   x.providerCalls!==0||x.d1Writes!==0||x.publicWrites!==0)return null;
@@ -48,7 +53,10 @@ function safeFacts(x){
   'overlapDates','comparedScores','mismatchedScores','maxScoreDifference',
   'rollingPresent','rollingSchema','rollingStatus','rollingStoredAt',
   'rollingObservationDate','rollingBaseHashMatches','rollingPrimaryGmh',
-  'rollingSecondaryNone','publicationAuthorized','d1SeedCasVerified',
+  'rollingSecondaryNone','r32Present','r32Status',
+   'r32VersionMatch','r32MethodologyMatch','r32ObservationDate',
+   'r32StoredAt','r32BodySha256','r32History252Valid',
+   'publicationAuthorized','d1SeedCasVerified',
   'r32NonRegressionVerified','d1ReadOnly','providerCalls','d1Writes',
   'publicWrites'
  ];
