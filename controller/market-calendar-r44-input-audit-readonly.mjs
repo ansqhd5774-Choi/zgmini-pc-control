@@ -114,6 +114,10 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
   else byIssuer.set(id,{cap,tickers:[t]});
  }
  const counts={one:0,two:0,three:0,missing:0,conflicting:0};
+ // Read-only what-if count for an explicitly requested 50B USD cutoff.
+ // Does not alter the approved 20B/200B star formula or publisher output.
+ const threshold50BUsd=50000000000;
+ let atLeast50BCalendarTickers=0;
  const grades=new Map();
  for(const t of scheduled){
   const cap=strict.get(t);
@@ -122,6 +126,7 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
   else{
    const g=importance(cap);grades.set(t,g);
    counts[g===1?'one':g===2?'two':'three']++;
+   if(cap>=threshold50BUsd)atLeast50BCalendarTickers++;
   }
  }
  let metadataCandidates=0,aliasCandidates=0,maskedShareClassCandidates=0;
@@ -157,12 +162,16 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
  }
  if(Object.values(missingReasons).reduce((sum,n)=>sum+n,0)!==counts.missing)
   fail('R44_MISSING_REASON_COUNT_MISMATCH');
+ if(atLeast50BCalendarTickers<counts.three||
+   atLeast50BCalendarTickers>counts.two+counts.three)
+  fail('R44_50B_SCENARIO_OUT_OF_RANGE');
  return {
   rawRows:rows.length,validListedTickers:strict.size,invalidRows,nonListedRows,
   strictDuplicateTickerConflicts:strictConflicts.size,rawCapDuplicateConflicts:rawConflicts.size,
   metadataRejectedWithCap,
   calendarTickerCount:scheduled.length,coveredTickerCount:counts.one+counts.two+counts.three,
-  counts,missingReasons,metadataCandidates,aliasCandidates,maskedShareClassCandidates,grades
+  counts,missingReasons,metadataCandidates,aliasCandidates,maskedShareClassCandidates,
+  threshold50B:{cutoffUsd:threshold50BUsd,calendarTickerCount:atLeast50BCalendarTickers},grades
  };
 }
 
@@ -210,7 +219,7 @@ export function inspectR44ExistingInputAudit(dataRoot,{openDb}={}){
   calendarTickerCount:null,coveredTickerCount:null,counts:null,
   invalidRows:null,nonListedRows:null,metadataRejectedWithCap:null,
   metadataCandidates:null,aliasCandidates:null,maskedShareClassCandidates:null,
-  missingReasons:null,
+  missingReasons:null,threshold50B:null,
   rawCapDuplicateConflicts:null,sqliteDays:0,archiveDays:0,
   localOutputAgrees:null,outputStatus:'NOT_READ',
   sqliteOpened:false,providerCalls:0,dbWrites:0,d1Writes:0,operationalWrites:0,
@@ -251,7 +260,7 @@ export function inspectR44ExistingInputAudit(dataRoot,{openDb}={}){
    result.code='R44_PINNED_INPUT_ROW_MISMATCH';return result;
   }
   for(const k of ['rawRows','validListedTickers','calendarTickerCount',
-   'coveredTickerCount','counts','missingReasons','invalidRows','nonListedRows',
+   'coveredTickerCount','counts','missingReasons','threshold50B','invalidRows','nonListedRows',
    'metadataRejectedWithCap','metadataCandidates','aliasCandidates',
    'maskedShareClassCandidates','rawCapDuplicateConflicts'])result[k]=a[k];
   const prior=getBody(db,'output',OUTPUT_KEY);
