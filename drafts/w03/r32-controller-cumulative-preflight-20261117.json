@@ -74,5 +74,48 @@
     "Only after actual installed Controller SHA is verified, run registered 64-symbol R32 A query when memory >=1536MiB"
   ],
   "neverUseAsOfficialApproval": true,
-  "operationalEffects": "NONE"
+  "operationalEffects": "NONE",
+  "mergedSourceAttribution": [
+    {
+      "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1753",
+      "mergeSha": "ee05bef29d5f41f461bcb458a82e707ab9832efd",
+      "paths": [
+        "controller/http32-two-host-checkpoints-readonly.mjs",
+        "controller/provider-activity-runtime-readonly.mjs"
+      ]
+    },
+    {
+      "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1772",
+      "mergeSha": "f59e723aa43e59520d760f5da17a07f7f09a04b2",
+      "paths": [
+        "controller/inflation-event129-evidence-readonly.mjs"
+      ]
+    },
+    {
+      "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1783",
+      "mergeSha": "cb2541fbc6bdd63c6922c0c80b3ecf7a016c8b0a",
+      "paths": [
+        "config/operations.json",
+        "controller/operations.mjs",
+        "controller/theme-nine-r32-raw-coverage-readonly.mjs"
+      ]
+    },
+    {
+      "pr": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1785",
+      "mergeSha": "018d45e0582fc1b17eb6904333d0bd7b90dbfb1f",
+      "paths": [
+        "controller/theme-nine-r32-raw-coverage-readonly.mjs"
+      ]
+    }
+  ],
+  "checks": {
+    "sourceCommitAndSixFileHashesVerified": true,
+    "configOperationsRetained": 42,
+    "newOperationReadOnly": true,
+    "sourceCI": "SUCCESS",
+    "maintenanceInstallApproved": false,
+    "maintenanceReconciliationComplete": false,
+    "pc64SymbolReadback": false
+  },
+  "sourceProvenanceNotice": "Historical PRs establish source changes, not blanket authorization or the installed B manifest. Shared owner must verify the entire cumulative target and approval lineage."
 }
