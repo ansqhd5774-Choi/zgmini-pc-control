@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {authorizeDolManual,performDolManual,DOL_MANUAL_SCHEMA} from './dol-manual-v1.mjs';
+import {authorizeDolManual,performDolManual,runDolManualOnce,DOL_MANUAL_SCHEMA} from './dol-manual-v1.mjs';
+import {readFileSync} from 'node:fs';
 import {sanitizeR6BResult} from './report.mjs';
 
 const uid='eacb5f1c-8f44-47f4-8edb-e221a3a02e91';
@@ -141,4 +142,13 @@ test('sanitized manual 3-of-4 output retains only bounded counts, no raw',()=>{
  ])assert.equal(sanitizeR6BResult(change,request,env).status,'STATE_UNKNOWN');
  const badEnv={...env,R6_B_EFFECT_OUTCOME:'failure'};
  assert.equal(sanitizeR6BResult(input,request,badEnv).status,'STATE_UNKNOWN');
+});
+
+test('the manual module never imports the top-level awaiting operation entrypoint',async()=>{
+ const source=readFileSync(new URL('./dol-manual-v1.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/from ['"]\\.\\/operation\\.mjs['"]/);
+ const input=fixture(),o=inject();
+ const done=await runDolManualOnce({...input,...o});
+ assert.equal(done.status,'PARTIAL');
+ assert.deepEqual(o.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
 });
