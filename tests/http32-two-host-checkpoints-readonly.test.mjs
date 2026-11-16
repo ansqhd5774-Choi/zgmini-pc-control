@@ -84,3 +84,38 @@ test('symlink reports never escape the approved source root',t=>temp(root=>{
   assert.ok(!JSON.stringify(r).includes('PRIVATE_TOKEN'));
  }finally{fs.rmSync(outside,{force:true});}
 }));
+
+test('current Core cycle reports R10 child invocation separately from aged saved R10 receipt',()=>temp(root=>{
+ put(root,'local-asset-bubble-r10-alpaca-collection.json',{...sample,checkedAt:'2026-11-12T00:08:19.983Z'});
+ put(root,'asset-r10-alpaca/incremental-checkpoint.json',{through:'2026-11-11'});
+ put(root,'local-cycle-last-run.json',{
+  at:'2026-11-16T13:25:34.482Z',lane:'core',status:'COMPLETE',
+  alpacaIncremental:{status:'FAILED_PREVIOUS_INPUTS_PRESERVED',runRequests:null},
+  progressive:{auxiliaryStartedAt:'2026-11-16T13:17:00Z',auxiliaryStatus:'COMPLETE'},
+  secret:'KEY_LEAK_BLOCK',commandLine:'NOT_TO_EXPOSE'
+ });
+ const x=inspectHttp32TwoHostCheckpoints({root,now:NOW}),a=x.hosts[0];
+ assert.equal(a.cacheEvidenceVerified,false);
+ assert.equal(a.coreCycleReadState,'READ_VERIFIED');
+ assert.equal(a.coreCycleLane,'core');
+ assert.equal(a.coreCycleStatus,'COMPLETE');
+ assert.equal(a.coreAlpacaStatus,'FAILED_PREVIOUS_INPUTS_PRESERVED');
+ assert.equal(a.coreAlpacaRunRequests,null);
+ assert.equal(a.coreAuxiliaryStartedAt,'2026-11-16T13:17:00.000Z');
+ assert.ok(!JSON.stringify(x).includes('KEY_LEAK_BLOCK'));
+ assert.ok(!JSON.stringify(x).includes('NOT_TO_EXPOSE'));
+}));
+test('missing or non-Core recent local cycle never forges R10 invocation proof',()=>temp(root=>{
+ const absent=inspectHttp32TwoHostCheckpoints({root,now:NOW}).hosts[0];
+ assert.equal(absent.coreCycleReadState,'FILE_ABSENT');
+ assert.equal(absent.coreAlpacaStatus,'UNVERIFIED');
+ put(root,'local-cycle-last-run.json',{
+  at:'2026-11-16T13:15:00Z',lane:'korea',status:'COMPLETE',
+  alpacaIncremental:{status:'SKIPPED_KOREA_LANE',runRequests:0},
+  progressive:{auxiliaryStatus:'COMPLETE'}
+ });
+ const a=inspectHttp32TwoHostCheckpoints({root,now:NOW}).hosts[0];
+ assert.equal(a.coreCycleLane,'korea');
+ assert.equal(a.coreAlpacaStatus,'SKIPPED_KOREA_LANE');
+ assert.equal(a.cacheEvidenceVerified,false);
+}));
