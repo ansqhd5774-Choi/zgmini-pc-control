@@ -3,8 +3,11 @@ on:
   workflow_run:
     workflows:
       - ZGMINI Handoff Queue Candidate Selector
+      - ZGMINI Agent Handoff Intake
     types: [completed]
   workflow_dispatch: {}
+  schedule:
+    - cron: '7,22,37,52 * * * *'
 permissions:
   contents: read
   issues: read
@@ -22,7 +25,9 @@ jobs:
         github.event.workflow_run.head_branch == 'main' &&
         github.event.workflow_run.actor.login == 'ansqhd5774-Choi') ||
        (github.event_name == 'workflow_dispatch' &&
-        github.actor == 'ansqhd5774-Choi'))
+        github.actor == 'ansqhd5774-Choi') ||
+       (github.event_name == 'schedule' &&
+        github.ref == 'refs/heads/main'))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 6
     defaults:
