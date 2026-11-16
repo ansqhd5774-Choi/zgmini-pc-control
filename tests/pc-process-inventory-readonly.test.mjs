@@ -349,3 +349,14 @@ test('runner-query missing cannot be misreported as actual offline six seats',()
  assert.equal(unknown.runners[0].busy,null);
  assert.doesNotMatch(JSON.stringify(unknown),/SECRET|password/);
 });
+test('runner query HTTP 403 emits read-only forbidden classification, no fabricated offline list',()=>{
+ const x=sanitizeDedicatedRunnerEvidence({diagnostics:['RUNNERS_QUERY_UNAVAILABLE'],
+  runnerQueryError:'HTTP_403_FORBIDDEN',runners:null,token:'SECRET'});
+ assert.equal(x.queryState,'QUERY_UNAVAILABLE');
+ assert.equal(x.queryFailureReason,'HTTP_403_FORBIDDEN');
+ assert.equal(x.allSixOnline,null);
+ assert.deepEqual(x.runners.map(row=>row.status),Array(6).fill('UNVERIFIED'));
+ assert.doesNotMatch(JSON.stringify(x),/SECRET|token/);
+ assert.equal(sanitizeDedicatedRunnerEvidence({diagnostics:['RUNNERS_QUERY_UNAVAILABLE'],
+  runnerQueryError:'PRIVATE'}).queryFailureReason,null);
+});
