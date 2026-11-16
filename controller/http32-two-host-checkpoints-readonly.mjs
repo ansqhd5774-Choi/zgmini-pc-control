@@ -87,7 +87,7 @@ export function inspectHttp32TwoHostCheckpoints({
     coreAlpacaStatus:reportStatus(cycle.alpacaIncremental?.status,[
      'CACHED','NO_NEW_WINDOW','COLLECTED_PENDING_VALIDATION',
      'DEFERRED_QUOTA','BLOCKED','FAILED_PREVIOUS_INPUTS_PRESERVED',
-     'SKIPPED_KOREA_LANE'
+     'SKIPPED_KOREA_LANE','EXCLUDED_BY_USER'
     ]),
     coreAlpacaRunRequests:safeInteger(cycle.alpacaIncremental?.runRequests),
     coreAuxiliaryStartedAt:time(progressive.auxiliaryStartedAt),
