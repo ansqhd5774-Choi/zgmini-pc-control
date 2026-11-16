@@ -5,7 +5,7 @@ export const HANDOFF_OWNER = 'ansqhd5774-Choi';
 export const HANDOFF_BOT = 'github-actions[bot]';
 export const SELECTION_MARKER = 'HANDOFF_SELECTOR_CANDIDATE_V1';
 const STATES = new Set(['open']);
-const selectedLabel = name => name === 'agent-handoff' || name === 'handoff-agent-pending';
+const selectedLabel = label => label?.name === 'agent-handoff' || label?.name === 'handoff-agent-pending';
 const number = n => Number.isSafeInteger(n) && n > 0;
 const exactIssueUrl = n => 'https://api.github.com/repos/' + HANDOFF_REPOSITORY + '/issues/' + n;
 
