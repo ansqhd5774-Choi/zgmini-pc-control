@@ -159,3 +159,32 @@ test('missing sealed adapters cannot execute a provider request',async()=>{
   performDolManual({auth}),
   e=>e.code==='R6_DOL_ADAPTER_MISSING');
 });
+
+test('unexpected post-claim failures report bounded stage without leaking exception text',async()=>{
+ const auth=authorizeDolManual(fixture());
+ for(const stage of ['MODULE_LOAD','LOCAL_RUNTIME_SETUP','COLLECTOR_EXECUTION',
+  'SQLITE_READBACK','CLEANUP']){
+  const o=inject();
+  const result=await performDolManual({...o,auth,
+   run:async({onStage})=>{onStage(stage);
+    throw new TypeError('PRIVATE_PROVIDER_BODY_LOCAL_PATH_MUST_NOT_LEAK');}});
+  assert.deepEqual(o.calls,['VERIFY','LOCK','CLAIM','UNLOCK']);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.code,`R6_DOL_${stage}_STOP`);
+  assert.equal(result.lastPass,'ONE_SHOT_CLAIMED');
+  assert.equal(result.firstFail,'COLLECT_OR_PUBLISH');
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_PROVIDER_BODY_LOCAL_PATH/);
+ }
+});
+
+test('generic pre-claim failure stays BLOCKED without claiming or retrying',async()=>{
+ const auth=authorizeDolManual(fixture());
+ const o=inject();
+ const result=await performDolManual({...o,auth,
+  verify:()=>{o.calls.push('VERIFY');throw new TypeError('UNSAFE_SOURCE_PATH');}});
+ assert.deepEqual(o.calls,['VERIFY']);
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(result.code,'R6_DOL_PREFLIGHT_STOP');
+ assert.equal(result.firstFail,'PREFLIGHT');
+ assert.doesNotMatch(JSON.stringify(result),/UNSAFE_SOURCE_PATH/);
+});
