@@ -6,7 +6,7 @@ permissions:
   contents: write
   issues: write
 concurrency:
-  group: zgmini-writer-insert-preview-a
+  group: zgmini-writer-insert-preview-a-${{ github.event.issue.number }}
   cancel-in-progress: false
 jobs:
   exact-writer-insert-preview-a:
