@@ -75,6 +75,20 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 
 ## 재개와 인수인계
 
+### #1501 RECONNECTED 접수 원장 정합 복구
+
+`tools/controller-intake-recovery.mjs`는 정확히 #1501만 지원하는 독립 Windows operator 경로다.
+`inspect --source-sha <40자리 커밋>`으로 현재 바이트와 원격 JSON/TXT 영수증을 대조한다.
+`apply`는 커밋된 `approvals/maintenance-recoveries/pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b.intake.json`의
+source·의존 파일·ledger/owner/marker/backlog/host/보호 상태 해시가 모두 일치해야 실행된다.
+
+- 기존 설치·Supervisor·Runner·Workflow·원본 ledger는 변경하지 않는다.
+- #1503과 동일 operation/source의 #1517 실제 실행을 대체 영수증으로 보존하며 기능 결과 BLOCKED를 유지한다. 재생하지 않는다.
+- #1508 성공 실행의 시작 시각은 접수 재개가 확인된 **상한 증거**이며 정확한 enable 시각으로 주장하지 않는다.
+- 원본 backlog를 별도 보존하고 두 요청 처리 근거를 기록한 뒤, 원래 설치 lease 전체를 recovery 아래 보관한다.
+- PREPARED 이후 실패하면 claim·원본 lease·단계 기록을 보존한다. 같은 명령 재실행이나 자동 롤백은 금지한다.
+- 이 복구는 신규 Controller 설치·사후 검사·W01 Event129 원인 규명 성공이 아니다.
+
 원래 잠금이 이미 없거나 다른 담당자가 복구했다면 `NO_ACTIVE_INSTALL_LEASE`와 기존 보관 결과를 대조한다. 이를 새 복구 성공으로 보고하거나 도구를 다시 적용하지 않는다. #106은 2026-11-03T10:54:42Z의 사용자 실PC 보관 결과가 Issue 댓글에 등록됐고, 이후 새 Supervisor/정상 watchdog 상태를 확인했다. 이 과거 성공을 현재 모든 lease가 없다는 보장으로 사용하지 않는다.
 
 1. 원래 실패 요청은 terminal 이력으로 보존하고 recovery 결과를 연결한다.

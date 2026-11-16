@@ -139,31 +139,40 @@ export async function main(args=process.argv.slice(2)){
   approval.requestId===REQUEST&&approval.sourceSha===sourceSha&&
   JSON.stringify(approval.hashes)===JSON.stringify(e.hashes)&&
   JSON.stringify(approval.fileHashes)===JSON.stringify(fileHashes),'INTAKE_APPROVAL_MISMATCH');
- const claim=path.join(root,'leases/controller-recovery');fs.mkdirSync(claim);
+ return commitIntakeRecovery({e,proposal,sourceSha,freshEvidence:collectEvidence,
+  verifyFinal:()=>{
+   const s=collectAutomationStatus([]);
+   need(s.runtimeState==='HEALTHY'&&s.maintenanceState==='HEALTHY'&&s.workflowState==='active'&&
+    s.actualControllerSha===e.summary.actualControllerSha,'INTAKE_FINAL_RUNTIME_DRIFT');
+   need(digest(JSON.stringify(protectedSnapshot()))===e.hashes.protectedState,'INTAKE_FINAL_PROTECTION_DRIFT');
+  }});
+}
+
+export function commitIntakeRecovery({e,proposal,sourceSha,freshEvidence,verifyFinal,
+ rootDir=root,isAlive=alive}){
+ const claim=path.join(rootDir,'leases/controller-recovery');fs.mkdirSync(claim);
  const nonce=randomUUID(),claimFile=path.join(claim,'owner.json');
  put(claimFile,{pid:process.pid,nonce,requestId:REQUEST});
- const out=path.join(root,'recovery'),record=path.join(out,REQUEST+'-intake-'+nonce+'.json');
+ const out=path.join(rootDir,'recovery'),record=path.join(out,REQUEST+'-intake-'+nonce+'.json');
  fs.mkdirSync(out,{recursive:true});let started=false;
  try{
-  const fresh=collectEvidence();
-  need(JSON.stringify(fresh.hashes)===JSON.stringify(e.hashes)&&alive(e.ownerPid)===false,'INTAKE_EVIDENCE_CHANGED');
+  const fresh=freshEvidence();
+  need(JSON.stringify(fresh.hashes)===JSON.stringify(e.hashes)&&isAlive(e.ownerPid)===false,'INTAKE_EVIDENCE_CHANGED');
   put(record,{...proposal,status:'PREPARED',at:new Date().toISOString()});
+  fs.writeFileSync(record+'.original-backlog.json',e.bytes.backlog,{flag:'wx',mode:0o600});
   // Durable PREPARED and claim precede the first operational bookkeeping write.
   started=true;
   const tmp=e.files.backlog+'.intake-'+nonce+'.tmp';put(tmp,e.backlog);
   need(fs.readFileSync(e.files.backlog).equals(e.bytes.backlog),'INTAKE_BACKLOG_CHANGED');
   fs.renameSync(tmp,e.files.backlog);
   need(JSON.stringify(read(e.files.backlog))===JSON.stringify(e.backlog),'INTAKE_BACKLOG_READBACK');
-  const s=collectAutomationStatus([]);
-  need(s.runtimeState==='HEALTHY'&&s.maintenanceState==='HEALTHY'&&s.workflowState==='active'&&
-   s.actualControllerSha===e.summary.actualControllerSha,'INTAKE_FINAL_RUNTIME_DRIFT');
-  need(digest(JSON.stringify(protectedSnapshot()))===e.hashes.protectedState,'INTAKE_FINAL_PROTECTION_DRIFT');
+  verifyFinal();
   for(const k of ['ledger','owner','marker','host','baseline'])
    need(fs.readFileSync(e.files[k]).equals(e.bytes[k]),'INTAKE_FINAL_IDENTITY_DRIFT');
-  need(alive(e.ownerPid)===false,'INTAKE_OWNER_REVIVED');
+  need(isAlive(e.ownerPid)===false,'INTAKE_OWNER_REVIVED');
   const archive=path.join(out,REQUEST+'-intake-'+nonce+'.lease');
   put(record+'.archive-prepared.json',{...proposal,status:'ARCHIVE_PREPARED',archiveName:path.basename(archive)});
-  fs.renameSync(path.join(root,'leases/controller-install'),archive);
+  fs.renameSync(path.join(rootDir,'leases/controller-install'),archive);
   const result={...e.summary,status:'INTAKE_RECOVERED_EXISTING_CONTROLLER_PRESERVED',sourceSha,
    leaseArchived:true,archiveName:path.basename(archive),maintenanceBookkeepingWrites:2,
    at:new Date().toISOString()};

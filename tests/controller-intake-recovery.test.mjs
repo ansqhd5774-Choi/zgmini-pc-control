@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planIntakeRecovery,REQUEST} from '../tools/controller-intake-recovery.mjs';
+import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import {planIntakeRecovery,commitIntakeRecovery,REQUEST} from '../tools/controller-intake-recovery.mjs';
 const body={operation:'theme-platform-shadow-readonly',sourceRepository:'ansqhd5774-Choi/zgmini',
  sourceBranch:'main',sourceSha:'a'.repeat(40),requestId:'pc-original'};
 function fixture(){
@@ -46,4 +47,55 @@ const rejected={
 };
 for(const [name,mutate] of Object.entries(rejected))test('refuses '+name,()=>{
  const f=fixture();mutate(f);assert.throws(()=>planIntakeRecovery(f));
+});
+function transaction(){
+ const rootDir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-intake-test-'));
+ fs.mkdirSync(path.join(rootDir,'leases/controller-install'),{recursive:true});
+ const files={ledger:path.join(rootDir,'ledger.json'),owner:path.join(rootDir,'leases/controller-install/owner.json'),
+  marker:path.join(rootDir,'leases/controller-install/RECOVERY_REQUIRED.json'),
+  host:path.join(rootDir,'host.json'),baseline:path.join(rootDir,'baseline.json'),backlog:path.join(rootDir,'backlog.json')};
+ const bytes=Object.fromEntries(Object.entries(files).map(([k,p])=>{
+  const b=Buffer.from(JSON.stringify({kind:k}));fs.writeFileSync(p,b);return [k,b];
+ }));
+ const e={files,bytes,hashes:{fixture:'unchanged'},ownerPid:123,
+  backlog:{reconciled:true},summary:{originalLedgerPreserved:true,replayedRequests:0}};
+ return {rootDir,e,proposal:{},sourceSha:'a'.repeat(40),freshEvidence:()=>e,verifyFinal:()=>{},isAlive:()=>false};
+}
+test('transaction preserves original journal and backlog bytes and archives the complete lease',()=>{
+ const f=transaction();try{
+  const r=commitIntakeRecovery(f);
+  assert.equal(r.status,'INTAKE_RECOVERED_EXISTING_CONTROLLER_PRESERVED');
+  assert.equal(fs.existsSync(path.join(f.rootDir,'leases/controller-install')),false);
+  assert.equal(fs.existsSync(path.join(f.rootDir,'leases/controller-recovery')),false);
+  assert.deepEqual(fs.readFileSync(f.e.files.ledger),f.e.bytes.ledger);
+  assert.deepEqual(fs.readFileSync(path.join(f.rootDir,'recovery',r.archiveName,'owner.json')),f.e.bytes.owner);
+  const backup=fs.readdirSync(path.join(f.rootDir,'recovery')).find(x=>x.endsWith('.original-backlog.json'));
+  assert.deepEqual(fs.readFileSync(path.join(f.rootDir,'recovery',backup)),f.e.bytes.backlog);
+ }finally{fs.rmSync(f.rootDir,{recursive:true,force:true});}
+});
+test('fresh evidence change refuses all bookkeeping changes and releases only own claim',()=>{
+ const f=transaction();try{
+  f.freshEvidence=()=>({hashes:{changed:true}});
+  assert.throws(()=>commitIntakeRecovery(f),{code:'INTAKE_EVIDENCE_CHANGED'});
+  assert.deepEqual(fs.readFileSync(f.e.files.backlog),f.e.bytes.backlog);
+  assert.ok(fs.existsSync(path.join(f.rootDir,'leases/controller-install')));
+  assert.equal(fs.existsSync(path.join(f.rootDir,'leases/controller-recovery')),false);
+ }finally{fs.rmSync(f.rootDir,{recursive:true,force:true});}
+});
+test('uncertain final check retains original lease, reservation and PREPARED evidence without rollback',()=>{
+ const f=transaction();try{
+  f.verifyFinal=()=>{throw Object.assign(Error(),{code:'FIXTURE_RUNTIME_DRIFT'});};
+  assert.throws(()=>commitIntakeRecovery(f),{code:'FIXTURE_RUNTIME_DRIFT'});
+  assert.ok(fs.existsSync(path.join(f.rootDir,'leases/controller-install')));
+  assert.ok(fs.existsSync(path.join(f.rootDir,'leases/controller-recovery')));
+  assert.deepEqual(fs.readFileSync(f.e.files.ledger),f.e.bytes.ledger);
+  assert.throws(()=>commitIntakeRecovery(f),{code:'EEXIST'});
+ }finally{fs.rmSync(f.rootDir,{recursive:true,force:true});}
+});
+test('identity drift after backlog write cannot archive a different owner',()=>{
+ const f=transaction();try{
+  f.verifyFinal=()=>fs.writeFileSync(f.e.files.owner,'{}');
+  assert.throws(()=>commitIntakeRecovery(f),{code:'INTAKE_FINAL_IDENTITY_DRIFT'});
+  assert.ok(fs.existsSync(path.join(f.rootDir,'leases/controller-install')));
+ }finally{fs.rmSync(f.rootDir,{recursive:true,force:true});}
 });
