@@ -78,6 +78,27 @@ export function validateQfrApplySource(preflight,evidence){
   return true;
 }
 
+// Only a pinned, proven pre-D1 QFR drift may terminate APPLYING as zero-write BLOCKED.
+// Other child errors, timeouts and incomplete result files remain STATE_UNKNOWN.
+export function validateQfrPinnedNoWrite(text,preflight,expectedKey){
+  const rows=parseLogRows(text);
+  const storedAt=Number(rows.SOURCE_STORED_AT);
+  if(rows.MODE!=='APPLY_EXPLICIT'||rows.SNAPSHOT_KEY!==expectedKey
+    ||rows.SOURCE_GATES!=='PASS'||rows.SOURCE_HTTP_REQUESTS!=='0'
+    ||rows.D1_QUERIES!=='0'||rows.D1_WRITES!=='0'
+    ||rows.ERROR!=='QFR_PUBLISH_SOURCE_DRIFT'
+    ||rows.RESULT!=='FAIL_QFR_D1_NO_VERIFIED_PUBLICATION'
+    ||!SHA256.test(rows.SOURCE_VERSION??'')
+    ||!SHA256.test(rows.RAW_ZIP_SHA256??'')
+    ||!Number.isSafeInteger(storedAt)||storedAt<=0
+    ||!preflight
+    ||(rows.SOURCE_VERSION===preflight.sourceVersion
+      &&rows.RAW_ZIP_SHA256===preflight.rawZipSha256
+      &&storedAt===preflight.sourceStoredAt))
+    throw Error('PUBLICATION_QFR_NO_WRITE_EVIDENCE_INVALID');
+  return true;
+}
+
 export function parsePublisherLog(text,operation){
   const rows=parseLogRows(text);
   if(operation==='bea-unit-profit-once'
@@ -126,6 +147,8 @@ export function nextLedgerPhase(before,event,{code:reason=null}={}){
     return {...before,phase:'BLOCKED',firstFail:reason,updatedAt:now()};
   if(before.phase==='APPLYING'&&event==='UNVERIFIED')
     return {...before,phase:'STATE_UNKNOWN',firstFail:reason,updatedAt:now()};
+  if(before.phase==='APPLYING'&&event==='NO_WRITE_STOP')
+    return {...before,phase:'BLOCKED',firstFail:reason,updatedAt:now()};
   throw Error('PUBLICATION_LEDGER_TRANSITION_REJECTED');
 }
 
@@ -265,7 +288,7 @@ async function execute(){
     snapshotKey:invocation.snapshotKey,status:'BLOCKED',code:'PUBLICATION_NOT_STARTED',
     startedAt:now(),finishedAt:null,providerCalls:null,d1Writes:null,
     sourceVersion:null,sourceStoredAt:null};
-  let ledgerPath=null,leasePath=null,phase=null;
+  let ledgerPath=null,leasePath=null,phase=null,noWriteVerified=false;
   try{
     const {publisherRoot,operationalRoot}=await validatePcSources(validated);
     fs.mkdirSync(path.join(SAFE_ROOT,'requests'),{recursive:true});
@@ -324,8 +347,15 @@ async function execute(){
       ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin.rawZipSha256,
       ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String(qfrPin.sourceStoredAt)};
     const applied=await runFixedChild(script,[...invocation.flags],applyEnv,APPLY_TIMEOUT_MS);
-    if(applied.exitCode!==0||applied.timedOut||applied.truncated)
+    if(applied.exitCode!==0||applied.timedOut||applied.truncated){
+      if(!bea&&applied.exitCode===1&&!applied.timedOut&&!applied.truncated){
+        validateQfrPinnedNoWrite(readNewResult(outputDir,prefix,before),
+          qfrPin,invocation.snapshotKey);
+        noWriteVerified=true;
+        throw Error('PUBLICATION_QFR_SOURCE_DRIFT_NO_WRITE');
+      }
       throw Error('PUBLICATION_APPLY_RESULT_UNKNOWN');
+    }
     const evidence=parsePublisherLog(readNewResult(outputDir,prefix,before),request.operation);
     if(bea&&evidence.sourceVersion!==invocation.sourceSha256)
       throw Error('PUBLICATION_BEA_APPLY_SOURCE_MISMATCH');
@@ -345,7 +375,8 @@ async function execute(){
     const reason=code(error);
     if(phase&&ledgerPath){
       if(phase.phase==='PASS')phase={...phase,phase:'STATE_UNKNOWN',firstFail:reason,updatedAt:now()};
-      else phase=nextLedgerPhase(phase,phase.phase==='APPLYING'?'UNVERIFIED':'STOP',{code:reason});
+      else phase=nextLedgerPhase(phase,phase.phase==='APPLYING'
+        ?(noWriteVerified?'NO_WRITE_STOP':'UNVERIFIED'):'STOP',{code:reason});
       writeAtomic(ledgerPath,phase);
     }
     report={...report,status:phase?.phase==='STATE_UNKNOWN'?'STATE_UNKNOWN':'BLOCKED',
