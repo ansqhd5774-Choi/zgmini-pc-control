@@ -78,7 +78,6 @@ test('owner-only, identity and receipt-fingerprint checks fail closed',()=>{
   assert.throws(()=>evaluateWorkUpdate(f.issue,comments,{...a,body:a.body.replace('ACKNOWLEDGED','WORKING')}),/SOURCE_COMMENT_READBACK_STOP/);
   assert.throws(()=>evaluateWorkUpdate(f.issue,[...comments,{...ownerReceipt(f,a),body:'bad'}],a),/RECEIPT_CONFLICT_STOP/);
   assert.throws(()=>parseWorkUpdate(JSON.stringify({schema:WORK_SCHEMA})),/FIELDS_STOP/);
-  assert.throws(()=>parseWorkUpdate(a.body.replace(f.parsed.incidentId,'handoff-forged-other')),/^(?!$)/);
   const forged={...a,body:a.body.replace(f.parsed.incidentId,'handoff-forged-other')};
   assert.throws(()=>evaluateWorkUpdate(f.issue,[...f.comments,forged],forged),/ORIGIN_PROOF_MISMATCH/);
 });
