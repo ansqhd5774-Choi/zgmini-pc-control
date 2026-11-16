@@ -128,6 +128,22 @@ export function verifyCensusDocumentProvenance(doc,hashForArchive){
  }
  return true;
 }
+// A previous valid Census document is never evidence of a fresh SAVED_READBACK.
+// The current official collector sets sourceStoredAt to its request's moment.
+export function verifyCensusBReadbackWindow({status,sourceStoredAt,startedAt,finishedAt}={}){
+ need(['SAVED_READBACK','UNCHANGED'].includes(status)&&
+  typeof sourceStoredAt==='string'&&
+  !Number.isNaN(Date.parse(sourceStoredAt))&&
+  new Date(sourceStoredAt).toISOString()===sourceStoredAt,
+  'W01_CENSUS_B_STORED_AT_INVALID_STOP');
+ if(status==='UNCHANGED')return true; // legitimate last-good retention
+ need(Number.isSafeInteger(startedAt)&&Number.isSafeInteger(finishedAt)&&
+  startedAt<=finishedAt&&
+  Date.parse(sourceStoredAt)>=startedAt&&
+  Date.parse(sourceStoredAt)<=finishedAt,
+  'W01_CENSUS_B_STORED_AT_PREVIOUS_RUN_STOP');
+ return true;
+}
 function checkedArchive(doc){
  need(doc?.schemaVersion===1&&doc.provider==='US_CENSUS_M3'&&
   doc.selector==='MTM/TI'&&doc.unit==='USD_MILLION_SA_NOMINAL'&&
@@ -161,6 +177,7 @@ function checkedArchive(doc){
 export function makeWindowsCensusApiBAdapter(proof){
  need(process.platform==='win32','W01_CENSUS_B_WINDOWS_ONLY_STOP');
  let writer=null,core=null,claim=null,quota=null,censusKey=null;
+ let collectStartedAt=null,collectFinishedAt=null;
  const requestId=proof.request.requestId;
  const journalFile=path.join(JOURNAL,requestId,'journal.jsonl');
  return {
@@ -263,14 +280,21 @@ export function makeWindowsCensusApiBAdapter(proof){
     originalFetch:globalThis.fetch,mode:'enforce'});
    const module=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
     'scripts','pc-writer','inflation-causal-candidate-once.mjs')).href);
-   return module.runInflationCandidateOnce({approved:true,base:CENSUS_B_DATA_ROOT,
-    groups:['census'],providerEnv:{CENSUS_API_KEY:censusKey},quotaFetch:quota.fetch});
+   collectStartedAt=Date.now();
+   const result=await module.runInflationCandidateOnce({
+    approved:true,base:CENSUS_B_DATA_ROOT,groups:['census'],
+    providerEnv:{CENSUS_API_KEY:censusKey},quotaFetch:quota.fetch});
+   collectFinishedAt=Date.now();
+   return result;
   },
-  async verifySavedReadback(){
+  async verifySavedReadback(output){
    need(core!==null&&claim!==null,'W01_CENSUS_B_READBACK_LEASE_STOP');
    const raw=fixedFile(CENSUS_B_TARGET,CENSUS_B_DATA_ROOT);
    const doc=JSON.parse(raw.toString('utf8'));
    checkedArchive(doc);
+   verifyCensusBReadbackWindow({
+    status:output?.completed?.[0]?.status,sourceStoredAt:doc.sourceStoredAt,
+    startedAt:collectStartedAt,finishedAt:collectFinishedAt});
   },
   async releaseCoreLease(id){
    need(id===requestId&&core!==null,'W01_CENSUS_B_CORE_RELEASE_OWNER_STOP');
