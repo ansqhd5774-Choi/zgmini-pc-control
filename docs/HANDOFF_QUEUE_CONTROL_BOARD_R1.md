@@ -8,7 +8,7 @@
 - 입력: 승인된 비공개 `zgmini-pc-control`의 원래 Issue·전체 댓글. GitHub 원본을 변경하지 않는다.
 - 출력: GitHub Actions Job Summary와 구조화된 표준출력 JSON. Issue·라벨·원장·운영 PC 파일·SQLite·D1은 변경하지 않는다.
 - 실제 중앙/개별 ChatGPT 담당자가 기존 GitHub 댓글로 인수·진행·결과를 보고하는 방식을 유지한다.
-- 다른 일반챗 자동 깨우기, OpenAI API, Copilot, 자동 소스 수정, 새 예약·Windows 예약 작업을 구성하지 않는다.
+- 다른 일반챗 자동 깨우기, OpenAI API, Copilot, 자동 소스 수정, Windows 예약 작업을 구성하지 않는다. GitHub Actions 읽기 전용 15분 예약 감시만 별도로 허용한다.
 
 ## 우선순위 산식 (작업 검토용, 심각도 확정 아님)
 `agent-handoff/queue-priority.mjs`의 `HANDOFF_PRIORITY_ADVISORY_R1`.
@@ -45,16 +45,18 @@
 - 이는 **내부 점검 후보**이지 사용자가 승인한 SLA나 실제 담당자 귀책/시스템 장애 판정이 아니다.
 
 ## 실제 실행과 갱신
-- 새 `.github/workflows/agent-handoff-queue-board.yml`은 기존 접수 Workflow 다음에 실행되는 **후보 선별 Actions의 성공 종료 1종**만 받아 최신 `main`에서 읽기 전용으로 실행한다. 중복 인계 이벤트에 따른 관제판 과잉 실행을 방지한다.
-- GitHub Actions에서 `ZGMINI Handoff Queue Control Board`를 수동 실행해도 동일한 최신 스냅샷을 얻는다. 새 ChatGPT 예약·타이머는 없다.
+- `.github/workflows/agent-handoff-queue-board.yml`은 후보 선별 완료 및 기존 인수/결과 처리 Workflow 성공 종료를 관찰하며 최신 `main`에서 읽기 전용으로 실행한다. Intake Workflow 성공은 다른 인계 사건일 수도 있으므로 무해한 추가 조회만 발생할 수 있다.
+- GitHub Actions에서 `ZGMINI Handoff Queue Control Board`를 수동 실행해도 동일한 최신 스냅샷을 얻는다.
+- 사용자의 공통 대기열 PC 유휴 자원 활용 승인을 반영해 GitHub Actions `schedule` 15분 간격(UTC 매시 07·22·37·52분)을 추가한다. 기존 self-hosted Windows 격리 Runner가 동일한 읽기 전용 Job을 수행하며 별도 PC 상주 폴링·Windows 작업 스케줄러·ChatGPT 예약은 추가하지 않는다.
+- GitHub 예약 실행은 시작 시각이 지연되거나 드물게 누락될 수 있다. 최근 실행 증거 없이는 24/7 감시 정상이나 특정 시간 이내 경보 도달을 보장하지 않는다.
 - 기존 `ZGMINI_AGENT_HANDOFF_ENABLED=true` 승인 조건을 유지한다. 기존 비활성 상태를 이 배포에서 임의로 변경하지 않는다.
 - 대상은 원본 Issue 100건 이하, 댓글 400개 이하 및 전부 재조회. 초과·누락·변경 경합은 요약을 성공한 척하지 않고 안전 중단한다.
-- 진행이 없는 시간 중간에는 자동 재평가가 불가능하며 **다음 이벤트/수동 실행 시** 경과 시간을 재계산한다.
+- 새 사건이 없더라도 예약 실행이 성공하면 경과 시간을 재평가한다. Runner 오프라인, GitHub 예약 지연·실패 시 최신 관측 시각은 이전 스냅샷이며 항상 `asOf`를 근거로 판단한다.
 - 이 판정기는 운영 PC의 실제 장애 해결·GitHub 결과 댓글 반환 기능과 독립적이다.
 
 ## 완료 증거
 - 소스 PR: 독립 `agent-handoff-ci` Runner CI에서 `tests/agent-handoff*.test.mjs` 및 공유 자원 계약을 검증.
-- 실제 동작: 자연 접수/진행 이벤트 뒤 `ZGMINI Handoff Queue Control Board` 워크플로의 `authenticated-readonly-board` 성공 및 Job Summary의 정확한 현재 Issue 수·상태·우선순위 검토.
+- 실제 동작: 자연 접수/진행 이벤트 또는 예약 트리거 뒤 `ZGMINI Handoff Queue Control Board` 워크플로의 `authenticated-readonly-board` 성공 및 Job Summary의 정확한 현재 Issue 수·상태·우선순위 검토. GitHub 예약은 최초 실행을 관측하기 전에는 `미실증`으로 분리한다.
 - 신규 장애, 운영 PC 작업, 기존 요청 재실행을 검증을 위해 인위적으로 생성하지 않는다.
 - 기존 인수 댓글 실증: `#1509`, Run `43866177031`, 댓글 `6916318558` → 봇 `6916343819`. 기존 결과 반환 실증: `#1068` → `#1063`. 이 두 완료점은 재실행하지 않는다.
 

@@ -5,7 +5,8 @@ import {HANDOFF_REPOSITORY,HANDOFF_OWNER} from './queue-selector.mjs';
 import {compileQueueBoard,renderBoardMarkdown} from './queue-board.mjs';
 
 const API='https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/';
-const WORKFLOWS=new Set(['ZGMINI Handoff Queue Candidate Selector']);
+const WORKFLOWS=new Set(['ZGMINI Handoff Queue Candidate Selector','ZGMINI Agent Handoff Intake']);
+export const BOARD_CRON='7,22,37,52 * * * *';
 const fail=code=>{throw Error('HANDOFF_BOARD_RUNNER_'+code);};
 
 export function validateBoardEvent(event,env) {
@@ -22,6 +23,9 @@ export function validateBoardEvent(event,env) {
       event.workflow_run.actor?.login!==HANDOFF_OWNER||
       event.workflow_run.head_branch!=='main')
       fail('RUN_PROVENANCE_STOP');
+  }else if(env.GITHUB_EVENT_NAME==='schedule'){
+    if(env.GITHUB_REF!=='refs/heads/main'||event.schedule!==BOARD_CRON)
+      fail('SCHEDULE_PROVENANCE_STOP');
   }else fail('EVENT_TYPE_STOP');
 }
 
