@@ -28,6 +28,16 @@ export const APPROVAL_ROUTES=Object.freeze({
       'controlRepository','approvalManifestPath','approvalManifestSha256']),
   }),
 });
+// These exact titles are already authenticated and executed by the existing
+// pc-writer-b-source-once.yml, not by this shared generic Writer B intake.
+// A shared label alone is not a reason to mark these requests rejected.
+const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
+  'r181-protected-route-install',
+  'r181-source-shape-readonly',
+  'r181-saved-ledger-readonly',
+  'r181-primary-route-install',
+  'r181-existing-task-run-once',
+]));
 const stop=code=>{throw new Error('SHARED_ISSUE_ADMISSION_'+code);};
 const exactKeys=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&
   Object.keys(o).length===keys.length&&keys.every(k=>Object.hasOwn(o,k));
@@ -43,6 +53,8 @@ function validRequest(route,req) {
 /** Exact body/title/label errors are explicit; no PC execution is implied. */
 export function inspectSharedIssueAdmission({title,labels,body}) {
   const labelNames=Array.isArray(labels)?labels.map(v=>typeof v==='string'?v:v?.name):[];
+  if(labelNames.includes('pc-writer-b-install')&&DELEGATED_EXACT_TITLES.has(title))
+    return Object.freeze({state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
   const routes=Object.entries(APPROVAL_ROUTES).filter(([,r])=>labelNames.includes(r.label));
   if(routes.length===0){
     const named=Object.entries(APPROVAL_ROUTES).filter(([,r])=>title===r.title);
