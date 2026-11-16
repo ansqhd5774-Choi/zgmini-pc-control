@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof}
+import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
+ shouldWaitForV2OwnerEvidence}
  from './core-task-event-owner-proof.mjs';
 
 // Sanitized fixture only. Never read the host's TaskScheduler log in tests.
@@ -159,4 +160,29 @@ test('V2 event fallback observation gate is reachable with GetInstances filtered
  // Passing the gate is not ownership proof; matching 129 + live identity
  // remains mandatory and fails closed when the event is absent.
  assert.equal(proof('NO EVENT 129').ok,false);
+});
+
+test('V2 waits for normal Korea-held lock and Task non-running instead of early one-shot STOP',()=>{
+ const transient={isV2:true,linked:false,taskRunning:false};
+ assert.equal(shouldWaitForV2OwnerEvidence(transient),true);
+ assert.equal(shouldWaitForV2OwnerEvidence({...transient,isV2:false}),false);
+ assert.equal(shouldWaitForV2OwnerEvidence({...transient,linked:true}),false);
+ assert.equal(shouldWaitForV2OwnerEvidence({...transient,taskRunning:null}),false);
+});
+test('V2 waits only for verified event mismatch, never accepts missing reader/WMI/inputs',()=>{
+ const base={isV2:true,linked:false,taskRunning:true};
+ const absent=proof(event({task:String.raw`\\ZGMINI-PC-Local-Korea`}));
+ assert.equal(absent.ok,false);
+ assert.equal(absent.code,'INFL_MANUAL_B_EVENT129_TASK_PID_NOT_VERIFIED');
+ assert.equal(shouldWaitForV2OwnerEvidence({...base,eventCode:absent.code}),true);
+ for(const code of [
+  'INFL_MANUAL_B_EVENT129_INPUT_UNVERIFIED',
+  'INFL_MANUAL_B_EVENT129_READER_UNAVAILABLE',
+  'INFL_MANUAL_B_EVENT129_LOG_TOO_LARGE',
+  undefined,
+ ]){
+  assert.equal(shouldWaitForV2OwnerEvidence({...base,eventCode:code}),false);
+ }
+ assert.equal(shouldWaitForV2OwnerEvidence({...base,isV2:false,
+  eventCode:absent.code}),false);
 });
