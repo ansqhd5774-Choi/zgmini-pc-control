@@ -12,6 +12,9 @@ on:
       - 'tools/maintenance-contract.mjs'
       - 'tools/r181-pinned-route-candidate.mjs'
       - 'tools/r181-protected-b-transaction.mjs'
+      - 'tools/r181-source-shape-readonly.mjs'
+      - 'tools/r181-source-shape-run.mjs'
+      - 'tools/r181-source-shape-report.mjs'
       - 'tools/r181-protected-b-windows-io.mjs'
       - 'tools/r181-protected-b-entry.mjs'
       - 'tools/r181-protected-b-report.mjs'
@@ -32,6 +35,7 @@ on:
       - 'tests/maintenance-contract.test.mjs'
       - 'tests/r181-pinned-route-candidate.test.mjs'
       - 'tests/r181-protected-b-transaction.test.mjs'
+      - 'tests/r181-source-shape-readonly.test.mjs'
       - 'tests/r181-protected-b-windows-io.test.mjs'
       - 'tests/r181-protected-b-entry-report.test.mjs'
       - '.github/workflows/pc-writer-b-source-once.yml'
@@ -75,6 +79,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-protected-b-windows-io.test.mjs
       - name: Verify W03 existing B workflow branch and one-shot reporter safety
         run: node --test --test-concurrency=1 tests/r181-protected-b-entry-report.test.mjs
+      - name: Verify W03 R181 exact readonly shape classification and report safety
+        run: node --test --test-concurrency=1 tests/r181-source-shape-readonly.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
