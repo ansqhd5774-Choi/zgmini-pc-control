@@ -125,6 +125,7 @@ test('WSH owner probe returns sanitized live identity despite security-filtered 
  assert.equal(p.linked,false);
  assert.equal(p.taskRunning,true);
  assert.equal(p.ownerCoreMatched,true);
+ assert.equal(p.ownerKoreaMatched,false);
  assert.ok(Number.isSafeInteger(p.ownerCreatedAtMs));
  assert.equal(JSON.stringify(p).includes('node.exe'),false);
  assert.equal(JSON.stringify(p).includes('4321'),false);
@@ -185,4 +186,35 @@ test('V2 waits only for verified event mismatch, never accepts missing reader/WM
  }
  assert.equal(shouldWaitForV2OwnerEvidence({...base,isV2:false,
   eventCode:absent.code}),false);
+});
+
+test('Korea exact live lock owner is a bounded wait candidate even when Core Task reports running',()=>{
+ const node=String.raw`E:\ZGmini\runtime\node.exe`;
+ const script=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
+ for(const suffix of ['--korea','--korea --publish','--publish --korea']){
+  const p=runSanitizedWshProbe({command:'"'+node+'" "'+script+'" '+suffix,
+   taskState:4});
+  assert.equal(p.ok,true);
+  assert.equal(p.ownerCoreMatched,false);
+  assert.equal(p.ownerKoreaMatched,true);
+  assert.equal(shouldWaitForV2OwnerEvidence({isV2:true,linked:false,
+   taskRunning:p.taskRunning,ownerKoreaMatched:p.ownerKoreaMatched}),true);
+  assert.equal(shouldWaitForV2OwnerEvidence({isV2:false,linked:false,
+   taskRunning:p.taskRunning,ownerKoreaMatched:p.ownerKoreaMatched}),false);
+ }
+});
+test('Korea wait never accepts a lookalike script, extra args, or unknown owner',()=>{
+ const node=String.raw`E:\ZGmini\runtime\node.exe`;
+ const script=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs`;
+ for(const command of [
+  '"'+node+'" "'+script+'" --korea --force',
+  '"'+node+'" "E:\\other\\local-cycle.mjs" --korea',
+  'node.exe "'+script+'" --korea',
+  '"'+node+'" "'+script+'" --publish --unsafe --korea',
+ ]){
+  const p=runSanitizedWshProbe({command});
+  assert.equal(p.ownerKoreaMatched,false);
+  assert.equal(shouldWaitForV2OwnerEvidence({isV2:true,linked:false,
+   taskRunning:true,ownerKoreaMatched:p.ownerKoreaMatched}),false);
+ }
 });
