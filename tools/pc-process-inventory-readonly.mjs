@@ -340,8 +340,10 @@ export function projectObservedProviderHosts(raw){
    lastRunStatuses:Object.fromEntries(Object.entries(x.lastRunStatuses).sort())});
  }
  hosts.sort((a,b)=>a.host.localeCompare(b.host));
+ // Omitted one-off hosts do not make the repeating cohort incomplete:
+ // only omission of a monitored host prevents an exact monitored roster.
  const complete=rows.length===raw.monitoredHostsReturned&&
-  rows.length===raw.monitoredHostCount&&raw.omittedHosts===0;
+  rows.length===raw.monitoredHostCount;
  const counts={normal:hosts.filter(x=>x.monitoringState==='normal').length,
   failed:hosts.filter(x=>x.monitoringState==='failed').length,
   unknown:hosts.filter(x=>x.monitoringState==='unknown').length,total:hosts.length};
