@@ -23,6 +23,7 @@ import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectD05LineageReadonly,summarizeD05LineageOperation} from './d05-lineage-readonly.mjs';
 import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
 import {inspectSourceInventory} from './source-inventory-runtime-readonly.mjs';
+import {inspectProviderActivity} from './provider-activity-runtime-readonly.mjs';
 import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
@@ -114,6 +115,7 @@ export async function runOperation(request,context){
   return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
  }
  if(request.operation==='source-inventory-runtime-readonly')return inspectSourceInventory(dataRoot);
+ if(request.operation==='provider-activity-runtime-readonly')return inspectProviderActivity(dataRoot);
  if(request.operation==='market-calendar-r44-runtime-readonly')return inspectDeltaR44CheckpointEvidence(dataRoot);
  if(request.operation==='market-calendar-r44-input-audit-readonly')return inspectR44ExistingInputAudit(dataRoot);
  if(request.operation==='market-calendar-r44-production-readonly')return inspectR44ProductionReadonly();
