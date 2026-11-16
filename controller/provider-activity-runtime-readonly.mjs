@@ -132,12 +132,14 @@ export function inspectProviderActivity(dataRoot,{now=Date.now(),fileSystem=fs}=
    hosts.set(host,x);
   }
  }
- const sorted=[...hosts.values()].sort((a,b)=>b.lastAttemptAt-a.lastAttemptAt||a.host.localeCompare(b.host))
-  .slice(0,MAX_HOSTS);
- const classified=sorted.map(x=>({x,monitor:classifyObservedHttpHost(x,now)}));
+ // Classify the FULL observed set before prioritizing. Slicing the freshest
+ // 128 hosts first lets numerous recent one-off hosts evict older repeated
+ // hosts, falsifying both the roster and the HTTP denominator.
+ const classified=[...hosts.values()].map(x=>({x,monitor:classifyObservedHttpHost(x,now)}));
  const monitored=classified.filter(row=>row.monitor.repeated);
+ const sorted=(rows)=>rows.sort((a,b)=>b.x.lastAttemptAt-a.x.lastAttemptAt||a.x.host.localeCompare(b.x.host));
  // Never truncate an eligible host to make room for a one-off host.
- const prioritized=[...monitored,...classified.filter(row=>!row.monitor.repeated)];
+ const prioritized=[...sorted(monitored),...sorted(classified.filter(row=>!row.monitor.repeated))];
  const selected=prioritized.slice(0,MAX_RETURNED_HOSTS);
  const resultHosts=selected.map(({x,monitor})=>({
   host:x.host,requestCount:x.requestCount,observedDayCount:x.observedDays.size,
