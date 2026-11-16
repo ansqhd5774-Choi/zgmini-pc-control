@@ -175,7 +175,21 @@ export function makeWindowsCensusApiBAdapter(proof){
     await this.verifyCoreLease(id);
    }catch(e){
     if(fd!==undefined&&fd!==null)try{fs.closeSync(fd);}catch{}
-    // Do not remove any non-matching or foreign Core lock.
+    // Failed initial verification: remove only this exact inode and content.
+    // Foreign, partial or changed Core locks must remain for their owner.
+    let safelyReleased=false;
+    if(core?.value===value){
+     try{
+      const st=fs.statSync(CENSUS_B_CORE_LOCK);
+      if(st.dev===core.dev&&st.ino===core.ino&&
+       fs.readFileSync(CENSUS_B_CORE_LOCK,'utf8')===core.value){
+       fs.unlinkSync(CENSUS_B_CORE_LOCK);
+       safelyReleased=!fs.existsSync(CENSUS_B_CORE_LOCK);
+      }
+     }catch{}
+    }
+    core=null;
+    if(safelyReleased)stop('W01_CENSUS_B_CORE_ACQUIRE_ABORTED_CLEAN_STOP');
     throw e;
    }
   },
