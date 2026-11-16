@@ -306,5 +306,5 @@ test('current diagnostic process cannot certify its own PID as B Core owner',asy
  assert.equal(r.rawBDirect.ok,null);
  assert.equal(r.probeCounts.wmi,0);
  assert.equal(r.lock.same,true);
- assert.equal(JSON.stringify(r).includes(String(process.pid)),false);
+ assert.doesNotMatch(JSON.stringify(r),/"(?:pid|lockPid|ProcessId|CommandLine)"\s*:/i);
 });
