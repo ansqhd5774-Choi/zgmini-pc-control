@@ -13,7 +13,7 @@ import {coreVbsTaskEventCandidates,verifyCoreVbsTaskWitness,
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
 const DATA=String.raw`E:\ZGmini\data\pc-writer`;
-const PROBE=path.join(ROOT,'inflation-core-owner-diagnostic-probe.js');
+const PROBE=path.join(ROOT,'inflation-core-owner-diagnostic-probe.mjs');
 const EVENT_TOOL=path.win32.join(process.env.SystemRoot||'C:\\Windows',
  'System32','wevtutil.exe');
 const SCRIPT=path.win32.join(process.env.SystemRoot||'C:\\Windows',
