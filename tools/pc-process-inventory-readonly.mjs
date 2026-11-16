@@ -132,6 +132,12 @@ export function sanitizeMaintenanceStatus(raw){
   receiverStatus:raw?.receiverStatus==='LISTENING'?'LISTENING':'UNVERIFIED',
   workflowState:['active','disabled_manually','disabled_inactivity'].includes(raw?.workflowState)
    ?raw.workflowState:'UNVERIFIED',
+  // Existing collectAutomationStatus computes HEALTHY only when the actual
+  // Controller file hashes, supervisor heartbeat, six dedicated Runner
+  // children and PC Job state are all verified. Do not infer from Issue PASS.
+  runtimeState:raw?.runtimeState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
+  maintenanceState:raw?.maintenanceState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
+  automationState:raw?.automationState==='HEALTHY'?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
   operationalWrites:0,providerCalls:0,d1Writes:0
  };
 }
