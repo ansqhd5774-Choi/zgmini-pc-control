@@ -236,10 +236,18 @@ export async function reconcileInterruptedRollback(original,port,persist){
   status:'RECOVERY_REQUIRED',originalStatus:original.status,originalPhase:phase,
   actualInstalledSha:null,originalRequestRetried:false};
  const record=async(code,patch={})=>{Object.assign(out,{code,...patch,at:new Date().toISOString()});await persist({...out});};
+ // A connected new Supervisor may already be serving jobs, and enabling
+ // pc-job.yml may have succeeded without its acknowledgement. A standalone
+ // rollback must not kill that tree or overwrite host.json before the intake
+ // and backlog have been independently reconciled. A failed resume at this
+ // boundary is not evidence that the new Controller installation is bad.
+ if(phase==='RECONNECTED'){
+  await record('RECOVERY_RECONNECTED_INTAKE_READBACK_REQUIRED');return out;
+ }
  if(['POSTCHECK_PENDING','INTAKE_RESUMED','BACKLOG_RECONCILED'].includes(phase)){
   await record('RECOVERY_WAIT_EXISTING_RESULT');return out;
  }
- if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED'].includes(phase)||!['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
+ if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED'].includes(phase)||!['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
   await record('RECOVERY_PHASE_NOT_ROLLBACK_ELIGIBLE');return out;
  }
  try{
