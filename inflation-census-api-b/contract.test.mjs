@@ -74,7 +74,7 @@ test('exact owner Issue, manifest digest, source pin and request identity requir
   x=>x.event.repository.private=false,
   x=>x.event.issue.labels=[],
   x=>x.env.GITHUB_RUN_ATTEMPT='2',
-  x=>x.env.GITHUB_SHA='d'.repeat(40),
+  x=>x.env.GITHUB_SHA='not-a-commit',
   x=>x.request.operation='other',
   x=>x.request.requestId='not-a-uuid',
   x=>x.request.approvalManifestPath='../unsafe.json',
