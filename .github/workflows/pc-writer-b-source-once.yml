@@ -41,7 +41,8 @@ jobs:
           repository: ansqhd5774-Choi/zgmini-pc-control
           ref: ${{ github.sha }}
           path: writer-b-control
-          fetch-depth: 1
+          # R181 pins a reviewed code ancestor; generic Writer B stays shallow.
+          fetch-depth: ${{ github.event.issue.title == 'r181-protected-route-install' && '0' || '1' }}
           persist-credentials: false
       - name: Approve exact manifest before candidate checkout
         if: github.event.issue.title == 'pc-writer-source-install'
