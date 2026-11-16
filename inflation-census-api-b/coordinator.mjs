@@ -6,7 +6,7 @@ import {assertCensusBAuthorized,CENSUS_B_DATA_ROOT,CENSUS_B_CORE_LOCK,
  from './contract.mjs';
 const SHA64=/^[a-f0-9]{64}$/;
 const METHODS=['proveLiveCoreLockOwner','acquireSharedWriterLease','readPcPreimage',
- 'assertCoreIdle','acquireCoreLease','verifyCoreLease','claimOnce',
+ 'preflightProviderReadOnly','assertCoreIdle','acquireCoreLease','verifyCoreLease','claimOnce',
  'collectAndReadback','verifySavedReadback','releaseCoreLease',
  'releaseSharedWriterLease','journalPhase'];
 const fail=code=>{throw Object.assign(new Error(code),{code});};
@@ -50,6 +50,7 @@ export async function performCensusApiB(proof,io){
   await io.acquireSharedWriterLease(proof.request.requestId);writer=true;
   const preimage=await io.readPcPreimage();
   verifyCensusBPreimage(proof.manifest,preimage);phase='SOURCE_VERIFIED';
+  await io.preflightProviderReadOnly();phase='PROVIDER_PREFLIGHT_VERIFIED';
   await io.assertCoreIdle();
   coreAcquireAttempted=true;
   await io.acquireCoreLease(proof.request.requestId);core=true;
