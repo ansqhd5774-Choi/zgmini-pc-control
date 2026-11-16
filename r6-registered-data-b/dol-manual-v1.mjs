@@ -159,7 +159,13 @@ export async function runInstalledDolManual({auth,pcHome=R6_B_HOME,
    nationalSeriesSaved:nationalSeries,nationalRowsSaved:nationalRows,
    stateRowsSaved:stateRows,
   };
- }finally{onStage('CLEANUP');hooks.deregister();db.close();}
+ }finally{
+  // Do not overwrite a collector/readback failure stage merely because
+  // normal cleanup was attempted. Mark CLEANUP only on cleanup exceptions.
+  try{hooks.deregister();}
+  catch(cause){onStage('CLEANUP');throw cause;}
+  finally{try{db.close();}catch(cause){onStage('CLEANUP');throw cause;}}
+ }
 }
 
 export async function performDolManual({auth,sourceRoot=R6_B_SOURCE,
