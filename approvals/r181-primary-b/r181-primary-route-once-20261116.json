@@ -1,0 +1,16 @@
+{
+  "schema": "ZGMINI_R181_PRIMARY_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "W03_R181_PRIMARY_GMH_ROUTE_SINGLE_FILE",
+  "operation": "r181-primary-route-install",
+  "controlSourceSha": "64fd9cc19cc9f4c3bde6dca131f073f17cdfe9c2",
+  "targetPath": "E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r181-primary.mjs",
+  "beforeSha256": "da433fe2febea455343b66424b2b6e9d6680575f21f2552fc0be8d3bd95aa5c9",
+  "patchId": "GMH_2026_11_PRIMARY_HELPER_STOCKS_US_PLUS3",
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowTaskChanges": false,
+  "allowOtherFileChanges": false
+}
