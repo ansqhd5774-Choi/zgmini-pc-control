@@ -243,13 +243,22 @@ export async function inspectInflationEvent129Once({
    out.lock.after=legal(after?.status,['PRESENT','ABSENT','INVALID','UNAVAILABLE']);
    out.lock.same=before?.status==='PRESENT'&&after?.status==='PRESENT'?
     before.hash===after.hash:null;
-   if(out.lock.same!==true){
-    out.status='STATE_UNKNOWN';out.code='INFL_E129_LOCK_SNAPSHOT_RACE';
-    out.firstFailCode='INFL_E129_LOCK_SNAPSHOT_RACE';
+   // Initial ABSENT/INVALID/UNAVAILABLE is not a proven lock replacement.
+   // Preserve the FIRST failure even if a later lock read also changes.
+   if(before?.status==='PRESENT'&&out.lock.same!==true){
+    const code=after?.status==='UNAVAILABLE'?
+     'INFL_E129_LOCK_READBACK_UNVERIFIED':'INFL_E129_LOCK_SNAPSHOT_RACE';
+    out.status='STATE_UNKNOWN';out.code=code;
+    out.firstFailCode??=code;
+    if(out.firstFailCode===code)out.stage='AFTER_LOCK';
    }
   }catch{
    out.lock.after='UNAVAILABLE';out.lock.same=null;
-   out.status='STATE_UNKNOWN';out.code='INFL_E129_LOCK_SNAPSHOT_RACE';
+   if(before?.status==='PRESENT'){
+    out.status='STATE_UNKNOWN';out.code='INFL_E129_LOCK_READBACK_UNVERIFIED';
+    out.firstFailCode??=out.code;
+    if(out.firstFailCode===out.code)out.stage='AFTER_LOCK';
+   }
   }
   // Must never advertise success without a stable lock, nor confuse an auxiliary parse with B.
   if(clock()-start>80000){out.status='STATE_UNKNOWN';out.code='INFL_E129_TIME_BUDGET_STOP';}
