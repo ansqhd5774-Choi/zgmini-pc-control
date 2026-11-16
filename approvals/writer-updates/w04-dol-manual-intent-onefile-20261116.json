@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "455ec124af17e98a6754a9ccadb2df7b8617a7c8",
+  "baseHead": "7afe6b0bcaa74d622ada9190fdc9fcc7fd4d5f10",
+  "baseConfigSourceSha": "7afe6b0bcaa74d622ada9190fdc9fcc7fd4d5f10",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/employment-r6-collector.mjs",
+      "change": "M",
+      "beforeSha256": "727c678bc33320afb902d4db28eda008e0b31c7ef27281cab7e06d21fc08d42a",
+      "afterSha256": "a4a67f82bfe56c7ba7008227ac904eebce2a3ebd16f85557251599030e4ccbde"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-score/employment-r6-provider.mjs",
+      "sha256": "ad0809f4f5dea5b6cc02ff0acf4441f2a6c40b16bb802ec03bd86a82f727d9da"
+    },
+    {
+      "path": "lib/market-score/employment-r6-scheduler.mjs",
+      "sha256": "7f33c6f3920317cdfd362bb04b570f7af8a5c3322e5924edb4c0cfaf31c16a88"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
