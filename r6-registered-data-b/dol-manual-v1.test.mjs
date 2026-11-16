@@ -152,3 +152,10 @@ test('the manual module never imports the top-level awaiting operation entrypoin
  assert.equal(done.status,'PARTIAL');
  assert.deepEqual(o.calls,['VERIFY','LOCK','CLAIM','RUN','UNLOCK']);
 });
+
+test('missing sealed adapters cannot execute a provider request',async()=>{
+ const auth=authorizeDolManual(fixture());
+ await assert.rejects(
+  performDolManual({auth}),
+  e=>e.code==='R6_DOL_ADAPTER_MISSING');
+});
