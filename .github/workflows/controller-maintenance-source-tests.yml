@@ -23,6 +23,8 @@ on:
       - 'tools/r181-source-shape-readonly.mjs'
       - 'tools/r181-source-shape-run.mjs'
       - 'tools/r181-source-shape-report.mjs'
+      - 'tools/r181-saved-ledger-readonly.mjs'
+      - 'tools/r181-saved-ledger-report.mjs'
       - 'tools/r181-protected-b-windows-io.mjs'
       - 'tools/r181-protected-b-entry.mjs'
       - 'tools/r181-protected-b-report.mjs'
@@ -46,6 +48,7 @@ on:
       - 'tests/r181-existing-task-once.test.mjs'
       - 'tests/r181-protected-b-transaction.test.mjs'
       - 'tests/r181-source-shape-readonly.test.mjs'
+      - 'tests/r181-saved-ledger-readonly.test.mjs'
       - 'tests/r181-protected-b-windows-io.test.mjs'
       - 'tests/r181-protected-b-entry-report.test.mjs'
       - '.github/workflows/pc-writer-b-source-once.yml'
@@ -83,6 +86,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
+      - name: Verify W03 R181 exact saved-ledger source-only A metadata and privacy contract
+        run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only
         run: node --test --test-concurrency=1 tests/r181-pinned-route-candidate.test.mjs
       - name: Verify W03 protected PC-only R181 B contract without operational effects
