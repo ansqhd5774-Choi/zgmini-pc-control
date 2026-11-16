@@ -1,4 +1,5 @@
 import {parseHandoff, fingerprintHandoff, routeHandoff} from './contract.mjs';
+import {sortAdvisoryQueue} from './queue-priority.mjs';
 
 export const HANDOFF_REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 export const HANDOFF_OWNER = 'ansqhd5774-Choi';
@@ -79,15 +80,10 @@ export function assessIncident(issue, comments) {
     incidentId: request.incidentId, fingerprint, receipt});
 }
 
-export function orderedPendingIssues(issues) {
-  if (!Array.isArray(issues) || issues.length > 500) throw Error('HANDOFF_INVENTORY_INVALID');
-  const unique = new Set();
-  for (const item of issues) {
-    if (!number(item?.number) || unique.has(item.number))
-      throw Error('HANDOFF_INVENTORY_DUPLICATE_OR_INVALID');
-    unique.add(item.number);
-  }
-  return [...issues].sort((a,b) => a.number - b.number);
+export function orderedPendingIssues(issues, nowMs=Date.now()) {
+  // Priority is advisory ordering, never authority for actual incident selection.
+  // assessIncident() still requires exact GitHub bot routing evidence.
+  return sortAdvisoryQueue(issues,nowMs);
 }
 
 // One authenticated selection at a time, maximum 10 per bounded pass.
