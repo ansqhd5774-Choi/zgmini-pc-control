@@ -20,6 +20,9 @@ const safeInteger=x=>Number.isSafeInteger(x)&&x>=0?x:null;
 const reportStatus=(x,allowed)=>typeof x==='string'&&allowed.includes(x)?x:'UNVERIFIED';
 function safeJson(root,parts,fileSystem){
  try{
+  const baseStat=fileSystem.lstatSync(root);
+  if(!baseStat.isDirectory()||baseStat.isSymbolicLink())
+   return {state:'UNSAFE_ROOT',value:null};
   let current=root;
   for(const part of parts.slice(0,-1)){
    current=path.join(current,part);
