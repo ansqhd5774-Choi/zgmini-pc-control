@@ -180,7 +180,9 @@ test('host list and status counters never disclose raw response URL, header or c
   responseUrl:'https://sec-data.gov/?api_key=SEC-PRIVATE-KEY',authorization:'Bearer TOPSECRET'}]);
  const out=inspectProviderActivity(d,{now:NOW});
  const serialized=JSON.stringify(out);
- assert.equal(out.http.failed,0);\n assert.equal(out.http.unknown,1);\n assert.equal(out.hosts[0].lastRunStatuses['404'],1);
+ assert.equal(out.http.failed,0);
+ assert.equal(out.http.unknown,1);
+ assert.equal(out.hosts[0].lastRunStatuses['404'],1);
  assert.ok(!serialized.includes('SEC-PRIVATE-KEY'));
  assert.ok(!serialized.includes('TOPSECRET'));
  assert.ok(!serialized.includes('responseUrl'));
