@@ -429,7 +429,9 @@ export async function runR6RegisteredOnce({env=process.env}={}){
  // This branch never loads BLS overlay, BLS keys, publisher, or a scheduler.
  if(parsedApproval?.schema==='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1'){
   const {runDolManualOnce}=await import('./dol-manual-v1.mjs');
-  return runDolManualOnce({event,env,approvalBytes});
+  return runDolManualOnce({event,env,approvalBytes,
+   verify:verifyInstalledR6Overlay,acquire:acquireCoreLockBounded,
+   claim:claimOnce});
  }
  const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';
  const overlayBytes=git(['show',`HEAD:${overlayPath}`]);
