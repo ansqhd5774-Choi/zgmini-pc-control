@@ -21,7 +21,7 @@ const KEYWORDS=new Set(['const','let','var','return','new','function','async',
   'throw','Error','status','ok','httpStatus']);
 function safeShapes(source){
   return source.split(/\r?\n/).flatMap((line,i)=>{
-    if(!(i<=9||(i>=38&&i<=61)))return [];
+    if(i>65)return [];
     let pattern='',state='CODE',quote='',escape=false;
     for(let j=0;j<line.length;j++){
       const c=line[j],n=line[j+1]??'';
@@ -68,6 +68,56 @@ const LITERALS={
   BARS_QUERY:'/api/v1/bars?',
 };
 const WORDS=['source','symbol','dataset','ticker','timeframe','SPY','1h'];
+const SIGNALS=Object.freeze({
+  HOST_GMH:'getmarkethistory.com',
+  PATH_API:'/api',PATH_V1:'/v1',PATH_V2:'/v2',
+  PATH_BARS:'/bars',PATH_QUERY:'/query',PATH_STOCKS:'/stocks',
+  PATH_ETF:'/etf',PATH_HOURLY:'/hour',PATH_ONE_HOUR:'/1h',
+  DATASET_PARAM:'dataset=',TICKER_PARAM:'ticker=',
+  SYMBOL_PARAM:'symbol=',SOURCE_PARAM:'source=',
+  GRANULARITY_PARAM:'timeframe=',QUERY_QUESTION:'?',
+});
+function safeImportFiles(source){
+  const lines=source.split(/\r?\n/);
+  return lines.slice(0,15).flatMap((line,i)=>{
+    const m=line.match(/^\s*import\s+(?:.*?)\s+from\s+(['"])(.*?)\1/);
+    if(!m)return [];
+    const dest=m[2];
+    if(dest.startsWith('node:'))return [{line:i+1,kind:'NODE_BUILTIN'}];
+    if(!/^(\.\.\/|\.\/)+[a-z0-9._\/-]+\.mjs$/i.test(dest))
+      return [{line:i+1,kind:'OTHER_IMPORT'}];
+    const name=dest.split('/').at(-1);
+    return [{line:i+1,kind:'RELATIVE_MODULE',
+      basename:/^[a-z0-9][a-z0-9.-]{1,72}\.mjs$/i.test(name)?name:null,
+      parentDepth:(dest.match(/\.\.\//g)||[]).length}];
+  });
+}
+// Examine only short literal-like fragments and return fixed signal names.
+// Never return any original fragment, URL, API key or query value.
+function fixedLiteralSignals(source){
+  const lines=source.split(/\r?\n/),bt=String.fromCharCode(96),out=[];
+  for(let i=0;i<Math.min(66,lines.length);i++){
+    const line=lines[i],parts=[];
+    for(const quote of ["'",'"',bt]){
+      let at=0;
+      while(at<line.length){
+        const start=line.indexOf(quote,at);
+        if(start<0)break;
+        const end=line.indexOf(quote,start+1);
+        if(end<0)break;
+        parts.push(line.slice(start+1,end));
+        at=end+1;
+        if(parts.length>14)break;
+      }
+    }
+    const signs=Object.entries(SIGNALS)
+      .filter(([_,v])=>parts.some(part=>part.includes(v)))
+      .map(([k])=>k);
+    if(signs.length)out.push({line:i+1,signals:signs});
+    if(out.length>=30)break;
+  }
+  return out;
+}
 export function classifyR181SourceForFixture(source){
   need(typeof source==='string'&&Buffer.byteLength(source)<=8192,
     'R181_INSPECT_UNSAFE_SOURCE_STOP');
@@ -91,6 +141,8 @@ export function classifyR181SourceForFixture(source){
       usesGetMarketHistoryHost:source.includes('getmarkethistory.com'),
     },
     safeShapeLines:safeShapes(source),
+    importFiles:safeImportFiles(source),
+    literalSignalsByLine:fixedLiteralSignals(source),
     runtimeUrlVerified:false,http404SubtypeVerified:false,
     providerCalls:0,operationalWrites:0,sqliteOpened:false,d1Writes:0,
   });
