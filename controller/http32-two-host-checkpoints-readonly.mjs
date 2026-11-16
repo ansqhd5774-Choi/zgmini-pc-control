@@ -12,7 +12,7 @@ const ALLOWED_ROOT_FILES=Object.freeze({
  alpacaCheckpoint:['asset-r10-alpaca','incremental-checkpoint.json'],
  monthlyBackfill:['local-monthly-one-year-backfill-last-run.json']
 });
-const isDate=x=>typeof x==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(x)&&
+const isDate=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&
  Number.isFinite(Date.parse(x+'T00:00:00Z'));
 const time=x=>typeof x==='string'&&Number.isFinite(Date.parse(x))?
  new Date(x).toISOString():null;
