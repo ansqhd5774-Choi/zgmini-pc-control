@@ -45,3 +45,24 @@ test('sanitized PASS requires complete read-only SHA evidence',()=>{
  assert.equal(Object.hasOwn(sanitizePreview({...result,
   coreDrain:{status:'SNAPSHOT',commandLine:'secret'}},req,645),'coreDrain'),false);
 });
+
+test('anchor failure diagnostics are private, bounded, and strictly validated',()=>{
+ const base={schema:'ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1',
+  requestId:id,chatId:chat,issueNumber:645,status:'BLOCKED',
+  code:'WRITER_B_INSERT_ANCHOR_MATCH_STOP',
+  beforeSha256:'a'.repeat(64),baseHead:'f'.repeat(40),
+  filePath:'scripts/pc-writer/alpaca-incremental.mjs',
+  anchorEvidence:[{index:0,exactCount:1,trimmedCount:1},
+   {index:1,exactCount:0,trimmedCount:1}],
+  pcSourceWrites:0,taskWrites:0,dbWrites:0,d1Writes:0,providerCalls:0,
+  untrustedToken:'DO_NOT_COPY'};
+ const safe=sanitizePreview(base,req,645);
+ assert.equal(safe.status,'BLOCKED');
+ assert.equal(safe.anchorEvidence[1].trimmedCount,1);
+ assert.equal(Object.hasOwn(safe,'untrustedToken'),false);
+ assert.equal(Object.hasOwn(sanitizePreview({...base,
+  anchorEvidence:[{index:0,exactCount:999,trimmedCount:1}]},req,645),
+  'anchorEvidence'),false);
+ assert.equal(Object.hasOwn(sanitizePreview({...base,pcSourceWrites:1},req,645),
+  'anchorEvidence'),false);
+});

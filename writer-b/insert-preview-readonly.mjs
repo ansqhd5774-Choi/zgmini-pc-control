@@ -44,7 +44,23 @@ export function previewWriterInsertions(spec,{
  const source=readTarget(root,spec.filePath);
  need(Buffer.isBuffer(source)&&sha256(source)===spec.beforeSha256,
   'WRITER_B_PREVIEW_PREIMAGE_SHA_STOP');
- const projected=applyApprovedInsertions(source,spec.insertions);
+ let projected;
+ try{projected=applyApprovedInsertions(source,spec.insertions);}
+ catch(error){
+  if(error?.code!=='WRITER_B_INSERT_ANCHOR_MATCH_STOP')throw error;
+  // Bounded cardinality only, never source lines, URL, keys, or anchor text.
+  // These counts are diagnostic and cannot authorize a looser insertion.
+  const lines=source.toString('utf8').split(/\r\n|\n/);
+  const anchorEvidence=spec.insertions.map((op,index)=>({
+   index,
+   exactCount:Math.min(3,lines.filter(line=>line===op.anchor).length),
+   trimmedCount:Math.min(3,lines.filter(line=>line.trim()===op.anchor.trim()).length)
+  }));
+  return {status:'BLOCKED',code:error.code,filePath:spec.filePath,
+   baseHead:spec.baseHead,beforeSha256:spec.beforeSha256,anchorEvidence,
+   evidenceLevel:'PC_EXACT_PREIMAGE_ANCHOR_CARDINALITY_ONLY',
+   pcSourceWrites:0,taskWrites:0,dbWrites:0,d1Writes:0,providerCalls:0};
+ }
  const xml=taskXml();
  need(Buffer.isBuffer(xml)&&xml.length>=5&&xml.length<=200_000,
   'WRITER_B_PREVIEW_TASK_XML_STOP');
