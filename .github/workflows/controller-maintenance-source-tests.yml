@@ -11,6 +11,10 @@ on:
       - 'tests/supervisor-status-write.test.mjs'
       - 'tools/maintenance-contract.mjs'
       - 'tools/r181-pinned-route-candidate.mjs'
+      - 'tools/r181-protected-b-transaction.mjs'
+      - 'tools/r181-protected-b-windows-io.mjs'
+      - 'tools/r181-protected-b-entry.mjs'
+      - 'tools/r181-protected-b-report.mjs'
       - 'tools/update.mjs'
       - 'tools/runner-watchdog.mjs'
       - 'tests/runner-watchdog.test.mjs'
@@ -27,6 +31,10 @@ on:
       - '.github/workflows/pc-watchdog-b-upgrade-once.yml'
       - 'tests/maintenance-contract.test.mjs'
       - 'tests/r181-pinned-route-candidate.test.mjs'
+      - 'tests/r181-protected-b-transaction.test.mjs'
+      - 'tests/r181-protected-b-windows-io.test.mjs'
+      - 'tests/r181-protected-b-entry-report.test.mjs'
+      - '.github/workflows/pc-writer-b-source-once.yml'
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
       - 'inflation-manual-b/**'
@@ -61,6 +69,12 @@ jobs:
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only
         run: node --test --test-concurrency=1 tests/r181-pinned-route-candidate.test.mjs
+      - name: Verify W03 protected PC-only R181 B contract without operational effects
+        run: node --test --test-concurrency=1 tests/r181-protected-b-transaction.test.mjs
+      - name: Verify W03 fixed Windows B IO is inert without a registered operation
+        run: node --test --test-concurrency=1 tests/r181-protected-b-windows-io.test.mjs
+      - name: Verify W03 existing B workflow branch and one-shot reporter safety
+        run: node --test --test-concurrency=1 tests/r181-protected-b-entry-report.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes

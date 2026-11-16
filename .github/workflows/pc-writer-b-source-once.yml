@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      github.event.issue.title == 'pc-writer-source-install' &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -41,13 +41,15 @@ jobs:
           repository: ansqhd5774-Choi/zgmini-pc-control
           ref: ${{ github.sha }}
           path: writer-b-control
-          fetch-depth: 1
+          # R181 pins a reviewed code ancestor; generic Writer B stays shallow.
+          fetch-depth: ${{ github.event.issue.title == 'r181-protected-route-install' && '0' || '1' }}
           persist-credentials: false
       - name: Approve exact manifest before candidate checkout
+        if: github.event.issue.title == 'pc-writer-source-install'
         id: manifest
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\preflight.mjs"'
       - name: Checkout approved public candidate SHA only
-        if: steps.manifest.outcome == 'success'
+        if: github.event.issue.title == 'pc-writer-source-install' && steps.manifest.outcome == 'success'
         id: candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -57,11 +59,20 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Run approved exact-file Writer B source transaction
-        if: steps.candidate.outcome == 'success'
+        if: github.event.issue.title == 'pc-writer-source-install' && steps.candidate.outcome == 'success'
         id: install
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\windows-adapter.mjs" > "%RUNNER_TEMP%\writer-b-install-result.json"'
+      - name: R181 exact protected source B (independent immutable manifest)
+        if: github.event.issue.title == 'r181-protected-route-install'
+        id: r181
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-protected-b-entry.mjs"'
+      - name: R181 create-only sanitized result and source Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-protected-route-install'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-protected-b-report.mjs"'
       - name: Create-only sanitized result and originating Issue comment
-        if: always() && steps.control.outcome == 'success'
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-source-install'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\report.mjs"'
