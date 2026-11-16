@@ -8,6 +8,12 @@ const ALLOWED_CODE = /^(?:writer-b|controller|agent-handoff|tools)\/[a-zA-Z0-9_.
 const REPAIRABLE_KINDS = new Set(['COMMON_CONTROLLER','COMMON_RUNNER','COMMON_WRITER','FEATURE']);
 const MAX_SOURCE = 65536;
 const MAX_REPLACEMENT = 8000;
+// Verified source locations for exact published Writer B failure codes.
+// These identify candidate modules, not an established root cause.
+const KNOWN_WRITER_ERROR_SOURCES = Object.freeze({
+  WRITER_B_PC_PREIMAGE_STOP: 'writer-b/installer.mjs',
+  WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP: 'writer-b/import-availability.mjs'
+});
 
 function stop(s) {throw Error('HANDOFF_AI_'+s);}
 
@@ -34,15 +40,23 @@ export function prepareAiCase(issue, comments, explicitPath=null) {
      c.body?.startsWith(AI_RESULT_MARKER+'\n')));
   if(claimed.length>0) stop('ALREADY_ATTEMPTED_OR_RESULT_PRESENT');
   if(request.origin.repository!==HANDOFF_REPOSITORY) stop('CROSS_REPO_NOT_SUPPORTED');
-  const paths=request.failure.fileRefs.filter(x=>ALLOWED_CODE.test(x));
-  // Exact source reference is mandatory: never guess another source file from failure text.
-  if(!paths.length) stop('NO_APPROVED_CODE_REFERENCE');
+  const reportedCodeFiles=request.failure.fileRefs.filter(x=>ALLOWED_CODE.test(x));
+  const knownSource=request.failure.kind==='COMMON_WRITER' &&
+    KNOWN_WRITER_ERROR_SOURCES[request.failure.code];
+  const paths=reportedCodeFiles.length ? reportedCodeFiles : (knownSource?[knownSource]:[]);
+  // Supplier fileRefs may correctly point to results/ and approvals/, not code.
+  // Do not reject a verified failure solely on that basis. A curated error-code
+  // to source mapping is a hypothesis for AI review, NEVER a proven fix.
+  if(!paths.length) stop('NO_REVIEWABLE_SOURCE_CANDIDATE');
   const path=explicitPath??paths[0];
   if(!paths.includes(path)) stop('PATH_OUTSIDE_INCIDENT_PROOF');
+  const sourceBasis=reportedCodeFiles.length ? 'INCIDENT_CODE_FILE_REFERENCE' :
+    'VERIFIED_ERROR_CODE_SOURCE_CANDIDATE';
   return Object.freeze({number:issue.number,id:request.incidentId,
     fingerprint:fingerprintHandoff(request),path,
     failureKind:request.failure.kind,failureCode:request.failure.code,
-    checkpoint:request.origin.checkpoint, sourceAtIncident:request.origin.sourceSha});
+    checkpoint:request.origin.checkpoint, sourceAtIncident:request.origin.sourceSha,
+    sourceBasis, evidenceFileRefs:[...request.failure.fileRefs]});
 }
 
 export function attemptReceipt(task) {
