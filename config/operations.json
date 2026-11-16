@@ -25,6 +25,7 @@
     "fear-greed-archive-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "alpaca-quota-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-r44-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "market-calendar-r44-input-audit-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-r44-production-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-er1-saved-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "market-calendar-er1-nov30-availability": {"grade":"A","timeoutSeconds":60,"resource":"light"},
