@@ -204,3 +204,44 @@ test('more than 128 newer one-off hosts do not evict the 32 repeated HTTP hosts'
  assert.equal(out.status,'STATE_UNKNOWN'); // full 192-host log exceeds the bounded trust envelope
  assert.equal(out.omittedHosts,128);
 }));
+test('7-day Alpaca bursts imply a false hourly deadline but 12h-old HTTP 200 is reachable',()=>fixture(({d,write})=>{
+ const rows=[];
+ for(let i=0;i<7;i++){
+  const day=Date.parse('2026-11-09T00:00:00Z')+i*86400000;
+  rows.push(event(new Date(day).toISOString(),{'data.alpaca.markets':host({'200':1})}));
+  rows.push(event(new Date(day+30*60000).toISOString(),{'data.alpaca.markets':host({'200':1})}));
+ }
+ write(rows);
+ const x=inspectProviderActivity(d,{now:NOW});
+ assert.equal(x.monitoredHostCount,1);
+ assert.equal(x.hosts[0].expectedIntervalMs,30*60000);
+ assert.equal(x.http.normal,1);
+ assert.equal(x.http.unknown,0);
+ assert.equal(x.hosts[0].reason,'RECENT_2XX_CADENCE_UNVERIFIED');
+ assert.equal(x.hosts[0].lastRunStatuses['200'],1);
+ assert.equal(x.allActiveEndpointsVerified,false);
+ assert.equal(x.providerCalls,0);
+}));
+test('fresh latest HTTP 503 stays failed despite burst-derived cadence',()=>fixture(({d,write})=>{
+ const rows=[];
+ for(let i=0;i<7;i++){
+  const day=Date.parse('2026-11-09T00:00:00Z')+i*86400000;
+  rows.push(event(new Date(day).toISOString(),{'data.alpaca.markets':host({'200':1})}));
+  rows.push(event(new Date(day+30*60000).toISOString(),{'data.alpaca.markets':host({[i===6?'503':'200']:1})}));
+ }
+ write(rows);
+ const x=inspectProviderActivity(d,{now:NOW});
+ assert.equal(x.http.normal,0);
+ assert.equal(x.http.failed,1);
+ assert.equal(x.hosts[0].reason,'LAST_HTTP_ERROR');
+}));
+test('13-day-old Census CDN 200 remains unverified without a proved monthly due schedule',()=>fixture(({d,write})=>{
+ write([
+  event('2026-11-02T21:00:00Z',{'cdn.www.census.gov':host({'200':1})}),
+  event('2026-11-03T21:00:00Z',{'cdn.www.census.gov':host({'200':1})}),
+ ]);
+ const out=inspectProviderActivity(d,{now:NOW});
+ assert.equal(out.http.unknown,1);
+ assert.equal(out.http.normal,0);
+ assert.equal(out.hosts[0].reason,'NO_VERIFIED_SCHEDULE_OVER_36H');
+}));
