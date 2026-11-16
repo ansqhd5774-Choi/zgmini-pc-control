@@ -32,7 +32,8 @@ const basic=()=>({status:'STATE_UNKNOWN',code:'INFL_E129_NOT_OBSERVED_WITHIN_LIM
  rawBVbs:{ok:null,code:'NOT_EVALUATED',candidates:[]},
  supplemental:{parsed:null,coreCandidates:null,onlySupplemental:false},
  task:{definition:'NOT_EVALUATED',instance:'NOT_EVALUATED'},
- wmi:{status:'NOT_EVALUATED',ownerFound:null,coreMatched:null},
+ wmi:{status:'NOT_EVALUATED',ownerFound:null,coreMatched:null,
+  taskRunning:null,linked:null,koreaMatched:null},
  event:{total:null,systemMatch:null,taskMatch:null,fieldsPresent:null,
   fieldCounts:{TaskName:null,Path:null,ProcessID:null,TimeCreated:null},
   pidMatch:null,timeParsed:null,withinTime:null,timeDeltaMs:null,candidateCount:null},
@@ -157,6 +158,15 @@ export async function inspectInflationEvent129Once({
   snapshot(out,clock,'BEFORE_LOCK');
   before=readLock();out.probeCounts.lockReads++;out.lock.before=legal(before?.status,['PRESENT','ABSENT','INVALID','UNAVAILABLE']);
   if(before?.status!=='PRESENT'){stop('INFL_E129_LOCK_NOT_VERIFIED','LOCK');return finish();}
+  // Mirror the current B preflight lock age and self-owner restrictions.
+  // A stale/future lock is not proof of an active Core owner.
+  const lockAge=clock()-before.at;
+  if(!Number.isSafeInteger(lockAge)||lockAge<0||lockAge>=3600000){
+   stop('INFL_E129_LOCK_AGE_OUT_OF_WINDOW','LOCK');return finish();
+  }
+  if(before.pid===process.pid){
+   stop('INFL_E129_LOCK_SELF_OWNER_UNVERIFIED','LOCK');return finish();
+  }
   if(clock()-start>78000){stop('INFL_E129_TIME_BUDGET_STOP','TIME');return finish();}
   snapshot(out,clock,'TASK_DEFINITION');
   const task=execute(SCHTASKS,['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],{timeout:8000,maxBuffer:262144});
@@ -171,8 +181,28 @@ export async function inspectInflationEvent129Once({
   out.wmi.status=owner?.wmiStatus??'ERROR';
   out.wmi.ownerFound=typeof owner?.ownerFound==='boolean'?owner.ownerFound:null;
   out.wmi.coreMatched=typeof owner?.ownerCoreMatched==='boolean'?owner.ownerCoreMatched:null;
+  out.wmi.taskRunning=typeof owner?.taskRunning==='boolean'?owner.taskRunning:null;
+  out.wmi.linked=typeof owner?.linked==='boolean'?owner.linked:null;
+  out.wmi.koreaMatched=typeof owner?.ownerKoreaMatched==='boolean'?owner.ownerKoreaMatched:null;
   if(!owner||owner.ok!==true){
    stop('INFL_E129_TASK_OR_WMI_UNAVAILABLE','WMI');return finish();
+  }
+  // In actual B V2, a verified live Task/WMI linked Core owner takes the
+  // direct path WITHOUT Event129. A must not fabricate a failed event proof.
+  if(owner.linked===true){
+   if(owner.ownerCoreMatched!==true){
+    stop('INFL_E129_LINKED_OWNER_SCRIPT_UNVERIFIED','WMI');return finish();
+   }
+   out.status='PASS';out.code='INFL_E129_CURRENT_WMI_LINK_OBSERVED';
+   out.stage='WMI';return finish();
+  }
+  // B's 12-minute observer waits for Core when Korea owns the shared lock
+  // or no Core Task is running; one-shot A must expose snapshot uncertainty.
+  if(owner.ownerKoreaMatched===true){
+   stop('INFL_E129_NON_CORE_LOCK_OWNER_OBSERVED','WMI');return finish();
+  }
+  if(owner.taskRunning!==true){
+   stop('INFL_E129_CORE_TASK_NOT_RUNNING_AT_SNAPSHOT','WMI');return finish();
   }
   snapshot(out,clock,'EVENT129');
   const raw=execute(EVENT_TOOL,['qe','Microsoft-Windows-TaskScheduler/Operational',
