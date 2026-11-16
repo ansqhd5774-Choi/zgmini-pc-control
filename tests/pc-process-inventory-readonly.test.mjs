@@ -209,3 +209,11 @@ test('1501 recovery checkpoint refuses to interpret uncorrelated or malformed ph
  assert.equal(no.ownerPidObservation,'UNKNOWN');
  assert.equal(no.ledgerPhase,null);
 });
+test('workflow state distinguishes current active and manual disable without exposing raw data',()=>{
+ const base={maintenanceSourceSha:'a'.repeat(40),maintenanceFilesVerified:true,
+  installLock:{held:true,recoveryRequired:true},diagnostics:[]};
+ assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'active'}).workflowState,'active');
+ assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'disabled_manually'}).workflowState,'disabled_manually');
+ assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'disabled_inactivity'}).workflowState,'disabled_inactivity');
+ assert.equal(sanitizeMaintenanceStatus({...base,workflowState:'SECRET_TOKEN'}).workflowState,'UNVERIFIED');
+});
