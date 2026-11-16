@@ -256,6 +256,8 @@ test('DOL national error categories remain diagnostic without leaking arbitrary 
   ['DOL_NATIONAL_NO_VALID_ROWS','DOL_NATIONAL_NO_VALID_ROWS'],
   ['DOL_NATIONAL_SERIES_INCOMPLETE','DOL_NATIONAL_SERIES_INCOMPLETE'],
   ['DOL_NATIONAL_INVALID_DATA','DOL_NATIONAL_INVALID_DATA'],
+  ['DOL_NATIONAL_SOURCE_UNAVAILABLE','DOL_NATIONAL_SOURCE_UNAVAILABLE'],
+  ['DOL_NATIONAL_RESPONSE_FORMAT_UNSUPPORTED','DOL_NATIONAL_RESPONSE_FORMAT_UNSUPPORTED'],
   ['DOL_RELEASE_OBSERVATION_STALE','DOL_RELEASE_OBSERVATION_STALE'],
   ['HTTP_503_SECRET_DO_NOT_OUTPUT','OTHER'],
  ];
@@ -333,4 +335,30 @@ test('W04 National raw diagnostic rejects arbitrary formats and unbounded error 
   latestNationalObservationDate:'2026-11-14',
  });
  assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|MALICIOUS_FORMAT/);
+});
+
+test('official DOL HTTP-200 source unavailability remains redacted and exact in A diagnostic',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T11:30:15.554Z',
+  2,5712,0,0,0,'DOL_NATIONAL_SOURCE_UNAVAILABLE',
+  JSON.stringify({mode:'ONE_YEAR',nationalResponseEvidence:{
+    httpStatus:200,contentTypeCategory:'text/plain',responseFormat:'SOURCE_UNAVAILABLE',
+    bodyCharLength:100,parsedNationalSeriesCount:0,
+    requestFailureCode:'DOL_NATIONAL_SOURCE_UNAVAILABLE',
+    sourceUrl:'SECRET_DO_NOT_OUTPUT',bodySha256:'PRIVATE_DIGEST_DO_NOT_OUTPUT',
+  }}));
+ db.close();
+ const before=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.dol.ONE_YEAR.failureCode,'DOL_NATIONAL_SOURCE_UNAVAILABLE');
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.responseFormat,'SOURCE_UNAVAILABLE');
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.httpStatus,200);
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.requestFailureCode,'DOL_NATIONAL_SOURCE_UNAVAILABLE');
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.parsedNationalSeriesCount,0);
+ assert.equal(sha(file),before);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|PRIVATE_DIGEST_DO_NOT_OUTPUT|sourceUrl|bodySha256/);
 });
