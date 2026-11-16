@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a0adf60a-7bbd-49e6-83c1-9ba3095d74bb",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "f59e999082fd3b21893f0f74fc1913441ec80bba",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "f9dd87f72f3b821a074c66ade82ce6ff6211f429",
+  "candidateSourceSha": "6aa96c65442b9156231424e8c1ec3595f9d651b8",
+  "manifestSha256": "61dfbb8d3cc5716fc1f2b7ef2918c1dbe2f5c13f62cd3e2a15dd072e2acb24d3",
+  "baseTreeOid": "7e7f4a0fc5930b7f5aca17a7ae2cc207580cd41d",
+  "preparedTreeOid": "55a2592ed91742fe8ca501bf5f34eb3cf17f27d5",
+  "provenanceSha256": "94e81253885fc4a4b827a54e5d8e1db3c57822960b0167de05678b9c59137034",
+  "runId": "43794969732",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-calendar-r44-marketcap.mjs",
+    "lib/market-calendar-deltascreener-public.mjs",
+    "lib/earnings-api-display.mjs"
+  ]
+}
