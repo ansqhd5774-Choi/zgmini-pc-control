@@ -22,6 +22,11 @@ test('fixed source audit: separate exact market-cap grading from metadata-only e
  assert.equal(x.maskedShareClassCandidates,1);
  assert.equal(x.coveredTickerCount,2);
  assert.deepEqual(x.counts,{one:1,two:0,three:1,missing:3,conflicting:0});
+ assert.deepEqual(x.missingReasons,{
+  absentFromSourceCsv:2,onlyOutsideAllowedExchanges:0,
+  missingOrInvalidMarketCap:0,missingRequiredMetadata:1,
+  duplicateTickerQuarantined:0,otherUnclassified:0
+ });
  assert.equal(x.grades.get('DAC'),1);
  assert.equal(x.grades.get('GOOG'),3);
  assert.equal(x.grades.get('META'),null);
@@ -41,6 +46,28 @@ test('duplicate ticker never becomes a metadata recovery candidate',()=>{
  assert.equal(x.rawCapDuplicateConflicts,1);
  assert.deepEqual(x.counts,{one:0,two:0,three:0,missing:2,conflicting:0});
  assert.equal(x.metadataCandidates,1);
+ assert.equal(x.missingReasons.duplicateTickerQuarantined,1);
+ assert.equal(x.missingReasons.missingRequiredMetadata,1);
+});
+test('missing reasons partition the existing CSV rather than imputing any star',()=>{
+ const data=csv([
+  'FULL,Listed,NASDAQ,Technology,Apps,US,10,15000000000',
+  'OTC1,Nonlisted,OTC,Tech,Apps,US,10,15000000000',
+  'NOCP,NoCap,NYSE,Tech,Apps,US,10,0',
+  'NOMETA,NoMetadata,NASDAQ,,Apps,US,10,26000000000',
+  'REPEAT,One,NASDAQ,Tech,Apps,US,15,36000000000',
+  'REPEAT,One,NASDAQ,Tech,Apps,US,15,36000000000'
+ ]);
+ const a=analyzeR44ExistingInput(data,['FULL','OTC1','NOCP','NOMETA','REPEAT','ABS']);
+ assert.deepEqual(a.counts,{one:1,two:0,three:0,missing:5,conflicting:0});
+ assert.deepEqual(a.missingReasons,{
+  absentFromSourceCsv:1,onlyOutsideAllowedExchanges:1,
+  missingOrInvalidMarketCap:1,missingRequiredMetadata:1,
+  duplicateTickerQuarantined:1,otherUnclassified:0
+ });
+ assert.equal(Object.values(a.missingReasons).reduce((sum,n)=>sum+n,0),a.counts.missing);
+ assert.equal(a.grades.get('ABS'),null);
+ assert.equal(a.grades.get('FULL'),1);
 });
 test('strict CSV contract refuses malformed input or unsafe ticker',()=>{
  assert.throws(()=>analyzeR44ExistingInput('ticker,mktCap\nDAC,1\n',['DAC']),
