@@ -36,7 +36,7 @@ export function verifyCensusBCollectorResult(result){
   'W01_CENSUS_B_COLLECTOR_RESULT_STOP');
  return result;
 }
-const safeCode=e=>/^(?:W01_CENSUS_B|INFL_MANUAL_B)_[A-Z0-9_]{3,90}$/.test(e?.code??'')?
+const safeCode=e=>/^(?:W01_CENSUS_B|INFL_MANUAL_B|WRITER_B_CORE)_[A-Z0-9_]{3,90}$/.test(e?.code??'')?
  e.code:'W01_CENSUS_B_IO_UNVERIFIED_STOP';
 export async function performCensusApiB(proof,io){
  assertCensusBAuthorized(proof);
@@ -75,8 +75,12 @@ export async function performCensusApiB(proof,io){
    replay:'FORBIDDEN'};
  }catch(e){
   firstFail=safeCode(e);
-  retain=(claimed&&writeIntent)||(coreAcquireAttempted&&!core)||
-   (claimAttempted&&!claimed);
+  const cleanCoreAbort=['W01_CENSUS_B_CORE_LEASE_BUSY_STOP',
+   'W01_CENSUS_B_CORE_ACQUIRE_ABORTED_CLEAN_STOP'].includes(e?.code);
+  const cleanClaimRefusal=e?.code==='R17_B_REQUEST_ALREADY_CLAIMED_STOP';
+  retain=(claimed&&writeIntent)||
+   (coreAcquireAttempted&&!core&&!cleanCoreAbort)||
+   (claimAttempted&&!claimed&&!cleanClaimRefusal);
   if(claimed)try{
    await io.journalPhase(retain?'RECOVERY_REQUIRED':'CLAIMED_UNTOUCHED_STOP');
   }catch{retain=true;firstFail='W01_CENSUS_B_JOURNAL_UNVERIFIED_STOP';}
