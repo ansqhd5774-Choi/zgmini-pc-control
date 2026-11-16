@@ -70,6 +70,8 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
  const scheduled=[...new Set(calendarTickers)].sort(),scheduledSet=new Set(scheduled);
  const strict=new Map(),rawCap=new Map();
  const strictSeen=new Set(),strictConflicts=new Set(),rawSeen=new Set(),rawConflicts=new Set();
+ // Count exact source-presence reasons only; do not disclose raw symbols or rows.
+ const sourcePresence=new Map();
  let invalidRows=0,nonListedRows=0,metadataRejectedWithCap=0;
  const p=(row,col)=>row[pos[col]]?.trim()??'';
  for(const row of rows){
@@ -78,6 +80,17 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
    positive(p(row,'price'))!==null;
   const validBase=TICKER.test(t)&&cap!==null;
   const listed=LISTED.has(p(row,'exchange').toUpperCase());
+  if(TICKER.test(t)){
+   const seen=sourcePresence.get(t)??{listed:false,validCap:false,complete:false};
+   if(listed){
+    seen.listed=true;
+    if(cap!==null){
+     seen.validCap=true;
+     if(metaOK)seen.complete=true;
+    }
+   }
+   sourcePresence.set(t,seen);
+  }
   if(validBase&&listed){
    if(rawSeen.has(t)){rawConflicts.add(t);rawCap.delete(t)}
    else{rawSeen.add(t);rawCap.set(t,cap)}
@@ -112,7 +125,19 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
   }
  }
  let metadataCandidates=0,aliasCandidates=0,maskedShareClassCandidates=0;
+ const missingReasons={absentFromSourceCsv:0,onlyOutsideAllowedExchanges:0,
+  missingOrInvalidMarketCap:0,missingRequiredMetadata:0,
+  duplicateTickerQuarantined:0,otherUnclassified:0};
  for(const t of scheduled){
+  if(grades.get(t)===null&&!conflicting.has(t)){
+   const source=sourcePresence.get(t);
+   const reason=!source?'absentFromSourceCsv':
+    !source.listed?'onlyOutsideAllowedExchanges':
+    !source.validCap?'missingOrInvalidMarketCap':
+    !source.complete?'missingRequiredMetadata':
+    strictConflicts.has(t)?'duplicateTickerQuarantined':'otherUnclassified';
+   missingReasons[reason]++;
+  }
   if(strict.get(t)===undefined&&!strictConflicts.has(t)){
    if(rawCap.has(t))metadataCandidates++;
    else {
@@ -130,12 +155,14 @@ export function analyzeR44ExistingInput(csv,calendarTickers){
    }
   }
  }
+ if(Object.values(missingReasons).reduce((sum,n)=>sum+n,0)!==counts.missing)
+  fail('R44_MISSING_REASON_COUNT_MISMATCH');
  return {
   rawRows:rows.length,validListedTickers:strict.size,invalidRows,nonListedRows,
   strictDuplicateTickerConflicts:strictConflicts.size,rawCapDuplicateConflicts:rawConflicts.size,
   metadataRejectedWithCap,
   calendarTickerCount:scheduled.length,coveredTickerCount:counts.one+counts.two+counts.three,
-  counts,metadataCandidates,aliasCandidates,maskedShareClassCandidates,grades
+  counts,missingReasons,metadataCandidates,aliasCandidates,maskedShareClassCandidates,grades
  };
 }
 
@@ -183,6 +210,7 @@ export function inspectR44ExistingInputAudit(dataRoot,{openDb}={}){
   calendarTickerCount:null,coveredTickerCount:null,counts:null,
   invalidRows:null,nonListedRows:null,metadataRejectedWithCap:null,
   metadataCandidates:null,aliasCandidates:null,maskedShareClassCandidates:null,
+  missingReasons:null,
   rawCapDuplicateConflicts:null,sqliteDays:0,archiveDays:0,
   localOutputAgrees:null,outputStatus:'NOT_READ',
   sqliteOpened:false,providerCalls:0,dbWrites:0,d1Writes:0,operationalWrites:0,
@@ -223,7 +251,7 @@ export function inspectR44ExistingInputAudit(dataRoot,{openDb}={}){
    result.code='R44_PINNED_INPUT_ROW_MISMATCH';return result;
   }
   for(const k of ['rawRows','validListedTickers','calendarTickerCount',
-   'coveredTickerCount','counts','invalidRows','nonListedRows',
+   'coveredTickerCount','counts','missingReasons','invalidRows','nonListedRows',
    'metadataRejectedWithCap','metadataCandidates','aliasCandidates',
    'maskedShareClassCandidates','rawCapDuplicateConflicts'])result[k]=a[k];
   const prior=getBody(db,'output',OUTPUT_KEY);
