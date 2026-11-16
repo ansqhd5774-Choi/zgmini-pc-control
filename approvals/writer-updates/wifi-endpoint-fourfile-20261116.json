@@ -1,0 +1,77 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "27ce7650c70f2c980936f97199badf08b86af333",
+  "baseHead": "ecf5a859dbee150e3557e94896f410366f718f3e",
+  "baseConfigSourceSha": "ecf5a859dbee150e3557e94896f410366f718f3e",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "93888fa594ef28dc44b81f144bbd5bc962d89152c1374b0efd467b44f83349db",
+      "afterSha256": "588624ec4e7ac3a944abb3971663091e087cea70ec8324d1c9cfc137a7386e99",
+      "candidateSha256": "2f0aa085889353d30fbe45d5af3dc047f6acc2bb1d69f0b8e31e9f14fa6ef293",
+      "insertions": [
+        {
+          "anchor": "import {appendCollectionEvent,appendProviderFailure} from './collection-events.mjs';",
+          "position": "after",
+          "text": "import {providerEndpointFingerprint,PROVIDER_ENDPOINTS_PER_HOST_MAX,appendProviderEndpointEvent} from './provider-endpoint-fingerprint.mjs';\n"
+        },
+        {
+          "anchor": "  const {runPublicFeeds}=await import('../../worker/public-feed-collectors.ts');",
+          "position": "before",
+          "text": "  // Observe the real HTTP fetch wrapper without changing its quota/response behavior.\n  // The single-child collector log remains append-only and never stores URLs.\n  const endpointPaths={};let endpointTrackingOmitted=0;\n  const previousCollectorFetch=globalThis.fetch;\n  globalThis.fetch=async(input,init)=>{\n   const route=providerEndpointFingerprint(input,init);\n   const bucket=route?(endpointPaths[route.host]??={}):null;\n   const entry=bucket&&(bucket[route.id]??(Object.keys(bucket).length<PROVIDER_ENDPOINTS_PER_HOST_MAX?\n    (bucket[route.id]={requests:0,statuses:{}}):null));\n   if(!entry)endpointTrackingOmitted++;\n   const count=status=>{if(entry){entry.requests++;entry.statuses[status]=(entry.statuses[status]??0)+1;}};\n   try{const response=await previousCollectorFetch(input,init);count(response.status);return response;}\n   catch(error){count(error?.code==='PROVIDER_QUOTA_GUARD'?'PROVIDER_QUOTA_GUARD':'NETWORK_ERROR');throw error;}\n  };\n"
+        },
+        {
+          "anchor": "  appendCollectionEvent(base,report);",
+          "position": "before",
+          "text": "  report.endpointPaths=endpointPaths;report.endpointTrackingOmitted=endpointTrackingOmitted;\n  try{appendProviderEndpointEvent(base,report);}catch{report.endpointDiagnosticWriteFailures=1;}\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/api-connection-health.mjs",
+      "change": "M",
+      "beforeSha256": "b38332f6cb3f00e5bf93c410adc781b5f2595b88947e306e765b189e7ac10079",
+      "afterSha256": "79754fad2480faab9a845d20b621c1e7b0d4e21f735bff3deab5fe0f65264557"
+    },
+    {
+      "path": "worker/api-connection-health.mjs",
+      "change": "M",
+      "beforeSha256": "77b08ec8d3d46dd104f61f9a27a3aeba732073b61a3b1a0c3134ef4caefbfa52",
+      "afterSha256": "60d1d9070e3e49320ae8d011fda336d1fef3a1e682e8fbcedee43380bd8b24e3"
+    },
+    {
+      "path": "scripts/pc-writer/provider-endpoint-fingerprint.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "42502b91ca4876f4729f998ebe5a61605e829e2f90780084dc44cc9da99d784b"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/collection-events.mjs",
+      "sha256": "0085ea065382b8530fe3b45000d12bdb961801e183f5bd161ad897e2c53ad2ba"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "2230171690ad4874c39bd94e4abdc644d36b143d5fc90cf3766deb3c7e79ef73"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
