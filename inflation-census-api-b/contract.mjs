@@ -28,7 +28,7 @@ const REQUEST_FIELDS=['schema','requestId','chatId','operation','controlReposito
 const APPROVAL_FIELDS=['schema','status','scope','operation','controlSourceSha',
  'installedSourceSha','sourceRoot','dataRoot','coreLock','writerLock',
  'sourceFilesSha256','providerEndpoint','selector','targetFile',
- 'maxProviderGets','maxRawArchives','maxOutputFiles','coreLeaseMode',
+ 'maxProviderGets','maxRawArchives','maxOutputFiles','maxBackupFiles','coreLeaseMode',
  'allowQuotaLedgerWrites','allowProviderCalls','allowDatabaseWrites','allowD1Writes',
  'allowSourceChanges','allowTaskChanges','allowScheduleChanges','allowOtherWrites'];
 const authorized=new WeakSet();
@@ -50,6 +50,7 @@ export function validateCensusBManifest(m){
   m.providerEndpoint===CENSUS_B_ENDPOINT&&m.selector==='MTM/TI/SA/US'&&
   m.targetFile===CENSUS_B_TARGET&&
   m.maxProviderGets===2&&m.maxRawArchives===2&&m.maxOutputFiles===1&&
+  m.maxBackupFiles===1&&
   m.coreLeaseMode==='EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK_VERIFIED_OWNER'&&
   m.allowProviderCalls===true&&m.allowQuotaLedgerWrites===true&&
   m.allowDatabaseWrites===false&&m.allowD1Writes===false&&
