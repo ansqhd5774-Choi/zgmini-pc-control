@@ -21,6 +21,10 @@ export function validateTrigger(event, env) {
         event.workflow_run?.conclusion !== 'success' ||
         event.workflow_run?.actor?.login !== HANDOFF_OWNER)
       throw Error('HANDOFF_SELECTOR_WORKFLOW_PROVENANCE_STOP');
+  } else if (env.GITHUB_EVENT_NAME === 'push') {
+    if (event.ref !== 'refs/heads/main' || event.deleted === true ||
+        env.GITHUB_ACTOR !== HANDOFF_OWNER)
+      throw Error('HANDOFF_SELECTOR_MAIN_PUSH_ONLY');
   } else if (env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
     if (event.sender?.login !== HANDOFF_OWNER || env.GITHUB_ACTOR !== HANDOFF_OWNER)
       throw Error('HANDOFF_SELECTOR_OWNER_ONLY');
