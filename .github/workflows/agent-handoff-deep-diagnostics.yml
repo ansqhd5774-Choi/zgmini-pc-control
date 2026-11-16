@@ -22,11 +22,12 @@ permissions:
   actions: read
   issues: write
 # Serialize both diagnostic writers to the shared evidence ledger.
-concurrency:
-  group: zgmini-proactive-diagnostics-ledger
-  cancel-in-progress: false
 jobs:
   handoff-evidence-and-conditional-simulation:
+    concurrency:
+      group: zgmini-proactive-diagnostics-ledger
+      cancel-in-progress: false
+      queue: max
     if: >-
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
