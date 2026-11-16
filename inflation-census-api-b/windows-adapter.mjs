@@ -160,7 +160,7 @@ function checkedArchive(doc){
 }
 export function makeWindowsCensusApiBAdapter(proof){
  need(process.platform==='win32','W01_CENSUS_B_WINDOWS_ONLY_STOP');
- let writer=null,core=null,claim=null,quota=null;
+ let writer=null,core=null,claim=null,quota=null,censusKey=null;
  const requestId=proof.request.requestId;
  const journalFile=path.join(JOURNAL,requestId,'journal.jsonl');
  return {
@@ -175,6 +175,18 @@ export function makeWindowsCensusApiBAdapter(proof){
   async readPcPreimage(){
    need(writer!==null,'W01_CENSUS_B_WRITER_LEASE_MISSING_STOP');
    return readSourcePreimage(requestId);
+  },
+  async preflightProviderReadOnly(){
+   need(writer!==null,'W01_CENSUS_B_WRITER_LEASE_MISSING_STOP');
+   // Read credentials exclusively in memory after the pinned local-env SHA
+   // has been checked, before claiming a non-repeatable provider request.
+   const load=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
+    'scripts','pc-writer','local-env.mjs')).href);
+   const providers=load.loadLocalProviders(CENSUS_B_DATA_ROOT);
+   need(typeof providers?.CENSUS_API_KEY==='string'&&
+    providers.CENSUS_API_KEY.trim().length>0,
+    'W01_CENSUS_B_CENSUS_KEY_UNAVAILABLE_STOP');
+   censusKey=providers.CENSUS_API_KEY;
   },
   async assertCoreIdle(){
    await awaitNaturalCoreIdle({
@@ -242,11 +254,9 @@ export function makeWindowsCensusApiBAdapter(proof){
     fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   },
   async collectAndReadback(){
-   need(core!==null&&claim!==null,'W01_CENSUS_B_COLLECT_LEASE_STOP');
+   need(core!==null&&claim!==null&&typeof censusKey==='string',
+    'W01_CENSUS_B_COLLECT_LEASE_STOP');
    await this.verifyCoreLease(requestId);
-   const load=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
-    'scripts','pc-writer','local-env.mjs')).href);
-   const env=load.loadLocalProviders(CENSUS_B_DATA_ROOT);
    const qm=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
     'scripts','pc-writer','quota-fetch.mjs')).href);
    quota=qm.createQuotaFetch({base:CENSUS_B_DATA_ROOT,
@@ -254,7 +264,7 @@ export function makeWindowsCensusApiBAdapter(proof){
    const module=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
     'scripts','pc-writer','inflation-causal-candidate-once.mjs')).href);
    return module.runInflationCandidateOnce({approved:true,base:CENSUS_B_DATA_ROOT,
-    groups:['census'],providerEnv:env,quotaFetch:quota.fetch});
+    groups:['census'],providerEnv:{CENSUS_API_KEY:censusKey},quotaFetch:quota.fetch});
   },
   async verifySavedReadback(){
    need(core!==null&&claim!==null,'W01_CENSUS_B_READBACK_LEASE_STOP');
