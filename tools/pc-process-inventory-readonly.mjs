@@ -108,6 +108,17 @@ const asSha=x=>typeof x==='string'&&SHA40.test(x)?x:null;
 const asBool=x=>typeof x==='boolean'?x:null;
 // Only fixed, bounded fields leave the operating PC. Never return a full
 // owner/lease/claim object, source path, nonce, credential or environment.
+const SIGNAL_KEYS=['controllerFilesVerified','supervisorAlive',
+ 'supervisorIdentityVerified','supervisorFresh','supervisorChildrenVerified',
+ 'runnerSetOnline','workflowActive'];
+export function sanitizeRuntimeSignals(input){
+ const result={};
+ for(const k of SIGNAL_KEYS){
+  const x=input?.[k];
+  result[k]=typeof x==='boolean'?x:null;
+ }
+ return result;
+}
 export function sanitizeMaintenanceStatus(raw){
  const diagnostics=Array.isArray(raw?.diagnostics)?raw.diagnostics:[];
  const lockKnown=Boolean(raw?.installLock&&typeof raw.installLock==='object'&&
@@ -138,6 +149,7 @@ export function sanitizeMaintenanceStatus(raw){
   runtimeState:raw?.runtimeState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
   maintenanceState:raw?.maintenanceState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
   automationState:raw?.automationState==='HEALTHY'?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
+  runtimeSignals:sanitizeRuntimeSignals(raw?.runtimeSignals),
   operationalWrites:0,providerCalls:0,d1Writes:0
  };
 }
