@@ -14,7 +14,7 @@ import {
 } from './contract.mjs';
 import {performOfficialManualB} from './coordinator.mjs';
 import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
- shouldWaitForV2OwnerEvidence}
+ shouldAcceptVisibleCoreOwner,shouldWaitForV2OwnerEvidence}
  from './core-task-event-owner-proof.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
  from '../r17-writer-b/r17-b-claim.mjs';
@@ -166,7 +166,13 @@ async function observeLiveCoreLockOwner(approvalSchema){
    catch{fail('INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');}
    need(ownerProof?.ok===true,
     'INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');
-   if(ownerProof.linked!==true){
+   if(ownerProof.linked===true){
+    // In V1 keep the original EnginePID ancestry. V2 additionally requires
+    // the exact approved Core command even on the visible-engine path.
+    need(shouldAcceptVisibleCoreOwner(
+     approvalSchema===APPROVAL_SCHEMA_V2,ownerProof),
+     'INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');
+   }else{
     // V1 always retains its original EnginePID ancestry protection.
     need(approvalSchema===APPROVAL_SCHEMA_V2,
      'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
