@@ -125,3 +125,52 @@ test('preimage requires all four exact approved installed source files',()=>{
  delete p.sourceFilesSha256[CENSUS_B_SOURCE_FILES[0]];
  assert.throws(()=>verifyCensusBPreimage(m,p),/SOURCE_PREIMAGE_STOP/);
 });
+
+
+test('Core busy denies cleanly before one-shot claim and releases Writer',async()=>{
+ const {calls,api}=io({acquireCoreLease:async()=>{
+  throw Object.assign(Error('occupied'),{code:'W01_CENSUS_B_CORE_LEASE_BUSY_STOP'});
+ }});
+ const r=await performCensusApiB(proof(),api);
+ assert.equal(r.status,'STOP');
+ assert.equal(r.code,'W01_CENSUS_B_CORE_LEASE_BUSY_STOP');
+ assert.equal(r.providerCalls,0);
+ assert.equal(calls.at(-1),'writer-release:false');
+ assert.ok(!calls.includes('claim'));
+});
+
+test('ambiguous Core lease setup retains Writer for original recovery owner',async()=>{
+ const {calls,api}=io({acquireCoreLease:async()=>{throw Error('unknown half-created lease');}});
+ const r=await performCensusApiB(proof(),api);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.providerCalls,0);
+ assert.equal(calls.at(-1),'writer-release:true');
+});
+
+test('failed completion journal keeps original recovery owner and never emits PASS',async()=>{
+ const {calls,api}=io({journalPhase:async phase=>{
+  calls.push('journal:'+phase);
+  if(phase==='COMPLETED')throw Error('ledger inaccessible');
+ }});
+ const r=await performCensusApiB(proof(),api);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.providerCalls,null);
+ assert.equal(calls.at(-1),'writer-release:true');
+});
+
+test('native B interface shares exact Core owner verifier and never creates Task',async()=>{
+ const fs=await import('node:fs');
+ const path=await import('node:path');
+ const root=path.resolve(import.meta.dirname,'..');
+ const code=fs.readFileSync(path.join(root,'inflation-census-api-b','windows-adapter.mjs'),'utf8');
+ const workflow=fs.readFileSync(path.join(root,'.github','workflows',
+  'pc-writer-b-source-once.yml'),'utf8');
+ assert.match(code,/observeLiveCoreLockOwner\(APPROVAL_SCHEMA_V2/);
+ assert.match(code,/awaitNaturalCoreIdle/);
+ assert.match(code,/acquireInstallLock/);
+ assert.match(code,/runInflationCandidateOnce\(\{approved:true/);
+ assert.match(code,/groups:\['census'\]/);
+ assert.match(code,/mode:'enforce'/);
+ assert.match(workflow,/github\.event\.issue\.title == 'w01-census-m3-api-once'/);
+ assert.doesNotMatch(code,/\/Create\b|\/Run\b|New-ScheduledTask/);
+});
