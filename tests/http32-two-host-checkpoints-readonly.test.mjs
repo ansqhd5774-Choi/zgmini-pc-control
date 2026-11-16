@@ -119,3 +119,20 @@ test('missing or non-Core recent local cycle never forges R10 invocation proof',
  assert.equal(a.coreAlpacaStatus,'SKIPPED_KOREA_LANE');
  assert.equal(a.cacheEvidenceVerified,false);
 }));
+
+test('user-approved R10 Alpaca exclusion is distinct from a transport outage',()=>temp(root=>{
+ put(root,'local-asset-bubble-r10-alpaca-collection.json',{...sample,checkedAt:'2026-11-12T00:08:19.983Z'});
+ put(root,'asset-r10-alpaca/incremental-checkpoint.json',{through:'2026-11-11'});
+ put(root,'local-cycle-last-run.json',{
+  at:'2026-11-16T14:24:16.913Z',lane:'core',status:'COMPLETE',
+  alpacaIncremental:{status:'EXCLUDED_BY_USER',runRequests:0},
+  progressive:{auxiliaryStatus:'COMPLETE',auxiliaryStartedAt:'2026-11-16T14:23:26.801Z'},
+  token:'SECRET_SHALL_NOT_LEAK'
+ });
+ const x=inspectHttp32TwoHostCheckpoints({root,now:NOW}).hosts[0];
+ assert.equal(x.coreCycleReadState,'READ_VERIFIED');
+ assert.equal(x.coreAlpacaStatus,'EXCLUDED_BY_USER');
+ assert.equal(x.coreAlpacaRunRequests,0);
+ assert.equal(x.cacheEvidenceVerified,false); // excluded != successful R10 refresh
+ assert.ok(!JSON.stringify(x).includes('SECRET_SHALL_NOT_LEAK'));
+}));
