@@ -84,7 +84,7 @@ function runProbe(opts={}){
   this.moveNext=()=>n++;this.item=()=>a[n];}
  const task={Enabled:true,State:opts.idle?3:4,
   GetInstances:()=>({Count:0,Item:()=>null})};
- const sandbox={WScript:{Arguments:{length:2,Item:i=>String(i===0?5000:
+ const sandbox={JSON:opts.noNativeJson?undefined:JSON,WScript:{Arguments:{length:2,Item:i=>String(i===0?5000:
   (opts.badPid?9999:8000))},Echo:x=>out.push(x)},
   ActiveXObject:function(){return{Connect:()=>{},GetFolder:()=>({GetTask:()=>task})};},
   GetObject:()=>({ExecQuery:()=>records}),Enumerator};
@@ -101,4 +101,13 @@ test('actual WSH script connects the trusted VBS hierarchy to the lock Node',()=
  for(const x of [{gone:true},{badParent:true},{badCommand:true},
   {badPid:true},{idle:true}])
   assert.equal(runProbe(x).taskVbsLinked,false,JSON.stringify(x));
+});
+
+test('WSH JScript without native JSON still emits pinned launcher array',()=>{
+ const witness=runProbe({noNativeJson:true});
+ assert.equal(witness.ok,true);
+ assert.equal(witness.taskVbsLinked,true);
+ assert.deepEqual([...witness.approvedLauncherKinds],
+  ['ARCHIVE_NODE','CUTOVER_VBS','TASK_VBS']);
+ assert.equal(runProbe({noNativeJson:true,badParent:true}).taskVbsLinked,false);
 });
