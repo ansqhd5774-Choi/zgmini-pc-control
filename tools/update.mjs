@@ -1013,7 +1013,7 @@ function readOwner() {
  need(status.mode==='LISTENING'&&status.children?.length===6,'SUPERVISOR_NOT_HEALTHY');
  return {owner,status};
 }
-function verifyRecoveryOperator(supervisorPid=0){
+export function verifyRecoveryOperator(supervisorPid=0){
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'RECOVERY_OPERATOR_REQUIRED');
  const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
  for(const [rel,expected]of Object.entries(installed.files??{})){
@@ -1113,7 +1113,7 @@ function retiredIranEvidence(schtasks){
  const inventory=spawnSync(schtasks,['/Query','/FO','CSV','/NH'],opt);
  return confirmRetiredIranAbsent({exact,inventory});
 }
-function protectedSnapshot() {
+export function protectedSnapshot() {
  // Existing Core task XML hashes + PC writer config hashes, read-only.
  const dataRoot='E:/ZGmini/data',out={files:{},tasks:{}};
  for(const name of ['config.json','quota-runner.cmd','run-local.cmd']) {
