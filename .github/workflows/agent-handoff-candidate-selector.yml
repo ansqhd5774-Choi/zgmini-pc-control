@@ -7,6 +7,12 @@ on:
       - ZGMINI Agent Handoff Writer B Failure Intake
     types: [completed]
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - agent-handoff/queue-selector.mjs
+      - agent-handoff/queue-dispatcher.mjs
+      - .github/workflows/agent-handoff-candidate-selector.yml
 permissions:
   contents: read
   issues: write
