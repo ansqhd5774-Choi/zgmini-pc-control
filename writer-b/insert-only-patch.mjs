@@ -7,6 +7,24 @@ import {createHash} from 'node:crypto';
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 const sha256=x=>createHash('sha256').update(x).digest('hex');
+// Fixed selectors for PC Core only. They match syntax, never arbitrary values,
+// and still require the exact 64-hex PC preimage + approved after SHA at B.
+const SEC_CORE_PATH='scripts/pc-writer/collect-local.mjs';
+const SEC_CORE_SELECTORS=Object.freeze({
+ '@zgmini:sec-core:entry':/^\s*(?:export\s+)?(?:default\s+)?async\s+function\s+collectLocal\s*\(/,
+ '@zgmini:sec-core:quota':/^\s*(?:const|let)\s+quota\s*=\s*createQuotaFetch\s*\(/
+});
+export function insertionAnchorIndices(lines,anchor,{filePath=null}={}){
+ if(typeof anchor!=='string'||!Array.isArray(lines))
+  stop('WRITER_B_INSERT_CONTRACT_STOP');
+ if(anchor.startsWith('@zgmini:sec-core:')){
+  need(Object.hasOwn(SEC_CORE_SELECTORS,anchor),'WRITER_B_INSERT_SELECTOR_UNKNOWN_STOP');
+  need(filePath===SEC_CORE_PATH,'WRITER_B_INSERT_SELECTOR_TARGET_STOP');
+  const pattern=SEC_CORE_SELECTORS[anchor];
+  return lines.flatMap((line,index)=>pattern.test(line)?[index]:[]);
+ }
+ return lines.flatMap((line,index)=>line===anchor?[index]:[]);
+}
 const keys=(obj,list)=>obj!==null&&typeof obj==='object'&&
  !Array.isArray(obj)&&Object.keys(obj).length===list.length&&
  list.every(k=>Object.hasOwn(obj,k));
@@ -24,6 +42,8 @@ export function validateInsertions(insertions){
    typeof op.text==='string'&&op.text.length>=2&&op.text.length<=4096&&
    op.text.endsWith('\n')&&!op.text.includes('\r')&&!op.text.includes('\0'),
    'WRITER_B_INSERT_CONTRACT_STOP');
+  if(op.anchor.startsWith('@zgmini:sec-core:'))
+   need(Object.hasOwn(SEC_CORE_SELECTORS,op.anchor),'WRITER_B_INSERT_SELECTOR_UNKNOWN_STOP');
   total+=Buffer.byteLength(op.anchor)+Buffer.byteLength(op.text);
   need(total<=12000,'WRITER_B_INSERT_BYTES_STOP');
   need(!seen.has(op.anchor),'WRITER_B_INSERT_DUPLICATE_ANCHOR_STOP');
@@ -32,7 +52,7 @@ export function validateInsertions(insertions){
  return insertions;
 }
 
-export function applyApprovedInsertions(original,insertions){
+export function applyApprovedInsertions(original,insertions,{filePath=null}={}){
  need(Buffer.isBuffer(original)&&original.length>=1&&original.length<=2_000_000,
   'WRITER_B_INSERT_PREIMAGE_BYTES_STOP');
  validateInsertions(insertions);
@@ -49,8 +69,7 @@ export function applyApprovedInsertions(original,insertions){
  const prepared=[];
  const positions=new Set();
  for(const op of insertions){
-  const matches=[];
-  for(let i=0;i<lines.length;i++)if(lines[i]===op.anchor)matches.push(i);
+  const matches=insertionAnchorIndices(lines,op.anchor,{filePath});
   need(matches.length===1,'WRITER_B_INSERT_ANCHOR_MATCH_STOP');
   const index=matches[0];
   // Windows PC source may legitimately omit its terminal newline. Inserting
@@ -82,7 +101,7 @@ export function materializeApprovedWriterFile(entry,candidate,pcOriginal=null){
    'WRITER_B_INSERT_CANDIDATE_DRIFT_STOP');
   need(Buffer.isBuffer(pcOriginal)&&sha256(pcOriginal)===entry.beforeSha256,
    'WRITER_B_INSERT_PREIMAGE_DRIFT_STOP');
-  const patched=applyApprovedInsertions(pcOriginal,entry.insertions);
+  const patched=applyApprovedInsertions(pcOriginal,entry.insertions,{filePath:entry.path});
   need(sha256(patched)===entry.afterSha256,
    'WRITER_B_INSERT_AFTER_SHA_STOP');
   return patched;
