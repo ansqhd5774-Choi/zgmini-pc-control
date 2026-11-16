@@ -51,9 +51,21 @@ test('unverified operating-PC recovery cannot trigger an AI source patch',()=>{
   const {issue,comments}=fixture(2010,['tools/update.mjs'],'BACKLOG_OR_RECOVERY_NOT_VERIFIED');
   assert.throws(()=>prepareAiCase(issue,comments),/RUNTIME_EVIDENCE_REQUIRED/);
 });
-test('no approved source file means no model call or inference from result files',()=>{
-  const {issue,comments}=fixture(2002,['results/b-install.json','approvals/writer-updates/r1.json']);
-  assert.throws(()=>prepareAiCase(issue,comments),/NO_APPROVED_CODE_REFERENCE/);
+test('verified Writer B error maps supplier evidence files to review-only source candidate',()=>{
+  const a=fixture(2002,['results/b-install.json','approvals/writer-updates/r1.json']);
+  const first=prepareAiCase(a.issue,a.comments);
+  assert.equal(first.path,'writer-b/installer.mjs');
+  assert.equal(first.sourceBasis,'VERIFIED_ERROR_CODE_SOURCE_CANDIDATE');
+  assert.deepEqual(first.evidenceFileRefs,['results/b-install.json','approvals/writer-updates/r1.json']);
+  const b=fixture(2003,['results/b-install.json'],'WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP');
+  const second=prepareAiCase(b.issue,b.comments);
+  assert.equal(second.path,'writer-b/import-availability.mjs');
+  assert.equal(second.sourceBasis,'VERIFIED_ERROR_CODE_SOURCE_CANDIDATE');
+  assert.throws(()=>prepareAiCase(a.issue,a.comments,'controller/update.mjs'),/PATH_OUTSIDE_INCIDENT_PROOF/);
+});
+test('unknown failure code with evidence-only fileRefs remains review-blocked',()=>{
+  const {issue,comments}=fixture(2004,['results/b-install.json'],'UNMAPPED_FAILURE_STOP');
+  assert.throws(()=>prepareAiCase(issue,comments),/NO_REVIEWABLE_SOURCE_CANDIDATE/);
 });
 test('cannot switch to a different source path or repeat a claimed incident',()=>{
   const {issue,comments}=fixture();
