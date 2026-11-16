@@ -118,7 +118,7 @@ test('event gate protects repository, branch, schedule and actor',()=>{
     GITHUB_EVENT_NAME:'schedule',GITHUB_REF:'refs/heads/main'};
   assert.doesNotThrow(()=>validateScoutEvent(event,env));
   assert.throws(()=>validateScoutEvent({...event,schedule:'* * * * *'},env),/SCHEDULE_STOP/);
-  assert.throws(()=>validateScoutEvent(event,{...env,GITHUB_REF:'refs/heads/dev'}),/SCHEDULE_STOP/);
+  assert.throws(()=>validateScoutEvent(event,{...env,GITHUB_REF:'refs/heads/dev'}),/MAIN_REF_STOP/);
   assert.throws(()=>validateScoutEvent({...event,repository:{full_name:REPO,private:false}},env),/SCOPE_STOP/);
   assert.doesNotThrow(()=>validateScoutEvent({repository:event.repository,sender:{login:OWNER}},
     {...env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_ACTOR:OWNER}));
@@ -130,5 +130,24 @@ test('new workflow uses existing isolated runner with bounded permissions',()=>{
   assert.match(s,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
   assert.match(s,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(s,/node agent-handoff\/proactive-diagnostics-runner.mjs/);
-  assert.doesNotMatch(s,/workflow_run:|pull_request:|contents: write/);
+  assert.match(s,/workflow_run:/);assert.match(s,/issues:/);assert.match(s,/push:/);
+  assert.match(s,/types: \[labeled\]/);assert.match(s,/github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.doesNotMatch(s,/pull_request:|contents: write|actions: write/);
+});
+
+test('R1 fallback gate allows only verified owner events on main',()=>{
+  const e={repository:{full_name:REPO,private:true}};
+  const base={GITHUB_REPOSITORY:REPO,GITHUB_REF:'refs/heads/main',GITHUB_EVENT_PATH:'event.json'};
+  const accepted={...e,action:'completed',workflow_run:{name:'ZGMINI Handoff Queue Candidate Selector',head_branch:'main',actor:{login:OWNER},conclusion:'success'}};
+  assert.doesNotThrow(()=>validateScoutEvent(accepted,{...base,GITHUB_EVENT_NAME:'workflow_run'}));
+  assert.throws(()=>validateScoutEvent({...accepted,workflow_run:{...accepted.workflow_run,conclusion:'skipped'}},{...base,GITHUB_EVENT_NAME:'workflow_run'}),/FALLBACK_WORKFLOW_STOP/);
+  assert.throws(()=>validateScoutEvent({...accepted,workflow_run:{...accepted.workflow_run,actor:{login:'attacker'}}},{...base,GITHUB_EVENT_NAME:'workflow_run'}),/FALLBACK_WORKFLOW_STOP/);
+  assert.throws(()=>validateScoutEvent({...accepted,workflow_run:{...accepted.workflow_run,head_branch:'bad'}},{...base,GITHUB_EVENT_NAME:'workflow_run'}),/FALLBACK_WORKFLOW_STOP/);
+  const issue={...e,action:'labeled',label:{name:'handoff-agent-pending'},
+    issue:{state:'open',user:{login:OWNER},labels:[{name:'agent-handoff'},{name:'handoff-agent-pending'}]}};
+  assert.doesNotThrow(()=>validateScoutEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:OWNER}));
+  assert.throws(()=>validateScoutEvent({...issue,label:{name:'other'}},{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:OWNER}),/FALLBACK_ISSUE_STOP/);
+  assert.throws(()=>validateScoutEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:'attacker'}),/FALLBACK_ISSUE_STOP/);
+  assert.doesNotThrow(()=>validateScoutEvent({...e,ref:'refs/heads/main',deleted:false},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}));
+  assert.throws(()=>validateScoutEvent({...e,ref:'refs/heads/main',deleted:false},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:'attacker'}),/FALLBACK_PUSH_STOP/);
 });
