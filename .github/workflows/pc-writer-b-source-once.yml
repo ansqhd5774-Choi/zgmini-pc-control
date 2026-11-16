@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -157,6 +157,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-report.mjs"'
+      - name: Authenticate exact GMH seven-theme saved-only scoring request
+        if: github.event.issue.title == 'w03-gmh-seven-private-score-once'
+        id: w03gmhscorepreflight
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-private-score-preflight.mjs"'
+      - name: Checkout exact approved GMH private scorer source commit
+        if: github.event.issue.title == 'w03-gmh-seven-private-score-once' && steps.w03gmhscorepreflight.outcome == 'success'
+        id: w03gmhscoresource
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhscorepreflight.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Compute verified 628-session seven-theme private 7x252 score once
+        if: github.event.issue.title == 'w03-gmh-seven-private-score-once' && steps.w03gmhscoresource.outcome == 'success'
+        id: w03gmhscore
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-private-score-once.mjs"'
+      - name: Create-only redacted private 7x252 SHA result and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-private-score-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-private-score-report.mjs"'
       - name: Create-only sanitized result and originating Issue comment
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-source-install'
         env:
