@@ -8,6 +8,7 @@ export const OPERATION='r181-source-shape-readonly';
 export const REQUEST_SCHEMA='ZGMINI_R181_SOURCE_SHAPE_READONLY_V1';
 export const TARGET='E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r181-primary-cycle.mjs';
 export const PIN='be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62';
+export const DEPENDENCY='E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r181-primary.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control',ACTOR='ansqhd5774-Choi';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const hash=b=>createHash('sha256').update(b).digest('hex');
@@ -119,7 +120,7 @@ function fixedLiteralSignals(source){
   return out;
 }
 export function classifyR181SourceForFixture(source){
-  need(typeof source==='string'&&Buffer.byteLength(source)<=8192,
+  need(typeof source==='string'&&Buffer.byteLength(source)<=32768,
     'R181_INSPECT_UNSAFE_SOURCE_STOP');
   const n=source.split('/api/v1/bars/stocks/').length-1;
   const literalHints={
@@ -191,5 +192,25 @@ export function inspectPinnedR181WindowsFile({read=fs.readFileSync,
   const after=read(TARGET);
   need(Buffer.isBuffer(after)&&after.equals(before),
     'R181_INSPECT_CONCURRENT_DRIFT_STOP');
-  return shape;
+  const depStat=stat(DEPENDENCY);
+  need(depStat.isFile()&&!depStat.isSymbolicLink()&&
+    depStat.size>0&&depStat.size<=32768,
+    'R181_INSPECT_DEPENDENCY_SCOPE_STOP');
+  need(path.win32.dirname(realpath(DEPENDENCY)).toLowerCase()===
+    realpath(path.win32.dirname(TARGET)).toLowerCase(),
+    'R181_INSPECT_DEPENDENCY_ROOT_ESCAPE_STOP');
+  const depBytes=read(DEPENDENCY);
+  need(Buffer.isBuffer(depBytes)&&depBytes.length===depStat.size,
+    'R181_INSPECT_DEPENDENCY_READ_STOP');
+  const depSource=depBytes.toString('utf8');
+  need(Buffer.from(depSource,'utf8').equals(depBytes)&&
+    !depSource.includes('\0'),
+    'R181_INSPECT_DEPENDENCY_UTF8_STOP');
+  const depShape=classifyR181SourceForFixture(depSource);
+  need(read(DEPENDENCY).equals(depBytes),
+    'R181_INSPECT_DEPENDENCY_DRIFT_STOP');
+  return {...shape,
+    safeShapeLines:shape.safeShapeLines.slice(0,10),
+    dependency:{filename:'r181-primary.mjs',sha256:hash(depBytes),
+      bytes:depBytes.length,shape:depShape}};
 }
