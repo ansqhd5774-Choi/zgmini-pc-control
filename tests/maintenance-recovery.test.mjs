@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyRecovery,archiveUntouched,
- verifyMaintenanceManifest as recoveryInventory} from '../tools/maintenance-recovery.mjs';
+ verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
 const state=()=>({identityVerified:true,ownerAlive:false,
