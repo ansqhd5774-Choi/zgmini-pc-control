@@ -127,6 +127,10 @@ export function sanitizeDedicatedRunnerEvidence(raw){
  const unavailable=diag.includes('RUNNERS_QUERY_UNAVAILABLE');
  const items=Array.isArray(raw?.runners)?raw.runners:null;
  const queryState=unavailable?'QUERY_UNAVAILABLE':items?'QUERY_RETURNED':'QUERY_UNVERIFIED';
+ const failureReasons=new Set(['HTTP_403_FORBIDDEN','HTTP_401_UNAUTHORIZED',
+  'HTTP_404_NOT_FOUND','HTTP_429_LIMITED','REQUEST_TIMEOUT','RUNNER_QUERY_ERROR_OTHER']);
+ const queryFailureReason=unavailable&&failureReasons.has(raw?.runnerQueryError)
+  ?raw.runnerQueryError:null;
  const rows=REQUIRED_OPERATING_RUNNERS.map(name=>{
   const matches=items?items.filter(x=>x?.name===name):[];
   const observed=matches.length===1?matches[0]:null;
@@ -137,7 +141,7 @@ export function sanitizeDedicatedRunnerEvidence(raw){
  });
  const allSixOnline=queryState==='QUERY_RETURNED'&&
   rows.every(x=>x.status==='online');
- return {queryState,allSixOnline:queryState==='QUERY_RETURNED'?allSixOnline:null,
+ return {queryState,queryFailureReason,allSixOnline:queryState==='QUERY_RETURNED'?allSixOnline:null,
   returnedRowCount:items&&Number.isSafeInteger(items.length)?items.length:null,
   runners:rows,operationalWrites:0,providerCalls:0,d1Writes:0};
 }
