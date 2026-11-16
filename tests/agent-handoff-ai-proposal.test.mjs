@@ -9,12 +9,12 @@ import {validateAiEvent,executeOnce,callStructuredModel} from '../agent-handoff/
 const owner='ansqhd5774-Choi';
 const url=n=>'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n;
 const sha=c=>c.repeat(40);
-function fixture(n=2001,fileRefs=['writer-b/installer.mjs']){
+function fixture(n=2001,fileRefs=['writer-b/installer.mjs'],failureCode='WRITER_B_PC_PREIMAGE_STOP'){
   const body={schema:'ZGMINI_AGENT_HANDOFF_V1',incidentId:'handoff-case-'+n+'-20261116',
     origin:{repository:HANDOFF_REPOSITORY,issueNumber:n-1,
       requestId:'req-'+n+'-20261116',chatId:'chat-abc1234',
       branch:'main',sourceSha:sha('a'),checkpoint:'OTHER'},
-    failure:{kind:'COMMON_WRITER',code:'WRITER_B_PC_PREIMAGE_STOP',
+    failure:{kind:'COMMON_WRITER',code:failureCode,
       lastPass:'NOT_RECORDED',firstFail:'NOT_RECORDED',fileRefs,evidenceIssueNumber:n-1}};
   const request=parseHandoff(JSON.stringify(body));
   const route=routeHandoff(request);
@@ -47,6 +47,10 @@ test('only bot-verified candidate receipt can lead to AI attempt',()=>{
   assert.equal(task.fingerprint,fingerprintHandoff(request));
 });
 
+test('unverified operating-PC recovery cannot trigger an AI source patch',()=>{
+  const {issue,comments}=fixture(2010,['tools/update.mjs'],'BACKLOG_OR_RECOVERY_NOT_VERIFIED');
+  assert.throws(()=>prepareAiCase(issue,comments),/RUNTIME_EVIDENCE_REQUIRED/);
+});
 test('no approved source file means no model call or inference from result files',()=>{
   const {issue,comments}=fixture(2002,['results/b-install.json','approvals/writer-updates/r1.json']);
   assert.throws(()=>prepareAiCase(issue,comments),/NO_APPROVED_CODE_REFERENCE/);
