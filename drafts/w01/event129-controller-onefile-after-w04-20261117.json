@@ -15,7 +15,18 @@
         "controller/employment-r6-candidate-readonly.mjs",
         "controller/theme-nine-r32-raw-coverage-readonly.mjs"
       ],
-      "status": "GO_RECORDED_BUT_OPERATING_INSTALL_UNVERIFIED"
+      "status": "OPERATING_PC_SUCCEEDED_TARGET_VERIFIED",
+      "actualInstalledSha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2",
+      "maintenanceIssue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1932",
+      "maintenanceRequestId": "pc-update-0fd1b658-0652-4580-b00f-0ca00d172ee3",
+      "terminalReceipt": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1932#issuecomment-6941913034",
+      "terminalStatus": "SUCCEEDED",
+      "terminalCode": "APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED",
+      "terminalJsonPath": "results/maintenance-pc-update-0fd1b658-0652-4580-b00f-0ca00d172ee3.json",
+      "terminalTxtPath": "results/maintenance-pc-update-0fd1b658-0652-4580-b00f-0ca00d172ee3.txt",
+      "reportPairReadbackVerified": true,
+      "protectedStateUnchanged": true,
+      "currentLeaseSnapshotVerified": false
     },
     "directW01BaselineBeforeSha": "621ed556c08f294ddd353dcbc4a524fc09de91f2cbca61ca8f7d25478b372e38",
     "mustVerifyActualInstalledShaAndBytes": true,
@@ -74,7 +85,10 @@
     "lastW01CoreCode": "CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE",
     "historicW01ChannelEnabled": false,
     "currentChannelEnabled": null,
-    "notes": "Historic channel enabled=false is not current status; new module only reads gl configuration and never enables it."
+    "notes": "Historic channel enabled=false is not current status; new module only reads gl configuration and never enables it.",
+    "priorW04ControllerTerminal": "SUCCEEDED_OPERATING_PC_SHA_MATCH",
+    "priorW04ControllerResultReadback": true,
+    "currentW01OnefileEffectApproval": "NOT_GRANTED"
   },
-  "next": "WAIT_FOR_W04_EXACT_TARGET_INSTALLED_READBACK_THEN_APPROVE_W01_B_EFFECT_AND_VALIDATE_ONEFILE_MANIFEST; NO_REPEATED_OWNER_HANDOFF"
+  "next": "W04_BASELINE_SUCCEEDED; obtain explicit W01 exact one-file B effect GO/NO-GO from existing PR #1929 request; only after GO create approved raw manifest with fresh PC preimage/lease, apply once and run Event129 A; NO_REPEATED_OWNER_HANDOFF"
 }
