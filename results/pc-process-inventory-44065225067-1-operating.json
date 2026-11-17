@@ -1,0 +1,1245 @@
+{
+  "schema": "ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1",
+  "role": "operating",
+  "requestId": "e2049b7d-7619-4a74-9e79-1979a6d40115",
+  "issueNumber": 1988,
+  "runId": "44065225067",
+  "attempt": "1",
+  "observedAtUtc": "2026-11-17T10:31:05.111Z",
+  "host": "PC",
+  "runnerName": "zgmini-pc-03",
+  "runnerLabel": "zgmini-pc-control",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "automaticRetries": 0,
+  "commandLinesCaptured": false,
+  "environmentValuesCaptured": false,
+  "maintenance": {
+    "status": "PASS",
+    "code": "MAINTENANCE_SOURCE_READONLY",
+    "observedAtUtc": "2026-11-17T10:31:07.675Z",
+    "maintenanceSourceSha": "c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7",
+    "maintenanceFilesVerified": true,
+    "actualControllerSha": "5492726bb5b0505b7ff7db73a3c673dabdf724ce",
+    "controllerFilesVerified": null,
+    "installLockReadbackVerified": true,
+    "installLockHeld": true,
+    "installLockRecoveryRequired": true,
+    "receiverStatus": "LISTENING",
+    "workflowState": "active",
+    "runtimeState": "UNVERIFIED",
+    "maintenanceState": "HEALTHY",
+    "automationState": "PARTIAL_OR_UNVERIFIED",
+    "runtimeSignals": {
+      "controllerFilesVerified": true,
+      "supervisorAlive": true,
+      "supervisorIdentityVerified": true,
+      "supervisorFresh": true,
+      "supervisorChildrenVerified": true,
+      "runnerSetOnline": null,
+      "workflowActive": true
+    },
+    "dedicatedRunnerEvidence": {
+      "queryState": "QUERY_UNAVAILABLE",
+      "queryFailureReason": "HTTP_403_FORBIDDEN",
+      "allSixOnline": null,
+      "returnedRowCount": null,
+      "runners": [
+        {
+          "name": "zgmini-pc-01",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-02",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-03",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-04",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-05",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-06",
+          "status": "UNVERIFIED",
+          "busy": null
+        }
+      ],
+      "operationalWrites": 0,
+      "providerCalls": 0,
+      "d1Writes": 0
+    },
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "c996LeaseCorrelation": {
+    "status": "STATE_UNKNOWN",
+    "code": "C996_LEASE_IDENTITY_UNPROVEN",
+    "ownerPid": 34528,
+    "ownerMarkerIdentityMatched": true,
+    "ledger996Matched": true,
+    "ledgerMarkerTimeMatched": false,
+    "unchangedAcrossReads": true,
+    "ownerSha256": "d6f4eb1eba25a2d07709f561d9cee32aa713259eb4ae01e5f5ee02f45d315d9e",
+    "markerSha256": "c61f2717222fab0be6d2d7994960ca4eb4d92bcc8c86d23e0c6490ececf1cf04",
+    "ledgerSha256": "c6276bcf78ee96d8858e91621c85437abb5377108fe6c5b5681bf9b617743930",
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "c1501LeaseCorrelation": {
+    "status": "STATE_UNKNOWN",
+    "code": "C1501_LEASE_IDENTITY_UNPROVEN",
+    "ownerPid": 34528,
+    "ownerMarkerIdentityMatched": true,
+    "ledgerMarkerTimeMatched": false,
+    "unchangedAcrossReads": true,
+    "ownerSha256": "d6f4eb1eba25a2d07709f561d9cee32aa713259eb4ae01e5f5ee02f45d315d9e",
+    "markerSha256": "c61f2717222fab0be6d2d7994960ca4eb4d92bcc8c86d23e0c6490ececf1cf04",
+    "ledgerSha256": "2962e110c98f678db33fdd3b46ecea061bc1d94cacd692f28fa202c21e875846",
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "ledger1501Matched": true,
+    "ledgerPhase": null,
+    "ledgerFirstFail": null,
+    "ledgerStatus": null,
+    "ledgerFailureOperation": null,
+    "ledgerIntakePaused": null,
+    "ledgerWorkflowEnabled": null,
+    "ownerPidObservation": "UNKNOWN",
+    "backupPresent": null,
+    "backlogPresent": null,
+    "eligibleForAutomaticRelease": false
+  },
+  "c1841RecoveryCheckpoint": {
+    "status": "STATE_UNKNOWN",
+    "code": "C1841_LEASE_IDENTITY_UNPROVEN",
+    "ownerPid": 34528,
+    "ownerMarkerIdentityMatched": true,
+    "ledgerMarkerTimeMatched": false,
+    "unchangedAcrossReads": true,
+    "ownerSha256": "d6f4eb1eba25a2d07709f561d9cee32aa713259eb4ae01e5f5ee02f45d315d9e",
+    "markerSha256": "c61f2717222fab0be6d2d7994960ca4eb4d92bcc8c86d23e0c6490ececf1cf04",
+    "ledgerSha256": "c9bac8a38b3e06263a89a63abbd81e34a12eef67cb12aa251588ed19149de34d",
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "ledger1841Matched": true,
+    "ledgerPhase": "RECOVERY_REQUIRED",
+    "ledgerFirstFail": "SWITCHED",
+    "ledgerStatus": "RECOVERY_REQUIRED",
+    "ledgerFailureOperation": "reconnect",
+    "ledgerIntakePaused": true,
+    "ledgerWorkflowEnabled": false,
+    "ownerPidObservation": "UNKNOWN",
+    "backupPresent": true,
+    "backlogPresent": true,
+    "eligibleForAutomaticRelease": false
+  },
+  "observedHttpHostRoster": {
+    "status": "STATE_UNKNOWN",
+    "code": "OBSERVED_HTTP_COHORT_READBACK",
+    "source": "PC_COLLECTION_EVENTS_FETCH_WRAPPER",
+    "scope": "OBSERVED_REPEATED_HTTP_HOSTS_NOT_APPROVED_API_ENDPOINTS",
+    "observedAt": "2026-11-17T10:31:08.215Z",
+    "windowDays": 14,
+    "monitoredCount": 32,
+    "rosterComplete": true,
+    "http": {
+      "normal": 32,
+      "failed": 0,
+      "unknown": 0,
+      "total": 32
+    },
+    "hosts": [
+      {
+        "host": "api.bls.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T08:45:26.725Z",
+        "last2xxRunAt": "2026-11-17T08:45:26.725Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "api.census.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX_CADENCE_UNVERIFIED",
+        "lastAttemptAt": "2026-11-17T05:20:52.463Z",
+        "last2xxRunAt": "2026-11-17T05:20:52.463Z",
+        "lastRunStatuses": {
+          "200": 4
+        }
+      },
+      {
+        "host": "api.earningsapi.com",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T05:00:32.618Z",
+        "last2xxRunAt": "2026-11-17T05:00:32.618Z",
+        "lastRunStatuses": {
+          "200": 15
+        }
+      },
+      {
+        "host": "api.stlouisfed.org",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX_CADENCE_UNVERIFIED",
+        "lastAttemptAt": "2026-11-17T08:45:26.725Z",
+        "last2xxRunAt": "2026-11-17T08:45:26.725Z",
+        "lastRunStatuses": {
+          "200": 3
+        }
+      },
+      {
+        "host": "apps.bea.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T04:55:11.740Z",
+        "last2xxRunAt": "2026-11-17T04:55:11.740Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "cdn.www.census.gov",
+        "monitoringState": "normal",
+        "reason": "MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW",
+        "lastAttemptAt": "2026-11-03T21:00:36.518Z",
+        "last2xxRunAt": "2026-11-03T21:00:36.518Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "data-dbg.krx.co.kr",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T09:37:05.723Z",
+        "last2xxRunAt": "2026-11-17T09:37:05.723Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "data.alpaca.markets",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX_CADENCE_UNVERIFIED",
+        "lastAttemptAt": "2026-11-17T00:05:34.182Z",
+        "last2xxRunAt": "2026-11-17T00:05:34.182Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "data.bis.org",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:10:41.002Z",
+        "last2xxRunAt": "2026-11-17T10:10:41.002Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "data.financialresearch.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T05:50:10.673Z",
+        "last2xxRunAt": "2026-11-17T05:50:10.673Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "data.sec.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T02:40:36.955Z",
+        "last2xxRunAt": "2026-11-17T02:40:36.955Z",
+        "lastRunStatuses": {
+          "200": 7,
+          "404": 2
+        }
+      },
+      {
+        "host": "ecos.bok.or.kr",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T03:37:07.832Z",
+        "last2xxRunAt": "2026-11-17T03:37:07.832Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "en.wikipedia.org",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T02:40:36.955Z",
+        "last2xxRunAt": "2026-11-17T02:40:36.955Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "home.treasury.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "ir.eia.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "marketparquet.com",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T04:15:13.893Z",
+        "last2xxRunAt": "2026-11-17T04:15:13.893Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "markets.newyorkfed.org",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T09:46:55.388Z",
+        "last2xxRunAt": "2026-11-17T09:46:55.388Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "oui.doleta.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:10:41.002Z",
+        "last2xxRunAt": "2026-11-17T10:10:41.002Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "production.dataviz.cnn.io",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:20:18.186Z",
+        "last2xxRunAt": "2026-11-17T10:20:18.186Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "raw.githubusercontent.com",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T04:15:13.893Z",
+        "last2xxRunAt": "2026-11-17T04:15:13.893Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "thedocs.worldbank.org",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T06:45:17.733Z",
+        "last2xxRunAt": "2026-11-17T06:45:17.733Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "www.bea.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "www.bls.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 4
+        }
+      },
+      {
+        "host": "www.census.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 3
+        }
+      },
+      {
+        "host": "www.cftc.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "www.eia.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 3
+        }
+      },
+      {
+        "host": "www.federalreserve.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 4,
+          "404": 1
+        }
+      },
+      {
+        "host": "www.nass.usda.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      },
+      {
+        "host": "www.newyorkfed.org",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "www.sec.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX_CADENCE_UNVERIFIED",
+        "lastAttemptAt": "2026-11-17T04:45:11.412Z",
+        "last2xxRunAt": "2026-11-17T04:45:11.412Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "www.treasurydirect.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 2
+        }
+      },
+      {
+        "host": "www.usda.gov",
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "lastAttemptAt": "2026-11-17T10:00:51.513Z",
+        "last2xxRunAt": "2026-11-17T10:00:51.513Z",
+        "lastRunStatuses": {
+          "200": 1
+        }
+      }
+    ],
+    "sourceCoverage": "PARTIAL_OR_UNKNOWN",
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0
+  },
+  "http32TwoHostCheckpoints": {
+    "schema": "ZGMINI_HTTP32_TWO_HOST_CHECKPOINTS_RO_V1",
+    "status": "READ_ONLY_COLLECTED",
+    "reason": null,
+    "observedAt": "2026-11-17T10:31:09.837Z",
+    "hosts": [
+      {
+        "host": "data.alpaca.markets",
+        "source": "R10_ALPACA_INCREMENTAL_LOCAL",
+        "reportReadState": "READ_VERIFIED",
+        "checkpointReadState": "READ_VERIFIED",
+        "reportStatus": "COLLECTED_PENDING_VALIDATION",
+        "checkedAt": "2026-11-12T00:08:19.983Z",
+        "requestEnd": "2026-11-11",
+        "checkpointThrough": "2026-11-11",
+        "cacheWindowHours": 20,
+        "withinCacheWindow": false,
+        "storageVerified": true,
+        "checkpointAligned": true,
+        "cacheEvidenceVerified": false,
+        "runRequests": 55,
+        "coreCycleReadState": "READ_VERIFIED",
+        "coreCycleAt": "2026-11-17T10:17:19.637Z",
+        "coreCycleLane": "core",
+        "coreCycleStatus": "COMPLETE",
+        "coreAlpacaStatus": "EXCLUDED_BY_USER",
+        "coreAlpacaRunRequests": 0,
+        "coreAuxiliaryStartedAt": "2026-11-17T10:13:53.292Z",
+        "coreAuxiliaryStatus": "COMPLETE",
+        "note": "R10_CACHE_NOT_PROOF_OF_ALL_ALPACA_COLLECTORS"
+      },
+      {
+        "host": "cdn.www.census.gov",
+        "source": "PC_MONTHLY_ONE_YEAR_BACKFILL_LOCAL",
+        "reportReadState": "READ_VERIFIED",
+        "reportStatus": "STORED",
+        "lastBackfillAt": "2026-10-06T22:22:14.566Z",
+        "asOf": "2026-10-06",
+        "chartStatus": "STORED",
+        "chartTarget": "2026-08-01",
+        "chartRecordCount": 342,
+        "chartRowsWritten": 126,
+        "note": "PC_BACKFILL_NOT_CLOUDFLARE_D1_OR_POST_RELEASE_HTTP_PROOF"
+      }
+    ],
+    "sourceOnly": true,
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "c1501Backlog": {
+    "status": "STATE_UNKNOWN",
+    "code": "C1501_BACKLOG_OWNER_UNVERIFIED",
+    "schema": "ZGMINI_PC_BACKLOG_WINDOW_READONLY_V1",
+    "originalRequestIssue": 1501,
+    "windowCount": null,
+    "openWindowCount": null,
+    "replayCount": null,
+    "windows": [],
+    "replays": [],
+    "rosterTruncated": false,
+    "stateHash": null,
+    "mutationAllowed": false,
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "targetEndpointStatus": {
+    "status": "OBSERVED",
+    "code": "ENDPOINT_HASH_STATUS_READBACK",
+    "scope": "FIXED_THREE_OBSERVED_HOSTS_ONLY",
+    "source": "PC_ENDPOINT_PATH_HASH_LOG",
+    "windowDays": 14,
+    "seenEvents": 281,
+    "invalidEvents": 0,
+    "partialTail": false,
+    "rowsTruncated": false,
+    "endpointCoverageVerified": false,
+    "hosts": [
+      {
+        "host": "data.sec.gov",
+        "endpointCount": 9,
+        "returnedCount": 9,
+        "truncated": false,
+        "endpointHashes": [
+          {
+            "hash": "1f8b4fcdca92ed847cd9a1f6400fb58c",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          },
+          {
+            "hash": "268c23e3bbaed0a6d75a5e31deb964c7",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          },
+          {
+            "hash": "2f3f296a9f18395b186d42645e755694",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          },
+          {
+            "hash": "48220ed8f7add1c47ff3336b2827ffb6",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "404": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": null,
+            "last404At": "2026-11-17T02:40:36.955Z"
+          },
+          {
+            "hash": "6685632a40dc6570aa81281df24d194f",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          },
+          {
+            "hash": "9e7444da6de02dc7a20566f6b49e9232",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "404": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": null,
+            "last404At": "2026-11-17T02:40:36.955Z"
+          },
+          {
+            "hash": "ac28a19a3c96c3174140f5bc46a898d1",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          },
+          {
+            "hash": "b6884ab591e43d5325abd8a6d75f714f",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          },
+          {
+            "hash": "b8d69bb17d4199c472e335d3c4173647",
+            "lastAt": "2026-11-17T02:40:36.955Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 4,
+            "last2xxAt": "2026-11-17T02:40:36.955Z",
+            "last404At": null
+          }
+        ]
+      },
+      {
+        "host": "data.alpaca.markets",
+        "endpointCount": 1,
+        "returnedCount": 1,
+        "truncated": false,
+        "endpointHashes": [
+          {
+            "hash": "e8bd8bbcae026cf0a8947507bd01cc40",
+            "lastAt": "2026-11-17T00:05:34.182Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-17T00:05:34.182Z",
+            "last404At": null
+          }
+        ]
+      },
+      {
+        "host": "cdn.www.census.gov",
+        "endpointCount": 0,
+        "returnedCount": 0,
+        "truncated": false,
+        "endpointHashes": []
+      }
+    ],
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0
+  },
+  "status": "PASS",
+  "code": "PROCESS_INVENTORY_COLLECTED",
+  "snapshot": {
+    "observedAtUtc": "2026-11-17T10:31:27.0102251Z",
+    "totalProcessCount": 407,
+    "selectedProcessCount": 88,
+    "processes": [
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 9776,
+        "ppid": 17144,
+        "session": 1,
+        "workingSetMiB": 19
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 19696,
+        "ppid": 39984,
+        "session": 1,
+        "workingSetMiB": 19
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 24608,
+        "ppid": 32464,
+        "session": 1,
+        "workingSetMiB": 44
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 26904,
+        "ppid": 38432,
+        "session": 1,
+        "workingSetMiB": 18
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 28716,
+        "ppid": 6280,
+        "session": 0,
+        "workingSetMiB": 11
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 37640,
+        "ppid": 18740,
+        "session": 1,
+        "workingSetMiB": 14
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 39076,
+        "ppid": 20816,
+        "session": 1,
+        "workingSetMiB": 19
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "pid": 32896,
+        "ppid": 24608,
+        "session": 1,
+        "workingSetMiB": 93
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 13100,
+        "ppid": 35880,
+        "session": 1,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 15692,
+        "ppid": 13100,
+        "session": 1,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 30644,
+        "ppid": 15640,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 35880,
+        "ppid": 3520,
+        "session": 1,
+        "workingSetMiB": 4
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 37336,
+        "ppid": 37512,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 7596,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 42
+      },
+      {
+        "name": "node.exe",
+        "pid": 7620,
+        "ppid": 26176,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 9428,
+        "ppid": 29688,
+        "session": 1,
+        "workingSetMiB": 55
+      },
+      {
+        "name": "node.exe",
+        "pid": 15636,
+        "ppid": 22268,
+        "session": 1,
+        "workingSetMiB": 54
+      },
+      {
+        "name": "node.exe",
+        "pid": 20176,
+        "ppid": 30644,
+        "session": 1,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "node.exe",
+        "pid": 22576,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 41
+      },
+      {
+        "name": "node.exe",
+        "pid": 23208,
+        "ppid": 15692,
+        "session": 1,
+        "workingSetMiB": 1
+      },
+      {
+        "name": "node.exe",
+        "pid": 27892,
+        "ppid": 25832,
+        "session": 1,
+        "workingSetMiB": 54
+      },
+      {
+        "name": "node.exe",
+        "pid": 31452,
+        "ppid": 23208,
+        "session": 1,
+        "workingSetMiB": 1474
+      },
+      {
+        "name": "node.exe",
+        "pid": 31892,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 33092,
+        "ppid": 20012,
+        "session": 1,
+        "workingSetMiB": 48
+      },
+      {
+        "name": "node.exe",
+        "pid": 35492,
+        "ppid": 5116,
+        "session": 1,
+        "workingSetMiB": 58
+      },
+      {
+        "name": "node.exe",
+        "pid": 35592,
+        "ppid": 32764,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 36620,
+        "ppid": 37336,
+        "session": 1,
+        "workingSetMiB": 12
+      },
+      {
+        "name": "node.exe",
+        "pid": 37584,
+        "ppid": 29920,
+        "session": 1,
+        "workingSetMiB": 1
+      },
+      {
+        "name": "node.exe",
+        "pid": 39916,
+        "ppid": 30884,
+        "session": 1,
+        "workingSetMiB": 49
+      },
+      {
+        "name": "node.exe",
+        "pid": 41588,
+        "ppid": 34528,
+        "session": 1,
+        "workingSetMiB": 4
+      },
+      {
+        "name": "powershell.exe",
+        "pid": 40748,
+        "ppid": 35492,
+        "session": 1,
+        "workingSetMiB": 80
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 5116,
+        "ppid": 32896,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 12284,
+        "ppid": 21784,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 17144,
+        "ppid": 41588,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 18740,
+        "ppid": 41588,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 20012,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 20816,
+        "ppid": 41588,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 22268,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 25832,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 26176,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 29688,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 30884,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 32464,
+        "ppid": 41588,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 32764,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 38432,
+        "ppid": 41588,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 39984,
+        "ppid": 41588,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 1436,
+        "ppid": 12464,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5104,
+        "ppid": 4996,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 6824,
+        "ppid": 9976,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9300,
+        "ppid": 5540,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9660,
+        "ppid": 34016,
+        "session": 1,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9928,
+        "ppid": 29688,
+        "session": 1,
+        "workingSetMiB": 7
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 10720,
+        "ppid": 10696,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 18132,
+        "ppid": 26176,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 19308,
+        "ppid": 20012,
+        "session": 1,
+        "workingSetMiB": 7
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 20852,
+        "ppid": 17144,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 21152,
+        "ppid": 36620,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 23904,
+        "ppid": 31520,
+        "session": 1,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 25752,
+        "ppid": 18740,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 25824,
+        "ppid": 25808,
+        "session": 1,
+        "workingSetMiB": 0
+      }
+    ],
+    "processCounts": [
+      {
+        "name": "cmd.exe",
+        "count": 15
+      },
+      {
+        "name": "conhost.exe",
+        "count": 41
+      },
+      {
+        "name": "gh.exe",
+        "count": 1
+      },
+      {
+        "name": "node.exe",
+        "count": 17
+      },
+      {
+        "name": "powershell.exe",
+        "count": 1
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "count": 7
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "count": 1
+      },
+      {
+        "name": "wscript.exe",
+        "count": 5
+      }
+    ],
+    "services": [
+      {
+        "name": "actions.runner.ansqhd5774-Choi-akkigo-boja.akkigo-boja-runner",
+        "state": "Running",
+        "startMode": "Auto"
+      }
+    ],
+    "serviceStatus": "OK",
+    "tasks": [
+      {
+        "name": "ZGMINI-Migrate-Resume-20261015",
+        "state": "Disabled"
+      },
+      {
+        "name": "ZGMINI-Migrate-To-E-20261015",
+        "state": "Disabled"
+      },
+      {
+        "name": "ZGMINI-PC-Breadth-R10V9-Publication",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Breadth-R10V9-Shadow",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Configured-Themes",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-GetMarketHistory-ETF",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Local-Core",
+        "state": "Running"
+      },
+      {
+        "name": "ZGMINI-PC-Local-Korea",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-MarketParquet-ETF",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Biotech",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Data-Center-Power",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Nine-R47-Private",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Nine-R54-Public",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-US-Breadth-R1",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Writer",
+        "state": "Disabled"
+      }
+    ],
+    "taskStatus": "OK",
+    "startup": [
+      "ZGMINI_PC_CONTROL.vbs",
+      "ZGMINI_PC_MAINTENANCE.vbs"
+    ],
+    "startupStatus": "OK",
+    "processListTruncated": true
+  }
+}
