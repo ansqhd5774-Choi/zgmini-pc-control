@@ -345,6 +345,68 @@ export function inspect1501LeaseCorrelation({
  }catch{return as1501(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
 }
 
+// #1841 partial Controller-switch recovery: exact immutable-intent evidence.
+// Reuse the existing fixed Windows read-only inventory; never change a lease.
+const C1841_ID='pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12';
+const C1841_TARGET='2f569c18e09a55e54e81052985a80f6a8765d680';
+const as1841=row=>{
+ const {ledger996Matched,...rest}=row;
+ return {...rest,code:rest.code.replace(/^C996_/,'C1841_'),
+  ledger1841Matched:ledger996Matched};
+};
+export function classify1841RecoveryCheckpoint(snapshot,
+ {signal=process.kill,backupPresent=null,backlogPresent=null}={}){
+ const correlated=as1841(classify996LeaseCorrelation(snapshot,
+  {requestId:C1841_ID,issueNumber:1841,targetSha:C1841_TARGET}));
+ const base={...correlated,ledgerPhase:null,ledgerFirstFail:null,
+  ledgerStatus:null,ledgerFailureOperation:null,ledgerIntakePaused:null,
+  ledgerWorkflowEnabled:null,ownerPidObservation:'UNKNOWN',
+  backupPresent:null,backlogPresent:null,eligibleForAutomaticRelease:false};
+ // An old original ledger is NOT proof that the CURRENT held lease belongs
+ // to that request. Return its bounded phase separately from lease identity.
+ if(correlated.ledger1841Matched!==true||correlated.unchangedAcrossReads!==true)
+  return base;
+ let ledger;try{ledger=JSON.parse(snapshot.first.ledger.toString('utf8'));}
+ catch{return base;}
+ return {...base,
+  ledgerPhase:SAFE_RECOVERY_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:SAFE_RECOVERY_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  ledgerStatus:SAFE_RECOVERY_STATUS.has(ledger.status)?ledger.status:null,
+  ledgerFailureOperation:safeOperation(ledger.failureOperation),
+  ledgerIntakePaused:safeFlag(ledger.intakePaused),
+  ledgerWorkflowEnabled:safeFlag(ledger.workflowEnabled),
+  ownerPidObservation:correlated.status==='CORRELATED'
+   ?pidObservation(correlated.ownerPid,signal):'UNKNOWN',
+  backupPresent:safeFlag(backupPresent),backlogPresent:safeFlag(backlogPresent)};
+}
+export function inspect1841LeaseCorrelation({
+ read=fs.readFileSync,stat=fs.lstatSync,
+ lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install'),
+ signal=process.kill}={}){
+ try{
+  const before=lock();
+  if(before?.held!==true||before?.recoveryRequired!==true)
+   return classify1841RecoveryCheckpoint({lockBefore:before,lockAfter:before});
+  const files={owner:path.join(MAINTENANCE_ROOT,'leases/controller-install/owner.json'),
+   marker:path.join(MAINTENANCE_ROOT,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   ledger:path.join(MAINTENANCE_ROOT,'ledger',C1841_ID+'.json')};
+  const snap=()=>Object.fromEntries(Object.entries(files).map(([key,file])=>{
+   const st=stat(file);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>32768)
+    throw Error('C1841_FIXED_SOURCE_UNSAFE');
+   const bytes=read(file);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+    throw Error('C1841_FILE_READ_MISMATCH');
+   return [key,bytes];
+  }));
+  const first=snap(),second=snap(),after=lock();
+  return classify1841RecoveryCheckpoint({lockBefore:before,lockAfter:after,first,second},{
+   signal,backupPresent:fixedPathExists(
+    path.join('E:/ZGmini/automation/pc-control/backups','controller-update-'+C1841_ID),stat),
+   backlogPresent:fixedPathExists(
+    path.join(MAINTENANCE_ROOT,'backlog',C1841_ID+'.json'),stat)});
+ }catch{return as1841(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
+}
 // Fixed read-only HTTP request log projection. The source module is the
 // already-tested Controller A adapter, loaded from the exact Git checkout.
 // No caller input, secrets, URLs, query paths, or raw log lines are returned.
@@ -614,6 +676,7 @@ export function collect(role,ctx,env=process.env){
   maintenance:collectMaintenanceStatusReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
+   c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
   observedHttpHostRoster:readObservedProviderHosts(),
   http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
   c1501Backlog:inspect1501BacklogReadonly(),
@@ -647,6 +710,7 @@ export function toText(r){
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c996LeaseCorrelation='+(r.c996LeaseCorrelation?.status??'NOT_APPLICABLE'),
   'c996LeaseCorrelationCode='+(r.c996LeaseCorrelation?.code??'NOT_APPLICABLE'),
+   'c1841RecoveryCheckpoint='+(r.c1841RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 async function main(){

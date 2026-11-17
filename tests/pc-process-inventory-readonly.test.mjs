@@ -1,7 +1,7 @@
 import test from 'node:test';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -209,6 +209,65 @@ test('1501 recovery checkpoint refuses to interpret uncorrelated or malformed ph
  assert.equal(no.status,'STATE_UNKNOWN');
  assert.equal(no.ownerPidObservation,'UNKNOWN');
  assert.equal(no.ledgerPhase,null);
+});
+test('#1841 original ledger is correlated only with its own matching live owner marker',()=>{
+ const x=pinned996();
+ x.first.ledger=Buffer.from(JSON.stringify({
+  requestId:'pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12',
+  issueNumber:1841,targetSha:'2f569c18e09a55e54e81052985a80f6a8765d680',
+  status:'RECOVERY_REQUIRED',phase:'SWITCHED',firstFail:'SWITCHED',
+  failureOperation:'reconcileBacklog',intakePaused:true,workflowEnabled:false,
+  updatedAt:'2026-11-12T20:32:33.000Z',token:'SECRET_DO_NOT_LEAK'}));
+ x.second={...x.first};
+ const result=classify1841RecoveryCheckpoint(x,{
+  signal:()=>{const e=new Error('absent');e.code='ESRCH';throw e;},
+  backupPresent:true,backlogPresent:true});
+ assert.equal(result.status,'CORRELATED');
+ assert.equal(result.code,'C1841_LEASE_IDENTITY_CORRELATED');
+ assert.equal(result.ledger1841Matched,true);
+ assert.equal(result.ledgerPhase,'SWITCHED');
+ assert.equal(result.ledgerFirstFail,'SWITCHED');
+ assert.equal(result.ledgerFailureOperation,'reconcileBacklog');
+ assert.equal(result.ownerPidObservation,'PID_NOT_PRESENT');
+ assert.equal(result.backupPresent,true);
+ assert.equal(result.backlogPresent,true);
+ assert.equal(result.eligibleForAutomaticRelease,false);
+ assert.equal(Object.hasOwn(result,'ledger996Matched'),false);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_LEAK|7acb05d3|2f569c18|nonce|ZGmini/i);
+});
+test('#1841 stale ledger timing or another owner never authenticates a held lease',()=>{
+ const x=pinned996();
+ const wrong=classify1841RecoveryCheckpoint({...x,second:{...x.first}});
+ assert.equal(wrong.status,'STATE_UNKNOWN');
+ assert.equal(wrong.ledger1841Matched,false);
+ x.first.ledger=Buffer.from(JSON.stringify({
+  requestId:'pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12',
+  issueNumber:1841,targetSha:'2f569c18e09a55e54e81052985a80f6a8765d680',
+  status:'RECOVERY_REQUIRED',phase:'SWITCHED',firstFail:'SWITCHED',
+  updatedAt:'2026-11-17T01:40:00.000Z',note:'SECRET'}));
+ x.second={...x.first};
+ const stale=classify1841RecoveryCheckpoint(x,{backupPresent:true,backlogPresent:false,
+  signal:()=>{throw Error('MUST_NOT_SIGNAL_UNVERIFIED_OWNER');}});
+ assert.equal(stale.status,'STATE_UNKNOWN');
+ assert.equal(stale.ledger1841Matched,true);
+ assert.equal(stale.ownerMarkerIdentityMatched,true);
+ assert.equal(stale.ledgerMarkerTimeMatched,false);
+ assert.equal(stale.ledgerPhase,'SWITCHED');
+ assert.equal(stale.ownerPidObservation,'UNKNOWN');
+ assert.equal(stale.eligibleForAutomaticRelease,false);
+ assert.doesNotMatch(JSON.stringify(stale),/SECRET|7acb05d3|nonce|ZGmini/i);
+});
+test('#1841 fixed read-only probe rejects missing original bytes without writing or executing',()=>{
+ const out=inspect1841LeaseCorrelation({
+  lock:()=>({held:true,recoveryRequired:true,ownerPid:1}),
+  stat:()=>{throw Error('absent');},
+  read:()=>{throw Error('MUST_NOT_READ_UNSAFE');},
+  signal:()=>{throw Error('MUST_NOT_EXECUTE');}});
+ assert.equal(out.status,'STATE_UNKNOWN');
+ assert.equal(out.code,'C1841_ORIGINAL_FILES_UNAVAILABLE');
+ assert.equal(out.operationalWrites,0);
+ assert.equal(out.providerCalls,0);
+ assert.equal(out.d1Writes,0);
 });
 test('workflow state distinguishes current active and manual disable without exposing raw data',()=>{
  const base={maintenanceSourceSha:'a'.repeat(40),maintenanceFilesVerified:true,
