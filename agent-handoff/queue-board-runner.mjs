@@ -62,16 +62,22 @@ export async function collectBoard(io,nowMs){
     fail('IO_REQUIRED');
   const issues=await io.listIssues();
   if(!Array.isArray(issues)||issues.length>100)fail('BACKLOG_CAP_EXCEEDED');
+  const openHandoffs=issues.filter(issue=>!issue.pull_request);
+  if(openHandoffs.some(issue=>!issue.labels?.some(label=>label.name==='agent-handoff')))
+    fail('INCIDENT_INVENTORY_OUT_OF_SCOPE');
+  // Only pending incidents need expensive comment and origin verification.
+  // Non-pending open labels are counted, never classified as resolved.
+  const pending=openHandoffs.filter(issue=>
+    issue.labels.some(label=>label.name==='handoff-agent-pending'));
   const records=[];
-  for(const issue of issues){
-    if(issue.pull_request)continue;
+  for(const issue of pending){
     const comments=await io.readComments(issue.number);
     const fresh=await io.readIssue(issue.number);
     if(issueIdentity(issue)!==issueIdentity(fresh))fail('ISSUE_DRIFT_RESCAN_REQUIRED');
     // Every row is the same exact GitHub Issue at both read points.
     records.push({issue:{...fresh,repository:HANDOFF_REPOSITORY},comments});
   }
-  return compileQueueBoard(records,nowMs);
+  return compileQueueBoard(records,nowMs,{openHandoffIssueCount:openHandoffs.length});
 }
 
 export async function main(env=process.env) {
@@ -79,7 +85,7 @@ export async function main(env=process.env) {
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   validateBoardEvent(event,env);
   const board=await collectBoard({
-    listIssues:()=>pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending',2),
+    listIssues:()=>pages('issues?state=open&labels=agent-handoff',2),
     readComments:n=>pages('issues/'+n+'/comments',4),
     readIssue:n=>request('issues/'+n)
   },Date.now());
