@@ -45,6 +45,42 @@ test('sanitize output keeps only bounded whitelisted Windows process metadata',(
  assert.equal(result.services[0].startMode,'Auto');
  assert.equal(result.tasks[0].state,'Ready');
 });
+test('aggregated memory coverage exposes only fixed process classes and private commit',()=>{
+ const sample={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:3,
+  selectedProcessCount:1,processes:[
+   {name:'node.exe',pid:12,ppid:10,session:1,workingSetMiB:0,
+    privateCommitMiB:512,commandLine:'SECRET'}],
+  memoryGroups:[
+   {kind:'NODE_NONRUNNER',count:1,workingSetMiB:0,privateCommitMiB:512,
+    zeroWorkingSetCount:1,unknownWorkingSetCount:0,unknownPrivateCommitCount:0,
+    commandLine:'SECRET'},
+   {kind:'OTHER_PROCESSES',count:2,workingSetMiB:300,privateCommitMiB:900,
+    zeroWorkingSetCount:0,unknownWorkingSetCount:0,unknownPrivateCommitCount:0,
+    applicationName:'Private-Browser'}]};
+ const out=sanitizeProbe(sample);
+ assert.equal(out.memoryGroupCoverage,'COUNT_COMPLETE');
+ assert.equal(out.memoryGroups.reduce((n,g)=>n+g.count,0),3);
+ assert.equal(out.memoryGroups[0].privateCommitMiB,512);
+ assert.equal(out.processes[0].privateCommitMiB,512);
+ assert.equal(out.processes[0].workingSetMiB,0);
+ assert.doesNotMatch(JSON.stringify(out),/SECRET|Private-Browser|applicationName|commandLine/);
+ assert.equal(sanitizeProbe({...sample,totalProcessCount:4}).memoryGroupCoverage,'COUNT_PARTIAL');
+ assert.equal(sanitizeProbe({...sample,memoryGroups:[]}).memoryGroupCoverage,'UNAVAILABLE');
+});
+test('memory groups fail closed for unapproved labels and forged counters',()=>{
+ const base={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:1,
+  processes:[],services:[],tasks:[]};
+ const valid={kind:'NODE_NONRUNNER',count:1,workingSetMiB:0,
+  privateCommitMiB:30,zeroWorkingSetCount:1,
+  unknownWorkingSetCount:0,unknownPrivateCommitCount:0};
+ const cases=[
+  [{...valid,kind:'secret-app.exe'}],
+  [{...valid,zeroWorkingSetCount:2}],
+  [{...valid,privateCommitMiB:-1}],
+  [valid,valid]];
+ for(const groups of cases)
+  assert.throws(()=>sanitizeProbe({...base,memoryGroups:groups}));
+});
 test('reject unapproved process names, task names, service names',()=>{
  const raw={schema:'ZGMINI_PC_PROCESS_PROBE_V1',
   processes:[{name:'unknown.exe',pid:1,ppid:0}],services:[],tasks:[]};
