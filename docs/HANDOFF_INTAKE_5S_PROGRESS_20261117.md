@@ -38,6 +38,17 @@
 - **운영과 구분:** 위 회귀는 개발 소스 검증이다. 실제 PC의 독립 상주 감시기 설치·유효한 read-only 인증 제공·부팅 후 재기동·실제 매 5초 계측은 **미실시**. `RUNTIME_ACTIVATION_BLOCKED` 및 **5단계 중 4단계 완료(80%, 운영 0/1)**를 유지한다. 실제 독립 ChatGPT 대화 전달 여부도 별도 미구현이다.
 - **다음 필수 실행:** 사용자 또는 기존 승인된 PC 관리 경로에서 독립 상주 실행/복구 계약과 인증 갱신 수단을 확정한 뒤, 해당 운영 효과에 필요한 정규 승인·최소 설치·실측으로 5/5를 완료한다. GitHub Runner 좌석을 무한 점유하거나 Job 토큰을 유출/재사용하는 우회는 금지한다.
 
+## 2026-11-17 KST 11:01 — 공통 대기열 PC 운영 실증 1회 (읽기 전용)
+
+- **원본 요청:** [#1863](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1863) `pc-process-inventory-readonly`, `role=handoff`, `requestId=b8372b69-85b0-4a7b-91d6-c76420cf0d25`.
+- **실제 실행:** [Actions Run 43999701240](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43999701240), `handoff-process-snapshot` Job `133760412066`, Runner `zgmini-handoff-ci-spare-01`, hostname `DESKTOP-N62L0NG`; `PASS / PROCESS_INVENTORY_COLLECTED`.
+- **원격 결과 원본:** `results/pc-process-inventory-43999701240-1-handoff.json` (blob `d01e47347f22138f53d172ddd7b7ff20a9f8e468`)와 `.txt` (blob `4c70129ed710917328960452f6621698d2b08f94`) **2/2 직접 재조회**, 원본 Issue 봇 receipt [#1863 댓글 6935589347](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1863#issuecomment-6935589347).
+- **실제 등록 상태:** `services=OK`이며 `actions.runner.ansqhd5774-Choi-zgmini-pc-control.zgmini-handoff-ci-spare-01` **Running/Auto** 1개. `tasks=OK, tasks=[]`; `startup=OK, startup=[]`. 격리 PC Windows `totalProcessCount=262`, `node.exe=6`, `Runner.Listener.exe=5`, `Runner.Worker.exe=1`. 이 검사는 프로세스 명령줄을 수집하지 않으므로 기존 일반 `node.exe`의 감시기 여부는 독립 확인할 수 없다. 다만 **ZGMINI 이름의 별도 감시 서비스/예약/시작프로그램 등록은 관측되지 않았다.**
+- **실제 지연 참고:** Run 생성 `01:59:54Z` → Job 시작 `02:00:41Z` (약 47초) → 결과 로그 `02:01:08Z` (생성 후 약 74초). 따라서 기존 단회 Actions Job 재활용만으로 5초 감시 보장을 주장할 수 없음.
+- **권한/환경:** 공급자 호출 `0`, 운영 데이터 쓰기 `0`, D1 쓰기 `0`; PC 설치·인증 설정·서비스·예약·Runner 변경 `0`.
+- **현재 상태:** 5초 감시 소스 및 변경 사건의 bot receipt 검증은 PR #1850/#1859 main 반영 + Windows CI 완료. **실PC 상주 실행 및 유효한 읽기 전용 GitHub 자격·회전은 여전히 미설치/미확인**, `RUNTIME_ACTIVATION_BLOCKED`, **5단계 중 4단계(80%) 유지**. 실제 실PC 5초 가동은 0회.
+- **다음 필수 실행:** 정상 업무 Runner를 점유하지 않는 별도 상주 실행/부팅 복구 + 최소권한 인증·갱신을 기존 등록 계약에서 실제 증명하거나, 그 경로가 없으면 C급 사용자 직접 설정 범위 및 안전한 설치 패키지를 명시한다. 권한 밖 Windows 서비스 설치·무한 Job 실행·임시 Job 토큰 영구 저장은 시행하지 않는다.
+
 ## 독립성·실제 상태
 
 현재 단계는 **SOURCE_MERGED_RUNTIME_NOT_DEPLOYED**. 새 watcher는 해당 PC에 설치/기동되지 않았고, GitHub Actions 15분 주기도 변경하지 않았음. 기존 6 Runner 운영·공유 원장·DB/D1·게시 영향 없음.
