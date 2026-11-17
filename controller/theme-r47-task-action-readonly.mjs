@@ -13,6 +13,10 @@ export const R47_TARGET=String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\THEME
 export const R47_EXPECTED_TASK_SHA='bf3207ab2274d1248e7bd8c953cea2fd3bd277b8bd70bb1c2494339a06e0a4be';
 export const R47_BEFORE_SHA='2e0fc3e358feff70103d1e9025ce0944132b7b10a2159900f9479b9860550888';
 const ROOT=String.raw`E:\ZGmini\data\pc-writer`;
+const PRIVATE_ACTIONS=Object.freeze([
+ {command:String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\THEME_NINE_R48_PRIVATE_CYCLE.cmd`,kind:'R48_PRIVATE_CYCLE'},
+ {command:String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\THEME_NINE_R73_SCHEDULED_PRIVATE.cmd`,kind:'R73_SCHEDULED_PRIVATE'},
+]);
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const normalized=value=>path.win32.normalize(String(value).replace(/^"([^"]+)"$/,'$1')).toLowerCase();
 const base=()=>({status:'STATE_UNKNOWN',code:'R47_TASK_ACTION_UNVERIFIED',
@@ -78,6 +82,20 @@ function knownLauncher(command){
   (normalizedCommand===file||
    normalizedCommand==='c:\\windows\\system32\\'+file);
 }
+function fixedPrivateTaskKind(action){
+ const command=normalized(action.command);
+ const args=action.arguments.trim().replace(/&quot;/gi,'"').toLowerCase();
+ for(const item of PRIVATE_ACTIONS){
+  const expected=normalized(item.command);
+  // Native schtasks /TR <known CMD> and the fixed cmd.exe /d /c wrapper
+  // are observation-only alternatives; no dynamic arguments are accepted.
+  if(command===expected&&args==='')return item.kind;
+  if(knownLauncher(action.command)&&
+    path.win32.basename(command)==='cmd.exe'&&
+    args==='/d /c ""'+expected+'""')return item.kind;
+ }
+ return null;
+}
 function literalTargetInArgs(args){
  // Textual occurrence is only a clue; never a proof of execution through
  // a launcher or a reason to relax the original direct-action guard.
@@ -103,12 +121,14 @@ export function inspectR47TaskActionReadonly({
   action=checkedExec(decodeFixedXml(raw));
  }catch{return {...out,code:'R47_TASK_XML_UNVERIFIED'};}
  const direct=normalized(action.command)===normalized(R47_TARGET);
+ const privateTaskActionKind=fixedPrivateTaskKind(action);
  const kind=direct?'DIRECT_TARGET':knownLauncher(action.command)?'KNOWN_LAUNCHER':'OTHER';
  const evidence={...out,status:'PASS',code:'R47_TASK_ACTION_READONLY_CLASSIFIED',
   commandKind:kind,argumentsPresent:action.arguments.length>0,
   workingDirectoryPresent:action.workingDirectory.length>0,
   targetReferencedCanonical:direct?true:'UNKNOWN',
   targetLiteralInArguments:literalTargetInArgs(action.arguments),
+  privateTaskActionKind,privateTaskActionVerified:privateTaskActionKind!==null,
   taskXmlSha256MatchesApproved:sha(raw)===R47_EXPECTED_TASK_SHA,
   directActionVerified:direct};
  try{
