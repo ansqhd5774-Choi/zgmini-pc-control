@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 
 const launcher=readFileSync('tools/handoff-watch-user-start.cmd','utf8');
 const contract=readFileSync('docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md','utf8');
@@ -30,4 +31,25 @@ test('operator contract separates owner C setup and actual 5-second runtime evid
   assert.match(contract,/GitHub CLI/);
   assert.match(contract,/등록되지 않음/);
   assert.match(contract,/5\/5 완료 조건/);
+});
+
+test('C activation candidate uses exactly the post-receipt-fix immutable module set',()=>{
+  assert.match(contract,/0a30d3061d25fc826e2b149046dea46d123e785e/);
+  assert.match(contract,/정확 7파일/);
+  const moduleBlobs=[
+    ['agent-handoff/intake-watch-5s.mjs','bd9a5b9b428f6d11be40fbb960420d858c07c5e6'],
+    ['agent-handoff/intake-receipt-readonly.mjs','0b97307fc3bf1ed8462a5a6413c3fc8f12bbb08b'],
+    ['agent-handoff/queue-selector.mjs','964faf91138989cf3b42c44afbb6a77a1d2712b1'],
+    ['agent-handoff/queue-priority.mjs','5178eb3b531e9f48c7f4ac9bc13888219425ed6a'],
+    ['agent-handoff/contract.mjs','9b65f341c31a2ef6ac67be6824079806207ad72c'],
+    ['agent-handoff/watcher-gh-credential.mjs','03340fc943af09c6be7b55e635d09b30ef346ff5']
+  ];
+  for(const [name,expected] of moduleBlobs){
+    const bytes=readFileSync(name);
+    const actual=createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex');
+    assert.equal(actual,expected,'Git blob changed since C source pin: '+name);
+    assert.ok(contract.includes(name)&&contract.includes(expected));
+  }
+  assert.match(contract,/1b1773df0e9f64093ce509bb1a3590da99096024/); // CMD Git blob, not Windows SHA256
+  assert.match(contract,/설치 전 STOP/);
 });
