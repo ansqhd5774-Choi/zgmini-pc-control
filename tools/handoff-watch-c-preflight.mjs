@@ -38,7 +38,7 @@ export function inspectWatchCPreflight({
       const target=path.resolve(root,...file.split('/'));
       // Explicitly reject symlinks to avoid validating an unexpected source.
       if(lstatSync(target).isFile() && !lstatSync(target).isSymbolicLink() &&
-          realpathSync(target)===target){
+          (platform==='win32'?realpathSync(target).toLowerCase()===target.toLowerCase():realpathSync(target)===target)){
         const bytes=readFileSync(target);
         ok=bytes.length<=MAX_BYTES&&gitBlob(bytes)===expected;
       }
