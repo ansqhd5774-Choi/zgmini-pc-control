@@ -76,6 +76,14 @@
 - **진행률:** 1~4/5 **DONE, 4/5(80%)**. 5/5 **BLOCKED(C급 등록·인증 미실행)**, 실제 상시 감시 0/1. 원담당 ChatGPT 채팅 자동 전달은 이 감시기의 계약 범위가 아니며 접수 영수증과 구분.
 - **NEXT(한 가지 필수 실행):** 사용자가 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`에 따라 격리 PC 저권한 사용자·고정 source/Node22·자격 안전성을 먼저 확인한 뒤 C급 Task `ZGMINI-HANDOFF-WATCH`를 **직접 1회 등록**. 이후 최소 2회 `WATCH_HEARTBEAT` 실측, 유효 `HANDOFF_ROUTED` 영수증, 기존 Runner Job 비간섭·GitHub 제한 준수 검증. 무승인 신규 서비스/예약 원격 생성·토큰 로그·Runner 장기 점유 금지.
 
+## 2026-11-17 후속 — C급 실제 활성화 전 자격/소스 적격성 확인
+
+- **승계 완료점:** #1872 `main` 병합 `c4ae26e5d07392cc0507bb4cf91ee4fd4a4b3381`, Windows 감시 전용 CI **431/431 PASS**, 진척 **4/5(80%)**. 기존 CI·PC 전체 스냅샷 반복 없음.
+- **실제 발견한 운영 위험:** GitHub CLI가 시스템 credential store를 이용하지 못하면 토큰을 평문 설정 파일에 저장할 수 있음(공식 [gh auth login](https://cli.github.com/manual/gh_auth_login)). 기본 `gh auth login`의 일반 OAuth scope는 private repository Issues 읽기에 필요한 최소 권한보다 큼. 따라서 C급 승인 사용자가 실제 저장 방식/기존 최소 권한을 로컬 확인하지 않고 설치하는 것은 승인 계약과 맞지 않음.
+- **소스 정확성:** C 설치 검증 후보는 #1872 최종 HEAD `0b4c7b32f7284ad68bbb6e60da8e668019f0e0d0`가 병합된 **`c4ae26e5…`**. 운영 PC의 현재 checkout SHA 또는 실제 설치된 별도 감시 프로세스 SHA로 단정하지 않는다. 임의로 Runner `_work`를 상주 소스로 쓰거나 최신 `main`에 자동 추종하지 않음.
+- **문서 최소 보완:** `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`에 정확 source pin·평문 fallback STOP·광범위 신규 GitHub CLI 기본 로그인 금지·인증 출력 비공유를 명시. 소스/시험·운영 PC/Runner/DB/D1/원본 Issue 변경 없음.
+- **NEXT:** 사용자 C급 직접 확인 시 동일 Windows 저권한 계정의 고정 Node22·GitHub CLI/Windows 보안 자격증명·안정적 source 경로가 적격인지 판정. 하나라도 부재/불명확하면 새 토큰·서비스·예약으로 우회하지 않고 **RUNTIME_ACTIVATION_BLOCKED** 보존. 적격일 경우에만 별도 ONLOGON Task 1회 등록 → heartbeat 2회 및 `HANDOFF_ROUTED` 영수증·Runner 비간섭 확인.
+
 ## 독립성·실제 상태
 
 현재 단계는 **SOURCE_MERGED_RUNTIME_NOT_DEPLOYED**. 새 watcher는 해당 PC에 설치/기동되지 않았고, GitHub Actions 15분 주기도 변경하지 않았음. 기존 6 Runner 운영·공유 원장·DB/D1·게시 영향 없음.
