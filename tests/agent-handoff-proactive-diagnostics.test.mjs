@@ -130,7 +130,7 @@ test('new workflow uses existing isolated runner with bounded permissions',()=>{
   assert.match(s,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
   assert.match(s,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(s,/node agent-handoff\/proactive-diagnostics-runner.mjs/);
-  assert.doesNotMatch(s,/^  workflow_run:/m);assert.match(s,/issues:/);assert.match(s,/push:/);
+  assert.doesNotMatch(s,/^  workflow_run:/m);assert.match(s,/issues:/);assert.doesNotMatch(s,/^  push:/m);
   assert.match(s,/types: \[labeled\]/);assert.doesNotMatch(s,/github\.event\.workflow_run/);
   assert.doesNotMatch(s,/pull_request:|contents: write|actions: write/);
 });
@@ -148,6 +148,6 @@ test('R1 fallback gate allows only verified owner events on main',()=>{
   assert.doesNotThrow(()=>validateScoutEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:OWNER}));
   assert.throws(()=>validateScoutEvent({...issue,label:{name:'other'}},{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:OWNER}),/FALLBACK_ISSUE_STOP/);
   assert.throws(()=>validateScoutEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:'attacker'}),/FALLBACK_ISSUE_STOP/);
-  assert.doesNotThrow(()=>validateScoutEvent({...e,ref:'refs/heads/main',deleted:false},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}));
-  assert.throws(()=>validateScoutEvent({...e,ref:'refs/heads/main',deleted:false},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:'attacker'}),/FALLBACK_PUSH_STOP/);
+  assert.throws(()=>validateScoutEvent({...e,ref:'refs/heads/main'},
+    {...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}),/PROACTIVE_DIAG_RUNNER_EVENT_TYPE_STOP/);
 });
