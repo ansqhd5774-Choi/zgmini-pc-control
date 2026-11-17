@@ -61,11 +61,20 @@
 ## 2026-11-17 후속 — 독립 감시기 인증/기동·실측 준비 (소스)
 
 - **기존 완료 증거:** #1870 `main` 병합 `8340b1d51182b05d18c4362db4c3cddcdcac5aa7`, 격리 Windows **420/420 PASS**, Retry-After·Rate-limit reset 준수 및 401 종료. 이력은 반복 검사하지 않는다.
-- **현재 소스 보완:** 공통 Windows PC에서 사용자가 승인한 GitHub CLI 자격 저장소를 통한 선택적 `GH_CREDENTIAL_STORE` 인증 공급자 추가. `gh auth token --hostname github.com`의 stdout을 Node 메모리에서만 활용하고 환경/argv·로그/Issue에 비밀을 기록하지 않음. 60초 캐시와 인증 조회 실패 코드만 보존하며, 공급자 실패는 해당 watcher만 제한적 백오프한다.
+- **현재 소스 보완:** 공통 Windows PC에서 사용자가 승인한 GitHub CLI 자격 저장소를 통한 선택적 `GH_CREDENTIAL_STORE` 인증 공급자 추가. `gh auth token --hostname github.com`의 stdout을 Node 메모리에서만 활용하고 환경/argv·로그/Issue에 비밀을 기록하지 않음. 60초 캐시를 유지하되 인증 저장소 조회 실패·토큰 형식 오류는 watcher만 즉시 종료한다. 일반 네트워크 제한은 기존 백오프를 유지한다.
 - **감시 주기 실측 경로:** 정상 감시 12회마다 `WATCH_HEARTBEAT` 최소/최대 관측 간격을 비민감 로그로 기록해 5초 주기를 향후 실PC에서 확인할 수 있도록 함. 실제 통신 성공·원담당 수신과는 분리.
 - **Windows C급 활성화 준비:** `tools/handoff-watch-user-start.cmd`는 검증된 Node22 실행파일을 인수로 받아 기존 고정 소스 감시기만 기동하고, 비밀 인수·서비스 등록·예약 생성/교체를 수행하지 않음. 비민감 기록은 사용자별 `%TEMP%\\ZGMINI`에만 기록. C급 1회 PC 직접 설정과 STOP/복구 기준을 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`로 명시.
 - **현행 실제 상태:** 해당 격리 PC에 별도 watcher 작업·영구 Node22·인증 자격 저장소 등록이 확인되지 않았음. 신규 GitHub CLI/계정/Windows 예약·서비스 설치/PC 쓰기는 이번 소스 준비에 포함되지 않는다. `5단계 중 4단계(80%), 실운영 0/1, RUNTIME_ACTIVATION_BLOCKED` 유지.
 - **다음 행동:** GitHub PR+격리 CI로 소스/정적 계약 통과 → `main` 읽기 검증 → C급 실제 장비 사용자 설정 필요 범위만 제시 → 실제 5초 heartbeat·Runner 업무 비간섭·접수 영수증을 일회 측정.
+
+## 2026-11-17 최종 확인 — PR #1872 인증 실패 안전 종료, CI, main 병합
+
+- **LAST PASS:** [PR #1872](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1872) 최종 HEAD `0b4c7b32f7284ad68bbb6e60da8e668019f0e0d0`, squash merge **`c4ae26e5d07392cc0507bb4cf91ee4fd4a4b3381`**. 변경 파일 8개(소스·시험·사용자 기동 CMD·계약·진행기록), 운영 저장소/Controller/Runner/DB/D1 변경 없음.
+- **확인된 결함과 수정:** 승인 계약은 GitHub CLI 자격 저장소에서 인증을 읽을 수 없으면 종료를 요구했지만, 기존 감시기는 `HANDOFF_GH_CREDENTIAL_UNAVAILABLE` 및 `HANDOFF_GH_TOKEN_INVALID`을 반복 백오프함. Source `df6d683fa122684325c811e4ce82c822ce894212`에서 두 경우 `AUTH_SOURCE_UNAVAILABLE_STOP` 단회 종료, Test `0b4c7b32…`에서 GitHub 요청/재시도 0회 확인.
+- **격리 Windows 전용 CI:** 기존 보안 규칙에 따라 새 SHA에 `agent-handoff-ci` 라벨 이벤트를 다시 발생시켜 [Run #44006803180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006803180) **431/431 PASS**, 0 FAIL. Runner `zgmini-handoff-ci-spare-01`, source checkout **정확한 PR HEAD `0b4c7b32…`**, 신규 인증 실패 시험 로그 직접 확인. 별도 [C996 #44006160603](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006160603)은 43/43 PASS이나 감시기 CI가 아니므로 별개로 기록.
+- **운영 실체:** `DESKTOP-N62L0NG`에 별도 Windows Task 등록/실행·고정 Node22·안전한 GitHub CLI 인증·실제 5초 heartbeat·영수증 실측은 **아직 확인되지 않음**. 2026-11-17 읽기 전용 [#1863](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1863)의 기존 PC 등록 증거를 재사용하며 추가 전체 스냅샷을 수행하지 않음.
+- **진행률:** 1~4/5 **DONE, 4/5(80%)**. 5/5 **BLOCKED(C급 등록·인증 미실행)**, 실제 상시 감시 0/1. 원담당 ChatGPT 채팅 자동 전달은 이 감시기의 계약 범위가 아니며 접수 영수증과 구분.
+- **NEXT(한 가지 필수 실행):** 사용자가 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`에 따라 격리 PC 저권한 사용자·고정 source/Node22·자격 안전성을 먼저 확인한 뒤 C급 Task `ZGMINI-HANDOFF-WATCH`를 **직접 1회 등록**. 이후 최소 2회 `WATCH_HEARTBEAT` 실측, 유효 `HANDOFF_ROUTED` 영수증, 기존 Runner Job 비간섭·GitHub 제한 준수 검증. 무승인 신규 서비스/예약 원격 생성·토큰 로그·Runner 장기 점유 금지.
 
 ## 독립성·실제 상태
 
