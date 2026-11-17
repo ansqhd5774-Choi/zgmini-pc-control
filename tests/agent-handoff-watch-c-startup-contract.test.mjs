@@ -34,7 +34,7 @@ test('operator contract separates owner C setup and actual 5-second runtime evid
 });
 
 test('C activation candidate uses exactly the post-receipt-fix immutable module set',()=>{
-  assert.match(contract,/3976174e6c4c49c329933097163130b5c8138a47/);
+  assert.match(contract,/82e06469569bb6842aa4aca43970d84262329481/);
   assert.match(contract,/정확 7파일/);
   const moduleBlobs=[
     ['agent-handoff/intake-watch-5s.mjs','ac3bf7cd987e2ac4bacdcd94105a7689344bae7e'],
