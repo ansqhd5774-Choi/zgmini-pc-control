@@ -3,6 +3,8 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {HANDOFF_REPOSITORY,HANDOFF_OWNER} from './queue-selector.mjs';
 import {compileQueueBoard,renderBoardMarkdown} from './queue-board.mjs';
+import {DIRECT_OWNER_REVIEWS,compileDirectOwnerBoard,renderDirectOwnerMarkdown}
+  from './direct-owner-reviews.mjs';
 
 const API='https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/';
 const WORKFLOWS=new Set(['ZGMINI Handoff Queue Candidate Selector']);
@@ -89,11 +91,23 @@ export async function main(env=process.env) {
     readComments:n=>pages('issues/'+n+'/comments',4),
     readIssue:n=>request('issues/'+n)
   },Date.now());
-  const markdown=renderBoardMarkdown(board);
+  // Central #68 direct owner reviews are a separate source, not agent-handoff Issues.
+  // An unavailable proof remains UNVERIFIED; it does not erase the incident board.
+  const directReads=await Promise.all(DIRECT_OWNER_REVIEWS.map(async spec=>{
+    const [origin,review]=await Promise.allSettled([
+      request('issues/comments/'+spec.originCommentId),
+      request('issues/'+spec.reviewIssue)
+    ]);
+    return {origin:origin.status==='fulfilled'?origin.value:null,
+      review:review.status==='fulfilled'?review.value:null};
+  }));
+  const directOwnerReviews=compileDirectOwnerBoard(directReads,Date.now());
+  const result=Object.freeze({...board,directOwnerReviews});
+  const markdown=renderBoardMarkdown(board)+renderDirectOwnerMarkdown(directOwnerReviews);
   if(env.GITHUB_STEP_SUMMARY)
     fs.appendFileSync(env.GITHUB_STEP_SUMMARY,markdown,'utf8');
-  process.stdout.write(JSON.stringify(board)+'\n');
-  return board;
+  process.stdout.write(JSON.stringify(result)+'\n');
+  return result;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
   main().catch(e=>{process.stderr.write(e.message+'\n');process.exitCode=1;});
