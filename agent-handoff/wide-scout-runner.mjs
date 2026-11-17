@@ -35,9 +35,6 @@ export function validateWideEvent(event,env){
       event.issue?.user?.login!==OWNER||event.issue.state!=='open'||
       !event.issue?.labels?.some?.(x=>x.name==='agent-handoff')||
       env.GITHUB_ACTOR!==OWNER)stop('ISSUE_PROVENANCE');
-  }else if(kind==='push'){
-    if(event.ref!=='refs/heads/main'||event.deleted===true||
-      env.GITHUB_ACTOR!==OWNER)stop('PUSH_PROVENANCE');
   }else stop('EVENT');
 }
 function ledgerGuard(x){

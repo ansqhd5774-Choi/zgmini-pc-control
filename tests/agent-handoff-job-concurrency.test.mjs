@@ -44,6 +44,17 @@ for(const {file,job,group,cron} of workflows){
   });
 }
 
+test('source pushes cannot start redundant diagnostics while owner and 15-minute paths remain',()=>{
+  for(const {file} of workflows.slice(0,3)){
+    const yaml=read(file);
+    assert.doesNotMatch(yaml,/^  push:/m);
+    assert.doesNotMatch(yaml,/github\.event_name == 'push'/);
+    assert.match(yaml,/^  schedule:/m);
+    assert.match(yaml,/^  issues:/m);
+    assert.match(yaml,/^  workflow_dispatch:/m);
+  }
+});
+
 test('all three ledger writers retain one serialized group and queue capacity',()=>{
   const names=workflows.slice(0,3).map(({file})=>
     read(file).match(/^      group: (.+)$/m)?.[1]);

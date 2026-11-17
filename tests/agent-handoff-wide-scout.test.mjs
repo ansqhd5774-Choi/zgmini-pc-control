@@ -134,6 +134,7 @@ test('workflow is guarded on Windows, least-privilege and no production writes',
   const s=readFileSync(new URL('../.github/workflows/agent-handoff-wide-scout.yml',import.meta.url),'utf8');
   assert.match(s,/cron: '14,29,44,59 \* \* \* \*'/);
   assert.doesNotMatch(s,/^  workflow_run:/m);assert.match(s,/issues:/);
+  assert.doesNotMatch(s,/^  push:/m);
   assert.match(s,/pull-requests: read/);
   assert.match(s,/contents: read/);assert.match(s,/actions: read/);
   assert.match(s,/zgmini-handoff-ci-isolated/);
@@ -155,6 +156,8 @@ test('event identity and owner provenance are strict',()=>{
   assert.doesNotThrow(()=>validateWideEvent(w,{...env,GITHUB_EVENT_NAME:'workflow_run'}));
   assert.throws(()=>validateWideEvent({...w,workflow_run:{...w.workflow_run,
     actor:{login:'attacker'}}},{...env,GITHUB_EVENT_NAME:'workflow_run'}),/WORKFLOW_PROVENANCE/);
+  assert.throws(()=>validateWideEvent({...e,ref:'refs/heads/main'},
+    {...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}),/WIDE_SCOUT_RUNNER_EVENT/);
 });
 
 test('status-partition coverage prevents a newest-300-only blind spot',()=>{

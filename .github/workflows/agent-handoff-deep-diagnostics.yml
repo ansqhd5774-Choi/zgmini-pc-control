@@ -1,14 +1,10 @@
 name: ZGMINI Handoff Deep Evidence Diagnostics R2
 on:
+  # Source pushes use PR CI; periodic and authenticated owner diagnostic paths remain.
   # Existing schedule remains the 15-minute periodic path.
   # Owner-labeled incidents and manual dispatch remain fallbacks without completed-run cascades.
   issues:
     types: [labeled]
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/agent-handoff-deep-diagnostics.yml
-      - agent-handoff/deep-diagnostics-runner.mjs
   schedule:
     - cron: '12,27,42,57 * * * *'
   workflow_dispatch: {}
@@ -36,8 +32,6 @@ jobs:
         github.event.label.name == 'handoff-agent-pending' &&
         github.event.issue.state == 'open' &&
         github.event.issue.user.login == 'ansqhd5774-Choi' &&
-        github.actor == 'ansqhd5774-Choi') ||
-       (github.event_name == 'push' &&
         github.actor == 'ansqhd5774-Choi'))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 6

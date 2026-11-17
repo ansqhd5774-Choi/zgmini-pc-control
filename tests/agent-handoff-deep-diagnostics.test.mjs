@@ -150,7 +150,7 @@ test('workflow stays owner/schedule gated on isolated Windows without write to c
   assert.match(workflow,/zgmini-handoff-ci-isolated/);
   assert.match(workflow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(workflow,/deep-diagnostics-runner.mjs/);
-  assert.doesNotMatch(workflow,/^  workflow_run:/m);assert.match(workflow,/issues:/);assert.match(workflow,/push:/);
+  assert.doesNotMatch(workflow,/^  workflow_run:/m);assert.match(workflow,/issues:/);assert.doesNotMatch(workflow,/^  push:/m);
   assert.match(workflow,/types: \[labeled\]/);
   assert.doesNotMatch(workflow,/contents: write|actions: write|pull_request:/);
   const event={repository:{private:true,full_name:repo},schedule:DEEP_POLICY.schedule};
@@ -171,6 +171,6 @@ test('R2 fallback gate refuses untrusted events and accepts authorized source re
   const issue={...e,action:'labeled',label:{name:'handoff-agent-pending'},issue:{state:'open',user:{login:owner},labels:[{name:'agent-handoff'}]}};
   assert.doesNotThrow(()=>validateDeepEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:owner}));
   assert.throws(()=>validateDeepEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:'attacker'}),/FALLBACK_ISSUE/);
-  assert.doesNotThrow(()=>validateDeepEvent({...e,ref:'refs/heads/main'},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}));
-  assert.throws(()=>validateDeepEvent({...e,ref:'refs/heads/main',deleted:true},{...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}),/FALLBACK_PUSH/);
+  assert.throws(()=>validateDeepEvent({...e,ref:'refs/heads/main'},
+    {...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}),/HANDOFF_DEEP_RUNNER_EVENT/);
 });
