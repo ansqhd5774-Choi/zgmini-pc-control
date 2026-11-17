@@ -19,11 +19,11 @@
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
-- **실행 source (2026-11-17 최신 정확 후보):** 과거 [PR #1872](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1872)의 `c4ae26e5d07392cc0507bb4cf91ee4fd4a4b3381`는 **더 이상 신규 설치 후보가 아니다**. 당시 이후 접수 영수증 누락을 수정한 [PR #1909](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1909)가 `main`에 병합됐다. 운영 PC C급 사용자가 검증할 새로운 **불변 소스 후보는 `0a30d3061d25fc826e2b149046dea46d123e785e`**(PR #1909 main merge)이다. [격리 Windows CI #44028599065](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44028599065)는 해당 변경의 PR HEAD `d159e736872cfea3efc3f816c70c2bbdcf159d32`에서 455/455 PASS이며 **PC 설치 검증은 아니다**. 2026-11-17 최신 `main`과 이 불변 후보의 아래 watcher 파일 Git blob이 동일함을 별도 재조회했다. PC의 고정 읽기 전용 소스 위치에 반드시 이 **동일 불변 commit**의 아래 **정확 7파일**만 원본 상대 폴더 구조 그대로 둔다(필수 watcher/import 6개와 실행 CMD 1개). 다른 기능용 `agent-handoff/` 전체 디렉터리나 Controller/Writer 등은 설치 범위에 포함하지 않는다. 일회성 Runner `_work`를 상주 소스 위치로 사용하지 않는다. 
+- **실행 source (PR #1920 임시 검증 후보, C급 설치 금지):** 기존 main pin `0a30d3061d25fc826e2b149046dea46d123e785e`는 신규 감시기 예외 로그의 인증정보 노출 결함을 수정하기 전 버전이므로 **신규 설치 후보에서 제외한다**. [PR #1920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1920)은 로그의 임의 예외 메시지를 안전한 고정 진단코드로 제한한다. 현재 수정본 7파일의 **소스 검증 후보**는 Git commit `7f6684ca2f6fd4d6362f3a1eae7b096ba90ef823`이며, 이 SHA는 PR 중간 소스 commit으로 **main 병합/운영 PC 설치 승인 증거가 아니다**. PR 격리 Windows CI가 통과하고 main에 소스 병합된 뒤, 원격 main에서 정확 7파일 Git blob 및 최종 main merge SHA를 재확인해 **별도 source pin 갱신 전까지 설치 STOP**한다. 사용자가 직접 승인한 별도 고정 읽기 전용 설치 위치에만 승인된 최종 commit의 아래 7개 watcher 파일을 상대 폴더 구조 그대로 설치한다. GitHub Runner `_work`를 상주 소스에 사용하거나 임의로 운영 PC E:·C: 경로를 추정하지 않는다.
 
-  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (설치 후보 `0a30d306…`) |
+  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (PR #1920 검증 후보 `7f6684ca…`, **운영 설치 불가**) |
   |---|---|
-  | `agent-handoff/intake-watch-5s.mjs` | `bd9a5b9b428f6d11be40fbb960420d858c07c5e6` |
+  | `agent-handoff/intake-watch-5s.mjs` | `2515dd83b96f76146dc75991fa8648cae6d42382` |
   | `agent-handoff/intake-receipt-readonly.mjs` | `0b97307fc3bf1ed8462a5a6413c3fc8f12bbb08b` |
   | `agent-handoff/queue-selector.mjs` | `964faf91138989cf3b42c44afbb6a77a1d2712b1` |
   | `agent-handoff/queue-priority.mjs` | `5178eb3b531e9f48c7f4ac9bc13888219425ed6a` |

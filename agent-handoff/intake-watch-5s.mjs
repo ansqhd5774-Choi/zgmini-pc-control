@@ -10,6 +10,39 @@ export const ISSUE_LIST_URL = 'https://api.github.com/repos/ansqhd5774-Choi/zgmi
 
 function stop(code) { throw new Error(code); }
 
+// Only fixed, source-defined diagnoses may leave the isolated watcher's process.
+// Arbitrary error messages can contain a bearer token, local path or response body.
+const SAFE_WATCH_ERROR_CODES=new Set([
+  'HANDOFF_WATCH_AUTH_REQUIRED',
+  'HANDOFF_WATCH_FETCH_REQUIRED',
+  'HANDOFF_WATCH_TIMEOUT_INVALID',
+  'HANDOFF_WATCH_INCOMPLETE_PAGE_STOP',
+  'HANDOFF_WATCH_INVALID_ISSUE_STOP',
+  'HANDOFF_WATCH_DUPLICATE_ISSUE_STOP',
+  'HANDOFF_WATCH_INTERVAL_MUST_BE_5000'
+]);
+const SAFE_WATCH_FATAL_CODES=new Set([
+  'HANDOFF_WATCH_NOT_ENABLED',
+  'HANDOFF_WATCH_AUTH_SOURCE_CONFLICT',
+  'HANDOFF_WATCH_AUTH_REQUIRED',
+  'HANDOFF_WATCH_AUTH_REJECTED_STOP',
+  'HANDOFF_WATCH_AUTH_SOURCE_UNAVAILABLE_STOP',
+  'HANDOFF_WATCH_INTERVAL_MUST_BE_5000',
+  'HANDOFF_GH_CREDENTIAL_CONFIG_INVALID',
+  'HANDOFF_GH_EXECUTABLE_INVALID'
+]);
+export function safeWatchReadErrorCode(error){
+  if(error?.name==='AbortError')return 'REQUEST_TIMEOUT';
+  const message=error?.message;
+  return typeof message==='string'&&SAFE_WATCH_ERROR_CODES.has(message)
+    ?message:'WATCH_REQUEST_FAILED';
+}
+export function safeWatchFatalErrorCode(error){
+  const message=error?.message;
+  return typeof message==='string'&&SAFE_WATCH_FATAL_CODES.has(message)
+    ?message:'HANDOFF_WATCH_FATAL_STOP';
+}
+
 // Use GitHub's reset/retry evidence. Never retry every 60s through a longer
 // primary limit window. A 401 is handled as terminal by runWatch.
 export function retryDelayMs(headers, nowMs=Date.now()) {
@@ -204,7 +237,7 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
       backoff=true;
       consecutiveFailures++;
       retryAfterMs=Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6));
-      onReport({state:'WATCH_READ_FAILED',code:err?.name==='AbortError'?'REQUEST_TIMEOUT':String(err?.message||'UNKNOWN_ERROR').slice(0,80),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
+      onReport({state:'WATCH_READ_FAILED',code:safeWatchReadErrorCode(err),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     }
     // A single low-volume heartbeat per 12 checks provides real PC timing
     // evidence without logging issue bodies, authentication or every poll.
@@ -234,4 +267,4 @@ async function main(env=process.env){
   if(result?.state==='AUTH_SOURCE_UNAVAILABLE_STOP')stop('HANDOFF_WATCH_AUTH_SOURCE_UNAVAILABLE_STOP');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
-  main().catch(e=>{process.stderr.write(String(e?.message||'WATCH_STOP').replace(/Bearer\s+\S+/g,'Bearer [REDACTED]')+'\n');process.exitCode=1});
+  main().catch(e=>{process.stderr.write(safeWatchFatalErrorCode(e)+'\n');process.exitCode=1});
