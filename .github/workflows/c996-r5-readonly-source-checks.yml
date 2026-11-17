@@ -25,7 +25,7 @@ jobs:
       - name: Run source-only unit tests
         run: node --test tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs
       - name: Run R47 fixed CMD B authorization and CAS tests
-        run: node --test tests/r47-cmd-approval-intake.test.mjs tests/r47-cmd-onefile-cas.test.mjs tests/r47-cmd-report.test.mjs
+        run: node --test tests/r47-cmd-approval-intake.test.mjs tests/r47-cmd-onefile-cas.test.mjs tests/r47-cmd-report.test.mjs tests/r47-cmd-windows-boundary.test.mjs
       - name: Identify exact permitted queue PC without WIM access
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
