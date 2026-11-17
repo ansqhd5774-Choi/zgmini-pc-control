@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
+import {TextDecoder} from 'node:util';
 import {taskAction} from './pc-source-readonly.mjs';
 
 export const R47_TASK='ZGMINI-PC-Theme-Nine-R47-Private';
@@ -41,6 +41,18 @@ function readTaskXml(){
  if(p.error||p.signal||p.status!==0||!Buffer.isBuffer(p.stdout))
   throw Error('TASK_QUERY_UNAVAILABLE');
  return p.stdout;
+}
+function decodeFixedXml(raw){
+ // Task Scheduler XML can be UTF-8 or UTF-16. No raw XML or parser errors
+ // ever leave this fixed A output.
+ let encoding='utf-8';
+ if(raw[0]===255&&raw[1]===254)encoding='utf-16le';
+ else if(raw[0]===254&&raw[1]===255)encoding='utf-16be';
+ else if(raw[0]===60&&raw[1]===0)encoding='utf-16le';
+ else if(raw[0]===0&&raw[1]===60)encoding='utf-16be';
+ const value=new TextDecoder(encoding,{fatal:true}).decode(raw);
+ if(!/^\s*(?:<\?xml\b|<Task\b)/.test(value))throw Error('BAD_XML');
+ return value;
 }
 function checkedExec(xml){
  const actions=[...xml.matchAll(/<Actions(?:\s[^>]*)?>([\s\S]*?)<\/Actions>/gi)];
@@ -88,7 +100,7 @@ export function inspectR47TaskActionReadonly({
  try{
   raw=queryTask(R47_TASK);
   if(!Buffer.isBuffer(raw)||raw.length<5||raw.length>262144)throw Error('XML_BYTES');
-  action=checkedExec(decodeTaskXmlBytes(raw));
+  action=checkedExec(decodeFixedXml(raw));
  }catch{return {...out,code:'R47_TASK_XML_UNVERIFIED'};}
  const direct=normalized(action.command)===normalized(R47_TARGET);
  const kind=direct?'DIRECT_TARGET':knownLauncher(action.command)?'KNOWN_LAUNCHER':'OTHER';
