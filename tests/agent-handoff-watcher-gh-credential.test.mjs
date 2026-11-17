@@ -62,3 +62,23 @@ test('missing credential source is rejected rather than silently unauthenticated
  await assert.rejects(runWatch({fetchImpl:async()=>{throw Error('SHOULD_NOT_CALL')}}),
   /HANDOFF_WATCH_AUTH_REQUIRED/);
 });
+
+test('missing or invalid credential fails closed without polling or repeated retries',async()=>{
+ for(const code of ['HANDOFF_GH_CREDENTIAL_UNAVAILABLE','HANDOFF_GH_TOKEN_INVALID']){
+   let fetchCalls=0,sleepCalls=0;
+   const notices=[];
+   const result=await runWatch({
+     tokenProvider:async()=>{throw Error(code);},
+     fetchImpl:async()=>{fetchCalls++;throw Error('FETCH_MUST_NOT_RUN');},
+     sleep:async()=>{sleepCalls++;},
+     onReport:x=>notices.push(x),
+     clock:()=>1_000_000
+   });
+   assert.equal(result.state,'AUTH_SOURCE_UNAVAILABLE_STOP');
+   assert.equal(fetchCalls,0);
+   assert.equal(sleepCalls,0);
+   assert.deepEqual(notices.map(x=>x.state),['WATCH_AUTH_SOURCE_UNAVAILABLE_STOP']);
+   assert.equal(notices[0].code,code);
+   assert.equal(notices[0].workExecuted,false);
+ }
+});
