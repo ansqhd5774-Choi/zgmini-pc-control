@@ -44,7 +44,8 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
  assert.equal(result.report.code,'PROTECTED_STATE_POSTCHECK_UNVERIFIED');
  assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
  assert.deepEqual(result.report.workerOutcome,
-  {status:'PASS',code:'RUNNER_COMMAND_EXECUTED'});
+  {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',
+   firstFail:null,resultPresent:true});
  assert.equal(result.report.result.code,'RUNNER_COMMAND_EXECUTED');
  assert.equal(result.report.protectedStateUnchanged,null);
  assert.match(result.report.protectedBeforeSha256,/^[a-f0-9]{64}$/);
@@ -80,4 +81,26 @@ test('changed protected state remains BLOCKED instead of being relabeled as unce
  assert.equal(result.report.status,'BLOCKED');
  assert.equal(result.report.code,'PROTECTED_STATE_DRIFT_OBSERVED');
  assert.equal(result.report.result.code,'RUNNER_COMMAND_EXECUTED');
+});
+
+test('postcheck R13 with missing worker result preserves original timeout',async()=>{
+ const c=fixture();c.policy.operations['timeout-proof'].timeoutSeconds=1;
+ let probes=0;
+ const result=await executeJob(req('timeout-proof','postcheck-r13-timeout-01'),
+  {...c,runId:'3304',retiredTaskEvidence:()=>{
+   if(++probes===2)throw Object.assign(new Error('inventory unavailable'),
+    {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+   return 'APPROVED_RETIRED_ABSENT';
+  }});
+ assert.equal(probes,2);
+ assert.equal(result.report.status,'STATE_UNKNOWN');
+ assert.equal(result.report.code,'PROTECTED_STATE_POSTCHECK_UNVERIFIED');
+ assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.deepEqual(result.report.workerOutcome,
+  {status:'FAIL',code:'JOB_EXECUTION_TIMEOUT',
+   firstFail:'OWN_WORKER_TIMEOUT',resultPresent:false});
+ assert.equal(result.report.result,undefined);
+ assert.equal(result.report.firstFail,'PROTECTED_STATE_POSTCHECK');
+ assert.equal(result.report.protectedStateUnchanged,null);
+ assert.equal(result.report.resourceLeasesRetained,undefined);
 });
