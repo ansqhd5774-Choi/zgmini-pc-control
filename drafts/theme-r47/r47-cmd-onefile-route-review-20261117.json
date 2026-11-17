@@ -1,0 +1,85 @@
+{
+  "schema": "ZGMINI_W03_R47_CMD_ONEFILE_ROUTE_REVIEW_V1",
+  "status": "PROPOSED_NOT_APPROVED_NOT_EXECUTABLE",
+  "purpose": "SHARED_B_ROUTE_GO_NO_GO_REVIEW_ONLY",
+  "createdFor": "ZGMINI W03 R47 single existing CMD file",
+  "origin": {
+    "ledger": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1009",
+    "handoff": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6937230843",
+    "approvalReview": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6936233882",
+    "preimage": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1846#issuecomment-6934924717"
+  },
+  "reviewedRuntimeEffect": {
+    "kind": "EXISTING_R47_TASK_CMD_SINGLE_FILE_CAS",
+    "candidateRepository": "ansqhd5774-Choi/zgmini",
+    "candidateSourcePath": "scripts/pc-writer/THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd",
+    "observedOldSha256": "2e0fc3e358feff70103d1e9025ce0944132b7b10a2159900f9479b9860550888",
+    "proposedTargetSha256": "a08fdec82b484c41ba3ac562908f31d96fee09c75cc3ff1b32386e9dd625ba45",
+    "otherImmutableR49EmbeddedSha256": "2133e5d4e625762340e715ecd21e809f274713c030e904e3e3f314dc3b6a0729",
+    "observedAt": "HISTORICAL_2026_11_17_PREIMAGE",
+    "currentLiveSha": "NOT_RECHECKED",
+    "taskDefinitionSha": "NOT_RECHECKED",
+    "leaseOwner": "NOT_RECHECKED",
+    "taskChangeAuthorized": false,
+    "allowedSourceFiles": [],
+    "operationalWrites": 0
+  },
+  "currentRouteAssessment": [
+    {
+      "route": "writer-b/contract.mjs",
+      "result": "NO_GO",
+      "reason": "RELATIVE accepts approved .mjs source overlay, not .cmd"
+    },
+    {
+      "route": "tools/maintenance-contract.mjs",
+      "result": "NO_GO",
+      "reason": "Controller-only installable paths limited to controller/*.mjs or config/operations.json"
+    },
+    {
+      "route": "tools/source-bundle-register.mjs",
+      "result": "NO_GO",
+      "reason": "HOST_APPROVED_SOURCES_SINGLE_CAS_ONLY registers source-bundle Host, not active Task CMD bytes"
+    },
+    {
+      "route": "R49 immutable one-click installer",
+      "result": "NO_GO",
+      "reason": "R49 embedded R47 image hash differs from current proposed target and may entail Task effects"
+    },
+    {
+      "route": "direct-writer-b configured package",
+      "result": "NO_GO",
+      "reason": "Fixed configured theme package runner/activation is not a generic R47 Task CMD single-file CAS"
+    }
+  ],
+  "decision": "NO_GO_FOR_ALL_REVIEWED_EXISTING_ROUTES",
+  "notAClaim": "DOES_NOT_PROVE_ALL_POSSIBLE_PRIOR_APPROVALS_ABSENT",
+  "minimumFutureRoute": {
+    "reusableFoundation": "existing authorized B maintainer, only if its contract explicitly permits this exact effect",
+    "scope": "ONE_EXISTING_R47_CMD_ONLY",
+    "mustProtect": [
+      "authorized exact old/target bytes and owner approval",
+      "fresh operating PC target path and file sha256",
+      "current Task XML/launcher and no Task definition changes",
+      "no new Task, schedule, Controller, sqlite, D1, provider or sidecar changes",
+      "lease/resource ownership and bounded once-only requestId",
+      "atomic compare-and-swap of the single approved file",
+      "original bytes backup, exact rollback and post-readback of SHA",
+      "result JSON/TXT with source version and protected state"
+    ],
+    "ownerActions": [
+      "determine whether a currently approved specialized path already meets these exact guarantees",
+      "if none, approve and implement only a narrowly constrained single-file CMD B adapter under the common maintainer",
+      "stage independent source+Windows regression and submit the separate operation-effect approval before executing",
+      "do not replay any original consumed B Issue, R49 bundle or alter active R47 Task"
+    ]
+  },
+  "approval": {
+    "grade": "B",
+    "state": "NOT_GRANTED",
+    "approver": "NOT_ATTESTED",
+    "manifestPath": null,
+    "manifestSha256": null,
+    "issueNumber": null,
+    "executionState": "NOT_REQUESTED"
+  }
+}
