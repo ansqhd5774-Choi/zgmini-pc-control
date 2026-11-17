@@ -29,3 +29,78 @@ test('controlled operation failure is reported instead of losing the result',asy
 test('core conflict fixture preserves lock and never invokes real SQLite or writer',async()=>{const result=await executeJob(req('core-conflict-proof'),fixture());assert.equal(result.report.status,'PASS');assert.equal(result.report.result.code,'CORE_WRITE_GATE_BLOCKED_WITHOUT_LOCK_CHANGE');assert.equal(result.report.sqliteOpened,false);});
 test('timeout terminates only the subprocess created by this job and preserves a failure report',async()=>{const c=fixture();c.policy.operations['timeout-proof'].timeoutSeconds=1;const result=await executeJob(req('timeout-proof'),c);assert.equal(result.report.code,'JOB_EXECUTION_TIMEOUT');assert.equal(result.report.protectedStateUnchanged,true);assert.equal(result.report.operationalWrites,0);});
 test('unapproved source never executes a test command',async()=>{const c=fixture();const result=await executeJob(req('theme-common-tests'),c);assert.equal(result.report.result.code,'SOURCE_NOT_APPROVED_FOR_EXECUTION');});
+
+test('postcheck R13 inventory uncertainty keeps worker result but never authorizes PASS',async()=>{
+ const c=fixture();let probes=0;
+ const retiredTaskEvidence=()=>{
+  if(++probes===2)throw Object.assign(new Error('inventory probe unavailable'),
+   {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+  return 'APPROVED_RETIRED_ABSENT';
+ };
+ const result=await executeJob(req('runner-smoke','postcheck-r13-unknown-01'),
+  {...c,retiredTaskEvidence,runId:'3301'});
+ assert.equal(probes,2);
+ assert.equal(result.report.status,'STATE_UNKNOWN');
+ assert.equal(result.report.code,'PROTECTED_STATE_POSTCHECK_UNVERIFIED');
+ assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.deepEqual(result.report.workerOutcome,
+  {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',
+   firstFail:null,resultPresent:true});
+ assert.equal(result.report.result.code,'RUNNER_COMMAND_EXECUTED');
+ assert.equal(result.report.protectedStateUnchanged,null);
+ assert.match(result.report.protectedBeforeSha256,/^[a-f0-9]{64}$/);
+ assert.equal(result.report.protectedAfterSha256,null);
+ assert.equal(result.report.firstFail,'PROTECTED_STATE_POSTCHECK');
+ assert.equal(result.report.operationalWrites,0);
+ assert.equal(result.report.providerCalls,0);
+ assert.equal(result.report.d1Writes,0);
+ assert.equal(JSON.parse(fs.readFileSync(
+  path.join(result.workspace,'RESULT.json'),'utf8')).status,'STATE_UNKNOWN');
+});
+
+test('retired R13 inventory precheck failure blocks worker without changing safety rule',async()=>{
+ const c=fixture();
+ const result=await executeJob(req('runner-smoke','precheck-r13-denied-01'),
+  {...c,runId:'3302',retiredTaskEvidence:()=>{
+   throw Object.assign(new Error('inventory probe unavailable'),
+    {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+  }});
+ assert.equal(result.report.status,'BLOCKED');
+ assert.equal(result.report.code,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.equal(result.report.failureOperation,'PROTECTED_STATE_SNAPSHOT');
+ assert.equal(result.report.result,undefined);
+});
+
+test('changed protected state remains BLOCKED instead of being relabeled as uncertain',async()=>{
+ const c=fixture();let probes=0;
+ const result=await executeJob(req('runner-smoke','postcheck-r13-drift-01'),
+  {...c,runId:'3303',retiredTaskEvidence:()=>{
+   return ++probes===1?'APPROVED_RETIRED_ABSENT':'UNEXPECTED_TASK_STATE';
+  }});
+ assert.equal(probes,2);
+ assert.equal(result.report.status,'BLOCKED');
+ assert.equal(result.report.code,'PROTECTED_STATE_DRIFT_OBSERVED');
+ assert.equal(result.report.result.code,'RUNNER_COMMAND_EXECUTED');
+});
+
+test('postcheck R13 with missing worker result preserves original timeout',async()=>{
+ const c=fixture();c.policy.operations['timeout-proof'].timeoutSeconds=1;
+ let probes=0;
+ const result=await executeJob(req('timeout-proof','postcheck-r13-timeout-01'),
+  {...c,runId:'3304',retiredTaskEvidence:()=>{
+   if(++probes===2)throw Object.assign(new Error('inventory unavailable'),
+    {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+   return 'APPROVED_RETIRED_ABSENT';
+  }});
+ assert.equal(probes,2);
+ assert.equal(result.report.status,'STATE_UNKNOWN');
+ assert.equal(result.report.code,'PROTECTED_STATE_POSTCHECK_UNVERIFIED');
+ assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.deepEqual(result.report.workerOutcome,
+  {status:'FAIL',code:'JOB_EXECUTION_TIMEOUT',
+   firstFail:'OWN_WORKER_TIMEOUT',resultPresent:false});
+ assert.equal(result.report.result,undefined);
+ assert.equal(result.report.firstFail,'PROTECTED_STATE_POSTCHECK');
+ assert.equal(result.report.protectedStateUnchanged,null);
+ assert.equal(result.report.resourceLeasesRetained,undefined);
+});
