@@ -32,3 +32,5 @@ test('unchanged no-follow lstat path traversal emits bounded progress markers',(
  assert.ok(steps.some(x=>x.operation==='PATH_LSTAT'&&x.depth>=1));
  assert.ok(steps.every(x=>Number.isSafeInteger(x.depth)&&x.depth>=0&&x.depth<=24));
 });
+// W01 ephemeral CI-only import: test exact PR #1854 engine/test blob pair.
+import './engine.test.mjs';
