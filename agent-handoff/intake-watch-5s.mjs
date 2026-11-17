@@ -148,6 +148,13 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
         onReport({state:result.state,change:result.change||null,observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     } catch(err){
       if(signal?.aborted)break;
+      // A missing/invalid local credential is a C-setup problem, not a
+      // transient GitHub rate limit. Stop this isolated watcher immediately.
+      if(err?.message==='HANDOFF_GH_CREDENTIAL_UNAVAILABLE' || err?.message==='HANDOFF_GH_TOKEN_INVALID'){
+        onReport({state:'WATCH_AUTH_SOURCE_UNAVAILABLE_STOP',code:err.message,
+          observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
+        return {state:'AUTH_SOURCE_UNAVAILABLE_STOP',noWrite:true};
+      }
       backoff=true;
       consecutiveFailures++;
       retryAfterMs=Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6));
@@ -178,6 +185,7 @@ async function main(env=process.env){
   const result=await runWatch({token:env.GITHUB_TOKEN,tokenProvider,
     onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
   if(result?.state==='AUTH_REJECTED_STOP')stop('HANDOFF_WATCH_AUTH_REJECTED_STOP');
+  if(result?.state==='AUTH_SOURCE_UNAVAILABLE_STOP')stop('HANDOFF_WATCH_AUTH_SOURCE_UNAVAILABLE_STOP');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
   main().catch(e=>{process.stderr.write(String(e?.message||'WATCH_STOP').replace(/Bearer\s+\S+/g,'Bearer [REDACTED]')+'\n');process.exitCode=1});
