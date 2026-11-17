@@ -66,3 +66,16 @@ test('runner references exact readonly central comment and issue GETs',()=>{
  assert.match(s,/renderDirectOwnerMarkdown/);
  assert.doesNotMatch(s,/method:\s*['"]POST|method:\s*['"]PATCH/);
 });
+
+test('central review board can read authenticated PR metadata without write grants',()=>{
+ const yaml=readFileSync(new URL('../.github/workflows/agent-handoff-queue-board.yml',import.meta.url),'utf8');
+ const permissions=yaml.match(/^permissions:\n((?:^  [^\n]+\n|^  #.*\n)+)jobs:/m)?.[1];
+ assert.ok(permissions,'workflow permission block must be explicit');
+ assert.match(permissions,/^  contents: read$/m);
+ assert.match(permissions,/^  issues: read$/m);
+ assert.match(permissions,/^  pull-requests: read$/m);
+ assert.doesNotMatch(permissions,/^  (?:actions|checks|contents|deployments|discussions|id-token|issues|packages|pages|pull-requests|repository-projects|security-events|statuses|workflows): write$/m);
+ assert.match(yaml,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
+ assert.match(yaml,/run: node agent-handoff\/queue-board-runner.mjs/);
+ assert.match(yaml,/cron: '7,22,37,52 \* \* \* \*'/);
+});

@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
   issues: read
+  # The board authenticates fixed PR review Issues (W01/W03/W04) via /issues/:number.
+  # Without pull-requests:read those PR metadata GETs are unavailable to GITHUB_TOKEN.
+  pull-requests: read
 jobs:
   authenticated-readonly-board:
     concurrency:
