@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {digest,approveExactR47B,assertApprovedR47B,R47_B_ISSUE}
  from '../task-cmd-b/approval-intake.mjs';
-import {R47_CMD_B} from '../task-cmd-b/r47-onefile-cas.mjs';
+import {R47_CMD_B,R47_CMD_B_CALENDAR_SAFE} from '../task-cmd-b/r47-onefile-cas.mjs';
 const SHA='f'.repeat(40);
 const RID='01234567-89ab-4cde-8fab-0123456789ab';
 const CID='11234567-89ab-4cde-8fab-1123456789ab';
@@ -38,6 +38,26 @@ test('exact user-issued B scope is attested only with same raw manifest SHA',()=
  assert.equal(a.issueNumber,3000);
  assert.equal(a.manifest.sourceSha,manifest().sourceSha);
  assert.throws(()=>assertApprovedR47B({...a}),{code:'TASK_CMD_B_APPROVAL_NOT_AUTHENTICATED_STOP'});
+});
+test('calendar-safe exact raw-byte B approval accepts pinned transition only',()=>{
+ const x=fixture(),old=JSON.parse(x.manifestBytes.toString('utf8'));
+ const next={...old,beforeSha256:R47_CMD_B_CALENDAR_SAFE.beforeSha256,
+  afterSha256:R47_CMD_B_CALENDAR_SAFE.afterSha256,
+  sourceSha:R47_CMD_B_CALENDAR_SAFE.sourceSha};
+ function replace(m){
+  x.manifestBytes=Buffer.from(JSON.stringify(m)+'\\n');
+  x.request.approvalManifestSha256=digest(x.manifestBytes);
+  x.event.issue.body=JSON.stringify(x.request);
+ }
+ replace(next);
+ const auth=approveExactR47B(x);
+ assert.equal(auth.manifest.beforeSha256,R47_CMD_B_CALENDAR_SAFE.beforeSha256);
+ assert.equal(auth.manifest.afterSha256,R47_CMD_B_CALENDAR_SAFE.afterSha256);
+ assert.equal(auth.manifest.sourceSha,R47_CMD_B_CALENDAR_SAFE.sourceSha);
+ replace({...next,sourceSha:'f'.repeat(40)});
+ assert.throws(()=>approveExactR47B(x),{code:'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
+ replace({...next,afterSha256:R47_CMD_B.requestedTargetSha256});
+ assert.throws(()=>approveExactR47B(x),{code:'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
 });
 test('reject fake GitHub actor, job attempt, label, title, public repo, wrong control SHA',()=>{
  for(const edit of [
