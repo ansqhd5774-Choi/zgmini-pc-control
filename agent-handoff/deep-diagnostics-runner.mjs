@@ -36,9 +36,6 @@ export function validateDeepEvent(event,env){
       event.issue?.state!=='open'||event.issue?.user?.login!==owner||
       !event.issue?.labels?.some?.(x=>x.name==='agent-handoff')||
       env.GITHUB_ACTOR!==owner)stop('FALLBACK_ISSUE');
-  }else if(env.GITHUB_EVENT_NAME==='push'){
-    if(event.ref!=='refs/heads/main'||event.deleted===true||
-      env.GITHUB_ACTOR!==owner)stop('FALLBACK_PUSH');
   }else stop('EVENT');
 }
 function checkLedger(x){
