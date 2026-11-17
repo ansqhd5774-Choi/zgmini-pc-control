@@ -12,7 +12,19 @@
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
-- **실행 source:** 검증된 기준은 [PR #1872](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1872) 최종 HEAD `0b4c7b32f7284ad68bbb6e60da8e668019f0e0d0`, `main` 병합 commit **`c4ae26e5d07392cc0507bb4cf91ee4fd4a4b3381`**이다. 운영 checkout/Runner의 일회성 `_work`가 아닌, 사용자 승인된 **고정 읽기 전용 소스 위치**에 이 commit의 `agent-handoff/`, `tools/handoff-watch-user-start.cmd` 및 상대 import 의존 파일을 동일하게 둔다. `main` 최신 HEAD만으로 실제 C 설치 SHA가 갱신됐다고 간주하지 않는다. 실제 경로/Node 위치가 확인될 때까지 운영 PC E:나 C: 경로를 임의로 기입하지 않는다.
+- **실행 source (2026-11-17 최신 정확 후보):** 과거 [PR #1872](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1872)의 `c4ae26e5d07392cc0507bb4cf91ee4fd4a4b3381`는 **더 이상 신규 설치 후보가 아니다**. 당시 이후 접수 영수증 누락을 수정한 [PR #1909](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1909)가 `main`에 병합됐다. 운영 PC C급 사용자가 검증할 새로운 **불변 소스 후보는 `0a30d3061d25fc826e2b149046dea46d123e785e`**(PR #1909 main merge)이다. [격리 Windows CI #44028599065](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44028599065)는 해당 변경의 PR HEAD `d159e736872cfea3efc3f816c70c2bbdcf159d32`에서 455/455 PASS이며 **PC 설치 검증은 아니다**. 2026-11-17 최신 `main`과 이 불변 후보의 아래 watcher 파일 Git blob이 동일함을 별도 재조회했다. PC의 고정 읽기 전용 소스 위치에 반드시 이 **동일 불변 commit**의 아래 **정확 7파일**만 원본 상대 폴더 구조 그대로 둔다(필수 watcher/import 6개와 실행 CMD 1개). 다른 기능용 `agent-handoff/` 전체 디렉터리나 Controller/Writer 등은 설치 범위에 포함하지 않는다. 일회성 Runner `_work`를 상주 소스 위치로 사용하지 않는다. 
+
+  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (설치 후보 `0a30d306…`) |
+  |---|---|
+  | `agent-handoff/intake-watch-5s.mjs` | `bd9a5b9b428f6d11be40fbb960420d858c07c5e6` |
+  | `agent-handoff/intake-receipt-readonly.mjs` | `0b97307fc3bf1ed8462a5a6413c3fc8f12bbb08b` |
+  | `agent-handoff/queue-selector.mjs` | `964faf91138989cf3b42c44afbb6a77a1d2712b1` |
+  | `agent-handoff/queue-priority.mjs` | `5178eb3b531e9f48c7f4ac9bc13888219425ed6a` |
+  | `agent-handoff/contract.mjs` | `9b65f341c31a2ef6ac67be6824079806207ad72c` |
+  | `agent-handoff/watcher-gh-credential.mjs` | `03340fc943af09c6be7b55e635d09b30ef346ff5` |
+  | `tools/handoff-watch-user-start.cmd` | `1b1773df0e9f64093ce509bb1a3590da99096024` |
+
+  위 값은 GitHub **Git blob SHA-1**이며 Windows 파일의 SHA-256이라고 주장하지 않는다. 실제 승인 C급 설치 시에는 원본 commit·실제 바이트/파일 경로·로컬 읽기 권한을 독립 확인하고, 불일치면 **설치 전 STOP**. `main` 최신 HEAD만으로 실제 C 설치 SHA가 갱신됐다고 간주하지 않는다. 실제 경로/Node 위치가 확인될 때까지 운영 PC E:나 C: 경로를 임의로 기입하지 않는다.
 - **Node:** 위 사용자/부팅 컨텍스트에서 실행 가능한 고정 Node22 실행파일의 실제 경로·실행 해시를 확인한다. Actions의 `setup-node` 성공만으로 상주 실행이 가능한지 판단하지 않는다.
 - **인증:** 동일 저권한 Windows 계정의 공식 GitHub CLI 설치 여부·인증 상태·**실제 저장 위치**를 사용자 로컬에서 확인한다. GitHub CLI는 Windows 자격 저장소 사용 불가 시 `hosts.yml` 평문으로 되돌아갈 수 있다. `gh auth status --hostname github.com`만으로 평문 저장이 없다는 점을 확정할 수 없으면 **STOP**. 이 명령의 원본 출력·스크린샷·토큰 일부도 채팅/Issue/CI에 전송하지 않는다. 최소한 해당 private 제어 저장소의 `Issues: read` 권한만 사용해야 한다. 일반 `gh auth login`의 기본 OAuth 권한(`repo` 등)은 이보다 넓으므로 **5초 감시를 위해 기본 로그인이나 광범위 토큰 발급을 새로 진행하지 않는다**. 안전한 기존 최소권한 자격이 확인되지 않거나 CLI가 세부권한 토큰을 수용하지 못하면 C 등록 전에 **STOP**하고 별도 승인된 인증 경로를 검토한다. GitHub CLI 설치/로그인이 없으면 이 경로는 미설치다.
 - **Windows 작업 스케줄러:** 사용자 직접 `ZGMINI-HANDOFF-WATCH`라는 별도 `ONLOGON` 작업을 최소 권한(`LIMITED`)으로 등록한다. **기존 항목 있으면 덮어쓰지 않고 중단**. Windows 작업의 실행 항목은 고정 소스의 **`tools/handoff-watch-user-start.cmd`**를 사용하며, CMD에는 **실제 확인한 Node22 실행파일 절대경로 1개만** 전달한다. 이 CMD는 어떤 서비스/예약도 만들거나 수정하지 않으며 기존 작업을 덮어쓰지 않는다. 시작 직후 자격이 없으면 비정상 종료하고, 정상 동작 시 `%TEMP%\\ZGMINI\\handoff-watch-observation.log`에 비민감 경과·1분당 약 1회 heartbeat만 기록한다. 실제 사용자·고정 소스/Node 경로는 작업 스케줄러 C급 설정에서 확인한 값만 사용한다. 작업 시작 시 **중복 인스턴스 실행 금지**, 오류 시 제한된 횟수·간격으로만 재시작, 부팅/로그인 재개를 구성한다. 이 등록은 C급 사용자 직접 설정이며 GitHub PR/ChatGPT 도구가 대신하지 않는다.
