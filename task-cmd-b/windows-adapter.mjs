@@ -10,6 +10,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {createHash} from 'node:crypto';
 import {applyR47CmdBCas,R47_CMD_B} from './r47-onefile-cas.mjs';
 import {approveExactR47B,assertApprovedR47B,R47_B_ISSUE} from './approval-intake.mjs';
+import {gitApprovedR47Blob} from './source-pin.mjs';
 import {taskAction} from '../controller/pc-source-readonly.mjs';
 import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled}
@@ -238,9 +239,9 @@ export async function runPinnedR47WindowsB({controlRoot,candidateRoot,event,env}
  need(typeof body?.approvalManifestPath==='string'&&
   /^approvals\/task-cmd-b\/[a-z0-9][a-z0-9._-]{0,90}\.json$/.test(body.approvalManifestPath),
   'TASK_CMD_B_APPROVAL_PATH_STOP');
- const file=path.join(controlRoot,...body.approvalManifestPath.split('/'));
- const bytes=exactFile(file,path.join(controlRoot,'approvals','task-cmd-b'),16384);
  const controlSha=git(controlRoot,'rev-parse','HEAD');
+ // Pinned original Git blob, not working-tree bytes with platform EOL conversion.
+ const bytes=gitApprovedR47Blob(controlRoot,body.approvalManifestPath);
  const auth=approveExactR47B({event,env,manifestBytes:bytes,controlSha});
  need(git(candidateRoot,'rev-parse','HEAD')===auth.manifest.sourceSha,
   'TASK_CMD_B_PINNED_SOURCE_CHECKOUT_STOP');
