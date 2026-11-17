@@ -75,7 +75,7 @@ const POWERSHELL=[
  "$admin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)",
  "$taskOk = $false",
  "$taskExists = $false",
- "try { $tasks = @(Get-ScheduledTask -ErrorAction Stop | Where-Object { $_.TaskName -eq 'ZGMINI-HANDOFF-WATCH' -and $_.TaskPath -eq '\\' }); $taskOk = $true; $taskExists = $tasks.Count -gt 0 } catch { }",
+ "try { $tasks = @(Get-ScheduledTask -ErrorAction Stop | Where-Object { $_.TaskName -eq 'ZGMINI-HANDOFF-WATCH' }); $taskOk = $true; $taskExists = $tasks.Count -gt 0 } catch { }",
  "$ghPresent = $null -ne (Get-Command gh.exe -ErrorAction SilentlyContinue)",
  "[pscustomobject]@{schema='ZGMINI_HANDOFF_WATCH_RUNNER_CONTEXT_PROBE_V1';sessionId=[int]$process.SessionId;serviceSid=[bool]$serviceSid;adminGroupToken=[bool]$admin;taskQueryOk=[bool]$taskOk;taskExists=[bool]$taskExists;ghCliPresent=[bool]$ghPresent} | ConvertTo-Json -Compress"
 ].join('; ');
