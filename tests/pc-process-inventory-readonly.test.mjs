@@ -98,6 +98,48 @@ test('compact result preserves full memory attribution and large readonly roster
  assert.deepEqual(JSON.parse(raw),complete);
  assert.match(raw,/privateCommitMiB/);
 });
+test('bounded broad categories resolve OTHER process group without leaking names',()=>{
+ const base={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:4,
+  selectedProcessCount:0,processes:[],services:[],tasks:[],
+  memoryGroups:[{kind:'OTHER_PROCESSES',count:4,workingSetMiB:4000,
+   privateCommitMiB:3000,zeroWorkingSetCount:0,
+   unknownWorkingSetCount:0,unknownPrivateCommitCount:0}],
+  otherSubgroups:[
+   {category:'BROWSER_WEBVIEW',count:2,workingSetMiB:3000,privateCommitMiB:2000,
+    processName:'DO_NOT_LEAK_USER_APP'},
+   {category:'WINDOWS_CORE_UI',count:1,workingSetMiB:700,privateCommitMiB:600},
+   {category:'UNCLASSIFIED_OTHER',count:1,workingSetMiB:300,privateCommitMiB:400}],
+  otherTopMemory:[{category:'BROWSER_WEBVIEW',workingSetMiB:2500,
+   privateCommitMiB:1600,commandLine:'SECRET_DO_NOT_LEAK'}]};
+ const out=sanitizeProbe(base);
+ assert.equal(out.memoryGroupCoverage,'COUNT_COMPLETE');
+ assert.equal(out.otherSubgroupCoverage,'COUNT_COMPLETE');
+ assert.equal(out.otherSubgroups.reduce((n,g)=>n+g.count,0),4);
+ assert.equal(out.otherTopMemory[0].workingSetMiB,2500);
+ assert.deepEqual(Object.keys(out.otherTopMemory[0]),
+  ['category','workingSetMiB','privateCommitMiB']);
+ assert.doesNotMatch(JSON.stringify(out),/DO_NOT_LEAK|SECRET|processName|commandLine/);
+ assert.equal(sanitizeProbe({...base,otherSubgroups:base.otherSubgroups.slice(0,2)})
+  .otherSubgroupCoverage,'COUNT_PARTIAL');
+ assert.equal(sanitizeProbe({...base,otherSubgroups:[]}).otherSubgroupCoverage,'UNAVAILABLE');
+});
+test('broad category sanitizer rejects names, forged data, duplicate classes',()=>{
+ const base={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:1,
+  processes:[],memoryGroups:[{kind:'OTHER_PROCESSES',count:1,
+   workingSetMiB:123,privateCommitMiB:66,zeroWorkingSetCount:0,
+   unknownWorkingSetCount:0,unknownPrivateCommitCount:0}]};
+ const valid={category:'UNCLASSIFIED_OTHER',count:1,
+  workingSetMiB:123,privateCommitMiB:66};
+ for(const groups of [
+  [{...valid,category:'private.exe'}],
+  [{...valid,workingSetMiB:-1}],
+  [valid,valid]
+ ])assert.throws(()=>sanitizeProbe({...base,otherSubgroups:groups}));
+ for(const row of [
+  {category:'private.exe',workingSetMiB:123,privateCommitMiB:1},
+  {category:'WINDOWS_CORE_UI',workingSetMiB:-1,privateCommitMiB:1},
+ ])assert.throws(()=>sanitizeProbe({...base,otherTopMemory:[row]}));
+});
 test('reject unapproved process names, task names, service names',()=>{
  const raw={schema:'ZGMINI_PC_PROCESS_PROBE_V1',
   processes:[{name:'unknown.exe',pid:1,ppid:0}],services:[],tasks:[]};
