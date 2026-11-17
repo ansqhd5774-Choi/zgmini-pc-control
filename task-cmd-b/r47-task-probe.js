@@ -4,9 +4,9 @@
  try{
   var service=new ActiveXObject('Schedule.Service');
   service.Connect();
-  var task=service.GetFolder('\\\\').GetTask('ZGMINI-PC-Theme-Nine-R47-Private');
+  var task=service.GetFolder('\\').GetTask('ZGMINI-PC-Theme-Nine-R47-Private');
   var instances=task.GetInstances(0).Count;
-  var wmi=GetObject('winmgmts:root\\\\cimv2');
+  var wmi=GetObject('winmgmts:root\\cimv2');
   var processes=wmi.ExecQuery('SELECT Name,CommandLine FROM Win32_Process');
   var iter=new Enumerator(processes),related=0,unknown=0;
   for(;!iter.atEnd();iter.moveNext()){
