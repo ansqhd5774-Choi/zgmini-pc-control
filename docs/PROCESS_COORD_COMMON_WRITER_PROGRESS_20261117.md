@@ -27,8 +27,8 @@
 
 - **DONE:** 인계 10건의 원본 분류, 해결된 2건 대기 해제, Writer 8/8 인수 receipt, 대기열 PC 실제 Job 증거, 공통 소스 패치·테스트 작성.
 - **소스 검증 DONE:** 정확 PR HEAD `4e207fa1852c0551d0afe4037efede6e72f36a97`에서 [격리 Windows CI Run 44006906854](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006906854) **424/424 PASS**, [C996 CI Run 44006752176](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006752176) **43/43 PASS**. 2026-11-17T03:02Z 격리 Runner `zgmini-handoff-ci-spare-01` 및 호스트 `DESKTOP-N62L0NG` Job 로그 검증. PR source-only main 병합 `5a064fd5a3608f6c67c55990f10cdd173bdbb559`. 독립 사람 리뷰는 별도 증거 없음.
-- **BLOCKED(기능별 설치):** 8건 모두 과거 B 단회 소모. 현재 Runtime before SHA와 개별 원담당의 정확한 새 승인 source/manifest 없이는 기능별 설치 진행 불가. 공용 소스 패치 성공을 기능별 설치 PASS로 취급하지 않음.
-- **다음 필수 업무:** W01/W02/W04 원담당이 자신의 미완료 Writer 설치 필요 여부를 기존 완료점/최신 PC before SHA 및 승인 source와 대조하여 결정한다. 필요한 경우 **새 고유 B 승인 manifest**를 정확히 만들고 기존 정규 단회 설치 경로를 이용한다. 과거 8건의 원본 B를 재실행하지 않으며 새 공통 진단이 이미 설치·실행된 것으로 주장하지 않는다. 총괄은 새 증거로 공통 결함이 재현될 때만 공용 원인 수정을 추가한다.
+- **HISTORICAL (정정 전 판정):** 아래 최신 재대조 전에 8건을 모두 미완료 설치로 분류했으나 이는 잘못된 합산임. 원본 B 단회 실패와 후속 별도 승인 B 설치 성공을 구분해야 함. 기능별 저장·게시 검증은 별개임.
+- **최신 판정 우선:** 문서 맨 아래 `2026-11-17 W01/W02/W04 최신 설치 재대조`를 우선 적용. W02·W04 기설치 소스는 정확 파일 해시 검증 완료; W01은 고유 A #1880 결과 회수 전까지 신규 설치 여부를 미확정으로 유지. 과거 B 재실행 금지.
 - **금지:** 이전 B/pc-job ID 재실행, 격리 대기열 PC에서 운영 PC 쓰기, 임의 원격 shell, Controller/lease 강제 변경, 기능별 산식·원자료·D1 변경.
 
 ## 2026-11-17 W01/W02/W04 최신 설치 재대조 — 추가 실행
