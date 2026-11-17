@@ -1487,11 +1487,30 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
    await waitForReconnect(child.pid,manifest.installedSha,'ROLLBACK_RECONNECT_FAILED');
   },
-  verifyPrevious:async({installedSha,requireRunning})=>{
+  verifyRestoredPrevious:async installedSha=>{
+   // Require the whole saved host and all installed Controller bytes, not
+   // merely a matching source label. prepareRecovery loaded the old protection.
+   if(installedManifest().installedSha!==installedSha)return false;
+   need(fs.readFileSync(hostPath).equals(fs.readFileSync(path.join(snapshotRoot,'host.json'))),
+    'RECOVERY_PREVIOUS_HOST_DRIFT');
+   const current=readOwner();
+   need(current.status.sourceSha===installedSha,'RECOVERY_PREVIOUS_SUPERVISOR_DRIFT');
+   need(available(apiRunners()),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE');
+   for(const child of current.status.children){
+    need(child.alive===true,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');
+    try{process.kill(child.pid,0);}catch{need(false,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');}
+   }
+   need(protectedBefore!==undefined&&JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),
+    'RECOVERY_PREVIOUS_PROTECTION_DRIFT');
+   return true;
+  },
+  verifyPrevious:async({installedSha,requireRunning,requireIdle=true})=>{
    if(installedManifest().installedSha!==installedSha)return false;
    if(requireRunning){
     const s=json(path.join(controlRoot,'SUPERVISOR_STATUS.json'));
-    if(s.sourceSha!==installedSha||Date.now()-Date.parse(s.at)>45000||!available(apiRunners()))return false;
+    const rows=apiRunners();
+    const runnersVerified=requireIdle?available(rows):dedicatedPcRunnerRows(rows,{requireOnline:true})!==null;
+    if(s.sourceSha!==installedSha||Date.now()-Date.parse(s.at)>45000||!runnersVerified)return false;
    }
    return JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore??protectedSnapshot());
   },
