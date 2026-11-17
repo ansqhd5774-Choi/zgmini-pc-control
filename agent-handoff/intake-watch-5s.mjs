@@ -64,9 +64,11 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
   if(intervalMs!==INTERVAL_MS) stop('HANDOFF_WATCH_INTERVAL_MUST_BE_5000');
   let etag=null,previous=null;
   // A bounded asynchronous receipt lane: never await it in the 5s discovery loop.
-  const receiptQueue=[],receiptPending=new Set();
+  const receiptQueue=[],receiptDeferred=[],receiptPending=new Set();
   let checkingReceipt=false,receiptBackoffUntil=0;
   const drainReceipts=()=>{
+    // Bounded active lane; overflow stays in memory instead of being silently dropped.
+    while(receiptQueue.length<25 && receiptDeferred.length>0) receiptQueue.push(receiptDeferred.shift());
     if(checkingReceipt||signal?.aborted||receiptQueue.length===0||clock()<receiptBackoffUntil) return;
     checkingReceipt=true;
     const number=receiptQueue.shift();
@@ -83,14 +85,19 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
   };
   const queueChangedReceipts=change=>{
     const numbers=[...(change?.observedIssueNumbers||[]),...(change?.newIssueNumbers||[]),...(change?.updatedIssueNumbers||[])];
+    let deferredCount=0;
     for(const number of numbers){
       if(!Number.isSafeInteger(number)||number<=0||receiptPending.has(number))continue;
+      receiptPending.add(number);
       if(receiptQueue.length>=25){
-        onReport({state:'RECEIPT_QUEUE_LIMIT',at:new Date(clock()).toISOString(),workExecuted:false});
-        break;
-      }
-      receiptQueue.push(number);receiptPending.add(number);
+        // One listing page is already capped at 99. Keep excess identities and
+        // drain them sequentially; never spin another read loop or occupy a Runner.
+        receiptDeferred.push(number);
+        deferredCount++;
+      } else receiptQueue.push(number);
     }
+    if(deferredCount>0) onReport({state:'RECEIPT_BACKPRESSURE_DEFERRED',
+      deferredCount,at:new Date(clock()).toISOString(),workExecuted:false});
     drainReceipts();
   };
   while(!signal?.aborted){
