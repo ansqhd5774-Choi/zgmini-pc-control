@@ -118,6 +118,7 @@ test('new R35 issue report omits unrelated R54 details and fits 8192-byte upload
   const projected=projectR35Details(inspect({dataRoot:root,taskQuery:()=>'<Task/>',
    freeMiB:807,list:fs.readdirSync}));
   assert.equal(projected.r47Reports.reports.length,2);
+  assert.deepEqual(projected.r47InstalledCmd,{status:'UNKNOWN',sha256:null});
   assert.equal(projected.r35Manifest.latestSpyDay,'2026-10-30');
   assert.equal(Object.hasOwn(projected,'freeMiB'),false);
   assert.equal(Object.hasOwn(projected,'recentRuns'),false);
@@ -157,6 +158,10 @@ test('installed R54, R47 report and raw manifests are observed only by hash and 
   const result=inspect({dataRoot:root,freeMiB:900,taskQuery:()=>'<Task/>',list:fs.readdirSync});
   assert.equal(result.sourceLineage.installed.r54Connect.sha256,
    createHash('sha256').update(script).digest('hex'));
+  const projected=projectR35Details(result);
+  assert.deepEqual(projected.r47InstalledCmd,{status:'READ',
+   sha256:createHash('sha256').update('@echo off').digest('hex')});
+  assert.equal(JSON.stringify(projected).includes('SECRET_MUST_NOT_LEAK'),false);
   assert.equal(result.sourceLineage.manifests.r35.latestSpyDay,'2026-10-30');
   assert.equal(result.sourceLineage.recentRuns.r47.files[0].detail.targetClosedNYDay,'2026-11-03');
   assert.deepEqual(result.sourceLineage.recentRuns.r54.files[0].detail.errors,
