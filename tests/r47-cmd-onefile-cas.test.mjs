@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  R47_CMD_B,validateR47CmdBManifest,verifyR47CmdBPreimage,
- verifyR47CmdBCandidate,applyR47CmdBCas
+ verifyR47CmdBCandidate,verifyR47CmdBPaused,applyR47CmdBCas
 } from '../task-cmd-b/r47-onefile-cas.mjs';
 
 function manifest(){
@@ -82,6 +82,11 @@ test('R47 rejected B approval performs no lease or file change',async()=>{
   readPreimage:async()=>preimage(m),
   fetchCandidateBytes:async()=>Buffer.from('invalid'),
   backupOriginal:async()=>({sha256:m.beforeSha256,durable:true}),
+  pauseExactTask:async()=>{},
+  readPausedState:async()=>({...preimage(m),taskEnabled:false,
+   taskDefinitionExceptEnabledMatchesOriginal:true}),
+  restoreExactTask:async()=>{},
+  verifyTaskRestored:async()=>true,
   journalWriteIntent:async()=>{},
   assertTaskQuiet:async()=>{},
   replaceExactBytesIfBeforeMatches:async()=>{calls.push('replace')},
@@ -101,6 +106,11 @@ test('R47 candidate mismatch safely releases owned shared Writer lease',async()=
   readPreimage:async()=>preimage(m),
   fetchCandidateBytes:async()=>Buffer.from('incorrect bytes'.repeat(20)),
   backupOriginal:async()=>{calls.push('backup');return{}},
+  pauseExactTask:async()=>{},
+  readPausedState:async()=>({...preimage(m),taskEnabled:false,
+   taskDefinitionExceptEnabledMatchesOriginal:true}),
+  restoreExactTask:async()=>{},
+  verifyTaskRestored:async()=>true,
   journalWriteIntent:async()=>{calls.push('intent')},
   assertTaskQuiet:async()=>{},
   replaceExactBytesIfBeforeMatches:async()=>{calls.push('write')},
@@ -112,4 +122,17 @@ test('R47 candidate mismatch safely releases owned shared Writer lease',async()=
  assert.equal(result.code,'TASK_CMD_B_CANDIDATE_SHA_STOP');
  assert.deepEqual(calls,['lease','release']);
  assert.equal(released.retain,false);
+});
+
+test('R47 requires disabled and drained Task before any file write',()=>{
+ const m=manifest(),base={...preimage(m),taskEnabled:false,
+  taskDefinitionExceptEnabledMatchesOriginal:true};
+ assert.equal(verifyR47CmdBPaused(m,base),true);
+ for(const [key,value] of [
+  ['taskEnabled',true],['taskRunning',true],
+  ['taskDefinitionExceptEnabledMatchesOriginal',false],
+  ['sharedWriterLeaseOwned',false],
+  ['installedSha256','f'.repeat(64)]
+ ]) assert.throws(()=>verifyR47CmdBPaused(m,{...base,[key]:value}),
+  {code:'TASK_CMD_B_PAUSED_PREIMAGE_STOP'},key);
 });
