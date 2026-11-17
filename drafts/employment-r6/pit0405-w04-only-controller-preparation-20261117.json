@@ -1,0 +1,46 @@
+{
+  "schema": "ZGMINI_W04_PIT0405_CONTROLLER_PREPARATION_V1",
+  "status": "DRAFT_ONLY_NOT_APPROVED_NOT_FOR_PC_MAINTENANCE_INTAKE",
+  "owner": "W04",
+  "milestone": "PIT-04-05",
+  "targetControllerRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "reportedInstalledControllerSha": "5492726bb5b0505b7ff7db73a3c673dabdf724ce",
+  "reportedInstalledControllerEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1979",
+  "targetSha": "451f53ae3831d369dfbcd4474b2c641736634a34",
+  "sourceReview": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1978",
+  "sourceRuntimeDiff": {
+    "sourceBase": "5492726bb5b0505b7ff7db73a3c673dabdf724ce",
+    "sourceTarget": "451f53ae3831d369dfbcd4474b2c641736634a34",
+    "controllerConfigChangeCount": 1
+  },
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-candidate-readonly.mjs",
+      "beforeSha256": "e156d22989210b2599d9393a15f8206fecd325d14f3d72af04d658bd60ee9409",
+      "afterSha256": "d6a0a70d679c2d3708f87ea941288b99cc493b14ba2251caf0c78739b89c4a63"
+    }
+  ],
+  "allowFilesFingerprint": "ecc3df068aba10df599bcec9920e9d1b4c8b8313030e333df1a07a0d0d61e2fd",
+  "approvedOperationPath": "pc-controller-update",
+  "postOperation": "core-status",
+  "postSource": {
+    "repository": "ansqhd5774-Choi/zgmini",
+    "branch": "main",
+    "sha": "1f451fbd979af6b9a0a1a2a4b2f79db60f3ae22f"
+  },
+  "sourceOnlyCi": [
+    "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44058208441",
+    "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44058208449"
+  ],
+  "openPrerequisites": [
+    "Independent protected runtime/readback for W03 Issue #1979 UNKNOWN, workflowEnabled=false, protectedStateUnchanged=false; do not treat report of controller SHA as completed recovery",
+    "Exact fresh GO for afterSha256 d6a0... and existing Controller B protection/lease/backup/rollback contract",
+    "On admission, W04 itself must confirm installed SHA and all controller/config changed file paths, and construct exact immutable approved raw manifest with new requestId; do not reuse failed or unapproved request"
+  ],
+  "forbiddenEffects": [
+    "Controller install from this draft",
+    "Issue of pc-controller-update without matching approved B manifest and live protective preflight",
+    "W03 source changes",
+    "Operations config/Task/Writer/SQLite/D1/provider or candidate promotion"
+  ]
+}
