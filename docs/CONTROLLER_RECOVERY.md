@@ -77,7 +77,7 @@ E:\ZGmini\runtime\node.exe E:\ZGmini\projects\zgmini-pc-control\tools\maintenanc
 
 ### #1501 RECONNECTED 접수 원장 정합 복구
 
-`tools/controller-intake-recovery.mjs`는 정확히 #1501만 지원하는 독립 Windows operator 경로다.
+`tools/controller-intake-recovery.mjs`는 고정된 #1501 및 #1745 사례를 지원하는 독립 Windows operator 경로다. 기본 CLI는 기존 #1501이며, #1745는 명시적으로 `--issue 1745`를 추가한다.
 `inspect --source-sha <40자리 커밋>`으로 현재 바이트와 원격 JSON/TXT 영수증을 대조한다.
 `apply`는 커밋된 `approvals/maintenance-recoveries/pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b.intake.json`의
 source·의존 파일·ledger/owner/marker/backlog/host/보호 상태 해시가 모두 일치해야 실행된다.
@@ -98,3 +98,14 @@ source·의존 파일·ledger/owner/marker/backlog/host/보호 상태 해시가 
 5. #68의 대기 항목 담당에게 실제 SHA와 사용 가능한 모듈을 인계한다. 이미 설치된 기능은 중복 설치하지 않는다.
 
 구현·격리 Windows 시험·실PC 읽기 전용 확인·실제 lease 복구·유지보수기 설치·GitHub 자동 갱신 재개는 별도 증거다. 코드 저장만으로 자동 복구가 설치됐다고 보고하지 않는다.
+
+### #1745 RECONNECTED 접수 원장 정합 복구
+
+설치 SHA가 실제 목표와 일치하고 Workflow가 active여도, 과거 ledger의 resumeIntake 실패와 열린 backlog 때문에 공유 설치 lease는 남을 수 있다. 이를 Controller 미설치 또는 Runner 전체 장애로 보고 재설치하지 않는다. 과거 실패 ledger는 원본 증거로 보존하며 성공으로 덮어쓰지 않는다.
+
+- 고정 요청: pc-update-45b549d0-f233-40eb-9075-02942c25f8cd, 실제 유지할 Controller e3a495c97d6b40d6d4eea2ff4f586bef46216eb7.
+- inspect/apply --source-sha <검증 커밋> --issue 1745: 기존 독립 Windows operator만 사용한다. 실행 파일·의존성 Git 바이트와 커밋된 정확한 승인 명세를 검증한다.
+- #1747의 원본 요청·봇 댓글 내 JSON·저장 JSON/TXT를 교차 검증한다. 실제 PASS 시작 시각은 접수 재개의 상한 증거이며 정확한 enable 시각이 아니다. 해당 구간 pc-job 전체 검색 결과가 정확히 #1747 한 건이고 이미 실행됐을 때만 재생 없이 backlog를 닫는다.
+- 현재 Controller/유지보수기 건강·6개 전용 Runner·Workflow active·보호 상태·종료된 원 소유자·ledger/owner/marker/backlog/host 원본 해시가 모두 일치해야 한다. 누락/추가 요청·진행 중 실행·소유자 재생존·바이트 변화가 있으면 적용하지 않는다.
+- 기존 공통 transaction으로 원본 backlog 백업, 정합화된 backlog 재조회, 전체 install lease 보관을 수행한다. 원본 ledger는 그대로 두고 별도 complete 영수증으로 복구를 판정한다. 중간 실패는 원본/claim/단계 증거를 유지하고 재실행하지 않는다.
+- Controller/Workflow/예약/DB/D1/공급자 호출/원본 요청 재실행은 변경 0이다. 이 복구는 W03 신규 검사기의 설치 또는 68단계 완료를 뜻하지 않는다. 복구 후 새 모듈이 필요한 담당자는 실제 설치 SHA에서 누적 diff와 정확한 별도 설치 manifest를 준비해 기존 정상 B 경로를 사용한다. 독립 기능은 이 공유 설치 상태를 전역 Gate로 삼지 않는다.

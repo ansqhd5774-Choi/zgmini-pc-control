@@ -1,0 +1,42 @@
+{
+  "schema": "ZGMINI_PC_INTAKE_RECOVERY_APPROVAL_V1",
+  "approved": true,
+  "requestId": "pc-update-45b549d0-f233-40eb-9075-02942c25f8cd",
+  "sourceSha": "33d66558f6ed1807f23257ef6a5af2eacd8e3969",
+  "hashes": {
+    "ledger": "5c57c2868a04fa79965b44d7fc7cef857c5ad1883c5c950bfe4d5423560849cb",
+    "owner": "03ad28afd61c4146d2cd397903dc7024701624379e448d9e0b87fa63d0b690dd",
+    "marker": "2735532f974d0feb116ca30456db10d55ae5c90f3c13d8ef1937c9e1654361c4",
+    "backlog": "85ebb4840aa48fe62e504e7ffd7d01a19fd2662d017082872e11ded562656559",
+    "host": "e6c8e30480cedddcf20f0b1bcdc5fd0063dda09860d48e313a04a660cc01128c",
+    "baseline": "f5d359a44efde20c418f36ece038b5846da8ca4e19f0a73b84c7597f5f43b32a",
+    "protectedState": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae"
+  },
+  "fileHashes": {
+    "tools/controller-intake-recovery.mjs": "cc54425adff0d48483c517b73c5acf0b7a258dd0903641c652846d7934a6ec20",
+    "tools/automation-status.mjs": "79863954361b1d88dd39d33c8e59d71897d1aad43687fb6c58adc5242f29bba7",
+    "tools/update.mjs": "d56d5540f1464836c8ae4fb101b6e89bc95a75085cff44e6f1a1525bf4c0138f",
+    "tools/maintenance-apply.mjs": "055feacf2888755dc19490cc6a46c0948776bfae0d358ef7870e1daf649cce8b",
+    "tools/maintenance-contract.mjs": "24145afe1695f8cde691a03a87df480af1ea695d4757eb34d00d6b6405d58f57",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc"
+  },
+  "authority": "Existing user standing approval: PC_AUTOMATION_STANDARD section 5, common control lease archive/recovery; current request to resolve #1745",
+  "issueNumber": 1745,
+  "allowedEffects": [
+    "backup-original-backlog",
+    "reconcile-single-already-executed-request-1747",
+    "archive-complete-install-lease"
+  ],
+  "forbiddenEffects": [
+    "controller-change",
+    "workflow-change",
+    "ledger-overwrite",
+    "task-change",
+    "database-write",
+    "provider-call",
+    "original-request-retry"
+  ],
+  "successStatus": "INTAKE_RECOVERED_EXISTING_CONTROLLER_PRESERVED",
+  "stopOnAnyEvidenceChange": true
+}
