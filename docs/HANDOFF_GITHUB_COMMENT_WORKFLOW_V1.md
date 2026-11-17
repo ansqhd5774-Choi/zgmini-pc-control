@@ -7,6 +7,26 @@
 - 운영 PC의 Controller, Core, Writer, SQLite, D1, 배포와 관리자/보안 설정에 이 Workflow가 쓰기 작업을 수행하지 않는다.
 - 일반챗의 자동 깨우기·대화 자동 재개를 지원한다고 주장하지 않는다. 새 ChatGPT 예약 작업이나 AI API 인증·과금·실행을 만들지 않는다.
 
+
+## 일반 담당자 접수부터 작업 회신까지 (2026-11-17 책임·증거 명확화)
+
+일반 원담당이 요청할 수 있는 지원 업무는 **공통 Controller·Runner/GitHub Actions·공통 Writer 수신기/loader·공통 승인/manifest/설치 경로·공유 자원 충돌·공통 진단기·업무 인계/회신 구조 결함**이다. 기능별 수집·산식·계산·저장·게시·설치·UI는 원담당이 유지한다. 자세한 업무별 사례와 요청 조건은 [공통 작업 표준](PC_AUTOMATION_STANDARD.md#공통-프로세스-총괄--요청-가능-업무접수작업-회신-2026-11-17)에 있다.
+
+| 단계 | 요청자에게 알려야 할 사실 | 현재 자동화의 증거와 한계 |
+|---|---|---|
+| 직접 요청/자동 발견 | 원담당이 직접 맡긴 사건인지, 봇이 장애를 자동 발견했는지 구분 | 작성자·원본 Issue/Run. 자동 발견은 담당자의 직접 의뢰가 아님 |
+| 접수 확인 | 요청이 원본과 함께 정상 등록됐는지 | `ZGMINI_AGENT_HANDOFF_V1`·라벨·`HANDOFF_ROUTED` 인증 영수증 |
+| 후보 선별 | 공통/기능 담당 **유형**과 중복 여부 | `HANDOFF_SELECTOR_CANDIDATE_V1`. 실제 사람/채팅에 전달했다는 의미가 아님 |
+| 담당자에게 실제 전달 | 누구에게 무엇을 보냈고 수신 경로가 무엇인지 | **현재 ChatGPT 대화 자동 전달 경로 미구현.** 증거 없으면 `DELIVERY_UNVERIFIED`(보고 용어) |
+| 실제 인수/작업 | 수신한 담당자가 사건을 인수·진행하는지 | `ZGMINI_HANDOFF_WORK_UPDATE_V1`·`HANDOFF_WORK_STATE_RECORDED_V1`은 GitHub 계정 증거; 특정 채팅의 수신까지는 별도 증거 필요 |
+| 결과 제출 | 해당 담당자가 확인 가능한 작업 결과를 남겼는지 | 지원되는 `ZGMINI_AGENT_HANDOFF_RESULT_V1`의 PR·성공 CI 검증. **비코드 조정/무수정 판정은 현재 정식 결과 브로커가 지원한다고 가정하지 않음** |
+| 원본 회신 | 처음 요청한 원본 Issue에서 같은 사건의 결과를 확인할 수 있는지 | `HANDOFF_RESULT_RECORDED` 및 `HANDOFF_ORIGIN_RESULT_RECORDED`·원본 Issue readback을 각각 확인 |
+| 요청자 수신·종결 | 원담당의 실제 대화가 결과를 받았고 본래 기능을 이어갔는지 | GitHub 댓글만으로 자동 재개되지 않음. 실제 확인 전 `OWNER_ACK_UNKNOWN`, PC 적용은 별도 검증 |
+
+**접수 위치·형식:** `ansqhd5774-Choi/zgmini-pc-control`의 [Issues](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues)에 기존 `ZGMINI_AGENT_HANDOFF_V1` JSON·`agent-handoff` 라벨을 사용한다. 원본 Issue/Run·requestId·branch/source SHA·LAST PASS/FIRST FAIL·요청할 공통 지원 결과를 원본 기록과 연결한다. 이미 같은 사고가 있으면 새로운 요청/재시도를 만들지 않는다.
+
+**반드시 구분:** `DELIVERY_UNVERIFIED`와 `OWNER_ACK_UNKNOWN`은 **업무 보고용 판정 표현**이며 기존 코드의 상태값(enum)에 추가된 것은 아니다. 전달·수신이 입증되지 않은 문제를 담당자의 업무 지연이나 미처리로 단정하지 않는다. 15분 관제판 조회 성공도 전달·작업 완료 증거가 아니다. 원본 실행 Issue와 그 인계 Issue는 같은 사고의 서로 다른 기록이므로 **업무 2건으로 중복 계산하지 않는다**.
+
 ## 현재 이미 존재하는 접수/결과 계약
 - Issue JSON: ZGMINI_AGENT_HANDOFF_V1; 라벨 agent-handoff와 handoff-agent-pending.
 - 입력 인증: HANDOFF_ROUTED 봇 영수증 + HANDOFF_SELECTOR_CANDIDATE_V1 단일 봇 영수증.
