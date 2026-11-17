@@ -17,7 +17,11 @@ const PIT_FIELDS=['coreCurrentRows','coreHistoryRevisions','coreCurrentKeys',
   // source hashes, raw observations, paths, or availability timestamps.
   'coreHistoryAsOfUniqueKeys','coreHistoryPriorRevisionKeys',
   'coreHistoryPriorRevisionRows','coreHistoryAmbiguousLatestKeys',
-  'coreHistorySameInstantAdditionalRows','candidateHistoryAsOfUniqueKeys',
+  'coreHistorySameInstantAdditionalRows',
+  // PIT-04-03: disjoint Core CURRENT-to-latest-HISTORY, count-only classification.
+  'coreCurrentHistoryMatchingKeys','coreCurrentHistoryConflictingKeys',
+  'coreCurrentHistoryUnverifiedKeys','coreCurrentHistoryMissingKeys',
+  'candidateHistoryAsOfUniqueKeys',
   'candidateHistoryPriorRevisionKeys','candidateHistoryPriorRevisionRows',
   'candidateHistoryAmbiguousLatestKeys','candidateHistorySameInstantAdditionalRows',
   'coreCurrentKeysMissingHistory','missingKeysWithCandidateHistory',
