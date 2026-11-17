@@ -247,20 +247,39 @@ export async function runPinnedR47WindowsB({controlRoot,candidateRoot,event,env}
  return await applyR47CmdBCas(auth.manifest,
   makeR47WindowsAdapter(auth,{candidateRoot}));
 }
+// Create-only local status for the separately authorized GitHub reporter.
+function persistSafeResult(result){
+ const tmp=process.env.RUNNER_TEMP;
+ need(typeof tmp==='string'&&path.isAbsolute(tmp),
+  'TASK_CMD_B_RESULT_TEMP_STOP');
+ const allowed=['PASS','STOP','STATE_UNKNOWN'];
+ const status=allowed.includes(result?.status)?result.status:'STATE_UNKNOWN';
+ const code=/^TASK_CMD_B_[A-Z0-9_]+$/.test(result?.code??'')?
+  result.code:'TASK_CMD_B_RESULT_UNVERIFIED_STOP';
+ const safe={status,code,
+  ...(typeof result?.requestId==='string'&&
+   /^[a-z0-9-]{12,90}$/.test(result.requestId)?
+   {requestId:result.requestId}:{})};
+ const file=path.join(tmp,'task-cmd-b-result.json');
+ const bytes=Buffer.from(JSON.stringify(safe)+'\n','utf8');
+ writeDurable(file,bytes);
+}
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ let result;
  try{
   const root=process.env.GITHUB_WORKSPACE;
   need(typeof root==='string'&&root.length>0,'TASK_CMD_B_WORKSPACE_STOP');
   const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
-  const result=await runPinnedR47WindowsB({
+  result=await runPinnedR47WindowsB({
    controlRoot:path.join(root,'r47-control'),
    candidateRoot:path.join(root,'r47-candidate'),event,env:process.env});
-  process.stdout.write(JSON.stringify(result)+'\n');
-  if(result.status!=='PASS')process.exitCode=1;
  }catch(e){
-  process.stdout.write(JSON.stringify({status:'STOP',
+  result={status:'STOP',
    code:/^TASK_CMD_B_[A-Z0-9_]+$/.test(e?.code??'')?e.code:
-    'TASK_CMD_B_WINDOWS_ADAPTER_UNVERIFIED_STOP'})+'\n');
-  process.exitCode=1;
+    'TASK_CMD_B_WINDOWS_ADAPTER_UNVERIFIED_STOP'};
  }
+ try{persistSafeResult(result);}
+ catch{result={status:'STATE_UNKNOWN',code:'TASK_CMD_B_LOCAL_RESULT_UNVERIFIED_STOP'};}
+ process.stdout.write(JSON.stringify(result)+'\n');
+ if(result.status!=='PASS')process.exitCode=1;
 }
