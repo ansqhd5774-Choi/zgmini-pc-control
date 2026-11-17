@@ -75,7 +75,15 @@ export function inspectWatchCPreflight({
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href){
-  const report=inspectWatchCPreflight();
-  process.stdout.write(JSON.stringify(report)+'\n');
-  if(!report.sourceEligible)process.exitCode=2;
+  // Optional external fixed installation root; never print the root path.
+  const args=process.argv.slice(2);
+  if(args.length!==0 && (args.length!==2 || args[0]!=='--source-root' ||
+      !path.isAbsolute(args[1]) || !args[1].trim())) {
+    process.stdout.write(JSON.stringify({state:'SOURCE_PREFLIGHT_STOP',reason:'ARGS_INVALID'})+'\n');
+    process.exitCode=2;
+  }else{
+    const report=inspectWatchCPreflight({root:args.length===2?args[1]:DEFAULT_ROOT});
+    process.stdout.write(JSON.stringify(report)+'\n');
+    if(!report.sourceEligible)process.exitCode=2;
+  }
 }
