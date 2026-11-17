@@ -149,7 +149,7 @@ function literalTargetInArgs(args){
  return false;
 }
 export function inspectR47TaskActionReadonly({
- platform=process.platform,queryTask=readTaskXml,installedHash=readInstalledCmd,fixedFileHash=hashFixedPrivateFile
+ platform=process.platform,queryTask=readTaskXml,installedHash=readInstalledCmd,fixedFileHash=hashFixedPrivateFile,expectedTaskSha=R47_EXPECTED_TASK_SHA
 }={}){
  const out=base();
  if(platform!=='win32')return {...out,code:'R47_WINDOWS_REQUIRED'};
@@ -168,7 +168,7 @@ export function inspectR47TaskActionReadonly({
   targetReferencedCanonical:direct?true:'UNKNOWN',
   targetLiteralInArguments:literalTargetInArgs(action.arguments),
   privateTaskActionKind,privateTaskActionVerified:privateTaskActionKind!==null,
-  taskXmlSha256MatchesApproved:sha(raw)===R47_EXPECTED_TASK_SHA,
+  taskXmlSha256MatchesApproved:sha(raw)===expectedTaskSha,
   directActionVerified:direct};
  try{
   const digest=installedHash(R47_TARGET);
