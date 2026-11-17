@@ -278,11 +278,18 @@ export function makeWindowsCensusApiBAdapter(proof){
     'scripts','pc-writer','quota-fetch.mjs')).href);
    quota=qm.createQuotaFetch({base:CENSUS_B_DATA_ROOT,
     originalFetch:globalThis.fetch,mode:'enforce'});
+   // Supplying the single approved collector prevents the shared
+   // dispatcher from eagerly importing the unrelated five provider modules.
+   const census=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
+    'scripts','pc-writer','inflation-causal-candidate-census-m3.mjs')).href);
+   need(typeof census.collectCensusM3Inventories==='function',
+    'W01_CENSUS_B_COLLECTOR_EXPORT_STOP');
    const module=await import(pathToFileURL(path.join(CENSUS_B_SOURCE_ROOT,
     'scripts','pc-writer','inflation-causal-candidate-once.mjs')).href);
    collectStartedAt=Date.now();
    const result=await module.runInflationCandidateOnce({
     approved:true,base:CENSUS_B_DATA_ROOT,groups:['census'],
+    collectors:{census:census.collectCensusM3Inventories},
     providerEnv:{CENSUS_API_KEY:censusKey},quotaFetch:quota.fetch});
    collectFinishedAt=Date.now();
    return result;

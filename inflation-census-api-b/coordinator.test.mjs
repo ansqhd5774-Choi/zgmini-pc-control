@@ -260,3 +260,21 @@ test('UNCHANGED preserves the last-good saved_at without claiming this-run fresh
   status:'INVALID',sourceStoredAt:'2026-11-17T00:00:00.000Z',
   startedAt:0,finishedAt:1}),/W01_CENSUS_B_STORED_AT_INVALID_STOP/);
 });
+
+test('only the approved Census M3 module is loaded for B instead of six shared dispatcher collectors',async()=>{
+ const fs=await import('node:fs');
+ const path=await import('node:path');
+ const code=fs.readFileSync(path.join(import.meta.dirname,'windows-adapter.mjs'),'utf8');
+ const begin=code.indexOf('  async collectAndReadback(){');
+ const end=code.indexOf('  async verifySavedReadback(',begin);
+ assert.ok(begin>=0&&end>begin);
+ const routine=code.slice(begin,end);
+ assert.match(routine,/inflation-causal-candidate-census-m3\.mjs/);
+ assert.match(routine,/collectCensusM3Inventories==='function'/);
+ assert.match(routine,/collectors:\{census:census\.collectCensusM3Inventories\}/);
+ assert.match(routine,/groups:\['census'\]/);
+ assert.match(routine,/providerEnv:\{CENSUS_API_KEY:censusKey\}/);
+ const imports=[...routine.matchAll(/await import\(/g)];
+ assert.equal(imports.length,3,'only quota, approved Census module and common dispatcher');
+ assert.doesNotMatch(routine,/inflation-causal-candidate-(?:bls3|fed-g17|treasury|eia-gasoline)\.mjs/);
+});
