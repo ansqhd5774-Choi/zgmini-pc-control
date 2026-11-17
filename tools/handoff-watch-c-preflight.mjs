@@ -33,7 +33,7 @@ export function inspectWatchCPreflight({
     throw Error('HANDOFF_WATCH_PREFLIGHT_INVALID_INPUT');
   const checks=[];
   for(const [file,expected] of Object.entries(C_SOURCE_BLOBS)){
-    let ok=false;
+    let ok=false,windowsCmdCrLfNormalized=false;
     try {
       const target=path.resolve(root,...file.split('/'));
       // Explicitly reject symlinks to avoid validating an unexpected source.
@@ -41,10 +41,22 @@ export function inspectWatchCPreflight({
           statSync(target).size<=MAX_BYTES &&
           (platform==='win32'?realpathSync(target).toLowerCase()===target.toLowerCase():realpathSync(target)===target)){
         const bytes=readFileSync(target);
-        ok=bytes.length<=MAX_BYTES&&gitBlob(bytes)===expected;
+        if(bytes.length<=MAX_BYTES){
+          ok=gitBlob(bytes)===expected;
+          if(!ok && file==='tools/handoff-watch-user-start.cmd'){
+            // A Windows checkout may have CRLF worktree bytes even if the
+            // repository stores the identical CMD as LF. Accept ONLY this
+            // single deterministic line-ending transformation.
+            const normalized=Buffer.from(bytes.toString('utf8').replace(/\r\n/g,'\n'),'utf8');
+            if(normalized.length<bytes.length && gitBlob(normalized)===expected){
+              ok=true;
+              windowsCmdCrLfNormalized=true;
+            }
+          }
+        }
       }
     }catch{/* A missing/inaccessible/mismatching local source is a STOP. */}
-    checks.push({file,matched:ok});
+    checks.push({file,matched:ok,windowsCmdCrLfNormalized});
   }
   const sourceFilesMatch=checks.every(x=>x.matched);
   const hostMatch=platform==='win32'&&hostname.toUpperCase()==='DESKTOP-N62L0NG';
