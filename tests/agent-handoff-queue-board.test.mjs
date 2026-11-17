@@ -144,7 +144,7 @@ test('board returns complete deterministic aggregate and non-executable GitHub l
   const md=renderBoardMarkdown(board);
   assert.match(md,/#3102/);
   assert.match(md,/15분 간격 GitHub 예약 실행/);
-  assert.match(md,/열린 자동 인계: \*\*2\*\*/);
+  assert.match(md,/열린 agent-handoff 이슈: \*\*2\*\*/);
   assert.match(md,/현재 대기: \*\*2\*\*/);
   assert.match(md,/중앙 #68 댓글로 직접 접수된 공유 지원 요청/);
   assert.throws(()=>compileQueueBoard([{issue:a.issue,comments:a.comments},{issue:a.issue,comments:a.comments}],now),/DUPLICATE/);
