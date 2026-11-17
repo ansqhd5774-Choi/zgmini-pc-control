@@ -8,6 +8,7 @@ import {collectAutomationStatus} from './automation-status.mjs';
 import {protectedSnapshot,verifyRecoveryOperator,closeLatestPause} from './update.mjs';
 
 export const REQUEST='pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b';
+export const REQUEST1979='pc-update-6ca8cf47-2f0d-4dfa-b520-df377c1d38fe';
 export const REQUEST1745='pc-update-45b549d0-f233-40eb-9075-02942c25f8cd';
 const root='E:/ZGmini/automation/pc-maintenance',control='E:/ZGmini/automation/pc-control';
 const repository='ansqhd5774-Choi/zgmini-pc-control';
@@ -108,7 +109,7 @@ export function plan1745IntakeRecovery(e){
   candidateCount:1,resumeEvidenceIssueNumber:1747}};
 }
 
-function resultPair(issueNumber,basename){
+export function resultPair(issueNumber,basename){
  const i=gh(`issues/${issueNumber}`),body=JSON.parse(i.body);
  need(i.user?.login==='ansqhd5774-Choi'&&i.labels.some(x=>x.name==='pc-job'),'INTAKE_PC_ISSUE_IDENTITY');
  const comments=gh(`issues/${issueNumber}/comments?per_page=100`);
@@ -122,7 +123,7 @@ function resultPair(issueNumber,basename){
  const bot=comments.some(x=>x.user?.login==='github-actions[bot]'&&
   x.body.includes('zgmini-pc-result:')&&x.body.includes(`results/${basename}.json`)&&
   x.body.includes(body.requestId));
- if(issueNumber===1747){
+ if([1747,1985].includes(issueNumber)){
   const match=comments.filter(x=>x.user?.login==='github-actions[bot]'&&
    x.body.includes('zgmini-pc-result:')&&x.body.includes('results/'+basename+'.json'));
   need(match.length===1,'INTAKE_BOT_RECEIPT_AMBIGUOUS');
@@ -203,7 +204,7 @@ export async function main(args=process.argv.slice(2)){
 export function commitIntakeRecovery({e,proposal,sourceSha,freshEvidence,verifyFinal,
  rootDir=root,isAlive=alive}){
  const requestId=e.summary.requestId??REQUEST;
- need([REQUEST,REQUEST1745].includes(requestId),'INTAKE_REQUEST_UNSUPPORTED');
+ need([REQUEST,REQUEST1745,REQUEST1979].includes(requestId),'INTAKE_REQUEST_UNSUPPORTED');
  const claim=path.join(rootDir,'leases/controller-recovery');fs.mkdirSync(claim);
  const nonce=randomUUID(),claimFile=path.join(claim,'owner.json');
  put(claimFile,{pid:process.pid,nonce,requestId});

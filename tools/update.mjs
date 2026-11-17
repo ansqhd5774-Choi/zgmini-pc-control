@@ -91,6 +91,15 @@ export function validBacklogOriginalPcJob(body){
  return body.schema==='ZGMINI_PC_JOB_V1'&&/^[a-z0-9-]{8,80}$/.test(body.requestId);
 }
 
+// A malformed queued request is a terminal rejection, never an executable replay.
+// Preserve exact original bytes digest and reason instead of stranding a switched Controller.
+export function classifyBacklogOriginal(text){
+ if(typeof text!=='string')throw Object.assign(Error('BACKLOG_BODY_UNOBSERVABLE'),{code:'BACKLOG_BODY_UNOBSERVABLE'});
+ let body;try{body=JSON.parse(text);}catch{return {valid:false,code:'BACKLOG_ORIGINAL_BODY_INVALID',originalBodySha256:sha256(text)};}
+ if(!validBacklogOriginalPcJob(body))return {valid:false,code:'BACKLOG_ORIGINAL_REQUEST_INVALID',originalBodySha256:sha256(text)};
+ return {valid:true,body,originalBodySha256:sha256(text)};
+}
+
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const writeJson=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);};
@@ -1354,13 +1363,23 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
      const key=String(original.number);
      if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
+     if(state.replays[key]?.status==='REJECTED_INVALID_ORIGINAL'){
+       const rejected=classifyBacklogOriginal(original.body);
+       need(!rejected.valid&&rejected.originalBodySha256===state.replays[key].originalBodySha256,
+        'BACKLOG_REJECTED_ORIGINAL_CHANGED');continue;
+     }
      if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
      const comments=readAllMaintenancePages(page=>github(`issues/${original.number}/comments?per_page=100&page=${page}`));
      if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
        state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);continue;
      }
-     let body;try{body=JSON.parse(original.body);}catch{throw Object.assign(Error('BACKLOG_ORIGINAL_BODY_INVALID'),{code:'BACKLOG_ORIGINAL_BODY_INVALID'});}
-     need(validBacklogOriginalPcJob(body),'BACKLOG_ORIGINAL_REQUEST_INVALID');
+     const decision=classifyBacklogOriginal(original.body);
+     if(!decision.valid){
+       state.replays[key]={status:'REJECTED_INVALID_ORIGINAL',reason:decision.code,
+        originalBodySha256:decision.originalBodySha256,replayed:false};
+       writeJson(backlogFile,state);continue;
+     }
+     const body=decision.body;
      const marker=`Maintenance replay ${request.requestId} original #${original.number}`;
      state.replays[key]={status:'POSTING',originalRequestId:body.requestId};writeJson(backlogFile,state);
      const input=path.join(maintenanceRoot,'approved',request.requestId+'.replay-'+original.number+'.json');
