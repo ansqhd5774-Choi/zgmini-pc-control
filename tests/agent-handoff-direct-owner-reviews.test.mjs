@@ -58,6 +58,12 @@ test('bad denominator or timestamp must fail instead of silently undercounting',
  assert.throws(()=>compileDirectOwnerBoard(fixture(),NaN),/INPUT_INVALID/);
  assert.throws(()=>renderDirectOwnerMarkdown({schema:'wrong'}),/OUTPUT_SCHEMA/);
 });
+test('board uses only read permissions for issue comments and linked PR review evidence',()=>{
+ const yaml=readFileSync(new URL('../.github/workflows/agent-handoff-queue-board.yml',import.meta.url),'utf8');
+ assert.match(yaml,/permissions:\\n  contents: read\\n  issues: read\\n  pull-requests: read/);
+ assert.doesNotMatch(yaml,/contents: write|issues: write|pull-requests: write/);
+ assert.match(yaml,/runs-on: \\[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\\]/);
+});
 test('runner references exact readonly central comment and issue GETs',()=>{
  const s=readFileSync(new URL('../agent-handoff/queue-board-runner.mjs',import.meta.url),'utf8');
  assert.match(s,/DIRECT_OWNER_REVIEWS/);
