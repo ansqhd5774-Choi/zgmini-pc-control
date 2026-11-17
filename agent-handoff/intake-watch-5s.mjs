@@ -1,6 +1,7 @@
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {verifyHandoffReceipt} from './intake-receipt-readonly.mjs';
+import {createGhCredentialProvider} from './watcher-gh-credential.mjs';
 
 // Read-only fast intake observation; no dispatch, remediation, or operating-PC writes.
 export const INTERVAL_MS = 5_000;
@@ -77,9 +78,11 @@ export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,t
   }
 }
 
-export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{},receiptVerifier=verifyHandoffReceipt}={}) {
+export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{},receiptVerifier=verifyHandoffReceipt}={}) {
   if(intervalMs!==INTERVAL_MS) stop('HANDOFF_WATCH_INTERVAL_MUST_BE_5000');
-  let etag=null,previous=null,consecutiveFailures=0;
+  if(typeof tokenProvider!=='function' && (!token || typeof token!=='string'))
+    stop('HANDOFF_WATCH_AUTH_REQUIRED');
+  let etag=null,previous=null,consecutiveFailures=0,activeToken=token;
   // A bounded asynchronous receipt lane: never await it in the 5s discovery loop.
   const receiptQueue=[],receiptDeferred=[],receiptPending=new Set();
   let checkingReceipt=false,receiptBackoffUntil=0;
@@ -90,7 +93,7 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
     checkingReceipt=true;
     const number=receiptQueue.shift();
     receiptPending.delete(number);
-    Promise.resolve().then(()=>receiptVerifier({token,issueNumber:number,fetchImpl,signal}))
+    Promise.resolve().then(()=>receiptVerifier({token:activeToken,issueNumber:number,fetchImpl,signal}))
       .then(result=>onReport({state:'RECEIPT_OBSERVED',...result,observedAt:new Date(clock()).toISOString(),workExecuted:false}))
       .catch(err=>{
         if(signal?.aborted)return;
@@ -117,10 +120,21 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
       deferredCount,at:new Date(clock()).toISOString(),workExecuted:false});
     drainReceipts();
   };
+  let completedPolls=0,lastPollStart=null,minIntervalMs=Infinity,maxIntervalMs=0;
   while(!signal?.aborted){
     const start=clock();let backoff=false,retryAfterMs=0;
+    if(lastPollStart!==null){
+      const interval=Math.max(0,start-lastPollStart);
+      minIntervalMs=Math.min(minIntervalMs,interval);maxIntervalMs=Math.max(maxIntervalMs,interval);
+    }
+    lastPollStart=start;
     try {
-      const result=await checkOnce({token,fetchImpl,etag,previous,signal,nowMs:start});
+      // An optional credential provider refreshes a short-lived token from the
+      // Windows credential store; it never blocks the independent work Runner.
+      const selectedToken=typeof tokenProvider==='function'?await tokenProvider():token;
+      if(typeof selectedToken!=='string'||!selectedToken.trim())stop('HANDOFF_WATCH_AUTH_REQUIRED');
+      activeToken=selectedToken;
+      const result=await checkOnce({token:selectedToken,fetchImpl,etag,previous,signal,nowMs:start});
       if(result.state==='AUTH_REJECTED'){
         onReport({state:'WATCH_AUTH_REJECTED_STOP',observedAt:new Date(clock()).toISOString(),
           deliveryVerified:false,workExecuted:false});
@@ -134,10 +148,27 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
         onReport({state:result.state,change:result.change||null,observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     } catch(err){
       if(signal?.aborted)break;
+      // A missing/invalid local credential is a C-setup problem, not a
+      // transient GitHub rate limit. Stop this isolated watcher immediately.
+      if(err?.message==='HANDOFF_GH_CREDENTIAL_UNAVAILABLE' || err?.message==='HANDOFF_GH_TOKEN_INVALID'){
+        onReport({state:'WATCH_AUTH_SOURCE_UNAVAILABLE_STOP',code:err.message,
+          observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
+        return {state:'AUTH_SOURCE_UNAVAILABLE_STOP',noWrite:true};
+      }
       backoff=true;
       consecutiveFailures++;
       retryAfterMs=Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6));
       onReport({state:'WATCH_READ_FAILED',code:err?.name==='AbortError'?'REQUEST_TIMEOUT':String(err?.message||'UNKNOWN_ERROR').slice(0,80),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
+    }
+    // A single low-volume heartbeat per 12 checks provides real PC timing
+    // evidence without logging issue bodies, authentication or every poll.
+    completedPolls++;
+    if(completedPolls%12===0){
+      onReport({state:'WATCH_HEARTBEAT',completedPolls,
+        observedMinIntervalMs:Number.isFinite(minIntervalMs)?minIntervalMs:null,
+        observedMaxIntervalMs:maxIntervalMs,backoffActive:backoff,
+        observedAt:new Date(clock()).toISOString(),workExecuted:false,noWrite:true});
+      minIntervalMs=Infinity;maxIntervalMs=0;
     }
     // No overlapping checks. Back off on failures/rate limits without waiting inside workers.
     drainReceipts();
@@ -147,9 +178,14 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
 
 async function main(env=process.env){
   if(env.ZGMINI_HANDOFF_WATCH_ENABLED!=='true')stop('HANDOFF_WATCH_NOT_ENABLED');
-  if(!env.GITHUB_TOKEN)stop('HANDOFF_WATCH_AUTH_REQUIRED');
-  const result=await runWatch({token:env.GITHUB_TOKEN,onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
+  const fromGhStore=env.ZGMINI_HANDOFF_WATCH_AUTH_SOURCE==='GH_CREDENTIAL_STORE';
+  if(fromGhStore && (env.GH_TOKEN || env.GITHUB_TOKEN))stop('HANDOFF_WATCH_AUTH_SOURCE_CONFLICT');
+  if(!fromGhStore && !env.GITHUB_TOKEN)stop('HANDOFF_WATCH_AUTH_REQUIRED');
+  const tokenProvider=fromGhStore?createGhCredentialProvider():null;
+  const result=await runWatch({token:env.GITHUB_TOKEN,tokenProvider,
+    onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
   if(result?.state==='AUTH_REJECTED_STOP')stop('HANDOFF_WATCH_AUTH_REJECTED_STOP');
+  if(result?.state==='AUTH_SOURCE_UNAVAILABLE_STOP')stop('HANDOFF_WATCH_AUTH_SOURCE_UNAVAILABLE_STOP');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
   main().catch(e=>{process.stderr.write(String(e?.message||'WATCH_STOP').replace(/Bearer\s+\S+/g,'Bearer [REDACTED]')+'\n');process.exitCode=1});
