@@ -17,6 +17,8 @@ const result={kind:'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1',status:'PASS',
   providerCalls:0,d1Writes:0,promotionApproved:false,publicationStatus:'NOT_REQUESTED',
   summary:{sourceFeatures:1,UNTRUSTED_RAW:'PRIVATE_VALUE'},
   pit:{coreCurrentKeysMissingHistory:4,
+    coreCurrentHistoryMatchingKeys:20,coreCurrentHistoryConflictingKeys:2,
+    coreCurrentHistoryUnverifiedKeys:1,coreCurrentHistoryMissingKeys:4,
     coreHistoryAsOfUniqueKeys:123,coreHistoryPriorRevisionKeys:9,
     coreHistoryPriorRevisionRows:11,coreHistoryAmbiguousLatestKeys:2,
     coreHistorySameInstantAdditionalRows:3,candidateHistoryAsOfUniqueKeys:42,
@@ -69,6 +71,12 @@ test('approved fixture runs in workspace and output projection does not leak raw
   assert.equal(result.asOfDate,'2026-11-02');
   assert.equal(result.sqliteOpened,true);
   assert.equal(result.summary.sourceFeatures,1);
+  assert.deepEqual([
+    result.pit.coreCurrentHistoryMatchingKeys,
+    result.pit.coreCurrentHistoryConflictingKeys,
+    result.pit.coreCurrentHistoryUnverifiedKeys,
+    result.pit.coreCurrentHistoryMissingKeys,
+  ],[20,2,1,4]);
   assert.deepEqual({
     coreUnique:result.pit.coreHistoryAsOfUniqueKeys,
     corePriorKeys:result.pit.coreHistoryPriorRevisionKeys,
@@ -192,4 +200,30 @@ test('History count as-of date fails closed on impossible calendar dates',async 
   assert.equal(result.providerCalls,0);
   assert.equal(result.d1Writes,0);
   assert.equal(result.operationalWrites,0);
+});
+
+test('PIT-04-03 count projection fails closed for unsafe counts or raw fields',async t=>{
+  const f=fixture(t);
+  const content=fs.readFileSync(f.script,'utf8')
+    .replace('coreCurrentHistoryMatchingKeys:20','coreCurrentHistoryMatchingKeys:-1')
+    .replace('coreCurrentHistoryConflictingKeys:2','coreCurrentHistoryConflictingKeys:2.5')
+    .replace('coreCurrentHistoryUnverifiedKeys:1','coreCurrentHistoryUnverifiedKeys:"PRIVATE_RAW"')
+    .replace('coreCurrentHistoryMissingKeys:4','coreCurrentHistoryMissingKeys:Number.MAX_SAFE_INTEGER+1');
+  fs.writeFileSync(f.script,content);
+  const files={[ENTRY]:hash(Buffer.from(content))};
+  const manifestBytes=Buffer.from(JSON.stringify({files})+'\n');
+  fs.writeFileSync(path.join(f.host.approvedSources[SHA].root,'manifest.json'),manifestBytes);
+  f.host.approvedSources[SHA].manifestSha256=hash(manifestBytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'PASS');
+  assert.deepEqual([
+    result.pit.coreCurrentHistoryMatchingKeys,
+    result.pit.coreCurrentHistoryConflictingKeys,
+    result.pit.coreCurrentHistoryUnverifiedKeys,
+    result.pit.coreCurrentHistoryMissingKeys,
+  ],[null,null,null,null]);
+  assert.equal(result.promotionApproved,false);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.operationalWrites,0);
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_RAW|source_hash|rawValue/);
 });
