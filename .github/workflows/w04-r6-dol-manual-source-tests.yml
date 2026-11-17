@@ -43,6 +43,18 @@ jobs:
         run: node --test --test-concurrency=1 tests/employment-r6-collection-evidence-readonly.test.mjs
       - name: Verify W04 PIT-04-03 count-only controller projection in isolated CI
         run: node --test --test-concurrency=1 tests/employment-r6-candidate-readonly.test.mjs
+      - name: Checkout exact W04 PIT-04-03 app source for isolated tests
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: c846ea45e0a7792788843f16eb2c5953938b2f57
+          path: employment-r6-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Test exact W04 Reader and Runner source without operational data
+        run: |
+          cd employment-r6-source
+          node --test --test-concurrency=1 tests/pc-writer-employment-r6-pit-coverage.test.mjs tests/employment-r6-runner-stage.test.mjs
       - name: Check exact dedicated R6 admission without shared false rejection
         run: node --test tests/shared-resource-issue-admission.test.mjs
       - name: Confirm source-only isolated host
