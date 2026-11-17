@@ -23,6 +23,8 @@ const base=()=>({status:'STATE_UNKNOWN',code:'R47_TASK_ACTION_UNVERIFIED',
  scope:'FIXED_R47_TASK_AND_CMD_READONLY',task:R47_TASK,
  commandKind:'UNKNOWN',argumentsPresent:null,workingDirectoryPresent:null,
  targetReferencedCanonical:'UNKNOWN',targetLiteralInArguments:null,
+ privateTaskActionKind:null,privateTaskActionVerified:false,
+ privateChainFiles:[],privateChainEvidence:'NOT_EVALUATED',
  taskXmlSha256MatchesApproved:null,installedCmdSha256MatchesBefore:null,
  directActionVerified:false,authorizesB:false,providerCalls:0,
  sqliteOpened:false,d1Writes:0,operationalWrites:0});
@@ -37,6 +39,43 @@ function readInstalledCmd(){
  const bytes=fs.readFileSync(R47_TARGET);
  if(bytes.length!==st.size)throw Error('CMD_READ_DRIFT');
  return sha(bytes);
+}
+function hashFixedPrivateFile(file){
+ const root=normalized(fs.realpathSync.native(ROOT));
+ const wanted=normalized(file);
+ if(!wanted.startsWith(root+'\\'))throw Error('PRIVATE_PATH_DENIED');
+ const st=fs.lstatSync(file);
+ if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>256*1024)
+  throw Error('PRIVATE_FILE_DENIED');
+ const actual=normalized(fs.realpathSync.native(file));
+ if(actual!==wanted||!actual.startsWith(root+'\\'))
+  throw Error('PRIVATE_FILE_REDIRECT');
+ const bytes=fs.readFileSync(file);
+ if(bytes.length!==st.size)throw Error('PRIVATE_FILE_DRIFT');
+ return sha(bytes);
+}
+function fixedChainMembers(kind){
+ const folder=path.win32.dirname(PRIVATE_ACTIONS[0].command);
+ const r48={role:'R48_CYCLE_CMD',file:PRIVATE_ACTIONS[0].command};
+ if(kind==='R48_PRIVATE_CYCLE')return [r48];
+ if(kind==='R73_SCHEDULED_PRIVATE')return [
+  {role:'R73_ENTRY_CMD',file:PRIVATE_ACTIONS[1].command},
+  {role:'R73_RETRY_MJS',file:path.win32.join(folder,'theme-nine-r73-auto-http502-private-retry.mjs')},
+  r48];
+ return [];
+}
+function readFixedChain(kind,readFileHash){
+ const chain=fixedChainMembers(kind);
+ if(!chain.length)return {privateChainFiles:[],privateChainEvidence:'NOT_APPLICABLE'};
+ const files=chain.map(item=>{
+  try{
+   const digest=readFileHash(item.file);
+   if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))throw Error('BAD_DIGEST');
+   return {role:item.role,status:'READ',sha256:digest};
+  }catch{return {role:item.role,status:'UNAVAILABLE',sha256:null};}
+ });
+ return {privateChainFiles:files,privateChainEvidence:files.every(x=>x.status==='READ')
+  ?'HASHES_OBSERVED_NOT_CHAIN_PROOF':'INCOMPLETE'};
 }
 function readTaskXml(){
  const exe=path.win32.join(process.env.SystemRoot||String.raw`C:\Windows`,'System32','schtasks.exe');
@@ -110,7 +149,7 @@ function literalTargetInArgs(args){
  return false;
 }
 export function inspectR47TaskActionReadonly({
- platform=process.platform,queryTask=readTaskXml,installedHash=readInstalledCmd
+ platform=process.platform,queryTask=readTaskXml,installedHash=readInstalledCmd,fixedFileHash=hashFixedPrivateFile,expectedTaskSha=R47_EXPECTED_TASK_SHA
 }={}){
  const out=base();
  if(platform!=='win32')return {...out,code:'R47_WINDOWS_REQUIRED'};
@@ -129,11 +168,15 @@ export function inspectR47TaskActionReadonly({
   targetReferencedCanonical:direct?true:'UNKNOWN',
   targetLiteralInArguments:literalTargetInArgs(action.arguments),
   privateTaskActionKind,privateTaskActionVerified:privateTaskActionKind!==null,
-  taskXmlSha256MatchesApproved:sha(raw)===R47_EXPECTED_TASK_SHA,
+  taskXmlSha256MatchesApproved:sha(raw)===expectedTaskSha,
   directActionVerified:direct};
  try{
   const digest=installedHash(R47_TARGET);
   if(typeof digest!=='string'||!/^[a-f0-9]{64}$/.test(digest))throw Error('CMD_HASH');
-  return {...evidence,installedCmdSha256MatchesBefore:digest===R47_BEFORE_SHA};
+  const preimageMatches=digest===R47_BEFORE_SHA;
+  const chain=evidence.taskXmlSha256MatchesApproved&&preimageMatches
+    ?readFixedChain(privateTaskActionKind,fixedFileHash)
+    :{privateChainFiles:[],privateChainEvidence:'PREIMAGE_UNVERIFIED'};
+  return {...evidence,installedCmdSha256MatchesBefore:preimageMatches,...chain};
  }catch{return {...evidence,status:'STATE_UNKNOWN',code:'R47_CMD_PREIMAGE_UNVERIFIED'};}
 }

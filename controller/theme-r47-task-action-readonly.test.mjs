@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {inspectR47TaskActionReadonly,R47_TARGET,R47_TASK,
  R47_BEFORE_SHA} from './theme-r47-task-action-readonly.mjs';
 
@@ -52,6 +53,73 @@ test('unknown private CMD, suffix, or arbitrary runner cannot match a fixed acti
   assert.equal(r.privateTaskActionVerified,false);
   assert.equal(r.authorizesB,false);
  }
+});
+test('approved Task+R47 preimage yields only fixed R48 installed hash, not chain execution PASS',()=>{
+ const query=xml(PRIVATE_R48),observed=[],digest='b'.repeat(64);
+ 
+ const expected=createHash('sha256').update(query).digest('hex');
+ const r=inspectR47TaskActionReadonly({platform:'win32',
+  queryTask:()=>query,installedHash:()=>R47_BEFORE_SHA,expectedTaskSha:expected,
+  fixedFileHash:file=>{observed.push(file);return digest;}});
+ assert.equal(r.status,'PASS');
+ assert.equal(r.privateTaskActionKind,'R48_PRIVATE_CYCLE');
+ assert.equal(r.privateChainEvidence,'HASHES_OBSERVED_NOT_CHAIN_PROOF');
+ assert.deepEqual(r.privateChainFiles,[{role:'R48_CYCLE_CMD',status:'READ',sha256:digest}]);
+ assert.deepEqual(observed,[PRIVATE_R48]);
+ assert.equal(r.authorizesB,false);
+});
+test('approved R73 Task returns exactly 3 bounded hash roles, no raw source',()=>{
+ const query=xml(PRIVATE_R73),hash='c'.repeat(64),seen=[];
+ 
+ const expected=createHash('sha256').update(query).digest('hex');
+ const r=inspectR47TaskActionReadonly({platform:'win32',
+  queryTask:()=>query,installedHash:()=>R47_BEFORE_SHA,expectedTaskSha:expected,
+  fixedFileHash:file=>{seen.push(file);return hash;}});
+ assert.equal(r.privateTaskActionKind,'R73_SCHEDULED_PRIVATE');
+ assert.equal(r.privateChainFiles.length,3);
+ assert.deepEqual(r.privateChainFiles.map(x=>x.role),['R73_ENTRY_CMD','R73_RETRY_MJS','R48_CYCLE_CMD']);
+ assert.equal(seen[0],PRIVATE_R73);
+ assert.equal(seen[2],PRIVATE_R48);
+ assert.ok(seen[1].endsWith('theme-nine-r73-auto-http502-private-retry.mjs'));
+ assert.equal(r.privateChainEvidence,'HASHES_OBSERVED_NOT_CHAIN_PROOF');
+ assert.equal(JSON.stringify(r).includes(PRIVATE_R73),false);
+ assert.equal(r.authorizesB,false);
+});
+test('changed Task XML SHA never reads fixed chain files',()=>{
+ let called=false;
+ const r=inspectR47TaskActionReadonly({platform:'win32',
+  queryTask:()=>xml(PRIVATE_R48),installedHash:()=>R47_BEFORE_SHA,
+  fixedFileHash:()=>{called=true;return 'a'.repeat(64);}});
+ assert.equal(called,false);
+ assert.equal(r.taskXmlSha256MatchesApproved,false);
+ assert.equal(r.privateChainEvidence,'PREIMAGE_UNVERIFIED');
+ assert.deepEqual(r.privateChainFiles,[]);
+});
+test('preimage R47 drift leaves chain unobserved even if Task hash matches',()=>{
+ const query=xml(PRIVATE_R48);
+ 
+ let called=false;
+ const r=inspectR47TaskActionReadonly({platform:'win32',
+  queryTask:()=>query,installedHash:()=> 'f'.repeat(64),
+  expectedTaskSha:createHash('sha256').update(query).digest('hex'),
+  fixedFileHash:()=>{called=true;return 'a'.repeat(64);}});
+ assert.equal(called,false);
+ assert.equal(r.installedCmdSha256MatchesBefore,false);
+ assert.equal(r.privateChainEvidence,'PREIMAGE_UNVERIFIED');
+ assert.equal(r.authorizesB,false);
+});
+test('missing fixed installed wrapper is explicit INCOMPLETE with redacted detail',()=>{
+ const query=xml(PRIVATE_R48);
+ 
+ const r=inspectR47TaskActionReadonly({platform:'win32',
+  queryTask:()=>query,installedHash:()=>R47_BEFORE_SHA,
+  expectedTaskSha:createHash('sha256').update(query).digest('hex'),
+  fixedFileHash:()=>{throw Error('private path and secret');}});
+ assert.equal(r.status,'PASS');
+ assert.equal(r.privateChainEvidence,'INCOMPLETE');
+ assert.equal(r.privateChainFiles[0].status,'UNAVAILABLE');
+ assert.equal(JSON.stringify(r).includes('private path'),false);
+ assert.equal(r.authorizesB,false);
 });
 test('exact fixed R47 Task direct CMD is classified but does not approve B',()=>{
  const r=inspect(xml(R47_TARGET));
