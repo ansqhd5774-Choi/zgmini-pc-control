@@ -422,3 +422,53 @@ test('interrupted RUNNING at RECONNECTED preserves the existing Controller until
  assert.equal(rows.length,1);
  assert.deepEqual(calls,[]);
 });
+
+function restoredRecovery(overrides={}){
+ const calls=[],rows=[],port={};
+ for(const key of ['prepareRecovery','verifyBackup','verifyRestoredPrevious','restore',
+  'reconnectPrevious','verifyPrevious','resumeIntake','reconcileBacklog'])
+  port[key]=async()=>{calls.push(key);return true;};
+ Object.assign(port,overrides);
+ const original={requestId:'pc-update-restored-fixture',status:'RECOVERY_REQUIRED',
+  phase:'RECOVERY_REQUIRED',firstFail:'SWITCHED',installedShaBefore:previous};
+ return {calls,rows,port,original,run:()=>reconcileInterruptedRollback(original,port,async row=>rows.push(row))};
+}
+test('1841 already-restored exact snapshot resumes intake without another restore or reconnect',async()=>{
+ const f=restoredRecovery(),original=structuredClone(f.original),r=await f.run();
+ assert.equal(r.status,'ROLLED_BACK');assert.equal(r.existingVersionPreserved,true);
+ assert.equal(r.actualInstalledSha,previous);assert.equal(r.originalRequestRetried,false);
+ assert.deepEqual(f.original,original);
+ assert.ok(!f.calls.includes('restore'));assert.ok(!f.calls.includes('reconnectPrevious'));
+ assert.ok(f.calls.includes('resumeIntake'));assert.ok(f.calls.includes('reconcileBacklog'));
+ const before=f.rows.findIndex(x=>x.code==='RECOVERY_INTAKE_RESUME_STARTED');
+ assert.ok(before>=0);assert.equal(f.rows[before].mutationStarted,true);
+});
+test('restored intake ambiguity retains mutation flag and never repeats restore or enable',async()=>{
+ let n=0;const f=restoredRecovery({resumeIntake:async()=>{n++;throw Object.assign(Error(),{code:'WORKFLOW_ENABLE_NOT_CONFIRMED'});}});
+ const r=await f.run();assert.equal(n,1);assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.failureOperation,'resumeIntake');assert.equal(r.mutationStarted,true);
+ assert.equal(r.code,'WORKFLOW_ENABLE_NOT_CONFIRMED');
+ assert.ok(!f.calls.includes('restore'));assert.ok(!f.calls.includes('reconcileBacklog'));
+});
+test('restored proof exception refuses file mutation and intake',async()=>{
+ const f=restoredRecovery({verifyRestoredPrevious:async()=>{throw Object.assign(Error(),{code:'CURRENT_CONTROLLER_DRIFT'});}});
+ const r=await f.run();assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.failureOperation,'verifyRestoredPrevious');assert.equal(r.mutationStarted,undefined);
+ assert.ok(!f.calls.includes('restore'));assert.ok(!f.calls.includes('resumeIntake'));
+});
+test('unproven restored state retains original verified rollback path',async()=>{
+ const f=restoredRecovery({verifyRestoredPrevious:async()=>false}),r=await f.run();
+ assert.equal(r.status,'ROLLED_BACK');assert.ok(f.calls.includes('restore'));
+ assert.ok(f.calls.includes('reconnectPrevious'));assert.notEqual(r.existingVersionPreserved,true);
+});
+test('backup failure never skips into already-restored intake',async()=>{
+ const f=restoredRecovery({verifyBackup:async()=>false}),r=await f.run();
+ assert.equal(r.status,'RECOVERY_REQUIRED');assert.equal(r.code,'RECOVERY_BACKUP_NOT_VERIFIED');
+ assert.ok(!f.calls.includes('verifyRestoredPrevious'));assert.ok(!f.calls.includes('resumeIntake'));
+});
+test('backlog ambiguity preserves recovery claim after enabled intake and does not replay twice',async()=>{
+ let n=0;const f=restoredRecovery({reconcileBacklog:async()=>{n++;throw Object.assign(Error(),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});}});
+ const r=await f.run();assert.equal(n,1);assert.equal(r.status,'RECOVERY_REQUIRED');
+ assert.equal(r.failureOperation,'reconcileBacklog');assert.equal(r.mutationStarted,true);
+ assert.ok(!f.calls.includes('restore'));
+});

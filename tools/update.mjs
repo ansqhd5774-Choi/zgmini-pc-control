@@ -1487,6 +1487,19 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
    await waitForReconnect(child.pid,manifest.installedSha,'ROLLBACK_RECONNECT_FAILED');
   },
+  verifyRestoredPrevious:async installedSha=>{
+   // Require the whole saved host and all installed Controller bytes, not
+   // merely a matching source label. prepareRecovery loaded the old protection.
+   if(!fs.readFileSync(hostPath).equals(fs.readFileSync(path.join(snapshotRoot,'host.json'))))return false;
+   if(installedManifest().installedSha!==installedSha)return false;
+   const current=readOwner();
+   if(current.status.sourceSha!==installedSha||!available(apiRunners()))return false;
+   for(const child of current.status.children){
+    if(child.alive!==true)return false;
+    try{process.kill(child.pid,0);}catch{return false;}
+   }
+   return protectedBefore!==undefined&&JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
+  },
   verifyPrevious:async({installedSha,requireRunning})=>{
    if(installedManifest().installedSha!==installedSha)return false;
    if(requireRunning){
