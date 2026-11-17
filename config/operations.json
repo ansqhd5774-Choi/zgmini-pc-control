@@ -21,6 +21,7 @@
     "r17-268-postcancel-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "pc-source-origin-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "r54-sixfile-inventory-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "r47-task-action-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "release-calendar-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "source-inventory-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "provider-activity-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},

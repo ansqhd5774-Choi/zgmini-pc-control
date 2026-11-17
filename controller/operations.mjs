@@ -11,6 +11,7 @@ import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs'
 import {inspectSharedResourceReleaseReadonly} from './shared-resource-release-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
 import {inspectR54SixFileInventory} from './r54-sixfile-inventory-readonly.mjs';
+import {inspectR47TaskActionReadonly} from './theme-r47-task-action-readonly.mjs';
 import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
 import {inspectUsBreadthR17Runtime} from './us-breadth-r17-runtime-readonly.mjs';
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
@@ -114,6 +115,7 @@ export async function runOperation(request,context){
  if(request.operation==='us-breadth-r17-runtime-readonly')return inspectUsBreadthR17Runtime(dataRoot);
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
  if(request.operation==='r54-sixfile-inventory-readonly')return inspectR54SixFileInventory(dataRoot);
+ if(request.operation==='r47-task-action-readonly')return inspectR47TaskActionReadonly();
  if(request.operation==='release-calendar-runtime-readonly'){
   let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
   return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
