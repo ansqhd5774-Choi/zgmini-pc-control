@@ -29,6 +29,15 @@
 - **다음 필수 행동:** 기존 공통 대기열 PC의 승인된 사용자/시스템 관리 경로에서 별도 읽기 전용 감시기의 자동시작·복구와 read-only GitHub 토큰 공급/회전을 확정 → 정확한 SHA·최소 권한·승인 범위를 검증한 뒤 단회 설치 → 실제 5초 간격·작업 비간섭·백오프를 관측한다. 신규 Windows 서비스/예약 또는 비밀 설정이 C급이면 사용자 직접 승인·수행을 따른다. Runner를 24시간 점유하거나 Actions Job 토큰을 영구 저장하지 않는다.
 - **작업 이력 보호:** 이전 브랜치에서 만든 PR #1855가 과거 squash 병합 이력 차이로 기존 watcher 소스 3파일을 신규로 다시 나타내는 충돌을 확인하여 **미병합 CLOSED** 처리. 최신 main SHA `5ca284bec86ba1d05a608db806e3dd822d664889`에서 이 진행기록 **1파일만** 수정하도록 새 브랜치를 생성했다.
 
+## 2026-11-17 후속 — 5초 변경 감지와 실제 접수 영수증 검증 분리
+
+- **추가로 확인된 실제 결함:** PR #1850의 5초 소스는 `agent-handoff` Issue 변화만 판정하므로 사건이 제대로 **접수되었는지**를 판단하는 `HANDOFF_ROUTED` 봇 영수증을 검증하지 않았다.
+- **소스 보완:** `agent-handoff/intake-receipt-readonly.mjs`는 변경된 Issue의 인증된 원본·전체 댓글(최대 4페이지)을 읽고 기존 `queue-selector.mjs`의 `assessIncident`로 정확한 bot receipt/fingerprint/selector 상태를 판정한다. 위조·출처 불일치·페이지 누락이면 `receiptVerified=false`다.
+- **비차단 구조:** `agent-handoff/intake-watch-5s.mjs`의 Issue 목록 체크 5초 루프와 영수증 확인을 별도 비동기 레인으로 분리. 영수증 대기열은 최대 25개, 동일 검증의 동시 실행은 1개, rate-limit/인증 거부 시 백오프. 기존 작업 Runner 점유·GitHub Issue 쓰기·운영 PC 수집/설치·배포 없음.
+- **검증:** [PR #1859](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1859) 격리 Windows `ZGMINI Agent Handoff PR Evidence CI` Run `43999193344` **412/412 PASS**, `c996-source` PASS. `main` 병합 SHA `ed9fd88898177c4bb2d5528196f336ded202d61d`. 최신 main에서 소스 2파일·시험 1파일 원격 재조회 PASS.
+- **운영과 구분:** 위 회귀는 개발 소스 검증이다. 실제 PC의 독립 상주 감시기 설치·유효한 read-only 인증 제공·부팅 후 재기동·실제 매 5초 계측은 **미실시**. `RUNTIME_ACTIVATION_BLOCKED` 및 **5단계 중 4단계 완료(80%, 운영 0/1)**를 유지한다. 실제 독립 ChatGPT 대화 전달 여부도 별도 미구현이다.
+- **다음 필수 실행:** 사용자 또는 기존 승인된 PC 관리 경로에서 독립 상주 실행/복구 계약과 인증 갱신 수단을 확정한 뒤, 해당 운영 효과에 필요한 정규 승인·최소 설치·실측으로 5/5를 완료한다. GitHub Runner 좌석을 무한 점유하거나 Job 토큰을 유출/재사용하는 우회는 금지한다.
+
 ## 독립성·실제 상태
 
 현재 단계는 **SOURCE_MERGED_RUNTIME_NOT_DEPLOYED**. 새 watcher는 해당 PC에 설치/기동되지 않았고, GitHub Actions 15분 주기도 변경하지 않았음. 기존 6 Runner 운영·공유 원장·DB/D1·게시 영향 없음.
