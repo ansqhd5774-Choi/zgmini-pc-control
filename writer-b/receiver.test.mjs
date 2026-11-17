@@ -483,6 +483,32 @@ test('reporter forwards only a known preimage check and no raw PC values',()=>{
    code:'WRITER_B_TARGET_PREIMAGE_SHA_STOP'},RID,'123456'),'preimageCheck'),false);
 });
 
+test('preimage check is retained in exact JSON/TXT readback, raw values omitted',async()=>{
+ const x=fixture(),created=new Map();
+ const raw={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
+  code:'WRITER_B_PC_PREIMAGE_STOP',preimageCheck:'HEAD',
+  observedHead:'PRIVATE_SHA_NEVER_PUBLISH'};
+ const apiFetch=async(url,init)=>{
+  if(init.method==='PUT'){
+   created.set(url,Buffer.from(JSON.parse(init.body).content,'base64').toString('utf8'));
+   return {status:201};
+  }
+  if(init.method==='GET')return {status:200,json:async()=>({encoding:'base64',
+   content:Buffer.from(created.get(url.replace('?ref=main',''))??'').toString('base64')})};
+  if(init.method==='POST')return {status:201};
+ };
+ const report=await uploadWriterBReport({event:x.event,env:x.env,
+  rawResult:JSON.stringify(raw),apiFetch});
+ assert.equal(report.deliveryStatus,'RESULT_PAIR_READBACK_VERIFIED');
+ assert.equal(report.verified,2);
+ const json=[...created].find(([url])=>url.endsWith('.json'))?.[1];
+ const txt=[...created].find(([url])=>url.endsWith('.txt'))?.[1];
+ assert.equal(JSON.parse(json).preimageCheck,'HEAD');
+ assert.ok(txt.includes('PREIMAGE_CHECK=HEAD'));
+ assert.equal(json.includes('PRIVATE_SHA_NEVER_PUBLISH'),false);
+ assert.equal(txt.includes('PRIVATE_SHA_NEVER_PUBLISH'),false);
+});
+
 test('reporter keeps legacy first diagnostic but discards unsafe appended batch',()=>{
  const first={sourceKind:'APPROVED_AFTER',sourcePath:'lib/source.mjs',
   dependencyPath:'lib/one.mjs',reason:'NOT_FOUND'};
