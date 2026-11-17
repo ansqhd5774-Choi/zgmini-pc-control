@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {digest} from '../task-cmd-b/approval-intake.mjs';
 import {validateR47CmdBManifest,R47_CMD_B} from '../task-cmd-b/r47-onefile-cas.mjs';
 const dir=path.dirname(fileURLToPath(import.meta.url));
-const exact=path.join(dir,'..','approvals','task-cmd-b',
- 'w03-r47-cmd-onefile-go-20261117.json');
-test('approved manifest exact source bytes are LF-stable on Windows checkout',()=>{
- const raw=fs.readFileSync(exact);
+const root=path.resolve(dir,'..');
+const relative='approvals/task-cmd-b/w03-r47-cmd-onefile-go-20261117.json';
+test('approved manifest exact tracked Git bytes are platform EOL invariant',()=>{
+ const raw=execFileSync('git',['-C',root,'cat-file','blob',
+  'HEAD:'+relative],{shell:false,maxBuffer:16384});
  assert.equal(raw.length,946);
  assert.equal(digest(raw),
   '2b2f5a2f5884b3321f09ce85bb23e797143a2c996e20605afb61679e7f959df5');
