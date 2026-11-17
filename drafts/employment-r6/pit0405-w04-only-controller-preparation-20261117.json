@@ -42,5 +42,39 @@
     "Issue of pc-controller-update without matching approved B manifest and live protective preflight",
     "W03 source changes",
     "Operations config/Task/Writer/SQLite/D1/provider or candidate promotion"
-  ]
+  ],
+  "proposedUpdateManifest": {
+    "schema": "ZGMINI_PC_UPDATE_V1",
+    "installedSha": "5492726bb5b0505b7ff7db73a3c673dabdf724ce",
+    "targetSha": "451f53ae3831d369dfbcd4474b2c641736634a34",
+    "allowFiles": [
+      {
+        "path": "controller/employment-r6-candidate-readonly.mjs",
+        "sha256": "d6a0a70d679c2d3708f87ea941288b99cc493b14ba2251caf0c78739b89c4a63"
+      }
+    ],
+    "purpose": "pc-controller-maintenance",
+    "controllerOnlyInstall": true,
+    "approval": {
+      "grade": "B_PENDING_EXACT_GO_NOT_VALID",
+      "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1986",
+      "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+    },
+    "checks": {
+      "targetSha": "451f53ae3831d369dfbcd4474b2c641736634a34",
+      "status": "PASS",
+      "manifestSha256": "ecc3df068aba10df599bcec9920e9d1b4c8b8313030e333df1a07a0d0d61e2fd"
+    },
+    "backup": {
+      "strategy": "VERSIONED_SNAPSHOT",
+      "rollback": {
+        "kind": "RESTORE_INSTALLED_SHA",
+        "sha": "5492726bb5b0505b7ff7db73a3c673dabdf724ce"
+      }
+    },
+    "postOperation": "core-status",
+    "postSourceBranch": "main",
+    "postSourceSha": "1f451fbd979af6b9a0a1a2a4b2f79db60f3ae22f"
+  },
+  "proposalValidity": "SCHEMA_SHAPE_REVIEW_ONLY: approval.grade deliberately invalid until exact operational GO; installedSha requires fresh PC readback"
 }
