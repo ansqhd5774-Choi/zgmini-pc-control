@@ -30,7 +30,14 @@ const PIT_FIELDS=['coreCurrentRows','coreHistoryRevisions','coreCurrentKeys',
   'candidateOverlapConflictingKeys','candidateOverlapUnverifiedKeys',
   'candidateNewKeysWithConsistentPITMetadata','candidateNewKeysWithIncompletePITMetadata',
   'coreMissingHistoryKeysWithConsistentCandidateMetadata',
-  'coreMissingHistoryKeysWithoutConsistentCandidateMetadata'];
+  'coreMissingHistoryKeysWithoutConsistentCandidateMetadata',
+  // PIT-04-05: aggregate raw response / collection run attribution only.
+  'rawSnapshotMetadataKeys','rawSnapshotCertifiedKeys',
+  'coreCurrentRawLineageVerifiedKeys','coreCurrentRawLineageMissingSnapshotKeys',
+  'coreCurrentRawLineageConflictingKeys','coreCurrentRawLineageUnverifiedKeys',
+  'coreHistoryRawLineageTotalRows','coreHistoryRawLineageVerifiedRows',
+  'coreHistoryRawLineageMissingSnapshotRows','coreHistoryRawLineageConflictingRows',
+  'coreHistoryRawLineageUnverifiedRows'];
 const count=n=>Number.isSafeInteger(n)&&n>=0?n:null;
 const dateOnly=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)
   &&Number.isFinite(Date.parse(x+'T00:00:00Z'))
@@ -171,6 +178,33 @@ export async function inspectEmploymentR6Candidate(request,context){
         ||(pit.coreCurrentKeysMissingHistory!==null
           &&pit.coreCurrentHistoryMissingKeys!==pit.coreCurrentKeysMissingHistory)))
       stop('R6_RESULT_INVALID');
+    // Neither raw source bodies nor hashes can pass this boundary. A complete
+    // four-bucket lineage partition is necessary for reportable evidence.
+    const rawCurrent=['coreCurrentRawLineageVerifiedKeys',
+      'coreCurrentRawLineageMissingSnapshotKeys','coreCurrentRawLineageConflictingKeys',
+      'coreCurrentRawLineageUnverifiedKeys'];
+    const rawHistory=['coreHistoryRawLineageVerifiedRows',
+      'coreHistoryRawLineageMissingSnapshotRows','coreHistoryRawLineageConflictingRows',
+      'coreHistoryRawLineageUnverifiedRows'];
+    const complete=fields=>fields.every(key=>pit[key]!==null);
+    const total=fields=>fields.reduce((sum,key)=>sum+pit[key],0);
+    if(body.status==='PASS'
+      &&((complete(rawCurrent)&&(pit.coreCurrentKeys===null
+        ||total(rawCurrent)!==pit.coreCurrentKeys))
+        ||(complete(rawHistory)&&(pit.coreHistoryRawLineageTotalRows===null
+          ||total(rawHistory)!==pit.coreHistoryRawLineageTotalRows))
+        ||(pit.rawSnapshotMetadataKeys!==null&&pit.rawSnapshotCertifiedKeys!==null
+          &&pit.rawSnapshotCertifiedKeys>pit.rawSnapshotMetadataKeys))){
+      stop('R6_RESULT_INVALID');
+    }
+    const rawStatuses=new Set(['NO_RUNTIME_EVIDENCE','HOLD_INCOMPLETE_SOURCE_LINEAGE',
+      'READONLY_SOURCE_LINKS_NOT_PIT_APPROVAL']);
+    pit.rawLineageEvidenceStatus=rawStatuses.has(body.pit?.rawLineageEvidenceStatus)
+      ?body.pit.rawLineageEvidenceStatus:'NO_RUNTIME_EVIDENCE';
+    if(body.status==='PASS'&&pit.rawLineageEvidenceStatus!=='NO_RUNTIME_EVIDENCE'
+      &&(pit.rawSnapshotMetadataKeys===null||pit.rawSnapshotCertifiedKeys===null
+        ||pit.coreHistoryRawLineageTotalRows===null
+        ||!complete(rawCurrent)||!complete(rawHistory)))stop('R6_RESULT_INVALID');
     pit.candidateReconciliationPreviewStatus=/^[A-Z0-9_]{1,90}$/.test(body.pit?.candidateReconciliationPreviewStatus??'')
       ?body.pit.candidateReconciliationPreviewStatus:'NO_RUNTIME_EVIDENCE';
     const walPreflight=Object.fromEntries(['coreWalMode','candidateWalMode',
