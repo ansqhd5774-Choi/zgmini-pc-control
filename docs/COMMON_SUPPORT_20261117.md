@@ -27,3 +27,7 @@ results/r47-fixed-chain-readonly-20261117.json은 실제 PC의 읽기 전용 경
 W01 parser를 다시 구현하지 않는다. 기존 pc-source-bundle-register B로 parser와 전체 정적 의존성의 정확 source manifest를 host.approvedSources[sourceSha]에 등록한다. 등록 entrypoint/branch/sourceSha/manifest 원본 바이트 SHA를 검증하고, 모든 승인 파일을 hash 검증한 후 해당 요청 workspace에 복사해 그 고정 엔트리만 실행한다. 운영 checkout의 임의 최신 JS를 직접 import하지 않는다. 자격증명 없는 최소 child 환경·45초/32KiB 상한과 128MiB V8 heap으로 제한한다. 원래 parser의 readOnly+WAL/SHM 선재 조건을 유지한다. 반환은 23 ID별 PRESENT_VALID/UNVERIFIED와 집계만 허용하고 수치 원문·경로·관측시각 등은 제거한다.
 
 현재 소스 지원만 완료했으며 Controller 신규 operation과 W01 immutable bundle은 PC에 자동 설치되지 않는다. W01이 정확 app source bundle/정규 host 등록 및 3파일 Controller 최소 diff manifest를 준비해 원래 승인 경로로 적용하고 A 결과를 직접 회수한다. parser/23개 실제 자료 수집·검증·게시를 총괄이 대행하지 않는다.
+
+## 실제 재발 방지 수신기 인계 완료
+
+results/common-prevention-handoff-20261117.json 및 TXT: 승인된 3개 런타임 파일(maintenance-apply/maintenance-agent/update)을 기존 협조 종료·백업·새 Windows 출처 검증으로 적용했다. source c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7 → 36cf8ffb813f3a006f3e05379fba641fb3404645, STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED. 첫 원격 poll 완료 후 새 owner PID와 LISTENING heartbeat 일치, 유지보수기/Controller/6Runner HEALTHY, 공유 설치 lease 없음, Workflow active 및 기존 보호 snapshot 불변을 독립 확인했다. W03/W04/W01 기능 설치와 데이터 실행은 대행하지 않았다.
