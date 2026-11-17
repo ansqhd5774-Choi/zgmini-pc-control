@@ -2,8 +2,12 @@
   "schema": "ZGMINI_PC_INTAKE_RECOVERY_APPROVAL_V1",
   "approved": true,
   "requestId": "pc-update-6ca8cf47-2f0d-4dfa-b520-df377c1d38fe",
-  "sourceSha": "a038d97baf22df20ae0a53a0f653495cbdb2a9ad",
+  "sourceSha": "36cf8ffb813f3a006f3e05379fba641fb3404645",
   "hashes": {
+    "completedClaim": "f09c3dee67cc83d33dc6a0ed60d3034b73b494bfbcc88b5325b4c1111fe54f9e",
+    "completedRecord": "05fc2c972e6e4e172e9b41b81ba4397c295e7d11074f1764bafe6d07e6d53202",
+    "completedArchivedOwner": "07269e663bc0a7032ad664846181389bfd7e253d06489e239b9727d621d70b29",
+    "completedArchivedMarker": "66d54327c4235b998c688b36ad11248077c11870c2ce71b5e63e4eaac6eb2dac",
     "ledger": "2bf490237ddf89a08e6c9b38fd05c6de52a99fe40da711986f549d0cdd038645",
     "owner": "d6f4eb1eba25a2d07709f561d9cee32aa713259eb4ae01e5f5ee02f45d315d9e",
     "marker": "c61f2717222fab0be6d2d7994960ca4eb4d92bcc8c86d23e0c6490ececf1cf04",
@@ -13,7 +17,8 @@
     "protectedState": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae"
   },
   "fileHashes": {
-    "tools/controller-1979-backlog-recovery.mjs": "8520873c569564e1aeb058d8d0d2369c7dd564986c3c8e4c94e8b77069aff743",
+    "tools/completed-recovery-claim.mjs": "6bfa35829bb6b0559d993ad299345a4d2a9df333e07d004d42bee0a6e577c9ba",
+    "tools/controller-1979-backlog-recovery.mjs": "cfb254015d444dd4f51bb5b8ee0eb097ae9e70ad988c0aad933a6ae1b310bb4b",
     "tools/controller-intake-recovery.mjs": "467acd59d3f1b33f310ef99ef6c4016a198b61ed11ba67caa2eb6864d1de68bf",
     "tools/automation-status.mjs": "79863954361b1d88dd39d33c8e59d71897d1aad43687fb6c58adc5242f29bba7",
     "tools/update.mjs": "3719d3fe71b3ed7a1e49dbfd4d4da58a733e29a1e64bbbc5e1dd5fb7ba8871b8",
@@ -22,20 +27,22 @@
     "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
     "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc"
   },
-  "authority": "Current user request to resolve common blockers and PC_AUTOMATION_STANDARD section 5 standing approval for exact control lease archive/recovery",
+  "authority": "Current user request plus existing PC_AUTOMATION_STANDARD section 5 exact control lease recovery standing approval",
   "allowedEffects": [
-    "backup-original-backlog",
-    "record-1981-invalid-original-rejection-no-replay",
-    "archive-entire-install-lease"
+    "archive-exact-completed-1841-recovery-claim-with-terminal-record-and-dead-owner-proof",
+    "backup-original-1979-backlog",
+    "record-invalid-original-1981-no-replay",
+    "archive-entire-1979-install-lease"
   ],
   "forbiddenEffects": [
     "controller-install",
     "workflow-toggle",
-    "original-ledger-overwrite",
     "task-change",
-    "provider-call",
     "database-write",
+    "provider-call",
+    "original-ledger-overwrite",
     "original-request-retry"
   ],
+  "supersedes": "f0f4a97b exact manifest; prior execution stopped at existing claim before writes",
   "stopOnEvidenceChange": true
 }
