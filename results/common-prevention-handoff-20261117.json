@@ -1,0 +1,47 @@
+{
+  "schema": "ZGMINI_COMMON_PREVENTION_HANDOFF_READBACK_V1",
+  "status": "PASS",
+  "code": "STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED",
+  "installedShaBefore": "c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7",
+  "targetSha": "36cf8ffb813f3a006f3e05379fba641fb3404645",
+  "receiverPid": 35136,
+  "verifiedAt": "2026-11-17T11:00:26.583Z",
+  "checks": {
+    "allSevenFileHashes": true,
+    "targetSource": true,
+    "runtimeHealthy": true,
+    "maintenanceHealthy": true,
+    "controllerPreserved": true,
+    "noInstallLease": true,
+    "workflowActive": true,
+    "protectedUnchanged": true,
+    "receiverHeartbeatMatchesOwner": true
+  },
+  "receiverRuntimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "originalRequestRetries": 0,
+  "controllerChanges": 0,
+  "workflowChanges": 0,
+  "taskChanges": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "databaseWrites": 0,
+  "relatedTests": {
+    "passed": 215,
+    "failed": 0
+  },
+  "unchangedHandoffTests": {
+    "passed": 22,
+    "fixtureSetupBlocked": 1,
+    "reason": "SYMLINK_FIXTURE_CREATE_EPERM_NO_POLICY_CHANGE"
+  },
+  "firstObservation": {
+    "status": "UNVERIFIED",
+    "verifiedAt": "2026-11-17T10:58:30.603Z",
+    "reason": "New receiver origin attested; initial GitHub poll had not yet replaced old receiver heartbeat"
+  },
+  "maintenancePreventionSourceInstalled": true
+}
