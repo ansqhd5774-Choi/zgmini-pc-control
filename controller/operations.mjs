@@ -28,6 +28,7 @@ import {inspectSourceInventory} from './source-inventory-runtime-readonly.mjs';
 import {inspectProviderActivity} from './provider-activity-runtime-readonly.mjs';
 import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
 import {inspectNineR32RawCoverage} from './theme-nine-r32-raw-coverage-readonly.mjs';
+import {inspectA401Private23} from './inflation-a401-private23-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
@@ -165,6 +166,7 @@ export async function runOperation(request,context){
   const audit=inspectNineR32RawCoverage(dataRoot);
   return audit.status==='PARTIAL'?{...audit,status:'BLOCKED',coverageStatus:'PARTIAL'}:audit;
  }
+ if(request.operation==='inflation-a401-private23-readonly')return inspectA401Private23(request,context);
  if(request.operation==='inflation19-runtime-readonly')return inspectInflation19RuntimeReadonly(dataRoot);
  if(request.operation==='inflation-candidates-runtime-readonly')return inspectInflationCandidatesRuntimeReadonly(dataRoot);
  if(request.operation==='theme-platform-shadow-readonly'){

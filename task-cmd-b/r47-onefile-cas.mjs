@@ -2,6 +2,7 @@
 // SOURCE ONLY: this module registers no operation, schedules no task, and makes no writes.
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {verifiedR47TaskRoute} from './r47-task-chain.mjs';
 
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const must=(ok,code)=>{if(!ok)stop(code);};
@@ -50,7 +51,7 @@ export function validateR47CmdBManifest(m){
 export function verifyR47CmdBPreimage(manifest,actual){
  validateR47CmdBManifest(manifest);
  must(actual&&actual.task===manifest.task&&
-  fixed(actual.taskActionPath,manifest.targetPath)&&
+  verifiedR47TaskRoute(actual,manifest.targetPath)&&
   fixed(actual.installedFilePath,manifest.targetPath)&&
   actual.taskXmlSha256===manifest.taskXmlSha256&&
   actual.installedSha256===manifest.beforeSha256&&
