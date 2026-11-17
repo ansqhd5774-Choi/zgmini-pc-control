@@ -19,11 +19,11 @@
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
-- **실행 source (PR #1920 main 병합 pin, 운영 C 설치는 별도):** 기존 pin `0a30d3061d25fc826e2b149046dea46d123e785e`는 예외 로그에 비밀정보를 노출할 수 있는 이전 watcher 소스로 **신규 설치 불허**. [PR #1920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1920)을 안전 오류코드 출력으로 수정한 뒤 main squash SHA **`f1a280b9c24ec8d01ee228115b92ebb964f49802`**로 병합했다. 격리 Windows [CI #44035399650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44035399650)에서 463/463 PASS, C996 #44035374844 SUCCESS이며, 병합 이후 main과 이 불변 SHA의 7개 실행 소스 Git blob을 **7/7 동일** 재확인했다. **사용자 C급 직접 설치 검증은 아직 없으므로 CI가 운영 가동 승인은 아니다.** 실제 PC의 사용자 승인된 고정 읽기 전용 위치에는 아래 정확 7파일만 같은 불변 SHA에서 가져와 상대 폴더 구조를 유지한다. 일회성 Runner `_work`를 쓰거나 임의 경로·토큰·저권한 Windows 계정을 추정하지 않는다.
+- **실행 source (이번 작업 PR 검증 중 — 사용자 C 설치 전 STOP):** 기존 main source pin `f1a280b9c24ec8d01ee228115b92ebb964f49802`의 감시기는 조회 실패·GitHub 제한 상태에서도 12회 시도만 채우면 `WATCH_HEARTBEAT`를 출력하고, 마지막 주기가 정상인 경우 이전 실패 여부를 단독 heartbeat에서 확인할 수 없었다. 이번 변경은 12회 관측창의 정상 조회, 실패 조회, 제한/백오프 횟수 및 `completeUnthrottledWindow`를 별도 기록한다. 새 watcher 소스의 중간 Git commit **`3976174e6c4c49c329933097163130b5c8138a47`**은 **PR 검증 후보일 뿐, main 병합·실제 설치 승인 아님**. 이 후보의 7개 Git blob을 시험에서 검사하며, Windows PR CI PASS/실제 main 병합/7파일 원격 확인 후 불변 main merge SHA를 별도 확정하기 전까지 **C 신규 설치 STOP**. 어떤 경우에도 저권한 Windows 사용자·보안 인증·Node·Task 등록·heartbeat 실측을 CI가 대신하지 않는다. 설치 대상은 아래 정확 7파일(6 watcher module, 1 CMD)만 유지하고, 운영 PC 경로를 추정하거나 Runner `_work`를 상주 설치 경로로 사용하지 않는다.
 
-  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (확정 main 소스 `f1a280b9…`, **C급 설치 별도**) |
+  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (이번 PR 소스 검증 후보 `3976174e…`; **설치 전 STOP**) |
   |---|---|
-  | `agent-handoff/intake-watch-5s.mjs` | `2515dd83b96f76146dc75991fa8648cae6d42382` |
+  | `agent-handoff/intake-watch-5s.mjs` | `ac3bf7cd987e2ac4bacdcd94105a7689344bae7e` |
   | `agent-handoff/intake-receipt-readonly.mjs` | `0b97307fc3bf1ed8462a5a6413c3fc8f12bbb08b` |
   | `agent-handoff/queue-selector.mjs` | `964faf91138989cf3b42c44afbb6a77a1d2712b1` |
   | `agent-handoff/queue-priority.mjs` | `5178eb3b531e9f48c7f4ac9bc13888219425ed6a` |
