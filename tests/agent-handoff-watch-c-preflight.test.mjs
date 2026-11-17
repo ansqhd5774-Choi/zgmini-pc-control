@@ -55,9 +55,29 @@ test('one tampered, missing or mismatching pinned source cannot pass preflight',
   }finally{rmSync(temp,{recursive:true,force:true});}
 });
 
-test('Windows launcher checkout must preserve LF bytes to match the pinned Git blob',()=>{
+test('Windows CMD checkout is anchored to Git blob, allowing only equivalent CRLF conversion',()=>{
   const attributes=readFileSync('.gitattributes','utf8');
   assert.match(attributes,/^tools\/handoff-watch-user-start\.cmd text eol=lf$/m);
   assert.equal(inspectWatchCPreflight(base).sourceFiles.find(x=>
     x.file==='tools/handoff-watch-user-start.cmd').matched,true);
+});
+test('CRLF-only CMD checkout passes, but executable-content edits still fail',()=>{
+  const temp=mkdtempSync(path.join(os.tmpdir(),'zgmini-watch-cmd-eol-'));
+  try{
+    for(const file of Object.keys(C_SOURCE_BLOBS)){
+      const dest=path.join(temp,...file.split('/'));
+      mkdirSync(path.dirname(dest),{recursive:true});
+      cpSync(path.resolve(file),dest);
+    }
+    const cmd=path.join(temp,'tools','handoff-watch-user-start.cmd');
+    const source=readFileSync(cmd,'utf8').replace(/\r\n/g,'\n');
+    writeFileSync(cmd,source.replace(/\n/g,'\r\n'),'utf8');
+    const valid=inspectWatchCPreflight({...base,root:temp});
+    assert.equal(valid.sourceEligible,true);
+    assert.equal(valid.sourceFiles.find(x=>x.file==='tools/handoff-watch-user-start.cmd').windowsCmdCrLfNormalized,true);
+    writeFileSync(cmd,source.replace(/\n/g,'\r\n')+'\r\nrem modified command\r\n','utf8');
+    const invalid=inspectWatchCPreflight({...base,root:temp});
+    assert.equal(invalid.sourceEligible,false);
+    assert.equal(invalid.sourceFiles.find(x=>x.file==='tools/handoff-watch-user-start.cmd').matched,false);
+  }finally{rmSync(temp,{recursive:true,force:true});}
 });
