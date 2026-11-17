@@ -1,6 +1,7 @@
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {verifyHandoffReceipt} from './intake-receipt-readonly.mjs';
+import {createGhCredentialProvider} from './watcher-gh-credential.mjs';
 
 // Read-only fast intake observation; no dispatch, remediation, or operating-PC writes.
 export const INTERVAL_MS = 5_000;
@@ -77,9 +78,11 @@ export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,t
   }
 }
 
-export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{},receiptVerifier=verifyHandoffReceipt}={}) {
+export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{},receiptVerifier=verifyHandoffReceipt}={}) {
   if(intervalMs!==INTERVAL_MS) stop('HANDOFF_WATCH_INTERVAL_MUST_BE_5000');
-  let etag=null,previous=null,consecutiveFailures=0;
+  if(typeof tokenProvider!=='function' && (!token || typeof token!=='string'))
+    stop('HANDOFF_WATCH_AUTH_REQUIRED');
+  let etag=null,previous=null,consecutiveFailures=0,activeToken=token;
   // A bounded asynchronous receipt lane: never await it in the 5s discovery loop.
   const receiptQueue=[],receiptDeferred=[],receiptPending=new Set();
   let checkingReceipt=false,receiptBackoffUntil=0;
@@ -90,7 +93,7 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
     checkingReceipt=true;
     const number=receiptQueue.shift();
     receiptPending.delete(number);
-    Promise.resolve().then(()=>receiptVerifier({token,issueNumber:number,fetchImpl,signal}))
+    Promise.resolve().then(()=>receiptVerifier({token:activeToken,issueNumber:number,fetchImpl,signal}))
       .then(result=>onReport({state:'RECEIPT_OBSERVED',...result,observedAt:new Date(clock()).toISOString(),workExecuted:false}))
       .catch(err=>{
         if(signal?.aborted)return;
@@ -120,7 +123,12 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
   while(!signal?.aborted){
     const start=clock();let backoff=false,retryAfterMs=0;
     try {
-      const result=await checkOnce({token,fetchImpl,etag,previous,signal,nowMs:start});
+      // An optional credential provider refreshes a short-lived token from the
+      // Windows credential store; it never blocks the independent work Runner.
+      const selectedToken=typeof tokenProvider==='function'?await tokenProvider():token;
+      if(typeof selectedToken!=='string'||!selectedToken.trim())stop('HANDOFF_WATCH_AUTH_REQUIRED');
+      activeToken=selectedToken;
+      const result=await checkOnce({token:selectedToken,fetchImpl,etag,previous,signal,nowMs:start});
       if(result.state==='AUTH_REJECTED'){
         onReport({state:'WATCH_AUTH_REJECTED_STOP',observedAt:new Date(clock()).toISOString(),
           deliveryVerified:false,workExecuted:false});
@@ -147,8 +155,12 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
 
 async function main(env=process.env){
   if(env.ZGMINI_HANDOFF_WATCH_ENABLED!=='true')stop('HANDOFF_WATCH_NOT_ENABLED');
-  if(!env.GITHUB_TOKEN)stop('HANDOFF_WATCH_AUTH_REQUIRED');
-  const result=await runWatch({token:env.GITHUB_TOKEN,onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
+  const fromGhStore=env.ZGMINI_HANDOFF_WATCH_AUTH_SOURCE==='GH_CREDENTIAL_STORE';
+  if(fromGhStore && (env.GH_TOKEN || env.GITHUB_TOKEN))stop('HANDOFF_WATCH_AUTH_SOURCE_CONFLICT');
+  if(!fromGhStore && !env.GITHUB_TOKEN)stop('HANDOFF_WATCH_AUTH_REQUIRED');
+  const tokenProvider=fromGhStore?createGhCredentialProvider():null;
+  const result=await runWatch({token:env.GITHUB_TOKEN,tokenProvider,
+    onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
   if(result?.state==='AUTH_REJECTED_STOP')stop('HANDOFF_WATCH_AUTH_REJECTED_STOP');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
