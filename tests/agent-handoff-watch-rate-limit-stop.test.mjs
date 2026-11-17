@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {checkOnce,runWatch,retryDelayMs} from '../agent-handoff/intake-watch-5s.mjs';
+import {checkOnce,runWatch,retryDelayMs,safeWatchReadErrorCode,safeWatchFatalErrorCode} from '../agent-handoff/intake-watch-5s.mjs';
 const headers=(map={})=>({get:name=>Object.hasOwn(map,name)?map[name]:null});
 const response=(status,h={})=>({status,headers:headers(h),json:async()=>[]});
 
@@ -48,4 +48,36 @@ test('GitHub explicitly stated 429 wait is not shortened by 5s timer',async()=>{
    fetchImpl:async()=>{calls++;return response(429,{'retry-after':'600'});},
    sleep:async ms=>{delays.push(ms);controller.abort();},onReport:()=>{}});
  assert.equal(calls,1);assert.deepEqual(delays,[600_000]);
+});
+
+test('poller never emits thrown credential-like exception text to its observation log',async()=>{
+ const controller=new AbortController(),reports=[],delays=[];
+ const secret='github_pat_sensitive-test-token';
+ let requests=0;
+ await runWatch({token:secret,signal:controller.signal,clock:()=>1_000_000,
+   fetchImpl:async()=>{requests++;throw Error('HTTP request failed with token='+secret+' and host=C:\\private\\watcher');},
+   sleep:async ms=>{delays.push(ms);controller.abort();},
+   onReport:x=>reports.push(x)});
+ assert.equal(requests,1);
+ assert.deepEqual(delays,[60_000]);
+ assert.equal(reports.length,1);
+ assert.equal(reports[0].state,'WATCH_READ_FAILED');
+ assert.equal(reports[0].code,'WATCH_REQUEST_FAILED');
+ assert.ok(!JSON.stringify(reports).includes(secret));
+ assert.ok(!JSON.stringify(reports).includes('C:\\private'));
+});
+
+test('only source-defined diagnostics survive log sanitization',()=>{
+ assert.equal(safeWatchReadErrorCode(Error('HANDOFF_WATCH_INVALID_ISSUE_STOP')),
+   'HANDOFF_WATCH_INVALID_ISSUE_STOP');
+ assert.equal(safeWatchReadErrorCode({name:'AbortError',message:'Bearer secret'}),
+   'REQUEST_TIMEOUT');
+ assert.equal(safeWatchReadErrorCode(Error('HANDOFF_WATCH_INVALID_ISSUE_STOP Bearer secret')),
+   'WATCH_REQUEST_FAILED');
+ assert.equal(safeWatchFatalErrorCode(Error('HANDOFF_WATCH_AUTH_REJECTED_STOP')),
+   'HANDOFF_WATCH_AUTH_REJECTED_STOP');
+ for(const raw of ['Bearer github_pat_sensitive','gh auth error C:\\Users\\someone','HANDOFF_WATCH_FATAL_STOP private']){
+   assert.equal(safeWatchReadErrorCode(Error(raw)),'WATCH_REQUEST_FAILED');
+   assert.equal(safeWatchFatalErrorCode(Error(raw)),'HANDOFF_WATCH_FATAL_STOP');
+ }
 });
