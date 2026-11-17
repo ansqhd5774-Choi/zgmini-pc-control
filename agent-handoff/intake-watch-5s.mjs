@@ -1,5 +1,6 @@
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
+import {verifyHandoffReceipt} from './intake-receipt-readonly.mjs';
 
 // Read-only fast intake observation; no dispatch, remediation, or operating-PC writes.
 export const INTERVAL_MS = 5_000;
@@ -59,14 +60,45 @@ export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,t
   }
 }
 
-export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{}}={}) {
+export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{},receiptVerifier=verifyHandoffReceipt}={}) {
   if(intervalMs!==INTERVAL_MS) stop('HANDOFF_WATCH_INTERVAL_MUST_BE_5000');
   let etag=null,previous=null;
+  // A bounded asynchronous receipt lane: never await it in the 5s discovery loop.
+  const receiptQueue=[],receiptPending=new Set();
+  let checkingReceipt=false,receiptBackoffUntil=0;
+  const drainReceipts=()=>{
+    if(checkingReceipt||signal?.aborted||receiptQueue.length===0||clock()<receiptBackoffUntil) return;
+    checkingReceipt=true;
+    const number=receiptQueue.shift();
+    receiptPending.delete(number);
+    Promise.resolve().then(()=>receiptVerifier({token,issueNumber:number,fetchImpl,signal}))
+      .then(result=>onReport({state:'RECEIPT_OBSERVED',...result,observedAt:new Date(clock()).toISOString(),workExecuted:false}))
+      .catch(err=>{
+        if(signal?.aborted)return;
+        const code=String(err?.message||'HANDOFF_RECEIPT_READ_FAILED').slice(0,90);
+        if(/HTTP_(403|429|401)/.test(code))receiptBackoffUntil=clock()+60_000;
+        onReport({state:'RECEIPT_READ_FAILED',issueNumber:number,code,observedAt:new Date(clock()).toISOString(),receiptVerified:false,chatDelivered:false,workExecuted:false});
+      })
+      .finally(()=>{checkingReceipt=false;drainReceipts();});
+  };
+  const queueChangedReceipts=change=>{
+    const numbers=[...(change?.observedIssueNumbers||[]),...(change?.newIssueNumbers||[]),...(change?.updatedIssueNumbers||[])];
+    for(const number of numbers){
+      if(!Number.isSafeInteger(number)||number<=0||receiptPending.has(number))continue;
+      if(receiptQueue.length>=25){
+        onReport({state:'RECEIPT_QUEUE_LIMIT',at:new Date(clock()).toISOString(),workExecuted:false});
+        break;
+      }
+      receiptQueue.push(number);receiptPending.add(number);
+    }
+    drainReceipts();
+  };
   while(!signal?.aborted){
     const start=clock();let backoff=false;
     try {
       const result=await checkOnce({token,fetchImpl,etag,previous,signal});
       etag=result.etag;previous=result.issues;backoff=result.needsBackoff;
+      queueChangedReceipts(result.change);
       if(result.state!=='UNCHANGED' && (result.state!=='OBSERVED_CHANGE_ONLY' || Object.values(result.change).some(v=>Array.isArray(v)&&v.length>0)))
         onReport({state:result.state,change:result.change||null,observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     } catch(err){
@@ -75,6 +107,7 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
       onReport({state:'WATCH_READ_FAILED',code:err?.name==='AbortError'?'REQUEST_TIMEOUT':String(err?.message||'UNKNOWN_ERROR').slice(0,80),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     }
     // No overlapping checks. Back off on failures/rate limits without waiting inside workers.
+    drainReceipts();
     await sleep(Math.max(backoff?60_000:0, start+intervalMs-clock()));
   }
 }
