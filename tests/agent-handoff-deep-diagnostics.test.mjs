@@ -150,7 +150,7 @@ test('workflow stays owner/schedule gated on isolated Windows without write to c
   assert.match(workflow,/zgmini-handoff-ci-isolated/);
   assert.match(workflow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(workflow,/deep-diagnostics-runner.mjs/);
-  assert.match(workflow,/workflow_run:/);assert.match(workflow,/issues:/);assert.match(workflow,/push:/);
+  assert.doesNotMatch(workflow,/^  workflow_run:/m);assert.match(workflow,/issues:/);assert.match(workflow,/push:/);
   assert.match(workflow,/types: \[labeled\]/);
   assert.doesNotMatch(workflow,/contents: write|actions: write|pull_request:/);
   const event={repository:{private:true,full_name:repo},schedule:DEEP_POLICY.schedule};

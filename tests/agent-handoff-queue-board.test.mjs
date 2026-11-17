@@ -149,7 +149,7 @@ test('runner requires authenticated workflow provenance and never grants arbitra
   const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
     GITHUB_EVENT_NAME:'workflow_run'};
   assert.doesNotThrow(()=>validateBoardEvent(event,env));
-  assert.doesNotThrow(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env));
+  assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'Untrusted Pipeline'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,actor:{login:'untrusted'}}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,head_branch:'other'}},env),/RUN_PROVENANCE_STOP/);
@@ -182,7 +182,8 @@ test('board GitHub workflow is isolated, origin-guarded, read-only, and has a bo
   assert.match(flow,/workflow_dispatch:/);
   assert.match(flow,/schedule:\s*\n\s*- cron: '7,22,37,52 \* \* \* \*'/);
   assert.match(flow,/github\.event_name == 'schedule'/);
-  assert.match(flow,/ZGMINI Agent Handoff Intake/);
+  assert.match(flow,/ZGMINI Handoff Queue Candidate Selector/);
+  assert.doesNotMatch(flow,/ZGMINI Agent Handoff Intake/);
   assert.doesNotMatch(flow,/contents: write|issues: write|zgmini-pc-control\]/);
   assert.match(flow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(flow,/node agent-handoff\/queue-board-runner.mjs/);

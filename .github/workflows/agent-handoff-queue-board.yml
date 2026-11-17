@@ -3,7 +3,6 @@ on:
   workflow_run:
     workflows:
       - ZGMINI Handoff Queue Candidate Selector
-      - ZGMINI Agent Handoff Intake
     types: [completed]
   workflow_dispatch: {}
   schedule:

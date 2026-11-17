@@ -173,6 +173,29 @@ test('a completed pc-job without a published JSON is unknown, not successful int
   assert.equal(f.posts, 0);
 });
 
+test('cancelled parent PC run without report is review-only, not a second failed intake', async () => {
+  const f = fixture(); f.io.readReport = async () => null;
+  const cancelled = event(); cancelled.workflow_run.conclusion = 'cancelled';
+  const result = await processCompletedPcJob(cancelled, f.io);
+  assert.equal(result.state, 'UPSTREAM_CANCELLED_NO_REPORT');
+  assert.equal(result.requiresOwnerReview, true);
+  assert.equal(result.pcRuntimeVerified, false);
+  assert.equal(result.reportsObserved, 0);
+  assert.equal(result.confirmedFailures, 0);
+  assert.equal(result.newIssues, 0);
+  assert.equal(f.posts, 0);
+  assert.equal(f.routeCalls, 0);
+});
+
+test('cancelled PC run with published failure proof is not falsely suppressed', async () => {
+  const f = fixture();
+  const cancelled = event(); cancelled.workflow_run.conclusion = 'cancelled';
+  const result = await processCompletedPcJob(cancelled, f.io);
+  assert.equal(result.confirmedFailures, 1);
+  assert.equal(result.newIssues, 1);
+  assert.equal(result.state, 'SCAN_COMPLETED');
+});
+
 test('missing bot receipt remains pending without speculative issue creation', async () => {
   const f = fixture(); f.io.readComments = async () => [];
   const outcome = await processCompletedPcJob(event(), f.io);

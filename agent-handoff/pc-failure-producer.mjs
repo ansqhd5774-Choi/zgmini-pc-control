@@ -155,7 +155,16 @@ export async function processCompletedPcJob(event, {
     await confirmRoute(prepared, created.number);
     result.newIssues++;
   }
-  if (!result.reportsObserved) result.state = 'NO_PUBLISHED_RESULTS';
+  if (!result.reportsObserved) {
+    // A cancelled parent run can have no per-seat result; do not report
+    // the same cancellation as a second intake execution failure.
+    // The parent is still CANCELLED, and no runtime success is inferred.
+    if (event.workflow_run.conclusion === 'cancelled') {
+      result.state = 'UPSTREAM_CANCELLED_NO_REPORT';
+      result.requiresOwnerReview = true;
+      result.pcRuntimeVerified = false;
+    } else result.state = 'NO_PUBLISHED_RESULTS';
+  }
   else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
   else if (result.failureProofPending) result.state = 'PARTIAL_FAILURE_EVIDENCE_PENDING';
   else if (result.waitProofPending) result.state = 'PARTIAL_WAIT_EVIDENCE_PENDING';
