@@ -49,6 +49,15 @@
 - **현재 상태:** 5초 감시 소스 및 변경 사건의 bot receipt 검증은 PR #1850/#1859 main 반영 + Windows CI 완료. **실PC 상주 실행 및 유효한 읽기 전용 GitHub 자격·회전은 여전히 미설치/미확인**, `RUNTIME_ACTIVATION_BLOCKED`, **5단계 중 4단계(80%) 유지**. 실제 실PC 5초 가동은 0회.
 - **다음 필수 실행:** 정상 업무 Runner를 점유하지 않는 별도 상주 실행/부팅 복구 + 최소권한 인증·갱신을 기존 등록 계약에서 실제 증명하거나, 그 경로가 없으면 C급 사용자 직접 설정 범위 및 안전한 설치 패키지를 명시한다. 권한 밖 Windows 서비스 설치·무한 Job 실행·임시 Job 토큰 영구 저장은 시행하지 않는다.
 
+## 2026-11-17 후속 — 접수 폭주 시 영수증 검증 누락 방지
+
+- **결함:** 기존 5초 감시에서 `receiptQueue`가 25개를 넘으면 나머지 Issue 번호를 `RECEIPT_QUEUE_LIMIT`로 보고만 하고 버려, 새 댓글 등 변경이 없으면 누락 사건을 영수증 검증하지 못했다.
+- **수정:** [PR #1868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1868)에서 25개 활성 큐는 유지하되 초과 사건을 메모리 보류 큐로 연결해 순차 검사하도록 변경했다. GitHub 목록 한 페이지 최대 99개/미완전 목록 차단, 5초 체크 루프는 영수증 검사를 await하지 않는 기존 구조 유지.
+- **검증:** 격리 Windows CI Run [44002369326](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44002369326)에서 **414/414 PASS**. 27건 동시 발견 시 실제 receipt verifier 27/27 처리, 단일 영수증 레인 최대 동시 1, 영수증 검사 정체에도 5초 주기 목록 확인 4/4 유지 테스트 추가. `c996-source`도 PASS.
+- **main 병합:** `ce4b462d0403aaaaed23141fa4dcb66a868421d7`, 기존 감시 소스 1파일·신규 회귀시험 1파일. 기존 GitHub 접수 workflow·Runner·PC 데이터/DB/D1·예약·보안·키 설정 변경 없음.
+- **실제 운영:** 이 개선도 **SOURCE_ONLY**. 공통 대기열 PC의 5초 감시 상주 기동/최소 권한 인증·토큰 회전은 미완료. 활성화 증거가 없으므로 **5단계 중 4단계(80%), 실운영 0/1, `RUNTIME_ACTIVATION_BLOCKED`**를 유지한다.
+- **다음 필수 작업:** 기존 PC의 C급 직접 설정으로 별도 자동 시작/복구 및 만료·권한을 관리하는 GitHub 읽기 인증이 허용될 때 최소 범위에 한해 설치·실측한다. 임시 Job 토큰 보관·기존 Runner 점유 또는 미승인 Windows 서비스/예약 생성 금지.
+
 ## 독립성·실제 상태
 
 현재 단계는 **SOURCE_MERGED_RUNTIME_NOT_DEPLOYED**. 새 watcher는 해당 PC에 설치/기동되지 않았고, GitHub Actions 15분 주기도 변경하지 않았음. 기존 6 Runner 운영·공유 원장·DB/D1·게시 영향 없음.
