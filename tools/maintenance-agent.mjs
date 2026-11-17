@@ -183,7 +183,7 @@ export function normalizedResult(request,result,code){
     recoverySha:isSha(from.recoverySha)?from.recoverySha:null,
     protectedStateUnchanged:from.protectedStateUnchanged===true,
     workflowEnabled:typeof from.workflowEnabled==='boolean'
-      ?from.workflowEnabled:request.operation===R54_B_OPERATION?null:false,
+      ?from.workflowEnabled:null,
     ...(inventory?{sourceInventory:inventory}:{}),
   };
 }
