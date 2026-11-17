@@ -16,7 +16,7 @@ const result={kind:'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1',status:'PASS',
   code:'EMPLOYMENT_R6_READONLY_STAGE_COMPLETED',sqliteOpened:true,asOfDate:'2026-11-02',
   providerCalls:0,d1Writes:0,promotionApproved:false,publicationStatus:'NOT_REQUESTED',
   summary:{sourceFeatures:1,UNTRUSTED_RAW:'PRIVATE_VALUE'},
-  pit:{coreCurrentKeysMissingHistory:4,
+  pit:{coreCurrentKeys:27,coreCurrentKeysMissingHistory:4,
     coreCurrentHistoryMatchingKeys:20,coreCurrentHistoryConflictingKeys:2,
     coreCurrentHistoryUnverifiedKeys:1,coreCurrentHistoryMissingKeys:4,
     coreHistoryAsOfUniqueKeys:123,coreHistoryPriorRevisionKeys:9,
@@ -226,4 +226,41 @@ test('PIT-04-03 count projection fails closed for unsafe counts or raw fields',a
   assert.equal(result.providerCalls,0);
   assert.equal(result.operationalWrites,0);
   assert.doesNotMatch(JSON.stringify(result),/PRIVATE_RAW|source_hash|rawValue/);
+});
+
+test('PIT-04-03 rejects a PASS when four valid buckets do not sum to Core CURRENT',async t=>{
+  const f=fixture(t);
+  const changed=fs.readFileSync(f.script,'utf8')
+    .replace('coreCurrentHistoryMatchingKeys:20','coreCurrentHistoryMatchingKeys:21');
+  fs.writeFileSync(f.script,changed);
+  const approved=f.host.approvedSources[SHA];
+  const files={[ENTRY]:hash(Buffer.from(changed))};
+  const manifestBytes=Buffer.from(JSON.stringify({files})+'\n');
+  fs.writeFileSync(path.join(approved.root,'manifest.json'),manifestBytes);
+  approved.manifestSha256=hash(manifestBytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'FAIL');
+  assert.equal(result.code,'R6_RESULT_INVALID');
+  assert.equal(result.actualExecutionSha,SHA);
+  assert.equal(JSON.stringify(result).includes('PRIVATE_VALUE'),false);
+  assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
+  assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
+});
+
+test('PIT-04-03 rejects missing-history disagreement even when four buckets sum',async t=>{
+  const f=fixture(t);
+  const changed=fs.readFileSync(f.script,'utf8')
+    .replace('coreCurrentKeysMissingHistory:4','coreCurrentKeysMissingHistory:5');
+  fs.writeFileSync(f.script,changed);
+  const approved=f.host.approvedSources[SHA];
+  const files={[ENTRY]:hash(Buffer.from(changed))};
+  const manifestBytes=Buffer.from(JSON.stringify({files})+'\n');
+  fs.writeFileSync(path.join(approved.root,'manifest.json'),manifestBytes);
+  approved.manifestSha256=hash(manifestBytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'FAIL');
+  assert.equal(result.code,'R6_RESULT_INVALID');
+  assert.equal(result.actualExecutionSha,SHA);
+  assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
+  assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
 });
