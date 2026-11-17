@@ -12,6 +12,9 @@
 
 **공통 총괄에 지원 요청 가능한 업무(2026-11-17):** 공통 Controller·Runner/GitHub Actions·공통 Writer 수신기·승인/manifest·공유 자원 경합·공통 진단·접수/배분/회신 구조의 결함은 공통 총괄이 진단·최소 수정·관련 검증한다. 기능별 수집·산식·게시·설치는 원담당 책임으로 유지한다. 실제 공통 오류가 발생하면 `ansqhd5774-Choi/zgmini-pc-control`의 기존 `agent-handoff` GitHub Issue(`ZGMINI_AGENT_HANDOFF_V1`, `agent-handoff` 라벨)로 원본 Issue/Run·requestId·branch/source SHA·LAST PASS/FIRST FAIL·필요한 공통 지원 결과를 연결해 요청한다. 접수 봇 기록과 실제 총괄/원담당 ChatGPT 대화 수신은 다르다. 결과는 원본 Issue에 회신하고 원담당의 실제 수신·운영 적용을 별도 확인한다. 상세 목록과 8단계 요청→접수→분류→실제 전달→인수→처리→회신→요청자 확인 계약: [공통 작업 표준](docs/PC_AUTOMATION_STANDARD.md#공통-프로세스-총괄--요청-가능-업무접수작업-회신-2026-11-17). GitHub 댓글만으로 자동 전달/수신이 완료됐다고 판단하지 않는다.
 
+**공통 총괄 접수의 두 원천(2026-11-17):** 정규 `agent-handoff` Incident/미완료 라벨은 **자동 장애 인계**만 집계한다. 기능 원담당이 공용 Controller·Writer 승인/설치 지원을 중앙 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)에 직접 남긴 **인계·검토 요청 댓글도 별도의 실접수 채널**이다. 총괄이 신규 요청/현황을 보고할 때에는 **두 원천을 모두** 읽어 기능별 고유 작업으로 중복 제거하고 각각 근거 댓글·PR·실제 회신/미완료 조건을 대조한다. `handoff-agent-pending=1`을 총괄 전체 대기 1건으로 말하지 않는다. 댓글·봇 ACK는 타 ChatGPT 대화 자동 수신이나 사용자 B 승인 증거가 아니며, 공통 총괄은 기능별 설치를 대신 수행하지 않는다.
+
+
 - **원담당 업무 재개(2026-11-06):** 이 지침을 받은 각 일반챗은 자기 원래 기능 업무의 마지막 유효 완료 지점에서 승인된 다음 실행으로 바로 진행한다. 공용 #434 자연 B 실증 대기·다른 대화의 인계 미수신은 독립 업무의 전역 Gate가 아니다. 실제 업무에 필요한 정상 B는 기존 승인·보호 계약으로 진행하되 #434 확인만 위한 인위적 B는 만들지 않는다. 프로세스 총괄은 담당자의 기능 구현·설치를 대신하지 않는다.
 
 - **성공 실행물 재사용(2026-11-08):** 새 업무의 필수 실행에 참고할 동일 유형 성공 사례가 있으면 [docs/SUCCESS_EVIDENCE_REUSE.md](docs/SUCCESS_EVIDENCE_REUSE.md)의 승인 manifest·실제 Windows Issue/Run·원격 JSON/TXT·검증 효과를 **관련 범위만** 조회하고 검증된 공통 구조를 재사용한다. 성공 증거는 기존 `approvals/`·`results/`에 한 번 보존하고, 새로운 재사용 패턴이 검증될 때만 색인을 갱신한다. 과거 해시·승인을 현행값으로 복사하거나 별도 Gate·예약·민감 파일 업로드를 만들지 않는다. GitHub 반영은 다른 대화·PC의 자동 학습/적용이 아니다.
