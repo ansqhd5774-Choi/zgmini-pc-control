@@ -199,6 +199,7 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
     drainReceipts();
   };
   let completedPolls=0,lastPollStart=null,minIntervalMs=Infinity,maxIntervalMs=0;
+  let successfulReadsInWindow=0,failedReadsInWindow=0,backoffCyclesInWindow=0;
   while(!signal?.aborted){
     if(receiptAuthRejected)return {state:'AUTH_REJECTED_STOP',noWrite:true};
     const start=clock();let backoff=false,retryAfterMs=0;
@@ -219,7 +220,13 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
           deliveryVerified:false,workExecuted:false});
         return {state:'AUTH_REJECTED_STOP',noWrite:true};
       }
+      // A completed attempt is not necessarily a successful GitHub read.
+      // Keep this evidence separate from the five-second start interval.
+      if(['UNCHANGED','INITIAL_INVENTORY','OBSERVED_CHANGE_ONLY'].includes(result.state))
+        successfulReadsInWindow++;
+      else failedReadsInWindow++;
       etag=result.etag;previous=result.issues;backoff=result.needsBackoff;
+      if(backoff)backoffCyclesInWindow++;
       consecutiveFailures=backoff?consecutiveFailures+1:0;
       retryAfterMs=backoff?Math.max(result.retryAfterMs||0,Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6))):0;
       queueChangedReceipts(result.change);
@@ -236,6 +243,8 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
       }
       backoff=true;
       consecutiveFailures++;
+      failedReadsInWindow++;
+      backoffCyclesInWindow++;
       retryAfterMs=Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6));
       onReport({state:'WATCH_READ_FAILED',code:safeWatchReadErrorCode(err),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     }
@@ -246,8 +255,12 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
       onReport({state:'WATCH_HEARTBEAT',completedPolls,
         observedMinIntervalMs:Number.isFinite(minIntervalMs)?minIntervalMs:null,
         observedMaxIntervalMs:maxIntervalMs,backoffActive:backoff,
+        successfulReadsInWindow,failedReadsInWindow,backoffCyclesInWindow,
+        completeUnthrottledWindow:successfulReadsInWindow===12&&
+          failedReadsInWindow===0&&backoffCyclesInWindow===0,
         observedAt:new Date(clock()).toISOString(),workExecuted:false,noWrite:true});
       minIntervalMs=Infinity;maxIntervalMs=0;
+      successfulReadsInWindow=0;failedReadsInWindow=0;backoffCyclesInWindow=0;
     }
     // No overlapping checks. Back off on failures/rate limits without waiting inside workers.
     drainReceipts();
