@@ -43,7 +43,7 @@ test('task failure is isolated and does not mask other task results',()=>{
 });
 
 test('source probe ledger is attributed by New York date; source responses are not quota failures',()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'r35-ny-probe-'));
+ const root=fs.realpathSync.native(fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'r35-ny-probe-')));
  const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
  try{
   const win={start:'2026-10-30',end:'2026-11-03'};
@@ -76,7 +76,7 @@ test('source probe ledger is attributed by New York date; source responses are n
 });
 
 test('SPY raw pages are independently hash-checked; only target session counts are reported',()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'r35-raw-proof-'));
+ const root=fs.realpathSync.native(fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'r35-raw-proof-')));
  const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
  try{
   const dir=path.join(root,'themes','legacy-nine-r35-delta','raw');
@@ -101,7 +101,7 @@ test('SPY raw pages are independently hash-checked; only target session counts a
 });
 
 test('new R35 issue report omits unrelated R54 details and fits 8192-byte upload contract',()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'r35-compact-report-'));
+ const root=fs.realpathSync.native(fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'r35-compact-report-')));
  try{
   const add=(relative,text)=>{
    const file=path.join(root,relative);
@@ -118,7 +118,7 @@ test('new R35 issue report omits unrelated R54 details and fits 8192-byte upload
   const projected=projectR35Details(inspect({dataRoot:root,taskQuery:()=>'<Task/>',
    freeMiB:807,list:fs.readdirSync}));
   assert.equal(projected.r47Reports.reports.length,2);
-  assert.deepEqual(projected.r47InstalledCmd,{status:'UNKNOWN',sha256:null});
+  assert.deepEqual(projected.r47InstalledCmd,{status:'UNAVAILABLE',sha256:null});
   assert.equal(projected.r35Manifest.latestSpyDay,'2026-10-30');
   assert.equal(Object.hasOwn(projected,'freeMiB'),false);
   assert.equal(Object.hasOwn(projected,'recentRuns'),false);
@@ -136,7 +136,7 @@ test('observation contains no raw XML or error stderr',()=>{
 });
 
 test('installed R54, R47 report and raw manifests are observed only by hash and dates',()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'r54-readonly-proof-'));
+ const root=fs.realpathSync.native(fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'r54-readonly-proof-')));
  try{
   const write=(relative,content)=>{
    const p=path.join(root,relative);
