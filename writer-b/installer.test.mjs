@@ -136,6 +136,33 @@ test('preimage compares actual 3-file SHA and scoped dirty, ignoring unrelated d
   {code:'WRITER_B_PC_PREIMAGE_STOP'});
 });
 
+test('preimage guard records only a bounded failing-check label',async()=>{
+ const m=manifest(),{io}=mockIO(),good=await io.readPcPreimage();
+ for(const [field,wrong,gate] of [
+  ['head','f'.repeat(40),'HEAD'],
+  ['configSource','f'.repeat(40),'CONFIG_SOURCE'],
+  ['coreTaskEnabled',false,'TASK_ENABLED'],
+  ['targetPathsClean',false,'TARGET_PATHS_CLEAN'],
+  ['beforeSha256',{},'BEFORE_KEYSET'],
+ ]){
+  assert.throws(()=>verifyWriterBPreimage(m,{...good,[field]:wrong}),error=>{
+   assert.equal(error.code,'WRITER_B_PC_PREIMAGE_STOP');
+   assert.equal(error.preimageCheck,gate);
+   assert.equal(JSON.stringify(error).includes(m.baseHead),false);
+   return true;
+  });
+ }
+});
+test('preimage guard stops before claim and reports which gate failed',async()=>{
+ const {io,state}=mockIO({dirtyTarget:true});
+ const out=await performWriterBInstall(auth(),io);
+ assert.equal(out.status,'WRITER_B_PREFLIGHT_STOP');
+ assert.equal(out.code,'WRITER_B_PC_PREIMAGE_STOP');
+ assert.equal(out.preimageCheck,'TARGET_PATHS_CLEAN');
+ assert.equal(state.claimed,false);
+ assert.deepEqual(state.steps,['lock','preimage','release']);
+});
+
 test('candidate source and exact prepared file diff must match per-file approval',()=>{
  const m=manifest();
  assert.throws(()=>verifyWriterBCandidate(m,{sourceSha:m.candidateSourceSha,
