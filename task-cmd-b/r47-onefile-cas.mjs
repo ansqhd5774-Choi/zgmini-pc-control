@@ -21,6 +21,19 @@ export const R47_CMD_B=Object.freeze({
  requestedTargetSha256:'a08fdec82b484c41ba3ac562908f31d96fee09c75cc3ff1b32386e9dd625ba45',
  historicalTaskXmlSha256:'bf3207ab2274d1248e7bd8c953cea2fd3bd277b8bd70bb1c2494339a06e0a4be'
 });
+export const R47_CMD_B_CALENDAR_SAFE=Object.freeze({
+ beforeSha256:R47_CMD_B.requestedTargetSha256,
+ afterSha256:'fde41fa4ac02c99139171c18a03fa2b00f6956825be92f9c2b3d10da7217a955',
+ sourceSha:'a2cea21930f142657c6890471c515ac6d92e7809'
+});
+// A new GO is never inferred from the historical one-file GO. Both exact
+// transitions are individually pinned; source, target or preimage drift stops.
+const authorizedR47Transition=m=>
+ (m.beforeSha256===R47_CMD_B.historicalOldSha256&&
+  m.afterSha256===R47_CMD_B.requestedTargetSha256)||
+ (m.beforeSha256===R47_CMD_B_CALENDAR_SAFE.beforeSha256&&
+  m.afterSha256===R47_CMD_B_CALENDAR_SAFE.afterSha256&&
+  m.sourceSha===R47_CMD_B_CALENDAR_SAFE.sourceSha);
 const KEYS=['schema','status','scope','requestId','sourceRepository','sourceSha',
  'sourcePath','targetPath','task','beforeSha256','afterSha256','taskXmlSha256',
  'runCount','allowTaskChanges','allowProviderCalls','allowSqliteWrites',
@@ -38,8 +51,7 @@ export function validateR47CmdBManifest(m){
   m.sourcePath===R47_CMD_B.sourcePath&&
   fixed(m.targetPath,R47_CMD_B.targetPath)&&
   m.task===R47_CMD_B.task&&
-  m.beforeSha256===R47_CMD_B.historicalOldSha256&&
-  m.afterSha256===R47_CMD_B.requestedTargetSha256&&
+  authorizedR47Transition(m)&&
   sha64(m.taskXmlSha256)&&
   m.taskXmlSha256===R47_CMD_B.historicalTaskXmlSha256,
   'TASK_CMD_B_MANIFEST_SCOPE_STOP');
