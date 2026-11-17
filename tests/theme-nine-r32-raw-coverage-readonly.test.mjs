@@ -220,3 +220,49 @@ test('R23 baseline checkpoint must retain approved fixed dates even with rekeyed
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'R32_COVERAGE_CHECKPOINT_IDENTITY');
 });
+
+
+test('post-migration R35 manifest accepts stocks/us with unchanged SHA and price mode',t=>{
+ const f=fixture(t),folder='legacy-nine-r35-delta',file=f.files[`${folder}-manifest`];
+ const manifest=JSON.parse(fs.readFileSync(file,'utf8'));
+ const entry=manifest.files.find(x=>x.symbol==='BOTZ');
+ entry.requestedUrl=entry.requestedUrl.replace('/bars/stocks/BOTZ/','/bars/stocks/us/BOTZ/');
+ fs.writeFileSync(file,JSON.stringify(manifest));
+ const r=audit(f);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.latestVerifiedSPYDay,'2026-11-03');
+ assert.equal(r.currentnessVerified,false);
+});
+test('post-migration R35 checkpoint prefers new route over archived manifest URL',t=>{
+ const f=fixture(t),folder='legacy-nine-r35-delta',file=f.files[`${folder}-checkpoint`];
+ const state=JSON.parse(fs.readFileSync(file,'utf8'));
+ const ref=state.symbols.BOTZ.files[0];
+ const manifest=JSON.parse(fs.readFileSync(f.files[`${folder}-manifest`],'utf8'));
+ const oldEntry=manifest.files.find(x=>x.symbol==='BOTZ');
+ assert.equal(ref.requestedUrl??oldEntry.requestedUrl,oldEntry.requestedUrl);
+ ref.requestedUrl=oldEntry.requestedUrl.replace('/bars/stocks/BOTZ/','/bars/stocks/us/BOTZ/');
+ fs.writeFileSync(file,JSON.stringify(state));
+ const r=audit(f);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.currentnessVerified,false);
+});
+test('unrecognized R35 region remains denied',t=>{
+ const f=fixture(t),folder='legacy-nine-r35-delta',file=f.files[`${folder}-manifest`];
+ const manifest=JSON.parse(fs.readFileSync(file,'utf8'));
+ const entry=manifest.files.find(x=>x.symbol==='SPY');
+ entry.requestedUrl=entry.requestedUrl.replace('/bars/stocks/SPY/','/bars/stocks/ca/SPY/');
+ fs.writeFileSync(file,JSON.stringify(manifest));
+ const r=audit(f);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'R32_COVERAGE_PAGE_SOURCE_URL');
+});
+test('R23 historical path identity cannot be rewritten as stocks/us',t=>{
+ const f=fixture(t,{delta:false}),file=f.files['legacy-nine-r23-manifest'];
+ const manifest=JSON.parse(fs.readFileSync(file,'utf8'));
+ const entry=manifest.files.find(x=>x.symbol==='SPY');
+ entry.requestedUrl=entry.requestedUrl.replace('/bars/stocks/SPY/','/bars/stocks/us/SPY/');
+ fs.writeFileSync(file,JSON.stringify(manifest));
+ const r=audit(f);
+ assert.equal(r.status,'BLOCKED');
+ assert.equal(r.code,'R32_COVERAGE_PAGE_SOURCE_URL');
+});
