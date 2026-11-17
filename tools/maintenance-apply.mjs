@@ -278,7 +278,9 @@ export async function reconcileInterruptedRollback(original,port,persist){
   recoveryOperation='reconcileBacklog';
   if(port.reconcileBacklog)await port.reconcileBacklog();
   recoveryOperation='verifyPrevious';
-  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_FINAL_READBACK_FAILED');
+  // Replayed A jobs may now legitimately occupy a seat. Require six Online
+  // runners and the same healthy Controller, not idle seats after intake opens.
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true,requireIdle:false})!==true)throw fail('RECOVERY_FINAL_READBACK_FAILED');
   await record('INTERRUPTED_ROLLBACK_VERIFIED',{status:'ROLLED_BACK',actualInstalledSha:original.installedShaBefore,protectedStateUnchanged:true});
   }catch(error){await record(maintenanceFailureCode(error,recoveryOperation),{status:'RECOVERY_REQUIRED',failureOperation:recoveryOperation});}
  return out;

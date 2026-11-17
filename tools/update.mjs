@@ -1500,11 +1500,13 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    }
    return protectedBefore!==undefined&&JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
   },
-  verifyPrevious:async({installedSha,requireRunning})=>{
+  verifyPrevious:async({installedSha,requireRunning,requireIdle=true})=>{
    if(installedManifest().installedSha!==installedSha)return false;
    if(requireRunning){
     const s=json(path.join(controlRoot,'SUPERVISOR_STATUS.json'));
-    if(s.sourceSha!==installedSha||Date.now()-Date.parse(s.at)>45000||!available(apiRunners()))return false;
+    const rows=apiRunners();
+    const runnersVerified=requireIdle?available(rows):dedicatedPcRunnerRows(rows,{requireOnline:true})!==null;
+    if(s.sourceSha!==installedSha||Date.now()-Date.parse(s.at)>45000||!runnersVerified)return false;
    }
    return JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore??protectedSnapshot());
   },
