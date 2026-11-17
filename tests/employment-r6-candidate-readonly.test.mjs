@@ -336,6 +336,10 @@ test('PIT-04-05 Core History mismatch and over-certified snapshots fail closed',
     'coreHistoryRawLineageVerifiedRows:24,');
   assert.equal(inconsistent.status,'FAIL');
   assert.equal(inconsistent.code,'R6_RESULT_INVALID');
+  const overCertified=await runWithChangedPit(t,
+    'rawSnapshotCertifiedKeys:4,','rawSnapshotCertifiedKeys:7,');
+  assert.equal(overCertified.status,'FAIL');
+  assert.equal(overCertified.code,'R6_RESULT_INVALID');
 });
 
 test('PIT-04-05 invalid status cannot forge lineage readiness or promote a candidate',async t=>{
