@@ -67,12 +67,15 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   // retired-R13 inventory postcheck cannot be read. Keep the original
   // bounded diagnostic result, but never mark this job as PASS.
   if(preflightOperation==='POSTCHECK'&&
-     postcheckCode==='RETIRED_IRAN_INVENTORY_UNAVAILABLE'&&
-     report.result&&typeof report.result.code==='string'){
+     postcheckCode==='RETIRED_IRAN_INVENTORY_UNAVAILABLE'&&!uncertainChild){
+   // The worker result file may be missing or timed out (as in #1838).
+   // Preserve the already recorded outcome without treating it as a PASS.
+   const prePostcheckOutcome={status:report.status,code:report.code,
+    firstFail:report.firstFail,resultPresent:report.result!==undefined};
    Object.assign(report,{
     status:'STATE_UNKNOWN',code:'PROTECTED_STATE_POSTCHECK_UNVERIFIED',
     postcheckFailureCode:postcheckCode,
-    workerOutcome:{status:report.result.status,code:report.result.code},
+    workerOutcome:prePostcheckOutcome,
     protectedStateUnchanged:null,
     protectedBeforeSha256:digest(JSON.stringify(before)),
     protectedAfterSha256:null,
