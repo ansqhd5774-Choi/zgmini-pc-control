@@ -1,6 +1,0 @@
-{
-  "status": "DRAFT_ONLY_NONEXECUTABLE",
-  "purpose": "Obtain PR number for exact per-request B approval self-reference; delete from PR final diff",
-  "scope": "W04_PIT0405_READONLY_HOST_CAS",
-  "targetInstalledControllerSha": "f7f1559bc0ef15bb9b375982d048369c474c490f"
-}
