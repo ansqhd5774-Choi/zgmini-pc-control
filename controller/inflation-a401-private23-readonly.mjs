@@ -56,6 +56,7 @@ export function stageA401Bundle(request,{host,workspace}){
 }
 export function inspectA401Private23(request,context,{run=spawnSync}={}){
  try{
+  need(typeof context.dataRoot==='string'&&path.win32.normalize(context.dataRoot).toLowerCase()===String.raw`E:\ZGmini\data`.toLowerCase(),'A401_DATA_ROOT_DENIED');
   const staged=stageA401Bundle(request,context);
   const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
    PATH:path.dirname(process.execPath),TEMP:context.workspace,TMP:context.workspace};
