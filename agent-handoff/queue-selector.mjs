@@ -54,8 +54,16 @@ export function assessIncident(issue, comments) {
   let request;
   try { request = parseHandoff(issue.body); }
   catch { return {state: 'INVALID_CONTRACT'}; }
-  if (issue.title !== 'agent-handoff ' + request.incidentId ||
-      issue.repository !== HANDOFF_REPOSITORY) return {state: 'ISSUE_IDENTITY_MISMATCH'};
+  // The intake broker already accepts owner-authored descriptive Issue titles.
+  // Keep the canonical title mandatory for bot-created Issues. For an owner
+  // Issue, the authenticated exact bot route below binds incidentId, body
+  // fingerprint and role, so title text is not the authorization proof.
+  const botCreated=issue.user.login===HANDOFF_BOT;
+  if (issue.repository !== HANDOFF_REPOSITORY ||
+      typeof issue.title !== 'string' || !issue.title.trim() ||
+      issue.title.length > 256 ||
+      (botCreated && issue.title !== 'agent-handoff ' + request.incidentId))
+    return {state: 'ISSUE_IDENTITY_MISMATCH'};
   const routed = routeHandoff(request);
   const fingerprint = fingerprintHandoff(request);
   if (routed.fingerprint !== fingerprint) return {state: 'FINGERPRINT_MISMATCH'};
