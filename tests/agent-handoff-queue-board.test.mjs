@@ -181,17 +181,18 @@ test('read-only collector uses exact inventory/readback and fails when issue cha
   await assert.rejects(()=>collectBoard({...io,readIssue:async()=>({...f.issue,state:'closed'})},now),
     /ISSUE_DRIFT_RESCAN_REQUIRED/);
 });
-test('owner-authored handoff with descriptive title remains unselected and shows precise proof reason',()=>{
+test('owner-authored handoff with verified bot route can have descriptive title without claiming job started',()=>{
   const f=fixture(3194);
   f.issue.user={login:HANDOFF_OWNER};
   f.issue.title='[W03→총괄] descriptive human issue title';
   const row=evaluateQueueItem(f.issue,f.comments,now);
-  assert.equal(row.status,'PROOF_REVIEW_REQUIRED');
-  assert.equal(row.evidenceState,'ISSUE_IDENTITY_MISMATCH');
+  assert.equal(row.status,'PENDING_OWNER_ACK');
+  assert.equal(row.evidenceState,'ALREADY_SELECTED');
   assert.equal(row.ownerAccountVerified,false);
+  assert.equal(row.runtimeVerified,false);
   const board=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
   const markdown=renderBoardMarkdown(board);
-  assert.match(markdown,/ISSUE_IDENTITY_MISMATCH/);
+  assert.match(markdown,/ALREADY_SELECTED/);
   assert.match(markdown,/검증 원인/);
   assert.equal(board.pendingIssueCount,1);
   assert.equal(board.ackOnlyCount,0);

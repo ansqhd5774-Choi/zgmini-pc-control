@@ -57,6 +57,47 @@ test('rejects invalid or ineligible incidents without operations',()=>{
   assert.equal(assessIncident({...issue,title:'different'},[route]).state,'ISSUE_IDENTITY_MISMATCH');
   assert.equal(assessIncident({...issue,labels:[...issue.labels,{name:'handoff-duplicate'}]},[route]).state,'NOT_PENDING');
 });
+test('authenticated owner issue with descriptive title uses exact bot route, not title as authorization',async()=>{
+  const {issue,route}=fixture(2501);
+  const ownerIssue={...issue,user:{login:owner},
+    title:'[W03→프로세스 총괄] approved one-file B scope review'};
+  const verdict=assessIncident(ownerIssue,[route]);
+  assert.equal(verdict.state,'READY');
+  assert.match(verdict.receipt,/automaticAiExecution: NOT_CONFIGURED/);
+  let writes=0;
+  const saved=[route];
+  const result=await processQueue([ownerIssue],{
+    readComments:async()=>structuredClone(saved),
+    readIssue:async()=>structuredClone(ownerIssue),
+    recordReceipt:async(_,body)=>{writes++;saved.push({user:{login:HANDOFF_BOT},
+      issue_url:'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/2501',body});}
+  });
+  assert.equal(result.selected,1);
+  assert.deepEqual(result.selectedIssues,[2501]);
+  assert.equal(result.pcOperationalWrites,0);
+  assert.equal(result.automaticAiExecutions,0);
+  assert.equal(writes,1);
+  assert.equal(assessIncident(ownerIssue,saved).state,'ALREADY_SELECTED');
+  const again=await processQueue([ownerIssue],{
+    readComments:async()=>structuredClone(saved),
+    readIssue:async()=>structuredClone(ownerIssue),
+    recordReceipt:async()=>{writes++;}
+  });
+  assert.equal(again.alreadySelected,1);
+  assert.equal(writes,1);
+});
+
+test('descriptive owner title cannot bypass missing route or author and body integrity',()=>{
+  const {issue,route}=fixture(2502);
+  const ownerIssue={...issue,user:{login:owner},title:'W03 R47 shared handoff'};
+  assert.equal(assessIncident(ownerIssue,[]).state,'ROUTE_RECEIPT_UNVERIFIED');
+  assert.equal(assessIncident(ownerIssue,[{...route,body:route.body.replace('fingerprint:', 'changed:')}]).state,'ROUTE_RECEIPT_UNVERIFIED');
+  assert.equal(assessIncident({...ownerIssue,user:{login:'collaborator'}},[route]).state,'UNTRUSTED_ISSUE');
+  assert.equal(assessIncident({...ownerIssue,title:' '},[route]).state,'ISSUE_IDENTITY_MISMATCH');
+  assert.equal(assessIncident({...ownerIssue,body:'not-json'},[route]).state,'INVALID_CONTRACT');
+  assert.equal(assessIncident({...issue,title:'W03 R47 shared handoff'},[route]).state,'ISSUE_IDENTITY_MISMATCH');
+});
+
 test('candidate receipt is idempotent; malformed previous selection blocks duplication',()=>{
   const {issue,route,request,issue_url}=fixture();
   const body=selectionReceipt(request,fingerprintHandoff(request));
