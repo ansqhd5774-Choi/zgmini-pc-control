@@ -1,0 +1,143 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44077269668-1-seat-1",
+  "requestId": "pc-294cbbe1-c658-4fa4-9b7e-fbe801e0a401",
+  "startedAt": "2026-11-17T11:48:25.121Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "29b5e7296ee780a312a36c12ec3fe958a5c13ab3",
+  "sourceBranch": "main",
+  "operation": "inflation-a401-private23-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "A401_PRIVATE23_SOURCE_READBACK_VERIFIED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-aba4f5e6-4c4e-4fb6-9df3-0154f0ff2028",
+  "pcOperationalApprovedSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "A401_PRIVATE23_SOURCE_READBACK_VERIFIED",
+    "expected": 23,
+    "verified": 23,
+    "originalReady": 19,
+    "additionalReady": 4,
+    "original": [
+      {
+        "id": "1",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "3",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "4",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "5",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "6",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "7",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "8",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "9",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "10",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "11",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "12",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "13",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "14",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "18",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "19",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "21",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "25",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "26",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "31",
+        "status": "PRESENT_VALID"
+      }
+    ],
+    "additional": [
+      {
+        "id": "2",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "16",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "24",
+        "status": "PRESENT_VALID"
+      },
+      {
+        "id": "29",
+        "status": "PRESENT_VALID"
+      }
+    ],
+    "evidenceScope": "APPROVED_PRIVATE_SOURCE_READBACK",
+    "sqliteOpened": true,
+    "sqliteReadOnly": true,
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0,
+    "sqliteWrites": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "protectedAfterSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "actualExecutionSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-17T11:48:54.219Z",
+  "durationMs": 29098
+}
