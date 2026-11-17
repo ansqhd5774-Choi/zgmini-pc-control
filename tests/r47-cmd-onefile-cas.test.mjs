@@ -28,6 +28,14 @@ function preimage(m){
   sharedWriterLeaseOwned:true,unrelatedWriteConflict:false,
   sourceDirtyOnTarget:false};
 }
+test('R47 fixed CMD path matches the R54 observed data-root location, not a doubled pc-writer segment',()=>{
+ const r54Observed=String.raw`E:\\ZGmini\\data\\pc-writer\\theme-nine-r48\\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd`;
+ assert.equal(R47_CMD_B.targetPath,r54Observed);
+ // This does not certify Task Exec action: preimage comparison still fails closed.
+ assert.throws(()=>verifyR47CmdBPreimage(manifest(),{
+  ...preimage(manifest()),taskActionPath:String.raw`E:\\ZGmini\\data\\pc-writer\\pc-writer\\theme-nine-r48\\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd`
+ }),{code:'TASK_CMD_B_PREIMAGE_STOP'});
+});
 test('R47 one-file manifest restricts task, CMD path, both SHA and effects',()=>{
  const m=manifest();assert.equal(validateR47CmdBManifest(m),m);
  for(const [key,value] of [
