@@ -1,0 +1,54 @@
+{
+  "schema": "ZGMINI_PC_INTAKE_RECOVERY_V1",
+  "requestId": "pc-update-6ca8cf47-2f0d-4dfa-b520-df377c1d38fe",
+  "issueNumber": 1979,
+  "status": "INTAKE_RECOVERED_EXISTING_CONTROLLER_PRESERVED",
+  "actualControllerSha": "5492726bb5b0505b7ff7db73a3c673dabdf724ce",
+  "originalLedgerPreserved": true,
+  "originalRequestRetried": false,
+  "controllerChanged": false,
+  "workflowChanged": false,
+  "replayedRequests": 0,
+  "rejectedOriginalIssues": [
+    1981
+  ],
+  "rejectionCode": "PREIMAGE_MANIFEST_PATH",
+  "providerCalls": 0,
+  "operationalWrites": 0,
+  "d1Writes": 0,
+  "protectedStateUnchanged": true,
+  "sourceSha": "36cf8ffb813f3a006f3e05379fba641fb3404645",
+  "leaseArchived": true,
+  "archiveName": "pc-update-6ca8cf47-2f0d-4dfa-b520-df377c1d38fe-intake-0723d134-89d9-43b0-8e03-2db1c42a813c.lease",
+  "maintenanceBookkeepingWrites": 2,
+  "at": "2026-11-17T10:43:48.308Z",
+  "completedClaimArchived": true,
+  "completedClaimArchiveName": "pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12-completed-claim-fb0d66b1-1cb6-46c5-b9d9-60b110055595.lease",
+  "independentReadback": {
+    "verifiedAt": "2026-11-17T10:46:34.418Z",
+    "checks": {
+      "installLeaseAbsent": true,
+      "recoveryClaimAbsent": true,
+      "reentryAbsent": true,
+      "oldClaimPreserved": true,
+      "installOwnerPreserved": true,
+      "installMarkerPreserved": true,
+      "ledgerUnchanged": true,
+      "invalidOriginalRejected": true,
+      "controllerSame": true,
+      "runtimeHealthy": true,
+      "maintenanceHealthy": true,
+      "workflowActive": true,
+      "protectedUnchanged": true
+    },
+    "installLock": {
+      "held": false
+    }
+  },
+  "originalLedgerStatusPreserved": "RECOVERY_REQUIRED",
+  "tests": {
+    "windowsTempPassed": 152,
+    "failed": 0
+  },
+  "maintenancePreventionSourceInstalled": false
+}

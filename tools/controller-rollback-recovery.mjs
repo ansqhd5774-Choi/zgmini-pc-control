@@ -6,6 +6,9 @@ const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const digest=b=>createHash('sha256').update(b).digest('hex'),read=p=>JSON.parse(fs.readFileSync(p));
 const need=(b,c)=>{if(!b)throw Object.assign(Error(c),{code:c});};
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
+export function retainRollbackClaim(result,archived){
+ return result?.mutationStarted===true&&!(archived===true&&result.status==='ROLLED_BACK'&&result.leaseArchived===true);
+}
 export function validateStalledClaim({requestId,approval,claimBytes,recordBytes,backlogBytes,ownerAlive}){
  const spec=approval.resumeClaim,owner=JSON.parse(claimBytes),prior=JSON.parse(recordBytes);
  need(spec&&spec.ownerSha256===digest(claimBytes)&&spec.recordSha256===digest(recordBytes)&&
@@ -75,7 +78,7 @@ export async function main(args=process.argv.slice(2)){
  fs.writeFileSync(claimFile,JSON.stringify({pid:process.pid,nonce,requestId:id}),{flag:'wx'});
  const reports=path.join(root,'recovery');fs.mkdirSync(reports,{recursive:true});
  const record=path.join(reports,id+'-rollback-'+nonce+'.json');let keep=false,archived=false;
- const persist=async r=>{if(r.mutationStarted)keep=true;const temp=record+'.tmp';fs.writeFileSync(temp,JSON.stringify(r,null,2)+'\n',{flag:'wx'});fs.renameSync(temp,record);};
+ const persist=async r=>{if(r.mutationStarted)keep=retainRollbackClaim(r,archived);const temp=record+'.tmp';fs.writeFileSync(temp,JSON.stringify(r,null,2)+'\n',{flag:'wx'});fs.renameSync(temp,record);};
  try{
   need(fs.readFileSync(path.join(dir,'owner.json')).equals(ownerBytes)&&fs.readFileSync(ledgerFile).equals(ledgerBytes)&&alive(owner.pid)===false,'ROLLBACK_EVIDENCE_CHANGED');
   const {ports}=makePorts(data,data.issueNumber,{recoveryOperator:true});

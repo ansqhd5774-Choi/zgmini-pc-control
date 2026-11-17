@@ -117,3 +117,11 @@ source·의존 파일·ledger/owner/marker/backlog/host/보호 상태 해시가 
 - 현재 Controller/유지보수기 건강·6개 전용 Runner·Workflow active·보호 상태·종료된 원 소유자·ledger/owner/marker/backlog/host 원본 해시가 모두 일치해야 한다. 누락/추가 요청·진행 중 실행·소유자 재생존·바이트 변화가 있으면 적용하지 않는다.
 - 기존 공통 transaction으로 원본 backlog 백업, 정합화된 backlog 재조회, 전체 install lease 보관을 수행한다. 원본 ledger는 그대로 두고 별도 complete 영수증으로 복구를 판정한다. 중간 실패는 원본/claim/단계 증거를 유지하고 재실행하지 않는다.
 - Controller/Workflow/예약/DB/D1/공급자 호출/원본 요청 재실행은 변경 0이다. 이 복구는 W03 신규 검사기의 설치 또는 68단계 완료를 뜻하지 않는다. 복구 후 새 모듈이 필요한 담당자는 실제 설치 SHA에서 누적 diff와 정확한 별도 설치 manifest를 준비해 기존 정상 B 경로를 사용한다. 독립 기능은 이 공유 설치 상태를 전역 Gate로 삼지 않는다.
+
+### #1979 INTAKE_RESUMED 이후 잘못된 backlog 요청
+
+Controller 실제 목표 5492726bb5b0505b7ff7db73a3c673dabdf724ce, Workflow active 및 6개 Runner 건강과 별도 #1985 PASS를 확인해도 #1979 원본 ledger는 실패 이력으로 보존한다. tools/controller-1979-backlog-recovery.mjs는 정확한 원본 바이트/승인 해시로 고정된 #1981 한 건만 대상으로 한다. 기존 경로를 만족하지 않는 writer-updates 승인 문서를 writer-preimage 문서처럼 허용하지 않는다.
+
+원본 pause window는 이미 닫혔다. 전체 구간 검색이 #1981 한 건이고 현행 검사기로 부적합이 확인될 때 REJECTED_INVALID_ORIGINAL/PREIMAGE_MANIFEST_PATH를 backlog에 기록한다. 원본 Issue/본문은 수정하지 않고 재생하지 않는다. 기존 공통 transaction의 원본 backlog 백업·현재 보호 재검증·install lease 전체 보관·독립 결과 재조회 및 정확한 커밋 승인 manifest를 그대로 적용한다. 이는 원본 #1979 설치 성공 판정이 아닌 접수 정합 복구다. inspect/apply --source-sha <고정 source>로 구별하며 apply는 현재 사용자 공통 제어 lease 복구 승인 범위에서만 수행한다.
+
+재발 방지 source: update.mjs의 classifyBacklogOriginal은 관측 가능한 잘못된 JSON/계약을 실행 금지의 명시적 terminal rejection으로 분리한다. 검증을 완화하지 않고 body SHA와 실패 코드를 원장에 남긴 뒤 다른 정상 요청의 처리를 계속한다. 내용이 바뀌었거나 관측 불명확한 경우는 중단한다. 이 source 수정은 유지보수기 자체의 정규 정책 인계 전까지 운영 적용된 것으로 간주하지 않는다.

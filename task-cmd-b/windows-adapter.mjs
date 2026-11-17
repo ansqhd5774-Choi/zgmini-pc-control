@@ -8,6 +8,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createHash} from 'node:crypto';
+import {R47_CHAIN_ROOT,R47_CHAIN_PINS,verifiedR47TaskRoute} from './r47-task-chain.mjs';
 import {applyR47CmdBCas,R47_CMD_B} from './r47-onefile-cas.mjs';
 import {approveExactR47B,assertApprovedR47B,R47_B_ISSUE} from './approval-intake.mjs';
 import {gitApprovedR47Blob} from './source-pin.mjs';
@@ -107,10 +108,17 @@ export function makeR47WindowsAdapter(auth,{candidateRoot}){
   ownerLock();
   const x=taskXml(m.task),p=taskProbe(),bytes=readTarget();
   const action=taskAction(x.decoded);
-  // A direct approved Task action is mandatory. An unknown nested launcher is
-  // not silently accepted as proof of executing this CMD.
+  // Only the exact reviewed R73/R48 launcher byte chain can supplement a
+  // direct Task action. Re-read every member on every pre/post-CAS probe.
   const direct=same(action.command,target);
-  return {x,p,bytes,direct,action};
+  const taskChainProof=direct?null:{kind:'PINNED_R73_R48_CHAIN',
+   taskActionPath:action.command,targetPath:target,arguments:action.arguments,
+   workingDirectory:action.workingDirectory,
+   files:Object.fromEntries(Object.keys(R47_CHAIN_PINS).map(name=>
+    [name,sha(exactFile(path.win32.join(R47_CHAIN_ROOT,name),DATA,256*1024))]))};
+  need(verifiedR47TaskRoute({taskActionPath:action.command,taskChainProof},target),
+   'TASK_CMD_B_TASK_CHAIN_UNVERIFIED_STOP');
+  return {x,p,bytes,direct,action,taskChainProof};
  }
  return {
   async assertPinnedApproval(candidate){return assertApprovedR47B(auth)===auth&&
@@ -122,9 +130,8 @@ export function makeR47WindowsAdapter(auth,{candidateRoot}){
   },
   async readPreimage(){
    const e=probeEvidence();
-   need(e.direct,'TASK_CMD_B_TASK_ACTION_NOT_DIRECT_STOP');
    if(!baseTask){baseTask=e.x;original=e.bytes;}
-   return {task:m.task,taskActionPath:e.direct?target:e.action.command,
+   return {task:m.task,taskActionPath:e.action.command,taskChainProof:e.taskChainProof,
     installedFilePath:target,taskXmlSha256:sha(e.x.raw),
     installedSha256:sha(e.bytes),taskEnabled:e.p.enabled,
     taskRunning:!notRunning(e.p),sharedWriterLeaseOwned:true,

@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {validateStalledClaim} from '../tools/controller-rollback-recovery.mjs';
+import {validateStalledClaim,retainRollbackClaim} from '../tools/controller-rollback-recovery.mjs';
 const h=b=>createHash('sha256').update(b).digest('hex');
 function fixture(){
  const requestId='pc-update-fixture';
@@ -21,3 +21,11 @@ for(const [name,change] of Object.entries({
  changedBacklog:f=>f.backlogBytes=Buffer.from('{"changed":true}'),
  unsafePhase:f=>{const r=JSON.parse(f.recordBytes);r.code='WRITE_OUTCOME_UNKNOWN';f.recordBytes=Buffer.from(JSON.stringify(r));f.approval.resumeClaim.recordSha256=h(f.recordBytes);},
  }))test('stalled continuation refuses '+name,()=>{const f=fixture();change(f);assert.throws(()=>validateStalledClaim(f));});
+
+test('successful archive final record releases reservation while uncertain and pre-archive writes retain it',()=>{
+ const done={mutationStarted:true,status:'ROLLED_BACK',leaseArchived:true};
+ assert.equal(retainRollbackClaim(done,true),false);
+ assert.equal(retainRollbackClaim(done,false),true);
+ assert.equal(retainRollbackClaim({...done,leaseArchived:false},true),true);
+ assert.equal(retainRollbackClaim({...done,status:'RECOVERY_REQUIRED'},true),true);
+});

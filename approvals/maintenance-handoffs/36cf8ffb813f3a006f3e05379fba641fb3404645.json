@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7",
+  "targetSha": "36cf8ffb813f3a006f3e05379fba641fb3404645",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Current user instruction to resolve the five common blockers and existing PC_AUTOMATION_STANDARD section 5 same-purpose maintainer policy handoff; exact seven-runtime-file receiver, no C privilege/security/task change",
+  "files": {
+    "tools/maintenance-contract.mjs": "24145afe1695f8cde691a03a87df480af1ea695d4757eb34d00d6b6405d58f57",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "da5121e526c752ab8950cfd27d497255bcc27caa940b91ea9aad04c81239504f",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "3719d3fe71b3ed7a1e49dbfd4d4da58a733e29a1e64bbbc5e1dd5fb7ba8871b8",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "windowsRecoveryTestsPassed": 152,
+    "failed": 0,
+    "remoteSourceBytesVerified": true
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "effects": [
+    "retain running reconnected Controller on uncertain intake",
+    "reject invalid backlog original without execution or global install failure",
+    "represent unobserved workflow state as null"
+  ],
+  "preserve": [
+    "Controller 5492726bb5b0505b7ff7db73a3c673dabdf724ce and host.json",
+    "existing six operating Runners and active pc-job workflow",
+    "Core/Korea tasks, retired Iran absence, DB/D1/source/provider settings",
+    "original #1841/#1979 ledgers and archived claims/leases"
+  ],
+  "scopeNote": "Cooperative receiver-only update; no forced process termination. Source-only rollback operator reservation fix is retained in GitHub and is not installed as a receiver runtime file. Requires merged main approval, exact nine file hashes and fresh no-active-update/independent-medium-operator/receiver-origin/startup proof."
+}
