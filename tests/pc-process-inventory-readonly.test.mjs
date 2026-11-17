@@ -1,7 +1,7 @@
 import test from 'node:test';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -80,6 +80,23 @@ test('memory groups fail closed for unapproved labels and forged counters',()=>{
   [valid,valid]];
  for(const groups of cases)
   assert.throws(()=>sanitizeProbe({...base,memoryGroups:groups}));
+});
+test('compact result preserves full memory attribution and large readonly roster without truncation',()=>{
+ const complete={schema:'ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1',
+  role:'operating',status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',
+  snapshot:{memoryGroupCoverage:'COUNT_COMPLETE',
+   memoryGroups:[{kind:'NODE_NONRUNNER',count:14,workingSetMiB:0,
+    privateCommitMiB:3000,zeroWorkingSetCount:14,
+    unknownWorkingSetCount:0,unknownPrivateCommitCount:0}],
+   processes:Array.from({length:60},(_,i)=>({name:'node.exe',pid:i+1,
+    ppid:123,session:1,workingSetMiB:0,privateCommitMiB:90}))},
+  observedHttpHostRoster:{hosts:Array.from({length:32},(_,i)=>({
+   host:'example-'+i+'.gov',summary:'X'.repeat(180),readOnly:true}))}};
+ const raw=serializeProcessResult(complete);
+ assert.ok(Buffer.byteLength(raw)<32768);
+ assert.ok(Buffer.byteLength(raw)<Buffer.byteLength(JSON.stringify(complete,null,2)));
+ assert.deepEqual(JSON.parse(raw),complete);
+ assert.match(raw,/privateCommitMiB/);
 });
 test('reject unapproved process names, task names, service names',()=>{
  const raw={schema:'ZGMINI_PC_PROCESS_PROBE_V1',
