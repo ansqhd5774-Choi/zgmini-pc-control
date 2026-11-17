@@ -71,9 +71,9 @@ try {
   if($cfg -match '(?im)^\s*oauth_token\s*:' -or
      $cfg -match '(?:github_pat_|gh[opusr]_|ghs_)[A-Za-z0-9_]{12,}'){StopSafe 'GH_PLAINTEXT_TOKEN_STOP'}
   $cfg=$null
-  $null=& $gh.Source auth status --hostname github.com 2>&1
+  $null=& $gh.Source auth status --hostname github.com 2>$null
   if($LASTEXITCODE -ne 0){StopSafe 'GH_AUTH_UNAVAILABLE'}
-  $null=& $gh.Source api --method GET 'repos/ansqhd5774-Choi/zgmini-pc-control/issues?per_page=1' 2>&1
+  $null=& $gh.Source api --method GET 'repos/ansqhd5774-Choi/zgmini-pc-control/issues?per_page=1' 2>$null
   if($LASTEXITCODE -ne 0){StopSafe 'ISSUES_READ_UNAVAILABLE'}
 
   if(-not $Apply){Report 'READONLY_READY_USER_APPLY_REQUIRED';exit 0}
