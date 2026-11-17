@@ -40,9 +40,6 @@ export function validateScoutEvent(event,env){
       event.issue?.state!=='open'||event.issue?.user?.login!==OWNER||
       !event.issue?.labels?.some?.(x=>x.name==='agent-handoff')||
       env.GITHUB_ACTOR!==OWNER)stop('FALLBACK_ISSUE_STOP');
-  }else if(env.GITHUB_EVENT_NAME==='push'){
-    if(event.ref!=='refs/heads/main'||event.deleted===true||
-      env.GITHUB_ACTOR!==OWNER)stop('FALLBACK_PUSH_STOP');
   }else stop('EVENT_TYPE_STOP');
 }
 function assertLedger(issue){
