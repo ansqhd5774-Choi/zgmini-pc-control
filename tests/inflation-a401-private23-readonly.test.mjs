@@ -13,3 +13,53 @@ test('source file drift blocks before invoking any child',()=>{const f=fixture()
 test('arbitrary request cannot use an unregistered app checkout',()=>{const f=fixture();try{assert.throws(()=>stageA401Bundle({...f.request,sourceSha:'b'.repeat(40)},f.context),{code:'A401_BUNDLE_NOT_APPROVED'});}finally{fs.rmSync(f.root,{recursive:true,force:true});}});
 
 test('another host data root cannot silently read the fixed operating PC root',()=>{const f=fixture();try{f.context.dataRoot='C:/other-data';let calls=0;const r=inspectA401Private23(f.request,f.context,{run:()=>{calls++;}});assert.equal(calls,0);assert.equal(r.code,'A401_DATA_ROOT_DENIED');}finally{fs.rmSync(f.root,{recursive:true,force:true});}});
+
+function addSyntheticBundleFiles(f, extraFiles){
+ const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const manifestPath=path.join(f.bundle,'manifest.json');
+ const manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+ for(const[relativePath,text]of Object.entries(extraFiles)){
+  const bytes=Buffer.from(text),file=path.join(f.bundle,'source',relativePath);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(file,bytes);
+  manifest.files[relativePath]=sha(bytes);
+ }
+ const raw=Buffer.from(JSON.stringify(manifest));
+ fs.writeFileSync(manifestPath,raw);
+ f.context.host.approvedSources[f.request.sourceSha].manifestSha256=sha(raw);
+ return manifest;
+}
+const w01ClosureSix={
+ 'lib/inflation-causal-candidates-public-7-catalog.mjs':'// synthetic catalog fixture',
+ 'lib/inflation-causal-public-catalog.mjs':'// synthetic public catalog fixture',
+ 'scripts/pc-writer/inflation-causal-candidates-public-7-preview-r1.mjs':'// synthetic candidate preview fixture',
+ 'scripts/pc-writer/inflation-causal-public-preview-r1.mjs':'// synthetic preview fixture',
+ 'worker/inflation-causal-candidates-public-7-r1.mjs':'// synthetic candidate worker fixture',
+ 'worker/inflation-causal-public-r1.mjs':'// synthetic public worker fixture'
+};
+test('fixed seven-file W01 closure stages precisely the two required worker contracts',()=>{
+ const f=fixture();try{
+  const manifest=addSyntheticBundleFiles(f,w01ClosureSix);
+  assert.equal(Object.keys(manifest.files).length,7);
+  const staged=stageA401Bundle(f.request,f.context);
+  for(const[relativePath,fixtureText]of Object.entries(w01ClosureSix)){
+   assert.equal(fs.readFileSync(path.join(staged.cwd,relativePath),'utf8'),fixtureText);
+  }
+  assert.ok(fs.existsSync(staged.entry));
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
+test('unlisted worker module is blocked even with internally consistent manifest digest',()=>{
+ const f=fixture();try{
+  addSyntheticBundleFiles(f,{'worker/other.mjs':'// denied synthetic module'});
+  assert.throws(()=>stageA401Bundle(f.request,f.context),{code:'A401_BUNDLE_PATH'});
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
+test('approved worker module byte drift blocks before child execution',()=>{
+ const f=fixture();try{
+  addSyntheticBundleFiles(f,w01ClosureSix);
+  fs.appendFileSync(path.join(f.bundle,'source','worker/inflation-causal-public-r1.mjs'),'// drift');
+  let calls=0;
+  const result=inspectA401Private23(f.request,f.context,{run:()=>{calls++;}});
+  assert.equal(calls,0);assert.equal(result.status,'BLOCKED');assert.equal(result.code,'A401_SOURCE_BYTES_DRIFT');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
