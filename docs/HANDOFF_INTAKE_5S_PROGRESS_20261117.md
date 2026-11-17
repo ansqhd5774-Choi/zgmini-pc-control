@@ -91,3 +91,14 @@
 **현재 완료율:** 소스/PR 범위 4/5 (80%), PC 실제 5초 감시 활성화는 0/1.
 
 **다음 필수 행동:** 실제 공통 대기열 PC에서 기존 승인된 읽기 권한·상주 실행/재시작 계약과 B급 유지보수 적용 경로 확인 → 허용 범위 내 설치 → 실제 5초 주기·기존 업무 Runner 비점유·재연결·API quota 측정. 허용된 설치 경로가 없으면 자동화 미적용 사실과 정확한 부족 권한을 기록하며 다른 원격 실행 도구로 우회하지 않는다.
+
+## 2026-11-17 공통 대기열 PC 한정 후속 — 영수증 검증 429 누락·중복·401 복구
+
+- **범위 확정:** 이 기록은 **공통 대기열 PC의 독립 5초 접수 감시 소스 자체** 장애 복구에만 적용. 프로세스 총괄 업무·중앙 #68의 다른 인계·W01~W05 기능 승인/설치 판단은 처리하지 않음.
+- **확인된 코드 결함:** `agent-handoff/intake-watch-5s.mjs`가 영수증 검증 lane의 HTTP 403/429 실패 후 해당 Issue를 대기열에서 제거하여, 5초 목록이 이후 `304` 또는 불변 `updated_at`이면 잃어버린 영수증을 자동 재검증하지 않음. 검증 중인 사건을 `receiptPending`에서 즉시 제거하여 빠른 연속 업데이트 시 진행 중 신원을 큐 중복 방지 대상으로 취급하지 않음. 영수증 검증 lane의 HTTP 401이 목록 loop 전체 정지 조건이 되지 않음. 별도 `intake-receipt-readonly.mjs`가 GitHub `Retry-After`·quota-reset 대기 근거를 예외에 보존하지 않음.
+- **최소 수정 PR:** [#1909](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1909), 정확 기존 **소스 2개·시험 2개**만 변경. 임시 실패(403/429/5xx/AbortError) 영수증 번호를 대기열에 보존해 **최대 3번만** 서버 지정 retry-after·할당량 reset 이후 재검증. 3회 후에는 `RECEIPT_RETRY_EXHAUSTED`로 종료하고 자동 재시도 무한 루프 금지. 진행 중 같은 번호의 변경은 1회 후속 검증으로 합치고 in-flight 완료 전에 pending 집합에서 제거하지 않음. 영수증-only 401은 `WATCH_RECEIPT_AUTH_REJECTED_STOP` 후 전체 감시 정지; 비정형 예외 원문·토큰은 로그에 미게시.
+- **5초 루프 독립:** 영수증 오류 백오프는 영수증 레인에만 적용하며 정상 목록 GET 5초 타이머를 점유하지 않음. 전체 인증 401이 발생하면 반복 조회를 멈춤. 새 GitHub Actions/상주 Runner/예약/C급 Windows 작업을 만들지 않음.
+- **격리 테스트:** 신규 경계 시험 5개(HTTP 429 Retry-After, 403 reset epoch, `304` 불변 목록의 429 복구, 영수증-only 401 종료, 3회 제한), 기존 테스트 합계 [Handoff Windows CI Run 44028599065](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44028599065) **455/455 PASS, 0 FAIL**, 정확 소스 PR HEAD `d159e736872cfea3efc3f816c70c2bbdcf159d32`. [C996 Run 44028592068](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44028592068) `completed/success`.
+- **main 적용:** #1909 실제 squash 병합 `0a30d3061d25fc826e2b149046dea46d123e785e`; 운영 PC, 기존 격리 Runner, Windows 사용자 작업 스케줄러, 서비스, 인증 자격, SQLite/D1/공급자 호출·원자료 변경 **0건**.
+- **운영 미완료 그대로:** 소스 병합은 **5초 감시기의 실제 PC 설치·부팅 재기동·최소권한 credential·heartbeat 계측을 증명하지 않음**. 원래 5단계 계획 **4/5(80%) 소스/테스트 완료**, 실운영 **0/1 및 RUNTIME_ACTIVATION_BLOCKED** 유지. 기존 C급 등록 계약 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`는 변경/승인하지 않음.
+- **다음 실행:** 공통 대기열 PC 독립 감시기 C급 사용자 직접 활성화가 실제 승인·검증됐을 때만 정확 설치 source/Node/인증·최소 2회 heartbeat·5초 목록과 영수증 lane·Runner 비간섭 실측. 별도 승인이 없으면 운영 설치를 시도하지 않고 추가 코드 변경도 관측 결함에 한정.
