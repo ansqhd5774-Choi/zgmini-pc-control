@@ -30,8 +30,11 @@ const PS_SCRIPT=[
  "$filtered = @($processes | Where-Object { $names -contains $_.Name })",
  "$counts = @($filtered | Group-Object Name | Sort-Object Name | ForEach-Object { [pscustomobject]@{name=[string]$_.Name;count=[int]$_.Count} })",
  "$selected = @($filtered | Sort-Object @{Expression={ if ($_.Name -match '(?i)^Runner\\.') {0} elseif ($_.Name -match '(?i)^(wscript|cscript)\\.exe$') {1} elseif ($_.Name -match '(?i)^node\\.exe$') {2} elseif ($_.Name -match '(?i)^(powershell|pwsh)\\.exe$') {3} elseif ($_.Name -match '(?i)^cmd\\.exe$') {4} else {5} }},Name,ProcessId | Select-Object -First 60 | ForEach-Object {",
- " [pscustomobject]@{name=[string]$_.Name;pid=[int]$_.ProcessId;ppid=[int]$_.ParentProcessId;session=[int]$_.SessionId;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576)}",
+ " [pscustomobject]@{name=[string]$_.Name;pid=[int]$_.ProcessId;ppid=[int]$_.ParentProcessId;session=[int]$_.SessionId;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576);privateCommitMiB=[int][math]::Floor(([double]$_.PageFileUsage)/1024)}",
  "})",
+ "$byPid=@{}; foreach($p in $processes){$byPid[[int]$p.ProcessId]=$p}",
+ "$memoryRows=@(foreach($p in $processes){ $n=[string]$p.Name; $kind='OTHER_PROCESSES'; if($n -ieq 'Runner.Listener.exe'){$kind='RUNNER_LISTENER'} elseif($n -ieq 'Runner.Worker.exe'){$kind='RUNNER_WORKER'} elseif($n -ieq 'node.exe'){ $kind='NODE_NONRUNNER'; $parentId=[int]$p.ParentProcessId; for($depth=0;$depth -lt 12;$depth++){if(!$byPid.ContainsKey($parentId)){break}; $ancestor=$byPid[$parentId];if($ancestor.Name -in @('Runner.Listener.exe','Runner.Worker.exe')){$kind='NODE_RUNNER_DESCENDANT';break};$nextId=[int]$ancestor.ParentProcessId;if($nextId -eq $parentId){break};$parentId=$nextId} } elseif($n -in @('wscript.exe','cscript.exe','powershell.exe','pwsh.exe','cmd.exe','conhost.exe','git.exe','gh.exe','python.exe','pythonw.exe')){$kind='SUPPORT_PROCESSES'}; [pscustomobject]@{kind=$kind;workingSetMiB=[int][math]::Floor(([double]$p.WorkingSetSize)/1048576);privateCommitMiB=[int][math]::Floor(([double]$p.PageFileUsage)/1024);workingSetUnknown=($null -eq $p.WorkingSetSize);privateCommitUnknown=($null -eq $p.PageFileUsage)} })",
+ "$memoryGroups=@($memoryRows | Group-Object kind | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{kind=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum;zeroWorkingSetCount=@($items | Where-Object { $_.workingSetMiB -eq 0 }).Count;unknownWorkingSetCount=@($items | Where-Object { $_.workingSetUnknown }).Count;unknownPrivateCommitCount=@($items | Where-Object { $_.privateCommitUnknown }).Count} })",
  "$services=@()",
  "$serviceStatus='OK'",
  "try { $services=@(Get-CimInstance -ClassName Win32_Service -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^(actions\\.runner\\.|zgmini)' } | Sort-Object Name | Select-Object -First 24 | ForEach-Object { [pscustomobject]@{ name=[string]$_.Name;state=[string]$_.State;startMode=[string]$_.StartMode } }) } catch { $serviceStatus='UNAVAILABLE' }",
@@ -41,7 +44,7 @@ const PS_SCRIPT=[
  "$startup=@()",
  "$startupStatus='OK'",
  "try { $folder=Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Startup'; if (Test-Path -LiteralPath $folder -PathType Container) { $startup=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^ZGMINI[-_. ]' } | Select-Object -First 24 | ForEach-Object { [string]$_.Name }) } } catch { $startupStatus='UNAVAILABLE' }",
- "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
+ "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);memoryGroups=@($memoryGroups);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
  "$result | ConvertTo-Json -Compress -Depth 8"
 ].join('; ');
 
@@ -71,7 +74,8 @@ export function sanitizeProbe(raw){
    if(!KNOWN_PROCESSES.has(name.toLowerCase()))fail('PROBE_PROCESS_NOT_ALLOWLISTED');
    if(smallInt(p.pid)===null||smallInt(p.ppid)===null)fail('PROBE_PID_INVALID');
    return {name,pid:p.pid,ppid:p.ppid,session:smallInt(p.session,1000),
-    workingSetMiB:smallInt(p.workingSetMiB,200000)};
+    workingSetMiB:smallInt(p.workingSetMiB,200000),
+    privateCommitMiB:smallInt(p.privateCommitMiB,200000)};
  });
  const processCounts=safeList(raw.processCounts,24).map(p=>{
   const name=simple(p?.name,60);
@@ -79,6 +83,28 @@ export function sanitizeProbe(raw){
    fail('PROBE_PROCESS_COUNT_INVALID');
   return {name,count:p.count};
  });
+ // Aggregates all processes without exporting private application names,
+ // paths, command lines or an unbounded process list.
+ const allowedKinds=new Set(['RUNNER_LISTENER','RUNNER_WORKER',
+  'NODE_RUNNER_DESCENDANT','NODE_NONRUNNER','SUPPORT_PROCESSES','OTHER_PROCESSES']);
+ const memoryGroups=safeList(raw.memoryGroups,6).map(g=>{
+  if(!allowedKinds.has(g?.kind))fail('PROBE_MEMORY_GROUP_NOT_ALLOWLISTED');
+  const row={kind:g.kind};
+  for(const k of ['count','workingSetMiB','privateCommitMiB','zeroWorkingSetCount',
+   'unknownWorkingSetCount','unknownPrivateCommitCount']){
+    const v=smallInt(g?.[k],2000000);
+    if(v===null)fail('PROBE_MEMORY_GROUP_VALUE_INVALID');
+    row[k]=v;
+  }
+  if(row.zeroWorkingSetCount>row.count||row.unknownWorkingSetCount>row.count||
+     row.unknownPrivateCommitCount>row.count)fail('PROBE_MEMORY_GROUP_COUNT_INVALID');
+  return row;
+ });
+ if(new Set(memoryGroups.map(g=>g.kind)).size!==memoryGroups.length)
+  fail('PROBE_MEMORY_GROUP_DUPLICATE');
+ const counted=memoryGroups.reduce((acc,g)=>acc+g.count,0);
+ const memoryGroupCoverage=memoryGroups.length===0?'UNAVAILABLE':
+   counted===raw.totalProcessCount?'COUNT_COMPLETE':'COUNT_PARTIAL';
  const services=safeList(raw.services,24).map(s=>{
   const name=simple(s?.name,110);
   if(!/^(actions\.runner\.|zgmini)/i.test(name))fail('PROBE_SERVICE_NOT_ALLOWLISTED');
@@ -99,7 +125,8 @@ export function sanitizeProbe(raw){
     String(raw.observedAtUtc).slice(0,32):null,
   totalProcessCount:smallInt(raw.totalProcessCount,100000),
   selectedProcessCount:smallInt(raw.selectedProcessCount,100000),
-  processes,processCounts,services,serviceStatus:mode(raw.serviceStatus),
+  processes,processCounts,memoryGroups,memoryGroupCoverage,
+  services,serviceStatus:mode(raw.serviceStatus),
   tasks,taskStatus:mode(raw.taskStatus),startup,startupStatus:mode(raw.startupStatus),
   processListTruncated:smallInt(raw.selectedProcessCount,100000)>processes.length};
 }
@@ -705,6 +732,7 @@ export function toText(r){
   'observedAtUtc='+r.observedAtUtc,
   'totalProcessCount='+(r.snapshot?.totalProcessCount??'UNKNOWN'),
   'selectedProcessCount='+(r.snapshot?.selectedProcessCount??'UNKNOWN'),
+  'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
