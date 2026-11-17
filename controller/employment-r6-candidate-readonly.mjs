@@ -17,7 +17,11 @@ const PIT_FIELDS=['coreCurrentRows','coreHistoryRevisions','coreCurrentKeys',
   // source hashes, raw observations, paths, or availability timestamps.
   'coreHistoryAsOfUniqueKeys','coreHistoryPriorRevisionKeys',
   'coreHistoryPriorRevisionRows','coreHistoryAmbiguousLatestKeys',
-  'coreHistorySameInstantAdditionalRows','candidateHistoryAsOfUniqueKeys',
+  'coreHistorySameInstantAdditionalRows',
+  // PIT-04-03: disjoint Core CURRENT-to-latest-HISTORY, count-only classification.
+  'coreCurrentHistoryMatchingKeys','coreCurrentHistoryConflictingKeys',
+  'coreCurrentHistoryUnverifiedKeys','coreCurrentHistoryMissingKeys',
+  'candidateHistoryAsOfUniqueKeys',
   'candidateHistoryPriorRevisionKeys','candidateHistoryPriorRevisionRows',
   'candidateHistoryAmbiguousLatestKeys','candidateHistorySameInstantAdditionalRows',
   'coreCurrentKeysMissingHistory','missingKeysWithCandidateHistory',
@@ -156,6 +160,17 @@ export async function inspectEmploymentR6Candidate(request,context){
         scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING'})):[];
     const summary=Object.fromEntries(SUMMARY_FIELDS.map(k=>[k,count(body.summary?.[k])]));
     const pit=Object.fromEntries(PIT_FIELDS.map(k=>[k,count(body.pit?.[k])]));
+    // PIT-04-03: a complete four-bucket result must partition the same
+    // as-of Core CURRENT keys. A PASS report with inconsistent totals is
+    // invalid evidence, never a new candidate promotion or corrected count.
+    const four=['coreCurrentHistoryMatchingKeys','coreCurrentHistoryConflictingKeys',
+      'coreCurrentHistoryUnverifiedKeys','coreCurrentHistoryMissingKeys'];
+    if(body.status==='PASS'&&four.every(k=>pit[k]!==null)
+      &&(pit.coreCurrentKeys===null
+        ||four.reduce((sum,k)=>sum+pit[k],0)!==pit.coreCurrentKeys
+        ||(pit.coreCurrentKeysMissingHistory!==null
+          &&pit.coreCurrentHistoryMissingKeys!==pit.coreCurrentKeysMissingHistory)))
+      stop('R6_RESULT_INVALID');
     pit.candidateReconciliationPreviewStatus=/^[A-Z0-9_]{1,90}$/.test(body.pit?.candidateReconciliationPreviewStatus??'')
       ?body.pit.candidateReconciliationPreviewStatus:'NO_RUNTIME_EVIDENCE';
     const walPreflight=Object.fromEntries(['coreWalMode','candidateWalMode',
