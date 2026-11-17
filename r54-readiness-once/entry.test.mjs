@@ -118,7 +118,7 @@ test('new R35 issue report omits unrelated R54 details and fits 8192-byte upload
   const projected=projectR35Details(inspect({dataRoot:root,taskQuery:()=>'<Task/>',
    freeMiB:807,list:fs.readdirSync}));
   assert.equal(projected.r47Reports.reports.length,2);
-  assert.deepEqual(projected.r47InstalledCmd,{status:'UNKNOWN',sha256:null});
+  assert.deepEqual(projected.r47InstalledCmd,{status:'UNAVAILABLE',sha256:null});
   assert.equal(projected.r35Manifest.latestSpyDay,'2026-10-30');
   assert.equal(Object.hasOwn(projected,'freeMiB'),false);
   assert.equal(Object.hasOwn(projected,'recentRuns'),false);
