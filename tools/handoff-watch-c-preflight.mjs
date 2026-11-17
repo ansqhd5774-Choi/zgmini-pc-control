@@ -1,7 +1,7 @@
 // Read-only, token-free C activation preflight for the independent queue-PC watcher.
 // This checks the exact pinned SOURCE and local host; it cannot authorize/install
 // Windows tasks, provision credentials, start the watcher or prove 5s runtime.
-import {readFileSync,lstatSync,realpathSync} from 'node:fs';
+import {readFileSync,lstatSync,realpathSync,statSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,6 +38,7 @@ export function inspectWatchCPreflight({
       const target=path.resolve(root,...file.split('/'));
       // Explicitly reject symlinks to avoid validating an unexpected source.
       if(lstatSync(target).isFile() && !lstatSync(target).isSymbolicLink() &&
+          statSync(target).size<=MAX_BYTES &&
           (platform==='win32'?realpathSync(target).toLowerCase()===target.toLowerCase():realpathSync(target)===target)){
         const bytes=readFileSync(target);
         ok=bytes.length<=MAX_BYTES&&gitBlob(bytes)===expected;
