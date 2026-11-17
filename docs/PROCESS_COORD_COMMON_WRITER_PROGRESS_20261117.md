@@ -52,3 +52,13 @@
 **한계:** 위 A는 `FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS` 범위의 PC source/preimage 읽기 전용이며, 실제 공급자 수집·SQLite 결과·Cloudflare D1/API/UI 출력을 검증하지 않는다. 운영 source/Task/DB/D1 신규 쓰기 0; 기존 B requestId 재실행 0.
 
 **다음 필수 행동 하나:** #1880 GitHub Run cancelled/무로그/무결과의 실제 원인 및 `zgmini-pc-02` Runner 정상 접수 상태를 기존 승인된 진단/원장으로 한정 확인. 재조회로 원본 결과가 뒤늦게 입증되면 활용하고, 미확정이면 원담당 W01과 **새 승인 A 요청의 필요성**을 결정. 그때 `local-cycle.mjs` 및 Core bridge의 현재 SHA를 대조해 설치 필요/불필요 회신. W02·W04와 다른 독립 기능을 전역 차단하지 않음.
+
+## 2026-11-17 #1880 취소 실행 추가 조사 — Runner 02 범위 한정
+
+- **원본:** [W01 승인 A #1880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1880#issuecomment-6937390352), [Run 44008646478](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44008646478), attempt 1, `completed/cancelled`. Job 133790015470: `zgmini-pc-02`, 2026-11-17T03:13:31Z~03:26:31Z **13분 정각**; Run 전체 794000ms(13분14초).
+- **관측 증거:** GitHub `GET actions/runs/{id}/jobs` 및 전용 Job steps 도구 **0개**, job log 404, run logs 본문 없음. 본 요청 Issue bot 결과 없음. 원격 `results/44008646478-1-seat-2.json` / `.txt` 각각 404. `pc-job.yml` 당시 커밋 `b39ec76a5fc9ae16a1234dbbb6910d71ca5ae41f`의 job `timeout-minutes:8`, 고정 operation `writer-install-preimage-readonly`의 허용 시간 60초. 8분 이후 추가 5분 패턴은 **취소/시간제한 경로 의심**일 뿐 정확한 취소 주체·실제 PC 상태 입증이 아님.
+- **동일 Runner 과거 반례:** 2026-11-16T23:50Z [#1812](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1812), [Run 43982706453](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43982706453)은 `zgmini-pc-02`에서 Job 단계 5/5 완료, A JSON PASS. 이전 정상 이력일 뿐 현재 Runner Online 증거는 아님.
+- **동시 다른 Runner 정상:** [#1881](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1881), [Run 44008648543](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44008648543), `zgmini-pc-05`의 동일 `writer-install-preimage-readonly`는 5/5 단계 및 원격 JSON/TXT 2/2 PASS. **공용 operation 자체의 보편적 고장으로 판정 불가**.
+- **범위:** LAST PASS=GitHub opened+pc-job label 및 Runner 02 배정. FIRST FAIL=작업 단계/원격 결과 증거 부재, 최종 cancelled. `AUTOMATION_BLOCKED/PC_JOB_CANCELLED_BEFORE_STEP_EVIDENCE`로 고유 W01 A 한 건만 분류; 운영 PC 원자료/SQLite/D1/Writer 파일 변경, Core 수집 실패, 설치 누락 여부는 **미확정**.
+- **재시도/운영 조치:** 같은 requestId/Run 재실행 0, 신규 대체 A 0, 운영 Task/Controller/Runner/DB/D1/원자료 변경 0. 격리 대기열 PC를 운영 Runner 대체 실행기로 사용하지 않음.
+- **다음 필수 행동:** W01 담당이 기존 성공 B(#1636/#1650) 및 미완료 `local-cycle.mjs` 통합 필요성을 원본 #1633에서 판단. 동일 Runner의 지원되는 실제 진단/원장으로 해당 취소 원인이 확인될 때만 최소 복구 판단; 불명확하면 별도 승인된 새 고유 A를 필요 범위에 한해 결정. W02/W04 정상 소스 설치 3/3·2/2, 공통 대기열 8/10 정합화는 유지. 기능 수집·게시 결과 확인은 기능 원담당 업무.
