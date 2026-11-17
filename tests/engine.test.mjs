@@ -104,3 +104,44 @@ test('postcheck R13 with missing worker result preserves original timeout',async
  assert.equal(result.report.protectedStateUnchanged,null);
  assert.equal(result.report.resourceLeasesRetained,undefined);
 });
+
+test('R13 POSTCHECK failure after uncertain worker termination retains recovery identity and leases',async()=>{
+ const c=fixture();c.policy.operations['timeout-proof'].timeoutSeconds=1;
+ let probes=0;
+ const result=await executeJob(req('timeout-proof','postcheck-r13-uncertain-child-01'),
+  {...c,runId:'3305',terminateTree:()=>{throw Error('simulated termination denial');},
+   terminationGraceMs:100,retiredTaskEvidence:()=>{
+    if(++probes===2)throw Object.assign(new Error('inventory unavailable'),
+     {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+    return 'APPROVED_RETIRED_ABSENT';
+   }});
+ try{
+  assert.equal(probes,2);
+  assert.equal(result.report.status,'STATE_UNKNOWN');
+  assert.equal(result.report.code,'WORKER_TERMINATION_UNVERIFIED');
+  assert.equal(result.report.firstFail,'OWN_WORKER_TERMINATION');
+  assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+  assert.deepEqual(result.report.workerOutcome,{
+   status:'STATE_UNKNOWN',code:'WORKER_TERMINATION_UNVERIFIED',
+   firstFail:'OWN_WORKER_TERMINATION',resultPresent:false});
+  assert.equal(result.report.protectedStateUnchanged,null);
+  assert.equal(result.report.protectedAfterSha256,null);
+  assert.equal(result.report.resourceLeasesRetained,true);
+  assert.equal(result.report.next,'RECONCILE_WORKER_AND_RETAIN_RESOURCE_LEASES');
+  assert.ok(fs.existsSync(path.join(c.root,'leases','seat-1')));
+  assert.ok(fs.existsSync(path.join(c.root,'leases','request-postcheck-r13-uncertain-child-01')));
+  assert.equal(JSON.parse(fs.readFileSync(
+   path.join(result.workspace,'RECOVERY_REQUIRED.json'),'utf8')).reason,
+   'WORKER_TERMINATION_UNVERIFIED');
+  assert.equal(JSON.parse(fs.readFileSync(
+   path.join(result.workspace,'RESULT.json'),'utf8')).code,'WORKER_TERMINATION_UNVERIFIED');
+ }finally{
+  if(result.report.workerPid){
+   try{
+    if(process.platform==='win32')execFileSync('taskkill.exe',
+     ['/PID',String(result.report.workerPid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
+    else process.kill(result.report.workerPid,'SIGKILL');
+   }catch{}
+  }
+ }
+});
