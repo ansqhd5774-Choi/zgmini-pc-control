@@ -117,3 +117,17 @@
 - **원격 소스 반영:** PR #1904 `main` squash **`3e66b950ab642b4ab9fc87fc831fbfea24e61709`**. 본 기록은 소스 병합의 증거이지 후속 자연 예약의 시간 단축 실증은 아니다.
 - **잔여 과제:** 자연 15분 실행 중 deep/wide/proactive가 정상 동작하고 동시에 불필요한 push 실행 0인지, Queue Board 직접 검토 4/4가 유지되는지 배정·실행 시각을 표본으로 확인해야 한다. 별도 인위적 Run/신규 예약/5초 Windows C급 설치는 하지 않았다.
 - **다른 미완료 업무와 분리:** W03 [#1894](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1894) 기존 R47 CMD 1파일은 기존 5개 B경로 `NO_GO`, 효과 승인/정규 CAS 경로 미완료 `EFFECT_APPROVAL_HOLD`; [Draft #1892](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1892)는 검토 전용이다. W01 [#1634](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1634)는 Core bridge 설치 증거 있음, `local-cycle.mjs` 미설치·R10/R23 의존성 미확인 `WAITING_EVIDENCE`. 기능 W01 판단에 따라 자동 Core 통합과 독립 Census 단회 B 분리, 과거 소진 요청 재실행 금지. 공유 Controller W03+W04 누적 두 파일 `SOURCE_SCOPE_GO`도 정규 B 승인/실제 설치와 구분.
+
+## 2026-11-17 W03 R32 + W04 PIT 2파일 실제 Controller 사전 실측
+
+**이번 실작업:** 공유 Controller 2파일 기술 GO 이후 신규 고유 승인 A [#1906](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1906#issuecomment-6939525910), 실제 운영 [Run 44024407741](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44024407741), `zgmini-pc-03`, `PASS/CORE_READONLY_DIAGNOSIS`, JSON/TXT **2/2** 원격 재조회. 관측 2026-11-17T05:29:13Z, 실제 `controlSourceSha=384ffd09e80ad769e31596483dfe73e9ee8b6c6a`, Core lock absent, 수집 체크포인트 `COMPLETE`, Writer 체크포인트 `VERIFIED`, 승인 Writer source `2070ff53549e2f9f2cea57d5af7e1d83f9fd7388`, 공급자/DB/D1/운영 파일 변경 0. `core-status`가 공유 Controller **유지보수 lease**까지 확인한 것은 아니므로 실제 B claim 전 정규 전제검사 유지.
+
+**정확 B 소스 후보(승인 아님):** 이미 원담당 W04 [Draft #1878](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1878)에 source-only 검토안 존재. 실제 설치본 `384ffd09e80ad769e31596483dfe73e9ee8b6c6a` → 불변 target `fbe943a069c9b2366f8e295d2c63b7895c639ef2`; target은 새 main `0059683993655900b13fffbc328ec64e87b9d576`의 조상, 이후 Controller/config diff 0. allowFiles 배포차이 정확 2:
+- W03 `controller/theme-nine-r32-raw-coverage-readonly.mjs`: SHA256 `33c0b896ac3b941c13cde703afcbdb8c63bc7bf7f20bcb045af2fd8fd8356fd4`.
+- W04 `controller/employment-r6-candidate-readonly.mjs`: SHA256 `e156d22989210b2599d9393a15f8206fecd325d14f3d72af04d658bd60ee9409`.
+- 정렬 JSON `manifestFingerprint` **`2748317833789f004b34eb56134fa4801dcc59030fe7b9b1b884da1266060585` (64 hex)**. PR #1878의 자유형 본문 표기 `2748317833789f004b34fa4801dcc59030fe7b9b1b884da1266060585`는 57자 오기이며 절대 manifest로 복사하지 않는다. 원본 Draft JSON에는 정식 64자 값이 이미 기록됨.
+- 기존 W03 #1833 및 W04 #1882 소스 CI/PR PASS 재사용. W03의 구형 별도 B 승인, W04 PIT-04-02 기존 B 승인을 새 PIT-04-03 실제 운영 효과 허가로 소급하지 않음.
+
+**사용자/권한자의 명시적인 효과 승인 필요:** 공유 Owner의 **2파일 source 포함 기술 GO**는 [W04 #1878/6939006722](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1878#issuecomment-6939006722)에 완료. 아직 PIT-04-03 누적 **APPROVED_B manifest/설치/Runtime 검증 0**. 범위와 실제 PC 증거에 근거해 [#1878/6939562255](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1878#issuecomment-6939562255), [중앙 #68/6939586572](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6939586572)에 W03 R32 + W04 PIT-04-03 **두 파일만** `pc-controller-update` 기존 B 1회 적용하는 정확 GO/NO-GO 승인 요청. 승인되면 승인 ref·raw manifest SHA·현재 PC lease/원본 백업/rollback·main 계보 보호·Core postcheck와 JSON/TXT 확인 후 실행. 미승인 효과 선실행, 새 Writer/CMD Task, Core/Korea scheduler, DB/D1/원자료/공급자/기존 B 재실행 금지.
+
+**이번 결과:** Controller 읽기 전용 사전 실측 `DONE`, source scope `DONE`, **B 승인 `HOLD`**, 실제 설치 0. W03 R47 CMD #1894와 W01 Writer #1634 등 독립 담당 업무를 전역 대기시키지 않음.
