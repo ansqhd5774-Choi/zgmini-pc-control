@@ -31,3 +31,21 @@ W01 parser를 다시 구현하지 않는다. 기존 pc-source-bundle-register B�
 ## 실제 재발 방지 수신기 인계 완료
 
 results/common-prevention-handoff-20261117.json 및 TXT: 승인된 3개 런타임 파일(maintenance-apply/maintenance-agent/update)을 기존 협조 종료·백업·새 Windows 출처 검증으로 적용했다. source c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7 → 36cf8ffb813f3a006f3e05379fba641fb3404645, STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED. 첫 원격 poll 완료 후 새 owner PID와 LISTENING heartbeat 일치, 유지보수기/Controller/6Runner HEALTHY, 공유 설치 lease 없음, Workflow active 및 기존 보호 snapshot 불변을 독립 확인했다. W03/W04/W01 기능 설치와 데이터 실행은 대행하지 않았다.
+
+
+## 공통 지원 4건의 인수 범위 및 종료 판정
+
+사용자의 후속 지시: 총괄에게 요청된 공통 지원만 완료하고, 나머지 기능 작업은 원담당이 진행한다. 아래의 완료는 **요청한 지원 범위의 완료**이며 기능별 운영 종단 완료가 아니다. 기능 후속 미실행을 이유로 이 지원 4건을 다시 미완료로 열지 않는다. 새 코드/환경의 실제 오류가 발견되면 해당 신규 증거의 영향 범위만 다시 처리한다.
+
+| 지원 | 최초 요청의 완료 조건 | 충족 근거 및 반환 | 공통 판정 | 원담당에게 남기는 작업 |
+|---|---|---|---|---|
+| W03 #1894 | 고정 R73 간접 경로의 공통 B receiver 최소 보호 수정·검증·정규 승인 경로 반환 | PR #1989, results/r47-fixed-chain-readonly-20261117.json, 기존 효과 GO #6941303392, 반환 #6946187545 | SUPPORT_COMPLETE | 새 고유 manifest/B CMD 설치·결과 회수, 수집·계산·게시 |
+| W04 #6944873762 | #1979 공통 복구와 요청된 정확 1파일의 운영 GO/NO-GO | 실제 복구·수신기 인계, 현재 before SHA 및 누적 1파일 검증, OPERATIONAL_B_GO #6946188691 | SUPPORT_COMPLETE | 본인 정규 manifest 완성·설치·PIT A·데이터 검증 |
+| W05 #6944925601 | 별도 writer-source 인증 소비자의 존재와 정확 경로 확인; 없으면 GAP/NO-GO 및 최소 범위 반환 | 별도 READY_FOR_OWNER_REPLAN 인증 소비자 없음이라는 GAP 확인, 기존 Writer B의 fresh idle/lease/source/Task 경로와 관측기 false의 의미를 분리해 반환 #6946188039 | SUPPORT_COMPLETE — GAP_REPORTED | 기존 승인 범위 새 B의 현재 preflight와 본인 기능 작업. 관측만으로 승인/해제 성공을 주장하지 않음 |
+| W01 #6945119078 | parser 재작성 없이 고정 A 진입점의 공통 파일/신뢰 경로에 대한 source-only 결론·지원 | PR #1989의 고정 operation/승인 bundle 신뢰 경로·11개 전용 테스트, 반환 #6946189465 | SUPPORT_COMPLETE — SOURCE_ONLY | 본인 승인 bundle 및 실제 cumulative manifest·PC 설치·A 실행·23원자료 판정 |
+
+반환 댓글은 모두 ansqhd5774-Choi/zgmini-pc-control의 원본 #1894 또는 #68에 보존한다. 기존 원본 기능 승인·실행 증거는 유지한다. 이 종료 판정은 자동 ChatGPT 수신 ACK, PC 설치, source-only 결과의 Runtime 승격 또는 새 운영 효과 승인이 아니다.
+
+- W05의 신규 Core/Korea trigger 선행 억제·guard 완화는 여전히 HOLD/NOT_APPROVED다. 이번 의뢰는 존재/범위 확인이므로 새 인증기·추가 Controller·일괄 진단·Writer 설치를 만들지 않는다.
+- 현재 관측한 Controller 5492726b… 기준 W04 target 451f53ae…까지는 1파일이다. W01 공통 target 7c2f2449…까지는 W04 변경을 포함해 4파일이며, W04 적용 후에는 W01 3파일이다. 원담당이 실제 설치 직전 source를 기준으로 계산한다.
+- #1894의 handoff-agent-pending은 공통 source 지원 미처리 라벨이다. 요청 범위의 수정·검증·반환이 완료되면 완료 근거를 남기고 이 라벨만 정리한다. agent-handoff 라벨·Issue·원본 이력은 보존하며 기능 설치 성공으로 Issue를 닫거나 가짜 HANDOFF_RESULT_RECORDED 봇 영수증을 만들지 않는다.
