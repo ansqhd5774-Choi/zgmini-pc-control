@@ -31,25 +31,43 @@ function publicErrorCode(error,fallback){
   (Object.hasOwn(SHARED_CLAIM_CODES,code)?SHARED_CLAIM_CODES[code]:fallback);
 }
 
+// A preclaim PC preimage mismatch remains fail-closed. Expose only which
+// fixed guard failed; never return the observed SHA, path, config or Task XML.
+const PREIMAGE_CHECKS=new Set([
+ 'OBJECT','SOURCE_ROOT','CONFIG_PATH','CORE_TASK','HEAD','CONFIG_SOURCE',
+ 'CONFIG_HASH_SHAPE','TASK_XML_HASH_SHAPE','BRANCH_SHAPE','TASK_ENABLED',
+ 'TARGET_PATHS_CLEAN','BEFORE_KEYSET','PROTECTED_KEYSET','CONSUMER_KEYSET'
+]);
+function requirePreimage(ok,check){
+ if(!ok)throw Object.assign(new Error('WRITER_B_PC_PREIMAGE_STOP'),{
+  code:'WRITER_B_PC_PREIMAGE_STOP',preimageCheck:check});
+}
+export function safeWriterBPreimageCheck(error){
+ return error?.code==='WRITER_B_PC_PREIMAGE_STOP'&&
+  PREIMAGE_CHECKS.has(error?.preimageCheck)?error.preimageCheck:null;
+}
+
 export function verifyWriterBPreimage(manifest,preimage){
  validateWriterBManifest(manifest);
  const changed=manifest.files.map(x=>x.path);
  const protectedPaths=manifest.protectedFiles.map(x=>x.path);
  const runtimePaths=manifest.runtimeDependencies.consumers.map(x=>x.path);
- need(object(preimage)&&preimage.sourceRoot===manifest.sourceRoot&&
-   preimage.configPath===manifest.configPath&&preimage.coreTask===manifest.coreTask&&
-   preimage.head===manifest.baseHead&&
-   preimage.configSource===manifest.baseConfigSourceSha&&
-   SHA64.test(preimage.originalConfigSha256??'')&&
-   SHA64.test(preimage.originalTaskDefinitionSha256??'')&&
-   typeof preimage.originalBranch==='string'&&
+ requirePreimage(object(preimage),'OBJECT');
+ requirePreimage(preimage.sourceRoot===manifest.sourceRoot,'SOURCE_ROOT');
+ requirePreimage(preimage.configPath===manifest.configPath,'CONFIG_PATH');
+ requirePreimage(preimage.coreTask===manifest.coreTask,'CORE_TASK');
+ requirePreimage(preimage.head===manifest.baseHead,'HEAD');
+ requirePreimage(preimage.configSource===manifest.baseConfigSourceSha,'CONFIG_SOURCE');
+ requirePreimage(SHA64.test(preimage.originalConfigSha256??''),'CONFIG_HASH_SHAPE');
+ requirePreimage(SHA64.test(preimage.originalTaskDefinitionSha256??''),'TASK_XML_HASH_SHAPE');
+ requirePreimage(typeof preimage.originalBranch==='string'&&
    /^[a-z0-9][a-z0-9._/-]{0,127}$/i.test(preimage.originalBranch)&&
-   !preimage.originalBranch.includes('..')&&
-   preimage.coreTaskEnabled===true&&preimage.targetPathsClean===true&&
-   sameKeys(preimage.beforeSha256,changed)&&
-   sameKeys(preimage.protectedSha256,protectedPaths)&&
-   sameKeys(preimage.runtimeConsumerSha256,runtimePaths),
-   'WRITER_B_PC_PREIMAGE_STOP');
+   !preimage.originalBranch.includes('..'),'BRANCH_SHAPE');
+ requirePreimage(preimage.coreTaskEnabled===true,'TASK_ENABLED');
+ requirePreimage(preimage.targetPathsClean===true,'TARGET_PATHS_CLEAN');
+ requirePreimage(sameKeys(preimage.beforeSha256,changed),'BEFORE_KEYSET');
+ requirePreimage(sameKeys(preimage.protectedSha256,protectedPaths),'PROTECTED_KEYSET');
+ requirePreimage(sameKeys(preimage.runtimeConsumerSha256,runtimePaths),'CONSUMER_KEYSET');
  for(const item of manifest.files){
   const actual=preimage.beforeSha256[item.path];
   need(item.change==='A'?actual===null:actual===item.beforeSha256,
