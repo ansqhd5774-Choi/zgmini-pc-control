@@ -18,26 +18,32 @@ function verifiedOrigin(s,origin){
    origin.issue_url===API+'issues/68'&&typeof origin.body==='string'&&
    origin.body.includes(s.textProof);
 }
-function verifiedReview(s,review){
- return review?.number===s.reviewIssue&&
-   review.repository_url===API.slice(0,-1)&&
-   ['open','closed'].includes(review.state)&&
-   typeof review.title==='string'&&review.title.includes(s.reviewTitle)&&
-   (s.reviewType==='PR'?Boolean(review.pull_request):!review.pull_request);
+function reviewProofCode(s,review,readStatus){
+ if(!review)return /^HTTP_(?:[1-5][0-9]{2})$/.test(readStatus??'')?
+   readStatus:'REVIEW_READ_UNAVAILABLE';
+ if(review.number!==s.reviewIssue)return 'REVIEW_NUMBER_MISMATCH';
+ if(review.repository_url!==API.slice(0,-1))return 'REVIEW_REPOSITORY_MISMATCH';
+ if(!['open','closed'].includes(review.state))return 'REVIEW_STATE_INVALID';
+ if(typeof review.title!=='string'||!review.title.includes(s.reviewTitle))
+   return 'REVIEW_TITLE_MISMATCH';
+ if((s.reviewType==='PR'?Boolean(review.pull_request):!review.pull_request)===false)
+   return 'REVIEW_TYPE_MISMATCH';
+ return 'REVIEW_VERIFIED';
 }
 export function compileDirectOwnerBoard(readbacks,nowMs){
  if(!Array.isArray(readbacks)||readbacks.length!==DIRECT_OWNER_REVIEWS.length||
    !Number.isFinite(nowMs)||nowMs<Date.UTC(2020,0,1))fail('INPUT_INVALID');
  const records=DIRECT_OWNER_REVIEWS.map((s,i)=>{
    const x=readbacks[i],sourceValid=verifiedOrigin(s,x?.origin);
-   const reviewValid=verifiedReview(s,x?.review);
+   const reviewProof=reviewProofCode(s,x?.review,x?.reviewReadStatus);
+   const reviewValid=reviewProof==='REVIEW_VERIFIED';
    const state=!sourceValid?'ORIGIN_PROOF_UNVERIFIED':
      !reviewValid?'REVIEW_PROOF_UNVERIFIED':
      x.review.state==='open'?'REVIEW_OPEN':'REVIEW_CLOSED_RUNTIME_UNVERIFIED';
    return Object.freeze({key:s.key,worker:s.worker,originCommentId:s.originCommentId,
      originUrl:LINK+'68#issuecomment-'+s.originCommentId,
      reviewIssue:s.reviewIssue,reviewUrl:LINK+s.reviewIssue,
-     reviewType:s.reviewType,state,
+     reviewType:s.reviewType,state,reviewProof,
      sourceAccountVerified:sourceValid,reviewIssueVerified:reviewValid,
      chatSessionVerified:false,bApprovalVerified:false,
      pcRuntimeVerified:false,operationalWrites:0});
@@ -54,11 +60,11 @@ export function renderDirectOwnerMarkdown(board){
  const lines=['','## 중앙 #68 직접 담당 인계 (자동 장애 Incident와 별도)','',
    '실접수 참조: **'+board.intakeCount+'건** / 출처 계정 확인 **'+
     board.verifiedOriginCount+'건** / 검토 Issue 확인 **'+board.verifiedReviewCount+'건**',
-   '','| 담당 | 중앙 원본 댓글 | 공통 검토 | 검증 상태 |',
-   '|---|---|---|---|'];
+   '','| 담당 | 중앙 원본 댓글 | 공통 검토 | 검증 상태 | 근거 판정 |',
+   '|---|---|---|---|---|'];
  for(const r of board.records)
    lines.push('| '+r.worker+' | [#68/'+r.originCommentId+']('+r.originUrl+') | [#'+
-     r.reviewIssue+']('+r.reviewUrl+') | '+r.state+' |');
+     r.reviewIssue+']('+r.reviewUrl+') | '+r.state+' | '+r.reviewProof+' |');
  lines.push('','- 자동 agent-handoff 대기 Issue와 직접 요청은 별도 지표이며 고유 업무 수로 단순 합산하지 않습니다.',
    '- GitHub 계정과 검토 기록만 검증합니다. 다른 ChatGPT 대화 수신, B 승인, 실제 PC 설치는 인증하지 않습니다.',
    '- 이 목록은 알려진 직접 요청 4건의 색인입니다. 새로운 직접 요청 전체를 자동 발견했다는 뜻은 아닙니다.',
