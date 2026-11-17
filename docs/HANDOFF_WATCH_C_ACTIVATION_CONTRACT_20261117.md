@@ -19,9 +19,9 @@
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
-- **실행 source (PR #1920 임시 검증 후보, C급 설치 금지):** 기존 main pin `0a30d3061d25fc826e2b149046dea46d123e785e`는 신규 감시기 예외 로그의 인증정보 노출 결함을 수정하기 전 버전이므로 **신규 설치 후보에서 제외한다**. [PR #1920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1920)은 로그의 임의 예외 메시지를 안전한 고정 진단코드로 제한한다. 현재 수정본 7파일의 **소스 검증 후보**는 Git commit `7f6684ca2f6fd4d6362f3a1eae7b096ba90ef823`이며, 이 SHA는 PR 중간 소스 commit으로 **main 병합/운영 PC 설치 승인 증거가 아니다**. PR 격리 Windows CI가 통과하고 main에 소스 병합된 뒤, 원격 main에서 정확 7파일 Git blob 및 최종 main merge SHA를 재확인해 **별도 source pin 갱신 전까지 설치 STOP**한다. 사용자가 직접 승인한 별도 고정 읽기 전용 설치 위치에만 승인된 최종 commit의 아래 7개 watcher 파일을 상대 폴더 구조 그대로 설치한다. GitHub Runner `_work`를 상주 소스에 사용하거나 임의로 운영 PC E:·C: 경로를 추정하지 않는다.
+- **실행 source (PR #1920 main 병합 pin, 운영 C 설치는 별도):** 기존 pin `0a30d3061d25fc826e2b149046dea46d123e785e`는 예외 로그에 비밀정보를 노출할 수 있는 이전 watcher 소스로 **신규 설치 불허**. [PR #1920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1920)을 안전 오류코드 출력으로 수정한 뒤 main squash SHA **`f1a280b9c24ec8d01ee228115b92ebb964f49802`**로 병합했다. 격리 Windows [CI #44035399650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44035399650)에서 463/463 PASS, C996 #44035374844 SUCCESS이며, 병합 이후 main과 이 불변 SHA의 7개 실행 소스 Git blob을 **7/7 동일** 재확인했다. **사용자 C급 직접 설치 검증은 아직 없으므로 CI가 운영 가동 승인은 아니다.** 실제 PC의 사용자 승인된 고정 읽기 전용 위치에는 아래 정확 7파일만 같은 불변 SHA에서 가져와 상대 폴더 구조를 유지한다. 일회성 Runner `_work`를 쓰거나 임의 경로·토큰·저권한 Windows 계정을 추정하지 않는다.
 
-  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (PR #1920 검증 후보 `7f6684ca…`, **운영 설치 불가**) |
+  | 설치 대상 소스 확인 항목 | Git blob SHA-1 (확정 main 소스 `f1a280b9…`, **C급 설치 별도**) |
   |---|---|
   | `agent-handoff/intake-watch-5s.mjs` | `2515dd83b96f76146dc75991fa8648cae6d42382` |
   | `agent-handoff/intake-receipt-readonly.mjs` | `0b97307fc3bf1ed8462a5a6413c3fc8f12bbb08b` |
