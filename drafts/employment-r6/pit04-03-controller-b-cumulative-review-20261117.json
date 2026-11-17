@@ -1,0 +1,98 @@
+{
+  "schema": "ZGMINI_W04_PIT0403_CONTROLLER_CUMULATIVE_REVIEW_V1",
+  "status": "PROPOSED_NOT_APPROVED_NOT_EXECUTABLE",
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "repository": "ansqhd5774-Choi/zgmini-pc-control",
+  "lastInstalledEvidence": {
+    "controllerSourceSha": "384ffd09e80ad769e31596483dfe73e9ee8b6c6a",
+    "evidenceIssue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1874",
+    "operation": "pc-source-bundle-register",
+    "result": "SUCCEEDED/BUNDLE_REGISTERED/HOST_CAS_READBACK",
+    "freshness": "2026-11-17; recheck immediately before any B execution"
+  },
+  "sourceTarget": {
+    "branch": "main",
+    "sourceSha": "60cde094d83d302608e4ee2fc63b38b89c0dab87",
+    "sourceMergedBy": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1875",
+    "mustRemainAncestorOfMain": true,
+    "fullGitDiffPaths": 75,
+    "controllerConfigDiffPaths": 2,
+    "livePcJobWorkflowChanged": false
+  },
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-candidate-readonly.mjs",
+      "sha256": "1e68a5bef987fde630e9d20f056c3fe53960b2897948c6b31f4a36a124e10441"
+    },
+    {
+      "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
+      "sha256": "33c0b896ac3b941c13cde703afcbdb8c63bc7bf7f20bcb045af2fd8fd8356fd4"
+    }
+  ],
+  "allowFilesManifestSha256": "e364c1cb7b61279b2b3313408b73c57d193b9a5b0be86dde1a5c5a6d1264c2bd",
+  "previousApprovals": [
+    {
+      "owner": "W03",
+      "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1833",
+      "originalInstallRequest": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1841",
+      "status": "SOURCE_APPROVAL_EXISTS_BUT_ORIGINAL_INSTALL_ROLLED_BACK_DO_NOT_REPLAY_OWNER_GO_REQUIRED"
+    },
+    {
+      "owner": "W04",
+      "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1875",
+      "hostSuccess": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1874",
+      "status": "SOURCE_MERGED_HOST_SOURCE_REGISTERED_CONTROLLER_B_UNVERIFIED"
+    }
+  ],
+  "contractPreflight": {
+    "actualFunction": "validateControllerOnlyInstallDelta",
+    "source": "tools/maintenance-contract.mjs",
+    "input": "git diff --name-only installedControllerSha sourceTarget.sourceSha",
+    "onlyW04Result": "ALLOWFILE_DIFF_MISMATCH",
+    "bothFilesResult": "PASS",
+    "note": "Passing this source-only delta test does not authorize installing the W03 module or replace current PC readback"
+  },
+  "testEvidence": [
+    {
+      "kind": "APP_READER_RUNNER_NODE_SQLITE",
+      "run": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44003890594",
+      "result": "28/28 PASS"
+    },
+    {
+      "kind": "CONTROLLER_W04_SOURCE_CI",
+      "run": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44005979636",
+      "result": "SUCCESS"
+    }
+  ],
+  "requiredOwnerActions": [
+    "One shared Controller owner must independently decide whether W03 exact module can be included; last #68 instruction forbids automatic W03 installation",
+    "Re-read actual PC installed Controller SHA, maintenance lease, original bytes and affected protection state",
+    "If and only if GO, create exact merged B approval manifest under approvals/controller-updates, with independently verified current installed SHA and an authorized merged approval PR covering both modules",
+    "Verify main ancestry and complete controller/config installed-to-target diff, protect existing host and keep exact versioned backup/rollback and postcheck",
+    "Use existing pc-controller-update B maintainer; issue a new unique request once; retrieve actual PC JSON/TXT and postcheck before W04 A"
+  ],
+  "explicitlyNotAuthorized": [
+    "pc-controller-update Issue creation",
+    "automatic W03 module install",
+    "Core/SQLite/D1/provider or public publication change",
+    "changes to Scheduler, live pc-job Workflow or maintenance receiver",
+    "replay of canceled/rolled-back #1841"
+  ],
+  "afterControllerInstall": {
+    "operation": "employment-r6-candidate-stage-readonly",
+    "purpose": "PIT-04-03 exact Current to latest as-of History safe four-bucket counts on operating PC",
+    "expectedCoreCurrentKeysFromPriorObservation": 40777,
+    "expectedHistoryMissingKeysFromPriorObservation": 2880,
+    "candidateConflictingKeysFromPriorObservation": 14,
+    "completenessRule": "matching+conflicting+unverified+missing = actual as-of Core Current; numbers from past observations must not override fresh result",
+    "resultRequirements": [
+      "unique requestId",
+      "JSON+TXT readback",
+      "asOf provenance",
+      "protected state",
+      "no DB/D1 writes",
+      "no candidate promotion"
+    ]
+  }
+}
