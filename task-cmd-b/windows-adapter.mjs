@@ -12,6 +12,8 @@ import {R47_CHAIN_ROOT,R47_CHAIN_PINS,verifiedR47TaskRoute} from './r47-task-cha
 import {applyR47CmdBCas,R47_CMD_B} from './r47-onefile-cas.mjs';
 import {approveExactR47B,assertApprovedR47B,R47_B_ISSUE} from './approval-intake.mjs';
 import {gitApprovedR47Blob} from './source-pin.mjs';
+import {pinnedR47CandidateBlobOid,verifiedR47CandidateSource}
+ from './candidate-source-provenance.mjs';
 import {taskAction} from '../controller/pc-source-readonly.mjs';
 import {decodeTaskXmlBytes} from '../writer-b/windows-guards.mjs';
 import {sameTaskDefinitionExceptSettingsEnabled}
@@ -139,11 +141,18 @@ export function makeR47WindowsAdapter(auth,{candidateRoot}){
     sourceDirtyOnTarget:!e.bytes.equals(original)};
   },
   async fetchCandidateBytes(){
-   need(git(candidateRoot,'rev-parse','HEAD')===m.sourceSha&&
-    git(candidateRoot,'status','--porcelain=v1','--untracked-files=all')==='',
-    'TASK_CMD_B_CANDIDATE_SOURCE_DRIFT_STOP');
+   const initialHead=git(candidateRoot,'rev-parse','HEAD');
+   const treeEntry=git(candidateRoot,'ls-tree','HEAD','--',m.sourcePath);
+   const blobOid=pinnedR47CandidateBlobOid(treeEntry,m.sourcePath);
+   const gitBlob=run('git',['-C',candidateRoot,'-c','core.fsmonitor=false',
+    'cat-file','blob',blobOid]);
+   const pathStatus=git(candidateRoot,'status','--porcelain=v1',
+    '--untracked-files=all','--',m.sourcePath);
    const p=path.join(candidateRoot,...m.sourcePath.split('/'));
-   return exactFile(p,candidateRoot);
+   const worktreeBytes=exactFile(p,candidateRoot);
+   const finalHead=git(candidateRoot,'rev-parse','HEAD');
+   return verifiedR47CandidateSource(m,{initialHead,finalHead,treeEntry,
+    pathStatus,blobOid,gitBlob,worktreeBytes});
   },
   async backupOriginal(){
    ownerLock();
