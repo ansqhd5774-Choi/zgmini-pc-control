@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- R47_CMD_B,validateR47CmdBManifest,verifyR47CmdBPreimage,
+ R47_CMD_B,R47_CMD_B_CALENDAR_SAFE,validateR47CmdBManifest,verifyR47CmdBPreimage,
  verifyR47CmdBCandidate,verifyR47CmdBPaused,applyR47CmdBCas
 } from '../task-cmd-b/r47-onefile-cas.mjs';
 
@@ -28,6 +28,36 @@ function preimage(m){
   sharedWriterLeaseOwned:true,unrelatedWriteConflict:false,
   sourceDirtyOnTarget:false};
 }
+test('legacy onefile GO stays exact and new calendar-safe version accepts only its own pinned source',()=>{
+ const legacy=manifest();
+ assert.equal(validateR47CmdBManifest(legacy),legacy);
+ const upgrade={...legacy,
+  sourceSha:R47_CMD_B_CALENDAR_SAFE.sourceSha,
+  beforeSha256:R47_CMD_B_CALENDAR_SAFE.beforeSha256,
+  afterSha256:R47_CMD_B_CALENDAR_SAFE.afterSha256};
+ assert.equal(validateR47CmdBManifest(upgrade),upgrade);
+ assert.equal(verifyR47CmdBPreimage(upgrade,preimage(upgrade)),true);
+ const paused={...preimage(upgrade),taskEnabled:false,
+  taskDefinitionExceptEnabledMatchesOriginal:true};
+ assert.equal(verifyR47CmdBPaused(upgrade,paused),true);
+ for(const mutant of [
+  {...upgrade,sourceSha:'a'.repeat(40)},
+  {...upgrade,beforeSha256:legacy.beforeSha256},
+  {...upgrade,afterSha256:legacy.afterSha256},
+  {...legacy,beforeSha256:upgrade.beforeSha256},
+  {...legacy,afterSha256:upgrade.afterSha256},
+  {...upgrade,taskXmlSha256:'0'.repeat(64)},
+  {...upgrade,targetPath:String.raw`E:\ZGmini\different.cmd`},
+  {...upgrade,allowOtherFileWrites:true}
+ ]){
+  assert.throws(()=>validateR47CmdBManifest(mutant),{
+   code:mutant.allowOtherFileWrites?'TASK_CMD_B_SIDE_EFFECT_STOP':
+    'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
+ }
+ assert.throws(()=>verifyR47CmdBPreimage(upgrade,{
+  ...preimage(upgrade),installedSha256:legacy.beforeSha256
+ }),{code:'TASK_CMD_B_PREIMAGE_STOP'});
+});
 test('R47 fixed CMD path matches the R54 observed data-root location, not a doubled pc-writer segment',()=>{
  const r54Observed=String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd`;
  assert.equal(R47_CMD_B.targetPath,r54Observed);
