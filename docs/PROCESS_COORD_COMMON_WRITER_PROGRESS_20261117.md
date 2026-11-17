@@ -45,10 +45,10 @@
    - 기존 인계 #1580/#1620/#1669/#1677의 대기 라벨만 해제. 원담당 원본 [#1676 정정 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1676#issuecomment-6937005992).
 3. **W01 Inflation [과거 일부 B 성공 / 최신 정확 파일 검사 진행 중]**
    - Core bridge 관련 후속 정확 B [#1636](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1636) 및 [#1650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1650) `WRITER_B_INSTALLED_VERIFIED`. 그러나 기존 #1633 전체 2파일 제안은 `WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP`이었고, 이후 B 설치는 Core bridge 단일 파일에 한정되어 `local-cycle.mjs`까지 설치됐다고 간주하지 않음.
-   - 신규 승인 A [#1880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1880) [Run 44008646478](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44008646478): 동일 A Operation 고정 2파일 scope, **초기 관측 시점 RUNNING**. 결과 JSON/TXT remote readback 없을 때 PASS/FAIL/설치 누락을 단정하지 않으며 동일 requestId 재실행 금지.
+   - 신규 승인 A [#1880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1880) [Run 44008646478](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44008646478): 동일 A Operation 고정 2파일 scope, **최종 GitHub completed/cancelled (2026-11-17T03:26:38Z)**. Job #133790015470 `zgmini-pc-02` started 03:13:31Z, completed 03:26:31Z, steps 배열 비어 있고 decoded Job log 404, 원본 Issue 댓글/JSON/TXT 결과 없음. 취소 원인·실제 PC 내부 진행은 미확정. `AUTOMATION_BLOCKED/PC_JOB_CANCELLED_NO_RESULT`로 이 A 검사만 범위 제한하며 중복 재실행 금지.
    - 인계 #1613/#1634의 pending 라벨은 유지. 작업 완료/기능 hook 필요성은 결과 회수와 W01 원담당 판단으로 결정.
 4. **공통 대기열 정리:** 총 10건 중 Controller 복구 2 + W02 2 + W04 4 = **8건 pending 정합 해제**. W01 2건 잔존. GitHub 접수/인수는 다른 ChatGPT 대화의 자동 수신이 아님.
 
 **한계:** 위 A는 `FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS` 범위의 PC source/preimage 읽기 전용이며, 실제 공급자 수집·SQLite 결과·Cloudflare D1/API/UI 출력을 검증하지 않는다. 운영 source/Task/DB/D1 신규 쓰기 0; 기존 B requestId 재실행 0.
 
-**다음 필수 행동 하나:** #1880 고유 Run의 최종 상태와 JSON/TXT 2/2 재조회 → `local-cycle.mjs` 및 `inflation-causal-candidate-core-bridge.mjs`의 실제 SHA를 B 승인 AFTER와 대조 → 원담당 W01 원본 #1633에 설치 필요/불필요를 정확히 회신. 결과 미확정은 다른 기능 전체의 BLOCKER가 아님.
+**다음 필수 행동 하나:** #1880 GitHub Run cancelled/무로그/무결과의 실제 원인 및 `zgmini-pc-02` Runner 정상 접수 상태를 기존 승인된 진단/원장으로 한정 확인. 재조회로 원본 결과가 뒤늦게 입증되면 활용하고, 미확정이면 원담당 W01과 **새 승인 A 요청의 필요성**을 결정. 그때 `local-cycle.mjs` 및 Core bridge의 현재 SHA를 대조해 설치 필요/불필요 회신. W02·W04와 다른 독립 기능을 전역 차단하지 않음.
