@@ -1490,15 +1490,19 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   verifyRestoredPrevious:async installedSha=>{
    // Require the whole saved host and all installed Controller bytes, not
    // merely a matching source label. prepareRecovery loaded the old protection.
-   if(!fs.readFileSync(hostPath).equals(fs.readFileSync(path.join(snapshotRoot,'host.json'))))return false;
    if(installedManifest().installedSha!==installedSha)return false;
+   need(fs.readFileSync(hostPath).equals(fs.readFileSync(path.join(snapshotRoot,'host.json'))),
+    'RECOVERY_PREVIOUS_HOST_DRIFT');
    const current=readOwner();
-   if(current.status.sourceSha!==installedSha||!available(apiRunners()))return false;
+   need(current.status.sourceSha===installedSha,'RECOVERY_PREVIOUS_SUPERVISOR_DRIFT');
+   need(available(apiRunners()),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE');
    for(const child of current.status.children){
-    if(child.alive!==true)return false;
-    try{process.kill(child.pid,0);}catch{return false;}
+    need(child.alive===true,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');
+    try{process.kill(child.pid,0);}catch{need(false,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');}
    }
-   return protectedBefore!==undefined&&JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore);
+   need(protectedBefore!==undefined&&JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),
+    'RECOVERY_PREVIOUS_PROTECTION_DRIFT');
+   return true;
   },
   verifyPrevious:async({installedSha,requireRunning,requireIdle=true})=>{
    if(installedManifest().installedSha!==installedSha)return false;
