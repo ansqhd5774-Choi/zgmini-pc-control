@@ -83,7 +83,8 @@ export async function applyR47CmdBCas(manifest,io){
   await io.acquireSharedWriterLease(manifest.requestId);
   leased=true;
   verifyR47CmdBPreimage(manifest,await io.readPreimage());
-  verifyR47CmdBCandidate(manifest,await io.fetchCandidateBytes());
+  const candidate=await io.fetchCandidateBytes();
+  verifyR47CmdBCandidate(manifest,candidate);
   const backup=await io.backupOriginal(manifest);
   must(backup?.sha256===manifest.beforeSha256&&backup?.durable===true,
    'TASK_CMD_B_BACKUP_NOT_VERIFIED_STOP');
@@ -92,7 +93,7 @@ export async function applyR47CmdBCas(manifest,io){
   await io.journalWriteIntent(manifest);
   // Even a throwing CAS can have applied bytes; never call a retry here.
   writeIntent=true;
-  await io.replaceExactBytesIfBeforeMatches(manifest);
+  await io.replaceExactBytesIfBeforeMatches(manifest,candidate);
   const after=await io.readInstalledAfter();
   must(after?.installedSha256===manifest.afterSha256&&
    after?.taskXmlSha256===manifest.taskXmlSha256&&
