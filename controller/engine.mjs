@@ -63,22 +63,22 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   preflightOperation='RESULT_LEDGER_WRITE';report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
  }catch(error){
   const postcheckCode=errorCode(error);
-  // A completed allowlisted worker is not verified if the unrelated
-  // retired-R13 inventory postcheck cannot be read. Keep the original
-  // bounded diagnostic result, but never mark this job as PASS.
+  // A failed retired-R13 POSTCHECK cannot verify the worker outcome.
+  // If termination is uncertain, retain its stronger recovery-needed identity
+  // and lease marker instead of reclassifying it as a generic BLOCKED gate.
   if(preflightOperation==='POSTCHECK'&&
-     postcheckCode==='RETIRED_IRAN_INVENTORY_UNAVAILABLE'&&!uncertainChild){
-   // The worker result file may be missing or timed out (as in #1838).
-   // Preserve the already recorded outcome without treating it as a PASS.
+     postcheckCode==='RETIRED_IRAN_INVENTORY_UNAVAILABLE'){
    const prePostcheckOutcome={status:report.status,code:report.code,
     firstFail:report.firstFail,resultPresent:report.result!==undefined};
    Object.assign(report,{
-    status:'STATE_UNKNOWN',code:'PROTECTED_STATE_POSTCHECK_UNVERIFIED',
     postcheckFailureCode:postcheckCode,
     workerOutcome:prePostcheckOutcome,
     protectedStateUnchanged:null,
     protectedBeforeSha256:digest(JSON.stringify(before)),
     protectedAfterSha256:null,
+   });
+   if(!uncertainChild)Object.assign(report,{
+    status:'STATE_UNKNOWN',code:'PROTECTED_STATE_POSTCHECK_UNVERIFIED',
     firstFail:'PROTECTED_STATE_POSTCHECK',
     next:'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY',
    });
