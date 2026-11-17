@@ -9,6 +9,13 @@
 3. Windows 자격 관리에 안전하게 보관된 GitHub CLI 인증을 사용할 때는 `ZGMINI_HANDOFF_WATCH_AUTH_SOURCE=GH_CREDENTIAL_STORE`를 설정한다. `gh auth token --hostname github.com`의 **stdout을 해당 Node 프로세스의 메모리에서만 읽어** 조건부 GET에 사용한다. 토큰은 인수·로그·Issue·예약 명령문에 넣지 않고 60초 내 캐시를 갱신한다.
 4. 정상 조회 주기는 5초, GitHub 제한 시 `Retry-After`·rate-limit reset을 지키고, 401 인증 거부 시 반복 재시도 없이 중단한다. **12회 조회마다 1회** 비민감 `WATCH_HEARTBEAT`(관측 최소/최대 간격·백오프 유무)을 기록한다.
 
+## 읽기 전용 C 사전검사 (실행·설치·승인 아님)
+
+- **검사 소스:** `tools/handoff-watch-c-preflight.mjs`는 **별도 임시 검증 checkout**에 둔 채 해당 checkout에서만 `node tools/handoff-watch-c-preflight.mjs`로 검사한다. 실제 watcher C 설치의 원래 **7개 파일 범위에는 이 검사기를 포함하지 않는다**. 소스를 임의 복사하거나 신뢰하지 않은 checkout에서 실행하지 않는다.
+- **로컬 확인 항목:** 이 검사기는 7개 승인 후보 파일의 Git blob 바이트 해시(Windows CMD 하나는 CRLF→LF 정규화 결과가 **정확히 동일 Git blob**인 경우에만 허용, 이때 `windowsCmdCrLfNormalized=true` 표시), `DESKTOP-N62L0NG` 호스트, Windows 운영체제, Node 22, 원시 `GITHUB_TOKEN`·`GH_TOKEN` 환경변수 부재만 로컬에서 읽는다. 결과는 `sourceFilesMatched`, `hostMatch`, `node22`, `rawTokenEnvironmentAbsent`와 상태 코드만 반환하며 사용자 계정명·경로·GitHub 토큰은 출력하지 않는다. `tools/handoff-watch-user-start.cmd`는 Git checkout의 LF를 우선 보존하도록 해당 파일만 `text eol=lf`로 고정한다. 기존 Windows checkout이 CRLF를 남겼을 때에도 CMD의 **줄바꿈만** 정상화해 Git blob 내용의 동일성을 확인하고, 다른 문자·명령 변경은 계속 STOP한다.
+- **결과 해석:** `SOURCE_PREFLIGHT_STOP`이면 **설치 전 중단**. `SOURCE_PREFLIGHT_PASS_C_AUTH_AND_TASK_REQUIRED`는 **바이트·호스트·Node 사전검사만 통과**한 상태다. 이 결과는 실제 Windows Task 등록, 안전한 Windows 자격 저장·최소권한, 작업 실행권한, 자동 재기동, 5초 heartbeat, 영수증 검증, Runner 비간섭을 인증하지 않는다. 이 후속 요건은 기존 C급 사용자 직접 확인·승인·실행 절차에 남긴다.
+- **권한 경계:** 검사기는 외부 HTTP·GitHub API·인증 조회, Task 스케줄러 명령, 서비스·파일 생성·설치, 감시 루프 실행을 전혀 수행하지 않는다. 운영 PC 임의 원격 실행이나 새 Windows 사용자/토큰 등록을 승인하지 않는다.
+
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
