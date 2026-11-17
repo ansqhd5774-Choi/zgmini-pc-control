@@ -21,7 +21,24 @@ export async function verifyHandoffReceipt({
         Accept:'application/vnd.github+json',Authorization:'Bearer '+token,
         'X-GitHub-Api-Version':'2022-11-28'
       },signal:controller.signal});
-      if(response.status!==200) throw Error('HANDOFF_RECEIPT_READ_HTTP_'+response.status);
+      if(response.status!==200) {
+        const error=new Error('HANDOFF_RECEIPT_READ_HTTP_'+response.status);
+        error.httpStatus=response.status;
+        if(response.status===403||response.status===429){
+          // Preserve the server's actual retry boundary for the independent
+          // receipt lane. Do not log or persist response bodies or credentials.
+          const get=name=>response.headers?.get?.(name);
+          const retry=get('retry-after'),remaining=get('x-ratelimit-remaining'),reset=get('x-ratelimit-reset');
+          let waitMs=60_000;
+          if(retry!=null&&retry!==''&&Number.isFinite(Number(retry))&&Number(retry)>=0)
+            waitMs=Math.max(waitMs,Math.ceil(Number(retry)*1000));
+          if(remaining!=null&&remaining!==''&&Number(remaining)===0&&
+             reset!=null&&reset!==''&&Number.isFinite(Number(reset)))
+            waitMs=Math.max(waitMs,Math.ceil(Number(reset)*1000-Date.now()+1000));
+          error.retryAfterMs=Math.min(waitMs,86_400_000);
+        }
+        throw error;
+      }
       return await response.json();
     } finally {
       clearTimeout(t);
