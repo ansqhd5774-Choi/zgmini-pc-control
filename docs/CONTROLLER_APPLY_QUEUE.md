@@ -8,6 +8,21 @@
 
 현재 단일 조정 원장은 [공용 Controller 적용 대기열 #68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)이다. 관련 작업자는 이곳에 등록하며 대화별로 새 대기열을 만들지 않는다. 원장을 교체할 때는 기존 원장에 대체 위치와 인계를 기록한다. 기존 요청·승인·결과 Issue는 삭제하지 않는다.
 
+
+### 중앙 원장 직접 인계도 실제 접수다 — 2026-11-17 누락 정정
+
+이전 보고는 `handoff-agent-pending` 라벨 **1건(#1634)**을 총괄 전체 요청 1건으로 잘못 표시했다. 그 1건은 **자동 장애 Incident 대기**이고, 중앙 #68에 기능 담당이 직접 남긴 **공유 승인·설치 조정 요청 4건**은 별도다. 같은 요청의 인계 댓글 여러 개·후속 PR 리뷰는 같은 담당 작업으로 묶고, 자동 사고와 직접 요청이 같은 근본 사건이면 중복으로 설치하지 않는다. 새로운 라벨·전용 Runner·예약·Controller 설치 Gate를 만들지 않는다.
+
+| 현재 직접 조정 업무(독립 기준) | 요청 원문 | 총괄 검토·반환 | 안전 판정 |
+|---|---|---|---|
+| W03 R47 CMD 단일 파일 | [중앙 #68 댓글 6937230843](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6937230843), [6936233882](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6936233882) | [비실행 Draft #1892](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1892), [기능 원장 #1009 회신](https://github.com/ansqhd5774-Choi/zgmini/issues/1009#issuecomment-6938061256) | 현재 검토한 일반 Writer/Controller/Host 등록 경로는 .cmd 단일 파일 교체 불가. 신규 B 효과 승인·실증 전 **NO-GO** |
+| W04 PIT-04-03 Controller | [중앙 #68 댓글 6937150103](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6937150103), [6937649947](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6937649947) | [Draft #1878 원본 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1878#issuecomment-6938062204) | W03+W04 2개 누적 Controller 파일 source 호환 검토, W03 포함 명시 승인/최신 운영 원본 필요. **B 설치 HOLD** |
+| W05 WPSFD42 3파일 Writer | [중앙 #68 댓글 6937746172](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6937746172) | [#1885 정확 검토 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1885#issuecomment-6938063151) | 일반 .mjs Writer B 계약 대상 경로에는 해당하나 Git index/직전 preimage·사용자 승인 manifest 부재. **B 승인 HOLD** |
+| W01 Event129/POSTCHECK Controller | [공통 검토 Draft #1871](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1871), [중앙 #68 W01 인계](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | [#1871 검토 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1871#issuecomment-6938063950) | Stage만 존재·#1854 SOURCE_REVIEW_HOLD, W03/W04 누적 설치와 상충. **B 설치 NO-GO AS-IS** |
+
+**총괄 접수/검토 회신은 4/4건, 실제 운영 Controller/Writer 설치 승인은 0/4건**이다. 따라서 승인 대기 4건을 `agent-handoff-pending=1`로 축소하거나 검토 회신 4/4를 운영 완료 4/4로 표현하지 않는다. 현재 설치·lease·Task·승인 범위는 실제 적용 직전에 정확히 재검증하고, 독립 소스/계산/저장/게시 업무는 계속한다. 이 4건은 자동 인계 Workflow가 다른 ChatGPT 대화를 깨워 실제 수신한 증거가 아니다.
+
+
 이 문서 자체에는 변하는 설치 SHA나 미확인 PR 상태를 고정하지 않는다. 조정 원장에는 적용 담당 한 명과 적용 중인 항목을 명시한다. 담당이 미지정이면 준비된 작업의 담당자가 현황·실행 순서와 담당안을 등록해 확정한다. 대기열의 담당 기록과 PC의 실제 유지보수 원장·lease를 적용 직전에 함께 확인하며, 경합 중에는 둘이 동시에 적용하지 않는다.
 
 기능 담당은 개발·테스트·승인 증거를 준비하고, 적용 담당은 공용 배포 묶음·설치 순서·결과를 관리한다. 기존 적용 담당을 임의로 덮어쓰지 않고 명시적 인계로 변경한다. Issue 기록은 원자적 잠금이 아니므로 실제 적용에는 기존 PC lease를 사용한다. 조정 역할은 새 승인 권한이나 다른 작업자의 코드 변경 권한을 뜻하지 않는다.
