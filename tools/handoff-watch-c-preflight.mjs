@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 
-export const C_SOURCE_COMMIT='3976174e6c4c49c329933097163130b5c8138a47';
+export const C_SOURCE_COMMIT='82e06469569bb6842aa4aca43970d84262329481';
 export const C_SOURCE_BLOBS=Object.freeze({
   'agent-handoff/intake-watch-5s.mjs':'ac3bf7cd987e2ac4bacdcd94105a7689344bae7e',
   'agent-handoff/intake-receipt-readonly.mjs':'0b97307fc3bf1ed8462a5a6413c3fc8f12bbb08b',
