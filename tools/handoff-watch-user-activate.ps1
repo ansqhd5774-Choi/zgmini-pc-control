@@ -5,12 +5,13 @@
 param([switch]$Apply,[switch]$ConfirmRestrictedCredential,[string]$NodeExe='')
 $ErrorActionPreference='Stop'
 $TaskName='ZGMINI-HANDOFF-WATCH'
+$script:changesStarted=$false
 $Root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 function Report([string]$State,[bool]$Wrote=$false) {
   [pscustomobject]@{schema='ZGMINI_HANDOFF_WATCH_USER_ACTIVATION_R1';state=$State;
     pcWrites=$Wrote;credentialValueCaptured=$false;runtimeHeartbeatVerified=$false} | ConvertTo-Json -Compress
 }
-function StopSafe([string]$Code){Report $Code;exit 2}
+function StopSafe([string]$Code){Report $Code $script:changesStarted;exit 2}
 function Unsafe([string]$P){
   return [string]::IsNullOrWhiteSpace($P) -or $P -match '[%"&|<>^!]' -or
     $P.Contains([string][char]10) -or $P.Contains([string][char]13) -or $P.StartsWith('\\')
@@ -88,6 +89,7 @@ try {
     StopSafe 'SOURCE_MANIFEST_UNEXPECTED'
   }
   # No files, tasks or credentials are changed before all above checks.
+  $script:changesStarted=$true
   if(-not (Test-Path -LiteralPath $parent)){New-Item -ItemType Directory -Path $parent -ErrorAction Stop | Out-Null}
   New-Item -ItemType Directory -Path $target -ErrorAction Stop | Out-Null
   foreach($name in $allowed){
