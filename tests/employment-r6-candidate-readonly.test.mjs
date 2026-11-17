@@ -113,6 +113,53 @@ test('approved fixture runs in workspace and output projection does not leak raw
   assert.equal(JSON.stringify(result).includes('PRIVATE_VALUE'),false);
 });
 
+test('W04 raw attestations expose only fixed release groups, months and count triples',async t=>{
+  const f=fixture(t);
+  const inject=body=>{
+    fs.writeFileSync(f.script,body);
+    const approved=f.host.approvedSources[SHA];
+    const files={[ENTRY]:hash(Buffer.from(body))};
+    const bytes=Buffer.from(JSON.stringify({files})+'\n');
+    fs.writeFileSync(path.join(approved.root,'manifest.json'),bytes);
+    approved.manifestSha256=hash(bytes);
+  };
+  const original="rawSnapshotMetadataKeys:6,rawSnapshotCertifiedKeys:4,";
+  const extended=original+[
+    "rawSnapshotInvalidBodyKeys:1,rawSnapshotValidWithoutRunKeys:1,",
+    "rawSnapshotByGroup:[{releaseGroup:'BLS_BED',metadataKeys:6,bodyVerifiedKeys:5,runCertifiedKeys:4}],",
+    "rawSnapshotByMonth:[{retrievalMonth:'2026-11',metadataKeys:6,bodyVerifiedKeys:5,runCertifiedKeys:4}],",
+  ].join('\n');
+  assert.ok(fakeR6.includes(original));
+  inject(fakeR6.replace(original,extended));
+  const pass=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(pass.status,'PASS',JSON.stringify(pass));
+  assert.deepEqual(pass.pit.rawSnapshotByGroup,[{
+    releaseGroup:'BLS_BED',metadataKeys:6,bodyVerifiedKeys:5,runCertifiedKeys:4,
+  }]);
+  assert.deepEqual(pass.pit.rawSnapshotByMonth,[{
+    retrievalMonth:'2026-11',metadataKeys:6,bodyVerifiedKeys:5,runCertifiedKeys:4,
+  }]);
+  assert.equal(pass.pit.rawSnapshotInvalidBodyKeys,1);
+  assert.equal(pass.pit.rawSnapshotValidWithoutRunKeys,1);
+  assert.doesNotMatch(JSON.stringify(pass),/PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK/);
+
+  // An immutable child attempting to leak a source ID, exact timestamp, or
+  // inconsistent count must not claim a valid A-grade PASS.
+  const wrong=[
+    extended.replace("releaseGroup:'BLS_BED'","releaseGroup:'PRIVATE_SOURCE_ID'"),
+    extended.replace("retrievalMonth:'2026-11'","retrievalMonth:'2026-11-17T09:00:00.000Z'"),
+    extended.replace("rawSnapshotValidWithoutRunKeys:1","rawSnapshotValidWithoutRunKeys:2"),
+  ];
+  for(const replacement of wrong){
+    inject(fakeR6.replace(original,replacement));
+    const invalid=await inspectEmploymentR6Candidate(f.request,{...f,
+      workspace:fs.mkdtempSync(path.join(f.root,'workspace-attest-'))});
+    assert.equal(invalid.status,'FAIL');
+    assert.equal(invalid.code,'R6_RESULT_INVALID');
+    assert.doesNotMatch(JSON.stringify(invalid),/PRIVATE_SOURCE_ID|PRIVATE_PROVIDER_RAW_BODY/);
+  }
+});
+
 test('early WAL block cannot be misreported as peak calculation memory',async t=>{
   const f=fixture(t);
   const blocked=fakeR6.replace("status:'PASS'","status:'BLOCKED'")
