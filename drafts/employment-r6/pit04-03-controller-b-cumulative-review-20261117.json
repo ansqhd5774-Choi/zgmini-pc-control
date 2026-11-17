@@ -13,24 +13,24 @@
   },
   "sourceTarget": {
     "branch": "main",
-    "sourceSha": "60cde094d83d302608e4ee2fc63b38b89c0dab87",
-    "sourceMergedBy": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1875",
+    "sourceSha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2",
+    "sourceMergedBy": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1882",
     "mustRemainAncestorOfMain": true,
-    "fullGitDiffPaths": 75,
+    "fullGitDiffPaths": 88,
     "controllerConfigDiffPaths": 2,
     "livePcJobWorkflowChanged": false
   },
   "allowFiles": [
     {
       "path": "controller/employment-r6-candidate-readonly.mjs",
-      "sha256": "1e68a5bef987fde630e9d20f056c3fe53960b2897948c6b31f4a36a124e10441"
+      "sha256": "e156d22989210b2599d9393a15f8206fecd325d14f3d72af04d658bd60ee9409"
     },
     {
       "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
       "sha256": "33c0b896ac3b941c13cde703afcbdb8c63bc7bf7f20bcb045af2fd8fd8356fd4"
     }
   ],
-  "allowFilesManifestSha256": "e364c1cb7b61279b2b3313408b73c57d193b9a5b0be86dde1a5c5a6d1264c2bd",
+  "allowFilesManifestSha256": "2748317833789f004b34eb56134fa4801dcc59030fe7b9b1b884da1266060585",
   "previousApprovals": [
     {
       "owner": "W03",
@@ -40,9 +40,9 @@
     },
     {
       "owner": "W04",
-      "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1875",
+      "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1882",
       "hostSuccess": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1874",
-      "status": "SOURCE_MERGED_HOST_SOURCE_REGISTERED_CONTROLLER_B_UNVERIFIED"
+      "status": "PIT_04_03_COUNT_PROJECTION_AND_PARTITION_GUARD_SOURCE_MERGED_HOST_SOURCE_REGISTERED_CONTROLLER_B_UNVERIFIED"
     }
   ],
   "contractPreflight": {
@@ -50,7 +50,7 @@
     "source": "tools/maintenance-contract.mjs",
     "input": "git diff --name-only installedControllerSha sourceTarget.sourceSha",
     "onlyW04Result": "ALLOWFILE_DIFF_MISMATCH",
-    "bothFilesResult": "PASS",
+    "bothFilesResult": "PASS_AFTER_CURRENT_MAIN_DELTA_COMPARISON_SOURCE_ONLY",
     "note": "Passing this source-only delta test does not authorize installing the W03 module or replace current PC readback"
   },
   "testEvidence": [
@@ -63,6 +63,11 @@
       "kind": "CONTROLLER_W04_SOURCE_CI",
       "run": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44005979636",
       "result": "SUCCESS"
+    },
+    {
+      "kind": "CONTROLLER_W04_PARTITION_INTEGRITY_WINDOWS_CI",
+      "run": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44009480320",
+      "result": "Controller 11/11 PASS, DOL 17/17 PASS"
     }
   ],
   "requiredOwnerActions": [
