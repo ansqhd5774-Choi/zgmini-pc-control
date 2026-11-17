@@ -48,6 +48,18 @@
 
 **언제 요청하는가:** 위 공통 도구·실행 계약의 실제 장애, 공유 자원 충돌 또는 업무 인계 자체의 오류가 현재 기능의 필수 실행에 영향을 줄 때만 요청한다. 기능 API·원자료·산식 오류와 단순 `WAIT_RECORDED`·정상 대기는 원담당 업무이며, 공용 원인이 확인되지 않으면 총괄은 **공용 원인 판정 지원**까지만 맡는다. 무관한 승인된 기능 작업은 계속한다.
 
+**업무 전가 반송 원칙(2026-11-17):** 기존 책임 배분을 명확히 적용한다. 공통 요청의 제목·라벨·'승인 필요' 표현보다 **실제로 남은 동작과 최초 실패 위치**로 업무를 분류한다. 총괄은 실제 공통 도구 결함·공유 자원 충돌·범위 밖 운영 효과 승인/보호 검토에만 한정해서 수락하고, 원담당의 기능별 실행·자료 대조·명세 작성·설치·결과 회수를 떠맡지 않는다. 잘못 넘어온 요청은 **같은 원본 Issue/#68에 원담당, 원담당의 다음 필수 실행, 총괄이 지원할 공통 부분(있을 경우)만 명시해 회신**한다. 불필요한 새 Issue/재승인/별도 Gate를 만들거나, 인계를 반송했다는 이유로 독립 기능 작업을 중단하지 않는다. 실제 공통 결함이 의심되지만 미확정이면 총괄의 원인 판정 지원만 허용하며, 기능 실행 책임은 계속 원담당에게 둔다.
+
+| 원담당 | 원담당이 끝까지 처리할 작업(총괄 이관 금지) | 총괄 지원이 허용되는 예외 |
+|---|---|---|
+| W01 물가지표 | 승인 A 실행·결과 회수, Core 소유권/Census B 조건 대조, 23개 원자료 검증, BLS·Census 수집/파서/저장, 계산·D1/API/UI 검증 | 공통 Controller/수신기 실제 결함과 그 수정·보호 심사. Windows Event129 관리자 설정은 사용자 직접(C급) |
+| W03 테마공탐 | 승인 A 결과, R48/R73 체인과 기능 소스 대조, 승인 R47 CMD B 설치, ETF 63종+SPY 수집·계산·게시 | 공통 Task Engine/Controller 조회기·B 실행 경로 자체 결함과 공유 보호 승인 |
+| W04 고용지표 | Reader/Runner·회귀시험, A 조회·결과 분석, SHA/정확 diff, 신규 B manifest 작성·검증, 승인 후 B 실행과 최종 계보 11계수 검증 | 신규 Controller **운영 효과**의 범위·보호 심사, 공통 유지보수 복구; 소스 SHA와 기능별 manifest 준비는 W04 |
+| W05 API–사이트 연결 | 승인 A 회수, Writer B 사전조건/3파일 SHA·manifest 대조, 정규 Writer B 설치, WPSFD42 수집·SQLite·게시·API/UI 검증 | 공통 Controller/Task Engine/Writer receiver·공통 B 설치기 자체 결함 또는 공유 자원 경합 |
+| W06 UIUX | 75단계 계획/진행 기록, 계산·checkpoint·원장 대조, 입력 변경 회귀시험, 승인 A 조회·API/UI·차트 검증 | 공통 Controller·공통 B 설치기 결함만 총괄. 실제 Writer 수정·설치는 Writer 원담당 |
+
+**예외 확인:** 원담당이 기존 승인·고정 허용목록·실제 설치 원장으로 수행 가능한 A/B를 먼저 자기 책임으로 처리한다. 새 운영 효과 승인 또는 공통 코드/공유 보호 **실제 필요분만** 총괄에 요청한다. 각 기능의 실행 성공은 원담당 PC Runtime·원격 JSON/TXT·저장·게시 증거로만 판정한다. 위 분류는 업무 권한을 새로 부여하거나 기존 승인 범위·운영 PC source/Workflow를 변경하지 않는다.
+
 **어디에 어떻게 요청하는가:** 저장소 `ansqhd5774-Choi/zgmini-pc-control`의 [GitHub Issues](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues)에 기존 `ZGMINI_AGENT_HANDOFF_V1` JSON 계약과 `agent-handoff` 라벨로 요청한다. 신규 Issue 생성 시 본문·라벨을 같은 생성 요청에 넣고, 기존 동일 사건이 있다면 **원본 Issue·인계 Issue를 재사용**한다. 형식과 유효 필드는 [AGENT_HANDOFF_V1.md](AGENT_HANDOFF_V1.md) 및 `agent-handoff/contract.mjs`를 따른다. 원본 `repository/issueNumber/requestId/chatId/branch/sourceSha/checkpoint`, 실패 `kind/code/lastPass/firstFail/fileRefs/evidenceIssueNumber`와 고유 `incidentId`를 정확히 확인한다. 지원 요청 목적·총괄이 반환해야 할 결과는 **원본 업무 Issue/진행 기록에 자연어로 설명**한다. 검증 계약에 없는 JSON 키를 추가하지 않고 API 키·인증 URL·전체 원자료를 올리지 않는다.
 
 예시 요청: “원본 Writer B Issue #번호, Run #번호에서 공통 receiver import 결함이 의심됨. 공통 도구의 원인 분석·최소 수정·회귀 검증을 요청. 기능별 hook·설치·게시 작업은 원담당이 유지. 원본 LAST PASS/FIRST FAIL, source SHA 및 승인 범위는 원본 증거 참고.”
