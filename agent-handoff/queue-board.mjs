@@ -83,8 +83,12 @@ export function evaluateQueueItem(issue,comments,nowMs){
     receiptCount,ownerAccountVerified:receiptCount>0});
 }
 
-export function compileQueueBoard(items,nowMs){
-  if(!validMs(nowMs)||!Array.isArray(items)||items.length>100)fail('INVENTORY_INVALID');
+export function compileQueueBoard(items,nowMs,
+  {openHandoffIssueCount=Array.isArray(items)?items.length:0}={}){
+  if(!validMs(nowMs)||!Array.isArray(items)||items.length>100||
+    !Number.isSafeInteger(openHandoffIssueCount)||
+    openHandoffIssueCount<items.length||openHandoffIssueCount>100)
+    fail('INVENTORY_INVALID');
   const numbers=new Set();
   for(const item of items){
     const n=item?.issue?.number;
@@ -105,7 +109,12 @@ export function compileQueueBoard(items,nowMs){
   }
   return Object.freeze({schema:'ZGMINI_HANDOFF_BOARD_R1',asOf:new Date(nowMs).toISOString(),
     advisoryOnly:true,completeInventory:true,
-    issueCount:records.length,verifiedOwnerAccounts:records.filter(r=>r.ownerAccountVerified).length,
+    // Active pending is verified using owner/bot comment readback; open non-pending
+    // is only a GitHub label inventory count, NOT proof of issue resolution.
+    issueCount:records.length,pendingIssueCount:records.length,
+    openHandoffIssueCount,nonPendingOpenIssueCount:openHandoffIssueCount-records.length,
+    ackOnlyCount:records.filter(r=>r.status==='ACKNOWLEDGED').length,
+    verifiedOwnerAccounts:records.filter(r=>r.ownerAccountVerified).length,
     reviewAlertCount:records.filter(r=>!['NONE','RUNTIME_PROOF_SEPARATE'].includes(r.alert)).length,
     statuses,alerts,roles,records,operationalWrites:0,aiCalls:0,automaticPcRetries:0});
 }
@@ -115,19 +124,25 @@ export function renderBoardMarkdown(board){
   const out=['# ZGMINI 공통 대기열 관제','',
     '관측 기준 UTC: '+board.asOf,
     '원본: GitHub Issue 및 인증된 댓글 (읽기 전용 스냅샷)',
-    '총 대기 Issue: **'+board.issueCount+'** · 인증 계정 인수: **'+board.verifiedOwnerAccounts+
+    '열린 agent-handoff 이슈: **'+board.openHandoffIssueCount+'** · 현재 대기: **'+board.pendingIssueCount+
+      '** · 대기 라벨 없는 열린 인계: **'+board.nonPendingOpenIssueCount+'**',
+    '현재 대기 중 ACK 기록만 확인된 건: **'+board.ackOnlyCount+
+      '** · 인증 계정 인수: **'+board.verifiedOwnerAccounts+
       '** · 확인 후보: **'+board.reviewAlertCount+'**',
-    '','| 우선순위(참고) | Issue | 유형 | 역할 | 증거상태 | 마지막 진행 이후(h) | 확인사항 |',
-    '|---|---|---|---|---|---:|---|'];
+    '','| 우선순위(참고) | Issue | 유형 | 역할 | 증거상태 | 검증 원인 | 마지막 진행 이후(h) | 확인사항 |',
+    '|---|---|---|---|---|---|---:|---|'];
   for(const x of board.records){
     const ref='[#'+x.issueNumber+'](https://github.com/'+HANDOFF_REPOSITORY+
       '/issues/'+x.issueNumber+')';
     out.push('| '+x.priority+' ('+x.score+') | '+ref+' | '+(x.kind??'UNVERIFIED')+
-      ' | '+x.role+' | '+x.status+' | '+(x.lastProgressHours??'—')+
+      ' | '+x.role+' | '+x.status+' | '+x.evidenceState+' | '+(x.lastProgressHours??'—')+
       ' | '+x.alert+' |');
   }
   out.push('','- 우선순위는 오류 종류·단계·GitHub 생성 시각에 따른 **검토 순서**이며 실제 운영 영향이나 확정 긴급도가 아닙니다.',
     '- 인수 표시는 GitHub 계정 댓글 영수증만 확인합니다. 특정 일반챗 자동 실행·수신/운영 적용을 증명하지 않습니다.',
+    '- 대기 라벨이 없는 열린 인계는 이력/별도 검토 대상으로 집계하며, 해제만으로 해결·운영 완료로 판정하지 않습니다.',
+    '- agent-handoff 라벨에는 봇 생성 사건뿐 아니라 소유자가 직접 작성한 인계 Issue도 포함될 수 있습니다. 판정은 원본 JSON·정확한 제목·봇 영수증 검증에 따릅니다.',
+    '- 중앙 #68 댓글로 직접 접수된 공유 지원 요청은 별도의 실접수 원천이며 이 agent-handoff 이슈 집계에 포함되지 않습니다.',
     '- 지연 표시는 '+REVIEW_POLICY.ackHours+'/'+REVIEW_POLICY.workHours+'/'+REVIEW_POLICY.evidenceHours+
       '시간 경과 검토 후보입니다. 계약상 SLA 위반이 아닙니다.',
     '- 이 스냅샷은 후보 선별·인수/결과 Workflow 성공 후, 수동 실행 또는 15분 간격 GitHub 예약 실행 시 갱신됩니다. 예약은 지연되거나 누락될 수 있습니다.');

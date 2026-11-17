@@ -135,11 +135,18 @@ test('board returns complete deterministic aggregate and non-executable GitHub l
     {issue:b.issue,comments:b.comments}],now);
   assert.equal(board.schema,'ZGMINI_HANDOFF_BOARD_R1');
   assert.equal(board.issueCount,2);assert.equal(board.verifiedOwnerAccounts,1);
+  assert.equal(board.openHandoffIssueCount,2);
+  assert.equal(board.pendingIssueCount,2);
+  assert.equal(board.nonPendingOpenIssueCount,0);
+  assert.equal(board.ackOnlyCount,1);
   assert.equal(board.records[0].issueNumber,3102);
   assert.equal(board.operationalWrites,0);
   const md=renderBoardMarkdown(board);
   assert.match(md,/#3102/);
   assert.match(md,/15분 간격 GitHub 예약 실행/);
+  assert.match(md,/열린 agent-handoff 이슈: \*\*2\*\*/);
+  assert.match(md,/현재 대기: \*\*2\*\*/);
+  assert.match(md,/중앙 #68 댓글로 직접 접수된 공유 지원 요청/);
   assert.throws(()=>compileQueueBoard([{issue:a.issue,comments:a.comments},{issue:a.issue,comments:a.comments}],now),/DUPLICATE/);
 });
 test('runner requires authenticated workflow provenance and never grants arbitrary triggers',()=>{
@@ -174,6 +181,48 @@ test('read-only collector uses exact inventory/readback and fails when issue cha
   await assert.rejects(()=>collectBoard({...io,readIssue:async()=>({...f.issue,state:'closed'})},now),
     /ISSUE_DRIFT_RESCAN_REQUIRED/);
 });
+test('owner-authored handoff with descriptive title remains unselected and shows precise proof reason',()=>{
+  const f=fixture(3194);
+  f.issue.user={login:HANDOFF_OWNER};
+  f.issue.title='[W03→총괄] descriptive human issue title';
+  const row=evaluateQueueItem(f.issue,f.comments,now);
+  assert.equal(row.status,'PROOF_REVIEW_REQUIRED');
+  assert.equal(row.evidenceState,'ISSUE_IDENTITY_MISMATCH');
+  assert.equal(row.ownerAccountVerified,false);
+  const board=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
+  const markdown=renderBoardMarkdown(board);
+  assert.match(markdown,/ISSUE_IDENTITY_MISMATCH/);
+  assert.match(markdown,/검증 원인/);
+  assert.equal(board.pendingIssueCount,1);
+  assert.equal(board.ackOnlyCount,0);
+});
+
+test('open history and current pending are counted separately without false completion',async()=>{
+  const pending=fixture(3110);
+  const nonPending=fixture(3111);
+  nonPending.issue.labels=[{name:'agent-handoff'}];
+  let commentReads=0,issueReads=0;
+  const io={listIssues:async()=>[structuredClone(nonPending.issue),structuredClone(pending.issue)],
+    readComments:async n=>{commentReads++;assert.equal(n,pending.issue.number);
+      return structuredClone(pending.comments);},
+    readIssue:async n=>{issueReads++;assert.equal(n,pending.issue.number);
+      return structuredClone(pending.issue);}};
+  const board=await collectBoard(io,now);
+  assert.equal(board.openHandoffIssueCount,2);
+  assert.equal(board.pendingIssueCount,1);
+  assert.equal(board.nonPendingOpenIssueCount,1);
+  assert.equal(board.issueCount,1);
+  assert.equal(board.records[0].issueNumber,pending.issue.number);
+  assert.equal(commentReads,1);
+  assert.equal(issueReads,1);
+  const markdown=renderBoardMarkdown(board);
+  assert.match(markdown,/대기 라벨이 없는 열린 인계/);
+  assert.doesNotMatch(markdown,/해결 완료: \*\*1\*\*/);
+  const outOfScope={...nonPending.issue,labels:[]};
+  await assert.rejects(()=>collectBoard({...io,listIssues:async()=>[outOfScope]},now),
+    /INCIDENT_INVENTORY_OUT_OF_SCOPE/);
+});
+
 test('board GitHub workflow is isolated, origin-guarded, read-only, and has a bounded schedule',()=>{
   const p=new URL('../.github/workflows/agent-handoff-queue-board.yml',import.meta.url);
   const flow=readFileSync(p,'utf8');
