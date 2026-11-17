@@ -1,5 +1,9 @@
 # 일반챗 작업 전 공통 지침
 
+**공통 총괄 업무 요청(2026-11-17):** 공통 Controller/Runner/GitHub Actions/Writer 도구/승인·설치·공유 자원/인계 시스템의 구조 결함만 총괄에 요청한다. 기능별 수집·산식·게시·설치는 원담당이 수행한다. 제어 저장소의 기존 `agent-handoff` Issue에 `ZGMINI_AGENT_HANDOFF_V1`, `agent-handoff` 라벨과 원본 Issue/Run·LAST PASS/FIRST FAIL·source SHA·정확한 지원 목표를 제시한다. GitHub 접수 영수증, 실제 처리자 전달·인수, 결과 원본 회신, 원담당 실제 수신은 **서로 다른 단계**다. [상세 업무목록·요청/회신 계약](PC_AUTOMATION_STANDARD.md#공통-프로세스-총괄--요청-가능-업무접수작업-회신-2026-11-17).
+
+
+
 2026-11-08 R2 Writer B 경합 보완 / **2026-11-12 두 PC 실측·신규 대화 실행 표준 추가**. 상세 정본: [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md).
 
 현재 업무·브랜치·기존 승인·완료 증거를 보존하고 마지막 유효 완료 지점부터 이어서 수행하라. **이 지침을 받은 일반챗은 자기 원래 기능의 다음 필수 실행을 즉시 진행하라.**
