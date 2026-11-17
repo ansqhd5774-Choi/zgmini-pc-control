@@ -194,9 +194,11 @@ export async function performWriterBInstall(auth,io){
   const code=publicErrorCode(error,'WRITER_B_ADAPTER_UNEXPECTED_STOP');
   if(!claimed){
    const diagnostic=safeWriterBImportDiagnostic(error);
-    const batch=safeWriterBImportDiagnosticBatch(error);
+   const batch=safeWriterBImportDiagnosticBatch(error);
+   const preimageCheck=safeWriterBPreimageCheck(error);
    result={status:'WRITER_B_PREFLIGHT_STOP',code,requestId:auth.requestId,
-     ...(diagnostic?{diagnostic}:{}),...(batch??{})};
+    ...(diagnostic?{diagnostic}:{}),...(batch??{}),
+    ...(preimageCheck?{preimageCheck}:{})};
   }else{
    try{
     if(configMayHaveChanged||sourceMayHaveChanged){
