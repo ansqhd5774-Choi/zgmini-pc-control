@@ -1,0 +1,9 @@
+schema=ZGMINI_PC_RESULT_V1
+jobId=run-44059624581-1-seat-3
+status=BLOCKED
+code=PREIMAGE_MANIFEST_PATH
+lastPass=EVENT_RECEIVED
+firstFail=EVENT_OR_REQUEST_VALIDATION
+operationalWrites=0
+providerCalls=0
+d1Writes=0
