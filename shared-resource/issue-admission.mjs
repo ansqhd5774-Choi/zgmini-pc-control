@@ -48,6 +48,8 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   'r181-primary-route-install',
   'r181-existing-task-run-once',
   'w01-census-m3-api-once',
+  // Dedicated R47 CMD B receives this exact title via pc-approved-runtime-b-once.
+  'pc-r47-cmd-onefile-install',
 ]));
 const stop=code=>{throw new Error('SHARED_ISSUE_ADMISSION_'+code);};
 const exactKeys=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&
