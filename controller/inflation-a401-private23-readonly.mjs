@@ -3,6 +3,11 @@
 import fs from 'node:fs';import path from 'node:path';
 import {createHash} from 'node:crypto';import {spawnSync} from 'node:child_process';
 export const A401_ENTRY='scripts/pc-writer/inflation-a401-baseline23-readonly.mjs';
+// Only the two W01 static-import worker modules are permitted under worker/.
+const A401_WORKER_MODULES=new Set([
+ 'worker/inflation-causal-public-r1.mjs',
+ 'worker/inflation-causal-candidates-public-7-r1.mjs'
+]);
 const IDS=['1','3','4','5','6','7','8','9','10','11','12','13','14','18','19','21','25','26','31'];
 const EXTRA=['2','16','24','29'];
 const hash=b=>createHash('sha256').update(b).digest('hex');
@@ -45,7 +50,7 @@ export function stageA401Bundle(request,{host,workspace}){
   Object.keys(m.files).length>0&&Object.keys(m.files).length<=64&&Object.hasOwn(m.files,A401_ENTRY),'A401_MANIFEST_SCOPE');
  const entries=[];let total=0;
  for(const[rel,digest]of Object.entries(m.files)){
-  need(/^(?:lib|scripts\/pc-writer)\/[a-zA-Z0-9_./-]+\.mjs$/.test(rel)&&
+  need((/^(?:lib|scripts\/pc-writer)\/[a-zA-Z0-9_./-]+\.mjs$/.test(rel)||A401_WORKER_MODULES.has(rel))&&
    !rel.split('/').some(x=>!x||x==='.'||x==='..')&&/^[a-f0-9]{64}$/.test(digest),'A401_BUNDLE_PATH');
   const b=regular(path.join(root,'source',rel));total+=b.length;
   need(hash(b)===digest&&total<=8_000_000,'A401_SOURCE_BYTES_DRIFT');entries.push([rel,b]);
