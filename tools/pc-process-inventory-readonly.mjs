@@ -725,7 +725,7 @@ export function collect(role,ctx,env=process.env){
   return {...withMaintenance,status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',snapshot};
  }catch{return {...withMaintenance,status:'PARTIAL',code:'PROCESS_REPORT_INVALID'};}
 }
-export function toText(r){
+// Preserve the complete approved evidence schema while staying inside the\n// existing atomic result-pair 32 KiB limit. Never drop verification fields.\nexport function serializeProcessResult(result){return JSON.stringify(result)+'\n';}\nexport function toText(r){
  return ['schema='+r.schema,'requestId='+r.requestId,'role='+r.role,
   'runId='+r.runId,'attempt='+r.attempt,'host='+r.host,
   'runner='+r.runnerName,'status='+r.status,'code='+r.code,
@@ -747,7 +747,7 @@ async function main(){
  const ctx=authenticateProcess(event,env,role);
  const result=collect(role,ctx,env);
  const stem='results/pc-process-inventory-'+ctx.runId+'-'+ctx.attempt+'-'+role;
- const outputs=[[stem+'.json',JSON.stringify(result,null,2)+'\n'],[stem+'.txt',toText(result)]];
+ const outputs=[[stem+'.json',serializeProcessResult(result)],[stem+'.txt',toText(result)]];
  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json',
   'X-GitHub-Api-Version':'2022-11-28','content-type':'application/json'};
  const uploaded=await uploadResultPairAtomic({outputs,headers,
