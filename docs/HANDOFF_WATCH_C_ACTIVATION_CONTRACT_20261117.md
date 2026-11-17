@@ -19,7 +19,7 @@
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
-- **실행 source (heartbeat 집계 수정 완료, C 설치는 별도):** 이전 확정 pin `f1a280b9c24ec8d01ee228115b92ebb964f49802`는 12회 관측창에서 정상 조회·실패 조회·백오프 횟수를 구분하지 못한 감시기 버전으로 신규 설치에서 제외한다. [PR #1925](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1925)의 감시기 heartbeat 집계를 수정해 main squash **`82e06469569bb6842aa4aca43970d84262329481`**에 병합했다. 격리 Windows [CI #44037276119](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44037276119) **466/466 PASS**, C996 #44037249894 SUCCESS. 병합 직후 7개 watcher/CMD Git blob이 이 불변 commit과 main에서 **7/7 동일**함을 독립 재조회했다. 설치용 후보는 이 불변 commit의 정확 7개 파일로만 제한한다. **이 SHA 확정은 실제 Windows 상주 Task 설치·보안 인증·자동 재시작의 승인이 아니며, 해당 C급 확인 전 실제 설치·가동을 주장하지 않는다.** Runner 일회성 `_work` 경로에 상주 설치하지 않으며 사용자/경로/토큰을 추정하지 않는다.
+- **실행 source (heartbeat 집계 수정 완료, C 설치는 별도):** 이전 확정 pin `f1a280b9c24ec8d01ee228115b92ebb964f49802`는 12회 관측창에서 정상 조회·실패 조회·백오프 횟수를 구분하지 못한 감시기 버전으로 신규 설치에서 제외한다. [PR #1925](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1925)의 감시기 heartbeat 집계를 수정해 main squash **`82e06469569bb6842aa4aca43970d84262329481`**에 병합했다. 격리 Windows [CI #44037276119](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44037276119) **466/466 PASS**, C996 #44037249894 SUCCESS. 병합 직후 7개 watcher/CMD Git blob이 이 불변 commit과 main에서 **7/7 동일**함을 독립 재조회했다. 설치용 후보는 이 불변 commit의 정확 7파일(6개 watcher 모듈과 CMD 1개)로만 제한한다. **이 SHA 확정은 실제 Windows 상주 Task 설치·보안 인증·자동 재시작의 승인이 아니며, 해당 C급 확인 전 실제 설치·가동을 주장하지 않는다.** Runner 일회성 `_work` 경로에 상주 설치하지 않으며 사용자/경로/토큰을 추정하지 않는다.
 
   | 설치 대상 소스 확인 항목 | Git blob SHA-1 (확정 source pin `82e06469…`; **C급 설치 별도**) |
   |---|---|
