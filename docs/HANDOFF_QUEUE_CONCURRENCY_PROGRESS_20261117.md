@@ -4,7 +4,7 @@
 - 브랜치: codex/handoff-queue-job-concurrency-20261117
 - 최초 유효 main: 75ae083d74dc9078c50f1ac215c6554a5c9d3bfb
 - 계획: docs/HANDOFF_QUEUE_CONCURRENCY_EXECUTION_PLAN_20261117.md
-- 현재 단계: 5/6 — 소스·CI 검증 PASS, 자연 실행 효과는 미검증
+- 현재 단계: 6/6 — DONE (격리 CI 401/401 + 자연 실행 4/4 PASS; scheduler 장기 신뢰성 별도 유보)
 - source 변경 범위: 기존 격리 감시 YAML 4개 + 신규 정적 계약 시험 1개. 운영 PC 쓰기 0, 예약/실행 주기 변경 0.
 
 ## 원본 조사
@@ -48,3 +48,19 @@
 ## 다음 단일 필수 행동
 - 구버전 실행이 완전히 종료된 뒤 신버전 board의 기존 schedule/자연 workflow_run 한 건을 조회하여 runner/결론 및 queue:max 대기 보존 여부를 확인한다. 새로운 예약·Runner·중복 요청·운영 PC 변경 금지.
 - 해당 결과가 PASS이고 동일 source SHA에서 불필요한 pending 취소가 재발하지 않으면 6단계를 종료한다. 실패하면 원본 Run/Jobs의 last PASS/FIRST FAIL을 보고 필요한 범위만 재검토한다.
+
+## 2026-11-17 09:02 KST — 6/6 실제 실행 검증 완료 (관측 범위 명시)
+- 검증 대상 GitHub head_sha: 838d88997fe02ea00487b86182d05a1daacf837b. 해당 SHA는 승인된 PR #1811 병합 SHA 6f070b1db9391e95838d96342d7b1f0a8f10e5c4 이후 진행 기록만 반영된 main이다.
+- 기존 자연 workflow_run 트리거 2026-11-17 08:59:46 KST 네 건을 각각 GitHub Run+Job 원본에서 직접 재조회: **4 성공 / 0 취소**. 모두 격리 Runner zgmini-handoff-ci-spare-01에서 실제 Job 종료.
+  - 43983949585 정밀 진단 R2: SUCCESS, 09:00:26 KST 종료, job 133707194179.
+  - 43983949542 Queue Control Board: SUCCESS, 09:01:01 KST 종료, job 133707194432. 로그 ZGMINI_HANDOFF_BOARD_R1, completeInventory=true, issueCount=9, ACKNOWLEDGED=1, PENDING_OWNER_ACK=8, reviewAlertCount=0. 인수 상태는 운영 PC 복구 성공이 아님.
+  - 43983949537 능동 진단 R1: SUCCESS, 09:01:46 KST 종료, job 133707194819.
+  - 43983949741 Wide Scout R3: SUCCESS, 09:02:19 KST 종료, job 133707196582.
+- 동일 공유 ledger 그룹의 정밀/능동/확장 세 작업이 직렬 실행됐으며, board 독립 그룹도 실제 통과. 병합 직후 전환 중 취소 3건과 신버전 첫 board 취소는 앞선 기록대로 보존. 이번 네 건이 미래 모든 트리거의 취소 0을 보장하는 것은 아님.
+- Node PR Windows CI 401/401 PASS는 기존 증거 재사용. 이번 추가 source/Runner 설치/예약 추가/DB 쓰기 0.
+- 별도 유보(DEFERRED): GitHub Actions schedule 자체가 11월 17일 01:26~07:56 사이 나타나지 않았던 플랫폼 내부 원인은 미확정. 기존 cron은 유지. 09:02 KST 조회 시 schedule 누적 4건이며 09:07 이후의 일정은 이 기록에서 아직 미관측. 주기적 감시의 완전성을 주장하지 않음.
+
+## 상태 및 인계
+- 본 수정 계획 6/6 = **DONE (설정 반영·격리 회귀·실제 자연 Run 4/4 확인)**.
+- 남은 의존성 = **DEFERRED (GitHub scheduler 장기 신뢰성 별도 점검)**, 본 취소 개선의 무한 반복 Gate로 삼지 않는다.
+- 후속 조사는 신규 schedule 미생성 또는 정확히 동일 SHA에서 불필요한 취소가 실제 발생할 때 해당 원본 Run/Job과 YAML의 변경 영향만 재검증한다.
