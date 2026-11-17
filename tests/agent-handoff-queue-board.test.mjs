@@ -149,7 +149,7 @@ test('runner requires authenticated workflow provenance and never grants arbitra
   const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,GITHUB_EVENT_PATH:'event.json',
     GITHUB_EVENT_NAME:'workflow_run'};
   assert.doesNotThrow(()=>validateBoardEvent(event,env));
-  assert.doesNotThrow(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env));
+  assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'ZGMINI Agent Handoff Intake'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,name:'Untrusted Pipeline'}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,actor:{login:'untrusted'}}},env),/RUN_PROVENANCE_STOP/);
   assert.throws(()=>validateBoardEvent({...event,workflow_run:{...event.workflow_run,head_branch:'other'}},env),/RUN_PROVENANCE_STOP/);

@@ -130,8 +130,8 @@ test('new workflow uses existing isolated runner with bounded permissions',()=>{
   assert.match(s,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
   assert.match(s,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(s,/node agent-handoff\/proactive-diagnostics-runner.mjs/);
-  assert.match(s,/workflow_run:/);assert.match(s,/issues:/);assert.match(s,/push:/);
-  assert.match(s,/types: \[labeled\]/);assert.match(s,/github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.doesNotMatch(s,/^  workflow_run:/m);assert.match(s,/issues:/);assert.match(s,/push:/);
+  assert.match(s,/types: \[labeled\]/);assert.doesNotMatch(s,/github\.event\.workflow_run/);
   assert.doesNotMatch(s,/pull_request:|contents: write|actions: write/);
 });
 

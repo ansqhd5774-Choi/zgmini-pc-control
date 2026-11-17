@@ -133,7 +133,7 @@ test('invalid ledger stops with zero writes',async()=>{
 test('workflow is guarded on Windows, least-privilege and no production writes',()=>{
   const s=readFileSync(new URL('../.github/workflows/agent-handoff-wide-scout.yml',import.meta.url),'utf8');
   assert.match(s,/cron: '14,29,44,59 \* \* \* \*'/);
-  assert.match(s,/workflow_run:/);assert.match(s,/issues:/);
+  assert.doesNotMatch(s,/^  workflow_run:/m);assert.match(s,/issues:/);
   assert.match(s,/pull-requests: read/);
   assert.match(s,/contents: read/);assert.match(s,/actions: read/);
   assert.match(s,/zgmini-handoff-ci-isolated/);

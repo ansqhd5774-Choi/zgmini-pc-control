@@ -60,3 +60,32 @@ test('no new triggers, runner, provider operations or permissions are introduced
     assert.ok(yaml.includes('github.event.repository.private == true'));
   }
 });
+
+test('completed-run fanout is limited to intake, selector and board',()=>{
+  const intake=read('agent-handoff.yml');
+  const selector=read('agent-handoff-candidate-selector.yml');
+  const board=read('agent-handoff-queue-board.yml');
+  assert.match(intake,/^  issue_comment:/m);
+  assert.match(selector,/^  workflow_run:/m);
+  assert.match(selector,/- ZGMINI Agent Handoff Intake/);
+  assert.match(board,/^  workflow_run:/m);
+  assert.match(board,/- ZGMINI Handoff Queue Candidate Selector/);
+  assert.doesNotMatch(board,/- ZGMINI Agent Handoff Intake/);
+  // Keep the schedule, explicit owner dispatch and labeled-event fallback.
+  for(const file of ['agent-handoff-wide-scout.yml',
+    'agent-handoff-deep-diagnostics.yml',
+    'agent-handoff-proactive-diagnostics.yml']){
+    const yaml=read(file);
+    assert.doesNotMatch(yaml,/^  workflow_run:/m);
+    assert.doesNotMatch(yaml,/github.event.workflow_run/);
+    assert.match(yaml,/^  schedule:/m);
+    assert.match(yaml,/^  workflow_dispatch:/m);
+    assert.match(yaml,/^  issues:/m);
+    assert.match(yaml,/types: \[labeled\]/);
+  }
+  const oldFanout=1+1+2+3;
+  const newFanout=1+1+1;
+  assert.equal(oldFanout,7);
+  assert.equal(newFanout,3);
+  assert.equal(oldFanout-newFanout,4);
+});

@@ -5,7 +5,7 @@ import {HANDOFF_REPOSITORY,HANDOFF_OWNER} from './queue-selector.mjs';
 import {compileQueueBoard,renderBoardMarkdown} from './queue-board.mjs';
 
 const API='https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/';
-const WORKFLOWS=new Set(['ZGMINI Handoff Queue Candidate Selector','ZGMINI Agent Handoff Intake']);
+const WORKFLOWS=new Set(['ZGMINI Handoff Queue Candidate Selector']);
 export const BOARD_CRON='7,22,37,52 * * * *';
 const fail=code=>{throw Error('HANDOFF_BOARD_RUNNER_'+code);};
 
