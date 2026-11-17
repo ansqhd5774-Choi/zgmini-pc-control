@@ -85,36 +85,81 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
   let etag=null,previous=null,consecutiveFailures=0,activeToken=token;
   // A bounded asynchronous receipt lane: never await it in the 5s discovery loop.
   const receiptQueue=[],receiptDeferred=[],receiptPending=new Set();
-  let checkingReceipt=false,receiptBackoffUntil=0;
+  const receiptNeedsRecheck=new Set(),receiptRetryCounts=new Map();
+  let checkingReceipt=false,activeReceiptNumber=null,receiptBackoffUntil=0,receiptAuthRejected=false;
+  const enqueueReceipt=number=>{
+    if(receiptPending.has(number)){
+      // Preserve an update seen during an in-flight read, but coalesce it to
+      // one follow-up check instead of growing duplicate queued identities.
+      if(activeReceiptNumber===number)receiptNeedsRecheck.add(number);
+      return false;
+    }
+    receiptPending.add(number);
+    if(receiptQueue.length>=25){receiptDeferred.push(number);return true;}
+    receiptQueue.push(number);
+    return false;
+  };
   const drainReceipts=()=>{
-    // Bounded active lane; overflow stays in memory instead of being silently dropped.
+    // The receipt lane cannot occupy the independent five-second GET lane.
     while(receiptQueue.length<25 && receiptDeferred.length>0) receiptQueue.push(receiptDeferred.shift());
-    if(checkingReceipt||signal?.aborted||receiptQueue.length===0||clock()<receiptBackoffUntil) return;
+    if(checkingReceipt||signal?.aborted||receiptAuthRejected||receiptQueue.length===0||clock()<receiptBackoffUntil) return;
     checkingReceipt=true;
     const number=receiptQueue.shift();
-    receiptPending.delete(number);
+    activeReceiptNumber=number;
     Promise.resolve().then(()=>receiptVerifier({token:activeToken,issueNumber:number,fetchImpl,signal}))
-      .then(result=>onReport({state:'RECEIPT_OBSERVED',...result,observedAt:new Date(clock()).toISOString(),workExecuted:false}))
+      .then(result=>{
+        receiptRetryCounts.delete(number);
+        onReport({state:'RECEIPT_OBSERVED',...result,observedAt:new Date(clock()).toISOString(),workExecuted:false});
+      })
       .catch(err=>{
         if(signal?.aborted)return;
-        const code=String(err?.message||'HANDOFF_RECEIPT_READ_FAILED').slice(0,90);
-        if(/HTTP_(403|429|401)/.test(code))receiptBackoffUntil=clock()+60_000;
-        onReport({state:'RECEIPT_READ_FAILED',issueNumber:number,code,observedAt:new Date(clock()).toISOString(),receiptVerified:false,chatDelivered:false,workExecuted:false});
+        const raw=String(err?.message||'');
+        const httpStatus=Number(err?.httpStatus)||Number(raw.match(/HTTP_(\d{3})/)?.[1])||null;
+        // Do not expose arbitrary exception text or bearer credentials in the PC log.
+        const code=/^HANDOFF_RECEIPT_READ_HTTP_\d{3}$/.test(raw)?raw:
+          err?.name==='AbortError'?'REQUEST_TIMEOUT':'HANDOFF_RECEIPT_READ_FAILED';
+        if(httpStatus===401){
+          receiptAuthRejected=true;
+          onReport({state:'WATCH_RECEIPT_AUTH_REJECTED_STOP',issueNumber:number,
+            observedAt:new Date(clock()).toISOString(),workExecuted:false});
+        } else if(httpStatus===403||httpStatus===429||(httpStatus>=500&&httpStatus<=599)||
+                  err?.name==='AbortError'){
+          const attempt=(receiptRetryCounts.get(number)||0)+1;
+          if(attempt<=3){
+            receiptRetryCounts.set(number,attempt);
+            const hinted=Number(err?.retryAfterMs);
+            const waitMs=Math.max(60_000,
+              Number.isFinite(hinted)&&hinted>0?Math.min(hinted,86_400_000):0,
+              Math.min(3_600_000,60_000*2**(attempt-1)));
+            receiptBackoffUntil=Math.max(receiptBackoffUntil,clock()+waitMs);
+            receiptNeedsRecheck.add(number);
+            onReport({state:'RECEIPT_RETRY_DEFERRED',issueNumber:number,attempt,waitMs,
+              observedAt:new Date(clock()).toISOString(),workExecuted:false});
+          } else {
+            receiptRetryCounts.delete(number);
+            receiptNeedsRecheck.delete(number);
+            onReport({state:'RECEIPT_RETRY_EXHAUSTED',issueNumber:number,attempt,
+              observedAt:new Date(clock()).toISOString(),workExecuted:false});
+          }
+        }
+        onReport({state:'RECEIPT_READ_FAILED',issueNumber:number,code,
+          observedAt:new Date(clock()).toISOString(),receiptVerified:false,chatDelivered:false,workExecuted:false});
       })
-      .finally(()=>{checkingReceipt=false;drainReceipts();});
+      .finally(()=>{
+        checkingReceipt=false;
+        activeReceiptNumber=null;
+        receiptPending.delete(number);
+        if(receiptNeedsRecheck.delete(number)&&!signal?.aborted&&!receiptAuthRejected)
+          enqueueReceipt(number);
+        drainReceipts();
+      });
   };
   const queueChangedReceipts=change=>{
     const numbers=[...(change?.observedIssueNumbers||[]),...(change?.newIssueNumbers||[]),...(change?.updatedIssueNumbers||[])];
     let deferredCount=0;
     for(const number of numbers){
-      if(!Number.isSafeInteger(number)||number<=0||receiptPending.has(number))continue;
-      receiptPending.add(number);
-      if(receiptQueue.length>=25){
-        // One listing page is already capped at 99. Keep excess identities and
-        // drain them sequentially; never spin another read loop or occupy a Runner.
-        receiptDeferred.push(number);
-        deferredCount++;
-      } else receiptQueue.push(number);
+      if(!Number.isSafeInteger(number)||number<=0)continue;
+      if(enqueueReceipt(number))deferredCount++;
     }
     if(deferredCount>0) onReport({state:'RECEIPT_BACKPRESSURE_DEFERRED',
       deferredCount,at:new Date(clock()).toISOString(),workExecuted:false});
@@ -122,6 +167,7 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
   };
   let completedPolls=0,lastPollStart=null,minIntervalMs=Infinity,maxIntervalMs=0;
   while(!signal?.aborted){
+    if(receiptAuthRejected)return {state:'AUTH_REJECTED_STOP',noWrite:true};
     const start=clock();let backoff=false,retryAfterMs=0;
     if(lastPollStart!==null){
       const interval=Math.max(0,start-lastPollStart);
