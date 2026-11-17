@@ -469,6 +469,20 @@ test('batched import problems use same one-shot JSON/TXT 2/2 with no secrets',as
  }
 });
 
+test('reporter forwards only a known preimage check and no raw PC values',()=>{
+ const raw={status:'WRITER_B_PREFLIGHT_STOP',requestId:RID,
+  code:'WRITER_B_PC_PREIMAGE_STOP',preimageCheck:'HEAD',
+  rawPcHead:'SECRET_SHA',config:'DO_NOT_FORWARD'};
+ const safe=sanitizeWriterBResult(raw,RID,'123456');
+ assert.equal(safe.preimageCheck,'HEAD');
+ assert.equal(JSON.stringify(safe).includes('SECRET_SHA'),false);
+ assert.equal(JSON.stringify(safe).includes('DO_NOT_FORWARD'),false);
+ const invalid=sanitizeWriterBResult({...raw,preimageCheck:'../SECRET'},RID,'123456');
+ assert.equal(Object.hasOwn(invalid,'preimageCheck'),false);
+ assert.equal(Object.hasOwn(sanitizeWriterBResult({...raw,
+   code:'WRITER_B_TARGET_PREIMAGE_SHA_STOP'},RID,'123456'),'preimageCheck'),false);
+});
+
 test('reporter keeps legacy first diagnostic but discards unsafe appended batch',()=>{
  const first={sourceKind:'APPROVED_AFTER',sourcePath:'lib/source.mjs',
   dependencyPath:'lib/one.mjs',reason:'NOT_FOUND'};
