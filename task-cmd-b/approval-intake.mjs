@@ -5,7 +5,7 @@ import {validateR47CmdBManifest,R47_CMD_B} from './r47-onefile-cas.mjs';
 export const R47_B_ISSUE=Object.freeze({
  repository:'ansqhd5774-Choi/zgmini-pc-control',
  actor:'ansqhd5774-Choi',title:'pc-r47-cmd-onefile-install',
- label:'pc-r47-cmd-b-install',operation:'pc-r47-cmd-onefile-install',
+ label:'pc-writer-b-install',operation:'pc-r47-cmd-onefile-install',
  requestSchema:'ZGMINI_TASK_CMD_ONEFILE_B_REQUEST_V1',
  approvalRoot:'approvals/task-cmd-b/'
 });
