@@ -9,6 +9,22 @@ export const ISSUE_LIST_URL = 'https://api.github.com/repos/ansqhd5774-Choi/zgmi
 
 function stop(code) { throw new Error(code); }
 
+// Use GitHub's reset/retry evidence. Never retry every 60s through a longer
+// primary limit window. A 401 is handled as terminal by runWatch.
+export function retryDelayMs(headers, nowMs=Date.now()) {
+  const read=name=>headers?.get?.(name);
+  let delay=60_000;
+  const retry=read('retry-after');
+  if(retry!==null&&retry!==undefined&&retry!==''&&Number.isFinite(Number(retry))&&Number(retry)>=0)
+    delay=Math.max(delay,Math.ceil(Number(retry)*1000));
+  const remaining=read('x-ratelimit-remaining');
+  const reset=read('x-ratelimit-reset');
+  if(remaining!==null&&remaining!==undefined&&remaining!==''&&Number(remaining)===0 &&
+      reset!==null&&reset!==undefined&&reset!==''&&Number.isFinite(Number(reset)))
+    delay=Math.max(delay,Math.ceil(Number(reset)*1000-nowMs+1000));
+  return Math.min(delay,86_400_000);
+}
+
 export function summarizeIssues(items) {
   if (!Array.isArray(items) || items.length >= 100) stop('HANDOFF_WATCH_INCOMPLETE_PAGE_STOP');
   const issues = items.filter(x=>!x.pull_request).map(x=>{
@@ -31,7 +47,7 @@ export function changeSummary(previous, next) {
 }
 
 // One GET per cycle. Existing event-triggered brokers remain responsible for intake receipts.
-export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,timeoutMs=REQUEST_TIMEOUT_MS,signal}={}) {
+export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,timeoutMs=REQUEST_TIMEOUT_MS,signal,nowMs=Date.now()}={}) {
   if(typeof token!=='string'||!token.trim()) stop('HANDOFF_WATCH_AUTH_REQUIRED');
   if(typeof fetchImpl!=='function') stop('HANDOFF_WATCH_FETCH_REQUIRED');
   if(!Number.isInteger(timeoutMs)||timeoutMs<100||timeoutMs>4_500) stop('HANDOFF_WATCH_TIMEOUT_INVALID');
@@ -48,12 +64,13 @@ export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,t
     const remaining=remainingRaw == null ? NaN : Number(remainingRaw);
     const limited=Number.isFinite(remaining)&&remaining>=0&&remaining<50;
     const nextEtag=response.headers?.get?.('etag')||etag;
-    if(response.status===304)return {state:'UNCHANGED',etag:nextEtag,issues:previous,needsBackoff:limited,noWrite:true};
-    if(response.status===403||response.status===429)return {state:'RATE_LIMIT_OR_FORBIDDEN',etag,issues:previous,needsBackoff:true,noWrite:true};
-    if(response.status===401)return {state:'AUTH_REJECTED',etag,issues:previous,needsBackoff:true,noWrite:true};
-    if(response.status!==200) return {state:'GITHUB_HTTP_ERROR',httpStatus:response.status,etag,issues:previous,needsBackoff:true,noWrite:true};
+    const retryAfterMs=retryDelayMs(response.headers,nowMs);
+    if(response.status===304)return {state:'UNCHANGED',etag:nextEtag,issues:previous,needsBackoff:limited,retryAfterMs:limited?retryAfterMs:null,noWrite:true};
+    if(response.status===403||response.status===429)return {state:'RATE_LIMIT_OR_FORBIDDEN',etag,issues:previous,needsBackoff:true,retryAfterMs,noWrite:true};
+    if(response.status===401)return {state:'AUTH_REJECTED',etag,issues:previous,needsBackoff:false,noWrite:true};
+    if(response.status!==200) return {state:'GITHUB_HTTP_ERROR',httpStatus:response.status,etag,issues:previous,needsBackoff:true,retryAfterMs,noWrite:true};
     const issues=summarizeIssues(await response.json());
-    return {state:changeSummary(previous,issues).state,change:changeSummary(previous,issues),etag:nextEtag,issues,needsBackoff:limited,noWrite:true};
+    return {state:changeSummary(previous,issues).state,change:changeSummary(previous,issues),etag:nextEtag,issues,needsBackoff:limited,retryAfterMs:limited?retryAfterMs:null,noWrite:true};
   } finally {
     clearTimeout(timeout);
     signal?.removeEventListener('abort',relay);
@@ -62,7 +79,7 @@ export async function checkOnce({token,fetchImpl=fetch,etag=null,previous=null,t
 
 export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL_MS,clock=()=>Date.now(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onReport=()=>{},receiptVerifier=verifyHandoffReceipt}={}) {
   if(intervalMs!==INTERVAL_MS) stop('HANDOFF_WATCH_INTERVAL_MUST_BE_5000');
-  let etag=null,previous=null;
+  let etag=null,previous=null,consecutiveFailures=0;
   // A bounded asynchronous receipt lane: never await it in the 5s discovery loop.
   const receiptQueue=[],receiptDeferred=[],receiptPending=new Set();
   let checkingReceipt=false,receiptBackoffUntil=0;
@@ -101,28 +118,38 @@ export async function runWatch({token,fetchImpl=fetch,signal,intervalMs=INTERVAL
     drainReceipts();
   };
   while(!signal?.aborted){
-    const start=clock();let backoff=false;
+    const start=clock();let backoff=false,retryAfterMs=0;
     try {
-      const result=await checkOnce({token,fetchImpl,etag,previous,signal});
+      const result=await checkOnce({token,fetchImpl,etag,previous,signal,nowMs:start});
+      if(result.state==='AUTH_REJECTED'){
+        onReport({state:'WATCH_AUTH_REJECTED_STOP',observedAt:new Date(clock()).toISOString(),
+          deliveryVerified:false,workExecuted:false});
+        return {state:'AUTH_REJECTED_STOP',noWrite:true};
+      }
       etag=result.etag;previous=result.issues;backoff=result.needsBackoff;
+      consecutiveFailures=backoff?consecutiveFailures+1:0;
+      retryAfterMs=backoff?Math.max(result.retryAfterMs||0,Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6))):0;
       queueChangedReceipts(result.change);
       if(result.state!=='UNCHANGED' && (result.state!=='OBSERVED_CHANGE_ONLY' || Object.values(result.change).some(v=>Array.isArray(v)&&v.length>0)))
         onReport({state:result.state,change:result.change||null,observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     } catch(err){
       if(signal?.aborted)break;
       backoff=true;
+      consecutiveFailures++;
+      retryAfterMs=Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6));
       onReport({state:'WATCH_READ_FAILED',code:err?.name==='AbortError'?'REQUEST_TIMEOUT':String(err?.message||'UNKNOWN_ERROR').slice(0,80),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
     }
     // No overlapping checks. Back off on failures/rate limits without waiting inside workers.
     drainReceipts();
-    await sleep(Math.max(backoff?60_000:0, start+intervalMs-clock()));
+    await sleep(Math.max(backoff?retryAfterMs:0, start+intervalMs-clock()));
   }
 }
 
 async function main(env=process.env){
   if(env.ZGMINI_HANDOFF_WATCH_ENABLED!=='true')stop('HANDOFF_WATCH_NOT_ENABLED');
   if(!env.GITHUB_TOKEN)stop('HANDOFF_WATCH_AUTH_REQUIRED');
-  await runWatch({token:env.GITHUB_TOKEN,onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
+  const result=await runWatch({token:env.GITHUB_TOKEN,onReport:x=>process.stdout.write(JSON.stringify(x)+'\n')});
+  if(result?.state==='AUTH_REJECTED_STOP')stop('HANDOFF_WATCH_AUTH_REJECTED_STOP');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
   main().catch(e=>{process.stderr.write(String(e?.message||'WATCH_STOP').replace(/Bearer\s+\S+/g,'Bearer [REDACTED]')+'\n');process.exitCode=1});
