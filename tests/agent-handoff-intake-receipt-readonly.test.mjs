@@ -72,3 +72,24 @@ test('slow independent receipt verification never stops the 5s list poll',async(
  release({issueNumber:101,state:'ALREADY_SELECTED',receiptVerified:true,chatDelivered:false,noWrite:true});
  await Promise.resolve();await Promise.resolve();
 });
+
+test('receipt 429 retains authoritative Retry-After without leaking HTTP response body',async()=>{
+  const delayError=await verifyHandoffReceipt({token:'synthetic-secret',issueNumber:101,
+    fetchImpl:async()=>({status:429,headers:{get:name=>name==='retry-after'?'240':null},
+      json:async()=>{throw Error('body must not be accessed');}})})
+    .then(()=>null,err=>err);
+  assert.equal(delayError.message,'HANDOFF_RECEIPT_READ_HTTP_429');
+  assert.equal(delayError.httpStatus,429);
+  assert.equal(delayError.retryAfterMs,240_000);
+  assert.ok(!JSON.stringify(delayError).includes('synthetic-secret'));
+});
+
+test('receipt quota reset epoch is honored when longer than Retry-After',async()=>{
+  const reset=Math.floor(Date.now()/1000)+600;
+  const error=await verifyHandoffReceipt({token:'x',issueNumber:101,
+    fetchImpl:async()=>({status:403,headers:{get:name=>({
+      'retry-after':'60','x-ratelimit-remaining':'0','x-ratelimit-reset':String(reset)
+    })[name]??null}})}).then(()=>null,err=>err);
+  assert.equal(error.httpStatus,403);
+  assert.ok(error.retryAfterMs>590_000&&error.retryAfterMs<=602_000);
+});
