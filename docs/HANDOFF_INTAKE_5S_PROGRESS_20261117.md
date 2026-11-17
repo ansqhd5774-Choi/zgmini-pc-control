@@ -102,3 +102,13 @@
 - **main 적용:** #1909 실제 squash 병합 `0a30d3061d25fc826e2b149046dea46d123e785e`; 운영 PC, 기존 격리 Runner, Windows 사용자 작업 스케줄러, 서비스, 인증 자격, SQLite/D1/공급자 호출·원자료 변경 **0건**.
 - **운영 미완료 그대로:** 소스 병합은 **5초 감시기의 실제 PC 설치·부팅 재기동·최소권한 credential·heartbeat 계측을 증명하지 않음**. 원래 5단계 계획 **4/5(80%) 소스/테스트 완료**, 실운영 **0/1 및 RUNTIME_ACTIVATION_BLOCKED** 유지. 기존 C급 등록 계약 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`는 변경/승인하지 않음.
 - **다음 실행:** 공통 대기열 PC 독립 감시기 C급 사용자 직접 활성화가 실제 승인·검증됐을 때만 정확 설치 source/Node/인증·최소 2회 heartbeat·5초 목록과 영수증 lane·Runner 비간섭 실측. 별도 승인이 없으면 운영 설치를 시도하지 않고 추가 코드 변경도 관측 결함에 한정.
+
+## 2026-11-17 공통 대기열 PC 전용 — 실제 C 활성화 전 불변 소스 후보 정정
+
+- **착수·범위:** 대기열 5초 감시 운영 5/5 설치 실측을 진행하기 전 기존 승인된 C급 실행 계약·고정 소스·기존 실제 PC 관측 증거를 점검. 다른 W0X 업무·프로세스 총괄의 승인·Controller 설치/Writer 범위는 변경하지 않음.
+- **실제 장애 위험:** 과거 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`의 C 설치 source pin `c4ae26e5d07392cc0507bb4cf91ee4fd4a4b3381`은 PR #1909의 영수증 403/429 제한 재검증·401 종료·in-flight 중복 제거 수정 전 코드. 그 pin으로 사용자 C 설치 시 복구 결함이 그대로 재유입될 수 있음. 이 코드/계획 오류를 미수정 상태로 두지 않음.
+- **실제 소스 점검:** 제어 `main`과 PR #1909 squash `0a30d3061d25fc826e2b149046dea46d123e785e`의 6개 watcher/import 모듈 및 1개 CMD Git blob **7/7 동일**. 과거 `c4ae26...`와는 watcher·receipt verifier·selector 3모듈의 blob이 서로 다름. 최신 파일을 과거 출처 SHA-256으로 오인하지 않고 명시적인 Git blob SHA-1로 기록.
+- **최소 변경 PR:** [#1913](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1913) 소스 설치 지침 1파일·정적 계약시험 1파일만 수정. 불변 실행 source 후보를 `0a30d306...`로 정정하고 **필요한 7파일만** 후보로 명시해 `agent-handoff` 전체/기능별 source/Controller 복사로 확장 금지. 실제 고정 설치 경로·저권한 Windows 사용자·Node22·인증 자격을 추정하거나 자동 등록하지 않음. 정적 시험에서 6개 `.mjs` Git blob SHA-1을 실제 바이트로 계산하고 계약에 명시된 해시 및 CMD blob 참조를 검사.
+- **CI / main:** [격리 Windows PR CI Run #44030504705](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44030504705) **456/456 PASS, fail 0**; [C996 #44030489660](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44030489660) **SUCCESS**. 소스·계약 PR #1913 squash main **`e37ecbab206b31e84ceee7581e8188b1e1a9cefe`**.
+- **운영 차단 그대로:** 현재 확인 가능한 마지막 실제 공통 대기열 PC read-only 프로세스 원본은 [#1863](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1863). 별도 5초 상주 `ZGMINI-HANDOFF-WATCH` 작업의 **등록·활성화**, 저권한 사용자·Node22 고정 실제 경로, 최소 읽기 권한을 가진 안전한 자격 저장소, 2회 이상 heartbeat, Runner 비간섭의 **새 운영 실증은 없음**. Github 소스/CI 통과를 실제 가동으로 승격하지 않음. **소스 계획 4/5(80%), 운영 0/1, RUNTIME_ACTIVATION_BLOCKED 유지.**
+- **다음 정확 작업:** [C급 사용자 직접 활성화 계약](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md)에 따라 운영 PC에서 허가된 저권한 사용자·Node22·GitHub CLI 안전한 최소 읽기 권한·고정 7파일·Task 신규 등록 충돌을 실제 확인한 경우에만 **사용자 C급 직접 등록** → 2회 heartbeat/429·401/Runner 비간섭 실측. 한 조건이라도 미확인이라면 `STOP`; GitHub Actions Job 장기 점유·원격 셸·미승인 C 등록으로 우회하지 않음.
