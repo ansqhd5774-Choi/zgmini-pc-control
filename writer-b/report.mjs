@@ -8,6 +8,7 @@ import {CONTROL_REPO,ACTOR,ISSUE_LABEL,ISSUE_TITLE,
  REQUEST_SCHEMA,OPERATION} from './contract.mjs';
 import {safeWriterBImportDiagnostic,
  safeWriterBImportDiagnosticBatch} from './import-availability.mjs';
+import {safeWriterBPreimageCheck} from './installer.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -99,8 +100,11 @@ export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256
    safeWriterBImportDiagnostic(raw):null;
    const batch=raw.status==='WRITER_B_PREFLIGHT_STOP'?
     safeWriterBImportDiagnosticBatch(raw):null;
+  const preimageCheck=raw.status==='WRITER_B_PREFLIGHT_STOP'?
+   safeWriterBPreimageCheck(raw):null;
   return {...base,status:raw.status,code:raw.code,
     ...(diagnostic?{diagnostic}:{}),...(batch??{}),
+    ...(preimageCheck?{preimageCheck}:{}),
     ...(raw.status==='WRITER_B_INSTALL_STOP_RESTORED'?
      {recovery:'ORIGINAL_VERIFIED'}:{}),
     ...(raw.status==='WRITER_B_RECOVERY_REQUIRED'?
@@ -112,6 +116,7 @@ export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256
 function textResult(result){return [
  `REQUEST_ID=${result.requestId}`,`STATUS=${result.status}`,
  `CODE=${result.code}`,`SOURCE_SHA=${result.sourceSha??'NONE'}`,
+ ...(result.preimageCheck?[`PREIMAGE_CHECK=${result.preimageCheck}`]:[]),
  ...(result.diagnostic?[
   `IMPORT_SOURCE_KIND=${result.diagnostic.sourceKind}`,
   `IMPORT_SOURCE_PATH=${result.diagnostic.sourcePath}`,
