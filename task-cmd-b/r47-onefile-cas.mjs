@@ -66,17 +66,33 @@ export function verifyR47CmdBCandidate(manifest,bytes){
   sha(bytes)===manifest.afterSha256,'TASK_CMD_B_CANDIDATE_SHA_STOP');
  return true;
 }
+// Task Scheduler may relaunch the CMD between two enabled-state samples.
+// A receiver must prove the Task disabled and naturally drained before CAS.
+export function verifyR47CmdBPaused(manifest,actual){
+ validateR47CmdBManifest(manifest);
+ must(actual&&actual.task===manifest.task&&
+  fixed(actual.installedFilePath,manifest.targetPath)&&
+  actual.installedSha256===manifest.beforeSha256&&
+  actual.taskEnabled===false&&actual.taskRunning===false&&
+  actual.taskDefinitionExceptEnabledMatchesOriginal===true&&
+  actual.sharedWriterLeaseOwned===true&&
+  actual.unrelatedWriteConflict===false,
+  'TASK_CMD_B_PAUSED_PREIMAGE_STOP');
+ return true;
+}
 const METHODS=['assertPinnedApproval','acquireSharedWriterLease','readPreimage',
- 'fetchCandidateBytes','backupOriginal','journalWriteIntent','assertTaskQuiet',
- 'replaceExactBytesIfBeforeMatches','readInstalledAfter','releaseSharedWriterLease'];
-// I/O must be bound by an independently approved Windows adapter. In particular,
-// assertPinnedApproval MUST authenticate raw approval bytes + GitHub Issue actor,
-// immutable source SHA, and exact one-file effect; this function cannot grant B.
+ 'fetchCandidateBytes','backupOriginal','pauseExactTask','readPausedState',
+ 'assertTaskQuiet','journalWriteIntent','replaceExactBytesIfBeforeMatches',
+ 'readInstalledAfter','restoreExactTask','verifyTaskRestored',
+ 'releaseSharedWriterLease'];
+// The authenticated Windows adapter must implement approved-raw-byte/actor
+// admission in assertPinnedApproval. This source module never claims B approval.
 export async function applyR47CmdBCas(manifest,io){
  validateR47CmdBManifest(manifest);
  must(io&&METHODS.every(k=>typeof io[k]==='function'),
   'TASK_CMD_B_ADAPTER_NOT_REGISTERED_STOP');
- let leased=false,writeIntent=false,status=null;
+ let leased=false,taskMayBePaused=false,writeIntent=false,recovery=false;
+ let status=null;
  try{
   must(await io.assertPinnedApproval(manifest)===true,
    'TASK_CMD_B_APPROVAL_NOT_VERIFIED_STOP');
@@ -88,18 +104,31 @@ export async function applyR47CmdBCas(manifest,io){
   const backup=await io.backupOriginal(manifest);
   must(backup?.sha256===manifest.beforeSha256&&backup?.durable===true,
    'TASK_CMD_B_BACKUP_NOT_VERIFIED_STOP');
-  await io.assertTaskQuiet(manifest.task);
-  verifyR47CmdBPreimage(manifest,await io.readPreimage());
+  // Mark possible Task state change before invoking the external adapter.
+  taskMayBePaused=true;
+  await io.pauseExactTask(manifest.task);
+  must(await io.assertTaskQuiet(manifest.task)===true,
+   'TASK_CMD_B_TASK_NOT_QUIET_STOP');
+  verifyR47CmdBPaused(manifest,await io.readPausedState());
   await io.journalWriteIntent(manifest);
-  // Even a throwing CAS can have applied bytes; never call a retry here.
+  // Even a throwing CAS may have installed bytes. Never automatically retry.
   writeIntent=true;
   await io.replaceExactBytesIfBeforeMatches(manifest,candidate);
   const after=await io.readInstalledAfter();
   must(after?.installedSha256===manifest.afterSha256&&
-   after?.taskXmlSha256===manifest.taskXmlSha256&&
    fixed(after?.installedFilePath,manifest.targetPath)&&
-   after?.taskDefinitionUnchanged===true,
+   after?.taskDefinitionExceptEnabledMatchesOriginal===true,
    'TASK_CMD_B_POSTCHECK_UNVERIFIED_STOP');
+  await io.restoreExactTask(manifest.task);
+  taskMayBePaused=false;
+  must(await io.verifyTaskRestored(manifest)===true,
+   'TASK_CMD_B_TASK_RESTORE_READBACK_STOP');
+  // Final file readback must follow Task restoration as well.
+  const final=await io.readInstalledAfter();
+  must(final?.installedSha256===manifest.afterSha256&&
+   final?.taskXmlSha256===manifest.taskXmlSha256&&
+   final?.taskEnabled===true&&final?.taskDefinitionUnchanged===true,
+   'TASK_CMD_B_FINAL_READBACK_STOP');
   writeIntent=false;
   status={status:'PASS',code:'TASK_CMD_B_ONEFILE_CAS_READBACK_VERIFIED',
    requestId:manifest.requestId,providerCalls:0,taskChanges:0,
@@ -107,12 +136,21 @@ export async function applyR47CmdBCas(manifest,io){
  }catch(e){
   const code=/^TASK_CMD_B_[A-Z0-9_]+$/.test(e?.code??'')?
    e.code:'TASK_CMD_B_ADAPTER_UNVERIFIED_STOP';
-  status={status:writeIntent?'STATE_UNKNOWN':'STOP',code,
+  if(taskMayBePaused&&!writeIntent){
+   try{await io.restoreExactTask(manifest.task);
+    taskMayBePaused=false;
+    must(await io.verifyTaskRestored(manifest)===true,
+     'TASK_CMD_B_TASK_RESTORE_READBACK_STOP');
+   }catch{recovery=true;}
+  }
+  recovery||=writeIntent;
+  status={status:recovery?'STATE_UNKNOWN':'STOP',code,
    requestId:manifest.requestId,providerCalls:0,taskChanges:0,
    d1Writes:0,sqliteWrites:0,replay:'FORBIDDEN'};
  }finally{
   if(leased){
-   try{await io.releaseSharedWriterLease({requestId:manifest.requestId,retain:writeIntent});}
+   try{await io.releaseSharedWriterLease({requestId:manifest.requestId,
+    retain:recovery});}
    catch{status={...status,status:'STATE_UNKNOWN',
     code:'TASK_CMD_B_LEASE_RELEASE_UNVERIFIED_STOP'};}
   }
