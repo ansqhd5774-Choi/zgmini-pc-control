@@ -18,13 +18,16 @@ const initial={ok:true,linked:false,taskRunning:true,ownerCoreMatched:true,
 const vbs={...initial,taskVbsLinked:true,taskVbsCreatedAtMs:start,
  approvedLauncherKinds:['ARCHIVE_NODE','CUTOVER_VBS','TASK_VBS']};
 function fixture({xml=event(),owner=initial,witness=vbs,secondHash='SAME',
- failEvent=false,failTask=false,failWmi=false,lockAt=start+20000}={}){
+ failEvent=false,failTask=false,failWmi=false,failLogConfig=false,
+ logConfig='enabled: true',lockAt=start+20000}={}){
  const seen=[],bytes=Buffer.isBuffer(xml)?xml:Buffer.from(xml);
  let locks=0;
  const execute=(_bin,args)=>{
   seen.push(args);
   if(args[0]==='/Query')return failTask?{status:1}:{status:0,stdout:Buffer.from('<Task>'+('x'.repeat(50))+'</Task>')};
   if(args[0]==='qe')return failEvent?{status:5}:{status:0,stdout:bytes};
+  if(args[0]==='gl')return failLogConfig?{status:5}:
+   {status:0,stdout:Buffer.from(logConfig)};
   if(args[0]==='//NoLogo'){
    if(failWmi)return {status:2};
    const target=args.length===5?witness:owner;
@@ -38,6 +41,26 @@ function fixture({xml=event(),owner=initial,witness=vbs,secondHash='SAME',
   hashFile:file=>Object.values(APPROVED_VBS_CHAIN_FILES).find(v=>v.path===file)?.sha256}};
 }
 const run=f=>inspectInflationEvent129Once(f.ctx);
+test('read-only channel config identifies disabled log even when Core is idle',async()=>{
+ const f=fixture({owner:{...initial,taskRunning:false,ownerCoreMatched:false},
+  logConfig:'name: Microsoft-Windows-TaskScheduler/Operational\r\nenabled: false\r\n'});
+ const r=await run(f);
+ assert.deepEqual(r.logConfig,{read:'OK',enabled:false});
+ assert.equal(r.probeCounts.logConfig,1);
+ assert.equal(f.seen.filter(a=>a[0]==='gl').length,1);
+ assert.equal(r.code,'INFL_E129_CORE_TASK_NOT_RUNNING_AT_SNAPSHOT');
+ assert.equal(r.authorizesB,false);
+});
+test('channel config permission errors or ambiguous output stay unknown',async()=>{
+ for(const options of [{failLogConfig:true},{logConfig:'ACCESS_DENIED'},
+  {logConfig:'enabled: true\nenabled: false'}]){
+  const r=await run(fixture(options));
+  assert.equal(r.logConfig.enabled,null);
+  assert.ok(['UNAVAILABLE','UNPARSEABLE'].includes(r.logConfig.read));
+  assert.equal(r.providerCalls,0);
+  assert.equal(r.authorizesB,false);
+ }
+});
 test('A diagnostic direct B proof reuses exact verification; VBS is not evaluated',async()=>{
  const f=fixture({owner:{...initial,ownerCreatedAtMs:start}});
  const r=await run(f);
