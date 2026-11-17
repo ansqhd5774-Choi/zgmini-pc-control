@@ -1,0 +1,53 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+  "targetSha": "a21b928f0c058ff6e7daf8a33dcfb613c9adc4df",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "c1df0c32b43fe96669cfd664a7988ad3dce65aab455c423c0d363b028e4de672"
+    },
+    {
+      "path": "controller/http32-two-host-checkpoints-readonly.mjs",
+      "sha256": "ed1154d7e146368a0786bffa108558d9d0fa985738c6022929b2d5e4b4687baa"
+    },
+    {
+      "path": "controller/inflation-event129-evidence-readonly.mjs",
+      "sha256": "621ed556c08f294ddd353dcbc4a524fc09de91f2cbca61ca8f7d25478b372e38"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "8cef8d286ce4a657cc7e38ce5e00eda850b1b7b5c4f114ceab3795f88adb0b79"
+    },
+    {
+      "path": "controller/provider-activity-runtime-readonly.mjs",
+      "sha256": "50b4deabf361978145e7c484113e8e78b170ca3edd41d8ce79af7cf7c8f0f1e7"
+    },
+    {
+      "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
+      "sha256": "6d4f4a25503ea46bed4a5827325611bc98c3db6828c7b637289cc19557430db5"
+    }
+  ],
+  "purpose": "pc-controller-heavy-readonly",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1809",
+    "scope": "PC_CONTROL_HEAVY_READONLY_UPDATE"
+  },
+  "checks": {
+    "targetSha": "a21b928f0c058ff6e7daf8a33dcfb613c9adc4df",
+    "status": "PASS",
+    "manifestSha256": "1d2fb4aaf841cf637eebb7b3ac04c161654c1a815481f5414c4cc3a042437c3c"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "5b43c3cc9da75143481f310bb45a76f919d5b040"
+}
