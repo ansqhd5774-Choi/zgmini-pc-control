@@ -81,6 +81,15 @@ test('XML containing secret arbitrary raw text is not echoed in result',()=>{
  assert.equal(JSON.stringify(r).includes('secret'),false);
  assert.equal(JSON.stringify(r).includes('<Task>'),false);
 });
+test('UTF-16LE Scheduler XML decodes to the same fixed direct-target classification',()=>{
+ const utf8=xml(R47_TARGET).toString('utf8');
+ const raw=Buffer.concat([Buffer.from([255,254]),Buffer.from(utf8,'utf16le')]);
+ const r=inspect(raw);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.commandKind,'DIRECT_TARGET');
+ assert.equal(r.directActionVerified,true);
+ assert.equal(r.authorizesB,false);
+});
 test('non-Windows cannot access Task probe and cannot claim an observation',()=>{
  let called=false;
  const r=inspectR47TaskActionReadonly({platform:'linux',
