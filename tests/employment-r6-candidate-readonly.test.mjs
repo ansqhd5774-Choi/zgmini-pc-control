@@ -17,6 +17,14 @@ const result={kind:'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1',status:'PASS',
   providerCalls:0,d1Writes:0,promotionApproved:false,publicationStatus:'NOT_REQUESTED',
   summary:{sourceFeatures:1,UNTRUSTED_RAW:'PRIVATE_VALUE'},
   pit:{coreCurrentKeys:27,coreCurrentKeysMissingHistory:4,
+    rawSnapshotMetadataKeys:6,rawSnapshotCertifiedKeys:4,
+    coreCurrentRawLineageVerifiedKeys:20,coreCurrentRawLineageMissingSnapshotKeys:2,
+    coreCurrentRawLineageConflictingKeys:3,coreCurrentRawLineageUnverifiedKeys:2,
+    coreHistoryRawLineageTotalRows:30,coreHistoryRawLineageVerifiedRows:23,
+    coreHistoryRawLineageMissingSnapshotRows:4,coreHistoryRawLineageConflictingRows:1,
+    coreHistoryRawLineageUnverifiedRows:2,
+    rawLineageEvidenceStatus:'HOLD_INCOMPLETE_SOURCE_LINEAGE',
+    rawBody:'PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK',
     coreCurrentHistoryMatchingKeys:20,coreCurrentHistoryConflictingKeys:2,
     coreCurrentHistoryUnverifiedKeys:1,coreCurrentHistoryMissingKeys:4,
     coreHistoryAsOfUniqueKeys:123,coreHistoryPriorRevisionKeys:9,
@@ -263,4 +271,79 @@ test('PIT-04-03 rejects missing-history disagreement even when four buckets sum'
   assert.equal(result.actualExecutionSha,SHA);
   assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
   assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
+});
+
+
+test('PIT-04-05 fixed sanitized lineage count fields are projected without any raw response',async t=>{
+  const f=fixture(t);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'PASS');
+  assert.deepEqual([
+    result.pit.rawSnapshotMetadataKeys,result.pit.rawSnapshotCertifiedKeys,
+    result.pit.coreCurrentRawLineageVerifiedKeys,
+    result.pit.coreCurrentRawLineageMissingSnapshotKeys,
+    result.pit.coreCurrentRawLineageConflictingKeys,
+    result.pit.coreCurrentRawLineageUnverifiedKeys,
+    result.pit.coreHistoryRawLineageTotalRows,
+    result.pit.coreHistoryRawLineageVerifiedRows,
+    result.pit.coreHistoryRawLineageMissingSnapshotRows,
+    result.pit.coreHistoryRawLineageConflictingRows,
+    result.pit.coreHistoryRawLineageUnverifiedRows,
+  ],[6,4,20,2,3,2,30,23,4,1,2]);
+  assert.equal(result.pit.rawLineageEvidenceStatus,'HOLD_INCOMPLETE_SOURCE_LINEAGE');
+  assert.equal(result.promotionApproved,false);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+  assert.equal(result.operationalWrites,0);
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK|rawBody|responseHash|source_hash/);
+});
+
+async function runWithChangedPit(t,oldText,newText){
+  const f=fixture(t);
+  const raw=fs.readFileSync(f.script,'utf8');
+  assert.ok(raw.includes(oldText));
+  const changed=raw.replace(oldText,newText);
+  fs.writeFileSync(f.script,changed);
+  const files={[ENTRY]:hash(Buffer.from(changed))};
+  const bytes=Buffer.from(JSON.stringify({files})+'\n');
+  fs.writeFileSync(path.join(f.host.approvedSources[SHA].root,'manifest.json'),bytes);
+  f.host.approvedSources[SHA].manifestSha256=hash(bytes);
+  return await inspectEmploymentR6Candidate(f.request,f);
+}
+
+test('PIT-04-05 malformed count or inconsistent Core partition cannot become PASS evidence',async t=>{
+  const invalid=await runWithChangedPit(t,
+    'coreCurrentRawLineageMissingSnapshotKeys:2,',
+    'coreCurrentRawLineageMissingSnapshotKeys:20,');
+  assert.equal(invalid.status,'FAIL');
+  assert.equal(invalid.code,'R6_RESULT_INVALID');
+  assert.equal(invalid.actualExecutionSha,SHA);
+  assert.equal(invalid.operationalWrites,undefined);
+});
+
+test('PIT-04-05 incomplete nonzero lineage cannot become PASS even when other fields match',async t=>{
+  const invalid=await runWithChangedPit(t,
+    'coreHistoryRawLineageVerifiedRows:23,',
+    "coreHistoryRawLineageVerifiedRows:'SECRET_DO_NOT_EMIT',");
+  assert.equal(invalid.status,'FAIL');
+  assert.equal(invalid.code,'R6_RESULT_INVALID');
+  assert.doesNotMatch(JSON.stringify(invalid),/SECRET_DO_NOT_EMIT/);
+});
+
+test('PIT-04-05 Core History mismatch and over-certified snapshots fail closed',async t=>{
+  const inconsistent=await runWithChangedPit(t,
+    'coreHistoryRawLineageVerifiedRows:23,',
+    'coreHistoryRawLineageVerifiedRows:24,');
+  assert.equal(inconsistent.status,'FAIL');
+  assert.equal(inconsistent.code,'R6_RESULT_INVALID');
+});
+
+test('PIT-04-05 invalid status cannot forge lineage readiness or promote a candidate',async t=>{
+  const r=await runWithChangedPit(t,
+    "rawLineageEvidenceStatus:'HOLD_INCOMPLETE_SOURCE_LINEAGE',",
+    "rawLineageEvidenceStatus:'PRIVATE_RESPONSE_SHOULD_NOT_LEAK',");
+  assert.equal(r.status,'PASS');
+  assert.equal(r.pit.rawLineageEvidenceStatus,'NO_RUNTIME_EVIDENCE');
+  assert.equal(r.promotionApproved,false);
+  assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RESPONSE_SHOULD_NOT_LEAK/);
 });
