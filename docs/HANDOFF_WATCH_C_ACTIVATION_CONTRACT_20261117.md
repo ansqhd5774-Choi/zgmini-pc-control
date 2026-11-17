@@ -16,6 +16,23 @@
 - **결과 해석:** `SOURCE_PREFLIGHT_STOP`이면 **설치 전 중단**. `SOURCE_PREFLIGHT_PASS_C_AUTH_AND_TASK_REQUIRED`는 **바이트·호스트·Node 사전검사만 통과**한 상태다. 이 결과는 실제 Windows Task 등록, 안전한 Windows 자격 저장·최소권한, 작업 실행권한, 자동 재기동, 5초 heartbeat, 영수증 검증, Runner 비간섭을 인증하지 않는다. 이 후속 요건은 기존 C급 사용자 직접 확인·승인·실행 절차에 남긴다.
 - **권한 경계:** 검사기는 외부 HTTP·GitHub API·인증 조회, Task 스케줄러 명령, 서비스·파일 생성·설치, 감시 루프 실행을 전혀 수행하지 않는다. 운영 PC 임의 원격 실행이나 새 Windows 사용자/토큰 등록을 승인하지 않는다.
 
+## 공통 대기열 PC 한정 — 일반 사용자 직접 활성화 경로
+
+**권한 구분:** 이 PC는 데이터 수집 운영 PC와 다른 `DESKTOP-N62L0NG`이다. 공통 대기열 PC에서 현재 로그인한 일반 사용자 명의로 만드는 `ONLOGON / Interactive / RunLevel Limited` 작업에는 Windows 관리자 상승이 필수인 것은 아니다. 다만 OS/조직 정책이 막으면 실패를 보고하고 중단하며 SYSTEM·관리자·기존 Runner 서비스로 우회하지 않는다. 과거 문서의 `C급`은 기존 프로젝트 내부 변경 분류이고 **다른 운영 PC의 관리자 승인을 자동으로 요구한다는 뜻은 아니다**.
+
+- **제공된 사용자 직접 도구:** `tools/handoff-watch-user-activate.ps1`은 인터랙티브 사용자 PC에서만 실행하도록 호스트·세션 0 금지·서비스 계정 금지·원시 토큰 환경변수 부재를 검사한다. **기본 실행은 읽기 전용**이고 `-Apply`가 있어야 변경 가능하다. 사용자가 기존 GitHub 토큰이 이 제어 저장소의 `Issues:read` 정도로 제한됐음을 직접 확인하고 `-ConfirmRestrictedCredential`를 전달해야 등록한다. 권한 검증을 GitHub 읽기 API 성공만으로 과장하지 않는다.
+- **소스 경로:** 개인 로그인 계정에서 접근 가능한 **신뢰된 체크아웃**에서 실행한다. Runner `_work` 폴더나 운영 PC에서 실행하지 않는다. Node22의 검증된 `node.exe`와 `gh.exe`가 필요하다. 도구는 체크아웃의 정해진 **7개 Git blob SHA-1**과 `C_SOURCE_COMMIT=82e06469569bb6842aa4aca43970d84262329481`을 읽기 전용 검사한 다음, 대상 파일 7개만 현재 사용자의 `%LOCALAPPDATA%\ZGMINI\handoff-watch`에 **신규 복사**한다. 기존 대상 폴더나 이름이 같은 예약 작업이 있으면 덮어쓰지 않고 중단한다. 복사 후 동일 해시를 재검사한다.
+- **보안 자격:** 작업 등록 전 GitHub CLI가 해당 로그인 사용자에서 동작하고 private 제어 저장소 Issues GET이 가능한지 출력 없이 확인한다. `GH_TOKEN`·`GITHUB_TOKEN` 환경 입력, `GH_CONFIG_DIR` 사용자 정의, 기본 `hosts.yml`의 평문 `oauth_token` 또는 토큰 문자열은 **STOP**. 토큰·계정명·절대경로·CLI 오류 원문을 GitHub/채팅/CI에 노출하지 않는다. 새 로그인이나 토큰 생성·권한 확대는 자동 수행하지 않는다.
+- **예약 등록:** 검증된 사용자 계정의 `ZGMINI-HANDOFF-WATCH`를 `Interactive / Limited / ONLOGON`으로만 등록한다. 재실행은 최대 2회·5분 간격, 동시 인스턴스 중복 실행 금지. 기존 Runner/Task의 속성 변경이나 운영 PC 접근 없음. 등록 시 시작을 요청하지만 `REGISTERED_START_REQUESTED_HEARTBEAT_PENDING`는 5초 실제 가동 완료를 의미하지 않는다.
+- **실행 순서:** 관리자 PowerShell이나 GitHub Actions Runner가 아닌 일반 사용자 로그인 PowerShell에서 신뢰된 소스 루트로 이동해 아래 두 명령을 사용한다. 첫 번째는 완전 읽기 전용; 첫 번째의 `READONLY_READY_USER_APPLY_REQUIRED` 결과와 최소권한 저장소 확인 후 두 번째를 실행한다.
+
+```powershell
+powershell -NoProfile -File .\tools\handoff-watch-user-activate.ps1
+powershell -NoProfile -File .\tools\handoff-watch-user-activate.ps1 -Apply -ConfirmRestrictedCredential
+```
+
+**검증/보류:** 실제 PC `WATCH_HEARTBEAT` 최소 2회, 정상 창의 `successfulReadsInWindow=12`·`failedReadsInWindow=0`·`backoffCyclesInWindow=0`, 관측 시작 간격 및 실제 영수증·Runner 비간섭을 확인하기 전에는 계획의 마지막 5/5단계를 완료로 변경하지 않는다. 사용자 로그인 환경이 없거나 자격 저장·기존 작업 조건을 만족하지 못하면 `RUNTIME_ACTIVATION_BLOCKED` 유지. 이 스크립트는 GitHub 소스 병합만으로 자동 실행되지 않는다.
+
 ## 사용자 직접 C급 설정 전 확인할 실제 조건
 
 - **호스트와 사용자:** PC는 `DESKTOP-N62L0NG`이어야 한다. 별도 저권한 Windows 사용자로 로그인할 때 자동 실행하는 태스크를 선택한다. 이미 등록된 GitHub Runner 서비스·6개 운영 Runner에는 변경하지 않는다.
