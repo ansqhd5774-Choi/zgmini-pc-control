@@ -60,9 +60,9 @@ test('bad denominator or timestamp must fail instead of silently undercounting',
 });
 test('board uses only read permissions for issue comments and linked PR review evidence',()=>{
  const yaml=readFileSync(new URL('../.github/workflows/agent-handoff-queue-board.yml',import.meta.url),'utf8');
- assert.match(yaml,/permissions:\\n  contents: read\\n  issues: read\\n  pull-requests: read/);
+ assert.match(yaml,/permissions:\s*\n\s*contents: read\s*\n\s*issues: read\s*\n\s*pull-requests: read/);
  assert.doesNotMatch(yaml,/contents: write|issues: write|pull-requests: write/);
- assert.match(yaml,/runs-on: \\[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\\]/);
+ assert.ok(yaml.includes('runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]'));
 });
 test('runner references exact readonly central comment and issue GETs',()=>{
  const s=readFileSync(new URL('../agent-handoff/queue-board-runner.mjs',import.meta.url),'utf8');
