@@ -8,6 +8,8 @@ on:
       - 'tests/shared-resource-issue-admission.test.mjs'
       - 'controller/employment-r6-collection-evidence-readonly.mjs'
       - 'tests/employment-r6-collection-evidence-readonly.test.mjs'
+      - 'controller/employment-r6-candidate-readonly.mjs'
+      - 'tests/employment-r6-candidate-readonly.test.mjs'
       - 'approvals/employment-r6-registered-data/**'
       - '.github/workflows/w04-r6-dol-manual-source-tests.yml'
 permissions:
@@ -39,6 +41,8 @@ jobs:
         run: node --test --test-concurrency=1 r6-registered-data-b/dol-manual-v1.test.mjs r6-registered-data-b/operation.test.mjs r6-registered-data-b/operation-injected.test.mjs r6-registered-data-b/report.test.mjs
       - name: Verify fixed W04 National error metadata remains bounded and readonly
         run: node --test --test-concurrency=1 tests/employment-r6-collection-evidence-readonly.test.mjs
+      - name: Verify W04 PIT-04-03 count-only controller projection in isolated CI
+        run: node --test --test-concurrency=1 tests/employment-r6-candidate-readonly.test.mjs
       - name: Check exact dedicated R6 admission without shared false rejection
         run: node --test tests/shared-resource-issue-admission.test.mjs
       - name: Confirm source-only isolated host
