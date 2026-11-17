@@ -26,7 +26,7 @@ const nowIso=clock=>new Date(clock()).toISOString();
 const basic=()=>({status:'STATE_UNKNOWN',code:'INFL_E129_NOT_OBSERVED_WITHIN_LIMIT',
  scope:'CORE_OWNER_EVENT129_READONLY_ONLY',authorizesB:false,
  providerCalls:0,operationalWrites:0,d1Writes:0,sqliteOpened:false,
- stage:'START',firstFailCode:null,reader:'NOT_EVALUATED',
+ stage:'START',firstFailCode:null,logConfig:{read:'NOT_EVALUATED',enabled:null},reader:'NOT_EVALUATED',
  encoding:'NOT_EVALUATED',bom:'NOT_EVALUATED',
  readerShape:{status:'NOT_EVALUATED',byteBand:'NOT_EVALUATED',suspectedEncoding:'NOT_EVALUATED',
   bEventRoots:null,auxEventRoots:null,xmlDeclaration:null},
@@ -40,7 +40,7 @@ const basic=()=>({status:'STATE_UNKNOWN',code:'INFL_E129_NOT_OBSERVED_WITHIN_LIM
   fieldCounts:{TaskName:null,Path:null,ProcessID:null,TimeCreated:null},
   pidMatch:null,timeParsed:null,withinTime:null,timeDeltaMs:null,candidateCount:null},
  lock:{before:'NOT_EVALUATED',after:'NOT_EVALUATED',same:null},
- snapshots:[],probeCounts:{event:0,taskDefinition:0,wmi:0,lockReads:0}});
+ snapshots:[],probeCounts:{logConfig:0,event:0,taskDefinition:0,wmi:0,lockReads:0}});
 const legal=(v,codes)=>codes.includes(v)?v:'UNAVAILABLE';
 const delta=(a,b)=>Number.isSafeInteger(a)&&Number.isSafeInteger(b)?
  Math.max(-3600000,Math.min(3600000,a-b)):null;
@@ -183,6 +183,18 @@ function statusOf(p){
  if(p?.error||p?.status!==0)return 'ERROR';
  return Buffer.isBuffer(p.stdout)?'OK':'ERROR';
 }
+// Channel configuration is diagnostic only; it does not satisfy Core/B ownership proof.
+function readTaskLogConfiguration(execute){
+ try{
+  const result=execute(EVENT_TOOL,['gl','Microsoft-Windows-TaskScheduler/Operational'],
+   {timeout:5000,maxBuffer:16384});
+  if(statusOf(result)!=='OK')return {read:'UNAVAILABLE',enabled:null};
+  const lines=[...result.stdout.toString('utf8')
+   .matchAll(/^\s*enabled\s*:\s*(true|false)\s*$/gim)];
+  if(lines.length!==1)return {read:'UNPARSEABLE',enabled:null};
+  return {read:'OK',enabled:lines[0][1].toLowerCase()==='true'};
+ }catch{return {read:'UNAVAILABLE',enabled:null};}
+}
 function safeProbe(raw){
  if(!Buffer.isBuffer(raw)||raw.length>12000)return null;
  try{
@@ -204,6 +216,8 @@ export async function inspectInflationEvent129Once({
  };
  const start=clock();
  if(platform!=='win32'){out.code='INFL_E129_WINDOWS_REQUIRED';return finish();}
+ out.probeCounts.logConfig++;
+ out.logConfig=readTaskLogConfiguration(execute);
  const stop=(code,phase)=>{out.code=code;out.firstFailCode??=code;out.stage=phase;};
  let before=null,after=null,owner=null,bytes=null,eventsText=null;
  try{
