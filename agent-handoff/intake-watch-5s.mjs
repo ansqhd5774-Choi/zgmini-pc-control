@@ -120,8 +120,14 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
       deferredCount,at:new Date(clock()).toISOString(),workExecuted:false});
     drainReceipts();
   };
+  let completedPolls=0,lastPollStart=null,minIntervalMs=Infinity,maxIntervalMs=0;
   while(!signal?.aborted){
     const start=clock();let backoff=false,retryAfterMs=0;
+    if(lastPollStart!==null){
+      const interval=Math.max(0,start-lastPollStart);
+      minIntervalMs=Math.min(minIntervalMs,interval);maxIntervalMs=Math.max(maxIntervalMs,interval);
+    }
+    lastPollStart=start;
     try {
       // An optional credential provider refreshes a short-lived token from the
       // Windows credential store; it never blocks the independent work Runner.
@@ -146,6 +152,16 @@ export async function runWatch({token,tokenProvider,fetchImpl=fetch,signal,inter
       consecutiveFailures++;
       retryAfterMs=Math.min(3_600_000,60_000*2**Math.min(consecutiveFailures-1,6));
       onReport({state:'WATCH_READ_FAILED',code:err?.name==='AbortError'?'REQUEST_TIMEOUT':String(err?.message||'UNKNOWN_ERROR').slice(0,80),observedAt:new Date(clock()).toISOString(),deliveryVerified:false,workExecuted:false});
+    }
+    // A single low-volume heartbeat per 12 checks provides real PC timing
+    // evidence without logging issue bodies, authentication or every poll.
+    completedPolls++;
+    if(completedPolls%12===0){
+      onReport({state:'WATCH_HEARTBEAT',completedPolls,
+        observedMinIntervalMs:Number.isFinite(minIntervalMs)?minIntervalMs:null,
+        observedMaxIntervalMs:maxIntervalMs,backoffActive:backoff,
+        observedAt:new Date(clock()).toISOString(),workExecuted:false,noWrite:true});
+      minIntervalMs=Infinity;maxIntervalMs=0;
     }
     // No overlapping checks. Back off on failures/rate limits without waiting inside workers.
     drainReceipts();
