@@ -13,8 +13,8 @@ export const R47_CMD_B=Object.freeze({
  scope:'EXISTING_R47_TASK_CMD_SINGLE_FILE_CAS',
  sourceRepository:'ansqhd5774-Choi/zgmini',
  sourcePath:'scripts/pc-writer/THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd',
- // This is the installed data-root CMD observed by R54 readiness, not the source checkout path.
- targetPath:String.raw`E:\ZGmini\data\pc-writer\pc-writer\theme-nine-r48\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd`,
+ // R54 observed this data-root file path; actual Task Exec action requires read-only preflight.
+ targetPath:String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd`,
  task:'ZGMINI-PC-Theme-Nine-R47-Private',
  historicalOldSha256:'2e0fc3e358feff70103d1e9025ce0944132b7b10a2159900f9479b9860550888',
  requestedTargetSha256:'a08fdec82b484c41ba3ac562908f31d96fee09c75cc3ff1b32386e9dd625ba45',
