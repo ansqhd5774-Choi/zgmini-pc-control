@@ -33,6 +33,7 @@ const PIT_FIELDS=['coreCurrentRows','coreHistoryRevisions','coreCurrentKeys',
   'coreMissingHistoryKeysWithoutConsistentCandidateMetadata',
   // PIT-04-05: aggregate raw response / collection run attribution only.
   'rawSnapshotMetadataKeys','rawSnapshotCertifiedKeys',
+  'rawSnapshotInvalidBodyKeys','rawSnapshotValidWithoutRunKeys',
   'coreCurrentRawLineageVerifiedKeys','coreCurrentRawLineageMissingSnapshotKeys',
   'coreCurrentRawLineageConflictingKeys','coreCurrentRawLineageUnverifiedKeys',
   'coreHistoryRawLineageTotalRows','coreHistoryRawLineageVerifiedRows',
@@ -45,6 +46,32 @@ const dateOnly=x=>typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const safe=code=>/^[A-Z0-9_]{1,100}$/.test(code??'')?code:'R6_CONTROLLER_INTERNAL_ERROR';
+
+// Fixed R6 source labels only; this is a safe metadata projection, not a
+// general-purpose SQL, file, provider, or exact timestamp disclosure channel.
+const R6_SOURCE_GROUPS=new Set([
+ 'DOL_UI_WEEKLY_CLAIMS','BLS_EMPLOYMENT_SITUATION','BLS_JOLTS',
+ 'BLS_ECI','BLS_STATE_MSA','BLS_BED','UNKNOWN',
+]);
+const ATTEST_FIELDS=['metadataKeys','bodyVerifiedKeys','runCertifiedKeys'];
+const attestRows=(rows,key,allowed,max)=>{
+ if(rows==null)return null;
+ if(!Array.isArray(rows)||rows.length>max)stop('R6_RESULT_INVALID');
+ const seen=new Set();
+ return rows.map(item=>{
+  const name=item?.[key];
+  if(typeof name!=='string'||!allowed(name)||seen.has(name))stop('R6_RESULT_INVALID');
+  seen.add(name);
+  const counts=Object.fromEntries(ATTEST_FIELDS.map(k=>[k,count(item[k])]));
+  if(Object.values(counts).some(x=>x===null)
+    ||counts.runCertifiedKeys>counts.bodyVerifiedKeys
+    ||counts.bodyVerifiedKeys>counts.metadataKeys)stop('R6_RESULT_INVALID');
+  return {[key]:name,...counts};
+ });
+};
+const isMonth=x=>typeof x==='string'&&(
+ /^(?:20\d{2})-(?:0[1-9]|1[0-2])$/.test(x)||x==='OLDER'||x==='UNKNOWN');
+const bucketTotal=(rows,key)=>rows.reduce((sum,row)=>sum+row[key],0);
 
 export function validateBundle(request,{host,workspace}){
   const approved=host?.approvedSources?.[request.sourceSha];
@@ -167,6 +194,27 @@ export async function inspectEmploymentR6Candidate(request,context){
         scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING'})):[];
     const summary=Object.fromEntries(SUMMARY_FIELDS.map(k=>[k,count(body.summary?.[k])]));
     const pit=Object.fromEntries(PIT_FIELDS.map(k=>[k,count(body.pit?.[k])]));
+    // New Host bundles can carry bounded raw-body/run proof by source/month.
+    // Older approved bundles omit these arrays and retain their prior output.
+    pit.rawSnapshotByGroup=attestRows(body.pit?.rawSnapshotByGroup,
+      'releaseGroup',name=>R6_SOURCE_GROUPS.has(name),R6_SOURCE_GROUPS.size);
+    pit.rawSnapshotByMonth=attestRows(body.pit?.rawSnapshotByMonth,
+      'retrievalMonth',isMonth,14);
+    if((pit.rawSnapshotByGroup===null)!==(pit.rawSnapshotByMonth===null))
+      stop('R6_RESULT_INVALID');
+    if(pit.rawSnapshotByGroup!==null){
+      const expected=[pit.rawSnapshotMetadataKeys,pit.rawSnapshotCertifiedKeys,
+        pit.rawSnapshotInvalidBodyKeys,pit.rawSnapshotValidWithoutRunKeys];
+      if(expected.some(x=>x===null)
+        ||[pit.rawSnapshotByGroup,pit.rawSnapshotByMonth].some(rows=>
+          bucketTotal(rows,'metadataKeys')!==pit.rawSnapshotMetadataKeys
+          ||bucketTotal(rows,'runCertifiedKeys')!==pit.rawSnapshotCertifiedKeys
+          ||bucketTotal(rows,'bodyVerifiedKeys')!==
+            pit.rawSnapshotMetadataKeys-pit.rawSnapshotInvalidBodyKeys)
+        ||pit.rawSnapshotMetadataKeys-pit.rawSnapshotInvalidBodyKeys!==
+          pit.rawSnapshotCertifiedKeys+pit.rawSnapshotValidWithoutRunKeys)
+        stop('R6_RESULT_INVALID');
+    }
     // PIT-04-03: a complete four-bucket result must partition the same
     // as-of Core CURRENT keys. A PASS report with inconsistent totals is
     // invalid evidence, never a new candidate promotion or corrected count.
