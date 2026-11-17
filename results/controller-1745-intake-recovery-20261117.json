@@ -1,0 +1,49 @@
+{
+  "schema": "ZGMINI_PC_INTAKE_RECOVERY_V1",
+  "requestId": "pc-update-45b549d0-f233-40eb-9075-02942c25f8cd",
+  "issueNumber": 1745,
+  "status": "INTAKE_RECOVERED_EXISTING_CONTROLLER_PRESERVED",
+  "actualControllerSha": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+  "originalLedgerPreserved": true,
+  "originalRequestRetried": false,
+  "controllerChanged": false,
+  "workflowChanged": false,
+  "replayedRequests": 0,
+  "providerCalls": 0,
+  "operationalWrites": 0,
+  "d1Writes": 0,
+  "protectedStateUnchanged": true,
+  "candidateCount": 1,
+  "resumeEvidenceIssueNumber": 1747,
+  "sourceSha": "33d66558f6ed1807f23257ef6a5af2eacd8e3969",
+  "leaseArchived": true,
+  "archiveName": "pc-update-45b549d0-f233-40eb-9075-02942c25f8cd-intake-2af3f47a-bc7e-452d-8b64-52b091267313.lease",
+  "maintenanceBookkeepingWrites": 2,
+  "at": "2026-11-17T00:07:19.770Z",
+  "independentReadback": {
+    "verifiedAt": "2026-11-17T00:07:57.455Z",
+    "checks": {
+      "leaseAbsent": true,
+      "recoveryClaimAbsent": true,
+      "archivedOwnerSame": true,
+      "archivedMarkerSame": true,
+      "originalLedgerSame": true,
+      "backlogClosed": true,
+      "protectedUnchanged": true,
+      "controllerSame": true,
+      "runtimeHealthy": true,
+      "maintenanceHealthy": true,
+      "workflowActive": true
+    },
+    "automationState": "NO_ACTIVE_INSTALL_LEASE",
+    "installLock": {
+      "held": false
+    }
+  },
+  "tests": {
+    "windowsTempPassed": 76,
+    "failed": 0
+  },
+  "originalLedgerStatusPreserved": "RECOVERY_REQUIRED",
+  "scope": "Shared intake recovery only; W03 R32 coverage inspector remains not installed"
+}
