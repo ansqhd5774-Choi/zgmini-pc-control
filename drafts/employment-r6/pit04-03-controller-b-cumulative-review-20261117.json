@@ -71,11 +71,11 @@
     }
   ],
   "requiredOwnerActions": [
-    "One shared Controller owner must independently decide whether W03 exact module can be included; last #68 instruction forbids automatic W03 installation",
-    "Re-read actual PC installed Controller SHA, maintenance lease, original bytes and affected protection state",
-    "If and only if GO, create exact merged B approval manifest under approvals/controller-updates, with independently verified current installed SHA and an authorized merged approval PR covering both modules",
-    "Verify main ancestry and complete controller/config installed-to-target diff, protect existing host and keep exact versioned backup/rollback and postcheck",
-    "Use existing pc-controller-update B maintainer; issue a new unique request once; retrieve actual PC JSON/TXT and postcheck before W04 A"
+    "W04 is the delegated single functional installation owner; shared process coordinator already completed W03+W04 technical scope GO (PR #1878 comment 6939006722) and handoff (issue #68 comment 6940072011), do not request that decision again",
+    "W04 prepares an exact B-effect approval package and obtains user's or authorized approver's explicit approval of cumulative two-file Controller install, rather than treating this draft or ordinary continue-work language as approval",
+    "Before any authorized B execution, W04 re-reads actual Controller source, bytes, main ancestry, Core and maintenance lease ownership, protection state and versioned backup/rollback, consulting shared coordinator only for concrete conflicting resource ownership",
+    "After explicit GO, W04 finalizes the formal approval manifest under approvals/controller-updates with exact raw-byte hash and approval reference; uses the existing one-time pc-controller-update and verifies postOperation, JSON/TXT, and W04 PIT-04-03 A four-bucket result",
+    "Never replay #1841 or #1874 and never bypass ALLOWFILE_DIFF_MISMATCH or TARGET_NOT_ON_MAIN"
   ],
   "explicitlyNotAuthorized": [
     "pc-controller-update Issue creation",
@@ -99,5 +99,57 @@
       "no DB/D1 writes",
       "no candidate promotion"
     ]
+  },
+  "installationManifestProposal": {
+    "proposalId": "W04-PIT0403-TWOFILE-EXECUTION-MANIFEST-PROPOSAL-R1",
+    "status": "DRAFT_ONLY_NOT_APPROVED_NOT_FOR_PC_MAINTENANCE_INTAKE",
+    "sourceEvidence": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1882",
+    "requiredEffectApproval": "EXPLICIT_USER_OR_AUTHORIZED_APPROVER_B_GO_ON_W03_R32_PLUS_W04_PIT0403",
+    "spec": {
+      "schema": "ZGMINI_PC_UPDATE_V1",
+      "installedSha": "384ffd09e80ad769e31596483dfe73e9ee8b6c6a",
+      "targetSha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2",
+      "allowFiles": [
+        {
+          "path": "controller/employment-r6-candidate-readonly.mjs",
+          "sha256": "e156d22989210b2599d9393a15f8206fecd325d14f3d72af04d658bd60ee9409"
+        },
+        {
+          "path": "controller/theme-nine-r32-raw-coverage-readonly.mjs",
+          "sha256": "33c0b896ac3b941c13cde703afcbdb8c63bc7bf7f20bcb045af2fd8fd8356fd4"
+        }
+      ],
+      "purpose": "pc-controller-maintenance",
+      "controllerOnlyInstall": true,
+      "approval": {
+        "grade": "B",
+        "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1882",
+        "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+      },
+      "checks": {
+        "targetSha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2",
+        "status": "PASS",
+        "manifestSha256": "2748317833789f004b34eb56134fa4801dcc59030fe7b9b1b884da1266060585"
+      },
+      "backup": {
+        "strategy": "VERSIONED_SNAPSHOT",
+        "rollback": {
+          "kind": "RESTORE_INSTALLED_SHA",
+          "sha": "384ffd09e80ad769e31596483dfe73e9ee8b6c6a"
+        }
+      },
+      "postOperation": "core-status",
+      "postSourceBranch": "main",
+      "postSourceSha": "28f9858547940a0dcc5bfc795aaae21c7ddb6aaf"
+    },
+    "completionConditions": [
+      "Formal user or authorized B-effect GO recorded with exact 2file scope; source review PR alone does not grant operational approval",
+      "Re-read installed Controller SHA, raw two old files, Task/maintenance lease and backup at B time; update installedSha/rollback if installation drifted",
+      "Verify immutable target remains main ancestor and unchanged 2file deployable diff; compare target bytes against allowFiles sha256",
+      "Pin newly produced approvals/controller-updates manifest raw UTF-8 bytes SHA256 to a new unique authenticated B request, do not reuse previous requests or manifests",
+      "Ensure formal approval PR is merged and pinned approval.ref is accepted by controller updater; keep all unrelated operational lanes unchanged",
+      "Use existing maintenance only after source/lease preflight GO, then independently verify live source and W04 new A four-bucket counts"
+    ],
+    "excludes": "Controller A code source GO and W04 delegated ownership are already completed; no further process-coordinator re-handoff or new source audit is a prerequisite"
   }
 }
