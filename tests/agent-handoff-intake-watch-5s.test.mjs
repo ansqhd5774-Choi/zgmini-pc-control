@@ -24,8 +24,8 @@ test('authentication and rate-limit failures cannot be success',async()=>{
  await assert.rejects(()=>checkOnce({fetchImpl:async()=>response(200)}),/AUTH_REQUIRED/);
  for(const code of [403,429]){const r=await checkOnce({token:'test',fetchImpl:async()=>response(code)});assert.equal(r.needsBackoff,true);assert.equal(r.state,'RATE_LIMIT_OR_FORBIDDEN');}
 });
-test('watcher polls 5s without overlap; limits back off 60s',async()=>{
+test('watcher polls 5s without overlap; limits use increasing backoff',async()=>{
  let active=0,maxActive=0,calls=0;const delays=[];const controller=new AbortController();
  await runWatch({token:'test',signal:controller.signal,clock:()=>1000,sleep:async ms=>{delays.push(ms);if(delays.length>=3)controller.abort();},fetchImpl:async()=>{active++;maxActive=Math.max(maxActive,active);calls++;const code=calls>=2?429:304;active--;return response(code);},onReport:()=>{}});
- assert.equal(maxActive,1);assert.equal(calls,3);assert.deepEqual(delays,[5000,60000,60000]);
+ assert.equal(maxActive,1);assert.equal(calls,3);assert.deepEqual(delays,[5000,60000,120000]);
 });
