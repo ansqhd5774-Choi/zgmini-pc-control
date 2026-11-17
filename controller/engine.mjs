@@ -61,7 +61,29 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??report.pcOperationalApprovedSha;
   report.next??=report.status==='PASS'?'READ_RESULT_NO_REPEAT':report.status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST':'INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY';
   preflightOperation='RESULT_LEDGER_WRITE';report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
- }catch(error){report.status='BLOCKED';const baseCode=errorCode(error);report.code=baseCode==='INTERNAL_EXECUTION_ERROR'&&error instanceof SyntaxError
+ }catch(error){
+  const postcheckCode=errorCode(error);
+  // A completed allowlisted worker is not verified if the unrelated
+  // retired-R13 inventory postcheck cannot be read. Keep the original
+  // bounded diagnostic result, but never mark this job as PASS.
+  if(preflightOperation==='POSTCHECK'&&
+     postcheckCode==='RETIRED_IRAN_INVENTORY_UNAVAILABLE'&&!uncertainChild){
+   // The worker result file may be missing or timed out (as in #1838).
+   // Preserve the already recorded outcome without treating it as a PASS.
+   const prePostcheckOutcome={status:report.status,code:report.code,
+    firstFail:report.firstFail,resultPresent:report.result!==undefined};
+   Object.assign(report,{
+    status:'STATE_UNKNOWN',code:'PROTECTED_STATE_POSTCHECK_UNVERIFIED',
+    postcheckFailureCode:postcheckCode,
+    workerOutcome:prePostcheckOutcome,
+    protectedStateUnchanged:null,
+    protectedBeforeSha256:digest(JSON.stringify(before)),
+    protectedAfterSha256:null,
+    firstFail:'PROTECTED_STATE_POSTCHECK',
+    next:'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY',
+   });
+  }else{
+report.status='BLOCKED';const baseCode=errorCode(error);report.code=baseCode==='INTERNAL_EXECUTION_ERROR'&&error instanceof SyntaxError
     ?preflightOperation==='REQUEST_LEDGER'?'REQUEST_LEDGER_PARSE_FAILED':preflightOperation==='CORE_STATE_READ'?'CORE_CONFIG_PARSE_FAILED':baseCode:baseCode;
    report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';
    if(!report.phase&&report.lastPass==='REQUEST_RECEIVED'){
@@ -71,6 +93,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
      nextAction:leaseFailure?'INSPECT_LEASE_OWNER_NO_LOCK_DELETION':'INSPECT_NAMED_PREFLIGHT_OPERATION_NO_AUTOMATIC_RETRY'});
    }
   if(report.code==='MEMORY_WAIT_ALREADY_ACTIVE')Object.assign(report,{phase:'PREVALIDATION',failureOperation:'MEMORY_WAIT_LEASE_ACQUIRE',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY',nextAction:'WAIT_FOR_EXISTING_MEMORY_WAITER_NO_LOCK_DELETION',firstFail:'MEMORY_ADMISSION'});
+  }
  }
  finally{if(uncertainChild){report.resourceLeasesRetained=true;const marker=path.join(workspace,'RECOVERY_REQUIRED.json');writeJson(marker,{requestId:report.requestId,workerPid:report.workerPid,reason:'WORKER_TERMINATION_UNVERIFIED'});}else{releaseMemoryWait?.();releaseResource?.();releaseSeat?.();releaseRequest?.();}}
  return finalize();
