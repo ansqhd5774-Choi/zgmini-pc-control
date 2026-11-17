@@ -7,7 +7,10 @@
     "ledger": "https://github.com/ansqhd5774-Choi/zgmini/issues/1009",
     "handoff": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6937230843",
     "approvalReview": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6936233882",
-    "preimage": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1846#issuecomment-6934924717"
+    "preimage": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1846#issuecomment-6934924717",
+    "directAgentHandoff": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1894",
+    "selectorCandidateReceipt": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1894#issuecomment-6938582748",
+    "accountAcknowledgement": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1894#issuecomment-6938596861"
   },
   "reviewedRuntimeEffect": {
     "kind": "EXISTING_R47_TASK_CMD_SINGLE_FILE_CAS",
@@ -22,7 +25,13 @@
     "leaseOwner": "NOT_RECHECKED",
     "taskChangeAuthorized": false,
     "allowedSourceFiles": [],
-    "operationalWrites": 0
+    "operationalWrites": 0,
+    "proposedSourceBranch": "codex/theme-fear-greed-integration-20261025",
+    "requestedW03SourceSha": "d959424f3218af892b186cb35c251736e95cbac5",
+    "targetCmdChangeCommit": "c9cefeb3fc65e7933060c2b261118773971cddb5",
+    "lastObservedTaskXmlSha256": "bf3207ab2274d1248e7bd8c953cea2fd3bd277b8bd70bb1c2494339a06e0a4be",
+    "lastObservedTaskXmlIssue": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1846#issuecomment-6934924717",
+    "isThisCurrentRuntimeProof": false
   },
   "currentRouteAssessment": [
     {
