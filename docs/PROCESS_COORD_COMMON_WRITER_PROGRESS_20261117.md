@@ -4,7 +4,7 @@
 - **작업 브랜치:** `codex/coord-writer-preimage-gate-20261117`.
 - **계획·권한 정본:** `AGENTS.md`, `docs/PC_AUTOMATION_STANDARD.md`, `docs/AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md`.
 - **중앙 실행 원장:** [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6936365026).
-- **공통 코드 PR:** [#1876](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1876) — **DRAFT / source-only / 운영 미적용**.
+- **공통 코드 PR:** [#1876](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1876) — **main source 병합 완료** (squash `5a064fd5a3608f6c67c55990f10cdd173bdbb559`) / **운영 PC 미적용**.
 
 ## 마지막 유효 완료점
 
@@ -21,12 +21,12 @@
 - `writer-b/installer.mjs`: 기존 `WRITER_B_PC_PREIMAGE_STOP`과 선행 보호 검사 유지, 최초 불일치의 allowlisted `preimageCheck` 코드만 추가. 관측 SHA·파일 바이트·로컬 경로·토큰 미반환.
 - `writer-b/report.mjs`: 보장된 한정 값만 결과 JSON/TXT로 전달, 임의/위조 필드 폐기.
 - `writer-b/installer.test.mjs`, `writer-b/receiver.test.mjs`: HEAD·config·Task·dirty·맵 키 실패 분기/무변경, 위조 진단 폐기, JSON/TXT 비공개값 제거 회귀 시험.
-- 모든 변경은 브랜치와 Draft PR에만 존재. 원본 Controller/Runner·Writer/DB/D1·공급자·운영 Task·실제 설치 변경 **0건**.
+- 코드·회귀시험·이 진행 기록 5파일은 [PR #1876](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1876)에서 `main`에 병합되어 원격 재조회됨. 원본 Controller/Runner·Writer/DB/D1·공급자·운영 Task·실제 설치 변경 **0건**.
 
 ## 판정·다음 필수 실행
 
 - **DONE:** 인계 10건의 원본 분류, 해결된 2건 대기 해제, Writer 8/8 인수 receipt, 대기열 PC 실제 Job 증거, 공통 소스 패치·테스트 작성.
-- **CI 상태:** [PR #1876](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1876) 최종 HEAD의 관련 Node/격리 CI 성공 및 독립 리뷰가 확인될 때까지 **SOURCE_REVIEW_PENDING**. CI queued는 실행 실패가 아님.
+- **소스 검증 DONE:** 정확 PR HEAD `4e207fa1852c0551d0afe4037efede6e72f36a97`에서 [격리 Windows CI Run 44006906854](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006906854) **424/424 PASS**, [C996 CI Run 44006752176](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006752176) **43/43 PASS**. 2026-11-17T03:02Z 격리 Runner `zgmini-handoff-ci-spare-01` 및 호스트 `DESKTOP-N62L0NG` Job 로그 검증. PR source-only main 병합 `5a064fd5a3608f6c67c55990f10cdd173bdbb559`. 독립 사람 리뷰는 별도 증거 없음.
 - **BLOCKED(기능별 설치):** 8건 모두 과거 B 단회 소모. 현재 Runtime before SHA와 개별 원담당의 정확한 새 승인 source/manifest 없이는 기능별 설치 진행 불가. 공용 소스 패치 성공을 기능별 설치 PASS로 취급하지 않음.
-- **다음 1순위:** Draft PR 정확 HEAD CI/회귀 결과 확인 → 실패 시 변경 범위 내 최소 수정, 성공 시 PR 리뷰/병합 여부 결정. 이후 필요한 **공용 도구**만 기존 B 유지보수 경로에서 승인 여부 확인. 개별 기능의 새로운 manifest·설치·수집/게시 검증은 W01/W02/W04 원담당이 수행.
+- **다음 필수 업무:** W01/W02/W04 원담당이 자신의 미완료 Writer 설치 필요 여부를 기존 완료점/최신 PC before SHA 및 승인 source와 대조하여 결정한다. 필요한 경우 **새 고유 B 승인 manifest**를 정확히 만들고 기존 정규 단회 설치 경로를 이용한다. 과거 8건의 원본 B를 재실행하지 않으며 새 공통 진단이 이미 설치·실행된 것으로 주장하지 않는다. 총괄은 새 증거로 공통 결함이 재현될 때만 공용 원인 수정을 추가한다.
 - **금지:** 이전 B/pc-job ID 재실행, 격리 대기열 PC에서 운영 PC 쓰기, 임의 원격 shell, Controller/lease 강제 변경, 기능별 산식·원자료·D1 변경.
