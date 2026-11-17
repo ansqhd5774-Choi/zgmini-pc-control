@@ -58,6 +58,15 @@
 - **실제 운영:** 이 개선도 **SOURCE_ONLY**. 공통 대기열 PC의 5초 감시 상주 기동/최소 권한 인증·토큰 회전은 미완료. 활성화 증거가 없으므로 **5단계 중 4단계(80%), 실운영 0/1, `RUNTIME_ACTIVATION_BLOCKED`**를 유지한다.
 - **다음 필수 작업:** 기존 PC의 C급 직접 설정으로 별도 자동 시작/복구 및 만료·권한을 관리하는 GitHub 읽기 인증이 허용될 때 최소 범위에 한해 설치·실측한다. 임시 Job 토큰 보관·기존 Runner 점유 또는 미승인 Windows 서비스/예약 생성 금지.
 
+## 2026-11-17 후속 — 독립 감시기 인증/기동·실측 준비 (소스)
+
+- **기존 완료 증거:** #1870 `main` 병합 `8340b1d51182b05d18c4362db4c3cddcdcac5aa7`, 격리 Windows **420/420 PASS**, Retry-After·Rate-limit reset 준수 및 401 종료. 이력은 반복 검사하지 않는다.
+- **현재 소스 보완:** 공통 Windows PC에서 사용자가 승인한 GitHub CLI 자격 저장소를 통한 선택적 `GH_CREDENTIAL_STORE` 인증 공급자 추가. `gh auth token --hostname github.com`의 stdout을 Node 메모리에서만 활용하고 환경/argv·로그/Issue에 비밀을 기록하지 않음. 60초 캐시와 인증 조회 실패 코드만 보존하며, 공급자 실패는 해당 watcher만 제한적 백오프한다.
+- **감시 주기 실측 경로:** 정상 감시 12회마다 `WATCH_HEARTBEAT` 최소/최대 관측 간격을 비민감 로그로 기록해 5초 주기를 향후 실PC에서 확인할 수 있도록 함. 실제 통신 성공·원담당 수신과는 분리.
+- **Windows C급 활성화 준비:** `tools/handoff-watch-user-start.cmd`는 검증된 Node22 실행파일을 인수로 받아 기존 고정 소스 감시기만 기동하고, 비밀 인수·서비스 등록·예약 생성/교체를 수행하지 않음. 비민감 기록은 사용자별 `%TEMP%\\ZGMINI`에만 기록. C급 1회 PC 직접 설정과 STOP/복구 기준을 `docs/HANDOFF_WATCH_C_ACTIVATION_CONTRACT_20261117.md`로 명시.
+- **현행 실제 상태:** 해당 격리 PC에 별도 watcher 작업·영구 Node22·인증 자격 저장소 등록이 확인되지 않았음. 신규 GitHub CLI/계정/Windows 예약·서비스 설치/PC 쓰기는 이번 소스 준비에 포함되지 않는다. `5단계 중 4단계(80%), 실운영 0/1, RUNTIME_ACTIVATION_BLOCKED` 유지.
+- **다음 행동:** GitHub PR+격리 CI로 소스/정적 계약 통과 → `main` 읽기 검증 → C급 실제 장비 사용자 설정 필요 범위만 제시 → 실제 5초 heartbeat·Runner 업무 비간섭·접수 영수증을 일회 측정.
+
 ## 독립성·실제 상태
 
 현재 단계는 **SOURCE_MERGED_RUNTIME_NOT_DEPLOYED**. 새 watcher는 해당 PC에 설치/기동되지 않았고, GitHub Actions 15분 주기도 변경하지 않았음. 기존 6 Runner 운영·공유 원장·DB/D1·게시 영향 없음.
