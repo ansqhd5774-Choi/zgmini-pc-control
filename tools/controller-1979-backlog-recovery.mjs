@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {REQUEST1979,resultPair,commitIntakeRecovery} from './controller-intake-recovery.mjs';
+import {inspectCompletedClaim,archiveCompletedClaim} from './completed-recovery-claim.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
 import {protectedSnapshot,verifyRecoveryOperator,validBacklogOriginalPcJob} from './update.mjs';
 const repository='ansqhd5774-Choi/zgmini-pc-control';
@@ -65,7 +66,8 @@ export function plan1979(e){
   rejectedOriginalIssues:[1981],rejectionCode:'PREIMAGE_MANIFEST_PATH',providerCalls:0,
   operationalWrites:0,d1Writes:0,protectedStateUnchanged:true}};
 }
-export function collect1979(){
+export function collect1979(completedClaimPath){
+ const completed=inspectCompletedClaim(root,alive,completedClaimPath);
  const dir=path.join(root,'leases/controller-install');
  const files={ledger:path.join(root,'ledger',REQUEST1979+'.json'),owner:path.join(dir,'owner.json'),
   marker:path.join(dir,'RECOVERY_REQUIRED.json'),backlog:path.join(root,'backlog',REQUEST1979+'.json'),
@@ -88,10 +90,10 @@ export function collect1979(){
   candidates:search.items.map(x=>x.number).sort((a,b)=>a-b),originalBody:original.body,
   receipt1985:receipt.receipt,body1985:receipt.body,botReceipt:receipt.bot,resultPairsVerified:true});
  for(const[k,f]of Object.entries(files))need(fs.readFileSync(f).equals(bytes[k]),'INTAKE_EVIDENCE_CHANGED');
- return {...p,files,bytes,ownerPid:v.owner.pid,hashes:{...Object.fromEntries(Object.entries(bytes).map(([k,b])=>[k,hash(b)])),
+ return {...p,files,bytes,completed,ownerPid:v.owner.pid,hashes:{...completed.hashes,...Object.fromEntries(Object.entries(bytes).map(([k,b])=>[k,hash(b)])),
   protectedState:hash(JSON.stringify(protection))}};
 }
-const dependencies=['tools/controller-1979-backlog-recovery.mjs','tools/controller-intake-recovery.mjs',
+const dependencies=['tools/completed-recovery-claim.mjs','tools/controller-1979-backlog-recovery.mjs','tools/controller-intake-recovery.mjs',
  'tools/automation-status.mjs','tools/update.mjs','tools/maintenance-apply.mjs',
  'tools/maintenance-contract.mjs','tools/maintenance-lock.mjs','tools/source-bundle-register.mjs'];
 export function main(args=process.argv.slice(2)){
@@ -109,11 +111,12 @@ export function main(args=process.argv.slice(2)){
   a.approved===true&&a.requestId===REQUEST1979&&a.sourceSha===sourceSha&&
   JSON.stringify(a.hashes)===JSON.stringify(e.hashes)&&JSON.stringify(a.fileHashes)===JSON.stringify(fileHashes),
   'INTAKE_APPROVAL_MISMATCH');
- return commitIntakeRecovery({e,proposal,sourceSha,freshEvidence:collect1979,verifyFinal:()=>{
+ const completedClaimArchive=archiveCompletedClaim(root,e.completed,alive);
+ return {...commitIntakeRecovery({e,proposal,sourceSha,freshEvidence:()=>collect1979(completedClaimArchive),verifyFinal:()=>{
   const s=collectAutomationStatus([]);
   need(s.runtimeState==='HEALTHY'&&s.maintenanceState==='HEALTHY'&&s.workflowState==='active'&&
    s.actualControllerSha===target&&hash(JSON.stringify(protectedSnapshot()))===e.hashes.protectedState,'INTAKE_FINAL_RUNTIME_DRIFT');
- }});
+ }}),completedClaimArchived:true,completedClaimArchiveName:path.basename(completedClaimArchive)};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{console.log(JSON.stringify(main()));}catch(e){console.log(JSON.stringify({status:'RECOVERY_REQUIRED',
