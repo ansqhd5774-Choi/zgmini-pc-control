@@ -177,6 +177,35 @@ test('dedicated R181 workflow titles are not falsely rejected by shared ingress'
  assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
 });
 
+test('dedicated R47 CMD B title is delegated without suppressing unknown-label rejection',async()=>{
+ const wf=readFileSync(new URL('../.github/workflows/pc-approved-runtime-b-once.yml',import.meta.url),'utf8');
+ const title='pc-r47-cmd-onefile-install';
+ assert.ok(wf.includes("github.event.issue.title == '"+title+"'"));
+ assert.ok(wf.includes("contains(github.event.issue.labels.*.name, 'pc-writer-b-install')"));
+ const approved={...issue(title),body:JSON.stringify({
+  schema:'ZGMINI_TASK_CMD_ONEFILE_B_REQUEST_V1',
+  requestId:'bd14ae89-139d-4722-9e2b-7f401102474f',
+  chatId:'e296811b-e936-4cf0-9db5-1b311305f89e',
+  operation:'pc-r47-cmd-onefile-install',
+  controlRepository:repo,
+  approvalManifestPath:'approvals/task-cmd-b/w03-r47-cmd-onefile-reissue-20261117.json',
+  approvalManifestSha256:'5ea21082660efcf6bbf1be373e79aeb65b12ecbe854b324de82da595a64566cd'
+ })};
+ const admission=inspectSharedIssueAdmission(approved);
+ assert.deepEqual(admission,{state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
+ let posted=0;
+ const report=await reportRejectedAdmission({...event(title),issue:approved},{
+  listComments:async()=>[],postComment:async()=>{posted++;},getComment:async()=>null
+ });
+ assert.equal(report.state,'UNMANAGED');
+ assert.equal(posted,0);
+ const wrong={...approved,title:'invalid-r47-cmd-install'};
+ const denied=inspectSharedIssueAdmission(wrong);
+ assert.equal(denied.state,'REJECTED_AT_ADMISSION');
+ assert.equal(denied.code,'EXACT_ISSUE_TITLE_REQUIRED');
+ assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
+});
+
 test('dedicated W04 R6 manual B request is not falsely rejected by shared intake',async()=>{
  const workflow=readFileSync(new URL('../.github/workflows/pc-employment-r6-registered-data-once.yml',
   import.meta.url),'utf8');
