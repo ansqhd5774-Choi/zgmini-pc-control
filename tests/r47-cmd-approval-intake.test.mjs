@@ -45,7 +45,7 @@ test('calendar-safe exact raw-byte B approval accepts pinned transition only',()
   afterSha256:R47_CMD_B_CALENDAR_SAFE.afterSha256,
   sourceSha:R47_CMD_B_CALENDAR_SAFE.sourceSha};
  function replace(m){
-  x.manifestBytes=Buffer.from(JSON.stringify(m)+'\\n');
+  x.manifestBytes=Buffer.from(JSON.stringify(m)+'\n');
   x.request.approvalManifestSha256=digest(x.manifestBytes);
   x.event.issue.body=JSON.stringify(x.request);
  }
