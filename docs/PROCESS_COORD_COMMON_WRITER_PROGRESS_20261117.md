@@ -27,6 +27,28 @@
 
 - **DONE:** 인계 10건의 원본 분류, 해결된 2건 대기 해제, Writer 8/8 인수 receipt, 대기열 PC 실제 Job 증거, 공통 소스 패치·테스트 작성.
 - **소스 검증 DONE:** 정확 PR HEAD `4e207fa1852c0551d0afe4037efede6e72f36a97`에서 [격리 Windows CI Run 44006906854](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006906854) **424/424 PASS**, [C996 CI Run 44006752176](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44006752176) **43/43 PASS**. 2026-11-17T03:02Z 격리 Runner `zgmini-handoff-ci-spare-01` 및 호스트 `DESKTOP-N62L0NG` Job 로그 검증. PR source-only main 병합 `5a064fd5a3608f6c67c55990f10cdd173bdbb559`. 독립 사람 리뷰는 별도 증거 없음.
-- **BLOCKED(기능별 설치):** 8건 모두 과거 B 단회 소모. 현재 Runtime before SHA와 개별 원담당의 정확한 새 승인 source/manifest 없이는 기능별 설치 진행 불가. 공용 소스 패치 성공을 기능별 설치 PASS로 취급하지 않음.
-- **다음 필수 업무:** W01/W02/W04 원담당이 자신의 미완료 Writer 설치 필요 여부를 기존 완료점/최신 PC before SHA 및 승인 source와 대조하여 결정한다. 필요한 경우 **새 고유 B 승인 manifest**를 정확히 만들고 기존 정규 단회 설치 경로를 이용한다. 과거 8건의 원본 B를 재실행하지 않으며 새 공통 진단이 이미 설치·실행된 것으로 주장하지 않는다. 총괄은 새 증거로 공통 결함이 재현될 때만 공용 원인 수정을 추가한다.
+- **HISTORICAL (정정 전 판정):** 아래 최신 재대조 전에 8건을 모두 미완료 설치로 분류했으나 이는 잘못된 합산임. 원본 B 단회 실패와 후속 별도 승인 B 설치 성공을 구분해야 함. 기능별 저장·게시 검증은 별개임.
+- **최신 판정 우선:** 문서 맨 아래 `2026-11-17 W01/W02/W04 최신 설치 재대조`를 우선 적용. W02·W04 기설치 소스는 정확 파일 해시 검증 완료; W01은 고유 A #1880 결과 회수 전까지 신규 설치 여부를 미확정으로 유지. 과거 B 재실행 금지.
 - **금지:** 이전 B/pc-job ID 재실행, 격리 대기열 PC에서 운영 PC 쓰기, 임의 원격 shell, Controller/lease 강제 변경, 기능별 산식·원자료·D1 변경.
+
+## 2026-11-17 W01/W02/W04 최신 설치 재대조 — 추가 실행
+
+**결론:** 과거 실패 8건을 현재 미설치 8건으로 합산한 이전 판정은 틀림. 여러 정확 승인 B가 뒤이어 설치 성공했으므로 신규 설치 대신 **현재 PC의 승인 AFTER SHA 재조회**를 우선함.
+
+1. **W02 Taxonomy [완료 / 설치 재시도 불필요]**
+   - 후속 B [#1600](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1600): Run 43829473029, 결과 원격 `WRITER_B_INSTALLED_VERIFIED`, 로컬 source SHA `f4ab6f4e6bdbebb8f6958be88b5c9e194df8329b`.
+   - 최신 고유 A [#1881](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1881), [Run 44008648543](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44008648543): 2026-11-17T03:14:29Z `PASS/WRITER_APPROVED_PREIMAGE_READONLY`, 승인 3파일 `lib/market-calendar-taxonomy-public.mjs`, `scripts/pc-writer/market-calendar-taxonomy-output.mjs`, `scripts/pc-writer/run-local.mjs` 모두 W02 승인 AFTER SHA와 **3/3 일치**; `HEAD=config.source=2070ff53549e2f9f2cea57d5af7e1d83f9fd7388`. PC 운영 쓰기/Provider/D1 0.
+   - 기존 인계 #1583/#1594의 대기 라벨만 해제하고 원본·Issue 기록 보존. 원담당 원본 [#1592 정정 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1592#issuecomment-6937005338).
+2. **W04 Employment [해당 설치 파일 확인 / 설치 재시도 불필요]**
+   - 후속 B [#1678](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1678), [#1729](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1729), 최종 [#1751](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1751): 승인 B `WRITER_B_INSTALLED_VERIFIED`, 최종 로컬 source SHA `2070ff53549e2f9f2cea57d5af7e1d83f9fd7388`.
+   - 기존 운영 A [#1812](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1812) 2026-11-16T23:50:41Z의 Provider `9a41a73e8cca84ae6ced6998f88c5dadc6fd5f12e6d09b7542748a5b187ddb12` 및 Collector `848c83202b2b63944629655850542ef2a90fefdeed48ffbfdc1774ad487a0bc5`가 #1751 승인 AFTER SHA와 **2/2 일치**. 이후 [#1860](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1860) 2026-11-17T01:56Z 및 W02 A #1881 03:14Z에도 동일 checkout/config SHA 유지. 2파일 이외의 R6 기능 데이터/스케줄러/게시까지 완료됐다는 주장은 하지 않음.
+   - 기존 인계 #1580/#1620/#1669/#1677의 대기 라벨만 해제. 원담당 원본 [#1676 정정 회신](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1676#issuecomment-6937005992).
+3. **W01 Inflation [과거 일부 B 성공 / 최신 정확 파일 검사 진행 중]**
+   - Core bridge 관련 후속 정확 B [#1636](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1636) 및 [#1650](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1650) `WRITER_B_INSTALLED_VERIFIED`. 그러나 기존 #1633 전체 2파일 제안은 `WRITER_B_IMPORT_MISSING_DEPENDENCY_STOP`이었고, 이후 B 설치는 Core bridge 단일 파일에 한정되어 `local-cycle.mjs`까지 설치됐다고 간주하지 않음.
+   - 신규 승인 A [#1880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1880) [Run 44008646478](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44008646478): 동일 A Operation 고정 2파일 scope, **초기 관측 시점 RUNNING**. 결과 JSON/TXT remote readback 없을 때 PASS/FAIL/설치 누락을 단정하지 않으며 동일 requestId 재실행 금지.
+   - 인계 #1613/#1634의 pending 라벨은 유지. 작업 완료/기능 hook 필요성은 결과 회수와 W01 원담당 판단으로 결정.
+4. **공통 대기열 정리:** 총 10건 중 Controller 복구 2 + W02 2 + W04 4 = **8건 pending 정합 해제**. W01 2건 잔존. GitHub 접수/인수는 다른 ChatGPT 대화의 자동 수신이 아님.
+
+**한계:** 위 A는 `FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS` 범위의 PC source/preimage 읽기 전용이며, 실제 공급자 수집·SQLite 결과·Cloudflare D1/API/UI 출력을 검증하지 않는다. 운영 source/Task/DB/D1 신규 쓰기 0; 기존 B requestId 재실행 0.
+
+**다음 필수 행동 하나:** #1880 고유 Run의 최종 상태와 JSON/TXT 2/2 재조회 → `local-cycle.mjs` 및 `inflation-causal-candidate-core-bridge.mjs`의 실제 SHA를 B 승인 AFTER와 대조 → 원담당 W01 원본 #1633에 설치 필요/불필요를 정확히 회신. 결과 미확정은 다른 기능 전체의 BLOCKER가 아님.
