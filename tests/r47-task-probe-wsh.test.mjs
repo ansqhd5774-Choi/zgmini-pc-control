@@ -13,7 +13,7 @@ function simulateProbe({count=0,processes=[],taskEnabled=true,wmiError=false}={}
  const slash=String.fromCharCode(92);
  const task={Enabled:taskEnabled,State:3,GetInstances:()=>({Count:count})};
  const sandbox={
-  ActiveXObject:name=>{
+  ActiveXObject:function(name){
    assert.equal(name,'Schedule.Service');return{
     Connect(){},
     GetFolder(folder){calls.push(['folder',folder]);assert.equal(folder,slash);
