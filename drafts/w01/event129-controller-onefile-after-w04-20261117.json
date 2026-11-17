@@ -1,0 +1,80 @@
+{
+  "schema": "ZGMINI_W01_EVENT129_CONTROLLER_ONEFILE_INSTALL_REVIEW_V1",
+  "status": "SOURCE_PREPARED_B_EFFECT_APPROVAL_REQUIRED_NOT_EXECUTABLE",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "scope": "PC_CONTROL_CONTROLLER_UPDATE",
+  "operation": "pc-controller-update",
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "preconditions": {
+    "priorScopedControllerInstall": {
+      "owner": "W04_ORIGINAL_OWNER",
+      "approvedGoRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68#issuecomment-6941007769",
+      "expectedInstalledSha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2",
+      "priorApprovedFiles": [
+        "controller/employment-r6-candidate-readonly.mjs",
+        "controller/theme-nine-r32-raw-coverage-readonly.mjs"
+      ],
+      "status": "GO_RECORDED_BUT_OPERATING_INSTALL_UNVERIFIED"
+    },
+    "directW01BaselineBeforeSha": "621ed556c08f294ddd353dcbc4a524fc09de91f2cbca61ca8f7d25478b372e38",
+    "mustVerifyActualInstalledShaAndBytes": true,
+    "mustVerifyMaintenanceLeaseAndRollback": true,
+    "mustVerifyMainAncestry": true
+  },
+  "proposedInstall": {
+    "installedSha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2",
+    "targetSha": "c9a7cc6a37dedf2a8ae46bd1171ad133ba4fb969",
+    "allowFiles": [
+      {
+        "path": "controller/inflation-event129-evidence-readonly.mjs",
+        "sha256": "bf7421c0da240350f66a06341a604891d5a870d75d3fbd200165a097ea85e7ea"
+      }
+    ],
+    "allowFilesManifestSha256": "bfa606b12b5a9327f7c4e36d197c47496c2549bc0a0320f8ec223c63aae99e92",
+    "runtimeDiffCount": 1,
+    "colocatedSourceTest": "controller/inflation-event129-evidence-readonly.test.mjs",
+    "sourceApprovalPR": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1866",
+    "sourcePrMerged": true,
+    "sourceTestChecks": [
+      "source-only:success",
+      "c996-source:success"
+    ],
+    "postOperation": "core-status",
+    "postVerificationOperation": "inflation-event129-evidence-readonly",
+    "freshPostSourceSha": "MUST_PIN_FROM_CURRENT_ZGMINI_MAIN_AT_APPROVED_B_REQUEST",
+    "backup": {
+      "strategy": "VERSIONED_SNAPSHOT",
+      "rollback": {
+        "kind": "RESTORE_INSTALLED_SHA",
+        "sha": "fbe943a069c9b2366f8e295d2c63b7895c639ef2"
+      }
+    },
+    "deltaContract": "controllerOnlyInstall:exactly_one_changed_runtime_module; no pc-job.yml or config/operations.json change",
+    "sourceOnlyNotInstallable": true
+  },
+  "requiredAdditionalApproval": {
+    "authority": "USER_OR_PREEXISTING_AUTHORIZED_B_EFFECT_APPROVER",
+    "effect": "ALLOW_W01_EVENT129_A_READONLY_MODULE_EXACT_ONEFILE_CONTROLLER_B_INSTALL_AFTER_W04",
+    "status": "PENDING_NOT_GRANTED",
+    "requiredRef": "EXPLICIT_APPROVAL_COMMENT_OR_MERGED_APPROVAL_PR",
+    "mustCreateZGMINI_PC_UPDATE_V1ManifestUnderApprovalsAfterApproval": true,
+    "oneTimeUniqueRequestId": "MUST_CREATE_ONLY_AFTER_APPROVAL",
+    "forbidden": [
+      "REPLAY_CENSUS_B_1818",
+      "FORCE_CORE_TASK_OR_DELETE_LOCK",
+      "CHANGE_EVENT129_CHANNEL_OR_SECURITY_SETTINGS",
+      "MUTATE_SQLITE_D1_PROVIDER",
+      "INTERFERE_WITH_W04_APPROVED_TWOFILE_INSTALL",
+      "CREATE_UNAPPROVED_PC_MAINTENANCE_ISSUE"
+    ]
+  },
+  "observedEvidence": {
+    "lastW01CoreRun": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1922",
+    "lastW01CoreCode": "CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE",
+    "historicW01ChannelEnabled": false,
+    "currentChannelEnabled": null,
+    "notes": "Historic channel enabled=false is not current status; new module only reads gl configuration and never enables it."
+  },
+  "next": "WAIT_FOR_W04_EXACT_TARGET_INSTALLED_READBACK_THEN_APPROVE_W01_B_EFFECT_AND_VALIDATE_ONEFILE_MANIFEST; NO_REPEATED_OWNER_HANDOFF"
+}
