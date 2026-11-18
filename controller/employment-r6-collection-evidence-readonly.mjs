@@ -129,8 +129,11 @@ function fullTenYearRawCoverage(weeks,complete){
  for(let i=0;i<required.length;i++){
   const w=required[i],expected=latestMs-(requiredRawWeeks-1-i)*WEEK_MS;
   if(day(w.week)!==expected)return {...result,status:'NONCONSECUTIVE_10Y_WEEKS',firstFailureWeek:w.week};
+  if(w.invalidValues!==0)return {...result,status:'STATE_CLAIMS_VALUE_INVALID',firstFailureWeek:w.week};
   if(!complete(w))return {...result,status:'REGION_51_COVERAGE_GAP',firstFailureWeek:w.week};
-  // The approved R6 transform excludes prior four-week averages of zero.
+  // The approved R6 transform excludes missing/invalid and zero prior 4w bases.
+  if(i>=55&&required[i-52].invalidPriorRegions!==0)
+   return {...result,status:'PRIOR_4W_INVALID_BASE',firstFailureWeek:w.week};
   if(i>=55&&required[i-52].zeroPriorRegions!==0)
    return {...result,status:'PRIOR_4W_ZERO_BASE',firstFailureWeek:w.week};
  }
@@ -139,9 +142,10 @@ function fullTenYearRawCoverage(weeks,complete){
 function coverage(rows){
  if(!Array.isArray(rows))return {status:'UNKNOWN'};
  const weeks=rows.map(r=>({week:date(r.observation_date),count:safeInt(r.row_count),regions:safeInt(r.region_count),
-  unknown:safeInt(r.unknown_code_count),zeroPriorRegions:safeInt(r.zero_prior_region_count)})).filter(x=>x.week);
+  unknown:safeInt(r.unknown_code_count),zeroPriorRegions:safeInt(r.zero_prior_region_count),
+  invalidValues:safeInt(r.invalid_value_count),invalidPriorRegions:safeInt(r.invalid_prior_region_count)})).filter(x=>x.week);
  weeks.sort((a,b)=>a.week.localeCompare(b.week));
- const complete=x=>x?.count===51&&x?.regions===51&&x?.unknown===0;
+ const complete=x=>x?.count===51&&x?.regions===51&&x?.unknown===0&&x?.invalidValues===0;
  let latestCandidate=null,earliestBreak=null,latestBreak=null,eligible=0;
  for(let i=55;i<weeks.length;i++){
   const current=weeks.slice(i-3,i+1),previous=weeks.slice(i-55,i-51);
@@ -149,9 +153,11 @@ function coverage(rows){
   let reason=null;
   if(current.length!==4||previous.length!==4||!consecutive(current)||!consecutive(previous)||
      current.some((x,j)=>day(x.week)-day(previous[j].week)!==52*7*86400000))reason='WEEK_ALIGNMENT_GAP';
+  else if([...current,...previous].some(x=>x.invalidValues!==0))reason='STATE_CLAIMS_VALUE_INVALID';
   else if([...current,...previous].some(x=>!complete(x)))reason='REGION_51_COVERAGE_GAP';
-  // R6 rejects only a zero four-week PRIOR average per state, not an individual
-  // zero-valued weekly observation. The prior window ends at previous[3].
+  // R6 rejects missing/invalid and zero four-week PRIOR bases, but allows an
+  // individual genuine zero claim. The prior window ends at previous[3].
+  else if(previous[3].invalidPriorRegions!==0)reason='PRIOR_4W_INVALID_BASE';
   else if(previous[3].zeroPriorRegions!==0)reason='PRIOR_4W_ZERO_BASE';
   if(reason){if(!earliestBreak)earliestBreak={week:weeks[i].week,reason};latestBreak={week:weeks[i].week,reason};}
   else{latestCandidate=weeks[i].week;eligible++;}
@@ -164,7 +170,8 @@ function coverage(rows){
   latestComplete51Week:latestComplete,latestStrict52WeekCandidate:latestCandidate,
   strict52WeekCandidateCount:eligible,firstWindowBreak:earliestBreak,latestWindowBreak:latestBreak,
   fullTenYearRawCoverage:fullTenYearRawCoverage(weeks,complete),
-  recentIncompleteWeeks:weeks.filter(x=>!complete(x)).slice(-8).reverse().map(x=>({week:x.week,regions:x.regions,rows:x.count,unknownCodes:x.unknown})),
+  recentIncompleteWeeks:weeks.filter(x=>!complete(x)).slice(-8).reverse().map(x=>({
+   week:x.week,regions:x.regions,rows:x.count,unknownCodes:x.unknown,invalidValues:x.invalidValues})),
   note:'COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION'};
 }
 
@@ -322,9 +329,16 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
     WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
     GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600
    ), region_windows AS (
-    SELECT c.observation_date,c.geography_code,
+    SELECT c.observation_date,c.geography_code,c.value AS claim_value,
      SUM(c.value) OVER (PARTITION BY c.geography_code ORDER BY c.observation_date
-       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_week_total
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_week_total,
+     COUNT(*) OVER (PARTITION BY c.geography_code ORDER BY c.observation_date
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_row_count,
+     SUM(CASE WHEN typeof(c.value) NOT IN ('integer','real') OR c.value<0
+         OR c.value>9007199254740991 OR c.value!=CAST(c.value AS INTEGER)
+       THEN 1 ELSE 0 END) OVER (
+       PARTITION BY c.geography_code ORDER BY c.observation_date
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_invalid_value_count
     FROM market_score_employment_r4_shadow_current_v1 AS c
     INNER JOIN recent_weeks AS w ON w.observation_date=c.observation_date
     WHERE c.logical_series_id='STATE_INITIAL_CLAIMS' AND c.geography_type='STATE'
@@ -332,6 +346,11 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    SELECT observation_date,COUNT(*) AS row_count,
     COUNT(DISTINCT geography_code) AS region_count,
     SUM(CASE WHEN geography_code NOT IN (${countryMarkers}) THEN 1 ELSE 0 END) AS unknown_code_count,
+    SUM(CASE WHEN typeof(claim_value) NOT IN ('integer','real') OR claim_value<0
+       OR claim_value>9007199254740991 OR claim_value!=CAST(claim_value AS INTEGER)
+      THEN 1 ELSE 0 END) AS invalid_value_count,
+    SUM(CASE WHEN prior_four_row_count<>4 OR prior_four_invalid_value_count>0
+      THEN 1 ELSE 0 END) AS invalid_prior_region_count,
     SUM(CASE WHEN prior_four_week_total=0 THEN 1 ELSE 0 END) AS zero_prior_region_count
    FROM region_windows
    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600`).all(...CORE_STATES);
