@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run source-only unit tests
-        run: node --test tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs
+        run: node --test tests/pc-source-origin-readonly.test.mjs tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs
       - name: Run R47 fixed CMD B authorization and CAS tests
         run: node --test tests/r47-cmd-approval-intake.test.mjs tests/r47-cmd-onefile-cas.test.mjs tests/r47-cmd-report.test.mjs tests/r47-cmd-windows-boundary.test.mjs tests/r47-cmd-approval-bytes.test.mjs tests/r47-task-probe-wsh.test.mjs tests/shared-resource-issue-admission.test.mjs controller/theme-r47-task-action-readonly.test.mjs
       - name: Run common recovery and fixed ingress regressions in TEMP
