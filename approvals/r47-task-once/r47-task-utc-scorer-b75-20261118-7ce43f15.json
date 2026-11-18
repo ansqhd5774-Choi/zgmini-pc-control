@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_R47_TASK_ONCE_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "W03_R47_EXISTING_TASK_RUN_ONCE",
+  "operation": "r47-existing-task-run-once",
+  "controlSourceSha": "e6aab8430cda65859ca80a31fdbe8dc4098c7e14",
+  "taskName": "ZGMINI-PC-Theme-Nine-R47-Private",
+  "actionSha256": "a5f808f3ca8259f84c797be61903b80bb3874ed2f67837fe66975ed8d0da75a8",
+  "helperAfterSha256": "b75f7e2cb253b6abb327096e19c49d676c8c75b25bb816ca82756815aec91639",
+  "cycleSha256": "0940698222e0eba68940c0bb36023c71a53e29fb8c8ffdbb032b1492c4b168dc",
+  "maxLaunches": 1,
+  "allowProviderCalls": true,
+  "allowSqliteWrites": false,
+  "allowD1Writes": false,
+  "allowTaskRegistrationChanges": false,
+  "allowScheduleChanges": false,
+  "allowOtherOperations": false
+}
