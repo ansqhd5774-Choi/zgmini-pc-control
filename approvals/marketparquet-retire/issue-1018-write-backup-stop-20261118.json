@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_MP_TASK_RETIRE_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "requestId": "92b67940-becf-462b-bcae-a86cba35c70b",
+  "controlSourceSha": "d15adc7252d60cbbe4e64ed8ca61c4e1b6474db5",
+  "taskName": "ZGMINI-PC-MarketParquet-ETF",
+  "taskXmlSha256": "784ce63cb8c947abed116c2d754a3d24985f73d41ddaf9afdd44d43b246a7126",
+  "entrySha256": "4cad9645ff306cc5d2ea9f86fb8922f78f4b19dd706d6386ec01b0bbabe0b673",
+  "protectedTaskName": "ZGMINI-PC-GetMarketHistory-ETF",
+  "protectedTaskXmlSha256": "3e4f0e387e36049352fe4e6135eabd311c4862cec186a17a2f8eaf6dee3a677e",
+  "maxDisables": 1,
+  "allowProviderCalls": false,
+  "allowSourceWrites": false,
+  "allowDatabaseWrites": false,
+  "allowOtherTaskChanges": false,
+  "recoverPrewriteRequestId": "edeab1b2-fa5d-454a-8e82-bce25051da8e"
+}
