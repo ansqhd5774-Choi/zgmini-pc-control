@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.sha }}
           path: writer-b-control
           # R181 and W01 Census verify reviewed ancestors; generic Writer B stays shallow.
-          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || '1' }}
+          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || '1' }}
           persist-credentials: false
       - name: W01 Census #28 API-only approved manual B transaction
         if: github.event.issue.title == 'w01-census-m3-api-once'
@@ -98,6 +98,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-existing-task-report.mjs"'
+      - name: Run existing fixed R47 private Task once after approved route fix
+        if: github.event.issue.title == 'r47-existing-task-run-once'
+        id: r47task
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r47-existing-task-once.mjs"'
+      - name: Report fixed R47 Task acceptance without claiming collection success
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r47-existing-task-run-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r47-existing-task-report.mjs"'
       - name: Inspect fixed R181 URL shape without source disclosure or provider calls
         if: github.event.issue.title == 'r181-source-shape-readonly'
         id: r181shape
