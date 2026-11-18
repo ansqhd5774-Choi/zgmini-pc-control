@@ -6,11 +6,13 @@
 
 ## 0. 두 PC 및 증거 분류
 - 기존 운영 PC: 호스트 PC, Windows 11 Pro, 데이터 수집·저장·계산·승인된 게시가 실제 수행되는 PC.
-- 공통 대기열 PC: 호스트 DESKTOP-N62L0NG, Windows 10 Home, GitHub 메타데이터 전용 자동 장애 접수·검증·인계 및 격리 CI 실행 PC.
+- 별도 격리 시험·공통 인계 PC: 호스트 DESKTOP-N62L0NG, Windows 10 Home. 고정 자동 인계 Runner는 GitHub 메타데이터 장애 접수·검증·인계 및 허용된 격리 CI에 사용되며, 이 물리 PC의 승인된 개발·시험 환경은 운영 PC의 메모리 부하를 분리한다.
 - 공통점: private ansqhd5774-Choi/zgmini-pc-control GitHub Issue/Actions → 지정 self-hosted Runner → 인증된 결과 JSON/TXT+Issue 보조 댓글.
 - 차이점: 역할·Runner 라벨·Windows 버전·Node/실행기 설치·부팅/프로세스 관리가 다르다. 대상 PC와 역할을 구분하지 않고 기존 CMD/ZIP를 새 기본 실행 경로로 만들지 않는다.
 
 증거 구분: [실PC 관측]은 실제 Issue/Run에서 반환된 결과, [운영 계약]은 GitHub 정본 소스/문서에 명시된 규칙, [미확인]은 관측되지 않은 항목이다. 설계/CI PASS는 실PC 설치·자동 복구 PASS를 뜻하지 않는다.
+
+**담당자/시험 PC 구분(2026-11-18 사용자 확정):** `zgmini-pc-control`은 저장소 이름이다. 해당 Issues·PR 전문 담당자는 별도 PC `DESKTOP-N62L0NG`의 **승인된 개발·격리 환경**에서 다양한 소스 작업·시뮬레이션·검증을 수행해 기존 운영 PC `PC`의 메모리 부하를 분리한다. 아래 등록된 `zgmini-handoff-ci-isolated` **자동 Runner의 GitHub intake/CI 제한은 자동 Workflow에 적용되는 것이며, 전문 담당자의 전체 문제 해결 업무를 제한하는 뜻이 아니다.** 전문 담당자는 운영 PC 설치·변경을 하지 않고, 결과와 정확한 설치 자료를 `zgmini` 최종 프로세스 총괄에게 인계한다. 등록되지 않은 임의 실행이나 운영 원본 접근 권한이 새로 생기는 것은 아니다.
 
 ## 1. 하드웨어 및 기본 소프트웨어 — 각 Runner 실측
 
@@ -41,7 +43,7 @@
 | 고정 GitHub label | self-hosted, Windows, X64, zgmini-pc-control | self-hosted, Windows, X64, zgmini-handoff-ci-isolated |
 | 전용 Runner | zgmini-pc-01 ~ zgmini-pc-06 (6좌석 구성) | zgmini-handoff-ci-spare-01 (1좌석 확인) |
 | 대표 실행 검증 | #1249 zgmini-pc-03, #1255 zgmini-pc-02 | #1245/#1254 zgmini-handoff-ci-spare-01 |
-| 업무 경계 | 고정 Controller A급 진단, 승인된 독립 Writer/유지보수기 B급, 로컬 기능 실행 | 검증된 원본 GitHub Issue/Run/JSON/TXT 읽기·사건 분류·중복 제거·제한된 GitHub 기록 및 격리 테스트 |
+| 업무 경계 | 고정 Controller A급 진단, 승인된 독립 Writer/유지보수기 B급, 로컬 기능 실행 | **고정 자동 Runner:** 원본 GitHub Issue/Run/JSON/TXT 검증·사건 분류·인계·허용된 격리 CI. **별도 개발 환경:** 전문 담당자의 승인된 문제 해결·모의시험. 운영 PC 변경 불가 |
 | 기본 명령 실행 | 운영 설치 Node를 사용하는 기존 고정 Controller entry | checkout + pinned setup-node 22 + GitHub 전용 모듈 |
 | 운영 데이터·DB·파일 갱신 | 별도 실제 업무 승인 및 보호 계약이 있을 때만 | 장애 인계/격리 CI 워크플로에서는 금지 |
 | C급 시스템·보안·관리자 변경 | 사용자 직접 수행; 사전 계약·승인 필요 | 같은 제한, 자동 권한 없음 |
