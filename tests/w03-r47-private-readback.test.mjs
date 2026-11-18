@@ -48,16 +48,28 @@ function saved(t){
   rosterSha256:ROSTER_SHA,latestSpySessionDate:'2026-11-13',
   deltaCompletedWindows:[{start:'2026-11-03',end:'2026-11-12',spyDay:'2026-11-12'}],
   deltaVerifiedPageReferences:64};
+ const days=Array.from({length:252},(_,i)=>new Date(
+  Date.parse('2026-11-13T00:00:00Z')-(251-i)*86_400_000
+ ).toISOString().slice(0,10));
+ const tickers=Array.from({length:63},(_,i)=>'T'+String(i+1).padStart(3,'0'));
+ const individual=Object.fromEntries(tickers.map(symbol=>[symbol,{
+  symbol,history:days.map(date=>({date,score:50,realSessionCount:50,status:'ADAPTIVE_PROVISIONAL'}))
+ }]));
  const score={contract:'THEME_NINE_R47_PRIVATE_INCREMENTAL_INDIVIDUAL_V1',
   source,publicationAuthorized:false,
   approvedFormula:'EXACT_EXISTING_THEME_OPTIONAL_ADAPTIVE_R2_T40_R20_V40',
+  latest252TradingDates:days,
   counts:{themes:9,approvedETFPositions:64,uniqueApprovedETFs:63},
-  individual:{privateScoresNotToUpload:12345}};
+  individual,privateScoresNotToUpload:12345};
  const theme={contract:'THEME_NINE_R47_PRIVATE_RECURRING_NINE_THEME_SHADOW_V1',
   source,benchmarkDate:'2026-11-13',publicationAuthorized:false,
   aggregation:'EXACT_EXISTING_R32_DATE_REDUCER',
   counts:{themes:9,approvedETFPositions:64,uniqueApprovedETFs:63,tradingDates:252},
-  themes:[{privateLicensedBarsNotToUpload:999}]};
+  themes:Array.from({length:9},(_,i)=>({
+    theme:'PrivateTest'+(i+1),
+    history:days.map(date=>({date,score:50})),
+    privateLicensedBarsNotToUpload:999
+  }))};
  const aa=Buffer.from(JSON.stringify(score)+'\n');
  const bb=Buffer.from(JSON.stringify(theme)+'\n');
  const digest=sha(Buffer.concat([aa,bb])).slice(0,16);
