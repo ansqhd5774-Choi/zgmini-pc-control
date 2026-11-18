@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectPcSource,taskAction} from '../controller/pc-source-readonly.mjs';
+import {inspectPcSource,inspectFixedCreditR2Source,taskAction} from '../controller/pc-source-readonly.mjs';
+import {createHash} from 'node:crypto';
+import {projectSourcePreflightReport} from '../controller/report-upload-verified.mjs';
 
 const fixture=t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-pc-source-fixture-'));
@@ -213,4 +215,59 @@ test('escaped Git pointer cannot be used to read a historical checkout',t=>{
  assert.equal(result.sourceResolved,false);
  assert.equal(result.historicalCheckoutCandidate,undefined);
  assert.equal(result.runtimeSourceVerified,false);
+});
+
+
+test('fixed Credit R2 module SHA survives bounded pc-source-preflight summary without raw data',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release',sha='c'.repeat(40);
+ f.put('start.cmd','rem Core wrapper has no direct checkout reference');
+ fs.mkdirSync(path.join(f.root,p,'.git'),{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/scripts/pc-writer/run-local.mjs','export {}');
+ const code='export const creditR2=0; // zero must remain valid';
+ const src=f.put(p+'/lib/market-score/credit-r2.mjs',code);
+ f.put('data/pc-writer/config.json',JSON.stringify({source:{sha}}));
+ f.put('data/pc-writer/local-writer-last-run.json',
+  JSON.stringify({source:sha,at:'2026-11-18T10:45:39Z',status:'VERIFIED'}));
+ const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:(cwd,args)=>args[0]==='rev-parse'?sha:''});
+ assert.equal(result.runtimeSourceVerified,false);
+ const module=result.historicalCheckoutCandidate.creditR2Module;
+ assert.equal(module.status,'PASS');
+ assert.equal(module.sha256,createHash('sha256').update(code).digest('hex'));
+ assert.equal(module.evidenceLevel,'CHECKOUT_FILE_NOT_CORE_RUNTIME');
+ assert.equal(module.gitTrackedProven,null);
+ const projected=projectSourcePreflightReport({operation:'pc-source-preflight',result});
+ assert.equal(projected.result.historicalCheckoutCandidate.creditR2Module.sha256,module.sha256);
+ assert.equal(projected.result.historicalCheckoutCandidate.moduleSourceInventory.filesTransfer,'OMITTED_SUMMARY_ONLY');
+ assert.equal(fs.readFileSync(src,'utf8'),code);
+});
+
+test('fixed nested source refuses symlinks, missing file, outside path and never leaks bytes',t=>{
+ const f=fixture(t),source=path.join(f.root,'projects','pilot');
+ const outside=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-credit-probe-outside-'));
+ t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
+ const secret=path.join(outside,'secret.mjs');fs.writeFileSync(secret,'PROTECTED_PRIVATE_BYTES');
+ assert.equal(inspectFixedCreditR2Source(source).status,'STATE_UNKNOWN');
+ const file=path.join(source,'lib','market-score','credit-r2.mjs');
+ fs.mkdirSync(path.dirname(file),{recursive:true});
+ fs.symlinkSync(secret,file);
+ const r=inspectFixedCreditR2Source(source);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.sha256,null);
+ assert.doesNotMatch(JSON.stringify(r),/PROTECTED_PRIVATE_BYTES|secret\.mjs/);
+ assert.equal(inspectFixedCreditR2Source(outside).status,'STATE_UNKNOWN');
+});
+
+test('historical checkout without approved config match cannot expose Credit R2 digest',t=>{
+ const f=fixture(t),p='projects/zgmini-earnings-history-pc-release';
+ f.put('start.cmd','rem no project');
+ fs.mkdirSync(path.join(f.root,p,'.git'),{recursive:true});
+ f.put(p+'/scripts/pc-writer/local-cycle.mjs','export {}');
+ f.put(p+'/lib/market-score/credit-r2.mjs','export const noProof=1');
+ f.put('data/pc-writer/config.json',JSON.stringify({source:'a'.repeat(40)}));
+ f.put('data/pc-writer/local-writer-last-run.json',JSON.stringify({source:'b'.repeat(40)}));
+ const r=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
+  git:(cwd,args)=>args[0]==='rev-parse'?'b'.repeat(40):''});
+ assert.equal(r.historicalCheckoutCandidate.creditR2Module,undefined);
 });
