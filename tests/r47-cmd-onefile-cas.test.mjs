@@ -166,3 +166,15 @@ test('R47 requires disabled and drained Task before any file write',()=>{
  ]) assert.throws(()=>verifyR47CmdBPaused(m,{...base,[key]:value}),
   {code:'TASK_CMD_B_PAUSED_PREIMAGE_STOP'},key);
 });
+
+test('transient-recovery upgrade accepts only exact current preimage and reviewed source',async()=>{
+ const {R47_CMD_B_TRANSIENT_SAFE:p}=await import('../task-cmd-b/r47-onefile-cas.mjs');
+ const m={...manifest(),sourceSha:p.sourceSha,beforeSha256:p.beforeSha256,afterSha256:p.afterSha256};
+ assert.equal(validateR47CmdBManifest(m),m);
+ assert.equal(verifyR47CmdBPreimage(m,preimage(m)),true);
+ for(const mutant of [{...m,sourceSha:'a'.repeat(40)},
+   {...m,beforeSha256:R47_CMD_B.historicalOldSha256},
+   {...m,afterSha256:R47_CMD_B_CALENDAR_SAFE.afterSha256}]){
+  assert.throws(()=>validateR47CmdBManifest(mutant),{code:'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
+ }
+});
