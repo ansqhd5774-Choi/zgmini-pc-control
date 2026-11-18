@@ -113,7 +113,7 @@ test('V2 survives only an ancestor default-head move with byte-identical W03 con
  const next='8'.repeat(40),req=request(),envMoved={...env(),GITHUB_SHA:next};
  const gitRun=args=>{
   if(args[0]==='rev-parse'&&args[1]==='HEAD')
-   return {status:0,stdout:next+'\\n'};
+   return {status:0,stdout:next+'\n'};
   if(args[0]==='merge-base'&&args[1]==='--is-ancestor'&&
    args[2]===SOURCE&&args[3]===next)return {status:0};
   if(args[0]==='diff'&&args[1]==='--quiet'&&
