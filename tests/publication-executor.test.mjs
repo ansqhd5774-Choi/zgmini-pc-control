@@ -232,6 +232,11 @@ test('manufacturing one-shot uses fixed SHA arguments and verified JSON readback
  assert.match(executor,/parseBeaMfgResult\(applied\.output/);
  assert.match(executor,/if\(!bea&&!mfg\)validateQfrApplySource\(qfrPin,evidence\)/);
  assert.match(executor,/if\(!bea&&!mfg&&applied\.exitCode===1/);
+ for(const name of ['ZGMINI_EARNINGS_BEA_MFG_B_PIN_REQUIRED',
+   'ZGMINI_EARNINGS_BEA_MFG_SOURCE_VERSION',
+   'ZGMINI_EARNINGS_BEA_MFG_SOURCE_STORED_AT',
+   'ZGMINI_EARNINGS_BEA_MFG_OBSERVED_THROUGH'])
+   assert.ok(executor.includes(name));
  assert.match(executor,/validatePublicationReadback\(validated/);
  const contract=source('tools/publication-contract.mjs');
  assert.match(contract,/BEA_MANUFACTURING_PROFIT_SINGLE_KEY_D1_ONCE/);
