@@ -90,3 +90,31 @@ test('existing last-good timestamp and no-write result stays bounded',()=>{
  assert.equal(out.d1NowVerified,false);
  assert.equal(out.evidenceScope,'LOCAL_WRITER_LEDGER_ONLY_NOT_LIVE_D1');
 });
+
+test('per-key success cannot certify a failed, dry-run or same-key failed Writer',t=>{
+ const valid={at:stamp,status:'VERIFIED',
+  inflation7:{status:'READBACK_VERIFIED',key,ready:6,d1Writes:1,
+    sourceVersion,sourceStoredAt}};
+ const invalid=[
+  run=>{run.status='FAILED';},
+  run=>{run.status='DRY_RUN_PASS';},
+  run=>{run.status='VERIFIED_WITH_GAPS';run.failures=[
+    {id:'inflation-7-publication',reason:'INFL7_AUTO_D1_READBACK_MISMATCH'}];},
+  run=>{run.status='UNEXPECTED_PRIVATE_STATUS';},
+ ];
+ for(const mutate of invalid){
+  const data=structuredClone(valid);mutate(data);
+  const out=inspectInflation19RuntimeReadonly(root(t,data)).inflation7Writer;
+  assert.equal(out.status,'CONTRACT_UNVERIFIED');
+  assert.equal(out.verifiedAtWriterTime,false);
+  assert.equal(out.d1NowVerified,false);
+  assert.doesNotMatch(JSON.stringify(out),/UNEXPECTED_PRIVATE_STATUS/);
+ }
+ const partial=structuredClone(valid);
+ partial.status='VERIFIED_WITH_GAPS';
+ partial.failures=[{id:'unrelated-publication',reason:'SOME_OTHER_STAGE'}];
+ const out=inspectInflation19RuntimeReadonly(root(t,partial)).inflation7Writer;
+ assert.equal(out.status,'READBACK_VERIFIED');
+ assert.equal(out.verifiedAtWriterTime,true);
+ assert.equal(out.d1NowVerified,false);
+});
