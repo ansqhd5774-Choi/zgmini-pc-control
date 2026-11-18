@@ -328,7 +328,17 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
    approvalManifestSha256:auth.request.approvalManifestSha256},auth.approval.mode);
   claimed=true;lastPass='ONE_SHOT_CLAIMED';
   const value=await execute({auth,sourceRoot,pcHome,config,lock});
-  outcome={...base,...value,lastPass:'PUBLISH_READBACK',firstFail:null};
+  // A NOOP never publishes, while a missing/ambiguous child result cannot
+  // attest collection or publication simply because execute() returned.
+  need(value&&typeof value==='object'&&
+   (value.status==='NOOP'
+    ?value.publication==='NOT_ATTEMPTED'
+    :['SUCCESS','PARTIAL'].includes(value.status)&&
+      ['VERIFIED','UNCHANGED'].includes(value.publication)),
+   'R6_B_RUN_RESULT_UNVERIFIED');
+  outcome={...base,...value,
+   lastPass:value.status==='NOOP'?'COLLECTION_NOOP':'PUBLISH_READBACK',
+   firstFail:null};
  }catch(cause){
   const code=safeCode(cause?.code??cause?.message);
   // A claim may have reached persistent storage before the exception; do not
