@@ -508,3 +508,17 @@ test('maintenance workflow readback retries uncertain GET only, including enable
  await assert.rejects(confirmExactWorkflowState(()=> 'active','unknown',{pause:async()=>{}}),
   {code:'WORKFLOW_STATE_PROBE_INVALID'});
 });
+
+test('workflow drift while draining aborts before backup or stopping Supervisor',async()=>{
+ const f=fixture({waitForDrain:async()=>{f.events.push('drain');
+  throw Object.assign(Error('intake unexpectedly active'),{code:'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN'});
+ }});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.code,'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN');
+ assert.equal(r.firstFail,'INTAKE_PAUSED');
+ assert.equal(r.failureOperation,'waitForDrain');
+ assert.equal(f.events.includes('backup'),false);
+ assert.equal(f.events.includes('stop'),false);
+ assert.equal(f.events.includes('restore'),false);
+ assert.equal(f.installed,previous);
+});
