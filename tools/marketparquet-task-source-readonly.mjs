@@ -47,8 +47,10 @@ export function inspectTask({platform=process.platform,query=queryTask,hashEntry
  const active=enabled==='true'?true:enabled==='false'?false:null;
  const exec=[...xml.matchAll(/<Exec(?:\s[^>]*)?>([\s\S]*?)<\/Exec>/gi)];
  const base={...blank('TASK_ACTION_UNVERIFIED'),taskEnabled:active,
-  taskXmlSha256:sha(q.stdout),observedAtUtc:clock()};
- if(active===null||exec.length!==1)return {...base,code:'TASK_ENABLED_OR_ACTION_UNVERIFIED'};
+  taskXmlSha256:sha(q.stdout),observedAtUtc:clock(),
+  enabledFieldPresent:active!==null,execActionCount:Math.min(exec.length,4),
+  execActionCountTruncated:exec.length>4};
+ if(exec.length!==1)return {...base,code:'TASK_EXEC_ACTION_COUNT_NOT_ONE'};
  const command=entities(tag(exec[0][1],'Command'));
  const args=entities(tag(exec[0][1],'Arguments')??'');
  if(command===null||args===null)return {...base,code:'TASK_ACTION_ENCODING_UNVERIFIED'};
@@ -67,6 +69,8 @@ export function inspectTask({platform=process.platform,query=queryTask,hashEntry
  const leaf=path.win32.basename(p);
  if(!/^[a-z0-9][a-z0-9._-]{0,127}\.(?:cmd|bat|vbs|mjs|js)$/i.test(leaf))
   return {...base,actionKind,entryFileScope:root,code:'TASK_SOURCE_FILENAME_UNVERIFIED'};
- return {...base,status:'PASS',code:'MARKETPARQUET_TASK_SOURCE_FINGERPRINTED',
+ return {...base,status:active===null?'STATE_UNKNOWN':'PASS',
+  code:active===null?'TASK_ENABLED_FIELD_ABSENT_SOURCE_FINGERPRINTED':
+   'MARKETPARQUET_TASK_SOURCE_FINGERPRINTED',
   actionKind,entryFileScope:root,entryFileLeaf:leaf,entryFileSha256:sum};
 }
