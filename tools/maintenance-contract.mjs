@@ -111,6 +111,62 @@ export function validateR54BManifestRequest(request,manifestBytes,{
   throw Error('R54_B_MANIFEST_SCOPE_DENIED');
  return Object.freeze({request:approved,manifest:Object.freeze({...manifest})});
 }
+// Single-purpose MarketParquet retirement. The 2026-11-16 user decision
+// approves stopping this provider, not a generic Scheduler edit facility.
+export const MP_RETIRE_B_OPERATION='marketparquet-task-retire';
+export const MP_RETIRE_B_ISSUE_TITLE='pc-marketparquet-task-retire';
+export const MP_RETIRE_B_MANIFEST_PATH='approvals/marketparquet-task-retire/one-task.json';
+export const MP_RETIRE_B_MANIFEST=Object.freeze({
+ schema:'ZGMINI_MP_EXACT_TASK_RETIRE_B_V1',
+ status:'APPROVED_B',
+ scope:'MARKETPARQUET_TASK_RETIRE_EXACT',
+ taskName:'ZGMINI-PC-MarketParquet-ETF',
+ taskXmlSha256:'784ce63cb8c947abed116c2d754a3d24985f73d41ddaf9afdd44d43b246a7126',
+ entryPath:'E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r167-cycle.mjs',
+ entrySha256:'4cad9645ff306cc5d2ea9f86fb8922f78f4b19dd706d6386ec01b0bbabe0b673',
+ runCount:1,
+ preserveOtherTasks:true,
+ preserveSourceAndData:true,
+ noProviderCalls:true,
+ noD1Writes:true,
+ noControllerChanges:true
+});
+export function validateMpRetireBIssueEnvelope(request,{
+ controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],
+}={}){
+ if(controlRepository!==CONTROL_REPOSITORY||request?.controlRepository!==CONTROL_REPOSITORY
+  ||actor!==CONTROL_ACTOR||!Array.isArray(allowedActors)
+  ||!allowedActors.includes(CONTROL_ACTOR))
+  throw Error('MP_B_ISSUE_ORIGIN_DENIED');
+ requireKeys(request,ISSUE_KEYS,'MP_B_ISSUE_FIELDS_INVALID');
+ if(request.schema!==MAINTENANCE_ISSUE_SCHEMA||request.operation!==MP_RETIRE_B_OPERATION)
+  throw Error('MP_B_OPERATION_DENIED');
+ requireString(request.requestId,REQUEST_ID,'MP_B_REQUEST_ID_INVALID');
+ requireString(request.chatId,CHAT_ID,'MP_B_CHAT_ID_INVALID');
+ requireSha(request.targetControllerSha,'MP_B_CONTROLLER_PIN_INVALID');
+ requireDigest(request.approvalManifestSha256,'MP_B_MANIFEST_PIN_INVALID');
+ return Object.freeze({...request});
+}
+export function validateMpRetireBManifestRequest(request,manifestBytes,{
+ controlRepository=CONTROL_REPOSITORY,actor=null,allowedActors=[CONTROL_ACTOR],installedSha=null,
+}={}){
+ const approved=validateMpRetireBIssueEnvelope(request,{controlRepository,actor,allowedActors});
+ if(!SHA40.test(String(installedSha??''))||installedSha!==approved.targetControllerSha)
+  throw Error('MP_B_INSTALLED_CONTROLLER_DRIFT');
+ if(!Buffer.isBuffer(manifestBytes)||manifestBytes.length<100||manifestBytes.length>8192
+  ||sha256(manifestBytes)!==approved.approvalManifestSha256)
+  throw Error('MP_B_MANIFEST_DIGEST_DENIED');
+ let manifest;
+ try{manifest=JSON.parse(manifestBytes.toString('utf8'));}
+ catch{throw Error('MP_B_MANIFEST_JSON_INVALID');}
+ const keys=Object.keys(MP_RETIRE_B_MANIFEST);
+ if(!manifest||Array.isArray(manifest)||typeof manifest!=='object'
+  ||Object.keys(manifest).sort().join(',')!==[...keys].sort().join(',')
+  ||keys.some(k=>manifest[k]!==MP_RETIRE_B_MANIFEST[k]))
+  throw Error('MP_B_MANIFEST_SCOPE_DENIED');
+ return Object.freeze({request:approved,manifest:Object.freeze({...manifest})});
+}
+
 // Independent B-grade host registration. The ordinary controller-update issue
 // and its eleven-field manifest remain unchanged.
 export const R6_HOST_OPERATION="employment-r6-host-register";
