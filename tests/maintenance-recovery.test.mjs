@@ -2,9 +2,27 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyRecovery,archiveUntouched,
- verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners} from '../tools/maintenance-recovery.mjs';
+ verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners,inspectEvidenceFile} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
+test('inspect evidence distinguishes missing, unreadable and malformed bytes without disclosing local paths',()=>{
+ const secretFile='E:/private/DO_NOT_EXPOSE_SECRET.json';
+ const run=(label,fn)=>()=>inspectEvidenceFile(secretFile,label,fn);
+ const missing=Object.assign(Error('DO_NOT_EXPOSE_SECRET'),{code:'ENOENT'});
+ const denied=Object.assign(Error('DO_NOT_EXPOSE_SECRET'),{code:'EACCES'});
+ for(const [action,expected] of [
+  [run('RECOVERY_REQUEST_LEDGER',()=>{throw missing;}),'RECOVERY_REQUEST_LEDGER_MISSING'],
+  [run('RECOVERY_INSTALL_OWNER',()=>{throw denied;}),'RECOVERY_INSTALL_OWNER_UNREADABLE'],
+  [run('RECOVERY_INSTALL_MARKER',()=>Buffer.from('{DO_NOT_EXPOSE_SECRET')),'RECOVERY_INSTALL_MARKER_INVALID_JSON'],
+  [run('RECOVERY_CONTROLLER_HOST',()=>Buffer.from('null')),'RECOVERY_CONTROLLER_HOST_INVALID_JSON'],
+ ]){
+  assert.throws(action,e=>e.code===expected&&e.message===expected&&
+   !e.message.includes(secretFile)&&!e.message.includes('DO_NOT_EXPOSE_SECRET'));
+ }
+ const good=inspectEvidenceFile(secretFile,'RECOVERY_REQUEST_LEDGER',()=>Buffer.from('{"status":"RECOVERY_REQUIRED"}'));
+ assert.equal(good.value.status,'RECOVERY_REQUIRED');
+ assert.equal(good.bytes.toString(),'{"status":"RECOVERY_REQUIRED"}');
+});
 const state=()=>({identityVerified:true,ownerAlive:false,
  ledger:{status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',firstFail:'RECEIVED',installedShaBefore:sha,intakePaused:false,workflowEnabled:true},
  actualSha:sha,controllerVerified:true,maintenanceVerified:true,backupExists:false,backlogExists:false,
