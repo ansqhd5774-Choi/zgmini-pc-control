@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {
-  REPO,TITLE,SCHEMA,RESULT_SCHEMA,CMD_SHA,ROSTER_SHA,
+  REPO,TITLE,SCHEMA,RESULT_SCHEMA,CMD_SHA,ROSTER_SHA,APPROVAL_PATH,
   authorize,inspectR47PrivateSaved,execute,
 } from '../tools/w03-r47-private-readback.mjs';
 import {sanitize,asText} from '../tools/w03-r47-private-readback-report.mjs';
@@ -15,7 +16,9 @@ const request=()=>({
  requestId:'7af5ce31-44b2-4aa1-8822-cc8b27337e65',
  chatId:'f8f62ea0-43ef-4dc5-9a74-22276a1f0354',
  controlRepository:REPO,controlSourceSha:'a'.repeat(40),
- expectedInstalledCmdSha256:CMD_SHA,
+ expectedInstalledCmdSha256:CMD_SHA,approvalManifestPath:APPROVAL_PATH,
+ approvalManifestSha256:sha(fs.readFileSync(path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),'..',APPROVAL_PATH))),
 });
 function fixtureEvent(){
  const req=request();
@@ -80,6 +83,7 @@ test('readback request admits exact owner event, immutable CMD SHA and 7 keys',(
   x=>x.env.GITHUB_RUN_ATTEMPT='2',
   x=>x.event.issue.labels=[],
   x=>{const p=JSON.parse(x.event.issue.body);p.expectedInstalledCmdSha256='0'.repeat(64);x.event.issue.body=JSON.stringify(p);},
+  x=>{const p=JSON.parse(x.event.issue.body);p.approvalManifestSha256='0'.repeat(64);x.event.issue.body=JSON.stringify(p);},
   x=>{const p=JSON.parse(x.event.issue.body);p.arbitraryFile='C:/sensitive';x.event.issue.body=JSON.stringify(p);},
   x=>{x.event.repository.private=false;},
  ]){const obj=fixtureEvent();mutation(obj);assert.throws(()=>authorize(obj.event,obj.env));}
