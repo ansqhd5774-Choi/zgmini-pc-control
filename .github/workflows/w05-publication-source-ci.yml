@@ -5,6 +5,8 @@ on:
     paths:
       - 'tools/publication-*.mjs'
       - 'tests/publication-*.test.mjs'
+      - 'tests/w05-qfr-publication-draft.test.mjs'
+      - 'approvals/publications/pc-publication-34db72af-680c-4129-b6ee-8a7f31e5c40a.json'
       - '.github/workflows/w05-publication-source-ci.yml'
 permissions:
   contents: read
@@ -27,4 +29,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify B publication contract and executor (no operational effects)
-        run: node --test tests/publication-contract.test.mjs tests/publication-executor.test.mjs
+        run: node --test tests/publication-contract.test.mjs tests/publication-executor.test.mjs tests/w05-qfr-publication-draft.test.mjs
