@@ -1,0 +1,535 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44366803990-1-seat-2",
+  "requestId": "pc-a461e729-cfd4-40ce-bde1-a36b40780539",
+  "startedAt": "2026-11-18T18:11:27.828Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "52ebe50e137910a53c26c7d64bc3426c734053e9",
+  "sourceBranch": "codex/theme-fear-greed-integration-20261025",
+  "operation": "writer-install-preimage-readonly",
+  "seat": 2,
+  "status": "STATE_UNKNOWN",
+  "code": "WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w03-r178-preimage-20261119-24",
+  "pcOperationalApprovedSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED",
+    "observedAt": "2026-11-18T18:11:31.482Z",
+    "evidenceLevel": "FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS",
+    "runtimeSourceVerified": false,
+    "sourceRoot": null,
+    "sourceRootAbsolute": null,
+    "sourceHead": null,
+    "approvedConfigSource": null,
+    "checkpointSource": null,
+    "sourceIdentityConsistent": false,
+    "coreTaskSourceLinked": false,
+    "taskLaunchers": [
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c"
+      },
+      {
+        "path": "data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+        "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+        "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-core-r10.mjs",
+        "sha256": "e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/verified-checks-r10.mjs",
+        "sha256": "f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R31_SCOPED_PUBLICATION.mjs",
+        "sha256": "ffa71643748e79eedacf26b72880804cbab0edfb2eb32435da2346ec4bd0ad19"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R33_OBSERVE_PUBLISH_CYCLE.mjs",
+        "sha256": "7bd792d1ed84067846ca3ef0748b4a5eac8e5ba78feb18c9a3fcaf46b58ee58b"
+      }
+    ],
+    "r6Config": {
+      "status": "PASS",
+      "configSha256": "fcd914ceb544c7deaec1f2913b4ea55f88495dcf23677c98169b372e2986209a",
+      "keys": {
+        "employmentR6AutoCollection": "ENABLED",
+        "employmentR6OneYearAutoPublication": "ENABLED"
+      },
+      "reason": null
+    },
+    "calendar": [
+      {
+        "path": "lib/market-calendar-company-ko.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "employmentR6": [
+      {
+        "path": "lib/market-score/employment-r4-bed-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r4-shadow-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-collector.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-contract.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-feature-engine.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-observation-reader.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-scheduler.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/collect-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/run-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-window.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "worker/employment-r6-public-display.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "scopedPreimage": {
+      "manifestPath": "approvals/writer-preimage/w03-r178-gmh-closure-32-r1.json",
+      "manifestSha256": "e2d8092409415c25d770cc60472e9bf894fa9cdd99046f3137bd5fba2ef5e4b1",
+      "files": [
+        {
+          "path": "lib/cnn-index.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/cnn-observed-archive-r1.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/market-calendar-er1-earnings-score.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/market-calendar-er1-forecast-score.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/market-calendar-er1-month-key.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/market-calendar-er1-public-display.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/market-score/theme-etf-provisional.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "lib/marketparquet-retirement.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-gmh-seven-pc-parity-r1.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-gmh-seven-private-bridge.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-gmh-seven-saved-input-r1.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-optional-score-r188.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-history-r1.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-private-seed-r1.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-approved-writer-entry.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-authorized-cas.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-private-draft.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-saved-to-cas-r1.mjs",
+          "expectedEffect": "A",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/public-display-freshness.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/public-feed-input-safety.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/public-feed-store.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-ai-semiconductor-optional.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-biotech-continuation-r2.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-biotech-optional.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-biotech-provisional-r1.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-data-center-power-provisional-r1.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-data-center-power-r1.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-etf-only-public.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-etf-rolling-public.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-history-reference.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-nine-r37-public.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        },
+        {
+          "path": "worker/theme-nine-r88-provisional.mjs",
+          "expectedEffect": "M",
+          "exists": null,
+          "sha256": null,
+          "state": "NOT_OBSERVED",
+          "trackedDirty": null
+        }
+      ]
+    }
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "protectedAfterSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "actualExecutionSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-18T18:11:51.996Z",
+  "durationMs": 24168
+}
