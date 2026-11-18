@@ -110,6 +110,8 @@ jobs:
       - name: Retire exact forbidden MarketParquet task once preserving GMH
         if: github.event.issue.title == 'marketparquet-exact-task-retire-once'
         id: mpretire
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\marketparquet-task-retire-once.mjs"'
       - name: Record exact task disabled and protected GMH readback
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'marketparquet-exact-task-retire-once'

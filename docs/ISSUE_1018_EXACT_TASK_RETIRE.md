@@ -9,3 +9,8 @@
 검증: 고정 범위·서명된 actor/request/raw SHA·정상/변조/실행중/백업 실패/직전 drift/중지 불명확/GMH 변경/가짜 PASS 회귀를 실행한다. 원본 PC에서는 먼저 읽기 전용 native snapshot으로 current preimage만 확인한다.
 
 Microsoft 공식 API: https://learn.microsoft.com/en-us/windows/win32/taskschd/registeredtask
+## 2026-11-18 최초 Windows 결과 보완
+
+#2174는 Task disable 이전 백업 flush 단계에서 EPERM으로 중단됐다. 읽기 핸들 fsync가 원인이며 쓰기/배타 생성 핸들로 수정하고 실제 TEMP 회귀를 추가했다. 이 prewrite 실패가 공유 Writer 잠금을 계속 잡지 않도록 소유 잠금 해제 범위를 수정했다(단회 journal/백업은 보존). 기존 #2174는 재실행하지 않는다.
+
+이미 종료된 #2174가 남긴 잠금 한 건만 새 명세의 recoverPrewriteRequestId로 지정한다. 고정 run completed/failure, 정확 원격 PREFLIGHT_STOP 영수증 SHA, 현재 Task/GMH/진입점 원본 SHA 불변, 이전 백업 SHA, shared owner UUID를 독립 확인한 후 NTFS hardlink create-only로 보관하고 같은 파일 ID인 잠금만 해제한다. 다른 요청/실행중/운영 변경 불명확 상태에는 적용하지 않는다. 새 요청으로 정규 단회 중지를 이어간다.

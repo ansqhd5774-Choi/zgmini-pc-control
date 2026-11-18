@@ -26,7 +26,7 @@ export function authorize({event,env,manifestBytes}){
  const r=JSON.parse(event.issue.body);
  need(exact(r,['schema','requestId','chatId','operation','controlRepository','approvalManifestPath','approvalManifestSha256'])&&r.schema===REQUEST_SCHEMA&&r.operation===OPERATION&&r.controlRepository===REPO&&UUID.test(r.requestId)&&UUID.test(r.chatId)&&MANIFEST.test(r.approvalManifestPath)&&/^[a-f0-9]{64}$/.test(r.approvalManifestSha256)&&Buffer.isBuffer(manifestBytes)&&sha(manifestBytes)===r.approvalManifestSha256,'MP_RETIRE_REQUEST_STOP');
  const m=JSON.parse(manifestBytes.toString('utf8'));
- need(exact(m,['schema','status','requestId','controlSourceSha','taskName','taskXmlSha256','entrySha256','protectedTaskName','protectedTaskXmlSha256','maxDisables','allowProviderCalls','allowSourceWrites','allowDatabaseWrites','allowOtherTaskChanges'])&&m.schema==='ZGMINI_MP_TASK_RETIRE_APPROVAL_V1'&&m.status==='APPROVED_B'&&m.requestId===r.requestId&&/^[a-f0-9]{40}$/.test(m.controlSourceSha)&&m.taskName===TASK&&m.taskXmlSha256===PINS.xml&&m.entrySha256===PINS.entry&&m.protectedTaskName===PROTECTED_TASK&&m.protectedTaskXmlSha256===PINS.protectedXml&&m.maxDisables===1&&['allowProviderCalls','allowSourceWrites','allowDatabaseWrites','allowOtherTaskChanges'].every(k=>m[k]===false),'MP_RETIRE_MANIFEST_STOP');
+ need(exact(m,['schema','status','requestId','controlSourceSha','taskName','taskXmlSha256','entrySha256','protectedTaskName','protectedTaskXmlSha256','maxDisables','allowProviderCalls','allowSourceWrites','allowDatabaseWrites','allowOtherTaskChanges','recoverPrewriteRequestId'])&&m.schema==='ZGMINI_MP_TASK_RETIRE_APPROVAL_V1'&&m.status==='APPROVED_B'&&m.requestId===r.requestId&&/^[a-f0-9]{40}$/.test(m.controlSourceSha)&&m.taskName===TASK&&m.taskXmlSha256===PINS.xml&&m.entrySha256===PINS.entry&&m.protectedTaskName===PROTECTED_TASK&&m.protectedTaskXmlSha256===PINS.protectedXml&&m.maxDisables===1&&(m.recoverPrewriteRequestId===null||m.recoverPrewriteRequestId==='edeab1b2-fa5d-454a-8e82-bce25051da8e')&&['allowProviderCalls','allowSourceWrites','allowDatabaseWrites','allowOtherTaskChanges'].every(k=>m[k]===false),'MP_RETIRE_MANIFEST_STOP');
  const p=Object.freeze({request:Object.freeze(r),manifest:Object.freeze(m),controlSha:env.GITHUB_SHA});proofs.add(p);return p;
 }
 export function equivalentDefinition(a,b){
@@ -56,24 +56,46 @@ export async function retire(proof,io,{digest=sha}={}){
   attempted=true;await io.disable();
   const after=await io.read();need(after.enabled===false&&after.instances===0&&after.state===1&&after.sourceProcesses===0&&after.protectedEnabled===true&&after.entrySha256===PINS.entry&&digest(after.protectedXml)===PINS.protectedXml&&equivalentDefinition(decode(before.xml),decode(after.xml)),'MP_RETIRE_POSTCHECK_STOP');
   return {...base,status:'PASS',code:'MP_RETIRE_EXACT_TASK_DISABLED_READBACK_VERIFIED',taskDisabled:true,protectedTaskUnchanged:true,beforeXmlSha256:PINS.xml,afterXmlSha256:digest(after.xml),entrySha256:PINS.entry,protectedTaskXmlSha256:PINS.protectedXml};
- }catch(e){retain=attempted||claimed;return {...base,status:attempted?'STATE_UNKNOWN':'PREFLIGHT_STOP',code:/^MP_RETIRE_[A-Z0-9_]+$/.test(e.code??'')?e.code:'MP_RETIRE_UNCLASSIFIED_STOP',disableAttempted:attempted};}
+ }catch(e){retain=attempted;return {...base,status:attempted?'STATE_UNKNOWN':'PREFLIGHT_STOP',code:/^(?:MP_RETIRE_|R17_B_)[A-Z0-9_]+$/.test(e.code??'')?(''+e.code).replace(/^R17_B_/,'MP_RETIRE_SHARED_'):e.code==='EPERM'?'MP_RETIRE_BACKUP_FLUSH_DENIED':'MP_RETIRE_UNCLASSIFIED_STOP',disableAttempted:attempted};}
  finally{if(lock)await io.release(lock,proof.request.requestId,retain);}
 }
+export function writeDurableExclusiveBackup(file,bytes){const fd=fs.openSync(file,'wx');try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}return sha(fs.readFileSync(file));}
 export function nativeIO(){return {
  acquire:id=>acquireInstallLock({journalRoot:ROOT,requestId:id,sharedLock:SHARED}),
  claim:(lock,id)=>createInstallJournal({journalRoot:ROOT,requestId:id,sharedLock:SHARED,fd:lock.fd}),
  read:nativeRead,
- backup:(bytes,id)=>{const f=path.join(ROOT,id,'original-task.xml');fs.writeFileSync(f,bytes,{flag:'wx'});const fd=fs.openSync(f,'r');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}return sha(fs.readFileSync(f));},
+ backup:(bytes,id)=>{const f=path.join(ROOT,id,'original-task.xml');return writeDurableExclusiveBackup(f,bytes);},
  disable:()=>ps("$ErrorActionPreference='Stop';$s=New-Object -ComObject Schedule.Service;$s.Connect();$s.GetFolder('\\').GetTask('"+TASK+"').Enabled=$false;'DISABLED'"),
  release:(lock,id,retain)=>releaseInstallClaim({fd:lock.fd,sharedLock:SHARED,requestId:id,retain}),
 };}
 function git(root,args){const r=spawnSync('C:/Program Files/Git/cmd/git.exe',['-C',root,...args],{encoding:null,windowsHide:true,shell:false,timeout:20000,maxBuffer:524288});need(!r.error&&r.status===0,'MP_RETIRE_SOURCE_READ_STOP');return r.stdout;}
+const OLD='edeab1b2-fa5d-454a-8e82-bce25051da8e';
+export function verifyRecoveryEvidence({run,receiptBytes,ownerText}){
+ need(ownerText===OLD&&run?.status==='completed'&&run.conclusion==='failure'&&String(run.id)==='44287401636'&&sha(receiptBytes)==='cf9279e7fb4e9fb22e783614049467d3490a100a7351f021561c9bb0ad9f58bb','MP_RETIRE_OLD_RUN_NOT_PROVEN_STOP');
+ const r=JSON.parse(receiptBytes);need(r.requestId===OLD&&r.status==='PREFLIGHT_STOP'&&r.taskDisabled===false&&r.runId==='44287401636','MP_RETIRE_OLD_RECEIPT_STOP');
+}
+async function recoverKnownPrewrite(proof,env){
+ if(proof.manifest.recoverPrewriteRequestId===null)return;
+ need(proof.manifest.recoverPrewriteRequestId===OLD&&typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>20,'MP_RETIRE_RECOVERY_AUTH_STOP');
+ const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json','user-agent':'zgmini-exact-prewrite-recovery'};
+ const get=async url=>{const r=await fetch('https://api.github.com/repos/'+REPO+url,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});need(r.ok,'MP_RETIRE_RECOVERY_REMOTE_READ_STOP');return r.json();};
+ const run=await get('/actions/runs/44287401636'),file=await get('/contents/results/marketparquet-retire-'+OLD+'.json?ref=main');
+ need(file.encoding==='base64'&&typeof file.content==='string','MP_RETIRE_RECOVERY_RECEIPT_ENCODING_STOP');
+ const receiptBytes=Buffer.from(file.content.replace(/\s/g,''),'base64'),ownerText=fs.readFileSync(SHARED,'utf8');verifyRecoveryEvidence({run,receiptBytes,ownerText});
+ const current=nativeRead();need(current.enabled===true&&current.state===3&&current.instances===0&&current.sourceProcesses===0&&current.protectedEnabled===true&&sha(current.xml)===PINS.xml&&sha(current.protectedXml)===PINS.protectedXml&&current.entrySha256===PINS.entry,'MP_RETIRE_RECOVERY_PREIMAGE_STOP');
+ const backup=path.join(ROOT,OLD,'original-task.xml');need(sha(fs.readFileSync(backup))===PINS.xml,'MP_RETIRE_RECOVERY_BACKUP_STOP');
+ const a=fs.lstatSync(SHARED);need(a.isFile()&&!a.isSymbolicLink()&&a.size===36,'MP_RETIRE_RECOVERY_LEASE_SCOPE_STOP');
+ const archived=path.join(ROOT,OLD,'prewrite-shared-lease.archived');fs.linkSync(SHARED,archived);
+ const b=fs.lstatSync(SHARED),copy=fs.lstatSync(archived);need(a.ino===b.ino&&b.ino===copy.ino&&a.dev===b.dev&&b.dev===copy.dev&&fs.readFileSync(SHARED,'utf8')===OLD,'MP_RETIRE_RECOVERY_LEASE_DRIFT_STOP');
+ fs.unlinkSync(SHARED);
+}
 export async function entry({event,env,root,io=nativeIO()}){
  need(process.platform==='win32','MP_RETIRE_WINDOWS_REQUIRED_STOP');
  need(git(root,['rev-parse','HEAD']).toString().trim()===env.GITHUB_SHA,'MP_RETIRE_HEAD_STOP');
  const r=JSON.parse(event.issue.body);need(MANIFEST.test(r.approvalManifestPath),'MP_RETIRE_MANIFEST_PATH_STOP');
  const bytes=git(root,['cat-file','blob','HEAD:'+r.approvalManifestPath]);const p=authorize({event,env,manifestBytes:bytes});
  git(root,['merge-base','--is-ancestor',p.manifest.controlSourceSha,'HEAD']);git(root,['diff','--exit-code',p.manifest.controlSourceSha,'HEAD','--',...REVIEWED]);git(root,['diff','--exit-code','HEAD','--',...REVIEWED]);
+ await recoverKnownPrewrite(p,env);
  return retire(p,io);
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
