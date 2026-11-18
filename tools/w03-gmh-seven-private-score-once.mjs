@@ -6,6 +6,11 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {REPO,OWNER,APPROVED_SOURCE_SHA,verifyCandidate}
  from './w03-gmh-seven-manual-once.mjs';
+import {APPROVED_SAVED_SOURCE_SHA,SAVED_SCHEMA,
+ verifySavedCandidate,launchSavedScore}
+ from './w03-gmh-seven-saved-score-v2.mjs';
+export {SAVED_SCHEMA,APPROVED_SAVED_SOURCE_SHA}
+ from './w03-gmh-seven-saved-score-v2.mjs';
 
 export const TITLE='w03-gmh-seven-private-score-once';
 export const SCHEMA='ZGMINI_W03_GMH_SEVEN_PRIVATE_SCORE_REQUEST_V1';
@@ -32,10 +37,11 @@ export function authorize(event,env){
   'controlRepository','controlSourceSha','candidateSourceSha'];
  need(r&&typeof r==='object'&&!Array.isArray(r)&&
   Object.keys(r).length===fields.length&&fields.every(k=>Object.hasOwn(r,k))&&
-  r.schema===SCHEMA&&r.operation===TITLE&&
+  (r.schema===SCHEMA||r.schema===SAVED_SCHEMA)&&r.operation===TITLE&&
   UUID.test(r.requestId??'')&&UUID.test(r.chatId??'')&&
   r.controlRepository===REPO&&r.controlSourceSha===env.GITHUB_SHA&&
-  r.candidateSourceSha===APPROVED_SOURCE_SHA,
+  r.candidateSourceSha===(r.schema===SAVED_SCHEMA?
+   APPROVED_SAVED_SOURCE_SHA:APPROVED_SOURCE_SHA),
   'W03_GMH_SCORE_REQUEST_STOP');
  return Object.freeze(r);
 }
@@ -48,7 +54,7 @@ function claim(req){
  need(fs.realpathSync.native(JOURNAL).toLowerCase().startsWith(pc.toLowerCase()+path.sep),
   'W03_GMH_SCORE_JOURNAL_STOP');
  fs.writeFileSync(path.join(JOURNAL,req.requestId+'.json'),JSON.stringify({
-  schema:SCHEMA,requestId:req.requestId,source:APPROVED_SOURCE_SHA,
+  schema:req.schema,requestId:req.requestId,source:req.candidateSourceSha,
   operation:TITLE,at:new Date().toISOString(),providerCalls:0,d1Writes:0,
   publicWrites:0})+'\n',{flag:'wx'});
 }
@@ -81,31 +87,34 @@ function launch(script){
   {schema:OUTPUT,status:'STOP',code:'W03_GMH_SCORE_PRIVATE_INPUT_NOT_VERIFIED'};
 }
 export function execute({event,env,sourceRoot,verify=verifyCandidate,
- journal=claim,run=launch}={}){
+ journal=claim,run=launch,verifySaved=verifySavedCandidate,
+ runSaved=launchSavedScore}={}){
  const req=authorize(event,env);
  need(process.platform==='win32','W03_GMH_SCORE_WINDOWS_ONLY_STOP');
- const file=verify({sourceRoot});
+ const savedMode=req.schema===SAVED_SCHEMA;
+ const file=savedMode?verifySaved({sourceRoot}):verify({sourceRoot});
  journal(req);
- const r=run(file);
+ const r=savedMode?{schema:OUTPUT,...runSaved(file)}:run(file);
  need(r?.schema===OUTPUT&&['PASS','STOP'].includes(r.status),
   'W03_GMH_SCORE_RESULT_CONTRACT_STOP');
  return {...r,requestId:req.requestId,
-  sourceCommit:APPROVED_SOURCE_SHA,controlSha:env.GITHUB_SHA,
+  sourceCommit:req.candidateSourceSha,controlSha:env.GITHUB_SHA,
   runId:env.GITHUB_RUN_ID??null,
   providerCalls:0,d1Writes:0,publicWrites:0,taskChanges:0,
   rawBarExposure:false,retry:'NO_AUTOMATIC_REEXECUTION'};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- let result;
+ let result,sourceCommit=APPROVED_SOURCE_SHA;
  try{
   const env=process.env,event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
+  sourceCommit=authorize(event,env).candidateSourceSha;
   result=execute({event,env,
    sourceRoot:path.join(env.GITHUB_WORKSPACE??'','w03-gmh-source')});
  }catch(e){
   result={schema:OUTPUT,status:'STOP',requestId:null,
    code:/^W03_GMH_SCORE_[A-Z0-9_]{3,80}$/.test(e?.code??'')?
     e.code:'W03_GMH_SCORE_UNCLASSIFIED_STOP',
-   sourceCommit:APPROVED_SOURCE_SHA,providerCalls:0,d1Writes:0,publicWrites:0,
+   sourceCommit,providerCalls:0,d1Writes:0,publicWrites:0,
    taskChanges:0,rawBarExposure:false,retry:'NO_AUTOMATIC_REEXECUTION'};
  }
  try{
