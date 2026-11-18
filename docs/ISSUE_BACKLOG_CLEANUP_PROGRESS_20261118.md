@@ -4,7 +4,7 @@
 - 기준: [ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md](ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md) R1
 - 우선순위: **기존 Open 이슈 처리 → 분류되지 않은 원본/차단 증거 조사 → 신규 자동 종료 기능 개발**. 코드 개선을 기존 누적 정리의 선행 조건으로 만들지 않는다.
 - 관측 기준: 사용자 최초 화면 Open 1,198 / Closed 19(시점성 과거 수치). 1차 완료 뒤 Closed 48건을 조회했고, 이번 2차 배치 뒤 Closed **81건**을 조회했다. GitHub 검색 응답의 Open 쪽은 100건 제한이 있어 실시간 Open 총수는 미확정이다.
-- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **누적 136건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건). 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
+- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **누적 147건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건). 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
 
 ## 1. 1차에서 Closed한 28건
 
@@ -236,7 +236,36 @@
 - [#371](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/371)처럼 B급 전용 요약 `PASS`·`RESULT_UPLOAD: 2/2`가 있는 경우도 별도 결과 경로·실제 계약 및 현재 Issue 범위까지 확인해야 함
 - [#155](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/155) `PASS`지만 `records=0`·목표 미달 정정, 중앙 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 유지 등 기존 보류 유지
 
-## 5. 확인했지만 닫지 않은 사례
+## 5. 5차 작업 — 기존 Open 11건 추가 종료
+
+- 작업 대상: 이슈 #468~#495 중 **검증 완료된 일반 `pc-job` 10건**, Controller 유지보수 **1건**만 `Closed / completed`
+- 2026-11-18 KST 누적 직접 종료: **147건** = 28 + 33 + 43 + 32 + 11. 과거 최초 Open 1,198건 대비 직접 정리 약 12.3% (현재 Open 총수와 다름)
+- 정합성: 일반 요청의 `schema/requestId/operation`, Run `completed/success`, 원격 JSON/TXT 2/2, `PASS`·code·jobId 일치 확인. 정규 유지보수 #476은 `SUCCEEDED`·target=actual Controller SHA·보호 상태·Workflow 활성과 연계 #477 사후검사를 검증
+- GitHub Closed 생성일 분할 재조회: 11/02 47건, 11/03 53건, 11/04~06 54건, 11/07~19 14건, **총 Closed 168건**. 모든 조회 구간 100건 미만이고 이번 11건 전체 Closed 일치
+- GitHub 이슈 상태 외의 PC 실행·설치·SQLite/D1·예약·공개 게시 변경 0건. 원본 댓글·결과·실행 이력은 보존
+
+| 분류 | 이슈 | 원본 근거 |
+| --- | --- | --- |
+| `pc-job` | [#468](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/468) | [Run 42216452150](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42216452150) |
+| `pc-job` | [#469](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/469) | [Run 42217648660](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42217648660) |
+| `pc-job` | [#470](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/470) | [Run 42218229009](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42218229009) |
+| `pc-job` | [#477](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/477) | [Run 42222240510](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42222240510) |
+| `pc-job` | [#478](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/478) | [Run 42222496073](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42222496073) |
+| `pc-job` | [#479](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/479) | [Run 42222523422](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42222523422) |
+| `pc-job` | [#489](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/489) | [Run 42233076653](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42233076653) |
+| `pc-job` | [#492](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/492) | [Run 42235267871](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42235267871) |
+| `pc-job` | [#493](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/493) | [Run 42237932188](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42237932188) |
+| `pc-job` | [#495](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/495) | [Run 42240944697](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/42240944697) |
+| `pc-maintenance` | [#476](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/476) | 실제 Controller 유지보수 결과 JSON/TXT + [#477](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/477) 사후 PASS |
+
+### 다음 조사에서 유지할 보류 조건
+
+- [#504](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/504) 원격 결과 댓글 부재, [#521](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/521) `ALPACA_LEDGER_ABSENT/BLOCKED`는 이번 종료 대상에서 제외
+- [#227](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/227) backlog replay 안내는 대체 #228의 `runner-smoke` 결과만으로 원본 업무 목표 달성이 입증되지 않으므로 Open 유지
+- [#452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452) 6개 파일 존재 결과와 승인된 목표 SHA 정합성이 다를 수 있다는 원담당 기록을 우선 적용, Open 유지
+- 실제 기능 수집·게시·승인 대기는 담당자의 최종 효과 검증 없이 일반 단회 읽기 요청과 함께 일괄 종료하지 않음
+
+## 6. 확인했지만 닫지 않은 사례
 
 | Issue | 실제 확인 | 보존·후속 |
 | --- | --- | --- |
@@ -248,9 +277,9 @@
 | [#12](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/12) | `BLOCKED/OPERATION_NOT_ALLOWED` | 보호 거부 자체가 요구한 시험인지 원담당 인수 후 개별 판정 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | 공유 Controller 중앙 원장, 다수 조정 댓글 | 영속 조정 원장으로 유지. 일괄 Close 금지 |
 
-## 6. 다음 필수 작업
+## 7. 다음 필수 작업
 
-1. [#456](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/456) 이후 가장 오래된 Open의 정상 완료 단회 실행·정규 유지보수 증거를 우선 검증한다. B급 전용 수집·게시·등록은 고유 결과 계약과 실제 효과 확인 전 종료하지 않는다.
+1. [#502](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/502) 이후 오래된 Open `pc-job`/정규 유지보수 건을 원본 Run·결과 JSON/TXT로 대조해 정리한다. 다른 계약의 B급 수집·게시·등록은 해당 실제 효과 검증을 별도로 수행한다.
 2. 결과쌍 결손(#4/#6)은 기존 Run/댓글·결과 게시 저장소를 읽기 전용으로 대조. 한쪽이 없어도 실행을 재시도하거나 성공으로 위장하지 않는다.
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
