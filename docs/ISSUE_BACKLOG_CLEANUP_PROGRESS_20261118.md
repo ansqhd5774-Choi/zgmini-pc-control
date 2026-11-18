@@ -4,7 +4,7 @@
 - 기준: [ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md](ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md) R1
 - 우선순위: **기존 Open 이슈 처리 → 분류되지 않은 원본/차단 증거 조사 → 신규 자동 종료 기능 개발**. 코드 개선을 기존 누적 정리의 선행 조건으로 만들지 않는다.
 - 관측 기준: 사용자 최초 화면 Open 1,198 / Closed 19(시점성 과거 수치). 1차 완료 뒤 Closed 48건을 조회했고, 이번 2차 배치 뒤 Closed **81건**을 조회했다. GitHub 검색 응답의 Open 쪽은 100건 제한이 있어 실시간 Open 총수는 미확정이다.
-- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **누적 61건**(1차 28건 + 2차 33건). 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
+- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **누적 104건**(1차 28건 + 2차 33건 + 3차 43건). 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
 
 ## 1. 1차에서 Closed한 28건
 
@@ -106,7 +106,78 @@
 - 기존 [#4](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/4)·[#6](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/6) 한쪽 결과쌍 결손 및 #8/#9/#10/#12, 중앙 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)은 원래 보존 판정을 유지
 - **미확정은 PC 실행을 재실행하여 보정하지 않는다.** 원본 자료 재조회 또는 담당 인수가 필요한 범위만 추적
 
-## 3. 확인했지만 닫지 않은 사례
+## 3. 3차 작업 — 실증 완료 이슈 43건 추가 종료
+
+- 범위: 이슈 #102~#220의 원본 요청 중 **단회 `pc-job` 32건 / `pc-maintenance` Controller 유지보수 11건**만 이번에 Close
+- 누적 직접 종료: **104건** = 1차 28 + 2차 33 + 3차 43
+- 종료 전 요청 schema/requestId/operation/원본 댓글, 결과 JSON+TXT `2/2`, Actions Run 최종 성공(`pc-job`), 유지보수 target SHA=actual SHA와 보호 상태 유지(`pc-maintenance`), 최신 이슈 Open/라벨/댓글 일치 확인
+- 종료 후 GitHub `is:issue is:closed` 최신순 100건 목록에서 신규 **43건 전부 Closed 재조회 PASS**. 전체 Closed/Open 정확한 총계는 검색 조회 상한으로 미확정
+- PC/Controller/SQLite/D1/Task/예약 변경, 원본 재실행, 증거 삭제 0건. 이슈 Close는 **과거 단회 요청의 수명주기 종료**이며 기능 전체의 성공과 구분
+
+### 단회 진단·조회·사후 확인 32건
+
+| Issue | 검증한 Run |
+| --- | --- |
+| [#102](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/102) | [41604809756](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41604809756) |
+| [#107](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/107) | [41613295348](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41613295348) |
+| [#108](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/108) | [41613571172](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41613571172) |
+| [#109](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/109) | [41613644238](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41613644238) |
+| [#111](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/111) | [41616217717](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41616217717) |
+| [#113](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/113) | [41626464872](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41626464872) |
+| [#117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/117) | [41649418304](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41649418304) |
+| [#119](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/119) | [41650475079](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41650475079) |
+| [#121](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/121) | [41651973237](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41651973237) |
+| [#124](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/124) | [41657164974](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41657164974) |
+| [#125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/125) | [41658114507](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41658114507) |
+| [#131](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/131) | [41682083909](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41682083909) |
+| [#135](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/135) | [41685614927](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41685614927) |
+| [#137](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/137) | [41686142853](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41686142853) |
+| [#141](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/141) | [41688113905](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41688113905) |
+| [#142](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/142) | [41688297709](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41688297709) |
+| [#147](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/147) | [41691604831](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41691604831) |
+| [#150](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/150) | [41692089868](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41692089868) |
+| [#160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/160) | [41694567252](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41694567252) |
+| [#164](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/164) | [41696452596](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41696452596) |
+| [#174](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/174) | [41698893881](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41698893881) |
+| [#180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/180) | [41699968514](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41699968514) |
+| [#181](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/181) | [41700101034](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41700101034) |
+| [#186](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/186) | [41700816223](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41700816223) |
+| [#188](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/188) | [41701583808](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41701583808) |
+| [#190](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/190) | [41702404095](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41702404095) |
+| [#191](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/191) | [41702558766](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41702558766) |
+| [#198](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/198) | [41772898398](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41772898398) |
+| [#200](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/200) | [41773465574](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41773465574) |
+| [#201](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/201) | [41773483870](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41773483870) |
+| [#208](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/208) | [41774477791](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41774477791) |
+| [#214](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/214) | [41775433207](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/41775433207) |
+
+### Controller 유지보수 11건
+
+요청의 `ZGMINI_PC_MAINTENANCE_RESULT_V1` 원격 JSON/TXT 2/2에서 `SUCCEEDED/APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED`, 목표=실제 SHA, `protectedStateUnchanged=true`, `workflowEnabled=true`를 확인. 표의 사후 검사 Issue는 위의 별도 `pc-job` PASS를 검증한 건이다.
+
+| Maintenance Issue | 후속 사후검사 |
+| --- | --- |
+| [#123](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/123) | [#124](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/124) |
+| [#134](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/134) | [#135](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/135) |
+| [#140](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/140) | [#141](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/141) |
+| [#146](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/146) | [#147](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/147) |
+| [#159](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/159) | [#160](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/160) |
+| [#163](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/163) | [#164](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/164) |
+| [#171](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/171) | [#174](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/174) |
+| [#177](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/177) | [#180](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/180) |
+| [#197](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/197) | [#198](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/198) |
+| [#204](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/204) | [#208](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/208) |
+| [#213](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/213) | [#214](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/214) |
+
+### 미완료·추가 확인이 필요한 사례
+
+- [#103](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/103) `ALPACA_LEDGER_ABSENT`, [#122](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/122) `CONTROL_DIRTY`, [#136](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/136)·[#148](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/148) 소스 미검증, [#185](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/185) 메모리 부족, [#217](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/217) WAL 사전조건 등 실제 `BLOCKED`
+- [#106](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/106), [#118](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/118), [#120](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/120)의 과거 유지보수 `UNKNOWN`은 후속 복구 댓글과 별개로 원본의 정확한 최종 상태·인수 확인 필요
+- [#126](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/126) B 결과 불일치. [#129](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/129), [#145](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/145), [#182](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/182), [#192](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/192), [#194](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/194), [#210](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/210), [#215](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/215) 등 별도 수집·게시·등록 계약은 해당 결과 pair와 실제 효과를 개별 확인하기 전 보류
+- **반례 [#155](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/155):** 자동 댓글은 `PASS`지만 후속 원담당 댓글에 `records=0`·실제 일정 확보 미완료/`PARTIAL` 명시. 결과 외피 PASS만 보고 종료하면 안 됨
+- [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 중앙 공유 조정 원장은 계속 Open 유지
+
+## 4. 확인했지만 닫지 않은 사례
 
 | Issue | 실제 확인 | 보존·후속 |
 | --- | --- | --- |
@@ -118,9 +189,9 @@
 | [#12](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/12) | `BLOCKED/OPERATION_NOT_ALLOWED` | 보호 거부 자체가 요구한 시험인지 원담당 인수 후 개별 판정 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | 공유 Controller 중앙 원장, 다수 조정 댓글 | 영속 조정 원장으로 유지. 일괄 Close 금지 |
 
-## 4. 다음 필수 작업
+## 5. 다음 필수 작업
 
-1. [#102](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/102) 이후 **기존 Open 작은 번호 순서**로 이어서 검증. 사용 가능한 과거 결과는 재사용하고 단회 실행·유지보수 실제 성공의 JSON/TXT 2/2 및 효과를 대조해 닫는다.
+1. [#220](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/220) 이후 기존 Open 요청을 순서대로 검증한다. 별도 B급·수집·게시·등록 계약은 독립적인 실제 결과·효과 확인 전 종료하지 않는다.
 2. 결과쌍 결손(#4/#6)은 기존 Run/댓글·결과 게시 저장소를 읽기 전용으로 대조. 한쪽이 없어도 실행을 재시도하거나 성공으로 위장하지 않는다.
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
