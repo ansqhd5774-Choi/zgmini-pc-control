@@ -15,7 +15,7 @@ const fixture=(operation='census-qfr-margin-once')=>{
    publisherFiles:Object.fromEntries(spec.sourceFiles.map(name=>[name,'c'.repeat(64)])),
    approval:{grade:'B',scope:spec.approvalScope,actor:ACTOR,issueNumber:84},
    execution:{mode:'ONCE',maxAutomaticRetries:0,maxD1Keys:1,provider:spec.provider},
-   ...(operation==='bea-unit-profit-once'?{sourceSha256:'f'.repeat(64)}:{})};
+   ...(['bea-unit-profit-once','bea-manufacturing-profit-once'].includes(operation)?{sourceSha256:'f'.repeat(64)}:{})};
  const bytes=JSON.stringify(approval);
  const request={schema:REQUEST_SCHEMA,requestId:REQUEST_ID,
    chatId:'chat-12f7e7d2-2ed8-4efe-baca-e3624a84097c',operation,
@@ -28,9 +28,16 @@ const validate=(f,env=context)=>validatePublicationRequest(JSON.stringify(f.requ
 const admitted=f=>validatePublicationApproval(validate(f),f.bytes);
 const repin=f=>{f.bytes=JSON.stringify(f.approval);f.request.approvalManifestSha256=sha256(f.bytes);};
 
-test('only BEA and QFR are admitted with fixed scripts, explicit write flags and independent keys',()=>{
+test('only fixed BEA Unit, BEA manufacturing and QFR sidecars are admitted with distinct keys',()=>{
  const a=admitted(fixture('bea-unit-profit-once'));
  const b=admitted(fixture('census-qfr-margin-once'));
+ const m=admitted(fixture('bea-manufacturing-profit-once'));
+ assert.deepEqual(m.invocation.flags,['--apply','--confirm-bea-manufacturing-d1-write']);
+ assert.equal(m.invocation.snapshotKey,'detail:earnings-bea-manufacturing-profit:r1');
+ assert.equal(m.invocation.sourceSha256,'f'.repeat(64));
+ assert.notEqual(m.invocation.snapshotKey,a.invocation.snapshotKey);
+ assert.notEqual(m.invocation.snapshotKey,b.invocation.snapshotKey);
+ assert.match(m.invocation.script,/EARNINGS_BEA_MFG_PROFIT_R6_D1_ONE_SHOT\.mjs$/);
  assert.deepEqual(a.invocation.flags,['--apply','--confirm-bea-unit-d1-write']);
  assert.deepEqual(b.invocation.flags,['--apply','--confirm-census-qfr-d1-write']);
  assert.notEqual(a.invocation.snapshotKey,b.invocation.snapshotKey);
@@ -67,7 +74,7 @@ test('wrong target key, source repository, source SHA, grade and operation scope
   assert.throws(()=>admitted(f),/PUBLICATION_B_APPROVAL_MISSING/);}
 });
 test('BEA library files and fixed QFR import graph require exact approved bytes',()=>{
- for(const operation of ['bea-unit-profit-once','census-qfr-margin-once']){
+ for(const operation of ['bea-unit-profit-once','census-qfr-margin-once','bea-manufacturing-profit-once']){
   const v=admitted(fixture(operation));
   assert.equal(validatePublisherFileDigests(v,v.approval.publisherFiles),true);
   const file=Object.keys(v.approval.publisherFiles).find(x=>x.startsWith('lib/'))
@@ -142,4 +149,22 @@ test('BEA source SHA is immutable manifest-pinned while QFR rejects unexpected s
  const unexpected=fixture('census-qfr-margin-once');
  unexpected.approval.sourceSha256='d'.repeat(64);repin(unexpected);
  assert.throws(()=>admitted(unexpected),/PUBLICATION_MANIFEST_FIELDS_INVALID/);
+});
+
+
+test('BEA manufacturing requires a separately pinned CSV SHA, bounded source files and its own B effect',()=>{
+ const m=fixture('bea-manufacturing-profit-once');
+ const v=admitted(m);
+ assert.equal(v.approval.approval.scope,'BEA_MANUFACTURING_PROFIT_SINGLE_KEY_D1_ONCE');
+ assert.equal(v.approval.execution.provider,'STORED_CSV_ONLY');
+ for(const edit of [x=>delete x.sourceSha256,x=>x.sourceSha256='unverified',
+   x=>x.approval.scope='CENSUS_QFR_MARGIN_SINGLE_KEY_D1_ONCE',
+   x=>x.execution.provider='STORED_SQLITE_ONLY',
+   x=>x.publisherFiles['scripts/pc-writer/EARNINGS_BEA_MFG_PROFIT_R6_D1_ONE_SHOT.mjs']='bad']){
+  const copy=fixture('bea-manufacturing-profit-once');edit(copy.approval);repin(copy);
+  assert.throws(()=>admitted(copy),/PUBLICATION_(MANIFEST_FIELDS_INVALID|BEA_SOURCE_PIN_INVALID|B_APPROVAL_MISSING|EXECUTION_SCOPE_INVALID|SOURCE_DIGEST_INVALID)/);
+ }
+ const r=fixture('bea-manufacturing-profit-once');
+ r.request.operation='census-qfr-margin-once';
+ assert.throws(()=>admitted(r),/PUBLICATION_MANIFEST_SCOPE_MISMATCH/);
 });
