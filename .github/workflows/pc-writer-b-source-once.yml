@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.sha }}
           path: writer-b-control
           # R181 and W01 Census verify reviewed ancestors; generic Writer B stays shallow.
-          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || '1' }}
+          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || (github.event.issue.title == 'w03-gmh-seven-private-score-once' && '64' || '1') }}
           persist-credentials: false
       - name: W01 Census #28 API-only approved manual B transaction
         if: github.event.issue.title == 'w01-census-m3-api-once'
