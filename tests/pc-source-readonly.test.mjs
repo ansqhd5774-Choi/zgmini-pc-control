@@ -23,7 +23,7 @@ const fixture=t=>{
 
 test('read-only Core task trace resolves Git HEAD, dirty names and required file hashes',t=>{
  const f=fixture(t),read=[];const git=(cwd,args)=>{
-  assert.equal(cwd,path.join(f.root,'projects/pilot'));
+  assert.equal(cwd.toLowerCase(),fs.realpathSync.native(path.join(f.root,'projects/pilot')).toLowerCase());
   assert.ok([['rev-parse','HEAD'],['status','--porcelain','--untracked-files=no']].some(x=>JSON.stringify(x)===JSON.stringify(args)));
   return args[0]==='rev-parse'?'a'.repeat(40)+'\n':' M scripts/pc-writer/run-local.mjs\n';
  };
@@ -124,7 +124,7 @@ test('fixed historical checkout reports HEAD and Writer agreement as candidate o
  const result=inspectPcSource({dataRoot:f.dataRoot,coreTaskXml:f.task,
   git:(cwd,args)=>{
    seen.push(args);
-   assert.equal(cwd,path.join(f.root,p));
+   assert.equal(cwd.toLowerCase(),fs.realpathSync.native(path.join(f.root,p)).toLowerCase());
    return args[0]==='rev-parse'?sha+'\n':'';
   }});
  assert.equal(result.status,'PASS');
