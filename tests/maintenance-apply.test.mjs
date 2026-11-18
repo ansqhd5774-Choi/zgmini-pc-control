@@ -3,8 +3,10 @@ import test from 'node:test';
 import './maintenance-backlog-request.test.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
-import {confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
+import {readControllerUpdateArtifacts,confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
 import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
 
@@ -521,4 +523,104 @@ test('workflow drift while draining aborts before backup or stopping Supervisor'
  assert.equal(f.events.includes('stop'),false);
  assert.equal(f.events.includes('restore'),false);
  assert.equal(f.installed,previous);
+});
+
+function stageArtifactFixture(){
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-stage-readonly-'));
+ const backupBase=path.join(dir,'backups'),backlogBase=path.join(dir,'backlog'),
+  leaseBase=path.join(dir,'leases');
+ for(const p of [backupBase,backlogBase,leaseBase])fs.mkdirSync(p);
+ const requestId='pc-update-staged-test-0001';
+ const opts={backupBase,backlogBase,leaseBase};
+ const backup=path.join(backupBase,'controller-update-'+requestId);
+ const backlog=path.join(backlogBase,requestId+'.json');
+ const lease=path.join(leaseBase,'controller-install');
+ const inspect=()=>readControllerUpdateArtifacts(requestId,opts);
+ const cleanup=()=>fs.rmSync(dir,{recursive:true,force:true});
+ return {dir,requestId,opts,backup,backlog,lease,inspect,cleanup};
+}
+test('stage artifact inspection is read-only, namespaced and does not infer installation',()=>{
+ const f=stageArtifactFixture();
+ try{
+  const result=f.inspect();
+  assert.equal(result.status,'OBSERVED');
+  assert.equal(result.artifacts.stageRoot,'ABSENT');
+  assert.equal(result.backlog.file,'ABSENT');
+  assert.equal(result.lease.directory,'ABSENT');
+  assert.equal(result.operationalWrites,0);
+  assert.equal(result.recoveryComplete,false);
+  assert.equal(result.installSuccessProven,false);
+  assert.equal(fs.readdirSync(f.opts.backupBase).length,0);
+  assert.throws(()=>readControllerUpdateArtifacts('../not-a-request',f.opts),
+   {code:'MAINTENANCE_REQUEST_ID'});
+ }finally{f.cleanup();}
+});
+test('STAGED partial intake journal and matching recovery owner are summarized without private bytes',()=>{
+ const f=stageArtifactFixture();
+ try{
+  fs.mkdirSync(path.join(f.backup,'stage'),{recursive:true});
+  fs.writeFileSync(path.join(f.backup,'stage','host.json'),'private host contents');
+  const ledger={schema:'ZGMINI_PC_BACKLOG_V1',requestId:f.requestId,
+   pausedAt:'2026-11-18T04:18:00Z',resumedAt:null,
+   windows:[{pausedAt:'2026-11-18T04:18:00Z',resumedAt:null}],replays:{}};
+  fs.writeFileSync(f.backlog,JSON.stringify(ledger));
+  fs.mkdirSync(f.lease);
+  const nonce='01234567-89ab-cdef-0123-456789abcdef';
+  fs.writeFileSync(path.join(f.lease,'owner.json'),JSON.stringify({pid:98765,nonce}));
+  fs.writeFileSync(path.join(f.lease,'RECOVERY_REQUIRED.json'),
+   JSON.stringify({requestOwnerPid:98765,nonce}));
+  const result=f.inspect();
+  assert.equal(result.status,'OBSERVED');
+  assert.equal(result.artifacts.stageRoot,'PRESENT');
+  assert.equal(result.artifacts.snapshotRoot,'ABSENT');
+  assert.equal(result.artifacts.stagedHost,'PRESENT');
+  assert.equal(result.backlog.openWindows,1);
+  assert.equal(result.lease.ownerMarkerMatch,true);
+  const txt=JSON.stringify(result);
+  assert.equal(txt.includes(nonce),false);
+  assert.equal(txt.includes('98765'),false);
+  assert.equal(txt.includes('private host contents'),false);
+  assert.equal(txt.includes(f.dir),false);
+  const classified=readMaintenanceRecoveryStatus(f.requestId,{
+   readInstalled:()=>previous,
+   readLedger:()=>({status:'BLOCKED',firstFail:'STAGED'}),
+   readLock:()=>({held:false}),
+   readArtifacts:f.inspect,
+  });
+  assert.equal(classified.guidance.state,'RECOVERY_REVIEW_REQUIRED');
+  assert.equal(classified.guidance.blockScope,'SHARED_INSTALL_ONLY');
+ }finally{f.cleanup();}
+});
+test('staged artifacts with invalid or mismatched local records fail closed',()=>{
+ const f=stageArtifactFixture();
+ try{
+  fs.mkdirSync(f.lease);
+  fs.writeFileSync(path.join(f.lease,'RECOVERY_REQUIRED.json'),'{}');
+  assert.equal(f.inspect().status,'UNVERIFIED');
+  fs.writeFileSync(path.join(f.lease,'owner.json'),JSON.stringify({
+   pid:33,nonce:'01234567-89ab-cdef-0123-456789abcdef'}));
+  assert.equal(f.inspect().lease.ownerMarkerMatch,false);
+  fs.writeFileSync(f.backlog,'{not-json');
+  assert.equal(f.inspect().backlog.file,'UNVERIFIED');
+  const classified=readMaintenanceRecoveryStatus(f.requestId,{
+   readInstalled:()=>previous,readLedger:()=>({status:'BLOCKED',firstFail:'STAGED'}),
+   readLock:()=>({held:false}),readArtifacts:f.inspect});
+  assert.equal(classified.artifactReadbackCode,'UPDATE_ARTIFACTS_UNVERIFIED');
+  assert.equal(classified.guidance.state,'STATE_UNKNOWN');
+ }finally{f.cleanup();}
+});
+test('stage path type corruption cannot be treated as absent or completed',()=>{
+ const f=stageArtifactFixture();
+ try{
+  fs.mkdirSync(f.backup);
+  fs.writeFileSync(path.join(f.backup,'stage'),'not a directory');
+  const result=f.inspect();
+  assert.equal(result.artifacts.stageRoot,'UNSAFE');
+  assert.equal(result.status,'UNVERIFIED');
+  fs.rmSync(path.join(f.backup,'stage'));
+  const backlog={schema:'ZGMINI_PC_BACKLOG_V1',requestId:f.requestId,
+   windows:[{pausedAt:'2026-11-18T04:18:00Z',resumedAt:'2026-11-18T04:17:00Z'}],replays:{}};
+  fs.writeFileSync(f.backlog,JSON.stringify(backlog));
+  assert.equal(f.inspect().backlog.file,'UNVERIFIED');
+ }finally{f.cleanup();}
 });
