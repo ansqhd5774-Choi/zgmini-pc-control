@@ -31,9 +31,26 @@ export function verifyMaintenanceManifest(installed,rootDir,readBytes=fs.readFil
 }
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});};
 const json=p=>JSON.parse(fs.readFileSync(p,'utf8'));
+// Operator-only, bounded evidence labels: never return raw paths, source bytes,
+// Git/GitHub stderr or credentials when an inspect step fails.
+export function inspectEvidenceFile(file,label,readFile=fs.readFileSync){
+ need(/^[A-Z][A-Z0-9_]+$/.test(label),'RECOVERY_INVALID_EVIDENCE_LABEL');
+ let bytes;
+ try{bytes=readFile(file);}catch(e){
+  need(false,label+(e?.code==='ENOENT'?'_MISSING':'_UNREADABLE'));
+ }
+ let value;
+ try{value=JSON.parse(bytes);}catch{need(false,label+'_INVALID_JSON');}
+ need(value!==null&&typeof value==='object'&&!Array.isArray(value),label+'_INVALID_JSON');
+ return {bytes,value};
+}
+const inspectStep=(label,fn)=>{try{return fn();}catch(e){
+ if(typeof e?.code==='string'&&/^(RECOVERY_|ROLLBACK_)[A-Z0-9_]+$/.test(e.code))throw e;
+ need(false,label);
+}};
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
 const put=(p,v)=>fs.writeFileSync(p,JSON.stringify(v,null,2)+'\n',{flag:'wx',mode:0o600});
-const github=route=>JSON.parse(execFileSync(gh,['api',`repos/${repository}/${route}`],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:3e6}));
+const github=route=>inspectStep('RECOVERY_GITHUB_QUERY_UNAVAILABLE',()=>JSON.parse(execFileSync(gh,['api',`repos/${repository}/${route}`],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:3e6})));
 
 export function classifyRecovery(s){
  const checks={
@@ -99,16 +116,16 @@ export function verifyOperatingRunners(rows){
 
 function observe(requestId){
  const ledgerFile=path.join(root,'ledger',requestId+'.json');
- const ledgerBytes=fs.readFileSync(ledgerFile),ledger=JSON.parse(ledgerBytes);
+ const {bytes:ledgerBytes,value:ledger}=inspectEvidenceFile(ledgerFile,'RECOVERY_REQUEST_LEDGER');
  const dir=path.join(root,'leases/controller-install');
- const ownerBytes=fs.readFileSync(path.join(dir,'owner.json')),markerBytes=fs.readFileSync(path.join(dir,'RECOVERY_REQUIRED.json'));
- const owner=JSON.parse(ownerBytes),marker=JSON.parse(markerBytes);
- const host=json(path.join(control,'host.json'));
+ const {bytes:ownerBytes,value:owner}=inspectEvidenceFile(path.join(dir,'owner.json'),'RECOVERY_INSTALL_OWNER');
+ const {bytes:markerBytes,value:marker}=inspectEvidenceFile(path.join(dir,'RECOVERY_REQUIRED.json'),'RECOVERY_INSTALL_MARKER');
+ const host=inspectEvidenceFile(path.join(control,'host.json'),'RECOVERY_CONTROLLER_HOST').value;
  const validFile=p=>/^(controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(p);
  const controllerVerified=/^[a-f0-9]{40}$/.test(host.controllerSourceSha??'')&&Object.keys(host.controllerFiles??{}).length>=5&&
-  Object.entries(host.controllerFiles).every(([p,h])=>validFile(p)&&/^[a-f0-9]{64}$/.test(h)&&digest(fs.readFileSync(path.join(control,p)))===h);
- const installed=json(path.join(root,'MAINTENANCE_INSTALL.json'));
- const maintenanceVerified=verifyMaintenanceManifest(installed,root);
+  Object.entries(host.controllerFiles).every(([p,h])=>validFile(p)&&/^[a-f0-9]{64}$/.test(h)&&inspectStep('RECOVERY_CONTROLLER_FILES_UNREADABLE',()=>digest(fs.readFileSync(path.join(control,p)))===h));
+ const installed=inspectEvidenceFile(path.join(root,'MAINTENANCE_INSTALL.json'),'RECOVERY_MAINTENANCE_MANIFEST').value;
+ const maintenanceVerified=inspectStep('RECOVERY_MAINTENANCE_FILES_UNREADABLE',()=>verifyMaintenanceManifest(installed,root));
  const issue=github('issues/'+ledger.issueNumber);let body;try{body=JSON.parse(issue.body);}catch{}
  const identityVerified=ledger.requestId===requestId&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&
   /^[0-9a-f-]{36}$/.test(owner.nonce??'')&&marker.nonce===owner.nonce&&marker.requestOwnerPid===owner.pid&&
@@ -124,7 +141,7 @@ function observe(requestId){
   backlogExists:fs.existsSync(path.join(root,'backlog',requestId+'.json')),
   workflow:github('actions/workflows/pc-job.yml').state,
   ...operatingRunners,
-  otherLeaseCount:fs.readdirSync(path.join(control,'leases')).filter(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-')).length};
+  otherLeaseCount:inspectStep('RECOVERY_CONTROL_LEASES_UNREADABLE',()=>fs.readdirSync(path.join(control,'leases')).filter(x=>x!=='supervisor'&&!x.startsWith('supervisor.dead-')).length)};
  return {state,ownerBytes,markerBytes,ledgerBytes};
 }
 
@@ -133,10 +150,11 @@ export function main(args=process.argv.slice(2)){
  need(args.length===5&&['inspect','abort-untouched'].includes(args[0])&&args[1]==='--request-id'&&args[3]==='--source-sha', 'RECOVERY_USAGE');
  const [mode,,id,,source]=args;
  need(/^pc-[a-z0-9-]{8,76}$/.test(id)&&/^[a-f0-9]{40}$/.test(source),'RECOVERY_IDENTITY_FORMAT');
- const g=a=>execFileSync('git',a,{cwd:repo,windowsHide:true,maxBuffer:4e6});
- g(['merge-base','--is-ancestor',source,'HEAD']);
- const pinned=g(['show',source+':tools/maintenance-recovery.mjs']);
- need(digest(pinned)===digest(fs.readFileSync(fileURLToPath(import.meta.url))),'RECOVERY_SOURCE_DRIFT');
+ const g=(args,label)=>inspectStep(label,()=>execFileSync('git',args,{cwd:repo,windowsHide:true,maxBuffer:4e6}));
+ g(['merge-base','--is-ancestor',source,'HEAD'],'RECOVERY_SOURCE_ANCESTRY_UNVERIFIED');
+ const pinned=g(['show',source+':tools/maintenance-recovery.mjs'],'RECOVERY_PINNED_TOOL_UNAVAILABLE');
+ const toolBytes=inspectStep('RECOVERY_EXECUTABLE_UNREADABLE',()=>fs.readFileSync(fileURLToPath(import.meta.url)));
+ need(digest(pinned)===digest(toolBytes),'RECOVERY_SOURCE_DRIFT');
  if(!fs.existsSync(path.join(root,'leases/controller-install'))){
   const result={schema:'ZGMINI_PC_RECOVERY_RESULT_V1',requestId:id,sourceSha:source,
    status:'NO_ACTIVE_INSTALL_LEASE',code:'REUSE_EXISTING_RECOVERY_EVIDENCE',changed:false,
@@ -150,9 +168,9 @@ export function main(args=process.argv.slice(2)){
  if(mode==='abort-untouched'){
   need(decision.status==='ABORT_UNTOUCHED_ELIGIBLE','RECOVERY_NOT_ELIGIBLE');
   const rel='approvals/maintenance-recoveries/'+id+'.json';
-  const raw=fs.readFileSync(path.join(repo,rel));
-  need(digest(g(['show','HEAD:'+rel]))===digest(raw),'RECOVERY_APPROVAL_UNCOMMITTED');
-  const approval=JSON.parse(raw);
+  const raw=inspectStep('RECOVERY_APPROVAL_UNREADABLE',()=>fs.readFileSync(path.join(repo,rel)));
+  need(digest(g(['show','HEAD:'+rel],'RECOVERY_APPROVAL_SOURCE_UNAVAILABLE'))===digest(raw),'RECOVERY_APPROVAL_UNCOMMITTED');
+  const approval=inspectStep('RECOVERY_APPROVAL_INVALID_JSON',()=>JSON.parse(raw));
   need(approval.schema==='ZGMINI_PC_RECOVERY_APPROVAL_V1'&&approval.approved===true&&
    approval.operation==='ABORT_UNTOUCHED'&&approval.requestId===id&&approval.sourceSha===source&&
    approval.issueNumber===before.state.ledger.issueNumber&&approval.installedSha===before.state.actualSha&&
