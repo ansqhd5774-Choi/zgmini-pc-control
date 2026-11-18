@@ -61,9 +61,9 @@ function inspectArchive(rawDir,name){
 }
 export function inspectInflationCensusM3ArchivedHeaders(dataRoot,{strictPlatform=true}={}){
   if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot)||
-     (strictPlatform&&process.platform!=='win32')||
-     (process.platform==='win32'&&path.win32.normalize(dataRoot).toLowerCase()!==
-       path.win32.normalize(DATA_ROOT).toLowerCase()))
+     (strictPlatform&&(process.platform!=='win32'||
+       path.win32.normalize(dataRoot).toLowerCase()!==
+       path.win32.normalize(DATA_ROOT).toLowerCase())))
     return stop('W01_CENSUS_ARCHIVE_ROOT_DENIED');
   try{
     const root=safeDirectory(dataRoot);
