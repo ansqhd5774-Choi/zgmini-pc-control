@@ -1305,7 +1305,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     need(seats!==null,'RUNNER_SET_DRIFT');
     const busy=seats.some(x=>x.busy),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
     const pending=['in_progress','queued','waiting'].map(status=>github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0).reduce((a,b)=>a+b,0);
-    if(!busy&&!leases.length&&!pending){quiet++;if(quiet>=2)return;}else quiet=0;
+    if(!busy&&!leases.length&&!pending){
+     quiet++;
+     if(quiet>=2){
+      // Verify GitHub intake is still paused before backup and supervisor stop.
+      // A drift discovered here remains before those runtime-mutation steps.
+      need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+       'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN');
+      return;
+     }
+    }else quiet=0;
     await wait(3000);
    }
    throw Object.assign(Error('DRAIN_WAIT_TIMEOUT'),{code:'DRAIN_WAIT_TIMEOUT'});
@@ -1320,8 +1329,6 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    writeJson(path.join(backupRoot,'PROTECTED_BEFORE.json'),protectedBefore);
   },
   stopOwnSupervisor:async()=>{
-   need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
-    'WORKFLOW_STATE_DRIFT_BEFORE_SUPERVISOR_STOP');
    const current=readOwner();need(current.owner.pid===oldOwner.owner.pid&&current.owner.nonce===oldOwner.owner.nonce,'SUPERVISOR_OWNER_CHANGED');
    verifyIndependent(current.owner.pid);
    // Read-only controls are checked again just before stopping the dedicated tree.
