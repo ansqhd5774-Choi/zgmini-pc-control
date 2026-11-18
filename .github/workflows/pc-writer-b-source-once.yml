@@ -233,12 +233,12 @@ jobs:
       - name: Read W03 R47 private score pair SHA and current source manifests without raw prices
         if: github.event.issue.title == 'w03-r47-private-readback-once'
         id: w03r47privateread
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-r47-private-readback.mjs"'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r47-private-readback.mjs"'
       - name: Create-only redacted W03 R47 private pair metadata JSON TXT and Issue readback
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r47-private-readback-once'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-r47-private-readback-report.mjs"'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r47-private-readback-report.mjs"'
       - name: Create-only sanitized result and originating Issue comment
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-source-install'
         env:
