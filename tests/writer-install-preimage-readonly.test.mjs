@@ -75,7 +75,7 @@ test('symbolic links or missing files never yield guessed preimage',()=>{
    // Isolated Windows runners may not have symlink creation privileges.
    // Simulate the same lstat boundary without opening a real outside file.
    fileSystem={...fs,lstatSync(target){
-    if(path.resolve(target).toLowerCase()===path.resolve(file).toLowerCase())
+    if(path.basename(String(target)).toLowerCase()===path.basename(file).toLowerCase())
      return {isFile:()=>true,isSymbolicLink:()=>true,size:12};
     return fs.lstatSync(target);
    }};
