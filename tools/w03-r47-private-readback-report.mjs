@@ -25,7 +25,12 @@ export function sanitize(raw,req,env){
  const b=base(req,env);
  if(raw?.schema!==RESULT_SCHEMA||raw.requestId!==req.requestId||
   raw.controlSha!==env.GITHUB_SHA||!SHA40.test(raw.controlSha??'')||
-  !STATUS.has(raw.status)||raw.status!==raw.code)return b;
+  !STATUS.has(raw.status)||!((raw.status===raw.code&&
+   ['PRIVATE_RESULT_PAIR_AND_MANIFEST_SHA_VERIFIED',
+    'PRIVATE_RESULT_SOURCE_MANIFEST_CHANGED'].includes(raw.status))||
+   (raw.status==='NO_PRIVATE_SHADOW'&&raw.code==='R47_PRIVATE_SHADOW_NOT_FOUND')||
+   (raw.status==='STOP'&&/^W03_R47_READBACK_[A-Z0-9_]+$/.test(raw.code??''))))
+  return b;
  const a=raw.metadata;
  if(a?.schema!=='ZGMINI_W03_R47_PRIVATE_SHADOW_METADATA_V1'||
   a.status!==raw.status||a.code!==raw.code||
