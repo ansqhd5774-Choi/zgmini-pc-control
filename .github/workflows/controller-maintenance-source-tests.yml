@@ -20,6 +20,8 @@ on:
       - 'controller/inflation-event129-b-proof.mjs'
       - 'controller/inflation-vbs-b-proof.mjs'
       - 'controller/operations.mjs'
+      - 'controller/earnings-bea-mfg-archive-readonly.mjs'
+      - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
       - 'tests/theme-l7-runtime-readonly.test.mjs'
@@ -162,6 +164,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
       - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
         run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
+      - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
+        run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs
       - name: Verify immutable W03 R179 B approval SHA and zero-publication rights
         run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-approval.test.mjs
       - name: Verify W03 exact R179 seven-versus-ten B source contract and isolated transaction simulation
