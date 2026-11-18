@@ -21,15 +21,15 @@ const REQUIRED_FILES=Object.freeze({
  'worker/theme-etf-only-public.mjs':
   'bb3f56c5f3a62b7dfa4aae19a1b18381611e6335',
 });
-const root='E:\ZGmini\data',node='E:\ZGmini\runtime\node.exe';
+const root='E:\\ZGmini\\data',node='E:\\ZGmini\\runtime\\node.exe';
 const fail=c=>{throw Object.assign(Error(c),{code:c});};
 const need=(x,c)=>{if(!x)fail(c);};
 const HEX40=/^[a-f0-9]{40}$/;
 const HEX64=/^[a-f0-9]{64}$/;
 const gitBlob=b=>createHash('sha1').update('blob '+b.length+'\0').update(b).digest('hex');
 function exactHead(sourceRoot){
- const git=['C:\Program Files\Git\cmd\git.exe',
-  'C:\Program Files\Git\bin\git.exe'].find(x=>fs.existsSync(x));
+ const git=['C:\\Program Files\\Git\\cmd\\git.exe',
+  'C:\\Program Files\\Git\\bin\\git.exe'].find(x=>fs.existsSync(x));
  need(git,'W03_GMH_SCORE_V2_GIT_MISSING_STOP');
  const r=spawnSync(git,['-C',sourceRoot,'rev-parse','HEAD'],{
   shell:false,windowsHide:true,timeout:15000,encoding:'utf8'});
@@ -67,7 +67,7 @@ export function launchSavedScore(script,{platform=process.platform,
  const r=spawn(node,[script,'--pc-private-score-once'],{
   cwd:path.dirname(script),shell:false,windowsHide:true,
   timeout:420000,maxBuffer:6000,encoding:'utf8',
-  env:{SystemRoot:process.env.SystemRoot??'C:\Windows',
+  env:{SystemRoot:process.env.SystemRoot??'C:\\Windows',
    PATH:process.env.PATH??'',ZGMINI_DATA_ROOT:root}
  });
  let value;
