@@ -361,8 +361,14 @@ export function summarize2094StageStatus(observed){
   held:observed.installLock?.held===true?true:observed.installLock?.held===false?false:null};
  const verified=a.status==='OBSERVED'&&observed.artifactReadbackCode===null
   &&Object.values(backup).every(v=>!['UNKNOWN','UNSAFE'].includes(v))
-  &&backlog.file!=='UNKNOWN'&&lease.directory!=='UNKNOWN'
-  &&lease.held!==null;
+  &&![backlog.file,lease.directory,lease.ownerFile,lease.recoveryMarker]
+   .some(v=>['UNKNOWN','UNSAFE'].includes(v))
+  &&(backlog.file!=='PRESENT'||backlog.windows!==null
+    &&backlog.openWindows!==null&&backlog.replayCount!==null
+    &&backlog.openWindows<=backlog.windows)
+  &&lease.held!==null
+  &&(lease.directory!=='PRESENT'||lease.ownerFile==='PRESENT')
+  &&(lease.recoveryMarker!=='PRESENT'||lease.ownerMarkerMatch===true);
  return {schema:'ZGMINI_C2094_STAGE_A_V1',
   status:verified?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
   code:verified?'C2094_PINNED_ARTIFACTS_OBSERVED':'C2094_ARTIFACTS_UNVERIFIED',
