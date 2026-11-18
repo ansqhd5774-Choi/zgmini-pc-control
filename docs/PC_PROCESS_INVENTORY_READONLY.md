@@ -13,7 +13,8 @@
 ## 실측 필드와 정보 최소화
 - Windows 표준 CIM 읽기 전용 Win32_Process: **전체 프로세스 개수 + 지정한 프로세스 이름별 전체 집계(processCounts) + 실행 프로세스 이름/PID/PPID/session/Working Set MiB(최대 60 상세)**. 상세 60개는 Runner.Listener/Worker → WScript → Node → PowerShell → CMD 순 우선한다. 전체 지정 프로세스가 60개를 넘더라도 이름별 전체 집계는 보존한다.
 - 동일 CIM의 ZGMINI/Actions Runner 관련 서비스명·상태·시작 형태(최대 24).
-- 이름이 ZGMINI로 시작하는 예약 작업 이름·상태(최대 48). 명령·인수·트리거 원문은 읽거나 게시하지 않는다.
+- 이름이 ZGMINI로 시작하는 예약 작업 이름·상태(최대 48). 명령·인수·트리거 원문을 게시하지 않는다.
+- #1018 기존 공급자 제거 판정에 필요한 고정 `ZGMINI-PC-MarketParquet-ETF` Task XML의 로컬 해시, Enabled 상태, 정확 단일 E: 데이터/프로젝트 launcher 파일의 SHA256·basename·실행형식만 `marketParquetTaskSource`에 추가한다. 원본 XML·명령행·인수·비밀·파일 바이트는 반환하지 않는다. 경로/작업이 모호하면 `STATE_UNKNOWN`. Task 수정·정지·재설정·Provider 접근은 절대 수행하지 않는다.
 - 사용자 Startup 폴더에서 ZGMINI로 시작하는 **파일 이름만**(최대 24). 파일 본문, 전체 경로, 계정명은 반환하지 않는다.
 - 명령줄, 환경변수, 프로세스 토큰, 시리얼번호, IP/MAC, 사용자 개인정보, 계정 식별자, 인증·원자료·DB는 조회·전송하지 않는다.
 - PowerShell/CIM에서 접근 실패 시 PARTIAL과 안전 코드만 반환한다. 실패 stderr 원문을 로그/결과로 내보내지 않는다.
