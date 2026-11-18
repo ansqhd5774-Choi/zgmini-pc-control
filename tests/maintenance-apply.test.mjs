@@ -624,3 +624,20 @@ test('stage path type corruption cannot be treated as absent or completed',()=>{
   assert.equal(f.inspect().backlog.file,'UNVERIFIED');
  }finally{f.cleanup();}
 });
+
+test('terminal STAGED artifact remains review-required even if install lease is absent',()=>{
+ const f=stageArtifactFixture();
+ try{
+  fs.mkdirSync(path.join(f.backup,'stage'),{recursive:true});
+  const artifacts=f.inspect();
+  assert.equal(artifacts.status,'OBSERVED');
+  const result=readMaintenanceRecoveryStatus(f.requestId,{
+   readInstalled:()=>previous,
+   readLedger:()=>({status:'BLOCKED',firstFail:'STAGED',installedShaBefore:previous}),
+   readLock:()=>({held:false}),
+   readArtifacts:()=>artifacts});
+  assert.equal(result.guidance.state,'STAGED_EVIDENCE_REVIEW_REQUIRED');
+  assert.equal(result.guidance.blockScope,'SHARED_INSTALL_ONLY');
+  assert.equal(result.guidance.next,'PRESERVE_STAGE_VERIFY_BACKLOG_INSTALL_LEASE_AND_RUNTIME');
+ }finally{f.cleanup();}
+});
