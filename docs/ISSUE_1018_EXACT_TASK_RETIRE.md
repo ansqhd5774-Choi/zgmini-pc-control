@@ -16,3 +16,5 @@ Microsoft 공식 API: https://learn.microsoft.com/en-us/windows/win32/taskschd/r
 이미 종료된 #2174가 남긴 잠금 한 건만 새 명세의 recoverPrewriteRequestId로 지정한다. 고정 run completed/failure, 정확 원격 PREFLIGHT_STOP 영수증 SHA, 현재 Task/GMH/진입점 원본 SHA 불변, 이전 백업 SHA, shared owner UUID를 독립 확인한 후 NTFS hardlink create-only로 보관하고 같은 파일 ID인 잠금만 해제한다. 다른 요청/실행중/운영 변경 불명확 상태에는 적용하지 않는다. 새 요청으로 정규 단회 중지를 이어간다.
 
 #2179는 Actions run GET 권한 부재로 복구 전 중단됐다. 기존 #2174의 완료된 첫 실행과 create-only PREFLIGHT_STOP 영수증은 이미 검증된 사실이므로 종료 상태를 매번 조회하는 선행조건을 제거한다. immutable 원문 SHA와 일회성 원장·원본 Task/백업/owner 재조회는 유지하며 Actions 권한을 확대하지 않는다. 새 ID만 사용한다.
+
+#2182는 실제 operator/의존 파일 변경 없이 다른 W03 읽기 작업의 공용 Workflow 추가까지 코드 drift로 처리하여 preflight 중단됐다. 실행 효과와 관계없는 전체 Workflow 비교를 제거하고 operator·reporter·고정 source reader·claim helper만 고정한다. 현재 Workflow의 Owner/event/단회/고정 operation admission은 유지한다. 다른 담당자의 독립 작업 때문에 같은 원본 Task 중지가 다시 막히지 않도록 하는 범위 보완이다.
