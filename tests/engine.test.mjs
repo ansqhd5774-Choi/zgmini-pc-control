@@ -34,7 +34,8 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
  const c=fixture();let probes=0;
  const retiredTaskEvidence=()=>{
   if(++probes===2)throw Object.assign(new Error('inventory probe unavailable'),
-   {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+   {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE',
+    probeReason:'SCHTASKS_INVENTORY_EMPTY_PARSE'});
   return 'APPROVED_RETIRED_ABSENT';
  };
  const result=await executeJob(req('runner-smoke','postcheck-r13-unknown-01'),
@@ -43,6 +44,7 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
  assert.equal(result.report.status,'STATE_UNKNOWN');
  assert.equal(result.report.code,'PROTECTED_STATE_POSTCHECK_UNVERIFIED');
  assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.equal(result.report.protectedProbeReason,'SCHTASKS_INVENTORY_EMPTY_PARSE');
  assert.deepEqual(result.report.workerOutcome,
   {status:'PASS',code:'RUNNER_COMMAND_EXECUTED',
    firstFail:null,resultPresent:true});
@@ -63,11 +65,13 @@ test('retired R13 inventory precheck failure blocks worker without changing safe
  const result=await executeJob(req('runner-smoke','precheck-r13-denied-01'),
   {...c,runId:'3302',retiredTaskEvidence:()=>{
    throw Object.assign(new Error('inventory probe unavailable'),
-    {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
+    {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE',
+     probeReason:'SCHTASKS_INVENTORY_COMMAND_FAILED'});
   }});
  assert.equal(result.report.status,'BLOCKED');
  assert.equal(result.report.code,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
  assert.equal(result.report.failureOperation,'PROTECTED_STATE_SNAPSHOT');
+ assert.equal(result.report.protectedProbeReason,'SCHTASKS_INVENTORY_COMMAND_FAILED');
  assert.equal(result.report.result,undefined);
 });
 
