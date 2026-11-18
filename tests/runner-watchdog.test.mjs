@@ -169,3 +169,12 @@ test('only an exact GitHub private main ancestry and nine hash-pinned files are 
    /HANDOFF_SOURCE_ISOLATED_HASH_DENIED/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('future heartbeat cannot certify a live Supervisor as healthy',()=>{
+ const now=Date.parse('2026-11-14T00:00:00.000Z'),owner={pid:123};
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now+1).toISOString(),now}),'BLOCKED_LIVE_OR_UNKNOWN');
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now+60000).toISOString(),now}),'BLOCKED_LIVE_OR_UNKNOWN');
+ assert.equal(decide({owner,live:true,heartbeat:'invalid-timestamp',now}),'BLOCKED_LIVE_OR_UNKNOWN');
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now-44999).toISOString(),now}),'HEALTHY');
+ assert.equal(decide({owner,live:true,heartbeat:new Date(now-45000).toISOString(),now}),'BLOCKED_LIVE_OR_UNKNOWN');
+});
