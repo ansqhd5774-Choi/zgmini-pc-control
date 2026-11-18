@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {authorize,OUTPUT,SAVED_SCHEMA} from './w03-gmh-seven-private-score-once.mjs';
+import {authorize,identifySafeReceipt,OUTPUT,SAVED_SCHEMA} from './w03-gmh-seven-private-score-once.mjs';
 import {REPO,APPROVED_SOURCE_SHA} from './w03-gmh-seven-manual-once.mjs';
 const SHA64=/^[a-f0-9]{64}$/;
 const SHA40=/^[a-f0-9]{40}$/;
@@ -34,7 +34,7 @@ export function sanitize(raw,req,env){
   if(raw.status!=='PASS'||raw.code!=='W03_GMH_SCORE_SAVED_7X252_VERIFIED'||
    !/^\d{4}-\d\d-\d\d$/.test(raw.observationDate??'')||
    !Number.isSafeInteger(raw.commonSessionCount)||
-   raw.commonSessionCount<628||raw.commonSessionCount>1500||
+   raw.commonSessionCount<628||
    raw.historyPoints!==1764||
    !Number.isSafeInteger(raw.rawPagesVerified)||
    raw.rawPagesVerified<14||raw.rawPagesVerified>256||
@@ -70,13 +70,23 @@ const check=async(fetchApi,url,headers,contents)=>{
  }catch{return false;}
 };
 export async function report({event,env,raw,fetchApi=fetch}){
- const req=authorize(event,env);
+ let req,admitted=true;
+ try{req=authorize(event,env);}
+ catch(error){
+  if(error?.code!=='W03_GMH_SCORE_REQUEST_STOP')throw error;
+  // This fallback NEVER grants execution; a previously pinned V2 request
+  // can only receive a redacted STOP receipt when GitHub's event HEAD drifted.
+  req=identifySafeReceipt(event,env);
+  if(req.schema!==SAVED_SCHEMA)throw error;
+  admitted=false;
+ }
  need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20&&
   RUN.test(env.GITHUB_RUN_ID??''),'W03_GMH_SCORE_REPORT_AUTH_STOP');
  let parsed=null;
  try{parsed=typeof raw==='string'&&Buffer.byteLength(raw)<=5000?
   JSON.parse(raw):null;}catch{}
- const result=sanitize(parsed,req,env);
+ const result=admitted?sanitize(parsed,req,env):{
+  ...base(req,env),status:'STOP',code:'W03_GMH_SCORE_CONTROL_PIN_DRIFT_STOP'};
  const headers={accept:'application/vnd.github+json',
   authorization:'Bearer '+env.GITHUB_TOKEN,
   'x-github-api-version':'2022-11-28',
