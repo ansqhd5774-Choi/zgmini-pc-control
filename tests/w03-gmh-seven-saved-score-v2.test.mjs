@@ -41,6 +41,7 @@ const launch=data=>launchSavedScore('/approved/pc-parity.mjs',{
 function signedRaw(raw,req){
  return {schema:OUTPUT,...raw,requestId:req.requestId,
   sourceCommit:req.candidateSourceSha,controlSha:SOURCE,
+  requestedControlSha:req.controlSourceSha,
   runId:'43210',providerCalls:0,d1Writes:0,publicWrites:0,
   taskChanges:0,rawBarExposure:false,retry:'NO_AUTOMATIC_REEXECUTION'};
 }
