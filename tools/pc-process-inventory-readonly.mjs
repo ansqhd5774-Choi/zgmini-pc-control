@@ -11,6 +11,7 @@ import {collectAutomationStatus} from './automation-status.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
+import {readMaintenanceRecoveryStatus} from './update.mjs';
 import {createHash} from 'node:crypto';
 
 export const TITLE='pc-process-inventory-readonly';
@@ -308,6 +309,83 @@ function collectMaintenanceStatusReadonly(){
  catch{return sanitizeMaintenanceStatus(null);}
 }
 
+
+// A fixed historical Controller B failure: independently sample only local
+// journal + staged/backlog/lease metadata through the existing A-grade PC
+// process inventory. No new operation, receiver handoff, B effect or PC writes.
+const C2094_ID='pc-update-dbed28c1-a59b-403b-84c6-8cf190930cb5';
+const C2094_ISSUE=2094;
+const C2094_BEFORE='f7f1559bc0ef15bb9b375982d048369c474c490f';
+const C2094_TARGET='ead5d2d585ff2ce2a6df5f9b6cf720f65d90b49b';
+const C2094_SAFE_STATES=new Set(['PRESENT','ABSENT','UNKNOWN','UNSAFE']);
+const C2094_SAFE_PHASES=new Set(['RECEIVED','VALIDATED','STAGED','INTAKE_PAUSED',
+ 'DRAINED','BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED',
+ 'INTAKE_RESUMED','BACKLOG_RECONCILED','POSTCHECK_PENDING','PASS','BLOCKED',
+ 'ROLLED_BACK','RECOVERY_REQUIRED']);
+const C2094_SAFE_CODES=new Set(['WORKFLOW_DISABLE_NOT_CONFIRMED',
+ 'WORKFLOW_ENABLE_NOT_CONFIRMED','BACKLOG_OR_RECOVERY_NOT_VERIFIED']);
+const c2094Unknown=code=>({schema:'ZGMINI_C2094_STAGE_A_V1',
+ status:'STATE_UNKNOWN',code,ledgerStatus:null,ledgerPhase:null,
+ ledgerFirstFail:null,ledgerFailureOperation:null,
+ backup:null,backlog:null,lease:null,actualControllerSha:null,
+ restorationVerified:false,recoveryEligible:false,
+ operationalWrites:0,providerCalls:0,d1Writes:0});
+const stageState=v=>C2094_SAFE_STATES.has(v)?v:'UNKNOWN';
+const goodInt=(v,max)=>Number.isSafeInteger(v)&&v>=0&&v<=max?v:null;
+export function summarize2094StageStatus(observed){
+ if(observed?.status!=='STATUS'||observed.ledgerReadbackCode||
+    observed.installedReadbackCode||observed.lockReadbackCode)
+  return c2094Unknown('C2094_STATUS_READBACK_UNVERIFIED');
+ const ledger=observed.ledger;
+ if(ledger?.requestId!==C2094_ID||ledger?.issueNumber!==C2094_ISSUE
+    ||ledger?.targetSha!==C2094_TARGET
+    ||ledger?.installedShaBefore!==C2094_BEFORE)
+  return c2094Unknown('C2094_LEDGER_IDENTITY_UNVERIFIED');
+ const a=observed.artifacts;
+ if(!a||a.schema!=='ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1'
+    ||a.requestId!==C2094_ID)
+  return c2094Unknown('C2094_ARTIFACT_READBACK_UNAVAILABLE');
+ const aFiles=a.artifacts??{},b=a.backlog??{},l=a.lease??{};
+ const backup={backupRoot:stageState(aFiles.backupRoot),
+  stageRoot:stageState(aFiles.stageRoot),
+  stagedHost:stageState(aFiles.stagedHost),
+  snapshotRoot:stageState(aFiles.snapshotRoot),
+  originalHost:stageState(aFiles.originalHost),
+  protectedBefore:stageState(aFiles.protectedBefore),
+  previousHost:stageState(aFiles.previousHost)};
+ const backlog={file:stageState(b.file),windows:goodInt(b.windows,64),
+  openWindows:goodInt(b.openWindows,64),replayCount:goodInt(b.replayCount,10000)};
+ const lease={directory:stageState(l.directory),ownerFile:stageState(l.ownerFile),
+  recoveryMarker:stageState(l.recoveryMarker),
+  ownerMarkerMatch:typeof l.ownerMarkerMatch==='boolean'?l.ownerMarkerMatch:null,
+  held:observed.installLock?.held===true?true:observed.installLock?.held===false?false:null};
+ const verified=a.status==='OBSERVED'&&observed.artifactReadbackCode===null
+  &&Object.values(backup).every(v=>!['UNKNOWN','UNSAFE'].includes(v))
+  &&backlog.file!=='UNKNOWN'&&lease.directory!=='UNKNOWN'
+  &&lease.held!==null;
+ return {schema:'ZGMINI_C2094_STAGE_A_V1',
+  status:verified?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:verified?'C2094_PINNED_ARTIFACTS_OBSERVED':'C2094_ARTIFACTS_UNVERIFIED',
+  ledgerStatus:C2094_SAFE_PHASES.has(ledger.status)?ledger.status:null,
+  ledgerPhase:C2094_SAFE_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:C2094_SAFE_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  ledgerFailureOperation:typeof ledger.failureOperation==='string'
+   &&/^[a-zA-Z]{1,40}$/.test(ledger.failureOperation)?ledger.failureOperation:null,
+  recordedCode:C2094_SAFE_CODES.has(ledger.code)?ledger.code:null,
+  workflowEnabled:typeof ledger.workflowEnabled==='boolean'?ledger.workflowEnabled:null,
+  backup,backlog,lease,
+  actualControllerSha:observed.actualControllerSha===C2094_BEFORE?C2094_BEFORE:null,
+  restorationVerified:false,recoveryEligible:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect2094StageReadonly(read=()=>readMaintenanceRecoveryStatus(C2094_ID)){
+ try{
+  const first=summarize2094StageStatus(read());
+  const second=summarize2094StageStatus(read());
+  return JSON.stringify(first)===JSON.stringify(second)?second
+   :c2094Unknown('C2094_DOUBLE_READ_CHANGED');
+ }catch{return c2094Unknown('C2094_STAGE_READ_FAILED');}
+}
 
 const C996_ID='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const C996_TARGET='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
@@ -796,6 +874,7 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
+  c2094StageEvidence:inspect2094StageReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
    c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
@@ -835,6 +914,8 @@ export function toText(r){
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
+  'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
+  'c2094StageCode='+(r.c2094StageEvidence?.code??'NOT_APPLICABLE'),
   'c996LeaseCorrelation='+(r.c996LeaseCorrelation?.status??'NOT_APPLICABLE'),
   'c996LeaseCorrelationCode='+(r.c996LeaseCorrelation?.code??'NOT_APPLICABLE'),
    'c1841RecoveryCheckpoint='+(r.c1841RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
