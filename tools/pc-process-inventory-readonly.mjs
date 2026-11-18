@@ -42,6 +42,7 @@ const PS_SCRIPT=[
  "$collabNames=@('Teams.exe','ms-teams.exe','outlook.exe','WINWORD.EXE','EXCEL.EXE','POWERPNT.EXE','ONENOTE.EXE','Zoom.exe','slack.exe','Discord.exe')",
  "$otherRows=@($memoryRows | Where-Object { $_.kind -eq 'OTHER_PROCESSES' } | ForEach-Object { $k='UNCLASSIFIED_OTHER'; if($_.name -in $windowsSystemNames){$k='WINDOWS_CORE_UI'} elseif($_.name -in $browserNames){$k='BROWSER_WEBVIEW'} elseif($_.name -in $ideNames){$k='IDE_EDITOR'} elseif($_.name -in $securityNames){$k='SECURITY_TOOLS'} elseif($_.name -in $collabNames){$k='OFFICE_COLLAB'}; [pscustomobject]@{category=$k;workingSetMiB=[int]$_.workingSetMiB;privateCommitMiB=[int]$_.privateCommitMiB} })",
  "$otherSubgroups=@($otherRows | Group-Object category | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{category=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum} })",
+ "$browserAttribution=@($processes | Where-Object { $_.Name -in $browserNames } | ForEach-Object { $parentId=[int]$_.ParentProcessId; $runnerChild=$false; for($depth=0;$depth -lt 12;$depth++){if(!$byPid.ContainsKey($parentId)){break}; $ancestor=$byPid[$parentId];if($ancestor.Name -in @('Runner.Listener.exe','Runner.Worker.exe')){$runnerChild=$true;break};$nextId=[int]$ancestor.ParentProcessId;if($nextId -eq $parentId){break};$parentId=$nextId}; $scope=if($runnerChild){'RUNNER_DESCENDANT'}elseif($null -eq $_.SessionId){'UNKNOWN_SESSION_NONRUNNER'}elseif([int]$_.SessionId -eq 0){'SESSION_ZERO_NONRUNNER'}else{'NONZERO_SESSION_NONRUNNER'}; [pscustomobject]@{class=$scope;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576);privateCommitMiB=[int][math]::Floor(([double]$_.PageFileUsage)/1024)} } | Group-Object class | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{class=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum} })",
  "$otherTopMemory=@($otherRows | Sort-Object @{Expression='workingSetMiB';Descending=$true},@{Expression='privateCommitMiB';Descending=$true} | Select-Object -First 8 | ForEach-Object { [pscustomobject]@{category=$_.category;workingSetMiB=$_.workingSetMiB;privateCommitMiB=$_.privateCommitMiB} })",
  "$services=@()",
  "$serviceStatus='OK'",
@@ -52,7 +53,7 @@ const PS_SCRIPT=[
  "$startup=@()",
  "$startupStatus='OK'",
  "try { $folder=Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Startup'; if (Test-Path -LiteralPath $folder -PathType Container) { $startup=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^ZGMINI[-_. ]' } | Select-Object -First 24 | ForEach-Object { [string]$_.Name }) } } catch { $startupStatus='UNAVAILABLE' }",
- "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);memoryGroups=@($memoryGroups);otherSubgroups=@($otherSubgroups);otherTopMemory=@($otherTopMemory);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
+ "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);memoryGroups=@($memoryGroups);otherSubgroups=@($otherSubgroups);browserAttribution=@($browserAttribution);otherTopMemory=@($otherTopMemory);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
  "$result | ConvertTo-Json -Compress -Depth 8"
 ].join('; ');
 
@@ -136,6 +137,35 @@ export function sanitizeProbe(raw){
  const otherSubgroupCount=otherSubgroups.reduce((acc,g)=>acc+g.count,0);
  const otherSubgroupCoverage=otherSubgroups.length===0?'UNAVAILABLE':
   otherCount===otherSubgroupCount?'COUNT_COMPLETE':'COUNT_PARTIAL';
+ // Aggregate only fixed browser session/Runner-ancestry classes; no process
+ // names, PID, command lines, usernames or per-browser identifiers leave PC.
+ const browserClasses=new Set(['RUNNER_DESCENDANT','SESSION_ZERO_NONRUNNER',
+  'NONZERO_SESSION_NONRUNNER','UNKNOWN_SESSION_NONRUNNER']);
+ const browserAttribution=raw.browserAttribution===undefined?[]:
+  safeList(raw.browserAttribution,4).map(g=>{
+   if(!browserClasses.has(g?.class))fail('PROBE_BROWSER_CLASS_DENIED');
+   const row={class:g.class};
+   for(const k of ['count','workingSetMiB','privateCommitMiB']){
+    const value=smallInt(g?.[k],2000000);
+    if(value===null)fail('PROBE_BROWSER_METRIC_INVALID');
+    row[k]=value;
+   }
+   if(row.count===0)fail('PROBE_BROWSER_ZERO_GROUP');
+   return row;
+  });
+ if(raw.browserAttribution!==undefined){
+  if(!Array.isArray(raw.browserAttribution)||
+   raw.browserAttribution.length>4||
+   new Set(browserAttribution.map(g=>g.class)).size!==browserAttribution.length)
+    fail('PROBE_BROWSER_GROUP_INVALID');
+  const expected=otherSubgroups.find(g=>g.category==='BROWSER_WEBVIEW')??
+   {count:0,workingSetMiB:0,privateCommitMiB:0};
+  for(const key of ['count','workingSetMiB','privateCommitMiB'])
+   if(browserAttribution.reduce((acc,g)=>acc+g[key],0)!==expected[key])
+    fail('PROBE_BROWSER_TOTAL_MISMATCH');
+ }
+ const browserAttributionCoverage=raw.browserAttribution===undefined?
+  'UNAVAILABLE':'COUNT_COMPLETE';
  const otherTopMemory=safeList(raw.otherTopMemory,8).map(g=>sanitizeOtherRow(g,false));
  const services=safeList(raw.services,24).map(s=>{
   const name=simple(s?.name,110);
@@ -158,7 +188,7 @@ export function sanitizeProbe(raw){
   totalProcessCount:smallInt(raw.totalProcessCount,100000),
   selectedProcessCount:smallInt(raw.selectedProcessCount,100000),
   processes,processCounts,memoryGroups,memoryGroupCoverage,
-  otherSubgroups,otherSubgroupCoverage,otherTopMemory,
+  otherSubgroups,otherSubgroupCoverage,browserAttribution,browserAttributionCoverage,otherTopMemory,
   services,serviceStatus:mode(raw.serviceStatus),
   tasks,taskStatus:mode(raw.taskStatus),startup,startupStatus:mode(raw.startupStatus),
   processListTruncated:smallInt(raw.selectedProcessCount,100000)>processes.length};

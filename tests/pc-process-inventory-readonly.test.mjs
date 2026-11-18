@@ -594,3 +594,49 @@ test('bounded monthly Census source evidence is allowed in sanitised 32-host ros
   reason:'MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW_SECRET'}]});
  assert.equal(tampered.status,'STATE_UNKNOWN');
 });
+
+
+test('browser attribution distinguishes Runner descendants from nonzero Windows sessions using only aggregate memory',()=>{
+ const fixture={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:3,
+  selectedProcessCount:0,processes:[],services:[],tasks:[],
+  memoryGroups:[{kind:'OTHER_PROCESSES',count:3,workingSetMiB:6000,
+   privateCommitMiB:12000,zeroWorkingSetCount:0,
+   unknownWorkingSetCount:0,unknownPrivateCommitCount:0}],
+  otherSubgroups:[{category:'BROWSER_WEBVIEW',count:3,workingSetMiB:6000,
+   privateCommitMiB:12000}],
+  browserAttribution:[
+   {class:'RUNNER_DESCENDANT',count:1,workingSetMiB:400,privateCommitMiB:900,
+    pid:123,name:'SECRET_USER_BROWSER'},
+   {class:'NONZERO_SESSION_NONRUNNER',count:2,workingSetMiB:5600,
+    privateCommitMiB:11100,cmd:'NEVER_SHOW'}
+  ]};
+ const out=sanitizeProbe(fixture);
+ assert.equal(out.browserAttributionCoverage,'COUNT_COMPLETE');
+ assert.equal(out.browserAttribution.length,2);
+ assert.equal(out.browserAttribution.reduce((v,g)=>v+g.workingSetMiB,0),6000);
+ assert.deepEqual(Object.keys(out.browserAttribution[0]),
+  ['class','count','workingSetMiB','privateCommitMiB']);
+ assert.doesNotMatch(JSON.stringify(out),/SECRET_USER_BROWSER|NEVER_SHOW|pid|cmd/);
+ assert.equal(sanitizeProbe({...fixture,browserAttribution:undefined})
+  .browserAttributionCoverage,'UNAVAILABLE');
+ for(const bad of [
+  [{...fixture.browserAttribution[0],class:'SECRET_APPLICATION'},
+   fixture.browserAttribution[1]],
+  [{...fixture.browserAttribution[0],count:2},fixture.browserAttribution[1]],
+  [{...fixture.browserAttribution[0],workingSetMiB:-1},fixture.browserAttribution[1]],
+  [fixture.browserAttribution[0],fixture.browserAttribution[0]],
+  [fixture.browserAttribution[0]],
+  [{...fixture.browserAttribution[0],class:'SESSION_ZERO_NONRUNNER',count:0},
+   fixture.browserAttribution[1]]
+ ])assert.throws(()=>sanitizeProbe({...fixture,browserAttribution:bad}));
+});
+test('zero-browser inventory yields complete empty attribution and rejects invented browser processes',()=>{
+ const raw={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:1,
+  selectedProcessCount:0,processes:[],otherSubgroups:[
+   {category:'WINDOWS_CORE_UI',count:1,workingSetMiB:10,privateCommitMiB:15}],
+  browserAttribution:[]};
+ assert.equal(sanitizeProbe(raw).browserAttributionCoverage,'COUNT_COMPLETE');
+ assert.throws(()=>sanitizeProbe({...raw,browserAttribution:[
+  {class:'NONZERO_SESSION_NONRUNNER',count:1,workingSetMiB:10,privateCommitMiB:15}
+ ]}));
+});
