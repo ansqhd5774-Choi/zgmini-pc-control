@@ -15,6 +15,8 @@ on:
       - 'tests/theme-nine-r32-raw-coverage-readonly.test.mjs'
       - 'controller/core-runtime-source-wmi.mjs'
       - 'controller/inflation-event129-evidence-readonly.mjs'
+      - 'controller/inflation19-runtime-readonly.mjs'
+      - 'tests/w01-inflation7-writer-ledger-existing-a.test.mjs'
       - 'controller/inflation-event129-evidence-readonly.test.mjs'
       - 'controller/inflation-core-owner-diagnostic-probe.mjs'
       - 'controller/inflation-event129-b-proof.mjs'
@@ -142,6 +144,8 @@ jobs:
           node-version: '22'
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
+      - name: Verify W01 inflation7 Writer receipt in existing Inflation19 read-only A without PC effects
+        run: node --test --test-concurrency=1 tests/w01-inflation7-writer-ledger-existing-a.test.mjs
       - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
         run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
