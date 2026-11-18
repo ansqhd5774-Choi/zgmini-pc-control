@@ -33,7 +33,7 @@ test('read-only Core task trace resolves Git HEAD, dirty names and required file
  assert.equal(result.status,'PASS');assert.equal(result.sourceResolved,true);
  assert.equal(result.runtimeSourceVerified,false);
  assert.equal(result.evidenceLevel,'STATIC_LAUNCHER_TRACE_ONLY');
- assert.equal(result.sourceHead,'a'.repeat(40));
+ assert.equal(result.sourceHead,'a'.repeat(40),JSON.stringify({code:result.code,sourceResolved:result.sourceResolved,sourceRoot:result.sourceRoot}));
  assert.deepEqual(result.trackedDirty,['scripts/pc-writer/run-local.mjs']);
  assert.equal(result.sourceRoot,'projects/pilot');
  assert.equal(result.tracedLaunchers.length,2);
@@ -134,7 +134,7 @@ test('fixed historical checkout reports HEAD and Writer agreement as candidate o
  assert.equal(result.historicalCheckoutCandidate.evidenceLevel,
   'HISTORICAL_CHECKOUT_NOT_CORE_RUNTIME');
  assert.equal(result.historicalCheckoutCandidate.sourceRoot,p);
- assert.equal(result.historicalCheckoutCandidate.head,sha);
+ assert.equal(result.historicalCheckoutCandidate.head,sha,JSON.stringify({code:result.code,historical:result.historicalCheckoutCandidate}));
  assert.equal(result.historicalCheckoutCandidate.gitVerified,true);
  assert.equal(result.historicalCheckoutCandidate.trackedDirty,false);
  assert.equal(result.historicalCheckoutCandidate.matchesWriterCheckpoint,true);
