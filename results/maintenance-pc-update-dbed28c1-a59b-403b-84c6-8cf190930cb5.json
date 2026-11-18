@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-dbed28c1-a59b-403b-84c6-8cf190930cb5",
+  "targetControllerSha": "ead5d2d585ff2ce2a6df5f9b6cf720f65d90b49b",
+  "status": "BLOCKED",
+  "code": "WORKFLOW_DISABLE_NOT_CONFIRMED",
+  "lastPass": "BLOCKED",
+  "firstFail": "STAGED",
+  "actualControllerSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": true
+}
