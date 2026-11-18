@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 
 const SQLITE_MAGIC='SQLite format 3\0';
 const MAX_DB_BYTES=64*1024**3;
@@ -128,8 +129,11 @@ function fullTenYearRawCoverage(weeks,complete){
  for(let i=0;i<required.length;i++){
   const w=required[i],expected=latestMs-(requiredRawWeeks-1-i)*WEEK_MS;
   if(day(w.week)!==expected)return {...result,status:'NONCONSECUTIVE_10Y_WEEKS',firstFailureWeek:w.week};
+  if(w.invalidValues!==0)return {...result,status:'STATE_CLAIMS_VALUE_INVALID',firstFailureWeek:w.week};
   if(!complete(w))return {...result,status:'REGION_51_COVERAGE_GAP',firstFailureWeek:w.week};
-  // The approved R6 transform excludes prior four-week averages of zero.
+  // The approved R6 transform excludes missing/invalid and zero prior 4w bases.
+  if(i>=55&&required[i-52].invalidPriorRegions!==0)
+   return {...result,status:'PRIOR_4W_INVALID_BASE',firstFailureWeek:w.week};
   if(i>=55&&required[i-52].zeroPriorRegions!==0)
    return {...result,status:'PRIOR_4W_ZERO_BASE',firstFailureWeek:w.week};
  }
@@ -138,9 +142,10 @@ function fullTenYearRawCoverage(weeks,complete){
 function coverage(rows){
  if(!Array.isArray(rows))return {status:'UNKNOWN'};
  const weeks=rows.map(r=>({week:date(r.observation_date),count:safeInt(r.row_count),regions:safeInt(r.region_count),
-  unknown:safeInt(r.unknown_code_count),zeroPriorRegions:safeInt(r.zero_prior_region_count)})).filter(x=>x.week);
+  unknown:safeInt(r.unknown_code_count),zeroPriorRegions:safeInt(r.zero_prior_region_count),
+  invalidValues:safeInt(r.invalid_value_count),invalidPriorRegions:safeInt(r.invalid_prior_region_count)})).filter(x=>x.week);
  weeks.sort((a,b)=>a.week.localeCompare(b.week));
- const complete=x=>x?.count===51&&x?.regions===51&&x?.unknown===0;
+ const complete=x=>x?.count===51&&x?.regions===51&&x?.unknown===0&&x?.invalidValues===0;
  let latestCandidate=null,earliestBreak=null,latestBreak=null,eligible=0;
  for(let i=55;i<weeks.length;i++){
   const current=weeks.slice(i-3,i+1),previous=weeks.slice(i-55,i-51);
@@ -148,9 +153,11 @@ function coverage(rows){
   let reason=null;
   if(current.length!==4||previous.length!==4||!consecutive(current)||!consecutive(previous)||
      current.some((x,j)=>day(x.week)-day(previous[j].week)!==52*7*86400000))reason='WEEK_ALIGNMENT_GAP';
+  else if([...current,...previous].some(x=>x.invalidValues!==0))reason='STATE_CLAIMS_VALUE_INVALID';
   else if([...current,...previous].some(x=>!complete(x)))reason='REGION_51_COVERAGE_GAP';
-  // R6 rejects only a zero four-week PRIOR average per state, not an individual
-  // zero-valued weekly observation. The prior window ends at previous[3].
+  // R6 rejects missing/invalid and zero four-week PRIOR bases, but allows an
+  // individual genuine zero claim. The prior window ends at previous[3].
+  else if(previous[3].invalidPriorRegions!==0)reason='PRIOR_4W_INVALID_BASE';
   else if(previous[3].zeroPriorRegions!==0)reason='PRIOR_4W_ZERO_BASE';
   if(reason){if(!earliestBreak)earliestBreak={week:weeks[i].week,reason};latestBreak={week:weeks[i].week,reason};}
   else{latestCandidate=weeks[i].week;eligible++;}
@@ -163,8 +170,106 @@ function coverage(rows){
   latestComplete51Week:latestComplete,latestStrict52WeekCandidate:latestCandidate,
   strict52WeekCandidateCount:eligible,firstWindowBreak:earliestBreak,latestWindowBreak:latestBreak,
   fullTenYearRawCoverage:fullTenYearRawCoverage(weeks,complete),
-  recentIncompleteWeeks:weeks.filter(x=>!complete(x)).slice(-8).reverse().map(x=>({week:x.week,regions:x.regions,rows:x.count,unknownCodes:x.unknown})),
+  recentIncompleteWeeks:weeks.filter(x=>!complete(x)).slice(-8).reverse().map(x=>({
+   week:x.week,regions:x.regions,rows:x.count,unknownCodes:x.unknown,invalidValues:x.invalidValues})),
   note:'COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION'};
+}
+
+
+// W04 fixed-scope National RAW-vs-run audit. Link only by the original
+// response BODY digest stored in the run (never by a coincidental date).
+// Raw XML, exact digest and individual values must never leave this operation.
+const NATIONAL_RAW_MAX_CHUNKS=24;
+const NATIONAL_RAW_MAX_CHARS=2_880_000;
+const NATIONAL_RAW_HASH=/^[a-f0-9]{64}$/i;
+const NATIONAL_RAW_SERIES=Object.freeze({
+ INITIAL_CLAIMS:['InitialClaims','SA'],
+ INITIAL_CLAIMS_4W:['InitialClaims','SA4WK'],
+ CONTINUED_CLAIMS:['ContinuedClaims','SA'],
+ INSURED_UNEMPLOYMENT_RATE:['IUR','SA'],
+});
+function rawTag(block,tag){
+ const match=String(block).match(new RegExp('<'+tag+'(?:\\s[^>]*)?>([\\s\\S]*?)<\\/'+tag+'>','i'));
+ return match?match[1]:null;
+}
+function rawWeekDate(value){
+ const m=String(value??'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+ if(!m)return null;
+ const y=Number(m[3]),month=Number(m[1]),d=Number(m[2]);
+ if(y<1900||y>2199||month<1||month>12||d<1||d>31)return null;
+ const time=new Date(Date.UTC(y,month-1,d));
+ if(time.getUTCFullYear()!==y||time.getUTCMonth()!==month-1||time.getUTCDate()!==d
+    ||time.getUTCDay()!==6)return null;
+ return time.toISOString().slice(0,10);
+}
+function rawNationalDates(xml,retrievedAt){
+ if(!/^\s*(?:<\?xml[^>]*\?>\s*)?<r539cyNational(?:\s[^>]*)?>/i.test(xml)
+    ||!/<\/r539cyNational\s*>\s*(?:<!--[\s\S]*?-->\s*)*$/i.test(xml))return null;
+ const observed=Object.fromEntries(Object.keys(NATIONAL_RAW_SERIES).map(k=>[k,null]));
+ let latestWeekEnded=null,weekBlocks=0,invalidWeekDates=0;
+ for(const match of xml.matchAll(/<week(?:\s[^>]*)?>([\s\S]*?)<\/week>/gi)){
+  weekBlocks++;
+  const block=match[1],date=rawWeekDate(rawTag(block,'weekEnded'));
+  if(!date){invalidWeekDates++;continue;}
+  if(!latestWeekEnded||date>latestWeekEnded)latestWeekEnded=date;
+  if(retrievedAt&&date>retrievedAt.slice(0,10))continue;
+  for(const [id,[outer,inner]] of Object.entries(NATIONAL_RAW_SERIES)){
+   const value=rawTag(rawTag(block,outer),inner);
+   if(value==null||!String(value).trim())continue;
+   const parsed=Number(String(value).replace(/,/g,'').trim());
+   if(!Number.isFinite(parsed)||parsed<0||(id==='INSURED_UNEMPLOYMENT_RATE'&&parsed>100))continue;
+   if(!observed[id]||date>observed[id])observed[id]=date;
+  }
+ }
+ return {latestWeekEnded,latestNumericDates:observed,weekBlocks,invalidWeekDates};
+}
+function auditStoredNationalRun(db,mode){
+ const base={status:'NOT_VERIFIED',latestWeekEnded:null,latestNumericDates:null,
+  recordedLatestDates:null,weekBlocks:null,invalidWeekDates:null,linkedByRawBodySha:false};
+ const run=db.prepare("SELECT detail_json FROM market_score_employment_r4_shadow_runs_v1 WHERE provider='EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS' AND json_extract(detail_json,'$.mode')=? ORDER BY completed_at DESC LIMIT 1").get(mode);
+ if(!run)return {...base,status:'RUN_NOT_STORED'};
+ const detail=safeJson(run.detail_json);
+ const bodySha=detail?.nationalResponseEvidence?.bodySha256;
+ if(typeof bodySha!=='string'||!NATIONAL_RAW_HASH.test(bodySha))return {...base,status:'RUN_BODY_HASH_NOT_STORED'};
+ // Historical fixture DBs may lack immutable source-key columns. Report
+ // unsupported evidence, never silently convert this to a source failure.
+ const columns=new Set(db.prepare("PRAGMA table_info(market_score_employment_r6_raw_snapshot_v1)").all().map(x=>x.name));
+ if(!['snapshot_id','body_sha256','body_chunk','chunk_index','chunk_count',
+      'request_key','release_group','retrieved_at'].every(k=>columns.has(k)))
+  return {...base,status:'RAW_SCHEMA_UNSUPPORTED'};
+ const head=db.prepare("SELECT snapshot_id,chunk_count,retrieved_at FROM market_score_employment_r6_raw_snapshot_v1 WHERE body_sha256=? AND release_group='DOL_UI_WEEKLY_CLAIMS' AND request_key LIKE 'DOL_NATIONAL:%' AND chunk_index=0 ORDER BY retrieved_at DESC LIMIT 1").get(bodySha.toLowerCase());
+ if(!head)return {...base,status:'MATCHING_RAW_NOT_STORED'};
+ if(typeof head.snapshot_id!=='string'||!Number.isSafeInteger(head.chunk_count)
+    ||head.chunk_count<1||head.chunk_count>NATIONAL_RAW_MAX_CHUNKS)return {...base,status:'RAW_CHUNK_BOUNDS_FAILED'};
+ const chunks=db.prepare("SELECT chunk_index,body_chunk,chunk_count,body_sha256 FROM market_score_employment_r6_raw_snapshot_v1 WHERE snapshot_id=? ORDER BY chunk_index LIMIT 25").all(head.snapshot_id);
+ if(chunks.length!==head.chunk_count||chunks.some((c,i)=>c.chunk_index!==i
+     ||c.chunk_count!==head.chunk_count||c.body_sha256!==bodySha.toLowerCase()
+     ||typeof c.body_chunk!=='string'))
+  return {...base,status:'RAW_CHUNKS_INCOMPLETE'};
+ let length=0;
+ for(const chunk of chunks){
+  length+=chunk.body_chunk.length;
+  if(length>NATIONAL_RAW_MAX_CHARS)return {...base,status:'RAW_BODY_BOUNDS_FAILED'};
+ }
+ const xml=chunks.map(x=>x.body_chunk).join('');
+ if(createHash('sha256').update(xml).digest('hex')!==bodySha.toLowerCase())
+  return {...base,status:'RAW_BODY_HASH_MISMATCH'};
+ const raw=rawNationalDates(xml,head.retrieved_at);
+ if(!raw)return {...base,status:'RAW_XML_ROOT_INVALID'};
+ const recorded=Object.fromEntries(Object.keys(NATIONAL_RAW_SERIES).map(id=>
+  [id,date(detail?.latestNationalSeriesObservationDates?.[id])]));
+ const comparisons=Object.keys(NATIONAL_RAW_SERIES).map(id=>{
+  const a=raw.latestNumericDates[id],b=recorded[id];
+  return a&&b?(a>b?1:a<b?-1:0):null;
+ });
+ const state=comparisons.some(x=>x===1)?'RAW_NEWER_THAN_RUN_PARSER'
+  :comparisons.some(x=>x===-1)?'RAW_OLDER_THAN_RUN_PARSER'
+  :comparisons.every(x=>x===0)?'RAW_EQUALS_RUN_PARSER'
+  :'RAW_OR_RUN_DATES_INCOMPLETE';
+ return {status:state,latestWeekEnded:raw.latestWeekEnded,
+  latestNumericDates:raw.latestNumericDates,recordedLatestDates:recorded,
+  weekBlocks:raw.weekBlocks,invalidWeekDates:raw.invalidWeekDates,
+  linkedByRawBodySha:true};
 }
 
 /** Path is supplied by the installed Controller, never by Issue JSON. */
@@ -197,6 +302,8 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    result[key]={};
    for(const mode of MODES)result[key][mode]=summarizeRun(query.get(provider,mode),key);
   }
+  stage='NATIONAL_RAW_RUN_COMPARISON';
+  result.nationalRaw=Object.fromEntries(MODES.map(mode=>[mode,auditStoredNationalRun(db,mode)]));
   stage='ETA539_METADATA';
   const snapshots=db.prepare(`SELECT request_key,retrieved_at,chunk_count,http_status,
    json_extract(detail_json,'$.historyWeeks') AS history_weeks,
@@ -222,9 +329,16 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
     WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'
     GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600
    ), region_windows AS (
-    SELECT c.observation_date,c.geography_code,
+    SELECT c.observation_date,c.geography_code,c.value AS claim_value,
      SUM(c.value) OVER (PARTITION BY c.geography_code ORDER BY c.observation_date
-       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_week_total
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_week_total,
+     COUNT(*) OVER (PARTITION BY c.geography_code ORDER BY c.observation_date
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_row_count,
+     SUM(CASE WHEN typeof(c.value) NOT IN ('integer','real') OR c.value<0
+         OR c.value>9007199254740991 OR c.value!=CAST(c.value AS INTEGER)
+       THEN 1 ELSE 0 END) OVER (
+       PARTITION BY c.geography_code ORDER BY c.observation_date
+       ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS prior_four_invalid_value_count
     FROM market_score_employment_r4_shadow_current_v1 AS c
     INNER JOIN recent_weeks AS w ON w.observation_date=c.observation_date
     WHERE c.logical_series_id='STATE_INITIAL_CLAIMS' AND c.geography_type='STATE'
@@ -232,6 +346,11 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    SELECT observation_date,COUNT(*) AS row_count,
     COUNT(DISTINCT geography_code) AS region_count,
     SUM(CASE WHEN geography_code NOT IN (${countryMarkers}) THEN 1 ELSE 0 END) AS unknown_code_count,
+    SUM(CASE WHEN typeof(claim_value) NOT IN ('integer','real') OR claim_value<0
+       OR claim_value>9007199254740991 OR claim_value!=CAST(claim_value AS INTEGER)
+      THEN 1 ELSE 0 END) AS invalid_value_count,
+    SUM(CASE WHEN prior_four_row_count<>4 OR prior_four_invalid_value_count>0
+      THEN 1 ELSE 0 END) AS invalid_prior_region_count,
     SUM(CASE WHEN prior_four_week_total=0 THEN 1 ELSE 0 END) AS zero_prior_region_count
    FROM region_windows
    GROUP BY observation_date ORDER BY observation_date DESC LIMIT 600`).all(...CORE_STATES);
