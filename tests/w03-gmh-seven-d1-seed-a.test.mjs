@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {authorize,compareD1Seed,execute,REPO,TITLE,SCHEMA,OUTPUT}
  from '../tools/w03-gmh-seven-d1-seed-a.mjs';
@@ -52,6 +56,34 @@ const env=()=>({GITHUB_REPOSITORY:REPO,GITHUB_EVENT_NAME:'issues',
  GITHUB_EVENT_ACTION:'opened',GITHUB_RUN_ATTEMPT:'1',
  GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_SHA:HEAD,
  GITHUB_RUN_ID:'43888880001'});
+test('D1 preflight accepts reviewed fixture and returns safe first-fail enum only',t=>{
+ const tmp=mkdtempSync(path.join(tmpdir(),'w03-d1-preflight-'));
+ t.after(()=>rmSync(tmp,{recursive:true,force:true}));
+ const eventPath=path.join(tmp,'event.json'),outPath=path.join(tmp,'output.txt');
+ const script=fileURLToPath(new URL('../tools/w03-gmh-seven-d1-seed-preflight.mjs',
+  import.meta.url));
+ const base={...process.env,...env(),
+  GITHUB_EVENT_PATH:eventPath,GITHUB_OUTPUT:outPath};
+ writeFileSync(eventPath,JSON.stringify(event()));
+ const ok=spawnSync(process.execPath,[script],{env:base,encoding:'utf8',timeout:20000});
+ assert.equal(ok.status,0,ok.stderr);
+ assert.match(ok.stdout,/W03_GMH_D1_READ_ONLY_SOURCE_PIN/);
+ assert.match(readFileSync(outPath,'utf8'),/candidateSourceSha=/);
+ const invalid={...event(),issue:{...event().issue,
+  body:JSON.stringify({...request(),extra:'LEAKED_PRIVATE_PAYLOAD'})}};
+ writeFileSync(eventPath,JSON.stringify(invalid));
+ const stopped=spawnSync(process.execPath,[script],{env:base,encoding:'utf8',timeout:20000});
+ assert.equal(stopped.status,1);
+ assert.match(stopped.stderr,/W03_GMH_D1_REQUEST_STOP/);
+ assert.doesNotMatch(stopped.stderr,/LEAKED_PRIVATE_PAYLOAD/);
+ assert.doesNotMatch(stopped.stderr,/E:\\\\/);
+ writeFileSync(eventPath,JSON.stringify(event()));
+ const missingOutput={...base};delete missingOutput.GITHUB_OUTPUT;
+ const noOutput=spawnSync(process.execPath,[script],{env:missingOutput,
+  encoding:'utf8',timeout:20000});
+ assert.equal(noOutput.status,1);
+ assert.match(noOutput.stderr,/W03_GMH_D1_OUTPUT_MISSING/);
+});
 test('only one owner-opened read-only D1 request with exact output pins is allowed',()=>{
  assert.equal(authorize(event(),env()).requestId,ID);
  for(const mutate of [
