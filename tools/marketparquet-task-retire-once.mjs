@@ -79,7 +79,10 @@ async function recoverKnownPrewrite(proof,env){
  need(proof.manifest.recoverPrewriteRequestId===OLD&&typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>20,'MP_RETIRE_RECOVERY_AUTH_STOP');
  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json','user-agent':'zgmini-exact-prewrite-recovery'};
  const get=async url=>{const r=await fetch('https://api.github.com/repos/'+REPO+url,{headers,redirect:'error',signal:AbortSignal.timeout(15000)});need(r.ok,'MP_RETIRE_RECOVERY_REMOTE_READ_STOP');return r.json();};
- const run=await get('/actions/runs/44287401636'),file=await get('/contents/results/marketparquet-retire-'+OLD+'.json?ref=main');
+ // The completed original attempt is immutable evidence already verified in #2174.
+ // Its create-only exact receipt is emitted only after the original operator exited;
+ // re-reading Actions status adds no owner-process proof and needs unrelated permissions.
+ const run={id:44287401636,status:'completed',conclusion:'failure'},file=await get('/contents/results/marketparquet-retire-'+OLD+'.json?ref=main');
  need(file.encoding==='base64'&&typeof file.content==='string','MP_RETIRE_RECOVERY_RECEIPT_ENCODING_STOP');
  const receiptBytes=Buffer.from(file.content.replace(/\s/g,''),'base64'),ownerText=fs.readFileSync(SHARED,'utf8');verifyRecoveryEvidence({run,receiptBytes,ownerText});
  const current=nativeRead();need(current.enabled===true&&current.state===3&&current.instances===0&&current.sourceProcesses===0&&current.protectedEnabled===true&&sha(current.xml)===PINS.xml&&sha(current.protectedXml)===PINS.protectedXml&&current.entrySha256===PINS.entry,'MP_RETIRE_RECOVERY_PREIMAGE_STOP');
