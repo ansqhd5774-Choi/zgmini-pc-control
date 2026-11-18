@@ -2939,6 +2939,41 @@ export async function command(args=process.argv.slice(2)) {
     actualControllerSha:state.actualControllerSha};
   }
  }
+ if(cmd==='mp-task-retire-status'){
+  need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
+  const backupRoot=path.join(maintenanceRoot,'ledger','MP_TASK_RETIRE_B_'+requestId);
+  let phase=null;
+  try{
+   const lines=fs.readFileSync(path.join(backupRoot,'JOURNAL.jsonl'),'utf8')
+    .trim().split('\n');
+   phase=JSON.parse(lines.at(-1)).phase;
+  }catch{/* no previous verified journal */}
+  return {...readMaintenanceRecoveryStatus(requestId),
+   mpRetireJournalPhase:phase,mpRetireBackupExists:fs.existsSync(backupRoot)};
+ }
+ if(cmd==='mp-task-retire-apply'){
+  need(args.length===5&&args[1]==='--request-id'&&args[3]==='--manifest-file',
+   'MAINTENANCE_ARGS');
+  const approvedPath=path.join(maintenanceRoot,'approved',requestId+'.json');
+  need(path.resolve(args[4])===path.resolve(approvedPath),'MP_B_APPROVAL_FILE_PATH');
+  const pkg=json(approvedPath),issue=pkg.issue;
+  need(issue?.requestId===requestId&&issue.operation===MP_RETIRE_B_OPERATION
+   &&pkg.actor==='ansqhd5774-Choi'&&Number.isSafeInteger(pkg.issueNumber),
+   'MP_B_PACKAGE_IDENTITY');
+  const actual=github('issues/'+pkg.issueNumber);
+  need(actual.state==='open'&&actual.title===MP_RETIRE_B_ISSUE_TITLE
+   &&actual.user?.login==='ansqhd5774-Choi'
+   &&actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,
+   'MP_B_ISSUE_CANCELED');
+  const approvedIssue=validateMpRetireBIssueEnvelope(JSON.parse(actual.body),{
+   actor:actual.user.login,controlRepository});
+  need(JSON.stringify(approvedIssue)===JSON.stringify(issue),'MP_B_ISSUE_IDENTITY');
+  const raw=Buffer.from(pkg.manifestRawBase64??'','base64');
+  validateMpRetireBManifestRequest(approvedIssue,raw,{
+   actor:pkg.actor,controlRepository,installedSha:installedManifest().installedSha});
+  const result=await runMpRetireApprovedOneShot({requestId});
+  return {...result,actualControllerSha:installedManifest().installedSha};
+ }
  if(cmd==='r54-b-status'){
   need(args.length===3&&args[1]==='--request-id','MAINTENANCE_ARGS');
   // Status is read-only and may include a prior one-shot backup/journal.
