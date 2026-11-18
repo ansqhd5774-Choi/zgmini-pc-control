@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {nextRuntimeFiles,requireHandoffApproval,approvedRuntimeChanges} from '../tools/handoff-maintenance.mjs';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
 import {readControllerUpdateArtifacts,confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
@@ -640,4 +643,31 @@ test('terminal STAGED artifact remains review-required even if install lease is 
   assert.equal(result.guidance.blockScope,'SHARED_INSTALL_ONLY');
   assert.equal(result.guidance.next,'PRESERVE_STAGE_VERIFY_BACKLOG_INSTALL_LEASE_AND_RUNTIME');
  }finally{f.cleanup();}
+});
+
+test('exact approved V2 handoff pins nine checked-out tool bytes and changes only updater',()=>{
+ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+ const installedSha='36cf8ffb813f3a006f3e05379fba641fb3404645';
+ const targetSha='732d94aa592723e09c6d776b37f269283dd26e3e';
+ const old=JSON.parse(fs.readFileSync(path.join(root,'approvals/maintenance-handoffs',installedSha+'.json'),'utf8'));
+ const approved=JSON.parse(fs.readFileSync(path.join(root,'approvals/maintenance-handoffs',targetSha+'.json'),'utf8'));
+ const draft=JSON.parse(fs.readFileSync(path.join(root,'drafts/process-coordination','maintenance-handoff-'+targetSha+'.json'),'utf8'));
+ assert.equal(draft.approved,false);
+ assert.equal(approved.approved,true);
+ assert.equal(requireHandoffApproval(approved,targetSha,installedSha),'SEVEN_TO_SEVEN');
+ assert.equal(approved.transition,'SEVEN_TO_SEVEN');
+ assert.deepEqual(approved.runtimeChangedFiles,['tools/update.mjs']);
+ assert.deepEqual(Object.keys(approved.files).sort(),Object.keys(old.files).sort());
+ for(const [rel,digest] of Object.entries(approved.files)){
+  assert.match(rel,/^tools\/[a-z0-9.-]+$/);
+  const actual=createHash('sha256').update(fs.readFileSync(path.join(root,rel))).digest('hex');
+  assert.equal(actual,digest,rel);
+ }
+ const prior=Object.fromEntries(nextRuntimeFiles.map(rel=>[rel,old.files[rel]]));
+ assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',prior,approved.files),['tools/update.mjs']);
+ assert.equal(approved.files['tools/update.mjs'],
+  'aff7b1c51b37be86cebbd8743fcd8561d449da389e2bf63b02bc654f5f7d9425');
+ assert.equal(approved.checks.windowsHandoffExecuted,false);
+ // A source authorization is not a claim of installation or rollback success.
+ assert.match(approved.scopeNote,/NOT PC APPLIED/);
 });
