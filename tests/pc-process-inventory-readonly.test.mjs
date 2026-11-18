@@ -640,3 +640,53 @@ test('zero-browser inventory yields complete empty attribution and rejects inven
   {class:'NONZERO_SESSION_NONRUNNER',count:1,workingSetMiB:10,privateCommitMiB:15}
  ]}));
 });
+
+
+test('unclassified OTHER attribution keeps exact class totals without leaking process identifiers',()=>{
+ const base={schema:'ZGMINI_PC_PROCESS_PROBE_V1',
+  totalProcessCount:4,selectedProcessCount:0,processes:[],services:[],tasks:[],
+  memoryGroups:[{kind:'OTHER_PROCESSES',count:4,workingSetMiB:4402,
+   privateCommitMiB:7300,zeroWorkingSetCount:0,
+   unknownWorkingSetCount:0,unknownPrivateCommitCount:0}],
+  otherSubgroups:[{category:'UNCLASSIFIED_OTHER',count:4,
+   workingSetMiB:4402,privateCommitMiB:7300}],
+  unclassifiedAttribution:[
+   {class:'RUNNER_DESCENDANT',count:1,workingSetMiB:1659,
+    privateCommitMiB:1865,name:'PRIVATE_PROCESS',pid:123,commandLine:'secret'},
+   {class:'NONZERO_SESSION_NONRUNNER',count:3,workingSetMiB:2743,
+    privateCommitMiB:5435,username:'PRIVATE_USER',path:'SECRET_PATH'}
+  ]};
+ const result=sanitizeProbe(base);
+ assert.equal(result.unclassifiedAttributionCoverage,'COUNT_COMPLETE');
+ assert.equal(result.unclassifiedAttribution.length,2);
+ assert.equal(result.unclassifiedAttribution.reduce((n,g)=>n+g.workingSetMiB,0),4402);
+ assert.deepEqual(Object.keys(result.unclassifiedAttribution[0]),
+  ['class','count','workingSetMiB','privateCommitMiB']);
+ assert.doesNotMatch(JSON.stringify(result),
+  /PRIVATE_PROCESS|PRIVATE_USER|SECRET_PATH|secret|commandLine|username/);
+ assert.equal(sanitizeProbe({...base,unclassifiedAttribution:undefined})
+  .unclassifiedAttributionCoverage,'UNAVAILABLE');
+ for(const invalid of [
+  [{...base.unclassifiedAttribution[0],class:'UNAPPROVED_APP'},
+   base.unclassifiedAttribution[1]],
+  [base.unclassifiedAttribution[0],base.unclassifiedAttribution[0]],
+  [{...base.unclassifiedAttribution[0],count:2},
+   base.unclassifiedAttribution[1]],
+  [{...base.unclassifiedAttribution[0],workingSetMiB:-1},
+   base.unclassifiedAttribution[1]],
+  [{...base.unclassifiedAttribution[0],count:0},
+   base.unclassifiedAttribution[1]],
+  [base.unclassifiedAttribution[0]]
+ ])assert.throws(()=>sanitizeProbe({...base,unclassifiedAttribution:invalid}));
+});
+test('no UNCLASSIFIED_OTHER gives complete empty attribution only for empty groups',()=>{
+ const base={schema:'ZGMINI_PC_PROCESS_PROBE_V1',totalProcessCount:1,
+  selectedProcessCount:0,processes:[],
+  otherSubgroups:[{category:'WINDOWS_CORE_UI',count:1,
+   workingSetMiB:50,privateCommitMiB:80}],
+  unclassifiedAttribution:[]};
+ assert.equal(sanitizeProbe(base).unclassifiedAttributionCoverage,'COUNT_COMPLETE');
+ assert.throws(()=>sanitizeProbe({...base,unclassifiedAttribution:[
+  {class:'SESSION_ZERO_NONRUNNER',count:1,workingSetMiB:50,privateCommitMiB:80}
+ ]}));
+});
