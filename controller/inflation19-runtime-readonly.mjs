@@ -161,7 +161,11 @@ export function inflation7WriterState(file){
   raw.ready:null;
  const d1Writes=raw.d1Writes===0||raw.d1Writes===1?raw.d1Writes:null;
  const readbackStatus=status==='READBACK_VERIFIED'||status==='ALREADY_STORED';
- const complete=Boolean(key&&sourceVersion&&sourceStoredAt!==null&&
+ // A successful per-key receipt cannot override a failed or dry-run Writer.
+ // Unrelated stage failures may coexist with an independently verified key.
+ const publishedRun=(writerStatus==='VERIFIED'||
+  writerStatus==='VERIFIED_WITH_GAPS')&&!failed;
+ const complete=Boolean(publishedRun&&key&&sourceVersion&&sourceStoredAt!==null&&
   readyCount!==null&&readyCount>=1&&d1Writes!==null&&writerAt&&
   sourceStoredAt<=Date.parse(writerAt)&&
   (status!=='READBACK_VERIFIED'||d1Writes===1)&&
