@@ -1,0 +1,11 @@
+schema=ZGMINI_MP_TASK_RETIRE_RECEIPT_V1
+requestId=92b67940-becf-462b-bcae-a86cba35c70b
+status=PREFLIGHT_STOP
+code=MP_RETIRE_RECOVERY_REMOTE_READ_STOP
+taskDisabled=false
+protectedTaskUnchanged=false
+providerCalls=0
+d1Writes=0
+noFutureHttpGuaranteed=false
+runId=44288951950
+retry=NO_REEXECUTE

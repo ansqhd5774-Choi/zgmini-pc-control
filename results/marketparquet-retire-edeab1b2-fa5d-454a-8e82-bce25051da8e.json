@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_MP_TASK_RETIRE_RECEIPT_V1",
+  "requestId": "edeab1b2-fa5d-454a-8e82-bce25051da8e",
+  "status": "PREFLIGHT_STOP",
+  "code": "MP_RETIRE_UNCLASSIFIED_STOP",
+  "taskDisabled": false,
+  "protectedTaskUnchanged": false,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "noFutureHttpGuaranteed": false,
+  "runId": "44287401636",
+  "retry": "NO_REEXECUTE"
+}

@@ -81,6 +81,12 @@ export function requireCurrentProtection({historical,current}){
    ||!(/^[a-f0-9]{64}$/.test(
       current['E:/ZGmini/automation/pc-control/host.json']??'')))
    throw error('WATCHDOG_B_PROTECTED_SHAPE_OR_IRAN_INVALID');
+ // Core and Korea Task digests are immutable since the first-install snapshot.
+ // Approved Writer/Controller/Iran transitions do not authorize Task drift.
+ for(const task of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']){
+  if(!Object.hasOwn(historical,task)||historical[task]!==current[task])
+   throw error('WATCHDOG_B_CORE_KOREA_TASK_DRIFT');
+ }
  for(const [key,value] of Object.entries(current)){
   if(key==='ZGMINI-PC-Iran-Progress-R13')continue;
   if(!/^[a-f0-9]{64}$/.test(String(value??'')))

@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -42,7 +42,7 @@ jobs:
           ref: ${{ github.sha }}
           path: writer-b-control
           # R181 and W01 Census verify reviewed ancestors; generic Writer B stays shallow.
-          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || (github.event.issue.title == 'w03-gmh-seven-private-score-once' && '64' || '1') }}
+          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || ((github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly') && '64' || '1') }}
           persist-credentials: false
       - name: W01 Census #28 API-only approved manual B transaction
         if: github.event.issue.title == 'w01-census-m3-api-once'
@@ -107,6 +107,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r47-existing-task-report.mjs"'
+      - name: Retire exact forbidden MarketParquet task once preserving GMH
+        if: github.event.issue.title == 'marketparquet-exact-task-retire-once'
+        id: mpretire
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\marketparquet-task-retire-once.mjs"'
+      - name: Record exact task disabled and protected GMH readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'marketparquet-exact-task-retire-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\marketparquet-task-retire-report.mjs"'
       - name: Inspect fixed R181 URL shape without source disclosure or provider calls
         if: github.event.issue.title == 'r181-source-shape-readonly'
         id: r181shape
@@ -230,6 +241,29 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-d1-seed-report.mjs"'
+      - name: Authenticate W03 immutable GMH collection-time read-only request
+        if: github.event.issue.title == 'w03-gmh-seven-collection-time-readonly'
+        id: w03gmhtimepreflight
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-gmh-seven-collection-time-preflight.mjs"'
+      - name: Checkout exact pinned GMH time-audit source only
+        if: github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' && steps.w03gmhtimepreflight.outcome == 'success'
+        id: w03gmhtimesource
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhtimepreflight.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify pinned GMH manifest request timestamps without private score recompute or D1
+        if: github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' && steps.w03gmhtimesource.outcome == 'success'
+        id: w03gmhtime
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-gmh-seven-collection-time-a.mjs"'
+      - name: Create-only sanitized GMH collection-time JSON TXT and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-collection-time-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-gmh-seven-collection-time-report.mjs"'
       - name: Read W03 R47 private score pair SHA and current source manifests without raw prices
         if: github.event.issue.title == 'w03-r47-private-readback-once'
         id: w03r47privateread

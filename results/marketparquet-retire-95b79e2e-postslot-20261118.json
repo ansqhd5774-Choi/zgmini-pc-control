@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_MP_RETIRE_POSTSLOT_OBSERVATION_V1",
+  "evidenceType": "ACTUAL_WINDOWS_NATIVE_READONLY",
+  "observedAtUtc": "2026-11-18T11:30:34.187Z",
+  "relatedIssue": 2186,
+  "relatedRunId": "44291099819",
+  "existingExpectedSlotKst": "2026-11-18T20:30:00+09:00",
+  "task": {
+    "name": "ZGMINI-PC-MarketParquet-ETF",
+    "enabled": false,
+    "state": "Disabled",
+    "instances": 0,
+    "sourceProcesses": 0,
+    "lastRunTimeKst": "2026-11-18T14:20:01+09:00",
+    "ranAtExpectedSlot": false,
+    "xmlSha256": "94e50aef2fe2130a4f2f4fd2706eaa487755567495fcc9eb333a43c5c7d9d7c0",
+    "entrySha256": "4cad9645ff306cc5d2ea9f86fb8922f78f4b19dd706d6386ec01b0bbabe0b673"
+  },
+  "protectedGmhTask": {
+    "name": "ZGMINI-PC-GetMarketHistory-ETF",
+    "enabled": true,
+    "state": "Ready",
+    "xmlSha256": "3e4f0e387e36049352fe4e6135eabd311c4862cec186a17a2f8eaf6dee3a677e",
+    "unchanged": true
+  },
+  "providerObservation": {
+    "source": "FIXED_LOCAL_JSONL_ONLY",
+    "host": "marketparquet.com",
+    "latestObservedAttemptUtc": "2026-11-18T01:05:48.289Z",
+    "observedRequestCount": 28,
+    "newRequestsObservedAfterRetirement": 0,
+    "completeNetworkCoverage": false,
+    "allFutureCallsGuaranteed": false
+  },
+  "providerCallsByObservation": 0,
+  "pcSourceWrites": 0,
+  "sqliteWrites": 0,
+  "d1Writes": 0
+}

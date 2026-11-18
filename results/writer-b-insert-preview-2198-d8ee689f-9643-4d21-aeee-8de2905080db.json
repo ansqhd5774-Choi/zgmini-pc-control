@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "d8ee689f-9643-4d21-aeee-8de2905080db",
+  "chatId": "d1fdc491-6fef-4165-b46d-f9e807f38c09",
+  "issueNumber": 2198,
+  "status": "PASS_READONLY",
+  "code": "WRITER_B_INSERT_PREVIEW_VERIFIED",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0,
+  "beforeSha256": "d7f601aaba137de807ef9b065ea9be7ff31a2e7b4fe199452c18cd0b839a8300",
+  "afterSha256": "1d79fe8a652e6b36c3f473aef525725abfc3cf2e92d647c694af0b3ca94617b7",
+  "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "baseHead": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "insertions": 2,
+  "coreDrain": {
+    "status": "UNAVAILABLE"
+  }
+}

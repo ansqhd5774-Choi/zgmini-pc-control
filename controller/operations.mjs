@@ -16,6 +16,7 @@ import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
 import {inspectUsBreadthR17Runtime} from './us-breadth-r17-runtime-readonly.mjs';
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
+import {inspectInflationCausalSaved} from './inflation-causal-saved-readonly.mjs';
 import {inspectDeltaR44CheckpointEvidence} from './market-calendar-r44-runtime-readonly.mjs';
 import {inspectR44ExistingInputAudit} from './market-calendar-r44-input-audit-readonly.mjs';
 import {inspectR44ProductionReadonly} from './market-calendar-r44-production-readonly.mjs';
@@ -129,6 +130,7 @@ export async function runOperation(request,context){
  if(request.operation==='market-calendar-r44-input-audit-readonly')return inspectR44ExistingInputAudit(dataRoot);
  if(request.operation==='market-calendar-r44-production-readonly')return inspectR44ProductionReadonly();
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
+ if(request.operation==='inflation-causal-saved-status')return inspectInflationCausalSaved(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
  if(request.operation==='asset-r10-source-readonly')return inspectAssetR10SourceBytes(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});

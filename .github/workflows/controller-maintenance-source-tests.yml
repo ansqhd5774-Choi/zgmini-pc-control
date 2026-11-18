@@ -5,6 +5,8 @@ on:
     paths:
       - 'controller/common.mjs'
       - 'controller/supervisor.mjs'
+      - 'controller/pc-source-readonly.mjs'
+      - 'tests/pc-source-readonly.test.mjs'
       - 'controller/core-runtime-source-readonly.mjs'
       - 'controller/provider-activity-runtime-readonly.mjs'
       - 'controller/http32-two-host-checkpoints-readonly.mjs'
@@ -14,9 +16,9 @@ on:
       - 'controller/theme-nine-r32-raw-coverage-readonly.mjs'
       - 'tests/theme-nine-r32-raw-coverage-readonly.test.mjs'
       - 'controller/core-runtime-source-wmi.mjs'
-      - 'controller/inflation-event129-evidence-readonly.mjs'
       - 'controller/inflation19-runtime-readonly.mjs'
       - 'tests/w01-inflation7-writer-ledger-existing-a.test.mjs'
+      - 'controller/inflation-event129-evidence-readonly.mjs'
       - 'controller/inflation-event129-evidence-readonly.test.mjs'
       - 'controller/inflation-core-owner-diagnostic-probe.mjs'
       - 'controller/inflation-event129-b-proof.mjs'
@@ -32,6 +34,8 @@ on:
       - 'tests/theme-l7-runtime-readonly.test.mjs'
       - 'tests/supervisor-status-write.test.mjs'
       - 'tools/maintenance-contract.mjs'
+      - 'tools/maintenance-recovery.mjs'
+      - 'tests/maintenance-recovery.test.mjs'
       - 'shared-resource/issue-admission.mjs'
       - 'tests/shared-resource-issue-admission.test.mjs'
       - 'tools/r181-pinned-route-candidate.mjs'
@@ -64,6 +68,10 @@ on:
       - 'tools/w03-gmh-seven-d1-seed-a.mjs'
       - 'tools/w03-gmh-seven-d1-seed-preflight.mjs'
       - 'tools/w03-gmh-seven-d1-seed-report.mjs'
+      - 'tools/w03-gmh-seven-collection-time-a.mjs'
+      - 'tools/w03-gmh-seven-collection-time-preflight.mjs'
+      - 'tools/w03-gmh-seven-collection-time-report.mjs'
+      - 'tests/w03-gmh-seven-collection-time-a.test.mjs'
       - 'tests/w03-gmh-seven-d1-seed-a.test.mjs'
       - 'tools/w03-r179-guard-shape-readonly.mjs'
       - 'tools/w03-r179-guard-shape-report.mjs'
@@ -118,6 +126,8 @@ on:
       - '.github/workflows/pc-writer-b-source-once.yml'
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
+      - 'writer-b/w01-r2-two-branch-preview.test.mjs'
+      - 'approvals/writer-previews/w01-r2-stored-payload-two-branch-20261119.json'
       - 'inflation-manual-b/**'
       - 'inflation-census-api-b/**'
       - 'approvals/inflation-manual-b/**'
@@ -151,6 +161,10 @@ jobs:
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
       - name: Verify W01 inflation7 Writer receipt in existing Inflation19 read-only A without PC effects
         run: node --test --test-concurrency=1 tests/w01-inflation7-writer-ledger-existing-a.test.mjs
+      - name: Verify fixed Credit R2 source SHA and protected report summary (no PC access)
+        run: |
+          node --check controller/pc-source-readonly.mjs
+          node --test --test-concurrency=1 tests/pc-source-readonly.test.mjs
       - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
         run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
@@ -161,6 +175,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
       - name: Verify W03 immutable D1 seed and rolling read-only overlap without credential refresh
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-d1-seed-a.test.mjs
+      - name: Verify W03 exact pinned GMH 14-symbol collection-time read-only one-shot
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-collection-time-a.test.mjs
       - name: Verify W03 pinned 7x252 vs public base/R32 read-only comparison
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
       - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
@@ -205,6 +221,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-primary-route-b.test.mjs
       - name: Verify W03 bounded start of existing R181 Task with one-shot journal
         run: node --test --test-concurrency=1 tests/r181-existing-task-once.test.mjs
+      - name: Verify W01 R2 both checkpoint branches in read-only insert preview
+        run: node --test writer-b/w01-r2-two-branch-preview.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
@@ -213,6 +231,8 @@ jobs:
         run: |
           node --check inflation-census-api-b/windows-adapter.mjs
           node --check inflation-census-api-b/report.mjs
+      - name: Regression test six operating runners without PC writes
+        run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         run: |
           node --check watchdog-b/contract.mjs

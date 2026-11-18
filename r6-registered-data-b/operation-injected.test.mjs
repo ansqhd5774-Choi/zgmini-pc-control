@@ -250,3 +250,68 @@ test('historically claimed request is blocked even after the claim filename migr
  assert.ok(!f.calls.includes('RUN'));
  assert.deepEqual(readdirSync(pcHome),[path.basename(oldDaily)]);
 });
+
+test('PIT-06-06 NOOP retains an explicit no-publication checkpoint',async()=>{
+ const f=inject();
+ const run=async()=>{f.calls.push('RUN');return{
+  status:'NOOP',code:'R6_B_ALREADY_COLLECTED',publication:'NOT_ATTEMPTED',
+  sqlite:'UNCHANGED',providerRequests:0,blsRequests:0,dolRequests:0,groupResults:[],
+ };};
+ const report=await performR6RegisteredOnce({auth,...f,run});
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+ assert.equal(report.status,'NOOP');
+ assert.equal(report.lastPass,'ONE_SHOT_CLAIMED');
+ assert.equal(report.publication,'NOT_ATTEMPTED');
+ assert.equal(report.firstFail,null);
+ assert.notEqual(report.status,'SUCCESS');
+});
+
+test('PIT-06-06 an absent or unverified post-claim result never claims success or publish readback',async()=>{
+ for(const returned of [undefined,{},{
+  status:'SUCCESS',publication:'NOT_ATTEMPTED',code:'R6_B_COLLECT_PUBLISH_VERIFIED',
+ },{
+  status:'PARTIAL',publication:'UNVERIFIED',code:'R6_B_PARTIAL_PUBLISH_VERIFIED',
+ }]){
+  const f=inject();
+  const run=async()=>{f.calls.push('RUN');return returned;};
+  const report=await performR6RegisteredOnce({auth,...f,run});
+  assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+  assert.equal(report.status,'STATE_UNKNOWN');
+  assert.equal(report.code,'R6_B_RUN_RESULT_UNVERIFIED');
+  assert.equal(report.lastPass,'ONE_SHOT_CLAIMED');
+  assert.equal(report.firstFail,'COLLECT_OR_PUBLISH');
+  assert.equal(report.retry,'READ_EXISTING_CLAIM_AND_DB_NO_RETRY');
+ }
+});
+
+test('PIT-06-06 persist-then-throw claim is ambiguous and never retried',async()=>{
+ const f=inject(),durable=[];
+ const claim=()=>{f.calls.push('CLAIM');durable.push('CLAIM_MAY_HAVE_REACHED_DISK');
+  throw Object.assign(new Error('R6_B_CLAIM_STATE_UNKNOWN'),
+   {code:'R6_B_CLAIM_STATE_UNKNOWN'});};
+ const report=await performR6RegisteredOnce({auth,...f,claim});
+ assert.deepEqual(durable,['CLAIM_MAY_HAVE_REACHED_DISK']);
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','UNLOCK']);
+ assert.equal(report.status,'STATE_UNKNOWN');
+ assert.equal(report.code,'R6_B_CLAIM_STATE_UNKNOWN');
+ assert.equal(report.firstFail,'PREFLIGHT');
+ assert.equal(report.retry,'READ_EXISTING_CLAIM_AND_DB_NO_RETRY');
+ assert.notEqual(report.status,'SUCCESS');
+});
+
+test('PIT-06-06 verified PARTIAL publication never upgrades missing groups to SUCCESS',async()=>{
+ const f=inject();
+ const run=async()=>{f.calls.push('RUN');return{
+  status:'PARTIAL',code:'R6_B_PARTIAL_PUBLISH_VERIFIED',
+  publication:'VERIFIED',sqlite:'COLLECTOR_RECORDED',providerRequests:2,
+  blsRequests:0,dolRequests:2,groupResults:[
+   {groupName:'DOL_UI_WEEKLY_CLAIMS',status:'PARTIAL',providerRequests:2}],
+ };};
+ const report=await performR6RegisteredOnce({auth,...f,run});
+ assert.equal(report.status,'PARTIAL');
+ assert.equal(report.code,'R6_B_PARTIAL_PUBLISH_VERIFIED');
+ assert.equal(report.lastPass,'PUBLISH_READBACK');
+ assert.equal(report.firstFail,null);
+ assert.equal(report.publication,'VERIFIED');
+ assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+});
