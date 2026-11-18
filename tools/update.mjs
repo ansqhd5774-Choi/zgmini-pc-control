@@ -70,8 +70,8 @@ export function requireCompleteRunnerInventory(response){
 }
 const sha256=x=>createHash('sha256').update(x).digest('hex');
 const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
-// Accept the same optional preimage manifest scope as controller/common.mjs.
-// The independent maintenance updater cannot import controller files during recovery.
+// Match controller/common.mjs's optional read-only request scopes without
+// importing live Controller files during independent maintenance recovery.
 export function validBacklogOriginalPcJob(body){
  if(!body||typeof body!=='object'||Array.isArray(body))return false;
  const base=['schema','requestId','chatId','operation','sourceRepository','sourceBranch','sourceSha'];
@@ -79,9 +79,13 @@ export function validBacklogOriginalPcJob(body){
  const keys=Object.keys(body);
  const scoped=body.operation==='writer-install-preimage-readonly'&&
   keys.length===base.length+extra.length&&extra.every(k=>Object.hasOwn(body,k));
- const allowed=scoped?[...base,...extra]:base;
+ const pit04=body.operation==='employment-r6-candidate-stage-readonly'&&
+  Object.hasOwn(body,'pit04Offset');
+ const allowed=scoped?[...base,...extra]:pit04?[...base,'pit04Offset']:base;
  if(keys.length!==allowed.length||!allowed.every(k=>Object.hasOwn(body,k))||
     keys.some(k=>!allowed.includes(k)))return false;
+ if(pit04&&(!Number.isSafeInteger(body.pit04Offset)||
+   body.pit04Offset<0||body.pit04Offset>50000))return false;
  if(scoped){
   if(typeof body.preimageManifestPath!=='string'||
      !/^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(body.preimageManifestPath)||
