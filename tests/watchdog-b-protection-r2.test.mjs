@@ -43,3 +43,16 @@ test('exact existing Controller source and each installed Controller file remain
   controllerFiles:{'../outside.mjs':hash('original-runtime')}},ctrl,read),
   /WATCHDOG_B_CONTROLLER_FILE_HASH_DRIFT/);
 });
+
+test('immutable Core and Korea Task hashes reject valid-format drift or missing history',()=>{
+ for(const task of ['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea']){
+  const changed=state();
+  changed.current[task]=hash('unapproved-'+task);
+  assert.throws(()=>requireCurrentProtection(changed),
+   /WATCHDOG_B_CORE_KOREA_TASK_DRIFT/);
+  const missing=state();
+  delete missing.historical[task];
+  assert.throws(()=>requireCurrentProtection(missing),
+   /WATCHDOG_B_CORE_KOREA_TASK_DRIFT/);
+ }
+});
