@@ -4,7 +4,7 @@
 - 기준: [ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md](ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md) R1
 - 우선순위(2026-11-18 전환): **최신 실제 장애·차단(P0) → 최신 완료 요청 검증·종료(P1) → 최근 중복·미확정(P2) → 과거 누적 잔량(P3)**. 신규 자동 종료 코드는 기존 누적 정리의 선행 조건이 아니다. 상세 계약은 기준서 1A를 따른다.
 - 관측 기준: 사용자 최초 화면 Open 1,198 / Closed 19(시점성 과거 수치). 1차 완료 뒤 Closed 48건을 조회했고, 이번 2차 배치 뒤 Closed **81건**을 조회했다. GitHub 검색 응답의 Open 쪽은 100건 제한이 있어 실시간 Open 총수는 미확정이다.
-- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **직접 누적 149건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건 + 최신 전환 2건). #2128은 동시 다른 작업 종료로 **우리 직접 종료 건수에 포함하지 않음**. 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
+- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **직접 누적 167건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건 + 최신 전환 2건 + 이번 18건). #2128은 동시 다른 작업 종료로 **우리 직접 종료 건수에 포함하지 않음**. 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
 
 ## 1. 1차에서 Closed한 28건
 
@@ -276,7 +276,57 @@
 - 총계 주의: 이전 5차 종료 때의 GitHub 전체 Closed **168건**은 그 시점의 스냅샷이다. 이번 동시 타 작업 Close가 발생했으므로 이를 실시간 현황이라고 반복 표기하지 않음. `openTotal` 최신 전체 집계는 별도 독립 분할 조회 전 미확정
 - 현재 이번 전환 과정에서 **운영 PC·Controller·원본 DB/D1/Task 변경 0건**, 전체 재실행 0건
 
-## 7. 확인했지만 닫지 않은 사례
+## 7. 6차 최신순 직접 정리 — 18건 종료 (2026-11-18 KST)
+
+- **사용자 승인 우선순위**: 신규 Open·최근 갱신 중 실제 P0 장애 먼저 분류 → 최신 단회 PASS 수명주기 완료 검증 후 종료 → 과거 이슈는 P3로 유지
+- 이번 대화에서 **18건만 직접 Close**. 누적 직접 종료 **167건** = 28 + 33 + 43 + 32 + 11 + 최신 전환 2 + 이번 18. 다른 대화가 닫은 [#2128](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2128), [#2130](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2130) 등은 직접 실적에 포함하지 않음
+- **완료 증거**: 표의 각 요청은 GitHub 원본 Issue의 고유 requestId·schema·operation, 원격 `results/*.json` 및 `*.txt` **2/2**, 기록된 Run 성공, 현재 상태를 대조했고, 실제 이번 18건 전부 `Closed` 재조회 PASS. Host/Process는 별도의 결과 schema와 역할 operating/handoff·관측 ID·0 operationalWrites를 확인
+- 최신 [#2133](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2133)은 **기존 D1 seed 읽기 전용 비교 1,624개 중 불일치 0**의 범위로만 PASS. 결과에 `publicationAuthorized=false`, `d1SeedCasVerified=false`, `r32NonRegressionVerified=false`이므로 신규 게시·승인된 공개 성공으로 표현하지 않는다
+- GitHub Closed **191건**: 생성일 기준 11/02 47, 11/03 53, 11/04~06 54, 11/07~10 10, 11/11~15 0, 11/16~17 2, 11/18 25건. 검색 7구간 모두 100건 이하, 중복 없는 Issue 번호 기준. **Open 전체 수는 아직 미확정**이다
+- GitHub 이슈 상태 외 운영 PC·Controller·SQLite/D1·Task·배포·원본 결과 삭제·PC 작업 재실행 **0건**
+
+### 7.1 표준 `pc-job` 성공 10건
+
+| 이슈 | 원본 Run |
+| --- | --- |
+| [#2117](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2117) | [44245593729](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44245593729) |
+| [#2100](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2100) | [44238822587](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44238822587) |
+| [#2099](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2099) | [44238275189](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44238275189) |
+| [#2096](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2096) | [44236563194](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44236563194) |
+| [#2095](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2095) | [44236404405](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44236404405) |
+| [#2091](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2091) | [44235695757](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44235695757) |
+| [#2090](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2090) | [44233733220](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44233733220) |
+| [#2088](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2088) | [44230284284](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44230284284) |
+| [#2081](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2081) | [44226161984](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44226161984) |
+| [#2080](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2080) | [44224927060](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44224927060) |
+
+### 7.2 Host/Process 인벤토리 읽기 전용 5건
+
+| 이슈 | 원본 Run | 유형 |
+| --- | --- | --- |
+| [#2114](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2114) | [44243383920](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44243383920) | `process-inventory-readonly` |
+| [#2108](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2108) | [44240685942](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44240685942) | `process-inventory-readonly` |
+| [#2086](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2086) | [44226960547](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44226960547) | `host-inventory-readonly` |
+| [#2085](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2085) | [44226841374](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44226841374) | `host-inventory-readonly` |
+| [#2084](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2084) | [44226687240](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44226687240) | `process-inventory-readonly` |
+
+### 7.3 W03 전용 결과 계약 3건
+
+| 이슈 | 원본 Run | 검증 완료 범위 |
+| --- | --- | --- |
+| [#2133](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2133) | [44251904069](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44251904069) | W03 D1 seed read-only / 1,624 scores, mismatch 0 |
+| [#2121](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2121) | [44248537680](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44248537680) | W03 R51 stored-date read-only |
+| [#2119](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2119) | [44246366950](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44246366950) | W03 R48 private SHA readback |
+
+### 7.4 최신 보류 및 다음 판단
+
+- [#2129](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2129), [#2125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2125): W03 D1 seed 별도 고유 요청으로 댓글 **0건**. #2133이 성공했어도 다른 requestId를 동일 결과로 재사용하지 않음. 실제 Run/저장/수신 증거 확인 전 Open
+- [#2115](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2115): 최초 **`EXACT_ISSUE_TITLE_REQUIRED` 미접수** 댓글과 이후 `PRIVATE_RESULT_PAIR_AND_MANIFEST_SHA_VERIFIED` 전용 readback 결과가 모두 있음. 대체 경로의 정확한 수신·원본 효과/담당 인수 확인 전 Open
+- [#2107](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2107): 원본 `BLOCKED/RESOURCE_WAIT_MEMORY`, 기능 진입 전 중단. 1차 admission 통과 후 2차 메모리 검사에서 거부되는 소스 구조가 공통 담당자에 의해 조사됨. 완료로 위장하거나 임의 실행하지 않음
+- [#2106](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2106): Task RUN_REQUEST_ACCEPTED와 Task/DB 실제 완료는 구별. 수집·DB 후속 증거 없이 Closed 금지
+- 최신 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 중앙 Controller 조정 원장, [#1818](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1818) Census M3 등 최근 갱신된 오래된 업무는 P0/P2 활동 여부를 별도로 검토하며 자동 Closed 금지
+
+## 8. 확인했지만 닫지 않은 사례
 
 | Issue | 실제 확인 | 보존·후속 |
 | --- | --- | --- |
@@ -288,9 +338,9 @@
 | [#12](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/12) | `BLOCKED/OPERATION_NOT_ALLOWED` | 보호 거부 자체가 요구한 시험인지 원담당 인수 후 개별 판정 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | 공유 Controller 중앙 원장, 다수 조정 댓글 | 영속 조정 원장으로 유지. 일괄 Close 금지 |
 
-## 8. 다음 필수 작업
+## 9. 다음 필수 작업
 
-1. 최신 updated/created Open 이슈에서 P0 실제 장애·차단과 P1 최신 단회 완료 후보를 재조회한다. 특히 #2129·#2125의 기존 결과·Run 조회, #2130의 SUMMARY_ONLY 범위, 최신 #2117 이하 완료 요청을 검증한다. 이미 타 담당이 Close한 대상은 건너뛴다. 과거 #502 이후 누적 정리는 P3로 유지한다.
+1. 최신 P0 원장(#68, #2107, #1818)과 결과 미수신(#2129, #2125)의 현재 계약·Run을 **조회만** 하고 원담당과 연결한다. 다음 최신 Open #2079 이하의 단회 성공 후보는 원본 JSON/TXT와 Run 검증 후 개별 종료한다. 이미 Closed된 #2128/#2130/이번 18건의 완료 증거 재검증과 PC 재실행은 금지하고, 과거 누적은 P3 보조 대기열로 유지한다.
 2. 결과쌍 결손(#4/#6)은 기존 Run/댓글·결과 게시 저장소를 읽기 전용으로 대조. 한쪽이 없어도 실행을 재시도하거나 성공으로 위장하지 않는다.
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
