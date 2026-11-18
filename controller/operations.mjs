@@ -50,11 +50,16 @@ export function attestRetiredIranAbsence({exact,inventory}){
  need(exact.status!==0,'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
  need(exact.status===1&&taskNotFound(decodeTaskOutput(exact.stderr??Buffer.alloc(0))),
   'RETIRED_IRAN_QUERY_UNCERTAIN');
- need(inventory&&!inventory.error&&!inventory.signal&&inventory.status===0,
-  'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ // Preserve the existing fail-closed code while distinguishing a failed
+ // scheduler command from a successful command with an unparseable inventory.
+ const inventoryError=probeReason=>Object.assign(
+  new Error('RETIRED_IRAN_INVENTORY_UNAVAILABLE'),
+  {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE',probeReason});
+ if(!inventory||inventory.error||inventory.signal||inventory.status!==0)
+  throw inventoryError('SCHTASKS_INVENTORY_COMMAND_FAILED');
  const names=decodeTaskOutput(inventory.stdout??Buffer.alloc(0)).split(/\r?\n/)
   .map(line=>line.match(/^\s*"([^"]+)"\s*,/)?.[1]??null).filter(Boolean);
- need(names.length>0,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ if(names.length===0)throw inventoryError('SCHTASKS_INVENTORY_EMPTY_PARSE');
  need(!names.some(name=>/ZGMINI-PC-Iran/i.test(name)),'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
  return 'APPROVED_RETIRED_ABSENT';
 }
