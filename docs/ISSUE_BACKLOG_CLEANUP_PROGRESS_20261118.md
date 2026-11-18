@@ -4,7 +4,7 @@
 - 기준: [ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md](ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md) R1
 - 우선순위(2026-11-18 전환): **최신 실제 장애·차단(P0) → 최신 완료 요청 검증·종료(P1) → 최근 중복·미확정(P2) → 과거 누적 잔량(P3)**. 신규 자동 종료 코드는 기존 누적 정리의 선행 조건이 아니다. 상세 계약은 기준서 1A를 따른다.
 - 관측 기준: 사용자 최초 화면 Open 1,198 / Closed 19(시점성 과거 수치). 1차 완료 뒤 Closed 48건을 조회했고, 이번 2차 배치 뒤 Closed **81건**을 조회했다. GitHub 검색 응답의 Open 쪽은 100건 제한이 있어 실시간 Open 총수는 미확정이다.
-- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **직접 누적 167건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건 + 최신 전환 2건 + 이번 18건). #2128은 동시 다른 작업 종료로 **우리 직접 종료 건수에 포함하지 않음**. 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
+- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **직접 누적 188건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건 + 최신 전환 2건 + 6차 18건 + 7차 21건). #2128은 동시 다른 작업 종료로 **우리 직접 종료 건수에 포함하지 않음**. 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
 
 ## 1. 1차에서 Closed한 28건
 
@@ -326,7 +326,57 @@
 - [#2106](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2106): Task RUN_REQUEST_ACCEPTED와 Task/DB 실제 완료는 구별. 수집·DB 후속 증거 없이 Closed 금지
 - 최신 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 중앙 Controller 조정 원장, [#1818](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1818) Census M3 등 최근 갱신된 오래된 업무는 P0/P2 활동 여부를 별도로 검토하며 자동 Closed 금지
 
-## 8. 확인했지만 닫지 않은 사례
+## 8. 7차 최신순 직접 정리 — 21건 종료 (2026-11-18 KST)
+
+- **이번 신규 종료 21건**: 표준 단회 `pc-job` 11건, Host/Process 읽기 전용 인벤토리 10건. 직접 종료 누적 **188건**(전 회차 167 + 이번 21).
+- 원본 요청 `requestId`/schema/operation, 실제 `runId/seat`, 원격 JSON/TXT 결과쌍 **2/2**, 상태·코드·Job 성공을 검증. Host/Process는 저장된 `issueNumber`, role, `operationalWrites=0`을 추가 대조하고 종료 직전 Open/댓글 수를 재조회
+- 현재 GitHub Closed는 **212건**: 생성일 구간별 11/02 47건, 11/03 53건, 11/04~06 54건, 11/07~10 10건, 11/11~15 0건, 11/16~17 17건, 11/18 31건; 모든 구간 검색 상한 100건 미만. **이번 21건 전원 Closed readback PASS**. 다른 작업의 종료 기록은 직접 종료 실적에서 제외
+- 표준 요청 성공은 **그때의 읽기 전용 진단 완료**만 의미. [#2055](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2055) `R32_SAVED_RAW_SHA_CHECKPOINT_VERIFIED_NOT_CURRENT`를 최신 보강 원자료 완성이나 게시 완료로 주장하지 않음
+- PC 작업 재실행·Controller 설치·Task 예약·SQLite/D1/웹 게시·원자료 삭제 **0건**
+
+### 8.1 일반 PC 단회 진단 11건
+
+| Issue | GitHub Actions 원본 |
+| --- | --- |
+| [#2072](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2072) | [Run 44221858034](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44221858034) |
+| [#2060](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2060) | [Run 44212106863](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44212106863) |
+| [#2058](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2058) | [Run 44211834183](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44211834183) |
+| [#2055](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2055) | [Run 44210472996](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44210472996) |
+| [#2054](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2054) | [Run 44202609250](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44202609250) |
+| [#2041](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2041) | [Run 44088646624](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44088646624) |
+| [#2027](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2027) | [Run 44084002310](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44084002310) |
+| [#2024](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2024) | [Run 44083636847](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44083636847) |
+| [#2019](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2019) | [Run 44081956387](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44081956387) |
+| [#2018](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2018) | [Run 44081708642](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44081708642) |
+| [#2016](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2016) | [Run 44080920562](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44080920562) |
+
+### 8.2 Host/Process 별도 계약 10건
+
+| Issue | GitHub Actions 원본 | 범위 |
+| --- | --- | --- |
+| [#2076](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2076) | [Run 44223582023](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44223582023) | `process-inventory-readonly` |
+| [#2074](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2074) | [Run 44222297628](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44222297628) | `process-inventory-readonly` |
+| [#2048](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2048) | [Run 44091319308](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44091319308) | `process-inventory-readonly` |
+| [#2047](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2047) | [Run 44091313042](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44091313042) | `process-inventory-readonly` |
+| [#2040](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2040) | [Run 44087820370](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44087820370) | `process-inventory-readonly` |
+| [#2035](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2035) | [Run 44086438586](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44086438586) | `process-inventory-readonly` |
+| [#2029](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2029) | [Run 44084257054](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44084257054) | `process-inventory-readonly` |
+| [#2028](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2028) | [Run 44084251128](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44084251128) | `process-inventory-readonly` |
+| [#2026](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2026) | [Run 44083848852](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44083848852) | `host-inventory-readonly` |
+| [#2025](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2025) | [Run 44083842514](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44083842514) | `host-inventory-readonly` |
+
+### 8.3 보존한 실제 장애 및 미완료 요청
+
+- [#2079](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2079): `STATE_UNKNOWN / CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE`; 실행 인스턴스의 실제 소유권이 확정되지 않아 Open 유지
+- [#2077](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2077): `BLOCKED / R32_CHECKPOINT_INCOMPLETE_OR_FAILED`; 원본 checkpoint 상태 확인 전 Open 유지
+- [#2071](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2071)·[#2064](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2064): `RESOURCE_WAIT_MEMORY` 차단. 안전 기준 임의 완화·재실행 금지
+- [#2069](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2069): SPY/ETF 원자료 지정 구간 수집 64/64 완료 기록과 **후속 R47 계산 실패**가 공존. 별도 후속 계산이 실제 해결됐는지 원담당 확인 전 Open 유지. [#2066](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2066) 원본은 공급자 `HTTP 502 / STOP_NETWORK_OR_TIMEOUT`으로 저장 0
+- [#2059](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2059)·[#2021](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2021)·[#2017](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2017): 유지보수 승인/manifest `BLOCKED`. [#2052](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2052)·[#2023](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2023) 등 `BUNDLE_REGISTERED`는 일반 진단과 달리 고유 source/승인·실제 효과 확인이 필요해 보류
+- [#2034](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2034): 원본 `CONFIG_B_PAIR_INPUT_STOP`, 후속 source 수정은 존재하나 같은 요청 ID를 성공으로 덮어쓰지 않음
+- 최신 [#2129](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2129)·[#2125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2125) W03 D1 별도 요청 댓글 0건, [#2107](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2107) 메모리 이중 검사 차단을 보존
+- 최근 갱신된 [#1818](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1818)의 물가 Census #28는 PR #1325까지의 source 수정에도 **실PC 미완료**로 원담당 기록. [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) 중앙 인계는 영속 유지
+
+## 9. 확인했지만 닫지 않은 사례
 
 | Issue | 실제 확인 | 보존·후속 |
 | --- | --- | --- |
@@ -338,9 +388,9 @@
 | [#12](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/12) | `BLOCKED/OPERATION_NOT_ALLOWED` | 보호 거부 자체가 요구한 시험인지 원담당 인수 후 개별 판정 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | 공유 Controller 중앙 원장, 다수 조정 댓글 | 영속 조정 원장으로 유지. 일괄 Close 금지 |
 
-## 9. 다음 필수 작업
+## 10. 다음 필수 작업
 
-1. 최신 P0 원장(#68, #2107, #1818)과 결과 미수신(#2129, #2125)의 현재 계약·Run을 **조회만** 하고 원담당과 연결한다. 다음 최신 Open #2079 이하의 단회 성공 후보는 원본 JSON/TXT와 Run 검증 후 개별 종료한다. 이미 Closed된 #2128/#2130/이번 18건의 완료 증거 재검증과 PC 재실행은 금지하고, 과거 누적은 P3 보조 대기열로 유지한다.
+1. P0 실제 미완료 #1818 Census #28, #2107 메모리 차단, #2079 Core Task 소유권 미확정, #2077 R32 checkpoint를 최신 원담당 증거에 연결한다. 다음 P1 최신 Open #2015 이하 성공 후보를 기존 Run·JSON/TXT·승인 효과로 확인해 종료한다. #2129/#2125 미수신 요청은 고유 ID·Run·결과를 읽기 전용으로 조사하며 재실행하지 않는다. 별도 B급 source 등록·수집/게시 후보는 단회 진단 PASS만으로 종료하지 않는다.
 2. 결과쌍 결손(#4/#6)은 기존 Run/댓글·결과 게시 저장소를 읽기 전용으로 대조. 한쪽이 없어도 실행을 재시도하거나 성공으로 위장하지 않는다.
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
