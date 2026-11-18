@@ -1,0 +1,47 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "36cf8ffb813f3a006f3e05379fba641fb3404645",
+  "targetSha": "732d94aa592723e09c6d776b37f269283dd26e3e",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "PROPOSAL_ONLY: same-purpose SEVEN_TO_SEVEN maintenance V2 update requires separately validated exact source approval and independent Windows operator verification before any application; central #68 / #2108",
+  "files": {
+    "tools/maintenance-contract.mjs": "24145afe1695f8cde691a03a87df480af1ea695d4757eb34d00d6b6405d58f57",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "da5121e526c752ab8950cfd27d497255bcc27caa940b91ea9aad04c81239504f",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "aff7b1c51b37be86cebbd8743fcd8561d449da389e2bf63b02bc654f5f7d9425",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "sourceCiMaintenance": "PASS #44239576498",
+    "sourceCiC996": "PASS #44239576427",
+    "targetNineSourcePathsReviewed": true,
+    "installedMaintainerSource": "36cf8ffb813f3a006f3e05379fba641fb3404645",
+    "installedMaintainerFilesVerifiedAt": "2026-11-18T04:56:31Z",
+    "operatingPCNoActiveControllerInstallLeaseAt": "2026-11-18T04:56:31Z",
+    "windowsHandoffExecuted": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/update.mjs"
+  ],
+  "effects": [
+    "Bounded exact pc-job workflow disable/enable state GET confirmation",
+    "Recheck disabled workflow at drain completion before Controller backup/stop",
+    "Read-only fixed per-request stage/backup/backlog/install-lease summary with private owner identity redacted"
+  ],
+  "preserve": [
+    "Existing Controller f7f1559bc0ef15bb9b375982d048369c474c490f, host.json, six Runner registrations",
+    "Core/Korea Tasks, approved Iran R13 absence, SQLite, D1, provider/collection settings",
+    "Existing receiver origin proof, Startup guard, historical request ledgers/leases/backups",
+    "Original #2094 blocked terminal result, no re-execution or unattended stage cleanup",
+    "W04 single 6-file Controller install owner and W01 parallel install hold"
+  ],
+  "scopeNote": "PROPOSAL_ONLY_NOT_INSTALLABLE: seven-to-seven V2 from 36cf8ff to immutable 732d94a, exactly tools/update.mjs differs among seven installed runtime files. Nine source-path hashes pinned. Independent receiver proof, exact medium-token operator, SHA/backup/rollback and original stage/backlog evidence required before actual B handoff. This draft grants no operational effect."
+}
