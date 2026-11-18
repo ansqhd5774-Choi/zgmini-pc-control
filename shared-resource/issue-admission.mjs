@@ -50,6 +50,7 @@ const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
   // Dedicated W03 R47/R48 private-only readback B handlers, not generic Writer B.
   'w03-r47-private-readback-once',
   'w03-r48-private-readback-once',
+  'w03-r51-stored-date-readback-once',
   'w01-census-m3-api-once',
   // Dedicated R47 CMD B receives this exact title via pc-approved-runtime-b-once.
   'pc-r47-cmd-onefile-install',
