@@ -13,6 +13,8 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
   SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
+  MP_RETIRE_B_OPERATION,MP_RETIRE_B_ISSUE_TITLE,MP_RETIRE_B_MANIFEST_PATH,
+  validateMpRetireBIssueEnvelope,validateMpRetireBManifestRequest,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
@@ -253,7 +255,8 @@ export function createMaintenanceAgent({
     return exec(nodeBinary,[updateScript,...args],updateTimeoutMs,safeUpdaterEnv());
   }
   async function updaterStatus(id,operation="controller-update"){
-    const subcommand=operation===R54_B_OPERATION?'r54-b-status'
+    const subcommand=operation===MP_RETIRE_B_OPERATION?'mp-task-retire-status'
+      :operation===R54_B_OPERATION?'r54-b-status'
       :operation===SOURCE_BUNDLE_OPERATION?'source-bundle-status'
       :operation==="employment-r6-host-register"?"host-r6-status":"status";
     try{return parseJsonOutput(await updater([subcommand,"--request-id",id]),"UPDATE_STATUS_INVALID");}
@@ -311,7 +314,9 @@ export function createMaintenanceAgent({
       "--json","number,title,state,body,author,labels,comments"],"GITHUB_ISSUE_READ_FAILED");
   }
   async function manifestBytes(request){
-    const approvedPath=request.operation===R54_B_OPERATION
+    const approvedPath=request.operation===MP_RETIRE_B_OPERATION
+      ?MP_RETIRE_B_MANIFEST_PATH
+      :request.operation===R54_B_OPERATION
       ?'approvals/theme-nine-r54/sixfile-source.json'
       :request.operation===SOURCE_BUNDLE_OPERATION
       ?`approvals/source-bundles/${request.approvalManifestSha256}.json`
@@ -520,7 +525,7 @@ export function createMaintenanceAgent({
     return persistResult(entry,result);
   }
   async function processIssue(issue){
-    if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
+    if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,MP_RETIRE_B_ISSUE_TITLE].includes(issue?.title)
       ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
       return {status:"IGNORED",issueNumber:issue?.number};
     if(typeof issue.body!=="string"||Buffer.byteLength(issue.body)>MAX_BODY_BYTES){
@@ -529,7 +534,9 @@ export function createMaintenanceAgent({
     let request;
     try{
       const parsed=parseIssueBody(issue.body);
-      request=parsed.operation==="employment-r6-host-register"
+      request=parsed.operation===MP_RETIRE_B_OPERATION
+        ?validateMpRetireBIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
+        :parsed.operation==="employment-r6-host-register"
         ?validateR6HostIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
         :parsed.operation===SOURCE_BUNDLE_OPERATION
         ?validateSourceBundleIssueEnvelope(parsed,{actor:issue.author.login,controlRepository:repo})
@@ -537,6 +544,8 @@ export function createMaintenanceAgent({
         ?validateR54BIssueEnvelope(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo})
         :validateMaintenanceRequest(parsed,{actor:issue.author.login,allowedActors,controlRepository:repo});
       if((request.operation==="employment-r6-host-register")!==(issue.title===R6_HOST_ISSUE_TITLE))
+        throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
+      if((request.operation===MP_RETIRE_B_OPERATION)!==(issue.title===MP_RETIRE_B_ISSUE_TITLE))
         throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
       if((request.operation===R54_B_OPERATION)!==(issue.title===R54_B_ISSUE_TITLE))
         throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
@@ -583,7 +592,9 @@ export function createMaintenanceAgent({
       const installedSha=installedShaFromStatus(preflight);
       if(!isSha(installedSha))throw coded("INSTALLED_CONTROLLER_SHA_UNVERIFIED");
       const args={actor:issue.author.login,allowedActors,controlRepository:repo,installedSha};
-      approved=request.operation===R54_B_OPERATION
+      approved=request.operation===MP_RETIRE_B_OPERATION
+        ?validateMpRetireBManifestRequest(request,approvedBytes,{...args})
+        :request.operation===R54_B_OPERATION
         ?validateR54BManifestRequest(request,approvedBytes,{...args})
         :request.operation===SOURCE_BUNDLE_OPERATION
         ?validateSourceBundleBApproval(request,approvedBytes,{actor:issue.author.login,installedSha})
@@ -615,7 +626,8 @@ export function createMaintenanceAgent({
     if(!held.created)return {status:"RUNNING",code:"DUPLICATE_REQUEST_SUPPRESSED"};
     let result;
     try{
-      const command=request.operation===R54_B_OPERATION?'r54-b-apply'
+      const command=request.operation===MP_RETIRE_B_OPERATION?'mp-task-retire-apply'
+        :request.operation===R54_B_OPERATION?'r54-b-apply'
         :request.operation===SOURCE_BUNDLE_OPERATION?'source-bundle-apply'
         :request.operation==="employment-r6-host-register"?"host-r6-apply":"apply";
       const executed=parseJsonOutput(await updater([command,"--request-id",request.requestId,
@@ -676,7 +688,7 @@ export function createMaintenanceAgent({
       if(!Number.isSafeInteger(number)||number<=0||seen.has(number))continue;
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
-      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(entry?.title))continue;
+      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,MP_RETIRE_B_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
       const cached=settledIssueCache.get(number);
       const updatedAt=entry?.updatedAt;
