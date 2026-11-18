@@ -1,0 +1,65 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "REVIEW_REQUIRED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "8b642196a8c572b774d3c5bf177d9e0d94714008",
+  "baseHead": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "baseConfigSourceSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "d7f601aaba137de807ef9b065ea9be7ff31a2e7b4fe199452c18cd0b839a8300",
+      "afterSha256": "58a8d36db230dbb721901920dca84adf9deca2d0165950c89e7252360b909f6a",
+      "candidateSha256": "3c25d57cb47e614fe9e7db9a43f9fc3e0dc70f942bc1b0bd6c0d2db2562df0ed",
+      "insertions": [
+        {
+          "anchor": "  const p=envelope?.projection;",
+          "position": "after",
+          "text": "  if(id==='inflation'&&p?.status==='READY'&&p.sourceVersion===checkpoint.sourceVersion&&p.sourceStoredAt===checkpoint.sourceStoredAt){\n   const {inflationR2AsOfTrendCompatibility}=await import('./inflation-r2-trend-date-refresh.mjs');\n   const corrected=inflationR2AsOfTrendCompatibility(envelope?.payload);\n   if(corrected!==envelope?.payload){\n    await projectionWriter(core).write(id,corrected,Date.now(),checkpoint);\n    report.projections.push({id,status:'LOCAL_READY'});\n    return;\n   }\n  }\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/inflation-r2-trend-date-refresh.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "773e2ddb7d874872975108d8d2b54324174be24292a7f42eadabc143a94165dd"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "w01-r2-archive-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "w01-r2-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
