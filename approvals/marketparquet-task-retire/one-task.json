@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_MP_EXACT_TASK_RETIRE_B_V1",
+  "status": "APPROVED_B",
+  "scope": "MARKETPARQUET_TASK_RETIRE_EXACT",
+  "taskName": "ZGMINI-PC-MarketParquet-ETF",
+  "taskXmlSha256": "784ce63cb8c947abed116c2d754a3d24985f73d41ddaf9afdd44d43b246a7126",
+  "entryPath": "E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r167-cycle.mjs",
+  "entrySha256": "4cad9645ff306cc5d2ea9f86fb8922f78f4b19dd706d6386ec01b0bbabe0b673",
+  "runCount": 1,
+  "preserveOtherTasks": true,
+  "preserveSourceAndData": true,
+  "noProviderCalls": true,
+  "noD1Writes": true,
+  "noControllerChanges": true
+}
