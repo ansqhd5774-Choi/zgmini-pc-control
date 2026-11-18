@@ -186,6 +186,36 @@ export function inspectWriterModuleInventory(sourceRoot,{
  return output;
 }
 
+// One pinned module needed by the existing Writer B single-file CAS contract.
+// Unlike the aggregate direct-lib/ inventory, this includes lib/market-score/.
+// A checked-out file digest is never treated as active Core process evidence.
+export function inspectFixedCreditR2Source(sourceRoot,{
+ realpath=p=>fs.realpathSync.native(p),read=p=>fs.readFileSync(p),
+}={}){
+ const pathName='lib/market-score/credit-r2.mjs';
+ const unknown=()=>({status:'STATE_UNKNOWN',code:'CREDIT_R2_MODULE_PREIMAGE_UNVERIFIED',
+  path:pathName,sha256:null,evidenceLevel:'CHECKOUT_FILE_NOT_CORE_RUNTIME'});
+ if(typeof sourceRoot!=='string'||!path.isAbsolute(sourceRoot))return unknown();
+ const filename=path.join(sourceRoot,...pathName.split('/'));
+ try{
+  const root=path.resolve(sourceRoot);
+  const expected=path.resolve(filename);
+  const canonicalRoot=realpath(root),canonicalFile=realpath(expected);
+  const stat=fs.lstatSync(filename);
+  if(canonicalRoot.toLowerCase()!==root.toLowerCase()||
+     canonicalFile.toLowerCase()!==expected.toLowerCase()||
+     !canonicalFile.toLowerCase().startsWith((canonicalRoot+path.sep).toLowerCase())||
+     !stat.isFile()||stat.isSymbolicLink()||stat.size<1||stat.size>2_000_000)
+   return unknown();
+  const bytes=read(filename);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==stat.size)return unknown();
+  return {status:'PASS',code:'CREDIT_R2_CHECKOUT_FILE_HASH_READONLY',
+   path:pathName,sha256:sha256(bytes),fileBytes:bytes.length,
+   evidenceLevel:'CHECKOUT_FILE_NOT_CORE_RUNTIME',
+   gitTrackedProven:null,providerCalls:0,d1Writes:0,operationalWrites:0};
+ }catch{return unknown();}
+}
+
 /** Injectable dependencies keep fixture tests independent from a real Windows PC. */
 export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
  realpath=p=>fs.realpathSync.native(p),read=p=>fs.readFileSync(p),
@@ -338,6 +368,7 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
       // tracked. A candidate-level clean status cannot prove per-file clean.
       dirtyPaths:null});
      candidate.moduleSourceInventory=inspectWriterModuleInventory(real,{realpath,read});
+      candidate.creditR2Module=inspectFixedCreditR2Source(real,{realpath,read});
     }
     result.historicalCheckoutCandidate=candidate;
    }
@@ -355,6 +386,9 @@ export function inspectPcSource({dataRoot,coreTaskXml,exists=fs.existsSync,
    result.sourceHeadMatchesConfig=result.sourceHead.toLowerCase()===result.configApprovedSha;
   result.writerSourceInventory=inspectWriterSourceInventory(sourceRoot,{realpath,read,dirtyPaths:changed});
   result.moduleSourceInventory=inspectWriterModuleInventory(sourceRoot,{realpath,read});
+   // Only a source-resolved checkout whose HEAD matches approved Writer config.
+   if(result.sourceHeadMatchesConfig===true)
+    result.creditR2Module=inspectFixedCreditR2Source(sourceRoot,{realpath,read});
  }catch{result.code='PC_SOURCE_GIT_READ_UNVERIFIED';return result;}
  for(const name of sourceFiles){
   const p=path.join(sourceRoot,...name.split('/'));

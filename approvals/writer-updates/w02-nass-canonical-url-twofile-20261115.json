@@ -1,0 +1,43 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "95d40cd35c64a5cd89311bd0cb87da723f341b35",
+  "baseHead": "c9d54e227934e80081fb80ebc0efd8114424985c",
+  "baseConfigSourceSha": "c9d54e227934e80081fb80ebc0efd8114424985c",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-calendar-usda-nass.mjs",
+      "change": "M",
+      "beforeSha256": "065ab1d052c4a75e9a851a6dcc69cdf527ef12c8f603ecd9a194324a2d88a133",
+      "afterSha256": "8a9332b5e955afb6faa595f15412e133e0cbfba56f640d1448ef3b0888fdee54"
+    },
+    {
+      "path": "lib/release-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "cdf3f09ace70b42f799f4e39dbb8bd2315acb0dda82438e5fac18aa7977023b9",
+      "afterSha256": "9847c513fc5c6d48fc53c9fd125567fb45cafe4e64cce286ed5caa766d018460"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "sha256": "4d618a1e8158f405def228c3c28fbb288bd0e4533c991595c937b91ad71b89de"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}

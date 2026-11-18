@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "452d0897-f0ff-44a0-93af-cba9c94789c0",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "c9d54e227934e80081fb80ebc0efd8114424985c",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+  "candidateSourceSha": "3cf95b1865382cf7f73708a344c81db98ae4c03f",
+  "manifestSha256": "7a2ae9f7b7f6df5aab693917cfa19772e281d757f94bfa5fa9b9638320c4598d",
+  "baseTreeOid": "0591a6894033f93db1e5fa4ddbb397c2d8309806",
+  "preparedTreeOid": "37d301e90ac7ca71392b294e1f1607d46c18f78c",
+  "provenanceSha256": "572b90374c7c328698f1efe491089a4fdaedee0d7cad53e7350fd1a6a6a30b1a",
+  "runId": "43694321143",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-calendar-usda-nass.mjs",
+    "lib/release-calendar.mjs",
+    "scripts/pc-writer/release-calendar.mjs"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "e2f261f7-86d3-42ab-bd1b-e728534a6b02",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "ecf5a859dbee150e3557e94896f410366f718f3e",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "fb222ee3c3293d334709c21d4846fcfddc497c8a",
+  "candidateSourceSha": "143a26285e8b21a34fabef7a5802cb41f4c4a447",
+  "manifestSha256": "29371923bf4b7cf912ec892e2d9c6a5c974c9a34c26303ca0eaa6dc715e8b0c2",
+  "baseTreeOid": "4ee8074f65362e93dc9377e7a11debddd099e95f",
+  "preparedTreeOid": "024fc33b9c9b5066f9f690fbe7544204d058a0f8",
+  "provenanceSha256": "a9eef58864b9cc34611dbf6da0c60f53083fb528486b627abe08536272e828ce",
+  "runId": "43724532788",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/run-local.mjs",
+    "scripts/pc-writer/api-connection-health.mjs",
+    "worker/api-connection-health.mjs"
+  ]
+}

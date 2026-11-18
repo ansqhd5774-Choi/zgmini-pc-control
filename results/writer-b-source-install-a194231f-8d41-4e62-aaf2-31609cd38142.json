@@ -1,0 +1,26 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a194231f-8d41-4e62-aaf2-31609cd38142",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "d8f280644649a2a7830d6a09a7217f0f5df92760",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "20ffdb53622393c5f957299f6713fe1149920964",
+  "candidateSourceSha": "adaf71f6d462fb54ad516fccbf509f89e94a64f4",
+  "manifestSha256": "81947ba7dee3932afdd000ea0beb1d541ed22f4eecabcd8a29bf80c132d6dfe0",
+  "baseTreeOid": "dd87e155cce66a1bf4245003ec8c6840bc7658f6",
+  "preparedTreeOid": "07c81f892dd0adb65ff8ced14b2ce3ddc35fca3e",
+  "provenanceSha256": "2cc0a64d50fec3bdc8390db8218f1e7737ab73bd043387bae622ad397d929d5a",
+  "runId": "43713073226",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-calendar-deltascreener-public.mjs",
+    "lib/market-calendar-deltascreener-snapshot.mjs",
+    "lib/market-calendar-r44-marketcap.mjs",
+    "scripts/pc-writer/collect-local.mjs",
+    "scripts/pc-writer/market-calendar-deltascreener-input.mjs",
+    "scripts/pc-writer/market-calendar-deltascreener-output.mjs",
+    "scripts/pc-writer/run-local.mjs"
+  ]
+}

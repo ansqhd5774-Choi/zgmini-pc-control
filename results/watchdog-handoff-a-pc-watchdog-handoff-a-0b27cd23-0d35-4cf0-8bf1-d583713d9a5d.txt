@@ -1,0 +1,14 @@
+schema=ZGMINI_WATCHDOG_HANDOFF_FIRSTFAIL_A_RESULT_V1
+requestId=pc-watchdog-handoff-a-0b27cd23-0d35-4cf0-8bf1-d583713d9a5d
+status=PASS
+code=WATCHDOG_HANDOFF_A_READ_ONLY
+watchdog=HEALTHY_NEW_SCOPE
+claim=NOT_CLAIMED
+bridgeStatus=BLOCKED
+bridgeCode=ENOENT
+receiverSource=PRIOR
+receiverState=LISTENING
+checkout=MAIN_TARGET_NOT_ANCESTOR
+controllerInstallLock=FREE
+stopRequest=ABSENT
+operationalWrites=0

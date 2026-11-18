@@ -1,0 +1,33 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_APPROVAL_V1",
+  "requestId": "pc-publication-34db72af-680c-4129-b6ee-8a7f31e5c40a",
+  "operation": "census-qfr-margin-once",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "publisherSha": "24f80c4cc096114537ceb5c5a7dab01591791c43",
+  "operationalSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "snapshotKey": "detail:earnings-recession-indicators:census-qfr-mfg-margin:v1",
+  "publisherFiles": {
+    "scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs": "5286287be8773dd8d2d4bdc943e7ee40131d88669c1ec981f4be68a34025879a",
+    "scripts/pc-writer/EARNINGS_CENSUS_QFR_R2_SQLITE_APPEND.mjs": "9d3cd0296d41baa9d6deb12897b164fe13115eada4df17ed14196d89ed9273d0",
+    "scripts/pc-writer/EARNINGS_CENSUS_QFR_R3_STORED_PREVIEW_READONLY.mjs": "4119bba808819a71f58b6d76ccb3872b5151c7c80df666b483f4f871bc075933",
+    "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_PROJECTION_DRAFT_READONLY.mjs": "59e4303e2135bfad20b9e51c6e48763be655fad5d2f00eb1e9d50b5cb0e3c002",
+    "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs": "7b08d799dfce2c5ab720dd69791d727834c2c5c83ed365c39fd89cd3c7853005",
+    "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs": "db4c14f28c7eb196136e431cc51680542f8846e6b183e0aa7d5b3307b27fcb5b",
+    "scripts/pc-writer/d1.mjs": "267fb175386fa007bd74b255d922fba9ee6fe71ffe953f94970beb8ba9d9ff87",
+    "scripts/pc-writer/d1-transient.mjs": "f912c335675481f8646380feaebb6241ec0d877b78dbd6fa165e208fdc6d457e",
+    "scripts/pc-writer/d1-diagnostics.mjs": "2e9ea54661c51d86798800e532edb10c6796694d3049844ef8b283b7ad6dfe5f",
+    "worker/earnings-companion-c-qfr-r1.mjs": "a66b60a751b9ec9a0a6379027c2b4785c20a4c4a693be72a9398dbc0da32dbd7"
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "CENSUS_QFR_MARGIN_SINGLE_KEY_D1_ONCE",
+    "actor": "ansqhd5774-Choi",
+    "issueNumber": 2089
+  },
+  "execution": {
+    "mode": "ONCE",
+    "maxAutomaticRetries": 0,
+    "maxD1Keys": 1,
+    "provider": "STORED_SQLITE_ONLY"
+  }
+}

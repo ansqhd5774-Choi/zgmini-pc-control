@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "3ff2f9ab-4e79-4219-aa27-2b3450e5d3b4",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "fb222ee3c3293d334709c21d4846fcfddc497c8a",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "d8f280644649a2a7830d6a09a7217f0f5df92760",
+  "candidateSourceSha": "a2cdfe53811d32ca35d6e4189cbea7d82e6760d6",
+  "manifestSha256": "f91963731561d2bedf0a64eeb6d8ff43468efb109b023f6ced26f4cf67dd8b5e",
+  "baseTreeOid": "07c81f892dd0adb65ff8ced14b2ce3ddc35fca3e",
+  "preparedTreeOid": "4ee8074f65362e93dc9377e7a11debddd099e95f",
+  "provenanceSha256": "7b3a50d5dda911db81bde2b0bd8482e610d859312a20d4922b58bd29bea485ea",
+  "runId": "43720328688",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/market-calendar-r44-d1-readback.mjs",
+    "scripts/pc-writer/run-local.mjs"
+  ]
+}

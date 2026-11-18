@@ -8,8 +8,12 @@ import {fileURLToPath} from 'node:url';
 import {authenticate,validateSeat} from './pc-host-inventory-readonly.mjs';
 import {uploadResultPairAtomic} from '../writer-config-b/result-pair-atomic.mjs';
 import {collectAutomationStatus} from './automation-status.mjs';
+import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
+import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
+import {readMaintenanceRecoveryStatus} from './update.mjs';
 import {createHash} from 'node:crypto';
+import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -28,8 +32,22 @@ const PS_SCRIPT=[
  "$filtered = @($processes | Where-Object { $names -contains $_.Name })",
  "$counts = @($filtered | Group-Object Name | Sort-Object Name | ForEach-Object { [pscustomobject]@{name=[string]$_.Name;count=[int]$_.Count} })",
  "$selected = @($filtered | Sort-Object @{Expression={ if ($_.Name -match '(?i)^Runner\\.') {0} elseif ($_.Name -match '(?i)^(wscript|cscript)\\.exe$') {1} elseif ($_.Name -match '(?i)^node\\.exe$') {2} elseif ($_.Name -match '(?i)^(powershell|pwsh)\\.exe$') {3} elseif ($_.Name -match '(?i)^cmd\\.exe$') {4} else {5} }},Name,ProcessId | Select-Object -First 60 | ForEach-Object {",
- " [pscustomobject]@{name=[string]$_.Name;pid=[int]$_.ProcessId;ppid=[int]$_.ParentProcessId;session=[int]$_.SessionId;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576)}",
+ " [pscustomobject]@{name=[string]$_.Name;pid=[int]$_.ProcessId;ppid=[int]$_.ParentProcessId;session=[int]$_.SessionId;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576);privateCommitMiB=[int][math]::Floor(([double]$_.PageFileUsage)/1024)}",
  "})",
+ "$byPid=@{}; foreach($p in $processes){$byPid[[int]$p.ProcessId]=$p}",
+ "$memoryRows=@(foreach($p in $processes){ $n=[string]$p.Name; $kind='OTHER_PROCESSES'; if($n -ieq 'Runner.Listener.exe'){$kind='RUNNER_LISTENER'} elseif($n -ieq 'Runner.Worker.exe'){$kind='RUNNER_WORKER'} elseif($n -ieq 'node.exe'){ $kind='NODE_NONRUNNER'; $parentId=[int]$p.ParentProcessId; for($depth=0;$depth -lt 12;$depth++){if(!$byPid.ContainsKey($parentId)){break}; $ancestor=$byPid[$parentId];if($ancestor.Name -in @('Runner.Listener.exe','Runner.Worker.exe')){$kind='NODE_RUNNER_DESCENDANT';break};$nextId=[int]$ancestor.ParentProcessId;if($nextId -eq $parentId){break};$parentId=$nextId} } elseif($n -in @('wscript.exe','cscript.exe','powershell.exe','pwsh.exe','cmd.exe','conhost.exe','git.exe','gh.exe','python.exe','pythonw.exe')){$kind='SUPPORT_PROCESSES'}; [pscustomobject]@{kind=$kind;name=$n;pid=[int]$p.ProcessId;ppid=[int]$p.ParentProcessId;session=$p.SessionId;workingSetMiB=[int][math]::Floor(([double]$p.WorkingSetSize)/1048576);privateCommitMiB=[int][math]::Floor(([double]$p.PageFileUsage)/1024);workingSetUnknown=($null -eq $p.WorkingSetSize);privateCommitUnknown=($null -eq $p.PageFileUsage)} })",
+ "$memoryGroups=@($memoryRows | Group-Object kind | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{kind=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum;zeroWorkingSetCount=@($items | Where-Object { $_.workingSetMiB -eq 0 }).Count;unknownWorkingSetCount=@($items | Where-Object { $_.workingSetUnknown }).Count;unknownPrivateCommitCount=@($items | Where-Object { $_.privateCommitUnknown }).Count} })",
+ "$windowsSystemNames=@('System','Registry','Memory Compression','svchost.exe','smss.exe','csrss.exe','wininit.exe','winlogon.exe','services.exe','lsass.exe','fontdrvhost.exe','dwm.exe','explorer.exe','sihost.exe','SearchHost.exe','ShellExperienceHost.exe','RuntimeBroker.exe','audiodg.exe','taskhostw.exe','dllhost.exe','WUDFHost.exe','ctfmon.exe','ApplicationFrameHost.exe','SearchIndexer.exe','StartMenuExperienceHost.exe','Widgets.exe','MoUsoCoreWorker.exe')",
+ "$browserNames=@('chrome.exe','msedge.exe','firefox.exe','brave.exe','opera.exe','vivaldi.exe','msedgewebview2.exe')",
+ "$ideNames=@('Code.exe','Cursor.exe','Windsurf.exe','Codex.exe','devenv.exe','idea64.exe','pycharm64.exe','webstorm64.exe')",
+ "$securityNames=@('MsMpEng.exe','SecurityHealthService.exe','SecurityHealthSystray.exe','Sense.exe')",
+ "$collabNames=@('Teams.exe','ms-teams.exe','outlook.exe','WINWORD.EXE','EXCEL.EXE','POWERPNT.EXE','ONENOTE.EXE','Zoom.exe','slack.exe','Discord.exe')",
+ "$otherRows=@($memoryRows | Where-Object { $_.kind -eq 'OTHER_PROCESSES' } | ForEach-Object { $k='UNCLASSIFIED_OTHER'; if($_.name -in $windowsSystemNames){$k='WINDOWS_CORE_UI'} elseif($_.name -in $browserNames){$k='BROWSER_WEBVIEW'} elseif($_.name -in $ideNames){$k='IDE_EDITOR'} elseif($_.name -in $securityNames){$k='SECURITY_TOOLS'} elseif($_.name -in $collabNames){$k='OFFICE_COLLAB'}; [pscustomobject]@{category=$k;pid=$_.pid;ppid=$_.ppid;session=$_.session;workingSetMiB=[int]$_.workingSetMiB;privateCommitMiB=[int]$_.privateCommitMiB} })",
+ "$otherSubgroups=@($otherRows | Group-Object category | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{category=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum} })",
+ "$browserAttribution=@($processes | Where-Object { $_.Name -in $browserNames } | ForEach-Object { $parentId=[int]$_.ParentProcessId; $runnerChild=$false; for($depth=0;$depth -lt 12;$depth++){if(!$byPid.ContainsKey($parentId)){break}; $ancestor=$byPid[$parentId];if($ancestor.Name -in @('Runner.Listener.exe','Runner.Worker.exe')){$runnerChild=$true;break};$nextId=[int]$ancestor.ParentProcessId;if($nextId -eq $parentId){break};$parentId=$nextId}; $scope=if($runnerChild){'RUNNER_DESCENDANT'}elseif($null -eq $_.SessionId){'UNKNOWN_SESSION_NONRUNNER'}elseif([int]$_.SessionId -eq 0){'SESSION_ZERO_NONRUNNER'}else{'NONZERO_SESSION_NONRUNNER'}; [pscustomobject]@{class=$scope;workingSetMiB=[int][math]::Floor(([double]$_.WorkingSetSize)/1048576);privateCommitMiB=[int][math]::Floor(([double]$_.PageFileUsage)/1024)} } | Group-Object class | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{class=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum} })",
+ "$unclassifiedRows=@($otherRows | Where-Object { $_.category -eq 'UNCLASSIFIED_OTHER' } | ForEach-Object { $parentId=[int]$_.ppid; $runnerChild=$false; for($depth=0;$depth -lt 12;$depth++){if(!$byPid.ContainsKey($parentId)){break};$ancestor=$byPid[$parentId];if($ancestor.Name -in @('Runner.Listener.exe','Runner.Worker.exe')){$runnerChild=$true;break};$nextId=[int]$ancestor.ParentProcessId;if($nextId -eq $parentId){break};$parentId=$nextId}; $scope=if($runnerChild){'RUNNER_DESCENDANT'}elseif($null -eq $_.session){'UNKNOWN_SESSION_NONRUNNER'}elseif([int]$_.session -eq 0){'SESSION_ZERO_NONRUNNER'}else{'NONZERO_SESSION_NONRUNNER'};[pscustomobject]@{class=$scope;workingSetMiB=[int]$_.workingSetMiB;privateCommitMiB=[int]$_.privateCommitMiB} })",
+ "$unclassifiedAttribution=@($unclassifiedRows | Group-Object class | Sort-Object Name | ForEach-Object { $items=$_.Group; [pscustomobject]@{class=[string]$_.Name;count=[int]$_.Count;workingSetMiB=[int]($items | Measure-Object workingSetMiB -Sum).Sum;privateCommitMiB=[int]($items | Measure-Object privateCommitMiB -Sum).Sum} })",
+ "$otherTopMemory=@($otherRows | Sort-Object @{Expression='workingSetMiB';Descending=$true},@{Expression='privateCommitMiB';Descending=$true} | Select-Object -First 8 | ForEach-Object { [pscustomobject]@{category=$_.category;workingSetMiB=$_.workingSetMiB;privateCommitMiB=$_.privateCommitMiB} })",
  "$services=@()",
  "$serviceStatus='OK'",
  "try { $services=@(Get-CimInstance -ClassName Win32_Service -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^(actions\\.runner\\.|zgmini)' } | Sort-Object Name | Select-Object -First 24 | ForEach-Object { [pscustomobject]@{ name=[string]$_.Name;state=[string]$_.State;startMode=[string]$_.StartMode } }) } catch { $serviceStatus='UNAVAILABLE' }",
@@ -39,7 +57,7 @@ const PS_SCRIPT=[
  "$startup=@()",
  "$startupStatus='OK'",
  "try { $folder=Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Startup'; if (Test-Path -LiteralPath $folder -PathType Container) { $startup=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^ZGMINI[-_. ]' } | Select-Object -First 24 | ForEach-Object { [string]$_.Name }) } } catch { $startupStatus='UNAVAILABLE' }",
- "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
+ "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);memoryGroups=@($memoryGroups);otherSubgroups=@($otherSubgroups);browserAttribution=@($browserAttribution);unclassifiedAttribution=@($unclassifiedAttribution);otherTopMemory=@($otherTopMemory);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
  "$result | ConvertTo-Json -Compress -Depth 8"
 ].join('; ');
 
@@ -69,7 +87,8 @@ export function sanitizeProbe(raw){
    if(!KNOWN_PROCESSES.has(name.toLowerCase()))fail('PROBE_PROCESS_NOT_ALLOWLISTED');
    if(smallInt(p.pid)===null||smallInt(p.ppid)===null)fail('PROBE_PID_INVALID');
    return {name,pid:p.pid,ppid:p.ppid,session:smallInt(p.session,1000),
-    workingSetMiB:smallInt(p.workingSetMiB,200000)};
+    workingSetMiB:smallInt(p.workingSetMiB,200000),
+    privateCommitMiB:smallInt(p.privateCommitMiB,200000)};
  });
  const processCounts=safeList(raw.processCounts,24).map(p=>{
   const name=simple(p?.name,60);
@@ -77,6 +96,110 @@ export function sanitizeProbe(raw){
    fail('PROBE_PROCESS_COUNT_INVALID');
   return {name,count:p.count};
  });
+ // Aggregates all processes without exporting private application names,
+ // paths, command lines or an unbounded process list.
+ const allowedKinds=new Set(['RUNNER_LISTENER','RUNNER_WORKER',
+  'NODE_RUNNER_DESCENDANT','NODE_NONRUNNER','SUPPORT_PROCESSES','OTHER_PROCESSES']);
+ const memoryGroups=safeList(raw.memoryGroups,6).map(g=>{
+  if(!allowedKinds.has(g?.kind))fail('PROBE_MEMORY_GROUP_NOT_ALLOWLISTED');
+  const row={kind:g.kind};
+  for(const k of ['count','workingSetMiB','privateCommitMiB','zeroWorkingSetCount',
+   'unknownWorkingSetCount','unknownPrivateCommitCount']){
+    const v=smallInt(g?.[k],2000000);
+    if(v===null)fail('PROBE_MEMORY_GROUP_VALUE_INVALID');
+    row[k]=v;
+  }
+  if(row.zeroWorkingSetCount>row.count||row.unknownWorkingSetCount>row.count||
+     row.unknownPrivateCommitCount>row.count)fail('PROBE_MEMORY_GROUP_COUNT_INVALID');
+  return row;
+ });
+ if(new Set(memoryGroups.map(g=>g.kind)).size!==memoryGroups.length)
+  fail('PROBE_MEMORY_GROUP_DUPLICATE');
+ const counted=memoryGroups.reduce((acc,g)=>acc+g.count,0);
+ const memoryGroupCoverage=memoryGroups.length===0?'UNAVAILABLE':
+   counted===raw.totalProcessCount?'COUNT_COMPLETE':'COUNT_PARTIAL';
+
+ // The original full CIM snapshot stays on the host. Export fixed broad
+ // categories only, never arbitrary process names, commands, PIDs or paths.
+ const categoryKinds=new Set(['WINDOWS_CORE_UI','BROWSER_WEBVIEW',
+  'IDE_EDITOR','SECURITY_TOOLS','OFFICE_COLLAB','UNCLASSIFIED_OTHER']);
+ const sanitizeOtherRow=(g,hasCount)=>{
+  if(!categoryKinds.has(g?.category))fail('PROBE_OTHER_CATEGORY_NOT_ALLOWLISTED');
+  const row={category:g.category};
+  for(const k of hasCount?['count','workingSetMiB','privateCommitMiB']:
+   ['workingSetMiB','privateCommitMiB']){
+   const n=smallInt(g?.[k],2000000);
+   if(n===null)fail('PROBE_OTHER_METRIC_INVALID');
+   row[k]=n;
+  }
+  return row;
+ };
+ const otherSubgroups=safeList(raw.otherSubgroups,6).map(g=>sanitizeOtherRow(g,true));
+ if(new Set(otherSubgroups.map(g=>g.category)).size!==otherSubgroups.length)
+  fail('PROBE_OTHER_CATEGORY_DUPLICATE');
+ const otherCount=memoryGroups.find(g=>g.kind==='OTHER_PROCESSES')?.count;
+ const otherSubgroupCount=otherSubgroups.reduce((acc,g)=>acc+g.count,0);
+ const otherSubgroupCoverage=otherSubgroups.length===0?'UNAVAILABLE':
+  otherCount===otherSubgroupCount?'COUNT_COMPLETE':'COUNT_PARTIAL';
+ // Aggregate only fixed browser session/Runner-ancestry classes; no process
+ // names, PID, command lines, usernames or per-browser identifiers leave PC.
+ const browserClasses=new Set(['RUNNER_DESCENDANT','SESSION_ZERO_NONRUNNER',
+  'NONZERO_SESSION_NONRUNNER','UNKNOWN_SESSION_NONRUNNER']);
+ const browserAttribution=raw.browserAttribution===undefined?[]:
+  safeList(raw.browserAttribution,4).map(g=>{
+   if(!browserClasses.has(g?.class))fail('PROBE_BROWSER_CLASS_DENIED');
+   const row={class:g.class};
+   for(const k of ['count','workingSetMiB','privateCommitMiB']){
+    const value=smallInt(g?.[k],2000000);
+    if(value===null)fail('PROBE_BROWSER_METRIC_INVALID');
+    row[k]=value;
+   }
+   if(row.count===0)fail('PROBE_BROWSER_ZERO_GROUP');
+   return row;
+  });
+ if(raw.browserAttribution!==undefined){
+  if(!Array.isArray(raw.browserAttribution)||
+   raw.browserAttribution.length>4||
+   new Set(browserAttribution.map(g=>g.class)).size!==browserAttribution.length)
+    fail('PROBE_BROWSER_GROUP_INVALID');
+  const expected=otherSubgroups.find(g=>g.category==='BROWSER_WEBVIEW')??
+   {count:0,workingSetMiB:0,privateCommitMiB:0};
+  for(const key of ['count','workingSetMiB','privateCommitMiB'])
+   if(browserAttribution.reduce((acc,g)=>acc+g[key],0)!==expected[key])
+    fail('PROBE_BROWSER_TOTAL_MISMATCH');
+ }
+ const browserAttributionCoverage=raw.browserAttribution===undefined?
+  'UNAVAILABLE':'COUNT_COMPLETE';
+ // Attribution uses existing private PID/parent/session values on the PC;
+ // only fixed group totals leave the host, never identities or command lines.
+ const unclassifiedClasses=new Set(['RUNNER_DESCENDANT','SESSION_ZERO_NONRUNNER',
+  'NONZERO_SESSION_NONRUNNER','UNKNOWN_SESSION_NONRUNNER']);
+ const unclassifiedAttribution=raw.unclassifiedAttribution===undefined?[]:
+  safeList(raw.unclassifiedAttribution,4).map(g=>{
+   if(!unclassifiedClasses.has(g?.class))fail('PROBE_UNCLASSIFIED_CLASS_DENIED');
+   const row={class:g.class};
+   for(const k of ['count','workingSetMiB','privateCommitMiB']){
+    const value=smallInt(g?.[k],2000000);
+    if(value===null)fail('PROBE_UNCLASSIFIED_METRIC_INVALID');
+    row[k]=value;
+   }
+   if(row.count===0)fail('PROBE_UNCLASSIFIED_ZERO_GROUP');
+   return row;
+  });
+ if(raw.unclassifiedAttribution!==undefined){
+  if(!Array.isArray(raw.unclassifiedAttribution)||
+   raw.unclassifiedAttribution.length>4||
+   new Set(unclassifiedAttribution.map(g=>g.class)).size!==unclassifiedAttribution.length)
+    fail('PROBE_UNCLASSIFIED_GROUP_INVALID');
+  const expected=otherSubgroups.find(g=>g.category==='UNCLASSIFIED_OTHER')??
+   {count:0,workingSetMiB:0,privateCommitMiB:0};
+  for(const key of ['count','workingSetMiB','privateCommitMiB'])
+   if(unclassifiedAttribution.reduce((acc,g)=>acc+g[key],0)!==expected[key])
+    fail('PROBE_UNCLASSIFIED_TOTAL_MISMATCH');
+ }
+ const unclassifiedAttributionCoverage=raw.unclassifiedAttribution===undefined?
+  'UNAVAILABLE':'COUNT_COMPLETE';
+ const otherTopMemory=safeList(raw.otherTopMemory,8).map(g=>sanitizeOtherRow(g,false));
  const services=safeList(raw.services,24).map(s=>{
   const name=simple(s?.name,110);
   if(!/^(actions\.runner\.|zgmini)/i.test(name))fail('PROBE_SERVICE_NOT_ALLOWLISTED');
@@ -97,7 +220,10 @@ export function sanitizeProbe(raw){
     String(raw.observedAtUtc).slice(0,32):null,
   totalProcessCount:smallInt(raw.totalProcessCount,100000),
   selectedProcessCount:smallInt(raw.selectedProcessCount,100000),
-  processes,processCounts,services,serviceStatus:mode(raw.serviceStatus),
+  processes,processCounts,memoryGroups,memoryGroupCoverage,
+  otherSubgroups,otherSubgroupCoverage,browserAttribution,browserAttributionCoverage,
+  unclassifiedAttribution,unclassifiedAttributionCoverage,otherTopMemory,
+  services,serviceStatus:mode(raw.serviceStatus),
   tasks,taskStatus:mode(raw.taskStatus),startup,startupStatus:mode(raw.startupStatus),
   processListTruncated:smallInt(raw.selectedProcessCount,100000)>processes.length};
 }
@@ -107,6 +233,43 @@ const asSha=x=>typeof x==='string'&&SHA40.test(x)?x:null;
 const asBool=x=>typeof x==='boolean'?x:null;
 // Only fixed, bounded fields leave the operating PC. Never return a full
 // owner/lease/claim object, source path, nonce, credential or environment.
+const SIGNAL_KEYS=['controllerFilesVerified','supervisorAlive',
+ 'supervisorIdentityVerified','supervisorFresh','supervisorChildrenVerified',
+ 'runnerSetOnline','workflowActive'];
+export function sanitizeRuntimeSignals(input){
+ const result={};
+ for(const k of SIGNAL_KEYS){
+  const x=input?.[k];
+  result[k]=typeof x==='boolean'?x:null;
+ }
+ return result;
+}
+// Exact six operating seats. Never publish raw runner objects, GitHub IDs,
+// IP addresses, command lines, or arbitrary diagnostic strings.
+const REQUIRED_OPERATING_RUNNERS=Array.from({length:6},(_,i)=>'zgmini-pc-0'+(i+1));
+export function sanitizeDedicatedRunnerEvidence(raw){
+ const diag=Array.isArray(raw?.diagnostics)?raw.diagnostics:[];
+ const unavailable=diag.includes('RUNNERS_QUERY_UNAVAILABLE');
+ const items=Array.isArray(raw?.runners)?raw.runners:null;
+ const queryState=unavailable?'QUERY_UNAVAILABLE':items?'QUERY_RETURNED':'QUERY_UNVERIFIED';
+ const failureReasons=new Set(['HTTP_403_FORBIDDEN','HTTP_401_UNAUTHORIZED',
+  'HTTP_404_NOT_FOUND','HTTP_429_LIMITED','REQUEST_TIMEOUT','RUNNER_QUERY_ERROR_OTHER']);
+ const queryFailureReason=unavailable&&failureReasons.has(raw?.runnerQueryError)
+  ?raw.runnerQueryError:null;
+ const rows=REQUIRED_OPERATING_RUNNERS.map(name=>{
+  const matches=items?items.filter(x=>x?.name===name):[];
+  const observed=matches.length===1?matches[0]:null;
+  return {name,status:!items?'UNVERIFIED':matches.length===0?'MISSING':
+   matches.length>1?'DUPLICATE':observed?.status==='online'?'online':
+   observed?.status==='offline'?'offline':'UNVERIFIED',
+   busy:observed&&typeof observed.busy==='boolean'?observed.busy:null};
+ });
+ const allSixOnline=queryState==='QUERY_RETURNED'&&
+  rows.every(x=>x.status==='online');
+ return {queryState,queryFailureReason,allSixOnline:queryState==='QUERY_RETURNED'?allSixOnline:null,
+  returnedRowCount:items&&Number.isSafeInteger(items.length)?items.length:null,
+  runners:rows,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
 export function sanitizeMaintenanceStatus(raw){
  const diagnostics=Array.isArray(raw?.diagnostics)?raw.diagnostics:[];
  const lockKnown=Boolean(raw?.installLock&&typeof raw.installLock==='object'&&
@@ -129,7 +292,16 @@ export function sanitizeMaintenanceStatus(raw){
   installLockReadbackVerified:lockKnown,
   installLockHeld:held,installLockRecoveryRequired:recoveryRequired,
   receiverStatus:raw?.receiverStatus==='LISTENING'?'LISTENING':'UNVERIFIED',
-  workflowState:raw?.workflowState==='active'?'active':'UNVERIFIED',
+  workflowState:['active','disabled_manually','disabled_inactivity'].includes(raw?.workflowState)
+   ?raw.workflowState:'UNVERIFIED',
+  // Existing collectAutomationStatus computes HEALTHY only when the actual
+  // Controller file hashes, supervisor heartbeat, six dedicated Runner
+  // children and PC Job state are all verified. Do not infer from Issue PASS.
+  runtimeState:raw?.runtimeState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
+  maintenanceState:raw?.maintenanceState==='HEALTHY'?'HEALTHY':'UNVERIFIED',
+  automationState:raw?.automationState==='HEALTHY'?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
+  runtimeSignals:sanitizeRuntimeSignals(raw?.runtimeSignals),
+  dedicatedRunnerEvidence:sanitizeDedicatedRunnerEvidence(raw),
   operationalWrites:0,providerCalls:0,d1Writes:0
  };
 }
@@ -139,8 +311,93 @@ function collectMaintenanceStatusReadonly(){
 }
 
 
+// A fixed historical Controller B failure: independently sample only local
+// journal + staged/backlog/lease metadata through the existing A-grade PC
+// process inventory. No new operation, receiver handoff, B effect or PC writes.
+const C2094_ID='pc-update-dbed28c1-a59b-403b-84c6-8cf190930cb5';
+const C2094_ISSUE=2094;
+const C2094_BEFORE='f7f1559bc0ef15bb9b375982d048369c474c490f';
+const C2094_TARGET='ead5d2d585ff2ce2a6df5f9b6cf720f65d90b49b';
+const C2094_SAFE_STATES=new Set(['PRESENT','ABSENT','UNKNOWN','UNSAFE']);
+const C2094_SAFE_PHASES=new Set(['RECEIVED','VALIDATED','STAGED','INTAKE_PAUSED',
+ 'DRAINED','BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED',
+ 'INTAKE_RESUMED','BACKLOG_RECONCILED','POSTCHECK_PENDING','PASS','BLOCKED',
+ 'ROLLED_BACK','RECOVERY_REQUIRED']);
+const C2094_SAFE_CODES=new Set(['WORKFLOW_DISABLE_NOT_CONFIRMED',
+ 'WORKFLOW_ENABLE_NOT_CONFIRMED','BACKLOG_OR_RECOVERY_NOT_VERIFIED']);
+const c2094Unknown=code=>({schema:'ZGMINI_C2094_STAGE_A_V1',
+ status:'STATE_UNKNOWN',code,ledgerStatus:null,ledgerPhase:null,
+ ledgerFirstFail:null,ledgerFailureOperation:null,
+ backup:null,backlog:null,lease:null,actualControllerSha:null,
+ restorationVerified:false,recoveryEligible:false,
+ operationalWrites:0,providerCalls:0,d1Writes:0});
+const stageState=v=>C2094_SAFE_STATES.has(v)?v:'UNKNOWN';
+const goodInt=(v,max)=>Number.isSafeInteger(v)&&v>=0&&v<=max?v:null;
+export function summarize2094StageStatus(observed){
+ if(observed?.status!=='STATUS'||observed.ledgerReadbackCode||
+    observed.installedReadbackCode||observed.lockReadbackCode)
+  return c2094Unknown('C2094_STATUS_READBACK_UNVERIFIED');
+ const ledger=observed.ledger;
+ if(ledger?.requestId!==C2094_ID||ledger?.issueNumber!==C2094_ISSUE
+    ||ledger?.targetSha!==C2094_TARGET
+    ||ledger?.installedShaBefore!==C2094_BEFORE)
+  return c2094Unknown('C2094_LEDGER_IDENTITY_UNVERIFIED');
+ const a=observed.artifacts;
+ if(!a||a.schema!=='ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1'
+    ||a.requestId!==C2094_ID)
+  return c2094Unknown('C2094_ARTIFACT_READBACK_UNAVAILABLE');
+ const aFiles=a.artifacts??{},b=a.backlog??{},l=a.lease??{};
+ const backup={backupRoot:stageState(aFiles.backupRoot),
+  stageRoot:stageState(aFiles.stageRoot),
+  stagedHost:stageState(aFiles.stagedHost),
+  snapshotRoot:stageState(aFiles.snapshotRoot),
+  originalHost:stageState(aFiles.originalHost),
+  protectedBefore:stageState(aFiles.protectedBefore),
+  previousHost:stageState(aFiles.previousHost)};
+ const backlog={file:stageState(b.file),windows:goodInt(b.windows,64),
+  openWindows:goodInt(b.openWindows,64),replayCount:goodInt(b.replayCount,10000)};
+ const lease={directory:stageState(l.directory),ownerFile:stageState(l.ownerFile),
+  recoveryMarker:stageState(l.recoveryMarker),
+  ownerMarkerMatch:typeof l.ownerMarkerMatch==='boolean'?l.ownerMarkerMatch:null,
+  held:observed.installLock?.held===true?true:observed.installLock?.held===false?false:null};
+ const verified=a.status==='OBSERVED'&&observed.artifactReadbackCode===null
+  &&Object.values(backup).every(v=>!['UNKNOWN','UNSAFE'].includes(v))
+  &&![backlog.file,lease.directory,lease.ownerFile,lease.recoveryMarker]
+   .some(v=>['UNKNOWN','UNSAFE'].includes(v))
+  &&(backlog.file!=='PRESENT'||backlog.windows!==null
+    &&backlog.openWindows!==null&&backlog.replayCount!==null
+    &&backlog.openWindows<=backlog.windows)
+  &&lease.held!==null
+  &&(lease.directory!=='PRESENT'||lease.ownerFile==='PRESENT')
+  &&(lease.recoveryMarker!=='PRESENT'||lease.ownerMarkerMatch===true);
+ return {schema:'ZGMINI_C2094_STAGE_A_V1',
+  status:verified?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:verified?'C2094_PINNED_ARTIFACTS_OBSERVED':'C2094_ARTIFACTS_UNVERIFIED',
+  ledgerStatus:C2094_SAFE_PHASES.has(ledger.status)?ledger.status:null,
+  ledgerPhase:C2094_SAFE_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:C2094_SAFE_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  ledgerFailureOperation:typeof ledger.failureOperation==='string'
+   &&/^[a-zA-Z]{1,40}$/.test(ledger.failureOperation)?ledger.failureOperation:null,
+  recordedCode:C2094_SAFE_CODES.has(ledger.code)?ledger.code:null,
+  workflowEnabled:typeof ledger.workflowEnabled==='boolean'?ledger.workflowEnabled:null,
+  backup,backlog,lease,
+  actualControllerSha:observed.actualControllerSha===C2094_BEFORE?C2094_BEFORE:null,
+  restorationVerified:false,recoveryEligible:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect2094StageReadonly(read=()=>readMaintenanceRecoveryStatus(C2094_ID)){
+ try{
+  const first=summarize2094StageStatus(read());
+  const second=summarize2094StageStatus(read());
+  return JSON.stringify(first)===JSON.stringify(second)?second
+   :c2094Unknown('C2094_DOUBLE_READ_CHANGED');
+ }catch{return c2094Unknown('C2094_STAGE_READ_FAILED');}
+}
+
 const C996_ID='pc-update-0010b2cf-9bca-40cf-89c5-b750fa42b404';
 const C996_TARGET='9db6fff689c488a59fe8771f013b7c5d3bafc0a8';
+const C1501_ID='pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b';
+const C1501_TARGET='b2ff49dd14a09ebeba482e2ae9a84530e00f094f';
 const MAINTENANCE_ROOT='E:/ZGmini/automation/pc-maintenance';
 const sha256=b=>createHash('sha256').update(b).digest('hex');
 const c996Unknown=code=>({status:'STATE_UNKNOWN',code,
@@ -150,7 +407,8 @@ const c996Unknown=code=>({status:'STATE_UNKNOWN',code,
  operationalWrites:0,providerCalls:0,d1Writes:0});
 // Return a bounded read-only correlation result. Neither the raw owner nonce,
 // original ledger/body, absolute paths nor recovery marker is published.
-export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}={}){
+export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}={},
+ {requestId=C996_ID,issueNumber=996,targetSha=C996_TARGET}={}){
  if(lockBefore?.held!==true||lockBefore?.recoveryRequired!==true||
     lockAfter?.held!==true||lockAfter?.recoveryRequired!==true)
   return c996Unknown('C996_ACTIVE_RECOVERY_LEASE_NOT_VERIFIED');
@@ -170,8 +428,8 @@ export function classify996LeaseCorrelation({lockBefore,lockAfter,first,second}=
   /^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(owner.nonce);
  const ownerMarkerIdentityMatched=Boolean(pid&&nonceOk&&marker?.nonce===owner.nonce&&
   marker?.requestOwnerPid===pid&&lockBefore.ownerPid===pid&&lockAfter.ownerPid===pid);
- const ledger996Matched=ledger?.requestId===C996_ID&&ledger?.issueNumber===996&&
-  ledger?.targetSha===C996_TARGET;
+ const ledger996Matched=ledger?.requestId===requestId&&ledger?.issueNumber===issueNumber&&
+  ledger?.targetSha===targetSha;
  const tLedger=Date.parse(ledger?.updatedAt??''),tMarker=Date.parse(marker?.at??''),
   tOwner=Date.parse(owner?.at??'');
  const ledgerMarkerTimeMatched=Number.isFinite(tLedger)&&
@@ -210,6 +468,403 @@ export function inspect996LeaseCorrelation({
  }catch{return c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE');}
 }
 
+// Fixed #1501 probe uses the same double-read, exact-identity and timestamp
+// evidence as #996. This is an independent read-only comparison, not evidence
+// that an old recovery issue remains the owner of a CURRENT lease.
+const as1501=row=>{
+ const {ledger996Matched,...rest}=row;
+ return {...rest,code:rest.code.replace(/^C996_/,'C1501_'),
+  ledger1501Matched:ledger996Matched};
+};
+export function classify1501LeaseCorrelation(snapshot){
+ return as1501(classify996LeaseCorrelation(snapshot,
+  {requestId:C1501_ID,issueNumber:1501,targetSha:C1501_TARGET}));
+}
+const SAFE_RECOVERY_PHASES=new Set([
+ 'RECEIVED','VALIDATED','STAGED','INTAKE_PAUSED','DRAINED','BACKED_UP',
+ 'SUPERVISOR_STOPPED','SWITCHED','RECONNECTED','INTAKE_RESUMED',
+ 'BACKLOG_RECONCILED','POSTCHECK_PENDING','PASS','BLOCKED','ROLLED_BACK',
+ 'RECOVERY_REQUIRED']);
+const SAFE_RECOVERY_STATUS=new Set(['RUNNING','UNKNOWN','PASS','BLOCKED',
+ 'ROLLED_BACK','RECOVERY_REQUIRED']);
+const safeOperation=s=>typeof s==='string'&&/^[a-zA-Z][a-zA-Z0-9]{0,63}$/.test(s)?s:null;
+const safeFlag=x=>typeof x==='boolean'?x:null;
+// A PID probe cannot prove process identity, because Windows can recycle PIDs.
+// Never interpret a visible PID as ownership of the original maintenance lease.
+function pidObservation(pid,signal=process.kill){
+ if(!Number.isSafeInteger(pid)||pid<=0)return 'UNKNOWN';
+ try{signal(pid,0);return 'PID_PRESENT_IDENTITY_UNVERIFIED';}
+ catch(e){return e?.code==='ESRCH'?'PID_NOT_PRESENT':'UNKNOWN';}
+}
+export function classify1501RecoveryCheckpoint({lockBefore,lockAfter,first,second},
+ {signal=process.kill,backupPresent=null,backlogPresent=null}={}){
+ const correlation=classify1501LeaseCorrelation({lockBefore,lockAfter,first,second});
+ const empty={...correlation,ledgerPhase:null,ledgerFirstFail:null,
+  ledgerStatus:null,ledgerFailureOperation:null,ledgerIntakePaused:null,
+  ledgerWorkflowEnabled:null,ownerPidObservation:'UNKNOWN',
+  backupPresent:null,backlogPresent:null,eligibleForAutomaticRelease:false};
+ if(correlation.status!=='CORRELATED')return empty;
+ let ledger;
+ try{ledger=JSON.parse(first.ledger.toString('utf8'));}catch{return empty;}
+ return {...empty,
+  ledgerPhase:SAFE_RECOVERY_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:SAFE_RECOVERY_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  ledgerStatus:SAFE_RECOVERY_STATUS.has(ledger.status)?ledger.status:null,
+  ledgerFailureOperation:safeOperation(ledger.failureOperation),
+  ledgerIntakePaused:safeFlag(ledger.intakePaused),
+  ledgerWorkflowEnabled:safeFlag(ledger.workflowEnabled),
+  ownerPidObservation:pidObservation(correlation.ownerPid,signal),
+  backupPresent:safeFlag(backupPresent),backlogPresent:safeFlag(backlogPresent),
+  eligibleForAutomaticRelease:false};
+}
+function fixedPathExists(p,stat=fs.lstatSync){
+ try{stat(p);return true;}catch(e){return e?.code==='ENOENT'?false:null;}
+}
+export function inspect1501LeaseCorrelation({
+ read=fs.readFileSync,stat=fs.lstatSync,
+ lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install'),
+ signal=process.kill}={}){
+ try{
+  const before=lock();
+  if(before?.held!==true||before?.recoveryRequired!==true)
+   return as1501(c996Unknown('C996_ACTIVE_RECOVERY_LEASE_NOT_VERIFIED'));
+  const fixed={
+   owner:path.join(MAINTENANCE_ROOT,'leases/controller-install/owner.json'),
+   marker:path.join(MAINTENANCE_ROOT,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   ledger:path.join(MAINTENANCE_ROOT,'ledger',C1501_ID+'.json')
+  };
+  const snapshot=()=>Object.fromEntries(Object.entries(fixed).map(([k,f])=>{
+   const st=stat(f);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>32768)
+    throw Error('C1501_FIXED_ORIGINAL_FILE_INVALID');
+   const bytes=read(f);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)throw Error('C1501_FILE_READ_MISMATCH');
+   return [k,bytes];
+  }));
+  const first=snapshot(),second=snapshot(),after=lock();
+  const data=classify1501RecoveryCheckpoint({lockBefore:before,lockAfter:after,
+   first,second},{
+    signal,backupPresent:fixedPathExists(
+     path.join('E:/ZGmini/automation/pc-control/backups','controller-update-'+C1501_ID),stat),
+    backlogPresent:fixedPathExists(
+     path.join(MAINTENANCE_ROOT,'backlog',C1501_ID+'.json'),stat)});
+  return data;
+ }catch{return as1501(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
+}
+
+// #1841 partial Controller-switch recovery: exact immutable-intent evidence.
+// Reuse the existing fixed Windows read-only inventory; never change a lease.
+const C1841_ID='pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12';
+const C1841_TARGET='2f569c18e09a55e54e81052985a80f6a8765d680';
+const as1841=row=>{
+ const {ledger996Matched,...rest}=row;
+ return {...rest,code:rest.code.replace(/^C996_/,'C1841_'),
+  ledger1841Matched:ledger996Matched};
+};
+export function classify1841RecoveryCheckpoint(snapshot,
+ {signal=process.kill,backupPresent=null,backlogPresent=null}={}){
+ const correlated=as1841(classify996LeaseCorrelation(snapshot,
+  {requestId:C1841_ID,issueNumber:1841,targetSha:C1841_TARGET}));
+ const base={...correlated,ledgerPhase:null,ledgerFirstFail:null,
+  ledgerStatus:null,ledgerFailureOperation:null,ledgerIntakePaused:null,
+  ledgerWorkflowEnabled:null,ownerPidObservation:'UNKNOWN',
+  backupPresent:null,backlogPresent:null,eligibleForAutomaticRelease:false};
+ // An old original ledger is NOT proof that the CURRENT held lease belongs
+ // to that request. Return its bounded phase separately from lease identity.
+ if(correlated.ledger1841Matched!==true||correlated.unchangedAcrossReads!==true)
+  return base;
+ let ledger;try{ledger=JSON.parse(snapshot.first.ledger.toString('utf8'));}
+ catch{return base;}
+ return {...base,
+  ledgerPhase:SAFE_RECOVERY_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:SAFE_RECOVERY_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  ledgerStatus:SAFE_RECOVERY_STATUS.has(ledger.status)?ledger.status:null,
+  ledgerFailureOperation:safeOperation(ledger.failureOperation),
+  ledgerIntakePaused:safeFlag(ledger.intakePaused),
+  ledgerWorkflowEnabled:safeFlag(ledger.workflowEnabled),
+  ownerPidObservation:correlated.status==='CORRELATED'
+   ?pidObservation(correlated.ownerPid,signal):'UNKNOWN',
+  backupPresent:safeFlag(backupPresent),backlogPresent:safeFlag(backlogPresent)};
+}
+export function inspect1841LeaseCorrelation({
+ read=fs.readFileSync,stat=fs.lstatSync,
+ lock=()=>maintenanceLockStatus(MAINTENANCE_ROOT,'controller-install'),
+ signal=process.kill}={}){
+ try{
+  const before=lock();
+  if(before?.held!==true||before?.recoveryRequired!==true)
+   return classify1841RecoveryCheckpoint({lockBefore:before,lockAfter:before});
+  const files={owner:path.join(MAINTENANCE_ROOT,'leases/controller-install/owner.json'),
+   marker:path.join(MAINTENANCE_ROOT,'leases/controller-install/RECOVERY_REQUIRED.json'),
+   ledger:path.join(MAINTENANCE_ROOT,'ledger',C1841_ID+'.json')};
+  const snap=()=>Object.fromEntries(Object.entries(files).map(([key,file])=>{
+   const st=stat(file);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>32768)
+    throw Error('C1841_FIXED_SOURCE_UNSAFE');
+   const bytes=read(file);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+    throw Error('C1841_FILE_READ_MISMATCH');
+   return [key,bytes];
+  }));
+  const first=snap(),second=snap(),after=lock();
+  return classify1841RecoveryCheckpoint({lockBefore:before,lockAfter:after,first,second},{
+   signal,backupPresent:fixedPathExists(
+    path.join('E:/ZGmini/automation/pc-control/backups','controller-update-'+C1841_ID),stat),
+   backlogPresent:fixedPathExists(
+    path.join(MAINTENANCE_ROOT,'backlog',C1841_ID+'.json'),stat)});
+ }catch{return as1841(c996Unknown('C996_ORIGINAL_FILES_UNAVAILABLE'));}
+}
+// Fixed read-only HTTP request log projection. The source module is the
+// already-tested Controller A adapter, loaded from the exact Git checkout.
+// No caller input, secrets, URLs, query paths, or raw log lines are returned.
+const HTTP_OBSERVATION_ROOT='E:/ZGmini/data';
+const HOST=/^(?=.{4,180}$)[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
+const HTTP_CODE=/^(?:[1-5][0-9]{2}|NETWORK_ERROR|PROVIDER_QUOTA_GUARD)$/;
+const HOST_STATE=new Set(['normal','failed','unknown']);
+const HOST_REASON=new Set([
+ 'NOT_REPEATED','ESTIMATED_CADENCE_OVERDUE','NO_VERIFIED_SCHEDULE_OVER_36H',
+ 'LAST_HTTP_ERROR','QUOTA_OR_UNCLASSIFIED','RECENT_2XX',
+ 'RECENT_2XX_CADENCE_UNVERIFIED','MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW',
+ 'EVIDENCE_UNKNOWN']);
+const safeIso=v=>typeof v==='string'&&Number.isFinite(Date.parse(v))
+ ?new Date(v).toISOString():null;
+const unknownHostEvidence=code=>({status:'STATE_UNKNOWN',code,
+ source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',monitoredCount:null,
+ rosterComplete:false,http:null,hosts:[],providerCalls:0,operationalWrites:0,d1Writes:0});
+export function projectObservedProviderHosts(raw){
+ if(!raw||raw.source!=='PC_COLLECTION_EVENTS_FETCH_WRAPPER'||
+  raw.scope!=='FIXED_LOCAL_JSONL_ONLY'||
+  !Number.isSafeInteger(raw.monitoredHostCount)||raw.monitoredHostCount<0||
+  !Number.isSafeInteger(raw.monitoredHostsReturned)||
+  raw.monitoredHostsReturned<0||raw.monitoredHostsReturned>64||
+  !Array.isArray(raw.hosts)||raw.hosts.length>64)
+  return unknownHostEvidence('OBSERVED_HOST_INPUT_INVALID');
+ const rows=raw.hosts.filter(x=>x?.monitored===true);
+ const seen=new Set(),hosts=[];
+ for(const x of rows){
+  if(!HOST.test(x.host??'')||seen.has(x.host)||
+    !HOST_STATE.has(x.monitoringState)||!HOST_REASON.has(x.reason)||
+    !x.lastRunStatuses||typeof x.lastRunStatuses!=='object'||
+    Object.keys(x.lastRunStatuses).length>20||
+    Object.entries(x.lastRunStatuses).some(([k,v])=>!HTTP_CODE.test(k)||
+      !Number.isSafeInteger(v)||v<0)||
+    (x.lastAttemptAt!==null&&!safeIso(x.lastAttemptAt))||
+    (x.last2xxRunAt!==null&&!safeIso(x.last2xxRunAt)))
+    return unknownHostEvidence('OBSERVED_HOST_ITEM_INVALID');
+  seen.add(x.host);
+  hosts.push({host:x.host,monitoringState:x.monitoringState,reason:x.reason,
+   lastAttemptAt:safeIso(x.lastAttemptAt),last2xxRunAt:safeIso(x.last2xxRunAt),
+   lastRunStatuses:Object.fromEntries(Object.entries(x.lastRunStatuses).sort())});
+ }
+ hosts.sort((a,b)=>a.host.localeCompare(b.host));
+ // Omitted one-off hosts do not make the repeating cohort incomplete:
+ // only omission of a monitored host prevents an exact monitored roster.
+ const complete=rows.length===raw.monitoredHostsReturned&&
+  rows.length===raw.monitoredHostCount;
+ const counts={normal:hosts.filter(x=>x.monitoringState==='normal').length,
+  failed:hosts.filter(x=>x.monitoringState==='failed').length,
+  unknown:hosts.filter(x=>x.monitoringState==='unknown').length,total:hosts.length};
+ const consistent=raw.http?.normal===counts.normal&&raw.http?.failed===counts.failed&&
+  raw.http?.unknown===counts.unknown&&raw.http?.total===raw.monitoredHostCount;
+ return {status:complete&&consistent&&raw.status==='PASS'?'PASS':'STATE_UNKNOWN',
+  code:complete&&consistent?'OBSERVED_HTTP_COHORT_READBACK':'OBSERVED_HTTP_COHORT_PARTIAL',
+  source:'PC_COLLECTION_EVENTS_FETCH_WRAPPER',
+  scope:'OBSERVED_REPEATED_HTTP_HOSTS_NOT_APPROVED_API_ENDPOINTS',
+  observedAt:safeIso(raw.now),windowDays:raw.windowDays===14?14:null,
+  monitoredCount:raw.monitoredHostCount,rosterComplete:complete&&consistent,
+  http:consistent?counts:null,hosts,
+  sourceCoverage:raw.status==='PASS'?'PASS':'PARTIAL_OR_UNKNOWN',
+  providerCalls:0,operationalWrites:0,d1Writes:0};
+}
+function readObservedProviderHosts(){
+ try{return projectObservedProviderHosts(inspectProviderActivity(HTTP_OBSERVATION_ROOT));}
+ catch{return unknownHostEvidence('HTTP_DIAGNOSTIC_READ_FAILED');}
+}
+
+// Read the ORIGINAL #1501 immutable-intent backlog only. Summary never
+// contains request bodies, URL paths, owner nonces, or credentials.
+const C1501_BACKLOG_FILE=path.join(MAINTENANCE_ROOT,'backlog',C1501_ID+'.json');
+const BACKLOG_LIMIT=1024*1024;
+const backlogUnknown=code=>({status:'STATE_UNKNOWN',code,
+ schema:'ZGMINI_PC_BACKLOG_WINDOW_READONLY_V1',originalRequestIssue:1501,
+ windowCount:null,openWindowCount:null,replayCount:null,
+ windows:[],replays:[],rosterTruncated:false,
+ stateHash:null,mutationAllowed:false,operationalWrites:0,providerCalls:0,d1Writes:0});
+const validBacklogTime=s=>typeof s==='string'&&Number.isFinite(Date.parse(s))
+ ?new Date(s).toISOString():null;
+export function classify1501BacklogBytes(first,second){
+ if(!Buffer.isBuffer(first)||!Buffer.isBuffer(second)||first.length===0||
+  first.length>BACKLOG_LIMIT||!first.equals(second))
+  return backlogUnknown('C1501_BACKLOG_SNAPSHOT_CHANGED_OR_UNREADABLE');
+ let v;try{v=JSON.parse(first.toString('utf8'));}catch{
+  return backlogUnknown('C1501_BACKLOG_JSON_INVALID');}
+ if(v?.schema!=='ZGMINI_PC_BACKLOG_V1')
+  return backlogUnknown('C1501_BACKLOG_SCHEMA_INVALID');
+ const raw=Array.isArray(v.windows)?v.windows:[{pausedAt:v.pausedAt,resumedAt:v.resumedAt}];
+ if(raw.length<1||raw.length>8)
+  return backlogUnknown('C1501_BACKLOG_WINDOWS_INVALID');
+ const windows=[];
+ for(let i=0;i<raw.length;i++){
+  const pausedAt=validBacklogTime(raw[i]?.pausedAt);
+  const resumedAt=raw[i]?.resumedAt==null?null:validBacklogTime(raw[i].resumedAt);
+  if(!pausedAt||(raw[i]?.resumedAt!=null&&!resumedAt)||
+   (resumedAt&&Date.parse(resumedAt)<Date.parse(pausedAt))||
+   (i>0&&Date.parse(pausedAt)<Date.parse(windows.at(-1).pausedAt)))
+   return backlogUnknown('C1501_BACKLOG_WINDOW_INVALID');
+  windows.push({index:i+1,pausedAt,resumedAt});
+ }
+ const replays=v.replays??{};
+ if(!replays||typeof replays!=='object'||Array.isArray(replays)||
+   Object.keys(replays).length>2000)
+  return backlogUnknown('C1501_BACKLOG_REPLAYS_INVALID');
+ const permitted=new Set(['DONE','SKIPPED_RESULT_PRESENT','POSTING']);
+ const rows=[];
+ let done=0,skipped=0,posting=0,other=0;
+ for(const [key,item] of Object.entries(replays)){
+  if(!/^[1-9][0-9]{0,9}$/.test(key)||typeof item!=='object'||item===null||
+   Array.isArray(item))return backlogUnknown('C1501_BACKLOG_REPLAY_ITEM_INVALID');
+  const state=permitted.has(item.status)?item.status:'OTHER_UNVERIFIED';
+  if(state==='DONE')done++;else if(state==='SKIPPED_RESULT_PRESENT')skipped++;
+  else if(state==='POSTING')posting++;else other++;
+  rows.push({issueNumber:Number(key),status:state});
+ }
+ rows.sort((a,b)=>a.issueNumber-b.issueNumber);
+ const open=windows.filter(w=>w.resumedAt===null).length;
+ return {schema:'ZGMINI_PC_BACKLOG_WINDOW_READONLY_V1',status:'PASS',
+  code:'C1501_BACKLOG_WINDOW_READBACK_VERIFIED',originalRequestIssue:1501,
+  stateHash:sha256(first),windowCount:windows.length,openWindowCount:open,
+  windows,replayCount:rows.length,
+  replayCounts:{done,skippedResultPresent:skipped,posting,otherUnverified:other},
+  replays:rows.slice(0,32),rosterTruncated:rows.length>32,
+  mutationAllowed:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect1501BacklogReadonly({
+ correlation=inspect1501LeaseCorrelation,
+ stat=fs.lstatSync,read=fs.readFileSync}={}){
+ if(correlation()?.status!=='CORRELATED')
+  return backlogUnknown('C1501_BACKLOG_OWNER_UNVERIFIED');
+ try{
+  const dir=stat(path.dirname(C1501_BACKLOG_FILE));
+  if(!dir.isDirectory()||dir.isSymbolicLink())
+   return backlogUnknown('C1501_BACKLOG_UNSAFE_DIRECTORY');
+  const item=stat(C1501_BACKLOG_FILE);
+  if(!item.isFile()||item.isSymbolicLink()||
+   item.size<=0||item.size>BACKLOG_LIMIT)
+   return backlogUnknown('C1501_BACKLOG_UNSAFE_FILE');
+  const first=read(C1501_BACKLOG_FILE),second=read(C1501_BACKLOG_FILE);
+  if(!Buffer.isBuffer(first)||first.length!==item.size)
+   return backlogUnknown('C1501_BACKLOG_READ_SIZE_DRIFT');
+  return classify1501BacklogBytes(first,second);
+ }catch{return backlogUnknown('C1501_BACKLOG_UNAVAILABLE');}
+}
+
+// Three exact observed HTTP hosts only; method/path remains one-way hashed.
+// No full URL, credentials, paths, body, or other providers are published.
+const FIXED_TARGET_HOSTS=['data.sec.gov','data.alpaca.markets','cdn.www.census.gov'];
+const FIXED_ENDPOINT_LOG='E:/ZGmini/data/pc-writer/provider-endpoint-events.jsonl';
+const FIXED_ENDPOINT_MAX_BYTES=8*1024*1024;
+const FIXED_ENDPOINT_MAX_ROWS=16000;
+const HASH32=/^[a-f0-9]{32}$/;
+const ENDPOINT_STATUS=/^(?:[1-5][0-9]{2}|NETWORK_ERROR|PROVIDER_QUOTA_GUARD)$/;
+const endpointUnknown=(code)=>({status:'STATE_UNKNOWN',code,
+ scope:'FIXED_THREE_OBSERVED_HOSTS_ONLY',source:'PC_ENDPOINT_PATH_HASH_LOG',
+ hosts:[],endpointCoverageVerified:false,providerCalls:0,operationalWrites:0,d1Writes:0});
+export function projectTargetEndpointStatus(lines,now=Date.now(),{partialTail=false,rowsTruncated=false}={}){
+ if(!Number.isSafeInteger(now)||now<0||!Array.isArray(lines)||lines.length>FIXED_ENDPOINT_MAX_ROWS)
+  return endpointUnknown('ENDPOINT_INPUT_INVALID');
+ const from=now-14*86400000;
+ const matched=new Map(FIXED_TARGET_HOSTS.map(host=>[host,new Map()]));
+ let invalid=0,seenEvents=0;
+ for(const line of lines){
+  if(typeof line!=='string'||line.length>200000){invalid++;continue;}
+  if(!line.trim())continue;
+  let record;try{record=JSON.parse(line);}catch{invalid++;continue;}
+  const at=Date.parse(record?.at??'');
+  if(!Number.isFinite(at)||at>now+60000){invalid++;continue;}
+  if(at<from)continue;
+  if(record.endpointPaths===null||typeof record.endpointPaths!=='object'||
+    Array.isArray(record.endpointPaths)){invalid++;continue;}
+  seenEvents++;
+  for(const host of FIXED_TARGET_HOSTS){
+   const routes=record.endpointPaths[host];
+   if(routes===undefined)continue;
+   if(!routes||typeof routes!=='object'||Array.isArray(routes)||
+     Object.keys(routes).length>128){invalid++;continue;}
+   const dest=matched.get(host);
+   for(const [hash,row] of Object.entries(routes)){
+    if(!HASH32.test(hash)||!row||!Number.isSafeInteger(row.requests)||
+      row.requests<1||row.requests>50000||!row.statuses||
+      typeof row.statuses!=='object'||Array.isArray(row.statuses)||
+      Object.keys(row.statuses).length>20){invalid++;continue;}
+    const statuses=Object.entries(row.statuses);
+    if(!statuses.length||statuses.some(([k,v])=>!ENDPOINT_STATUS.test(k)||
+      !Number.isSafeInteger(v)||v<0)||
+      statuses.reduce((sum,[,v])=>sum+v,0)!==row.requests){invalid++;continue;}
+    const old=dest.get(hash);
+    const successful=statuses.some(([k,v])=>k.startsWith('2')&&v>0);
+    const failed404=statuses.some(([k,v])=>k==='404'&&v>0);
+    const merged={hash,lastAt:at,lastStatuses:Object.fromEntries(statuses),
+      totalRequests:(old?.totalRequests??0)+row.requests,
+      last2xxAt:successful?Math.max(old?.last2xxAt??0,at):(old?.last2xxAt??null),
+      last404At:failed404?Math.max(old?.last404At??0,at):(old?.last404At??null)};
+    if(old&&at<old.lastAt){
+      merged.lastAt=old.lastAt;merged.lastStatuses=old.lastStatuses;
+    }
+    dest.set(hash,merged);
+   }
+  }
+ }
+ const hosts=FIXED_TARGET_HOSTS.map(host=>{
+  const all=[...matched.get(host).values()].sort((a,b)=>a.hash.localeCompare(b.hash));
+  const safe=all.slice(0,40);
+  return {host,endpointCount:all.length,returnedCount:safe.length,
+   truncated:all.length>40,
+   endpointHashes:safe.map(row=>({hash:row.hash,
+    lastAt:new Date(row.lastAt).toISOString(),
+    lastStatuses:row.lastStatuses,totalRequests:row.totalRequests,
+    last2xxAt:row.last2xxAt?new Date(row.last2xxAt).toISOString():null,
+    last404At:row.last404At?new Date(row.last404At).toISOString():null}))};
+ });
+ const partial=partialTail||rowsTruncated||invalid>0||hosts.some(h=>h.truncated);
+ const observed=hosts.some(h=>h.endpointCount>0);
+ return {status:observed&&!partial?'OBSERVED':'STATE_UNKNOWN',
+  code:!observed?'ENDPOINT_NO_OBSERVATIONS':partial?'ENDPOINT_PARTIAL':'ENDPOINT_HASH_STATUS_READBACK',
+  scope:'FIXED_THREE_OBSERVED_HOSTS_ONLY',source:'PC_ENDPOINT_PATH_HASH_LOG',
+  windowDays:14,seenEvents,invalidEvents:invalid,
+  partialTail,rowsTruncated,
+  endpointCoverageVerified:false,hosts,
+  providerCalls:0,operationalWrites:0,d1Writes:0};
+}
+function readTargetEndpointStatus(){
+ try{
+  const root=path.dirname(FIXED_ENDPOINT_LOG);
+  const d=fs.lstatSync(root),f=fs.lstatSync(FIXED_ENDPOINT_LOG);
+  if(!d.isDirectory()||d.isSymbolicLink()||!f.isFile()||f.isSymbolicLink()||
+    f.size<1)return endpointUnknown('ENDPOINT_LOG_UNAVAILABLE');
+  const fd=fs.openSync(FIXED_ENDPOINT_LOG,'r');
+  let buffer,partialTail=false,changed=false;
+  try{
+   const before=fs.fstatSync(fd),length=Math.min(before.size,FIXED_ENDPOINT_MAX_BYTES);
+   partialTail=before.size>length;buffer=Buffer.alloc(length);
+   let used=0;
+   while(used<length){
+    const n=fs.readSync(fd,buffer,used,length-used,before.size-length+used);
+    if(n<=0)throw Error('SHORT_READ');
+    used+=n;
+   }
+   const after=fs.fstatSync(fd);
+   changed=before.size!==after.size||before.mtimeMs!==after.mtimeMs;
+  }finally{fs.closeSync(fd);}
+  if(changed)return endpointUnknown('ENDPOINT_LOG_CHANGED');
+  let lines=buffer.toString('utf8').split('\n');
+  if(partialTail)lines.shift();
+  lines.pop();
+  const rowsTruncated=lines.length>FIXED_ENDPOINT_MAX_ROWS;
+  if(rowsTruncated)lines=lines.slice(-FIXED_ENDPOINT_MAX_ROWS);
+  return projectTargetEndpointStatus(lines,Date.now(),{partialTail,rowsTruncated});
+ }catch{return endpointUnknown('ENDPOINT_LOG_UNAVAILABLE');}
+}
+
 export function collect(role,ctx,env=process.env){
  const host=os.hostname().toUpperCase();
  const runnerName=String(env.RUNNER_NAME||'');
@@ -226,7 +881,15 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
-  c996LeaseCorrelation:inspect996LeaseCorrelation()}:base;
+  c2094StageEvidence:inspect2094StageReadonly(),
+  c996LeaseCorrelation:inspect996LeaseCorrelation(),
+  c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
+   c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
+  observedHttpHostRoster:readObservedProviderHosts(),
+  marketParquetTaskSource:inspectMarketParquetTask(),
+  http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
+  c1501Backlog:inspect1501BacklogReadonly(),
+  targetEndpointStatus:readTargetEndpointStatus()}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
@@ -244,6 +907,9 @@ export function collect(role,ctx,env=process.env){
   return {...withMaintenance,status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',snapshot};
  }catch{return {...withMaintenance,status:'PARTIAL',code:'PROCESS_REPORT_INVALID'};}
 }
+// Preserve the complete approved evidence schema while staying inside the
+// existing atomic result-pair 32 KiB limit. Never drop verification fields.
+export function serializeProcessResult(result){return JSON.stringify(result)+'\n';}
 export function toText(r){
  return ['schema='+r.schema,'requestId='+r.requestId,'role='+r.role,
   'runId='+r.runId,'attempt='+r.attempt,'host='+r.host,
@@ -251,11 +917,17 @@ export function toText(r){
   'observedAtUtc='+r.observedAtUtc,
   'totalProcessCount='+(r.snapshot?.totalProcessCount??'UNKNOWN'),
   'selectedProcessCount='+(r.snapshot?.selectedProcessCount??'UNKNOWN'),
+  'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
+  'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  'marketParquetTaskStatus='+(r.marketParquetTaskSource?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
+  'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
+  'c2094StageCode='+(r.c2094StageEvidence?.code??'NOT_APPLICABLE'),
   'c996LeaseCorrelation='+(r.c996LeaseCorrelation?.status??'NOT_APPLICABLE'),
   'c996LeaseCorrelationCode='+(r.c996LeaseCorrelation?.code??'NOT_APPLICABLE'),
+   'c1841RecoveryCheckpoint='+(r.c1841RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 async function main(){
@@ -264,7 +936,7 @@ async function main(){
  const ctx=authenticateProcess(event,env,role);
  const result=collect(role,ctx,env);
  const stem='results/pc-process-inventory-'+ctx.runId+'-'+ctx.attempt+'-'+role;
- const outputs=[[stem+'.json',JSON.stringify(result,null,2)+'\n'],[stem+'.txt',toText(result)]];
+ const outputs=[[stem+'.json',serializeProcessResult(result)],[stem+'.txt',toText(result)]];
  const headers={authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json',
   'X-GitHub-Api-Version':'2022-11-28','content-type':'application/json'};
  const uploaded=await uploadResultPairAtomic({outputs,headers,

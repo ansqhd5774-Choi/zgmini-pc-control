@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-670b37db-f2e8-45bc-832a-a5d209c6b202",
+  "targetControllerSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "status": "BLOCKED",
+  "code": "BUNDLE_APPROVAL_PR_DID_NOT_AUTHORIZE_MANIFEST",
+  "lastPass": "NONE",
+  "firstFail": "BUNDLE_APPROVAL_PR_DID_NOT_AUTHORIZE_MANIFEST",
+  "actualControllerSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": null
+}

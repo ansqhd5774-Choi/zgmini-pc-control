@@ -3,7 +3,7 @@
 // Git/Task executables and an exact PC source checkout.
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {applyApprovedInsertions,validateInsertions} from './insert-only-patch.mjs';
+import {applyApprovedInsertions,validateInsertions,insertionAnchorIndices} from './insert-only-patch.mjs';
 
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
@@ -44,7 +44,25 @@ export function previewWriterInsertions(spec,{
  const source=readTarget(root,spec.filePath);
  need(Buffer.isBuffer(source)&&sha256(source)===spec.beforeSha256,
   'WRITER_B_PREVIEW_PREIMAGE_SHA_STOP');
- const projected=applyApprovedInsertions(source,spec.insertions);
+ let projected;
+ try{projected=applyApprovedInsertions(source,spec.insertions,{filePath:spec.filePath});}
+ catch(error){
+  if(error?.code!=='WRITER_B_INSERT_ANCHOR_MATCH_STOP')throw error;
+  // Bounded cardinality only, never source lines, URL, keys, or anchor text.
+  // These counts are diagnostic and cannot authorize a looser insertion.
+  const lines=source.toString('utf8').split(/\r\n|\n/);
+  const anchorEvidence=spec.insertions.map((op,index)=>({
+   index,
+   exactCount:Math.min(3,insertionAnchorIndices(lines,op.anchor,{filePath:spec.filePath}).length),
+   trimmedCount:Math.min(3,op.anchor.startsWith('@zgmini:sec-core:')
+    ?insertionAnchorIndices(lines,op.anchor,{filePath:spec.filePath}).length
+    :lines.filter(line=>line.trim()===op.anchor.trim()).length)
+  }));
+  return {status:'BLOCKED',code:error.code,filePath:spec.filePath,
+   baseHead:spec.baseHead,beforeSha256:spec.beforeSha256,anchorEvidence,
+   evidenceLevel:'PC_EXACT_PREIMAGE_ANCHOR_CARDINALITY_ONLY',
+   pcSourceWrites:0,taskWrites:0,dbWrites:0,d1Writes:0,providerCalls:0};
+ }
  const xml=taskXml();
  need(Buffer.isBuffer(xml)&&xml.length>=5&&xml.length<=200_000,
   'WRITER_B_PREVIEW_TASK_XML_STOP');

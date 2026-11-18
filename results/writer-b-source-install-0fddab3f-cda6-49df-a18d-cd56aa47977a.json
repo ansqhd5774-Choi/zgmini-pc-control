@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "0fddab3f-cda6-49df-a18d-cd56aa47977a",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "a4e69599fc23c2760e222c7b45d932cd9ceb96cd",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "e96ab08a87652dfafbfd22b12af28d615cbe415d",
+  "candidateSourceSha": "102b248a7c0cfa1506c0605092f667e47f5bd4ad",
+  "manifestSha256": "583586cc01a2bb3e6de6de6ca3373fa0253aefb1cc0b4f24d84604c28d6ed55e",
+  "baseTreeOid": "12a92d75426093ae92e11ef9a01a22f4aaf8122c",
+  "preparedTreeOid": "9ca67700abb06918b19fb3eb2b2ce0d98b8bf7f5",
+  "provenanceSha256": "efd63c1446a7b777e971db7eb22ed63da3c34b3c201c46d227d8e00cb9108bf0",
+  "runId": "43855741146",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/inflation-causal-candidate-census-m3.mjs"
+  ]
+}

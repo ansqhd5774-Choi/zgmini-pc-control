@@ -1,7 +1,8 @@
 // I/O-free one-shot transaction coordinator. A trusted Windows adapter must
 // implement the fixed effects; this is not an executable pc-job or B shortcut.
 import {
- assertAuthorizedManualReceiver,DATA_ROOT,MAX_BYTES,SOURCE_FILES,TARGETS,URLS,
+ assertAuthorizedManualReceiver,APPROVAL_SCHEMA_V2,DATA_ROOT,MAX_BYTES,
+ SOURCE_FILES,TARGETS,URLS,
 } from './contract.mjs';
 
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -16,10 +17,18 @@ const METHODS=['acquireSharedLock','readSourcePreimage','fetchExactSources',
 const EXPECTED_STATUS=new Set(['SAVED_READBACK','UNCHANGED','ARCHIVED_READBACK']);
 
 export function verifyManualPreimage(manifest,preimage){
+ // Keep V1 immutable: a legacy approval never accepts a different HEAD.
+ // New V2 approval explicitly pins the complete executable import closure,
+ // requires a clean tracked checkout and HEAD === config.source, and repeats
+ // this proof immediately before the first write under the exclusive lease.
+ const sourceIdentity=manifest.schema===APPROVAL_SCHEMA_V2?
+  preimage?.sourceClean===true&&
+  /^[a-f0-9]{40}$/i.test(preimage.sourceHead??'')&&
+  preimage.sourceHead===preimage.configSource:
+  preimage?.sourceHead===manifest.sourceSha&&
+  preimage.configSource===manifest.sourceSha;
  need(object(preimage)&&preimage.sourceRoot===manifest.sourceRoot&&
-  preimage.sourceHead===manifest.sourceSha&&
-  preimage.configSource===manifest.sourceSha&&
-  object(preimage.sourceFiles)&&
+  sourceIdentity&&object(preimage.sourceFiles)&&
   Object.keys(preimage.sourceFiles).length===SOURCE_FILES.length&&
   SOURCE_FILES.every((name,i)=>
    preimage.sourceFiles[name]===manifest.sourceFiles[i].sha256)&&

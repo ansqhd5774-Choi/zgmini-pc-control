@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_R181_PRIMARY_B_RESULT_V1",
+  "requestId": "2874d7f4-4eef-4d79-a26e-72f33d4647f4",
+  "status": "R181_PRIMARY_B_APPLIED_VERIFIED",
+  "code": "R181_PRIMARY_B_SINGLE_ROUTE_APPLIED",
+  "applied": true,
+  "controlSha": "d79602ae713ba9a22765685a8fd9349ff19f0589",
+  "manifestSha256": "7380c873c1a8ab4bcc31cd138d41017e5a1a4f9d0f7cd5b281a5212586ad601a",
+  "beforeSha256": "da433fe2febea455343b66424b2b6e9d6680575f21f2552fc0be8d3bd95aa5c9",
+  "afterSha256": "1779d0141bb8ef7eaeb6ccfa3fc6616ad6baa83f3a81f9e59089ac2761e0d171",
+  "backupVerified": true,
+  "changedFileCount": 1,
+  "runId": "43809040146",
+  "retry": "NO_REEXECUTE_READ_ONLY_RECONCILE"
+}

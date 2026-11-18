@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_W03_GMH_SEVEN_MANUAL_RESULT_V1",
+  "status": "PASS",
+  "code": "W03_GMH_MANUAL_PRIVATE_RAW_CHECKPOINT",
+  "requestId": "2a9c76b4-f40c-4cc5-897a-e2c1a66543de",
+  "runId": "43861584385",
+  "sourceCommit": "f5fe56a48d651129bd811cc34d43665fba51c146",
+  "controlSha": "701f491cab7862c843859848325a2e5598b4b3dd",
+  "providerCalls": 4,
+  "rawPagesStored": 4,
+  "completedSymbols": 7,
+  "pendingSymbols": 7,
+  "manifestFiles": 16,
+  "d1Writes": 0,
+  "publicWrites": 0,
+  "schedulerChanges": 0,
+  "rawPriceExposed": false,
+  "retry": "NO_AUTOMATIC_REEXECUTION",
+  "sourceStatus": "CHECKPOINT_READY_TO_RESUME"
+}

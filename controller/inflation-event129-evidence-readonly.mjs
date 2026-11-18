@@ -1,0 +1,401 @@
+// W01 bounded Event129 evidence. READ ONLY; no B coordinator or provider imports.
+// All returned data are fixed codes, booleans, counts and bounded differences.
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import {TextDecoder} from 'node:util';
+import {fileURLToPath} from 'node:url';
+import {verifyCoreTaskEvent129} from './inflation-event129-b-proof.mjs';
+import {coreVbsTaskEventCandidates,verifyCoreVbsTaskWitness,
+ assertPinnedVbsLaunchers,APPROVED_VBS_CHAIN_FILES} from './inflation-vbs-b-proof.mjs';
+
+const ROOT=path.dirname(fileURLToPath(import.meta.url));
+const LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
+const DATA=String.raw`E:\ZGmini\data\pc-writer`;
+const PROBE=path.join(ROOT,'inflation-core-owner-diagnostic-probe.mjs');
+const EVENT_TOOL=path.win32.join(process.env.SystemRoot||'C:\\Windows',
+ 'System32','wevtutil.exe');
+const SCRIPT=path.win32.join(process.env.SystemRoot||'C:\\Windows',
+ 'System32','cscript.exe');
+const SCHTASKS=path.win32.join(process.env.SystemRoot||'C:\\Windows',
+ 'System32','schtasks.exe');
+const MAX_RESULT=8192,MAX_XML=300000,MAX_EVENTS=64,MAX_VBS=6;
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const nowIso=clock=>new Date(clock()).toISOString();
+const basic=()=>({status:'STATE_UNKNOWN',code:'INFL_E129_NOT_OBSERVED_WITHIN_LIMIT',
+ scope:'CORE_OWNER_EVENT129_READONLY_ONLY',authorizesB:false,
+ providerCalls:0,operationalWrites:0,d1Writes:0,sqliteOpened:false,
+ stage:'START',firstFailCode:null,logConfig:{read:'NOT_EVALUATED',enabled:null},reader:'NOT_EVALUATED',
+ encoding:'NOT_EVALUATED',bom:'NOT_EVALUATED',
+ readerShape:{status:'NOT_EVALUATED',byteBand:'NOT_EVALUATED',suspectedEncoding:'NOT_EVALUATED',
+  bEventRoots:null,auxEventRoots:null,xmlDeclaration:null},
+ rawBDirect:{ok:null,code:'NOT_EVALUATED'},
+ rawBVbs:{ok:null,code:'NOT_EVALUATED',candidates:[]},
+ supplemental:{parsed:null,coreCandidates:null,onlySupplemental:false},
+ task:{definition:'NOT_EVALUATED',instance:'NOT_EVALUATED'},
+ wmi:{status:'NOT_EVALUATED',ownerFound:null,coreMatched:null,
+  taskRunning:null,linked:null,koreaMatched:null},
+ event:{total:null,systemMatch:null,taskMatch:null,fieldsPresent:null,
+  fieldCounts:{TaskName:null,Path:null,ProcessID:null,TimeCreated:null},
+  pidMatch:null,timeParsed:null,withinTime:null,timeDeltaMs:null,candidateCount:null},
+ lock:{before:'NOT_EVALUATED',after:'NOT_EVALUATED',same:null},
+ snapshots:[],probeCounts:{logConfig:0,event:0,taskDefinition:0,wmi:0,lockReads:0}});
+const legal=(v,codes)=>codes.includes(v)?v:'UNAVAILABLE';
+const delta=(a,b)=>Number.isSafeInteger(a)&&Number.isSafeInteger(b)?
+ Math.max(-3600000,Math.min(3600000,a-b)):null;
+function snapshot(out,clock,phase){
+ if(out.snapshots.length<10)out.snapshots.push({phase,utc:nowIso(clock)});
+}
+function decode(bytes){
+ if(!Buffer.isBuffer(bytes)||bytes.length>=MAX_XML)return {ok:false,encoding:'UNSUPPORTED',bom:'UNKNOWN',text:null};
+ const a=bytes,bom=a.length>=3&&a[0]===239&&a[1]===187&&a[2]===191?'UTF8':
+ a.length>=2&&a[0]===255&&a[1]===254?'UTF16LE':
+ a.length>=2&&a[0]===254&&a[1]===255?'UTF16BE':'NONE';
+ const encoding=bom==='UTF16LE'?'utf-16le':bom==='UTF16BE'?'utf-16be':'utf-8';
+ try{
+  const text=new TextDecoder(encoding,{fatal:true}).decode(a);
+  return {ok:true,encoding:encoding.toUpperCase(),bom,text};
+ }catch{return {ok:false,encoding:'UNSUPPORTED',bom,text:null};}
+}
+// Fixed, non-content-bearing summary. A clean reader exit does NOT mean a
+// matching Event129 existed, nor that the B regex understood the XML.
+export function classifyEvent129ReaderShape(bytes,rawText,auxText=rawText){
+ const count=Buffer.isBuffer(bytes)?bytes.length:0;
+ const byteBand=count===0?'ZERO':count<=1024?'UP_TO_1K':
+  count<=16384?'UP_TO_16K':count<=262144?'UP_TO_256K':'UP_TO_300K';
+ const sample=Buffer.isBuffer(bytes)?bytes.subarray(0,Math.min(256,count)):Buffer.alloc(0);
+ let oddNul=0,evenNul=0;
+ for(let i=0;i<sample.length;i++)if(sample[i]===0)(i%2?oddNul++:evenNul++);
+ const pairs=Math.floor(sample.length/2);
+ const suspect=pairs>=8&&oddNul>=pairs*.45&&evenNul<=pairs*.1?
+  'POSSIBLE_UTF16LE_NO_BOM':
+  pairs>=8&&evenNul>=pairs*.45&&oddNul<=pairs*.1?
+  'POSSIBLE_UTF16BE_NO_BOM':'NONE';
+ const raw=typeof rawText==='string'?rawText:'';
+ const auxiliary=typeof auxText==='string'?auxText:raw;
+ const exact=(raw.match(/<Event(?:\s[^>]*)?>[\s\S]*?<\/Event>/g)||[]).length;
+ const auxiliaryTags=(auxiliary.match(/<(?:[A-Za-z_][\w.-]*:)?Event(?=[\s>])/g)||[]).length;
+ const bEventRoots=Math.min(MAX_EVENTS,exact);
+ const auxEventRoots=Math.min(MAX_EVENTS,auxiliaryTags);
+ const result={status:'NOT_EVALUATED',byteBand,suspectedEncoding:suspect,
+  bEventRoots,auxEventRoots,xmlDeclaration:/^\s*<\?xml\b/.test(auxiliary)};
+ if(count===0)result.status='EMPTY_STDOUT';
+ else if(auxiliary.trim().length===0)result.status='WHITESPACE_ONLY';
+ else if(auxEventRoots>0&&exact>0)result.status='B_EVENT_ROOT_OBSERVED';
+ else if(/<(?:[A-Za-z_][\w.-]*:)?Event(?=[\s>])/.test(auxiliary)&&
+  !/<\/(?:[A-Za-z_][\w.-]*:)?Event\s*>/.test(auxiliary))
+  result.status='INCOMPLETE_EVENT_XML';
+ else if(/<[A-Za-z_][\w.-]*:Event(?=[\s>])/.test(auxiliary))
+  result.status='PREFIXED_EVENT_NOT_B_RECOGNIZED';
+ else if(auxEventRoots>0&&exact===0)
+  result.status='AUX_EVENT_ROOT_NOT_B_RECOGNIZED';
+ else if(/<Events(?:\s[^>]*)?>\s*<\/Events>/.test(auxiliary))
+  result.status='EMPTY_EVENTS_CONTAINER';
+ else if(/<\?xml\b|<[A-Za-z_][\w:.-]*(?:\s|>)/.test(auxiliary))
+  result.status='XML_WITHOUT_B_EVENT_ROOT';
+ else result.status='NON_XML_STDOUT';
+ return result;
+}
+function auxiliaryEventText(bytes,decoded){
+ if(!decoded.ok)return null;
+ const raw=decoded.text;
+ if(decoded.bom!=='NONE')return raw;
+ const possible=classifyEvent129ReaderShape(bytes,'',raw).suspectedEncoding;
+ if(possible==='NONE')return raw;
+ try{return new TextDecoder(possible==='POSSIBLE_UTF16LE_NO_BOM'?
+  'utf-16le':'utf-16be',{fatal:true}).decode(bytes);}
+ catch{return raw;}
+}
+
+// This is auxiliary structure/coverage analysis ONLY; it never authorizes a B proof.
+export function describeEvent129(xml,lockPid,ownerCreatedAtMs,lockAt,clock=Date.now){
+ const out={parsed:false,total:0,systemMatch:0,taskMatch:0,
+  fieldsPresent:0,pidMatch:0,timeParsed:0,withinTime:0,timeDeltaMs:null,
+  fieldCounts:{TaskName:0,Path:0,ProcessID:0,TimeCreated:0},candidateCount:0};
+ if(typeof xml!=='string'||xml.length<30||xml.length>=MAX_XML)return out;
+ const roots=[...xml.matchAll(/<Event(?:\s[^>]*)?>[\s\S]*?<\/Event>/g)];
+ if(roots.length>MAX_EVENTS){out.total=MAX_EVENTS;return out;}
+ if(!roots.length||/<Event(?:\s[^>]*)?>/.test(xml.replace(/<Event(?:\s[^>]*)?>[\s\S]*?<\/Event>/g,'')))return out;
+ out.parsed=true;out.total=roots.length;
+ for(const root of roots){
+  const e=root[0];
+  if(!/<EventID(?:\s[^>]*)?>129<\/EventID>/.test(e)||
+   !/<Provider\s+Name="Microsoft-Windows-TaskScheduler"/.test(e)||
+   !/<Channel>Microsoft-Windows-TaskScheduler\/Operational<\/Channel>/.test(e))continue;
+  out.systemMatch++;
+  for(const [field,regexp] of [
+   ['TaskName',/<Data Name="TaskName">[^<]+<\/Data>/],
+   ['Path',/<Data Name="Path">[^<]+<\/Data>/],
+   ['ProcessID',/<Data Name="ProcessID">[^<]+<\/Data>/],
+   ['TimeCreated',/<TimeCreated\s+SystemTime="[^"]+"/]]){
+   if(regexp.test(e))out.fieldCounts[field]++;
+  }
+  if(!e.includes('<Data Name="TaskName">\\ZGMINI-PC-Local-Core</Data>'))continue;
+  out.taskMatch++;
+  const p=/<Data Name="Path">([^<]{1,320})<\/Data>/.exec(e)?.[1];
+  const pid=/<Data Name="ProcessID">([1-9][0-9]{0,9})<\/Data>/.exec(e)?.[1];
+  const timestamp=/<TimeCreated\s+SystemTime="([^"]{1,80})"/.exec(e)?.[1];
+  if(!p||!pid||!timestamp)continue;
+  out.fieldsPresent++;
+  if(pid!==String(lockPid))continue;
+  out.pidMatch++;
+  const t=/^20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(timestamp)?
+   Date.parse(timestamp):NaN;
+  if(!Number.isFinite(t))continue;
+  out.timeParsed++;
+  out.timeDeltaMs??=delta(t,ownerCreatedAtMs);
+  if(Number.isSafeInteger(ownerCreatedAtMs)&&Number.isSafeInteger(lockAt)&&
+   Math.abs(t-ownerCreatedAtMs)<=30000&&t<=lockAt+5000&&lockAt-t<=3600000&&
+   ownerCreatedAtMs<=lockAt+5000&&clock()>=lockAt)out.withinTime++;
+ }
+ out.candidateCount=out.taskMatch;
+ return out;
+}
+function lockReader(){
+ try{
+  const st=fs.lstatSync(LOCK);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<=0||st.size>=512)
+   return {status:'INVALID'};
+  const bytes=fs.readFileSync(LOCK);
+  if(bytes.length!==st.size)return {status:'INVALID'};
+  const x=JSON.parse(bytes.toString('utf8'));
+  if(!x||Object.keys(x).sort().join(',')!=='at,pid'||
+   !Number.isSafeInteger(x.pid)||x.pid<=0||
+   !Number.isSafeInteger(x.at)||x.at<946684800000)return {status:'INVALID'};
+  return {status:'PRESENT',pid:x.pid,at:x.at,hash:sha(bytes)};
+ }catch(e){return {status:e?.code==='ENOENT'?'ABSENT':'UNAVAILABLE'};}
+}
+function pinHash(file){
+ const f=Object.values(APPROVED_VBS_CHAIN_FILES).find(item=>item.path.toLowerCase()===file.toLowerCase());
+ if(!f||!file.toLowerCase().startsWith(DATA.toLowerCase()+'\\'))return null;
+ try{
+  const st=fs.lstatSync(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<=0||st.size>2000000)return null;
+  return sha(fs.readFileSync(file));
+ }catch{return null;}
+}
+function command(binary,args,{timeout=8000,maxBuffer=MAX_XML}={}){
+ return spawnSync(binary,args,{shell:false,windowsHide:true,encoding:null,timeout,maxBuffer});
+}
+function statusOf(p){
+ if(p?.error?.code==='ETIMEDOUT'||p?.signal)return 'TIMEOUT';
+ if(p?.error||p?.status!==0)return 'ERROR';
+ return Buffer.isBuffer(p.stdout)?'OK':'ERROR';
+}
+// Channel configuration is diagnostic only; it does not satisfy Core/B ownership proof.
+function readTaskLogConfiguration(execute){
+ try{
+  const result=execute(EVENT_TOOL,['gl','Microsoft-Windows-TaskScheduler/Operational'],
+   {timeout:5000,maxBuffer:16384});
+  if(statusOf(result)!=='OK')return {read:'UNAVAILABLE',enabled:null};
+  const lines=[...result.stdout.toString('utf8')
+   .matchAll(/^\s*enabled\s*:\s*(true|false)\s*$/gim)];
+  if(lines.length!==1)return {read:'UNPARSEABLE',enabled:null};
+  return {read:'OK',enabled:lines[0][1].toLowerCase()==='true'};
+ }catch{return {read:'UNAVAILABLE',enabled:null};}
+}
+function safeProbe(raw){
+ if(!Buffer.isBuffer(raw)||raw.length>12000)return null;
+ try{
+  const p=JSON.parse(raw.toString('utf8').trim());
+  if(typeof p?.ok!=='boolean'||typeof p?.taskRunning!=='boolean'||
+   typeof p?.linked!=='boolean'||typeof p?.ownerCoreMatched!=='boolean')return null;
+  return p;
+ }catch{return null;}
+}
+export async function inspectInflationEvent129Once({
+ platform=process.platform,clock=Date.now,readLock=lockReader,
+ execute=command,hashFile=pinHash,probePath=PROBE
+}={}){
+ const out=basic(),finish=()=>{
+  if(JSON.stringify(out).length>MAX_RESULT)return {status:'STATE_UNKNOWN',
+   code:'INFL_E129_RESULT_LIMIT_STOP',authorizesB:false,
+   providerCalls:0,operationalWrites:0,d1Writes:0,sqliteOpened:false};
+  return out;
+ };
+ const start=clock();
+ if(platform!=='win32'){out.code='INFL_E129_WINDOWS_REQUIRED';return finish();}
+ out.probeCounts.logConfig++;
+ out.logConfig=readTaskLogConfiguration(execute);
+ const stop=(code,phase)=>{out.code=code;out.firstFailCode??=code;out.stage=phase;};
+ let before=null,after=null,owner=null,bytes=null,eventsText=null;
+ try{
+  snapshot(out,clock,'BEFORE_LOCK');
+  before=readLock();out.probeCounts.lockReads++;out.lock.before=legal(before?.status,['PRESENT','ABSENT','INVALID','UNAVAILABLE']);
+  if(before?.status!=='PRESENT'){stop('INFL_E129_LOCK_NOT_VERIFIED','LOCK');return finish();}
+  // Mirror the current B preflight lock age and self-owner restrictions.
+  // A stale/future lock is not proof of an active Core owner.
+  const lockAge=clock()-before.at;
+  if(!Number.isSafeInteger(lockAge)||lockAge<0||lockAge>=3600000){
+   stop('INFL_E129_LOCK_AGE_OUT_OF_WINDOW','LOCK');return finish();
+  }
+  if(before.pid===process.pid){
+   stop('INFL_E129_LOCK_SELF_OWNER_UNVERIFIED','LOCK');return finish();
+  }
+  if(clock()-start>78000){stop('INFL_E129_TIME_BUDGET_STOP','TIME');return finish();}
+  snapshot(out,clock,'TASK_DEFINITION');
+  const task=execute(SCHTASKS,['/Query','/TN','ZGMINI-PC-Local-Core','/XML'],{timeout:8000,maxBuffer:262144});
+  out.probeCounts.taskDefinition++;
+  out.task.definition=statusOf(task);
+  if(out.task.definition!=='OK'){stop('INFL_E129_TASK_DEFINITION_UNAVAILABLE','TASK');return finish();}
+  snapshot(out,clock,'WMI_OWNER');
+  const initial=execute(SCRIPT,['//NoLogo','//E:JScript',probePath,String(before.pid)],{timeout:7000,maxBuffer:12000});
+  out.probeCounts.wmi++;
+  owner=statusOf(initial)==='OK'?safeProbe(initial.stdout):null;
+  out.task.instance=owner?.taskInstanceStatus??'ERROR';
+  out.wmi.status=owner?.wmiStatus??'ERROR';
+  out.wmi.ownerFound=typeof owner?.ownerFound==='boolean'?owner.ownerFound:null;
+  out.wmi.coreMatched=typeof owner?.ownerCoreMatched==='boolean'?owner.ownerCoreMatched:null;
+  out.wmi.taskRunning=typeof owner?.taskRunning==='boolean'?owner.taskRunning:null;
+  out.wmi.linked=typeof owner?.linked==='boolean'?owner.linked:null;
+  out.wmi.koreaMatched=typeof owner?.ownerKoreaMatched==='boolean'?owner.ownerKoreaMatched:null;
+  if(!owner||owner.ok!==true){
+   stop('INFL_E129_TASK_OR_WMI_UNAVAILABLE','WMI');return finish();
+  }
+  // In actual B V2, a verified live Task/WMI linked Core owner takes the
+  // direct path WITHOUT Event129. A must not fabricate a failed event proof.
+  if(owner.linked===true){
+   if(owner.ownerCoreMatched!==true){
+    stop('INFL_E129_LINKED_OWNER_SCRIPT_UNVERIFIED','WMI');return finish();
+   }
+   out.status='PASS';out.code='INFL_E129_CURRENT_WMI_LINK_OBSERVED';
+   out.stage='WMI';return finish();
+  }
+  // B's 12-minute observer waits for Core when Korea owns the shared lock
+  // or no Core Task is running; one-shot A must expose snapshot uncertainty.
+  if(owner.ownerKoreaMatched===true){
+   stop('INFL_E129_NON_CORE_LOCK_OWNER_OBSERVED','WMI');return finish();
+  }
+  if(owner.taskRunning!==true){
+   stop('INFL_E129_CORE_TASK_NOT_RUNNING_AT_SNAPSHOT','WMI');return finish();
+  }
+  snapshot(out,clock,'EVENT129');
+  const raw=execute(EVENT_TOOL,['qe','Microsoft-Windows-TaskScheduler/Operational',
+    '/q:*[System[(EventID=129)]]','/rd:true','/c:64','/f:xml'],{timeout:12000,maxBuffer:MAX_XML});
+  out.probeCounts.event++;
+  out.reader=statusOf(raw);
+  if(out.reader!=='OK'){stop('INFL_E129_READER_UNAVAILABLE','READER');return finish();}
+  bytes=raw.stdout;
+  const decoded=decode(bytes);
+  out.encoding=decoded.encoding;out.bom=decoded.bom;
+  eventsText=bytes.toString('utf8'); // EXACT current B encoding behavior (no repair).
+  const auxiliaryText=auxiliaryEventText(bytes,decoded);
+  out.readerShape=classifyEvent129ReaderShape(bytes,eventsText,auxiliaryText??eventsText);
+  const extra=describeEvent129(eventsText,before.pid,owner.ownerCreatedAtMs,before.at,clock);
+  out.event={total:extra.total,systemMatch:extra.systemMatch,taskMatch:extra.taskMatch,
+   fieldsPresent:extra.fieldsPresent,fieldCounts:extra.fieldCounts,
+   pidMatch:extra.pidMatch,timeParsed:extra.timeParsed,
+   withinTime:extra.withinTime,timeDeltaMs:extra.timeDeltaMs,candidateCount:extra.candidateCount};
+  if(decoded.ok){
+   const aux=describeEvent129(auxiliaryText,before.pid,owner.ownerCreatedAtMs,before.at,clock);
+   out.supplemental={parsed:aux.parsed,coreCandidates:aux.taskMatch,
+    onlySupplemental:aux.taskMatch>0&&extra.taskMatch===0};
+  }
+  const direct=verifyCoreTaskEvent129({xml:eventsText,lockPid:before.pid,
+   lockAt:before.at,ownerCreatedAtMs:owner.ownerCreatedAtMs,
+   taskRunning:owner.taskRunning,ownerCoreMatched:owner.ownerCoreMatched,now:clock()});
+  out.rawBDirect={ok:direct.ok,code:direct.code};
+  if(direct.ok===true){out.status='PASS';out.code='INFL_E129_B_DIRECT_LINK_OBSERVED';out.stage='PROOF';return finish();}
+  const candidates=coreVbsTaskEventCandidates(eventsText,{now:clock()});
+  out.rawBVbs.code=candidates.length?'INFL_E129_CANDIDATES_UNVERIFIED':
+   'INFL_E129_NOT_OBSERVED_WITHIN_LIMIT';
+  out.rawBVbs.ok=false;
+  for(const candidate of candidates.slice(0,MAX_VBS)){
+   if(clock()-start>78000){stop('INFL_E129_TIME_BUDGET_STOP','WMI');break;}
+   snapshot(out,clock,'WMI_VBS');
+   const w=execute(SCRIPT,['//NoLogo','//E:JScript',probePath,
+    String(before.pid),String(candidate.pid)],{timeout:7000,maxBuffer:12000});
+   out.probeCounts.wmi++;
+   const witness=statusOf(w)==='OK'?safeProbe(w.stdout):null;
+   let candidateCode='INFL_E129_WMI_UNAVAILABLE';
+   if(witness?.ok===true){
+    const result=verifyCoreVbsTaskWitness({candidate,witness,lockAt:before.at,
+     ownerCreatedAtMs:owner.ownerCreatedAtMs,taskRunning:owner.taskRunning,
+     ownerCoreMatched:owner.ownerCoreMatched,now:clock()});
+    candidateCode=result.code;
+    if(result.ok){
+     try{
+      assertPinnedVbsLaunchers(witness.approvedLauncherKinds,hashFile);
+      out.rawBVbs.ok=true;out.rawBVbs.code='INFL_MANUAL_B_CORE_TASK_VBS_CHAIN_LINKED';
+     }catch{candidateCode='INFL_E129_LAUNCHER_HASH_UNVERIFIED';}
+    }else if(witness.taskVbsLinked===false){
+     candidateCode='INFL_E129_VBS_ANCESTRY_UNVERIFIED';
+    }
+   }
+   out.rawBVbs.candidates.push({code:candidateCode,
+    ancestry:witness?.taskVbsLinked??null,
+    hashMatched:candidateCode==='INFL_MANUAL_B_CORE_TASK_VBS_CHAIN_LINKED'?true:
+     candidateCode==='INFL_E129_LAUNCHER_HASH_UNVERIFIED'?false:null});
+   if(out.rawBVbs.ok){out.status='PASS';out.code='INFL_E129_B_VBS_LINK_OBSERVED';break;}
+  }
+  if(out.status!=='PASS'&&out.firstFailCode===null)
+   stop('INFL_E129_NOT_OBSERVED_WITHIN_LIMIT','PROOF');
+  return finish();
+ }catch{
+  stop('INFL_E129_READONLY_EXCEPTION_STOP','ERROR');return finish();
+ }finally{
+  snapshot(out,clock,'AFTER_LOCK');
+  try{
+   after=readLock();out.probeCounts.lockReads++;
+   out.lock.after=legal(after?.status,['PRESENT','ABSENT','INVALID','UNAVAILABLE']);
+   out.lock.same=before?.status==='PRESENT'&&after?.status==='PRESENT'?
+    before.hash===after.hash:null;
+   // Initial ABSENT/INVALID/UNAVAILABLE is not a proven lock replacement.
+   // Preserve the FIRST failure even if a later lock read also changes.
+   if(before?.status==='PRESENT'&&out.lock.same!==true){
+    const code=after?.status==='UNAVAILABLE'?
+     'INFL_E129_LOCK_READBACK_UNVERIFIED':'INFL_E129_LOCK_SNAPSHOT_RACE';
+    out.status='STATE_UNKNOWN';out.code=code;
+    out.firstFailCode??=code;
+    if(out.firstFailCode===code)out.stage='AFTER_LOCK';
+   }
+  }catch{
+   out.lock.after='UNAVAILABLE';out.lock.same=null;
+   if(before?.status==='PRESENT'){
+    out.status='STATE_UNKNOWN';out.code='INFL_E129_LOCK_READBACK_UNVERIFIED';
+    out.firstFailCode??=out.code;
+    if(out.firstFailCode===out.code)out.stage='AFTER_LOCK';
+   }
+  }
+  // A one-shot observer can still report Event129 reader/encoding/field
+  // coverage when Core is idle. This is NOT a B ownership proof.
+  if(out.status!=='PASS'&&out.probeCounts.event===0&&clock()-start<=68000){
+   snapshot(out,clock,'EVENT129_COVERAGE_ONLY');
+   out.probeCounts.event++;
+   try{
+    const coverage=execute(EVENT_TOOL,['qe','Microsoft-Windows-TaskScheduler/Operational',
+     '/q:*[System[(EventID=129)]]','/rd:true','/c:64','/f:xml'],
+     {timeout:12000,maxBuffer:MAX_XML});
+    out.reader=statusOf(coverage);
+    if(out.reader==='OK'){
+     const dec=decode(coverage.stdout);
+     out.encoding=dec.encoding;out.bom=dec.bom;
+     const rawText=coverage.stdout.toString('utf8');
+     const auxiliaryText=auxiliaryEventText(coverage.stdout,dec);
+     out.readerShape=classifyEvent129ReaderShape(coverage.stdout,rawText,auxiliaryText??rawText);
+     const extra=describeEvent129(rawText,before?.pid,
+      owner?.ownerCreatedAtMs,before?.at,clock);
+     const bound=before?.status==='PRESENT';
+     const witnessed=bound&&Number.isSafeInteger(owner?.ownerCreatedAtMs);
+     out.event={total:extra.total,systemMatch:extra.systemMatch,
+      taskMatch:extra.taskMatch,fieldsPresent:extra.fieldsPresent,
+      fieldCounts:extra.fieldCounts,pidMatch:bound?extra.pidMatch:null,
+      timeParsed:witnessed?extra.timeParsed:null,
+      withinTime:witnessed?extra.withinTime:null,
+      timeDeltaMs:witnessed?extra.timeDeltaMs:null,
+      candidateCount:extra.candidateCount};
+     if(dec.ok){
+      const auxiliary=describeEvent129(auxiliaryText,before?.pid,
+       owner?.ownerCreatedAtMs,before?.at,clock);
+      out.supplemental={parsed:auxiliary.parsed,
+       coreCandidates:auxiliary.taskMatch,
+       onlySupplemental:auxiliary.taskMatch>0&&extra.taskMatch===0};
+     }
+    }
+   }catch{out.reader='ERROR';}
+  }
+  // Must never advertise success without a stable lock, nor confuse an auxiliary parse with B.
+  if(clock()-start>80000){out.status='STATE_UNKNOWN';out.code='INFL_E129_TIME_BUDGET_STOP';}
+ }
+}

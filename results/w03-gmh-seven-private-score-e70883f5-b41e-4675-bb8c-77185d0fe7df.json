@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_W03_GMH_SEVEN_PRIVATE_SCORE_RESULT_V1",
+  "status": "PASS",
+  "code": "W03_GMH_SCORE_SAVED_7X252_VERIFIED",
+  "requestId": "e70883f5-b41e-4675-bb8c-77185d0fe7df",
+  "runId": "44275475749",
+  "sourceCommit": "0dcc572ca27f311e60baec826d0e75557e0185a8",
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "publicWrites": 0,
+  "taskChanges": 0,
+  "rawBarExposure": false,
+  "retry": "NO_AUTOMATIC_REEXECUTION",
+  "observationDate": "2026-11-13",
+  "commonSessionCount": 679,
+  "historyPoints": 1764,
+  "inputManifestSha256": "82f380e346e350c276c4b532353ddc3112dbfa5f90c8d1590c25e22ec064bc0a",
+  "privateArtifactSha256": "9f5fa50f294224b273b0eee6e4d1ad96afc1b37a61774d8bf74d1543ffa1f62a",
+  "checkpointSha256": "3ddc25440fe93a8301f0f6f9d6d82dc34867fc6852198f4ac90a03828eba0336",
+  "rawPagesVerified": 30,
+  "localSaved": true
+}

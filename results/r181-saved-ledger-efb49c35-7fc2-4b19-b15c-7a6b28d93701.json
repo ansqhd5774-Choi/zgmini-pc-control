@@ -1,0 +1,98 @@
+{
+  "schema": "ZGMINI_R181_SAVED_LEDGER_RESULT_V1",
+  "requestId": "efb49c35-7fc2-4b19-b15c-7a6b28d93701",
+  "status": "PASS",
+  "code": "R181_SAVED_LEDGER_READONLY",
+  "runId": "43839640361",
+  "sourcePinVerified": true,
+  "coverage": {
+    "coverageStatus": "LEDGER_REPORTED_COMPLETE",
+    "reportedState": "LOCAL_PRIMARY_STORED",
+    "reportedAt": "2026-11-16T05:29:19.353Z",
+    "providerCalls": 14,
+    "fixedSymbolCount": 14,
+    "matchingRows": 14,
+    "unknownSymbolCount": 0,
+    "symbols": [
+      {
+        "symbol": "SPY",
+        "bars": 145,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "BOTZ",
+        "bars": 117,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "ROBO",
+        "bars": 97,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "SKYY",
+        "bars": 89,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "CLOU",
+        "bars": 83,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "DRIV",
+        "bars": 68,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "NLR",
+        "bars": 107,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "URA",
+        "bars": 143,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "ITA",
+        "bars": 122,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "SHLD",
+        "bars": 109,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "FINX",
+        "bars": 72,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "ARKF",
+        "bars": 81,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "CIBR",
+        "bars": 136,
+        "latest15NY": "2026-11-13"
+      },
+      {
+        "symbol": "BUG",
+        "bars": 140,
+        "latest15NY": "2026-11-13"
+      }
+    ],
+    "evidenceLevel": "LEDGER_METADATA_ONLY_SQLITE_NOT_VERIFIED",
+    "sqliteOpened": false,
+    "rawShaVerified": false,
+    "checkpointVerified": false
+  },
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "sqliteOpened": false,
+  "d1Writes": 0,
+  "retry": "DO_NOT_REEXECUTE"
+}

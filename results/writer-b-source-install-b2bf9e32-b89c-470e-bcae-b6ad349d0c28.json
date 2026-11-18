@@ -1,0 +1,23 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "b2bf9e32-b89c-470e-bcae-b6ad349d0c28",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "a8028279dfed695cb826b8a3e2166796cc8a03bf",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "ecf5a859dbee150e3557e94896f410366f718f3e",
+  "candidateSourceSha": "27ce7650c70f2c980936f97199badf08b86af333",
+  "manifestSha256": "d47891f3d5f7682c12afefbd2e37d53444df77788e3299ec68a94d208e094f59",
+  "baseTreeOid": "024fc33b9c9b5066f9f690fbe7544204d058a0f8",
+  "preparedTreeOid": "0d74e35b4f97248556b67c8595eedc6d6e7cc1fd",
+  "provenanceSha256": "b7d5704defc47642b3f1b586ae6001491a4f152b0459889a747b3ef4c1dbef77",
+  "runId": "43778598706",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/collect-local.mjs",
+    "scripts/pc-writer/api-connection-health.mjs",
+    "worker/api-connection-health.mjs",
+    "scripts/pc-writer/provider-endpoint-fingerprint.mjs"
+  ]
+}

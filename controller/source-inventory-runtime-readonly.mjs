@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {gunzipSync} from 'node:zlib';
+import {inspectEarningsCCheckpoint} from './earnings-c-checkpoint-readonly.mjs';
 
 const DB_NAMES=Object.freeze(['core','history']);
 const TABLES=Object.freeze({
@@ -184,7 +185,7 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    tableAvailability:Object.fromEntries(Object.entries(TABLES).map(([k,v])=>[k,tables.has(v)])),
    batch:null,employment:null,employmentR6:null,breadth:null,breadthUniverse:null,
    earningsUniverse:null,consumption:null,publicFeeds:null,census2027Diagnostic:null,
-   treasuryTawsInput:null};
+   treasuryTawsInput:null,earningsCompanionC:null};
   if(has('batch')){
    queryStage='BATCH';
    const all=row('SELECT COUNT(*) AS n,MAX(stored_at) AS latest FROM market_input_batches_v1');
@@ -226,6 +227,9 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{
    const x=row('SELECT trade_date,member_count FROM market_score_breadth_b1_r3_universe_v1 ORDER BY trade_date DESC LIMIT 1');
    out.breadthUniverse={latestTradeDate:stamp(x?.trade_date),reportedMemberCount:integer(x?.member_count)};
   }
+  // An independent, fixed-key BLS receipt; a missing C dataset must never
+  // fail inventory checks for other source families.
+  out.earningsCompanionC=inspectEarningsCCheckpoint(db);
   if(has('earningsUniverse')){
    queryStage='EARNINGS_UNIVERSE';
    const x=row('SELECT period_end,security_count,issuer_count,retrieved_at FROM market_score_earnings_e1_r3_universe_v1 ORDER BY period_end DESC LIMIT 1');

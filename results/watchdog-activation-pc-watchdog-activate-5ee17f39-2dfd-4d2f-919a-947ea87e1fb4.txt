@@ -1,0 +1,7 @@
+schema=ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1
+requestId=pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4
+status=BLOCKED
+code=WATCHDOG_ACTIVATION_UNKNOWN
+newProcessAttested=false
+watchdogFileWrites=0
+next=STOP_INSPECT_EXISTING_CLAIM_NO_RETRY

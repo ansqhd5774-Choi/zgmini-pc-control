@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_W03_R179_GUARD_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "W03_R179_SEVEN_CORE_READBACK_MINIMUM_ONLY",
+  "operation": "w03-r179-readback-guard-install",
+  "controlSourceSha": "be0690f24050da7a5975fee5fb8f96db1bff4632",
+  "targetPath": "E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r179-publish-core.mjs",
+  "beforeSha256": "f9ea0a1bfaf52909b7a434b65ba93887f56660bc979a3cb7e0992597bc9f3b68",
+  "beforeBytes": 10822,
+  "patchId": "R179_LEGACY_SEVEN_EXACT_TO_AT_LEAST_SEVEN",
+  "maxAttempts": 1,
+  "allowProviderCalls": false,
+  "allowSqliteWrites": false,
+  "allowD1Writes": false,
+  "allowTaskChanges": false,
+  "allowOtherSourceChanges": false
+}

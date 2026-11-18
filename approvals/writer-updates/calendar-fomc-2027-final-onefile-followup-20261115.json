@@ -1,0 +1,37 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "support/w02-2027-fomc-owner-onepass-20261115",
+  "candidateSourceSha": "694711096168db7533baebe0930c400c5abbb5f7",
+  "baseHead": "05d7ae49e0a84cbeebd90ef4de6dd7284094bf97",
+  "baseConfigSourceSha": "05d7ae49e0a84cbeebd90ef4de6dd7284094bf97",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/release-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "ad016f09bd9a50f925136b4a2154268a8f3f2a0c0c262109be2d611fb935ae64",
+      "afterSha256": "a69164fd804642c64b82da3a31556f4209130861428853023ab096b7a3517298"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "sha256": "383dbf3e66b2291be30c8dc3d96e91030e827e64bea5bed9fc74b758d0cbd4b2"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}

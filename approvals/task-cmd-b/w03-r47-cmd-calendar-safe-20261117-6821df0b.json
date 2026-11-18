@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_TASK_CMD_ONEFILE_B_V1",
+  "status": "APPROVED_B",
+  "scope": "EXISTING_R47_TASK_CMD_SINGLE_FILE_CAS",
+  "requestId": "6821df0b-05eb-4044-8e59-8b06346fec6a",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "a2cea21930f142657c6890471c515ac6d92e7809",
+  "sourcePath": "scripts/pc-writer/THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd",
+  "targetPath": "E:\\ZGmini\\data\\pc-writer\\theme-nine-r48\\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd",
+  "task": "ZGMINI-PC-Theme-Nine-R47-Private",
+  "beforeSha256": "a08fdec82b484c41ba3ac562908f31d96fee09c75cc3ff1b32386e9dd625ba45",
+  "afterSha256": "fde41fa4ac02c99139171c18a03fa2b00f6956825be92f9c2b3d10da7217a955",
+  "taskXmlSha256": "bf3207ab2274d1248e7bd8c953cea2fd3bd277b8bd70bb1c2494339a06e0a4be",
+  "runCount": 1,
+  "allowTaskChanges": false,
+  "allowProviderCalls": false,
+  "allowSqliteWrites": false,
+  "allowD1Writes": false,
+  "allowOtherFileWrites": false
+}

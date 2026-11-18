@@ -1,0 +1,873 @@
+{
+  "schema": "ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1",
+  "role": "operating",
+  "requestId": "24c8cb5f-8c67-4f17-b72d-8408e88213a0",
+  "issueNumber": 1777,
+  "runId": "43892950658",
+  "attempt": "1",
+  "observedAtUtc": "2026-11-16T15:08:09.355Z",
+  "host": "PC",
+  "runnerName": "zgmini-pc-01",
+  "runnerLabel": "zgmini-pc-control",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "automaticRetries": 0,
+  "commandLinesCaptured": false,
+  "environmentValuesCaptured": false,
+  "maintenance": {
+    "status": "PASS",
+    "code": "MAINTENANCE_SOURCE_READONLY",
+    "observedAtUtc": "2026-11-16T15:08:10.814Z",
+    "maintenanceSourceSha": "c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7",
+    "maintenanceFilesVerified": true,
+    "actualControllerSha": "e3a495c97d6b40d6d4eea2ff4f586bef46216eb7",
+    "controllerFilesVerified": null,
+    "installLockReadbackVerified": true,
+    "installLockHeld": true,
+    "installLockRecoveryRequired": true,
+    "receiverStatus": "LISTENING",
+    "workflowState": "active",
+    "runtimeState": "UNVERIFIED",
+    "maintenanceState": "HEALTHY",
+    "automationState": "PARTIAL_OR_UNVERIFIED",
+    "runtimeSignals": {
+      "controllerFilesVerified": true,
+      "supervisorAlive": true,
+      "supervisorIdentityVerified": true,
+      "supervisorFresh": true,
+      "supervisorChildrenVerified": true,
+      "runnerSetOnline": null,
+      "workflowActive": true
+    },
+    "dedicatedRunnerEvidence": {
+      "queryState": "QUERY_UNAVAILABLE",
+      "queryFailureReason": "HTTP_403_FORBIDDEN",
+      "allSixOnline": null,
+      "returnedRowCount": null,
+      "runners": [
+        {
+          "name": "zgmini-pc-01",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-02",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-03",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-04",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-05",
+          "status": "UNVERIFIED",
+          "busy": null
+        },
+        {
+          "name": "zgmini-pc-06",
+          "status": "UNVERIFIED",
+          "busy": null
+        }
+      ],
+      "operationalWrites": 0,
+      "providerCalls": 0,
+      "d1Writes": 0
+    },
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "c996LeaseCorrelation": {
+    "status": "STATE_UNKNOWN",
+    "code": "C996_LEASE_IDENTITY_UNPROVEN",
+    "ownerPid": 26988,
+    "ownerMarkerIdentityMatched": true,
+    "ledger996Matched": true,
+    "ledgerMarkerTimeMatched": false,
+    "unchangedAcrossReads": true,
+    "ownerSha256": "03ad28afd61c4146d2cd397903dc7024701624379e448d9e0b87fa63d0b690dd",
+    "markerSha256": "2735532f974d0feb116ca30456db10d55ae5c90f3c13d8ef1937c9e1654361c4",
+    "ledgerSha256": "c6276bcf78ee96d8858e91621c85437abb5377108fe6c5b5681bf9b617743930",
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "c1501LeaseCorrelation": {
+    "status": "STATE_UNKNOWN",
+    "code": "C1501_LEASE_IDENTITY_UNPROVEN",
+    "ownerPid": 26988,
+    "ownerMarkerIdentityMatched": true,
+    "ledgerMarkerTimeMatched": false,
+    "unchangedAcrossReads": true,
+    "ownerSha256": "03ad28afd61c4146d2cd397903dc7024701624379e448d9e0b87fa63d0b690dd",
+    "markerSha256": "2735532f974d0feb116ca30456db10d55ae5c90f3c13d8ef1937c9e1654361c4",
+    "ledgerSha256": "2962e110c98f678db33fdd3b46ecea061bc1d94cacd692f28fa202c21e875846",
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "ledger1501Matched": true,
+    "ledgerPhase": null,
+    "ledgerFirstFail": null,
+    "ledgerStatus": null,
+    "ledgerFailureOperation": null,
+    "ledgerIntakePaused": null,
+    "ledgerWorkflowEnabled": null,
+    "ownerPidObservation": "UNKNOWN",
+    "backupPresent": null,
+    "backlogPresent": null,
+    "eligibleForAutomaticRelease": false
+  },
+  "observedHttpHostRoster": {
+    "status": "STATE_UNKNOWN",
+    "code": "OBSERVED_HOST_ITEM_INVALID",
+    "source": "PC_COLLECTION_EVENTS_FETCH_WRAPPER",
+    "monitoredCount": null,
+    "rosterComplete": false,
+    "http": null,
+    "hosts": [],
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0
+  },
+  "http32TwoHostCheckpoints": {
+    "schema": "ZGMINI_HTTP32_TWO_HOST_CHECKPOINTS_RO_V1",
+    "status": "READ_ONLY_COLLECTED",
+    "reason": null,
+    "observedAt": "2026-11-16T15:08:11.929Z",
+    "hosts": [
+      {
+        "host": "data.alpaca.markets",
+        "source": "R10_ALPACA_INCREMENTAL_LOCAL",
+        "reportReadState": "READ_VERIFIED",
+        "checkpointReadState": "READ_VERIFIED",
+        "reportStatus": "COLLECTED_PENDING_VALIDATION",
+        "checkedAt": "2026-11-12T00:08:19.983Z",
+        "requestEnd": "2026-11-11",
+        "checkpointThrough": "2026-11-11",
+        "cacheWindowHours": 20,
+        "withinCacheWindow": false,
+        "storageVerified": true,
+        "checkpointAligned": true,
+        "cacheEvidenceVerified": false,
+        "runRequests": 55,
+        "coreCycleReadState": "READ_VERIFIED",
+        "coreCycleAt": "2026-11-16T14:56:28.992Z",
+        "coreCycleLane": "core",
+        "coreCycleStatus": "COMPLETE",
+        "coreAlpacaStatus": "EXCLUDED_BY_USER",
+        "coreAlpacaRunRequests": 0,
+        "coreAuxiliaryStartedAt": "2026-11-16T14:55:35.020Z",
+        "coreAuxiliaryStatus": "COMPLETE",
+        "note": "R10_CACHE_NOT_PROOF_OF_ALL_ALPACA_COLLECTORS"
+      },
+      {
+        "host": "cdn.www.census.gov",
+        "source": "PC_MONTHLY_ONE_YEAR_BACKFILL_LOCAL",
+        "reportReadState": "READ_VERIFIED",
+        "reportStatus": "STORED",
+        "lastBackfillAt": "2026-10-06T22:22:14.566Z",
+        "asOf": "2026-10-06",
+        "chartStatus": "STORED",
+        "chartTarget": "2026-08-01",
+        "chartRecordCount": 342,
+        "chartRowsWritten": 126,
+        "note": "PC_BACKFILL_NOT_CLOUDFLARE_D1_OR_POST_RELEASE_HTTP_PROOF"
+      }
+    ],
+    "sourceOnly": true,
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "c1501Backlog": {
+    "status": "STATE_UNKNOWN",
+    "code": "C1501_BACKLOG_OWNER_UNVERIFIED",
+    "schema": "ZGMINI_PC_BACKLOG_WINDOW_READONLY_V1",
+    "originalRequestIssue": 1501,
+    "windowCount": null,
+    "openWindowCount": null,
+    "replayCount": null,
+    "windows": [],
+    "replays": [],
+    "rosterTruncated": false,
+    "stateHash": null,
+    "mutationAllowed": false,
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "targetEndpointStatus": {
+    "status": "OBSERVED",
+    "code": "ENDPOINT_HASH_STATUS_READBACK",
+    "scope": "FIXED_THREE_OBSERVED_HOSTS_ONLY",
+    "source": "PC_ENDPOINT_PATH_HASH_LOG",
+    "windowDays": 14,
+    "seenEvents": 146,
+    "invalidEvents": 0,
+    "partialTail": false,
+    "rowsTruncated": false,
+    "endpointCoverageVerified": false,
+    "hosts": [
+      {
+        "host": "data.sec.gov",
+        "endpointCount": 9,
+        "returnedCount": 9,
+        "truncated": false,
+        "endpointHashes": [
+          {
+            "hash": "1f8b4fcdca92ed847cd9a1f6400fb58c",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          },
+          {
+            "hash": "268c23e3bbaed0a6d75a5e31deb964c7",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          },
+          {
+            "hash": "2f3f296a9f18395b186d42645e755694",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          },
+          {
+            "hash": "48220ed8f7add1c47ff3336b2827ffb6",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "404": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": null,
+            "last404At": "2026-11-16T11:05:11.662Z"
+          },
+          {
+            "hash": "6685632a40dc6570aa81281df24d194f",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          },
+          {
+            "hash": "9e7444da6de02dc7a20566f6b49e9232",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "404": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": null,
+            "last404At": "2026-11-16T11:05:11.662Z"
+          },
+          {
+            "hash": "ac28a19a3c96c3174140f5bc46a898d1",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          },
+          {
+            "hash": "b6884ab591e43d5325abd8a6d75f714f",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          },
+          {
+            "hash": "b8d69bb17d4199c472e335d3c4173647",
+            "lastAt": "2026-11-16T11:05:11.662Z",
+            "lastStatuses": {
+              "200": 1
+            },
+            "totalRequests": 2,
+            "last2xxAt": "2026-11-16T11:05:11.662Z",
+            "last404At": null
+          }
+        ]
+      },
+      {
+        "host": "data.alpaca.markets",
+        "endpointCount": 0,
+        "returnedCount": 0,
+        "truncated": false,
+        "endpointHashes": []
+      },
+      {
+        "host": "cdn.www.census.gov",
+        "endpointCount": 0,
+        "returnedCount": 0,
+        "truncated": false,
+        "endpointHashes": []
+      }
+    ],
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0
+  },
+  "status": "PASS",
+  "code": "PROCESS_INVENTORY_COLLECTED",
+  "snapshot": {
+    "observedAtUtc": "2026-11-16T15:08:18.4774609Z",
+    "totalProcessCount": 403,
+    "selectedProcessCount": 73,
+    "processes": [
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 10764,
+        "ppid": 35604,
+        "session": 1,
+        "workingSetMiB": 28
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 21956,
+        "ppid": 33196,
+        "session": 1,
+        "workingSetMiB": 25
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 23304,
+        "ppid": 35648,
+        "session": 1,
+        "workingSetMiB": 11
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 25320,
+        "ppid": 29240,
+        "session": 1,
+        "workingSetMiB": 36
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 28716,
+        "ppid": 6280,
+        "session": 0,
+        "workingSetMiB": 11
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 34024,
+        "ppid": 11492,
+        "session": 1,
+        "workingSetMiB": 16
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 37248,
+        "ppid": 41400,
+        "session": 1,
+        "workingSetMiB": 17
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "pid": 29164,
+        "ppid": 25320,
+        "session": 1,
+        "workingSetMiB": 92
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 4292,
+        "ppid": 3520,
+        "session": 1,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 30644,
+        "ppid": 15640,
+        "session": 1,
+        "workingSetMiB": 2
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 32172,
+        "ppid": 4292,
+        "session": 1,
+        "workingSetMiB": 2
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 36392,
+        "ppid": 32172,
+        "session": 1,
+        "workingSetMiB": 2
+      },
+      {
+        "name": "wscript.exe",
+        "pid": 37336,
+        "ppid": 37512,
+        "session": 1,
+        "workingSetMiB": 2
+      },
+      {
+        "name": "node.exe",
+        "pid": 7620,
+        "ppid": 26176,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 7928,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 13
+      },
+      {
+        "name": "node.exe",
+        "pid": 18872,
+        "ppid": 29276,
+        "session": 1,
+        "workingSetMiB": 12
+      },
+      {
+        "name": "node.exe",
+        "pid": 20176,
+        "ppid": 30644,
+        "session": 1,
+        "workingSetMiB": 9
+      },
+      {
+        "name": "node.exe",
+        "pid": 26368,
+        "ppid": 34808,
+        "session": 1,
+        "workingSetMiB": 14
+      },
+      {
+        "name": "node.exe",
+        "pid": 31572,
+        "ppid": 26988,
+        "session": 1,
+        "workingSetMiB": 17
+      },
+      {
+        "name": "node.exe",
+        "pid": 31892,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 35592,
+        "ppid": 32764,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "node.exe",
+        "pid": 36620,
+        "ppid": 37336,
+        "session": 1,
+        "workingSetMiB": 27
+      },
+      {
+        "name": "node.exe",
+        "pid": 36892,
+        "ppid": 36392,
+        "session": 1,
+        "workingSetMiB": 38
+      },
+      {
+        "name": "node.exe",
+        "pid": 37584,
+        "ppid": 29920,
+        "session": 1,
+        "workingSetMiB": 4
+      },
+      {
+        "name": "node.exe",
+        "pid": 39236,
+        "ppid": 20776,
+        "session": 1,
+        "workingSetMiB": 66
+      },
+      {
+        "name": "node.exe",
+        "pid": 40416,
+        "ppid": 36892,
+        "session": 1,
+        "workingSetMiB": 334
+      },
+      {
+        "name": "powershell.exe",
+        "pid": 25552,
+        "ppid": 39236,
+        "session": 1,
+        "workingSetMiB": 85
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 11492,
+        "ppid": 31572,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 12284,
+        "ppid": 21784,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 20776,
+        "ppid": 29164,
+        "session": 1,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 26176,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 29240,
+        "ppid": 31572,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 29276,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 32764,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 33196,
+        "ppid": 31572,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 34808,
+        "ppid": 33840,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 35604,
+        "ppid": 31572,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 35648,
+        "ppid": 31572,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 41400,
+        "ppid": 31572,
+        "session": 1,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 1436,
+        "ppid": 12464,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5104,
+        "ppid": 4996,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5672,
+        "ppid": 32476,
+        "session": 1,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 10720,
+        "ppid": 10696,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 15680,
+        "ppid": 35228,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 16848,
+        "ppid": 29164,
+        "session": 1,
+        "workingSetMiB": 12
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 18084,
+        "ppid": 33196,
+        "session": 1,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 18132,
+        "ppid": 26176,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 21152,
+        "ppid": 36620,
+        "session": 1,
+        "workingSetMiB": 1
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 24800,
+        "ppid": 25552,
+        "session": 1,
+        "workingSetMiB": 7
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 25052,
+        "ppid": 40416,
+        "session": 1,
+        "workingSetMiB": 7
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 25824,
+        "ppid": 25808,
+        "session": 1,
+        "workingSetMiB": 1
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 26164,
+        "ppid": 28520,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 26632,
+        "ppid": 32764,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 27328,
+        "ppid": 37584,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 27460,
+        "ppid": 15460,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 28724,
+        "ppid": 28716,
+        "session": 0,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 29888,
+        "ppid": 20176,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 31644,
+        "ppid": 41400,
+        "session": 1,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 32840,
+        "ppid": 26576,
+        "session": 1,
+        "workingSetMiB": 0
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 34176,
+        "ppid": 29240,
+        "session": 1,
+        "workingSetMiB": 6
+      }
+    ],
+    "processCounts": [
+      {
+        "name": "cmd.exe",
+        "count": 12
+      },
+      {
+        "name": "conhost.exe",
+        "count": 34
+      },
+      {
+        "name": "node.exe",
+        "count": 13
+      },
+      {
+        "name": "powershell.exe",
+        "count": 1
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "count": 7
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "count": 1
+      },
+      {
+        "name": "wscript.exe",
+        "count": 5
+      }
+    ],
+    "services": [
+      {
+        "name": "actions.runner.ansqhd5774-Choi-akkigo-boja.akkigo-boja-runner",
+        "state": "Running",
+        "startMode": "Auto"
+      }
+    ],
+    "serviceStatus": "OK",
+    "tasks": [
+      {
+        "name": "ZGMINI-Migrate-Resume-20261015",
+        "state": "Disabled"
+      },
+      {
+        "name": "ZGMINI-Migrate-To-E-20261015",
+        "state": "Disabled"
+      },
+      {
+        "name": "ZGMINI-PC-Breadth-R10V9-Publication",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Breadth-R10V9-Shadow",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Configured-Themes",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-GetMarketHistory-ETF",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Local-Core",
+        "state": "Running"
+      },
+      {
+        "name": "ZGMINI-PC-Local-Korea",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-MarketParquet-ETF",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Biotech",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Data-Center-Power",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Nine-R47-Private",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Theme-Nine-R54-Public",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-US-Breadth-R1",
+        "state": "Ready"
+      },
+      {
+        "name": "ZGMINI-PC-Writer",
+        "state": "Disabled"
+      }
+    ],
+    "taskStatus": "OK",
+    "startup": [
+      "ZGMINI_PC_CONTROL.vbs",
+      "ZGMINI_PC_MAINTENANCE.vbs"
+    ],
+    "startupStatus": "OK",
+    "processListTruncated": true
+  }
+}

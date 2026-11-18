@@ -1,0 +1,16 @@
+{
+  "schema": "ZGMINI_R181_PROTECTED_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "W03_R181_PC_ONLY_SINGLE_FILE_GMH_ROUTE",
+  "operation": "r181-protected-route-install",
+  "controlSourceSha": "e64e36d93bc0636733959b64d61e6270aa0fdede",
+  "targetPath": "E:\\ZGmini\\data\\theme-market-history-r131\\marketparquet-r167\\r181-primary-cycle.mjs",
+  "beforeSha256": "be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62",
+  "patchId": "GMH_2026_11_STOCKS_US_EXACT_3_BYTE_INSERT",
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbWrites": false,
+  "allowD1Writes": false,
+  "allowTaskChanges": false,
+  "allowOtherFileChanges": false
+}

@@ -129,3 +129,98 @@ test('PC text evidence absent remains pending, never posts a wait',async()=>{
   assert.equal(result.waitProofPending,1);
   assert.equal(posts,0);
 });
+
+const verifiedWorkerWait=(operation='employment-r6-wal-memory-preflight')=>{
+  const report=blocked();
+  report.operation=operation;
+  delete report.phase;
+  delete report.mutationStarted;
+  report.lastPass='ALLOWLISTED_WORKER_STARTED';
+  report.firstFail='ALLOWLISTED_OPERATION';
+  report.exitCode=0;
+  report.actualExecutionSha=report.controlSourceSha;
+  report.protectedStateUnchanged=true;
+  report.protectedBeforeSha256='c'.repeat(64);
+  report.protectedAfterSha256=report.protectedBeforeSha256;
+  report.result={status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
+    candidateExecuted:false,providerCalls:0,sqliteOpened:false,
+    operationalWrites:0,d1Writes:0};
+  const origin=issue();
+  origin.body=JSON.stringify({...request(),operation});
+  const txt=Object.entries(report)
+    .filter(([k])=>k!=='result')
+    .map(([k,v])=>`${k}=${v}`).join('\r\n')+'\r\n';
+  return {origin,report,txt};
+};
+
+test('worker-level memory wait requires confirmed protected state and candidate not executed',()=>{
+  for(const operation of ['employment-r6-wal-memory-preflight',
+    'theme-nine-r32-raw-coverage-readonly']){
+    const {origin,report,txt}=verifiedWorkerWait(operation);
+    const r=preparePcSharedResourceWait({originIssue:origin,report,
+      resultPath:pathJson,resultTxt:txt});
+    assert.equal(r.state,'WAITING_SHARED_RESOURCE');
+    assert.equal(r.wait.safePoint,'REQUEST_CONSUMED_WORKER_PREOP_UNTOUCHED');
+    assert.equal(r.wait.automaticPcRetries,0);
+    assert.equal(r.wait.resume,'OWNER_REPLAN_NEW_AUTHORIZED_REQUEST_ONLY');
+  }
+});
+
+test('worker memory proof fails closed for unsafe operation, mutation or text drift',()=>{
+  const changes=[
+    r=>{r.result.candidateExecuted=true;},
+    r=>{r.result.operationalWrites=1;},
+    r=>{r.result.sqliteOpened=true;},
+    r=>{r.result.providerCalls=1;},
+    r=>{r.protectedStateUnchanged=false;},
+    r=>{r.protectedAfterSha256='d'.repeat(64);},
+    r=>{r.actualExecutionSha='e'.repeat(40);},
+    r=>{r.exitCode=1;},
+    r=>{r.resourceLeasesRetained=true;},
+    r=>{r.phase='PREVALIDATION';},
+    r=>{r.result.code='OTHER_BLOCKER';}
+  ];
+  for(const change of changes){
+    const {origin,report,txt}=verifiedWorkerWait();
+    change(report);
+    assert.equal(preparePcSharedResourceWait({originIssue:origin,report,
+      resultPath:pathJson,resultTxt:txt}).state,'WAIT_PROOF_UNVERIFIED');
+  }
+  const {origin,report,txt}=verifiedWorkerWait();
+  assert.equal(preparePcSharedResourceWait({originIssue:origin,report,
+    resultPath:pathJson,resultTxt:txt.replace('protectedStateUnchanged=true',
+      'protectedStateUnchanged=false')}).state,'WAIT_PROOF_UNVERIFIED');
+  const invalid=verifiedWorkerWait('core-status');
+  assert.equal(preparePcSharedResourceWait({originIssue:invalid.origin,
+    report:invalid.report,resultPath:pathJson,resultTxt:invalid.txt}).state,
+    'WAIT_PROOF_UNVERIFIED');
+});
+
+test('verified readonly worker wait records one central ledger receipt, never a repair',async()=>{
+  const {origin,report,txt}=verifiedWorkerWait();
+  const queue=[];let posts=0,repairs=0;
+  const io={
+    readReport:async p=>p===pathJson?report:null,
+    readReportText:async p=>p===pathJson.replace('.json','.txt')?txt:null,
+    readComments:async()=>[receipt()],
+    readIssue:async n=>n===1009?origin:null,
+    listHandoffs:async()=>({repository:repo,complete:true,issues:[]}),
+    createHandoff:async()=>{repairs++;throw Error('UNEXPECTED_REPAIR');},
+    listResourceWaitComments:async()=>queue,
+    createResourceWaitComment:async body=>{
+      posts++;queue.push({id:12345,body,user:{login:bot},
+        issue_url:`https://api.github.com/repos/${repo}/issues/68`});
+      return {id:12345};
+    },
+    readResourceWaitComment:async id=>queue.find(x=>x.id===id)
+  };
+  const result=await processCompletedPcJob(ev(),io);
+  assert.equal(result.state,'WAITING_SHARED_RESOURCE_RECORDED');
+  assert.equal(result.waitsRecorded,1);
+  assert.equal(result.automaticPcRetries,0);
+  assert.equal(repairs,0);
+  assert.equal(posts,1);
+  const repeated=await processCompletedPcJob(ev(),io);
+  assert.equal(repeated.waitsReused,1);
+  assert.equal(posts,1);
+});

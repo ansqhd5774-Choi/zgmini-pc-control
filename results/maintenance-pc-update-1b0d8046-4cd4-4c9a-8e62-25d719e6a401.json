@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-1b0d8046-4cd4-4c9a-8e62-25d719e6a401",
+  "targetControllerSha": "451f53ae3831d369dfbcd4474b2c641736634a34",
+  "status": "BLOCKED",
+  "code": "BUNDLE_B_APPROVAL_CONTRACT_INVALID",
+  "lastPass": "NONE",
+  "firstFail": "BUNDLE_B_APPROVAL_CONTRACT_INVALID",
+  "actualControllerSha": null,
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": null
+}

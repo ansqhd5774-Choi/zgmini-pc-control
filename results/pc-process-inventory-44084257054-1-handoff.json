@@ -1,0 +1,332 @@
+{
+  "schema": "ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1",
+  "role": "handoff",
+  "requestId": "d514cf8e-d716-44f8-a633-504055bd3ec6",
+  "issueNumber": 2029,
+  "runId": "44084257054",
+  "attempt": "1",
+  "observedAtUtc": "2026-11-17T12:33:48.990Z",
+  "host": "DESKTOP-N62L0NG",
+  "runnerName": "zgmini-handoff-ci-spare-01",
+  "runnerLabel": "zgmini-handoff-ci-isolated",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "automaticRetries": 0,
+  "commandLinesCaptured": false,
+  "environmentValuesCaptured": false,
+  "status": "PASS",
+  "code": "PROCESS_INVENTORY_COLLECTED",
+  "snapshot": {
+    "observedAtUtc": "2026-11-17T12:33:51.7033576Z",
+    "totalProcessCount": 240,
+    "selectedProcessCount": 38,
+    "processes": [
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 1064,
+        "ppid": 9996,
+        "session": 2,
+        "workingSetMiB": 81
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 5012,
+        "ppid": 5816,
+        "session": 0,
+        "workingSetMiB": 88
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 5664,
+        "ppid": 10468,
+        "session": 2,
+        "workingSetMiB": 75
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 9944,
+        "ppid": 9720,
+        "session": 2,
+        "workingSetMiB": 67
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 13724,
+        "ppid": 11160,
+        "session": 2,
+        "workingSetMiB": 17
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "pid": 3584,
+        "ppid": 5012,
+        "session": 0,
+        "workingSetMiB": 92
+      },
+      {
+        "name": "node.exe",
+        "pid": 1136,
+        "ppid": 15536,
+        "session": 2,
+        "workingSetMiB": 40
+      },
+      {
+        "name": "node.exe",
+        "pid": 2272,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 38
+      },
+      {
+        "name": "node.exe",
+        "pid": 9984,
+        "ppid": 8012,
+        "session": 0,
+        "workingSetMiB": 38
+      },
+      {
+        "name": "node.exe",
+        "pid": 10272,
+        "ppid": 17620,
+        "session": 2,
+        "workingSetMiB": 49
+      },
+      {
+        "name": "node.exe",
+        "pid": 14460,
+        "ppid": 13772,
+        "session": 2,
+        "workingSetMiB": 40
+      },
+      {
+        "name": "node.exe",
+        "pid": 19788,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 40
+      },
+      {
+        "name": "powershell.exe",
+        "pid": 6368,
+        "ppid": 9984,
+        "session": 0,
+        "workingSetMiB": 91
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 8012,
+        "ppid": 3584,
+        "session": 0,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 9720,
+        "ppid": 9340,
+        "session": 2,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 9996,
+        "ppid": 5500,
+        "session": 2,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 10468,
+        "ppid": 3624,
+        "session": 2,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 11160,
+        "ppid": 1952,
+        "session": 2,
+        "workingSetMiB": 2
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 13772,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 4
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 15536,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 4
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 712,
+        "ppid": 10272,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 2584,
+        "ppid": 5012,
+        "session": 0,
+        "workingSetMiB": 5
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 3288,
+        "ppid": 16048,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 4064,
+        "ppid": 4036,
+        "session": 0,
+        "workingSetMiB": 3
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5196,
+        "ppid": 10468,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5880,
+        "ppid": 19788,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 7036,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 7528,
+        "ppid": 9996,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 8536,
+        "ppid": 8892,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9740,
+        "ppid": 9720,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9816,
+        "ppid": 19116,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9836,
+        "ppid": 13148,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 11244,
+        "ppid": 15536,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 12252,
+        "ppid": 11160,
+        "session": 2,
+        "workingSetMiB": 7
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 12316,
+        "ppid": 2272,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 15236,
+        "ppid": 6368,
+        "session": 0,
+        "workingSetMiB": 8
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 17304,
+        "ppid": 13772,
+        "session": 2,
+        "workingSetMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 19540,
+        "ppid": 3584,
+        "session": 0,
+        "workingSetMiB": 11
+      }
+    ],
+    "processCounts": [
+      {
+        "name": "cmd.exe",
+        "count": 7
+      },
+      {
+        "name": "conhost.exe",
+        "count": 18
+      },
+      {
+        "name": "node.exe",
+        "count": 6
+      },
+      {
+        "name": "powershell.exe",
+        "count": 1
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "count": 5
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "count": 1
+      }
+    ],
+    "services": [
+      {
+        "name": "actions.runner.ansqhd5774-Choi-zgmini-pc-control.zgmini-handoff-ci-spare-01",
+        "state": "Running",
+        "startMode": "Auto"
+      }
+    ],
+    "serviceStatus": "OK",
+    "tasks": [],
+    "taskStatus": "OK",
+    "startup": [],
+    "startupStatus": "OK",
+    "processListTruncated": false
+  }
+}

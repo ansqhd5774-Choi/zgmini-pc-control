@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_R181_PROTECTED_B_RESULT_V1",
+  "requestId": "f8267c96-4e7d-4743-9f09-085e20085510",
+  "status": "R181_B_PREFLIGHT_STOP",
+  "code": "R181_LEGACY_ROUTE_NOT_UNIQUE",
+  "applied": false,
+  "controlSha": null,
+  "manifestSha256": "2fb4f8c1b122aebd5bb7d507453dd384c207ebae0a4b2f5cfbe9df48cbfefccb",
+  "beforeSha256": null,
+  "afterSha256": null,
+  "backupVerified": false,
+  "changedFileCount": 0,
+  "runId": "43803162631",
+  "retry": "NO_REEXECUTE_READ_ONLY_RECONCILE"
+}

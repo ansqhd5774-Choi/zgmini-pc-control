@@ -72,3 +72,60 @@ jobs:
           DIRECT_B_CANDIDATE_OUTCOME: ${{ steps.candidate.outcome }}
           DIRECT_B_APPLY_OUTCOME: ${{ steps.apply.outcome }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\generic-b-control\direct-writer-b\report.mjs"'
+  r47-cmd-onefile-b:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-r47-cmd-onefile-install' &&
+      contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
+      github.run_attempt == 1
+    concurrency:
+      group: zgmini-writer-source-b-one-at-a-time
+      cancel-in-progress: false
+      queue: max
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+    steps:
+      - name: Checkout exact control event SHA
+        id: control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: r47-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Authenticate pinned R47 approval and resolve fixed source
+        id: pin
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r47-control\task-cmd-b\source-pin.mjs"'
+      - name: Checkout exact approved R47 CMD source
+        id: candidate
+        if: success() && steps.pin.outputs.sourceSha != ''
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.pin.outputs.sourceSha }}
+          path: r47-candidate
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Apply exact approved R47 one-file Task CMD CAS
+        id: apply
+        if: success() && steps.candidate.outcome == 'success'
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r47-control\task-cmd-b\windows-adapter.mjs"'
+      - name: Create-only R47 result JSON TXT and verify remote readback
+        if: always() && steps.control.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          R47_PIN_OUTCOME: ${{ steps.pin.outcome }}
+          R47_CANDIDATE_OUTCOME: ${{ steps.candidate.outcome }}
+          R47_APPLY_OUTCOME: ${{ steps.apply.outcome }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\r47-control\task-cmd-b\report.mjs"'

@@ -23,7 +23,15 @@ jobs:
         with:
           node-version: '22'
       - name: Run source-only unit tests
-        run: node --test tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs
+        run: node --test tests/pc-source-origin-readonly.test.mjs tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs tests/agent-handoff-pc-resource-wait.test.mjs tests/shared-resource-lifecycle.test.mjs
+      - name: Run R47 fixed CMD B authorization and CAS tests
+        run: node --test tests/r47-cmd-approval-intake.test.mjs tests/r47-cmd-onefile-cas.test.mjs tests/r47-cmd-report.test.mjs tests/r47-cmd-windows-boundary.test.mjs tests/r47-cmd-approval-bytes.test.mjs tests/r47-task-probe-wsh.test.mjs tests/shared-resource-issue-admission.test.mjs controller/theme-r47-task-action-readonly.test.mjs
+      - name: Run common recovery and fixed ingress regressions in TEMP
+        run: node --test tests/controller-intake-recovery.test.mjs tests/controller-1979-backlog-recovery.test.mjs tests/completed-recovery-claim.test.mjs tests/rollback-stalled-claim.test.mjs tests/interrupted-rollback.test.mjs tests/maintenance-backlog-request.test.mjs tests/r47-task-chain.test.mjs tests/inflation-a401-private23-readonly.test.mjs tests/inflation-a407-integrity-readonly.test.mjs
+      - name: Test fixed R47 existing Task once without PC or provider calls
+        run: node --test tests/r47-existing-task-once.test.mjs
+      - name: Verify fixed forbidden provider Task retirement without operating effects
+        run: node --test tests/marketparquet-task-retire.test.mjs
       - name: Identify exact permitted queue PC without WIM access
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (

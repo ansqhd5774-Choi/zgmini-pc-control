@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      github.event.issue.title == 'pc-writer-source-install' &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w03-r48-private-readback-once' || github.event.issue.title == 'w03-r51-stored-date-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -41,13 +41,24 @@ jobs:
           repository: ansqhd5774-Choi/zgmini-pc-control
           ref: ${{ github.sha }}
           path: writer-b-control
-          fetch-depth: 1
+          # R181 and W01 Census verify reviewed ancestors; generic Writer B stays shallow.
+          fetch-depth: ${{ (github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'marketparquet-exact-task-retire-once' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w01-census-m3-api-once') && '0' || ((github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-collection-time-readonly') && '64' || '1') }}
           persist-credentials: false
+      - name: W01 Census #28 API-only approved manual B transaction
+        if: github.event.issue.title == 'w01-census-m3-api-once'
+        id: w01census
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\inflation-census-api-b\windows-adapter.mjs"'
+      - name: W01 create-only redacted Census B JSON TXT and originating Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w01-census-m3-api-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\inflation-census-api-b\report.mjs"'
       - name: Approve exact manifest before candidate checkout
+        if: github.event.issue.title == 'pc-writer-source-install'
         id: manifest
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\preflight.mjs"'
       - name: Checkout approved public candidate SHA only
-        if: steps.manifest.outcome == 'success'
+        if: github.event.issue.title == 'pc-writer-source-install' && steps.manifest.outcome == 'success'
         id: candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -57,11 +68,231 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Run approved exact-file Writer B source transaction
-        if: steps.candidate.outcome == 'success'
+        if: github.event.issue.title == 'pc-writer-source-install' && steps.candidate.outcome == 'success'
         id: install
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\windows-adapter.mjs" > "%RUNNER_TEMP%\writer-b-install-result.json"'
+      - name: R181 exact protected source B (independent immutable manifest)
+        if: github.event.issue.title == 'r181-protected-route-install'
+        id: r181
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-protected-b-entry.mjs"'
+      - name: R181 create-only sanitized result and source Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-protected-route-install'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-protected-b-report.mjs"'
+      - name: Apply exact approved R181 primary helper route only
+        if: github.event.issue.title == 'r181-primary-route-install'
+        id: r181primary
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-primary-b-entry.mjs"'
+      - name: R181 primary create-only result and protected hash readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-primary-route-install'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-primary-b-report.mjs"'
+      - name: Launch existing registered R181 collector exactly once by approved Windows Task
+        if: github.event.issue.title == 'r181-existing-task-run-once'
+        id: r181task
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-existing-task-once.mjs"'
+      - name: Record one-shot R181 Task run acceptance without asserting data collection
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-existing-task-run-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-existing-task-report.mjs"'
+      - name: Run existing fixed R47 private Task once after approved route fix
+        if: github.event.issue.title == 'r47-existing-task-run-once'
+        id: r47task
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r47-existing-task-once.mjs"'
+      - name: Report fixed R47 Task acceptance without claiming collection success
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r47-existing-task-run-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r47-existing-task-report.mjs"'
+      - name: Retire exact forbidden MarketParquet task once preserving GMH
+        if: github.event.issue.title == 'marketparquet-exact-task-retire-once'
+        id: mpretire
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\marketparquet-task-retire-once.mjs"'
+      - name: Record exact task disabled and protected GMH readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'marketparquet-exact-task-retire-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\marketparquet-task-retire-report.mjs"'
+      - name: Inspect fixed R181 URL shape without source disclosure or provider calls
+        if: github.event.issue.title == 'r181-source-shape-readonly'
+        id: r181shape
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-source-shape-run.mjs"'
+      - name: R181 readonly shape create-only result and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-source-shape-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-source-shape-report.mjs"'
+      - name: R181 fixed saved ledger 14-symbol metadata read only
+        if: github.event.issue.title == 'r181-saved-ledger-readonly'
+        id: r181savedledger
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-saved-ledger-readonly.mjs"'
+      - name: R181 saved ledger create-only sanitized JSON TXT and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'r181-saved-ledger-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\r181-saved-ledger-report.mjs"'
+      - name: R179 protected stored input source and inventory readonly
+        if: github.event.issue.title == 'w03-r179-stored-handoff-readonly'
+        id: w03r179
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-stored-handoff-readonly.mjs"'
+      - name: Create-only sanitized R179 input handoff JSON TXT and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r179-stored-handoff-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-stored-handoff-report.mjs"'
+      - name: Inspect pinned R179 actual operator shape without protected source disclosure
+        if: github.event.issue.title == 'w03-r179-guard-shape-readonly'
+        id: w03r179shape
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-guard-shape-readonly.mjs"'
+      - name: Create-only sanitized R179 operator shape JSON TXT readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r179-guard-shape-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-guard-shape-report.mjs"'
+      - name: Apply exact approved R179 seven-theme readback compatibility patch
+        if: github.event.issue.title == 'w03-r179-readback-guard-install'
+        id: w03r179guard
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-seven-readback-entry.mjs"'
+      - name: R179 exact B create-only result pair and source SHA readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r179-readback-guard-install'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r179-seven-readback-report.mjs"'
+      - name: Authenticate fixed manual seven-theme GMH historical collector source
+        if: github.event.issue.title == 'w03-gmh-seven-history-manual-once'
+        id: w03gmhmanualpreflight
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-preflight.mjs"'
+      - name: Checkout exact approved GMH-only private collector candidate
+        if: github.event.issue.title == 'w03-gmh-seven-history-manual-once' && steps.w03gmhmanualpreflight.outcome == 'success'
+        id: w03gmhmanualsource
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhmanualpreflight.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Execute exact approved manual GMH saved historical pages only
+        if: github.event.issue.title == 'w03-gmh-seven-history-manual-once' && steps.w03gmhmanualsource.outcome == 'success'
+        id: w03gmhmanualrun
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-once.mjs"'
+      - name: Create-only redacted private GMH historical checkpoint pair
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-history-manual-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-manual-report.mjs"'
+      - name: Authenticate exact GMH seven-theme saved-only scoring request
+        if: github.event.issue.title == 'w03-gmh-seven-private-score-once'
+        id: w03gmhscorepreflight
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-private-score-preflight.mjs"'
+      - name: Checkout exact approved GMH private scorer source commit
+        if: github.event.issue.title == 'w03-gmh-seven-private-score-once' && steps.w03gmhscorepreflight.outcome == 'success'
+        id: w03gmhscoresource
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhscorepreflight.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Compute verified 628-session seven-theme private 7x252 score once
+        if: github.event.issue.title == 'w03-gmh-seven-private-score-once' && steps.w03gmhscoresource.outcome == 'success'
+        id: w03gmhscore
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-private-score-once.mjs"'
+      - name: Create-only redacted private 7x252 SHA result and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-private-score-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-private-score-report.mjs"'
+      - name: Read immutable GMH 7x252 and compare public base/R32 APIs without D1 writes
+        if: github.event.issue.title == 'w03-gmh-seven-public-compat-readonly'
+        id: w03gmhpubliccompat
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-public-compat-a.mjs"'
+      - name: Create-only redacted public compatibility result pair
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-public-compat-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-public-compat-report.mjs"'
+      - name: Authenticate protected W03 GMH D1 seed read-only request
+        if: github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly'
+        id: w03gmhd1auth
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-d1-seed-preflight.mjs"'
+      - name: Checkout reviewed D1 read-only module and 7x252 score source
+        if: github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' && steps.w03gmhd1auth.outcome == 'success'
+        id: w03gmhd1source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhd1auth.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Read fixed D1 legacy seed and rolling rows without token refresh or mutation
+        if: github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' && steps.w03gmhd1source.outcome == 'success'
+        id: w03gmhd1read
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-d1-seed-a.mjs"'
+      - name: Create-only sanitized D1 seed overlap and lineage JSON TXT pair
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-d1-seed-report.mjs"'
+      - name: Authenticate W03 immutable GMH collection-time read-only request
+        if: github.event.issue.title == 'w03-gmh-seven-collection-time-readonly'
+        id: w03gmhtimepreflight
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-gmh-seven-collection-time-preflight.mjs"'
+      - name: Checkout exact pinned GMH time-audit source only
+        if: github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' && steps.w03gmhtimepreflight.outcome == 'success'
+        id: w03gmhtimesource
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini
+          ref: ${{ steps.w03gmhtimepreflight.outputs.candidateSourceSha }}
+          path: w03-gmh-source
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify pinned GMH manifest request timestamps without private score recompute or D1
+        if: github.event.issue.title == 'w03-gmh-seven-collection-time-readonly' && steps.w03gmhtimesource.outcome == 'success'
+        id: w03gmhtime
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-gmh-seven-collection-time-a.mjs"'
+      - name: Create-only sanitized GMH collection-time JSON TXT and readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-gmh-seven-collection-time-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\\ZGmini\\runtime\\node.exe" "%GITHUB_WORKSPACE%\\writer-b-control\\tools\\w03-gmh-seven-collection-time-report.mjs"'
+      - name: Read W03 R47 private score pair SHA and current source manifests without raw prices
+        if: github.event.issue.title == 'w03-r47-private-readback-once'
+        id: w03r47privateread
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r47-private-readback.mjs"'
+      - name: Create-only redacted W03 R47 private pair metadata JSON TXT and Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r47-private-readback-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r47-private-readback-report.mjs"'
+      - name: Read W03 R48 private candidate SHA R47 source pair and manifest only
+        if: github.event.issue.title == 'w03-r48-private-readback-once'
+        id: w03r48privateread
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r48-private-readback.mjs"'
+      - name: Create-only redacted W03 R48 candidate lineage JSON TXT and Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r48-private-readback-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r48-private-readback-report.mjs"'
+      - name: Read W03 R51 existing private stage and exact R48 source SHA only
+        if: github.event.issue.title == 'w03-r51-stored-date-readback-once'
+        id: w03r51read
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r51-stored-date-readback.mjs"'
+      - name: Create-only sanitized W03 R51 date SHA metadata JSON TXT and Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r51-stored-date-readback-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r51-stored-date-report.mjs"'
       - name: Create-only sanitized result and originating Issue comment
-        if: always() && steps.control.outcome == 'success'
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-source-install'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\writer-b\report.mjs"'

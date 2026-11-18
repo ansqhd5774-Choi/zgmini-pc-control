@@ -148,6 +148,49 @@ test('an entire zero prior four-week state base prevents a valid score',t=>{
  assert.equal(r.stateClaims.firstWindowBreak?.reason,'PRIOR_4W_ZERO_BASE');
 });
 
+test('W04 PIT-04-07 NULL in a prior 4-week state base is not silently ignored by SQLite SUM',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ seed(db);
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=NULL WHERE geography_code='WY' AND observation_date='2025-01-04'").run();
+ db.close();
+ const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.stateClaims.sampledWeeks,56);
+ assert.equal(r.stateClaims.complete51Weeks,55);
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].invalidValues,1);
+ assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
+ assert.equal(r.stateClaims.firstWindowBreak?.reason,'STATE_CLAIMS_VALUE_INVALID');
+ assert.equal(r.stateClaims.latestStrict52WeekCandidate,null);
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),beforeHash);assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+});
+
+test('W04 PIT-04-07 invalid state claim counts cannot certify 51-state or 10y raw windows',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=NULL WHERE geography_code='WY' AND observation_date='2026-10-31'").run();
+ db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.sampledWeeks,577);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'STATE_CLAIMS_VALUE_INVALID');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+ assert.equal(r.stateClaims.latestStrict52WeekCandidate,'2026-10-24');
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(sha(file),before);
+ const cases=[-1,1.5,'not-a-count'];
+ for(const value of cases){
+  const writing=new DatabaseSync(file);
+  writing.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=? WHERE geography_code='WY' AND observation_date='2026-10-31'").run(value);
+  writing.close();
+  const checked=inspectEmploymentR6CollectionEvidence(data);
+  assert.equal(checked.stateClaims.fullTenYearRawCoverage.status,'STATE_CLAIMS_VALUE_INVALID',String(value));
+  assert.equal(checked.stateClaims.incompleteWeeks,1,String(value));
+ }
+});
+
 test('530 complete weeks cannot satisfy 10-year claims coverage without older stored rows',t=>{
  const {data,file}=fixture(t),db=createDb(file);
  seed(db,{weeks:530,startDate:'2015-10-17'});db.close();
@@ -219,8 +262,224 @@ test('unapproved data path and symbolic core file fail without opening SQLite',t
  const {data,storage,file}=fixture(t);
  assert.equal(inspectEmploymentR6CollectionEvidence(storage).code,'R6_EVIDENCE_DATA_ROOT_DENIED');
  const other=path.join(storage,'other.sqlite');const db=createDb(other);db.close();
- fs.symlinkSync(other,file);
- const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
+ let filesystem=fs;
+ try{fs.symlinkSync(other,file);}
+ catch(error){
+  if(!['EPERM','EACCES'].includes(error?.code))throw error;
+  // Isolated Windows CI users may lack symlink creation privileges.
+  // Simulate the same lstat+realpath contract without relaxing the guard.
+  filesystem={...fs,
+   lstatSync(target){
+    if(target===file)return Object.assign(Object.create(fs.lstatSync(other)),{
+     isSymbolicLink:()=>true,
+    });
+    return fs.lstatSync(target);
+   },
+   realpathSync(target){return target===file?other:fs.realpathSync(target);},
+  };
+ }
+ const r=inspectEmploymentR6CollectionEvidence(data,{filesystem,
+  openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
  assert.equal(r.status,'STATE_UNKNOWN');
  assert.equal(r.sqliteOpened,false);
+});
+
+test('DOL national error categories remain diagnostic without leaking arbitrary error text',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T08:00:00.000Z',
+  2,51,0,0,0,'DOL_NATIONAL_HTTP_FAILED',
+  JSON.stringify({mode:'RELEASE',nationalResponseEvidence:{httpStatus:503},
+    privateToken:'SECRET_DO_NOT_OUTPUT'}));
+ db.close();
+ const testCodes=[
+  ['DOL_NATIONAL_HTTP_FAILED','DOL_NATIONAL_HTTP_FAILED'],
+  ['DOL_NATIONAL_REQUEST_FAILED','DOL_NATIONAL_REQUEST_FAILED'],
+  ['DOL_NATIONAL_NO_VALID_ROWS','DOL_NATIONAL_NO_VALID_ROWS'],
+  ['DOL_NATIONAL_SERIES_INCOMPLETE','DOL_NATIONAL_SERIES_INCOMPLETE'],
+  ['DOL_NATIONAL_INVALID_DATA','DOL_NATIONAL_INVALID_DATA'],
+  ['DOL_NATIONAL_SOURCE_UNAVAILABLE','DOL_NATIONAL_SOURCE_UNAVAILABLE'],
+  ['DOL_NATIONAL_RESPONSE_FORMAT_UNSUPPORTED','DOL_NATIONAL_RESPONSE_FORMAT_UNSUPPORTED'],
+  ['DOL_RELEASE_OBSERVATION_STALE','DOL_RELEASE_OBSERVATION_STALE'],
+  ['HTTP_503_SECRET_DO_NOT_OUTPUT','OTHER'],
+ ];
+ for(const [stored,expected] of testCodes){
+  const writing=new DatabaseSync(file);
+  writing.prepare(`UPDATE market_score_employment_r4_shadow_runs_v1 SET failure_code=?
+   WHERE provider='EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS'
+    AND json_extract(detail_json,'$.mode')='RELEASE'`).run(stored);
+  writing.close();
+  const beforeHash=sha(file);
+  const result=inspectEmploymentR6CollectionEvidence(data);
+  assert.equal(result.status,'PASS');
+  assert.equal(result.dol.RELEASE.failureCode,expected,stored);
+  assert.equal(result.dol.RELEASE.providerRequests,2);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+  assert.equal(result.operationalWrites,0);
+  assert.equal(sha(file),beforeHash,'read-only diagnosis must preserve storage bytes');
+  assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|privateToken|nationalResponseEvidence/i);
+ }
+});
+
+test('W04 manual National response diagnosis classifies stored 200 TEXT without leaking source body',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T10:14:15.554Z',
+  2,5712,0,0,0,'DOL_NATIONAL_NO_VALID_ROWS',
+  JSON.stringify({mode:'ONE_YEAR',missingSeries:[
+   'INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE'],
+   nationalResponseEvidence:{
+    httpStatus:200,contentTypeCategory:'text/plain',responseFormat:'TEXT',
+    bodyCharLength:42,parsedNationalSeriesCount:0,
+    latestNationalObservationDate:null,
+    bodySha256:'DO_NOT_OUTPUT_PRIVATE_DIGEST',
+    sourceUrl:'SECRET_DO_NOT_OUTPUT',token:'SECRET_DO_NOT_OUTPUT'
+   },error:'SECRET_DO_NOT_OUTPUT'}));
+ db.close();
+ const before=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.dol.ONE_YEAR.status,'PARTIAL');
+ assert.equal(result.dol.ONE_YEAR.failureCode,'DOL_NATIONAL_NO_VALID_ROWS');
+ assert.deepEqual(result.dol.ONE_YEAR.nationalResponse,{
+  httpStatus:200,contentTypeCategory:'text/plain',responseFormat:'TEXT',
+  bodyPresent:true,parsedNationalSeriesCount:0,
+  requestFailureCode:null,validationFailureCode:null,latestNationalObservationDate:null,
+ });
+ assert.equal(sha(file),before);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+ assert.equal(result.operationalWrites,0);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|DO_NOT_OUTPUT_PRIVATE_DIGEST|sourceUrl|token|bodySha256|error/i);
+});
+
+test('W04 National raw diagnostic rejects arbitrary formats and unbounded error codes',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T10:14:15.554Z',
+  2,5712,0,0,0,'SECRET_DO_NOT_OUTPUT',
+  JSON.stringify({mode:'ONE_YEAR',nationalResponseEvidence:{
+   httpStatus:200,contentTypeCategory:'text/html;token=SECRET_DO_NOT_OUTPUT',
+   responseFormat:'MALICIOUS_FORMAT_SECRET_DO_NOT_OUTPUT',bodyCharLength:500,
+   parsedNationalSeriesCount:999,requestFailureCode:'SECRET_DO_NOT_OUTPUT',
+   validationFailureCode:'SECRET_DO_NOT_OUTPUT',
+   latestNationalObservationDate:'2026-11-14'
+  }}));
+ db.close();
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.dol.ONE_YEAR.failureCode,'OTHER');
+ assert.deepEqual(result.dol.ONE_YEAR.nationalResponse,{
+  httpStatus:200,contentTypeCategory:'UNKNOWN',responseFormat:'UNKNOWN',
+  bodyPresent:true,parsedNationalSeriesCount:null,
+  requestFailureCode:null,validationFailureCode:null,
+  latestNationalObservationDate:'2026-11-14',
+ });
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|MALICIOUS_FORMAT/);
+});
+
+test('official DOL HTTP-200 source unavailability remains redacted and exact in A diagnostic',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ db.prepare(`INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-16T11:30:15.554Z',
+  2,5712,0,0,0,'DOL_NATIONAL_SOURCE_UNAVAILABLE',
+  JSON.stringify({mode:'ONE_YEAR',nationalResponseEvidence:{
+    httpStatus:200,contentTypeCategory:'text/plain',responseFormat:'SOURCE_UNAVAILABLE',
+    bodyCharLength:100,parsedNationalSeriesCount:0,
+    requestFailureCode:'DOL_NATIONAL_SOURCE_UNAVAILABLE',
+    sourceUrl:'SECRET_DO_NOT_OUTPUT',bodySha256:'PRIVATE_DIGEST_DO_NOT_OUTPUT',
+  }}));
+ db.close();
+ const before=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(result.status,'PASS');
+ assert.equal(result.dol.ONE_YEAR.failureCode,'DOL_NATIONAL_SOURCE_UNAVAILABLE');
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.responseFormat,'SOURCE_UNAVAILABLE');
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.httpStatus,200);
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.requestFailureCode,'DOL_NATIONAL_SOURCE_UNAVAILABLE');
+ assert.equal(result.dol.ONE_YEAR.nationalResponse.parsedNationalSeriesCount,0);
+ assert.equal(sha(file),before);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|PRIVATE_DIGEST_DO_NOT_OUTPUT|sourceUrl|bodySha256/);
+});
+
+
+function storeNationalRawFixture(db,{
+ rawDate='11/07/2026',recordedDate='2026-10-17',corrupt=false,missingChunk=false,
+}={}){
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN snapshot_id TEXT");
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN body_sha256 TEXT");
+ const xml='<r539cyNational><week><weekEnded>'+rawDate+'</weekEnded>'+
+  '<InitialClaims><SA>210,000</SA><SA4WK>205,000</SA4WK></InitialClaims>'+
+  '<ContinuedClaims><SA>1,800,000</SA></ContinuedClaims><IUR><SA>1.2</SA></IUR>'+
+  '</week></r539cyNational>';
+ const hash=createHash('sha256').update(xml).digest('hex');
+ const detail=JSON.stringify({mode:'RELEASE',latestInitialClaimsObservationDate:recordedDate,
+  latestNationalSeriesObservationDates:Object.fromEntries(
+   ['INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE']
+     .map(id=>[id,recordedDate])),
+  nationalResponseEvidence:{bodySha256:hash,latestNationalObservationDate:recordedDate},
+  privateToken:'SECRET_DO_NOT_OUTPUT'});
+ db.prepare("INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)").run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-18T01:55:19.006Z',
+  2,51,0,0,0,'DOL_RELEASE_OBSERVATION_STALE',detail);
+ db.prepare("INSERT INTO market_score_employment_r6_raw_snapshot_v1 "+
+  "(request_key,release_group,chunk_index,retrieved_at,chunk_count,http_status,detail_json,body_chunk,snapshot_id,body_sha256) "+
+  "VALUES(?,?,?,?,?,?,?,?,?,?)").run('DOL_NATIONAL:2025-2026','DOL_UI_WEEKLY_CLAIMS',0,
+   '2026-11-18T01:54:19.006Z',missingChunk?2:1,200,'{}',
+   corrupt?xml.replace('210,000','209,000'):xml,'fixture-nat-1',hash);
+ return {xml,hash};
+}
+
+test('W04 A/light compares immutable saved National XML to its exact run hash without changing storage',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db);db.close();
+ const before=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_NEWER_THAN_RUN_PARSER');
+ assert.equal(r.nationalRaw.RELEASE.linkedByRawBodySha,true);
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-11-07');
+ assert.equal(r.nationalRaw.RELEASE.latestNumericDates.INITIAL_CLAIMS,'2026-11-07');
+ assert.equal(r.nationalRaw.RELEASE.recordedLatestDates.INITIAL_CLAIMS,'2026-10-17');
+ assert.equal(r.nationalRaw.ONE_YEAR.status,'RUN_NOT_STORED');
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_DO_NOT_OUTPUT|210,000|<week|bodySha256|snapshot_id/i);
+ assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
+});
+
+test('National same raw/parser date is aligned; mismatch cannot be called source freshness',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{rawDate:'10/17/2026'});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_EQUALS_RUN_PARSER');
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-10-17');
+});
+
+test('National raw audit blocks a corrupted body and fails closed without revealing it',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{corrupt:true});db.close();
+ const before=sha(file);
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_BODY_HASH_MISMATCH');
+ assert.equal(r.nationalRaw.RELEASE.latestNumericDates,null);
+ assert.equal(r.nationalRaw.RELEASE.linkedByRawBodySha,false);
+ assert.equal(sha(file),before);
+ assert.doesNotMatch(JSON.stringify(r),/210,000|209,000|<week|bodySha256|SECRET_DO_NOT_OUTPUT/i);
+});
+
+test('National raw audit detects incomplete chunk set instead of pretending XML is old',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{missingChunk:true});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_CHUNKS_INCOMPLETE');
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,null);
 });

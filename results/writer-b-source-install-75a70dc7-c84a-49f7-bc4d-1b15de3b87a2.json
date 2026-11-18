@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "75a70dc7-c84a-49f7-bc4d-1b15de3b87a2",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "4f9b36015a0631960cab40a4346eea6958e46342",
+  "candidateSourceSha": "4fb1aa9e96045fba11551211764200dc2291954b",
+  "manifestSha256": "7a7dc525a5577257a478f00a0237c788850794f265711426e161e7ce09b8b99a",
+  "baseTreeOid": "1511ebad43c73406874f1e6d3ce1266e3c1eeb5a",
+  "preparedTreeOid": "0591a6894033f93db1e5fa4ddbb397c2d8309806",
+  "provenanceSha256": "f7b8a2ebb7270e4357638eb594423c7f0aaec80932a6321eb386cd6bc3703691",
+  "runId": "43678815888",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-calendar-er1-forecast-saved-adapter.mjs"
+  ]
+}

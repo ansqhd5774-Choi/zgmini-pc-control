@@ -648,3 +648,19 @@ test("coordinator PASS, ROLLED_BACK and RECOVERY_REQUIRED map to safe comment ou
     assert.equal(report.actualControllerSha,actual);
   }
 });
+
+
+test('unknown controller recovery does not assert disabled workflow',()=>{
+ const request={requestId:REQUEST_ID,targetControllerSha:TARGET,operation:'controller-update'};
+ const raw={status:'RECOVERY_REQUIRED',code:'BACKLOG_ORIGINAL_REQUEST_INVALID',
+   lastPass:'RECOVERY_REQUIRED',firstFail:'INTAKE_RESUMED',actualInstalledSha:TARGET};
+ const unknown=normalizedResult(request,raw);
+ assert.equal(unknown.status,'UNKNOWN');
+ assert.equal(unknown.code,'BACKLOG_ORIGINAL_REQUEST_INVALID');
+ assert.equal(unknown.actualControllerSha,TARGET);
+ assert.equal(unknown.workflowEnabled,null);
+ const confirmedDisabled=normalizedResult(request,{...raw,workflowEnabled:false});
+ assert.equal(confirmedDisabled.workflowEnabled,false);
+ const confirmedActive=normalizedResult(request,{...raw,workflowEnabled:true});
+ assert.equal(confirmedActive.workflowEnabled,true);
+});

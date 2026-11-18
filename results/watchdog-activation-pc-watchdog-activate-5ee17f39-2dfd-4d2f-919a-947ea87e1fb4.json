@@ -1,0 +1,12 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1",
+  "requestId": "pc-watchdog-activate-5ee17f39-2dfd-4d2f-919a-947ea87e1fb4",
+  "issueNumber": 1381,
+  "targetSha": "d01229adacc3c23f50bb119d146e291ff7e15012",
+  "runId": "43635693745",
+  "attempt": "1",
+  "status": "BLOCKED",
+  "code": "WATCHDOG_ACTIVATION_UNKNOWN",
+  "watchdogFileWrites": 0,
+  "newProcessAttested": false
+}

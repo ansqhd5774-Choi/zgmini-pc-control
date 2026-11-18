@@ -3,11 +3,130 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - 'controller/common.mjs'
+      - 'controller/supervisor.mjs'
+      - 'controller/pc-source-readonly.mjs'
+      - 'tests/pc-source-readonly.test.mjs'
+      - 'controller/core-runtime-source-readonly.mjs'
+      - 'controller/provider-activity-runtime-readonly.mjs'
+      - 'controller/http32-two-host-checkpoints-readonly.mjs'
+      - 'tests/provider-activity-runtime-readonly.test.mjs'
+      - 'tests/http32-two-host-checkpoints-readonly.test.mjs'
+      - 'controller/theme-l7-runtime-readonly.mjs'
+      - 'controller/theme-nine-r32-raw-coverage-readonly.mjs'
+      - 'tests/theme-nine-r32-raw-coverage-readonly.test.mjs'
+      - 'controller/core-runtime-source-wmi.mjs'
+      - 'controller/inflation-event129-evidence-readonly.mjs'
+      - 'controller/inflation-event129-evidence-readonly.test.mjs'
+      - 'controller/inflation-core-owner-diagnostic-probe.mjs'
+      - 'controller/inflation-event129-b-proof.mjs'
+      - 'controller/inflation-vbs-b-proof.mjs'
+      - 'controller/operations.mjs'
+      - 'controller/earnings-bea-mfg-archive-readonly.mjs'
+      - 'controller/earnings-c-checkpoint-readonly.mjs'
+      - 'controller/source-inventory-runtime-readonly.mjs'
+      - 'tests/earnings-c-checkpoint-readonly.test.mjs'
+      - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
+      - 'config/operations.json'
+      - 'tests/core-task-observation.test.mjs'
+      - 'tests/theme-l7-runtime-readonly.test.mjs'
+      - 'tests/supervisor-status-write.test.mjs'
       - 'tools/maintenance-contract.mjs'
+      - 'tools/maintenance-recovery.mjs'
+      - 'tests/maintenance-recovery.test.mjs'
+      - 'shared-resource/issue-admission.mjs'
+      - 'tests/shared-resource-issue-admission.test.mjs'
+      - 'tools/r181-pinned-route-candidate.mjs'
+      - 'tools/r181-primary-route-candidate.mjs'
+      - 'tools/r181-primary-b-transaction.mjs'
+      - 'tools/r181-primary-b-entry.mjs'
+      - 'tools/r181-existing-task-once.mjs'
+      - 'tools/r181-existing-task-report.mjs'
+      - 'tools/r181-primary-b-report.mjs'
+      - 'tools/r181-protected-b-transaction.mjs'
+      - 'tools/r181-source-shape-readonly.mjs'
+      - 'tools/r181-source-shape-run.mjs'
+      - 'tools/r181-source-shape-report.mjs'
+      - 'tools/r181-saved-ledger-readonly.mjs'
+      - 'tools/r181-saved-ledger-report.mjs'
+      - 'tools/w03-r179-stored-handoff-readonly.mjs'
+      - 'tools/w03-gmh-seven-manual-once.mjs'
+      - 'tools/w03-gmh-seven-manual-preflight.mjs'
+      - 'tools/w03-gmh-seven-manual-report.mjs'
+      - 'tests/w03-gmh-seven-manual-once.test.mjs'
+      - 'tools/w03-gmh-seven-private-score-once.mjs'
+      - 'tools/w03-gmh-seven-private-score-preflight.mjs'
+      - 'tools/w03-gmh-seven-private-score-report.mjs'
+      - 'tests/w03-gmh-seven-private-score-once.test.mjs'
+      - 'tools/w03-gmh-seven-saved-score-v2.mjs'
+      - 'tests/w03-gmh-seven-saved-score-v2.test.mjs'
+      - 'tools/w03-gmh-seven-public-compat-a.mjs'
+      - 'tools/w03-gmh-seven-public-compat-report.mjs'
+      - 'tests/w03-gmh-seven-public-compat-a.test.mjs'
+      - 'tools/w03-gmh-seven-d1-seed-a.mjs'
+      - 'tools/w03-gmh-seven-d1-seed-preflight.mjs'
+      - 'tools/w03-gmh-seven-d1-seed-report.mjs'
+      - 'tools/w03-gmh-seven-collection-time-a.mjs'
+      - 'tools/w03-gmh-seven-collection-time-preflight.mjs'
+      - 'tools/w03-gmh-seven-collection-time-report.mjs'
+      - 'tests/w03-gmh-seven-collection-time-a.test.mjs'
+      - 'tests/w03-gmh-seven-d1-seed-a.test.mjs'
+      - 'tools/w03-r179-guard-shape-readonly.mjs'
+      - 'tools/w03-r179-guard-shape-report.mjs'
+      - 'tools/w03-r179-stored-handoff-report.mjs'
+      - 'tools/w03-r179-seven-readback-b.mjs'
+      - 'tools/w03-r179-seven-readback-windows-io.mjs'
+      - 'tools/w03-r179-seven-readback-entry.mjs'
+      - 'tools/w03-r179-seven-readback-report.mjs'
+      - 'tests/w03-r179-seven-readback-b.test.mjs'
+      - 'tests/w03-r179-seven-readback-approval.test.mjs'
+      - 'approvals/w03-r179-guard/**'
+      - 'tools/w03-r47-private-readback.mjs'
+      - 'tools/w03-r47-private-readback-report.mjs'
+      - 'tools/w03-r48-private-readback.mjs'
+      - 'tools/w03-r48-private-readback-report.mjs'
+      - 'tools/w03-r51-stored-date-readback.mjs'
+      - 'tools/w03-r51-stored-date-report.mjs'
+      - 'tests/w03-r51-stored-date-readback.test.mjs'
+      - 'approvals/w03-r51-readback/**'
+      - 'tests/w03-r48-private-readback.test.mjs'
+      - 'approvals/w03-r48-readback/**'
+      - 'tests/w03-r47-private-readback.test.mjs'
+      - 'approvals/w03-r47-readback/**'
+      - 'tests/w03-r179-stored-handoff.test.mjs'
+      - 'tests/w03-r179-guard-shape.test.mjs'
+      - 'tools/r181-protected-b-windows-io.mjs'
+      - 'tools/r181-protected-b-entry.mjs'
+      - 'tools/r181-protected-b-report.mjs'
       - 'tools/update.mjs'
+      - 'tools/runner-watchdog.mjs'
+      - 'tests/runner-watchdog.test.mjs'
+      - 'watchdog-b/**'
+      - 'tests/watchdog-b-upgrade.test.mjs'
+      - 'tests/watchdog-b-protection-r2.test.mjs'
+      - 'tests/watchdog-guardian-activation.test.mjs'
+      - 'tests/watchdog-activation-first-fail.test.mjs'
+      - 'tests/watchdog-handoff-firstfail.test.mjs'
+      - 'approvals/watchdog-activations/**'
+      - '.github/workflows/pc-watchdog-guardian-activate-once.yml'
+      - 'tests/watchdog-protected-drift.test.mjs'
+      - 'approvals/watchdog-upgrades/**'
+      - '.github/workflows/pc-watchdog-b-upgrade-once.yml'
       - 'tests/maintenance-contract.test.mjs'
+      - 'tests/r181-pinned-route-candidate.test.mjs'
+      - 'tests/r181-primary-route-b.test.mjs'
+      - 'tests/r181-existing-task-once.test.mjs'
+      - 'tests/r181-protected-b-transaction.test.mjs'
+      - 'tests/r181-source-shape-readonly.test.mjs'
+      - 'tests/r181-saved-ledger-readonly.test.mjs'
+      - 'tests/r181-protected-b-windows-io.test.mjs'
+      - 'tests/r181-protected-b-entry-report.test.mjs'
+      - '.github/workflows/pc-writer-b-source-once.yml'
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
+      - 'inflation-manual-b/**'
+      - 'inflation-census-api-b/**'
+      - 'approvals/inflation-manual-b/**'
       - '.github/workflows/controller-maintenance-source-tests.yml'
 permissions:
   contents: read
@@ -34,8 +153,98 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Run scoped maintenance update and heavy-readonly regression tests
-        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs
+      - name: Verify exact HTTP host roster and connection evidence, no provider I/O
+        run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
+      - name: Verify fixed Credit R2 source SHA and protected report summary (no PC access)
+        run: |
+          node --check controller/pc-source-readonly.mjs
+          node --test --test-concurrency=1 tests/pc-source-readonly.test.mjs
+      - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
+        run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
+      - name: Run scoped maintenance and Controller runtime safety regressions
+        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
+      - name: Verify W03 R32 64-symbol GMH raw/checkpoint SHA coverage, without provider calls
+        run: node --test --test-concurrency=1 tests/theme-nine-r32-raw-coverage-readonly.test.mjs
+      - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted
+        run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
+      - name: Verify W03 immutable D1 seed and rolling read-only overlap without credential refresh
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-d1-seed-a.test.mjs
+      - name: Verify W03 exact pinned GMH 14-symbol collection-time read-only one-shot
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-collection-time-a.test.mjs
+      - name: Verify W03 pinned 7x252 vs public base/R32 read-only comparison
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
+      - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-private-score-once.test.mjs
+      - name: Verify same existing B title V2 SHA/rights/private result contract
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-saved-score-v2.test.mjs
+      - name: Verify W03 bounded GMH seven-theme manual Windows collection is exact and private
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-manual-once.test.mjs
+      - name: Verify W03 R179 fixed operator-shape read-only A and redaction
+        run: node --test --test-concurrency=1 tests/w03-r179-guard-shape.test.mjs
+      - name: Verify W03 R181 exact saved-ledger source-only A metadata and privacy contract
+        run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
+      - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
+        run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
+      - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
+        run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs
+      - name: Verify W05 BLS C exact source SHA checkpoint using existing A inventory, offline only
+        run: node --test --test-concurrency=1 tests/earnings-c-checkpoint-readonly.test.mjs tests/source-inventory-runtime-readonly.test.mjs
+      - name: Verify immutable W03 R179 B approval SHA and zero-publication rights
+        run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-approval.test.mjs
+      - name: Verify W03 exact R179 seven-versus-ten B source contract and isolated transaction simulation
+        run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-b.test.mjs
+      - name: Verify W03 exact R47 private pair readback B source and report privacy
+        run: node --test --test-concurrency=1 tests/w03-r47-private-readback.test.mjs
+      - name: Verify W03 R48 candidate and exact R47 pair SHA without touching PC files
+        run: node --test --test-concurrency=1 tests/w03-r48-private-readback.test.mjs
+      - name: Verify W03 R51 private provisional saved dates and SHA without public API calls
+        run: node --test --test-concurrency=1 tests/w03-r51-stored-date-readback.test.mjs
+      - name: Verify W03 R179 stored handoff source/ledger/privacy before running existing PC-only publisher
+        run: node --test --test-concurrency=1 tests/w03-r179-stored-handoff.test.mjs
+      - name: Verify W03 R181 pinned route candidate is fail-closed and source-only
+        run: node --test --test-concurrency=1 tests/r181-pinned-route-candidate.test.mjs
+      - name: Verify W03 protected PC-only R181 B contract without operational effects
+        run: node --test --test-concurrency=1 tests/r181-protected-b-transaction.test.mjs
+      - name: Verify W03 fixed Windows B IO is inert without a registered operation
+        run: node --test --test-concurrency=1 tests/r181-protected-b-windows-io.test.mjs
+      - name: Verify W03 existing B workflow branch and one-shot reporter safety
+        run: node --test --test-concurrency=1 tests/r181-protected-b-entry-report.test.mjs
+      - name: Verify W03 R181 exact readonly shape classification and report safety
+        run: node --test --test-concurrency=1 tests/r181-source-shape-readonly.test.mjs
+      - name: Verify W03 actual r181-primary.mjs B route, fixed source and Windows protection
+        run: node --test --test-concurrency=1 tests/r181-primary-route-b.test.mjs
+      - name: Verify W03 bounded start of existing R181 Task with one-shot journal
+        run: node --test --test-concurrency=1 tests/r181-existing-task-once.test.mjs
+      - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
+        run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
+      - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
+        run: node --test --test-concurrency=1 inflation-census-api-b/contract.test.mjs inflation-census-api-b/coordinator.test.mjs inflation-census-api-b/report.test.mjs
+      - name: Syntax-check W01 Census B Windows adapter and sanitized reporter without executing them
+        run: |
+          node --check inflation-census-api-b/windows-adapter.mjs
+          node --check inflation-census-api-b/report.mjs
+      - name: Regression test six operating runners without PC writes
+        run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
+      - name: Validate fixed Watchdog B module syntax without PC writes
+        run: |
+          node --check watchdog-b/contract.mjs
+          node --check watchdog-b/upgrade.mjs
+          node --check watchdog-b/report.mjs
+          node --check watchdog-b/protected-drift-readonly.mjs
+          node --check watchdog-b/guardian-activation.mjs
+          node --check watchdog-b/guardian-result.mjs
+          node --check watchdog-b/activation-first-fail-readonly.mjs
+          node --check watchdog-b/handoff-firstfail-readonly.mjs
+      - name: Parse WMI Guardian helper and reject invalid PID without process effects
+        run: |
+          cscript //NoLogo watchdog-b\guardian-rotate.vbs PROBE NOT_A_PID > "%RUNNER_TEMP%\watchdog-guardian-denied.txt"
+          if not "%ERRORLEVEL%"=="5" exit /b 7
+          findstr /c:"WATCHDOG_ROTATION_DENIED" "%RUNNER_TEMP%\watchdog-guardian-denied.txt" >nul
+          if errorlevel 1 exit /b 8
+          cscript //NoLogo watchdog-b\guardian-origin-readonly.vbs NOT_A_PID > "%RUNNER_TEMP%\watchdog-origin-denied.txt"
+          if not "%ERRORLEVEL%"=="2" exit /b 9
+          findstr /c:"INVALID_PID" "%RUNNER_TEMP%\watchdog-origin-denied.txt" >nul
+          if errorlevel 1 exit /b 10
       - name: Confirm source-only isolated CI host
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (

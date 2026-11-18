@@ -34,3 +34,32 @@ test('invalid source root and unsupported file path rejected',()=>{
  assert.throws(()=>previewWriterInsertions({...spec,filePath:'../secret.mjs'},env),
   /WRITER_B_PREVIEW_SPEC_STOP/);
 });
+
+test('missing versus whitespace-drift anchors report bounded counts without revealing code',()=>{
+ const source=Buffer.from("const alpha=1;\n  const omega=2;\n");
+ const miss={...spec,beforeSha256:sha(source),insertions:[
+  {anchor:'const alpha=1;',position:'after',text:'const added=1;\n'},
+  {anchor:'const omega=2;',position:'before',text:'const added=2;\n'}
+ ]};
+ let taskRead=0;
+ const out=previewWriterInsertions(miss,{...env,readTarget:()=>source,
+  taskXml:()=>{taskRead++;return Buffer.from('<Task/>');}});
+ assert.equal(out.status,'BLOCKED');
+ assert.equal(out.code,'WRITER_B_INSERT_ANCHOR_MATCH_STOP');
+ assert.deepEqual(out.anchorEvidence,[
+  {index:0,exactCount:1,trimmedCount:1},
+  {index:1,exactCount:0,trimmedCount:1}
+ ]);
+ assert.equal(out.pcSourceWrites,0);
+ assert.equal(taskRead,0);
+ assert.equal(JSON.stringify(out).includes('omega'),false);
+ assert.equal(JSON.stringify(out).includes('alpha'),false);
+});
+test('ambiguous anchor reports at most three matches and never grants an insertion',()=>{
+ const source=Buffer.from(Array(5).fill('const alpha=1;').join('\n')+'\n');
+ const out=previewWriterInsertions({...spec,beforeSha256:sha(source)},
+  {...env,readTarget:()=>source});
+ assert.equal(out.status,'BLOCKED');
+ assert.equal(out.anchorEvidence[0].exactCount,3);
+ assert.equal(out.anchorEvidence[0].trimmedCount,3);
+});

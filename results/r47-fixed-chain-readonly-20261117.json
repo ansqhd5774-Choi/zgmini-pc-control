@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "code": "R47_FIXED_INDIRECT_CHAIN_READONLY_VERIFIED",
+  "verifiedAt": "2026-11-17T10:48:34.002Z",
+  "taskXmlSha256": "bf3207ab2274d1248e7bd8c953cea2fd3bd277b8bd70bb1c2494339a06e0a4be",
+  "files": {
+    "THEME_NINE_R73_SCHEDULED_PRIVATE.cmd": "599a3c710322858faf021d90b4c80fdcf2d3ba02d084f090bd34b42ae13a778b",
+    "theme-nine-r73-auto-http502-private-retry.mjs": "0940698222e0eba68940c0bb36023c71a53e29fb8c8ffdbb032b1492c4b168dc",
+    "theme-nine-r71-private-recovery-once.mjs": "41556b023b565c863cf25eabc5b78a4a6de95d880070f5bb019106e7be55404d",
+    "THEME_NINE_R48_PRIVATE_CYCLE.cmd": "7356da2ae151eceb2b3306b40c13de3394eef3476e15ca1528128006748ed0c4"
+  },
+  "scope": "READONLY_CHAIN_PROOF_ONLY_NOT_CMD_INSTALL",
+  "taskChanges": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sourceWrites": 0
+}

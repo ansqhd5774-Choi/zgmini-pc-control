@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "0a674eac32418d0c1bd23a9a050b2202e8951f1a",
+  "sourceBranch": "main",
+  "entrypoint": "scripts/pc-writer/inflation-a407-integrity-readonly.mjs",
+  "files": {
+    "lib/inflation-causal-candidates-public-7-catalog.mjs": "14e810c504e9aa9ea81e538c83ff7d100a9abbac5e30a6d5684789b1a3161749",
+    "lib/inflation-causal-public-catalog.mjs": "57a10a00c354ef5664722f6a26ff5e8b2b396ddd782776a5ce5d4cf38eea84af",
+    "scripts/pc-writer/inflation-a401-baseline23-readonly.mjs": "ab6460abb48138ecd0c81c5bd139a9e7d34bda0765bb9892ae66b2005a27e015",
+    "scripts/pc-writer/inflation-a407-integrity-readonly.mjs": "dbf1cac272cbbd267b76363b42f8101683e33dd81219a5c75b33dc30e1c98fa1",
+    "scripts/pc-writer/inflation-causal-candidates-public-7-preview-r1.mjs": "f319c93dad34a131953746e470c50bc6921a9236d13eb74c790779f7b4560b7e",
+    "scripts/pc-writer/inflation-causal-public-preview-r1.mjs": "bc458372f86faf061306ae50e2bc806534f80e4458e45dc7901a3e09cfab86cc",
+    "worker/inflation-causal-candidates-public-7-r1.mjs": "a2b1f8e593cf5b4c88f5bff5bf107a36acd4a2354e6abb14614c29a07630de5e",
+    "worker/inflation-causal-public-r1.mjs": "86c5003c3b37cac16e3e5e9b5ed610f9e00f29ee6005cb2abb91fb04abea951f"
+  }
+}

@@ -9,6 +9,7 @@ on:
       - 'tests/pc-process-inventory-readonly.test.mjs'
       - '.github/workflows/pc-process-inventory-readonly.yml'
 permissions:
+  actions: read
   contents: write
   issues: write
 concurrency:

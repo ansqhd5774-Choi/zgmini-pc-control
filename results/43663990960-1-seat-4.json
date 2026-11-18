@@ -1,0 +1,202 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43663990960-1-seat-4",
+  "requestId": "pc-728b0152-4d60-455d-a355-f4ca1c7e058b",
+  "startedAt": "2026-11-15T01:38:11.459Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+  "sourceBranch": "main",
+  "operation": "employment-r6-collection-evidence-readonly",
+  "seat": 4,
+  "status": "PASS",
+  "code": "R6_DOL_BED_STORED_EVIDENCE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-6f758302-8365-41dc-b50e-1d0a15579d94",
+  "pcOperationalApprovedSha": "05d7ae49e0a84cbeebd90ef4de6dd7284094bf97",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "R6_DOL_BED_STORED_EVIDENCE_READONLY",
+    "sqliteOpened": true,
+    "scope": "R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC",
+    "dol": {
+      "BACKFILL": {
+        "status": "PARTIAL",
+        "completedAt": "2026-11-09T22:21:08.952Z",
+        "failureCode": "SERIES_PARTIAL",
+        "providerRequests": 2,
+        "collectedRows": 30600,
+        "inserted": 3570,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 4,
+        "knownMissingSeries": [
+          "INITIAL_CLAIMS",
+          "INITIAL_CLAIMS_4W",
+          "CONTINUED_CLAIMS",
+          "INSURED_UNEMPLOYMENT_RATE"
+        ],
+        "latestInitialClaimsObservationDate": null
+      },
+      "ONE_YEAR": {
+        "status": "SUCCESS",
+        "completedAt": "2026-11-09T09:50:43.942Z",
+        "failureCode": null,
+        "providerRequests": 2,
+        "collectedRows": 6084,
+        "inserted": 0,
+        "revised": 4,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": "2026-10-10"
+      },
+      "RELEASE": {
+        "status": "PARTIAL",
+        "completedAt": "2026-11-15T01:30:14.499Z",
+        "failureCode": "DOL_RELEASE_OBSERVATION_STALE",
+        "providerRequests": 2,
+        "collectedRows": 3060,
+        "inserted": 0,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 4,
+        "knownMissingSeries": [
+          "INITIAL_CLAIMS",
+          "INITIAL_CLAIMS_4W",
+          "CONTINUED_CLAIMS",
+          "INSURED_UNEMPLOYMENT_RATE"
+        ],
+        "latestInitialClaimsObservationDate": null
+      }
+    },
+    "bed": {
+      "BACKFILL": {
+        "status": "PARTIAL",
+        "completedAt": "2026-11-09T22:21:24.465Z",
+        "failureCode": "SERIES_PARTIAL",
+        "providerRequests": 6,
+        "collectedRows": 5127,
+        "inserted": 456,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 1,
+        "knownMissingSeries": [
+          "BDS0000000000000000110008RQ5"
+        ],
+        "latestInitialClaimsObservationDate": null
+      },
+      "ONE_YEAR": {
+        "status": "SUCCESS",
+        "completedAt": "2026-11-09T09:50:48.560Z",
+        "failureCode": null,
+        "providerRequests": 3,
+        "collectedRows": 1023,
+        "inserted": 0,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": null
+      },
+      "RELEASE": {
+        "status": "SUCCESS",
+        "completedAt": "2026-11-09T23:25:47.611Z",
+        "failureCode": null,
+        "providerRequests": 3,
+        "collectedRows": 567,
+        "inserted": 0,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": null
+      }
+    },
+    "eta539": [
+      {
+        "mode": "RELEASE",
+        "snapshotStoredAt": "2026-11-14T21:30:06.670Z",
+        "httpStatus": 200,
+        "historyWeeks": 60,
+        "selectedWeeks": 60,
+        "firstSelectedWeek": "2025-09-06",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      },
+      {
+        "mode": "RELEASE",
+        "snapshotStoredAt": "2026-11-13T21:25:08.165Z",
+        "httpStatus": 200,
+        "historyWeeks": 60,
+        "selectedWeeks": 60,
+        "firstSelectedWeek": "2025-09-06",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      },
+      {
+        "mode": "RELEASE",
+        "snapshotStoredAt": "2026-11-12T21:35:14.959Z",
+        "httpStatus": 200,
+        "historyWeeks": 60,
+        "selectedWeeks": 60,
+        "firstSelectedWeek": "2025-09-06",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      },
+      {
+        "mode": "BACKFILL",
+        "snapshotStoredAt": "2026-11-09T22:20:28.399Z",
+        "httpStatus": 200,
+        "historyWeeks": 600,
+        "selectedWeeks": 600,
+        "firstSelectedWeek": "2015-05-02",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      }
+    ],
+    "stateClaims": {
+      "status": "OBSERVED",
+      "sampledWeeks": 600,
+      "firstWeek": "2015-05-02",
+      "lastWeek": "2026-10-24",
+      "complete51Weeks": 600,
+      "incompleteWeeks": 0,
+      "latestComplete51Week": "2026-10-24",
+      "latestStrict52WeekCandidate": "2026-10-24",
+      "strict52WeekCandidateCount": 545,
+      "firstWindowBreak": null,
+      "latestWindowBreak": null,
+      "fullTenYearRawCoverage": {
+        "status": "RAW_PRECONDITIONS_COMPLETE",
+        "observedRawWeeks": 600,
+        "requiredRawWeeks": 577,
+        "requiredRows": 29427,
+        "referenceWeeks": 521,
+        "firstRequiredWeek": "2015-10-10",
+        "latestRequiredWeek": "2026-10-24",
+        "firstFailureWeek": null
+      },
+      "recentIncompleteWeeks": [],
+      "note": "COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d",
+  "protectedAfterSha256": "4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d",
+  "actualExecutionSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-15T01:38:38.016Z",
+  "durationMs": 26557
+}

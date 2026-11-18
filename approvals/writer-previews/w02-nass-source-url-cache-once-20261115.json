@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "81d82474fd0d6515231746f1d29fa78be1baee6e",
+  "filePath": "scripts/pc-writer/release-calendar.mjs",
+  "beforeSha256": "4d618a1e8158f405def228c3c28fbb288bd0e4533c991595c937b91ad71b89de",
+  "insertions": [
+    {
+      "anchor": " const sourceSetComplete=Object.keys(RELEASE_SOURCES)",
+      "position": "before",
+      "text": " // An official NASS URL change invalidates only the prior cached source.\n // Keep the six-hour TTL for unchanged failures and future cycles.\n const nassUrlCurrent=previous?.body?.sources?.usda_nass?.sourceUrl===\n  RELEASE_SOURCES.usda_nass.page;\n"
+    },
+    {
+      "anchor": "  previous?.body?.sources?.bls?.annualCollectorVersion===1;",
+      "position": "before",
+      "text": "  nassUrlCurrent&&\n"
+    }
+  ]
+}

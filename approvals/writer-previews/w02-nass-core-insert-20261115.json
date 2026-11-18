@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+  "filePath": "scripts/pc-writer/release-calendar.mjs",
+  "beforeSha256": "383dbf3e66b2291be30c8dc3d96e91030e827e64bea5bed9fc74b758d0cbd4b2",
+  "insertions": [
+    {
+      "anchor": "import {USDA_WASDE_URL,parseUsdaWasdeHtml} from '../../lib/usda-calendar.mjs';",
+      "position": "after",
+      "text": "import {collectNassReportSchedule} from '../../lib/market-calendar-usda-nass.mjs';\n"
+    },
+    {
+      "anchor": "    if(source==='cftc'){",
+      "position": "before",
+      "text": "    if(source==='usda_nass'){\n     const nass=await collectNassReportSchedule({store,key,now,fetchImpl,\n      countRequest:()=>requests++,previous});\n     sources.usda_nass=nass.state;\n     events.push(...nass.events);\n     continue;\n    }\n"
+    }
+  ]
+}

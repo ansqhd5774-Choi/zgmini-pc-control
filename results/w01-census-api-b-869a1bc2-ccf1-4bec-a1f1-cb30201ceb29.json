@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_W01_CENSUS_M3_API_B_RESULT_V1",
+  "status": "STOP",
+  "code": "INFL_MANUAL_B_CORE_OWNER_EVENT129_UNVERIFIED_STOP",
+  "requestId": "869a1bc2-ccf1-4bec-a1f1-cb30201ceb29",
+  "runId": "43985786219",
+  "controlSha": "4a8099eb48c9e811da474760710a8f72bdcf0806",
+  "sourceSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "providerCalls": 0,
+  "stored": null,
+  "publicWrites": 0,
+  "d1Writes": 0,
+  "taskChanges": 0,
+  "replay": "FORBIDDEN"
+}

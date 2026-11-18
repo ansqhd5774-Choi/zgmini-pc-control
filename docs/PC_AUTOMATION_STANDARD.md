@@ -1,5 +1,11 @@
 # ZGMINI — 일반챗·CMD·PC Runner 공통 작업 지침
 
+## MarketParquet 사용 제거 — 2026-11-16 사용자 결정
+
+- **MarketParquet는 사용하지 않는다.** 공급자가 11/05 무료 데이터 파생 점수·차트의 공개를 불허했고 11/08 KST 무료 예외도 거절했으며, 사용자가 수집·계산·게시 의존성 삭제와 main 반영을 지시했다. 문제가 생겨도 복구·재시도·재문의·유료 구매로 과거 설계를 유지하지 말고 해당 의존성을 제거한다. [사용 제거 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/MARKETPARQUET_REMOVAL.md)을 따른다.
+- 과거 ‘MarketParquet 24시간 잠정치’, 무료 가이드 또는 위험 수용 플래그를 근거로 사용을 재개하지 않는다. 불가능한 잠정치는 미제공으로 분리하고 GMH의 검증된 입력·권리 범위에서 가능한 확정 경로와 독립 작업은 계속한다. Alpaca 등 새 공급처를 임의로 추가하지 않는다.
+- main 소스 반영을 PC 설치·예약 삭제 완료로 간주하지 않는다. 정규 유지보수로 정확한 대상만 적용한다. 과거 데이터·DB/D1·실행 증거는 보존하며, GMH 파일이 함께 든 `marketparquet-r167` 폴더를 통째로 삭제하지 않는다. 제거된 공급자의 대기를 전체 Controller·기능 업무의 전역 Gate로 만들지 않는다.
+
 2026-11-08 R2 Writer B 경합 보완 정본. **2026-11-12 두 PC 실측 및 신규 대화 작업 경로 준수 절차를 추가했다(기존 승인·실행 계약 유지).** 이전의 동일 목적 지침을 대체한다. 현재 업무·승인·완료 증거는 보존하며 처음부터 재시작하지 않는다. #319 복구 결과와 위험도별 검증·병렬 처리 기준을 보존하며, 일반챗 원담당의 업무 재개·인계 수신 기준을 추가한 **운영 지침**이다. 문서 반영만으로 실행기 코드가 설치·활성화됐다고 주장하지 않는다.
 
 ## 1. 목적과 정본
@@ -23,22 +29,94 @@
 - **격리 게스트의 실제 한계 명시:** USB·네트워크·공유폴더·클립보드 없이 실행하는 WinPE 게스트의 stdout은 **기본적으로 호스트 GitHub Runner stdout으로 연결되지 않는다.** 이때 게스트 화면만 확인된 1회 TEST_ONLY 결과를 텍스트화한다면 `SCREEN_VISUAL_OBSERVATION`과 정확한 실행 증거를 분리해 기록하며, 텍스트로 전사했다고 게스트 원시 stdout을 확보한 것으로 주장하지 않는다. 다음 **새로운 승인된** 시험에서 구조화된 로그가 필요하면 승인된 시리얼 콘솔 등 한정된 guest→host 로그 경로를 먼저 설계하되 기존 VM/ISO/운영 환경을 임의 변경하거나 완료된 실증을 재실행하지 않는다.
 - **효율 및 실제 작업:** 읽기/로그 회수가 가능하면 그 작업을 즉시 끝내고 실제 기능의 미완료 필수 실행으로 넘어간다. **Remote Desktop Commander(리무트 데스크톱 컨트롤) 플러그인은 장치 목록 조회·연결·진단·승인 요청을 포함해 ZGMINI 작업에 사용하지 않는다.** GitHub Runner 대기·미배정은 해당 Run만 증거 미확정으로 기록하고, 다른 원격 도구·추가 승인으로 우회하지 않는다. 별도 ZIP·새 Runner·새 예약·유료 서비스는 기본 대체 수단이 아니다. 이 원칙은 기존 A/B/C 등급, 고정 허용목록, 승인·C급 NO-GO를 바꾸지 않는다.
 
+### Issues·PR 전문 담당자와 별도 PC의 시험 업무 (2026-11-18 사용자 확정)
+
+- **전문 담당자의 책임:** `zgmini-pc-control`의 Issues·PR **전체 생명주기**를 독립적으로 해결한다. 분석·소스 수정·구조 개선·리뷰·CI·모의시험·병합·종결 등은 예시일 뿐 **허용된 수행 수단을 제한하는 목록이 아니다**. 저장소·담당자·물리 PC를 같은 이름으로 취급하지 않는다.
+- **별도 PC 활용:** `DESKTOP-N62L0NG`의 승인된 개발·격리 환경에서 가능한 범위의 실험·검증·시뮬레이션을 수행하고, 운영 PC `PC`의 메모리·CPU·공유 쓰기 부하는 최소화한다. 단, 기존 `zgmini-handoff-ci-isolated` **자동 Runner/Workflow**에는 등록된 허용 작업만 적용한다. 전문 담당자의 전체 업무와 자동 Runner의 설치된 operation 범위는 다른 개념이며, 별도 PC에서 운영 원본이나 미승인 코드를 임의 실행할 수 있다는 뜻은 아니다.
+- **설치 권한 분리:** 전문 담당자는 운영 PC에 직접 설치하거나 Controller·Runner·Writer·DB 등 운영 환경을 변경하지 않는다. 검증을 마친 운영 적용 대상은 **최종 `zgmini` 프로세스 총괄**에게 실제 인계한다. 총괄이 기존 승인·manifest·원본 보호·lease·복구 조건에 따라 운영 적용을 수행하거나 정식 운영 적용 담당을 조정하며, 기능별 원담당의 고유 업무를 임의 이관하지 않는다.
+- **인계·종결:** 원본 Issue/PR, 저장소/브랜치/HEAD SHA, 변경 파일과 목적, 시험·모의시험·CI 결과 및 한계, LAST PASS/FIRST FAIL, 영향·위험, 필요한 승인과 정확한 manifest/복구 계획, 다음 운영 실행과 성공 판정 조건을 정리한다. GitHub 인계 댓글·PR PASS·담당 채팅 실제 수신·운영 Runtime 성공은 **각기 별개**다. 설치가 필요 없는 Issues·PR은 전문 담당자가 독립적으로 종료한다.
+- **브랜치 혼동 방지:** 제어 저장소의 구 `codex/controller-ops-lessons-20261105` 브랜치는 과거 기록이며, 이름만으로 현재 `zgmini` 총괄의 소속·직책·실행 권한을 판정하지 않는다. 기존 이력을 강제로 삭제·재작성하지 않는다.
+
+### `zgmini` Issue 인계·인수·수정 종결 (2026-11-18 사용자 확정)
+
+**책임 주체는 두 개뿐이다.** (1) **인계자:** 오류를 발견하여 원본 Issue에 증상·재현·증거를 등록한 일반 작업 대화. (2) **인수자:** Issue를 접수해 원인을 분석하고 필요한 코드·문서·공통 구조 수정, 관련 모의시험·회귀시험·CI·PR 병합, 수정 승인과 결과 댓글·종결을 처리하는 **`zgmini` 프로세스 총괄**. 이 Issue의 처리 책임을 설명할 때 실제 지정·인수 증거가 없는 `기능 원담당`, `Writer 담당자`, `설치 담당자`, 별도 가상 ChatGPT 대화를 **제3의 책임 주체로 생성하거나 그쪽으로 반환·전가하지 않는다**. 기존 별도 업무의 실제 수행 사실과 승인된 실행 권한 자체를 부정하거나 박탈하는 규칙은 아니다.
+
+**기본 처리:** 인계자가 Issue 등록 → 인수자가 기존 완료 증거를 재사용해 분석·수정·검증·승인 → 인수자가 **원본 Issue 댓글에** 원인, 해결 범위, 정확 PR/commit SHA, 테스트/CI, 완료되지 않은 운영 적용과 다음 승인된 실행을 기재 → **해당 수정 요청이 해결되었다면 Closed/completed** → 인계자가 기존 Issue 번호를 조회해 Closed 상태와 결과 댓글을 확인하고 기존 승인 범위에서 PC 수집·계산·저장·게시·화면 작업을 이어간다. `is:open` 검색만으로는 Closed를 찾지 못하므로 인계자는 해당 번호 직접 조회 또는 전체 상태 조회를 이용한다. Github의 Closed·댓글은 타 ChatGPT 대화를 자동 재개시키는 신호가 아니므로 실제 조회/수신과 구분한다.
+
+**종결 경계:** 수정·검증·승인이 확인된 **개발/구조/코드 결함 수정 요청**은 실제 PC Writer 설치 또는 D1 게시가 아직 미확인되어도 수정 완료로 종료할 수 있다. 다만 댓글에는 `SOURCE_FIXED / RUNTIME_UNVERIFIED`처럼 **완료된 범위와 미적용 범위**를 분리한다. 원래 Issue의 요구가 **운영 복구/실서비스 정상화 자체**이거나 수정 테스트가 실패·미완료이면 실제 요구 조건이 충족되기 전 `Closed/completed`로 잘못 보고하지 않는다. 인계자가 기존 운영 적용 과정에서 실패·재발·새 증거를 발견하면 같은 Issue를 다시 열거나 중복되지 않는 새 Issue로 인계하고, 인수자가 재분석·수정한다. 같은 미적용 문제에 불필요한 신규 Issue를 누적하지 않는다.
+
+**권한과 기존 업무 보존:** 총괄의 코드 수정 승인·Issue Closed는 **PC Writer/Controller 설치 승인, 실제 설치·D1 쓰기·운영 게시 완료를 의미하지 않는다**. 운영 적용은 실제 인계자가 기존 승인된 A/B 실행·manifest/해시·lock/lease·원본 보호 절차로 계속한다. 인계자의 대화가 종료됐다면 자동 후속 실행을 가정하지 않고, 해당 상태는 남겨 다음 유효 대화가 원본 Issue/결과를 조회해 재개할 수 있게 한다. 본 규칙 때문에 새 Writer 담당·인계 Workflow·Gate·예약·재승인을 만들지 않는다. 기존 `agent-handoff` 공통 장애 인계와 `zgmini-pc-control` Issues·PR 전문 담당자의 별도 PC/권한 규칙은 유지한다.
+
+### 공통 프로세스 총괄 — 요청 가능 업무·접수·작업 회신 (2026-11-17)
+
+**누가 무엇을 맡는가:** 별도 PC `DESKTOP-N62L0NG`에서 구동되는 **기존 자동 인계 Runner/Workflow**는 등록된 GitHub Issue 접수·출처 확인·중복 제거·담당 유형 분류·전달 상태 추적·결과 기록과 원본 회신 중개, 허용된 격리 CI에 한정된다. **자동 Runner의 임무는 Issues·PR 전문 담당자의 전체 업무를 제한하지 않는다.** 이 자동 Workflow에는 운영 PC 설치·운영 데이터 변경 권한이 없다. **프로세스 총괄 ChatGPT**는 공통 Controller, Runner/GitHub Actions, 공통 Writer receiver·loader, 공통 승인/manifest·설치 도구, 공유 자원 경합, 공통 오류 판정기, 인계·결과 중개의 **구조적 결함**을 분석하고 해당 공통 부분만 최소 수정·검증·조정한다. 기능별 수집기·검증기·계산기·산식·저장·게시·UI·기능별 설치와 최종 반영은 각 **기능 원담당**이 수행한다. `COMMON_WRITER` 등의 코드가 붙었다는 이유만으로 기능 전체를 총괄에게 이전하지 않는다.
+
+**총괄 접수·집계에서 빠지면 안 되는 두 경로:** (A) 자동 `agent-handoff` 사건(고유 Incident, `handoff-agent-pending` 잔존), (B) 기존 중앙 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)로 기능 원담당이 직접 작성한 공유 설치·승인·공통 장애 **실제 지원 요청 댓글**. B는 `agent-handoff` 라벨을 갖지 않으며 A만 조회하면 누락된다. 총괄의 작업 착수·상태·건수 보고에는 **둘 모두 확인**해 고유 기능/결정 단위로 중복 제거하고, 인계 원문·검토 PR·원담당 원장·승인/실행 상태·총괄 원본 회신을 함께 표시한다. 같은 기능의 업데이트 댓글 여러 개를 여러 미완료 작업으로 중복 계산하지 않는다. 자동 대기열 PC의 Incident 관제판은 A만 표시하는 별도 지표이며, B가 없다는 증거가 아니다. 기존 인계 Workflow의 schema/라벨·예약·Runner·실제 승인·운영 파일은 변경하지 않는다. 총괄 검토 댓글/PR 생성은 사용자 B 승인, 실제 PC 설치·타 대화 자동 수신이 아니므로 처리 완료율과 운영 적용률을 따로 보고한다.
+
+
+| 총괄에게 요청할 수 있는 작업 | 요청 예시 | 총괄 수행 범위 |
+|---|---|---|
+| 공통 Controller/고정 operation 결함 | 승인된 operation의 공통 등록·판정 오류 | 등록·source·Runtime 근거 대조, 공통 처리기 수정/검증 |
+| Runner·Actions 공통 장애 | 잘못된 job 취소·미배정·트리거 누락 | 실제 Run/Job/Runner 진단, 공통 Workflow 수정/검증 |
+| 공통 Writer 도구 결함 | 공유 receiver/loader/import 오류가 기능 작업을 차단 | 공유 코드 원인과 최소 수정/검증; 기능 hook·설치는 원담당 |
+| 공통 승인·설치 경로 | 공유 manifest 생성/해시/수신기 계약 불일치 | 공통 계약과 생성·검사 경로 정합성 개선 |
+| 공유 자원 충돌 | 동일 Controller/Core/Writer 파일에 둘 이상의 운영 쓰기 | 소유자·승인·manifest·lease·적용 순서 조정 |
+| 공통 진단·집계 결함 | 원장 필드 오독·중복 사건 수 계산 | 공통 판정기·집계 로직 수정/검증 |
+| 공통 업무 접수·인계·회신 | 접수는 됐으나 수신 대상 미확인, 결과 회신 누락 | 접수·라우팅·반환 구조 수정/검증 |
+
+**언제 요청하는가:** 위 공통 도구·실행 계약의 실제 장애, 공유 자원 충돌 또는 업무 인계 자체의 오류가 현재 기능의 필수 실행에 영향을 줄 때만 요청한다. 기능 API·원자료·산식 오류와 단순 `WAIT_RECORDED`·정상 대기는 원담당 업무이며, 공용 원인이 확인되지 않으면 총괄은 **공용 원인 판정 지원**까지만 맡는다. 무관한 승인된 기능 작업은 계속한다.
+
+**업무 전가 반송 원칙(2026-11-17):** 기존 책임 배분을 명확히 적용한다. 공통 요청의 제목·라벨·'승인 필요' 표현보다 **실제로 남은 동작과 최초 실패 위치**로 업무를 분류한다. 총괄은 실제 공통 도구 결함·공유 자원 충돌·범위 밖 운영 효과 승인/보호 검토에만 한정해서 수락하고, 원담당의 기능별 실행·자료 대조·명세 작성·설치·결과 회수를 떠맡지 않는다. 잘못 넘어온 요청은 **같은 원본 Issue/#68에 원담당, 원담당의 다음 필수 실행, 총괄이 지원할 공통 부분(있을 경우)만 명시해 회신**한다. 불필요한 새 Issue/재승인/별도 Gate를 만들거나, 인계를 반송했다는 이유로 독립 기능 작업을 중단하지 않는다. 실제 공통 결함이 의심되지만 미확정이면 총괄의 원인 판정 지원만 허용하며, 기능 실행 책임은 계속 원담당에게 둔다.
+
+| 원담당 | 원담당이 끝까지 처리할 작업(총괄 이관 금지) | 총괄 지원이 허용되는 예외 |
+|---|---|---|
+| W01 물가지표 | 승인 A 실행·결과 회수, Core 소유권/Census B 조건 대조, 23개 원자료 검증, BLS·Census 수집/파서/저장, 계산·D1/API/UI 검증 | 공통 Controller/수신기 실제 결함과 그 수정·보호 심사. Windows Event129 관리자 설정은 사용자 직접(C급) |
+| W03 테마공탐 | 승인 A 결과, R48/R73 체인과 기능 소스 대조, 승인 R47 CMD B 설치, ETF 63종+SPY 수집·계산·게시 | 공통 Task Engine/Controller 조회기·B 실행 경로 자체 결함과 공유 보호 승인 |
+| W04 고용지표 | Reader/Runner·회귀시험, A 조회·결과 분석, SHA/정확 diff, 신규 B manifest 작성·검증, 승인 후 B 실행과 최종 계보 11계수 검증 | 신규 Controller **운영 효과**의 범위·보호 심사, 공통 유지보수 복구; 소스 SHA와 기능별 manifest 준비는 W04 |
+| W05 API–사이트 연결 | 승인 A 회수, Writer B 사전조건/3파일 SHA·manifest 대조, 정규 Writer B 설치, WPSFD42 수집·SQLite·게시·API/UI 검증 | 공통 Controller/Task Engine/Writer receiver·공통 B 설치기 자체 결함 또는 공유 자원 경합 |
+| W06 UIUX | 75단계 계획/진행 기록, 계산·checkpoint·원장 대조, 입력 변경 회귀시험, 승인 A 조회·API/UI·차트 검증 | 공통 Controller·공통 B 설치기 결함만 총괄. 실제 Writer 수정·설치는 Writer 원담당 |
+
+**예외 확인:** 원담당이 기존 승인·고정 허용목록·실제 설치 원장으로 수행 가능한 A/B를 먼저 자기 책임으로 처리한다. 새 운영 효과 승인 또는 공통 코드/공유 보호 **실제 필요분만** 총괄에 요청한다. 각 기능의 실행 성공은 원담당 PC Runtime·원격 JSON/TXT·저장·게시 증거로만 판정한다. 위 분류는 업무 권한을 새로 부여하거나 기존 승인 범위·운영 PC source/Workflow를 변경하지 않는다.
+
+**어디에 어떻게 요청하는가:** 저장소 `ansqhd5774-Choi/zgmini-pc-control`의 [GitHub Issues](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues)에 기존 `ZGMINI_AGENT_HANDOFF_V1` JSON 계약과 `agent-handoff` 라벨로 요청한다. 신규 Issue 생성 시 본문·라벨을 같은 생성 요청에 넣고, 기존 동일 사건이 있다면 **원본 Issue·인계 Issue를 재사용**한다. 형식과 유효 필드는 [AGENT_HANDOFF_V1.md](AGENT_HANDOFF_V1.md) 및 `agent-handoff/contract.mjs`를 따른다. 원본 `repository/issueNumber/requestId/chatId/branch/sourceSha/checkpoint`, 실패 `kind/code/lastPass/firstFail/fileRefs/evidenceIssueNumber`와 고유 `incidentId`를 정확히 확인한다. 지원 요청 목적·총괄이 반환해야 할 결과는 **원본 업무 Issue/진행 기록에 자연어로 설명**한다. 검증 계약에 없는 JSON 키를 추가하지 않고 API 키·인증 URL·전체 원자료를 올리지 않는다.
+
+예시 요청: “원본 Writer B Issue #번호, Run #번호에서 공통 receiver import 결함이 의심됨. 공통 도구의 원인 분석·최소 수정·회귀 검증을 요청. 기능별 hook·설치·게시 작업은 원담당이 유지. 원본 LAST PASS/FIRST FAIL, source SHA 및 승인 범위는 원본 증거 참고.”
+
+**업무 접수부터 회신까지 — 서로 다른 성공 증거를 절대 합산하지 않는다.**
+
+| 단계 | 요청자·대기열·처리자가 할 일 | 인정할 근거 / 현재 실제 한계 |
+|---|---|---|
+| 1. 요청 또는 자동 발견 | 원담당의 직접 Issue 요청과 PC 실패 감지로 봇이 생성한 Issue를 구별 | Issue 작성자·원본 실행 확인. 자동 발견은 원담당이 직접 부탁했다는 뜻이 아님 |
+| 2. 접수 확인 | 대기열이 schema/라벨·원본 증거·fingerprint·중복을 확인 | 고유 `agent-handoff` Issue 및 `HANDOFF_ROUTED` 봇 댓글. 이것은 **접수 기록**만 증명 |
+| 3. 담당 업무 판정 | 실제 공통 결함/기능 원인·기존 소유자·수정 범위를 대조 | `COMMON_PROCESS_OWNER` 또는 `ORIGIN_FUNCTION_OWNER`은 **역할 후보**이지 실제 처리자 주소/승인이 아님 |
+| 4. 실제 업무 전달 | 지정된 처리자/대화의 **수신 경로로** 원본·요청·증거를 전달 | **현 구현에 대화 자동 전달이 없음.** `HANDOFF_SELECTOR_CANDIDATE_V1`은 선별 영수증일 뿐. 전달 실증 전에는 `DELIVERY_UNVERIFIED`(보고 용어) |
+| 5. 담당자 인수 | 실제 담당자가 자기 수신 경로에서 고유 사건을 확인하고 인수 여부를 기록 | GitHub 계정의 `ACKNOWLEDGED` 댓글은 계정 기록만 인증; 특정 ChatGPT 대화의 실제 수신·실행을 독립 입증하지 못함 |
+| 6. 처리·검증 | 처리자가 **자신의 책임 범위에서** 실제 수정/시험/승인을 수행 | 마지막 PASS·최초 FAIL, 변경 SHA, PR·CI, 필요한 운영 Runtime 증거를 구분 |
+| 7. 결과 회신 | 실제 처리자가 기존 인계 Issue에 지원되는 결과를 제출하고 원본 Issue 회신을 확인 | `ZGMINI_AGENT_HANDOFF_RESULT_V1` → `HANDOFF_RESULT_RECORDED` → `HANDOFF_ORIGIN_RESULT_RECORDED`를 원본 기록과 대조. 현재 결과 broker는 PR·CI 증거 형식이므로 **무수정 조정/단순 판정의 정식 반환을 지원한다고 가정하지 않음** |
+| 8. 요청자 확인·종결 | 원담당이 결과를 **자기 대화에서 실제 수신·검토**하고 기능 업무를 이어감 | 원본 bot 결과 기록은 자동 메시지 전달/채팅 재개가 아님. 실제 확인이 없으면 `OWNER_ACK_UNKNOWN`, 운영 반영 전에는 `RUNTIME_VERIFICATION_PENDING` 유지 |
+
+`DELIVERY_UNVERIFIED`, `OWNER_ACK_UNKNOWN`은 이 표의 **보고·해석 용어**다. `agent-handoff/contract.mjs`의 JSON 상태 enum으로 새로 등록된 값이 아니다. 기존 `HANDOFF_ROUTED`·후보 선별·결과 댓글의 기술적 존재를 **실제 타 ChatGPT 대화 수신·조치의 증거로 사용하지 않는다.** 실제 전달/수신 경로가 없으면 미전달 사건으로 남기며 담당자의 태만 또는 미처리로 집계하지 않는다. 자동 발견과 정식 의뢰, 원본 실행과 인계 Issue는 사건별 고유 ID로 연결하고 **한 사건을 두 건의 미완료 업무로 합산하지 않는다**.
+
+**점검 주기와 한계:** 대기열 관제판은 GitHub Actions 설정상 15분 간격으로 조회하고 Issue/Workflow 이벤트에서도 실행될 수 있다. GitHub 예약 지연·누락이 가능하며, 점검 완료는 실제 업무 전달·회신 완료가 아니다. 실증 전에는 15분 이내 전달 보장이라고 보고하지 않는다. 수신 미확인 때문에 무관한 기능 작업을 멈추거나 기존 요청을 중복 생성하지 않는다.
+
+**반환 책임의 종료 조건:** 총괄이 공통 수정·검증을 끝내면 본인 작업의 증거와 원본 요청에 연계된 결과를 반환한다. 해당 기능 원담당의 운영 설치·수집·게시까지 총괄 완료로 계산하지 않는다. 공통 업무가 단순 검토·무수정 판정이어서 기존 `RESULT_V1` 규격(PR/CI)에 맞지 않으면 결과를 허위로 채워 기록하지 말고 현재 반환 규격의 미지원 범위를 명확히 남긴다. 실제 원담당 수신이 확인될 때만 요청자 수신 완료를 기록한다.
+
 ### 신규 대화·두 PC 작업 경로 표준 (2026-11-12 실제 Runner 실측 반영)
 
 **원칙:** 새 일반챗은 기존 운영체계를 임의 재설계하지 않고 마지막 유효 완료 지점에서 현재 기능 작업을 계속한다. 이는 현재 업무에 관련된 가벼운 확인 절차이며 새로운 전역 Gate가 아니다.
 
-1. **대화 시작·재개:** 제어 저장소 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), 이 지침 및 [두 PC 운영 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)의 관련 부분을 실제 조회한다. 기존 담당 브랜치·승인·미완료 단계·유효한 실PC 증거를 대조한다. [운영 PC 실측 JSON](pc-profiles/operating-PC.json), [격리 PC 실측 JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json)은 증거 범위 내에서 참고한다. GitHub 수정만으로 새 ChatGPT 대화에 지침이 자동 주입됐다고 주장하지 않는다.
+1. **대화 시작·재개:** **신규 대화 첫 진입 때만** 제어 저장소 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), 이 지침 및 [두 PC 운영 정본](PC_OPERATING_SYSTEMS_CANONICAL.md)의 필요한 부분을 확인한다. **같은 대화의 후속 작업은 첫 단계부터 재개하지 말고** 마지막 유효 완료점·기존 승인·미완료 필수 실행 하나를 승계한다. 관련 source·설정·PC 실행 환경에 변화 또는 상충 증거가 있을 때만 변경된 부분을 다시 확인한다. 기존 담당 브랜치·승인·미완료 단계·유효한 실PC 증거를 재사용한다. [운영 PC 실측 JSON](pc-profiles/operating-PC.json), [격리 PC 실측 JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json)은 증거 범위 내에서 참고한다. GitHub 수정만으로 새 ChatGPT 대화에 지침이 자동 주입됐다고 주장하지 않는다.
 2. **대상 PC 선택:**
    - 기존 **운영 PC**: 호스트 `PC`, Windows 11 Pro, 전용 Runner `zgmini-pc-01`~`06`, label `zgmini-pc-control`, Node `E:\ZGmini\runtime\node.exe`, Controller `E:\ZGmini\automation\pc-control`. GitHub 승인 A급 진단, 별도 승인 B급 Writer/Controller 적용, 로컬 데이터 수집·계산·저장·게시 관련 작업을 담당한다. Windows 사용자 로그인 Startup·Guardian·Watchdog·Supervisor 및 독립 유지보수기 계약을 따른다.
-   - 별도 **공통 대기열 PC**: 호스트 `DESKTOP-N62L0NG`, Windows 10 Home, 전용 Runner `zgmini-handoff-ci-spare-01`, label `zgmini-handoff-ci-isolated`, pinned setup-node 22. 원본 GitHub 결과 검증·수리 가능 장애 접수·중복 제거·인계/결과 중개·격리 CI만 수행한다. 운영 PC의 `E:\ZGmini` Controller 설치 루트가 없으므로 기존 PC 경로·DB·운영 권한을 그대로 가정하지 않는다.
+   - 별도 **격리 시험·공통 인계 PC**: 호스트 `DESKTOP-N62L0NG`, Windows 10 Home, 전용 Runner `zgmini-handoff-ci-spare-01`, label `zgmini-handoff-ci-isolated`, pinned setup-node 22. **해당 자동 Runner**는 원본 GitHub 결과 검증·수리 가능 장애 접수·중복 제거·인계/결과 중개·허용된 격리 CI만 수행한다. 이 PC의 별도 승인된 개발·시험 환경에서 전문 담당자는 폭넓은 Issues·PR 작업과 모의시험을 수행한다. 운영 PC의 `E:\ZGmini` Controller 설치 루트가 없으므로 기존 PC 경로·DB·운영 권한을 그대로 가정하지 않는다.
    - 실측 Runner.Listener 프로세스는 운영 PC 7개, 격리 PC 5개였으나 이는 **ZGMINI 전용 Runner 구성(각 6개/1개)**과 같지 않다. 이름별 PID 소유권·Online·부팅 후 복구는 별도 실증 없이는 확정하지 않는다.
 3. **기존 Workflow 우선:** 운영 A급은 기존 `pc-job` Issue JSON → `pc-job.yml` → 설치된 `controller/entry.mjs` → `upload.mjs`를 재사용한다. B급은 해당 기존 독립 승인 manifest·유지보수기/Writer 계약을 사용한다. 공통 장애 인계는 `agent-handoff*` 및 공유 요청 접수용 격리 Workflow, 정확한 opt-in과 GitHub 증거를 사용한다. 고정 Runner label·호스트·Node 경로를 먼저 확인한다. **기존 작동 경로를 두고 임의 ZIP·CMD·기능 전용 Runner/수신기/예약을 새 기본 방식으로 만들지 않는다.** 이미 승인된 수동 CMD 경로나 명시적 C급 직접 절차까지 폐기하는 의미는 아니다.
 4. **실행 전 최소 대조:** 해당 요청의 actor·schema·고유 requestId·repo/branch/source SHA·승인 manifest·실제 설치 상태와 관련 자원만 확인한다. [성공 사례 재사용 정본](SUCCESS_EVIDENCE_REUSE.md)의 승인/Windows Issue·Run/원격 결과를 활용한다. 기존 경로의 지원 범위가 부족하면 실제 미지원 지점을 입증한 뒤 공통 도구를 최소 수정·시험/PR·실PC 검증으로 확장한다. 독립 업무를 불필요한 공통 복구나 전역 검사의 대기로 묶지 않는다.
 5. **실행/결과/재시도:** `queued`는 Runner Offline이나 성공과 동의어가 아니다. GitHub CI PASS도 기능 PC 실행 PASS를 증명하지 않는다. Run ID/attempt·실행 Runner/host·status/code/lastPass/firstFail·**원격 JSON/TXT 2/2 readback과 원본 Issue 댓글**을 구분해 검증한다. BLOCKED·STATE_UNKNOWN·결과 누락은 기존 요청부터 조사하고 동일 requestId 자동 재실행 0회를 유지한다. Watchdog 복구는 원본 PC 작업 재실행과 다르다.
 6. **중앙 장애 인계:** 수리 가능한 확인된 실패만 기존 `agent-handoff` 경로로 접수한다. 총괄은 공통 프로세스 장애를 처리하고 원담당의 기능 개발/설치를 대신하지 않는다. GitHub 댓글은 다른 일반챗 자동 수신/재개가 아니다. 실제 원담당 대화가 재개되면 원본 Issue를 조회한다.
-7. **보호·최종 완료:** 이 PC별 문서화만으로 #996의 C급 NO-GO/ISO_ONLY_PASS, 기존 Task·Core/Writer/DB·원자료·TTL·산식·승인된 D1/API/UI 계약을 변경하지 않는다. C급 관리자·보안·시스템 변경은 사용자 직접 수행한다. 기능 완료는 실제 **수집→PC 원자료 저장→계산→로컬 결과 저장→승인된 게시→API→PC/모바일 UI** 증거로 판정한다. 예약 자동 갱신 검증은 관련 기능 완료 후 후속 단계다. 전체 진행률·이번 실증·남은 실제 문제·다음 필수 작업만 보고한다.
+7. **보호·최종 완료:** #996 C급 접수·잠금 복구는 2026-11-15 `INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`로 완료됐고 **당시 원본 Controller 설치는 ABORTED**다. 별도 승인 [#1396](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1396#issuecomment-6884221298)에서 Controller 15파일 설치 `SUCCEEDED`, [#1397](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1397#issuecomment-6884218522)에서 동일 SHA `PASS` 사후검사를 기록했으므로 이 후속 설치 완료점은 기존 #996 중단과 구분한다. 이 결과를 새 NO-GO 판정이나 C 재실행 근거로 삼지 않는다. 이 PC별 문서화만으로 기존 Task·Core/Writer/DB·원자료·TTL·산식·승인된 D1/API/UI 계약을 변경하지 않는다. C급 관리자·보안·시스템 변경은 사용자 직접 수행한다. 기능 완료는 실제 **수집→PC 원자료 저장→계산→로컬 결과 저장→승인된 게시→API→PC/모바일 UI** 증거로 판정한다. 예약 검증은 미완료 작업·후속 단계·진행률 분모로 등록하지 않는다. 모든 기능의 개발·실운영 데이터 수집/저장·계산·게시·API/홈페이지 적용을 작업자가 완료한 후에만 사용자가 홈페이지에서 육안으로 최종 정상 여부를 판단한다. 전 기능 완료 전 사용자에게 육안 검증을 요청하지 않는다. 전체 진행률·이번 실증·남은 실제 문제·다음 필수 작업만 보고한다.
 
-**검증 기준:** 새로운 대화가 실제 GitHub 정본을 읽고, 적절한 Runner와 기존 Workflow를 선택하며, 원격 결과를 회수하는지 별도 재현으로 확인한다. 문서 병합만으로 프로젝트 설정 동기화·대화 간 자동 인계를 주장하지 않는다.
+**검증 기준:** 신규 대화에서 기존 정본·실행 증거를 실제 업무에 재사용하고 적절한 Runner·Workflow를 선택해 필요한 결과를 회수했는지 **그 실행 증거로만** 판단한다. 새 대화라는 이유만으로 별도 전체 재현·건강 검사를 만들지 않는다. 문서 병합만으로 프로젝트 설정 동기화·대화 간 자동 인계를 주장하지 않는다.
 
 
 마지막 유효 완료 지점과 다음 필수 실행을 정하고 그 실행에 필요한 입력·설치 모듈·경로·승인만 확인한다. 기존 공통 등록기·수집기·계산기·게시기·adapter를 우선 재사용한다. 설정으로 가능한 일을 새 Controller 설치·기능별 CMD·예약 복제로 확대하지 않는다. 기술적 근거 없이 기능·테마·ETF 수량 상한이나 목표 개수를 추가하지 않는다.
@@ -75,7 +153,7 @@
 - [공통 PR #889](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/889) 병합 SHA `2158108b107a500c190214a3429116287fffb506`: 승인/source pin 함수를 독립 `approval-contract.mjs`로 분리해 CLI↔receiver 순환 import를 제거. 실제 CLI→dispatcher→receiver 격리 재현에서 수정 전 exit 13, 수정 후 정상적인 제한 결과를 확인했고 관련 Node 8/8 PASS. 기존 승인·잠금·원본 보호는 유지한다.
 - [공통 PR #890](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/890) 병합 SHA `a2ff50826fcbd66ecfe9d3141e36c08c1a8f2c68`: 정규 B Step5의 실제 Node 종료 코드를 `RUNNER_TEMP` 내 생성 전용 부가 원장에 기록하고 원래 종료 코드를 보존한다. 보고기는 고정 Actions 단계 상태·원본 결과와 이를 교차 검산해 `LAST_PASS/FIRST_FAIL/firstFailCode/nodeExitCode`를 JSON/TXT/댓글에 안전하게 전달하며, 모순·누락은 계속 `STATE_UNKNOWN`으로 판정한다. 실행 단계 진입과 운영 효과 시도 여부를 구분한다. source 관련 Node 34/34 PASS. 과거 #846 원본 결과를 소급 수정하지 않는다.
 - [공통 PR #891](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/891) 병합 SHA `c567f3296f1b1edec3e51850569c8a0c95582086`: 기존 승인된 **읽기 전용** Windows 호환성 proof에서 실제 CLI import 연결을 추가로 시험하고 V2 증거에 CLI proof 결과·test source SHA·Node 종료 코드를 기록하도록 개선했다. V1인 #845는 `LEGACY_NOT_TESTED`로 구분하고 이전 정상 격리 증거를 소급 무효화하지 않는다. 관련 source Node 20/20 PASS. 새 Workflow·B 설치·예약 생성은 없다.
-- 후속 [#892](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/892) **실제 Windows 읽기 전용 proof PASS**: run `42445755255`, 고유 결과 `PROOF_WINDOWS_BILATERAL_CLI_PASS`, 실제 CLI 진입 증거 `WINDOWS_CLI_ENTRY_PASS`, `CLI_NODE_EXIT_CODE=0`, `OPERATION_WRITES=0`, JSON/TXT 원격 GET/readback `2/2`([결과 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/892#issuecomment-6717095881)). 이는 수정된 공통 CLI import 경로의 Windows **읽기 전용 격리 시험**을 입증한다. **테마 108파일 B 운영 설치·백업·활성 버전·Task 전환·게시 성공 증거는 아니다.** 실제 설치·수집→계산→저장→D1→API/UI는 원담당의 기존 승인·정규 B 경로에서 수행한다. 예약 자동 갱신 검증은 모든 기능 작업 완료 후 별도 후속 단계다. 오류 재발 시 신규 Gate/Controller 재설치보다 관련 진입점·최초 실패 코드·기존 원장의 최소 차이부터 확인한다.
+- 후속 [#892](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/892) **실제 Windows 읽기 전용 proof PASS**: run `42445755255`, 고유 결과 `PROOF_WINDOWS_BILATERAL_CLI_PASS`, 실제 CLI 진입 증거 `WINDOWS_CLI_ENTRY_PASS`, `CLI_NODE_EXIT_CODE=0`, `OPERATION_WRITES=0`, JSON/TXT 원격 GET/readback `2/2`([결과 댓글](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/892#issuecomment-6717095881)). 이는 수정된 공통 CLI import 경로의 Windows **읽기 전용 격리 시험**을 입증한다. **테마 108파일 B 운영 설치·백업·활성 버전·Task 전환·게시 성공 증거는 아니다.** 실제 설치·수집→계산→저장→D1→API/UI는 원담당의 기존 승인·정규 B 경로에서 수행한다. 예약 검증 작업을 별도 후속 업무나 미완료 항목으로 생성하지 않는다. 전체 기능 작업을 끝낸 후 사용자에게 홈페이지 최종 육안 확인을 요청하며, 그 이전에는 작업자가 필수 회귀·보호 결과만 자체 확보한다. 오류 재발 시 신규 Gate/Controller 재설치보다 관련 진입점·최초 실패 코드·기존 원장의 최소 차이부터 확인한다.
 
 **대형 A급 결과의 전달 범위:** `pc-source-preflight`의 파일 목록이 32KiB 전송 예산을 넘으면 기존 원본 PC ledger는 보존하고 GitHub 결과에는 `reportTransfer.status=SUMMARY_ONLY`, 목록 개수·압축 JSON 지문·생략 표시만 제공한다(Controller source PR #664). 이 축약본은 개별 파일 존재·SHA의 원격 완전 증거가 아니며, 필요한 경우 기존 실행 로그나 승인된 좁은 읽기 증거로 판정한다. PC A 실행 성공과 보고서 업로드 실패(`REPORT_SIZE`)를 구분하고 동일 requestId/Issue를 결과 전달 복구 목적으로 재실행하지 않는다. 기존 32KiB 안전 제한·JSON/TXT 정확 재조회는 유지한다.
 

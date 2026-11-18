@@ -146,3 +146,93 @@ test('workflow admission gate includes every registered shared B title when labe
     assert.equal(missing.code,'EXACT_RESOURCE_LABEL_REQUIRED');
   }
 });
+
+test('dedicated R181 workflow titles are not falsely rejected by shared ingress',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/pc-writer-b-source-once.yml',
+  import.meta.url),'utf8');
+ const titles=['r181-protected-route-install','r181-source-shape-readonly',
+  'r181-saved-ledger-readonly','w03-r179-stored-handoff-readonly',
+  'w03-r179-guard-shape-readonly',
+  'w03-gmh-seven-history-manual-once',
+  'w03-gmh-seven-private-score-once',
+  'w03-gmh-seven-public-compat-readonly',
+  'w03-gmh-seven-d1-seed-readonly',
+  'w03-gmh-seven-collection-time-readonly',
+  'w03-r47-private-readback-once',
+  'w03-r48-private-readback-once',
+  'w03-r51-stored-date-readback-once',
+  'w03-r179-readback-guard-install',
+  'r181-primary-route-install',
+  'r181-existing-task-run-once'];
+ for(const title of titles){
+  assert.ok(workflow.includes("github.event.issue.title == '"+title+"'"),
+   'dedicated workflow exact title missing '+title);
+  const admission=inspectSharedIssueAdmission({...issue(title),
+   body:JSON.stringify({schema:'WRONG_BODY_FOR_SHARED_B'})});
+  assert.equal(admission.state,'UNMANAGED');
+  assert.equal(admission.code,'DEDICATED_EXACT_WORKFLOW_ROUTE');
+ }
+ // Same label plus unregistered title still produces a meaningful rejection.
+ const unknown=inspectSharedIssueAdmission({...issue('invalid-operation'),
+  body:JSON.stringify({schema:'WRONG_BODY'})});
+ assert.equal(unknown.code,'EXACT_ISSUE_TITLE_REQUIRED');
+ assert.equal(unknown.state,'REJECTED_AT_ADMISSION');
+ // Generic shared Writer B routing is not loosened.
+ assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
+});
+
+test('dedicated R47 CMD B title is delegated without suppressing unknown-label rejection',async()=>{
+ const wf=readFileSync(new URL('../.github/workflows/pc-approved-runtime-b-once.yml',import.meta.url),'utf8');
+ const title='pc-r47-cmd-onefile-install';
+ assert.ok(wf.includes("github.event.issue.title == '"+title+"'"));
+ assert.ok(wf.includes("contains(github.event.issue.labels.*.name, 'pc-writer-b-install')"));
+ const approved={...issue(title),body:JSON.stringify({
+  schema:'ZGMINI_TASK_CMD_ONEFILE_B_REQUEST_V1',
+  requestId:'bd14ae89-139d-4722-9e2b-7f401102474f',
+  chatId:'e296811b-e936-4cf0-9db5-1b311305f89e',
+  operation:'pc-r47-cmd-onefile-install',
+  controlRepository:repo,
+  approvalManifestPath:'approvals/task-cmd-b/w03-r47-cmd-onefile-reissue-20261117.json',
+  approvalManifestSha256:'5ea21082660efcf6bbf1be373e79aeb65b12ecbe854b324de82da595a64566cd'
+ })};
+ const admission=inspectSharedIssueAdmission(approved);
+ assert.deepEqual(admission,{state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
+ let posted=0;
+ const report=await reportRejectedAdmission({...event(title),issue:approved},{
+  listComments:async()=>[],postComment:async()=>{posted++;},getComment:async()=>null
+ });
+ assert.equal(report.state,'UNMANAGED');
+ assert.equal(posted,0);
+ const wrong={...approved,title:'invalid-r47-cmd-install'};
+ const denied=inspectSharedIssueAdmission(wrong);
+ assert.equal(denied.state,'REJECTED_AT_ADMISSION');
+ assert.equal(denied.code,'EXACT_ISSUE_TITLE_REQUIRED');
+ assert.equal(inspectSharedIssueAdmission(base()).state,'ADMITTED_TO_WORKFLOW');
+});
+
+test('dedicated W04 R6 manual B request is not falsely rejected by shared intake',async()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/pc-employment-r6-registered-data-once.yml',
+  import.meta.url),'utf8');
+ const title='pc-employment-r6-registered-data-once';
+ assert.ok(workflow.includes("github.event.issue.title == '"+title+"'"));
+ assert.ok(workflow.includes("contains(github.event.issue.labels.*.name, 'pc-writer-b-install')"));
+ const exact={...issue(title),
+  body:JSON.stringify({schema:'ZGMINI_R6_REGISTERED_DATA_B_REQUEST_V1',
+   requestId:'6ebd5330-9950-4fcf-94c3-64cf392e4ac2',
+   chatId:'12cf700f-384d-4bbb-b401-7ac56be203e7',
+   operation:'employment-r6-registered-data-once',
+   approvalManifestSha256:'8'.repeat(64)})};
+ const result=inspectSharedIssueAdmission(exact);
+ assert.deepEqual(result,{state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
+ let posted=0;
+ const ev={...event(title),issue:exact};
+ const report=await reportRejectedAdmission(ev,{
+  listComments:async()=>[],postComment:async()=>{posted++;},
+  getComment:async()=>null
+ });
+ assert.equal(report.state,'UNMANAGED');
+ assert.equal(posted,0);
+ const invalid=inspectSharedIssueAdmission({...exact,title:'not-an-approved-r6-route'});
+ assert.equal(invalid.state,'REJECTED_AT_ADMISSION');
+ assert.equal(invalid.code,'EXACT_ISSUE_TITLE_REQUIRED');
+});

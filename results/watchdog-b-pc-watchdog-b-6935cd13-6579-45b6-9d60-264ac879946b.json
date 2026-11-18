@@ -1,0 +1,11 @@
+{
+  "schema": "ZGMINI_PC_WATCHDOG_B_RESULT_V1",
+  "requestId": "pc-watchdog-b-6935cd13-6579-45b6-9d60-264ac879946b",
+  "issueNumber": 1393,
+  "status": "STAGED",
+  "code": "WATCHDOG_B_APPROVED_SOURCE_STAGED_AWAITING_NATURAL_RESTART",
+  "writes": 2,
+  "targetSha": "a2ec241d98a2ca93508443deb5b4688ecbccb905",
+  "runId": "43639988809",
+  "attempt": "1"
+}

@@ -1,0 +1,230 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43789176758-1-seat-4",
+  "requestId": "pc-d9fbe97e-4cf4-4f76-b2af-4c47a16c7865",
+  "startedAt": "2026-11-16T01:56:56.004Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "b2ff49dd14a09ebeba482e2ae9a84530e00f094f",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "543b957886b07972271ffa53dbc9ae4f86a1a4c5",
+  "sourceBranch": "codex/theme-fear-greed-integration-20261025",
+  "operation": "theme-platform-shadow-readonly",
+  "seat": 4,
+  "status": "BLOCKED",
+  "code": "SHADOW_PUBLIC_REPLAY_REVIEW",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-fbced24a-40a8-4605-9c07-5a829ab971d1",
+  "memoryAdmission": {
+    "admitted": true,
+    "minimumFreeMiB": 1536,
+    "firstFreeMiB": 2186,
+    "freeMiB": 2186,
+    "minObservedMiB": 2186,
+    "samples": 1,
+    "waitedMs": 0.03469999999992979
+  },
+  "pcOperationalApprovedSha": "f9dd87f72f3b821a074c66ade82ce6ff6211f429",
+  "exitCode": 0,
+  "result": {
+    "status": "BLOCKED",
+    "replayStatus": "PARTIAL",
+    "code": "SHADOW_PUBLIC_REPLAY_REVIEW",
+    "executionMode": "APPROVED_READONLY_SHADOW",
+    "publicTargetCount": 10,
+    "publicPhases": 20,
+    "publicComplete": 10,
+    "publicBlocked": 10,
+    "publicPending": 0,
+    "publicCoverageStatus": "PARTIAL",
+    "privateCoverage": {
+      "status": "PARTIAL",
+      "themes": 1,
+      "expectedPhases": 2,
+      "complete": 0,
+      "blocked": 2,
+      "pending": 0
+    },
+    "privateCoverageStatus": "PARTIAL",
+    "phaseRows": [
+      {
+        "id": "robotics",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "robotics",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "cloud-saas",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "cloud-saas",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "autonomous-driving",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "autonomous-driving",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "nuclear-smr",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "nuclear-smr",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "defense",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "defense",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "fintech",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "fintech",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "cybersecurity",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "cybersecurity",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "biotech",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "biotech",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_STORED_PUBLIC_API_UNAVAILABLE"
+      },
+      {
+        "id": "data-center-power",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "data-center-power",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_OPTIONAL_PROVISIONAL_D1_INVALID"
+      },
+      {
+        "id": "space-satellite",
+        "kind": "confirmed",
+        "status": "COMPLETE",
+        "stage": null,
+        "code": null
+      },
+      {
+        "id": "space-satellite",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_OPTIONAL_PROVISIONAL_D1_INVALID"
+      },
+      {
+        "id": "ai-software",
+        "kind": "confirmed",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_NINE_R25_NON_SPY_DATE"
+      },
+      {
+        "id": "ai-software",
+        "kind": "provisional",
+        "status": "BLOCKED",
+        "stage": "source",
+        "code": "THEME_NINE_R25_NON_SPY_DATE"
+      }
+    ],
+    "phaseRowsTruncated": false,
+    "sourceMode": "SAVED_PLUS_PUBLIC_API_AND_D1_READS",
+    "d1Reads": 4,
+    "publicApiReads": 1,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "schedulerWrites": 0,
+    "checkpointPersistence": "TRANSIENT_MEMORY_ONLY",
+    "actualExecutionSha": "543b957886b07972271ffa53dbc9ae4f86a1a4c5",
+    "requestedSourceSha": "543b957886b07972271ffa53dbc9ae4f86a1a4c5",
+    "candidateExecuted": true,
+    "approvedFileCount": 124
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "dfe485998b31d826cec7365600550a3bfb31190e88c7730caa6371cb5ab85a3d",
+  "protectedAfterSha256": "dfe485998b31d826cec7365600550a3bfb31190e88c7730caa6371cb5ab85a3d",
+  "actualExecutionSha": "543b957886b07972271ffa53dbc9ae4f86a1a4c5",
+  "next": "RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST",
+  "finishedAt": "2026-11-16T01:57:41.235Z",
+  "durationMs": 45231
+}

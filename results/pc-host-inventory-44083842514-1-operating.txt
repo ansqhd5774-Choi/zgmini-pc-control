@@ -1,0 +1,14 @@
+schema=ZGMINI_PC_HOST_INVENTORY_RESULT_V1
+requestId=65c5c1dc-45f6-471e-ba9e-bc5ad400c90c
+runId=44083842514
+attempt=1
+role=operating
+host=PC
+runner=zgmini-pc-05
+expectedLabel=zgmini-pc-control
+status=PASS
+code=READONLY_HOST_INVENTORY_COLLECTED
+operationalWrites=0
+automaticRetries=0
+memory.totalMiB=16122
+memory.freeMiB=1119

@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "9d12e1bc-2ba7-4836-9d45-41ba80427a05",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "6705548e6ee67a775955fe59d4c030987451e015",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "a8028279dfed695cb826b8a3e2166796cc8a03bf",
+  "candidateSourceSha": "abb2e0807e939c1c656f248245c424e54e6954de",
+  "manifestSha256": "47d248126d17479bd559c6c6649bffb77eb75ee927cafb63ec99a71bb0c9ef3a",
+  "baseTreeOid": "0d74e35b4f97248556b67c8595eedc6d6e7cc1fd",
+  "preparedTreeOid": "44e2b3b04bc7038e2789a029d30be4fc368523c0",
+  "provenanceSha256": "adb6b08d7f063f01ddbe4968e2e80337bbd610d9ee833a057c75e7d990672f11",
+  "runId": "43787228000",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/quota-policy.mjs"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "8e82f0fd-10e4-448a-9e17-f3cd31edcae1",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "b886a1234a8a728957ab8e73394c5ea12e1b9acc",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "f4ab6f4e6bdbebb8f6958be88b5c9e194df8329b",
+  "candidateSourceSha": "4193d0bbf254183991bb0b535d346609178f9f8e",
+  "manifestSha256": "e2fd3034d547604f333808cd1804eda8f693a22b75417c4cc83286091d9c3a69",
+  "baseTreeOid": "e7fde859a52ea42da4cb5ee7d224d3cbc36aa23d",
+  "preparedTreeOid": "ccbebdff85fe2d573a24818d1abf9ad6c61c896c",
+  "provenanceSha256": "64fd65d101b246bf42d64c6728295eb715519545edd99054ece1d1efb8f455e1",
+  "runId": "43836744161",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/api-connection-health.mjs",
+    "worker/api-connection-health.mjs"
+  ]
+}

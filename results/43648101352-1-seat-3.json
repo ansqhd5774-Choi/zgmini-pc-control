@@ -1,0 +1,212 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-43648101352-1-seat-3",
+  "requestId": "pc-68f33d6d-c6a1-4a15-8aa7-32e829723195",
+  "startedAt": "2026-11-14T22:26:37.347Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "643b7c7c4372ffad552443fc312c6cb1b944e2fc",
+  "sourceBranch": "main",
+  "operation": "source-inventory-runtime-readonly",
+  "seat": 3,
+  "status": "STATE_UNKNOWN",
+  "code": "SOURCE_INVENTORY_PARTIAL_READONLY",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-6f758302-8365-41dc-b50e-1d0a15579d94",
+  "pcOperationalApprovedSha": "05d7ae49e0a84cbeebd90ef4de6dd7284094bf97",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "SOURCE_INVENTORY_PARTIAL_READONLY",
+    "scope": "STORED_PC_SQLITE_ONLY",
+    "overallUniqueSourceCount": null,
+    "declaredEnabledCalendarMapping": "NOT_INSPECTED",
+    "core": {
+      "status": "PASS",
+      "code": "STORED_INVENTORY_READONLY",
+      "sqliteOpened": true,
+      "coverageStatus": "ALL_TARGET_TABLES_PRESENT",
+      "observedTableCount": 8,
+      "targetTableCount": 8,
+      "tableAvailability": {
+        "batch": true,
+        "employment": true,
+        "employmentR6": true,
+        "breadth": true,
+        "breadthUniverse": true,
+        "earningsUniverse": true,
+        "consumption": true,
+        "feeds": true
+      },
+      "batch": {
+        "storedBatches": 643,
+        "latestStoredAt": 1794692406205,
+        "knownFamilies": {
+          "macro": {
+            "storedBatches": 45,
+            "latestStoredAt": 1794685821266,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": 42,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": 1
+            }
+          },
+          "credit": {
+            "storedBatches": 44,
+            "latestStoredAt": 1794678320977,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 3,
+              "providerSummaryKeys": null
+            }
+          },
+          "supply": {
+            "storedBatches": 44,
+            "latestStoredAt": 1794682813457,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 2,
+              "providerSummaryKeys": null
+            }
+          },
+          "fundFlows": {
+            "storedBatches": 44,
+            "latestStoredAt": 1794690621618,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": 1
+            }
+          },
+          "bisDsr": {
+            "storedBatches": 44,
+            "latestStoredAt": 1794688220737,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": null
+            }
+          },
+          "bisTc": {
+            "storedBatches": 44,
+            "latestStoredAt": 1794689424846,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": null
+            }
+          },
+          "rates": {
+            "storedBatches": 45,
+            "latestStoredAt": 1794691211373,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": 7,
+              "externalKeys": null,
+              "providerSummaryKeys": 1
+            }
+          }
+        },
+        "distinctSeriesInsideBodies": "NOT_INSPECTED"
+      },
+      "employment": {
+        "observationRows": 43441,
+        "uniqueProviderSeriesGeography": 192,
+        "latestRetrievedAt": "2026-11-14T22:10:12.478Z"
+      },
+      "employmentR6": {
+        "storedChunks": 868,
+        "snapshots": 81,
+        "uniqueReleaseRequests": 43,
+        "latestRetrievedAt": "2026-11-14T21:30:06.670Z"
+      },
+      "breadth": {
+        "latestTradeDate": "2026-11-13",
+        "latestRows": 503,
+        "latestUniqueTickers": 503
+      },
+      "breadthUniverse": {
+        "latestTradeDate": "2026-11-13",
+        "reportedMemberCount": 503
+      },
+      "earningsUniverse": {
+        "latestPeriodEnd": "2026-06-30",
+        "reportedSecurityCount": 503,
+        "reportedIssuerCount": 500,
+        "retrievedAt": "2026-11-14T14:30:22.977Z"
+      },
+      "consumption": {
+        "latestScoreDate": "2026-09-30",
+        "storedRows": 52,
+        "uniqueSourceKeys": 52,
+        "uniqueProviders": 1
+      },
+      "publicFeeds": {
+        "currentOutputFeedKeys": 13,
+        "countedAsRawInput": false
+      },
+      "census2027Diagnostic": {
+        "status": "OBSERVED",
+        "year": 2027,
+        "collectionStatus": "READY_WITH_FALLBACK",
+        "attempts": [
+          {
+            "endpoint": "annual",
+            "code": "SOURCE_PARSE_OR_FORMAT_FAILED"
+          }
+        ],
+        "attemptedAt": "2026-11-14T21:40:06.205Z",
+        "storedAt": 1794692406205
+      },
+      "treasuryTawsInput": {
+        "status": "OBSERVED",
+        "storedAt": 1794692406205,
+        "fromDate": "2025-11-15",
+        "toDate": "2026-11-14",
+        "rawRowCount": 447,
+        "storedAwardedCount": 436,
+        "eligibleAwardedRows": 436,
+        "eligibleCountMatchesStored": true,
+        "textBytes": 3038408,
+        "textSha256": "c70216a051dd9a24a6b9189193535da23fc136f22e1e0219455d896545bf74de",
+        "scope": "ELIGIBLE_RESULT_COUNT_NOT_FULL_PARSER_REVALIDATION"
+      }
+    },
+    "history": {
+      "status": "STATE_UNKNOWN",
+      "code": "WAL_SIDECARS_ABSENT_UNVERIFIED",
+      "sqliteOpened": false
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d",
+  "protectedAfterSha256": "4c9666de6260e528ba1cc3c93e100bd6afc867be7d5379a552e49ef1a112029d",
+  "actualExecutionSha": "8e2736a62a90798afe159ef4d96a8713265ca021",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-14T22:27:12.953Z",
+  "durationMs": 35606
+}

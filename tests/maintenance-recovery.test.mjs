@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {classifyRecovery,archiveUntouched,
- verifyMaintenanceManifest as recoveryInventory} from '../tools/maintenance-recovery.mjs';
+ verifyMaintenanceManifest as recoveryInventory,verifyOperatingRunners} from '../tools/maintenance-recovery.mjs';
 import {verifyMaintenanceManifest as statusInventory} from '../tools/automation-status.mjs';
 const sha='a'.repeat(40),id='pc-update-recovery-fixture';
 const state=()=>({identityVerified:true,ownerAlive:false,
@@ -20,7 +20,7 @@ test('status and recovery verify both pre-handoff six and post-handoff seven exa
  const manifest=(files,sourceSha=files.length===original.length?oldSha:targetSha)=>({
   schema:'ZGMINI_PC_MAINTENANCE_INSTALL_V1',sourceSha,files:Object.fromEntries(
   files.map(p=>[p,createHash('sha256').update(data[p]).digest('hex')]))});
- const readBytes=p=>data[path.relative('/fixture',p)];
+ const readBytes=p=>data[path.relative('/fixture',p).split(path.sep).join('/')];
  for(const validate of [recoveryInventory,statusInventory]){
   assert.equal(validate(manifest(original),'/fixture',readBytes),true);
   assert.equal(validate(manifest(next),'/fixture',readBytes),true);
@@ -82,4 +82,20 @@ test('second recovery cannot compete for single reservation',()=>{
   assert.throws(()=>archiveUntouched(f),{code:'EEXIST'});
   assert.ok(fs.existsSync(path.join(f.root,'leases/controller-install')));
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
+
+const operating=()=>Array.from({length:6},(_,i)=>({name:'zgmini-pc-0'+(i+1),status:'online',busy:false}));
+test('six operating runners pass with or without isolated runner',()=>{
+ const six=operating();const isolated={name:'DESKTOP-N62L0NG',status:'online',busy:true};
+ assert.deepEqual(verifyOperatingRunners(six),{runnerSetVerified:true,runnersIdle:true});
+ assert.deepEqual(verifyOperatingRunners([...six,isolated]),{runnerSetVerified:true,runnersIdle:true});
+});
+test('operating runner duplicates, missing, offline and busy fail closed',()=>{
+ const six=operating();
+ for(const rows of [[...six,six[0]],six.slice(1),six.map((x,i)=>i===0?{...x,status:'offline'}:x)]){
+  assert.equal(verifyOperatingRunners(rows).runnerSetVerified,false);
+ }
+ const busy=six.map((x,i)=>i===0?{...x,busy:true}:x);
+ assert.equal(verifyOperatingRunners(busy).runnersIdle,false);
+ assert.equal(verifyOperatingRunners(null).runnerSetVerified,false);
 });

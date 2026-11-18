@@ -48,10 +48,36 @@ export function summarizeAutomation(s){
   intakeNote:'GitHub read access and Runner health do not prove this chat may submit a maintenance request.'};
 }
 
+// Fixed non-sensitive observations from the installed automation status.
+// Neither PID, nonce, owner path, command line nor environment is included.
+export function safeRuntimeSignals(state){
+ const names=['controllerFilesVerified','supervisorAlive','supervisorIdentityVerified',
+  'supervisorFresh','supervisorChildrenVerified','runnerSetOnline'];
+ const flags=Object.fromEntries(names.map(k=>[k,
+  typeof state?.[k]==='boolean'?state[k]:null]));
+ return {...flags,workflowActive:state?.workflowState==='active'?true:
+  ['disabled_manually','disabled_inactivity'].includes(state?.workflowState)?false:null};
+}
+
+// Normalize only error classes from gh stderr: never export raw messages,
+// URLs, credentials or execution paths. A 403 does NOT prove six offline seats.
+export function classifyRunnerQueryError(error){
+ const msg=String(error?.stderr??error?.message??'');
+ if(/\bHTTP\s*403\b|\b403\s+Forbidden\b/i.test(msg))return 'HTTP_403_FORBIDDEN';
+ if(/\bHTTP\s*401\b|\b401\s+Unauthorized\b/i.test(msg))return 'HTTP_401_UNAUTHORIZED';
+ if(/\bHTTP\s*404\b|\b404\s+Not Found\b/i.test(msg))return 'HTTP_404_NOT_FOUND';
+ if(/\bHTTP\s*429\b|\b429\s+Too Many Requests\b/i.test(msg))return 'HTTP_429_LIMITED';
+ if(error?.code==='ETIMEDOUT')return 'REQUEST_TIMEOUT';
+ return 'RUNNER_QUERY_ERROR_OTHER';
+}
 export function collectAutomationStatus(args=process.argv.slice(2)){
  need(process.platform==='win32','STATUS_WINDOWS_REQUIRED');
  need(args.length===0||(args.length===2&&args[0]==='--request-id'&&/^pc-[a-z0-9-]{8,76}$/.test(args[1])),'STATUS_ARGS');
- const codes=[];const observe=(label,f)=>{try{return f();}catch{codes.push(label);return null;}};
+ const codes=[];let runnerQueryError=null;
+ const observe=(label,f)=>{try{return f();}catch(error){
+  codes.push(label);
+  if(label==='RUNNERS_QUERY_UNAVAILABLE')runnerQueryError=classifyRunnerQueryError(error);
+  return null;}};
  const host=observe('CONTROLLER_MANIFEST_UNAVAILABLE',()=>read(control+'/host.json'));
  const installed=observe('MAINTENANCE_MANIFEST_UNAVAILABLE',()=>read(maintenance+'/MAINTENANCE_INSTALL.json'));
  const maintenanceVerified=observe('MAINTENANCE_FILES_UNVERIFIED',()=>{
@@ -83,7 +109,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   supervisorIdentityVerified:Boolean(owner?.nonce&&owner.pid===supervisor?.pid&&supervisor.sourceSha===host?.controllerSourceSha),
   supervisorFresh:Date.now()-Date.parse(supervisor?.at??'')>=0&&Date.now()-Date.parse(supervisor?.at??'')<45000,
   supervisorChildrenVerified:supervisor?.mode==='LISTENING'&&supervisor?.children?.length===6&&Array.from({length:6},(_,i)=>i+1).every(seat=>supervisor.children.filter(c=>c.seat===seat&&c.alive===true&&live(c.pid)===true).length===1),
-  runnerSetOnline:dedicatedPcRunnersOnline(rows),
+  runnerSetOnline:Array.isArray(rows)?dedicatedPcRunnersOnline(rows):null,
   workflowState:workflow,installedOperations:operations};
  Object.assign(state,{maintenanceFilesVerified:maintenanceVerified===true,
   receiverIdentityVerified:Boolean(receiverOwner?.nonce&&receiver?.pid===receiverOwner.pid&&live(receiverOwner.pid)===true),
@@ -93,8 +119,10 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   freshnessSeconds:45,collectorSource:'tools/automation-status.mjs',...summarizeAutomation(state),
   actualControllerSha:state.actualControllerSha,maintenanceSourceSha:installed?.sourceSha??null,
   installLock:state.installLock,workflowState:workflow,
+  runtimeSignals:safeRuntimeSignals(state),
   receiverObservedAt:receiver?.at??null,receiverStatus:receiver?.status??null,maintenanceFilesVerified:state.maintenanceFilesVerified,
   runners:rows?.map(x=>({name:x.name,status:x.status,busy:x.busy}))??null,
+  runnerQueryError,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
   diagnostics:codes,operationalWrites:0,providerCalls:0,dbD1Writes:0};
 }

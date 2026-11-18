@@ -1,0 +1,71 @@
+# Fixed B scope: stage the independent Watchdog bridge from an existing PC
+# Runner. This workflow NEVER invokes the maintainer handoff operator.
+name: ZGMINI Independent Watchdog Approved B Upgrade Once
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: zgmini-watchdog-b-one-at-a-time
+  cancel-in-progress: false
+jobs:
+  watchdog-b-approved-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.action == 'opened' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      (github.event.issue.title == 'pc-watchdog-b-upgrade' ||
+       github.event.issue.title == 'pc-watchdog-protected-drift-readonly' ||
+       github.event.issue.title == 'pc-watchdog-activation-first-fail-readonly' ||
+       github.event.issue.title == 'pc-watchdog-handoff-status-readonly') &&
+      contains(github.event.issue.labels.*.name, 'pc-maintenance') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: cmd
+    env:
+      GITHUB_EVENT_ACTION: ${{ github.event.action }}
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
+    steps:
+      - name: Pin exact control event commit including approval
+        id: checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          path: watchdog-b-control
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run exact allowed independent Watchdog B update (no process kill)
+        if: github.event.issue.title == 'pc-watchdog-b-upgrade'
+        id: apply
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\upgrade.mjs" > "%RUNNER_TEMP%\watchdog-b-apply.json"'
+      - name: Deliver create-only result JSON TXT and Issue comment
+        if: always() && steps.checkout.outcome == 'success' && github.event.issue.title == 'pc-watchdog-b-upgrade'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\report.mjs"'
+      - name: Read exactly which #1372 protected categories changed, no B write
+        if: github.event.issue.title == 'pc-watchdog-protected-drift-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\protected-drift-readonly.mjs"'
+      - name: Read consumed #1381 durable claim and Guardian identity only
+        if: github.event.issue.title == 'pc-watchdog-activation-first-fail-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\activation-first-fail-readonly.mjs"'
+      - name: Read only the exact existing maintenance handoff 1378 result
+        if: github.event.issue.title == 'pc-watchdog-handoff-status-readonly'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\watchdog-b-control\watchdog-b\handoff-firstfail-readonly.mjs"'

@@ -1,0 +1,37 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "16064e29fea0e53e7769a24d93d75b6f5292cfc0",
+  "targetSha": "c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "Existing 2026-11-03 ZGMINI standing approval, docs/PC_AUTOMATION_STANDARD.md section 5, for verified same-purpose maintainer policy handoff and subsequent error correction; user 2026-11-15 directed continuation after completed #996 C intake recovery. Exact source merged PR #1365 commit c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7; this is a narrow target-specific V2 approval candidate that must be reviewed/merged to main before operator use. It is not a new C consent, not authorization to replay #996, and not evidence of any PC handoff. Fresh current PC MAINTENANCE_INSTALL source SHA and seven installed runtime file byte hashes, authenticated receiver identity, no active install lease, startup origin and local main checkout must all match before write; otherwise fail closed.",
+  "files": {
+    "tools/maintenance-contract.mjs": "24145afe1695f8cde691a03a87df480af1ea695d4757eb34d00d6b6405d58f57",
+    "tools/maintenance-apply.mjs": "a1c14289ffb0c199181617706147f7d1971157f739dd7d840b1eb708bf4b6592",
+    "tools/maintenance-agent.mjs": "fd4aa486ebff95f5b52a6ad41220781132320aa15af74ea507309538bf31cfc5",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "758d3a5cedd71c782be4c97089a82b82342e9caa42d80fc786cb33a26ec5d952",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "command": "Exact merged PR #1365 head 8736033fafe3c9aec6740e89a009d3989dbcd88c and merge commit c2e6744b2765eb13bd50d8ca3a21a0b31b448dc7; GitHub Actions ZGMINI Controller Maintenance Source Tests Run 43620735807 and C996 R5 Readonly Source Checks Run 43620735670 both completed/success; source raw UTF-8 SHA-256 for 9 pinned files calculated from GitHub branch bytes, standard SHA256 vectors passed and unchanged 6 files cross-matched previously approved 16064e29 manifest.",
+    "passedWorkflows": 2,
+    "failedWorkflows": 0,
+    "platform": "GitHub source/CI only. Windows 7-to-7 handoff, PC installed source verification and new receiver origin NOT YET RUN."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing Controller install source badad9124157879d7a645b64f2768113d632355b, host.json, controller/config and active pc-job Workflow",
+    "Six zgmini-pc operating Runner seats; isolated spare Runner is not a seventh operating seat",
+    "All Core/Korea tasks and approved absence of Iran R13",
+    "SQLite, D1, supplier credentials, source input/checkpoints, public results",
+    "Existing E: ledgers, #996 archived C Claim/Lease/fixed reservation and recovery backups",
+    "All immutable maintenance request receipts and pending B job identities"
+  ],
+  "scopeNote": "Seven-to-seven same-purpose independent Windows maintenance receiver handoff only. The 9 pinned source paths comprise seven installed runtime files plus bootstrap/handoff operator helpers. Relative to #996 postread installed maintenance source 16064e29, only tools/maintenance-contract.mjs, tools/update.mjs and tools/handoff-maintenance.mjs change; existing other six source paths unchanged. Never install full repository source, accept incomplete GitHub Runner pagination, rewrite raw data, change Controller/DB/D1/Tasks/Workflow or execute from pc-job/Actions Runner. After exact source and consent/preservation controls, run the existing approved local Windows handoff operator once, recover authenticated receiver origin and exact source. Subsequent Controller B is a separate scope requiring its own manifest."
+}

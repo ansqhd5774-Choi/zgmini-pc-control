@@ -1,0 +1,7 @@
+schema=ZGMINI_PC_WATCHDOG_ACTIVATION_B_RESULT_V1
+requestId=pc-watchdog-activate-31390a2f-c503-4ff1-9858-a960bbc07a0d
+status=PASS
+code=WATCHDOG_GUARDIAN_NEW_RUNTIME_ATTESTED
+newProcessAttested=true
+watchdogFileWrites=0
+next=READ_EXISTING_HANDOFF_ISSUE_1378

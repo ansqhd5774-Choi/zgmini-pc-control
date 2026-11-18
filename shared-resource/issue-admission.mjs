@@ -28,6 +28,34 @@ export const APPROVAL_ROUTES=Object.freeze({
       'controlRepository','approvalManifestPath','approvalManifestSha256']),
   }),
 });
+// These exact titles are already authenticated and executed by the existing
+// pc-writer-b-source-once.yml, not by this shared generic Writer B intake.
+// A shared label alone is not a reason to mark these requests rejected.
+const DELEGATED_EXACT_TITLES=Object.freeze(new Set([
+  // The exact W04 DOL manual B workflow owns this request; a shared B label
+  // must not produce a contradictory generic rejection after it is accepted.
+  'pc-employment-r6-registered-data-once',
+  'r181-protected-route-install',
+  'r181-source-shape-readonly',
+  'r181-saved-ledger-readonly',
+  'w03-r179-stored-handoff-readonly',
+  'w03-r179-guard-shape-readonly',
+  'w03-gmh-seven-history-manual-once',
+  'w03-gmh-seven-private-score-once',
+  'w03-gmh-seven-public-compat-readonly',
+  'w03-gmh-seven-d1-seed-readonly',
+  'w03-gmh-seven-collection-time-readonly',
+  'w03-r179-readback-guard-install',
+  'r181-primary-route-install',
+  'r181-existing-task-run-once',
+  // Dedicated W03 R47/R48 private-only readback B handlers, not generic Writer B.
+  'w03-r47-private-readback-once',
+  'w03-r48-private-readback-once',
+  'w03-r51-stored-date-readback-once',
+  'w01-census-m3-api-once',
+  // Dedicated R47 CMD B receives this exact title via pc-approved-runtime-b-once.
+  'pc-r47-cmd-onefile-install',
+]));
 const stop=code=>{throw new Error('SHARED_ISSUE_ADMISSION_'+code);};
 const exactKeys=(o,keys)=>o&&typeof o==='object'&&!Array.isArray(o)&&
   Object.keys(o).length===keys.length&&keys.every(k=>Object.hasOwn(o,k));
@@ -43,6 +71,8 @@ function validRequest(route,req) {
 /** Exact body/title/label errors are explicit; no PC execution is implied. */
 export function inspectSharedIssueAdmission({title,labels,body}) {
   const labelNames=Array.isArray(labels)?labels.map(v=>typeof v==='string'?v:v?.name):[];
+  if(labelNames.includes('pc-writer-b-install')&&DELEGATED_EXACT_TITLES.has(title))
+    return Object.freeze({state:'UNMANAGED',code:'DEDICATED_EXACT_WORKFLOW_ROUTE'});
   const routes=Object.entries(APPROVAL_ROUTES).filter(([,r])=>labelNames.includes(r.label));
   if(routes.length===0){
     const named=Object.entries(APPROVAL_ROUTES).filter(([,r])=>title===r.title);

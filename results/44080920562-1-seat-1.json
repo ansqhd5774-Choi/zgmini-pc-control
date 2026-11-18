@@ -1,0 +1,227 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44080920562-1-seat-1",
+  "requestId": "pc-fec0f047-7654-4a13-9f22-a40619112611",
+  "startedAt": "2026-11-17T12:12:21.475Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "29b5e7296ee780a312a36c12ec3fe958a5c13ab3",
+  "sourceBranch": "main",
+  "operation": "inflation19-runtime-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "INFL19_RUNTIME_READONLY_EVIDENCE",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-aba4f5e6-4c4e-4fb6-9df3-0154f0ff2028",
+  "pcOperationalApprovedSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "INFL19_RUNTIME_READONLY_EVIDENCE",
+    "operationalReadiness": "NOT_ASSERTED",
+    "cycle": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-17T12:09:10.907Z",
+      "cycleStatus": "COMPLETE",
+      "cycleAt": "2026-11-17T12:09:10.903Z",
+      "collectionExit": 0,
+      "publicationExit": 0,
+      "status": "NO_VERIFIED_RELEASE_DUE",
+      "providerRequests": 0,
+      "byGroup": {
+        "bls8": {
+          "outcome": "SKIPPED"
+        },
+        "electricity": {
+          "outcome": "SKIPPED"
+        },
+        "sce": {
+          "outcome": "SKIPPED"
+        },
+        "gas": {
+          "outcome": "SKIPPED"
+        }
+      }
+    },
+    "checkpoint": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-17T00:05:35.725Z",
+      "byGroup": {
+        "bls8": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "electricity": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "sce": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "gas": {
+          "processedEvent": "2026-11-17",
+          "attemptedEvent": "2026-11-17",
+          "attemptedAt": "2026-11-17T00:05:34.778Z"
+        }
+      }
+    },
+    "writer": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-17T12:06:04.741Z",
+      "writerAt": "2026-11-17T12:00:49.604Z",
+      "writerStatus": "VERIFIED",
+      "status": "SKIPPED_METADATA_ONLY",
+      "inflationFailure": null,
+      "readyCount": 19,
+      "d1Writes": 0,
+      "sourceStoredAt": null,
+      "sourceVersion": null
+    },
+    "projection": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-16T22:46:50.752Z",
+      "stagingOnly": true,
+      "readyCount": 19,
+      "sourceStoredAt": 1794869108887,
+      "sourceVersion": "INFL19_PRESENTATION_a86523e341e9e7056d024ef5c9d2e13d3ad203a6ef9b130841e0950adaeaaa27",
+      "perId": [
+        {
+          "id": "1",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-04T21:25:06.490Z"
+        },
+        {
+          "id": "3",
+          "status": "READY",
+          "observationDate": "2026-11-11",
+          "sourceStoredAt": "2026-11-13T00:00:18.103Z"
+        },
+        {
+          "id": "4",
+          "status": "READY",
+          "observationDate": "2026-08",
+          "sourceStoredAt": "2026-11-04T06:25:37.684Z"
+        },
+        {
+          "id": "5",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "6",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "7",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "8",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "9",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "10",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "11",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "12",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-06T16:50:07.364Z"
+        },
+        {
+          "id": "13",
+          "status": "READY",
+          "observationDate": "2026-07-01",
+          "sourceStoredAt": "2026-10-30T13:30:04.561Z"
+        },
+        {
+          "id": "14",
+          "status": "READY",
+          "observationDate": "2026-07-01",
+          "sourceStoredAt": "2026-11-05T17:50:37.578Z"
+        },
+        {
+          "id": "18",
+          "status": "READY",
+          "observationDate": "2026-11-13",
+          "sourceStoredAt": "2026-11-16T22:45:08.887Z"
+        },
+        {
+          "id": "19",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-10-16T13:20:04.842Z"
+        },
+        {
+          "id": "21",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-16T10:22:54.804Z"
+        },
+        {
+          "id": "25",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "26",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-16T10:22:53.978Z"
+        },
+        {
+          "id": "31",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T04:41:52.103Z"
+        }
+      ]
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "protectedAfterSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "actualExecutionSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-17T12:12:31.554Z",
+  "durationMs": 10079
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "3cf95b1865382cf7f73708a344c81db98ae4c03f",
+  "baseHead": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+  "baseConfigSourceSha": "e94e7f677147dbd11e3d8bb17012ade91c41a02d",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-calendar-usda-nass.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "065ab1d052c4a75e9a851a6dcc69cdf527ef12c8f603ecd9a194324a2d88a133"
+    },
+    {
+      "path": "lib/release-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "a69164fd804642c64b82da3a31556f4209130861428853023ab096b7a3517298",
+      "afterSha256": "cdf3f09ace70b42f799f4e39dbb8bd2315acb0dda82438e5fac18aa7977023b9"
+    },
+    {
+      "path": "scripts/pc-writer/release-calendar.mjs",
+      "change": "M",
+      "beforeSha256": "383dbf3e66b2291be30c8dc3d96e91030e827e64bea5bed9fc74b758d0cbd4b2",
+      "afterSha256": "4d618a1e8158f405def228c3c28fbb288bd0e4533c991595c937b91ad71b89de",
+      "candidateSha256": "d3c0163371585af81218baeac551dbcc6f11507830ed61d7302bead61cc2db65",
+      "insertions": [
+        {
+          "anchor": "import {USDA_WASDE_URL,parseUsdaWasdeHtml} from '../../lib/usda-calendar.mjs';",
+          "position": "after",
+          "text": "import {collectNassReportSchedule} from '../../lib/market-calendar-usda-nass.mjs';\n"
+        },
+        {
+          "anchor": "    if(source==='cftc'){",
+          "position": "before",
+          "text": "    if(source==='usda_nass'){\n     const nass=await collectNassReportSchedule({store,key,now,fetchImpl,\n      countRequest:()=>requests++,previous});\n     sources.usda_nass=nass.state;\n     events.push(...nass.events);\n     continue;\n    }\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}

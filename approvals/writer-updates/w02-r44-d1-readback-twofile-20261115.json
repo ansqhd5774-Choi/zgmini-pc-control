@@ -1,0 +1,90 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "a2cdfe53811d32ca35d6e4189cbea7d82e6760d6",
+  "baseHead": "d8f280644649a2a7830d6a09a7217f0f5df92760",
+  "baseConfigSourceSha": "d8f280644649a2a7830d6a09a7217f0f5df92760",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/market-calendar-r44-d1-readback.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4f751d66b61c7e82c2da9ea9be3d9195cf922c98de7e444aa2ad199d92841b8d"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "a58ff9e7383319a91f0ce321f07a2beadda554921b79b8a066eca80e9917200f",
+      "afterSha256": "23a7f5b6ec56c08a9fef21b10976e45e6e8d939912429d9839381d819f0d5f91",
+      "candidateSha256": "299053ededc6f910cd74222debe09ddbc2603e91f51f25455bb7f3080712bbbe",
+      "insertions": [
+        {
+          "anchor": "import {appendD1Diagnostic} from './d1-diagnostics.mjs';",
+          "position": "after",
+          "text": "import {r44D1Readback} from './market-calendar-r44-d1-readback.mjs';\n"
+        },
+        {
+          "anchor": "  const er1FeedReadbacks=[];",
+          "position": "after",
+          "text": "  const r44FeedReadbacks=[];\n  const recordR44Readback=(row,d1Row)=>{\n   const evidence=r44D1Readback(row,d1Row);\n   if(evidence)r44FeedReadbacks.push(evidence);\n  };\n"
+        },
+        {
+          "anchor": "    assertER1ReadbackConsistent(recordER1Readback(row,existing));return;",
+          "position": "before",
+          "text": "    recordR44Readback(row,existing);\n"
+        },
+        {
+          "anchor": "    recordER1Readback(row,existing);return;",
+          "position": "before",
+          "text": "    recordR44Readback(row,existing);\n"
+        },
+        {
+          "anchor": "   recordER1Readback(row,check);",
+          "position": "after",
+          "text": "   recordR44Readback(row,check);\n"
+        },
+        {
+          "anchor": "  // Independent, bounded publication lane for PC-archived real CNN scores.",
+          "position": "before",
+          "text": "  report.deltaR44D1=r44FeedReadbacks[0]??{status:'R44_OUTPUT_NOT_SEEN'};\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-wsh-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      },
+      {
+        "id": "core-wsh-inner-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}

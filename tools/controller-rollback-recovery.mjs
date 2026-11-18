@@ -6,6 +6,21 @@ const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const digest=b=>createHash('sha256').update(b).digest('hex'),read=p=>JSON.parse(fs.readFileSync(p));
 const need=(b,c)=>{if(!b)throw Object.assign(Error(c),{code:c});};
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
+export function retainRollbackClaim(result,archived){
+ return result?.mutationStarted===true&&!(archived===true&&result.status==='ROLLED_BACK'&&result.leaseArchived===true);
+}
+export function validateStalledClaim({requestId,approval,claimBytes,recordBytes,backlogBytes,ownerAlive}){
+ const spec=approval.resumeClaim,owner=JSON.parse(claimBytes),prior=JSON.parse(recordBytes);
+ need(spec&&spec.ownerSha256===digest(claimBytes)&&spec.recordSha256===digest(recordBytes)&&
+  spec.backlogSha256===digest(backlogBytes),'ROLLBACK_STALLED_CLAIM_HASH_MISMATCH');
+ need(owner.requestId===requestId&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+  /^[a-f0-9-]{36}$/.test(owner.nonce??'')&&ownerAlive===false,'ROLLBACK_STALLED_OWNER_UNVERIFIED');
+ need(prior.requestId===requestId&&prior.schema==='ZGMINI_PC_ROLLBACK_RECONCILIATION_V1'&&
+  prior.status==='RECOVERY_REQUIRED'&&prior.originalPhase==='SWITCHED'&&
+  prior.code==='ROLLBACK_SUPERVISOR_SOURCE_UNKNOWN'&&prior.failureOperation==='restore'&&
+  prior.actualInstalledSha===null,'ROLLBACK_STALLED_PHASE_UNSUPPORTED');
+ return true;
+}
 export async function main(args=process.argv.slice(2)){
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'ROLLBACK_OPERATOR_WINDOWS_REQUIRED');
  need(args.length===4&&args[0]==='--request-id'&&/^pc-[a-z0-9-]{8,76}$/.test(args[1])&&args[2]==='--source-sha'&&/^[a-f0-9]{40}$/.test(args[3]),'ROLLBACK_USAGE');
@@ -29,12 +44,41 @@ export async function main(args=process.argv.slice(2)){
  need(ledger.requestId===id&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce&&alive(owner.pid)===false,'ROLLBACK_OWNER_NOT_PROVEN_DEAD');
  const data=loadApprovedPackage(id,path.join(root,'approved',id+'.json'),{recovery:true});
  need(data.manifest.installedSha===ledger.installedShaBefore&&data.manifest.targetSha===ledger.targetSha,'ROLLBACK_ORIGINAL_TARGET_MISMATCH');
- const claim=path.join(root,'leases/controller-recovery');fs.mkdirSync(claim);
+ const claim=path.join(root,'leases/controller-recovery');
+ if(fs.existsSync(claim)){
+  const spec=approval.resumeClaim;
+  need(spec&&typeof spec.recordName==='string'&&
+   spec.recordName.startsWith(id+'-rollback-')&&/^[a-z0-9-]+\.json$/.test(spec.recordName),
+   'ROLLBACK_STALLED_APPROVAL_REQUIRED');
+  const claimBytes=fs.readFileSync(path.join(claim,'owner.json')),
+   recordBytes=fs.readFileSync(path.join(root,'recovery',spec.recordName)),
+   backlogBytes=fs.readFileSync(path.join(root,'backlog',id+'.json'));
+  const priorOwner=JSON.parse(claimBytes);
+  validateStalledClaim({requestId:id,approval,claimBytes,recordBytes,backlogBytes,ownerAlive:alive(priorOwner.pid)});
+  // This is a separately approved continuation after a guard stopped before
+  // restore. Prove original live snapshot, disabled intake and protection first.
+  const {ports}=makePorts(data,data.issueNumber,{recoveryOperator:true});
+  await ports.prepareRecovery();
+  need(await ports.verifyRestoredPrevious(ledger.installedShaBefore)===true,'ROLLBACK_STALLED_SNAPSHOT_UNVERIFIED');
+  const reservation=path.join(root,'leases/controller-recovery-reentry');fs.mkdirSync(reservation);
+  try{
+   need(fs.readFileSync(path.join(claim,'owner.json')).equals(claimBytes)&&
+    fs.readFileSync(path.join(root,'recovery',spec.recordName)).equals(recordBytes)&&
+    fs.readFileSync(path.join(root,'backlog',id+'.json')).equals(backlogBytes)&&
+    fs.readFileSync(ledgerFile).equals(ledgerBytes)&&alive(priorOwner.pid)===false,
+    'ROLLBACK_STALLED_EVIDENCE_CHANGED');
+   const destination=path.resolve(root,'recovery',id+'-dead-recovery-claim-'+randomUUID()+'.lease');
+   need(destination.startsWith(path.resolve(root,'recovery')+path.sep)&&
+    fs.lstatSync(claim).isDirectory()&&!fs.lstatSync(claim).isSymbolicLink(),'ROLLBACK_STALLED_PATH_INVALID');
+   fs.renameSync(claim,destination);
+   fs.mkdirSync(claim); // A new atomic owner; retain the old complete claim.
+  }finally{fs.rmdirSync(reservation);}
+ }else fs.mkdirSync(claim);
  const claimFile=path.join(claim,'owner.json'),nonce=randomUUID();
  fs.writeFileSync(claimFile,JSON.stringify({pid:process.pid,nonce,requestId:id}),{flag:'wx'});
  const reports=path.join(root,'recovery');fs.mkdirSync(reports,{recursive:true});
  const record=path.join(reports,id+'-rollback-'+nonce+'.json');let keep=false,archived=false;
- const persist=async r=>{if(r.mutationStarted)keep=true;const temp=record+'.tmp';fs.writeFileSync(temp,JSON.stringify(r,null,2)+'\n',{flag:'wx'});fs.renameSync(temp,record);};
+ const persist=async r=>{if(r.mutationStarted)keep=retainRollbackClaim(r,archived);const temp=record+'.tmp';fs.writeFileSync(temp,JSON.stringify(r,null,2)+'\n',{flag:'wx'});fs.renameSync(temp,record);};
  try{
   need(fs.readFileSync(path.join(dir,'owner.json')).equals(ownerBytes)&&fs.readFileSync(ledgerFile).equals(ledgerBytes)&&alive(owner.pid)===false,'ROLLBACK_EVIDENCE_CHANGED');
   const {ports}=makePorts(data,data.issueNumber,{recoveryOperator:true});

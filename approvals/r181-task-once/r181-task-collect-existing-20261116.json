@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_R181_TASK_ONCE_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "W03_R181_EXISTING_TASK_RUN_ONCE",
+  "operation": "r181-existing-task-run-once",
+  "controlSourceSha": "81d55f4c76b8afec353eeb24c83b59993062b735",
+  "taskName": "ZGMINI-PC-GetMarketHistory-ETF",
+  "actionSha256": "4bdbfeaa9dff719ba6e8c48a4b0c94c8deef70e3b8e849de73c4a73fd18965fe",
+  "helperAfterSha256": "1779d0141bb8ef7eaeb6ccfa3fc6616ad6baa83f3a81f9e59089ac2761e0d171",
+  "cycleSha256": "be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62",
+  "maxLaunches": 1,
+  "allowProviderCalls": true,
+  "allowSqliteWrites": true,
+  "allowD1Writes": false,
+  "allowTaskRegistrationChanges": false,
+  "allowScheduleChanges": false,
+  "allowOtherOperations": false
+}

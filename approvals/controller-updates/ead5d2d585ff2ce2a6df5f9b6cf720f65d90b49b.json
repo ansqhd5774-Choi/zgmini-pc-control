@@ -1,0 +1,53 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "targetSha": "ead5d2d585ff2ce2a6df5f9b6cf720f65d90b49b",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "1129de6324a0a80b9840b22626c0c2025f0e9e37158ca08990fb54ceb6a52176"
+    },
+    {
+      "path": "controller/employment-r6-candidate-readonly.mjs",
+      "sha256": "8ba98ec0e90349a66783e64352a0046a560386035fa359595f29ceae14e5aac8"
+    },
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "377318c0d57e23d3763bbbad295280fb408ef16f43d0f4f08afca82c30121f8f"
+    },
+    {
+      "path": "controller/inflation-a401-private23-readonly.mjs",
+      "sha256": "db62b0799731d48a9f04e0c8510c6fa273f70e2b07c2eda5411cc636743d27aa"
+    },
+    {
+      "path": "controller/inflation-a407-integrity-readonly.mjs",
+      "sha256": "8d038527098d7527ee09575af11f53e81524476da85400eb46be5bf896bac88e"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "208bbdb89b18a02860825c4aab46d310ae33b31f527be4d7f810629bd9219d14"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2078",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "ead5d2d585ff2ce2a6df5f9b6cf720f65d90b49b",
+    "status": "PASS",
+    "manifestSha256": "5eac97ce0fc4bf290d152b948502da0dc09446342dbf22bafd09fb0564925608"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "f7f1559bc0ef15bb9b375982d048369c474c490f"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "b8d3c665e32de4721e174cd23bd6c25d739cf1e9"
+}
