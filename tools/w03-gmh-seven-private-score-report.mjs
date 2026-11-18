@@ -13,7 +13,9 @@ const need=(v,code)=>{if(!v)fail(code);};
 const base=(req,env)=>({schema:OUTPUT,status:'STATE_UNKNOWN',
  code:'W03_GMH_SCORE_RESULT_UNVERIFIED',requestId:req.requestId,
  runId:RUN.test(env.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
- sourceCommit:req.candidateSourceSha,providerCalls:0,d1Writes:0,
+ sourceCommit:req.candidateSourceSha,
+ requestedControlSha:req.controlSourceSha,executedControlSha:env.GITHUB_SHA,
+ providerCalls:0,d1Writes:0,
  publicWrites:0,taskChanges:0,rawBarExposure:false,
  retry:'NO_AUTOMATIC_REEXECUTION',
  observationDate:null,commonSessionCount:null,historyPoints:null,
@@ -22,7 +24,8 @@ const base=(req,env)=>({schema:OUTPUT,status:'STATE_UNKNOWN',
 export function sanitize(raw,req,env){
  const a=base(req,env);
  if(raw?.schema!==OUTPUT||raw.requestId!==req.requestId||
-  raw.controlSha!==req.controlSourceSha||
+  raw.controlSha!==env.GITHUB_SHA||
+  raw.requestedControlSha!==req.controlSourceSha||
   !SHA40.test(raw.controlSha??'')||
   raw.sourceCommit!==req.candidateSourceSha||
   raw.providerCalls!==0||raw.d1Writes!==0||
@@ -91,6 +94,8 @@ export async function report({event,env,raw,fetchApi=fetch}){
   'VERIFIED_RAW_PAGES='+(result.rawPagesVerified??'UNKNOWN'),
   'PRIVATE_LOCAL_SAVED='+(result.localSaved??'UNKNOWN'),
   'PRIVATE_OUTPUT_SHA256='+(result.privateArtifactSha256??'UNKNOWN'),
+  'REQUESTED_CONTROL_SHA='+result.requestedControlSha,
+  'EXECUTED_CONTROL_SHA='+result.executedControlSha,
   'PROVIDER_CALLS=0','D1_WRITES=0','PUBLIC_WRITES=0',
   'RAW_BAR_EXPOSURE=false','RETRY=NO_AUTOMATIC_REEXECUTION',''].join('\n');
  let created=0,verified=0;
