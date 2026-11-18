@@ -101,6 +101,22 @@ export function classifyBacklogOriginal(text){
 }
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// GitHub workflow disable/enable states can be eventually consistent.
+// A bounded, read-only observation never substitutes for an exact state
+// confirmation; unknown states and exhausted readbacks remain fail-closed.
+export async function confirmExactWorkflowState(readState,expected,{pause=wait}={}){
+ need(typeof readState==='function'&&
+  (expected==='active'||expected==='disabled_manually')&&
+  typeof pause==='function','WORKFLOW_STATE_PROBE_INVALID');
+ for(let attempt=0;attempt<6;attempt++){
+  let state;
+  try{state=await readState();}catch{/* No evidence: retry only a GET. */}
+  if(state===expected)return true;
+  if(state!==undefined&&state!=='active'&&state!=='disabled_manually')return false;
+  if(attempt<5)await pause(1000);
+ }
+ return false;
+}
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const writeJson=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);};
 const git=(args,options={})=>execFileSync('git',args,{cwd:checkout,encoding:Object.hasOwn(options,'encoding')?options.encoding:'utf8',windowsHide:true,timeout:120000,maxBuffer:8e6});
@@ -1276,7 +1292,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId:request.requestId,
      pausedAt:at,resumedAt:null,replays:{},windows:[{pausedAt:at,resumedAt:null}]});
    github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
-   need(github('actions/workflows/pc-job.yml').state==='disabled_manually','WORKFLOW_DISABLE_NOT_CONFIRMED');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'disabled_manually'),'WORKFLOW_DISABLE_NOT_CONFIRMED');
   },
   didPauseIntake:()=>pausedByUs,
   waitForDrain:async()=>{
@@ -1288,7 +1305,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     need(seats!==null,'RUNNER_SET_DRIFT');
     const busy=seats.some(x=>x.busy),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
     const pending=['in_progress','queued','waiting'].map(status=>github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0).reduce((a,b)=>a+b,0);
-    if(!busy&&!leases.length&&!pending){quiet++;if(quiet>=2)return;}else quiet=0;
+    if(!busy&&!leases.length&&!pending){
+     quiet++;
+     if(quiet>=2){
+      // Verify GitHub intake is still paused before backup and supervisor stop.
+      // A drift discovered here remains before those runtime-mutation steps.
+      need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+       'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN');
+      return;
+     }
+    }else quiet=0;
     await wait(3000);
    }
    throw Object.assign(Error('DRAIN_WAIT_TIMEOUT'),{code:'DRAIN_WAIT_TIMEOUT'});
@@ -1333,7 +1359,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   resumeIntake:async()=>{
    need(installedManifest().installedSha===manifest.targetSha||installedManifest().installedSha===manifest.installedSha,'INTAKE_SHA_UNKNOWN');
    github('actions/workflows/pc-job.yml/enable','PUT');pausedByUs=false;
-   need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_ENABLE_NOT_CONFIRMED');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'active'),'WORKFLOW_ENABLE_NOT_CONFIRMED');
    if(fs.existsSync(backlogFile)){
      const backlog=json(backlogFile);
      writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));

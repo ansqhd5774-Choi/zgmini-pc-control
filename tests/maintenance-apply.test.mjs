@@ -4,7 +4,7 @@ import './maintenance-backlog-request.test.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
-import {readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
+import {confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
 import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
 
@@ -477,4 +477,48 @@ test('successful replay requires Online runners but does not wait for newly disp
  const r=await f.run();assert.equal(r.status,'ROLLED_BACK');
  assert.equal(options.length,2);assert.notEqual(options[0].requireIdle,false);
  assert.equal(options[1].requireIdle,false);assert.equal(options[1].requireRunning,true);
+});
+
+test('maintenance workflow readback accepts only eventual exact disabled state',async()=>{
+ const states=['active','active','disabled_manually'];const pauses=[];
+ const ok=await confirmExactWorkflowState(()=>states.shift(),'disabled_manually',
+  {pause:async ms=>pauses.push(ms)});
+ assert.equal(ok,true);assert.deepEqual(pauses,[1000,1000]);
+});
+test('maintenance workflow readback never infers disable from persistent active or missing state',async()=>{
+ let calls=0;const pauses=[];
+ const ok=await confirmExactWorkflowState(()=>{calls++;return 'active';},'disabled_manually',
+  {pause:async ms=>pauses.push(ms)});
+ assert.equal(ok,false);assert.equal(calls,6);assert.deepEqual(pauses,[1000,1000,1000,1000,1000]);
+ assert.equal(await confirmExactWorkflowState(()=>undefined,'disabled_manually',{pause:async()=>{}}),false);
+});
+test('maintenance workflow readback rejects unexpected state and does not toggle the workflow',async()=>{
+ let calls=0;const pauses=[];
+ assert.equal(await confirmExactWorkflowState(()=>{calls++;return 'disabled_inactivity';},'disabled_manually',
+  {pause:async ms=>pauses.push(ms)}),false);
+ assert.equal(calls,1);assert.deepEqual(pauses,[]);
+});
+test('maintenance workflow readback retries uncertain GET only, including enable verification',async()=>{
+ let calls=0;const pauses=[];
+ const ok=await confirmExactWorkflowState(()=>{
+  if(++calls===1)throw Error('private API error');
+  return 'active';
+ },'active',{pause:async ms=>pauses.push(ms)});
+ assert.equal(ok,true);assert.equal(calls,2);assert.deepEqual(pauses,[1000]);
+ await assert.rejects(confirmExactWorkflowState(()=> 'active','unknown',{pause:async()=>{}}),
+  {code:'WORKFLOW_STATE_PROBE_INVALID'});
+});
+
+test('workflow drift while draining aborts before backup or stopping Supervisor',async()=>{
+ const f=fixture({waitForDrain:async()=>{f.events.push('drain');
+  throw Object.assign(Error('intake unexpectedly active'),{code:'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN'});
+ }});
+ const r=await applyApprovedUpdate(request,f.port);
+ assert.equal(r.code,'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN');
+ assert.equal(r.firstFail,'INTAKE_PAUSED');
+ assert.equal(r.failureOperation,'waitForDrain');
+ assert.equal(f.events.includes('backup'),false);
+ assert.equal(f.events.includes('stop'),false);
+ assert.equal(f.events.includes('restore'),false);
+ assert.equal(f.installed,previous);
 });
