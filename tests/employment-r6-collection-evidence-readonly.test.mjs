@@ -223,6 +223,7 @@ test('missing one state in 577 weeks rejects ten-year raw coverage',t=>{
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'REGION_51_COVERAGE_GAP');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+ assert.deepEqual(r.stateClaims.fullTenYearRawCoverage.missingRegionCodes,['WY']);
 });
 
 test('a whole missing calendar week rejects apparent 577-week count',t=>{
@@ -232,6 +233,39 @@ test('a whole missing calendar week rejects apparent 577-week count',t=>{
  const r=inspectEmploymentR6CollectionEvidence(data);
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'NONCONSECUTIVE_10Y_WEEKS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2016-03-05');
+});
+
+
+test('576 stored weeks identify the first absent calendar week exactly',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("DELETE FROM market_score_employment_r4_shadow_current_v1 WHERE observation_date='2016-03-05'").run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const raw=r.stateClaims.fullTenYearRawCoverage;
+ assert.equal(r.status,'PASS');
+ assert.equal(raw.observedRawWeeks,576);
+ assert.equal(raw.status,'INSUFFICIENT_RAW_WEEKS');
+ assert.equal(raw.firstFailureWeek,'2016-03-05');
+ assert.equal(raw.missingRegionCodes,undefined);
+ assert.equal(r.operationalWrites,0);
+});
+
+test('unknown ZZ geography cannot cover a missing approved WY jurisdiction',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET geography_code='ZZ' WHERE geography_code='WY' AND observation_date='2026-10-31'").run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const raw=r.stateClaims.fullTenYearRawCoverage;
+ assert.equal(r.status,'PASS');
+ assert.equal(raw.status,'REGION_51_COVERAGE_GAP');
+ assert.equal(raw.firstFailureWeek,'2026-10-31');
+ assert.deepEqual(raw.missingRegionCodes,['WY']);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY|TOKEN_SECRET/i);
+ assert.equal(r.providerCalls,0);
+ assert.equal(r.operationalWrites,0);
 });
 
 test('577 weeks with one zero prior-state 4w base are still not score-ready',t=>{
