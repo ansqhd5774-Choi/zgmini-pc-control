@@ -43,7 +43,7 @@
 | 고정 GitHub label | self-hosted, Windows, X64, zgmini-pc-control | self-hosted, Windows, X64, zgmini-handoff-ci-isolated |
 | 전용 Runner | zgmini-pc-01 ~ zgmini-pc-06 (6좌석 구성) | zgmini-handoff-ci-spare-01 (1좌석 확인) |
 | 대표 실행 검증 | #1249 zgmini-pc-03, #1255 zgmini-pc-02 | #1245/#1254 zgmini-handoff-ci-spare-01 |
-| 업무 경계 | 고정 Controller A급 진단, 승인된 독립 Writer/유지보수기 B급, 로컬 기능 실행 | 검증된 원본 GitHub Issue/Run/JSON/TXT 읽기·사건 분류·중복 제거·제한된 GitHub 기록 및 격리 테스트 |
+| 업무 경계 | 고정 Controller A급 진단, 승인된 독립 Writer/유지보수기 B급, 로컬 기능 실행 | **고정 자동 Runner:** 원본 GitHub Issue/Run/JSON/TXT 검증·사건 분류·인계·허용된 격리 CI. **별도 개발 환경:** 전문 담당자의 승인된 문제 해결·모의시험. 운영 PC 변경 불가 |
 | 기본 명령 실행 | 운영 설치 Node를 사용하는 기존 고정 Controller entry | checkout + pinned setup-node 22 + GitHub 전용 모듈 |
 | 운영 데이터·DB·파일 갱신 | 별도 실제 업무 승인 및 보호 계약이 있을 때만 | 장애 인계/격리 CI 워크플로에서는 금지 |
 | C급 시스템·보안·관리자 변경 | 사용자 직접 수행; 사전 계약·승인 필요 | 같은 제한, 자동 권한 없음 |
