@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- R47_CMD_B,R47_CMD_B_CALENDAR_SAFE,validateR47CmdBManifest,verifyR47CmdBPreimage,
+ R47_CMD_B,R47_CMD_B_CALENDAR_SAFE,R47_CMD_B_TRANSIENT_SAFE,
+ R47_CMD_B_UTC_BOUNDARY_SAFE,validateR47CmdBManifest,verifyR47CmdBPreimage,
  verifyR47CmdBCandidate,verifyR47CmdBPaused,applyR47CmdBCas
 } from '../task-cmd-b/r47-onefile-cas.mjs';
 
@@ -177,4 +178,43 @@ test('transient-recovery upgrade accepts only exact current preimage and reviewe
    {...m,afterSha256:R47_CMD_B_CALENDAR_SAFE.afterSha256}]){
   assert.throws(()=>validateR47CmdBManifest(mutant),{code:'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
  }
+});
+
+
+test('UTC scorer fix B is one exact source/preimage/after SHA transition only',()=>{
+ const pin=R47_CMD_B_UTC_BOUNDARY_SAFE;
+ const m={...manifest(),sourceSha:pin.sourceSha,
+  beforeSha256:pin.beforeSha256,afterSha256:pin.afterSha256};
+ assert.equal(pin.beforeSha256,R47_CMD_B_TRANSIENT_SAFE.afterSha256);
+ assert.equal(validateR47CmdBManifest(m),m);
+ assert.equal(verifyR47CmdBPreimage(m,preimage(m)),true);
+ assert.equal(verifyR47CmdBPaused(m,{...preimage(m),
+  taskEnabled:false,taskDefinitionExceptEnabledMatchesOriginal:true}),true);
+ for(const changed of [
+  {sourceSha:R47_CMD_B_TRANSIENT_SAFE.sourceSha},
+  {beforeSha256:R47_CMD_B_TRANSIENT_SAFE.beforeSha256},
+  {afterSha256:R47_CMD_B_TRANSIENT_SAFE.afterSha256},
+  {taskXmlSha256:'0'.repeat(64)},
+  {targetPath:String.raw`E:\\ZGmini\\data\\other.cmd`},
+  {runCount:2},
+ ]){
+  assert.throws(()=>validateR47CmdBManifest({...m,...changed}),
+   {code:'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
+ }
+ for(const key of ['allowProviderCalls','allowSqliteWrites','allowD1Writes',
+  'allowTaskChanges','allowOtherFileWrites']){
+  assert.throws(()=>validateR47CmdBManifest({...m,[key]:true}),
+   {code:'TASK_CMD_B_SIDE_EFFECT_STOP'});
+ }
+ assert.throws(()=>verifyR47CmdBPreimage(m,{
+  ...preimage(m),installedSha256:R47_CMD_B_TRANSIENT_SAFE.beforeSha256
+ }),{code:'TASK_CMD_B_PREIMAGE_STOP'});
+ // Old triples retain their explicit source/after pairing.
+ const previous={...manifest(),
+  sourceSha:R47_CMD_B_TRANSIENT_SAFE.sourceSha,
+  beforeSha256:R47_CMD_B_TRANSIENT_SAFE.beforeSha256,
+  afterSha256:R47_CMD_B_TRANSIENT_SAFE.afterSha256};
+ assert.equal(validateR47CmdBManifest(previous),previous);
+ assert.throws(()=>validateR47CmdBManifest({...previous,
+  afterSha256:pin.afterSha256}),{code:'TASK_CMD_B_MANIFEST_SCOPE_STOP'});
 });
