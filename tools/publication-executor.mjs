@@ -5,6 +5,7 @@ import path from 'node:path';
 import {spawn,execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {admitPublication} from './publication-preflight.mjs';
+import {parseBeaMfgResult} from './publication-bea-mfg-result.mjs';
 import {CONTROL_REPOSITORY,sha256,validateSourceCheckpoints,
   validatePublisherFileDigests,validatePublicationReadback,
   classifyPublicationLedger} from './publication-contract.mjs';
@@ -330,11 +331,13 @@ async function execute(){
     fs.writeFileSync(ledgerPath,JSON.stringify(phase,null,2)+'\n',{flag:'wx'});
     const logDirectory=resultDirectoryFor(request.requestId);
     const bea=request.operation==='bea-unit-profit-once';
-    // Both publishers now write to the B request's bounded evidence directory.
+    const mfg=request.operation==='bea-manufacturing-profit-once';
+    // The fixed BEA manufacturing publisher returns bounded JSON stdout;
+    // the existing BEA Unit/QFR publishers retain their TXT evidence files.
     const outputDir=logDirectory;
     const prefix=bea?'EARNINGS_BEA_UNIT_PROFIT_R1_RESULT_':
       'EARNINGS_CENSUS_QFR_R4_D1_RESULT_';
-    const preflightLogBefore=new Set(fs.readdirSync(outputDir)
+    const preflightLogBefore=mfg?null:new Set(fs.readdirSync(outputDir)
       .filter(file=>file.startsWith(prefix)&&file.endsWith('.txt')));
     const childEnv={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
       PATH:process.env.PATH,TEMP:process.env.RUNNER_TEMP, TMP:process.env.RUNNER_TEMP,
@@ -344,29 +347,36 @@ async function execute(){
       ZGMINI_EARNINGS_C_LOG_DIR:logDirectory,
       ...(bea?{ZGMINI_EARNINGS_BEA_UNIT_SOURCE_SHA:invocation.sourceSha256}:{})};
     const script=path.join(publisherRoot,...invocation.script.split('/'));
-    const preflight=await runFixedChild(script,['--dry-run'],childEnv,PREFLIGHT_TIMEOUT_MS);
+    const preflight=await runFixedChild(script,mfg?
+      ['--source-sha',invocation.sourceSha256,'--dry-run']:
+      ['--dry-run'],childEnv,PREFLIGHT_TIMEOUT_MS);
     if(preflight.exitCode!==0||preflight.timedOut||preflight.truncated)
       throw Error('PUBLICATION_PREFLIGHT_FAILED');
-    const preflightEvidence=readNewResult(outputDir,prefix,preflightLogBefore);
-    const qfrPin=bea?null:validateQfrStoredPreflight(preflightEvidence,invocation.snapshotKey);
+    const preflightEvidence=mfg?preflight.output:
+      readNewResult(outputDir,prefix,preflightLogBefore);
+    const mfgPin=mfg?parseBeaMfgResult(preflightEvidence,{phase:'PREFLIGHT',
+      expectedSha:invocation.sourceSha256}):null;
+    const qfrPin=bea||mfg?null:validateQfrStoredPreflight(preflightEvidence,invocation.snapshotKey);
     if(bea)validateBeaStoredPreflight(preflightEvidence,invocation.sourceSha256);
     // Both pinned publishers use second-resolution, exclusive result filenames.
     // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
     const fenceAt=Date.now();
     await new Promise(resolve=>setTimeout(resolve,millisecondsToNextUtcSecond(fenceAt)));
     phase=nextLedgerPhase(phase,'PREFLIGHT_PASS');writeAtomic(ledgerPath,phase);
-    const before=new Set(fs.readdirSync(outputDir)
+    const before=mfg?null:new Set(fs.readdirSync(outputDir)
       .filter(f=>f.startsWith(prefix)&&f.endsWith('.txt')));
     phase=nextLedgerPhase(phase,'APPLY_START');writeAtomic(ledgerPath,phase);
     // The B executor alone derives these pins from its verified, unique preflight file.
     // User Issue fields cannot inject or override publisher environment checkpoints.
-    const applyEnv=bea?childEnv:{...childEnv,
+    const applyEnv=bea||mfg?childEnv:{...childEnv,
       ZGMINI_EARNINGS_QFR_SOURCE_VERSION:qfrPin.sourceVersion,
       ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin.rawZipSha256,
       ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String(qfrPin.sourceStoredAt)};
-    const applied=await runFixedChild(script,[...invocation.flags],applyEnv,APPLY_TIMEOUT_MS);
+    const applied=await runFixedChild(script,mfg?
+      ['--source-sha',invocation.sourceSha256,...invocation.flags]:
+      [...invocation.flags],applyEnv,APPLY_TIMEOUT_MS);
     if(applied.exitCode!==0||applied.timedOut||applied.truncated){
-      if(!bea&&applied.exitCode===1&&!applied.timedOut&&!applied.truncated){
+      if(!bea&&!mfg&&applied.exitCode===1&&!applied.timedOut&&!applied.truncated){
         validateQfrPinnedNoWrite(readNewResult(outputDir,prefix,before),
           qfrPin,invocation.snapshotKey);
         noWriteVerified=true;
@@ -374,11 +384,13 @@ async function execute(){
       }
       throw Error('PUBLICATION_APPLY_RESULT_UNKNOWN');
     }
-    const evidence=parsePublisherLog(readNewResult(outputDir,prefix,before),
+    const evidence=mfg?parseBeaMfgResult(applied.output,{phase:'APPLY',
+      expectedSha:invocation.sourceSha256,expectedKey:invocation.snapshotKey,
+      preflight:mfgPin}):parsePublisherLog(readNewResult(outputDir,prefix,before),
       request.operation,invocation.snapshotKey);
-    if(bea&&evidence.sourceVersion!==invocation.sourceSha256)
+    if((bea||mfg)&&evidence.sourceVersion!==invocation.sourceSha256)
       throw Error('PUBLICATION_BEA_APPLY_SOURCE_MISMATCH');
-    if(!bea)validateQfrApplySource(qfrPin,evidence);
+    if(!bea&&!mfg)validateQfrApplySource(qfrPin,evidence);
     // QFR must forward the actual parsed key, not manufacture the expected key.
     validatePublicationReadback(validated,{
       ...evidence,...(bea?{key:invocation.snapshotKey}:{})});
