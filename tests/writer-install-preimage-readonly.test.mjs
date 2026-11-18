@@ -83,6 +83,26 @@ test('wrong checkout and absent task source never become verified',()=>{
  }finally{f.finish();}
 });
 
+test('fail-closed checkout reason separates missing, Git, and mismatched fixed source',()=>{
+ const f=fixture();try{
+  for(const [change,expected] of [
+   [{historicalCheckoutCandidate:undefined},'HISTORICAL_CHECKOUT_NOT_DISCOVERED'],
+   [{historicalCheckoutCandidate:{...f.trace().historicalCheckoutCandidate,gitVerified:false}},'HISTORICAL_GIT_UNVERIFIED'],
+   [{historicalCheckoutCandidate:{...f.trace().historicalCheckoutCandidate,sourceRoot:'projects/unapproved-checkout'}},'HISTORICAL_CHECKOUT_MISMATCH'],
+   [{sourceResolved:true,sourceRoot:'projects/unapproved-checkout',sourceHead:SHA},'TASK_CHAIN_CHECKOUT_MISMATCH'],
+  ]){
+   const r=inspectWriterInstallPreimage(f.data,{strictPlatform:false,
+    inspectSource:()=>({...f.trace(),...change})});
+   assert.equal(r.status,'STATE_UNKNOWN');
+   assert.equal(r.code,'WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED');
+   assert.equal(r.checkoutFailureReason,expected);
+   assert.equal(r.runtimeSourceVerified,false);
+   assert.equal(r.scopedPreimage?.files?.some(x=>x.sha256!==null),undefined);
+   assert.doesNotMatch(JSON.stringify(r),/PRIVATE_ACCESS_DENIED|TOKEN_SECRET/);
+  }
+ }finally{f.finish();}
+});
+
 test('manifest-scoped A only reads selected approved paths, legacy output stays unobserved',()=>{
  const f=fixture();try{
   const selected='lib/inflation-causal-candidates-public-7-catalog.mjs';
