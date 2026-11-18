@@ -109,3 +109,17 @@ test('existing checkout helper rejects unpinned HEAD and mutated source files',(
   platform:'win32',head:()=>APPROVED_SAVED_SOURCE_SHA,files}),
   {code:'W03_GMH_SCORE_V2_SOURCE_BLOB_DRIFT'});
 });
+
+test('drift result binds reviewed request SHA separately from actual execution checkout SHA',()=>{
+ const req=request(),running='c'.repeat(40);
+ const executor={...env(),GITHUB_SHA:running};
+ const raw=signedRaw(launch(child()),req);
+ raw.controlSha=running;
+ const accepted=sanitize(raw,req,executor);
+ assert.equal(accepted.status,'PASS');
+ assert.equal(accepted.requestedControlSha,SOURCE);
+ assert.equal(accepted.executedControlSha,running);
+ assert.equal(sanitize({...raw,controlSha:SOURCE},req,executor).status,'STATE_UNKNOWN');
+ assert.equal(sanitize({...raw,requestedControlSha:running},req,executor).status,
+  'STATE_UNKNOWN');
+});
