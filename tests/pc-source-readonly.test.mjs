@@ -251,11 +251,15 @@ test('fixed nested source refuses symlinks, missing file, outside path and never
  assert.equal(inspectFixedCreditR2Source(source).status,'STATE_UNKNOWN');
  const file=path.join(source,'lib','market-score','credit-r2.mjs');
  fs.mkdirSync(path.dirname(file),{recursive:true});
- fs.symlinkSync(secret,file);
- const r=inspectFixedCreditR2Source(source);
- assert.equal(r.status,'STATE_UNKNOWN');
- assert.equal(r.sha256,null);
- assert.doesNotMatch(JSON.stringify(r),/PROTECTED_PRIVATE_BYTES|secret\.mjs/);
+ let linked=false;
+ try{fs.symlinkSync(secret,file,'file');linked=true;}
+ catch(error){if(!['EPERM','EACCES','ENOTSUP'].includes(error?.code))throw error;}
+ if(linked){
+  const r=inspectFixedCreditR2Source(source);
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.sha256,null);
+  assert.doesNotMatch(JSON.stringify(r),/PROTECTED_PRIVATE_BYTES|secret\.mjs/);
+ }
  assert.equal(inspectFixedCreditR2Source(outside).status,'STATE_UNKNOWN');
 });
 
