@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_R47_TASK_ONCE_RECEIPT_V1",
+  "requestId": "b588c0bd-8b9f-4712-8d60-05cafeaa2f75",
+  "status": "RUN_REQUEST_ACCEPTED",
+  "code": "R47_TASK_SCHEDULER_ACCEPTED",
+  "taskRunRequested": true,
+  "collectorVerified": false,
+  "providerCalls": null,
+  "sqliteWrites": null,
+  "d1Writes": null,
+  "runId": "44213979130",
+  "retry": "NO_REEXECUTE",
+  "controlSha": "e3fa246a2e120a209370212832ff0816616d3708"
+}
