@@ -81,6 +81,29 @@ Err.Clear
 Set svc=GetObject("winmgmts:\\.\root\cimv2")
 If Err.Number <> 0 Then Unknown
 
+' MP_TASK_PROBE reads one exact Task Scheduler COM object; no task mutation.
+' It prints only Enabled/State/instance count and never command/arguments.
+If WScript.Arguments.Count=1 And UCase(CStr(WScript.Arguments(0)))="MP_TASK_PROBE" Then
+ Dim mpService,mpFolder,mpTask,mpEnabled,mpState,mpInstances
+ Err.Clear
+ Set mpService=CreateObject("Schedule.Service")
+ If Err.Number<>0 Then Unknown
+ mpService.Connect
+ If Err.Number<>0 Then Unknown
+ Set mpFolder=mpService.GetFolder("\")
+ If Err.Number<>0 Then Unknown
+ Set mpTask=mpFolder.GetTask("ZGMINI-PC-MarketParquet-ETF")
+ If Err.Number<>0 Then Unknown
+ mpEnabled=CStr(mpTask.Enabled)
+ mpState=CLng(mpTask.State)
+ mpInstances=CLng(mpTask.GetInstances(0).Count)
+ If Err.Number<>0 Then Unknown
+ If mpEnabled<>"True" And mpEnabled<>"False" Then Unknown
+ If mpState<1 Or mpState>4 Or mpInstances<0 Then Unknown
+ WScript.Echo "MP_TASK|" & mpEnabled & "|" & CStr(mpState) & "|" & CStr(mpInstances)
+ WScript.Quit 0
+End If
+
 ' R54_SCAN is read-only WMI observation. It never exposes CommandLine,
 ' tokens or process environment: only PID, parent and a scoped match flag.
 ' The caller requires this installed, approved script's exact file hash.
