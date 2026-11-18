@@ -260,7 +260,7 @@ test('PIT-06-06 NOOP retains an explicit no-publication checkpoint',async()=>{
  const report=await performR6RegisteredOnce({auth,...f,run});
  assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
  assert.equal(report.status,'NOOP');
- assert.equal(report.lastPass,'COLLECTION_NOOP');
+ assert.equal(report.lastPass,'ONE_SHOT_CLAIMED');
  assert.equal(report.publication,'NOT_ATTEMPTED');
  assert.equal(report.firstFail,null);
  assert.notEqual(report.status,'SUCCESS');
