@@ -14,7 +14,7 @@ function safeFile(fsApi,file,max){
  if(st.size<1||st.size>max)fail('BEA_MFG_ARCHIVE_FILE_SIZE_INVALID');
 }
 function ordinal(d){
- if(typeof d!=='string'||!/^20\d\d-(01|04|07|10)-01$/.test(d))fail('BEA_MFG_ARCHIVE_CSV_INVALID');
+ if(typeof d!=='string'||!/^(?:19|20)\d{2}-(01|04|07|10)-01$/.test(d))fail('BEA_MFG_ARCHIVE_CSV_INVALID');
  const y=Number(d.slice(0,4)),m=Number(d.slice(5,7));
  return {index:y*4+(m-1)/3,period:y+'-Q'+((m-1)/3+1),
    end:Date.UTC(y,m+2,0,23,59,59)};
@@ -65,8 +65,14 @@ export function inspectBeaMfgArchiveReadonly(dataRoot,{filesystem=fs,now=Date.no
      ||path.basename(path.dirname(folder)).toLowerCase()!=='zgmini')return initial;
    for(const name of REL){
      folder=path.join(folder,name);
-     if(!filesystem.existsSync(folder))return {...initial,status:'PASS',code:'BEA_MFG_ARCHIVE_NOT_STORED'};
-     const st=filesystem.lstatSync(folder);
+     // existsSync follows symlinks: a dangling link is NOT evidence of no archive.
+     let st;
+     try{st=filesystem.lstatSync(folder);}
+     catch(error){
+       if(error?.code==='ENOENT')
+         return {...initial,status:'PASS',code:'BEA_MFG_ARCHIVE_NOT_STORED'};
+       throw error;
+     }
      if(st.isSymbolicLink()||!st.isDirectory())fail('BEA_MFG_ARCHIVE_UNSAFE_PATH');
    }
    const entries=filesystem.readdirSync(folder);

@@ -80,3 +80,35 @@ test('no issue supplied path and no arbitrary data root',()=>{
  assert.equal(inspectBeaMfgArchiveReadonly('relative').status,'STATE_UNKNOWN');
  assert.equal(inspectBeaMfgArchiveReadonly(os.tmpdir()).status,'STATE_UNKNOWN');
 });
+
+test('BEA quarterly historical archive beginning in 1947 passes the official 4-digit date contract',t=>{
+ const {data,folder,meta}=fixture(t);
+ const historic='observation_date,'+series+'\n1947-01-01,10.1\n1947-04-01,11.1\n1947-07-01,12.1\n1947-10-01,13.1\n1948-01-01,14.1\n';
+ const historicSha=createHash('sha256').update(historic).digest('hex');
+ fs.writeFileSync(path.join(folder,historicSha+'.csv'),historic);
+ fs.writeFileSync(path.join(folder,historicSha+'.json'),JSON.stringify({
+   ...meta,sourceVersion:historicSha,file:historicSha+'.csv',
+   latestPeriod:'1948-Q1',rowCount:5
+ }));
+ const x=inspectBeaMfgArchiveReadonly(data,{now});
+ assert.equal(x.status,'PASS',JSON.stringify(x));
+ assert.equal(x.latest.sourceVersion,historicSha);
+ assert.equal(x.latest.observedThrough,'1948-Q1');
+ assert.equal(x.latest.rowCount,5);
+ assert.equal(x.providerCalls,0);assert.equal(x.operationalWrites,0);
+});
+
+test('dangling archive directory symlink cannot appear as NOT_STORED even when existsSync is false',t=>{
+ const {data,folder}=fixture(t);
+ const filesystem=Object.create(fs);
+ // On Windows unprivileged accounts cannot create a real symlink; simulate the
+ // actual lstat/exists disagreement without requiring admin rights.
+ filesystem.existsSync=p=>p===folder?false:fs.existsSync(p);
+ filesystem.lstatSync=p=>p===folder?
+   {isSymbolicLink:()=>true,isDirectory:()=>false}:fs.lstatSync(p);
+ const x=inspectBeaMfgArchiveReadonly(data,{filesystem,now});
+ assert.equal(x.status,'STATE_UNKNOWN');
+ assert.equal(x.code,'BEA_MFG_ARCHIVE_UNSAFE_PATH');
+ assert.equal(x.latest,null);
+ assert.equal(x.operationalWrites,0);
+});
