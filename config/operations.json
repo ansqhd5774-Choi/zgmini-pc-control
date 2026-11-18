@@ -43,6 +43,7 @@
     "inflation-a407-integrity-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation19-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation-candidates-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "inflation-census-m3-archive-headers-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "core-conflict-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
     "failure-proof": {"grade":"A","timeoutSeconds":30,"resource":"light"},
