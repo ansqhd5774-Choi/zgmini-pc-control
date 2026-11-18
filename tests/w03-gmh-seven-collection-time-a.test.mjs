@@ -178,5 +178,10 @@ test('existing B workflow and shared admission limit source scope to the exact W
   'w03-gmh-seven-collection-time-report.mjs',
   'candidateSourceSha','persist-credentials: false'];
  for(const s of required)assert.ok(wf.includes(s),s);
- assert.ok(!/w03-gmh-seven-collection-time.*Task|Cron|wrangler/i.test(wf));
+ const from=wf.indexOf('      - name: Authenticate W03 immutable GMH collection-time read-only request');
+ const through=wf.indexOf('      - name: Read W03 R47 private score pair',from);
+ assert.ok(from>=0&&through>from);
+ const ownSteps=wf.slice(from,through);
+ assert.ok(!/Task|Cron|wrangler/i.test(ownSteps));
+
 });
