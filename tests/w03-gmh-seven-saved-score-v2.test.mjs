@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorize,SCHEMA,TITLE,OUTPUT,
+import {authorize,compatibleControlSha,SCHEMA,TITLE,OUTPUT,
  SAVED_SCHEMA,APPROVED_SAVED_SOURCE_SHA}
  from '../tools/w03-gmh-seven-private-score-once.mjs';
 import {APPROVED_SOURCE_SHA,REPO}
@@ -107,4 +107,37 @@ test('existing checkout helper rejects unpinned HEAD and mutated source files',(
  assert.throws(()=>verifySavedCandidate({sourceRoot:reqRoot,
   platform:'win32',head:()=>APPROVED_SAVED_SOURCE_SHA,files}),
   {code:'W03_GMH_SCORE_V2_SOURCE_BLOB_DRIFT'});
+});
+
+test('V2 survives only an ancestor default-head move with byte-identical W03 control',()=>{
+ const next='8'.repeat(40),req=request(),envMoved={...env(),GITHUB_SHA:next};
+ const gitRun=args=>{
+  if(args[0]==='rev-parse'&&args[1]==='HEAD')
+   return {status:0,stdout:next+'\\n'};
+  if(args[0]==='merge-base'&&args[1]==='--is-ancestor'&&
+   args[2]===SOURCE&&args[3]===next)return {status:0};
+  if(args[0]==='diff'&&args[1]==='--quiet'&&
+   args.includes('tools/w03-gmh-seven-private-score-once.mjs')&&
+   args.includes('.github/workflows/pc-writer-b-source-once.yml'))
+   return {status:0};
+  return {status:1};
+ };
+ const approve=(p,h)=>compatibleControlSha(p,h,gitRun);
+ assert.equal(compatibleControlSha(SOURCE,next,gitRun),true);
+ assert.equal(authorize(event(req),envMoved,{allowControlDrift:approve}).controlSourceSha,SOURCE);
+ const raw={...signedRaw(launch(child()),req),controlSha:next};
+ assert.equal(sanitize(raw,req,envMoved).status,'PASS');
+ // V1 retains the previous exact-event-SHA rule.
+ assert.throws(()=>authorize(event(request(SCHEMA)),envMoved,{allowControlDrift:approve}),
+  {code:'W03_GMH_SCORE_REQUEST_STOP'});
+ // Identical bytes are not sufficient without verified ancestry or HEAD.
+ const noAncestor=args=>args[0]==='merge-base'?{status:1}:gitRun(args);
+ const changedSource=args=>args[0]==='diff'?{status:1}:gitRun(args);
+ const wrongHead=args=>args[0]==='rev-parse'?
+  {status:0,stdout:'7'.repeat(40)}:gitRun(args);
+ assert.equal(compatibleControlSha(SOURCE,next,noAncestor),false);
+ assert.equal(compatibleControlSha(SOURCE,next,changedSource),false);
+ assert.equal(compatibleControlSha(SOURCE,next,wrongHead),false);
+ assert.equal(compatibleControlSha('bad',next,gitRun),false);
+ assert.equal(sanitize({...raw,controlSha:SOURCE},req,envMoved).status,'STATE_UNKNOWN');
 });
