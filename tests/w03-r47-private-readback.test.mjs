@@ -33,7 +33,7 @@ function fixtureEvent(){
  return {req,event,env};
 }
 function saved(t){
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'w03-r47-readback-'));
+ const dir=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'w03-r47-readback-')));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const home=path.join(dir,'themes');
  const base=path.join(home,'legacy-nine-r23');
@@ -101,7 +101,7 @@ test('readback request admits exact owner event, immutable CMD SHA and 7 keys',(
  ]){const obj=fixtureEvent();mutation(obj);assert.throws(()=>authorize(obj.event,obj.env));}
 });
 test('missing R47 directory is not reported as saved source',t=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'w03-r47-empty-'));
+ const dir=fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(),'w03-r47-empty-')));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const x=inspectR47PrivateSaved({dataRoot:dir});
  assert.equal(x.status,'NO_PRIVATE_SHADOW');
