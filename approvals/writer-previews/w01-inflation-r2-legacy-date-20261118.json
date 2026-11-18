@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "d7f601aaba137de807ef9b065ea9be7ff31a2e7b4fe199452c18cd0b839a8300",
+  "insertions": [
+    {
+      "anchor": "  const p=envelope?.projection;",
+      "position": "after",
+      "text": "  if(id==='inflation'&&p?.status==='READY'&&p.sourceVersion===checkpoint.sourceVersion&&p.sourceStoredAt===checkpoint.sourceStoredAt){\n   const {requiresInflationR2TrendDateRefresh}=await import('./inflation-r2-trend-date-refresh.mjs');\n   if(requiresInflationR2TrendDateRefresh(envelope)){\n    const input=await loadProjectionSource(id,scope,{now:checkpoint.sourceStoredAt});\n    const payload=await builders[id](input);\n    await projectionWriter(core).write(id,payload,Date.now(),checkpoint);\n   }\n  }\n"
+    }
+  ]
+}
