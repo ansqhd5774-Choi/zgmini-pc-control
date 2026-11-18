@@ -5,6 +5,8 @@ on:
     paths:
       - 'controller/common.mjs'
       - 'controller/supervisor.mjs'
+      - 'controller/pc-source-readonly.mjs'
+      - 'tests/pc-source-readonly.test.mjs'
       - 'controller/core-runtime-source-readonly.mjs'
       - 'controller/provider-activity-runtime-readonly.mjs'
       - 'controller/http32-two-host-checkpoints-readonly.mjs'
@@ -151,6 +153,10 @@ jobs:
           node-version: '22'
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
+      - name: Verify fixed Credit R2 source SHA and protected report summary (no PC access)
+        run: |
+          node --check controller/pc-source-readonly.mjs
+          node --test --test-concurrency=1 tests/pc-source-readonly.test.mjs
       - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
         run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
