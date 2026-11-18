@@ -337,7 +337,7 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
       ['VERIFIED','UNCHANGED'].includes(value.publication)),
    'R6_B_RUN_RESULT_UNVERIFIED');
   outcome={...base,...value,
-   lastPass:value.status==='NOOP'?'COLLECTION_NOOP':'PUBLISH_READBACK',
+   lastPass:value.status==='NOOP'?'ONE_SHOT_CLAIMED':'PUBLISH_READBACK',
    firstFail:null};
  }catch(cause){
   const code=safeCode(cause?.code??cause?.message);
