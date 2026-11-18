@@ -1,0 +1,137 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "lib/cnn-index.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/cnn-observed-archive-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-calendar-er1-earnings-score.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-calendar-er1-forecast-score.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-calendar-er1-month-key.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-calendar-er1-public-display.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/market-score/theme-etf-provisional.mjs",
+      "change": "M"
+    },
+    {
+      "path": "lib/marketparquet-retirement.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/theme-gmh-seven-pc-parity-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-gmh-seven-private-bridge.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-gmh-seven-saved-input-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-optional-score-r188.mjs",
+      "change": "M"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-history-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-private-seed-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-approved-writer-entry.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-authorized-cas.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-private-draft.mjs",
+      "change": "A"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-saved-to-cas-r1.mjs",
+      "change": "A"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/public-feed-input-safety.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-ai-semiconductor-optional.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-biotech-continuation-r2.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-biotech-optional.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-biotech-provisional-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-data-center-power-provisional-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-data-center-power-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-etf-only-public.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-etf-rolling-public.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-history-reference.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-nine-r37-public.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-nine-r88-provisional.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
