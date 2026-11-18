@@ -20,7 +20,7 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 const need=(v,c)=>{if(!v)throw Object.assign(Error(c),{code:c});};
 const exact=(v,k)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===k.length&&k.every(x=>Object.hasOwn(v,x));
 const proofs=new WeakSet();
-const REVIEWED=['tools/marketparquet-task-retire-once.mjs','tools/marketparquet-task-retire-report.mjs','tools/marketparquet-task-source-readonly.mjs','r17-writer-b/r17-b-claim.mjs','.github/workflows/pc-writer-b-source-once.yml'];
+const REVIEWED=['tools/marketparquet-task-retire-once.mjs','tools/marketparquet-task-retire-report.mjs','tools/marketparquet-task-source-readonly.mjs','r17-writer-b/r17-b-claim.mjs'];
 export function authorize({event,env,manifestBytes}){
  need(env.GITHUB_REPOSITORY===REPO&&env.GITHUB_EVENT_NAME==='issues'&&env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_RUN_ATTEMPT==='1'&&env.GITHUB_ACTOR===OWNER&&/^[a-f0-9]{40}$/.test(env.GITHUB_SHA??'')&&event.repository?.full_name===REPO&&event.repository.private===true&&event.sender?.login===OWNER&&event.issue?.user?.login===OWNER&&event.issue.title===OPERATION&&!event.issue.pull_request&&Number.isSafeInteger(event.issue.number)&&event.issue.number>0&&event.issue.labels?.some(x=>x.name==='pc-writer-b-install'),'MP_RETIRE_EVENT_STOP');
  const r=JSON.parse(event.issue.body);
