@@ -362,3 +362,81 @@ test('official DOL HTTP-200 source unavailability remains redacted and exact in 
  assert.equal(result.d1Writes,0);
  assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|PRIVATE_DIGEST_DO_NOT_OUTPUT|sourceUrl|bodySha256/);
 });
+
+
+function storeNationalRawFixture(db,{
+ rawDate='11/07/2026',recordedDate='2026-10-17',corrupt=false,missingChunk=false,
+}={}){
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN snapshot_id TEXT");
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN body_sha256 TEXT");
+ const xml='<r539cyNational><week><weekEnded>'+rawDate+'</weekEnded>'+
+  '<InitialClaims><SA>210,000</SA><SA4WK>205,000</SA4WK></InitialClaims>'+
+  '<ContinuedClaims><SA>1,800,000</SA></ContinuedClaims><IUR><SA>1.2</SA></IUR>'+
+  '</week></r539cyNational>';
+ const hash=createHash('sha256').update(xml).digest('hex');
+ const detail=JSON.stringify({mode:'RELEASE',latestInitialClaimsObservationDate:recordedDate,
+  latestNationalSeriesObservationDates:Object.fromEntries(
+   ['INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE']
+     .map(id=>[id,recordedDate])),
+  nationalResponseEvidence:{bodySha256:hash,latestNationalObservationDate:recordedDate},
+  privateToken:'SECRET_DO_NOT_OUTPUT'});
+ db.prepare("INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)").run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-18T01:55:19.006Z',
+  2,51,0,0,0,'DOL_RELEASE_OBSERVATION_STALE',detail);
+ db.prepare("INSERT INTO market_score_employment_r6_raw_snapshot_v1 "+
+  "(request_key,release_group,chunk_index,retrieved_at,chunk_count,http_status,detail_json,body_chunk,snapshot_id,body_sha256) "+
+  "VALUES(?,?,?,?,?,?,?,?,?,?)").run('DOL_NATIONAL:2025-2026','DOL_UI_WEEKLY_CLAIMS',0,
+   '2026-11-18T01:54:19.006Z',missingChunk?2:1,200,'{}',
+   corrupt?xml.replace('210,000','209,000'):xml,'fixture-nat-1',hash);
+ return {xml,hash};
+}
+
+test('W04 A/light compares immutable saved National XML to its exact run hash without changing storage',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db);db.close();
+ const before=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_NEWER_THAN_RUN_PARSER');
+ assert.equal(r.nationalRaw.RELEASE.linkedByRawBodySha,true);
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-11-07');
+ assert.equal(r.nationalRaw.RELEASE.latestNumericDates.INITIAL_CLAIMS,'2026-11-07');
+ assert.equal(r.nationalRaw.RELEASE.recordedLatestDates.INITIAL_CLAIMS,'2026-10-17');
+ assert.equal(r.nationalRaw.ONE_YEAR.status,'RUN_BODY_HASH_NOT_STORED');
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_DO_NOT_OUTPUT|210,000|<week|bodySha256|snapshot_id/i);
+ assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
+});
+
+test('National same raw/parser date is aligned; mismatch cannot be called source freshness',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{rawDate:'10/17/2026'});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_EQUALS_RUN_PARSER');
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-10-17');
+});
+
+test('National raw audit blocks a corrupted body and fails closed without revealing it',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{corrupt:true});db.close();
+ const before=sha(file);
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_BODY_HASH_MISMATCH');
+ assert.equal(r.nationalRaw.RELEASE.latestNumericDates,null);
+ assert.equal(r.nationalRaw.RELEASE.linkedByRawBodySha,false);
+ assert.equal(sha(file),before);
+ assert.doesNotMatch(JSON.stringify(r),/210,000|209,000|<week|bodySha256|SECRET_DO_NOT_OUTPUT/i);
+});
+
+test('National raw audit detects incomplete chunk set instead of pretending XML is old',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{missingChunk:true});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_CHUNKS_INCOMPLETE');
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,null);
+});
