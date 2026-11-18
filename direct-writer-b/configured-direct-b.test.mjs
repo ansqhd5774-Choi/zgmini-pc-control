@@ -77,3 +77,30 @@ test('untrusted fixture proof is stripped and cannot prove an effect',async()=>{
   assert.equal(report.operationSucceeded,false);
   assert.equal(report.compatibilityEvidenceSha256,null);
 });
+
+test('PIN and bundle incomplete local JSON/TXT results remain UNKNOWN',async()=>{
+  const f=fixture();
+  for(const mode of ['PIN_REGISTRY_CAS','VERSIONED_BUNDLE_ACTIVATE']){
+    const auth={mode,request:f.request,raw:f.raw,controlSha:'a'.repeat(40),
+      manifest:{sourceSha,profileId:'approved-fixture'},approvalPath:'fixed'};
+    const args={makeApprovedNativeAdapter:async()=>({
+      originVerified:true,effect:mode,sourceSha,adapter:{},trustedProfiles:{}}),
+      pinRunner:async()=>({status:'PASS',endToEndDone:false,
+        reportStatus:'INCOMPLETE',evidenceRecoveryRequired:true}),
+      bundleRunner:async()=>({status:'PASS',endToEndDone:false,
+        reportStatus:'INCOMPLETE',evidenceRecoveryRequired:true})};
+    const incomplete=await applyApprovedOnce(auth,args);
+    assert.equal(incomplete.status,'DIRECT_B_EFFECT_UNKNOWN');
+    assert.equal(incomplete.code,'DIRECT_B_LEDGER_INCOMPLETE');
+    assert.equal(incomplete.operationSucceeded,false);
+    assert.equal(sanitizeDirectBReport(incomplete,f.request,env).operationSucceeded,false);
+    const complete=await applyApprovedOnce(auth,{...args,
+      pinRunner:async()=>({status:'PASS',endToEndDone:true,reportStatus:'JSON_TXT_2_OF_2'}),
+      bundleRunner:async()=>({status:'PASS',endToEndDone:true,reportStatus:'JSON_TXT_2_OF_2'})});
+    assert.equal(complete.status,'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED');
+    assert.equal(complete.operationSucceeded,true);
+    assert.equal(sanitizeDirectBReport(complete,f.request,env).operationSucceeded,true);
+    const tampered={...complete,reportStatus:'INCOMPLETE'};
+    assert.equal(sanitizeDirectBReport(tampered,f.request,env).operationSucceeded,false);
+  }
+});
