@@ -101,6 +101,22 @@ export function classifyBacklogOriginal(text){
 }
 
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// GitHub workflow disable/enable states can be eventually consistent.
+// A bounded, read-only observation never substitutes for an exact state
+// confirmation; unknown states and exhausted readbacks remain fail-closed.
+export async function confirmExactWorkflowState(readState,expected,{pause=wait}={}){
+ need(typeof readState==='function'&&
+  (expected==='active'||expected==='disabled_manually')&&
+  typeof pause==='function','WORKFLOW_STATE_PROBE_INVALID');
+ for(let attempt=0;attempt<6;attempt++){
+  let state;
+  try{state=await readState();}catch{/* No evidence: retry only a GET. */}
+  if(state===expected)return true;
+  if(state!==undefined&&state!=='active'&&state!=='disabled_manually')return false;
+  if(attempt<5)await pause(1000);
+ }
+ return false;
+}
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const writeJson=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);};
 const git=(args,options={})=>execFileSync('git',args,{cwd:checkout,encoding:Object.hasOwn(options,'encoding')?options.encoding:'utf8',windowsHide:true,timeout:120000,maxBuffer:8e6});
@@ -1276,7 +1292,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId:request.requestId,
      pausedAt:at,resumedAt:null,replays:{},windows:[{pausedAt:at,resumedAt:null}]});
    github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
-   need(github('actions/workflows/pc-job.yml').state==='disabled_manually','WORKFLOW_DISABLE_NOT_CONFIRMED');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'disabled_manually'),'WORKFLOW_DISABLE_NOT_CONFIRMED');
   },
   didPauseIntake:()=>pausedByUs,
   waitForDrain:async()=>{
@@ -1303,6 +1320,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    writeJson(path.join(backupRoot,'PROTECTED_BEFORE.json'),protectedBefore);
   },
   stopOwnSupervisor:async()=>{
+   need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+    'WORKFLOW_STATE_DRIFT_BEFORE_SUPERVISOR_STOP');
    const current=readOwner();need(current.owner.pid===oldOwner.owner.pid&&current.owner.nonce===oldOwner.owner.nonce,'SUPERVISOR_OWNER_CHANGED');
    verifyIndependent(current.owner.pid);
    // Read-only controls are checked again just before stopping the dedicated tree.
@@ -1333,7 +1352,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   resumeIntake:async()=>{
    need(installedManifest().installedSha===manifest.targetSha||installedManifest().installedSha===manifest.installedSha,'INTAKE_SHA_UNKNOWN');
    github('actions/workflows/pc-job.yml/enable','PUT');pausedByUs=false;
-   need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_ENABLE_NOT_CONFIRMED');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'active'),'WORKFLOW_ENABLE_NOT_CONFIRMED');
    if(fs.existsSync(backlogFile)){
      const backlog=json(backlogFile);
      writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
