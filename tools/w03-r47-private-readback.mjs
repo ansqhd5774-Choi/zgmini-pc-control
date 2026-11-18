@@ -130,6 +130,33 @@ function readJsonPair(root,firstName,baselineHash,deltaHash){
   Number.isSafeInteger(source.deltaVerifiedPageReferences)&&
   source.deltaVerifiedPageReferences>=0,
   'W03_R47_READBACK_RESULT_CONTRACT_STOP');
+ // The two SHA-verified files must contain a complete 63-ETF / 9-theme
+ // persisted *shape*, not merely a plausible filename or contract string.
+ const days=score.latest252TradingDates;
+ need(Array.isArray(days)&&days.length===252&&
+  days.every((day,i)=>date(day)&&(!i||day>days[i-1]))&&
+  days[251]===m[1]&&
+  score.individual&&typeof score.individual==='object'&&
+  !Array.isArray(score.individual)&&
+  Object.keys(score.individual).length===63&&
+  Array.isArray(theme.themes)&&theme.themes.length===9,
+  'W03_R47_READBACK_HISTORY_SHAPE_STOP');
+ const validScore=v=>v===null||(typeof v==='number'&&
+  Number.isFinite(v)&&v>=0&&v<=100);
+ for(const [ticker,s] of Object.entries(score.individual)){
+  need(/^[A-Z][A-Z0-9.]{0,11}$/.test(ticker)&&s?.symbol===ticker&&
+   Array.isArray(s.history)&&s.history.length===252&&
+   s.history.every((row,i)=>row?.date===days[i]&&validScore(row.score)),
+   'W03_R47_READBACK_ETF_HISTORY_STOP');
+ }
+ const seen=new Set();
+ for(const t of theme.themes){
+  need(typeof t?.theme==='string'&&t.theme.length>0&&t.theme.length<=128&&
+   !seen.has(t.theme)&&Array.isArray(t.history)&&t.history.length===252&&
+   t.history.every((row,i)=>row?.date===days[i]&&validScore(row.score)),
+   'W03_R47_READBACK_THEME_HISTORY_STOP');
+  seen.add(t.theme);
+ }
  const matching=source.baselineManifestSha256===baselineHash&&
   source.deltaManifestSha256===deltaHash;
  return {status:matching?'PRIVATE_RESULT_PAIR_AND_MANIFEST_SHA_VERIFIED':
