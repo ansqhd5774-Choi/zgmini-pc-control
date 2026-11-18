@@ -1,7 +1,7 @@
 // Strict stdout-only adapter for the fixed archived BEA manufacturing B publisher.
 // No provider calls, filesystem writes, D1 requests, or arbitrary subprocess arguments.
 const SHA=/^[a-f0-9]{64}$/;
-const QUARTER=/^\\d{4}-Q[1-4]$/;
+const QUARTER=/^\d{4}-Q[1-4]$/;
 const keys=(value,fields)=>value&&typeof value==='object'&&!Array.isArray(value)
   &&Object.keys(value).length===fields.length
   &&fields.every(k=>Object.hasOwn(value,k));
