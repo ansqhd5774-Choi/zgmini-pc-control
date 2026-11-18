@@ -59,8 +59,11 @@ test('symlink, missing directory and unsafe scope stop safely',t=>{
   const f=fixture(t),file=f.save(2025,[HEAD]);
   fs.unlinkSync(file);
   const outside=path.join(path.dirname(f.data),'outside.json');fs.writeFileSync(outside,'[]');
-  fs.symlinkSync(outside,file);
-  assert.equal(inspect(f.data,{strictPlatform:false}).code,'W01_CENSUS_ARCHIVE_FILE_UNSAFE');
+  let linked=false;
+  try{fs.symlinkSync(outside,file);linked=true;}
+  catch(e){if(!['EPERM','EACCES','ENOTSUP'].includes(e.code))throw e;}
+  if(linked)assert.equal(inspect(f.data,{strictPlatform:false}).code,
+    'W01_CENSUS_ARCHIVE_FILE_UNSAFE');
   fs.rmSync(f.raw,{recursive:true,force:true});
   assert.equal(inspect(f.data,{strictPlatform:false}).code,'W01_CENSUS_ARCHIVE_DIR_UNAVAILABLE');
   assert.equal(inspect(f.raw,{strictPlatform:false}).code,'W01_CENSUS_ARCHIVE_DIR_UNAVAILABLE');
