@@ -124,6 +124,8 @@ on:
       - '.github/workflows/pc-writer-b-source-once.yml'
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
+      - 'writer-b/w01-r2-two-branch-preview.test.mjs'
+      - 'approvals/writer-previews/w01-r2-stored-payload-two-branch-20261119.json'
       - 'inflation-manual-b/**'
       - 'inflation-census-api-b/**'
       - 'approvals/inflation-manual-b/**'
@@ -215,6 +217,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-primary-route-b.test.mjs
       - name: Verify W03 bounded start of existing R181 Task with one-shot journal
         run: node --test --test-concurrency=1 tests/r181-existing-task-once.test.mjs
+      - name: Verify W01 R2 both checkpoint branches in read-only insert preview
+        run: node --test writer-b/w01-r2-two-branch-preview.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
