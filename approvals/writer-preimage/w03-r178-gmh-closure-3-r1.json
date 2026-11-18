@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_WRITER_PREIMAGE_SCOPE_APPROVAL_V1",
+  "status": "APPROVED_A_READONLY",
+  "scope": "PC_WRITER_APPROVED_SOURCE_PREIMAGE",
+  "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+  "files": [
+    {
+      "path": "worker/theme-space-satellite-provisional-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-space-satellite-r1.mjs",
+      "change": "M"
+    },
+    {
+      "path": "worker/theme-space-satellite-r2.mjs",
+      "change": "M"
+    }
+  ],
+  "allowOtherPaths": false
+}
