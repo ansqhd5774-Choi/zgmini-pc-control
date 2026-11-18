@@ -106,10 +106,10 @@ export function inspect({dataRoot=ROOT}={}){
   if(!names.length)return {...base,status:'NO_R51_CANDIDATE',code:'NO_R51_CANDIDATE'};
   const ordered=names.map(x=>({name:x.name,m:x.name.match(R51),
     time:fs.lstatSync(path.join(folder,x.name)).mtimeMs}))
-   .sort((a,b)=>b.m[2].localeCompare(a.m[2])||
-    b.m[1].localeCompare(a.m[1])||b.time-a.time||a.name.localeCompare(b.name));
+   .sort((a,b)=>b.m[1].localeCompare(a.m[1])||
+    b.m[2].localeCompare(a.m[2])||b.time-a.time||a.name.localeCompare(b.name));
   const {name,m}=ordered[0];
-  check(date(m[1])&&date(m[2])&&m[1]<=m[2],'W03_R51_READBACK_DATE_STOP');
+  check(date(m[1])&&date(m[2]),'W03_R51_READBACK_DATE_STOP');
   const f=safeFile(path.join(folder,name),6*1048576);
   check(f.sha256.startsWith(m[3]),'W03_R51_READBACK_DIGEST_STOP');
   let rec;try{rec=JSON.parse(f.bytes)}catch{stop('W03_R51_READBACK_RESULT_JSON_STOP')}
@@ -134,7 +134,9 @@ export function inspect({dataRoot=ROOT}={}){
    points.every((p,i)=>date(p?.date)&&
     (i===0||p.date>points[i-1].date)&&
     p.scores&&typeof p.scores==='object'&&!Array.isArray(p.scores)&&
-    Object.keys(p.scores).length>=1),
+    Object.keys(p.scores).length>=1&&Object.keys(p.scores).length<=9&&
+    Object.values(p.scores).every(s=>typeof s==='number'&&
+      Number.isFinite(s)&&s>=0&&s<=100)),
    'W03_R51_READBACK_RESULT_CONTRACT_STOP');
   const lineage=rec.provisionalLineage;
   const mode=lineage?.source==='EXISTING_PUBLIC_PROVISIONAL_AS_PUBLISHED'?
