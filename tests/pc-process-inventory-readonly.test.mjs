@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {createHash} from 'node:crypto';
+import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
 import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
@@ -757,4 +759,68 @@ test('C2094 fixed A scope fails closed on unknown type, damaged readback or unst
   ...a,artifacts:{...a.artifacts,backlog:{...a.artifacts.backlog,openWindows:reads++?1:0}}}));
  assert.equal(changed.code,'C2094_DOUBLE_READ_CHANGED');
  assert.doesNotMatch(JSON.stringify(changed),/secret|token/i);
+});
+
+test('fixed MarketParquet Task fingerprint never reveals credentials or command line',()=>{
+ const xml='<Task><Settings><Enabled>true</Enabled></Settings><Actions><Exec>'+
+  '<Command>C:\\Windows\\System32\\cmd.exe</Command>'+
+  '<Arguments>/d /c &quot;E:\\ZGmini\\data\\pc-writer\\legacy\\collect.cmd&quot; SECRET_TOKEN</Arguments>'+
+  '</Exec></Actions></Task>';
+ const bytes=Buffer.from(xml);
+ const evidence=inspectTask({platform:'win32',query:()=>({status:0,stdout:bytes}),
+  hashEntry:p=>{assert.equal(p,'E:\\ZGmini\\data\\pc-writer\\legacy\\collect.cmd');return 'a'.repeat(64);},
+  clock:()=> '2026-11-18T09:00:00Z'});
+ assert.equal(TASK,'ZGMINI-PC-MarketParquet-ETF');
+ assert.equal(evidence.status,'PASS');
+ assert.equal(evidence.taskEnabled,true);
+ assert.equal(evidence.actionKind,'CMD');
+ assert.equal(evidence.entryFileScope,'E_DATA');
+ assert.equal(evidence.entryFileLeaf,'collect.cmd');
+ assert.equal(evidence.entryFileSha256,'a'.repeat(64));
+ assert.equal(evidence.taskXmlSha256,createHash('sha256').update(bytes).digest('hex'));
+ assert.doesNotMatch(JSON.stringify(evidence),/SECRET_TOKEN|legacy|\/d \/c|C:\\Windows/);
+});
+test('MarketParquet Task probe fails closed for missing/ambiguous/unapproved sources',()=>{
+ const doc=(enabled,execs)=>'<Task><Settings><Enabled>'+enabled+'</Enabled></Settings><Actions>'+execs+'</Actions></Task>';
+ const exec=p=>'<Exec><Command>E:\\ZGmini\\runtime\\node.exe</Command><Arguments>'+p+'</Arguments></Exec>';
+ const probe=x=>inspectTask({platform:'win32',query:()=>({status:0,stdout:Buffer.from(x)}),
+  hashEntry:()=> 'b'.repeat(64)});
+ assert.equal(inspectTask({platform:'linux'}).status,'STATE_UNKNOWN');
+ assert.equal(probe(doc('true',exec('C:\\Users\\x.mjs'))).code,'TASK_SOURCE_OUTSIDE_APPROVED_ROOT');
+ assert.equal(probe(doc('true',exec('E:\\ZGmini\\data\\a.mjs')+exec('E:\\ZGmini\\data\\b.mjs'))).code,'TASK_EXEC_ACTION_COUNT_NOT_ONE');
+ assert.equal(probe(doc('false',exec('E:\\ZGmini\\data\\x.mjs'))).taskEnabled,false);
+ assert.equal(probe(doc('true','')).status,'STATE_UNKNOWN');
+ assert.equal(inspectTask({platform:'win32',query:()=>({status:1,stderr:Buffer.from('SECRET')})}).code,
+  'TASK_QUERY_UNAVAILABLE');
+});
+
+test('Task XML without explicit Settings Enabled still fingerprints one action without claiming Task enabled',()=>{
+ const xml='<Task><Settings></Settings><Actions><Exec>'+
+  '<Command>E:\\ZGmini\\runtime\\node.exe</Command>'+
+  '<Arguments>E:\\ZGmini\\data\\pc-writer\\collector.mjs</Arguments>'+
+  '</Exec></Actions></Task>';
+ const result=inspectTask({platform:'win32',query:()=>({status:0,stdout:Buffer.from(xml)}),
+  hashEntry:()=> 'f'.repeat(64)});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'TASK_ENABLED_FIELD_ABSENT_SOURCE_FINGERPRINTED');
+ assert.equal(result.enabledFieldPresent,false);
+ assert.equal(result.execActionCount,1);
+ assert.equal(result.taskEnabled,null);
+ assert.equal(result.entryFileLeaf,'collector.mjs');
+ assert.equal(result.entryFileSha256,'f'.repeat(64));
+ assert.equal(result.operationalWrites,0);
+ assert.equal(result.providerCalls,0);
+});
+test('missing and multiple Task Exec actions are distinct hard-UNKNOWN without source access',()=>{
+ const inspect=xml=>inspectTask({platform:'win32',
+  query:()=>({status:0,stdout:Buffer.from(xml)}),
+  hashEntry:()=>{throw Error('HASH_ENTRY_MUST_NOT_RUN');}});
+ const empty=inspect('<Task><Settings><Enabled>true</Enabled></Settings><Actions></Actions></Task>');
+ assert.equal(empty.status,'STATE_UNKNOWN');
+ assert.equal(empty.code,'TASK_EXEC_ACTION_COUNT_NOT_ONE');
+ assert.equal(empty.execActionCount,0);
+ const two=inspect('<Task><Settings></Settings><Actions><Exec></Exec><Exec></Exec></Actions></Task>');
+ assert.equal(two.status,'STATE_UNKNOWN');
+ assert.equal(two.execActionCount,2);
+ assert.equal(two.taskEnabled,null);
 });

@@ -140,25 +140,57 @@ export function verifyPcFailureResultPair({report, resultTxt}) {
 
 /** Called only after the producer has read BOTH immutable files from GitHub. */
 export function preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt}){
-  // Reuse the existing strict owner/report identity validator. It must find
-  // BLOCKED noneligible; the clean-wait allowlist is deliberately much narrower.
+  // The original pc-job, published result, requested source and read-only
+  // operation are authenticated by the existing strict failure adapter.
   const authenticated=preparePcFailureHandoff({originIssue,report,resultPath});
   if(report.status!=='BLOCKED'||!CLEAN_WAIT_CODES.has(report.code))
     return Object.freeze({state:'NOT_ELIGIBLE'});
   if(authenticated.state!=='NOT_ELIGIBLE')stop('WAIT_IDENTITY_INVALID');
-  const preflight=report.phase==='PREVALIDATION'&&report.mutationStarted===false&&
-    report.operationalWrites===0&&report.providerCalls===0&&
+
+  const noOperationalEffects=report.operationalWrites===0&&report.providerCalls===0&&
     report.d1Writes===0&&report.sqliteOpened===false&&
     report.resourceLeasesRetained!==true;
+  const preflight=noOperationalEffects&&report.phase==='PREVALIDATION'&&
+    report.mutationStarted===false;
+
+  // Two already-allowlisted read-only diagnostics can report memory contention
+  // *after* the Controller has started its worker. Their legacy immutable
+  // result pair has no phase/mutationStarted fields. Never assert that the
+  // worker did not start; require the operation-specific pre-operation proof.
+  const workerWait=noOperationalEffects&&report.code==='RESOURCE_WAIT_MEMORY'&&
+    ['employment-r6-wal-memory-preflight',
+      'theme-nine-r32-raw-coverage-readonly'].includes(report.operation)&&
+    report.phase===undefined&&report.mutationStarted===undefined&&
+    report.lastPass==='ALLOWLISTED_WORKER_STARTED'&&
+    report.firstFail==='ALLOWLISTED_OPERATION'&&report.exitCode===0&&
+    report.actualExecutionSha===report.controlSourceSha&&
+    report.protectedStateUnchanged===true&&
+    typeof report.protectedBeforeSha256==='string'&&
+    /^[a-f0-9]{64}$/.test(report.protectedBeforeSha256)&&
+    report.protectedAfterSha256===report.protectedBeforeSha256&&
+    report.result?.status==='BLOCKED'&&report.result?.code===report.code&&
+    report.result?.candidateExecuted===false&&
+    report.result?.providerCalls===0&&report.result?.d1Writes===0&&
+    report.result?.operationalWrites===0&&report.result?.sqliteOpened===false;
+
   const validLease=report.code!=='LEASE_BUSY'||['REQUEST_LEASE','SEAT_LEASE',
     'RESOURCE_LEASE'].includes(report.failureOperation);
-  if(!preflight||!validLease)return Object.freeze({state:'WAIT_PROOF_UNVERIFIED'});
+  if((!preflight&&!workerWait)||!validLease)
+    return Object.freeze({state:'WAIT_PROOF_UNVERIFIED'});
+
   const proofs=[['jobId',report.jobId],['requestId',report.requestId],
-    ['status','BLOCKED'],['code',report.code],['phase','PREVALIDATION'],
-    ['mutationStarted','false'],['operationalWrites','0'],
+    ['status','BLOCKED'],['code',report.code],['operationalWrites','0'],
     ['providerCalls','0'],['d1Writes','0'],['sqliteOpened','false']];
+  if(preflight)proofs.push(['phase','PREVALIDATION'],['mutationStarted','false']);
+  else proofs.push(['lastPass','ALLOWLISTED_WORKER_STARTED'],
+    ['firstFail','ALLOWLISTED_OPERATION'],['exitCode','0'],
+    ['actualExecutionSha',report.actualExecutionSha],
+    ['protectedStateUnchanged','true'],
+    ['protectedBeforeSha256',report.protectedBeforeSha256],
+    ['protectedAfterSha256',report.protectedAfterSha256]);
   if(proofs.some(([k,v])=>!textMatches(resultTxt,k,v)))
     return Object.freeze({state:'WAIT_PROOF_UNVERIFIED'});
+
   const request=JSON.parse(originIssue.body);
   const intentFingerprint=createHash('sha256').update(JSON.stringify({
     operation:request.operation,sourceRepository:request.sourceRepository,
@@ -175,10 +207,9 @@ export function preparePcSharedResourceWait({originIssue,report,resultPath,resul
     evidence:{runId,status:report.status,code:report.code,
       resultJsonPath:resultPath,resultTxtPath:resultPath.replace(/\.json$/,'.txt'),
       resultPairReadbackVerified:true},
-    // The original Issue's one-shot execution opportunity is spent. The
-    // Controller may have exited before its request ledger or lease was
-    // acquired (e.g. LEASE_BUSY), but operational data remains untouched.
-    safePoint:'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',releaseCondition:report.code==='RESOURCE_WAIT_MEMORY'?
+    safePoint:workerWait?'REQUEST_CONSUMED_WORKER_PREOP_UNTOUCHED':
+      'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+    releaseCondition:report.code==='RESOURCE_WAIT_MEMORY'?
       'HEAVY_MEMORY_AVAILABLE_VERIFIED':'LEASE_OWNER_RELEASE_VERIFIED'});
   return Object.freeze({state:'WAITING_SHARED_RESOURCE',wait});
 }

@@ -30,6 +30,22 @@ const OPS=Object.freeze({
       'worker/earnings-bea-unit-profit-r1.mjs',
     ]),
   }),
+  'bea-manufacturing-profit-once':Object.freeze({
+    script:'scripts/pc-writer/EARNINGS_BEA_MFG_PROFIT_R6_D1_ONE_SHOT.mjs',
+    flags:Object.freeze(['--apply','--confirm-bea-manufacturing-d1-write']),
+    snapshotKey:'detail:earnings-bea-manufacturing-profit:r1',
+    approvalScope:'BEA_MANUFACTURING_PROFIT_SINGLE_KEY_D1_ONCE',
+    provider:'STORED_CSV_ONLY',
+    sourceFiles:Object.freeze([
+      'scripts/pc-writer/EARNINGS_BEA_MFG_PROFIT_R6_D1_ONE_SHOT.mjs',
+      'scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs',
+      'scripts/pc-writer/d1.mjs',
+      'scripts/pc-writer/d1-transient.mjs',
+      'scripts/pc-writer/d1-diagnostics.mjs',
+      'lib/market-score/earnings-bea-manufacturing-profit-source-r1.mjs',
+      'worker/earnings-bea-manufacturing-profit-r1.mjs',
+    ]),
+  }),
   'census-qfr-margin-once':Object.freeze({
     script:'scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs',
     flags:Object.freeze(['--apply','--confirm-census-qfr-d1-write']),
@@ -84,7 +100,7 @@ export function validatePublicationApproval(request,bytes){
   if(sha256(bytes)!==request.approvalManifestSha256)throw Error('PUBLICATION_MANIFEST_HASH_MISMATCH');
   let approval;
   try{approval=JSON.parse(bytes.toString());}catch{throw Error('PUBLICATION_MANIFEST_JSON_INVALID');}
-  const bea=request.operation==='bea-unit-profit-once';
+  const bea=['bea-unit-profit-once','bea-manufacturing-profit-once'].includes(request.operation);
   exact(approval,['schema','requestId','operation','sourceRepository','publisherSha',
     'operationalSha','snapshotKey','publisherFiles','approval','execution',
     ...(bea?['sourceSha256']:[])],

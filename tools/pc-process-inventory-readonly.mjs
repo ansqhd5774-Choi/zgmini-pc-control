@@ -13,6 +13,7 @@ import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-che
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus} from './update.mjs';
 import {createHash} from 'node:crypto';
+import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -885,6 +886,7 @@ export function collect(role,ctx,env=process.env){
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
    c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
   observedHttpHostRoster:readObservedProviderHosts(),
+  marketParquetTaskSource:inspectMarketParquetTask(),
   http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
   c1501Backlog:inspect1501BacklogReadonly(),
   targetEndpointStatus:readTargetEndpointStatus()}:base;
@@ -918,6 +920,7 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  'marketParquetTaskStatus='+(r.marketParquetTaskSource?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
