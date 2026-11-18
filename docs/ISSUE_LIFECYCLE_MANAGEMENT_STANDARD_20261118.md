@@ -3,7 +3,7 @@
 - 제정: 2026-11-18 KST
 - 전담 저장소: `ansqhd5774-Choi/zgmini-pc-control`
 - 전담 개발 브랜치: `codex/issues-lifecycle-manager-20261118`
-- 범위: 이슈 상태 감사·종료 판정·안전한 정리·신규 요청 자동 종료의 후속 개발
+- 범위: 이슈·PR 수명주기 감사·종결 + 공통 대기열 PC(`DESKTOP-N62L0NG`)의 접수·인계·관제·격리 실행 기반 프로세스 총괄
 - 상태: **기준 수립(문서 단계)**. 이 문서의 커밋만으로 자동 종료가 설치·활성화된 것은 아니다.
 - 상위 정본: [AGENTS.md](../AGENTS.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), [GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md). 충돌 시 최신 `main` 및 명시 승인·실제 운영 증거 우선.
 
@@ -13,7 +13,7 @@
 
 - 기준 시점 관측치: 2026-11-18 사용자 GitHub Issues 화면 `Open 1,198 / Closed 19`. 이 수치는 고정 현재값이나 전체 미완료 건수가 아니다. 실행 시 API 재조회 결과를 기준으로 한다.
 - 이슈의 Close는 원본 본문·댓글·JSON/TXT·Run 링크를 **보존**하는 상태 전환일 뿐, PC 작업 취소·재실행·성공 입증·운영 변경·결과 삭제가 아니다.
-- 공통 이슈 관리는 **기록과 상태**만 담당한다. 기능별 수집·계산·게시·설치·UI는 원담당, 공통 Controller/Runner/Writer 결함은 프로세스 총괄, 실제 공유 자원 쓰기는 기존 단일 소유자와 승인·lease가 담당한다.
+- 이 담당자는 **GitHub 이슈·PR 수명주기 관리와 공통 대기열 PC 프로세스 총괄**을 맡는다. 기능별 수집·계산·게시·설치·UI는 원담당이 수행한다. 기존 운영 PC(`PC`)의 Controller·6 Runner·Writer·Core 및 실제 공통 운영 쓰기는 기존 PC 프로세스 총괄/승인된 단일 소유자가 담당한다. 공통 대기열 PC의 실행·인계 도구 결함은 이 담당자가 분석·개선하고, 양 PC를 잇는 공유 자원·승인·보호 변경은 기존 #68 조정으로 정확한 담당·lease를 지정한다.
 - 이슈 관리 기능이 다른 원담당의 독립 작업을 막거나, 신규 Runner·CMD·예약·유료 서비스·PC 접근 경로를 만들지 않는다.
 
 ## 1A. 이슈 처리 우선순위 — 최신·운영 영향 우선 (2026-11-18 개정)
@@ -28,6 +28,23 @@
 최신 범위는 매 작업 시작 시 GitHub의 `is:issue is:open`을 **updated 내림차순**과 **created 내림차순**으로 각각 읽어 교집합 및 차이를 파악한다. 가장 최근 생성된 번호만으로 최신 장애를 누락하지 않는다. 검색은 페이지 제한을 점검하고, 추출된 상위 일부를 Open 총수라고 주장하지 않는다.
 
 종료 전 **바로 직전** 요청 schema·requestId·operation·현재 state·신규 댓글·동시 다른 담당의 변경을 재조회한다. 동시 Close 확인 시 다시 닫거나 자동 reopen하지 않는다. `PASS`가 부분 증거만 나타내거나 후속 정정/승인 해시 불일치가 있으면 무조건 자동 Close 금지. 이 우선순위 변경은 기존 종료 증거 요건·원담당 책임·공용 Controller 보호·영속 중앙 원장 보존을 완화하지 않는다.
+
+## 1B. 사용자 지정 역할: 공통 대기열 PC 프로세스 총괄 (2026-11-18)
+
+사용자는 이슈담당즈에 기존 PC 프로세스 총괄과 **업무 범위 약 90% 상당의 공통 프로세스 분석·개선·인계 조정 책임**을 부여하되, **직접 관리할 PC는 공통 대기열 PC**로 구분했다. 90%는 기능상 역할 설명이며 운영 B/C 승인, 자격정보·관리자 권한, 타 PC 쓰기 권한이나 안전 검사 면제를 뜻하지 않는다.
+
+| 경계 | 이슈담당즈 (이 브랜치) | 기존 PC 프로세스 총괄 / 원담당 |
+| --- | --- | --- |
+| 호스트·실행기 | `DESKTOP-N62L0NG`, `zgmini-handoff-ci-isolated` 전용 Runner 1개 | 운영 `PC`의 `zgmini-pc-01`~`06` 및 운영 전용 유지보수기 |
+| 담당 기능 | GitHub Issues·PR 정리, 공통 인계 접수/선별/중복 제거/원장·관제, 격리 Runner·Workflow/인수·결과 회신 경로의 진단·최소 개선·회귀 검증 | 운영 Controller·Writer·Core·Runner 결함, 실제 기능별 수집/계산/저장/게시/배포 |
+| 공통 경계 | #68 원장·`agent-handoff` 원본을 통해 양측 실제 담당/증거 연결; 공통 장애 원인·LAST PASS/FIRST FAIL 및 영향/수정 범위 구분 | 실제 운영 변경·원본 승인/manifest/lease/backup과 기능별 Runtime 검증 |
+| 허용 실행 | 기존 설치된 격리 GitHub Workflows·정확한 Runner/원본 Issue/Run·JSON/TXT 조회, 승인된 최소 소스 변경·격리 테스트·GitHub 기록 | 운영 PC 승인 A/B 실행; C는 사용자 직접 수행 |
+
+**우선 작업 순서:** ① 격리 대기열 최신 실제 장애·대기·인계/원본 결과와 Workflow/Runner의 마지막 유효 증거 확인 → ② 승인된 범위에서 원인 분석·최소 수정/관련 회귀·결과 회신·원본/중앙 조정 연결 → ③ 완료 증거가 확정된 단회 Issue 종료 및 대체된 PR 정리 → ④ 최근 처리 후 과거 잔량. 승인·실행이 확인되지 않은 경우 `STATE_UNKNOWN`/HOLD로 보존하고 독립 이슈 정리는 계속한다.
+
+**경계 보호:** 기존 `agent-handoff`의 스키마·bot 영수증·전체 댓글 검증, 원본 requestId/Run/attempt, 인수·회신 8단계와 중복방지를 유지한다. 격리 CI 성공/관제 요약/Issue 댓글은 운영 PC 적용, 다른 ChatGPT 대화 실제 수신, Windows 서비스 정상 지속 운영의 증거가 아니다. 격리 PC에 운영 PC의 E: 설치/DB/Task/원장·키가 있다고 가정하지 않는다. 승인 없는 운영 쓰기·Controller 교체·복구·Runner 재시작·워크플로 권한 확대·신규 유료 서비스·자동 재실행 금지.
+
+**기준 정본:** [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md), [HANDOFF_QUEUE_CONTROL_BOARD_R1.md](HANDOFF_QUEUE_CONTROL_BOARD_R1.md), [AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md). 이 전담 브랜치의 문서 수정만으로 main·운영 PC·실제 격리 PC 설정이 자동 변경되지는 않는다.
 
 ## 2. 분류 기준: GitHub 이슈 ≠ 현재 작업 건수
 
