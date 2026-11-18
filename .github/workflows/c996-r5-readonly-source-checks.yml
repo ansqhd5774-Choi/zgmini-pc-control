@@ -32,6 +32,8 @@ jobs:
         run: node --test tests/r47-existing-task-once.test.mjs
       - name: Verify fixed forbidden provider Task retirement without operating effects
         run: node --test tests/marketparquet-task-retire.test.mjs
+      - name: Test fixed GMH source time readonly attestation and redaction
+        run: node --test tests/w03-gmh-source-time-readonly.test.mjs
       - name: Identify exact permitted queue PC without WIM access
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
