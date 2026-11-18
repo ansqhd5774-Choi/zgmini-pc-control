@@ -51,6 +51,8 @@ on:
       - 'tools/w03-gmh-seven-private-score-preflight.mjs'
       - 'tools/w03-gmh-seven-private-score-report.mjs'
       - 'tests/w03-gmh-seven-private-score-once.test.mjs'
+      - 'tools/w03-gmh-seven-saved-score-v2.mjs'
+      - 'tests/w03-gmh-seven-saved-score-v2.test.mjs'
       - 'tools/w03-gmh-seven-public-compat-a.mjs'
       - 'tools/w03-gmh-seven-public-compat-report.mjs'
       - 'tests/w03-gmh-seven-public-compat-a.test.mjs'
@@ -156,6 +158,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
       - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-private-score-once.test.mjs
+      - name: Verify same existing B title V2 SHA/rights/private result contract
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-saved-score-v2.test.mjs
       - name: Verify W03 bounded GMH seven-theme manual Windows collection is exact and private
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-manual-once.test.mjs
       - name: Verify W03 R179 fixed operator-shape read-only A and redaction
