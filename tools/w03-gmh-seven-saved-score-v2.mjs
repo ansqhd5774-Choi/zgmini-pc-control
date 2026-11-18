@@ -80,7 +80,7 @@ export function launchSavedScore(script,{platform=process.platform,
   value.sourceProvider==='GETMARKETHISTORY_1H_PRIVATE'&&
   /^\d{4}-\d\d-\d\d$/.test(value.observationDate??'')&&
   Number.isSafeInteger(value.commonSessionCount)&&
-  value.commonSessionCount>=628&&value.commonSessionCount<=1500&&
+  value.commonSessionCount>=628&&
   value.historyPoints===1764&&
   Number.isSafeInteger(value.rawPagesVerified)&&
   value.rawPagesVerified>=14&&value.rawPagesVerified<=256&&

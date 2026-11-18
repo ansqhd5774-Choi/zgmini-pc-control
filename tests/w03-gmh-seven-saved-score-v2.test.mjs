@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authorize,compatibleControlSha,SCHEMA,TITLE,OUTPUT,
+import {authorize,identifySafeReceipt,compatibleControlSha,SCHEMA,TITLE,OUTPUT,
  SAVED_SCHEMA,APPROVED_SAVED_SOURCE_SHA}
  from '../tools/w03-gmh-seven-private-score-once.mjs';
 import {APPROVED_SOURCE_SHA,REPO}
  from '../tools/w03-gmh-seven-manual-once.mjs';
 import {launchSavedScore,verifySavedCandidate}
  from '../tools/w03-gmh-seven-saved-score-v2.mjs';
-import {sanitize}
+import {sanitize,report}
  from '../tools/w03-gmh-seven-private-score-report.mjs';
 
 const SOURCE='9'.repeat(40),ID='e80ffcc1-45b6-4e2f-aed7-56422097435f';
@@ -140,4 +140,63 @@ test('V2 survives only an ancestor default-head move with byte-identical W03 con
  assert.equal(compatibleControlSha(SOURCE,next,wrongHead),false);
  assert.equal(compatibleControlSha('bad',next,gitRun),false);
  assert.equal(sanitize({...raw,controlSha:SOURCE},req,envMoved).status,'STATE_UNKNOWN');
+});
+
+test('genuine V2 history above old arbitrary 1500 cap retains 7x252 and SHA gate',()=>{
+ const req=request(),r=launch({...child(),commonSessionCount:1501});
+ assert.equal(r.status,'PASS');
+ assert.equal(r.commonSessionCount,1501);
+ const safe=sanitize(signedRaw(r,req),req,env());
+ assert.equal(safe.status,'PASS');
+ assert.equal(safe.commonSessionCount,1501);
+ assert.equal(launch({...child(),commonSessionCount:627}).status,'STOP');
+ const v1Raw=signedRaw({status:'PASS',code:'W03_GMH_SCORE_PRIVATE_7X252_VERIFIED',
+  observationDate:'2026-11-13',commonSessionCount:1501,
+  historyPoints:1764,inputManifestSha256:'a'.repeat(64),
+  privateArtifactSha256:'c'.repeat(64)},request(SCHEMA));
+ assert.equal(sanitize(v1Raw,request(SCHEMA),env()).status,'STATE_UNKNOWN');
+});
+test('unapproved V2 event SHA drift produces redacted 2/2 STOP receipts, never PASS',async()=>{
+ const req=request(),moved={...env(),GITHUB_SHA:'8'.repeat(40),
+  GITHUB_TOKEN:'x'.repeat(25)};
+ const e=event(req),uploads=new Map(),comments=[];
+ const mockFetch=async (url,{method='GET',body}={})=>{
+  if(method==='PUT'){
+   const b=JSON.parse(body),content=Buffer.from(b.content,'base64');
+   uploads.set(url,content);
+   return {status:201};
+  }
+  if(method==='GET'){
+   const bytes=uploads.get(url.split('?')[0]);
+   if(!bytes)return {status:404};
+   return {status:200,json:async()=>({encoding:'base64',
+    content:bytes.toString('base64')})};
+  }
+  if(method==='POST'&&url.endsWith('/comments')){
+   comments.push(JSON.parse(body).body);
+   return {status:201};
+  }
+  throw Error('unexpected IO');
+ };
+ assert.equal(identifySafeReceipt(e,moved).requestId,req.requestId);
+ assert.throws(()=>authorize(e,moved),{code:'W03_GMH_SCORE_REQUEST_STOP'});
+ // Even a forged PASS raw result is never published as success on auth denial.
+ const forged=signedRaw(launch(child()),req);
+ const actual=await report({event:e,env:moved,raw:JSON.stringify(forged),
+  fetchApi:mockFetch});
+ assert.deepEqual(actual,{status:'STOP',created:2,verified:2});
+ const jsonUrl=[...uploads.keys()].find(x=>x.endsWith('.json'));
+ const safe=JSON.parse(uploads.get(jsonUrl));
+ assert.equal(safe.code,'W03_GMH_SCORE_CONTROL_PIN_DRIFT_STOP');
+ assert.equal(safe.status,'STOP');
+ assert.equal(safe.historyPoints,null);
+ assert.equal(safe.privateArtifactSha256,null);
+ assert.equal(comments.length,1);
+ assert.ok(comments[0].includes('STOP'));
+ assert.ok(!comments[0].includes('PASS'));
+ assert.equal([...uploads.keys()].length,2);
+ await assert.rejects(report({event:event(request(SCHEMA)),env:moved,
+  raw:'{}',fetchApi:mockFetch}),{code:'W03_GMH_SCORE_REQUEST_STOP'});
+ assert.throws(()=>identifySafeReceipt(event({...req,extra:true}),moved),
+  {code:'W03_GMH_SCORE_REQUEST_STOP'});
 });
