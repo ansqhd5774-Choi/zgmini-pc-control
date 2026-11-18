@@ -22,6 +22,8 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
+ MP_RETIRE_B_OPERATION,MP_RETIRE_B_ISSUE_TITLE,MP_RETIRE_B_MANIFEST,
+ validateMpRetireBIssueEnvelope,validateMpRetireBManifestRequest,
  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
   from './maintenance-contract.mjs';
 import {acquireMaintenanceLock,maintenanceLockStatus} from './maintenance-lock.mjs';
@@ -962,6 +964,199 @@ export async function runR54BApprovedOneShot({requestId,
   }
  }
 }
+// Exact one-task retirement B. Other task XML, GMH source, SQLite, D1,
+// Controller and provider calls are never writable by this operation.
+const MP_TASK=MP_RETIRE_B_MANIFEST.taskName;
+const MP_KEEP_TASKS=Object.freeze(['ZGMINI-PC-GetMarketHistory-ETF','ZGMINI-PC-Local-Core']);
+const mpError=(code)=>Object.assign(Error(code),{code});
+const mpFailure=(error,fallback)=>/^[A-Z0-9_]+$/.test(error?.code??'')
+ ?error.code:/^[A-Z0-9_]+$/.test(error?.message??'')?error.message:fallback;
+function mpDecodeXml(bytes){
+ need(Buffer.isBuffer(bytes)&&bytes.length>=50&&bytes.length<=262144,
+  'MP_B_TASK_XML_BYTES_INVALID');
+ if(bytes[0]===255&&bytes[1]===254)return bytes.subarray(2).toString('utf16le');
+ if(bytes[0]===254&&bytes[1]===255)return Buffer.from(bytes.subarray(2)).swap16().toString('utf16le');
+ if(bytes[1]===0&&bytes[3]===0)return bytes.toString('utf16le');
+ return bytes.toString('utf8').replace(/^\uFEFF/,'');
+}
+const mpXmlTag=(xml,name)=>[...xml.matchAll(new RegExp('<'+name+'(?:\\s[^>]*)?>([\\s\\S]*?)<\\/'+name+'>','gi'))];
+function mpEntities(value){
+ need(typeof value==='string'&&!/&(?!amp;|quot;|apos;|lt;|gt;)/i.test(value),
+  'MP_B_TASK_XML_ENTITY_INVALID');
+ return value.replace(/&(amp|quot|apos|lt|gt);/gi,(_,v)=>({
+  amp:'&',quot:'"',apos:"'",lt:'<',gt:'>'
+ })[v.toLowerCase()]);
+}
+export function inspectMpRetireTaskXml(bytes,entryBytes,{
+ pin=MP_RETIRE_B_MANIFEST,pinnedPreimage=true,
+}={}){
+ need(pin.taskName===MP_TASK&&pin.entryPath===MP_RETIRE_B_MANIFEST.entryPath,
+  'MP_B_TASK_SCOPE_INVALID');
+ if(pinnedPreimage)need(sha256(bytes)===pin.taskXmlSha256,
+  'MP_B_TASK_XML_PREIMAGE_DRIFT');
+ need(Buffer.isBuffer(entryBytes)&&entryBytes.length>0&&
+  sha256(entryBytes)===pin.entrySha256,'MP_B_ENTRY_SOURCE_SHA_DRIFT');
+ const xml=mpDecodeXml(bytes);
+ need(/<Task(?:\s|>)/i.test(xml)&&mpXmlTag(xml,'Exec').length===1,
+  'MP_B_TASK_EXEC_COUNT_INVALID');
+ const exec=mpXmlTag(xml,'Exec')[0][1];
+ const commands=mpXmlTag(exec,'Command'),argumentsRows=mpXmlTag(exec,'Arguments');
+ need(commands.length===1&&argumentsRows.length===1,'MP_B_TASK_ACTION_INVALID');
+ const command=mpEntities(commands[0][1]).trim().replace(/^"|"$/g,'');
+ const args=mpEntities(argumentsRows[0][1]);
+ need(path.win32.basename(command).toLowerCase()==='node.exe',
+  'MP_B_TASK_EXECUTABLE_CHANGED');
+ const scripts=[...args.matchAll(/[a-z]:\\(?:[^\s"'<>\\]+\\)*[^\s"'<>\\]+\.(?:mjs|js|cmd)\b/gi)]
+  .map(x=>path.win32.normalize(x[0]).toLowerCase());
+ need(scripts.length===1&&scripts[0]===path.win32.normalize(pin.entryPath).toLowerCase(),
+  'MP_B_TASK_ENTRY_CHANGED');
+ // schtasks may materialize <Enabled> when disabled; every other XML byte
+ // must remain identical across the two stable XML query snapshots.
+ const comparable=xml.replace(/<Enabled(?:\s[^>]*)?>\s*(?:true|false)\s*<\/Enabled>/gi,'')
+  .replace(/\r\n/g,'\n');
+ return {comparable,entrySha256:sha256(entryBytes)};
+}
+export function parseMpRetireTaskProbe(text){
+ const m=String(text??'').trim().match(/^MP_TASK\|(True|False)\|([1-4])\|([0-9]{1,5})$/);
+ need(m&&Number(m[3])<=10000,'MP_B_TASK_COM_PROBE_INVALID');
+ return {enabled:m[1]==='True',state:Number(m[2]),instances:Number(m[3])};
+}
+function mpRun(binary,args){
+ need(process.platform==='win32','MP_B_WINDOWS_REQUIRED');
+ const p=path.win32.join(process.env.SystemRoot||'C:\\Windows','System32',binary);
+ const x=spawnSync(p,args,{encoding:null,windowsHide:true,shell:false,
+  timeout:15000,maxBuffer:262144});
+ need(x.status===0&&!x.error&&!x.signal&&Buffer.isBuffer(x.stdout),
+  'MP_B_FIXED_WINDOWS_COMMAND_FAILED');
+ return x.stdout;
+}
+function mpNativeXml(task){
+ need(task===MP_TASK||MP_KEEP_TASKS.includes(task),'MP_B_QUERY_SCOPE_DENIED');
+ return mpRun('schtasks.exe',['/Query','/TN',task,'/XML']);
+}
+function mpNativeProbe(){
+ const source=path.win32.join(maintenanceRoot,'tools','maintenance-ancestry.vbs');
+ return parseMpRetireTaskProbe(mpRun('cscript.exe',['//NoLogo',source,
+  'MP_TASK_PROBE']).toString('utf8'));
+}
+function mpNativeEntry(){
+ const file=MP_RETIRE_B_MANIFEST.entryPath;
+ const stat=fs.lstatSync(file);
+ need(stat.isFile()&&!stat.isSymbolicLink()&&stat.size>0&&stat.size<=1048576,
+  'MP_B_ENTRY_FILE_UNSAFE');
+ const real=fs.realpathSync.native(file);
+ need(path.win32.normalize(real).toLowerCase()===path.win32.normalize(file).toLowerCase(),
+  'MP_B_ENTRY_REALPATH_DRIFT');
+ return fs.readFileSync(file);
+}
+function mpNativeDisable(){
+ mpRun('schtasks.exe',['/Change','/TN',MP_TASK,'/Disable']);
+}
+function mpWriteDurable(file,content,fsImpl=fs){
+ const fd=fsImpl.openSync(file,'wx');
+ try{
+  const bytes=Buffer.isBuffer(content)?content:Buffer.from(content,'utf8');
+  need(fsImpl.writeSync(fd,bytes,0,bytes.length)===bytes.length,
+   'MP_B_BACKUP_SHORT_WRITE');
+  fsImpl.fsyncSync(fd);
+ }finally{fsImpl.closeSync(fd);}
+ need(fsImpl.readFileSync(file).equals(Buffer.isBuffer(content)
+  ?content:Buffer.from(content,'utf8')),'MP_B_BACKUP_READBACK_DRIFT');
+}
+function mpAppendDurable(file,record,fsImpl=fs){
+ const fd=fsImpl.openSync(file,'a');
+ try{const bytes=Buffer.from(JSON.stringify(record)+'\n');
+  need(fsImpl.writeSync(fd,bytes,0,bytes.length)===bytes.length,
+   'MP_B_JOURNAL_SHORT_WRITE');fsImpl.fsyncSync(fd);
+ }finally{fsImpl.closeSync(fd);}
+}
+/** Test injection is only for isolated CI. The authenticated CLI calls this
+ * without overrides; the request itself never supplies Task, source or tools. */
+export async function runMpRetireApprovedOneShot({requestId,
+ queryXml=mpNativeXml,probe=mpNativeProbe,readEntry=mpNativeEntry,
+ disable=mpNativeDisable,acquireInstall=()=>acquireMaintenanceLock(maintenanceRoot,'controller-install'),
+ backupBase=path.join(maintenanceRoot,'ledger'),fsImpl=fs,pin=MP_RETIRE_B_MANIFEST,
+}={}){
+ need(/^pc-[a-z0-9-]{8,76}$/.test(requestId??''),'MP_B_REQUEST_ID_INVALID');
+ need(pin.taskName===MP_TASK&&pin.entryPath===MP_RETIRE_B_MANIFEST.entryPath,
+  'MP_B_TASK_SCOPE_INVALID');
+ const backupRoot=path.join(backupBase,'MP_TASK_RETIRE_B_'+requestId);
+ let lastPass='NONE',lease=null,disableAttempted=false,backupCreated=false;
+ const observe=()=>{
+  const xml=queryXml(MP_TASK),entry=readEntry(),state=probe();
+  const examined=inspectMpRetireTaskXml(xml,entry,{pin,pinnedPreimage:true});
+  const protectedXml=MP_KEEP_TASKS.map(queryXml);
+  need(protectedXml.every(x=>Buffer.isBuffer(x)&&x.length>0),
+   'MP_B_PROTECTED_TASK_UNOBSERVED');
+  need(state.enabled===true&&state.state===3&&state.instances===0,
+   'MP_B_TASK_NOT_READY_IDLE');
+  return {xml,entry,examined,protectedXml};
+ };
+ let before;
+ try{
+  need(!fsImpl.existsSync(backupRoot),'MP_B_PREVIOUS_REQUEST_RECONCILE');
+  before=observe();lastPass='MP_B_PREIMAGE_AND_GMH_VERIFIED';
+  lease=acquireInstall();
+  need(!fsImpl.existsSync(backupRoot),'MP_B_PREVIOUS_REQUEST_RECONCILE');
+  const fresh=observe();
+  need(fresh.xml.equals(before.xml)&&fresh.entry.equals(before.entry)&&
+   fresh.protectedXml.every((x,i)=>x.equals(before.protectedXml[i])),
+   'MP_B_PRE_DISABLE_SOURCE_OR_TASK_DRIFT');
+  fsImpl.mkdirSync(backupRoot);backupCreated=true;
+  mpWriteDurable(path.join(backupRoot,'task-original.xml'),fresh.xml,fsImpl);
+  mpWriteDurable(path.join(backupRoot,'protected-task-hashes.json'),
+   JSON.stringify({tasks:MP_KEEP_TASKS.map((task,i)=>({
+    task,sha256:sha256(fresh.protectedXml[i])})),
+    entrySha256:sha256(fresh.entry),
+    taskXmlSha256:sha256(fresh.xml)})+'\n',fsImpl);
+  const journal=path.join(backupRoot,'JOURNAL.jsonl');
+  mpWriteDurable(journal,JSON.stringify({phase:'BACKUP_VERIFIED',
+   at:new Date().toISOString(),task:MP_TASK})+'\n',fsImpl);
+  lastPass='MP_B_ORIGINAL_BACKUP_DURABLE';
+  // No process kill, source replacement, SQLite write, provider fetch or
+  // other Task mutation. The original Task is never automatically restored.
+  disableAttempted=true;disable();
+  const afterXml=queryXml(MP_TASK),afterState=probe(),afterEntry=readEntry();
+  const after=inspectMpRetireTaskXml(afterXml,afterEntry,{pin,pinnedPreimage:false});
+  need(afterState.enabled===false&&afterState.state===1&&afterState.instances===0,
+   'MP_B_TASK_DISABLE_READBACK_UNKNOWN');
+  need(after.comparable===fresh.examined.comparable &&
+   after.entrySha256===fresh.examined.entrySha256,
+   'MP_B_TASK_DEFINITION_OR_SOURCE_CHANGED');
+  need(MP_KEEP_TASKS.map(queryXml).every((x,i)=>x.equals(fresh.protectedXml[i])),
+   'MP_B_GMH_OR_CORE_TASK_CHANGED');
+  mpAppendDurable(journal,{phase:'DISABLED_VERIFIED',
+   at:new Date().toISOString(),task:MP_TASK},fsImpl);
+  lastPass='MP_B_DISABLED_GMH_CORE_PRESERVED';
+  return {status:'SUCCEEDED',code:'MP_B_EXACT_TASK_DISABLED_VERIFIED',
+   requestId,task:MP_TASK,taskEnabled:false,taskWrites:1,
+   gmhTaskPreserved:true,coreTaskPreserved:true,entrySourcePreserved:true,
+   originalXmlBackupSha256:sha256(fresh.xml),providerCalls:0,d1Writes:0,
+   controllerWrites:0,writerFilesChanged:0,noAutomaticRetry:true};
+ }catch(error){
+  const code=mpFailure(error,'MP_B_EXECUTION_UNKNOWN');
+  return {status:disableAttempted?'UNKNOWN':'BLOCKED',code,firstFail:code,
+   lastPass,requestId,task:MP_TASK,
+   taskWrites:disableAttempted?null:0,originalBackupCreated:backupCreated,
+   providerCalls:0,d1Writes:0,controllerWrites:0,writerFilesChanged:0,
+   noAutomaticRetry:true};
+ }finally{
+  if(lease){
+   if(disableAttempted) {
+    // An uncertain command may have disabled the Task despite exit failure:
+    // preserve the original backup and exclusive lease for exact recovery.
+    // The verified success path releases the lease below (see exit marker).
+   }
+   const ledger=path.join(backupRoot,'JOURNAL.jsonl');
+   let successful=false;
+   try{successful=fsImpl.readFileSync(ledger,'utf8').includes('"phase":"DISABLED_VERIFIED"');}
+   catch{/* Incomplete attempt is never considered successful. */}
+   if(disableAttempted&&!successful)lease.holdForRecovery();
+   else lease.release();
+  }
+ }
+}
+
 const sameR6WindowsPath=(left,right)=>path.win32.normalize(left).toLowerCase()===path.win32.normalize(right).toLowerCase();
 const r6FileIdentity=file=>{const s=fs.statSync(file,{bigint:true});
  need(s.isFile(),'R6_HOST_DB_NOT_REGULAR');
