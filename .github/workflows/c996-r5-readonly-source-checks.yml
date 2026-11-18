@@ -26,6 +26,8 @@ jobs:
         run: node --test tests/pc-source-origin-readonly.test.mjs tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs tests/agent-handoff-pc-resource-wait.test.mjs tests/shared-resource-lifecycle.test.mjs
       - name: Verify direct Writer B local ledger and configured-runtime status contracts
         run: node --test direct-writer-b/configured-direct-b.test.mjs
+      - name: Verify exact R6 missing week and jurisdiction readonly evidence
+        run: node --test tests/employment-r6-collection-evidence-readonly.test.mjs
       - name: Verify bounded R6 collection and publication core-status projection
         run: node --test tests/core-status-employment-r6-readonly.test.mjs
       - name: Verify R17 bounded IEX error readback (source-only)
