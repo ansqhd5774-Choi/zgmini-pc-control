@@ -157,6 +157,7 @@ test('dedicated R181 workflow titles are not falsely rejected by shared ingress'
   'w03-gmh-seven-private-score-once',
   'w03-gmh-seven-public-compat-readonly',
   'w03-gmh-seven-d1-seed-readonly',
+  'w03-gmh-seven-collection-time-readonly',
   'w03-r47-private-readback-once',
   'w03-r48-private-readback-once',
   'w03-r51-stored-date-readback-once',

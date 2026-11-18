@@ -62,6 +62,10 @@ on:
       - 'tools/w03-gmh-seven-d1-seed-a.mjs'
       - 'tools/w03-gmh-seven-d1-seed-preflight.mjs'
       - 'tools/w03-gmh-seven-d1-seed-report.mjs'
+      - 'tools/w03-gmh-seven-collection-time-a.mjs'
+      - 'tools/w03-gmh-seven-collection-time-preflight.mjs'
+      - 'tools/w03-gmh-seven-collection-time-report.mjs'
+      - 'tests/w03-gmh-seven-collection-time-a.test.mjs'
       - 'tests/w03-gmh-seven-d1-seed-a.test.mjs'
       - 'tools/w03-r179-guard-shape-readonly.mjs'
       - 'tools/w03-r179-guard-shape-report.mjs'
@@ -157,6 +161,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
       - name: Verify W03 immutable D1 seed and rolling read-only overlap without credential refresh
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-d1-seed-a.test.mjs
+      - name: Verify W03 exact pinned GMH 14-symbol collection-time read-only one-shot
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-collection-time-a.test.mjs
       - name: Verify W03 pinned 7x252 vs public base/R32 read-only comparison
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
       - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
