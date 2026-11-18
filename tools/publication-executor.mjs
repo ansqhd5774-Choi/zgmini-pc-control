@@ -368,7 +368,12 @@ async function execute(){
     phase=nextLedgerPhase(phase,'APPLY_START');writeAtomic(ledgerPath,phase);
     // The B executor alone derives these pins from its verified, unique preflight file.
     // User Issue fields cannot inject or override publisher environment checkpoints.
-    const applyEnv=bea||mfg?childEnv:{...childEnv,
+    const applyEnv=mfg?{...childEnv,
+      ZGMINI_EARNINGS_BEA_MFG_B_PIN_REQUIRED:'1',
+      ZGMINI_EARNINGS_BEA_MFG_SOURCE_VERSION:mfgPin.sourceVersion,
+      ZGMINI_EARNINGS_BEA_MFG_SOURCE_STORED_AT:String(mfgPin.sourceStoredAt),
+      ZGMINI_EARNINGS_BEA_MFG_OBSERVED_THROUGH:mfgPin.period}:
+      bea?childEnv:{...childEnv,
       ZGMINI_EARNINGS_QFR_SOURCE_VERSION:qfrPin.sourceVersion,
       ZGMINI_EARNINGS_QFR_RAW_ZIP_SHA256:qfrPin.rawZipSha256,
       ZGMINI_EARNINGS_QFR_SOURCE_STORED_AT:String(qfrPin.sourceStoredAt)};
