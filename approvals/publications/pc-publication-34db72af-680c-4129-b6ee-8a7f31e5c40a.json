@@ -3,7 +3,7 @@
   "requestId": "pc-publication-34db72af-680c-4129-b6ee-8a7f31e5c40a",
   "operation": "census-qfr-margin-once",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "publisherSha": "7b95f8fee83b031a14bf2e199b812d403e211c19",
+  "publisherSha": "24f80c4cc096114537ceb5c5a7dab01591791c43",
   "operationalSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
   "snapshotKey": "detail:earnings-recession-indicators:census-qfr-mfg-margin:v1",
   "publisherFiles": {
