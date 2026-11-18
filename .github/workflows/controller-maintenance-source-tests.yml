@@ -20,6 +20,8 @@ on:
       - 'controller/inflation-event129-b-proof.mjs'
       - 'controller/inflation-vbs-b-proof.mjs'
       - 'controller/operations.mjs'
+      - 'controller/inflation-census-m3-archived-headers-readonly.mjs'
+      - 'controller/inflation-census-m3-archived-headers-readonly.test.mjs'
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
       - 'tests/theme-l7-runtime-readonly.test.mjs'
@@ -130,6 +132,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
       - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
         run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
+      - name: Verify W01 Census M3 archived-header A scope and redaction
+        run: node --test --test-concurrency=1 controller/inflation-census-m3-archived-headers-readonly.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R32 64-symbol GMH raw/checkpoint SHA coverage, without provider calls
