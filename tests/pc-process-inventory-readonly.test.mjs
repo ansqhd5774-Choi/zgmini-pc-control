@@ -1,7 +1,9 @@
 import test from 'node:test';
+import {createHash} from 'node:crypto';
+import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -689,4 +691,136 @@ test('no UNCLASSIFIED_OTHER gives complete empty attribution only for empty grou
  assert.throws(()=>sanitizeProbe({...base,unclassifiedAttribution:[
   {class:'SESSION_ZERO_NONRUNNER',count:1,workingSetMiB:50,privateCommitMiB:80}
  ]}));
+});
+
+const C2094_ID='pc-update-dbed28c1-a59b-403b-84c6-8cf190930cb5';
+function stage2094Fixture(){
+ return {status:'STATUS',installedReadbackCode:null,ledgerReadbackCode:null,
+  lockReadbackCode:null,artifactReadbackCode:null,
+  actualControllerSha:'f7f1559bc0ef15bb9b375982d048369c474c490f',
+  installLock:{held:false,recoveryRequired:false,ownerPid:12345,nonce:'NO_EXPORT'},
+  ledger:{schema:'ZGMINI_PC_UPDATE_RESULT_V1',requestId:C2094_ID,
+   issueNumber:2094,targetSha:'ead5d2d585ff2ce2a6df5f9b6cf720f65d90b49b',
+   installedShaBefore:'f7f1559bc0ef15bb9b375982d048369c474c490f',
+   status:'BLOCKED',phase:'BLOCKED',firstFail:'STAGED',
+   failureOperation:'pauseIntake',code:'WORKFLOW_DISABLE_NOT_CONFIRMED',
+   workflowEnabled:true,nonce:'CONFIDENTIAL',absolutePath:'E:/PRIVATE/data',
+   providerApiKey:'SECRET'},
+  artifacts:{schema:'ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1',requestId:C2094_ID,
+   status:'OBSERVED',recoveryComplete:false,installSuccessProven:false,
+   artifacts:{backupRoot:'PRESENT',stageRoot:'PRESENT',stagedHost:'PRESENT',
+    snapshotRoot:'ABSENT',originalHost:'ABSENT',protectedBefore:'ABSENT',
+    previousHost:'ABSENT'},backlog:{file:'PRESENT',windows:1,openWindows:0,
+     replayCount:0,secret:'NO_EXPORT'},
+   lease:{directory:'ABSENT',ownerFile:'ABSENT',recoveryMarker:'ABSENT',
+    ownerMarkerMatch:null,privateOwner:'NO_EXPORT'}}};
+}
+test('C2094 fixed A scope reports actual stage metadata but NEVER approves recovery',()=>{
+ const j=stage2094Fixture(),r=summarize2094StageStatus(j);
+ assert.equal(r.status,'READ_ONLY_OBSERVED');
+ assert.equal(r.ledgerFirstFail,'STAGED');
+ assert.equal(r.ledgerFailureOperation,'pauseIntake');
+ assert.equal(r.backup.stageRoot,'PRESENT');
+ assert.equal(r.backlog.openWindows,0);
+ assert.equal(r.lease.held,false);
+ assert.equal(r.restorationVerified,false);
+ assert.equal(r.recoveryEligible,false);
+ const output=JSON.stringify(r);
+ assert.doesNotMatch(output,/NO_EXPORT|CONFIDENTIAL|SECRET|PRIVATE|ownerPid|nonce|absolutePath|providerApiKey/);
+ assert.equal(inspect2094StageReadonly(()=>j).status,'READ_ONLY_OBSERVED');
+});
+test('C2094 fixed A scope rejects wrong issue, target, prior SHA and foreign request',()=>{
+ const a=stage2094Fixture(),bad=[
+  {...a,ledger:{...a.ledger,requestId:'pc-update-other-1234567890'}},
+  {...a,ledger:{...a.ledger,issueNumber:9999}},
+  {...a,ledger:{...a.ledger,targetSha:'a'.repeat(40)}},
+  {...a,ledger:{...a.ledger,installedShaBefore:'b'.repeat(40)}},
+  {...a,artifacts:{...a.artifacts,requestId:'pc-update-other-1234567890'}},
+  {...a,installedReadbackCode:'INSTALLED_MANIFEST_UNAVAILABLE'}
+ ];
+ for(const j of bad)assert.equal(summarize2094StageStatus(j).status,'STATE_UNKNOWN');
+});
+test('C2094 fixed A scope fails closed on unknown type, damaged readback or unstable snapshot',()=>{
+ const a=stage2094Fixture();
+ for(const j of [
+  {...a,artifacts:{...a.artifacts,status:'UNVERIFIED'}},
+  {...a,artifactReadbackCode:'UPDATE_ARTIFACTS_UNVERIFIED'},
+  {...a,installLock:{held:'false'}},
+  {...a,artifacts:{...a.artifacts,artifacts:{...a.artifacts.artifacts,stageRoot:'SYMLINK'}}},
+  {...a,artifacts:{...a.artifacts,backlog:{...a.artifacts.backlog,openWindows:-1}}},
+ ]){
+  const result=summarize2094StageStatus(j);
+  assert.equal(result.status,'STATE_UNKNOWN');
+  assert.equal(result.recoveryEligible,false);
+ }
+ assert.equal(inspect2094StageReadonly(()=>{throw Error('secret token');}).status,'STATE_UNKNOWN');
+ let reads=0;
+ const changed=inspect2094StageReadonly(()=>({
+  ...a,artifacts:{...a.artifacts,backlog:{...a.artifacts.backlog,openWindows:reads++?1:0}}}));
+ assert.equal(changed.code,'C2094_DOUBLE_READ_CHANGED');
+ assert.doesNotMatch(JSON.stringify(changed),/secret|token/i);
+});
+
+test('fixed MarketParquet Task fingerprint never reveals credentials or command line',()=>{
+ const xml='<Task><Settings><Enabled>true</Enabled></Settings><Actions><Exec>'+
+  '<Command>C:\\Windows\\System32\\cmd.exe</Command>'+
+  '<Arguments>/d /c &quot;E:\\ZGmini\\data\\pc-writer\\legacy\\collect.cmd&quot; SECRET_TOKEN</Arguments>'+
+  '</Exec></Actions></Task>';
+ const bytes=Buffer.from(xml);
+ const evidence=inspectTask({platform:'win32',query:()=>({status:0,stdout:bytes}),
+  hashEntry:p=>{assert.equal(p,'E:\\ZGmini\\data\\pc-writer\\legacy\\collect.cmd');return 'a'.repeat(64);},
+  clock:()=> '2026-11-18T09:00:00Z'});
+ assert.equal(TASK,'ZGMINI-PC-MarketParquet-ETF');
+ assert.equal(evidence.status,'PASS');
+ assert.equal(evidence.taskEnabled,true);
+ assert.equal(evidence.actionKind,'CMD');
+ assert.equal(evidence.entryFileScope,'E_DATA');
+ assert.equal(evidence.entryFileLeaf,'collect.cmd');
+ assert.equal(evidence.entryFileSha256,'a'.repeat(64));
+ assert.equal(evidence.taskXmlSha256,createHash('sha256').update(bytes).digest('hex'));
+ assert.doesNotMatch(JSON.stringify(evidence),/SECRET_TOKEN|legacy|\/d \/c|C:\\Windows/);
+});
+test('MarketParquet Task probe fails closed for missing/ambiguous/unapproved sources',()=>{
+ const doc=(enabled,execs)=>'<Task><Settings><Enabled>'+enabled+'</Enabled></Settings><Actions>'+execs+'</Actions></Task>';
+ const exec=p=>'<Exec><Command>E:\\ZGmini\\runtime\\node.exe</Command><Arguments>'+p+'</Arguments></Exec>';
+ const probe=x=>inspectTask({platform:'win32',query:()=>({status:0,stdout:Buffer.from(x)}),
+  hashEntry:()=> 'b'.repeat(64)});
+ assert.equal(inspectTask({platform:'linux'}).status,'STATE_UNKNOWN');
+ assert.equal(probe(doc('true',exec('C:\\Users\\x.mjs'))).code,'TASK_SOURCE_OUTSIDE_APPROVED_ROOT');
+ assert.equal(probe(doc('true',exec('E:\\ZGmini\\data\\a.mjs')+exec('E:\\ZGmini\\data\\b.mjs'))).code,'TASK_EXEC_ACTION_COUNT_NOT_ONE');
+ assert.equal(probe(doc('false',exec('E:\\ZGmini\\data\\x.mjs'))).taskEnabled,false);
+ assert.equal(probe(doc('true','')).status,'STATE_UNKNOWN');
+ assert.equal(inspectTask({platform:'win32',query:()=>({status:1,stderr:Buffer.from('SECRET')})}).code,
+  'TASK_QUERY_UNAVAILABLE');
+});
+
+test('Task XML without explicit Settings Enabled still fingerprints one action without claiming Task enabled',()=>{
+ const xml='<Task><Settings></Settings><Actions><Exec>'+
+  '<Command>E:\\ZGmini\\runtime\\node.exe</Command>'+
+  '<Arguments>E:\\ZGmini\\data\\pc-writer\\collector.mjs</Arguments>'+
+  '</Exec></Actions></Task>';
+ const result=inspectTask({platform:'win32',query:()=>({status:0,stdout:Buffer.from(xml)}),
+  hashEntry:()=> 'f'.repeat(64)});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'TASK_ENABLED_FIELD_ABSENT_SOURCE_FINGERPRINTED');
+ assert.equal(result.enabledFieldPresent,false);
+ assert.equal(result.execActionCount,1);
+ assert.equal(result.taskEnabled,null);
+ assert.equal(result.entryFileLeaf,'collector.mjs');
+ assert.equal(result.entryFileSha256,'f'.repeat(64));
+ assert.equal(result.operationalWrites,0);
+ assert.equal(result.providerCalls,0);
+});
+test('missing and multiple Task Exec actions are distinct hard-UNKNOWN without source access',()=>{
+ const inspect=xml=>inspectTask({platform:'win32',
+  query:()=>({status:0,stdout:Buffer.from(xml)}),
+  hashEntry:()=>{throw Error('HASH_ENTRY_MUST_NOT_RUN');}});
+ const empty=inspect('<Task><Settings><Enabled>true</Enabled></Settings><Actions></Actions></Task>');
+ assert.equal(empty.status,'STATE_UNKNOWN');
+ assert.equal(empty.code,'TASK_EXEC_ACTION_COUNT_NOT_ONE');
+ assert.equal(empty.execActionCount,0);
+ const two=inspect('<Task><Settings></Settings><Actions><Exec></Exec><Exec></Exec></Actions></Task>');
+ assert.equal(two.status,'STATE_UNKNOWN');
+ assert.equal(two.execActionCount,2);
+ assert.equal(two.taskEnabled,null);
 });

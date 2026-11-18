@@ -148,6 +148,49 @@ test('an entire zero prior four-week state base prevents a valid score',t=>{
  assert.equal(r.stateClaims.firstWindowBreak?.reason,'PRIOR_4W_ZERO_BASE');
 });
 
+test('W04 PIT-04-07 NULL in a prior 4-week state base is not silently ignored by SQLite SUM',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ seed(db);
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=NULL WHERE geography_code='WY' AND observation_date='2025-01-04'").run();
+ db.close();
+ const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.stateClaims.sampledWeeks,56);
+ assert.equal(r.stateClaims.complete51Weeks,55);
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].invalidValues,1);
+ assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
+ assert.equal(r.stateClaims.firstWindowBreak?.reason,'STATE_CLAIMS_VALUE_INVALID');
+ assert.equal(r.stateClaims.latestStrict52WeekCandidate,null);
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),beforeHash);assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+});
+
+test('W04 PIT-04-07 invalid state claim counts cannot certify 51-state or 10y raw windows',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=NULL WHERE geography_code='WY' AND observation_date='2026-10-31'").run();
+ db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.sampledWeeks,577);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'STATE_CLAIMS_VALUE_INVALID');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+ assert.equal(r.stateClaims.latestStrict52WeekCandidate,'2026-10-24');
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(sha(file),before);
+ const cases=[-1,1.5,'not-a-count'];
+ for(const value of cases){
+  const writing=new DatabaseSync(file);
+  writing.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=? WHERE geography_code='WY' AND observation_date='2026-10-31'").run(value);
+  writing.close();
+  const checked=inspectEmploymentR6CollectionEvidence(data);
+  assert.equal(checked.stateClaims.fullTenYearRawCoverage.status,'STATE_CLAIMS_VALUE_INVALID',String(value));
+  assert.equal(checked.stateClaims.incompleteWeeks,1,String(value));
+ }
+});
+
 test('530 complete weeks cannot satisfy 10-year claims coverage without older stored rows',t=>{
  const {data,file}=fixture(t),db=createDb(file);
  seed(db,{weeks:530,startDate:'2015-10-17'});db.close();

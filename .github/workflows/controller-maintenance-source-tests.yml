@@ -22,6 +22,8 @@ on:
       - 'controller/operations.mjs'
       - 'controller/inflation-census-m3-archived-headers-readonly.mjs'
       - 'controller/inflation-census-m3-archived-headers-readonly.test.mjs'
+      - 'controller/earnings-bea-mfg-archive-readonly.mjs'
+      - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
       - 'tests/theme-l7-runtime-readonly.test.mjs'
@@ -51,6 +53,8 @@ on:
       - 'tools/w03-gmh-seven-private-score-preflight.mjs'
       - 'tools/w03-gmh-seven-private-score-report.mjs'
       - 'tests/w03-gmh-seven-private-score-once.test.mjs'
+      - 'tools/w03-gmh-seven-saved-score-v2.mjs'
+      - 'tests/w03-gmh-seven-saved-score-v2.test.mjs'
       - 'tools/w03-gmh-seven-public-compat-a.mjs'
       - 'tools/w03-gmh-seven-public-compat-report.mjs'
       - 'tests/w03-gmh-seven-public-compat-a.test.mjs'
@@ -68,6 +72,18 @@ on:
       - 'tests/w03-r179-seven-readback-b.test.mjs'
       - 'tests/w03-r179-seven-readback-approval.test.mjs'
       - 'approvals/w03-r179-guard/**'
+      - 'tools/w03-r47-private-readback.mjs'
+      - 'tools/w03-r47-private-readback-report.mjs'
+      - 'tools/w03-r48-private-readback.mjs'
+      - 'tools/w03-r48-private-readback-report.mjs'
+      - 'tools/w03-r51-stored-date-readback.mjs'
+      - 'tools/w03-r51-stored-date-report.mjs'
+      - 'tests/w03-r51-stored-date-readback.test.mjs'
+      - 'approvals/w03-r51-readback/**'
+      - 'tests/w03-r48-private-readback.test.mjs'
+      - 'approvals/w03-r48-readback/**'
+      - 'tests/w03-r47-private-readback.test.mjs'
+      - 'approvals/w03-r47-readback/**'
       - 'tests/w03-r179-stored-handoff.test.mjs'
       - 'tests/w03-r179-guard-shape.test.mjs'
       - 'tools/r181-protected-b-windows-io.mjs'
@@ -146,6 +162,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
       - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-private-score-once.test.mjs
+      - name: Verify same existing B title V2 SHA/rights/private result contract
+        run: node --test --test-concurrency=1 tests/w03-gmh-seven-saved-score-v2.test.mjs
       - name: Verify W03 bounded GMH seven-theme manual Windows collection is exact and private
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-manual-once.test.mjs
       - name: Verify W03 R179 fixed operator-shape read-only A and redaction
@@ -154,10 +172,18 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
       - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
         run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
+      - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
+        run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs
       - name: Verify immutable W03 R179 B approval SHA and zero-publication rights
         run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-approval.test.mjs
       - name: Verify W03 exact R179 seven-versus-ten B source contract and isolated transaction simulation
         run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-b.test.mjs
+      - name: Verify W03 exact R47 private pair readback B source and report privacy
+        run: node --test --test-concurrency=1 tests/w03-r47-private-readback.test.mjs
+      - name: Verify W03 R48 candidate and exact R47 pair SHA without touching PC files
+        run: node --test --test-concurrency=1 tests/w03-r48-private-readback.test.mjs
+      - name: Verify W03 R51 private provisional saved dates and SHA without public API calls
+        run: node --test --test-concurrency=1 tests/w03-r51-stored-date-readback.test.mjs
       - name: Verify W03 R179 stored handoff source/ledger/privacy before running existing PC-only publisher
         run: node --test --test-concurrency=1 tests/w03-r179-stored-handoff.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only

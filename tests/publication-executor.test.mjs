@@ -221,3 +221,24 @@ test('QFR apply result proves the actual key, no side effects and exact D1 outco
  assert.match(executor,/request\.operation,invocation\.snapshotKey\)/);
  assert.match(executor,/\.\.\.evidence,\.\.\.\(bea\?\{key:invocation\.snapshotKey\}:\{\}\)/);
 });
+
+
+test('manufacturing one-shot uses fixed SHA arguments and verified JSON readback without changing legacy B operations',()=>{
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/const mfg=request\.operation==='bea-manufacturing-profit-once'/);
+ assert.match(executor,/\['--source-sha',invocation\.sourceSha256,'--dry-run'\]/);
+ assert.match(executor,/\['--source-sha',invocation\.sourceSha256,\.\.\.invocation\.flags\]/);
+ assert.match(executor,/parseBeaMfgResult\(preflightEvidence/);
+ assert.match(executor,/parseBeaMfgResult\(applied\.output/);
+ assert.match(executor,/if\(!bea&&!mfg\)validateQfrApplySource\(qfrPin,evidence\)/);
+ assert.match(executor,/if\(!bea&&!mfg&&applied\.exitCode===1/);
+ for(const name of ['ZGMINI_EARNINGS_BEA_MFG_B_PIN_REQUIRED',
+   'ZGMINI_EARNINGS_BEA_MFG_SOURCE_VERSION',
+   'ZGMINI_EARNINGS_BEA_MFG_SOURCE_STORED_AT',
+   'ZGMINI_EARNINGS_BEA_MFG_OBSERVED_THROUGH'])
+   assert.ok(executor.includes(name));
+ assert.match(executor,/validatePublicationReadback\(validated/);
+ const contract=source('tools/publication-contract.mjs');
+ assert.match(contract,/BEA_MANUFACTURING_PROFIT_SINGLE_KEY_D1_ONCE/);
+ assert.match(contract,/STORED_CSV_ONLY/);
+});

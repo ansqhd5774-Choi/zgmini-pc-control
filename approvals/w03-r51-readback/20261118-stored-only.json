@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_W03_R51_READBACK_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "R51_SAVED_PRIVATE_DATE_SHA_READONLY",
+  "operation": "w03-r51-stored-date-readback-once",
+  "dataRoot": "E:\\ZGmini\\data",
+  "maxFiles": 512,
+  "allowProviderCalls": false,
+  "allowPublicGets": false,
+  "allowSqlite": false,
+  "allowPCWrites": false,
+  "allowD1": false,
+  "allowTaskChanges": false,
+  "maxRuns": 1
+}

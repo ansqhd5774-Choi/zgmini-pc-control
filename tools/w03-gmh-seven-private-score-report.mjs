@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {authorize,OUTPUT} from './w03-gmh-seven-private-score-once.mjs';
+import {authorize,identifySafeReceipt,OUTPUT,SAVED_SCHEMA} from './w03-gmh-seven-private-score-once.mjs';
 import {REPO,APPROVED_SOURCE_SHA} from './w03-gmh-seven-manual-once.mjs';
 const SHA64=/^[a-f0-9]{64}$/;
 const SHA40=/^[a-f0-9]{40}$/;
@@ -13,22 +13,43 @@ const need=(v,code)=>{if(!v)fail(code);};
 const base=(req,env)=>({schema:OUTPUT,status:'STATE_UNKNOWN',
  code:'W03_GMH_SCORE_RESULT_UNVERIFIED',requestId:req.requestId,
  runId:RUN.test(env.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
- sourceCommit:APPROVED_SOURCE_SHA,providerCalls:0,d1Writes:0,
+ sourceCommit:req.candidateSourceSha,providerCalls:0,d1Writes:0,
  publicWrites:0,taskChanges:0,rawBarExposure:false,
  retry:'NO_AUTOMATIC_REEXECUTION',
  observationDate:null,commonSessionCount:null,historyPoints:null,
- inputManifestSha256:null,privateArtifactSha256:null});
+ inputManifestSha256:null,privateArtifactSha256:null,
+ checkpointSha256:null,rawPagesVerified:null,localSaved:null});
 export function sanitize(raw,req,env){
  const a=base(req,env);
  if(raw?.schema!==OUTPUT||raw.requestId!==req.requestId||
-  raw.controlSha!==req.controlSourceSha||
+  raw.controlSha!==env.GITHUB_SHA||
   !SHA40.test(raw.controlSha??'')||
-  raw.sourceCommit!==APPROVED_SOURCE_SHA||
+  raw.sourceCommit!==req.candidateSourceSha||
   raw.providerCalls!==0||raw.d1Writes!==0||
   raw.publicWrites!==0||raw.taskChanges!==0||
   raw.rawBarExposure!==false||raw.retry!=='NO_AUTOMATIC_REEXECUTION')return a;
  if(raw.status==='STOP'&&CODE.test(raw.code??''))
   return {...a,status:'STOP',code:raw.code};
+ if(req.schema===SAVED_SCHEMA){
+  if(raw.status!=='PASS'||raw.code!=='W03_GMH_SCORE_SAVED_7X252_VERIFIED'||
+   !/^\d{4}-\d\d-\d\d$/.test(raw.observationDate??'')||
+   !Number.isSafeInteger(raw.commonSessionCount)||
+   raw.commonSessionCount<628||
+   raw.historyPoints!==1764||
+   !Number.isSafeInteger(raw.rawPagesVerified)||
+   raw.rawPagesVerified<14||raw.rawPagesVerified>256||
+   raw.localSaved!==true||
+   !SHA64.test(raw.checkpointSha256??'')||
+   !SHA64.test(raw.inputManifestSha256??'')||
+   !SHA64.test(raw.privateArtifactSha256??''))return a;
+  return {...a,status:'PASS',code:raw.code,
+   observationDate:raw.observationDate,
+   commonSessionCount:raw.commonSessionCount,historyPoints:1764,
+   inputManifestSha256:raw.inputManifestSha256,
+   privateArtifactSha256:raw.privateArtifactSha256,
+   checkpointSha256:raw.checkpointSha256,
+   rawPagesVerified:raw.rawPagesVerified,localSaved:true};
+ }
  if(raw.status!=='PASS'||raw.code!=='W03_GMH_SCORE_PRIVATE_7X252_VERIFIED'||
   !/^\d{4}-\d\d-\d\d$/.test(raw.observationDate??'')||
   !Number.isSafeInteger(raw.commonSessionCount)||
@@ -49,13 +70,23 @@ const check=async(fetchApi,url,headers,contents)=>{
  }catch{return false;}
 };
 export async function report({event,env,raw,fetchApi=fetch}){
- const req=authorize(event,env);
+ let req,admitted=true;
+ try{req=authorize(event,env);}
+ catch(error){
+  if(error?.code!=='W03_GMH_SCORE_REQUEST_STOP')throw error;
+  // This fallback NEVER grants execution; a previously pinned V2 request
+  // can only receive a redacted STOP receipt when GitHub's event HEAD drifted.
+  req=identifySafeReceipt(event,env);
+  if(req.schema!==SAVED_SCHEMA)throw error;
+  admitted=false;
+ }
  need(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>=20&&
   RUN.test(env.GITHUB_RUN_ID??''),'W03_GMH_SCORE_REPORT_AUTH_STOP');
  let parsed=null;
  try{parsed=typeof raw==='string'&&Buffer.byteLength(raw)<=5000?
   JSON.parse(raw):null;}catch{}
- const result=sanitize(parsed,req,env);
+ const result=admitted?sanitize(parsed,req,env):{
+  ...base(req,env),status:'STOP',code:'W03_GMH_SCORE_CONTROL_PIN_DRIFT_STOP'};
  const headers={accept:'application/vnd.github+json',
   authorization:'Bearer '+env.GITHUB_TOKEN,
   'x-github-api-version':'2022-11-28',
@@ -66,6 +97,9 @@ export async function report({event,env,raw,fetchApi=fetch}){
   'COMMON_SESSIONS='+(result.commonSessionCount??'UNKNOWN'),
   'HISTORY_POINTS='+(result.historyPoints??'UNKNOWN'),
   'MANIFEST_SHA256='+(result.inputManifestSha256??'UNKNOWN'),
+  'CHECKPOINT_SHA256='+(result.checkpointSha256??'UNKNOWN'),
+  'VERIFIED_RAW_PAGES='+(result.rawPagesVerified??'UNKNOWN'),
+  'PRIVATE_LOCAL_SAVED='+(result.localSaved??'UNKNOWN'),
   'PRIVATE_OUTPUT_SHA256='+(result.privateArtifactSha256??'UNKNOWN'),
   'PROVIDER_CALLS=0','D1_WRITES=0','PUBLIC_WRITES=0',
   'RAW_BAR_EXPOSURE=false','RETRY=NO_AUTOMATIC_REEXECUTION',''].join('\n');

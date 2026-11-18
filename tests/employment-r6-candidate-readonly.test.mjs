@@ -1,10 +1,11 @@
 import {test} from 'node:test';
+import {validateRequest} from '../controller/common.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {validateBundle,inspectEmploymentR6Candidate} from '../controller/employment-r6-candidate-readonly.mjs';
+import {validateBundle,inspectEmploymentR6Candidate,projectPit04KeyReview} from '../controller/employment-r6-candidate-readonly.mjs';
 
 const ENTRY='scripts/pc-writer/employment-r6-runner-stage.mjs';
 const SHA='a'.repeat(40);
@@ -397,4 +398,118 @@ test('PIT-04-05 invalid status cannot forge lineage readiness or promote a candi
   assert.equal(r.pit.rawLineageEvidenceStatus,'NO_RUNTIME_EVIDENCE');
   assert.equal(r.promotionApproved,false);
   assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RESPONSE_SHOULD_NOT_LEAK/);
+});
+
+const PIT04_FILE='lib/market-score/employment-r6-pit04-key-evidence.mjs';
+const PIT04_READER='scripts/pc-writer/employment-r6-pit-coverage.mjs';
+const pit04Fixture=()=>({
+ kind:'EMPLOYMENT_R6_PIT0408_KEY_REVIEW_SOURCE_ONLY_V1',
+ status:'HOLD_KEY_CLASSIFICATION_NOT_RAW_PIT_ATTESTATION',
+ counts:{coreKeys:27,coreHistoryMissing:4,coreHistoryConflict:0,
+  coreHistoryAmbiguous:0,candidateOverlapConflicts:1,
+  missingCandidateInternalMatch:3,missingCandidateIncomplete:1,
+  missingWithoutCandidate:0,duplicateCurrentKeys:0},
+ evidenceTotal:1,offset:0,pageSize:8,evidenceTruncated:false,nextOffset:null,
+ evidence:[{logicalSeriesId:'STATE_INITIAL_CLAIMS',geographyCode:'AK',
+  observationDate:'2026-10-31',reason:'CANDIDATE_CURRENT_CONFLICT',
+  coreHistoryMissing:true,candidateCurrentConflict:true,
+  rawPitAttested:false,repairAuthorized:false,
+  source_hash:'SENSITIVE_HASH_MUST_NOT_LEAK',value:1234}],
+ rawPitAttested:false,promotionApproved:false,repairAuthorized:false,
+ rawPrivate:{path:'SENSITIVE_PC_PATH_MUST_NOT_LEAK'},
+});
+function sealPit04Fixture(f,review=pit04Fixture(),{includeReview=true,includeReader=true}={}){
+ const original=fs.readFileSync(f.script,'utf8');
+ const start="fs.writeFileSync(path.join(out,'EMPLOYMENT_R6_RUNNER_fixture.json'),JSON.stringify(result));";
+ assert.ok(original.includes(start));
+ const code=original.replace(start,(
+  includeReview?'result.pit04KeyReview='+JSON.stringify(review)+';\n':''
+ )+start);
+ fs.writeFileSync(f.script,code);
+ const files={[ENTRY]:hash(Buffer.from(code))};
+ const add=(name,value)=>{
+  const target=path.join(f.root,'bundle','source',name);
+  fs.mkdirSync(path.dirname(target),{recursive:true});
+  fs.writeFileSync(target,value);
+  files[name]=hash(Buffer.from(value));
+ };
+ add(PIT04_FILE,'// approved source-only fixture');
+ if(includeReader)add(PIT04_READER,'// approved snapshot-reader fixture');
+ const raw=Buffer.from(JSON.stringify({files})+'\n');
+ fs.writeFileSync(path.join(f.root,'bundle','manifest.json'),raw);
+ f.host.approvedSources[SHA].manifestSha256=hash(raw);
+}
+test('PIT-04-08 schema accepts only optional bounded offset on existing R6 A',()=>{
+ const policy={sourceRepository:'ansqhd5774-Choi/zgmini',operations:{
+  'employment-r6-candidate-stage-readonly':{},'runner-smoke':{}}};
+ const req={schema:'ZGMINI_PC_JOB_V1',requestId:'pc-00000000-0000-4000-8000-000000000001',
+  chatId:'chat_1234',operation:'employment-r6-candidate-stage-readonly',
+  sourceRepository:'ansqhd5774-Choi/zgmini',
+  sourceBranch:'codex/employment-1y-reader-r1',sourceSha:SHA};
+ assert.doesNotThrow(()=>validateRequest(req,policy));
+ assert.equal(validateRequest({...req,pit04Offset:8},policy).pit04Offset,8);
+ for(const value of [-1,50001,1.5,'8',null,Infinity]){
+  assert.throws(()=>validateRequest({...req,pit04Offset:value},policy),/PIT04_OFFSET_INVALID/);
+ }
+ assert.throws(()=>validateRequest({...req,operation:'runner-smoke',pit04Offset:0},policy),
+  /REQUEST_FIELDS/);
+ assert.throws(()=>validateRequest({...req,pit04Offset:0,sql:'SELECT *'},policy),
+  /REQUEST_FIELDS/);
+});
+test('PIT-04-08 Controller fail-closes on missing approved classifier or reader bytes',t=>{
+ const f=fixture(t);
+ assert.throws(()=>validateBundle({...f.request,pit04Offset:0},f),
+  /R6_PIT04_SOURCE_NOT_APPROVED/);
+ sealPit04Fixture(f,pit04Fixture(),{includeReader:false});
+ assert.throws(()=>validateBundle({...f.request,pit04Offset:0},f),
+  /R6_PIT04_SOURCE_NOT_APPROVED/);
+ sealPit04Fixture(f);
+ assert.doesNotThrow(()=>validateBundle({...f.request,pit04Offset:0},f));
+ assert.throws(()=>validateBundle({...f.request,pit04Offset:50001},f),
+  /R6_PIT04_OFFSET_INVALID/);
+});
+test('PIT-04-08 paginated result passes fixed request and strips extra raw fields',async t=>{
+ const f=fixture(t);sealPit04Fixture(f);
+ const r=await inspectEmploymentR6Candidate({...f.request,pit04Offset:0},f);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.pit04KeyReview.evidence[0].geographyCode,'AK');
+ assert.equal(r.pit04KeyReview.pageSize,8);
+ assert.equal(r.pit04KeyReview.nextOffset,null);
+ assert.equal(r.pit04KeyReview.rawPitAttested,false);
+ assert.equal(r.promotionApproved,false);
+ assert.equal(r.operationalWrites,0);
+ assert.equal(r.providerCalls,0);
+ assert.equal(r.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(r),/SENSITIVE_HASH_MUST_NOT_LEAK|SENSITIVE_PC_PATH_MUST_NOT_LEAK|source_hash/);
+ assert.equal(fs.readFileSync(f.core,'utf8'),'synthetic-core');
+ assert.equal(fs.readFileSync(f.candidate,'utf8'),'synthetic-candidate');
+});
+test('PIT-04-08 bad page and unrequested result are rejected at Controller boundary',async t=>{
+ const variants=[
+  {change:p=>({...p,offset:8}),code:'R6_PIT04_RESULT_INVALID',requested:true},
+  {change:p=>({...p,nextOffset:8}),code:'R6_PIT04_RESULT_INVALID',requested:true},
+  {change:p=>({...p,evidence:[{...p.evidence[0],geographyCode:'ZZ'}]}),
+   code:'R6_PIT04_RESULT_INVALID',requested:true},
+  {change:p=>({...p,counts:{...p.counts,missingCandidateIncomplete:0}}),
+   code:'R6_PIT04_RESULT_INVALID',requested:true},
+  {change:p=>p,code:'R6_PIT04_UNREQUESTED_RESULT',requested:false},
+ ];
+ for(const [index,v] of variants.entries()){
+  const f=fixture(t);sealPit04Fixture(f,v.change(pit04Fixture()));
+  const request=v.requested?{...f.request,pit04Offset:0}:f.request;
+  const r=await inspectEmploymentR6Candidate(request,f);
+  assert.equal(r.status,'FAIL',`variant ${index}:`+JSON.stringify(r));
+  assert.equal(r.code,v.code);
+  assert.doesNotMatch(JSON.stringify(r),/SENSITIVE_HASH_MUST_NOT_LEAK|SENSITIVE_PC_PATH_MUST_NOT_LEAK/);
+ }
+});
+test('PIT-04-08 direct projection rejects forged region and offset, never publishes',()=>{
+ const p=pit04Fixture();
+ const good=projectPit04KeyReview(p,{offset:0,asOfDate:'2026-11-02'});
+ assert.equal(good.promotionApproved,false);
+ assert.equal(good.evidence.length,1);
+ assert.doesNotMatch(JSON.stringify(good),/source_hash|value|rawPrivate/);
+ assert.throws(()=>projectPit04KeyReview(p,{offset:8,asOfDate:'2026-11-02'}),/R6_PIT04_RESULT_INVALID/);
+ assert.throws(()=>projectPit04KeyReview({...p,evidence:[{...p.evidence[0],observationDate:'2026-11-01'}]},
+  {offset:0,asOfDate:'2026-11-02'}),/R6_PIT04_RESULT_INVALID/);
 });
