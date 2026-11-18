@@ -16,7 +16,7 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.sender.login == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
-      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
+      (github.event.issue.title == 'pc-writer-source-install' || github.event.issue.title == 'r181-protected-route-install' || github.event.issue.title == 'r181-source-shape-readonly' || github.event.issue.title == 'r181-saved-ledger-readonly' || github.event.issue.title == 'w03-r179-stored-handoff-readonly' || github.event.issue.title == 'w03-r179-guard-shape-readonly' || github.event.issue.title == 'w03-r179-readback-guard-install' || github.event.issue.title == 'w03-gmh-seven-history-manual-once' || github.event.issue.title == 'w03-gmh-seven-private-score-once' || github.event.issue.title == 'w03-gmh-seven-public-compat-readonly' || github.event.issue.title == 'w03-gmh-seven-d1-seed-readonly' || github.event.issue.title == 'r181-primary-route-install' || github.event.issue.title == 'r181-existing-task-run-once' || github.event.issue.title == 'r47-existing-task-run-once' || github.event.issue.title == 'w03-r47-private-readback-once' || github.event.issue.title == 'w01-census-m3-api-once') &&
       contains(github.event.issue.labels.*.name, 'pc-writer-b-install') &&
       github.run_attempt == 1
     concurrency:
@@ -230,6 +230,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-gmh-seven-d1-seed-report.mjs"'
+      - name: Read W03 R47 private score pair SHA and current source manifests without raw prices
+        if: github.event.issue.title == 'w03-r47-private-readback-once'
+        id: w03r47privateread
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r47-private-readback.mjs"'
+      - name: Create-only redacted W03 R47 private pair metadata JSON TXT and Issue readback
+        if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'w03-r47-private-readback-once'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\writer-b-control\tools\w03-r47-private-readback-report.mjs"'
       - name: Create-only sanitized result and originating Issue comment
         if: always() && steps.control.outcome == 'success' && github.event.issue.title == 'pc-writer-source-install'
         env:
