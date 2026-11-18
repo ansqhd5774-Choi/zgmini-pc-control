@@ -15,13 +15,18 @@
       "path": "scripts/pc-writer/run-local.mjs",
       "change": "M",
       "beforeSha256": "d7f601aaba137de807ef9b065ea9be7ff31a2e7b4fe199452c18cd0b839a8300",
-      "afterSha256": "58a8d36db230dbb721901920dca84adf9deca2d0165950c89e7252360b909f6a",
+      "afterSha256": "1d79fe8a652e6b36c3f473aef525725abfc3cf2e92d647c694af0b3ca94617b7",
       "candidateSha256": "3c25d57cb47e614fe9e7db9a43f9fc3e0dc70f942bc1b0bd6c0d2db2562df0ed",
       "insertions": [
         {
           "anchor": "  const p=envelope?.projection;",
           "position": "after",
           "text": "  if(id==='inflation'&&p?.status==='READY'&&p.sourceVersion===checkpoint.sourceVersion&&p.sourceStoredAt===checkpoint.sourceStoredAt){\n   const {inflationR2AsOfTrendCompatibility}=await import('./inflation-r2-trend-date-refresh.mjs');\n   const corrected=inflationR2AsOfTrendCompatibility(envelope?.payload);\n   if(corrected!==envelope?.payload){\n    await projectionWriter(core).write(id,corrected,Date.now(),checkpoint);\n    report.projections.push({id,status:'LOCAL_READY'});\n    return;\n   }\n  }\n"
+        },
+        {
+          "anchor": "   const payload=r10?.status==='READY'?r10.payload:await builders[id](input);",
+          "position": "after",
+          "text": "   // Same saved-input repair must apply after a changed projection checkpoint.\n   // The installed legacy scorer is left intact; only its produced trend is corrected.\n   if(id==='inflation'){\n    const {inflationR2AsOfTrendCompatibility}=await import('./inflation-r2-trend-date-refresh.mjs');\n    const repaired=inflationR2AsOfTrendCompatibility(payload);\n    if(repaired!==payload){\n     await projectionWriter(core).write(id,repaired,Date.now(),checkpoint);\n     report.projections.push({id,status:'LOCAL_READY'});\n     return;\n    }\n   }\n"
         }
       ]
     },
