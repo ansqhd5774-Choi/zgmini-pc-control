@@ -61,7 +61,29 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   report.pcOperationalApprovedSha=report.result?.core?.approvedSourceSha??report.pcOperationalApprovedSha;
   report.next??=report.status==='PASS'?'READ_RESULT_NO_REPEAT':report.status==='BLOCKED'?'RESOLVE_NAMED_GATE_BEFORE_NEW_REQUEST':'INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY';
   preflightOperation='RESULT_LEDGER_WRITE';report.finishedAt=new Date().toISOString();report.durationMs=Date.now()-start;writeJson(ledger,{payloadSha,report});
- }catch(error){report.status='BLOCKED';const baseCode=errorCode(error);report.code=baseCode==='INTERNAL_EXECUTION_ERROR'&&error instanceof SyntaxError
+ }catch(error){
+  const postcheckCode=errorCode(error);
+  // A failed retired-R13 POSTCHECK cannot verify the worker outcome.
+  // If termination is uncertain, retain its stronger recovery-needed identity
+  // and lease marker instead of reclassifying it as a generic BLOCKED gate.
+  if(preflightOperation==='POSTCHECK'&&
+     postcheckCode==='RETIRED_IRAN_INVENTORY_UNAVAILABLE'){
+   const prePostcheckOutcome={status:report.status,code:report.code,
+    firstFail:report.firstFail,resultPresent:report.result!==undefined};
+   Object.assign(report,{
+    postcheckFailureCode:postcheckCode,
+    workerOutcome:prePostcheckOutcome,
+    protectedStateUnchanged:null,
+    protectedBeforeSha256:digest(JSON.stringify(before)),
+    protectedAfterSha256:null,
+   });
+   if(!uncertainChild)Object.assign(report,{
+    status:'STATE_UNKNOWN',code:'PROTECTED_STATE_POSTCHECK_UNVERIFIED',
+    firstFail:'PROTECTED_STATE_POSTCHECK',
+    next:'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY',
+   });
+  }else{
+report.status='BLOCKED';const baseCode=errorCode(error);report.code=baseCode==='INTERNAL_EXECUTION_ERROR'&&error instanceof SyntaxError
     ?preflightOperation==='REQUEST_LEDGER'?'REQUEST_LEDGER_PARSE_FAILED':preflightOperation==='CORE_STATE_READ'?'CORE_CONFIG_PARSE_FAILED':baseCode:baseCode;
    report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';
    if(!report.phase&&report.lastPass==='REQUEST_RECEIVED'){
@@ -71,6 +93,7 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
      nextAction:leaseFailure?'INSPECT_LEASE_OWNER_NO_LOCK_DELETION':'INSPECT_NAMED_PREFLIGHT_OPERATION_NO_AUTOMATIC_RETRY'});
    }
   if(report.code==='MEMORY_WAIT_ALREADY_ACTIVE')Object.assign(report,{phase:'PREVALIDATION',failureOperation:'MEMORY_WAIT_LEASE_ACQUIRE',mutationStarted:false,affectedScope:'OWN_REQUEST_ONLY',nextAction:'WAIT_FOR_EXISTING_MEMORY_WAITER_NO_LOCK_DELETION',firstFail:'MEMORY_ADMISSION'});
+  }
  }
  finally{if(uncertainChild){report.resourceLeasesRetained=true;const marker=path.join(workspace,'RECOVERY_REQUIRED.json');writeJson(marker,{requestId:report.requestId,workerPid:report.workerPid,reason:'WORKER_TERMINATION_UNVERIFIED'});}else{releaseMemoryWait?.();releaseResource?.();releaseSeat?.();releaseRequest?.();}}
  return finalize();

@@ -1,0 +1,157 @@
+{
+  "schema": "ZGMINI_W03_R179_GUARD_SHAPE_RESULT_V1",
+  "status": "PASS",
+  "code": "W03_R179_GUARD_SHAPE_READONLY",
+  "requestId": "f162b989-6fd1-4ca2-8a18-26e9d5ca49cc",
+  "runId": "43854792567",
+  "payload": {
+    "result": "STATIC_SOURCE_PINNED",
+    "sourceBytes": 10822,
+    "sourceSha256": "f9ea0a1bfaf52909b7a434b65ba93887f56660bc979a3cb7e0992597bc9f3b68",
+    "exactOldCount": 0,
+    "oldMatches": [],
+    "comparisonCount": 1,
+    "comparisons": [
+      {
+        "line": 34,
+        "nameClass": "GOT",
+        "operator": "<",
+        "count": 7,
+        "nearRollingMarker": true
+      }
+    ],
+    "rollingMarkerCount": 1,
+    "context": [
+      {
+        "markerLine": 34,
+        "signals": [
+          {
+            "line": 20,
+            "tags": [
+              "ROLLING_IDENTIFIER"
+            ]
+          },
+          {
+            "line": 23,
+            "tags": [
+              "JSON_PARSE"
+            ]
+          },
+          {
+            "line": 24,
+            "tags": [
+              "JSON_STRINGIFY",
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 25,
+            "tags": [
+              "THROW_BRANCH"
+            ]
+          },
+          {
+            "line": 31,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 33,
+            "tags": [
+              "THEME_IDENTIFIER",
+              "GOT_IDENTIFIER"
+            ]
+          },
+          {
+            "line": 34,
+            "tags": [
+              "ROLLING_MISMATCH",
+              "OBSERVED_DATE_IDENTIFIER",
+              "OBSERVATION_DATE_IDENTIFIER",
+              "GOT_IDENTIFIER",
+              "LENGTH_ACCESS",
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 35,
+            "tags": [
+              "OBSERVATION_DATE_IDENTIFIER",
+              "GOT_IDENTIFIER",
+              "LENGTH_ACCESS",
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 36,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 37,
+            "tags": [
+              "OBSERVED_DATE_IDENTIFIER",
+              "OBSERVATION_DATE_IDENTIFIER"
+            ]
+          },
+          {
+            "line": 40,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 41,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 42,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 43,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 45,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 47,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          },
+          {
+            "line": 51,
+            "tags": [
+              "IF_BRANCH"
+            ]
+          }
+        ]
+      }
+    ],
+    "sourceOnly": true,
+    "providerCalls": 0,
+    "sqliteOpened": false,
+    "sqliteWrites": 0,
+    "publisherExecuted": false,
+    "pcWrites": 0,
+    "d1Writes": 0
+  },
+  "sourceOnly": true,
+  "providerCalls": 0,
+  "pcWrites": 0,
+  "d1Writes": 0,
+  "retry": "NO_AUTOMATIC_REEXECUTION"
+}

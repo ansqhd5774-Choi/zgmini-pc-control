@@ -1,0 +1,31 @@
+{
+  "schema": "ZGMINI_W03_R47_PRIVATE_READBACK_RESULT_V1",
+  "requestId": "b21d9aa1-8cc9-4eb1-881a-4bfe260df093",
+  "runId": "44243908022",
+  "status": "PRIVATE_RESULT_PAIR_AND_MANIFEST_SHA_VERIFIED",
+  "code": "PRIVATE_RESULT_PAIR_AND_MANIFEST_SHA_VERIFIED",
+  "candidateCount": 8,
+  "latest": {
+    "status": "PRIVATE_RESULT_PAIR_AND_MANIFEST_SHA_VERIFIED",
+    "benchmarkDate": "2026-11-13",
+    "scoreSha256": "bce1de3f051337709424c6f6c696990218c395a0bf409ef46307ef497322b754",
+    "themeSha256": "8793095aa084708db7eb71b5494685641f72ab3bf153a3060aaca9676b996d56",
+    "outputDigest16": "35066b104a92404d",
+    "scoreBytes": 9480056,
+    "themeBytes": 1644393,
+    "sourceBaselineSha256": "8c6aa292da35310ce37093b73a331177582fb741d16d8a6423bee7413ddbcdb5",
+    "sourceDeltaSha256": "2e3708460458c5217b2877a779a6933ccda2f7c31ab1baa5f5bcd321758ca0c6",
+    "completedWindowCount": 9,
+    "verifiedPageReferencesAtCalculation": 559,
+    "sourceCurrentManifestMatch": true,
+    "sourceRawPagesRehashedNow": false
+  },
+  "sourceRawPagesRehashedNow": false,
+  "providerCalls": 0,
+  "sqliteOpened": false,
+  "pcWrites": 0,
+  "d1Writes": 0,
+  "taskRunVerified": false,
+  "executionAuthorized": false,
+  "retry": "NO_AUTOMATIC_REEXECUTION"
+}

@@ -1,0 +1,11 @@
+REQUEST_ID=93c8418c-14cb-452a-af9b-6b53e31430ab
+STATUS=PASS
+CODE=W03_R179_STORED_HANDOFF_READONLY
+RUN_ID=43843580097
+SAFE_DETAILS={"status":"SOURCES_PINNED_READONLY","sources":{"r181":{"status":"PIN_MATCH","pinMatch":true,"bytes":7089,"static":{"signalLevel":"STATIC_SOURCE_ONLY_NOT_EXECUTION_AUTHORIZATION","sqliteToken":false,"parquetToken":false,"jsonToken":true,"wranglerToken":false,"d1Token":true,"dryRunFlagPresent":false,"computeOnlyFlagPresent":false,"readOnlyFlagPresent":false}},"r179":{"status":"PIN_MATCH","pinMatch":true,"bytes":10822,"static":{"signalLevel":"STATIC_SOURCE_ONLY_NOT_EXECUTION_AUTHORIZATION","sqliteToken":false,"parquetToken":false,"jsonToken":true,"wranglerToken":false,"d1Token":true,"dryRunFlagPresent":false,"computeOnlyFlagPresent":false,"readOnlyFlagPresent":false}},"r171":{"status":"PIN_MATCH","pinMatch":true,"bytes":6389,"static":{"signalLevel":"STATIC_SOURCE_ONLY_NOT_EXECUTION_AUTHORIZATION","sqliteToken":false,"parquetToken":false,"jsonToken":true,"wranglerToken":false,"d1Token":false,"dryRunFlagPresent":false,"computeOnlyFlagPresent":false,"readOnlyFlagPresent":false}}},"ledgers":{"R181_PRIMARY_LAST_RUN.json":{"status":"LOCAL_PRIMARY_STORED","dates":{"observationDate":null,"observedDate":null,"baseObservationDate":null,"confirmedObservationDate":null}},"ZGMINI_R179_PUBLICATION_LAST_RUN.json":{"status":"PUBLIC_API_ROLLING_MISMATCH","dates":{"observationDate":null,"observedDate":"2026-10-28","baseObservationDate":null,"confirmedObservationDate":null}},"R183_PUBLICATION_RETRY_LAST_RUN.json":{"status":"PUBLISHER_CHILD_FAILED_REVIEW","dates":{"observationDate":null,"observedDate":null,"baseObservationDate":null,"confirmedObservationDate":null}}},"storage":{"counts":{"sqlite":0,"db":0,"parquet":0,"json":26,"ndjson":0,"csv":0,"other":37},"datedParquetFiles":0,"earliestDatedFile":null,"latestDatedFile":null,"requiresContentValidation":true},"lastPublicationStatus":"PUBLIC_API_ROLLING_MISMATCH","nextGate":"STORED_RAW_CONTENT_252_AND_RIGHTS_BEFORE_COMPUTE","rightsAttested":false,"sourceRawShaVerified":false,"sqliteCheckpointVerified":false,"history252Verified":false,"publisherExecuted":false,"d1Readback":false,"providerCalls":0,"sqliteOpened":false,"pcWrites":0,"d1Writes":0}
+PROVIDER_CALLS=0
+SOURCE_ONLY=true
+SQLITE_OPENED=false
+PC_WRITES=0
+D1_WRITES=0
+RETRY=NO_AUTOMATIC_REEXECUTION

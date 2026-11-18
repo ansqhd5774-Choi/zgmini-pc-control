@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_PC_INTAKE_RECOVERY_APPROVAL_V1",
+  "approved": true,
+  "requestId": "pc-update-95a0c24a-e0eb-4ad5-a250-559750f8450b",
+  "sourceSha": "6badafe41adeeebe1cac7939bf78f60c6e15ebe6",
+  "hashes": {
+    "ledger": "2962e110c98f678db33fdd3b46ecea061bc1d94cacd692f28fa202c21e875846",
+    "owner": "0746f702b9575748b1c8065d4328862f3bb60271146c5c16d84181884e30c253",
+    "marker": "8f2f36d7bdeb45e0be040260736ba0bfa7165b19b2898bd22d34eaf8083f3967",
+    "backlog": "edc6289c457da779cbcec8d1bbff4d61d0eda8d03f9837eda2808b793f30a647",
+    "host": "4a8ea1ede95ffc6cb273417a4f9ad19474c72cff90bd0e75995e2845654d057a",
+    "baseline": "7a465488efa758bc0cc3a6d4828412e2c1f4479b80501b30f18ed30cfd1db42f",
+    "protectedState": "d494579c6e50becc539e249bab0926c9197f867ee9759ab7b2e2a20c9ea76e83"
+  },
+  "fileHashes": {
+    "tools/controller-intake-recovery.mjs": "c72bb0177d3efdd17e6e7f19c3ec9887b38968141470258a1f755453e0203e58",
+    "tools/automation-status.mjs": "6aa7b16d2c48889d59223f062eb469ffaff5d4d31284e668a9b47bc945ae18dc",
+    "tools/update.mjs": "d56d5540f1464836c8ae4fb101b6e89bc95a75085cff44e6f1a1525bf4c0138f",
+    "tools/maintenance-apply.mjs": "055feacf2888755dc19490cc6a46c0948776bfae0d358ef7870e1daf649cce8b",
+    "tools/maintenance-contract.mjs": "24145afe1695f8cde691a03a87df480af1ea695d4757eb34d00d6b6405d58f57",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc"
+  }
+}

@@ -1,0 +1,19 @@
+name: SEC Core four-file Writer B approval source tests
+on:
+  pull_request:
+    paths:
+      - 'approvals/writer-updates/sec-core-compatible-fourfile-20261116.json'
+      - 'tests/sec-core-fourfile-b-approval.test.mjs'
+      - '.github/workflows/sec-core-fourfile-writer-b-ci.yml'
+permissions:
+  contents: read
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: node --test tests/sec-core-fourfile-b-approval.test.mjs tests/sec-core-structural-insertion.test.mjs

@@ -7,7 +7,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-const LIMIT_PER_DIR=64;
+const LIMIT_PER_DIR=256;
 const MAX_CANDIDATES=130;
 const MAX_FILE_BYTES=2_000_000;
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -78,9 +78,12 @@ export function inspectPcSourceOrigin({dataRoot,fsOps=fs,pathOps=path,git=defaul
   let entries;
   try{entries=fsOps.readdirSync(safe,{withFileTypes:true})}
   catch{continue;}
-  if(entries.length>LIMIT_PER_DIR){output.inventoryTruncated=true;continue;}
-  for(const entry of entries){
-   if(!entry.isDirectory()||entry.isSymbolicLink?.())continue;
+  // Bound eligible directories deterministically; unrelated files or an
+  // oversized parent must not erase every discoverable checkout candidate.
+  const children=entries.filter(entry=>entry.isDirectory()&&!entry.isSymbolicLink?.())
+   .sort((a,b)=>a.name.localeCompare(b.name,'en'));
+  if(children.length>LIMIT_PER_DIR)output.inventoryTruncated=true;
+  for(const entry of children.slice(0,LIMIT_PER_DIR)){
    const child=safeReal(pathOps.join(safe,entry.name));
    if(child&&stat(child)?.isDirectory())dirs.push(child);
   }

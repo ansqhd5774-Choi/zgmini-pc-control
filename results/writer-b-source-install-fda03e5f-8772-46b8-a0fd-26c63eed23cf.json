@@ -1,0 +1,23 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "fda03e5f-8772-46b8-a0fd-26c63eed23cf",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "76de317fdb625596236d476eafa69598c52ccf40",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "8254045340877b3f96e9fd9bae41b7a17d24cc8b",
+  "candidateSourceSha": "6c6d0a2bda90771646cb913a4fe226fcc6e47b5e",
+  "manifestSha256": "a1a358dfdce6571770688a3a01376d7b235300161f131f4791752faa35032337",
+  "baseTreeOid": "5b2f5351c4aae107197791796e89b3fde94c8731",
+  "preparedTreeOid": "5540b8cfe3a9b6e55b0a6c7affc68e55cb824b39",
+  "provenanceSha256": "acfdd0339c04de0bae272246e0d8ce7d456540f17c1b9039dd71554daf4f9a96",
+  "runId": "43825043114",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/collect-local.mjs",
+    "scripts/pc-writer/sec-request-controls.mjs",
+    "scripts/pc-writer/sec-guard-runtime-config.mjs",
+    "scripts/pc-writer/sec-legacy-quota-bridge.mjs"
+  ]
+}

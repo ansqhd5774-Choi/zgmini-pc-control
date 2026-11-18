@@ -1,0 +1,70 @@
+# One HTTP GET for verified Census CDN connectivity on the canonical
+# Windows operating runner. It NEVER installs/starts a collector or edits DB.
+name: ZGMINI HTTP32 Census CDN One-Shot Transport
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tools/http32-census-cdn-once.mjs'
+      - 'tests/http32-census-cdn-once.test.mjs'
+      - '.github/workflows/pc-census-cdn-connectivity-once.yml'
+permissions:
+  contents: read
+  issues: read
+concurrency:
+  group: http32-census-cdn-once-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  isolated-source-tests:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 3
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact one-time URL, safe status and no side effects
+        run: node --test tests/http32-census-cdn-once.test.mjs
+  operating-pc-cdn-connectivity:
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'opened' &&
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.actor == 'ansqhd5774-Choi' &&
+      github.event.sender.login == 'ansqhd5774-Choi' &&
+      github.event.issue.user.login == 'ansqhd5774-Choi' &&
+      github.event.issue.title == 'pc-census-cdn-connectivity-once' &&
+      contains(github.event.issue.body, '"schema":"ZGMINI_HTTP32_CENSUS_CDN_ONCE_V1"') &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Windows, X64, zgmini-pc-control]
+    timeout-minutes: 2
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Checkout exact event-time control commit without persistent credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ansqhd5774-Choi/zgmini-pc-control
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: One single fixed GET to Census BFS CSV, headers only
+        env:
+          GITHUB_EVENT_ACTION: ${{ github.event.action }}
+        run: '"E:\ZGmini\runtime\node.exe" tools/http32-census-cdn-once.mjs'

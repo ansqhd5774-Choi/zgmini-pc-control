@@ -1,0 +1,427 @@
+{
+  "schema": "ZGMINI_PC_PROCESS_INVENTORY_RESULT_V1",
+  "role": "handoff",
+  "requestId": "64194f26-f197-4026-bbd5-efb5d4e53bcd",
+  "issueNumber": 2035,
+  "runId": "44086438586",
+  "attempt": "1",
+  "observedAtUtc": "2026-11-17T12:48:18.332Z",
+  "host": "DESKTOP-N62L0NG",
+  "runnerName": "zgmini-handoff-ci-spare-01",
+  "runnerLabel": "zgmini-handoff-ci-isolated",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "automaticRetries": 0,
+  "commandLinesCaptured": false,
+  "environmentValuesCaptured": false,
+  "status": "PASS",
+  "code": "PROCESS_INVENTORY_COLLECTED",
+  "snapshot": {
+    "observedAtUtc": "2026-11-17T12:48:20.6696817Z",
+    "totalProcessCount": 242,
+    "selectedProcessCount": 38,
+    "processes": [
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 1064,
+        "ppid": 9996,
+        "session": 2,
+        "workingSetMiB": 81,
+        "privateCommitMiB": 27
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 5012,
+        "ppid": 5816,
+        "session": 0,
+        "workingSetMiB": 89,
+        "privateCommitMiB": 31
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 5664,
+        "ppid": 10468,
+        "session": 2,
+        "workingSetMiB": 75,
+        "privateCommitMiB": 25
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 9944,
+        "ppid": 9720,
+        "session": 2,
+        "workingSetMiB": 67,
+        "privateCommitMiB": 23
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "pid": 13724,
+        "ppid": 11160,
+        "session": 2,
+        "workingSetMiB": 17,
+        "privateCommitMiB": 25
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "pid": 15036,
+        "ppid": 5012,
+        "session": 0,
+        "workingSetMiB": 92,
+        "privateCommitMiB": 35
+      },
+      {
+        "name": "node.exe",
+        "pid": 1136,
+        "ppid": 15536,
+        "session": 2,
+        "workingSetMiB": 40,
+        "privateCommitMiB": 64
+      },
+      {
+        "name": "node.exe",
+        "pid": 2272,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 38,
+        "privateCommitMiB": 21
+      },
+      {
+        "name": "node.exe",
+        "pid": 10272,
+        "ppid": 17620,
+        "session": 2,
+        "workingSetMiB": 49,
+        "privateCommitMiB": 102
+      },
+      {
+        "name": "node.exe",
+        "pid": 14460,
+        "ppid": 13772,
+        "session": 2,
+        "workingSetMiB": 40,
+        "privateCommitMiB": 29
+      },
+      {
+        "name": "node.exe",
+        "pid": 19788,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 40,
+        "privateCommitMiB": 20
+      },
+      {
+        "name": "node.exe",
+        "pid": 20532,
+        "ppid": 22760,
+        "session": 0,
+        "workingSetMiB": 38,
+        "privateCommitMiB": 18
+      },
+      {
+        "name": "powershell.exe",
+        "pid": 23368,
+        "ppid": 20532,
+        "session": 0,
+        "workingSetMiB": 91,
+        "privateCommitMiB": 81
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 9720,
+        "ppid": 9340,
+        "session": 2,
+        "workingSetMiB": 3,
+        "privateCommitMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 9996,
+        "ppid": 5500,
+        "session": 2,
+        "workingSetMiB": 3,
+        "privateCommitMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 10468,
+        "ppid": 3624,
+        "session": 2,
+        "workingSetMiB": 3,
+        "privateCommitMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 11160,
+        "ppid": 1952,
+        "session": 2,
+        "workingSetMiB": 2,
+        "privateCommitMiB": 3
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 13772,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 4,
+        "privateCommitMiB": 2
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 15536,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 4,
+        "privateCommitMiB": 2
+      },
+      {
+        "name": "cmd.exe",
+        "pid": 22760,
+        "ppid": 15036,
+        "session": 0,
+        "workingSetMiB": 5,
+        "privateCommitMiB": 5
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 712,
+        "ppid": 10272,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 2584,
+        "ppid": 5012,
+        "session": 0,
+        "workingSetMiB": 5,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 2740,
+        "ppid": 15036,
+        "session": 0,
+        "workingSetMiB": 11,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 3288,
+        "ppid": 16048,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 4064,
+        "ppid": 4036,
+        "session": 0,
+        "workingSetMiB": 3,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5196,
+        "ppid": 10468,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 5880,
+        "ppid": 19788,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 7036,
+        "ppid": 15500,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 7528,
+        "ppid": 9996,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 8536,
+        "ppid": 8892,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9740,
+        "ppid": 9720,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9816,
+        "ppid": 19116,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 9836,
+        "ppid": 13148,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 11244,
+        "ppid": 15536,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 12252,
+        "ppid": 11160,
+        "session": 2,
+        "workingSetMiB": 7,
+        "privateCommitMiB": 7
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 12316,
+        "ppid": 2272,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 15508,
+        "ppid": 23368,
+        "session": 0,
+        "workingSetMiB": 8,
+        "privateCommitMiB": 2
+      },
+      {
+        "name": "conhost.exe",
+        "pid": 17304,
+        "ppid": 13772,
+        "session": 2,
+        "workingSetMiB": 6,
+        "privateCommitMiB": 6
+      }
+    ],
+    "processCounts": [
+      {
+        "name": "cmd.exe",
+        "count": 7
+      },
+      {
+        "name": "conhost.exe",
+        "count": 18
+      },
+      {
+        "name": "node.exe",
+        "count": 6
+      },
+      {
+        "name": "powershell.exe",
+        "count": 1
+      },
+      {
+        "name": "Runner.Listener.exe",
+        "count": 5
+      },
+      {
+        "name": "Runner.Worker.exe",
+        "count": 1
+      }
+    ],
+    "memoryGroups": [
+      {
+        "kind": "NODE_NONRUNNER",
+        "count": 5,
+        "workingSetMiB": 207,
+        "privateCommitMiB": 236,
+        "zeroWorkingSetCount": 0,
+        "unknownWorkingSetCount": 0,
+        "unknownPrivateCommitCount": 0
+      },
+      {
+        "kind": "NODE_RUNNER_DESCENDANT",
+        "count": 1,
+        "workingSetMiB": 38,
+        "privateCommitMiB": 18,
+        "zeroWorkingSetCount": 0,
+        "unknownWorkingSetCount": 0,
+        "unknownPrivateCommitCount": 0
+      },
+      {
+        "kind": "OTHER_PROCESSES",
+        "count": 204,
+        "workingSetMiB": 8918,
+        "privateCommitMiB": 6970,
+        "zeroWorkingSetCount": 1,
+        "unknownWorkingSetCount": 0,
+        "unknownPrivateCommitCount": 0
+      },
+      {
+        "kind": "RUNNER_LISTENER",
+        "count": 5,
+        "workingSetMiB": 329,
+        "privateCommitMiB": 131,
+        "zeroWorkingSetCount": 0,
+        "unknownWorkingSetCount": 0,
+        "unknownPrivateCommitCount": 0
+      },
+      {
+        "kind": "RUNNER_WORKER",
+        "count": 1,
+        "workingSetMiB": 92,
+        "privateCommitMiB": 35,
+        "zeroWorkingSetCount": 0,
+        "unknownWorkingSetCount": 0,
+        "unknownPrivateCommitCount": 0
+      },
+      {
+        "kind": "SUPPORT_PROCESSES",
+        "count": 26,
+        "workingSetMiB": 227,
+        "privateCommitMiB": 207,
+        "zeroWorkingSetCount": 0,
+        "unknownWorkingSetCount": 0,
+        "unknownPrivateCommitCount": 0
+      }
+    ],
+    "memoryGroupCoverage": "COUNT_COMPLETE",
+    "services": [
+      {
+        "name": "actions.runner.ansqhd5774-Choi-zgmini-pc-control.zgmini-handoff-ci-spare-01",
+        "state": "Running",
+        "startMode": "Auto"
+      }
+    ],
+    "serviceStatus": "OK",
+    "tasks": [],
+    "taskStatus": "OK",
+    "startup": [],
+    "startupStatus": "OK",
+    "processListTruncated": false
+  }
+}

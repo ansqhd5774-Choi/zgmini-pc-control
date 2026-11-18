@@ -91,7 +91,32 @@ export function validBacklogOriginalPcJob(body){
  return body.schema==='ZGMINI_PC_JOB_V1'&&/^[a-z0-9-]{8,80}$/.test(body.requestId);
 }
 
+// A malformed queued request is a terminal rejection, never an executable replay.
+// Preserve exact original bytes digest and reason instead of stranding a switched Controller.
+export function classifyBacklogOriginal(text){
+ if(typeof text!=='string')throw Object.assign(Error('BACKLOG_BODY_UNOBSERVABLE'),{code:'BACKLOG_BODY_UNOBSERVABLE'});
+ let body;try{body=JSON.parse(text);}catch{return {valid:false,code:'BACKLOG_ORIGINAL_BODY_INVALID',originalBodySha256:sha256(text)};}
+ if(!validBacklogOriginalPcJob(body))return {valid:false,code:'BACKLOG_ORIGINAL_REQUEST_INVALID',originalBodySha256:sha256(text)};
+ return {valid:true,body,originalBodySha256:sha256(text)};
+}
+
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+// GitHub workflow disable/enable states can be eventually consistent.
+// A bounded, read-only observation never substitutes for an exact state
+// confirmation; unknown states and exhausted readbacks remain fail-closed.
+export async function confirmExactWorkflowState(readState,expected,{pause=wait}={}){
+ need(typeof readState==='function'&&
+  (expected==='active'||expected==='disabled_manually')&&
+  typeof pause==='function','WORKFLOW_STATE_PROBE_INVALID');
+ for(let attempt=0;attempt<6;attempt++){
+  let state;
+  try{state=await readState();}catch{/* No evidence: retry only a GET. */}
+  if(state===expected)return true;
+  if(state!==undefined&&state!=='active'&&state!=='disabled_manually')return false;
+  if(attempt<5)await pause(1000);
+ }
+ return false;
+}
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
 const writeJson=(file,data)=>{fs.mkdirSync(path.dirname(file),{recursive:true});const tmp=file+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2)+'\n',{flag:'wx'});fs.renameSync(tmp,file);};
 const git=(args,options={})=>execFileSync('git',args,{cwd:checkout,encoding:Object.hasOwn(options,'encoding')?options.encoding:'utf8',windowsHide:true,timeout:120000,maxBuffer:8e6});
@@ -1013,7 +1038,7 @@ function readOwner() {
  need(status.mode==='LISTENING'&&status.children?.length===6,'SUPERVISOR_NOT_HEALTHY');
  return {owner,status};
 }
-function verifyRecoveryOperator(supervisorPid=0){
+export function verifyRecoveryOperator(supervisorPid=0){
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'RECOVERY_OPERATOR_REQUIRED');
  const installed=json(path.join(maintenanceRoot,'MAINTENANCE_INSTALL.json'));
  for(const [rel,expected]of Object.entries(installed.files??{})){
@@ -1113,7 +1138,7 @@ function retiredIranEvidence(schtasks){
  const inventory=spawnSync(schtasks,['/Query','/FO','CSV','/NH'],opt);
  return confirmRetiredIranAbsent({exact,inventory});
 }
-function protectedSnapshot() {
+export function protectedSnapshot() {
  // Existing Core task XML hashes + PC writer config hashes, read-only.
  const dataRoot='E:/ZGmini/data',out={files:{},tasks:{}};
  for(const name of ['config.json','quota-runner.cmd','run-local.cmd']) {
@@ -1267,7 +1292,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    writeJson(backlogFile,{schema:'ZGMINI_PC_BACKLOG_V1',requestId:request.requestId,
      pausedAt:at,resumedAt:null,replays:{},windows:[{pausedAt:at,resumedAt:null}]});
    github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
-   need(github('actions/workflows/pc-job.yml').state==='disabled_manually','WORKFLOW_DISABLE_NOT_CONFIRMED');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'disabled_manually'),'WORKFLOW_DISABLE_NOT_CONFIRMED');
   },
   didPauseIntake:()=>pausedByUs,
   waitForDrain:async()=>{
@@ -1279,7 +1305,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     need(seats!==null,'RUNNER_SET_DRIFT');
     const busy=seats.some(x=>x.busy),leases=fs.readdirSync(path.join(controlRoot,'leases')).filter(x=>x!=='supervisor');
     const pending=['in_progress','queued','waiting'].map(status=>github(`actions/workflows/pc-job.yml/runs?status=${status}&per_page=1`).total_count||0).reduce((a,b)=>a+b,0);
-    if(!busy&&!leases.length&&!pending){quiet++;if(quiet>=2)return;}else quiet=0;
+    if(!busy&&!leases.length&&!pending){
+     quiet++;
+     if(quiet>=2){
+      // Verify GitHub intake is still paused before backup and supervisor stop.
+      // A drift discovered here remains before those runtime-mutation steps.
+      need(github('actions/workflows/pc-job.yml').state==='disabled_manually',
+       'WORKFLOW_STATE_DRIFT_BEFORE_DRAIN');
+      return;
+     }
+    }else quiet=0;
     await wait(3000);
    }
    throw Object.assign(Error('DRAIN_WAIT_TIMEOUT'),{code:'DRAIN_WAIT_TIMEOUT'});
@@ -1324,7 +1359,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   resumeIntake:async()=>{
    need(installedManifest().installedSha===manifest.targetSha||installedManifest().installedSha===manifest.installedSha,'INTAKE_SHA_UNKNOWN');
    github('actions/workflows/pc-job.yml/enable','PUT');pausedByUs=false;
-   need(github('actions/workflows/pc-job.yml').state==='active','WORKFLOW_ENABLE_NOT_CONFIRMED');
+   need(await confirmExactWorkflowState(()=>github('actions/workflows/pc-job.yml').state,
+    'active'),'WORKFLOW_ENABLE_NOT_CONFIRMED');
    if(fs.existsSync(backlogFile)){
      const backlog=json(backlogFile);
      writeJson(backlogFile,closeLatestPause(backlog,new Date().toISOString()));
@@ -1354,13 +1390,23 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    for(const original of [...candidates.values()].sort((a,b)=>a.number-b.number)){
      const key=String(original.number);
      if(state.replays[key]?.status==='DONE'||state.replays[key]?.status==='SKIPPED_RESULT_PRESENT')continue;
+     if(state.replays[key]?.status==='REJECTED_INVALID_ORIGINAL'){
+       const rejected=classifyBacklogOriginal(original.body);
+       need(!rejected.valid&&rejected.originalBodySha256===state.replays[key].originalBodySha256,
+        'BACKLOG_REJECTED_ORIGINAL_CHANGED');continue;
+     }
      if(state.replays[key])throw Object.assign(Error('BACKLOG_REPLAY_OUTCOME_UNKNOWN'),{code:'BACKLOG_REPLAY_OUTCOME_UNKNOWN'});
      const comments=readAllMaintenancePages(page=>github(`issues/${original.number}/comments?per_page=100&page=${page}`));
      if(comments.some(c=>c.user?.login==='github-actions[bot]'&&c.body?.includes('zgmini-pc-result:'))){
        state.replays[key]={status:'SKIPPED_RESULT_PRESENT'};writeJson(backlogFile,state);continue;
      }
-     let body;try{body=JSON.parse(original.body);}catch{throw Object.assign(Error('BACKLOG_ORIGINAL_BODY_INVALID'),{code:'BACKLOG_ORIGINAL_BODY_INVALID'});}
-     need(validBacklogOriginalPcJob(body),'BACKLOG_ORIGINAL_REQUEST_INVALID');
+     const decision=classifyBacklogOriginal(original.body);
+     if(!decision.valid){
+       state.replays[key]={status:'REJECTED_INVALID_ORIGINAL',reason:decision.code,
+        originalBodySha256:decision.originalBodySha256,replayed:false};
+       writeJson(backlogFile,state);continue;
+     }
+     const body=decision.body;
      const marker=`Maintenance replay ${request.requestId} original #${original.number}`;
      state.replays[key]={status:'POSTING',originalRequestId:body.requestId};writeJson(backlogFile,state);
      const input=path.join(maintenanceRoot,'approved',request.requestId+'.replay-'+original.number+'.json');
@@ -1487,11 +1533,30 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const child=spawn(node,[path.join(controlRoot,'controller/supervisor.mjs')],{cwd:controlRoot,windowsHide:true,detached:true,stdio:'ignore'});child.unref();
    await waitForReconnect(child.pid,manifest.installedSha,'ROLLBACK_RECONNECT_FAILED');
   },
-  verifyPrevious:async({installedSha,requireRunning})=>{
+  verifyRestoredPrevious:async installedSha=>{
+   // Require the whole saved host and all installed Controller bytes, not
+   // merely a matching source label. prepareRecovery loaded the old protection.
+   if(installedManifest().installedSha!==installedSha)return false;
+   need(fs.readFileSync(hostPath).equals(fs.readFileSync(path.join(snapshotRoot,'host.json'))),
+    'RECOVERY_PREVIOUS_HOST_DRIFT');
+   const current=readOwner();
+   need(current.status.sourceSha===installedSha,'RECOVERY_PREVIOUS_SUPERVISOR_DRIFT');
+   need(available(apiRunners()),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE');
+   for(const child of current.status.children){
+    need(child.alive===true,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');
+    try{process.kill(child.pid,0);}catch{need(false,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');}
+   }
+   need(protectedBefore!==undefined&&JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),
+    'RECOVERY_PREVIOUS_PROTECTION_DRIFT');
+   return true;
+  },
+  verifyPrevious:async({installedSha,requireRunning,requireIdle=true})=>{
    if(installedManifest().installedSha!==installedSha)return false;
    if(requireRunning){
     const s=json(path.join(controlRoot,'SUPERVISOR_STATUS.json'));
-    if(s.sourceSha!==installedSha||Date.now()-Date.parse(s.at)>45000||!available(apiRunners()))return false;
+    const rows=apiRunners();
+    const runnersVerified=requireIdle?available(rows):dedicatedPcRunnerRows(rows,{requireOnline:true})!==null;
+    if(s.sourceSha!==installedSha||Date.now()-Date.parse(s.at)>45000||!runnersVerified)return false;
    }
    return JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore??protectedSnapshot());
   },
@@ -1532,6 +1597,90 @@ export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
  return {...data,issue:validated.request,manifest:validated.manifest};
 }
 
+// A read-only, fixed-root view of exactly one update's preserved artifacts.
+// Presence and well-formedness are evidence, NOT a recovery/installation GO.
+// No issue data or operator-supplied filesystem paths reach this observation.
+export function readControllerUpdateArtifacts(requestId,{
+ fsImpl=fs,backupBase=path.join(controlRoot,'backups'),
+ backlogBase=path.join(maintenanceRoot,'backlog'),
+ leaseBase=path.join(maintenanceRoot,'leases'),
+}={}){
+ need(/^pc-[a-z0-9-]{8,76}$/.test(requestId??''),'MAINTENANCE_REQUEST_ID');
+ const entry=(p,type)=>{
+  try{
+   const st=fsImpl.lstatSync(p);
+   if(st.isSymbolicLink())return 'UNSAFE';
+   return type==='directory'?(st.isDirectory()?'PRESENT':'UNSAFE')
+    :(st.isFile()?'PRESENT':'UNSAFE');
+  }catch(error){return error?.code==='ENOENT'?'ABSENT':'UNKNOWN';}
+ };
+ const child=(parent,p,type)=>{
+  if(parent==='ABSENT')return 'ABSENT';
+  if(parent!=='PRESENT')return 'UNKNOWN';
+  return entry(p,type);
+ };
+ const backupBaseState=entry(backupBase,'directory');
+ const backupPath=path.join(backupBase,'controller-update-'+requestId);
+ const backupRoot=child(backupBaseState,backupPath,'directory');
+ const stageRoot=child(backupRoot,path.join(backupPath,'stage'),'directory');
+ const snapshotRoot=child(backupRoot,path.join(backupPath,'snapshot'),'directory');
+ const stagedHost=child(stageRoot,path.join(backupPath,'stage','host.json'),'file');
+ const originalHost=child(snapshotRoot,path.join(backupPath,'snapshot','host.json'),'file');
+ const protectedBefore=child(backupRoot,path.join(backupPath,'PROTECTED_BEFORE.json'),'file');
+ const previousHost=child(backupRoot,path.join(backupPath,'previous-host.json'),'file');
+ const backlogBaseState=entry(backlogBase,'directory');
+ const backlogPath=path.join(backlogBase,requestId+'.json');
+ const backlogFile=child(backlogBaseState,backlogPath,'file');
+ let backlog={file:backlogFile,windows:null,openWindows:null,replayCount:null};
+ if(backlogFile==='PRESENT'){
+  try{
+   const bytes=fsImpl.readFileSync(backlogPath);
+   need(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=131072,
+    'MAINTENANCE_BACKLOG_READBACK_INVALID');
+   const data=JSON.parse(bytes.toString('utf8'));
+   need(data?.schema==='ZGMINI_PC_BACKLOG_V1'&&data.requestId===requestId
+    &&Array.isArray(data.windows)&&data.windows.length>=1&&data.windows.length<=64
+    &&data.windows.every(w=>w&&typeof w.pausedAt==='string'
+     &&Number.isFinite(Date.parse(w.pausedAt))
+     &&(w.resumedAt===null||typeof w.resumedAt==='string'
+      &&Number.isFinite(Date.parse(w.resumedAt))
+      &&Date.parse(w.resumedAt)>=Date.parse(w.pausedAt)))
+    &&data.replays&&typeof data.replays==='object'&&!Array.isArray(data.replays),
+    'MAINTENANCE_BACKLOG_READBACK_INVALID');
+   backlog={file:'PRESENT',windows:data.windows.length,
+    openWindows:data.windows.filter(w=>w.resumedAt===null).length,
+    replayCount:Object.keys(data.replays).length};
+  }catch{backlog={file:'UNVERIFIED',windows:null,openWindows:null,replayCount:null};}
+ }
+ const leaseBaseState=entry(leaseBase,'directory');
+ const leasePath=path.join(leaseBase,'controller-install');
+ const leaseDir=child(leaseBaseState,leasePath,'directory');
+ const ownerFile=child(leaseDir,path.join(leasePath,'owner.json'),'file');
+ const recoveryMarker=child(leaseDir,path.join(leasePath,'RECOVERY_REQUIRED.json'),'file');
+ let ownerMarkerMatch=null;
+ if(ownerFile==='PRESENT'&&recoveryMarker==='PRESENT'){
+  try{
+   const owner=JSON.parse(fsImpl.readFileSync(path.join(leasePath,'owner.json'),'utf8'));
+   const marker=JSON.parse(fsImpl.readFileSync(path.join(leasePath,'RECOVERY_REQUIRED.json'),'utf8'));
+   ownerMarkerMatch=Number.isSafeInteger(owner?.pid)&&owner.pid>0
+    &&/^[a-f0-9-]{36}$/i.test(owner?.nonce??'')
+    &&marker?.requestOwnerPid===owner.pid&&marker?.nonce===owner.nonce;
+  }catch{ownerMarkerMatch=false;}
+ }
+ const objects={backupRoot,stageRoot,snapshotRoot,stagedHost,originalHost,
+  protectedBefore,previousHost};
+ const unexpected=[...Object.values(objects),backlog.file,leaseDir,ownerFile,recoveryMarker]
+  .some(v=>['UNSAFE','UNKNOWN','UNVERIFIED'].includes(v));
+ const invalidLease=leaseDir==='PRESENT'&&(ownerFile!=='PRESENT'
+  ||recoveryMarker==='PRESENT'&&ownerMarkerMatch!==true);
+ return {schema:'ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1',requestId,
+  status:unexpected||invalidLease?'UNVERIFIED':'OBSERVED',
+  artifacts:objects,backlog,
+  lease:{directory:leaseDir,ownerFile,recoveryMarker,ownerMarkerMatch},
+  operationalWrites:0,originalRequestRetried:false,
+  recoveryComplete:false,installSuccessProven:false};
+}
+
 // Recovery-status reads must survive a partially switched/missing host.json.
 // Never infer a successful install from the journal alone. An unreadable lock
 // is treated as a held recovery lock so the receiver cannot start another job.
@@ -1539,6 +1688,7 @@ export function readMaintenanceRecoveryStatus(requestId,{
  readInstalled=()=>installedManifest().installedSha,
  readLedger=()=>{const file=path.join(recordDir,requestId+'.json');return fs.existsSync(file)?json(file):null;},
  readLock=()=>maintenanceLockStatus(maintenanceRoot,'controller-install'),
+ readArtifacts=()=>readControllerUpdateArtifacts(requestId),
 }={}){
  let actualControllerSha=null,installedReadbackCode=null,ledger=null,ledgerReadbackCode=null,
    installLock={held:true,recoveryRequired:true},lockReadbackCode=null;
@@ -1554,14 +1704,31 @@ export function readMaintenanceRecoveryStatus(requestId,{
   if(!observed||typeof observed.held!=='boolean')throw Error('invalid lock status');
   installLock=observed;
  }catch{lockReadbackCode='UPDATE_LOCK_UNAVAILABLE';}
+ let artifacts=null,artifactReadbackCode=null;
+ try{artifacts=readArtifacts();if(artifacts?.status!=='OBSERVED')
+  artifactReadbackCode='UPDATE_ARTIFACTS_UNVERIFIED';}
+ catch{artifactReadbackCode='UPDATE_ARTIFACTS_UNAVAILABLE';}
  const state={status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
-  installLock,lockReadbackCode};
+  installLock,lockReadbackCode,artifacts,artifactReadbackCode};
  return {...state,guidance:maintenanceNextAction(state)};
 }
 
 // Current lock observation wins over a historical failed request. Never infer
 // that an absent lock proves recovery/installation success; reuse its evidence.
 export function maintenanceNextAction(s){
+ if(s.artifactReadbackCode)
+  return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_STAGE_BACKLOG_LEASE',
+   blockScope:'SHARED_INSTALL_ONLY'};
+ if(s.artifacts?.backlog?.openWindows>0)
+  return {state:'RECOVERY_REVIEW_REQUIRED',next:'VERIFY_OPEN_BACKLOG_AND_ORIGINAL_OWNER',
+   blockScope:'SHARED_INSTALL_ONLY'};
+ // STAGED is past prevalidation: a prior terminal BLOCKED record is not proof
+ // that the filesystem staging and intake artifacts were reconciled.
+ if(s.artifacts?.artifacts?.stageRoot==='PRESENT'
+  &&s.ledger?.firstFail==='STAGED'&&s.ledger?.status==='BLOCKED')
+  return {state:'STAGED_EVIDENCE_REVIEW_REQUIRED',
+   next:'PRESERVE_STAGE_VERIFY_BACKLOG_INSTALL_LEASE_AND_RUNTIME',
+   blockScope:'SHARED_INSTALL_ONLY'};
  if(s.lockReadbackCode||s.installedReadbackCode||s.ledgerReadbackCode)
   return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_FAILED_READBACK',blockScope:'SHARED_INSTALL_ONLY'};
  if(s.installLock?.held){

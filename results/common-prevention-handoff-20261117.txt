@@ -1,0 +1,16 @@
+allSevenFileHashes=true
+targetSource=true
+runtimeHealthy=true
+maintenanceHealthy=true
+controllerPreserved=true
+noInstallLease=true
+workflowActive=true
+protectedUnchanged=true
+receiverHeartbeatMatchesOwner=true
+status=PASS
+code=STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED
+targetSha=36cf8ffb813f3a006f3e05379fba641fb3404645
+controllerChanges=0
+providerCalls=0
+databaseWrites=0
+d1Writes=0

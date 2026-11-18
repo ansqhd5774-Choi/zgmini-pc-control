@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validBacklogOriginalPcJob} from '../tools/update.mjs';
+import {validBacklogOriginalPcJob,classifyBacklogOriginal} from '../tools/update.mjs';
 
 const base={
  schema:'ZGMINI_PC_JOB_V1',
@@ -60,4 +60,17 @@ test('non-object or array bodies are rejected',()=>{
  for(const v of [null,undefined,[],false,'{}']){
   assert.equal(validBacklogOriginalPcJob(v),false);
  }
+});
+
+test('malformed backlog request is a durable rejection candidate, never allowed',()=>{
+ for(const body of ['{',JSON.stringify({...preimage,preimageManifestPath:'approvals/writer-updates/other-scope.json'})]){
+ const r=classifyBacklogOriginal(body);assert.equal(r.valid,false);assert.match(r.originalBodySha256,/^[a-f0-9]{64}$/);
+ assert.equal(Object.hasOwn(r,'body'),false);
+ }
+});
+test('valid backlog preserves optional scoped fields for existing dispatch validation',()=>{
+ const r=classifyBacklogOriginal(JSON.stringify(preimage));assert.equal(r.valid,true);assert.deepEqual(r.body,preimage);
+});
+test('unobservable body is not silently rejected as malformed',()=>{
+ assert.throws(()=>classifyBacklogOriginal(null),{code:'BACKLOG_BODY_UNOBSERVABLE'});
 });

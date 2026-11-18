@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "60d5fb48-f281-4096-8d70-05456af7be0c",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "7afe6b0bcaa74d622ada9190fdc9fcc7fd4d5f10",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "49ffa1b15f6d9d88ec95578c0eac670c13d5b1fe",
+  "candidateSourceSha": "94ebd38383b49a5329ce67d8ad3b54ab9a5c45a3",
+  "manifestSha256": "2d87ef58a0d8d31336dad06a96de67145f97d0a673a83da690c18649259eeb8d",
+  "baseTreeOid": "f9325d74df7e9a1253203b5a4d39302d42eddc9e",
+  "preparedTreeOid": "4269cf8bc06927e86ca473d9dc220a48a5dc33fa",
+  "provenanceSha256": "79dcd76cf82140c0631f97e70620f5b217e673e9dd6ee3e15976fee8826b7464",
+  "runId": "43859603124",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-score/employment-r6-collector.mjs"
+  ]
+}

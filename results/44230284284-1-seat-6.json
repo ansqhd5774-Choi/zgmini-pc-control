@@ -1,0 +1,300 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44230284284-1-seat-6",
+  "requestId": "pc-62a4c75d-3588-452f-93a5-7d1ea1c86f4b",
+  "startedAt": "2026-11-18T03:25:24.867Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "0193056bdb47bcf6c911f17623b6c302c8199c4c",
+  "sourceBranch": "fix/w04-pit0405-raw-attestation-breakdown-20261117",
+  "operation": "employment-r6-candidate-stage-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-23d628f1-7939-4657-b98b-a58eae8386a1",
+  "memoryAdmission": {
+    "admitted": true,
+    "minimumFreeMiB": 1536,
+    "firstFreeMiB": 1622,
+    "freeMiB": 1622,
+    "minObservedMiB": 1622,
+    "samples": 1,
+    "waitedMs": 0.02889999999979409
+  },
+  "pcOperationalApprovedSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+    "actualExecutionSha": "0193056bdb47bcf6c911f17623b6c302c8199c4c",
+    "sourceBundleSha": "0193056bdb47bcf6c911f17623b6c302c8199c4c",
+    "asOfDate": "2026-11-18",
+    "sqliteOpened": true,
+    "summary": {
+      "sourceFeatures": 29,
+      "recentlyObservedFeatures": 23,
+      "chartReadyFeatures": 23,
+      "chartPartialFeatures": 5,
+      "scoredFeatures": 24,
+      "recentlyScoredFeatures": 18
+    },
+    "pit": {
+      "coreCurrentRows": 40777,
+      "coreHistoryRevisions": 38804,
+      "coreCurrentKeys": 40777,
+      "coreHistoryAsOfUniqueKeys": 37897,
+      "coreHistoryPriorRevisionKeys": 877,
+      "coreHistoryPriorRevisionRows": 907,
+      "coreHistoryAmbiguousLatestKeys": 0,
+      "coreHistorySameInstantAdditionalRows": 0,
+      "coreCurrentHistoryMatchingKeys": 37897,
+      "coreCurrentHistoryConflictingKeys": 0,
+      "coreCurrentHistoryUnverifiedKeys": 0,
+      "coreCurrentHistoryMissingKeys": 2880,
+      "candidateHistoryAsOfUniqueKeys": 3700,
+      "candidateHistoryPriorRevisionKeys": 0,
+      "candidateHistoryPriorRevisionRows": 0,
+      "candidateHistoryAmbiguousLatestKeys": 0,
+      "candidateHistorySameInstantAdditionalRows": 0,
+      "coreCurrentKeysMissingHistory": 2880,
+      "missingKeysWithCandidateHistory": 2625,
+      "missingKeysWithMatchingCandidateValueAndHash": 2625,
+      "candidateCurrentKeys": 3700,
+      "candidateNewKeys": 0,
+      "candidateOverlapMatchingKeys": 3686,
+      "candidateOverlapConflictingKeys": 14,
+      "candidateOverlapUnverifiedKeys": 0,
+      "candidateNewKeysWithConsistentPITMetadata": 0,
+      "candidateNewKeysWithIncompletePITMetadata": 0,
+      "coreMissingHistoryKeysWithConsistentCandidateMetadata": 2625,
+      "coreMissingHistoryKeysWithoutConsistentCandidateMetadata": 255,
+      "rawSnapshotMetadataKeys": 86,
+      "rawSnapshotCertifiedKeys": 59,
+      "coreCurrentRawLineageVerifiedKeys": 29031,
+      "coreCurrentRawLineageMissingSnapshotKeys": 10889,
+      "coreCurrentRawLineageConflictingKeys": 0,
+      "coreCurrentRawLineageUnverifiedKeys": 857,
+      "coreHistoryRawLineageTotalRows": 38804,
+      "coreHistoryRawLineageVerifiedRows": 29016,
+      "coreHistoryRawLineageMissingSnapshotRows": 8873,
+      "coreHistoryRawLineageConflictingRows": 0,
+      "coreHistoryRawLineageUnverifiedRows": 915,
+      "rawLineageEvidenceStatus": "HOLD_INCOMPLETE_SOURCE_LINEAGE",
+      "candidateReconciliationPreviewStatus": "HOLD_CONFLICTING_REVISIONS"
+    },
+    "indicators": [
+      {
+        "id": "U3_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "U6_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "LFPR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "EPOP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "PAYEMS_MOM",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "PAYEMS_3M_AVG",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "PAYEMS_ACCEL",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "AVG_WEEKLY_HOURS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "TEMP_HELP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INITIAL_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INITIAL_CLAIMS_4W",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "CONTINUED_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "IUR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "STATE_CLAIMS_BREADTH",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "JOLTS_OPENINGS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_HIRES_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_QUITS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_LAYOFFS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "AHE_YOY",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "ECI_12M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INDUSTRY_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "STATE_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "MSA_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_GAINS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_LOSSES_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_NET_GROSS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_SMALL_FIRM_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_STATE_BREADTH",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_BIRTH_DEATH_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "UNAVAILABLE",
+        "scoreStatus": "READY"
+      }
+    ],
+    "bodyDigest": "ee79c18c679991ebeec06ddd2cfa546f49bea3d2b23775088d8055299fc500ff",
+    "walPreflight": {
+      "coreWalMode": true,
+      "candidateWalMode": false,
+      "coreWalSidecarsPreexisting": true,
+      "candidateWalSidecarsPreexisting": false
+    },
+    "promotionApproved": false,
+    "memoryTelemetry": {
+      "kind": "SYSTEM_RAM_SAMPLED_DURING_R6_CHILD_V1",
+      "intervalMs": 100,
+      "samples": 746,
+      "totalMiB": 16122,
+      "baselineFreeMiB": 1883,
+      "minimumFreeMiB": 327,
+      "peakSystemUsedMiB": 15795,
+      "peakIncreaseFromBaselineMiB": 1556,
+      "calculationPeakValid": true,
+      "measurementPhase": "COMPUTATION"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "protectedAfterSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "actualExecutionSha": "0193056bdb47bcf6c911f17623b6c302c8199c4c",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-18T03:26:49.251Z",
+  "durationMs": 84384
+}

@@ -6,15 +6,18 @@ import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.m
 import {inspectWriterPublicationEvidence} from './writer-publication-evidence-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
+import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
 import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs';
 import {inspectSharedResourceReleaseReadonly} from './shared-resource-release-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
 import {inspectR54SixFileInventory} from './r54-sixfile-inventory-readonly.mjs';
+import {inspectR47TaskActionReadonly} from './theme-r47-task-action-readonly.mjs';
 import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
 import {inspectUsBreadthR17Runtime} from './us-breadth-r17-runtime-readonly.mjs';
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
 import {inspectDeltaR44CheckpointEvidence} from './market-calendar-r44-runtime-readonly.mjs';
+import {inspectR44ExistingInputAudit} from './market-calendar-r44-input-audit-readonly.mjs';
 import {inspectR44ProductionReadonly} from './market-calendar-r44-production-readonly.mjs';
 import {inspectER1NovemberAvailability} from './market-calendar-er1-nov30-availability-readonly.mjs';
 import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
@@ -22,13 +25,18 @@ import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectD05LineageReadonly,summarizeD05LineageOperation} from './d05-lineage-readonly.mjs';
 import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
 import {inspectSourceInventory} from './source-inventory-runtime-readonly.mjs';
+import {inspectProviderActivity} from './provider-activity-runtime-readonly.mjs';
 import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
+import {inspectNineR32RawCoverage} from './theme-nine-r32-raw-coverage-readonly.mjs';
+import {inspectA401Private23} from './inflation-a401-private23-readonly.mjs';
+import {inspectA407IntegrityReadonly} from './inflation-a407-integrity-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
 import {inspectEmploymentR6CollectionEvidence} from './employment-r6-collection-evidence-readonly.mjs';
+import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
@@ -89,6 +97,8 @@ export async function runOperation(request,context){
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
  if(request.operation==='inflation-core-lock-observation-readonly')
   return observeInflationCoreLock({queryTask});
+ if(request.operation==='inflation-event129-evidence-readonly')
+  return inspectInflationEvent129Once();
  if(request.operation==='shared-resource-release-readonly')return inspectSharedResourceReleaseReadonly({dataRoot,queryTask});
   if(request.operation==='writer-b-1063-recovery-readonly')return inspectWriterB1063Recovery();
  if(request.operation==='fear-greed-archive-status')return inspectFearGreedArchive(dataRoot,{queryTask});
@@ -108,12 +118,15 @@ export async function runOperation(request,context){
  if(request.operation==='us-breadth-r17-runtime-readonly')return inspectUsBreadthR17Runtime(dataRoot);
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
  if(request.operation==='r54-sixfile-inventory-readonly')return inspectR54SixFileInventory(dataRoot);
+ if(request.operation==='r47-task-action-readonly')return inspectR47TaskActionReadonly();
  if(request.operation==='release-calendar-runtime-readonly'){
   let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
   return inspectReleaseCalendarRuntime(dataRoot,{coreTaskXml});
  }
  if(request.operation==='source-inventory-runtime-readonly')return inspectSourceInventory(dataRoot);
+ if(request.operation==='provider-activity-runtime-readonly')return inspectProviderActivity(dataRoot);
  if(request.operation==='market-calendar-r44-runtime-readonly')return inspectDeltaR44CheckpointEvidence(dataRoot);
+ if(request.operation==='market-calendar-r44-input-audit-readonly')return inspectR44ExistingInputAudit(dataRoot);
  if(request.operation==='market-calendar-r44-production-readonly')return inspectR44ProductionReadonly();
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
@@ -122,6 +135,7 @@ export async function runOperation(request,context){
  if(request.operation==='employment-r6-host-cas-readonly')return inspectEmploymentR6HostCas({host});
  if(request.operation==='employment-r6-wal-memory-preflight')return inspectEmploymentR6WalMemoryPreflight({host});
  if(request.operation==='employment-r6-collection-evidence-readonly')return inspectEmploymentR6CollectionEvidence(dataRoot);
+ if(request.operation==='earnings-bea-mfg-archive-readonly')return inspectBeaMfgArchiveReadonly(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
   if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
@@ -148,6 +162,15 @@ export async function runOperation(request,context){
   return {status:'PASS',code:'SOURCE_COMMIT_READONLY_VERIFIED',sourceSha:data.sha,changedFileCount:data.files?.length??null,executedCandidateCode:false};
  }
  if(request.operation==='theme-l7-runtime-readonly')return inspectThemeL7RuntimeReadonly({dataRoot,queryTask});
+ if(request.operation==='theme-nine-r32-raw-coverage-readonly'){
+  const min=policy.operations[request.operation].minimumFreeMiB;
+  if(os.freemem()/1048576<min)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',candidateExecuted:false,
+   providerCalls:0,sqliteOpened:false,operationalWrites:0,d1Writes:0};
+  const audit=inspectNineR32RawCoverage(dataRoot);
+  return audit.status==='PARTIAL'?{...audit,status:'BLOCKED',coverageStatus:'PARTIAL'}:audit;
+ }
+ if(request.operation==='inflation-a401-private23-readonly')return inspectA401Private23(request,context);
+ if(request.operation==='inflation-a407-integrity-readonly')return inspectA407IntegrityReadonly(request,context);
  if(request.operation==='inflation19-runtime-readonly')return inspectInflation19RuntimeReadonly(dataRoot);
  if(request.operation==='inflation-candidates-runtime-readonly')return inspectInflationCandidatesRuntimeReadonly(dataRoot);
  if(request.operation==='theme-platform-shadow-readonly'){

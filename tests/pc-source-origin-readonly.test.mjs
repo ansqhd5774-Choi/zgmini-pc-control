@@ -166,12 +166,25 @@ test('invalid or missing config SHA never selects a candidate',()=>{
  assert.doesNotMatch(JSON.stringify(result),/SECRET|not_a_sha/);
 });
 
-test('excess directory count marks inventory truncated and prevents selection',()=>{
+test('more than 64 unrelated directories do not erase an approved checkout candidate',()=>{
  const f=fixture();f.repos.push(f.addRepo('A',SHA_A));
  for(let i=0;i<65;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+i));
  const result=f.inspect();
+ assert.equal(result.inventoryTruncated,false);
+ assert.equal(result.candidateCount,1);
+ assert.equal(result.configMatchingCandidate,'projects/A');
+ assert.equal(result.runtimeSourceVerified,false);
+});
+
+test('bounded directory scan remains incomplete and cannot claim a unique candidate',()=>{
+ const f=fixture();f.repos.push(f.addRepo('A',SHA_A));
+ for(let i=0;i<260;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+i));
+ const result=f.inspect();
  assert.equal(result.inventoryTruncated,true);
  assert.equal(result.configMatchingCandidate,null);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.operationalWrites,0);
 });
 
 test('git read failure yields candidate without trusted HEAD',()=>{

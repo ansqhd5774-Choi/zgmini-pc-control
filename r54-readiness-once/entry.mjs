@@ -298,6 +298,14 @@ export function projectR35Details(details){
  const manifest=lineage.manifests?.r35??{};
  return {
   r47Task:details.tasks?.find(t=>t.name==='ZGMINI-PC-Theme-Nine-R47-Private')??null,
+  // Already inspected under the existing fixed R54 read-only contract.
+  // Return only the R47 CMD status and digest, never the command contents.
+  r47InstalledCmd:{
+   status:['READ','DENIED','UNAVAILABLE'].includes(lineage.installed?.r47Cmd?.status)
+    ?lineage.installed.r47Cmd.status:'UNKNOWN',
+   sha256:lineage.installed?.r47Cmd?.status==='READ'&&
+    SHA64.test(lineage.installed.r47Cmd.sha256??'')
+    ?lineage.installed.r47Cmd.sha256:null},
   r47Reports:{status:runs.status??'UNAVAILABLE',reports},
   r35Manifest:{status:manifest.status??'UNAVAILABLE',
    sha256:manifest.sha256??null,modifiedAt:manifest.modifiedAt??null,

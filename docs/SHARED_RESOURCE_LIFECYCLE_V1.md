@@ -131,3 +131,9 @@
 - 원본 Writer B는 제어 workflow SHA와 승인된 manifest 바이트/고정 ref/SHA-256을 검증한다. pc-job은 **요청 기능 source SHA와 승인 fingerprint**가 원본이다. Controller 설치 SHA·기능 source SHA·PC config의 source SHA를 서로 혼동하지 않는다. 현승인 fingerprint가 변경됐다면 Writer manifest와 동일하게 `SOURCE_DRIFT_REVIEW`로 분류한다.
 - A 관측이 원본 완료 **이전**이거나 요청·Run·영수증·TXT/JSON 필드·자원 키·Task XML 안정성·2회 샘플·현재 운영 source가 맞지 않으면 해제 후보로 받지 않는다. 정상 후보도 별도 lease 소유권 해제 증거가 아니므로 `RECHECK_EVIDENCE_PENDING`, `releaseVerified=false`, `ownerReplanAuthorized=false`, 자동 PC 재시도 0회를 유지한다.
 - 소스 회귀는 Writer B, pc-job, 승인 드리프트, 원본/A 다른 요청, 복제 영수증, 서로 다른 자원, 과거 A 관측, 결과쌍 불일치, 보호 source 드리프트를 다룬다. 이는 **운영 연결을 위한 읽기 전용 후보 코드**이며, 현재 Controller #917 실제 C 복구·A 관측기 설치·자연 자원 대기→해제→원담당 수신 실증은 여전히 미완료다. **총 4/5(80%) 유지**.
+
+### 자연 유휴 관측과 기존 Writer B 재계획의 구분 — 2026-11-17
+
+shared-resource-release-readonly는 관측 후보이며 releaseVerified/ownerReplanAuthorized=false를 유지한다. 이 관측기를 Writer B 설치 승인으로 승격하지 않는다. 동시에 이 값 자체를 이미 승인된 새 Writer B의 전역 진입 금지 조건으로 삼지도 않는다. 현재 writer-b/installer.mjs는 reviewResourceWait의 READY_FOR_OWNER_REPLAN을 요구하지 않으며, windows-adapter.mjs의 waitForCoreIdleWindow(PRECLAIM/POST_PREPARE) → pauseCore 직전 fresh race 검사 → 자연 drain → 공유 claim/원본/manifest/Task·source 검증을 자체 수행한다.
+
+기존 효과·동일 source 범위의 승인된 원담당은 새 고유 요청을 준비하고 이 정규 설치기에서 현시점 안전 조건을 다시 판정한다. 과거 A의 자연 유휴 관측은 통과 보장이 아니고, 소비된 원본 B를 자동 반복할 수도 없다. 재개용 Boolean을 임의로 true로 바꾸거나 별도 release 인증기를 필수 인프라로 만드는 것은 필요하지 않다. W05의 기존 3파일 source-only GO는 유지되며, Core/Korea trigger 선행 억제·guard 완화의 새 효과 HOLD/NOT_APPROVED는 그대로다. 유휴 사전검사가 다시 안전 대기를 반환하면 기능 실패로 오인하거나 재요청을 반복하지 않고 실제 상태 변화/구체적인 실패 단계만 처리한다.

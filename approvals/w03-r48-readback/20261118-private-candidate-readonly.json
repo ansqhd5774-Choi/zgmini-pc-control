@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_W03_R48_PRIVATE_READBACK_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PRIVATE_R48_CANDIDATE_SHA_R47_PAIR_READONLY_ONCE",
+  "operation": "w03-r48-private-readback-once",
+  "dataRoot": "E:\\ZGmini\\data",
+  "maxCandidateFiles": 512,
+  "providerCallsAllowed": false,
+  "rawDataExportAllowed": false,
+  "sqliteAccessAllowed": false,
+  "pcWritesAllowed": false,
+  "d1WritesAllowed": false,
+  "taskChangesAllowed": false,
+  "maxRuns": 1
+}

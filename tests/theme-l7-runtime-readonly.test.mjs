@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
- safeR181ErrorFlow,safeR181HttpErrorFlow} from '../controller/theme-l7-runtime-readonly.mjs';
+ safeR181ErrorFlow,safeR181HttpErrorFlow,safeRecordedR181HttpFailure,
+ safeR181LedgerCoverage} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -72,10 +73,24 @@ test('symlinks and malformed ledger values cannot escape or leak the boundary',(
  const f=fixture();try{
   const link=path.join(f.l7,names[0]);
   fs.unlinkSync(link);
-  fs.symlinkSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),link);
-  assert.throws(()=>inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot}),
-   {code:'L7_READONLY_ENTRY_NOT_REGULAR'});
-  fs.unlinkSync(link);fs.writeFileSync(link,'// a normal source');
+  // The isolated Windows CI account may lack SeCreateSymbolicLinkPrivilege.
+  // Skip only the fixture operation in that environment; the application
+  // always rejects symlinks if they are present. Preserve the malformed
+  // ledger checks regardless of host privileges.
+  let linkCreated=false;
+  try{
+   fs.symlinkSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),link);
+   linkCreated=true;
+  }catch(error){
+   if(process.platform!=='win32'||!['EPERM','EACCES'].includes(error?.code))
+    throw error;
+  }
+  if(linkCreated){
+   assert.throws(()=>inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot}),
+    {code:'L7_READONLY_ENTRY_NOT_REGULAR'});
+   fs.unlinkSync(link);
+  }
+  fs.writeFileSync(link,'// a normal source');
   fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
    '{"status":"secret","observationDate":"2026-13-99","token":"SECRET"}');
   const out=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot,
@@ -408,4 +423,94 @@ test('R181 error branch inventory is bounded and never claims a runtime failure'
  assert.equal(JSON.stringify(out).includes('SECRET_VALUE'),false);
  assert.deepEqual(safeR181HttpErrorFlow('throw Error("x")\n'.repeat(1000)),
   {status:'UNREADABLE_SOURCE',sites:[],lines:[],truncated:false});
+});
+
+test('W03 R181 pinned STOP exposes only an already recorded non-OK integer HTTP code',()=>{
+ for(const [numeric,group] of [[301,'REDIRECT_3XX'],[401,'CLIENT_4XX'],
+  [403,'CLIENT_4XX'],[429,'CLIENT_4XX'],[503,'SERVER_5XX']]){
+  const result=safeRecordedR181HttpFailure({
+   status:'STOP',httpStatus:numeric,reason:'private provider URL and token',
+   credential:'SHOULD_NOT_LEAK'
+  },{sourcePinned:true});
+  assert.deepEqual(result,{source:'PINNED_R181_LEDGER_HTTP_STATUS',
+   status:numeric,group});
+  assert.equal(JSON.stringify(result).includes('SHOULD_NOT_LEAK'),false);
+ }
+});
+
+test('W03 R181 unknown, malformed, successful, unpinned, or non-STOP HTTP values never leak',()=>{
+ const invalid=[undefined,null,'429',200,299,99,600,429.5,-1,NaN,
+  Infinity,{value:429},[429],true];
+ for(const value of invalid){
+  assert.equal(safeRecordedR181HttpFailure({
+   status:'STOP',httpStatus:value,reason:'secret'
+  },{sourcePinned:true}),null);
+ }
+ assert.equal(safeRecordedR181HttpFailure({status:'STOP',httpStatus:429}),null);
+ assert.equal(safeRecordedR181HttpFailure({status:'READY',httpStatus:429},
+  {sourcePinned:true}),null);
+ assert.equal(safeRecordedR181HttpFailure(null,{sourcePinned:true}),null);
+});
+
+test('W03 R181 unpinned installed source cannot assert recorded HTTP proof',()=>{
+ const f=fixture();
+ try{
+  fs.writeFileSync(path.join(f.l7,'R181_PRIMARY_LAST_RUN.json'),
+   JSON.stringify({status:'STOP',httpStatus:403,reason:'SPY HTTP 403'}));
+  const result=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+  const ledger=result.ledgers['R181_PRIMARY_LAST_RUN.json'];
+  assert.equal(ledger.recordedHttpFailure,null);
+  assert.equal(ledger.safeHttpFailure,null);
+  assert.equal(result.sources[names[0]].sha256.length,64);
+  assert.equal(result.providerCalls,0);
+  assert.equal(result.d1Writes,0);
+ }finally{f.close();}
+});
+
+
+test('R181 fixed 14-symbol ledger coverage projects only bounded metadata, never secrets',()=>{
+ const symbols=['SPY','BOTZ','ROBO','SKYY','CLOU','DRIV','NLR','URA',
+  'ITA','SHLD','FINX','ARKF','CIBR','BUG'];
+ const coverage=Object.fromEntries(symbols.map(symbol=>[symbol,
+  {bars:701,latest15NY:'2026-11-13',close:12345,token:'DO_NOT_LEAK'}]));
+ const raw={status:'LOCAL_PRIMARY_STORED',at:'2026-11-16T05:29:30.439Z',
+  providerCalls:14,coverage,apiKey:'TOP_SECRET',sourceUrl:'https://private'};
+ const out=safeR181LedgerCoverage(raw,{sourcePinned:true});
+ assert.equal(out.status,'LEDGER_REPORTED_COMPLETE');
+ assert.equal(out.matchingSymbols,14);
+ assert.equal(out.unexpectedSymbolCount,0);
+ assert.equal(out.evidence,'LEDGER_METADATA_ONLY_NOT_SQLITE_VERIFIED');
+ assert.equal(out.symbols[0].symbol,'SPY');
+ assert.equal(out.symbols[0].bars,701);
+ for(const v of ['DO_NOT_LEAK','TOP_SECRET','12345','https://private'])
+  assert.equal(JSON.stringify(out).includes(v),false);
+ assert.equal(safeR181LedgerCoverage(raw).status,'NOT_ATTESTED');
+ assert.equal(safeR181LedgerCoverage({...raw,status:'STOP'},{sourcePinned:true}).status,
+  'NOT_ATTESTED');
+});
+test('R181 ledger coverage never elevates missing, extra or malformed bars to verified',()=>{
+ const symbols=['SPY','BOTZ','ROBO','SKYY','CLOU','DRIV','NLR','URA',
+  'ITA','SHLD','FINX','ARKF','CIBR','BUG'];
+ const coverage=Object.fromEntries(symbols.map(symbol=>[symbol,
+  {bars:701,latest15NY:'2026-11-13'}]));
+ const raw={status:'LOCAL_PRIMARY_STORED',at:'2026-11-16T05:29:30Z',
+  providerCalls:14,coverage};
+ for(const invalid of [
+  {...coverage,SPY:null},
+  {...coverage,SPY:{bars:1.5,latest15NY:'2026-11-13'}},
+  {...coverage,SPY:{bars:1,latest15NY:'2026-02-30'}},
+  {...coverage,SPY:{bars:1,latest15NY:'SECRET_TOKEN'}},
+  Object.fromEntries(Object.entries(coverage).filter(([symbol])=>symbol!=='SPY')),
+  {...coverage,OTHER:coverage.SPY},
+ ]){
+  const out=safeR181LedgerCoverage({...raw,coverage:invalid},{sourcePinned:true});
+  assert.equal(out.status,'LEDGER_REPORTED_INCOMPLETE');
+  assert.equal(out.evidence,'LEDGER_METADATA_ONLY_NOT_SQLITE_VERIFIED');
+  assert.equal(JSON.stringify(out).includes('SECRET_TOKEN'),false);
+  assert.equal(JSON.stringify(out).includes('OTHER'),false);
+ }
+ assert.equal(safeR181LedgerCoverage({...raw,coverage:null},{sourcePinned:true}).status,
+  'LEDGER_COVERAGE_ABSENT');
+ assert.equal(safeR181LedgerCoverage({...raw,providerCalls:'14'},{sourcePinned:true}).status,
+  'LEDGER_REPORTED_INCOMPLETE');
 });

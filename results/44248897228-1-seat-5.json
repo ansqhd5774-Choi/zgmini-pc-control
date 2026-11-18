@@ -1,0 +1,1069 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44248897228-1-seat-5",
+  "requestId": "pc-4f24a9bc-1018-4e33-8ed4-2ea4263a4c11",
+  "startedAt": "2026-11-18T06:06:46.934Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "57d2c6e031af7b1919576bb222c3921b1523b53a",
+  "sourceBranch": "main",
+  "operation": "provider-activity-runtime-readonly",
+  "seat": 5,
+  "status": "STATE_UNKNOWN",
+  "code": "PROVIDER_ACTIVITY_PARTIAL",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-issue1018-close-20261118",
+  "pcOperationalApprovedSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "PROVIDER_ACTIVITY_PARTIAL",
+    "source": "PC_COLLECTION_EVENTS_FETCH_WRAPPER",
+    "scope": "FIXED_LOCAL_JSONL_ONLY",
+    "evidenceLevel": "FETCH_WRAPPER_HTTP_ONLY_NOT_PARSER_OR_STORAGE_PROOF",
+    "now": "2026-11-18T06:06:50.004Z",
+    "windowDays": 14,
+    "observedWindowStart": "2026-11-04T06:06:50.004Z",
+    "eventsExamined": 3059,
+    "logLinesExamined": 5423,
+    "tailBytes": 1688788,
+    "tailTruncated": false,
+    "linesTruncated": false,
+    "invalidRows": 1,
+    "duplicateLines": 0,
+    "hiddenHosts": 0,
+    "observedHostCount": 32,
+    "hostsReturned": 32,
+    "hosts": [
+      {
+        "host": "www.sec.gov",
+        "requestCount": 242,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T06:00:12.481Z",
+        "last2xxRunAt": "2026-11-18T06:00:12.481Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 7199050,
+        "statusCounts": {
+          "ok2xx": 242,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "markets.newyorkfed.org",
+        "requestCount": 314,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:55:27.385Z",
+        "last2xxRunAt": "2026-11-18T05:55:27.385Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 3893728,
+        "statusCounts": {
+          "ok2xx": 312,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 2,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.federalreserve.gov",
+        "requestCount": 1141,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:55:27.385Z",
+        "last2xxRunAt": "2026-11-18T05:55:27.385Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 2682102,
+        "statusCounts": {
+          "ok2xx": 1082,
+          "client4xx": 59,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "oui.doleta.gov",
+        "requestCount": 1263,
+        "observedDayCount": 14,
+        "lastAttemptAt": "2026-11-18T05:45:43.542Z",
+        "last2xxRunAt": "2026-11-18T05:45:43.542Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 1200466,
+        "statusCounts": {
+          "ok2xx": 1247,
+          "client4xx": 0,
+          "server5xx": 16,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "production.dataviz.cnn.io",
+        "requestCount": 975,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:45:43.542Z",
+        "last2xxRunAt": "2026-11-18T05:45:43.542Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 1199734,
+        "statusCounts": {
+          "ok2xx": 974,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 1,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "data.bis.org",
+        "requestCount": 242,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:35:16.755Z",
+        "last2xxRunAt": "2026-11-18T05:35:16.755Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 5098755,
+        "statusCounts": {
+          "ok2xx": 242,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "api.stlouisfed.org",
+        "requestCount": 8477,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:15:13.199Z",
+        "last2xxRunAt": "2026-11-18T05:15:13.199Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 2100468,
+        "statusCounts": {
+          "ok2xx": 8463,
+          "client4xx": 0,
+          "server5xx": 13,
+          "networkError": 1,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "thedocs.worldbank.org",
+        "requestCount": 120,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:10:11.311Z",
+        "last2xxRunAt": "2026-11-18T05:10:11.311Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 7205323,
+        "statusCounts": {
+          "ok2xx": 119,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 1,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.newyorkfed.org",
+        "requestCount": 338,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T05:10:11.311Z",
+        "last2xxRunAt": "2026-11-18T05:10:11.311Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 3763165,
+        "statusCounts": {
+          "ok2xx": 337,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 1,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "api.earningsapi.com",
+        "requestCount": 208,
+        "observedDayCount": 14,
+        "lastAttemptAt": "2026-11-18T05:00:48.361Z",
+        "last2xxRunAt": "2026-11-18T05:00:48.361Z",
+        "lastRunRequests": 15,
+        "lastRunResponses": {
+          "ok2xx": 15,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 15
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 86397246,
+        "statusCounts": {
+          "ok2xx": 208,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "data.financialresearch.gov",
+        "requestCount": 240,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:35:19.891Z",
+        "last2xxRunAt": "2026-11-18T04:35:19.891Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 7196415,
+        "statusCounts": {
+          "ok2xx": 240,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "home.treasury.gov",
+        "requestCount": 59,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 59,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "ir.eia.gov",
+        "requestCount": 59,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 59,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.bea.gov",
+        "requestCount": 113,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 11057906,
+        "statusCounts": {
+          "ok2xx": 113,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.bls.gov",
+        "requestCount": 176,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 4,
+        "lastRunResponses": {
+          "ok2xx": 4,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 4
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 176,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.census.gov",
+        "requestCount": 177,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 3,
+        "lastRunResponses": {
+          "ok2xx": 3,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 3
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 177,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.cftc.gov",
+        "requestCount": 59,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 59,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.eia.gov",
+        "requestCount": 167,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 3,
+        "lastRunResponses": {
+          "ok2xx": 3,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 3
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 167,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.nass.usda.gov",
+        "requestCount": 13,
+        "observedDayCount": 4,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21755635,
+        "statusCounts": {
+          "ok2xx": 12,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 1,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.treasurydirect.gov",
+        "requestCount": 94,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 93,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 1,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "www.usda.gov",
+        "requestCount": 59,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T04:10:51.227Z",
+        "last2xxRunAt": "2026-11-18T04:10:51.227Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775835,
+        "statusCounts": {
+          "ok2xx": 59,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "api.bls.gov",
+        "requestCount": 218,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T03:55:30.106Z",
+        "last2xxRunAt": "2026-11-18T03:55:30.106Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 5999644,
+        "statusCounts": {
+          "ok2xx": 217,
+          "client4xx": 0,
+          "server5xx": 1,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "api.census.gov",
+        "requestCount": 480,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T03:55:30.106Z",
+        "last2xxRunAt": "2026-11-18T03:55:30.106Z",
+        "lastRunRequests": 4,
+        "lastRunResponses": {
+          "ok2xx": 4,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 4
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 7199345,
+        "statusCounts": {
+          "ok2xx": 480,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "marketparquet.com",
+        "requestCount": 28,
+        "observedDayCount": 14,
+        "lastAttemptAt": "2026-11-18T01:05:48.289Z",
+        "last2xxRunAt": "2026-11-18T01:05:48.289Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 86089227,
+        "statusCounts": {
+          "ok2xx": 28,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "raw.githubusercontent.com",
+        "requestCount": 14,
+        "observedDayCount": 14,
+        "lastAttemptAt": "2026-11-18T01:05:48.289Z",
+        "last2xxRunAt": "2026-11-18T01:05:48.289Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 86089227,
+        "statusCounts": {
+          "ok2xx": 14,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "apps.bea.gov",
+        "requestCount": 80,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-18T00:00:43.052Z",
+        "last2xxRunAt": "2026-11-18T00:00:43.052Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 21775020,
+        "statusCounts": {
+          "ok2xx": 80,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "data.alpaca.markets",
+        "requestCount": 28,
+        "observedDayCount": 14,
+        "lastAttemptAt": "2026-11-18T00:00:43.052Z",
+        "last2xxRunAt": "2026-11-18T00:00:43.052Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 14600878,
+        "statusCounts": {
+          "ok2xx": 28,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "data-dbg.krx.co.kr",
+        "requestCount": 88,
+        "observedDayCount": 14,
+        "lastAttemptAt": "2026-11-17T23:37:07.112Z",
+        "last2xxRunAt": "2026-11-17T23:37:07.112Z",
+        "lastRunRequests": 5,
+        "lastRunResponses": {
+          "ok2xx": 5,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 5
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX_CADENCE_UNVERIFIED",
+        "expectedIntervalMs": 7200284,
+        "statusCounts": {
+          "ok2xx": 88,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "ecos.bok.or.kr",
+        "requestCount": 20,
+        "observedDayCount": 10,
+        "lastAttemptAt": "2026-11-17T23:37:07.112Z",
+        "last2xxRunAt": "2026-11-17T23:37:07.112Z",
+        "lastRunRequests": 2,
+        "lastRunResponses": {
+          "ok2xx": 2,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 75622686,
+        "statusCounts": {
+          "ok2xx": 20,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "data.sec.gov",
+        "requestCount": 396,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-17T23:20:30.047Z",
+        "last2xxRunAt": "2026-11-17T23:20:30.047Z",
+        "lastRunRequests": 9,
+        "lastRunResponses": {
+          "ok2xx": 7,
+          "client4xx": 2,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 7,
+          "404": 2
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 25800092,
+        "statusCounts": {
+          "ok2xx": 308,
+          "client4xx": 88,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "en.wikipedia.org",
+        "requestCount": 44,
+        "observedDayCount": 15,
+        "lastAttemptAt": "2026-11-17T23:20:30.047Z",
+        "last2xxRunAt": "2026-11-17T23:20:30.047Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": true,
+        "monitoringState": "normal",
+        "reason": "RECENT_2XX",
+        "expectedIntervalMs": 25800092,
+        "statusCounts": {
+          "ok2xx": 44,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      },
+      {
+        "host": "deltascreener.com",
+        "requestCount": 1,
+        "observedDayCount": 1,
+        "lastAttemptAt": "2026-11-15T12:20:10.850Z",
+        "last2xxRunAt": "2026-11-15T12:20:10.850Z",
+        "lastRunRequests": 1,
+        "lastRunResponses": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        },
+        "lastRunStatuses": {
+          "200": 1
+        },
+        "monitored": false,
+        "monitoringState": "unknown",
+        "reason": "NOT_REPEATED",
+        "expectedIntervalMs": null,
+        "statusCounts": {
+          "ok2xx": 1,
+          "client4xx": 0,
+          "server5xx": 0,
+          "networkError": 0,
+          "quotaGuard": 0,
+          "other": 0
+        }
+      }
+    ],
+    "monitorScope": "OBSERVED_REPEATED_HTTP_HOSTS_NOT_APPROVED_API_ENDPOINTS",
+    "http": {
+      "normal": 31,
+      "failed": 0,
+      "unknown": 0,
+      "total": 31
+    },
+    "monitoredHostCount": 31,
+    "monitoredHostsReturned": 31,
+    "omittedHosts": 0,
+    "allActiveEndpointsVerified": false,
+    "activeEndpointCount": null,
+    "missingCollectorCoverage": [
+      "ALPACA_CHILD_PROCESS",
+      "SUPPLY_R10_CHILD_PROCESS",
+      "SECTOR_CHILD_PROCESS",
+      "DOL_OR_BLS_INDEPENDENT_COLLECTORS_UNVERIFIED"
+    ],
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedStateUnchanged": true,
+  "protectedBeforeSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "protectedAfterSha256": "591c8e7efc555f926d3d14d70cbb92b680b100066b224e026bc9ca4c212591ae",
+  "actualExecutionSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-18T06:06:53.887Z",
+  "durationMs": 6953
+}

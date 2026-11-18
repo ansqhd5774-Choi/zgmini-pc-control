@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_PC_ROLLBACK_RECONCILIATION_V1",
+  "requestId": "pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12",
+  "status": "ROLLED_BACK",
+  "originalStatus": "RECOVERY_REQUIRED",
+  "originalPhase": "SWITCHED",
+  "actualInstalledSha": "384ffd09e80ad769e31596483dfe73e9ee8b6c6a",
+  "originalRequestRetried": false,
+  "code": "INTERRUPTED_ROLLBACK_VERIFIED",
+  "at": "2026-11-17T01:56:05.079Z",
+  "existingVersionPreserved": true,
+  "mutationStarted": true,
+  "protectedStateUnchanged": true,
+  "leaseArchived": true,
+  "originalLedgerPreserved": true,
+  "sourceSha": "3c755497c8c166bbd276b0e67f8798231ef76352"
+}

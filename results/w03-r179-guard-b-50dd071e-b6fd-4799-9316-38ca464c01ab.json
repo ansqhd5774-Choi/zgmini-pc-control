@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_W03_R179_GUARD_B_RESULT_V1",
+  "requestId": "50dd071e-b6fd-4799-9316-38ca464c01ab",
+  "status": "STATE_UNKNOWN",
+  "code": "W03_R179_B_RESULT_UNVERIFIED",
+  "applied": false,
+  "changedFileCount": 0,
+  "changedByteCount": 0,
+  "backupVerified": false,
+  "sourceOnly": true,
+  "beforeSha256": null,
+  "afterSha256": null,
+  "controlSha": "3cbd9490601cb8dffb4011dda8d063f7f87472e0",
+  "runId": "43852609672",
+  "providerCalls": 0,
+  "sqliteWrites": 0,
+  "d1Writes": 0,
+  "taskChanges": 0,
+  "otherSourceWrites": 0,
+  "retry": "NO_AUTOMATIC_REEXECUTION"
+}

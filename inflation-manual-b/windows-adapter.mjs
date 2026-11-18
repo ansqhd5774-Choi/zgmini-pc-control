@@ -8,11 +8,16 @@ import {randomUUID} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {
- CONTROL_REPO,DATA_ROOT,MAX_BYTES,OPERATION,SOURCE_FILES,SOURCE_ROOT,
+ APPROVAL_SCHEMA_V2,CONTROL_REPO,DATA_ROOT,MAX_BYTES,OPERATION,SOURCE_FILES,SOURCE_ROOT,
  TARGETS,URLS,authorizeManualReceiver,sha256,verifyIssueEvent,
  verifiedPinnedManifestBytes,
 } from './contract.mjs';
 import {performOfficialManualB} from './coordinator.mjs';
+import {verifyCoreTaskEvent129,shouldAttemptCoreOwnerProof,
+ shouldAcceptVisibleCoreOwner,shouldWaitForV2OwnerEvidence}
+ from './core-task-event-owner-proof.mjs';
+import {coreVbsTaskEventCandidates,verifyCoreVbsTaskWitness,
+ assertPinnedVbsLaunchers} from './core-task-vbs-chain-proof.mjs';
 import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
  from '../r17-writer-b/r17-b-claim.mjs';
 import {coreReadyForMaintenance,coreMaintenanceWindowBlockCode}
@@ -23,6 +28,10 @@ import {awaitNaturalCoreIdle,MAX_POST_PREPARE_IDLE_WAIT_MS}
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 const PROBE=path.join(ROOT,'..','r17-writer-b','r17-b-windows-probe.js');
 const CORE_OWNER_PROBE=path.join(ROOT,'core-lock-owner-probe.js');
+// The alternate proof is read-only and never enables the Windows Event Log.
+// An absent/denied/disabled TaskScheduler Operational channel is a hard STOP.
+const EVENT_TOOL=path.join(process.env.SystemRoot??String.raw`C:\Windows`,
+ 'System32','wevtutil.exe');
 const SHARED_LOCK=String.raw`E:\ZGmini\data\pc-writer\writer-source-install.lock`;
 const CORE_LOCK=String.raw`E:\ZGmini\data\pc-writer\local-cycle.lock`;
 const JOURNAL_ROOT=String.raw`E:\ZGmini\data\pc-writer\inflation-manual-b-once`;
@@ -76,17 +85,21 @@ function checkSourceHome(){
 function sourcePreimage(auth){
  checkSourceHome();
  const head=execute('git',['-C',SOURCE_ROOT,'rev-parse','HEAD']);
+ // Tracked worktree mutations are never approved by a V2 manifest. This
+ // check is paired with exact four-module hashes and repeated pre-write.
+ const sourceClean=execute('git',['-C',SOURCE_ROOT,'status',
+  '--porcelain=v1','--untracked-files=no']).length===0;
  const config=JSON.parse(safeFixedFile(CONFIG,DATA_ROOT,131_072).toString('utf8'));
  const modules=Object.fromEntries(SOURCE_FILES.map(name=>[name,
   sha256(safeFixedFile(sourceFile(name),SOURCE_ROOT,2_000_000))]));
  const owner=fs.readFileSync(SHARED_LOCK,'utf8');
  need(owner===auth.request.requestId,'INFL_MANUAL_B_SHARED_OWNER_STOP');
- return {sourceRoot:SOURCE_ROOT,sourceHead:head,
+ return {sourceRoot:SOURCE_ROOT,sourceHead:head,sourceClean,
   configSource:config.source,sourceFiles:modules,dataRoot:DATA_ROOT,
   otherWriterActive:false};
 }
 
-function taskProbe(){
+export function taskProbe(){
  let proof;
  try{proof=JSON.parse(execute('cscript',['//NoLogo',PROBE]));}
  catch{fail('INFL_MANUAL_B_CORE_PROBE_JSON_STOP');}
@@ -98,11 +111,29 @@ function taskProbe(){
 }
 
 // An idle snapshot alone does not establish which physical file Core locks.
+function readCoreTask129Events(){
+ need(fs.existsSync(EVENT_TOOL),'INFL_MANUAL_B_EVENT129_READER_UNAVAILABLE');
+ const result=spawnSync(EVENT_TOOL,[
+  'qe','Microsoft-Windows-TaskScheduler/Operational',
+  '/q:*[System[(EventID=129)]]','/rd:true','/c:64','/f:xml',
+ ],{shell:false,windowsHide:true,encoding:'utf8',
+  maxBuffer:300_000,timeout:15_000});
+ need(!result.error&&result.status===0&&
+  typeof result.stdout==='string'&&result.stdout.length<300_000,
+  'INFL_MANUAL_B_EVENT129_READER_UNAVAILABLE');
+ return result.stdout;
+}
 // Require a naturally active Task-linked Core Node PID to own the E: lock at
 // least once in THIS bounded B run. No Task start, disable, or forced cycle.
-async function observeLiveCoreLockOwner(){
- const deadline=Date.now()+CORE_OWNER_OBSERVATION_MS;
+// V2 may use the TaskScheduler event-129 process-launch record to prove the
+// same PID even when GetInstances(0) hides an elevated task from this Runner.
+export async function observeLiveCoreLockOwner(approvalSchema,{maxObservationMs=CORE_OWNER_OBSERVATION_MS}={}){
+ need(Number.isInteger(maxObservationMs)&&maxObservationMs>=30_000&&
+  maxObservationMs<=CORE_OWNER_OBSERVATION_MS,
+  'INFL_MANUAL_B_CORE_OWNER_WINDOW_SCOPE_STOP');
+ const deadline=Date.now()+maxObservationMs;
  let sawTaskInstance=false,sawRelatedCore=false,sawCoreLock=false;
+ let sawEvent129Mismatch=false;
  while(Date.now()<deadline){
   const probe=taskProbe();
   sawTaskInstance||=probe.instances>0;
@@ -111,7 +142,11 @@ async function observeLiveCoreLockOwner(){
   need(probe.enabled===true,
    'INFL_MANUAL_B_CORE_OWNER_PROBE_UNVERIFIED_STOP');
   if(probe.unknownProcessLines>0){await delay(1500);continue;}
-  if(probe.instances>0&&probe.relatedProcesses>0&&fs.existsSync(CORE_LOCK)){
+  // The V2 event fallback MUST be reachable when GetInstances(0) is
+  // security-context filtered (0 visible instances). The exact Task/Node
+  // PID, command, creation time and lock still have to pass below.
+  if(shouldAttemptCoreOwnerProof(approvalSchema===APPROVAL_SCHEMA_V2,
+   probe,fs.existsSync(CORE_LOCK))){
    let lockBytes,lock;
    try{
     const stat=fs.lstatSync(CORE_LOCK);
@@ -134,8 +169,68 @@ async function observeLiveCoreLockOwner(){
    try{ownerProof=JSON.parse(execute('cscript',
     ['//NoLogo','//E:JScript',CORE_OWNER_PROBE,String(lock.pid)]));}
    catch{fail('INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');}
-   need(ownerProof?.ok===true&&ownerProof.linked===true,
-    'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+   need(ownerProof?.ok===true,
+    'INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');
+   if(ownerProof.linked===true){
+    // In V1 keep the original EnginePID ancestry. V2 additionally requires
+    // the exact approved Core command even on the visible-engine path.
+    need(shouldAcceptVisibleCoreOwner(
+     approvalSchema===APPROVAL_SCHEMA_V2,ownerProof),
+     'INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');
+   }else{
+    // V1 always retains its original EnginePID ancestry protection.
+    need(approvalSchema===APPROVAL_SCHEMA_V2,
+     'INFL_MANUAL_B_CORE_OWNER_NOT_TASK_LINKED_STOP');
+    // Korea shares this lock with Core; its valid owner is not permission
+    // to store, but is not a reason to consume a one-shot B request early.
+    // Wait for a naturally running Core within the original 12m bound.
+    if(shouldWaitForV2OwnerEvidence({isV2:true,linked:false,
+     taskRunning:ownerProof.taskRunning,
+     ownerKoreaMatched:ownerProof.ownerKoreaMatched})){
+     await delay(1500);continue;
+    }
+    // No guessed ownership: event PID, immutable task name, approved Node
+    // executable, process creation instant and current lock PID must concur.
+    const eventsXml=readCoreTask129Events();
+    let event=verifyCoreTaskEvent129({
+     xml:eventsXml,lockPid:lock.pid,lockAt:lock.at,
+     taskRunning:ownerProof.taskRunning,
+     ownerCoreMatched:ownerProof.ownerCoreMatched,
+     ownerCreatedAtMs:ownerProof.ownerCreatedAtMs,
+    });
+    // Core Task launches wscript.exe, which launches the Core Node through
+    // immutable VBS wrappers. Do not accept Event129 alone or a node.exe name.
+    // A live WMI parent chain, exact Task PID and pinned launcher file bytes
+    // are ALL mandatory. This branch is V2-only; V1 stays untouched.
+    if(!event.ok&&approvalSchema===APPROVAL_SCHEMA_V2){
+     for(const candidate of coreVbsTaskEventCandidates(eventsXml)){
+      let witness;
+      try{witness=JSON.parse(execute('cscript',
+       ['//NoLogo','//E:JScript',CORE_OWNER_PROBE,
+        String(lock.pid),String(candidate.pid)]));}
+      catch{fail('INFL_MANUAL_B_CORE_OWNER_WMI_UNVERIFIED_STOP');}
+      const linked=verifyCoreVbsTaskWitness({
+       candidate,witness,lockAt:lock.at,
+       ownerCreatedAtMs:ownerProof.ownerCreatedAtMs,
+       taskRunning:ownerProof.taskRunning,
+       ownerCoreMatched:ownerProof.ownerCoreMatched,
+      });
+      if(!linked.ok)continue;
+      assertPinnedVbsLaunchers(witness.approvedLauncherKinds,
+       file=>sha256(safeFixedFile(file,DATA_ROOT,2_000_000)));
+      event=linked;
+      break;
+     }
+    }
+    if(!event.ok&&shouldWaitForV2OwnerEvidence({
+     isV2:true,linked:false,taskRunning:ownerProof.taskRunning,
+     eventCode:event.code})){
+     sawEvent129Mismatch=true;
+     await delay(1500);continue;
+    }
+    need(event.ok===true,
+     'INFL_MANUAL_B_CORE_OWNER_EVENT129_UNVERIFIED_STOP');
+   }
    // A vanished or replaced lock is not proof of the observed owner.
    need(fs.existsSync(CORE_LOCK)&&
     fs.readFileSync(CORE_LOCK,'utf8')===lockBytes,
@@ -146,6 +241,8 @@ async function observeLiveCoreLockOwner(){
  }
  // Distinguish an active E: Core lock from a missing Task engine window.
  // These bounded flags disclose no PID, command line, path or raw content.
+ if(sawEvent129Mismatch)
+  fail('INFL_MANUAL_B_CORE_OWNER_EVENT129_UNVERIFIED_STOP');
  if(sawCoreLock&&!sawTaskInstance)
   fail('INFL_MANUAL_B_CORE_TASK_INSTANCE_GAP_STOP');
  if(sawCoreLock&&!sawRelatedCore)
@@ -231,7 +328,9 @@ export function makeWindowsManualAdapter(auth){
    }
   },
   async readSourcePreimage(){return sourcePreimage(auth);},
-  async proveActiveCoreLock(){await observeLiveCoreLockOwner();},
+  async proveActiveCoreLock(){
+   await observeLiveCoreLockOwner(auth.manifest.schema);
+  },
   async fetchExactSources(){
    source??=await import(pathToFileURL(sourceFile(SOURCE_MJS)).href);
    return officialBytes(source);

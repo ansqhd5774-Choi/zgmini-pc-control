@@ -1,0 +1,44 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "6aa96c65442b9156231424e8c1ec3595f9d651b8",
+  "baseHead": "f9dd87f72f3b821a074c66ade82ce6ff6211f429",
+  "baseConfigSourceSha": "f9dd87f72f3b821a074c66ade82ce6ff6211f429",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-calendar-r44-marketcap.mjs",
+      "change": "M",
+      "beforeSha256": "7fbd226f0e50e3f855ff4f6164e6b384a06ca4ced3d81dcc77c416b66c3bec3c",
+      "afterSha256": "9d48059c0a1f3ef8e2c282350f68f918e72d28a527682262636b03d389a460c3"
+    },
+    {
+      "path": "lib/market-calendar-deltascreener-public.mjs",
+      "change": "M",
+      "beforeSha256": "2bc62faa6908c6eeb554354d14bc97a00a71aadbc3658fc231785a638a0627d0",
+      "afterSha256": "8ad6378bfc241baeaf27838ba6fe493ed620cad2b9dd372a3a933b0b1186be26"
+    },
+    {
+      "path": "lib/earnings-api-display.mjs",
+      "change": "M",
+      "beforeSha256": "f39adc9e00f0d3edb613a800a1b331d1aad4020377f8e3bd8c7364ea6b4cfa14",
+      "afterSha256": "320f86d504eb8bd65a9c84900c2838794da5eac6df5fd28f8c194bcdaf2ff4d1"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}

@@ -1,0 +1,54 @@
+name: ZGMINI W04 DOL Manual Source Tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'r6-registered-data-b/**'
+      - 'shared-resource/issue-admission.mjs'
+      - 'tests/shared-resource-issue-admission.test.mjs'
+      - 'controller/employment-r6-collection-evidence-readonly.mjs'
+      - 'tests/employment-r6-collection-evidence-readonly.test.mjs'
+      - 'controller/employment-r6-candidate-readonly.mjs'
+      - 'tests/employment-r6-candidate-readonly.test.mjs'
+      - 'approvals/employment-r6-registered-data/**'
+      - '.github/workflows/w04-r6-dol-manual-source-tests.yml'
+permissions:
+  contents: read
+concurrency:
+  group: w04-dol-manual-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'ansqhd5774-Choi'
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify DOL-only authorization and existing registered data regressions
+        run: node --test --test-concurrency=1 r6-registered-data-b/dol-manual-v1.test.mjs r6-registered-data-b/operation.test.mjs r6-registered-data-b/operation-injected.test.mjs r6-registered-data-b/report.test.mjs
+      - name: Verify fixed W04 National error metadata remains bounded and readonly
+        run: node --test --test-concurrency=1 tests/employment-r6-collection-evidence-readonly.test.mjs
+      - name: Verify W04 PIT-04-03 count-only controller projection in isolated CI
+        run: node --test --test-concurrency=1 tests/employment-r6-candidate-readonly.test.mjs
+      - name: Check exact dedicated R6 admission without shared false rejection
+        run: node --test tests/shared-resource-issue-admission.test.mjs
+      - name: Confirm source-only isolated host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo W04_DOL_MANUAL_TEST_ISOLATED_HOST=TRUE
+          ) else (
+            exit /b 5
+          )

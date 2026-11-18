@@ -157,6 +157,56 @@ function safeR181HttpCode(raw){
    status>=200?'SUCCESS_2XX':'INFORMATIONAL_1XX'};
 }
 
+// R181's approved source writes `status.httpStatus=res.status` in the
+// non-OK HTTP branch. Prefer that integer recorded by the collector over
+// parsing an arbitrary legacy reason string. Only a pinned source and a STOP
+// ledger can attest the field's provenance; no raw reason or private source
+// leaves the PC. Missing and malformed observations remain unknown.
+export function safeRecordedR181HttpFailure(raw,{sourcePinned=false}={}){
+ if(sourcePinned!==true||raw?.status!=='STOP'||
+  !raw||Object.getPrototypeOf(raw)!==Object.prototype)return null;
+ const value=raw.httpStatus;
+ if(typeof value!=='number'||!Number.isInteger(value)||
+  value<100||value>599||(value>=200&&value<=299))return null;
+ return {source:'PINNED_R181_LEDGER_HTTP_STATUS',status:value,
+  group:value>=500?'SERVER_5XX':value>=400?'CLIENT_4XX':
+   value>=300?'REDIRECT_3XX':'INFORMATIONAL_1XX'};
+}
+
+// Fixed-symbol, privacy-preserving R181 ledger projection. This inspects the
+// already saved JSON metadata only; it does NOT open SQLite, validate raw-bar
+// SHA/checkpoints, issue provider GET, calculate R178 or authorize D1 writes.
+const R181_COVERAGE_SYMBOLS=Object.freeze(['SPY','BOTZ','ROBO','SKYY','CLOU',
+ 'DRIV','NLR','URA','ITA','SHLD','FINX','ARKF','CIBR','BUG']);
+export function safeR181LedgerCoverage(raw,{sourcePinned=false}={}){
+ if(sourcePinned!==true||!raw||Object.getPrototypeOf(raw)!==Object.prototype||
+  raw.status!=='LOCAL_PRIMARY_STORED')return {status:'NOT_ATTESTED'};
+ const coverage=raw.coverage;
+ if(!coverage||typeof coverage!=='object'||Array.isArray(coverage)||
+   Object.getPrototypeOf(coverage)!==Object.prototype)
+  return {status:'LEDGER_COVERAGE_ABSENT'};
+ const keys=Object.keys(coverage);
+ const symbols=R181_COVERAGE_SYMBOLS.map(symbol=>{
+  const entry=Object.hasOwn(coverage,symbol)?coverage[symbol]:null;
+  const bars=Number.isSafeInteger(entry?.bars)&&entry.bars>0&&
+   entry.bars<=1_000_000?entry.bars:null;
+  const latest15NY=date(entry?.latest15NY);
+  return {symbol,bars,latest15NY};
+ });
+ const at=stamp(raw.at);
+ const providerCalls=Number.isSafeInteger(raw.providerCalls)&&
+  raw.providerCalls>=0&&raw.providerCalls<=1_000_000?raw.providerCalls:null;
+ const unexpectedCount=keys.filter(k=>!R181_COVERAGE_SYMBOLS.includes(k)).length;
+ const complete=keys.length===R181_COVERAGE_SYMBOLS.length&&
+  unexpectedCount===0&&at!==null&&providerCalls!==null&&providerCalls>0&&
+  symbols.every(x=>x.bars!==null&&x.latest15NY!==null);
+ return {status:complete?'LEDGER_REPORTED_COMPLETE':'LEDGER_REPORTED_INCOMPLETE',
+  evidence:'LEDGER_METADATA_ONLY_NOT_SQLITE_VERIFIED',at,providerCalls,
+  expectedSymbols:R181_COVERAGE_SYMBOLS.length,
+  matchingSymbols:symbols.filter(x=>x.bars!==null&&x.latest15NY!==null).length,
+  unexpectedSymbolCount:unexpectedCount,symbols};
+}
+
 // Only line positions and fixed syntactic categories are returned; source
 // text, identifiers, string literals, URLs, arguments, paths and comments
 // are never copied from this private PC file to the result.
@@ -364,7 +414,7 @@ function sourceState(base,name){
  return result;
 }
 
-function ledgerState(base,name){
+function ledgerState(base,name,{approvedR181Source=false}={}){
  const entry=child(base,name);
  if(!entry)return {present:false};
  if(entry.bytes>65536)return {present:true,status:'UNREADABLE_SIZE_LIMIT'};
@@ -380,7 +430,12 @@ function ledgerState(base,name){
  return {present:true,status:code(raw.status)??'UNREPORTED',
   resultCode:code(raw.code),dates,times,modifiedAt:entry.modifiedAt,
   diagnostic:diagnosticState(raw),
-  ...(name===LEDGER_NAMES[0]?{safeHttpFailure:safeR181HttpCode(raw)}:{})};
+  ...(name===LEDGER_NAMES[0]?{
+    safeHttpFailure:safeR181HttpCode(raw),
+    recordedHttpFailure:safeRecordedR181HttpFailure(raw,{
+     sourcePinned:approvedR181Source}),
+    storedCoverage:safeR181LedgerCoverage(raw,{sourcePinned:approvedR181Source})
+   }:{})};
 }
 
 function taskState(queryTask){
@@ -427,7 +482,9 @@ export function inspectThemeL7RuntimeReadonly({dataRoot,queryTask}={}){
  const sources=Object.fromEntries(SOURCE_NAMES.map(name=>[
   name,folder==='PRESENT'?sourceState(inspected,name):{present:false}]));
  const ledgers=Object.fromEntries(LEDGER_NAMES.map(name=>[
-  name,folder==='PRESENT'?ledgerState(inspected,name):{present:false}]));
+  name,folder==='PRESENT'?ledgerState(inspected,name,{
+    approvedR181Source:sources[SOURCE_NAMES[0]]?.sha256===APPROVED_R181_SHA
+   }):{present:false}]));
  return {status:'PASS',code:'L7_RUNTIME_READONLY_INVENTORY',
   operationalReadiness:'NOT_ASSERTED',sourceDirectory:folder,
   sources,ledgers,task:taskState(queryTask),

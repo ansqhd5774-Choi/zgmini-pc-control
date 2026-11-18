@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-7acb05d3-2860-4d19-8e30-55fe78892b12",
+  "targetControllerSha": "2f569c18e09a55e54e81052985a80f6a8765d680",
+  "status": "UNKNOWN",
+  "code": "BACKLOG_OR_RECOVERY_NOT_VERIFIED",
+  "lastPass": "RECOVERY_REQUIRED",
+  "firstFail": "SWITCHED",
+  "actualControllerSha": "384ffd09e80ad769e31596483dfe73e9ee8b6c6a",
+  "recoverySha": null,
+  "protectedStateUnchanged": false,
+  "workflowEnabled": false
+}

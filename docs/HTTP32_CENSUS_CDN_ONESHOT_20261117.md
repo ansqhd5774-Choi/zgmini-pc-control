@@ -1,0 +1,57 @@
+# HTTP 32 마지막 Census CDN 단회 PC 검증 — 2026-11-17
+
+## 목표
+운영 PC에서 `cdn.www.census.gov`의 공식 BFS CSV 고정 URL에 GET 정확히 1회 실행해 실제 HTTP 응답 상태를 검증한다. 차트 원자료 전체 다운로드, 저장, D1/Cloudflare 로그인, 비정기 재수집, 신규 예약을 실행하지 않는다.
+
+## 현재 확인된 근거
+- 운영 PC 연결/실패: #1781 / Run 43893942654, HTTP 31/32, 실패 0, Census CDN 1건 미확인
+- 외부 Cloud browser: CSV HTTP 200, Content-Type text/csv, Last-Modified 2026-11-12T15:00:32Z. PC 직접 증거는 아님
+- 현재 사이트 API 14/14, HTTP 31/32. 이력 CDN이 비정기라 36시간 호출 없음은 단독 장애 증거가 아님
+
+## 최소 실행
+1. 운영 PC용 일회성 고정 Census GET 코드/승인자 단일 Issue 워크플로 작성
+2. 격리 Windows Runner에서 유닛 테스트(이슈 위조 차단, 정확한 URL 1회, HTTP/CSV 검증, 실패·무재시도)
+3. 성공한 PR/정확한 커밋을 main에 병합
+4. 승인자 소유 단일 Issue 1회 접수 후 실제 Windows self-hosted Runner 결과 확인
+5. 성공 HTTP 200은 **진단 시점의 해당 PC 연결 성공**으로만 해석. 기존 rolling 14일 host log가 변경되지 않았으면 홈페이지의 HTTP 31/32는 별도로 유지
+
+## 금지
+- PC Controller 설치/수집기/Task/Runner 설정 수정
+- 운영 DB/SQLite/D1/원자료/기존 HTTP 이벤트 로그 수정
+- 리다이렉션/호스트 변경/무한 재시도/사용자 입력 URL
+- Cloudflare 대시보드 인증이나 D1 전체 검사
+- 실제 연결 증거 이전에 임의 32/32로 표시
+
+## 진행 기록
+- 코드: `tools/http32-census-cdn-once.mjs`
+- 테스트: `tests/http32-census-cdn-once.test.mjs`
+- 실행 워크플로: `.github/workflows/pc-census-cdn-connectivity-once.yml`
+- 상태: 소스 준비, CI/병합/운영 Issue/실제 HTTP 응답 아직 확인 전
+
+## 실제 운영 실행 결과 — 2026-11-17 01:07 KST
+- 승인자 소유 Issue: https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1797
+- Windows PC Run: https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43903908465
+- 운영 로그 검증: `HTTP32_CENSUS_CDN_ONCE` → `status=PASS`, `code=HTTP_200_CSV_FROM_OPERATING_PC`, `httpStatus=200`, `contentType=CSV`, `observedAt=2026-11-16T16:07:56.551Z`.
+- 헤더 `Last-Modified=2026-11-12T15:00:01Z`, `providerCalls=1`, `automaticRetries=0`, `operationalWrites=d1Writes=0`, `collectorRun=false`, `scheduleChanged=false`.
+- **검증 결론:** 운영 PC에서 Census CDN 직접 연결 성공. 이전 HTTP 31/32의 마지막 미확인은 최근 호출 부재(월간 자료)로 인한 감시 판정임을 분리했다.
+- **다음 최소 수정:** 14일 관측 대상에 포함된 공식 월간 BFS CDN만 36시간 일간 검사에서 제외해 마지막 2xx 실측이 있으면 정상, 실제 503·네트워크 오류는 실패로 분류. 현재 수집기/Task/HTTP 로그/DB는 변경하지 않음.
+- 새로운 배포의 HTTP 32/32는 운영 PC/사이트에서 원장 재조회 후에만 확정.
+
+## 최종 완료 — 2026-11-17 01:22 KST
+
+- 실제 PC 단회 HTTP 200/CSV: [Issue #1797](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1797) / [Run 43903908465](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43903908465), providerCalls=1, operationalWrites=0.
+- 월간 감시 분리 변경: [PC PR #1800](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/1800), 병합 SHA `a50590d8db253993b89caf12b3fe5ab2f8faee19`, Controller/Process Inventory/C996 CI 3/3 PASS.
+- 실제 Windows 읽기 전용 최종 검증: [Issue #1801](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1801) / [Run 43906701802](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43906701802), `results/pc-process-inventory-43906701802-1-operating.json`.
+- 결과: `2026-11-16T16:22:39.528Z`, `rosterComplete=true`, `http={normal:32,failed:0,unknown:0,total:32}`, `status=PASS`, `operationalWrites=providerCalls=d1Writes=0`. Census `MONTHLY_BFS_2XX_IN_OBSERVED_WINDOW`, 마지막 기존 Fetch-wrapper HTTP 200 시각 `2026-11-03T21:00:36.518Z`.
+- 공개 `https://zgmini.kr/api/api-connection-health?http32_verify=fe8a27b1e0e80fbc` HTTP 200, `status=healthy`, `api=14/14`, `http=32/32`, `checkedAt=2026-11-16T16:17:31.335Z`.
+- **완료 범위:** 현재 14일 반복 관측 HTTP 32개 호스트의 연결 상태 확인. 이는 32개 정규 수집기·D1 저장 완료의 동의어는 아님. 14일 rolling 호스트 분모는 시간이 지나면 바뀔 수 있음. 추가 재시도·예약 생성·Cloudflare 로그인·D1 감사 불필요.
+
+## 유지 상태 재검증 — 2026-11-17 08:17 KST
+
+- 사용자 후속 "계속해라"에 따라 운영 상태가 실제로 유지되는지 단회 재조회. 새로운 수집 코드·예약·배포 없음.
+- 사이트 조회: https://zgmini.kr/api/api-connection-health?postcheck=20261117T0815KST — HTTP 200, `status=healthy`, `api=14/14`, `http=32/32`, `checkedAt=2026-11-16T23:10:13.435Z` (08:10:13 KST).
+- 실제 Windows PC 공식 A: [Issue #1802](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/1802), [Run #43977911377](https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/43977911377), [원장 JSON](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/results/pc-process-inventory-43977911377-1-operating.json).
+- `observedAtUtc=2026-11-16T23:17:53.522Z` (08:17:53 KST), `status=PASS`, `rosterComplete=true`, `http={normal:32,failed:0,unknown:0,total:32}`, `providerCalls=0`, `operationalWrites=0`, `d1Writes=0`.
+- 마지막 관측 HTTP 2xx의 경과 시각: **30개 호스트 24시간 이내**, `ecos.bok.or.kr` **약 59.7시간 전**, 월간 `cdn.www.census.gov` **약 314.3시간 전**. 보존된 월간 예외와 승인된 관측 주기 정책에 따른 정상 연결 판정이며, 32개 전부 최근 24시간 통신했다는 뜻은 아님.
+- 주요 개별 확인: `data.alpaca.markets` 마지막 200 `2026-11-16T20:07:19.588Z`; `data.sec.gov` 최근 200×7/선택 프레임 404×2; `cdn.www.census.gov` 과거 로깅 200×1과 별도 PC 단회 GET #1797의 200 확인. API 정상 숫자를 공급자별 원자료 최신성/저장 완료로 해석하지 않는다.
+- **판정:** 기존 완료 후 유지 검증도 PC·사이트 양측 PASS. 지금 추가 코드 변경 또는 인위적 수집 요청을 만들 이유 없음.

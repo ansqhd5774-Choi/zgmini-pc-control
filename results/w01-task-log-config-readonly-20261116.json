@@ -1,0 +1,10 @@
+{
+  "schema": "ZGMINI_TASK_LOG_CONFIG_READONLY_V1",
+  "observedAt": "2026-11-16T13:32:12.427Z",
+  "log": "Microsoft-Windows-TaskScheduler/Operational",
+  "enabled": false,
+  "configurationReads": 1,
+  "eventQueries": 0,
+  "configurationWrites": 0,
+  "providerCalls": 0
+}

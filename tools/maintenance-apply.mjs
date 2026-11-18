@@ -136,12 +136,20 @@ export async function applyApprovedUpdate(request, port) {
     const firstFail=ledger.phase,reason=maintenanceFailureCode(error,failureOperation);
     const details=(status,nextAction)=>failureDetails({status,failureOperation,
       intakeAttempted,backup,supervisorStopped,switched,nextAction});
+    // Once the new six-Runner tree has reconnected, an intake API timeout
+    // or journal failure has an UNKNOWN effect. The workflow may already be
+    // enabled and queued Issues may already be claimed. Never stop that tree
+    // or overwrite host.json via an automatic rollback on this boundary.
+    // Reconcile the exact existing request/lease in the independent operator.
+    const intakeBoundaryUncertain=ledger.phase==='RECONNECTED'||
+      ledger.phase==='INTAKE_RESUMED';
     // A network timeout while a postcheck may still be running is not evidence
     // of diagnostic failure. In particular, do not stop its active Runner.
-    if((ledger.phase==='POSTCHECK_PENDING' && ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason)) ||
-      (ledger.phase==='INTAKE_RESUMED' && reason.startsWith('BACKLOG_'))) {
-      const nextAction=reason==='BACKLOG_REPLAY_OUTCOME_UNKNOWN'
-        ?'RECONCILE_QUEUED_ISSUES_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY'
+    if(intakeBoundaryUncertain ||
+      (ledger.phase==='POSTCHECK_PENDING' &&
+       ['POSTCHECK_OUTCOME_UNKNOWN','RUNNER_RECONNECT_OUTCOME_UNKNOWN'].includes(reason))) {
+      const nextAction=intakeBoundaryUncertain
+        ?'RECONCILE_WORKFLOW_BACKLOG_AND_INSTALLED_SHA_NO_AUTOMATIC_ROLLBACK'
         :'RECONCILE_POSTCHECK_AND_ACTUAL_INSTALL_BEFORE_ANY_RETRY';
       await record('RECOVERY_REQUIRED',{status:'RECOVERY_REQUIRED',code:reason,firstFail,
         actualInstalledSha:null,intakePaused:paused,next:nextAction,...details('RECOVERY_REQUIRED',nextAction)});
@@ -228,24 +236,52 @@ export async function reconcileInterruptedRollback(original,port,persist){
   status:'RECOVERY_REQUIRED',originalStatus:original.status,originalPhase:phase,
   actualInstalledSha:null,originalRequestRetried:false};
  const record=async(code,patch={})=>{Object.assign(out,{code,...patch,at:new Date().toISOString()});await persist({...out});};
+ // A connected new Supervisor may already be serving jobs, and enabling
+ // pc-job.yml may have succeeded without its acknowledgement. A standalone
+ // rollback must not kill that tree or overwrite host.json before the intake
+ // and backlog have been independently reconciled. A failed resume at this
+ // boundary is not evidence that the new Controller installation is bad.
+ if(phase==='RECONNECTED'){
+  await record('RECOVERY_RECONNECTED_INTAKE_READBACK_REQUIRED');return out;
+ }
  if(['POSTCHECK_PENDING','INTAKE_RESUMED','BACKLOG_RECONCILED'].includes(phase)){
   await record('RECOVERY_WAIT_EXISTING_RESULT');return out;
  }
- if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED'].includes(phase)||!['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
+ if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED'].includes(phase)||!['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
   await record('RECOVERY_PHASE_NOT_ROLLBACK_ELIGIBLE');return out;
  }
+ let recoveryOperation='prepareRecovery';
  try{
   await port.prepareRecovery();
+  recoveryOperation='verifyBackup';
   if(await port.verifyBackup(original.installedShaBefore)!==true)throw fail('RECOVERY_BACKUP_NOT_VERIFIED');
   await record('RECOVERY_BACKUP_VERIFIED');
-  await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
-  await port.restore();await record('RECOVERY_FILES_RESTORED');
-  await port.reconnectPrevious();
+  // Automatic rollback may already have restored and reconnected the exact
+  // snapshot before an intake check failed. Prove that state independently;
+  // never copy files over a live, healthy previous Controller a second time.
+  recoveryOperation='verifyRestoredPrevious';
+  const preserved=port.verifyRestoredPrevious?
+   await port.verifyRestoredPrevious(original.installedShaBefore)===true:false;
+  if(preserved){
+   await record('RECOVERY_EXISTING_VERSION_VERIFIED',{existingVersionPreserved:true});
+  }else{
+   await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
+   recoveryOperation='restore';await port.restore();await record('RECOVERY_FILES_RESTORED');
+   recoveryOperation='reconnectPrevious';await port.reconnectPrevious();
+  }
+  recoveryOperation='verifyPrevious';
   if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
+  // Intake/backlog writes also require a durable claim, even without restore.
+  await record('RECOVERY_INTAKE_RESUME_STARTED',{mutationStarted:true});
+  recoveryOperation='resumeIntake';
   await port.resumeIntake();
+  recoveryOperation='reconcileBacklog';
   if(port.reconcileBacklog)await port.reconcileBacklog();
-  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_FINAL_READBACK_FAILED');
+  recoveryOperation='verifyPrevious';
+  // Replayed A jobs may now legitimately occupy a seat. Require six Online
+  // runners and the same healthy Controller, not idle seats after intake opens.
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true,requireIdle:false})!==true)throw fail('RECOVERY_FINAL_READBACK_FAILED');
   await record('INTERRUPTED_ROLLBACK_VERIFIED',{status:'ROLLED_BACK',actualInstalledSha:original.installedShaBefore,protectedStateUnchanged:true});
-  }catch(error){await record(maintenanceFailureCode(error,'reconcileBacklog'),{status:'RECOVERY_REQUIRED'});}
+  }catch(error){await record(maintenanceFailureCode(error,recoveryOperation),{status:'RECOVERY_REQUIRED',failureOperation:recoveryOperation});}
  return out;
 }

@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "8f0c734a-2a1f-44ba-b5a1-06721932076c",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "a23b7c90b4e57607dc5ae968eaecc6bedeb2153d",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "a3effa5a670770c4002eb4557fdd46a38d78f4e0",
+  "candidateSourceSha": "a165cdf36b9f1235b2e5a8acc5431e34f87652cd",
+  "manifestSha256": "ee38755e8cc003f82365bf36c8cec85104228c06cd3fc1bba4919dff630f4c55",
+  "baseTreeOid": "65f0684f525805e1dbbdd0b0e51708d418c88b6d",
+  "preparedTreeOid": "f10b7be40f637763777b6552e929284eb65170e6",
+  "provenanceSha256": "c237f58314d6f86f52f4ac40c995f087a24e3f196a790cf6871b7e9ea454cdac",
+  "runId": "43845054509",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/inflation-causal-candidate-core-bridge.mjs"
+  ]
+}

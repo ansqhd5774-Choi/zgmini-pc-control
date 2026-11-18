@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_W03_R47_PRIVATE_READBACK_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "FIXED_R47_PRIVATE_SHADOW_METADATA_READONLY",
+  "operation": "w03-r47-private-readback-once",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "expectedInstalledCmdSha256": "b75f7e2cb253b6abb327096e19c49d676c8c75b25bb816ca82756815aec91639",
+  "privateResultRoot": "E:\\ZGmini\\data\\themes\\legacy-nine-r47-private",
+  "maxResultPairCount": 512,
+  "rawPriceDataReturned": false,
+  "privateScoreDataReturned": false,
+  "allowProviderCalls": false,
+  "allowSqliteReads": false,
+  "allowPCWrites": false,
+  "allowTaskChanges": false,
+  "allowD1Writes": false,
+  "runCount": 1
+}
