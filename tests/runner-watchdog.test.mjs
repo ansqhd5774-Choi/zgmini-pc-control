@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import {createHash} from 'node:crypto';
-import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass,validateHandoffStaging,verifyHandoffIsolatedSource} from '../tools/runner-watchdog.mjs';
+import {decide,archiveDeadLease,validateHandoffIntent,verifyHandoffPass,validateHandoffStaging,validateExistingHandoffReceipt,verifyHandoffIsolatedSource} from '../tools/runner-watchdog.mjs';
 test('fresh heartbeat is required for healthy status',()=>{
  const now=Date.now(),owner={pid:123};
  assert.equal(decide({owner,live:true,heartbeat:new Date(now).toISOString(),now}),'HEALTHY');
@@ -119,6 +119,43 @@ test('handoff source acquisition rejects untrusted Issue before any clone',()=>{
   assert.throws(()=>validateHandoffStaging(x.issue,x.body),
    /HANDOFF_SOURCE_STAGING_REQUEST_DENIED/);
  }
+});
+test('replay survives advanced installed SHA and rejects forged receipt identities',()=>{
+ const make=()=>{const p=validIntent();p.issue.number=1378;p.installed.sourceSha=fixedSha;
+ p.receipt={schema:'ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1',
+  requestId,issueNumber:1378,targetSha:fixedSha,status:'PASS',
+  code:'STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED'};return p;};
+ const p=make();
+ assert.deepEqual(validateExistingHandoffReceipt(p.issue,p.body,p.receipt,1378),
+  {requestId,targetSha:fixedSha});
+ assert.throws(()=>admit(p),/HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
+ for(const mutate of [
+  x=>{x.issue.author.login='untrusted';},
+  x=>{x.issue.labels=[];},
+  x=>{x.issue.state='CLOSED';},
+  x=>{x.issue.number=2000;},
+  x=>{x.body.requestId='pc-handoff-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';},
+  x=>{x.receipt.schema='WRONG';},
+  x=>{x.receipt.requestId='pc-handoff-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';},
+  x=>{x.receipt.issueNumber=2000;},
+  x=>{x.receipt.targetSha=oldSha;},
+  x=>{x.receipt.status='WRONG';},
+  x=>{x.receipt.code='UNSAFE CODE';},
+  x=>{x.receipt.code='HANDOFF_UNKNOWN';},
+  x=>{delete x.receipt.code;},
+ ]){const v=make();mutate(v);
+  assert.throws(()=>validateExistingHandoffReceipt(v.issue,v.body,v.receipt,1378),
+   /HANDOFF_SOURCE_STAGING_REQUEST_DENIED|HANDOFF_LEDGER_REQUEST_DRIFT/);
+ }
+ const running=make();running.receipt.status='RUNNING';delete running.receipt.code;
+ assert.equal(validateExistingHandoffReceipt(running.issue,running.body,running.receipt,1378).requestId,requestId);
+});
+test('durable replay precedes any potentially failing source preflight',()=>{
+ const text=fs.readFileSync(new URL('../tools/runner-watchdog.mjs',import.meta.url),'utf8');
+ const replay=text.indexOf('if(fs.existsSync(receiptFile))');
+ const preflight=text.indexOf('plan=await prepareHandoff(issue,body);');
+ assert.ok(replay>0&&preflight>replay);
+ assert.ok(text.includes('validateExistingHandoffReceipt(issue,body,receipt,issueNumber)'));
 });
 test('only an exact GitHub private main ancestry and nine hash-pinned files are accepted',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-wdog-isolated-'));

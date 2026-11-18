@@ -108,6 +108,24 @@ export function validateHandoffStaging(issue,body){
   code('HANDOFF_SOURCE_STAGING_REQUEST_DENIED');
  return Object.freeze({requestId:body.requestId,targetSha:body.targetSha});
 }
+// Repost only an authenticated existing receipt; never rerun handoff.
+export function validateExistingHandoffReceipt(issue,body,receipt,issueNumber){
+ const admitted=validateHandoffStaging(issue,body);
+ if(!Number.isSafeInteger(issueNumber)||issueNumber<1
+   ||issue?.number!==issueNumber
+   ||receipt?.schema!=='ZGMINI_WATCHDOG_HANDOFF_RECEIPT_V1'
+   ||receipt.requestId!==admitted.requestId
+   ||receipt.issueNumber!==issueNumber
+   ||receipt.targetSha!==admitted.targetSha
+   ||!['RUNNING','PASS','BLOCKED','RECOVERY_REQUIRED',
+       'AUTOMATION_BLOCKED','STATE_UNKNOWN'].includes(receipt.status)
+   ||(receipt.status!=='RUNNING'
+       &&(typeof receipt.code!=='string'||safeCode(receipt.code)!==receipt.code))
+   ||(receipt.status==='PASS'
+       &&receipt.code!=='STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED'))
+   code('HANDOFF_LEDGER_REQUEST_DRIFT');
+ return admitted;
+}
 export function verifyHandoffIsolatedSource({
  checkout, approval, approvalBytes, body, installed, gitRun=git,
  readBytes=p=>fs.readFileSync(p)
@@ -293,9 +311,8 @@ export async function main(){
    receiptFile=path.join(dir,admitted.requestId+'.json');
    if(fs.existsSync(receiptFile)){
     const receipt=read(receiptFile);
-    // Recovery may deliver an existing result but never repeat installation.
-    if(receipt.issueNumber!==issueNumber||receipt.targetSha!==admitted.targetSha)
-      code('HANDOFF_LEDGER_REQUEST_DRIFT');
+    // Re-authenticate receipt identity; never repeat installation.
+    validateExistingHandoffReceipt(issue,body,receipt,issueNumber);
     if(receipt.status==='RUNNING'){
      // After this watchdog process restarted, the old child may still be
      // running. Never retry or assert failure; preserve and report unknown.
