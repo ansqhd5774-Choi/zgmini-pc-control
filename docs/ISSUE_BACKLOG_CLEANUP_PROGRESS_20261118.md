@@ -2,9 +2,9 @@
 
 - 담당 브랜치: `codex/issues-lifecycle-manager-20261118`
 - 기준: [ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md](ISSUE_LIFECYCLE_MANAGEMENT_STANDARD_20261118.md) R1
-- 우선순위: **기존 Open 이슈 처리 → 분류되지 않은 원본/차단 증거 조사 → 신규 자동 종료 기능 개발**. 코드 개선을 기존 누적 정리의 선행 조건으로 만들지 않는다.
+- 우선순위(2026-11-18 전환): **최신 실제 장애·차단(P0) → 최신 완료 요청 검증·종료(P1) → 최근 중복·미확정(P2) → 과거 누적 잔량(P3)**. 신규 자동 종료 코드는 기존 누적 정리의 선행 조건이 아니다. 상세 계약은 기준서 1A를 따른다.
 - 관측 기준: 사용자 최초 화면 Open 1,198 / Closed 19(시점성 과거 수치). 1차 완료 뒤 Closed 48건을 조회했고, 이번 2차 배치 뒤 Closed **81건**을 조회했다. GitHub 검색 응답의 Open 쪽은 100건 제한이 있어 실시간 Open 총수는 미확정이다.
-- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **누적 147건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건). 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
+- 변경 효과: 이번까지 GitHub 이슈 상태 전환 **직접 누적 149건**(1차 28건 + 2차 33건 + 3차 43건 + 4차 32건 + 5차 11건 + 최신 전환 2건). #2128은 동시 다른 작업 종료로 **우리 직접 종료 건수에 포함하지 않음**. 운영 PC/Controller/Runner/DB/D1/Task/예약/source 변경 0건, Issue 삭제·PC 재실행 0건.
 
 ## 1. 1차에서 Closed한 28건
 
@@ -265,7 +265,18 @@
 - [#452](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/452) 6개 파일 존재 결과와 승인된 목표 SHA 정합성이 다를 수 있다는 원담당 기록을 우선 적용, Open 유지
 - 실제 기능 수집·게시·승인 대기는 담당자의 최종 효과 검증 없이 일반 단회 읽기 요청과 함께 일괄 종료하지 않음
 
-## 6. 확인했지만 닫지 않은 사례
+## 6. 최신 이슈 우선 전환 — 2026-11-18 KST
+
+- 기존 **과거 #502 이후 오래된 순서** 정리는 즉시 **P3 보조 대기열**로 전환. `created desc` + `updated desc` 상위 Open을 각각 조회해 최신 활동 이슈 및 오래된 활성 장애를 함께 확인.
+- 최신 Open 확인: [#2130](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2130), [#2129](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2129), [#2128](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2128), [#2125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2125), [#2124](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2124), [#2122](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2122) 등. 중앙 [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68)도 updated 상위에 있으나 영속 원장으로 보존
+- **이 대화 직접 Close 2건**: [#2124](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2124) (L7 `PASS/L7_RUNTIME_READONLY_INVENTORY`, Run 44249899179)와 [#2122](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2122) (Census runtime `PASS/INFLATION_CANDIDATES_RUNTIME_READONLY_EVIDENCE`, Run 44248897539). 각 원격 JSON+TXT 2/2, requestId/operation/jobId, Actions `completed/success` 확인 후 Close. 단회 **조회 요청 종료**이지 실제 테마 점수/물가지표 전체 완료 아님
+- [#2128](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2128): 원격 JSON+TXT 2/2 및 Actions 성공 검증까지 통과했으나 **종료 직전 재조회에서 이미 `closed`이고 댓글이 2개로 변경**됨. 동시 변경으로 판단하여 no-op. 우리 직접 종료 149건에는 미포함
+- [#2129](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2129)·[#2125](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2125): 최신 Writer B 요청에 **결과 댓글 0건**. 실제 Run·저장·수신 여부 확인 전 완료로 간주하지 않고 Open 유지
+- [#2130](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2130): `PASS/PC_SOURCE_READONLY_DIAGNOSIS` 댓글이지만 **`SUMMARY_ONLY`—원격으로 전체 파일 inventory/해시 검증 불가**. 요약 증거와 실제 요청 목표를 구분하여 추가 검증 전 Open 유지
+- 총계 주의: 이전 5차 종료 때의 GitHub 전체 Closed **168건**은 그 시점의 스냅샷이다. 이번 동시 타 작업 Close가 발생했으므로 이를 실시간 현황이라고 반복 표기하지 않음. `openTotal` 최신 전체 집계는 별도 독립 분할 조회 전 미확정
+- 현재 이번 전환 과정에서 **운영 PC·Controller·원본 DB/D1/Task 변경 0건**, 전체 재실행 0건
+
+## 7. 확인했지만 닫지 않은 사례
 
 | Issue | 실제 확인 | 보존·후속 |
 | --- | --- | --- |
@@ -277,9 +288,9 @@
 | [#12](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/12) | `BLOCKED/OPERATION_NOT_ALLOWED` | 보호 거부 자체가 요구한 시험인지 원담당 인수 후 개별 판정 |
 | [#68](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/68) | 공유 Controller 중앙 원장, 다수 조정 댓글 | 영속 조정 원장으로 유지. 일괄 Close 금지 |
 
-## 7. 다음 필수 작업
+## 8. 다음 필수 작업
 
-1. [#502](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/502) 이후 오래된 Open `pc-job`/정규 유지보수 건을 원본 Run·결과 JSON/TXT로 대조해 정리한다. 다른 계약의 B급 수집·게시·등록은 해당 실제 효과 검증을 별도로 수행한다.
+1. 최신 updated/created Open 이슈에서 P0 실제 장애·차단과 P1 최신 단회 완료 후보를 재조회한다. 특히 #2129·#2125의 기존 결과·Run 조회, #2130의 SUMMARY_ONLY 범위, 최신 #2117 이하 완료 요청을 검증한다. 이미 타 담당이 Close한 대상은 건너뛴다. 과거 #502 이후 누적 정리는 P3로 유지한다.
 2. 결과쌍 결손(#4/#6)은 기존 Run/댓글·결과 게시 저장소를 읽기 전용으로 대조. 한쪽이 없어도 실행을 재시도하거나 성공으로 위장하지 않는다.
 3. 실패/차단(#8/#9/#10/#12)은 원담당의 실제 처리·후속 이슈 확인 후 별도 정리. Core/실행기 오류를 이슈 담당자가 임의 수리하지 않는다.
 4. 같은 작업의 원격 결과를 반복 검사하지 않도록 이 원장과 Close 상태를 재사용하고, 정리 결과가 충분히 축적된 뒤 신규 요청 자동 Close를 개발한다.
