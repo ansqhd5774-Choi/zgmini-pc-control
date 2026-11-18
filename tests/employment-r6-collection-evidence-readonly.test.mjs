@@ -402,7 +402,7 @@ test('W04 A/light compares immutable saved National XML to its exact run hash wi
  assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-11-07');
  assert.equal(r.nationalRaw.RELEASE.latestNumericDates.INITIAL_CLAIMS,'2026-11-07');
  assert.equal(r.nationalRaw.RELEASE.recordedLatestDates.INITIAL_CLAIMS,'2026-10-17');
- assert.equal(r.nationalRaw.ONE_YEAR.status,'RUN_BODY_HASH_NOT_STORED');
+ assert.equal(r.nationalRaw.ONE_YEAR.status,'RUN_NOT_STORED');
  assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
  assert.equal(sha(file),before);
  assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
