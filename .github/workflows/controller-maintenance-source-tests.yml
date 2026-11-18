@@ -70,6 +70,10 @@ on:
       - 'tools/w03-r47-private-readback-report.mjs'
       - 'tools/w03-r48-private-readback.mjs'
       - 'tools/w03-r48-private-readback-report.mjs'
+      - 'tools/w03-r51-stored-date-readback.mjs'
+      - 'tools/w03-r51-stored-date-report.mjs'
+      - 'tests/w03-r51-stored-date-readback.test.mjs'
+      - 'approvals/w03-r51-readback/**'
       - 'tests/w03-r48-private-readback.test.mjs'
       - 'approvals/w03-r48-readback/**'
       - 'tests/w03-r47-private-readback.test.mjs'
@@ -166,6 +170,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/w03-r47-private-readback.test.mjs
       - name: Verify W03 R48 candidate and exact R47 pair SHA without touching PC files
         run: node --test --test-concurrency=1 tests/w03-r48-private-readback.test.mjs
+      - name: Verify W03 R51 private provisional saved dates and SHA without public API calls
+        run: node --test --test-concurrency=1 tests/w03-r51-stored-date-readback.test.mjs
       - name: Verify W03 R179 stored handoff source/ledger/privacy before running existing PC-only publisher
         run: node --test --test-concurrency=1 tests/w03-r179-stored-handoff.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only

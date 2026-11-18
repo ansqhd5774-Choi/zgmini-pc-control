@@ -159,6 +159,7 @@ test('dedicated R181 workflow titles are not falsely rejected by shared ingress'
   'w03-gmh-seven-d1-seed-readonly',
   'w03-r47-private-readback-once',
   'w03-r48-private-readback-once',
+  'w03-r51-stored-date-readback-once',
   'w03-r179-readback-guard-install',
   'r181-primary-route-install',
   'r181-existing-task-run-once'];
