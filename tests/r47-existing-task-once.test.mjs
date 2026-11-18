@@ -47,7 +47,7 @@ function fakeIo(steps,{badHash=false,ambiguous=false}={}){
   acquire:()=>{steps.push('LEASE');return {fd:7};},
   sourceDigest:(file,bytes)=>{
    steps.push('SOURCE');
-   assert.equal(bytes,file===TARGET?219531:6378);
+   assert.equal(bytes,file===TARGET?219775:6378);
    assert.ok(file===TARGET||file===CYCLE);
    return badHash?'0'.repeat(64):
      file===TARGET?TARGET_AFTER_SHA:CYCLE_SHA;

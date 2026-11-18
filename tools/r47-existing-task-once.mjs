@@ -19,7 +19,7 @@ export const APPROVAL_SCHEMA='ZGMINI_R47_TASK_ONCE_APPROVAL_V1';
 export const TASK='ZGMINI-PC-Theme-Nine-R47-Private';
 export const TARGET=String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\THEME_NINE_R47_RECURRING_PRIVATE_UPDATE.cmd`;
 export const CYCLE=String.raw`E:\ZGmini\data\pc-writer\theme-nine-r48\theme-nine-r73-auto-http502-private-retry.mjs`;
-export const TARGET_AFTER_SHA='4d1cc9f180b7169e892da2fec888d08b5f7fcbfa7db285ced68cc5d09e6869c4';
+export const TARGET_AFTER_SHA='b75f7e2cb253b6abb327096e19c49d676c8c75b25bb816ca82756815aec91639';
 export const CYCLE_SHA='0940698222e0eba68940c0bb36023c71a53e29fb8c8ffdbb032b1492c4b168dc';
 export const ACTION_SHA='a5f808f3ca8259f84c797be61903b80bb3874ed2f67837fe66975ed8d0da75a8';
 const REPO='ansqhd5774-Choi/zgmini-pc-control',OWNER='ansqhd5774-Choi';
@@ -197,7 +197,7 @@ export async function runAuthorizedR47Task(proof,{sourceDigest=fixedSourceDigest
  let stage='PRECHECK',code='R47_TASK_NOT_EXECUTED';
  try{
   lease=acquire({journalRoot:ROOT,requestId:id,sharedLock:SHARED});
-  need(sourceDigest(TARGET,219531)===TARGET_AFTER_SHA,
+  need(sourceDigest(TARGET,219775)===TARGET_AFTER_SHA,
    'R47_TASK_PATCH_NOT_INSTALLED_STOP');
   need(sourceDigest(CYCLE,6378)===CYCLE_SHA,
    'R47_TASK_CYCLE_SOURCE_DRIFT_STOP');
