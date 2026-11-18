@@ -18,11 +18,43 @@ export const OUTPUT='ZGMINI_W03_GMH_SEVEN_PRIVATE_SCORE_RESULT_V1';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const SHA40=/^[a-f0-9]{40}$/;
 const SHA64=/^[a-f0-9]{64}$/;
+
+const CONTROL_V2_GUARD_PATHS=Object.freeze([
+ '.github/workflows/pc-writer-b-source-once.yml',
+ 'tools/w03-gmh-seven-manual-once.mjs',
+ 'tools/w03-gmh-seven-private-score-once.mjs',
+ 'tools/w03-gmh-seven-private-score-preflight.mjs',
+ 'tools/w03-gmh-seven-private-score-report.mjs',
+ 'tools/w03-gmh-seven-saved-score-v2.mjs'
+]);
+// An issue-opened event can reference a newer default-branch commit than its
+// owner-pinned request. Permit V2 only when the requested commit is an ancestor
+// and ALL executable/auth/report/workflow bytes are unchanged. Never re-pin to
+// a newer implementation merely because the main branch moved.
+function runControlGit(args){
+ if(process.platform!=='win32')return {status:-1};
+ const git=['C:\\Program Files\\Git\\cmd\\git.exe',
+  'C:\\Program Files\\Git\\bin\\git.exe'].find(x=>fs.existsSync(x));
+ if(!git)return {status:-1};
+ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+ return spawnSync(git,['-C',root,...args],{
+  shell:false,windowsHide:true,timeout:15000,encoding:'utf8'});
+}
+export function compatibleControlSha(pinned,eventSha,run=runControlGit){
+ if(!SHA40.test(pinned??'')||!SHA40.test(eventSha??''))return false;
+ if(pinned===eventSha)return true;
+ const head=run(['rev-parse','HEAD']);
+ if(head?.status!==0||head.stdout?.trim()!==eventSha)return false;
+ return run(['merge-base','--is-ancestor',pinned,eventSha])?.status===0&&
+  run(['diff','--quiet',pinned,eventSha,'--',...CONTROL_V2_GUARD_PATHS])?.status===0&&
+  run(['diff','--quiet','HEAD','--',...CONTROL_V2_GUARD_PATHS])?.status===0;
+}
+
 const ROOT='E:\\ZGmini\\data';
 const JOURNAL='E:\\ZGmini\\data\\pc-writer\\w03-gmh-seven-private-score-once';
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const need=(x,code)=>{if(!x)fail(code);};
-export function authorize(event,env){
+export function authorize(event,env,{allowControlDrift=compatibleControlSha}={}){
  need(env?.GITHUB_REPOSITORY===REPO&&env.GITHUB_EVENT_NAME==='issues'&&
   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_RUN_ATTEMPT==='1'&&
   env.GITHUB_ACTOR===OWNER&&SHA40.test(env.GITHUB_SHA??'')&&
@@ -39,7 +71,9 @@ export function authorize(event,env){
   Object.keys(r).length===fields.length&&fields.every(k=>Object.hasOwn(r,k))&&
   (r.schema===SCHEMA||r.schema===SAVED_SCHEMA)&&r.operation===TITLE&&
   UUID.test(r.requestId??'')&&UUID.test(r.chatId??'')&&
-  r.controlRepository===REPO&&r.controlSourceSha===env.GITHUB_SHA&&
+  r.controlRepository===REPO&&
+  (r.controlSourceSha===env.GITHUB_SHA||
+   (r.schema===SAVED_SCHEMA&&allowControlDrift(r.controlSourceSha,env.GITHUB_SHA)))&&
   r.candidateSourceSha===(r.schema===SAVED_SCHEMA?
    APPROVED_SAVED_SOURCE_SHA:APPROVED_SOURCE_SHA),
   'W03_GMH_SCORE_REQUEST_STOP');

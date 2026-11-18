@@ -22,7 +22,7 @@ const base=(req,env)=>({schema:OUTPUT,status:'STATE_UNKNOWN',
 export function sanitize(raw,req,env){
  const a=base(req,env);
  if(raw?.schema!==OUTPUT||raw.requestId!==req.requestId||
-  raw.controlSha!==req.controlSourceSha||
+  raw.controlSha!==env.GITHUB_SHA||
   !SHA40.test(raw.controlSha??'')||
   raw.sourceCommit!==req.candidateSourceSha||
   raw.providerCalls!==0||raw.d1Writes!==0||
