@@ -39,7 +39,8 @@ test('read-only Core task trace resolves Git HEAD, dirty names and required file
  assert.equal(result.tracedLaunchers.length,2);
  assert.equal(result.requiredFiles.find(x=>x.path.endsWith('us-breadth-provisional-cycle.mjs')).exists,false);
  assert.deepEqual(fs.readFileSync(path.join(f.root,'start.cmd')),before);
- assert.ok(read.every(p=>p.startsWith(f.root+path.sep)));
+ const canonicalRoot=fs.realpathSync.native(f.root).toLowerCase()+path.sep;
+ assert.ok(read.every(p=>p.toLowerCase().startsWith(canonicalRoot)));
 });
 
 test('outside-root script references and unknown launchers do not access arbitrary files',t=>{
