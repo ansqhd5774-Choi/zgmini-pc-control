@@ -132,8 +132,18 @@ export function inspectWriterInstallPreimage(dataRoot,{coreTaskXml,
    clean:historical.trackedDirty===false,dirtyPaths:[],
    dirtyComplete:historical.trackedDirty===false,type:'HISTORICAL_CHECKOUT',
   }:null;
- if(!candidate||candidate.relative!==CHECKOUT)
-  return {...result,code:'WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED'};
+ if(!candidate||candidate.relative!==CHECKOUT){
+  // Safe, bounded outcome only: no Git stderr, command line, paths outside
+  // the fixed checkout, credential, or source contents may be returned.
+  const checkoutFailureReason=trace?.sourceResolved===true?
+   trace.sourceRoot!==CHECKOUT?'TASK_CHAIN_CHECKOUT_MISMATCH':'TASK_CHAIN_HEAD_UNVERIFIED':
+   !historical?'HISTORICAL_CHECKOUT_NOT_DISCOVERED':
+   historical.sourceRoot!==CHECKOUT?'HISTORICAL_CHECKOUT_MISMATCH':
+   historical.gitVerified!==true?'HISTORICAL_GIT_UNVERIFIED':
+   !sourceState(historical.head)?'HISTORICAL_HEAD_UNVERIFIED':
+   'CHECKOUT_CANDIDATE_UNVERIFIED';
+  return {...result,code:'WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED',checkoutFailureReason};
+ }
  const candidatePath=path.resolve(base,...CHECKOUT.split('/'));
  let source;
  try{
