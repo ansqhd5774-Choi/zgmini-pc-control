@@ -205,7 +205,7 @@ export function preparePcSharedResourceWait({originIssue,report,resultPath,resul
       requestId:request.requestId,chatId:request.chatId,
       sourceSha:request.sourceSha,approvalFingerprintSha256:intentFingerprint},
     evidence:{runId,status:report.status,code:report.code,
-      resultJsonPath:resultPath,resultTxtPath:resultPath.replace(/\\.json$/,'.txt'),
+      resultJsonPath:resultPath,resultTxtPath:resultPath.replace(/\.json$/,'.txt'),
       resultPairReadbackVerified:true},
     safePoint:workerWait?'REQUEST_CONSUMED_WORKER_PREOP_UNTOUCHED':
       'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
