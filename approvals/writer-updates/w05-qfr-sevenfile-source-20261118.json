@@ -1,0 +1,81 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "b8d3c665e32de4721e174cd23bd6c25d739cf1e9",
+  "baseHead": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "baseConfigSourceSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5286287be8773dd8d2d4bdc943e7ee40131d88669c1ec981f4be68a34025879a"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R2_SQLITE_APPEND.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "9d3cd0296d41baa9d6deb12897b164fe13115eada4df17ed14196d89ed9273d0"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R3_STORED_PREVIEW_READONLY.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4119bba808819a71f58b6d76ccb3872b5151c7c80df666b483f4f871bc075933"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_PROJECTION_DRAFT_READONLY.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "59e4303e2135bfad20b9e51c6e48763be655fad5d2f00eb1e9d50b5cb0e3c002"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_CENSUS_QFR_R4_D1_ONCE.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "7b08d799dfce2c5ab720dd69791d727834c2c5c83ed365c39fd89cd3c7853005"
+    },
+    {
+      "path": "scripts/pc-writer/EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "db4c14f28c7eb196136e431cc51680542f8846e6b183e0aa7d5b3307b27fcb5b"
+    },
+    {
+      "path": "worker/earnings-companion-c-qfr-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a66b60a751b9ec9a0a6379027c2b4785c20a4c4a693be72a9398dbc0da32dbd7"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/d1-transient.mjs",
+      "sha256": "5fd4be11dc4a671a9634757bb449807e497a7974c5fd061faa06b455dd0d253e"
+    },
+    {
+      "path": "scripts/pc-writer/d1-diagnostics.mjs",
+      "sha256": "eb5ffbcdb56805ca15affac876493217de52b21e0f90f99976bbcff8ddc13037"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
