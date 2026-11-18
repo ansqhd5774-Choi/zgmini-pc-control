@@ -111,7 +111,7 @@
 - 범위: 이슈 #102~#220의 원본 요청 중 **단회 `pc-job` 32건 / `pc-maintenance` Controller 유지보수 11건**만 이번에 Close
 - 누적 직접 종료: **104건** = 1차 28 + 2차 33 + 3차 43
 - 종료 전 요청 schema/requestId/operation/원본 댓글, 결과 JSON+TXT `2/2`, Actions Run 최종 성공(`pc-job`), 유지보수 target SHA=actual SHA와 보호 상태 유지(`pc-maintenance`), 최신 이슈 Open/라벨/댓글 일치 확인
-- 종료 후 GitHub `is:issue is:closed` 최신순 100건 목록에서 신규 **43건 전부 Closed 재조회 PASS**. 전체 Closed/Open 정확한 총계는 검색 조회 상한으로 미확정
+- 종료 후 GitHub `is:issue is:closed` 최신순 100건 목록에서 신규 **43건 전부 Closed 재조회 PASS**. Closed 전체는 생성일 구간별 독립 검색(11/02 47건, 11/03 53건, 11/04 9건, 11/06~10 12건, 11/16~19 3건; 다른 기간 0건)으로 **124건** 확인. Open 전체는 100건 조회 상한으로 미확정
 - PC/Controller/SQLite/D1/Task/예약 변경, 원본 재실행, 증거 삭제 0건. 이슈 Close는 **과거 단회 요청의 수명주기 종료**이며 기능 전체의 성공과 구분
 
 ### 단회 진단·조회·사후 확인 32건
