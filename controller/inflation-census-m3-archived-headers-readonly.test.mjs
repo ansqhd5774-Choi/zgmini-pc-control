@@ -68,8 +68,7 @@ test('symlink, missing directory and unsafe scope stop safely',t=>{
   assert.equal(inspect(f.data,{strictPlatform:false}).code,'W01_CENSUS_ARCHIVE_DIR_UNAVAILABLE');
   assert.equal(inspect(f.raw,{strictPlatform:false}).code,'W01_CENSUS_ARCHIVE_DIR_UNAVAILABLE');
 });
-test('Windows-only admission cannot be bypassed by passing a test root',t=>{
+test('strict Windows PC admission denies synthetic test roots on every platform',t=>{
   const f=fixture(t);
-  if(process.platform!=='win32')
-    assert.equal(inspect(f.data).code,'W01_CENSUS_ARCHIVE_ROOT_DENIED');
+  assert.equal(inspect(f.data).code,'W01_CENSUS_ARCHIVE_ROOT_DENIED');
 });
