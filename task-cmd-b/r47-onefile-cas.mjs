@@ -31,6 +31,11 @@ export const R47_CMD_B_TRANSIENT_SAFE=Object.freeze({
  afterSha256:'4d1cc9f180b7169e892da2fec888d08b5f7fcbfa7db285ced68cc5d09e6869c4',
  sourceSha:'c47252fd2ee66bc34f7b930e61b38cc6714add77'
 });
+export const R47_CMD_B_UTC_BOUNDARY_SAFE=Object.freeze({
+ beforeSha256:R47_CMD_B_TRANSIENT_SAFE.afterSha256,
+ afterSha256:'b75f7e2cb253b6abb327096e19c49d676c8c75b25bb816ca82756815aec91639',
+ sourceSha:'2bee93f59bb488acff29f6a00e1c0c5813af777b'
+});
 // A new GO is never inferred from the historical one-file GO. Both exact
 // transitions are individually pinned; source, target or preimage drift stops.
 const authorizedR47Transition=m=>
@@ -41,7 +46,10 @@ const authorizedR47Transition=m=>
   m.sourceSha===R47_CMD_B_CALENDAR_SAFE.sourceSha)||
  (m.beforeSha256===R47_CMD_B_TRANSIENT_SAFE.beforeSha256&&
   m.afterSha256===R47_CMD_B_TRANSIENT_SAFE.afterSha256&&
-  m.sourceSha===R47_CMD_B_TRANSIENT_SAFE.sourceSha);
+  m.sourceSha===R47_CMD_B_TRANSIENT_SAFE.sourceSha)||
+ (m.beforeSha256===R47_CMD_B_UTC_BOUNDARY_SAFE.beforeSha256&&
+  m.afterSha256===R47_CMD_B_UTC_BOUNDARY_SAFE.afterSha256&&
+  m.sourceSha===R47_CMD_B_UTC_BOUNDARY_SAFE.sourceSha);
 const KEYS=['schema','status','scope','requestId','sourceRepository','sourceSha',
  'sourcePath','targetPath','task','beforeSha256','afterSha256','taskXmlSha256',
  'runCount','allowTaskChanges','allowProviderCalls','allowSqliteWrites',
