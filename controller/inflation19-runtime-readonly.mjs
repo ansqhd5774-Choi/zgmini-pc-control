@@ -139,6 +139,40 @@ function writerState(file){
   sourceVersion:version(raw.sourceVersion)};
 }
 
+// Reuse the existing fixed A/light Writer ledger read. The seven-row
+// publication receipt is metadata only; it is not a present-time D1 readback.
+export function inflation7WriterState(file){
+ if(file.availability!=='PRESENT')return {availability:file.availability};
+ const writerAt=instant(file.data.at);
+ const writerStatus=allow(TOP_LEVEL_STATES,file.data.status);
+ const raw=file.data.inflation7;
+ const failed=Array.isArray(file.data.failures)&&file.data.failures.some(x=>
+  record(x)&&x.id==='inflation-7-publication');
+ const evidenceScope='LOCAL_WRITER_LEDGER_ONLY_NOT_LIVE_D1';
+ if(!record(raw))return {availability:'PRESENT',modifiedAt:file.modifiedAt,
+  writerAt,writerStatus,status:failed?'FAILED_STAGE':'NOT_RECORDED',
+  evidenceScope,verifiedAtWriterTime:false,d1NowVerified:false};
+ const status=allow(WRITER_STATES,raw.status);
+ const key=raw.key==='detail:inflation-causal-candidates-7:r1'?raw.key:null;
+ const sourceVersion=typeof raw.sourceVersion==='string'&&
+  /^INFL7_PRESENTATION_[a-f0-9]{64}$/.test(raw.sourceVersion)?raw.sourceVersion:null;
+ const sourceStoredAt=timeMillis(raw.sourceStoredAt);
+ const readyCount=Number.isSafeInteger(raw.ready)&&raw.ready>=0&&raw.ready<=7?
+  raw.ready:null;
+ const d1Writes=raw.d1Writes===0||raw.d1Writes===1?raw.d1Writes:null;
+ const readbackStatus=status==='READBACK_VERIFIED'||status==='ALREADY_STORED';
+ const complete=Boolean(key&&sourceVersion&&sourceStoredAt!==null&&
+  readyCount!==null&&readyCount>=1&&d1Writes!==null&&writerAt&&
+  sourceStoredAt<=Date.parse(writerAt)&&
+  (status!=='READBACK_VERIFIED'||d1Writes===1)&&
+  (status!=='ALREADY_STORED'||d1Writes===0));
+ return {availability:'PRESENT',modifiedAt:file.modifiedAt,writerAt,writerStatus,
+  status:readbackStatus&&!complete?'CONTRACT_UNVERIFIED':status,
+  key,sourceVersion,sourceStoredAt,readyCount,d1Writes,
+  evidenceScope,verifiedAtWriterTime:readbackStatus&&complete,
+  d1NowVerified:false};
+}
+
 function projectionState(file){
  if(file.availability!=='PRESENT')return {availability:file.availability};
  const payload=file.data.payload;
@@ -173,5 +207,6 @@ export function inspectInflation19RuntimeReadonly(dataRoot){
   writer=writerState(reads.writer),projection=projectionState(reads.projection);
  return {status:'PASS',code:'INFL19_RUNTIME_READONLY_EVIDENCE',
   operationalReadiness:'NOT_ASSERTED',cycle,checkpoint,writer,projection,
+  inflation7Writer:inflation7WriterState(reads.writer),
   providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
 }
