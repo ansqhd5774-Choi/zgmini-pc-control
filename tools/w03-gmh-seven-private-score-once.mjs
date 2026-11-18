@@ -22,7 +22,56 @@ const ROOT='E:\\ZGmini\\data';
 const JOURNAL='E:\\ZGmini\\data\\pc-writer\\w03-gmh-seven-private-score-once';
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const need=(x,code)=>{if(!x)fail(code);};
-export function authorize(event,env){
+// W03 B issue creation and its GitHub event checkout can see different main
+// HEADs. Accept drift ONLY for a reviewed ancestor with byte-identical
+// executable B contract; no weakened candidate source or rights checks.
+const APPROVED_W03_CONTROL_BASE='dd1d9fed0455f344746add7e5844d3e6b178e699';
+const W03_CONTROL_CONTRACT_FILES=Object.freeze([
+ '.github/workflows/pc-writer-b-source-once.yml',
+ 'tools/w03-gmh-seven-private-score-once.mjs',
+ 'tools/w03-gmh-seven-private-score-preflight.mjs',
+ 'tools/w03-gmh-seven-private-score-report.mjs',
+ 'tools/w03-gmh-seven-saved-score-v2.mjs',
+ 'tools/w03-gmh-seven-manual-once.mjs'
+]);
+export function proveReviewedControlDrift({
+ requestSha,executionSha,workspace,platform=process.platform,
+ git=spawnSync,realpath=fs.realpathSync.native,lstat=fs.lstatSync
+}={}){
+ if(platform!=='win32'||!SHA40.test(requestSha??'')||
+  !SHA40.test(executionSha??'')||requestSha===executionSha||
+  typeof workspace!=='string'||!path.isAbsolute(workspace))return false;
+ const root=path.resolve(workspace,'writer-b-control');
+ try{
+  const stat=lstat(root);
+  if(!stat.isDirectory()||stat.isSymbolicLink()||
+   path.normalize(realpath(root)).toLowerCase()!==path.normalize(root).toLowerCase())
+   return false;
+ }catch{return false;}
+ const run=args=>{
+  try{
+   const p=git('git',['--no-optional-locks','-c','core.fsmonitor=false',
+    '-C',root,...args],{
+    cwd:root,shell:false,windowsHide:true,timeout:10000,
+    maxBuffer:8192,encoding:'utf8',
+    env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}
+   });
+   if(p?.error||p?.status!==0||typeof p.stdout!=='string'||
+    p.stdout.length>8192)return null;
+   return p.stdout;
+  }catch{return null;}
+ };
+ const actual=run(['rev-parse','HEAD']);
+ if(actual?.trim().toLowerCase()!==executionSha.toLowerCase())return false;
+ if(run(['merge-base','--is-ancestor',APPROVED_W03_CONTROL_BASE,requestSha])===null)
+  return false;
+ if(run(['merge-base','--is-ancestor',requestSha,executionSha])===null)
+  return false;
+ if(run(['diff','--no-ext-diff','--quiet',requestSha,executionSha,'--',
+  ...W03_CONTROL_CONTRACT_FILES])===null)return false;
+ return true;
+}
+export function authorize(event,env,{proveDrift=proveReviewedControlDrift}={}){
  need(env?.GITHUB_REPOSITORY===REPO&&env.GITHUB_EVENT_NAME==='issues'&&
   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_RUN_ATTEMPT==='1'&&
   env.GITHUB_ACTOR===OWNER&&SHA40.test(env.GITHUB_SHA??'')&&
@@ -39,7 +88,10 @@ export function authorize(event,env){
   Object.keys(r).length===fields.length&&fields.every(k=>Object.hasOwn(r,k))&&
   (r.schema===SCHEMA||r.schema===SAVED_SCHEMA)&&r.operation===TITLE&&
   UUID.test(r.requestId??'')&&UUID.test(r.chatId??'')&&
-  r.controlRepository===REPO&&r.controlSourceSha===env.GITHUB_SHA&&
+  r.controlRepository===REPO&&
+  (r.controlSourceSha===env.GITHUB_SHA||
+   proveDrift({requestSha:r.controlSourceSha,executionSha:env.GITHUB_SHA,
+    workspace:env.GITHUB_WORKSPACE})===true)&&
   r.candidateSourceSha===(r.schema===SAVED_SCHEMA?
    APPROVED_SAVED_SOURCE_SHA:APPROVED_SOURCE_SHA),
   'W03_GMH_SCORE_REQUEST_STOP');
@@ -99,6 +151,7 @@ export function execute({event,env,sourceRoot,verify=verifyCandidate,
   'W03_GMH_SCORE_RESULT_CONTRACT_STOP');
  return {...r,requestId:req.requestId,
   sourceCommit:req.candidateSourceSha,controlSha:env.GITHUB_SHA,
+  requestedControlSha:req.controlSourceSha,
   runId:env.GITHUB_RUN_ID??null,
   providerCalls:0,d1Writes:0,publicWrites:0,taskChanges:0,
   rawBarExposure:false,retry:'NO_AUTOMATIC_REEXECUTION'};
