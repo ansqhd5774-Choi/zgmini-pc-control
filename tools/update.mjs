@@ -1597,6 +1597,90 @@ export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
  return {...data,issue:validated.request,manifest:validated.manifest};
 }
 
+// A read-only, fixed-root view of exactly one update's preserved artifacts.
+// Presence and well-formedness are evidence, NOT a recovery/installation GO.
+// No issue data or operator-supplied filesystem paths reach this observation.
+export function readControllerUpdateArtifacts(requestId,{
+ fsImpl=fs,backupBase=path.join(controlRoot,'backups'),
+ backlogBase=path.join(maintenanceRoot,'backlog'),
+ leaseBase=path.join(maintenanceRoot,'leases'),
+}={}){
+ need(/^pc-[a-z0-9-]{8,76}$/.test(requestId??''),'MAINTENANCE_REQUEST_ID');
+ const entry=(p,type)=>{
+  try{
+   const st=fsImpl.lstatSync(p);
+   if(st.isSymbolicLink())return 'UNSAFE';
+   return type==='directory'?(st.isDirectory()?'PRESENT':'UNSAFE')
+    :(st.isFile()?'PRESENT':'UNSAFE');
+  }catch(error){return error?.code==='ENOENT'?'ABSENT':'UNKNOWN';}
+ };
+ const child=(parent,p,type)=>{
+  if(parent==='ABSENT')return 'ABSENT';
+  if(parent!=='PRESENT')return 'UNKNOWN';
+  return entry(p,type);
+ };
+ const backupBaseState=entry(backupBase,'directory');
+ const backupPath=path.join(backupBase,'controller-update-'+requestId);
+ const backupRoot=child(backupBaseState,backupPath,'directory');
+ const stageRoot=child(backupRoot,path.join(backupPath,'stage'),'directory');
+ const snapshotRoot=child(backupRoot,path.join(backupPath,'snapshot'),'directory');
+ const stagedHost=child(stageRoot,path.join(backupPath,'stage','host.json'),'file');
+ const originalHost=child(snapshotRoot,path.join(backupPath,'snapshot','host.json'),'file');
+ const protectedBefore=child(backupRoot,path.join(backupPath,'PROTECTED_BEFORE.json'),'file');
+ const previousHost=child(backupRoot,path.join(backupPath,'previous-host.json'),'file');
+ const backlogBaseState=entry(backlogBase,'directory');
+ const backlogPath=path.join(backlogBase,requestId+'.json');
+ const backlogFile=child(backlogBaseState,backlogPath,'file');
+ let backlog={file:backlogFile,windows:null,openWindows:null,replayCount:null};
+ if(backlogFile==='PRESENT'){
+  try{
+   const bytes=fsImpl.readFileSync(backlogPath);
+   need(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=131072,
+    'MAINTENANCE_BACKLOG_READBACK_INVALID');
+   const data=JSON.parse(bytes.toString('utf8'));
+   need(data?.schema==='ZGMINI_PC_BACKLOG_V1'&&data.requestId===requestId
+    &&Array.isArray(data.windows)&&data.windows.length>=1&&data.windows.length<=64
+    &&data.windows.every(w=>w&&typeof w.pausedAt==='string'
+     &&Number.isFinite(Date.parse(w.pausedAt))
+     &&(w.resumedAt===null||typeof w.resumedAt==='string'
+      &&Number.isFinite(Date.parse(w.resumedAt))
+      &&Date.parse(w.resumedAt)>=Date.parse(w.pausedAt)))
+    &&data.replays&&typeof data.replays==='object'&&!Array.isArray(data.replays),
+    'MAINTENANCE_BACKLOG_READBACK_INVALID');
+   backlog={file:'PRESENT',windows:data.windows.length,
+    openWindows:data.windows.filter(w=>w.resumedAt===null).length,
+    replayCount:Object.keys(data.replays).length};
+  }catch{backlog={file:'UNVERIFIED',windows:null,openWindows:null,replayCount:null};}
+ }
+ const leaseBaseState=entry(leaseBase,'directory');
+ const leasePath=path.join(leaseBase,'controller-install');
+ const leaseDir=child(leaseBaseState,leasePath,'directory');
+ const ownerFile=child(leaseDir,path.join(leasePath,'owner.json'),'file');
+ const recoveryMarker=child(leaseDir,path.join(leasePath,'RECOVERY_REQUIRED.json'),'file');
+ let ownerMarkerMatch=null;
+ if(ownerFile==='PRESENT'&&recoveryMarker==='PRESENT'){
+  try{
+   const owner=JSON.parse(fsImpl.readFileSync(path.join(leasePath,'owner.json'),'utf8'));
+   const marker=JSON.parse(fsImpl.readFileSync(path.join(leasePath,'RECOVERY_REQUIRED.json'),'utf8'));
+   ownerMarkerMatch=Number.isSafeInteger(owner?.pid)&&owner.pid>0
+    &&/^[a-f0-9-]{36}$/i.test(owner?.nonce??'')
+    &&marker?.requestOwnerPid===owner.pid&&marker?.nonce===owner.nonce;
+  }catch{ownerMarkerMatch=false;}
+ }
+ const objects={backupRoot,stageRoot,snapshotRoot,stagedHost,originalHost,
+  protectedBefore,previousHost};
+ const unexpected=[...Object.values(objects),backlog.file,leaseDir,ownerFile,recoveryMarker]
+  .some(v=>['UNSAFE','UNKNOWN','UNVERIFIED'].includes(v));
+ const invalidLease=leaseDir==='PRESENT'&&(ownerFile!=='PRESENT'
+  ||recoveryMarker==='PRESENT'&&ownerMarkerMatch!==true);
+ return {schema:'ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1',requestId,
+  status:unexpected||invalidLease?'UNVERIFIED':'OBSERVED',
+  artifacts:objects,backlog,
+  lease:{directory:leaseDir,ownerFile,recoveryMarker,ownerMarkerMatch},
+  operationalWrites:0,originalRequestRetried:false,
+  recoveryComplete:false,installSuccessProven:false};
+}
+
 // Recovery-status reads must survive a partially switched/missing host.json.
 // Never infer a successful install from the journal alone. An unreadable lock
 // is treated as a held recovery lock so the receiver cannot start another job.
@@ -1604,6 +1688,7 @@ export function readMaintenanceRecoveryStatus(requestId,{
  readInstalled=()=>installedManifest().installedSha,
  readLedger=()=>{const file=path.join(recordDir,requestId+'.json');return fs.existsSync(file)?json(file):null;},
  readLock=()=>maintenanceLockStatus(maintenanceRoot,'controller-install'),
+ readArtifacts=()=>readControllerUpdateArtifacts(requestId),
 }={}){
  let actualControllerSha=null,installedReadbackCode=null,ledger=null,ledgerReadbackCode=null,
    installLock={held:true,recoveryRequired:true},lockReadbackCode=null;
@@ -1619,14 +1704,31 @@ export function readMaintenanceRecoveryStatus(requestId,{
   if(!observed||typeof observed.held!=='boolean')throw Error('invalid lock status');
   installLock=observed;
  }catch{lockReadbackCode='UPDATE_LOCK_UNAVAILABLE';}
+ let artifacts=null,artifactReadbackCode=null;
+ try{artifacts=readArtifacts();if(artifacts?.status!=='OBSERVED')
+  artifactReadbackCode='UPDATE_ARTIFACTS_UNVERIFIED';}
+ catch{artifactReadbackCode='UPDATE_ARTIFACTS_UNAVAILABLE';}
  const state={status:'STATUS',actualControllerSha,installedReadbackCode,ledger,ledgerReadbackCode,
-  installLock,lockReadbackCode};
+  installLock,lockReadbackCode,artifacts,artifactReadbackCode};
  return {...state,guidance:maintenanceNextAction(state)};
 }
 
 // Current lock observation wins over a historical failed request. Never infer
 // that an absent lock proves recovery/installation success; reuse its evidence.
 export function maintenanceNextAction(s){
+ if(s.artifactReadbackCode)
+  return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_STAGE_BACKLOG_LEASE',
+   blockScope:'SHARED_INSTALL_ONLY'};
+ if(s.artifacts?.backlog?.openWindows>0)
+  return {state:'RECOVERY_REVIEW_REQUIRED',next:'VERIFY_OPEN_BACKLOG_AND_ORIGINAL_OWNER',
+   blockScope:'SHARED_INSTALL_ONLY'};
+ // STAGED is past prevalidation: a prior terminal BLOCKED record is not proof
+ // that the filesystem staging and intake artifacts were reconciled.
+ if(s.artifacts?.artifacts?.stageRoot==='PRESENT'
+  &&s.ledger?.firstFail==='STAGED'&&s.ledger?.status==='BLOCKED')
+  return {state:'STAGED_EVIDENCE_REVIEW_REQUIRED',
+   next:'PRESERVE_STAGE_VERIFY_BACKLOG_INSTALL_LEASE_AND_RUNTIME',
+   blockScope:'SHARED_INSTALL_ONLY'};
  if(s.lockReadbackCode||s.installedReadbackCode||s.ledgerReadbackCode)
   return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_FAILED_READBACK',blockScope:'SHARED_INSTALL_ONLY'};
  if(s.installLock?.held){
