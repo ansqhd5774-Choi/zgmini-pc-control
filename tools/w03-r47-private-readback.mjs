@@ -16,7 +16,14 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const SHA40=/^[a-f0-9]{40}$/;
 const HEX=/^[a-f0-9]{64}$/;
 const NAME=/^THEME_NINE_R47_PRIVATE_(\d{4}-\d{2}-\d{2})_([a-f0-9]{16})_ETF\.json$/;
-const REQUEST_KEYS=['schema','operation','requestId','chatId','controlRepository','controlSourceSha','expectedInstalledCmdSha256'];
+export const APPROVAL_PATH='approvals/w03-r47-readback/r47-private-shadow-readonly-20261118.json';
+const APPROVAL_KEYS=['schema','status','scope','operation','sourceRepository',
+ 'expectedInstalledCmdSha256','privateResultRoot','maxResultPairCount',
+ 'rawPriceDataReturned','privateScoreDataReturned','allowProviderCalls',
+ 'allowSqliteReads','allowPCWrites','allowTaskChanges','allowD1Writes','runCount'];
+const REQUEST_KEYS=['schema','operation','requestId','chatId','controlRepository',
+ 'controlSourceSha','expectedInstalledCmdSha256','approvalManifestPath',
+ 'approvalManifestSha256'];
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(v,code)=>{if(!v)stop(code);};
@@ -42,8 +49,33 @@ export function authorize(event,env){
  need(sameKeys(r,REQUEST_KEYS)&&r.schema===SCHEMA&&r.operation===TITLE&&
   r.controlRepository===REPO&&r.controlSourceSha===env.GITHUB_SHA&&
   r.expectedInstalledCmdSha256===CMD_SHA&&UUID.test(r.requestId??'')&&
-  UUID.test(r.chatId??''),
+  UUID.test(r.chatId??'')&&r.approvalManifestPath===APPROVAL_PATH&&
+  HEX.test(r.approvalManifestSha256??''),
   'W03_R47_READBACK_REQUEST_STOP');
+ const filename=path.resolve(path.dirname(fileURLToPath(import.meta.url)),
+  '..',APPROVAL_PATH);
+ const p=fs.lstatSync(filename);
+ need(p.isFile()&&!p.isSymbolicLink()&&p.size>=200&&p.size<=4096,
+  'W03_R47_READBACK_APPROVAL_FILE_STOP');
+ const data=fs.readFileSync(filename);
+ need(data.length===p.size&&sha(data)===r.approvalManifestSha256,
+  'W03_R47_READBACK_APPROVAL_SHA_STOP');
+ let manifest;try{manifest=JSON.parse(data);}catch{
+  stop('W03_R47_READBACK_APPROVAL_JSON_STOP');}
+ need(sameKeys(manifest,APPROVAL_KEYS)&&
+  manifest.schema==='ZGMINI_W03_R47_PRIVATE_READBACK_APPROVAL_V1'&&
+  manifest.status==='APPROVED_B'&&
+  manifest.scope==='FIXED_R47_PRIVATE_SHADOW_METADATA_READONLY'&&
+  manifest.operation===TITLE&&manifest.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+  manifest.expectedInstalledCmdSha256===CMD_SHA&&
+  manifest.privateResultRoot===String.raw`E:\ZGmini\data\themes\legacy-nine-r47-private`&&
+  manifest.maxResultPairCount===512&&manifest.runCount===1&&
+  manifest.rawPriceDataReturned===false&&
+  manifest.privateScoreDataReturned===false&&
+  manifest.allowProviderCalls===false&&manifest.allowSqliteReads===false&&
+  manifest.allowPCWrites===false&&manifest.allowTaskChanges===false&&
+  manifest.allowD1Writes===false,
+  'W03_R47_READBACK_APPROVAL_SCOPE_STOP');
  return r;
 }
 function fixedRoot(root){
