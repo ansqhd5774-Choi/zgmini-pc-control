@@ -1722,6 +1722,13 @@ export function maintenanceNextAction(s){
  if(s.artifacts?.backlog?.openWindows>0)
   return {state:'RECOVERY_REVIEW_REQUIRED',next:'VERIFY_OPEN_BACKLOG_AND_ORIGINAL_OWNER',
    blockScope:'SHARED_INSTALL_ONLY'};
+ // STAGED is past prevalidation: a prior terminal BLOCKED record is not proof
+ // that the filesystem staging and intake artifacts were reconciled.
+ if(s.artifacts?.artifacts?.stageRoot==='PRESENT'
+  &&s.ledger?.firstFail==='STAGED'&&s.ledger?.status==='BLOCKED')
+  return {state:'STAGED_EVIDENCE_REVIEW_REQUIRED',
+   next:'PRESERVE_STAGE_VERIFY_BACKLOG_INSTALL_LEASE_AND_RUNTIME',
+   blockScope:'SHARED_INSTALL_ONLY'};
  if(s.lockReadbackCode||s.installedReadbackCode||s.ledgerReadbackCode)
   return {state:'STATE_UNKNOWN',next:'READ_ONLY_RECONCILE_FAILED_READBACK',blockScope:'SHARED_INSTALL_ONLY'};
  if(s.installLock?.held){
