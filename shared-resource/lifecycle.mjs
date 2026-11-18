@@ -78,6 +78,7 @@ export function prepareResourceWait({resourceKey, origin, evidence, safePoint,
   // Controller may exit before acquiring a lease or recording its ledger.
   // It must not reuse Writer B's truly unclaimed preclaim status.
   if (!['UNCLAIMED_UNTOUCHED', 'REQUEST_CONSUMED_PREWORKER_UNTOUCHED',
+        'REQUEST_CONSUMED_WORKER_PREOP_UNTOUCHED',
         'CLAIMED_ORIGINAL_VERIFIED'].includes(safePoint) ||
       (safePoint !== 'CLAIMED_ORIGINAL_VERIFIED' && recovery != null) ||
       (safePoint === 'CLAIMED_ORIGINAL_VERIFIED' && recovery !== 'ORIGINAL_VERIFIED'))
