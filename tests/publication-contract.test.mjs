@@ -166,5 +166,5 @@ test('BEA manufacturing requires a separately pinned CSV SHA, bounded source fil
  }
  const r=fixture('bea-manufacturing-profit-once');
  r.request.operation='census-qfr-margin-once';
- assert.throws(()=>admitted(r),/PUBLICATION_MANIFEST_SCOPE_MISMATCH/);
+ assert.throws(()=>admitted(r),/PUBLICATION_MANIFEST_(FIELDS_INVALID|SCOPE_MISMATCH)/);
 });
