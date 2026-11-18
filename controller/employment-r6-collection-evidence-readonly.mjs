@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 
 const SQLITE_MAGIC='SQLite format 3\0';
 const MAX_DB_BYTES=64*1024**3;
@@ -167,6 +168,103 @@ function coverage(rows){
   note:'COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION'};
 }
 
+
+// W04 fixed-scope National RAW-vs-run audit. Link only by the original
+// response BODY digest stored in the run (never by a coincidental date).
+// Raw XML, exact digest and individual values must never leave this operation.
+const NATIONAL_RAW_MAX_CHUNKS=24;
+const NATIONAL_RAW_MAX_CHARS=2_880_000;
+const NATIONAL_RAW_HASH=/^[a-f0-9]{64}$/i;
+const NATIONAL_RAW_SERIES=Object.freeze({
+ INITIAL_CLAIMS:['InitialClaims','SA'],
+ INITIAL_CLAIMS_4W:['InitialClaims','SA4WK'],
+ CONTINUED_CLAIMS:['ContinuedClaims','SA'],
+ INSURED_UNEMPLOYMENT_RATE:['IUR','SA'],
+});
+function rawTag(block,tag){
+ const match=String(block).match(new RegExp('<'+tag+'(?:\\s[^>]*)?>([\\s\\S]*?)<\\/'+tag+'>','i'));
+ return match?match[1]:null;
+}
+function rawWeekDate(value){
+ const m=String(value??'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+ if(!m)return null;
+ const y=Number(m[3]),month=Number(m[1]),d=Number(m[2]);
+ if(y<1900||y>2199||month<1||month>12||d<1||d>31)return null;
+ const time=new Date(Date.UTC(y,month-1,d));
+ if(time.getUTCFullYear()!==y||time.getUTCMonth()!==month-1||time.getUTCDate()!==d
+    ||time.getUTCDay()!==6)return null;
+ return time.toISOString().slice(0,10);
+}
+function rawNationalDates(xml,retrievedAt){
+ if(!/^\s*(?:<\?xml[^>]*\?>\s*)?<r539cyNational(?:\s[^>]*)?>/i.test(xml)
+    ||!/<\/r539cyNational\s*>\s*(?:<!--[\s\S]*?-->\s*)*$/i.test(xml))return null;
+ const observed=Object.fromEntries(Object.keys(NATIONAL_RAW_SERIES).map(k=>[k,null]));
+ let latestWeekEnded=null,weekBlocks=0,invalidWeekDates=0;
+ for(const match of xml.matchAll(/<week(?:\s[^>]*)?>([\s\S]*?)<\/week>/gi)){
+  weekBlocks++;
+  const block=match[1],date=rawWeekDate(rawTag(block,'weekEnded'));
+  if(!date){invalidWeekDates++;continue;}
+  if(!latestWeekEnded||date>latestWeekEnded)latestWeekEnded=date;
+  if(retrievedAt&&date>retrievedAt.slice(0,10))continue;
+  for(const [id,[outer,inner]] of Object.entries(NATIONAL_RAW_SERIES)){
+   const value=rawTag(rawTag(block,outer),inner);
+   if(value==null||!String(value).trim())continue;
+   const parsed=Number(String(value).replace(/,/g,'').trim());
+   if(!Number.isFinite(parsed)||parsed<0||(id==='INSURED_UNEMPLOYMENT_RATE'&&parsed>100))continue;
+   if(!observed[id]||date>observed[id])observed[id]=date;
+  }
+ }
+ return {latestWeekEnded,latestNumericDates:observed,weekBlocks,invalidWeekDates};
+}
+function auditStoredNationalRun(db,mode){
+ const base={status:'NOT_VERIFIED',latestWeekEnded:null,latestNumericDates:null,
+  recordedLatestDates:null,weekBlocks:null,invalidWeekDates:null,linkedByRawBodySha:false};
+ const run=db.prepare("SELECT detail_json FROM market_score_employment_r4_shadow_runs_v1 WHERE provider='EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS' AND json_extract(detail_json,'$.mode')=? ORDER BY completed_at DESC LIMIT 1").get(mode);
+ if(!run)return {...base,status:'RUN_NOT_STORED'};
+ const detail=safeJson(run.detail_json);
+ const bodySha=detail?.nationalResponseEvidence?.bodySha256;
+ if(typeof bodySha!=='string'||!NATIONAL_RAW_HASH.test(bodySha))return {...base,status:'RUN_BODY_HASH_NOT_STORED'};
+ // Historical fixture DBs may lack immutable source-key columns. Report
+ // unsupported evidence, never silently convert this to a source failure.
+ const columns=new Set(db.prepare("PRAGMA table_info(market_score_employment_r6_raw_snapshot_v1)").all().map(x=>x.name));
+ if(!['snapshot_id','body_sha256','body_chunk','chunk_index','chunk_count',
+      'request_key','release_group','retrieved_at'].every(k=>columns.has(k)))
+  return {...base,status:'RAW_SCHEMA_UNSUPPORTED'};
+ const head=db.prepare("SELECT snapshot_id,chunk_count,retrieved_at FROM market_score_employment_r6_raw_snapshot_v1 WHERE body_sha256=? AND release_group='DOL_UI_WEEKLY_CLAIMS' AND request_key LIKE 'DOL_NATIONAL:%' AND chunk_index=0 ORDER BY retrieved_at DESC LIMIT 1").get(bodySha.toLowerCase());
+ if(!head)return {...base,status:'MATCHING_RAW_NOT_STORED'};
+ if(typeof head.snapshot_id!=='string'||!Number.isSafeInteger(head.chunk_count)
+    ||head.chunk_count<1||head.chunk_count>NATIONAL_RAW_MAX_CHUNKS)return {...base,status:'RAW_CHUNK_BOUNDS_FAILED'};
+ const chunks=db.prepare("SELECT chunk_index,body_chunk,chunk_count,body_sha256 FROM market_score_employment_r6_raw_snapshot_v1 WHERE snapshot_id=? ORDER BY chunk_index LIMIT 25").all(head.snapshot_id);
+ if(chunks.length!==head.chunk_count||chunks.some((c,i)=>c.chunk_index!==i
+     ||c.chunk_count!==head.chunk_count||c.body_sha256!==bodySha.toLowerCase()
+     ||typeof c.body_chunk!=='string'))
+  return {...base,status:'RAW_CHUNKS_INCOMPLETE'};
+ let length=0;
+ for(const chunk of chunks){
+  length+=chunk.body_chunk.length;
+  if(length>NATIONAL_RAW_MAX_CHARS)return {...base,status:'RAW_BODY_BOUNDS_FAILED'};
+ }
+ const xml=chunks.map(x=>x.body_chunk).join('');
+ if(createHash('sha256').update(xml).digest('hex')!==bodySha.toLowerCase())
+  return {...base,status:'RAW_BODY_HASH_MISMATCH'};
+ const raw=rawNationalDates(xml,head.retrieved_at);
+ if(!raw)return {...base,status:'RAW_XML_ROOT_INVALID'};
+ const recorded=Object.fromEntries(Object.keys(NATIONAL_RAW_SERIES).map(id=>
+  [id,date(detail?.latestNationalSeriesObservationDates?.[id])]));
+ const comparisons=Object.keys(NATIONAL_RAW_SERIES).map(id=>{
+  const a=raw.latestNumericDates[id],b=recorded[id];
+  return a&&b?(a>b?1:a<b?-1:0):null;
+ });
+ const state=comparisons.some(x=>x===1)?'RAW_NEWER_THAN_RUN_PARSER'
+  :comparisons.some(x=>x===-1)?'RAW_OLDER_THAN_RUN_PARSER'
+  :comparisons.every(x=>x===0)?'RAW_EQUALS_RUN_PARSER'
+  :'RAW_OR_RUN_DATES_INCOMPLETE';
+ return {status:state,latestWeekEnded:raw.latestWeekEnded,
+  latestNumericDates:raw.latestNumericDates,recordedLatestDates:recorded,
+  weekBlocks:raw.weekBlocks,invalidWeekDates:raw.invalidWeekDates,
+  linkedByRawBodySha:true};
+}
+
 /** Path is supplied by the installed Controller, never by Issue JSON. */
 export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  filesystem=fs,openDatabase=file=>new DatabaseSync(file,{readOnly:true,timeout:4000}),
@@ -197,6 +295,8 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    result[key]={};
    for(const mode of MODES)result[key][mode]=summarizeRun(query.get(provider,mode),key);
   }
+  stage='NATIONAL_RAW_RUN_COMPARISON';
+  result.nationalRaw=Object.fromEntries(MODES.map(mode=>[mode,auditStoredNationalRun(db,mode)]));
   stage='ETA539_METADATA';
   const snapshots=db.prepare(`SELECT request_key,retrieved_at,chunk_count,http_status,
    json_extract(detail_json,'$.historyWeeks') AS history_weeks,
