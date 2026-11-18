@@ -1671,8 +1671,10 @@ export function readControllerUpdateArtifacts(requestId,{
   protectedBefore,previousHost};
  const unexpected=[...Object.values(objects),backlog.file,leaseDir,ownerFile,recoveryMarker]
   .some(v=>['UNSAFE','UNKNOWN','UNVERIFIED'].includes(v));
+ const invalidLease=leaseDir==='PRESENT'&&(ownerFile!=='PRESENT'
+  ||recoveryMarker==='PRESENT'&&ownerMarkerMatch!==true);
  return {schema:'ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1',requestId,
-  status:unexpected||ownerMarkerMatch===false?'UNVERIFIED':'OBSERVED',
+  status:unexpected||invalidLease?'UNVERIFIED':'OBSERVED',
   artifacts:objects,backlog,
   lease:{directory:leaseDir,ownerFile,recoveryMarker,ownerMarkerMatch},
   operationalWrites:0,originalRequestRetried:false,
