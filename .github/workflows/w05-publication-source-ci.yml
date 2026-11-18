@@ -29,4 +29,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify B publication contract and executor (no operational effects)
-        run: node --test tests/publication-contract.test.mjs tests/publication-executor.test.mjs tests/w05-qfr-publication-draft.test.mjs
+        run: node --test tests/publication-contract.test.mjs tests/publication-executor.test.mjs tests/publication-bea-mfg-result.test.mjs tests/w05-qfr-publication-draft.test.mjs
