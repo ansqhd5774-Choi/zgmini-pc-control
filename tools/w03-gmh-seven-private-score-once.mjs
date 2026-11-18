@@ -54,7 +54,10 @@ const ROOT='E:\\ZGmini\\data';
 const JOURNAL='E:\\ZGmini\\data\\pc-writer\\w03-gmh-seven-private-score-once';
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const need=(x,code)=>{if(!x)fail(code);};
-export function authorize(event,env,{allowControlDrift=compatibleControlSha}={}){
+// Receipt identity is intentionally weaker than *execution authorization*:
+ // a verified owner-owned immutable request may receive a STOP audit receipt
+ // on control HEAD drift, but cannot checkout, compute or write private data.
+export function identifySafeReceipt(event,env){
  need(env?.GITHUB_REPOSITORY===REPO&&env.GITHUB_EVENT_NAME==='issues'&&
   env.GITHUB_EVENT_ACTION==='opened'&&env.GITHUB_RUN_ATTEMPT==='1'&&
   env.GITHUB_ACTOR===OWNER&&SHA40.test(env.GITHUB_SHA??'')&&
@@ -71,13 +74,18 @@ export function authorize(event,env,{allowControlDrift=compatibleControlSha}={})
   Object.keys(r).length===fields.length&&fields.every(k=>Object.hasOwn(r,k))&&
   (r.schema===SCHEMA||r.schema===SAVED_SCHEMA)&&r.operation===TITLE&&
   UUID.test(r.requestId??'')&&UUID.test(r.chatId??'')&&
-  r.controlRepository===REPO&&
-  (r.controlSourceSha===env.GITHUB_SHA||
-   (r.schema===SAVED_SCHEMA&&allowControlDrift(r.controlSourceSha,env.GITHUB_SHA)))&&
+  r.controlRepository===REPO&&SHA40.test(r.controlSourceSha??'')&&
   r.candidateSourceSha===(r.schema===SAVED_SCHEMA?
    APPROVED_SAVED_SOURCE_SHA:APPROVED_SOURCE_SHA),
   'W03_GMH_SCORE_REQUEST_STOP');
  return Object.freeze(r);
+}
+export function authorize(event,env,{allowControlDrift=compatibleControlSha}={}){
+ const r=identifySafeReceipt(event,env);
+ need(r.controlSourceSha===env.GITHUB_SHA||
+  (r.schema===SAVED_SCHEMA&&allowControlDrift(r.controlSourceSha,env.GITHUB_SHA)),
+  'W03_GMH_SCORE_REQUEST_STOP');
+ return r;
 }
 function claim(req){
  need(process.platform==='win32','W03_GMH_SCORE_WINDOWS_ONLY_STOP');
