@@ -34,8 +34,11 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
    try{return queryTask(task);}catch{throw Object.assign(new Error('PROTECTED_TASK_XML_QUERY_FAILED'),{code:'PROTECTED_TASK_XML_QUERY_FAILED',safeTaskName:task});}
   }});}
   catch(error){const retiredIranFailure=String(error?.code??'').startsWith('RETIRED_IRAN_');
+   const protectedProbeReason=['SCHTASKS_INVENTORY_COMMAND_FAILED',
+    'SCHTASKS_INVENTORY_EMPTY_PARSE'].includes(error?.probeReason)?error.probeReason:null;
    Object.assign(report,{phase:'PREVALIDATION',failureOperation:'PROTECTED_STATE_SNAPSHOT',mutationStarted:false,
     affectedScope:'OWN_REQUEST_ONLY',nextAction:retiredIranFailure?'VERIFY_APPROVED_RETIRED_IRAN_STATE_NO_RETRY':'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
+    ...(protectedProbeReason?{protectedProbeReason}:{}),
     ...(retiredIranFailure?{failedProtectedTask:'ZGMINI-PC-Iran-Progress-R13'}:typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}
   preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
   preflightOperation='WORKER_INPUT_WRITE';
@@ -72,6 +75,8 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
     firstFail:report.firstFail,resultPresent:report.result!==undefined};
    Object.assign(report,{
     postcheckFailureCode:postcheckCode,
+    ...(['SCHTASKS_INVENTORY_COMMAND_FAILED','SCHTASKS_INVENTORY_EMPTY_PARSE']
+      .includes(error?.probeReason)?{protectedProbeReason:error.probeReason}:{}),
     workerOutcome:prePostcheckOutcome,
     protectedStateUnchanged:null,
     protectedBeforeSha256:digest(JSON.stringify(before)),

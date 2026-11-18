@@ -67,9 +67,21 @@ test('symbolic links or missing files never yield guessed preimage',()=>{
  const f=fixture();try{
   const outside=path.join(f.temp,'private.mjs');fs.writeFileSync(outside,'secret');
   const relative=CALENDAR_PREIMAGE_FILES[2];const file=path.join(f.source,...relative.split('/'));
-  fs.mkdirSync(path.dirname(file),{recursive:true});fs.symlinkSync(outside,file);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  let fileSystem=fs;
+  try{fs.symlinkSync(outside,file);}
+  catch(error){
+   if(!['EPERM','EACCES'].includes(error?.code))throw error;
+   // Isolated Windows runners may not have symlink creation privileges.
+   // Simulate the same lstat boundary without opening a real outside file.
+   fileSystem={...fs,lstatSync(target){
+    if(path.basename(String(target)).toLowerCase()===path.basename(file).toLowerCase())
+     return {isFile:()=>true,isSymbolicLink:()=>true,size:12};
+    return fs.lstatSync(target);
+   }};
+  }
   const r=inspectWriterInstallPreimage(f.data,{strictPlatform:false,
-   inspectSource:f.trace});
+   fileSystem,inspectSource:f.trace});
   assert.equal(r.calendar[2].exists,null);assert.equal(r.calendar[2].sha256,null);
  }finally{f.finish();}
 });
@@ -80,6 +92,26 @@ test('wrong checkout and absent task source never become verified',()=>{
    inspectSource:()=>({...f.trace(),historicalCheckoutCandidate:{gitVerified:true,
     sourceRoot:'projects/another-project',head:SHA,trackedDirty:false}})});
   assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.sourceRoot,null);
+ }finally{f.finish();}
+});
+
+test('fail-closed checkout reason separates missing, Git, and mismatched fixed source',()=>{
+ const f=fixture();try{
+  for(const [change,expected] of [
+   [{historicalCheckoutCandidate:undefined},'HISTORICAL_CHECKOUT_NOT_DISCOVERED'],
+   [{historicalCheckoutCandidate:{...f.trace().historicalCheckoutCandidate,gitVerified:false}},'HISTORICAL_GIT_UNVERIFIED'],
+   [{historicalCheckoutCandidate:{...f.trace().historicalCheckoutCandidate,sourceRoot:'projects/unapproved-checkout'}},'HISTORICAL_CHECKOUT_MISMATCH'],
+   [{sourceResolved:true,sourceRoot:'projects/unapproved-checkout',sourceHead:SHA},'TASK_CHAIN_CHECKOUT_MISMATCH'],
+  ]){
+   const r=inspectWriterInstallPreimage(f.data,{strictPlatform:false,
+    inspectSource:()=>({...f.trace(),...change})});
+   assert.equal(r.status,'STATE_UNKNOWN');
+   assert.equal(r.code,'WRITER_PREIMAGE_CHECKOUT_NOT_CORROBORATED');
+   assert.equal(r.checkoutFailureReason,expected);
+   assert.equal(r.runtimeSourceVerified,false);
+   assert.equal(r.scopedPreimage?.files?.some(x=>x.sha256!==null),undefined);
+   assert.doesNotMatch(JSON.stringify(r),/PRIVATE_ACCESS_DENIED|TOKEN_SECRET/);
+  }
  }finally{f.finish();}
 });
 

@@ -25,6 +25,21 @@ test('access denial, unknown failure and unreliable inventory are not accepted a
  assert.throws(()=>attestRetiredIranAbsence({exact:missing(),inventory:{status:1,stderr:Buffer.from('failed')} }),{code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
  assert.throws(()=>attestRetiredIranAbsence({exact:missing(),inventory:inventory([])}),{code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});
 });
+test('scheduler inventory failure and empty parse share fail-closed code but differ in safe reason',()=>{
+ const errorFrom=inventoryResult=>{
+  try{attestRetiredIranAbsence({exact:missing(),inventory:inventoryResult});}
+  catch(error){return error;}
+  assert.fail('expected fail-closed inventory');
+ };
+ const command=errorFrom({status:1,stderr:Buffer.from('PRIVATE_ACCESS_DENIED')});
+ assert.equal(command.code,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.equal(command.probeReason,'SCHTASKS_INVENTORY_COMMAND_FAILED');
+ const empty=errorFrom({status:0,stdout:Buffer.from('malformed text')});
+ assert.equal(empty.code,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.equal(empty.probeReason,'SCHTASKS_INVENTORY_EMPTY_PARSE');
+ assert.doesNotMatch(JSON.stringify({reason:empty.probeReason}),/PRIVATE|malformed/);
+});
+
 test('protectedState and readCore keep both active task hashes and record expected absence',()=>{
  const queried=[];
  const queryTask=name=>{queried.push(name);return Buffer.from('safe-fixture-'+name);};
