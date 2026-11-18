@@ -67,9 +67,21 @@ test('symbolic links or missing files never yield guessed preimage',()=>{
  const f=fixture();try{
   const outside=path.join(f.temp,'private.mjs');fs.writeFileSync(outside,'secret');
   const relative=CALENDAR_PREIMAGE_FILES[2];const file=path.join(f.source,...relative.split('/'));
-  fs.mkdirSync(path.dirname(file),{recursive:true});fs.symlinkSync(outside,file);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  let fileSystem=fs;
+  try{fs.symlinkSync(outside,file);}
+  catch(error){
+   if(!['EPERM','EACCES'].includes(error?.code))throw error;
+   // Isolated Windows runners may not have symlink creation privileges.
+   // Simulate the same lstat boundary without opening a real outside file.
+   fileSystem={...fs,lstatSync(target){
+    if(path.resolve(target).toLowerCase()===path.resolve(file).toLowerCase())
+     return {isFile:()=>true,isSymbolicLink:()=>true,size:12};
+    return fs.lstatSync(target);
+   }};
+  }
   const r=inspectWriterInstallPreimage(f.data,{strictPlatform:false,
-   inspectSource:f.trace});
+   fileSystem,inspectSource:f.trace});
   assert.equal(r.calendar[2].exists,null);assert.equal(r.calendar[2].sha256,null);
  }finally{f.finish();}
 });
