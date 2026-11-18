@@ -10,6 +10,8 @@ on:
       - 'tests/core-task-observation.test.mjs'
       - 'tests/supervisor-status-write.test.mjs'
       - 'tools/maintenance-contract.mjs'
+      - 'tools/maintenance-recovery.mjs'
+      - 'tests/maintenance-recovery.test.mjs'
       - 'tools/update.mjs'
       - 'tools/runner-watchdog.mjs'
       - 'tests/runner-watchdog.test.mjs'
@@ -55,6 +57,8 @@ jobs:
           node-version: '22'
       - name: Run scoped maintenance and Controller runtime safety regressions
         run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
+      - name: Regression test operating six runners on isolated source-only host
+        run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         run: |
           node --check watchdog-b/contract.mjs
