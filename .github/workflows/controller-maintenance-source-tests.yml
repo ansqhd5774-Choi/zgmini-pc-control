@@ -32,6 +32,8 @@ on:
       - 'tests/theme-l7-runtime-readonly.test.mjs'
       - 'tests/supervisor-status-write.test.mjs'
       - 'tools/maintenance-contract.mjs'
+      - 'tools/maintenance-recovery.mjs'
+      - 'tests/maintenance-recovery.test.mjs'
       - 'shared-resource/issue-admission.mjs'
       - 'tests/shared-resource-issue-admission.test.mjs'
       - 'tools/r181-pinned-route-candidate.mjs'
@@ -221,6 +223,8 @@ jobs:
         run: |
           node --check inflation-census-api-b/windows-adapter.mjs
           node --check inflation-census-api-b/report.mjs
+      - name: Regression test six operating runners without PC writes
+        run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
         run: |
           node --check watchdog-b/contract.mjs
