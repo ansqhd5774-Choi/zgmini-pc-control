@@ -45,6 +45,31 @@ test('missing date/header and duplicate input report only safe vocabulary',t=>{
   assert.equal(r.archives[1].unknownHeaderCount,1);
   assert.doesNotMatch(JSON.stringify(r),/external-secret|PRIVATE/);
 });
+test('unused Census metadata collisions do not invalidate consumable headers',t=>{
+  const f=fixture(t);
+  f.save(2025,[[...HEAD,'','extra_note','extra_note'],
+    ['TI','2025-09-01','yes','MTM','123456','1','','PRIVATE','PRIVATE']]);
+  f.save(2026,[[...HEAD,'error_data','error_data'],
+    ['TI','2026-09-01','yes','MTM','987654','1','N','N']]);
+  const r=inspect(f.data,{strictPlatform:false});
+  assert.equal(r.status,'PASS');
+  assert.equal(r.invalidCount,0);
+  assert.deepEqual(r.archives.map(x=>x.shape),['HEADERS_VALID','HEADERS_VALID']);
+  assert.equal(r.archives[0].duplicateHeaderCount,1);
+  assert.equal(r.archives[0].unknownHeaderCount,1);
+  assert.equal(r.archives[1].duplicateHeaderCount,1);
+  assert.doesNotMatch(JSON.stringify(r),/123456|987654|PRIVATE|extra_note/);
+});
+test('duplicate consumed selector or monthly-date header remains invalid',t=>{
+  const f=fixture(t);
+  f.save(2025,[[...HEAD,'data_type_code']]);
+  f.save(2026,[[...HEAD,'time_slot_date']]);
+  const r=inspect(f.data,{strictPlatform:false});
+  assert.equal(r.status,'DIAGNOSED');
+  assert.equal(r.invalidCount,2);
+  assert.deepEqual(r.archives.map(x=>x.shape),['HEADERS_INVALID','HEADERS_INVALID']);
+  assert.deepEqual(r.archives.map(x=>x.duplicateHeaderCount),[1,1]);
+});
 test('missing year does not become a false fully verified result',t=>{
   const f=fixture(t);f.save(2025,[HEAD]);
   const r=inspect(f.data,{strictPlatform:false});

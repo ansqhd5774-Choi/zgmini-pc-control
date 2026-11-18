@@ -35,8 +35,12 @@ function classify(bytes){
   const missingRequired=REQUIRED.filter(k=>!keys.has(k));
   const hasMonthlyDate=keys.has('time_slot_date')||keys.has('time');
   const unknownHeaderCount=[...keys].filter(k=>!ALLOWED.has(k)).length;
-  const valid=headers.length>0&&headers.every(Boolean)&&duplicateHeaderCount===0&&
-    !missingRequired.length&&hasMonthlyDate;
+  // Mirror the actual Census collector's effective schema: only consumed
+  // selector/date headers must be present exactly once. Unused supplier
+  // metadata, including empty or repeated labels, remains diagnostic only.
+  const consumed=[...REQUIRED,...['time_slot_date','time'].filter(key=>keys.has(key))];
+  const valid=!missingRequired.length&&hasMonthlyDate&&
+    consumed.every(key=>headers.filter(header=>header===key).length===1);
   return {shape:valid?'HEADERS_VALID':'HEADERS_INVALID',missingRequired,hasMonthlyDate,
     duplicateHeaderCount,unknownHeaderCount,rowCount:obj.length-1};
 }
