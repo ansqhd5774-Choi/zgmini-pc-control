@@ -287,7 +287,7 @@ test('001 candidate pagination processes 600 open candidates without 500-row gat
  const data=Array.from({length:600},(_,i)=>({number:i+1}));
  const seen=[];
  const rows=await pages('issues?state=open',100,async resource=>{
-  const page=Number(resource.match(/page=(\\d+)$/)?.[1]);
+  const page=Number(resource.split('page=').at(-1));
   seen.push(page);return data.slice((page-1)*100,page*100);
  });
  assert.equal(rows.length,600);
@@ -296,21 +296,22 @@ test('001 candidate pagination processes 600 open candidates without 500-row gat
 test('001 exact 500-row boundary no longer becomes incomplete inventory',async()=>{
  const data=Array.from({length:500},(_,i)=>({number:i+1}));
  const rows=await pages('issues',5,async resource=>{
-  const page=Number(resource.match(/page=(\\d+)$/)?.[1]);
+  const page=Number(resource.split('page=').at(-1));
   return data.slice((page-1)*100,page*100);
  });
  assert.equal(rows.length,500);
 });
 test('001 activation matches 009 and 006 without adding a global queue',()=>{
- const read=n=>readFileSync(new URL('../.github/workflows/'+n,import.meta.url),'utf8');
+ const read=n=>readFileSync(new URL('../.github/workflows/'+n,import.meta.url),'utf8').replace(/\r\n/g,'\n');
  const selector=read('agent-handoff-candidate-selector.yml');
- assert.match(selector,/vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'/);
- assert.doesNotMatch(selector,/^concurrency:/m);
- assert.match(selector,/verify-and-select-candidates:\\s*\\n    concurrency:/);
- assert.match(selector,/queue: max/);
+ assert.ok(selector.includes("vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'"));
+ assert.ok(!selector.startsWith('concurrency:')&&!selector.includes('\nconcurrency:\n'));
+ assert.ok(selector.includes("verify-and-select-candidates:\n    concurrency:"));
+ assert.ok(selector.includes('queue: max'));
  const intake=read('agent-handoff.yml');
- assert.doesNotMatch(intake,/startsWith\\(github.event.comment.body/);
- assert.match(intake,/contains\\(github.event.comment.body, 'ZGMINI_AGENT_HANDOFF_RESULT_V1'/);
- assert.match(intake,/contains\\(github.event.comment.body, 'ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1'/);
- assert.match(intake,/contains\\(github.event.comment.body, 'ZGMINI_HANDOFF_WORK_UPDATE_V1'/);
+ assert.ok(!intake.includes('startsWith(github.event.comment.body'));
+ for(const name of ['ZGMINI_AGENT_HANDOFF_RESULT_V1',
+  'ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1','ZGMINI_HANDOFF_WORK_UPDATE_V1'])
+   assert.ok(intake.includes("contains(github.event.comment.body, '"+name+"'"));
+
 });
