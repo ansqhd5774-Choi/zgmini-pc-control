@@ -89,7 +89,7 @@ test('only approved controller-only maintenance scope accepts selective source',
   {selectiveSource:{...make().selectiveSource,customPaths:['controller/operations.mjs','controller/operations.mjs']}},
  ]){
   assert.throws(()=>validate({...make(),...patch}),
-   /SELECTIVE_SOURCE_|CONTROLLER_ONLY_INSTALL_SCOPE_INVALID/);
+   /SELECTIVE_SOURCE_|CONTROLLER_ONLY_INSTALL_SCOPE_INVALID|UPDATE_B_APPROVAL_REQUIRED/);
  }
  assert.equal(validate({...make(),selectiveSource:undefined}).manifest.selectiveSource,undefined);
 });
