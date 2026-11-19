@@ -13,7 +13,8 @@ import {applyApprovedUpdate,maintenanceCliFailureReport} from './maintenance-app
 import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
-  validateControllerOnlyInstallDelta,deployableControllerTreePaths,
+  validateControllerOnlyInstallDelta,validateControllerSelectivePin,
+  deployableControllerTreePaths,
   isControllerSourceTestPath,
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
@@ -1234,10 +1235,46 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     need(git(['status','--porcelain','--untracked-files=all','--',
       ...CONTROL_UPDATE_SENSITIVE_PATHS]).trim()==='','CONTROL_DIRTY');
    git(['fetch','--no-tags','origin','main']);
+   const selective=manifest.selectiveSource??null;
+   if(selective){
+    // Only a manifest-pinned branch head is fetched, never an Issue path or
+    // arbitrary executable. This is an overlay commit, not the public main SHA.
+    git(['fetch','--no-tags','origin',selective.branch]);
+    need(git(['rev-parse','FETCH_HEAD']).trim()===manifest.targetSha,
+     'SELECTIVE_TARGET_BRANCH_DRIFT');
+   }
    need(git(['cat-file','-t',manifest.targetSha]).trim()==='commit','TARGET_NOT_COMMIT');
-   need(git(['merge-base','--is-ancestor',manifest.targetSha,'refs/remotes/origin/main']).trim()==='','TARGET_NOT_ON_MAIN');
+   if(selective){
+    need(git(['merge-base','--is-ancestor',selective.mainSha,
+     'refs/remotes/origin/main']).trim()==='','SELECTIVE_SOURCE_NOT_ON_MAIN');
+    const parents=git(['rev-list','--parents','-n','1',manifest.targetSha]).trim().split(/\s+/);
+    need(parents.length===2&&parents[1]===manifest.installedSha,
+     'SELECTIVE_TARGET_PARENT_MISMATCH');
+   }else{
+    need(git(['merge-base','--is-ancestor',manifest.targetSha,
+     'refs/remotes/origin/main']).trim()==='','TARGET_NOT_ON_MAIN');
+   }
    need(git(['merge-base','--is-ancestor',manifest.installedSha,manifest.targetSha]).trim()==='','TARGET_NOT_DESCENDANT');
    const diff=git(['diff','--name-only',manifest.installedSha,manifest.targetSha,'--']).trim().split(/\r?\n/).filter(Boolean);
+   if(selective){
+    const declared=manifest.allowFiles.map(f=>f.path).sort();
+    // For this mode *all* changed paths, including docs/tools/workflows,
+    // must be precisely the reviewed Controller/config paths.
+    need(JSON.stringify([...diff].sort())===JSON.stringify(declared),
+     'SELECTIVE_NONSCOPED_DIFF');
+    const pinPath='approvals/controller-selective-targets/'+manifest.targetSha+'.json';
+    let pinBytes;
+    try{pinBytes=git(['show','refs/remotes/origin/main:'+pinPath]);}
+    catch{throw Object.assign(Error('SELECTIVE_PIN_NOT_ON_MAIN'),{code:'SELECTIVE_PIN_NOT_ON_MAIN'});}
+    let pin;
+    try{pin=JSON.parse(pinBytes);}catch{throw Object.assign(Error('SELECTIVE_PIN_INVALID'),{code:'SELECTIVE_PIN_INVALID'});}
+    validateControllerSelectivePin(manifest,pin);
+    for(const item of manifest.allowFiles){
+     if(selective.customPaths.includes(item.path))continue;
+     need(sha256(git(['show',selective.mainSha+':'+item.path],{encoding:null}))===item.sha256,
+      'SELECTIVE_MAIN_SOURCE_HASH_MISMATCH');
+    }
+   }
    // tools/docs/tests/reports are not deployed into the six Runner host. Changes
    // to a live workflow or executable script still require a different approval.
    if(manifest.controllerOnlyInstall===true)
@@ -1271,7 +1308,19 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    plannedFiles=deployed;
    const pr=github('pulls/'+manifest.approval.ref.split('/').pop());
    need(pr.merged===true&&validSha(pr.merge_commit_sha),'APPROVAL_PR_NOT_MERGED');
-   need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,manifest.targetSha]).trim()==='','APPROVAL_PR_TARGET_MISMATCH');
+   if(selective){
+    need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,
+     'refs/remotes/origin/main']).trim()==='','SELECTIVE_APPROVAL_NOT_ON_MAIN');
+    const pinPath='approvals/controller-selective-targets/'+manifest.targetSha+'.json';
+    let approvedPin;
+    try{approvedPin=JSON.parse(git(['show',pr.merge_commit_sha+':'+pinPath]));}
+    catch{throw Object.assign(Error('SELECTIVE_PIN_NOT_IN_APPROVAL_PR'),
+     {code:'SELECTIVE_PIN_NOT_IN_APPROVAL_PR'});}
+    validateControllerSelectivePin(manifest,approvedPin);
+   }else{
+    need(git(['merge-base','--is-ancestor',pr.merge_commit_sha,
+     manifest.targetSha]).trim()==='','APPROVAL_PR_TARGET_MISMATCH');
+   }
    protectedBefore=protectedSnapshot();
   },
   stage:async()=>{
