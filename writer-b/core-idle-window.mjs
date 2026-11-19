@@ -7,7 +7,8 @@ export const MAX_CORE_IDLE_WAIT_MS=6*60000;
 // the late natural-idle window short so the bounded transaction can finish.
 export const MAX_POST_PREPARE_IDLE_WAIT_MS=90000;
 export const CORE_IDLE_POLL_MS=1500;
-const stop=code=>{throw Object.assign(new Error(code),{code});};
+const stop=(code,idleObservation=null)=>{throw Object.assign(new Error(code),
+ {code,...(idleObservation?{idleObservation}:{})});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 
 export async function awaitNaturalCoreIdle({
@@ -21,17 +22,26 @@ export async function awaitNaturalCoreIdle({
  need(Number.isFinite(begin),'WRITER_B_CORE_IDLE_CLOCK_STOP');
  const deadline=begin+windowMs;
  let consecutive=0,samples=0,last=null;
+ let readySamples=0,activeSamples=0,otherSamples=0,maxReadyStreak=0;
  // The independent sample cap prevents infinite polling if a test/host clock
  // fails to advance, without turning an active Core into a verified idle.
  const cap=Math.ceil(windowMs/CORE_IDLE_POLL_MS)+2;
  while(clock()<deadline&&samples<cap){
   last=await sample();
   samples++;
-  consecutive=isReady(last?.probe,last?.lock)?consecutive+1:0;
+  const ready=isReady(last?.probe,last?.lock);
+  consecutive=ready?consecutive+1:0;
+  if(ready){
+   readySamples++;
+   maxReadyStreak=Math.max(maxReadyStreak,consecutive);
+  }else if(blockCode(last?.probe,last?.lock)===
+    'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED')activeSamples++;
+  else otherSamples++;
   if(consecutive>=2)return {status:'CORE_PREPAUSE_IDLE',samples};
   await wait(CORE_IDLE_POLL_MS);
  }
  const code=blockCode(last?.probe,last?.lock);
  stop(typeof code==='string'&&/^WRITER_B_CORE_[A-Z0-9_]+$/.test(code)?
-  code:'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED');
+  code:'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED',
+  {windowMs,samples,readySamples,activeSamples,otherSamples,maxReadyStreak});
 }

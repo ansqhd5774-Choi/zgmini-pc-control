@@ -8,7 +8,7 @@ import {CONTROL_REPO,ACTOR,ISSUE_LABEL,ISSUE_TITLE,
  REQUEST_SCHEMA,OPERATION} from './contract.mjs';
 import {safeWriterBImportDiagnostic,
  safeWriterBImportDiagnosticBatch} from './import-availability.mjs';
-import {safeWriterBPreimageCheck} from './installer.mjs';
+import {safeWriterBPreimageCheck,safeWriterBIdleObservation} from './installer.mjs';
 
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
@@ -102,9 +102,11 @@ export function sanitizeWriterBResult(raw,requestId,runId,approvedManifestSha256
     safeWriterBImportDiagnosticBatch(raw):null;
   const preimageCheck=raw.status==='WRITER_B_PREFLIGHT_STOP'?
    safeWriterBPreimageCheck(raw):null;
+  const idleObservation=safeWriterBIdleObservation(raw);
   return {...base,status:raw.status,code:raw.code,
     ...(diagnostic?{diagnostic}:{}),...(batch??{}),
     ...(preimageCheck?{preimageCheck}:{}),
+    ...(idleObservation?{idleObservation}:{}),
     ...(raw.status==='WRITER_B_INSTALL_STOP_RESTORED'?
      {recovery:'ORIGINAL_VERIFIED'}:{}),
     ...(raw.status==='WRITER_B_RECOVERY_REQUIRED'?
@@ -117,6 +119,14 @@ function textResult(result){return [
  `REQUEST_ID=${result.requestId}`,`STATUS=${result.status}`,
  `CODE=${result.code}`,`SOURCE_SHA=${result.sourceSha??'NONE'}`,
  ...(result.preimageCheck?[`PREIMAGE_CHECK=${result.preimageCheck}`]:[]),
+ ...(result.idleObservation?[
+  `IDLE_WINDOW_MS=${result.idleObservation.windowMs}`,
+  `IDLE_SAMPLES=${result.idleObservation.samples}`,
+  `IDLE_READY_SAMPLES=${result.idleObservation.readySamples}`,
+  `IDLE_ACTIVE_SAMPLES=${result.idleObservation.activeSamples}`,
+  `IDLE_OTHER_SAMPLES=${result.idleObservation.otherSamples}`,
+  `IDLE_MAX_READY_STREAK=${result.idleObservation.maxReadyStreak}`,
+ ]:[]),
  ...(result.diagnostic?[
   `IMPORT_SOURCE_KIND=${result.diagnostic.sourceKind}`,
   `IMPORT_SOURCE_PATH=${result.diagnostic.sourcePath}`,

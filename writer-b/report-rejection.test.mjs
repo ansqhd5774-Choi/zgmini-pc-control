@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import {readWriterBLocalResult,uploadWriterBReport} from './report.mjs';
+import {readWriterBLocalResult,uploadWriterBReport,sanitizeWriterBResult} from './report.mjs';
 import {ACTOR,CONTROL_REPO,ISSUE_LABEL,ISSUE_TITLE,REQUEST_SCHEMA,
  OPERATION} from './contract.mjs';
 
@@ -92,6 +92,57 @@ test('malformed request JSON never uses the contract rejection receipt',async()=
   rawResult:JSON.stringify(proof),apiFetch:async()=>{calls++;return {status:201};}}),
  {code:'WRITER_B_REPORT_REQUEST_JSON_STOP'});
  assert.equal(calls,0);
+});
+
+test('Core idle timeout counts survive safe JSON sanitization; spoofed details never leak',()=>{
+ const counts={windowMs:6000,samples:4,readySamples:2,
+  activeSamples:2,otherSamples:0,maxReadyStreak:1};
+ const raw={status:'WRITER_B_PREFLIGHT_STOP',requestId:REQUEST_ID,
+  code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',
+  idleObservation:{...counts,privatePid:'SECRET-PID'}};
+ const clean=sanitizeWriterBResult(raw,REQUEST_ID,RUN_ID,'a'.repeat(64));
+ assert.deepEqual(clean.idleObservation,counts);
+ assert.doesNotMatch(JSON.stringify(clean),/privatePid|SECRET-PID/);
+ const spoofed=sanitizeWriterBResult({...raw,
+  idleObservation:{...counts,samples:900000,secret:'NEVER-PUBLISH'}},
+  REQUEST_ID,RUN_ID,'a'.repeat(64));
+ assert.equal(spoofed.idleObservation,undefined);
+ assert.equal(spoofed.status,'WRITER_B_PREFLIGHT_STOP');
+});
+
+test('Core idle stop publishes identical bounded counts in readback JSON and TXT',async()=>{
+ const counts={windowMs:6000,samples:4,readySamples:2,
+  activeSamples:2,otherSamples:0,maxReadyStreak:1};
+ const files=new Map(),calls=[];
+ const apiFetch=async(url,options)=>{
+  calls.push(options.method);
+  if(options.method==='PUT'){
+   files.set(url,JSON.parse(options.body).content);
+   return {status:201};
+  }
+  if(options.method==='GET'){
+   const encoded=files.get(url.split('?')[0]);
+   return encoded?{status:200,json:async()=>({encoding:'base64',content:encoded})}:{status:404};
+  }
+  return {status:201};
+ };
+ const status=await uploadWriterBReport({event:eventFor(JSON.stringify(request)),env,
+  rawResult:JSON.stringify({status:'WRITER_B_PREFLIGHT_STOP',requestId:REQUEST_ID,
+   code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',
+   idleObservation:{...counts,unsafe:'DO_NOT_EXPOSE'}}),apiFetch});
+ assert.equal(status.deliveryStatus,'RESULT_PAIR_READBACK_VERIFIED');
+ assert.equal(status.verified,2);
+ const texts=[...files.entries()].map(([key,base64])=>
+  ({key,content:Buffer.from(base64,'base64').toString('utf8')}));
+ assert.equal(texts.length,2);
+ const json=JSON.parse(texts.find(x=>x.key.endsWith('.json')).content);
+ const txt=texts.find(x=>x.key.endsWith('.txt')).content;
+ assert.deepEqual(json.idleObservation,counts);
+ assert.match(txt,/IDLE_SAMPLES=4/);
+ assert.match(txt,/IDLE_ACTIVE_SAMPLES=2/);
+ assert.match(txt,/IDLE_MAX_READY_STREAK=1/);
+ assert.doesNotMatch(JSON.stringify(texts),/DO_NOT_EXPOSE/);
+ assert.deepEqual(calls,['PUT','GET','PUT','GET','POST']);
 });
 
 test('valid request retains two result files, readback and normal comment',async()=>{
