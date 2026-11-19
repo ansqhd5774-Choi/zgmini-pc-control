@@ -62,3 +62,31 @@ test('runner API permission failures are distinct from offline runner status',()
  assert.equal(v.runnerSetOnline,null);
  assert.equal(summarizeAutomation({...healthy(),runnerSetOnline:null}).runtimeState,'UNVERIFIED');
 });
+
+test('403 runner roster permission is scoped, not a controller local outage or an all-six PASS',()=>{
+ const r=summarizeAutomation({...healthy(),runnerSetOnline:null,
+  runnerQueryError:'HTTP_403_FORBIDDEN',maintenanceFilesVerified:true,
+  receiverIdentityVerified:true,receiverFresh:true,receiverListening:true});
+ assert.equal(r.localControllerState,'HEALTHY');
+ assert.equal(r.runnerRegistryState,'UNVERIFIED');
+ assert.equal(r.runtimeState,'UNVERIFIED');
+ assert.equal(r.automationState,'PARTIAL_OR_UNVERIFIED');
+ assert.equal(r.next,'CHECK_GITHUB_RUNNER_ROSTER_READ_PERMISSION');
+ assert.equal(r.blockScope,'NONE_FROM_INSTALL_LEASE');
+});
+test('missing, offline and unrelated runner errors retain scoped diagnosis',()=>{
+ for(const runnerSetOnline of [false,null]){
+  const r=summarizeAutomation({...healthy(),runnerSetOnline,
+   runnerQueryError:'REQUEST_TIMEOUT'});
+  assert.equal(r.next,'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE');
+  assert.equal(r.runtimeState,'UNVERIFIED');
+ }
+ const a=summarizeAutomation({...healthy(),runnerSetOnline:null,
+  runnerQueryError:'HTTP_403_FORBIDDEN',supervisorFresh:false});
+ assert.equal(a.localControllerState,'UNVERIFIED');
+ assert.equal(a.next,'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE');
+ const blocked=summarizeAutomation({...healthy(),runnerSetOnline:null,
+  runnerQueryError:'HTTP_403_FORBIDDEN',installLock:{held:true,recoveryRequired:true}});
+ assert.equal(blocked.state,'RECOVERY_REQUIRED');
+ assert.equal(blocked.next,'RECOVER_CURRENT_INSTALL_LEASE_WITH_EXACT_OWNER_AND_LEDGER');
+});
