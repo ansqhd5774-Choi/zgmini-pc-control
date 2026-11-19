@@ -18,6 +18,37 @@ const preimage={
  preimageManifestSha256:'b'.repeat(64)
 };
 
+const pit04={
+ ...base,
+ operation:'employment-r6-candidate-stage-readonly',
+ pit04Offset:0
+};
+
+test('PIT-04-08 optional offset survives independent maintenance backlog validation',()=>{
+ for(const offset of [0,8,50000]){
+  const body={...pit04,pit04Offset:offset};
+  assert.equal(validBacklogOriginalPcJob(body),true,String(offset));
+  const classified=classifyBacklogOriginal(JSON.stringify(body));
+  assert.equal(classified.valid,true,String(offset));
+  assert.deepEqual(classified.body,body);
+ }
+ assert.equal(validBacklogOriginalPcJob({...pit04,pit04Offset:0,unexpected:true}),false);
+});
+test('PIT-04-08 backlog offset rejects invalid types and bounds',()=>{
+ for(const offset of [-1,50001,1.5,'8',null,true,Infinity]){
+  const body={...pit04,pit04Offset:offset};
+  assert.equal(validBacklogOriginalPcJob(body),false,String(offset));
+  const classified=classifyBacklogOriginal(JSON.stringify(body));
+  assert.equal(classified.valid,false,String(offset));
+  assert.equal(classified.code,'BACKLOG_ORIGINAL_REQUEST_INVALID');
+ }
+});
+test('PIT-04-08 offset remains operation-specific, legacy seven-field operation valid',()=>{
+ assert.equal(validBacklogOriginalPcJob({...base,operation:pit04.operation}),true);
+ assert.equal(validBacklogOriginalPcJob({...pit04,operation:'core-status'}),false);
+ assert.equal(validBacklogOriginalPcJob({...pit04,operation:'writer-install-preimage-readonly'}),false);
+});
+
 test('legacy seven-field pc-job is still valid',()=>{
  assert.equal(validBacklogOriginalPcJob(base),true);
 });
