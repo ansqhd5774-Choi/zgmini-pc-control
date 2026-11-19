@@ -1,0 +1,236 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44493406850-1-seat-4",
+  "requestId": "pc-0c14a36e-d080-4217-905c-e591b717a5b6",
+  "startedAt": "2026-11-19T09:06:52.922Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "fe1c540302d8bb9768905aaab384324eab2f3ffe",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "863ed1bef077301949899dd4aeb3f78f448fd9ed",
+  "sourceBranch": "codex/w04-pit0408-host-r3-restore-raw-lineage-20261118",
+  "operation": "source-inventory-runtime-readonly",
+  "seat": 4,
+  "status": "PASS",
+  "code": "SOURCE_INVENTORY_STORED_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-common-process-repair-20261119",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "SOURCE_INVENTORY_STORED_READONLY",
+    "scope": "STORED_PC_SQLITE_ONLY",
+    "overallUniqueSourceCount": null,
+    "declaredEnabledCalendarMapping": "NOT_INSPECTED",
+    "core": {
+      "status": "PASS",
+      "code": "STORED_INVENTORY_READONLY",
+      "sqliteOpened": true,
+      "coverageStatus": "ALL_TARGET_TABLES_PRESENT",
+      "observedTableCount": 8,
+      "targetTableCount": 8,
+      "tableAvailability": {
+        "batch": true,
+        "employment": true,
+        "employmentR6": true,
+        "breadth": true,
+        "breadthUniverse": true,
+        "earningsUniverse": true,
+        "consumption": true,
+        "feeds": true
+      },
+      "batch": {
+        "storedBatches": 721,
+        "latestStoredAt": 1795077909848,
+        "knownFamilies": {
+          "macro": {
+            "storedBatches": 50,
+            "latestStoredAt": 1795077909848,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": 42,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": 1
+            }
+          },
+          "credit": {
+            "storedBatches": 49,
+            "latestStoredAt": 1795075214196,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 3,
+              "providerSummaryKeys": null
+            }
+          },
+          "supply": {
+            "storedBatches": 49,
+            "latestStoredAt": 1795077026483,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 2,
+              "providerSummaryKeys": null
+            }
+          },
+          "fundFlows": {
+            "storedBatches": 49,
+            "latestStoredAt": 1795071009540,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": 1
+            }
+          },
+          "bisDsr": {
+            "storedBatches": 49,
+            "latestStoredAt": 1795069807567,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": null
+            }
+          },
+          "bisTc": {
+            "storedBatches": 49,
+            "latestStoredAt": 1795070115676,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": null,
+              "externalKeys": 1,
+              "providerSummaryKeys": null
+            }
+          },
+          "rates": {
+            "storedBatches": 50,
+            "latestStoredAt": 1795076111099,
+            "latestBodyKeys": {
+              "status": "OBSERVED_KEYS_NOT_ACTIVE_SERIES_PROOF",
+              "rootSeriesKeys": null,
+              "rateR2SeriesKeys": 7,
+              "externalKeys": null,
+              "providerSummaryKeys": 1
+            }
+          }
+        },
+        "distinctSeriesInsideBodies": "NOT_INSPECTED"
+      },
+      "employment": {
+        "observationRows": 43496,
+        "uniqueProviderSeriesGeography": 192,
+        "latestRetrievedAt": "2026-11-19T08:55:21.096Z"
+      },
+      "employmentR6": {
+        "storedChunks": 1097,
+        "snapshots": 88,
+        "uniqueReleaseRequests": 43,
+        "latestRetrievedAt": "2026-11-19T05:15:07.968Z"
+      },
+      "breadth": {
+        "latestTradeDate": "2026-11-17",
+        "latestRows": 503,
+        "latestUniqueTickers": 503
+      },
+      "breadthUniverse": {
+        "latestTradeDate": "2026-11-17",
+        "reportedMemberCount": 503
+      },
+      "earningsUniverse": {
+        "latestPeriodEnd": "2026-06-30",
+        "reportedSecurityCount": 503,
+        "reportedIssuerCount": 500,
+        "retrievedAt": "2026-11-19T06:00:19.216Z"
+      },
+      "consumption": {
+        "latestScoreDate": "2026-09-30",
+        "storedRows": 52,
+        "uniqueSourceKeys": 52,
+        "uniqueProviders": 1
+      },
+      "publicFeeds": {
+        "currentOutputFeedKeys": 16,
+        "countedAsRawInput": false
+      },
+      "census2027Diagnostic": {
+        "status": "OBSERVED",
+        "year": 2027,
+        "collectionStatus": "READY_WITH_FALLBACK",
+        "attempts": [
+          {
+            "endpoint": "annual",
+            "code": "SOURCE_PARSE_OR_FORMAT_FAILED"
+          }
+        ],
+        "attemptedAt": "2026-11-19T04:45:23.950Z",
+        "storedAt": 1795063523950
+      },
+      "treasuryTawsInput": {
+        "status": "OBSERVED",
+        "storedAt": 1795063523950,
+        "fromDate": "2025-11-20",
+        "toDate": "2026-11-19",
+        "rawRowCount": 445,
+        "storedAwardedCount": 436,
+        "eligibleAwardedRows": 436,
+        "eligibleCountMatchesStored": true,
+        "textBytes": 3026234,
+        "textSha256": "cbeb2747b962e3a144d450ffb21dde07d6b8f0730f86044e59aa24e01aaa0980",
+        "scope": "ELIGIBLE_RESULT_COUNT_NOT_FULL_PARSER_REVALIDATION"
+      }
+    },
+    "history": {
+      "status": "PASS",
+      "code": "STORED_INVENTORY_READONLY",
+      "sqliteOpened": true,
+      "coverageStatus": "NO_TARGET_TABLES",
+      "observedTableCount": 0,
+      "targetTableCount": 8,
+      "tableAvailability": {
+        "batch": false,
+        "employment": false,
+        "employmentR6": false,
+        "breadth": false,
+        "breadthUniverse": false,
+        "earningsUniverse": false,
+        "consumption": false,
+        "feeds": false
+      },
+      "batch": null,
+      "employment": null,
+      "employmentR6": null,
+      "breadth": null,
+      "breadthUniverse": null,
+      "earningsUniverse": null,
+      "consumption": null,
+      "publicFeeds": null,
+      "census2027Diagnostic": null,
+      "treasuryTawsInput": null
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": true
+  },
+  "protectedBeforeSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedAfterSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "fe1c540302d8bb9768905aaab384324eab2f3ffe",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-19T09:07:45.041Z",
+  "durationMs": 52119
+}
