@@ -104,6 +104,17 @@ export function validateChildSummary(stdout){
    'W05_B_CHILD_RESULT_UNVERIFIED_STOP');
  return lines[0].slice('TXT_CREATED='.length);
 }
+// Node os.tmpdir() on Windows uses TMP before TEMP. Match the child environment
+// exactly so an otherwise successful SQLite commit never becomes a false UNKNOWN.
+export function childResultLogPath(name,env=process.env){
+ expect(typeof name==='string'&&
+  /^EARNINGS_BLS_SERVICE_R1_RESULT_\\d{8}-\\d{6}Z\\.txt$/.test(name),
+  'W05_B_CHILD_RESULT_NAME_STOP');
+ const dir=typeof env.TMP==='string'&&env.TMP?env.TMP:
+  typeof env.TEMP==='string'&&env.TEMP?env.TEMP:os.tmpdir();
+ expect(path.isAbsolute(dir),'W05_B_TEMP_ROOT_STOP');
+ return path.join(dir,name);
+}
 function safeReport(report,env){
  const dir=env.RUNNER_TEMP;
  expect(typeof dir==='string'&&path.isAbsolute(dir),'W05_B_RUNNER_TEMP_STOP');
@@ -140,7 +151,7 @@ export function execute(env=process.env){
    report.status='STATE_UNKNOWN';report.code='W05_B_COLLECTOR_AFTER_ATTEMPT_UNVERIFIED_STOP';
   }else{
    const name=validateChildSummary(child.stdout);
-   const txt=secureRegular(path.join(env.TEMP||os.tmpdir(),name),4000).toString('utf8');
+   const txt=secureRegular(childResultLogPath(name,env),4000).toString('utf8');
    expect(txt.includes('MODE=MANUAL_CONFIRMED_SERVICE_APPEND')&&
     txt.includes('SERIES=WPSFD42')&&txt.includes('API_REQUESTS=1')&&
     txt.includes('DB_TRANSACTION_COMMITTED=YES')&&
