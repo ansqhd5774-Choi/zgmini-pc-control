@@ -70,17 +70,24 @@ export function readbackServiceSnapshot(dbPath=DB){
    provenance?.authority==='US_BLS'&&provenance?.seriesID==='WPSFD42'&&
    provenance?.contract==='EARNINGS_COMPANION_R3C_BLS_DIRECT_V1'&&
    provenance?.retrievedAt===snap.retrieved_at,'W05_B_SNAPSHOT_LINEAGE_STOP');
-  const chunk=db.prepare(`SELECT payload_json,row_count
+  const chunk=db.prepare(`SELECT payload_json,row_count,first_seen_at
    FROM api_history_chunks_v1
    WHERE provider='BLS' AND dataset='WPSFD42' AND chunk_sha256=?`).get(hashes[0]);
-  expect(chunk?.row_count===snap.row_count&&sha256(Buffer.from(chunk.payload_json,'utf8'))===hashes[0],
+  expect(chunk?.row_count===snap.row_count&&sha256(Buffer.from(chunk.payload_json,'utf8'))===hashes[0]&&
+   typeof chunk.first_seen_at==='string'&&Number.isFinite(Date.parse(chunk.first_seen_at))&&
+   Date.parse(chunk.first_seen_at)<=Date.parse(snap.retrieved_at),
    'W05_B_SQLITE_CHUNK_READBACK_STOP');
+  const expectedSnapshot=sha256(Buffer.from(JSON.stringify({
+   contract:'EARNINGS_COMPANION_R3C_BLS_DIRECT_V1',provider:'BLS',
+   dataset:'WPSFD42',frequency:'MONTHLY',seasonalAdjustment:'SA',chunks:hashes
+  }),'utf8'));
+  expect(snap.snapshot_sha256===expectedSnapshot,'W05_B_SNAPSHOT_SHA_READBACK_STOP');
   const rows=JSON.parse(chunk.payload_json);
   expect(Array.isArray(rows)&&rows.length===snap.row_count&&
    rows.every(x=>x.seriesID==='WPSFD42'&&Number.isFinite(x.value)),
    'W05_B_SQLITE_ROWS_READBACK_STOP');
   return {series:'WPSFD42',rows:snap.row_count,observationAt:snap.latest_observation_date,
-   sourceStoredAt:snap.retrieved_at,snapshotSha256:snap.snapshot_sha256,chunkSha256:hashes[0]};
+   retrievedAt:snap.retrieved_at,firstSeenAt:chunk.first_seen_at,snapshotSha256:snap.snapshot_sha256,chunkSha256:hashes[0]};
  }finally{db.close()}
 }
 function childEnv(env){
