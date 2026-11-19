@@ -14,6 +14,7 @@ const BOT = 'github-actions[bot]';
 const API = `https://api.github.com/repos/${REPO}`;
 const MAX_PAGES = 5;
 const MAX_QUEUE_PAGES = 20;
+const MAX_HANDOFF_PAGES = 100;
 const MAX_BYTES = 65536;
 
 function stop(code) { throw new Error(`PC_HANDOFF_PRODUCER_${code}`); }
@@ -294,10 +295,72 @@ async function completePages(endpoint, label, maxPages=MAX_PAGES) {
   stop(`${label}_INVENTORY_LIMIT`);
 }
 
+/**
+ * Read to the actual final page; 500 records is not a GitHub-wide limit.
+ * A fully occupied last safety-bound page is UNKNOWN, never an empty tail.
+ * Page-level integrity and the final empty/short page are mandatory.
+ */
+export async function completeHandoffPages(readPage,maxPages=MAX_HANDOFF_PAGES){
+  if(typeof readPage!=='function'||!Number.isSafeInteger(maxPages)||
+      maxPages<1||maxPages>MAX_HANDOFF_PAGES)stop('HANDOFF_SCAN_INPUT_INVALID');
+  const issues=[];
+  for(let page=1;page<=maxPages;page++){
+    const rows=await readPage(page);
+    if(!Array.isArray(rows)||rows.length>100)
+      stop('HANDOFF_INVENTORY_INVALID');
+    issues.push(...rows);
+    if(rows.length<100) return issues;
+  }
+  stop('HANDOFF_INVENTORY_LIMIT');
+}
+
+// This is a validation cache, not a source-of-truth cache. Every page is
+// revalidated against GitHub via If-None-Match before reuse. 304 proves the
+// server representation is unchanged; failed validation never reuses cache.
+export function conditionalHandoffPageReader(fetchPage){
+  if(typeof fetchPage!=='function')stop('HANDOFF_PAGE_READER_INVALID');
+  const cached=new Map();
+  return async page=>{
+    const previous=cached.get(page);
+    const response=await fetchPage(page,previous?.etag||null);
+    if(response?.status===304){
+      if(!previous?.etag)stop('HANDOFF_CACHE_304_WITHOUT_PROOF');
+      return previous.rows;
+    }
+    if(response?.status!==200||!Array.isArray(response.rows)||
+       response.rows.length>100)stop('HANDOFF_PAGE_UNVERIFIED');
+    if(typeof response.etag==='string'&&response.etag.length>0)
+      cached.set(page,{etag:response.etag,rows:response.rows});
+    else cached.delete(page);
+    return response.rows;
+  };
+}
+
 export async function main(env = process.env) {
   if (env.GITHUB_REPOSITORY !== REPO || env.GITHUB_EVENT_NAME !== 'workflow_run' ||
       !env.GITHUB_EVENT_PATH) stop('ENVIRONMENT_NOT_ALLOWED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
+  // Shared by pre-write dedup and post-create routing. A fresh conditional
+  // GET is performed for every page on every call, including readback.
+  const getHandoffPage=conditionalHandoffPageReader(async(page,etag)=>{
+    const headers={
+      Authorization:`Bearer ${env.GITHUB_TOKEN||''}`,
+      Accept:'application/vnd.github+json',
+      'X-GitHub-Api-Version':'2022-11-28',
+      ...(etag?{'If-None-Match':etag}:{})
+    };
+    if(!env.GITHUB_TOKEN)stop('TOKEN_NOT_CONFIGURED');
+    const response=await fetch(
+      API+'/issues?state=all&labels=agent-handoff&per_page=100&page='+page,
+      {headers,signal:AbortSignal.timeout(25000)});
+    if(response.status===304)return {status:304};
+    if(!response.ok)stop('GITHUB_HTTP_'+response.status);
+    return {status:200,etag:response.headers.get('etag'),
+      rows:await response.json()};
+  });
+  const listHandoffs=async()=>({repository:REPO,complete:true,
+    issues:(await completeHandoffPages(getHandoffPage))
+      .filter(x=>!x.pull_request).map(x=>({...x,repository:REPO}))});
   const report = await processCompletedPcJob(event, {
     readReport: async resultPath => {
       const content = await request(`contents/${resultPath}?ref=main`, {missingOk: true});
@@ -314,17 +377,13 @@ export async function main(env = process.env) {
       const item = await request(`issues/${number}`);
       return {...item, repository: REPO};
     },
-    listHandoffs: async () => ({repository: REPO, complete: true,
-      issues: (await completePages('issues?state=all&labels=agent-handoff', 'HANDOFF'))
-        .filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
+    listHandoffs,
     createHandoff: async prepared => request('issues', {method: 'POST',
       body: {title: `agent-handoff ${prepared.incidentId}`,
         labels: ['agent-handoff'], body: prepared.body}}),
     routeHandoff: (prepared, number) => routeVerifiedBotIssue(prepared, number, {
       readIssue: async n => ({...await request(`issues/${n}`), repository: REPO}),
-      listHandoffs: async () => ({repository: REPO, complete: true,
-        issues: (await completePages('issues?state=all&labels=agent-handoff', 'HANDOFF'))
-          .filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
+      listHandoffs,
       listIssueComments: n => completePages(`issues/${n}/comments`, 'ROUTE_COMMENT', 4),
       postIssueComment: (n, body) => request(`issues/${n}/comments`, {method:'POST', body:{body}}),
       addIssueLabel: (n, label) => request(`issues/${n}/labels`, {method:'POST', body:{labels:[label]}})
