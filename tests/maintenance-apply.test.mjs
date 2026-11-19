@@ -676,3 +676,53 @@ test('exact approved V2 handoff pins nine checked-out tool bytes and changes onl
  // A source authorization is not a claim of installation or rollback success.
  assert.match(approved.scopeNote,/NOT PC APPLIED/);
 });
+
+test('exact current-main selective maintainer direct handoff pins two changed bytes', async()=>{
+ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+ const installedSha='36cf8ffb813f3a006f3e05379fba641fb3404645';
+ const targetSha='a6e7d1a43244520214ea7c7dd3fdd31f9fbbeac6';
+ const old=JSON.parse(fs.readFileSync(path.join(root,'approvals/maintenance-handoffs',installedSha+'.json'),'utf8'));
+ const file=path.join(root,'approvals/maintenance-handoffs',targetSha+'.json');
+ const raw=fs.readFileSync(file);
+ const approved=JSON.parse(raw.toString('utf8'));
+ const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+ assert.equal(old.targetSha,installedSha);
+ assert.equal(approved.approved,true);
+ assert.equal(approved.installedSha,installedSha);
+ assert.equal(approved.targetSha,targetSha);
+ assert.equal(requireHandoffApproval(approved,targetSha,installedSha),'SEVEN_TO_SEVEN');
+ assert.deepEqual(approved.runtimeChangedFiles,
+  ['tools/maintenance-contract.mjs','tools/update.mjs']);
+ assert.deepEqual(Object.keys(approved.files).sort(),Object.keys(old.files).sort());
+ assert.equal(Object.keys(approved.files).length,9);
+ const prior=Object.fromEntries(nextRuntimeFiles.map(rel=>[rel,old.files[rel]]));
+ assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',prior,approved.files),
+  approved.runtimeChangedFiles);
+ for(const [rel,digest] of Object.entries(approved.files)){
+  assert.match(rel,/^tools\\/[a-z0-9.-]+$/);
+  const pinned=execFileSync('git',['show',targetSha+':'+rel],
+   {cwd:root,encoding:null,windowsHide:true});
+  assert.equal(sha(pinned),digest,rel+' pinned source');
+  assert.equal(sha(fs.readFileSync(path.join(root,rel))),digest,
+   rel+' checkout source');
+ }
+ for(const rel of nextRuntimeFiles){
+  const installed=execFileSync('git',['show',installedSha+':'+rel],
+   {cwd:root,encoding:null,windowsHide:true});
+  assert.equal(sha(installed),old.files[rel],rel+' installed pin');
+ }
+ const {validateHandoffIntent}=await import('../tools/runner-watchdog.mjs');
+ const request={schema:'ZGMINI_MAINTENANCE_HANDOFF_REQUEST_V1',
+  requestId:'pc-handoff-aaaaaaaa-bbbb-4ccc-8ddd-0123456789ab',
+  operation:'maintenance-handoff',targetSha,
+  approvalManifestSha256:sha(raw)};
+ const issue={title:'pc-maintenance-handoff',state:'OPEN',
+  author:{login:'ansqhd5774-Choi'},labels:[{name:'pc-maintenance'}]};
+ assert.equal(validateHandoffIntent(issue,request,approved,{sourceSha:installedSha},sha(raw)).targetSha,
+  targetSha);
+ assert.throws(()=>validateHandoffIntent(issue,{...request,
+  approvalManifestSha256:'0'.repeat(64)},approved,{sourceSha:installedSha},sha(raw)),
+  /HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
+ assert.throws(()=>validateHandoffIntent(issue,request,approved,{sourceSha:targetSha},sha(raw)),
+  /HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
+});
