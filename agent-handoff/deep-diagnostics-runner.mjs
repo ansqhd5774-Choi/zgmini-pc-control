@@ -60,7 +60,7 @@ export async function processDeepQueue(io,now){
   if(!Array.isArray(reports)||reports.length>DEEP_POLICY.maxComments)stop('COMMENTS');
   const main=await io.mainSha();
   if(!sha(main))stop('MAIN_SHA');
-  let posted=0,already=0,unverified=0;
+  let posted=0,already=0,unverified=chosen.unknownClockIssues.length;
   const observed=[];
   for(const candidate of chosen.selected){
     if(posted>=DEEP_POLICY.maxNewReports)break;
@@ -107,7 +107,7 @@ export async function processDeepQueue(io,now){
   }
   return {schema:DEEP_POLICY.version,cutoff:chosen.cutoff,
     recentHandoffs:chosen.selected.length,posted,already,unverified,
-    observed,ledgerIssue,pcOperationalWrites:0,aiCalls:0,
+    unknownClockIssues:chosen.unknownClockIssues,observed,ledgerIssue,pcOperationalWrites:0,aiCalls:0,
     pcRetries:0,sourceEdits:0,simulator:'DECISION_TABLE_ONLY'};
 }
 async function api(repo,resource){

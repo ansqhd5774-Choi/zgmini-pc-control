@@ -20,19 +20,24 @@ const allowSource=x=>x==='SAME_BLOB'||x==='CHANGED_BLOB'||x==='UNAVAILABLE';
 export function selectRecentHandoffs(issues,now){
   if(!Array.isArray(issues)||issues.length>DEEP_POLICY.maxIssues||!Number.isFinite(now))fail('INVENTORY_STOP');
   const cutoff=now-DEEP_POLICY.lookbackDays*86400000;
-  const ids=new Set(),selected=[];
+  const ids=new Set(),selected=[],unknownClockIssues=[];
   for(const issue of issues){
     if(!positive(issue?.number)||ids.has(issue.number))fail('ISSUE_ID_STOP');
     ids.add(issue.number);
-    const t=utc(issue.created_at,now);
-    if(t===null)fail('ISSUE_CLOCK_STOP');
     if(issue.state!=='open'||issue.pull_request)continue;
     if(!Array.isArray(issue.labels)||!['agent-handoff','handoff-agent-pending']
       .every(x=>issue.labels.some(y=>y?.name===x)))continue;
+    const t=utc(issue.created_at,now);
+    if(t===null){
+      // Keep this untrusted candidate visible as UNVERIFIED without letting
+      // its bad timestamp block independent, authenticated Issue evidence.
+      unknownClockIssues.push(issue.number);
+      continue;
+    }
     if(t>=cutoff)selected.push({...issue,_createdMs:t});
   }
   selected.sort((a,b)=>b._createdMs-a._createdMs||b.number-a.number);
-  return {cutoff:new Date(cutoff).toISOString(),selected};
+  return {cutoff:new Date(cutoff).toISOString(),selected,unknownClockIssues};
 }
 export function verifyHandoff(issue,comments){
   if(!issue||!positive(issue.number)||!Array.isArray(comments)||comments.length>DEEP_POLICY.maxComments)

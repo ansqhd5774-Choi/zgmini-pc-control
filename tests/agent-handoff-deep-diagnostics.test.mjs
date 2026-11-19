@@ -174,3 +174,42 @@ test('R2 fallback gate refuses untrusted events and accepts authorized source re
   assert.throws(()=>validateDeepEvent({...e,ref:'refs/heads/main'},
     {...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}),/HANDOFF_DEEP_RUNNER_EVENT/);
 });
+
+test('bad clock in one pending incident is isolated and reported, not a global stop',()=>{
+  const good=fixture(301);
+  const bad=fixture(302,'WRITER_B_PC_PREIMAGE_STOP','incorrect-clock');
+  const nonPending=fixture(303,'WRITER_B_PC_PREIMAGE_STOP','incorrect-clock');
+  nonPending.issue.labels=[{name:'agent-handoff'}];
+  const outcome=selectRecentHandoffs([bad.issue,good.issue,nonPending.issue],now);
+  assert.deepEqual(outcome.selected.map(x=>x.number),[301]);
+  assert.deepEqual(outcome.unknownClockIssues,[302]);
+  assert.equal(outcome.cutoff,'2026-11-09T13:00:00.000Z');
+});
+
+test('deep runner preserves valid evidence and counts unknown-clock issue',async()=>{
+  const good=fixture(310),bad=fixture(311,'WRITER_B_PC_PREIMAGE_STOP','unknown-clock');
+  const posts=[],ledger=[];
+  const io={
+    listIssues:async()=>[bad.issue,good.issue],
+    readIssue:async id=>id===310?structuredClone(good.issue):structuredClone(bad.issue),
+    readComments:async n=>n===1743?structuredClone(ledger):
+      structuredClone(n===310?good.comments:bad.comments),
+    readLedger:async()=>({number:1743,state:'open',user:{login:owner},
+      body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:ledger.length}),
+    readOrigin:async()=>originFor(good),readOriginComments:async()=>[],
+    mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
+    recentHistory:async()=>[],
+    postLedger:async body=>{
+      posts.push(body);
+      ledger.push({id:9300+posts.length,body,created_at:new Date().toISOString(),
+        user:{login:'github-actions[bot]'}});
+    }
+  };
+  const result=await processDeepQueue(io,now);
+  assert.equal(result.posted,1);
+  assert.equal(result.unverified,1);
+  assert.deepEqual(result.unknownClockIssues,[311]);
+  assert.deepEqual(result.observed.map(x=>x.issue),[310]);
+  assert.equal(posts.length,1);
+  assert.equal(result.pcOperationalWrites,0);
+});
