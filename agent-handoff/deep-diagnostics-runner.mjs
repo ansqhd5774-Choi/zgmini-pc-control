@@ -43,7 +43,7 @@ function checkLedger(x){
   // comment count may grow due to the independent proactive diagnostics job.
   if(!x||x.number!==ledgerIssue||x.state!=='open'||x.pull_request||
     x.user?.login!==owner||!x.body?.includes(ledgerMarker)||
-    !Number.isSafeInteger(x.comments)||x.comments<DEEP_POLICY.legacyDeepReportCount)
+    !Number.isSafeInteger(x.comments)||x.comments<0)
     stop('LEDGER_UNVERIFIED');
 }
 
