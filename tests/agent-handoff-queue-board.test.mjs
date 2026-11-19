@@ -371,7 +371,7 @@ test('006 exact full page boundary needs an empty lookahead and is complete',asy
  const items=Array.from({length:200},(_,i)=>({number:i+1}));
  const seen=[];
  const rows=await pages('issues',2,async resource=>{
-  const n=Number(resource.match(/page=(\\d+)$/)?.[1]);
+  const n=Number(resource.match(/page=(\d+)$/)?.[1]);
   seen.push(n);return items.slice((n-1)*100,n*100);
  });
  assert.equal(rows.length,200);
