@@ -164,6 +164,15 @@ export function validateActiveUpgradeReceipt(receipt,_legacyInstallVersion,activ
   'AI_V2_ACTIVE_UPGRADE_MANIFEST_DENIED');
  return entries;
 }
+export function activeUpgradeReceiptNames(names){
+ requireCheck(Array.isArray(names),'AI_V2_ACTIVE_UPGRADE_RECEIPT_LIST_INVALID');
+ return names.filter(name=>/^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\\.json$/.test(name)).sort();
+}
+export function approvedDirectTool(install){
+ return install?.sourceSha===ACTIVE_V2.sourceSha&&
+  install?.manifest?.['scripts/pc-writer/theme-config-tool.mjs']===ACTIVE_V2.cliSha256&&
+  install?.manifest?.['scripts/pc-writer/theme-config-registry.mjs']===ACTIVE_V2.registrySha256;
+}
 function verifiedActiveCommonTool(home,oldVersion,active){
  requireCheck(active.activeRuntimeProbe==='LINKED'&&
   active.activeToolVersion===ACTIVE_V2.version&&
@@ -171,8 +180,7 @@ function verifiedActiveCommonTool(home,oldVersion,active){
   active.activeCliSha256===ACTIVE_V2.cliSha256&&
   active.activeRegistrySha256===ACTIVE_V2.registrySha256,
   'AI_V2_ACTIVE_SOURCE_BYTES_DENIED');
- const receipts=fs.readdirSync(home).filter(name=>
-  /^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\.json$/.test(name)).sort();
+ const receipts=activeUpgradeReceiptNames(fs.readdirSync(home));
  requireCheck(receipts.length>0,'AI_V2_ACTIVE_UPGRADE_RECEIPT_MISSING');
  // Do not reject a valid active upgrade merely because historical receipts accumulated.
  // Each candidate remains bounded by requireFile(maxBytes:100_000) and full manifest/hash checks.
@@ -270,9 +278,7 @@ function installedCommonTool(){
   fs.readFileSync(path.join(root,...registryRelative.split('/')),'utf8'));
  // A marker is a diagnostic hint, never authority to execute an unapproved bundle.
  // Verify the exact approved V2 source and installed file bytes in either path.
- const approvedDirect=install.sourceSha===ACTIVE_V2.sourceSha&&
-  install.manifest[cliRelative]===ACTIVE_V2.cliSha256&&
-  install.manifest[registryRelative]===ACTIVE_V2.registrySha256;
+ const approvedDirect=approvedDirectTool(install);
  if(!approvedDirect||!flags.cliRegisterMarker||!flags.registryV2Marker){
   const active=readActiveConfiguredDiagnostic(home);
   try{return verifiedActiveCommonTool(home,install.version,active)}catch(e){
