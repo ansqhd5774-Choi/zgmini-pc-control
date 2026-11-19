@@ -108,7 +108,7 @@ export function validateChildSummary(stdout){
 // exactly so an otherwise successful SQLite commit never becomes a false UNKNOWN.
 export function childResultLogPath(name,env=process.env){
  expect(typeof name==='string'&&
-  /^EARNINGS_BLS_SERVICE_R1_RESULT_\\d{8}-\\d{6}Z\\.txt$/.test(name),
+  /^EARNINGS_BLS_SERVICE_R1_RESULT_\d{8}-\d{6}Z\.txt$/.test(name),
   'W05_B_CHILD_RESULT_NAME_STOP');
  const dir=typeof env.TMP==='string'&&env.TMP?env.TMP:
   typeof env.TEMP==='string'&&env.TEMP?env.TEMP:os.tmpdir();
