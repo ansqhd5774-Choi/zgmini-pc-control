@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {evaluateWorkUpdate,WORK_SCHEMA,WORK_RECEIPT} from './work-progress-contract.mjs';
+import {evaluateWorkUpdate,WORK_SCHEMA,WORK_RECEIPT,parseWorkUpdate} from './work-progress-contract.mjs';
 import {readIssueCommentLedger} from './comment-ledger.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -9,6 +9,9 @@ const OWNER='ansqhd5774-Choi';
 const API='https://api.github.com/repos/'+REPO;
 const stop=s=>{throw Error('HANDOFF_WORK_BROKER_'+s);};
 
+export function isWorkUpdateComment(body){
+ try{return parseWorkUpdate(body).schema===WORK_SCHEMA;}catch{return false;}
+}
 export function validateWorkEvent(event,env) {
   if(env.GITHUB_REPOSITORY!==REPO||env.GITHUB_EVENT_NAME!=='issue_comment'||
     env.GITHUB_ACTOR!==OWNER||event?.action!=='created'||
@@ -20,7 +23,7 @@ export function validateWorkEvent(event,env) {
     ![OWNER,'github-actions[bot]'].includes(event.issue?.user?.login)||
     event.comment?.user?.login!==OWNER||
     typeof event.comment?.body!=='string'||
-    !event.comment.body.startsWith('{"schema":"'+WORK_SCHEMA+'"'))
+    !isWorkUpdateComment(event.comment.body))
     stop('EVENT_NOT_ALLOWED');
 }
 async function request(resource,{method='GET',body}={}) {
