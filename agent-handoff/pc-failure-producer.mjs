@@ -32,6 +32,27 @@ export function assertCompletedPcJobEvent(event) {
   return {runId: run.id, attempt: run.run_attempt, since: run.created_at};
 }
 
+// Only transient, read-only GitHub failures can be isolated to one Seat.
+// Authentication failures, malformed data, provenance conflicts and uncertain
+// GitHub writes remain hard stops; these could invalidate another Seat too.
+export async function scopedSeatRead(seat, phase, read, recordPending) {
+  if (!issueNumber(seat) || seat>6 || !['RESULT_JSON','ORIGIN_ISSUE',
+    'RESULT_TXT','RECEIPT_INVENTORY','HANDOFF_INVENTORY'].includes(phase) ||
+    typeof read!=='function' || typeof recordPending!=='function')
+    stop('SCOPED_READ_INPUT_INVALID');
+  try { return {ready:true,value:await read()}; }
+  catch(error) {
+    const message=typeof error?.message==='string'?error.message:'';
+    if (!['AbortError','TimeoutError'].includes(error?.name) &&
+        !(error instanceof TypeError && /^fetch failed(?:$|:)/i.test(message)) &&
+        !/^PC_HANDOFF_PRODUCER_GITHUB_HTTP_(408|429|5[0-9][0-9])$/.test(message))
+      throw error;
+    // No exception text, URL, original input or credentials enter the log.
+    recordPending({seat,phase,reason:'TRANSIENT_GITHUB_READ_UNAVAILABLE'});
+    return {ready:false};
+  }
+}
+
 const marker = (runId, attempt, seat) =>
   `<!-- zgmini-pc-result:${runId}:${attempt}:${seat} -->`;
 
@@ -73,7 +94,8 @@ export async function processCompletedPcJob(event, {
     reportsObserved: 0, confirmedFailures: 0, newIssues: 0, reusedIssues: 0,
     routesRecorded: 0, routesReused: 0,
     waitsRecorded:0,waitsReused:0,waitProofPending:0,failureProofPending:0,
-    missingReceipts: 0, pcOperationalWrites: 0, automaticPcRetries: 0};
+    missingReceipts: 0, seatReadPending: 0, seatReadProblems: [],
+    pcOperationalWrites: 0, automaticPcRetries: 0};
   const confirmRoute = async (prepared, number) => {
     if (typeof routeHandoff !== 'function') stop('ROUTE_NOT_CONFIGURED');
     const routed = await routeHandoff(prepared, number);
@@ -81,10 +103,17 @@ export async function processCompletedPcJob(event, {
     else if (routed?.state === 'ROUTE_REUSED') result.routesReused++;
     else stop('ROUTE_RESULT_INVALID');
   };
+  const recordPending=problem=>{
+    result.seatReadPending++;
+    result.seatReadProblems.push(problem);
+  };
+  const readSeat=(seat,phase,read)=>scopedSeatRead(seat,phase,read,recordPending);
   let comments = null;
   for (let seat = 1; seat <= 6; seat++) {
     const resultPath = `results/${run.runId}-${run.attempt}-seat-${seat}.json`;
-    const report = await readReport(resultPath);
+    const observed=await readSeat(seat,'RESULT_JSON',()=>readReport(resultPath));
+    if (!observed.ready) continue;
+    const report=observed.value;
     if (report === null) continue;
     result.reportsObserved++;
     // Memory/seat lease contention is not a repair incident. Require the
@@ -92,12 +121,22 @@ export async function processCompletedPcJob(event, {
     // central wait record. Other BLOCKED codes remain out of this path.
     if(report.status==='BLOCKED'&&
       ['RESOURCE_WAIT_MEMORY','MEMORY_WAIT_ALREADY_ACTIVE','LEASE_BUSY'].includes(report.code)){
-      comments ??= await readComments(run.since);
+      if(comments===null){
+        const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
+          ()=>readComments(run.since));
+        if(!inventory.ready)continue;
+        comments=inventory.value;
+      }
       const original=findOriginalIssueNumber(comments,{...run,seat});
       if(original===null){result.missingReceipts++;continue;}
-      const originIssue=await readIssue(original);
+      const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
+      if(!origin.ready)continue;
+      const originIssue=origin.value;
       if(typeof readReportText!=='function')stop('WAIT_TEXT_READER_MISSING');
-      const resultTxt=await readReportText(resultPath.replace(/\.json$/,'.txt'));
+      const txt=await readSeat(seat,'RESULT_TXT',
+        ()=>readReportText(resultPath.replace(/\.json$/,'.txt')));
+      if(!txt.ready)continue;
+      const resultTxt=txt.value;
       const wait=preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt});
       if(wait.state==='WAIT_PROOF_UNVERIFIED'){result.waitProofPending++;continue;}
       if(wait.state!=='WAITING_SHARED_RESOURCE')stop('WAIT_CLASSIFICATION_STOP');
@@ -111,24 +150,35 @@ export async function processCompletedPcJob(event, {
     }
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
     if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status)) continue;
-    comments ??= await readComments(run.since);
+    if(comments===null){
+      const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
+        ()=>readComments(run.since));
+      if(!inventory.ready)continue;
+      comments=inventory.value;
+    }
     const original = findOriginalIssueNumber(comments, {...run, seat});
     if (original === null) { result.missingReceipts++; continue; }
-    const originIssue = await readIssue(original);
+    const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
+    if(!origin.ready)continue;
+    const originIssue=origin.value;
     const prepared = preparePcFailureHandoff({originIssue, report, resultPath});
     // A failure-proof fixture is eligible for exclusion only after the
     // authenticated original request agrees with the published result.
     if (prepared.state === 'NOT_ELIGIBLE') continue;
     if (prepared.state !== 'READY_TO_ENQUEUE') stop('STATE_DRIFT');
     if (typeof readReportText !== 'function') stop('FAILURE_TEXT_READER_MISSING');
-    const resultTxt = await readReportText(resultPath.replace(/\.json$/, '.txt'));
+    const txt=await readSeat(seat,'RESULT_TXT',
+      ()=>readReportText(resultPath.replace(/\.json$/, '.txt')));
+    if(!txt.ready)continue;
+    const resultTxt=txt.value;
     const pair = verifyPcFailureResultPair({report, resultTxt});
     if (pair.state === 'EVIDENCE_PAIR_MISSING') {
       result.failureProofPending++; continue;
     }
     result.confirmedFailures++;
-    const inventory = await listHandoffs();
-    const decision = reconcileHandoffInventory(prepared, inventory);
+    const snapshot=await readSeat(seat,'HANDOFF_INVENTORY',()=>listHandoffs());
+    if(!snapshot.ready)continue;
+    const decision = reconcileHandoffInventory(prepared, snapshot.value);
     if (decision.state === 'REUSE_EXISTING') {
       // A closed original incident is already disposed. Keep its fingerprint
       // as a dedup anchor without writing an obsolete pending-agent route.
@@ -155,7 +205,11 @@ export async function processCompletedPcJob(event, {
     await confirmRoute(prepared, created.number);
     result.newIssues++;
   }
-  if (!result.reportsObserved) {
+  if (result.seatReadPending) {
+    // Preserve partial success counters while clearly marking incomplete
+    // observations, including runs with zero successfully read JSON reports.
+    result.state='PARTIAL_SEAT_READ_PENDING';
+  } else if (!result.reportsObserved) {
     // A cancelled parent run can have no per-seat result; do not report
     // the same cancellation as a second intake execution failure.
     // The parent is still CANCELLED, and no runtime success is inferred.
@@ -250,7 +304,8 @@ export async function main(env = process.env) {
     readResourceWaitComment:id=>request(`issues/comments/${id}`)
   });
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (['PARTIAL_RECEIPT_PENDING','PARTIAL_FAILURE_EVIDENCE_PENDING',
+  if (['PARTIAL_SEAT_READ_PENDING','PARTIAL_RECEIPT_PENDING',
+    'PARTIAL_FAILURE_EVIDENCE_PENDING',
     'PARTIAL_WAIT_EVIDENCE_PENDING',
     'NO_PUBLISHED_RESULTS'].includes(report.state)) process.exitCode = 1;
   return report;
