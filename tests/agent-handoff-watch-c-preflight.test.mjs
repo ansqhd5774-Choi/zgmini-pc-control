@@ -12,9 +12,13 @@ test('local C preflight validates exactly seven pinned Git blobs without tokens 
   const report=inspectWatchCPreflight(base);
   assert.equal(report.sourceCommit,C_SOURCE_COMMIT);
   assert.equal(report.sourceFilesChecked,7);
-  assert.equal(report.sourceFilesMatched,7);
-  assert.equal(report.sourceEligible,true);
-  assert.equal(report.state,'SOURCE_PREFLIGHT_PASS_C_AUTH_AND_TASK_REQUIRED');
+  // The C installer is pinned to an immutable historical source, not HEAD.
+  // A later queue-selector edit must not silently promote the current checkout.
+  assert.equal(report.sourceFilesMatched,6);
+  assert.deepEqual(report.sourceFiles.filter(x=>!x.matched).map(x=>x.file),
+    ['agent-handoff/queue-selector.mjs']);
+  assert.equal(report.sourceEligible,false);
+  assert.equal(report.state,'SOURCE_PREFLIGHT_STOP');
   assert.equal(report.credentialStoreVerified,false);
   assert.equal(report.windowsTaskRegisteredVerified,false);
   assert.equal(report.runtimeHeartbeatVerified,false);
@@ -44,13 +48,16 @@ test('one tampered, missing or mismatching pinned source cannot pass preflight',
       mkdirSync(path.dirname(dest),{recursive:true});
       cpSync(path.resolve(file),dest);
     }
-    assert.equal(inspectWatchCPreflight({...base,root:temp}).sourceEligible,true);
+    const baseline=inspectWatchCPreflight({...base,root:temp});
+    assert.equal(baseline.sourceEligible,false);
+    assert.equal(baseline.sourceFilesMatched,6);
     const target=path.join(temp,'agent-handoff','intake-watch-5s.mjs');
     writeFileSync(target,Buffer.concat([readFileSync(target),Buffer.from('\n//tampered\n')]));
     const report=inspectWatchCPreflight({...base,root:temp});
     assert.equal(report.sourceEligible,false);
-    assert.equal(report.sourceFilesMatched,6);
+    assert.equal(report.sourceFilesMatched,5);
     assert.equal(report.sourceFiles.find(x=>x.file==='agent-handoff/intake-watch-5s.mjs').matched,false);
+    assert.equal(report.sourceFiles.find(x=>x.file==='agent-handoff/queue-selector.mjs').matched,false);
     assert.equal(report.pcWrites,0);
   }finally{rmSync(temp,{recursive:true,force:true});}
 });
@@ -73,7 +80,8 @@ test('CRLF-only CMD checkout passes, but executable-content edits still fail',()
     const source=readFileSync(cmd,'utf8').replace(/\r\n/g,'\n');
     writeFileSync(cmd,source.replace(/\n/g,'\r\n'),'utf8');
     const valid=inspectWatchCPreflight({...base,root:temp});
-    assert.equal(valid.sourceEligible,true);
+    assert.equal(valid.sourceEligible,false); // HEAD selector differs from the immutable C pin.
+    assert.equal(valid.sourceFilesMatched,6);
     assert.equal(valid.sourceFiles.find(x=>x.file==='tools/handoff-watch-user-start.cmd').windowsCmdCrLfNormalized,true);
     writeFileSync(cmd,source.replace(/\n/g,'\r\n')+'\r\nrem modified command\r\n','utf8');
     const invalid=inspectWatchCPreflight({...base,root:temp});
