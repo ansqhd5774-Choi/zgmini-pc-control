@@ -7,7 +7,7 @@ import {manifestFingerprint,validateUpdateRequest,validateControllerSelectivePin
  validateControllerOnlyInstallDelta,MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY
 } from '../tools/maintenance-contract.mjs';
 
-const target='7afa3cc330ca468ef2ffaeec8b5597f78499f71f';
+const target='6d84dbfaaf8344069ea131b226385bdae3632c35';
 const installed='6e52999aeb7dda5975464a78780559ba5cd46895';
 const root=path.join(import.meta.dirname,'..','approvals');
 const raw=fs.readFileSync(path.join(root,'controller-updates',target+'.json'));
@@ -26,9 +26,9 @@ test('PIT0605 two-file selective Controller B is exact, source-pinned, CAS-safe'
  assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
  assert.equal(manifest.backup.rollback.sha,installed);
  assert.equal(manifest.selectiveSource.schema,'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1');
- assert.equal(manifest.selectiveSource.branch,'codex/w04-pit0605-reader-projection-20261119');
+ assert.equal(manifest.selectiveSource.branch,'codex/w04-pit0605-selective-overlay-20261120');
  assert.equal(manifest.selectiveSource.mainSha,'ae81e9721d782174bc87eeca08e49ded7f7c18ae');
- assert.deepEqual(manifest.selectiveSource.customPaths,[]);
+ assert.deepEqual(manifest.selectiveSource.customPaths,files);
  assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2375');
  assert.equal(validateControllerOnlyInstallDelta(files,manifest.allowFiles),true);
  const issue={schema:MAINTENANCE_ISSUE_SCHEMA,
