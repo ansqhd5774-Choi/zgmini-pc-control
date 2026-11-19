@@ -76,7 +76,7 @@ test('publisher permits only bounded metadata, never raw data or secret keys',()
 });
 
 test('validates collector summary and rejects missing service confirmation',()=>{
- assert.equal(validateChildSummary('TXT_CREATED=EARNINGS_BLS_SERVICE_R1_RESULT_20261119-024500Z.txt\\nRESULT=PASS_R3C_MANUAL_BLS_PERSISTED\\n'),
+ assert.equal(validateChildSummary('TXT_CREATED=EARNINGS_BLS_SERVICE_R1_RESULT_20261119-024500Z.txt\nRESULT=PASS_R3C_MANUAL_BLS_PERSISTED\n'),
   'EARNINGS_BLS_SERVICE_R1_RESULT_20261119-024500Z.txt');
  assert.throws(()=>validateChildSummary('RESULT=PASS_R3C_MANUAL_BLS_PERSISTED'),
   /W05_B_CHILD_RESULT_UNVERIFIED_STOP/);
