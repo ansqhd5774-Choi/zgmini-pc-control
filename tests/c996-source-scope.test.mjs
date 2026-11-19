@@ -19,7 +19,7 @@ test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['tools/maintenance-apply.mjs']),all);
  assert.deepEqual(selectGroups(['agent-handoff/pc-failure-producer.mjs']),['handoff007','handoff009','handoff008']);
  assert.deepEqual(selectGroups(['.github/workflows/agent-handoff-candidate-selector.yml']),['handoff007','handoff009','handoff008']);
- assert.deepEqual(selectGroups(['tests/r47-task-chain.test.mjs']),['recovery']);
+ assert.deepEqual(selectGroups(['tests/r47-task-chain.test.mjs']),['r47','recovery']);
  assert.deepEqual(selectGroups(['tools/unknown-shared-contract.mjs']),all);
 });
 test('011 workflow and selection contract changes always run all original suites',()=>{
@@ -66,7 +66,7 @@ test('011 actual PR comparison uses existing contents-read scope and selects onl
     {filename:'docs/unrelated-feature.md'}]})};
   });
   assert.equal(calls,1);
-  assert.deepEqual(selectGroups(changed),['handoff009']);
+  assert.deepEqual(selectGroups(changed),['handoff007','handoff009','handoff008']);
   const unknown=await changedFiles(env,async()=>({ok:false,status:403}));
   assert.equal(unknown,null);
   const cap=await changedFiles(env,async()=>({ok:true,json:async()=>({
