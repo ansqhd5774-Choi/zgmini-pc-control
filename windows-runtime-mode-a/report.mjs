@@ -56,8 +56,8 @@ export function sanitizeAReport(raw,req,env){
   requestId:req.requestId,status:'STATE_UNKNOWN',code:'A_RUNTIME_RESULT_UNVERIFIED',
   runId:ID.test(env?.GITHUB_RUN_ID??'')?env.GITHUB_RUN_ID:null,
   manifestSha256:req.approvalManifestSha256,sourceSha:req.sourceSha,
-  fileHashesComplete:false,taskChecksComplete:false,
-  operationalWrites:0,retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE',profiles:[]};
+  fileHashesComplete:false,taskChecksComplete:false,taskEnabledVerified:false,
+  mode:'UNVERIFIED',operationalWrites:0,retry:'NO_AUTO_RETRY_READ_ONLY_RECONCILE',profiles:[]};
  if(!plain(raw)||raw.requestId!==req.requestId||
   !['DONE','BLOCKED'].includes(raw.status))return fallback;
  const blocked=raw.status==='BLOCKED';
@@ -70,13 +70,23 @@ export function sanitizeAReport(raw,req,env){
   raw.requestedSourceSha!==req.sourceSha||
   !Array.isArray(raw.profiles)||raw.profiles.length>4)
   return blocked?safeBlocked:fallback;
+ const summary=raw.mode==='SUMMARY_ONLY';
+ if(summary&&(!Number.isSafeInteger(raw.selectedCount)||raw.selectedCount<=4||
+  !Number.isSafeInteger(raw.registeredCount)||raw.registeredCount<raw.selectedCount||
+  raw.profiles.length!==0||raw.code!=='A_RUNTIME_SUMMARY_ONLY'||
+  raw.fileHashesComplete!==false||raw.taskChecksComplete!==false||
+  raw.taskEnabledVerified!==false))return fallback;
+ if(!summary&&raw.mode==='SUMMARY_ONLY')return fallback;
  const profiles=raw.profiles.map(cleanProfile);
  if(profiles.some(x=>x===null))return blocked?safeBlocked:fallback;
  const report={...fallback,status:blocked?'BLOCKED':'DONE',
-  code:blocked?blockedCode:raw.code==='A_RUNTIME_FILE_AND_TASK_READONLY'?
+  code:blocked?blockedCode:summary?'A_RUNTIME_SUMMARY_ONLY':
+   raw.code==='A_RUNTIME_FILE_AND_TASK_READONLY'?
    raw.code:'A_RUNTIME_PARTIAL',controlSha:raw.controlSha,
-  fileHashesComplete:flag(raw.fileHashesComplete)===true,
-  taskChecksComplete:flag(raw.taskChecksComplete)===true,
+  mode:summary?'SUMMARY_ONLY':'DETAILED',
+  fileHashesComplete:!summary&&flag(raw.fileHashesComplete)===true,
+  taskChecksComplete:!summary&&flag(raw.taskChecksComplete)===true,
+  taskEnabledVerified:!summary&&flag(raw.taskEnabledVerified)===true,
   registeredCount:bounded(raw.registeredCount),
   selectedCount:bounded(raw.selectedCount),profiles};
  return Buffer.byteLength(JSON.stringify(report))<=32768?report:fallback;
@@ -87,6 +97,8 @@ export function textAReport(r){
   `MANIFEST_SHA256=${r.manifestSha256}`,`SOURCE_SHA=${r.sourceSha}`,
   `FILE_HASHES_COMPLETE=${r.fileHashesComplete}`,
   `TASK_CHECKS_COMPLETE=${r.taskChecksComplete}`,
+  `TASK_ENABLED_VERIFIED=${r.taskEnabledVerified}`,
+  `EVIDENCE_MODE=${r.mode}`,
   `SELECTED_PROFILES=${r.selectedCount??0}`,
   `OPERATIONAL_WRITES=${r.operationalWrites}`,
   `RETRY=${r.retry}`,''].join('\n');
@@ -133,6 +145,7 @@ export async function uploadAReport({event,env,rawResult,fetchApi=fetch}){
  const response=await fetchApi(`https://api.github.com/repos/${REPO}/issues/${event.issue.number}/comments`,
   {method:'POST',headers,body:JSON.stringify({body:comment})});
  need(response.status===201,'A_RUNTIME_REPORT_COMMENT_STOP');
+ need(verified===2,'A_RUNTIME_RESULT_PAIR_UNVERIFIED');
  return {status:finalStatus,delivery,created,verified};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
