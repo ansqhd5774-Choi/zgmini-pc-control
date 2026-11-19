@@ -201,7 +201,7 @@ async function completePages(endpoint, category, maxPages=MAX_PAGES) {
 
 // Narrow GitHub search by the immutable Run ID. Search is discovery only:
 // every returned candidate is re-read from its original Issue and validated.
-export async function findRunReceiptComments(runId,{searchIssues,readIssueComments}){
+export async function findRunReceiptComments(runId,{searchIssues,readIssueComments,readRecentComments}){
   if(!positive(runId)||typeof searchIssues!=='function'||
      typeof readIssueComments!=='function')stop('RECEIPT_LOOKUP_CONFIG');
   const result=await searchIssues(runId);
@@ -211,7 +211,25 @@ export async function findRunReceiptComments(runId,{searchIssues,readIssueCommen
      result.items.length!==result.total_count)
     stop('RECEIPT_SEARCH_INCOMPLETE');
   const seen=new Set(),comments=[];
-  for(const issue of result.items){
+  // Search indexing may trail the source comment. A single newest-first
+  // discovery page is a bounded fallback, never an exhaustive global gate.
+  let candidates=result.items;
+  if(candidates.length===0&&typeof readRecentComments==='function'){
+    const recent=await readRecentComments();
+    if(!Array.isArray(recent)||recent.length>100)stop('RECENT_COMMENTS_INCOMPLETE');
+    const ids=new Set();
+    for(const c of recent){
+      if(c?.user?.login!==BOT||typeof c.body!=='string'||
+         !c.body.includes('RUN_ID: '+runId+'; RETRY: NO_REEXECUTE'))continue;
+      const m=c.issue_url?.match(
+        /^https:\/\/api\.github\.com\/repos\/ansqhd5774-Choi\/zgmini-pc-control\/issues\/([1-9][0-9]*)$/);
+      if(m)ids.add(Number(m[1]));
+    }
+    candidates=await Promise.all([...ids].map(n=>Promise.resolve({
+      number:n,title:'pc-writer-source-install',
+      labels:[{name:'pc-writer-b-install'}]})));
+  }
+  for(const issue of candidates){
     if(!positive(issue?.number)||issue.pull_request||
        seen.has(issue.number)||issue.title!=='pc-writer-source-install'||
        !issue.labels?.some(x=>x.name==='pc-writer-b-install'))
@@ -262,7 +280,12 @@ export async function main(env = process.env) {
         if(!res.ok)stop('RECEIPT_SEARCH_HTTP_'+res.status);
         return res.json();
       },
-      readIssueComments:n=>completePages('issues/'+n+'/comments','ORIGIN_COMMENTS')
+      readIssueComments:n=>completePages('issues/'+n+'/comments','ORIGIN_COMMENTS'),
+      readRecentComments:async()=>{
+        const rows=await request('issues/comments?sort=created&direction=desc&per_page=100');
+        if(!Array.isArray(rows)||rows.length>100)stop('RECENT_COMMENTS_INVALID');
+        return rows;
+      }
     }),
     readIssue: async issue => ({...await request(`issues/${issue}`), repository: REPO}),
     readFile: fileReadback,
