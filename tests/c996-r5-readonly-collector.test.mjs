@@ -21,7 +21,7 @@ test('timestamps are limited to brackets',()=>{
  assert.equal(logTimestamp('secret 11/12/2026 08:05:22'),null);
 });
 test('commit log absent never implies full validation',()=>assert.equal(classification([],[]),'COMMIT_LOG_NOT_ESTABLISHED'));
-test('identified commit log still does not claim drift stage known',()=>assert.equal(classification([], [{name:'COMMIT_NEW_WIM.dism.log',counts:{}}]),'LOGS_PRESENT_STAGE_UNPROVEN'));
+test('COMMIT basename alone is not a logged action',()=>assert.equal(classification([], [{name:'COMMIT_NEW_WIM.dism.log',counts:{}}]),'COMMIT_LOG_NOT_ESTABLISHED'));
 
 test('unchanged no-follow lstat path traversal emits bounded progress markers',()=>{
  const steps=[];
