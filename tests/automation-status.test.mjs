@@ -103,5 +103,5 @@ test('010 status CI covers direct status imports and verifies isolated host befo
  const test=workflow.indexOf('      - name: Run automation status read-only regression tests');
  assert.ok(host>=0 && test>host);
  assert.match(workflow,/cancel-in-progress: true/);
- assert.match(workflow,/permissions:\\n  contents: read/);
+ assert.match(workflow,/permissions:\n  contents: read/);
 });
