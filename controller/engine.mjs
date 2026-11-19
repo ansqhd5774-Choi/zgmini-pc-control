@@ -61,7 +61,8 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass=before?'PROTECTED_STATE_SNAPSHOT':'CORE_STATE_READ';
   preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
-  writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat,approvedPreimageScope}});
+  writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat,approvedPreimageScope,
+   skipProtectedTaskObservation:isolatedRead&&!before&&request.operation==='core-status'}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
   preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
    const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace};
