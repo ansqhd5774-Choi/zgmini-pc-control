@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "a6e7d1a43244520214ea7c7dd3fdd31f9fbbeac6",
+  "targetSha": "e8552e369f6aad59991e05d0341883b0c71150b3",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-19 user instruction to overhaul the failing common automation process. Same-purpose standing approval in docs/PC_AUTOMATION_STANDARD.md section 5; reviewed and merged PR #2293. Only exact maintenance admission feedback and request-construction source changes, no Controller/Core/data effects.",
+  "files": {
+    "tools/maintenance-contract.mjs": "b6803c66a56a0eae474842c46f24cf2832377abf77aef69e134d3a57772862d8",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "6503764f1eb6f11a39e7c026b271cc4706166878c5f9a8f1135e6ada8e8db4aa",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "4d7bc704f8cb04b1ba18d9bf6d51694a93632fbb9976d5871df3fdea9b5ea1ca",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "installedWindowsEvidence": "PASS #2273 STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED; no later maintenance handoff observed",
+    "sourceCi": "PASS 44486392921; C996 PASS 44486392947; local maintenance safety 160/160",
+    "targetMainCommit": "e8552e369f6aad59991e05d0341883b0c71150b3",
+    "windowsHandoffExecuted": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-agent.mjs"
+  ],
+  "preserve": [
+    "Existing Controller 5875d50c and six Runner registrations",
+    "Core/Korea tasks and approved absence of Iran R13",
+    "Business DB rows/schema, provider quotas, D1, source/Writer files",
+    "Original request/lease/ledger history; no replay of failed installations"
+  ],
+  "scopeNote": "Exact two-runtime-file independent receiver handoff. Owner admission and immutable source/startup/lease checks remain enforced. New rejection comments have no PC execution effect; malformed bodies or secrets are never echoed. Controller installation uses a separate exact B manifest."
+}
