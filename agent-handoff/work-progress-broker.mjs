@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {evaluateWorkUpdate,WORK_SCHEMA,WORK_RECEIPT} from './work-progress-contract.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const OWNER='ansqhd5774-Choi';
@@ -35,14 +36,8 @@ async function request(resource,{method='GET',body}={}) {
   return response.json();
 }
 async function readComments(issueNumber) {
-  const output=[];
-  for(let page=1;page<=4;page++){
-    const rows=await request('issues/'+issueNumber+'/comments?per_page=100&page='+page);
-    if(!Array.isArray(rows))stop('COMMENT_INVENTORY_INVALID');
-    output.push(...rows);
-    if(rows.length<100)return output;
-  }
-  stop('COMMENT_INVENTORY_INCOMPLETE');
+  return readIssueCommentLedger(page=>request(
+    'issues/'+issueNumber+'/comments?per_page=100&page='+page));
 }
 async function readIssue(number) {
   return {...await request('issues/'+number),repository:REPO};
