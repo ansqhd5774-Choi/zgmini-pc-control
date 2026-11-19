@@ -302,13 +302,21 @@ export async function inspectEmploymentR6Candidate(request,context){
     const resultFile=path.join(outputDir,reports[0]);
     if(fs.statSync(resultFile).size>12000)stop('R6_RESULT_TOO_LARGE');
     const body=JSON.parse(fs.readFileSync(resultFile,'utf8'));
+    const resultKind=body.status==='PASS'&&request.pit0605Raw===true
+      ?'EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
+      :'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1';
     if(!STATUS.has(body.status)||!/^[A-Z0-9_]{1,100}$/.test(body.code??'')
-      ||body.kind!==(request.pit0605Raw===true
-        ?'EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
-        :'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1')
+      ||body.kind!==resultKind
       ||body.providerCalls!==0||body.d1Writes!==0
       ||body.publicationStatus!=='NOT_REQUESTED'||body.promotionApproved!==false
       ||child.truncated||child.exitCode!==(body.status==='PASS'?0:2))stop('R6_RESULT_INVALID');
+    if(request.pit0605Raw===true&&body.status!=='PASS'){
+      // The child may return the existing bounded failure report; do not
+      // replace the actual error with an unrelated result-kind error.
+      return {status:body.status,code:safe(body.code),
+       candidateExecuted:true,sqliteOpened:body.sqliteOpened===true,
+       repairAuthorized:false,operationalWrites:0,providerCalls:0,d1Writes:0};
+    }
     if(request.pit0605Raw===true){
       if(body.kind!=='EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
         ||body.status!=='PASS'||body.code!=='PIT0605_SOURCE_EVIDENCE_CLASSIFIED_NOT_PIT'
