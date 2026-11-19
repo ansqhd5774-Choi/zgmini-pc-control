@@ -1,0 +1,6 @@
+{
+  "schema": "STAGING_NOT_APPROVED",
+  "installedSha": "bed78dc16e81e257886aa5480705b50192b5cd01",
+  "targetSha": "7b0b87607f8bd7e369f3a1eaa1955b8ca58a20f2",
+  "note": "Pending this approval PR number; do not submit B until final pin and validation."
+}
