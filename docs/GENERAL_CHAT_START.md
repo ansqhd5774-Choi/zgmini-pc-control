@@ -1,5 +1,7 @@
 # 새 일반챗의 자동 작업 시작
 
+**현행 우선순위(2026-11-19):** [실행 효과 중심 공통 정본](PC_AUTOMATION_STANDARD.md)과 [짧은 전달문](GENERAL_CHAT_PREWORK.md)을 먼저 적용한다. 이 문서의 과거 사건·설치 SHA·대기/승인 보류는 당시 범위의 증거다. 고정 순수 조회에 설치·게시·복구의 전체 조건을 붙이지 않는다. 실제 인수한 지원은 실행·결과 반환까지 이어가며 코드 수정 없는 진단에 PR/CI를 의무화하지 않는다.
+
 ## 2026-11-15 마지막 완료점부터 실행 — 신규 대화 최초 진입 5단계
 
 1. **마지막 완료점 계승:** **신규 대화 첫 진입에만** `main`의 [AGENTS.md](../AGENTS.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)의 관련 범위와 이 문서·[GENERAL_CHAT_PREWORK.md](GENERAL_CHAT_PREWORK.md)를 확인한다. **같은 대화에서 계속하라는 요청에는 문서·과거 검사·전체 PR을 재조회하지 않는다.** 이전 기능별 브랜치·승인·마지막 유효 실증을 재사용하고 미완료 필수 실행 하나를 바로 진행한다. 관련 변경·상충 증거가 있을 때만 영향 범위를 확인한다.

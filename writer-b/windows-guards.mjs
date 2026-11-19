@@ -47,8 +47,8 @@ export function coreReadyForMaintenance(probe,coreCycleLockExists){
 // existing Core drains naturally. This is NOT proof that source can be changed.
 export function coreMayInhibitNewStarts(probe){
  return probe?.enabled===true&&[2,3,4].includes(probe.state)&&
-  [probe.instances,probe.relatedProcesses].every(n=>Number.isSafeInteger(n)&&n>=0)&&
-  probe.unknownProcessLines===0;
+  [probe.instances,probe.relatedProcesses,probe.unknownProcessLines]
+    .every(n=>Number.isSafeInteger(n)&&n>=0);
 }
 
 // Injected fixed-task adapter; the same sequence is exercised without touching

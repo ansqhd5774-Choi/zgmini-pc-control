@@ -39,6 +39,12 @@ export function evaluateQueueItem(issue,comments,nowMs){
     return Object.freeze({...base,status:'PROOF_REVIEW_REQUIRED',
       alert:'LEDGER_REVIEW_REQUIRED',lastProgressHours:null,receiptCount:0});
   }
+  const diagnoses=comments.filter(c=>author(c)===HANDOFF_BOT&&
+    c.issue_url===URL(issue.number)&&c.body?.startsWith('HANDOFF_DIAGNOSIS_RETURNED_V1\n'));
+  if(diagnoses.length>1)return Object.freeze({...base,status:'PROOF_REVIEW_REQUIRED',
+    alert:'DIAGNOSIS_RECEIPT_CONFLICT',lastProgressHours:null,receiptCount:diagnoses.length});
+  if(diagnoses.length===1)return Object.freeze({...base,status:'DIAGNOSIS_EVIDENCE_RECORDED',
+    alert:'INCIDENT_RESOLUTION_SEPARATE',lastProgressHours:null,receiptCount:1});
   const finals=comments.filter(c=>returned(c,issue.number));
   if(finals.length>1)return Object.freeze({...base,status:'PROOF_REVIEW_REQUIRED',
     alert:'RESULT_RECEIPT_CONFLICT',lastProgressHours:null,receiptCount:finals.length});
@@ -162,7 +168,7 @@ export function ownerExecutionPlan(board){
     ownerActionRequired,
     acknowledged:ids(['ACKNOWLEDGED']),working:ids(['WORKING']),
     waitingEvidence:ids(['WAITING_EVIDENCE']),
-    resultRecorded:ids(['RESULT_EVIDENCE_RECORDED']),
+    resultRecorded:ids(['RESULT_EVIDENCE_RECORDED','DIAGNOSIS_EVIDENCE_RECORDED']),
     proofReviewRequired:ids(['PROOF_REVIEW_REQUIRED','AWAITING_CANDIDATE_SELECTION']),
     // This describes this metadata process, never the availability of an
     // independently configured ChatGPT/Codex processor.

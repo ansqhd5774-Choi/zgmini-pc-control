@@ -104,6 +104,16 @@ test('missing owner receipt remains proof review rather than acknowledged/workin
   assert.deepEqual(plan.acknowledged,[]);
   assert.throws(()=>ownerExecutionPlan({records:[]}),/EXECUTION_PLAN_INPUT/);
 });
+
+test('verified diagnostic return is a query receipt, not incident or runtime resolution',()=>{
+ const f=fixture();const receipt={id:999,user:{login:HANDOFF_BOT},
+  issue_url:url(f.issue.number),body:'HANDOFF_DIAGNOSIS_RETURNED_V1\nincidentResolution: NOT_ASSERTED'};
+ const board=compileQueueBoard([{issue:f.issue,comments:[...f.comments,receipt]}],now);
+ assert.equal(board.records[0].status,'DIAGNOSIS_EVIDENCE_RECORDED');
+ assert.equal(board.records[0].runtimeVerified,false);
+ assert.equal(board.records[0].alert,'INCIDENT_RESOLUTION_SEPARATE');
+ assert.deepEqual(ownerExecutionPlan(board).resultRecorded,[f.issue.number]);
+});
 test('missing selector receipt is not a verified assignment or false ACK',()=>{
   const f=fixture();
   const x=evaluateQueueItem(f.issue,[f.comments[0]],now);
