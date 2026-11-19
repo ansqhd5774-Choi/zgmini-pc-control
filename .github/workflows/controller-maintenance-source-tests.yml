@@ -4,6 +4,10 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'controller/common.mjs'
+      - 'controller/entry.mjs'
+      - 'controller/preimage-manifest-stager.mjs'
+      - '.github/workflows/pc-job.yml'
+      - 'tests/pc-job-late-label-intake.test.mjs'
       - 'controller/supervisor.mjs'
       - 'controller/pc-source-readonly.mjs'
       - 'tests/pc-source-readonly.test.mjs'
@@ -194,6 +198,8 @@ jobs:
         run: node tools/controller-ci-scope.mjs
       - name: Check CI scope selection regressions
         run: node --test tests/controller-ci-scope.test.mjs
+      - name: Verify pc-job late-label intake remains opt-in and deduplicated
+        run: node --test --test-concurrency=1 tests/pc-job-late-label-intake.test.mjs tests/preimage-manifest-contract.test.mjs
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
