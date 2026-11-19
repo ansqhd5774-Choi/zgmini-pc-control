@@ -1,0 +1,69 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44516499692-1-seat-5",
+  "requestId": "pc-update-7aa9a0e3-96db-45f5-a48b-cb5a4fca97b1-postcheck",
+  "startedAt": "2026-11-19T11:37:41.930Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "d770edbf8dd8193cafcd8e33c9404af48465a07d",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "863ed1bef077301949899dd4aeb3f78f448fd9ed",
+  "sourceBranch": "codex/w04-pit0408-host-r3-restore-raw-lineage-20261118",
+  "operation": "core-status",
+  "seat": 5,
+  "status": "PASS",
+  "code": "CORE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-controller-ops-lessons-20261105-33-lineage-b",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_READONLY_DIAGNOSIS",
+    "core": {
+      "lockPresent": true,
+      "checkpoints": {
+        "local-cycle-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-19T11:36:44.657Z",
+          "bytes": 2400,
+          "status": "COMPLETE"
+        },
+        "local-collection-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-19T11:37:05.868Z",
+          "bytes": 3152,
+          "status": "WAITING_PUBLICATION"
+        },
+        "local-writer-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-19T11:33:12.061Z",
+          "bytes": 6031,
+          "status": "VERIFIED"
+        }
+      },
+      "taskXmlHashes": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1",
+        "ZGMINI-PC-Iran-Progress-R13": "APPROVED_RETIRED_ABSENT"
+      },
+      "approvedSourceSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedAfterSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "d770edbf8dd8193cafcd8e33c9404af48465a07d",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-19T11:37:46.555Z",
+  "durationMs": 4625
+}
