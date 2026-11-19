@@ -4,6 +4,7 @@ import {pathToFileURL} from 'node:url';
 import {HANDOFF_REPOSITORY, HANDOFF_OWNER, processQueue} from './queue-selector.mjs';
 import {collectBoard} from './queue-board-runner.mjs';
 import {ownerExecutionPlan} from './queue-board.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 
 const API = 'https://api.github.com/repos/' + HANDOFF_REPOSITORY;
 const SOURCE_WORKFLOWS = new Set([
@@ -50,15 +51,19 @@ async function request(resource, {method='GET', body}={}) {
   return response.json();
 }
 
-async function pages(resource, cap) {
+export async function pages(resource, cap=100, read=request) {
   const all = [];
   for (let page=1; page<=cap; page++) {
-    const rows = await request(resource + (resource.includes('?')?'&':'?') +
+    const rows = await read(resource + (resource.includes('?')?'&':'?') +
       'per_page=100&page=' + page);
-    if (!Array.isArray(rows)) throw Error('HANDOFF_SELECTOR_INVALID_PAGE');
+    if (!Array.isArray(rows)||rows.length>100) throw Error('HANDOFF_SELECTOR_INVALID_PAGE');
     all.push(...rows);
     if (rows.length < 100) return all;
   }
+  const probe=await read(resource+(resource.includes('?')?'&':'?')+
+    'per_page=100&page='+(cap+1));
+  if(!Array.isArray(probe)||probe.length>100)throw Error('HANDOFF_SELECTOR_INVALID_PAGE');
+  if(probe.length===0)return all;
   throw Error('HANDOFF_SELECTOR_INCOMPLETE_INVENTORY');
 }
 
@@ -111,12 +116,12 @@ export function isolateInitialCommentRead(readComments, onDeferred) {
 export async function main(env=process.env) {
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   validateTrigger(event, env);
-  const issues = (await pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending',5))
+  const issues = (await pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending'))
     .filter(i=>!i.pull_request).map(i=>({...i,repository:HANDOFF_REPOSITORY}));
   const commentReadUnavailable=[];
   const result = await processQueue(issues,{
     readComments: isolateInitialCommentRead(
-      n=>pages('issues/'+n+'/comments',4),
+      n=>readIssueCommentLedger(page=>request('issues/'+n+'/comments?per_page=100&page='+page)),
       n=>commentReadUnavailable.push(n)),
     readIssue: async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
     recordReceipt: (n,body)=>request('issues/'+n+'/comments',{method:'POST',body:{body}})
@@ -126,7 +131,7 @@ export async function main(env=process.env) {
   // comments and identity; this avoids a redundant global GitHub list request.
   const output=await finalizeSelection({...result,commentReadUnavailable},()=>collectBoard({
     listIssues:async()=>issues,
-    readComments:n=>pages('issues/'+n+'/comments',4),
+    readComments:n=>readIssueCommentLedger(page=>request('issues/'+n+'/comments?per_page=100&page='+page)),
     readIssue:async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
   },Date.now()));
   process.stdout.write(JSON.stringify(output)+'\n');

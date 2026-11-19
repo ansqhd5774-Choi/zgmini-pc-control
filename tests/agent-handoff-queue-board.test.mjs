@@ -314,16 +314,19 @@ test('one Issue transient GET error does not discard verified peer rows',async()
   assert.match(renderBoardMarkdown(board),/개별 증거 미확인/);
 });
 
-test('comment inventory exceeding 400 is explicitly unverified without losing peers',async()=>{
+test('authenticated queue-board evidence survives more than 400 unrelated comments',async()=>{
   const a=fixture(4201),b=fixture(4202);
+  const unrelated=Array.from({length:405},(_,i)=>({
+    id:i+100,user:{login:'other-user'},issue_url:url(4201),body:'discussion '+i
+  }));
   const board=await collectBoard({
     listIssues:async()=>[a.issue,b.issue],
-    readComments:async n=>n===4201?Array.from({length:401},()=>({})):b.comments,
+    readComments:async n=>n===4201?[...a.comments,...unrelated]:b.comments,
     readIssue:async n=>n===4201?a.issue:b.issue
   },now);
-  assert.equal(board.unverifiedIssueCount,1);
-  assert.equal(board.unverifiedIssues[0].reason,'COMMENT_INVENTORY_UNVERIFIED');
-  assert.equal(board.evidenceComplete,false);
+  assert.equal(board.unverifiedIssueCount,0);
+  assert.equal(board.evidenceComplete,true);
+  assert.equal(board.records.find(x=>x.issueNumber===4201).status,'PENDING_OWNER_ACK');
   assert.equal(board.records.find(x=>x.issueNumber===4202).status,'PENDING_OWNER_ACK');
 });
 
@@ -362,4 +365,15 @@ test('bounded read pool preserves original ordering and caps parallel reads',asy
   },4);
   assert.equal(peak,4);
   assert.deepEqual(values,Array.from({length:17},(_,i)=>i*2));
+});
+
+test('006 exact full page boundary needs an empty lookahead and is complete',async()=>{
+ const items=Array.from({length:200},(_,i)=>({number:i+1}));
+ const seen=[];
+ const rows=await pages('issues',2,async resource=>{
+  const n=Number(resource.match(/page=(\d+)$/)?.[1]);
+  seen.push(n);return items.slice((n-1)*100,n*100);
+ });
+ assert.equal(rows.length,200);
+ assert.deepEqual(seen,[1,2,3]);
 });

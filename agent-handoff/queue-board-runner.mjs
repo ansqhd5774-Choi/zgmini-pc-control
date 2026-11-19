@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {HANDOFF_REPOSITORY,HANDOFF_OWNER} from './queue-selector.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 import {compileQueueBoard,renderBoardMarkdown,MAX_BOARD_ISSUES} from './queue-board.mjs';
 import {DIRECT_OWNER_REVIEWS,compileDirectOwnerBoard,renderDirectOwnerMarkdown}
   from './direct-owner-reviews.mjs';
@@ -50,6 +51,10 @@ export async function pages(resource,cap,read=request){
     result.push(...rows);
     if(rows.length<100)return result;
   }
+  const probe=await read(resource+(resource.includes('?')?'&':'?')+
+    'per_page=100&page='+(cap+1));
+  if(!Array.isArray(probe)||probe.length>100)fail('INVALID_PAGE');
+  if(probe.length===0)return result;
   fail('PAGINATION_INCOMPLETE');
 }
 
@@ -106,7 +111,7 @@ export async function collectBoard(io,nowMs){
       if(issueIdentity(issue)!==issueIdentity(fresh))
         return {issue:{...issue,repository:HANDOFF_REPOSITORY},
           comments:[],unverifiedReason:'ISSUE_DRIFT_RESCAN_REQUIRED'};
-      if(!Array.isArray(comments)||comments.length>400)
+      if(!Array.isArray(comments))
         return {issue:{...issue,repository:HANDOFF_REPOSITORY},
           comments:[],unverifiedReason:'COMMENT_INVENTORY_UNVERIFIED'};
       return {issue:{...fresh,repository:HANDOFF_REPOSITORY},comments};
@@ -126,7 +131,8 @@ export async function main(env=process.env) {
   validateBoardEvent(event,env);
   const board=await collectBoard({
     listIssues:()=>pages('issues?state=open&labels=agent-handoff',10),
-    readComments:n=>pages('issues/'+n+'/comments',5),
+    readComments:n=>readIssueCommentLedger(page=>request(
+      'issues/'+n+'/comments?per_page=100&page='+page)),
     readIssue:n=>request('issues/'+n)
   },Date.now());
   // Central #68 direct owner reviews are a separate source, not agent-handoff Issues.

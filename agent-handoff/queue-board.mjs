@@ -11,8 +11,8 @@ const validMs=ms=>Number.isFinite(ms)&&ms>=Date.UTC(2020,0,1);
 export const MAX_BOARD_ISSUES=1000;
 const author=x=>x?.user?.login;
 function ownerWork(c){
-  return author(c)===HANDOFF_OWNER&&typeof c.body==='string'&&
-    c.body.startsWith('{"schema":"'+WORK_SCHEMA+'"');
+  if(author(c)!==HANDOFF_OWNER||typeof c.body!=='string')return false;
+  try{return JSON.parse(c.body)?.schema===WORK_SCHEMA;}catch{return false;}
 }
 function returned(c,issueNumber){
   return author(c)===HANDOFF_BOT&&c.issue_url===URL(issueNumber)&&

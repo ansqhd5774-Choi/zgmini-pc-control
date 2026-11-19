@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {parseHandoff,fingerprintHandoff,routeHandoff} from '../agent-handoff/contract.mjs';
 import {selectionReceipt,HANDOFF_BOT,HANDOFF_OWNER,HANDOFF_REPOSITORY} from '../agent-handoff/queue-selector.mjs';
 import {WORK_SCHEMA,WORK_RECEIPT,parseWorkUpdate,workReceipt,evaluateWorkUpdate} from '../agent-handoff/work-progress-contract.mjs';
-import {validateWorkEvent,processWorkComment} from '../agent-handoff/work-progress-broker.mjs';
+import {validateWorkEvent,processWorkComment,isWorkUpdateComment} from '../agent-handoff/work-progress-broker.mjs';
 
 const owner=HANDOFF_OWNER;
 const issueUrl=n=>'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n;
@@ -142,4 +142,21 @@ test('009 permits a verified work update after 405 unrelated comments',()=>{
   assert.equal(all.length,405);
   assert.equal(evaluateWorkUpdate(f.issue,all,a).state,'READY');
   assert.equal(evaluateWorkUpdate(f.issue,[...all,ownerReceipt(f,a)],a).state,'ALREADY_RECORDED');
+});
+
+test('009 owner work history accepts JSON whitespace and reordered fields without changing proof',()=>{
+ const f=fixture(),first=makeUpdate(f,f.issue.number,'ACKNOWLEDGED',700);
+ const reordered=JSON.stringify({state:'ACKNOWLEDGED',
+  ...JSON.parse(first.body)},null,2);
+ const c={...first,body:'  \n'+reordered+'\n'};
+ assert.equal(isWorkUpdateComment(c.body),true);
+ assert.equal(isWorkUpdateComment('{"schema":"ZGMINI_HANDOFF_WORK_UPDATE_V1","forged":1}'),false);
+ const env={GITHUB_REPOSITORY:HANDOFF_REPOSITORY,
+  GITHUB_EVENT_NAME:'issue_comment',GITHUB_ACTOR:owner};
+ const event={repository:{full_name:HANDOFF_REPOSITORY,private:true},
+  action:'created',issue:f.issue,comment:c};
+ assert.doesNotThrow(()=>validateWorkEvent(event,env));
+ const receipt=ownerReceipt(f,c);
+ assert.equal(evaluateWorkUpdate(f.issue,[...f.comments,c],c).state,'READY');
+ assert.equal(evaluateWorkUpdate(f.issue,[...f.comments,c,receipt],c).state,'ALREADY_RECORDED');
 });
