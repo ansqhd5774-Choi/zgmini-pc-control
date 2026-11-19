@@ -2,6 +2,7 @@
 // Exact W05 B one-shot sanitized result-pair publisher. Never uploads raw BLS payloads or keys.
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {sha256,validateIssue,CONTROL_REPO,expect,fail} from './contract.mjs';
 const JSON_NAME='W05_R304_B_RESULT.json';
 const FIELDS=['schema','status','code','requestId','sourceSha','provider','series',
@@ -80,7 +81,7 @@ export async function upload(env=process.env,apiFetch=fetch){
  expect(comment.status===201,'W05_B_RESULT_COMMENT_STOP');
  return {status:'RESULT_PAIR_READBACK_VERIFIED',requestId:req.requestId};
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===new URL(import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/,x=>x.slice(1))){
- // Windows file URL path is handled by Node's normal entrypoint; no alternate CLI.
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ if(process.argv.length!==2)fail('W05_B_REPORT_ARGUMENTS_STOP');
  await upload();
 }
