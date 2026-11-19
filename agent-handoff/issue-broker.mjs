@@ -81,8 +81,8 @@ async function hasVerifiedComment(issueNumber, expectedBody) {
   for(const item of comments){
     if(item.user?.login!=='github-actions[bot]'||
        typeof item.body!=='string')continue;
-    const completeRoute=item.body.startsWith('HANDOFF_ROUTED\\nincidentId: ')||
-      item.body.startsWith('HANDOFF_DUPLICATE_REUSED\\nfingerprint: ');
+    const completeRoute=item.body.startsWith('HANDOFF_ROUTED\nincidentId: ')||
+      item.body.startsWith('HANDOFF_DUPLICATE_REUSED\nfingerprint: ');
     if(!completeRoute)continue;
     if(item.issue_url!==issueUrl||item.body!==expectedBody)
       throw new Error('HANDOFF_COMMENT_CONFLICT_STOP');
