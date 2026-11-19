@@ -74,6 +74,20 @@ test('read-only sample failure propagates without Task mutation',async()=>{
   {code:'WRITER_B_TASK_PROBE_STOP'});
 });
 
+test('safe timeout evidence counts intermittent READY and ACTIVE without exposing probes',async()=>{
+ const {opts}=harness([
+  {probe:ready,lock:false},{probe:running,lock:true},
+  {probe:ready,lock:false},{probe:running,lock:true}
+ ]);
+ await assert.rejects(awaitNaturalCoreIdle(opts,{windowMs:6000}),error=>{
+  assert.equal(error.code,'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED');
+  assert.deepEqual(error.idleObservation,{windowMs:6000,samples:4,
+   readySamples:2,activeSamples:2,otherSamples:0,maxReadyStreak:1});
+  assert.equal(JSON.stringify(error).includes('relatedProcesses'),false);
+  return true;
+ });
+});
+
 test('post-prepare natural idle is bounded to 90 seconds inside 12-minute job',async()=>{
  assert.equal(MAX_CORE_IDLE_WAIT_MS,360000);
  assert.equal(MAX_POST_PREPARE_IDLE_WAIT_MS,90000);
