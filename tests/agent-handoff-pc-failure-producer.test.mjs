@@ -250,12 +250,22 @@ test('failed readback stops instead of claiming enqueue success', async () => {
 
 test('the new workflow remains opt-in, single-writer and self-hosted', () => {
   const yaml = readFileSync(new URL('../.github/workflows/agent-handoff-pc-failure-intake.yml',
-    import.meta.url), 'utf8');
+    import.meta.url), 'utf8').replace(/\r\n/g,'\n');
   assert.match(yaml, /workflow_run:\s*\n\s*workflows: \[ZGMINI PC Job\]/);
   assert.match(yaml, /types: \[completed\]/);
   assert.match(yaml, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
   assert.match(yaml, /github\.event\.workflow_run\.conclusion != 'skipped'/);
   assert.doesNotMatch(yaml, /if: >-\s*\n\s*false &&/);
+  // The shared writer lane must be entered only after the job is admitted.
+  // Upstream runs rejected by if must not queue behind a real writer.
+  assert.equal(yaml.includes('\nconcurrency:\n'),false,
+    'skipped workflow events must not acquire a global lane');
+  const jobStart=yaml.indexOf('jobs:\n  enqueue-confirmed-failures:\n');
+  const queueStart=yaml.indexOf('    concurrency:\n      group: agent-handoff-pc-failure-intake\n      cancel-in-progress: false\n      queue: max\n',jobStart);
+  const admitStart=yaml.indexOf('    if: >-',jobStart);
+  assert.ok(jobStart>=0&&queueStart>jobStart&&admitStart>queueStart,
+    'only the admitted writer job owns the unchanged serialized queue');
+  assert.equal((yaml.match(/^      group: agent-handoff-pc-failure-intake$/gm)||[]).length,1);
   assert.match(yaml, /group: agent-handoff-pc-failure-intake/);
   assert.match(yaml, /queue: max/);
   assert.match(yaml, /cancel-in-progress: false/);
