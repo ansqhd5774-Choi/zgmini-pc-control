@@ -2,7 +2,7 @@
 // Never fetches provider data, changes SQLite, or publishes to D1.
 import fs from 'node:fs';
 import path from 'node:path';
-import {DatabaseSync} from 'node:sqlite';
+import {openSqliteReadonly} from './common.mjs';
 import {createHash} from 'node:crypto';
 
 const SQLITE_MAGIC='SQLite format 3\0';
@@ -105,7 +105,7 @@ function safeEntry(file,root,filesystem){
    !relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative)?{stat,real}:null;
  }catch{return null;}
 }
-// WAL mode read-only SQLite may create -shm; sidecars must pre-exist.
+// A normal read-only SQLite open may create WAL sidecars. Check their exact state.
 function preflight(file,root,filesystem){
  const entry=safeEntry(file,root,filesystem);
  if(!entry?.stat.isFile()||entry.stat.size<100||entry.stat.size>MAX_DB_BYTES)
@@ -119,8 +119,16 @@ function preflight(file,root,filesystem){
  if(header.toString('ascii',0,16)!==SQLITE_MAGIC||![1,2].includes(header[18])||![1,2].includes(header[19]))
   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_HEADER_INVALID'};
  if(header[18]===2||header[19]===2){
-  if(!['-wal','-shm'].every(ext=>safeEntry(file+ext,root,filesystem)?.stat.isFile()))
-   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_ABSENT'};
+  const sidecars=['-wal','-shm'].map(ext=>{
+   try{
+    filesystem.lstatSync(file+ext);
+    return safeEntry(file+ext,root,filesystem)?.stat.isFile()?'VALID':'UNSAFE';
+   }catch(error){return error?.code==='ENOENT'?'ABSENT':'UNSAFE';}
+  });
+  // File presence is not a health test. SQLite may rebuild coordination files;
+  // never follow unsafe entries, but let the native reader validate normal WAL.
+  if(sidecars.includes('UNSAFE'))
+   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_PARTIAL_OR_UNSAFE'};
  }
  return {status:'PASS',path:entry.real};
 }
@@ -320,7 +328,7 @@ function auditStoredNationalRun(db,mode){
 
 /** Path is supplied by the installed Controller, never by Issue JSON. */
 export function inspectEmploymentR6CollectionEvidence(dataRoot,{
- filesystem=fs,openDatabase=file=>new DatabaseSync(file,{readOnly:true,timeout:4000}),
+ filesystem=fs,openDatabase=openSqliteReadonly,
 }={}){
  const result={status:'BLOCKED',code:'R6_EVIDENCE_DATA_ROOT_DENIED',sqliteOpened:false,
   scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,...noWrite()};
@@ -332,9 +340,10 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  if(!pc?.stat.isDirectory()||!storage?.stat.isDirectory())return result;
  const gate=preflight(path.join(storage.real,'core.sqlite'),root,filesystem);
  if(gate.status!=='PASS')return {...result,status:'STATE_UNKNOWN',code:gate.code};
+ const runRead=()=>{
  let db,stage='OPEN_READONLY';
  try{
-  db=openDatabase(gate.path);result.sqliteOpened=true;
+   db=openDatabase(gate.path);result.sqliteOpened=true;
   stage='READONLY_PRAGMAS';db.exec('PRAGMA query_only=ON');db.exec('PRAGMA busy_timeout=4000');
   stage='TABLE_DISCOVERY';
   const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(x=>x.name));
@@ -419,4 +428,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  }catch{
   return {...result,status:'STATE_UNKNOWN',code:'R6_EVIDENCE_QUERY_FAILED',firstFail:stage};
  }finally{try{db?.close();}catch{}}
+ };
+ const response=runRead();
+ return response;
 }
