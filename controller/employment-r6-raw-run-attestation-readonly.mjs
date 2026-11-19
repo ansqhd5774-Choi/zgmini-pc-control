@@ -31,34 +31,54 @@ const columnsExist=(db,table,columns)=>{
  return columns.every(x=>existing.has(x));
 };
 const sha=value=>createHash('sha256').update(value).digest('hex');
+const FAILURE_CODES=['CHUNK_OR_COUNT_INVALID','HASH_FORMAT_INVALID',
+ 'SOURCE_FIELDS_INVALID','TIME_INVALID','RESPONSE_HASH_OR_METADATA_MISMATCH',
+ 'SNAPSHOT_ID_MISMATCH','BODY_SHA_MISMATCH'];
+const MAX_INVALID_REASON_ROWS=32;
 
 // All snapshot chunks, body hashes and receipt links are checked on the PC.
-// Only bounded aggregate counts cross the Controller output boundary.
+// Only bounded counts and snapshot-local ordinals/reason codes leave the PC;
+// no raw body, snapshot hash, provider key, path or detailed timestamp leaves.
 export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString()}={}){
  if(!Number.isFinite(Date.parse(checkedAt))||new Date(checkedAt).toISOString()!==checkedAt)
   throw Error('R6_RAW_AUDIT_CHECKED_AT_INVALID');
  if(!columnsExist(db,RAW,RAW_COLS)||!columnsExist(db,RUNS,RUN_COLS))
   return {status:'SCHEMA_UNAVAILABLE',checkedAt,
    metadataKeys:null,bodyVerifiedKeys:null,runCertifiedKeys:null,
-   invalidBodyKeys:null,validWithoutRunKeys:null};
+   invalidBodyKeys:null,validWithoutRunKeys:null,
+   invalidReasonCounts:null,invalidReasonOrdinals:null,invalidReasonTruncated:null};
  const verified=new Map();
+ const invalidReasonCounts=Object.fromEntries(FAILURE_CODES.map(code=>[code,0]));
+ const invalidReasonOrdinals=[];
  let metadataKeys=0,totalBytes=0,group=null;
+ const markInvalid=reason=>{
+  invalidReasonCounts[reason]++;
+  // Ordinal is valid only for this checkedAt/read transaction. It is not
+  // a stable record identity, source hash, or approval to repair HISTORY.
+  if(invalidReasonOrdinals.length<MAX_INVALID_REASON_ROWS)
+   invalidReasonOrdinals.push({ordinal:metadataKeys,reason});
+ };
  const finish=()=>{
   if(!group)return;
   const h=group.head;
-  if(!group.valid||group.count!==h.chunk_count||!HASH.test(String(h.snapshot_id??''))
-   ||!HASH.test(String(h.body_sha256??''))||!Number.isSafeInteger(h.chunk_count)
-   ||h.chunk_count<1||h.chunk_count>MAX_CHUNKS
-   ||!String(h.provider??'').trim()||!String(h.request_key??'').trim()
-   ||!String(h.release_group??'').trim())return;
+  if(!group.valid||group.count!==h.chunk_count
+   ||!Number.isSafeInteger(h.chunk_count)||h.chunk_count<1
+   ||h.chunk_count>MAX_CHUNKS)return markInvalid('CHUNK_OR_COUNT_INVALID');
+  if(!HASH.test(String(h.snapshot_id??''))
+   ||!HASH.test(String(h.body_sha256??'')))return markInvalid('HASH_FORMAT_INVALID');
+  if(!String(h.provider??'').trim()||!String(h.request_key??'').trim()
+   ||!String(h.release_group??'').trim())return markInvalid('SOURCE_FIELDS_INVALID');
   const retrieved=Date.parse(h.retrieved_at??''),created=Date.parse(h.created_at??'');
-  const detail=safeJson(h.detail_json);
   if(!Number.isFinite(retrieved)||!Number.isFinite(created)||created<retrieved
-   ||created>Date.parse(checkedAt)||retrieved>Date.parse(checkedAt)
-   ||detail?.responseHash!==h.body_sha256
-   ||sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))!==h.snapshot_id)
-   return;
-  if(group.hasher.digest('hex')!==h.body_sha256)return;
+   ||created>Date.parse(checkedAt)||retrieved>Date.parse(checkedAt))
+   return markInvalid('TIME_INVALID');
+  const detail=safeJson(h.detail_json);
+  if(detail?.responseHash!==h.body_sha256)
+   return markInvalid('RESPONSE_HASH_OR_METADATA_MISMATCH');
+  if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))!==h.snapshot_id)
+   return markInvalid('SNAPSHOT_ID_MISMATCH');
+  if(group.hasher.digest('hex')!==h.body_sha256)
+   return markInvalid('BODY_SHA_MISMATCH');
   verified.set(h.snapshot_id,{provider:h.provider,release_group:h.release_group,
    body_sha256:h.body_sha256,retrieved_at:h.retrieved_at});
  };
@@ -112,7 +132,9 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
  return {status:'HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT',checkedAt,metadataKeys,
   bodyVerifiedKeys:verified.size,runCertifiedKeys:certified.size,
   invalidBodyKeys:metadataKeys-verified.size,
-  validWithoutRunKeys:verified.size-certified.size};
+  validWithoutRunKeys:verified.size-certified.size,
+  invalidReasonCounts,invalidReasonOrdinals,
+  invalidReasonTruncated:metadataKeys-verified.size>invalidReasonOrdinals.length};
 }
 
 // The fixed PC data root is supplied by the installed Controller, not Issue JSON.
