@@ -146,7 +146,7 @@ test('staged directory symlink is refused',t=>{
  const f=fixture(t);
  const target=path.join(f.stageBundle,'source','node_modules');
  const alias=path.join(f.stageBundle,'source','package-alias');
- fs.symlinkSync(target,alias,'dir');
+ fs.symlinkSync(target,alias,process.platform==='win32'?'junction':'dir');
  assert.throws(()=>plan(f),err('BUNDLE_SYMLINK_FORBIDDEN'));
 });
 test('manifest entries cannot escape source root',t=>{
