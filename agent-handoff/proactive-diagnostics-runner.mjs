@@ -89,8 +89,7 @@ function assertShard(issue,month,index){
      issue.title!==shardTitle(month,index)||
      typeof issue.body!=='string'||!issue.body.includes(shardMarker(month,index))||
      ![OWNER,BOT].includes(issue.user?.login)||
-     !['open','closed'].includes(issue.state)||
-     !issue.labels?.some(x=>x.name===SCOUT_POLICY.shardLabel))
+     !['open','closed'].includes(issue.state))
     stop('SHARD_IDENTITY_UNVERIFIED');
 }
 function checkedShardList(shards,month){
@@ -238,7 +237,8 @@ export async function scanLatest(io,nowMs){
 
 async function request(resource,{method='GET',body,text=false}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN_MISSING');
-  const res=await fetch(API+resource,{
+  const endpoint=resource.startsWith('search/')?'https://api.github.com/':API;
+  const res=await fetch(endpoint+resource,{
     method,headers:{'Authorization':'Bearer '+process.env.GITHUB_TOKEN,
       'Accept':'application/vnd.github+json',
       'X-GitHub-Api-Version':'2022-11-28',
@@ -314,8 +314,16 @@ export async function main(env=process.env){
     readLegacyComments:()=>readLegacyProactiveArchive(page=>
       request('issues/'+issue+'/comments?per_page=100&page='+page)),
     findShards:async month=>{
-      const all=await listPaged('issues?state=all&labels='+
-        SCOUT_POLICY.shardLabel,20);
+      const q='repo:'+REPO+' in:title "ZGMINI Proactive Diagnostics '+month+'"';
+      const all=[];
+      for(let page=1;page<=2;page++){
+        const result=await request('search/issues?q='+encodeURIComponent(q)+
+          '&per_page=100&page='+page);
+        if(!Array.isArray(result?.items)||result.total_count>200)
+          stop('SHARD_SEARCH_INCOMPLETE');
+        all.push(...result.items);
+        if(result.items.length<100)break;
+      }
       return all.filter(x=>!x.pull_request&&
         typeof x.title==='string'&&
         x.title.startsWith('ZGMINI Proactive Diagnostics '+month+' #'));
@@ -325,7 +333,7 @@ export async function main(env=process.env){
     createShard:(month,index,title,body)=>request('issues',{method:'POST',
       body:{title,body:body+'\n\nVerified GitHub Actions failures for '+month+
         '. Append-only diagnostic evidence. No PC action.',
-        labels:[SCOUT_POLICY.shardLabel]}}),
+        labels:[]}}),
     postComment:(n,body)=>request('issues/'+n+'/comments',{method:'POST',
       body:{body}})
   },Date.now());
