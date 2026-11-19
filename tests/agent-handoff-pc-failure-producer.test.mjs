@@ -354,7 +354,7 @@ test('global auth, malformed proof and write failures remain strict hard stops',
 
 test('raw network failures are sanitized and untrusted request errors are not suppressed',async()=>{
   const observed=[];
-  const e=new TypeError('fetch network error with sensitive input');
+  const e=new TypeError('fetch failed: sensitive input');
   const out=await scopedSeatRead(2,'RESULT_JSON',async()=>{throw e;},x=>observed.push(x));
   assert.deepEqual(out,{ready:false});
   assert.deepEqual(observed,[{seat:2,phase:'RESULT_JSON',
@@ -363,4 +363,36 @@ test('raw network failures are sanitized and untrusted request errors are not su
   await assert.rejects(()=>scopedSeatRead(2,'RESULT_JSON',async()=>{
     throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_400');
   },()=>{}),/GITHUB_HTTP_400/);
+  await assert.rejects(()=>scopedSeatRead(2,'RESULT_JSON',async()=>{
+    throw new TypeError('Cannot read properties of undefined');
+  },()=>{}),/Cannot read properties/);
+});
+
+test('transient shared receipt inventory failure on Seat 2 does not block Seat 4',async()=>{
+  const f=fixture(),original=f.io.readReport,originalRead=f.io.readComments;
+  f.io.readReport=async p=>p.endsWith('seat-2.json')
+    ? {...report(),seat:2,jobId:`run-${runId}-1-seat-2`}
+    : original(p);
+  let calls=0;
+  f.io.readComments=async since=>{
+    calls++;
+    if(calls===1)throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_503');
+    return originalRead(since);
+  };
+  const out=await processCompletedPcJob(event(),f.io);
+  assert.equal(out.seatReadPending,1);
+  assert.deepEqual(out.seatReadProblems,[{seat:2,phase:'RECEIPT_INVENTORY',
+    reason:'TRANSIENT_GITHUB_READ_UNAVAILABLE'}]);
+  assert.equal(out.newIssues,1);
+  assert.equal(out.routesRecorded,1);
+  assert.equal(out.state,'PARTIAL_SEAT_READ_PENDING');
+  assert.equal(calls,2);
+  assert.equal(f.posts,1);
+});
+
+test('incomplete shared receipt inventory is never treated as an empty list',async()=>{
+  const f=fixture();
+  f.io.readComments=async()=>Array.from({length:501},()=>comments()[0]);
+  await assert.rejects(processCompletedPcJob(event(),f.io),/COMMENT_INVENTORY_INCOMPLETE/);
+  assert.equal(f.posts,0);
 });
