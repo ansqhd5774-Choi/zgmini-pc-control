@@ -14,6 +14,7 @@ import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus} from './update.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
+import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
@@ -71,14 +72,20 @@ export function authenticateProcess(event,env,role){
  if(!['operating','handoff'].includes(role))fail('ROLE_INVALID');
  let raw;
  try{raw=JSON.parse(event?.issue?.body??'');}catch{fail('REQUEST_JSON_INVALID');}
- if(!raw||Object.keys(raw).sort().join(',')!=='operation,requestId,role,schema'||
-   raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role)fail('REQUEST_SCOPE_INVALID');
+ const keys=Object.keys(raw||{}).sort().join(',');
+ const basic=keys==='operation,requestId,role,schema';
+ const withJobs=keys==='operation,requestId,role,runnerJobRefs,schema';
+ if(!raw||(!basic&&!withJobs)||
+   raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
+   (withJobs&&role!=='operating'))fail('REQUEST_SCOPE_INVALID');
+ const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
  normalized.issue.title='pc-host-inventory-readonly';
  normalized.issue.body=JSON.stringify({schema:'ZGMINI_PC_HOST_INVENTORY_REQUEST_V1',
   operation:'host-inventory-readonly',requestId:raw.requestId,role});
  if(event.issue.title!==TITLE)fail('ISSUE_TITLE_INVALID');
- return authenticate(normalized,env,role);
+ const verified=authenticate(normalized,env,role);
+ return runnerJobRefs?{...verified,runnerJobRefs}:verified;
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -889,7 +896,9 @@ export function collect(role,ctx,env=process.env){
   marketParquetTaskSource:inspectMarketParquetTask(),
   http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
   c1501Backlog:inspect1501BacklogReadonly(),
-  targetEndpointStatus:readTargetEndpointStatus()}:base;
+  targetEndpointStatus:readTargetEndpointStatus(),
+  ...(Array.isArray(ctx.runnerJobRefs)?
+   {runnerJobHistory:inspectRunnerJobHistory(ctx.runnerJobRefs)}:{})}:base;
  const ps=path.win32.join(env.SystemRoot||'C:\\Windows',
   'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
  if(os.platform()!=='win32'||!fs.existsSync(ps))
@@ -928,6 +937,11 @@ export function toText(r){
   'c996LeaseCorrelation='+(r.c996LeaseCorrelation?.status??'NOT_APPLICABLE'),
   'c996LeaseCorrelationCode='+(r.c996LeaseCorrelation?.code??'NOT_APPLICABLE'),
    'c1841RecoveryCheckpoint='+(r.c1841RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
+  ...(r.runnerJobHistory?.length?[
+   'runnerJobHistoryCases='+r.runnerJobHistory.length,
+   ...r.runnerJobHistory.map(j=>'runnerJob.'+j.runId+'='+
+    j.classification+':exactReferences='+j.exactReferences)
+  ]:[]),
   'operationalWrites=0','automaticRetries=0',''].join('\r\n');
 }
 async function main(){
