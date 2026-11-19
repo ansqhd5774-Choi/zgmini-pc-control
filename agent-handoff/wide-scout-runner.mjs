@@ -86,7 +86,8 @@ export function validateWideEvent(event,env){
 }
 async function request(resource,{body=null}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN');
-  const response=await fetch(ROOT+resource,{
+  const endpoint=resource.startsWith('search/')?'https://api.github.com/':ROOT;
+  const response=await fetch(endpoint+resource,{
     method:body===null?'GET':'POST',
     headers:{
       Authorization:'Bearer '+process.env.GITHUB_TOKEN,
