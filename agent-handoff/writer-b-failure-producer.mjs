@@ -91,7 +91,7 @@ export async function processCompletedWriterB(event, {
      reportSteps[0].conclusion!=='failure'&&
      reportSteps[0].conclusion!=='cancelled')
     return Object.freeze({...initial,state:'SOURCE_REPORT_STATE_UNKNOWN'});
-  const comments = await readComments(run.since);
+  const comments = await readComments(run.since,run.runId);
   const receipt = findWriterBReceipt(comments, run.runId);
   if (!receipt) {
     // Invalid Writer B admission emits a distinct authenticated rejection
@@ -199,6 +199,33 @@ async function completePages(endpoint, category, maxPages=MAX_PAGES) {
   stop(`${category}_INVENTORY_LIMIT`);
 }
 
+// Narrow GitHub search by the immutable Run ID. Search is discovery only:
+// every returned candidate is re-read from its original Issue and validated.
+export async function findRunReceiptComments(runId,{searchIssues,readIssueComments}){
+  if(!positive(runId)||typeof searchIssues!=='function'||
+     typeof readIssueComments!=='function')stop('RECEIPT_LOOKUP_CONFIG');
+  const result=await searchIssues(runId);
+  if(!result||result.incomplete_results!==false||
+     !Number.isSafeInteger(result.total_count)||result.total_count<0||
+     result.total_count>100||!Array.isArray(result.items)||
+     result.items.length!==result.total_count)
+    stop('RECEIPT_SEARCH_INCOMPLETE');
+  const seen=new Set(),comments=[];
+  for(const issue of result.items){
+    if(!positive(issue?.number)||issue.pull_request||
+       seen.has(issue.number)||issue.title!=='pc-writer-source-install'||
+       !issue.labels?.some(x=>x.name==='pc-writer-b-install'))
+      continue;
+    seen.add(issue.number);
+    const rows=await readIssueComments(issue.number);
+    if(!Array.isArray(rows))stop('RECEIPT_ISSUE_COMMENTS_INVALID');
+    comments.push(...rows.filter(x=>
+      typeof x?.body==='string'&&
+      x.body.includes('RUN_ID: '+runId+'; RETRY: NO_REEXECUTE')));
+    if(comments.length>500)stop('RECEIPT_MATCH_LIMIT');
+  }
+  return comments;
+}
 async function fileReadback(filePath, ref, maxBytes) {
   const content = await request(`contents/${filePath}?ref=${ref}`, {missingOk: true});
   if (!content) return null;
@@ -222,8 +249,21 @@ export async function main(env = process.env) {
         stop('SOURCE_JOBS_INCOMPLETE');
       return result.jobs;
     },
-    readComments: since => completePages(
-      `issues/comments?since=${encodeURIComponent(since)}`, 'COMMENTS'),
+    readComments: (_since,id)=>findRunReceiptComments(id,{
+      searchIssues:async runId=>{
+        const q='repo:'+REPO+' is:issue in:comments "RUN_ID: '+runId+'"';
+        const url='https://api.github.com/search/issues?q='+
+          encodeURIComponent(q)+'&per_page=100';
+        const res=await fetch(url,{headers:{
+          Authorization:'Bearer '+process.env.GITHUB_TOKEN,
+          Accept:'application/vnd.github+json',
+          'X-GitHub-Api-Version':'2022-11-28'},
+          signal:AbortSignal.timeout(25000)});
+        if(!res.ok)stop('RECEIPT_SEARCH_HTTP_'+res.status);
+        return res.json();
+      },
+      readIssueComments:n=>completePages('issues/'+n+'/comments','ORIGIN_COMMENTS')
+    }),
     readIssue: async issue => ({...await request(`issues/${issue}`), repository: REPO}),
     readFile: fileReadback,
     listHandoffs: async () => ({repository: REPO, complete: true,
