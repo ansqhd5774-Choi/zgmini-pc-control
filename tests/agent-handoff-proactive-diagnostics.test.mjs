@@ -122,7 +122,8 @@ test('ledger invalid or source drift fails before writing',async()=>{
   assert.equal(io.posted.length,0);
   const io2=ioFor([run(101)]);
   io2.getRun=async()=>run(101,recent,{head_sha:'b'.repeat(40)});
-  await assert.rejects(()=>scanLatest(io2,now),/SOURCE_RUN_DRIFT/);
+  const result=await scanLatest(io2,now);
+  assert.equal(result.unverified,1);
   assert.equal(io2.posted.length,0);
 });
 test('event gate protects repository, branch, schedule and actor',()=>{
@@ -192,4 +193,60 @@ test('bad run evidence is isolated while independent run posts',async()=>{
   assert.equal(result.unverified,1);
   assert.equal(result.newReports,1);
   assert.equal(result.observed[0].runId,602);
+});
+
+test('300-comment shard rotation continues on an independently authenticated next shard',async()=>{
+  const io=ioFor([run(710)]);
+  await io.createShard('2026-11',1,
+    'ZGMINI Proactive Diagnostics 2026-11 #1',
+    '<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2 month:2026-11 shard:1 -->');
+  for(let i=0;i<300;i++)io.shards.get(3000).comments.push(
+    receipt(run(10000+i),900000+i));
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  assert.equal(result.observed[0].shardIssue,3001);
+  assert.equal(io.shards.get(3000).comments.length,300);
+  assert.equal(io.shards.get(3001).comments.length,1);
+});
+
+test('lost comment acknowledgement is reconciled without a second write',async()=>{
+  const io=ioFor([run(720)]);
+  const original=io.postComment;let calls=0;
+  io.postComment=async(n,body)=>{calls++;await original(n,body);throw Error('lost ACK');};
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  assert.equal(calls,1);
+  const again=await scanLatest(io,now);
+  assert.equal(again.newReports,0);
+  assert.equal(again.alreadyRecorded,1);
+  assert.equal(calls,1);
+});
+
+test('complete old archive prohibits a duplicate new shard report',async()=>{
+  const oldRun=run(730),io=ioFor([oldRun]);
+  io.readLegacyComments=async()=>[
+    {id:SCOUT_POLICY.legacyAnchorCommentId,body:markerFor(oldRun),
+      user:{login:'github-actions[bot]'},created_at:recent}
+  ];
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,0);
+  assert.equal(result.alreadyRecorded,1);
+  assert.equal(io.shards.size,0);
+});
+
+test('ambiguous shard creation without readback is stopped and not retried',async()=>{
+  const io=ioFor([run(740)]);
+  let count=0;
+  io.createShard=async()=>{count++;throw Error('POST response lost');};
+  await assert.rejects(()=>scanLatest(io,now),/SHARD_CREATE_OUTCOME_UNKNOWN/);
+  assert.equal(count,1);
+  assert.equal(io.posted.length,0);
+});
+
+test('invalid run cannot suppress a later valid run in newest-first scan',async()=>{
+  const io=ioFor([run(800,'bad'),run(801)]);
+  const result=await scanLatest(io,now);
+  assert.equal(result.unverified,1);
+  assert.equal(result.newReports,1);
+  assert.equal(result.observed[0].runId,801);
 });
