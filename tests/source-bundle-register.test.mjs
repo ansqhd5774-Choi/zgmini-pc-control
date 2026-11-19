@@ -11,6 +11,16 @@ import {planSourceBundleRegistration,SOURCE_BUNDLE_SCHEMA,
   from '../tools/source-bundle-register.mjs';
 
 const hash=b=>createHash('sha256').update(b).digest('hex');
+test('source bundle uses the same safe conversation trace labels while retaining owner and request identity',()=>{
+ const q={schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',requestId:'pc-update-aaaaaaaa-bbbb-4ccc-8ddd-0123456789ab',
+  chatId:'chat-common-process-repair-20261119',operation:SOURCE_BUNDLE_OPERATION,
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',targetControllerSha:'a'.repeat(40),approvalManifestSha256:'b'.repeat(64)};
+ const ctx={actor:'ansqhd5774-Choi',controlRepository:q.controlRepository};
+ assert.equal(validateSourceBundleIssueEnvelope(q,ctx).chatId,q.chatId);
+ assert.throws(()=>validateSourceBundleIssueEnvelope(q,{...ctx,actor:'other'}));
+ assert.throws(()=>validateSourceBundleIssueEnvelope({...q,chatId:'chat-../bad'},ctx));
+ assert.throws(()=>validateSourceBundleIssueEnvelope({...q,requestId:'pc-reused-label'},ctx));
+});
 const SOURCE_SHA='a'.repeat(40),INSTALLED_SHA='b'.repeat(40);
 const sourceFiles=Object.freeze({
  'scripts/pc-writer/theme-platform.mjs':`import {reader} from './reader.mjs';\nimport {decode} from 'hyparquet';\nexport {reader,decode};\n`,

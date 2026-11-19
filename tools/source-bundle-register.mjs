@@ -19,7 +19,10 @@ const MAX_FILES=8192;
 const MAX_MANIFEST_BYTES=1024*1024;
 const UUID='[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}';
 const REQUEST_ID=new RegExp(`^pc-(?:update-)?${UUID}$`);
-const CHAT_ID=new RegExp(`^chat-${UUID}$`);
+// Shared by the existing maintenance envelopes. This is a correlation label,
+// never an actor credential, install lease, or approval nonce.
+export const CONVERSATION_TRACE_ID=/^chat-[a-z0-9][a-z0-9-]{0,74}$/;
+const CHAT_ID=CONVERSATION_TRACE_ID;
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const fail=code=>{throw Object.assign(new Error(code),{code});};
 const requireObject=x=>x&&typeof x==='object'&&!Array.isArray(x);
