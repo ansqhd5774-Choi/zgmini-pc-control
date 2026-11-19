@@ -90,10 +90,8 @@ export function evaluateQueueItem(issue,comments,nowMs){
 }
 
 export function compileQueueBoard(items,nowMs,
-  {openHandoffIssueCount=Array.isArray(items)?items.length:0,
-   unverifiedIssues=[]}={}){
+  {openHandoffIssueCount=Array.isArray(items)?items.length:0}={}){
   if(!validMs(nowMs)||!Array.isArray(items)||items.length>MAX_BOARD_ISSUES||
-    !Array.isArray(unverifiedIssues)||unverifiedIssues.length>MAX_BOARD_ISSUES||
     !Number.isSafeInteger(openHandoffIssueCount)||
     openHandoffIssueCount<items.length||
     openHandoffIssueCount>MAX_BOARD_ISSUES)
