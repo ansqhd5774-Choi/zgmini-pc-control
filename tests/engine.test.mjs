@@ -94,6 +94,8 @@ test('a fixed read keeps Core evidence through unavailable Task observation, nev
  assert.equal(out.report.status,'STATE_UNKNOWN');
  assert.equal(out.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
  assert.equal(out.report.result.core.approvedSourceSha,'a'.repeat(40));
+ assert.equal(out.report.result.taskObservation,'UNVERIFIED');
+ assert.deepEqual(out.report.result.core.taskXmlHashes,{});
  assert.equal(out.report.protectedStateUnchanged,null);
  assert.equal(out.report.protectionPrecheckCode,'PROTECTED_TASK_XML_QUERY_FAILED');
  assert.equal(JSON.stringify(out.report).includes('private error text'),false);
