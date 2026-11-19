@@ -33,8 +33,7 @@ function fixedPowerShell(paths){
   " }",
   " $out+=@{id=$e[0];status=$state}",
   "}",
-  "@{schema='C996_R5_ACL_BOUNDARY_V1';runnerUserMatchesFixedOwner=[bool]$matchesOwner;entries=$out}",
-  " | ConvertTo-Json -Compress -Depth 4",
+  "@{schema='C996_R5_ACL_BOUNDARY_V1';runnerUserMatchesFixedOwner=[bool]$matchesOwner;entries=$out} | ConvertTo-Json -Compress -Depth 4",
  ].join("\n");
 }
 export function parseAclBoundary(output){
