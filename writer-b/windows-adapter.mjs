@@ -19,7 +19,7 @@ import {buildLocalOverlayProvenance,
  writeImmutableLocalProvenance} from './provenance.mjs';
 import {snapshotUnrelatedDirty} from './unrelated-snapshot.mjs';
 import {decodeTaskXmlBytes,coreQuietFromProbe,
- coreReadyForMaintenance,coreMaintenanceWindowBlockCode,
+ coreReadyForMaintenance,coreMaintenanceWindowBlockCode,inhibitCoreStarts,
  attestTaskFirstHopLauncher} from './windows-guards.mjs';
 import {awaitNaturalCoreIdle,
  MAX_POST_PREPARE_IDLE_WAIT_MS} from './core-idle-window.mjs';
@@ -112,6 +112,13 @@ function atomicBytes(file,bytes,id){
  fs.writeFileSync(tmp,bytes,{flag:'wx'});
  try{fs.renameSync(tmp,file);}catch{stop('WRITER_B_CONFIG_ATOMIC_RENAME_STOP');}
  need(fs.readFileSync(file).equals(bytes),'WRITER_B_CONFIG_ATOMIC_READBACK_STOP');
+}
+
+function durableBackup(file,bytes){
+ const raw=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes,'utf8');
+ const fd=fs.openSync(file,'wx');
+ try{fs.writeFileSync(fd,raw);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+ need(fs.readFileSync(file).equals(raw),'WRITER_B_BACKUP_READBACK_STOP');
 }
 
 function statusSnapshot(root,manifest){
@@ -253,19 +260,19 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
   async backupOriginal(snapshot){
    need(snapshot===before&&originalConfig&&originalXml,
     'WRITER_B_BACKUP_SOURCE_STOP');
-   fs.writeFileSync(path.join(journalDir,'config.original.bin'),originalConfig,{flag:'wx'});
-   fs.writeFileSync(path.join(journalDir,'task.original.xml'),originalXml.raw,{flag:'wx'});
+   durableBackup(path.join(journalDir,'config.original.bin'),originalConfig);
+   durableBackup(path.join(journalDir,'task.original.xml'),originalXml.raw);
    for(const file of m.files.filter(f=>f.change==='M')){
     const basename=file.path.replaceAll('/','__');
-    fs.writeFileSync(path.join(journalDir,`${basename}.original.bin`),
-     sourceRaw(file.path),{flag:'wx'});
+    durableBackup(path.join(journalDir,`${basename}.original.bin`),sourceRaw(file.path));
    }
-   fs.writeFileSync(path.join(journalDir,'preimage.json'),
+   durableBackup(path.join(journalDir,'preimage.json'),
     JSON.stringify({head:before.head,branch:before.originalBranch,
+     requestId:auth.requestId,manifestSha256:auth.manifestSha256,
+     coreMaintenance:m.coreMaintenance??'NATURAL_IDLE',
      originalConfigSha256:before.originalConfigSha256,
      originalTaskDefinitionSha256:before.originalTaskDefinitionSha256,
-     beforeSha256:before.beforeSha256,protectedSha256:before.protectedSha256}),
-    {flag:'wx'});
+     beforeSha256:before.beforeSha256,protectedSha256:before.protectedSha256}));
    journal('BACKED_UP');
   },
   async prepareIsolatedCommit(){
@@ -318,16 +325,15 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
    journal(phase==='POST_PREPARE'?'CORE_POST_PREPARE_IDLE':'CORE_PREPAUSE_IDLE');
   },
   async pauseCore(){
-   assertBase();
-   need(fixedTaskXml(task).normalized===originalXml.normalized,
-    'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP');
-   need(coreReadyForMaintenance(taskProbe(),fs.existsSync(CORE_CYCLE_LOCK)),
-    'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED');
-   exec('schtasks',['/Change','/TN',task,'/Disable']);
-   journal('TASK_PAUSED');
+   inhibitCoreStarts({assertBase,
+    definitionMatches:()=>fixedTaskXml(task).normalized===originalXml.normalized,
+    probe:taskProbe,cycleLockExists:()=>fs.existsSync(CORE_CYCLE_LOCK),journal,
+    disable:()=>exec('schtasks',['/Change','/TN',task,'/Disable']),
+   },{reserved:m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'});
   },
   async waitForCoreDrain(){
-   let consecutive=0;const until=Date.now()+90000;
+   let consecutive=0;const until=Date.now()+
+    (m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'?360000:90000);
    while(Date.now()<until){
     consecutive=taskQuiet(taskProbe())?consecutive+1:0;
     if(consecutive>=2){journal('CORE_DRAINED');return;}
@@ -385,6 +391,8 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     'WRITER_B_CONFIG_TARGET_SHA_STOP');
   },
   async restoreCore(){
+   need(fixedTaskXml(task).normalized===originalXml.normalized,
+    'WRITER_B_CORE_RESTORE_TASK_XML_DRIFT_STOP');
    const state=taskProbe();
    if(state.enabled){
     need(fixedTaskXml(task).normalized===originalXml.normalized,

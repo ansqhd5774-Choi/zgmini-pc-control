@@ -1,5 +1,19 @@
 # 공통 Writer B — 신규 기능 재사용 안내 (Source-only)
 
+## Core 자연 유휴 반복 대기의 해결 절차 (2026-11-19)
+
+`WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`는 Core 고장을 뜻하지 않는다. 같은 상태에서 B 요청을 반복하거나 Controller를 재설치하지 않는다. 기존 성공 #711은 당시 설치 증거이며 이후 유휴 창을 보장하지 않는다. #2229의 표본 기록은 관측 개선이고 설치 진입 해결은 아니다.
+
+사용자가 승인한 유지보수 범위에서 **새 정확 manifest**에 `coreMaintenance: "PAUSE_NEW_STARTS_DRAIN_360S_V1"`와 실제 원본 `runtimeDependencies.taskXmlSha256`를 고정하면 공통 설치기가 다음 순서로 실행한다. 기존 manifest에는 이 권한을 소급 추가하지 않으며, 필드가 없으면 기존 자연 유휴 방식이 유지된다.
+
+1. 공유 Writer lease → source/config/대상 파일/후보/원본 Task 검증 → 단회 claim → 백업·격리 후보 준비. 이때 Core는 계속 실행한다.
+2. 원본 Task 정의와 source를 다시 대조하고, 알려진 READY/QUEUED/RUNNING 상태에서 **신규 예약 시작만 Disable**한다. 실행 중 인스턴스·자식 프로세스를 종료하거나 Core lock을 삭제하지 않는다. 변경 의도는 먼저 fsync journal에 남기고 Disable 결과를 재조회한다.
+3. 최대 360초 정상 종료를 기다린다. Task disabled, instances/processes/unknown=0, Core lock 없음이 연속 2표본으로 확인된 뒤에만 기존 source/config CAS 교체를 수행한다. 조용해지지 않으면 교체 0건으로 기존 source/config·Task 활성 상태를 복원하고 재조회한다.
+4. 성공·처리 가능한 실패 모두 Task 원본 정의와 활성 상태를 확인한 뒤 공유 lease를 반환한다. 복원이 불명확하면 `WRITER_B_RECOVERY_REQUIRED`로 claim/lease/백업을 보존한다. Task 정의 drift가 있으면 무조건 Enable하지 않는다.
+5. 프로세스 강제 종료·전원 중단은 JavaScript finally의 실행을 보장하지 않는다. `TASK_PAUSE_INTENT` 이후 영수증이 없으면 동일 ID 재실행·자동 Enable을 금지하고, 정확 요청 journal/백업·실제 source/config·Task를 기존 복구 계약으로 대조한다. 소스 부분 적용 중 예약을 켜지 않는다.
+
+최대 drain 360초는 완료 보장이 아니다. 더 오래 실행되는 Core를 강제로 끝내지 않는다. 이 모드는 공통 Writer B에만 적용하며 A 조회·다른 업무의 전역 조건이 아니다. 코드/CI 완료, 실제 B 설치, 기능 수집·게시 성공은 구분한다. W05 #2222는 재실행하지 않고 원담당이 현행 preimage와 위 선택을 담은 **새 승인 manifest·새 요청 ID**로 기존 공통 workflow를 사용한다. 신규 CMD·Controller·예약은 만들지 않는다.
+
 > 공통 Writer B의 실제 PC 설치 선례: [#651](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/651), [#666](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/666). 해당 당시의 승인 범위에만 유효하며, 후속 기능 파일의 자동 설치·게시 성공을 뜻하지 않는다.
 > 아래는 **각 기능 원담당**의 승인된 공통 경로 재사용 안내다. PR 생성·병합·테스트 PASS와 새 기능의 실제 PC 설치·게시 검증을 구분한다.
 

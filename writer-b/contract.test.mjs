@@ -56,6 +56,17 @@ test('3-file Inflation19 manifest validates without hard-coded filename values',
  assert.equal(validateWriterBManifest(extra),extra);
 });
 
+test('reserved maintenance is exact opt-in bound to approved original Task XML',()=>{
+ const m={...manifest(),coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'};
+ assert.equal(validateWriterBManifest(m),m);
+ for(const coreMaintenance of [true,'DISABLE','PAUSE_NEW_STARTS_DRAIN_999S_V1',null])
+  assert.throws(()=>validateWriterBManifest({...m,coreMaintenance}),
+   {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
+ assert.throws(()=>validateWriterBManifest({...m,runtimeDependencies:{
+  ...m.runtimeDependencies,taskXmlSha256:null}}),
+  {code:'WRITER_B_MAINTENANCE_APPROVAL_STOP'});
+});
+
 test('strict path scope and duplicate names prevent traversal and accidental targets',()=>{
  for(const candidate of ['../.env','scripts/pc-writer/../../secrets.mjs',
   'scripts/pc-writer/evil.cmd','E:\\ZGmini\\secrets.mjs','scripts/pc-writer/.hidden.mjs',
