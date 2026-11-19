@@ -167,3 +167,34 @@ test('fixed installed path uses native readonly SQLite and leaves PC data unchan
  assert.equal(sha(fs.readFileSync(file)),before);
  assert.doesNotMatch(JSON.stringify(result),/private source bytes|PRIVATE_|real-path-test|snapshot_id|body_chunk/);
 });
+
+test('bounded mismatch lineage groups expose only safe month/provider/revision and counts',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ db.exec('ALTER TABLE market_score_employment_r4_shadow_runs_v1 ADD COLUMN collector_revision TEXT');
+ const bad=snapshot(db,{requestKey:'PRIVATE-BAD-LINEAGE',body:'PRIVATE_BODY'});
+ const raw='market_score_employment_r6_raw_snapshot_v1';
+ db.prepare('UPDATE '+raw+' SET detail_json=? WHERE snapshot_id=?')
+  .run(JSON.stringify({responseHash:'f'.repeat(64),privateToken:'PRIVATE_TOKEN'}),bad.id);
+ db.prepare('INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?)')
+  .run('EMPLOYMENT_R6_'+RELEASE,'SUCCESS','2026-11-18T02:00:00.000Z',
+   JSON.stringify({rawSnapshots:[{snapshotId:bad.id,bodySha256:bad.hash}]}),'R6_TEST_1');
+ const report=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.equal(report.invalidReasonCounts.RESPONSE_HASH_VALUE_MISMATCH,1);
+ assert.deepEqual(report.invalidLineageGroups,[{
+  reason:'RESPONSE_HASH_VALUE_MISMATCH',provider:PROVIDER,releaseGroup:RELEASE,
+  retrievedMonth:'2026-11',collectorRevision:'R6_TEST_1',count:1,
+ }]);
+ assert.equal(report.invalidLineageScope,'DIAGNOSTIC_NOT_PIT');
+ assert.doesNotMatch(JSON.stringify(report),/PRIVATE_|PRIVATE-BAD|body_sha256|snapshotId|requestKey/);
+ db.close();
+});
+test('unlinked invalid snapshot has explicit UNLINKED lineage rather than fabricated revision',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ const bad=snapshot(db,{requestKey:'PRIVATE-UNLINKED',body:'private'});
+ db.prepare('UPDATE market_score_employment_r6_raw_snapshot_v1 SET detail_json=? WHERE snapshot_id=?')
+  .run(JSON.stringify({responseHash:'0'.repeat(64)}),bad.id);
+ const result=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.equal(result.invalidLineageGroups[0].collectorRevision,'UNLINKED');
+ assert.equal(result.invalidLineageGroups[0].count,1);
+ db.close();
+});
