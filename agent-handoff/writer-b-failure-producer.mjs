@@ -84,7 +84,9 @@ export async function processCompletedWriterB(event, {
     x?.name==='Create-only sanitized result and originating Issue comment');
   if(reportSteps.length!==1)stop('SOURCE_REPORT_STEP_UNVERIFIED');
   if(reportSteps[0].conclusion==='skipped')
-    return Object.freeze({...initial,state:'UNRELATED_SOURCE_OPERATION'});
+    return Object.freeze({...initial,state:
+      sourceJobs[0].conclusion==='success'?'UNRELATED_SOURCE_OPERATION':
+      'SOURCE_REPORT_STATE_UNKNOWN'});
   if(reportSteps[0].conclusion!=='success'&&
      reportSteps[0].conclusion!=='failure'&&
      reportSteps[0].conclusion!=='cancelled')
