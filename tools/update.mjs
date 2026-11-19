@@ -80,9 +80,13 @@ export function validBacklogOriginalPcJob(body){
  const keys=Object.keys(body);
  const scoped=body.operation==='writer-install-preimage-readonly'&&
   keys.length===base.length+extra.length&&extra.every(k=>Object.hasOwn(body,k));
- const allowed=scoped?[...base,...extra]:base;
+ const pit04=body.operation==='employment-r6-candidate-stage-readonly'&&
+  Object.hasOwn(body,'pit04Offset');
+ const allowed=scoped?[...base,...extra]:pit04?[...base,'pit04Offset']:base;
  if(keys.length!==allowed.length||!allowed.every(k=>Object.hasOwn(body,k))||
     keys.some(k=>!allowed.includes(k)))return false;
+ if(pit04&&(!Number.isSafeInteger(body.pit04Offset)||
+   body.pit04Offset<0||body.pit04Offset>50000))return false;
  if(scoped){
   if(typeof body.preimageManifestPath!=='string'||
      !/^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(body.preimageManifestPath)||
