@@ -59,11 +59,16 @@ export async function upload(env=process.env,apiFetch=fetch){
  expect(safeName(req.requestId),'W05_B_REPORT_REQUEST_STOP');
  const input=path.join(env.RUNNER_TEMP,JSON_NAME);
  let result;
- if(fs.existsSync(input)){
+ try {
+  if(!fs.existsSync(input))fail('W05_B_LOCAL_RESULT_MISSING_STOP');
   result=sanitizedReport(JSON.parse(fs.readFileSync(input,'utf8')),req.requestId);
- }else{
+ }catch(e){
+  // Never upload an unverified local payload or claim an effect result.
+  // An unreadable/malformed result after a possible DB commit is STATE_UNKNOWN.
+  const code=e?.code==='W05_B_LOCAL_RESULT_MISSING_STOP'?
+   'W05_B_LOCAL_RESULT_MISSING_STOP':'W05_B_LOCAL_RESULT_UNVERIFIED_STOP';
   result={schema:PREFIX,requestId:req.requestId,status:'STATE_UNKNOWN',
-   code:'W05_B_LOCAL_RESULT_MISSING_STOP',sourceSha:null,provider:'BLS',
+   code,sourceSha:null,provider:'BLS',
    series:'WPSFD42',providerCalls:'NOT_CONFIRMED',
    dbWrites:'NOT_CONFIRMED',d1Writes:0,schedulerChanges:0,automaticRetries:0};
  }
