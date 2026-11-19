@@ -271,7 +271,10 @@ export async function scopedWriterBIncidents(prepared,runCreatedAt,{
     stop('SCOPED_INCIDENT_RECENT_WINDOW_INCOMPLETE');
   const candidates=new Map();
   for(const row of [...search.items,...recent]){
-    if(!positive(row?.number)||row.pull_request)continue;
+    if(!positive(row?.number)||row.pull_request||
+       typeof row.body!=='string')continue;
+    let item;try{item=parseHandoff(row.body);}catch{continue;}
+    if(item.origin.requestId!==requestId)continue;
     candidates.set(row.number,row);
   }
   const verified=[];
