@@ -61,15 +61,36 @@ export async function processDeepQueue(io,now){
   const main=await io.mainSha();
   if(!sha(main))stop('MAIN_SHA');
   let posted=0,already=0,unverified=chosen.unknownClockIssues.length;
-  const observed=[];
+  const observed=[],unverifiedIssues=chosen.unknownClockIssues.map(issueNumber=>({
+    issueNumber,reason:'ISSUE_CLOCK_UNVERIFIED'}));
+  // Unknown global authentication/permission conditions must not be treated
+  // as a local incident defect. No GitHub write is attempted on these errors.
+  const localReadError=error=>{
+    const message=typeof error?.message==='string'?error.message:'';
+    return !/^HANDOFF_DEEP_RUNNER_(TOKEN|REPOSITORY|GITHUB_HTTP_(401|403))$/.test(message);
+  };
   for(const candidate of chosen.selected){
     if(posted>=DEEP_POLICY.maxNewReports)break;
-    const issue=await io.readIssue(candidate.number);
-    if(identity(issue)!==identity(candidate))stop('ISSUE_DRIFT');
-    const comments=await io.readComments(issue.number);
+    let issue,comments;
+    try{
+      issue=await io.readIssue(candidate.number);
+      // Identity drift is an integrity conflict, never a recoverable read error.
+      if(identity(issue)!==identity(candidate))stop('ISSUE_DRIFT');
+      comments=await io.readComments(issue.number);
+    }catch(error){
+      if(error?.message==='HANDOFF_DEEP_RUNNER_ISSUE_DRIFT'||!localReadError(error))
+        throw error;
+      unverified++;
+      unverifiedIssues.push({issueNumber:candidate.number,reason:'ISSUE_EVIDENCE_READ_UNAVAILABLE'});
+      continue;
+    }
     let handoff;
     try{handoff=verifyHandoff(issue,comments);}
-    catch{unverified++;continue;}
+    catch{
+      unverified++;
+      unverifiedIssues.push({issueNumber:candidate.number,reason:'HANDOFF_RECEIPT_UNVERIFIED'});
+      continue;
+    }
     const ledgerNow=await io.readComments(ledgerIssue);
     if(alreadyReported(ledgerNow,issue,handoff)){already++;continue;}
     const [origin,history]=await Promise.all([
@@ -107,7 +128,8 @@ export async function processDeepQueue(io,now){
   }
   return {schema:DEEP_POLICY.version,cutoff:chosen.cutoff,
     recentHandoffs:chosen.selected.length,posted,already,unverified,
-    unknownClockIssues:chosen.unknownClockIssues,observed,ledgerIssue,pcOperationalWrites:0,aiCalls:0,
+    unknownClockIssues:chosen.unknownClockIssues,unverifiedIssues,observed,ledgerIssue,
+    pcOperationalWrites:0,aiCalls:0,
     pcRetries:0,sourceEdits:0,simulator:'DECISION_TABLE_ONLY'};
 }
 async function api(repo,resource){
