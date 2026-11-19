@@ -1,5 +1,7 @@
 # ZGMINI — 일반챗·CMD·PC Runner 공통 작업 지침
 
+**2026-11-19 인계 실행 보완:** 후보 영수증만 있는 미인수 사건은 완료가 아니며, selector의 `OWNER_ACTION_REQUIRED` 목록으로 계속 노출한다. 현재 담당자가 실제 인수했으면 기존 Incident에 ACKNOWLEDGED→WORKING을 기록하고 지원 행동·결과 원본 회신까지 수행한다. 고정 `NOT_CONFIGURED` 문구는 중개기 자체의 한계이며 중앙 처리자 현재 상태의 실측이 아니다. 완료/취소된 무변경 A 조회의 과거 내부 로그 미확보를 현재 승인 읽기의 전역 Gate로 두지 않되, 쓰기 결과불명·활성 lease·권한/보호 검사에는 이 재개 기준을 확대하지 않는다. [실행·증거·반환 절차](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md)의 2026-11-19 정정을 따른다. 자동 AI 처리·다른 대화 재개는 실제 검증 전까지 미검증으로 보고한다.
+
 ## MarketParquet 사용 제거 — 2026-11-16 사용자 결정
 
 - **MarketParquet는 사용하지 않는다.** 공급자가 11/05 무료 데이터 파생 점수·차트의 공개를 불허했고 11/08 KST 무료 예외도 거절했으며, 사용자가 수집·계산·게시 의존성 삭제와 main 반영을 지시했다. 문제가 생겨도 복구·재시도·재문의·유료 구매로 과거 설계를 유지하지 말고 해당 의존성을 제거한다. [사용 제거 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/MARKETPARQUET_REMOVAL.md)을 따른다.
