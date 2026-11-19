@@ -63,7 +63,7 @@ function issueIdentity(issue){
 // Authentication, bad page data, or a programming error are global failures.
 function scopedReadFailure(error){
   const msg=typeof error?.message==='string'?error.message:'';
-  if(/^HANDOFF_BOARD_RUNNER_GITHUB_HTTP_(404|408|429|5\\d\\d)$/.test(msg))
+  if(/^HANDOFF_BOARD_RUNNER_GITHUB_HTTP_(404|408|429|5\d\d)$/.test(msg))
     return 'ISSUE_READ_UNAVAILABLE';
   if(['AbortError','TimeoutError'].includes(error?.name)||
      (error instanceof TypeError&&/^fetch failed(?:$|:)/i.test(msg)))
