@@ -166,7 +166,7 @@ export function validateActiveUpgradeReceipt(receipt,_legacyInstallVersion,activ
 }
 export function activeUpgradeReceiptNames(names){
  requireCheck(Array.isArray(names),'AI_V2_ACTIVE_UPGRADE_RECEIPT_LIST_INVALID');
- return names.filter(name=>/^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\\.json$/.test(name)).sort();
+ return names.filter(name=>/^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\.json$/.test(name)).sort();
 }
 export function approvedDirectTool(install){
  return install?.sourceSha===ACTIVE_V2.sourceSha&&
@@ -328,7 +328,7 @@ export function verifyGithubContentsResponse(payload,expectedBytes){
  requireCheck(payload&&typeof payload==='object'&&payload.encoding==='base64'&&
   typeof payload.content==='string'&&payload.content.length>0,
   'AI_V2_REPORT_READBACK_INVALID');
- const encoded=payload.content.replace(/\\s/g,'');
+ const encoded=payload.content.replace(/\s/g,'');
  requireCheck(/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)&&encoded.length%4===0,
   'AI_V2_REPORT_READBACK_INVALID');
  const actual=Buffer.from(encoded,'base64');
