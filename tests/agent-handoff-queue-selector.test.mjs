@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {fingerprintHandoff, parseHandoff, routeHandoff} from '../agent-handoff/contract.mjs';
 import {assessIncident, selectionReceipt, processQueue, SELECTION_MARKER,
   HANDOFF_BOT, HANDOFF_REPOSITORY} from '../agent-handoff/queue-selector.mjs';
-import {validateTrigger, finalizeSelection} from '../agent-handoff/queue-dispatcher.mjs';
+import {validateTrigger, finalizeSelection, isolateInitialCommentRead} from '../agent-handoff/queue-dispatcher.mjs';
 
 const owner = 'ansqhd5774-Choi';
 function fixture(n=2001) {
@@ -220,4 +220,64 @@ test('finalization rejects malformed input instead of manufacturing PASS',async(
     /HANDOFF_SELECTOR_FINALIZATION_INPUT_INVALID/);
   await assert.rejects(()=>finalizeSelection({selected:0},null),
     /HANDOFF_SELECTOR_FINALIZATION_INPUT_INVALID/);
+});
+
+test('first Issue read failure is isolated in dispatcher while good receipts still post',async()=>{
+  const failed=fixture(2701),good=fixture(2702);
+  const rows=[failed.issue,good.issue],deferredReads=[]; let writes=0;
+  const saved=[good.route];
+  const readComments=isolateInitialCommentRead(async n=>{
+    if(n===2701)throw Error('backend unavailable: sensitive text not for logs');
+    return structuredClone(saved);
+  },n=>deferredReads.push(n));
+  const result=await processQueue(rows,{
+    readComments,
+    readIssue:async n=>structuredClone(rows.find(x=>x.number===n)),
+    recordReceipt:async(n,body)=>{
+      writes++;
+      saved.push({user:{login:HANDOFF_BOT},
+        issue_url:'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n,body});
+    }
+  });
+  assert.equal(result.selected,1);
+  assert.deepEqual(result.selectedIssues,[2702]);
+  assert.equal(result.deferred,1);
+  assert.deepEqual(deferredReads,[2701]);
+  assert.equal(JSON.stringify({result,deferredReads}).includes('sensitive text'),false);
+  assert.equal(writes,1);
+});
+
+test('missing route is deferred without fabricating evidence',async()=>{
+  const f=fixture(2703),deferredReads=[];
+  const readComments=isolateInitialCommentRead(async()=>[],n=>deferredReads.push(n));
+  const result=await processQueue([f.issue],{
+    readComments,
+    readIssue:async()=>structuredClone(f.issue),
+    recordReceipt:async()=>{throw Error('unexpected write');}
+  });
+  assert.equal(result.selected,0);
+  assert.equal(result.deferred,1);
+  assert.deepEqual(deferredReads,[]);
+});
+
+test('repository auth failure and post-write readback remain hard stop',async()=>{
+  const f=fixture(2704),deferredReads=[];
+  const authorized=isolateInitialCommentRead(async()=>{
+    throw Error('HANDOFF_SELECTOR_GITHUB_HTTP_403');
+  },n=>deferredReads.push(n));
+  await assert.rejects(()=>authorized(f.issue.number),/GITHUB_HTTP_403/);
+  assert.deepEqual(deferredReads,[]);
+  let readCount=0,posts=0;
+  const reader=isolateInitialCommentRead(async()=>{
+    readCount++;
+    if(readCount>2)throw Error('post-write proof not readable');
+    return [f.route];
+  },n=>deferredReads.push(n));
+  await assert.rejects(()=>processQueue([f.issue],{
+    readComments:reader,
+    readIssue:async()=>structuredClone(f.issue),
+    recordReceipt:async()=>{posts++;}
+  }),/post-write proof not readable/);
+  assert.equal(posts,1);
+  assert.deepEqual(deferredReads,[]);
 });
