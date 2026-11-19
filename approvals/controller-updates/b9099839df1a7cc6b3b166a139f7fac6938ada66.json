@@ -1,0 +1,37 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "f7f1559bc0ef15bb9b375982d048369c474c490f",
+  "targetSha": "b9099839df1a7cc6b3b166a139f7fac6938ada66",
+  "allowFiles": [
+    {
+      "path": "controller/engine.mjs",
+      "sha256": "a5012e567286622f87ff134cbcb4ec1c27bf5bac64e305c1ba20d92f55df9444"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "fd18bde82c964911ad9cdab242602f7d823feef1bcd8dbafa49f42b9f31b6176"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2248",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "b9099839df1a7cc6b3b166a139f7fac6938ada66",
+    "status": "PASS",
+    "manifestSha256": "7c7952f4ecf395912b36d6154ffe3aef86c48e536edef628351b4f9504bef8bd"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "f7f1559bc0ef15bb9b375982d048369c474c490f"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "8660924cc2f62b1a0409cbd6d6fe3be95b510eff"
+}
