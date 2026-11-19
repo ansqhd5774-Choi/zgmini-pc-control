@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {processCompletedWriterB,findRunReceiptComments} from '../agent-handoff/writer-b-failure-producer.mjs';
+import {processCompletedWriterB,findRunReceiptComments,scopedWriterBIncidents} from '../agent-handoff/writer-b-failure-producer.mjs';
 import {parseHandoff} from '../agent-handoff/contract.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
@@ -434,4 +434,47 @@ test('source receipt is found in bounded recent comments while search indexing l
   });
   assert.equal(direct,1);
   assert.equal(out.length,1);
+});
+
+test('request-scoped incident inventory ignores unlimited unrelated history',async()=>{
+  const {io,state}=fixture();
+  await processCompletedWriterB(event(),io);
+  const old=state.created[0];
+  const createdAt='2026-11-08T02:11:00Z';
+  const prepared={state:'READY_TO_ENQUEUE',body:old.body};
+  let reads=0;
+  const rows=await scopedWriterBIncidents(prepared,createdAt,{
+    searchIssues:async()=>({incomplete_results:false,total_count:1,items:[old]}),
+    listRecentIssues:async()=>Array.from({length:30},(_,i)=>({
+      number:i+2000,created_at:createdAt,body:'{}'
+    })),
+    readIssue:async id=>{reads++;assert.equal(id,old.number);return old;}
+  });
+  assert.equal(rows.complete,true);
+  assert.equal(rows.issues.length,1);
+  assert.equal(reads,1);
+});
+test('request-scoped inventory handles GitHub search lag with direct recent issue',async()=>{
+  const {io,state}=fixture();
+  await processCompletedWriterB(event(),io);
+  const old=state.created[0];
+  const prepared={state:'READY_TO_ENQUEUE',body:old.body};
+  const out=await scopedWriterBIncidents(prepared,'2026-11-08T02:11:00Z',{
+    searchIssues:async()=>({incomplete_results:false,total_count:0,items:[]}),
+    listRecentIssues:async()=>[{...old,created_at:'2026-11-08T02:12:00Z'}],
+    readIssue:async()=>old
+  });
+  assert.equal(out.issues.length,1);
+});
+test('uncovered recent incident window refuses duplicate-unsafe creation',async()=>{
+  const {io,state}=fixture();
+  await processCompletedWriterB(event(),io);
+  const prepared={state:'READY_TO_ENQUEUE',body:state.created[0].body};
+  await assert.rejects(scopedWriterBIncidents(prepared,'2026-11-08T02:11:00Z',{
+    searchIssues:async()=>({incomplete_results:false,total_count:0,items:[]}),
+    listRecentIssues:async()=>Array.from({length:100},(_,i)=>({
+      number:i+1,created_at:'2026-11-08T02:12:00Z',body:'{}'
+    })),
+    readIssue:async()=>{throw Error('unexpected');}
+  }),/RECENT_WINDOW_INCOMPLETE/);
 });
