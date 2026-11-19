@@ -1,0 +1,38 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "269f38f53dee033725ad45987aa7f8915a6b6b93",
+  "targetSha": "2af4be8fd70ab1033cdd235ac7d7211c1b318683",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-19 continued user instruction and same-purpose standing approval in docs/PC_AUTOMATION_STANDARD.md section 5. PR #2340 merged as 1caeccfe63aa9a6905d707c90eb059c157f0ad6a; operation is the exact one-file PIT-04 backlog compatibility in independent maintainer update.mjs, not Controller/Runner/Core/DB changes. Verified current Windows installed source and 7-file integrity #2345 Run 44525505250. Execution remains conditional on exact installed SHA, startup/individual byte CAS, receiver origin, lease, backup, prior journal and approved normal handoff protections.",
+  "files": {
+    "tools/maintenance-contract.mjs": "2bd8275206137d306b7cda0654ebf431dd555b9651918ad407c31933ba240d19",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "6503764f1eb6f11a39e7c026b271cc4706166878c5f9a8f1135e6ada8e8db4aa",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "37379406e6f1e3f012fabc22d00007df1b9435bc6735ee0444cb845ee115d13f",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "installedWindowsEvidence": "PASS operating PC #2345 Run 44525505250 attempt1 2026-11-19T12:37:44Z: maintenanceSourceSha=269f38f53dee033725ad45987aa7f8915a6b6b93, maintenanceFilesVerified=true, receiverStatus=LISTENING, installLockHeld=false, maintenanceState=HEALTHY, operationalWrites=0. Individual per-file and startup byte CAS enforced by handoff operator at execution.",
+    "sourceCi": "PASS source exact target 2af4be8fd70ab1033cdd235ac7d7211c1b318683 maintenance CI #44520336238 and C996 #44520336314; PR #2340 merged main 1caeccfe63aa9a6905d707c90eb059c157f0ad6a; updater Git blob 0f5e6b7c8481f9c2727957e16e56bb9ad6363032 retained.",
+    "targetMainCommit": "1caeccfe63aa9a6905d707c90eb059c157f0ad6a (merge commit); exact target 2af4be8fd70ab1033cdd235ac7d7211c1b318683 is proven ancestor of main",
+    "windowsHandoffExecuted": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/update.mjs"
+  ],
+  "preserve": [
+    "Existing Controller and six Runner registrations",
+    "Core/Korea tasks and approved absence of Iran R13",
+    "Business DB rows/schema, provider quotas, D1, source/Writer files",
+    "Original request/lease/ledger history; no replay of failed installations"
+  ],
+  "scopeNote": "Exact V2 successor 7-to-7; source updater only, nine tool bytes pinned, runtimeChangedFiles single updater. Existing Windows #2345 source and seven-file integrity evidence reused; Windows operator must fail closed on any startup/installed file digest drift, old journal/probe guard, incorrect actor/token, active lease, changed receiver identity or absent immutable backup/rollback. One new unique pc-maintenance-handoff issue only after reviewed manifest merged into main; zero Controller/Core/Writer/DB changes, #2094 STAGED preserved."
+}
