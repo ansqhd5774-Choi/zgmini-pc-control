@@ -229,7 +229,7 @@ async function main() {
   await collectIndependentEvidence(report);
   if(report.inputs.some(x=>x.code==='EPERM'||x.code==='EACCES')||
    report.logErrors.some(x=>x.code==='EPERM'||x.code==='EACCES')){
-   report.aclBoundary=probeFixedAclBoundary({ownerProfile:path.win32.dirname(path.win32.dirname(path.win32.dirname(TEMP))),
+   report.aclBoundary=probeFixedAclBoundary({ownerProfile:path.win32.resolve(TEMP,'..','..','..','..'),
     ownerTemp:TEMP,r5Root:ROOT,attempt:ATTEMPT});
   }
  }catch(e){
