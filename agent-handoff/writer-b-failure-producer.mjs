@@ -362,7 +362,10 @@ export async function main(env = process.env) {
       postIssueComment: (n, body) => request(`issues/${n}/comments`, {method:'POST', body:{body}}),
       addIssueLabel: (n, label) => request(`issues/${n}/labels`, {method:'POST', body:{labels:[label]}})
     }),
-    listResourceWaitComments: () => completePages('issues/68/comments',
+    // A wait record for this Run cannot predate the source run itself.
+    // Avoid coupling it to the complete historical #68 comment count.
+    listResourceWaitComments: () => completePages('issues/68/comments?since='+
+      encodeURIComponent(event.workflow_run.created_at),
       'RESOURCE_WAIT', MAX_QUEUE_PAGES),
     createResourceWaitComment: body => request('issues/68/comments',
       {method:'POST',body:{body}}),
