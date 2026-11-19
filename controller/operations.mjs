@@ -38,6 +38,7 @@ import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.m
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
 import {inspectEmploymentR6CollectionEvidence} from './employment-r6-collection-evidence-readonly.mjs';
+import {inspectEmploymentR6RawRunLight} from './employment-r6-raw-run-attestation-readonly.mjs';
 import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
@@ -192,6 +193,7 @@ export async function runOperation(request,context){
  if(request.operation==='employment-r6-host-cas-readonly')return inspectEmploymentR6HostCas({host});
  if(request.operation==='employment-r6-wal-memory-preflight')return inspectEmploymentR6WalMemoryPreflight({host});
  if(request.operation==='employment-r6-collection-evidence-readonly')return inspectEmploymentR6CollectionEvidence(dataRoot);
+ if(request.operation==='employment-r6-raw-run-attestation-readonly')return inspectEmploymentR6RawRunLight(dataRoot);
  if(request.operation==='earnings-bea-mfg-archive-readonly')return inspectBeaMfgArchiveReadonly(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
