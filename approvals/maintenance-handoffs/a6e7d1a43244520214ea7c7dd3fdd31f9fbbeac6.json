@@ -1,0 +1,43 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "36cf8ffb813f3a006f3e05379fba641fb3404645",
+  "targetSha": "a6e7d1a43244520214ea7c7dd3fdd31f9fbbeac6",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-19 user instruction to proceed with shared Controller selective-source deployment and existing same-purpose maintenance authorization in docs/PC_AUTOMATION_STANDARD.md section 5. Exact source-only W01/W04 approval scope, bounded independent maintenance receiver handoff. Approved maintainer change only; no automatic Controller/Core/DB/D1/Task/provider effect.",
+  "files": {
+    "tools/maintenance-contract.mjs": "dc4f5bb669defa1a749bdd4f2cf154a0e8f4ad668f7afa9fdac6c334aa1ce5c6",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "da5121e526c752ab8950cfd27d497255bcc27caa940b91ea9aad04c81239504f",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "4d7bc704f8cb04b1ba18d9bf6d51694a93632fbb9976d5871df3fdea9b5ea1ca",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "installedWindowsEvidence": "PASS #2270 / Run 44466157388; installed source 36cf8ff, maintenanceFilesVerified=true, installLockHeld=false, receiver LISTENING",
+    "precedingFailedStaging": "BLOCKED #2271 / HANDOFF_SOURCE_ISOLATED_HASH_DENIED; original request not replayed; no operator invocation",
+    "targetMainCommit": "a6e7d1a43244520214ea7c7dd3fdd31f9fbbeac6",
+    "pinnedSourceComparison": "Nine tool Git blobs on 2d490b64d61473b20a4caee5638b8dc74109997b and a6e7d1a43244520214ea7c7dd3fdd31f9fbbeac6 identical; direct installed-to-target differs only in contract and update",
+    "existingSelectiveSourceCi": "PASS #44460200333",
+    "existingC996SourceCi": "PASS #44460200357",
+    "windowsHandoffExecuted": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/update.mjs"
+  ],
+  "preserve": [
+    "Operating Controller b9099839df1a7cc6b3b166a139f7fac6938ada66 and its protected state",
+    "Historical #2094 STAGED artifacts and ledgers",
+    "All operating Runner registrations, Core/Korea task XML, approved absence of Iran R13",
+    "SQLite/D1/provider credentials and primary source",
+    "Existing maintenance receiver startup/origin/lock and backups"
+  ],
+  "scopeNote": "New direct immutable 7-to-7 handoff from verified installed maintainer 36cf8ff to pinned target main ancestor a6e7d1a4. Only two runtime tool bytes differ; seven other nine approved source hashes unchanged. No in-place update without source file checks, original installed byte hashes, owner/startup/lease proof, byte backups, cooperative stop, independent Windows operator and receipt. Never replay #2271 or original #2094. After PASS, separate Controller 7-path selective B pin+manifest is needed; this manifest does not authorize Controller installation."
+}
