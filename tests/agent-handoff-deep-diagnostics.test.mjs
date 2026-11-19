@@ -213,3 +213,63 @@ test('deep runner preserves valid evidence and counts unknown-clock issue',async
   assert.equal(posts.length,1);
   assert.equal(result.pcOperationalWrites,0);
 });
+
+test('bounded inventory accepts 150 complete pending Issues without arbitrary 100 stop',()=>{
+  const incidents=Array.from({length:150},(_,i)=>fixture(500+i));
+  const selected=selectRecentHandoffs(incidents.map(x=>x.issue),now);
+  assert.equal(selected.selected.length,150);
+  assert.deepEqual(selected.unknownClockIssues,[]);
+  assert.throws(()=>selectRecentHandoffs(
+    Array.from({length:201},(_,i)=>fixture(800+i).issue),now),/INVENTORY_STOP/);
+});
+
+test('unrelated Issue read error cannot block a verified following report',async()=>{
+  const failed=fixture(711),good=fixture(712);
+  const comments=[];let posts=0;
+  const io={
+    listIssues:async()=>[failed.issue,good.issue],
+    readIssue:async n=>{
+      if(n===711)throw Error('transient per-Issue network error');
+      return structuredClone(good.issue);
+    },
+    readComments:async n=>n===1743?structuredClone(comments):structuredClone(good.comments),
+    readLedger:async()=>({number:1743,state:'open',user:{login:owner},
+      body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:comments.length}),
+    readOrigin:async()=>originFor(good),readOriginComments:async()=>[],
+    mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
+    recentHistory:async()=>[],
+    postLedger:async body=>{
+      posts++;
+      comments.push({id:17000+posts,created_at:new Date().toISOString(),body,
+        user:{login:'github-actions[bot]'}});
+    }
+  };
+  const output=await processDeepQueue(io,now);
+  assert.equal(output.posted,1);
+  assert.equal(output.unverified,1);
+  assert.deepEqual(output.unverifiedIssues,
+    [{issueNumber:711,reason:'ISSUE_EVIDENCE_READ_UNAVAILABLE'}]);
+  assert.deepEqual(output.observed.map(x=>x.issue),[712]);
+  assert.equal(posts,1);
+  assert.equal(output.pcOperationalWrites,0);
+});
+
+test('global authentication errors and evidence drift remain hard stops',async()=>{
+  const f=fixture(720);let posts=0;
+  const baseline={
+    listIssues:async()=>[f.issue],
+    readLedger:async()=>({number:1743,state:'open',user:{login:owner},
+      body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:0}),
+    readComments:async n=>n===1743?[]:f.comments,
+    readOrigin:async()=>originFor(f),
+    readOriginComments:async()=>[],
+    mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
+    recentHistory:async()=>[],postLedger:async()=>{posts++;}
+  };
+  await assert.rejects(()=>processDeepQueue({...baseline,
+    readIssue:async()=>{throw Error('HANDOFF_DEEP_RUNNER_GITHUB_HTTP_403');}
+  },now),/GITHUB_HTTP_403/);
+  await assert.rejects(()=>processDeepQueue({...baseline,
+    readIssue:async()=>({...f.issue,title:'changed title'})},now),/ISSUE_DRIFT/);
+  assert.equal(posts,0);
+});
