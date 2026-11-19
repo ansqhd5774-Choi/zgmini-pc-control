@@ -125,7 +125,9 @@ export function inspectApprovedA(auth,{dataRoot=String.raw`E:\ZGmini\data`,
  if(auth.profiles.length>4)return {status:'DONE',
   code:'A_RUNTIME_SUMMARY_ONLY',mode:'SUMMARY_ONLY',
   registeredCount:auth.registeredCount,selectedCount:auth.profiles.length,
-  fileHashesComplete:false,taskChecksComplete:false,
+  registrySha256:auth.registrySha256,controlSha:auth.controlSha,
+  requestedSourceSha:auth.req.sourceSha,blockedProfiles:0,profiles:[],
+  fileHashesComplete:false,taskChecksComplete:false,taskEnabledVerified:false,
   operationalWrites:0,providerCalls:0,d1Writes:0};
  const profiles=auth.profiles.map(profile=>{
   try{
@@ -169,12 +171,15 @@ export function inspectApprovedA(auth,{dataRoot=String.raw`E:\ZGmini\data`,
  const taskChecksComplete=blocked===0&&profiles.every(p=>
   Object.values(p.tasks??{}).every(x=>x.status==='XML_READ'&&
    x.expectedCommandPresent!==false&&x.expectedHourPresent!==false));
+ // XML readback is not evidence that every Task is enabled. Keep it separate.
+ const taskEnabledVerified=taskChecksComplete&&profiles.every(p=>
+  Object.values(p.tasks??{}).every(x=>x.enabled===true));
  return {status:blocked?'BLOCKED':'DONE',
   code:blocked?'A_RUNTIME_PARTIAL':'A_RUNTIME_FILE_AND_TASK_READONLY',
   mode:'DETAILED',registeredCount:auth.registeredCount,
   registrySha256:auth.registrySha256,controlSha:auth.controlSha,
   requestedSourceSha:auth.req.sourceSha,selectedCount:profiles.length,
-  fileHashesComplete:blocked===0,taskChecksComplete,
+  fileHashesComplete:blocked===0,taskChecksComplete,taskEnabledVerified,
   blockedProfiles:blocked,profiles,operationalWrites:0,providerCalls:0,d1Writes:0};
 }
 async function main(){
