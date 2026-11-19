@@ -57,11 +57,13 @@ export function probeFixedAclBoundary({
  if(platform!=='win32')return {status:'NOT_WINDOWS'};
  const all=[ownerProfile,ownerTemp,r5Root,attempt];
  if(all.some(v=>typeof v!=='string'))return {status:'FIXED_PATHS_INVALID'};
- const fixed='C:\\Users\\ansqh';
- if(path.win32.normalize(ownerProfile).toLowerCase()!==fixed.toLowerCase()||
-  !path.win32.normalize(ownerTemp).toLowerCase().startsWith((fixed+'\\').toLowerCase())||
-  !path.win32.normalize(r5Root).toLowerCase().startsWith((ownerTemp+'\\').toLowerCase())||
-  !path.win32.normalize(attempt).toLowerCase().startsWith((r5Root+'\\').toLowerCase()))
+ const expected=[
+  'C:\\Users\\ansqh',
+  'C:\\Users\\ansqh\\AppData\\Local\\Temp',
+  'C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7',
+  'C:\\Users\\ansqh\\AppData\\Local\\Temp\\C996_ISO_R5_80f18cafcbd44c82af95082138eb51e7\\ISO_ATTEMPT_187cd12b4d2a4789b9ef549ba9cda886',
+ ];
+ if(all.some((value,i)=>path.win32.normalize(value).toLowerCase()!==expected[i].toLowerCase()))
    return {status:'FIXED_PATHS_INVALID'};
  const script=fixedPowerShell(all);
  let child;
