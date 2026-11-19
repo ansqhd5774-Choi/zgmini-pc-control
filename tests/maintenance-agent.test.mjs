@@ -351,7 +351,7 @@ test("Issue body cannot add shell, file, path, token or URL fields",async t=>{
 });
 
 test('trusted malformed correlation ID gets one exact admission rejection and can be corrected',async t=>{
- const f=fixture(t);f.issue.body=JSON.stringify({...f.request,chatId:'chat-human-readable-label'});
+ const f=fixture(t);f.issue.body=JSON.stringify({...f.request,chatId:'chat-invalid/../../label'});
  const first=await f.agent.pollOnce();
  assert.equal(first[0].code,'UPDATE_CHAT_ID_INVALID');
  assert.equal(first[0].phase,'REQUEST_ADMISSION');assert.equal(first[0].executionStarted,false);
