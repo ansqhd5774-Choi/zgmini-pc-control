@@ -188,3 +188,18 @@ test('report step fails closed if only one of JSON and TXT was verified',()=>{
  assert.equal(reportUploadState([false,false]),'PARTIAL');
  assert.throws(()=>reportUploadState([true]),/AI_V2_REPORT_VERIFICATION_INVALID/);
 });
+
+test('completed #182 one-shot registration has no active Issue-triggered Workflow',()=>{
+ const obsolete=new URL('../.github/workflows/pc-ai-software-v2-register-once.yml',import.meta.url);
+ assert.equal(fs.existsSync(obsolete),false,'a retired one-shot may not be reactivated by another Issue');
+ const reservation=new URL('../results/ai-software-v2-register-once-reservation.json',import.meta.url);
+ const receipt=JSON.parse(fs.readFileSync(reservation,'utf8'));
+ const resultPath=new URL('../results/ai-software-v2-'+receipt.requestId+'.json',import.meta.url);
+ const result=JSON.parse(fs.readFileSync(resultPath,'utf8'));
+ assert.equal(receipt.issueNumber,182);
+ assert.equal(receipt.state,'EXECUTION_STARTED_NO_AUTO_RETRY');
+ assert.equal(result.requestId,receipt.requestId);
+ assert.equal(result.code,'AI_V2_PRIVATE_REGISTRATION_VERIFIED');
+ assert.equal(result.status,'PASS');
+ assert.equal(result.registered,true);
+});
