@@ -222,7 +222,7 @@ export function retainPit0408PrivateEvidence({outputDir,host,request,keyReview,a
   if(!row||Object.keys(row).length!==allowed.size
     ||Object.keys(row).some(k=>!allowed.has(k))
     ||row.logicalSeriesId!=='STATE_INITIAL_CLAIMS'
-    ||!PIT04_STATES.has(row.geographyCode)
+    ||!PIT04_REGIONS.has(row.geographyCode)
     ||!/^20\d{2}-\d{2}-\d{2}$/.test(row.observationDate??'')
     ||row.rawPitAttested!==false||row.repairAuthorized!==false
     ||typeof row.coreHistoryMissing!=='boolean'
