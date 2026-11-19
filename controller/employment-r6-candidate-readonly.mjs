@@ -134,6 +134,62 @@ export function projectPit04KeyReview(review,{offset,asOfDate}={}){
   rawPitAttested:false,promotionApproved:false,repairAuthorized:false};
 }
 
+
+const PIT0605_CLASSES=['ORIGINAL_VERSION_AND_HISTORICAL_AVAILABILITY_PROVED',
+ 'RAW_OBSERVATION_MATCH_HISTORICAL_TIME_UNPROVEN',
+ 'RAW_OBSERVATION_OR_REVISION_CONFLICT','RAW_NOT_FOUND_IN_CHECKED_SCOPE'];
+export function projectPit0605Aggregate(raw){
+ if(raw?.kind!=='ZGMINI_W04_PIT0605_AGGREGATE_ONLY_V1'
+ ||raw.status!=='HOLD_HISTORICAL_PIT_UNATTESTED'
+ ||raw.historicalVersionAttested!==false||raw.repairAuthorized!==false
+ ||raw.operationalWrites!==0||raw.providerCalls!==0||raw.d1Writes!==0
+ ||!/^[a-f0-9]{64}$/.test(raw.evidenceDigest??'')
+ ||!Number.isFinite(Date.parse(raw.checkedAt??'')))stop('R6_PIT0605_REPORT_INVALID');
+ const missing=count(raw.missingHistoryKeys);
+ const snapshots=count(raw.checkedRawSnapshots),accepted=count(raw.acceptedDOLSnapshots);
+ const malformed=count(raw.malformedRawSnapshotGroups);
+ const counts=Object.fromEntries(PIT0605_CLASSES.map(k=>[k,count(raw.counts?.[k])]));
+ const rejected=Object.fromEntries(['bodyOrId','metadata','run','parser']
+  .map(k=>[k,count(raw.rejectedRawSnapshots?.[k])]));
+ if(missing===null||missing>50000
+  ||[snapshots,accepted,malformed,...Object.values(counts),...Object.values(rejected)].some(x=>x===null)
+  ||Object.values(counts).reduce((a,b)=>a+b,0)!==missing
+  ||counts.ORIGINAL_VERSION_AND_HISTORICAL_AVAILABILITY_PROVED!==0
+  ||accepted>snapshots)stop('R6_PIT0605_REPORT_INVALID');
+ return {kind:raw.kind,status:raw.status,checkedAt:raw.checkedAt,missingHistoryKeys:missing,
+  counts,checkedRawSnapshots:snapshots,acceptedDOLSnapshots:accepted,
+  malformedRawSnapshotGroups:malformed,rejectedRawSnapshots:rejected,
+  evidenceDigest:raw.evidenceDigest,historicalVersionAttested:false,repairAuthorized:false};
+}
+export function retainPit0605PrivateEvidence({outputDir,host,request,aggregate}){
+ const file=path.join(outputDir,'PIT0605_PRIVATE_KEY_EVIDENCE.json');
+ const st=fs.lstatSync(file);
+ if(!st.isFile()||st.isSymbolicLink()||st.size<10||st.size>32*1024*1024)
+   stop('R6_PIT0605_PRIVATE_SOURCE_INVALID');
+ const bytes=fs.readFileSync(file);
+ let proof;
+ try{proof=JSON.parse(bytes.toString('utf8'));}catch{stop('R6_PIT0605_PRIVATE_INVALID');}
+ if(proof?.kind!=='PIT0605_PC_WORKSPACE_PRIVATE_V1'
+  ||proof.digest!==aggregate.evidenceDigest
+  ||!Array.isArray(proof.rows)||proof.rows.length!==aggregate.missingHistoryKeys
+  ||digest(JSON.stringify(proof.rows))!==aggregate.evidenceDigest)
+   stop('R6_PIT0605_PRIVATE_INVALID');
+ const home=host?.dataRoot;
+ if(typeof home!=='string'||!path.isAbsolute(home)
+   ||path.basename(home).toLowerCase()!=='data')stop('R6_PIT0605_PRIVATE_ROOT_UNAVAILABLE');
+ const writer=path.join(home,'pc-writer'),root=path.join(writer,'pit-evidence');
+ if(!fs.statSync(writer).isDirectory())stop('R6_PIT0605_PRIVATE_ROOT_UNAVAILABLE');
+ try{fs.mkdirSync(root,{recursive:false});}catch(e){if(e?.code!=='EEXIST')throw e;}
+ const dir=fs.lstatSync(root);
+ if(!dir.isDirectory()||dir.isSymbolicLink())stop('R6_PIT0605_PRIVATE_ROOT_UNAVAILABLE');
+ const filename='pit0605-'+request.requestId+'.json',target=path.join(root,filename);
+ fs.writeFileSync(target,bytes,{flag:'wx',mode:0o600});
+ const sha=digest(bytes);
+ if(digest(fs.readFileSync(target))!==sha)stop('R6_PIT0605_PRIVATE_READBACK_MISMATCH');
+ return {evidenceFileRef:'PC_WRITER_PIT_EVIDENCE/'+filename,
+  evidenceFileSha256:sha,privateEvidenceReadback:true};
+}
+
 export function validateBundle(request,{host,workspace}){
   if(Object.hasOwn(request,'pit04Offset')&&(!Number.isSafeInteger(request.pit04Offset)
      ||request.pit04Offset<0||request.pit04Offset>50000))stop('R6_PIT04_OFFSET_INVALID');
@@ -168,6 +224,11 @@ export function validateBundle(request,{host,workspace}){
     !['lib/market-score/employment-r6-pit04-key-evidence.mjs',
       'scripts/pc-writer/employment-r6-pit-coverage.mjs'].every(p=>Object.hasOwn(files,p)))
     stop('R6_PIT04_SOURCE_NOT_APPROVED');
+  if(request.pit0605Raw===true&&
+     !['lib/market-score/employment-r6-pit04-key-evidence.mjs',
+       'lib/market-score/employment-r4-shadow-provider.mjs',
+       'scripts/pc-writer/employment-r6-pit-coverage.mjs'].every(p=>Object.hasOwn(files,p)))
+     stop('R6_PIT0605_SOURCE_NOT_APPROVED');
   for(const [name,sha] of Object.entries(files)){
     if(!HASH.test(sha)||!name||name.startsWith('/')||name.includes('\\')
       ||name.split('/').some(s=>!s||s==='.'||s==='..')||!/^[-a-zA-Z0-9_./]+$/.test(name))stop('R6_BUNDLE_PATH_INVALID');
@@ -231,6 +292,7 @@ export async function inspectEmploymentR6Candidate(request,context){
     argv.push('--as-of',context.host.employmentR6AsOfDate);
   }
   if(Object.hasOwn(request,'pit04Offset'))argv.push('--pit04-offset',String(request.pit04Offset));
+  if(request.pit0605Raw===true)argv.push('--pit0605-raw','1');
   const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
     PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace,HOME:workspace,USERPROFILE:workspace};
   const child=await runChild(path.join(target,ENTRY),argv,{cwd:target,env});
@@ -245,6 +307,23 @@ export async function inspectEmploymentR6Candidate(request,context){
       ||body.providerCalls!==0||body.d1Writes!==0
       ||body.publicationStatus!=='NOT_REQUESTED'||body.promotionApproved!==false
       ||child.truncated||child.exitCode!==(body.status==='PASS'?0:2))stop('R6_RESULT_INVALID');
+    if(request.pit0605Raw===true){
+      if(body.kind!=='EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
+        ||body.status!=='PASS'||body.code!=='PIT0605_SOURCE_EVIDENCE_CLASSIFIED_NOT_PIT'
+        ||body.providerCalls!==0||body.d1Writes!==0
+        ||body.publicationStatus!=='NOT_REQUESTED'||body.promotionApproved!==false
+        ||child.truncated||child.exitCode!==0)stop('R6_PIT0605_REPORT_INVALID');
+      const aggregate=projectPit0605Aggregate(body.pit0605Aggregate);
+      const retained=retainPit0605PrivateEvidence({
+       outputDir,host:context.host,request,aggregate});
+      return {status:'PASS',code:'R6_PIT0605_SOURCE_CLASSIFIED_NOT_TRUE_PIT',
+       actualExecutionSha:request.sourceSha,sqliteOpened:true,
+       pit0605Aggregate:aggregate,...retained,
+       promotionApproved:false,repairAuthorized:false,
+       operationalWrites:0,providerCalls:0,d1Writes:0};
+    }
+    if(body.kind!=='EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1')
+       stop('R6_RESULT_INVALID');
     // The child is an immutable approved source; project only documented
     // aggregate fields and statuses, never report paths, raw rows or errors.
     if(body.status==='PASS'&&(!Array.isArray(body.indicators)||body.indicators.length!==29
