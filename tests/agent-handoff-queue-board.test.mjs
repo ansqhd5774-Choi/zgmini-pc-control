@@ -5,7 +5,7 @@ import {parseHandoff,fingerprintHandoff,routeHandoff} from '../agent-handoff/con
 import {assessPriority,sortAdvisoryQueue,hoursSince} from '../agent-handoff/queue-priority.mjs';
 import {selectionReceipt,orderedPendingIssues,HANDOFF_REPOSITORY,HANDOFF_BOT,HANDOFF_OWNER} from '../agent-handoff/queue-selector.mjs';
 import {WORK_SCHEMA,workReceipt} from '../agent-handoff/work-progress-contract.mjs';
-import {evaluateQueueItem,compileQueueBoard,renderBoardMarkdown} from '../agent-handoff/queue-board.mjs';
+import {evaluateQueueItem,compileQueueBoard,renderBoardMarkdown,ownerExecutionPlan} from '../agent-handoff/queue-board.mjs';
 import {validateBoardEvent,collectBoard,BOARD_CRON} from '../agent-handoff/queue-board-runner.mjs';
 
 const now=Date.parse('2026-11-16T12:30:00Z');
@@ -77,6 +77,32 @@ test('authentic selected but not yet acknowledged incident produces review warni
   assert.equal(x.alert,'ACK_DELAY_REVIEW');
   assert.equal(x.ownerAccountVerified,false);
   assert.equal(x.chatSessionVerified,false);
+});
+
+test('previously selected incident remains actionable until an authenticated owner ACK',()=>{
+  const f=fixture();
+  const board=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
+  const plan=ownerExecutionPlan(board);
+  assert.equal(plan.state,'OWNER_ACTION_REQUIRED');
+  assert.deepEqual(plan.ownerActionRequired,[f.issue.number]);
+  assert.equal(plan.thisProcessExecutesAi,false);
+  assert.equal(plan.processorAvailability,'NOT_ATTESTED');
+});
+
+test('verified owner ACK leaves unclaimed queue without pretending automatic AI execution',()=>{
+  const f=fixture();const comments=[...f.comments,...update(f,100,'ACKNOWLEDGED','2026-11-16T00:00:00Z')];
+  const plan=ownerExecutionPlan(compileQueueBoard([{issue:f.issue,comments}],now));
+  assert.deepEqual(plan.ownerActionRequired,[]);
+  assert.deepEqual(plan.acknowledged,[f.issue.number]);
+  assert.deepEqual(plan.working,[]);
+});
+
+test('missing owner receipt remains proof review rather than acknowledged/working',()=>{
+  const f=fixture();const [c]=update(f,100,'ACKNOWLEDGED','2026-11-16T00:00:00Z');
+  const plan=ownerExecutionPlan(compileQueueBoard([{issue:f.issue,comments:[...f.comments,c]}],now));
+  assert.deepEqual(plan.proofReviewRequired,[f.issue.number]);
+  assert.deepEqual(plan.acknowledged,[]);
+  assert.throws(()=>ownerExecutionPlan({records:[]}),/EXECUTION_PLAN_INPUT/);
 });
 test('missing selector receipt is not a verified assignment or false ACK',()=>{
   const f=fixture();

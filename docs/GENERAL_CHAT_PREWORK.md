@@ -1,5 +1,7 @@
 # 일반챗 작업 전 공통 지침
 
+**인계 후 실행(2026-11-19):** 접수·후보 선정은 실제 인수/실행이 아니다. 현재 담당자가 받았으면 기존 Incident에 ACKNOWLEDGED→WORKING을 기록하고 승인된 지원 행동을 끝까지 실행·결과 회신한다. selector의 `OWNER_ACTION_REQUIRED`는 이전 후보 중 미인수 건도 포함한다. 중개기의 고정 `NOT_CONFIGURED`를 전체 처리자의 현재 상태로 단정하지 않는다. 과거 완료/취소된 무변경 A 조회의 내부 로그가 없다는 이유로 현재 지원되는 승인 읽기까지 전역 차단하지 않는다. 쓰기 결과 불명확·활성 lease는 그대로 보호한다. 상세 [실행 우선 정정](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md).
+
 **공통 총괄 업무 요청(2026-11-17):** 공통 Controller/Runner/GitHub Actions/Writer 도구/승인·설치·공유 자원/인계 시스템의 구조 결함만 총괄에 요청한다. 기능별 수집·산식·게시·설치는 원담당이 수행한다. 제어 저장소의 기존 `agent-handoff` Issue에 `ZGMINI_AGENT_HANDOFF_V1`, `agent-handoff` 라벨과 원본 Issue/Run·LAST PASS/FIRST FAIL·source SHA·정확한 지원 목표를 제시한다. GitHub 접수 영수증, 실제 처리자 전달·인수, 결과 원본 회신, 원담당 실제 수신은 **서로 다른 단계**다. [상세 업무목록·요청/회신 계약](PC_AUTOMATION_STANDARD.md#공통-프로세스-총괄--요청-가능-업무접수작업-회신-2026-11-17).
 
 

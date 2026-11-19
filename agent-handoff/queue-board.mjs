@@ -148,3 +148,25 @@ export function renderBoardMarkdown(board){
     '- 이 스냅샷은 후보 선별·인수/결과 Workflow 성공 후, 수동 실행 또는 15분 간격 GitHub 예약 실행 시 갱신됩니다. 예약은 지연되거나 누락될 수 있습니다.');
   return out.join('\n')+'\n';
 }
+
+// A selector receipt is not a completed assignment. Include older selections
+// in the execution backlog on every pass, without dispatching duplicate work.
+export function ownerExecutionPlan(board){
+  if(board?.schema!=='ZGMINI_HANDOFF_BOARD_R1'||!Array.isArray(board.records))
+    fail('EXECUTION_PLAN_INPUT');
+  const ids=statuses=>board.records.filter(x=>statuses.includes(x.status))
+    .map(x=>x.issueNumber);
+  const ownerActionRequired=ids(['PENDING_OWNER_ACK']);
+  return Object.freeze({
+    state:ownerActionRequired.length?'OWNER_ACTION_REQUIRED':'EXECUTION_BACKLOG_OBSERVED',
+    ownerActionRequired,
+    acknowledged:ids(['ACKNOWLEDGED']),working:ids(['WORKING']),
+    waitingEvidence:ids(['WAITING_EVIDENCE']),
+    resultRecorded:ids(['RESULT_EVIDENCE_RECORDED']),
+    proofReviewRequired:ids(['PROOF_REVIEW_REQUIRED','AWAITING_CANDIDATE_SELECTION']),
+    // This describes this metadata process, never the availability of an
+    // independently configured ChatGPT/Codex processor.
+    thisProcessExecutesAi:false,processorAvailability:'NOT_ATTESTED',
+    automaticPcRetries:0,
+  });
+}

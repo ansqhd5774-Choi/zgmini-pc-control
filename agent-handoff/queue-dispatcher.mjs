@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {HANDOFF_REPOSITORY, HANDOFF_OWNER, processQueue} from './queue-selector.mjs';
+import {collectBoard} from './queue-board-runner.mjs';
+import {ownerExecutionPlan} from './queue-board.mjs';
 
 const API = 'https://api.github.com/repos/' + HANDOFF_REPOSITORY;
 const SOURCE_WORKFLOWS = new Set([
@@ -70,10 +72,18 @@ export async function main(env=process.env) {
     readIssue: async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
     recordReceipt: (n,body)=>request('issues/'+n+'/comments',{method:'POST',body:{body}})
   });
-  process.stdout.write(JSON.stringify({
-    state:'SELECTOR_METADATA_ONLY', ...result,
-    agentExecutionConfigured:false, pcRuntimeVerified:false})+'\n');
-  return result;
+  // Re-read current authoritative progress after selection. selected=0 does
+  // not mean NO_WORK when an earlier selection still has no owner receipt.
+  const board=await collectBoard({
+    listIssues:()=>pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending',2),
+    readComments:n=>pages('issues/'+n+'/comments',4),
+    readIssue:async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
+  },Date.now());
+  const execution=ownerExecutionPlan(board);
+  const output={...result,state:execution.state,execution,
+    pcRuntimeVerified:false};
+  process.stdout.write(JSON.stringify(output)+'\n');
+  return output;
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
   main().catch(e=>{process.stderr.write(e.message+'\n');process.exitCode=1;});
