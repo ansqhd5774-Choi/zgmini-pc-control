@@ -53,6 +53,13 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
  const invalidHeads=includeInvalidLineage?new Map():null;
  const invalidReasonCounts=Object.fromEntries(FAILURE_CODES.map(code=>[code,0]));
  const invalidReasonOrdinals=[];
+ // Diagnostic-only: inspect both independent integrity checks even when
+ // responseHash has the historical BED canonical-vs-HTTP mismatch.
+ // Do not promote these snapshots into verified or certified sets.
+ const mismatchIntegrity={
+  checked:0,bodyShaMatched:0,bodyShaMismatched:0,
+  snapshotIdMatched:0,snapshotIdMismatched:0,
+ };
  let metadataKeys=0,totalBytes=0,group=null;
  const markInvalid=reason=>{
   invalidReasonCounts[reason]++;
@@ -81,8 +88,18 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
   const detail=safeJson(h.detail_json);
   if(!detail||!Object.hasOwn(detail,'responseHash')||detail.responseHash==null)
    return markInvalid('RESPONSE_HASH_MISSING');
-  if(detail.responseHash!==h.body_sha256)
+  if(detail.responseHash!==h.body_sha256){
+   if(includeInvalidLineage){
+    mismatchIntegrity.checked++;
+    if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))===h.snapshot_id)
+     mismatchIntegrity.snapshotIdMatched++;
+    else mismatchIntegrity.snapshotIdMismatched++;
+    if(group.hasher.digest('hex')===h.body_sha256)
+     mismatchIntegrity.bodyShaMatched++;
+    else mismatchIntegrity.bodyShaMismatched++;
+   }
    return markInvalid('RESPONSE_HASH_VALUE_MISMATCH');
+  }
   if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))!==h.snapshot_id)
    return markInvalid('SNAPSHOT_ID_MISMATCH');
   if(group.hasher.digest('hex')!==h.body_sha256)
@@ -174,7 +191,10 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
   validWithoutRunKeys:verified.size-certified.size,
   invalidReasonCounts,invalidReasonOrdinals,
   invalidReasonTruncated:metadataKeys-verified.size>invalidReasonOrdinals.length,
-  ...(invalidLineage?{invalidLineageGroups:invalidLineage,invalidLineageScope:'DIAGNOSTIC_NOT_PIT'}:{})};
+  ...(invalidLineage?{
+   invalidLineageGroups:invalidLineage,invalidLineageScope:'DIAGNOSTIC_NOT_PIT',
+   mismatchIntegrity:{...mismatchIntegrity,scope:'INDEPENDENT_HASH_CHECKS_NOT_PIT'},
+  }:{})};
 }
 
 // The fixed PC data root is supplied by the installed Controller, not Issue JSON.
