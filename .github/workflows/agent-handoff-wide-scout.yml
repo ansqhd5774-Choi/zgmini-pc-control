@@ -14,7 +14,7 @@ permissions:
 jobs:
   read-only-extended-monitor:
     concurrency:
-      group: zgmini-proactive-diagnostics-ledger
+      group: zgmini-wide-scout-ledger
       cancel-in-progress: false
       queue: max
     if: >-
