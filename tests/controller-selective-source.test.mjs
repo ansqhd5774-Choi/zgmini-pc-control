@@ -127,3 +127,19 @@ test('exact installed-tree overlay diff is distinct from main-wide delta and pre
   assert.throws(()=>git('show',overlay+':controller/unapproved.mjs'));
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('W01 W04 seven-path selective review seed is exact and remains unapproved',()=>{
+ const draft={
+  installedSha:'b9099839df1a7cc6b3b166a139f7fac6938ada66',
+  targetSha:'310d777f06e51448bf0d863f52a21a1af2c086fc',
+  paths:['config/operations.json','controller/common.mjs',
+   'controller/employment-r6-candidate-readonly.mjs',
+   'controller/inflation-a401-private23-readonly.mjs',
+   'controller/inflation-a407-integrity-readonly.mjs',
+   'controller/inflation19-runtime-readonly.mjs','controller/operations.mjs']
+ };
+ assert.equal(draft.paths.length,7);
+ assert.equal(new Set(draft.paths).size,7);
+ assert.equal(draft.paths.every(p=>p.startsWith('config/')||p.startsWith('controller/')),true);
+ assert.notEqual(draft.installedSha,draft.targetSha);
+});
