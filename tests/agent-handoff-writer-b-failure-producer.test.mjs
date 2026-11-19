@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {processCompletedWriterB} from '../agent-handoff/writer-b-failure-producer.mjs';
+import {processCompletedWriterB,findRunReceiptComments} from '../agent-handoff/writer-b-failure-producer.mjs';
 import {parseHandoff} from '../agent-handoff/contract.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
@@ -50,6 +50,8 @@ function fixture(initial = report()) {
     calls: {comments: 0, file: [], list: 0, create: 0, route: 0, readIssue: []},
     failAfterPost: false, failBeforePost: false, tamperReadback: false};
   const io = {
+    getSourceJobs: async()=>[{name:'writer-source-approved-b',steps:[
+      {name:'Create-only sanitized result and originating Issue comment',conclusion:'success'}]}],
     readComments: async since => {
       state.calls.comments++;
       assert.equal(since, '2026-11-08T02:11:00Z');
@@ -367,4 +369,69 @@ test('route failure prevents Writer B intake completion and never retries the in
   await assert.rejects(processCompletedWriterB(event(), io), /COMMENT_READBACK_STOP/);
   assert.equal(state.calls.create, 1);
   assert.equal(state.calls.route, 0);
+});
+
+test('unrelated Writer B source operations do not scan comments or create incidents',async()=>{
+  const {io,state}=fixture();
+  io.getSourceJobs=async()=>[{name:'writer-source-approved-b',conclusion:'success',steps:[
+    {name:'Create-only sanitized result and originating Issue comment',conclusion:'skipped'}]}];
+  const e=event();e.workflow_run.conclusion='success';
+  const actual=await processCompletedWriterB(e,io);
+  assert.equal(actual.state,'UNRELATED_SOURCE_OPERATION');
+  assert.equal(state.calls.comments,0);
+  assert.equal(state.calls.create,0);
+});
+test('unverified source job provenance does not create incident',async()=>{
+  const {io,state}=fixture();
+  io.getSourceJobs=async()=>[];
+  await assert.rejects(processCompletedWriterB(event(),io),/SOURCE_JOBS_UNVERIFIED/);
+  assert.equal(state.calls.comments,0);
+  assert.equal(state.calls.create,0);
+});
+
+test('failed source checkout with skipped reporter is not silently unrelated',async()=>{
+  const {io,state}=fixture();
+  io.getSourceJobs=async()=>[{name:'writer-source-approved-b',conclusion:'failure',steps:[
+    {name:'Create-only sanitized result and originating Issue comment',conclusion:'skipped'}]}];
+  const e=event();e.workflow_run.conclusion='failure';
+  const result=await processCompletedWriterB(e,io);
+  assert.equal(result.state,'SOURCE_REPORT_STATE_UNKNOWN');
+  assert.equal(state.calls.comments,0);
+  assert.equal(state.calls.create,0);
+});
+
+test('Run ID lookup ignores unlimited unrelated repository comments',async()=>{
+  const candidate={number:874,title:'pc-writer-source-install',
+    labels:[{name:'pc-writer-b-install'}]};
+  let called=0;
+  const rows=await findRunReceiptComments(runId,{
+    searchIssues:async id=>{
+      assert.equal(id,runId);
+      return {incomplete_results:false,total_count:1,items:[candidate]};
+    },
+    readIssueComments:async n=>{
+      assert.equal(n,874);called++;
+      return [comment(report()),{body:'unrelated',user:{login:owner}}];
+    }
+  });
+  assert.equal(called,1);
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].user.login,bot);
+});
+test('Run ID discovery refuses incomplete search without creating evidence',async()=>{
+  await assert.rejects(findRunReceiptComments(runId,{
+    searchIssues:async()=>({incomplete_results:true,total_count:0,items:[]}),
+    readIssueComments:async()=>{throw Error('must not read');}
+  }),/RECEIPT_SEARCH_INCOMPLETE/);
+});
+
+test('source receipt is found in bounded recent comments while search indexing lags',async()=>{
+  let direct=0;
+  const out=await findRunReceiptComments(runId,{
+    searchIssues:async()=>({incomplete_results:false,total_count:0,items:[]}),
+    readRecentComments:async()=>[comment(report()),{body:'unrelated'}],
+    readIssueComments:async n=>{assert.equal(n,874);direct++;return [comment(report())];}
+  });
+  assert.equal(direct,1);
+  assert.equal(out.length,1);
 });

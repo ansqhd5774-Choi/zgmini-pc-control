@@ -60,12 +60,12 @@ function authorizedManifestPath(originIssue) {
 
 /** A verified completed Writer B run can generate *at most one* incident. */
 export async function processCompletedWriterB(event, {
-  readComments, readIssue, readFile, listHandoffs, createHandoff,
+  readComments, readIssue, readFile, listHandoffs, createHandoff, getSourceJobs,
   listResourceWaitComments, createResourceWaitComment, readResourceWaitComment,
   routeHandoff
 }) {
   const run = assertCompletedWriterBEvent(event);
-  if ([readComments, readIssue, readFile, listHandoffs, createHandoff]
+  if ([readComments, readIssue, readFile, listHandoffs, createHandoff, getSourceJobs]
     .some(fn => typeof fn !== 'function')) stop('IO_NOT_CONFIGURED');
   const initial = {state: 'SCAN_COMPLETED', runId: run.runId,
     originalIssues: 0, verifiedResults: 0, confirmedFailures: 0,
@@ -74,7 +74,24 @@ export async function processCompletedWriterB(event, {
 
   // The source workflow fires on all owner-opened Issues. Most runs have a
   // skipped Writer B job, so absence of its exact bot receipt is not failure.
-  const comments = await readComments(run.since);
+  // The source workflow multiplexes unrelated approved operations. Check the
+  // exact Writer B reporter step before reading repository-wide comments.
+  const sourceJobs=await getSourceJobs(run.runId);
+  if(!Array.isArray(sourceJobs)||sourceJobs.length!==1||
+    sourceJobs[0]?.name!=='writer-source-approved-b'||
+    !Array.isArray(sourceJobs[0]?.steps))stop('SOURCE_JOBS_UNVERIFIED');
+  const reportSteps=sourceJobs[0].steps.filter(x=>
+    x?.name==='Create-only sanitized result and originating Issue comment');
+  if(reportSteps.length!==1)stop('SOURCE_REPORT_STEP_UNVERIFIED');
+  if(reportSteps[0].conclusion==='skipped')
+    return Object.freeze({...initial,state:
+      sourceJobs[0].conclusion==='success'?'UNRELATED_SOURCE_OPERATION':
+      'SOURCE_REPORT_STATE_UNKNOWN'});
+  if(reportSteps[0].conclusion!=='success'&&
+     reportSteps[0].conclusion!=='failure'&&
+     reportSteps[0].conclusion!=='cancelled')
+    return Object.freeze({...initial,state:'SOURCE_REPORT_STATE_UNKNOWN'});
+  const comments = await readComments(run.since,run.runId);
   const receipt = findWriterBReceipt(comments, run.runId);
   if (!receipt) {
     // Invalid Writer B admission emits a distinct authenticated rejection
@@ -182,6 +199,51 @@ async function completePages(endpoint, category, maxPages=MAX_PAGES) {
   stop(`${category}_INVENTORY_LIMIT`);
 }
 
+// Narrow GitHub search by the immutable Run ID. Search is discovery only:
+// every returned candidate is re-read from its original Issue and validated.
+export async function findRunReceiptComments(runId,{searchIssues,readIssueComments,readRecentComments}){
+  if(!positive(runId)||typeof searchIssues!=='function'||
+     typeof readIssueComments!=='function')stop('RECEIPT_LOOKUP_CONFIG');
+  const result=await searchIssues(runId);
+  if(!result||result.incomplete_results!==false||
+     !Number.isSafeInteger(result.total_count)||result.total_count<0||
+     result.total_count>100||!Array.isArray(result.items)||
+     result.items.length!==result.total_count)
+    stop('RECEIPT_SEARCH_INCOMPLETE');
+  const seen=new Set(),comments=[];
+  // Search indexing may trail the source comment. A single newest-first
+  // discovery page is a bounded fallback, never an exhaustive global gate.
+  let candidates=result.items;
+  if(candidates.length===0&&typeof readRecentComments==='function'){
+    const recent=await readRecentComments();
+    if(!Array.isArray(recent)||recent.length>100)stop('RECENT_COMMENTS_INCOMPLETE');
+    const ids=new Set();
+    for(const c of recent){
+      if(c?.user?.login!==BOT||typeof c.body!=='string'||
+         !c.body.includes('RUN_ID: '+runId+'; RETRY: NO_REEXECUTE'))continue;
+      const m=c.issue_url?.match(
+        /^https:\/\/api\.github\.com\/repos\/ansqhd5774-Choi\/zgmini-pc-control\/issues\/([1-9][0-9]*)$/);
+      if(m)ids.add(Number(m[1]));
+    }
+    candidates=await Promise.all([...ids].map(n=>Promise.resolve({
+      number:n,title:'pc-writer-source-install',
+      labels:[{name:'pc-writer-b-install'}]})));
+  }
+  for(const issue of candidates){
+    if(!positive(issue?.number)||issue.pull_request||
+       seen.has(issue.number)||issue.title!=='pc-writer-source-install'||
+       !issue.labels?.some(x=>x.name==='pc-writer-b-install'))
+      continue;
+    seen.add(issue.number);
+    const rows=await readIssueComments(issue.number);
+    if(!Array.isArray(rows))stop('RECEIPT_ISSUE_COMMENTS_INVALID');
+    comments.push(...rows.filter(x=>
+      typeof x?.body==='string'&&
+      x.body.includes('RUN_ID: '+runId+'; RETRY: NO_REEXECUTE')));
+    if(comments.length>500)stop('RECEIPT_MATCH_LIMIT');
+  }
+  return comments;
+}
 async function fileReadback(filePath, ref, maxBytes) {
   const content = await request(`contents/${filePath}?ref=${ref}`, {missingOk: true});
   if (!content) return null;
@@ -199,8 +261,32 @@ export async function main(env = process.env) {
       !env.GITHUB_EVENT_PATH) stop('ENVIRONMENT_NOT_ALLOWED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   const result = await processCompletedWriterB(event, {
-    readComments: since => completePages(
-      `issues/comments?since=${encodeURIComponent(since)}`, 'COMMENTS'),
+    getSourceJobs: async id => {
+      const result=await request(`actions/runs/${id}/jobs?per_page=100`);
+      if(!Array.isArray(result?.jobs)||result.jobs.length!==1)
+        stop('SOURCE_JOBS_INCOMPLETE');
+      return result.jobs;
+    },
+    readComments: (_since,id)=>findRunReceiptComments(id,{
+      searchIssues:async runId=>{
+        const q='repo:'+REPO+' is:issue in:comments "RUN_ID: '+runId+'"';
+        const url='https://api.github.com/search/issues?q='+
+          encodeURIComponent(q)+'&per_page=100';
+        const res=await fetch(url,{headers:{
+          Authorization:'Bearer '+process.env.GITHUB_TOKEN,
+          Accept:'application/vnd.github+json',
+          'X-GitHub-Api-Version':'2022-11-28'},
+          signal:AbortSignal.timeout(25000)});
+        if(!res.ok)stop('RECEIPT_SEARCH_HTTP_'+res.status);
+        return res.json();
+      },
+      readIssueComments:n=>completePages('issues/'+n+'/comments','ORIGIN_COMMENTS'),
+      readRecentComments:async()=>{
+        const rows=await request('issues/comments?sort=created&direction=desc&per_page=100');
+        if(!Array.isArray(rows)||rows.length>100)stop('RECENT_COMMENTS_INVALID');
+        return rows;
+      }
+    }),
     readIssue: async issue => ({...await request(`issues/${issue}`), repository: REPO}),
     readFile: fileReadback,
     listHandoffs: async () => ({repository: REPO, complete: true,

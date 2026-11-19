@@ -26,6 +26,8 @@ jobs:
         run: node --test tests/pc-source-origin-readonly.test.mjs tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs tests/agent-handoff-pc-resource-wait.test.mjs tests/shared-resource-lifecycle.test.mjs
       - name: Verify 007 wide scout shard and concurrency regressions
         run: node --test tests/agent-handoff-wide-scout.test.mjs tests/agent-handoff-job-concurrency.test.mjs
+      - name: Verify 008 Writer B failure intake regressions
+        run: node --test tests/agent-handoff-writer-b-failure-producer.test.mjs tests/agent-handoff-writer-b-workflow.test.mjs tests/shared-resource-controller-independent.test.mjs
       - name: Verify direct Writer B local ledger and configured-runtime status contracts
         run: node --test direct-writer-b/configured-direct-b.test.mjs
       - name: Verify exact R6 missing week and jurisdiction readonly evidence
