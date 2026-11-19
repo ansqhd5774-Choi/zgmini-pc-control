@@ -202,7 +202,7 @@ test('mismatched BED-style response metadata still checks body and snapshot ID i
  assert.equal(report.bodyVerifiedKeys,0);
  assert.deepEqual(report.mismatchIntegrity,{
   checked:2,bodyShaMatched:1,bodyShaMismatched:1,
-  snapshotIdMatched:2,snapshotIdMismatched:0,
+  idMatched:2,idMismatched:0,
   scope:'INDEPENDENT_HASH_CHECKS_NOT_PIT',
  });
  assert.doesNotMatch(JSON.stringify(report),/SECRET_|PRIVATE_|CHANGED|REQUEST_SUCCEEDED|snapshotId|body_sha256/);
