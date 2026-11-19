@@ -1,5 +1,5 @@
 // Isolated GitHub-only monitoring runner. Reads only control-repo metadata,
-// writes only a bounded bot summary comment to pre-existing issue #1743.
+// writes only bounded bot summaries to authenticated monthly shard issues.
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -9,12 +9,61 @@ import {
 } from './wide-scout.mjs';
 const ROOT='https://api.github.com/repos/'+CONTROL_REPO+'/';
 const stop=x=>{throw Error('WIDE_SCOUT_RUNNER_'+x)};
-const allowedNames=new Set([
-  'ZGMINI Handoff Queue Candidate Selector',
-  'ZGMINI Agent Handoff PR Evidence CI'
-]);
 const workflowFiles=['agent-handoff-queue-board.yml',
   'agent-handoff-proactive-diagnostics.yml','agent-handoff-deep-diagnostics.yml'];
+const BOT='github-actions[bot]';
+const MARKER='<!-- ZGMINI_WIDE_SCOUT_LEDGER_R4';
+const shardTitle=(month,index)=>'ZGMINI Wide Scout '+month+' #'+index;
+const shardMarker=(month,index)=>MARKER+' month:'+month+' shard:'+index+' -->';
+const goodId=n=>Number.isSafeInteger(n)&&n>0;
+const monthFor=now=>new Date(now).toISOString().slice(0,7);
+const previousMonth=now=>{
+  const d=new Date(now);d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-1);
+  return monthFor(d.getTime());
+};
+function validateShard(x,month,index){
+  if(!goodId(x?.number)||x.pull_request||!['open','closed'].includes(x.state)||
+    x.title!==shardTitle(month,index)||x.user?.login!==OWNER||
+    typeof x.body!=='string'||!x.body.includes(shardMarker(month,index)))
+    stop('SHARD_IDENTITY');
+}
+async function loadShards(io,month){
+  const list=await io.findShards(month);
+  if(!Array.isArray(list)||list.length>100)stop('SHARD_INDEX_LIMIT');
+  const seen=new Set(),shards=[];
+  for(const issue of list){
+    const match=issue?.title?.match(/^ZGMINI Wide Scout (\d{4}-\d\d) #([1-9]\d*)$/);
+    if(!match||match[1]!==month)stop('SHARD_INDEX');
+    const index=Number(match[2]);
+    if(!goodId(index)||index>100||seen.has(index))stop('SHARD_INDEX_CONFLICT');
+    seen.add(index);
+    validateShard(issue,month,index);
+    const comments=await io.readShardComments(issue.number);
+    if(!Array.isArray(comments)||comments.length>WIDE_POLICY.maxComments)
+      stop('SHARD_COMMENTS_LIMIT');
+    shards.push({issue,index,comments});
+  }
+  shards.sort((a,b)=>a.index-b.index);
+  if(shards.some((x,i)=>x.index!==i+1))stop('SHARD_INDEX_GAP');
+  return shards;
+}
+async function ensureShard(io,month,shards){
+  const latest=shards.at(-1);
+  if(latest?.issue.state==='open'&&latest.comments.length<WIDE_POLICY.maxComments)
+    return latest.issue;
+  const index=(latest?.index??0)+1;
+  if(index>100)stop('SHARD_INDEX_LIMIT');
+  let created;
+  try{created=await io.createShard(month,index,shardTitle(month,index),shardMarker(month,index));}
+  catch(e){
+    const after=await loadShards(io,month);
+    const recovered=after.find(x=>x.index===index);
+    if(!recovered)stop('SHARD_CREATE_OUTCOME_UNKNOWN');
+    return recovered.issue;
+  }
+  validateShard(await io.readShard(created?.number),month,index);
+  return created;
+}
 export function validateWideEvent(event,env){
   if(event?.repository?.full_name!==CONTROL_REPO||
     event.repository.private!==true||env.GITHUB_REPOSITORY!==CONTROL_REPO||
@@ -24,25 +73,12 @@ export function validateWideEvent(event,env){
     if(event.schedule!==WIDE_POLICY.schedule)stop('SCHEDULE');
   }else if(kind==='workflow_dispatch'){
     if(event.sender?.login!==OWNER||env.GITHUB_ACTOR!==OWNER)stop('OWNER');
-  }else if(kind==='workflow_run'){
-    const run=event.workflow_run;
-    if(event.action!=='completed'||run?.conclusion!=='success'||
-      !allowedNames.has(run.name)||run.actor?.login!==OWNER||
-      (run.name==='ZGMINI Handoff Queue Candidate Selector'&&run.head_branch!=='main'))
-      stop('WORKFLOW_PROVENANCE');
   }else if(kind==='issues'){
     if(event.action!=='labeled'||event.label?.name!=='handoff-agent-pending'||
       event.issue?.user?.login!==OWNER||event.issue.state!=='open'||
       !event.issue?.labels?.some?.(x=>x.name==='agent-handoff')||
       env.GITHUB_ACTOR!==OWNER)stop('ISSUE_PROVENANCE');
   }else stop('EVENT');
-}
-function ledgerGuard(x){
-  if(x?.number!==WIDE_POLICY.ledgerIssue||x.state!=='open'||x.pull_request||
-    x.user?.login!==OWNER||typeof x.body!=='string'||
-    !x.body.includes('<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->')||
-    !Number.isSafeInteger(x.comments)||x.comments>WIDE_POLICY.maxComments)
-      stop('LEDGER_PROOF');
 }
 async function request(resource,{body=null}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN');
@@ -104,7 +140,7 @@ async function recentRuns(now){
   const rank={completed:4,in_progress:3,waiting:2,queued:1,pending:0};
   for(const batch of batches){
     for(const run of batch.items){
-      if(!Number.isSafeInteger(run?.id)||run.id<1)stop('RUN_IDENTITY');
+      if(!goodId(run?.id)){complete=false;continue;}
       const prev=map.get(run.id);
       if(prev){
         complete=false;
@@ -126,17 +162,29 @@ async function readWorkflows(){
   }
   return values;
 }
-async function readLedgerComments(){
-  const x=await paged('issues/'+WIDE_POLICY.ledgerIssue+'/comments',4,false,Date.now());
-  if(!x.complete&&x.items.length>=WIDE_POLICY.maxComments)stop('LEDGER_PAGE_LIMIT');
+async function findShards(month){
+  const q='repo:'+CONTROL_REPO+' in:title "ZGMINI Wide Scout '+month+'"';
+  const found=[];
+  for(let p=1;p<=2;p++){
+    const data=await request('search/issues?q='+encodeURIComponent(q)+
+      '&per_page=100&page='+p);
+    if(!Array.isArray(data?.items)||!Number.isSafeInteger(data.total_count)||
+      data.total_count>200)stop('SHARD_SEARCH_INCOMPLETE');
+    found.push(...data.items);
+    if(data.items.length<100)break;
+  }
+  return found.filter(x=>!x.pull_request&&x.title?.startsWith('ZGMINI Wide Scout '+month+' #'));
+}
+async function readShardComments(n){
+  const x=await paged('issues/'+n+'/comments',4,false,Date.now());
+  if(!x.complete)stop('SHARD_PAGE_INCOMPLETE');
   return x.items;
 }
 export async function scoutWide(io,now){
   if(!io||!Number.isFinite(now)||
     ['getRuns','getIssues','getPulls','getWorkflows','getScheduleCount',
-      'getLedger','getComments','postComment'].some(k=>typeof io[k]!=='function'))
-    stop('IO');
-  ledgerGuard(await io.getLedger());
+      'findShards','readShard','readShardComments','createShard','postComment']
+      .some(k=>typeof io[k]!=='function'))stop('IO');
   const [runs,issues,pulls,workflows,schedules]=await Promise.all([
     io.getRuns(now),io.getIssues(now),io.getPulls(now),
     io.getWorkflows(),io.getScheduleCount()
@@ -147,24 +195,35 @@ export async function scoutWide(io,now){
     complete:{runs:runs.complete,issues:issues.complete,pulls:pulls.complete}
   },now);
   const textReport=renderWideReport(report);
-  let comments=await io.getComments();
-  let decision=reportDecision(comments,report,now);
-  let posted=0;
+  const month=monthFor(now),previous=previousMonth(now);
+  let shards=await loadShards(io,month);
+  const previousShards=await loadShards(io,previous);
+  const comments=[...previousShards,...shards].flatMap(x=>x.comments);
+  let decision=reportDecision(comments,report,now),posted=0;
   if(decision==='REPORT'){
-    ledgerGuard(await io.getLedger());
-    comments=await io.getComments();
-    decision=reportDecision(comments,report,now);
+    // Other workers may have posted while GitHub inventory was read.
+    shards=await loadShards(io,month);
+    const current=[...previousShards,...shards].flatMap(x=>x.comments);
+    decision=reportDecision(current,report,now);
     if(decision==='REPORT'){
-      try{await io.postComment(textReport);}
-      catch(e){
-        comments=await io.getComments();
-        if(!comments.some(x=>x?.body?.includes(snapshotMarker(report))&&
-          x?.user?.login==='github-actions[bot]'))throw e;
+      const target=await ensureShard(io,month,shards);
+      shards=await loadShards(io,month);
+      const selected=shards.find(x=>x.issue.number===target.number);
+      if(!selected||selected.issue.state!=='open'||
+         selected.comments.length>=WIDE_POLICY.maxComments)stop('SHARD_WRITE_SCOPE');
+      decision=reportDecision([...previousShards,...shards].flatMap(x=>x.comments),report,now);
+      if(decision==='REPORT'){
+        try{await io.postComment(target.number,textReport);}
+        catch(error){
+          const after=await loadShards(io,month);
+          if(!after.some(x=>x.comments.some(c=>c?.body?.includes(snapshotMarker(report))&&
+             c.user?.login===BOT)))throw error;
+        }
+        const after=await loadShards(io,month);
+        if(!after.some(x=>x.comments.some(c=>c?.body?.includes(snapshotMarker(report))&&
+           c.user?.login===BOT)))stop('READBACK');
+        posted=1;
       }
-      comments=await io.getComments();
-      if(!comments.some(x=>x?.body?.includes(snapshotMarker(report))&&
-        x?.user?.login==='github-actions[bot]'))stop('READBACK');
-      posted=1;
     }
   }
   return {report,posted,decision,generated:textReport,
@@ -177,16 +236,20 @@ export async function main(env=process.env){
     getRuns:recentRuns,
     getIssues:now=>paged('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending'+
       '&sort=created&direction=desc',2,true,now),
-    getPulls:now=>paged('pulls?state=open&sort=updated&direction=desc',1,false,now),
+    getPulls:now=>paged('pulls?state=open&sort=updated&direction=desc',5,false,now),
     getWorkflows:readWorkflows,
     getScheduleCount:async()=>{
       const x=await request('actions/runs?event=schedule&per_page=1');
       if(!Number.isSafeInteger(x?.total_count))stop('SCHEDULE_COUNT_UNVERIFIED');
       return x.total_count;
     },
-    getLedger:()=>request('issues/'+WIDE_POLICY.ledgerIssue),
-    getComments:readLedgerComments,
-    postComment:body=>request('issues/'+WIDE_POLICY.ledgerIssue+'/comments',{body:{body}})
+    findShards,
+    readShard:n=>request('issues/'+n),
+    readShardComments,
+    createShard:async(month,index,title,marker)=>request('issues',{body:{
+      title,body:marker+'\\n\\nGitHub-only wide scout evidence. No PC action.',
+      labels:[]}}),
+    postComment:(n,body)=>request('issues/'+n+'/comments',{body:{body}})
   },Date.now());
   if(env.GITHUB_STEP_SUMMARY)fs.appendFileSync(env.GITHUB_STEP_SUMMARY,
     '# GitHub 확대 능동 감시 R3\n\n'+result.generated+'\n\n댓글 저장: '+
