@@ -39,10 +39,42 @@ export function validateDeepEvent(event,env){
   }else stop('EVENT');
 }
 function checkLedger(x){
+  // Historical ledger is never written by this runner again. Its current
+  // comment count may grow due to the independent proactive diagnostics job.
   if(!x||x.number!==ledgerIssue||x.state!=='open'||x.pull_request||
     x.user?.login!==owner||!x.body?.includes(ledgerMarker)||
-    !Number.isSafeInteger(x.comments)||x.comments>DEEP_POLICY.maxComments)
+    !Number.isSafeInteger(x.comments)||x.comments<DEEP_POLICY.legacyDeepReportCount)
     stop('LEDGER_UNVERIFIED');
+}
+
+// Bounded, fixed historical prefix. The last verified R2 legacy report has a
+// pinned comment ID; unrelated future writes to #1743 cannot invalidate
+// historical deduplication. This checks the original bot-authored evidence
+// without deleting, moving or copying its contents.
+export async function readLegacyDeepArchive(pageReader){
+  if(typeof pageReader!=='function')stop('LEGACY_READER');
+  const archived=[];let found=false;
+  for(let page=1;page<=4;page++){
+    const rows=await pageReader(page);
+    if(!Array.isArray(rows)||rows.length>100)stop('LEGACY_PAGE_INVALID');
+    for(const c of rows){
+      if(typeof c?.body==='string'&&
+         c.body.startsWith('<!-- ZGMINI_HANDOFF_DEEP_DIAG_R2 issue:'))
+        archived.push(c);
+      if(c?.id===DEEP_POLICY.legacyAnchorCommentId){
+        found=true;
+        if(!c.body.startsWith('<!-- ZGMINI_HANDOFF_DEEP_DIAG_R2 issue:2237 fingerprint:8883b99d3d6f00ad0195ed4d051d804710b1475eeac0d20fe398f7a9aeefbafa -->')||
+           c.user?.login!=='github-actions[bot]')
+          stop('LEGACY_ANCHOR_INVALID');
+        break;
+      }
+    }
+    if(found)break;
+    if(rows.length<100)stop('LEGACY_ANCHOR_MISSING');
+  }
+  if(!found||archived.length!==DEEP_POLICY.legacyDeepReportCount)
+    stop('LEGACY_ARCHIVE_INCOMPLETE');
+  return archived;
 }
 function identity(x){
   return JSON.stringify([x?.number,x?.state,x?.title,x?.body,x?.created_at,
@@ -51,13 +83,14 @@ function identity(x){
 }
 export async function processDeepQueue(io,now){
   const required=['listIssues','readIssue','readComments','readLedger',
-    'readOrigin','readOriginComments','mainSha','compareFile','recentHistory','postLedger'];
+    'readLegacyReports','readOrigin','readOriginComments','mainSha',
+    'compareFile','recentHistory','postIncidentReport'];
   if(!io||required.some(x=>typeof io[x]!=='function')||!Number.isFinite(now))stop('IO');
   checkLedger(await io.readLedger());
   const inventory=await io.listIssues();
   const chosen=selectRecentHandoffs(inventory,now);
-  const reports=await io.readComments(ledgerIssue);
-  if(!Array.isArray(reports)||reports.length>DEEP_POLICY.maxComments)stop('COMMENTS');
+  const legacyReports=await io.readLegacyReports();
+  if(!Array.isArray(legacyReports))stop('LEGACY_ARCHIVE_UNVERIFIED');
   const main=await io.mainSha();
   if(!sha(main))stop('MAIN_SHA');
   let posted=0,already=0,unverified=chosen.unknownClockIssues.length;
@@ -91,8 +124,10 @@ export async function processDeepQueue(io,now){
       unverifiedIssues.push({issueNumber:candidate.number,reason:'HANDOFF_RECEIPT_UNVERIFIED'});
       continue;
     }
-    const ledgerNow=await io.readComments(ledgerIssue);
-    if(alreadyReported(ledgerNow,issue,handoff)){already++;continue;}
+    // Check the immutable historical prefix and the current Incident itself.
+    // Never require the full, unbounded shared #1743 comment history.
+    if(alreadyReported(legacyReports,issue,handoff)||
+       alreadyReported(comments,issue,handoff)){already++;continue;}
     const [origin,history]=await Promise.all([
       io.readOrigin(handoff.origin.repository,handoff.origin.issueNumber),
       io.recentHistory(handoff.origin.sourceSha)
@@ -109,18 +144,26 @@ export async function processDeepQueue(io,now){
     const report=buildDeepReport(issue,handoff,{
       origin,originComments,history,source:{files,mainSha:main}
     },now);
-    checkLedger(await io.readLedger());
     if(identity(await io.readIssue(issue.number))!==identity(issue))
       stop('BEFORE_POST_DRIFT');
-    const pre=await io.readComments(ledgerIssue);
+    const pre=await io.readComments(issue.number);
+    if(!Array.isArray(pre)||pre.length>DEEP_POLICY.maxComments)
+      stop('INCIDENT_COMMENT_INVENTORY_UNVERIFIED');
+    // Route/authentication may have changed since the earlier read.
+    verifyHandoff(issue,pre);
     if(alreadyReported(pre,issue,handoff)){already++;continue;}
-    if(pre.length>=DEEP_POLICY.maxComments)stop('LEDGER_CAP');
-    try{await io.postLedger(report);}
+    if(pre.length>=DEEP_POLICY.maxComments){
+      unverified++;
+      unverifiedIssues.push({issueNumber:issue.number,reason:'INCIDENT_COMMENT_CAP'});
+      continue;
+    }
+    try{await io.postIncidentReport(issue.number,report);}
     catch{
-      if(!alreadyReported(await io.readComments(ledgerIssue),issue,handoff))
+      // An uncertain write outcome must NEVER be retried blindly.
+      if(!alreadyReported(await io.readComments(issue.number),issue,handoff))
         stop('POST_RESULT_UNKNOWN');
     }
-    if(!alreadyReported(await io.readComments(ledgerIssue),issue,handoff))
+    if(!alreadyReported(await io.readComments(issue.number),issue,handoff))
       stop('POST_READBACK');
     posted++;
     observed.push({issue:issue.number,origin:handoff.origin.issueNumber,
@@ -129,6 +172,7 @@ export async function processDeepQueue(io,now){
   return {schema:DEEP_POLICY.version,cutoff:chosen.cutoff,
     recentHandoffs:chosen.selected.length,posted,already,unverified,
     unknownClockIssues:chosen.unknownClockIssues,unverifiedIssues,observed,ledgerIssue,
+    reportStore:'INCIDENT_ISSUE_COMMENTS',legacyReportCount:legacyReports.length,
     pcOperationalWrites:0,aiCalls:0,
     pcRetries:0,sourceEdits:0,simulator:'DECISION_TABLE_ONLY'};
 }
@@ -145,8 +189,9 @@ async function api(repo,resource){
   if(!response.ok)stop('GITHUB_HTTP_'+response.status);
   return response.json();
 }
-async function postLedger(body){
-  const response=await fetch(API+HANDOFF_REPOSITORY+'/issues/'+ledgerIssue+'/comments',{
+async function postIncidentReport(issueNumber,body){
+  if(!id(issueNumber)||issueNumber===ledgerIssue)stop('INCIDENT_POST_SCOPE');
+  const response=await fetch(API+HANDOFF_REPOSITORY+'/issues/'+issueNumber+'/comments',{
     method:'POST',headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,
       Accept:'application/vnd.github+json','Content-Type':'application/json',
       'X-GitHub-Api-Version':'2022-11-28'},body:JSON.stringify({body}),
@@ -189,6 +234,11 @@ export async function main(env=process.env){
     readIssue:n=>api(HANDOFF_REPOSITORY,'issues/'+n),
     readComments:(n)=>getPaged(HANDOFF_REPOSITORY,'issues/'+n+'/comments',4),
     readLedger:()=>api(HANDOFF_REPOSITORY,'issues/'+ledgerIssue),
+    readLegacyReports:()=>readLegacyDeepArchive(async page=>{
+      const rows=await api(HANDOFF_REPOSITORY,'issues/'+ledgerIssue+
+        '/comments?per_page=100&page='+page);
+      return rows;
+    }),
     readOrigin:(r,n)=>api(r,'issues/'+n),
     readOriginComments:(r,n)=>getPaged(r,'issues/'+n+'/comments',4),
     mainSha:async()=>{
@@ -202,11 +252,11 @@ export async function main(env=process.env){
       if(!x||!Array.isArray(x.workflow_runs)||x.total_count>50)return null;
       return x.workflow_runs;
     },
-    postLedger
+    postIncidentReport
   },Date.now());
   const message='# ZGMINI 증거 심화 진단 R2\n\n'+
     '- 최근 7일 후보: '+outcome.recentHandoffs+'\n'+
-    '- 신규 증거·시뮬레이션 보고: '+outcome.posted+'\n'+
+    '- 신규 증거·시뮬레이션 보고(인계 Issue별 댓글): '+outcome.posted+'\n'+
     '- 기존 보고 중복 제외: '+outcome.already+'\n'+
     '- 인증 미확인 제외: '+outcome.unverified+'\n'+
     '- 코드 수정/운영 PC 쓰기/AI: 0\n';
