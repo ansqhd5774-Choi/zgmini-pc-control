@@ -414,7 +414,7 @@ test('corrupt Seat 2 proof cannot block independently authenticated Seat 4',asyn
   f.io.readComments=async()=>[
     {user:{login:bot},body:`<!-- zgmini-pc-result:${runId}:1:2 -->\nverified`,
       issue_url:`https://api.github.com/repos/${repo}/issues/1009`},
-    ...oldComments()
+    ...(await oldComments())
   ];
   const out=await processCompletedPcJob(event(),f.io);
   assert.equal(out.state,'PARTIAL_SEAT_PROOF_UNVERIFIED');
