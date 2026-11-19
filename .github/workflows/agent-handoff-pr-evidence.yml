@@ -9,12 +9,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: zgmini-handoff-ci-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   handoff-source-tests:
+    # Scope the queue to actual admitted jobs and the exact approved HEAD.
+    # An additional label event must not cancel an in-flight evidence receipt.
+    concurrency:
+      group: zgmini-handoff-ci-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+      cancel-in-progress: false
+      queue: max
     # A new PR SHA requires another explicit label event after source review.
     # In particular, later synchronize events must never auto-execute new code.
     if: >-
