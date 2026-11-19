@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_W05_R304_SERVICE_B_APPROVAL_V1",
+  "status": "PROPOSED_NOT_APPROVED",
+  "scope": "W05_WPSFD42_BLS_ONCE_EXISTING_SQLITE_APPEND",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "installedSourceSha": "e16669ae4d35af25cadd68c939ed70533fa457ab",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "dataRoot": "E:\\ZGmini\\data\\pc-writer",
+  "files": {
+    "scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs": "87e811b608ea7358c48aceebfe458e24e5887f2f31207481783abcad516a1af3",
+    "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs": "b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31",
+    "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs": "f3f6e41b3b61039580db7ab7f6bed3133eb305ffef35e4b4b7ea919e0220ea77"
+  },
+  "series": "WPSFD42",
+  "startYear": 2025,
+  "endYear": 2026,
+  "maxProviderRequests": 1,
+  "runCount": 1,
+  "allowSqliteAppend": true,
+  "allowD1Writes": false,
+  "allowTaskChanges": false,
+  "allowSchemaChanges": false,
+  "allowOtherSources": false,
+  "allowNewSchedulers": false
+}
