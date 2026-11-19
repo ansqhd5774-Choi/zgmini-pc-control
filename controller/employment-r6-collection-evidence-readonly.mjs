@@ -17,6 +17,42 @@ const TABLES=Object.freeze([
  'market_score_employment_r6_raw_snapshot_v1',
  'market_score_employment_r4_shadow_current_v1',
 ]);
+// W04 PIT-04-08: schema-only view of the two fixed Core lineage tables.
+// Ordinals are the indices of these constants, never names read from SQLite.
+// No arbitrary SQL, DB contents, raw hashes, paths or source bodies leave the PC.
+const PIT_SCHEMA_REQUIRED=Object.freeze({
+ raw:Object.freeze(['snapshot_id','chunk_index','chunk_count','release_group','provider',
+  'request_key','retrieved_at','created_at','body_sha256','detail_json','body_chunk']),
+ runs:Object.freeze(['provider','status','completed_at','detail_json']),
+});
+const PIT_SCHEMA_TABLES=Object.freeze({
+ raw:'market_score_employment_r6_raw_snapshot_v1',
+ runs:'market_score_employment_r4_shadow_runs_v1',
+});
+function fixedSchemaColumns(db,tables,table,required){
+ const tablePresent=tables.has(table);
+ const existing=tablePresent?new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(row=>row.name)):new Set();
+ const missingOrdinals=required.flatMap((column,index)=>existing.has(column)?[]:[index]);
+ return {tablePresent,requiredCount:required.length,
+  presentCount:required.length-missingOrdinals.length,missingOrdinals};
+}
+function inspectPitRawSchema(db,tables,file,filesystem){
+ const raw=fixedSchemaColumns(db,tables,PIT_SCHEMA_TABLES.raw,PIT_SCHEMA_REQUIRED.raw);
+ const runs=fixedSchemaColumns(db,tables,PIT_SCHEMA_TABLES.runs,PIT_SCHEMA_REQUIRED.runs);
+ const identity=filesystem.statSync(file);
+ // A metadata-only identity marker, NOT a digest of any SQLite contents.
+ // Stable for the same physical file, not proof of a frozen transaction.
+ const dbIdentityTag=createHash('sha256').update(JSON.stringify([
+  file,String(identity.dev),String(identity.ino),String(identity.birthtimeMs),
+ ])).digest('hex').slice(0,16);
+ const reason=!raw.tablePresent?'RAW_TABLE_MISSING'
+  :!runs.tablePresent?'RUNS_TABLE_MISSING'
+  :raw.missingOrdinals.length?'RAW_REQUIRED_COLUMNS_MISSING'
+  :runs.missingOrdinals.length?'RUNS_REQUIRED_COLUMNS_MISSING'
+  :'REQUIRED_SCHEMA_PRESENT';
+ return {kind:'EMPLOYMENT_R6_PIT_SCHEMA_ONLY_V1',reason,
+  checkedAt:new Date().toISOString(),dbIdentityTag,raw,runs};
+}
 const CORE_STATES=Object.freeze([
  'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
 ]);
@@ -287,7 +323,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  filesystem=fs,openDatabase=file=>new DatabaseSync(file,{readOnly:true,timeout:4000}),
 }={}){
  const result={status:'BLOCKED',code:'R6_EVIDENCE_DATA_ROOT_DENIED',sqliteOpened:false,
-  scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,...noWrite()};
+  scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,...noWrite()};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return result;
  const root=(()=>{try{return filesystem.realpathSync(dataRoot);}catch{return null;}})();
  if(!root||path.basename(root).toLowerCase()!=='data'||path.basename(path.dirname(root)).toLowerCase()!=='zgmini')return result;
@@ -302,6 +338,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
   stage='READONLY_PRAGMAS';db.exec('PRAGMA query_only=ON');db.exec('PRAGMA busy_timeout=4000');
   stage='TABLE_DISCOVERY';
   const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(x=>x.name));
+  result.pitRawSchema=inspectPitRawSchema(db,tables,gate.path,filesystem);
   if(TABLES.some(t=>!tables.has(t)))return {...result,status:'STATE_UNKNOWN',code:'R6_EVIDENCE_TABLE_MISSING',
    missingTableCount:TABLES.filter(t=>!tables.has(t)).length};
   const query=db.prepare(`SELECT status,completed_at,provider_requests,collected_rows,inserted_count,revised_count,rejected_count,failure_code,detail_json
