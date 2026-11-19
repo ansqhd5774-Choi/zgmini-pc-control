@@ -150,7 +150,9 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     const method = request.method ?? 'GET';
     const uri = new URL(url);
     let value;
-    if (uri.pathname.endsWith('/issues') && method === 'GET') value = previousIssues;
+    if (uri.pathname === '/search/issues' && method === 'GET') value = {
+      incomplete_results:false,total_count:previousIssues.length,items:previousIssues};
+    else if (uri.pathname.endsWith('/issues') && method === 'GET') value = previousIssues;
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') {
       if (closeBeforeComment) currentIssueState = 'closed';
       value = comments;
@@ -316,4 +318,8 @@ test('owner broker stops if closure occurs while scanning route receipts',async(
 
 test('owner broker never posts a pending label if Incident closes after route receipt',async()=>{
   await simulateBroker({closeOnComment:true,expectedClosedPosts:['comment']});
+});
+
+test('owner intake queries only the matching request and does not scan 500 unrelated incidents',async()=>{
+  await simulateBroker({previousIssues:[]});
 });
