@@ -55,7 +55,12 @@ export function isScopedWriterPath(file){
 }
 
 export function validateWriterBManifest(manifest){
- need(exact(manifest,APPROVAL_KEYS),'WRITER_B_MANIFEST_FIELDS_STOP');
+ const maintenance=Object.hasOwn(manifest??{},'coreMaintenance');
+ need(exact(manifest,maintenance?[...APPROVAL_KEYS,'coreMaintenance']:APPROVAL_KEYS),
+  'WRITER_B_MANIFEST_FIELDS_STOP');
+ if(maintenance)need(manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'&&
+  SHA64.test(manifest.runtimeDependencies?.taskXmlSha256??''),
+  'WRITER_B_MAINTENANCE_APPROVAL_STOP');
  need(manifest.schema===APPROVAL_SCHEMA&&manifest.status==='APPROVED_B'&&
    manifest.scope===SCOPE&&manifest.runCount===1&&
    manifest.sourceRepository===SOURCE_REPO&&

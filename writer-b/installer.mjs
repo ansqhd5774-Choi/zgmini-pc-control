@@ -156,6 +156,7 @@ export async function performWriterBInstall(auth,io){
  // authorizeWriterBIssue after fetching the immutable approved manifest.
  assertAuthenticatedWriterBIssue(auth);
  const manifest=validateWriterBManifest(auth.manifest);
+ const reservedWindow=manifest.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1';
  need(object(io)&&REQUIRED_IO.every(name=>typeof io[name]==='function'),
    'WRITER_B_ADAPTER_CONTRACT_STOP');
  let acquired=false,claimed=false,taskMayHaveChanged=false;
@@ -169,7 +170,7 @@ export async function performWriterBInstall(auth,io){
   // Observe the Core before claiming the one-shot maintenance request or
   // creating backups/commits. A busy Core is a clean preflight deferral,
   // not a partially started installation.
-  await io.waitForCoreIdleWindow();
+  if(!reservedWindow)await io.waitForCoreIdleWindow();
 
   await io.claimRequest(auth.requestId);claimed=true;
   await io.backupOriginal(before,manifest);
@@ -179,7 +180,7 @@ export async function performWriterBInstall(auth,io){
   // Preparing the isolated overlay can overlap a new, legitimate Core cycle.
   // Reuse the existing bounded natural-idle wait just before the final
   // pause check. The wait never disables Core or bypasses the last CAS.
-  await io.waitForCoreIdleWindow('POST_PREPARE');
+  if(!reservedWindow)await io.waitForCoreIdleWindow('POST_PREPARE');
 
   // Mark mutation intent before any call that may partially apply its effects.
   taskMayHaveChanged=true;

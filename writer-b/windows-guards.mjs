@@ -43,6 +43,30 @@ export function coreReadyForMaintenance(probe,coreCycleLockExists){
   probe.unknownProcessLines===0&&coreCycleLockExists===false;
 }
 
+// Explicit maintenance approval may inhibit future Scheduler starts while an
+// existing Core drains naturally. This is NOT proof that source can be changed.
+export function coreMayInhibitNewStarts(probe){
+ return probe?.enabled===true&&[2,3,4].includes(probe.state)&&
+  [probe.instances,probe.relatedProcesses].every(n=>Number.isSafeInteger(n)&&n>=0)&&
+  probe.unknownProcessLines===0;
+}
+
+// Injected fixed-task adapter; the same sequence is exercised without touching
+// operational Scheduler state in Windows isolation tests.
+export function inhibitCoreStarts(io,{reserved=false}={}){
+ io.assertBase();
+ need(io.definitionMatches(),'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP');
+ const probe=io.probe();
+ need(reserved?coreMayInhibitNewStarts(probe):
+  coreReadyForMaintenance(probe,io.cycleLockExists()),
+  'WRITER_B_CORE_PREPAUSE_RACE_DEFERRED');
+ io.journal('TASK_PAUSE_INTENT');
+ io.disable();
+ need(io.probe().enabled===false&&io.definitionMatches(),
+  'WRITER_B_CORE_PAUSE_READBACK_STOP');
+ io.journal('TASK_PAUSED');
+}
+
 export function coreMaintenanceWindowBlockCode(probe,coreCycleLockExists){
  if(coreReadyForMaintenance(probe,coreCycleLockExists))return null;
  if(coreCycleLockExists===true||probe?.instances>0||

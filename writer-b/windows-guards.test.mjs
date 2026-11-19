@@ -1,12 +1,48 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {decodeTaskXmlBytes,coreQuietFromProbe,
- coreReadyForMaintenance,coreMaintenanceWindowBlockCode,
+ coreReadyForMaintenance,coreMaintenanceWindowBlockCode,coreMayInhibitNewStarts,inhibitCoreStarts,
  attestTaskFirstHopLauncher} from './windows-guards.mjs';
 
 const XML='<?xml version="1.0"?><Task><Settings><Enabled>true</Enabled></Settings></Task>';
 const quiet=()=>({enabled:false,state:3,instances:0,
  relatedProcesses:0,unknownProcessLines:0});
+
+test('reserved window accepts known running Core for inhibition, never for source switch',()=>{
+ for(const state of [2,3,4]){
+  const probe={...quiet(),enabled:true,state,instances:1,relatedProcesses:2};
+  assert.equal(coreMayInhibitNewStarts(probe),true);
+  assert.equal(coreQuietFromProbe(probe,true),false);
+ }
+ for(const delta of [{enabled:false},{state:0},{state:1},
+  {unknownProcessLines:1},{instances:-1},{relatedProcesses:NaN}])
+  assert.equal(coreMayInhibitNewStarts({...quiet(),enabled:true,...delta}),false);
+});
+
+test('fixed Task inhibition persists intent and verifies disabled state without killing running Core',()=>{
+ const steps=[];let enabled=true;
+ const io={assertBase:()=>steps.push('base'),definitionMatches:()=>true,
+  probe:()=>({...quiet(),enabled,state:enabled?4:1,instances:1,relatedProcesses:2}),
+  cycleLockExists:()=>true,journal:x=>steps.push(x),disable:()=>{steps.push('disable');enabled=false;}};
+ inhibitCoreStarts(io,{reserved:true});
+ assert.deepEqual(steps,['base','TASK_PAUSE_INTENT','disable','TASK_PAUSED']);
+ assert.equal(io.probe().instances,1);
+ assert.equal(coreQuietFromProbe(io.probe(),true),false);
+});
+
+test('failed inhibition, unknown state, Task drift and intent write failure never reach a quiet/switch pass',()=>{
+ for(const mode of ['unknown','drift','intent','disable','readback']){
+  const steps=[];
+  const io={assertBase:()=>{},definitionMatches:()=>mode!=='drift',
+   probe:()=>({...quiet(),enabled:true,state:mode==='unknown'?0:4}),
+   cycleLockExists:()=>true,
+   journal:x=>{steps.push(x);if(mode==='intent')throw new Error('disk');},
+   disable:()=>{steps.push('disable');if(mode==='disable')throw new Error('child');}};
+  assert.throws(()=>inhibitCoreStarts(io,{reserved:true}),undefined,mode);
+  assert.equal(steps.includes('TASK_PAUSED'),false,mode);
+  if(['unknown','drift','intent'].includes(mode))assert.equal(steps.includes('disable'),false);
+ }
+});
 
 test('Windows Task XML decoder preserves UTF-8/UTF-8 BOM/UTF-16LE identities',()=>{
  assert.equal(decodeTaskXmlBytes(Buffer.from(XML)),XML);

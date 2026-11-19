@@ -35,8 +35,8 @@ function manifest(){
   allowTaskDefinitionChanges:false,allowOtherSourceChanges:false,
  };
 }
-const auth=()=>{
- const bytes=Buffer.from(JSON.stringify(manifest()));
+const auth=(overrides={})=>{
+ const bytes=Buffer.from(JSON.stringify({...manifest(),...overrides}));
  return authorizeWriterBIssue({
   manifestBytes:bytes,
   env:{GITHUB_REPOSITORY:CONTROL_REPO,GITHUB_EVENT_NAME:'issues',
@@ -119,6 +119,56 @@ function mockIO({failAt=null,rollbackFail=false,dirtyTarget=false,
  };
  return {io,state};
 }
+
+const maintenanceAuth=()=>auth({coreMaintenance:'PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+test('approved maintenance stages before inhibition and drains active Core without natural-idle lottery',async()=>{
+ const {io,state}=mockIO({failAt:'window'});
+ let active=true;
+ io.waitForCoreDrain=async()=>{
+  assert.equal(state.coreEnabled,false);
+  assert.equal(state.head,manifest().baseHead);
+  state.steps.push('running-core-finishes');active=false;
+ };
+ const quiet=io.assertCoreQuiet;
+ io.assertCoreQuiet=async()=>{assert.equal(active,false);await quiet();};
+ const out=await performWriterBInstall(maintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALLED_VERIFIED');
+ assert.ok(state.steps.indexOf('prepare')<state.steps.indexOf('pause'));
+ assert.ok(state.steps.indexOf('running-core-finishes')<state.steps.indexOf('switch'));
+ assert.equal(state.steps.some(s=>s.startsWith('window')),false);
+ assert.equal(state.coreEnabled,true);assert.equal(state.retained,false);
+});
+
+test('maintenance preparation failure leaves scheduling untouched',async()=>{
+ const {io,state}=mockIO({failAt:'prepare'});
+ const out=await performWriterBInstall(maintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');
+ assert.equal(state.steps.includes('pause'),false);
+ assert.equal(state.coreEnabled,true);assert.equal(state.head,manifest().baseHead);
+});
+
+test('maintenance pause, drain and source failures restore exact originals before release',async()=>{
+ for(const failAt of ['pause','drain','switch','config']){
+  const {io,state}=mockIO({failAt});
+  const out=await performWriterBInstall(maintenanceAuth(),io);
+  assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED',failAt);
+  assert.equal(state.coreEnabled,true,failAt);
+  assert.equal(state.head,manifest().baseHead,failAt);
+  assert.equal(state.config,manifest().baseHead,failAt);
+  assert.equal(state.retained,false,failAt);
+  if(failAt==='drain')assert.equal(state.steps.includes('switch'),false);
+ }
+});
+
+test('maintenance restore failure retains ownership and never reports success',async()=>{
+ const {io,state}=mockIO();
+ io.waitForCoreDrain=async()=>{throw Object.assign(new Error('timeout'),
+  {code:'WRITER_B_CORE_NATURAL_DRAIN_TIMEOUT_STOP'});};
+ io.restoreCore=async()=>{throw new Error('cannot restore');};
+ const out=await performWriterBInstall(maintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_RECOVERY_REQUIRED');
+ assert.equal(state.retained,true);assert.equal(state.steps.includes('switch'),false);
+});
 
 test('B coordinator rejects forged registration flags before lock or other I/O',async()=>{
  const {io,state}=mockIO();
