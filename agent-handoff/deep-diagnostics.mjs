@@ -5,7 +5,7 @@ import {assessIncident,HANDOFF_REPOSITORY,HANDOFF_OWNER,HANDOFF_BOT} from './que
 
 export const DEEP_POLICY=Object.freeze({
   version:'ZGMINI_HANDOFF_DEEP_DIAG_R2',
-  ledgerIssueNumber:1743,lookbackDays:7,maxIssues:100,
+  ledgerIssueNumber:1743,lookbackDays:7,maxIssues:200,
   maxNewReports:3,maxComments:400,maxSourceFiles:3,maxHistory:50,
   schedule:'12,27,42,57 * * * *'
 });
