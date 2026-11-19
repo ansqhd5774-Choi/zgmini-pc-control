@@ -100,16 +100,29 @@ export async function processQueue(issues, {readComments, readIssue, recordRecei
       !Number.isSafeInteger(limit) || limit < 1 || limit > 10)
     throw Error('HANDOFF_SELECTOR_INPUT_INVALID');
   const summary = {scanned: 0, selected: 0, alreadySelected: 0,
-    deferred: 0, pcOperationalWrites: 0, automaticPcRetries: 0,
+    deferred: 0, deferredIssues: [], pcOperationalWrites: 0, automaticPcRetries: 0,
     automaticAiExecutions: 0, selectedIssues: []};
   for (const issue of orderedPendingIssues(issues)) {
     if (summary.selected >= limit) break;
     if (!issue.labels?.some(selectedLabel)) continue;
     summary.scanned++;
-    const comments = await readComments(issue.number);
+    // An unrelated Issue's failed read must not block already-verifiable
+    // candidates. Only pre-write reads are isolated: uncertain POST/readback
+    // remains a hard stop to protect the once-only selection receipt.
+    let comments;
+    try { comments = await readComments(issue.number); }
+    catch {
+      summary.deferred++;
+      summary.deferredIssues.push({issueNumber: issue.number, reason: 'COMMENT_READ_UNAVAILABLE'});
+      continue;
+    }
     const verdict = assessIncident(issue, comments);
     if (verdict.state === 'ALREADY_SELECTED') {summary.alreadySelected++; continue;}
-    if (verdict.state !== 'READY') {summary.deferred++; continue;}
+    if (verdict.state !== 'READY') {
+      summary.deferred++;
+      summary.deferredIssues.push({issueNumber: issue.number, reason: verdict.state});
+      continue;
+    }
     // Re-read the authoritative issue and bot receipt immediately before write.
     const current = await readIssue(issue.number);
     if (JSON.stringify({body:current?.body,labels:current?.labels?.map(x=>x.name).sort(),
