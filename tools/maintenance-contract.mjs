@@ -244,7 +244,9 @@ const SHA40=/^[a-f0-9]{40}$/;
 const SHA256=/^[a-f0-9]{64}$/;
 const UUID="[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}";
 const REQUEST_ID=new RegExp("^pc-(?:update-)?"+UUID+"$");
-const CHAT_ID=new RegExp("^chat-"+UUID+"$");
+// Conversation correlation is not authority. Keep it bounded and data-only,
+// while accepting the safe trace labels already used by ordinary PC jobs.
+const CHAT_ID=/^chat-[a-z0-9][a-z0-9-]{0,74}$/;
 const sha256=value=>createHash("sha256").update(value).digest("hex");
 export function readAllMaintenancePages(readPage,{maxPages=100}={}){
  const out=[];

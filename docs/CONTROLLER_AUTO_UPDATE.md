@@ -65,6 +65,7 @@
 ## 통신 구조
 
 **접수와 실행을 분리한다.** 승인된 요청을 작성할 때 `tools/maintenance-contract.mjs`의 `prepareControllerUpdateRequest(rawManifestBytes, {installedSha, chatId?})`를 재사용하면 requestId/chatId와 원본 바이트 해시를 자동 생성·검증한다. 같은 대화는 반환된 chatId를 후속 요청에 재사용한다. 새 승인 Gate가 아니라 수작업 JSON·UUID 오류를 줄이는 작성 기능이다.
+requestId는 기존 고유 UUID 계약과 원장 중복 방지를 유지한다. chatId는 권한이 아닌 대화 추적값이며 `chat-` 뒤 영소문자·숫자·하이픈 1~75자를 허용한다. 기존 UUID와 일반 PC 작업에서 사용하던 안전한 대화 라벨을 모두 사용할 수 있다. 경로·개행·제어문자·인증정보를 넣지 않는다. 이 호환성이 작성자 인증이나 승인·source·lease 검증을 대신하지 않는다.
 신뢰된 Owner의 요청이 실행 전 형식 검사에서 거부되면 원본 Issue에 `REQUEST_REJECTED_BEFORE_EXECUTION`, 정확한 오류 코드와 실행 시작 여부를 한 번 회신한다. 내부 BLOCKED만 반환하고 요청자를 결과 없는 대기로 남기지 않는다. 형식 오류 수정에 기존 업무 승인을 다시 요구하지 않는다. 요청 거부 회신은 PC 실행 결과나 설치 완료가 아니다.
 
 1. 일반챗이 B급 승인·파일 해시·검사 결과를 `approvals/controller-updates/<40-char-target-SHA>.json`에 저장한다. 승인 manifest는 설치 SHA, 목표 SHA, 파일별 SHA-256, 목적·PR, 검사 PASS, 검증된 snapshot rollback, 사후 진단의 고정 이름·불변 source를 기록한다.

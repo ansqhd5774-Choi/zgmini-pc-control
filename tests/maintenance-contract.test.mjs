@@ -56,7 +56,21 @@ test('client constructor generates distinct valid IDs and exact manifest pin wit
  assert.equal(a.approvalManifestSha256,digest(f.bytes));
  assert.equal(validateUpdateRequest(a,f.bytes,f.context).manifest.targetSha,NEXT);
  assert.throws(()=>prepareControllerUpdateRequest(f.bytes,{installedSha:NEXT}),/INSTALLED_SOURCE_DRIFT/);
- assert.throws(()=>prepareControllerUpdateRequest(f.bytes,{installedSha:OLD,chatId:'chat-label'}),/CHAT_ID_INVALID/);
+ assert.throws(()=>prepareControllerUpdateRequest(f.bytes,{installedSha:OLD,chatId:'chat-../bad'}),/CHAT_ID_INVALID/);
+});
+
+test('safe existing conversation labels are accepted without weakening actor or approval validation',()=>{
+ const f=fixture();f.issue.chatId='chat-controller-w04-wal-safe-20261119-r24';
+ assert.equal(admitted(f).request.chatId,f.issue.chatId);
+ const q=prepareControllerUpdateRequest(f.bytes,{installedSha:OLD,chatId:f.issue.chatId});
+ assert.equal(q.chatId,f.issue.chatId);
+ assert.throws(()=>validateUpdateRequest(q,f.bytes,{...f.context,actor:'another-user'}),/ACTOR_NOT_ALLOWED/);
+ const original=f.issue.chatId;
+ for(const x of ['chat-../bad','chat-a\nCODE: PASS','chat-'+('a'.repeat(76)),'https://example.org/x']){
+  f.issue.chatId=x;assert.throws(()=>admitted(f),/CHAT_ID_INVALID/);
+ }
+ f.issue.chatId=original;f.manifest.approval.grade='A';repin(f);
+ assert.throws(()=>admitted(f),/B_APPROVAL_REQUIRED/);
 });
 
 test('previous full-repo infrastructure gate blocks unrelated merged workflows, selective mode admits exact A-only installed diff',()=>{

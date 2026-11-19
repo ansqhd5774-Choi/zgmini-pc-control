@@ -34,6 +34,7 @@
 순수 조회 예외는 설치된 실행기가 명시적으로 지원하는 고정 operation에만 적용한다. Issue에 임의 effect나 shell·SQL·경로·명령을 넣어 권한을 확대하지 않는다.
 조회가 성공해도 보호 확인이 실패하면 읽기 결과와 보호 미확인을 따로 보고한다. READONLY_RESULT_PROTECTION_UNVERIFIED는 시스템 정상이나 쓰기 승인 PASS가 아니다. 실제 보호 drift·예기치 않은 작업 재등록·무결성 오류는 계속 차단한다.
 현재 설치된 허용목록/schema에 맞는 Issue를 고유 chatId/requestId로 한 번 접수하고 status/code/lastPass/firstFail·실제 실행 SHA·TXT/JSON·원본 댓글을 회수한다. 요청 UUID/접두사는 실제 계약으로 검증한다.
+대화 추적용 chatId를 권한 증명이나 모든 경로의 UUID 전용 Gate로 사용하지 않는다. 정규 유지보수는 기존 UUID 및 `chat-` 뒤 영소문자·숫자·하이픈 1~75자의 대화 라벨을 수용한다. 요청 단회성과 승인 범위는 requestId 원장·작성자 인증·정확한 manifest/source로 검증한다.
 원격 source, 실제 Controller source, PC 운영 HEAD/config.source, 검사 대상 source를 구분한다. 파일 존재·해시 확인에 현재 실행 중 Core의 전체 계보를 새 필수조건으로 붙이지 않는다.
 동일 source·환경·효과의 유효한 실PC 증거는 재사용한다. 미지원 작업은 기존 공통 실행기에 최소 명세/모듈을 등록·검증한다. 임의 원격 스크립트로 우회하지 않는다.
 
