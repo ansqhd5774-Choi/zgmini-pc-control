@@ -2,6 +2,8 @@
 
 ## Core 자연 유휴 반복 대기의 해결 절차 (2026-11-19)
 
+**실제 Windows 설치 검증 완료:** [#2234](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2234) / Run `44441257850`, `WRITER_B_INSTALLED_VERIFIED`, W05 승인 3파일 설치. [정확 승인 manifest](../approvals/writer-updates/w05-r304-maintenance-window-20261119.json)와 [JSON](../results/writer-b-source-install-7814b297-4856-4c77-924c-fcccc5acae51.json)·[TXT](../results/writer-b-source-install-7814b297-4856-4c77-924c-fcccc5acae51.txt) 2/2 원격 재조회. 운영 로컬 오버레이 SHA `e16669ae4d35af25cadd68c939ed70533fa457ab`이며 후보 원격 SHA와 구분한다. 독립 [#2235](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2235)에서 3파일 SHA-256 및 HEAD=config.source 일치, [#2236](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2236)에서 Core 원본 Task XML 해시 복원·lock 부재·보호 상태 불변을 확인했다. 설치 직후 기존 Writer checkpoint의 이전 SHA는 다음 자연 실행 전의 기록이며 신규 기능 실행 성공으로 해석하지 않는다. W05 수집·계산·D1 게시는 별도 미검증이다. 다음 작업은 이 공통 실행 구조와 실패 회귀를 재사용하되 과거 preimage/승인을 복사하지 않는다.
+
 `WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`는 Core 고장을 뜻하지 않는다. 같은 상태에서 B 요청을 반복하거나 Controller를 재설치하지 않는다. 기존 성공 #711은 당시 설치 증거이며 이후 유휴 창을 보장하지 않는다. #2229의 표본 기록은 관측 개선이고 설치 진입 해결은 아니다.
 
 사용자가 승인한 유지보수 범위에서 **새 정확 manifest**에 `coreMaintenance: "PAUSE_NEW_STARTS_DRAIN_360S_V1"`와 실제 원본 `runtimeDependencies.taskXmlSha256`를 고정하면 공통 설치기가 다음 순서로 실행한다. 기존 manifest에는 이 권한을 소급 추가하지 않으며, 필드가 없으면 기존 자연 유휴 방식이 유지된다.

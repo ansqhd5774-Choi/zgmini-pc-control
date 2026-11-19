@@ -283,6 +283,8 @@ Controller **실제 교체**는 검증된 독립 유지보수기에 `pc-maintena
 
 ### Writer B의 Core 유지보수 창 확보 (2026-11-19)
 
+이 경로는 실제 Windows [#2234](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2234)에서 W05 정확 3파일 `WRITER_B_INSTALLED_VERIFIED`로 검증됐고, [#2235](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2235)의 파일 SHA/HEAD=config.source 및 [#2236](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2236)의 Core Task 원본 해시/lock 부재를 독립 확인했다. 코드·CI만의 성공으로 재사용하지 않는다. 현재·향후 승인된 Writer B는 아래 동일 구조를 재사용하고 현행 원본·정확 승인·새 요청 ID만 대조한다. 기능 수집·계산·게시는 설치 성공과 별개다.
+
 Core 자연 유휴 대기가 반복되면 같은 B 요청·상태 조회를 반복하지 않는다. 사용자 승인 범위에서 공통 [Writer B 절차](../writer-b/README.md)의 `coreMaintenance: "PAUSE_NEW_STARTS_DRAIN_360S_V1"`와 원본 Task XML SHA를 **새 정확 manifest**에 고정한다. 후보 준비 후 신규 예약 시작만 일시 억제하고 현재 Core의 정상 종료를 최대 360초 기다린다. disabled·인스턴스/프로세스/unknown=0·Core lock 부재가 연속 확인된 뒤에만 source/config를 교체하며, 종료 미확인 시 교체 없이 원상 복원·재조회한다. 프로세스 강제 종료·lock 삭제·작업 주기/정의 변경은 허용하지 않는다.
 
 기존 manifest는 기존 자연 유휴 정책을 유지한다. 과거 #711 성공이나 #2229 진단 개선은 현재 설치 창 확보 증거가 아니다. 중간 종료·부분 적용은 claim/lease/백업을 보존하고 정확 요청의 source/config/Task를 대조하기 전 재실행·무조건 Enable하지 않는다. 기능 설치는 원담당이 기존 공통 workflow로 이어가며, Controller 재설치나 신규 CMD·예약을 선행 조건으로 추가하지 않는다.

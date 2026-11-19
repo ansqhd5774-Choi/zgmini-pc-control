@@ -39,6 +39,13 @@
 
 ## 4. 다음 담당자의 재사용 방법
 
+### Core 유지보수 창을 확보하는 Writer B (2026-11-19 실제 검증)
+
+- 새 승인 `coreMaintenance=PAUSE_NEW_STARTS_DRAIN_360S_V1` 및 원본 Task XML SHA → 후보 준비 → 신규 예약 시작 억제 → 현재 실행 정상 drain → 기존 CAS 설치 → 원본 Task 복원/readback. [절차](../writer-b/README.md), [정확 승인 manifest](../approvals/writer-updates/w05-r304-maintenance-window-20261119.json).
+- [#2234 / Run44441257850](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2234): `WRITER_B_INSTALLED_VERIFIED`, [JSON](../results/writer-b-source-install-7814b297-4856-4c77-924c-fcccc5acae51.json)·[TXT](../results/writer-b-source-install-7814b297-4856-4c77-924c-fcccc5acae51.txt) 2/2, 로컬 운영 오버레이 SHA `e16669ae4d35af25cadd68c939ed70533fa457ab`, 정확 W05 3파일 설치.
+- 독립 [#2235 / Run44442081354](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2235): 3파일 SHA-256 3/3 일치·HEAD=config.source. [#2236 / Run44442099517](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2236): Core 원본 Task XML 해시 일치·lock 부재·보호 상태 불변. 각 원격 JSON/TXT 2/2 재조회. checkpoint의 이전 SHA는 다음 자연 실행 전 기록으로 구분했다.
+- 기존 #2222는 실패/미설치 이력을 보존하고 재실행하지 않는다. 과거 source/Task SHA·승인은 다른 작업에 복사하지 않는다. 실제 설치 성공은 W05 공급자 호출·계산·DB/D1 게시·신규 source 자연 실행의 성공 증거가 아니다.
+
 1. 기능별 목표와 마지막 완료 단계부터 확인하고, 같은 작업 유형의 색인 또는 기존 `approvals/`·`results/`에서 **관련 사례만** 찾는다.
 2. 재사용 대상은 공통 operation·manifest **형식**·테스트 Fixture·실패 복구 패턴이다. 과거 beforeSHA·운영 HEAD·승인·config·stored_at를 현행값으로 고정하지 않는다.
 3. 변경 대상의 최신 승인 source, 실제 Windows 원본/해시·충돌, 자원 lease를 기존 정규 계약으로 대조한다. 성공 자료가 현재 작업의 승인이나 Runtime 증거를 대신하지 않는다.
