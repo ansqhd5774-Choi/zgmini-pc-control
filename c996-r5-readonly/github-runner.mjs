@@ -1,5 +1,5 @@
 // Fixed Issue -> isolated Windows Runner -> sanitized JSON/TXT readback.
-// This is source-only until the workflow is on main AND exact host/runner is verified.
+// Active, fixed host read-only collector; no operational image modifications.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -46,10 +46,18 @@ export function selectSafeReport(raw,ctx,hostname) {
   const validCode=s=>typeof s==='string' && /^[A-Z0-9_]{1,80}$/.test(s);
   if(!validCode(raw.code))stop('REPORT_CODE_STOP');
   const pins=(raw.inputs||[]).map(v=>{
-    if(!/^(ADK_WIM|FINAL_WIM|TEST_ISO|BIOS_BCD|UEFI_BCD)$/.test(v.id||'') ||
-      !/^[a-f0-9]{64}$/.test(v.sha256||'') || !Number.isSafeInteger(v.bytes))
+    if(!/^(ADK_WIM|FINAL_WIM|TEST_ISO|BIOS_BCD|UEFI_BCD)$/.test(v.id||''))
       stop('HASH_REPORT_STOP');
-    return {id:v.id,matched:v.matched===true,bytes:v.bytes,sha256:v.sha256};
+    if(v.status==='UNVERIFIED'){
+      if(v.matched!==false||!validCode(v.code))stop('HASH_REPORT_STOP');
+      return {id:v.id,matched:false,status:'UNVERIFIED',code:v.code};
+    }
+    if(!/^[a-f0-9]{64}$/.test(v.sha256||'')||
+       !Number.isSafeInteger(v.bytes)||v.bytes<0||
+       (v.status!==undefined&&!['MATCHED','MISMATCH'].includes(v.status)))
+      stop('HASH_REPORT_STOP');
+    return {id:v.id,matched:v.matched===true,status:v.matched===true?'MATCHED':'MISMATCH',
+      bytes:v.bytes,sha256:v.sha256};
   });
   const pinIds=['ADK_WIM','FINAL_WIM','TEST_ISO','BIOS_BCD','UEFI_BCD'];
   if(pins.length>5 || new Set(pins.map(x=>x.id)).size!==pins.length)
@@ -58,6 +66,20 @@ export function selectSafeReport(raw,ctx,hostname) {
     !pinIds.every(id=>pins.some(p=>p.id===id && p.matched)) ||
     raw.inputHashesUnchanged!==5))
     stop('COMPLETE_HASH_PROOF_REQUIRED');
+  const evidenceIds=['ISO_RESULT','FINAL_INDEX_1','MAKE_ISO',
+    'MOUNT_STATUS','DISCARD_RESULT','ISO_PASS'];
+  const fixedEvidence=(raw.fixedEvidence||[]).map(v=>{
+    if(!evidenceIds.includes(v.id)||!['PRESENT','MISSING','TOO_LARGE','UNVERIFIED'].includes(v.status))
+      stop('EVIDENCE_REPORT_STOP');
+    if(v.status==='PRESENT'&&(!/^[a-f0-9]{64}$/.test(v.sha256??'')||
+      !Number.isSafeInteger(v.bytes)||v.bytes<0))stop('EVIDENCE_REPORT_STOP');
+    if(v.status==='UNVERIFIED'&&!validCode(v.code))stop('EVIDENCE_REPORT_STOP');
+    return {id:v.id,status:v.status,
+      ...(v.status==='PRESENT'?{bytes:v.bytes,sha256:v.sha256}:{}),
+      ...(v.status==='UNVERIFIED'?{code:v.code}:{})};
+  });
+  if(fixedEvidence.length>6||new Set(fixedEvidence.map(x=>x.id)).size!==fixedEvidence.length)
+    stop('EVIDENCE_REPORT_STOP');
   const logs=(raw.logs||[]).map(v=>{
     if(!/^[A-Za-z0-9_.-]{1,96}\.log$/i.test(v.name||'') ||
       !/^[a-f0-9]{64}$/.test(v.sha256||'') || !Number.isSafeInteger(v.bytes) ||
@@ -70,9 +92,35 @@ export function selectSafeReport(raw,ctx,hostname) {
         !Number.isSafeInteger(n)||n<0)stop('LOG_REPORT_STOP');
       counts[k]=n;
     }
-    return {directory:v.directory,name:v.name,bytes:v.bytes,sha256:v.sha256,counts};
+    const events=(v.events||[]).slice(0,8).map(e=>{
+      if(!Object.hasOwn(counts,e.code)||!Number.isSafeInteger(e.line)||e.line<1||
+        (e.at!==null&&e.at!==undefined&&
+         !/^\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}:\d{2}$/.test(e.at)))
+        stop('LOG_EVENT_REPORT_STOP');
+      return {line:e.line,code:e.code,at:e.at??null};
+    });
+    if((v.events||[]).length>8)stop('LOG_EVENT_REPORT_STOP');
+    return {directory:v.directory,name:v.name,bytes:v.bytes,sha256:v.sha256,counts,events};
   });
-  if(logs.length>16) stop('LOG_REPORT_STOP');
+  if(logs.length>16)stop('LOG_REPORT_STOP');
+  const logDirs=['R5_ROOT','ISO_ATTEMPT','ISO_LOGS','R5_LOGS'];
+  const logErrors=(raw.logErrors||[]).map(x=>{
+    if(!logDirs.includes(x.directory)||!validCode(x.code))stop('LOG_REPORT_STOP');
+    return {directory:x.directory,code:x.code};
+  });
+  if(logErrors.length>16||!Number.isSafeInteger(raw.logOmitted??0)||
+    (raw.logOmitted??0)<0||!Number.isSafeInteger(raw.inputHashesUnchanged??0)||
+    (raw.inputHashesUnchanged??0)<0||(raw.inputHashesUnchanged??0)>5)
+    stop('LOG_REPORT_STOP');
+  const inputChecksComplete=raw.inputChecksComplete===true;
+  const logScanComplete=raw.logScanComplete===true;
+  if(inputChecksComplete&&(pins.length!==5||pins.some(x=>!x.matched)||
+     raw.inputHashesUnchanged!==5))stop('COMPLETE_HASH_PROOF_REQUIRED');
+  if(logScanComplete&&(logErrors.length>0||(raw.logOmitted??0)>0))
+    stop('LOG_REPORT_STOP');
+  if(raw.status==='COMPLETE'&&(!inputChecksComplete||!logScanComplete||
+     !logs.some(x=>(x.counts.COMMIT_REQUEST??0)>0)))
+    stop('COMPLETE_HASH_PROOF_REQUIRED');
   const allowedSteps=['PRE_INPUT_HASH','EVIDENCE_METADATA','LOG_DISCOVERY','LOG_READ','POST_INPUT_HASH','DONE'];
   const allowedIds=[...pinIds,'ISO_RESULT','FINAL_INDEX_1','MAKE_ISO','MOUNT_STATUS','DISCARD_RESULT','ISO_PASS','R5_ROOT','ISO_ATTEMPT','ISO_LOGS','R5_LOGS'];
   const inspectStep=raw.inspectStep??null,inspectId=raw.inspectId??null;
@@ -91,15 +139,20 @@ export function selectSafeReport(raw,ctx,hostname) {
     requestId:ctx.requestId,issueNumber:ctx.issueNumber,runId:ctx.runId,attempt:ctx.attempt,
     host:hostname,code:raw.code,status:raw.status,logCount:logs.length,
     pinCount:pins.filter(x=>x.matched).length,inspectStep,inspectId,
-    inspectOperation,inspectDepth,sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
+    inspectOperation,inspectDepth,sourceClassification:'NOT_DETERMINED_BY_THIS_RUN',
     rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,operationalWrites:0,
-    automaticRetries:0,rawLogIncluded:false,pins,logs};
+    automaticRetries:0,rawLogIncluded:false,pins,logs,fixedEvidence,logErrors,
+    logOmitted:raw.logOmitted??0,inputChecksComplete,logScanComplete,
+    inputHashesUnchanged:raw.inputHashesUnchanged??0};
 }
 
 function resultText(r) {
   return ['schema='+r.schema,'requestId='+r.requestId,'runId='+r.runId,
     'attempt='+r.attempt,'host='+r.host,'status='+r.status,'code='+r.code,
     'pinCount='+r.pinCount+'/5','logCount='+r.logCount,
+    'inputChecksComplete='+(r.inputChecksComplete===true),
+    'logScanComplete='+(r.logScanComplete===true),
+    'logOmitted='+(r.logOmitted??0),
     'inspectStep='+(r.inspectStep??'UNKNOWN'),'inspectId='+(r.inspectId??'NONE'),
     'inspectOperation='+(r.inspectOperation??'UNKNOWN'),
     'inspectDepth='+(r.inspectDepth??'NONE'),'rootCauseStage=UNKNOWN',
@@ -147,7 +200,7 @@ export function runCollector(ctx,hostname) {
   if(hostname!==HOST) {
     return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',...ctx,host:hostname,
       status:'BLOCKED',code:'WRONG_HOST',pinCount:0,logCount:0,
-      sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
+      sourceClassification:'NOT_DETERMINED_BY_THIS_RUN',
       rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,
       operationalWrites:0,automaticRetries:0,rawLogIncluded:false,pins:[],logs:[]};
   }
@@ -167,7 +220,7 @@ export function runCollector(ctx,hostname) {
       e.code||'COLLECTOR_STOPPED';
     return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',...ctx,host:hostname,
       status:'BLOCKED',code:safeCode,pinCount:0,logCount:0,
-      sourceClassification:'IMAGE_METADATA_DRIFT_CONFIRMED',
+      sourceClassification:'NOT_DETERMINED_BY_THIS_RUN',
       rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,
       operationalWrites:0,automaticRetries:0,rawLogIncluded:false,pins:[],logs:[]};
   }
@@ -187,13 +240,17 @@ export async function uploadVerifiedPair(report,token,fetcher=fetch) {
     if(!res.ok)stop('GITHUB_HTTP_'+res.status);
     return res.json();
   }
-  // Unique run/attempt path: never overwrite a previous result.
-  for (const f of files) {
-    await api('PUT','/contents/'+f.file,{message:'results(c996): sanitized R5 readonly '+report.runId,
-      content:Buffer.from(f.data).toString('base64'),branch:'main'});
+  // Existing/uncertain create is reconciled by exact GET bytes only.
+  // Never overwrite, re-run the collector, or rewrite historical evidence.
+  for(const f of files) {
+    try{
+      await api('PUT','/contents/'+f.file,{message:'results(c996): sanitized R5 readonly '+report.runId,
+        content:Buffer.from(f.data).toString('base64'),branch:'main'});
+    }catch{/* Exact bytes in main must independently prove whether PUT succeeded. */}
     const got=await api('GET','/contents/'+f.file+'?ref=main');
-    const decoded=Buffer.from((got.content||'').replace(/\s/g,''),'base64').toString('utf8');
-    if(decoded!==f.data)stop('RESULT_READBACK_MISMATCH');
+    if(got?.encoding!=='base64'||typeof got.content!=='string'||
+      !Buffer.from(got.content.replace(/\s/g,''),'base64').equals(Buffer.from(f.data)))
+      stop('RESULT_READBACK_MISMATCH');
   }
   await api('POST','/issues/'+report.issueNumber+'/comments',{
     body:'<!-- zgmini-c996-r5-result:'+report.runId+':'+report.attempt+' -->\n'+
