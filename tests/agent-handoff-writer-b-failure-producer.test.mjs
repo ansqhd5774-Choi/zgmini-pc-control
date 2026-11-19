@@ -373,7 +373,7 @@ test('route failure prevents Writer B intake completion and never retries the in
 
 test('unrelated Writer B source operations do not scan comments or create incidents',async()=>{
   const {io,state}=fixture();
-  io.getSourceJobs=async()=>[{name:'writer-source-approved-b',steps:[
+  io.getSourceJobs=async()=>[{name:'writer-source-approved-b',conclusion:'success',steps:[
     {name:'Create-only sanitized result and originating Issue comment',conclusion:'skipped'}]}];
   const e=event();e.workflow_run.conclusion='success';
   const actual=await processCompletedWriterB(e,io);
@@ -385,6 +385,17 @@ test('unverified source job provenance does not create incident',async()=>{
   const {io,state}=fixture();
   io.getSourceJobs=async()=>[];
   await assert.rejects(processCompletedWriterB(event(),io),/SOURCE_JOBS_UNVERIFIED/);
+  assert.equal(state.calls.comments,0);
+  assert.equal(state.calls.create,0);
+});
+
+test('failed source checkout with skipped reporter is not silently unrelated',async()=>{
+  const {io,state}=fixture();
+  io.getSourceJobs=async()=>[{name:'writer-source-approved-b',conclusion:'failure',steps:[
+    {name:'Create-only sanitized result and originating Issue comment',conclusion:'skipped'}]}];
+  const e=event();e.workflow_run.conclusion='failure';
+  const result=await processCompletedWriterB(e,io);
+  assert.equal(result.state,'SOURCE_REPORT_STATE_UNKNOWN');
   assert.equal(state.calls.comments,0);
   assert.equal(state.calls.create,0);
 });
