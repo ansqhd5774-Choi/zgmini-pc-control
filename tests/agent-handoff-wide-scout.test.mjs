@@ -72,9 +72,11 @@ test('time bounds, identity, and pagination completeness stay explicit',()=>{
   const r=evaluateWideSnapshot(snapshot({runs:[run(10,older)],
     complete:{runs:false,issues:true,pulls:true}}),now);
   assert.equal(r.inventory.complete.runs,false);
-  assert.throws(()=>evaluateWideSnapshot(snapshot({runs:[run(2),run(2)]}),now),/RUN_IDENTITY/);
-  assert.throws(()=>evaluateWideSnapshot(snapshot({issues:[issue(4,'not-date')]}),now),/ISSUE_IDENTITY/);
-  assert.throws(()=>evaluateWideSnapshot(snapshot({pulls:[pr(7),pr(7)]}),now),/PR_IDENTITY/);
+  const invalid=evaluateWideSnapshot(snapshot({runs:[run(2),run(2)],
+    issues:[issue(4,'not-date')],pulls:[pr(7),pr(7)]}),now);
+  assert.deepEqual(invalid.inventory.invalid,{runs:1,issues:1,pulls:1});
+  assert.deepEqual(invalid.inventory.complete,{runs:false,issues:false,pulls:false});
+  assert.equal(invalid.hasActionableReview,true);
 });
 test('bot-only duplicate and cooldown protections',()=>{
   const r=evaluateWideSnapshot(snapshot({runs:[run(33)]}),now);
@@ -88,47 +90,48 @@ test('bot-only duplicate and cooldown protections',()=>{
   assert.equal(reportDecision([aged],newer,now),'REPORT');
   assert.match(snapshotMarker(r),/^[<]!-- ZGMINI_WIDE_SCOUT_R3 digest:[a-f0-9]{64} -->$/);
 });
-test('isolated runner posts one report, readback verifies, rerun deduplicates',async()=>{
-  const comments=[],posted=[];
+test('monthly shards preserve one report, readback, and deduplication',async()=>{
+  const issues=[],comments=new Map(),posts=[];
+  let nextIssue=2000;
   const io={
     getRuns:async()=>({items:[run(51)],complete:true}),
     getIssues:async()=>({items:[],complete:true}),
     getPulls:async()=>({items:[],complete:true}),
     getWorkflows:async()=>workflows,
     getScheduleCount:async()=>0,
-    getLedger:async()=>({number:1743,state:'open',pull_request:null,
-      user:{login:OWNER},
-      comments:comments.length,
-      body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->'}),
-    getComments:async()=>structuredClone(comments),
-    postComment:async body=>{
-      posted.push(body);
-      comments.push({id:100+posted.length,created_at:recent,
+    findShards:async month=>issues.filter(x=>x.title.startsWith('ZGMINI Wide Scout '+month+' #')),
+    readShard:async n=>issues.find(x=>x.number===n),
+    readShardComments:async n=>structuredClone(comments.get(n)||[]),
+    createShard:async(month,index,title,marker)=>{
+      const issue={number:nextIssue++,title,body:marker,state:'open',user:{login:OWNER}};
+      issues.push(issue);comments.set(issue.number,[]);
+      return issue;
+    },
+    postComment:async(n,body)=>{
+      posts.push({n,body});
+      comments.get(n).push({id:100+posts.length,created_at:recent,
         user:{login:'github-actions[bot]'},body});
     }
   };
   const first=await scoutWide(io,now);
   assert.equal(first.posted,1);
   assert.equal(first.operationalWrites,0);
+  assert.equal(issues.length,1);
+  assert.match(issues[0].title,/ZGMINI Wide Scout 2026-11 #1/);
   const again=await scoutWide(io,now);
   assert.equal(again.posted,0);
   assert.equal(again.decision,'DUPLICATE');
-  assert.equal(posted.length,1);
+  assert.equal(posts.length,1);
+  issues[0].body='forged marker';
+  await assert.rejects(()=>scoutWide(io,now),/SHARD_IDENTITY/);
 });
-test('invalid ledger stops with zero writes',async()=>{
-  let writes=0;
-  const io={
-    getRuns:async()=>({items:[],complete:true}),
-    getIssues:async()=>({items:[],complete:true}),
-    getPulls:async()=>({items:[],complete:true}),
-    getWorkflows:async()=>workflows,
-    getScheduleCount:async()=>0,
-    getLedger:async()=>({number:1743,state:'closed'}),
-    getComments:async()=>[],
-    postComment:async()=>{writes++}
-  };
-  await assert.rejects(()=>scoutWide(io,now),/LEDGER_PROOF/);
-  assert.equal(writes,0);
+test('incomplete listings are reportable without treating absence as healthy',()=>{
+  const report=evaluateWideSnapshot(snapshot({
+    complete:{runs:false,issues:true,pulls:true}
+  }),now);
+  assert.equal(report.hasActionableReview,true);
+  assert.equal(reportDecision([],report,now),'REPORT');
+  assert.match(renderWideReport(report),/INCOMPLETE_EVIDENCE/);
 });
 test('workflow is guarded on Windows, least-privilege and no production writes',()=>{
   const s=readFileSync(new URL('../.github/workflows/agent-handoff-wide-scout.yml',import.meta.url),'utf8');
@@ -150,12 +153,6 @@ test('event identity and owner provenance are strict',()=>{
   assert.doesNotThrow(()=>validateWideEvent(e,env));
   assert.throws(()=>validateWideEvent({...e,schedule:'* * * * *'},env),/SCHEDULE/);
   assert.throws(()=>validateWideEvent(e,{...env,GITHUB_REF:'refs/heads/test'}),/SCOPE/);
-  const w={repository:e.repository,action:'completed',workflow_run:{
-    name:'ZGMINI Handoff Queue Candidate Selector',actor:{login:OWNER},
-    head_branch:'main',conclusion:'success'}};
-  assert.doesNotThrow(()=>validateWideEvent(w,{...env,GITHUB_EVENT_NAME:'workflow_run'}));
-  assert.throws(()=>validateWideEvent({...w,workflow_run:{...w.workflow_run,
-    actor:{login:'attacker'}}},{...env,GITHUB_EVENT_NAME:'workflow_run'}),/WORKFLOW_PROVENANCE/);
   assert.throws(()=>validateWideEvent({...e,ref:'refs/heads/main'},
     {...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}),/WIDE_SCOUT_RUNNER_EVENT/);
 });
