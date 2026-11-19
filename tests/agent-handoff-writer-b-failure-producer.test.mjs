@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {processCompletedWriterB} from '../agent-handoff/writer-b-failure-producer.mjs';
+import {processCompletedWriterB,findRunReceiptComments} from '../agent-handoff/writer-b-failure-producer.mjs';
 import {parseHandoff} from '../agent-handoff/contract.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
@@ -398,4 +398,29 @@ test('failed source checkout with skipped reporter is not silently unrelated',as
   assert.equal(result.state,'SOURCE_REPORT_STATE_UNKNOWN');
   assert.equal(state.calls.comments,0);
   assert.equal(state.calls.create,0);
+});
+
+test('Run ID lookup ignores unlimited unrelated repository comments',async()=>{
+  const candidate={number:874,title:'pc-writer-source-install',
+    labels:[{name:'pc-writer-b-install'}]};
+  let called=0;
+  const rows=await findRunReceiptComments(runId,{
+    searchIssues:async id=>{
+      assert.equal(id,runId);
+      return {incomplete_results:false,total_count:1,items:[candidate]};
+    },
+    readIssueComments:async n=>{
+      assert.equal(n,874);called++;
+      return [comment(report()),{body:'unrelated',user:{login:owner}}];
+    }
+  });
+  assert.equal(called,1);
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].user.login,bot);
+});
+test('Run ID discovery refuses incomplete search without creating evidence',async()=>{
+  await assert.rejects(findRunReceiptComments(runId,{
+    searchIssues:async()=>({incomplete_results:true,total_count:0,items:[]}),
+    readIssueComments:async()=>{throw Error('must not read');}
+  }),/RECEIPT_SEARCH_INCOMPLETE/);
 });
