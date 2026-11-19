@@ -24,6 +24,17 @@ test('fixed-owner issue authentication prohibits other PCs, accounts and arbitra
   [event(),{...env,GITHUB_RUN_ATTEMPT:'2'},'DESKTOP-N62L0NG']
  ])assert.throws(()=>validateContext(e,v,h),/HANDOFF_WATCH_RUNNER_ADMISSION_STOP/);
 });
+test('valid JSON whitespace and property order do not change admission',()=>{
+ const formatted = JSON.stringify({target:'handoff',requestId:request.requestId,
+   operation:'read-only-context-and-cadence',schema:SCHEMA},null,2);
+ assert.equal(validateContext({...event(),issue:{...event().issue,body:formatted}},
+   env,'DESKTOP-N62L0NG').issueNumber,2142);
+ for (const body of ['{invalid',JSON.stringify({...request,target:'other'}),
+   JSON.stringify({...request,unknown:true})]) {
+   assert.throws(()=>validateContext({...event(),issue:{...event().issue,body}},
+     env,'DESKTOP-N62L0NG'),/HANDOFF_WATCH_RUNNER_ADMISSION_STOP/);
+ }
+});
 const baseline={schema:'ZGMINI_HANDOFF_WATCH_RUNNER_CONTEXT_PROBE_V1',
  sessionId:0,serviceSid:true,adminGroupToken:true,taskQueryOk:true,taskExists:false,ghCliPresent:true};
 test('a privileged Session 0 Runner is NOT authorized to install interactive per-user watch',()=>{
@@ -102,5 +113,9 @@ test('workflow scope permits only issue-triggered read-only isolated 2-minute jo
   "github.run_attempt == 1",
   'GITHUB_TOKEN: \${{ github.token }}'
  ])assert.ok(workflow.includes(q),q);
+ assert.ok(workflow.includes("github.event.issue.title == 'handoff-watch-runner-context-readonly'"));
+ assert.ok(workflow.indexOf('Confirm isolated queue host before checking out source') <
+   workflow.indexOf('uses: actions/checkout@'));
+ assert.doesNotMatch(workflow,/contains\(github\.event\.issue\.body/);
  assert.doesNotMatch(workflow,/issues: write|contents: write|schedule:|workflow_dispatch:|powershell.*Register-ScheduledTask/);
 });

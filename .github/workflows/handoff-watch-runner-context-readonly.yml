@@ -16,8 +16,6 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.issue.user.login == 'ansqhd5774-Choi' &&
       github.event.issue.title == 'handoff-watch-runner-context-readonly' &&
-      contains(github.event.issue.body, '"schema":"ZGMINI_HANDOFF_WATCH_RUNNER_CONTEXT_REQUEST_V1"') &&
-      contains(github.event.issue.body, '"target":"handoff"') &&
       github.run_attempt == 1
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 2
@@ -25,6 +23,14 @@ jobs:
       run:
         shell: cmd
     steps:
+      - name: Confirm isolated queue host before checking out source
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo HANDOFF_WATCH_CONTEXT_ISOLATED_HOST=TRUE
+          ) else (
+            echo HANDOFF_WATCH_CONTEXT_ISOLATED_HOST=FALSE
+            exit /b 5
+          )
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: main
