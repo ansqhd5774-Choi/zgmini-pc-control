@@ -54,7 +54,7 @@ test('fixed light audit verifies complete raw chunks and exact run receipt links
   invalidBodyKeys:1,validWithoutRunKeys:1,
   invalidReasonCounts:{
    CHUNK_OR_COUNT_INVALID:0,HASH_FORMAT_INVALID:0,SOURCE_FIELDS_INVALID:0,
-   TIME_INVALID:0,RESPONSE_HASH_OR_METADATA_MISMATCH:0,
+   TIME_INVALID:0,RESPONSE_HASH_MISSING:0,RESPONSE_HASH_VALUE_MISMATCH:0,
    SNAPSHOT_ID_MISMATCH:0,BODY_SHA_MISMATCH:1,
   },
   invalidReasonOrdinals:[{ordinal:expectedOrdinal,reason:'BODY_SHA_MISMATCH'}],
@@ -82,13 +82,33 @@ test('invalid snapshot reason codes isolate chunk, time, response metadata and I
  assert.equal(result.bodyVerifiedKeys,0);
  assert.equal(result.invalidBodyKeys,4);
  for(const code of ['CHUNK_OR_COUNT_INVALID','TIME_INVALID',
-  'RESPONSE_HASH_OR_METADATA_MISMATCH','SNAPSHOT_ID_MISMATCH'])
+  'RESPONSE_HASH_VALUE_MISMATCH','SNAPSHOT_ID_MISMATCH'])
   assert.equal(result.invalidReasonCounts[code],1);
  assert.equal(Object.values(result.invalidReasonCounts).reduce((a,b)=>a+b,0),4);
  assert.equal(result.invalidReasonOrdinals.length,4);
  assert.equal(new Set(result.invalidReasonOrdinals.map(x=>x.ordinal)).size,4);
  assert.equal(result.invalidReasonTruncated,false);
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_|broken-|metadata body|responseHash|snapshotId|body_sha256/);
+ db.close();
+});
+test('missing responseHash is distinct from a present incorrect value without leaking metadata',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ for(const key of ['hash-absent','hash-null','hash-invalid'])
+  snapshot(db,{requestKey:key,body:'secret-'+key});
+ const table='market_score_employment_r6_raw_snapshot_v1';
+ db.prepare('UPDATE '+table+' SET detail_json=? WHERE request_key=?')
+  .run(JSON.stringify({secret:'PRIVATE_MISSING'}),'hash-absent');
+ db.prepare('UPDATE '+table+' SET detail_json=? WHERE request_key=?')
+  .run(JSON.stringify({responseHash:null,secret:'PRIVATE_NULL'}),'hash-null');
+ db.prepare('UPDATE '+table+' SET detail_json=? WHERE request_key=?')
+  .run(JSON.stringify({responseHash:'f'.repeat(64),secret:'PRIVATE_WRONG'}),'hash-invalid');
+ const result=auditFixedR6RawRunSnapshot(db,{checkedAt:AT});
+ assert.equal(result.invalidBodyKeys,3);
+ assert.equal(result.invalidReasonCounts.RESPONSE_HASH_MISSING,2);
+ assert.equal(result.invalidReasonCounts.RESPONSE_HASH_VALUE_MISMATCH,1);
+ assert.equal(result.invalidReasonOrdinals.length,3);
+ assert.equal(Object.values(result.invalidReasonCounts).reduce((a,b)=>a+b,0),3);
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_|secret-|hash-absent|hash-null|hash-invalid|responseHash/);
  db.close();
 });
 test('failure reasons stay bounded when invalid snapshots exceed the output limit',()=>{

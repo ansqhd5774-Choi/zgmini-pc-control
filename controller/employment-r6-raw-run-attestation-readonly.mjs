@@ -32,7 +32,8 @@ const columnsExist=(db,table,columns)=>{
 };
 const sha=value=>createHash('sha256').update(value).digest('hex');
 const FAILURE_CODES=['CHUNK_OR_COUNT_INVALID','HASH_FORMAT_INVALID',
- 'SOURCE_FIELDS_INVALID','TIME_INVALID','RESPONSE_HASH_OR_METADATA_MISMATCH',
+ 'SOURCE_FIELDS_INVALID','TIME_INVALID','RESPONSE_HASH_MISSING',
+ 'RESPONSE_HASH_VALUE_MISMATCH',
  'SNAPSHOT_ID_MISMATCH','BODY_SHA_MISMATCH'];
 const MAX_INVALID_REASON_ROWS=32;
 
@@ -73,8 +74,10 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
    ||created>Date.parse(checkedAt)||retrieved>Date.parse(checkedAt))
    return markInvalid('TIME_INVALID');
   const detail=safeJson(h.detail_json);
-  if(detail?.responseHash!==h.body_sha256)
-   return markInvalid('RESPONSE_HASH_OR_METADATA_MISMATCH');
+  if(!detail||!Object.hasOwn(detail,'responseHash')||detail.responseHash==null)
+   return markInvalid('RESPONSE_HASH_MISSING');
+  if(detail.responseHash!==h.body_sha256)
+   return markInvalid('RESPONSE_HASH_VALUE_MISMATCH');
   if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))!==h.snapshot_id)
    return markInvalid('SNAPSHOT_ID_MISMATCH');
   if(group.hasher.digest('hex')!==h.body_sha256)
