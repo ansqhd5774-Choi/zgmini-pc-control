@@ -95,13 +95,17 @@ async function validatePins(onAttempt=()=>{},onProgress=()=>{},onlyIds=null) {
  for (const entry of FIXED) {
   if(onlyIds!==null&&!onlyIds.includes(entry.id))continue;
   onAttempt(entry.id);
+  let lastOperation=null,lastDepth=null;
   try {
-   const v=await hashFile(entry.file,onProgress);
+   const v=await hashFile(entry.file,(operation,depth)=>{
+    lastOperation=operation;lastDepth=depth;onProgress(operation,depth);
+   });
    items.push({id:entry.id,matched:v.bytes===entry.bytes&&v.sha256===entry.sha,
     bytes:v.bytes,sha256:v.sha256,status:v.bytes===entry.bytes&&v.sha256===entry.sha?'MATCHED':'MISMATCH'});
   } catch(e) {
    // A denied image does not erase other input results or prevent log diagnosis.
-   items.push({id:entry.id,matched:false,status:'UNVERIFIED',code:codeOf(e)});
+   items.push({id:entry.id,matched:false,status:'UNVERIFIED',code:codeOf(e),
+    inspectOperation:lastOperation,inspectDepth:lastDepth});
   }
  }
  return items;
