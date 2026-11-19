@@ -35,7 +35,25 @@ test('new handoff CI checks out exact PR head and preserves read-only credential
   assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
   assert.match(workflow, /defaults:\s*\n\s+run:\s*\n\s+shell: cmd/);
   assert.match(workflow, /timeout-minutes: 5/);
-  assert.match(workflow, /cancel-in-progress: true/);
+  // Only admitted jobs enter the queue. Every manually reviewed PR HEAD
+  // retains its own non-cancelled execution evidence.
+  assert.doesNotMatch(workflow, /^concurrency:\s*$/m);
+  assert.match(workflow,
+    /jobs:\n  handoff-source-tests:\n(?:    #[^\n]*\n)*    concurrency:\n      group: zgmini-handoff-ci-\$\{\{ github\.event\.pull_request\.number \}\}-\$\{\{ github\.event\.pull_request\.head\.sha \}\}\n      cancel-in-progress: false\n      queue: max/);
+  assert.doesNotMatch(workflow,/cancel-in-progress: true/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest|zgmini-pc-control\]|node\.exe|\$\{\{\s*secrets\.|issues: write|actions: write/);
   assert.doesNotMatch(workflow, /^(?:\s*)(?:artifact|cache|schedule):/m);
+});
+
+test('CI preserves manual SHA review rather than auto-testing synchronize or branch pushes',()=>{
+  const source=workflow;
+  assert.match(source,/types: \[labeled\]/);
+  assert.match(source,/github\.event\.action == 'labeled'/);
+  assert.match(source,/github\.event\.label\.name == 'agent-handoff-ci'/);
+  assert.doesNotMatch(source,/types: \[[^\]]*(synchronize|opened|reopened)/);
+  const job=source.slice(source.indexOf('jobs:\n  handoff-source-tests:'));
+  const queueIndex=job.indexOf('    concurrency:\n');
+  const ifIndex=job.indexOf('    if: >-\n');
+  assert.ok(queueIndex>=0 && queueIndex<ifIndex);
+  assert.equal((source.match(/^      queue: max$/gm)||[]).length,1);
 });
