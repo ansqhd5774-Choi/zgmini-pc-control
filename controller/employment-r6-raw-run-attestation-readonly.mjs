@@ -40,7 +40,7 @@ const MAX_INVALID_REASON_ROWS=32;
 // All snapshot chunks, body hashes and receipt links are checked on the PC.
 // Only bounded counts and snapshot-local ordinals/reason codes leave the PC;
 // no raw body, snapshot hash, provider key, path or detailed timestamp leaves.
-export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString()}={}){
+export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(),includeInvalidLineage=false}={}){
  if(!Number.isFinite(Date.parse(checkedAt))||new Date(checkedAt).toISOString()!==checkedAt)
   throw Error('R6_RAW_AUDIT_CHECKED_AT_INVALID');
  if(!columnsExist(db,RAW,RAW_COLS)||!columnsExist(db,RUNS,RUN_COLS))
@@ -49,11 +49,16 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
    invalidBodyKeys:null,validWithoutRunKeys:null,
    invalidReasonCounts:null,invalidReasonOrdinals:null,invalidReasonTruncated:null};
  const verified=new Map();
+ // Internal-only identities for bounded lineage aggregates; never return raw hashes or keys.
+ const invalidHeads=includeInvalidLineage?new Map():null;
  const invalidReasonCounts=Object.fromEntries(FAILURE_CODES.map(code=>[code,0]));
  const invalidReasonOrdinals=[];
  let metadataKeys=0,totalBytes=0,group=null;
  const markInvalid=reason=>{
   invalidReasonCounts[reason]++;
+  if(invalidHeads)invalidHeads.set(group.id,{reason,provider:String(group.head.provider??''),
+   releaseGroup:String(group.head.release_group??''),retrievedAt:String(group.head.retrieved_at??''),
+   bodySha:String(group.head.body_sha256??'')});
   // Ordinal is valid only for this checkedAt/read transaction. It is not
   // a stable record identity, source hash, or approval to repair HISTORY.
   if(invalidReasonOrdinals.length<MAX_INVALID_REASON_ROWS)
@@ -113,8 +118,11 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
  }
  finish();
  const certified=new Set();
+ const invalidRunRevisions=includeInvalidLineage?new Map():null;
+ const hasRunRevision=includeInvalidLineage&&columnsExist(db,RUNS,['collector_revision']);
  let runCount=0;
- const runs=db.prepare('SELECT provider,status,completed_at,detail_json FROM '+RUNS+
+ const runs=db.prepare('SELECT provider,status,completed_at,detail_json'+
+  (hasRunRevision?',collector_revision':'')+' FROM '+RUNS+
   ' WHERE completed_at<=?').iterate(checkedAt);
  for(const run of runs){
   runCount++;
@@ -126,18 +134,47 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
   if(!Array.isArray(details?.rawSnapshots)||details.rawSnapshots.length>MAX_SNAPSHOTS)
    continue;
   for(const item of details.rawSnapshots){
+   if(invalidRunRevisions){
+    const bad=invalidHeads.get(item?.snapshotId);
+    if(bad&&item.bodySha256===bad.bodySha
+     &&run.provider==='EMPLOYMENT_R6_'+bad.releaseGroup
+     &&Date.parse(bad.retrievedAt)<=completed){
+     const declared=String(run.collector_revision??'').trim();
+     const revision=hasRunRevision&&/^[A-Za-z0-9._-]{1,64}$/.test(declared)
+      ?declared:'UNKNOWN';
+     const values=invalidRunRevisions.get(item.snapshotId)??new Set();
+     values.add(revision);invalidRunRevisions.set(item.snapshotId,values);
+    }
+   }
    const snap=verified.get(item?.snapshotId);
    if(snap&&item.bodySha256===snap.body_sha256
     &&run.provider==='EMPLOYMENT_R6_'+snap.release_group
     &&Date.parse(snap.retrieved_at)<=completed)certified.add(item.snapshotId);
   }
  }
+ const invalidLineageCounts=new Map();
+ if(invalidHeads)for(const [id,bad] of invalidHeads){
+  const revisions=invalidRunRevisions.get(id);
+  const collectorRevision=!revisions?.size?'UNLINKED':revisions.size===1?[...revisions][0]:'AMBIGUOUS';
+  const month=/^20\d\d-(?:0[1-9]|1[0-2])/.test(bad.retrievedAt)
+   ?bad.retrievedAt.slice(0,7):'UNKNOWN';
+  const provider=/^[A-Za-z0-9_]{1,32}$/.test(bad.provider)?bad.provider:'OTHER';
+  const releaseGroup=/^[A-Za-z0-9_]{1,64}$/.test(bad.releaseGroup)?bad.releaseGroup:'OTHER';
+  const key=JSON.stringify([bad.reason,provider,releaseGroup,month,collectorRevision]);
+  invalidLineageCounts.set(key,(invalidLineageCounts.get(key)??0)+1);
+ }
+ const invalidLineage=invalidHeads?[...invalidLineageCounts].map(([key,count])=>{
+  const [reason,provider,releaseGroup,retrievedMonth,collectorRevision]=JSON.parse(key);
+  return {reason,provider,releaseGroup,retrievedMonth,collectorRevision,count};
+ }).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))):null;
+ if(invalidLineage&&invalidLineage.length>64)throw Error('R6_RAW_AUDIT_LINEAGE_GROUP_CAP');
  return {status:'HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT',checkedAt,metadataKeys,
   bodyVerifiedKeys:verified.size,runCertifiedKeys:certified.size,
   invalidBodyKeys:metadataKeys-verified.size,
   validWithoutRunKeys:verified.size-certified.size,
   invalidReasonCounts,invalidReasonOrdinals,
-  invalidReasonTruncated:metadataKeys-verified.size>invalidReasonOrdinals.length};
+  invalidReasonTruncated:metadataKeys-verified.size>invalidReasonOrdinals.length,
+  ...(invalidLineage?{invalidLineageGroups:invalidLineage,invalidLineageScope:'DIAGNOSTIC_NOT_PIT'}:{})};
 }
 
 // The fixed PC data root is supplied by the installed Controller, not Issue JSON.
@@ -166,7 +203,7 @@ export function inspectEmploymentR6RawRunLight(dataRoot,{
   const checkedAt=now().toISOString();
   db=openDatabase(file);base.sqliteOpened=true;
   stage='HASH_AND_RUNS_READONLY';
-  const attestation=auditFixedR6RawRunSnapshot(db,{checkedAt});
+  const attestation=auditFixedR6RawRunSnapshot(db,{checkedAt,includeInvalidLineage:true});
   const dbIdentityTag=sha(JSON.stringify([file,String(stat.dev),String(stat.ino),
    String(stat.birthtimeMs)])).slice(0,16);
   if(attestation.status!=='HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT')
