@@ -221,3 +221,39 @@ test('finalization rejects malformed input instead of manufacturing PASS',async(
   await assert.rejects(()=>finalizeSelection({selected:0},null),
     /HANDOFF_SELECTOR_FINALIZATION_INPUT_INVALID/);
 });
+
+test('one pending Issue comment GET failure cannot block independent candidates',async()=>{
+  const failed=fixture(2701),good=fixture(2702);
+  const rows=[failed.issue,good.issue]; let writes=0;
+  const saved=[good.route];
+  const result=await processQueue(rows,{
+    readComments:async n=>{
+      if(n===2701)throw Error('backend unavailable: secret token not for logs');
+      return structuredClone(saved);
+    },
+    readIssue:async n=>structuredClone(rows.find(x=>x.number===n)),
+    recordReceipt:async(n,body)=>{
+      writes++;
+      saved.push({user:{login:HANDOFF_BOT},
+        issue_url:'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n,body});
+    }
+  });
+  assert.equal(result.selected,1);
+  assert.deepEqual(result.selectedIssues,[2702]);
+  assert.equal(result.deferred,1);
+  assert.deepEqual(result.deferredIssues,[{issueNumber:2701,reason:'COMMENT_READ_UNAVAILABLE'}]);
+  assert.equal(JSON.stringify(result).includes('secret token'),false);
+  assert.equal(writes,1);
+});
+
+test('unverified candidate reason is reported without weakening bot receipt rules',async()=>{
+  const f=fixture(2703);
+  const result=await processQueue([f.issue],{
+    readComments:async()=>[],
+    readIssue:async()=>structuredClone(f.issue),
+    recordReceipt:async()=>{throw Error('unexpected write');}
+  });
+  assert.equal(result.selected,0);
+  assert.equal(result.deferred,1);
+  assert.deepEqual(result.deferredIssues,[{issueNumber:2703,reason:'ROUTE_RECEIPT_UNVERIFIED'}]);
+});
