@@ -1,0 +1,226 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "8660924cc2f62b1a0409cbd6d6fe3be95b510eff",
+  "baseHead": "e16669ae4d35af25cadd68c939ed70533fa457ab",
+  "baseConfigSourceSha": "e16669ae4d35af25cadd68c939ed70533fa457ab",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/theme-etf-provisional.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "cd15755daa0ffda4ade23c1aa6a7da8cedc4f44ba071054dd44f9ca05889ad50"
+    },
+    {
+      "path": "lib/marketparquet-retirement.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "8846a71456cab355401bc385fb6c3a7adae8111da4689f9930162349b1bf40fb"
+    },
+    {
+      "path": "scripts/pc-writer/theme-gmh-seven-pc-parity-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "81b533b95e5bc8eed860aa14771b2b52d8fe586681e5721f163c66cd42db19d7"
+    },
+    {
+      "path": "scripts/pc-writer/theme-gmh-seven-private-bridge.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "16e54ea74555c412c5341136edf3723e0f8a0c3ecb040947347ffd3a51b9fcba"
+    },
+    {
+      "path": "scripts/pc-writer/theme-gmh-seven-saved-input-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "5f8b0cda1f7a390a658ea5ecb90e2b8abcb715ea495e1fa23c076f15aff08f6b"
+    },
+    {
+      "path": "scripts/pc-writer/theme-optional-score-r188.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "36d45cd82af507f5b75a5a96413c626b50c830ca2aa1291bbb64f113cd0e3366"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-history-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "6977d168aaf667995e00da31d507fd8ec530373b28799ce3137f5deeda05a783"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-private-seed-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "043102d2010b74de88c502e2e8951fb3ec1a3ac6baeefe947d75fe2aaddc6124"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-approved-writer-entry.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "2519887919ff9098f731c28b7afcffeb4d38d863da507a8b0302c7363ecbbf75"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-authorized-cas.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c78070c11f23b22d9d3fb6e8742f7d77863702766451320e1f44e7431dd076d4"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-private-draft.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "419ea05fd27fca84c0eeb5b68b80363bab11845fcd3619898206a3922a2bd0ce"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-saved-to-cas-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "bc120465c67ca945abf68dd72b0f21d7869f162a064d88f51a420b3b34b7514c"
+    },
+    {
+      "path": "worker/theme-ai-semiconductor-optional.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "15ceb7b71a89bbe60d6b9d3057b5d6bc81cbe46d9d0b066fab16b6cdd8625f80"
+    },
+    {
+      "path": "worker/theme-biotech-continuation-r2.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a34f701d5be6d2a4be6415fdee8006d4c22d5a206b6df66b118d8e17ac6a5d09"
+    },
+    {
+      "path": "worker/theme-biotech-optional.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "0bf357ca0fecc98413a8cefeea48f235863b04c35387c4d3cae8d83c691177e1"
+    },
+    {
+      "path": "worker/theme-biotech-provisional-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "43f86d3aa50daa84316316e9b7569566a85d701801fba4dc58a269682b8fdcd7"
+    },
+    {
+      "path": "worker/theme-data-center-power-provisional-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "8b20498708c5b3cefe423fe6ae2106a5b1ea6ae4ed88f26de3576c0f4f542a39"
+    },
+    {
+      "path": "worker/theme-data-center-power-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "505cd92c9b90065b1b366792a566048d337b3a4f1c239d994451041ee2299578"
+    },
+    {
+      "path": "worker/theme-etf-rolling-public.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c5c0ea3e60c468466c60e56c0e5444f8f7b20b706273c72976a87a9696cf41da"
+    },
+    {
+      "path": "worker/theme-history-reference.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a1b713c1516970479f8c26ae9d86a314f6bac93e67eab02259e4dd08b9edcb8f"
+    },
+    {
+      "path": "worker/theme-nine-r37-public.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "d9ac298ac662a867c23dec9ce0bd64ab03e311e0f3432c9a6ac7b070d23ce91f"
+    },
+    {
+      "path": "worker/theme-nine-r88-provisional.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "dff652c7e34e7a306d7ea96ea649424f23fa9935fd3617c4449a8cba7d2e4874"
+    },
+    {
+      "path": "lib/cnn-index.mjs",
+      "change": "M",
+      "beforeSha256": "cde0a679768aee34a994f5f73b000875478c7c536afdcb38ab9e6e806a994c1d",
+      "afterSha256": "195d9d01c4d424911ba9eab33cb03d1a7f5985db5bffe788f58fe921e910e9a3"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "change": "M",
+      "beforeSha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878",
+      "afterSha256": "83f374589e94ba8bf94475f122ef323b8bce566a42aded166a1ff80bc6b4b964"
+    },
+    {
+      "path": "worker/public-feed-input-safety.mjs",
+      "change": "M",
+      "beforeSha256": "1d4dd5e1039a538d314a9f9b122aef89bfb2f4d21867582c32a6352ff1699fa8",
+      "afterSha256": "9baf93b2694c5100355107301a6e4aeec39eefa7d5ce077f9e2bdd7a76275c7e"
+    },
+    {
+      "path": "worker/theme-etf-only-public.mjs",
+      "change": "M",
+      "beforeSha256": "e362f5891d2c535b7876131cc97c109674fa4a27334e7875c74deb61b6180c10",
+      "afterSha256": "af91ce995da2cce1179cd12ea54d161a26de3a098f496d824c220a69742656f4"
+    },
+    {
+      "path": "worker/theme-space-satellite-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c706b19215596ec42d0a0949b6ce10222fa91d67ff9bd6f7b10b14aa8613162f"
+    },
+    {
+      "path": "worker/theme-space-satellite-provisional-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "e808e8884e21d085dfd1b1d8d1f40bfc0dee8dcba5249be70fd61f63a240fa8a"
+    },
+    {
+      "path": "worker/theme-space-satellite-r2.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "0004103b9fafeab98802402b2b2e2075b0e45c205b180cc3ea75e1f159ea2a25"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/cnn-observed-archive-r1.mjs",
+      "sha256": "f9cb4c8da02e2175527c389a54563a6f45c6f2815f5af524c27b071a6059ec63"
+    },
+    {
+      "path": "lib/market-calendar-er1-earnings-score.mjs",
+      "sha256": "35247642b8c1c7d0efb12e35719fd981386e29da7b32c1138cde92873f916974"
+    },
+    {
+      "path": "lib/market-calendar-er1-forecast-score.mjs",
+      "sha256": "4673db7669e6cb65f3a49d9f55618b58ff9905629bf0c799e61ee792e4d24fde"
+    },
+    {
+      "path": "lib/market-calendar-er1-month-key.mjs",
+      "sha256": "6e5d8453085c78f770156823f0f4f32657c3bb03aa5df6b0c2442c0c61a2463e"
+    },
+    {
+      "path": "lib/market-calendar-er1-public-display.mjs",
+      "sha256": "5c94721a7ea3d5fb2399e19993522c8f9d66b696023245273a41ea208f1fd5c8"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "sha256": "b21f03057025bad7aed58c7bb1f69b2abba0f0b446c587869594eea732adfaa6"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
