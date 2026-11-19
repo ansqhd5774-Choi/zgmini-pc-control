@@ -63,7 +63,7 @@ test('runner API permission failures are distinct from offline runner status',()
  assert.equal(summarizeAutomation({...healthy(),runnerSetOnline:null}).runtimeState,'UNVERIFIED');
 });
 
-test('403 runner roster permission is scoped, not a controller local outage or an all-six PASS',()=>{
+test('403 roster permission remains scoped without introducing a new next-step gate',()=>{
  const r=summarizeAutomation({...healthy(),runnerSetOnline:null,
   runnerQueryError:'HTTP_403_FORBIDDEN',maintenanceFilesVerified:true,
   receiverIdentityVerified:true,receiverFresh:true,receiverListening:true});
@@ -71,7 +71,7 @@ test('403 runner roster permission is scoped, not a controller local outage or a
  assert.equal(r.runnerRegistryState,'UNVERIFIED');
  assert.equal(r.runtimeState,'UNVERIFIED');
  assert.equal(r.automationState,'PARTIAL_OR_UNVERIFIED');
- assert.equal(r.next,'CHECK_GITHUB_RUNNER_ROSTER_READ_PERMISSION');
+ assert.equal(r.next,'VERIFY_TARGET_MANIFEST_AND_CURRENT_RUNTIME');
  assert.equal(r.blockScope,'NONE_FROM_INSTALL_LEASE');
 });
 test('missing, offline and unrelated runner errors retain scoped diagnosis',()=>{
