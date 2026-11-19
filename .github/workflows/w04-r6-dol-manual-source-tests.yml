@@ -15,6 +15,8 @@ on:
       - 'tests/w04-raw27-lineage-selective-b.test.mjs'
       - 'controller/employment-r6-candidate-readonly.mjs'
       - 'tests/employment-r6-candidate-readonly.test.mjs'
+      - 'tests/w04-pit0605-controller-private-evidence.test.mjs'
+      - 'approvals/source-bundles/manifests/**'
       - 'approvals/employment-r6-registered-data/**'
       - '.github/workflows/w04-r6-dol-manual-source-tests.yml'
 permissions:
@@ -50,6 +52,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/employment-r6-raw-run-light-attestation.test.mjs tests/w04-raw27-lineage-selective-b.test.mjs
       - name: Verify W04 PIT-04-03 count-only controller projection in isolated CI
         run: node --test --test-concurrency=1 tests/employment-r6-candidate-readonly.test.mjs
+      - name: Verify PIT0605 opt-in and persisted private proof without provider/operational I/O
+        run: node --test --test-concurrency=1 tests/w04-pit0605-controller-private-evidence.test.mjs
       - name: Check exact dedicated R6 admission without shared false rejection
         run: node --test tests/shared-resource-issue-admission.test.mjs
       - name: Confirm source-only isolated host
