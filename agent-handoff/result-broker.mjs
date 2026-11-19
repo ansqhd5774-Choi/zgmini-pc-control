@@ -226,16 +226,17 @@ export async function main(env = process.env) {
   const alreadyRecorded = await inspectExistingResult(
     event.issue.number, result.resultId, digest, comment);
   if (!alreadyRecorded) {
+    let reconciled=false;
     try {
       await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`,
         {method: 'POST', body: {body: comment}});
     } catch {
       // A POST response may be lost after GitHub stored the comment.
       // Reconcile the exact bot receipt; never blindly post it again.
-      if (!await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
-        throw new Error('RESULT_COMMENT_POST_OUTCOME_UNKNOWN');
+      reconciled=await inspectExistingResult(event.issue.number, result.resultId, digest, comment);
+      if (!reconciled) throw new Error('RESULT_COMMENT_POST_OUTCOME_UNKNOWN');
     }
-    if (!await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
+    if (!reconciled && !await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
       throw new Error('RESULT_COMMENT_READBACK_STOP');
   }
   if (originalIssue !== null) {
@@ -243,15 +244,16 @@ export async function main(env = process.env) {
     const delivered = await inspectOriginReceipt(
       originalIssue, result, digest, event.issue.number, receipt);
     if (!delivered) {
+      let reconciled=false;
       try {
         await api(`/repos/${REPOSITORY}/issues/${originalIssue}/comments`,
           {method: 'POST', body: {body: receipt}});
       } catch {
-        if (!await inspectOriginReceipt(originalIssue, result, digest,
-          event.issue.number, receipt))
-          throw new Error('RESULT_ORIGIN_POST_OUTCOME_UNKNOWN');
+        reconciled=await inspectOriginReceipt(originalIssue, result, digest,
+          event.issue.number, receipt);
+        if (!reconciled) throw new Error('RESULT_ORIGIN_POST_OUTCOME_UNKNOWN');
       }
-      if (!await inspectOriginReceipt(originalIssue, result, digest,
+      if (!reconciled && !await inspectOriginReceipt(originalIssue, result, digest,
         event.issue.number, receipt))
         throw new Error('RESULT_ORIGIN_COMMENT_READBACK_STOP');
     }
