@@ -17,6 +17,9 @@ on:
       - 'tests/employment-r6-candidate-readonly.test.mjs'
       - 'tests/w04-pit0605-controller-private-evidence.test.mjs'
       - 'tests/w04-pit0408-private-ledger.test.mjs'
+      - 'tests/w04-pit0408-selective-controller-b.test.mjs'
+      - 'approvals/controller-updates/f896b2fd05ca6df845e446497ddc71b076fa3ab0.json'
+      - 'approvals/controller-selective-targets/f896b2fd05ca6df845e446497ddc71b076fa3ab0.json'
       - 'tests/w04-pit0605-selective-controller-b.test.mjs'
       - 'approvals/source-bundles/manifests/**'
       - 'approvals/employment-r6-registered-data/**'
@@ -58,6 +61,8 @@ jobs:
         run: node --test --test-concurrency=1 tests/w04-pit0605-controller-private-evidence.test.mjs
       - name: Verify PIT0408 private key ledger integrity and no-public-data-leak contract
         run: node --test --test-concurrency=1 tests/w04-pit0408-private-ledger.test.mjs
+      - name: Verify PIT0408 selective Controller B exact CAS and manifest
+        run: node --test --test-concurrency=1 tests/w04-pit0408-selective-controller-b.test.mjs
       - name: Verify PIT0605 two-file Controller B manifest and CAS pin
         run: node --test --test-concurrency=1 tests/w04-pit0605-selective-controller-b.test.mjs
       - name: Check exact dedicated R6 admission without shared false rejection
