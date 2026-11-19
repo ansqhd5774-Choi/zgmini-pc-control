@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "d770edbf8dd8193cafcd8e33c9404af48465a07d",
+  "targetSha": "6e52999aeb7dda5975464a78780559ba5cd46895",
+  "sourceMainSha": "2fee2c241f0318576e08b0940f77864361013bf4",
+  "targetBranch": "codex/w04-provenance-runtime-20261119",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-raw-run-attestation-readonly.mjs",
+      "sha256": "dd8d9edcc19f7e02d7eec2eefb48c91f035fbcb5198338c48808e9e8cd323b86"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2357"
+}
