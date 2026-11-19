@@ -1,5 +1,8 @@
-# Source-only candidate. Install only after exact approval and Windows bridge proof.
-# Reuses the independently proven Writer B Actions lane, NOT maintenance handoff.
+# Active, approved one-shot B entrypoint; performs real authorized PC effects.
+# Three independently authenticated Issue contracts share this Workflow.
+# Keep their cross-job serialization until actual overlapping PC resources,
+# leases and Task/DB write effects are proven independent; never assume so
+# from differing job names. Historical requests are not replayed.
 name: ZGMINI Approved Runtime B Once
 on:
   issues:
