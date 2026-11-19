@@ -36,6 +36,15 @@ const FAILURE_CODES=['CHUNK_OR_COUNT_INVALID','HASH_FORMAT_INVALID',
  'RESPONSE_HASH_VALUE_MISMATCH',
  'SNAPSHOT_ID_MISMATCH','BODY_SHA_MISMATCH'];
 const MAX_INVALID_REASON_ROWS=32;
+// Exact legacy R4 BED parser algorithm; never replace the immutable HTTP hash.
+const stableJson=value=>JSON.stringify(stableValue(value));
+function stableValue(value,depth=0){
+ if(depth>100)throw Error('R6_CANONICAL_DEPTH');
+ if(value==null||typeof value!=='object')return value;
+ if(Array.isArray(value))return value.map(x=>stableValue(x,depth+1));
+ return Object.fromEntries(Object.keys(value).sort().map(k=>[k,stableValue(value[k],depth+1)]));
+}
+
 
 // All snapshot chunks, body hashes and receipt links are checked on the PC.
 // Only bounded counts and snapshot-local ordinals/reason codes leave the PC;
@@ -49,10 +58,22 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
    invalidBodyKeys:null,validWithoutRunKeys:null,
    invalidReasonCounts:null,invalidReasonOrdinals:null,invalidReasonTruncated:null};
  const verified=new Map();
+ const legacy=new Map();
+ const legacyProof={examined:0,canonicalMatched:0,canonicalMismatched:0,
+  invalidJson:0,bodyOrIdInvalid:0,runLinked:0,
+  scope:'LEGACY_BED_CANONICAL_COMPATIBILITY_NOT_PIT'};
+
  // Internal-only identities for bounded lineage aggregates; never return raw hashes or keys.
  const invalidHeads=includeInvalidLineage?new Map():null;
  const invalidReasonCounts=Object.fromEntries(FAILURE_CODES.map(code=>[code,0]));
  const invalidReasonOrdinals=[];
+ // Diagnostic-only: inspect both independent integrity checks even when
+ // responseHash has the historical BED canonical-vs-HTTP mismatch.
+ // Do not promote these snapshots into verified or certified sets.
+ const mismatchIntegrity={
+  checked:0,bodyShaMatched:0,bodyShaMismatched:0,
+  idMatched:0,idMismatched:0,
+ };
  let metadataKeys=0,totalBytes=0,group=null;
  const markInvalid=reason=>{
   invalidReasonCounts[reason]++;
@@ -81,8 +102,34 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
   const detail=safeJson(h.detail_json);
   if(!detail||!Object.hasOwn(detail,'responseHash')||detail.responseHash==null)
    return markInvalid('RESPONSE_HASH_MISSING');
-  if(detail.responseHash!==h.body_sha256)
+  if(detail.responseHash!==h.body_sha256){
+   if(includeInvalidLineage){
+    mismatchIntegrity.checked++;
+    if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))===h.snapshot_id)
+     mismatchIntegrity.idMatched++;
+    else mismatchIntegrity.idMismatched++;
+    const bodyMatched=group.hasher.digest('hex')===h.body_sha256;
+    if(bodyMatched)mismatchIntegrity.bodyShaMatched++;
+    else mismatchIntegrity.bodyShaMismatched++;
+    if(h.provider==='BLS_BED'&&h.release_group==='BLS_BED'){
+     legacyProof.examined++;
+     const idMatched=sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))===h.snapshot_id;
+     if(!bodyMatched||!idMatched)legacyProof.bodyOrIdInvalid++;
+     else try{
+      const payload=JSON.parse(group.bodyParts.join(''));
+      if(!payload||payload.status!=='REQUEST_SUCCEEDED'||!Array.isArray(payload.Results?.series))
+       legacyProof.invalidJson++;
+      else if(sha(stableJson(payload))!==detail.responseHash)legacyProof.canonicalMismatched++;
+      else{
+       legacyProof.canonicalMatched++;
+       legacy.set(h.snapshot_id,{provider:h.provider,release_group:h.release_group,
+        body_sha256:h.body_sha256,retrieved_at:h.retrieved_at});
+      }
+     }catch{legacyProof.invalidJson++;}
+    }
+   }
    return markInvalid('RESPONSE_HASH_VALUE_MISMATCH');
+  }
   if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))!==h.snapshot_id)
    return markInvalid('SNAPSHOT_ID_MISMATCH');
   if(group.hasher.digest('hex')!==h.body_sha256)
@@ -98,7 +145,7 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
    finish();metadataKeys++;
    if(metadataKeys>MAX_SNAPSHOTS)throw Error('R6_RAW_AUDIT_SNAPSHOT_CAP');
    group={id:row.snapshot_id,head:row,count:0,bytes:0,valid:true,
-    hasher:createHash('sha256')};
+    hasher:createHash('sha256'),bodyParts:includeInvalidLineage&&row.provider==='BLS_BED'&&row.release_group==='BLS_BED'?[]:null};
   }
   const h=group.head;
   if(!Number.isSafeInteger(row.chunk_index)||row.chunk_index!==group.count
@@ -113,11 +160,12 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
    group.bytes+=bytes;totalBytes+=bytes;
    if(group.bytes>MAX_BODY_BYTES||totalBytes>MAX_TOTAL_BYTES)
     throw Error('R6_RAW_AUDIT_BYTE_CAP');
-   if(group.valid)group.hasher.update(row.body_chunk,'utf8');
+   if(group.valid){group.hasher.update(row.body_chunk,'utf8');group.bodyParts?.push(row.body_chunk);}
   }
  }
  finish();
  const certified=new Set();
+ const legacyLinked=new Set();
  const invalidRunRevisions=includeInvalidLineage?new Map():null;
  const hasRunRevision=includeInvalidLineage&&columnsExist(db,RUNS,['collector_revision']);
  let runCount=0;
@@ -146,12 +194,17 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
      values.add(revision);invalidRunRevisions.set(item.snapshotId,values);
     }
    }
+   const old=legacy.get(item?.snapshotId);
+   if(old&&item.bodySha256===old.body_sha256&&run.provider==='EMPLOYMENT_R6_'+old.release_group
+    &&Date.parse(old.retrieved_at)<=completed)legacyLinked.add(item.snapshotId);
    const snap=verified.get(item?.snapshotId);
    if(snap&&item.bodySha256===snap.body_sha256
     &&run.provider==='EMPLOYMENT_R6_'+snap.release_group
     &&Date.parse(snap.retrieved_at)<=completed)certified.add(item.snapshotId);
   }
  }
+ legacyProof.runLinked=legacyLinked.size;
+ const missingHistoryLineage=includeInvalidLineage?auditMissingHistoryLineage(db,verified,certified,checkedAt):null;
  const invalidLineageCounts=new Map();
  if(invalidHeads)for(const [id,bad] of invalidHeads){
   const revisions=invalidRunRevisions.get(id);
@@ -174,7 +227,51 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
   validWithoutRunKeys:verified.size-certified.size,
   invalidReasonCounts,invalidReasonOrdinals,
   invalidReasonTruncated:metadataKeys-verified.size>invalidReasonOrdinals.length,
-  ...(invalidLineage?{invalidLineageGroups:invalidLineage,invalidLineageScope:'DIAGNOSTIC_NOT_PIT'}:{})};
+  ...(invalidLineage?{
+   invalidLineageGroups:invalidLineage,invalidLineageScope:'DIAGNOSTIC_NOT_PIT',
+   mismatchIntegrity:{...mismatchIntegrity,scope:'INDEPENDENT_HASH_CHECKS_NOT_PIT'},
+   legacyBedProof:legacyProof,missingHistoryLineage,
+  }:{})};
+}
+
+
+function auditMissingHistoryLineage(db,verified,certified,checkedAt){
+ const current='market_score_employment_r4_shadow_current_v1';
+ const history='market_score_employment_r4_shadow_history_v1';
+ const keys=['logical_series_id','geography_type','geography_code','observation_date'];
+ const columns=[...keys,'provider','source_hash','retrieved_at','available_at','provenance_json'];
+ if(!columnsExist(db,current,columns)||!columnsExist(db,history,keys))
+  return {status:'SCHEMA_UNAVAILABLE',scope:'MISSING_HISTORY_KEY_SOURCE_LINKS_NOT_PIT'};
+ const links=new Map();
+ for(const id of certified){const v=verified.get(id),key=v.provider+'|'+v.body_sha256;
+  const times=links.get(key)??[];times.push(Date.parse(v.retrieved_at));links.set(key,times);}
+ const groups=new Map();let total=0;
+ const query='SELECT c.* FROM '+current+' c WHERE c.observation_date<=? AND NOT EXISTS (SELECT 1 FROM '+history+
+  ' h WHERE '+keys.map(k=>'h.'+k+'=c.'+k).join(' AND ')+')';
+ for(const row of db.prepare(query).iterate(checkedAt.slice(0,10))){
+  if(++total>100000)throw Error('R6_HISTORY_LINEAGE_ROW_CAP');
+  const provider=/^[A-Za-z0-9_]{1,32}$/.test(row.provider??'')?row.provider:'OTHER';
+  const series=/^[A-Za-z0-9_]{1,64}$/.test(row.logical_series_id??'')?row.logical_series_id:'OTHER';
+  const key=provider+'|'+series;
+  const g=groups.get(key)??{provider,logicalSeriesId:series,missingHistoryKeys:0,
+   rawRunLinked:0,metadataInvalid:0,rawRunLinkMissing:0,
+   availableTimeMissing:0,availableTimeAfterRetrieval:0};
+  g.missingHistoryKeys++;
+  const p=safeJson(row.provenance_json),rt=Date.parse(row.retrieved_at??'');
+  if(!p||!HASH.test(String(row.source_hash??''))||p.rawRecordHash!==row.source_hash
+   ||!HASH.test(String(p.responseHash??''))||!Number.isFinite(rt)||rt>Date.parse(checkedAt))g.metadataInvalid++;
+  else if((links.get(row.provider+'|'+p.responseHash)??[]).some(t=>t===rt))g.rawRunLinked++;
+  else g.rawRunLinkMissing++;
+  const at=Date.parse(row.available_at??'');
+  if(!Number.isFinite(at))g.availableTimeMissing++;
+  else if(at>rt)g.availableTimeAfterRetrieval++;
+  groups.set(key,g);
+ }
+ if(groups.size>64)throw Error('R6_HISTORY_LINEAGE_GROUP_CAP');
+ return {status:'OBSERVED',scope:'MISSING_HISTORY_KEY_SOURCE_LINKS_NOT_PIT',
+  missingHistoryKeys:total,groups:[...groups.values()].sort((a,b)=>
+   (a.provider+'|'+a.logicalSeriesId).localeCompare(b.provider+'|'+b.logicalSeriesId)),
+  rawRecordValuesReparsed:false,pitAttested:false,repairAuthorized:false};
 }
 
 // The fixed PC data root is supplied by the installed Controller, not Issue JSON.
