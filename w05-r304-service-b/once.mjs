@@ -130,7 +130,7 @@ export function execute(env=process.env){
   if(child.error||child.signal){
    report.status='STATE_UNKNOWN';report.code='W05_B_CHILD_TERMINATION_UNVERIFIED_STOP';
   }else if(child.status!==0){
-   report.status='RUNTIME_FAILED';report.code='W05_B_COLLECTOR_NONZERO_STOP';
+   report.status='STATE_UNKNOWN';report.code='W05_B_COLLECTOR_AFTER_ATTEMPT_UNVERIFIED_STOP';
   }else{
    const name=validateChildSummary(child.stdout);
    const txt=secureRegular(path.join(env.TEMP||os.tmpdir(),name),4000).toString('utf8');
