@@ -18,7 +18,7 @@
     "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
   },
   "checks": {
-    "installedWindowsEvidence": "PENDING_CURRENT_READBACK; historical #2301 PASS at target 269f38f5 is not current installed proof",
+    "installedWindowsEvidence": "PASS #2345 / Run 44525505250-1, 2026-11-19T12:37:44.734Z: maintenanceSourceSha=269f38f53dee033725ad45987aa7f8915a6b6b93, maintenanceFilesVerified=true, receiverStatus=LISTENING, installLockHeld=false, workflowState=active, operationalWrites=0. This attests current installed manifest file set (7 runtime files) but does not return per-file digests/startup hash or prove target approval; runner roster GitHub 403 unrelated.",
     "sourceCi": "PR #2340 exact HEAD maintenance CI #44520336238 and C996 CI #44520336314 success; merged main 1caeccfe63aa9a6905d707c90eb059c157f0ad6a, updater Git blob 0f5e6b7c8481f9c2727957e16e56bb9ad6363032 unchanged. Runtime install unverified.",
     "targetMainCommit": "MERGED main 1caeccfe63aa9a6905d707c90eb059c157f0ad6a; exact source target 2af4be8fd70ab1033cdd235ac7d7211c1b318683 verified ancestor of main (compare behind=0). On approved release, materialize SHA-named approvals/maintenance-handoffs/2af4be8fd70ab1033cdd235ac7d7211c1b318683.json on main. Current draft is NOT an approval.",
     "windowsHandoffExecuted": false
@@ -34,5 +34,5 @@
     "Business DB rows/schema, provider quotas, D1, source/Writer files",
     "Original request/lease/ledger history; no replay of failed installations"
   ],
-  "scopeNote": "NON_EXECUTING_DRAFT. No production handoff request permitted. Existing installed SHA (269f38...) is historical #2301 target, not latest on-disk evidence. Read back 7 installed runtime file digests, installed sourceSha, startup digest, receiver and lease status; verify actual CAS and target nine source hashes; preserve prior journals and #2094 STAGED. Merge #2340 via approved process; confirm final ancestor target SHA and exact SHA-named approval path on main, re-pin and review if merge commit differs. Only then exact successor approval, unique handoff and receipt."
+  "scopeNote": "NON_EXECUTING_DRAFT. Current live Windows readback #2345 confirms installed source SHA, 7-file manifest integrity, receiver LISTENING and no controller-install lock. Startup raw SHA and 7 individual on-disk digests not individually returned; source candidates previously pinned from #2301, not independent byte proof for the successor. Exact #2340 target source is ancestor of merged main 1caeccfe63aa9a6905d707c90eb059c157f0ad6a. Formal approved:true manifest must be separately prepared at approvals/maintenance-handoffs/<targetSha>.json, CAS startup, installed file map, existing journals/probe guard/backups and stopped receiver at operator execution. Do not replay #2094 STAGED; this file confers no runtime authority."
 }
