@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "a31e460a-1a8e-49c6-8a96-c294d30775fe",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "42bd5a7c686405cd057ac63795d70714e6b36555",
+  "candidateSourceSha": "12d646342d2013eae2ea5fc3aa706ecc25107212",
+  "manifestSha256": "f684c0b646dc0e10525ddb9167770639c3bc5a6da0f46df6cd25048af96f0b85",
+  "baseTreeOid": "c4388410fc274e96a3f34d05a06995456cceea88",
+  "preparedTreeOid": "1e104042640aa45d7e70db692bc603960384790f",
+  "provenanceSha256": "69e4096d2edb07e648fafccb1ca8ab8d4732e79ace28c2358890c1fabbed5ca9",
+  "runId": "44464053425",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "worker/macro-result-contract-r61.mjs"
+  ]
+}
