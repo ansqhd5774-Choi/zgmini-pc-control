@@ -21,8 +21,9 @@ async function comments(n){
  }need(false,'COMMENT_LIMIT');
 }
 function matched(rows,n,body){
+ const identity=body.split('\n')[1];
  const found=rows.filter(c=>c.user?.login==='github-actions[bot]'&&
-  c.body?.startsWith(DIAGNOSIS_RECEIPT+'\n'));
+  c.body?.startsWith(DIAGNOSIS_RECEIPT+'\n')&&c.body.split('\n')[1]===identity);
  need(found.length<=1&&found.every(c=>c.issue_url===`${API}/issues/${n}`&&c.body===body),
   'RECEIPT_CONFLICT');return found.length===1;
 }
