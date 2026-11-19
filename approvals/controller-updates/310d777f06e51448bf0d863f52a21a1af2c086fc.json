@@ -61,6 +61,6 @@
     }
   },
   "postOperation": "core-status",
-  "postSourceBranch": "main",
-  "postSourceSha": "544c12bb4207f121e535f86f589aea16cbeab776"
+  "postSourceBranch": "codex/w04-pit0408-host-r3-restore-raw-lineage-20261118",
+  "postSourceSha": "863ed1bef077301949899dd4aeb3f78f448fd9ed"
 }
