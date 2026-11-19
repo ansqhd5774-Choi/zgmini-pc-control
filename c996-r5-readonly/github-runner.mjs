@@ -50,7 +50,14 @@ export function selectSafeReport(raw,ctx,hostname) {
       stop('HASH_REPORT_STOP');
     if(v.status==='UNVERIFIED'){
       if(v.matched!==false||!validCode(v.code))stop('HASH_REPORT_STOP');
-      return {id:v.id,matched:false,status:'UNVERIFIED',code:v.code};
+      if(v.inspectOperation!==undefined&&v.inspectOperation!==null&&
+       !['PATH_LSTAT','LEAF_RECHECK','STREAM_READ','HASH_COMPLETE'].includes(v.inspectOperation))
+        stop('HASH_REPORT_STOP');
+      if(v.inspectDepth!==undefined&&v.inspectDepth!==null&&
+        (!Number.isSafeInteger(v.inspectDepth)||v.inspectDepth<0||v.inspectDepth>24))
+        stop('HASH_REPORT_STOP');
+      return {id:v.id,matched:false,status:'UNVERIFIED',code:v.code,
+       inspectOperation:v.inspectOperation??null,inspectDepth:v.inspectDepth??null};
     }
     if(!/^[a-f0-9]{64}$/.test(v.sha256||'')||
        !Number.isSafeInteger(v.bytes)||v.bytes<0||
