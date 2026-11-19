@@ -148,6 +148,49 @@ test('an entire zero prior four-week state base prevents a valid score',t=>{
  assert.equal(r.stateClaims.firstWindowBreak?.reason,'PRIOR_4W_ZERO_BASE');
 });
 
+test('W04 PIT-04-07 NULL in a prior 4-week state base is not silently ignored by SQLite SUM',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ seed(db);
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=NULL WHERE geography_code='WY' AND observation_date='2025-01-04'").run();
+ db.close();
+ const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.stateClaims.sampledWeeks,56);
+ assert.equal(r.stateClaims.complete51Weeks,55);
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(r.stateClaims.recentIncompleteWeeks[0].invalidValues,1);
+ assert.equal(r.stateClaims.strict52WeekCandidateCount,0);
+ assert.equal(r.stateClaims.firstWindowBreak?.reason,'STATE_CLAIMS_VALUE_INVALID');
+ assert.equal(r.stateClaims.latestStrict52WeekCandidate,null);
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),beforeHash);assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+});
+
+test('W04 PIT-04-07 invalid state claim counts cannot certify 51-state or 10y raw windows',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=NULL WHERE geography_code='WY' AND observation_date='2026-10-31'").run();
+ db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.stateClaims.sampledWeeks,577);
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'STATE_CLAIMS_VALUE_INVALID');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+ assert.equal(r.stateClaims.latestStrict52WeekCandidate,'2026-10-24');
+ assert.equal(r.stateClaims.incompleteWeeks,1);
+ assert.equal(sha(file),before);
+ const cases=[-1,1.5,'not-a-count'];
+ for(const value of cases){
+  const writing=new DatabaseSync(file);
+  writing.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=? WHERE geography_code='WY' AND observation_date='2026-10-31'").run(value);
+  writing.close();
+  const checked=inspectEmploymentR6CollectionEvidence(data);
+  assert.equal(checked.stateClaims.fullTenYearRawCoverage.status,'STATE_CLAIMS_VALUE_INVALID',String(value));
+  assert.equal(checked.stateClaims.incompleteWeeks,1,String(value));
+ }
+});
+
 test('530 complete weeks cannot satisfy 10-year claims coverage without older stored rows',t=>{
  const {data,file}=fixture(t),db=createDb(file);
  seed(db,{weeks:530,startDate:'2015-10-17'});db.close();
@@ -180,6 +223,7 @@ test('missing one state in 577 weeks rejects ten-year raw coverage',t=>{
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'REGION_51_COVERAGE_GAP');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2026-10-31');
+ assert.deepEqual(r.stateClaims.fullTenYearRawCoverage.missingRegionCodes,['WY']);
 });
 
 test('a whole missing calendar week rejects apparent 577-week count',t=>{
@@ -189,6 +233,39 @@ test('a whole missing calendar week rejects apparent 577-week count',t=>{
  const r=inspectEmploymentR6CollectionEvidence(data);
  assert.equal(r.status,'PASS');
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'NONCONSECUTIVE_10Y_WEEKS');
+ assert.equal(r.stateClaims.fullTenYearRawCoverage.firstFailureWeek,'2016-03-05');
+});
+
+
+test('576 stored weeks identify the first absent calendar week exactly',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("DELETE FROM market_score_employment_r4_shadow_current_v1 WHERE observation_date='2016-03-05'").run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const raw=r.stateClaims.fullTenYearRawCoverage;
+ assert.equal(r.status,'PASS');
+ assert.equal(raw.observedRawWeeks,576);
+ assert.equal(raw.status,'INSUFFICIENT_RAW_WEEKS');
+ assert.equal(raw.firstFailureWeek,'2016-03-05');
+ assert.equal(raw.missingRegionCodes,undefined);
+ assert.equal(r.operationalWrites,0);
+});
+
+test('unknown ZZ geography cannot cover a missing approved WY jurisdiction',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ seed(db,{weeks:577,startDate:'2015-10-17'});
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET geography_code='ZZ' WHERE geography_code='WY' AND observation_date='2026-10-31'").run();
+ db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ const raw=r.stateClaims.fullTenYearRawCoverage;
+ assert.equal(r.status,'PASS');
+ assert.equal(raw.status,'REGION_51_COVERAGE_GAP');
+ assert.equal(raw.firstFailureWeek,'2026-10-31');
+ assert.deepEqual(raw.missingRegionCodes,['WY']);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY|TOKEN_SECRET/i);
+ assert.equal(r.providerCalls,0);
+ assert.equal(r.operationalWrites,0);
 });
 
 test('577 weeks with one zero prior-state 4w base are still not score-ready',t=>{
@@ -202,17 +279,39 @@ test('577 weeks with one zero prior-state 4w base are still not score-ready',t=>
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'PRIOR_4W_ZERO_BASE');
 });
 
-test('WAL database without sidecars remains untouched and unopened',t=>{
- const {data,storage,file}=fixture(t),db=createDb(file);
- db.exec('PRAGMA journal_mode=WAL');db.close();
- assert.equal(fs.readFileSync(file)[18],2);
- const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
- const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
- assert.equal(r.status,'STATE_UNKNOWN');
- assert.equal(r.code,'R6_EVIDENCE_WAL_SIDECARS_ABSENT');
- assert.equal(r.sqliteOpened,false);
- assert.equal(sha(file),beforeHash);
- assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+test('clean WAL without sidecars uses native read-only and preserves business database',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);db.exec('PRAGMA journal_mode=WAL');db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));assert.equal(r.sqliteOpened,true);
+ assert.equal(r.pitRawSchema.raw.requiredCount,11);assert.equal(sha(file),before);
+ assert.equal(r.operationalWrites,0);
+});
+
+test('live WAL pair is readable and committed data is preserved without stopping the writer',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);db.exec('PRAGMA journal_mode=WAL');
+ const before=db.prepare('SELECT COUNT(*) AS n FROM market_score_employment_r4_shadow_current_v1').get().n;
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));assert.equal(r.sqliteOpened,true);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM market_score_employment_r4_shadow_current_v1').get().n,before);
+ assert.equal(r.operationalWrites,0);assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);
+ db.close();
+});
+
+test('a valid saved WAL without a shared index is read through normal SQLite coordination',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);db.exec('PRAGMA journal_mode=WAL');
+ db.exec('PRAGMA user_version=7');
+ const base=fs.readFileSync(file),wal=fs.readFileSync(file+'-wal');db.close();
+ fs.writeFileSync(file,base);fs.writeFileSync(file+'-wal',wal);
+ assert.equal(fs.existsSync(file+'-shm'),false);
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));assert.equal(r.operationalWrites,0);
+});
+
+test('database open failures preserve a specific query failure without claiming evidence success',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);db.close();const before=sha(file);
+ const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('fixture busy');}});
+ assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.code,'R6_EVIDENCE_QUERY_FAILED');
+ assert.equal(r.sqliteOpened,false);assert.equal(sha(file),before);
 });
 
 test('unapproved data path and symbolic core file fail without opening SQLite',t=>{
@@ -361,4 +460,143 @@ test('official DOL HTTP-200 source unavailability remains redacted and exact in 
  assert.equal(result.providerCalls,0);
  assert.equal(result.d1Writes,0);
  assert.doesNotMatch(JSON.stringify(result),/SECRET_DO_NOT_OUTPUT|PRIVATE_DIGEST_DO_NOT_OUTPUT|sourceUrl|bodySha256/);
+});
+
+
+function storeNationalRawFixture(db,{
+ rawDate='11/07/2026',recordedDate='2026-10-17',corrupt=false,missingChunk=false,
+}={}){
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN snapshot_id TEXT");
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN body_sha256 TEXT");
+ const xml='<r539cyNational><week><weekEnded>'+rawDate+'</weekEnded>'+
+  '<InitialClaims><SA>210,000</SA><SA4WK>205,000</SA4WK></InitialClaims>'+
+  '<ContinuedClaims><SA>1,800,000</SA></ContinuedClaims><IUR><SA>1.2</SA></IUR>'+
+  '</week></r539cyNational>';
+ const hash=createHash('sha256').update(xml).digest('hex');
+ const detail=JSON.stringify({mode:'RELEASE',latestInitialClaimsObservationDate:recordedDate,
+  latestNationalSeriesObservationDates:Object.fromEntries(
+   ['INITIAL_CLAIMS','INITIAL_CLAIMS_4W','CONTINUED_CLAIMS','INSURED_UNEMPLOYMENT_RATE']
+     .map(id=>[id,recordedDate])),
+  nationalResponseEvidence:{bodySha256:hash,latestNationalObservationDate:recordedDate},
+  privateToken:'SECRET_DO_NOT_OUTPUT'});
+ db.prepare("INSERT INTO market_score_employment_r4_shadow_runs_v1 VALUES(?,?,?,?,?,?,?,?,?,?)").run(
+  'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS','PARTIAL','2026-11-18T01:55:19.006Z',
+  2,51,0,0,0,'DOL_RELEASE_OBSERVATION_STALE',detail);
+ db.prepare("INSERT INTO market_score_employment_r6_raw_snapshot_v1 "+
+  "(request_key,release_group,chunk_index,retrieved_at,chunk_count,http_status,detail_json,body_chunk,snapshot_id,body_sha256) "+
+  "VALUES(?,?,?,?,?,?,?,?,?,?)").run('DOL_NATIONAL:2025-2026','DOL_UI_WEEKLY_CLAIMS',0,
+   '2026-11-18T01:54:19.006Z',missingChunk?2:1,200,'{}',
+   corrupt?xml.replace('210,000','209,000'):xml,'fixture-nat-1',hash);
+ return {xml,hash};
+}
+
+test('W04 A/light compares immutable saved National XML to its exact run hash without changing storage',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db);db.close();
+ const before=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_NEWER_THAN_RUN_PARSER');
+ assert.equal(r.nationalRaw.RELEASE.linkedByRawBodySha,true);
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-11-07');
+ assert.equal(r.nationalRaw.RELEASE.latestNumericDates.INITIAL_CLAIMS,'2026-11-07');
+ assert.equal(r.nationalRaw.RELEASE.recordedLatestDates.INITIAL_CLAIMS,'2026-10-17');
+ assert.equal(r.nationalRaw.ONE_YEAR.status,'RUN_NOT_STORED');
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET_DO_NOT_OUTPUT|210,000|<week|bodySha256|snapshot_id/i);
+ assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
+});
+
+test('National same raw/parser date is aligned; mismatch cannot be called source freshness',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{rawDate:'10/17/2026'});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_EQUALS_RUN_PARSER');
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,'2026-10-17');
+});
+
+test('National raw audit blocks a corrupted body and fails closed without revealing it',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{corrupt:true});db.close();
+ const before=sha(file);
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_BODY_HASH_MISMATCH');
+ assert.equal(r.nationalRaw.RELEASE.latestNumericDates,null);
+ assert.equal(r.nationalRaw.RELEASE.linkedByRawBodySha,false);
+ assert.equal(sha(file),before);
+ assert.doesNotMatch(JSON.stringify(r),/210,000|209,000|<week|bodySha256|SECRET_DO_NOT_OUTPUT/i);
+});
+
+test('National raw audit detects incomplete chunk set instead of pretending XML is old',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ storeNationalRawFixture(db,{missingChunk:true});db.close();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.nationalRaw.RELEASE.status,'RAW_CHUNKS_INCOMPLETE');
+ assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,null);
+});
+
+test('W04 PIT schema diagnosis reports only fixed raw/runs missing column ordinals',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});db.close();
+ const before=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.pitRawSchema.kind,'EMPLOYMENT_R6_PIT_SCHEMA_ONLY_V1');
+ assert.equal(r.pitRawSchema.reason,'RAW_REQUIRED_COLUMNS_MISSING');
+ assert.deepEqual(r.pitRawSchema.raw,{tablePresent:true,requiredCount:11,presentCount:7,
+  missingOrdinals:[0,4,7,8]});
+ assert.deepEqual(r.pitRawSchema.runs,{tablePresent:true,requiredCount:4,presentCount:4,
+  missingOrdinals:[]});
+ assert.match(r.pitRawSchema.dbIdentityTag,/^[a-f0-9]{16}$/);
+ assert.equal(inspectEmploymentR6CollectionEvidence(data).pitRawSchema.dbIdentityTag,r.pitRawSchema.dbIdentityTag);
+ assert.match(r.pitRawSchema.checkedAt,/^20\d{2}-\d{2}-\d{2}T/);
+ assert.equal(sha(file),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY|SECRET_DO_NOT_OUTPUT|TOKEN_SECRET|body_chunk|detail_json/i);
+ assert.equal(r.providerCalls,0);assert.equal(r.operationalWrites,0);assert.equal(r.d1Writes,0);
+ assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
+});
+
+test('W04 PIT schema reports required columns present after complete fixed schema',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ for(const c of ['snapshot_id TEXT','provider TEXT','created_at TEXT','body_sha256 TEXT']){
+  db.exec(`ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN ${c}`);
+ }
+ db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.pitRawSchema.reason,'REQUIRED_SCHEMA_PRESENT');
+ assert.equal(r.pitRawSchema.raw.presentCount,11);
+ assert.deepEqual(r.pitRawSchema.raw.missingOrdinals,[]);
+ assert.equal(r.pitRawSchema.runs.presentCount,4);
+ assert.deepEqual(r.pitRawSchema.runs.missingOrdinals,[]);
+ assert.equal(sha(file),before);
+});
+
+test('W04 PIT schema distinguishes a missing runs table without changing DB',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ db.exec('DROP TABLE market_score_employment_r4_shadow_runs_v1');db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.reason,'RUNS_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.runs.tablePresent,false);
+ assert.deepEqual(r.pitRawSchema.runs.missingOrdinals,[0,1,2,3]);
+ assert.equal(sha(file),before);
+});
+
+test('W04 PIT schema distinguishes a missing raw table without changing DB',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ db.exec('DROP TABLE market_score_employment_r6_raw_snapshot_v1');db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.reason,'RAW_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.raw.tablePresent,false);
+ assert.deepEqual(r.pitRawSchema.raw.missingOrdinals,[0,1,2,3,4,5,6,7,8,9,10]);
+ assert.equal(sha(file),before);
 });
