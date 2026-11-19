@@ -14,7 +14,9 @@ test('Writer B intake is gated independently and retains pending events', () => 
   assert.match(workflow, /vars\.ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED == 'true'/);
   assert.match(workflow, /github\.event\.workflow_run\.conclusion != 'skipped'/);
   assert.doesNotMatch(workflow, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
+  assert.match(workflow, /jobs:\s*\n\s+enqueue-verified-writer-b-failures:\s*\n\s+concurrency:\s*\n\s+group: agent-handoff-writer-b-failure-intake/);
   assert.match(workflow, /cancel-in-progress: false\s*\n\s+queue: max/);
+  assert.doesNotMatch(workflow, /^concurrency:/m);
   assert.match(workflow, /runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
   assert.match(workflow, /uses: actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
 });
