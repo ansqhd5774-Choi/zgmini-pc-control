@@ -1,0 +1,128 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+import {
+  UPDATE_SCHEMA,MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY,
+  manifestFingerprint,validateUpdateRequest,
+  validateControllerSelectivePin,validateControllerOnlyInstallDelta,
+} from '../tools/maintenance-contract.mjs';
+
+const digest=x=>createHash('sha256').update(x).digest('hex');
+const installedSha='a'.repeat(40),targetSha='b'.repeat(40),mainSha='c'.repeat(40);
+const approvalRef='https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2252';
+const files=[
+ {path:'config/operations.json',sha256:digest('config-overlay')},
+ {path:'controller/operations.mjs',sha256:digest('operations-overlay')},
+ {path:'controller/common.mjs',sha256:digest('common-from-main')},
+];
+const make=()=>({
+ schema:UPDATE_SCHEMA,installedSha,targetSha,allowFiles:files,
+ purpose:'pc-controller-maintenance',controllerOnlyInstall:true,
+ selectiveSource:{schema:'ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1',
+  branch:'codex/controller-selective-w01-w04-20261119',mainSha,
+  customPaths:['config/operations.json','controller/operations.mjs']},
+ approval:{grade:'B',scope:'PC_CONTROL_CONTROLLER_UPDATE',ref:approvalRef},
+ checks:{targetSha,status:'PASS',manifestSha256:manifestFingerprint(files).sha256},
+ backup:{strategy:'VERSIONED_SNAPSHOT',
+  rollback:{kind:'RESTORE_INSTALLED_SHA',sha:installedSha}},
+ postOperation:'core-status',postSourceBranch:'main',postSourceSha:mainSha,
+});
+function validate(manifest){
+ const bytes=Buffer.from(JSON.stringify(manifest));
+ const issue={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-12345678-1234-4123-8123-123456789abc',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:manifest.targetSha,approvalManifestSha256:digest(bytes)};
+ return validateUpdateRequest(issue,bytes,{actor:'ansqhd5774-Choi',installedSha});
+}
+function pin(manifest){
+ return {schema:'ZGMINI_CONTROLLER_SELECTIVE_PIN_V1',
+  installedSha:manifest.installedSha,targetSha:manifest.targetSha,
+  sourceMainSha:manifest.selectiveSource.mainSha,
+  targetBranch:manifest.selectiveSource.branch,
+  customPaths:[...manifest.selectiveSource.customPaths].sort(),
+  allowFiles:manifest.allowFiles,approvalRef:manifest.approval.ref};
+}
+
+test('selective overlay B admission retains exact installed/target identities and reviewed paths',()=>{
+ const x=validate(make());
+ assert.equal(x.manifest.targetSha,targetSha);
+ assert.equal(x.manifest.installedSha,installedSha);
+ assert.equal(x.manifest.selectiveSource.mainSha,mainSha);
+ assert.deepEqual(x.manifest.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
+ assert.equal(validateControllerSelectivePin(x.manifest,pin(x.manifest)),true);
+});
+
+test('pin must match merged PR, branch, baseline, target and every approved file hash',()=>{
+ const x=validate(make()).manifest;
+ const tamper=[
+  {targetSha:'d'.repeat(40)},
+  {sourceMainSha:'e'.repeat(40)},
+  {targetBranch:'codex/controller-fake-branch'},
+  {installedSha:'f'.repeat(40)},
+  {approvalRef:approvalRef.replace('/2252','/2253')},
+  {customPaths:[]},
+  {allowFiles:[...x.allowFiles.slice(0,2),{...x.allowFiles[2],sha256:'0'.repeat(64)}]},
+ ];
+ for(const patch of tamper)assert.throws(
+  ()=>validateControllerSelectivePin(x,{...pin(x),...patch}),
+  /SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateControllerSelectivePin(x,null),/SELECTIVE_PIN_MISSING/);
+ assert.throws(()=>validateControllerSelectivePin(x,{...pin(x),rogue:true}),
+  /SELECTIVE_PIN_FIELDS_INVALID/);
+});
+
+test('only approved controller-only maintenance scope accepts selective source',()=>{
+ for(const patch of [
+  {controllerOnlyInstall:false},
+  {purpose:'pc-controller-heavy-readonly'},
+  {infrastructureEvidence:{}},
+  {selectiveSource:{...make().selectiveSource,branch:'../bad'}},
+  {selectiveSource:{...make().selectiveSource,customPaths:['controller/rogue.mjs']}},
+  {selectiveSource:{...make().selectiveSource,customPaths:['controller/operations.mjs','controller/operations.mjs']}},
+ ]){
+  assert.throws(()=>validate({...make(),...patch}),
+   /SELECTIVE_SOURCE_|CONTROLLER_ONLY_INSTALL_SCOPE_INVALID/);
+ }
+ assert.equal(validate({...make(),selectiveSource:undefined}).manifest.selectiveSource,undefined);
+});
+
+test('exact installed-tree overlay diff is distinct from main-wide delta and preserves baseline',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-selective-controller-'));
+ const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8'}).trim();
+ try{
+  git('init','-q');git('config','user.name','Test Fixture');
+  git('config','user.email','test@example.invalid');
+  fs.mkdirSync(path.join(root,'controller'));
+  fs.mkdirSync(path.join(root,'config'));
+  fs.writeFileSync(path.join(root,'controller','operations.mjs'),'export const stable=true;\n');
+  fs.writeFileSync(path.join(root,'config','operations.json'),'{"operations":{}}\n');
+  git('add','controller/operations.mjs','config/operations.json');
+  git('commit','-qm','installed baseline');
+  const old=git('rev-parse','HEAD');
+  git('checkout','-qb','main-candidate');
+  fs.writeFileSync(path.join(root,'controller','unapproved.mjs'),'export const unapproved=true;\n');
+  git('add','controller/unapproved.mjs');git('commit','-qm','unrelated main feature');
+  const main=git('rev-parse','HEAD');
+  git('checkout','-qb','selective-target',old);
+  fs.writeFileSync(path.join(root,'controller','operations.mjs'),'export const stable=true; export const a407=true;\n');
+  fs.writeFileSync(path.join(root,'config','operations.json'),'{"operations":{"a407":{"grade":"A"}}}\n');
+  git('add','controller/operations.mjs','config/operations.json');
+  git('commit','-qm','exact two approved paths');
+  const overlay=git('rev-parse','HEAD');
+  assert.equal(git('rev-list','--parents','-n','1',overlay),overlay+' '+old);
+  const diff=git('diff','--name-only',old,overlay).split(/\r?\n/);
+  assert.deepEqual(diff,['config/operations.json','controller/operations.mjs']);
+  assert.equal(validateControllerOnlyInstallDelta(diff,files.slice(0,2)),true);
+  assert.throws(()=>validateControllerOnlyInstallDelta(
+   git('diff','--name-only',old,main).split(/\r?\n/),files.slice(0,2)),
+   /ALLOWFILE_DIFF_MISMATCH/);
+  assert.equal(git('show',overlay+':controller/unapproved.mjs').length,0);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
