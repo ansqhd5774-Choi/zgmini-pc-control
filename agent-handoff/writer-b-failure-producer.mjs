@@ -60,12 +60,12 @@ function authorizedManifestPath(originIssue) {
 
 /** A verified completed Writer B run can generate *at most one* incident. */
 export async function processCompletedWriterB(event, {
-  readComments, readIssue, readFile, listHandoffs, createHandoff,
+  readComments, readIssue, readFile, listHandoffs, createHandoff, getSourceJobs,
   listResourceWaitComments, createResourceWaitComment, readResourceWaitComment,
   routeHandoff
 }) {
   const run = assertCompletedWriterBEvent(event);
-  if ([readComments, readIssue, readFile, listHandoffs, createHandoff]
+  if ([readComments, readIssue, readFile, listHandoffs, createHandoff, getSourceJobs]
     .some(fn => typeof fn !== 'function')) stop('IO_NOT_CONFIGURED');
   const initial = {state: 'SCAN_COMPLETED', runId: run.runId,
     originalIssues: 0, verifiedResults: 0, confirmedFailures: 0,
@@ -74,6 +74,21 @@ export async function processCompletedWriterB(event, {
 
   // The source workflow fires on all owner-opened Issues. Most runs have a
   // skipped Writer B job, so absence of its exact bot receipt is not failure.
+  // The source workflow multiplexes unrelated approved operations. Check the
+  // exact Writer B reporter step before reading repository-wide comments.
+  const sourceJobs=await getSourceJobs(run.runId);
+  if(!Array.isArray(sourceJobs)||sourceJobs.length!==1||
+    sourceJobs[0]?.name!=='writer-source-approved-b'||
+    !Array.isArray(sourceJobs[0]?.steps))stop('SOURCE_JOBS_UNVERIFIED');
+  const reportSteps=sourceJobs[0].steps.filter(x=>
+    x?.name==='Create-only sanitized result and originating Issue comment');
+  if(reportSteps.length!==1)stop('SOURCE_REPORT_STEP_UNVERIFIED');
+  if(reportSteps[0].conclusion==='skipped')
+    return Object.freeze({...initial,state:'UNRELATED_SOURCE_OPERATION'});
+  if(reportSteps[0].conclusion!=='success'&&
+     reportSteps[0].conclusion!=='failure'&&
+     reportSteps[0].conclusion!=='cancelled')
+    return Object.freeze({...initial,state:'SOURCE_REPORT_STATE_UNKNOWN'});
   const comments = await readComments(run.since);
   const receipt = findWriterBReceipt(comments, run.runId);
   if (!receipt) {
@@ -199,6 +214,12 @@ export async function main(env = process.env) {
       !env.GITHUB_EVENT_PATH) stop('ENVIRONMENT_NOT_ALLOWED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   const result = await processCompletedWriterB(event, {
+    getSourceJobs: async id => {
+      const result=await request(`actions/runs/${id}/jobs?per_page=100`);
+      if(!Array.isArray(result?.jobs)||result.jobs.length!==1)
+        stop('SOURCE_JOBS_INCOMPLETE');
+      return result.jobs;
+    },
     readComments: since => completePages(
       `issues/comments?since=${encodeURIComponent(since)}`, 'COMMENTS'),
     readIssue: async issue => ({...await request(`issues/${issue}`), repository: REPO}),
