@@ -127,6 +127,8 @@ on:
       - '.github/workflows/pc-writer-b-source-once.yml'
       - 'tests/controller-heavy-only-install.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
+      - 'tests/controller-selective-source.test.mjs'
+      - 'tests/controller-sevenpath-overlay.test.mjs'
       - 'writer-b/w01-r2-two-branch-preview.test.mjs'
       - 'approvals/writer-previews/w01-r2-stored-payload-two-branch-20261119.json'
       - 'inflation-manual-b/**'
@@ -155,6 +157,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          fetch-depth: 0 # verify immutable historical V2 B approval bytes
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
@@ -170,8 +173,10 @@ jobs:
         run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
       - name: Verify retired R13 inventory reason and W03 checkout failure attribution
         run: node --test --test-concurrency=1 tests/retired-iran-controller.test.mjs tests/writer-install-preimage-readonly.test.mjs tests/engine.test.mjs
+      - name: Verify exact installed-base seven-path Controller overlay and imports
+        run: node --test --test-concurrency=1 tests/controller-sevenpath-overlay.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
-        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
+        run: node --test --test-concurrency=1 tests/maintenance-contract.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R32 64-symbol GMH raw/checkpoint SHA coverage, without provider calls
         run: node --test --test-concurrency=1 tests/theme-nine-r32-raw-coverage-readonly.test.mjs
       - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted

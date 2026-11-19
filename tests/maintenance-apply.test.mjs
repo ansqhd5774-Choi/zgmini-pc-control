@@ -8,6 +8,7 @@ import os from 'node:os';
 import {nextRuntimeFiles,requireHandoffApproval,approvedRuntimeChanges} from '../tools/handoff-maintenance.mjs';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
 import {readControllerUpdateArtifacts,confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
   closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
@@ -658,9 +659,13 @@ test('exact approved V2 handoff pins nine checked-out tool bytes and changes onl
  assert.equal(approved.transition,'SEVEN_TO_SEVEN');
  assert.deepEqual(approved.runtimeChangedFiles,['tools/update.mjs']);
  assert.deepEqual(Object.keys(approved.files).sort(),Object.keys(old.files).sort());
+ // Verify the approved historical bytes, not later changes at HEAD.
+ // Any additional maintainer source change requires an independent B handoff.
  for(const [rel,digest] of Object.entries(approved.files)){
   assert.match(rel,/^tools\/[a-z0-9.-]+$/);
-  const actual=createHash('sha256').update(fs.readFileSync(path.join(root,rel))).digest('hex');
+  const historical=execFileSync('git',['show',targetSha+':'+rel],
+    {cwd:root,encoding:null,windowsHide:true});
+  const actual=createHash('sha256').update(historical).digest('hex');
   assert.equal(actual,digest,rel);
  }
  const prior=Object.fromEntries(nextRuntimeFiles.map(rel=>[rel,old.files[rel]]));
