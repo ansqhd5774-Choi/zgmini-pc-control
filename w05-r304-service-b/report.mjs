@@ -7,7 +7,7 @@ import {sha256,validateIssue,CONTROL_REPO,INSTALLED_SHA,expect,fail} from './con
 const JSON_NAME='W05_R304_B_RESULT.json';
 const FIELDS=['schema','status','code','requestId','sourceSha','provider','series',
  'providerCalls','dbWrites','d1Writes','schedulerChanges','automaticRetries',
- 'rows','observationAt','sourceStoredAt','snapshotSha256','chunkSha256'];
+ 'rows','observationAt','retrievedAt','firstSeenAt','snapshotSha256','chunkSha256'];
 const ALLOWED_STATUSES=new Set(['PASS','BLOCKED','RUNTIME_FAILED','STATE_UNKNOWN']);
 const PREFIX='ZGMINI_W05_R304_SERVICE_B_RESULT_V1';
 const API=`https://api.github.com/repos/${CONTROL_REPO}`;
@@ -24,8 +24,10 @@ export function sanitizedReport(report,requestId){
    ['COMMITTED_IDEMPOTENT','NOT_CONFIRMED'].includes(report.dbWrites)&&
    (report.rows===undefined||(Number.isInteger(report.rows)&&report.rows>=1&&report.rows<=400))&&
    (report.observationAt===undefined||/^\d{4}-(0[1-9]|1[0-2])-01$/.test(report.observationAt))&&
-   (report.sourceStoredAt===undefined||(typeof report.sourceStoredAt==='string'&&
-     Number.isFinite(Date.parse(report.sourceStoredAt))))&&
+   (report.retrievedAt===undefined||(typeof report.retrievedAt==='string'&&
+     Number.isFinite(Date.parse(report.retrievedAt))))&&
+   (report.firstSeenAt===undefined||(typeof report.firstSeenAt==='string'&&
+     Number.isFinite(Date.parse(report.firstSeenAt))))&&
    (report.snapshotSha256===undefined||/^[a-f0-9]{64}$/.test(report.snapshotSha256))&&
    (report.chunkSha256===undefined||/^[a-f0-9]{64}$/.test(report.chunkSha256))&&
    Object.keys(report).every(k=>FIELDS.includes(k)),
@@ -74,6 +76,9 @@ export async function upload(env=process.env,apiFetch=fetch){
   'SERIES=WPSFD42','PROVIDER_CALLS='+result.providerCalls,
   'DB_WRITES='+result.dbWrites,'D1_WRITES=0','SCHEDULER_CHANGES=0',
   'ROWS='+(result.rows??'UNKNOWN'),
+  'OBSERVATION_AT='+(result.observationAt??'UNKNOWN'),
+  'RETRIEVED_AT='+(result.retrievedAt??'UNKNOWN'),
+  'FIRST_SEEN_AT='+(result.firstSeenAt??'UNKNOWN'),
   'SNAPSHOT_SHA256='+(result.snapshotSha256??'NONE'),
   'CHUNK_SHA256='+(result.chunkSha256??'NONE'),
   'RETRY=NO_REEXECUTE',
