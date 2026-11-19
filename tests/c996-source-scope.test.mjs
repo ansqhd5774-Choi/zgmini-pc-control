@@ -10,12 +10,16 @@ test('011 unrelated feature/docs PR cannot be blocked by unrelated source suites
 });
 test('011 handoff and R6 changes select their own suites without unrelated R47',()=>{
  const set=selectGroups(['agent-handoff/result-broker.mjs','tests/employment-r6-collection-evidence-readonly.test.mjs']);
- assert.deepEqual(set,['handoff009','employment']);
+ assert.deepEqual(set,['handoff007','handoff009','handoff008','employment']);
 });
 test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['tests/agent-handoff-result.test.mjs']),['handoff009']);
  assert.deepEqual(selectGroups(['direct-writer-b/configured-direct-b.test.mjs']),['writer']);
  assert.deepEqual(selectGroups(['tools/update.mjs']),all);
+ assert.deepEqual(selectGroups(['tools/maintenance-apply.mjs']),all);
+ assert.deepEqual(selectGroups(['agent-handoff/pc-failure-producer.mjs']),['handoff007','handoff009','handoff008']);
+ assert.deepEqual(selectGroups(['.github/workflows/agent-handoff-candidate-selector.yml']),['handoff007','handoff009','handoff008']);
+ assert.deepEqual(selectGroups(['tests/r47-task-chain.test.mjs']),['recovery']);
  assert.deepEqual(selectGroups(['tools/unknown-shared-contract.mjs']),all);
 });
 test('011 workflow and selection contract changes always run all original suites',()=>{
