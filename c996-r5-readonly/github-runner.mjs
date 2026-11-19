@@ -6,6 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {parseAclBoundary} from './acl-boundary.mjs';
 
 export const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 export const HOST = 'DESKTOP-N62L0NG';
@@ -142,6 +143,17 @@ export function selectSafeReport(raw,ctx,hostname) {
      (inspectOperation!=='PATH_LSTAT'&&inspectDepth!==null) ||
      (inspectOperation!==null&&!['PRE_INPUT_HASH','POST_INPUT_HASH'].includes(inspectStep)))
     stop('INSPECTION_OPERATION_INVALID');
+  let aclBoundary=null;
+  if(raw.aclBoundary!==undefined&&raw.aclBoundary!==null){
+    if(raw.aclBoundary.status==='SCOPED_ACL_OBSERVED'){
+      const parsed=parseAclBoundary(JSON.stringify(raw.aclBoundary));
+      if(!parsed)stop('ACL_BOUNDARY_REPORT_STOP');
+      aclBoundary={status:'SCOPED_ACL_OBSERVED',...parsed};
+    }else if(['NOT_WINDOWS','FIXED_PATHS_INVALID','ACL_QUERY_UNAVAILABLE',
+       'ACL_RESPONSE_INVALID'].includes(raw.aclBoundary.status)){
+      aclBoundary={status:raw.aclBoundary.status};
+    }else stop('ACL_BOUNDARY_REPORT_STOP');
+  }
   return {schema:'ZGMINI_C996_R5_GITHUB_RESULT_V1',
     requestId:ctx.requestId,issueNumber:ctx.issueNumber,runId:ctx.runId,attempt:ctx.attempt,
     host:hostname,code:raw.code,status:raw.status,logCount:logs.length,
@@ -150,7 +162,7 @@ export function selectSafeReport(raw,ctx,hostname) {
     rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,operationalWrites:0,
     automaticRetries:0,rawLogIncluded:false,pins,logs,fixedEvidence,logErrors,
     logOmitted:raw.logOmitted??0,inputChecksComplete,logScanComplete,
-    inputHashesUnchanged:raw.inputHashesUnchanged??0};
+    inputHashesUnchanged:raw.inputHashesUnchanged??0,aclBoundary};
 }
 
 function resultText(r) {
