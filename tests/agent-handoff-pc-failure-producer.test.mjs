@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {assertCompletedPcJobEvent, findOriginalIssueNumber, processCompletedPcJob} from
-  '../agent-handoff/pc-failure-producer.mjs';
+import {assertCompletedPcJobEvent, findOriginalIssueNumber, processCompletedPcJob,
+  scopedSeatRead} from '../agent-handoff/pc-failure-producer.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
 const runId = 42423158559;
@@ -283,4 +283,84 @@ test('missing route handler or failed route readback stops completion after inta
   fail.io.routeHandoff = async () => { throw new Error('HANDOFF_BOT_DIRECT_ROUTE_COMMENT_READBACK_STOP'); };
   await assert.rejects(processCompletedPcJob(event(), fail.io), /COMMENT_READBACK_STOP/);
   assert.equal(fail.posts, 1);
+});
+
+test('transient JSON GET on Seat 2 does not block verified Seat 4 failure',async()=>{
+  const f=fixture(),original=f.io.readReport;
+  f.io.readReport=async p=>{
+    if(p.endsWith('seat-2.json'))
+      throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_503');
+    return original(p);
+  };
+  const output=await processCompletedPcJob(event(),f.io);
+  assert.equal(output.state,'PARTIAL_SEAT_READ_PENDING');
+  assert.equal(output.seatReadPending,1);
+  assert.deepEqual(output.seatReadProblems,[{seat:2,phase:'RESULT_JSON',
+    reason:'TRANSIENT_GITHUB_READ_UNAVAILABLE'}]);
+  assert.equal(output.newIssues,1);
+  assert.equal(output.routesRecorded,1);
+  assert.equal(f.posts,1);
+  assert.equal(output.pcOperationalWrites,0);
+  assert.equal(output.automaticPcRetries,0);
+});
+
+test('transient origin Issue or TXT GET defers only affected Seat',async()=>{
+  for(const phase of ['ORIGIN_ISSUE','RESULT_TXT']){
+    const f=fixture();
+    if(phase==='ORIGIN_ISSUE'){
+      const original=f.io.readIssue;
+      f.io.readIssue=async n=>{
+        if(n===1009)throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_502');
+        return original(n);
+      };
+    }else{
+      f.io.readReportText=async()=>{const e=Error('network timeout');e.name='TimeoutError';throw e;};
+    }
+    const out=await processCompletedPcJob(event(),f.io);
+    assert.equal(out.state,'PARTIAL_SEAT_READ_PENDING');
+    assert.equal(out.seatReadPending,1);
+    assert.equal(out.seatReadProblems[0].phase,phase);
+    assert.equal(out.newIssues,0);
+    assert.equal(f.posts,0);
+  }
+});
+
+test('temporary failure reading all JSON reports never becomes NO_PUBLISHED_RESULTS',async()=>{
+  const f=fixture();
+  f.io.readReport=async()=>{throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_503');};
+  const out=await processCompletedPcJob(event(),f.io);
+  assert.equal(out.reportsObserved,0);
+  assert.equal(out.state,'PARTIAL_SEAT_READ_PENDING');
+  assert.equal(out.seatReadPending,6);
+  assert.equal(out.newIssues,0);
+});
+
+test('global auth, malformed proof and write failures remain strict hard stops',async()=>{
+  const f=fixture();
+  f.io.readReport=async()=>{throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_403');};
+  await assert.rejects(processCompletedPcJob(event(),f.io),/GITHUB_HTTP_403/);
+  const invalid=fixture();
+  invalid.io.readReport=async()=>{throw SyntaxError('invalid JSON evidence');};
+  await assert.rejects(processCompletedPcJob(event(),invalid.io),/invalid JSON evidence/);
+  const callbacks=[];
+  await assert.rejects(()=>scopedSeatRead(4,'ORIGIN_ISSUE',async()=>{
+    throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_401');
+  },x=>callbacks.push(x)),/GITHUB_HTTP_401/);
+  assert.deepEqual(callbacks,[]);
+  const write=fixture();
+  write.io.createHandoff=async()=>{throw Error('write outcome unknown');};
+  await assert.rejects(processCompletedPcJob(event(),write.io),/POST_OUTCOME_UNKNOWN/);
+});
+
+test('raw network failures are sanitized and untrusted request errors are not suppressed',async()=>{
+  const observed=[];
+  const e=new TypeError('fetch network error with sensitive input');
+  const out=await scopedSeatRead(2,'RESULT_JSON',async()=>{throw e;},x=>observed.push(x));
+  assert.deepEqual(out,{ready:false});
+  assert.deepEqual(observed,[{seat:2,phase:'RESULT_JSON',
+    reason:'TRANSIENT_GITHUB_READ_UNAVAILABLE'}]);
+  assert.equal(JSON.stringify(observed).includes('sensitive input'),false);
+  await assert.rejects(()=>scopedSeatRead(2,'RESULT_JSON',async()=>{
+    throw Error('PC_HANDOFF_PRODUCER_GITHUB_HTTP_400');
+  },()=>{}),/GITHUB_HTTP_400/);
 });
