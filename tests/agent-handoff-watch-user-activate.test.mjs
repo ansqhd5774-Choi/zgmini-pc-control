@@ -49,7 +49,10 @@ test('preflight CLI accepts external pinned root and rejects malformed input',()
   const pass=spawnSync(process.execPath,[executable,'--source-root',process.cwd()],{encoding:'utf8',env,timeout:10_000});
   const data=JSON.parse(pass.stdout.trim());
   assert.equal(data.sourceFilesChecked,7);
-  assert.equal(data.sourceFilesMatched,7);
+  assert.equal(data.sourceFilesMatched,6);
+  assert.equal(data.sourceEligible,false);
+  assert.equal(data.state,'SOURCE_PREFLIGHT_STOP');
+  assert.equal(pass.status,2); // An evolving HEAD cannot be the approved C install.
   assert.equal(data.sourceCommit,C_SOURCE_COMMIT);
   assert.equal(data.pcWrites,0);
   const fail=spawnSync(process.execPath,[executable,'--source-root','./relative'],{encoding:'utf8',env,timeout:10_000});

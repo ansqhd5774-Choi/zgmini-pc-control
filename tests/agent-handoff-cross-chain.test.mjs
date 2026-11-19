@@ -206,6 +206,12 @@ test('verified Writer B STOP reaches the same handoff and result contract withou
   const routingComments = [];
   let issueCreates = 0;
   const io = {
+    getSourceJobs: async run => {
+      assert.equal(run,writerRunId);
+      return [{name:'writer-source-approved-b',conclusion:'success',steps:[
+        {name:'Create-only sanitized result and originating Issue comment',conclusion:'success'}
+      ]}];
+    },
     readComments: async () => [receipt],
     readIssue: async n => n === originIssue.number ? originIssue : incidents.find(x => x.number === n),
     readFile: async (filePath, ref) => {
