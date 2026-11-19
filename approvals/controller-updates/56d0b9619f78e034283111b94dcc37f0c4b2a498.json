@@ -5,20 +5,20 @@
   "allowFiles": [
     {
       "path": "controller/theme-l7-runtime-readonly.mjs",
-      "sha256": "0f71c622b46bd5d73edfcc1397869ab5289f6bfccd56c048825ed63773dbdca6"
+      "sha256": "186cb05c0647398fbc032c19bc9a76589851238740d8394d102b0abad223e701"
     }
   ],
   "purpose": "pc-controller-maintenance",
   "controllerOnlyInstall": true,
   "approval": {
     "grade": "B",
-    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2408",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2411",
     "scope": "PC_CONTROL_CONTROLLER_UPDATE"
   },
   "checks": {
     "targetSha": "56d0b9619f78e034283111b94dcc37f0c4b2a498",
     "status": "PASS",
-    "manifestSha256": "7c5605c747d80dc323b35ba1a534fce25f38558d88da186c47e80f0e90fc4bd5"
+    "manifestSha256": "c4a316d473e874cadc1a20a56fbe7266ada17245d978d937b8615301f2835e4a"
   },
   "backup": {
     "strategy": "VERSIONED_SNAPSHOT",
