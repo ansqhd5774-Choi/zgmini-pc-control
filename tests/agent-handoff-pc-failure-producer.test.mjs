@@ -250,7 +250,7 @@ test('failed readback stops instead of claiming enqueue success', async () => {
 
 test('the new workflow remains opt-in, single-writer and self-hosted', () => {
   const yaml = readFileSync(new URL('../.github/workflows/agent-handoff-pc-failure-intake.yml',
-    import.meta.url), 'utf8');
+    import.meta.url), 'utf8').replace(/\r\n/g,'\n');
   assert.match(yaml, /workflow_run:\s*\n\s*workflows: \[ZGMINI PC Job\]/);
   assert.match(yaml, /types: \[completed\]/);
   assert.match(yaml, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
