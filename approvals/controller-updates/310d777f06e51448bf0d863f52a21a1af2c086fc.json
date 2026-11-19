@@ -1,0 +1,66 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "b9099839df1a7cc6b3b166a139f7fac6938ada66",
+  "targetSha": "310d777f06e51448bf0d863f52a21a1af2c086fc",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "10f60dff52c81564491c3829680092b91fc41cc89577e203da98b7347de30af9"
+    },
+    {
+      "path": "controller/common.mjs",
+      "sha256": "67d54cae62829e833a3ac547da621dbd1231ba4e40b7a54960a89610995b32e6"
+    },
+    {
+      "path": "controller/employment-r6-candidate-readonly.mjs",
+      "sha256": "9a7411946b70c13837a68825aac4078a7c2044219bffe7cd3c4fda7a0a100b87"
+    },
+    {
+      "path": "controller/inflation-a401-private23-readonly.mjs",
+      "sha256": "db62b0799731d48a9f04e0c8510c6fa273f70e2b07c2eda5411cc636743d27aa"
+    },
+    {
+      "path": "controller/inflation-a407-integrity-readonly.mjs",
+      "sha256": "8d038527098d7527ee09575af11f53e81524476da85400eb46be5bf896bac88e"
+    },
+    {
+      "path": "controller/inflation19-runtime-readonly.mjs",
+      "sha256": "b60db71de3d2034e4dd2bcceac93e16ad0f909ef20b874b0f44c230cdbeeaa32"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "1e6ba9aa97aec0ea16113e1d68777a2cd0b869cfc0a4e351b8b1e29d888ef9b3"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/controller-selective-w01-w04-20261119",
+    "mainSha": "4311757ce617cf6cab20683c933668bd0aa594c3",
+    "customPaths": [
+      "config/operations.json",
+      "controller/operations.mjs"
+    ]
+  },
+  "approval": {
+    "grade": "B",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2275"
+  },
+  "checks": {
+    "targetSha": "310d777f06e51448bf0d863f52a21a1af2c086fc",
+    "status": "PASS",
+    "manifestSha256": "93451c28a261b4381b89eeaec38a4ef126d509a32eb7eda43f0ced589fb28878"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "b9099839df1a7cc6b3b166a139f7fac6938ada66"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "main",
+  "postSourceSha": "544c12bb4207f121e535f86f589aea16cbeab776"
+}
