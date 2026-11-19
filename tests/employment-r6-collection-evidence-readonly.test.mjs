@@ -517,3 +517,64 @@ test('National raw audit detects incomplete chunk set instead of pretending XML 
  assert.equal(r.nationalRaw.RELEASE.status,'RAW_CHUNKS_INCOMPLETE');
  assert.equal(r.nationalRaw.RELEASE.latestWeekEnded,null);
 });
+
+test('W04 PIT schema diagnosis reports only fixed raw/runs missing column ordinals',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});db.close();
+ const before=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.pitRawSchema.kind,'EMPLOYMENT_R6_PIT_SCHEMA_ONLY_V1');
+ assert.equal(r.pitRawSchema.reason,'RAW_REQUIRED_COLUMNS_MISSING');
+ assert.deepEqual(r.pitRawSchema.raw,{tablePresent:true,requiredCount:11,presentCount:7,
+  missingOrdinals:[0,4,7,8]});
+ assert.deepEqual(r.pitRawSchema.runs,{tablePresent:true,requiredCount:4,presentCount:4,
+  missingOrdinals:[]});
+ assert.match(r.pitRawSchema.dbIdentityTag,/^[a-f0-9]{16}$/);
+ assert.equal(inspectEmploymentR6CollectionEvidence(data).pitRawSchema.dbIdentityTag,r.pitRawSchema.dbIdentityTag);
+ assert.match(r.pitRawSchema.checkedAt,/^20\\d{2}-\\d{2}-\\d{2}T/);
+ assert.equal(sha(file),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY|SECRET_DO_NOT_OUTPUT|TOKEN_SECRET|body_chunk|detail_json/i);
+ assert.equal(r.providerCalls,0);assert.equal(r.operationalWrites,0);assert.equal(r.d1Writes,0);
+ assert.ok(Buffer.byteLength(JSON.stringify(r))<32768);
+});
+
+test('W04 PIT schema reports required columns present after complete fixed schema',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db,{weeks:1});
+ for(const c of ['snapshot_id TEXT','provider TEXT','created_at TEXT','body_sha256 TEXT']){
+  db.exec(`ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN ${c}`);
+ }
+ db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.pitRawSchema.reason,'REQUIRED_SCHEMA_PRESENT');
+ assert.equal(r.pitRawSchema.raw.presentCount,11);
+ assert.deepEqual(r.pitRawSchema.raw.missingOrdinals,[]);
+ assert.equal(r.pitRawSchema.runs.presentCount,4);
+ assert.deepEqual(r.pitRawSchema.runs.missingOrdinals,[]);
+ assert.equal(sha(file),before);
+});
+
+test('W04 PIT schema distinguishes a missing runs table without changing DB',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ db.exec('DROP TABLE market_score_employment_r4_shadow_runs_v1');db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.reason,'RUNS_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.runs.tablePresent,false);
+ assert.deepEqual(r.pitRawSchema.runs.missingOrdinals,[0,1,2,3]);
+ assert.equal(sha(file),before);
+});
+
+test('W04 PIT schema distinguishes a missing raw table without changing DB',t=>{
+ const {data,file}=fixture(t),db=createDb(file);
+ db.exec('DROP TABLE market_score_employment_r6_raw_snapshot_v1');db.close();
+ const before=sha(file),r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.reason,'RAW_TABLE_MISSING');
+ assert.equal(r.pitRawSchema.raw.tablePresent,false);
+ assert.deepEqual(r.pitRawSchema.raw.missingOrdinals,[0,1,2,3,4,5,6,7,8,9,10]);
+ assert.equal(sha(file),before);
+});
