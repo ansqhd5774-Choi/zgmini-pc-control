@@ -256,6 +256,11 @@ test('the new workflow remains opt-in, single-writer and self-hosted', () => {
   assert.match(yaml, /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
   assert.match(yaml, /github\.event\.workflow_run\.conclusion != 'skipped'/);
   assert.doesNotMatch(yaml, /if: >-\s*\n\s*false &&/);
+  // The shared writer lane must be entered only after the job is admitted.
+  // Upstream runs rejected by if must not queue behind a real writer.
+  assert.doesNotMatch(yaml, /^concurrency:\\s*$/m);
+  assert.match(yaml, /jobs:\\n  enqueue-confirmed-failures:\\n(?:    #[^\\n]*\\n)*    concurrency:\\n      group: agent-handoff-pc-failure-intake\\n      cancel-in-progress: false\\n      queue: max\\n    if:/);
+  assert.equal((yaml.match(/^      group: agent-handoff-pc-failure-intake$/gm)||[]).length,1);
   assert.match(yaml, /group: agent-handoff-pc-failure-intake/);
   assert.match(yaml, /queue: max/);
   assert.match(yaml, /cancel-in-progress: false/);
