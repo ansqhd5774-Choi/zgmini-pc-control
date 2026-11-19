@@ -3,4 +3,3 @@
 approval/ER1_PC_OPERATION_APPROVAL.json text eol=lf
 approvals/maintenance-recoveries/*.json text eol=lf
 approvals/w03-r179-guard/*.json text eol=lf
-tools/handoff-watch-user-start.cmd text eol=lf
