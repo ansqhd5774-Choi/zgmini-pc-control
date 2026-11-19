@@ -7,13 +7,14 @@ permissions:
   contents: read
   actions: read
   issues: write
-concurrency:
-  # Single metadata writer lane: two completed PC runs may describe one incident.
-  group: agent-handoff-pc-failure-intake
-  cancel-in-progress: false
-  queue: max
 jobs:
   enqueue-confirmed-failures:
+    # Serialize only actual writers. Skipped/untrusted workflow_run events
+    # must not hold the shared lane before this job's admission check.
+    concurrency:
+      group: agent-handoff-pc-failure-intake
+      cancel-in-progress: false
+      queue: max
     # Activation is controlled by the reviewed repository Actions variable.
     # Keep the workflow disabled until that setting and the operating scope
     # have been confirmed by an authorized maintainer.
