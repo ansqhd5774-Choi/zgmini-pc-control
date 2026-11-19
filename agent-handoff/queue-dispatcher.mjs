@@ -62,6 +62,30 @@ async function pages(resource, cap) {
   throw Error('HANDOFF_SELECTOR_INCOMPLETE_INVENTORY');
 }
 
+// Selection receipts are durable GitHub writes. An advisory board read failure
+// must not retrospectively fail the completed selection or trigger a duplicate
+// selection. The independent Queue Control Board keeps its own verification.
+export async function finalizeSelection(result, readBoard) {
+  if (!result || !Number.isSafeInteger(result.selected) ||
+      typeof readBoard !== 'function')
+    throw Error('HANDOFF_SELECTOR_FINALIZATION_INPUT_INVALID');
+  try {
+    const board = await readBoard();
+    const execution = ownerExecutionPlan(board);
+    return {...result, state: execution.state, execution,
+      boardReadback: {state: 'VERIFIED', pendingIssueCount: board.pendingIssueCount},
+      pcRuntimeVerified: false};
+  } catch (error) {
+    // Only fixed, non-sensitive error codes may leave the isolated runner.
+    const raw = typeof error?.message === 'string' ? error.message : '';
+    const reason = /^HANDOFF_(?:BOARD|SELECTOR)_[A-Z0-9_]{1,90}$/.test(raw)
+      ? raw : 'HANDOFF_SELECTOR_BOARD_STATUS_UNAVAILABLE';
+    return {...result, state: 'CANDIDATE_SELECTION_COMPLETED_BOARD_UNVERIFIED',
+      execution: null, boardReadback: {state: 'UNVERIFIED', reason},
+      pcRuntimeVerified: false};
+  }
+}
+
 export async function main(env=process.env) {
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   validateTrigger(event, env);
@@ -72,16 +96,14 @@ export async function main(env=process.env) {
     readIssue: async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
     recordReceipt: (n,body)=>request('issues/'+n+'/comments',{method:'POST',body:{body}})
   });
-  // Re-read current authoritative progress after selection. selected=0 does
-  // not mean NO_WORK when an earlier selection still has no owner receipt.
-  const board=await collectBoard({
-    listIssues:()=>pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending',2),
+  // Earlier selections still need an owner-status readback when selected=0.
+  // Reuse the already fetched pending-issue inventory, but re-read each item's
+  // comments and identity; this avoids a redundant global GitHub list request.
+  const output=await finalizeSelection(result,()=>collectBoard({
+    listIssues:async()=>issues,
     readComments:n=>pages('issues/'+n+'/comments',4),
     readIssue:async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
-  },Date.now());
-  const execution=ownerExecutionPlan(board);
-  const output={...result,state:execution.state,execution,
-    pcRuntimeVerified:false};
+  },Date.now()));
   process.stdout.write(JSON.stringify(output)+'\n');
   return output;
 }
