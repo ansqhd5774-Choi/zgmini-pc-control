@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseHandoff} from './contract.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 import {assessIncident} from './queue-selector.mjs';
 import {DIAGNOSIS_SCHEMA,DIAGNOSIS_RECEIPT,REPO,OWNER,parseDiagnosis,verifyDiagnosis} from './diagnosis-result.mjs';
 const API=`https://api.github.com/repos/${REPO}`;
@@ -15,10 +16,7 @@ async function api(p,body){
  need(r.ok,`HTTP_${r.status}`);return r.json();
 }
 async function comments(n){
- const all=[];for(let p=1;p<=4;p++){
-  const rows=await api(`/issues/${n}/comments?per_page=100&page=${p}`);
-  need(Array.isArray(rows),'COMMENTS');all.push(...rows);if(rows.length<100)return all;
- }need(false,'COMMENT_LIMIT');
+ return readIssueCommentLedger(p=>api('/issues/'+n+'/comments?per_page=100&page='+p));
 }
 function matched(rows,n,body){
  const identity=body.split('\n')[1];
@@ -60,10 +58,14 @@ export async function returnDiagnosis(event,env,io){
  }
  for(const target of [n,origin.number]){
   if(matched(await io.comments(target),target,receipt))continue;
+  let reconciled=false;
   try{await io.post(target,receipt);}catch{
-   need(matched(await io.comments(target),target,receipt),'POST_OUTCOME_UNKNOWN');
+   reconciled=matched(await io.comments(target),target,receipt);
+   need(reconciled,'POST_OUTCOME_UNKNOWN');
   }
-  need(matched(await io.comments(target),target,receipt),'READBACK');
+  // The ambiguous POST has already been reconciled against the immutable
+  // exact receipt. Do not immediately repeat the same full ledger GET.
+  if(!reconciled)need(matched(await io.comments(target),target,receipt),'READBACK');
  }
  return {state:'DIAGNOSIS_RETURNED_TO_ORIGIN',incident:n,origin:origin.number,
   evidenceIssue:result.evidenceIssueNumber,operationalWrites:0,aiCalls:0};

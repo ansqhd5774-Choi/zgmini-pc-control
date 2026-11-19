@@ -26,6 +26,8 @@ jobs:
         run: node --test tests/pc-source-origin-readonly.test.mjs tests/c996-r5-readonly-collector.test.mjs tests/c996-r5-readonly-github.test.mjs tests/market-calendar-r44-runtime-readonly.test.mjs tests/market-calendar-r44-production-readonly.test.mjs r54-readiness-once/entry.test.mjs tests/agent-handoff-pc-resource-wait.test.mjs tests/shared-resource-lifecycle.test.mjs
       - name: Verify 007 wide scout shard and concurrency regressions
         run: node --test tests/agent-handoff-wide-scout.test.mjs tests/agent-handoff-job-concurrency.test.mjs
+      - name: Verify 009 complete comment ledger and return regressions
+        run: node --test tests/agent-handoff-comment-ledger.test.mjs tests/agent-handoff-result.test.mjs tests/agent-handoff-work-progress.test.mjs tests/agent-handoff-diagnosis.test.mjs
       - name: Verify 009 handoff issue admission and concurrency regressions
         run: node --test tests/agent-handoff.test.mjs tests/agent-handoff-job-concurrency.test.mjs tests/agent-handoff-work-progress.test.mjs tests/agent-handoff-result.test.mjs
       - name: Verify 008 Writer B failure intake regressions
