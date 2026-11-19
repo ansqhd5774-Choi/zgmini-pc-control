@@ -42,12 +42,115 @@ export function validateScoutEvent(event,env){
       env.GITHUB_ACTOR!==OWNER)stop('FALLBACK_ISSUE_STOP');
   }else stop('EVENT_TYPE_STOP');
 }
-function assertLedger(issue){
+
+const SHARD_PREFIX='<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2';
+const shardTitle=(month,index)=>'ZGMINI Proactive Diagnostics '+month+' #'+index;
+const shardMarker=(month,index)=>SHARD_PREFIX+' month:'+month+' shard:'+index+' -->';
+const shardMonth=run=>{
+  const date=typeof run?.created_at==='string'?run.created_at.slice(0,7):'';
+  if(!/^\d{4}-\d\d$/.test(date))stop('SHARD_MONTH_INVALID');
+  return date;
+};
+function assertLegacyLedger(issue){
   if(issue?.number!==SCOUT_POLICY.ledgerIssueNumber||
-    issue.state!=='open'||issue.pull_request||
-    issue.user?.login!==OWNER||typeof issue.body!=='string'||
-    !issue.body.includes(marker)||issue.comments>400)
-    stop('LEDGER_NOT_VERIFIED');
+     issue.state!=='open'||issue.pull_request||
+     issue.user?.login!==OWNER||typeof issue.body!=='string'||
+     !issue.body.includes(marker))stop('LEDGER_NOT_VERIFIED');
+}
+// The historical 167 R1 reports are immutable, not a growing shared queue.
+// Always read only the prefix ending at a known authenticated bot comment.
+export async function readLegacyProactiveArchive(readPage){
+  if(typeof readPage!=='function')stop('ARCHIVE_READER_INVALID');
+  const rows=[];
+  for(let page=1;page<=3;page++){
+    const part=await readPage(page);
+    if(!Array.isArray(part)||part.length>100)stop('ARCHIVE_PAGE_UNVERIFIED');
+    for(const c of part){
+      rows.push(c);
+      if(c?.id===SCOUT_POLICY.legacyAnchorCommentId){
+        if(c.user?.login!==BOT||
+           c.body?.split('\n')[0]!=='<!-- ZGMINI_PROACTIVE_DIAG_R1 run:44467706543 attempt:1 -->')
+          stop('ARCHIVE_ANCHOR_INVALID');
+        const reports=rows.filter(x=>typeof x.body==='string'&&
+          x.body.startsWith('<!-- ZGMINI_PROACTIVE_DIAG_R1 run:'));
+        if(reports.length!==SCOUT_POLICY.legacyReportCount||
+           reports.some(x=>x.user?.login!==BOT||!goodId(x.id)||
+             typeof x.created_at!=='string'))
+          stop('ARCHIVE_REPORT_INCOMPLETE');
+        return rows;
+      }
+    }
+    if(part.length<100)break;
+  }
+  stop('ARCHIVE_ANCHOR_NOT_FOUND');
+}
+function assertShard(issue,month,index){
+  if(issue?.number<=0||!goodId(issue?.number)||issue.pull_request||
+     issue.title!==shardTitle(month,index)||
+     typeof issue.body!=='string'||!issue.body.includes(shardMarker(month,index))||
+     ![OWNER,BOT].includes(issue.user?.login)||
+     !['open','closed'].includes(issue.state)||
+     !issue.labels?.some(x=>x.name===SCOUT_POLICY.shardLabel))
+    stop('SHARD_IDENTITY_UNVERIFIED');
+}
+function checkedShardList(shards,month){
+  if(!Array.isArray(shards)||shards.length>100)stop('SHARD_INDEX_INCOMPLETE');
+  const numbers=new Set();
+  const entries=shards.map(issue=>{
+    const match=typeof issue?.title==='string'?
+      issue.title.match(/^ZGMINI Proactive Diagnostics (\d{4}-\d\d) #([1-9]\d*)$/):null;
+    if(!match||match[1]!==month)stop('SHARD_INDEX_DRIFT');
+    const index=Number(match[2]);
+    if(!Number.isSafeInteger(index)||index>100||numbers.has(index))
+      stop('SHARD_INDEX_CONFLICT');
+    assertShard(issue,month,index);
+    numbers.add(index);
+    return {issue,index};
+  }).sort((a,b)=>a.index-b.index);
+  if(entries.some((e,i)=>e.index!==i+1))stop('SHARD_INDEX_GAP');
+  return entries;
+}
+async function loadShardEvidence(io,month){
+  const shards=checkedShardList(await io.findShards(month),month);
+  const entries=[];
+  for(const {issue,index} of shards){
+    const comments=await io.readShardComments(issue.number);
+    if(!Array.isArray(comments)||comments.length>400)
+      stop('SHARD_COMMENTS_INCOMPLETE');
+    entries.push({issue,index,comments});
+  }
+  return entries;
+}
+function recordedInEntries(entries,run){
+  let found=false;
+  for(const {comments} of entries){
+    if(recordedFor(comments,run)){
+      if(found)stop('SHARD_DUPLICATE_CROSS_INDEX');
+      found=true;
+    }
+  }
+  return found;
+}
+async function ensureShard(io,month,entries){
+  const last=entries.at(-1);
+  if(last?.issue.state==='open'&&
+     last.comments.length<SCOUT_POLICY.maxShardComments)return last.issue;
+  const index=(last?.index??0)+1;
+  if(index>100)stop('SHARD_INDEX_CAP');
+  let result;
+  try{result=await io.createShard(month,index,shardTitle(month,index),shardMarker(month,index));}
+  catch{
+    // A timed-out POST may have created an Issue. Never blindly send again.
+    const after=await loadShardEvidence(io,month);
+    const found=after.find(x=>x.index===index);
+    if(!found)stop('SHARD_CREATE_OUTCOME_UNKNOWN');
+    return found.issue;
+  }
+  if(!goodId(result?.number))stop('SHARD_CREATE_RESULT_INVALID');
+  const verified=await io.readShard(result.number);
+  assertShard(verified,month,index);
+  if(verified.number!==result.number)stop('SHARD_CREATE_READBACK');
+  return verified;
 }
 export function lookbackQuery(nowMs){
   const cutoff=new Date(nowMs-SCOUT_POLICY.lookbackDays*86400000);
@@ -55,60 +158,84 @@ export function lookbackQuery(nowMs){
   return '>='+cutoff.toISOString().slice(0,10);
 }
 export async function scanLatest(io,nowMs){
-  if(!io||['listRuns','getRun','getJobs','getLog','readLedger','readComments','postComment']
+  if(!io||['listRuns','getRun','getJobs','getLog','readLedger','readLegacyComments',
+    'findShards','readShard','readShardComments','createShard','postComment']
     .some(k=>typeof io[k]!=='function'))stop('IO_REQUIRED');
-  const ledger=await io.readLedger();
-  assertLedger(ledger);
+  assertLegacyLedger(await io.readLedger());
+  const legacy=await io.readLegacyComments();
+  if(!Array.isArray(legacy)||!legacy.some(x=>x.id===SCOUT_POLICY.legacyAnchorCommentId))
+    stop('ARCHIVE_NOT_VERIFIED');
   const inventory=await io.listRuns(lookbackQuery(nowMs));
   const selected=selectRecentFailures(inventory,nowMs);
-  let comments=await io.readComments();
-  if(!Array.isArray(comments)||comments.length>400)stop('COMMENTS_INCOMPLETE');
-  let existing=0,posted=0;
+  let existing=0,posted=0,unverified=selected.unverified;
   const observed=[];
   for(const run of selected.recent){
-    if(recordedFor(comments,run)){existing++;continue;}
     if(posted>=SCOUT_POLICY.maxNewComments)break;
-    const live=await io.getRun(run.id);
-    assertSameRun(run,live);
-    const jobs=await io.getJobs(run.id,run.run_attempt);
-    if(!Array.isArray(jobs)||jobs.length>SCOUT_POLICY.maxJobsPerRun)
-      stop('JOBS_INCOMPLETE');
-    // Job metadata and log bytes are untrusted; only fixed classifications leave memory.
+    if(recordedFor(legacy,run)){existing++;continue;}
+    const month=shardMonth(run);
+    let shards=await loadShardEvidence(io,month);
+    if(recordedInEntries(shards,run)){existing++;continue;}
+    let live,jobs;
+    try{
+      live=await io.getRun(run.id);
+      assertSameRun(run,live);
+      jobs=await io.getJobs(run.id,run.run_attempt);
+      if(!Array.isArray(jobs)||jobs.length>SCOUT_POLICY.maxJobsPerRun)
+        stop('JOBS_INCOMPLETE');
+    }catch(error){
+      // A different Run remains independently reviewable. Never publish this
+      // run without verified identity and complete jobs.
+      if(error?.message?.includes('GITHUB_HTTP_401')||
+         error?.message?.includes('GITHUB_HTTP_403'))throw error;
+      unverified++;continue;
+    }
     let unavailable=false;
     const hints=[];
     const failed=jobs.filter(j=>['failure','timed_out'].includes(j.conclusion)).slice(0,2);
     for(const job of failed){
-      if(!goodId(job.id))stop('JOB_ID_INVALID');
-      try{
-        const found=classifyLogs(await io.getLog(job.id));
-        hints.push(...found);
-      }catch{unavailable=true;}
+      if(!goodId(job.id)){unavailable=true;continue;}
+      try{hints.push(...classifyLogs(await io.getLog(job.id)));}
+      catch(error){
+        if(/GITHUB_HTTP_(401|403)/.test(error?.message||''))throw error;
+        unavailable=true;
+      }
     }
     const report=buildDiagnosis(live,jobs,hints,nowMs,{logsUnavailable:unavailable});
-    // Re-read ledger and run before the only write. Strictly fail on stale/unknown proof.
-    assertLedger(await io.readLedger());
+    // Before a GitHub write, independently verify Run and immutable archive.
+    assertLegacyLedger(await io.readLedger());
     const fresh=await io.getRun(run.id);
     assertSameRun(live,fresh);
-    comments=await io.readComments();
-    if(recordedFor(comments,run)){existing++;continue;}
-    if(comments.length>=400)stop('LEDGER_CAP_STOP');
-    try{await io.postComment(report);}
+    if(recordedFor(legacy,run)){existing++;continue;}
+    shards=await loadShardEvidence(io,month);
+    if(recordedInEntries(shards,run)){existing++;continue;}
+    let target=await ensureShard(io,month,shards);
+    // If creating a shard changed the index, re-check all authenticated
+    // shards (including the new one) before posting any run receipt.
+    shards=await loadShardEvidence(io,month);
+    if(recordedInEntries(shards,run)){existing++;continue;}
+    const actual=shards.find(x=>x.issue.number===target.number);
+    if(!actual||actual.issue.state!=='open'||actual.comments.length>=
+      SCOUT_POLICY.maxShardComments)stop('SHARD_WRITE_SCOPE_DRIFT');
+    try{await io.postComment(target.number,report);}
     catch{
-      comments=await io.readComments();
-      if(!recordedFor(comments,run))stop('WRITE_RESULT_UNKNOWN');
+      const after=await loadShardEvidence(io,month);
+      if(!recordedInEntries(after,run))stop('WRITE_RESULT_UNKNOWN');
     }
-    comments=await io.readComments();
-    if(!recordedFor(comments,run))stop('WRITE_READBACK_STOP');
+    const after=await loadShardEvidence(io,month);
+    if(!recordedInEntries(after,run))stop('WRITE_READBACK_STOP');
     posted++;
-    observed.push({runId:run.id,attempt:run.run_attempt,classification:'EVIDENCE_REVIEW'});
+    observed.push({runId:run.id,attempt:run.run_attempt,
+      shardIssue:target.number,classification:'EVIDENCE_REVIEW'});
   }
   return Object.freeze({schema:SCOUT_POLICY.version,
     cutoff:selected.cutoff,scanned:inventory.length,
     recentFailures:selected.recent.length,excludedOld:selected.excludedOld,
-    alreadyRecorded:existing,newReports:posted,limit:SCOUT_POLICY.maxNewComments,
-    observed,pcOperationalWrites:0,aiCalls:0,automaticRetries:0,
-    ledgerIssue:SCOUT_POLICY.ledgerIssueNumber});
+    unverified,alreadyRecorded:existing,newReports:posted,
+    limit:SCOUT_POLICY.maxNewComments,observed,
+    pcOperationalWrites:0,aiCalls:0,automaticRetries:0,
+    legacyLedgerIssue:SCOUT_POLICY.ledgerIssueNumber,reportStore:'MONTHLY_SHARDED_ISSUES'});
 }
+
 async function request(resource,{method='GET',body,text=false}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN_MISSING');
   const res=await fetch(API+resource,{
