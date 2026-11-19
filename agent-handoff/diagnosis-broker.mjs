@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseHandoff} from './contract.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 import {assessIncident} from './queue-selector.mjs';
 import {DIAGNOSIS_SCHEMA,DIAGNOSIS_RECEIPT,REPO,OWNER,parseDiagnosis,verifyDiagnosis} from './diagnosis-result.mjs';
 const API=`https://api.github.com/repos/${REPO}`;
@@ -15,10 +16,7 @@ async function api(p,body){
  need(r.ok,`HTTP_${r.status}`);return r.json();
 }
 async function comments(n){
- const all=[];for(let p=1;p<=4;p++){
-  const rows=await api(`/issues/${n}/comments?per_page=100&page=${p}`);
-  need(Array.isArray(rows),'COMMENTS');all.push(...rows);if(rows.length<100)return all;
- }need(false,'COMMENT_LIMIT');
+ return readIssueCommentLedger(p=>api('/issues/'+n+'/comments?per_page=100&page='+p));
 }
 function matched(rows,n,body){
  const identity=body.split('\n')[1];
