@@ -197,6 +197,12 @@ async function completePages(endpoint, category, maxPages=MAX_PAGES) {
     rows.push(...part);
     if (part.length < 100) return rows;
   }
+  // Exactly N*100 rows is complete when the next page is empty.
+  // Probe only the boundary; do not silently accept a truncated inventory.
+  const separator=endpoint.includes('?')?'&':'?';
+  const probe=await request(`${endpoint}${separator}per_page=100&page=${maxPages+1}`);
+  if(!Array.isArray(probe))stop(`${category}_INVENTORY_INVALID`);
+  if(probe.length===0)return rows;
   stop(`${category}_INVENTORY_LIMIT`);
 }
 
