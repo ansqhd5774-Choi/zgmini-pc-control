@@ -132,3 +132,21 @@ test('GitHub Actions bot-created incident is accepted for dedup but spoofed orig
   const forged = input(); forged.originIssue.user.login = 'github-actions[bot]';
   assert.throws(() => preparePcFailureHandoff(forged), /PC_HANDOFF_ISSUE_NOT_AUTHORIZED/);
 });
+
+test('complete 650-Issue inventory preserves exact dedup without 500 global gate',()=>{
+  const prepared=preparePcFailureHandoff(input());
+  const issues=Array.from({length:650},(_,i)=>({
+    repository:repo,number:3000+i,user:{login:'ansqhd5774-Choi'},
+    body:'invalid-other-incident',labels:[{name:'agent-handoff'}]
+  }));
+  const inventory={repository:repo,complete:true,issues};
+  assert.equal(reconcileHandoffInventory(prepared,inventory).state,'CREATE_CANDIDATE_ONLY');
+  inventory.issues[625]={...issues[625],user:{login:'github-actions[bot]'},
+    body:prepared.body};
+  assert.equal(reconcileHandoffInventory(prepared,inventory).state,'REUSE_EXISTING');
+  inventory.issues[626]={...issues[626],user:{login:'github-actions[bot]'},
+    body:prepared.body};
+  assert.throws(()=>reconcileHandoffInventory(prepared,inventory),/DUPLICATE_INCIDENT_STOP/);
+  inventory.complete=false;
+  assert.throws(()=>reconcileHandoffInventory(prepared,inventory),/INVENTORY_INCOMPLETE/);
+});
