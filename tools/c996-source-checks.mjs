@@ -68,25 +68,29 @@ export function selectGroups(paths){
 export async function changedFiles(env=process.env,fetcher=fetch){
  try{
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
-  const n=event.pull_request?.number;
+  const base=event.pull_request?.base?.sha;
+  const head=event.pull_request?.head?.sha;
   const repo=env.GITHUB_REPOSITORY;
-  if(!Number.isSafeInteger(n)||n<1||repo!=='ansqhd5774-Choi/zgmini-pc-control'||
-     !env.GITHUB_TOKEN)throw Error('NO_SCOPED_PR_PROOF');
-  const paths=[];
-  for(let page=1;page<=10;page++){
-   const res=await fetcher('https://api.github.com/repos/'+repo+
-    '/pulls/'+n+'/files?per_page=100&page='+page,{headers:{
-     Authorization:'Bearer '+env.GITHUB_TOKEN,
-     Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'
-    },signal:AbortSignal.timeout(20000)});
-   if(!res.ok)throw Error('PR_FILES_UNAVAILABLE');
-   const rows=await res.json();
-   if(!Array.isArray(rows)||rows.length>100||rows.some(x=>typeof x.filename!=='string'))
-     throw Error('PR_FILES_INVALID');
-   paths.push(...rows.flatMap(x=>[x.filename,...(typeof x.previous_filename==='string'?[x.previous_filename]:[])]));
-   if(rows.length<100)return paths;
-  }
-  throw Error('PR_FILES_TOO_MANY');
+  if(!/^[a-f0-9]{40}$/.test(base??'')||!/^[a-f0-9]{40}$/.test(head??'')||
+     repo!=='ansqhd5774-Choi/zgmini-pc-control'||!env.GITHUB_TOKEN)
+     throw Error('NO_SCOPED_PR_PROOF');
+  // Compare uses the existing contents:read token; unlike the Pull Request
+  // files endpoint it does not require extra pull-requests permissions.
+  const res=await fetcher('https://api.github.com/repos/'+repo+
+   '/compare/'+base+'...'+head,{headers:{
+    Authorization:'Bearer '+env.GITHUB_TOKEN,
+    Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'
+   },signal:AbortSignal.timeout(20000)});
+  if(!res.ok)throw Error('PR_COMPARE_UNAVAILABLE');
+  const diff=await res.json();
+  // GitHub compare lists at most 300 changed files; at that boundary we
+  // cannot assert complete coverage, so run the existing full suite.
+  const rows=diff?.files;
+  if(!Array.isArray(rows)||rows.length>=300||
+     rows.some(x=>typeof x.filename!=='string'))
+    throw Error('PR_COMPARE_INCOMPLETE');
+  return rows.flatMap(x=>[x.filename,
+   ...(typeof x.previous_filename==='string'?[x.previous_filename]:[])]);
  }catch{return null;} // Missing scope evidence => existing full test set.
 }
 export async function main(env=process.env){
