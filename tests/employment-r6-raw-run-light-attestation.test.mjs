@@ -188,6 +188,27 @@ test('bounded mismatch lineage groups expose only safe month/provider/revision a
  assert.doesNotMatch(JSON.stringify(report),/PRIVATE_|PRIVATE-BAD|body_sha256|snapshotId|requestKey/);
  db.close();
 });
+test('mismatched BED-style response metadata still checks body and snapshot ID independently',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ const good=snapshot(db,{requestKey:'SECRET_GOOD',body:'{"status": "REQUEST_SUCCEEDED"}'});
+ const broken=snapshot(db,{requestKey:'SECRET_BAD',body:'{"status": "REQUEST_SUCCEEDED"}',
+  storedBody:'{"status":"CHANGED"}'});
+ const raw='market_score_employment_r6_raw_snapshot_v1';
+ for(const id of [good.id,broken.id])
+  db.prepare('UPDATE '+raw+' SET detail_json=? WHERE snapshot_id=?')
+   .run(JSON.stringify({responseHash:'f'.repeat(64),secret:'PRIVATE_CANONICAL'}),id);
+ const report=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.equal(report.invalidReasonCounts.RESPONSE_HASH_VALUE_MISMATCH,2);
+ assert.equal(report.bodyVerifiedKeys,0);
+ assert.deepEqual(report.mismatchIntegrity,{
+  checked:2,bodyShaMatched:1,bodyShaMismatched:1,
+  snapshotIdMatched:2,snapshotIdMismatched:0,
+  scope:'INDEPENDENT_HASH_CHECKS_NOT_PIT',
+ });
+ assert.doesNotMatch(JSON.stringify(report),/SECRET_|PRIVATE_|CHANGED|REQUEST_SUCCEEDED|snapshotId|body_sha256/);
+ db.close();
+});
+
 test('unlinked invalid snapshot has explicit UNLINKED lineage rather than fabricated revision',()=>{
  const db=new DatabaseSync(':memory:');schema(db);
  const bad=snapshot(db,{requestKey:'PRIVATE-UNLINKED',body:'private'});
