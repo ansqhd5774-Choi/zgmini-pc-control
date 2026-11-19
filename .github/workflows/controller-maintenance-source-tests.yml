@@ -134,6 +134,23 @@ on:
       - 'inflation-manual-b/**'
       - 'inflation-census-api-b/**'
       - 'approvals/inflation-manual-b/**'
+      - 'tools/controller-ci-scope.mjs'
+      - 'tests/controller-ci-scope.test.mjs'
+      - 'tests/retired-iran-controller.test.mjs'
+      - 'tests/writer-install-preimage-readonly.test.mjs'
+      - 'tests/engine.test.mjs'
+      - 'tests/maintenance-agent.test.mjs'
+      - 'tests/maintenance-lock.test.mjs'
+      - 'tests/source-bundle-register.test.mjs'
+      - 'tests/source-inventory-runtime-readonly.test.mjs'
+      - 'tests/sqlite-readonly-contract.test.mjs'
+      - 'tests/employment-r6-collection-evidence-readonly.test.mjs'
+      - 'inflation-manual-b/contract.test.mjs'
+      - 'inflation-manual-b/coordinator.test.mjs'
+      - 'inflation-manual-b/core-task-event-owner-proof.test.mjs'
+      - 'inflation-census-api-b/contract.test.mjs'
+      - 'inflation-census-api-b/coordinator.test.mjs'
+      - 'inflation-census-api-b/report.test.mjs'
       - '.github/workflows/controller-maintenance-source-tests.yml'
 permissions:
   contents: read
@@ -153,6 +170,14 @@ jobs:
       run:
         shell: cmd
     steps:
+      - name: Confirm source-only isolated CI host
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=TRUE
+          ) else (
+            echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=FALSE
+            exit /b 5
+          )
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -161,87 +186,134 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
+      - name: Determine affected source test families
+        id: scope
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node tools/controller-ci-scope.mjs
+      - name: Check CI scope selection regressions
+        run: node --test tests/controller-ci-scope.test.mjs
       - name: Verify exact HTTP host roster and connection evidence, no provider I/O
+        if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/provider-activity-runtime-readonly.test.mjs
       - name: Verify W01 inflation7 Writer receipt in existing Inflation19 read-only A without PC effects
+        if: steps.scope.outputs.w01 == 'true'
         run: node --test --test-concurrency=1 tests/w01-inflation7-writer-ledger-existing-a.test.mjs
       - name: Verify fixed Credit R2 source SHA and protected report summary (no PC access)
+        if: steps.scope.outputs.core == 'true'
         run: |
           node --check controller/pc-source-readonly.mjs
           node --test --test-concurrency=1 tests/pc-source-readonly.test.mjs
       - name: Verify fixed Alpaca and Census checkpoints without provider or operational I/O
+        if: steps.scope.outputs.w01 == 'true'
         run: node --test --test-concurrency=1 tests/http32-two-host-checkpoints-readonly.test.mjs
       - name: Verify retired R13 inventory reason and W03 checkout failure attribution
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/retired-iran-controller.test.mjs tests/writer-install-preimage-readonly.test.mjs tests/engine.test.mjs
       - name: Verify exact installed-base seven-path Controller overlay and imports
+        if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-sevenpath-overlay.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
+        if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-agent.test.mjs tests/maintenance-lock.test.mjs tests/maintenance-contract.test.mjs tests/source-bundle-register.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
       - name: Verify W03 R32 64-symbol GMH raw/checkpoint SHA coverage, without provider calls
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/theme-nine-r32-raw-coverage-readonly.test.mjs
       - name: Verify W03 R181 stored ledger projection remains fixed-symbol, read-only and redacted
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/theme-l7-runtime-readonly.test.mjs
       - name: Verify W03 immutable D1 seed and rolling read-only overlap without credential refresh
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-d1-seed-a.test.mjs
       - name: Verify W03 exact pinned GMH 14-symbol collection-time read-only one-shot
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-collection-time-a.test.mjs
       - name: Verify W03 pinned 7x252 vs public base/R32 read-only comparison
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-public-compat-a.test.mjs
       - name: Verify exact saved-only W03 GMH seven private 7x252 scoring contract
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-private-score-once.test.mjs
       - name: Verify same existing B title V2 SHA/rights/private result contract
+        if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-saved-score-v2.test.mjs
       - name: Verify W03 bounded GMH seven-theme manual Windows collection is exact and private
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-gmh-seven-manual-once.test.mjs
       - name: Verify W03 R179 fixed operator-shape read-only A and redaction
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r179-guard-shape.test.mjs
       - name: Verify W03 R181 exact saved-ledger source-only A metadata and privacy contract
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-saved-ledger-readonly.test.mjs
       - name: Verify exact dedicated Windows operations are not falsely rejected by shared admission
+        if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/shared-resource-issue-admission.test.mjs
       - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
+        if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs
       - name: Verify W05 BLS C exact source SHA checkpoint using existing A inventory, offline only
+        if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/earnings-c-checkpoint-readonly.test.mjs tests/source-inventory-runtime-readonly.test.mjs tests/sqlite-readonly-contract.test.mjs tests/employment-r6-collection-evidence-readonly.test.mjs
       - name: Verify immutable W03 R179 B approval SHA and zero-publication rights
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-approval.test.mjs
       - name: Verify W03 exact R179 seven-versus-ten B source contract and isolated transaction simulation
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-b.test.mjs
       - name: Verify W03 exact R47 private pair readback B source and report privacy
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r47-private-readback.test.mjs
       - name: Verify W03 R48 candidate and exact R47 pair SHA without touching PC files
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r48-private-readback.test.mjs
       - name: Verify W03 R51 private provisional saved dates and SHA without public API calls
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r51-stored-date-readback.test.mjs
       - name: Verify W03 R179 stored handoff source/ledger/privacy before running existing PC-only publisher
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/w03-r179-stored-handoff.test.mjs
       - name: Verify W03 R181 pinned route candidate is fail-closed and source-only
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-pinned-route-candidate.test.mjs
       - name: Verify W03 protected PC-only R181 B contract without operational effects
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-protected-b-transaction.test.mjs
       - name: Verify W03 fixed Windows B IO is inert without a registered operation
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-protected-b-windows-io.test.mjs
       - name: Verify W03 existing B workflow branch and one-shot reporter safety
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-protected-b-entry-report.test.mjs
       - name: Verify W03 R181 exact readonly shape classification and report safety
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-source-shape-readonly.test.mjs
       - name: Verify W03 actual r181-primary.mjs B route, fixed source and Windows protection
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-primary-route-b.test.mjs
       - name: Verify W03 bounded start of existing R181 Task with one-shot journal
+        if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/r181-existing-task-once.test.mjs
       - name: Verify W01 R2 both checkpoint branches in read-only insert preview
+        if: steps.scope.outputs.w01 == 'true'
         run: node --test writer-b/w01-r2-two-branch-preview.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
+        if: steps.scope.outputs.w01 == 'true'
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
+        if: steps.scope.outputs.w01 == 'true'
         run: node --test --test-concurrency=1 inflation-census-api-b/contract.test.mjs inflation-census-api-b/coordinator.test.mjs inflation-census-api-b/report.test.mjs
       - name: Syntax-check W01 Census B Windows adapter and sanitized reporter without executing them
+        if: steps.scope.outputs.w01 == 'true'
         run: |
           node --check inflation-census-api-b/windows-adapter.mjs
           node --check inflation-census-api-b/report.mjs
       - name: Regression test six operating runners without PC writes
+        if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-recovery.test.mjs
       - name: Validate fixed Watchdog B module syntax without PC writes
+        if: steps.scope.outputs.watchdog == 'true'
         run: |
           node --check watchdog-b/contract.mjs
           node --check watchdog-b/upgrade.mjs
@@ -252,6 +324,7 @@ jobs:
           node --check watchdog-b/activation-first-fail-readonly.mjs
           node --check watchdog-b/handoff-firstfail-readonly.mjs
       - name: Parse WMI Guardian helper and reject invalid PID without process effects
+        if: steps.scope.outputs.watchdog == 'true'
         run: |
           cscript //NoLogo watchdog-b\guardian-rotate.vbs PROBE NOT_A_PID > "%RUNNER_TEMP%\watchdog-guardian-denied.txt"
           if not "%ERRORLEVEL%"=="5" exit /b 7
@@ -261,11 +334,3 @@ jobs:
           if not "%ERRORLEVEL%"=="2" exit /b 9
           findstr /c:"INVALID_PID" "%RUNNER_TEMP%\watchdog-origin-denied.txt" >nul
           if errorlevel 1 exit /b 10
-      - name: Confirm source-only isolated CI host
-        run: |
-          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
-            echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=TRUE
-          ) else (
-            echo CONTROLLER_MAINTENANCE_SOURCE_ONLY_ISOLATED_HOST=FALSE
-            exit /b 5
-          )
