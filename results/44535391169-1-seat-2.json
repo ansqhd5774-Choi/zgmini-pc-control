@@ -1,0 +1,221 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44535391169-1-seat-2",
+  "requestId": "pc-4eb23664-6407-49c9-978f-7663d402602b",
+  "startedAt": "2026-11-19T13:38:05.926Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "6e52999aeb7dda5975464a78780559ba5cd46895",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "863ed1bef077301949899dd4aeb3f78f448fd9ed",
+  "sourceBranch": "codex/w04-pit0408-host-r3-restore-raw-lineage-20261118",
+  "operation": "employment-r6-raw-run-attestation-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "R6_RAW_RUN_AGGREGATE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-provenance-repair-20261119",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "R6_RAW_RUN_AGGREGATE_READONLY",
+    "sqliteOpened": true,
+    "scope": "W04_R6_RAW_RUN_FIXED_AGGREGATE_ONLY",
+    "dbIdentityTag": "b6fb111e0ff0378b",
+    "attestation": {
+      "status": "HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT",
+      "checkedAt": "2026-11-19T13:38:07.766Z",
+      "metadataKeys": 88,
+      "bodyVerifiedKeys": 61,
+      "runCertifiedKeys": 61,
+      "invalidBodyKeys": 27,
+      "validWithoutRunKeys": 0,
+      "invalidReasonCounts": {
+        "CHUNK_OR_COUNT_INVALID": 0,
+        "HASH_FORMAT_INVALID": 0,
+        "SOURCE_FIELDS_INVALID": 0,
+        "TIME_INVALID": 0,
+        "RESPONSE_HASH_MISSING": 0,
+        "RESPONSE_HASH_VALUE_MISMATCH": 27,
+        "SNAPSHOT_ID_MISMATCH": 0,
+        "BODY_SHA_MISMATCH": 0
+      },
+      "invalidReasonOrdinals": [
+        {
+          "ordinal": 1,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 14,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 15,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 16,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 25,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 27,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 30,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 33,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 39,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 47,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 49,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 52,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 56,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 61,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 62,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 64,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 65,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 69,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 72,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 73,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 74,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 76,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 80,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 81,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 86,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 87,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 88,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        }
+      ],
+      "invalidReasonTruncated": false,
+      "invalidLineageGroups": [
+        {
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH",
+          "provider": "BLS_BED",
+          "releaseGroup": "BLS_BED",
+          "retrievedMonth": "2026-11",
+          "collectorRevision": "EMP-R6-COLLECTOR-R1",
+          "count": 27
+        }
+      ],
+      "invalidLineageScope": "DIAGNOSTIC_NOT_PIT",
+      "mismatchIntegrity": {
+        "checked": 27,
+        "bodyShaMatched": 27,
+        "bodyShaMismatched": 0,
+        "idMatched": 27,
+        "idMismatched": 0,
+        "scope": "INDEPENDENT_HASH_CHECKS_NOT_PIT"
+      },
+      "legacyBedProof": {
+        "examined": 27,
+        "canonicalMatched": 27,
+        "canonicalMismatched": 0,
+        "invalidJson": 0,
+        "bodyOrIdInvalid": 0,
+        "runLinked": 27,
+        "scope": "LEGACY_BED_CANONICAL_COMPATIBILITY_NOT_PIT"
+      },
+      "missingHistoryLineage": {
+        "status": "OBSERVED",
+        "scope": "MISSING_HISTORY_KEY_SOURCE_LINKS_NOT_PIT",
+        "missingHistoryKeys": 2880,
+        "groups": [
+          {
+            "provider": "DOL_ETA",
+            "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+            "missingHistoryKeys": 2880,
+            "rawRunLinked": 0,
+            "metadataInvalid": 0,
+            "rawRunLinkMissing": 2880,
+            "availableTimeMissing": 2880,
+            "availableTimeAfterRetrieval": 0
+          }
+        ],
+        "rawRecordValuesReparsed": false,
+        "pitAttested": false,
+        "repairAuthorized": false
+      }
+    },
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "protectedBeforeSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedAfterSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "6e52999aeb7dda5975464a78780559ba5cd46895",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-19T13:38:29.877Z",
+  "durationMs": 23951
+}
