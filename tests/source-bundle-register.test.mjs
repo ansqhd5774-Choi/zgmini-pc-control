@@ -29,7 +29,9 @@ const sourceFiles=Object.freeze({
  'node_modules/hyparquet/src/index.js':'export const decode=()=>1;\n',
 });
 function fixture(t){
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-bundle-candidate-'));
+ // Windows service TEMP may use a short-name or redirected path. Put fixtures
+ // under its actual directory; keep the production alias rejection unchanged.
+ const dir=fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'zgmini-bundle-candidate-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const stageBundle=path.join(dir,'sealed');
  fs.mkdirSync(path.join(stageBundle,'source'),{recursive:true});
