@@ -20,7 +20,7 @@ export function parseDiagnosis(body){
  return Object.freeze(x);
 }
 function ownerRequest(issue){
- need(issue?.user?.login===OWNER&&!issue.pull_request&&issue.title==='pc-job'&&
+ need(issue?.user?.login===OWNER&&!issue.pull_request&&
   issue.labels?.some(x=>x.name==='pc-job'),'REQUEST_OWNER');
  let x;try{x=JSON.parse(issue.body);}catch{need(false,'REQUEST_JSON');}
  need(x.schema==='ZGMINI_PC_JOB_V1'&&READS.has(x.operation)&&

@@ -60,6 +60,16 @@ test('limited read evidence never asserts system protection verified',()=>{
   workerOutcome:{status:'PASS',code:f.report.result.code}});
  assert.match(verifyDiagnosis(f.input()),/READ_VERIFIED_PROTECTION_UNVERIFIED/);
 });
+
+test('authenticated PC requests are identified by schema and label, not display title',()=>{
+ const f=fixture();f.origin.title='PC Update original postcheck';
+ f.evidence.title='PC Update recovery postcheck';
+ assert.match(verifyDiagnosis(f.input()),/READ_AND_PROTECTION_VERIFIED/);
+ for(const delta of [{user:{login:'other'}},{labels:[]},{pull_request:{url:'other'}}]){
+  const g=fixture();Object.assign(g.evidence,delta);
+  assert.throws(()=>verifyDiagnosis(g.input()),/REQUEST_OWNER/);
+ }
+});
 test('strict data-only diagnosis contract rejects extra fields, malformed identity and self-selected commands',()=>{
  const f=fixture();assert.equal(parseDiagnosis(JSON.stringify(f.result)).schema,DIAGNOSIS_SCHEMA);
  for(const x of [{...f.result,cmd:'anything'},{...f.result,evidenceIssueNumber:0},
@@ -101,6 +111,26 @@ test('lost POST response is reconciled rather than duplicated',async()=>{
  const f=fixture(),post=f.io.post;f.io.post=async(...a)=>{await post(...a);throw Error('lost');};
  await returnDiagnosis(f.event,f.env,f.io);assert.equal(f.rows.get(201).length,1);
 });
+
+test('a distinct verified diagnosis preserves earlier receipts without blocking the new result',async()=>{
+ const f=fixture();await returnDiagnosis(f.event,f.env,f.io);
+ const first=f.rows.get(201)[0].body;
+ f.event.comment.body=JSON.stringify({...f.result,resultId:'result-diagnosis-followup-20261119'});
+ f.rows.get(202).find(x=>x.id===f.event.comment.id).body=f.event.comment.body;
+ await returnDiagnosis(f.event,f.env,f.io);
+ assert.equal(f.rows.get(201).length,2);
+ assert.equal(f.rows.get(201)[0].body,first);
+ assert.match(f.rows.get(201)[1].body,/resultId: result-diagnosis-followup-20261119/);
+ await returnDiagnosis(f.event,f.env,f.io);
+ assert.equal(f.rows.get(201).length,2);
+});
+
+test('changed content with the same diagnosis identity remains a conflict',async()=>{
+ const f=fixture();await returnDiagnosis(f.event,f.env,f.io);
+ f.rows.get(201)[0].body+='\nchanged';
+ await assert.rejects(returnDiagnosis(f.event,f.env,f.io),/RECEIPT_CONFLICT/);
+ assert.equal(f.rows.get(201).length,1);
+});
 test('partial return resumes remaining delivery without replaying the PC query',async()=>{
  const f=fixture(),post=f.io.post;let fail=true;
  f.io.post=async(n,b)=>{if(n===201&&fail)throw Error('unavailable');return post(n,b);};
@@ -112,6 +142,6 @@ test('partial return resumes remaining delivery without replaying the PC query',
 test('untrusted events, missing selection, source drift and conflicting receipts block return',async()=>{
  const f=fixture();await assert.rejects(returnDiagnosis(f.event,{...f.env,GITHUB_ACTOR:'other'},f.io));
  f.rows.get(202).splice(1,1);await assert.rejects(returnDiagnosis(f.event,f.env,f.io),/SELECTION/);
- const g=fixture();g.rows.get(201).push({user:{login:'github-actions[bot]'},issue_url:url(201),body:DIAGNOSIS_RECEIPT+'\nconflict'});
+ const g=fixture();g.rows.get(201).push({user:{login:'github-actions[bot]'},issue_url:url(201),body:DIAGNOSIS_RECEIPT+'\nresultId: '+g.result.resultId+'\nconflict'});
  await assert.rejects(returnDiagnosis(g.event,g.env,g.io),/RECEIPT_CONFLICT/);
 });
