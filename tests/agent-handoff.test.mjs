@@ -132,6 +132,8 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   ].join('\n');
   const pushBot = body => comments.push({
     user:{login:'github-actions[bot]'},issue_url:issueUrl,body});
+  for(let i=0;i<unrelatedCommentCount;i++) comments.push({
+    user:{login:'reader'},issue_url:issueUrl,body:'unrelated comment '+i});
   if (existingBotReceipt === 'duplicate-exact') {
     pushBot(expectedReceipt);pushBot(expectedReceipt);
   } else if (existingBotReceipt === 'conflicting-route') {
@@ -143,8 +145,6 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   } else if (existingBotReceipt === 'unrelated-human') {
     comments.push({user:{login:'someone-else'},issue_url:issueUrl,body:expectedReceipt});
   }
-  for(let i=0;i<unrelatedCommentCount;i++) comments.push({
-    user:{login:'reader'},issue_url:issueUrl,body:'unrelated comment '+i});
   const labels = ['agent-handoff',...existingLabels];
   const posts = [];
   let currentIssueState = issueState;
