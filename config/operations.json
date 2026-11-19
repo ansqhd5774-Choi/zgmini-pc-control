@@ -40,6 +40,7 @@
     "theme-l7-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "theme-nine-r32-raw-coverage-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536},
     "inflation-a401-private23-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+ "inflation-a407-integrity-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation19-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation-candidates-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},

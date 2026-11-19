@@ -3,6 +3,17 @@
 import fs from 'node:fs';import path from 'node:path';
 import {createHash} from 'node:crypto';import {spawnSync} from 'node:child_process';
 export const A401_ENTRY='scripts/pc-writer/inflation-a401-baseline23-readonly.mjs';
+export const A407_ENTRY='scripts/pc-writer/inflation-a407-integrity-readonly.mjs';
+const A407_FILES=new Set([
+ 'lib/inflation-causal-candidates-public-7-catalog.mjs',
+ 'lib/inflation-causal-public-catalog.mjs',
+ 'scripts/pc-writer/inflation-a401-baseline23-readonly.mjs',
+ A407_ENTRY,
+ 'scripts/pc-writer/inflation-causal-candidates-public-7-preview-r1.mjs',
+ 'scripts/pc-writer/inflation-causal-public-preview-r1.mjs',
+ 'worker/inflation-causal-candidates-public-7-r1.mjs',
+ 'worker/inflation-causal-public-r1.mjs'
+]);
 // Only the two W01 static-import worker modules are permitted under worker/.
 const A401_WORKER_MODULES=new Set([
  'worker/inflation-causal-public-r1.mjs',
@@ -32,11 +43,13 @@ export function summarizeA401(body){
   expected:23,verified,originalReady,additionalReady,original,additional,
   evidenceScope:'APPROVED_PRIVATE_SOURCE_READBACK',sqliteOpened:verified===23?true:null,sqliteReadOnly:true,providerCalls:0,operationalWrites:0,d1Writes:0,sqliteWrites:0};
 }
-export function stageA401Bundle(request,{host,workspace}){
+export function stageA401Bundle(request,{host,workspace},entrypoint=A401_ENTRY){
+ const isA407=entrypoint===A407_ENTRY;
+ need(entrypoint===A401_ENTRY||isA407,'A401_ENTRY_DENIED');
  need(request.sourceRepository==='ansqhd5774-Choi/zgmini'&&request.sourceBranch==='main'&&
   /^[a-f0-9]{40}$/.test(request.sourceSha??''),'A401_SOURCE_SCOPE');
  const a=host?.approvedSources?.[request.sourceSha];
- need(a?.branch==='main'&&a.entrypoint===A401_ENTRY&&path.isAbsolute(a.root??'')&&
+ need(a?.branch==='main'&&a.entrypoint===entrypoint&&path.isAbsolute(a.root??'')&&
   /^[a-f0-9]{64}$/.test(a.manifestSha256??'')&&path.isAbsolute(workspace??''),'A401_BUNDLE_NOT_APPROVED');
  const root=fs.realpathSync(a.root),regular=p=>{
   const st=fs.lstatSync(p),real=fs.realpathSync(p);
@@ -45,9 +58,12 @@ export function stageA401Bundle(request,{host,workspace}){
  };
  const raw=regular(path.join(root,'manifest.json'));need(hash(raw)===a.manifestSha256,'A401_MANIFEST_DRIFT');
  const m=JSON.parse(raw);
- need(m.sourceSha===request.sourceSha&&m.sourceBranch==='main'&&m.entrypoint===A401_ENTRY&&
+ need(m.sourceSha===request.sourceSha&&m.sourceBranch==='main'&&m.entrypoint===entrypoint&&
   m.files&&typeof m.files==='object'&&!Array.isArray(m.files)&&
-  Object.keys(m.files).length>0&&Object.keys(m.files).length<=64&&Object.hasOwn(m.files,A401_ENTRY),'A401_MANIFEST_SCOPE');
+  Object.keys(m.files).length>0&&Object.keys(m.files).length<=64&&Object.hasOwn(m.files,entrypoint),'A401_MANIFEST_SCOPE');
+ if(isA407)need(m.schema==='ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1'&&
+  m.sourceRepository==='ansqhd5774-Choi/zgmini'&&Object.keys(m.files).length===8&&
+  Object.keys(m.files).every(rel=>A407_FILES.has(rel)),'A407_BUNDLE_SCOPE');
  const entries=[];let total=0;
  for(const[rel,digest]of Object.entries(m.files)){
   need((/^(?:lib|scripts\/pc-writer)\/[a-zA-Z0-9_./-]+\.mjs$/.test(rel)||A401_WORKER_MODULES.has(rel))&&
@@ -55,9 +71,9 @@ export function stageA401Bundle(request,{host,workspace}){
   const b=regular(path.join(root,'source',rel));total+=b.length;
   need(hash(b)===digest&&total<=8_000_000,'A401_SOURCE_BYTES_DRIFT');entries.push([rel,b]);
  }
- const dest=path.join(workspace,'a401-approved-source');fs.mkdirSync(dest);
+ const dest=path.join(workspace,isA407?'a407-approved-source':'a401-approved-source');fs.mkdirSync(dest);
  for(const[rel,b]of entries){const file=path.join(dest,rel);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,b,{flag:'wx'});}
- return {entry:path.join(dest,A401_ENTRY),cwd:dest};
+ return {entry:path.join(dest,entrypoint),cwd:dest};
 }
 export function inspectA401Private23(request,context,{run=spawnSync}={}){
  try{

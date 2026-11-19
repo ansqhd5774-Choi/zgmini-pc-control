@@ -14,10 +14,17 @@ export function validateRequest(request,policy){
  const scoped=request.operation==='writer-install-preimage-readonly'&&
   Object.keys(request).length===keys.length+extra.length&&
   extra.every(k=>Object.hasOwn(request,k));
- need(Object.keys(request).length===keys.length+(scoped?extra.length:0)&&
+ // W04 PIT-04-08: one optional nonnegative page offset on the existing
+ // allowlisted read-only R6 operation. All other request shapes stay fixed.
+ const pit04=request.operation==='employment-r6-candidate-stage-readonly'&&
+  Object.hasOwn(request,'pit04Offset');
+ need(Object.keys(request).length===keys.length+(scoped?extra.length:pit04?1:0)&&
   keys.every(k=>Object.hasOwn(request,k))&&
-  Object.keys(request).every(k=>keys.includes(k)||(scoped&&extra.includes(k))),
+  Object.keys(request).every(k=>keys.includes(k)||(scoped&&extra.includes(k))
+    ||(pit04&&k==='pit04Offset')),
   'REQUEST_FIELDS');
+ if(pit04)need(Number.isSafeInteger(request.pit04Offset)&&request.pit04Offset>=0
+   &&request.pit04Offset<=50000,'PIT04_OFFSET_INVALID');
  if(scoped){
   need(typeof request.preimageManifestPath==='string'&&
    /^approvals\/writer-preimage\/[a-z0-9][a-z0-9-]{3,79}\.json$/.test(request.preimageManifestPath),
