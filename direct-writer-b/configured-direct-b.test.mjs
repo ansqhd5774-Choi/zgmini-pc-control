@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {authorizeApprovedRaw,applyApprovedOnce} from './run.mjs';
-import {sanitizeDirectBReport,directBTextReport} from './report.mjs';
+import {sanitizeDirectBReport,directBTextReport,uploadDirectBReport} from './report.mjs';
 import {resolveConfiguredSourcePin} from './configured-source-pin.mjs';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
@@ -103,4 +103,25 @@ test('PIN and bundle incomplete local JSON/TXT results remain UNKNOWN',async()=>
     const tampered={...complete,reportStatus:'INCOMPLETE'};
     assert.equal(sanitizeDirectBReport(tampered,f.request,env).operationSucceeded,false);
   }
+});
+
+test('B reporting never returns success for 1/2 remote result files',async()=>{
+ const f=fixture(),uploaded=new Map();let comments=0;
+ const fakeFetch=async(url,opts)=>{
+  const clean=url.replace('?ref=main','');
+  if(opts.method==='PUT'){
+   const bytes=Buffer.from(JSON.parse(opts.body).content,'base64');
+   if(url.endsWith('.json')){uploaded.set(clean,bytes);return {status:201}}
+   return {status:422};
+  }
+  if(opts.method==='GET'){
+   const bytes=uploaded.get(clean);
+   return {status:bytes?200:404,json:async()=>({encoding:'base64',content:bytes?.toString('base64')})};
+  }
+  comments++;return {status:201};
+ };
+ await assert.rejects(uploadDirectBReport({event:f.event,
+  env:{...env,GITHUB_TOKEN:'t'.repeat(35)},rawResult:'',
+  fetchApi:fakeFetch}),{code:'DIRECT_B_RESULT_PAIR_UNVERIFIED'});
+ assert.equal(comments,1,'the sanitized issue comment is fallback, not delivery success');
 });
