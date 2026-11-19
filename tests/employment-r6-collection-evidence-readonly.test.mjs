@@ -600,3 +600,72 @@ test('W04 PIT schema distinguishes a missing raw table without changing DB',t=>{
  assert.deepEqual(r.pitRawSchema.raw.missingOrdinals,[0,1,2,3,4,5,6,7,8,9,10]);
  assert.equal(sha(file),before);
 });
+
+function seedEta539Parity(db,{latestInvalid=false}={}){
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN snapshot_id TEXT");
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN provider TEXT");
+ db.exec("ALTER TABLE market_score_employment_r6_raw_snapshot_v1 ADD COLUMN body_sha256 TEXT");
+ for(const column of ['provider','provider_series_id','source_hash','source_revision','retrieved_at'])
+  db.exec('ALTER TABLE market_score_employment_r4_shadow_current_v1 ADD COLUMN '+column+' TEXT');
+ const week='2026-10-31',report='2026-11-04',stored='2026-11-19T00:00:00.000Z';
+ const lines=['st,rptdate,c1,c2,c3,c8',...STATES.map(st=>
+   [st,'11/04/2026','2','10/31/2026',st==='AL'?'0':'300','9000'].join(','))];
+ if(latestInvalid)lines.push('AL,11/11/2026,2,10/31/2026,,9000');
+ const raw=lines.join('\n'),digest=createHash('sha256').update(raw).digest('hex');
+ const snapshotId=createHash('sha256').update('DOL_UI_WEEKLY_CLAIMS|DOL_ETA|DOL_ETA539:60w|'+digest).digest('hex');
+ db.prepare("INSERT INTO market_score_employment_r6_raw_snapshot_v1 "+
+  "(request_key,release_group,chunk_index,retrieved_at,chunk_count,http_status,detail_json,body_chunk,snapshot_id,provider,body_sha256) "+
+  "VALUES(?,?,?,?,?,?,?,?,?,?,?)").run('DOL_ETA539:60w','DOL_UI_WEEKLY_CLAIMS',0,
+   stored,1,200,'{}',raw,snapshotId,'DOL_ETA',digest);
+ const insert=db.prepare("INSERT INTO market_score_employment_r4_shadow_current_v1 "+
+   "(logical_series_id,geography_type,geography_code,observation_date,value,provider,provider_series_id,source_hash,source_revision,retrieved_at) "+
+   "VALUES(?,?,?,?,?,?,?,?,?,?)");
+ for(const st of STATES){
+  const value=st==='AL'?0:300;
+  const hash=createHash('sha256').update(JSON.stringify({reportDate:report,reflectedWeek:week,st,value})).digest('hex');
+  insert.run('STATE_INITIAL_CLAIMS','STATE',st,week,value,
+   'DOL_ETA','ETA539:C3',hash,'ETA539:RPTDATE:'+report,stored);
+ }
+}
+test('W04 PIT0407 raw snapshot c3 matches stored Current with genuine zero, no raw disclosure or mutation',t=>{
+ const {data,file,storage}=fixture(t),db=createDb(file);
+ seed(db);seedEta539Parity(db);db.close();
+ const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ const p=r.eta539RawCurrentParity;
+ assert.equal(p.kind,'W04_ETA539_C3_RAW_CURRENT_PARITY_V1');
+ assert.equal(p.status,'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT');
+ assert.equal(p.checkedWeeks,1);
+ assert.equal(p.checkedKeys,51);
+ assert.deepEqual(p.counts,{MATCH:51,CURRENT_NEWER_THAN_RAW:0,MISSING_CURRENT:0,
+  OTHER_SOURCE:0,VALUE_DIFFERENT:0,HASH_DIFFERENT:0,REVISION_DIFFERENT:0});
+ assert.equal(p.rawPitAttested,false);assert.equal(p.repairAuthorized,false);
+ assert.equal(r.providerCalls,0);assert.equal(r.d1Writes,0);assert.equal(r.operationalWrites,0);
+ assert.equal(sha(file),beforeHash);
+ assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.doesNotMatch(JSON.stringify(p),/body_chunk|source_hash|snapshot_id|9000|10\/31\/2026/i);
+});
+test('W04 PIT0407 raw parity separates newer Current, changed value, provenance hash and revision',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);seedEta539Parity(db);
+ const u=(column,value,state)=>db.prepare('UPDATE market_score_employment_r4_shadow_current_v1 SET '+
+  column+'=? WHERE geography_code=? AND observation_date=?').run(value,state,'2026-10-31');
+ u('retrieved_at','2026-11-20T00:00:00.000Z','AL');
+ u('value',900,'AK');
+ u('source_hash','f'.repeat(64),'AZ');
+ u('source_revision','ETA539:RPTDATE:2026-10-30','AR');
+ u('provider','OTHER','CA');
+ db.prepare("DELETE FROM market_score_employment_r4_shadow_current_v1 WHERE geography_code='CO' AND observation_date='2026-10-31'").run();
+ db.close();
+ const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+ assert.equal(p.status,'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT');
+ assert.deepEqual(p.counts,{MATCH:45,CURRENT_NEWER_THAN_RAW:1,MISSING_CURRENT:1,
+  OTHER_SOURCE:1,VALUE_DIFFERENT:1,HASH_DIFFERENT:1,REVISION_DIFFERENT:1});
+});
+test('W04 PIT0407 newer missing c3 revision does not reuse older valid state-week',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);seedEta539Parity(db,{latestInvalid:true});db.close();
+ const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+ assert.equal(p.status,'NO_COMPLETE_WEEK_IN_SNAPSHOT',JSON.stringify(p));
+ assert.equal(p.invalidLatest,1);
+ assert.equal(p.rawPitAttested,false);assert.equal(p.repairAuthorized,false);
+});
