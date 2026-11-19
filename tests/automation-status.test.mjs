@@ -88,5 +88,5 @@ test('missing, offline and unrelated runner errors retain scoped diagnosis',()=>
  const blocked=summarizeAutomation({...healthy(),runnerSetOnline:null,
   runnerQueryError:'HTTP_403_FORBIDDEN',installLock:{held:true,recoveryRequired:true}});
  assert.equal(blocked.state,'RECOVERY_REQUIRED');
- assert.equal(blocked.next,'RECOVER_CURRENT_INSTALL_LEASE_WITH_EXACT_OWNER_AND_LEDGER');
+ assert.equal(blocked.next,'USE_CONTROLLER_RECOVERY_RUNBOOK');
 });
