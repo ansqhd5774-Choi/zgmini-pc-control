@@ -47,6 +47,25 @@ export function safeWriterBPreimageCheck(error){
   PREIMAGE_CHECKS.has(error?.preimageCheck)?error.preimageCheck:null;
 }
 
+// Expose bounded aggregate counts only; never expose Task probes/PIDs/paths.
+export function safeWriterBIdleObservation(error){
+ if(!['WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',
+  'WRITER_B_CORE_WINDOW_UNVERIFIED_DEFERRED'].includes(error?.code))return null;
+ const x=error?.idleObservation;
+ if(!x||typeof x!=='object'||Array.isArray(x))return null;
+ const keys=['windowMs','samples','readySamples','activeSamples',
+  'otherSamples','maxReadyStreak'];
+ if(keys.some(k=>!Number.isSafeInteger(x[k])))return null;
+ if(x.windowMs<1||x.windowMs>360000||
+  x.samples<1||x.samples>Math.ceil(x.windowMs/1500)+2||
+  [x.readySamples,x.activeSamples,x.otherSamples].some(n=>n<0||n>x.samples)||
+  x.readySamples+x.activeSamples+x.otherSamples!==x.samples||
+  x.maxReadyStreak<0||x.maxReadyStreak>1||
+  x.maxReadyStreak>x.readySamples||
+  (x.readySamples>0)!==(x.maxReadyStreak===1))return null;
+ return Object.fromEntries(keys.map(k=>[k,x[k]]));
+}
+
 export function verifyWriterBPreimage(manifest,preimage){
  validateWriterBManifest(manifest);
  const changed=manifest.files.map(x=>x.path);
@@ -193,12 +212,14 @@ export async function performWriterBInstall(auth,io){
  }catch(error){
   const code=publicErrorCode(error,'WRITER_B_ADAPTER_UNEXPECTED_STOP');
   if(!claimed){
+   const idleObservation=safeWriterBIdleObservation(error);
    const diagnostic=safeWriterBImportDiagnostic(error);
    const batch=safeWriterBImportDiagnosticBatch(error);
    const preimageCheck=safeWriterBPreimageCheck(error);
    result={status:'WRITER_B_PREFLIGHT_STOP',code,requestId:auth.requestId,
     ...(diagnostic?{diagnostic}:{}),...(batch??{}),
-    ...(preimageCheck?{preimageCheck}:{})};
+    ...(preimageCheck?{preimageCheck}:{}),
+    ...(idleObservation?{idleObservation}:{})};
   }else{
    try{
     if(configMayHaveChanged||sourceMayHaveChanged){
@@ -209,7 +230,9 @@ export async function performWriterBInstall(auth,io){
     if(taskMayHaveChanged)await io.restoreCore(before);
     await io.verifyOriginalState(before,manifest);
     result={status:'WRITER_B_INSTALL_STOP_RESTORED',code,
-      requestId:auth.requestId,recovery:'ORIGINAL_VERIFIED'};
+      requestId:auth.requestId,recovery:'ORIGINAL_VERIFIED',
+      ...(safeWriterBIdleObservation(error)?
+       {idleObservation:safeWriterBIdleObservation(error)}:{})};
    }catch{
     retain=true;
     result={status:'WRITER_B_RECOVERY_REQUIRED',code,
