@@ -70,7 +70,7 @@ export function selectGroups(paths){
    for(const g of ['handoff007','handoff009','handoff008'])chosen.add(g);
   // Unknown modifications to shared runtime source should not silently
   // skip an affected source test: conservatively run the full existing set.
-  if(/^(?:tools\/|controller\/|agent-handoff\/|direct-writer-b\/)/.test(p)&&
+  if(/^(?:tools\/|controller\/|direct-writer-b\/)/.test(p)&&
      !Object.values(MATCH).some(re=>re.test(p)))return ALL;
  }
  return ALL.filter(g=>chosen.has(g));
