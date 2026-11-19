@@ -72,9 +72,11 @@ test('time bounds, identity, and pagination completeness stay explicit',()=>{
   const r=evaluateWideSnapshot(snapshot({runs:[run(10,older)],
     complete:{runs:false,issues:true,pulls:true}}),now);
   assert.equal(r.inventory.complete.runs,false);
-  assert.throws(()=>evaluateWideSnapshot(snapshot({runs:[run(2),run(2)]}),now),/RUN_IDENTITY/);
-  assert.throws(()=>evaluateWideSnapshot(snapshot({issues:[issue(4,'not-date')]}),now),/ISSUE_IDENTITY/);
-  assert.throws(()=>evaluateWideSnapshot(snapshot({pulls:[pr(7),pr(7)]}),now),/PR_IDENTITY/);
+  const invalid=evaluateWideSnapshot(snapshot({runs:[run(2),run(2)],
+    issues:[issue(4,'not-date')],pulls:[pr(7),pr(7)]}),now);
+  assert.deepEqual(invalid.inventory.invalid,{runs:1,issues:1,pulls:1});
+  assert.deepEqual(invalid.inventory.complete,{runs:false,issues:false,pulls:false});
+  assert.equal(invalid.hasActionableReview,true);
 });
 test('bot-only duplicate and cooldown protections',()=>{
   const r=evaluateWideSnapshot(snapshot({runs:[run(33)]}),now);
