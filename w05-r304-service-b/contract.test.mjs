@@ -7,7 +7,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readbackServiceSnapshot,validateChildSummary} from './once.mjs';
 import {validateIssue,validateApproval,SCHEMA,OPERATION,MANIFEST,INSTALLED_SHA,
  FILES,SOURCE_ROOT,DATA_ROOT,sha256,sanitizedCode} from './contract.mjs';
-import {sanitizedReport} from './report.mjs';
+import {sanitizedReport,upload} from './report.mjs';
 
 const requestId='pc-w05-r304-11111111-2222-4333-8444-555555555555';
 const chatId='chat-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
@@ -112,4 +112,41 @@ test('simulated SQLite chunk and immutable snapshot SHA readback is fail-closed'
   db.prepare('UPDATE api_history_chunks_v1 SET payload_json=?').run('[]');
   assert.throws(()=>readbackServiceSnapshot(target),/W05_B_SQLITE_CHUNK_READBACK_STOP/);
  }finally{db.close();fs.rmSync(folder,{recursive:true,force:true});}
+});
+
+test('no local B result produces safe STATE_UNKNOWN JSON/TXT 2/2, not silent success',async()=>{
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),'w05-r304-report-'));
+ try{
+  const eventPath=path.join(folder,'event.json');
+  fs.writeFileSync(eventPath,JSON.stringify(makeEvent()));
+  const saved=new Map();
+  const fakeFetch=async(url,options)=>{
+   if(url.endsWith('/comments'))return {status:201,ok:true};
+   if(options.method==='PUT'){
+    if(saved.has(url))return {status:422,ok:false};
+    const body=JSON.parse(options.body);
+    saved.set(url,body.content);
+    return {status:201,ok:true};
+   }
+   if(!saved.has(url))return {status:404,ok:false};
+   return {status:200,ok:true,json:async()=>({content:saved.get(url)})};
+  };
+  const cfg={...env,GITHUB_EVENT_PATH:eventPath,RUNNER_TEMP:folder,
+   GITHUB_TOKEN:'local-test-fake-token-no-network-12345'};
+  const result=await upload(cfg,fakeFetch);
+  assert.equal(result.status,'RESULT_PAIR_READBACK_VERIFIED');
+  assert.equal(saved.size,2);
+  const jsonURL=[...saved.keys()].find(x=>x.endsWith('.json'));
+  const body=JSON.parse(Buffer.from(saved.get(jsonURL),'base64').toString('utf8'));
+  assert.equal(body.status,'STATE_UNKNOWN');
+  assert.equal(body.code,'W05_B_LOCAL_RESULT_MISSING_STOP');
+  fs.writeFileSync(path.join(folder,'W05_R304_B_RESULT.json'),
+   '{"status":"PASS","providerCalls":99,"secret":"do-not-upload"}');
+  saved.clear();
+  await upload(cfg,fakeFetch);
+  const second=JSON.parse(Buffer.from(saved.get(jsonURL),'base64').toString('utf8'));
+  assert.equal(second.status,'STATE_UNKNOWN');
+  assert.equal(second.code,'W05_B_LOCAL_RESULT_UNVERIFIED_STOP');
+  assert.equal(JSON.stringify(second).includes('do-not-upload'),false);
+ }finally{fs.rmSync(folder,{recursive:true,force:true})}
 });
