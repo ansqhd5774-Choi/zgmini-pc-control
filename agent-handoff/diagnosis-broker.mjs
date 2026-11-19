@@ -58,10 +58,14 @@ export async function returnDiagnosis(event,env,io){
  }
  for(const target of [n,origin.number]){
   if(matched(await io.comments(target),target,receipt))continue;
+  let reconciled=false;
   try{await io.post(target,receipt);}catch{
-   need(matched(await io.comments(target),target,receipt),'POST_OUTCOME_UNKNOWN');
+   reconciled=matched(await io.comments(target),target,receipt);
+   need(reconciled,'POST_OUTCOME_UNKNOWN');
   }
-  need(matched(await io.comments(target),target,receipt),'READBACK');
+  // The ambiguous POST has already been reconciled against the immutable
+  // exact receipt. Do not immediately repeat the same full ledger GET.
+  if(!reconciled)need(matched(await io.comments(target),target,receipt),'READBACK');
  }
  return {state:'DIAGNOSIS_RETURNED_TO_ORIGIN',incident:n,origin:origin.number,
   evidenceIssue:result.evidenceIssueNumber,operationalWrites:0,aiCalls:0};
