@@ -1,5 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import {readbackServiceSnapshot,validateChildSummary} from './once.mjs';
 import {validateIssue,validateApproval,SCHEMA,OPERATION,MANIFEST,INSTALLED_SHA,
  FILES,SOURCE_ROOT,DATA_ROOT,sha256,sanitizedCode} from './contract.mjs';
 import {sanitizedReport} from './report.mjs';
@@ -68,4 +73,43 @@ test('publisher permits only bounded metadata, never raw data or secret keys',()
  assert.throws(()=>sanitizedReport({...clean,observationAt:'2026-13-01'},requestId),
   /W05_B_REPORT_CONTRACT_STOP/);
  assert.equal(sanitizedCode('NOT_SAFE'),'W05_B_UNEXPECTED_STOP');
+});
+
+test('validates collector summary and rejects missing service confirmation',()=>{
+ assert.equal(validateChildSummary('TXT_CREATED=EARNINGS_BLS_SERVICE_R1_RESULT_20261119-024500Z.txt\\nRESULT=PASS_R3C_MANUAL_BLS_PERSISTED\\n'),
+  'EARNINGS_BLS_SERVICE_R1_RESULT_20261119-024500Z.txt');
+ assert.throws(()=>validateChildSummary('RESULT=PASS_R3C_MANUAL_BLS_PERSISTED'),
+  /W05_B_CHILD_RESULT_UNVERIFIED_STOP/);
+});
+test('simulated SQLite chunk and immutable snapshot SHA readback is fail-closed',()=>{
+ const folder=fs.mkdtempSync(path.join(os.tmpdir(),'w05-r304-fixture-'));
+ const target=path.join(folder,'sample.sqlite');
+ const db=new DatabaseSync(target);
+ try{
+  db.exec(`CREATE TABLE api_history_chunks_v1(
+   provider TEXT,dataset TEXT,chunk_sha256 TEXT,payload_json TEXT,row_count INTEGER,first_seen_at TEXT);
+   CREATE TABLE api_history_snapshots_v1(
+   provider TEXT,dataset TEXT,snapshot_sha256 TEXT,chunk_hashes_json TEXT,row_count INTEGER,
+   retrieved_at TEXT,status TEXT,history_mode TEXT,latest_observation_date TEXT,provenance_json TEXT);`);
+  const rows=[{seriesID:'WPSFD42',value:125.6,observationDate:'2026-08-01'}];
+  const chunkJson=JSON.stringify(rows),chunkHash=sha256(Buffer.from(chunkJson));
+  const stamp='2026-11-19T02:45:00.000Z';
+  const contract='EARNINGS_COMPANION_R3C_BLS_DIRECT_V1';
+  const snapHash=sha256(Buffer.from(JSON.stringify({contract,provider:'BLS',
+   dataset:'WPSFD42',frequency:'MONTHLY',seasonalAdjustment:'SA',chunks:[chunkHash]})));
+  const provenance=JSON.stringify({authority:'US_BLS',seriesID:'WPSFD42',
+   contract,retrievedAt:stamp});
+  db.prepare('INSERT INTO api_history_chunks_v1 VALUES(?,?,?,?,?,?)').run(
+    'BLS','WPSFD42',chunkHash,chunkJson,1,stamp);
+  db.prepare('INSERT INTO api_history_snapshots_v1 VALUES(?,?,?,?,?,?,?,?,?,?)').run(
+    'BLS','WPSFD42',snapHash,JSON.stringify([chunkHash]),1,stamp,
+    'READY_DIRECT_BLS',contract,'2026-08-01',provenance);
+  const saved=readbackServiceSnapshot(target);
+  assert.equal(saved.rows,1);
+  assert.equal(saved.snapshotSha256,snapHash);
+  assert.equal(saved.retrievedAt,stamp);
+  assert.equal(saved.firstSeenAt,stamp);
+  db.prepare('UPDATE api_history_chunks_v1 SET payload_json=?').run('[]');
+  assert.throws(()=>readbackServiceSnapshot(target),/W05_B_SQLITE_CHUNK_READBACK_STOP/);
+ }finally{db.close();fs.rmSync(folder,{recursive:true,force:true});}
 });
