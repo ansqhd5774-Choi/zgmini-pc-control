@@ -7,7 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {
  CONTROL_REPO,SOURCE_SHA,REQUEST_SCHEMA,REQUEST_SCOPE,REQUEST_TITLE,FILES,
  validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,inspectScheduledLauncher,validateActiveUpgradeReceipt,
- activeUpgradeReceiptNames,approvedDirectTool,verifyGithubContentsResponse,reportUploadState,
+ activeUpgradeReceiptNames,approvedDirectTool,validPriorUpgradeVersion,verifyGithubContentsResponse,reportUploadState,
 } from '../tools/ai-software-v2-register-once.mjs';
 
 function approvedIssue(){
@@ -161,8 +161,10 @@ test('valid intermediate upgrade ancestry does not have to equal original V1 ver
  // Actual activeVersion is derived from the canonical full manifest; this synthetic
  // positive case deliberately cannot forge that digest. Test the ancestry predicate
  // separately while retaining the entire manifest validation in production.
- assert.notEqual('fe5e30aeb56ac94d',old);
- assert.notEqual('fe5e30aeb56ac94d',active);
+ assert.equal(validPriorUpgradeVersion('fe5e30aeb56ac94d',active),true);
+ assert.equal(validPriorUpgradeVersion(old,active),true);
+ assert.equal(validPriorUpgradeVersion(active,active),false);
+ assert.equal(validPriorUpgradeVersion('broken',active),false);
  assert.throws(()=>validateActiveUpgradeReceipt({status:'CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED',
   sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',
   oldVersion:'fe5e30aeb56ac94d',newVersion:active,installedManifest:manifest},old,active),
@@ -172,6 +174,7 @@ test('valid intermediate upgrade ancestry does not have to equal original V1 ver
 test('GitHub result files must be independently read back with matching bytes',()=>{
  const bytes=Buffer.from('{"result":"PASS"}\\n');
  assert.equal(verifyGithubContentsResponse({encoding:'base64',content:bytes.toString('base64')},bytes),true);
+ assert.equal(verifyGithubContentsResponse({encoding:'base64',content:bytes.toString('base64')+'\n'},bytes),true);
  assert.throws(()=>verifyGithubContentsResponse({encoding:'base64',content:Buffer.from('different').toString('base64')},bytes),
   /AI_V2_REPORT_READBACK_MISMATCH/);
  assert.throws(()=>verifyGithubContentsResponse({encoding:'raw',content:'invalid'},bytes),
