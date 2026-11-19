@@ -43,13 +43,65 @@ test('fixed light audit verifies complete raw chunks and exact run receipt links
  snapshot(db,{requestKey:'test-two',body:'another response'});
  snapshot(db,{requestKey:'test-three',body:'expected value',storedBody:'tampered data!'});
  run(db,certified);
+ const badId=db.prepare("SELECT snapshot_id FROM market_score_employment_r6_raw_snapshot_v1 WHERE request_key=? LIMIT 1")
+  .get('test-three').snapshot_id;
+ const expectedOrdinal=db.prepare("SELECT COUNT(DISTINCT snapshot_id) AS n FROM market_score_employment_r6_raw_snapshot_v1 WHERE snapshot_id<=?")
+  .get(badId).n;
  const result=auditFixedR6RawRunSnapshot(db,{checkedAt:AT});
  assert.deepEqual(result,{
   status:'HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT',checkedAt:AT,
   metadataKeys:3,bodyVerifiedKeys:2,runCertifiedKeys:1,
   invalidBodyKeys:1,validWithoutRunKeys:1,
+  invalidReasonCounts:{
+   CHUNK_OR_COUNT_INVALID:0,HASH_FORMAT_INVALID:0,SOURCE_FIELDS_INVALID:0,
+   TIME_INVALID:0,RESPONSE_HASH_OR_METADATA_MISMATCH:0,
+   SNAPSHOT_ID_MISMATCH:0,BODY_SHA_MISMATCH:1,
+  },
+  invalidReasonOrdinals:[{ordinal:expectedOrdinal,reason:'BODY_SHA_MISMATCH'}],
+  invalidReasonTruncated:false,
  });
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_|original body|another response|snapshotId|body_sha256|test-one/);
+ db.close();
+});
+test('invalid snapshot reason codes isolate chunk, time, response metadata and ID failures',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ snapshot(db,{requestKey:'broken-count',body:'count body'});
+ snapshot(db,{requestKey:'broken-time',body:'time body'});
+ snapshot(db,{requestKey:'broken-response',body:'metadata body'});
+ snapshot(db,{requestKey:'broken-id',body:'id body'});
+ const table='market_score_employment_r6_raw_snapshot_v1';
+ db.prepare('DELETE FROM '+table+' WHERE request_key=? AND chunk_index=0').run('broken-count');
+ db.prepare('UPDATE '+table+' SET created_at=? WHERE request_key=?')
+  .run('2026-11-17T01:00:00.000Z','broken-time');
+ db.prepare('UPDATE '+table+' SET detail_json=? WHERE request_key=?')
+  .run(JSON.stringify({responseHash:'f'.repeat(64),secret:'PRIVATE_META'}),'broken-response');
+ db.prepare('UPDATE '+table+' SET snapshot_id=? WHERE request_key=?')
+  .run('f'.repeat(64),'broken-id');
+ const result=auditFixedR6RawRunSnapshot(db,{checkedAt:AT});
+ assert.equal(result.metadataKeys,4);
+ assert.equal(result.bodyVerifiedKeys,0);
+ assert.equal(result.invalidBodyKeys,4);
+ for(const code of ['CHUNK_OR_COUNT_INVALID','TIME_INVALID',
+  'RESPONSE_HASH_OR_METADATA_MISMATCH','SNAPSHOT_ID_MISMATCH'])
+  assert.equal(result.invalidReasonCounts[code],1);
+ assert.equal(Object.values(result.invalidReasonCounts).reduce((a,b)=>a+b,0),4);
+ assert.equal(result.invalidReasonOrdinals.length,4);
+ assert.equal(new Set(result.invalidReasonOrdinals.map(x=>x.ordinal)).size,4);
+ assert.equal(result.invalidReasonTruncated,false);
+ assert.doesNotMatch(JSON.stringify(result),/PRIVATE_|broken-|metadata body|responseHash|snapshotId|body_sha256/);
+ db.close();
+});
+test('failure reasons stay bounded when invalid snapshots exceed the output limit',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ for(let i=0;i<35;i++)
+  snapshot(db,{requestKey:'private-'+i,body:'original-'+i,storedBody:'tampered-'+i});
+ const result=auditFixedR6RawRunSnapshot(db,{checkedAt:AT});
+ assert.equal(result.metadataKeys,35);
+ assert.equal(result.invalidBodyKeys,35);
+ assert.equal(result.invalidReasonCounts.BODY_SHA_MISMATCH,35);
+ assert.equal(result.invalidReasonOrdinals.length,32);
+ assert.equal(result.invalidReasonTruncated,true);
+ assert.doesNotMatch(JSON.stringify(result),/private-|original-|tampered-/);
  db.close();
 });
 test('wrong provider or future run cannot certify a valid snapshot',()=>{
