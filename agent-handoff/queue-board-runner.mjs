@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {HANDOFF_REPOSITORY,HANDOFF_OWNER} from './queue-selector.mjs';
-import {compileQueueBoard,renderBoardMarkdown} from './queue-board.mjs';
+import {compileQueueBoard,renderBoardMarkdown,MAX_BOARD_ISSUES} from './queue-board.mjs';
 import {DIRECT_OWNER_REVIEWS,compileDirectOwnerBoard,renderDirectOwnerMarkdown}
   from './direct-owner-reviews.mjs';
 
@@ -41,12 +41,12 @@ async function request(resource){
   return resp.json();
 }
 
-async function pages(resource,cap){
+export async function pages(resource,cap,read=request){
   const result=[];
   for(let page=1;page<=cap;page++){
-    const rows=await request(resource+(resource.includes('?')?'&':'?')+
+    const rows=await read(resource+(resource.includes('?')?'&':'?')+
       'per_page=100&page='+page);
-    if(!Array.isArray(rows))fail('INVALID_PAGE');
+    if(!Array.isArray(rows)||rows.length>100)fail('INVALID_PAGE');
     result.push(...rows);
     if(rows.length<100)return result;
   }
@@ -59,26 +59,64 @@ function issueIdentity(issue){
     labels:issue.labels?.map(x=>x.name).sort()});
 }
 
+// Only an issue-scoped read failure may be downgraded to UNVERIFIED.
+// Authentication, bad page data, or a programming error are global failures.
+function scopedReadFailure(error){
+  const msg=typeof error?.message==='string'?error.message:'';
+  if(/^HANDOFF_BOARD_RUNNER_GITHUB_HTTP_(404|408|429|5\\d\\d)$/.test(msg))
+    return 'ISSUE_READ_UNAVAILABLE';
+  if(['AbortError','TimeoutError'].includes(error?.name)||
+     (error instanceof TypeError&&/^fetch failed(?:$|:)/i.test(msg)))
+    return 'ISSUE_READ_UNAVAILABLE';
+  return null;
+}
+export async function mapBounded(items,worker,width=4){
+  if(!Array.isArray(items)||typeof worker!=='function'||
+     !Number.isSafeInteger(width)||width<1||width>8)
+    fail('BOUNDED_MAP_INPUT');
+  const out=[];
+  for(let p=0;p<items.length;p+=width){
+    const batch=items.slice(p,p+width);
+    const values=await Promise.all(batch.map(worker));
+    out.push(...values);
+  }
+  return out;
+}
+
 export async function collectBoard(io,nowMs){
   if(!io||['listIssues','readComments','readIssue'].some(k=>typeof io[k]!=='function'))
     fail('IO_REQUIRED');
   const issues=await io.listIssues();
-  if(!Array.isArray(issues)||issues.length>100)fail('BACKLOG_CAP_EXCEEDED');
+  if(!Array.isArray(issues)||issues.length>MAX_BOARD_ISSUES)
+    fail('BACKLOG_CAP_EXCEEDED');
   const openHandoffs=issues.filter(issue=>!issue.pull_request);
-  if(openHandoffs.some(issue=>!issue.labels?.some(label=>label.name==='agent-handoff')))
+  if(openHandoffs.some(issue=>
+    !Number.isSafeInteger(issue?.number)||issue.number<1||
+    !Array.isArray(issue.labels)||
+    !issue.labels.some(label=>label.name==='agent-handoff')))
     fail('INCIDENT_INVENTORY_OUT_OF_SCOPE');
-  // Only pending incidents need expensive comment and origin verification.
-  // Non-pending open labels are counted, never classified as resolved.
   const pending=openHandoffs.filter(issue=>
     issue.labels.some(label=>label.name==='handoff-agent-pending'));
-  const records=[];
-  for(const issue of pending){
-    const comments=await io.readComments(issue.number);
-    const fresh=await io.readIssue(issue.number);
-    if(issueIdentity(issue)!==issueIdentity(fresh))fail('ISSUE_DRIFT_RESCAN_REQUIRED');
-    // Every row is the same exact GitHub Issue at both read points.
-    records.push({issue:{...fresh,repository:HANDOFF_REPOSITORY},comments});
-  }
+  const records=await mapBounded(pending,async issue=>{
+    try {
+      // Independent read-only GET requests share no mutable resource.
+      const [comments,fresh]=await Promise.all([
+        io.readComments(issue.number),io.readIssue(issue.number)
+      ]);
+      if(issueIdentity(issue)!==issueIdentity(fresh))
+        return {issue:{...issue,repository:HANDOFF_REPOSITORY},
+          comments:[],unverifiedReason:'ISSUE_DRIFT_RESCAN_REQUIRED'};
+      if(!Array.isArray(comments)||comments.length>400)
+        return {issue:{...issue,repository:HANDOFF_REPOSITORY},
+          comments:[],unverifiedReason:'COMMENT_INVENTORY_UNVERIFIED'};
+      return {issue:{...fresh,repository:HANDOFF_REPOSITORY},comments};
+    }catch(error){
+      const reason=scopedReadFailure(error);
+      if(!reason)throw error;
+      return {issue:{...issue,repository:HANDOFF_REPOSITORY},
+        comments:[],unverifiedReason:reason};
+    }
+  });
   return compileQueueBoard(records,nowMs,{openHandoffIssueCount:openHandoffs.length});
 }
 
@@ -87,8 +125,8 @@ export async function main(env=process.env) {
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   validateBoardEvent(event,env);
   const board=await collectBoard({
-    listIssues:()=>pages('issues?state=open&labels=agent-handoff',2),
-    readComments:n=>pages('issues/'+n+'/comments',4),
+    listIssues:()=>pages('issues?state=open&labels=agent-handoff',10),
+    readComments:n=>pages('issues/'+n+'/comments',5),
     readIssue:n=>request('issues/'+n)
   },Date.now());
   // Central #68 direct owner reviews are a separate source, not agent-handoff Issues.
