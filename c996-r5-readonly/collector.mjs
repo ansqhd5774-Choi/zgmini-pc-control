@@ -33,6 +33,10 @@ const LOG_DIRS = Object.freeze([
   {id:'ISO_LOGS',dir:path.win32.join(ATTEMPT,'logs')},
   {id:'R5_LOGS',dir:path.win32.join(ROOT,'logs')}
 ]);
+export function fixedAclTargets(){
+ return {ownerProfile:path.win32.resolve(TEMP,'..','..','..'),
+  ownerTemp:TEMP,r5Root:ROOT,attempt:ATTEMPT};
+}
 const MAX_LOG_BYTES = 64 * 1024 * 1024;
 const MAX_LOGS = 16;
 
@@ -229,8 +233,7 @@ async function main() {
   await collectIndependentEvidence(report);
   if(report.inputs.some(x=>x.code==='EPERM'||x.code==='EACCES')||
    report.logErrors.some(x=>x.code==='EPERM'||x.code==='EACCES')){
-   report.aclBoundary=probeFixedAclBoundary({ownerProfile:path.win32.resolve(TEMP,'..','..','..','..'),
-    ownerTemp:TEMP,r5Root:ROOT,attempt:ATTEMPT});
+   report.aclBoundary=probeFixedAclBoundary(fixedAclTargets());
   }
  }catch(e){
   report.status='STOPPED';report.code=codeOf(e);
