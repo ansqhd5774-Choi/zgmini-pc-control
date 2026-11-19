@@ -9,6 +9,7 @@ import {assertCompletedWriterBEvent, findWriterBReceipt,
 import {reconcileHandoffInventory} from './pc-result-to-incident.mjs';
 import {persistResourceWait} from './resource-wait-ledger.mjs';
 import {routeVerifiedBotIssue} from './bot-direct-route.mjs';
+import {parseHandoff} from './contract.mjs';
 
 const REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -145,7 +146,7 @@ export async function processCompletedWriterB(event, {
     else if (routed?.state === 'ROUTE_REUSED') observed.routesReused++;
     else stop('ROUTE_RESULT_INVALID');
   };
-  const decision = reconcileHandoffInventory(prepared, await listHandoffs());
+  const decision = reconcileHandoffInventory(prepared, await listHandoffs(prepared,event.workflow_run.created_at));
   if (decision.state === 'REUSE_EXISTING') {
     if (decision.closed) return Object.freeze({...observed,
       state: 'REUSED_CLOSED_EXISTING', reusedIssues: 1});
@@ -244,6 +245,47 @@ export async function findRunReceiptComments(runId,{searchIssues,readIssueCommen
   }
   return comments;
 }
+// Query the immutable requestId, not every historical Incident.
+// GitHub search may lag new writes; a newest-first direct Issue page covers
+// recent candidates, and an unbounded same-run window fails closed.
+export async function scopedWriterBIncidents(prepared,runCreatedAt,{
+  searchIssues,listRecentIssues,readIssue
+}){
+  if(prepared?.state!=='READY_TO_ENQUEUE'||
+     [searchIssues,listRecentIssues,readIssue].some(x=>typeof x!=='function')||
+     !Number.isFinite(Date.parse(runCreatedAt)))stop('SCOPED_INCIDENT_IO');
+  const requestId=parseHandoff(prepared.body).origin.requestId;
+  const search=await searchIssues(requestId);
+  if(!search||search.incomplete_results!==false||
+     !Number.isSafeInteger(search.total_count)||search.total_count<0||
+     search.total_count>100||!Array.isArray(search.items)||
+     search.items.length!==search.total_count)
+    stop('SCOPED_INCIDENT_SEARCH_INCOMPLETE');
+  const recent=await listRecentIssues();
+  if(!Array.isArray(recent)||recent.length>100)
+    stop('SCOPED_INCIDENT_RECENT_INVALID');
+  // If 100 newer issues exist since the source run, the recent window is
+  // insufficient to cover an index-lagged duplicate. Never infer absence.
+  if(recent.length===100&&
+     Date.parse(recent.at(-1)?.created_at||'')>Date.parse(runCreatedAt))
+    stop('SCOPED_INCIDENT_RECENT_WINDOW_INCOMPLETE');
+  const candidates=new Map();
+  for(const row of [...search.items,...recent]){
+    if(!positive(row?.number)||row.pull_request)continue;
+    candidates.set(row.number,row);
+  }
+  const verified=[];
+  for(const n of candidates.keys()){
+    const issue=await readIssue(n);
+    if(!issue||issue.number!==n||
+       ![OWNER,BOT].includes(issue.user?.login)||
+       !issue.labels?.some(x=>x.name==='agent-handoff')||
+       typeof issue.body!=='string')continue;
+    let parsed;try{parsed=parseHandoff(issue.body);}catch{continue;}
+    if(parsed.origin.requestId===requestId)verified.push({...issue,repository:REPO});
+  }
+  return {repository:REPO,complete:true,issues:verified};
+}
 async function fileReadback(filePath, ref, maxBytes) {
   const content = await request(`contents/${filePath}?ref=${ref}`, {missingOk: true});
   if (!content) return null;
@@ -260,6 +302,23 @@ export async function main(env = process.env) {
   if (env.GITHUB_REPOSITORY !== REPO || env.GITHUB_EVENT_NAME !== 'workflow_run' ||
       !env.GITHUB_EVENT_PATH) stop('ENVIRONMENT_NOT_ALLOWED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
+  const listScopedHandoffs=(prepared,createdAt)=>
+    scopedWriterBIncidents(prepared,createdAt,{
+      searchIssues:async requestId=>{
+        const q='repo:'+REPO+' is:issue label:agent-handoff in:body "'+requestId+'"';
+        const res=await fetch('https://api.github.com/search/issues?q='+
+          encodeURIComponent(q)+'&per_page=100',{headers:{
+            Authorization:'Bearer '+process.env.GITHUB_TOKEN,
+            Accept:'application/vnd.github+json',
+            'X-GitHub-Api-Version':'2022-11-28'},
+            signal:AbortSignal.timeout(25000)});
+        if(!res.ok)stop('SCOPED_INCIDENT_HTTP_'+res.status);
+        return res.json();
+      },
+      listRecentIssues:()=>request(
+        'issues?state=all&labels=agent-handoff&sort=created&direction=desc&per_page=100'),
+      readIssue:n=>request('issues/'+n)
+    });
   const result = await processCompletedWriterB(event, {
     getSourceJobs: async id => {
       const result=await request(`actions/runs/${id}/jobs?per_page=100`);
@@ -289,17 +348,13 @@ export async function main(env = process.env) {
     }),
     readIssue: async issue => ({...await request(`issues/${issue}`), repository: REPO}),
     readFile: fileReadback,
-    listHandoffs: async () => ({repository: REPO, complete: true,
-      issues: (await completePages('issues?state=all&labels=agent-handoff',
-        'HANDOFFS')).filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
+    listHandoffs:listScopedHandoffs,
     createHandoff: async prepared => request('issues', {method: 'POST',
       body: {title: `agent-handoff ${prepared.incidentId}`,
         labels: ['agent-handoff'], body: prepared.body}}),
     routeHandoff: (prepared, number) => routeVerifiedBotIssue(prepared, number, {
       readIssue: async n => ({...await request(`issues/${n}`), repository: REPO}),
-      listHandoffs: async () => ({repository: REPO, complete: true,
-        issues: (await completePages('issues?state=all&labels=agent-handoff', 'HANDOFFS'))
-          .filter(x => !x.pull_request).map(x => ({...x, repository: REPO}))}),
+      listHandoffs:()=>listScopedHandoffs(prepared,event.workflow_run.created_at),
       listIssueComments: n => completePages(`issues/${n}/comments`, 'ROUTE_COMMENTS', 4),
       postIssueComment: (n, body) => request(`issues/${n}/comments`, {method:'POST', body:{body}}),
       addIssueLabel: (n, label) => request(`issues/${n}/labels`, {method:'POST', body:{labels:[label]}})
