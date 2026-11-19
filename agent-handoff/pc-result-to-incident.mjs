@@ -7,6 +7,7 @@ import {prepareResourceWait} from '../shared-resource/lifecycle.mjs';
 const CONTROL_REPO = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
 const PRODUCER = 'github-actions[bot]';
+export const MAX_HANDOFF_INVENTORY_ISSUES = 10000;
 const SUPPORTED_FAILURES = new Set(['FAIL', 'RUNTIME_FAILED']);
 // These allowlisted PC operations deliberately generate failures/timeouts to
 // prove the reporter. Their outcomes are not production incidents.
@@ -219,7 +220,7 @@ export function reconcileHandoffInventory(prepared, inventory) {
   if (!prepared || prepared.state !== 'READY_TO_ENQUEUE' ||
       !inventory || inventory.complete !== true ||
       inventory.repository !== CONTROL_REPO || !Array.isArray(inventory.issues) ||
-      inventory.issues.length > 500) stop('INVENTORY_INCOMPLETE');
+      inventory.issues.length > MAX_HANDOFF_INVENTORY_ISSUES) stop('INVENTORY_INCOMPLETE');
   const matches = inventory.issues.filter(x => {
     if (!x || x.repository !== CONTROL_REPO ||
         ![OWNER, PRODUCER].includes(x.user?.login) ||

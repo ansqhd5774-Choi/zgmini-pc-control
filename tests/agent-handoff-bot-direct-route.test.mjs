@@ -327,3 +327,16 @@ test('isolated bot routing ignores earlier labeled pull requests in the Issue in
   assert.equal(f.postCount,1);
   assert.equal(f.created.labels.some(label=>label.name==='handoff-agent-pending'),true);
 });
+
+test('verified 650-Issue inventory keeps duplicate routing protection',async()=>{
+  const f=fixture();
+  const earlier=Array.from({length:649},(_,i)=>({
+    repository:repo,number:10+i,user:{login:'ansqhd5774-Choi'},
+    body:'invalid-other-incident',labels:[{name:'agent-handoff'}]
+  }));
+  f.io.listHandoffs=async()=>({repository:repo,complete:true,
+    issues:[...earlier,structuredClone(f.created)]});
+  const result=await routeVerifiedBotIssue(prepared(),1200,f.io);
+  assert.equal(result.state,'ROUTE_RECORDED');
+  assert.equal(f.postCount,1);
+});

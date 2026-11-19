@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {assertCompletedPcJobEvent, findOriginalIssueNumber, processCompletedPcJob,
-  scopedSeatRead,scopedSeatProof} from '../agent-handoff/pc-failure-producer.mjs';
+  scopedSeatRead,scopedSeatProof,completeHandoffPages,
+  conditionalHandoffPageReader} from '../agent-handoff/pc-failure-producer.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
 const runId = 42423158559;
@@ -432,4 +433,45 @@ test('unrecognized proof or programming errors are not silently quarantined',()=
     throw TypeError('unexpected code defect');
   },x=>problems.push(x)),/unexpected code defect/);
   assert.deepEqual(problems,[]);
+});
+
+test('handoff scan accepts 650 verified issues and reaches actual final page',async()=>{
+  const pages=Array.from({length:6},(_,i)=>Array.from({length:100},(_,j)=>({number:i*100+j+1})));
+  pages.push(Array.from({length:50},(_,j)=>({number:601+j})));
+  const calls=[];
+  const rows=await completeHandoffPages(async page=>{
+    calls.push(page);return pages[page-1];
+  });
+  assert.equal(rows.length,650);
+  assert.deepEqual(calls,[1,2,3,4,5,6,7]);
+});
+
+test('full final handoff page is incomplete, not proof of no duplicate',async()=>{
+  let calls=0;
+  await assert.rejects(()=>completeHandoffPages(async()=>{
+    calls++;return Array.from({length:100},(_,j)=>({number:j+1}));
+  },6),/HANDOFF_INVENTORY_LIMIT/);
+  assert.equal(calls,6);
+  await assert.rejects(()=>completeHandoffPages(async()=>({items:[]}),3),
+    /HANDOFF_INVENTORY_INVALID/);
+});
+
+test('ETag validates each page on every scan without stale or unverified reuse',async()=>{
+  const calls=[], data=[{number:1}];let phase=0;
+  const reader=conditionalHandoffPageReader(async(page,etag)=>{
+    calls.push({page,etag});
+    if(phase===0)return {status:200,etag:'"v1"',rows:structuredClone(data)};
+    if(phase===1)return {status:304};
+    return {status:200,etag:'"v2"',rows:[...data,{number:2}]};
+  });
+  assert.equal((await completeHandoffPages(reader)).length,1);
+  phase=1;
+  assert.equal((await completeHandoffPages(reader)).length,1);
+  phase=2;
+  assert.equal((await completeHandoffPages(reader)).length,2);
+  assert.deepEqual(calls.map(c=>c.etag),[null,'"v1"','"v1"']);
+  const unsafe=conditionalHandoffPageReader(async()=>({status:304}));
+  await assert.rejects(()=>unsafe(1),/HANDOFF_CACHE_304_WITHOUT_PROOF/);
+  const refused=conditionalHandoffPageReader(async()=>{throw Error('GITHUB_HTTP_403');});
+  await assert.rejects(()=>refused(1),/GITHUB_HTTP_403/);
 });

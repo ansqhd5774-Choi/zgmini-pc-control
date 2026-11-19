@@ -2,6 +2,7 @@
 // A GITHUB_TOKEN-created Issues event does not start another workflow, so the
 // producer must persist its routing receipt in the same isolated CI job.
 import {prepareHandoff} from './route.mjs';
+import {MAX_HANDOFF_INVENTORY_ISSUES} from './pc-result-to-incident.mjs';
 
 const REPOSITORY = 'ansqhd5774-Choi/zgmini-pc-control';
 const OWNER = 'ansqhd5774-Choi';
@@ -28,7 +29,7 @@ export async function routeVerifiedBotIssue(prepared, issueNumber, {
   if (verified.state === 'closed') stop('BOT_ISSUE_CLOSED_STOP');
   const inventory = await listHandoffs();
   if (inventory?.repository !== REPOSITORY || inventory.complete !== true ||
-      !Array.isArray(inventory.issues) || inventory.issues.length > 500)
+      !Array.isArray(inventory.issues) || inventory.issues.length > MAX_HANDOFF_INVENTORY_ISSUES)
     stop('INVENTORY_INCOMPLETE');
   const earlier = inventory.issues.filter(item =>
     item?.repository === REPOSITORY && positive(item.number) &&
