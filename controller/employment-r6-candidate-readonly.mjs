@@ -303,7 +303,9 @@ export async function inspectEmploymentR6Candidate(request,context){
     if(fs.statSync(resultFile).size>12000)stop('R6_RESULT_TOO_LARGE');
     const body=JSON.parse(fs.readFileSync(resultFile,'utf8'));
     if(!STATUS.has(body.status)||!/^[A-Z0-9_]{1,100}$/.test(body.code??'')
-      ||body.kind!=='EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1'
+      ||body.kind!==(request.pit0605Raw===true
+        ?'EMPLOYMENT_R6_RUNNER_PIT0605_AGGREGATE_V1'
+        :'EMPLOYMENT_R6_RUNNER_READONLY_REPORT_V1')
       ||body.providerCalls!==0||body.d1Writes!==0
       ||body.publicationStatus!=='NOT_REQUESTED'||body.promotionApproved!==false
       ||child.truncated||child.exitCode!==(body.status==='PASS'?0:2))stop('R6_RESULT_INVALID');
