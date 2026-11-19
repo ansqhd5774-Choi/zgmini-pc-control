@@ -238,7 +238,8 @@ test('workflow only names fixed Windows Runner, no arbitrary shell and no B stag
 
 test('Task XML inventory remains DONE while unknown enabled is explicitly unverified',()=>{
  fixture(({root})=>{
-  const result=inspectApprovedA(auth(),{dataRoot:root,queryTask:()=>xml});
+  const unknownEnabledXml=xml.replace('<Enabled>true</Enabled>','');
+  const result=inspectApprovedA(auth(),{dataRoot:root,queryTask:()=>unknownEnabledXml});
   assert.equal(result.taskChecksComplete,true);
   assert.equal(result.taskEnabledVerified,false);
   const sanitized=sanitizeAReport({schema:'ZGMINI_APPROVED_RUNTIME_A_LOCAL_RESULT_V1',
