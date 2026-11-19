@@ -193,6 +193,152 @@ function fullTenYearRawCoverage(weeks,complete){
  }
  return {...result,status:'RAW_PRECONDITIONS_COMPLETE'};
 }
+
+// W04 PIT-04-07: fixed, aggregate-only ETA539 raw c3 <-> stored Current audit.
+// One immutable, hash-verified stored snapshot; no provider access, raw export,
+// History mutation, backdating, or claim that this is historical TRUE_PIT.
+const ETA539_MAX_RAW=8*1024*1024;
+const ETA539_MAX_CHUNKS=64;
+const ETA539_CURRENT_TABLE='market_score_employment_r4_shadow_current_v1';
+const eta539Digest=s=>createHash('sha256').update(s).digest('hex');
+function eta539CsvLine(line){
+ const cells=[];let value='',quoted=false;
+ for(let i=0;i<line.length;i++){
+  const c=line[i];
+  if(quoted){if(c==='"'&&line[i+1]==='"'){value+='"';i++;}
+   else if(c==='"')quoted=false;else value+=c;}
+  else if(c==='"')quoted=true;
+  else if(c===','){cells.push(value);value='';}
+  else value+=c;
+ }
+ if(quoted)return null;
+ cells.push(value);
+ return cells;
+}
+function eta539Date(value,{week=false}={}){
+ const s=String(value??'').trim();
+ let m=s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+ if(m)m=[m[0],m[3],m[1],m[2]];
+ else m=s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+ if(!m)return null;
+ const year=Number(m[1]),month=Number(m[2]),dayOfMonth=Number(m[3]);
+ if(year<1900||year>2199||month<1||month>12||dayOfMonth<1||dayOfMonth>31)return null;
+ const d=new Date(Date.UTC(year,month-1,dayOfMonth));
+ if(d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1
+   ||d.getUTCDate()!==dayOfMonth||(week&&d.getUTCDay()!==6))return null;
+ return d.toISOString().slice(0,10);
+}
+function eta539ClaimValue(text){
+ const s=String(text??'').trim();
+ if(!/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(s))return null;
+ const n=Number(s.replace(/,/g,''));
+ return Number.isSafeInteger(n)&&n>=0?n:null;
+}
+function inspectEta539RawCurrentParity(db){
+ const base={kind:'W04_ETA539_C3_RAW_CURRENT_PARITY_V1',status:'UNVERIFIED',
+  rawPitAttested:false,repairAuthorized:false};
+ const fail=status=>({...base,status});
+ const columns=table=>new Set(db.prepare('PRAGMA table_info('+table+')').all().map(x=>x.name));
+ const rawTable='market_score_employment_r6_raw_snapshot_v1';
+ const rawCols=columns(rawTable),curCols=columns(ETA539_CURRENT_TABLE);
+ const requiredRaw=['snapshot_id','chunk_index','chunk_count','release_group','provider',
+  'request_key','retrieved_at','body_sha256','body_chunk'];
+ const requiredCurrent=['logical_series_id','geography_type','geography_code',
+  'observation_date','value','provider','provider_series_id','source_hash','source_revision','retrieved_at'];
+ if(requiredRaw.some(k=>!rawCols.has(k))||requiredCurrent.some(k=>!curCols.has(k)))
+  return fail('SCHEMA_UNSUPPORTED');
+ const head=db.prepare("SELECT snapshot_id,chunk_count,release_group,provider,request_key,retrieved_at,body_sha256 FROM "+
+   rawTable+" WHERE release_group='DOL_UI_WEEKLY_CLAIMS' "+
+   "AND request_key IN ('DOL_ETA539:60w','DOL_ETA539:112w','DOL_ETA539:530w','DOL_ETA539:600w') "+
+   "AND chunk_index=0 ORDER BY retrieved_at DESC LIMIT 1").get();
+ if(!head)return fail('RAW_SNAPSHOT_NOT_STORED');
+ if(typeof head.snapshot_id!=='string'||!Number.isSafeInteger(head.chunk_count)
+   ||head.chunk_count<1||head.chunk_count>ETA539_MAX_CHUNKS
+   ||!NATIONAL_RAW_HASH.test(head.body_sha256??'')
+   ||!Number.isFinite(Date.parse(head.retrieved_at??'')))return fail('RAW_METADATA_INVALID');
+ const chunks=db.prepare('SELECT chunk_index,chunk_count,body_sha256,body_chunk FROM '+
+   rawTable+' WHERE snapshot_id=? ORDER BY chunk_index LIMIT 65').all(head.snapshot_id);
+ if(chunks.length!==head.chunk_count||chunks.some((c,i)=>c.chunk_index!==i
+   ||c.chunk_count!==head.chunk_count||c.body_sha256!==head.body_sha256
+   ||typeof c.body_chunk!=='string'))return fail('RAW_CHUNKS_INVALID');
+ const bytes=chunks.reduce((n,c)=>n+Buffer.byteLength(c.body_chunk),0);
+ if(bytes>ETA539_MAX_RAW)return fail('RAW_SIZE_LIMIT');
+ const raw=chunks.map(c=>c.body_chunk).join('');
+ if(eta539Digest(raw)!==head.body_sha256.toLowerCase()
+   ||eta539Digest([head.release_group,head.provider,head.request_key,
+     head.body_sha256.toLowerCase()].join('|'))!==head.snapshot_id.toLowerCase())
+  return fail('RAW_BODY_OR_ID_HASH_MISMATCH');
+ const lines=raw.replace(/\r/g,'').split('\n').filter(x=>x.trim());
+ if(lines.length<2||lines.length>100000)return fail('RAW_ROW_COUNT_INVALID');
+ const header=eta539CsvLine(lines[0])?.map(x=>x.trim().toLowerCase());
+ if(!header||new Set(header).size!==header.length
+   ||['st','rptdate','c2','c3'].some(k=>!header.includes(k)))return fail('RAW_HEADER_INVALID');
+ const col=Object.fromEntries(['st','rptdate','c2','c3'].map(k=>[k,header.indexOf(k)]));
+ const rows=new Map();let invalidLatest=0,ambiguousLatest=0,invalidDates=0;
+ const cutoff=head.retrieved_at.slice(0,10),core=new Set(CORE_STATES);
+ for(const line of lines.slice(1)){
+  const fields=eta539CsvLine(line);
+  if(!fields||fields.length!==header.length)return fail('RAW_CSV_INVALID');
+  const st=String(fields[col.st]??'').trim().toUpperCase();
+  if(!core.has(st))continue;
+  const week=eta539Date(fields[col.c2],{week:true});
+  const report=eta539Date(fields[col.rptdate]);
+  if(!week||!report){invalidDates++;continue;}
+  if(week>cutoff||report>cutoff)continue;
+  const value=eta539ClaimValue(fields[col.c3]),key=st+'|'+week;
+  const previous=rows.get(key);
+  if(!previous||report>previous.report||(report===previous.report)){
+   rows.set(key,{st,week,report,value,ambiguous:report===previous?.report&&
+     (previous.value!==value||previous.ambiguous)});
+  }
+ }
+ const weeks=new Map();
+ for(const record of rows.values()){
+  if(record.value===null){invalidLatest++;continue;}
+  if(record.ambiguous){ambiguousLatest++;continue;}
+  const bucket=weeks.get(record.week)??new Map();
+  bucket.set(record.st,record);weeks.set(record.week,bucket);
+ }
+ const allWeeks=[...weeks.keys()].sort((a,b)=>b.localeCompare(a));
+ const selected=allWeeks.filter(w=>weeks.get(w).size===CORE_STATES.length).slice(0,60);
+ if(!selected.length)return {...fail('NO_COMPLETE_WEEK_IN_SNAPSHOT'),
+  latestSnapshotStoredAt:stamp(head.retrieved_at),invalidLatest,ambiguousLatest,invalidDates};
+ const holders=selected.map(()=>'?').join(',');
+ const current=db.prepare("SELECT geography_code,observation_date,value,provider,provider_series_id,"+
+   "source_hash,source_revision,retrieved_at FROM "+ETA539_CURRENT_TABLE+
+   " WHERE logical_series_id='STATE_INITIAL_CLAIMS' AND geography_type='STATE'"+
+   ' AND observation_date IN ('+holders+')').all(...selected);
+ const byKey=new Map(current.map(c=>[c.geography_code+'|'+c.observation_date,c]));
+ const counts={MATCH:0,CURRENT_NEWER_THAN_RAW:0,MISSING_CURRENT:0,OTHER_SOURCE:0,
+  VALUE_DIFFERENT:0,HASH_DIFFERENT:0,REVISION_DIFFERENT:0};
+ for(const week of selected){
+  for(const item of weeks.get(week).values()){
+   const cur=byKey.get(item.st+'|'+item.week);
+   if(!cur){counts.MISSING_CURRENT++;continue;}
+   if(cur.provider!=='DOL_ETA'||cur.provider_series_id!=='ETA539:C3'){
+    counts.OTHER_SOURCE++;continue;
+   }
+   if(Date.parse(cur.retrieved_at)>Date.parse(head.retrieved_at)){
+    counts.CURRENT_NEWER_THAN_RAW++;continue;
+   }
+   const expectedHash=eta539Digest(JSON.stringify({reportDate:item.report,
+    reflectedWeek:item.week,st:item.st,value:item.value}));
+   const expectedRevision='ETA539:RPTDATE:'+item.report;
+   if(typeof cur.value!=='number'||!Number.isFinite(cur.value)||cur.value!==item.value)
+    counts.VALUE_DIFFERENT++;
+   else if(cur.source_hash!==expectedHash)counts.HASH_DIFFERENT++;
+   else if(cur.source_revision!==expectedRevision)counts.REVISION_DIFFERENT++;
+   else counts.MATCH++;
+  }
+ }
+ const checked=selected.length*CORE_STATES.length;
+ if(Object.values(counts).reduce((a,b)=>a+b,0)!==checked)return fail('PARITY_COUNT_INCONSISTENT');
+ return {...base,status:'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT',
+  snapshotRequestKey:head.request_key,latestSnapshotStoredAt:stamp(head.retrieved_at),
+  completeWeeksInSnapshot:allWeeks.filter(w=>weeks.get(w).size===CORE_STATES.length).length,
+  checkedWeeks:selected.length,checkedKeys:checked,invalidLatest,ambiguousLatest,invalidDates,counts};
+}
+
 function coverage(rows){
  if(!Array.isArray(rows))return {status:'UNKNOWN'};
  const weeks=rows.map(r=>({week:date(r.observation_date),count:safeInt(r.row_count),regions:safeInt(r.region_count),
@@ -331,7 +477,7 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  filesystem=fs,openDatabase=openSqliteReadonly,
 }={}){
  const result={status:'BLOCKED',code:'R6_EVIDENCE_DATA_ROOT_DENIED',sqliteOpened:false,
-  scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,...noWrite()};
+  scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,eta539RawCurrentParity:null,...noWrite()};
  if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))return result;
  const root=(()=>{try{return filesystem.realpathSync(dataRoot);}catch{return null;}})();
  if(!root||path.basename(root).toLowerCase()!=='data'||path.basename(path.dirname(root)).toLowerCase()!=='zgmini')return result;
@@ -377,6 +523,8 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    historyWeeks:safeInt(r.history_weeks),selectedWeeks:safeInt(r.selected_weeks),
    firstSelectedWeek:date(r.first_selected_week),latestCompleteWeek:date(r.latest_complete_week),coreCount:safeInt(r.core_count),
   })):[{status:'NOT_STORED'}];
+  stage='ETA539_RAW_CURRENT_PARITY';
+  result.eta539RawCurrentParity=inspectEta539RawCurrentParity(db);
   stage='STATE_CLAIMS_51_COVERAGE';
   // All geography labels are fixed source constants; only aggregates leave the DB.
   const countryMarkers=CORE_STATES.map(()=>'?').join(',');
