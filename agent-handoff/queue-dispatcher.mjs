@@ -86,20 +86,45 @@ export async function finalizeSelection(result, readBoard) {
   }
 }
 
+// Only the first, pre-write comment read for each Issue may be isolated.
+// A failed POST, provenance recheck, or post-write receipt readback still
+// stops selection rather than risking a duplicate GitHub write.
+export function isolateInitialCommentRead(readComments, onDeferred) {
+  if(typeof readComments!=='function'||typeof onDeferred!=='function')
+    throw Error('HANDOFF_SELECTOR_COMMENT_READER_INVALID');
+  const seen=new Set();
+  return async issueNumber=>{
+    if(seen.has(issueNumber))return readComments(issueNumber);
+    seen.add(issueNumber);
+    try {return await readComments(issueNumber);}
+    catch(error){
+      const code=typeof error?.message==='string'?error.message:'';
+      // Repository authorization failures are global, not per-Incident defects.
+      if(/^HANDOFF_SELECTOR_GITHUB_HTTP_(401|403)$/.test(code)||
+         code==='HANDOFF_SELECTOR_TOKEN_UNAVAILABLE')throw error;
+      onDeferred(issueNumber);
+      return []; // assessIncident reports missing proof without any GitHub POST
+    }
+  };
+}
+
 export async function main(env=process.env) {
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
   validateTrigger(event, env);
   const issues = (await pages('issues?state=open&labels=agent-handoff%2Chandoff-agent-pending',5))
     .filter(i=>!i.pull_request).map(i=>({...i,repository:HANDOFF_REPOSITORY}));
+  const commentReadUnavailable=[];
   const result = await processQueue(issues,{
-    readComments: n=>pages('issues/'+n+'/comments',4),
+    readComments: isolateInitialCommentRead(
+      n=>pages('issues/'+n+'/comments',4),
+      n=>commentReadUnavailable.push(n)),
     readIssue: async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
     recordReceipt: (n,body)=>request('issues/'+n+'/comments',{method:'POST',body:{body}})
   });
   // Earlier selections still need an owner-status readback when selected=0.
   // Reuse the already fetched pending-issue inventory, but re-read each item's
   // comments and identity; this avoids a redundant global GitHub list request.
-  const output=await finalizeSelection(result,()=>collectBoard({
+  const output=await finalizeSelection({...result,commentReadUnavailable},()=>collectBoard({
     listIssues:async()=>issues,
     readComments:n=>pages('issues/'+n+'/comments',4),
     readIssue:async n=>({...await request('issues/'+n),repository:HANDOFF_REPOSITORY}),
