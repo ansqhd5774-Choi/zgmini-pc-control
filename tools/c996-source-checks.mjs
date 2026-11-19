@@ -7,7 +7,8 @@ import {fileURLToPath} from 'node:url';
 export const GROUPS=Object.freeze({
  foundation:[
   'tests/pc-source-origin-readonly.test.mjs','tests/c996-r5-readonly-collector.test.mjs',
-  'tests/c996-r5-readonly-github.test.mjs','tests/market-calendar-r44-runtime-readonly.test.mjs',
+  'tests/c996-r5-readonly-github.test.mjs','tests/c996-source-scope.test.mjs',
+  'tests/market-calendar-r44-runtime-readonly.test.mjs',
   'tests/market-calendar-r44-production-readonly.test.mjs','r54-readiness-once/entry.test.mjs',
   'tests/agent-handoff-pc-resource-wait.test.mjs','tests/shared-resource-lifecycle.test.mjs'],
  handoff007:['tests/agent-handoff-wide-scout.test.mjs','tests/agent-handoff-job-concurrency.test.mjs'],
@@ -82,7 +83,7 @@ export async function changedFiles(env=process.env,fetcher=fetch){
    const rows=await res.json();
    if(!Array.isArray(rows)||rows.length>100||rows.some(x=>typeof x.filename!=='string'))
      throw Error('PR_FILES_INVALID');
-   paths.push(...rows.map(x=>x.filename));
+   paths.push(...rows.flatMap(x=>[x.filename,...(typeof x.previous_filename==='string'?[x.previous_filename]:[])]));
    if(rows.length<100)return paths;
   }
   throw Error('PR_FILES_TOO_MANY');
