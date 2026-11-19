@@ -37,7 +37,8 @@ export const GROUPS=Object.freeze({
   'tests/inflation-a407-integrity-readonly.test.mjs'],
  retirement:['tests/marketparquet-task-retire.test.mjs'],
  aiSoftware:['tests/ai-software-v2-register-once.test.mjs'],
- approvedRuntimeA:['windows-runtime-mode-a/approved-runtime-a.test.mjs']
+ approvedRuntimeA:['windows-runtime-mode-a/approved-runtime-a.test.mjs'],
+ w05B:['tests/w05-r304-report-recovery.test.mjs']
 });
 const ALL=Object.keys(GROUPS);
 const MATCH=Object.freeze({
@@ -52,7 +53,8 @@ const MATCH=Object.freeze({
  recovery:/^(?:tests\/(?:controller-intake-recovery|controller-1979-backlog-recovery|completed-recovery-claim|rollback-stalled-claim|interrupted-rollback|maintenance-backlog-request|r47-task-chain|inflation-a401-|inflation-a407-)|controller\/|tools\/maintenance-)/,
  retirement:/^(?:tests\/marketparquet-task-retire|marketparquet-|docs\/MARKETPARQUET_REMOVAL)/,
  aiSoftware:/^(?:tests\/ai-software-v2-register-once\.test\.mjs|tools\/ai-software-v2-register-once\.mjs|\.github\/workflows\/pc-ai-software-v2-register-once\.yml)$/,
- approvedRuntimeA:/^(?:windows-runtime-mode-a\/.*|\.github\/workflows\/pc-approved-runtime-a-once\.yml)$/
+ approvedRuntimeA:/^(?:windows-runtime-mode-a\/.*|\.github\/workflows\/pc-approved-runtime-a-once\.yml)$/,
+ w05B:/^(?:w05-r304-service-b\/|tests\/w05-r304-report-recovery\.test\.mjs)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
  p==='tools/c996-source-checks.mjs'||p==='tests/c996-source-scope.test.mjs'||
