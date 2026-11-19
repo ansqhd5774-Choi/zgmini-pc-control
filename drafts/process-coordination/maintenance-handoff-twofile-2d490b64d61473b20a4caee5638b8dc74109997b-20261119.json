@@ -1,0 +1,61 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "732d94aa592723e09c6d776b37f269283dd26e3e",
+  "targetSha": "2d490b64d61473b20a4caee5638b8dc74109997b",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "SOURCE-ONLY CANDIDATE. The standing same-purpose maintenance authorization is not independently verified as a live, exact two-file receiver handoff. Review source scope and current operating PC preimage before any approved manifest PR.",
+  "files": {
+    "tools/maintenance-contract.mjs": "dc4f5bb669defa1a749bdd4f2cf154a0e8f4ad668f7afa9fdac6c334aa1ce5c6",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "da5121e526c752ab8950cfd27d497255bcc27caa940b91ea9aad04c81239504f",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "4d7bc704f8cb04b1ba18d9bf6d51694a93632fbb9976d5871df3fdea9b5ea1ca",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "f7adf444c30be2091a49a69e9d37d336dd4abdb82a9119fa5fba35682a6713cc",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "sourceBase": "approvals/maintenance-handoffs/732d94aa592723e09c6d776b37f269283dd26e3e.json",
+    "exactNineTargetSourceSha": "2d490b64d61473b20a4caee5638b8dc74109997b",
+    "nineFileSha256Recomputed": true,
+    "nineFileHashSource": "GitHub fetch_file raw UTF-8 source bytes with SHA256 implementation verified on abc and empty vector",
+    "unchangedRuntimeFiles": [
+      "tools/maintenance-apply.mjs",
+      "tools/maintenance-agent.mjs",
+      "tools/maintenance-lock.mjs",
+      "tools/maintenance-ancestry.vbs",
+      "tools/source-bundle-register.mjs"
+    ],
+    "unchangedOperatorFiles": [
+      "tools/bootstrap-maintenance.mjs",
+      "tools/handoff-maintenance.mjs"
+    ],
+    "runtimeChangedFiles": [
+      "tools/maintenance-contract.mjs",
+      "tools/update.mjs"
+    ],
+    "sourceCiMaintenance": "PASS https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44460200333",
+    "sourceCiC996": "PASS https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44460200357",
+    "installedReceiverSourceObservedNow": false,
+    "windowsHandoffExecuted": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "preserve": [
+    "Operating Controller b9099839df1a7cc6b3b166a139f7fac6938ada66 and its protected state",
+    "Historical #2094 STAGED artifacts and ledgers",
+    "All operating Runner registrations, Core/Korea task XML, approved absence of Iran R13",
+    "SQLite/D1/provider credentials and primary source",
+    "Existing maintenance receiver startup/origin/lock and backups"
+  ],
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/update.mjs"
+  ],
+  "scopeNote": "This file is an inert draft only. It does not authorize or trigger runtime installation. For live handoff, verify that current operating receiver MAINTENANCE_INSTALL.json sourceSha and seven installed file hashes match installedSha/approved preimage; confirm receiver ownership, no active installation, origin, protection and rollback; then create exact approved immutable handoff manifest in approvals/maintenance-handoffs/<targetSha>.json, merge after CI/review, perform one operator-only V2 handoff, and collect runtime receipt. If current receiver SHA differs, regenerate from actual preimage and do not force.",
+  "notApproval": true,
+  "noPcInstallPerformed": true
+}
