@@ -37,14 +37,14 @@ export function assertCompletedPcJobEvent(event) {
 // GitHub writes remain hard stops; these could invalidate another Seat too.
 export async function scopedSeatRead(seat, phase, read, recordPending) {
   if (!issueNumber(seat) || seat>6 || !['RESULT_JSON','ORIGIN_ISSUE',
-    'RESULT_TXT','HANDOFF_INVENTORY'].includes(phase) ||
+    'RESULT_TXT','RECEIPT_INVENTORY','HANDOFF_INVENTORY'].includes(phase) ||
     typeof read!=='function' || typeof recordPending!=='function')
     stop('SCOPED_READ_INPUT_INVALID');
   try { return {ready:true,value:await read()}; }
   catch(error) {
     const message=typeof error?.message==='string'?error.message:'';
     if (!['AbortError','TimeoutError'].includes(error?.name) &&
-        !(error instanceof TypeError) &&
+        !(error instanceof TypeError && /^fetch failed(?:$|:)/i.test(message)) &&
         !/^PC_HANDOFF_PRODUCER_GITHUB_HTTP_(408|429|5[0-9][0-9])$/.test(message))
       throw error;
     // No exception text, URL, original input or credentials enter the log.
@@ -121,7 +121,12 @@ export async function processCompletedPcJob(event, {
     // central wait record. Other BLOCKED codes remain out of this path.
     if(report.status==='BLOCKED'&&
       ['RESOURCE_WAIT_MEMORY','MEMORY_WAIT_ALREADY_ACTIVE','LEASE_BUSY'].includes(report.code)){
-      comments ??= await readComments(run.since);
+      if(comments===null){
+        const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
+          ()=>readComments(run.since));
+        if(!inventory.ready)continue;
+        comments=inventory.value;
+      }
       const original=findOriginalIssueNumber(comments,{...run,seat});
       if(original===null){result.missingReceipts++;continue;}
       const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
@@ -145,7 +150,12 @@ export async function processCompletedPcJob(event, {
     }
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
     if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status)) continue;
-    comments ??= await readComments(run.since);
+    if(comments===null){
+      const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
+        ()=>readComments(run.since));
+      if(!inventory.ready)continue;
+      comments=inventory.value;
+    }
     const original = findOriginalIssueNumber(comments, {...run, seat});
     if (original === null) { result.missingReceipts++; continue; }
     const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
