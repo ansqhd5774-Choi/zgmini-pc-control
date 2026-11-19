@@ -424,3 +424,14 @@ test('Run ID discovery refuses incomplete search without creating evidence',asyn
     readIssueComments:async()=>{throw Error('must not read');}
   }),/RECEIPT_SEARCH_INCOMPLETE/);
 });
+
+test('source receipt is found in bounded recent comments while search indexing lags',async()=>{
+  let direct=0;
+  const out=await findRunReceiptComments(runId,{
+    searchIssues:async()=>({incomplete_results:false,total_count:0,items:[]}),
+    readRecentComments:async()=>[comment(report()),{body:'unrelated'}],
+    readIssueComments:async n=>{assert.equal(n,874);direct++;return [comment(report())];}
+  });
+  assert.equal(direct,1);
+  assert.equal(out.length,1);
+});
