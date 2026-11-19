@@ -2,6 +2,18 @@ import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync
 import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
+// Only reviewed fixed operations with no provider/DB/operational write effect
+// may return useful reads when an unrelated Scheduler observation is missing.
+// The caller cannot select or expand this class in the Issue payload.
+const ISOLATED_READS=new Set(['runner-smoke','core-status','writer-install-preimage-readonly']);
+const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
+ 'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
+function noteUnavailableProtection(report,error,phase){
+ report[phase==='PRECHECK'?'protectionPrecheckCode':'protectionPostcheckCode']=errorCode(error);
+ if(phase==='POSTCHECK')report.postcheckFailureCode=errorCode(error);
+ if(['SCHTASKS_INVENTORY_COMMAND_FAILED','SCHTASKS_INVENTORY_EMPTY_PARSE'].includes(error?.probeReason))
+  report.protectedProbeReason=error.probeReason;
+}
 export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,queryTask=nativeTaskXml,retiredTaskEvidence=nativeRetiredIranEvidence,fixture=false,terminateTree=null,terminationGraceMs=5000,fixtureFreeMiB=null,fixtureMemoryWaitMs=20,fixtureMemoryPollMs=2,approvedPreimageScope=null}={}){
  need(Number.isInteger(seat)&&seat>=1&&seat<=policy.seats,'SEAT_NOT_ALLOWED');need(/^\d{1,20}$/.test(String(runId)),'RUN_ID');
  const workspaceId=`run-${runId}-${attempt}-seat-${seat}`,workspace=path.join(root,'jobs',workspaceId);fs.mkdirSync(workspace,{recursive:true});
@@ -9,6 +21,10 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
  let releaseSeat,releaseRequest,releaseResource,releaseMemoryWait,ledger,before,uncertainChild=false,preflightOperation='REQUEST_VALIDATION';
  try{
   const request=validateRequest(raw,policy);report.chatId=request.chatId;preflightOperation='REQUEST_LEDGER';const payloadSha=digest(JSON.stringify(request));
+  const isolatedRead=policy.mutationsEnabled===false&&
+   policy.operations[request.operation].grade==='A'&&
+   policy.operations[request.operation].resource==='light'&&ISOLATED_READS.has(request.operation);
+  report.effectClass=isolatedRead?'FIXED_READONLY_NO_PROVIDER_NO_DB':'REGISTERED_OPERATION';
   const ledgerRoot=path.join(root,'ledger');fs.mkdirSync(ledgerRoot,{recursive:true});ledger=path.join(ledgerRoot,request.requestId+'.json');
   if(fs.existsSync(ledger)){const prior=JSON.parse(fs.readFileSync(ledger));need(prior.payloadSha===payloadSha,'DUPLICATE_REQUEST_PAYLOAD_CHANGED');need(['PASS','FAIL','BLOCKED','STATE_UNKNOWN'].includes(prior.report?.status),'PRIOR_RESULT_INVALID');Object.assign(report,{status:prior.report.status,code:prior.report.code,lastPass:prior.report.lastPass,firstFail:prior.report.firstFail,actualExecutionSha:prior.report.actualExecutionSha,protectedStateUnchanged:prior.report.protectedStateUnchanged});report.reused=true;report.reuseCode='DUPLICATE_REUSED_NO_EXECUTION';report.prior=prior.report;return finalize();}
   preflightOperation='REQUEST_LEASE';releaseRequest=exclusive(path.join(root,'leases'),'request-'+request.requestId);
@@ -33,11 +49,16 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   preflightOperation='PROTECTED_STATE_SNAPSHOT';try{before=protectedState(host.dataRoot,{retiredTaskEvidence,queryTask:task=>{
    try{return queryTask(task);}catch{throw Object.assign(new Error('PROTECTED_TASK_XML_QUERY_FAILED'),{code:'PROTECTED_TASK_XML_QUERY_FAILED',safeTaskName:task});}
   }});}
-  catch(error){const retiredIranFailure=String(error?.code??'').startsWith('RETIRED_IRAN_');
+  catch(error){if(isolatedRead&&unavailableProtection(error)){
+   noteUnavailableProtection(report,error,'PRECHECK');
+  }else{const retiredIranFailure=String(error?.code??'').startsWith('RETIRED_IRAN_');
+   const protectedProbeReason=['SCHTASKS_INVENTORY_COMMAND_FAILED',
+    'SCHTASKS_INVENTORY_EMPTY_PARSE'].includes(error?.probeReason)?error.probeReason:null;
    Object.assign(report,{phase:'PREVALIDATION',failureOperation:'PROTECTED_STATE_SNAPSHOT',mutationStarted:false,
     affectedScope:'OWN_REQUEST_ONLY',nextAction:retiredIranFailure?'VERIFY_APPROVED_RETIRED_IRAN_STATE_NO_RETRY':'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
-    ...(retiredIranFailure?{failedProtectedTask:'ZGMINI-PC-Iran-Progress-R13'}:typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}
-  preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass='PROTECTED_STATE_SNAPSHOT';
+    ...(protectedProbeReason?{protectedProbeReason}:{}),
+    ...(retiredIranFailure?{failedProtectedTask:'ZGMINI-PC-Iran-Progress-R13'}:typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}}
+  preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass=before?'PROTECTED_STATE_SNAPSHOT':'CORE_STATE_READ';
   preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
   writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat,approvedPreimageScope}});
@@ -53,8 +74,26 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   else if(childResult.timedOut){report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';}
   else if(fs.existsSync(output)){preflightOperation='WORKER_RESULT_PARSE';const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result,sqliteOpened:result.sqliteOpened===true});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
   else{report.status='FAIL';report.code='WORKER_RESULT_MISSING';report.firstFail='RESULT_FILE';}
-  preflightOperation='POSTCHECK';const after=protectedState(host.dataRoot,{queryTask,retiredTaskEvidence});report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);report.protectedBeforeSha256=digest(JSON.stringify(before));report.protectedAfterSha256=digest(JSON.stringify(after));
-  need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
+  preflightOperation='POSTCHECK';let after;
+  try{after=protectedState(host.dataRoot,{retiredTaskEvidence,queryTask:task=>{
+   try{return queryTask(task);}catch{throw Object.assign(new Error('PROTECTED_TASK_XML_QUERY_FAILED'),{code:'PROTECTED_TASK_XML_QUERY_FAILED',safeTaskName:task});}
+  }});}
+  catch(error){if(isolatedRead&&unavailableProtection(error))noteUnavailableProtection(report,error,'POSTCHECK');else throw error;}
+  report.protectedBeforeSha256=before?digest(JSON.stringify(before)):null;
+  report.protectedAfterSha256=after?digest(JSON.stringify(after)):null;
+  if(isolatedRead&&(!before||!after)){
+   report.workerOutcome={status:report.status,code:report.code,
+    firstFail:report.firstFail,resultPresent:report.result!==undefined};
+   report.protectedStateUnchanged=null;
+   report.protectionObservation='UNVERIFIED';
+   report.affectedScope='PROTECTION_ATTESTATION_ONLY';
+   if(report.status==='PASS')Object.assign(report,{status:'STATE_UNKNOWN',
+    code:'READONLY_RESULT_PROTECTION_UNVERIFIED',firstFail:'PROTECTED_STATE_OBSERVATION'});
+   report.next='USE_VERIFIED_READ_RESULT_NOT_AS_WRITE_OR_SYSTEM_HEALTH_APPROVAL';
+  }else{
+   report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);
+   need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
+  }
   report.actualExecutionSha=request.operation==='employment-r6-candidate-stage-readonly'
     ?(report.result?.actualExecutionSha??null)
     :(report.result?.actualExecutionSha??host.controllerSourceSha);
@@ -72,6 +111,8 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
     firstFail:report.firstFail,resultPresent:report.result!==undefined};
    Object.assign(report,{
     postcheckFailureCode:postcheckCode,
+    ...(['SCHTASKS_INVENTORY_COMMAND_FAILED','SCHTASKS_INVENTORY_EMPTY_PARSE']
+      .includes(error?.probeReason)?{protectedProbeReason:error.probeReason}:{}),
     workerOutcome:prePostcheckOutcome,
     protectedStateUnchanged:null,
     protectedBeforeSha256:digest(JSON.stringify(before)),

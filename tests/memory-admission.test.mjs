@@ -96,8 +96,8 @@ test('independent light work continues while memory-gated heavy job waits',async
  assert.equal(light.report.status,'PASS');assert.equal(blocked.report.status,'BLOCKED');
  assert.equal(blocked.report.code,'RESOURCE_WAIT_MEMORY');assert.equal(fs.existsSync(path.join(c.root,'leases','heavy')),false);
 });
-test('scheduled-task snapshot failure is attributed before worker execution without leaking shell errors',async()=>{
- const c=setup(),q=request('runner-smoke','memory-request-5000');
+test('non-isolated operation Task snapshot failure remains prevalidation without leaking shell errors',async()=>{
+ const c=setup(),q=request('failure-proof','memory-request-5000');
  const r=await executeJob(q,{...c,queryTask:()=>{throw new Error('private PC path and stdout must not leak');}});
  assert.equal(r.report.status,'BLOCKED');assert.equal(r.report.code,'PROTECTED_TASK_XML_QUERY_FAILED');
  assert.equal(r.report.phase,'PREVALIDATION');assert.equal(r.report.failureOperation,'PROTECTED_STATE_SNAPSHOT');
