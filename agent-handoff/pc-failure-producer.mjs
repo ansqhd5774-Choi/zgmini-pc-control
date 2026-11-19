@@ -195,7 +195,11 @@ export async function processCompletedPcJob(event, {
     await confirmRoute(prepared, created.number);
     result.newIssues++;
   }
-  if (!result.reportsObserved) {
+  if (result.seatReadPending) {
+    // Preserve partial success counters while clearly marking incomplete
+    // observations, including runs with zero successfully read JSON reports.
+    result.state='PARTIAL_SEAT_READ_PENDING';
+  } else if (!result.reportsObserved) {
     // A cancelled parent run can have no per-seat result; do not report
     // the same cancellation as a second intake execution failure.
     // The parent is still CANCELLED, and no runtime success is inferred.
@@ -205,7 +209,6 @@ export async function processCompletedPcJob(event, {
       result.pcRuntimeVerified = false;
     } else result.state = 'NO_PUBLISHED_RESULTS';
   }
-  else if (result.seatReadPending) result.state = 'PARTIAL_SEAT_READ_PENDING';
   else if (result.missingReceipts) result.state = 'PARTIAL_RECEIPT_PENDING';
   else if (result.failureProofPending) result.state = 'PARTIAL_FAILURE_EVIDENCE_PENDING';
   else if (result.waitProofPending) result.state = 'PARTIAL_WAIT_EVIDENCE_PENDING';
