@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ACL_IDS,parseAclBoundary,probeFixedAclBoundary}
  from '../c996-r5-readonly/acl-boundary.mjs';
+import {fixedAclTargets} from '../c996-r5-readonly/collector.mjs';
 
 const p=Object.freeze({
  ownerProfile:'C:\\Users\\ansqh',
@@ -59,4 +60,14 @@ test('ACL query denial and unavailable PowerShell are failures, not permission g
   status:1,stdout:'ACCESS DENIED: private path'})});
  assert.equal(res.status,'ACL_QUERY_UNAVAILABLE');
  assert.equal(probeFixedAclBoundary({...p,platform:'linux'}).status,'NOT_WINDOWS');
+});
+
+test('actual C996 collector ACL targets exactly match immutable probe scope',()=>{
+ const actual=fixedAclTargets();
+ assert.deepEqual(actual,p);
+ let called=false;
+ const fake=()=>{called=true;return {status:0,stdout:JSON.stringify(result())}};
+ const observed=probeFixedAclBoundary({...actual,platform:'win32',spawn:fake});
+ assert.equal(called,true);
+ assert.equal(observed.status,'SCOPED_ACL_OBSERVED');
 });
