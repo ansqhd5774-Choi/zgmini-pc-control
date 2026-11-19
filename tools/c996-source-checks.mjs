@@ -65,7 +65,8 @@ export function selectGroups(paths){
   // The agent-handoff contract and workflow components are shared by
   // 007, 008 and 009; do not validate only one of those consumers.
   if(p.startsWith('agent-handoff/')||
-     /^\\.github\\/workflows\\/agent-handoff(?:-|\\.)/.test(p))
+     p.startsWith('.github/workflows/agent-handoff-')||
+     p==='.github/workflows/agent-handoff.yml')
    for(const g of ['handoff007','handoff009','handoff008'])chosen.add(g);
   // Unknown modifications to shared runtime source should not silently
   // skip an affected source test: conservatively run the full existing set.
