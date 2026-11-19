@@ -3,6 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {prepareHandoff} from './route.mjs';
 import {parseHandoff} from './contract.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 
 // No agent or PC source is executed here. The broker only validates structured
 // reports and records a durable routing decision in the original queue Issue.
@@ -71,31 +72,24 @@ async function listPreviousBodies(currentIssue, currentBody) {
   return bodies;
 }
 async function hasVerifiedComment(issueNumber, expectedBody) {
-  // A matching receipt is valid only when there is exactly one complete bot
-  // route decision in the original Issue. A second, contradictory decision
-  // must not be masked by returning early on the first matching comment.
+  // A full per-Issue receipt ledger, not the first 400 comments, is needed
+  // to detect competing route decisions before marking an Issue routed.
   const issueUrl = `${API}/repos/${REPOSITORY}/issues/${issueNumber}`;
-  let matching = 0;
-  for (let page = 1; page <= 4; page++) {
-    const comments = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
-    if (!Array.isArray(comments)) throw new Error('HANDOFF_COMMENT_LEDGER_INVALID');
-    for (const item of comments) {
-      if (item.user?.login !== 'github-actions[bot]' ||
-          typeof item.body !== 'string') continue;
-      // Retain the existing recovery behavior for incomplete bot markers.
-      // Only a structured route decision competes with the expected receipt.
-      const completeRoute = item.body.startsWith('HANDOFF_ROUTED\nincidentId: ') ||
-        item.body.startsWith('HANDOFF_DUPLICATE_REUSED\nfingerprint: ');
-      if (!completeRoute) continue;
-      if (item.issue_url !== issueUrl || item.body !== expectedBody)
-        throw new Error('HANDOFF_COMMENT_CONFLICT_STOP');
-      if (++matching > 1) throw new Error('HANDOFF_COMMENT_DUPLICATE_STOP');
-    }
-    if (comments.length < 100) return matching === 1;
+  const comments=await readIssueCommentLedger(page=>api(
+    `/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`));
+  let matching=0;
+  for(const item of comments){
+    if(item.user?.login!=='github-actions[bot]'||
+       typeof item.body!=='string')continue;
+    const completeRoute=item.body.startsWith('HANDOFF_ROUTED\\nincidentId: ')||
+      item.body.startsWith('HANDOFF_DUPLICATE_REUSED\\nfingerprint: ');
+    if(!completeRoute)continue;
+    if(item.issue_url!==issueUrl||item.body!==expectedBody)
+      throw new Error('HANDOFF_COMMENT_CONFLICT_STOP');
+    if(++matching>1)throw new Error('HANDOFF_COMMENT_DUPLICATE_STOP');
   }
-  throw new Error('HANDOFF_COMMENT_SCAN_LIMIT_STOP');
+  return matching===1;
 }
-
 function exactOwnerIssue(current, original, stateLabel) {
   return current?.number === original.number &&
     current.user?.login === 'ansqhd5774-Choi' &&
