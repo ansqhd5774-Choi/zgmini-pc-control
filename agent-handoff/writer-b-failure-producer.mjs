@@ -158,7 +158,7 @@ export async function processCompletedWriterB(event, {
   try { created = await createHandoff(prepared); }
   catch {
     // A lost POST response is ambiguous, never automatically re-POST.
-    const after = reconcileHandoffInventory(prepared, await listHandoffs());
+    const after = reconcileHandoffInventory(prepared, await listHandoffs(prepared,event.workflow_run.created_at));
     if (after.state !== 'REUSE_EXISTING') stop('POST_OUTCOME_UNKNOWN');
     if (after.closed) return Object.freeze({...observed,
       state: 'POST_RECONCILED_CLOSED_EXISTING', reusedIssues: 1});
