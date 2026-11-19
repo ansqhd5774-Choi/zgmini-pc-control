@@ -1,0 +1,173 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44511936669-1-seat-2",
+  "requestId": "pc-7de2a3d4-9fb6-4a71-a35f-8f0e24cab912",
+  "startedAt": "2026-11-19T11:07:47.692Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "bd5a5e20d1dccdb4f7940828295421d8c29aebe3",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "863ed1bef077301949899dd4aeb3f78f448fd9ed",
+  "sourceBranch": "codex/w04-pit0408-host-r3-restore-raw-lineage-20261118",
+  "operation": "employment-r6-raw-run-attestation-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "R6_RAW_RUN_AGGREGATE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-controller-ops-lessons-20261105-32-r33",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "R6_RAW_RUN_AGGREGATE_READONLY",
+    "sqliteOpened": true,
+    "scope": "W04_R6_RAW_RUN_FIXED_AGGREGATE_ONLY",
+    "dbIdentityTag": "b6fb111e0ff0378b",
+    "attestation": {
+      "status": "HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT",
+      "checkedAt": "2026-11-19T11:07:50.318Z",
+      "metadataKeys": 88,
+      "bodyVerifiedKeys": 61,
+      "runCertifiedKeys": 61,
+      "invalidBodyKeys": 27,
+      "validWithoutRunKeys": 0,
+      "invalidReasonCounts": {
+        "CHUNK_OR_COUNT_INVALID": 0,
+        "HASH_FORMAT_INVALID": 0,
+        "SOURCE_FIELDS_INVALID": 0,
+        "TIME_INVALID": 0,
+        "RESPONSE_HASH_MISSING": 0,
+        "RESPONSE_HASH_VALUE_MISMATCH": 27,
+        "SNAPSHOT_ID_MISMATCH": 0,
+        "BODY_SHA_MISMATCH": 0
+      },
+      "invalidReasonOrdinals": [
+        {
+          "ordinal": 1,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 14,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 15,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 16,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 25,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 27,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 30,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 33,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 39,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 47,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 49,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 52,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 56,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 61,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 62,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 64,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 65,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 69,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 72,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 73,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 74,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 76,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 80,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 81,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 86,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 87,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        },
+        {
+          "ordinal": 88,
+          "reason": "RESPONSE_HASH_VALUE_MISMATCH"
+        }
+      ],
+      "invalidReasonTruncated": false
+    },
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0
+  },
+  "protectedBeforeSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedAfterSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "bd5a5e20d1dccdb4f7940828295421d8c29aebe3",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-19T11:08:09.502Z",
+  "durationMs": 21810
+}
