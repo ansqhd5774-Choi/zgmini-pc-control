@@ -6,7 +6,7 @@ import {assessPriority,sortAdvisoryQueue,hoursSince} from '../agent-handoff/queu
 import {selectionReceipt,orderedPendingIssues,HANDOFF_REPOSITORY,HANDOFF_BOT,HANDOFF_OWNER} from '../agent-handoff/queue-selector.mjs';
 import {WORK_SCHEMA,workReceipt} from '../agent-handoff/work-progress-contract.mjs';
 import {evaluateQueueItem,compileQueueBoard,renderBoardMarkdown,ownerExecutionPlan} from '../agent-handoff/queue-board.mjs';
-import {validateBoardEvent,collectBoard,BOARD_CRON} from '../agent-handoff/queue-board-runner.mjs';
+import {validateBoardEvent,collectBoard,BOARD_CRON,pages,mapBounded} from '../agent-handoff/queue-board-runner.mjs';
 
 const now=Date.parse('2026-11-16T12:30:00Z');
 const url=n=>'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n;
@@ -214,8 +214,13 @@ test('read-only collector uses exact inventory/readback and fails when issue cha
   const board=await collectBoard(io,now);
   assert.equal(board.issueCount,1);
   assert.equal(board.records[0].issueNumber,f.issue.number);
-  await assert.rejects(()=>collectBoard({...io,readIssue:async()=>({...f.issue,state:'closed'})},now),
-    /ISSUE_DRIFT_RESCAN_REQUIRED/);
+  const partial=await collectBoard({...io,
+    readIssue:async()=>({...f.issue,state:'closed'})},now);
+  assert.equal(partial.issueCount,1);
+  assert.equal(partial.unverifiedIssueCount,1);
+  assert.equal(partial.evidenceComplete,false);
+  assert.equal(partial.records[0].status,'PROOF_REVIEW_REQUIRED');
+  assert.equal(partial.unverifiedIssues[0].reason,'ISSUE_DRIFT_RESCAN_REQUIRED');
 });
 test('owner-authored handoff with verified bot route can have descriptive title without claiming job started',()=>{
   const f=fixture(3194);
@@ -273,4 +278,88 @@ test('board GitHub workflow is isolated, origin-guarded, read-only, and has a bo
   assert.doesNotMatch(flow,/contents: write|issues: write|zgmini-pc-control\]/);
   assert.match(flow,/ZGMINI_AGENT_HANDOFF_ENABLED/);
   assert.match(flow,/node agent-handoff\/queue-board-runner.mjs/);
+});
+
+test('verified 120 pending Issues are not stopped by the historical 100 cap',async()=>{
+  const fixtures=Array.from({length:120},(_,i)=>fixture(4000+i));
+  const source=new Map(fixtures.map(f=>[f.issue.number,f]));
+  const b=await collectBoard({
+    listIssues:async()=>fixtures.map(f=>structuredClone(f.issue)),
+    readComments:async n=>structuredClone(source.get(n).comments),
+    readIssue:async n=>structuredClone(source.get(n).issue)
+  },now);
+  assert.equal(b.issueCount,120);
+  assert.equal(b.openHandoffIssueCount,120);
+  assert.equal(b.unverifiedIssueCount,0);
+  assert.equal(b.completeInventory,true);
+  assert.equal(b.evidenceComplete,true);
+});
+
+test('one Issue transient GET error does not discard verified peer rows',async()=>{
+  const a=fixture(4101),b=fixture(4102);
+  const board=await collectBoard({
+    listIssues:async()=>[a.issue,b.issue],
+    readComments:async n=>{
+      if(n===4101)throw Error('HANDOFF_BOARD_RUNNER_GITHUB_HTTP_503');
+      return b.comments;
+    },
+    readIssue:async n=>n===4101?a.issue:b.issue
+  },now);
+  assert.equal(board.issueCount,2);
+  assert.equal(board.unverifiedIssueCount,1);
+  assert.equal(board.evidenceComplete,false);
+  assert.equal(board.unverifiedIssues[0].issueNumber,4101);
+  assert.equal(board.records.find(x=>x.issueNumber===4102).status,'PENDING_OWNER_ACK');
+  assert.equal(board.records.find(x=>x.issueNumber===4101).status,'PROOF_REVIEW_REQUIRED');
+  assert.match(renderBoardMarkdown(board),/개별 증거 미확인/);
+});
+
+test('comment inventory exceeding 400 is explicitly unverified without losing peers',async()=>{
+  const a=fixture(4201),b=fixture(4202);
+  const board=await collectBoard({
+    listIssues:async()=>[a.issue,b.issue],
+    readComments:async n=>n===4201?Array.from({length:401},()=>({})):b.comments,
+    readIssue:async n=>n===4201?a.issue:b.issue
+  },now);
+  assert.equal(board.unverifiedIssueCount,1);
+  assert.equal(board.unverifiedIssues[0].reason,'COMMENT_INVENTORY_UNVERIFIED');
+  assert.equal(board.evidenceComplete,false);
+  assert.equal(board.records.find(x=>x.issueNumber===4202).status,'PENDING_OWNER_ACK');
+});
+
+test('global GitHub 401/403 is never disguised as a partial Issue failure',async()=>{
+  for(const status of [401,403]){
+    const f=fixture();
+    await assert.rejects(()=>collectBoard({
+      listIssues:async()=>[f.issue],
+      readComments:async()=>{throw Error('HANDOFF_BOARD_RUNNER_GITHUB_HTTP_'+status);},
+      readIssue:async()=>f.issue
+    },now),new RegExp('GITHUB_HTTP_'+status));
+  }
+});
+
+test('complete pagination continues beyond 100 and stops on a full last page',async()=>{
+  const seen=[];
+  const data=Array.from({length:250},(_,i)=>({number:i+1}));
+  const rows=await pages('issues?state=open',5,async resource=>{
+    const page=Number(resource.match(/page=(\d+)$/)?.[1]);
+    seen.push(page);return data.slice((page-1)*100,page*100);
+  });
+  assert.equal(rows.length,250);
+  assert.deepEqual(seen,[1,2,3]);
+  await assert.rejects(()=>pages('issues',2,async()=>data.slice(0,100)),
+    /PAGINATION_INCOMPLETE/);
+  await assert.rejects(()=>pages('issues',2,async()=>({bad:true})),
+    /INVALID_PAGE/);
+});
+
+test('bounded read pool preserves original ordering and caps parallel reads',async()=>{
+  let active=0,peak=0;
+  const values=await mapBounded(Array.from({length:17},(_,i)=>i),async n=>{
+    active++;peak=Math.max(peak,active);
+    await Promise.resolve();
+    active--;return n*2;
+  },4);
+  assert.equal(peak,4);
+  assert.deepEqual(values,Array.from({length:17},(_,i)=>i*2));
 });
