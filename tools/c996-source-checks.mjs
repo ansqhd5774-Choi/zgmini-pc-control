@@ -51,13 +51,22 @@ const MATCH=Object.freeze({
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
  p==='tools/c996-source-checks.mjs'||p==='tests/c996-source-scope.test.mjs'||
- p==='tools/update.mjs'||p==='tools/maintenance-lock.mjs';
+ p==='tools/update.mjs'||p.startsWith('tools/maintenance-');
 export function selectGroups(paths){
  if(!Array.isArray(paths)||paths.some(p=>typeof p!=='string'))return ALL;
  if(paths.some(isGlobal))return ALL;
  const chosen=new Set();
  for(const p of paths){
   for(const [g,re] of Object.entries(MATCH))if(re.test(p))chosen.add(g);
+  // A changed test file always selects its own suite, even if renamed or
+  // introduced after a source-specific regex was first authored.
+  for(const [g,tests] of Object.entries(GROUPS))
+   if(tests.includes(p))chosen.add(g);
+  // The agent-handoff contract and workflow components are shared by
+  // 007, 008 and 009; do not validate only one of those consumers.
+  if(p.startsWith('agent-handoff/')||
+     /^\\.github\\/workflows\\/agent-handoff(?:-|\\.)/.test(p))
+   for(const g of ['handoff007','handoff009','handoff008'])chosen.add(g);
   // Unknown modifications to shared runtime source should not silently
   // skip an affected source test: conservatively run the full existing set.
   if(/^(?:tools\/|controller\/|agent-handoff\/|direct-writer-b\/)/.test(p)&&
