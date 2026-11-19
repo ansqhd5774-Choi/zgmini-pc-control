@@ -139,8 +139,9 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
     if(bad&&item.bodySha256===bad.bodySha
      &&run.provider==='EMPLOYMENT_R6_'+bad.releaseGroup
      &&Date.parse(bad.retrievedAt)<=completed){
-     const revision=hasRunRevision&&String(run.collector_revision??'').trim()
-      ?String(run.collector_revision).trim().slice(0,64):'UNKNOWN';
+     const declared=String(run.collector_revision??'').trim();
+     const revision=hasRunRevision&&/^[A-Za-z0-9._-]{1,64}$/.test(declared)
+      ?declared:'UNKNOWN';
      const values=invalidRunRevisions.get(item.snapshotId)??new Set();
      values.add(revision);invalidRunRevisions.set(item.snapshotId,values);
     }
