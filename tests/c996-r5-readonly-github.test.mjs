@@ -16,7 +16,8 @@ function fixture(){
 function raw(){return {schema:'C996_R5_LOG_EVIDENCE_READONLY_V1',host:HOST,
   status:'COMPLETE',code:'LOGS_PRESENT_STAGE_UNPROVEN',rawLogIncluded:false,
   operationalWrites:0,discardAttempts:0,isoAttempts:0,
-  inputHashesUnchanged:5,
+  inputHashesUnchanged:5,inputChecksComplete:true,logScanComplete:true,
+  logErrors:[],logOmitted:0,
   inputs:['ADK_WIM','FINAL_WIM','TEST_ISO','BIOS_BCD','UEFI_BCD'].map((id,i)=>
     ({id,bytes:1000+i,sha256:'a'.repeat(64),matched:true})),
   logs:[{name:'COMMIT_NEW_WIM.dism.log',directory:'ISO_ATTEMPT',lines:12,
@@ -78,7 +79,7 @@ test('readback pair uploads only sanitized JSON and TXT and comments after both'
      return {ok:true,status:201,json:async()=>({})};
    }
    if(method==='GET') return {ok:true,status:200,json:async()=>({
-     content:Buffer.from(files.get(suffix.replace(/\?ref=.*/,''))).toString('base64')})};
+     encoding:'base64',content:Buffer.from(files.get(suffix.replace(/\?ref=.*/,''))).toString('base64')})};
    if(method==='POST') return {ok:true,status:201,json:async()=>({id:1})};
  };
  const x=await uploadVerifiedPair(r,'fake-test-token',fake);
@@ -160,4 +161,64 @@ test('safe EPERM path progress reports operation and bounded relative depth only
     {inspectOperation:'PATH_LSTAT',inspectDepth:null},
     {inspectOperation:'STREAM_READ',inspectDepth:null,inspectStep:'LOG_READ'}
   ]) assert.throws(()=>selectSafeReport({...r,...changes},ctx,HOST),/INSPECTION_OPERATION_INVALID/);
+});
+
+test('partial collector reports permitted per-pin failure, preserved event metadata, and independent logs',()=>{
+ const r=raw();
+ r.status='PARTIAL';r.code='INPUT_INTEGRITY_UNVERIFIED';
+ r.inputs[1]={id:'FINAL_WIM',matched:false,status:'UNVERIFIED',code:'EPERM',
+  inspectOperation:'PATH_LSTAT',inspectDepth:0};
+ r.inputChecksComplete=false;r.inputHashesUnchanged=4;
+ r.fixedEvidence=[{id:'ISO_RESULT',status:'PRESENT',sha256:'c'.repeat(64),bytes:47},
+  {id:'ISO_PASS',status:'MISSING'}];
+ r.logs[0].events=[{line:5,code:'COMMIT_REQUEST',at:'11/12/2026 03:01:02'}];
+ const sanitized=selectSafeReport(r,ctx,HOST);
+ assert.equal(sanitized.status,'PARTIAL');
+ assert.equal(sanitized.pinCount,4);
+ assert.equal(sanitized.pins[1].code,'EPERM');
+ assert.equal(sanitized.pins[1].inspectOperation,'PATH_LSTAT');
+ assert.equal(sanitized.fixedEvidence[0].sha256,'c'.repeat(64));
+ assert.deepEqual(sanitized.logs[0].events,[{line:5,code:'COMMIT_REQUEST',at:'11/12/2026 03:01:02'}]);
+ assert.equal(sanitized.sourceClassification,'NOT_DETERMINED_BY_THIS_RUN');
+ assert.doesNotMatch(JSON.stringify(sanitized),/PRIVATE LINE/);
+});
+test('a complete status requires separately verified full inputs, scan and logged COMMIT request',()=>{
+ const good=raw();
+ for(const mutate of [r=>{r.logScanComplete=false},
+  r=>{r.inputChecksComplete=false},
+  r=>{r.logs[0].counts={}},
+  r=>{r.logOmitted=1}
+ ]){
+  const x=structuredClone(good);mutate(x);
+  assert.throws(()=>selectSafeReport(x,ctx,HOST));
+ }
+});
+test('partial create-only GitHub result can reconcile identical existing JSON/TXT without overwrite',async()=>{
+ const report=selectSafeReport(raw(),ctx,HOST),files=new Map(),calls=[];
+ const fake=async(url,{method,body})=>{
+  calls.push(method);
+  const suffix=new URL(url).pathname;
+  if(method==='PUT'){
+   const encoded=JSON.parse(body).content;
+   if(!files.has(suffix))files.set(suffix,Buffer.from(encoded,'base64'));
+   return {ok:false,status:422,json:async()=>({})};
+  }
+  if(method==='GET')return {ok:true,status:200,json:async()=>({
+   encoding:'base64',content:files.get(suffix)?.toString('base64')})};
+  return {ok:true,status:201,json:async()=>({id:1})};
+ };
+ const result=await uploadVerifiedPair(report,'fixture-token',fake);
+ assert.equal(result.verified,true);
+ assert.deepEqual(calls,['PUT','GET','PUT','GET','POST']);
+});
+test('conflicting already-created JSON refuses recovery and cannot comment PASS',async()=>{
+ const report=selectSafeReport(raw(),ctx,HOST),calls=[];
+ const fake=async(_url,{method})=>{
+  calls.push(method);
+  return method==='GET'?{ok:true,status:200,json:async()=>({
+   encoding:'base64',content:Buffer.from('different').toString('base64')})}:
+   {ok:false,status:422,json:async()=>({})};
+ };
+ await assert.rejects(uploadVerifiedPair(report,'fixture-token',fake),/RESULT_READBACK_MISMATCH/);
+ assert.deepEqual(calls,['PUT','GET']);
 });
