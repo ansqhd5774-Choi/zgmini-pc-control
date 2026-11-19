@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {manifestFingerprint} from '../tools/maintenance-contract.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -78,4 +80,18 @@ test('new and changed module imports resolve within exact installed Controller s
  assert.match(show(target,'controller/common.mjs'),/pit04Offset/);
  assert.match(show(target,'controller/employment-r6-candidate-readonly.mjs'),/pit04Offset/);
  assert.match(show(target,'controller/inflation-a401-private23-readonly.mjs'),/export const A407_ENTRY=/);
+});
+
+test('seven actual target SHA256 bytes match the exact approval-manifest fingerprint',t=>{
+ const allowFiles=paths.map(rel=>({
+  path:rel,
+  sha256:createHash('sha256').update(
+   execFileSync('git',['show',target+':'+rel],{cwd,encoding:null,windowsHide:true})
+  ).digest('hex')
+ }));
+ const pin=manifestFingerprint(allowFiles);
+ assert.deepEqual(pin.files,allowFiles);
+ assert.match(pin.sha256,/^[a-f0-9]{64}$/);
+ t.diagnostic('SELECTIVE_ALLOW_FILES='+JSON.stringify(allowFiles));
+ t.diagnostic('SELECTIVE_MANIFEST_SHA256='+pin.sha256);
 });
