@@ -47,7 +47,7 @@ function verifiedReceiptFor(comments,body,commentId,issueUrl) {
 }
 
 export function evaluateWorkUpdate(issue,comments,sourceComment) {
-  if(!own(issue)||!Array.isArray(comments)||comments.length>400||
+  if(!own(issue)||!Array.isArray(comments)||
     !own(sourceComment)||!Number.isSafeInteger(sourceComment.id)||
     sourceComment.id<1||issue.state!=='open'||issue.pull_request)
     stop('ISSUE_OR_INVENTORY_STOP');
