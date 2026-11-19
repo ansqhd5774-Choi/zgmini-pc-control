@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 const workflow = (name) => readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8');
 
 const independentJobs = [
-  ['agent-handoff.yml', 3, ['agent-handoff/issue-broker.mjs', 'agent-handoff/result-broker.mjs', 'agent-handoff/work-progress-broker.mjs']],
+  ['agent-handoff.yml', 3, ['agent-handoff/issue-broker.mjs', 'agent-handoff/result-entry.mjs', 'agent-handoff/work-progress-broker.mjs']],
   ['agent-handoff-pc-failure-intake.yml', 1, ['agent-handoff/pc-failure-producer.mjs']],
   ['agent-handoff-writer-b-failure-intake.yml', 1, ['agent-handoff/writer-b-failure-producer.mjs']],
 ];
@@ -31,6 +31,15 @@ test('incident routing remains explicitly opted in and origin-authorized', () =>
   assert.match(workflow('agent-handoff-pc-failure-intake.yml'), /vars\.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true'/);
   assert.match(workflow('agent-handoff-writer-b-failure-intake.yml'), /vars\.ZGMINI_PC_HANDOFF_WRITER_B_INTAKE_ENABLED == 'true'/);
   assert.match(workflow('agent-handoff-writer-b-failure-intake.yml'), /github\.event\.workflow_run\.run_attempt == 1/);
+});
+
+test('result entry retains source verification and dispatches diagnosis without the operational Controller', () => {
+  const entry=readFileSync(new URL('../agent-handoff/result-entry.mjs',import.meta.url),'utf8');
+  assert.match(entry,/from '\.\/result-broker\.mjs'/);
+  assert.match(entry,/from '\.\/diagnosis-broker\.mjs'/);
+  assert.match(entry,/result\.schema===DIAGNOSIS_SCHEMA/);
+  assert.match(entry,/return sourceResult\(env\)/);
+  assert.doesNotMatch(entry,/child_process|controller\/engine|E:\\ZGmini/);
 });
 
 test('shared-resource issue admission explicitly passes issue action to the reporter', () => {

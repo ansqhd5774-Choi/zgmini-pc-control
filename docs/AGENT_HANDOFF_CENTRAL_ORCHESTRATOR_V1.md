@@ -1,5 +1,17 @@
 # ZGMINI 단일 ChatGPT 총괄 — 공통 장애 대기열 실행 계약
 
+## 현행 실행 효과 중심 계약 — 2026-11-19
+
+[공통 정본](PC_AUTOMATION_STANDARD.md)이 아래 역사적 사건·마일스톤보다 우선한다. 접수/후보/실제 인수/실행/결과 반환을 구분한다. source 수정은 기존 PR/CI 계약으로 반환한다. 코드 수정 없는 고정 읽기 진단은 아래 계약을 사용하며 무의미한 PR을 만들지 않는다.
+
+~~~json
+{"schema":"ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1","resultId":"result-고유한-실제-id","incidentId":"원본-incidentId","fingerprint":"원본-64자리-해시","evidenceIssueNumber":0}
+~~~
+
+위 예시는 필드 설명이며 제출할 수 있는 실행 JSON이 아니다. 실제 resultId/incidentId 형식·원본 fingerprint·양의 evidenceIssueNumber를 검증한다. 현재 지원 범위는 원본과 같은 runner-smoke/core-status/writer-install-preimage-readonly 고정 조회다. preimage는 같은 승인 scope 해시여야 한다. broker는 원본 owner/요청, 실제 PC bot 영수증, 고정 경로 JSON/TXT, Run/attempt/seat, 운영·공급자·DB 쓰기0을 검증하고 Incident와 원본 Issue에 각각 한 번 반환한다. POST 결과불명은 GET으로 조정하며 PC 작업을 재실행하지 않는다.
+
+진단은 READ_AND_PROTECTION_VERIFIED 또는 READ_VERIFIED_PROTECTION_UNVERIFIED로 구분한다. 보호 미확인 값을 PASS로 만들지 않으며 진단 반환이 사건 근본 해결·운영 설치/게시 승인·다른 채팅 수신을 뜻하지 않는다. 과거 source 결과 영수증과 진단 결과는 별도 증거다. 실제 자동 AI 호출은 새로 추가하지 않는다.
+
 ## 2026-11-19 실제 인수·실행 우선 정정
 
 - 후보 영수증의 `NOT_CONFIGURED`는 해당 GitHub 중개기가 AI를 실행하지 않는다는 고정 설명이다. 별도 중앙 ChatGPT/Codex 처리자의 현재 활성·실행을 조회한 결과가 아니다. 이 문구만으로 전체 미구성·PC 장애를 확정하지 않으며 과거 예약 ID·성공 이력으로 현재 정상도 확정하지 않는다.

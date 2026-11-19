@@ -40,3 +40,5 @@ jobs:
           node-version: '22'
       - name: Check handoff result and producer contracts
         run: node --test --test-concurrency=1 "tests/agent-handoff*.test.mjs" "tests/shared-resource*.test.mjs" "tests/resource-recheck-readback.test.mjs" "tests/writer-b-recovery-proof.test.mjs" "writer-b/receiver.test.mjs" "writer-b/installer.test.mjs" "writer-b/core-idle-window.test.mjs" "writer-b/report-rejection.test.mjs" "writer-b/windows-guards.test.mjs"
+      - name: Verify effect-scoped readonly evidence and unchanged strict mutation guards
+        run: node --test --test-concurrency=1 tests/engine.test.mjs tests/memory-admission.test.mjs tests/retired-iran-controller.test.mjs

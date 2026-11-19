@@ -15,8 +15,15 @@ test('reserved window accepts known running Core for inhibition, never for sourc
   assert.equal(coreQuietFromProbe(probe,true),false);
  }
  for(const delta of [{enabled:false},{state:0},{state:1},
-  {unknownProcessLines:1},{instances:-1},{relatedProcesses:NaN}])
+  {unknownProcessLines:NaN},{instances:-1},{relatedProcesses:NaN}])
   assert.equal(coreMayInhibitNewStarts({...quiet(),enabled:true,...delta}),false);
+});
+
+test('missing EnginePID evidence does not block inhibiting new starts of the exact approved Task',()=>{
+ const active={...quiet(),enabled:true,state:4,instances:1,unknownProcessLines:1};
+ assert.equal(coreMayInhibitNewStarts(active),true);
+ assert.equal(coreQuietFromProbe({...active,enabled:false,state:1},false),false,
+  'unknown process evidence still blocks every source/config switch');
 });
 
 test('fixed Task inhibition persists intent and verifies disabled state without killing running Core',()=>{

@@ -42,7 +42,7 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
   {...c,retiredTaskEvidence,runId:'3301'});
  assert.equal(probes,2);
  assert.equal(result.report.status,'STATE_UNKNOWN');
- assert.equal(result.report.code,'PROTECTED_STATE_POSTCHECK_UNVERIFIED');
+ assert.equal(result.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
  assert.equal(result.report.postcheckFailureCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
  assert.equal(result.report.protectedProbeReason,'SCHTASKS_INVENTORY_EMPTY_PARSE');
  assert.deepEqual(result.report.workerOutcome,
@@ -52,7 +52,7 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
  assert.equal(result.report.protectedStateUnchanged,null);
  assert.match(result.report.protectedBeforeSha256,/^[a-f0-9]{64}$/);
  assert.equal(result.report.protectedAfterSha256,null);
- assert.equal(result.report.firstFail,'PROTECTED_STATE_POSTCHECK');
+ assert.equal(result.report.firstFail,'PROTECTED_STATE_OBSERVATION');
  assert.equal(result.report.operationalWrites,0);
  assert.equal(result.report.providerCalls,0);
  assert.equal(result.report.d1Writes,0);
@@ -60,7 +60,7 @@ test('postcheck R13 inventory uncertainty keeps worker result but never authoriz
   path.join(result.workspace,'RESULT.json'),'utf8')).status,'STATE_UNKNOWN');
 });
 
-test('retired R13 inventory precheck failure blocks worker without changing safety rule',async()=>{
+test('missing unrelated inventory preserves a fixed read result without asserting protection PASS',async()=>{
  const c=fixture();
  const result=await executeJob(req('runner-smoke','precheck-r13-denied-01'),
   {...c,runId:'3302',retiredTaskEvidence:()=>{
@@ -68,11 +68,37 @@ test('retired R13 inventory precheck failure blocks worker without changing safe
     {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE',
      probeReason:'SCHTASKS_INVENTORY_COMMAND_FAILED'});
   }});
- assert.equal(result.report.status,'BLOCKED');
- assert.equal(result.report.code,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
- assert.equal(result.report.failureOperation,'PROTECTED_STATE_SNAPSHOT');
+ assert.equal(result.report.status,'STATE_UNKNOWN');
+ assert.equal(result.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
+ assert.equal(result.report.protectionPrecheckCode,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
  assert.equal(result.report.protectedProbeReason,'SCHTASKS_INVENTORY_COMMAND_FAILED');
- assert.equal(result.report.result,undefined);
+ assert.equal(result.report.result.code,'RUNNER_COMMAND_EXECUTED');
+ assert.equal(result.report.protectedStateUnchanged,null);
+ assert.equal(result.report.protectedBeforeSha256,null);
+ assert.equal(result.report.workerOutcome.status,'PASS');
+ assert.equal(result.report.operationalWrites,0);
+});
+
+test('protection availability exception cannot authorize another registered operation',async()=>{
+ const c=fixture();const out=await executeJob(req('failure-proof','strict-operation-protection-01'),
+  {...c,retiredTaskEvidence:()=>{throw Object.assign(new Error('unavailable'),
+   {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE'});}});
+ assert.equal(out.report.status,'BLOCKED');
+ assert.equal(out.report.code,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ assert.equal(out.report.result,undefined);
+});
+
+test('a fixed read keeps Core evidence through unavailable Task observation, never full health PASS',async()=>{
+ const c=fixture();const out=await executeJob(req('core-status','fixed-core-read-partial-01'),
+  {...c,queryTask:()=>{throw new Error('private error text');}});
+ assert.equal(out.report.status,'STATE_UNKNOWN');
+ assert.equal(out.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
+ assert.equal(out.report.result.core.approvedSourceSha,'a'.repeat(40));
+ assert.equal(out.report.result.taskObservation,'UNVERIFIED');
+ assert.deepEqual(out.report.result.core.taskXmlHashes,{});
+ assert.equal(out.report.protectedStateUnchanged,null);
+ assert.equal(out.report.protectionPrecheckCode,'PROTECTED_TASK_XML_QUERY_FAILED');
+ assert.equal(JSON.stringify(out.report).includes('private error text'),false);
 });
 
 test('changed protected state remains BLOCKED instead of being relabeled as uncertain',async()=>{

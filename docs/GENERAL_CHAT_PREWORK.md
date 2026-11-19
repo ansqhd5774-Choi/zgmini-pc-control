@@ -1,53 +1,14 @@
 # 일반챗 작업 전 공통 지침
 
-**인계 후 실행(2026-11-19):** 접수·후보 선정은 실제 인수/실행이 아니다. 현재 담당자가 받았으면 기존 Incident에 ACKNOWLEDGED→WORKING을 기록하고 승인된 지원 행동을 끝까지 실행·결과 회신한다. selector의 `OWNER_ACTION_REQUIRED`는 이전 후보 중 미인수 건도 포함한다. 중개기의 고정 `NOT_CONFIGURED`를 전체 처리자의 현재 상태로 단정하지 않는다. 과거 완료/취소된 무변경 A 조회의 내부 로그가 없다는 이유로 현재 지원되는 승인 읽기까지 전역 차단하지 않는다. 쓰기 결과 불명확·활성 lease는 그대로 보호한다. 상세 [실행 우선 정정](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md).
+2026-11-19 실행 효과 중심 개정. [전체 정본](PC_AUTOMATION_STANDARD.md)이 기준이며 이전 지침의 과거 사건/승인 보류를 현재 작업의 전역 조건으로 적용하지 않는다.
 
-**공통 총괄 업무 요청(2026-11-17):** 공통 Controller/Runner/GitHub Actions/Writer 도구/승인·설치·공유 자원/인계 시스템의 구조 결함만 총괄에 요청한다. 기능별 수집·산식·게시·설치는 원담당이 수행한다. 제어 저장소의 기존 `agent-handoff` Issue에 `ZGMINI_AGENT_HANDOFF_V1`, `agent-handoff` 라벨과 원본 Issue/Run·LAST PASS/FIRST FAIL·source SHA·정확한 지원 목표를 제시한다. GitHub 접수 영수증, 실제 처리자 전달·인수, 결과 원본 회신, 원담당 실제 수신은 **서로 다른 단계**다. [상세 업무목록·요청/회신 계약](PC_AUTOMATION_STANDARD.md#공통-프로세스-총괄--요청-가능-업무접수작업-회신-2026-11-17).
-
-
-
-2026-11-08 R2 Writer B 경합 보완 / **2026-11-12 두 PC 실측·신규 대화 실행 표준 추가**. 상세 정본: [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md).
-
-현재 업무·브랜치·기존 승인·완료 증거를 보존하고 마지막 유효 완료 지점부터 이어서 수행하라. **이 지침을 받은 일반챗은 자기 원래 기능의 다음 필수 실행을 즉시 진행하라.**
-
-## 마지막 완료점부터 재개·두 PC 구분 (2026-11-15)
-
-1. **신규 대화 첫 진입에 한해** GitHub `ansqhd5774-Choi/zgmini-pc-control` 최신 `main`의 [AGENTS.md](../AGENTS.md), [GENERAL_CHAT_START.md](GENERAL_CHAT_START.md), [PC_AUTOMATION_STANDARD.md](PC_AUTOMATION_STANDARD.md), [PC_OPERATING_SYSTEMS_CANONICAL.md](PC_OPERATING_SYSTEMS_CANONICAL.md)의 관련 부분을 확인하라. 같은 대화의 후속 작업에는 과거 PR·진단·설치 결과를 처음부터 재검사하지 말고 기존 기능의 **마지막 유효 완료 지점 다음 실행 하나**를 수행하라. 해당 source·설정·실행 환경이 바뀌거나 상충 증거가 나타날 때만 영향 범위를 재검증하라. 프로젝트/대화 지침이 자동 갱신됐다고 가정하지 마라.
-2. 실제 PC를 작업별로 구분하라. **운영 PC = 호스트 `PC`, Windows 11, Runner `zgmini-pc-01`~`06`, label `zgmini-pc-control`, `E:\ZGmini` Controller/고정 Node**. **공통 대기열 PC = `DESKTOP-N62L0NG`, Windows 10, Runner `zgmini-handoff-ci-spare-01`, label `zgmini-handoff-ci-isolated`, pinned Node 22 및 GitHub 인계·CI 전담**. 두 PC의 절대 경로·설치·권한·프로세스 관리 구조가 같다고 가정하지 마라.
-3. 작업 요청 전에 기존 성공된 **Issue → Actions → 해당 Runner → 승인된 실행기 → JSON/TXT·원본 Issue 결과**를 확인해 재사용하라. 운영 A는 기존 pc-job, B는 독립 승인 Writer/유지보수기, 공통 장애 인계는 기존 격리 Workflow를 사용한다. 새 ZIP/CMD·Runner·예약을 임의 제작하지 마라. 기존 승인된 수동 CMD 경로를 없애거나 우회 재설계하지도 마라.
-4. `runId`/`attempt`/Runner/host/실제 status·code 및 **원격 JSON/TXT 2/2**를 구분 확인하라. `queued`를 Offline으로, CI PASS를 실PC 완료로, GitHub 댓글을 다른 일반챗 자동 수신으로 취급하지 마라. 오류·STATE_UNKNOWN은 기존 원본 증거부터 확인하며 자동 재실행 0회다.
-5. #996 C급 접수·잠금 복구는 2026-11-15 완료(`INTAKE_RECOVERED_ORIGINAL_INSTALL_ABORTED`)이며 원본 요청을 재실행하지 마라. 미완료 Controller 설치는 별도로 취급하고, 보호된 Core·Writer·DB·Task·승인 산식·D1/API/UI는 별도 승인·실제 검증 없이 변경하지 마라. 공통 인계는 원담당 기능 완료를 대신하지 않는다. 예약 자동 갱신 검증은 기능별 실제 수집·계산·저장·게시·UI 완료 이후의 후속이다. 담당 업무 전체 진행률·새 증거·미해결 항목·다음 필수 실행만 보고하라.
-
-**실측 근거:** [운영 PC JSON](pc-profiles/operating-PC.json), [대기열 PC JSON](pc-profiles/handoff-DESKTOP-N62L0NG.json). 2026-11-12 관측 PID·RAM·Listener 수는 시점성 데이터이며 ZGMINI Runner 구성(6/1)을 전체 Listener 수(7/5)와 혼동하지 마라.
-
----
-
-
-1. 제어 저장소 ansqhd5774-Choi/zgmini-pc-control main의 AGENTS.md·GENERAL_CHAT_START.md·공통 정본에서 필요한 내용을 읽고 현재 업무의 다음 실행으로 진행하라. 지침 확인 보고로 끝내지 마라.
-   - **격리 Writer B 자동 인계(2026-11-10):** 정규 Writer B의 인증된 수리 가능 실패만 별도 Windows CI Runner가 `agent-handoff`로 등록하고 단일 중앙 ChatGPT가 처리한 뒤 원본 GitHub Issue에 결과를 기록한다. `WAIT_RECORDED`·성공은 수리 사건이 아니며, Issue 댓글은 다른 일반챗의 자동 수신/재개가 아니다. 실제 자기 대화 재개 시 원본 Issue를 확인하고 기능 작업을 계속하라. 새 격리 경로의 자연 수리 실패 전체 왕복은 후속 미관측이며 전역 Gate가 아니다. [중앙 계약](AGENT_HANDOFF_CENTRAL_ORCHESTRATOR_V1.md)과 [PC 공통 정본](PC_AUTOMATION_STANDARD.md)을 따른다.
-2. 다음 실행에 필요한 입력·설치 모듈·경로·승인만 확인하고 기존 공통 등록기·수집/계산/게시기·adapter를 재사용하라. 정상 업무마다 전체 Controller 상태·과거 복구·전체 테스트를 반복 점검하지 마라.
-3. 기존 성공 증거는 내부 진행 전제로 재사용하라. 과거 Controller 복구·설치 재확인을 이번 업무의 신규 성과나 핵심 진전으로 보고하지 마라. 해당 상태가 실제로 바뀌거나 현재 실행을 막을 때만 필요한 범위로 보고하라.
-   - 관련 성공 실행물은 [SUCCESS_EVIDENCE_REUSE.md](SUCCESS_EVIDENCE_REUSE.md)에서 필요한 유형만 조회하라. 기존 승인 manifest·고유 Windows Run·원격 JSON/TXT·검증 단계가 연결된 구조를 재사용하고, 과거 before SHA/승인/운영 source를 새 작업에 복사하지 마라. 재사용 가능한 새 공통 패턴이 실증되면 기존 결과 링크를 색인하되, 성공 보고만 위한 신규 Gate·예약·중복 파일은 만들지 마라.
-4. 설치된 작업은 현재 schema·정확한 source·고유 ID로 한 번 요청하고 TXT/JSON/댓글을 직접 회수하라.
-   - [#880](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/880) Controller 정규 B 설치와 [#882](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/882) 승인 manifest 범위 A 조회는 실제 Windows PASS. 신규 기능의 설치 전 해시 조회는 [승인 scope 재사용 계약](WRITER_PREIMAGE_APPROVED_SCOPE_R1.md)을 따른다. [#883](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/883) ER1 로컬 결과 조회는 PASS이나 개별 D1 게시 원장은 `NOT_RECORDED`이므로 운영 Writer 공유 2파일의 정규 설치·다음 정상 게시 없이 D1 일치를 주장하지 마라. 후속 [zgmini PR #1021](https://github.com/ansqhd5774-Choi/zgmini/pull/1021)은 최신 ER1 24개월 증거 보존과 동일 시각 BODY_MISMATCH 실패 전파를 8/8 source 시험으로 보강했지만 운영 Writer 적용·실제 D1 검증은 여전히 원담당 후속이다. 공통 Reader 재설치나 기존 요청 반복은 금지한다. 실제 실행 SHA와 status/code/lastPass/firstFail을 확인하라.
-   - **테마 B #846 후속(2026-11-08):** 실제 Windows [#846](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/846)은 Node top-level-await exit13으로 운영 설치 효과가 미확정이며, [#847](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/847) A에서 기존 주요 활성 파일·Task 해시 보존만 확인됐다. 공통 source [#889](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/889) (SHA `2158108b…`)는 CLI↔receiver 순환 import를 분리했고, [#890](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/890) (SHA `a2ff5082…`)는 실제 Node 종료 코드·FIRST FAIL을 결과에 보존하며, [#891](https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/891) (SHA `c567f329…`)는 기존 읽기 전용 Windows proof에 실제 CLI 로딩 시험을 추가했다. #845 V1은 과거 격리 검증으로 유지하되 CLI proof 미실시는 구분한다. 후속 실제 Windows [#892](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/892)는 run `42445755255`, `PROOF_WINDOWS_BILATERAL_CLI_PASS`, CLI exit `0`, 운영 쓰기 `0`, JSON/TXT GET `2/2`로 **읽기 전용 실행 경로 증명 PASS**다. 이는 108파일 설치·활성화 증거가 아니며 #846 단회 요청 재실행은 금지한다. 기능 원담당은 기존 승인·정규 B로 설치/게시를 이어간다. 다른 기능의 신규 Gate나 예약 조건으로 확대하지 마라.
-   - `pc-source-preflight`의 `SUMMARY_ONLY`는 파일별 목록이 생략된 전송본이다. PC 실행 PASS와 결과 업로드 PASS를 구분하고, 필요하면 기존 Actions 로그·원장의 고유 증거를 회수하되 같은 요청을 다시 실행하지 마라.
-5. 승인 범위의 manifest·해시·누적 diff·실행 명세·검증 자료는 직접 완성하라. 허용목록 부재·B급·신규 모듈만으로 재승인을 요구하지 말고 공통 상시 승인 범위와 기술적 등록을 구분하라. Controller B에서는 승인 `approval.ref`의 **실제 소스 병합 PR**이 목표 `targetSha`의 조상/동일 커밋인지 기존 계보 조건을 확인하라. 나중에 병합한 manifest 승인 PR을 참조하면 #762처럼 `UPDATE_VALIDATE_FAILED`가 발생할 수 있다. 실행기 검사를 우회하지 마라. 게시·배포 효과는 업무의 기존 승인을 대조하라.
-6. 현재 단독/병렬 방침을 따르고 공유 설치·쓰기는 자원별로 직렬화하라. Controller뿐 아니라 동일 PC Core 실행 checkout·승인 SHA 소비자까지 실제 겹치는 영향만 조정하라. 필요한 경우 #68에서 단일 담당·순서를 조정하라. 담당 미지정·실제 경합 없음이면 등록 후 조정을 맡고 기존 담당은 명시적으로 인계하라. GitHub 인계 기록만으로 다른 일반챗의 수신·재개를 확정하지 마라.
-   - 두 기능의 B 설치 후보가 `scripts/pc-writer/run-local.mjs` 등 **같은 경로**를 수정하면 기존 기능별 `afterSHA`를 독립적으로 적용하지 마라. 기능 담당자는 최신 승인 기능 hook·import·게시 증거를 모두 유지한 **공통 최종 바이트**를 선택하고, 경로 중복을 제외한 정확한 합집합 manifest·실제 PC before SHA·새 target SHA·승인 범위를 #68에서 적용 담당 한 명과 연결하라. 겹치는 운영 쓰기만 직렬화하고 기능 개발·조회는 병렬 유지한다. 상세 원칙: [CONTROLLER_APPLY_QUEUE.md](CONTROLLER_APPLY_QUEUE.md).
-7. 실제 오류가 있을 때 해당 접수·연결·복구 절차를 적용하라. 오류 코드·원장·실제 상태를 확인하고 timeout/응답 유실은 기존 요청부터 대조하라. 안전 거부를 우회하거나 같은 실패를 수정 없이 반복하지 마라. 독립 작업은 계속하라. 특히 단회 Writer B 요청이 `WRITER_B_INSTALL_STOP_RESTORED`로 소비되었다면 기존 requestId를 재실행하지 말고 원인을 분류한 뒤 현재 운영 HEAD·config.source·전후 해시 및 기존 승인 범위를 대조하여 정확한 manifest를 재확정하고 신규 requestId로 진행하라. Core의 정상 실행을 강제 중단하지 않고 자연 유휴를 기다리며, Task XML 정의 변경과 단순 Core 활성 경합을 구별하라.
-8. 완료 단계는 증거와 함께 닫고 다음 필수 실행 하나를 담당·입력·통과 조건과 함께 지정한다. 대기는 기존 ID 하나로 추적하며 같은 상태를 반복 보고하지 않는다. 사용자 중지 시 새 실행과 추적을 중단한다. 종료·부작용과 재시도 근거를 확인하기 전에는 새 요청을 만들지 마라.
-9. 보고는 이번 수행·검증·중요한 미해결 사항·다음 행동에 한정하라. 과거 증거를 꼭 언급하면 ‘기존 증거 재사용’으로 표시하라. 필수 단계를 막는 실제 접근·자원·승인·검증 문제만 BLOCKER로 분류하라. 승인된 다음 행동이 가능하면 끝까지 진행하라.
-10. 공용 총괄 #434의 자연 B 운영 효과 검증 대기와 타 일반챗 인계 미수신은 자기 업무의 전역 BLOCKER가 아니다. 자기 기능에 실제 필요한 정상 승인 B는 정규 경로로 진행하되, #434 실증만을 위한 시험용 B·과거 B 재실행은 만들지 마라. 실제 인계를 받은 원담당은 자기 대화에서 수신·다음 실행을 명시하고 수행하라. 총괄은 기능 업무를 대신하지 않는다.
-11. 반복되는 공용 절차 오류·과도한 Gate는 원담당이 실제 실패 근거와 함께 총괄에 인계하고 독립 기능 작업은 계속하라. 진단기의 고정 해시가 승인된 설치 버전보다 오래됐으면 `CHANGED`만으로 변조나 실행 원인을 확정하지 마라. 총괄이 검증한 개선은 GitHub 전체 정본과 이 사전문에 반영·원격 확인한 후 사용자에게 최신 전체 정본을 전달한다. GitHub 반영만으로 다른 대화의 자동 학습이나 PC 적용을 주장하지 않는다.
-12. 새 기능의 실제 PC 적용 전에 기존 A급 원본 진단·B급 Writer 설치 지원 경로를 필요한 범위에서 확인하라. 경로가 미지원이면 해당 공통 도구 문제만 총괄에 인계하고 독립 개발은 계속하라. 다른 기능의 고정 B 수신기로 우회하지 마라. (R2 #622)
-**운영 환경변수 변경 예외(2026-11-08):** 기존 Writer B는 `.mjs` source-only이고 일반 `pc-job`은 A급 조회-only다. 두 물가지표 승인 플래그는 별도 [Provider Flags B](../provider-flags-b/README.md)에서 정확한 사용자 승인·단회 manifest·기존 공유 lock·백업/보안 권한 보존·최종 파일 재조회 후 적용한다. `providers.env` 전체·키값·기타 변수는 외부로 출력하지 않는다. **물가지표 두 플래그는 #724 실제 Windows에서 `PROVIDER_B_APPLIED_VERIFIED/PROVIDER_B_TWO_FLAGS_SET`, 승인 해시·원본 백업·JSON/TXT 재조회 2/2로 적용 완료됐다.** #692·#711 및 #715·#718·#720·#722·#724를 재실행·재설치하지 않는다. 원담당은 설치 대기 없이 승인된 실제 수집→로컬 저장→계산→D1→API/UI 기능을 이어간다. 설정 반영만으로 기능 완료를 주장하지 않는다.
-
-**고용 R6 WAL·메모리 진단:** #741의 WAL 모드 DB에서 `-wal/-shm` 두 파일 부재는 정상 종료 이후에도 가능하므로 그 사실만으로 Core DB 고장이라고 보고하지 않는다. 공통 조회기의 `walSidecarState`·`blockedConditions`로 보조 파일 누락과 자원 부족을 따로 읽되, 실제 운영 DB에 부작용을 일으킬 수 있는 직접 읽기·검사 삭제·무단 메모리 기준 하향은 금지한다. 현재 조회기 소스·테스트 개선은 PC 설치 PASS와 별개다. 기존 #729·#741 재실행 없이 고용 R6 독립 소스 통합을 계속한다.
-
-13. 외부 시세·경제·연구 API를 새로 조사하거나 공급자에게 권한 메일을 보내기 전, [공급자별 이용권·회신 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/API_SOURCE_RIGHTS_REGISTRY.md)을 조회하고 동일 상품·플랜·사용 방식의 기존 Gmail 발신·수신을 확인하라. 대장의 10개사 문의 이력은 답변 완료(허용/거절), AI 지원 안내, 미답변, 이메일 배달 실패, 상담 접수 인증 필요로 구분된다. 확정 회신이 있으면 같은 질문을 재문의하지 않고, 기존 대기 메일을 새 문의로 중복 발송하지 않는다. 실제 새 회신이 있을 때만 권한 대장을 갱신하며 다른 기능을 전역 Gate로 묶지 않는다. **권한 판정의 공급자별 상태는 대장만 정본으로 두고 이 사전 지침에 복제하지 않는다. **GitHub 검색 결과가 이전 SHA를 가리킬 수 있으므로 대장 최신 `main` 원문·SHA를 직접 확인하라.****
-# Writer B Core 경합 후속 (2026-11-19)
-
-실제 성공 선례: [#2234 설치](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2234) → [#2235 3파일 해시·HEAD/config 재조회](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2235) → [#2236 Core 복원 확인](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2236). 단순 PR/CI 완료가 아니라 이 Windows 실행 구조를 재사용한다. 설치 완료를 기능 수집·계산·게시 완료로 확대하지 않는다.
-
-`WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED`가 반복되면 Core 고장·Controller 재설치로 확대하지 말고 [공통 Writer B 유지보수 창 절차](../writer-b/README.md)를 적용한다. 승인 범위의 새 정확 manifest에 `coreMaintenance: "PAUSE_NEW_STARTS_DRAIN_360S_V1"`와 원본 Task XML SHA를 고정하여 후보 준비 → 신규 예약 시작 억제 → 기존 실행 정상 drain → quiet 확인 → 설치 → 원래 활성 상태 복원/재조회 순서로 진행한다. 기존 실패 ID 재실행·Core 강제 종료·lock 삭제·중간 종료 후 무조건 Enable은 금지한다. 코드/CI와 실제 설치·업무 결과를 구분한다.
+1. 현재 업무의 목적·승인·브랜치·마지막 유효 완료 증거와 다음 실행 하나를 계승한다. 신규 대화에만 AGENTS/시작 문서/정본의 관련 범위를 읽는다.
+2. 운영 PC와 격리 PC, remote source·설치 Controller·운영 HEAD/config.source·검사 source를 구분한다.
+3. 작업의 실제 효과(고정 읽기/격리 계산/공급자 수집/설치/게시/복구)에 필요한 조건만 적용한다. 파일 해시 조회에 활성 Core 전체 계보나 과거 취소 로그를 불필요하게 요구하지 않는다.
+4. 설치된 schema/허용목록·고유 요청/승인 manifest·원본 해시를 사용한다. 임의 명령·SQL·원격 스크립트로 우회하지 않는다. 기존 성공 구조를 재사용하고 재설치·중복 시험을 하지 않는다.
+5. 결과 불명확은 기존 실제 상태부터 대조한다. 종료된 무변경 A 조회는 현재 정상 경로와 같은 승인 scope를 확인해 새 ID 한 번으로 재개할 수 있다. 쓰기·공급자 호출·활성/불명 lease는 별도 검증한다.
+6. Writer B 자연 유휴가 반복 실패하면 승인된 유지보수 모드(원본 Task SHA 고정·신규 시작 억제·정상 drain·CAS 설치·원본 복원)를 쓴다. 강제 종료·lock 삭제·같은 ID replay는 하지 않는다. 실제 선례 #2234→#2235→#2236.
+7. 인계 후보는 실행이 아니다. 실제 인수 시 기존 ACKNOWLEDGED→WORKING을 기록하고 지원 행동과 원본 회신까지 수행한다. 코드 없는 진단은 실제 PC Issue/JSON/TXT로 반환하며 PR을 억지로 만들지 않는다. 자동 AI/다른 대화 수신은 실증 전 미검증이다.
+8. 구현/CI/병합/설치/Runtime/게시/자연 갱신을 구분한다. 실제 결과와 사후 확인까지 완료하고 현재 업무를 막지 않는 문제는 별도로 남긴다.
+9. 동일 승인 범위는 재승인 없이 진행한다. 현재 요청 밖 운영 효과·관리자/보안 변경만 별도 판단한다. 비밀정보·원자료·다른 작업자 변경을 보호한다.
+10. 최종 보고는 결과·실제 증거·중요한 남은 범위·다음 행동만 한국어로 짧게 작성한다.
