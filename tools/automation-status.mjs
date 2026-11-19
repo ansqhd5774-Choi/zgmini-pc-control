@@ -48,8 +48,10 @@ export function summarizeAutomation(s){
   maintenanceState:s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'UNVERIFIED',
   automationState:healthy&&s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
   installedOperations:s.installedOperations??[],
-  next:base.state==='NO_ACTIVE_INSTALL_LEASE'&&!healthy?
-    (permissionOnly?'CHECK_GITHUB_RUNNER_ROSTER_READ_PERMISSION':'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE'):base.next,
+  // A roster-only permission failure never becomes a required next action.
+  // Keep the existing normal path; do not diagnose local Controller again.
+  next:base.state==='NO_ACTIVE_INSTALL_LEASE'&&!healthy&&!permissionOnly?
+    'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE':base.next,
   intakeToolPermission:'NOT_TESTED_BY_PC_STATUS',
   intakeNote:'GitHub read access and Runner health do not prove this chat may submit a maintenance request.'};
 }
