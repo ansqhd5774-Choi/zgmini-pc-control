@@ -23,7 +23,7 @@ const previousMonth=now=>{
 };
 function validateShard(x,month,index){
   if(!goodId(x?.number)||x.pull_request||!['open','closed'].includes(x.state)||
-    x.title!==shardTitle(month,index)||x.user?.login!==OWNER||
+    x.title!==shardTitle(month,index)||![OWNER,BOT].includes(x.user?.login)||
     typeof x.body!=='string'||!x.body.includes(shardMarker(month,index)))
     stop('SHARD_IDENTITY');
 }
