@@ -216,6 +216,9 @@ export async function uploadDirectBReport({event,env,rawResult,
     `${event.issue.number}/comments`,{method:'POST',headers,
     body:JSON.stringify({body:comment})});
   need(response.status===201,'DIRECT_B_REPORT_COMMENT_STOP');
+  // Delivery evidence and local B effect are independent. A comment cannot
+  // turn an incomplete 0/2 or 1/2 remote result into a successful report Job.
+  need(verified===2,'DIRECT_B_RESULT_PAIR_UNVERIFIED');
   return {status,delivery,created,verified};
 }
 
