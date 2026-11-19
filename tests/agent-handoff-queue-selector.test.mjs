@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {fingerprintHandoff, parseHandoff, routeHandoff} from '../agent-handoff/contract.mjs';
 import {assessIncident, selectionReceipt, processQueue, SELECTION_MARKER,
   HANDOFF_BOT, HANDOFF_REPOSITORY} from '../agent-handoff/queue-selector.mjs';
-import {validateTrigger} from '../agent-handoff/queue-dispatcher.mjs';
+import {validateTrigger, finalizeSelection} from '../agent-handoff/queue-dispatcher.mjs';
 
 const owner = 'ansqhd5774-Choi';
 function fixture(n=2001) {
@@ -175,4 +175,49 @@ test('workflow_run owner verification and explicit manual trigger only',()=>{
     {...env,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:owner}));
   assert.throws(()=>validateTrigger({repository:event.repository,sender:{login:'attacker'}},
     {...env,GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_ACTOR:owner}));
+});
+
+test('candidate selection stays recorded when the separate board readback fails',async()=>{
+  const selection={selected:1,alreadySelected:0,selectedIssues:[2405],
+    pcOperationalWrites:0,automaticPcRetries:0};
+  const output=await finalizeSelection(selection,async()=>{
+    throw Error('HANDOFF_BOARD_RUNNER_BACKLOG_CAP_EXCEEDED');
+  });
+  assert.equal(output.state,'CANDIDATE_SELECTION_COMPLETED_BOARD_UNVERIFIED');
+  assert.deepEqual(output.selectedIssues,[2405]);
+  assert.equal(output.selected,1);
+  assert.equal(output.execution,null);
+  assert.deepEqual(output.boardReadback,{
+    state:'UNVERIFIED',reason:'HANDOFF_BOARD_RUNNER_BACKLOG_CAP_EXCEEDED'});
+  assert.equal(output.pcRuntimeVerified,false);
+  assert.equal(output.automaticPcRetries,0);
+});
+
+test('board validation preserves pending owner actions even with zero new candidates',async()=>{
+  const output=await finalizeSelection({selected:0,alreadySelected:2},async()=>({
+    schema:'ZGMINI_HANDOFF_BOARD_R1',pendingIssueCount:2,
+    records:[{issueNumber:2301,status:'PENDING_OWNER_ACK'},
+      {issueNumber:2302,status:'WORKING'}]
+  }));
+  assert.equal(output.state,'OWNER_ACTION_REQUIRED');
+  assert.deepEqual(output.execution.ownerActionRequired,[2301]);
+  assert.deepEqual(output.execution.working,[2302]);
+  assert.deepEqual(output.boardReadback,{state:'VERIFIED',pendingIssueCount:2});
+  assert.equal(output.pcRuntimeVerified,false);
+});
+
+test('untrusted board errors do not leak arbitrary API or credential text',async()=>{
+  const output=await finalizeSelection({selected:0},async()=>{
+    throw Error('error: Authorization Bearer secret-token');
+  });
+  assert.equal(output.state,'CANDIDATE_SELECTION_COMPLETED_BOARD_UNVERIFIED');
+  assert.equal(output.boardReadback.reason,'HANDOFF_SELECTOR_BOARD_STATUS_UNAVAILABLE');
+  assert.equal(JSON.stringify(output).includes('secret-token'),false);
+});
+
+test('finalization rejects malformed input instead of manufacturing PASS',async()=>{
+  await assert.rejects(()=>finalizeSelection(null,async()=>({})),
+    /HANDOFF_SELECTOR_FINALIZATION_INPUT_INVALID/);
+  await assert.rejects(()=>finalizeSelection({selected:0},null),
+    /HANDOFF_SELECTOR_FINALIZATION_INPUT_INVALID/);
 });
