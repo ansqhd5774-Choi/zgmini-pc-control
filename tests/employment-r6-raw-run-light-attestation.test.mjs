@@ -43,6 +43,10 @@ test('fixed light audit verifies complete raw chunks and exact run receipt links
  snapshot(db,{requestKey:'test-two',body:'another response'});
  snapshot(db,{requestKey:'test-three',body:'expected value',storedBody:'tampered data!'});
  run(db,certified);
+ const badId=db.prepare("SELECT snapshot_id FROM market_score_employment_r6_raw_snapshot_v1 WHERE request_key=? LIMIT 1")
+  .get('test-three').snapshot_id;
+ const expectedOrdinal=db.prepare("SELECT COUNT(DISTINCT snapshot_id) AS n FROM market_score_employment_r6_raw_snapshot_v1 WHERE snapshot_id<=?")
+  .get(badId).n;
  const result=auditFixedR6RawRunSnapshot(db,{checkedAt:AT});
  assert.deepEqual(result,{
   status:'HASH_AND_RUN_LINKS_VERIFIED_NOT_PIT',checkedAt:AT,
@@ -53,7 +57,7 @@ test('fixed light audit verifies complete raw chunks and exact run receipt links
    TIME_INVALID:0,RESPONSE_HASH_OR_METADATA_MISMATCH:0,
    SNAPSHOT_ID_MISMATCH:0,BODY_SHA_MISMATCH:1,
   },
-  invalidReasonOrdinals:[{ordinal:3,reason:'BODY_SHA_MISMATCH'}],
+  invalidReasonOrdinals:[{ordinal:expectedOrdinal,reason:'BODY_SHA_MISMATCH'}],
   invalidReasonTruncated:false,
  });
  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_|original body|another response|snapshotId|body_sha256|test-one/);
