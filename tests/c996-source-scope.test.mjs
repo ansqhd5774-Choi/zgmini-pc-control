@@ -24,6 +24,9 @@ test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['tools/ai-software-v2-register-once.mjs']),['aiSoftware']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-ai-software-v2-register-once.yml']),['aiSoftware']);
  assert.deepEqual(selectGroups(['tests/ai-software-v2-register-once.test.mjs']),['aiSoftware']);
+ assert.deepEqual(selectGroups(['windows-runtime-mode-a/run.mjs']),['approvedRuntimeA']);
+ assert.deepEqual(selectGroups(['windows-runtime-mode-a/report.mjs']),['approvedRuntimeA']);
+ assert.deepEqual(selectGroups(['.github/workflows/pc-approved-runtime-a-once.yml']),['approvedRuntimeA']);
 });
 test('011 workflow and selection contract changes always run all original suites',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/c996-r5-readonly-source-checks.yml']),all);
