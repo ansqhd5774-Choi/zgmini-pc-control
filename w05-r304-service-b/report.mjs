@@ -39,17 +39,30 @@ function headers(token){
   'x-github-api-version':'2022-11-28','content-type':'application/json',
   'user-agent':'zgmini-w05-r304-once'};
 }
-async function writeAndVerify(url,body,env,apiFetch){
+export async function writeAndVerify(url,body,env,apiFetch){
  const data=Buffer.from(body,'utf8');
- const response=await apiFetch(url,{method:'PUT',headers:headers(env.GITHUB_TOKEN),
-  body:JSON.stringify({message:'evidence(w05): record R3-04 one-shot B result',
+ // Never update existing results or rerun the provider/SQLite effect.
+ // PUT failure may be an already-created file or an ambiguous response.
+ try{
+  const response=await apiFetch(url,{method:'PUT',headers:headers(env.GITHUB_TOKEN),
+   body:JSON.stringify({message:'evidence(w05): record R3-04 one-shot B result',
     content:data.toString('base64')})});
- if(response.status!==201)fail('W05_B_REMOTE_RESULT_CREATE_STOP');
- const read=await apiFetch(url,{headers:headers(env.GITHUB_TOKEN)});
+  if(response.status!==201)fail('W05_B_REMOTE_RESULT_CREATE_STOP');
+ }catch{/* Only exact authenticated GET can reconcile this state. */}
+ let read;
+ try{read=await apiFetch(url+'?ref=main',{method:'GET',headers:headers(env.GITHUB_TOKEN)})}
+ catch{fail('W05_B_REMOTE_RESULT_READBACK_STOP')}
  if(!read.ok)fail('W05_B_REMOTE_RESULT_READBACK_STOP');
- const fetched=await read.json();
- const raw=Buffer.from(String(fetched.content??'').replace(/\s+/g,''),'base64');
- expect(sha256(raw)===sha256(data),'W05_B_REMOTE_RESULT_HASH_STOP');
+ let fetched;
+ try{fetched=await read.json()}
+ catch{fail('W05_B_REMOTE_RESULT_READBACK_STOP')}
+ expect(fetched?.encoding==='base64'&&typeof fetched?.content==='string',
+  'W05_B_REMOTE_RESULT_READBACK_STOP');
+ const encoded=fetched.content.replace(/\s/g,'');
+ expect(/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)&&encoded.length%4===0,
+  'W05_B_REMOTE_RESULT_READBACK_STOP');
+ const raw=Buffer.from(encoded,'base64');
+ expect(raw.equals(data),'W05_B_REMOTE_RESULT_HASH_STOP');
 }
 export async function upload(env=process.env,apiFetch=fetch){
  expect(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>20&&

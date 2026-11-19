@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildR47Report} from '../task-cmd-b/report.mjs';
+import {buildR47Report,createAndReadback} from '../task-cmd-b/report.mjs';
 import {R47_B_ISSUE} from '../task-cmd-b/approval-intake.mjs';
 const ID='01234567-89ab-4cde-8fab-0123456789ab';
 function fixture(){
@@ -46,4 +46,24 @@ test('R47 known prewrite STOP and spoofed actor remain distinct',()=>{
  assert.equal(buildR47Report(x).status,'STOP');
  const y=fixture();y.env.GITHUB_ACTOR='untrusted';
  assert.throws(()=>buildR47Report(y),{code:'TASK_CMD_B_REPORT_EVENT_STOP'});
+});
+
+test('R47 report-only recovery accepts existing identical bytes after rejected create',async()=>{
+ const bytes=Buffer.from('R47_APPROVED_REPORT');
+ const calls=[];
+ const fakeApi=async(method,endpoint)=>{
+  calls.push({method,endpoint});
+  if(method==='PUT')throw Error('HTTP_422_EXISTS');
+  return {encoding:'base64',content:bytes.toString('base64')};
+ };
+ await createAndReadback('results/r47-fixture.json',bytes,'fixture-token',fakeApi);
+ assert.deepEqual(calls.map(x=>x.method),['PUT','GET']);
+ assert.ok(calls[1].endpoint.endsWith('?ref=main'));
+});
+test('R47 report-only recovery refuses different existing bytes',async()=>{
+ const bytes=Buffer.from('approved');
+ const fakeApi=async(method)=>method==='PUT'?Promise.reject(Error('EXISTS')):
+  {encoding:'base64',content:Buffer.from('mismatch').toString('base64')};
+ await assert.rejects(createAndReadback('results/r47-fixture.txt',bytes,
+  'fixture-token',fakeApi),{code:'TASK_CMD_B_REMOTE_READBACK_STOP'});
 });
