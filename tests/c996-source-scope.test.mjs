@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {GROUPS,selectGroups,changedFiles} from '../tools/c996-source-checks.mjs';
 const all=Object.keys(GROUPS);
 test('011 unrelated feature/docs PR cannot be blocked by unrelated source suites',()=>{
@@ -40,4 +42,31 @@ test('011 CI uses scoped PR concurrency and checks host before test execution',(
            y.indexOf('- name: Run changed-source regressions only'));
  assert.match(y,/runs-on: \[self-hosted, Windows, X64, zgmini-handoff-ci-isolated\]/);
  assert.doesNotMatch(y,/schedule:|workflow_dispatch:|runs-on: ubuntu-latest/);
+});
+
+test('011 actual PR comparison uses existing contents-read scope and selects only affected tests',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'c996-scope-'));
+ const path=join(dir,'event.json');
+ const base='a'.repeat(40),head='b'.repeat(40);
+ writeFileSync(path,JSON.stringify({pull_request:{base:{sha:base},head:{sha:head}}}));
+ const env={GITHUB_EVENT_PATH:path,GITHUB_REPOSITORY:'ansqhd5774-Choi/zgmini-pc-control',
+  GITHUB_TOKEN:'unit-test-not-secret'};
+ try{
+  let calls=0;
+  const changed=await changedFiles(env,async(url,opts)=>{
+   calls++;
+   assert.ok(url.endsWith('/compare/'+base+'...'+head));
+   assert.equal(opts.headers.Authorization,'Bearer unit-test-not-secret');
+   return {ok:true,json:async()=>({files:[
+    {filename:'agent-handoff/result-broker.mjs'},
+    {filename:'docs/unrelated-feature.md'}]})};
+  });
+  assert.equal(calls,1);
+  assert.deepEqual(selectGroups(changed),['handoff009']);
+  const unknown=await changedFiles(env,async()=>({ok:false,status:403}));
+  assert.equal(unknown,null);
+  const cap=await changedFiles(env,async()=>({ok:true,json:async()=>({
+   files:Array.from({length:300},(_,i)=>({filename:'docs/'+i+'.md'}))})}));
+  assert.equal(cap,null);
+ }finally{rmSync(dir,{recursive:true,force:true});}
 });
