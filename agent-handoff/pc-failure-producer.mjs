@@ -53,6 +53,34 @@ export async function scopedSeatRead(seat, phase, read, recordPending) {
   }
 }
 
+// Quarantine ONLY explicitly recognized pre-write contract violations.
+// This rejects the affected Seat and leaves the entire run non-successful,
+// while allowing unrelated Seats to finish their authenticated handoffs.
+const SEAT_PROOF_CODES=new Set([
+  'ISSUE_NOT_AUTHORIZED','REQUEST_JSON_INVALID','REQUEST_IDENTITY_INVALID',
+  'RESULT_PROVENANCE_INVALID','REQUEST_ID_MISMATCH_STOP','CHAT_ID_MISMATCH_STOP',
+  'OPERATION_MISMATCH_STOP','SOURCE_REPOSITORY_MISMATCH_STOP',
+  'SOURCE_BRANCH_MISMATCH_STOP','SOURCE_SHA_MISMATCH_STOP',
+  'CONTROL_SHA_INVALID','RESULT_STATUS_INVALID','FAILURE_FIELDS_INVALID',
+  'FAILURE_RESULT_TEXT_INVALID','FAILURE_RESULT_STATUS_INVALID',
+  'FAILURE_RESULT_PAIR_MISMATCH_STOP','WAIT_IDENTITY_INVALID'
+]);
+export function scopedSeatProof(seat, phase, verify, recordUnverified){
+  if (!issueNumber(seat)||seat>6||
+      !['FAILURE_IDENTITY','FAILURE_RESULT_PAIR','WAIT_IDENTITY'].includes(phase)||
+      typeof verify!=='function'||typeof recordUnverified!=='function')
+    stop('PROOF_SCOPE_INPUT_INVALID');
+  try{return {ready:true,value:verify()};}
+  catch(error){
+    const code=typeof error?.message==='string'?error.message:'';
+    if(!code.startsWith('PC_HANDOFF_')||
+       !SEAT_PROOF_CODES.has(code.slice('PC_HANDOFF_'.length)))throw error;
+    // Do not emit untrusted report contents or the exception message.
+    recordUnverified({seat,phase,reason:'SEAT_PROOF_UNVERIFIED'});
+    return {ready:false};
+  }
+}
+
 const marker = (runId, attempt, seat) =>
   `<!-- zgmini-pc-result:${runId}:${attempt}:${seat} -->`;
 
@@ -95,6 +123,7 @@ export async function processCompletedPcJob(event, {
     routesRecorded: 0, routesReused: 0,
     waitsRecorded:0,waitsReused:0,waitProofPending:0,failureProofPending:0,
     missingReceipts: 0, seatReadPending: 0, seatReadProblems: [],
+    seatProofUnverified:0, seatProofProblems:[],
     pcOperationalWrites: 0, automaticPcRetries: 0};
   const confirmRoute = async (prepared, number) => {
     if (typeof routeHandoff !== 'function') stop('ROUTE_NOT_CONFIGURED');
@@ -108,6 +137,8 @@ export async function processCompletedPcJob(event, {
     result.seatReadProblems.push(problem);
   };
   const readSeat=(seat,phase,read)=>scopedSeatRead(seat,phase,read,recordPending);
+  const verifySeat=(seat,phase,verify)=>scopedSeatProof(seat,phase,verify,
+    problem=>{result.seatProofUnverified++;result.seatProofProblems.push(problem);});
   let comments = null;
   for (let seat = 1; seat <= 6; seat++) {
     const resultPath = `results/${run.runId}-${run.attempt}-seat-${seat}.json`;
@@ -137,7 +168,10 @@ export async function processCompletedPcJob(event, {
         ()=>readReportText(resultPath.replace(/\.json$/,'.txt')));
       if(!txt.ready)continue;
       const resultTxt=txt.value;
-      const wait=preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt});
+      const checked=verifySeat(seat,'WAIT_IDENTITY',()=>
+        preparePcSharedResourceWait({originIssue,report,resultPath,resultTxt}));
+      if(!checked.ready)continue;
+      const wait=checked.value;
       if(wait.state==='WAIT_PROOF_UNVERIFIED'){result.waitProofPending++;continue;}
       if(wait.state!=='WAITING_SHARED_RESOURCE')stop('WAIT_CLASSIFICATION_STOP');
       const ledger=await persistResourceWait(wait.wait,{
@@ -161,7 +195,10 @@ export async function processCompletedPcJob(event, {
     const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
     if(!origin.ready)continue;
     const originIssue=origin.value;
-    const prepared = preparePcFailureHandoff({originIssue, report, resultPath});
+    const checked=verifySeat(seat,'FAILURE_IDENTITY',()=>
+      preparePcFailureHandoff({originIssue,report,resultPath}));
+    if(!checked.ready)continue;
+    const prepared=checked.value;
     // A failure-proof fixture is eligible for exclusion only after the
     // authenticated original request agrees with the published result.
     if (prepared.state === 'NOT_ELIGIBLE') continue;
@@ -171,7 +208,10 @@ export async function processCompletedPcJob(event, {
       ()=>readReportText(resultPath.replace(/\.json$/, '.txt')));
     if(!txt.ready)continue;
     const resultTxt=txt.value;
-    const pair = verifyPcFailureResultPair({report, resultTxt});
+    const verifiedPair=verifySeat(seat,'FAILURE_RESULT_PAIR',()=>
+      verifyPcFailureResultPair({report,resultTxt}));
+    if(!verifiedPair.ready)continue;
+    const pair=verifiedPair.value;
     if (pair.state === 'EVIDENCE_PAIR_MISSING') {
       result.failureProofPending++; continue;
     }
@@ -209,6 +249,8 @@ export async function processCompletedPcJob(event, {
     // Preserve partial success counters while clearly marking incomplete
     // observations, including runs with zero successfully read JSON reports.
     result.state='PARTIAL_SEAT_READ_PENDING';
+  } else if(result.seatProofUnverified){
+    result.state='PARTIAL_SEAT_PROOF_UNVERIFIED';
   } else if (!result.reportsObserved) {
     // A cancelled parent run can have no per-seat result; do not report
     // the same cancellation as a second intake execution failure.
@@ -304,7 +346,8 @@ export async function main(env = process.env) {
     readResourceWaitComment:id=>request(`issues/comments/${id}`)
   });
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (['PARTIAL_SEAT_READ_PENDING','PARTIAL_RECEIPT_PENDING',
+  if (['PARTIAL_SEAT_READ_PENDING','PARTIAL_SEAT_PROOF_UNVERIFIED',
+    'PARTIAL_RECEIPT_PENDING',
     'PARTIAL_FAILURE_EVIDENCE_PENDING',
     'PARTIAL_WAIT_EVIDENCE_PENDING',
     'NO_PUBLISHED_RESULTS'].includes(report.state)) process.exitCode = 1;
