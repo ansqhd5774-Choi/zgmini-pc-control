@@ -50,6 +50,8 @@ function fixture(initial = report()) {
     calls: {comments: 0, file: [], list: 0, create: 0, route: 0, readIssue: []},
     failAfterPost: false, failBeforePost: false, tamperReadback: false};
   const io = {
+    getSourceJobs: async()=>[{name:'writer-source-approved-b',steps:[
+      {name:'Create-only sanitized result and originating Issue comment',conclusion:'success'}]}],
     readComments: async since => {
       state.calls.comments++;
       assert.equal(since, '2026-11-08T02:11:00Z');
@@ -367,4 +369,22 @@ test('route failure prevents Writer B intake completion and never retries the in
   await assert.rejects(processCompletedWriterB(event(), io), /COMMENT_READBACK_STOP/);
   assert.equal(state.calls.create, 1);
   assert.equal(state.calls.route, 0);
+});
+
+test('unrelated Writer B source operations do not scan comments or create incidents',async()=>{
+  const {io,state}=fixture();
+  io.getSourceJobs=async()=>[{name:'writer-source-approved-b',steps:[
+    {name:'Create-only sanitized result and originating Issue comment',conclusion:'skipped'}]}];
+  const e=event();e.workflow_run.conclusion='success';
+  const actual=await processCompletedWriterB(e,io);
+  assert.equal(actual.state,'UNRELATED_SOURCE_OPERATION');
+  assert.equal(state.calls.comments,0);
+  assert.equal(state.calls.create,0);
+});
+test('unverified source job provenance does not create incident',async()=>{
+  const {io,state}=fixture();
+  io.getSourceJobs=async()=>[];
+  await assert.rejects(processCompletedWriterB(event(),io),/SOURCE_JOBS_UNVERIFIED/);
+  assert.equal(state.calls.comments,0);
+  assert.equal(state.calls.create,0);
 });
