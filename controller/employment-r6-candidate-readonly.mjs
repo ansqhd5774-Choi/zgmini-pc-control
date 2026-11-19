@@ -190,6 +190,95 @@ export function retainPit0605PrivateEvidence({outputDir,host,request,aggregate})
   evidenceFileSha256:sha,privateEvidenceReadback:true};
 }
 
+
+export function retainPit0408PrivateEvidence({outputDir,host,request,keyReview,allSeriesConflicts}){
+ const file=path.join(outputDir,'PIT0408_PRIVATE_KEY_EVIDENCE.json');
+ const stat=fs.lstatSync(file);
+ if(!stat.isFile()||stat.isSymbolicLink()||stat.size<10||stat.size>32*1024*1024)
+  stop('R6_PIT0408_PRIVATE_SOURCE_INVALID');
+ const bytes=fs.readFileSync(file);
+ let proof;
+ try{proof=JSON.parse(bytes.toString('utf8'));}
+ catch{stop('R6_PIT0408_PRIVATE_INVALID');}
+ const ledger=proof?.ledger;
+ if(proof?.kind!=='PIT0408_PC_WORKSPACE_PRIVATE_V1'||!HASH.test(proof.digest??'')
+   ||ledger?.schema!=='W04_PIT0408_PRIVATE_KEYS_V1'
+   ||ledger.rawPitAttested!==false||ledger.repairAuthorized!==false
+   ||ledger.asOfDate!==keyReview.asOfDate
+   ||ledger.coreStateKeyCount!==keyReview.counts.coreKeys
+   ||!Array.isArray(ledger.evidence)||ledger.evidence.length!==keyReview.evidenceTotal
+   ||!Array.isArray(ledger.allSeriesCandidateCurrentConflicts)
+   ||ledger.allSeriesCandidateCurrentConflicts.length!==allSeriesConflicts
+   ||digest(JSON.stringify(ledger))!==proof.digest)
+  stop('R6_PIT0408_PRIVATE_INVALID');
+ for(const [k,v] of Object.entries(keyReview.counts)){
+  if(ledger.counts?.[k]!==v)stop('R6_PIT0408_PRIVATE_COUNT_MISMATCH');
+ }
+ const allowed=new Set(['logicalSeriesId','geographyCode','observationDate',
+   'reason','coreHistoryMissing','candidateCurrentConflict','rawPitAttested','repairAuthorized']);
+ const seen=new Set();
+ let missing=0,claimConflicts=0;
+ for(const row of ledger.evidence){
+  if(!row||Object.keys(row).length!==allowed.size
+    ||Object.keys(row).some(k=>!allowed.has(k))
+    ||row.logicalSeriesId!=='STATE_INITIAL_CLAIMS'
+    ||!PIT04_STATES.has(row.geographyCode)
+    ||!/^20\d{2}-\d{2}-\d{2}$/.test(row.observationDate??'')
+    ||row.rawPitAttested!==false||row.repairAuthorized!==false
+    ||typeof row.coreHistoryMissing!=='boolean'
+    ||typeof row.candidateCurrentConflict!=='boolean'
+    ||!PIT04_REASONS.has(row.reason))stop('R6_PIT0408_PRIVATE_ROW_INVALID');
+  const id=row.geographyCode+'|'+row.observationDate;
+  if(seen.has(id))stop('R6_PIT0408_PRIVATE_DUPLICATE');
+  seen.add(id);
+  if(row.coreHistoryMissing)missing++;
+  if(row.candidateCurrentConflict)claimConflicts++;
+ }
+ if(missing!==keyReview.counts.coreHistoryMissing
+   ||claimConflicts!==keyReview.counts.candidateOverlapConflicts)
+  stop('R6_PIT0408_PRIVATE_COUNT_MISMATCH');
+ const allSeen=new Set();
+ let stateConflicts=0;
+ for(const row of ledger.allSeriesCandidateCurrentConflicts){
+  if(!row||Object.keys(row).length!==5
+    ||!['logicalSeriesId','geographyType','geographyCode','observationDate','reason']
+       .every(k=>Object.hasOwn(row,k))
+    ||typeof row.logicalSeriesId!=='string'||!/^[A-Z][A-Z0-9_]{2,63}$/.test(row.logicalSeriesId)
+    ||typeof row.geographyType!=='string'||!/^[A-Z_]{2,24}$/.test(row.geographyType)
+    ||typeof row.geographyCode!=='string'||!/^[A-Z0-9_-]{1,32}$/.test(row.geographyCode)
+    ||!/^20\d{2}-\d{2}-\d{2}$/.test(row.observationDate??'')
+    ||row.reason!=='CANDIDATE_CURRENT_CONFLICT')
+    stop('R6_PIT0408_PRIVATE_CONFLICT_INVALID');
+  const id=[row.logicalSeriesId,row.geographyType,row.geographyCode,
+    row.observationDate].join('|');
+  if(allSeen.has(id))stop('R6_PIT0408_PRIVATE_DUPLICATE');
+  allSeen.add(id);
+  if(row.logicalSeriesId==='STATE_INITIAL_CLAIMS')stateConflicts++;
+ }
+ if(stateConflicts!==keyReview.counts.candidateOverlapConflicts
+   ||keyReview.evidence.length>8)
+  stop('R6_PIT0408_PRIVATE_COUNT_MISMATCH');
+ const home=host?.dataRoot;
+ if(typeof home!=='string'||!path.isAbsolute(home)
+   ||path.basename(home).toLowerCase()!=='data')
+  stop('R6_PIT0408_PRIVATE_ROOT_UNAVAILABLE');
+ const writer=path.join(home,'pc-writer'),root=path.join(writer,'pit-evidence');
+ if(!fs.statSync(writer).isDirectory())
+  stop('R6_PIT0408_PRIVATE_ROOT_UNAVAILABLE');
+ try{fs.mkdirSync(root,{recursive:false});}catch(e){if(e?.code!=='EEXIST')throw e;}
+ const folder=fs.lstatSync(root);
+ if(!folder.isDirectory()||folder.isSymbolicLink())
+  stop('R6_PIT0408_PRIVATE_ROOT_UNAVAILABLE');
+ const name='pit0408-'+request.requestId+'.json',dest=path.join(root,name);
+ fs.writeFileSync(dest,bytes,{flag:'wx',mode:0o600});
+ const receiptSha=digest(bytes);
+ if(digest(fs.readFileSync(dest))!==receiptSha)
+  stop('R6_PIT0408_PRIVATE_READBACK_MISMATCH');
+ return {pit04PrivateEvidenceDigest:proof.digest,
+  evidenceFileSha256:receiptSha,evidenceFileRef:'PC_WRITER_PIT_EVIDENCE/'+name,
+  privateEvidenceReadback:true};
+}
+
 export function validateBundle(request,{host,workspace}){
   if(Object.hasOwn(request,'pit04Offset')&&(!Number.isSafeInteger(request.pit04Offset)
      ||request.pit04Offset<0||request.pit04Offset>50000))stop('R6_PIT04_OFFSET_INVALID');
@@ -292,6 +381,7 @@ export async function inspectEmploymentR6Candidate(request,context){
     argv.push('--as-of',context.host.employmentR6AsOfDate);
   }
   if(Object.hasOwn(request,'pit04Offset'))argv.push('--pit04-offset',String(request.pit04Offset));
+  if(request.pit0408Private===true)argv.push('--pit0408-private','1');
   if(request.pit0605Raw===true)argv.push('--pit0605-raw','1');
   const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,
     PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace,HOME:workspace,USERPROFILE:workspace};
@@ -355,9 +445,25 @@ export async function inspectEmploymentR6Candidate(request,context){
     if(wantsPit04&&body.status==='PASS'&&body.pit04KeyReview==null)
       stop('R6_PIT04_RESULT_MISSING');
     if(!wantsPit04&&body.pit04KeyReview!=null)stop('R6_PIT04_UNREQUESTED_RESULT');
+    if(request.pit0408Private!==true&&
+      (body.pit04PrivateEvidenceDigest!=null||body.pit04PrivateEvidencePersisted!=null))
+      stop('R6_PIT0408_UNREQUESTED_PRIVATE');
     const pit04KeyReview=wantsPit04&&body.status==='PASS'
       ?projectPit04KeyReview(body.pit04KeyReview,{
          offset:request.pit04Offset,asOfDate:body.asOfDate}):null;
+    let privateReceipt={};
+    if(request.pit0408Private===true&&body.status==='PASS'){
+      if(request.pit04Offset!==0||!HASH.test(body.pit04PrivateEvidenceDigest??'')
+        ||body.pit04PrivateEvidencePersisted!==true||pit04KeyReview===null
+        ||pit.candidateOverlapConflictingKeys===null)
+        stop('R6_PIT0408_PRIVATE_REPORT_INVALID');
+      privateReceipt=retainPit0408PrivateEvidence({
+        outputDir,host:context.host,request,
+        keyReview:{...pit04KeyReview,asOfDate:body.asOfDate},
+        allSeriesConflicts:pit.candidateOverlapConflictingKeys});
+      if(privateReceipt.pit04PrivateEvidenceDigest!==body.pit04PrivateEvidenceDigest)
+        stop('R6_PIT0408_PRIVATE_REPORT_INVALID');
+    }
     // New Host bundles can carry bounded raw-body/run proof by source/month.
     // Older approved bundles omit these arrays and retain their prior output.
     pit.rawSnapshotByGroup=attestRows(body.pit?.rawSnapshotByGroup,
@@ -424,7 +530,7 @@ export async function inspectEmploymentR6Candidate(request,context){
     return {status:body.status,code:body.code,actualExecutionSha:request.sourceSha,
       sourceBundleSha:request.sourceSha,asOfDate:dateOnly(body.asOfDate),
       sqliteOpened:body.sqliteOpened===true,
-      summary,pit,...(pit04KeyReview===null?{}:{pit04KeyReview}),
+      summary,pit,...(pit04KeyReview===null?{}:{pit04KeyReview}),...privateReceipt,
       indicators,bodyDigest:HASH.test(body.bodyDigest??'')?body.bodyDigest:null,
       walPreflight,promotionApproved:false,
       memoryTelemetry:{...child.memoryTelemetry,
