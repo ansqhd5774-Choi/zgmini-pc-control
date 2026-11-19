@@ -287,7 +287,7 @@ async function listRuns(created){
 }
 async function listPagedRuns(resource){
   const out=[];
-  for(let page=1;page<=4;page++){
+  for(let page=1;page<=10;page++){
     const result=await request(resource+'&per_page=100&page='+page);
     if(!Array.isArray(result?.workflow_runs))stop('RUN_PAGE_INVALID');
     out.push(...result.workflow_runs);
@@ -311,14 +311,29 @@ export async function main(env=process.env){
     },
     getLog:id=>request('actions/jobs/'+id+'/logs',{text:true}),
     readLedger:()=>request('issues/'+issue),
-    readComments:()=>listPaged('issues/'+issue+'/comments',4),
-    postComment:body=>request('issues/'+issue+'/comments',{method:'POST',body:{body}})
+    readLegacyComments:()=>readLegacyProactiveArchive(page=>
+      request('issues/'+issue+'/comments?per_page=100&page='+page)),
+    findShards:async month=>{
+      const all=await listPaged('issues?state=all&labels='+
+        SCOUT_POLICY.shardLabel,20);
+      return all.filter(x=>!x.pull_request&&
+        typeof x.title==='string'&&
+        x.title.startsWith('ZGMINI Proactive Diagnostics '+month+' #'));
+    },
+    readShard:n=>request('issues/'+n),
+    readShardComments:n=>listPaged('issues/'+n+'/comments',SCOUT_POLICY.maxShardPages),
+    createShard:(month,index,title,body)=>request('issues',{method:'POST',
+      body:{title,body:body+'\n\nVerified GitHub Actions failures for '+month+
+        '. Append-only diagnostic evidence. No PC action.',
+        labels:[SCOUT_POLICY.shardLabel]}}),
+    postComment:(n,body)=>request('issues/'+n+'/comments',{method:'POST',
+      body:{body}})
   },Date.now());
   const message='# ZGMINI 능동 GitHub 진단\n\n'+
     '- 최근 7일 최신순 후보: '+result.recentFailures+'\n'+
     '- 새 진단 댓글: '+result.newReports+'\n'+
     '- 이미 기록된 실행: '+result.alreadyRecorded+'\n'+
-    '- 원본 관제 Issue: #'+issue+'\n'+
+    '- 역사 보관 원장(읽기 전용): #'+issue+'\n'+
     '- 운영 PC 쓰기/재실행: 0\n';
   if(env.GITHUB_STEP_SUMMARY)fs.appendFileSync(env.GITHUB_STEP_SUMMARY,message,'utf8');
   process.stdout.write(JSON.stringify(result)+'\n');
