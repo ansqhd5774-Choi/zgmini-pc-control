@@ -122,7 +122,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         stats.comments++;
         assert.equal(args[args.indexOf("--repo")+1],REPO);
         const body=args[args.indexOf("--body")+1];
-        assert.match(body,/zgmini-pc-maintenance-(?:result|upload):/);
+        assert.match(body,/zgmini-pc-maintenance-(?:result|upload|rejected):/);
         if(commentError){issue.comments.push({body,author:{login:ACTOR}});throw commentError;}
         issue.comments.push({body,author:{login:ACTOR}});
         return {stdout:""};
@@ -348,6 +348,29 @@ test("Issue body cannot add shell, file, path, token or URL fields",async t=>{
   assert.equal(output[0].code,"ISSUE_CONTRACT_INVALID");
   assert.equal(f.stats.applies,0);
   assert.equal(f.stats.manifestReads,0);
+});
+
+test('trusted malformed correlation ID gets one exact admission rejection and can be corrected',async t=>{
+ const f=fixture(t);f.issue.body=JSON.stringify({...f.request,chatId:'chat-human-readable-label'});
+ const first=await f.agent.pollOnce();
+ assert.equal(first[0].code,'UPDATE_CHAT_ID_INVALID');
+ assert.equal(first[0].phase,'REQUEST_ADMISSION');assert.equal(first[0].executionStarted,false);
+ assert.equal(first[0].feedback,'VERIFIED');assert.equal(f.stats.comments,1);
+ assert.match(f.issue.comments[0].body,/REQUEST_REJECTED_BEFORE_EXECUTION/);
+ assert.match(f.issue.comments[0].body,/CODE: UPDATE_CHAT_ID_INVALID/);
+ assert.equal(f.stats.applies,0);assert.equal(f.stats.manifestReads,0);
+ await f.agent.pollOnce();assert.equal(f.stats.comments,1);
+ f.issue.body=JSON.stringify(f.request);const fixed=await f.agent.pollOnce();
+ assert.equal(fixed[0].status,'SUCCEEDED');assert.equal(f.stats.applies,1);
+});
+
+test('admission rejection reconciles lost delivery without leaking malformed request text',async t=>{
+ const f=fixture(t,{commentError:Error('lost response')});
+ f.issue.body='{SECRET_MUST_NOT_BE_RETURNED';
+ const first=await f.agent.pollOnce();
+ assert.equal(first[0].feedback,'VERIFIED');assert.equal(f.stats.applies,0);
+ assert.doesNotMatch(f.issue.comments[0].body,/SECRET_MUST_NOT_BE_RETURNED/);
+ await f.agent.pollOnce();assert.equal(f.stats.comments,1);
 });
 
 test("duplicate JSON security keys are rejected, including JSON.parse last-key-wins",async t=>{

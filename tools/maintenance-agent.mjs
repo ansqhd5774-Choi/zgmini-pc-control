@@ -519,12 +519,32 @@ export function createMaintenanceAgent({
       actualControllerSha:current.actualControllerSha??status.actualControllerSha},current.code);
     return persistResult(entry,result);
   }
+  async function rejectAdmission(issue,reason){
+    const code=/^(?:UPDATE|R6_HOST|R54_B|SOURCE_BUNDLE|ISSUE)_[A-Z0-9_]{1,70}$/.test(reason??'')
+      ?reason:'ISSUE_CONTRACT_INVALID';
+    const digest=sha256(typeof issue.body==='string'?issue.body:'');
+    const marker=`<!-- zgmini-pc-maintenance-rejected:${issue.number}:${digest} -->`;
+    const body=[marker,'REQUEST_REJECTED_BEFORE_EXECUTION',`CODE: ${code}`,
+      'PHASE: REQUEST_ADMISSION','EXECUTION_STARTED: false','PC_OPERATIONAL_EFFECTS: 0',
+      'NEXT: CORRECT_REQUEST_ENVELOPE_WITH_EXISTING_APPROVAL_NO_INSTALL_REPLAY'].join('\n');
+    const outcome={status:'BLOCKED',code,issueNumber:issue.number,
+      phase:'REQUEST_ADMISSION',executionStarted:false,operationalWrites:0};
+    const fresh=await issueDetails(issue.number);
+    if(!issueIsTrusted(fresh,{allowedActors,title:issue.title,label})||fresh.body!==issue.body)
+      return {...outcome,feedback:'ISSUE_CHANGED_BEFORE_REJECTION'};
+    const present=x=>(x.comments??[]).some(c=>c?.body===body&&
+      allowedActors.some(a=>a.toLowerCase()===String(c.author?.login??'').toLowerCase()));
+    if(present(fresh))return {...outcome,feedback:'VERIFIED'};
+    try{await github(['issue','comment',String(issue.number),'--repo',repo,'--body',body]);}
+    catch{/* Reconcile a lost response; never retry the PC or blindly post. */}
+    return {...outcome,feedback:present(await issueDetails(issue.number))?'VERIFIED':'COMMENT_OUTCOME_UNKNOWN'};
+  }
   async function processIssue(issue){
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
       ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
       return {status:"IGNORED",issueNumber:issue?.number};
     if(typeof issue.body!=="string"||Buffer.byteLength(issue.body)>MAX_BODY_BYTES){
-      return {status:"BLOCKED",code:"ISSUE_BODY_INVALID",issueNumber:issue.number};
+      return rejectAdmission(issue,'ISSUE_BODY_INVALID');
     }
     let request;
     try{
@@ -542,8 +562,8 @@ export function createMaintenanceAgent({
         throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
       if((request.operation===SOURCE_BUNDLE_OPERATION)!==(issue.title===SOURCE_BUNDLE_ISSUE_TITLE))
         throw coded("ISSUE_TITLE_OPERATION_MISMATCH");
-    }catch{
-      return {status:"BLOCKED",code:"ISSUE_CONTRACT_INVALID",issueNumber:issue.number};
+    }catch(error){
+      return rejectAdmission(issue,error?.code??error?.message);
     }
     if(!REQUEST_ID.test(request.requestId)){
       return {status:"BLOCKED",code:"INVALID_REQUEST_ID",issueNumber:issue.number};
