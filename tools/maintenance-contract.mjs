@@ -518,8 +518,10 @@ export function validateUpdateRequest(issue,manifestBytes,{
     throw Error('CONTROLLER_ONLY_INSTALL_SCOPE_INVALID');
   // Selective source is a separate B-approved Controller overlay, not a way to
   // reinterpret an unapproved main tree or to introduce extra operation effects.
-  if(raw.selectiveSource){
+  if(Object.hasOwn(raw,'selectiveSource')){
     const x=raw.selectiveSource;
+    if(!x||typeof x!=='object'||Array.isArray(x))
+      throw Error('SELECTIVE_SOURCE_FIELDS_INVALID');
     requireKeys(x,['schema','branch','mainSha','customPaths'],
       'SELECTIVE_SOURCE_FIELDS_INVALID');
     if(x.schema!=='ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1'||
