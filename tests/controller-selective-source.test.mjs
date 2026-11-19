@@ -123,6 +123,6 @@ test('exact installed-tree overlay diff is distinct from main-wide delta and pre
   assert.throws(()=>validateControllerOnlyInstallDelta(
    git('diff','--name-only',old,main).split(/\r?\n/),files.slice(0,2)),
    /ALLOWFILE_DIFF_MISMATCH/);
-  assert.equal(git('show',overlay+':controller/unapproved.mjs').length,0);
+  assert.throws(()=>git('show',overlay+':controller/unapproved.mjs'));
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
