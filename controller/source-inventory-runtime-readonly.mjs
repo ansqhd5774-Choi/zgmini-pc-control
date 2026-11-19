@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {DatabaseSync} from 'node:sqlite';
+import {openSqliteReadonly} from './common.mjs';
 import {gunzipSync} from 'node:zlib';
 import {inspectEarningsCCheckpoint} from './earnings-c-checkpoint-readonly.mjs';
 
@@ -157,15 +157,19 @@ function preflight(file,root,filesystem){
     ![1,2].includes(header[18])||![1,2].includes(header[19]))
   return {status:'UNKNOWN',code:'DB_HEADER_INVALID'};
  if(header[18]===2||header[19]===2){
-  if(!['-wal','-shm'].every(ext=>{
-   const side=safePath(file+ext,root,filesystem);
-   return side?.stat.isFile()&&!side.stat.isSymbolicLink();
-  }))return {status:'UNKNOWN',code:'WAL_SIDECARS_ABSENT_UNVERIFIED'};
+  for(const ext of ['-wal','-shm']){
+   try{
+    filesystem.lstatSync(file+ext);
+    const side=safePath(file+ext,root,filesystem);
+    if(!side?.stat.isFile()||side.stat.isSymbolicLink())
+     return {status:'UNKNOWN',code:'WAL_SIDECAR_UNSAFE'};
+   }catch(error){if(error?.code!=='ENOENT')return {status:'UNKNOWN',code:'WAL_SIDECAR_UNSAFE'};}
+  }
  }
  return {status:'READY',code:'READONLY_OPEN_APPROVED',path:entry.real};
 }
 
-function inspectDb(file,root,{filesystem=fs,openDatabase=f=>new DatabaseSync(f,{readOnly:true,timeout:4000})}={}){
+function inspectDb(file,root,{filesystem=fs,openDatabase=openSqliteReadonly}={}){
  const gate=preflight(file,root,filesystem);
  if(gate.status!=='READY')return {status:'STATE_UNKNOWN',code:gate.code,sqliteOpened:false};
  let db,queryStage='OPEN_READONLY';

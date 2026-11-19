@@ -1,4 +1,16 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
+// Logical read-only access: SQLite owns its read locks/WAL coordination.
+// Business rows/schema stay read-only; a read transaction keeps all queries
+// on one committed snapshot while the operational writer continues.
+export function openSqliteReadonly(filename,{timeout=4000}={}){
+ if(typeof filename!=='string'||!path.isAbsolute(filename)||filename.includes('\0'))
+  throw Error('SQLITE_READONLY_PATH_INVALID');
+ const {DatabaseSync}=createRequire(import.meta.url)('node:sqlite');
+ const db=new DatabaseSync(filename,{readOnly:true,timeout});
+ try{db.exec('PRAGMA query_only=ON');db.exec('BEGIN');return db;}
+ catch(error){db.close();throw error;}
+}
 export const digest=x=>createHash('sha256').update(x).digest('hex');
 export const need=(condition,code)=>{if(!condition)throw Object.assign(new Error(code),{code});};
 export function exclusive(root,id){

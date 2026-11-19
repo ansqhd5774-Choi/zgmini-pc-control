@@ -202,7 +202,7 @@ jobs:
       - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
         run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs
       - name: Verify W05 BLS C exact source SHA checkpoint using existing A inventory, offline only
-        run: node --test --test-concurrency=1 tests/earnings-c-checkpoint-readonly.test.mjs tests/source-inventory-runtime-readonly.test.mjs
+        run: node --test --test-concurrency=1 tests/earnings-c-checkpoint-readonly.test.mjs tests/source-inventory-runtime-readonly.test.mjs tests/sqlite-readonly-contract.test.mjs tests/employment-r6-collection-evidence-readonly.test.mjs
       - name: Verify immutable W03 R179 B approval SHA and zero-publication rights
         run: node --test --test-concurrency=1 tests/w03-r179-seven-readback-approval.test.mjs
       - name: Verify W03 exact R179 seven-versus-ten B source contract and isolated transaction simulation
