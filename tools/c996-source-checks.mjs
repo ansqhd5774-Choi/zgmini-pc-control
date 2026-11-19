@@ -52,7 +52,7 @@ const MATCH=Object.freeze({
  recovery:/^(?:tests\/(?:controller-intake-recovery|controller-1979-backlog-recovery|completed-recovery-claim|rollback-stalled-claim|interrupted-rollback|maintenance-backlog-request|r47-task-chain|inflation-a401-|inflation-a407-)|controller\/|tools\/maintenance-)/,
  retirement:/^(?:tests\/marketparquet-task-retire|marketparquet-|docs\/MARKETPARQUET_REMOVAL)/,
  aiSoftware:/^(?:tests\/ai-software-v2-register-once\.test\.mjs|tools\/ai-software-v2-register-once\.mjs|\.github\/workflows\/pc-ai-software-v2-register-once\.yml)$/,
- approvedRuntimeA:/^(?:windows-runtime-mode-a\/|\.github\/workflows\/pc-approved-runtime-a-once\.yml)$/
+ approvedRuntimeA:/^(?:windows-runtime-mode-a\/.*|\.github\/workflows\/pc-approved-runtime-a-once\.yml)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
  p==='tools/c996-source-checks.mjs'||p==='tests/c996-source-scope.test.mjs'||
