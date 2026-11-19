@@ -271,17 +271,18 @@ test('decodes bounded compressed Census diagnostic and rejects wrong-year payloa
   {status:'UNREADABLE_OR_INVALID',year:2027});
 });
 
-test('WAL with missing sidecars does not open or alter SQLite',t=>{
+test('clean WAL with absent sidecars is read without changing business data',t=>{
  const {data,storage}=fixture(t),{name,db}=database(storage);
  db.exec('PRAGMA journal_mode=WAL;CREATE TABLE v(x);INSERT INTO v VALUES(1)');db.close();
  for(const suffix of ['-wal','-shm'])try{fs.unlinkSync(name+suffix);}catch{}
- const before=hash(name),files=fs.readdirSync(storage).sort();
+ const before=hash(name);
  const r=inspectSourceInventory(data);
  assert.equal(r.status,'STATE_UNKNOWN');
- assert.equal(r.core.code,'WAL_SIDECARS_ABSENT_UNVERIFIED');
- assert.equal(r.core.sqliteOpened,false);
+ assert.equal(r.core.status,'PASS');
+ assert.equal(r.core.code,'STORED_INVENTORY_READONLY');
+ assert.equal(r.core.sqliteOpened,true);
  assert.equal(hash(name),before);
- assert.deepEqual(fs.readdirSync(storage).sort(),files);
+ assert.ok(fs.existsSync(name));
 });
 
 test('opens an existing WAL snapshot read-only while keeping logical data unchanged',t=>{
