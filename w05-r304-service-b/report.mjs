@@ -23,7 +23,7 @@ export function sanitizedReport(report,requestId){
    (report.providerCalls===1||report.providerCalls==='NOT_CONFIRMED')&&
    ['COMMITTED_IDEMPOTENT','NOT_CONFIRMED'].includes(report.dbWrites)&&
    (report.rows===undefined||(Number.isInteger(report.rows)&&report.rows>=1&&report.rows<=400))&&
-   (report.observationAt===undefined||/^\\d{4}-(0[1-9]|1[0-2])-01$/.test(report.observationAt))&&
+   (report.observationAt===undefined||/^\d{4}-(0[1-9]|1[0-2])-01$/.test(report.observationAt))&&
    (report.sourceStoredAt===undefined||(typeof report.sourceStoredAt==='string'&&
      Number.isFinite(Date.parse(report.sourceStoredAt))))&&
    (report.snapshotSha256===undefined||/^[a-f0-9]{64}$/.test(report.snapshotSha256))&&
