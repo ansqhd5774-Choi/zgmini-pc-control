@@ -11,6 +11,16 @@ import {planSourceBundleRegistration,SOURCE_BUNDLE_SCHEMA,
   from '../tools/source-bundle-register.mjs';
 
 const hash=b=>createHash('sha256').update(b).digest('hex');
+test('source bundle uses the same safe conversation trace labels while retaining owner and request identity',()=>{
+ const q={schema:'ZGMINI_PC_MAINTENANCE_REQUEST_V1',requestId:'pc-update-aaaaaaaa-bbbb-4ccc-8ddd-0123456789ab',
+  chatId:'chat-common-process-repair-20261119',operation:SOURCE_BUNDLE_OPERATION,
+  controlRepository:'ansqhd5774-Choi/zgmini-pc-control',targetControllerSha:'a'.repeat(40),approvalManifestSha256:'b'.repeat(64)};
+ const ctx={actor:'ansqhd5774-Choi',controlRepository:q.controlRepository};
+ assert.equal(validateSourceBundleIssueEnvelope(q,ctx).chatId,q.chatId);
+ assert.throws(()=>validateSourceBundleIssueEnvelope(q,{...ctx,actor:'other'}));
+ assert.throws(()=>validateSourceBundleIssueEnvelope({...q,chatId:'chat-../bad'},ctx));
+ assert.throws(()=>validateSourceBundleIssueEnvelope({...q,requestId:'pc-reused-label'},ctx));
+});
 const SOURCE_SHA='a'.repeat(40),INSTALLED_SHA='b'.repeat(40);
 const sourceFiles=Object.freeze({
  'scripts/pc-writer/theme-platform.mjs':`import {reader} from './reader.mjs';\nimport {decode} from 'hyparquet';\nexport {reader,decode};\n`,
@@ -19,7 +29,9 @@ const sourceFiles=Object.freeze({
  'node_modules/hyparquet/src/index.js':'export const decode=()=>1;\n',
 });
 function fixture(t){
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-bundle-candidate-'));
+ // Windows service TEMP may use a short-name or redirected path. Put fixtures
+ // under its actual directory; keep the production alias rejection unchanged.
+ const dir=fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()),'zgmini-bundle-candidate-'));
  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
  const stageBundle=path.join(dir,'sealed');
  fs.mkdirSync(path.join(stageBundle,'source'),{recursive:true});
@@ -136,7 +148,7 @@ test('staged directory symlink is refused',t=>{
  const f=fixture(t);
  const target=path.join(f.stageBundle,'source','node_modules');
  const alias=path.join(f.stageBundle,'source','package-alias');
- fs.symlinkSync(target,alias,'dir');
+ fs.symlinkSync(target,alias,process.platform==='win32'?'junction':'dir');
  assert.throws(()=>plan(f),err('BUNDLE_SYMLINK_FORBIDDEN'));
 });
 test('manifest entries cannot escape source root',t=>{
