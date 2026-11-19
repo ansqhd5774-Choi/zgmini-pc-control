@@ -131,3 +131,15 @@ test('unconfirmed write outcome and issue drift remain safe stops',async()=>{
   }};
   await assert.rejects(()=>processWorkComment(event,drift),/PREWRITE_ISSUE_DRIFT/);
 });
+
+test('009 permits a verified work update after 405 unrelated comments',()=>{
+  const f=fixture(),a=makeUpdate(f,f.issue.number,'ACKNOWLEDGED',900);
+  const unrelated=Array.from({length:402},(_,i)=>({
+    id:i+10,user:{login:'community-reader'},issue_url:issueUrl(f.issue.number),
+    body:'discussion '+i
+  }));
+  const all=[...f.comments,...unrelated,a];
+  assert.equal(all.length,405);
+  assert.equal(evaluateWorkUpdate(f.issue,all,a).state,'READY');
+  assert.equal(evaluateWorkUpdate(f.issue,[...all,ownerReceipt(f,a)],a).state,'ALREADY_RECORDED');
+});
