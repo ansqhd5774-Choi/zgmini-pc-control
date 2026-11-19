@@ -8,6 +8,7 @@ const URL=n=>'https://api.github.com/repos/'+HANDOFF_REPOSITORY+'/issues/'+n;
 const FINAL_MARKERS=['HANDOFF_RESULT_RECORDED\n','HANDOFF_ORIGIN_RESULT_RECORDED\n'];
 const fail=code=>{throw Error('HANDOFF_BOARD_'+code);};
 const validMs=ms=>Number.isFinite(ms)&&ms>=Date.UTC(2020,0,1);
+export const MAX_BOARD_ISSUES=1000;
 const author=x=>x?.user?.login;
 function ownerWork(c){
   return author(c)===HANDOFF_OWNER&&typeof c.body==='string'&&
@@ -25,8 +26,7 @@ export const REVIEW_POLICY=Object.freeze({
 
 export function evaluateQueueItem(issue,comments,nowMs){
   if(!validMs(nowMs)||!issue||!Number.isSafeInteger(issue.number)||issue.number<1||
-    !Array.isArray(comments)||comments.length>400)
-    fail('INPUT_OR_CLOCK_INVALID');
+    !Array.isArray(comments))fail('INPUT_OR_CLOCK_INVALID');
   const priority=assessPriority(issue,nowMs);
   const decision=assessIncident(issue,comments);
   const base={issueNumber:issue.number,priority:priority.band,score:priority.score,
@@ -90,10 +90,13 @@ export function evaluateQueueItem(issue,comments,nowMs){
 }
 
 export function compileQueueBoard(items,nowMs,
-  {openHandoffIssueCount=Array.isArray(items)?items.length:0}={}){
-  if(!validMs(nowMs)||!Array.isArray(items)||items.length>100||
+  {openHandoffIssueCount=Array.isArray(items)?items.length:0,
+   unverifiedIssues=[]}={}){
+  if(!validMs(nowMs)||!Array.isArray(items)||items.length>MAX_BOARD_ISSUES||
+    !Array.isArray(unverifiedIssues)||unverifiedIssues.length>MAX_BOARD_ISSUES||
     !Number.isSafeInteger(openHandoffIssueCount)||
-    openHandoffIssueCount<items.length||openHandoffIssueCount>100)
+    openHandoffIssueCount<items.length||
+    openHandoffIssueCount>MAX_BOARD_ISSUES)
     fail('INVENTORY_INVALID');
   const numbers=new Set();
   for(const item of items){
@@ -105,6 +108,18 @@ export function compileQueueBoard(items,nowMs,
   const byNumber=new Map(items.map(x=>[x.issue.number,x]));
   const records=ordered.map(issue=>{
     const x=byNumber.get(issue.number);
+    if(x.unverifiedReason){
+      const priority=assessPriority(issue,nowMs);
+      return Object.freeze({
+        issueNumber:issue.number,priority:priority.band,score:priority.score,
+        priorityPolicy:priority.policy??null,kind:priority.kind??null,
+        checkpoint:priority.checkpoint??null,role:priority.role,ageHours:priority.ageHours,
+        evidenceState:'UNVERIFIED',status:'PROOF_REVIEW_REQUIRED',
+        alert:'ISSUE_EVIDENCE_UNVERIFIED',unverifiedReason:x.unverifiedReason,
+        lastProgressHours:null,receiptCount:0,ownerAccountVerified:false,
+        chatSessionVerified:false,pcOperationalWrites:0,aiCalls:0,runtimeVerified:false
+      });
+    }
     return evaluateQueueItem(issue,x.comments,nowMs);
   });
   const statuses=Object.create(null),alerts=Object.create(null),roles=Object.create(null);
@@ -113,8 +128,11 @@ export function compileQueueBoard(items,nowMs,
     alerts[r.alert]=(alerts[r.alert]??0)+1;
     roles[r.role]=(roles[r.role]??0)+1;
   }
+  const unverified=records.filter(r=>r.evidenceState==='UNVERIFIED');
   return Object.freeze({schema:'ZGMINI_HANDOFF_BOARD_R1',asOf:new Date(nowMs).toISOString(),
-    advisoryOnly:true,completeInventory:true,
+    advisoryOnly:true,completeInventory:true,evidenceComplete:unverified.length===0,
+    unverifiedIssueCount:unverified.length,
+    unverifiedIssues:unverified.map(r=>({issueNumber:r.issueNumber,reason:r.unverifiedReason})),
     // Active pending is verified using owner/bot comment readback; open non-pending
     // is only a GitHub label inventory count, NOT proof of issue resolution.
     issueCount:records.length,pendingIssueCount:records.length,
@@ -132,6 +150,8 @@ export function renderBoardMarkdown(board){
     '원본: GitHub Issue 및 인증된 댓글 (읽기 전용 스냅샷)',
     '열린 agent-handoff 이슈: **'+board.openHandoffIssueCount+'** · 현재 대기: **'+board.pendingIssueCount+
       '** · 대기 라벨 없는 열린 인계: **'+board.nonPendingOpenIssueCount+'**',
+    '개별 증거 미확인: **'+board.unverifiedIssueCount+'건** · 증거 전체 확인: **'+
+      (board.evidenceComplete?'YES':'NO')+'**',
     '현재 대기 중 ACK 기록만 확인된 건: **'+board.ackOnlyCount+
       '** · 인증 계정 인수: **'+board.verifiedOwnerAccounts+
       '** · 확인 후보: **'+board.reviewAlertCount+'**',
