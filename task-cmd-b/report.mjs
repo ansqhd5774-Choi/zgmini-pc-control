@@ -78,12 +78,18 @@ export function buildR47Report({event,env,local}){
   providerCalls:0,sqliteWrites:0,d1Writes:0,
   taskDefinitionChanges:0,replay:'FORBIDDEN'});
 }
-async function createAndReadback(relative,bytes,token){
+export async function createAndReadback(relative,bytes,token,apiCall=api){
  const prefix=`/repos/${R47_B_ISSUE.repository}`;
  const endpoint=`${prefix}/contents/${relative}`;
- await api('PUT',endpoint,token,{message:`record exact R47 CMD B result ${relative}`,
-  content:bytes.toString('base64'),branch:'main'});
- const value=await api('GET',endpoint+'?ref=main',token);
+ // Only reconcile exact immutable bytes after an existing/ambiguous PUT.
+ // Never overwrite or repeat the B effect to repair evidence delivery.
+ try{
+  await apiCall('PUT',endpoint,token,{message:`record exact R47 CMD B result ${relative}`,
+   content:bytes.toString('base64'),branch:'main'});
+ }catch{/* Existing or uncertain: exact authenticated GET is required below. */}
+ let value;
+ try{value=await apiCall('GET',endpoint+'?ref=main',token)}
+ catch{stop('TASK_CMD_B_REMOTE_READBACK_STOP')}
  need(value?.encoding==='base64'&&typeof value.content==='string'&&
   Buffer.from(value.content.replace(/\s/g,''),'base64').equals(bytes),
   'TASK_CMD_B_REMOTE_READBACK_STOP');
