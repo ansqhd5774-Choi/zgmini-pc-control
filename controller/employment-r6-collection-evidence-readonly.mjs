@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
 
 const SQLITE_MAGIC='SQLite format 3\0';
 const MAX_DB_BYTES=64*1024**3;
@@ -105,7 +106,7 @@ function safeEntry(file,root,filesystem){
    !relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative)?{stat,real}:null;
  }catch{return null;}
 }
-// WAL mode read-only SQLite may create -shm; sidecars must pre-exist.
+// A normal read-only SQLite open may create WAL sidecars. Check their exact state.
 function preflight(file,root,filesystem){
  const entry=safeEntry(file,root,filesystem);
  if(!entry?.stat.isFile()||entry.stat.size<100||entry.stat.size>MAX_DB_BYTES)
@@ -119,10 +120,31 @@ function preflight(file,root,filesystem){
  if(header.toString('ascii',0,16)!==SQLITE_MAGIC||![1,2].includes(header[18])||![1,2].includes(header[19]))
   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_HEADER_INVALID'};
  if(header[18]===2||header[19]===2){
-  if(!['-wal','-shm'].every(ext=>safeEntry(file+ext,root,filesystem)?.stat.isFile()))
-   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_ABSENT'};
+  const sidecars=['-wal','-shm'].map(ext=>{
+   try{
+    filesystem.lstatSync(file+ext);
+    return safeEntry(file+ext,root,filesystem)?.stat.isFile()?'VALID':'UNSAFE';
+   }catch(error){return error?.code==='ENOENT'?'ABSENT':'UNSAFE';}
+  });
+  // One missing sidecar, a symlink, or any unreadable sidecar is not a clean shutdown.
+  if(sidecars.includes('UNSAFE')||sidecars[0]!==sidecars[1])
+   return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_PARTIAL_OR_UNSAFE'};
+  if(sidecars[0]==='ABSENT')
+   return {status:'PASS',path:entry.real,immutable:true,originalStat:entry.stat};
  }
  return {status:'PASS',path:entry.real};
+}
+// Only accept immutable results if the main file and the absent sidecars stayed
+// unchanged for the entire read; immutable SQLite bypasses file-change detection.
+function stableImmutable(gate,root,filesystem){
+ const current=safeEntry(gate.path,root,filesystem);
+ if(!current?.stat.isFile()||current.real!==gate.path)return false;
+ if(!['size','dev','ino','mtimeMs','ctimeMs'].every(k=>current.stat[k]===gate.originalStat[k]))
+  return false;
+ return ['-wal','-shm'].every(ext=>{
+  try{filesystem.lstatSync(gate.path+ext);return false;}
+  catch(error){return error?.code==='ENOENT';}
+ });
 }
 function summarizeRun(row,provider){
  if(!row)return {status:'NOT_STORED'};
@@ -332,9 +354,12 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  if(!pc?.stat.isDirectory()||!storage?.stat.isDirectory())return result;
  const gate=preflight(path.join(storage.real,'core.sqlite'),root,filesystem);
  if(gate.status!=='PASS')return {...result,status:'STATE_UNKNOWN',code:gate.code};
+ const runRead=()=>{
  let db,stage='OPEN_READONLY';
  try{
-  db=openDatabase(gate.path);result.sqliteOpened=true;
+  const target=gate.immutable?pathToFileURL(gate.path):gate.path;
+  if(gate.immutable){target.searchParams.set('mode','ro');target.searchParams.set('immutable','1');}
+  db=openDatabase(gate.immutable?target.href:target);result.sqliteOpened=true;
   stage='READONLY_PRAGMAS';db.exec('PRAGMA query_only=ON');db.exec('PRAGMA busy_timeout=4000');
   stage='TABLE_DISCOVERY';
   const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(x=>x.name));
@@ -419,4 +444,11 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  }catch{
   return {...result,status:'STATE_UNKNOWN',code:'R6_EVIDENCE_QUERY_FAILED',firstFail:stage};
  }finally{try{db?.close();}catch{}}
+ };
+ const response=runRead();
+ if(gate.immutable&&!stableImmutable(gate,root,filesystem))
+  return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_IMMUTABLE_RACE',
+   sqliteOpened:result.sqliteOpened,scope:result.scope,dol:null,bed:null,
+   eta539:null,stateClaims:null,pitRawSchema:null,...noWrite()};
+ return response;
 }
