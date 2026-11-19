@@ -8,8 +8,8 @@
   "allowFiles": [
     {
       "path": "controller/theme-l7-runtime-readonly.mjs",
-      "sha256": "0f71c622b46bd5d73edfcc1397869ab5289f6bfccd56c048825ed63773dbdca6"
+      "sha256": "186cb05c0647398fbc032c19bc9a76589851238740d8394d102b0abad223e701"
     }
   ],
-  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2408"
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2411"
 }
