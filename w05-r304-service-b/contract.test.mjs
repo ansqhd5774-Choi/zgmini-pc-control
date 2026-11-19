@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
-import {readbackServiceSnapshot,validateChildSummary} from './once.mjs';
+import {readbackServiceSnapshot,validateChildSummary,childResultLogPath} from './once.mjs';
 import {validateIssue,validateApproval,SCHEMA,OPERATION,MANIFEST,INSTALLED_SHA,
  FILES,SOURCE_ROOT,DATA_ROOT,sha256,sanitizedCode} from './contract.mjs';
 import {sanitizedReport,upload} from './report.mjs';
@@ -81,6 +81,18 @@ test('validates collector summary and rejects missing service confirmation',()=>
  assert.throws(()=>validateChildSummary('RESULT=PASS_R3C_MANUAL_BLS_PERSISTED'),
   /W05_B_CHILD_RESULT_UNVERIFIED_STOP/);
 });
+test('BLS child receipt follows Windows Node TMP-over-TEMP precedence',()=>{
+ const filename='EARNINGS_BLS_SERVICE_R1_RESULT_20261119-120000Z.txt';
+ const tmp=path.join(os.tmpdir(),'w05-tmp-source');
+ const temp=path.join(os.tmpdir(),'w05-temp-other');
+ assert.equal(childResultLogPath(filename,{TMP:tmp,TEMP:temp}),path.join(tmp,filename));
+ assert.equal(childResultLogPath(filename,{TMP:'',TEMP:temp}),path.join(temp,filename));
+ assert.throws(()=>childResultLogPath('../result.txt',{TMP:tmp,TEMP:temp}),
+  /W05_B_CHILD_RESULT_NAME_STOP/);
+ assert.throws(()=>childResultLogPath(filename,{TMP:'relative-dir'}),
+  /W05_B_TEMP_ROOT_STOP/);
+});
+
 test('simulated SQLite chunk and immutable snapshot SHA readback is fail-closed',()=>{
  const folder=fs.mkdtempSync(path.join(os.tmpdir(),'w05-r304-fixture-'));
  const target=path.join(folder,'sample.sqlite');
