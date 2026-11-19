@@ -58,7 +58,7 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
  // Do not promote these snapshots into verified or certified sets.
  const mismatchIntegrity={
   checked:0,bodyShaMatched:0,bodyShaMismatched:0,
-  snapshotIdMatched:0,snapshotIdMismatched:0,
+  idMatched:0,idMismatched:0,
  };
  let metadataKeys=0,totalBytes=0,group=null;
  const markInvalid=reason=>{
@@ -92,8 +92,8 @@ export function auditFixedR6RawRunSnapshot(db,{checkedAt=new Date().toISOString(
    if(includeInvalidLineage){
     mismatchIntegrity.checked++;
     if(sha([h.release_group,h.provider,h.request_key,h.body_sha256].join('|'))===h.snapshot_id)
-     mismatchIntegrity.snapshotIdMatched++;
-    else mismatchIntegrity.snapshotIdMismatched++;
+     mismatchIntegrity.idMatched++;
+    else mismatchIntegrity.idMismatched++;
     if(group.hasher.digest('hex')===h.body_sha256)
      mismatchIntegrity.bodyShaMatched++;
     else mismatchIntegrity.bodyShaMismatched++;
