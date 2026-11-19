@@ -1,0 +1,38 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "269f38f53dee033725ad45987aa7f8915a6b6b93",
+  "targetSha": "2af4be8fd70ab1033cdd235ac7d7211c1b318683",
+  "approved": false,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "NON_EXECUTING_DRAFT. Source-only PR #2340 exact HEAD and prior #2301 receipt; no current Windows installed SHA/preimage verification or successor operational approval. Must revalidate installedSha by Windows readback and obtain exact scope approval before enabling.",
+  "files": {
+    "tools/maintenance-contract.mjs": "2bd8275206137d306b7cda0654ebf431dd555b9651918ad407c31933ba240d19",
+    "tools/maintenance-apply.mjs": "48d9621d57c5edec1eb3c359b264d771facaefeeb0261666390d005c9c7a808a",
+    "tools/maintenance-agent.mjs": "6503764f1eb6f11a39e7c026b271cc4706166878c5f9a8f1135e6ada8e8db4aa",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "37379406e6f1e3f012fabc22d00007df1b9435bc6735ee0444cb845ee115d13f",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "installedWindowsEvidence": "PENDING_CURRENT_READBACK; historical #2301 PASS at target 269f38f5 is not current installed proof",
+    "sourceCi": "PR #2340 exact HEAD maintenance CI 44520336238 PASS and C996 CI 44520336314 PASS; reuse until source changes",
+    "targetMainCommit": "PENDING_REVIEW_AND_MERGE; targetSha is immutable PR HEAD, not confirmed merged main",
+    "windowsHandoffExecuted": false
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/update.mjs"
+  ],
+  "preserve": [
+    "Existing Controller and six Runner registrations",
+    "Core/Korea tasks and approved absence of Iran R13",
+    "Business DB rows/schema, provider quotas, D1, source/Writer files",
+    "Original request/lease/ledger history; no replay of failed installations"
+  ],
+  "scopeNote": "NON_EXECUTING_DRAFT successor candidate. Exact updater one-file delta from #2301 source; cannot use historic manifest to install. Prior to approval: current installed SHA+9-file preimage readback, source/installed CAS match, startup and lease protections, owner approval, then a new unique handoff request. Do not replay #2094 or alter its STAGED evidence."
+}
