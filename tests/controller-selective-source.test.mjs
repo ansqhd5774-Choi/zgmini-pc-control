@@ -213,3 +213,34 @@ test('W04 fixed light Raw/Run selective manifest and exact main pin are consiste
  assert.equal(checked.manifest.postOperation,'core-status');
  assert.equal(checked.manifest.backup.rollback.sha,installed);
 });
+
+test('W04 27-reason one-file selective pin and exact B manifest validate',()=>{
+ const installed='bed78dc16e81e257886aa5480705b50192b5cd01';
+ const target='7b0b87607f8bd7e369f3a1eaa1955b8ca58a20f2';
+ const file=path.join(import.meta.dirname,'..','approvals','controller-updates',target+'.json');
+ const pinFile=path.join(import.meta.dirname,'..','approvals','controller-selective-targets',target+'.json');
+ const raw=fs.readFileSync(file);
+ const approved=JSON.parse(raw.toString('utf8'));
+ const selectedPin=JSON.parse(fs.readFileSync(pinFile,'utf8'));
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-w04-raw27-reasons-20261119',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const checked=validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(checked.manifest,selectedPin),true);
+ assert.equal(checked.manifest.installedSha,installed);
+ assert.equal(checked.manifest.targetSha,target);
+ assert.equal(checked.manifest.controllerOnlyInstall,true);
+ assert.equal(checked.manifest.selectiveSource.mainSha,'a8f855c979327008f105d7ab15e8b197ed1de679');
+ assert.deepEqual(checked.manifest.selectiveSource.customPaths,[]);
+ assert.deepEqual(checked.manifest.allowFiles.map(x=>x.path),
+  ['controller/employment-r6-raw-run-attestation-readonly.mjs']);
+ assert.equal(checked.manifest.allowFiles[0].sha256,
+  '36e45cdaa6059b228a19ec9f94de5275be8331738dfd654c79673fcb80829d59');
+ assert.equal(checked.manifest.checks.manifestSha256,
+  manifestFingerprint(approved.allowFiles).sha256);
+ assert.equal(checked.manifest.approval.ref,
+  'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2316');
+ assert.equal(checked.manifest.backup.rollback.sha,installed);
+});
