@@ -204,7 +204,7 @@ const BACKUP_KEYS=["strategy","rollback"];
 const ROLLBACK_KEYS=["kind","sha"];
 const FILE_KEYS=["path","sha256"];
 const optionalManifestKeys=raw=>[...MANIFEST_KEYS,...
-  ['infrastructureEvidence','controllerOnlyInstall'].filter(k=>Object.hasOwn(raw,k))];
+  ['infrastructureEvidence','controllerOnlyInstall','selectiveSource'].filter(k=>Object.hasOwn(raw,k))];
 // The approval pins every deployed file and the updater checks the exact Git
 // diff. New readonly adapters must not require replacing this maintainer just
 // to append another filename. Keep paths confined to controller modules.
@@ -516,6 +516,25 @@ export function validateUpdateRequest(issue,manifestBytes,{
      !['pc-controller-maintenance','pc-controller-heavy-readonly'].includes(raw.purpose)||
      Object.hasOwn(raw,'infrastructureEvidence')))
     throw Error('CONTROLLER_ONLY_INSTALL_SCOPE_INVALID');
+  // Selective source is a separate B-approved Controller overlay, not a way to
+  // reinterpret an unapproved main tree or to introduce extra operation effects.
+  if(raw.selectiveSource){
+    const x=raw.selectiveSource;
+    requireKeys(x,['schema','branch','mainSha','customPaths'],
+      'SELECTIVE_SOURCE_FIELDS_INVALID');
+    if(x.schema!=='ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1'||
+      raw.controllerOnlyInstall!==true||raw.purpose!=='pc-controller-maintenance'||
+      Object.hasOwn(raw,'infrastructureEvidence'))
+      throw Error('SELECTIVE_SOURCE_SCOPE_INVALID');
+    requireSha(x.mainSha,'SELECTIVE_SOURCE_MAIN_SHA_INVALID');
+    if(typeof x.branch!=='string'||
+      !/^codex\/[a-z0-9][a-z0-9-]{3,94}$/.test(x.branch))
+      throw Error('SELECTIVE_SOURCE_BRANCH_INVALID');
+    if(!Array.isArray(x.customPaths)||x.customPaths.length>manifest.files.length||
+      new Set(x.customPaths).size!==x.customPaths.length||
+      x.customPaths.some(p=>!manifest.files.some(f=>f.path===p)))
+      throw Error('SELECTIVE_SOURCE_CUSTOM_PATH_INVALID');
+  }
   if(typeof raw.postSourceBranch!=="string"
     ||!(/^(?:main|codex\/[a-z0-9][a-z0-9./_-]{2,100})$/.test(raw.postSourceBranch))
     ||raw.postSourceBranch.includes(".."))throw Error("UPDATE_POST_SOURCE_BRANCH_INVALID");
@@ -540,6 +559,11 @@ export function validateUpdateRequest(issue,manifestBytes,{
     postOperation:raw.postOperation,postSourceBranch:raw.postSourceBranch,
     postSourceSha:raw.postSourceSha,
     ...(raw.controllerOnlyInstall===true?{controllerOnlyInstall:true}:{}),
+    ...(raw.selectiveSource?{selectiveSource:Object.freeze({
+      schema:raw.selectiveSource.schema,branch:raw.selectiveSource.branch,
+      mainSha:raw.selectiveSource.mainSha,
+      customPaths:Object.freeze([...raw.selectiveSource.customPaths].sort())
+    })}:{}),
     ...(raw.infrastructureEvidence?{infrastructureEvidence:structuredClone(raw.infrastructureEvidence)}:{}),
   });
   return Object.freeze({request,manifest:normalized});
@@ -562,6 +586,31 @@ export function validateInfrastructureDelta(paths,evidence,readBytes){
 
 // Current main behavior: explicit controller-only approvals compare exactly
 // installed controller/config paths, without unapproved workflow mutations.
+/** A reviewed, immutable main pin authorizes ONE exact installed-tree overlay.
+ * The committed target must have installedSha as its sole parent and the
+ * installed->target Git diff must equal allowFiles (verified by the operator).
+ * A main PR must contain this exact pin. No Issue-controlled path is read. */
+export function validateControllerSelectivePin(manifest,pin){
+ const x=manifest?.selectiveSource;
+ if(!x||!pin||typeof pin!=='object'||Array.isArray(pin))
+   throw Error('SELECTIVE_PIN_MISSING');
+ requireKeys(pin,['schema','installedSha','targetSha','sourceMainSha',
+   'targetBranch','customPaths','allowFiles','approvalRef'],
+   'SELECTIVE_PIN_FIELDS_INVALID');
+ if(pin.schema!=='ZGMINI_CONTROLLER_SELECTIVE_PIN_V1'||
+   pin.installedSha!==manifest.installedSha||
+   pin.targetSha!==manifest.targetSha||
+   pin.sourceMainSha!==x.mainSha||
+   pin.targetBranch!==x.branch||
+   pin.approvalRef!==manifest.approval.ref||
+   !Array.isArray(pin.customPaths)||
+   JSON.stringify([...pin.customPaths].sort())!==JSON.stringify(x.customPaths)||
+   JSON.stringify(manifestFingerprint(pin.allowFiles).files)!==
+     JSON.stringify(manifestFingerprint(manifest.allowFiles).files))
+   throw Error('SELECTIVE_PIN_MISMATCH');
+ return true;
+}
+
 export function validateControllerOnlyInstallDelta(paths,allowFiles){
  if(!Array.isArray(paths)||!Array.isArray(allowFiles)||
   paths.some(p=>typeof p!=='string'||p.includes('..')))
