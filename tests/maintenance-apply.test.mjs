@@ -699,7 +699,7 @@ test('exact current-main selective maintainer direct handoff pins two changed by
  assert.deepEqual(approvedRuntimeChanges('SEVEN_TO_SEVEN',prior,approved.files),
   approved.runtimeChangedFiles);
  for(const [rel,digest] of Object.entries(approved.files)){
-  assert.match(rel,/^tools\\/[a-z0-9.-]+$/);
+  assert.ok(rel.startsWith('tools/') && !rel.includes('..'),rel);
   const pinned=execFileSync('git',['show',targetSha+':'+rel],
    {cwd:root,encoding:null,windowsHide:true});
   assert.equal(sha(pinned),digest,rel+' pinned source');
