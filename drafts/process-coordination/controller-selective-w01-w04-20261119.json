@@ -1,0 +1,65 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_DRAFT_V1",
+  "approved": false,
+  "status": "SOURCE_CI_PASS_APPROVAL_AND_RUNTIME_PENDING",
+  "repository": "ansqhd5774-Choi/zgmini-pc-control",
+  "source": {
+    "installedSha": "b9099839df1a7cc6b3b166a139f7fac6938ada66",
+    "targetSha": "310d777f06e51448bf0d863f52a21a1af2c086fc",
+    "targetBranch": "codex/controller-selective-w01-w04-20261119",
+    "mainSha": "4311757ce617cf6cab20683c933668bd0aa594c3",
+    "customPaths": [
+      "config/operations.json",
+      "controller/operations.mjs"
+    ],
+    "purpose": "pc-controller-maintenance",
+    "controllerOnlyInstall": true
+  },
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "10f60dff52c81564491c3829680092b91fc41cc89577e203da98b7347de30af9"
+    },
+    {
+      "path": "controller/common.mjs",
+      "sha256": "67d54cae62829e833a3ac547da621dbd1231ba4e40b7a54960a89610995b32e6"
+    },
+    {
+      "path": "controller/employment-r6-candidate-readonly.mjs",
+      "sha256": "9a7411946b70c13837a68825aac4078a7c2044219bffe7cd3c4fda7a0a100b87"
+    },
+    {
+      "path": "controller/inflation-a401-private23-readonly.mjs",
+      "sha256": "db62b0799731d48a9f04e0c8510c6fa273f70e2b07c2eda5411cc636743d27aa"
+    },
+    {
+      "path": "controller/inflation-a407-integrity-readonly.mjs",
+      "sha256": "8d038527098d7527ee09575af11f53e81524476da85400eb46be5bf896bac88e"
+    },
+    {
+      "path": "controller/inflation19-runtime-readonly.mjs",
+      "sha256": "b60db71de3d2034e4dd2bcceac93e16ad0f909ef20b874b0f44c230cdbeeaa32"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "1e6ba9aa97aec0ea16113e1d68777a2cd0b869cfc0a4e351b8b1e29d888ef9b3"
+    }
+  ],
+  "allowFilesManifestSha256": "93451c28a261b4381b89eeaec38a4ef126d509a32eb7eda43f0ced589fb28878",
+  "testEvidence": {
+    "controllerMaintenanceCi": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44460200333",
+    "c996R5Ci": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/actions/runs/44460200357",
+    "testScope": "isolated source CI; no PC/B operation",
+    "overlayDiffCount": 7,
+    "selectiveOverlayTests": "6/6 PASS",
+    "maintenanceRegressions": "165/165 PASS"
+  },
+  "nextRequired": [
+    "Merge and independently handoff new maintainer code and prove exact tool bytes; old V2 one-file handoff does not authorize these two tool changes",
+    "Obtain merged B approval PR with exact selective pin and manifest; check installed source and main ancestry before B",
+    "Issue one new unique maintenance B only after effective operator contract is confirmed",
+    "Read back actual target SHA, protected state, JSON/TXT and independent postcheck"
+  ],
+  "notApproval": true,
+  "noPcInstallPerformed": true
+}
