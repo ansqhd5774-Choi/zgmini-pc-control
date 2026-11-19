@@ -13,7 +13,8 @@ export function classifyPath(p) {
       p.startsWith('approvals/inflation-') || p.startsWith('tests/w01-')) return ['w01'];
   if (p.startsWith('watchdog-b/') || p.startsWith('approvals/watchdog-') ||
       /^tests\/(runner-watchdog|watchdog-)/.test(p) ||
-      p === 'tools/runner-watchdog.mjs' || p.includes('pc-watchdog-')) return ['watchdog'];
+      p === 'tools/runner-watchdog.mjs' || p.includes('pc-watchdog-')) return ['core','watchdog'];
+  if (p === 'tests/http32-two-host-checkpoints-readonly.test.mjs') return ['w01'];
   if (/^(tools|tests)\/earnings-/.test(p) ||
       /^tests\/(source-inventory-runtime-readonly|sqlite-readonly-contract|employment-r6-collection-evidence-readonly)\.test\.mjs$/.test(p)) return ['w05'];
   if (p.startsWith('shared-resource/') || p.startsWith('tests/shared-resource-') ||
