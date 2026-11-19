@@ -36,14 +36,20 @@ const live=pid=>{if(!Number.isSafeInteger(pid)||pid<=0)return null;try{process.k
 
 export function summarizeAutomation(s){
  const base=maintenanceNextAction(s);
- const healthy=s.controllerFilesVerified===true&&s.supervisorAlive===true&&s.supervisorIdentityVerified===true&&
-  s.supervisorFresh===true&&s.supervisorChildrenVerified===true&&s.runnerSetOnline===true&&s.workflowState==='active';
- return {...base,runtimeState:healthy?'HEALTHY':'UNVERIFIED',
+ const localHealthy=s.controllerFilesVerified===true&&s.supervisorAlive===true&&s.supervisorIdentityVerified===true&&
+  s.supervisorFresh===true&&s.supervisorChildrenVerified===true&&s.workflowState==='active';
+ const healthy=localHealthy&&s.runnerSetOnline===true;
+ const permissionOnly=localHealthy&&s.runnerSetOnline===null&&
+  s.runnerQueryError==='HTTP_403_FORBIDDEN';
+ return {...base,localControllerState:localHealthy?'HEALTHY':'UNVERIFIED',
+  runnerRegistryState:s.runnerSetOnline===true?'ALL_SIX_ONLINE':s.runnerSetOnline===false?'NOT_ALL_ONLINE':'UNVERIFIED',
+  runtimeState:healthy?'HEALTHY':'UNVERIFIED',
   controllerState:healthy?'HEALTHY':'UNVERIFIED',
   maintenanceState:s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'UNVERIFIED',
   automationState:healthy&&s.maintenanceFilesVerified===true&&s.receiverIdentityVerified===true&&s.receiverFresh===true&&s.receiverListening===true?'HEALTHY':'PARTIAL_OR_UNVERIFIED',
   installedOperations:s.installedOperations??[],
-  next:base.state==='NO_ACTIVE_INSTALL_LEASE'&&!healthy?'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE':base.next,
+  next:base.state==='NO_ACTIVE_INSTALL_LEASE'&&!healthy?
+    (permissionOnly?'CHECK_GITHUB_RUNNER_ROSTER_READ_PERMISSION':'DIAGNOSE_CURRENT_RUNTIME_WITHOUT_REPLAYING_OLD_UPDATE'):base.next,
   intakeToolPermission:'NOT_TESTED_BY_PC_STATUS',
   intakeNote:'GitHub read access and Runner health do not prove this chat may submit a maintenance request.'};
 }
@@ -110,7 +116,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   supervisorFresh:Date.now()-Date.parse(supervisor?.at??'')>=0&&Date.now()-Date.parse(supervisor?.at??'')<45000,
   supervisorChildrenVerified:supervisor?.mode==='LISTENING'&&supervisor?.children?.length===6&&Array.from({length:6},(_,i)=>i+1).every(seat=>supervisor.children.filter(c=>c.seat===seat&&c.alive===true&&live(c.pid)===true).length===1),
   runnerSetOnline:Array.isArray(rows)?dedicatedPcRunnersOnline(rows):null,
-  workflowState:workflow,installedOperations:operations};
+  runnerQueryError,workflowState:workflow,installedOperations:operations};
  Object.assign(state,{maintenanceFilesVerified:maintenanceVerified===true,
   receiverIdentityVerified:Boolean(receiverOwner?.nonce&&receiver?.pid===receiverOwner.pid&&live(receiverOwner.pid)===true),
   receiverFresh:Date.now()-Date.parse(receiver?.at??'')>=0&&Date.now()-Date.parse(receiver?.at??'')<180000,
