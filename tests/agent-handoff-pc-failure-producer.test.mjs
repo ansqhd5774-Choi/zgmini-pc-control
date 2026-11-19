@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {assertCompletedPcJobEvent, findOriginalIssueNumber, processCompletedPcJob,
-  scopedSeatRead} from '../agent-handoff/pc-failure-producer.mjs';
+  scopedSeatRead,scopedSeatProof} from '../agent-handoff/pc-failure-producer.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
 const runId = 42423158559;
@@ -113,8 +113,10 @@ test('mismatched and duplicate TXT failure fields stop before incident creation'
   ]) {
     const f = fixture();
     f.io.readReportText = async () => modify(textReport(report()));
-    await assert.rejects(processCompletedPcJob(event(), f.io),
-      /FAILURE_RESULT_PAIR_MISMATCH_STOP/);
+    const out=await processCompletedPcJob(event(),f.io);
+    assert.equal(out.state,'PARTIAL_SEAT_PROOF_UNVERIFIED');
+    assert.deepEqual(out.seatProofProblems,[{seat:4,phase:'FAILURE_RESULT_PAIR',
+      reason:'SEAT_PROOF_UNVERIFIED'}]);
     assert.equal(f.posts, 0);
     assert.equal(f.routeCalls, 0);
   }
@@ -159,7 +161,9 @@ test('a fixture-labelled result cannot hide a genuine owner operation mismatch',
     const f = fixture();
     f.io.readReport = async p => p.endsWith('seat-4.json') ?
       {...report('FAIL'), operation} : null;
-    await assert.rejects(processCompletedPcJob(event(), f.io), /OPERATION_MISMATCH_STOP/);
+    const out=await processCompletedPcJob(event(),f.io);
+    assert.equal(out.state,'PARTIAL_SEAT_PROOF_UNVERIFIED');
+    assert.equal(out.seatProofUnverified,1);
     assert.equal(f.posts, 0);
   }
 });
@@ -225,7 +229,9 @@ test('report/source/provenance drift stops before posting', async () => {
   const f = fixture();
   f.io.readReport = async p => p.endsWith('seat-4.json') ?
     {...report(), sourceBranch: 'unapproved'} : null;
-  await assert.rejects(processCompletedPcJob(event(), f.io), /SOURCE_BRANCH_MISMATCH_STOP/);
+  const out=await processCompletedPcJob(event(),f.io);
+  assert.equal(out.state,'PARTIAL_SEAT_PROOF_UNVERIFIED');
+  assert.equal(out.seatProofUnverified,1);
   assert.equal(f.posts, 0);
 });
 
@@ -395,4 +401,35 @@ test('incomplete shared receipt inventory is never treated as an empty list',asy
   f.io.readComments=async()=>Array.from({length:501},()=>comments()[0]);
   await assert.rejects(processCompletedPcJob(event(),f.io),/COMMENT_INVENTORY_INCOMPLETE/);
   assert.equal(f.posts,0);
+});
+
+test('corrupt Seat 2 proof cannot block independently authenticated Seat 4',async()=>{
+  const f=fixture();
+  const original=f.io.readReport;
+  const source=report();
+  f.io.readReport=async p=>p.endsWith('seat-2.json')
+    ?{...source,seat:2,jobId:`run-${runId}-1-seat-2`,
+      sourceBranch:'unexpected-source'}:original(p);
+  const oldComments=f.io.readComments;
+  f.io.readComments=async()=>[
+    {user:{login:bot},body:`<!-- zgmini-pc-result:${runId}:1:2 -->\nverified`,
+      issue_url:`https://api.github.com/repos/${repo}/issues/1009`},
+    ...oldComments()
+  ];
+  const out=await processCompletedPcJob(event(),f.io);
+  assert.equal(out.state,'PARTIAL_SEAT_PROOF_UNVERIFIED');
+  assert.deepEqual(out.seatProofProblems,[{seat:2,phase:'FAILURE_IDENTITY',
+    reason:'SEAT_PROOF_UNVERIFIED'}]);
+  assert.equal(out.newIssues,1);
+  assert.equal(out.routesRecorded,1);
+  assert.equal(f.posts,1);
+  assert.equal(out.pcOperationalWrites,0);
+});
+
+test('unrecognized proof or programming errors are not silently quarantined',()=>{
+  const problems=[];
+  assert.throws(()=>scopedSeatProof(4,'FAILURE_IDENTITY',()=>{
+    throw TypeError('unexpected code defect');
+  },x=>problems.push(x)),/unexpected code defect/);
+  assert.deepEqual(problems,[]);
 });
