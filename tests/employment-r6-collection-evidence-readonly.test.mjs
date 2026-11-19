@@ -279,17 +279,67 @@ test('577 weeks with one zero prior-state 4w base are still not score-ready',t=>
  assert.equal(r.stateClaims.fullTenYearRawCoverage.status,'PRIOR_4W_ZERO_BASE');
 });
 
-test('WAL database without sidecars remains untouched and unopened',t=>{
+test('cleanly closed WAL opens immutable with no operational file or sidecar mutation',t=>{
  const {data,storage,file}=fixture(t),db=createDb(file);
- db.exec('PRAGMA journal_mode=WAL');db.close();
+ seed(db);db.exec('PRAGMA journal_mode=WAL');db.close();
  assert.equal(fs.readFileSync(file)[18],2);
+ assert.deepEqual(fs.readdirSync(storage).sort(),['core.sqlite']);
  const beforeHash=sha(file),beforeFiles=fs.readdirSync(storage).sort();
- const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('SHOULD_NOT_OPEN');}});
- assert.equal(r.status,'STATE_UNKNOWN');
- assert.equal(r.code,'R6_EVIDENCE_WAL_SIDECARS_ABSENT');
- assert.equal(r.sqliteOpened,false);
+ const r=inspectEmploymentR6CollectionEvidence(data);
+ assert.equal(r.status,'PASS',JSON.stringify(r));
+ assert.equal(r.sqliteOpened,true);
+ assert.equal(r.pitRawSchema.raw.requiredCount,11);
+ assert.equal(r.pitRawSchema.runs.requiredCount,4);
+ assert.equal(r.pitRawSchema.reason,'RAW_REQUIRED_COLUMNS_MISSING');
  assert.equal(sha(file),beforeHash);
  assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
+ assert.equal(r.operationalWrites,0);
+});
+
+test('partial WAL sidecars fail closed without opening SQLite or modifying files',t=>{
+ for(const suffix of ['-wal','-shm']){
+  const {data,storage,file}=fixture(t),db=createDb(file);
+  db.exec('PRAGMA journal_mode=WAL');db.close();
+  fs.writeFileSync(file+suffix,'simulated partial WAL sidecar');
+  const files=fs.readdirSync(storage).sort();
+  const hashes=Object.fromEntries(files.map(name=>[name,sha(path.join(storage,name))]));
+  const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('MUST_NOT_OPEN');}});
+  assert.equal(r.status,'STATE_UNKNOWN');
+  assert.equal(r.code,'R6_EVIDENCE_WAL_SIDECARS_PARTIAL_OR_UNSAFE');
+  assert.equal(r.sqliteOpened,false);
+  assert.deepEqual(fs.readdirSync(storage).sort(),files);
+  for(const name of files)assert.equal(sha(path.join(storage,name)),hashes[name]);
+ }
+});
+
+test('present live WAL pair fails closed rather than changing shared-memory bytes',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ db.exec('PRAGMA journal_mode=WAL');
+ db.exec("INSERT INTO market_score_employment_r4_shadow_current_v1 VALUES('X','STATE','AL','2026-11-01',1)");
+ const files=fs.readdirSync(storage).sort();
+ assert.deepEqual(files,['core.sqlite','core.sqlite-shm','core.sqlite-wal']);
+ const hashes=Object.fromEntries(files.map(name=>[name,sha(path.join(storage,name))]));
+ const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:()=>{throw Error('MUST_NOT_OPEN');}});
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_WAL_LIVE_SNAPSHOT_UNSAFE');
+ assert.equal(r.sqliteOpened,false);
+ for(const name of files)assert.equal(sha(path.join(storage,name)),hashes[name]);
+ db.close();
+});
+
+test('immutable WAL diagnostics discard output if a sidecar appears during reading',t=>{
+ const {data,storage,file}=fixture(t),db=createDb(file);
+ seed(db);db.exec('PRAGMA journal_mode=WAL');db.close();
+ const before=sha(file);
+ const r=inspectEmploymentR6CollectionEvidence(data,{openDatabase:uri=>{
+  fs.writeFileSync(file+'-wal','concurrent writer simulation');
+  return new DatabaseSync(uri,{readOnly:true,timeout:4000});
+ }});
+ assert.equal(r.status,'STATE_UNKNOWN');
+ assert.equal(r.code,'R6_EVIDENCE_IMMUTABLE_RACE');
+ assert.equal(r.pitRawSchema,null);
+ assert.equal(sha(file),before);
+ assert.deepEqual(fs.readdirSync(storage).sort(),['core.sqlite','core.sqlite-wal']);
 });
 
 test('unapproved data path and symbolic core file fail without opening SQLite',t=>{
