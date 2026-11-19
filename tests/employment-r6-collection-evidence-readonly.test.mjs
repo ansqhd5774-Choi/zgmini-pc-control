@@ -531,7 +531,7 @@ test('W04 PIT schema diagnosis reports only fixed raw/runs missing column ordina
   missingOrdinals:[]});
  assert.match(r.pitRawSchema.dbIdentityTag,/^[a-f0-9]{16}$/);
  assert.equal(inspectEmploymentR6CollectionEvidence(data).pitRawSchema.dbIdentityTag,r.pitRawSchema.dbIdentityTag);
- assert.match(r.pitRawSchema.checkedAt,/^20\\d{2}-\\d{2}-\\d{2}T/);
+ assert.match(r.pitRawSchema.checkedAt,/^20\d{2}-\d{2}-\d{2}T/);
  assert.equal(sha(file),before);
  assert.deepEqual(fs.readdirSync(storage).sort(),beforeFiles);
  assert.doesNotMatch(JSON.stringify(r),/PRIVATE_RAW_BODY|SECRET_DO_NOT_OUTPUT|TOKEN_SECRET|body_chunk|detail_json/i);
