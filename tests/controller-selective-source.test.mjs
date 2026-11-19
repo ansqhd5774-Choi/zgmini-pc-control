@@ -183,3 +183,33 @@ test('reviewed W01 W04 selective pin and B bytes pass exact maintainer admission
   approvalManifestSha256:'0'.repeat(64)},raw,
   {actor:'ansqhd5774-Choi',installedSha:installed}));
 });
+
+
+test('W04 fixed light Raw/Run selective manifest and exact main pin are consistent',()=>{
+ const installed='fe1c540302d8bb9768905aaab384324eab2f3ffe';
+ const target='bed78dc16e81e257886aa5480705b50192b5cd01';
+ const manifestFile=path.join(import.meta.dirname,'..','approvals','controller-updates',target+'.json');
+ const pinFile=path.join(import.meta.dirname,'..','approvals','controller-selective-targets',target+'.json');
+ const raw=fs.readFileSync(manifestFile);
+ const approved=JSON.parse(raw.toString('utf8'));
+ const selectedPin=JSON.parse(fs.readFileSync(pinFile,'utf8'));
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-w04-light-raw-audit-20261119',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const checked=validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(checked.manifest,selectedPin),true);
+ assert.equal(checked.manifest.controllerOnlyInstall,true);
+ assert.equal(checked.manifest.selectiveSource.mainSha,'77feaf861d45208eb50f0c5b3e384bf23200c967');
+ assert.deepEqual(checked.manifest.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
+ assert.deepEqual(checked.manifest.allowFiles.map(x=>x.path),[
+  'config/operations.json',
+  'controller/employment-r6-raw-run-attestation-readonly.mjs',
+  'controller/operations.mjs',
+ ]);
+ assert.equal(checked.manifest.checks.manifestSha256,manifestFingerprint(approved.allowFiles).sha256);
+ assert.equal(checked.manifest.postOperation,'core-status');
+ assert.equal(checked.manifest.backup.rollback.sha,installed);
+});
