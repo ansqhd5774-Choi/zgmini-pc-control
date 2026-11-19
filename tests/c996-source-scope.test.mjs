@@ -21,6 +21,9 @@ test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/agent-handoff-candidate-selector.yml']),['handoff007','handoff009','handoff008']);
  assert.deepEqual(selectGroups(['tests/r47-task-chain.test.mjs']),['r47','recovery']);
  assert.deepEqual(selectGroups(['tools/unknown-shared-contract.mjs']),all);
+ assert.deepEqual(selectGroups(['tools/ai-software-v2-register-once.mjs']),['aiSoftware']);
+ assert.deepEqual(selectGroups(['.github/workflows/pc-ai-software-v2-register-once.yml']),['aiSoftware']);
+ assert.deepEqual(selectGroups(['tests/ai-software-v2-register-once.test.mjs']),['aiSoftware']);
 });
 test('011 workflow and selection contract changes always run all original suites',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/c996-r5-readonly-source-checks.yml']),all);

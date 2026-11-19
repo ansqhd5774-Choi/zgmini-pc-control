@@ -150,10 +150,12 @@ function readActiveConfiguredDiagnostic(home){
    activeCliSha256:hash(cli),activeRegistrySha256:hash(registry)};
  }catch{return {activeRuntimeProbe:'READ_ONLY_PROBE_UNAVAILABLE'};}
 }
+export function validPriorUpgradeVersion(oldVersion,activeVersion){
+ return /^[a-f0-9]{16}$/.test(oldVersion??'')&&oldVersion!==activeVersion;
+}
 export function validateActiveUpgradeReceipt(receipt,_legacyInstallVersion,activeVersion){
  requireCheck(receipt?.status==='CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED'&&
-  receipt.sourceSha===ACTIVE_V2.sourceSha&&/^[a-f0-9]{16}$/.test(receipt.oldVersion??'')&&
-  receipt.oldVersion!==activeVersion&&
+  receipt.sourceSha===ACTIVE_V2.sourceSha&&validPriorUpgradeVersion(receipt.oldVersion,activeVersion)&&
   receipt.newVersion===activeVersion&&receipt.newVersion===ACTIVE_V2.version&&
   receipt.installedManifest&&Object.getPrototypeOf(receipt.installedManifest)===Object.prototype,
   'AI_V2_ACTIVE_UPGRADE_RECEIPT_DENIED');
@@ -164,6 +166,15 @@ export function validateActiveUpgradeReceipt(receipt,_legacyInstallVersion,activ
   'AI_V2_ACTIVE_UPGRADE_MANIFEST_DENIED');
  return entries;
 }
+export function activeUpgradeReceiptNames(names){
+ requireCheck(Array.isArray(names),'AI_V2_ACTIVE_UPGRADE_RECEIPT_LIST_INVALID');
+ return names.filter(name=>/^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\.json$/.test(name)).sort();
+}
+export function approvedDirectTool(install){
+ return install?.sourceSha===ACTIVE_V2.sourceSha&&
+  install?.manifest?.['scripts/pc-writer/theme-config-tool.mjs']===ACTIVE_V2.cliSha256&&
+  install?.manifest?.['scripts/pc-writer/theme-config-registry.mjs']===ACTIVE_V2.registrySha256;
+}
 function verifiedActiveCommonTool(home,oldVersion,active){
  requireCheck(active.activeRuntimeProbe==='LINKED'&&
   active.activeToolVersion===ACTIVE_V2.version&&
@@ -171,9 +182,10 @@ function verifiedActiveCommonTool(home,oldVersion,active){
   active.activeCliSha256===ACTIVE_V2.cliSha256&&
   active.activeRegistrySha256===ACTIVE_V2.registrySha256,
   'AI_V2_ACTIVE_SOURCE_BYTES_DENIED');
- const receipts=fs.readdirSync(home).filter(name=>
-  /^(?:AUTO_PUBLISH_UPGRADE_RESULT|PLATFORM_UPGRADE_[0-9]+)\.json$/.test(name)).sort();
- requireCheck(receipts.length>0&&receipts.length<=12,'AI_V2_ACTIVE_UPGRADE_RECEIPT_MISSING');
+ const receipts=activeUpgradeReceiptNames(fs.readdirSync(home));
+ requireCheck(receipts.length>0,'AI_V2_ACTIVE_UPGRADE_RECEIPT_MISSING');
+ // Do not reject a valid active upgrade merely because historical receipts accumulated.
+ // Each candidate remains bounded by requireFile(maxBytes:100_000) and full manifest/hash checks.
  let verified=null,receiptProbe='NO_MATCHING_UPGRADE_RECEIPT';
  for(const name of receipts){
   let receipt;try{receipt=JSON.parse(requireFile(path.join(home,name),{maxBytes:100_000}).toString('utf8'));}catch{continue;}
@@ -266,7 +278,10 @@ function installedCommonTool(){
  const cli=path.join(root,...cliRelative.split('/'));
  const flags=inspectInstalledCapability(fs.readFileSync(cli,'utf8'),
   fs.readFileSync(path.join(root,...registryRelative.split('/')),'utf8'));
- if(!flags.cliRegisterMarker||!flags.registryV2Marker){
+ // A marker is a diagnostic hint, never authority to execute an unapproved bundle.
+ // Verify the exact approved V2 source and installed file bytes in either path.
+ const approvedDirect=approvedDirectTool(install);
+ if(!approvedDirect||!flags.cliRegisterMarker||!flags.registryV2Marker){
   const active=readActiveConfiguredDiagnostic(home);
   try{return verifiedActiveCommonTool(home,install.version,active)}catch(e){
    const err=new Error(e?.code??'AI_V2_COMMON_V2_CAPABILITY_MISSING');
@@ -310,6 +325,43 @@ function sanitizedChildEnv(env){
  const keys=['SystemRoot','WINDIR','PATH','Path','PATHEXT','ComSpec','TEMP','TMP','APPDATA','LOCALAPPDATA'];
  return {...Object.fromEntries(keys.filter(k=>typeof env[k]==='string').map(k=>[k,env[k]])),
   ZGMINI_DATA_ROOT:DATA_ROOT};
+}
+export function verifyGithubContentsResponse(payload,expectedBytes){
+ requireCheck(payload&&typeof payload==='object'&&payload.encoding==='base64'&&
+  typeof payload.content==='string'&&payload.content.length>0,
+  'AI_V2_REPORT_READBACK_INVALID');
+ const encoded=payload.content.replace(/\s/g,'');
+ requireCheck(/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)&&encoded.length%4===0,
+  'AI_V2_REPORT_READBACK_INVALID');
+ const actual=Buffer.from(encoded,'base64');
+ requireCheck(actual.equals(Buffer.isBuffer(expectedBytes)?expectedBytes:Buffer.from(expectedBytes)),
+  'AI_V2_REPORT_READBACK_MISMATCH');
+ return true;
+}
+export function reportUploadState(verified){
+ requireCheck(Array.isArray(verified)&&verified.length===2&&
+  verified.every(x=>typeof x==='boolean'),'AI_V2_REPORT_VERIFICATION_INVALID');
+ return verified.every(Boolean)?'COMPLETE':'PARTIAL';
+}
+async function githubReadbackExact(relative,bytes,env){
+ let response;
+ try{response=await fetch(`https://api.github.com/repos/${CONTROL_REPO}/contents/${relative}`,{
+  method:'GET',headers:{accept:'application/vnd.github+json',
+   authorization:`Bearer ${env.GITHUB_TOKEN}`,
+   'x-github-api-version':'2022-11-28',
+   'user-agent':'zgmini-ai-software-register-once'}})}
+ catch{fail('AI_V2_REPORT_READBACK_UNKNOWN')}
+ requireCheck(response.ok,'AI_V2_REPORT_READBACK_HTTP_DENIED');
+ let payload;try{payload=await response.json()}catch{fail('AI_V2_REPORT_READBACK_INVALID')}
+ return verifyGithubContentsResponse(payload,bytes);
+}
+async function githubResultCreateAndVerify(relative,bytes,env){
+ try{await githubCreateOnly(relative,bytes,env)}
+ catch(e){
+  // Only an existing create-only target is eligible for exact-byte recovery.
+  if(e?.code!=='AI_V2_ONESHOT_ALREADY_RESERVED')throw e;
+ }
+ return githubReadbackExact(relative,bytes,env);
 }
 async function githubCreateOnly(relative,body,env){
  requireCheck(typeof env.GITHUB_TOKEN==='string'&&env.GITHUB_TOKEN.length>20,
@@ -374,7 +426,8 @@ async function execute(event,env){
    requireCheck(invocation.status===0&&!invocation.error,'AI_V2_COMMON_REGISTER_EXECUTION_FAILED');
    let cliResult;
    try{cliResult=JSON.parse(invocation.stdout)}catch{fail('AI_V2_COMMON_REGISTER_OUTPUT_INVALID')}
-   requireCheck(cliResult?.status==='REGISTERED_PRIVATE_ONLY'&&cliResult.id==='ai-software',
+   requireCheck(['REGISTERED_PRIVATE_ONLY','ALREADY_REGISTERED'].includes(cliResult?.status)&&
+    cliResult.id==='ai-software',
     'AI_V2_COMMON_REGISTER_STATUS_UNEXPECTED');
    registration=cliResult.status;
   }
@@ -432,12 +485,15 @@ async function uploadReport(event,env){
   `SCHEDULER_WRITES=0\nNEXT=${safe.next}\n`;
  const token=env.GITHUB_TOKEN;
  requireCheck(typeof token==='string'&&token.length>20,'AI_V2_REPORT_AUTH_MISSING');
- let uploads=0;
+ const verifiedUploads=[];
  for(const [file,bytes] of [
   [`results/ai-software-v2-${request.requestId}.json`,json],
   [`results/ai-software-v2-${request.requestId}.txt`,txt]]){
-   try{await githubCreateOnly(file,bytes,env);uploads++}catch{/* Issue comment is the fallback. */}
+   try{verifiedUploads.push(await githubResultCreateAndVerify(file,bytes,env))}
+   catch{verifiedUploads.push(false)}
  }
+ const uploads=verifiedUploads.filter(Boolean).length;
+ const uploadState=reportUploadState(verifiedUploads);
  const url=`https://api.github.com/repos/${CONTROL_REPO}/issues/${event.issue.number}/comments`;
  const response=await fetch(url,{method:'POST',headers:{accept:'application/vnd.github+json',
   authorization:`Bearer ${token}`,'x-github-api-version':'2022-11-28',
@@ -445,7 +501,9 @@ async function uploadReport(event,env){
   body:JSON.stringify({body:`AI 소프트웨어 V2 비공개 등록: **${safe.status}** (${safe.code})\n`+
    `검증 결과 파일: ${uploads}/2\n\n\`\`\`json\n${json.trim()}\n\`\`\``})});
  requireCheck(response.ok,'AI_V2_ISSUE_RESULT_COMMENT_FAILED');
- process.stdout.write(`AI_V2_REPORT=${safe.status} UPLOADED=${uploads}/2\n`);
+ process.stdout.write(`AI_V2_REPORT=${safe.status} UPLOADED=${uploads}/2 VERIFIED=${uploadState}\n`);
+ // A posted fallback comment is not equivalent to 2/2 independently verified files.
+ if(uploadState!=='COMPLETE')process.exitCode=1;
 }
 
 async function main(){
