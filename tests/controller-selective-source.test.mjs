@@ -143,3 +143,43 @@ test('W01 W04 seven-path selective review seed is exact and remains unapproved',
  assert.equal(draft.paths.every(p=>p.startsWith('config/')||p.startsWith('controller/')),true);
  assert.notEqual(draft.installedSha,draft.targetSha);
 });
+
+test('reviewed W01 W04 selective pin and B bytes pass exact maintainer admission',()=>{
+ const installed='b9099839df1a7cc6b3b166a139f7fac6938ada66';
+ const target='310d777f06e51448bf0d863f52a21a1af2c086fc';
+ const file='approvals/controller-updates/'+target+'.json';
+ const pinFile='approvals/controller-selective-targets/'+target+'.json';
+ const raw=fs.readFileSync(file);
+ const manifest=JSON.parse(raw.toString('utf8'));
+ const pin=JSON.parse(fs.readFileSync(pinFile,'utf8'));
+ const paths=['config/operations.json','controller/common.mjs',
+  'controller/employment-r6-candidate-readonly.mjs',
+  'controller/inflation-a401-private23-readonly.mjs',
+  'controller/inflation-a407-integrity-readonly.mjs',
+  'controller/inflation19-runtime-readonly.mjs','controller/operations.mjs'];
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.deepEqual(manifest.allowFiles.map(f=>f.path),paths);
+ assert.equal(manifest.checks.manifestSha256,
+  manifestFingerprint(manifest.allowFiles).sha256);
+ assert.deepEqual(manifest.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
+ assert.equal(manifest.selectiveSource.mainSha,
+  '4311757ce617cf6cab20683c933668bd0aa594c3');
+ assert.equal(manifest.approval.ref,
+  'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2275');
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-12345678-1234-4123-8123-123456789abc',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const verified=validateUpdateRequest(request,raw,
+  {actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(verified.manifest.targetSha,target);
+ assert.throws(()=>validateControllerSelectivePin(manifest,{...pin,
+  customPaths:[]}),/SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateUpdateRequest({...request,
+  approvalManifestSha256:'0'.repeat(64)},raw,
+  {actor:'ansqhd5774-Choi',installedSha:installed}));
+});
