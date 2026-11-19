@@ -134,7 +134,7 @@ test('Runner TEMP may differ from source user TEMP but must be C-only and exact'
 test('read denial stage includes only allowlisted file ID, never absolute path',()=>{
   const ctx={requestId:uuid,issueNumber:1500,runId:'1',attempt:'1'};
   const r=raw();r.status='STOPPED';r.code='EPERM';r.inspectStep='PRE_INPUT_HASH';r.inspectId='ADK_WIM';
-  r.inputs=[];r.logs=[];r.inputHashesUnchanged=undefined;
+  r.inputs=[];r.logs=[];r.inputHashesUnchanged=0;r.inputChecksComplete=false;
   const result=selectSafeReport(r,ctx,HOST);
   assert.equal(result.inspectStep,'PRE_INPUT_HASH');
   assert.equal(result.inspectId,'ADK_WIM');
@@ -148,7 +148,7 @@ test('read denial stage includes only allowlisted file ID, never absolute path',
 test('safe EPERM path progress reports operation and bounded relative depth only',()=>{
   const ctx={requestId:uuid,issueNumber:1500,runId:'1',attempt:'1'};
   const r=raw();r.status='STOPPED';r.code='EPERM';
-  r.inputs=[];r.logs=[];r.inspectStep='PRE_INPUT_HASH';r.inspectId='FINAL_WIM';
+  r.inputs=[];r.logs=[];r.inputChecksComplete=false;r.inputHashesUnchanged=0;r.inspectStep='PRE_INPUT_HASH';r.inspectId='FINAL_WIM';
   r.inspectOperation='PATH_LSTAT';r.inspectDepth=3;
   const out=selectSafeReport(r,ctx,HOST);
   assert.equal(out.inspectOperation,'PATH_LSTAT');
