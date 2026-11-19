@@ -81,6 +81,7 @@ test('pin must match merged PR, branch, baseline, target and every approved file
 test('only approved controller-only maintenance scope accepts selective source',()=>{
  for(const patch of [
   {controllerOnlyInstall:false},
+  {selectiveSource:null},
   {purpose:'pc-controller-heavy-readonly'},
   {infrastructureEvidence:{}},
   {selectiveSource:{...make().selectiveSource,branch:'../bad'}},
