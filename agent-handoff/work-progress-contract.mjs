@@ -32,9 +32,11 @@ export function workReceipt(data, commentId) {
     'aiExecution: NOT_ATTESTED','operationalWrites: 0'].join('\n');
 }
 
-function ownedComments(comments) {
-  return comments.filter(c=>c?.user?.login===HANDOFF_OWNER &&
-    typeof c.body==='string' && c.body.startsWith('{"schema":"'+WORK_SCHEMA+'"'));
+export function ownedComments(comments) {
+  return comments.filter(c=>{
+    if(c?.user?.login!==HANDOFF_OWNER||typeof c.body!=='string')return false;
+    try{return JSON.parse(c.body)?.schema===WORK_SCHEMA;}catch{return false;}
+  });
 }
 
 function verifiedReceiptFor(comments,body,commentId,issueUrl) {
