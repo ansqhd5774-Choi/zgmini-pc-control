@@ -131,6 +131,9 @@ function preflight(file,root,filesystem){
    return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_SIDECARS_PARTIAL_OR_UNSAFE'};
   if(sidecars[0]==='ABSENT')
    return {status:'PASS',path:entry.real,immutable:true,originalStat:entry.stat};
+  // A normal read-only open can mutate -shm; immutable reads miss uncheckpointed WAL.
+  // Do not access the operational live-WAL pair without an isolated snapshot.
+  return {status:'STATE_UNKNOWN',code:'R6_EVIDENCE_WAL_LIVE_SNAPSHOT_UNSAFE'};
  }
  return {status:'PASS',path:entry.real};
 }
