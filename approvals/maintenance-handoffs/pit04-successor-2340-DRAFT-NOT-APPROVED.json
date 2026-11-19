@@ -20,7 +20,7 @@
   "checks": {
     "installedWindowsEvidence": "PENDING_CURRENT_READBACK; historical #2301 PASS at target 269f38f5 is not current installed proof",
     "sourceCi": "PR #2340 exact HEAD maintenance CI 44520336238 PASS and C996 CI 44520336314 PASS; reuse until source changes",
-    "targetMainCommit": "PENDING_REVIEW_AND_MERGE; targetSha is immutable PR HEAD, not confirmed merged main",
+    "targetMainCommit": "PENDING_MAIN_INTEGRATION: operator requires exact targetSha commit be ancestor of checked-out main and approvals/maintenance-handoffs/<targetSha>.json exist on main. If merge/squash creates a different final source SHA, regenerate nine file pins and successor manifest for exact merged target; do not rename an approval blindly.",
     "windowsHandoffExecuted": false
   },
   "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
@@ -34,5 +34,5 @@
     "Business DB rows/schema, provider quotas, D1, source/Writer files",
     "Original request/lease/ledger history; no replay of failed installations"
   ],
-  "scopeNote": "NON_EXECUTING_DRAFT successor candidate. Exact updater one-file delta from #2301 source; cannot use historic manifest to install. Prior to approval: current installed SHA+9-file preimage readback, source/installed CAS match, startup and lease protections, owner approval, then a new unique handoff request. Do not replay #2094 or alter its STAGED evidence."
+  "scopeNote": "NON_EXECUTING_DRAFT. No production handoff request permitted. Existing installed SHA (269f38...) is historical #2301 target, not latest on-disk evidence. Read back 7 installed runtime file digests, installed sourceSha, startup digest, receiver and lease status; verify actual CAS and target nine source hashes; preserve prior journals and #2094 STAGED. Merge #2340 via approved process; confirm final ancestor target SHA and exact SHA-named approval path on main, re-pin and review if merge commit differs. Only then exact successor approval, unique handoff and receipt."
 }
