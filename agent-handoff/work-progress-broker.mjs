@@ -62,15 +62,20 @@ export async function processWorkComment(event,io) {
   if(verified.state==='ALREADY_RECORDED')return {state:'ALREADY_RECORDED',issueNumber:number};
   if(verified.state!=='READY'||verified.receipt!==first.receipt)
     stop('PREWRITE_PROOF_CHANGED');
+  let reconciled=false;
   try{await io.postComment(number,first.receipt);}catch {
     const afterUnknown=evaluateWorkUpdate(await io.readIssue(number),
       await io.readComments(number),event.comment);
     if(afterUnknown.state!=='ALREADY_RECORDED')
       stop('WRITE_OUTCOME_UNKNOWN');
+    reconciled=true;
   }
-  const after=evaluateWorkUpdate(await io.readIssue(number),
-    await io.readComments(number),event.comment);
-  if(after.state!=='ALREADY_RECORDED')stop('RECEIPT_READBACK_STOP');
+  // The ambiguous POST already received an exact receipt readback.
+  if(!reconciled){
+    const after=evaluateWorkUpdate(await io.readIssue(number),
+      await io.readComments(number),event.comment);
+    if(after.state!=='ALREADY_RECORDED')stop('RECEIPT_READBACK_STOP');
+  }
   return Object.freeze({state:'WORK_STATUS_RECORDED',issueNumber:number,
     updateId:first.updateId,progressState:first.progressState,
     pcOperationalWrites:0,aiCalls:0});
