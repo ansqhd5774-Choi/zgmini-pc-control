@@ -101,3 +101,15 @@ test('completed-run fanout is limited to intake, selector and board',()=>{
   assert.equal(newFanout,3);
   assert.equal(oldFanout-newFanout,4);
 });
+
+test('009 admits only relevant events and serializes actual issue writers without dropping queued events',()=>{
+ const yaml=read('agent-handoff.yml');
+ assert.doesNotMatch(yaml,/^concurrency:/m);
+ for(const job of ['route-sanitized-incident','record-verified-return','record-work-progress']){
+   assert.ok(yaml.includes('  '+job+':\n    concurrency:\n      group: agent-handoff-${{ github.event.issue.number }}\n      cancel-in-progress: false\n      queue: max'));
+ }
+ assert.equal((yaml.match(/^      queue: max$/gm)||[]).length,3);
+ assert.match(yaml,/github\.event\.action == 'opened'/);
+ assert.match(yaml,/github\.event\.action == 'labeled' && github\.event\.label\.name == 'agent-handoff'/);
+ assert.doesNotMatch(yaml,/cancel-in-progress: true/);
+});
