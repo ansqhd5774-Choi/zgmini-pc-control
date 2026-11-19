@@ -140,7 +140,7 @@ test('no local B result produces safe STATE_UNKNOWN JSON/TXT 2/2, not silent suc
     saved.set(url,body.content);
     return {status:201,ok:true};
    }
-   const readUrl=url.replace(/\\?ref=main$/,'');
+   const readUrl=url.replace(/\?ref=main$/,'');
    if(!saved.has(readUrl))return {status:404,ok:false};
    return {status:200,ok:true,json:async()=>({encoding:'base64',
     content:saved.get(readUrl)})};
