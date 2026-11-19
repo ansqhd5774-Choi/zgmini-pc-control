@@ -63,5 +63,9 @@ test('publisher permits only bounded metadata, never raw data or secret keys',()
   /W05_B_REPORT_CONTRACT_STOP/);
  assert.throws(()=>sanitizedReport({...clean,d1Writes:1},requestId),
   /W05_B_REPORT_CONTRACT_STOP/);
+ assert.throws(()=>sanitizedReport({...clean,providerCalls:'KEY=secret'},requestId),
+  /W05_B_REPORT_CONTRACT_STOP/);
+ assert.throws(()=>sanitizedReport({...clean,observationAt:'2026-13-01'},requestId),
+  /W05_B_REPORT_CONTRACT_STOP/);
  assert.equal(sanitizedCode('NOT_SAFE'),'W05_B_UNEXPECTED_STOP');
 });
