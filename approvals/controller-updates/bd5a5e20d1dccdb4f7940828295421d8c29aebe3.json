@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "7b0b87607f8bd7e369f3a1eaa1955b8ca58a20f2",
+  "targetSha": "bd5a5e20d1dccdb4f7940828295421d8c29aebe3",
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-raw-run-attestation-readonly.mjs",
+      "sha256": "c003de5448783f04bc701a5c596969efb92880c407eb337f645398c1b4bdecc4"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2326",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "bd5a5e20d1dccdb4f7940828295421d8c29aebe3",
+    "status": "PASS",
+    "manifestSha256": "6863b5f8476dd2459b26e858cf4bd9cc7c4e3293fc118f5f0e70ae23e20a3e59"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "7b0b87607f8bd7e369f3a1eaa1955b8ca58a20f2"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "codex/w04-pit0408-host-r3-restore-raw-lineage-20261118",
+  "postSourceSha": "863ed1bef077301949899dd4aeb3f78f448fd9ed",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w04-response-hash-selective-20261119",
+    "mainSha": "b5e40e51e808b352470ca70fdaab05e141325d39",
+    "customPaths": []
+  }
+}
