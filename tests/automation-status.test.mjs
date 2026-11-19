@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
@@ -89,4 +90,18 @@ test('missing, offline and unrelated runner errors retain scoped diagnosis',()=>
   runnerQueryError:'HTTP_403_FORBIDDEN',installLock:{held:true,recoveryRequired:true}});
  assert.equal(blocked.state,'RECOVERY_REQUIRED');
  assert.equal(blocked.next,'USE_CONTROLLER_RECOVERY_RUNBOOK');
+});
+
+test('010 status CI covers direct status imports and verifies isolated host before tests',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/automation-status-readonly-source-tests.yml',import.meta.url),'utf8');
+ for(const dependency of [
+  'tools/automation-status.mjs','tools/maintenance-lock.mjs','tools/update.mjs',
+  'tools/runner-watchdog.mjs','tests/automation-status.test.mjs',
+  'tests/runner-watchdog.test.mjs'
+ ])assert.ok(workflow.includes("      - '"+dependency+"'"),dependency);
+ const host=workflow.indexOf('      - name: Confirm isolated CI host');
+ const test=workflow.indexOf('      - name: Run automation status read-only regression tests');
+ assert.ok(host>=0 && test>host);
+ assert.match(workflow,/cancel-in-progress: true/);
+ assert.match(workflow,/permissions:\r?\n  contents: read/);
 });

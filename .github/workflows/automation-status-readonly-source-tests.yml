@@ -4,6 +4,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'tools/automation-status.mjs'
+      - 'tools/maintenance-lock.mjs'
+      - 'tools/update.mjs'
       - 'tests/automation-status.test.mjs'
       - 'tools/runner-watchdog.mjs'
       - 'tests/runner-watchdog.test.mjs'
@@ -33,8 +35,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
-      - name: Run automation status read-only regression tests
-        run: node --test --test-concurrency=1 tests/automation-status.test.mjs tests/runner-watchdog.test.mjs
       - name: Confirm isolated CI host
         run: |
           if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
@@ -43,3 +43,5 @@ jobs:
             echo AUTOMATION_STATUS_SOURCE_ONLY_ISOLATED_HOST=FALSE
             exit /b 5
           )
+      - name: Run automation status read-only regression tests
+        run: node --test --test-concurrency=1 tests/automation-status.test.mjs tests/runner-watchdog.test.mjs
