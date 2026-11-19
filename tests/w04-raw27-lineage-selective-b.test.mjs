@@ -5,7 +5,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {manifestFingerprint,validateUpdateRequest,validateControllerSelectivePin,validateControllerOnlyInstallDelta,
  MAINTENANCE_ISSUE_SCHEMA,CONTROL_REPOSITORY} from '../tools/maintenance-contract.mjs';
-const installed='d770edbf8dd8193cafcd8e33c9404af48465a07d';
+const installed='bd5a5e20d1dccdb4f7940828295421d8c29aebe3';
 const target='d770edbf8dd8193cafcd8e33c9404af48465a07d';
 const hash=x=>createHash('sha256').update(x).digest('hex');
 test('W04 bounded lineage selective B exact 1-file manifest and pin validation',()=>{
