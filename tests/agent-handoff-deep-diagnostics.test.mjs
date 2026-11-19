@@ -8,7 +8,7 @@ import {
   alreadyReported,sourceAssessment,simulateOptions,buildDeepReport,
   analyzeRecentHistory
 } from '../agent-handoff/deep-diagnostics.mjs';
-import {processDeepQueue,validateDeepEvent} from '../agent-handoff/deep-diagnostics-runner.mjs';
+import {processDeepQueue,validateDeepEvent,readLegacyDeepArchive} from '../agent-handoff/deep-diagnostics-runner.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control',owner='ansqhd5774-Choi';
 const now=Date.parse('2026-11-16T13:00:00Z'),when='2026-11-16T12:00:00Z';
@@ -105,6 +105,7 @@ test('isolated runner processes newest verified case and never reposts receipt',
     readIssue:async id=>structuredClone(records.get(id).issue),
     readComments:async id=>id===1743?structuredClone(ledgerComments):
       structuredClone(records.get(id).comments),
+    readLegacyReports:async()=>[],
     readLedger:async()=>({number:1743,state:'open',user:{login:owner},
       body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:ledgerComments.length}),
     readOrigin:async(_,n)=>originFor(records.get(n+1)),
@@ -112,9 +113,10 @@ test('isolated runner processes newest verified case and never reposts receipt',
     mainSha:async()=>mainSha,
     compareFile:async()=> 'SAME_BLOB',
     recentHistory:async()=>[],
-    postLedger:async body=>{
-      posts.push(body);
-      ledgerComments.push({id:9000+posts.length,body,created_at:new Date().toISOString(),
+    postIncidentReport:async(issueNumber,body)=>{
+      posts.push({issueNumber,body});
+      records.get(issueNumber).comments.push({
+        id:9000+posts.length,body,created_at:new Date().toISOString(),
         user:{login:'github-actions[bot]'}});
     }
   };
@@ -131,12 +133,13 @@ test('invalid bot selector evidence does not post',async()=>{
   const io={
     listIssues:async()=>[f.issue],readIssue:async()=>f.issue,
     readComments:async n=>n===1743?[]:[f.comments[0]],
+    readLegacyReports:async()=>[],
     readLedger:async()=>({number:1743,state:'open',user:{login:owner},
       body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:0}),
     readOrigin:async()=>{throw Error('should not call');},
     readOriginComments:async()=>[],
     mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
-    recentHistory:async()=>[],postLedger:async x=>posts.push(x)
+    recentHistory:async()=>[],postIncidentReport:async(_,x)=>posts.push(x)
   };
   const output=await processDeepQueue(io,now);
   assert.equal(output.unverified,1);assert.equal(output.posted,0);assert.deepEqual(posts,[]);
@@ -194,14 +197,15 @@ test('deep runner preserves valid evidence and counts unknown-clock issue',async
     readIssue:async id=>id===310?structuredClone(good.issue):structuredClone(bad.issue),
     readComments:async n=>n===1743?structuredClone(ledger):
       structuredClone(n===310?good.comments:bad.comments),
+    readLegacyReports:async()=>[],
     readLedger:async()=>({number:1743,state:'open',user:{login:owner},
       body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:ledger.length}),
     readOrigin:async()=>originFor(good),readOriginComments:async()=>[],
     mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
     recentHistory:async()=>[],
-    postLedger:async body=>{
+    postIncidentReport:async(_,body)=>{
       posts.push(body);
-      ledger.push({id:9300+posts.length,body,created_at:new Date().toISOString(),
+      good.comments.push({id:9300+posts.length,body,created_at:new Date().toISOString(),
         user:{login:'github-actions[bot]'}});
     }
   };
@@ -233,14 +237,15 @@ test('unrelated Issue read error cannot block a verified following report',async
       return structuredClone(good.issue);
     },
     readComments:async n=>n===1743?structuredClone(comments):structuredClone(good.comments),
+    readLegacyReports:async()=>[],
     readLedger:async()=>({number:1743,state:'open',user:{login:owner},
       body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:comments.length}),
     readOrigin:async()=>originFor(good),readOriginComments:async()=>[],
     mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
     recentHistory:async()=>[],
-    postLedger:async body=>{
+    postIncidentReport:async(_,body)=>{
       posts++;
-      comments.push({id:17000+posts,created_at:new Date().toISOString(),body,
+      good.comments.push({id:17000+posts,created_at:new Date().toISOString(),body,
         user:{login:'github-actions[bot]'}});
     }
   };
@@ -258,13 +263,14 @@ test('global authentication errors and evidence drift remain hard stops',async()
   const f=fixture(720);let posts=0;
   const baseline={
     listIssues:async()=>[f.issue],
+    readLegacyReports:async()=>[],
     readLedger:async()=>({number:1743,state:'open',user:{login:owner},
       body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:0}),
     readComments:async n=>n===1743?[]:f.comments,
     readOrigin:async()=>originFor(f),
     readOriginComments:async()=>[],
     mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
-    recentHistory:async()=>[],postLedger:async()=>{posts++;}
+    recentHistory:async()=>[],postIncidentReport:async()=>{posts++;}
   };
   await assert.rejects(()=>processDeepQueue({...baseline,
     readIssue:async()=>{throw Error('HANDOFF_DEEP_RUNNER_GITHUB_HTTP_403');}
@@ -272,4 +278,71 @@ test('global authentication errors and evidence drift remain hard stops',async()
   await assert.rejects(()=>processDeepQueue({...baseline,
     readIssue:async()=>({...f.issue,title:'changed title'})},now),/ISSUE_DRIFT/);
   assert.equal(posts,0);
+});
+
+test('legacy archive remains verifiable after root ledger exceeds 400 comments',async()=>{
+  const legacy=Array.from({length:200},(_,i)=>({
+    id:6900000000+i,body:i<11
+      ?'<!-- ZGMINI_HANDOFF_DEEP_DIAG_R2 issue:'+(1400+i)+
+        ' fingerprint:'+('a'.repeat(64))+' -->'
+      :'ordinary unrelated proactive diagnostic',user:{login:'github-actions[bot]'}
+  }));
+  legacy[180]={id:DEEP_POLICY.legacyAnchorCommentId,
+    user:{login:'github-actions[bot]'},
+    body:'<!-- ZGMINI_HANDOFF_DEEP_DIAG_R2 issue:2237 fingerprint:8883b99d3d6f00ad0195ed4d051d804710b1475eeac0d20fe398f7a9aeefbafa -->'};
+  const calls=[];
+  const found=await readLegacyDeepArchive(async page=>{
+    calls.push(page);
+    return legacy.slice((page-1)*100,page*100);
+  });
+  assert.deepEqual(calls,[1,2]);
+  assert.equal(found.length,12);
+  assert.equal(found.at(-1).id,DEEP_POLICY.legacyAnchorCommentId);
+  await assert.rejects(()=>readLegacyDeepArchive(async page=>
+    legacy.slice((page-1)*100,page*100).filter(c=>c.id!==DEEP_POLICY.legacyAnchorCommentId)
+  ),/LEGACY_ANCHOR_MISSING/);
+});
+
+test('legacy archived marker prevents duplicate incident report without new write',async()=>{
+  const f=fixture(750),legacy={
+    id:3001,user:{login:'github-actions[bot]'},created_at:new Date().toISOString(),
+    body:reportMarker(f.issue,f.request)+'\nprevious authenticated historical report'
+  };
+  let writes=0;
+  const io={
+    listIssues:async()=>[f.issue],readIssue:async()=>structuredClone(f.issue),
+    readComments:async()=>structuredClone(f.comments),
+    readLegacyReports:async()=>[legacy],
+    readLedger:async()=>({number:1743,state:'open',user:{login:owner},
+      body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:450}),
+    readOrigin:async()=>{throw Error('history must prevent origins lookup');},
+    readOriginComments:async()=>[],mainSha:async()=>mainSha,
+    compareFile:async()=> 'SAME_BLOB',recentHistory:async()=>[],
+    postIncidentReport:async()=>{writes++;}
+  };
+  const result=await processDeepQueue(io,now);
+  assert.equal(result.already,1);
+  assert.equal(result.posted,0);
+  assert.equal(result.reportStore,'INCIDENT_ISSUE_COMMENTS');
+  assert.equal(writes,0);
+});
+
+test('incident report write readback is required; unknown post does not retry',async()=>{
+  const f=fixture(760);let attempts=0,reads=0;
+  const io={
+    listIssues:async()=>[f.issue],readIssue:async()=>structuredClone(f.issue),
+    readComments:async()=>{reads++;return structuredClone(f.comments);},
+    readLegacyReports:async()=>[],
+    readLedger:async()=>({number:1743,state:'open',user:{login:owner},
+      body:'<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R1 -->',comments:410}),
+    readOrigin:async()=>originFor(f),readOriginComments:async()=>[],
+    mainSha:async()=>mainSha,compareFile:async()=> 'SAME_BLOB',
+    recentHistory:async()=>[],
+    postIncidentReport:async(issueNumber)=>{
+      assert.equal(issueNumber,760);attempts++;throw Error('ack lost before actual post');
+    }
+  };
+  await assert.rejects(()=>processDeepQueue(io,now),/POST_RESULT_UNKNOWN/);
+  assert.equal(attempts,1);
+  assert.ok(reads>=3);
 });

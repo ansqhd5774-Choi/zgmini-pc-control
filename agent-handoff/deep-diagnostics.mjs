@@ -6,6 +6,9 @@ import {assessIncident,HANDOFF_REPOSITORY,HANDOFF_OWNER,HANDOFF_BOT} from './que
 export const DEEP_POLICY=Object.freeze({
   version:'ZGMINI_HANDOFF_DEEP_DIAG_R2',
   ledgerIssueNumber:1743,lookbackDays:7,maxIssues:200,
+  // Existing 12 R2 reports remain on the shared historical ledger. New R2
+  // reports go to their authenticated incident Issues, not the growing ledger.
+  legacyAnchorCommentId:6997545800,legacyDeepReportCount:12,
   maxNewReports:3,maxComments:400,maxSourceFiles:3,maxHistory:50,
   schedule:'12,27,42,57 * * * *'
 });
