@@ -47,6 +47,10 @@ async function loadShards(io,month){
   if(shards.some((x,i)=>x.index!==i+1))stop('SHARD_INDEX_GAP');
   return shards;
 }
+function recentComments(shards){
+  return shards.flatMap(x=>x.comments).sort((a,b)=>
+    Date.parse(a.created_at)-Date.parse(b.created_at)).slice(-WIDE_POLICY.maxComments);
+}
 async function ensureShard(io,month,shards){
   const latest=shards.at(-1);
   if(latest?.issue.state==='open'&&latest.comments.length<WIDE_POLICY.maxComments)
@@ -198,12 +202,12 @@ export async function scoutWide(io,now){
   const month=monthFor(now),previous=previousMonth(now);
   let shards=await loadShards(io,month);
   const previousShards=await loadShards(io,previous);
-  const comments=[...previousShards,...shards].flatMap(x=>x.comments);
+  const comments=recentComments([...previousShards,...shards]);
   let decision=reportDecision(comments,report,now),posted=0;
   if(decision==='REPORT'){
     // Other workers may have posted while GitHub inventory was read.
     shards=await loadShards(io,month);
-    const current=[...previousShards,...shards].flatMap(x=>x.comments);
+    const current=recentComments([...previousShards,...shards]);
     decision=reportDecision(current,report,now);
     if(decision==='REPORT'){
       const target=await ensureShard(io,month,shards);
@@ -211,7 +215,7 @@ export async function scoutWide(io,now){
       const selected=shards.find(x=>x.issue.number===target.number);
       if(!selected||selected.issue.state!=='open'||
          selected.comments.length>=WIDE_POLICY.maxComments)stop('SHARD_WRITE_SCOPE');
-      decision=reportDecision([...previousShards,...shards].flatMap(x=>x.comments),report,now);
+      decision=reportDecision(recentComments([...previousShards,...shards]),report,now);
       if(decision==='REPORT'){
         try{await io.postComment(target.number,textReport);}
         catch(error){
