@@ -4,7 +4,11 @@ export const SCOUT_POLICY=Object.freeze({
   version:'ZGMINI_PROACTIVE_DIAGNOSTICS_R1',
   lookbackDays:7,
   maxNewComments:3,
-  maxRunInventory:400,
+  maxRunInventory:2000,
+  // Exact authenticated R1 prefix on the shared old ledger. Do not rewrite it.
+  legacyAnchorCommentId:7006077223,legacyReportCount:167,
+  shardLabel:'proactive-diagnostic-ledger',maxShardComments:300,
+  maxShardPages:4,
   maxJobsPerRun:100,
   ledgerIssueNumber:1743,
   schedule:'10,25,40,55 * * * *'
@@ -22,16 +26,21 @@ export function selectRecentFailures(runs,nowMs){
   if(!Array.isArray(runs)||runs.length>SCOUT_POLICY.maxRunInventory||
     !Number.isFinite(nowMs)||nowMs<Date.UTC(2020,0,1))stop('INVENTORY_OR_CLOCK_STOP');
   const cutoff=nowMs-SCOUT_POLICY.lookbackDays*dayMs;
-  const keys=new Set();
+  const keys=new Set(),duplicates=new Set();
   const recent=[];
-  let excludedOld=0,excludedOther=0;
+  let excludedOld=0,excludedOther=0,unverified=0;
   for(const run of runs){
-    if(!run||!isId(run.id)||!isAttempt(run.run_attempt))stop('RUN_IDENTITY_STOP');
+    if(!run||!isId(run.id)||!isAttempt(run.run_attempt)){
+      unverified++;continue;
+    }
     const key=run.id+':'+run.run_attempt;
-    if(keys.has(key))stop('DUPLICATE_RUN_STOP');
+    if(keys.has(key)){
+      // Neither copy of an ambiguous repeated run is eligible for a report.
+      duplicates.add(key);unverified++;continue;
+    }
     keys.add(key);
     const t=validTime(run.created_at,nowMs);
-    if(t===null)stop('RUN_TIMESTAMP_STOP');
+    if(t===null){unverified++;continue;}
     if(t<cutoff){excludedOld++;continue;}
     if(run.status!=='completed'||!['failure','timed_out'].includes(run.conclusion)||
       run.name==='ZGMINI Proactive GitHub Diagnostics'){
@@ -39,13 +48,15 @@ export function selectRecentFailures(runs,nowMs){
     }
     recent.push({...run,_createdMs:t});
   }
+  const valid=recent.filter(run=>!duplicates.has(run.id+':'+run.run_attempt));
+  unverified+=recent.length-valid.length;
   // Newest event ALWAYS first; no severity score may promote a historical run.
-  recent.sort((a,b)=>b._createdMs-a._createdMs||b.id-a.id||
+  valid.sort((a,b)=>b._createdMs-a._createdMs||b.id-a.id||
     b.run_attempt-a.run_attempt);
   return Object.freeze({
     lookbackDays:SCOUT_POLICY.lookbackDays,
     cutoff:new Date(cutoff).toISOString(),
-    recent,excludedOld,excludedOther
+    recent:valid,excludedOld,excludedOther,unverified
   });
 }
 export function markerFor(run){
@@ -55,7 +66,7 @@ export function markerFor(run){
 }
 const markerRegex=/^<!-- ZGMINI_PROACTIVE_DIAG_R1 run:(\d+) attempt:(\d+) -->$/m;
 export function recordedFor(comments,run){
-  if(!Array.isArray(comments)||comments.length>400)stop('COMMENTS_INCOMPLETE');
+  if(!Array.isArray(comments)||comments.length>10000)stop('COMMENTS_INCOMPLETE');
   const expected=markerFor(run);
   let count=0;
   for(const comment of comments){

@@ -6,7 +6,7 @@ import {
   assertSameRun,buildDiagnosis
 } from '../agent-handoff/proactive-diagnostics.mjs';
 import {
-  scanLatest,validateScoutEvent,lookbackQuery,REPO,OWNER
+  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,REPO,OWNER
 } from '../agent-handoff/proactive-diagnostics-runner.mjs';
 const now=Date.parse('2026-11-16T13:00:00Z');
 const recent='2026-11-16T12:00:00Z',old='2026-08-16T12:00:00Z';
@@ -22,18 +22,28 @@ const receipt=(r,id)=>({id,body:markerFor(r)+'\nverified',
   user:{login:'github-actions[bot]'},created_at:recent});
 function ioFor(runs,initial=[]){
   const comments=structuredClone(initial),posted=[];
+  const shards=new Map();let nextIssue=3000;
+  const archive=[{id:7006077223,body:'<!-- ZGMINI_PROACTIVE_DIAG_R1 run:44467706543 attempt:1 -->',user:{login:'github-actions[bot]'},created_at:recent}];
   return {
     listRuns:async()=>structuredClone(runs),
     readLedger:async()=>ledger(),
-    readComments:async()=>structuredClone(comments),
+    readLegacyComments:async()=>structuredClone(archive),
+    findShards:async month=>[...shards.values()].filter(x=>x.issue.title.startsWith('ZGMINI Proactive Diagnostics '+month+' #')).map(x=>structuredClone(x.issue)),
+    readShard:async n=>structuredClone(shards.get(n).issue),
+    readShardComments:async n=>structuredClone(shards.get(n).comments),
+    createShard:async(month,index,title,body)=>{
+      const issue={number:nextIssue++,title,body,state:'open',user:{login:OWNER},labels:[{name:SCOUT_POLICY.shardLabel}]};
+      shards.set(issue.number,{issue,comments:[]});return {number:issue.number};
+    },
     getRun:async id=>structuredClone(runs.find(r=>r.id===id)),
     getJobs:async()=>[{id:550,conclusion:'failure',steps:[{number:3,conclusion:'failure'}]}],
     getLog:async()=> 'AssertionError: a test failed',
-    postComment:async body=>{
+    postComment:async (n,body)=>{
       posted.push(body);
-      comments.push({id:comments.length+1,body,user:{login:'github-actions[bot]'},created_at:recent});
+      const a=shards.get(n).comments;
+      a.push({id:10000+posted.length,body,user:{login:'github-actions[bot]'},created_at:recent});
     },
-    posted
+    posted,shards
   };
 }
 test('recent seven days only, newest-first independent of source list order',()=>{
@@ -54,10 +64,10 @@ test('cutoff inclusive; old failures, successes, self failures ignored',()=>{
   ],now);
   assert.deepEqual(x.recent.map(r=>r.id),[101]);
 });
-test('invalid/duplicate identity and timestamps stop',()=>{
-  assert.throws(()=>selectRecentFailures([run(1),run(1)],now),/DUPLICATE_RUN_STOP/);
-  assert.throws(()=>selectRecentFailures([run(1,'bad')],now),/RUN_TIMESTAMP_STOP/);
-  assert.throws(()=>selectRecentFailures([run(1,'2099-01-01T00:00:00Z')],now),/RUN_TIMESTAMP_STOP/);
+test('invalid/duplicate identity and timestamps isolate unverified runs',()=>{
+  assert.equal(selectRecentFailures([run(1),run(1),run(2)],now).recent.map(x=>x.id).join(','),'2');
+  assert.equal(selectRecentFailures([run(1,'bad'),run(2)],now).unverified,1);
+  assert.equal(selectRecentFailures([run(1,'2099-01-01T00:00:00Z'),run(2)],now).recent.length,1);
 });
 test('provenance of bot marker required for dedupe',()=>{
   const r=run(100);
@@ -98,7 +108,10 @@ test('recent missing reports are posted newest-first at maximum three per cycle'
 });
 test('already posted exact run does not block newer unrecorded reports',async()=>{
   const runs=[run(101),run(102,'2026-11-15T00:00:00Z')];
-  const io=ioFor(runs,[receipt(runs[0],10)]);
+  const io=ioFor(runs);
+  // Existing report on an authenticated current shard.
+  await io.createShard('2026-11',1,'ZGMINI Proactive Diagnostics 2026-11 #1','<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2 month:2026-11 shard:1 -->');
+  io.shards.get(3000).comments.push(receipt(runs[0],10));
   const result=await scanLatest(io,now);
   assert.deepEqual(result.observed.map(x=>x.runId),[102]);
 });
@@ -109,7 +122,8 @@ test('ledger invalid or source drift fails before writing',async()=>{
   assert.equal(io.posted.length,0);
   const io2=ioFor([run(101)]);
   io2.getRun=async()=>run(101,recent,{head_sha:'b'.repeat(40)});
-  await assert.rejects(()=>scanLatest(io2,now),/SOURCE_RUN_DRIFT/);
+  const result=await scanLatest(io2,now);
+  assert.equal(result.unverified,1);
   assert.equal(io2.posted.length,0);
 });
 test('event gate protects repository, branch, schedule and actor',()=>{
@@ -150,4 +164,89 @@ test('R1 fallback gate allows only verified owner events on main',()=>{
   assert.throws(()=>validateScoutEvent(issue,{...base,GITHUB_EVENT_NAME:'issues',GITHUB_ACTOR:'attacker'}),/FALLBACK_ISSUE_STOP/);
   assert.throws(()=>validateScoutEvent({...e,ref:'refs/heads/main'},
     {...base,GITHUB_EVENT_NAME:'push',GITHUB_ACTOR:OWNER}),/PROACTIVE_DIAG_RUNNER_EVENT_TYPE_STOP/);
+});
+
+test('legacy archive stops at pinned authenticated 167th R1 report',async()=>{
+  const rows=Array.from({length:166},(_,i)=>({id:100+i,body:markerFor(run(i+1))+'\nverified',user:{login:'github-actions[bot]'},created_at:recent}));
+  rows.push({id:7006077223,body:'<!-- ZGMINI_PROACTIVE_DIAG_R1 run:44467706543 attempt:1 -->',user:{login:'github-actions[bot]'},created_at:recent});
+  const pages=[rows.slice(0,100),rows.slice(100)];
+  const found=await readLegacyProactiveArchive(async page=>pages[page-1]||[]);
+  assert.equal(found.length,167);
+  await assert.rejects(()=>readLegacyProactiveArchive(async()=>[]),/ARCHIVE_ANCHOR_NOT_FOUND/);
+});
+test('shard rollover and 401 stop are independent of shared ledger count',async()=>{
+  const io=ioFor([run(500)]);
+  io.readLedger=async()=>({...ledger(),comments:999});
+  const first=await scanLatest(io,now);
+  assert.equal(first.newReports,1);
+  assert.equal(first.reportStore,'MONTHLY_SHARDED_ISSUES');
+  assert.equal(io.shards.size,1);
+  const io2=ioFor([run(501)]);
+  io2.getRun=async()=>{throw Error('PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_401');};
+  await assert.rejects(()=>scanLatest(io2,now),/GITHUB_HTTP_401/);
+  assert.equal(io2.posted.length,0);
+});
+test('bad run evidence is isolated while independent run posts',async()=>{
+  const io=ioFor([run(601),run(602)]);
+  io.getJobs=async id=>id===601?null:[{id:550,conclusion:'failure'}];
+  const result=await scanLatest(io,now);
+  assert.equal(result.unverified,1);
+  assert.equal(result.newReports,1);
+  assert.equal(result.observed[0].runId,602);
+});
+
+test('300-comment shard rotation continues on an independently authenticated next shard',async()=>{
+  const io=ioFor([run(710)]);
+  await io.createShard('2026-11',1,
+    'ZGMINI Proactive Diagnostics 2026-11 #1',
+    '<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2 month:2026-11 shard:1 -->');
+  for(let i=0;i<300;i++)io.shards.get(3000).comments.push(
+    receipt(run(10000+i),900000+i));
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  assert.equal(result.observed[0].shardIssue,3001);
+  assert.equal(io.shards.get(3000).comments.length,300);
+  assert.equal(io.shards.get(3001).comments.length,1);
+});
+
+test('lost comment acknowledgement is reconciled without a second write',async()=>{
+  const io=ioFor([run(720)]);
+  const original=io.postComment;let calls=0;
+  io.postComment=async(n,body)=>{calls++;await original(n,body);throw Error('lost ACK');};
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  assert.equal(calls,1);
+  const again=await scanLatest(io,now);
+  assert.equal(again.newReports,0);
+  assert.equal(again.alreadyRecorded,1);
+  assert.equal(calls,1);
+});
+
+test('complete old archive prohibits a duplicate new shard report',async()=>{
+  const oldRun=run(730),io=ioFor([oldRun]);
+  io.readLegacyComments=async()=>[
+    {id:SCOUT_POLICY.legacyAnchorCommentId,body:markerFor(oldRun),
+      user:{login:'github-actions[bot]'},created_at:recent}
+  ];
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,0);
+  assert.equal(result.alreadyRecorded,1);
+  assert.equal(io.shards.size,0);
+});
+
+test('ambiguous shard creation without readback is stopped and not retried',async()=>{
+  const io=ioFor([run(740)]);
+  let count=0;
+  io.createShard=async()=>{count++;throw Error('POST response lost');};
+  await assert.rejects(()=>scanLatest(io,now),/SHARD_CREATE_OUTCOME_UNKNOWN/);
+  assert.equal(count,1);
+  assert.equal(io.posted.length,0);
+});
+
+test('invalid run cannot suppress a later valid run in newest-first scan',async()=>{
+  const io=ioFor([run(800,'bad'),run(801)]);
+  const result=await scanLatest(io,now);
+  assert.equal(result.unverified,1);
+  assert.equal(result.newReports,1);
+  assert.equal(result.observed[0].runId,801);
 });
