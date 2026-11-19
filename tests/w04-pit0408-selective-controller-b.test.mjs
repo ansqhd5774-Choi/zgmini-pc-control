@@ -52,3 +52,38 @@ test('PIT0408 B refuses wrong installed SHA and unrelated file effects',()=>{
  assert.throws(()=>validateControllerOnlyInstallDelta([...files,'controller/operations.mjs'],
   manifest.allowFiles),/ALLOWFILE_DIFF_MISMATCH/);
 });
+
+
+test('PIT0407 one-file ETA539 raw Current parity B pin is CAS-safe and PR-bound',()=>{
+ const target='cb7ed62e4e5288c683c07297995c5ba2cfe0ace6';
+ const installed='f896b2fd05ca6df845e446497ddc71b076fa3ab0';
+ const file='controller/employment-r6-collection-evidence-readonly.mjs';
+ const approval=fs.readFileSync(path.join(root,'controller-updates',target+'.json'));
+ const manifest=JSON.parse(approval);
+ const pin=JSON.parse(fs.readFileSync(path.join(root,'controller-selective-targets',target+'.json')));
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2417');
+ assert.equal(manifest.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.deepEqual(manifest.allowFiles,[{path:file,sha256:'d4290b61f4dc25c3264e6ef0f554808549f6906b85cc2a245ec72956c9e148ad'}]);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.selectiveSource.branch,'codex/w04-pit0407-selective-controller-b-20261120');
+ assert.equal(manifest.selectiveSource.mainSha,'5cc453954618b1e6ab3e10b1ef92b6f1cb0733a8');
+ assert.deepEqual(manifest.selectiveSource.customPaths,[file]);
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+ assert.equal(validateControllerOnlyInstallDelta([file],manifest.allowFiles),true);
+ const issue={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-w04-pit0407-b-20261120',operation:'controller-update',
+  controlRepository:CONTROL_REPOSITORY,targetControllerSha:target,
+  approvalManifestSha256:sha(approval)};
+ assert.equal(validateUpdateRequest(issue,approval,{
+  actor:'ansqhd5774-Choi',installedSha:installed
+ }).manifest.targetSha,target);
+ assert.throws(()=>validateUpdateRequest(issue,approval,{
+  actor:'ansqhd5774-Choi',installedSha:'a'.repeat(40)
+ }),/UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
