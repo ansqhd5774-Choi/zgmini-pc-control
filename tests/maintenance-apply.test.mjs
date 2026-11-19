@@ -677,7 +677,7 @@ test('exact approved V2 handoff pins nine checked-out tool bytes and changes onl
  assert.match(approved.scopeNote,/NOT PC APPLIED/);
 });
 
-test('exact current-main selective maintainer direct handoff pins two changed bytes', async()=>{
+test('historical selective maintainer handoff preserves its two-file immutable approval', async()=>{
  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
  const installedSha='36cf8ffb813f3a006f3e05379fba641fb3404645';
  const targetSha='a6e7d1a43244520214ea7c7dd3fdd31f9fbbeac6';
@@ -703,8 +703,9 @@ test('exact current-main selective maintainer direct handoff pins two changed by
   const pinned=execFileSync('git',['show',targetSha+':'+rel],
    {cwd:root,encoding:null,windowsHide:true});
   assert.equal(sha(pinned),digest,rel+' pinned source');
-  assert.equal(sha(fs.readFileSync(path.join(root,rel))),digest,
-   rel+' checkout source');
+  // This is a historical approval, not a prohibition on developing a new
+  // version. Actual handoff verifies the selected target's checkout separately
+  // in verifyHandoffIsolatedSource; old pins cannot authorize these new bytes.
  }
  for(const rel of nextRuntimeFiles){
   const installed=execFileSync('git',['show',installedSha+':'+rel],

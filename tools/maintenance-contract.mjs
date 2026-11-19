@@ -1,6 +1,6 @@
 // ZGMINI PC controller update admission and transition contract (pure ESM).
 // This module NEVER runs shell, downloads source, installs code or edits a PC.
-import {createHash} from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
 export {SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
   from './source-bundle-register.mjs';
@@ -364,6 +364,18 @@ export function validateMaintenanceRequest(request,{
   requireSha(request.targetControllerSha,"UPDATE_TARGET_SHA_INVALID");
   requireDigest(request.approvalManifestSha256,"UPDATE_MANIFEST_PIN_INVALID");
   return Object.freeze({...request});
+}
+
+// Client-side construction, not new authority. Existing manifest/actor/source
+// validation still decides admission. Callers no longer handcraft UUID fields.
+export function prepareControllerUpdateRequest(manifestBytes,{installedSha,chatId}={}){
+  const raw=JSON.parse(manifestBytes.toString());
+  const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+    requestId:'pc-update-'+randomUUID(),chatId:chatId??('chat-'+randomUUID()),
+    operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+    targetControllerSha:raw.targetSha,approvalManifestSha256:sha256(manifestBytes)};
+  validateUpdateRequest(request,manifestBytes,{actor:CONTROL_ACTOR,installedSha});
+  return Object.freeze(request);
 }
 
 /** Strict pre-admission for the single, pinned R6 host B request. The seven

@@ -10,6 +10,7 @@ import {
   requestFingerprint,dedupeUpdateRequest,newUpdateLedger,transitionLedger,
   validateInfrastructureDelta,validateControllerOnlyInstallDelta,
   deployableControllerTreePaths,isControllerSourceTestPath,
+  prepareControllerUpdateRequest,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -47,6 +48,16 @@ function fixture(){
 }
 const repin=(f)=>{f.bytes=Buffer.from(JSON.stringify(f.manifest)+"\n");f.issue.approvalManifestSha256=digest(f.bytes);return f;};
 const admitted=f=>validateUpdateRequest(f.issue,f.bytes,f.context);
+
+test('client constructor generates distinct valid IDs and exact manifest pin without installing',()=>{
+ const f=fixture(),a=prepareControllerUpdateRequest(f.bytes,{installedSha:OLD}),
+  b=prepareControllerUpdateRequest(f.bytes,{installedSha:OLD,chatId:a.chatId});
+ assert.notEqual(a.requestId,b.requestId);assert.equal(a.chatId,b.chatId);
+ assert.equal(a.approvalManifestSha256,digest(f.bytes));
+ assert.equal(validateUpdateRequest(a,f.bytes,f.context).manifest.targetSha,NEXT);
+ assert.throws(()=>prepareControllerUpdateRequest(f.bytes,{installedSha:NEXT}),/INSTALLED_SOURCE_DRIFT/);
+ assert.throws(()=>prepareControllerUpdateRequest(f.bytes,{installedSha:OLD,chatId:'chat-label'}),/CHAT_ID_INVALID/);
+});
 
 test('previous full-repo infrastructure gate blocks unrelated merged workflows, selective mode admits exact A-only installed diff',()=>{
   const changed=['.github/workflows/pc-er1-nov30-batch20.yml',
