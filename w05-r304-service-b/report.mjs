@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {sha256,validateIssue,CONTROL_REPO,expect,fail} from './contract.mjs';
+import {sha256,validateIssue,CONTROL_REPO,INSTALLED_SHA,expect,fail} from './contract.mjs';
 const JSON_NAME='W05_R304_B_RESULT.json';
 const FIELDS=['schema','status','code','requestId','sourceSha','provider','series',
  'providerCalls','dbWrites','d1Writes','schedulerChanges','automaticRetries',
@@ -18,6 +18,16 @@ export function sanitizedReport(report,requestId){
    ALLOWED_STATUSES.has(report.status)&&
    typeof report.code==='string'&&/^W05_B_[A-Z0-9_]{1,90}$/.test(report.code)&&
    report.d1Writes===0&&report.schedulerChanges===0&&report.automaticRetries===0&&
+   report.provider==='BLS'&&report.series==='WPSFD42'&&
+   (report.sourceSha===INSTALLED_SHA||report.sourceSha===null)&&
+   (report.providerCalls===1||report.providerCalls==='NOT_CONFIRMED')&&
+   ['COMMITTED_IDEMPOTENT','NOT_CONFIRMED'].includes(report.dbWrites)&&
+   (report.rows===undefined||(Number.isInteger(report.rows)&&report.rows>=1&&report.rows<=400))&&
+   (report.observationAt===undefined||/^\\d{4}-(0[1-9]|1[0-2])-01$/.test(report.observationAt))&&
+   (report.sourceStoredAt===undefined||(typeof report.sourceStoredAt==='string'&&
+     Number.isFinite(Date.parse(report.sourceStoredAt))))&&
+   (report.snapshotSha256===undefined||/^[a-f0-9]{64}$/.test(report.snapshotSha256))&&
+   (report.chunkSha256===undefined||/^[a-f0-9]{64}$/.test(report.chunkSha256))&&
    Object.keys(report).every(k=>FIELDS.includes(k)),
   'W05_B_REPORT_CONTRACT_STOP');
  return report;
