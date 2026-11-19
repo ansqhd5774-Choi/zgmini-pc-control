@@ -5,6 +5,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
 import {pathToFileURL} from 'node:url';
+import {probeFixedAclBoundary} from './acl-boundary.mjs';
 
 export const TARGET_HOST = 'DESKTOP-N62L0NG';
 const TEMP = 'C:\\Users\\ansqh\\AppData\\Local\\Temp';
@@ -161,7 +162,7 @@ async function inspectLog(x) {
   return {directory:x.id,name:x.name,bytes:h.bytes,sha256:h.sha256,lines,counts,events};
 }
 export function createReportBase(){return {schema:'C996_R5_LOG_EVIDENCE_READONLY_V1',host:TARGET_HOST,runId:crypto.randomUUID(),status:'STOPPED',code:'NOT_RUN',imageMetadata:'NOT_DETERMINED_BY_THIS_RUN',rootCauseStage:'UNKNOWN',isoOnlyPassPreserved:true,operationalWrites:0,discardAttempts:0,isoAttempts:0,rawLogIncluded:false,inputs:[],fixedEvidence:[],logs:[],logErrors:[],logOmitted:0,
-  inputHashesUnchanged:0,inputChecksComplete:false,logScanComplete:false};}
+  inputHashesUnchanged:0,inputChecksComplete:false,logScanComplete:false,aclBoundary:null};}
 export async function collectIndependentEvidence(report,{pins=validatePins,
  metadata=metadataFile,discover=selectLogs,inspect=inspectLog}={}) {
  report.inspectStep='PRE_INPUT_HASH';
@@ -226,6 +227,11 @@ async function main() {
   out=path.win32.join(outputTemp,'C996_R5_READONLY_'+report.runId.replaceAll('-',''));
   fs.mkdirSync(out,{recursive:false});
   await collectIndependentEvidence(report);
+  if(report.inputs.some(x=>x.code==='EPERM'||x.code==='EACCES')||
+   report.logErrors.some(x=>x.code==='EPERM'||x.code==='EACCES')){
+   report.aclBoundary=probeFixedAclBoundary({ownerProfile:path.win32.resolve(TEMP,'..','..','..','..'),
+    ownerTemp:TEMP,r5Root:ROOT,attempt:ATTEMPT});
+  }
  }catch(e){
   report.status='STOPPED';report.code=codeOf(e);
  }

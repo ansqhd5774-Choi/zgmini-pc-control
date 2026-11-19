@@ -222,3 +222,25 @@ test('conflicting already-created JSON refuses recovery and cannot comment PASS'
  await assert.rejects(uploadVerifiedPair(report,'fixture-token',fake),/RESULT_READBACK_MISMATCH/);
  assert.deepEqual(calls,['PUT','GET']);
 });
+
+test('fixed ACL diagnostic survives sanitized C996 report without revealing raw descriptors',()=>{
+ const r=raw();
+ r.aclBoundary={status:'SCOPED_ACL_OBSERVED',schema:'C996_R5_ACL_BOUNDARY_V1',
+  runnerUserMatchesFixedOwner:false,entries:[
+  {id:'OWNER_PROFILE',status:'ACL_READABLE'},
+  {id:'OWNER_TEMP',status:'ACL_READABLE'},
+  {id:'R5_ROOT',status:'ACCESS_DENIED'},
+  {id:'ISO_ATTEMPT',status:'ACCESS_DENIED'}],
+  untrustedSddl:'private-DACL-secret'};
+ const report=selectSafeReport(r,ctx,HOST);
+ assert.equal(report.aclBoundary.status,'SCOPED_ACL_OBSERVED');
+ assert.equal(report.aclBoundary.runnerUserMatchesFixedOwner,false);
+ assert.equal(report.aclBoundary.entries[2].status,'ACCESS_DENIED');
+ assert.doesNotMatch(JSON.stringify(report),/untrustedSddl|private-DACL-secret/);
+ for(const incorrect of [
+  {...r.aclBoundary,runnerUserMatchesFixedOwner:'ansqh'},
+  {...r.aclBoundary,entries:r.aclBoundary.entries.slice(0,3)},
+ ]){
+  assert.throws(()=>selectSafeReport({...r,aclBoundary:incorrect},ctx,HOST),/ACL_BOUNDARY_REPORT_STOP/);
+ }
+});

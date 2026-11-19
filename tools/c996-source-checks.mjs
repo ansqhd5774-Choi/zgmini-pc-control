@@ -7,7 +7,8 @@ import {fileURLToPath} from 'node:url';
 export const GROUPS=Object.freeze({
  foundation:[
   'tests/pc-source-origin-readonly.test.mjs','tests/c996-r5-readonly-collector.test.mjs',
-  'tests/c996-r5-readonly-github.test.mjs','tests/c996-source-scope.test.mjs',
+  'tests/c996-r5-readonly-github.test.mjs','tests/c996-r5-acl-boundary.test.mjs',
+  'tests/c996-source-scope.test.mjs',
   'tests/market-calendar-r44-runtime-readonly.test.mjs',
   'tests/market-calendar-r44-production-readonly.test.mjs','r54-readiness-once/entry.test.mjs',
   'tests/agent-handoff-pc-resource-wait.test.mjs','tests/shared-resource-lifecycle.test.mjs'],
