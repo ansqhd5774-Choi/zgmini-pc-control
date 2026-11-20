@@ -1,9 +1,14 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest} from './common.mjs';
-const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller),policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));
-const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
+const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller);
+let policy,event;
 const seat=Number(process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1]);const runId=process.env.GITHUB_RUN_ID,attempt=Number(process.env.GITHUB_RUN_ATTEMPT||1);
 const pointer=path.join(root,'reports',`${runId}-${attempt}-${seat}.json`);fs.mkdirSync(path.dirname(pointer),{recursive:true});
 try{
+ // Event identity precedes policy loading so a corrupt local policy still
+ // retains the original, trusted Issue number in the BLOCKED result pointer.
+ event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
+ try{policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));}
+ catch{throw Object.assign(Error('CONTROLLER_POLICY_UNAVAILABLE'),{code:'CONTROLLER_POLICY_UNAVAILABLE'});}
  // Host snapshot is loaded inside the receipt boundary: a missing or invalid
  // host manifest must not suppress the fixed BLOCKED JSON/TXT upload path.
  let host;
@@ -48,4 +53,4 @@ try{
 }catch(error){
  const missingModule=error?.code==='ERR_MODULE_NOT_FOUND'||error?.code==='MODULE_NOT_FOUND';
  const code=missingModule?'CONTROLLER_IMPORT_MISSING':errorCode(error);
- writeJson(pointer,{issueNumber:event.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?'ENGINE_IMPORT':code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code}));process.exitCode=1;}
+ writeJson(pointer,{issueNumber:event?.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?'ENGINE_IMPORT':code==='CONTROLLER_HOST_MANIFEST_UNAVAILABLE'?'HOST_MANIFEST_READ':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code}));process.exitCode=1;}
