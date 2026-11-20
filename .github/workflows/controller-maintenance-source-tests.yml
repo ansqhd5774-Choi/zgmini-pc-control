@@ -133,6 +133,7 @@ on:
       - 'tests/maintenance-apply.test.mjs'
       - 'tests/controller-selective-source.test.mjs'
       - 'tests/controller-import-closure.test.mjs'
+      - 'tests/controller-entry-import-receipt.test.mjs'
       - 'tests/w04-pit0801-minimal-overlay.test.mjs'
       - 'tests/controller-sevenpath-overlay.test.mjs'
       - 'writer-b/w01-r2-two-branch-preview.test.mjs'
@@ -225,6 +226,9 @@ jobs:
       - name: Reject missing transitive imports from exact selective Controller target
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-import-closure.test.mjs
+      - name: Verify missing engine import produces a report receipt
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
       - name: Verify W04 recovery target provenance-only delta and full import closure
         # Some PR head refs predate this dedicated W04-only historical fixture.
         # Do not fail unrelated source tests because an optional fixture is absent.
