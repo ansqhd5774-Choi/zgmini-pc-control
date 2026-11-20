@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {dedicatedPcRunnerRows,requireCompleteRunnerInventory} from '../tools/update.mjs';
 
 const seats=()=>Array.from({length:6},(_,i)=>({
@@ -67,4 +68,21 @@ test('unknown busy states in operating seats never pass an install precheck',()=
   assert.throws(()=>requireCompleteRunnerInventory({total_count:6,runners:rows}),
     {code:'RUNNER_STATE_INVALID'});
  }
+});
+
+// Guard the mutation ordering: a read failure must occur before a rollback
+// disables intake. This source contract complements the inventory unit tests.
+test('independent rollback preflights inventory before pausing intake',()=>{
+ const source=readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
+ const start=source.indexOf('  restore:async()=>{');
+ const end=source.indexOf('  verifyRestoredPrevious:async',start);
+ assert.ok(start>=0&&end>start,'restore port must exist');
+ const restore=source.slice(start,end);
+ const read=restore.indexOf('if(recoveryOperator&&!pausedByUs)apiRunners();');
+ const pause=restore.indexOf('openRollbackPause(');
+ const disable=restore.indexOf("github('actions/workflows/pc-job.yml/disable','PUT')");
+ assert.ok(read>=0&&pause>read&&disable>read,
+  'independent recovery inventory preflight must precede intake mutation');
+ assert.match(restore,/for\(let n=0;n<180;n\+\+\)\{\s*const rows=apiRunners\(\)/,
+  'actual drain must still recheck fresh inventory');
 });
