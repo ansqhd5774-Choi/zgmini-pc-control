@@ -133,6 +133,7 @@ on:
       - 'tests/maintenance-apply.test.mjs'
       - 'tests/controller-selective-source.test.mjs'
       - 'tests/controller-import-closure.test.mjs'
+      - 'tests/w04-pit0801-minimal-overlay.test.mjs'
       - 'tests/controller-sevenpath-overlay.test.mjs'
       - 'writer-b/w01-r2-two-branch-preview.test.mjs'
       - 'approvals/writer-previews/w01-r2-stored-payload-two-branch-20261119.json'
@@ -224,6 +225,9 @@ jobs:
       - name: Reject missing transitive imports from exact selective Controller target
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-import-closure.test.mjs
+      - name: Verify W04 recovery target provenance-only delta and full import closure
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/w04-pit0801-minimal-overlay.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-agent.test.mjs tests/maintenance-lock.test.mjs tests/maintenance-contract.test.mjs tests/source-bundle-register.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
