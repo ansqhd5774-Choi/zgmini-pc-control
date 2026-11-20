@@ -14,6 +14,7 @@ import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
   validateControllerOnlyInstallDelta,validateControllerSelectivePin,
+  validateControllerImportClosure,
   deployableControllerTreePaths,
   isControllerSourceTestPath,
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
@@ -1299,6 +1300,11 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    // Only exact colocated source tests stay in Git and CI, never on the live host.
    // Unknown Controller tree entries continue to fail closed.
    const deployed=deployableControllerTreePaths(listing);
+   // Fail closed against the full target tree (not main) before any staging,
+   // intake pause or Controller mutation. A one-file overlay must not import
+   // modules that were never installed in its immutable baseline.
+   validateControllerImportClosure(deployed,changed,
+     rel=>git(['show',manifest.targetSha+':'+rel]));
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
    validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
