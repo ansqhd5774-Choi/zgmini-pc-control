@@ -67,7 +67,7 @@ test('PIT-08 optional read-only timestamp and chart geometry pass without privat
     "  bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};",
     "  sourceStoredAt:1793500000000,formulaHash:'sha256:'+'f'.repeat(64),"+
     "methodologyVersion:'EMP-R6-FORMULA-R1',"+
-    "stateClaimsChart:{pointCount:52,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',"+
+    "stateClaimsChart:{pointCount:545,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',"+
     "lastDate:'2026-10-30',observationDate:'2026-10-30',"+
     "lastPointFinite:true,lastPointMatchesCurrent:true},"+
     "bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};"
@@ -84,7 +84,7 @@ test('PIT-08 optional read-only timestamp and chart geometry pass without privat
   assert.equal(result.methodologyVersion,'EMP-R6-FORMULA-R1');
   assert.match(result.formulaHash,/^sha256:[a-f0-9]{64}$/);
   assert.deepEqual(result.stateClaimsChart,{
-    pointCount:52,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',lastDate:'2026-10-30',
+    pointCount:545,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',lastDate:'2026-10-30',
     observationDate:'2026-10-30',lastPointFinite:true,lastPointMatchesCurrent:true,
   });
   assert.ok(!JSON.stringify(result).includes('PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK'));
