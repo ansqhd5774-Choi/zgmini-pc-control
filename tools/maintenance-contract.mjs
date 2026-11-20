@@ -658,7 +658,7 @@ export function controllerModuleSpecifiers(source){
    if(!template)add('string',value);
    continue;
   }
-  if(ch==='/'&&tokens.length&&['=','(',':',',','[','!','?',';','return','=>','{'].includes(tokens.at(-1).value)){
+  if(ch==='/'&&tokens.length&&['=','(',':',',','[','!','?',';','return','=>','{','&','|','+','-','*','%','^','~','<','>'].includes(tokens.at(-1).value)){
    i++;let escaped=false,inClass=false,closed=false;
    while(i<source.length){
     const c=source[i++];
