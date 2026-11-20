@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {executeJob} from './engine.mjs';import {need,writeJson,errorCode,digest,validateRequest} from './common.mjs';
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest} from './common.mjs';
 import {readStagedPreimageScope} from './preimage-manifest-contract.mjs';
 const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller),host=JSON.parse(fs.readFileSync(path.join(root,'host.json'))),policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));
 const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
@@ -19,6 +19,12 @@ try{
    /^[0-9a-f]{64}$/.test(host.controllerFiles?.[x]??'')),
   'PREIMAGE_STAGE_SOURCE_NOT_ATTESTED');
  const approvedPreimageScope=readStagedPreimageScope({env:process.env,request:raw});
+ // Delay engine/operations loading until inside the error receipt boundary.
+ // Missing selective-overlay imports must still produce an uploadable BLOCKED result.
+ const {executeJob}=await import('./engine.mjs');
  const result=await executeJob(raw,{root,policy,host,seat,runId,attempt,approvedPreimageScope});
  writeJson(pointer,{...result,issueNumber:event.issue.number});console.log(JSON.stringify(result.report));process.exitCode=result.report.status==='FAIL'?1:0;
-}catch(error){writeJson(pointer,{issueNumber:event.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code:errorCode(error),lastPass:'EVENT_RECEIVED',firstFail:'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code:errorCode(error)}));process.exitCode=1;}
+}catch(error){
+ const missingModule=error?.code==='ERR_MODULE_NOT_FOUND'||error?.code==='MODULE_NOT_FOUND';
+ const code=missingModule?'CONTROLLER_IMPORT_MISSING':errorCode(error);
+ writeJson(pointer,{issueNumber:event.issue?.number,report:{schema:'ZGMINI_PC_RESULT_V1',jobId:`run-${runId}-${attempt}-seat-${seat}`,status:'BLOCKED',code,lastPass:'EVENT_RECEIVED',firstFail:missingModule?'ENGINE_IMPORT':'EVENT_OR_REQUEST_VALIDATION',operationalWrites:0,providerCalls:0,d1Writes:0}});console.log(JSON.stringify({status:'BLOCKED',code}));process.exitCode=1;}
