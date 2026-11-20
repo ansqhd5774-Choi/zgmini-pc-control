@@ -226,7 +226,9 @@ jobs:
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-import-closure.test.mjs
       - name: Verify W04 recovery target provenance-only delta and full import closure
-        if: steps.scope.outputs.core == 'true'
+        # Some PR head refs predate this dedicated W04-only historical fixture.
+        # Do not fail unrelated source tests because an optional fixture is absent.
+        if: steps.scope.outputs.core == 'true' && hashFiles('tests/w04-pit0801-minimal-overlay.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/w04-pit0801-minimal-overlay.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
         if: steps.scope.outputs.core == 'true'
