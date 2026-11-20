@@ -22,12 +22,6 @@
       "change": "M",
       "beforeSha256": "93283e6d114405b4c5039089cd0614a8be6fa7a197c37a4c143a3e4045adf790",
       "afterSha256": "bedaacbc87ad418325fba8c871b4a15bdd23ef003fa265dcf0786426845a76d4"
-    },
-    {
-      "path": "lib/market-score/breadth-b1-r3-history-r4.mjs",
-      "change": "M",
-      "beforeSha256": "989378d85940c9eba6228fe959c3744654c8a948b97c173cbb6fecdc0581a216",
-      "afterSha256": "892ef577446e40717fb4dc9a410a23adb8e7d1aeedfd5ec15ee8ba0626d0381e"
     }
   ],
   "protectedFiles": [
@@ -94,6 +88,10 @@
     {
       "path": "worker/breadth-paid-contract.mjs",
       "sha256": "911efbf151abb056f328e3f0b45816e1e93e165b59eabacec9ef8dfc20aafa2e"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-history-r4.mjs",
+      "sha256": "989378d85940c9eba6228fe959c3744654c8a948b97c173cbb6fecdc0581a216"
     },
     {
       "path": "lib/market-score/sp500-pit-universe-r1.mjs",
