@@ -47,6 +47,7 @@ export const GROUPS=Object.freeze({
   'tests/calendar-source-d30-windows-d30-sqlite-readback.test.mjs'],
  calendar022:['calendar-source-b-install-20261107/preflight-windows.test.mjs',
   'calendar-source-b-install-20261107/upload-preflight-result.test.mjs'],
+ calendar023:['calendar-source-recovery-b/installer/export.test.mjs'],
  w05B:['tests/w05-r304-report-recovery.test.mjs']
 });
 const ALL=Object.keys(GROUPS);
@@ -67,6 +68,7 @@ const MATCH=Object.freeze({
  calendar020:/^(?:calendar-cf43-b-windows-adapter\/.*|\.github\/workflows\/pc-calendar-cf43-two-approved-b-once\.yml)$/,
  calendar021:/^(?:calendar-source-d30\/.*|tests\/calendar-source-d30-.*\.test\.mjs$|\.github\/workflows\/pc-calendar-d30-readonly-preview-once\.yml)$/,
  calendar022:/^(?:calendar-source-b-install-20261107\/.*|\.github\/workflows\/pc-calendar-source-preflight-once\.yml)$/,
+ calendar023:/^(?:calendar-source-recovery-b\/.*|\.github\/workflows\/pc-calendar-source-recovery-once\.yml)$/,
  w05B:/^(?:w05-r304-service-b\/.*|tests\/w05-r304-report-recovery\.test\.mjs)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
