@@ -75,7 +75,7 @@ test('PIT-08 optional read-only timestamp and chart geometry pass without privat
   assert.match(source,/sourceStoredAt:1793500000000/);
   fs.writeFileSync(f.script,source);
   const dir=f.host.approvedSources[SHA].root;
-  const manifestBytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\\n');
+  const manifestBytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\n');
   fs.writeFileSync(path.join(dir,'manifest.json'),manifestBytes);
   f.host.approvedSources[SHA].manifestSha256=hash(manifestBytes);
   const result=await inspectEmploymentR6Candidate(f.request,f);
@@ -101,7 +101,7 @@ test('PIT-08 chart metadata rejects invalid date without adding a legacy gate',a
   );
   fs.writeFileSync(f.script,source);
   const dir=f.host.approvedSources[SHA].root;
-  const bytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\\n');
+  const bytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\n');
   fs.writeFileSync(path.join(dir,'manifest.json'),bytes);
   f.host.approvedSources[SHA].manifestSha256=hash(bytes);
   const result=await inspectEmploymentR6Candidate(f.request,f);
