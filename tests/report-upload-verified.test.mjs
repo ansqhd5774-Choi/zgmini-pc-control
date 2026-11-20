@@ -250,6 +250,7 @@ test('invalid policy permits only original fixed BLOCKED policy-error receipt up
  const spec={runId:'12345',attempt:'1',seat:'2'};
  const pointer={issueNumber:2536,report:{schema:'ZGMINI_PC_RESULT_V1',
   jobId:'run-12345-1-seat-2',status:'BLOCKED',code:'CONTROLLER_POLICY_UNAVAILABLE',
+  lastPass:'EVENT_RECEIVED',firstFail:'EVENT_OR_REQUEST_VALIDATION',
   operationalWrites:0,providerCalls:0,d1Writes:0}};
  const fixed={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',maxReportBytes:32768};
  for(const broken of [null,'{not json','',Buffer.from('not-json'), 'null']){
@@ -260,6 +261,8 @@ test('invalid policy permits only original fixed BLOCKED policy-error receipt up
  assert.deepEqual(resolveUploadPolicy(JSON.stringify(ordinary),{pointer,...spec}),ordinary);
  for(const mutate of [
   p=>p.issueNumber=null,
+  p=>p.report.extra='not-an-approved-field',
+  p=>p.report.firstFail='ENGINE_IMPORT',
   p=>p.report.status='PASS',
   p=>p.report.code='CONTROLLER_IMPORT_MISSING',
   p=>p.report.jobId='run-12345-1-seat-3',
