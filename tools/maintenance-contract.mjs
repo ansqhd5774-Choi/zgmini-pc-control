@@ -1,6 +1,7 @@
 // ZGMINI PC controller update admission and transition contract (pure ESM).
 // This module NEVER runs shell, downloads source, installs code or edits a PC.
 import {createHash,randomUUID} from "node:crypto";
+import path from "node:path";
 import {CONVERSATION_TRACE_ID} from './source-bundle-register.mjs';
 export {SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
@@ -626,6 +627,35 @@ export function validateControllerSelectivePin(manifest,pin){
      JSON.stringify(manifestFingerprint(manifest.allowFiles).files))
    throw Error('SELECTIVE_PIN_MISMATCH');
  return true;
+}
+
+
+// Reject static and literal dynamic local imports missing from the exact
+// deployed target tree, including transitive dependencies, before staging.
+export function validateControllerImportClosure(paths,changedPaths,readSource) {
+ if(!Array.isArray(paths)||!Array.isArray(changedPaths)||typeof readSource!=='function')
+  throw Object.assign(Error('CONTROLLER_IMPORT_INPUT_INVALID'),{code:'CONTROLLER_IMPORT_INPUT_INVALID'});
+ const files=new Set(paths),pending=changedPaths.filter(p=>p.startsWith('controller/')&&p.endsWith('.mjs'));
+ const seen=new Set();
+ while(pending.length){
+  const current=pending.pop();
+  if(seen.has(current))continue;
+  seen.add(current);
+  if(!files.has(current))throw Object.assign(Error('CONTROLLER_IMPORT_MISSING'),{code:'CONTROLLER_IMPORT_MISSING'});
+  const source=readSource(current);
+  if(typeof source!=='string')
+   throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+  const re=/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\bimport\s*['"]([^'"]+)['"]/g;
+  for(const match of source.matchAll(re)){
+   const spec=match[1]??match[2]??match[3];
+   if(!spec.startsWith('.'))continue;
+   const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(current),spec));
+   if(!resolved.startsWith('controller/')||!files.has(resolved))
+    throw Object.assign(Error('CONTROLLER_IMPORT_MISSING'),{code:'CONTROLLER_IMPORT_MISSING'});
+   if(resolved.endsWith('.mjs')&&!seen.has(resolved))pending.push(resolved);
+  }
+ }
+ return {status:'VERIFIED',checkedModules:seen.size};
 }
 
 export function validateControllerOnlyInstallDelta(paths,allowFiles){
