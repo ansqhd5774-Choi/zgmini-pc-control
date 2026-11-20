@@ -19,6 +19,13 @@ export function selectPreservedRecoveryProtection(original,current,
  if(!record(original)||!record(current)||!record(original.files)||
     !record(current.files)||!record(original.tasks)||!record(current.tasks))
   return deny('RECOVERY_PROTECTION_SCHEMA_UNVERIFIED');
+ // Even an otherwise unchanged baseline must match an explicitly pinned
+ // approved live Writer SHA. Never ignore an approval CAS on the fast path.
+ if(approvedCurrentWriterConfigSha256!==null&&
+    (typeof approvedCurrentWriterConfigSha256!=='string'||
+     !/^[a-f0-9]{64}$/.test(approvedCurrentWriterConfigSha256)||
+     current.files['config.json']!==approvedCurrentWriterConfigSha256))
+  return deny('RECOVERY_WRITER_CONFIG_CAS_NOT_VERIFIED');
  if(JSON.stringify(original)===JSON.stringify(current))
   return {allowed:true,code:'RECOVERY_ORIGINAL_PROTECTION_UNCHANGED',
    baseline:original,preservedWriterConfig:false};
