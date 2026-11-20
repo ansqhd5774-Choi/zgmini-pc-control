@@ -43,7 +43,7 @@ export const GROUPS=Object.freeze({
 });
 const ALL=Object.keys(GROUPS);
 const MATCH=Object.freeze({
- foundation:/^(?:tests\/(?:pc-source-origin-readonly|c996-r5-readonly-(?:collector|github)|market-calendar-r44-|agent-handoff-pc-resource-wait|shared-resource-lifecycle)|r54-readiness-once\/|market-calendar-|pc-job\/|tools\/(?:pc-source|r54-))/,
+ foundation:/^(?:c996-r5-readonly\/|\.github\/workflows\/pc-c996-r5-readonly\.yml$|tests\/(?:pc-source-origin-readonly|c996-r5-readonly-(?:collector|github)|market-calendar-r44-|agent-handoff-pc-resource-wait|shared-resource-lifecycle)|r54-readiness-once\/|market-calendar-|pc-job\/|tools\/(?:pc-source|r54-))/,
  handoff007:/^(?:tests\/agent-handoff-(?:wide-scout|job-concurrency)|agent-handoff\/(?:wide-scout|proactive-diagnostics|resource-wait)|\.github\/workflows\/agent-handoff-(?:wide-scout|proactive-diagnostics|deep-diagnostics|queue-board)\.yml)/,
  handoff009:/^(?:tests\/agent-handoff(?:\.|-(?:comment-ledger|result|work-progress|diagnosis|queue-selector|direct-owner|cross-chain))|agent-handoff\/(?:issue-broker|result-|diagnosis-|work-progress-|comment-ledger|queue-selector|contract|route)\b|\.github\/workflows\/agent-handoff\.yml)/,
  handoff008:/^(?:tests\/(?:agent-handoff-writer-b-|shared-resource-controller-independent)|agent-handoff\/writer-b-|\.github\/workflows\/agent-handoff-writer-b-failure-intake\.yml)/,
@@ -58,7 +58,7 @@ const MATCH=Object.freeze({
  w05B:/^(?:w05-r304-service-b\/.*|tests\/w05-r304-report-recovery\.test\.mjs)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
- p==='.github/workflows/pc-c996-r5-readonly.yml'||p.startsWith('c996-r5-readonly/')||
+ 
  p==='tools/c996-source-checks.mjs'||p==='tests/c996-source-scope.test.mjs'||
  p==='tools/update.mjs'||p.startsWith('tools/maintenance-');
 export function selectGroups(paths){
