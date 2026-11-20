@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const controller=path.join(here,'..','controller');
 
-test('missing transitive Controller module yields uploadable BLOCKED pointer instead of entry crash',()=>{
+test('missing engine dependency or host manifest yields uploadable BLOCKED pointer',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-entry-import-'));
  try{
   fs.mkdirSync(path.join(root,'controller'));
@@ -33,10 +33,11 @@ test('missing transitive Controller module yields uploadable BLOCKED pointer ins
    issue:{number:2506,user:{login:'ansqhd5774-Choi'},labels:[{name:'pc-job'}],
     body:JSON.stringify(request)}}));
   const runId='99999999999',seat='2';
+  const env={...process.env,GITHUB_EVENT_PATH:event,GITHUB_REPOSITORY:repository,
+   GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',
+   GITHUB_RUN_ID:runId,GITHUB_RUN_ATTEMPT:'1',RUNNER_NAME:'zgmini-pc-02'};
   const out=spawnSync(process.execPath,[path.join(root,'controller','entry.mjs')],{
-   encoding:'utf8',env:{...process.env,GITHUB_EVENT_PATH:event,GITHUB_REPOSITORY:repository,
-    GITHUB_ACTOR:'ansqhd5774-Choi',GITHUB_EVENT_NAME:'issues',
-    GITHUB_RUN_ID:runId,GITHUB_RUN_ATTEMPT:'1',RUNNER_NAME:'zgmini-pc-02'}
+   encoding:'utf8',env
   });
   assert.equal(out.status,1,out.stderr);
   const pointer=JSON.parse(fs.readFileSync(path.join(root,'reports',
@@ -49,5 +50,26 @@ test('missing transitive Controller module yields uploadable BLOCKED pointer ins
   assert.equal(pointer.report.providerCalls,0);
   assert.equal(pointer.report.d1Writes,0);
   assert.match(out.stdout,/CONTROLLER_IMPORT_MISSING/);
+  // A missing or malformed installed host manifest also needs an uploadable
+  // receipt. The unchanged policy and original Issue identity remain valid.
+  const hostFile=path.join(root,'host.json');
+  const reportFile=path.join(root,'reports',`${runId}-1-${seat}.json`);
+  for(const hostBytes of [null,'{not valid json']){
+   fs.rmSync(reportFile,{force:true});
+   if(hostBytes===null)fs.rmSync(hostFile,{force:true});
+   else fs.writeFileSync(hostFile,hostBytes);
+   const missingHost=spawnSync(process.execPath,[path.join(root,'controller','entry.mjs')],{
+    encoding:'utf8',env
+   });
+   assert.equal(missingHost.status,1,missingHost.stderr);
+   const receipt=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+   assert.equal(receipt.issueNumber,2506);
+   assert.equal(receipt.report.status,'BLOCKED');
+   assert.equal(receipt.report.code,'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
+   assert.equal(receipt.report.firstFail,'HOST_MANIFEST_READ');
+   assert.equal(receipt.report.operationalWrites,0);
+   assert.equal(receipt.report.providerCalls,0);
+   assert.equal(receipt.report.d1Writes,0);
+  }
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
