@@ -6,6 +6,50 @@ const repo=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const digest=b=>createHash('sha256').update(b).digest('hex'),read=p=>JSON.parse(fs.readFileSync(p));
 const need=(b,c)=>{if(!b)throw Object.assign(Error(c),{code:c});};
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code==='ESRCH'?false:null;}};
+// Authentication is from the existing GitHub CLI credentials on the independent
+// Windows operator, never from caller-supplied event or arbitrary URLs. This pure
+// result validator is fail-closed, and does not grant rollback permission alone.
+const PC_REPO='ansqhd5774-Choi/zgmini-pc-control';
+const POSTCHECK_STEP='Execute fixed host allowlist entry';
+export function validateConfirmedPostcheckFailure({original,manifest,approval,issue,run,job}={}){
+ const spec=approval?.confirmedPostcheckFailure;
+ const keys=['issueNumber','runId','jobId','runnerName'];
+ if(!spec||typeof spec!=='object'||Array.isArray(spec)||
+    Object.keys(spec).sort().join('|')!==keys.sort().join('|')||
+    !Number.isSafeInteger(spec.issueNumber)||spec.issueNumber<1||
+    !Number.isSafeInteger(spec.runId)||spec.runId<1||
+    !Number.isSafeInteger(spec.jobId)||spec.jobId<1||
+    !/^zgmini-pc-0[1-6]$/.test(spec.runnerName??''))
+   return false;
+ if(original?.status!=='RECOVERY_REQUIRED'||original.firstFail!=='POSTCHECK_PENDING'||
+    original.postIssueNumber!==spec.issueNumber||
+    !/^pc-update-[0-9a-f-]{36}$/.test(original.requestId??'')||
+    !/^[0-9a-f]{40}$/.test(original.targetSha??'')||
+    !manifest||typeof manifest!=='object')
+   return false;
+ const title='PC Update '+original.requestId+' postcheck';
+ let body;try{body=JSON.parse(issue?.body??'');}catch{return false;}
+ if(issue?.number!==spec.issueNumber||issue.title!==title||
+    issue.user?.login!=='ansqhd5774-Choi'||
+    !issue.labels?.some(x=>x.name==='pc-job')||
+    body.schema!=='ZGMINI_PC_JOB_V1'||
+    body.requestId!==original.requestId+'-postcheck'||
+    body.operation!==manifest.postOperation||
+    body.sourceRepository!=='ansqhd5774-Choi/zgmini'||
+    body.sourceBranch!==manifest.postSourceBranch||
+    body.sourceSha!==manifest.postSourceSha)return false;
+ const issued=Date.parse(issue.created_at??''),started=Date.parse(run?.created_at??'');
+ if(!Number.isFinite(issued)||!Number.isFinite(started)||
+    started<issued||started-issued>900000)return false;
+ if(run?.id!==spec.runId||run.event!=='issues'||run.status!=='completed'||
+    run.conclusion!=='failure'||run.display_title!==title||
+    job?.id!==spec.jobId||job.run_id!==spec.runId||
+    job.status!=='completed'||job.conclusion!=='failure'||
+    job.runner_name!==spec.runnerName||job.name!=='approved-pc-job')return false;
+ const steps=job.steps?.filter(x=>x.name===POSTCHECK_STEP);
+ return Array.isArray(steps)&&steps.length===1&&
+    steps[0].status==='completed'&&steps[0].conclusion==='failure';
+}
 export function retainRollbackClaim(result,archived){
  return result?.mutationStarted===true&&!(archived===true&&result.status==='ROLLED_BACK'&&result.leaseArchived===true);
 }
@@ -44,6 +88,42 @@ export async function main(args=process.argv.slice(2)){
  need(ledger.requestId===id&&Number.isSafeInteger(owner.pid)&&owner.pid>0&&marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce&&alive(owner.pid)===false,'ROLLBACK_OWNER_NOT_PROVEN_DEAD');
  const data=loadApprovedPackage(id,path.join(root,'approved',id+'.json'),{recovery:true});
  need(data.manifest.installedSha===ledger.installedShaBefore&&data.manifest.targetSha===ledger.targetSha,'ROLLBACK_ORIGINAL_TARGET_MISMATCH');
+ // A confirmed postcheck is required only for the historically uncertain
+ // POSTCHECK_PENDING phase. Verify live GitHub issue/run/job evidence and the
+ // *current* Writer config CAS BEFORE creating any recovery claim or pausing
+ // the normal intake. Missing approval/evidence is a safe no-effect stop.
+ const recoveryOptions={recoveryOperator:true,
+  approvedRecoveryWriterConfigSha256:approval.approvedCurrentWriterConfigSha256??null};
+ let confirmedPostcheck=false;
+ if(ledger.status==='RECOVERY_REQUIRED'&&ledger.firstFail==='POSTCHECK_PENDING'){
+  const spec=approval.confirmedPostcheckFailure;
+  need(spec&&Number.isSafeInteger(spec.issueNumber)&&
+   Number.isSafeInteger(spec.runId)&&Number.isSafeInteger(spec.jobId),
+   'ROLLBACK_POSTCHECK_APPROVAL_REQUIRED');
+  need(/^[a-f0-9]{64}$/.test(approval.approvedCurrentWriterConfigSha256??''),
+   'ROLLBACK_WRITER_CONFIG_CAS_REQUIRED');
+  const writerPath='E:/ZGmini/data/pc-writer/config.json';
+  need(digest(fs.readFileSync(writerPath))===approval.approvedCurrentWriterConfigSha256,
+   'ROLLBACK_WRITER_CONFIG_CAS_CHANGED');
+  const ghbin='C:/Program Files/GitHub CLI/gh.exe';
+  const githubRead=rel=>JSON.parse(execFileSync(ghbin,
+   ['api','repos/'+PC_REPO+'/'+rel],{windowsHide:true,timeout:30000,
+    encoding:'utf8',maxBuffer:2e6}));
+  let evidence;try{
+   evidence={issue:githubRead('issues/'+spec.issueNumber),
+    run:githubRead('actions/runs/'+spec.runId),
+    job:githubRead('actions/jobs/'+spec.jobId)};
+  }catch{throw Object.assign(Error('ROLLBACK_POSTCHECK_READBACK_UNAVAILABLE'),
+   {code:'ROLLBACK_POSTCHECK_READBACK_UNAVAILABLE'});}
+  confirmedPostcheck=validateConfirmedPostcheckFailure({
+   original:ledger,manifest:data.manifest,approval,...evidence});
+  need(confirmedPostcheck,'ROLLBACK_POSTCHECK_EVIDENCE_UNVERIFIED');
+ }
+ const attachRecoveryPort=ports=>{
+  if(confirmedPostcheck)ports.confirmPostcheckFailure=async original=>
+   original===ledger&&confirmedPostcheck;
+  return ports;
+ };
  const claim=path.join(root,'leases/controller-recovery');
  if(fs.existsSync(claim)){
   const spec=approval.resumeClaim;
@@ -57,7 +137,8 @@ export async function main(args=process.argv.slice(2)){
   validateStalledClaim({requestId:id,approval,claimBytes,recordBytes,backlogBytes,ownerAlive:alive(priorOwner.pid)});
   // This is a separately approved continuation after a guard stopped before
   // restore. Prove original live snapshot, disabled intake and protection first.
-  const {ports}=makePorts(data,data.issueNumber,{recoveryOperator:true});
+  const {ports:basePorts}=makePorts(data,data.issueNumber,recoveryOptions);
+  const ports=attachRecoveryPort(basePorts);
   await ports.prepareRecovery();
   need(await ports.verifyRestoredPrevious(ledger.installedShaBefore)===true,'ROLLBACK_STALLED_SNAPSHOT_UNVERIFIED');
   const reservation=path.join(root,'leases/controller-recovery-reentry');fs.mkdirSync(reservation);
@@ -81,7 +162,8 @@ export async function main(args=process.argv.slice(2)){
  const persist=async r=>{if(r.mutationStarted)keep=retainRollbackClaim(r,archived);const temp=record+'.tmp';fs.writeFileSync(temp,JSON.stringify(r,null,2)+'\n',{flag:'wx'});fs.renameSync(temp,record);};
  try{
   need(fs.readFileSync(path.join(dir,'owner.json')).equals(ownerBytes)&&fs.readFileSync(ledgerFile).equals(ledgerBytes)&&alive(owner.pid)===false,'ROLLBACK_EVIDENCE_CHANGED');
-  const {ports}=makePorts(data,data.issueNumber,{recoveryOperator:true});
+  const {ports:basePorts}=makePorts(data,data.issueNumber,recoveryOptions);
+  const ports=attachRecoveryPort(basePorts);
   const r=await reconcileInterruptedRollback(ledger,ports,persist);
   if(r.status==='ROLLED_BACK'){
    need(fs.readFileSync(path.join(dir,'owner.json')).equals(ownerBytes)&&fs.readFileSync(path.join(dir,'RECOVERY_REQUIRED.json')).equals(markerBytes)&&fs.readFileSync(ledgerFile).equals(ledgerBytes),'ROLLBACK_EVIDENCE_CHANGED');
