@@ -15,8 +15,15 @@ try{
  need(host!==null&&typeof host==='object'&&!Array.isArray(host)&&
   host.controllerFiles!==null&&typeof host.controllerFiles==='object'&&
   !Array.isArray(host.controllerFiles),'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
+ // The maintenance prevalidation contract requires these nine baseline
+ // runtime files. Counting arbitrary entries is not proof they are attested.
+ const required=['config/operations.json','controller/common.mjs','controller/engine.mjs',
+  'controller/entry.mjs','controller/fear-greed-archive-readonly.mjs',
+  'controller/operations.mjs','controller/supervisor.mjs','controller/upload.mjs',
+  'controller/worker.mjs'];
  const files=Object.entries(host.controllerFiles);
- need(/^[a-f0-9]{40}$/.test(host.controllerSourceSha??'')&&files.length>=5&&
+ need(/^[a-f0-9]{40}$/.test(host.controllerSourceSha??'')&&
+  required.every(rel=>/^[a-f0-9]{64}$/.test(host.controllerFiles[rel]??''))&&
   files.every(([rel,sha])=>/^(controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)
    &&/^[a-f0-9]{64}$/.test(sha)),'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
  for(const [rel,sha] of Object.entries(host.controllerFiles))need(digest(fs.readFileSync(path.join(root,rel)))===sha,'CONTROLLER_SOURCE_DRIFT');
