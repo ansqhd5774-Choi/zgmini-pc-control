@@ -1,0 +1,69 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44684929431-1-seat-3",
+  "requestId": "pc-2c8f5b01-e990-4278-b88f-6f3537cbed4e",
+  "startedAt": "2026-11-20T06:02:03.970Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "d67f9f44e730f96abc9a4fd335bce60f5b453d06",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "a7c0cf678bb3d3e29d97d4a6c15f48e9dec69cfd",
+  "sourceBranch": "main",
+  "operation": "core-status",
+  "seat": 3,
+  "status": "PASS",
+  "code": "CORE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-pit0801-source-date-20261120",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "48e892755161b8d829f21b7ae0f270b07278d1ca",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_READONLY_DIAGNOSIS",
+    "core": {
+      "lockPresent": true,
+      "checkpoints": {
+        "local-cycle-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-20T05:57:50.728Z",
+          "bytes": 2397,
+          "status": "COMPLETE"
+        },
+        "local-collection-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-20T06:00:26.456Z",
+          "bytes": 4125,
+          "status": "COMPLETE"
+        },
+        "local-writer-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-20T05:56:42.995Z",
+          "bytes": 6558,
+          "status": "VERIFIED"
+        }
+      },
+      "taskXmlHashes": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1",
+        "ZGMINI-PC-Iran-Progress-R13": "APPROVED_RETIRED_ABSENT"
+      },
+      "approvedSourceSha": "48e892755161b8d829f21b7ae0f270b07278d1ca"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "875675b03e8448e491403fac74ff373c7f05d076e95b36a0c0d15ed5fa7708d6",
+  "protectedAfterSha256": "875675b03e8448e491403fac74ff373c7f05d076e95b36a0c0d15ed5fa7708d6",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "d67f9f44e730f96abc9a4fd335bce60f5b453d06",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-20T06:02:10.471Z",
+  "durationMs": 6501
+}
