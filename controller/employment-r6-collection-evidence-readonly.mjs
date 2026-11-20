@@ -317,6 +317,11 @@ function inspectEta539RawCurrentParity(db){
  const byKey=new Map(current.map(c=>[c.geography_code+'|'+c.observation_date,c]));
  const counts={MATCH:0,CURRENT_NEWER_THAN_RAW:0,MISSING_CURRENT:0,OTHER_SOURCE:0,
   VALUE_DIFFERENT:0,HASH_DIFFERENT:0,REVISION_DIFFERENT:0};
+ // A later Current retrieved_at is not historical PIT proof, but it need not
+ // conceal a content/hash/revision disagreement with the immutable Raw body.
+ // Keep the existing disjoint counts and supply an independent nested tally.
+ const newerCurrentComparison={VALUE_HASH_REVISION_MATCH:0,VALUE_DIFFERENT:0,
+  HASH_DIFFERENT:0,REVISION_DIFFERENT:0};
  for(const week of selected){
   for(const item of weeks.get(week).values()){
    const cur=byKey.get(item.st+'|'+item.week);
@@ -324,25 +329,29 @@ function inspectEta539RawCurrentParity(db){
    if(cur.provider!=='DOL_ETA'||cur.provider_series_id!=='ETA539:C3'){
     counts.OTHER_SOURCE++;continue;
    }
-   if(Date.parse(cur.retrieved_at)>Date.parse(head.retrieved_at)){
-    counts.CURRENT_NEWER_THAN_RAW++;continue;
-   }
    const expectedHash=eta539Digest(JSON.stringify({reportDate:item.report,
     reflectedWeek:item.week,st:item.st,value:item.value}));
    const expectedRevision='ETA539:RPTDATE:'+item.report;
-   if(typeof cur.value!=='number'||!Number.isFinite(cur.value)||cur.value!==item.value)
-    counts.VALUE_DIFFERENT++;
-   else if(cur.source_hash!==expectedHash)counts.HASH_DIFFERENT++;
-   else if(cur.source_revision!==expectedRevision)counts.REVISION_DIFFERENT++;
-   else counts.MATCH++;
+   const reason=typeof cur.value!=='number'||!Number.isFinite(cur.value)
+      ||cur.value!==item.value?'VALUE_DIFFERENT'
+    :cur.source_hash!==expectedHash?'HASH_DIFFERENT'
+    :cur.source_revision!==expectedRevision?'REVISION_DIFFERENT':'MATCH';
+   if(Date.parse(cur.retrieved_at)>Date.parse(head.retrieved_at)){
+    counts.CURRENT_NEWER_THAN_RAW++;
+    newerCurrentComparison[reason==='MATCH'?'VALUE_HASH_REVISION_MATCH':reason]++;
+   }else counts[reason]++;
   }
  }
  const checked=selected.length*CORE_STATES.length;
- if(Object.values(counts).reduce((a,b)=>a+b,0)!==checked)return fail('PARITY_COUNT_INCONSISTENT');
+ if(Object.values(counts).reduce((a,b)=>a+b,0)!==checked
+   ||Object.values(newerCurrentComparison).reduce((a,b)=>a+b,0)!==counts.CURRENT_NEWER_THAN_RAW)
+  return fail('PARITY_COUNT_INCONSISTENT');
  return {...base,status:'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT',
   snapshotRequestKey:head.request_key,latestSnapshotStoredAt:stamp(head.retrieved_at),
   completeWeeksInSnapshot:allWeeks.filter(w=>weeks.get(w).size===CORE_STATES.length).length,
-  checkedWeeks:selected.length,checkedKeys:checked,invalidLatest,ambiguousLatest,invalidDates,counts};
+  checkedWeeks:selected.length,checkedKeys:checked,invalidLatest,ambiguousLatest,invalidDates,
+  counts,newerCurrentComparison,
+  comparisonScope:'SINGLE_STORED_SNAPSHOT_CONTENT_ONLY_NOT_HISTORICAL_PIT'};
 }
 
 function coverage(rows){

@@ -704,3 +704,40 @@ test('PIT0407 stored ETA539 beyond approved 4096-chunk bound reports exact safe 
  assert.equal(p.rawPitAttested,false);
  assert.equal(p.repairAuthorized,false);
 });
+
+
+
+test('PIT0407 later Current retrieval does not hide same raw c3 values or overstate PIT',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);seedEta539Parity(db);
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 "+
+  "SET retrieved_at='2026-11-20T01:00:00.000Z' WHERE observation_date='2026-10-31'").run();
+ db.close();
+ const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+ assert.equal(p.status,'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT',JSON.stringify(p));
+ assert.equal(p.checkedKeys,51);
+ assert.equal(p.counts.CURRENT_NEWER_THAN_RAW,51);
+ assert.deepEqual(p.newerCurrentComparison,{
+  VALUE_HASH_REVISION_MATCH:51,VALUE_DIFFERENT:0,HASH_DIFFERENT:0,REVISION_DIFFERENT:0});
+ assert.equal(p.rawPitAttested,false);
+ assert.equal(p.repairAuthorized,false);
+});
+
+test('PIT0407 later Current retrieval compares value/hash/revision separately',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);seedEta539Parity(db);
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 "+
+  "SET retrieved_at='2026-11-20T01:00:00.000Z' WHERE observation_date='2026-10-31'").run();
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET value=901 "+
+  "WHERE observation_date='2026-10-31' AND geography_code='AL'").run();
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 SET source_hash=? "+
+  "WHERE observation_date='2026-10-31' AND geography_code='AK'").run('f'.repeat(64));
+ db.prepare("UPDATE market_score_employment_r4_shadow_current_v1 "+
+  "SET source_revision='ETA539:RPTDATE:2026-11-11' "+
+  "WHERE observation_date='2026-10-31' AND geography_code='AZ'").run();
+ db.close();
+ const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+ assert.equal(p.status,'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT',JSON.stringify(p));
+ assert.equal(p.counts.CURRENT_NEWER_THAN_RAW,51);
+ assert.deepEqual(p.newerCurrentComparison,{
+  VALUE_HASH_REVISION_MATCH:48,VALUE_DIFFERENT:1,HASH_DIFFERENT:1,REVISION_DIFFERENT:1});
+ assert.equal(p.rawPitAttested,false);
+});
