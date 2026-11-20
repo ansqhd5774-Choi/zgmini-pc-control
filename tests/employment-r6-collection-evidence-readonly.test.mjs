@@ -669,3 +669,38 @@ test('W04 PIT0407 newer missing c3 revision does not reuse older valid state-wee
  assert.equal(p.invalidLatest,1);
  assert.equal(p.rawPitAttested,false);assert.equal(p.repairAuthorized,false);
 });
+
+
+
+test('PIT0407 full stored ETA539 CSV can span more than 64 verified chunks without metadata false-negative',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);seedEta539Parity(db);
+ const head=db.prepare("SELECT * FROM market_score_employment_r6_raw_snapshot_v1 "+
+  "WHERE request_key='DOL_ETA539:60w' AND chunk_index=0").get();
+ const slices=65;const width=Math.ceil(head.body_chunk.length/slices);
+ const pieces=[];
+ for(let i=0;i<slices;i++)pieces.push(head.body_chunk.slice(i*width,(i+1)*width));
+ assert.equal(pieces.join(''),head.body_chunk);
+ db.prepare("UPDATE market_score_employment_r6_raw_snapshot_v1 SET body_chunk=?,chunk_count=65 "+
+  "WHERE snapshot_id=? AND chunk_index=0").run(pieces[0],head.snapshot_id);
+ const insert=db.prepare("INSERT INTO market_score_employment_r6_raw_snapshot_v1 "+
+  "(request_key,release_group,chunk_index,retrieved_at,chunk_count,http_status,detail_json,body_chunk,snapshot_id,provider,body_sha256) "+
+  "VALUES(?,?,?,?,?,?,?,?,?,?,?)");
+ for(let i=1;i<pieces.length;i++)insert.run(head.request_key,head.release_group,i,
+  head.retrieved_at,65,head.http_status,head.detail_json,pieces[i],
+  head.snapshot_id,head.provider,head.body_sha256);
+ db.close();
+ const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+ assert.equal(p.status,'SNAPSHOT_SCOPE_CLASSIFIED_NOT_PIT',JSON.stringify(p));
+ assert.equal(p.checkedKeys,51);
+ assert.equal(p.counts.MATCH,51);
+});
+
+test('PIT0407 stored ETA539 beyond approved 4096-chunk bound reports exact safe reason',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);seedEta539Parity(db);
+ db.prepare("UPDATE market_score_employment_r6_raw_snapshot_v1 "+
+  "SET chunk_count=4097 WHERE request_key='DOL_ETA539:60w'").run();db.close();
+ const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+ assert.equal(p.status,'RAW_CHUNK_COUNT_OUT_OF_BOUNDS');
+ assert.equal(p.rawPitAttested,false);
+ assert.equal(p.repairAuthorized,false);
+});
