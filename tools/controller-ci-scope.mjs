@@ -9,7 +9,8 @@ export function classifyPath(p) {
       p.startsWith('controller/') || p === 'config/operations.json' ||
       p === 'tools/update.mjs' || p.startsWith('tools/maintenance-')) return GROUPS;
   if (/^(tools|tests)\/(r181-|w03-)/.test(p) || p.startsWith('approvals/w03-')) return ['w03'];
-  if (/^inflation-(manual|census)-b\//.test(p) || p.startsWith('writer-b/w01-') ||
+  if (p.startsWith('inflation-core-handoff/') ||
+      /^inflation-(manual|census)-b\//.test(p) || p.startsWith('writer-b/w01-') ||
       p.startsWith('approvals/inflation-') || p.startsWith('tests/w01-')) return ['w01'];
   if (p.startsWith('watchdog-b/') || p.startsWith('approvals/watchdog-') ||
       /^tests\/(runner-watchdog|watchdog-)/.test(p) ||
