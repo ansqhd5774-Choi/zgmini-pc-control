@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {existsSync} from 'node:fs';
 import {D30_INSTALL_CONTRACT} from '../calendar-source-d30/contract.mjs';
 import {validateD30ReadOnlyIssue,parseD30ReadOnlyIssueEvent,
   runD30ReadOnlyWindowsHost}
@@ -80,4 +81,8 @@ test('non-Windows environment safe-stops before workspace and source access',asy
   assert.equal(report.code,'ER1_D30_PREVIEW_WINDOWS_ONLY');
   assert.equal(report.sourceWrites,0);
   assert.ok(JSON.stringify(report).length<32_768);
+});
+
+test('021 completed D30 preview and SQLite one-shot workflow is no longer active',()=>{
+ assert.equal(existsSync(new URL('../.github/workflows/pc-calendar-d30-readonly-preview-once.yml',import.meta.url)),false);
 });
