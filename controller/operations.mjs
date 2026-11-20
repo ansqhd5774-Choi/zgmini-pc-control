@@ -187,7 +187,8 @@ export async function runOperation(request,context){
    ...(partial?{taskObservation:'UNVERIFIED'}:{}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  }
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(
-  inspectD05LineageReadonly(dataRoot,{approvedSourceSha:readCore(dataRoot).approvedSourceSha}));
+  inspectD05LineageReadonly(dataRoot,{approvedSourceSha:
+   Object.hasOwn(context,'d05ApprovedSourceSha')?context.d05ApprovedSourceSha:readCore(dataRoot).approvedSourceSha}));
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
  if(request.operation==='inflation-core-lock-observation-readonly')
   return observeInflationCoreLock({queryTask});
