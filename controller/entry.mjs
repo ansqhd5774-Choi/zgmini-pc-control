@@ -1,5 +1,4 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,writeJson,errorCode,digest,validateRequest} from './common.mjs';
-import {readStagedPreimageScope} from './preimage-manifest-contract.mjs';
 const controller=path.dirname(fileURLToPath(import.meta.url)),root=path.dirname(controller),policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));
 const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
 const seat=Number(process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1]);const runId=process.env.GITHUB_RUN_ID,attempt=Number(process.env.GITHUB_RUN_ATTEMPT||1);
@@ -39,6 +38,7 @@ try{
   'controller/preimage-manifest-contract.mjs'].every(x=>
    /^[0-9a-f]{64}$/.test(host.controllerFiles?.[x]??'')),
   'PREIMAGE_STAGE_SOURCE_NOT_ATTESTED');
+ const {readStagedPreimageScope}=await import('./preimage-manifest-contract.mjs');
  const approvedPreimageScope=readStagedPreimageScope({env:process.env,request:raw});
  // Delay engine/operations loading until inside the error receipt boundary.
  // Missing selective-overlay imports must still produce an uploadable BLOCKED result.

@@ -99,5 +99,26 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
    assert.equal(receipt.report.providerCalls,0);
    assert.equal(receipt.report.d1Writes,0);
   }
+  // An attested preimage helper may still have an unavailable transitive
+  // import. It must not fail before entry creates the BLOCKED pointer.
+  const preimageFile=path.join(root,'controller','preimage-manifest-contract.mjs');
+  fs.writeFileSync(preimageFile,
+   "import './unavailable-preimage-helper.mjs'; export const readStagedPreimageScope=()=>null;\n");
+  const withBrokenPreimage={...controllerFiles,
+   'controller/preimage-manifest-contract.mjs':createHash('sha256')
+    .update(fs.readFileSync(preimageFile)).digest('hex')};
+  fs.writeFileSync(hostFile,JSON.stringify({controllerSourceSha:'b'.repeat(40),
+   controllerFiles:withBrokenPreimage}));
+  fs.rmSync(reportFile,{force:true});
+  const missingPreimage=spawnSync(process.execPath,
+   [path.join(root,'controller','entry.mjs')],{encoding:'utf8',env});
+  assert.equal(missingPreimage.status,1,missingPreimage.stderr);
+  const receipt=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+  assert.equal(receipt.issueNumber,2506);
+  assert.equal(receipt.report.status,'BLOCKED');
+  assert.equal(receipt.report.code,'CONTROLLER_IMPORT_MISSING');
+  assert.equal(receipt.report.operationalWrites,0);
+  assert.equal(receipt.report.providerCalls,0);
+  assert.equal(receipt.report.d1Writes,0);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
