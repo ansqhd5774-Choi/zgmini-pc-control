@@ -10,6 +10,11 @@ try{
  let host;
  try{host=JSON.parse(fs.readFileSync(path.join(root,'host.json')));}
  catch{throw Object.assign(Error('CONTROLLER_HOST_MANIFEST_UNAVAILABLE'),{code:'CONTROLLER_HOST_MANIFEST_UNAVAILABLE'});}
+ // A syntactically valid JSON value is not necessarily an installed host manifest.
+ // Distinguish missing manifest shape from operational source-file drift.
+ need(host!==null&&typeof host==='object'&&!Array.isArray(host)&&
+  host.controllerFiles!==null&&typeof host.controllerFiles==='object'&&
+  !Array.isArray(host.controllerFiles),'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
  for(const [rel,sha] of Object.entries(host.controllerFiles))need(digest(fs.readFileSync(path.join(root,rel)))===sha,'CONTROLLER_SOURCE_DRIFT');
  need(process.env.GITHUB_REPOSITORY===policy.controlRepository&&event.repository?.private===true,'CONTROL_REPOSITORY_OR_VISIBILITY');
  need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');const validEvent=event.action==='opened' ||
