@@ -175,7 +175,8 @@ function verifyInstalledR6OverlayCore({sourceRoot,pcHome,approvedSha,overlay,
  need(isApprovedR6RuntimeMode(config,approvedSha,manualDol)&&
   git(['rev-parse','HEAD'])===approvedSha,
   'R6_B_INSTALLED_SOURCE_STOP');
- git(['diff','--quiet','HEAD','--','lib','worker','scripts/pc-writer']);
+ try{git(['diff','--quiet','HEAD','--','lib','worker','scripts/pc-writer']);}
+ catch{throw error('R6_B_INSTALLED_GIT_DIFF_STOP');}
  for(const file of overlay.files){
   need(/^(?:lib\/market-score|scripts\/pc-writer)\/[a-zA-Z0-9_.-]+\.mjs$/.test(file.path)&&
     SHA64.test(file.afterSha256??'')&&
@@ -327,7 +328,7 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
  let lock=null,claimed=false,claimAttempted=false,lastPass='SOURCE_VERIFIED';
  let outcome;
  try{
-  const config=verifyOverlay({sourceRoot,pcHome,
+  const preflightConfig=verifyOverlay({sourceRoot,pcHome,
    approvedSha:auth.approval.installedSourceSha,overlay:auth.overlay});
   // Missing credentials are a read-only preflight failure, not a consumed
   // one-shot. Inspect presence only, before creating the durable claim.
@@ -335,15 +336,19 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   need(Boolean(providerFields.BLS_API_KEY?.trim()||
    providerFields.BLS_REGISTRATION_KEY?.trim()),'R6_B_REGISTERED_KEY_MISSING');
   lastPass='REGISTERED_KEY_PRESENT';
+  // D1 SELECT 1 is strictly read-only and potentially remote/slow.
+  // Do not occupy the Core's shared lock during external preflight.
+  need(await d1ReadProbe({sourceRoot,pcHome,config:preflightConfig})===true,
+   'R6_B_D1_AUTH_UNAVAILABLE');
+  lastPass='D1_READONLY_PREFLIGHT';
   lock=await lockFactory(pcHome,auth.request.requestId);
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
-  // The Actions Runner may have a different Windows user than scheduled Core.
-  // Fail before the no-retry claim and BLS calls if its existing Wrangler/D1
-  // read credential is unavailable. SELECT 1 is strictly read-only.
-  need(await d1ReadProbe({sourceRoot,pcHome,config})===true,
-   'R6_B_D1_AUTH_UNAVAILABLE');
+  // Remote preflight can race with a changed installed runtime. Fail closed.
+  const config=verifyOverlay({sourceRoot,pcHome,
+   approvedSha:auth.approval.installedSourceSha,overlay:auth.overlay});
+  need(config.core===preflightConfig.core,'R6_B_D1_TARGET_CHANGED_STOP');
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
-  lastPass='D1_READONLY_PREFLIGHT';
+  lastPass='LOCKED_SOURCE_REVERIFIED';
   const execute=run??runInstalledR6;
   // A persistent request/mode claim precedes every SQLite or provider effect.
   claimAttempted=true;

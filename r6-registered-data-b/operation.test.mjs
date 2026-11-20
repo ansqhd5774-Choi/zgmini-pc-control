@@ -261,9 +261,22 @@ test('027 Windows manual DOL checks exact source bytes but not unrelated automat
  assert.deepEqual(calls.map(x=>x[0]),['rev-parse','diff']);
  assert.throws(()=>verifyInstalledR6Overlay(settings),/R6_B_INSTALLED_SOURCE_STOP/);
  const dirty={...settings,git:args=>{if(args[0]==='diff')throw new Error('unapproved dirty source');return sourceSha;}};
- assert.throws(()=>verifyInstalledR6DolManualOverlay(dirty),/unapproved dirty source/);
+ assert.throws(()=>verifyInstalledR6DolManualOverlay(dirty),/R6_B_INSTALLED_GIT_DIFF_STOP/);
  const changed={...settings,overlay:{files:files.map((v,i)=>i===0?
   {...v,afterSha256:'b'.repeat(64)}:v)}};
  assert.throws(()=>verifyInstalledR6DolManualOverlay(changed),
   /R6_B_INSTALLED_OVERLAY_DRIFT_STOP/);
+});
+
+test('027 dirty Git worktree stays blocked with bounded diagnostic',t=>{
+ if(process.platform!=='win32')return t.skip('Windows source verifier');
+ const sha='a'.repeat(40),bytes=Buffer.from('pinned DOL fixture');
+ const files=['employment-r6-provider','employment-r6-collector','employment-r6-scheduler']
+  .map(name=>({path:'lib/market-score/'+name+'.mjs',afterSha256:hash(bytes)}));
+ const opts={sourceRoot:R6_B_SOURCE,pcHome:R6_B_HOME,approvedSha:sha,
+  overlay:{files},exists:()=>true,
+  read:p=>String(p).endsWith('config.json')?
+    JSON.stringify({source:sha,enabled:true,collectionTarget:'pc'}):bytes,
+  git:args=>{if(args[0]==='diff')throw Error('git dirty');return sha;}};
+ assert.throws(()=>verifyInstalledR6DolManualOverlay(opts),/R6_B_INSTALLED_GIT_DIFF_STOP/);
 });
