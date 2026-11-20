@@ -175,21 +175,20 @@ test('status-partition coverage prevents a newest-300-only blind spot',()=>{
 });
 
 test('shard closing after selection recovers with a fresh authenticated shard',async()=>{
-  const entries=[];const comments=new Map();let next=4000,reads=0;
+  const entries=[];const comments=new Map();let next=4000,closedOnce=false;
   const io={
     getRuns:async()=>({items:[],complete:true,coverage:[]}),
     getIssues:async()=>({items:[],complete:true}),
     getPulls:async()=>({items:[],complete:true}),
     getWorkflows:async()=>workflows.map((w,i)=>i===0?{...w,state:'disabled_manually'}:w),
     getScheduleCount:async()=>0,
-    findShards:async()=>entries.map(x=>({...x})),
-    readShard:async n=>entries.find(x=>x.number===n),
-    readShardComments:async n=>{
-      reads++;
-      // First post-selection readback closes shard #1, simulating another worker.
-      if(reads===2&&entries[0])entries[0].state='closed';
-      return [...(comments.get(n)||[])];
+    findShards:async()=>{
+      // Close the first shard immediately before post-selection readback.
+      if(entries.length===1&&!closedOnce){entries[0].state='closed';closedOnce=true;}
+      return entries.map(x=>({...x}));
     },
+    readShard:async n=>entries.find(x=>x.number===n),
+    readShardComments:async n=>[...(comments.get(n)||[])],
     createShard:async(month,index,title,marker)=>{
       const item={number:next++,title,body:marker,state:'open',user:{login:OWNER}};
       entries.push(item);comments.set(item.number,[]);return item;
