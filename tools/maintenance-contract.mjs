@@ -7,6 +7,38 @@ export {SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
   from './source-bundle-register.mjs';
 
+// Existing Controller recovery must never roll back or silently bless an
+// unrelated live Writer config update. A separately approved independent
+// recovery may retain its *exact* current SHA only when all other protected
+// observations match the original B baseline. This is a pure decision helper;
+// neither a file write nor an operational recovery authorization.
+export function selectPreservedRecoveryProtection(original,current,
+ {approvedCurrentWriterConfigSha256=null}={}){
+ const deny=code=>({allowed:false,code,baseline:null,preservedWriterConfig:false});
+ const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+ if(!record(original)||!record(current)||!record(original.files)||
+    !record(current.files)||!record(original.tasks)||!record(current.tasks))
+  return deny('RECOVERY_PROTECTION_SCHEMA_UNVERIFIED');
+ if(JSON.stringify(original)===JSON.stringify(current))
+  return {allowed:true,code:'RECOVERY_ORIGINAL_PROTECTION_UNCHANGED',
+   baseline:original,preservedWriterConfig:false};
+ if(typeof approvedCurrentWriterConfigSha256!=='string'||
+    !/^[a-f0-9]{64}$/.test(approvedCurrentWriterConfigSha256))
+  return deny('RECOVERY_PROTECTION_DRIFT_NOT_APPROVED');
+ const oldConfig=original.files['config.json'];
+ const currentConfig=current.files['config.json'];
+ if(!/^[a-f0-9]{64}$/.test(oldConfig??'')||
+    currentConfig!==approvedCurrentWriterConfigSha256||
+    oldConfig===currentConfig)
+  return deny('RECOVERY_WRITER_CONFIG_CAS_NOT_VERIFIED');
+ const expected={...original,files:{...original.files,
+  'config.json':approvedCurrentWriterConfigSha256}};
+ if(JSON.stringify(current)!==JSON.stringify(expected))
+  return deny('RECOVERY_OTHER_PROTECTED_STATE_DRIFT');
+ return {allowed:true,code:'RECOVERY_CURRENT_WRITER_CONFIG_PRESERVED',
+  baseline:current,preservedWriterConfig:true};
+}
+
 export const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 export const CONTROL_ACTOR="ansqhd5774-Choi";
 export const UPDATE_SCHEMA="ZGMINI_PC_UPDATE_V1";
