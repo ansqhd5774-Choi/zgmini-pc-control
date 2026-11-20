@@ -408,7 +408,8 @@ export function inspect2505RecoveryByteProof({
 }={}){
  const unknown=code=>({status:'STATE_UNKNOWN',code,
   snapshotFilesVerified:null,previousHostMatchesSnapshot:null,
-  protectedBaselineMatchesCurrent:null,ownerMarkerMatches:null,
+  protectedBaselineMatchesCurrent:null,protectedDifferenceScopes:null,
+  protectedDifferenceClass:'UNVERIFIED',ownerMarkerMatches:null,
   ownerPidPresent:null,leaseTimelineAligned:null,currentTargetMatches:null,
   leaseBoundToOriginalRequest:null,recoveryEligible:false,
   operationalWrites:0,providerCalls:0,d1Writes:0});
@@ -461,15 +462,43 @@ export function inspect2505RecoveryByteProof({
   // Chronology is useful evidence only: owner/marker have no request ID.
   const leaseTimelineAligned=Number.isFinite(created)&&Number.isFinite(updated)&&
    Number.isFinite(marked)&&created<=updated&&updated<=marked&&marked-updated<=60000;
-  let protectedBaselineMatchesCurrent=null;
-  try{protectedBaselineMatchesCurrent=JSON.stringify(protectedProbe())===
-   JSON.stringify(baseline);}catch{/* Scheduler read unavailable, not drift */}
+  let protectedBaselineMatchesCurrent=null,protectedDifferenceScopes=null;
+  let protectedDifferenceClass='UNVERIFIED';
+  try{
+   const currentProtected=protectedProbe();
+   protectedBaselineMatchesCurrent=JSON.stringify(currentProtected)===JSON.stringify(baseline);
+   // Only these six previously protected fixed names may be reported.
+   // Do not disclose hashes, raw task XML, configured paths or arbitrary keys.
+   const known=[
+    ['files','config.json','WRITER_CONFIG'],
+    ['files','quota-runner.cmd','WRITER_QUOTA_RUNNER'],
+    ['files','run-local.cmd','WRITER_LOCAL_RUNNER'],
+    ['tasks','ZGMINI-PC-Local-Core','LOCAL_CORE_TASK'],
+    ['tasks','ZGMINI-PC-Local-Korea','LOCAL_KOREA_TASK'],
+    ['tasks','ZGMINI-PC-Iran-Progress-R13','RETIRED_IRAN_TASK']
+   ];
+   const plain=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+   if(!plain(baseline?.files)||!plain(baseline?.tasks)||
+      !plain(currentProtected?.files)||!plain(currentProtected?.tasks)){
+    protectedDifferenceClass='UNVERIFIED_STRUCTURE';
+   }else{
+    protectedDifferenceScopes=known.filter(([group,name])=>
+     baseline[group][name]!==currentProtected[group][name]).map(([, ,label])=>label);
+    const unexpected=Object.entries({files:new Set(known.filter(x=>x[0]==='files').map(x=>x[1])),
+      tasks:new Set(known.filter(x=>x[0]==='tasks').map(x=>x[1]))}).some(([group,allowed])=>
+       [...Object.keys(baseline[group]),...Object.keys(currentProtected[group])].some(k=>!allowed.has(k)));
+    protectedDifferenceClass=unexpected?'UNVERIFIED_EXTRA_KEYS':
+     protectedBaselineMatchesCurrent?'MATCHED':
+     protectedDifferenceScopes.length?'KNOWN_SCOPES':'UNCLASSIFIED_DIFFERENCE';
+   }
+  }catch{/* Scheduler read unavailable, not drift */}
   const currentTargetMatches=nowHost.controllerSourceSha===C2505_TARGET;
   const stable=Object.entries(fixed).every(([k,p])=>readFixed(p).equals(start[k]));
   if(!stable)return unknown('C2505_PROOF_FILES_CHANGED');
   return {status:'READ_ONLY_OBSERVED',code:'C2505_BYTE_PROOF_OBSERVED',
    snapshotFilesVerified,previousHostMatchesSnapshot,
-   protectedBaselineMatchesCurrent,ownerMarkerMatches,
+   protectedBaselineMatchesCurrent,protectedDifferenceScopes,
+   protectedDifferenceClass,ownerMarkerMatches,
    ownerPidPresent:typeof pidPresent==='boolean'?pidPresent:null,
    leaseTimelineAligned,currentTargetMatches,
    // Only the original B operator could attest exact request-owner lineage.
