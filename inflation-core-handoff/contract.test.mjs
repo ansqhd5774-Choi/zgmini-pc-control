@@ -6,7 +6,7 @@ import {
  CORE_HANDOFF_ISSUE_TITLE,CORE_HANDOFF_ISSUE_LABEL,
  CORE_HANDOFF_OPERATION,CORE_HANDOFF_MODE,CORE_HANDOFF_DELIVERY,
  CORE_HANDOFF_SOURCE_FILES,authorizeCoreOwnedHandoff,
- assertAuthenticatedCoreHandoff,
+ assertAuthenticatedCoreHandoff,projectCoreOwnedTransactionApproval,
 } from './contract.mjs';
 import {
  CONTROL_REPO,OWNER,SCOPE,SOURCE_ROOT,DATA_ROOT,URLS,TARGETS,MAX_BYTES,
@@ -84,4 +84,21 @@ test('no JSON clone, approval-looking object or old Issue passes the branded aut
  const old=fixture();old.event.issue.title='pc-inflation-official-manual-once';
  assert.throws(()=>authorizeCoreOwnedHandoff(old),
   {code:'INFL_CORE_HANDOFF_EVENT_AUTH_STOP'});
+});
+
+test('V3 projects exact coordinator effect only from verified branded authority',()=>{
+ const approved=authorizeCoreOwnedHandoff(fixture());
+ const projected=projectCoreOwnedTransactionApproval(approved);
+ assert.equal(projected.requestId,uuid);
+ assert.equal(projected.status,'APPROVED_B');
+ assert.equal(projected.coreExecution,'CURRENT_CORE_OWNED_LOCK');
+ assert.equal(projected.exactOfficialSources,true);
+ assert.equal(projected.exactTwoTargets,true);
+ assert.equal(projected.dbWrites,false);
+ assert.equal(projected.d1Writes,false);
+ assert.equal(projected.taskChanges,false);
+ assert.equal(projected.sourceChanges,false);
+ assert.equal(projected.manifestSha256,approved.request.approvalManifestSha256);
+ assert.throws(()=>projectCoreOwnedTransactionApproval({...approved}),
+  {code:'INFL_CORE_HANDOFF_AUTH_OBJECT_STOP'});
 });
