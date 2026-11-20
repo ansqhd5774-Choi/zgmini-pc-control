@@ -10,7 +10,7 @@ import {
   requestFingerprint,dedupeUpdateRequest,newUpdateLedger,transitionLedger,
   validateInfrastructureDelta,validateControllerOnlyInstallDelta,
   deployableControllerTreePaths,isControllerSourceTestPath,
-  prepareControllerUpdateRequest,
+  prepareControllerUpdateRequest,selectPreservedRecoveryProtection,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -473,3 +473,46 @@ test('moderate readonly is a distinct B approval scope, not a generic resource b
  assert.equal(admitted(post).manifest.postOperation,'source-audit');
 });
 
+
+
+test('postcheck recovery retains approved Writer config CAS while all other protection remains fixed',()=>{
+ const historic={files:{'config.json':'a'.repeat(64),'quota-runner.cmd':'b'.repeat(64),
+  'run-local.cmd':'c'.repeat(64)},tasks:{'ZGMINI-PC-Local-Core':'core',
+  'ZGMINI-PC-Local-Korea':'korea','ZGMINI-PC-Iran-Progress-R13':'retired'}};
+ const current=clone(historic);
+ current.files['config.json']='d'.repeat(64);
+ const preserved=selectPreservedRecoveryProtection(historic,current,
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)});
+ assert.equal(preserved.allowed,true);
+ assert.equal(preserved.code,'RECOVERY_CURRENT_WRITER_CONFIG_PRESERVED');
+ assert.equal(preserved.preservedWriterConfig,true);
+ assert.deepEqual(preserved.baseline,current);
+ assert.equal(historic.files['config.json'],'a'.repeat(64));
+ for(const pin of [null,'e'.repeat(64),'d'.repeat(63),'INVALID']){
+  assert.equal(selectPreservedRecoveryProtection(historic,current,
+   {approvedCurrentWriterConfigSha256:pin}).allowed,false);
+ }
+ const taskDrift=clone(current);taskDrift.tasks['ZGMINI-PC-Local-Core']='modified';
+ assert.equal(selectPreservedRecoveryProtection(historic,taskDrift,
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)}).code,
+  'RECOVERY_OTHER_PROTECTED_STATE_DRIFT');
+ const unrelated=clone(current);unrelated.files['quota-runner.cmd']='x'.repeat(64);
+ assert.equal(selectPreservedRecoveryProtection(historic,unrelated,
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)}).allowed,false);
+ const missing=clone(current);delete missing.files['config.json'];
+ assert.equal(selectPreservedRecoveryProtection(historic,missing,
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)}).allowed,false);
+ assert.equal(selectPreservedRecoveryProtection(historic,current,
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)}).baseline,current);
+ const unchanged=selectPreservedRecoveryProtection(historic,clone(historic));
+ assert.equal(unchanged.allowed,true);
+ assert.equal(unchanged.preservedWriterConfig,false);
+ // A pinned recovery must not silently bypass its approved CAS when a Writer
+ // configuration changes back to the historic value.
+ assert.equal(selectPreservedRecoveryProtection(historic,clone(historic),
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)}).code,
+  'RECOVERY_WRITER_CONFIG_CAS_NOT_VERIFIED');
+ assert.equal(selectPreservedRecoveryProtection(historic,clone(historic),
+  {approvedCurrentWriterConfigSha256:'a'.repeat(64)}).allowed,true);
+ assert.equal(selectPreservedRecoveryProtection({files:null,tasks:{}},current).allowed,false);
+});

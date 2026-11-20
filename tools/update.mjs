@@ -21,6 +21,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
+ selectPreservedRecoveryProtection,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1159,7 +1160,8 @@ export function protectedSnapshot() {
  return out;
 }
 
-export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
+export function makePorts(packageData,issueNumber,{recoveryOperator=false,
+ approvedRecoveryWriterConfigSha256=null}={}) {
  const {issue,manifest}=packageData,request={requestId:issue.requestId,chatId:issue.chatId,
   installedSha:manifest.installedSha,targetSha:manifest.targetSha,postOperation:manifest.postOperation};
  const ledgerFile=path.join(recordDir,request.requestId+'.json');
@@ -1622,8 +1624,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   prepareRecovery:async()=>{
    need(recoveryOperator,'RECOVERY_OPERATOR_REQUIRED');verifyRecoveryOperator();
    need(fs.existsSync(path.join(backupRoot,'PROTECTED_BEFORE.json')),'RECOVERY_PROTECTION_BASELINE_MISSING');
-   protectedBefore=json(path.join(backupRoot,'PROTECTED_BEFORE.json'));
-   need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
+   const originalProtection=json(path.join(backupRoot,'PROTECTED_BEFORE.json'));
+   // A separately approved independent recovery may pin the live Writer config
+   // only. Do not edit the historic baseline or permit any other Task/file drift.
+   need(approvedRecoveryWriterConfigSha256===null||recoveryOperator,
+    'RECOVERY_WRITER_CAS_REQUIRES_INDEPENDENT_OPERATOR');
+   const decision=selectPreservedRecoveryProtection(originalProtection,
+    protectedSnapshot(),{approvedCurrentWriterConfigSha256:
+     approvedRecoveryWriterConfigSha256});
+   need(decision.allowed,decision.code);
+   protectedBefore=decision.baseline;
    const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
    const wf=github('actions/workflows/pc-job.yml').state;
    if(windows.some(w=>!w.resumedAt)){
