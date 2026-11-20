@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -823,4 +823,63 @@ test('missing and multiple Task Exec actions are distinct hard-UNKNOWN without s
  assert.equal(two.status,'STATE_UNKNOWN');
  assert.equal(two.execActionCount,2);
  assert.equal(two.taskEnabled,null);
+});
+
+
+const C2505_FIXED_ID='pc-update-8f413b02-4bb7-4d99-b71f-64d9c51a294a';
+const C2505_FIXED_SHA='0f1effad0c58e8b7bd684aa638521180183ca902';
+function c2505Fixture(){
+ return {status:'STATUS',actualControllerSha:C2505_FIXED_SHA,
+  installedReadbackCode:null,ledgerReadbackCode:null,lockReadbackCode:null,
+  artifactReadbackCode:null,installLock:{held:true,recoveryRequired:true},
+  ledger:{requestId:C2505_FIXED_ID,issueNumber:2505,targetSha:C2505_FIXED_SHA,
+   status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
+   firstFail:'POSTCHECK_PENDING',postIssueNumber:2506,
+   workflowEnabled:null,intakePaused:false,
+   privateUnrelated:'secret-do-not-publish'},
+  artifacts:{schema:'ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1',
+   requestId:C2505_FIXED_ID,status:'OBSERVED',
+   artifacts:{backupRoot:'PRESENT',stageRoot:'PRESENT',snapshotRoot:'PRESENT',
+    stagedHost:'PRESENT',originalHost:'PRESENT',protectedBefore:'PRESENT',
+    previousHost:'PRESENT'},
+   backlog:{file:'PRESENT',windows:1,openWindows:0,replayCount:0},
+   lease:{directory:'PRESENT',ownerFile:'PRESENT',
+    recoveryMarker:'PRESENT',ownerMarkerMatch:true,
+    nonce:'secret-do-not-publish'}}};
+}
+test('C2505 exact fixed recovery read is bounded and cannot authorize lease release',()=>{
+ const result=inspect2505RecoveryReadonly(()=>c2505Fixture());
+ assert.equal(result.status,'READ_ONLY_OBSERVED');
+ assert.equal(result.actualControllerSha,C2505_FIXED_SHA);
+ assert.equal(result.ledgerFirstFail,'POSTCHECK_PENDING');
+ assert.equal(result.postIssueNumber,2506);
+ assert.equal(result.backup.protectedBefore,'PRESENT');
+ assert.equal(result.backlog.openWindows,0);
+ assert.equal(result.lease.held,true);
+ assert.equal(result.lease.recoveryRequired,true);
+ assert.equal(result.lease.ownerRequestIdentityVerified,null);
+ assert.equal(result.recoveryEligible,false);
+ assert.equal(result.installSuccessProven,false);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+ assert.equal(JSON.stringify(result).includes('secret-do-not-publish'),false);
+});
+test('C2505 reports unknown for wrong request, incomplete evidence or changing readback',()=>{
+ const wrong=c2505Fixture();wrong.ledger.requestId='pc-foreign';
+ assert.equal(project2505RecoveryReadonly(wrong).code,
+  'C2505_LEDGER_IDENTITY_UNVERIFIED');
+ const invalid=c2505Fixture();
+ invalid.artifacts.artifacts.snapshotRoot='UNSAFE';
+ assert.equal(project2505RecoveryReadonly(invalid).status,'STATE_UNKNOWN');
+ const truncated=c2505Fixture();truncated.artifactReadbackCode='UPDATE_ARTIFACTS_UNVERIFIED';
+ assert.equal(project2505RecoveryReadonly(truncated).status,'STATE_UNKNOWN');
+ let n=0;
+ const changed=inspect2505RecoveryReadonly(()=>{
+  const x=c2505Fixture();if(++n===2)x.artifacts.artifacts.stageRoot='ABSENT';
+  return x;
+ });
+ assert.equal(changed.code,'C2505_DOUBLE_READ_CHANGED');
+ assert.equal(inspect2505RecoveryReadonly(()=>{throw Error('private');}).code,
+  'C2505_READBACK_FAILED');
 });
