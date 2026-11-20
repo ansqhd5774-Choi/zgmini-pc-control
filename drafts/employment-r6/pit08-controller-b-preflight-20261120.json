@@ -1,0 +1,10 @@
+{
+  "kind": "W04_PIT08_SELECTIVE_B_PREAPPROVAL_DRAFT",
+  "installedSha": "d67f9f44e730f96abc9a4fd335bce60f5b453d06",
+  "targetSha": "4b4afe7b5493e252bf254d4a0ce29f444c2c2748",
+  "sourceMainSha": "33eb2b5ab021a132173ed3afb2179eb528c7addc",
+  "allowFiles": [
+    "controller/employment-r6-candidate-readonly.mjs"
+  ],
+  "status": "DRAFT_NOT_APPROVED"
+}
