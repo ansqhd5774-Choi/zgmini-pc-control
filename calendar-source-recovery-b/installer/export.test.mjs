@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {execFileSync} from 'node:child_process';
 import {sha,FILES,APPROVAL_SHA,SOURCE_ROOT,REPO,verifyRequest,verifyApproval,
  inspectSourceFile,inspectGit,collectSource,makeResult,resultText}
  from './export.mjs';
@@ -37,12 +38,18 @@ test('five expected parsers are sized, hashed and stay in allowed root',()=>with
   /CAL_SOURCE_B_PATH_SCOPE_STOP/);
 }));
 
-test('symlink is refused and original external file is never dereferenced',()=>withFixture(dir=>{
+test('symlink is refused and original external file is never dereferenced',t=>withFixture(dir=>{
  const file=path.join(dir,'lib','tic-calendar.mjs');
  const external=path.join(dir,'other.mjs');
  fs.writeFileSync(external,names['tic-calendar.mjs']);
  fs.unlinkSync(file);
- fs.symlinkSync(external,file);
+ try{fs.symlinkSync(external,file);}catch(error){
+  if(process.platform==='win32'&&error.code==='EPERM'){
+   t.skip('Windows isolated runner cannot create a test symlink; no ACL bypass');
+   return;
+  }
+  throw error;
+ }
  assert.throws(()=>inspectSourceFile(dir,'lib/tic-calendar.mjs'),
   /CAL_SOURCE_B_SYMLINK_OR_TYPE_STOP/);
 }));
@@ -82,7 +89,9 @@ test('Git HEAD, exact root and per-file provenance are collected',()=>withFixtur
 }));
 
 test('approved B manifest is sha-pinned and tampered status fails closed',()=>{
- const bytes=fs.readFileSync(new URL('../approval.json',import.meta.url));
+ const bytes=execFileSync('git',['show','HEAD:calendar-source-recovery-b/approval.json']);
+ const checkout=fs.readFileSync(new URL('../approval.json',import.meta.url),'utf8');
+ assert.equal(checkout.replace(/\r\n/g,'\n'),bytes.toString('utf8'));
  assert.equal(sha(bytes),APPROVAL_SHA);
  assert.equal(verifyApproval(bytes).sourceRoot,SOURCE_ROOT);
  const m=JSON.parse(bytes);
