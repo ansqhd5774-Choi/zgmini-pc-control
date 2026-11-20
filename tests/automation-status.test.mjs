@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
-import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -328,4 +328,38 @@ test('missing or malformed supervisor timestamp remains unverified',()=>{
  assert.equal(invalid.statusPid,null);
  assert.equal(invalid.childCount,0);
  assert.equal(invalid.mode,null);
+});
+
+test('one-shot request reconciliation exposes bounded artifact status, never claims recovery success',()=>{
+ const id='pc-update-8f413b02-4bb7-4d99-b71f-64d9c51a294a';
+ const snapshot={
+  status:'STATUS',actualControllerSha:'0'.repeat(40),installedReadbackCode:null,
+  ledger:{status:'RECOVERY_REQUIRED',code:'POSTCHECK_OUTCOME_UNKNOWN',phase:'RECOVERY_REQUIRED',
+   postIssueNumber:2506},
+  installLock:{held:true,recoveryRequired:true},
+  artifacts:{schema:'ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1',requestId:id,
+   status:'OBSERVED',artifacts:{backupRoot:'PRESENT',protectedBefore:'PRESENT'},
+   backlog:{file:'PRESENT',windows:1,openWindows:0,replayCount:0},
+   lease:{directory:'PRESENT',recoveryMarker:'PRESENT',ownerMarkerMatch:true}},
+  guidance:{state:'RECOVERY_REQUIRED',next:'USE_CONTROLLER_RECOVERY_RUNBOOK'},
+ };
+ const r=summarizeRequestedRecoveryEvidence(snapshot);
+ assert.equal(r.requestId,id);
+ assert.equal(r.historicalCode,'POSTCHECK_OUTCOME_UNKNOWN');
+ assert.equal(r.postIssueNumber,2506);
+ assert.equal(r.artifacts.backupRoot,'PRESENT');
+ assert.equal(r.recoveryRequired,true);
+ assert.equal(r.installSuccessProven,false);
+ assert.equal(r.recoveryComplete,false);
+ assert.equal(r.originalRequestRetried,false);
+ assert.equal(r.operationalWrites,0);
+});
+test('request recovery summary fails closed when evidence not observed',()=>{
+ assert.equal(summarizeRequestedRecoveryEvidence(null),null);
+ const r=summarizeRequestedRecoveryEvidence({status:'STATUS',ledger:{code:'UNSAFE / SECRET'},
+  installLock:{held:true},artifacts:null,artifactReadbackCode:'UPDATE_ARTIFACTS_UNVERIFIED'});
+ assert.equal(r.historicalCode,null);
+ assert.equal(r.artifactReadbackCode,'UPDATE_ARTIFACTS_UNVERIFIED');
+ assert.equal(r.artifacts,null);
+ assert.equal(r.installSuccessProven,false);
 });
