@@ -97,7 +97,7 @@ function r6PublicationProjection(report,root){
  const failure=Array.isArray(report?.failures)
   ?report.failures.find(item=>item?.id==='employment-r6-one-year-publication'):null;
  if(!raw&&!failure)return null;
- const safeDate=typeof raw?.asOfDate==='string'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
+ const safeDate=typeof raw?.asOfDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
  const sourceStoredAt=Number.isSafeInteger(raw?.sourceStoredAt)&&raw.sourceStoredAt>0?raw.sourceStoredAt:null;
  const projected={status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
   asOfDate:safeDate,sourceStoredAt,
