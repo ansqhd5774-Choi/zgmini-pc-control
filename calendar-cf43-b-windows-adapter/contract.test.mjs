@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
 import {BASE,SOURCE_ROOT,CONFIG_PATH,CORE_TASK,CORE_TASK_XML_SHA,
  APPROVED,FILES,R17_PROTECTED,hash,verifyBefore,verifyCommitted,
  replaceSourceOnly} from './contract.mjs';
@@ -41,4 +42,10 @@ test('JSON pointer changes only config.source preserving adjacent bytes',()=>{
  assert.equal(updated.toString('utf8'),config.toString('utf8').replace(BASE,next));
  assert.throws(()=>replaceSourceOnly(config,'a'.repeat(40),next),
   /CAL_CF43_POINTER_SOURCE_STOP/);
+});
+
+test('020 completed one-shot cannot be retriggered; contract and recovery fixtures remain',()=>{
+ assert.equal(existsSync(new URL('../.github/workflows/pc-calendar-cf43-two-approved-b-once.yml',import.meta.url)),false);
+ assert.equal(FILES.length,2);
+ assert.equal(verifyBefore(before()).base,BASE);
 });
