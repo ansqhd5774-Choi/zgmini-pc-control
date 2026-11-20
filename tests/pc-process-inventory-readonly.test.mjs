@@ -912,7 +912,12 @@ test('C2505 byte proof verifies saved Controller closure and baseline without ex
   write(path.join(root,'snapshot',rel),bytes);
  }
  const savedHost=JSON.stringify({controllerSourceSha:old,controllerFiles:files});
- const baseline={files:{'config.json':'a'},tasks:{'ZGMINI-PC-Local-Core':'b'}};
+ const writerDataRoot=path.join(dir,'writer-data');
+ const writerBytes=JSON.stringify({fixture:true});
+ const writerSha=createHash('sha256').update(writerBytes).digest('hex');
+ const baseline={files:{'config.json':writerSha},tasks:{'ZGMINI-PC-Local-Core':'b'}};
+ write(path.join(writerDataRoot,'config.json'),writerBytes);
+ write(path.join(maintenanceRoot,'backlog',id+'.json'),{schema:'ZGMINI_PC_BACKLOG_V1',requestId:id,windows:[{pausedAt:stamp[0],resumedAt:stamp[1]}],replays:{}});
  write(path.join(maintenanceRoot,'ledger',id+'.json'),ledger);
  write(path.join(maintenanceRoot,'leases/controller-install/owner.json'),owner);
  write(path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),marker);
@@ -920,7 +925,8 @@ test('C2505 byte proof verifies saved Controller closure and baseline without ex
  write(path.join(root,'snapshot/host.json'),savedHost);
  write(path.join(root,'previous-host.json'),savedHost);
  write(path.join(root,'PROTECTED_BEFORE.json'),baseline);
- const args={controlRoot,maintenanceRoot,protectedProbe:()=>baseline,pidProbe:()=>false};
+ const args={controlRoot,maintenanceRoot,writerDataRoot,
+  protectedProbe:()=>baseline,pidProbe:()=>false};
  const good=inspect2505RecoveryByteProof(args);
  assert.equal(good.status,'READ_ONLY_OBSERVED');
  assert.equal(good.snapshotFilesVerified,true);
@@ -932,24 +938,39 @@ test('C2505 byte proof verifies saved Controller closure and baseline without ex
  assert.equal(good.currentTargetMatches,true);
  assert.equal(good.leaseBoundToOriginalRequest,null);
  assert.equal(good.recoveryEligible,false);
+ assert.equal(good.casDigests.currentWriterConfigSha256,writerSha);
+ assert.match(good.casDigests.ownerSha256,/^[a-f0-9]{64}$/);
+ assert.match(good.casDigests.markerSha256,/^[a-f0-9]{64}$/);
+ assert.match(good.casDigests.ledgerSha256,/^[a-f0-9]{64}$/);
+ assert.match(good.casDigests.snapshotHostSha256,/^[a-f0-9]{64}$/);
+ assert.match(good.casDigests.protectedBeforeSha256,/^[a-f0-9]{64}$/);
+ assert.match(good.casDigests.backlogSha256,/^[a-f0-9]{64}$/);
+ assert.ok(Date.parse(good.writerConfigModifiedAtUtc)>0);
  assert.equal(good.operationalWrites,0);
  assert.equal(good.providerCalls,0);
  assert.equal(good.d1Writes,0);
  assert.equal(JSON.stringify(good).includes(nonce),false);
  const changedKnown=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({
-  files:{'config.json':'different'},
+  files:{'config.json':writerSha},
   tasks:{'ZGMINI-PC-Local-Core':'different'}
  })});
  assert.equal(changedKnown.protectedBaselineMatchesCurrent,false);
  assert.equal(changedKnown.protectedDifferenceClass,'KNOWN_SCOPES');
- assert.deepEqual(changedKnown.protectedDifferenceScopes,['WRITER_CONFIG','LOCAL_CORE_TASK']);
+ assert.deepEqual(changedKnown.protectedDifferenceScopes,['LOCAL_CORE_TASK']);
  const extraKey=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({
-  files:{'config.json':'a','PRIVATE_PATH':'private'},tasks:{'ZGMINI-PC-Local-Core':'b'}
+  files:{'config.json':writerSha,'PRIVATE_PATH':'private'},tasks:{'ZGMINI-PC-Local-Core':'b'}
  })});
  assert.equal(extraKey.protectedDifferenceClass,'UNVERIFIED_EXTRA_KEYS');
  assert.equal(JSON.stringify(extraKey).includes('PRIVATE_PATH'),false);
- const drift=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({changed:true})});
+ const drift=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({
+  files:{'config.json':writerSha},tasks:{'ZGMINI-PC-Local-Core':'changed'}
+ })});
  assert.equal(drift.protectedBaselineMatchesCurrent,false);
+ // A different live Writer hash than the injected protected snapshot must STOP.
+ const changingConfig=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({
+  files:{'config.json':'a'.repeat(64)},tasks:{'ZGMINI-PC-Local-Core':'b'}
+ })});
+ assert.equal(changingConfig.code,'C2505_WRITER_CONFIG_READBACK_DRIFT');
  const modulePath=path.join(root,'snapshot/controller/entry.mjs');
  write(modulePath,'changed');
  assert.equal(inspect2505RecoveryByteProof(args).snapshotFilesVerified,false);

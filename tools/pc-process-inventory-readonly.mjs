@@ -403,13 +403,15 @@ export function inspect2505RecoveryByteProof({
  fileSystem=fs,
  maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
  controlRoot='E:/ZGmini/automation/pc-control',
+ writerDataRoot='E:/ZGmini/data/pc-writer',
  protectedProbe=protectedSnapshot,
  pidProbe=pid=>{try{process.kill(pid,0);return true;}catch(e){return e?.code==='ESRCH'?false:null;}}
 }={}){
  const unknown=code=>({status:'STATE_UNKNOWN',code,
   snapshotFilesVerified:null,previousHostMatchesSnapshot:null,
   protectedBaselineMatchesCurrent:null,protectedDifferenceScopes:null,
-  protectedDifferenceClass:'UNVERIFIED',ownerMarkerMatches:null,
+  protectedDifferenceClass:'UNVERIFIED',casDigests:null,
+  writerConfigModifiedAtUtc:null,ownerMarkerMatches:null,
   ownerPidPresent:null,leaseTimelineAligned:null,currentTargetMatches:null,
   leaseBoundToOriginalRequest:null,recoveryEligible:false,
   operationalWrites:0,providerCalls:0,d1Writes:0});
@@ -421,7 +423,9 @@ export function inspect2505RecoveryByteProof({
   currentHost:path.join(controlRoot,'host.json'),
   snapshotHost:path.join(root,'snapshot/host.json'),
   previousHost:path.join(root,'previous-host.json'),
-  protectedBefore:path.join(root,'PROTECTED_BEFORE.json')
+  protectedBefore:path.join(root,'PROTECTED_BEFORE.json'),
+  backlog:path.join(maintenanceRoot,'backlog',C2505_ID+'.json'),
+  writerConfig:path.join(writerDataRoot,'config.json')
  };
  const readFixed=(file,max=131072)=>{
   const st=fileSystem.lstatSync(file);
@@ -437,6 +441,16 @@ export function inspect2505RecoveryByteProof({
   const ledger=parse('ledger'),owner=parse('owner'),marker=parse('marker');
   const nowHost=parse('currentHost'),savedHost=parse('snapshotHost');
   const baseline=parse('protectedBefore');
+  const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+  const casDigests={ledgerSha256:sha256(start.ledger),
+   ownerSha256:sha256(start.owner),markerSha256:sha256(start.marker),
+   snapshotHostSha256:sha256(start.snapshotHost),
+   protectedBeforeSha256:sha256(start.protectedBefore),
+   backlogSha256:sha256(start.backlog),
+   currentWriterConfigSha256:sha256(start.writerConfig)};
+  const writerStat=fileSystem.lstatSync(fixed.writerConfig);
+  const writerConfigModifiedAtUtc=Number.isFinite(writerStat.mtimeMs)?
+   new Date(writerStat.mtimeMs).toISOString():null;
   if(ledger.requestId!==C2505_ID||ledger.issueNumber!==2505||
     ledger.targetSha!==C2505_TARGET||ledger.firstFail!=='POSTCHECK_PENDING'||
     ledger.status!=='RECOVERY_REQUIRED')return unknown('C2505_ORIGINAL_LEDGER_UNVERIFIED');
@@ -467,6 +481,10 @@ export function inspect2505RecoveryByteProof({
   try{
    const currentProtected=protectedProbe();
    protectedBaselineMatchesCurrent=JSON.stringify(currentProtected)===JSON.stringify(baseline);
+   // The current protection snapshot and our pinned Writer byte hash must
+   // refer to exactly the same observation. Otherwise fail closed.
+   if(currentProtected?.files?.['config.json']!==casDigests.currentWriterConfigSha256)
+    return unknown('C2505_WRITER_CONFIG_READBACK_DRIFT');
    // Only these six previously protected fixed names may be reported.
    // Do not disclose hashes, raw task XML, configured paths or arbitrary keys.
    const known=[
@@ -494,11 +512,13 @@ export function inspect2505RecoveryByteProof({
   }catch{/* Scheduler read unavailable, not drift */}
   const currentTargetMatches=nowHost.controllerSourceSha===C2505_TARGET;
   const stable=Object.entries(fixed).every(([k,p])=>readFixed(p).equals(start[k]));
-  if(!stable)return unknown('C2505_PROOF_FILES_CHANGED');
+  if(!stable||fileSystem.lstatSync(fixed.writerConfig).mtimeMs!==writerStat.mtimeMs)
+   return unknown('C2505_PROOF_FILES_CHANGED');
   return {status:'READ_ONLY_OBSERVED',code:'C2505_BYTE_PROOF_OBSERVED',
    snapshotFilesVerified,previousHostMatchesSnapshot,
    protectedBaselineMatchesCurrent,protectedDifferenceScopes,
-   protectedDifferenceClass,ownerMarkerMatches,
+   protectedDifferenceClass,casDigests,writerConfigModifiedAtUtc,
+   ownerMarkerMatches,
    ownerPidPresent:typeof pidPresent==='boolean'?pidPresent:null,
    leaseTimelineAligned,currentTargetMatches,
    // Only the original B operator could attest exact request-owner lineage.
