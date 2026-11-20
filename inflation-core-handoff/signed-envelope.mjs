@@ -2,7 +2,7 @@
 // approval issuance, Task scheduling, or installed signing key is provided.
 // A trusted, PINNED receiver must supply a private signing key from its
 // existing authorized secure store. Never accept a key from an Issue/manifest.
-import {randomUUID,sign,createPrivateKey} from 'node:crypto';
+import {KeyObject,randomUUID,sign,createPrivateKey} from 'node:crypto';
 import path from 'node:path';
 import {assertAuthenticatedCoreHandoff} from './contract.mjs';
 export const W01_HANDOFF_ENVELOPE_SCHEMA='ZGMINI_W01_CORE_HANDOFF_SIGNED_V1';
@@ -31,7 +31,8 @@ export function signCoreHandoff({authorization,privateKey,now=Date.now(),nonce=r
  const auth=assertAuthenticatedCoreHandoff(authorization);
  if(!Number.isSafeInteger(now)||now<1||!UUID.test(nonce))fail();
  let key;
- try{key=createPrivateKey(privateKey);}catch{fail();}
+ try{key=privateKey instanceof KeyObject&&privateKey.type==='private'?
+  privateKey:createPrivateKey(privateKey);}catch{fail();}
  if(key.asymmetricKeyType!=='ed25519')fail();
  const e={
   schema:W01_HANDOFF_ENVELOPE_SCHEMA,
