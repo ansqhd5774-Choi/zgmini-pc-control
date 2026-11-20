@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2,R6_B_APPROVAL_V3}
+import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2,R6_B_APPROVAL_V3,isApprovedR6RuntimeMode,verifyInstalledR6DolManualOverlay}
  from './operation.mjs';
 
 const uid='d3ac6032-49c1-47e6-98d1-d7adeba91a7c';
@@ -219,4 +219,27 @@ test('malformed null approval fails closed with the documented approval code',()
  request.approvalManifestSha256=hash(input.approvalBytes);
  input.event.issue.body=JSON.stringify(request);
  assert.throws(()=>authorizeR6RegisteredB(input),/R6_B_EFFECT_APPROVAL_STOP/);
+});
+
+test('027 DOL manual source preflight ignores scheduled-auto flags, not identity or enabled runtime',()=>{
+ const sha='a'.repeat(40);
+ const config={enabled:true,collectionTarget:'pc',source:sha,
+  employmentR6AutoCollection:false,employmentR6OneYearAutoPublication:false};
+ assert.equal(isApprovedR6RuntimeMode(config,sha,true),true);
+ assert.equal(isApprovedR6RuntimeMode(config,sha),false);
+ assert.equal(isApprovedR6RuntimeMode({...config,employmentR6AutoCollection:true},sha),false);
+ assert.equal(isApprovedR6RuntimeMode({...config,employmentR6AutoCollection:true,
+  employmentR6OneYearAutoPublication:true},sha),true);
+ for(const wrong of [{...config,enabled:false},
+  {...config,collectionTarget:'cloud'},{...config,source:'b'.repeat(40)}])
+  assert.equal(isApprovedR6RuntimeMode(wrong,sha,true),false);
+});
+test('027 manual DOL preflight remains restricted to three approval-pinned source files',()=>{
+ const a=['employment-r6-provider','employment-r6-collector','employment-r6-scheduler']
+  .map(n=>({path:'lib/market-score/'+n+'.mjs',afterSha256:'a'.repeat(64)}));
+ for(const files of [a.slice(1),[...a,a[0]],[a[0],a[1],a[1]],
+  a.map((v,i)=>i===2?{...v,path:'lib/market-score/other.mjs'}:v),
+  a.map((v,i)=>i===2?{...v,afterSha256:'bad'}:v)])
+   assert.throws(()=>verifyInstalledR6DolManualOverlay({overlay:{files}}),
+    /R6_DOL_FILE_SCOPE_STOP/);
 });
