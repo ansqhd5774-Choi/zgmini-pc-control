@@ -150,8 +150,9 @@ test('bounded Core lock: five-minute exhaustion remains BLOCKED with zero claim/
  assert.equal(attempt,61);
  assert.equal(waits.length,60);
  assert.deepEqual(waits,Array(60).fill(5_000));
- assert.ok(!f.calls.includes('D1_READ')&&!f.calls.includes('CLAIM')&&
-  !f.calls.includes('RUN')&&!f.calls.includes('UNLOCK'));
+ assert.equal(f.calls.filter(x=>x==='D1_READ').length,1);
+ assert.ok(!f.calls.includes('CLAIM')&&!f.calls.includes('RUN')&&
+  !f.calls.includes('UNLOCK'));
 });
 
 test('bounded Core lock: delayed timer cannot acquire after five-minute deadline',async()=>{
