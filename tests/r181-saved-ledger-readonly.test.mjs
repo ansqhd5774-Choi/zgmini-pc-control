@@ -75,6 +75,35 @@ test('arbitrary 14 symbols, unavailable bars, bad days, bad count all remain inc
   assert.equal(JSON.stringify(out).includes('FAKE'),false);
  }
 });
+test('real STOP is preserved without raw reason and partial coverage cannot become PASS',()=>{
+ const stopped={...ledger(),status:'STOP',
+  reason:'https://private.invalid/secret?token=HIDDEN',
+  coverage:Object.fromEntries(SYMBOLS.slice(0,5).map(k=>[k,coverage()[k]])),
+  providerCalls:6,at:'2026-11-19T05:00:02.769Z'};
+ const out=assessSavedR181Ledger(stopped);
+ assert.equal(out.reportedState,'STOP');
+ assert.equal(out.coverageStatus,'LEDGER_REPORTED_INCOMPLETE');
+ assert.equal(out.matchingRows,5);
+ assert.equal(out.providerCalls,6);
+ const safe=sanitizeSavedLedgerResult({
+  schema:'ZGMINI_R181_SAVED_LEDGER_RESULT_V1',status:'PASS',
+  code:'R181_SAVED_LEDGER_READONLY',requestId,
+  sourcePinVerified:true,controlSourceSha:controlSha,coverage:out
+ },req(),env());
+ assert.equal(safe.status,'PASS');
+ assert.equal(safe.coverage.reportedState,'STOP');
+ assert.equal(JSON.stringify(safe).includes('private.invalid'),false);
+ assert.equal(JSON.stringify(safe).includes('HIDDEN'),false);
+});
+test('STOP with retained 14/14 metadata is still failure, not collection-complete',()=>{
+ const out=assessSavedR181Ledger({...ledger(),status:'STOP',
+  reason:'REDACTED_NETWORK_FAILURE'});
+ assert.equal(out.reportedState,'STOP');
+ assert.equal(out.coverageStatus,'LEDGER_REPORTED_INCOMPLETE');
+ assert.equal(out.matchingRows,14);
+ const json=JSON.stringify(out);
+ assert.equal(json.includes('REDACTED_NETWORK_FAILURE'),false);
+});
 test('one-shot execution never starts collector and only invokes read-only inspection',()=>{
  let called=0;
  const out=executeSavedLedgerA({event:event(),env:env(),inspect:()=>{
