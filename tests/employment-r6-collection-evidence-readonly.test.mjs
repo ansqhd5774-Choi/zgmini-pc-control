@@ -622,11 +622,21 @@ function seedEta539Parity(db,{latestInvalid=false}={}){
    "VALUES(?,?,?,?,?,?,?,?,?,?)");
  for(const st of STATES){
   const value=st==='AL'?0:300;
-  const hash=createHash('sha256').update(JSON.stringify({reportDate:report,reflectedWeek:week,st,value})).digest('hex');
+  const hash=createHash('sha256').update(JSON.stringify({reflectedWeek:week,reportDate:report,st,value})).digest('hex');
   insert.run('STATE_INITIAL_CLAIMS','STATE',st,week,value,
    'DOL_ETA','ETA539:C3',hash,'ETA539:RPTDATE:'+report,stored);
  }
 }
+test('W04 PIT0407 stable field order reproduces actual parser sourceHash, not insertion order',()=>{
+ const item={st:'AL',reflectedWeek:'2026-10-31',reportDate:'2026-11-04',value:0};
+ const canonical=JSON.stringify(Object.fromEntries(Object.keys(item).sort().map(k=>[k,item[k]])));
+ const hash=createHash('sha256').update(canonical).digest('hex');
+ assert.equal(hash,createHash('sha256').update(JSON.stringify({reflectedWeek:item.reflectedWeek,
+  reportDate:item.reportDate,st:item.st,value:item.value})).digest('hex'));
+ assert.notEqual(hash,createHash('sha256').update(JSON.stringify({reportDate:item.reportDate,
+  reflectedWeek:item.reflectedWeek,st:item.st,value:item.value})).digest('hex'));
+});
+
 test('W04 PIT0407 raw snapshot c3 matches stored Current with genuine zero, no raw disclosure or mutation',t=>{
  const {data,file,storage}=fixture(t),db=createDb(file);
  seed(db);seedEta539Parity(db);db.close();
