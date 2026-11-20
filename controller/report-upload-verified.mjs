@@ -9,8 +9,8 @@ export function resolveUploadPolicy(policyBytes,{pointer,runId,attempt,seat}={})
  }catch{}
  const report=pointer?.report;
  if(!Number.isSafeInteger(pointer?.issueNumber)||pointer.issueNumber<1||
-    !/^\\d{1,20}$/.test(String(runId??''))||
-    !/^\\d{1,3}$/.test(String(attempt??''))||
+    !/^\d{1,20}$/.test(String(runId??''))||
+    !/^\d{1,3}$/.test(String(attempt??''))||
     !/^[1-6]$/.test(String(seat??''))||
     report?.schema!=='ZGMINI_PC_RESULT_V1'||
     report.jobId!==`run-${runId}-${attempt}-seat-${seat}`||
