@@ -34,6 +34,9 @@ test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-d30-readonly-preview-once.yml']),['calendar021']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-source-preflight-once.yml']),['calendar022']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-source-recovery-once.yml']),['calendar023']);
+ assert.deepEqual(selectGroups(['.github/workflows/pc-census-cdn-connectivity-once.yml']),['census025']);
+ assert.deepEqual(selectGroups(['tools/http32-census-cdn-once.mjs']),['census025']);
+ assert.deepEqual(selectGroups(['tests/http32-census-cdn-once.test.mjs']),['census025']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-twofile-b-install-once.yml']),['retiredOneShots']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-writer-b-1063-recovery-once.yml']),['retiredOneShots']);
  assert.deepEqual(selectGroups(['tests/retired-one-shots-20261120.test.mjs']),['retiredOneShots']);

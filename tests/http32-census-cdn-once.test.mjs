@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
 import {verifyExactIssue,probeCensusCdn,URL,ISSUE_TITLE,SCHEMA} from '../tools/http32-census-cdn-once.mjs';
 const requestId='5e379064-b5c9-486c-a7c9-1862634b42b7';
 function permitted(){
@@ -68,4 +69,11 @@ test('network exception terminates without retries, raw exception or credentials
  assert.equal(r.code,'NETWORK_OR_TIMEOUT_FAILED');
  assert.equal(r.automaticRetries,0);
  assert.ok(!JSON.stringify(r).includes('SENSITIVE_SECRETS_HERE'));
+});
+
+test('025 completed Census CDN Issue intake is retired while the fixed read-only probe remains',()=>{
+ assert.equal(existsSync(new URL('../.github/workflows/pc-census-cdn-connectivity-once.yml',import.meta.url)),false);
+ assert.equal(existsSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url)),true);
+ assert.equal(URL,'https://cdn.www.census.gov/econ/bfs/csv/bfs_monthly.csv');
+ assert.equal(ISSUE_TITLE,'pc-census-cdn-connectivity-once');
 });
