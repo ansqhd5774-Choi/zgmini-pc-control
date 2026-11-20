@@ -15,6 +15,10 @@ jobs:
       github.event.pull_request.head.repo.full_name == 'ansqhd5774-Choi/zgmini-pc-control'
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 4
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.autocrlf
+      GIT_CONFIG_VALUE_0: 'false'
     defaults:
       run:
         shell: cmd
