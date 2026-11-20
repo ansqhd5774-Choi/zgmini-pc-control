@@ -1,0 +1,132 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "d38f9d9e3b739090e813196344da40b6f77814de",
+  "baseHead": "7965b337cf69a6d48cb152b1594833d64266a677",
+  "baseConfigSourceSha": "7965b337cf69a6d48cb152b1594833d64266a677",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/theme-paid-hourly-source.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "3e3d908dafef55efe7c9ae87b1ac5d40289116a387a9e9e6f62302c7cd218976"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-registry.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4d2a028b795e744cdd8dd7908057eb76ea35d8d6d39bfa56b7c9385828d7e8d6"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-calculate.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "437e173be3a216825dfd4462f451e6286b2174959f5277e0b1c40b712db8fe5c"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-cycle.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "56b133606275f39cbbacc96c4f12de13a543f729a3e5b13f2c3d028d3d74df52"
+    },
+    {
+      "path": "scripts/pc-writer/theme-r25-pure.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "e69bc3c4d04fabcde0f19a9b2a7d7f919d6e554dbb8b915a9d6cf02d72dbbbc6"
+    },
+    {
+      "path": "scripts/pc-writer/theme-r32-pure.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "ff2e374d5d6901755f8eae79ae45b49c53219d386b817fd682b3978b3e804990"
+    },
+    {
+      "path": "scripts/pc-writer/theme-space-basket-pure.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "c697e214c2d006804ac477028cf86548a6cc8e6eddb4aea99ddea0a2839f8e10"
+    },
+    {
+      "path": "scripts/pc-writer/theme-optional-adaptive-r2.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "f794f5a2005ab8da34fbd12b1e16e0519445cfadca034e29d9cb8d0dfffc3cd3"
+    },
+    {
+      "path": "scripts/pc-writer/theme-optional-pair-weight-r3.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "bcaa39ef0351c5f65acaba2560c1234b215c43e223003742e919a9b01a0904d6"
+    },
+    {
+      "path": "worker/theme-paid-contract.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "15230f41e5f2e5f51847b47eb6f57e006f83883e46573b2a21c279edf584283b"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "a79eaddb52774343a3c69609698064200305e4854117a04f8a26e075f6772810",
+      "afterSha256": "67e7e14ad13e19e1fb00b6183581d3ceb86c5f98f729937bec6a4a27640e7816",
+      "candidateSha256": "30ddc7ee3c3a52a0590aafb6e14403a1eb7ae73b722b04c7223f44c7cb0c1474",
+      "insertions": [
+        {
+          "anchor": " const collection=spawnSync(process.execPath,[path.join(here,'collect-local.mjs'),...(lane==='korea'?['--korea']:[])],{windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:30*60000});",
+          "position": "before",
+          "text": " // Independent registered-theme lane; a source wait never blocks Core or sector updates.\n if(lane==='core'){\n  try{const {runPaidThemeCycle}=await import('./theme-paid-cycle.mjs');\n   console.log('THEME_PAID '+JSON.stringify(await runPaidThemeCycle(base,{publish:process.argv.includes('--publish')})));\n  }catch(e){const report={status:'FAILED_PREVIOUS_DATA_PRESERVED',code:/^PAID_[A-Z0-9_]+$/.test(e.code??'')?e.code:'PAID_THEME_RUNTIME_FAILED',d1Outcome:'CHECK_STORED_RESULT_BEFORE_RETRY'};console.warn('THEME_PAID '+JSON.stringify(report));try{save(path.join(base,'marketparquet-paid','theme-last-run.json'),report);}catch{}}\n }\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/local-env.mjs",
+      "sha256": "8b5a4f388ebbc94c37d6d50478344e4666140f1bee5d70c9315dfde1e584029c"
+    },
+    {
+      "path": "scripts/pc-writer/marketparquet-paid-store.mjs",
+      "sha256": "4ba0a487868a2a028f080c06bdde75f41ffef5c8018541a0a43e7bd15acdfc23"
+    },
+    {
+      "path": "scripts/pc-writer/sector-fear-greed-r3-rolling-local.mjs",
+      "sha256": "961793b7041b021c2eab4be623288c8383d02f3f3ecac643b538dce44afea623"
+    },
+    {
+      "path": "scripts/pc-writer/theme-optional-score-r188.mjs",
+      "sha256": "36d45cd82af507f5b75a5a96413c626b50c830ca2aa1291bbb64f113cd0e3366"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
