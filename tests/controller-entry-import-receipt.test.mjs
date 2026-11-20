@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -18,12 +19,20 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   // Reproduce a selectively installed engine with an absent transitive import.
   fs.writeFileSync(path.join(root,'controller','engine.mjs'),
    "import './r54-runtime-binding-readonly.mjs'; export const executeJob=()=>{};\n");
-  fs.writeFileSync(path.join(root,'host.json'),JSON.stringify({controllerFiles:{}}));
   fs.mkdirSync(path.join(root,'config'));
   const repository='ansqhd5774-Choi/zgmini-pc-control';
   fs.writeFileSync(path.join(root,'config','operations.json'),JSON.stringify({
    controlRepository:repository,sourceRepository:'ansqhd5774-Choi/zgmini',
    allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60}}
+  }));
+  // A valid installed manifest must attest a nonempty, scoped source inventory.
+  const paths=['controller/entry.mjs','controller/common.mjs',
+   'controller/preimage-manifest-contract.mjs','controller/engine.mjs',
+   'config/operations.json'];
+  const controllerFiles=Object.fromEntries(paths.map(rel=>[rel,
+   createHash('sha256').update(fs.readFileSync(path.join(root,rel))).digest('hex')]));
+  fs.writeFileSync(path.join(root,'host.json'),JSON.stringify({
+   controllerSourceSha:'b'.repeat(40),controllerFiles
   }));
   const request={schema:'ZGMINI_PC_JOB_V1',requestId:'pc-test-import-failure-0001',
    chatId:'chat-test-import-failure',operation:'core-status',
@@ -56,7 +65,14 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   // receipt. The unchanged policy and original Issue identity remain valid.
   const hostFile=path.join(root,'host.json');
   const reportFile=path.join(root,'reports',`${runId}-1-${seat}.json`);
-  for(const hostBytes of [null,'{not valid json','null','[]','"not a host"','{}','{"controllerFiles":null}','{"controllerFiles":[]}']){
+  for(const hostBytes of [null,'{not valid json','null','[]','"not a host"',
+   '{}','{"controllerFiles":null}','{"controllerFiles":[]}',
+   JSON.stringify({controllerSourceSha:'b'.repeat(40),controllerFiles:{}}),
+   JSON.stringify({controllerSourceSha:'bad',controllerFiles}),
+   JSON.stringify({controllerSourceSha:'b'.repeat(40),
+    controllerFiles:{...controllerFiles,'controller/../unverified.mjs':'c'.repeat(64)}}),
+   JSON.stringify({controllerSourceSha:'b'.repeat(40),
+    controllerFiles:{...controllerFiles,'controller/entry.mjs':'bad'}})]){
    fs.rmSync(reportFile,{force:true});
    if(hostBytes===null)fs.rmSync(hostFile,{force:true});
    else fs.writeFileSync(hostFile,hostBytes);
