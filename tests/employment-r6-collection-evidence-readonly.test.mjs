@@ -673,6 +673,7 @@ test('W04 PIT0407 newer missing c3 revision does not reuse older valid state-wee
 test('W04 PIT0407 raw metadata reports only failed field category',t=>{
  for(const [column,value,reason] of [
   ['snapshot_id',null,'SNAPSHOT_ID_TYPE'],
+  ['chunk_count','invalid-count','CHUNK_COUNT_TYPE'],
   ['chunk_count',0,'CHUNK_COUNT_RANGE'],
   ['body_sha256','invalid','BODY_SHA256_FORMAT'],
   ['retrieved_at','not-a-date','RETRIEVED_AT_FORMAT'],
