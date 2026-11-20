@@ -252,10 +252,15 @@ function inspectEta539RawCurrentParity(db){
    "AND request_key IN ('DOL_ETA539:60w','DOL_ETA539:112w','DOL_ETA539:530w','DOL_ETA539:600w') "+
    "AND chunk_index=0 ORDER BY retrieved_at DESC LIMIT 1").get();
  if(!head)return fail('RAW_SNAPSHOT_NOT_STORED');
- if(typeof head.snapshot_id!=='string'||!Number.isSafeInteger(head.chunk_count)
-   ||head.chunk_count<1||head.chunk_count>ETA539_MAX_CHUNKS
-   ||!NATIONAL_RAW_HASH.test(head.body_sha256??'')
-   ||!Number.isFinite(Date.parse(head.retrieved_at??'')))return fail('RAW_METADATA_INVALID');
+ // Return only the failed field category; never expose snapshot identifiers,
+ // timestamps, raw body, or hashes in public job results.
+ const metadataReason=typeof head.snapshot_id!=='string'?'SNAPSHOT_ID_TYPE'
+  :!Number.isSafeInteger(head.chunk_count)?'CHUNK_COUNT_TYPE'
+  :head.chunk_count<1||head.chunk_count>ETA539_MAX_CHUNKS?'CHUNK_COUNT_RANGE'
+  :!NATIONAL_RAW_HASH.test(head.body_sha256??'')?'BODY_SHA256_FORMAT'
+  :!Number.isFinite(Date.parse(head.retrieved_at??''))?'RETRIEVED_AT_FORMAT'
+  :null;
+ if(metadataReason)return {...fail('RAW_METADATA_INVALID'),metadataReason};
  const chunks=db.prepare('SELECT chunk_index,chunk_count,body_sha256,body_chunk FROM '+
    rawTable+' WHERE snapshot_id=? ORDER BY chunk_index LIMIT 65').all(head.snapshot_id);
  if(chunks.length!==head.chunk_count||chunks.some((c,i)=>c.chunk_index!==i
