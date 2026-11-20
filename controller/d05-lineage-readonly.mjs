@@ -99,9 +99,9 @@ export function inspectD05LineageReadonly(dataRoot,{fileSystem=fs,approvedSource
       !internallyConsistent||row.inputScope!=='SELECTED_7_BATCHES_ONLY'||
       row.inputStatus!=='LOCAL_SELECTED_7_MATCHED'||
       !['DIRECT_ID_AND_EXACT_ROW_MATCH','POST_SELECTION_UNIQUE_MATCH'].includes(row.selectionEvidence)||
-      row.selectionEvidence!==(row.sources?.every(s=>s?.selectionWitness==='READER_DIRECT_ID')
-       ?'DIRECT_ID_AND_EXACT_ROW_MATCH':'POST_SELECTION_UNIQUE_MATCH')||
       !Array.isArray(row.sources)||row.sources.length!==SOURCE_KEYS.length||
+      row.selectionEvidence!==(row.sources.every(s=>s?.selectionWitness==='READER_DIRECT_ID')
+       ?'DIRECT_ID_AND_EXACT_ROW_MATCH':'POST_SELECTION_UNIQUE_MATCH')||
       row.sources.some((s,i)=>s?.sourceKey!==SOURCE_KEYS[i]||
        typeof s.batchKey!=='string'||!BATCH_KEY.test(s.batchKey)||
        !s.batchKey.startsWith(SOURCE_KEYS[i]+':')||
