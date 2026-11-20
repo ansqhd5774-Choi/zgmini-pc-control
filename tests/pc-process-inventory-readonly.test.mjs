@@ -936,6 +936,18 @@ test('C2505 byte proof verifies saved Controller closure and baseline without ex
  assert.equal(good.providerCalls,0);
  assert.equal(good.d1Writes,0);
  assert.equal(JSON.stringify(good).includes(nonce),false);
+ const changedKnown=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({
+  files:{'config.json':'different'},
+  tasks:{'ZGMINI-PC-Local-Core':'different'}
+ })});
+ assert.equal(changedKnown.protectedBaselineMatchesCurrent,false);
+ assert.equal(changedKnown.protectedDifferenceClass,'KNOWN_SCOPES');
+ assert.deepEqual(changedKnown.protectedDifferenceScopes,['WRITER_CONFIG','LOCAL_CORE_TASK']);
+ const extraKey=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({
+  files:{'config.json':'a','PRIVATE_PATH':'private'},tasks:{'ZGMINI-PC-Local-Core':'b'}
+ })});
+ assert.equal(extraKey.protectedDifferenceClass,'UNVERIFIED_EXTRA_KEYS');
+ assert.equal(JSON.stringify(extraKey).includes('PRIVATE_PATH'),false);
  const drift=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({changed:true})});
  assert.equal(drift.protectedBaselineMatchesCurrent,false);
  const modulePath=path.join(root,'snapshot/controller/entry.mjs');
