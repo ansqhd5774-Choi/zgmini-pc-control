@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {installOneFile,verifyRequest,verifyApproval} from './install.mjs';
 import {uploadResult} from './upload.mjs';
 
@@ -20,6 +21,8 @@ const requestId='pc-calendar-cache-12345678-1234-4234-9234-123456789abc';
 const chatId='chat-87654321-1234-4234-9234-123456789abc';
 const controlSha='a'.repeat(40);
 const sha=b=>createHash('sha256').update(b).digest('hex');
+// Inspect exact committed approval bytes, not Windows CRLF checkout presentation.
+const committedApproval=()=>execFileSync('git',['show','HEAD:calendar-cache-hotfix/installer/approval.json'],{cwd:scratch});
 
 function fixture(t){
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'calendar-cache-b-test-'));
@@ -54,8 +57,11 @@ function event(){
 test('exact original and modified bytes, manifest fixed',()=>{
  assert.equal(sha(fs.readFileSync(original)),before);
  assert.equal(sha(fs.readFileSync(candidate)),after);
- assert.equal(sha(fs.readFileSync(path.join(here,'approval.json'))),approval);
- verifyApproval(fs.readFileSync(path.join(here,'approval.json')));
+ const manifest=committedApproval();
+ assert.equal(sha(manifest),approval);
+ const checkout=fs.readFileSync(path.join(here,'approval.json'),'utf8');
+ assert.equal(checkout.replace(/\r\n/g,'\n'),manifest.toString('utf8'));
+ verifyApproval(manifest);
 });
 
 test('one approved file only installed, backup/readback and unrelated files preserved',t=>{
@@ -170,15 +176,10 @@ test('failed rollback preserves both owned locks for explicit recovery',t=>{
  assert.equal(JSON.parse(fs.readFileSync(args.cycleLock,'utf8')).pid,process.pid);
 });
 
-test('workflow and event are exact, no repeat or 2-file workflow reuse',()=>{
+test('019 completed once: no active install intake; historical event authorization remains verifiable',()=>{
  const {evt,env}=event();
  const rootWorkflow=path.join(scratch,'.github','workflows','pc-calendar-cache-hotfix-once.yml');
- const localWorkflow=path.join(here,'.github','workflows','pc-calendar-cache-hotfix-once.yml');
- const workflow=fs.readFileSync(fs.existsSync(rootWorkflow)?rootWorkflow:localWorkflow,'utf8');
- assert.match(workflow,/GITHUB_EVENT_ACTION:\s*\$\{\{ github\.event\.action \}\}/);
- assert.match(workflow,/GIT_CONFIG_KEY_0:\s*core\.autocrlf/);
- assert.match(workflow,/calendar-cache-hotfix\\installer\\install\.mjs/);
- assert.doesNotMatch(workflow,/calendar-b-twofile\\install\.mjs/);
+ assert.equal(fs.existsSync(rootWorkflow),false,'completed one-shot must not accept another issue');
  assert.equal(verifyRequest(evt,env).request.requestId,requestId);
  assert.throws(()=>verifyRequest(evt,{...env,GITHUB_SHA:'b'.repeat(40)}),
   /CAL_CACHE_B_REQUEST_SCOPE_STOP/);
@@ -213,7 +214,8 @@ test('upload two sanitized artifacts and verify exact remote bytes',async t=>{
    new Response('{}',{status:404});
  };
  const r=await uploadResult({env:{...env,GITHUB_EVENT_PATH:eventPath,RUNNER_TEMP:tmp,
-  GITHUB_TOKEN:'token_placeholder_for_test_12345'},fetchImpl});
+  GITHUB_TOKEN:'token_placeholder_for_test_12345'},fetchImpl,
+  read:(file,encoding)=>file===path.join(here,'approval.json')?committedApproval():fs.readFileSync(file,encoding)});
  assert.equal(r.remoteResultPairsVerified,2);
  assert.equal(comments.length,1);
  assert.equal(stored.size,2);

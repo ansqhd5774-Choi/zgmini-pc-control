@@ -39,6 +39,7 @@ export const GROUPS=Object.freeze({
  retirement:['tests/marketparquet-task-retire.test.mjs'],
  aiSoftware:['tests/ai-software-v2-register-once.test.mjs'],
  approvedRuntimeA:['windows-runtime-mode-a/approved-runtime-a.test.mjs'],
+ calendar019:['calendar-cache-hotfix/installer/install.test.mjs'],
  w05B:['tests/w05-r304-report-recovery.test.mjs']
 });
 const ALL=Object.keys(GROUPS);
@@ -55,6 +56,7 @@ const MATCH=Object.freeze({
  retirement:/^(?:tests\/marketparquet-task-retire|marketparquet-|docs\/MARKETPARQUET_REMOVAL)/,
  aiSoftware:/^(?:tests\/ai-software-v2-register-once\.test\.mjs|tools\/ai-software-v2-register-once\.mjs|\.github\/workflows\/pc-ai-software-v2-register-once\.yml)$/,
  approvedRuntimeA:/^(?:windows-runtime-mode-a\/.*|\.github\/workflows\/pc-approved-runtime-a-once\.yml)$/,
+ calendar019:/^(?:calendar-cache-hotfix\/.*|\.github\/workflows\/pc-calendar-cache-hotfix-once\.yml)$/,
  w05B:/^(?:w05-r304-service-b\/.*|tests\/w05-r304-report-recovery\.test\.mjs)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
