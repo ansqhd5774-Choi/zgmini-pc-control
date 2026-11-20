@@ -459,6 +459,8 @@ export async function inspectEmploymentR6Candidate(request,context){
       const c=body.stateClaimsChart;
       const safeDate=v=>v===null||dateOnly(v)===v;
       if(!c||!Number.isInteger(c.pointCount)||c.pointCount<0||c.pointCount>400
+        ||c.unit!=='%'||typeof c.unitMatchesApproved!=='boolean'
+        ||!Number.isInteger(c.gapCount)||c.gapCount<0||c.gapCount>c.pointCount
         ||!safeDate(c.firstDate)||!safeDate(c.lastDate)
         ||!safeDate(c.observationDate)
         ||(c.pointCount===0&&(c.firstDate!==null||c.lastDate!==null))
@@ -470,7 +472,8 @@ export async function inspectEmploymentR6Candidate(request,context){
         ||(c.pointCount===0&&(c.lastPointFinite||c.lastPointMatchesCurrent)))
         stop('R6_RESULT_INVALID');
       sourceMeta.stateClaimsChart={
-        pointCount:c.pointCount,firstDate:c.firstDate,lastDate:c.lastDate,
+        pointCount:c.pointCount,unit:c.unit,unitMatchesApproved:c.unitMatchesApproved,
+        gapCount:c.gapCount,firstDate:c.firstDate,lastDate:c.lastDate,
         observationDate:c.observationDate,lastPointFinite:c.lastPointFinite,
         lastPointMatchesCurrent:c.lastPointMatchesCurrent,
       };
