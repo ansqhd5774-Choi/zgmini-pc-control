@@ -1,0 +1,600 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44664091258-1-seat-6",
+  "requestId": "pc-08c7231e-42a8-4e7d-a1e4-73842b64115a",
+  "startedAt": "2026-11-20T02:54:56.387Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "8660924cc2f62b1a0409cbd6d6fe3be95b510eff",
+  "sourceBranch": "main",
+  "operation": "writer-install-preimage-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w03-r178-post-b-onefile-20261120",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "51beb04b42b7b0ef9c264ddd65273b325072e7b7",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "WRITER_APPROVED_PREIMAGE_READONLY",
+    "observedAt": "2026-11-20T02:54:58.720Z",
+    "evidenceLevel": "FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS",
+    "runtimeSourceVerified": false,
+    "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+    "sourceRootAbsolute": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+    "sourceHead": "51beb04b42b7b0ef9c264ddd65273b325072e7b7",
+    "approvedConfigSource": "51beb04b42b7b0ef9c264ddd65273b325072e7b7",
+    "checkpointSource": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+    "sourceIdentityConsistent": false,
+    "coreTaskSourceLinked": false,
+    "taskLaunchers": [
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c"
+      },
+      {
+        "path": "data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+        "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+        "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-core-r10.mjs",
+        "sha256": "e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/verified-checks-r10.mjs",
+        "sha256": "f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R31_SCOPED_PUBLICATION.mjs",
+        "sha256": "ffa71643748e79eedacf26b72880804cbab0edfb2eb32435da2346ec4bd0ad19"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R33_OBSERVE_PUBLISH_CYCLE.mjs",
+        "sha256": "7bd792d1ed84067846ca3ef0748b4a5eac8e5ba78feb18c9a3fcaf46b58ee58b"
+      }
+    ],
+    "r6Config": {
+      "status": "PASS",
+      "configSha256": "52023eaa5122fac241b7a9b0f0cedf04058769de473bb056845b5ec7a503bf34",
+      "keys": {
+        "employmentR6AutoCollection": "ENABLED",
+        "employmentR6OneYearAutoPublication": "ENABLED"
+      },
+      "reason": null
+    },
+    "calendar": [
+      {
+        "path": "lib/market-calendar-company-ko.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "employmentR6": [
+      {
+        "path": "lib/market-score/employment-r4-bed-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r4-shadow-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-collector.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-contract.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-feature-engine.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-observation-reader.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-provider.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-scheduler.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-store.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/collect-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/run-local.mjs",
+        "expectedEffect": "M",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "lib/market-score/employment-r6-window.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      },
+      {
+        "path": "worker/employment-r6-public-display.mjs",
+        "expectedEffect": "A",
+        "exists": null,
+        "sha256": null,
+        "state": "NOT_OBSERVED",
+        "trackedDirty": null
+      }
+    ],
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "scopedPreimage": {
+      "manifestPath": "approvals/writer-preimage/w03-r178-gmh-closure-32-r1.json",
+      "manifestSha256": "e2d8092409415c25d770cc60472e9bf894fa9cdd99046f3137bd5fba2ef5e4b1",
+      "files": [
+        {
+          "path": "lib/cnn-index.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "cde0a679768aee34a994f5f73b000875478c7c536afdcb38ab9e6e806a994c1d",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/cnn-observed-archive-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "f9cb4c8da02e2175527c389a54563a6f45c6f2815f5af524c27b071a6059ec63",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/market-calendar-er1-earnings-score.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "35247642b8c1c7d0efb12e35719fd981386e29da7b32c1138cde92873f916974",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/market-calendar-er1-forecast-score.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "4673db7669e6cb65f3a49d9f55618b58ff9905629bf0c799e61ee792e4d24fde",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/market-calendar-er1-month-key.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "6e5d8453085c78f770156823f0f4f32657c3bb03aa5df6b0c2442c0c61a2463e",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/market-calendar-er1-public-display.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "5c94721a7ea3d5fb2399e19993522c8f9d66b696023245273a41ea208f1fd5c8",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/market-score/theme-etf-provisional.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "cd15755daa0ffda4ade23c1aa6a7da8cedc4f44ba071054dd44f9ca05889ad50",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "lib/marketparquet-retirement.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "8846a71456cab355401bc385fb6c3a7adae8111da4689f9930162349b1bf40fb",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/theme-gmh-seven-pc-parity-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "81b533b95e5bc8eed860aa14771b2b52d8fe586681e5721f163c66cd42db19d7",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-gmh-seven-private-bridge.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "16e54ea74555c412c5341136edf3723e0f8a0c3ecb040947347ffd3a51b9fcba",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-gmh-seven-saved-input-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "5f8b0cda1f7a390a658ea5ecb90e2b8abcb715ea495e1fa23c076f15aff08f6b",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-optional-score-r188.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "36d45cd82af507f5b75a5a96413c626b50c830ca2aa1291bbb64f113cd0e3366",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-history-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "6977d168aaf667995e00da31d507fd8ec530373b28799ce3137f5deeda05a783",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-private-seed-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "043102d2010b74de88c502e2e8951fb3ec1a3ac6baeefe947d75fe2aaddc6124",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-approved-writer-entry.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "2519887919ff9098f731c28b7afcffeb4d38d863da507a8b0302c7363ecbbf75",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-authorized-cas.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "afdfca8b0bb90247a0f7483492f4a37a0d41d8c894e81391016c7574f696ad93",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-private-draft.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "419ea05fd27fca84c0eeb5b68b80363bab11845fcd3619898206a3922a2bd0ce",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "scripts/pc-writer/theme-seven-gmh-r178-saved-to-cas-r1.mjs",
+          "expectedEffect": "A",
+          "exists": true,
+          "sha256": "bc120465c67ca945abf68dd72b0f21d7869f162a064d88f51a420b3b34b7514c",
+          "state": "PRESENT",
+          "trackedDirty": null,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": true
+        },
+        {
+          "path": "worker/public-display-freshness.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/public-feed-input-safety.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "1d4dd5e1039a538d314a9f9b122aef89bfb2f4d21867582c32a6352ff1699fa8",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/public-feed-store.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "b21f03057025bad7aed58c7bb1f69b2abba0f0b446c587869594eea732adfaa6",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-ai-semiconductor-optional.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "15ceb7b71a89bbe60d6b9d3057b5d6bc81cbe46d9d0b066fab16b6cdd8625f80",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-biotech-continuation-r2.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "a34f701d5be6d2a4be6415fdee8006d4c22d5a206b6df66b118d8e17ac6a5d09",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-biotech-optional.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "0bf357ca0fecc98413a8cefeea48f235863b04c35387c4d3cae8d83c691177e1",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-biotech-provisional-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "43f86d3aa50daa84316316e9b7569566a85d701801fba4dc58a269682b8fdcd7",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-data-center-power-provisional-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "8b20498708c5b3cefe423fe6ae2106a5b1ea6ae4ed88f26de3576c0f4f542a39",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-data-center-power-r1.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "505cd92c9b90065b1b366792a566048d337b3a4f1c239d994451041ee2299578",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-etf-only-public.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "af91ce995da2cce1179cd12ea54d161a26de3a098f496d824c220a69742656f4",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-etf-rolling-public.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "c5c0ea3e60c468466c60e56c0e5444f8f7b20b706273c72976a87a9696cf41da",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-history-reference.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "a1b713c1516970479f8c26ae9d86a314f6bac93e67eab02259e4dd08b9edcb8f",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-nine-r37-public.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "d9ac298ac662a867c23dec9ce0bd64ab03e311e0f3432c9a6ac7b070d23ce91f",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        },
+        {
+          "path": "worker/theme-nine-r88-provisional.mjs",
+          "expectedEffect": "M",
+          "exists": true,
+          "sha256": "dff652c7e34e7a306d7ea96ea649424f23fa9935fd3617c4449a8cba7d2e4874",
+          "state": "PRESENT",
+          "trackedDirty": false,
+          "gitTracked": "UNKNOWN",
+          "existingAdditionCollision": false
+        }
+      ]
+    }
+  },
+  "protectedBeforeSha256": "c5847bc94bb311f6fc6b80320a012d673eab3e3980fc36033cd07a2040bc980a",
+  "protectedAfterSha256": "c5847bc94bb311f6fc6b80320a012d673eab3e3980fc36033cd07a2040bc980a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-20T02:55:01.563Z",
+  "durationMs": 5176
+}
