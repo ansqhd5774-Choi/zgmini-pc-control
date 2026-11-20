@@ -1,0 +1,76 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "3fac1676a6cf05dffa6072c7426936243b68ccaf",
+  "baseHead": "b22b02e7fc48eab9f6de5d0387cc2b9c1972d28e",
+  "baseConfigSourceSha": "b22b02e7fc48eab9f6de5d0387cc2b9c1972d28e",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/theme-paid-calculate.mjs",
+      "change": "M",
+      "beforeSha256": "6f1d2fda4433cdd90f0cd2a290a001dc4b47ea863ac4bbd7c794f9554a4fdd7e",
+      "afterSha256": "5ad774f9bf2bdc7f2f357c5b11ca4cace8ad9301950d8f770fd8f59df1f24feb"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "56b133606275f39cbbacc96c4f12de13a543f729a3e5b13f2c3d028d3d74df52",
+      "afterSha256": "e1b11c0a89147303a9661c0d40ad89da6dd7b99c641b65f21f008f88b5e1741a"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-hourly-source.mjs",
+      "sha256": "3e3d908dafef55efe7c9ae87b1ac5d40289116a387a9e9e6f62302c7cd218976"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-registry.mjs",
+      "sha256": "4d2a028b795e744cdd8dd7908057eb76ea35d8d6d39bfa56b7c9385828d7e8d6"
+    },
+    {
+      "path": "scripts/pc-writer/theme-r25-pure.mjs",
+      "sha256": "e69bc3c4d04fabcde0f19a9b2a7d7f919d6e554dbb8b915a9d6cf02d72dbbbc6"
+    },
+    {
+      "path": "scripts/pc-writer/theme-r32-pure.mjs",
+      "sha256": "ff2e374d5d6901755f8eae79ae45b49c53219d386b817fd682b3978b3e804990"
+    },
+    {
+      "path": "scripts/pc-writer/theme-space-basket-pure.mjs",
+      "sha256": "c697e214c2d006804ac477028cf86548a6cc8e6eddb4aea99ddea0a2839f8e10"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/marketparquet-paid-store.mjs",
+      "sha256": "4ba0a487868a2a028f080c06bdde75f41ffef5c8018541a0a43e7bd15acdfc23"
+    },
+    {
+      "path": "worker/theme-paid-contract.mjs",
+      "sha256": "a02fc6d6ccddfad2ed3abb33132b44f188e4249c0fdbb6be3e5d0cf7ca08a91b"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
