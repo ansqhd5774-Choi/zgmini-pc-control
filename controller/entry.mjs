@@ -15,6 +15,10 @@ try{
  need(host!==null&&typeof host==='object'&&!Array.isArray(host)&&
   host.controllerFiles!==null&&typeof host.controllerFiles==='object'&&
   !Array.isArray(host.controllerFiles),'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
+ const files=Object.entries(host.controllerFiles);
+ need(/^[a-f0-9]{40}$/.test(host.controllerSourceSha??'')&&files.length>=5&&
+  files.every(([rel,sha])=>/^(controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)
+   &&/^[a-f0-9]{64}$/.test(sha)),'CONTROLLER_HOST_MANIFEST_UNAVAILABLE');
  for(const [rel,sha] of Object.entries(host.controllerFiles))need(digest(fs.readFileSync(path.join(root,rel)))===sha,'CONTROLLER_SOURCE_DRIFT');
  need(process.env.GITHUB_REPOSITORY===policy.controlRepository&&event.repository?.private===true,'CONTROL_REPOSITORY_OR_VISIBILITY');
  need(policy.allowedActors.includes(process.env.GITHUB_ACTOR),'ACTOR_NOT_ALLOWED');const validEvent=event.action==='opened' ||
