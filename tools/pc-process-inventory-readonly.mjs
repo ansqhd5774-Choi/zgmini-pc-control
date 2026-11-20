@@ -397,6 +397,38 @@ export function inspect2505RecoveryReadonly(
  }catch{return c2505Unknown('C2505_READBACK_FAILED');}
 }
 
+// Exact #2505 Writer B source-only causal proof, without modifying files.
+// Writer B #2497 source was installed before #2505; #2537 is the last
+// verified later Writer B source. The official B adapter edits only "source".
+const C2505_WRITER_BEFORE='7965b337cf69a6d48cb152b1594833d64266a677';
+const C2505_WRITER_LAST='a96c35cbf43877e9f3f640e77c10dbe47ab5b067';
+export function project2505WriterSourceOnlyDelta(raw,originalSha256){
+ const result=(code,sourceMatched=null,reversesToOriginal=null)=>({
+  code,sourceMatched,reversesToOriginal,
+  safeToReplaceProtectedBefore:false,recoveryEligible:false});
+ if(!Buffer.isBuffer(raw)||raw.length<1||raw.length>65536||
+    typeof originalSha256!=='string'||!/^[a-f0-9]{64}$/.test(originalSha256))
+  return result('C2505_WRITER_SOURCE_BYTES_UNVERIFIED');
+ let config,text,matches;
+ try{
+  text=raw.toString('utf8');
+  config=JSON.parse(text);
+  matches=[...text.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)];
+ }catch{return result('C2505_WRITER_SOURCE_JSON_UNVERIFIED');}
+ if(!config||Array.isArray(config)||typeof config!=='object'||
+    matches.length!==1||matches[0][1]!==config.source)
+  return result('C2505_WRITER_SOURCE_FIELD_AMBIGUOUS');
+ if(config.source!==C2505_WRITER_LAST)
+  return result('C2505_WRITER_SOURCE_NOT_LAST_RECEIPT',false,null);
+ const m=matches[0],swapped=m[0].replace(C2505_WRITER_LAST,C2505_WRITER_BEFORE);
+ if(swapped===m[0])return result('C2505_WRITER_SOURCE_REVERSE_INVALID',true,null);
+ const reverse=text.slice(0,m.index)+swapped+text.slice(m.index+m[0].length);
+ const reversed=createHash('sha256').update(Buffer.from(reverse,'utf8'))
+  .digest('hex')===originalSha256;
+ return result(reversed?'C2505_WRITER_SOURCE_ONLY_REVERSED_EXACT':
+  'C2505_WRITER_SOURCE_ONLY_REVERSE_DIFFERS',true,reversed);
+}
+
 // #2505 deep byte evidence on the already approved independent read-only PC
 // inventory. No process termination, lock release, GitHub writes or secret output.
 export function inspect2505RecoveryByteProof({
@@ -409,7 +441,8 @@ export function inspect2505RecoveryByteProof({
 }={}){
  const unknown=code=>({status:'STATE_UNKNOWN',code,
   snapshotFilesVerified:null,previousHostMatchesSnapshot:null,
-  protectedBaselineMatchesCurrent:null,protectedDifferenceScopes:null,
+  protectedBaselineMatchesCurrent:null,writerSourceOnlyDelta:null,
+  protectedDifferenceScopes:null,
   protectedDifferenceClass:'UNVERIFIED',casDigests:null,
   writerConfigModifiedAtUtc:null,ownerMarkerMatches:null,
   ownerPidPresent:null,leaseTimelineAligned:null,currentTargetMatches:null,
@@ -451,6 +484,8 @@ export function inspect2505RecoveryByteProof({
   const writerStat=fileSystem.lstatSync(fixed.writerConfig);
   const writerConfigModifiedAtUtc=Number.isFinite(writerStat.mtimeMs)?
    new Date(writerStat.mtimeMs).toISOString():null;
+  const writerSourceOnlyDelta=project2505WriterSourceOnlyDelta(
+   start.writerConfig,baseline?.files?.['config.json']);
   if(ledger.requestId!==C2505_ID||ledger.issueNumber!==2505||
     ledger.targetSha!==C2505_TARGET||ledger.firstFail!=='POSTCHECK_PENDING'||
     ledger.status!=='RECOVERY_REQUIRED')return unknown('C2505_ORIGINAL_LEDGER_UNVERIFIED');
@@ -518,6 +553,7 @@ export function inspect2505RecoveryByteProof({
    snapshotFilesVerified,previousHostMatchesSnapshot,
    protectedBaselineMatchesCurrent,protectedDifferenceScopes,
    protectedDifferenceClass,casDigests,writerConfigModifiedAtUtc,
+   writerSourceOnlyDelta,
    ownerMarkerMatches,
    ownerPidPresent:typeof pidPresent==='boolean'?pidPresent:null,
    leaseTimelineAligned,currentTargetMatches,
