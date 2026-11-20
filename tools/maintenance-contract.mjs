@@ -742,6 +742,16 @@ export function controllerModuleSpecifiers(source){
 
 // Reject unresolved dependencies in the exact deployed target tree, including
 // transitive imports; no mutation, scripts or runtime imports occur here.
+// The runtime entry and operation dispatcher must remain import-complete even
+// when the exact approved change only touches config or an unrelated adapter.
+// Verify against the approved target tree, never against current main.
+export function controllerImportScanRoots(changedPaths){
+ if(!Array.isArray(changedPaths)||changedPaths.some(p=>typeof p!=='string'))
+  throw Object.assign(Error('CONTROLLER_IMPORT_INPUT_INVALID'),{code:'CONTROLLER_IMPORT_INPUT_INVALID'});
+ return [...new Set(['controller/entry.mjs','controller/operations.mjs',
+  ...changedPaths.filter(p=>p.startsWith('controller/')&&p.endsWith('.mjs'))])];
+}
+
 export function validateControllerImportClosure(paths,changedPaths,readSource){
  if(!Array.isArray(paths)||!Array.isArray(changedPaths)||typeof readSource!=='function')
   throw Object.assign(Error('CONTROLLER_IMPORT_INPUT_INVALID'),{code:'CONTROLLER_IMPORT_INPUT_INVALID'});
