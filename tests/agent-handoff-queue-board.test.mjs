@@ -382,7 +382,37 @@ test('006 exact full page boundary needs an empty lookahead and is complete',asy
 test('board renders next action without manufacturing owner acknowledgement',()=>{
  const f=fixture();const board=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
  const text=renderBoardMarkdown(board);
- assert.match(text,/다음 행동/);assert.match(text,/실제 담당 인수 미확인/);
+ assert.match(text,/다음 행동/);assert.match(text,/정형 인수 영수증 미확인/);
  assert.equal(board.records[0].ownerAccountVerified,false);
  assert.equal(board.records[0].status,'PENDING_OWNER_ACK');
+});
+
+
+test('ordinary Owner notes and origin links are visible without upgrading pending to ACK or success',()=>{
+ const f=fixture();f.comments.push({id:55,user:{login:HANDOFF_OWNER},issue_url:url(f.issue.number),body:'후속 설치가 성공했다는 설명이며 자동 판정 근거는 아님'});
+ const board=compileQueueBoard([{issue:f.issue,comments:f.comments}],now),row=board.records[0];
+ assert.equal(row.originIssueNumber,f.issue.number-1);assert.equal(row.ownerNoteCount,1);
+ assert.equal(row.latestOwnerNoteId,55);assert.equal(row.status,'PENDING_OWNER_ACK');
+ assert.equal(row.ownerAccountVerified,false);assert.equal(row.runtimeVerified,false);
+ const text=renderBoardMarkdown(board);
+ assert.ok(text.includes('/issues/'+(f.issue.number-1)+')'));
+ assert.ok(text.includes('#issuecomment-55'));assert.match(text,/실제 미처리를 뜻하지 않습니다/);
+ assert.match(text,/일반챗 자동 호출은 이 관제의 지원 기능이 아닙니다/);
+ assert.equal(text.includes('후속 설치가 성공했다는 설명'),false);
+});
+test('other identities, wrong issue URLs and unsafe note IDs are not owner-note evidence',()=>{
+ const f=fixture();f.comments.push(
+  {id:55,user:{login:'outsider'},issue_url:url(f.issue.number),body:'done'},
+  {id:56,user:{login:HANDOFF_OWNER},issue_url:url(f.issue.number+1),body:'done'},
+  {id:'57',user:{login:HANDOFF_OWNER},issue_url:url(f.issue.number),body:'done'});
+ const row=evaluateQueueItem(f.issue,f.comments,now);
+ assert.equal(row.ownerNoteCount,0);assert.equal(row.latestOwnerNoteId,null);
+ assert.equal(row.status,'PENDING_OWNER_ACK');
+});
+test('adding review references never changes selector execution plan or grants mutation',()=>{
+ const f=fixture();const before=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
+ f.comments.push({id:70,user:{login:HANDOFF_OWNER},issue_url:url(f.issue.number),body:'작업 중'});
+ const after=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
+ assert.deepEqual(ownerExecutionPlan(after),ownerExecutionPlan(before));
+ assert.equal(after.operationalWrites,0);assert.equal(after.aiCalls,0);assert.equal(after.automaticPcRetries,0);
 });

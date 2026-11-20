@@ -38,7 +38,7 @@ test('idle observations lead to existing maintenance flow, not repeated waiting 
  const safe=sanitize({status:'WRITER_B_PREFLIGHT_STOP',code:'WRITER_B_CORE_ACTIVE_WINDOW_DEFERRED',idleObservation:{windowMs:3000,samples:2,readySamples:0,activeSamples:2,otherSamples:0,maxReadyStreak:0}});
  const text=writerBCommentSummary(safe,2);assert.match(text,/실행 중 2회/);assert.match(text,/기존 유지보수/);assert.match(text,/강제 종료하지 않습니다/);
 });
-for(const [status,expected] of [['PENDING_OWNER_ACK',/인수 미확인/],['ACKNOWLEDGED',/업무에 착수/],['WORKING',/중복 발행 금지/],['DIAGNOSIS_EVIDENCE_RECORDED',/해결 완료가 아님/],['RESULT_EVIDENCE_RECORDED',/완료 여부 확인/],['PROOF_REVIEW_REQUIRED',/독립 업무는 계속/]]){
+for(const [status,expected] of [['PENDING_OWNER_ACK',/정형 인수 영수증 미확인/],['ACKNOWLEDGED',/업무에 착수/],['WORKING',/중복 발행 금지/],['DIAGNOSIS_EVIDENCE_RECORDED',/해결 완료가 아님/],['RESULT_EVIDENCE_RECORDED',/완료 여부 확인/],['PROOF_REVIEW_REQUIRED',/독립 업무는 계속/]]){
  test('board action preserves scope: '+status,()=>{
   const record=Object.freeze({status});assert.match(queueItemNextAction(record),expected);assert.deepEqual(record,{status});
  });
