@@ -24,6 +24,21 @@ export const REVIEW_POLICY=Object.freeze({
   ackHours:24,workHours:48,evidenceHours:72
 });
 
+// Existing evidence links only: no extra requests or free-text success inference.
+function reviewReferences(issue,comments){
+ let originIssueNumber=null;
+ try{
+  const origin=parseHandoff(issue.body).origin;
+  if(origin.repository===HANDOFF_REPOSITORY&&Number.isSafeInteger(origin.issueNumber)&&origin.issueNumber>0)
+   originIssueNumber=origin.issueNumber;
+ }catch{}
+ const notes=comments.filter(c=>author(c)===HANDOFF_OWNER&&
+  c.issue_url===URL(issue.number)&&Number.isSafeInteger(c.id)&&c.id>0&&
+  typeof c.body==='string'&&c.body.trim()&&!ownerWork(c));
+ return {originIssueNumber,ownerNoteCount:notes.length,
+  latestOwnerNoteId:notes.length?notes.reduce((latest,c)=>Math.max(latest,c.id),0):null};
+}
+
 export function evaluateQueueItem(issue,comments,nowMs){
   if(!validMs(nowMs)||!issue||!Number.isSafeInteger(issue.number)||issue.number<1||
     !Array.isArray(comments))fail('INPUT_OR_CLOCK_INVALID');
@@ -32,6 +47,8 @@ export function evaluateQueueItem(issue,comments,nowMs){
   const base={issueNumber:issue.number,priority:priority.band,score:priority.score,
     priorityPolicy:priority.policy??null,kind:priority.kind??null,
     checkpoint:priority.checkpoint??null,role:priority.role,ageHours:priority.ageHours,
+    ...( ['READY','ALREADY_SELECTED'].includes(decision.state)?reviewReferences(issue,comments):
+      {originIssueNumber:null,ownerNoteCount:0,latestOwnerNoteId:null}),
     evidenceState:decision.state,ownerAccountVerified:false,
     chatSessionVerified:false,pcOperationalWrites:0,aiCalls:0,
     runtimeVerified:false};
@@ -145,7 +162,7 @@ export function compileQueueBoard(items,nowMs,
 export function queueItemNextAction(record){
  const actions={
   AWAITING_CANDIDATE_SELECTION:'기존 후보 선정 결과 확인. 접수를 실제 인수로 보지 않음',
-  PENDING_OWNER_ACK:'실제 담당 인수 미확인. 기존 총괄이 인수 여부를 확인',
+  PENDING_OWNER_ACK:'정형 인수 영수증 미확인. 원본·기존 처리 댓글을 먼저 확인하며 재접수·새 영수증을 일괄 요구하지 않음',
   ACKNOWLEDGED:'인수한 담당자가 원래 승인 업무에 착수',
   WORKING:'기존 처리를 계속. 같은 작업 중복 발행 금지',
   WAITING_EVIDENCE:'기존 실행·저장 결과에서 부족한 증거만 회수',
@@ -166,19 +183,27 @@ export function renderBoardMarkdown(board){
     '개별 증거 미확인: **'+board.unverifiedIssueCount+'건** · 증거 전체 확인: **'+
       (board.evidenceComplete?'YES':'NO')+'**',
     '현재 대기 중 ACK 기록만 확인된 건: **'+board.ackOnlyCount+
-      '** · 인증 계정 인수: **'+board.verifiedOwnerAccounts+
+      '** · 정형 인수 영수증 확인: **'+board.verifiedOwnerAccounts+
       '** · 확인 후보: **'+board.reviewAlertCount+'**',
-    '','접수·후보 선정은 실제 담당 인수가 아닙니다. 이미 인수한 담당자는 자동 연결 표기와 무관하게 승인 업무를 계속합니다.',
-    '','| 우선순위(참고) | Issue | 유형 | 역할 | 증거상태 | 검증 원인 | 마지막 진행 이후(h) | 확인사항 | 다음 행동 |',
-    '|---|---|---|---|---|---|---:|---|---|'];
+    '','정형 인수 영수증 미확인은 실제 미처리를 뜻하지 않습니다. 기존 처리 댓글과 원본의 후속 결과를 먼저 확인합니다. 이미 인수한 담당자는 승인 업무를 계속합니다.',
+    '','| 우선순위(참고) | Issue | 유형 | 역할 | 증거상태 | 검증 원인 | 마지막 진행 이후(h) | 확인사항 | 기존 증거 | 다음 행동 |',
+    '|---|---|---|---|---|---|---:|---|---|---|'];
   for(const x of board.records){
     const ref='[#'+x.issueNumber+'](https://github.com/'+HANDOFF_REPOSITORY+
       '/issues/'+x.issueNumber+')';
+    const evidence=[];
+    if(Number.isSafeInteger(x.originIssueNumber)&&x.originIssueNumber>0)
+      evidence.push('[원본 #'+x.originIssueNumber+'](https://github.com/'+HANDOFF_REPOSITORY+'/issues/'+x.originIssueNumber+')');
+    if(Number.isSafeInteger(x.latestOwnerNoteId)&&x.latestOwnerNoteId>0)
+      evidence.push('[Owner 계정 일반 댓글 '+x.ownerNoteCount+'개](https://github.com/'+HANDOFF_REPOSITORY+'/issues/'+x.issueNumber+'#issuecomment-'+x.latestOwnerNoteId+')');
+    const statusLabel=x.status==='PENDING_OWNER_ACK'?'정형 인수 영수증 미확인 ('+x.status+')':x.status;
     out.push('| '+x.priority+' ('+x.score+') | '+ref+' | '+(x.kind??'UNVERIFIED')+
-      ' | '+x.role+' | '+x.status+' | '+x.evidenceState+' | '+(x.lastProgressHours??'—')+
-      ' | '+x.alert+' | '+queueItemNextAction(x)+' |');
+      ' | '+x.role+' | '+statusLabel+' | '+x.evidenceState+' | '+(x.lastProgressHours??'—')+
+      ' | '+x.alert+' | '+(evidence.join(' · ')||'링크 미확인')+' | '+queueItemNextAction(x)+' |');
   }
-  out.push('','- 우선순위는 오류 종류·단계·GitHub 생성 시각에 따른 **검토 순서**이며 실제 운영 영향이나 확정 긴급도가 아닙니다.',
+  out.push('','- 일반챗 자동 호출은 이 관제의 지원 기능이 아닙니다. NOT_CONFIGURED 표기를 새 설정·승인 또는 업무 실행의 대기 조건으로 사용하지 않습니다.',
+    '- 원본·일반 댓글 링크는 검토 위치이며, 글 내용만으로 ACK·후속 성공·사건 종결을 자동 판정하지 않습니다.',
+    '- 우선순위는 오류 종류·단계·GitHub 생성 시각에 따른 **검토 순서**이며 실제 운영 영향이나 확정 긴급도가 아닙니다.',
     '- 인수 표시는 GitHub 계정 댓글 영수증만 확인합니다. 특정 일반챗 자동 실행·수신/운영 적용을 증명하지 않습니다.',
     '- 대기 라벨이 없는 열린 인계는 이력/별도 검토 대상으로 집계하며, 해제만으로 해결·운영 완료로 판정하지 않습니다.',
     '- agent-handoff 라벨에는 봇 생성 사건뿐 아니라 소유자가 직접 작성한 인계 Issue도 포함될 수 있습니다. 판정은 원본 JSON·정확한 제목·봇 영수증 검증에 따릅니다.',
