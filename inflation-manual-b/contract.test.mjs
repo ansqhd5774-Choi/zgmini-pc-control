@@ -173,5 +173,5 @@ test('V2 accepts only the two exact scoped four-file closures',()=>{
 });
 
 // Existing isolated W01 source CI also verifies the distinct, dormant V3 contract.
-import '../inflation-core-handoff/contract.test.mjs';
-import '../inflation-core-handoff/signed-envelope.test.mjs';
+import './core-handoff/contract.test.mjs';
+import './core-handoff/signed-envelope.test.mjs';
