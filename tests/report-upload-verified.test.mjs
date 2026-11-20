@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair} from '../controller/report-upload-verified.mjs';
+import {renderBoundedReport,projectSourcePreflightReport,uploadVerifiedReportPair,resolveUploadPolicy} from '../controller/report-upload-verified.mjs';
 
 const params={repository:'ansqhd5774-Choi/zgmini-pc-control',runId:'12345',attempt:'1',seat:'2',
  json:'{"ok":true}\n',txt:'status=PASS\r\n',wait:async()=>{}};
@@ -245,3 +245,35 @@ test('public Issue summary-only indicator is visible before the JSON payload',()
  assert.match(src,/\.status==='SUMMARY_ONLY'/);
 });
 
+
+test('invalid policy permits only original fixed BLOCKED policy-error receipt upload',()=>{
+ const spec={runId:'12345',attempt:'1',seat:'2'};
+ const pointer={issueNumber:2536,report:{schema:'ZGMINI_PC_RESULT_V1',
+  jobId:'run-12345-1-seat-2',status:'BLOCKED',code:'CONTROLLER_POLICY_UNAVAILABLE',
+  lastPass:'EVENT_RECEIVED',firstFail:'EVENT_OR_REQUEST_VALIDATION',
+  operationalWrites:0,providerCalls:0,d1Writes:0}};
+ const fixed={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',maxReportBytes:32768};
+ for(const broken of [null,'{not json','',Buffer.from('not-json'), 'null']){
+  assert.deepEqual(resolveUploadPolicy(broken,{pointer,...spec}),fixed);
+ }
+ const ordinary={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
+  maxReportBytes:16384,additionalPolicyField:true};
+ assert.deepEqual(resolveUploadPolicy(JSON.stringify(ordinary),{pointer,...spec}),ordinary);
+ for(const mutate of [
+  p=>p.issueNumber=null,
+  p=>p.report.extra='not-an-approved-field',
+  p=>p.report.firstFail='ENGINE_IMPORT',
+  p=>p.report.status='PASS',
+  p=>p.report.code='CONTROLLER_IMPORT_MISSING',
+  p=>p.report.jobId='run-12345-1-seat-3',
+  p=>p.report.operationalWrites=1,
+  p=>p.report.providerCalls=1,
+  p=>p.report.d1Writes=1
+ ]){
+  const changed=structuredClone(pointer);mutate(changed);
+  assert.throws(()=>resolveUploadPolicy('{bad',{pointer:changed,...spec}),
+   {code:'REPORT_POLICY_UNAVAILABLE'});
+ }
+ assert.throws(()=>resolveUploadPolicy('{bad',{pointer,...spec,runId:'123/4'}),
+  {code:'REPORT_POLICY_UNAVAILABLE'});
+});

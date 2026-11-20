@@ -5,6 +5,9 @@ on:
     paths:
       - 'controller/common.mjs'
       - 'controller/entry.mjs'
+      - 'controller/upload.mjs'
+      - 'controller/report-upload-verified.mjs'
+      - 'tests/report-upload-verified.test.mjs'
       - 'controller/preimage-manifest-stager.mjs'
       - '.github/workflows/pc-job.yml'
       - 'tests/pc-job-late-label-intake.test.mjs'
@@ -230,6 +233,9 @@ jobs:
       - name: Reject missing transitive imports from exact selective Controller target
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-import-closure.test.mjs
+      - name: Verify bounded report upload when operations policy is corrupt
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/report-upload-verified.test.mjs
       - name: Verify missing engine import produces a report receipt
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
