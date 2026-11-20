@@ -187,3 +187,38 @@ test('PIT0407 later Current content-parity B is exact one-file successor to inst
  assert.equal(validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed}).manifest.targetSha,target);
  assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:'a'.repeat(40)}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
 });
+
+
+test('PIT0407 canonical c3 sourceHash B is exact one-file successor of installed 7ffa',()=>{
+ const target='d67f9f44e730f96abc9a4fd335bce60f5b453d06';
+ const installed='7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead';
+ const file='controller/employment-r6-collection-evidence-readonly.mjs';
+ const raw=fs.readFileSync(path.join(root,'controller-updates',target+'.json'));
+ const manifest=JSON.parse(raw);
+ const pin=JSON.parse(fs.readFileSync(path.join(root,'controller-selective-targets',target+'.json')));
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2448');
+ assert.equal(manifest.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.deepEqual(manifest.allowFiles,[{path:file,sha256:'52eb2adf37fa6ca92de84d6bd6092783994db2d82e43597b8ee45d6e44f505bf'}]);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.selectiveSource.branch,'codex/w04-pit0407-hash-canonical-selective-b-20261120');
+ assert.equal(manifest.selectiveSource.mainSha,'f22f4f7c2544cd9b9b026a395b7f20c1c9aa442a');
+ assert.deepEqual(manifest.selectiveSource.customPaths,[file]);
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+ assert.equal(validateControllerOnlyInstallDelta([file],manifest.allowFiles),true);
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-w04-pit0407-hash-canonical-b-20261120',operation:'controller-update',
+  controlRepository:CONTROL_REPOSITORY,targetControllerSha:target,
+  approvalManifestSha256:sha(raw)};
+ assert.equal(validateUpdateRequest(request,raw,{
+  actor:'ansqhd5774-Choi',installedSha:installed
+ }).manifest.targetSha,target);
+ assert.throws(()=>validateUpdateRequest(request,raw,{
+  actor:'ansqhd5774-Choi',installedSha:'a'.repeat(40)
+ }),/UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
