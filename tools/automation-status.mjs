@@ -3,7 +3,7 @@ import fs from 'node:fs';import path from 'node:path';
 import {execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
-import {maintenanceNextAction,dedicatedPcRunnerRows} from './update.mjs';
+import {maintenanceNextAction,dedicatedPcRunnerRows,readMaintenanceRecoveryStatus} from './update.mjs';
 const control='E:/ZGmini/automation/pc-control',maintenance='E:/ZGmini/automation/pc-maintenance';
 const repo='ansqhd5774-Choi/zgmini-pc-control',gh='C:/Program Files/GitHub CLI/gh.exe';
 const read=f=>JSON.parse(fs.readFileSync(f,'utf8'));
@@ -203,6 +203,39 @@ export function classifyRunnerQueryError(error){
  if(error?.code==='ETIMEDOUT')return 'REQUEST_TIMEOUT';
  return 'RUNNER_QUERY_ERROR_OTHER';
 }
+// Compact read-only reconciliation of the original maintenance request.
+// Distinguishes observed artifacts from a verified installation or recovery.
+export function summarizeRequestedRecoveryEvidence(state){
+ if(!state||state.status!=='STATUS')return null;
+ const artifacts=state.artifacts;
+ const code=typeof state.ledger?.code==='string'&&/^[A-Z0-9_]{1,96}$/.test(state.ledger.code)
+  ?state.ledger.code:null;
+ const sha=typeof state.actualControllerSha==='string'&&/^[a-f0-9]{40}$/.test(state.actualControllerSha)
+  ?state.actualControllerSha:null;
+ return {
+  requestId:artifacts?.requestId??null,
+  actualControllerSha:sha,
+  installedReadbackCode:state.installedReadbackCode??null,
+  ledgerReadbackCode:state.ledgerReadbackCode??null,
+  lockReadbackCode:state.lockReadbackCode??null,
+  artifactReadbackCode:state.artifactReadbackCode??null,
+  historicalStatus:state.ledger?.status??null,
+  historicalCode:code,
+  historicalPhase:typeof state.ledger?.phase==='string'?state.ledger.phase:null,
+  postIssueNumber:Number.isSafeInteger(state.ledger?.postIssueNumber)?state.ledger.postIssueNumber:null,
+  leaseHeld:state.installLock?.held??null,
+  recoveryRequired:state.installLock?.recoveryRequired??null,
+  artifacts:artifacts?.artifacts??null,
+  backlog:artifacts?.backlog??null,
+  installLease:artifacts?.lease??null,
+  guidance:state.guidance??null,
+  installSuccessProven:false,
+  recoveryComplete:false,
+  originalRequestRetried:false,
+  operationalWrites:0,
+ };
+}
+
 export function collectAutomationStatus(args=process.argv.slice(2)){
  need(process.platform==='win32','STATUS_WINDOWS_REQUIRED');
  need(args.length===0||(args.length===2&&args[0]==='--request-id'&&/^pc-[a-z0-9-]{8,76}$/.test(args[1])),'STATUS_ARGS');
@@ -234,6 +267,10 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
  const operations=observe('INSTALLED_OPERATIONS_UNAVAILABLE',()=>Object.keys(read(control+'/config/operations.json').operations));
  const watchdog=inspectWatchdogReadOnly();
  const ledger=args.length?observe('REQUEST_LEDGER_UNAVAILABLE',()=>read(maintenance+'/ledger/'+args[1]+'.json')):null;
+ // Reuse the already implemented fixed-root artifact and recovery readback.
+ // Individual failures are collected rather than aborting the other probes.
+ const recovery=args.length?observe('RECOVERY_EVIDENCE_UNAVAILABLE',
+  ()=>readMaintenanceRecoveryStatus(args[1])):null;
  const state={actualControllerSha:host?.controllerSourceSha??null,
   installedReadbackCode:verified===true?null:'CONTROLLER_FILES_UNVERIFIED',
   lockReadbackCode:lock?null:'INSTALL_LEASE_UNAVAILABLE',
@@ -260,8 +297,9 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   watchdog,
   runnerQueryError,
   historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
+  recoveryEvidence:args.length?summarizeRequestedRecoveryEvidence(recovery):null,
   diagnostics:codes,operationalWrites:0,providerCalls:0,dbD1Writes:0};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{console.log(JSON.stringify(collectAutomationStatus()));}catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:e.code??'STATUS_FAILED',operationalWrites:0}));process.exitCode=2;}
+ try{console.log(JSON.stringify(collectAutomationStatus(process.argv.slice(2))));}catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:e.code??'STATUS_FAILED',operationalWrites:0}));process.exitCode=2;}
 }
