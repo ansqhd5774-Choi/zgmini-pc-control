@@ -283,6 +283,12 @@ export async function reconcileInterruptedRollback(original,port,persist){
   if(preserved){
    await record('RECOVERY_EXISTING_VERSION_VERIFIED',{existingVersionPreserved:true});
   }else{
+   // Read-only checks must precede the durable mutation claim. A rejected
+   // roster or protected-state preflight has not changed intake or files.
+   if(port.preflightRecoveryRestore){
+    recoveryOperation='preflightRecoveryRestore';
+    await port.preflightRecoveryRestore();
+   }
    await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
    recoveryOperation='restore';await port.restore();await record('RECOVERY_FILES_RESTORED');
    recoveryOperation='reconnectPrevious';await port.reconnectPrevious();

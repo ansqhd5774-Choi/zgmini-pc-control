@@ -1542,6 +1542,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    const host=json(path.join(snapshotRoot,'host.json'));
    return host.controllerSourceSha===manifest.installedSha&&Object.entries(host.controllerFiles).every(([rel,d])=>fs.existsSync(path.join(snapshotRoot,rel))&&sha256(fs.readFileSync(path.join(snapshotRoot,rel)))===d);
   },
+  preflightRecoveryRestore:async()=>{
+   if(!recoveryOperator)return;
+   // No rollback mutation marker exists yet; restore rechecks live state.
+   if(!pausedByUs)apiRunners();
+   need(protectedBefore!==undefined,'RECOVERY_PROTECTION_NOT_PINNED');
+   need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),
+    'RECOVERY_PROTECTION_PREFLIGHT_CHANGED');
+  },
   restore:async()=>{
    // The independent recovery operator must prove that the runner inventory
    // endpoint is readable before touching intake. Drain still rechecks the
