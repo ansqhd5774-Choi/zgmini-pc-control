@@ -196,6 +196,41 @@ async function reportRejectedRequest({event,env,rawResult,apiFetch}){
   deliveryStatus:'REQUEST_REJECTED_BEFORE_PC',created:0,verified:0};
 }
 
+// Presentation only: consume the already sanitized result, never raw exception text.
+// Existing receipt lines and JSON/TXT bytes remain the machine-readable authority.
+export function writerBCommentSummary(result,verified){
+ const out=['','### 작업 결과와 다음 행동',''];
+ if(verified!==2)return out.concat([
+  '- 완료 범위: 원격 결과 파일 확인 미완료. 설치 성공·실패를 확정하지 않습니다.',
+  '- 다음 행동: 기존 요청의 로컬 결과와 원격 JSON/TXT를 대조합니다. 설치를 다시 실행하지 않습니다.'
+ ]).join('\n');
+ const installed=result.status==='WRITER_B_INSTALLED_VERIFIED';
+ const restored=result.status==='WRITER_B_INSTALL_STOP_RESTORED';
+ const recovery=result.status==='WRITER_B_RECOVERY_REQUIRED';
+ const preflight=result.status==='WRITER_B_PREFLIGHT_STOP';
+ out.push('- 완료 범위: '+(installed?'Writer 파일 설치와 설치기 사후 검증 완료. 실제 계산·D1 게시·API/화면 완료는 별도입니다.':
+  restored?'설치 중단 후 원본 복구 확인. 요청한 설치는 미완료입니다.':
+  recovery?'복구 상태 확인 필요. 설치·원본 복구 완료로 판정하지 않습니다.':
+  preflight?'설치 전 검사에서 중단. 요청한 설치는 미완료입니다.':'실행 결과 미확정.'));
+ const gate=safeWriterBPreimageCheck(result);
+ if(gate)out.push('- 최초 차단 조건: `'+gate+'` (기존 원본 비교 검사).');
+ const diagnostic=safeWriterBImportDiagnostic(result);
+ if(diagnostic)out.push('- 확인된 의존성: `'+diagnostic.sourcePath+'` → `'+diagnostic.dependencyPath+'` / `'+diagnostic.reason+'`.');
+ const idle=safeWriterBIdleObservation(result);
+ if(idle)out.push('- 유휴 관측: '+idle.samples+'회 중 실행 중 '+idle.activeSamples+'회, 준비 '+idle.readySamples+'회, 미확인 '+idle.otherSamples+'회.');
+ let next=installed?'기존 기능 담당자가 설치된 경로에서 원래 승인 업무를 실행하고 실제 저장·게시 결과를 확인합니다.':
+  recovery||!preflight&&!restored?'현재 요청의 원장·잠금·설치 상태를 먼저 대조합니다. 결과 확인 전 설치 재실행은 하지 않습니다.':
+  restored?'복구된 원본을 유지하고 기록된 실패 조건을 수정한 뒤 기존 승인 범위에서 재개합니다.':
+  gate==='HEAD'||gate==='CONFIG_SOURCE'?'현재 소스와 승인 명세의 기준 SHA를 대조해 달라진 범위만 정리합니다. 원본을 과거 SHA로 강제 되돌리지 않습니다.':
+  gate?'표시된 원본 비교 조건을 현재 승인 명세와 대조해 해당 불일치만 수정합니다.':
+  diagnostic?'표시된 누락·읽기 실패 의존성을 승인 파일 구성과 대조하고 연결부만 수정합니다.':
+  idle?'현재 실행의 정상 종료와 기존 유지보수 진입 경로를 확인합니다. 같은 유휴 대기를 반복하거나 Core를 강제 종료하지 않습니다.':
+  '연결된 기존 결과 파일의 실패 코드를 확인하고 해당 조건만 수정합니다. 근거 없이 같은 설치를 반복하지 않습니다.';
+ out.push('- 다음 행동: '+next);
+ if(gate)out.push('- 증거 한계: 이 결과에는 기대값·실측값 상세가 포함되지 않습니다. 오류명만으로 실패 파일이나 실제 SHA를 추정하지 않습니다.');
+ return out.join('\n');
+}
+
 export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
  let req;
  try{req=validateWriterBReportEvent(event,env);}catch(error){
@@ -237,7 +272,11 @@ export async function uploadWriterBReport({event,env,rawResult,apiFetch=fetch}){
   `LOCAL_ONLY: ${verified===2&&result.localOnly===true?'true':'UNKNOWN'}; `+
   `REMOTE_SOURCE: NOT_PUBLISHED_BY_INSTALLER\n`+
   `RESULT_CREATED: ${created}/2; RESULT_READBACK: ${verified}/2\n`+
-  `RUN_ID: ${result.runId??'UNKNOWN'}; RETRY: NO_REEXECUTE\n`;
+  `RUN_ID: ${result.runId??'UNKNOWN'}; RETRY: NO_REEXECUTE\n`+
+  writerBCommentSummary(result,verified)+'\n\n'+
+  `실행: https://github.com/${CONTROL_REPO}/actions/runs/${result.runId}\n`+
+  `결과: [JSON](https://github.com/${CONTROL_REPO}/blob/main/results/writer-b-source-install-${req.requestId}.json) · `+
+  `[TXT](https://github.com/${CONTROL_REPO}/blob/main/results/writer-b-source-install-${req.requestId}.txt)\n`;
  const reply=await apiFetch(
   `https://api.github.com/repos/${CONTROL_REPO}/issues/${event.issue.number}/comments`,
   {method:'POST',headers,body:JSON.stringify({body:comment})});

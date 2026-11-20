@@ -377,3 +377,12 @@ test('006 exact full page boundary needs an empty lookahead and is complete',asy
  assert.equal(rows.length,200);
  assert.deepEqual(seen,[1,2,3]);
 });
+
+
+test('board renders next action without manufacturing owner acknowledgement',()=>{
+ const f=fixture();const board=compileQueueBoard([{issue:f.issue,comments:f.comments}],now);
+ const text=renderBoardMarkdown(board);
+ assert.match(text,/다음 행동/);assert.match(text,/실제 담당 인수 미확인/);
+ assert.equal(board.records[0].ownerAccountVerified,false);
+ assert.equal(board.records[0].status,'PENDING_OWNER_ACK');
+});
