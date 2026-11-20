@@ -197,8 +197,10 @@ function fullTenYearRawCoverage(weeks,complete){
 // W04 PIT-04-07: fixed, aggregate-only ETA539 raw c3 <-> stored Current audit.
 // One immutable, hash-verified stored snapshot; no provider access, raw export,
 // History mutation, backdating, or claim that this is historical TRUE_PIT.
-const ETA539_MAX_RAW=8*1024*1024;
-const ETA539_MAX_CHUNKS=64;
+// Reuse the established fixed R6 raw/run attestation's 32 MiB / 4096-chunk
+// limits. ETA539 saves the full provider CSV, not only selected 60 weeks.
+const ETA539_MAX_RAW=32*1024*1024;
+const ETA539_MAX_CHUNKS=4096;
 const ETA539_CURRENT_TABLE='market_score_employment_r4_shadow_current_v1';
 const eta539Digest=s=>createHash('sha256').update(s).digest('hex');
 function eta539CsvLine(line){
@@ -252,12 +254,16 @@ function inspectEta539RawCurrentParity(db){
    "AND request_key IN ('DOL_ETA539:60w','DOL_ETA539:112w','DOL_ETA539:530w','DOL_ETA539:600w') "+
    "AND chunk_index=0 ORDER BY retrieved_at DESC LIMIT 1").get();
  if(!head)return fail('RAW_SNAPSHOT_NOT_STORED');
- if(typeof head.snapshot_id!=='string'||!Number.isSafeInteger(head.chunk_count)
-   ||head.chunk_count<1||head.chunk_count>ETA539_MAX_CHUNKS
-   ||!NATIONAL_RAW_HASH.test(head.body_sha256??'')
-   ||!Number.isFinite(Date.parse(head.retrieved_at??'')))return fail('RAW_METADATA_INVALID');
+ // Classify actual metadata failure, rather than treating an oversized
+ // provider CSV as corrupt. No source IDs, body hashes or dates are exposed.
+ if(typeof head.snapshot_id!=='string'||!NATIONAL_RAW_HASH.test(head.snapshot_id))
+  return fail('RAW_SNAPSHOT_ID_INVALID');
+ if(!Number.isSafeInteger(head.chunk_count)||head.chunk_count<1
+   ||head.chunk_count>ETA539_MAX_CHUNKS)return fail('RAW_CHUNK_COUNT_OUT_OF_BOUNDS');
+ if(!NATIONAL_RAW_HASH.test(head.body_sha256??''))return fail('RAW_BODY_SHA_FORMAT_INVALID');
+ if(!Number.isFinite(Date.parse(head.retrieved_at??'')))return fail('RAW_RETRIEVED_AT_INVALID');
  const chunks=db.prepare('SELECT chunk_index,chunk_count,body_sha256,body_chunk FROM '+
-   rawTable+' WHERE snapshot_id=? ORDER BY chunk_index LIMIT 65').all(head.snapshot_id);
+   rawTable+' WHERE snapshot_id=? ORDER BY chunk_index LIMIT 4097').all(head.snapshot_id);
  if(chunks.length!==head.chunk_count||chunks.some((c,i)=>c.chunk_index!==i
    ||c.chunk_count!==head.chunk_count||c.body_sha256!==head.body_sha256
    ||typeof c.body_chunk!=='string'))return fail('RAW_CHUNKS_INVALID');
@@ -269,7 +275,7 @@ function inspectEta539RawCurrentParity(db){
      head.body_sha256.toLowerCase()].join('|'))!==head.snapshot_id.toLowerCase())
   return fail('RAW_BODY_OR_ID_HASH_MISMATCH');
  const lines=raw.replace(/\r/g,'').split('\n').filter(x=>x.trim());
- if(lines.length<2||lines.length>100000)return fail('RAW_ROW_COUNT_INVALID');
+ if(lines.length<2||lines.length>500000)return fail('RAW_ROW_COUNT_INVALID');
  const header=eta539CsvLine(lines[0])?.map(x=>x.trim().toLowerCase());
  if(!header||new Set(header).size!==header.length
    ||['st','rptdate','c2','c3'].some(k=>!header.includes(k)))return fail('RAW_HEADER_INVALID');
