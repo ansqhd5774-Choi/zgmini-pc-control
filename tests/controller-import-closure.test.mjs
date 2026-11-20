@@ -64,3 +64,16 @@ test('genuine re-exports, bare imports and literal import calls still fail close
   assert.throws(()=>validateControllerImportClosure(['controller/operations.mjs'],
    ['controller/operations.mjs'],()=>source),/CONTROLLER_IMPORT_MISSING/);
 });
+
+test('operator-joined regex literals with quotes do not corrupt module scan',()=>{
+ const sample="if(/[\\s\\\"'(]/.test(a)&&/[\\s\\\"')]/.test(b)){return import('./real.mjs');}";
+ assert.deepEqual(controllerModuleSpecifiers(sample),['./real.mjs']);
+});
+test('historic R47 task module parses without false imports from regex literals',()=>{
+ const target='f20004d4b784db1cc5e823bb3cde7b925aadcab3';
+ const source=execFileSync('git',['show',target+':controller/theme-r47-task-action-readonly.mjs'],{
+  encoding:'utf8',windowsHide:true});
+ const modules=controllerModuleSpecifiers(source);
+ assert.ok(modules.includes('./pc-source-readonly.mjs'));
+ assert.ok(!modules.some(x=>x.includes('not-real')));
+});
