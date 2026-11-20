@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -976,4 +976,30 @@ test('C2505 byte proof verifies saved Controller closure and baseline without ex
  assert.equal(inspect2505RecoveryByteProof(args).snapshotFilesVerified,false);
  fs.rmSync(path.join(root,'previous-host.json'));
  assert.equal(inspect2505RecoveryByteProof(args).status,'STATE_UNKNOWN');
+});
+
+test('C2505 Writer B source-only CAS proves exact original byte digest, not a changed baseline',()=>{
+ const old='7965b337cf69a6d48cb152b1594833d64266a677';
+ const latest='a96c35cbf43877e9f3f640e77c10dbe47ab5b067';
+ const before='{\n  "enabled": true,\n  "source": "'+old+'",\n  "other": "preserve-this"\n}\n';
+ const baselineHash=createHash('sha256').update(before).digest('hex');
+ const now=Buffer.from(before.replace(old,latest));
+ const ok=project2505WriterSourceOnlyDelta(now,baselineHash);
+ assert.equal(ok.code,'C2505_WRITER_SOURCE_ONLY_REVERSED_EXACT');
+ assert.equal(ok.sourceMatched,true);
+ assert.equal(ok.reversesToOriginal,true);
+ assert.equal(ok.recoveryEligible,false);
+ assert.equal(ok.safeToReplaceProtectedBefore,false);
+ assert.equal(JSON.stringify(ok).includes('preserve-this'),false);
+ const altered=Buffer.from(before.replace(old,latest).replace('preserve-this','unexpected'));
+ assert.equal(project2505WriterSourceOnlyDelta(altered,baselineHash).code,
+  'C2505_WRITER_SOURCE_ONLY_REVERSE_DIFFERS');
+ const outdated=Buffer.from(before);
+ assert.equal(project2505WriterSourceOnlyDelta(outdated,baselineHash).code,
+  'C2505_WRITER_SOURCE_NOT_LAST_RECEIPT');
+ const duplicate=Buffer.from('{"source":"'+latest+'","nested":{"source":"'+latest+'"}}');
+ assert.equal(project2505WriterSourceOnlyDelta(duplicate,baselineHash).code,
+  'C2505_WRITER_SOURCE_FIELD_AMBIGUOUS');
+ assert.equal(project2505WriterSourceOnlyDelta(now,'not-a-sha').code,
+  'C2505_WRITER_SOURCE_BYTES_UNVERIFIED');
 });
