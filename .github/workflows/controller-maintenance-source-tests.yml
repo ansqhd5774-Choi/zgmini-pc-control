@@ -130,6 +130,8 @@ on:
       - 'tests/r181-protected-b-entry-report.test.mjs'
       - '.github/workflows/pc-writer-b-source-once.yml'
       - 'tests/controller-heavy-only-install.test.mjs'
+      - 'tools/maintenance-apply.mjs'
+      - 'tests/interrupted-rollback.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
       - 'tests/controller-selective-source.test.mjs'
       - 'tests/controller-import-closure.test.mjs'
@@ -237,6 +239,10 @@ jobs:
       - name: Run scoped maintenance and Controller runtime safety regressions
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-agent.test.mjs tests/maintenance-lock.test.mjs tests/maintenance-contract.test.mjs tests/source-bundle-register.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs
+      - name: Verify independently confirmed postcheck rollback is fail-closed
+        # Heads predating the historical fixture must not fail unrelated PRs.
+        if: steps.scope.outputs.core == 'true' && hashFiles('tests/interrupted-rollback.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/interrupted-rollback.test.mjs
       - name: Verify W03 R32 64-symbol GMH raw/checkpoint SHA coverage, without provider calls
         if: steps.scope.outputs.w03 == 'true'
         run: node --test --test-concurrency=1 tests/theme-nine-r32-raw-coverage-readonly.test.mjs
