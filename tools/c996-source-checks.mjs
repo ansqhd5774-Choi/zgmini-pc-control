@@ -58,7 +58,6 @@ const MATCH=Object.freeze({
  w05B:/^(?:w05-r304-service-b\/.*|tests\/w05-r304-report-recovery\.test\.mjs)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
- 
  p==='tools/c996-source-checks.mjs'||p==='tests/c996-source-scope.test.mjs'||
  p==='tools/update.mjs'||p.startsWith('tools/maintenance-');
 export function selectGroups(paths){
