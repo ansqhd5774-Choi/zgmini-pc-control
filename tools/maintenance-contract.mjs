@@ -630,24 +630,79 @@ export function validateControllerSelectivePin(manifest,pin){
 }
 
 
-// Reject static and literal dynamic local imports missing from the exact
-// deployed target tree, including transitive dependencies, before staging.
-export function validateControllerImportClosure(paths,changedPaths,readSource) {
+// Extract only JavaScript import specifiers, excluding strings, comments,
+// regular expressions and literal patch templates. No code execution.
+export function controllerModuleSpecifiers(source){
+ if(typeof source!=='string')throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+ const tokens=[];
+ const add=(type,value)=>tokens.push({type,value});
+ let i=0;
+ while(i<source.length){
+  const ch=source[i],next=source[i+1];
+  if(/\s/.test(ch)){i++;continue;}
+  if(ch==='/'&&next==='/'){i+=2;while(i<source.length&&source[i]!=='\n')i++;continue;}
+  if(ch==='/'&&next==='*'){
+   i+=2;const close=source.indexOf('*/',i);
+   if(close<0)throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+   i=close+2;continue;
+  }
+  if(ch==="'"||ch==='"'||ch.charCodeAt(0)===96){
+   const quote=ch,template=ch.charCodeAt(0)===96;let value='';i++;let closed=false;
+   while(i<source.length){
+    const c=source[i++];
+    if(c==='\\'){if(i<source.length){const escaped=source[i++];value+='\\'+escaped;}continue;}
+    if(c===quote){closed=true;break;}
+    value+=c;
+   }
+   if(!closed)throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+   if(!template)add('string',value);
+   continue;
+  }
+  if(ch==='/'&&tokens.length&&['=','(',':',',','[','!','?',';','return','=>','{'].includes(tokens.at(-1).value)){
+   i++;let escaped=false,inClass=false,closed=false;
+   while(i<source.length){
+    const c=source[i++];
+    if(escaped){escaped=false;continue;}
+    if(c==='\\'){escaped=true;continue;}
+    if(c==='['){inClass=true;continue;}
+    if(c===']'){inClass=false;continue;}
+    if(c==='/'&&!inClass){closed=true;break;}
+   }
+   if(!closed)throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+   while(i<source.length&&/[a-z]/i.test(source[i]))i++;
+   add('regex','');continue;
+  }
+  if(/[a-zA-Z_$]/.test(ch)){
+   const begin=i++;while(i<source.length&&/[a-zA-Z0-9_$]/.test(source[i]))i++;
+   add('word',source.slice(begin,i));continue;
+  }
+  if(ch==='='&&next==='>'){add('punc','=>');i+=2;continue;}
+  add('punc',ch);i++;
+ }
+ const out=[];
+ for(let j=0;j<tokens.length;j++){
+  const word=tokens[j].value;
+  if(word==='from'&&tokens[j+1]?.type==='string')out.push(tokens[j+1].value);
+  if(word!=='import')continue;
+  if(tokens[j+1]?.type==='string')out.push(tokens[j+1].value);
+  else if(tokens[j+1]?.value==='('&&tokens[j+2]?.type==='string'&&tokens[j+3]?.value===')')
+   out.push(tokens[j+2].value);
+ }
+ return out;
+}
+
+// Reject unresolved dependencies in the exact deployed target tree, including
+// transitive imports; no mutation, scripts or runtime imports occur here.
+export function validateControllerImportClosure(paths,changedPaths,readSource){
  if(!Array.isArray(paths)||!Array.isArray(changedPaths)||typeof readSource!=='function')
   throw Object.assign(Error('CONTROLLER_IMPORT_INPUT_INVALID'),{code:'CONTROLLER_IMPORT_INPUT_INVALID'});
  const files=new Set(paths),pending=changedPaths.filter(p=>p.startsWith('controller/')&&p.endsWith('.mjs'));
  const seen=new Set();
  while(pending.length){
-  const current=pending.pop();
-  if(seen.has(current))continue;
-  seen.add(current);
+  const current=pending.pop();if(seen.has(current))continue;seen.add(current);
   if(!files.has(current))throw Object.assign(Error('CONTROLLER_IMPORT_MISSING'),{code:'CONTROLLER_IMPORT_MISSING'});
   const source=readSource(current);
-  if(typeof source!=='string')
-   throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
-  const re=/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|\bimport\s*['"]([^'"]+)['"]/g;
-  for(const match of source.matchAll(re)){
-   const spec=match[1]??match[2]??match[3];
+  for(const spec of controllerModuleSpecifiers(source)){
    if(!spec.startsWith('.'))continue;
    const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(current),spec));
    if(!resolved.startsWith('controller/')||!files.has(resolved))
