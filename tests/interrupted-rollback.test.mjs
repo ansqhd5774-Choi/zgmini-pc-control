@@ -51,3 +51,29 @@ test('missing or rejected verified postcheck keeps old safe WAIT without runtime
 });
 test('failed old runtime readback keeps recovery required and intake paused',async()=>{const f=fixture();f.port.verifyPrevious=async()=>false;const r=await reconcileInterruptedRollback(original,f.port,f.persist);assert.equal(r.code,'RECOVERY_RUNTIME_NOT_VERIFIED');assert.equal(r.mutationStarted,true);assert.ok(!f.calls.includes('resumeIntake'));});
 test('pre-install failure uses cancellation path rather than partial rollback',async()=>{const f=fixture();const r=await reconcileInterruptedRollback({...original,phase:'RECEIVED'},f.port,f.persist);assert.equal(r.code,'RECOVERY_PHASE_NOT_ROLLBACK_ELIGIBLE');assert.equal(f.calls.length,0);});
+
+test('independent rollback preflight failure leaves no mutation claim',async()=>{
+ const recovered={...original,status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
+  firstFail:'POSTCHECK_PENDING',postIssueNumber:2506,targetSha:'b'.repeat(40)};
+ for(const code of ['RUNNER_INVENTORY_INCOMPLETE','HTTP_403_FORBIDDEN']){
+  const f=fixture();
+  f.port.confirmPostcheckFailure=async()=>true;
+  f.port.verifyRestoredPrevious=async()=>false;
+  f.port.preflightRecoveryRestore=async()=>{f.calls.push('preflightRecoveryRestore');
+   throw Object.assign(Error(code),{code});};
+  const r=await reconcileInterruptedRollback(recovered,f.port,f.persist);
+  assert.equal(r.code,code);
+  assert.equal(r.failureOperation,'preflightRecoveryRestore');
+  assert.notEqual(r.mutationStarted,true);
+  assert.ok(!f.calls.includes('restore'));
+  assert.ok(!f.calls.includes('resumeIntake'));
+  assert.ok(!f.records.some(x=>x.code==='RECOVERY_RESTORE_STARTED'));
+ }
+});
+test('independent rollback read-only preflight precedes durable mutation marker',async()=>{
+ const f=fixture();f.port.preflightRecoveryRestore=async()=>{f.calls.push('preflightRecoveryRestore');};
+ const r=await reconcileInterruptedRollback(original,f.port,f.persist);
+ assert.equal(r.status,'ROLLED_BACK');
+ assert.ok(f.calls.indexOf('preflightRecoveryRestore')<f.calls.indexOf('restore'));
+ assert.equal(f.records.find(x=>x.code==='RECOVERY_RESTORE_STARTED')?.mutationStarted,true);
+});
