@@ -117,7 +117,11 @@ function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
     ||!Array.isArray(body?.indicators)||body.indicators.length!==29
     ||body.asOfDate!==asOfDate||body.sourceStoredAt!==sourceStoredAt)
     return 'METADATA_MISMATCH';
-  return 'VERIFIED';
+  // Model provenance is read exclusively from the same checksum-verified body.
+  if(!/^EMP-R6-FORMULA-R[0-9]{1,2}$/.test(body.methodologyVersion??'')
+    ||!/^sha256:[a-f0-9]{64}$/.test(body.formulaHash??''))return 'MODEL_PROVENANCE_INVALID';
+  return {status:'VERIFIED',methodologyVersion:body.methodologyVersion,
+   formulaHash:body.formulaHash};
  }catch(error){return error?.code==='ENOENT'?'MISSING':'READ_FAILED';}
 }
 function r6PublicationProjection(report,root){
@@ -136,7 +140,12 @@ function r6PublicationProjection(report,root){
  if(localHash!==null){
   projected.localResultHash=localHash;
   projected.localResultStored=typeof raw?.localResultStored==='boolean'?raw.localResultStored:null;
-  projected.localResultReadback=r6LocalResultReadback(root,localHash,safeDate,sourceStoredAt);
+  const result=r6LocalResultReadback(root,localHash,safeDate,sourceStoredAt);
+  projected.localResultReadback=typeof result==='string'?result:result.status;
+  if(typeof result==='object'&&result?.status==='VERIFIED'){
+   projected.methodologyVersion=result.methodologyVersion;
+   projected.formulaHash=result.formulaHash;
+  }
  }
  return projected;
 }
