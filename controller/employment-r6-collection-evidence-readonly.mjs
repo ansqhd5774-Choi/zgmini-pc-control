@@ -329,8 +329,8 @@ function inspectEta539RawCurrentParity(db){
    if(cur.provider!=='DOL_ETA'||cur.provider_series_id!=='ETA539:C3'){
     counts.OTHER_SOURCE++;continue;
    }
-   const expectedHash=eta539Digest(JSON.stringify({reportDate:item.report,
-    reflectedWeek:item.week,st:item.st,value:item.value}));
+   const expectedHash=eta539Digest(JSON.stringify({reflectedWeek:item.week,reportDate:item.report,
+    st:item.st,value:item.value}));
    const expectedRevision='ETA539:RPTDATE:'+item.report;
    const reason=typeof cur.value!=='number'||!Number.isFinite(cur.value)
       ||cur.value!==item.value?'VALUE_DIFFERENT'
