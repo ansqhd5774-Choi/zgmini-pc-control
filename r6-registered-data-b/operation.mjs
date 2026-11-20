@@ -164,18 +164,16 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,
  return Object.freeze({request,approval,overlay:effectiveOverlay});
 }
 
-export function verifyInstalledR6Overlay({sourceRoot,pcHome,approvedSha,overlay,
+function verifyInstalledR6OverlayCore({sourceRoot,pcHome,approvedSha,overlay,
  read=fs.readFileSync,exists=fs.existsSync,
- git=(args)=>execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,stdio:'pipe'}).trim()}={}){
+ git=(args)=>execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,stdio:'pipe'}).trim()}={},manualDol=false){
  need(process.platform==='win32'&&same(sourceRoot,R6_B_SOURCE)&&same(pcHome,R6_B_HOME),
   'R6_B_WINDOWS_PATH_STOP');
  need(exists(path.join(pcHome,'storage','core.sqlite')),
   'R6_B_EXISTING_CORE_DB_REQUIRED');
  const config=JSON.parse(read(path.join(pcHome,'config.json'),'utf8'));
- need(config.enabled===true&&config.collectionTarget==='pc'&&
-  config.employmentR6AutoCollection===true&&
-  config.employmentR6OneYearAutoPublication===true&&
-  config.source===approvedSha&&git(['rev-parse','HEAD'])===approvedSha,
+ need(isApprovedR6RuntimeMode(config,approvedSha,manualDol)&&
+  git(['rev-parse','HEAD'])===approvedSha,
   'R6_B_INSTALLED_SOURCE_STOP');
  git(['diff','--quiet','HEAD','--','lib','worker','scripts/pc-writer']);
  for(const file of overlay.files){
@@ -185,6 +183,31 @@ export function verifyInstalledR6Overlay({sourceRoot,pcHome,approvedSha,overlay,
   'R6_B_INSTALLED_OVERLAY_DRIFT_STOP');
  }
  return config;
+}
+
+export function isApprovedR6RuntimeMode(config,approvedSha,manualDol=false){
+ return config?.enabled===true&&config.collectionTarget==='pc'&&
+  (manualDol||(config.employmentR6AutoCollection===true&&
+   config.employmentR6OneYearAutoPublication===true))&&
+  config.source===approvedSha;
+}
+export function verifyInstalledR6Overlay(input={}){
+ return verifyInstalledR6OverlayCore(input,false);
+}
+export function verifyInstalledR6DolManualOverlay(input={}){
+ // The only authorized manual-only caller has independently validated its
+ // signed DOL SQLite approval; the exact three source files stay hash-pinned.
+ const files=input?.overlay?.files;
+ const expected=new Set([
+  'lib/market-score/employment-r6-provider.mjs',
+  'lib/market-score/employment-r6-collector.mjs',
+  'lib/market-score/employment-r6-scheduler.mjs',
+ ]);
+ need(Array.isArray(files)&&files.length===expected.size&&
+  files.every(f=>expected.has(f?.path)&&SHA64.test(f?.afterSha256??''))&&
+  new Set(files.map(f=>f.path)).size===expected.size,
+  'R6_DOL_FILE_SCOPE_STOP');
+ return verifyInstalledR6OverlayCore(input,true);
 }
 
 function withCoreLock(pcHome,requestId){
@@ -440,7 +463,7 @@ export async function runR6RegisteredOnce({env=process.env}={}){
  if(parsedApproval?.schema==='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1'){
   const {runDolManualOnce}=await import('./dol-manual-v1.mjs');
   return runDolManualOnce({event,env,approvalBytes,
-   verify:verifyInstalledR6Overlay,acquire:acquireCoreLockBounded,
+   verify:verifyInstalledR6DolManualOverlay,acquire:acquireCoreLockBounded,
    claim:claimOnce});
  }
  const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';
