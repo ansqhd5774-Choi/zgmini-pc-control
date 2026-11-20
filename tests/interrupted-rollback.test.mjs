@@ -29,7 +29,7 @@ test('missing or rejected verified postcheck keeps old safe WAIT without runtime
  for(const rejected of [
   { ...valid, postIssueNumber:null },
   { ...valid, targetSha:null },
-  { ...valid, status:'RUNNING' }
+  { ...valid, status:'RUNNING',phase:'POSTCHECK_PENDING' }
  ]){
   const f=fixture();f.port.confirmPostcheckFailure=async()=>true;
   const out=await reconcileInterruptedRollback(rejected,f.port,f.persist);
