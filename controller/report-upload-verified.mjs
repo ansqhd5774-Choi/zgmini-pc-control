@@ -1,3 +1,25 @@
+// A damaged installed operations policy must not suppress the specific BLOCKED
+// receipt produced by entry.mjs. This is NOT a general policy fallback: the
+// destination, report budget, run identity and failure code are all fixed.
+export function resolveUploadPolicy(policyBytes,{pointer,runId,attempt,seat}={}){
+ let policy;
+ try{
+  policy=JSON.parse(policyBytes);
+  if(policy&&typeof policy==='object'&&!Array.isArray(policy))return policy;
+ }catch{}
+ const report=pointer?.report;
+ if(!Number.isSafeInteger(pointer?.issueNumber)||pointer.issueNumber<1||
+    !/^\\d{1,20}$/.test(String(runId??''))||
+    !/^\\d{1,3}$/.test(String(attempt??''))||
+    !/^[1-6]$/.test(String(seat??''))||
+    report?.schema!=='ZGMINI_PC_RESULT_V1'||
+    report.jobId!==`run-${runId}-${attempt}-seat-${seat}`||
+    report.status!=='BLOCKED'||report.code!=='CONTROLLER_POLICY_UNAVAILABLE'||
+    report.operationalWrites!==0||report.providerCalls!==0||report.d1Writes!==0)
+  throw Object.assign(Error('REPORT_POLICY_UNAVAILABLE'),{code:'REPORT_POLICY_UNAVAILABLE'});
+ return {controlRepository:'ansqhd5774-Choi/zgmini-pc-control',maxReportBytes:32768};
+}
+
 /**
  * Verify both public job-result artifacts after each idempotent upload.
  * No filesystem access and no arbitrary path from an Issue payload.
