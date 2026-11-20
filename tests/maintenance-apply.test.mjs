@@ -11,11 +11,25 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
 import {readControllerUpdateArtifacts,confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
-  closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
+  closeLatestPause,backlogIssueInPause,prevalidationInventory,admittedMaintenanceIssueState} from '../tools/update.mjs';
 import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
+test('closed source Issue can only be used for separately approved recovery, never new installation',()=>{
+ const issue={title:'pc-controller-update',state:'closed',state_reason:'completed'};
+ assert.equal(admittedMaintenanceIssueState(issue),false);
+ assert.equal(admittedMaintenanceIssueState(issue,{recovery:false}),false);
+ assert.equal(admittedMaintenanceIssueState(issue,{recovery:true}),true);
+ assert.equal(admittedMaintenanceIssueState({...issue,state:'open'},{recovery:false}),true);
+ for(const state_reason of ['not_planned','duplicate',null,undefined]){
+  assert.equal(admittedMaintenanceIssueState({...issue,state_reason},{recovery:true}),false);
+ }
+ assert.equal(admittedMaintenanceIssueState({...issue,state:'closed',title:'pc-job'},{recovery:true}),false);
+ assert.equal(admittedMaintenanceIssueState({...issue,state:'draft'},{recovery:true}),false);
+ assert.equal(admittedMaintenanceIssueState(null,{recovery:true}),false);
+});
+
 test('no-effect proof rejects an incomplete, substituted or absent installed file inventory',()=>{
  const h='0'.repeat(64),files=Object.fromEntries(INSTALLABLE_FILES.map(x=>[x,h]));
  assert.equal(INSTALLABLE_FILES.length,9);
