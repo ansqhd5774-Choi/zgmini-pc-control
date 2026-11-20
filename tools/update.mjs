@@ -14,7 +14,7 @@ import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
   validateControllerOnlyInstallDelta,validateControllerSelectivePin,
-  validateControllerImportClosure,
+  validateControllerImportClosure,controllerImportScanRoots,
   deployableControllerTreePaths,
   isControllerSourceTestPath,
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
@@ -1305,7 +1305,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    // Fail closed against the full target tree (not main) before any staging,
    // intake pause or Controller mutation. A one-file overlay must not import
    // modules that were never installed in its immutable baseline.
-   validateControllerImportClosure(deployed,changed,
+   // An unchanged entry/operations module can still import a missing target
+   // dependency; verify these runtime roots as well as changed overlay files.
+   validateControllerImportClosure(deployed,controllerImportScanRoots(changed),
      rel=>git(['show',manifest.targetSha+':'+rel]));
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
