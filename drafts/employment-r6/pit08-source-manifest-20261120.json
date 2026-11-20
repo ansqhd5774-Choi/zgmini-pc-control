@@ -1,7 +1,7 @@
 {
   "schema": "ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "sourceSha": "a0ee44bc7a66edec804de2ad9eab284bca4a64ca",
+  "sourceSha": "8c4a63ee5f220976ec28f42a97bef899d29d4ec7",
   "sourceBranch": "codex/w04-pit08-source-bundle-20261120",
   "entrypoint": "scripts/pc-writer/employment-r6-runner-stage.mjs",
   "files": {
