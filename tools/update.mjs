@@ -1543,6 +1543,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    return host.controllerSourceSha===manifest.installedSha&&Object.entries(host.controllerFiles).every(([rel,d])=>fs.existsSync(path.join(snapshotRoot,rel))&&sha256(fs.readFileSync(path.join(snapshotRoot,rel)))===d);
   },
   restore:async()=>{
+   // The independent recovery operator must prove that the runner inventory
+   // endpoint is readable before touching intake. Drain still rechecks the
+   // live roster after pause; this is not an idle/availability shortcut.
+   if(recoveryOperator&&!pausedByUs)apiRunners();
    // A postcheck may have failed after the new listener came online. Stop its
    // tree only AFTER pausing intake and observing zero jobs/uploads again.
    if(!pausedByUs){
