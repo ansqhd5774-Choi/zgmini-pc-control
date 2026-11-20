@@ -72,8 +72,8 @@ test('network exception terminates without retries, raw exception or credentials
 });
 
 test('025 completed Census CDN Issue intake is retired while the fixed read-only probe remains',()=>{
- assert.equal(existsSync(new URL('../.github/workflows/pc-census-cdn-connectivity-once.yml',import.meta.url)),false);
- assert.equal(existsSync(new URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url)),true);
+ assert.equal(existsSync(new globalThis.URL('../.github/workflows/pc-census-cdn-connectivity-once.yml',import.meta.url)),false);
+ assert.equal(existsSync(new globalThis.URL('../.github/workflows/pc-process-inventory-readonly.yml',import.meta.url)),true);
  assert.equal(URL,'https://cdn.www.census.gov/econ/bfs/csv/bfs_monthly.csv');
  assert.equal(ISSUE_TITLE,'pc-census-cdn-connectivity-once');
 });
