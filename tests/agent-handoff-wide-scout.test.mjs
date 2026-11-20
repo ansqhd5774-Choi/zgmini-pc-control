@@ -173,3 +173,35 @@ test('status-partition coverage prevents a newest-300-only blind spot',()=>{
   assert.equal(report.inventory.statusCoverage[0].complete,false);
   assert.match(renderWideReport(report),/failure=200\(미완전\)/);
 });
+
+test('shard closing after selection recovers with a fresh authenticated shard',async()=>{
+  const entries=[];const comments=new Map();let next=4000,reads=0;
+  const io={
+    getRuns:async()=>({items:[],complete:true,coverage:[]}),
+    getIssues:async()=>({items:[],complete:true}),
+    getPulls:async()=>({items:[],complete:true}),
+    getWorkflows:async()=>workflows.map((w,i)=>i===0?{...w,state:'disabled_manually'}:w),
+    getScheduleCount:async()=>0,
+    findShards:async()=>entries.map(x=>({...x})),
+    readShard:async n=>entries.find(x=>x.number===n),
+    readShardComments:async n=>{
+      reads++;
+      // First post-selection readback closes shard #1, simulating another worker.
+      if(reads===4&&entries[0])entries[0].state='closed';
+      return [...(comments.get(n)||[])];
+    },
+    createShard:async(month,index,title,marker)=>{
+      const item={number:next++,title,body:marker,state:'open',user:{login:OWNER}};
+      entries.push(item);comments.set(item.number,[]);return item;
+    },
+    postComment:async(n,body)=>comments.get(n).push({
+      id:1,created_at:recent,user:{login:'github-actions[bot]'},body
+    })
+  };
+  const result=await scoutWide(io,now);
+  assert.equal(result.posted,1);
+  assert.equal(entries.length,2);
+  assert.equal(entries[0].state,'closed');
+  assert.equal(comments.get(entries[0].number).length,0);
+  assert.equal(comments.get(entries[1].number).length,1);
+});
