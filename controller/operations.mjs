@@ -11,11 +11,13 @@ import {inspectWriterB1063Recovery} from './writer-b-1063-recovery-readonly.mjs'
 import {inspectSharedResourceReleaseReadonly} from './shared-resource-release-readonly.mjs';
 import {inspectPcSourceOrigin} from './pc-source-origin-readonly.mjs';
 import {inspectR54SixFileInventory} from './r54-sixfile-inventory-readonly.mjs';
+import {inspectR54RuntimeBinding} from './r54-runtime-binding-readonly.mjs';
 import {inspectR47TaskActionReadonly} from './theme-r47-task-action-readonly.mjs';
 import {inspectR17Windows,R17_PATCH_TEXT} from './us-breadth-r17-preflight.mjs';
 import {inspectUsBreadthR17Runtime} from './us-breadth-r17-runtime-readonly.mjs';
 import {inspectR17PostCancel,ONE_SHOT_DIAGNOSTIC_ID} from './r17-268-postcancel-readonly.mjs';
 import {inspectER1SavedInput} from './market-calendar-er1-saved-readonly.mjs';
+import {inspectInflationCausalSaved} from './inflation-causal-saved-readonly.mjs';
 import {inspectDeltaR44CheckpointEvidence} from './market-calendar-r44-runtime-readonly.mjs';
 import {inspectR44ExistingInputAudit} from './market-calendar-r44-input-audit-readonly.mjs';
 import {inspectR44ProductionReadonly} from './market-calendar-r44-production-readonly.mjs';
@@ -29,7 +31,7 @@ import {inspectProviderActivity} from './provider-activity-runtime-readonly.mjs'
 import {inspectThemeL7RuntimeReadonly} from './theme-l7-runtime-readonly.mjs';
 import {inspectNineR32RawCoverage} from './theme-nine-r32-raw-coverage-readonly.mjs';
 import {inspectA401Private23} from './inflation-a401-private23-readonly.mjs';
- import {inspectA407IntegrityReadonly} from './inflation-a407-integrity-readonly.mjs';
+import {inspectA407IntegrityReadonly} from './inflation-a407-integrity-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
@@ -37,6 +39,7 @@ import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs'
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
 import {inspectEmploymentR6CollectionEvidence} from './employment-r6-collection-evidence-readonly.mjs';
 import {inspectEmploymentR6RawRunLight} from './employment-r6-raw-run-attestation-readonly.mjs';
+import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
 const retiredIranTask='ZGMINI-PC-Iran-Progress-R13';
 const taskNotFound=text=>/cannot find the file|cannot find the specified|does not exist|지정.*(?:파일|작업|경로).*찾을 수 없|찾을 수 없.*(?:파일|작업|경로)/i.test(text);
@@ -48,11 +51,16 @@ export function attestRetiredIranAbsence({exact,inventory}){
  need(exact.status!==0,'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
  need(exact.status===1&&taskNotFound(decodeTaskOutput(exact.stderr??Buffer.alloc(0))),
   'RETIRED_IRAN_QUERY_UNCERTAIN');
- need(inventory&&!inventory.error&&!inventory.signal&&inventory.status===0,
-  'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ // Preserve the existing fail-closed code while distinguishing a failed
+ // scheduler command from a successful command with an unparseable inventory.
+ const inventoryError=probeReason=>Object.assign(
+  new Error('RETIRED_IRAN_INVENTORY_UNAVAILABLE'),
+  {code:'RETIRED_IRAN_INVENTORY_UNAVAILABLE',probeReason});
+ if(!inventory||inventory.error||inventory.signal||inventory.status!==0)
+  throw inventoryError('SCHTASKS_INVENTORY_COMMAND_FAILED');
  const names=decodeTaskOutput(inventory.stdout??Buffer.alloc(0)).split(/\r?\n/)
   .map(line=>line.match(/^\s*"([^"]+)"\s*,/)?.[1]??null).filter(Boolean);
- need(names.length>0,'RETIRED_IRAN_INVENTORY_UNAVAILABLE');
+ if(names.length===0)throw inventoryError('SCHTASKS_INVENTORY_EMPTY_PARSE');
  need(!names.some(name=>/ZGMINI-PC-Iran/i.test(name)),'RETIRED_IRAN_UNEXPECTEDLY_ACTIVE');
  return 'APPROVED_RETIRED_ABSENT';
 }
@@ -73,8 +81,28 @@ export function protectedState(dataRoot,{queryTask,retiredTaskEvidence=nativeRet
  }
  return output;
 }
+// Project only bounded, non-sensitive R6 status from existing Core/Writer ledgers.
+const r6GroupNames=new Set([
+ 'DOL_UI_WEEKLY_CLAIMS','BLS_EMPLOYMENT_SITUATION','BLS_JOLTS',
+ 'BLS_ECI','BLS_STATE_MSA','BLS_BED',
+]);
 const r6Code=value=>typeof value==='string'&&/^[A-Z][A-Z0-9_]{0,99}$/.test(value)?value:null;
 const r6Count=value=>Number.isSafeInteger(value)&&value>=0&&value<=100000?value:null;
+function r6CollectionProjection(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+ const rows=(items,planned)=>Array.isArray(items)?items.slice(0,12).flatMap(item=>{
+  if(!item||!r6GroupNames.has(item.groupName))return [];
+  const status=r6Code(item.status);
+  if(!status)return [];
+  return [{groupName:item.groupName,status,
+   ...(r6Code(item.failureCode)?{failureCode:r6Code(item.failureCode)}:{}),
+   ...(!planned&&r6Count(item.providerRequests)!==null?{providerRequests:item.providerRequests}:{}),
+   ...(planned?{due:item.due===true}: {})}];
+ }).slice(0,6):[];
+ return {status:r6Code(raw.status),code:r6Code(raw.code),
+  providerRequests:r6Count(raw.providerRequests),
+  groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
+}
 function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
  if(!/^[a-f0-9]{64}$/.test(checksum??''))return 'NO_HASH';
  const folder=path.join(root,'employment-r6-public-results');
@@ -89,7 +117,11 @@ function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
     ||!Array.isArray(body?.indicators)||body.indicators.length!==29
     ||body.asOfDate!==asOfDate||body.sourceStoredAt!==sourceStoredAt)
     return 'METADATA_MISMATCH';
-  return 'VERIFIED';
+  // Model provenance is read exclusively from the same checksum-verified body.
+  if(!/^EMP-R6-FORMULA-R[0-9]{1,2}$/.test(body.methodologyVersion??'')
+    ||!/^sha256:[a-f0-9]{64}$/.test(body.formulaHash??''))return 'MODEL_PROVENANCE_INVALID';
+  return {status:'VERIFIED',methodologyVersion:body.methodologyVersion,
+   formulaHash:body.formulaHash};
  }catch(error){return error?.code==='ENOENT'?'MISSING':'READ_FAILED';}
 }
 function r6PublicationProjection(report,root){
@@ -108,7 +140,12 @@ function r6PublicationProjection(report,root){
  if(localHash!==null){
   projected.localResultHash=localHash;
   projected.localResultStored=typeof raw?.localResultStored==='boolean'?raw.localResultStored:null;
-  projected.localResultReadback=r6LocalResultReadback(root,localHash,safeDate,sourceStoredAt);
+  const result=r6LocalResultReadback(root,localHash,safeDate,sourceStoredAt);
+  projected.localResultReadback=typeof result==='string'?result:result.status;
+  if(typeof result==='object'&&result?.status==='VERIFIED'){
+   projected.methodologyVersion=result.methodologyVersion;
+   projected.formulaHash=result.formulaHash;
+  }
  }
  return projected;
 }
@@ -118,6 +155,10 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
   const s=fs.statSync(p);let data;try{data=JSON.parse(fs.readFileSync(p));}catch{data={};}
   out.checkpoints[file]={exists:true,modifiedAt:s.mtime.toISOString(),bytes:s.size,status:typeof data.status==='string'&&/^[A-Z0-9_:-]{1,80}$/.test(data.status)?data.status:null};
+  if(file==='local-collection-last-run.json'){
+   const employmentR6=r6CollectionProjection(data.employmentR6Collection);
+   if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
+  }
   if(file==='local-writer-last-run.json'){
    const employmentR6=r6PublicationProjection(data,root);
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
@@ -167,6 +208,7 @@ export async function runOperation(request,context){
  if(request.operation==='us-breadth-r17-runtime-readonly')return inspectUsBreadthR17Runtime(dataRoot);
  if(request.operation==='pc-source-origin-readonly')return inspectPcSourceOrigin({dataRoot});
  if(request.operation==='r54-sixfile-inventory-readonly')return inspectR54SixFileInventory(dataRoot);
+ if(request.operation==='r54-runtime-binding-readonly')return inspectR54RuntimeBinding({queryTask});
  if(request.operation==='r47-task-action-readonly')return inspectR47TaskActionReadonly();
  if(request.operation==='release-calendar-runtime-readonly'){
   let coreTaskXml=null;try{coreTaskXml=queryTask('ZGMINI-PC-Local-Core');}catch{}
@@ -178,6 +220,7 @@ export async function runOperation(request,context){
  if(request.operation==='market-calendar-r44-input-audit-readonly')return inspectR44ExistingInputAudit(dataRoot);
  if(request.operation==='market-calendar-r44-production-readonly')return inspectR44ProductionReadonly();
  if(request.operation==='market-calendar-er1-saved-status')return inspectER1SavedInput(dataRoot);
+ if(request.operation==='inflation-causal-saved-status')return inspectInflationCausalSaved(dataRoot);
  if(request.operation==='market-calendar-er1-nov30-availability')return inspectER1NovemberAvailability(dataRoot);
  if(request.operation==='asset-r10-publication-status')return inspectAssetR10Publication(dataRoot);
  if(request.operation==='asset-r10-source-readonly')return inspectAssetR10SourceBytes(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
@@ -185,6 +228,7 @@ export async function runOperation(request,context){
  if(request.operation==='employment-r6-wal-memory-preflight')return inspectEmploymentR6WalMemoryPreflight({host});
  if(request.operation==='employment-r6-collection-evidence-readonly')return inspectEmploymentR6CollectionEvidence(dataRoot);
  if(request.operation==='employment-r6-raw-run-attestation-readonly')return inspectEmploymentR6RawRunLight(dataRoot);
+ if(request.operation==='earnings-bea-mfg-archive-readonly')return inspectBeaMfgArchiveReadonly(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
   const minimum=policy.operations[request.operation].minimumFreeMiB??policy.minimumFreeMiBForHeavy;
   if(os.freemem()/1048576<minimum)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',
