@@ -21,6 +21,7 @@ export const CORE_HANDOFF_SOURCE_FILES=Object.freeze([
  'scripts/pc-writer/inflation-core-owned-lock-proof.mjs',
  'scripts/pc-writer/inflation-core-owned-static-once.mjs',
  'scripts/pc-writer/inflation-core-owned-static-ops.mjs',
+ 'scripts/pc-writer/inflation-core-handoff-signature.mjs',
  'scripts/pc-writer/inflation-causal-candidate-manual-official-r1.mjs',
  'scripts/pc-writer/inflation-causal-candidate-manual-official-store-r1.mjs',
  'lib/diagnostic-layer/xlsx-lite.mjs',
