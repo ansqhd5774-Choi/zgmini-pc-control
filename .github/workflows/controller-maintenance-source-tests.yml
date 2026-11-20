@@ -314,7 +314,7 @@ jobs:
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Verify W01 Core-owned V3 event and manifest authorization only
         if: steps.scope.outputs.w01 == 'true'
-        run: node --test --test-concurrency=1 inflation-core-handoff/contract.test.mjs
+        run: node --test --test-concurrency=1 inflation-core-handoff/contract.test.mjs inflation-core-handoff/signed-envelope.test.mjs
       - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
         if: steps.scope.outputs.w01 == 'true'
         run: node --test --test-concurrency=1 inflation-census-api-b/contract.test.mjs inflation-census-api-b/coordinator.test.mjs inflation-census-api-b/report.test.mjs
