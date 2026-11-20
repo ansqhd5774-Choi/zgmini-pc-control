@@ -484,7 +484,7 @@ test('reporter forwards only a known preimage check and no raw PC values',()=>{
 });
 
 test('preimage check is retained in exact JSON/TXT readback, raw values omitted',async()=>{
- const x=fixture(),created=new Map();
+ const x=fixture(),created=new Map();let posted;
  const raw={requestId:RID,status:'WRITER_B_PREFLIGHT_STOP',
   code:'WRITER_B_PC_PREIMAGE_STOP',preimageCheck:'HEAD',
   observedHead:'PRIVATE_SHA_NEVER_PUBLISH'};
@@ -495,7 +495,7 @@ test('preimage check is retained in exact JSON/TXT readback, raw values omitted'
   }
   if(init.method==='GET')return {status:200,json:async()=>({encoding:'base64',
    content:Buffer.from(created.get(url.replace('?ref=main',''))??'').toString('base64')})};
-  if(init.method==='POST')return {status:201};
+  if(init.method==='POST'){posted=JSON.parse(init.body).body;return {status:201};}
  };
  const report=await uploadWriterBReport({event:x.event,env:x.env,
   rawResult:JSON.stringify(raw),apiFetch});
@@ -507,6 +507,10 @@ test('preimage check is retained in exact JSON/TXT readback, raw values omitted'
  assert.ok(txt.includes('PREIMAGE_CHECK=HEAD'));
  assert.equal(json.includes('PRIVATE_SHA_NEVER_PUBLISH'),false);
  assert.equal(txt.includes('PRIVATE_SHA_NEVER_PUBLISH'),false);
+ assert.match(posted,/최초 차단 조건: `HEAD`/);
+ assert.match(posted,/다음 행동:/);
+ assert.match(posted,/\[JSON\]\(https:\/\/github.com\//);
+ assert.equal(posted.includes('PRIVATE_SHA_NEVER_PUBLISH'),false);
 });
 
 test('reporter keeps legacy first diagnostic but discards unsafe appended batch',()=>{

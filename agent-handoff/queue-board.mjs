@@ -141,6 +141,21 @@ export function compileQueueBoard(items,nowMs,
     statuses,alerts,roles,records,operationalWrites:0,aiCalls:0,automaticPcRetries:0});
 }
 
+// Advice only; never manufactures an ACK, changes routing or schedules work.
+export function queueItemNextAction(record){
+ const actions={
+  AWAITING_CANDIDATE_SELECTION:'기존 후보 선정 결과 확인. 접수를 실제 인수로 보지 않음',
+  PENDING_OWNER_ACK:'실제 담당 인수 미확인. 기존 총괄이 인수 여부를 확인',
+  ACKNOWLEDGED:'인수한 담당자가 원래 승인 업무에 착수',
+  WORKING:'기존 처리를 계속. 같은 작업 중복 발행 금지',
+  WAITING_EVIDENCE:'기존 실행·저장 결과에서 부족한 증거만 회수',
+  DIAGNOSIS_EVIDENCE_RECORDED:'반환된 진단으로 원래 장애 수정. 진단 반환은 해결 완료가 아님',
+  RESULT_EVIDENCE_RECORDED:'반환 결과의 범위와 원래 업무 완료 여부 확인',
+  PROOF_REVIEW_REQUIRED:'해당 Issue의 증거 불일치만 확인. 독립 업무는 계속'
+ };
+ return actions[record.status]??'원본 Issue에서 현재 상태 확인';
+}
+
 export function renderBoardMarkdown(board){
   if(board.schema!=='ZGMINI_HANDOFF_BOARD_R1')fail('OUTPUT_SCHEMA');
   const out=['# ZGMINI 공통 대기열 관제','',
@@ -153,14 +168,15 @@ export function renderBoardMarkdown(board){
     '현재 대기 중 ACK 기록만 확인된 건: **'+board.ackOnlyCount+
       '** · 인증 계정 인수: **'+board.verifiedOwnerAccounts+
       '** · 확인 후보: **'+board.reviewAlertCount+'**',
-    '','| 우선순위(참고) | Issue | 유형 | 역할 | 증거상태 | 검증 원인 | 마지막 진행 이후(h) | 확인사항 |',
-    '|---|---|---|---|---|---|---:|---|'];
+    '','접수·후보 선정은 실제 담당 인수가 아닙니다. 이미 인수한 담당자는 자동 연결 표기와 무관하게 승인 업무를 계속합니다.',
+    '','| 우선순위(참고) | Issue | 유형 | 역할 | 증거상태 | 검증 원인 | 마지막 진행 이후(h) | 확인사항 | 다음 행동 |',
+    '|---|---|---|---|---|---|---:|---|---|'];
   for(const x of board.records){
     const ref='[#'+x.issueNumber+'](https://github.com/'+HANDOFF_REPOSITORY+
       '/issues/'+x.issueNumber+')';
     out.push('| '+x.priority+' ('+x.score+') | '+ref+' | '+(x.kind??'UNVERIFIED')+
       ' | '+x.role+' | '+x.status+' | '+x.evidenceState+' | '+(x.lastProgressHours??'—')+
-      ' | '+x.alert+' |');
+      ' | '+x.alert+' | '+queueItemNextAction(x)+' |');
   }
   out.push('','- 우선순위는 오류 종류·단계·GitHub 생성 시각에 따른 **검토 순서**이며 실제 운영 영향이나 확정 긴급도가 아닙니다.',
     '- 인수 표시는 GitHub 계정 댓글 영수증만 확인합니다. 특정 일반챗 자동 실행·수신/운영 적용을 증명하지 않습니다.',
