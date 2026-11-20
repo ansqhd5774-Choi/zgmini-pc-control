@@ -187,7 +187,7 @@ test('shard closing after selection recovers with a fresh authenticated shard',a
     readShardComments:async n=>{
       reads++;
       // First post-selection readback closes shard #1, simulating another worker.
-      if(reads===4&&entries[0])entries[0].state='closed';
+      if(reads===2&&entries[0])entries[0].state='closed';
       return [...(comments.get(n)||[])];
     },
     createShard:async(month,index,title,marker)=>{
