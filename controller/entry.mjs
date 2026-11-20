@@ -9,6 +9,14 @@ try{
  event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
  try{policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));}
  catch{throw Object.assign(Error('CONTROLLER_POLICY_UNAVAILABLE'),{code:'CONTROLLER_POLICY_UNAVAILABLE'});}
+ // A syntactically valid scalar or incomplete object is not an executable
+ // local policy. Keep it inside the same fixed BLOCKED receipt boundary.
+ need(policy!==null&&typeof policy==='object'&&!Array.isArray(policy)&&
+  policy.controlRepository==='ansqhd5774-Choi/zgmini-pc-control'&&
+  Number.isSafeInteger(policy.maxReportBytes)&&policy.maxReportBytes>0&&
+  Array.isArray(policy.allowedActors)&&
+  policy.operations!==null&&typeof policy.operations==='object'&&
+  !Array.isArray(policy.operations),'CONTROLLER_POLICY_UNAVAILABLE');
  // Host snapshot is loaded inside the receipt boundary: a missing or invalid
  // host manifest must not suppress the fixed BLOCKED JSON/TXT upload path.
  let host;

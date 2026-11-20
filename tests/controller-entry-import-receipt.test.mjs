@@ -23,7 +23,7 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   const repository='ansqhd5774-Choi/zgmini-pc-control';
   fs.writeFileSync(path.join(root,'config','operations.json'),JSON.stringify({
    controlRepository:repository,sourceRepository:'ansqhd5774-Choi/zgmini',
-   allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60}}
+   maxReportBytes:32768,allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60}}
   }));
   // A valid installed manifest must attest a nonempty, scoped source inventory.
   const paths=['config/operations.json','controller/common.mjs','controller/engine.mjs',
@@ -124,7 +124,10 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   // The trusted GitHub event remains available for the original Issue number.
   const policyFile=path.join(root,'config','operations.json');
   const policyBytes=fs.readFileSync(policyFile);
-  for(const invalidPolicy of ['{broken json','']){
+  for(const invalidPolicy of ['{broken json','','null','[]','42','"string"','{}',
+   JSON.stringify({controlRepository:'ansqhd5774-Choi/zgmini-pc-control',maxReportBytes:32768}),
+   JSON.stringify({controlRepository:'incorrect/repo',maxReportBytes:32768,
+    allowedActors:['ansqhd5774-Choi'],operations:{}})]){
    fs.writeFileSync(policyFile,invalidPolicy);
    fs.rmSync(reportFile,{force:true});
    const badPolicy=spawnSync(process.execPath,

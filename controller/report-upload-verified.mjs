@@ -5,7 +5,10 @@ export function resolveUploadPolicy(policyBytes,{pointer,runId,attempt,seat}={})
  let policy;
  try{
   policy=JSON.parse(policyBytes);
-  if(policy&&typeof policy==='object'&&!Array.isArray(policy))return policy;
+  if(policy&&typeof policy==='object'&&!Array.isArray(policy)&&
+     policy.controlRepository==='ansqhd5774-Choi/zgmini-pc-control'&&
+     Number.isSafeInteger(policy.maxReportBytes)&&policy.maxReportBytes>0)
+   return policy;
  }catch{}
  const report=pointer?.report;
  const fields=['schema','jobId','status','code','lastPass','firstFail',
