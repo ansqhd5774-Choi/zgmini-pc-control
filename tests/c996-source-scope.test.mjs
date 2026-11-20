@@ -31,6 +31,9 @@ test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['.github/workflows/pc-ai-software-v2-register-once.yml']),['aiSoftware']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-cache-hotfix-once.yml']),['calendar019']);
  assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-cf43-two-approved-b-once.yml']),['calendar020']);
+ assert.deepEqual(selectGroups(['.github/workflows/pc-calendar-d30-readonly-preview-once.yml']),['calendar021']);
+ assert.deepEqual(selectGroups(['tests/calendar-source-d30-windows-preview-host.test.mjs']),['calendar021']);
+ assert.deepEqual(selectGroups(['tests/calendar-source-d30-windows-d30-sqlite-readback.test.mjs']),['calendar021']);
  assert.deepEqual(selectGroups(['calendar-cf43-b-windows-adapter/contract.test.mjs']),['calendar020']);
  assert.deepEqual(selectGroups(['calendar-cache-hotfix/installer/install.test.mjs']),['calendar019']);
  assert.deepEqual(selectGroups(['tests/ai-software-v2-register-once.test.mjs']),['aiSoftware']);
