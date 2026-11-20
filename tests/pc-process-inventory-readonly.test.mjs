@@ -1,9 +1,12 @@
 import test from 'node:test';
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,inspect1841LeaseCorrelation,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -882,4 +885,62 @@ test('C2505 reports unknown for wrong request, incomplete evidence or changing r
  assert.equal(changed.code,'C2505_DOUBLE_READ_CHANGED');
  assert.equal(inspect2505RecoveryReadonly(()=>{throw Error('private');}).code,
   'C2505_READBACK_FAILED');
+});
+
+test('C2505 byte proof verifies saved Controller closure and baseline without exposing lease identity',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-c2505-proof-'));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const controlRoot=path.join(dir,'control'),maintenanceRoot=path.join(dir,'maintenance');
+ const id='pc-update-8f413b02-4bb7-4d99-b71f-64d9c51a294a';
+ const root=path.join(controlRoot,'backups','controller-update-'+id);
+ const write=(file,body)=>{fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(file,typeof body==='string'?body:JSON.stringify(body));};
+ const old='5e805bc907a4fb9e8d2fb2d53432bfec7b7cea59';
+ const target='0f1effad0c58e8b7bd684aa638521180183ca902';
+ const nonce='11111111-2222-4333-8444-555555555555';
+ const stamp=['2026-11-20T14:20:19.000Z',
+  '2026-11-20T14:25:00.000Z','2026-11-20T14:25:01.000Z'];
+ const ledger={requestId:id,issueNumber:2505,installedShaBefore:old,targetSha:target,
+  status:'RECOVERY_REQUIRED',firstFail:'POSTCHECK_PENDING',updatedAt:stamp[1]};
+ const owner={pid:3210,nonce,at:stamp[0]};
+ const marker={requestOwnerPid:3210,nonce,at:stamp[2]};
+ const files={};
+ for(const rel of ['controller/entry.mjs','controller/engine.mjs',
+  'controller/operations.mjs','controller/common.mjs','config/operations.json']){
+  const bytes='fixture:'+rel;
+  files[rel]=createHash('sha256').update(bytes).digest('hex');
+  write(path.join(root,'snapshot',rel),bytes);
+ }
+ const savedHost=JSON.stringify({controllerSourceSha:old,controllerFiles:files});
+ const baseline={files:{'config.json':'a'},tasks:{'ZGMINI-PC-Local-Core':'b'}};
+ write(path.join(maintenanceRoot,'ledger',id+'.json'),ledger);
+ write(path.join(maintenanceRoot,'leases/controller-install/owner.json'),owner);
+ write(path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),marker);
+ write(path.join(controlRoot,'host.json'),{controllerSourceSha:target});
+ write(path.join(root,'snapshot/host.json'),savedHost);
+ write(path.join(root,'previous-host.json'),savedHost);
+ write(path.join(root,'PROTECTED_BEFORE.json'),baseline);
+ const args={controlRoot,maintenanceRoot,protectedProbe:()=>baseline,pidProbe:()=>false};
+ const good=inspect2505RecoveryByteProof(args);
+ assert.equal(good.status,'READ_ONLY_OBSERVED');
+ assert.equal(good.snapshotFilesVerified,true);
+ assert.equal(good.previousHostMatchesSnapshot,true);
+ assert.equal(good.protectedBaselineMatchesCurrent,true);
+ assert.equal(good.ownerMarkerMatches,true);
+ assert.equal(good.ownerPidPresent,false);
+ assert.equal(good.leaseTimelineAligned,true);
+ assert.equal(good.currentTargetMatches,true);
+ assert.equal(good.leaseBoundToOriginalRequest,null);
+ assert.equal(good.recoveryEligible,false);
+ assert.equal(good.operationalWrites,0);
+ assert.equal(good.providerCalls,0);
+ assert.equal(good.d1Writes,0);
+ assert.equal(JSON.stringify(good).includes(nonce),false);
+ const drift=inspect2505RecoveryByteProof({...args,protectedProbe:()=>({changed:true})});
+ assert.equal(drift.protectedBaselineMatchesCurrent,false);
+ const modulePath=path.join(root,'snapshot/controller/entry.mjs');
+ write(modulePath,'changed');
+ assert.equal(inspect2505RecoveryByteProof(args).snapshotFilesVerified,false);
+ fs.rmSync(path.join(root,'previous-host.json'));
+ assert.equal(inspect2505RecoveryByteProof(args).status,'STATE_UNKNOWN');
 });

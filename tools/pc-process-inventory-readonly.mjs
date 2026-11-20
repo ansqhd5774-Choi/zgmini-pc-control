@@ -11,7 +11,7 @@ import {collectAutomationStatus} from './automation-status.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
-import {readMaintenanceRecoveryStatus} from './update.mjs';
+import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
@@ -395,6 +395,87 @@ export function inspect2505RecoveryReadonly(
   return JSON.stringify(first)===JSON.stringify(second)?second:
    c2505Unknown('C2505_DOUBLE_READ_CHANGED');
  }catch{return c2505Unknown('C2505_READBACK_FAILED');}
+}
+
+// #2505 deep byte evidence on the already approved independent read-only PC
+// inventory. No process termination, lock release, GitHub writes or secret output.
+export function inspect2505RecoveryByteProof({
+ fileSystem=fs,
+ maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
+ controlRoot='E:/ZGmini/automation/pc-control',
+ protectedProbe=protectedSnapshot,
+ pidProbe=pid=>{try{process.kill(pid,0);return true;}catch(e){return e?.code==='ESRCH'?false:null;}}
+}={}){
+ const unknown=code=>({status:'STATE_UNKNOWN',code,
+  snapshotFilesVerified:null,previousHostMatchesSnapshot:null,
+  protectedBaselineMatchesCurrent:null,ownerMarkerMatches:null,
+  ownerPidPresent:null,leaseTimelineAligned:null,currentTargetMatches:null,
+  leaseBoundToOriginalRequest:null,recoveryEligible:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ const root=path.join(controlRoot,'backups','controller-update-'+C2505_ID);
+ const fixed={
+  ledger:path.join(maintenanceRoot,'ledger',C2505_ID+'.json'),
+  owner:path.join(maintenanceRoot,'leases/controller-install/owner.json'),
+  marker:path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),
+  currentHost:path.join(controlRoot,'host.json'),
+  snapshotHost:path.join(root,'snapshot/host.json'),
+  previousHost:path.join(root,'previous-host.json'),
+  protectedBefore:path.join(root,'PROTECTED_BEFORE.json')
+ };
+ const readFixed=(file,max=131072)=>{
+  const st=fileSystem.lstatSync(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<=0||st.size>max)
+   throw Error('FIXED_FILE_INVALID');
+  const bytes=fileSystem.readFileSync(file);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)throw Error('FIXED_BYTES_INVALID');
+  return bytes;
+ };
+ try{
+  const start=Object.fromEntries(Object.entries(fixed).map(([k,p])=>[k,readFixed(p)]));
+  const parse=k=>JSON.parse(start[k].toString('utf8'));
+  const ledger=parse('ledger'),owner=parse('owner'),marker=parse('marker');
+  const nowHost=parse('currentHost'),savedHost=parse('snapshotHost');
+  const baseline=parse('protectedBefore');
+  if(ledger.requestId!==C2505_ID||ledger.issueNumber!==2505||
+    ledger.targetSha!==C2505_TARGET||ledger.firstFail!=='POSTCHECK_PENDING'||
+    ledger.status!=='RECOVERY_REQUIRED')return unknown('C2505_ORIGINAL_LEDGER_UNVERIFIED');
+  const files=savedHost.controllerFiles;
+  if(savedHost.controllerSourceSha!==ledger.installedShaBefore||
+    typeof files!=='object'||!files||Array.isArray(files)||
+    Object.keys(files).length<5||Object.keys(files).length>160)
+    return unknown('C2505_SNAPSHOT_MANIFEST_UNVERIFIED');
+  let snapshotFilesVerified=true;
+  for(const [rel,expected] of Object.entries(files)){
+   if(!/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)||
+      !/^[a-f0-9]{64}$/.test(expected)||
+      createHash('sha256').update(readFixed(path.join(root,'snapshot',rel),2097152))
+       .digest('hex')!==expected){snapshotFilesVerified=false;break;}
+  }
+  const previousHostMatchesSnapshot=start.previousHost.equals(start.snapshotHost);
+  const ownerMarkerMatches=Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+   typeof owner.nonce==='string'&&/^[a-f0-9-]{36}$/i.test(owner.nonce)&&
+   marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce;
+  const pidPresent=ownerMarkerMatches?pidProbe(owner.pid):null;
+  const created=Date.parse(owner.at),updated=Date.parse(ledger.updatedAt),
+   marked=Date.parse(marker.at);
+  // Chronology is useful evidence only: owner/marker have no request ID.
+  const leaseTimelineAligned=Number.isFinite(created)&&Number.isFinite(updated)&&
+   Number.isFinite(marked)&&created<=updated&&updated<=marked&&marked-updated<=60000;
+  let protectedBaselineMatchesCurrent=null;
+  try{protectedBaselineMatchesCurrent=JSON.stringify(protectedProbe())===
+   JSON.stringify(baseline);}catch{/* Scheduler read unavailable, not drift */}
+  const currentTargetMatches=nowHost.controllerSourceSha===C2505_TARGET;
+  const stable=Object.entries(fixed).every(([k,p])=>readFixed(p).equals(start[k]));
+  if(!stable)return unknown('C2505_PROOF_FILES_CHANGED');
+  return {status:'READ_ONLY_OBSERVED',code:'C2505_BYTE_PROOF_OBSERVED',
+   snapshotFilesVerified,previousHostMatchesSnapshot,
+   protectedBaselineMatchesCurrent,ownerMarkerMatches,
+   ownerPidPresent:typeof pidPresent==='boolean'?pidPresent:null,
+   leaseTimelineAligned,currentTargetMatches,
+   // Only the original B operator could attest exact request-owner lineage.
+   leaseBoundToOriginalRequest:null,recoveryEligible:false,
+   operationalWrites:0,providerCalls:0,d1Writes:0};
+ }catch{return unknown('C2505_BYTE_PROOF_UNAVAILABLE');}
 }
 
 // A fixed historical Controller B failure: independently sample only local
@@ -968,6 +1049,7 @@ export function collect(role,ctx,env=process.env){
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
   c2505RecoveryCheckpoint:inspect2505RecoveryReadonly(),
+  c2505ByteProof:inspect2505RecoveryByteProof(),
   c2094StageEvidence:inspect2094StageReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
@@ -1011,6 +1093,7 @@ export function toText(r){
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
   'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
   'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
+  'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
   'marketParquetTaskStatus='+(r.marketParquetTaskSource?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
