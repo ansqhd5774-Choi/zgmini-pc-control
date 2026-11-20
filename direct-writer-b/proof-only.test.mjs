@@ -216,7 +216,7 @@ test('unmatched Issue workflows cannot evict a valid Writer B or proof job',()=>
     ['pc-writer-provider-flags-once.yml',true],
   ];
   for(const [name,writer] of workflows){
-    const yml=fs.readFileSync(path.join(dir,'../.github/workflows',name),'utf8');
+    const yml=fs.readFileSync(path.join(dir,'../.github/workflows',name),'utf8').replace(/\r\n/g,'\n');
     assert.doesNotMatch(yml,/^concurrency:/m,`${name}: run-level collision`);
     assert.match(yml,/^    concurrency:\n      group: /m);
     assert.match(yml,/^      cancel-in-progress: false$/m);

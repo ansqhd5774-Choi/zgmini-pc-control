@@ -105,7 +105,7 @@ test('429 stops without 5-second retry flood or leaking credentials',async()=>{
  assert.ok(!JSON.stringify(report).includes('private-token'));
 });
 test('014 completed isolated Runner context intake is retired without changing read-only probes',()=>{
- assert.equal(existsSync(new URL('../.github/workflows/handoff-watch-runner-context-readonly.yml',import.meta.url)),false);
+ assert.equal(existsSync(new globalThis.URL('../.github/workflows/handoff-watch-runner-context-readonly.yml',import.meta.url)),false);
  assert.equal(POLLS,3);
  assert.equal(INTERVAL_MS,5000);
 });

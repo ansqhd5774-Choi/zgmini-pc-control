@@ -50,8 +50,6 @@ export const GROUPS=Object.freeze({
  calendar023:['calendar-source-recovery-b/installer/export.test.mjs'],
  retiredOneShots:['tests/retired-one-shots-20261120.test.mjs',
   'tests/agent-handoff-watch-runner-context-readonly.test.mjs',
-  'calendar-b-twofile/install.test.mjs',
-  'direct-writer-b/proof-only.test.mjs',
   'r17-sip-refresh-b/workflow.test.mjs',
   'tests/report-recovery-540-workflow.test.mjs'],
  w05B:['tests/w05-r304-report-recovery.test.mjs']
