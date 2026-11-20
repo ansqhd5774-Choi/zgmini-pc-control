@@ -458,7 +458,7 @@ export async function inspectEmploymentR6Candidate(request,context){
     if(body.stateClaimsChart!==undefined){
       const c=body.stateClaimsChart;
       const safeDate=v=>v===null||dateOnly(v)===v;
-      if(!c||!Number.isInteger(c.pointCount)||c.pointCount<0||c.pointCount>400
+      if(!c||!Number.isInteger(c.pointCount)||c.pointCount<0||c.pointCount>600
         ||c.unit!=='%'||typeof c.unitMatchesApproved!=='boolean'
         ||!Number.isInteger(c.gapCount)||c.gapCount<0||c.gapCount>c.pointCount
         ||!safeDate(c.firstDate)||!safeDate(c.lastDate)
