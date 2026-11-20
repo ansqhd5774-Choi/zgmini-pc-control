@@ -669,3 +669,25 @@ test('W04 PIT0407 newer missing c3 revision does not reuse older valid state-wee
  assert.equal(p.invalidLatest,1);
  assert.equal(p.rawPitAttested,false);assert.equal(p.repairAuthorized,false);
 });
+
+test('W04 PIT0407 raw metadata reports only failed field category',t=>{
+ for(const [column,value,reason] of [
+  ['snapshot_id',null,'SNAPSHOT_ID_TYPE'],
+  ['chunk_count',0,'CHUNK_COUNT_RANGE'],
+  ['body_sha256','invalid','BODY_SHA256_FORMAT'],
+  ['retrieved_at','not-a-date','RETRIEVED_AT_FORMAT'],
+ ]){
+  const {data,file}=fixture(t),db=createDb(file);
+  seed(db);seedEta539Parity(db);
+  db.prepare('UPDATE market_score_employment_r6_raw_snapshot_v1 SET '+column+'=? WHERE request_key=?')
+   .run(value,'DOL_ETA539:60w');
+  db.close();
+  const p=inspectEmploymentR6CollectionEvidence(data).eta539RawCurrentParity;
+  assert.equal(p.status,'RAW_METADATA_INVALID',JSON.stringify(p));
+  assert.equal(p.metadataReason,reason);
+  assert.equal(p.rawPitAttested,false);
+  assert.equal(p.repairAuthorized,false);
+  assert.equal(p.providerCalls,undefined);
+  assert.doesNotMatch(JSON.stringify(p),/body_chunk|not-a-date|2026-10-31/i);
+ }
+});
