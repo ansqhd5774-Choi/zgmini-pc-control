@@ -50,11 +50,13 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(pointer.report.providerCalls,0);
   assert.equal(pointer.report.d1Writes,0);
   assert.match(out.stdout,/CONTROLLER_IMPORT_MISSING/);
+  // Missing, invalid JSON and valid JSON with invalid host shape all need an uploadable
+  // BLOCKED receipt, never an uncaught TypeError from Object.entries.
   // A missing or malformed installed host manifest also needs an uploadable
   // receipt. The unchanged policy and original Issue identity remain valid.
   const hostFile=path.join(root,'host.json');
   const reportFile=path.join(root,'reports',`${runId}-1-${seat}.json`);
-  for(const hostBytes of [null,'{not valid json']){
+  for(const hostBytes of [null,'{not valid json','null','[]','"not a host"','{}','{"controllerFiles":null}','{"controllerFiles":[]}']){
    fs.rmSync(reportFile,{force:true});
    if(hostBytes===null)fs.rmSync(hostFile,{force:true});
    else fs.writeFileSync(hostFile,hostBytes);
