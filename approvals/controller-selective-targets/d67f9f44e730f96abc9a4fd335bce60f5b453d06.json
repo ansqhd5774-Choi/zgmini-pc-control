@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead",
+  "targetSha": "d67f9f44e730f96abc9a4fd335bce60f5b453d06",
+  "sourceMainSha": "f22f4f7c2544cd9b9b026a395b7f20c1c9aa442a",
+  "targetBranch": "codex/w04-pit0407-hash-canonical-selective-b-20261120",
+  "customPaths": [
+    "controller/employment-r6-collection-evidence-readonly.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "52eb2adf37fa6ca92de84d6bd6092783994db2d82e43597b8ee45d6e44f505bf"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/0"
+}
