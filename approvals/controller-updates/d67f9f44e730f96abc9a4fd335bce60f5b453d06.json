@@ -1,0 +1,41 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead",
+  "targetSha": "d67f9f44e730f96abc9a4fd335bce60f5b453d06",
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-collection-evidence-readonly.mjs",
+      "sha256": "52eb2adf37fa6ca92de84d6bd6092783994db2d82e43597b8ee45d6e44f505bf"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/0",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "d67f9f44e730f96abc9a4fd335bce60f5b453d06",
+    "status": "PASS",
+    "manifestSha256": "ae63fadb6ea55524497bcbcf9b2b4a8b193f51e40beea31908db1049c8bb0fee"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "codex/employment-1y-reader-r1",
+  "postSourceSha": "0c893c4f9ef605b3f299693c5c01a2547a09dd85",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w04-pit0407-hash-canonical-selective-b-20261120",
+    "mainSha": "f22f4f7c2544cd9b9b026a395b7f20c1c9aa442a",
+    "customPaths": [
+      "controller/employment-r6-collection-evidence-readonly.mjs"
+    ]
+  }
+}
