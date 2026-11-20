@@ -682,6 +682,11 @@ test('unknown controller recovery does not assert disabled workflow',()=>{
  assert.equal(unknown.code,'BACKLOG_ORIGINAL_REQUEST_INVALID');
  assert.equal(unknown.actualControllerSha,TARGET);
  assert.equal(unknown.workflowEnabled,null);
+ assert.equal(unknown.protectedStateUnchanged,null);
+ const explicitlyDrifted=normalizedResult(request,{...raw,protectedStateUnchanged:false});
+ assert.equal(explicitlyDrifted.protectedStateUnchanged,false);
+ const explicitlyPreserved=normalizedResult(request,{...raw,protectedStateUnchanged:true});
+ assert.equal(explicitlyPreserved.protectedStateUnchanged,true);
  const confirmedDisabled=normalizedResult(request,{...raw,workflowEnabled:false});
  assert.equal(confirmedDisabled.workflowEnabled,false);
  const confirmedActive=normalizedResult(request,{...raw,workflowEnabled:true});
