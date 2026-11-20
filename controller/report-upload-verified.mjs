@@ -8,7 +8,13 @@ export function resolveUploadPolicy(policyBytes,{pointer,runId,attempt,seat}={})
   if(policy&&typeof policy==='object'&&!Array.isArray(policy))return policy;
  }catch{}
  const report=pointer?.report;
- if(!Number.isSafeInteger(pointer?.issueNumber)||pointer.issueNumber<1||
+ const fields=['schema','jobId','status','code','lastPass','firstFail',
+  'operationalWrites','providerCalls','d1Writes'];
+ if(!report||typeof report!=='object'||Array.isArray(report)||
+    Object.keys(report).sort().join('|')!==fields.sort().join('|')||
+    report.lastPass!=='EVENT_RECEIVED'||
+    report.firstFail!=='EVENT_OR_REQUEST_VALIDATION'||
+    !Number.isSafeInteger(pointer?.issueNumber)||pointer.issueNumber<1||
     !/^\d{1,20}$/.test(String(runId??''))||
     !/^\d{1,3}$/.test(String(attempt??''))||
     !/^[1-6]$/.test(String(seat??''))||
