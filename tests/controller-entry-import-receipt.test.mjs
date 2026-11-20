@@ -103,7 +103,7 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   // import. It must not fail before entry creates the BLOCKED pointer.
   const preimageFile=path.join(root,'controller','preimage-manifest-contract.mjs');
   fs.writeFileSync(preimageFile,
-   "import './unavailable-preimage-helper.mjs'; export const readStagedPreimageScope=()=>null;\\n");
+   "import './unavailable-preimage-helper.mjs'; export const readStagedPreimageScope=()=>null;\n");
   const withBrokenPreimage={...controllerFiles,
    'controller/preimage-manifest-contract.mjs':createHash('sha256')
     .update(fs.readFileSync(preimageFile)).digest('hex')};
