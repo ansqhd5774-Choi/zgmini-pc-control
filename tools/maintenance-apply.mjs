@@ -289,8 +289,23 @@ export async function reconcileInterruptedRollback(original,port,persist){
     recoveryOperation='preflightRecoveryRestore';
     await port.preflightRecoveryRestore();
    }
-   await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
-   recoveryOperation='restore';await port.restore();await record('RECOVERY_FILES_RESTORED');
+   recoveryOperation='restore';
+   if(port.restoreMarksMutation===true){
+    // Record the durable claim at the first real mutation boundary, not
+    // before repeated read-only roster/protection/backlog checks.
+    let marked=false;
+    await port.restore({beforeMutation:async()=>{
+     if(marked)return;
+     await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
+     marked=true;
+    }});
+    if(!marked)throw fail('RECOVERY_MUTATION_MARKER_MISSING');
+   }else{
+    // Existing restore ports retain their historical conservative contract.
+    await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
+    await port.restore();
+   }
+   await record('RECOVERY_FILES_RESTORED');
    recoveryOperation='reconnectPrevious';await port.reconnectPrevious();
   }
   recoveryOperation='verifyPrevious';
