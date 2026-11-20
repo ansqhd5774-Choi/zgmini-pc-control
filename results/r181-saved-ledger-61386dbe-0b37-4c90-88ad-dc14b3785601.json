@@ -1,0 +1,98 @@
+{
+  "schema": "ZGMINI_R181_SAVED_LEDGER_RESULT_V1",
+  "requestId": "61386dbe-0b37-4c90-88ad-dc14b3785601",
+  "status": "PASS",
+  "code": "R181_SAVED_LEDGER_READONLY",
+  "runId": "44672678154",
+  "sourcePinVerified": true,
+  "coverage": {
+    "coverageStatus": "LEDGER_REPORTED_INCOMPLETE",
+    "reportedState": "OTHER_OR_UNKNOWN",
+    "reportedAt": "2026-11-19T05:00:02.769Z",
+    "providerCalls": 6,
+    "fixedSymbolCount": 14,
+    "matchingRows": 5,
+    "unknownSymbolCount": 0,
+    "symbols": [
+      {
+        "symbol": "SPY",
+        "bars": 31,
+        "latest15NY": "2026-11-17"
+      },
+      {
+        "symbol": "BOTZ",
+        "bars": 26,
+        "latest15NY": "2026-11-17"
+      },
+      {
+        "symbol": "ROBO",
+        "bars": 22,
+        "latest15NY": "2026-11-17"
+      },
+      {
+        "symbol": "SKYY",
+        "bars": 19,
+        "latest15NY": "2026-11-17"
+      },
+      {
+        "symbol": "CLOU",
+        "bars": 18,
+        "latest15NY": "2026-11-17"
+      },
+      {
+        "symbol": "DRIV",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "NLR",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "URA",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "ITA",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "SHLD",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "FINX",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "ARKF",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "CIBR",
+        "bars": null,
+        "latest15NY": null
+      },
+      {
+        "symbol": "BUG",
+        "bars": null,
+        "latest15NY": null
+      }
+    ],
+    "evidenceLevel": "LEDGER_METADATA_ONLY_SQLITE_NOT_VERIFIED",
+    "sqliteOpened": false,
+    "rawShaVerified": false,
+    "checkpointVerified": false
+  },
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "sqliteOpened": false,
+  "d1Writes": 0,
+  "retry": "DO_NOT_REEXECUTE"
+}
