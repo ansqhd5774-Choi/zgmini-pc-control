@@ -112,3 +112,24 @@ export function assertAuthenticatedCoreHandoff(value){
 // No envelope can be constructed from an arbitrary flag/request JSON.
 // Receiver and actual Core-side transport still require an explicit approved
 // implementation and owner-proven readback; this module does not emit files.
+
+/**
+ * Boundary for the existing zgmini Core-owned coordinator, not an executable
+ * message or a transferable grant. Only a branded auth from the trusted,
+ * pinned receiver can be projected to the coordinator's exact fields.
+ */
+export function projectCoreOwnedTransactionApproval(auth){
+ const checked=assertAuthenticatedCoreHandoff(auth);
+ const m=checked.manifest;
+ return Object.freeze({
+  status:m.status,scope:m.scope,
+  requestId:checked.request.requestId,
+  manifestSha256:checked.request.approvalManifestSha256,
+  runCount:m.runCount,coreExecution:m.coreExecution,
+  exactOfficialSources:sameMap(m.providerUrls,URLS)&&
+   sameMap(m.maxBytes,MAX_BYTES),
+  exactTwoTargets:sameMap(m.targetFiles,TARGETS),
+  dbWrites:m.allowDbWrites, d1Writes:m.allowD1Writes,
+  taskChanges:m.allowTaskChanges,sourceChanges:m.allowSourceChanges,
+ });
+}
