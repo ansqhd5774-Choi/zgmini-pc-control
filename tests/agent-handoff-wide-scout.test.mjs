@@ -205,6 +205,15 @@ test('shard closing after selection recovers with a fresh authenticated shard',a
   assert.equal(comments.get(entries[1].number).length,1);
 });
 
+test('full historical read window does not globally block shard rotation',()=>{
+  const report=evaluateWideSnapshot(snapshot({workflows:workflows.map((w,i)=>
+    i===0?{...w,state:'disabled_manually'}:w)}),now);
+  const comments=Array.from({length:WIDE_POLICY.maxComments},(_,i)=>({
+    id:i+1,created_at:older,user:{login:'github-actions[bot]'},body:'historical '+i
+  }));
+  assert.equal(reportDecision(comments,report,now),'REPORT');
+});
+
 test('shard filling after selection recovers without posting to full shard',async()=>{
   const entries=[],comments=new Map();let next=5000,filled=false;
   const io={
