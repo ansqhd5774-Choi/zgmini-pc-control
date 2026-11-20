@@ -40,6 +40,9 @@ export const GROUPS=Object.freeze({
  aiSoftware:['tests/ai-software-v2-register-once.test.mjs'],
  approvedRuntimeA:['windows-runtime-mode-a/approved-runtime-a.test.mjs'],
  calendar019:['calendar-cache-hotfix/installer/install.test.mjs'],
+ calendar020:['calendar-cf43-b-windows-adapter/contract.test.mjs',
+  'calendar-cf43-b-windows-adapter/recovery-plan.test.mjs',
+  'calendar-cf43-b-windows-adapter/upload.test.mjs'],
  w05B:['tests/w05-r304-report-recovery.test.mjs']
 });
 const ALL=Object.keys(GROUPS);
@@ -57,6 +60,7 @@ const MATCH=Object.freeze({
  aiSoftware:/^(?:tests\/ai-software-v2-register-once\.test\.mjs|tools\/ai-software-v2-register-once\.mjs|\.github\/workflows\/pc-ai-software-v2-register-once\.yml)$/,
  approvedRuntimeA:/^(?:windows-runtime-mode-a\/.*|\.github\/workflows\/pc-approved-runtime-a-once\.yml)$/,
  calendar019:/^(?:calendar-cache-hotfix\/.*|\.github\/workflows\/pc-calendar-cache-hotfix-once\.yml)$/,
+ calendar020:/^(?:calendar-cf43-b-windows-adapter\/.*|\.github\/workflows\/pc-calendar-cf43-two-approved-b-once\.yml)$/,
  w05B:/^(?:w05-r304-service-b\/.*|tests\/w05-r304-report-recovery\.test\.mjs)$/
 });
 const isGlobal=p=>p==='.github/workflows/c996-r5-readonly-source-checks.yml'||
