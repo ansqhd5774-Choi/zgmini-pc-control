@@ -439,6 +439,45 @@ export async function inspectEmploymentR6Candidate(request,context){
         rawStatus:['READY','STALE','UNAVAILABLE'].includes(x.rawStatus)?x.rawStatus:'UNAVAILABLE',
         chartStatus:['READY','PARTIAL','UNAVAILABLE'].includes(x.chartStatus)?x.chartStatus:'UNAVAILABLE',
         scoreStatus:['READY','PARTIAL_HISTORY','PARTIAL_MISSING'].includes(x.scoreStatus)?x.scoreStatus:'PARTIAL_MISSING'})):[];
+    // Optional PIT-08 metadata. Older approved bundles remain compatible.
+    const sourceMeta={};
+    if(body.sourceStoredAt!==undefined){
+      if(!Number.isSafeInteger(body.sourceStoredAt)||body.sourceStoredAt<=0)
+        stop('R6_RESULT_INVALID');
+      sourceMeta.sourceStoredAt=body.sourceStoredAt;
+    }
+    if(body.formulaHash!==undefined){
+      if(!/^sha256:[a-f0-9]{64}$/.test(body.formulaHash??''))stop('R6_RESULT_INVALID');
+      sourceMeta.formulaHash=body.formulaHash;
+    }
+    if(body.methodologyVersion!==undefined){
+      if(!/^EMP-R6-FORMULA-R[0-9]{1,2}$/.test(body.methodologyVersion??''))
+        stop('R6_RESULT_INVALID');
+      sourceMeta.methodologyVersion=body.methodologyVersion;
+    }
+    if(body.stateClaimsChart!==undefined){
+      const c=body.stateClaimsChart;
+      const safeDate=v=>v===null||dateOnly(v)===v;
+      if(!c||!Number.isInteger(c.pointCount)||c.pointCount<0||c.pointCount>400
+        ||c.unit!=='%'||typeof c.unitMatchesApproved!=='boolean'
+        ||!Number.isInteger(c.gapCount)||c.gapCount<0||c.gapCount>c.pointCount
+        ||!safeDate(c.firstDate)||!safeDate(c.lastDate)
+        ||!safeDate(c.observationDate)
+        ||(c.pointCount===0&&(c.firstDate!==null||c.lastDate!==null))
+        ||(c.pointCount>0&&(!c.firstDate||!c.lastDate||c.firstDate>c.lastDate))
+        ||(c.lastDate&&c.lastDate>body.asOfDate)
+        ||(c.observationDate&&c.observationDate>body.asOfDate)
+        ||typeof c.lastPointFinite!=='boolean'
+        ||typeof c.lastPointMatchesCurrent!=='boolean'
+        ||(c.pointCount===0&&(c.lastPointFinite||c.lastPointMatchesCurrent)))
+        stop('R6_RESULT_INVALID');
+      sourceMeta.stateClaimsChart={
+        pointCount:c.pointCount,unit:c.unit,unitMatchesApproved:c.unitMatchesApproved,
+        gapCount:c.gapCount,firstDate:c.firstDate,lastDate:c.lastDate,
+        observationDate:c.observationDate,lastPointFinite:c.lastPointFinite,
+        lastPointMatchesCurrent:c.lastPointMatchesCurrent,
+      };
+    }
     const summary=Object.fromEntries(SUMMARY_FIELDS.map(k=>[k,count(body.summary?.[k])]));
     const pit=Object.fromEntries(PIT_FIELDS.map(k=>[k,count(body.pit?.[k])]));
     const wantsPit04=Object.hasOwn(request,'pit04Offset');
@@ -530,7 +569,7 @@ export async function inspectEmploymentR6Candidate(request,context){
     return {status:body.status,code:body.code,actualExecutionSha:request.sourceSha,
       sourceBundleSha:request.sourceSha,asOfDate:dateOnly(body.asOfDate),
       sqliteOpened:body.sqliteOpened===true,
-      summary,pit,...(pit04KeyReview===null?{}:{pit04KeyReview}),...privateReceipt,
+      summary,...sourceMeta,pit,...(pit04KeyReview===null?{}:{pit04KeyReview}),...privateReceipt,
       indicators,bodyDigest:HASH.test(body.bodyDigest??'')?body.bodyDigest:null,
       walPreflight,promotionApproved:false,
       memoryTelemetry:{...child.memoryTelemetry,
