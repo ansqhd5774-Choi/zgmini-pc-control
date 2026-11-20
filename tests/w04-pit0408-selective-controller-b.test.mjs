@@ -156,3 +156,34 @@ test('PIT0407 metadata-bound one-file Controller B retains installed-ebf48 CAS a
   actor:'ansqhd5774-Choi',installedSha:'a'.repeat(40)
  }),/UPDATE_INSTALLED_SOURCE_DRIFT/);
 });
+
+
+test('PIT0407 later Current content-parity B is exact one-file successor to installed 41158',()=>{
+ const target='7ffa8ff4e4e9d15368ae8392cc4a888059ae1ead';
+ const installed='41158ac40aae7eb5093aee13e379fe3d4d1b0963';
+ const file='controller/employment-r6-collection-evidence-readonly.mjs';
+ const raw=fs.readFileSync(path.join(root,'controller-updates',target+'.json'));
+ const manifest=JSON.parse(raw);
+ const pin=JSON.parse(fs.readFileSync(path.join(root,'controller-selective-targets',target+'.json')));
+ assert.equal(manifest.installedSha,installed);
+ assert.equal(manifest.targetSha,target);
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2436');
+ assert.equal(manifest.approval.scope,'PC_CONTROL_CONTROLLER_UPDATE');
+ assert.deepEqual(manifest.allowFiles,[{path:file,sha256:'be76829bb82f4ab732c0b8015d5e9169c7784e1a9871683541e12d55aa5c1387'}]);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.selectiveSource.branch,'codex/w04-pit0407-newer-parity-selective-b-20261120');
+ assert.equal(manifest.selectiveSource.mainSha,'923c1f551c8c8990e442a8210f176c6a27e69499');
+ assert.deepEqual(manifest.selectiveSource.customPaths,[file]);
+ assert.equal(validateControllerSelectivePin(manifest,pin),true);
+ assert.equal(validateControllerOnlyInstallDelta([file],manifest.allowFiles),true);
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-w04-pit0407-later-current-b-20261120',operation:'controller-update',
+  controlRepository:CONTROL_REPOSITORY,targetControllerSha:target,
+  approvalManifestSha256:sha(raw)};
+ assert.equal(validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed}).manifest.targetSha,target);
+ assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:'a'.repeat(40)}),/UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
