@@ -5,6 +5,12 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {GROUPS,selectGroups,changedFiles} from '../tools/c996-source-checks.mjs';
 const all=Object.keys(GROUPS);
+test('018 retired owner-inaccessible workflow and archived collector stay foundation-only',()=>{
+ assert.deepEqual(selectGroups(['.github/workflows/pc-c996-r5-readonly.yml']),['foundation']);
+ assert.deepEqual(selectGroups(['c996-r5-readonly/collector.mjs']),['foundation']);
+ assert.deepEqual(selectGroups(['.github/workflows/pc-c996-r5-readonly.yml','docs/PC_AUTOMATION_STANDARD.md']),['foundation']);
+});
+
 test('011 unrelated feature/docs PR cannot be blocked by unrelated source suites',()=>{
  assert.deepEqual(selectGroups(['docs/unrelated-feature.md','site/home.tsx']),[]);
 });
