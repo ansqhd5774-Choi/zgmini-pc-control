@@ -40,6 +40,30 @@ test('W04 PIT-08-01 bad selective target 0f1effad is blocked (historical regress
   rel=>git('show',target+':'+rel)),/CONTROLLER_IMPORT_MISSING/);
 });
 
+test('C2505 exact target has three unresolved runtime imports, not only the first observed failure',()=>{
+ const target='0f1effad0c58e8b7bd684aa638521180183ca902';
+ const previous='5e805bc907a4fb9e8d2fb2d53432bfec7b7cea59';
+ const sourceMain='a464fad6834c6ef545bdb5ea8666d63209b1156d';
+ const git=(...args)=>execFileSync('git',args,{encoding:'utf8',windowsHide:true}).trim();
+ const oldPaths=new Set(git('ls-tree','-r','--name-only',previous,'--','controller').split(/\r?\n/));
+ const targetPaths=new Set(git('ls-tree','-r','--name-only',target,'--','controller').split(/\r?\n/));
+ const targetOps=git('show',target+':controller/operations.mjs');
+ const allImports=controllerModuleSpecifiers(targetOps).filter(s=>s.startsWith('./'))
+  .map(s=>'controller/'+s.slice(2));
+ const missing=[...new Set(allImports.filter(p=>!targetPaths.has(p)))].sort();
+ const expected=[
+  'controller/earnings-bea-mfg-archive-readonly.mjs',
+  'controller/inflation-causal-saved-readonly.mjs',
+  'controller/r54-runtime-binding-readonly.mjs',
+ ];
+ assert.deepEqual(missing,expected,'any omitted direct import requires an independently approved target fix');
+ for(const p of expected){
+  assert.equal(oldPaths.has(p),false,'previous installed tree must not be misrepresented');
+  assert.doesNotThrow(()=>git('cat-file','-e',sourceMain+':'+p),
+   'source-main presence does not imply the approved selective overlay installed it');
+ }
+});
+
 test('patch text, comments and regex literals cannot invent module imports',()=>{
  const backtick=String.fromCharCode(96);
  const text=[
