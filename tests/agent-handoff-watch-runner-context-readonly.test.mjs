@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {existsSync} from 'node:fs';
 import {
  REPOSITORY,TITLE,SCHEMA,URL,POLLS,INTERVAL_MS,
  validateContext,classifyRunnerState,inspectRunnerContext,sampleFiveSecondReads
@@ -104,18 +104,8 @@ test('429 stops without 5-second retry flood or leaking credentials',async()=>{
  assert.equal(report.observedMinStartIntervalMs,null);
  assert.ok(!JSON.stringify(report).includes('private-token'));
 });
-test('workflow scope permits only issue-triggered read-only isolated 2-minute job',()=>{
- const workflow=readFileSync('.github/workflows/handoff-watch-runner-context-readonly.yml','utf8');
- for(const q of [
-  'types: [opened]','issues: read','contents: read',
-  "github.actor == 'ansqhd5774-Choi'",
-  'zgmini-handoff-ci-isolated','timeout-minutes: 2',
-  "github.run_attempt == 1",
-  'GITHUB_TOKEN: \${{ github.token }}'
- ])assert.ok(workflow.includes(q),q);
- assert.ok(workflow.includes("github.event.issue.title == 'handoff-watch-runner-context-readonly'"));
- assert.ok(workflow.indexOf('Confirm isolated queue host before checking out source') <
-   workflow.indexOf('uses: actions/checkout@'));
- assert.doesNotMatch(workflow,/contains\(github\.event\.issue\.body/);
- assert.doesNotMatch(workflow,/issues: write|contents: write|schedule:|workflow_dispatch:|powershell.*Register-ScheduledTask/);
+test('014 completed isolated Runner context intake is retired without changing read-only probes',()=>{
+ assert.equal(existsSync(new globalThis.URL('../.github/workflows/handoff-watch-runner-context-readonly.yml',import.meta.url)),false);
+ assert.equal(POLLS,3);
+ assert.equal(INTERVAL_MS,5000);
 });

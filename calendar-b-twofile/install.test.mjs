@@ -122,11 +122,7 @@ test('writer mutex and live cycle lock are respected without deleting owners',t=
 
 test('one-shot event and source SHA binding reject tampered request',()=>{
  const {event,env}=makeEvent();
- const workflow=fs.readFileSync(path.join(here,'.github','workflows',
-  'pc-calendar-twofile-b-install-once.yml'),'utf8');
- assert.match(workflow,/GITHUB_EVENT_ACTION:\s*\$\{\{ github\.event\.action \}\}/);
- assert.match(workflow,/GIT_CONFIG_KEY_0:\s*core\.autocrlf/);
- assert.match(workflow,/GIT_CONFIG_VALUE_0:\s*'false'/);
+ assert.equal(fs.existsSync(path.join(workspace,'.github/workflows/pc-calendar-twofile-b-install-once.yml')),false);
  assert.equal(verifyRequest(event,env).request.requestId,requestId);
  assert.throws(()=>verifyRequest(event,{...env,GITHUB_SHA:'b'.repeat(40)}),
   /CAL_B_REQUEST_SCOPE_STOP/);
