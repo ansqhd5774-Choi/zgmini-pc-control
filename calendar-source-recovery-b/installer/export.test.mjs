@@ -147,3 +147,8 @@ test('private staging exact write/readback rejects changed remote content',async
  await assert.rejects(putPrivateFile('results/a.mjs',bytes,{...args,branch:'main'}),
   /CAL_SOURCE_B_STAGE_BRANCH_SCOPE_STOP/);
 });
+
+test('023 completed historical parser one-shot intake is no longer active',()=>{
+ assert.equal(fs.existsSync(new URL('../../.github/workflows/pc-calendar-source-recovery-once.yml',import.meta.url)),false);
+ assert.equal(FILES.length,5);
+});
