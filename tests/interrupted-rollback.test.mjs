@@ -77,3 +77,36 @@ test('independent rollback read-only preflight precedes durable mutation marker'
  assert.ok(f.calls.indexOf('preflightRecoveryRestore')<f.calls.indexOf('restore'));
  assert.equal(f.records.find(x=>x.code==='RECOVERY_RESTORE_STARTED')?.mutationStarted,true);
 });
+
+test('boundary-aware restore readback failure before first write does not retain mutation marker',async()=>{
+ const f=fixture();f.port.restoreMarksMutation=true;
+ f.port.restore=async({beforeMutation})=>{f.calls.push('restoreReadback');
+  throw Object.assign(Error('HTTP_403_FORBIDDEN'),{code:'HTTP_403_FORBIDDEN'});};
+ const r=await reconcileInterruptedRollback(original,f.port,f.persist);
+ assert.equal(r.code,'HTTP_403_FORBIDDEN');
+ assert.notEqual(r.mutationStarted,true);
+ assert.ok(!f.records.some(x=>x.code==='RECOVERY_RESTORE_STARTED'));
+ assert.deepEqual(f.calls.slice(-1),['restoreReadback']);
+});
+test('boundary-aware restore persists durable claim before any runtime mutation',async()=>{
+ const f=fixture();f.port.restoreMarksMutation=true;
+ f.port.restore=async({beforeMutation})=>{
+  f.calls.push('restoreReadback');await beforeMutation();
+  assert.equal(f.records.at(-1).code,'RECOVERY_RESTORE_STARTED');
+  assert.equal(f.records.at(-1).mutationStarted,true);
+  f.calls.push('firstWrite');
+  throw Object.assign(Error('ROLLBACK_PARTIAL_APPLY'),{code:'ROLLBACK_PARTIAL_APPLY'});
+ };
+ const r=await reconcileInterruptedRollback(original,f.port,f.persist);
+ assert.equal(r.code,'ROLLBACK_PARTIAL_APPLY');
+ assert.equal(r.mutationStarted,true);
+ assert.ok(f.calls.indexOf('restoreReadback')<f.calls.indexOf('firstWrite'));
+});
+test('boundary-aware restore cannot report success without durable mutation marker',async()=>{
+ const f=fixture();f.port.restoreMarksMutation=true;
+ f.port.restore=async()=>{f.calls.push('restore');};
+ const r=await reconcileInterruptedRollback(original,f.port,f.persist);
+ assert.equal(r.code,'RECOVERY_MUTATION_MARKER_MISSING');
+ assert.notEqual(r.mutationStarted,true);
+ assert.ok(!f.calls.includes('reconnectPrevious'));
+});

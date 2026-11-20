@@ -1550,7 +1550,14 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),
     'RECOVERY_PROTECTION_PREFLIGHT_CHANGED');
   },
-  restore:async()=>{
+  restoreMarksMutation:recoveryOperator,
+  restore:async({beforeMutation}={})=>{
+   const markMutation=async()=>{
+    if(recoveryOperator){
+     need(typeof beforeMutation==='function','RECOVERY_MUTATION_CALLBACK_REQUIRED');
+     await beforeMutation();
+    }
+   };
    // The independent recovery operator must prove that the runner inventory
    // endpoint is readable before touching intake. Drain still rechecks the
    // live roster after pause; this is not an idle/availability shortcut.
@@ -1564,7 +1571,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
      // lost even when the disable succeeded. The second window is replayed
      // after the verified rollback reconnects the original six Runners.
      need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
-     writeJson(backlogFile,openRollbackPause(json(backlogFile),new Date().toISOString()));
+     const pause=openRollbackPause(json(backlogFile),new Date().toISOString());
+     await markMutation(); // durable claim before first intake/backlog write
+     writeJson(backlogFile,pause);
      github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
    }
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually','ROLLBACK_WORKFLOW_NOT_DISABLED');
@@ -1580,6 +1589,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    // Never stop the live Supervisor or switch Controller files on a stale CAS.
    if(recoveryOperator)need(recoveryProtectedSnapshotStillPinned(protectedBefore,
     protectedSnapshot()),'RECOVERY_PROTECTION_PRESWITCH_CHANGED');
+   // An already paused intake may reach its first mutation only after drain.
+   // Keep the claim durable before process termination or file rename.
+   await markMutation();
    const ownerFile=path.join(controlRoot,'leases/supervisor/owner.json');
    if(fs.existsSync(ownerFile)){
     const owner=json(ownerFile);let alive=true;try{process.kill(owner.pid,0);}catch{alive=false;}
