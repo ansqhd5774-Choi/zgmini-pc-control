@@ -1,0 +1,118 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "053914b6fe8162341f29a08dd089c259bf9525bc",
+  "baseHead": "a9fdd445f0e47e764f9a5659ee898b1b52a36d0f",
+  "baseConfigSourceSha": "a9fdd445f0e47e764f9a5659ee898b1b52a36d0f",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/breadth-paid-source.mjs",
+      "change": "M",
+      "beforeSha256": "72844e3f9e632bdba7827dca48415a1e5b3057d911009a47c898e2ae28bc96ba",
+      "afterSha256": "b9401f6e5cc72c25e6e5d5ab63a2081cdec078ae1a8e17c4be2ce5c73c1107c5"
+    },
+    {
+      "path": "scripts/pc-writer/breadth-paid-calculate.mjs",
+      "change": "M",
+      "beforeSha256": "93283e6d114405b4c5039089cd0614a8be6fa7a197c37a4c143a3e4045adf790",
+      "afterSha256": "bedaacbc87ad418325fba8c871b4a15bdd23ef003fa265dcf0786426845a76d4"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-history-r4.mjs",
+      "change": "M",
+      "beforeSha256": "989378d85940c9eba6228fe959c3744654c8a948b97c173cbb6fecdc0581a216",
+      "afterSha256": "892ef577446e40717fb4dc9a410a23adb8e7d1aeedfd5ec15ee8ba0626d0381e"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-score/breadth-b1-r1.mjs",
+      "sha256": "3cf3c954976bd0706c4aa58099da7d3b7910a33ce8421a788d7bb1a7d9361544"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-store.mjs",
+      "sha256": "6f6815ef42a78aa585f065e2cd446826fd03769a232842dc12cfe5c5de25b3bc"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-calendar.mjs",
+      "sha256": "ad2570e3ff18edf2ab181a9e92e91ff0a7a681c21cba7ed03890ab54b5f60d51"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r4-contract.mjs",
+      "sha256": "c9b9de04852b39d7b859ed2545dcd0b508ceb026cf0100a1f451c39f96826d67"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r4-reader.mjs",
+      "sha256": "fb3ab4781ff792329db763436c66898c6d3f33c1a996b30df5e68b553885b451"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r5-contract.mjs",
+      "sha256": "6ad7dc7f598ca3f425093aa3b4cbbc0f1c6d7894f9f5cc490f5b5466c087a501"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r5-reader.mjs",
+      "sha256": "aa1e9132371f37abf06a8fb2e67ad655dc4789875e8ff369a6ff15a527eab158"
+    },
+    {
+      "path": "lib/market-score/sector-fear-greed-r3-rolling.mjs",
+      "sha256": "74c56da091025a1d425b0e1c122059f29ba2da349804c21a32cc8be235833763"
+    },
+    {
+      "path": "lib/market-score/sector-fear-greed-r3-five-axis-complete.mjs",
+      "sha256": "ddcf0e73c957333705959125e086cf3e3785016f3d8a08a780d585ef5de43e00"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/local-env.mjs",
+      "sha256": "8b5a4f388ebbc94c37d6d50478344e4666140f1bee5d70c9315dfde1e584029c"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-hourly-source.mjs",
+      "sha256": "3e3d908dafef55efe7c9ae87b1ac5d40289116a387a9e9e6f62302c7cd218976"
+    },
+    {
+      "path": "scripts/pc-writer/marketparquet-paid-store.mjs",
+      "sha256": "4ba0a487868a2a028f080c06bdde75f41ffef5c8018541a0a43e7bd15acdfc23"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75"
+    },
+    {
+      "path": "scripts/pc-writer/breadth-paid-cycle.mjs",
+      "sha256": "6680417384b6410d9686c7d8bc52cccec7105ee7f49f90bf5f0d7866dea70d67"
+    },
+    {
+      "path": "worker/breadth-paid-contract.mjs",
+      "sha256": "911efbf151abb056f328e3f0b45816e1e93e165b59eabacec9ef8dfc20aafa2e"
+    },
+    {
+      "path": "lib/market-score/sp500-pit-universe-r1.mjs",
+      "sha256": "5eb3b54c96b617e96e10c36e6e8e269fafb80f86c6fb465d5d8a8e31ef686fab"
+    },
+    {
+      "path": "lib/marketparquet-retirement.mjs",
+      "sha256": "8846a71456cab355401bc385fb6c3a7adae8111da4689f9930162349b1bf40fb"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
