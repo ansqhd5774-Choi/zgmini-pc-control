@@ -34,7 +34,7 @@ export function sanitizeSavedLedgerResult(raw,req,env){
  if(!c||c.schema!=='ZGMINI_R181_LEDGER_COVERAGE_V1'||
   !['LEDGER_REPORTED_COMPLETE','LEDGER_REPORTED_INCOMPLETE'].includes(c.coverageStatus)||
   !['LOCAL_PRIMARY_STORED','PRIMARY_RAW_STORED','NO_NEW_COMPLETE_PRIMARY_DATE',
-    'OTHER_OR_UNKNOWN'].includes(c.reportedState)||
+    'STOP','OTHER_OR_UNKNOWN'].includes(c.reportedState)||
   !(c.reportedAt===null||
     typeof c.reportedAt==='string'&&c.reportedAt.length<=32&&
      !Number.isNaN(Date.parse(c.reportedAt)))||
@@ -65,7 +65,8 @@ export function sanitizeSavedLedgerResult(raw,req,env){
   sqliteOpened:false,rawShaVerified:false,checkpointVerified:false};
  // Never turn a reported-complete status into a verified SQLite/raw result.
  if(coverage.coverageStatus==='LEDGER_REPORTED_COMPLETE'&&
-  (coverage.reportedState==='OTHER_OR_UNKNOWN'||!coverage.reportedAt||
+  (['OTHER_OR_UNKNOWN','STOP'].includes(coverage.reportedState)||
+   !coverage.reportedAt||
    !(coverage.providerCalls>0)||coverage.matchingRows!==14||
    coverage.unknownSymbolCount!==0||
    symbols.some(s=>s.bars===null||s.latest15NY===null)))return out;
