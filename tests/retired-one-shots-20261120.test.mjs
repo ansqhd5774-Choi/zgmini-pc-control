@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {existsSync,readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const retired=["handoff-watch-runner-context-readonly.yml","pc-calendar-twofile-b-install-once.yml","pc-configured-runtime-proof-once.yml","pc-inflation19-public-d1-once.yml","pc-r17-sip-b-install-once.yml","pc-r17-sip-refresh-onefile-b-once.yml","pc-r17-writer-b-install-once.yml","pc-report-recovery-540-once.yml","pc-writer-b-1063-recovery-once.yml","pc-writer-config-b-once.yml","pc-writer-config-b-proof-once.yml"];
+const kept=['pc-approved-runtime-a-once.yml','pc-approved-runtime-b-once.yml','pc-job.yml','pc-writer-b-source-once.yml','pc-inflation-19-inventory-b-once.yml','pc-theme-r54-evidence-once.yml','pc-theme-r54-readiness-once.yml','pc-theme-r54-score-once.yml'];
+test('eleven completed one-shot Issue intakes are retired',()=>{
+ assert.equal(retired.length,11);assert.equal(new Set(retired).size,11);
+ for(const name of retired)assert.equal(existsSync(path.join(root,'.github/workflows',name)),false,name);
+});
+test('common A/B and unfinished inflation and R54 readers are preserved',()=>{
+ for(const name of kept)assert.equal(existsSync(path.join(root,'.github/workflows',name)),true,name);
+});
+test('pinned adapters, safety checks, approved manifests and historical recovery code remain',()=>{
+ const preserved=['tools/handoff-watch-runner-context-readonly.mjs',
+  'calendar-b-twofile/install.mjs','calendar-b-twofile/upload.mjs','calendar-b-twofile/approval.json',
+  'direct-writer-b/proof-only.mjs','inflation19-public-d1-b-once.mjs',
+  'r17-sip-b/r17-sip-b-install-windows.mjs','r17-sip-refresh-b/windows.mjs',
+  'r17-writer-b/r17-writer-b-install-windows.mjs','controller/report-recovery-540-once.mjs',
+  'writer-b/recovery-1063-windows.mjs','writer-config-b/run.mjs','writer-config-b/proof-only.mjs'];
+ for(const file of preserved)assert.equal(existsSync(path.join(root,file)),true,file);
+ assert.match(readFileSync(path.join(root,'writer-config-b/run.mjs'),'utf8'),/authorizeRequest|authorize/);
+ assert.match(readFileSync(path.join(root,'controller/report-recovery-540-once.mjs'),'utf8'),/runId: '42261956750'/);
+});
