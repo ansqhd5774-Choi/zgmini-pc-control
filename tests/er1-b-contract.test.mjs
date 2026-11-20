@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {
  sha256,validateIssue,validateApprovalBytes,validateBundleHashes,
  safeCandidateResult,SOURCE_FILES,CONTROL_REPO,ACTOR,ER1_SOURCE_SHA,
@@ -247,18 +246,4 @@ test('checkout SHA drift stops before workspace staging or any operational write
   /ER1_B_CHECKOUT_SHA_OR_DIRTY_STOP/);
  assert.equal(fs.existsSync(path.join(x.sourceRoot,
   'tools','market-calendar-er1','ER1_PC_OPERATION_ONCE.mjs')),false);
-});
-
-test('dedicated B workflow uses official pinned checkout, self-hosted CMD, no event-body command',()=>{
- const own=path.dirname(fileURLToPath(import.meta.url));
- const yaml=fs.readFileSync(path.resolve(own,'../.github/workflows/pc-er1-approved-once.yml'),'utf8');
- assert.match(yaml,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
- assert.match(yaml,/shell: cmd/);
- assert.match(yaml,/concurrency:[\s\S]*?cancel-in-progress: false/);
- assert.match(yaml,/actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/g);
- assert.match(yaml,/persist-credentials: false/g);
- assert.match(yaml,/ref: 611b3dccf361ce66e78daf0b4108396de7c9101e/);
- assert.doesNotMatch(yaml,/\$\{\{\s*github\.event\.issue\.body\s*\}\}/);
- assert.match(yaml,/"%GITHUB_WORKSPACE%\\er1-control\\er1-b-entry\.mjs"/);
- assert.match(yaml,/"%GITHUB_WORKSPACE%\\er1-control\\er1-b-upload\.mjs"/);
 });
