@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import{execFileSync}from'node:child_process';
 import {executeJob} from '../controller/engine.mjs';import {validateRequest,exclusive} from '../controller/common.mjs';
 const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
@@ -205,4 +206,67 @@ test('core-status preserves Core evidence when only postcheck Task lookup fails'
  assert.equal(out.report.protectionPostcheckCode,'PROTECTED_TASK_XML_QUERY_FAILED');
  assert.equal(out.report.protectedStateUnchanged,null);
  assert.equal(JSON.stringify(out.report).includes('private scheduler failure'),false);
+});
+
+
+function fixtureD05Ledger(c){
+ const dir=path.join(c.host.dataRoot,'pc-writer','score-lineage');
+ fs.mkdirSync(dir,{recursive:true});
+ const calculatedAt='2026-11-19T12:00:00.000Z',sourceSha='a'.repeat(40);
+ const stable={schema:'D05_COMPOSITE_INPUT_LINEAGE_LOCAL_V1',
+  eventId:'D05/CM-R1/'+calculatedAt,calculatedAt,asOfDate:'2026-11-19',score:50,
+  outputSignature:'12345678',archiveKey:'composite-observed:2026-11-19',
+  archiveStoredAt:Date.parse(calculatedAt),approvedSourceSha:sourceSha,runtimeSourceSha:sourceSha,
+  inputScope:'SELECTED_7_BATCHES_ONLY',inputStatus:'LOCAL_SELECTED_7_MATCHED',
+  selectionEvidence:'POST_SELECTION_UNIQUE_MATCH',
+  effectiveUseVerified:false,completeD05InputLineage:false,publicD1Verified:false,
+  sources:['macro','credit','supply','fundFlows','bisDsr','bisTc','rates'].map(sourceKey=>({
+   sourceKey,batchKey:sourceKey+':PRIVATE_NOT_RETURNED',storedAt:1,
+   storedBodySha256:'c'.repeat(64),selectionWitness:'POST_SELECTION_MATCH_ONLY'}))};
+ const stableEvidenceDigestSha256=createHash('sha256').update(JSON.stringify(stable)).digest('hex');
+ fs.writeFileSync(path.join(dir,'d05-composite-events-v1.jsonl'),
+  JSON.stringify({status:'PREPARED_LOCAL_ONLY',...stable,
+   recordedAt:'2026-11-19T12:00:01.000Z',stableEvidenceDigestSha256})+'\n');
+}
+
+test('D05 fixed read preserves ledger when unrelated scheduler query is unavailable',async()=>{
+ const c=fixture();fixtureD05Ledger(c);let schedulerCalls=0;
+ const out=await executeJob(req('d05-lineage-readonly','d05-scheduler-unavailable-01'),
+  {...c,runId:'5601',queryTask:()=>{schedulerCalls++;throw Error('private scheduler error');}});
+ assert.ok(schedulerCalls>=1);
+ assert.equal(out.report.status,'STATE_UNKNOWN');
+ assert.equal(out.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
+ assert.equal(out.report.result.code,'D05_READONLY_DIAGNOSIS');
+ assert.equal(out.report.result.lineage.eventCount,1);
+ assert.equal(out.report.result.lineage.currentApprovedSourceEventCount,1);
+ assert.equal(out.report.protectedStateUnchanged,null);
+ assert.equal(JSON.stringify(out.report).includes('private scheduler error'),false);
+});
+
+test('D05 fixed read keeps ledger proof when Core config JSON is unavailable',async()=>{
+ const c=fixture();fixtureD05Ledger(c);
+ fs.writeFileSync(path.join(c.host.dataRoot,'pc-writer','config.json'),'{invalid');
+ const out=await executeJob(req('d05-lineage-readonly','d05-source-config-unavailable-01'),
+  {...c,runId:'5602'});
+ assert.equal(out.report.status,'STATE_UNKNOWN');
+ assert.equal(out.report.code,'D05_CORE_SOURCE_OBSERVATION_UNVERIFIED');
+ assert.equal(out.report.result.code,'D05_READONLY_DIAGNOSIS');
+ assert.equal(out.report.result.lineage.eventCount,1);
+ assert.equal(out.report.result.lineage.currentApprovedSourceEventCount,null);
+ assert.equal(out.report.protectedStateUnchanged,true);
+ assert.equal(out.report.coreSourceObservation,'UNVERIFIED');
+});
+
+test('D05 read succeeds without extra source lookup and detects real protected drift',async()=>{
+ const c=fixture();fixtureD05Ledger(c);let queries=0;
+ const ok=await executeJob(req('d05-lineage-readonly','d05-source-reuse-01'),
+  {...c,runId:'5603',queryTask:()=>{queries++;return Buffer.from('fixed-task');}});
+ assert.equal(ok.report.status,'PASS');
+ assert.equal(ok.report.result.lineage.currentApprovedSourceEventCount,1);
+ assert.equal(queries,4);
+ let n=0;
+ const drift=await executeJob(req('d05-lineage-readonly','d05-protected-drift-01'),
+  {...c,runId:'5604',queryTask:()=>Buffer.from(++n<=2?'before':'after')});
+ assert.equal(drift.report.status,'BLOCKED');
+ assert.equal(drift.report.code,'PROTECTED_STATE_DRIFT_OBSERVED');
 });
