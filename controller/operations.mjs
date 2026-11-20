@@ -149,7 +149,7 @@ function r6PublicationProjection(report,root){
  }
  return projected;
 }
-export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
+export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence,taskXmlHashes}={}){
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
  for(const file of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json']){
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
@@ -165,7 +165,10 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
   }
  }
  const config=path.join(root,'config.json');if(fs.existsSync(config)){const c=JSON.parse(fs.readFileSync(config));const x=c.source;out.approvedSourceSha=[x?.sha,x?.commit,x?.commitSha,x,c.sourceSha].find(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v))??null;}
- if(queryTask){
+ if(taskXmlHashes){
+  // Reuse the fixed engine's precheck observation; the postcheck still verifies drift.
+  out.taskXmlHashes={...taskXmlHashes};
+ }else if(queryTask){
   for(const task of activeTasks)out.taskXmlHashes[task]=digest(queryTask(task));
   out.taskXmlHashes[retiredIranTask]=retiredTaskEvidence();
  }
@@ -179,7 +182,8 @@ export async function runOperation(request,context){
   // Only the fixed engine's missing pre-snapshot activates this scope. The
   // outer result must remain STATE_UNKNOWN; local Core evidence is still useful.
   const partial=context.skipProtectedTaskObservation===true&&policy.mutationsEnabled===false;
-  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:{queryTask,retiredTaskEvidence}),
+  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:context.protectedTaskHashes?
+   {taskXmlHashes:context.protectedTaskHashes}:{queryTask,retiredTaskEvidence}),
    ...(partial?{taskObservation:'UNVERIFIED'}:{}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  }
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(

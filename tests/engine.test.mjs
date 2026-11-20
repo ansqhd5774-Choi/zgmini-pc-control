@@ -175,3 +175,34 @@ test('R13 POSTCHECK failure after uncertain worker termination retains recovery 
   }
  }
 });
+
+
+test('core-status reuses precheck Task hashes and queries protected tasks only before and after',async()=>{
+ const c=fixture();let taskQueries=0,retiredQueries=0;
+ const out=await executeJob(req('core-status','core-status-reuse-precheck-01'),
+  {...c,runId:'5501',queryTask:()=>{taskQueries++;return Buffer.from('fixed-task');},
+   retiredTaskEvidence:()=>{retiredQueries++;return 'APPROVED_RETIRED_ABSENT';}});
+ assert.equal(out.report.status,'PASS');
+ assert.equal(out.report.result.code,'CORE_READONLY_DIAGNOSIS');
+ assert.equal(taskQueries,4); // two active tasks in each protected pre/post snapshot
+ assert.equal(retiredQueries,2); // one retired-task attestation in each snapshot
+ assert.equal(out.report.protectedStateUnchanged,true);
+ assert.equal(out.report.result.core.taskXmlHashes['ZGMINI-PC-Iran-Progress-R13'],'APPROVED_RETIRED_ABSENT');
+ assert.equal(out.report.providerCalls,0);
+ assert.equal(out.report.d1Writes,0);
+});
+
+test('core-status preserves Core evidence when only postcheck Task lookup fails',async()=>{
+ const c=fixture();let probes=0;
+ const out=await executeJob(req('core-status','core-status-postcheck-unavailable-01'),
+  {...c,runId:'5502',queryTask:()=>{if(++probes===3)throw new Error('private scheduler failure');
+   return Buffer.from('fixed-task');}});
+ assert.equal(probes,3);
+ assert.equal(out.report.status,'STATE_UNKNOWN');
+ assert.equal(out.report.code,'READONLY_RESULT_PROTECTION_UNVERIFIED');
+ assert.equal(out.report.result.code,'CORE_READONLY_DIAGNOSIS');
+ assert.equal(out.report.result.core.approvedSourceSha,'a'.repeat(40));
+ assert.equal(out.report.protectionPostcheckCode,'PROTECTED_TASK_XML_QUERY_FAILED');
+ assert.equal(out.report.protectedStateUnchanged,null);
+ assert.equal(JSON.stringify(out.report).includes('private scheduler failure'),false);
+});
