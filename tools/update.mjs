@@ -1636,6 +1636,15 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
  return result;
 }
 
+// Recovery can outlive the original one-shot Issue. This is only an Issue
+// identity predicate: a separately approved independent recovery operator
+// still needs the exact ledger/owner/marker/backup CAS before any effect.
+export function admittedMaintenanceIssueState(issue,{recovery=false}={}){
+ return issue?.title==='pc-controller-update'&&(
+  issue.state==='open'||
+  (recovery===true&&issue.state==='closed'&&issue.state_reason==='completed'));
+}
+
 export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
  const expected=path.join(maintenanceRoot,'approved',requestId+'.json');
  need(path.resolve(file)===path.resolve(expected),'APPROVAL_FILE_PATH');
@@ -1649,7 +1658,7 @@ export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
  let liveRequest;try{liveRequest=JSON.parse(actual.body);}catch{throw Object.assign(Error('MAINTENANCE_ISSUE_INVALID'),{code:'MAINTENANCE_ISSUE_INVALID'});}
  const authenticated=validateMaintenanceRequest(liveRequest,{actor:actual.user?.login,controlRepository});
  need(actual.user?.login===data.actor&&JSON.stringify(authenticated)===JSON.stringify(issue),'MAINTENANCE_ISSUE_IDENTITY');
- need(actual.state==='open'&&actual.title==='pc-controller-update','MAINTENANCE_REQUEST_CANCELED');
+ need(admittedMaintenanceIssueState(actual,{recovery}),'MAINTENANCE_REQUEST_CANCELED');
  need(actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,'MAINTENANCE_LABEL');
  const validated=validateUpdateRequest(issue,raw,{actor:data.actor,
   controlRepository,installedSha:recovery?manifest.installedSha:installedManifest().installedSha});
