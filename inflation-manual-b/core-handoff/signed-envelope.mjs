@@ -5,12 +5,14 @@
 import {KeyObject,randomUUID,sign,createPrivateKey} from 'node:crypto';
 import path from 'node:path';
 import {assertAuthenticatedCoreHandoff} from './contract.mjs';
+import {DATA_ROOT} from '../contract.mjs';
 export const W01_HANDOFF_ENVELOPE_SCHEMA='ZGMINI_W01_CORE_HANDOFF_SIGNED_V1';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const SHA=/^[a-f0-9]{64}$/i;
 const SHA40=/^[a-f0-9]{40}$/i;
 const STOP='W01_CORE_HANDOFF_SIGNING_UNVERIFIED_STOP';
 const fail=()=>{throw Object.assign(new Error(STOP),{code:STOP});};
+const same=(a,b)=>path.normalize(a).toLowerCase()===path.normalize(b).toLowerCase();
 // Canonical fixed-field string must stay byte-identical to the Core verifier.
 export function coreHandoffSigningBytes(e){
  if(e?.schema!==W01_HANDOFF_ENVELOPE_SCHEMA||
@@ -69,7 +71,11 @@ export function stageSignedCoreHandoff({
  // arbitrary root from an Issue or signed envelope is rejected upstream.
  let root;
  try{root=fsImpl.realpathSync(approvedRoot);}catch{fail();}
- if(root!==approvedRoot)fail(); // no junction/symlink for new staging root
+ if(!same(root,approvedRoot))fail();
+ if(process.platform==='win32'){
+  let installed;try{installed=fsImpl.realpathSync(DATA_ROOT);}catch{fail();}
+  if(!same(root,installed))fail(); // only approved installed Writer data root
+ }
  const signed=signCoreHandoff({authorization:auth,privateKey,now,nonce});
  const subdir=path.join(root,'inflation-causal-candidates-r1','core-handoff');
  // Never create parent directories or adopt an arbitrary alternate folder.
@@ -80,7 +86,7 @@ export function stageSignedCoreHandoff({
   if(!fsImpl.existsSync(subdir))fsImpl.mkdirSync(subdir,{recursive:false});
   const dirStat=fsImpl.lstatSync(subdir);
   if(!dirStat.isDirectory()||dirStat.isSymbolicLink()||
-   fsImpl.realpathSync(subdir)!==subdir)fail();
+   !same(fsImpl.realpathSync(subdir),subdir))fail();
  }catch{fail();}
  const name=signed.requestId+'.signed.json';
  const target=path.join(subdir,name);
