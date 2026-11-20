@@ -1,0 +1,25 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "dd1d3425-bef5-42d9-942c-32b80e8b7163",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "a9fdd445f0e47e764f9a5659ee898b1b52a36d0f",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "ae973dca52e9b8bd55ffecc846584fffe0f5584d",
+  "candidateSourceSha": "5b3925e5d58d9f33bbe4633c59b81ff67a1aa373",
+  "manifestSha256": "38faa28d1c04b1a7fcacbb0fac75be44b83f914a6b3fb22b7b1acac72d2a76ec",
+  "baseTreeOid": "4ad1f5611339fab46f75703dff94d2794dd763a5",
+  "preparedTreeOid": "94450c10a4ca3905ea778e6b0fc90f2d1ce33bf8",
+  "provenanceSha256": "8e8726c93e63c67bdf79b020401cfb304ba9b92a76a077b54b4dad0cfbbc3cbb",
+  "runId": "44765747043",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/breadth-paid-source.mjs",
+    "scripts/pc-writer/breadth-paid-calculate.mjs",
+    "scripts/pc-writer/breadth-paid-cycle.mjs",
+    "worker/breadth-paid-contract.mjs",
+    "scripts/pc-writer/local-cycle.mjs",
+    "lib/market-score/breadth-b1-r5-worker-domain.mjs"
+  ]
+}
