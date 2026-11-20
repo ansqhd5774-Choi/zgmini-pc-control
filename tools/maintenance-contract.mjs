@@ -7,6 +7,16 @@ export {SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
   from './source-bundle-register.mjs';
 
+// A recovery may drain jobs before the first Controller-byte mutation. Recheck
+// the exact preapproved live protected state both before intake pause and just
+// before a previous Controller is restored. No mutation or baseline rewriting.
+export function recoveryProtectedSnapshotStillPinned(pinned,current){
+ const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+ return record(pinned)&&record(current)&&record(pinned.files)&&
+  record(pinned.tasks)&&record(current.files)&&record(current.tasks)&&
+  JSON.stringify(pinned)===JSON.stringify(current);
+}
+
 // Existing Controller recovery must never roll back or silently bless an
 // unrelated live Writer config update. A separately approved independent
 // recovery may retain its *exact* current SHA only when all other protected

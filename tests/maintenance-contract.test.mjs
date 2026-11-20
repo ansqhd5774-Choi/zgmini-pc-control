@@ -11,6 +11,7 @@ import {
   validateInfrastructureDelta,validateControllerOnlyInstallDelta,
   deployableControllerTreePaths,isControllerSourceTestPath,
   prepareControllerUpdateRequest,selectPreservedRecoveryProtection,
+  recoveryProtectedSnapshotStillPinned,
 } from "../tools/maintenance-contract.mjs";
 
 const OLD="c491d95fdb594a729f08deff68d86e04c18a9544";
@@ -515,4 +516,24 @@ test('postcheck recovery retains approved Writer config CAS while all other prot
  assert.equal(selectPreservedRecoveryProtection(historic,clone(historic),
   {approvedCurrentWriterConfigSha256:'a'.repeat(64)}).allowed,true);
  assert.equal(selectPreservedRecoveryProtection({files:null,tasks:{}},current).allowed,false);
+});
+
+test('independent recovery protection CAS stays strict at pre-pause and pre-switch',()=>{
+ const pinned={files:{'config.json':'a'.repeat(64),'run-local.cmd':'b'.repeat(64)},
+  tasks:{'ZGMINI-PC-Local-Core':'c'.repeat(64),'ZGMINI-PC-Local-Korea':'d'.repeat(64)}};
+ const exact=clone(pinned);
+ assert.equal(recoveryProtectedSnapshotStillPinned(pinned,exact),true);
+ assert.equal(recoveryProtectedSnapshotStillPinned(pinned,{...pinned,
+  files:{...pinned.files,'config.json':'e'.repeat(64)}}),false);
+ assert.equal(recoveryProtectedSnapshotStillPinned(pinned,{...pinned,
+  tasks:{...pinned.tasks,'ZGMINI-PC-Local-Korea':'e'.repeat(64)}}),false);
+ assert.equal(recoveryProtectedSnapshotStillPinned(pinned,{...pinned,
+  files:{...pinned.files,unexpected:'e'.repeat(64)}}),false);
+ for(const bad of [null,undefined,[],{}, {files:null,tasks:{}},
+   {files:{},tasks:null}]){
+  assert.equal(recoveryProtectedSnapshotStillPinned(pinned,bad),false);
+  assert.equal(recoveryProtectedSnapshotStillPinned(bad,pinned),false);
+ }
+ // A successful snapshot comparison cannot mutate the frozen original.
+ assert.deepEqual(exact,pinned);
 });

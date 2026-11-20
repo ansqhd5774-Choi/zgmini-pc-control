@@ -21,7 +21,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
- selectPreservedRecoveryProtection,
+ selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1547,6 +1547,8 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
    // endpoint is readable before touching intake. Drain still rechecks the
    // live roster after pause; this is not an idle/availability shortcut.
    if(recoveryOperator&&!pausedByUs)apiRunners();
+   if(recoveryOperator)need(recoveryProtectedSnapshotStillPinned(protectedBefore,
+    protectedSnapshot()),'RECOVERY_PROTECTION_PREPAUSE_CHANGED');
    // A postcheck may have failed after the new listener came online. Stop its
    // tree only AFTER pausing intake and observing zero jobs/uploads again.
    if(!pausedByUs){
@@ -1566,6 +1568,10 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
     await wait(3000);
    }
    need(stable>=2,'ROLLBACK_DRAIN_TIMEOUT');
+   // Job drain may overlap a separately approved Writer B source update.
+   // Never stop the live Supervisor or switch Controller files on a stale CAS.
+   if(recoveryOperator)need(recoveryProtectedSnapshotStillPinned(protectedBefore,
+    protectedSnapshot()),'RECOVERY_PROTECTION_PRESWITCH_CHANGED');
    const ownerFile=path.join(controlRoot,'leases/supervisor/owner.json');
    if(fs.existsSync(ownerFile)){
     const owner=json(ownerFile);let alive=true;try{process.kill(owner.pid,0);}catch{alive=false;}
