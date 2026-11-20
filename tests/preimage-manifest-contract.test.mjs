@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import {validateRequest} from '../controller/common.mjs';
 import {validatePreimageApproval,readStagedPreimageScope,preimageStageFile,
  stagedPayload,isSafePreimagePath,blockedPayload} from '../controller/preimage-manifest-contract.mjs';
-import {stagePreimageManifest,verifyInstalledStageSource} from '../controller/preimage-manifest-stager.mjs';
+import {stagePreimageManifest,verifyInstalledStageSource,preimageStageLogStatus} from '../controller/preimage-manifest-stager.mjs';
 import {executeJob} from '../controller/engine.mjs';
 
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -164,4 +164,11 @@ test('engine passes only approved read-only scope in isolated worker input, not 
   else process.env.GITHUB_TOKEN=original;
   fs.rmSync(root,{recursive:true,force:true});
  }
+});
+
+test('preimage stage logs preserve READY versus BLOCKED without disclosing payload',()=>{
+ assert.equal(preimageStageLogStatus({status:'READY',manifestBase64:'private'}),'PREIMAGE_SCOPE_STAGE_READY');
+ assert.equal(preimageStageLogStatus({status:'BLOCKED',code:'PREIMAGE_STAGE_FETCH_STOP'}),'PREIMAGE_SCOPE_STAGE_BLOCKED');
+ assert.equal(preimageStageLogStatus(null),'PREIMAGE_SCOPE_STAGE_NOT_STAGED');
+ assert.equal(preimageStageLogStatus({status:'OTHER',token:'private'}),'PREIMAGE_SCOPE_STAGE_NOT_STAGED');
 });
