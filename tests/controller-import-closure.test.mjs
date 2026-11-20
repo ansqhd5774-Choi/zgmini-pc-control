@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {validateControllerImportClosure,controllerModuleSpecifiers} from '../tools/maintenance-contract.mjs';
+import {validateControllerImportClosure,controllerModuleSpecifiers,controllerImportScanRoots} from '../tools/maintenance-contract.mjs';
 
 test('valid local import graph including transitive paths',()=>{
  const sources={
@@ -76,4 +76,25 @@ test('historic R47 task module parses without false imports from regex literals'
  const modules=controllerModuleSpecifiers(source);
  assert.ok(modules.includes('./pc-source-readonly.mjs'));
  assert.ok(!modules.some(x=>x.includes('not-real')));
+});
+
+test('unchanged runtime roots must be checked in config-only and adapter-only overlays',()=>{
+ const files=['controller/entry.mjs','controller/operations.mjs','controller/new-adapter.mjs'];
+ const src={
+  'controller/entry.mjs':'export const start=true;',
+  'controller/operations.mjs':"import './r54-runtime-binding-readonly.mjs';",
+  'controller/new-adapter.mjs':'export const safe=true;'
+ };
+ for(const changed of [['config/operations.json'],['controller/new-adapter.mjs']]){
+  const roots=controllerImportScanRoots(changed);
+  assert.ok(roots.includes('controller/entry.mjs'));
+  assert.ok(roots.includes('controller/operations.mjs'));
+  assert.throws(()=>validateControllerImportClosure(files,roots,p=>src[p]),
+   /CONTROLLER_IMPORT_MISSING/);
+ }
+ const good={...src,'controller/operations.mjs':'export const ready=true;'};
+ assert.equal(validateControllerImportClosure(files,controllerImportScanRoots(['config/operations.json']),
+  p=>good[p]).status,'VERIFIED');
+ assert.deepEqual(controllerImportScanRoots(['config/operations.json','controller/entry.mjs']),
+  ['controller/entry.mjs','controller/operations.mjs']);
 });
