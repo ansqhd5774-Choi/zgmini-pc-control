@@ -1,4 +1,7 @@
 import test from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,verify,createHash} from 'node:crypto';
 import {authorizeCoreOwnedHandoff,
@@ -6,7 +9,7 @@ import {authorizeCoreOwnedHandoff,
  CORE_HANDOFF_ISSUE_TITLE,CORE_HANDOFF_ISSUE_LABEL,
  CORE_HANDOFF_OPERATION,CORE_HANDOFF_MODE,CORE_HANDOFF_DELIVERY,
  CORE_HANDOFF_SOURCE_FILES} from './contract.mjs';
-import {signCoreHandoff,coreHandoffSigningBytes} from './signed-envelope.mjs';
+import {signCoreHandoff,coreHandoffSigningBytes,stageSignedCoreHandoff} from './signed-envelope.mjs';
 import {CONTROL_REPO,OWNER,SCOPE,SOURCE_ROOT,DATA_ROOT,URLS,TARGETS,MAX_BYTES}
  from '../inflation-manual-b/contract.mjs';
 const id='c131d4c4-b788-4a1c-9f60-146dd6f7abb1';
@@ -59,4 +62,36 @@ test('signer accepts Ed25519 only, never an untrusted symmetric key',()=>{
  assert.throws(()=>signCoreHandoff({authorization:auth,
   privateKey:Buffer.from('arbitrary'),now,nonce}),
   {code:'W01_CORE_HANDOFF_SIGNING_UNVERIFIED_STOP'});
+});
+
+test('exact request staged atomically once, never replaces existing request',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'w01-signed-transfer-'));
+ const data=path.join(home,'inflation-causal-candidates-r1');
+ fs.mkdirSync(data);
+ try{
+  const authority=fixture();
+  const {privateKey}=generateKeyPairSync('ed25519');
+  const opts={authorization:authority,privateKey,approvedRoot:home,fsImpl:fs,now,nonce};
+  const staged=stageSignedCoreHandoff(opts);
+  assert.equal(staged.status,'SIGNED_CANDIDATE_STAGED_NOT_EXECUTED');
+  assert.equal(staged.providerCalls,0);
+  const target=path.join(data,'core-handoff',id+'.signed.json');
+  const envelope=JSON.parse(fs.readFileSync(target,'utf8'));
+  assert.equal(envelope.requestId,id);
+  assert.throws(()=>stageSignedCoreHandoff({...opts,
+   nonce:'8e40a64d-c3bb-407d-9cdb-64c67d6645e9'}),
+   {code:'W01_CORE_HANDOFF_SIGNING_UNVERIFIED_STOP'});
+  assert.equal(JSON.parse(fs.readFileSync(target,'utf8')).nonce,nonce);
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
+test('unbranded authorization cannot stage a file',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'w01-no-auth-'));
+ fs.mkdirSync(path.join(home,'inflation-causal-candidates-r1'));
+ try{
+  const {privateKey}=generateKeyPairSync('ed25519');
+  assert.throws(()=>stageSignedCoreHandoff({authorization:{...fixture()},
+   privateKey,approvedRoot:home,fsImpl:fs,now,nonce}),
+   {code:'INFL_CORE_HANDOFF_AUTH_OBJECT_STOP'});
+  assert.equal(fs.existsSync(path.join(home,'inflation-causal-candidates-r1','core-handoff')),false);
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
 });
