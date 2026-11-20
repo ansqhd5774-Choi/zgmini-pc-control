@@ -1,0 +1,84 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "19361427b70b72ec7f77839a5a3265bd8659461a",
+  "baseHead": "48e892755161b8d829f21b7ae0f270b07278d1ca",
+  "baseConfigSourceSha": "48e892755161b8d829f21b7ae0f270b07278d1ca",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/marketparquet-paid-store.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "53373eae62189d0ff001fb62f16fcdd9555a6854695350a7062196d274e328cd"
+    },
+    {
+      "path": "scripts/pc-writer/sector-fear-greed-r3-rolling-local.mjs",
+      "change": "M",
+      "beforeSha256": "0f73854897d1a0b4b47ce99aeb17ca1389d8c28046ad3f0470a28c35085094bb",
+      "afterSha256": "9cdb7a772e13190c330a5e076a281a40bea0b25927321db4bcb860ad782b3d2c"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d",
+      "afterSha256": "a79eaddb52774343a3c69609698064200305e4854117a04f8a26e075f6772810",
+      "candidateSha256": "705a9e3ac3b75f72039d09a294c14efbddad1e2605169357003e13abcfd536a6",
+      "insertions": [
+        {
+          "anchor": " const lane=process.argv.includes('--korea')?'korea':'core';",
+          "position": "after",
+          "text": " // Paid sector/theme inputs share one stored archive; no extra Task or publisher.\n if(lane==='core'){\n  try{const {collectPaidCurrent}=await import('./marketparquet-paid-store.mjs');\n   console.log('MARKETPARQUET_PAID '+JSON.stringify(await collectPaidCurrent(base)));\n  }catch(e){console.warn('MARKETPARQUET_PAID '+JSON.stringify({status:'FAILED_PREVIOUS_INPUTS_PRESERVED',code:/^MP_PAID_[A-Z0-9_]+$/.test(e.code??'')?e.code:'MP_PAID_COLLECTION_FAILED'}));}\n }\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-score/sector-fear-greed-r3-rolling.mjs",
+      "sha256": "74c56da091025a1d425b0e1c122059f29ba2da349804c21a32cc8be235833763"
+    },
+    {
+      "path": "lib/market-score/sector-fear-greed-r3-five-axis-complete.mjs",
+      "sha256": "ddcf0e73c957333705959125e086cf3e3785016f3d8a08a780d585ef5de43e00"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "sha256": "b21f03057025bad7aed58c7bb1f69b2abba0f0b446c587869594eea732adfaa6"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "sha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878"
+    },
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-approved-writer-entry.mjs",
+      "sha256": "2519887919ff9098f731c28b7afcffeb4d38d863da507a8b0302c7363ecbbf75"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
