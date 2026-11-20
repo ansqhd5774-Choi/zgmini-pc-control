@@ -253,7 +253,10 @@ test('invalid policy permits only original fixed BLOCKED policy-error receipt up
   lastPass:'EVENT_RECEIVED',firstFail:'EVENT_OR_REQUEST_VALIDATION',
   operationalWrites:0,providerCalls:0,d1Writes:0}};
  const fixed={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',maxReportBytes:32768};
- for(const broken of [null,'{not json','',Buffer.from('not-json'), 'null']){
+ for(const broken of [null,'{not json','',Buffer.from('not-json'), 'null', '[]', '{}', '42',
+  JSON.stringify({controlRepository:'incorrect/repo',maxReportBytes:32768}),
+  JSON.stringify({controlRepository:'ansqhd5774-Choi/zgmini-pc-control'}),
+  JSON.stringify({controlRepository:'ansqhd5774-Choi/zgmini-pc-control',maxReportBytes:0})]){
   assert.deepEqual(resolveUploadPolicy(broken,{pointer,...spec}),fixed);
  }
  const ordinary={controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
