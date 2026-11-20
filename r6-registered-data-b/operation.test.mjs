@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2,R6_B_APPROVAL_V3,isApprovedR6RuntimeMode,verifyInstalledR6DolManualOverlay}
+import {authorizeR6RegisteredB,R6_B_REPO,R6_B_TITLE,R6_B_LABEL,R6_B_SCHEMA,R6_B_APPROVAL_V2,R6_B_APPROVAL_V3,isApprovedR6RuntimeMode,verifyInstalledR6DolManualOverlay,verifyInstalledR6Overlay,R6_B_SOURCE,R6_B_HOME}
  from './operation.mjs';
 
 const uid='d3ac6032-49c1-47e6-98d1-d7adeba91a7c';
@@ -242,4 +242,28 @@ test('027 manual DOL preflight remains restricted to three approval-pinned sourc
   a.map((v,i)=>i===2?{...v,afterSha256:'bad'}:v)])
    assert.throws(()=>verifyInstalledR6DolManualOverlay({overlay:{files}}),
     /R6_DOL_FILE_SCOPE_STOP/);
+});
+
+test('027 Windows manual DOL checks exact source bytes but not unrelated automatic publication toggles',t=>{
+ if(process.platform!=='win32')return t.skip('Windows source verifier');
+ const sourceSha='a'.repeat(40),approvedBytes=Buffer.from('approved DOL source bytes\n');
+ const digest=hash(approvedBytes);
+ const files=['employment-r6-provider','employment-r6-collector','employment-r6-scheduler']
+  .map(x=>({path:'lib/market-score/'+x+'.mjs',afterSha256:digest}));
+ const config={enabled:true,collectionTarget:'pc',source:sourceSha,
+  employmentR6AutoCollection:false,employmentR6OneYearAutoPublication:false};
+ const calls=[];
+ const settings={sourceRoot:R6_B_SOURCE,pcHome:R6_B_HOME,approvedSha:sourceSha,
+  overlay:{files},exists:()=>true,
+  read:f=>String(f).endsWith('config.json')?JSON.stringify(config):approvedBytes,
+  git:args=>{calls.push(args);return args[0]==='rev-parse'?sourceSha:'';}};
+ assert.deepEqual(verifyInstalledR6DolManualOverlay(settings),config);
+ assert.deepEqual(calls.map(x=>x[0]),['rev-parse','diff']);
+ assert.throws(()=>verifyInstalledR6Overlay(settings),/R6_B_INSTALLED_SOURCE_STOP/);
+ const dirty={...settings,git:args=>{if(args[0]==='diff')throw new Error('unapproved dirty source');return sourceSha;}};
+ assert.throws(()=>verifyInstalledR6DolManualOverlay(dirty),/unapproved dirty source/);
+ const changed={...settings,overlay:{files:files.map((v,i)=>i===0?
+  {...v,afterSha256:'b'.repeat(64)}:v)}};
+ assert.throws(()=>verifyInstalledR6DolManualOverlay(changed),
+  /R6_B_INSTALLED_OVERLAY_DRIFT_STOP/);
 });
