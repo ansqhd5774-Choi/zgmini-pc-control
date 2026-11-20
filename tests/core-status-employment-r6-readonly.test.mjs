@@ -3,6 +3,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {readCore} from '../controller/operations.mjs';
 
 function fixture(t,collection,writer){
@@ -88,4 +89,38 @@ test('core-status excludes malformed R6 diagnostic fields and unknown groups',t=
  ]);
  assert(!JSON.stringify(view).includes('https://token'));
  assert(!JSON.stringify(view).includes('UNAPPROVED'));
+});
+
+test('core-status verifies stored R6 public-result checksum without leaking body or raw input',t=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-r6-checksum-'));
+ t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+ const dataRoot=path.join(temp,'data'),pc=path.join(dataRoot,'pc-writer');
+ const results=path.join(pc,'employment-r6-public-results');
+ fs.mkdirSync(results,{recursive:true});
+ const body={kind:'EMPLOYMENT_R6_ONE_YEAR_STORED_DISPLAY_R1',
+  asOfDate:'2026-11-20',sourceStoredAt:1795124109099,
+  indicators:Array.from({length:29},(_,i)=>({id:'F'+i,status:'READY'})),
+  secret:'PRIVATE_RAW_PAYLOAD_NOT_FOR_CONTROLLER'};
+ const hash=createHash('sha256').update(JSON.stringify(body)).digest('hex');
+ const resultFile=path.join(results,hash+'.json');
+ fs.writeFileSync(resultFile,JSON.stringify(body));
+ fs.writeFileSync(path.join(pc,'local-writer-last-run.json'),JSON.stringify({
+  status:'VERIFIED',employmentR6OneYear:{
+   status:'PUBLISHED',asOfDate:body.asOfDate,
+   sourceStoredAt:body.sourceStoredAt,localResultHash:hash,localResultStored:true,
+   sourceFeatures:29,chartReadyFeatures:23,recentlyObservedFeatures:23
+  }
+ }));
+ const read=()=>readCore(dataRoot,{queryTask:()=>Buffer.from('fixture-task'),
+  retiredTaskEvidence:()=> 'APPROVED_RETIRED_ABSENT'})
+ const verified=read().checkpoints['local-writer-last-run.json'].employmentR6;
+ assert.equal(verified.localResultReadback,'VERIFIED');
+ assert.equal(verified.localResultHash,hash);
+ assert.equal(verified.sourceStoredAt,1795124109099);
+ assert.equal(verified.localResultStored,true);
+ assert(!JSON.stringify(verified).includes('PRIVATE_RAW_PAYLOAD'));
+ fs.writeFileSync(resultFile,JSON.stringify({...body,secret:'TAMPERED'}));
+ assert.equal(read().checkpoints['local-writer-last-run.json'].employmentR6.localResultReadback,'HASH_MISMATCH');
+ fs.unlinkSync(resultFile);
+ assert.equal(read().checkpoints['local-writer-last-run.json'].employmentR6.localResultReadback,'MISSING');
 });

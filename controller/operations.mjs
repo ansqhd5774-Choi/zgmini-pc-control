@@ -103,17 +103,42 @@ function r6CollectionProjection(raw){
   providerRequests:r6Count(raw.providerRequests),
   groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
 }
-function r6PublicationProjection(report){
+function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
+ if(!/^[a-f0-9]{64}$/.test(checksum??''))return 'NO_HASH';
+ const folder=path.join(root,'employment-r6-public-results');
+ const file=path.join(folder,checksum+'.json');
+ try{
+  const dir=fs.lstatSync(folder),stat=fs.lstatSync(file);
+  if(!dir.isDirectory()||dir.isSymbolicLink()||!stat.isFile()||stat.isSymbolicLink()
+    ||stat.size<1||stat.size>8*1024*1024)return 'UNSAFE_OR_OVERSIZE';
+  const body=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(digest(JSON.stringify(body))!==checksum)return 'HASH_MISMATCH';
+  if(body?.kind!=='EMPLOYMENT_R6_ONE_YEAR_STORED_DISPLAY_R1'
+    ||!Array.isArray(body?.indicators)||body.indicators.length!==29
+    ||body.asOfDate!==asOfDate||body.sourceStoredAt!==sourceStoredAt)
+    return 'METADATA_MISMATCH';
+  return 'VERIFIED';
+ }catch(error){return error?.code==='ENOENT'?'MISSING':'READ_FAILED';}
+}
+function r6PublicationProjection(report,root){
  const raw=report?.employmentR6OneYear;
  const failure=Array.isArray(report?.failures)
   ?report.failures.find(item=>item?.id==='employment-r6-one-year-publication'):null;
  if(!raw&&!failure)return null;
  const safeDate=typeof raw?.asOfDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
- return {status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
-  asOfDate:safeDate,sourceStoredAt:Number.isSafeInteger(raw?.sourceStoredAt)&&raw.sourceStoredAt>0?raw.sourceStoredAt:null,
+ const sourceStoredAt=Number.isSafeInteger(raw?.sourceStoredAt)&&raw.sourceStoredAt>0?raw.sourceStoredAt:null;
+ const projected={status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
+  asOfDate:safeDate,sourceStoredAt,
   sourceFeatures:r6Count(raw?.sourceFeatures),
   chartReadyFeatures:r6Count(raw?.chartReadyFeatures),
   recentlyObservedFeatures:r6Count(raw?.recentlyObservedFeatures)};
+ const localHash=typeof raw?.localResultHash==='string'&&/^[a-f0-9]{64}$/.test(raw.localResultHash)?raw.localResultHash:null;
+ if(localHash!==null){
+  projected.localResultHash=localHash;
+  projected.localResultStored=typeof raw?.localResultStored==='boolean'?raw.localResultStored:null;
+  projected.localResultReadback=r6LocalResultReadback(root,localHash,safeDate,sourceStoredAt);
+ }
+ return projected;
 }
 export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
@@ -126,7 +151,7 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
   }
   if(file==='local-writer-last-run.json'){
-   const employmentR6=r6PublicationProjection(data);
+   const employmentR6=r6PublicationProjection(data,root);
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
   }
  }
