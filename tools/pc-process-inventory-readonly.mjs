@@ -318,6 +318,85 @@ function collectMaintenanceStatusReadonly(){
 }
 
 
+// Fixed #2505 installed-Controller recovery snapshot, using the existing
+// independent operating-PC process-inventory route. Never reads raw data,
+// exports owner/lease bytes, or grants any rollback/install authorization.
+const C2505_ID='pc-update-8f413b02-4bb7-4d99-b71f-64d9c51a294a';
+const C2505_TARGET='0f1effad0c58e8b7bd684aa638521180183ca902';
+const C2505_PHASES=new Set(['RECEIVED','VALIDATED','STAGED','INTAKE_PAUSED',
+ 'DRAINED','BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED',
+ 'INTAKE_RESUMED','BACKLOG_RECONCILED','POSTCHECK_PENDING','RECOVERY_REQUIRED',
+ 'PASS','BLOCKED','ROLLED_BACK']);
+const C2505_STATES=new Set(['PRESENT','ABSENT','UNKNOWN','UNSAFE','UNVERIFIED']);
+const c2505Unknown=code=>({schema:'ZGMINI_C2505_RECOVERY_READONLY_V1',
+ requestId:C2505_ID,status:'STATE_UNKNOWN',code,actualControllerSha:null,
+ originalRequestRetried:false,recoveryEligible:false,installSuccessProven:false,
+ operationalWrites:0,providerCalls:0,d1Writes:0});
+const c2505State=x=>C2505_STATES.has(x)?x:'UNKNOWN';
+const c2505Bool=x=>typeof x==='boolean'?x:null;
+export function project2505RecoveryReadonly(raw){
+ const ledger=raw?.ledger,a=raw?.artifacts;
+ if(raw?.status!=='STATUS'||ledger?.requestId!==C2505_ID||
+    ledger?.issueNumber!==2505||ledger?.targetSha!==C2505_TARGET)
+  return c2505Unknown('C2505_LEDGER_IDENTITY_UNVERIFIED');
+ if(a?.schema!=='ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1'||
+    a.requestId!==C2505_ID)
+  return c2505Unknown('C2505_ARTIFACT_IDENTITY_UNVERIFIED');
+ const backup={};
+ for(const key of ['backupRoot','stageRoot','snapshotRoot','stagedHost',
+  'originalHost','protectedBefore','previousHost'])
+  backup[key]=c2505State(a.artifacts?.[key]);
+ const backlog={file:c2505State(a.backlog?.file),
+  windows:Number.isSafeInteger(a.backlog?.windows)&&a.backlog.windows>=0&&
+   a.backlog.windows<=64?a.backlog.windows:null,
+  openWindows:Number.isSafeInteger(a.backlog?.openWindows)&&
+   a.backlog.openWindows>=0&&a.backlog.openWindows<=64?a.backlog.openWindows:null,
+  replayCount:Number.isSafeInteger(a.backlog?.replayCount)&&
+   a.backlog.replayCount>=0&&a.backlog.replayCount<=10000?a.backlog.replayCount:null};
+ const lease={directory:c2505State(a.lease?.directory),
+  ownerFile:c2505State(a.lease?.ownerFile),
+  recoveryMarker:c2505State(a.lease?.recoveryMarker),
+  ownerMarkerMatch:c2505Bool(a.lease?.ownerMarkerMatch),
+  held:c2505Bool(raw.installLock?.held),
+  recoveryRequired:c2505Bool(raw.installLock?.recoveryRequired),
+  // Matching owner/marker is NOT proof that this is #2505's own lease.
+  ownerRequestIdentityVerified:null};
+ const validStates=Object.values(backup).every(v=>v==='PRESENT'||v==='ABSENT')&&
+  [backlog.file,lease.directory,lease.ownerFile,lease.recoveryMarker]
+   .every(v=>v==='PRESENT'||v==='ABSENT');
+ const countsValid=backlog.file!=='PRESENT'||backlog.windows!==null&&
+  backlog.openWindows!==null&&backlog.replayCount!==null&&
+  backlog.openWindows<=backlog.windows;
+ const observed=raw.installedReadbackCode===null&&
+  raw.ledgerReadbackCode===null&&raw.lockReadbackCode===null&&
+  raw.artifactReadbackCode===null&&a.status==='OBSERVED'&&validStates&&
+  countsValid&&lease.held!==null&&lease.recoveryRequired!==null&&
+  (lease.recoveryMarker!=='PRESENT'||lease.ownerMarkerMatch===true);
+ return {schema:'ZGMINI_C2505_RECOVERY_READONLY_V1',requestId:C2505_ID,
+  status:observed?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:observed?'C2505_FIXED_ARTIFACTS_OBSERVED':'C2505_FIXED_ARTIFACTS_UNVERIFIED',
+  actualControllerSha:asSha(raw.actualControllerSha),
+  expectedTargetSha:C2505_TARGET,
+  ledgerStatus:C2505_PHASES.has(ledger.status)?ledger.status:null,
+  ledgerPhase:C2505_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:C2505_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  postIssueNumber:ledger.postIssueNumber===2506?2506:null,
+  ledgerWorkflowEnabled:c2505Bool(ledger.workflowEnabled),
+  ledgerIntakePaused:c2505Bool(ledger.intakePaused),
+  backup,backlog,lease,
+  originalRequestRetried:false,recoveryEligible:false,installSuccessProven:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect2505RecoveryReadonly(
+ read=()=>readMaintenanceRecoveryStatus(C2505_ID)){
+ try{
+  const first=project2505RecoveryReadonly(read());
+  const second=project2505RecoveryReadonly(read());
+  return JSON.stringify(first)===JSON.stringify(second)?second:
+   c2505Unknown('C2505_DOUBLE_READ_CHANGED');
+ }catch{return c2505Unknown('C2505_READBACK_FAILED');}
+}
+
 // A fixed historical Controller B failure: independently sample only local
 // journal + staged/backlog/lease metadata through the existing A-grade PC
 // process inventory. No new operation, receiver handoff, B effect or PC writes.
@@ -888,6 +967,7 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
+  c2505RecoveryCheckpoint:inspect2505RecoveryReadonly(),
   c2094StageEvidence:inspect2094StageReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
@@ -929,6 +1009,8 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
+  'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
   'marketParquetTaskStatus='+(r.marketParquetTaskSource?.status??'NOT_APPLICABLE'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
