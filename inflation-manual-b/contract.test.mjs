@@ -171,3 +171,7 @@ test('V2 accepts only the two exact scoped four-file closures',()=>{
  nonParserDrift.sourceFiles[0].sha256='e'.repeat(64);
  code(()=>validateApprovalManifest(nonParserDrift),'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
 });
+
+// Existing isolated W01 source CI also verifies the distinct, dormant V3 contract.
+import '../inflation-core-handoff/contract.test.mjs';
+import '../inflation-core-handoff/signed-envelope.test.mjs';
