@@ -26,9 +26,16 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
    allowedActors:['ansqhd5774-Choi'],operations:{'core-status':{grade:'A',resource:'light',timeoutSeconds:60}}
   }));
   // A valid installed manifest must attest a nonempty, scoped source inventory.
-  const paths=['controller/entry.mjs','controller/common.mjs',
-   'controller/preimage-manifest-contract.mjs','controller/engine.mjs',
-   'config/operations.json'];
+  const paths=['config/operations.json','controller/common.mjs','controller/engine.mjs',
+   'controller/entry.mjs','controller/fear-greed-archive-readonly.mjs',
+   'controller/operations.mjs','controller/supervisor.mjs',
+   'controller/upload.mjs','controller/worker.mjs',
+   'controller/preimage-manifest-contract.mjs'];
+  // Only the engine import graph executes in this isolated failure fixture.
+  for(const rel of paths){
+   const file=path.join(root,rel);
+   if(!fs.existsSync(file))fs.writeFileSync(file,'export const fixtureOnly=true;\n');
+  }
   const controllerFiles=Object.fromEntries(paths.map(rel=>[rel,
    createHash('sha256').update(fs.readFileSync(path.join(root,rel))).digest('hex')]));
   fs.writeFileSync(path.join(root,'host.json'),JSON.stringify({
@@ -69,6 +76,9 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
    '{}','{"controllerFiles":null}','{"controllerFiles":[]}',
    JSON.stringify({controllerSourceSha:'b'.repeat(40),controllerFiles:{}}),
    JSON.stringify({controllerSourceSha:'bad',controllerFiles}),
+   JSON.stringify({controllerSourceSha:'b'.repeat(40),
+    controllerFiles:Object.fromEntries(Object.entries(controllerFiles)
+     .filter(([rel])=>rel!=='controller/upload.mjs'))}),
    JSON.stringify({controllerSourceSha:'b'.repeat(40),
     controllerFiles:{...controllerFiles,'controller/../unverified.mjs':'c'.repeat(64)}}),
    JSON.stringify({controllerSourceSha:'b'.repeat(40),
