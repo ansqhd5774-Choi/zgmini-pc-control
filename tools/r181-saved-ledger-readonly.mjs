@@ -64,8 +64,13 @@ export function assessSavedR181Ledger(raw){
  const reportedState=raw?.status==='LOCAL_PRIMARY_STORED'?'LOCAL_PRIMARY_STORED':
   raw?.status==='PRIMARY_RAW_STORED'?'PRIMARY_RAW_STORED':
   raw?.status==='NO_NEW_COMPLETE_PRIMARY_DATE'?'NO_NEW_COMPLETE_PRIMARY_DATE':
-  'OTHER_OR_UNKNOWN';
- const complete=reportedState!=='OTHER_OR_UNKNOWN'&&at!==null&&
+  raw?.status==='STOP'?'STOP':'OTHER_OR_UNKNOWN';
+ // A failure can retain a full prior coverage snapshot. Never report the
+ // failure as collection-complete merely because the retained rows are full.
+ const completedState=reportedState==='LOCAL_PRIMARY_STORED'||
+  reportedState==='PRIMARY_RAW_STORED'||
+  reportedState==='NO_NEW_COMPLETE_PRIMARY_DATE';
+ const complete=completedState&&at!==null&&
   providerCalls!==null&&providerCalls>0&&validCoverage&&
   keys.length===SYMBOLS.length&&keys.every(key=>SYMBOLS.includes(key))&&
   symbols.every(e=>e.bars!==null&&e.latest15NY!==null);
