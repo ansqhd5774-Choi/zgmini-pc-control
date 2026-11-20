@@ -102,3 +102,12 @@ test('V3 projects exact coordinator effect only from verified branded authority'
  assert.throws(()=>projectCoreOwnedTransactionApproval({...approved}),
   {code:'INFL_CORE_HANDOFF_AUTH_OBJECT_STOP'});
 });
+
+test('trace-only chat label does not impose a second UUID approval gate',()=>{
+ const d=fixture();
+ const req=JSON.parse(d.event.issue.body);
+ req.chatId='chat-w01-core-handoff-20261121';
+ d.event.issue.body=JSON.stringify(req);
+ const auth=authorizeCoreOwnedHandoff(d);
+ assert.equal(auth.request.chatId,req.chatId);
+});
