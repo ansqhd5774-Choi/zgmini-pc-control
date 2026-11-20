@@ -120,5 +120,24 @@ test('missing engine dependency or host manifest yields uploadable BLOCKED point
   assert.equal(receipt.report.operationalWrites,0);
   assert.equal(receipt.report.providerCalls,0);
   assert.equal(receipt.report.d1Writes,0);
+  // Corrupt installed policy must not bypass entry's fixed failure receipt.
+  // The trusted GitHub event remains available for the original Issue number.
+  const policyFile=path.join(root,'config','operations.json');
+  const policyBytes=fs.readFileSync(policyFile);
+  for(const invalidPolicy of ['{broken json','']){
+   fs.writeFileSync(policyFile,invalidPolicy);
+   fs.rmSync(reportFile,{force:true});
+   const badPolicy=spawnSync(process.execPath,
+    [path.join(root,'controller','entry.mjs')],{encoding:'utf8',env});
+   assert.equal(badPolicy.status,1,badPolicy.stderr);
+   const blocked=JSON.parse(fs.readFileSync(reportFile,'utf8'));
+   assert.equal(blocked.issueNumber,2506);
+   assert.equal(blocked.report.status,'BLOCKED');
+   assert.equal(blocked.report.code,'CONTROLLER_POLICY_UNAVAILABLE');
+   assert.equal(blocked.report.operationalWrites,0);
+   assert.equal(blocked.report.providerCalls,0);
+   assert.equal(blocked.report.d1Writes,0);
+  }
+  fs.writeFileSync(policyFile,policyBytes);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
