@@ -507,5 +507,12 @@ test('postcheck recovery retains approved Writer config CAS while all other prot
  const unchanged=selectPreservedRecoveryProtection(historic,clone(historic));
  assert.equal(unchanged.allowed,true);
  assert.equal(unchanged.preservedWriterConfig,false);
+ // A pinned recovery must not silently bypass its approved CAS when a Writer
+ // configuration changes back to the historic value.
+ assert.equal(selectPreservedRecoveryProtection(historic,clone(historic),
+  {approvedCurrentWriterConfigSha256:'d'.repeat(64)}).code,
+  'RECOVERY_WRITER_CONFIG_CAS_NOT_VERIFIED');
+ assert.equal(selectPreservedRecoveryProtection(historic,clone(historic),
+  {approvedCurrentWriterConfigSha256:'a'.repeat(64)}).allowed,true);
  assert.equal(selectPreservedRecoveryProtection({files:null,tasks:{}},current).allowed,false);
 });
