@@ -26,6 +26,8 @@ export const CORE_HANDOFF_SOURCE_FILES=Object.freeze([
  'lib/diagnostic-layer/xlsx-lite.mjs',
 ]);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// chatId is trace-only, not execution authority; accept the common chat label.
+const CHAT_ID=/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/;
 const SHA40=/^[a-f0-9]{40}$/i;
 const SHA64=/^[a-f0-9]{64}$/i;
 const FILE=/^approvals\/inflation-core-handoff\/[a-z0-9][a-z0-9._-]{0,95}\.json$/;
@@ -78,7 +80,7 @@ function eventRequest(event,env){
  try{req=JSON.parse(event.issue.body);}catch{stop('INFL_CORE_HANDOFF_REQUEST_JSON_STOP');}
  need(exact(req,REQUEST_KEYS)&&req.schema===CORE_HANDOFF_REQUEST_SCHEMA&&
   req.operation===CORE_HANDOFF_OPERATION&&req.controlRepository===CONTROL_REPO&&
-  UUID.test(req.requestId??'')&&UUID.test(req.chatId??'')&&
+  UUID.test(req.requestId??'')&&CHAT_ID.test(req.chatId??'')&&
   FILE.test(req.approvalManifestPath??'')&&
   SHA64.test(req.approvalManifestSha256??''),
   'INFL_CORE_HANDOFF_REQUEST_SCOPE_STOP');
