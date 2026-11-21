@@ -7,6 +7,12 @@ import {execFileSync} from 'node:child_process';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 export const R6_KEY='detail:employment-r6:one-year:v1';
+export function selectR6GitBinary({platform=process.platform,exists=fs.existsSync}={}){
+ return platform==='win32'?
+   ['C:\\Program Files\\Git\\cmd\\git.exe',
+    'C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(exists)??null:'git';
+}
+
 const SQL='SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=?';
 const REV='EMP-R6-FORMULA-R2-CPS-2025-10';
 const FORMULA='sha256:04486846cd6063452d1c764116d3a31209f074d23a8764bf5b6ec8467095210e';
@@ -99,8 +105,16 @@ export async function inspectEmploymentR6D1Readback(dataRoot,{fileSystem=fs,quer
      if(!fileSystem.statSync(module).isFile())
        return {...out,code:'R6_D1_CLIENT_MISSING'};
      // Import only the already approved, tracked and unchanged D1 client tree.
-     const runGit=args=>execFileSync('git',args,{cwd:real,encoding:'utf8',
-       timeout:5000,maxBuffer:131072,windowsHide:true,stdio:['ignore','pipe','ignore']}).trim();
+     // The PC Runner child has a Node-only PATH; use the same fixed Git
+     // locations and read-only flags as pc-source-readonly.mjs.
+     const gitBinary=selectR6GitBinary({exists:fileSystem.existsSync});
+     if(!gitBinary)return {...out,code:'R6_D1_GIT_NOT_INSTALLED'};
+     const runGit=args=>execFileSync(gitBinary,
+       ['--no-optional-locks','-c','core.fsmonitor=false',
+        '-c','core.untrackedCache=false','-C',real,...args],
+       {encoding:'utf8',timeout:10000,maxBuffer:65536,windowsHide:true,
+        env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'},
+        stdio:['ignore','pipe','ignore']}).trim();
      phase='CHECKOUT_HEAD';
      if(runGit(['rev-parse','HEAD'])!==config.source)
        return {...out,code:'R6_D1_CLIENT_SOURCE_MISMATCH'};
