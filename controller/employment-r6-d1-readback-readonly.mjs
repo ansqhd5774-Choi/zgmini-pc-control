@@ -36,8 +36,7 @@ export function classifyR6ReadFailure(phase,error){
  const safeError=typeof error?.message==='string'&&
     /^(WRANGLER_LOGIN_REQUIRED|WRANGLER_AUTH_REFRESH_TIMEOUT|D1_AUTH_RESOLUTION_FAILED|D1_OUTCOME_UNKNOWN|D1_BATCH_FAILED|D1_HTTP_(401|403|429|500|502|503|504))$/.test(error.message)?
     error.message:null;
- return {...out,code:stages[phase]??'R6_D1_READ_FAILED',
-   failurePhase:phase,...(safeError?{safeError}:{} )};
+
  return {...out,code:stages[phase]??'R6_D1_READ_FAILED',
    failurePhase:phase,...(safeError?{safeError}:{})};
 }
