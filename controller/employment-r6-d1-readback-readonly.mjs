@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 
 export const R6_KEY='detail:employment-r6:one-year:v1';
@@ -72,6 +73,16 @@ export async function inspectEmploymentR6D1Readback(dataRoot,{fileSystem=fs,quer
      const module=path.join(real,'scripts','pc-writer','d1.mjs');
      if(!fileSystem.statSync(module).isFile())
        return {...out,code:'R6_D1_CLIENT_MISSING'};
+     // Import only the already approved, tracked and unchanged D1 client tree.
+     const runGit=args=>execFileSync('git',args,{cwd:real,encoding:'utf8',
+       timeout:5000,maxBuffer:131072,windowsHide:true,stdio:['ignore','pipe','ignore']}).trim();
+     if(runGit(['rev-parse','HEAD'])!==config.source)
+       return {...out,code:'R6_D1_CLIENT_SOURCE_MISMATCH'};
+     for(const file of ['scripts/pc-writer/d1.mjs',
+       'scripts/pc-writer/d1-transient.mjs','scripts/pc-writer/d1-diagnostics.mjs']){
+       runGit(['ls-files','--error-unmatch','--',file]);
+       runGit(['diff','--quiet','HEAD','--',file]);
+     }
      const {client,credential}=await import(pathToFileURL(module).href);
      const remote=client(config,()=>credential(real));
      row=(await remote.query(config.core,SQL,[R6_KEY])).results?.[0]??null;
