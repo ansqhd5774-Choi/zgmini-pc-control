@@ -229,6 +229,22 @@ function fixtureD05Ledger(c){
    recordedAt:'2026-11-19T12:00:01.000Z',stableEvidenceDigestSha256})+'\n');
 }
 
+test('092 simulated: unrelated Scheduler outage does not suppress fixed Core snapshot result',async()=>{
+ const c=fixture();
+ const out=await executeJob(req('core-runtime-source-readonly','core092-scheduler-sim-01'),
+  {...c,runId:'9221',queryTask:()=>{throw Error('private scheduler error');}});
+ assert.equal(out.report.status,'STATE_UNKNOWN');
+ assert.equal(out.report.protectionObservation,'UNVERIFIED');
+ assert.equal(out.report.protectedStateUnchanged,null);
+ assert.equal(out.report.result?.status,'STATE_UNKNOWN');
+ assert.ok(['CORE_WINDOWS_REQUIRED','CORE_FIXED_PROBE_UNAVAILABLE',
+  'CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE'].includes(out.report.result?.code));
+ assert.equal(out.report.effectClass,'FIXED_READONLY_NO_PROVIDER_NO_DB');
+ assert.equal(out.report.providerCalls,0);
+ assert.equal(out.report.d1Writes,0);
+ assert.doesNotMatch(JSON.stringify(out.report),/private scheduler error/);
+});
+
 test('D05 fixed read preserves ledger when unrelated scheduler query is unavailable',async()=>{
  const c=fixture();fixtureD05Ledger(c);let schedulerCalls=0;
  const out=await executeJob(req('d05-lineage-readonly','d05-scheduler-unavailable-01'),
