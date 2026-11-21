@@ -29,7 +29,7 @@
   },
   "postOperation": "core-status",
   "postSourceBranch": "main",
-  "postSourceSha": "bdb237e5d03d328e0e9727143f4d328316a10427",
+  "postSourceSha": "2eb796da811d0e074ca0cabab8e2cad9502bff43",
   "selectiveSource": {
     "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
     "branch": "codex/w05-r311-bea-policy-after-w04-20261121",
