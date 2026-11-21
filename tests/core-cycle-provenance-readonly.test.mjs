@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {inspectStoredCoreCycleEvidence,verifyStoredCoreCycle} from '../controller/core-cycle-provenance-readonly.mjs';
 import {inspectCoreRuntimeSource} from '../controller/core-runtime-source-readonly.mjs';
+import {validatePreimageApproval} from '../controller/preimage-manifest-contract.mjs';
 
 const sha=data=>createHash('sha256').update(data).digest('hex');
 const t=Date.UTC(2026,10,21,7,45,0),source='a'.repeat(40);
@@ -106,4 +107,14 @@ test('a bad or absent stored cycle does not override UNKNOWN from live snapshot'
  assert.equal(got.status,'STATE_UNKNOWN');
  assert.equal(got.runtimeSourceVerified,false);
  assert.equal(got.recentCycleEvidence.code,'NO_VALID_SOURCE');
+});
+
+test('092 preimage A has exactly seven fixed .mjs source paths and forbids other files',()=>{
+ const manifestPath='approvals/writer-preimage/core092-natural-provenance-r1.json';
+ const bytes=fs.readFileSync(new URL('../'+manifestPath,import.meta.url));
+ const approved=validatePreimageApproval(bytes,{expectedSha256:sha(bytes),manifestPath});
+ assert.equal(approved.files.length,7);
+ assert.deepEqual(approved.files.map(v=>v.change),['M','M','M','M','A','A','A']);
+ assert.ok(approved.files.every(v=>v.path.endsWith('.mjs')));
+ assert.equal(approved.sourceRoot,'projects/zgmini-earnings-history-pc-release');
 });
