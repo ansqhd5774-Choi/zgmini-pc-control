@@ -1,24 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {RECOVERY,validateTrigger} from '../controller/report-recovery-540-once.mjs';
 
-const here=path.dirname(fileURLToPath(import.meta.url));
-const workflow=fs.readFileSync(path.join(here,'..','.github','workflows',
-  'pc-report-recovery-540-once.yml'),'utf8');
-
-test('one-shot owner comment #540 only; no worker, A rerun, or schedule',()=>{
-  assert.match(workflow,/issue_comment:\s*\n\s*types: \[created\]/);
-  assert.match(workflow,/github\.repository == 'ansqhd5774-Choi\/zgmini-pc-control'/);
-  assert.match(workflow,/github\.event\.repository\.private == true/);
-  assert.match(workflow,/github\.event\.issue\.number == 540/);
-  assert.match(workflow,/github\.event\.issue\.pull_request == null/);
-  assert.match(workflow,/github\.actor == 'ansqhd5774-Choi'/);
-  assert.match(workflow,/github\.event\.comment\.user\.login == 'ansqhd5774-Choi'/);
-  assert.match(workflow,/github\.event\.comment\.body == '\/zgmini-recover-540-once'/);
-  assert.match(workflow,/runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
-  assert.match(workflow,/controller\\report-recovery-540-once\.mjs/);
-  assert.doesNotMatch(workflow,/entry\.mjs|worker\.mjs|workflow_dispatch|schedule:|actions\/checkout@|GITHUB_RUN_ID\s*:/);
-  assert.equal((workflow.match(/GITHUB_TOKEN:/g)??[]).length,1);
+test('072 exact #540 report recovery is delivered and the owner-only intake retired',()=>{
+ assert.equal(fs.existsSync(new URL('../.github/workflows/pc-report-recovery-540-once.yml',import.meta.url)),false);
+ assert.equal(RECOVERY.issueNumber,540);
+ assert.equal(RECOVERY.runId,'42261956750');
+ assert.equal(RECOVERY.operation,'release-calendar-runtime-readonly');
+ assert.equal(RECOVERY.trigger,'/zgmini-recover-540-once');
+ assert.throws(()=>validateTrigger({},{GITHUB_REPOSITORY:RECOVERY.repository}),/RECOVERY_EVENT_DENIED/);
 });

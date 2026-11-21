@@ -5,7 +5,7 @@ const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 // Only reviewed fixed operations with no provider/DB/operational write effect
 // may return useful reads when an unrelated Scheduler observation is missing.
 // The caller cannot select or expand this class in the Issue payload.
-const ISOLATED_READS=new Set(['runner-smoke','core-status','writer-install-preimage-readonly']);
+const ISOLATED_READS=new Set(['runner-smoke','core-status','d05-lineage-readonly','core-runtime-source-readonly','writer-install-preimage-readonly']);
 const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
  'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
 function noteUnavailableProtection(report,error,phase){
@@ -58,11 +58,19 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
     affectedScope:'OWN_REQUEST_ONLY',nextAction:retiredIranFailure?'VERIFY_APPROVED_RETIRED_IRAN_STATE_NO_RETRY':'INSPECT_REQUIRED_TASK_REGISTRATION_NO_AUTOMATIC_RETRY',
     ...(protectedProbeReason?{protectedProbeReason}:{}),
     ...(retiredIranFailure?{failedProtectedTask:'ZGMINI-PC-Iran-Progress-R13'}:typeof error.safeTaskName==='string'?{failedProtectedTask:error.safeTaskName}:{})});throw error;}}
-  preflightOperation='CORE_STATE_READ';report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;report.lastPass=before?'PROTECTED_STATE_SNAPSHOT':'CORE_STATE_READ';
+  preflightOperation='CORE_STATE_READ';
+  if(request.operation==='d05-lineage-readonly'){
+   // Core source observation is independent from the fixed, local D05 ledger read.
+   try{report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;}
+   catch{report.pcOperationalApprovedSha=null;report.coreSourceObservation='UNVERIFIED';}
+  }else report.pcOperationalApprovedSha=readCore(host.dataRoot).approvedSourceSha??null;
+  report.lastPass=before?'PROTECTED_STATE_SNAPSHOT':'CORE_STATE_READ';
   preflightOperation='WORKER_INPUT_WRITE';
   const input=path.join(workspace,'input.json'),output=path.join(workspace,'worker-result.json');
   writeJson(input,{request,context:{workspace,workspaceId,dataRoot:host.dataRoot,policy,host,seat,approvedPreimageScope,
-   skipProtectedTaskObservation:isolatedRead&&!before&&request.operation==='core-status'}});
+   skipProtectedTaskObservation:isolatedRead&&!before&&request.operation==='core-status',
+   ...(request.operation==='core-status'&&before?{protectedTaskHashes:before.tasks}:{}),
+   ...(request.operation==='d05-lineage-readonly'?{d05ApprovedSourceSha:report.pcOperationalApprovedSha}:{})}});
   const ms=policy.operations[request.operation].timeoutSeconds*1000;
   preflightOperation='WORKER_EXECUTION';const childResult=await new Promise(resolve=>{
    const env={SystemRoot:process.env.SystemRoot,ComSpec:process.env.ComSpec,PATH:path.dirname(process.execPath),TEMP:workspace,TMP:workspace};
@@ -94,6 +102,12 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   }else{
    report.protectedStateUnchanged=JSON.stringify(before)===JSON.stringify(after);
    need(report.protectedStateUnchanged,'PROTECTED_STATE_DRIFT_OBSERVED');
+  }
+  if(request.operation==='d05-lineage-readonly'&&report.coreSourceObservation==='UNVERIFIED'&&report.status==='PASS'){
+   report.workerOutcome={status:report.status,code:report.code,
+    firstFail:report.firstFail,resultPresent:report.result!==undefined};
+   report.status='STATE_UNKNOWN';report.code='D05_CORE_SOURCE_OBSERVATION_UNVERIFIED';
+   report.firstFail='CORE_SOURCE_OBSERVATION';report.next='USE_LEDGER_READ_RESULT_WITHOUT_CURRENT_SOURCE_ATTESTATION';
   }
   report.actualExecutionSha=request.operation==='employment-r6-candidate-stage-readonly'
     ?(report.result?.actualExecutionSha??null)

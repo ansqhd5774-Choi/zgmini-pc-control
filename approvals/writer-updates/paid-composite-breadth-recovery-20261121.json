@@ -1,0 +1,220 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "6bf5f80eb95075487c41abb9e07508be532fc3e4",
+  "baseHead": "a96c35cbf43877e9f3f640e77c10dbe47ab5b067",
+  "baseConfigSourceSha": "a96c35cbf43877e9f3f640e77c10dbe47ab5b067",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/market.mjs",
+      "change": "M",
+      "beforeSha256": "192b4c3aa2e3237ffe73200d0c713e20d7f89ced53e3fb1d156fb857de6925fd",
+      "afterSha256": "edd4d16ef3cab0ceaa56788543384350955537f083876465ad6278983cd2faf3",
+      "candidateSha256": "1c1cc521a5f440855c4922782830a83f94bd4cff2cc18c32011513b1db8e71b8",
+      "insertions": [
+        {
+          "anchor": " const handler=createMarketScoreR1Handler({env:{DB:db},fetchImpl:async()=>{throw Error('PROVIDER_NETWORK_FORBIDDEN')},collectInputs,orchestrate:buildStoredDiagnostic,collectBreadthDomain:readBreadthB1R5StoredPublicDomainR1,now:()=>new Date(now)});",
+          "position": "before",
+          "text": " const readBreadthB1R5StoredPublicDomainR1=async()=>{\n  const {paidCompositeBreadthDomain}=await import('./paid-composite-breadth.mjs');\n  return paidCompositeBreadthDomain(base,now);\n };\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "d7f601aaba137de807ef9b065ea9be7ff31a2e7b4fe199452c18cd0b839a8300",
+      "afterSha256": "75613735df17a269869cc4c53b7771229da914eb7f09e0fe10e37215e085c5e4",
+      "candidateSha256": "00e011cb71946cf80fcebdfd58e4e83142325c76a547da1a953a57756d6095b4",
+      "insertions": [
+        {
+          "anchor": " if(body?.overall?.status==='READY'){",
+          "position": "before",
+          "text": " // Old unverified provider snapshots are not a paid-history source.\n const {isValidatedPaidBreadthDomain}=await import('../../worker/breadth-paid-contract.mjs');\n if(isValidatedPaidBreadthDomain(body.domains?.find(d=>d.id==='breadth'))){\n  for(let i=comparableCompositeHistory.length-1;i>=0;i--)if(!isValidatedPaidBreadthDomain(comparableCompositeHistory[i]?.body?.domains?.find(d=>d.id==='breadth')))comparableCompositeHistory.splice(i,1);\n }\n"
+        }
+      ]
+    },
+    {
+      "path": "lib/market-score/domain-adapter-r1.mjs",
+      "change": "M",
+      "beforeSha256": "41d502a79eb860a9ed6f3c61cfae326e130abb7b5efbe6547129c3c2aacc12f0",
+      "afterSha256": "2861fb72b77fd1a201d1dd467e5e46fb9fb3da6e36d958e29689aafbb72eb512",
+      "candidateSha256": "56a38423c466927d8018dfb8dee149f21524dcb3a2d19a06357e600aab5a7c32",
+      "insertions": [
+        {
+          "anchor": "    asOfDate:value.asOfDate??base.asOfDate??null,",
+          "position": "after",
+          "text": "    ...(id==='breadth'&&value.paidSource?{paidSource:value.paidSource,observationDate:value.observationDate}:{}),\n"
+        }
+      ]
+    },
+    {
+      "path": "lib/market-score/composite-model-r1.mjs",
+      "change": "M",
+      "beforeSha256": "36bb25e45b4c9b27ddff0b2591a74b0982284cd98aa7642d336322018438a601",
+      "afterSha256": "383efbc67a394fb5d0bf581172bab6a3b2dde9677c595b4e20c2e9e558854444",
+      "candidateSha256": "6507b9a6be7577f93f5988a2d68508d1dcbca42537e6c4f1cbd87cc0468c37f8",
+      "insertions": [
+        {
+          "anchor": "      ...(spec.id===\"breadth\"?{methodologyVersion:src?.methodologyVersion??null,asOfDate:src?.asOfDate??null}:{}),",
+          "position": "after",
+          "text": "      ...(spec.id==='breadth'&&src?.paidSource?{source:src.source,paidSource:src.paidSource,observationDate:src.observationDate}:{}),\n"
+        }
+      ]
+    },
+    {
+      "path": "lib/composite-observed-history-r1.mjs",
+      "change": "M",
+      "beforeSha256": "119046885a64ff0b476af96fbfffd7982b5782b1f0f7edf70b44e487c623eb71",
+      "afterSha256": "573fc1a9ba7fd44b2731e963b1c1ea77c7950f54b12fb5f0fb2bd11686082641",
+      "candidateSha256": "15bc7bdd25265405b6fd94482f2f050e4c5d0828fad056cafafc333767a17739",
+      "insertions": [
+        {
+          "anchor": "export const COMPOSITE_OBSERVED_VERSION='COMPOSITE_CALCULATED_SCORES_R1';",
+          "position": "before",
+          "text": "import {isValidatedPaidBreadthDomain} from '../worker/breadth-paid-contract.mjs';\n"
+        },
+        {
+          "anchor": "export const COMPOSITE_OBSERVED_INTERVAL_MS=15*60000;",
+          "position": "after",
+          "text": "export const COMPOSITE_PAID_SOURCE_CONTRACT='CM_R1_PAID_BREADTH_RESTORED_R1';\nexport function isPaidCompositeObservedPoint(point){return point?.publicSourceContract===COMPOSITE_PAID_SOURCE_CONTRACT&&typeof point.breadthSourceVersion==='string'&&/^[a-f0-9]{64}$/.test(point.breadthSourceVersion);}\n"
+        },
+        {
+          "anchor": "   asOfDate:typeof body.asOfDate==='string'?body.asOfDate:null,",
+          "position": "after",
+          "text": "   ...(isValidatedPaidBreadthDomain(body.domains.find(d=>d.id==='breadth'))?{publicSourceContract:COMPOSITE_PAID_SOURCE_CONTRACT,breadthSourceVersion:body.domains.find(d=>d.id==='breadth').paidSource.sourceVersion}:{}),\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/paid-composite-breadth.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "801dde20fe22f6e73a2418427217c8a15c22a1719b4e4a6677daeb98365a6be6"
+    },
+    {
+      "path": "worker/breadth-paid-contract.mjs",
+      "change": "M",
+      "beforeSha256": "911efbf151abb056f328e3f0b45816e1e93e165b59eabacec9ef8dfc20aafa2e",
+      "afterSha256": "d817337a03bfdd1cd01bddae5017fe4ab354c338310d1872759ccc8f16b21591"
+    },
+    {
+      "path": "worker/breadth-paid-public.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "3767dd8b8a259a09b4b9c7bd520181e6ccb842d8f07c65c3c2cfeb7d03528bc5"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-score/breadth-b1-r1.mjs",
+      "sha256": "3cf3c954976bd0706c4aa58099da7d3b7910a33ce8421a788d7bb1a7d9361544"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-store.mjs",
+      "sha256": "6f6815ef42a78aa585f065e2cd446826fd03769a232842dc12cfe5c5de25b3bc"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-calendar.mjs",
+      "sha256": "ad2570e3ff18edf2ab181a9e92e91ff0a7a681c21cba7ed03890ab54b5f60d51"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r4-contract.mjs",
+      "sha256": "c9b9de04852b39d7b859ed2545dcd0b508ceb026cf0100a1f451c39f96826d67"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r4-reader.mjs",
+      "sha256": "fb3ab4781ff792329db763436c66898c6d3f33c1a996b30df5e68b553885b451"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r5-contract.mjs",
+      "sha256": "6ad7dc7f598ca3f425093aa3b4cbbc0f1c6d7894f9f5cc490f5b5466c087a501"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r5-reader.mjs",
+      "sha256": "aa1e9132371f37abf06a8fb2e67ad655dc4789875e8ff369a6ff15a527eab158"
+    },
+    {
+      "path": "lib/market-score/sector-fear-greed-r3-rolling.mjs",
+      "sha256": "74c56da091025a1d425b0e1c122059f29ba2da349804c21a32cc8be235833763"
+    },
+    {
+      "path": "lib/market-score/sector-fear-greed-r3-five-axis-complete.mjs",
+      "sha256": "ddcf0e73c957333705959125e086cf3e3785016f3d8a08a780d585ef5de43e00"
+    },
+    {
+      "path": "scripts/pc-writer/d1.mjs",
+      "sha256": "10beefecc524b569eba9abf826036fc8e069b4b6f0c3b3340a7bd6a5ab6353a5"
+    },
+    {
+      "path": "scripts/pc-writer/local-env.mjs",
+      "sha256": "8b5a4f388ebbc94c37d6d50478344e4666140f1bee5d70c9315dfde1e584029c"
+    },
+    {
+      "path": "scripts/pc-writer/theme-paid-hourly-source.mjs",
+      "sha256": "3e3d908dafef55efe7c9ae87b1ac5d40289116a387a9e9e6f62302c7cd218976"
+    },
+    {
+      "path": "scripts/pc-writer/marketparquet-paid-store.mjs",
+      "sha256": "4ba0a487868a2a028f080c06bdde75f41ffef5c8018541a0a43e7bd15acdfc23"
+    },
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75"
+    },
+    {
+      "path": "scripts/pc-writer/breadth-paid-cycle.mjs",
+      "sha256": "6680417384b6410d9686c7d8bc52cccec7105ee7f49f90bf5f0d7866dea70d67"
+    },
+    {
+      "path": "lib/market-score/breadth-b1-r3-history-r4.mjs",
+      "sha256": "989378d85940c9eba6228fe959c3744654c8a948b97c173cbb6fecdc0581a216"
+    },
+    {
+      "path": "lib/market-score/sp500-pit-universe-r1.mjs",
+      "sha256": "5eb3b54c96b617e96e10c36e6e8e269fafb80f86c6fb465d5d8a8e31ef686fab"
+    },
+    {
+      "path": "lib/marketparquet-retirement.mjs",
+      "sha256": "8846a71456cab355401bc385fb6c3a7adae8111da4689f9930162349b1bf40fb"
+    },
+    {
+      "path": "worker/market-score-r1.mjs",
+      "sha256": "235d499601a68f80c62246365d54d06bde3238bc0e9be94ccfdded3468a0d87a"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "sha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878"
+    },
+    {
+      "path": "worker/market-publication-validation.mjs",
+      "sha256": "62a2ed93a7f1c7d7e04a4dfae25cd6627c4dc969730c855c4b03be0e63edb4e2"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "existing-core-launcher",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/run-local.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}

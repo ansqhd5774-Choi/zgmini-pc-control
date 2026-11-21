@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "eae97a52-f66c-488d-86a7-5fd9eadc5f66",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "a96c35cbf43877e9f3f640e77c10dbe47ab5b067",
+  "candidateSourceSha": "6bf5f80eb95075487c41abb9e07508be532fc3e4",
+  "manifestSha256": "bfaa731a5d43689224c2614cc06372f72d93161ca15f12572299971563f7ba76",
+  "baseTreeOid": "cd0902c02841357eb2560f4c64f7e0169bad7c60",
+  "preparedTreeOid": "4bc72aec5f4485478c59607afb1f146dc2bb4e15",
+  "provenanceSha256": "5d598199e7cb8aa922e27bccad24719fbfe8427d7f4e40cdb5ee56bc2287ab85",
+  "runId": "44805608664",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/market.mjs",
+    "scripts/pc-writer/run-local.mjs",
+    "lib/market-score/domain-adapter-r1.mjs",
+    "lib/market-score/composite-model-r1.mjs",
+    "lib/composite-observed-history-r1.mjs",
+    "scripts/pc-writer/paid-composite-breadth.mjs",
+    "worker/breadth-paid-contract.mjs",
+    "worker/breadth-paid-public.mjs"
+  ]
+}

@@ -164,20 +164,19 @@ export function authorizeR6RegisteredB({event,env,approvalBytes,overlayBytes,
  return Object.freeze({request,approval,overlay:effectiveOverlay});
 }
 
-export function verifyInstalledR6Overlay({sourceRoot,pcHome,approvedSha,overlay,
+function verifyInstalledR6OverlayCore({sourceRoot,pcHome,approvedSha,overlay,
  read=fs.readFileSync,exists=fs.existsSync,
- git=(args)=>execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,stdio:'pipe'}).trim()}={}){
+ git=(args)=>execFileSync('git',args,{cwd:sourceRoot,encoding:'utf8',windowsHide:true,stdio:'pipe'}).trim()}={},manualDol=false){
  need(process.platform==='win32'&&same(sourceRoot,R6_B_SOURCE)&&same(pcHome,R6_B_HOME),
   'R6_B_WINDOWS_PATH_STOP');
  need(exists(path.join(pcHome,'storage','core.sqlite')),
   'R6_B_EXISTING_CORE_DB_REQUIRED');
  const config=JSON.parse(read(path.join(pcHome,'config.json'),'utf8'));
- need(config.enabled===true&&config.collectionTarget==='pc'&&
-  config.employmentR6AutoCollection===true&&
-  config.employmentR6OneYearAutoPublication===true&&
-  config.source===approvedSha&&git(['rev-parse','HEAD'])===approvedSha,
+ need(isApprovedR6RuntimeMode(config,approvedSha,manualDol)&&
+  git(['rev-parse','HEAD'])===approvedSha,
   'R6_B_INSTALLED_SOURCE_STOP');
- git(['diff','--quiet','HEAD','--','lib','worker','scripts/pc-writer']);
+ try{git(['diff','--quiet','HEAD','--','lib','worker','scripts/pc-writer']);}
+ catch{throw error('R6_B_INSTALLED_GIT_DIFF_STOP');}
  for(const file of overlay.files){
   need(/^(?:lib\/market-score|scripts\/pc-writer)\/[a-zA-Z0-9_.-]+\.mjs$/.test(file.path)&&
     SHA64.test(file.afterSha256??'')&&
@@ -185,6 +184,31 @@ export function verifyInstalledR6Overlay({sourceRoot,pcHome,approvedSha,overlay,
   'R6_B_INSTALLED_OVERLAY_DRIFT_STOP');
  }
  return config;
+}
+
+export function isApprovedR6RuntimeMode(config,approvedSha,manualDol=false){
+ return config?.enabled===true&&config.collectionTarget==='pc'&&
+  (manualDol||(config.employmentR6AutoCollection===true&&
+   config.employmentR6OneYearAutoPublication===true))&&
+  config.source===approvedSha;
+}
+export function verifyInstalledR6Overlay(input={}){
+ return verifyInstalledR6OverlayCore(input,false);
+}
+export function verifyInstalledR6DolManualOverlay(input={}){
+ // The only authorized manual-only caller has independently validated its
+ // signed DOL SQLite approval; the exact three source files stay hash-pinned.
+ const files=input?.overlay?.files;
+ const expected=new Set([
+  'lib/market-score/employment-r6-provider.mjs',
+  'lib/market-score/employment-r6-collector.mjs',
+  'lib/market-score/employment-r6-scheduler.mjs',
+ ]);
+ need(Array.isArray(files)&&files.length===expected.size&&
+  files.every(f=>expected.has(f?.path)&&SHA64.test(f?.afterSha256??''))&&
+  new Set(files.map(f=>f.path)).size===expected.size,
+  'R6_DOL_FILE_SCOPE_STOP');
+ return verifyInstalledR6OverlayCore(input,true);
 }
 
 function withCoreLock(pcHome,requestId){
@@ -304,7 +328,7 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
  let lock=null,claimed=false,claimAttempted=false,lastPass='SOURCE_VERIFIED';
  let outcome;
  try{
-  const config=verifyOverlay({sourceRoot,pcHome,
+  const preflightConfig=verifyOverlay({sourceRoot,pcHome,
    approvedSha:auth.approval.installedSourceSha,overlay:auth.overlay});
   // Missing credentials are a read-only preflight failure, not a consumed
   // one-shot. Inspect presence only, before creating the durable claim.
@@ -312,15 +336,19 @@ export async function performR6RegisteredOnce({auth,sourceRoot=R6_B_SOURCE,
   need(Boolean(providerFields.BLS_API_KEY?.trim()||
    providerFields.BLS_REGISTRATION_KEY?.trim()),'R6_B_REGISTERED_KEY_MISSING');
   lastPass='REGISTERED_KEY_PRESENT';
+  // D1 SELECT 1 is strictly read-only and potentially remote/slow.
+  // Do not occupy the Core's shared lock during external preflight.
+  need(await d1ReadProbe({sourceRoot,pcHome,config:preflightConfig})===true,
+   'R6_B_D1_AUTH_UNAVAILABLE');
+  lastPass='D1_READONLY_PREFLIGHT';
   lock=await lockFactory(pcHome,auth.request.requestId);
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
-  // The Actions Runner may have a different Windows user than scheduled Core.
-  // Fail before the no-retry claim and BLS calls if its existing Wrangler/D1
-  // read credential is unavailable. SELECT 1 is strictly read-only.
-  need(await d1ReadProbe({sourceRoot,pcHome,config})===true,
-   'R6_B_D1_AUTH_UNAVAILABLE');
+  // Remote preflight can race with a changed installed runtime. Fail closed.
+  const config=verifyOverlay({sourceRoot,pcHome,
+   approvedSha:auth.approval.installedSourceSha,overlay:auth.overlay});
+  need(config.core===preflightConfig.core,'R6_B_D1_TARGET_CHANGED_STOP');
   need(lock.held(),'R6_B_CORE_LOCK_LOST');
-  lastPass='D1_READONLY_PREFLIGHT';
+  lastPass='LOCKED_SOURCE_REVERIFIED';
   const execute=run??runInstalledR6;
   // A persistent request/mode claim precedes every SQLite or provider effect.
   claimAttempted=true;
@@ -440,7 +468,7 @@ export async function runR6RegisteredOnce({env=process.env}={}){
  if(parsedApproval?.schema==='ZGMINI_R6_DOL_MANUAL_B_APPROVAL_V1'){
   const {runDolManualOnce}=await import('./dol-manual-v1.mjs');
   return runDolManualOnce({event,env,approvalBytes,
-   verify:verifyInstalledR6Overlay,acquire:acquireCoreLockBounded,
+   verify:verifyInstalledR6DolManualOverlay,acquire:acquireCoreLockBounded,
    claim:claimOnce});
  }
  const overlayPath='approvals/writer-updates/bls-registered-v2-13-writer-b-20261109.json';

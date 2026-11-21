@@ -4,6 +4,7 @@ import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
 import {inspectWriterInstallPreimage} from './writer-install-preimage-readonly.mjs';
 import {inspectWriterPublicationEvidence} from './writer-publication-evidence-readonly.mjs';
+import {inspectEmploymentR6D1Readback} from './employment-r6-d1-readback-readonly.mjs';
 import {inspectCoreRuntimeSource} from './core-runtime-source-readonly.mjs';
 import {observeInflationCoreLock} from './inflation-core-lock-observation-readonly.mjs';
 import {inspectInflationEvent129Once} from './inflation-event129-evidence-readonly.mjs';
@@ -33,6 +34,7 @@ import {inspectNineR32RawCoverage} from './theme-nine-r32-raw-coverage-readonly.
 import {inspectA401Private23} from './inflation-a401-private23-readonly.mjs';
 import {inspectA407IntegrityReadonly} from './inflation-a407-integrity-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
+import {inspectInflationCensusM3ArchivedHeaders} from './inflation-census-m3-archived-headers-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
@@ -103,19 +105,53 @@ function r6CollectionProjection(raw){
   providerRequests:r6Count(raw.providerRequests),
   groups:rows(raw.groups,false),plannedGroups:rows(raw.plannedGroups,true)};
 }
-function r6PublicationProjection(report){
+function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
+ if(!/^[a-f0-9]{64}$/.test(checksum??''))return 'NO_HASH';
+ const folder=path.join(root,'employment-r6-public-results');
+ const file=path.join(folder,checksum+'.json');
+ try{
+  const dir=fs.lstatSync(folder),stat=fs.lstatSync(file);
+  if(!dir.isDirectory()||dir.isSymbolicLink()||!stat.isFile()||stat.isSymbolicLink()
+    ||stat.size<1||stat.size>8*1024*1024)return 'UNSAFE_OR_OVERSIZE';
+  const body=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(digest(JSON.stringify(body))!==checksum)return 'HASH_MISMATCH';
+  if(body?.kind!=='EMPLOYMENT_R6_ONE_YEAR_STORED_DISPLAY_R1'
+    ||!Array.isArray(body?.indicators)||body.indicators.length!==29
+    ||body.asOfDate!==asOfDate||body.sourceStoredAt!==sourceStoredAt)
+    return 'METADATA_MISMATCH';
+  // Model provenance is read exclusively from the same checksum-verified body.
+  if(!/^EMP-R6-FORMULA-R(?:[0-9]{1,2}|2-CPS-2025-10)$/.test(body.methodologyVersion??'')
+    ||!/^sha256:[a-f0-9]{64}$/.test(body.formulaHash??''))return 'MODEL_PROVENANCE_INVALID';
+  return {status:'VERIFIED',methodologyVersion:body.methodologyVersion,
+   formulaHash:body.formulaHash};
+ }catch(error){return error?.code==='ENOENT'?'MISSING':'READ_FAILED';}
+}
+function r6PublicationProjection(report,root){
  const raw=report?.employmentR6OneYear;
  const failure=Array.isArray(report?.failures)
   ?report.failures.find(item=>item?.id==='employment-r6-one-year-publication'):null;
  if(!raw&&!failure)return null;
  const safeDate=typeof raw?.asOfDate==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(raw.asOfDate)?raw.asOfDate:null;
- return {status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
-  asOfDate:safeDate,sourceStoredAt:Number.isSafeInteger(raw?.sourceStoredAt)&&raw.sourceStoredAt>0?raw.sourceStoredAt:null,
+ const sourceStoredAt=Number.isSafeInteger(raw?.sourceStoredAt)&&raw.sourceStoredAt>0?raw.sourceStoredAt:null;
+ const projected={status:r6Code(raw?.status),failureCode:r6Code(failure?.reason),
+  asOfDate:safeDate,sourceStoredAt,
   sourceFeatures:r6Count(raw?.sourceFeatures),
   chartReadyFeatures:r6Count(raw?.chartReadyFeatures),
   recentlyObservedFeatures:r6Count(raw?.recentlyObservedFeatures)};
+ const localHash=typeof raw?.localResultHash==='string'&&/^[a-f0-9]{64}$/.test(raw.localResultHash)?raw.localResultHash:null;
+ if(localHash!==null){
+  projected.localResultHash=localHash;
+  projected.localResultStored=typeof raw?.localResultStored==='boolean'?raw.localResultStored:null;
+  const result=r6LocalResultReadback(root,localHash,safeDate,sourceStoredAt);
+  projected.localResultReadback=typeof result==='string'?result:result.status;
+  if(typeof result==='object'&&result?.status==='VERIFIED'){
+   projected.methodologyVersion=result.methodologyVersion;
+   projected.formulaHash=result.formulaHash;
+  }
+ }
+ return projected;
 }
-export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence}={}){
+export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIranEvidence,taskXmlHashes}={}){
  const root=path.join(dataRoot,'pc-writer'),out={lockPresent:fs.existsSync(path.join(root,'local-cycle.lock')),checkpoints:{},taskXmlHashes:{}};
  for(const file of ['local-cycle-last-run.json','local-collection-last-run.json','local-writer-last-run.json']){
   const p=path.join(root,file);if(!fs.existsSync(p)){out.checkpoints[file]={exists:false};continue;}
@@ -126,12 +162,15 @@ export function readCore(dataRoot,{queryTask,retiredTaskEvidence=nativeRetiredIr
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
   }
   if(file==='local-writer-last-run.json'){
-   const employmentR6=r6PublicationProjection(data);
+   const employmentR6=r6PublicationProjection(data,root);
    if(employmentR6)out.checkpoints[file].employmentR6=employmentR6;
   }
  }
  const config=path.join(root,'config.json');if(fs.existsSync(config)){const c=JSON.parse(fs.readFileSync(config));const x=c.source;out.approvedSourceSha=[x?.sha,x?.commit,x?.commitSha,x,c.sourceSha].find(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v))??null;}
- if(queryTask){
+ if(taskXmlHashes){
+  // Reuse the fixed engine's precheck observation; the postcheck still verifies drift.
+  out.taskXmlHashes={...taskXmlHashes};
+ }else if(queryTask){
   for(const task of activeTasks)out.taskXmlHashes[task]=digest(queryTask(task));
   out.taskXmlHashes[retiredIranTask]=retiredTaskEvidence();
  }
@@ -145,11 +184,13 @@ export async function runOperation(request,context){
   // Only the fixed engine's missing pre-snapshot activates this scope. The
   // outer result must remain STATE_UNKNOWN; local Core evidence is still useful.
   const partial=context.skipProtectedTaskObservation===true&&policy.mutationsEnabled===false;
-  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:{queryTask,retiredTaskEvidence}),
+  return {status:'PASS',code:'CORE_READONLY_DIAGNOSIS',core:readCore(dataRoot,partial?{}:context.protectedTaskHashes?
+   {taskXmlHashes:context.protectedTaskHashes}:{queryTask,retiredTaskEvidence}),
    ...(partial?{taskObservation:'UNVERIFIED'}:{}),providerCalls:0,d1Writes:0,sqliteOpened:false};
  }
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(
-  inspectD05LineageReadonly(dataRoot,{approvedSourceSha:readCore(dataRoot).approvedSourceSha}));
+  inspectD05LineageReadonly(dataRoot,{approvedSourceSha:
+   Object.hasOwn(context,'d05ApprovedSourceSha')?context.d05ApprovedSourceSha:readCore(dataRoot).approvedSourceSha}));
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
  if(request.operation==='inflation-core-lock-observation-readonly')
   return observeInflationCoreLock({queryTask});
@@ -162,6 +203,7 @@ export async function runOperation(request,context){
  if(request.operation==='pc-source-preflight')return inspectPcSource({dataRoot,coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='writer-install-preimage-readonly')return inspectWriterInstallPreimage(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core'),approvedPreimageScope:context.approvedPreimageScope});
  if(request.operation==='writer-publication-evidence-readonly')return inspectWriterPublicationEvidence(dataRoot);
+ if(request.operation==='employment-r6-d1-readback-readonly')return inspectEmploymentR6D1Readback(dataRoot);
  if(request.operation==='r17-268-postcancel-readonly'){
   if(request.requestId!==ONE_SHOT_DIAGNOSTIC_ID)return {status:'BLOCKED',code:'R17_268_ONE_SHOT_REQUEST_ID_STOP',providerCalls:0,d1Writes:0,operationalWrites:0};
   let coreTaskXml=null,sourceTrace=null,protectedStateSha256=null;
@@ -231,6 +273,7 @@ export async function runOperation(request,context){
  if(request.operation==='inflation-a401-private23-readonly')return inspectA401Private23(request,context);
  if(request.operation==='inflation-a407-integrity-readonly')return inspectA407IntegrityReadonly(request,context);
  if(request.operation==='inflation19-runtime-readonly')return inspectInflation19RuntimeReadonly(dataRoot);
+ if(request.operation==='inflation-census-m3-archive-headers-readonly')return inspectInflationCensusM3ArchivedHeaders(dataRoot);
  if(request.operation==='inflation-candidates-runtime-readonly')return inspectInflationCandidatesRuntimeReadonly(dataRoot);
  if(request.operation==='theme-platform-shadow-readonly'){
   try{return await runApprovedShadowReadOnly({request,host,dataRoot});}

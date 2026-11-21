@@ -235,3 +235,58 @@ test('workflow only names fixed Windows Runner, no arbitrary shell and no B stag
  assert.ok(!text.includes('--install'));
  assert.ok(!text.includes('--apply'));
 });
+
+test('Task XML inventory remains DONE while unknown enabled is explicitly unverified',()=>{
+ fixture(({root})=>{
+  const unknownEnabledXml=xml.replace('<Enabled>true</Enabled>','');
+  const result=inspectApprovedA(auth(),{dataRoot:root,queryTask:()=>unknownEnabledXml});
+  assert.equal(result.taskChecksComplete,true);
+  assert.equal(result.taskEnabledVerified,false);
+  const sanitized=sanitizeAReport({schema:'ZGMINI_APPROVED_RUNTIME_A_LOCAL_RESULT_V1',
+   requestId,...result},request,env);
+  assert.equal(sanitized.status,'DONE');
+  assert.equal(sanitized.taskChecksComplete,true);
+  assert.equal(sanitized.taskEnabledVerified,false);
+ });
+});
+test('five approved profiles yield explicit bounded summary, never detailed-read PASS',()=>{
+ const many={...auth(),profiles:Array.from({length:5},(_,i)=>({...profile,id:'profile'+i})),
+  registeredCount:5};
+ const local={schema:'ZGMINI_APPROVED_RUNTIME_A_LOCAL_RESULT_V1',requestId,
+  ...inspectApprovedA(many,{dataRoot:'/unused'})};
+ assert.equal(local.status,'DONE');
+ assert.equal(local.mode,'SUMMARY_ONLY');
+ assert.equal(local.fileHashesComplete,false);
+ assert.equal(local.taskChecksComplete,false);
+ const sanitized=sanitizeAReport(local,request,env);
+ assert.equal(sanitized.status,'DONE');
+ assert.equal(sanitized.code,'A_RUNTIME_SUMMARY_ONLY');
+ assert.equal(sanitized.mode,'SUMMARY_ONLY');
+ assert.equal(sanitized.fileHashesComplete,false);
+ assert.equal(sanitized.taskChecksComplete,false);
+ assert.equal(sanitized.taskEnabledVerified,false);
+ assert.equal(sanitized.selectedCount,5);
+ assert.deepEqual(sanitized.profiles,[]);
+ const forged={...local,fileHashesComplete:true};
+ assert.equal(sanitizeAReport(forged,request,env).status,'STATE_UNKNOWN');
+});
+test('missing JSON/TXT remote readback fails report step even when comment was posted',async()=>{
+ const records=new Map();let comments=0;
+ const fakeFetch=async(url,opts)=>{
+  if(opts.method==='PUT'){
+   const data=JSON.parse(opts.body);
+   if(url.endsWith('.json'))records.set(url,Buffer.from(data.content,'base64'));
+   return {status:201};
+  }
+  if(opts.method==='GET'){
+   const bytes=records.get(url.replace('?ref=main',''));
+   return {status:bytes?200:404,json:async()=>({encoding:'base64',
+    content:bytes?.toString('base64')})};
+  }
+  comments++;
+  return {status:201};
+ };
+ await assert.rejects(uploadAReport({event,env:{...env,GITHUB_TOKEN:'x'.repeat(30)},
+  rawResult:'',fetchApi:fakeFetch}),{code:'A_RUNTIME_RESULT_PAIR_UNVERIFIED'});
+ assert.equal(comments,1);
+});

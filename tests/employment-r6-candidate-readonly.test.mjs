@@ -61,6 +61,54 @@ function fixture(t){
   return {root,workspace,host,request,core,candidate,script};
 }
 
+test('PIT-08 optional read-only timestamp and chart geometry pass without private raw fields',async t=>{
+  const f=fixture(t);
+  const source=fs.readFileSync(f.script,'utf8').replace(
+    "  bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};",
+    "  sourceStoredAt:1793500000000,formulaHash:'sha256:'+'f'.repeat(64),"+
+    "methodologyVersion:'EMP-R6-FORMULA-R1',"+
+    "stateClaimsChart:{pointCount:52,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',"+
+    "lastDate:'2026-10-30',observationDate:'2026-10-30',"+
+    "lastPointFinite:true,lastPointMatchesCurrent:true},"+
+    "bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};"
+  );
+  assert.match(source,/sourceStoredAt:1793500000000/);
+  fs.writeFileSync(f.script,source);
+  const dir=f.host.approvedSources[SHA].root;
+  const manifestBytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\n');
+  fs.writeFileSync(path.join(dir,'manifest.json'),manifestBytes);
+  f.host.approvedSources[SHA].manifestSha256=hash(manifestBytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'PASS',JSON.stringify(result));
+  assert.equal(result.sourceStoredAt,1793500000000);
+  assert.equal(result.methodologyVersion,'EMP-R6-FORMULA-R1');
+  assert.match(result.formulaHash,/^sha256:[a-f0-9]{64}$/);
+  assert.deepEqual(result.stateClaimsChart,{
+    pointCount:52,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',lastDate:'2026-10-30',
+    observationDate:'2026-10-30',lastPointFinite:true,lastPointMatchesCurrent:true,
+  });
+  assert.ok(!JSON.stringify(result).includes('PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK'));
+});
+
+test('PIT-08 chart metadata rejects invalid date without adding a legacy gate',async t=>{
+  const f=fixture(t);
+  const source=fs.readFileSync(f.script,'utf8').replace(
+    "  bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};",
+    "  stateClaimsChart:{pointCount:52,unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',"+
+    "lastDate:'NOT_A_DATE',observationDate:'2026-10-30',"+
+    "lastPointFinite:true,lastPointMatchesCurrent:true},"+
+    "bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};"
+  );
+  fs.writeFileSync(f.script,source);
+  const dir=f.host.approvedSources[SHA].root;
+  const bytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(source))}},null,2)+'\n');
+  fs.writeFileSync(path.join(dir,'manifest.json'),bytes);
+  f.host.approvedSources[SHA].manifestSha256=hash(bytes);
+  const result=await inspectEmploymentR6Candidate(f.request,f);
+  assert.equal(result.status,'FAIL');
+  assert.equal(result.code,'R6_RESULT_INVALID');
+});
+
 test('source, host, manifest and immutable path checks reject unapproved inputs',t=>{
   const f=fixture(t);
   assert.doesNotThrow(()=>validateBundle(f.request,f));

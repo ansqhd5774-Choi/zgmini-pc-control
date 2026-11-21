@@ -201,18 +201,11 @@ test('proof CLI --run/--report cannot deadlock their ES module imports',()=>{
   }finally{fs.rmSync(temp,{recursive:true});}
 });
 
-test('proof-only workflow has no install/effect stage',()=>{
-  const dir=path.dirname(fileURLToPath(import.meta.url));
-  const yml=fs.readFileSync(path.join(dir,
-    '../.github/workflows/pc-configured-runtime-proof-once.yml'),'utf8');
-  assert.match(yml,/types: \[opened\]/);
-  assert.match(yml,/pc-configured-runtime-proof/);
-  assert.match(yml,/--pin/);
-  assert.match(yml,/--run/);
-  assert.match(yml,/Prove Windows CLI entrypoint and both versions/);
-  assert.match(yml,/--report/);
-  assert.doesNotMatch(yml,/direct-writer-b\\run\.mjs/);
-  assert.doesNotMatch(yml,/RUN_INSTALL\.cmd/);
+test('026 retired TEMP-only Windows proof intake keeps approved source untouched',()=>{
+ const dir=path.dirname(fileURLToPath(import.meta.url));
+ assert.equal(fs.existsSync(path.join(dir,'../.github/workflows/pc-configured-runtime-proof-once.yml')),false);
+ const f=fixture();
+ assert.equal(f.auth.manifest.sourceSha,sourceSha);
 });
 
 test('unmatched Issue workflows cannot evict a valid Writer B or proof job',()=>{
@@ -221,20 +214,15 @@ test('unmatched Issue workflows cannot evict a valid Writer B or proof job',()=>
     ['pc-approved-runtime-b-once.yml',true],
     ['pc-writer-b-source-once.yml',true],
     ['pc-writer-provider-flags-once.yml',true],
-    ['pc-configured-runtime-proof-once.yml',false],
   ];
   for(const [name,writer] of workflows){
-    const yml=fs.readFileSync(path.join(dir,'../.github/workflows',name),'utf8');
+    const yml=fs.readFileSync(path.join(dir,'../.github/workflows',name),'utf8').replace(/\r\n/g,'\n');
     assert.doesNotMatch(yml,/^concurrency:/m,`${name}: run-level collision`);
     assert.match(yml,/^    concurrency:\n      group: /m);
     assert.match(yml,/^      cancel-in-progress: false$/m);
-    if(writer){
-      assert.match(yml,/^      group: zgmini-writer-source-b-one-at-a-time$/m);
-      assert.match(yml,/^      queue: max$/m);
-    }else{
-      assert.match(yml,/^      group: zgmini-configured-runtime-proof-/m);
-      assert.doesNotMatch(yml,/^      group: zgmini-writer-source-b-one-at-a-time$/m);
-    }
+    assert.equal(writer,true);
+    assert.match(yml,/^      group: zgmini-writer-source-b-one-at-a-time$/m);
+    assert.match(yml,/^      queue: max$/m);
   }
 });
 

@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {prepareHandoff} from './route.mjs';
+import {parseHandoff} from './contract.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 
 // No agent or PC source is executed here. The broker only validates structured
 // reports and records a durable routing decision in the original queue Issue.
@@ -30,51 +32,64 @@ async function api(path, {method = 'GET', body} = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-async function listPreviousBodies(currentIssue) {
+async function listPreviousBodies(currentIssue, currentBody) {
+  // The fingerprint includes requestId. Search only this request, not every
+  // unrelated historic Incident. Search may lag, so reconcile the newest
+  // labelled page as well. A missing/incomplete search is not an empty ledger.
+  const requestId = parseHandoff(currentBody).origin.requestId;
+  const q = 'repo:' + REPOSITORY +
+    ' is:issue label:agent-handoff in:body "' + requestId + '"';
+  const searched = await api('/search/issues?q='+encodeURIComponent(q)+'&per_page=100');
+  if (searched?.incomplete_results !== false ||
+      !Number.isSafeInteger(searched.total_count) ||
+      searched.total_count < 0 || searched.total_count > 100 ||
+      !Array.isArray(searched.items) ||
+      searched.items.length !== searched.total_count)
+    throw new Error('HANDOFF_SEARCH_INCOMPLETE_STOP');
+  const recent = await api('/repos/'+REPOSITORY+
+    '/issues?state=all&labels=agent-handoff&sort=created&direction=desc&per_page=100');
+  if (!Array.isArray(recent) || recent.length > 100)
+    throw new Error('HANDOFF_RECENT_INVENTORY_INVALID');
+  // If 100 newer issues have displaced the triggering Issue, search-index
+  // latency cannot be safely reconciled by the direct recent window.
+  if (recent.length === 100 &&
+      recent.at(-1)?.number >= currentIssue)
+    throw new Error('HANDOFF_RECENT_WINDOW_INCOMPLETE');
   const bodies = [];
-  // Fail closed at the scan limit. A truncated inventory must not claim that
-  // no duplicate exists. The route never retries a PC operation in any case.
-  for (let page = 1; page <= 5; page++) {
-    const rows = await api(`/repos/${REPOSITORY}/issues?state=all&labels=agent-handoff&per_page=100&page=${page}`);
-    if (!Array.isArray(rows)) throw new Error('HANDOFF_LEDGER_INVALID');
-    // The lowest issue number wins even when two opens race concurrently.
-    // The issues endpoint also lists PRs and may include third-party Issues.
-    // Only authorized, real Incidents can claim a prior fingerprint.
-    for (const issue of rows) if (issue.number < currentIssue && !issue.pull_request &&
-      ['ansqhd5774-Choi', 'github-actions[bot]'].includes(issue.user?.login) &&
-      issue.labels?.some(label => label.name === 'agent-handoff') &&
-      typeof issue.body === 'string') bodies.push(issue.body);
-    if (rows.length < 100) return bodies;
+  const visited = new Set();
+  for (const issue of [...searched.items, ...recent]) {
+    if (!Number.isSafeInteger(issue?.number) ||
+        issue.number >= currentIssue || visited.has(issue.number) ||
+        issue.pull_request ||
+        !['ansqhd5774-Choi', 'github-actions[bot]'].includes(issue.user?.login) ||
+        !issue.labels?.some(label => label.name === 'agent-handoff') ||
+        typeof issue.body !== 'string') continue;
+    visited.add(issue.number);
+    let prior;
+    try {prior = parseHandoff(issue.body);} catch {continue;}
+    if (prior.origin.requestId === requestId) bodies.push(issue.body);
   }
-  throw new Error('HANDOFF_LEDGER_SCAN_LIMIT_STOP');
+  return bodies;
 }
-
 async function hasVerifiedComment(issueNumber, expectedBody) {
-  // A matching receipt is valid only when there is exactly one complete bot
-  // route decision in the original Issue. A second, contradictory decision
-  // must not be masked by returning early on the first matching comment.
+  // A full per-Issue receipt ledger, not the first 400 comments, is needed
+  // to detect competing route decisions before marking an Issue routed.
   const issueUrl = `${API}/repos/${REPOSITORY}/issues/${issueNumber}`;
-  let matching = 0;
-  for (let page = 1; page <= 4; page++) {
-    const comments = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
-    if (!Array.isArray(comments)) throw new Error('HANDOFF_COMMENT_LEDGER_INVALID');
-    for (const item of comments) {
-      if (item.user?.login !== 'github-actions[bot]' ||
-          typeof item.body !== 'string') continue;
-      // Retain the existing recovery behavior for incomplete bot markers.
-      // Only a structured route decision competes with the expected receipt.
-      const completeRoute = item.body.startsWith('HANDOFF_ROUTED\nincidentId: ') ||
-        item.body.startsWith('HANDOFF_DUPLICATE_REUSED\nfingerprint: ');
-      if (!completeRoute) continue;
-      if (item.issue_url !== issueUrl || item.body !== expectedBody)
-        throw new Error('HANDOFF_COMMENT_CONFLICT_STOP');
-      if (++matching > 1) throw new Error('HANDOFF_COMMENT_DUPLICATE_STOP');
-    }
-    if (comments.length < 100) return matching === 1;
+  const comments=await readIssueCommentLedger(page=>api(
+    `/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`));
+  let matching=0;
+  for(const item of comments){
+    if(item.user?.login!=='github-actions[bot]'||
+       typeof item.body!=='string')continue;
+    const completeRoute=item.body.startsWith('HANDOFF_ROUTED\nincidentId: ')||
+      item.body.startsWith('HANDOFF_DUPLICATE_REUSED\nfingerprint: ');
+    if(!completeRoute)continue;
+    if(item.issue_url!==issueUrl||item.body!==expectedBody)
+      throw new Error('HANDOFF_COMMENT_CONFLICT_STOP');
+    if(++matching>1)throw new Error('HANDOFF_COMMENT_DUPLICATE_STOP');
   }
-  throw new Error('HANDOFF_COMMENT_SCAN_LIMIT_STOP');
+  return matching===1;
 }
-
 function exactOwnerIssue(current, original, stateLabel) {
   return current?.number === original.number &&
     current.user?.login === 'ansqhd5774-Choi' &&
@@ -87,7 +102,7 @@ export async function main(env = process.env) {
   if (!env.GITHUB_EVENT_PATH) throw new Error('GITHUB_EVENT_PATH_REQUIRED');
   const event = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   assertEvent(event, env);
-  const outcome = prepareHandoff(event.issue.body, await listPreviousBodies(event.issue.number));
+  const outcome = prepareHandoff(event.issue.body, await listPreviousBodies(event.issue.number, event.issue.body));
   const duplicate = outcome.state === 'DUPLICATE_REUSED';
   const stateLabel = duplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
   // The owner-origin route must enforce the same exclusive disposition as

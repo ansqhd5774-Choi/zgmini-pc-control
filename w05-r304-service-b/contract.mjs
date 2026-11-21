@@ -8,7 +8,9 @@ export const DATA_ROOT=String.raw`E:\ZGmini\data\pc-writer`;
 export const OPERATION='w05-bls-service-append-once';
 export const SCHEMA='ZGMINI_W05_R304_SERVICE_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_W05_R304_SERVICE_B_APPROVAL_V1';
-export const INSTALLED_SHA='e16669ae4d35af25cadd68c939ed70533fa457ab';
+// Exact verified PC checkout/config/checkpoint from R3-04 A #2584 / Run 44870551163.
+// Scope: three previously installed W05 files only; source pin is not effect approval.
+export const INSTALLED_SHA='a206220cc11045c24660e814124edbba9c0ff49f';
 export const FILES=Object.freeze({
  'scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs':'87e811b608ea7358c48aceebfe458e24e5887f2f31207481783abcad516a1af3',
  'scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs':'b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31',

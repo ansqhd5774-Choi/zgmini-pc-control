@@ -6,6 +6,10 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'tools/pc-process-inventory-readonly.mjs'
+      - 'tools/w03-paid-private-readonly.mjs'
+      - 'tools/w03-paid-source-coverage-readonly.mjs'
+      - 'tests/w03-paid-source-coverage-readonly.test.mjs'
+      - 'tests/w03-paid-private-readonly.test.mjs'
       - 'tools/runner-job-history-readonly.mjs'
       - 'tests/runner-job-history-readonly.test.mjs'
       - 'tests/pc-process-inventory-readonly.test.mjs'
@@ -37,7 +41,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify process discovery excludes commands and secrets
-        run: node --test tests/pc-process-inventory-readonly.test.mjs tests/runner-job-history-readonly.test.mjs
+        run: node --test tests/pc-process-inventory-readonly.test.mjs tests/runner-job-history-readonly.test.mjs tests/w03-paid-private-readonly.test.mjs tests/w03-paid-source-coverage-readonly.test.mjs
   operating-process-snapshot:
     if: >-
       github.event_name == 'issues' &&

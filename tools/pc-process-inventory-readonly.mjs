@@ -11,9 +11,10 @@ import {collectAutomationStatus} from './automation-status.mjs';
 import {inspectProviderActivity} from '../controller/provider-activity-runtime-readonly.mjs';
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
-import {readMaintenanceRecoveryStatus} from './update.mjs';
+import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
+import {inspectW03PaidPrivateReadonly} from './w03-paid-private-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
@@ -317,6 +318,251 @@ function collectMaintenanceStatusReadonly(){
  catch{return sanitizeMaintenanceStatus(null);}
 }
 
+
+// Fixed #2505 installed-Controller recovery snapshot, using the existing
+// independent operating-PC process-inventory route. Never reads raw data,
+// exports owner/lease bytes, or grants any rollback/install authorization.
+const C2505_ID='pc-update-8f413b02-4bb7-4d99-b71f-64d9c51a294a';
+const C2505_TARGET='0f1effad0c58e8b7bd684aa638521180183ca902';
+const C2505_PHASES=new Set(['RECEIVED','VALIDATED','STAGED','INTAKE_PAUSED',
+ 'DRAINED','BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','RECONNECTED',
+ 'INTAKE_RESUMED','BACKLOG_RECONCILED','POSTCHECK_PENDING','RECOVERY_REQUIRED',
+ 'PASS','BLOCKED','ROLLED_BACK']);
+const C2505_STATES=new Set(['PRESENT','ABSENT','UNKNOWN','UNSAFE','UNVERIFIED']);
+const c2505Unknown=code=>({schema:'ZGMINI_C2505_RECOVERY_READONLY_V1',
+ requestId:C2505_ID,status:'STATE_UNKNOWN',code,actualControllerSha:null,
+ originalRequestRetried:false,recoveryEligible:false,installSuccessProven:false,
+ operationalWrites:0,providerCalls:0,d1Writes:0});
+const c2505State=x=>C2505_STATES.has(x)?x:'UNKNOWN';
+const c2505Bool=x=>typeof x==='boolean'?x:null;
+export function project2505RecoveryReadonly(raw){
+ const ledger=raw?.ledger,a=raw?.artifacts;
+ if(raw?.status!=='STATUS'||ledger?.requestId!==C2505_ID||
+    ledger?.issueNumber!==2505||ledger?.targetSha!==C2505_TARGET)
+  return c2505Unknown('C2505_LEDGER_IDENTITY_UNVERIFIED');
+ if(a?.schema!=='ZGMINI_PC_UPDATE_ARTIFACT_READBACK_V1'||
+    a.requestId!==C2505_ID)
+  return c2505Unknown('C2505_ARTIFACT_IDENTITY_UNVERIFIED');
+ const backup={};
+ for(const key of ['backupRoot','stageRoot','snapshotRoot','stagedHost',
+  'originalHost','protectedBefore','previousHost'])
+  backup[key]=c2505State(a.artifacts?.[key]);
+ const backlog={file:c2505State(a.backlog?.file),
+  windows:Number.isSafeInteger(a.backlog?.windows)&&a.backlog.windows>=0&&
+   a.backlog.windows<=64?a.backlog.windows:null,
+  openWindows:Number.isSafeInteger(a.backlog?.openWindows)&&
+   a.backlog.openWindows>=0&&a.backlog.openWindows<=64?a.backlog.openWindows:null,
+  replayCount:Number.isSafeInteger(a.backlog?.replayCount)&&
+   a.backlog.replayCount>=0&&a.backlog.replayCount<=10000?a.backlog.replayCount:null};
+ const lease={directory:c2505State(a.lease?.directory),
+  ownerFile:c2505State(a.lease?.ownerFile),
+  recoveryMarker:c2505State(a.lease?.recoveryMarker),
+  ownerMarkerMatch:c2505Bool(a.lease?.ownerMarkerMatch),
+  held:c2505Bool(raw.installLock?.held),
+  recoveryRequired:c2505Bool(raw.installLock?.recoveryRequired),
+  // Matching owner/marker is NOT proof that this is #2505's own lease.
+  ownerRequestIdentityVerified:null};
+ const validStates=Object.values(backup).every(v=>v==='PRESENT'||v==='ABSENT')&&
+  [backlog.file,lease.directory,lease.ownerFile,lease.recoveryMarker]
+   .every(v=>v==='PRESENT'||v==='ABSENT');
+ const countsValid=backlog.file!=='PRESENT'||backlog.windows!==null&&
+  backlog.openWindows!==null&&backlog.replayCount!==null&&
+  backlog.openWindows<=backlog.windows;
+ const observed=raw.installedReadbackCode===null&&
+  raw.ledgerReadbackCode===null&&raw.lockReadbackCode===null&&
+  raw.artifactReadbackCode===null&&a.status==='OBSERVED'&&validStates&&
+  countsValid&&lease.held!==null&&lease.recoveryRequired!==null&&
+  (lease.recoveryMarker!=='PRESENT'||lease.ownerMarkerMatch===true);
+ return {schema:'ZGMINI_C2505_RECOVERY_READONLY_V1',requestId:C2505_ID,
+  status:observed?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:observed?'C2505_FIXED_ARTIFACTS_OBSERVED':'C2505_FIXED_ARTIFACTS_UNVERIFIED',
+  actualControllerSha:asSha(raw.actualControllerSha),
+  expectedTargetSha:C2505_TARGET,
+  ledgerStatus:C2505_PHASES.has(ledger.status)?ledger.status:null,
+  ledgerPhase:C2505_PHASES.has(ledger.phase)?ledger.phase:null,
+  ledgerFirstFail:C2505_PHASES.has(ledger.firstFail)?ledger.firstFail:null,
+  postIssueNumber:ledger.postIssueNumber===2506?2506:null,
+  ledgerWorkflowEnabled:c2505Bool(ledger.workflowEnabled),
+  ledgerIntakePaused:c2505Bool(ledger.intakePaused),
+  backup,backlog,lease,
+  originalRequestRetried:false,recoveryEligible:false,installSuccessProven:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+export function inspect2505RecoveryReadonly(
+ read=()=>readMaintenanceRecoveryStatus(C2505_ID)){
+ try{
+  const first=project2505RecoveryReadonly(read());
+  const second=project2505RecoveryReadonly(read());
+  return JSON.stringify(first)===JSON.stringify(second)?second:
+   c2505Unknown('C2505_DOUBLE_READ_CHANGED');
+ }catch{return c2505Unknown('C2505_READBACK_FAILED');}
+}
+
+// Exact #2505 Writer B source-only causal proof, without modifying files.
+// Writer B #2497 source was installed before #2505; #2537 is the last
+// verified later Writer B source. The official B adapter edits only "source".
+const C2505_WRITER_BEFORE='7965b337cf69a6d48cb152b1594833d64266a677';
+const C2505_WRITER_LAST='a96c35cbf43877e9f3f640e77c10dbe47ab5b067';
+export function project2505WriterSourceOnlyDelta(raw,originalSha256){
+ const result=(code,sourceMatched=null,reversesToOriginal=null)=>({
+  code,sourceMatched,reversesToOriginal,
+  safeToReplaceProtectedBefore:false,recoveryEligible:false});
+ if(!Buffer.isBuffer(raw)||raw.length<1||raw.length>65536||
+    typeof originalSha256!=='string'||!/^[a-f0-9]{64}$/.test(originalSha256))
+  return result('C2505_WRITER_SOURCE_BYTES_UNVERIFIED');
+ let config,text,matches;
+ try{
+  text=raw.toString('utf8');
+  config=JSON.parse(text);
+  matches=[...text.matchAll(/"source"\s*:\s*"([a-f0-9]{40})"/gi)];
+ }catch{return result('C2505_WRITER_SOURCE_JSON_UNVERIFIED');}
+ if(!config||Array.isArray(config)||typeof config!=='object'||
+    matches.length!==1||matches[0][1]!==config.source)
+  return result('C2505_WRITER_SOURCE_FIELD_AMBIGUOUS');
+ if(config.source!==C2505_WRITER_LAST)
+  return result('C2505_WRITER_SOURCE_NOT_LAST_RECEIPT',false,null);
+ const m=matches[0],swapped=m[0].replace(C2505_WRITER_LAST,C2505_WRITER_BEFORE);
+ if(swapped===m[0])return result('C2505_WRITER_SOURCE_REVERSE_INVALID',true,null);
+ const reverse=text.slice(0,m.index)+swapped+text.slice(m.index+m[0].length);
+ const reversed=createHash('sha256').update(Buffer.from(reverse,'utf8'))
+  .digest('hex')===originalSha256;
+ return result(reversed?'C2505_WRITER_SOURCE_ONLY_REVERSED_EXACT':
+  'C2505_WRITER_SOURCE_ONLY_REVERSE_DIFFERS',true,reversed);
+}
+
+// #2505 deep byte evidence on the already approved independent read-only PC
+// inventory. No process termination, lock release, GitHub writes or secret output.
+export function inspect2505RecoveryByteProof({
+ fileSystem=fs,
+ maintenanceRoot='E:/ZGmini/automation/pc-maintenance',
+ controlRoot='E:/ZGmini/automation/pc-control',
+ writerDataRoot='E:/ZGmini/data/pc-writer',
+ protectedProbe=protectedSnapshot,
+ pidProbe=pid=>{try{process.kill(pid,0);return true;}catch(e){return e?.code==='ESRCH'?false:null;}}
+}={}){
+ const unknown=code=>({status:'STATE_UNKNOWN',code,
+  snapshotFilesVerified:null,previousHostMatchesSnapshot:null,
+  protectedBaselineMatchesCurrent:null,writerSourceOnlyDelta:null,
+  protectedDifferenceScopes:null,
+  protectedDifferenceClass:'UNVERIFIED',casDigests:null,
+  writerConfigModifiedAtUtc:null,ownerMarkerMatches:null,
+  ownerPidPresent:null,leaseTimelineAligned:null,currentTargetMatches:null,
+  leaseBoundToOriginalRequest:null,recoveryEligible:false,
+  operationalWrites:0,providerCalls:0,d1Writes:0});
+ const root=path.join(controlRoot,'backups','controller-update-'+C2505_ID);
+ const fixed={
+  ledger:path.join(maintenanceRoot,'ledger',C2505_ID+'.json'),
+  owner:path.join(maintenanceRoot,'leases/controller-install/owner.json'),
+  marker:path.join(maintenanceRoot,'leases/controller-install/RECOVERY_REQUIRED.json'),
+  currentHost:path.join(controlRoot,'host.json'),
+  snapshotHost:path.join(root,'snapshot/host.json'),
+  previousHost:path.join(root,'previous-host.json'),
+  protectedBefore:path.join(root,'PROTECTED_BEFORE.json'),
+  backlog:path.join(maintenanceRoot,'backlog',C2505_ID+'.json'),
+  writerConfig:path.join(writerDataRoot,'config.json')
+ };
+ const readFixed=(file,max=131072)=>{
+  const st=fileSystem.lstatSync(file);
+  if(!st.isFile()||st.isSymbolicLink()||st.size<=0||st.size>max)
+   throw Error('FIXED_FILE_INVALID');
+  const bytes=fileSystem.readFileSync(file);
+  if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)throw Error('FIXED_BYTES_INVALID');
+  return bytes;
+ };
+ try{
+  const start=Object.fromEntries(Object.entries(fixed).map(([k,p])=>[k,readFixed(p)]));
+  const parse=k=>JSON.parse(start[k].toString('utf8'));
+  const ledger=parse('ledger'),owner=parse('owner'),marker=parse('marker');
+  const nowHost=parse('currentHost'),savedHost=parse('snapshotHost');
+  const baseline=parse('protectedBefore');
+  const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+  const casDigests={ledgerSha256:sha256(start.ledger),
+   ownerSha256:sha256(start.owner),markerSha256:sha256(start.marker),
+   snapshotHostSha256:sha256(start.snapshotHost),
+   protectedBeforeSha256:sha256(start.protectedBefore),
+   backlogSha256:sha256(start.backlog),
+   currentWriterConfigSha256:sha256(start.writerConfig)};
+  const writerStat=fileSystem.lstatSync(fixed.writerConfig);
+  const writerConfigModifiedAtUtc=Number.isFinite(writerStat.mtimeMs)?
+   new Date(writerStat.mtimeMs).toISOString():null;
+  const writerSourceOnlyDelta=project2505WriterSourceOnlyDelta(
+   start.writerConfig,baseline?.files?.['config.json']);
+  if(ledger.requestId!==C2505_ID||ledger.issueNumber!==2505||
+    ledger.targetSha!==C2505_TARGET||ledger.firstFail!=='POSTCHECK_PENDING'||
+    ledger.status!=='RECOVERY_REQUIRED')return unknown('C2505_ORIGINAL_LEDGER_UNVERIFIED');
+  const files=savedHost.controllerFiles;
+  if(savedHost.controllerSourceSha!==ledger.installedShaBefore||
+    typeof files!=='object'||!files||Array.isArray(files)||
+    Object.keys(files).length<5||Object.keys(files).length>160)
+    return unknown('C2505_SNAPSHOT_MANIFEST_UNVERIFIED');
+  let snapshotFilesVerified=true;
+  for(const [rel,expected] of Object.entries(files)){
+   if(!/^(?:controller\/[a-z0-9-]+\.mjs|config\/operations\.json)$/.test(rel)||
+      !/^[a-f0-9]{64}$/.test(expected)||
+      createHash('sha256').update(readFixed(path.join(root,'snapshot',rel),2097152))
+       .digest('hex')!==expected){snapshotFilesVerified=false;break;}
+  }
+  const previousHostMatchesSnapshot=start.previousHost.equals(start.snapshotHost);
+  const ownerMarkerMatches=Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+   typeof owner.nonce==='string'&&/^[a-f0-9-]{36}$/i.test(owner.nonce)&&
+   marker.requestOwnerPid===owner.pid&&marker.nonce===owner.nonce;
+  const pidPresent=ownerMarkerMatches?pidProbe(owner.pid):null;
+  const created=Date.parse(owner.at),updated=Date.parse(ledger.updatedAt),
+   marked=Date.parse(marker.at);
+  // Chronology is useful evidence only: owner/marker have no request ID.
+  const leaseTimelineAligned=Number.isFinite(created)&&Number.isFinite(updated)&&
+   Number.isFinite(marked)&&created<=updated&&updated<=marked&&marked-updated<=60000;
+  let protectedBaselineMatchesCurrent=null,protectedDifferenceScopes=null;
+  let protectedDifferenceClass='UNVERIFIED';
+  try{
+   const currentProtected=protectedProbe();
+   protectedBaselineMatchesCurrent=JSON.stringify(currentProtected)===JSON.stringify(baseline);
+   // The current protection snapshot and our pinned Writer byte hash must
+   // refer to exactly the same observation. Otherwise fail closed.
+   if(currentProtected?.files?.['config.json']!==casDigests.currentWriterConfigSha256)
+    return unknown('C2505_WRITER_CONFIG_READBACK_DRIFT');
+   // Only these six previously protected fixed names may be reported.
+   // Do not disclose hashes, raw task XML, configured paths or arbitrary keys.
+   const known=[
+    ['files','config.json','WRITER_CONFIG'],
+    ['files','quota-runner.cmd','WRITER_QUOTA_RUNNER'],
+    ['files','run-local.cmd','WRITER_LOCAL_RUNNER'],
+    ['tasks','ZGMINI-PC-Local-Core','LOCAL_CORE_TASK'],
+    ['tasks','ZGMINI-PC-Local-Korea','LOCAL_KOREA_TASK'],
+    ['tasks','ZGMINI-PC-Iran-Progress-R13','RETIRED_IRAN_TASK']
+   ];
+   const plain=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+   if(!plain(baseline?.files)||!plain(baseline?.tasks)||
+      !plain(currentProtected?.files)||!plain(currentProtected?.tasks)){
+    protectedDifferenceClass='UNVERIFIED_STRUCTURE';
+   }else{
+    protectedDifferenceScopes=known.filter(([group,name])=>
+     baseline[group][name]!==currentProtected[group][name]).map(([, ,label])=>label);
+    const unexpected=Object.entries({files:new Set(known.filter(x=>x[0]==='files').map(x=>x[1])),
+      tasks:new Set(known.filter(x=>x[0]==='tasks').map(x=>x[1]))}).some(([group,allowed])=>
+       [...Object.keys(baseline[group]),...Object.keys(currentProtected[group])].some(k=>!allowed.has(k)));
+    protectedDifferenceClass=unexpected?'UNVERIFIED_EXTRA_KEYS':
+     protectedBaselineMatchesCurrent?'MATCHED':
+     protectedDifferenceScopes.length?'KNOWN_SCOPES':'UNCLASSIFIED_DIFFERENCE';
+   }
+  }catch{/* Scheduler read unavailable, not drift */}
+  const currentTargetMatches=nowHost.controllerSourceSha===C2505_TARGET;
+  const stable=Object.entries(fixed).every(([k,p])=>readFixed(p).equals(start[k]));
+  if(!stable||fileSystem.lstatSync(fixed.writerConfig).mtimeMs!==writerStat.mtimeMs)
+   return unknown('C2505_PROOF_FILES_CHANGED');
+  return {status:'READ_ONLY_OBSERVED',code:'C2505_BYTE_PROOF_OBSERVED',
+   snapshotFilesVerified,previousHostMatchesSnapshot,
+   protectedBaselineMatchesCurrent,protectedDifferenceScopes,
+   protectedDifferenceClass,casDigests,writerConfigModifiedAtUtc,
+   writerSourceOnlyDelta,
+   ownerMarkerMatches,
+   ownerPidPresent:typeof pidPresent==='boolean'?pidPresent:null,
+   leaseTimelineAligned,currentTargetMatches,
+   // Only the original B operator could attest exact request-owner lineage.
+   leaseBoundToOriginalRequest:null,recoveryEligible:false,
+   operationalWrites:0,providerCalls:0,d1Writes:0};
+ }catch{return unknown('C2505_BYTE_PROOF_UNAVAILABLE');}
+}
 
 // A fixed historical Controller B failure: independently sample only local
 // journal + staged/backlog/lease metadata through the existing A-grade PC
@@ -888,12 +1134,15 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
+  c2505RecoveryCheckpoint:inspect2505RecoveryReadonly(),
+  c2505ByteProof:inspect2505RecoveryByteProof(),
   c2094StageEvidence:inspect2094StageReadonly(),
   c996LeaseCorrelation:inspect996LeaseCorrelation(),
   c1501LeaseCorrelation:inspect1501LeaseCorrelation(),
    c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
   observedHttpHostRoster:readObservedProviderHosts(),
   marketParquetTaskSource:inspectMarketParquetTask(),
+  w03PaidPrivate:inspectW03PaidPrivateReadonly(),
   http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
   c1501Backlog:inspect1501BacklogReadonly(),
   targetEndpointStatus:readTargetEndpointStatus(),
@@ -929,7 +1178,13 @@ export function toText(r){
   'memoryGroupCoverage='+(r.snapshot?.memoryGroupCoverage??'UNAVAILABLE'),
   'otherSubgroupCoverage='+(r.snapshot?.otherSubgroupCoverage??'UNAVAILABLE'),
   'maintenanceStatus='+(r.maintenance?.status??'NOT_APPLICABLE'),
+  'c2505Recovery='+(r.c2505RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
+  'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
+  'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
   'marketParquetTaskStatus='+(r.marketParquetTaskSource?.status??'NOT_APPLICABLE'),
+  'w03PaidPrivateStatus='+(r.w03PaidPrivate?.status??'NOT_APPLICABLE'),
+  'w03PaidPrivateCode='+(r.w03PaidPrivate?.code??'NOT_APPLICABLE'),
+  'w03PaidPrivatePoints='+(r.w03PaidPrivate?.historyPoints??'UNKNOWN'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),

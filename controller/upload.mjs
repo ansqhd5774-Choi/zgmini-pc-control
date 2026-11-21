@@ -1,11 +1,14 @@
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';import {need,exclusive,readAllPages} from './common.mjs';
-import {renderBoundedReport,uploadVerifiedReportPair} from './report-upload-verified.mjs';
+import {renderBoundedReport,uploadVerifiedReportPair,resolveUploadPolicy} from './report-upload-verified.mjs';
 import {cleanupVerifiedJobTemps} from './report-temp-retention.mjs';
-const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),policy=JSON.parse(fs.readFileSync(path.join(root,'config/operations.json')));
-const token=process.env.GITHUB_TOKEN;need(token,'REPORT_AUTH_MISSING');need(process.env.GITHUB_REPOSITORY===policy.controlRepository,'REPORT_REPOSITORY');
+const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const token=process.env.GITHUB_TOKEN;need(token,'REPORT_AUTH_MISSING');
 const seat=process.env.RUNNER_NAME?.match(/^zgmini-pc-0([1-6])$/)?.[1],runId=process.env.GITHUB_RUN_ID,attempt=process.env.GITHUB_RUN_ATTEMPT||'1';
 need(/^\d{1,20}$/.test(runId??'')&&/^[1-6]$/.test(seat??'')&&/^\d{1,3}$/.test(attempt),'REPORT_ID');
 const pointer=JSON.parse(fs.readFileSync(path.join(root,'reports',`${runId}-${attempt}-${seat}.json`)));
+let policyBytes=null;try{policyBytes=fs.readFileSync(path.join(root,'config/operations.json'));}catch{}
+const policy=resolveUploadPolicy(policyBytes,{pointer,runId,attempt,seat});
+need(process.env.GITHUB_REPOSITORY===policy.controlRepository,'REPORT_REPOSITORY');
 const report=pointer.report,{json,txt}=renderBoundedReport(report,policy.maxReportBytes);
 need(Number.isSafeInteger(pointer.issueNumber),'REPORT_ISSUE');
 const api=async(route,method='GET',body)=>{const response=await fetch('https://api.github.com/repos/'+policy.controlRepository+'/'+route,{method,headers:{accept:'application/vnd.github+json',authorization:'Bearer '+token,'x-github-api-version':'2022-11-28','content-type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(25000)});let data;try{data=await response.json();}catch{data={};}return {status:response.status,data};};

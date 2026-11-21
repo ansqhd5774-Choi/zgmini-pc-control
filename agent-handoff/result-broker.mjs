@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseHandoff} from './contract.mjs';
+import {readIssueCommentLedger} from './comment-ledger.mjs';
 import {parseAgentResult, resultDigest, verifyAgentResult} from './result-contract.mjs';
 import {centralResultReceipt, originResultReceipt} from './result-receipts.mjs';
 
@@ -53,9 +54,7 @@ function completeReceipt(row, number, expectedBody) {
 }
 async function inspectExistingResult(issueNumber, resultId, digest, expectedBody) {
   let verified = false;
-  for (let page = 1; page <= 4; page++) {
-    const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
-    if (!Array.isArray(rows)) throw new Error('RESULT_COMMENT_LEDGER_STOP');
+  for (const rows of [await readIssueCommentLedger(page=>api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`))]) {
     for (const row of rows) {
       if (row.user?.login !== BOT || typeof row.body !== 'string' ||
           !row.body.startsWith('HANDOFF_RESULT_RECORDED\n')) continue;
@@ -70,16 +69,13 @@ async function inspectExistingResult(issueNumber, resultId, digest, expectedBody
       if (verified) throw new Error('RESULT_RECEIPT_DUPLICATE_STOP');
       verified = true;
     }
-    if (rows.length < 100) return verified;
   }
-  throw new Error('RESULT_COMMENT_SCAN_LIMIT_STOP');
+  return verified;
 }
 
 async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNumber, expectedBody) {
   let verified = false;
-  for (let page = 1; page <= 4; page++) {
-    const rows = await api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`);
-    if (!Array.isArray(rows)) throw new Error('RESULT_ORIGIN_LEDGER_STOP');
+  for (const rows of [await readIssueCommentLedger(page=>api(`/repos/${REPOSITORY}/issues/${issueNumber}/comments?per_page=100&page=${page}`))]) {
     for (const row of rows) {
       if (row.user?.login !== BOT || typeof row.body !== 'string' ||
           !row.body.startsWith('HANDOFF_ORIGIN_RESULT_RECORDED\n')) continue;
@@ -98,16 +94,13 @@ async function inspectOriginReceipt(issueNumber, result, digest, handoffIssueNum
       if (verified) throw new Error('RESULT_ORIGIN_RECEIPT_DUPLICATE_STOP');
       verified = true;
     }
-    if (rows.length < 100) return verified;
   }
-  throw new Error('RESULT_ORIGIN_LEDGER_SCAN_LIMIT_STOP');
+  return verified;
 }
 
 async function verifyWriterBSourceAtOrigin(number, requestId, sourceSha, code) {
   let matched = null;
-  for (let page = 1; page <= 4; page++) {
-    const rows = await api(`/repos/${REPOSITORY}/issues/${number}/comments?per_page=100&page=${page}`);
-    if (!Array.isArray(rows)) throw new Error('RESULT_WRITER_RECEIPT_LEDGER_STOP');
+  for (const rows of [await readIssueCommentLedger(page=>api(`/repos/${REPOSITORY}/issues/${number}/comments?per_page=100&page=${page}`))]) {
     for (const item of rows) {
       if (item.user?.login !== BOT || typeof item.body !== 'string' || item.body.length > 4096 ||
           item.body.split('\n', 1)[0] !== `<!-- zgmini-writer-b-install:${requestId} -->` ||
@@ -123,8 +116,7 @@ async function verifyWriterBSourceAtOrigin(number, requestId, sourceSha, code) {
       }
       matched = runId;
     }
-    if (rows.length < 100) break;
-    if (page === 4) throw new Error('RESULT_WRITER_RECEIPT_SCAN_LIMIT_STOP');
+
   }
   if (matched === null) throw new Error('RESULT_WRITER_RECEIPT_MISSING_STOP');
   const run = await api(`/repos/${REPOSITORY}/actions/runs/${matched}`);
@@ -234,16 +226,17 @@ export async function main(env = process.env) {
   const alreadyRecorded = await inspectExistingResult(
     event.issue.number, result.resultId, digest, comment);
   if (!alreadyRecorded) {
+    let reconciled=false;
     try {
       await api(`/repos/${REPOSITORY}/issues/${event.issue.number}/comments`,
         {method: 'POST', body: {body: comment}});
     } catch {
       // A POST response may be lost after GitHub stored the comment.
       // Reconcile the exact bot receipt; never blindly post it again.
-      if (!await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
-        throw new Error('RESULT_COMMENT_POST_OUTCOME_UNKNOWN');
+      reconciled=await inspectExistingResult(event.issue.number, result.resultId, digest, comment);
+      if (!reconciled) throw new Error('RESULT_COMMENT_POST_OUTCOME_UNKNOWN');
     }
-    if (!await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
+    if (!reconciled && !await inspectExistingResult(event.issue.number, result.resultId, digest, comment))
       throw new Error('RESULT_COMMENT_READBACK_STOP');
   }
   if (originalIssue !== null) {
@@ -251,15 +244,16 @@ export async function main(env = process.env) {
     const delivered = await inspectOriginReceipt(
       originalIssue, result, digest, event.issue.number, receipt);
     if (!delivered) {
+      let reconciled=false;
       try {
         await api(`/repos/${REPOSITORY}/issues/${originalIssue}/comments`,
           {method: 'POST', body: {body: receipt}});
       } catch {
-        if (!await inspectOriginReceipt(originalIssue, result, digest,
-          event.issue.number, receipt))
-          throw new Error('RESULT_ORIGIN_POST_OUTCOME_UNKNOWN');
+        reconciled=await inspectOriginReceipt(originalIssue, result, digest,
+          event.issue.number, receipt);
+        if (!reconciled) throw new Error('RESULT_ORIGIN_POST_OUTCOME_UNKNOWN');
       }
-      if (!await inspectOriginReceipt(originalIssue, result, digest,
+      if (!reconciled && !await inspectOriginReceipt(originalIssue, result, digest,
         event.issue.number, receipt))
         throw new Error('RESULT_ORIGIN_COMMENT_READBACK_STOP');
     }

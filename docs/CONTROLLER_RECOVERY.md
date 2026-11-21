@@ -7,6 +7,10 @@
 - [복구 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319#issuecomment-6635620932): `ABORTED_UNTOUCHED` / `DEAD_PREVALIDATION_LEASE_ARCHIVED`, UTC `2026-11-04T16:10:25.084Z`, archive `pc-update-9f22c05c-2735-4d63-81c8-b88c6d332d9a-91e60677-9b52-4535-bf4a-95bdace558c7.lease`. 기존 Controller SHA `14940aa112494b1cea09ff5c7250f4af86a4ce6a`, `controllerChanged=false`, `originalRequestRetried=false`, `coreDbD1Writes=0`, `reportUpload=VERIFIED`.
 - 이전 설치 lease는 보관됐지만 새로운 Controller 버전 설치·복구 후 Supervisor heartbeat/owner·6 Runner 신선도 검증은 **별도 단계**다. 당시 원본 update 결과와 복구 결과를 합쳐 설치 PASS로 표시하지 않는다. 다른 정상 업무가 #319 과거 이력을 매번 재검사하게 하지 않는다.
 
+## 정상 운영 복귀 우선 (2026-11-21)
+
+[모든 변경 작업의 공통 복귀 기준](ROLLBACK_FIRST_WORKFLOW.md)을 적용한다. 원래 사후검사의 실행 단계가 terminal failure로 확정되면 결과 업로드 부재만으로 영구 UNKNOWN에 두지 않고, 정확한 원본 증거를 검증해 기존 백업 복원 경로로 연결한다. 단순 timeout/취소/권한 실패만으로 자동 롤백하지 않는다. `ROLLED_BACK`은 이전 운영 정상 복구이며 신규 기능 성공이 아니다. 원래 실패와 복구 실패의 코드를 각각 보존한다.
+
 ## 목적과 담당
 
 모든 기능에 적용하는 공통 절차다. #68의 단일 복구 담당이 기존 실패 Issue와 requestId를 소유하고 상태·도구·해제 조건·후속 담당을 기록한다. 단순히 다른 담당자 대기라고 보고하지 않는다. 진단·개발·이미 가능한 읽기 전용 작업은 계속하고 공유 설치만 보류한다.
@@ -66,9 +70,9 @@ snapshot 바이트 일치·현재 모든 Controller 해시·현재 Supervisor/6�
 보존하여 응답 불명확 시 claim과 원본 lease를 유지한다. 원본 실패 ledger는 덮어쓰지 않는다.
 미실행 backlog 요청은 기존 고유 replay 계약으로 처리하고, 취소된 과거 요청은 자동 재실행하지 않는다.
 
-`tools/controller-rollback-recovery.mjs`는 설치 전 취소와 다른 고정 경로 복구 도구다. 기존 실패 요청을 재실행하지 않으며 원본 ledger를 덮어쓰지 않는다. BACKED_UP/SUPERVISOR_STOPPED/SWITCHED 단계는 원장·백업·보호 상태가 검증될 때만 복구 대상이다. **RECONNECTED 이후는 새 Controller와 접수 상태가 이미 살아 있을 수 있으므로 자동 백업 복원을 수행하지 않는다.** 이 단계는 먼저 기존 ledger의 실패 원인, 실제 설치 SHA, host.json의 누적 승인 등록, Supervisor/Runner, `pc-job.yml` 활성 상태와 backlog를 읽기 전용으로 대조한다. `INTAKE_RESUMED`/BACKLOG_RECONCILED/POSTCHECK_PENDING 이후도 기존 결과를 확정할 때까지 임의 롤백하지 않는다.
+`tools/controller-rollback-recovery.mjs`는 설치 전 취소와 다른 고정 경로 복구 도구다. 기존 실패 요청을 재실행하지 않으며 원본 ledger를 덮어쓰지 않는다. BACKED_UP/SUPERVISOR_STOPPED/SWITCHED 단계는 원장·백업·보호 상태가 검증될 때만 복구 대상이다. **RECONNECTED 이후는 새 Controller와 접수 상태가 이미 살아 있을 수 있으므로 자동 백업 복원을 수행하지 않는다.** 이 단계는 먼저 기존 ledger의 실패 원인, 실제 설치 SHA, host.json의 누적 승인 등록, Supervisor/Runner, `pc-job.yml` 활성 상태와 backlog를 읽기 전용으로 대조한다. `INTAKE_RESUMED`/`BACKLOG_RECONCILED` 이후에는 기존 결과를 확정할 때까지 자동 롤백하지 않는다. `POSTCHECK_PENDING`은 기본적으로 대기하되, 원본 ledger가 `RECOVERY_REQUIRED/POSTCHECK_PENDING`이고 원본 `postIssueNumber`·`targetSha`, 별도 승인에 고정된 Issue/Run/Job/Runner, GitHub에서 확인한 해당 Job의 실제 `Execute fixed host allowlist entry` 실패를 독립 operator가 모두 검증하면 기존 보호 복구 경로에만 진입할 수 있다. 불명확한 결과나 업로드 단계만의 실패는 이 예외에 포함되지 않는다.
 
-실행에는 `approvals/maintenance-recoveries/<기존요청ID>.rollback.json`의 커밋된 `ZGMINI_PC_ROLLBACK_APPROVAL_V1` 명세가 필요하다. approved, requestId, sourceSha, toolSha256, ledgerSha256, ownerSha256, markerSha256, snapshotHostSha256, protectionSha256과 files를 고정한다. files는 복구 도구/update/maintenance-apply/maintenance-contract/maintenance-lock 5개 파일의 path·sha256이다. Git source와 실제 바이트를 모두 대조한다. 기존 요청의 승인 manifest·요청자·열린 Issue도 재검증한다.
+실행에는 `approvals/maintenance-recoveries/<기존요청ID>.rollback.json`의 커밋된 `ZGMINI_PC_ROLLBACK_APPROVAL_V1` 명세가 필요하다. approved, requestId, sourceSha, toolSha256, ledgerSha256, ownerSha256, markerSha256, snapshotHostSha256, protectionSha256과 files를 고정한다. files는 복구 도구/update/maintenance-apply/maintenance-contract/maintenance-lock 5개 파일의 path·sha256이다. Git source와 실제 바이트를 모두 대조한다. 기존 요청의 승인 manifest·요청자·Issue 신원도 재검증한다. 일반 설치는 원본 Issue가 `open`이어야 하지만, 별도로 승인된 독립 복구(`recovery:true`)에 한해서만 동일 원본 Issue의 `closed/completed` 상태를 허용한다. 취소·중복·다른 제목의 Issue는 허용하지 않는다. `POSTCHECK_PENDING` 복구에는 `confirmedPostcheckFailure`와 승인된 현재 Writer config 원시 SHA-256(`approvedCurrentWriterConfigSha256`)을 별도 승인 manifest에 명시하고, claim·Workflow pause 이전에 현재 Writer 바이트 및 GitHub 원본 실패 증거와 대조한다. 다른 보호 파일의 차이는 허용하지 않는다.
 
 기존 소유자 종료, 별도 복구 예약, Windows 로그인 사용자 독립 계보, 저장된 PROTECTED_BEFORE.json, 현재 보호 상태, 백업 바이트 검증을 모두 통과해야 복구한다. 과거 백업에 보호 기준이 없으면 소급 생성하지 않는다. 복구 시작 전에 실패하면 자체 복구 예약만 해제하고 원래 설치 잠금은 보존한다. 복구를 시작한 뒤 실패하면 복구 예약·원래 잠금과 별도 결과를 보존한다. 검증된 이전 Supervisor·6좌석·보호 상태·접수 재개·backlog 회수 후에만 ROLLED_BACK으로 판정하고 원래 설치 lease를 보관한다.
 

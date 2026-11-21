@@ -14,12 +14,15 @@ import {validateUpdateRequest,validateMaintenanceRequest,
 validateControllerConfigTransition,controllerAdmissionForPurpose,
   readAllMaintenancePages,validateInfrastructureDelta,
   validateControllerOnlyInstallDelta,validateControllerSelectivePin,
+  validateControllerImportClosure,controllerImportScanRoots,
   deployableControllerTreePaths,
   isControllerSourceTestPath,
   CONTROL_UPDATE_SENSITIVE_PATHS,CONTROLLER_POST_OPERATIONS,INSTALLABLE_FILES,
  validateR6HostIssueEnvelope,validateR6HostRegistrationRequest,classifyR6HostRecovery,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
+ selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
+ verifiedRunningPostcheckFailure,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1158,7 +1161,8 @@ export function protectedSnapshot() {
  return out;
 }
 
-export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
+export function makePorts(packageData,issueNumber,{recoveryOperator=false,
+ approvedRecoveryWriterConfigSha256=null}={}) {
  const {issue,manifest}=packageData,request={requestId:issue.requestId,chatId:issue.chatId,
   installedSha:manifest.installedSha,targetSha:manifest.targetSha,postOperation:manifest.postOperation};
  const ledgerFile=path.join(recordDir,request.requestId+'.json');
@@ -1299,6 +1303,13 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    // Only exact colocated source tests stay in Git and CI, never on the live host.
    // Unknown Controller tree entries continue to fail closed.
    const deployed=deployableControllerTreePaths(listing);
+   // Fail closed against the full target tree (not main) before any staging,
+   // intake pause or Controller mutation. A one-file overlay must not import
+   // modules that were never installed in its immutable baseline.
+   // An unchanged entry/operations module can still import a missing target
+   // dependency; verify these runtime roots as well as changed overlay files.
+   validateControllerImportClosure(deployed,controllerImportScanRoots(changed),
+     rel=>git(['show',manifest.targetSha+':'+rel]));
    const oldOperations=JSON.parse(fs.readFileSync(path.join(controlRoot,'config/operations.json')));
    const nextOperations=JSON.parse(git(['show',manifest.targetSha+':config/operations.json']));
    validateControllerConfigTransition(oldOperations,nextOperations,controllerAdmissionForPurpose(manifest.purpose));
@@ -1525,6 +1536,29 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
          result.sourceBranch===manifest.postSourceBranch&&
          result.controlSourceSha===manifest.targetSha};
     }
+    // Missing upload is not an unknown execution when the exact original
+    // Actions job proves its execution step failed. Observe, never resubmit.
+    if(n%5===0){
+     let confirmed=null;
+     try{
+      const liveIssue=github('issues/'+postIssueNumber);
+      const runs=readAllMaintenancePages(page=>github(
+       `actions/workflows/pc-job.yml/runs?event=issues&status=completed&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs)
+       .filter(r=>r.display_title===`PC Update ${issue.requestId} postcheck`&&r.conclusion==='failure');
+      const liveLedger=json(ledgerFile);
+      for(const run of runs){
+       const jobs=readAllMaintenancePages(page=>github(
+        `actions/runs/${run.id}/jobs?per_page=100&page=${page}`).jobs);
+       for(const job of jobs)if(verifiedRunningPostcheckFailure({
+        ledger:liveLedger,manifest,issue:liveIssue,run,job})){
+        confirmed={issueNumber:postIssueNumber,runId:run.id,jobId:job.id,runnerName:job.runner_name};break;
+       }
+       if(confirmed)break;
+      }
+     }catch{/* A failed observation is still UNKNOWN, never a rollback signal. */}
+     if(confirmed)throw Object.assign(Error('POSTCHECK_EXECUTION_FAILED_VERIFIED'),{
+      code:'POSTCHECK_EXECUTION_FAILED_VERIFIED',postcheckFailureEvidence:confirmed});
+    }
     await wait(3000);
    }
    throw Object.assign(Error('POSTCHECK_OUTCOME_UNKNOWN'),{code:'POSTCHECK_OUTCOME_UNKNOWN'});
@@ -1534,7 +1568,28 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    const host=json(path.join(snapshotRoot,'host.json'));
    return host.controllerSourceSha===manifest.installedSha&&Object.entries(host.controllerFiles).every(([rel,d])=>fs.existsSync(path.join(snapshotRoot,rel))&&sha256(fs.readFileSync(path.join(snapshotRoot,rel)))===d);
   },
-  restore:async()=>{
+  preflightRecoveryRestore:async()=>{
+   if(!recoveryOperator)return;
+   // No rollback mutation marker exists yet; restore rechecks live state.
+   if(!pausedByUs)apiRunners();
+   need(protectedBefore!==undefined,'RECOVERY_PROTECTION_NOT_PINNED');
+   need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),
+    'RECOVERY_PROTECTION_PREFLIGHT_CHANGED');
+  },
+  restoreMarksMutation:recoveryOperator,
+  restore:async({beforeMutation}={})=>{
+   const markMutation=async()=>{
+    if(recoveryOperator){
+     need(typeof beforeMutation==='function','RECOVERY_MUTATION_CALLBACK_REQUIRED');
+     await beforeMutation();
+    }
+   };
+   // The independent recovery operator must prove that the runner inventory
+   // endpoint is readable before touching intake. Drain still rechecks the
+   // live roster after pause; this is not an idle/availability shortcut.
+   if(recoveryOperator&&!pausedByUs)apiRunners();
+   if(recoveryOperator)need(recoveryProtectedSnapshotStillPinned(protectedBefore,
+    protectedSnapshot()),'RECOVERY_PROTECTION_PREPAUSE_CHANGED');
    // A postcheck may have failed after the new listener came online. Stop its
    // tree only AFTER pausing intake and observing zero jobs/uploads again.
    if(!pausedByUs){
@@ -1542,7 +1597,9 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
      // lost even when the disable succeeded. The second window is replayed
      // after the verified rollback reconnects the original six Runners.
      need(fs.existsSync(backlogFile),'BACKLOG_STATE_MISSING');
-     writeJson(backlogFile,openRollbackPause(json(backlogFile),new Date().toISOString()));
+     const pause=openRollbackPause(json(backlogFile),new Date().toISOString());
+     await markMutation(); // durable claim before first intake/backlog write
+     writeJson(backlogFile,pause);
      github('actions/workflows/pc-job.yml/disable','PUT');pausedByUs=true;
    }
    need(github('actions/workflows/pc-job.yml').state==='disabled_manually','ROLLBACK_WORKFLOW_NOT_DISABLED');
@@ -1554,6 +1611,13 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
     await wait(3000);
    }
    need(stable>=2,'ROLLBACK_DRAIN_TIMEOUT');
+   // Job drain may overlap a separately approved Writer B source update.
+   // Never stop the live Supervisor or switch Controller files on a stale CAS.
+   if(recoveryOperator)need(recoveryProtectedSnapshotStillPinned(protectedBefore,
+    protectedSnapshot()),'RECOVERY_PROTECTION_PRESWITCH_CHANGED');
+   // An already paused intake may reach its first mutation only after drain.
+   // Keep the claim durable before process termination or file rename.
+   await markMutation();
    const ownerFile=path.join(controlRoot,'leases/supervisor/owner.json');
    if(fs.existsSync(ownerFile)){
     const owner=json(ownerFile);let alive=true;try{process.kill(owner.pid,0);}catch{alive=false;}
@@ -1616,8 +1680,16 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
   prepareRecovery:async()=>{
    need(recoveryOperator,'RECOVERY_OPERATOR_REQUIRED');verifyRecoveryOperator();
    need(fs.existsSync(path.join(backupRoot,'PROTECTED_BEFORE.json')),'RECOVERY_PROTECTION_BASELINE_MISSING');
-   protectedBefore=json(path.join(backupRoot,'PROTECTED_BEFORE.json'));
-   need(JSON.stringify(protectedSnapshot())===JSON.stringify(protectedBefore),'PROTECTED_STATE_DRIFT');
+   const originalProtection=json(path.join(backupRoot,'PROTECTED_BEFORE.json'));
+   // A separately approved independent recovery may pin the live Writer config
+   // only. Do not edit the historic baseline or permit any other Task/file drift.
+   need(approvedRecoveryWriterConfigSha256===null||recoveryOperator,
+    'RECOVERY_WRITER_CAS_REQUIRES_INDEPENDENT_OPERATOR');
+   const decision=selectPreservedRecoveryProtection(originalProtection,
+    protectedSnapshot(),{approvedCurrentWriterConfigSha256:
+     approvedRecoveryWriterConfigSha256});
+   need(decision.allowed,decision.code);
+   protectedBefore=decision.baseline;
    const backlog=json(backlogFile),windows=backlogPauseWindows(backlog);
    const wf=github('actions/workflows/pc-job.yml').state;
    if(windows.some(w=>!w.resumedAt)){
@@ -1628,6 +1700,15 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false}={}) {
    workflowState:github('actions/workflows/pc-job.yml').state,runners:apiRunners().map(x=>({name:x.name,status:x.status,busy:x.busy}))})
  }};
  return result;
+}
+
+// Recovery can outlive the original one-shot Issue. This is only an Issue
+// identity predicate: a separately approved independent recovery operator
+// still needs the exact ledger/owner/marker/backup CAS before any effect.
+export function admittedMaintenanceIssueState(issue,{recovery=false}={}){
+ return issue?.title==='pc-controller-update'&&(
+  issue.state==='open'||
+  (recovery===true&&issue.state==='closed'&&issue.state_reason==='completed'));
 }
 
 export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
@@ -1643,7 +1724,7 @@ export function loadApprovedPackage(requestId,file,{recovery=false}={}) {
  let liveRequest;try{liveRequest=JSON.parse(actual.body);}catch{throw Object.assign(Error('MAINTENANCE_ISSUE_INVALID'),{code:'MAINTENANCE_ISSUE_INVALID'});}
  const authenticated=validateMaintenanceRequest(liveRequest,{actor:actual.user?.login,controlRepository});
  need(actual.user?.login===data.actor&&JSON.stringify(authenticated)===JSON.stringify(issue),'MAINTENANCE_ISSUE_IDENTITY');
- need(actual.state==='open'&&actual.title==='pc-controller-update','MAINTENANCE_REQUEST_CANCELED');
+ need(admittedMaintenanceIssueState(actual,{recovery}),'MAINTENANCE_REQUEST_CANCELED');
  need(actual.labels?.some(x=>x.name==='pc-maintenance')&&!actual.pull_request,'MAINTENANCE_LABEL');
  const validated=validateUpdateRequest(issue,raw,{actor:data.actor,
   controlRepository,installedSha:recovery?manifest.installedSha:installedManifest().installedSha});

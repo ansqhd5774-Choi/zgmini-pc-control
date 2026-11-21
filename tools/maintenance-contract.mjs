@@ -1,10 +1,60 @@
 // ZGMINI PC controller update admission and transition contract (pure ESM).
 // This module NEVER runs shell, downloads source, installs code or edits a PC.
 import {createHash,randomUUID} from "node:crypto";
+import path from "node:path";
 import {CONVERSATION_TRACE_ID} from './source-bundle-register.mjs';
 export {SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
   validateSourceBundleIssueEnvelope,validateSourceBundleBApproval}
   from './source-bundle-register.mjs';
+
+// A recovery may drain jobs before the first Controller-byte mutation. Recheck
+// the exact preapproved live protected state both before intake pause and just
+// before a previous Controller is restored. No mutation or baseline rewriting.
+export function recoveryProtectedSnapshotStillPinned(pinned,current){
+ const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
+ return record(pinned)&&record(current)&&record(pinned.files)&&
+  record(pinned.tasks)&&record(current.files)&&record(current.tasks)&&
+  JSON.stringify(pinned)===JSON.stringify(current);
+}
+
+// Existing Controller recovery must never roll back or silently bless an
+// unrelated live Writer config update. A separately approved independent
+// recovery may retain its *exact* current SHA only when all other protected
+// observations match the original B baseline. This is a pure decision helper;
+// neither a file write nor an operational recovery authorization.
+export function selectPreservedRecoveryProtection(original,current,
+ {approvedCurrentWriterConfigSha256=null}={}){
+ const deny=code=>({allowed:false,code,baseline:null,preservedWriterConfig:false});
+ const record=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+ if(!record(original)||!record(current)||!record(original.files)||
+    !record(current.files)||!record(original.tasks)||!record(current.tasks))
+  return deny('RECOVERY_PROTECTION_SCHEMA_UNVERIFIED');
+ // Even an otherwise unchanged baseline must match an explicitly pinned
+ // approved live Writer SHA. Never ignore an approval CAS on the fast path.
+ if(approvedCurrentWriterConfigSha256!==null&&
+    (typeof approvedCurrentWriterConfigSha256!=='string'||
+     !/^[a-f0-9]{64}$/.test(approvedCurrentWriterConfigSha256)||
+     current.files['config.json']!==approvedCurrentWriterConfigSha256))
+  return deny('RECOVERY_WRITER_CONFIG_CAS_NOT_VERIFIED');
+ if(JSON.stringify(original)===JSON.stringify(current))
+  return {allowed:true,code:'RECOVERY_ORIGINAL_PROTECTION_UNCHANGED',
+   baseline:original,preservedWriterConfig:false};
+ if(typeof approvedCurrentWriterConfigSha256!=='string'||
+    !/^[a-f0-9]{64}$/.test(approvedCurrentWriterConfigSha256))
+  return deny('RECOVERY_PROTECTION_DRIFT_NOT_APPROVED');
+ const oldConfig=original.files['config.json'];
+ const currentConfig=current.files['config.json'];
+ if(!/^[a-f0-9]{64}$/.test(oldConfig??'')||
+    currentConfig!==approvedCurrentWriterConfigSha256||
+    oldConfig===currentConfig)
+  return deny('RECOVERY_WRITER_CONFIG_CAS_NOT_VERIFIED');
+ const expected={...original,files:{...original.files,
+  'config.json':approvedCurrentWriterConfigSha256}};
+ if(JSON.stringify(current)!==JSON.stringify(expected))
+  return deny('RECOVERY_OTHER_PROTECTED_STATE_DRIFT');
+ return {allowed:true,code:'RECOVERY_CURRENT_WRITER_CONFIG_PRESERVED',
+  baseline:current,preservedWriterConfig:true};
+}
 
 export const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
 export const CONTROL_ACTOR="ansqhd5774-Choi";
@@ -628,6 +678,100 @@ export function validateControllerSelectivePin(manifest,pin){
  return true;
 }
 
+
+// Extract only JavaScript import specifiers, excluding strings, comments,
+// regular expressions and literal patch templates. No code execution.
+export function controllerModuleSpecifiers(source){
+ if(typeof source!=='string')throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+ const tokens=[];
+ const add=(type,value)=>tokens.push({type,value});
+ let i=0;
+ while(i<source.length){
+  const ch=source[i],next=source[i+1];
+  if(/\s/.test(ch)){i++;continue;}
+  if(ch==='/'&&next==='/'){i+=2;while(i<source.length&&source[i]!=='\n')i++;continue;}
+  if(ch==='/'&&next==='*'){
+   i+=2;const close=source.indexOf('*/',i);
+   if(close<0)throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+   i=close+2;continue;
+  }
+  if(ch==="'"||ch==='"'||ch.charCodeAt(0)===96){
+   const quote=ch,template=ch.charCodeAt(0)===96;let value='';i++;let closed=false;
+   while(i<source.length){
+    const c=source[i++];
+    if(c==='\\'){if(i<source.length){const escaped=source[i++];value+='\\'+escaped;}continue;}
+    if(c===quote){closed=true;break;}
+    value+=c;
+   }
+   if(!closed)throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+   if(!template)add('string',value);
+   continue;
+  }
+  if(ch==='/'&&tokens.length&&['=','(',':',',','[','!','?',';','return','=>','{','&','|','+','-','*','%','^','~','<','>'].includes(tokens.at(-1).value)){
+   i++;let escaped=false,inClass=false,closed=false;
+   while(i<source.length){
+    const c=source[i++];
+    if(escaped){escaped=false;continue;}
+    if(c==='\\'){escaped=true;continue;}
+    if(c==='['){inClass=true;continue;}
+    if(c===']'){inClass=false;continue;}
+    if(c==='/'&&!inClass){closed=true;break;}
+   }
+   if(!closed)throw Object.assign(Error('CONTROLLER_IMPORT_SOURCE_INVALID'),{code:'CONTROLLER_IMPORT_SOURCE_INVALID'});
+   while(i<source.length&&/[a-z]/i.test(source[i]))i++;
+   add('regex','');continue;
+  }
+  if(/[a-zA-Z_$]/.test(ch)){
+   const begin=i++;while(i<source.length&&/[a-zA-Z0-9_$]/.test(source[i]))i++;
+   add('word',source.slice(begin,i));continue;
+  }
+  if(ch==='='&&next==='>'){add('punc','=>');i+=2;continue;}
+  add('punc',ch);i++;
+ }
+ const out=[];
+ for(let j=0;j<tokens.length;j++){
+  const word=tokens[j].value;
+  if(word==='from'&&tokens[j+1]?.type==='string')out.push(tokens[j+1].value);
+  if(word!=='import')continue;
+  if(tokens[j+1]?.type==='string')out.push(tokens[j+1].value);
+  else if(tokens[j+1]?.value==='('&&tokens[j+2]?.type==='string'&&tokens[j+3]?.value===')')
+   out.push(tokens[j+2].value);
+ }
+ return out;
+}
+
+// Reject unresolved dependencies in the exact deployed target tree, including
+// transitive imports; no mutation, scripts or runtime imports occur here.
+// The runtime entry and operation dispatcher must remain import-complete even
+// when the exact approved change only touches config or an unrelated adapter.
+// Verify against the approved target tree, never against current main.
+export function controllerImportScanRoots(changedPaths){
+ if(!Array.isArray(changedPaths)||changedPaths.some(p=>typeof p!=='string'))
+  throw Object.assign(Error('CONTROLLER_IMPORT_INPUT_INVALID'),{code:'CONTROLLER_IMPORT_INPUT_INVALID'});
+ return [...new Set(['controller/entry.mjs','controller/operations.mjs',
+  ...changedPaths.filter(p=>p.startsWith('controller/')&&p.endsWith('.mjs'))])];
+}
+
+export function validateControllerImportClosure(paths,changedPaths,readSource){
+ if(!Array.isArray(paths)||!Array.isArray(changedPaths)||typeof readSource!=='function')
+  throw Object.assign(Error('CONTROLLER_IMPORT_INPUT_INVALID'),{code:'CONTROLLER_IMPORT_INPUT_INVALID'});
+ const files=new Set(paths),pending=changedPaths.filter(p=>p.startsWith('controller/')&&p.endsWith('.mjs'));
+ const seen=new Set();
+ while(pending.length){
+  const current=pending.pop();if(seen.has(current))continue;seen.add(current);
+  if(!files.has(current))throw Object.assign(Error('CONTROLLER_IMPORT_MISSING'),{code:'CONTROLLER_IMPORT_MISSING'});
+  const source=readSource(current);
+  for(const spec of controllerModuleSpecifiers(source)){
+   if(!spec.startsWith('.'))continue;
+   const resolved=path.posix.normalize(path.posix.join(path.posix.dirname(current),spec));
+   if(!resolved.startsWith('controller/')||!files.has(resolved))
+    throw Object.assign(Error('CONTROLLER_IMPORT_MISSING'),{code:'CONTROLLER_IMPORT_MISSING'});
+   if(resolved.endsWith('.mjs')&&!seen.has(resolved))pending.push(resolved);
+  }
+ }
+ return {status:'VERIFIED',checkedModules:seen.size};
+}
+
 export function validateControllerOnlyInstallDelta(paths,allowFiles){
  if(!Array.isArray(paths)||!Array.isArray(allowFiles)||
   paths.some(p=>typeof p!=='string'||p.includes('..')))
@@ -739,3 +883,57 @@ export function transitionLedger(ledger,event,evidence={}){
   throw Error("UPDATE_TRANSITION_NOT_ALLOWED");
 }
 
+
+// Terminal execution evidence shared by normal update and independent recovery.
+const PC_REPO='ansqhd5774-Choi/zgmini-pc-control';
+const POSTCHECK_STEP='Execute fixed host allowlist entry';
+export function validateConfirmedPostcheckFailure({original,manifest,approval,issue,run,job}={}){
+ const spec=approval?.confirmedPostcheckFailure;
+ const keys=['issueNumber','runId','jobId','runnerName'];
+ if(!spec||typeof spec!=='object'||Array.isArray(spec)||
+    Object.keys(spec).sort().join('|')!==keys.sort().join('|')||
+    !Number.isSafeInteger(spec.issueNumber)||spec.issueNumber<1||
+    !Number.isSafeInteger(spec.runId)||spec.runId<1||
+    !Number.isSafeInteger(spec.jobId)||spec.jobId<1||
+    !/^zgmini-pc-0[1-6]$/.test(spec.runnerName??''))
+   return false;
+ if(original?.status!=='RECOVERY_REQUIRED'||original.firstFail!=='POSTCHECK_PENDING'||
+    original.postIssueNumber!==spec.issueNumber||
+    !/^pc-update-[0-9a-f-]{36}$/.test(original.requestId??'')||
+    !/^[0-9a-f]{40}$/.test(original.targetSha??'')||
+    !manifest||typeof manifest!=='object')
+   return false;
+ const title='PC Update '+original.requestId+' postcheck';
+ let body;try{body=JSON.parse(issue?.body??'');}catch{return false;}
+ if(issue?.number!==spec.issueNumber||issue.title!==title||
+    issue.user?.login!=='ansqhd5774-Choi'||
+    !issue.labels?.some(x=>x.name==='pc-job')||
+    body.schema!=='ZGMINI_PC_JOB_V1'||
+    body.requestId!==original.requestId+'-postcheck'||
+    body.operation!==manifest.postOperation||
+    body.sourceRepository!=='ansqhd5774-Choi/zgmini'||
+    body.sourceBranch!==manifest.postSourceBranch||
+    body.sourceSha!==manifest.postSourceSha)return false;
+ const issued=Date.parse(issue.created_at??''),started=Date.parse(run?.created_at??'');
+ if(!Number.isFinite(issued)||!Number.isFinite(started)||
+    started<issued||started-issued>900000)return false;
+ if(run?.id!==spec.runId||run.event!=='issues'||run.status!=='completed'||
+    run.conclusion!=='failure'||run.display_title!==title||
+    job?.id!==spec.jobId||job.run_id!==spec.runId||
+    job.status!=='completed'||job.conclusion!=='failure'||
+    job.runner_name!==spec.runnerName||job.name!=='approved-pc-job')return false;
+ const steps=job.steps?.filter(x=>x.name===POSTCHECK_STEP);
+ return Array.isArray(steps)&&steps.length===1&&
+    steps[0].status==='completed'&&steps[0].conclusion==='failure';
+}
+
+export function verifiedRunningPostcheckFailure({ledger,manifest,issue,run,job}={}){
+ if(ledger?.status!=='RUNNING'||ledger.phase!=='POSTCHECK_PENDING'||
+    ledger.postIssueNumber!==issue?.number)return false;
+ // Adapt the already verified active phase to the same strict evidence predicate;
+ // this does not change a stored ledger, create approval, or execute rollback.
+ return validateConfirmedPostcheckFailure({
+  original:{...ledger,status:'RECOVERY_REQUIRED',firstFail:'POSTCHECK_PENDING'},
+  manifest,approval:{confirmedPostcheckFailure:{issueNumber:issue.number,
+   runId:run?.id,jobId:job?.id,runnerName:job?.runner_name}},issue,run,job});
+}

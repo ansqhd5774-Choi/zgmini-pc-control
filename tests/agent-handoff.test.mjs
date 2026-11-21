@@ -103,7 +103,7 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   expectConflictPosts = null, existingBotReceipt = null,
   expectReceiptError = null, previousIssues = [], expectedDuplicate = false,
   issueState = 'open', closeBeforeComment = false, closeOnComment = false,
-  expectedClosedPosts = null} = {}) {
+  expectedClosedPosts = null, unrelatedCommentCount = 0} = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zgmini-handoff-test-'));
   const eventPath = path.join(tmp, 'event.json');
   const issueTitle = 'agent-handoff handoff-123456789abc';
@@ -132,6 +132,8 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
   ].join('\n');
   const pushBot = body => comments.push({
     user:{login:'github-actions[bot]'},issue_url:issueUrl,body});
+  for(let i=0;i<unrelatedCommentCount;i++) comments.push({
+    user:{login:'reader'},issue_url:issueUrl,body:'unrelated comment '+i});
   if (existingBotReceipt === 'duplicate-exact') {
     pushBot(expectedReceipt);pushBot(expectedReceipt);
   } else if (existingBotReceipt === 'conflicting-route') {
@@ -150,10 +152,13 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
     const method = request.method ?? 'GET';
     const uri = new URL(url);
     let value;
-    if (uri.pathname.endsWith('/issues') && method === 'GET') value = previousIssues;
+    if (uri.pathname === '/search/issues' && method === 'GET') value = {
+      incomplete_results:false,total_count:previousIssues.length,items:previousIssues};
+    else if (uri.pathname.endsWith('/issues') && method === 'GET') value = previousIssues;
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'GET') {
       if (closeBeforeComment) currentIssueState = 'closed';
-      value = comments;
+      const page=Number(uri.searchParams.get('page')||1);
+      value = comments.slice((page-1)*100,page*100);
     }
     else if (uri.pathname.endsWith('/issues/2001/comments') && method === 'POST') {
       posts.push('comment');
@@ -207,7 +212,8 @@ async function simulateBroker({untrustedActor = false, loseComment = false,
       await runIssueBroker(env);
       const targetLabel = expectedDuplicate ? 'handoff-duplicate' : 'handoff-agent-pending';
       assert.deepEqual(posts, ['comment', ...(existingLabels.includes(targetLabel) ? [] : ['label'])]);
-      assert.equal(comments.length, forgedPartialReceipt || existingBotReceipt === 'unrelated-human' ? 2 : 1);
+      assert.equal(comments.length, unrelatedCommentCount +
+        (forgedPartialReceipt || existingBotReceipt === 'unrelated-human' ? 2 : 1));
     }
   } finally {
     globalThis.fetch = previousFetch;
@@ -316,4 +322,17 @@ test('owner broker stops if closure occurs while scanning route receipts',async(
 
 test('owner broker never posts a pending label if Incident closes after route receipt',async()=>{
   await simulateBroker({closeOnComment:true,expectedClosedPosts:['comment']});
+});
+
+test('owner intake queries only the matching request and does not scan 500 unrelated incidents',async()=>{
+  await simulateBroker({previousIssues:[]});
+});
+
+test('009 routes owner Incident with 405 unrelated comments without 400-row cutoff',async()=>{
+  await simulateBroker({unrelatedCommentCount:405});
+});
+test('009 still rejects conflicting route receipt past the fourth page',async()=>{
+  await simulateBroker({unrelatedCommentCount:405,
+    existingBotReceipt:'conflicting-route',
+    expectReceiptError:'HANDOFF_COMMENT_CONFLICT_STOP'});
 });

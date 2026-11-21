@@ -7,14 +7,17 @@ on:
 permissions:
   contents: read
   issues: write
-concurrency:
-  group: agent-handoff-${{ github.event.issue.number }}
-  cancel-in-progress: false
 jobs:
   route-sanitized-incident:
+    concurrency:
+      group: agent-handoff-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
     # Opt-in only. Keep the existing pc-job / Controller path untouched.
     if: >-
       github.event_name == 'issues' &&
+      (github.event.action == 'opened' ||
+       (github.event.action == 'labeled' && github.event.label.name == 'agent-handoff')) &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
       github.actor == 'ansqhd5774-Choi' &&
@@ -37,6 +40,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/issue-broker.mjs
   record-verified-return:
+    concurrency:
+      group: agent-handoff-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       issues: write
@@ -49,8 +56,8 @@ jobs:
       github.actor == 'ansqhd5774-Choi' &&
       github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'agent-handoff') &&
-      (startsWith(github.event.comment.body, '{"schema":"ZGMINI_AGENT_HANDOFF_RESULT_V1"') ||
-       startsWith(github.event.comment.body, '{"schema":"ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1"')) &&
+      (contains(github.event.comment.body, 'ZGMINI_AGENT_HANDOFF_RESULT_V1') ||
+       contains(github.event.comment.body, 'ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1')) &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 3
@@ -69,6 +76,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node agent-handoff/result-entry.mjs
   record-work-progress:
+    concurrency:
+      group: agent-handoff-${{ github.event.issue.number }}
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       issues: write
@@ -80,7 +91,7 @@ jobs:
       github.event.issue.pull_request == null &&
       contains(github.event.issue.labels.*.name, 'agent-handoff') &&
       contains(github.event.issue.labels.*.name, 'handoff-agent-pending') &&
-      startsWith(github.event.comment.body, '{"schema":"ZGMINI_HANDOFF_WORK_UPDATE_V1"') &&
+      contains(github.event.comment.body, 'ZGMINI_HANDOFF_WORK_UPDATE_V1') &&
       vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 3

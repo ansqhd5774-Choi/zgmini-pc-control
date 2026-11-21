@@ -1,0 +1,243 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44869316745-1-seat-1",
+  "requestId": "pc-64b1897f-0e1a-4e91-a205-cbcb9dc64975",
+  "startedAt": "2026-11-21T05:07:10.291Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "24f1139b97712b2e1383650a78f65877f9d1ae67",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "29b5e7296ee780a312a36c12ec3fe958a5c13ab3",
+  "sourceBranch": "main",
+  "operation": "inflation19-runtime-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "INFL19_RUNTIME_READONLY_EVIDENCE",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w01-writer-readback-after-controller-recovery-20261121",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "INFL19_RUNTIME_READONLY_EVIDENCE",
+    "operationalReadiness": "NOT_ASSERTED",
+    "cycle": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-21T04:58:22.139Z",
+      "cycleStatus": "COMPLETE",
+      "cycleAt": "2026-11-21T04:58:22.138Z",
+      "collectionExit": 0,
+      "publicationExit": 0,
+      "status": "NO_VERIFIED_RELEASE_DUE",
+      "providerRequests": 0,
+      "byGroup": {
+        "bls8": {
+          "outcome": "SKIPPED"
+        },
+        "electricity": {
+          "outcome": "SKIPPED"
+        },
+        "sce": {
+          "outcome": "SKIPPED"
+        },
+        "gas": {
+          "outcome": "SKIPPED"
+        }
+      }
+    },
+    "checkpoint": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-21T00:05:40.236Z",
+      "byGroup": {
+        "bls8": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "electricity": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "sce": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "gas": {
+          "processedEvent": "2026-11-21",
+          "attemptedEvent": "2026-11-21",
+          "attemptedAt": "2026-11-21T00:05:39.431Z"
+        }
+      }
+    },
+    "writer": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-21T05:04:38.279Z",
+      "writerAt": "2026-11-21T05:01:37.821Z",
+      "writerStatus": "VERIFIED",
+      "status": "SKIPPED_METADATA_ONLY",
+      "inflationFailure": null,
+      "readyCount": 19,
+      "d1Writes": 0,
+      "sourceStoredAt": null,
+      "sourceVersion": null
+    },
+    "projection": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-19T00:07:21.130Z",
+      "stagingOnly": true,
+      "readyCount": 19,
+      "sourceStoredAt": 1795046728605,
+      "sourceVersion": "INFL19_PRESENTATION_3e5a3fced8b2f6875a5a822ee322064b3d77420f352dac8ddd817d4534f6cd2e",
+      "perId": [
+        {
+          "id": "1",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-04T21:25:06.490Z"
+        },
+        {
+          "id": "3",
+          "status": "READY",
+          "observationDate": "2026-11-17",
+          "sourceStoredAt": "2026-11-19T00:05:28.605Z"
+        },
+        {
+          "id": "4",
+          "status": "READY",
+          "observationDate": "2026-08",
+          "sourceStoredAt": "2026-11-04T06:25:37.684Z"
+        },
+        {
+          "id": "5",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "6",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "7",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "8",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "9",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "10",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "11",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "12",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-06T16:50:07.364Z"
+        },
+        {
+          "id": "13",
+          "status": "READY",
+          "observationDate": "2026-07-01",
+          "sourceStoredAt": "2026-10-30T13:30:04.561Z"
+        },
+        {
+          "id": "14",
+          "status": "READY",
+          "observationDate": "2026-07-01",
+          "sourceStoredAt": "2026-11-05T17:50:37.578Z"
+        },
+        {
+          "id": "18",
+          "status": "READY",
+          "observationDate": "2026-11-13",
+          "sourceStoredAt": "2026-11-18T23:25:25.857Z"
+        },
+        {
+          "id": "19",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-17T13:50:15.288Z"
+        },
+        {
+          "id": "21",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-18T10:33:45.736Z"
+        },
+        {
+          "id": "25",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "26",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-18T10:33:45.732Z"
+        },
+        {
+          "id": "31",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T04:41:52.103Z"
+        }
+      ]
+    },
+    "inflation7Writer": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-21T05:04:38.279Z",
+      "writerAt": "2026-11-21T05:01:37.821Z",
+      "writerStatus": "VERIFIED",
+      "status": "UNCHANGED_VERIFIED",
+      "key": null,
+      "sourceVersion": null,
+      "sourceStoredAt": null,
+      "readyCount": 6,
+      "d1Writes": 0,
+      "evidenceScope": "LOCAL_WRITER_LEDGER_ONLY_NOT_LIVE_D1",
+      "verifiedAtWriterTime": false,
+      "d1NowVerified": false
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "a07df3b7a15885cc182121e3321733489f696c3c9e7549f1cf69e0965d8b7d62",
+  "protectedAfterSha256": "a07df3b7a15885cc182121e3321733489f696c3c9e7549f1cf69e0965d8b7d62",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "24f1139b97712b2e1383650a78f65877f9d1ae67",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-21T05:07:18.506Z",
+  "durationMs": 8215
+}

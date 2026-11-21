@@ -20,6 +20,48 @@ const TASK='ZGMINI-PC-GetMarketHistory-ETF';
 // A one-file, one-version source inspection approved for the R181 STOP
 // investigation. Unexpected PC source bytes are never inspected or echoed.
 const APPROVED_R181_SHA='be0303b112d6f4471137aa134bf98f696a8a8dfe60d1d13502646c5e0b509d62';
+// Past observed L7 publisher SHA: not a live-process or publication authorization.
+const APPROVED_R179_SHA='f9ea0a1bfaf52909b7a434b65ba93887f56660bc979a3cb7e0992597bc9f3b68';
+// Strip comments and all quoted/template bodies; only fixed booleans leave PC.
+export function safeR179R178Wiring(source,{sourcePinned=false}={}){
+ const unknown={status:'SOURCE_NOT_ATTESTED',evidenceLevel:'STATIC_SOURCE_ONLY_NOT_RUNTIME',
+  directR178Call:'NOT_INSPECTED',approvalInputs:'NOT_INSPECTED'};
+ if(sourcePinned!==true||typeof source!=='string'||
+  Buffer.byteLength(source,'utf8')>262144||source.includes('\0'))return unknown;
+ const tokens=[];let state='CODE',quote='',escaped=false;
+ for(let i=0;i<source.length;i++){
+  const c=source[i],next=source[i+1]??'';
+  if(state==='LINE'){if(c==='\n')state='CODE';continue;}
+  if(state==='BLOCK'){if(c==='*'&&next==='/'){state='CODE';i++;}continue;}
+  if(state==='STRING'){
+   if(escaped){escaped=false;continue;}
+   if(c==='\\'){escaped=true;continue;}
+   if(c===quote)state='CODE';
+   continue;
+  }
+  if(c==='/'&&next==='/'){state='LINE';i++;continue;}
+  if(c==='/'&&next==='*'){state='BLOCK';i++;continue;}
+  if(c==='"'||c==="'"||c===String.fromCharCode(96)){
+   state='STRING';quote=c;escaped=false;continue;
+  }
+  if(/[A-Za-z_$]/.test(c)){
+   let j=i+1;while(j<source.length&&/[A-Za-z0-9_$]/.test(source[j]))j++;
+   const name=source.slice(i,j);
+   tokens.push(['runApprovedGmhSevenR178FromPcWriter','approvedRecord',
+    'verifyApprovedEffect'].includes(name)?name:'OTHER');
+   i=j-1;continue;
+  }
+  if(c==='(')tokens.push('(');
+ }
+ const call=tokens.some((x,i)=>x==='runApprovedGmhSevenR178FromPcWriter'&&
+  tokens[i+1]==='(');
+ const approval=tokens.includes('approvedRecord')&&tokens.includes('verifyApprovedEffect');
+ return {status:'STATIC_PINNED_SOURCE_INSPECTED',
+  evidenceLevel:'STATIC_SOURCE_ONLY_NOT_RUNTIME',
+  directR178Call:call?'DIRECT_CALL_SYNTAX_PRESENT':'DIRECT_CALL_SYNTAX_NOT_SEEN',
+  approvalInputs:approval?'BOTH_IDENTIFIERS_SEEN':'BINDINGS_NOT_ESTABLISHED'};
+}
+
 const STAMP_FIELDS=['startedAt','finishedAt','sourceStoredAt','publishedAt',
  'updatedAt','lastRunAt'];
 const DATE_FIELDS=['observationDate','latestCommonDate','confirmedThrough',
@@ -400,6 +442,8 @@ function sourceState(base,name){
  const digest=sha(bytes);
  const result={present:true,sha256:digest,bytes:entry.bytes,
   modifiedAt:entry.modifiedAt};
+ if(name===SOURCE_NAMES[1])result.r178Wiring=safeR179R178Wiring(
+  bytes.toString('utf8'),{sourcePinned:digest===APPROVED_R179_SHA});
  if(name===SOURCE_NAMES[0]){
   result.safeSourceInspection=digest===APPROVED_R181_SHA&&bytes.length<=8192?
    safeR181SourceStructure(bytes.toString('utf8')):

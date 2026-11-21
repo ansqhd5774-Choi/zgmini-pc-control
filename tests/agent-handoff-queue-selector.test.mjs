@@ -1,9 +1,10 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {fingerprintHandoff, parseHandoff, routeHandoff} from '../agent-handoff/contract.mjs';
 import {assessIncident, selectionReceipt, processQueue, SELECTION_MARKER,
   HANDOFF_BOT, HANDOFF_REPOSITORY} from '../agent-handoff/queue-selector.mjs';
-import {validateTrigger, finalizeSelection, isolateInitialCommentRead} from '../agent-handoff/queue-dispatcher.mjs';
+import {validateTrigger, finalizeSelection, isolateInitialCommentRead, pages} from '../agent-handoff/queue-dispatcher.mjs';
 
 const owner = 'ansqhd5774-Choi';
 function fixture(n=2001) {
@@ -280,4 +281,37 @@ test('repository auth failure and post-write readback remain hard stop',async()=
   }),/post-write proof not readable/);
   assert.equal(posts,1);
   assert.deepEqual(deferredReads,[]);
+});
+
+test('001 candidate pagination processes 600 open candidates without 500-row gate',async()=>{
+ const data=Array.from({length:600},(_,i)=>({number:i+1}));
+ const seen=[];
+ const rows=await pages('issues?state=open',100,async resource=>{
+  const page=Number(resource.split('page=').at(-1));
+  seen.push(page);return data.slice((page-1)*100,page*100);
+ });
+ assert.equal(rows.length,600);
+ assert.deepEqual(seen,[1,2,3,4,5,6,7]);
+});
+test('001 exact 500-row boundary no longer becomes incomplete inventory',async()=>{
+ const data=Array.from({length:500},(_,i)=>({number:i+1}));
+ const rows=await pages('issues',5,async resource=>{
+  const page=Number(resource.split('page=').at(-1));
+  return data.slice((page-1)*100,page*100);
+ });
+ assert.equal(rows.length,500);
+});
+test('001 activation matches 009 and 006 without adding a global queue',()=>{
+ const read=n=>readFileSync(new URL('../.github/workflows/'+n,import.meta.url),'utf8').replace(/\r\n/g,'\n');
+ const selector=read('agent-handoff-candidate-selector.yml');
+ assert.ok(selector.includes("vars.ZGMINI_AGENT_HANDOFF_ENABLED == 'true'"));
+ assert.ok(!selector.startsWith('concurrency:')&&!selector.includes('\nconcurrency:\n'));
+ assert.ok(selector.includes("verify-and-select-candidates:\n    concurrency:"));
+ assert.ok(selector.includes('queue: max'));
+ const intake=read('agent-handoff.yml');
+ assert.ok(!intake.includes('startsWith(github.event.comment.body'));
+ for(const name of ['ZGMINI_AGENT_HANDOFF_RESULT_V1',
+  'ZGMINI_AGENT_HANDOFF_DIAGNOSIS_V1','ZGMINI_HANDOFF_WORK_UPDATE_V1'])
+   assert.ok(intake.includes("contains(github.event.comment.body, '"+name+"'"));
+
 });

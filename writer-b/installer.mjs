@@ -224,6 +224,13 @@ export async function performWriterBInstall(auth,io){
   }else{
    try{
     if(configMayHaveChanged||sourceMayHaveChanged){
+     // A failure can occur after Core was resumed. Reacquire the same approved
+     // maintenance window before restoring source; never terminate active work.
+     if(typeof io.prepareRollback==='function'){
+      taskMayHaveChanged=true;
+      await io.prepareRollback(before,prepared);
+      await io.waitForCoreDrain(before);
+     }
      await io.assertCoreQuiet();
      if(configMayHaveChanged)await io.restoreOriginalConfig(before,prepared);
      if(sourceMayHaveChanged)await io.restoreOriginalSource(before,prepared);
@@ -234,9 +241,10 @@ export async function performWriterBInstall(auth,io){
       requestId:auth.requestId,recovery:'ORIGINAL_VERIFIED',
       ...(safeWriterBIdleObservation(error)?
        {idleObservation:safeWriterBIdleObservation(error)}:{})};
-   }catch{
+   }catch(rollbackError){
     retain=true;
     result={status:'WRITER_B_RECOVERY_REQUIRED',code,
+      rollbackFailureCode:publicErrorCode(rollbackError,'WRITER_B_ROLLBACK_UNVERIFIED'),
       requestId:auth.requestId,recovery:'RECONCILE_EXACT_REQUEST_NO_RETRY'};
    }
   }

@@ -1,0 +1,30 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "3a9d1933-3585-44ba-8c5a-0e04bc057319",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "7a73ed450d06ba98425defc4096576cdae42a17b",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "7965b337cf69a6d48cb152b1594833d64266a677",
+  "candidateSourceSha": "d38f9d9e3b739090e813196344da40b6f77814de",
+  "manifestSha256": "0ea2d1d48f23f65f561d4d1fb0d7ded7a08246ca052ec28a57f9e1587e78ed2a",
+  "baseTreeOid": "17c6ede08ac105722cb06d1e8409090f8196fbbc",
+  "preparedTreeOid": "006037696f23bc6625d208fa40e188bcffcd8682",
+  "provenanceSha256": "c9a413fae166e41a86a959974a37004c627614e2c48c67e79df2d99601e16c2f",
+  "runId": "44755956858",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/theme-paid-hourly-source.mjs",
+    "scripts/pc-writer/theme-paid-registry.mjs",
+    "scripts/pc-writer/theme-paid-calculate.mjs",
+    "scripts/pc-writer/theme-paid-cycle.mjs",
+    "scripts/pc-writer/theme-r25-pure.mjs",
+    "scripts/pc-writer/theme-r32-pure.mjs",
+    "scripts/pc-writer/theme-space-basket-pure.mjs",
+    "scripts/pc-writer/theme-optional-adaptive-r2.mjs",
+    "scripts/pc-writer/theme-optional-pair-weight-r3.mjs",
+    "worker/theme-paid-contract.mjs",
+    "scripts/pc-writer/local-cycle.mjs"
+  ]
+}

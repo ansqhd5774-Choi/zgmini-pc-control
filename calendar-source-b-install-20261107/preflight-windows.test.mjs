@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {parseCoreTaskAction,summarizeVbsCalls,issueAuth} from './preflight-windows.mjs';
 const xml=(command,args)=>`<?xml version="1.0"?><Task><Actions><Exec>
@@ -146,4 +147,8 @@ test('even strict literal VBS candidate is diagnostic-only; conditional is weake
   assert.equal(e.diagnostic.strictStaticChainCandidate,false);
   return true;
  });
+});
+
+test('022 retired historical preflight Issue intake without loosening static VBS safety',()=>{
+ assert.equal(existsSync(new URL('../.github/workflows/pc-calendar-source-preflight-once.yml',import.meta.url)),false);
 });

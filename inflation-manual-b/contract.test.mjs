@@ -1,8 +1,10 @@
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {
  APPROVAL_SCHEMA_V2,DATA_ROOT,MAX_BYTES,SOURCE_POLICY_V2,TARGETS,
  V2_EXECUTABLE_SHA256,V2_EXECUTABLE_SHA256_EXISTING,
+ V2_EXECUTABLE_SHA256_CORE_2515,
  authorizeManualReceiver,assertAuthorizedManualReceiver,
  sha256,validateApprovalManifest,verifiedPinnedManifestBytes,
 } from './contract.mjs';
@@ -152,7 +154,7 @@ test('V2 rejects exact-shape but newly signed arbitrary executable hash',()=>{
  assert.equal(validateApprovalManifest(v1),v1);
 });
 
-test('V2 accepts only the two exact scoped four-file closures',()=>{
+test('V2 accepts only approved historic and exact installed candidate closures',()=>{
  const p=manifest();
  const v2={...p,schema:APPROVAL_SCHEMA_V2,
   sourcePolicy:SOURCE_POLICY_V2,
@@ -170,4 +172,88 @@ test('V2 accepts only the two exact scoped four-file closures',()=>{
  const nonParserDrift=structuredClone(corrected);
  nonParserDrift.sourceFiles[0].sha256='e'.repeat(64);
  code(()=>validateApprovalManifest(nonParserDrift),'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
+});
+
+test('W01 #2515 Core-only V2 candidate exactly matches prior official files and installed B receipt',()=>{
+ const original=manifest();
+ const fixture={...original,schema:APPROVAL_SCHEMA_V2,
+  sourcePolicy:SOURCE_POLICY_V2,
+  sourceFiles:original.sourceFiles.map((row,i)=>({...row,
+   sha256:V2_EXECUTABLE_SHA256_CORE_2515[i]}))};
+ delete fixture.sourceSha;
+ assert.equal(validateApprovalManifest(fixture),fixture);
+ const install=JSON.parse(fs.readFileSync(new URL(
+  '../approvals/writer-updates/paid-breadth-b1-r5-20261121.json',
+  import.meta.url),'utf8'));
+ const installedCore=install.files.filter(x=>
+  x.path==='scripts/pc-writer/local-cycle.mjs');
+ assert.equal(installedCore.length,1);
+ assert.equal(installedCore[0].afterSha256,V2_EXECUTABLE_SHA256_CORE_2515[3]);
+ assert.deepEqual(V2_EXECUTABLE_SHA256_CORE_2515.slice(0,3),
+  V2_EXECUTABLE_SHA256_EXISTING.slice(0,3));
+ assert.notEqual(V2_EXECUTABLE_SHA256_CORE_2515[3],
+  V2_EXECUTABLE_SHA256_EXISTING[3]);
+ assert.deepEqual(fixture.sourceFiles.map(x=>x.path),
+  original.sourceFiles.map(x=>x.path));
+ assert.deepEqual(fixture.providerUrls,original.providerUrls);
+ assert.deepEqual(fixture.targetFiles,original.targetFiles);
+ assert.equal(fixture.allowSourceChanges,false);
+ assert.equal(fixture.allowTaskChanges,false);
+ assert.equal(fixture.runCount,1);
+ for(const changed of [
+  m=>{m.sourceFiles[0].sha256='f'.repeat(64);},
+  m=>{m.sourceFiles[2].sha256=V2_EXECUTABLE_SHA256[2];},
+  m=>{m.sourceFiles[3].sha256='f'.repeat(64);},
+ ]){
+  const candidate=structuredClone(fixture);changed(candidate);
+  code(()=>validateApprovalManifest(candidate),
+   'INFL_MANUAL_B_SOURCE_CLOSURE_STOP');
+ }
+});
+
+test('W01 exact V2 source admission simulation: 3 valid and 13 adversarial scenarios',()=>{
+ const m=(closure=V2_EXECUTABLE_SHA256_CORE_2515)=>{
+  const p=manifest();
+  const v={...p,schema:APPROVAL_SCHEMA_V2,
+   sourcePolicy:SOURCE_POLICY_V2,
+   sourceFiles:p.sourceFiles.map((row,i)=>({...row,sha256:closure[i]}))};
+  delete v.sourceSha;
+  return v;
+ };
+ const scenarios=[
+  ['original W01 approved existing source',V2_EXECUTABLE_SHA256_EXISTING,null,true],
+  ['original W01 approved fixed XLSX source',V2_EXECUTABLE_SHA256,null,true],
+  ['installed #2515 Core exact source',V2_EXECUTABLE_SHA256_CORE_2515,null,true],
+  ['unexpected first collector bytes',null,v=>{v.sourceFiles[0].sha256='a'.repeat(64)},false],
+  ['unexpected store bytes',null,v=>{v.sourceFiles[1].sha256='a'.repeat(64)},false],
+  ['unexpected XLSX parser bytes',null,v=>{v.sourceFiles[2].sha256='a'.repeat(64)},false],
+  ['unexpected Core bytes',null,v=>{v.sourceFiles[3].sha256='a'.repeat(64)},false],
+  ['corrected parser plus installed Core mixed profile',null,v=>{
+   v.sourceFiles[2].sha256=V2_EXECUTABLE_SHA256[2]},false],
+  ['extra provider URL',null,v=>{v.providerUrls.unapproved='https://example.org/'},false],
+  ['redirect output to foreign path',null,v=>{v.targetFiles.census='C:/unapproved.json'},false],
+  ['unapproved task changes',null,v=>{v.allowTaskChanges=true},false],
+  ['unapproved source changes',null,v=>{v.allowSourceChanges=true},false],
+  ['two executions',null,v=>{v.runCount=2},false],
+  ['changed lock contract',null,v=>{v.coreLeaseMode='NONE'},false],
+  ['unapproved source policy',null,v=>{v.sourcePolicy='ANY_HEAD'},false],
+  ['extra unrestricted manifest field',null,v=>{v.operatorOverride=true},false],
+ ];
+ let accept=0,reject=0;
+ for(const [description,pinned,change,expected] of scenarios){
+  const v=m(pinned??V2_EXECUTABLE_SHA256_CORE_2515);
+  change?.(v);
+  if(expected){
+   assert.equal(validateApprovalManifest(v),v,description);
+   accept++;
+  }else{
+   assert.throws(()=>validateApprovalManifest(v),undefined,description);
+   reject++;
+  }
+ }
+ assert.equal(scenarios.length,16);
+ assert.equal(accept,3);
+ assert.equal(reject,13);
+ // This is an exact SOURCE CONTRACT simulation, not a success probability
+ // for the still-unverified Core owner, Writer B or public dataset.
 });

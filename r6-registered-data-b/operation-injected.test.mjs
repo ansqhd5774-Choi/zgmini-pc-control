@@ -32,17 +32,17 @@ function inject({lockOccupied=false,claimError=null,runError=null,
 test('D1 read preflight precedes single collect/publish and releases lock',async()=>{
  const f=inject();
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
  assert.equal(result.status,'SUCCESS');
  assert.equal(result.code,'R6_B_COLLECT_PUBLISH_VERIFIED');
  assert.equal(result.lastPass,'PUBLISH_READBACK');
  assert.equal(result.firstFail,null);
 });
 
-test('active Core lock: no claim, network or SQLite operation',async()=>{
+test('occupied Core lock: read-only D1 probe, no claim/provider or SQLite operation',async()=>{
  const f=inject({lockOccupied:true});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK']);
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'R6_B_CORE_LOCK_OCCUPIED');
  assert.equal(result.firstFail,'PREFLIGHT');
@@ -53,7 +53,7 @@ test('duplicate request claim: no provider work and lock released',async()=>{
   {code:'R6_B_REQUEST_ALREADY_CLAIMED'});
  const f=inject({claimError});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','UNLOCK']);
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'R6_B_REQUEST_ALREADY_CLAIMED');
  assert.equal(result.firstFail,'PREFLIGHT');
@@ -64,7 +64,7 @@ test('post-claim provider or D1 failure stays STATE_UNKNOWN; never auto retries'
   {code:'D1_PUBLICATION_READBACK_MISMATCH'});
  const f=inject({runError});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
  assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.firstFail,'COLLECT_OR_PUBLISH');
  assert.equal(result.lastPass,'ONE_SHOT_CLAIMED');
@@ -87,7 +87,7 @@ test('source mismatch preflight: prevents lock, claim and run',async()=>{
 test('Core lock release unverified downgrades apparent success without deleting lock',async()=>{
  const f=inject({releaseFails:true});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
  assert.equal(result.status,'STATE_UNKNOWN');
  assert.equal(result.code,'R6_B_CORE_LOCK_RELEASE_UNVERIFIED');
  assert.equal(result.firstFail,'CORE_LOCK_RELEASE');
@@ -95,12 +95,12 @@ test('Core lock release unverified downgrades apparent success without deleting 
  assert.notEqual(result.status,'SUCCESS');
 });
 
-test('D1 read authorization failure leaves claim and provider untouched',async()=>{
+test('D1 read authorization failure never holds Core lock or executes provider',async()=>{
  const probeError=Object.assign(new Error('R6_B_D1_AUTH_UNAVAILABLE'),
   {code:'R6_B_D1_AUTH_UNAVAILABLE'});
  const f=inject({probeError});
  const result=await performR6RegisteredOnce({auth,...f});
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ']);
  assert.equal(result.status,'BLOCKED');
  assert.equal(result.code,'R6_B_D1_AUTH_UNAVAILABLE');
  assert.equal(result.lastPass,'REGISTERED_KEY_PRESENT');
@@ -150,8 +150,9 @@ test('bounded Core lock: five-minute exhaustion remains BLOCKED with zero claim/
  assert.equal(attempt,61);
  assert.equal(waits.length,60);
  assert.deepEqual(waits,Array(60).fill(5_000));
- assert.ok(!f.calls.includes('D1_READ')&&!f.calls.includes('CLAIM')&&
-  !f.calls.includes('RUN')&&!f.calls.includes('UNLOCK'));
+ assert.equal(f.calls.filter(x=>x==='D1_READ').length,1);
+ assert.ok(!f.calls.includes('CLAIM')&&!f.calls.includes('RUN')&&
+  !f.calls.includes('UNLOCK'));
 });
 
 test('bounded Core lock: delayed timer cannot acquire after five-minute deadline',async()=>{
@@ -200,7 +201,7 @@ test('bounded Core lock: ownership UNKNOWN stops immediately, never claiming',as
  assert.equal(result.code,'R6_B_CORE_LOCK_UNKNOWN');
  assert.equal(result.firstFail,'PREFLIGHT');
  assert.equal(calls,0);
- assert.deepEqual(f.calls,['VERIFY','LOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK']);
 });
 
 
@@ -258,7 +259,7 @@ test('PIT-06-06 NOOP retains an explicit no-publication checkpoint',async()=>{
   sqlite:'UNCHANGED',providerRequests:0,blsRequests:0,dolRequests:0,groupResults:[],
  };};
  const report=await performR6RegisteredOnce({auth,...f,run});
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
  assert.equal(report.status,'NOOP');
  assert.equal(report.lastPass,'ONE_SHOT_CLAIMED');
  assert.equal(report.publication,'NOT_ATTEMPTED');
@@ -275,7 +276,7 @@ test('PIT-06-06 an absent or unverified post-claim result never claims success o
   const f=inject();
   const run=async()=>{f.calls.push('RUN');return returned;};
   const report=await performR6RegisteredOnce({auth,...f,run});
-  assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+  assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
   assert.equal(report.status,'STATE_UNKNOWN');
   assert.equal(report.code,'R6_B_RUN_RESULT_UNVERIFIED');
   assert.equal(report.lastPass,'ONE_SHOT_CLAIMED');
@@ -291,7 +292,7 @@ test('PIT-06-06 persist-then-throw claim is ambiguous and never retried',async()
    {code:'R6_B_CLAIM_STATE_UNKNOWN'});};
  const report=await performR6RegisteredOnce({auth,...f,claim});
  assert.deepEqual(durable,['CLAIM_MAY_HAVE_REACHED_DISK']);
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','UNLOCK']);
  assert.equal(report.status,'STATE_UNKNOWN');
  assert.equal(report.code,'R6_B_CLAIM_STATE_UNKNOWN');
  assert.equal(report.firstFail,'PREFLIGHT');
@@ -313,5 +314,40 @@ test('PIT-06-06 verified PARTIAL publication never upgrades missing groups to SU
  assert.equal(report.lastPass,'PUBLISH_READBACK');
  assert.equal(report.firstFail,null);
  assert.equal(report.publication,'VERIFIED');
- assert.deepEqual(f.calls,['VERIFY','LOCK','D1_READ','CLAIM','RUN','UNLOCK']);
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
+});
+
+test('D1 target drift during Core lock wait blocks before claim',async()=>{
+ const f=inject();let n=0;
+ const verifyOverlay=()=>{f.calls.push('VERIFY');return {core:++n===1?'a':'b'};};
+ const result=await performR6RegisteredOnce({auth,...f,verifyOverlay});
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','UNLOCK']);
+ assert.equal(result.code,'R6_B_D1_TARGET_CHANGED_STOP');
+ assert.equal(result.status,'BLOCKED');
+ assert.equal(f.calls.includes('CLAIM'),false);
+});
+
+test('source drift during remote D1 read is rechecked under lock',async()=>{
+ const f=inject();let n=0;
+ const verifyOverlay=()=>{f.calls.push('VERIFY');
+  if(++n===2)throw Object.assign(Error('drift'),{code:'R6_B_INSTALLED_SOURCE_STOP'});
+  return {core:'fixture-db-id'};};
+ const result=await performR6RegisteredOnce({auth,...f,verifyOverlay});
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','UNLOCK']);
+ assert.equal(result.code,'R6_B_INSTALLED_SOURCE_STOP');
+ assert.equal(result.status,'BLOCKED');
+});
+
+test('D1 latency does not consume the Core lock before admission',async()=>{
+ const f=inject();let start,finish;
+ const started=new Promise(resolve=>start=resolve);
+ const d1ReadProbe=()=>{f.calls.push('D1_READ');start();
+  return new Promise(resolve=>finish=resolve);};
+ const running=performR6RegisteredOnce({auth,...f,d1ReadProbe});
+ await started;
+ assert.deepEqual(f.calls,['VERIFY','D1_READ']);
+ finish(true);
+ const result=await running;
+ assert.equal(result.status,'SUCCESS');
+ assert.deepEqual(f.calls,['VERIFY','D1_READ','LOCK','VERIFY','CLAIM','RUN','UNLOCK']);
 });

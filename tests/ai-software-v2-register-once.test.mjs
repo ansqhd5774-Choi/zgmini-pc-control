@@ -7,6 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {
  CONTROL_REPO,SOURCE_SHA,REQUEST_SCHEMA,REQUEST_SCOPE,REQUEST_TITLE,FILES,
  validateRequest,checkedSourceFiles,validatedManifestEntries,inspectInstalledCapability,inspectScheduledLauncher,validateActiveUpgradeReceipt,
+ activeUpgradeReceiptNames,approvedDirectTool,validPriorUpgradeVersion,verifyGithubContentsResponse,reportUploadState,
 } from '../tools/ai-software-v2-register-once.mjs';
 
 function approvedIssue(){
@@ -128,4 +129,77 @@ test('active V2 upgrade receipt rejects unapproved source, manifest and version'
  ]){
   assert.throws(()=>validateActiveUpgradeReceipt({status:'CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED',...x},old,active),/AI_V2_/);
  }
+});
+
+test('historical upgrade receipt growth does not invalidate a valid active candidate',()=>{
+ const names=Array.from({length:18},(_,i)=>'PLATFORM_UPGRADE_'+(i+100)+'.json');
+ names.push('AUTO_PUBLISH_UPGRADE_RESULT.json','README.txt','PLATFORM_UPGRADE_abc.json');
+ const selected=activeUpgradeReceiptNames(names);
+ assert.equal(selected.length,19);
+ assert.ok(selected.includes('AUTO_PUBLISH_UPGRADE_RESULT.json'));
+ assert.ok(!selected.includes('PLATFORM_UPGRADE_abc.json'));
+});
+
+test('approved active tool requires both immutable code hashes AND approved source provenance',()=>{
+ const manifest={
+  'scripts/pc-writer/theme-config-tool.mjs':'7dcca351145966ece41a4ee19f948e3362cc3b13a593031f672535c6405bbf39',
+  'scripts/pc-writer/theme-config-registry.mjs':'0e592dc1a414ebb40be635c371af551580155a51bfc6e7c45d6c227885dc963c'
+ };
+ assert.equal(approvedDirectTool({sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',manifest}),true);
+ assert.equal(approvedDirectTool({sourceSha:'0'.repeat(40),manifest}),false);
+ assert.equal(approvedDirectTool({sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',
+  manifest:{...manifest,'scripts/pc-writer/theme-config-tool.mjs':'0'.repeat(64)}}),false);
+});
+
+test('valid intermediate upgrade ancestry does not have to equal original V1 version',()=>{
+ const old='facf62ed21bd5631',active='0b1ed5d35888b0e0';
+ const manifest={
+  'scripts/pc-writer/theme-config-tool.mjs':'7dcca351145966ece41a4ee19f948e3362cc3b13a593031f672535c6405bbf39',
+  'scripts/pc-writer/theme-config-registry.mjs':'0e592dc1a414ebb40be635c371af551580155a51bfc6e7c45d6c227885dc963c',
+  'package.json':'f'.repeat(64)
+ };
+ // Actual activeVersion is derived from the canonical full manifest; this synthetic
+ // positive case deliberately cannot forge that digest. Test the ancestry predicate
+ // separately while retaining the entire manifest validation in production.
+ assert.equal(validPriorUpgradeVersion('fe5e30aeb56ac94d',active),true);
+ assert.equal(validPriorUpgradeVersion(old,active),true);
+ assert.equal(validPriorUpgradeVersion(active,active),false);
+ assert.equal(validPriorUpgradeVersion('broken',active),false);
+ assert.throws(()=>validateActiveUpgradeReceipt({status:'CONFIGURED_AUTO_PUBLISH_UPGRADE_INSTALLED',
+  sourceSha:'9cad027530230d5b4f97707a9707ab97866dd1d6',
+  oldVersion:'fe5e30aeb56ac94d',newVersion:active,installedManifest:manifest},old,active),
+  /AI_V2_ACTIVE_UPGRADE_MANIFEST_DENIED/);
+});
+
+test('GitHub result files must be independently read back with matching bytes',()=>{
+ const bytes=Buffer.from('{"result":"PASS"}\\n');
+ assert.equal(verifyGithubContentsResponse({encoding:'base64',content:bytes.toString('base64')},bytes),true);
+ assert.equal(verifyGithubContentsResponse({encoding:'base64',content:bytes.toString('base64')+'\n'},bytes),true);
+ assert.throws(()=>verifyGithubContentsResponse({encoding:'base64',content:Buffer.from('different').toString('base64')},bytes),
+  /AI_V2_REPORT_READBACK_MISMATCH/);
+ assert.throws(()=>verifyGithubContentsResponse({encoding:'raw',content:'invalid'},bytes),
+  /AI_V2_REPORT_READBACK_INVALID/);
+});
+
+test('report step fails closed if only one of JSON and TXT was verified',()=>{
+ assert.equal(reportUploadState([true,true]),'COMPLETE');
+ assert.equal(reportUploadState([true,false]),'PARTIAL');
+ assert.equal(reportUploadState([false,true]),'PARTIAL');
+ assert.equal(reportUploadState([false,false]),'PARTIAL');
+ assert.throws(()=>reportUploadState([true]),/AI_V2_REPORT_VERIFICATION_INVALID/);
+});
+
+test('completed #182 one-shot registration has no active Issue-triggered Workflow',()=>{
+ const obsolete=new URL('../.github/workflows/pc-ai-software-v2-register-once.yml',import.meta.url);
+ assert.equal(fs.existsSync(obsolete),false,'a retired one-shot may not be reactivated by another Issue');
+ const reservation=new URL('../results/ai-software-v2-register-once-reservation.json',import.meta.url);
+ const receipt=JSON.parse(fs.readFileSync(reservation,'utf8'));
+ const resultPath=new URL('../results/ai-software-v2-'+receipt.requestId+'.json',import.meta.url);
+ const result=JSON.parse(fs.readFileSync(resultPath,'utf8'));
+ assert.equal(receipt.issueNumber,182);
+ assert.equal(receipt.state,'EXECUTION_STARTED_NO_AUTO_RETRY');
+ assert.equal(result.requestId,receipt.requestId);
+ assert.equal(result.code,'AI_V2_PRIVATE_REGISTRATION_VERIFIED');
+ assert.equal(result.status,'PASS');
+ assert.equal(result.registered,true);
 });

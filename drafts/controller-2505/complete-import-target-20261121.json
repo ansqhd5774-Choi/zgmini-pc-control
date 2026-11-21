@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_CONTROLLER_C2505_TARGET_EVIDENCE_R1",
+  "status": "VERIFIED_SOURCE_ONLY",
+  "installedSha": "5e805bc907a4fb9e8d2fb2d53432bfec7b7cea59",
+  "targetSha": "24f1139b97712b2e1383650a78f65877f9d1ae67",
+  "sourceMainSha": "a464fad6834c6ef545bdb5ea8666d63209b1156d",
+  "targetBranch": "codex/controller-2505-complete-imports-20261121",
+  "changedFiles": [
+    {
+      "path": "controller/earnings-bea-mfg-archive-readonly.mjs",
+      "sha256": "0835fc60ebaa63ce0b0ead772a5dfa9d1834fa9bffb6f90e0d63cb24428495ad"
+    },
+    {
+      "path": "controller/inflation-causal-saved-readonly.mjs",
+      "sha256": "7ef07c9c3f46dbbf3fec72e04dfbda72343a9c68029f924d53c6e0b64e030a38"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "7de39b2b3eea6f2941a44a537c844ec1c5e364fa81ef5f0dbbae3c5ad8207dd5"
+    },
+    {
+      "path": "controller/r54-runtime-binding-readonly.mjs",
+      "sha256": "b3211b6d3210320ba659924ae1d02158f55c37fb32c0e5fcbff6468a216ae8ad"
+    }
+  ],
+  "runtimeRoots": [
+    "controller/entry.mjs",
+    "controller/operations.mjs"
+  ],
+  "closure": {
+    "status": "VERIFIED",
+    "checkedModules": 50
+  },
+  "syntaxChecked": 64,
+  "tests": {
+    "reusedRecoveryAndClosurePass": 84
+  },
+  "operatingInstalled": false
+}

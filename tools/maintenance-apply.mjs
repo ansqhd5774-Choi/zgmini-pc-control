@@ -204,26 +204,34 @@ export async function applyApprovedUpdate(request, port) {
         observed,...details(status)});
       return {...ledger};
     }
-    // Never restore from an unverified snapshot, even if an earlier copy succeeded.
-    let restored=false;
-    if(backup) {
-      try {
-        if(await port.verifyBackup(request.installedSha)) {
-          await port.restore();
-          await port.reconnectPrevious();
-          restored=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});
-        }
-      } catch {restored=false;}
+    // Restore service before diagnosing the rejected candidate. Preserve the
+    // original failure separately from any recovery failure; never guess success.
+    let restored=false,rollbackFailureCode=null,rollbackOperation='verifyBackup';
+    try{
+      if(!backup||await port.verifyBackup(request.installedSha)!==true)
+        throw fail('ROLLBACK_BACKUP_NOT_VERIFIED');
+      rollbackOperation='restore';await port.restore();
+      rollbackOperation='reconnectPrevious';await port.reconnectPrevious();
+      rollbackOperation='verifyPrevious';
+      restored=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true})===true;
+      if(!restored)throw fail('ROLLBACK_PREVIOUS_RUNTIME_NOT_VERIFIED');
+      rollbackOperation='resumeIntake';await port.resumeIntake();paused=false;
+      rollbackOperation='reconcileBacklog';if(port.reconcileBacklog)await port.reconcileBacklog(request);
+      rollbackOperation='verifyPrevious';
+      restored=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true,requireIdle:false})===true;
+      if(!restored)throw fail('ROLLBACK_FINAL_RUNTIME_NOT_VERIFIED');
+    }catch(rollbackError){
+      rollbackFailureCode=maintenanceFailureCode(rollbackError,rollbackOperation);
+      restored=false;
     }
-    // Only an explicitly verified rollback may reactivate request intake.
-    if(restored) {try {await port.resumeIntake();paused=false;}catch{restored=false;}}
-    let backlogVerified=restored;
-    if(restored && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{backlogVerified=false;}}
-    const status=restored&&backlogVerified?'ROLLED_BACK':'RECOVERY_REQUIRED';
-    await record(status,{status,code:backlogVerified?reason:'BACKLOG_OR_RECOVERY_NOT_VERIFIED',firstFail,
+    const status=restored?'ROLLED_BACK':'RECOVERY_REQUIRED';
+    await record(status,{status,code:restored?reason:'BACKLOG_OR_RECOVERY_NOT_VERIFIED',firstFail,
+      originalFailureCode:reason,rollbackFailureCode,
+      rollbackFailureOperation:rollbackFailureCode?rollbackOperation:null,
+      ...(error.postcheckFailureEvidence?{postcheckFailureEvidence:error.postcheckFailureEvidence}:{}),
       actualInstalledSha:restored?request.installedSha:null,intakePaused:paused,
       recoverySha:restored?request.installedSha:null,protectedStateUnchanged:restored,workflowEnabled:restored&&!paused,
-      ...details(status)});
+      ...details(status,restored?'PREVIOUS_VERSION_RESTORED_CONTINUE_APPROVED_WORK':undefined)});
     return {...ledger};
   }
 }
@@ -244,10 +252,28 @@ export async function reconcileInterruptedRollback(original,port,persist){
  if(phase==='RECONNECTED'){
   await record('RECOVERY_RECONNECTED_INTAKE_READBACK_REQUIRED');return out;
  }
- if(['POSTCHECK_PENDING','INTAKE_RESUMED','BACKLOG_RECONCILED'].includes(phase)){
+ if(['INTAKE_RESUMED','BACKLOG_RECONCILED'].includes(phase)){
   await record('RECOVERY_WAIT_EXISTING_RESULT');return out;
  }
- if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED'].includes(phase)||!['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
+ if(phase==='POSTCHECK_PENDING'){
+  // A failed postcheck is not an uncertain postcheck. Only the independent
+  // operator may attest the original GitHub failed job, original request,
+  // exact snapshot/lease CAS, and existing active Controller. Ordinary callers
+  // have no such port and retain the historical WAIT/no-mutation behavior.
+  let confirmed=false;
+  if(original.status==='RECOVERY_REQUIRED'&&original.firstFail==='POSTCHECK_PENDING'&&
+    Number.isSafeInteger(original.postIssueNumber)&&original.postIssueNumber>0&&
+    /^[a-f0-9]{40}$/.test(original.targetSha??'')&&
+    typeof port.confirmPostcheckFailure==='function'){
+   try{confirmed=await port.confirmPostcheckFailure(original)===true;}catch{}
+  }
+  if(!confirmed){
+   await record('RECOVERY_WAIT_EXISTING_RESULT');return out;
+  }
+  await record('RECOVERY_CONFIRMED_POSTCHECK_FAILURE');
+ }
+ if(!['BACKED_UP','SUPERVISOR_STOPPED','SWITCHED','POSTCHECK_PENDING'].includes(phase)||
+    !['RUNNING','RECOVERY_REQUIRED'].includes(original.status)){
   await record('RECOVERY_PHASE_NOT_ROLLBACK_ELIGIBLE');return out;
  }
  let recoveryOperation='prepareRecovery';
@@ -265,8 +291,29 @@ export async function reconcileInterruptedRollback(original,port,persist){
   if(preserved){
    await record('RECOVERY_EXISTING_VERSION_VERIFIED',{existingVersionPreserved:true});
   }else{
-   await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
-   recoveryOperation='restore';await port.restore();await record('RECOVERY_FILES_RESTORED');
+   // Read-only checks must precede the durable mutation claim. A rejected
+   // roster or protected-state preflight has not changed intake or files.
+   if(port.preflightRecoveryRestore){
+    recoveryOperation='preflightRecoveryRestore';
+    await port.preflightRecoveryRestore();
+   }
+   recoveryOperation='restore';
+   if(port.restoreMarksMutation===true){
+    // Record the durable claim at the first real mutation boundary, not
+    // before repeated read-only roster/protection/backlog checks.
+    let marked=false;
+    await port.restore({beforeMutation:async()=>{
+     if(marked)return;
+     await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
+     marked=true;
+    }});
+    if(!marked)throw fail('RECOVERY_MUTATION_MARKER_MISSING');
+   }else{
+    // Existing restore ports retain their historical conservative contract.
+    await record('RECOVERY_RESTORE_STARTED',{mutationStarted:true});
+    await port.restore();
+   }
+   await record('RECOVERY_FILES_RESTORED');
    recoveryOperation='reconnectPrevious';await port.reconnectPrevious();
   }
   recoveryOperation='verifyPrevious';

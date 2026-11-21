@@ -159,3 +159,15 @@ test('D05 A result envelope succeeds only for sanitized verified evidence',t=>{
  assert.equal(strange.status,'BLOCKED');
  assert.equal(strange.code,'D05_LINEAGE_UNPROVEN');
 });
+
+
+test('D05 non-array source witnesses classify as invalid rows, not filesystem I/O',t=>{
+ const {root,dir,file}=fixture(t);fs.mkdirSync(dir,{recursive:true});
+ for(const bad of [{},'not-an-array',null]){
+  const invalid=row('2026-11-10');invalid.sources=bad;
+  const {status,recordedAt,stableEvidenceDigestSha256,...stable}=invalid;
+  invalid.stableEvidenceDigestSha256=createHash('sha256').update(JSON.stringify(stable)).digest('hex');
+  fs.writeFileSync(file,JSON.stringify(invalid)+'\n');
+  assert.equal(inspectD05LineageReadonly(root).code,'D05_LEDGER_ROW_UNPROVEN');
+ }
+});

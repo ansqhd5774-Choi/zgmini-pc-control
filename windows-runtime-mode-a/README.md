@@ -1,6 +1,6 @@
 # Windows 런타임 공통 A급 조회 — SOURCE_ONLY
 
-현재 상태: **소스·로컬 회귀 테스트만 완료**. 이 디렉터리의 workflow 파일은 아직 `main`에 등록되지 않았고, 실제 PC 조회 증거도 아니다. B급 설치·교체·예약 실행은 전혀 하지 않는다.
+현재 상태(2026-11-20): `.github/workflows/pc-approved-runtime-a-once.yml`은 이미 `main`에 등록되어 있고, 기존 읽기 전용 실PC 조회 #823·#832·#847·#895가 `DONE`, JSON/TXT 2/2 재조회로 종결되었다. 당시 관측된 `REPEATABLE_ACTIVE_RUNTIME`은 해당 시점의 파일·Task XML 재고이며 현재 Task 활성화·주기 실행·B 설치·게시 정상 보증은 아니다. 조회 자체는 운영 파일·DB·예약을 수정하지 않는다.
 
 ## 목적
 
@@ -14,7 +14,7 @@
 | `ACTIVE_PREIMAGE_UNVERIFIED` / `STATE_UNKNOWN*` | 활성 원본 불확실·검사 중 변동 | B급 설치 판단 불가 |
 
 이 모드는 **A 조회 증거**일 뿐 B 실행 권한이 아니다. 기존 `R179` 게시 실패, `L7` 수집 실패, 공개 API `STALE`은 이 조회 성공만으로 해결되지 않는다.
-파일·Task의 두 번 조회 사이에 변경이 감지되거나 프로필 접근에 실패하면 최상위도 `BLOCKED`이고, 각 프로필의 제한된 실패 코드가 결과에 남는다. Task 조회만 불완전한 경우에는 `taskChecksComplete:false`를 표시하므로 B급 활성화 검토에 그대로 사용할 수 없다.
+파일·Task의 두 번 조회 사이에 변경이 감지되거나 프로필 접근에 실패하면 최상위도 `BLOCKED`이고, 각 프로필의 제한된 실패 코드가 결과에 남는다. `taskChecksComplete`는 승인된 Task XML/예상 명령·시각 조회 완료를 뜻하고, 실제 활성 여부는 **별도** `taskEnabledVerified`로 판정한다(`enabled:null`은 활성 증거가 아니다). 4개 초과 등록 프로필은 `SUMMARY_ONLY`이며 파일 해시·Task 확인이 불완전한 요약 결과로 남긴다. JSON/TXT 2/2 재조회에 실패하면 댓글을 남겨도 보고 Job은 실패한다.
 
 ## 공통 등록과 요청 계약
 

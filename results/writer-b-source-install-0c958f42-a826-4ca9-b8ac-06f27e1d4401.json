@@ -1,0 +1,22 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "0c958f42-a826-4ca9-b8ac-06f27e1d4401",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "7965b337cf69a6d48cb152b1594833d64266a677",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "48e892755161b8d829f21b7ae0f270b07278d1ca",
+  "candidateSourceSha": "19361427b70b72ec7f77839a5a3265bd8659461a",
+  "manifestSha256": "4cbb3bb0283b0d7b55e00aafaac2020fa20de143781c47bc68e4d411a8ebccd5",
+  "baseTreeOid": "628c7290c4596c00ba9a934c012874959c5d0d9f",
+  "preparedTreeOid": "17c6ede08ac105722cb06d1e8409090f8196fbbc",
+  "provenanceSha256": "a299061c11eebc18df038a5e0256a35637f9eef6f29a5cc97005e44a45d174dd",
+  "runId": "44746478244",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/marketparquet-paid-store.mjs",
+    "scripts/pc-writer/sector-fear-greed-r3-rolling-local.mjs",
+    "scripts/pc-writer/local-cycle.mjs"
+  ]
+}

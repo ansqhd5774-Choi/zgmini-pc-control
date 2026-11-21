@@ -11,11 +11,25 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {applyApprovedUpdate,maintenanceFailureCode,reconcileInterruptedRollback} from '../tools/maintenance-apply.mjs';
 import {readControllerUpdateArtifacts,confirmExactWorkflowState,readMaintenanceRecoveryStatus,backlogPauseWindows,openRollbackPause,
-  closeLatestPause,backlogIssueInPause,prevalidationInventory} from '../tools/update.mjs';
+  closeLatestPause,backlogIssueInPause,prevalidationInventory,admittedMaintenanceIssueState} from '../tools/update.mjs';
 import {INSTALLABLE_FILES} from '../tools/maintenance-contract.mjs';
 
 const previous='c'.repeat(40), target='b'.repeat(40);
 const request={requestId:'pc-update-simulation-0001',installedSha:previous,targetSha:target};
+test('closed source Issue can only be used for separately approved recovery, never new installation',()=>{
+ const issue={title:'pc-controller-update',state:'closed',state_reason:'completed'};
+ assert.equal(admittedMaintenanceIssueState(issue),false);
+ assert.equal(admittedMaintenanceIssueState(issue,{recovery:false}),false);
+ assert.equal(admittedMaintenanceIssueState(issue,{recovery:true}),true);
+ assert.equal(admittedMaintenanceIssueState({...issue,state:'open'},{recovery:false}),true);
+ for(const state_reason of ['not_planned','duplicate',null,undefined]){
+  assert.equal(admittedMaintenanceIssueState({...issue,state_reason},{recovery:true}),false);
+ }
+ assert.equal(admittedMaintenanceIssueState({...issue,state:'closed',title:'pc-job'},{recovery:true}),false);
+ assert.equal(admittedMaintenanceIssueState({...issue,state:'draft'},{recovery:true}),false);
+ assert.equal(admittedMaintenanceIssueState(null,{recovery:true}),false);
+});
+
 test('no-effect proof rejects an incomplete, substituted or absent installed file inventory',()=>{
  const h='0'.repeat(64),files=Object.fromEntries(INSTALLABLE_FILES.map(x=>[x,h]));
  assert.equal(INSTALLABLE_FILES.length,9);
@@ -726,4 +740,26 @@ test('historical selective maintainer handoff preserves its two-file immutable a
   /HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
  assert.throws(()=>validateHandoffIntent(issue,request,approved,{sourceSha:targetSha},sha(raw)),
   /HANDOFF_APPROVAL_BYTES_OR_SOURCE_MISMATCH/);
+});
+
+test('verified terminal postcheck failure restores service without waiting for a missing upload',async()=>{
+ const f=fixture({postcheck:async()=>{throw Object.assign(Error('verified'),{code:'POSTCHECK_EXECUTION_FAILED_VERIFIED',postcheckFailureEvidence:{issueNumber:42,runId:10,jobId:20,runnerName:'zgmini-pc-06'}});}});
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'ROLLED_BACK');assert.equal(out.originalFailureCode,'POSTCHECK_EXECUTION_FAILED_VERIFIED');
+ assert.equal(out.rollbackFailureCode,null);assert.equal(out.actualInstalledSha,previous);assert.equal(f.paused,false);
+ assert.equal(out.nextAction,'PREVIOUS_VERSION_RESTORED_CONTINUE_APPROVED_WORK');assert.equal(out.postcheckFailureEvidence.jobId,20);
+});
+test('rollback failure retains both the original defect and exact restore failure',async()=>{
+ const f=fixture({postcheck:async()=>({status:'FAIL'}),restore:async()=>{throw Object.assign(Error('bad snapshot'),{code:'BACKUP_CAS_DRIFT'});}});
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'RECOVERY_REQUIRED');assert.equal(out.originalFailureCode,'POSTCHECK_NOT_VERIFIED');
+ assert.equal(out.rollbackFailureCode,'BACKUP_CAS_DRIFT');assert.equal(out.rollbackFailureOperation,'restore');
+ assert.equal(out.actualInstalledSha,null);
+});
+test('restored intake can accept normal busy jobs without invalidating rollback',async()=>{
+ let last=null;const f=fixture();const verify=f.port.verifyPrevious;
+ f.port.verifyPrevious=async o=>{last=o;return verify(o)};
+ f.port.postcheck=async()=>({status:'FAIL'});
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'ROLLED_BACK');assert.equal(last.requireIdle,false);
 });

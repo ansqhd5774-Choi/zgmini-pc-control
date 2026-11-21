@@ -13,7 +13,7 @@ const workflows = [
    cron:"12,27,42,57"},
   {file:'agent-handoff-wide-scout.yml',
    job:'read-only-extended-monitor',
-   group:'zgmini-proactive-diagnostics-ledger',
+   group:'zgmini-wide-scout-ledger',
    cron:"14,29,44,59"},
   {file:'agent-handoff-queue-board.yml',
    job:'authenticated-readonly-board',
@@ -55,10 +55,11 @@ test('source pushes cannot start redundant diagnostics while owner and 15-minute
   }
 });
 
-test('all three ledger writers retain one serialized group and queue capacity',()=>{
+test('007 serializes its own shard writes without blocking 005 and deep diagnostics',()=>{
   const names=workflows.slice(0,3).map(({file})=>
     read(file).match(/^      group: (.+)$/m)?.[1]);
-  assert.deepEqual(names,Array(3).fill('zgmini-proactive-diagnostics-ledger'));
+  assert.deepEqual(names,['zgmini-proactive-diagnostics-ledger',
+    'zgmini-proactive-diagnostics-ledger','zgmini-wide-scout-ledger']);
   assert.equal(workflows[3].group,'zgmini-handoff-control-board');
 });
 
@@ -99,4 +100,16 @@ test('completed-run fanout is limited to intake, selector and board',()=>{
   assert.equal(oldFanout,7);
   assert.equal(newFanout,3);
   assert.equal(oldFanout-newFanout,4);
+});
+
+test('009 admits only relevant events and serializes actual issue writers without dropping queued events',()=>{
+ const yaml=read('agent-handoff.yml');
+ assert.doesNotMatch(yaml,/^concurrency:/m);
+ for(const job of ['route-sanitized-incident','record-verified-return','record-work-progress']){
+   assert.ok(yaml.includes('  '+job+':\n    concurrency:\n      group: agent-handoff-${{ github.event.issue.number }}\n      cancel-in-progress: false\n      queue: max'));
+ }
+ assert.equal((yaml.match(/^      queue: max$/gm)||[]).length,3);
+ assert.match(yaml,/github\.event\.action == 'opened'/);
+ assert.match(yaml,/github\.event\.action == 'labeled' && github\.event\.label\.name == 'agent-handoff'/);
+ assert.doesNotMatch(yaml,/cancel-in-progress: true/);
 });

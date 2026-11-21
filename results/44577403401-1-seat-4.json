@@ -1,0 +1,286 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44577403401-1-seat-4",
+  "requestId": "pc-4ad7b926-15e8-46a3-8472-a2c13bbf90da",
+  "startedAt": "2026-11-19T17:27:53.117Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f896b2fd05ca6df845e446497ddc71b076fa3ab0",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "0c893c4f9ef605b3f299693c5c01a2547a09dd85",
+  "sourceBranch": "codex/employment-1y-reader-r1",
+  "operation": "employment-r6-collection-evidence-readonly",
+  "seat": 4,
+  "status": "PASS",
+  "code": "R6_DOL_BED_STORED_EVIDENCE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-pit0407-stored-value-check-20261120",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "R6_DOL_BED_STORED_EVIDENCE_READONLY",
+    "sqliteOpened": true,
+    "scope": "R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC",
+    "dol": {
+      "BACKFILL": {
+        "status": "PARTIAL",
+        "completedAt": "2026-11-09T22:21:08.952Z",
+        "failureCode": "SERIES_PARTIAL",
+        "providerRequests": 2,
+        "collectedRows": 30600,
+        "inserted": 3570,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 4,
+        "knownMissingSeries": [
+          "INITIAL_CLAIMS",
+          "INITIAL_CLAIMS_4W",
+          "CONTINUED_CLAIMS",
+          "INSURED_UNEMPLOYMENT_RATE"
+        ],
+        "latestInitialClaimsObservationDate": null,
+        "nationalResponse": null
+      },
+      "ONE_YEAR": {
+        "status": "SUCCESS",
+        "completedAt": "2026-11-16T13:49:48.963Z",
+        "failureCode": null,
+        "providerRequests": 2,
+        "collectedRows": 6088,
+        "inserted": 0,
+        "revised": 4,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": "2026-10-17",
+        "nationalResponse": {
+          "httpStatus": 200,
+          "contentTypeCategory": "text/xml",
+          "responseFormat": "NATIONAL_XML",
+          "bodyPresent": true,
+          "parsedNationalSeriesCount": 4,
+          "requestFailureCode": null,
+          "validationFailureCode": null,
+          "latestNationalObservationDate": "2026-10-17"
+        }
+      },
+      "RELEASE": {
+        "status": "PARTIAL",
+        "completedAt": "2026-11-19T17:12:26.519Z",
+        "failureCode": "DOL_RELEASE_OBSERVATION_STALE",
+        "providerRequests": 2,
+        "collectedRows": 3440,
+        "inserted": 0,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": "2026-10-24",
+        "nationalResponse": {
+          "httpStatus": 200,
+          "contentTypeCategory": "text/xml",
+          "responseFormat": "NATIONAL_XML",
+          "bodyPresent": true,
+          "parsedNationalSeriesCount": 4,
+          "requestFailureCode": null,
+          "validationFailureCode": null,
+          "latestNationalObservationDate": "2026-10-24"
+        }
+      }
+    },
+    "bed": {
+      "BACKFILL": {
+        "status": "PARTIAL",
+        "completedAt": "2026-11-09T22:21:24.465Z",
+        "failureCode": "SERIES_PARTIAL",
+        "providerRequests": 6,
+        "collectedRows": 5127,
+        "inserted": 456,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 1,
+        "knownMissingSeries": [
+          "BDS0000000000000000110008RQ5"
+        ],
+        "latestInitialClaimsObservationDate": null
+      },
+      "ONE_YEAR": {
+        "status": "SUCCESS",
+        "completedAt": "2026-11-09T09:50:48.560Z",
+        "failureCode": null,
+        "providerRequests": 3,
+        "collectedRows": 1023,
+        "inserted": 0,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": null
+      },
+      "RELEASE": {
+        "status": "SUCCESS",
+        "completedAt": "2026-11-09T23:25:47.611Z",
+        "failureCode": null,
+        "providerRequests": 3,
+        "collectedRows": 567,
+        "inserted": 0,
+        "revised": 0,
+        "rejected": 0,
+        "missingSeriesCount": 0,
+        "knownMissingSeries": [],
+        "latestInitialClaimsObservationDate": null
+      }
+    },
+    "eta539": [
+      {
+        "mode": "RELEASE",
+        "snapshotStoredAt": "2026-11-16T21:35:08.290Z",
+        "httpStatus": 200,
+        "historyWeeks": 60,
+        "selectedWeeks": 60,
+        "firstSelectedWeek": "2025-09-13",
+        "latestCompleteWeek": "2026-10-31",
+        "coreCount": 51
+      },
+      {
+        "mode": "ONE_YEAR",
+        "snapshotStoredAt": "2026-11-16T10:14:04.256Z",
+        "httpStatus": 200,
+        "historyWeeks": 112,
+        "selectedWeeks": 112,
+        "firstSelectedWeek": "2024-09-07",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      },
+      {
+        "mode": "RELEASE",
+        "snapshotStoredAt": "2026-11-14T21:30:06.670Z",
+        "httpStatus": 200,
+        "historyWeeks": 60,
+        "selectedWeeks": 60,
+        "firstSelectedWeek": "2025-09-06",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      },
+      {
+        "mode": "RELEASE",
+        "snapshotStoredAt": "2026-11-13T21:25:08.165Z",
+        "httpStatus": 200,
+        "historyWeeks": 60,
+        "selectedWeeks": 60,
+        "firstSelectedWeek": "2025-09-06",
+        "latestCompleteWeek": "2026-10-24",
+        "coreCount": 51
+      }
+    ],
+    "stateClaims": {
+      "status": "OBSERVED",
+      "sampledWeeks": 600,
+      "firstWeek": "2015-05-09",
+      "lastWeek": "2026-10-31",
+      "complete51Weeks": 600,
+      "incompleteWeeks": 0,
+      "latestComplete51Week": "2026-10-31",
+      "latestStrict52WeekCandidate": "2026-10-31",
+      "strict52WeekCandidateCount": 545,
+      "firstWindowBreak": null,
+      "latestWindowBreak": null,
+      "fullTenYearRawCoverage": {
+        "status": "RAW_PRECONDITIONS_COMPLETE",
+        "observedRawWeeks": 600,
+        "requiredRawWeeks": 577,
+        "requiredRows": 29427,
+        "referenceWeeks": 521,
+        "firstRequiredWeek": "2015-10-17",
+        "latestRequiredWeek": "2026-10-31",
+        "firstFailureWeek": null
+      },
+      "recentIncompleteWeeks": [],
+      "note": "COUNT_ONLY_NOT_PIT_OR_FORMULA_VERIFICATION"
+    },
+    "pitRawSchema": {
+      "kind": "EMPLOYMENT_R6_PIT_SCHEMA_ONLY_V1",
+      "reason": "REQUIRED_SCHEMA_PRESENT",
+      "checkedAt": "2026-11-19T17:27:55.247Z",
+      "dbIdentityTag": "b6fb111e0ff0378b",
+      "raw": {
+        "tablePresent": true,
+        "requiredCount": 11,
+        "presentCount": 11,
+        "missingOrdinals": []
+      },
+      "runs": {
+        "tablePresent": true,
+        "requiredCount": 4,
+        "presentCount": 4,
+        "missingOrdinals": []
+      }
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "nationalRaw": {
+      "BACKFILL": {
+        "status": "RUN_BODY_HASH_NOT_STORED",
+        "latestWeekEnded": null,
+        "latestNumericDates": null,
+        "recordedLatestDates": null,
+        "weekBlocks": null,
+        "invalidWeekDates": null,
+        "linkedByRawBodySha": false
+      },
+      "ONE_YEAR": {
+        "status": "RAW_EQUALS_RUN_PARSER",
+        "latestWeekEnded": "2026-12-26",
+        "latestNumericDates": {
+          "INITIAL_CLAIMS": "2026-10-17",
+          "INITIAL_CLAIMS_4W": "2026-10-17",
+          "CONTINUED_CLAIMS": "2026-10-17",
+          "INSURED_UNEMPLOYMENT_RATE": "2026-10-17"
+        },
+        "recordedLatestDates": {
+          "INITIAL_CLAIMS": "2026-10-17",
+          "INITIAL_CLAIMS_4W": "2026-10-17",
+          "CONTINUED_CLAIMS": "2026-10-17",
+          "INSURED_UNEMPLOYMENT_RATE": "2026-10-17"
+        },
+        "weekBlocks": 104,
+        "invalidWeekDates": 0,
+        "linkedByRawBodySha": true
+      },
+      "RELEASE": {
+        "status": "RAW_EQUALS_RUN_PARSER",
+        "latestWeekEnded": "2026-12-26",
+        "latestNumericDates": {
+          "INITIAL_CLAIMS": "2026-10-24",
+          "INITIAL_CLAIMS_4W": "2026-10-24",
+          "CONTINUED_CLAIMS": "2026-10-24",
+          "INSURED_UNEMPLOYMENT_RATE": "2026-10-24"
+        },
+        "recordedLatestDates": {
+          "INITIAL_CLAIMS": "2026-10-24",
+          "INITIAL_CLAIMS_4W": "2026-10-24",
+          "CONTINUED_CLAIMS": "2026-10-24",
+          "INSURED_UNEMPLOYMENT_RATE": "2026-10-24"
+        },
+        "weekBlocks": 104,
+        "invalidWeekDates": 0,
+        "linkedByRawBodySha": true
+      }
+    }
+  },
+  "protectedBeforeSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedAfterSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "f896b2fd05ca6df845e446497ddc71b076fa3ab0",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-19T17:28:40.287Z",
+  "durationMs": 47170
+}

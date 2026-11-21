@@ -9,11 +9,17 @@ import {blockedPayload,preimageStageFile,stagedPayload} from './preimage-manifes
 
 const CONTROL='ansqhd5774-Choi/zgmini-pc-control';
 const stop=code=>{throw Object.assign(new Error(code),{code});};
+// The log status never contains manifest bytes, credentials or local paths.
+export const preimageStageLogStatus=output=>output?.status==='READY'?
+ 'PREIMAGE_SCOPE_STAGE_READY':output?.status==='BLOCKED'?
+ 'PREIMAGE_SCOPE_STAGE_BLOCKED':'PREIMAGE_SCOPE_STAGE_NOT_STAGED';
 
 export async function stagePreimageManifest({env,event,policy,fetchImpl=fetch}={}){
  if(env.GITHUB_REPOSITORY!==CONTROL||event?.repository?.private!==true||
   env.GITHUB_ACTOR!=='ansqhd5774-Choi'||event?.issue?.user?.login!=='ansqhd5774-Choi'||
-  env.GITHUB_EVENT_NAME!=='issues'||event?.action!=='opened'||
+  env.GITHUB_EVENT_NAME!=='issues'||
+  !(event?.action==='opened'||
+    (event?.action==='labeled'&&event?.label?.name==='pc-job'))||
   !event.issue?.labels?.some(x=>x.name==='pc-job'))stop('PREIMAGE_STAGE_EVENT_STOP');
  let request;
  try{request=validateRequest(JSON.parse(event.issue.body),policy);}
@@ -75,7 +81,7 @@ async function main(env=process.env){
   const file=preimageStageFile(env);
   fs.writeFileSync(file,JSON.stringify(output)+'\n',{flag:'wx',mode:0o600});
  }
- process.stdout.write('PREIMAGE_SCOPE_STAGE_COMPLETE\n');
+ process.stdout.write(preimageStageLogStatus(output)+'\n');
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))

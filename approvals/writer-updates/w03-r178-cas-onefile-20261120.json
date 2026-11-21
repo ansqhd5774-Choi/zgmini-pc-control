@@ -1,0 +1,70 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "a7c0cf678bb3d3e29d97d4a6c15f48e9dec69cfd",
+  "baseHead": "42bd5a7c686405cd057ac63795d70714e6b36555",
+  "baseConfigSourceSha": "42bd5a7c686405cd057ac63795d70714e6b36555",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/theme-seven-gmh-r178-authorized-cas.mjs",
+      "change": "M",
+      "beforeSha256": "c78070c11f23b22d9d3fb6e8742f7d77863702766451320e1f44e7431dd076d4",
+      "afterSha256": "afdfca8b0bb90247a0f7483492f4a37a0d41d8c894e81391016c7574f696ad93"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/cnn-observed-archive-r1.mjs",
+      "sha256": "f9cb4c8da02e2175527c389a54563a6f45c6f2815f5af524c27b071a6059ec63"
+    },
+    {
+      "path": "lib/market-calendar-er1-earnings-score.mjs",
+      "sha256": "35247642b8c1c7d0efb12e35719fd981386e29da7b32c1138cde92873f916974"
+    },
+    {
+      "path": "lib/market-calendar-er1-forecast-score.mjs",
+      "sha256": "4673db7669e6cb65f3a49d9f55618b58ff9905629bf0c799e61ee792e4d24fde"
+    },
+    {
+      "path": "lib/market-calendar-er1-month-key.mjs",
+      "sha256": "6e5d8453085c78f770156823f0f4f32657c3bb03aa5df6b0c2442c0c61a2463e"
+    },
+    {
+      "path": "lib/market-calendar-er1-public-display.mjs",
+      "sha256": "5c94721a7ea3d5fb2399e19993522c8f9d66b696023245273a41ea208f1fd5c8"
+    },
+    {
+      "path": "worker/public-feed-store.mjs",
+      "sha256": "b21f03057025bad7aed58c7bb1f69b2abba0f0b446c587869594eea732adfaa6"
+    },
+    {
+      "path": "lib/cnn-index.mjs",
+      "sha256": "cde0a679768aee34a994f5f73b000875478c7c536afdcb38ab9e6e806a994c1d"
+    },
+    {
+      "path": "worker/public-display-freshness.mjs",
+      "sha256": "abdf00a5c1c5c7ae9e978dd27ceb1c4c572e15ac67c0378cc971204129714878"
+    },
+    {
+      "path": "worker/public-feed-input-safety.mjs",
+      "sha256": "1d4dd5e1039a538d314a9f9b122aef89bfb2f4d21867582c32a6352ff1699fa8"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}

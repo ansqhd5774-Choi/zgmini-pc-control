@@ -1,0 +1,414 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44575710220-1-seat-6",
+  "requestId": "pc-1e65fa70-11aa-4da4-91c8-076add4f8b29",
+  "startedAt": "2026-11-19T17:18:21.580Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "f896b2fd05ca6df845e446497ddc71b076fa3ab0",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "0c893c4f9ef605b3f299693c5c01a2547a09dd85",
+  "sourceBranch": "codex/employment-1y-reader-r1",
+  "operation": "employment-r6-candidate-stage-readonly",
+  "seat": 6,
+  "status": "PASS",
+  "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": true,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w04-pit0408-retry-20261120",
+  "effectClass": "REGISTERED_OPERATION",
+  "memoryAdmission": {
+    "admitted": true,
+    "minimumFreeMiB": 1536,
+    "firstFreeMiB": 2921,
+    "freeMiB": 2921,
+    "minObservedMiB": 2921,
+    "samples": 1,
+    "waitedMs": 0.015500000000002956
+  },
+  "pcOperationalApprovedSha": "23d474336719e5d717e2944be05a7bd5ec7e9e3d",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "EMPLOYMENT_R6_READONLY_STAGE_COMPLETED",
+    "actualExecutionSha": "0c893c4f9ef605b3f299693c5c01a2547a09dd85",
+    "sourceBundleSha": "0c893c4f9ef605b3f299693c5c01a2547a09dd85",
+    "asOfDate": "2026-11-19",
+    "sqliteOpened": true,
+    "summary": {
+      "sourceFeatures": 29,
+      "recentlyObservedFeatures": 23,
+      "chartReadyFeatures": 23,
+      "chartPartialFeatures": 5,
+      "scoredFeatures": 24,
+      "recentlyScoredFeatures": 18
+    },
+    "pit": {
+      "coreCurrentRows": 40781,
+      "coreHistoryRevisions": 38816,
+      "coreCurrentKeys": 40781,
+      "coreHistoryAsOfUniqueKeys": 37901,
+      "coreHistoryPriorRevisionKeys": 881,
+      "coreHistoryPriorRevisionRows": 915,
+      "coreHistoryAmbiguousLatestKeys": 0,
+      "coreHistorySameInstantAdditionalRows": 0,
+      "coreCurrentHistoryMatchingKeys": 37901,
+      "coreCurrentHistoryConflictingKeys": 0,
+      "coreCurrentHistoryUnverifiedKeys": 0,
+      "coreCurrentHistoryMissingKeys": 2880,
+      "candidateHistoryAsOfUniqueKeys": 3700,
+      "candidateHistoryPriorRevisionKeys": 0,
+      "candidateHistoryPriorRevisionRows": 0,
+      "candidateHistoryAmbiguousLatestKeys": 0,
+      "candidateHistorySameInstantAdditionalRows": 0,
+      "coreCurrentKeysMissingHistory": 2880,
+      "missingKeysWithCandidateHistory": 2625,
+      "missingKeysWithMatchingCandidateValueAndHash": 2625,
+      "candidateCurrentKeys": 3700,
+      "candidateNewKeys": 0,
+      "candidateOverlapMatchingKeys": 3686,
+      "candidateOverlapConflictingKeys": 14,
+      "candidateOverlapUnverifiedKeys": 0,
+      "candidateNewKeysWithConsistentPITMetadata": 0,
+      "candidateNewKeysWithIncompletePITMetadata": 0,
+      "coreMissingHistoryKeysWithConsistentCandidateMetadata": 2625,
+      "coreMissingHistoryKeysWithoutConsistentCandidateMetadata": 255,
+      "rawSnapshotMetadataKeys": null,
+      "rawSnapshotCertifiedKeys": null,
+      "rawSnapshotInvalidBodyKeys": null,
+      "rawSnapshotValidWithoutRunKeys": null,
+      "coreCurrentRawLineageVerifiedKeys": null,
+      "coreCurrentRawLineageMissingSnapshotKeys": null,
+      "coreCurrentRawLineageConflictingKeys": null,
+      "coreCurrentRawLineageUnverifiedKeys": null,
+      "coreHistoryRawLineageTotalRows": null,
+      "coreHistoryRawLineageVerifiedRows": null,
+      "coreHistoryRawLineageMissingSnapshotRows": null,
+      "coreHistoryRawLineageConflictingRows": null,
+      "coreHistoryRawLineageUnverifiedRows": null,
+      "rawSnapshotByGroup": null,
+      "rawSnapshotByMonth": null,
+      "rawLineageEvidenceStatus": "NO_RUNTIME_EVIDENCE",
+      "candidateReconciliationPreviewStatus": "HOLD_CONFLICTING_REVISIONS"
+    },
+    "pit04KeyReview": {
+      "kind": "EMPLOYMENT_R6_PIT0408_KEY_REVIEW_SOURCE_ONLY_V1",
+      "status": "HOLD_KEY_CLASSIFICATION_NOT_RAW_PIT_ATTESTATION",
+      "counts": {
+        "coreKeys": 30651,
+        "coreHistoryMissing": 2880,
+        "coreHistoryConflict": 0,
+        "coreHistoryAmbiguous": 0,
+        "candidateOverlapConflicts": 1,
+        "missingCandidateInternalMatch": 2625,
+        "missingCandidateIncomplete": 0,
+        "missingWithoutCandidate": 255,
+        "duplicateCurrentKeys": 0
+      },
+      "evidenceTotal": 2881,
+      "offset": 0,
+      "pageSize": 8,
+      "nextOffset": 8,
+      "evidenceTruncated": true,
+      "evidence": [
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "NE",
+          "observationDate": "2026-10-17",
+          "reason": "CANDIDATE_CURRENT_CONFLICT",
+          "coreHistoryMissing": false,
+          "candidateCurrentConflict": true,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AK",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AL",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AR",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "AZ",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "CA",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "CO",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        },
+        {
+          "logicalSeriesId": "STATE_INITIAL_CLAIMS",
+          "geographyCode": "CT",
+          "observationDate": "2025-07-26",
+          "reason": "MISSING_HISTORY_NO_CANDIDATE",
+          "coreHistoryMissing": true,
+          "candidateCurrentConflict": false,
+          "rawPitAttested": false,
+          "repairAuthorized": false
+        }
+      ],
+      "rawPitAttested": false,
+      "promotionApproved": false,
+      "repairAuthorized": false
+    },
+    "pit04PrivateEvidenceDigest": "e73af6d1e6ea0d9dea07baf67d148d32bfbd5c6b9f397c9cd64ebed560898e6e",
+    "evidenceFileSha256": "eb8d6e934271d9f68d0adc83624e6fc21bea58cd0d29ab4d3e7008f95ef28c4f",
+    "evidenceFileRef": "PC_WRITER_PIT_EVIDENCE/pit0408-pc-1e65fa70-11aa-4da4-91c8-076add4f8b29.json",
+    "privateEvidenceReadback": true,
+    "indicators": [
+      {
+        "id": "U3_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "U6_UNEMPLOYMENT",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "LFPR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "EPOP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "PAYEMS_MOM",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "PAYEMS_3M_AVG",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "PAYEMS_ACCEL",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "AVG_WEEKLY_HOURS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "TEMP_HELP",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INITIAL_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INITIAL_CLAIMS_4W",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "CONTINUED_CLAIMS",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "IUR",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "STATE_CLAIMS_BREADTH",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "PARTIAL_HISTORY"
+      },
+      {
+        "id": "JOLTS_OPENINGS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_HIRES_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_QUITS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "JOLTS_LAYOFFS_RATE",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "AHE_YOY",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "ECI_12M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "INDUSTRY_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "STATE_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "MSA_EMP_DIFFUSION_3M",
+        "rawStatus": "READY",
+        "chartStatus": "READY",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_GAINS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_GROSS_LOSSES_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_NET_GROSS_RATE",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_SMALL_FIRM_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_STATE_BREADTH",
+        "rawStatus": "STALE",
+        "chartStatus": "PARTIAL",
+        "scoreStatus": "READY"
+      },
+      {
+        "id": "BED_BIRTH_DEATH_NET",
+        "rawStatus": "STALE",
+        "chartStatus": "UNAVAILABLE",
+        "scoreStatus": "READY"
+      }
+    ],
+    "bodyDigest": "2e14db92907e6057747246c6bca41d971519fa1f944efe8e1be91e80e108794a",
+    "walPreflight": {
+      "coreWalMode": true,
+      "candidateWalMode": false,
+      "coreWalSidecarsPreexisting": true,
+      "candidateWalSidecarsPreexisting": false
+    },
+    "promotionApproved": false,
+    "memoryTelemetry": {
+      "kind": "SYSTEM_RAM_SAMPLED_DURING_R6_CHILD_V1",
+      "intervalMs": 100,
+      "samples": 333,
+      "totalMiB": 16122,
+      "baselineFreeMiB": 2885,
+      "minimumFreeMiB": 2450,
+      "peakSystemUsedMiB": 13672,
+      "peakIncreaseFromBaselineMiB": 435,
+      "calculationPeakValid": true,
+      "measurementPhase": "COMPUTATION"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0
+  },
+  "protectedBeforeSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedAfterSha256": "fa00580c68a7c425063518ee4db137c9cbd9456aef9bd8e0adb69ee6bc57d18a",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "0c893c4f9ef605b3f299693c5c01a2547a09dd85",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-19T17:19:00.597Z",
+  "durationMs": 39017
+}

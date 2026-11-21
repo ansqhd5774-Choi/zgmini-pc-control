@@ -46,7 +46,7 @@ export function assessIncident(issue, comments) {
       issue.labels.some(x => x?.name === 'handoff-duplicate')) {
     return {state: 'NOT_PENDING'};
   }
-  if (!Array.isArray(comments) || comments.length > 400) {
+  if (!Array.isArray(comments)) {
     return {state: 'COMMENT_INVENTORY_INVALID'};
   }
   if (![HANDOFF_OWNER, HANDOFF_BOT].includes(issue.user?.login) ||

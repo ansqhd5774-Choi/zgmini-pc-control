@@ -188,6 +188,27 @@ test('bounded mismatch lineage groups expose only safe month/provider/revision a
  assert.doesNotMatch(JSON.stringify(report),/PRIVATE_|PRIVATE-BAD|body_sha256|snapshotId|requestKey/);
  db.close();
 });
+test('mismatched BED-style response metadata still checks body and snapshot ID independently',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ const good=snapshot(db,{requestKey:'SECRET_GOOD',body:'{"status": "REQUEST_SUCCEEDED"}'});
+ const broken=snapshot(db,{requestKey:'SECRET_BAD',body:'{"status": "REQUEST_SUCCEEDED"}',
+  storedBody:'{"status":"CHANGED"}'});
+ const raw='market_score_employment_r6_raw_snapshot_v1';
+ for(const id of [good.id,broken.id])
+  db.prepare('UPDATE '+raw+' SET detail_json=? WHERE snapshot_id=?')
+   .run(JSON.stringify({responseHash:'f'.repeat(64),secret:'PRIVATE_CANONICAL'}),id);
+ const report=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.equal(report.invalidReasonCounts.RESPONSE_HASH_VALUE_MISMATCH,2);
+ assert.equal(report.bodyVerifiedKeys,0);
+ assert.deepEqual(report.mismatchIntegrity,{
+  checked:2,bodyShaMatched:1,bodyShaMismatched:1,
+  idMatched:2,idMismatched:0,
+  scope:'INDEPENDENT_HASH_CHECKS_NOT_PIT',
+ });
+ assert.doesNotMatch(JSON.stringify(report),/SECRET_|PRIVATE_|CHANGED|REQUEST_SUCCEEDED|snapshotId|body_sha256/);
+ db.close();
+});
+
 test('unlinked invalid snapshot has explicit UNLINKED lineage rather than fabricated revision',()=>{
  const db=new DatabaseSync(':memory:');schema(db);
  const bad=snapshot(db,{requestKey:'PRIVATE-UNLINKED',body:'private'});
@@ -197,4 +218,75 @@ test('unlinked invalid snapshot has explicit UNLINKED lineage rather than fabric
  assert.equal(result.invalidLineageGroups[0].collectorRevision,'UNLINKED');
  assert.equal(result.invalidLineageGroups[0].count,1);
  db.close();
+});
+
+
+function legacyBed(db,{key='BED_PRIVATE',storedBody=null,metadataHash=null,forgedId=false}={}){
+ const payload={status:'REQUEST_SUCCEEDED',Results:{series:[{seriesID:'PRIVATE_SERIES',data:[]}]}};
+ const body=JSON.stringify(payload,null,2);
+ const stable=x=>x&&typeof x==='object'?(Array.isArray(x)?x.map(stable):
+  Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])]))):x;
+ const hash=sha(body),id=forgedId?'f'.repeat(64):sha(['BLS_BED','BLS_BED',key,hash].join('|'));
+ db.prepare('INSERT INTO market_score_employment_r6_raw_snapshot_v1 VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+  .run(id,0,1,'BLS_BED','BLS_BED',key,'2026-11-18T01:00:00.000Z',
+   '2026-11-18T01:00:01.000Z',hash,JSON.stringify({responseHash:metadataHash??sha(JSON.stringify(stable(payload)))}),storedBody??body);
+ run(db,{id,hash},{provider:'EMPLOYMENT_R6_BLS_BED'});
+ return {id,hash};
+}
+test('legacy BED canonical difference is independently proved without rewriting or PIT promotion',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);legacyBed(db);
+ const before=db.prepare('SELECT * FROM market_score_employment_r6_raw_snapshot_v1').all();
+ const r=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.deepEqual(r.legacyBedProof,{examined:1,canonicalMatched:1,canonicalMismatched:0,
+  invalidJson:0,bodyOrIdInvalid:0,runLinked:1,scope:'LEGACY_BED_CANONICAL_COMPATIBILITY_NOT_PIT'});
+ assert.equal(r.bodyVerifiedKeys,0);assert.equal(r.runCertifiedKeys,0);
+ assert.equal(r.invalidReasonCounts.RESPONSE_HASH_VALUE_MISMATCH,1);
+ assert.deepEqual(db.prepare('SELECT * FROM market_score_employment_r6_raw_snapshot_v1').all(),before);
+ assert.doesNotMatch(JSON.stringify(r),/BED_PRIVATE|PRIVATE_SERIES|snapshotId|body_sha256/);db.close();
+});
+test('legacy compatibility never excuses tampered bytes, identity, wrong metadata or an unrelated source',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ legacyBed(db,{key:'bad-body',storedBody:'changed'});
+ legacyBed(db,{key:'bad-id',forgedId:true});
+ legacyBed(db,{key:'bad-canonical',metadataHash:'e'.repeat(64)});
+ const other=snapshot(db,{requestKey:'NON_BED',body:'{"status":"REQUEST_SUCCEEDED","Results":{"series":[]}}'});
+ db.prepare('UPDATE market_score_employment_r6_raw_snapshot_v1 SET detail_json=? WHERE snapshot_id=?')
+  .run(JSON.stringify({responseHash:'d'.repeat(64)}),other.id);
+ const r=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.equal(r.legacyBedProof.examined,3);assert.equal(r.legacyBedProof.bodyOrIdInvalid,2);
+ assert.equal(r.legacyBedProof.canonicalMismatched,1);assert.equal(r.legacyBedProof.runLinked,0);
+ assert.equal(r.legacyBedProof.canonicalMatched,0);assert.equal(r.runCertifiedKeys,0);db.close();
+});
+test('missing History source links are scoped to each key and independent of unrelated BED failures',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);
+ const item=snapshot(db,{requestKey:'claims',body:'PRIVATE_CLAIMS'});run(db,item);
+ legacyBed(db,{metadataHash:'e'.repeat(64)});
+ const columns='logical_series_id TEXT,geography_type TEXT,geography_code TEXT,observation_date TEXT,'+
+  'provider TEXT,source_hash TEXT,retrieved_at TEXT,available_at TEXT,provenance_json TEXT';
+ db.exec('CREATE TABLE market_score_employment_r4_shadow_current_v1('+columns+');'+
+  'CREATE TABLE market_score_employment_r4_shadow_history_v1('+columns+');');
+ const insert=db.prepare('INSERT INTO market_score_employment_r4_shadow_current_v1 VALUES(?,?,?,?,?,?,?,?,?)');
+ const h='a'.repeat(64),p=JSON.stringify({rawRecordHash:h,responseHash:item.hash});
+ for(const state of ['CA','NY','TX','MA'])
+  insert.run('STATE_CONTINUED_CLAIMS','STATE',state,'2026-10-31','DOL',h,
+   '2026-11-18T01:00:00.000Z',state==='NY'?null:'2026-11-10T01:00:00.000Z',p);
+ db.exec("INSERT INTO market_score_employment_r4_shadow_history_v1 SELECT * FROM market_score_employment_r4_shadow_current_v1 WHERE geography_code='MA'");
+ db.prepare('UPDATE market_score_employment_r4_shadow_current_v1 SET provenance_json=? WHERE geography_code=?')
+  .run(JSON.stringify({responseHash:item.hash,rawRecordHash:'b'.repeat(64)}),'TX');
+ const r=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ const v=r.missingHistoryLineage;
+ assert.equal(v.missingHistoryKeys,3);assert.equal(v.groups.length,1);
+ assert.equal(v.groups[0].rawRunLinked,2);assert.equal(v.groups[0].metadataInvalid,1);
+ assert.equal(v.groups[0].availableTimeMissing,1);assert.equal(v.pitAttested,false);
+ assert.equal(v.repairAuthorized,false);assert.equal(v.rawRecordValuesReparsed,false);
+ assert.doesNotMatch(JSON.stringify(v),/PRIVATE_|CA|NY|geography_code|provenance_json/);
+ db.close();
+});
+test('a run cannot attest future snapshots and the reader does not pretend to reconstruct lost historic availability',()=>{
+ const db=new DatabaseSync(':memory:');schema(db);const x=legacyBed(db);
+ db.exec('DELETE FROM market_score_employment_r4_shadow_runs_v1');
+ run(db,x,{provider:'EMPLOYMENT_R6_BLS_BED',time:'2026-11-17T01:00:00.000Z'});
+ const r=auditFixedR6RawRunSnapshot(db,{checkedAt:AT,includeInvalidLineage:true});
+ assert.equal(r.legacyBedProof.canonicalMatched,1);assert.equal(r.legacyBedProof.runLinked,0);
+ assert.equal(r.runCertifiedKeys,0);assert.equal(r.missingHistoryLineage.status,'SCHEMA_UNAVAILABLE');db.close();
 });

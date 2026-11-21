@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {inspectThemeL7RuntimeReadonly,safeR181SourceStructure,
  safeR181ErrorFlow,safeR181HttpErrorFlow,safeRecordedR181HttpFailure,
- safeR181LedgerCoverage} from '../controller/theme-l7-runtime-readonly.mjs';
+ safeR181LedgerCoverage,safeR179R178Wiring} from '../controller/theme-l7-runtime-readonly.mjs';
 
 const names=['r181-primary-cycle.mjs','r179-publish-core.mjs','r171-publish.mjs'];
 function fixture(){
@@ -513,4 +513,38 @@ test('R181 ledger coverage never elevates missing, extra or malformed bars to ve
   'LEDGER_COVERAGE_ABSENT');
  assert.equal(safeR181LedgerCoverage({...raw,providerCalls:'14'},{sourcePinned:true}).status,
   'LEDGER_REPORTED_INCOMPLETE');
+});
+
+test('R179 bridge diagnostic ignores strings, template text and comments',()=>{
+ const input=[
+  '// runApprovedGmhSevenR178FromPcWriter(approvedRecord,verifyApprovedEffect)',
+  "const note='runApprovedGmhSevenR178FromPcWriter(approvedRecord)';",
+  '/* verifyApprovedEffect approvedRecord */',
+  'const template='+String.fromCharCode(96)+
+   'runApprovedGmhSevenR178FromPcWriter(verifyApprovedEffect)'+String.fromCharCode(96)+';'
+ ].join('\n');
+ assert.equal(safeR179R178Wiring(input).status,'SOURCE_NOT_ATTESTED');
+ const out=safeR179R178Wiring(input,{sourcePinned:true});
+ assert.equal(out.directR178Call,'DIRECT_CALL_SYNTAX_NOT_SEEN');
+ assert.equal(out.approvalInputs,'BINDINGS_NOT_ESTABLISHED');
+});
+test('R179 bridge diagnostic exposes fixed static candidate fields only',()=>{
+ const input=[
+  'const approvedRecord=stored();',
+  'const verifyApprovedEffect=verify();',
+  'await runApprovedGmhSevenR178FromPcWriter({approvedRecord,verifyApprovedEffect});',
+  "const credential='SECRET_API_TOKEN';"
+ ].join('\n');
+ const out=safeR179R178Wiring(input,{sourcePinned:true});
+ assert.equal(out.status,'STATIC_PINNED_SOURCE_INSPECTED');
+ assert.equal(out.directR178Call,'DIRECT_CALL_SYNTAX_PRESENT');
+ assert.equal(out.approvalInputs,'BOTH_IDENTIFIERS_SEEN');
+ assert.equal(out.evidenceLevel,'STATIC_SOURCE_ONLY_NOT_RUNTIME');
+ assert.equal(JSON.stringify(out).includes('SECRET_API_TOKEN'),false);
+ const f=fixture();try{
+  const result=inspectThemeL7RuntimeReadonly({dataRoot:f.dataRoot});
+  assert.equal(result.sources['r179-publish-core.mjs'].r178Wiring.status,'SOURCE_NOT_ATTESTED');
+  assert.equal(result.operationalWrites,0);
+  assert.equal(result.d1Writes,0);
+ }finally{f.close();}
 });

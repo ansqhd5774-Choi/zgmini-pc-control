@@ -2,7 +2,7 @@
 import {createHash} from 'node:crypto';
 export const WIDE_POLICY=Object.freeze({
   version:'ZGMINI_GITHUB_WIDE_SCOUT_R3',lookbackDays:7,
-  maxRuns:1600,maxIssues:150,maxPulls:100,maxComments:400,
+  maxRuns:1600,maxIssues:500,maxPulls:500,maxComments:350,
   maxFindings:25,minReportHours:6,ledgerIssue:1743,
   schedule:'14,29,44,59 * * * *'
 });
@@ -37,9 +37,10 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
   if(!Array.isArray(coverage)||coverage.length>8)stop('COVERAGE_INVENTORY');
   const seenRuns=new Set(),seenIssues=new Set(),seenPrs=new Set();
   const observations=[];
+  const invalid={runs:0,issues:0,pulls:0};
   let failed=0,stale=0,cancelled=0,actionRequired=0,old=0,issuesDue=0,prsDue=0;
   for(const r of runs){
-    if(!goodId(r?.id)||seenRuns.has(r.id)||time(r.created_at,now)===null)stop('RUN_IDENTITY');
+    if(!goodId(r?.id)||seenRuns.has(r.id)||time(r.created_at,now)===null){invalid.runs++;continue;}
     seenRuns.add(r.id);
     const t=time(r.created_at,now);
     if(t<cutoff){old++;continue;}
@@ -59,7 +60,7 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
     }
   }
   for(const x of issues){
-    if(!goodId(x?.number)||seenIssues.has(x.number)||time(x.created_at,now)===null)stop('ISSUE_IDENTITY');
+    if(!goodId(x?.number)||seenIssues.has(x.number)||time(x.created_at,now)===null){invalid.issues++;continue;}
     seenIssues.add(x.number);
     const t=time(x.created_at,now);
     if(t<cutoff){old++;continue;}
@@ -74,7 +75,7 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
     }
   }
   for(const p of pulls){
-    if(!goodId(p?.number)||seenPrs.has(p.number)||time(p.created_at,now)===null)stop('PR_IDENTITY');
+    if(!goodId(p?.number)||seenPrs.has(p.number)||time(p.created_at,now)===null){invalid.pulls++;continue;}
     seenPrs.add(p.number);
     const t=time(p.created_at,now);
     if(t<cutoff){old++;continue;}
@@ -99,20 +100,21 @@ export function evaluateWideSnapshot({runs,issues,pulls,workflows,scheduleRunCou
   const findings=observations.slice(0,WIDE_POLICY.maxFindings);
   return Object.freeze({
     version:WIDE_POLICY.version,cutoff:new Date(cutoff).toISOString(),
-    inventory:{runs:runs.length,issues:issues.length,pulls:pulls.length,
-      complete:{runs:complete.runs===true,issues:complete.issues===true,pulls:complete.pulls===true},
+    inventory:{runs:runs.length,issues:issues.length,pulls:pulls.length,invalid,
+      complete:{runs:complete.runs===true&&invalid.runs===0,issues:complete.issues===true&&invalid.issues===0,pulls:complete.pulls===true&&invalid.pulls===0},
       oldExcluded:old,statusCoverage:coverage.map(x=>({status:x.status,count:x.count,complete:x.complete===true}))},
     counts:{failedHandledByR1:failed,delayedRuns:stale,cancelled,actionRequired,
       pendingHandoffs:issuesDue,waitingPRs:prsDue},
     schedule:{observedRuns:scheduleRunCount,workflows:workflowStatus},
     findings,omittedFindings:Math.max(0,observations.length-findings.length),
-    hasActionableReview:observations.length>0||workflowStatus.some(w=>w.state.startsWith('disabled')),
+    hasActionableReview:observations.length>0||workflowStatus.some(w=>w.state.startsWith('disabled'))||
+      !complete.runs||!complete.issues||!complete.pulls||Object.values(invalid).some(n=>n>0),
     pcOperationalWrites:0,aiCalls:0,codeEdits:0
   });
 }
 const fingerprintData=report=>JSON.stringify([report.cutoff.slice(0,10),
   report.counts,report.findings.map(x=>[x.kind,x.id]),report.schedule.workflows,
-  report.schedule.observedRuns]);
+  report.inventory.complete,report.inventory.invalid,report.inventory.statusCoverage]);
 export function snapshotMarker(report){
   if(report?.version!==WIDE_POLICY.version)stop('REPORT_SCHEMA');
   return '<!-- ZGMINI_WIDE_SCOUT_R3 digest:'+
@@ -150,6 +152,8 @@ export function renderWideReport(report){
     '- 관측 건수: 실행 '+report.inventory.runs+' / Issue '+report.inventory.issues+
       ' / PR '+report.inventory.pulls,
     '- 7일 초과 제외: '+report.inventory.oldExcluded,
+    '- 개별 자료 오류(나머지 계속 평가): '+JSON.stringify(report.inventory.invalid),
+    '- 판정: '+(Object.values(report.inventory.complete).every(Boolean)?'OBSERVED':'INCOMPLETE_EVIDENCE'),
     '- 상태별 검색: '+(report.inventory.statusCoverage.length?report.inventory.statusCoverage.map(x=>x.status+'='+x.count+(x.complete?'':'(미완전)')).join(', '):'미제공'),
     '- 실패 및 시간 초과: '+report.counts.failedHandledByR1+' (개별 진단은 R1 담당)',
     '- 장시간 대기·실행 중: '+report.counts.delayedRuns,
