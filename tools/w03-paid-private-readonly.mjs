@@ -107,7 +107,7 @@ export function inspectW03PaidPrivateReadonly({root=ROOT,fileSystem=fs}={}){
   prev=date;
  }
  if(prev!==common.confirmedDate)return UNKNOWN('W03_DERIVED_LAST_DATE_MISMATCH',common);
- return {status:'PASS',code:dates.length===252?
+ return {status:dates.length===252?'PASS':'PARTIAL',code:dates.length===252?
   'W03_AI_PRIVATE_252_READBACK_VERIFIED':'W03_AI_PRIVATE_PARTIAL_HISTORY',
   ...common,themeId:ID,privateStoreStatus:STATUS,privateThemeCount:stored.count,
   privateBodySha256:stored.bodySha256,historyPoints:dates.length,
