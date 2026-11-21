@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
-const ROOT='E:\\ZGmini\\data';
+const ROOT='E:\\ZGmini\data';
 const MODE='MARKETPARQUET_PAID_SPLIT_ADJUSTED_1H_NY_PROXY_V1';
-const SHA=/^[a-f0-9]{64}$/,DATE=/^20\\d\\d-\\d\\d-\\d\\d$/;
+const SHA=/^[a-f0-9]{64}$/,DATE=/^20\d\d-\d\d-\d\d$/;
 const SYMBOLS=['SPY','WISE','IGV','XSW','AIQ'];
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const date=s=>typeof s==='string'&&DATE.test(s)&&
@@ -39,7 +39,7 @@ function payload(raw){
  let rpc;
  if(text.startsWith('{'))rpc=JSON.parse(text);
  else {
-  const blocks=text.split(/\\r?\\n/).filter(s=>s.startsWith('data: '));
+  const blocks=text.split(/\r?\n/).filter(s=>s.startsWith('data: '));
   if(blocks.length!==1)throw Error('RPC_FORMAT');
   rpc=JSON.parse(blocks[0].slice(6));
  }
@@ -58,7 +58,7 @@ function verifyGeneration(home,universe,root,report,record,sys){
   if(e.isSymbolicLink())throw Error('SYMLINK');
   return e.name;
  });
- const receiptNames=names.filter(s=>/^20\\d\\d-\\d\\d-\\d\\d_20\\d\\d-\\d\\d-\\d\\d\\.json\\.receipt\\.json$/.test(s)).sort();
+ const receiptNames=names.filter(s=>/^20\d\d-\d\d-\d\d_20\d\d-\d\d-\d\d\.json\.receipt\.json$/.test(s)).sort();
  if(!receiptNames.length||receiptNames.length>24)throw Error('RECEIPT_COUNT');
  const proofs=receiptNames.map(n=>json(path.win32.join(dir,n),root,10000,sys));
  if(!proofs.every(p=>p.schema==='ZGMINI_PAID_HOURLY_RESPONSE_V1'&&p.plan==='full'&&
