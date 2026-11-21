@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "75613735df17a269869cc4c53b7771229da914eb7f09e0fe10e37215e085c5e4",
+  "insertions": [
+    {
+      "anchor": "import fs from 'node:fs';",
+      "position": "after",
+      "text": "import {coreCycleIdFromEnv} from './core-cycle-id.mjs';\n"
+    },
+    {
+      "anchor": "const originalFetch=globalThis.fetch;",
+      "position": "before",
+      "text": "report.coreCycleId=coreCycleIdFromEnv();\n"
+    }
+  ]
+}
