@@ -195,9 +195,12 @@ test('092 simulated: linked Core remains verified when unrelated earnings source
   probe:()=>({status:0,stdout:JSON.stringify(snapshot)}),realpath,
   lstat:()=>{throw Object.assign(Error('not found'),{code:'ENOENT'});},
   read:()=>{throw Error('unexpected read');},readLock:()=>({state:'ABSENT'})});
- assert.equal(result.status,'PASS');
- assert.equal(result.code,'CORE_RUNTIME_SOURCE_VERIFIED');
- assert.equal(result.runtimeSourceVerified,true);
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE');
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.runtimeProcessEvidence.status,'PASS');
+ assert.equal(result.runtimeProcessEvidence.code,'CORE_RUNTIME_SOURCE_VERIFIED');
+ assert.equal(result.runtimeProcessEvidence.runtimeSourceVerified,true);
  assert.equal(result.sourceFileHashesVerified,false);
  assert.equal(result.sourceFileHashCode,'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE');
  assert.equal(result.beforeFileSha256,null);
