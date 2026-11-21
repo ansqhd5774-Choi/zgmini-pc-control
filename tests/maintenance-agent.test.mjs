@@ -692,3 +692,15 @@ test('unknown controller recovery does not assert disabled workflow',()=>{
  const confirmedActive=normalizedResult(request,{...raw,workflowEnabled:true});
  assert.equal(confirmedActive.workflowEnabled,true);
 });
+
+test('candidate failure and verified operational rollback are independently reported',()=>{
+ const request={requestId:'pc-update-fixture',targetControllerSha:'b'.repeat(40)};
+ const raw={status:'ROLLED_BACK',actualInstalledSha:'a'.repeat(40),recoverySha:'a'.repeat(40),
+  code:'POSTCHECK_EXECUTION_FAILED_VERIFIED',originalFailureCode:'POSTCHECK_EXECUTION_FAILED_VERIFIED',
+  rollbackFailureCode:null,protectedStateUnchanged:true,workflowEnabled:true};
+ const out=normalizedResult(request,raw);assert.equal(out.status,'FAILED');
+ assert.equal(out.operationalRecovery,'PREVIOUS_VERSION_VERIFIED');
+ assert.equal(out.originalFailureCode,raw.originalFailureCode);assert.equal(out.rollbackFailureCode,null);
+ assert.equal(normalizedResult(request,{...raw,protectedStateUnchanged:false}).operationalRecovery,'UNVERIFIED');
+ assert.equal(normalizedResult(request,{...raw,recoverySha:'c'.repeat(40)}).operationalRecovery,'UNVERIFIED');
+});
