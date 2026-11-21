@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "5b33787dd32523496cd5a87dca73beb07ffaa409",
+  "targetSha": "7b94ac63dcac84be48a0a8806f7c69567181d5e1",
+  "sourceMainSha": "97f2a05502f9c6f5c5ff7195c3a68bbd1820dcca",
+  "targetBranch": "codex/w05-r311-bea-policy-after-w04-20261121",
+  "customPaths": [
+    "config/operations.json"
+  ],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "af6f22047811f8dab1f662c279faf5a0b16ae4ce9dd47944d4cb816708a5b21c"
+    }
+  ],
+  "approvalRef": "PENDING_PR_CREATION_SOURCE_ONLY"
+}
