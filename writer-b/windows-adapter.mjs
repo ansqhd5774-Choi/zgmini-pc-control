@@ -410,6 +410,32 @@ export function makeWindowsBAdapter(auth,{candidateRoot,controlRoot}){
     fixedTaskXml(task).normalized===originalXml.normalized,
     'WRITER_B_TASK_DEFINITION_DRIFT_STOP');
   },
+  async prepareRollback(before,artifact){
+   need(artifact===prepared,'WRITER_B_ROLLBACK_PREPARED_IDENTITY_STOP');
+   const assertOwned=()=>{
+    const head=git(source,'rev-parse','HEAD');
+    const branch=git(source,'branch','--show-current');
+    need((head===m.baseHead&&branch===before.originalBranch)||
+      (head===prepared.sha&&branch===prepared.branch),
+      'WRITER_B_ROLLBACK_SOURCE_EXTERNAL_DRIFT_STOP');
+    const config=fs.readFileSync(m.configPath);
+    need(config.equals(originalConfig)||
+      config.equals(replaceConfigOnly(originalConfig,m.baseHead,prepared.sha)),
+      'WRITER_B_CONFIG_ROLLBACK_DRIFT_STOP');
+    sameUnrelated(source,m,dirty);
+   };
+   assertOwned();
+   need(fixedTaskXml(task).normalized===originalXml.normalized,
+    'WRITER_B_CORE_PREPAUSE_TASK_XML_DRIFT_STOP');
+   if(!taskProbe().enabled)return; // Already paused by this exact owned transaction.
+   if(m.coreMaintenance!=='PAUSE_NEW_STARTS_DRAIN_360S_V1')await io.waitForCoreIdleWindow();
+   inhibitCoreStarts({assertBase:assertOwned,
+    definitionMatches:()=>fixedTaskXml(task).normalized===originalXml.normalized,
+    probe:taskProbe,cycleLockExists:()=>fs.existsSync(CORE_CYCLE_LOCK),journal,
+    disable:()=>exec('schtasks',['/Change','/TN',task,'/Disable']),
+   },{reserved:m.coreMaintenance==='PAUSE_NEW_STARTS_DRAIN_360S_V1'});
+   journal('ROLLBACK_CORE_PAUSED');
+  },
   async restoreOriginalConfig(){
    const current=fs.readFileSync(m.configPath);
    if(current.equals(originalConfig))return;
