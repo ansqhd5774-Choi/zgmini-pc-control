@@ -64,29 +64,38 @@ export async function inspectEmploymentR6D1Readback(dataRoot,{fileSystem=fs,quer
     !/^[a-f0-9-]{36}$/.test(config.core??'')||
     !/^[a-f0-9-]{36}$/.test(config.history??''))
    return {...out,code:'R6_CONFIG_NOT_APPROVED'};
+ let phase='QUERY_INJECTED';
  try{
    let row;
    if(queryFixed)row=await queryFixed(SQL,[R6_KEY]);
    else{
+     phase='CHECKOUT_RESOLVE';
      const fixed=path.resolve(dataRoot,'..','projects','zgmini-earnings-history-pc-release');
      const real=(fileSystem.realpathSync.native??fileSystem.realpathSync)(fixed);
+     phase='CLIENT_FILE';
      const module=path.join(real,'scripts','pc-writer','d1.mjs');
      if(!fileSystem.statSync(module).isFile())
        return {...out,code:'R6_D1_CLIENT_MISSING'};
      // Import only the already approved, tracked and unchanged D1 client tree.
      const runGit=args=>execFileSync('git',args,{cwd:real,encoding:'utf8',
        timeout:5000,maxBuffer:131072,windowsHide:true,stdio:['ignore','pipe','ignore']}).trim();
+     phase='CHECKOUT_HEAD';
      if(runGit(['rev-parse','HEAD'])!==config.source)
        return {...out,code:'R6_D1_CLIENT_SOURCE_MISMATCH'};
+     phase='CHECKOUT_FILE_INTEGRITY';
      for(const file of ['scripts/pc-writer/d1.mjs',
        'scripts/pc-writer/d1-transient.mjs','scripts/pc-writer/d1-diagnostics.mjs']){
        runGit(['ls-files','--error-unmatch','--',file]);
        runGit(['diff','--quiet','HEAD','--',file]);
      }
+     phase='CLIENT_IMPORT';
      const {client,credential}=await import(pathToFileURL(module).href);
+     phase='CLIENT_INITIALIZE';
      const remote=client(config,()=>credential(real));
+     phase='D1_SELECT';
      row=(await remote.query(config.core,SQL,[R6_KEY])).results?.[0]??null;
    }
+   phase='LOCAL_VERIFICATION';
    const digest=checkpoint?.localResultHash;
    let verified={...checkpoint,localResultReadback:'MISSING'};
    if(HEX64.test(digest??'')){
@@ -99,5 +108,23 @@ export async function inspectEmploymentR6D1Readback(dataRoot,{fileSystem=fs,quer
      }catch{}
    }
    return verifyR6D1Row(row,verified);
- }catch{return {...out,code:'R6_D1_READ_FAILED'};}
+ }catch(error){
+   // Never report exception text, URLs, tokens, settings or SQL result bodies.
+   const stages={
+     QUERY_INJECTED:'R6_D1_QUERY_FIXTURE_FAILED',
+     CHECKOUT_RESOLVE:'R6_D1_CHECKOUT_UNAVAILABLE',
+     CLIENT_FILE:'R6_D1_CLIENT_FILE_UNAVAILABLE',
+     CHECKOUT_HEAD:'R6_D1_GIT_HEAD_FAILED',
+     CHECKOUT_FILE_INTEGRITY:'R6_D1_GIT_INTEGRITY_FAILED',
+     CLIENT_IMPORT:'R6_D1_CLIENT_IMPORT_FAILED',
+     CLIENT_INITIALIZE:'R6_D1_CLIENT_INITIALIZE_FAILED',
+     D1_SELECT:'R6_D1_QUERY_FAILED',
+     LOCAL_VERIFICATION:'R6_D1_LOCAL_VERIFICATION_FAILED',
+   };
+   const safeError=typeof error?.message==='string'&&
+      /^(WRANGLER_LOGIN_REQUIRED|WRANGLER_AUTH_REFRESH_TIMEOUT|D1_AUTH_RESOLUTION_FAILED|D1_OUTCOME_UNKNOWN|D1_BATCH_FAILED|D1_HTTP_(401|403|429|500|502|503|504))$/.test(error.message)?
+      error.message:null;
+   return {...out,code:stages[phase]??'R6_D1_READ_FAILED',
+     failurePhase:phase,...(safeError?{safeError}:{} )};
+ }
 }
