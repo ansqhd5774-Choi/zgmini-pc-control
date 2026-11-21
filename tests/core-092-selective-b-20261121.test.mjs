@@ -9,7 +9,7 @@ import {manifestFingerprint,validateUpdateRequest,validateControllerSelectivePin
 } from '../tools/maintenance-contract.mjs';
 
 const installed='5b33787dd32523496cd5a87dca73beb07ffaa409';
-const target='2482bd297ef1ed11dbbebf31a21559f00a8f0db7';
+const target='b3621f24860de277c74abbefbab68a158b3e39c2';
 const root=path.join(import.meta.dirname,'..','approvals');
 const raw=fs.readFileSync(path.join(root,'controller-updates',target+'.json'));
 const manifest=JSON.parse(raw);
