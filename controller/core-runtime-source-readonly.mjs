@@ -196,10 +196,13 @@ export function inspectCoreRuntimeSource({platform=process.platform,
   const classified=classifyCoreSnapshot(snapshot,{realpath});
   if(classified.status!=='PASS')return {...classified,lockOwner};
   const beforeFileSha256=hashActiveCoreFiles(classified.activeCoreRoot,{realpath,lstat,read});
-  // Runtime process ancestry and optional earnings-file hashes are separate
-  // observations. Missing/unsafe files cannot erase verified TaskEngine lineage.
-  return {...classified,sourceFileHashesVerified:beforeFileSha256!==null,
-   sourceFileHashCode:beforeFileSha256===null?'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE':null,
-   beforeFileSha256,lockOwner};
+  // Preserve the old top-level fail-closed contract when these particular
+  // source file hashes cannot be proven. Do not discard independently verified
+  // live TaskEngine/WMI ancestry; it is not a replacement for file provenance.
+  if(!beforeFileSha256)return {...unknown('CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE'),
+   runtimeProcessEvidence:classified,sourceFileHashesVerified:false,
+   sourceFileHashCode:'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE',lockOwner};
+  return {...classified,sourceFileHashesVerified:true,
+   sourceFileHashCode:null,beforeFileSha256,lockOwner};
  }catch{return unknown('CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE');}
 }
