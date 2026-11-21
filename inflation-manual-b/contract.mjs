@@ -45,8 +45,21 @@ export const V2_EXECUTABLE_SHA256=Object.freeze([
  'd80c6a705d4d15be0b1381a04e0b26b50053eb4f87d37b5da64ccb340841e4b0',
  '2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d',
 ]);
+// REVIEWED SOURCE CANDIDATE ONLY: #2515 installed a later Core local-cycle
+// byte profile while W01 official collectors/XLSX remained untouched.
+// Exact after-SHA is from the independently verified B installation receipt,
+// not derived from the current GitHub HEAD. This constant DOES NOT create an
+// approval manifest or authorize a B Issue. A fresh current-PC readback and
+// an explicitly authorized manifest are still required before live execution.
+export const V2_EXECUTABLE_SHA256_CORE_2515=Object.freeze([
+ V2_EXECUTABLE_SHA256_EXISTING[0],
+ V2_EXECUTABLE_SHA256_EXISTING[1],
+ V2_EXECUTABLE_SHA256_EXISTING[2],
+ '2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75',
+]);
 export const V2_EXECUTABLE_SHA256_ALLOWED=Object.freeze([
  V2_EXECUTABLE_SHA256_EXISTING,V2_EXECUTABLE_SHA256,
+ V2_EXECUTABLE_SHA256_CORE_2515,
 ]);
 export const URLS=Object.freeze({
  bls:'https://download.bls.gov/pub/time.series/cu/cu.data.12.USHousing',
