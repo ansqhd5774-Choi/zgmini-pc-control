@@ -189,3 +189,34 @@ test('existing A collector attaches independent lock-owner evidence without writ
  assert.equal(out.operationalWrites,0);
  assert.equal(out.d1Writes,0);
 });
+
+test('092 simulated: linked Core remains verified when unrelated earnings source hashes are unavailable',()=>{
+ const result=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,
+  probe:()=>({status:0,stdout:JSON.stringify(snapshot)}),realpath,
+  lstat:()=>{throw Object.assign(Error('not found'),{code:'ENOENT'});},
+  read:()=>{throw Error('unexpected read');},readLock:()=>({state:'ABSENT'})});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.code,'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE');
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.runtimeProcessEvidence.status,'PASS');
+ assert.equal(result.runtimeProcessEvidence.code,'CORE_RUNTIME_SOURCE_VERIFIED');
+ assert.equal(result.runtimeProcessEvidence.runtimeSourceVerified,true);
+ assert.equal(result.sourceFileHashesVerified,false);
+ assert.equal(result.sourceFileHashCode,'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE');
+ assert.equal(result.beforeFileSha256,null);
+ assert.equal(result.lockOwner.status,'ABSENT');
+ assert.equal(result.operationalWrites,0);
+});
+
+test('092 simulated: file hashes can never promote unrelated Core PID ancestry to verified',()=>{
+ const fake={...snapshot,processes:snapshot.processes.map(p=>p.pid===30?
+  {...p,parentPid:999}:p)};
+ const result=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,
+  probe:()=>({status:0,stdout:JSON.stringify(fake)}),realpath,
+  lstat:()=>{throw Error('file must not be consulted without Core ancestry');},
+  read:()=>{throw Error('file must not be consulted');},
+  readLock:()=>({state:'ABSENT'})});
+ assert.equal(result.status,'STATE_UNKNOWN');
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.code,'CORE_LINKED_NODE_NOT_OBSERVED');
+});
