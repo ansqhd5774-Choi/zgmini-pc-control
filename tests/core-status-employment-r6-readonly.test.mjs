@@ -99,7 +99,7 @@ test('core-status verifies stored R6 public-result checksum without leaking body
  fs.mkdirSync(results,{recursive:true});
  const body={kind:'EMPLOYMENT_R6_ONE_YEAR_STORED_DISPLAY_R1',
   asOfDate:'2026-11-20',sourceStoredAt:1795124109099,
-  methodologyVersion:'EMP-R6-FORMULA-R2',formulaHash:'sha256:'+'a'.repeat(64),
+  methodologyVersion:'EMP-R6-FORMULA-R2-CPS-2025-10',formulaHash:'sha256:'+'a'.repeat(64),
   indicators:Array.from({length:29},(_,i)=>({id:'F'+i,status:'READY'})),
   secret:'PRIVATE_RAW_PAYLOAD_NOT_FOR_CONTROLLER'};
  const hash=createHash('sha256').update(JSON.stringify(body)).digest('hex');
@@ -116,7 +116,7 @@ test('core-status verifies stored R6 public-result checksum without leaking body
   retiredTaskEvidence:()=> 'APPROVED_RETIRED_ABSENT'})
  const verified=read().checkpoints['local-writer-last-run.json'].employmentR6;
  assert.equal(verified.localResultReadback,'VERIFIED');
- assert.equal(verified.methodologyVersion,'EMP-R6-FORMULA-R2');
+ assert.equal(verified.methodologyVersion,'EMP-R6-FORMULA-R2-CPS-2025-10');
  assert.equal(verified.formulaHash,'sha256:'+'a'.repeat(64));
  assert.equal(verified.localResultHash,hash);
  assert.equal(verified.sourceStoredAt,1795124109099);
