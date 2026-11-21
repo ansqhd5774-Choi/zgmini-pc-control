@@ -70,11 +70,11 @@ test('distinguishes 251 valid points from verified 252-point history',()=>{
   assert.equal(got.historyPoints,251);
  }finally{x.clean();}
 });
-test('missing last run and symlink are not reported as a completed readback',()=>{
+test('missing last run and directory substitution are not reported as completed',()=>{
  const x=fixture();try{
   fs.unlinkSync(x.report);
   assert.equal(inspectW03PaidPrivateReadonly({root:x.root}).code,'W03_LAST_RUN_W03_FILE_NOT_FOUND');
-  fs.symlinkSync(path.win32.join(x.dir,'derived','private-theme-'+x.digest+'.json'),x.report,'file');
+  fs.mkdirSync(x.report);
   assert.equal(inspectW03PaidPrivateReadonly({root:x.root}).code,'W03_LAST_RUN_W03_FILE_UNSAFE');
  }finally{x.clean();}
 });
