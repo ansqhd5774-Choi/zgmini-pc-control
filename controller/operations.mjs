@@ -118,7 +118,7 @@ function r6LocalResultReadback(root,checksum,asOfDate,sourceStoredAt){
     ||body.asOfDate!==asOfDate||body.sourceStoredAt!==sourceStoredAt)
     return 'METADATA_MISMATCH';
   // Model provenance is read exclusively from the same checksum-verified body.
-  if(!/^EMP-R6-FORMULA-R[0-9]{1,2}$/.test(body.methodologyVersion??'')
+  if(!/^EMP-R6-FORMULA-R(?:[0-9]{1,2}|2-CPS-2025-10)$/.test(body.methodologyVersion??'')
     ||!/^sha256:[a-f0-9]{64}$/.test(body.formulaHash??''))return 'MODEL_PROVENANCE_INVALID';
   return {status:'VERIFIED',methodologyVersion:body.methodologyVersion,
    formulaHash:body.formulaHash};
