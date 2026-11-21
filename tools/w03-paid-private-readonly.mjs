@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {inspectW03PaidSourceCoverage} from './w03-paid-source-coverage-readonly.mjs';
 
 const ROOT='E:\\ZGmini\\data';
 const SHA=/^[0-9a-f]{64}$/;
@@ -110,11 +111,14 @@ export function inspectW03PaidPrivateReadonly({root=ROOT,fileSystem=fs}={}){
   prev=date;
  }
  if(prev!==common.confirmedDate)return UNKNOWN('W03_DERIVED_LAST_DATE_MISMATCH',common);
+ const sourceCoverage=dates.length<252?
+  inspectW03PaidSourceCoverage({root,fileSystem,report,record}):null;
  return {status:dates.length===252?'PASS':'PARTIAL',code:dates.length===252?
   'W03_AI_PRIVATE_252_READBACK_VERIFIED':'W03_AI_PRIVATE_PARTIAL_HISTORY',
   ...common,themeId:ID,privateStoreStatus:STATUS,privateThemeCount:stored.count,
   privateBodySha256:stored.bodySha256,historyPoints:dates.length,
   firstDate:dates.length?dates[0].date:null,lastDate:prev,
   sourceVersion:record.sourceVersion,registrySha256:record.registrySha256,
+  ...(sourceCoverage?{sourceCoverage}:{}),
   operationalWrites:0,providerCalls:0,d1Writes:0};
 }
