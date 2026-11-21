@@ -53,6 +53,10 @@ test('exact stored receipt lineage gives metadata only for five selected tickers
   assert.equal(r.spySessions,70);
   assert.equal(r.perSymbol.WISE.storedSessions,60);
   assert.equal(r.perSymbol.WISE.first40RealSessionsDate,dates[49]);
+  assert.equal(r.perSymbol.WISE.longestContinuousSpySessions,60);
+  assert.equal(r.perSymbol.WISE.first40ContinuousSpySessionsDate,dates[49]);
+  assert.equal(r.perSymbol.IGV.longestContinuousSpySessions,16);
+  assert.equal(r.perSymbol.IGV.first40ContinuousSpySessionsDate,null);
   assert.equal(r.perSymbol.IGV.storedSessions,16);
   assert.equal(r.perSymbol.IGV.first40RealSessionsDate,null);
   assert.equal(r.perSymbol.SPY.storedSessions,70);
