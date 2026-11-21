@@ -23,6 +23,8 @@ on:
       - 'controller/theme-nine-r32-raw-coverage-readonly.mjs'
       - 'tests/theme-nine-r32-raw-coverage-readonly.test.mjs'
       - 'controller/core-runtime-source-wmi.mjs'
+      - 'controller/inflation-census-m3-archived-headers-readonly.mjs'
+      - 'controller/inflation-census-m3-archived-headers-readonly.test.mjs'
       - 'controller/inflation19-runtime-readonly.mjs'
       - 'tests/w01-inflation7-writer-ledger-existing-a.test.mjs'
       - 'controller/inflation-event129-evidence-readonly.mjs'
@@ -333,6 +335,9 @@ jobs:
       - name: Verify W01 R2 both checkpoint branches in read-only insert preview
         if: steps.scope.outputs.w01 == 'true'
         run: node --test writer-b/w01-r2-two-branch-preview.test.mjs
+      - name: Verify W01 Census #28 archived-header A safe reader on current main
+        if: steps.scope.outputs.w01 == 'true'
+        run: node --test --test-concurrency=1 controller/inflation-census-m3-archived-headers-readonly.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         if: steps.scope.outputs.w01 == 'true'
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
