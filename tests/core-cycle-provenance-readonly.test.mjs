@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectStoredCoreCycleEvidence,verifyStoredCoreCycle} from '../controller/core-cycle-provenance-readonly.mjs';
+import {inspectStoredCoreCycleEvidence,verifyStoredCoreCycle,verifyPinnedCheckoutGit} from '../controller/core-cycle-provenance-readonly.mjs';
 import {inspectCoreRuntimeSource} from '../controller/core-runtime-source-readonly.mjs';
 import {validatePreimageApproval} from '../controller/preimage-manifest-contract.mjs';
 
@@ -40,7 +40,7 @@ function fixture(){
 test('valid finished cycle binds task at source start to exact installed bytes, collection and Writer',()=>{
  const f=fixture();
  try{
-  const out=inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t});
+  const out=inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t,checkoutProof:()=>({status:'PASS',head:source})});
   assert.equal(out.status,'PASS');
   assert.equal(out.runtimeSourceVerified,true);
   assert.equal(out.activeCoreSourceVerified,false);
@@ -77,18 +77,18 @@ test('symlink escape and changed/missing source bytes never turn into proof',()=
   try{fs.symlinkSync(path.join(f.dataRoot,'config.json'),m,'file');symlinkCreated=true;}
   catch(e){if(!['EPERM','EACCES','ENOTSUP'].includes(e.code))throw e;}
   if(symlinkCreated){
-   assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t}).status,'STATE_UNKNOWN');
+   assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t,checkoutProof:()=>({status:'PASS',head:source})}).status,'STATE_UNKNOWN');
    fs.unlinkSync(m);
   }
   fs.writeFileSync(m,'tampered-source');
-  assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t}).status,'STATE_UNKNOWN');
+  assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t,checkoutProof:()=>({status:'PASS',head:source})}).status,'STATE_UNKNOWN');
  }finally{fs.rmSync(f.temp,{recursive:true,force:true});}
 });
 test('live not-running snapshot may use valid captured cycle, not invent an active Task',()=>{
  const fake={ok:true,engines:[],processes:[],taskStateBefore:3,taskStateAfter:3,
   runningInstances:0};
  const f=fixture();try{
-  const origin=()=>inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t});
+  const origin=()=>inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t,checkoutProof:()=>({status:'PASS',head:source})});
   const got=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,
    probe:()=>({status:0,stdout:JSON.stringify(fake)}),
    readLock:()=>({state:'ABSENT'}),recentCycleReader:origin});
@@ -117,4 +117,20 @@ test('092 preimage A has exactly seven fixed .mjs source paths and forbids other
  assert.deepEqual(approved.files.map(v=>v.change),['M','M','M','M','A','A','A']);
  assert.ok(approved.files.every(v=>v.path.endsWith('.mjs')));
  assert.equal(approved.sourceRoot,'projects/zgmini-earnings-history-pc-release');
+});
+
+test('approved source may be an isolated clean PC-local Git commit, without GitHub object lookup',()=>{
+ const exec=(bin,args)=>{
+  assert.match(bin,/git\.exe$/i);
+  assert.ok(args.includes('--no-optional-locks'));
+  if(args.includes('rev-parse'))return source+'\n';
+  if(args.includes('status'))return '';
+  throw Error('unexpected read');
+ };
+ const valid=verifyPinnedCheckoutGit({fileSystem:{existsSync:()=>true},exec});
+ assert.equal(valid.status,'PASS');
+ assert.equal(valid.head,source);
+ assert.equal(verifyPinnedCheckoutGit({fileSystem:{existsSync:()=>true},
+  exec:(bin,args)=>args.includes('rev-parse')?source+'\n':' M scripts/pc-writer/local-cycle.mjs'}).code,'CORE_RECENT_SOURCE_DIRTY');
+ assert.equal(verifyPinnedCheckoutGit({fileSystem:{existsSync:()=>false}}).status,'UNVERIFIED');
 });
