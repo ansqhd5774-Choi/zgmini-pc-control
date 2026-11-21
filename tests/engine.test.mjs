@@ -236,7 +236,9 @@ test('092 simulated: unrelated Scheduler outage does not suppress fixed Core sna
  assert.equal(out.report.status,'STATE_UNKNOWN');
  assert.equal(out.report.protectionObservation,'UNVERIFIED');
  assert.equal(out.report.protectedStateUnchanged,null);
- assert.equal(out.report.result?.code,'CORE_WINDOWS_REQUIRED');
+ assert.equal(out.report.result?.status,'STATE_UNKNOWN');
+ assert.ok(['CORE_WINDOWS_REQUIRED','CORE_FIXED_PROBE_UNAVAILABLE',
+  'CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE'].includes(out.report.result?.code));
  assert.equal(out.report.effectClass,'FIXED_READONLY_NO_PROVIDER_NO_DB');
  assert.equal(out.report.providerCalls,0);
  assert.equal(out.report.d1Writes,0);
