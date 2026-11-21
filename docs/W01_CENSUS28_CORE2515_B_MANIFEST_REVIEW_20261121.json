@@ -1,0 +1,73 @@
+{
+  "schema": "W01_CENSUS28_B_MANIFEST_REVIEW_CANDIDATE_V1",
+  "status": "REVIEW_REQUIRED_NOT_AUTHORIZED",
+  "sourceApprovalPath": "approvals/inflation-manual-b/official-static-two-source-w01-v2-approved-20261116.json",
+  "approvedManifestBlobSha": "80cff90f537a4fe10810d6a525ded3c35f23bfec",
+  "change": "EXACT_SOURCE_PREIMAGE_CORE_SHA_ONLY",
+  "changedFile": "scripts/pc-writer/local-cycle.mjs",
+  "approvedCoreSha256": "2e6200e5637fb99f339fdc74a64592f34c1272423a39366b8559c16ea1b13b5d",
+  "observedCoreSha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75",
+  "otherSourceHashesMatch": true,
+  "sourceEvidence": [
+    "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2607",
+    "https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/2609"
+  ],
+  "contractSourceIntegratedAt": "43d6122367e7908f166780679a2d1ae5757696d4",
+  "executionRestrictions": {
+    "authorization": false,
+    "approvedManifestUnchanged": true,
+    "issueCreationAllowed": false,
+    "providerCallsAllowed": false,
+    "operationOwnerVerified": false,
+    "coreTaskSourceLinked": false,
+    "firstRequiredCondition": "VALID_EFFECT_APPROVAL_AND_EXACT_IMMUTABLE_MANIFEST",
+    "secondRequiredCondition": "NATURAL_CORE_TASK_PID_LOCK_OWNER_EVIDENCE",
+    "history": "Do not rerun original #1818 B request",
+    "deployment": "NO_CONTROLLER_OR_WRITER_INSTALL_OR_LIVE_RUN"
+  },
+  "manifestCandidate": {
+    "schema": "ZGMINI_INFLATION_OFFICIAL_MANUAL_B_APPROVAL_V2",
+    "status": "PROPOSED_NOT_APPROVED",
+    "scope": "INFLATION_OFFICIAL_STATIC_TWO_RAW_JSON_ONLY",
+    "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+    "sourceFiles": [
+      {
+        "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-r1.mjs",
+        "sha256": "53c01bbc129e1c4c5ff129d37fae8e0ff801c30bfe50a6ad0ab1227d394a5ed6"
+      },
+      {
+        "path": "scripts/pc-writer/inflation-causal-candidate-manual-official-store-r1.mjs",
+        "sha256": "3ef346bd5e240cdcdbd741a0f62b665bba42bf33556e37a6efa359f07de834ec"
+      },
+      {
+        "path": "lib/diagnostic-layer/xlsx-lite.mjs",
+        "sha256": "44d4c230a0620faea0d8bb2575e6f13c9ab7cfb5700aa11d752017db747f619a"
+      },
+      {
+        "path": "scripts/pc-writer/local-cycle.mjs",
+        "sha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75"
+      }
+    ],
+    "providerUrls": {
+      "bls": "https://download.bls.gov/pub/time.series/cu/cu.data.12.USHousing",
+      "census": "https://www.census.gov/manufacturing/m3/prel/historical_data/histshts/naics/naicsinvp.xlsx"
+    },
+    "targetFiles": {
+      "bls": "E:\\ZGmini\\data\\pc-writer\\inflation-causal-candidates-r1\\bls-cpi-ppi3.json",
+      "census": "E:\\ZGmini\\data\\pc-writer\\inflation-causal-candidates-r1\\census-m3-manufacturing-inventories.json"
+    },
+    "maxBytes": {
+      "bls": 8000000,
+      "census": 6000000
+    },
+    "timeoutMs": 40000,
+    "runCount": 1,
+    "coreLeaseMode": "EXCLUSIVE_EXISTING_LOCAL_CYCLE_LOCK",
+    "allowDbWrites": false,
+    "allowD1Writes": false,
+    "allowTaskChanges": false,
+    "allowSourceChanges": false,
+    "allowOtherWrites": false,
+    "sourcePolicy": "CLEAN_CONFIGURED_HEAD_AND_FIXED_IMPORT_CLOSURE"
+  }
+}
