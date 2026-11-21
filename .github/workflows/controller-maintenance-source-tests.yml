@@ -163,6 +163,8 @@ on:
       - 'tests/source-inventory-runtime-readonly.test.mjs'
       - 'tests/sqlite-readonly-contract.test.mjs'
       - 'tests/employment-r6-collection-evidence-readonly.test.mjs'
+      - 'controller/employment-r6-d1-readback-readonly.mjs'
+      - 'tests/employment-r6-d1-readback-readonly.test.mjs'
       - 'inflation-manual-b/contract.test.mjs'
       - 'inflation-manual-b/coordinator.test.mjs'
       - 'inflation-manual-b/core-task-event-owner-proof.test.mjs'
@@ -251,6 +253,9 @@ jobs:
         # Do not fail unrelated source tests because an optional fixture is absent.
         if: steps.scope.outputs.core == 'true' && hashFiles('tests/w04-pit0801-minimal-overlay.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/w04-pit0801-minimal-overlay.test.mjs
+      - name: Verify W04 fixed-key D1 readback without network or operational effects
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/employment-r6-d1-readback-readonly.test.mjs
       - name: Run scoped maintenance and Controller runtime safety regressions
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/maintenance-agent.test.mjs tests/maintenance-lock.test.mjs tests/maintenance-contract.test.mjs tests/source-bundle-register.test.mjs tests/controller-heavy-only-install.test.mjs tests/controller-selective-source.test.mjs tests/maintenance-apply.test.mjs tests/core-task-observation.test.mjs tests/controller-core-lock-source-contract.test.mjs tests/supervisor-status-write.test.mjs tests/runner-watchdog.test.mjs tests/watchdog-b-upgrade.test.mjs tests/watchdog-b-protection-r2.test.mjs tests/watchdog-protected-drift.test.mjs tests/watchdog-guardian-activation.test.mjs tests/watchdog-activation-first-fail.test.mjs tests/watchdog-handoff-firstfail.test.mjs tests/rollback-stalled-claim.test.mjs tests/rollback-first-evidence.test.mjs
