@@ -1,0 +1,24 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "filePath": "scripts/pc-writer/local-cycle.mjs",
+  "beforeSha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75",
+  "insertions": [
+    {
+      "anchor": "import fs from 'node:fs';",
+      "position": "after",
+      "text": "import {createHash} from 'node:crypto';\nimport {newCoreCycleId} from './core-cycle-id.mjs';\nimport {captureCoreOriginAtStart} from './core-origin-runtime.mjs';\n"
+    },
+    {
+      "anchor": "fs.writeFileSync(file,JSON.stringify({pid:process.pid,at:Date.now()}),{flag:'wx'});",
+      "position": "after",
+      "text": "const cycleStartedAt=Date.now(),coreCycleId=newCoreCycleId();\nprocess.env.ZGMINI_CORE_CYCLE_ID=coreCycleId;\nconst coreOrigin=process.argv.includes('--publish')&&!process.argv.includes('--korea')?\n captureCoreOriginAtStart({startedAt:cycleStartedAt}):\n {status:'UNVERIFIED',code:'CORE_ORIGIN_OUTSIDE_APPROVED_LANE',ownerCreatedAtMs:null};\nconst checkoutSourceAtStart=(()=>{\n try{const p=spawnSync('git',['rev-parse','HEAD'],{cwd:path.resolve(here,'../..'),encoding:'utf8',windowsHide:true,timeout:4000});\n const s=typeof p?.stdout==='string'?p.stdout.trim():'';\n return p?.status===0&&/^[a-f0-9]{40}$/.test(s)?s:null;}catch{return null;}\n})();\nconst fileHash=n=>{\n try{const p=path.join(here,n),st=fs.lstatSync(p);\n if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>100000)return null;\n const b=fs.readFileSync(p);return b.length===st.size?createHash('sha256').update(b).digest('hex'):null;}catch{return null;}\n};\nconst entrypointSha256=(()=>{\n try{return createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex');}\n catch{return null;}\n})();\nconst coreProofFileSha256=Object.fromEntries([\n 'core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi.mjs'\n].map(n=>[n,fileHash(n)]));\n"
+    },
+    {
+      "anchor": " save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));",
+      "position": "before",
+      "text": " report.coreCycleId=coreCycleId;\n report.coreCycleStartedAt=new Date(cycleStartedAt).toISOString();\n report.coreCheckoutSourceSha=checkoutSourceAtStart;\n report.coreEntrypointSha256=entrypointSha256;\n report.coreProofFileSha256=coreProofFileSha256;\n report.coreProcessPid=process.pid;report.coreParentPid=process.ppid;\n report.coreOriginEvidence=coreOrigin.status==='PASS'?'TASK_ENGINE_WMI_CAPTURED_AT_START':'START_ONLY_UNVERIFIED';\n report.coreOriginCode=coreOrigin.code;report.coreNodeCreatedAtMs=coreOrigin.ownerCreatedAtMs;\n"
+    }
+  ]
+}

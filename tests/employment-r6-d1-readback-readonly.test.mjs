@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {verifyR6D1Row,R6_KEY,inspectEmploymentR6D1Readback} from '../controller/employment-r6-d1-readback-readonly.mjs';
+import {verifyR6D1Row,R6_KEY,inspectEmploymentR6D1Readback,classifyR6ReadFailure,selectR6GitBinary} from '../controller/employment-r6-d1-readback-readonly.mjs';
 
 const body={kind:'EMPLOYMENT_R6_ONE_YEAR_STORED_DISPLAY_R1',
  methodologyVersion:'EMP-R6-FORMULA-R2-CPS-2025-10',
@@ -58,4 +58,32 @@ test('invalid unapproved host input does not query D1',async()=>{
   queryFixed:async()=>{queried=true;return row;}});
  assert.equal(queried,false);
  assert.equal(result.status,'STATE_UNKNOWN');
+});
+
+test('R6 read failures expose only bounded phase and allowlisted error',()=>{
+ for(const [phase,code] of [
+  ['CHECKOUT_RESOLVE','R6_D1_CHECKOUT_UNAVAILABLE'],
+  ['CHECKOUT_HEAD','R6_D1_GIT_HEAD_FAILED'],
+  ['CHECKOUT_FILE_INTEGRITY','R6_D1_GIT_INTEGRITY_FAILED'],
+  ['CLIENT_IMPORT','R6_D1_CLIENT_IMPORT_FAILED'],
+  ['D1_SELECT','R6_D1_QUERY_FAILED']]){
+  const result=classifyR6ReadFailure(phase,new Error('private credential abc 123'));
+  assert.equal(result.code,code);
+  assert.equal(result.failurePhase,phase);
+  assert.equal(JSON.stringify(result).includes('credential abc'),false);
+  assert.equal(result.operationalWrites,0);
+ }
+ const authenticated=classifyR6ReadFailure('D1_SELECT',new Error('WRANGLER_LOGIN_REQUIRED'));
+ assert.equal(authenticated.safeError,'WRANGLER_LOGIN_REQUIRED');
+ const other=classifyR6ReadFailure('D1_SELECT',new Error('HTTP TOKEN=secret'));
+ assert.equal(Object.hasOwn(other,'safeError'),false);
+});
+
+test('R6 Reader uses fixed installed Windows Git, never PATH-only git',()=>{
+ const winA='C:\\Program Files\\Git\\cmd\\git.exe';
+ const winB='C:\\Program Files (x86)\\Git\\cmd\\git.exe';
+ assert.equal(selectR6GitBinary({platform:'win32',exists:p=>p===winA}),winA);
+ assert.equal(selectR6GitBinary({platform:'win32',exists:p=>p===winB}),winB);
+ assert.equal(selectR6GitBinary({platform:'win32',exists:()=>false}),null);
+ assert.equal(selectR6GitBinary({platform:'linux',exists:()=>false}),'git');
 });
