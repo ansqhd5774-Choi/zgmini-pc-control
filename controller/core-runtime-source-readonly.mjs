@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {inspectStoredCoreCycleEvidence} from './core-cycle-provenance-readonly.mjs';
 
 const nodePath=String.raw`E:\ZGmini\runtime\node.exe`;
 const projectsRoot=String.raw`E:\ZGmini\projects`;
@@ -178,6 +179,7 @@ export function inspectCoreRuntimeSource({platform=process.platform,
  probe=spawnSync,exists=fs.existsSync,realpath=fs.realpathSync.native,
  lstat=fs.lstatSync,read=fs.readFileSync,
  readLock=readCoreLockSnapshot,
+ recentCycleReader=inspectStoredCoreCycleEvidence,
  systemRoot=process.env.SystemRoot??String.raw`C:\Windows`}={}){
  if(platform!=='win32')return unknown('CORE_WINDOWS_REQUIRED');
  const cscript=path.win32.join(systemRoot,'System32','cscript.exe');
@@ -194,7 +196,24 @@ export function inspectCoreRuntimeSource({platform=process.platform,
   const lockAfter=readLock();
   const lockOwner=classifyCoreLockOwner(snapshot,lockBefore,lockAfter,{realpath});
   const classified=classifyCoreSnapshot(snapshot,{realpath});
-  if(classified.status!=='PASS')return {...classified,lockOwner};
+  if(classified.status!=='PASS'){
+    // A completed natural cycle is stronger than guessing at a 5-minute Task
+    // snapshot, but only after its exact in-cycle TaskEngine/WMI proof, approved
+    // source HEAD, collection+Writer cycle IDs and installed file bytes match.
+    // No override for a live but wrong source, invalid WMI inventory, or drift.
+    const eligible=new Set(['CORE_TASK_NOT_RUNNING_AT_SNAPSHOT',
+      'CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE','CORE_NO_ACTIVE_TASK_ENGINE',
+      'CORE_TASK_ENGINE_PID_UNAVAILABLE']);
+    if(eligible.has(classified.code)){
+      const recent=recentCycleReader();
+      if(recent.status==='PASS')return {...recent,
+        liveSnapshot:{status:classified.status,code:classified.code,
+          taskObservation:classified.taskObservation??null},lockOwner};
+      return {...classified,lockOwner,
+        recentCycleEvidence:{status:recent.status,code:recent.code}};
+    }
+    return {...classified,lockOwner};
+  }
   const beforeFileSha256=hashActiveCoreFiles(classified.activeCoreRoot,{realpath,lstat,read});
   // Preserve the old top-level fail-closed contract when these particular
   // source file hashes cannot be proven. Do not discard independently verified
