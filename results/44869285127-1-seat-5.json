@@ -1,0 +1,198 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-44869285127-1-seat-5",
+  "requestId": "pc-9f6718a1-69a1-4a3e-a407-967aa1948c41",
+  "startedAt": "2026-11-21T05:06:42.670Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "24f1139b97712b2e1383650a78f65877f9d1ae67",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "0a674eac32418d0c1bd23a9a050b2202e8951f1a",
+  "sourceBranch": "main",
+  "operation": "inflation-a407-integrity-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "A407_STORED_25_LOCAL_FINGERPRINTS_VERIFIED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w01-a407-recovered-controller-20261121",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "A407_STORED_25_LOCAL_FINGERPRINTS_VERIFIED",
+    "expectedOriginal": 19,
+    "originalVerified": 19,
+    "expectedCandidate": 6,
+    "candidateVerified": 6,
+    "census": "MISSING",
+    "original": [
+      {
+        "id": "1",
+        "sha256": "ce1e66cbdf835fc223b571ace2e5703470192c063b46ff2cf90469e00f0093d4",
+        "proof": "PIT_SNAPSHOT_AND_CHUNKS_HASH_MATCHED",
+        "chunkCount": 1
+      },
+      {
+        "id": "3",
+        "sha256": "08cd2b3163b35edbcd289b0f0fa5e00b988a490413f0cc96a471c5bae021d0fd",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "4",
+        "sha256": "536c41a448bd616c57c8121324d0491abf577ea239a1bc3e103e16acff5e5b3f",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "5",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "6",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "7",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "8",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "9",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "10",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "11",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "12",
+        "sha256": "644f5ed49f3bdd0ce538700c3aca17fc72f47889228bc5b3569d70b5d59dced1",
+        "proof": "PIT_SNAPSHOT_AND_CHUNKS_HASH_MATCHED",
+        "chunkCount": 1
+      },
+      {
+        "id": "13",
+        "sha256": "337d398ce9b089d6d53de96826ee13e06bbeda44548ac5ff97caf93b8f19893c",
+        "proof": "PIT_SNAPSHOT_AND_CHUNKS_HASH_MATCHED",
+        "chunkCount": 1
+      },
+      {
+        "id": "14",
+        "sha256": "d285e4ff43d6abda1536e38f631cd7bd4d5022bda35dd0cdd67cca429d3441d2",
+        "proof": "PIT_SNAPSHOT_AND_CHUNKS_HASH_MATCHED",
+        "chunkCount": 1
+      },
+      {
+        "id": "18",
+        "sha256": "7acd2370565bda04312cc1cb3fb0bebe6301bca075378cd43d63ca1d5241c7cc",
+        "proof": "SQLITE_BODY_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "19",
+        "sha256": "497db9ddcaa879d7a133e99a0b0822c6b330df161cbd3d1ef5093f84db62d888",
+        "proof": "PIT_SNAPSHOT_AND_CHUNKS_HASH_MATCHED",
+        "chunkCount": 1
+      },
+      {
+        "id": "21",
+        "sha256": "d356450a3fe5bcede8250d5fb0f1db4f7620d2cf7a8052cfb2149cc116114aad",
+        "proof": "PARSED_AND_ARCHIVE_DOUBLE_READ_FINGERPRINT",
+        "archiveSha256": "b3f8104551277c1fdbef99187d650cb1739d8d4d6d4dcd8279457e36b9e1e3a1"
+      },
+      {
+        "id": "25",
+        "sha256": "d89839f0c17aef95ae5722eb2744a5f77152a4f09c3648ea3d235c96704a4050",
+        "proof": "SOURCE_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "26",
+        "sha256": "a28ae8937ab4c8c86d0be64abff0a1a795425695ca9d46ec5068766ae06def44",
+        "proof": "PARSED_AND_ARCHIVE_DOUBLE_READ_FINGERPRINT",
+        "archiveSha256": "815fd56d81e0a1f6bfad3c043754f929821b4302021abbf296e0fc76e46298d9"
+      },
+      {
+        "id": "31",
+        "sha256": "c640d45716436d32de9f0787eff2e26810e37b7afecf6b684b7c31c421d70717",
+        "proof": "SCE_PARSED_WITH_REFERENCE_FINGERPRINT",
+        "metadataSha256": "7ae1d3541a96037af0bfcbc6c9169afcfe8ee4ac8f5160f7bb3afbe8f63b0ea6",
+        "archiveRefSha256": "6512ecdeea161d2d96cc61e7d01bcbc5912495a245800d22f80187249b270280"
+      }
+    ],
+    "candidate": [
+      {
+        "id": "2",
+        "sha256": "3fd56a657c673603c6f083e307a30d2ddd72746a3d0e28d39496531220d692f6",
+        "proof": "CANDIDATE_PARSED_AND_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "16",
+        "sha256": "9c195071b3449579815290e98ed83466905ce5d3a72e19b45c37b2b22a2bfa69",
+        "proof": "CANDIDATE_PARSED_AND_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "22",
+        "sha256": "db31e003600a776e0fd6ac8dd6392da91bc51cbac56e6d97b918f1ea718ddff9",
+        "proof": "CANDIDATE_PARSED_AND_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "23",
+        "sha256": "db31e003600a776e0fd6ac8dd6392da91bc51cbac56e6d97b918f1ea718ddff9",
+        "proof": "CANDIDATE_PARSED_AND_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "24",
+        "sha256": "db31e003600a776e0fd6ac8dd6392da91bc51cbac56e6d97b918f1ea718ddff9",
+        "proof": "CANDIDATE_PARSED_AND_DOUBLE_READ_FINGERPRINT"
+      },
+      {
+        "id": "29",
+        "sha256": "c6b565a50582b572d81f673492d9c47a331a6725a5b740aa36b867dce9214df2",
+        "proof": "CANDIDATE_PARSED_AND_DOUBLE_READ_FINGERPRINT"
+      }
+    ],
+    "checkpoints": {
+      "inflation19": {
+        "sha256": "c3d47b10d9563af1565254d161b9e564444db7cd5325c3096e5faebf0b27a47b",
+        "proof": "CHECKPOINT_FILE_DOUBLE_READ_FINGERPRINT"
+      },
+      "candidates7": {
+        "sha256": "83451da23e8a6a2ce72c9f8c2665382fc878004b38b8dfdda735bf13ab69d871",
+        "proof": "CHECKPOINT_FILE_DOUBLE_READ_FINGERPRINT"
+      }
+    },
+    "evidenceScope": "FIXED_PRIVATE_SOURCES_READONLY",
+    "sqliteReadOnly": true,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteWrites": 0,
+    "sourceWrites": 0,
+    "taskChanges": 0,
+    "operationalWrites": 0
+  },
+  "protectedBeforeSha256": "a07df3b7a15885cc182121e3321733489f696c3c9e7549f1cf69e0965d8b7d62",
+  "protectedAfterSha256": "a07df3b7a15885cc182121e3321733489f696c3c9e7549f1cf69e0965d8b7d62",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "24f1139b97712b2e1383650a78f65877f9d1ae67",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-21T05:06:48.732Z",
+  "durationMs": 6062
+}
