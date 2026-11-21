@@ -41,6 +41,20 @@ test('verifies exactly 252 private score dates with byte SHA without exposing sc
   assert.equal(Object.hasOwn(got,'score'),false);
  }finally{x.clean();}
 });
+test('post-publish unchanged and D1-CAS statuses still verify private bytes',()=>{
+ const x=fixture();try{
+  for(const state of ['UNCHANGED_READBACK_VERIFIED','D1_CAS_READBACK_VERIFIED']){
+   x.run.status=state;fs.writeFileSync(x.report,JSON.stringify(x.run));
+   const got=inspectW03PaidPrivateReadonly({root:x.root});
+   assert.equal(got.status,'PASS');
+   assert.equal(got.code,'W03_AI_PRIVATE_252_READBACK_VERIFIED');
+   assert.equal(got.cycleStatus,state);
+   assert.equal(got.privateBodySha256,x.digest);
+  }
+  x.run.privateStored.status='PRIVATE_STORE_FAILED';fs.writeFileSync(x.report,JSON.stringify(x.run));
+  assert.equal(inspectW03PaidPrivateReadonly({root:x.root}).code,'W03_PRIVATE_STORE_NOT_VERIFIED');
+ }finally{x.clean();}
+});
 test('does not promote missing theme, waiting cycle, or failed storage',()=>{
  const x=fixture({includeTheme:false});try{
   assert.equal(inspectW03PaidPrivateReadonly({root:x.root}).code,'W03_AI_SOFTWARE_NOT_CALCULATED');
