@@ -15,7 +15,7 @@ function fixture(){
  const dataRoot=path.join(temp,'pc-writer'),checkoutRoot=path.join(temp,'checkout');
  const src=path.join(checkoutRoot,'scripts','pc-writer');
  fs.mkdirSync(dataRoot,{recursive:true});fs.mkdirSync(src,{recursive:true});
- const names=['local-cycle.mjs','core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi.js'];
+ const names=['local-cycle.mjs','core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi.mjs'];
  const hashes={};
  for(const name of names){const bytes=Buffer.from('approved '+name);
   hashes[name]=sha(bytes);fs.writeFileSync(path.join(src,name),bytes);}
@@ -60,7 +60,7 @@ test('missing Task origin, cross-cycle mismatch, stale evidence and source misma
    {collection:{...f.collector,coreCycleId:'other'}},
    {writer:{...f.writer,source:'b'.repeat(40)}},
    {now:t+2*3600000},
-   {installedHashes:{...f.hashes,'core-origin-wmi.js':'c'.repeat(64)}},
+   {installedHashes:{...f.hashes,'core-origin-wmi.mjs':'c'.repeat(64)}},
   ]){
    const out=verifyStoredCoreCycle({...base,...mutated});
    assert.equal(out.status,'STATE_UNKNOWN',JSON.stringify(mutated).slice(0,95));
@@ -70,7 +70,7 @@ test('missing Task origin, cross-cycle mismatch, stale evidence and source misma
 });
 test('symlink escape and changed/missing source bytes never turn into proof',()=>{
  const f=fixture();try{
-  const m=path.join(f.src,'core-origin-wmi.js');
+  const m=path.join(f.src,'core-origin-wmi.mjs');
   fs.unlinkSync(m);
   let symlinkCreated=false;
   try{fs.symlinkSync(path.join(f.dataRoot,'config.json'),m,'file');symlinkCreated=true;}
