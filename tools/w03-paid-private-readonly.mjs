@@ -66,7 +66,10 @@ export function inspectW03PaidPrivateReadonly({root=ROOT,fileSystem=fs}={}){
  const report=run.value;
  const common={cycleStatus:safeCode(report.status),confirmedDate:safeDate(report.confirmedDate),
   sourceLatestDate:safeDate(report.sourceLatestDate),lastRunBodySha256:run.bodySha256};
- if(report.status!=='PRIVATE_CALCULATED')
+ // Publisher changes only the top-level status after the private calculation and
+ // local SHA readback. Do not mistake an unchanged public CAS for no private run.
+ if(!['PRIVATE_CALCULATED','UNCHANGED_READBACK_VERIFIED',
+   'D1_CAS_READBACK_VERIFIED'].includes(report.status))
   return UNKNOWN('W03_CYCLE_NOT_CALCULATED',common);
  const privateResult=Array.isArray(report.privateResults)?
   report.privateResults.find(r=>r?.id===ID):null;
