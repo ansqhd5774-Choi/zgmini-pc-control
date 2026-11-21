@@ -12,7 +12,7 @@ const SHA40=/^[0-9a-f]{40}$/;
 const SHA256=/^[0-9a-f]{64}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const PROOF_FILES=Object.freeze([
- 'core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi.js'
+ 'core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi.mjs'
 ]);
 const invalid=code=>({status:'STATE_UNKNOWN',code,runtimeSourceVerified:false,
  recentCoreSourceVerified:false,evidenceLevel:'HISTORICAL_CYCLE_UNVERIFIED',
