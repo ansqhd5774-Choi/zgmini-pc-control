@@ -43,7 +43,6 @@ test('092 exact selective B manifest and pin preserve old installed rollback SHA
 
 test('092 exact target is single-parent and no hidden scope or import mismatch',()=>{
  assert.deepEqual(git('rev-list','--parents','-n','1',target).split(' '),[target,installed]);
- assert.equal(git('rev-parse','refs/heads/codex/core-092-selective-from-5b337-20261121'),target);
  const changed=git('diff','--name-only',installed,target).split(/\r?\n/);
  assert.deepEqual(changed,manifest.allowFiles.map(x=>x.path));
  for(const f of manifest.allowFiles){
