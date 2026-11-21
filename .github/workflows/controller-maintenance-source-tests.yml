@@ -142,6 +142,7 @@ on:
       - 'tests/rollback-first-evidence.test.mjs'
       - 'tests/maintenance-apply.test.mjs'
       - 'tests/controller-selective-source.test.mjs'
+      - 'tests/core-092-selective-b-20261121.test.mjs'
       - 'tests/controller-import-closure.test.mjs'
       - 'tests/controller-entry-import-receipt.test.mjs'
       - 'tests/w04-pit0801-minimal-overlay.test.mjs'
@@ -242,6 +243,9 @@ jobs:
       - name: Verify missing engine import produces a report receipt
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
+      - name: Verify 092 exact selective B source, old CAS and file hashes
+        if: steps.scope.outputs.core == 'true' && hashFiles('tests/core-092-selective-b-20261121.test.mjs') != ''
+        run: node --test --test-concurrency=1 tests/core-092-selective-b-20261121.test.mjs
       - name: Verify W04 recovery target provenance-only delta and full import closure
         # Some PR head refs predate this dedicated W04-only historical fixture.
         # Do not fail unrelated source tests because an optional fixture is absent.
