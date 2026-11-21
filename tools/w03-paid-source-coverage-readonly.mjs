@@ -110,17 +110,24 @@ function verifyGeneration(home,universe,root,report,record,sys){
  const perSymbol=Object.fromEntries(SYMBOLS.map(s=>{
   const days=[...seen[s]].filter(d=>seen.SPY.has(d)).sort();
   let consecutive=0,longest=0,longestBeforeNov02=0,first40ContinuousDate=null;
+  let maxContinuousEndingInWiseAumWindow=0,daysWith40ContinuousInWiseAumWindow=0;
   for(const d of spyDays){
    consecutive=seen[s].has(d)?consecutive+1:0;
    longest=Math.max(longest,consecutive);
    if(d<'2026-11-02')longestBeforeNov02=Math.max(longestBeforeNov02,consecutive);
    if(!first40ContinuousDate&&consecutive>=40)first40ContinuousDate=d;
+   if(d>='2026-06-30'&&d<'2026-11-02'){
+    maxContinuousEndingInWiseAumWindow=Math.max(maxContinuousEndingInWiseAumWindow,consecutive);
+    if(consecutive>=40)daysWith40ContinuousInWiseAumWindow++;
+   }
   }
   return [s,{storedSessions:days.length,firstDate:days[0]??null,
    lastDate:days.at(-1)??null,first40RealSessionsDate:days[39]??null,
    longestContinuousSpySessions:longest,
    longestContinuousSpySessionsBefore20261102:longestBeforeNov02,
    first40ContinuousSpySessionsDate:first40ContinuousDate,
+   maxContinuousEndingIn20260630To20261101:maxContinuousEndingInWiseAumWindow,
+   daysWith40ContinuousEndingIn20260630To20261101:daysWith40ContinuousInWiseAumWindow,
    sessionsBefore20261102:days.filter(d=>d<'2026-11-02').length,
    sessionsOnOrAfter20261102:days.filter(d=>d>='2026-11-02').length}];
  }));
