@@ -201,7 +201,7 @@ export function inspectCoreRuntimeSource({platform=process.platform,
   // live TaskEngine/WMI ancestry; it is not a replacement for file provenance.
   if(!beforeFileSha256)return {...unknown('CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE'),
    runtimeProcessEvidence:classified,sourceFileHashesVerified:false,
-   sourceFileHashCode:'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE',lockOwner};
+   sourceFileHashCode:'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE',beforeFileSha256:null,lockOwner};
   return {...classified,sourceFileHashesVerified:true,
    sourceFileHashCode:null,beforeFileSha256,lockOwner};
  }catch{return unknown('CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE');}
