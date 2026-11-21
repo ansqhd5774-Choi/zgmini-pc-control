@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_W04_R6_D1_B_REVIEW_ONLY",
+  "installedSha": "8307767b575287d4d3267ea90de3b82c5dba2f65",
+  "targetSha": "385035320427a80c6e1e470e5cc2639fabf1e580",
+  "sourceMainSha": "01dcdc77483154951f8498ffd4fc4fb297299012",
+  "allowFiles": [
+    {
+      "path": "controller/employment-r6-d1-readback-readonly.mjs",
+      "sha256": "204952dc5a5ddca43b44a9f3695e978bcc29db8a735a14a8c6b20fc6040cde5d"
+    }
+  ],
+  "previewOnly": true
+}
