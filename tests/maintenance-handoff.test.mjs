@@ -145,7 +145,7 @@ test('seven-to-seven rollback plan preserves all original runtime files and neve
  assert.deepEqual(first.writes,nextRuntimeFiles);
  assert.deepEqual(first.rollbackAdded,['tools/source-bundle-register.mjs']);
 });
-test('seven-to-seven rejects symlinks, hardlinks and parent aliases even with matching bytes',t=>{
+test('seven-to-seven rejects symlinks, hardlinks and parent aliases even with matching bytes',async t=>{
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-handoff-file-scope-'));
  t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
  const target=path.join(temp,'receiver');fs.mkdirSync(path.join(target,'tools'),{recursive:true});
@@ -158,17 +158,24 @@ test('seven-to-seven rejects symlinks, hardlinks and parent aliases even with ma
  assert.throws(()=>requireDirectInstalledFiles(target,['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
  fs.unlinkSync(alias);
  fs.unlinkSync(installed);
- fs.symlinkSync(external,installed);
- assert.throws(()=>requireDirectInstalledFiles(target,['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
- fs.unlinkSync(installed);
+ await t.test('file symlink is rejected when the OS permits creating the fixture',sub=>{
+  try{fs.symlinkSync(external,installed);}catch(error){
+   if(process.platform==='win32'&&error.code==='EPERM'){
+    sub.skip('Windows file-symlink creation privilege unavailable; no privilege change');return;
+   }
+   throw error;
+  }
+  assert.throws(()=>requireDirectInstalledFiles(target,['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
+  fs.unlinkSync(installed);
+ });
  fs.rmSync(path.join(target,'tools'),{recursive:true,force:true});
- fs.symlinkSync(path.dirname(external),path.join(target,'tools'),'dir');
+ fs.symlinkSync(path.dirname(external),path.join(target,'tools'),process.platform==='win32'?'junction':'dir');
  assert.throws(()=>requireDirectInstalledFiles(target,['tools/outside.mjs']),/HANDOFF_PATH_ALIAS/);
  const realParent=path.join(temp,'real-parent');
  fs.mkdirSync(path.join(realParent,'receiver','tools'),{recursive:true});
  fs.writeFileSync(path.join(realParent,'receiver','tools','update.mjs'),'matching bytes');
  const linkedParent=path.join(temp,'junction-like-parent');
- fs.symlinkSync(realParent,linkedParent,'dir');
+ fs.symlinkSync(realParent,linkedParent,process.platform==='win32'?'junction':'dir');
  assert.throws(()=>requireDirectInstalledFiles(path.join(linkedParent,'receiver'),
   ['tools/update.mjs']),/HANDOFF_PATH_ALIAS/);
 });
