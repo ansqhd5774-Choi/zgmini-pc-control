@@ -7,6 +7,10 @@
 - [복구 결과](https://github.com/ansqhd5774-Choi/zgmini-pc-control/issues/319#issuecomment-6635620932): `ABORTED_UNTOUCHED` / `DEAD_PREVALIDATION_LEASE_ARCHIVED`, UTC `2026-11-04T16:10:25.084Z`, archive `pc-update-9f22c05c-2735-4d63-81c8-b88c6d332d9a-91e60677-9b52-4535-bf4a-95bdace558c7.lease`. 기존 Controller SHA `14940aa112494b1cea09ff5c7250f4af86a4ce6a`, `controllerChanged=false`, `originalRequestRetried=false`, `coreDbD1Writes=0`, `reportUpload=VERIFIED`.
 - 이전 설치 lease는 보관됐지만 새로운 Controller 버전 설치·복구 후 Supervisor heartbeat/owner·6 Runner 신선도 검증은 **별도 단계**다. 당시 원본 update 결과와 복구 결과를 합쳐 설치 PASS로 표시하지 않는다. 다른 정상 업무가 #319 과거 이력을 매번 재검사하게 하지 않는다.
 
+## 정상 운영 복귀 우선 (2026-11-21)
+
+[모든 변경 작업의 공통 복귀 기준](ROLLBACK_FIRST_WORKFLOW.md)을 적용한다. 원래 사후검사의 실행 단계가 terminal failure로 확정되면 결과 업로드 부재만으로 영구 UNKNOWN에 두지 않고, 정확한 원본 증거를 검증해 기존 백업 복원 경로로 연결한다. 단순 timeout/취소/권한 실패만으로 자동 롤백하지 않는다. `ROLLED_BACK`은 이전 운영 정상 복구이며 신규 기능 성공이 아니다. 원래 실패와 복구 실패의 코드를 각각 보존한다.
+
 ## 목적과 담당
 
 모든 기능에 적용하는 공통 절차다. #68의 단일 복구 담당이 기존 실패 Issue와 requestId를 소유하고 상태·도구·해제 조건·후속 담당을 기록한다. 단순히 다른 담당자 대기라고 보고하지 않는다. 진단·개발·이미 가능한 읽기 전용 작업은 계속하고 공유 설치만 보류한다.

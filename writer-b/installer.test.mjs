@@ -536,3 +536,23 @@ test('late-window restore uncertainty retains the original claim without another
  assert.equal(out.recovery,'RECONCILE_EXACT_REQUEST_NO_RETRY');
  assert.equal(state.retained,true);assert.equal(state.steps.includes('switch'),false);
 });
+
+test('late failure reacquires a maintenance window before restoring an already resumed Writer',async()=>{
+ const {io,state}=mockIO();let checks=0;const verify=io.assertWriterSource;
+ io.assertWriterSource=async()=>{await verify();if(++checks===2)throw Object.assign(Error('late'),{code:'WRITER_B_LATE_READBACK_STOP'});};
+ io.prepareRollback=async()=>{state.steps.push('rollback-pause');assert.equal(state.coreEnabled,true);state.coreEnabled=false;};
+ const out=await performWriterBInstall(maintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_INSTALL_STOP_RESTORED');assert.equal(state.head,manifest().baseHead);
+ assert.equal(state.config,manifest().baseHead);assert.equal(state.coreEnabled,true);assert.equal(state.retained,false);
+ assert.ok(state.steps.indexOf('rollback-pause')<state.steps.indexOf('rollback-config'));
+ assert.ok(state.steps.lastIndexOf('drain')<state.steps.indexOf('rollback-config'));
+});
+test('rollback refuses external drift and preserves both failures without overwriting source',async()=>{
+ const {io,state}=mockIO();let checks=0;const verify=io.assertWriterSource;
+ io.assertWriterSource=async()=>{await verify();if(++checks===2)throw Object.assign(Error('late'),{code:'WRITER_B_LATE_READBACK_STOP'});};
+ io.prepareRollback=async()=>{throw Object.assign(Error('external change'),{code:'WRITER_B_CONFIG_ROLLBACK_DRIFT_STOP'});};
+ const out=await performWriterBInstall(maintenanceAuth(),io);
+ assert.equal(out.status,'WRITER_B_RECOVERY_REQUIRED');assert.equal(out.code,'WRITER_B_LATE_READBACK_STOP');
+ assert.equal(out.rollbackFailureCode,'WRITER_B_CONFIG_ROLLBACK_DRIFT_STOP');assert.equal(state.retained,true);
+ assert.equal(state.steps.includes('rollback-config'),false);assert.equal(state.steps.includes('rollback-source'),false);
+});

@@ -22,6 +22,7 @@ validateControllerConfigTransition,controllerAdmissionForPurpose,
  decideR6RecoveryReentry,sameR6RecoveryClaim,verifyR6HistoricCompletion,
  R6_HOST_SOURCE_SHA,R6_HOST_SOURCE_MANIFEST_SHA256,
  selectPreservedRecoveryProtection,recoveryProtectedSnapshotStillPinned,
+ verifiedRunningPostcheckFailure,
  R6_HOST_CANDIDATE_SHA256,validateR54BIssueEnvelope,
  validateR54BManifestRequest,R54_B_ISSUE_TITLE,R54_B_OPERATION,
  R54_B_SOURCE_FILES,SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
@@ -1534,6 +1535,29 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
          result.sourceRepository==='ansqhd5774-Choi/zgmini'&&
          result.sourceBranch===manifest.postSourceBranch&&
          result.controlSourceSha===manifest.targetSha};
+    }
+    // Missing upload is not an unknown execution when the exact original
+    // Actions job proves its execution step failed. Observe, never resubmit.
+    if(n%5===0){
+     let confirmed=null;
+     try{
+      const liveIssue=github('issues/'+postIssueNumber);
+      const runs=readAllMaintenancePages(page=>github(
+       `actions/workflows/pc-job.yml/runs?event=issues&status=completed&created=${encodeURIComponent('>='+liveIssue.created_at)}&per_page=100&page=${page}`).workflow_runs)
+       .filter(r=>r.display_title===`PC Update ${issue.requestId} postcheck`&&r.conclusion==='failure');
+      const liveLedger=json(ledgerFile);
+      for(const run of runs){
+       const jobs=readAllMaintenancePages(page=>github(
+        `actions/runs/${run.id}/jobs?per_page=100&page=${page}`).jobs);
+       for(const job of jobs)if(verifiedRunningPostcheckFailure({
+        ledger:liveLedger,manifest,issue:liveIssue,run,job})){
+        confirmed={issueNumber:postIssueNumber,runId:run.id,jobId:job.id,runnerName:job.runner_name};break;
+       }
+       if(confirmed)break;
+      }
+     }catch{/* A failed observation is still UNKNOWN, never a rollback signal. */}
+     if(confirmed)throw Object.assign(Error('POSTCHECK_EXECUTION_FAILED_VERIFIED'),{
+      code:'POSTCHECK_EXECUTION_FAILED_VERIFIED',postcheckFailureEvidence:confirmed});
     }
     await wait(3000);
    }

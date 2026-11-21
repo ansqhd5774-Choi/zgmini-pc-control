@@ -204,26 +204,34 @@ export async function applyApprovedUpdate(request, port) {
         observed,...details(status)});
       return {...ledger};
     }
-    // Never restore from an unverified snapshot, even if an earlier copy succeeded.
-    let restored=false;
-    if(backup) {
-      try {
-        if(await port.verifyBackup(request.installedSha)) {
-          await port.restore();
-          await port.reconnectPrevious();
-          restored=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});
-        }
-      } catch {restored=false;}
+    // Restore service before diagnosing the rejected candidate. Preserve the
+    // original failure separately from any recovery failure; never guess success.
+    let restored=false,rollbackFailureCode=null,rollbackOperation='verifyBackup';
+    try{
+      if(!backup||await port.verifyBackup(request.installedSha)!==true)
+        throw fail('ROLLBACK_BACKUP_NOT_VERIFIED');
+      rollbackOperation='restore';await port.restore();
+      rollbackOperation='reconnectPrevious';await port.reconnectPrevious();
+      rollbackOperation='verifyPrevious';
+      restored=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true})===true;
+      if(!restored)throw fail('ROLLBACK_PREVIOUS_RUNTIME_NOT_VERIFIED');
+      rollbackOperation='resumeIntake';await port.resumeIntake();paused=false;
+      rollbackOperation='reconcileBacklog';if(port.reconcileBacklog)await port.reconcileBacklog(request);
+      rollbackOperation='verifyPrevious';
+      restored=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true,requireIdle:false})===true;
+      if(!restored)throw fail('ROLLBACK_FINAL_RUNTIME_NOT_VERIFIED');
+    }catch(rollbackError){
+      rollbackFailureCode=maintenanceFailureCode(rollbackError,rollbackOperation);
+      restored=false;
     }
-    // Only an explicitly verified rollback may reactivate request intake.
-    if(restored) {try {await port.resumeIntake();paused=false;}catch{restored=false;}}
-    let backlogVerified=restored;
-    if(restored && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{backlogVerified=false;}}
-    const status=restored&&backlogVerified?'ROLLED_BACK':'RECOVERY_REQUIRED';
-    await record(status,{status,code:backlogVerified?reason:'BACKLOG_OR_RECOVERY_NOT_VERIFIED',firstFail,
+    const status=restored?'ROLLED_BACK':'RECOVERY_REQUIRED';
+    await record(status,{status,code:restored?reason:'BACKLOG_OR_RECOVERY_NOT_VERIFIED',firstFail,
+      originalFailureCode:reason,rollbackFailureCode,
+      rollbackFailureOperation:rollbackFailureCode?rollbackOperation:null,
+      ...(error.postcheckFailureEvidence?{postcheckFailureEvidence:error.postcheckFailureEvidence}:{}),
       actualInstalledSha:restored?request.installedSha:null,intakePaused:paused,
       recoverySha:restored?request.installedSha:null,protectedStateUnchanged:restored,workflowEnabled:restored&&!paused,
-      ...details(status)});
+      ...details(status,restored?'PREVIOUS_VERSION_RESTORED_CONTINUE_APPROVED_WORK':undefined)});
     return {...ledger};
   }
 }

@@ -186,6 +186,12 @@ export function normalizedResult(request,result,code){
       ?from.protectedStateUnchanged:null,
     workflowEnabled:typeof from.workflowEnabled==='boolean'
       ?from.workflowEnabled:null,
+    ...(from.originalFailureCode?{originalFailureCode:safeCode(from.originalFailureCode),
+      rollbackFailureCode:from.rollbackFailureCode?safeCode(from.rollbackFailureCode):null}:{}),
+    ...(from.status==='ROLLED_BACK'?{operationalRecovery:
+      from.protectedStateUnchanged===true&&from.workflowEnabled===true&&
+      isSha(from.recoverySha)&&from.recoverySha===from.actualInstalledSha
+       ?'PREVIOUS_VERSION_VERIFIED':'UNVERIFIED'}:{}),
     ...(inventory?{sourceInventory:inventory}:{}),
   };
 }
@@ -200,6 +206,9 @@ function resultComment(result,uploadStatus=null){
     `TARGET_CONTROLLER_SHA: ${result.targetControllerSha}`,
     `ACTUAL_CONTROLLER_SHA: ${result.actualControllerSha??"UNVERIFIED"}`,
     `RECOVERY_SHA: ${result.recoverySha??"NONE"}`,
+    ...(result.operationalRecovery?[`OPERATIONAL_RECOVERY: ${result.operationalRecovery}`]:[]),
+    ...(result.originalFailureCode?[`ORIGINAL_FAILURE_CODE: ${result.originalFailureCode}`,
+      `ROLLBACK_FAILURE_CODE: ${result.rollbackFailureCode??'NONE'}`]:[]),
     `PROTECTED_STATE_UNCHANGED: ${result.protectedStateUnchanged??'UNVERIFIED'}`,
     `WORKFLOW_ENABLED: ${result.workflowEnabled??'UNVERIFIED'}`,
     ...(result.sourceInventory?.filter(row=>row.state!=='OLD').map(row=>

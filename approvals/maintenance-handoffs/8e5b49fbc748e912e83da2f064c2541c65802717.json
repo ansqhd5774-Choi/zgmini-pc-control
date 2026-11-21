@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "2af4be8fd70ab1033cdd235ac7d7211c1b318683",
+  "targetSha": "8e5b49fbc748e912e83da2f064c2541c65802717",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "2026-11-21 user explicitly requested rollback-first common execution and instruction changes. Reviewed source PR #2575; same-purpose section5 standing authorization. No business DB/Controller/Writer/Task modifications.",
+  "files": {
+    "tools/maintenance-contract.mjs": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e",
+    "tools/maintenance-apply.mjs": "d13447f9cadf720e14ebe62856fd0d7b1896f888ae374c1b5447d99e40cf9f2a",
+    "tools/maintenance-agent.mjs": "0433c8191a965e03343d98a4c62bd5dc2e1d7e8bdfb0e5c626e15fe4bbf1a016",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "9628022148f2f800fe63c93c0947dbc484f9ed874e51b2e12742cb20e98768be",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "localRollbackAndScopeTests": "261 PASS, 0 FAIL",
+    "sourceCi": "Verify PR #2575 exact target checks before execution; code tests do not imply operating installation."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "preserve": [
+    "Existing Controller source and six Runner registrations",
+    "Core/Korea Tasks and latest Writer source/config",
+    "Business DB/schema/provider quotas/D1",
+    "Existing request/lease/ledger history; no replay"
+  ],
+  "scopeNote": "Existing 7-to-7 handoff, exact nine source bytes. Cooperatively drain maintenance receiver only, use durable verified backup and original startup identity. No new Gate, Runner, Controller, recurring Task or workflow permission."
+}

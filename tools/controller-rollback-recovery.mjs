@@ -10,46 +10,8 @@ const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){return e.code===
 // Windows operator, never from caller-supplied event or arbitrary URLs. This pure
 // result validator is fail-closed, and does not grant rollback permission alone.
 const PC_REPO='ansqhd5774-Choi/zgmini-pc-control';
-const POSTCHECK_STEP='Execute fixed host allowlist entry';
-export function validateConfirmedPostcheckFailure({original,manifest,approval,issue,run,job}={}){
- const spec=approval?.confirmedPostcheckFailure;
- const keys=['issueNumber','runId','jobId','runnerName'];
- if(!spec||typeof spec!=='object'||Array.isArray(spec)||
-    Object.keys(spec).sort().join('|')!==keys.sort().join('|')||
-    !Number.isSafeInteger(spec.issueNumber)||spec.issueNumber<1||
-    !Number.isSafeInteger(spec.runId)||spec.runId<1||
-    !Number.isSafeInteger(spec.jobId)||spec.jobId<1||
-    !/^zgmini-pc-0[1-6]$/.test(spec.runnerName??''))
-   return false;
- if(original?.status!=='RECOVERY_REQUIRED'||original.firstFail!=='POSTCHECK_PENDING'||
-    original.postIssueNumber!==spec.issueNumber||
-    !/^pc-update-[0-9a-f-]{36}$/.test(original.requestId??'')||
-    !/^[0-9a-f]{40}$/.test(original.targetSha??'')||
-    !manifest||typeof manifest!=='object')
-   return false;
- const title='PC Update '+original.requestId+' postcheck';
- let body;try{body=JSON.parse(issue?.body??'');}catch{return false;}
- if(issue?.number!==spec.issueNumber||issue.title!==title||
-    issue.user?.login!=='ansqhd5774-Choi'||
-    !issue.labels?.some(x=>x.name==='pc-job')||
-    body.schema!=='ZGMINI_PC_JOB_V1'||
-    body.requestId!==original.requestId+'-postcheck'||
-    body.operation!==manifest.postOperation||
-    body.sourceRepository!=='ansqhd5774-Choi/zgmini'||
-    body.sourceBranch!==manifest.postSourceBranch||
-    body.sourceSha!==manifest.postSourceSha)return false;
- const issued=Date.parse(issue.created_at??''),started=Date.parse(run?.created_at??'');
- if(!Number.isFinite(issued)||!Number.isFinite(started)||
-    started<issued||started-issued>900000)return false;
- if(run?.id!==spec.runId||run.event!=='issues'||run.status!=='completed'||
-    run.conclusion!=='failure'||run.display_title!==title||
-    job?.id!==spec.jobId||job.run_id!==spec.runId||
-    job.status!=='completed'||job.conclusion!=='failure'||
-    job.runner_name!==spec.runnerName||job.name!=='approved-pc-job')return false;
- const steps=job.steps?.filter(x=>x.name===POSTCHECK_STEP);
- return Array.isArray(steps)&&steps.length===1&&
-    steps[0].status==='completed'&&steps[0].conclusion==='failure';
-}
+import {validateConfirmedPostcheckFailure} from './maintenance-contract.mjs';
+export {validateConfirmedPostcheckFailure};
 export function retainRollbackClaim(result,archived){
  return result?.mutationStarted===true&&!(archived===true&&result.status==='ROLLED_BACK'&&result.leaseArchived===true);
 }
