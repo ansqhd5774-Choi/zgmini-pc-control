@@ -72,9 +72,14 @@ test('symlink escape and changed/missing source bytes never turn into proof',()=
  const f=fixture();try{
   const m=path.join(f.src,'core-origin-wmi.js');
   fs.unlinkSync(m);
-  fs.symlinkSync(path.join(f.dataRoot,'config.json'),m);
-  assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t}).status,'STATE_UNKNOWN');
-  fs.unlinkSync(m);fs.writeFileSync(m,'tampered-source');
+  let symlinkCreated=false;
+  try{fs.symlinkSync(path.join(f.dataRoot,'config.json'),m,'file');symlinkCreated=true;}
+  catch(e){if(!['EPERM','EACCES','ENOTSUP'].includes(e.code))throw e;}
+  if(symlinkCreated){
+   assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t}).status,'STATE_UNKNOWN');
+   fs.unlinkSync(m);
+  }
+  fs.writeFileSync(m,'tampered-source');
   assert.equal(inspectStoredCoreCycleEvidence({dataRoot:f.dataRoot,checkoutRoot:f.checkoutRoot,now:t}).status,'STATE_UNKNOWN');
  }finally{fs.rmSync(f.temp,{recursive:true,force:true});}
 });
