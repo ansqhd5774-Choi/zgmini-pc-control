@@ -14,6 +14,7 @@ import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
+import {inspectW03PaidPrivateReadonly} from './w03-paid-private-readonly.mjs';
 import {validateRunnerJobRefs,inspectRunnerJobHistory} from './runner-job-history-readonly.mjs';
 
 export const TITLE='pc-process-inventory-readonly';
@@ -1141,6 +1142,7 @@ export function collect(role,ctx,env=process.env){
    c1841RecoveryCheckpoint:inspect1841LeaseCorrelation(),
   observedHttpHostRoster:readObservedProviderHosts(),
   marketParquetTaskSource:inspectMarketParquetTask(),
+  w03PaidPrivate:inspectW03PaidPrivateReadonly(),
   http32TwoHostCheckpoints:inspectHttp32TwoHostCheckpoints(),
   c1501Backlog:inspect1501BacklogReadonly(),
   targetEndpointStatus:readTargetEndpointStatus(),
@@ -1180,6 +1182,9 @@ export function toText(r){
   'c2505RecoveryCode='+(r.c2505RecoveryCheckpoint?.code??'NOT_APPLICABLE'),
   'c2505ByteProof='+(r.c2505ByteProof?.status??'NOT_APPLICABLE'),
   'marketParquetTaskStatus='+(r.marketParquetTaskSource?.status??'NOT_APPLICABLE'),
+  'w03PaidPrivateStatus='+(r.w03PaidPrivate?.status??'NOT_APPLICABLE'),
+  'w03PaidPrivateCode='+(r.w03PaidPrivate?.code??'NOT_APPLICABLE'),
+  'w03PaidPrivatePoints='+(r.w03PaidPrivate?.historyPoints??'UNKNOWN'),
   'maintenanceSourceSha='+(r.maintenance?.maintenanceSourceSha??'UNKNOWN'),
   'installLockHeld='+(r.maintenance?.installLockHeld??'UNKNOWN'),
   'c2094StageEvidence='+(r.c2094StageEvidence?.status??'NOT_APPLICABLE'),
