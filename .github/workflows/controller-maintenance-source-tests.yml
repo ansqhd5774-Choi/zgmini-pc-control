@@ -19,6 +19,8 @@ on:
       - 'controller/inflation-core-owner-diagnostic-probe.mjs'
       - 'controller/inflation-event129-b-proof.mjs'
       - 'controller/inflation-vbs-b-proof.mjs'
+      - 'controller/inflation-census-m3-archived-headers-readonly.mjs'
+      - 'controller/inflation-census-m3-archived-headers-readonly.test.mjs'
       - 'controller/operations.mjs'
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
@@ -170,6 +172,9 @@ jobs:
         run: node --test --test-concurrency=1 tests/r181-primary-route-b.test.mjs
       - name: Verify W03 bounded start of existing R181 Task with one-shot journal
         run: node --test --test-concurrency=1 tests/r181-existing-task-once.test.mjs
+      - name: Verify W01 Census #28 archived-header A safety on W04 selected Controller target
+        if: steps.scope.outputs.w01 == 'true'
+        run: node --test --test-concurrency=1 controller/inflation-census-m3-archived-headers-readonly.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
       - name: Verify W01 Census API-only B manifest approval scope without PC or provider I/O
