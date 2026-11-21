@@ -99,8 +99,17 @@ export async function inspectEmploymentR6D1Readback(dataRoot,{fileSystem=fs,quer
      if(!fileSystem.statSync(module).isFile())
        return {...out,code:'R6_D1_CLIENT_MISSING'};
      // Import only the already approved, tracked and unchanged D1 client tree.
-     const runGit=args=>execFileSync('git',args,{cwd:real,encoding:'utf8',
-       timeout:5000,maxBuffer:131072,windowsHide:true,stdio:['ignore','pipe','ignore']}).trim();
+     // The PC Runner child has a Node-only PATH; use the same fixed Git
+     // locations and read-only flags as pc-source-readonly.mjs.
+     const gitBinary=process.platform==='win32'?
+       ['C:\\Program Files\\Git\\cmd\\git.exe','C:\\Program Files (x86)\\Git\\cmd\\git.exe'].find(fileSystem.existsSync):'git';
+     if(!gitBinary)return {...out,code:'R6_D1_GIT_NOT_INSTALLED'};
+     const runGit=args=>execFileSync(gitBinary,
+       ['--no-optional-locks','-c','core.fsmonitor=false',
+        '-c','core.untrackedCache=false','-C',real,...args],
+       {encoding:'utf8',timeout:10000,maxBuffer:65536,windowsHide:true,
+        env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'},
+        stdio:['ignore','pipe','ignore']}).trim();
      phase='CHECKOUT_HEAD';
      if(runGit(['rev-parse','HEAD'])!==config.source)
        return {...out,code:'R6_D1_CLIENT_SOURCE_MISMATCH'};
