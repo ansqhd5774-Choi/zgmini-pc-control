@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 
 const BASE=String.raw`E:\ZGmini\data\pc-writer`;
 const SOURCE=String.raw`E:\ZGmini\projects\zgmini-earnings-history-pc-release`;
@@ -59,6 +60,33 @@ export function verifyStoredCoreCycle({cycle,collection,writer,approvedSource,
   cycleFinishedAt:cycle.at,sourceFileHashesVerified:true,
   providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0};
 }
+const DEPLOY_SOURCE_FILES=Object.freeze([
+ 'local-cycle.mjs',...PROOF_FILES,
+ 'collect-local.mjs','run-local.mjs','collection-events.mjs'
+]);
+// Exact source-owned paths only; never writes to the checkout or probes a remote.
+// This is a local-commit test, not a requirement that the SHA exists on GitHub.
+export function verifyPinnedCheckoutGit({
+ checkoutRoot=SOURCE,fileSystem=fs,exec=execFileSync,
+}={}){
+ const bins=[String.raw`C:\Program Files\Git\cmd\git.exe`,
+  String.raw`C:\Program Files (x86)\Git\cmd\git.exe`];
+ const exe=bins.find(p=>fileSystem.existsSync(p));
+ if(!exe)return {status:'UNVERIFIED',code:'CORE_RECENT_GIT_UNAVAILABLE'};
+ const pre=['--no-optional-locks','-c','core.fsmonitor=false',
+  '-c','core.untrackedCache=false','-C',checkoutRoot];
+ const options={encoding:'utf8',windowsHide:true,timeout:8000,maxBuffer:32768,
+  env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'}};
+ try{
+  const head=exec(exe,[...pre,'rev-parse','--verify','HEAD'],options).trim().toLowerCase();
+  if(!SHA40.test(head))return {status:'UNVERIFIED',code:'CORE_RECENT_HEAD_UNVERIFIED'};
+  const tracked=exec(exe,[...pre,'status','--porcelain','--untracked-files=all','--',
+   ...DEPLOY_SOURCE_FILES.map(n=>'scripts/pc-writer/'+n)],options);
+  if(typeof tracked!=='string'||tracked.trim()!=='')
+   return {status:'UNVERIFIED',code:'CORE_RECENT_SOURCE_DIRTY'};
+  return {status:'PASS',head,code:'CORE_RECENT_CHECKOUT_CLEAN'};
+ }catch{return {status:'UNVERIFIED',code:'CORE_RECENT_GIT_UNAVAILABLE'};}
+}
 function readBounded(root,relative,{fileSystem=fs,maxBytes=2_000_000}={}){
  try{
   const canonical=fileSystem.realpathSync.native??fileSystem.realpathSync;
@@ -75,6 +103,7 @@ function readBounded(root,relative,{fileSystem=fs,maxBytes=2_000_000}={}){
 }
 export function inspectStoredCoreCycleEvidence({
  dataRoot=BASE,checkoutRoot=SOURCE,fileSystem=fs,now=Date.now(),
+ checkoutProof=verifyPinnedCheckoutGit,
 }={}){
  const readJson=(root,file,maxBytes)=>{
   const bytes=readBounded(root,file,{fileSystem,maxBytes});
@@ -88,6 +117,10 @@ export function inspectStoredCoreCycleEvidence({
  const collection=readJson(dataRoot,'local-collection-last-run.json',1_000_000);
  const writer=readJson(dataRoot,'local-writer-last-run.json',2_000_000);
  if(!config||!cycle||!collection||!writer)return invalid('CORE_RECENT_PRIVATE_LEDGER_UNAVAILABLE');
+ const head=checkoutProof({checkoutRoot,fileSystem});
+ if(head?.status!=='PASS'||head?.head!==config.source)
+  return invalid(head?.status==='PASS'?'CORE_RECENT_HEAD_SOURCE_MISMATCH':
+   head?.code??'CORE_RECENT_HEAD_UNVERIFIED');
  const installedHashes={};
  for(const name of ['local-cycle.mjs',...PROOF_FILES]){
   const bytes=readBounded(checkoutRoot,path.join('scripts','pc-writer',name),{
