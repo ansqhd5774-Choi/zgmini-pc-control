@@ -1,0 +1,42 @@
+name: ZGMINI 092 Six-File Writer B Source Tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'approvals/writer-updates/core092-natural-cycle-sixfile-20261121.json'
+      - 'tests/core092-sixfile-writer-b-approval.test.mjs'
+      - '.github/workflows/core092-writer-b-source-ci.yml'
+permissions:
+  contents: read
+concurrency:
+  group: zgmini-core092-writer-b-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  source-only:
+    if: >-
+      github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
+      github.event.repository.private == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
+    timeout-minutes: 4
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Confirm existing isolated Windows CI host (no operational PC)
+        run: |
+          if /I "%COMPUTERNAME%"=="DESKTOP-N62L0NG" (
+            echo CORE092_WRITER_B_SOURCE_ONLY_ISOLATED=TRUE
+          ) else (
+            echo CORE092_WRITER_B_SOURCE_ONLY_ISOLATED=FALSE
+            exit /b 5
+          )
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify exact B manifest, A preview ancestry and recovery contracts
+        run: node --test --test-concurrency=1 tests/core092-sixfile-writer-b-approval.test.mjs writer-b/installer.test.mjs writer-b/contract.test.mjs

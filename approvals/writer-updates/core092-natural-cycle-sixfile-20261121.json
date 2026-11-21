@@ -1,0 +1,122 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/core092-cycle-lineage-source-r1-20261121",
+  "candidateSourceSha": "4d035ee046ddd508a43913bdc170dcd6288f47fd",
+  "baseHead": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "baseConfigSourceSha": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "change": "M",
+      "beforeSha256": "2cfa0f9ae794e36d0a2fcf865a571258c5d3a4e1709557a5e4c1059dde46da75",
+      "afterSha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d",
+      "candidateSha256": "e4b9f313339f0b7cb8b240f66b185240708d2ffa0547a52ef389dbed46cf25f2",
+      "insertions": [
+        {
+          "anchor": "import fs from 'node:fs';",
+          "position": "after",
+          "text": "import {createHash} from 'node:crypto';\nimport {newCoreCycleId} from './core-cycle-id.mjs';\nimport {captureCoreOriginAtStart} from './core-origin-runtime.mjs';\n"
+        },
+        {
+          "anchor": "fs.writeFileSync(file,JSON.stringify({pid:process.pid,at:Date.now()}),{flag:'wx'});",
+          "position": "after",
+          "text": "const cycleStartedAt=Date.now(),coreCycleId=newCoreCycleId();\nprocess.env.ZGMINI_CORE_CYCLE_ID=coreCycleId;\nconst coreOrigin=process.argv.includes('--publish')&&!process.argv.includes('--korea')?\n captureCoreOriginAtStart({startedAt:cycleStartedAt}):\n {status:'UNVERIFIED',code:'CORE_ORIGIN_OUTSIDE_APPROVED_LANE',ownerCreatedAtMs:null};\nconst checkoutSourceAtStart=(()=>{\n try{const p=spawnSync('git',['rev-parse','HEAD'],{cwd:path.resolve(here,'../..'),encoding:'utf8',windowsHide:true,timeout:4000});\n const s=typeof p?.stdout==='string'?p.stdout.trim():'';\n return p?.status===0&&/^[a-f0-9]{40}$/.test(s)?s:null;}catch{return null;}\n})();\nconst fileHash=n=>{\n try{const p=path.join(here,n),st=fs.lstatSync(p);\n if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>100000)return null;\n const b=fs.readFileSync(p);return b.length===st.size?createHash('sha256').update(b).digest('hex'):null;}catch{return null;}\n};\nconst entrypointSha256=(()=>{\n try{return createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex');}\n catch{return null;}\n})();\nconst coreProofFileSha256=Object.fromEntries([\n 'core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi.mjs'\n].map(n=>[n,fileHash(n)]));\n"
+        },
+        {
+          "anchor": " save(path.join(base,'local-cycle-last-run.json'),report);console.log(JSON.stringify(report));",
+          "position": "before",
+          "text": " report.coreCycleId=coreCycleId;\n report.coreCycleStartedAt=new Date(cycleStartedAt).toISOString();\n report.coreCheckoutSourceSha=checkoutSourceAtStart;\n report.coreEntrypointSha256=entrypointSha256;\n report.coreProofFileSha256=coreProofFileSha256;\n report.coreProcessPid=process.pid;report.coreParentPid=process.ppid;\n report.coreOriginEvidence=coreOrigin.status==='PASS'?'TASK_ENGINE_WMI_CAPTURED_AT_START':'START_ONLY_UNVERIFIED';\n report.coreOriginCode=coreOrigin.code;report.coreNodeCreatedAtMs=coreOrigin.ownerCreatedAtMs;\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "change": "M",
+      "beforeSha256": "82b3a5554d77986985ded9fb4ac9876554757b9699e09c15ac9ffbc08236a9f5",
+      "afterSha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706",
+      "candidateSha256": "6a485e72db44c5ca95de8e8076411e1cc1172a301f4b2294b2b1d6b789ce48a1",
+      "insertions": [
+        {
+          "anchor": "import path from 'node:path';",
+          "position": "after",
+          "text": "import {coreCycleIdFromEnv} from './core-cycle-id.mjs';\n"
+        },
+        {
+          "anchor": "  report.employmentR6Collection=employmentR6Collection;",
+          "position": "before",
+          "text": "  report.coreCycleId=coreCycleIdFromEnv();\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "change": "M",
+      "beforeSha256": "75613735df17a269869cc4c53b7771229da914eb7f09e0fe10e37215e085c5e4",
+      "afterSha256": "9cfbd0736e305aabdee0bf285c92515949eafe0c83968b9029961a37e6bf6c3b",
+      "candidateSha256": "38542217528b0d8c6c8e5b60a32bd183a35e9c4b8dd991a1680b82852303c73a",
+      "insertions": [
+        {
+          "anchor": "import fs from 'node:fs';",
+          "position": "after",
+          "text": "import {coreCycleIdFromEnv} from './core-cycle-id.mjs';\n"
+        },
+        {
+          "anchor": "const originalFetch=globalThis.fetch;",
+          "position": "before",
+          "text": "report.coreCycleId=coreCycleIdFromEnv();\n"
+        }
+      ]
+    },
+    {
+      "path": "scripts/pc-writer/core-cycle-id.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a3f3844200cd60cf70f9616e94cfcea7341f55d9d1929cab4ffd16e71d463cc1"
+    },
+    {
+      "path": "scripts/pc-writer/core-origin-runtime.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "18a1f623a78e2ce9f8b24ac55c748205b42b72e1754d1e1097c81a2a6ab8b853"
+    },
+    {
+      "path": "scripts/pc-writer/core-origin-wmi.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "979009bab6199bdc42067258e08ec72b8ea4a54a4d5c0ec7e4bd2ac174714196"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/collection-events.mjs",
+      "sha256": "0085ea065382b8530fe3b45000d12bdb961801e183f5bd161ad897e2c53ad2ba"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher-archive",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/local-cycle.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
