@@ -19,6 +19,29 @@ const baseline=code=>({status:'STATE_UNKNOWN',code,key:R6_KEY,
  methodologyVersion:null,formulaHash:null,providerCalls:0,d1Writes:0,
  operationalWrites:0,sqliteOpened:false});
 
+export function classifyR6ReadFailure(phase,error){
+ const out=baseline('R6_D1_READ_FAILED');
+ // Never report exception text, URLs, tokens, settings or SQL result bodies.
+ const stages={
+   QUERY_INJECTED:'R6_D1_QUERY_FIXTURE_FAILED',
+   CHECKOUT_RESOLVE:'R6_D1_CHECKOUT_UNAVAILABLE',
+   CLIENT_FILE:'R6_D1_CLIENT_FILE_UNAVAILABLE',
+   CHECKOUT_HEAD:'R6_D1_GIT_HEAD_FAILED',
+   CHECKOUT_FILE_INTEGRITY:'R6_D1_GIT_INTEGRITY_FAILED',
+   CLIENT_IMPORT:'R6_D1_CLIENT_IMPORT_FAILED',
+   CLIENT_INITIALIZE:'R6_D1_CLIENT_INITIALIZE_FAILED',
+   D1_SELECT:'R6_D1_QUERY_FAILED',
+   LOCAL_VERIFICATION:'R6_D1_LOCAL_VERIFICATION_FAILED',
+ };
+ const safeError=typeof error?.message==='string'&&
+    /^(WRANGLER_LOGIN_REQUIRED|WRANGLER_AUTH_REFRESH_TIMEOUT|D1_AUTH_RESOLUTION_FAILED|D1_OUTCOME_UNKNOWN|D1_BATCH_FAILED|D1_HTTP_(401|403|429|500|502|503|504))$/.test(error.message)?
+    error.message:null;
+ return {...out,code:stages[phase]??'R6_D1_READ_FAILED',
+   failurePhase:phase,...(safeError?{safeError}:{} )};
+ return {...out,code:stages[phase]??'R6_D1_READ_FAILED',
+   failurePhase:phase,...(safeError?{safeError}:{})};
+}
+
 export function verifyR6D1Row(row,checkpoint){
  const out=baseline('R6_D1_ROW_UNKNOWN');
  if(!row||typeof row.body!=='string'||Buffer.byteLength(row.body,'utf8')>8_000_000||
@@ -108,23 +131,5 @@ export async function inspectEmploymentR6D1Readback(dataRoot,{fileSystem=fs,quer
      }catch{}
    }
    return verifyR6D1Row(row,verified);
- }catch(error){
-   // Never report exception text, URLs, tokens, settings or SQL result bodies.
-   const stages={
-     QUERY_INJECTED:'R6_D1_QUERY_FIXTURE_FAILED',
-     CHECKOUT_RESOLVE:'R6_D1_CHECKOUT_UNAVAILABLE',
-     CLIENT_FILE:'R6_D1_CLIENT_FILE_UNAVAILABLE',
-     CHECKOUT_HEAD:'R6_D1_GIT_HEAD_FAILED',
-     CHECKOUT_FILE_INTEGRITY:'R6_D1_GIT_INTEGRITY_FAILED',
-     CLIENT_IMPORT:'R6_D1_CLIENT_IMPORT_FAILED',
-     CLIENT_INITIALIZE:'R6_D1_CLIENT_INITIALIZE_FAILED',
-     D1_SELECT:'R6_D1_QUERY_FAILED',
-     LOCAL_VERIFICATION:'R6_D1_LOCAL_VERIFICATION_FAILED',
-   };
-   const safeError=typeof error?.message==='string'&&
-      /^(WRANGLER_LOGIN_REQUIRED|WRANGLER_AUTH_REFRESH_TIMEOUT|D1_AUTH_RESOLUTION_FAILED|D1_OUTCOME_UNKNOWN|D1_BATCH_FAILED|D1_HTTP_(401|403|429|500|502|503|504))$/.test(error.message)?
-      error.message:null;
-   return {...out,code:stages[phase]??'R6_D1_READ_FAILED',
-     failurePhase:phase,...(safeError?{safeError}:{} )};
- }
+ }catch(error){return classifyR6ReadFailure(phase,error);}
 }
