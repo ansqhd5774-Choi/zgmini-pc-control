@@ -179,6 +179,7 @@ export function inspectCoreRuntimeSource({platform=process.platform,
  probe=spawnSync,exists=fs.existsSync,realpath=fs.realpathSync.native,
  lstat=fs.lstatSync,read=fs.readFileSync,
  readLock=readCoreLockSnapshot,
+ recentCycleReader=inspectStoredCoreCycleEvidence,
  systemRoot=process.env.SystemRoot??String.raw`C:\Windows`}={}){
  if(platform!=='win32')return unknown('CORE_WINDOWS_REQUIRED');
  const cscript=path.win32.join(systemRoot,'System32','cscript.exe');
@@ -204,7 +205,7 @@ export function inspectCoreRuntimeSource({platform=process.platform,
       'CORE_TASK_RUNNING_INSTANCE_UNOBSERVABLE','CORE_NO_ACTIVE_TASK_ENGINE',
       'CORE_TASK_ENGINE_PID_UNAVAILABLE']);
     if(eligible.has(classified.code)){
-      const recent=inspectStoredCoreCycleEvidence();
+      const recent=recentCycleReader();
       if(recent.status==='PASS')return {...recent,
         liveSnapshot:{status:classified.status,code:classified.code,
           taskObservation:classified.taskObservation??null},lockOwner};
