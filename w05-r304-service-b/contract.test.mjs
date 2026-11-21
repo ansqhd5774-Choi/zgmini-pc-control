@@ -164,3 +164,22 @@ test('no local B result produces safe STATE_UNKNOWN JSON/TXT 2/2, not silent suc
   assert.equal(JSON.stringify(second).includes('do-not-upload'),false);
  }finally{fs.rmSync(folder,{recursive:true,force:true})}
 });
+
+
+test('pin from actual R3-04 approved preimage A keeps manifest non-executable',()=>{
+ // PC A #2584 / Run 44870551163: sourceHead=config.source=checkpoint and
+ // exact 3 W05 file hashes. This test NEVER authorizes a provider/DB effect.
+ assert.equal(INSTALLED_SHA,'a206220cc11045c24660e814124edbba9c0ff49f');
+ assert.deepEqual(FILES,{
+  'scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs':'87e811b608ea7358c48aceebfe458e24e5887f2f31207481783abcad516a1af3',
+  'scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs':'b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31',
+  'scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs':'f3f6e41b3b61039580db7ab7f6bed3133eb305ffef35e4b4b7ea919e0220ea77'
+ });
+ const raw=fs.readFileSync(new URL('../approvals/w05-r304-service-b/approval.json',import.meta.url));
+ const proposed=JSON.parse(raw.toString('utf8'));
+ assert.equal(proposed.status,'PROPOSED_NOT_APPROVED');
+ assert.equal(proposed.installedSourceSha,INSTALLED_SHA);
+ assert.deepEqual(proposed.files,FILES);
+ assert.throws(()=>validateApproval(raw,{approvalSha256:sha256(raw)}),
+  /W05_B_EFFECT_NOT_APPROVED/);
+});
