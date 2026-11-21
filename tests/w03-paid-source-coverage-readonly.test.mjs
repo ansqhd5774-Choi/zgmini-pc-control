@@ -56,7 +56,7 @@ test('exact stored receipt lineage gives metadata only for five selected tickers
   assert.equal(r.perSymbol.IGV.storedSessions,16);
   assert.equal(r.perSymbol.IGV.first40RealSessionsDate,null);
   assert.equal(r.perSymbol.SPY.storedSessions,70);
-  assert.doesNotMatch(JSON.stringify(r),/close|bar_time|100/);
+  assert.doesNotMatch(JSON.stringify(r),/close|bar_time|rawPrice/);
  }finally{x.clean();}
 });
 test('stored source not matching exact derived source version is never attributed',()=>{
