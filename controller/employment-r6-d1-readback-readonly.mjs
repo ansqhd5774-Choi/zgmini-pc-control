@@ -28,7 +28,7 @@ export function verifyR6D1Row(row,checkpoint){
     body.summary?.sourceFeatures!==29||body.methodologyVersion!==REV||
     body.formulaHash!==FORMULA||!validTime(body.sourceStoredAt)||
     body.sourceStoredAt>Number(row.stored_at)||
-    !/^\\d{4}-\\d{2}-\\d{2}$/.test(body.asOfDate??''))
+    !/^\d{4}-\d{2}-\d{2}$/.test(body.asOfDate??''))
     return {...out,code:'R6_D1_CONTRACT_INVALID'};
  const digest=hash(body),localHash=checkpoint?.localResultHash;
  const same=checkpoint?.localResultReadback==='VERIFIED'&&
