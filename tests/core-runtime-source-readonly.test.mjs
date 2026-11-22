@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {classifyCoreSnapshot,inspectCoreRuntimeSource,hashActiveCoreFiles,readActiveCoreSourceIdentity,
- readCoreLockSnapshot,classifyCoreLockOwner} from '../controller/core-runtime-source-readonly.mjs';
+ readCoreLockSnapshot,classifyCoreLockOwner,selectCoreGitBinary} from '../controller/core-runtime-source-readonly.mjs';
 
 const snapshot={ok:true,runningInstances:1,engines:[10],processes:[
  {pid:0,parentPid:0,name:'other',sourceMarker:'',createdAtMs:null},
@@ -254,13 +254,55 @@ function sourceIdentityFixture({approved='a'.repeat(40),changedFile=false,
  movedHead=false,changedConfig=false}={}){
  const root=String.raw`E:\ZGmini\projects\fixture`,bytes=Buffer.from('exact installed source'),
   cfg=Buffer.from(JSON.stringify({source:approved}));let heads=0,configs=0;
- return {root,options:{realpath:p=>p,configFile:'fixture-config',
+ return {root,options:{realpath:p=>p,gitBinary:'git',configFile:'fixture-config',
   lstat:p=>({isFile:()=>true,isSymbolicLink:()=>false,size:p==='fixture-config'?cfg.length:bytes.length}),
   read:p=>p==='fixture-config'?(++configs>1&&changedConfig?Buffer.from('{}'):cfg):bytes,
   run:(command,args)=>{assert.equal(command,'git');
-   if(args[0]==='rev-parse')return Buffer.from((++heads>1&&movedHead?'b':'a').repeat(40)+'\n');
-   assert.equal(args[0],'cat-file');return changedFile?Buffer.from('other source'):bytes;}}};
+   assert.equal(args[0],'--no-optional-locks');
+   const actual=args.slice(args.indexOf('-C')+2);
+   if(actual[0]==='rev-parse')return Buffer.from((++heads>1&&movedHead?'b':'a').repeat(40)+'\n');
+   assert.equal(actual[0],'cat-file');return changedFile?Buffer.from('other source'):bytes;}}};
 }
+test('Windows Git uses an allowlisted absolute executable, not a Node-only PATH',()=>{
+ const win=String.raw`C:\Program Files\Git\cmd\git.exe`;
+ const alt=String.raw`C:\Program Files (x86)\Git\cmd\git.exe`;
+ assert.equal(selectCoreGitBinary({platform:'win32',exists:p=>p===win}),win);
+ assert.equal(selectCoreGitBinary({platform:'win32',exists:p=>p===alt}),alt);
+ assert.equal(selectCoreGitBinary({platform:'win32',exists:()=>false}),null);
+ assert.equal(selectCoreGitBinary({platform:'linux',exists:()=>false}),'git');
+});
+
+test('missing pinned Windows Git remains unverified without calling a shell',()=>{
+ const {root,options}=sourceIdentityFixture();
+ options.gitBinary=null;
+ options.run=()=>{throw Error('UNEXPECTED_EXECUTION');};
+ const result=readActiveCoreSourceIdentity(root,options);
+ assert.equal(result.status,'UNVERIFIED');
+ assert.equal(result.code,'CORE_SOURCE_GIT_NOT_INSTALLED');
+});
+
+test('pinned Git preserves exact HEAD/approved checkout/file-byte security checks',()=>{
+ const {root,options}=sourceIdentityFixture();
+ const pinned=String.raw`C:\Program Files\Git\cmd\git.exe`;
+ const fake=options.run;let calls=0;
+ options.gitBinary=pinned;
+ options.run=(command,args,opts)=>{
+  calls++;
+  assert.equal(command,pinned);
+  assert.equal(args[0],'--no-optional-locks');
+  assert.ok(args.includes('-C'));
+  assert.equal(opts.env.GIT_OPTIONAL_LOCKS,'0');
+  assert.equal(opts.env.GIT_TERMINAL_PROMPT,'0');
+  assert.deepEqual(opts.stdio,['ignore','pipe','ignore']);
+  return fake('git',args,opts);
+ };
+ const result=readActiveCoreSourceIdentity(root,options);
+ assert.equal(result.status,'VERIFIED');
+ assert.equal(result.sourceSha,'a'.repeat(40));
+ assert.equal(result.files.length,4);
+ assert.ok(calls>=6);
+});
+
 test('OS-observed source root binds approved HEAD and four exact execution source blobs',()=>{
  const {root,options}=sourceIdentityFixture(),r=readActiveCoreSourceIdentity(root,options);
  assert.equal(r.status,'VERIFIED');assert.equal(r.sourceSha,'a'.repeat(40));
@@ -289,14 +331,16 @@ function checkoutEolFixture({auto='true',filter='unspecified',text='unspecified'
  const root=String.raw`E:\ZGmini\projects\fixture`,blob=Buffer.from('const value=1;\n'),
   bytes=Buffer.from(tampered?'const value=2;\r\n':'const value=1;\r\n'),
   cfg=Buffer.from(JSON.stringify({source:'a'.repeat(40)}));
- return {root,options:{realpath:p=>p,configFile:'fixture-config',
+ return {root,options:{realpath:p=>p,gitBinary:'git',configFile:'fixture-config',
   lstat:p=>({isFile:()=>true,isSymbolicLink:()=>false,size:p==='fixture-config'?cfg.length:bytes.length}),
   read:p=>p==='fixture-config'?cfg:bytes,
   run:(command,args)=>{assert.equal(command,'git');
-   if(args[0]==='rev-parse')return Buffer.from('a'.repeat(40)+'\n');
-   if(args[0]==='cat-file')return blob;
-   if(args[0]==='config')return Buffer.from(auto+'\n');
-   assert.equal(args[0],'check-attr');const file=args.at(-1);
+   assert.equal(args[0],'--no-optional-locks');
+   const actual=args.slice(args.indexOf('-C')+2);
+   if(actual[0]==='rev-parse')return Buffer.from('a'.repeat(40)+'\n');
+   if(actual[0]==='cat-file')return blob;
+   if(actual[0]==='config')return Buffer.from(auto+'\n');
+   assert.equal(actual[0],'check-attr');const file=actual.at(-1);
    return Buffer.from([file,'text',text,file,'eol',eol,file,'filter',filter,''].join('\0'));}}};
 }
 test('Windows Git CRLF checkout records both actual bytes and Git blob hashes',()=>{
