@@ -15,13 +15,15 @@ const request={schema:'ZGMINI_PC_PUBLICATION_REQUEST_V1',requestId:id,
   operation:'census-qfr-margin-once',
   controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
   approvalManifestSha256:sha256(bytes)};
-const observedOperational='1e52876f5112c4a58a43273d264588755b7b9402';
-const pinnedPublisher='2f4a8227ecfc954d6c72ecbc6b56242c709a7f0f';
+// The reviewed manifest owns version pins; tests protect effect and CAS
+// semantics instead of forcing executable/test edits for each normal update.
+const observedOperational=manifest.operationalSha;
+const pinnedPublisher=manifest.publisherSha;
 
 test('QFR B draft pins exactly one D1 key and ten publisher-main file hashes, not installed QFR files',()=>{
   const v=validatePublicationApproval(request,bytes);
-  assert.equal(v.approval.publisherSha,pinnedPublisher);
-  assert.equal(v.approval.operationalSha,observedOperational);
+  assert.match(v.approval.publisherSha,/^[a-f0-9]{40}$/);
+  assert.match(v.approval.operationalSha,/^[a-f0-9]{40}$/);
   assert.equal(v.approval.approval.issueNumber,2089);
   assert.equal(v.approval.execution.maxD1Keys,1);
   assert.equal(v.approval.execution.maxAutomaticRetries,0);
@@ -52,6 +54,12 @@ test('QFR B draft cannot authorize its own D1 write without exact independent ow
     publisherClean:true,operationalClean:true,
     publisherRoot:'E:/zgmini/publisher-main',operationalRoot:'E:/zgmini/operational-approved'
   }),/PUBLICATION_OPERATIONAL_SOURCE_MISMATCH/);
+  assert.throws(()=>validateSourceCheckpoints(v,{
+    publisherHead:'e'.repeat(40),originMainHead:pinnedPublisher,publisherBranch:'main',
+    operationalHead:observedOperational,configSource:observedOperational,
+    publisherClean:true,operationalClean:true,
+    publisherRoot:'E:/zgmini/publisher-main',operationalRoot:'E:/zgmini/operational-approved'
+  }),/PUBLICATION_PUBLISHER_NOT_CLEAN_MAIN/);
   const bad={...manifest,publisherFiles:{...manifest.publisherFiles}};
   bad.publisherFiles['worker/earnings-companion-c-qfr-r1.mjs']='0'.repeat(64);
   assert.throws(()=>validatePublisherFileDigests(v,bad.publisherFiles),
