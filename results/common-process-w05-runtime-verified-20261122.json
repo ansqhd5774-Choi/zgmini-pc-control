@@ -1,0 +1,83 @@
+{
+  "schema": "ZGMINI_COMMON_PROCESS_W05_RUNTIME_VERIFIED_V1",
+  "verifiedAt": "2026-11-22T12:54:00Z",
+  "scope": "Common automation continuity fixes and exactly two delegated W05 data effects",
+  "source": {
+    "controlMerge": "3529777666faf6adb49abd67bea10066852a39bf",
+    "lineEndingFixMerge": "d53fbb606ba820e3305b8042f33bf9655ddb0c44",
+    "publisherMerge": "8a6dc683348ca549c110fabedd44c04d22183050"
+  },
+  "maintenance": {
+    "status": "PASS",
+    "code": "STOPPED_RECEIVER_HANDOFF_AND_WINDOWS_ORIGIN_VERIFIED",
+    "sourceSha": "3529777666faf6adb49abd67bea10066852a39bf",
+    "runtimeChangedFiles": [
+      "tools/maintenance-agent.mjs"
+    ],
+    "installedFileHashMatches": 7,
+    "installedFileHashMismatches": 0,
+    "receiverStatus": "LISTENING",
+    "receiverPid": 32452,
+    "receiverObservedAt": "2026-11-22T12:52:18.491Z"
+  },
+  "wpsfd42": {
+    "issue": 2767,
+    "run": 45024037997,
+    "status": "PASS",
+    "providerCalls": 1,
+    "automaticRetries": 0,
+    "rows": 22,
+    "observationAt": "2026-10-01",
+    "dbWrites": "COMMITTED_IDEMPOTENT",
+    "independentLocalReadback": "EXACT_ROWS_DATE_SNAPSHOT_AND_CHUNK_HASH",
+    "snapshotSha256": "e6ee311982565f49381cd68219c1a3330c875ad8697de7870aabc866a8cb5b71"
+  },
+  "qfr": {
+    "issue": 2768,
+    "run": 45024435025,
+    "status": "PASS",
+    "providerCalls": 0,
+    "d1Writes": 1,
+    "key": "detail:earnings-recession-indicators:census-qfr-mfg-margin:v1",
+    "d1Readback": "VERIFIED",
+    "apiHttp": 200,
+    "apiStatus": "READY",
+    "sourceVersion": "0cf9d0e4bced96b300810a448bf67be3b663252178f15853f103561d876ddeb3",
+    "sourceStoredAt": 1793112733108,
+    "apiReceiptSourceVersionMatch": true,
+    "apiReceiptSourceStoredAtMatch": true,
+    "observedThrough": "2026-Q2",
+    "historicalMode": "CURRENT_RETRIEVAL_NOT_PIT",
+    "historyRows": 5
+  },
+  "validation": {
+    "relatedSuite": {
+      "tests": 256,
+      "pass": 255,
+      "fail": 0,
+      "skip": 1
+    },
+    "byteAndHandoffSuite": {
+      "tests": 39,
+      "pass": 38,
+      "fail": 0,
+      "skip": 1
+    },
+    "skipReason": "Existing Windows file-symlink privilege unavailable; no policy change",
+    "control2749RemoteChecks": "4/4 PASS",
+    "control2766RemoteChecks": "2/2 PASS",
+    "app1472RemoteCi": "PASS after one failed-job rerun for unchanged SEC rate-limit timing test; SEC timing bug not fixed"
+  },
+  "preserved": [
+    "Original #2759 failure receipt",
+    "Existing schedules and formulas",
+    "Other D1 keys and existing data",
+    "Existing Controller and six Runner registrations"
+  ],
+  "notClaimed": [
+    "BEA collection completion",
+    "All W05 stages complete",
+    "A guarantee that automation can never fail",
+    "New maintenance receipt observed on a real installation request; source tests passed and installed for next legitimate request"
+  ]
+}
