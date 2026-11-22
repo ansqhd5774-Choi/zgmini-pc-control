@@ -1,0 +1,39 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "8e5b49fbc748e912e83da2f064c2541c65802717",
+  "targetSha": "3529777666faf6adb49abd67bea10066852a39bf",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User 2026-11-22 requested fundamental common automation remediation and operational application. Source PR #2749; only maintenance-agent.mjs changes in the installed seven-file receiver. No Controller/Writer/Task/provider/DB/D1 change.",
+  "files": {
+    "tools/maintenance-contract.mjs": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e",
+    "tools/maintenance-apply.mjs": "d13447f9cadf720e14ebe62856fd0d7b1896f888ae374c1b5447d99e40cf9f2a",
+    "tools/maintenance-agent.mjs": "167b6bbd3453f728b4a3bad0b686ef329547da0f701beb8f891b4f0c1c5c5617",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "9628022148f2f800fe63c93c0947dbc484f9ed874e51b2e12742cb20e98768be",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "localRollbackAndScopeTests": "261 PASS, 0 FAIL",
+    "sourceCi": "Verify PR #2575 exact target checks before execution; code tests do not imply operating installation."
+  },
+  "backup": "BYTE_VERIFIED_MAINTENANCE_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_ONLY_AFTER_RECEIVER_PROVEN_STOPPED",
+  "runtimeChangedFiles": [
+    "tools/maintenance-contract.mjs",
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ],
+  "preserve": [
+    "Existing Controller source and six Runner registrations",
+    "Core/Korea Tasks and latest Writer source/config",
+    "Business DB/schema/provider quotas/D1",
+    "Existing request/lease/ledger history; no replay"
+  ],
+  "scopeNote": "Normal seven-to-seven cooperative handoff. One changed runtime file provides a bounded best-effort original-Issue acceptance receipt. Preserve all other runtime files, startup identity, rollback backup, and receiver origin proof."
+}

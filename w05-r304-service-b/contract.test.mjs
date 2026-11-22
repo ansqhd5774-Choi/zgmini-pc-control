@@ -8,6 +8,7 @@ import {readbackServiceSnapshot,validateChildSummary,childResultLogPath} from '.
 import {validateIssue,validateApproval,SCHEMA,OPERATION,MANIFEST,INSTALLED_SHA,
  FILES,SOURCE_ROOT,DATA_ROOT,sha256,sanitizedCode,validateInstalledBinding} from './contract.mjs';
 import {sanitizedReport,upload} from './report.mjs';
+import {readApprovalBytes} from './approval-bytes.mjs';
 
 const requestId='pc-w05-r304-11111111-2222-4333-8444-555555555555';
 const chatId='chat-aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
@@ -38,6 +39,18 @@ test('rejects unapproved actor, post-label, request path and replay',()=>{
  assert.throws(()=>validateIssue({...makeEvent(),issue:{...makeEvent().issue,labels:[]}},env),/W05_B_REQUEST_OR_ACTOR_DENIED/);
  assert.throws(()=>validateIssue(makeEvent({approvalPath:'../wrong'}),env),/W05_B_REQUEST_CONTRACT_STOP/);
  assert.throws(()=>validateIssue(makeEvent(),{...env,GITHUB_RUN_ATTEMPT:'2'}),/W05_B_REQUEST_OR_ACTOR_DENIED/);
+});
+
+test('approval uses the exact pinned Git blob, independent of checkout line endings',()=>{
+ const raw=Buffer.from(JSON.stringify(approved(),null,2)+'\n');
+ const fromGit=readApprovalBytes({controlRoot:'fixture-root',runGit:(_exe,args,opts)=>{
+  assert.deepEqual(args,['-C','fixture-root','cat-file','blob','HEAD:'+MANIFEST]);
+  assert.equal(opts.shell,false);return raw;
+ }});
+ assert.equal(validateApproval(fromGit,{approvalSha256:sha256(raw)}).status,'APPROVED_B');
+ const crlf=Buffer.from(raw.toString().replace(/\n/g,'\r\n'));
+ assert.notEqual(sha256(crlf),sha256(raw));
+ assert.throws(()=>validateApproval(crlf,{approvalSha256:sha256(raw)}),/APPROVAL_BYTES_STOP/);
 });
 test('rejects proposed approval, changed source, broad provider effect and wrong raw hash',()=>{
  const good=approved(),raw=Buffer.from(JSON.stringify(good));
