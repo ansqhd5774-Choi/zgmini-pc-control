@@ -1,0 +1,20 @@
+{
+  "schema": "ZGMINI_W05_R304_SERVICE_B_RESULT_V1",
+  "status": "PASS",
+  "code": "W05_B_SERVICE_SQLITE_READBACK_VERIFIED",
+  "requestId": "pc-w05-r304-211831ef-547e-426a-8838-762b5913c214",
+  "sourceSha": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "provider": "BLS",
+  "series": "WPSFD42",
+  "providerCalls": 1,
+  "dbWrites": "COMMITTED_IDEMPOTENT",
+  "d1Writes": 0,
+  "schedulerChanges": 0,
+  "automaticRetries": 0,
+  "rows": 22,
+  "observationAt": "2026-10-01",
+  "retrievedAt": "2026-11-22T12:47:21.253Z",
+  "firstSeenAt": "2026-11-22T12:47:21.253Z",
+  "snapshotSha256": "e6ee311982565f49381cd68219c1a3330c875ad8697de7870aabc866a8cb5b71",
+  "chunkSha256": "64671e41a1b22510142205abe0499a81173dd7c5bae4d956f1c33bc9254b34f1"
+}
