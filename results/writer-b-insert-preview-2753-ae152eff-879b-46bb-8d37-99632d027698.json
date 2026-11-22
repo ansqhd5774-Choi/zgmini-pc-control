@@ -1,0 +1,29 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1",
+  "requestId": "ae152eff-879b-46bb-8d37-99632d027698",
+  "chatId": "c644e4a2-5c44-4c74-a4f9-5db331323335",
+  "issueNumber": 2753,
+  "status": "PASS_READONLY",
+  "code": "WRITER_B_INSERT_PREVIEW_VERIFIED",
+  "pcSourceWrites": 0,
+  "taskWrites": 0,
+  "dbWrites": 0,
+  "d1Writes": 0,
+  "providerCalls": 0,
+  "beforeSha256": "c4af0ecfec524e1b6c93e7cfb1ec1187ee1346f76e7bc7d5cfd2a27a3038d074",
+  "afterSha256": "330b29c25dafb63e5b8fdd75ecf52e886480e7d44b40e2dc9d7d3643e952ef8b",
+  "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+  "baseHead": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "filePath": "worker/market-operational-store.mjs",
+  "insertions": 2,
+  "coreDrain": {
+    "status": "SNAPSHOT",
+    "enabled": true,
+    "state": 3,
+    "instances": 0,
+    "relatedProcesses": 0,
+    "unknownProcessLines": 0,
+    "cycleLockPresent": false,
+    "drainReadyIfDisabled": true
+  }
+}
