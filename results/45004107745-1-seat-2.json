@@ -1,0 +1,113 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45004107745-1-seat-2",
+  "requestId": "pc-113fbd26-c431-45a9-9c17-bb2771b052f9",
+  "startedAt": "2026-11-22T08:43:30.061Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "9c084bf032dee10c0172646619559f641c1e422a",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "2eb796da811d0e074ca0cabab8e2cad9502bff43",
+  "sourceBranch": "main",
+  "operation": "inflation7-d1-readback-readonly",
+  "seat": 2,
+  "status": "PASS",
+  "code": "INFL7_D1_READBACK_VERIFIED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w01-inflation-seven-d1-census-20261122",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "INFL7_D1_READBACK_VERIFIED",
+    "key": "detail:inflation-causal-candidates-7:r1",
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "d1StoredAt": 1794825119516,
+    "d1BodySha256": "0f85649e97f1b2192fd2b052de9c284564733e528f8c66ef4d2a28ff0849f6fc",
+    "sourceStoredAt": 1794825002905,
+    "sourceVersion": "INFL7_PRESENTATION_18a38bc27e850b0a83ad6528c0929746ae67ee26fff847197f54ca2f0ca3f644",
+    "ready": 6,
+    "stale": 0,
+    "indicators": [
+      {
+        "id": "2",
+        "status": "READY",
+        "series": "EMM_EPMR_PTE_NUS_DPG",
+        "unit": "USD/갤런",
+        "value": 4.153,
+        "observationDate": "2026-11-02",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z"
+      },
+      {
+        "id": "16",
+        "status": "READY",
+        "series": "MTS_TABLE_4_CUSTOMS_DUTIES_405",
+        "unit": "USD",
+        "value": 5910402249.78,
+        "observationDate": "2026-09-30",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z"
+      },
+      {
+        "id": "22",
+        "status": "READY",
+        "series": "CUSR0000SEHA",
+        "unit": "지수",
+        "value": 451.337,
+        "observationDate": "2026-10-01",
+        "sourceStoredAt": "2026-11-16T10:30:02.905Z"
+      },
+      {
+        "id": "23",
+        "status": "READY",
+        "series": "CUSR0000SEHC01",
+        "unit": "지수",
+        "value": 446.588,
+        "observationDate": "2026-10-01",
+        "sourceStoredAt": "2026-11-16T10:30:02.905Z"
+      },
+      {
+        "id": "24",
+        "status": "READY",
+        "series": "WPSFD4",
+        "unit": "지수",
+        "value": 159.78,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-16T10:30:02.905Z"
+      },
+      {
+        "id": "28",
+        "status": "PENDING",
+        "series": "MTM/TI",
+        "unit": "백만 USD",
+        "value": null,
+        "observationDate": null,
+        "sourceStoredAt": null
+      },
+      {
+        "id": "29",
+        "status": "READY",
+        "series": "GMF",
+        "unit": "지수",
+        "value": 99.4361,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-07T22:40:02.928Z"
+      }
+    ]
+  },
+  "protectedBeforeSha256": "c13899953f777020e80c778f679c7b66c29c657cef4bb6a26e284d0cca3b437d",
+  "protectedAfterSha256": "c13899953f777020e80c778f679c7b66c29c657cef4bb6a26e284d0cca3b437d",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "9c084bf032dee10c0172646619559f641c1e422a",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-22T08:43:36.285Z",
+  "durationMs": 6224
+}
