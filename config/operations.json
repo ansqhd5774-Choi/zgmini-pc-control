@@ -17,6 +17,8 @@
     "writer-install-preimage-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "writer-publication-evidence-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "employment-r6-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
+    "inflation-census-m3-archive-headers-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "inflation7-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "us-breadth-r17-preflight": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "us-breadth-r17-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "r17-268-postcancel-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
