@@ -46,6 +46,36 @@
         engines.push(engine);
       }
     }
+    // GetInstances(0) can omit this Hidden task although State is RUNNING.
+    // The documented service enumeration includes hidden tasks without
+    // changing privileges/settings. Accept only the exact registered path.
+    var observedInstances = Number(running.Count);
+    var instanceIds = [];
+    var engineOrigin = 'REGISTERED_TASK_GET_INSTANCES';
+    if (engines.length === 0) {
+      try {
+        var allRunning = service.GetRunningTasks(1);
+        var exactCount = 0;
+        for (var ri = 1; ri <= allRunning.Count; ri += 1) {
+          var rt = allRunning.Item(ri);
+          if (String(rt.Path || '').toLowerCase() !== '\\zgmini-pc-local-core') continue;
+          var guid = String(rt.InstanceGuid || '');
+          var servicePid = integer(rt.EnginePID);
+          if (!/^\{[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\}$/i.test(guid) ||
+              servicePid === null || servicePid <= 0 || integer(rt.State) !== 4) continue;
+          exactCount += 1;
+          instanceIds.push(guid.toLowerCase());
+          if (!engineSeen[String(servicePid)]) {
+            engineSeen[String(servicePid)] = true;
+            engines.push(servicePid);
+          }
+        }
+        if (exactCount > 0) {
+          observedInstances = exactCount;
+          engineOrigin = 'TASK_SERVICE_INCLUDE_HIDDEN_EXACT_PATH';
+        }
+      } catch (ignoreServiceEnumeration) { }
+    }
     var wmi = GetObject('winmgmts:root\\cimv2');
     var results = wmi.ExecQuery('SELECT ProcessId,ParentProcessId,Name,CommandLine,CreationDate FROM Win32_Process');
     var processes = [], item = new Enumerator(results);
@@ -85,7 +115,10 @@
     var taskStateAfter = integer(task.State);
     done('{"ok":true,"taskStateBefore":' + (taskStateBefore===null?'null':taskStateBefore) +
       ',"taskStateAfter":' + (taskStateAfter===null?'null':taskStateAfter) +
-      ',"runningInstances":' + Number(running.Count) +
+      ',"runningInstances":' + observedInstances +
+      ',"registeredRunningInstances":' + Number(running.Count) +
+      ',"engineOrigin":"' + engineOrigin + '"' +
+      ',"taskInstanceIds":[' + (instanceIds.length?'"'+instanceIds.join('","')+'"':'') + ']' +
       ',"engines":[' + engines.join(',') + '],"processes":['+
       processes.join(',') + ']}', 0);
   } catch (error) {
