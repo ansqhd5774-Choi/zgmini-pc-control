@@ -2,7 +2,7 @@
   "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
   "installedSha": "565ddbd4ebfc46c88fb7dbaa810fd545656c6306",
   "targetSha": "8309119a13992b1e608b51e4d68d230a832e250b",
-  "sourceMainSha": "913a919fda490a9091529bd7e07c017051304a30",
+  "sourceMainSha": "7a887124c591c81f661cfc4e56a167a3003d5c8a",
   "targetBranch": "codex/w01-census-inflation7-d1-combined-565-20261122",
   "customPaths": [],
   "allowFiles": [
@@ -23,5 +23,5 @@
       "sha256": "2e657e3024aa2862a96b33067bd806b1569913e794e5d41adce061c6df18c880"
     }
   ],
-  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2649"
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2657"
 }
