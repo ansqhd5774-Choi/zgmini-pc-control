@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
-  "status": "PENDING_B_APPROVAL",
+  "status": "APPROVED_B",
   "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "sourceBranch": "main",
@@ -70,5 +70,6 @@
   "allowDbChanges": false,
   "allowD1Writes": false,
   "allowTaskDefinitionChanges": false,
-  "allowOtherSourceChanges": false
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
 }
