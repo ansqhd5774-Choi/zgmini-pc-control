@@ -1,0 +1,132 @@
+{
+  "schema": "ZGMINI_CORE092_OPERATIONAL_EVIDENCE_V1",
+  "status": "PASS",
+  "code": "CORE_RUNTIME_AND_COMPLETED_LINEAGE_VERIFIED",
+  "observedAt": "2026-11-22T00:25:27.308Z",
+  "verificationControlSourceSha": "7f3c18c11576fdf07efe7a874a78326e692b259a",
+  "verificationToolSha256": "4a90817242ddea34159f96e043aa88bc6c8904e992b0a3d4b3cc7b4e2dbf5480",
+  "runtimeEvidence": {
+    "observedAt": "2026-11-22T00:20:40.705Z",
+    "evidence": "ACTUAL_INSTALLED_CONTROLLER_AFTER_ORIGIN_FIX_DIRECT_WINDOWS_READONLY",
+    "controllerSourceSha": "d260aea2513902a77425344629f91575e2d950ef",
+    "result": {
+      "status": "PASS",
+      "code": "CORE_RUNTIME_SOURCE_VERIFIED",
+      "evidenceLevel": "TASK_ENGINE_WMI_PROCESS_CHAIN",
+      "runtimeSourceVerified": true,
+      "activeCoreSourceVerified": true,
+      "activeCoreRoot": "e:\\zgmini\\projects\\zgmini-earnings-history-pc-release",
+      "relativeEntrypoint": "scripts/pc-writer/local-cycle.mjs",
+      "runningTaskInstances": 1,
+      "providerCalls": 0,
+      "d1Writes": 0,
+      "sqliteOpened": false,
+      "operationalWrites": 0,
+      "sourceFileHashesVerified": true,
+      "sourceFileHashCode": null,
+      "beforeFileSha256": [
+        {
+          "path": "lib/earnings-api-calendar.mjs",
+          "sha256": "e48d4ea5da65d2b72b070e54bb41103486e730c38b8c040215388a9b57af39cb"
+        },
+        {
+          "path": "scripts/pc-writer/earnings-api-local.mjs",
+          "sha256": "a686bf736c9a5ae274cd2dc69dd169e93ddab90f72ae273c45e765c788226ce8"
+        },
+        {
+          "path": "scripts/pc-writer/release-calendar.mjs",
+          "sha256": "16e9ecc9692c67addceeb9dd8eb479d2d973e25f3c86db4e6872b96f29c85545"
+        }
+      ],
+      "lockOwner": {
+        "status": "VERIFIED_ACTIVE_CORE",
+        "code": "CORE_LOCK_TASK_LINKED_OWNER_VERIFIED"
+      },
+      "sourceIdentity": {
+        "status": "VERIFIED",
+        "sourceSha": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+        "approvedSourceSha": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+        "files": [
+          {
+            "path": "scripts/pc-writer/local-cycle.mjs",
+            "sha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d",
+            "gitBlobSha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d",
+            "bytePolicy": "EXACT_GIT_BLOB"
+          },
+          {
+            "path": "scripts/pc-writer/collect-local.mjs",
+            "sha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706",
+            "gitBlobSha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706",
+            "bytePolicy": "EXACT_GIT_BLOB"
+          },
+          {
+            "path": "scripts/pc-writer/run-local.mjs",
+            "sha256": "9cfbd0736e305aabdee0bf285c92515949eafe0c83968b9029961a37e6bf6c3b",
+            "gitBlobSha256": "9cfbd0736e305aabdee0bf285c92515949eafe0c83968b9029961a37e6bf6c3b",
+            "bytePolicy": "EXACT_GIT_BLOB"
+          },
+          {
+            "path": "scripts/pc-writer/collection-events.mjs",
+            "sha256": "0085ea065382b8530fe3b45000d12bdb961801e183f5bd161ad897e2c53ad2ba",
+            "gitBlobSha256": "74f836aff846268b6cb905f2dfaada3a83324fafc7891f93a5b6eac6d0bdf901",
+            "bytePolicy": "GIT_CRLF_CHECKOUT"
+          }
+        ]
+      },
+      "taskOrigin": {
+        "method": "TASK_SERVICE_INCLUDE_HIDDEN_EXACT_PATH",
+        "taskInstanceIds": [
+          "{ae3b4674-28bb-44b7-b5b0-ee1f68adb308}"
+        ]
+      },
+      "collectionWriterSameCycleVerified": false,
+      "resultLineage": "LIVE_SOURCE_PROVEN_CHECKPOINT_CYCLE_LINK_NOT_ATTESTED"
+    }
+  },
+  "completedCycle": {
+    "status": "PASS",
+    "code": "CORE_COMPLETED_COLLECTION_WRITER_LINEAGE_VERIFIED",
+    "collectionWriterSameCycleVerified": true,
+    "coreCycleId": "0a720a19-139c-461c-8375-9d1a2ec0457c",
+    "sourceSha": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+    "startedAt": "2026-11-22T00:20:03.276Z",
+    "completedAt": "2026-11-22T00:24:17.284Z",
+    "taskOriginEvidence": "TASK_ENGINE_WMI_CAPTURED_AT_START",
+    "collectionStatus": "COMPLETE",
+    "writerStatus": "VERIFIED",
+    "cycleStatus": "COMPLETE",
+    "scope": "COMPLETED_CYCLE_ORIGIN_AND_RESULT_LINK_ONLY",
+    "allBusinessDataVerified": false,
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "checkpointSha256": {
+      "local-cycle-last-run.json": "9ed9052389e963fe42c7d3101ddb950257c772037d018d0095b21dcfa494f8cb",
+      "local-collection-last-run.json": "fbdce8a7a3d9337a32154bd1a22fff76d267bb2d728067c218b53c8cadfeb8a4",
+      "local-writer-last-run.json": "c381dbc43204e7121cf71577e24894588d5f0d02c85b59656492539b0421d657"
+    }
+  },
+  "naturalWriter": {
+    "mode": "PUBLISH",
+    "status": "VERIFIED",
+    "source": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+    "coreCycleId": "0a720a19-139c-461c-8375-9d1a2ec0457c",
+    "rowsWritten": 17,
+    "readFailures": 0
+  },
+  "operatingReadback": {
+    "controllerSha": "d260aea2513902a77425344629f91575e2d950ef",
+    "workflowState": "active",
+    "installLeaseHeld": false,
+    "runnerOnlineCount": 6
+  },
+  "diagnosticEffects": {
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "scope": "092_EXECUTION_SOURCE_AND_COMPLETED_RESULTS_ONLY",
+  "allBusinessDataVerified": false
+}
