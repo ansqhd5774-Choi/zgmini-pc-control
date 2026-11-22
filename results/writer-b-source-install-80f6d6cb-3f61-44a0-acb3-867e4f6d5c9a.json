@@ -1,0 +1,21 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "80f6d6cb-3f61-44a0-acb3-867e4f6d5c9a",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "1e52876f5112c4a58a43273d264588755b7b9402",
+  "candidateSourceSha": "2f4a8227ecfc954d6c72ecbc6b56242c709a7f0f",
+  "manifestSha256": "c36c3765d170a9f8b89c7be682a872a56c06bb5aea415be5fd99cbfbf6ed6102",
+  "baseTreeOid": "e705390ef2a0403f8f5b1bbdb9863388eec2a366",
+  "preparedTreeOid": "348e94c603e3084ec52ef274bff78dce1360cbfc",
+  "provenanceSha256": "1363e56fb80c8c3e0ff755c8dd467412b7ffab6c14aa13c524dd9f39419c8149",
+  "runId": "45017438158",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "scripts/pc-writer/run-local.mjs",
+    "scripts/pc-writer/inflation-r2-trend-date-refresh.mjs"
+  ]
+}
