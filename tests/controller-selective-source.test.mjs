@@ -244,3 +244,33 @@ test('W04 27-reason one-file selective pin and exact B manifest validate',()=>{
   'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2316');
  assert.equal(checked.manifest.backup.rollback.sha,installed);
 });
+
+test('R6 protected drift firstFail installed-156 one-file B pin and recovery validate',()=>{
+ const installed='156fa7eb85b5020d3167fb92da3edbcccbb54ccc';
+ const target='13af1b1e9deb43d3008c521c0a528a51355f6905';
+ const file=path.join(import.meta.dirname,'..','approvals','controller-updates',target+'.json');
+ const pinFile=path.join(import.meta.dirname,'..','approvals','controller-selective-targets',target+'.json');
+ const raw=fs.readFileSync(file);
+ const manifest=JSON.parse(raw.toString('utf8'));
+ const pin=JSON.parse(fs.readFileSync(pinFile,'utf8'));
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-controller-firstfail-source-review',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const checked=validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(checked.manifest,pin),true);
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.deepEqual(manifest.allowFiles,[{path:'controller/engine.mjs',
+  sha256:'6231d4c9db82c7e0dad2cb82454c681fe3d6b6b3a12d97853cfeb520c98d8949'}]);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(manifest.selectiveSource.mainSha,'d674a66f039154f9b7501a4f5f23278216b20853');
+ assert.deepEqual(manifest.selectiveSource.customPaths,['controller/engine.mjs']);
+ assert.equal(manifest.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.approval.ref,
+  'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2735');
+ assert.throws(()=>validateControllerSelectivePin(manifest,{...pin,installedSha:target}),
+  /SELECTIVE_PIN_MISMATCH/);
+});
