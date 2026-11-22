@@ -30,7 +30,9 @@ export function classifyCompletedCoreLineage({cycle,collection,writer,identity,p
  if(!(/^[a-f0-9]{64}$/.test(entryHash??''))||entryHash!==cycle.coreEntrypointSha256||
   proofNames.some(n=>!(/^[a-f0-9]{64}$/.test(proofHashes?.[n]??''))||cycle.coreProofFileSha256?.[n]!==proofHashes[n]))
   return fail('CORE_COMPLETED_PROOF_FILE_MISMATCH');
- if(cycle.publishRequested!==true||cycle.publicationExit!==0||cycle.collectionExit!==0)
+ if(cycle.publishRequested!==true||writer.mode!=='PUBLISH'||
+  !['VERIFIED','VERIFIED_WITH_GAPS'].includes(writer.status)||
+  cycle.publicationExit!==0||cycle.collectionExit!==0)
   return fail('CORE_COMPLETED_RESULTS_NOT_SUCCESSFUL');
  return {status:'PASS',code:'CORE_COMPLETED_COLLECTION_WRITER_LINEAGE_VERIFIED',
   collectionWriterSameCycleVerified:true,coreCycleId:id,sourceSha:identity.sourceSha,

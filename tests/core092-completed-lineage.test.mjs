@@ -12,7 +12,7 @@ const fixture=()=>({
  coreEntrypointSha256:hash,coreProofFileSha256:{'core-cycle-id.mjs':hash,'core-origin-runtime.mjs':hash,'core-origin-wmi.mjs':hash},
  publishRequested:true,publicationExit:0,collectionExit:0,status:'COMPLETE'},
  collection:{coreCycleId:id,at:'2026-11-22T00:01:00.000Z',status:'COMPLETE'},
- writer:{coreCycleId:id,source:sha,at:'2026-11-22T00:02:00.000Z',status:'COMPLETE'},
+ writer:{coreCycleId:id,source:sha,at:'2026-11-22T00:02:00.000Z',mode:'PUBLISH',status:'VERIFIED'},
  identity:{status:'VERIFIED',sourceSha:sha,approvedSourceSha:sha,files:[{path:'scripts/pc-writer/local-cycle.mjs',sha256:hash}]},
  proofHashes:{'core-cycle-id.mjs':hash,'core-origin-runtime.mjs':hash,'core-origin-wmi.mjs':hash}});
 test('completed natural-cycle origin links collection and Writer without claiming all business data',()=>{
@@ -35,7 +35,8 @@ test('unverified startup, changed proof, stale process and incomplete publicatio
   x=>x.cycle.coreNodeCreatedAtMs-=40000,x=>x.collection.at='2026-11-21T00:01:00.000Z',
   x=>x.cycle.publicationExit=1,x=>x.identity.status='UNVERIFIED',
   x=>{x.identity.files=[];delete x.cycle.coreEntrypointSha256;},
-  x=>x.writer.at='2026-11-22T00:00:30.000Z']){
+  x=>x.writer.at='2026-11-22T00:00:30.000Z',
+  x=>x.writer.mode='DRY_RUN',x=>x.writer.status='FAILED']){
   const x=fixture();mutate(x);assert.equal(classifyCompletedCoreLineage(x).status,'UNVERIFIED');
  }
 });
