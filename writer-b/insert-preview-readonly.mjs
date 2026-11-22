@@ -17,7 +17,7 @@ const R54_PREVIEW_FILES=new Set([
  'lib/market-score/composite-model-r1.mjs',
  'worker/market-operational-store.mjs',
 ]);
-const approvedPreviewFile=value=>typeof value==='string'&&
+export const approvedPreviewFile=value=>typeof value==='string'&&
  (FILE.test(value)||R54_PREVIEW_FILES.has(value));
 export const PREVIEW_SCHEMA='ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1';
 export const sha256=b=>createHash('sha256').update(b).digest('hex');
