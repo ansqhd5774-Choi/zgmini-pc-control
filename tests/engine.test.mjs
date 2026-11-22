@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import{execFileSync}from'node:child_process';
-import {executeJob} from '../controller/engine.mjs';import {validateRequest,exclusive} from '../controller/common.mjs';
+import {executeJob,readFixedR6Stage} from '../controller/engine.mjs';import {validateRequest,exclusive} from '../controller/common.mjs';
 const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
 function fixture(){const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-runner-'));const dataRoot=path.join(root,'data');fs.mkdirSync(path.join(dataRoot,'pc-writer'),{recursive:true});fs.writeFileSync(path.join(dataRoot,'pc-writer/config.json'),JSON.stringify({source:'a'.repeat(40)}));return {root,policy:structuredClone(policy),host:{dataRoot,controllerSourceSha:'b'.repeat(40)},queryTask:()=>Buffer.from('fixed-task'),retiredTaskEvidence:()=> 'APPROVED_RETIRED_ABSENT',runId:'100',seat:1};}
 const req=(operation='runner-smoke',requestId='request-12345678')=>({schema:'ZGMINI_PC_JOB_V1',requestId,chatId:'chat-a',operation,sourceRepository:policy.sourceRepository,sourceBranch:'main',sourceSha:'a'.repeat(40)});
@@ -285,4 +285,22 @@ test('D05 read succeeds without extra source lookup and detects real protected d
   {...c,runId:'5604',queryTask:()=>Buffer.from(++n<=2?'before':'after')});
  assert.equal(drift.report.status,'BLOCKED');
  assert.equal(drift.report.code,'PROTECTED_STATE_DRIFT_OBSERVED');
+});
+
+test('R6 timeout stage parser accepts only a single literal phase from own workspace',()=>{
+ const workspace=fs.mkdtempSync(path.join(os.tmpdir(),'zg-r6-stage-'));
+ const marker=path.join(workspace,'employment-r6-readonly-stage.json');
+ try{
+  assert.equal(readFixedR6Stage(workspace),null);
+  fs.writeFileSync(marker,JSON.stringify({stage:'ETA539_RAW_CURRENT_PARITY'}));
+  assert.equal(readFixedR6Stage(workspace),'ETA539_RAW_CURRENT_PARITY');
+  fs.writeFileSync(marker,JSON.stringify({stage:'../PRIVATE_PATH'}));
+  assert.equal(readFixedR6Stage(workspace),null);
+  fs.writeFileSync(marker,JSON.stringify({stage:'STATE_CLAIMS_51_COVERAGE',raw:'must-not-report'}));
+  assert.equal(readFixedR6Stage(workspace),null);
+  fs.writeFileSync(marker,'x'.repeat(129));
+  assert.equal(readFixedR6Stage(workspace),null);
+  fs.writeFileSync(marker,'{ malformed');
+  assert.equal(readFixedR6Stage(workspace),null);
+ }finally{fs.rmSync(workspace,{recursive:true,force:true});}
 });
