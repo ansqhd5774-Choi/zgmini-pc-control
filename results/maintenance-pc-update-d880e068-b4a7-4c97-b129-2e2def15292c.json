@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-d880e068-b4a7-4c97-b129-2e2def15292c",
+  "targetControllerSha": "6097c7f955363f4651e2a22b69e2b31e98ca24eb",
+  "status": "BLOCKED",
+  "code": "SELECTIVE_PIN_NOT_IN_APPROVAL_PR",
+  "lastPass": "BLOCKED",
+  "firstFail": "RECEIVED",
+  "actualControllerSha": "9e3542e616f3fa781a2d614294d6bde17c087180",
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": true
+}
