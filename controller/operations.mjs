@@ -40,7 +40,7 @@ import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
 import {inspectEmploymentR6HostCas} from './employment-r6-host-cas-readonly.mjs';
 import {inspectEmploymentR6WalMemoryPreflight} from './employment-r6-wal-memory-readonly.mjs';
-import {inspectEmploymentR6CollectionEvidence} from './employment-r6-collection-evidence-readonly.mjs';
+import {inspectEmploymentR6CollectionEvidence,R6_READONLY_STAGES} from './employment-r6-collection-evidence-readonly.mjs';
 import {inspectEmploymentR6RawRunLight} from './employment-r6-raw-run-attestation-readonly.mjs';
 import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
@@ -232,7 +232,13 @@ export async function runOperation(request,context){
  if(request.operation==='asset-r10-source-readonly')return inspectAssetR10SourceBytes(dataRoot,{coreTaskXml:queryTask('ZGMINI-PC-Local-Core')});
  if(request.operation==='employment-r6-host-cas-readonly')return inspectEmploymentR6HostCas({host});
  if(request.operation==='employment-r6-wal-memory-preflight')return inspectEmploymentR6WalMemoryPreflight({host});
- if(request.operation==='employment-r6-collection-evidence-readonly')return inspectEmploymentR6CollectionEvidence(dataRoot);
+ if(request.operation==='employment-r6-collection-evidence-readonly')return inspectEmploymentR6CollectionEvidence(dataRoot,{
+  // Stage marker contains only a literal phase and remains in the isolated job workspace.
+  onStage:stage=>{
+   if(typeof workspace!=='string'||!R6_READONLY_STAGES.includes(stage))return;
+   writeJson(path.join(workspace,'employment-r6-readonly-stage.json'),{stage});
+  },
+ });
  if(request.operation==='employment-r6-raw-run-attestation-readonly')return inspectEmploymentR6RawRunLight(dataRoot);
  if(request.operation==='earnings-bea-mfg-archive-readonly')return inspectBeaMfgArchiveReadonly(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){
