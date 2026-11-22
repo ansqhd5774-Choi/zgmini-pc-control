@@ -1,0 +1,32 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "fix/w01-census-m3-duplicate-consumed-headers-20261122",
+  "candidateSourceSha": "9d23a8f552c2720b12b1b3ea559cc7c7a8a02c6d",
+  "baseHead": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+  "baseConfigSourceSha": "91b0e5a602883b9d3ee61310281957d3cdd23f11",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/inflation-causal-candidate-census-m3.mjs",
+      "change": "M",
+      "beforeSha256": "650c9ac80c534a3dc00026951911d0574c5c6421b0096caf902e5467ee4a960b",
+      "afterSha256": "50d85e953a459961f8b79b5426ebd7b10ecece533cf532f73177e39076894a90"
+    }
+  ],
+  "protectedFiles": [],
+  "runtimeDependencies": {
+    "taskXmlSha256": null,
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
