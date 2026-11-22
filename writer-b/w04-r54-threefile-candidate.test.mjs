@@ -6,12 +6,15 @@ import {validateWriterBManifest} from './contract.mjs';
 const path=new URL('../approvals/writer-updates/w04-r54-stored-event-threefile-candidate-20261122.json',import.meta.url);
 const staged=JSON.parse(fs.readFileSync(path,'utf8'));
 
-test('R54 source candidate is not install-authorized until exact B effect approval',()=>{
- assert.equal(staged.status,'PENDING_B_APPROVAL');
- assert.throws(()=>validateWriterBManifest(staged),{code:'WRITER_B_SOURCE_CONTRACT_STOP'});
+test('R54 exact threefile manifest matches the standing Writer B scope',()=>{
+ assert.equal(staged.status,'APPROVED_B');
+ assert.equal(staged.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_360S_V1');
+ assert.equal(validateWriterBManifest(staged),staged);
+ assert.throws(()=>validateWriterBManifest({...staged,status:'PENDING_B_APPROVAL'}),
+  {code:'WRITER_B_SOURCE_CONTRACT_STOP'});
 });
-test('approved-shape trial preserves exact three-file CAS and unrelated Writer changes',()=>{
- const candidate={...staged,status:'APPROVED_B'};
+test('approved manifest preserves exact three-file CAS and unrelated Writer changes',()=>{
+ const candidate=staged;
  assert.equal(validateWriterBManifest(candidate),candidate);
  assert.deepEqual(candidate.files.map(x=>[x.path,x.change]),[
   ['lib/market-score/composite-model-r1.mjs','M'],
