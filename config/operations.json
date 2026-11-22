@@ -47,6 +47,7 @@
     "inflation-causal-saved-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation19-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation-r2-local-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "inflation-r2-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "inflation-census-m3-archive-headers-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation-candidates-runtime-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "isolation-proof": {"grade":"A","timeoutSeconds":90,"resource":"light"},
