@@ -1,0 +1,19 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "filePath": "worker/market-operational-store.mjs",
+  "beforeSha256": "c4af0ecfec524e1b6c93e7cfb1ec1187ee1346f76e7bc7d5cfd2a27a3038d074",
+  "insertions": [
+    {
+      "anchor": "import {BIS_INPUT_TTL} from './bis-input-policy.mjs';",
+      "position": "after",
+      "text": "import {recordStoredEmploymentR54Event} from '../lib/market-score/employment-r54-calculation-event.mjs';\n"
+    },
+    {
+      "anchor": "   assertCompleteMarket(body);await init();const encoded=JSON.stringify(body);const statements=[];",
+      "position": "before",
+      "text": "   recordStoredEmploymentR54Event(body,now);\n"
+    }
+  ]
+}
