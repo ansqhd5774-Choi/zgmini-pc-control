@@ -51,6 +51,26 @@ export function inspectInflationR2Row(row){
   key:W01_R2_KEY,...values,providerCalls:0,d1Writes:0,operationalWrites:0};
 }
 
+// Fixed local report metadata; never expose full Writer config or report bodies.
+function fixedMetadata(dataRoot,fileSystem,name){
+ const file=path.join(dataRoot,'pc-writer',name);
+ try{
+  const stat=fileSystem.lstatSync(file);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<2||stat.size>131072)
+   return null;
+  const record=JSON.parse(fileSystem.readFileSync(file,'utf8'));
+  if(!record||typeof record!=='object'||Array.isArray(record))return null;
+  const sha=v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v)?v:null;
+  const instant=v=>typeof v==='string'&&Number.isFinite(Date.parse(v))&&
+   new Date(v).toISOString()===v?v:null;
+  return name==='config.json'?{configSource:sha(record.source)}:
+   name==='local-cycle-last-run.json'?
+    {coreCycleAt:instant(record.at),coreCycleStatus:typeof record.status==='string'&&
+     /^[A-Z_]{1,50}$/.test(record.status)?record.status:null}:
+    {writerAt:instant(record.at),writerSource:sha(record.source)};
+ }catch{return null;}
+}
+
 export function inspectInflationR2LocalReadonly(dataRoot,{
  fileSystem=fs,openDatabase=file=>new DatabaseSync(file,{readOnly:true,timeout:1000})
 }={}){
@@ -72,6 +92,10 @@ export function inspectInflationR2LocalReadonly(dataRoot,{
   const row=db.prepare('SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=?')
    .get(W01_R2_KEY);
   return {...inspectInflationR2Row(row),sqliteOpened:true,
+   config:fixedMetadata(dataRoot,fileSystem,'config.json'),
+   core:fixedMetadata(dataRoot,fileSystem,'local-cycle-last-run.json'),
+   writer:fixedMetadata(dataRoot,fileSystem,'local-writer-last-run.json'),
+   runtimeWriterSourceVerified:false,
    evidenceScope:'LOCAL_SQLITE_ONLY_NOT_D1_OR_PRODUCTION'};
  }catch(error){
   return status('W01_R2_LOCAL_READ_FAILED',{sqliteOpened:Boolean(db),
