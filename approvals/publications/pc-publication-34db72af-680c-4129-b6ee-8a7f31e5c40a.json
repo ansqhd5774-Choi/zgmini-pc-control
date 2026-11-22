@@ -3,8 +3,8 @@
   "requestId": "pc-publication-34db72af-680c-4129-b6ee-8a7f31e5c40a",
   "operation": "census-qfr-margin-once",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "publisherSha": "24f80c4cc096114537ceb5c5a7dab01591791c43",
-  "operationalSha": "2070ff53549e2f9f2cea57d5af7e1d83f9fd7388",
+  "publisherSha": "2f4a8227ecfc954d6c72ecbc6b56242c709a7f0f",
+  "operationalSha": "1e52876f5112c4a58a43273d264588755b7b9402",
   "snapshotKey": "detail:earnings-recession-indicators:census-qfr-mfg-margin:v1",
   "publisherFiles": {
     "scripts/pc-writer/EARNINGS_CENSUS_QFR_R1_READONLY.mjs": "5286287be8773dd8d2d4bdc943e7ee40131d88669c1ec981f4be68a34025879a",
