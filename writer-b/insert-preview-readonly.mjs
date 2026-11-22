@@ -9,7 +9,16 @@ const stop=code=>{throw Object.assign(new Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
 const SHA40=/^[a-f0-9]{40}$/i,SHA64=/^[a-f0-9]{64}$/i;
 const ROOT=/^E:\\ZGmini\\projects\\[a-z0-9][a-z0-9._-]{0,79}(?:\\[a-z0-9][a-z0-9._-]{0,79}){0,2}$/i;
+// Keep the established scripts/pc-writer preview scope unchanged.
+// R54 needs two fixed shared modules for a source-only SHA preview. Do not
+// widen this read-only capability to arbitrary lib/worker paths.
 const FILE=/^scripts\/pc-writer\/[a-z0-9][a-z0-9._-]{0,127}\.mjs$/i;
+const R54_PREVIEW_FILES=new Set([
+ 'lib/market-score/composite-model-r1.mjs',
+ 'worker/market-operational-store.mjs',
+]);
+const approvedPreviewFile=value=>typeof value==='string'&&
+ (FILE.test(value)||R54_PREVIEW_FILES.has(value));
 export const PREVIEW_SCHEMA='ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1';
 export const sha256=b=>createHash('sha256').update(b).digest('hex');
 
@@ -19,7 +28,7 @@ export function validatePreviewSpec(spec){
   ['schema','sourceRoot','baseHead','filePath','beforeSha256','insertions']
    .every(k=>Object.hasOwn(spec,k))&&
   spec.schema===PREVIEW_SCHEMA&&ROOT.test(spec.sourceRoot??'')&&
-  SHA40.test(spec.baseHead??'')&&FILE.test(spec.filePath??'')&&
+  SHA40.test(spec.baseHead??'')&&approvedPreviewFile(spec.filePath)&&
   !spec.filePath.includes('..')&&SHA64.test(spec.beforeSha256??''),
   'WRITER_B_PREVIEW_SPEC_STOP');
  validateInsertions(spec.insertions);

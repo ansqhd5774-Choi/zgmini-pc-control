@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "filePath": "lib/market-score/composite-model-r1.mjs",
+  "beforeSha256": "383efbc67a394fb5d0bf581172bab6a3b2dde9677c595b4e20c2e9e558854444",
+  "insertions": [
+    {
+      "anchor": "      ...(spec.id===\"rates\"?{modelVersion:src?.modelVersion??null}:{}),",
+      "position": "before",
+      "text": "      ...(spec.id===\"employment\"?{methodologyVersion:src?.methodologyVersion??null,asOfDate:src?.asOfDate??null}:{}),\n"
+    }
+  ]
+}
