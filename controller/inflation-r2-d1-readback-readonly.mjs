@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {readFixedReadonlyBytes} from './fixed-readonly-bytes.mjs';
 import {selectR6GitBinary} from './employment-r6-d1-readback-readonly.mjs';
-import {inspectInflationR2Row,W01_R2_KEY} from './inflation-r2-local-readonly.mjs';
+import {inspectInflationR2Row,inspectInflationR2LocalReadonly,W01_R2_KEY} from './inflation-r2-local-readonly.mjs';
 
 const SQL='SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=?';
 const result=(code,extra={})=>({status:'STATE_UNKNOWN',code,key:W01_R2_KEY,
@@ -30,7 +30,7 @@ export function verifyInflationR2D1Row(row,{expectedLocal=null}={}){
    expectedLocal.bodySha256===measured.bodySha256&&
    expectedLocal.storedAt===measured.storedAt&&
    expectedLocal.score===measured.score&&expectedLocal.asOfDate===measured.asOfDate;
- return {status:'PASS',
+ return {status:localMatches===false?'PARTIAL':'PASS',
    code:localMatches===false?'W01_R2_D1_LOCAL_MISMATCH':'W01_R2_D1_READBACK_VERIFIED',
    key:W01_R2_KEY,...values,localMatches,
    providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
@@ -82,6 +82,10 @@ export async function inspectInflationR2D1Readback(dataRoot,{
   phase='D1_SELECT';
   const row=(await client(config,()=>credential(real)).query(config.core,SQL,[W01_R2_KEY]))
    .results?.[0]??null;
-  return verifyInflationR2D1Row(row,{expectedLocal});
+  const local=expectedLocal??inspectInflationR2LocalReadonly(dataRoot);
+  const compared=verifyInflationR2D1Row(row,{expectedLocal:local.status==='PASS'?local:null});
+  return {...compared,localStatus:local.status,
+   localBodySha256:local.bodySha256??null,localStoredAt:local.storedAt??null,
+   localScore:local.score??null,localAsOfDate:local.asOfDate??null};
  }catch{return result('W01_R2_D1_'+phase+'_FAILED');}
 }
