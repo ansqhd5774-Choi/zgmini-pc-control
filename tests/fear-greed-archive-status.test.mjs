@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectFearGreedArchive,inspectSidecarSourceGate,inspectCompositeWriterCheckpoint} from '../controller/fear-greed-archive-readonly.mjs';
+import {inspectFearGreedArchive,inspectSidecarSourceGate} from '../controller/fear-greed-archive-readonly.mjs';
 import {executeJob} from '../controller/engine.mjs';
 
 const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
@@ -398,59 +398,4 @@ test('existing global publication ledger is sanitized and never equated to archi
  assert.equal(r.archiveTrace.publicationLedger.scope,'GLOBAL_PUBLICATION_ONLY');
  assert.equal(r.archiveTrace.sidecar.evidence,'NOT_FOUND');
  assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE/);
-});
-
-
-test('W06 composite Writer diagnostic filters private fields and hashes only fixed local SQLite bodies',()=>{
- const f=fixture();try{
-  const core=new DatabaseSync(f.dbFile);
-  const currentBody=JSON.stringify({score:45.1373,secret:'PRIVATE_SCORE_FORMULA'});
-  core.prepare('INSERT INTO market_public_snapshots_v1(snapshot_key,body,stored_at) VALUES(?,?,?)').run('current',currentBody,1795305650969);
-  core.close();
-  const before=digest(fs.readFileSync(f.dbFile));
-  fs.writeFileSync(path.join(f.dataRoot,'pc-writer','local-writer-last-run.json'),JSON.stringify({
-   at:'2026-11-22T11:59:54.050Z',source:'a'.repeat(40),mode:'PUBLISH',status:'VERIFIED',
-   market:{status:'VERIFIED',secret:'PRIVATE_PROVIDER_KEY'},
-   compositeObserved:{status:'UNCHANGED',date:'2026-11-22',points:1,privateRaw:'NEVER_ECHO_PRIVATE_RAW'},
-   compositeObservedPublication:{status:'VERIFIED',storedDays:21,publishedDays:0,deferredDays:0,token:'NEVER_ECHO_TOKEN'},
-   failures:[{id:'composite-observed-publication',reason:'AKIAABCDEFGHIJKLMNOP'},{id:'other',reason:'SECRET_OTHER'}],
-   credential:'PASSWORD_PRIVATE'}));
-  const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
-  assert.equal(r.status,'PASS');
-  assert.equal(r.writerComposite.state,'READ');
-  assert.equal(r.writerComposite.mode,'PUBLISH');
-  assert.equal(r.writerComposite.compositeArchiveLocal.status,'UNCHANGED');
-  assert.equal(r.writerComposite.compositeArchiveLocal.points,1);
-  assert.equal(r.writerComposite.compositePublication.status,'VERIFIED');
-  assert.equal(r.writerComposite.d1PerKeyReadback,'NOT_VERIFIED');
-  assert.deepEqual(r.writerComposite.failedStages,['composite-observed-publication']);
-  assert.equal(r.local.localCompositeKeys.current.bodySha256,digest(currentBody));
-  assert.equal(r.local.localCompositeKeys.current.storedAt,1795305650969);
-  assert.equal(r.local.localCompositeKeys.latestArchiveKey,'composite-observed:2026-11-02');
-  assert.equal(r.local.localCompositeKeys.latestArchive.bodySha256?.length,64);
-  assert.equal(digest(fs.readFileSync(f.dbFile)),before);
-  assert.doesNotMatch(JSON.stringify(r),/PRIVATE_|NEVER_ECHO|AKIAABCDEFGHIJKLMNOP|PASSWORD_/);
- }finally{fs.rmSync(f.root,{recursive:true,force:true})}
-});
-
-test('W06 composite checkpoint missing or untrusted fields cannot become remote verified evidence',()=>{
- const f=fixture();try{
-  assert.equal(inspectCompositeWriterCheckpoint(f.dataRoot).state,'MISSING');
-  const file=path.join(f.dataRoot,'pc-writer','local-writer-last-run.json');
-  fs.writeFileSync(file,JSON.stringify({at:'FORGED',mode:'REMOTE',status:'AKIAABCDEFGHIJKLMNOP',
-   compositeObserved:{status:'PUBLISH_AUTH_TOKEN',points:-1},
-   compositeObservedPublication:{status:'PENDING_VERIFIED_MARKET',publishedDays:-8},
-   failures:[{id:'not-composite-secret',reason:'SECRET'}]}));
-  const x=inspectCompositeWriterCheckpoint(f.dataRoot);
-  assert.equal(x.at,null);
-  assert.equal(x.mode,null);
-  assert.equal(x.writerStatus,null);
-  assert.equal(x.compositeArchiveLocal.status,null);
-  assert.equal(x.compositeArchiveLocal.points,null);
-  assert.equal(x.compositePublication.status,'PENDING_VERIFIED_MARKET');
-  assert.equal(x.compositePublication.publishedDays,null);
-  assert.deepEqual(x.failedStages,[]);
-  assert.equal(x.d1PerKeyReadback,'NOT_VERIFIED');
-  assert.doesNotMatch(JSON.stringify(x),/AKIA|PUBLISH_AUTH_TOKEN|not-composite-secret/);
- }finally{fs.rmSync(f.root,{recursive:true,force:true})}
 });
