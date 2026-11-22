@@ -489,7 +489,7 @@ function auditStoredNationalRun(db,mode){
 
 /** Path is supplied by the installed Controller, never by Issue JSON. */
 export function inspectEmploymentR6CollectionEvidence(dataRoot,{
- filesystem=fs,openDatabase=openSqliteReadonly,
+ filesystem=fs,openDatabase=openSqliteReadonly,onStage=null,
 }={}){
  const result={status:'BLOCKED',code:'R6_EVIDENCE_DATA_ROOT_DENIED',sqliteOpened:false,
   scope:'R6_DOL_BED_FIXED_SQLITE_DIAGNOSTIC',dol:null,bed:null,eta539:null,stateClaims:null,pitRawSchema:null,eta539RawCurrentParity:null,...noWrite()};
@@ -503,10 +503,13 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
  if(gate.status!=='PASS')return {...result,status:'STATE_UNKNOWN',code:gate.code};
  const runRead=()=>{
  let db,stage='OPEN_READONLY';
+ // Fixed stage labels only. Optional progress is diagnostic, never a prerequisite.
+ const markStage=value=>{stage=value;if(typeof onStage==='function')try{onStage(value);}catch{}};
  try{
+   markStage('OPEN_READONLY');
    db=openDatabase(gate.path);result.sqliteOpened=true;
-  stage='READONLY_PRAGMAS';db.exec('PRAGMA query_only=ON');db.exec('PRAGMA busy_timeout=4000');
-  stage='TABLE_DISCOVERY';
+  markStage('READONLY_PRAGMAS');db.exec('PRAGMA query_only=ON');db.exec('PRAGMA busy_timeout=4000');
+  markStage('TABLE_DISCOVERY');
   const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(x=>x.name));
   result.pitRawSchema=inspectPitRawSchema(db,tables,gate.path,filesystem);
   if(TABLES.some(t=>!tables.has(t)))return {...result,status:'STATE_UNKNOWN',code:'R6_EVIDENCE_TABLE_MISSING',
@@ -514,14 +517,14 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
   const query=db.prepare(`SELECT status,completed_at,provider_requests,collected_rows,inserted_count,revised_count,rejected_count,failure_code,detail_json
    FROM market_score_employment_r4_shadow_runs_v1 WHERE provider=? AND json_extract(detail_json,'$.mode')=?
    ORDER BY completed_at DESC LIMIT 1`);
-  stage='RUN_SUMMARY';
+  markStage('RUN_SUMMARY');
   for(const [key,provider] of Object.entries(PROVIDERS)){
    result[key]={};
    for(const mode of MODES)result[key][mode]=summarizeRun(query.get(provider,mode),key);
   }
-  stage='NATIONAL_RAW_RUN_COMPARISON';
+  markStage('NATIONAL_RAW_RUN_COMPARISON');
   result.nationalRaw=Object.fromEntries(MODES.map(mode=>[mode,auditStoredNationalRun(db,mode)]));
-  stage='ETA539_METADATA';
+  markStage('ETA539_METADATA');
   const snapshots=db.prepare(`SELECT request_key,retrieved_at,chunk_count,http_status,
    json_extract(detail_json,'$.historyWeeks') AS history_weeks,
    json_extract(detail_json,'$.parserMeta.latestCompleteWeek') AS latest_complete_week,
@@ -538,9 +541,9 @@ export function inspectEmploymentR6CollectionEvidence(dataRoot,{
    historyWeeks:safeInt(r.history_weeks),selectedWeeks:safeInt(r.selected_weeks),
    firstSelectedWeek:date(r.first_selected_week),latestCompleteWeek:date(r.latest_complete_week),coreCount:safeInt(r.core_count),
   })):[{status:'NOT_STORED'}];
-  stage='ETA539_RAW_CURRENT_PARITY';
+  markStage('ETA539_RAW_CURRENT_PARITY');
   result.eta539RawCurrentParity=inspectEta539RawCurrentParity(db);
-  stage='STATE_CLAIMS_51_COVERAGE';
+  markStage('STATE_CLAIMS_51_COVERAGE');
   // All geography labels are fixed source constants; only aggregates leave the DB.
   const countryMarkers=CORE_STATES.map(()=>'?').join(',');
   const weekly=db.prepare(`WITH recent_weeks AS (
