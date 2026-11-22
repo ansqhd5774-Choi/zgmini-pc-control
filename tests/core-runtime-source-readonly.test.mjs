@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {classifyCoreSnapshot,inspectCoreRuntimeSource,hashActiveCoreFiles,
+import {classifyCoreSnapshot,inspectCoreRuntimeSource,hashActiveCoreFiles,readActiveCoreSourceIdentity,
  readCoreLockSnapshot,classifyCoreLockOwner} from '../controller/core-runtime-source-readonly.mjs';
 
 const snapshot={ok:true,runningInstances:1,engines:[10],processes:[
@@ -13,6 +13,8 @@ const snapshot={ok:true,runningInstances:1,engines:[10],processes:[
   relativeRoot:'zgmini-earnings-history-pc-release',createdAtMs:300},
 ]};
 const realpath=p=>p;
+const verifiedIdentity=()=>({status:'VERIFIED',sourceSha:'a'.repeat(40),
+ approvedSourceSha:'a'.repeat(40),files:[]});
 test('live TaskEngine ancestry + exact sanitized E marker proves runtime',()=>{
  const r=classifyCoreSnapshot(snapshot,{realpath});
  assert.equal(r.status,'PASS');
@@ -61,6 +63,7 @@ test('injected collector snapshot yields PASS without touching host',()=>{
  const payload=Buffer.from('approved-source-bytes');
  const result=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,
   probe:()=>({status:0,stdout:JSON.stringify(snapshot)}),realpath,
+  sourceIdentity:verifiedIdentity,
   lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:payload.length}),
   read:()=>payload});
  assert.equal(result.status,'PASS');
@@ -75,7 +78,7 @@ test('non-Windows host never tries probe',()=>{
 });
 
 function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',
- runningCount=1,creationDate=null}){
+ runningCount=1,creationDate=null,hiddenRows=[],hiddenError=false}){
  const source=fs.readFileSync(new URL('../controller/core-runtime-source-wmi.mjs',import.meta.url),'utf8');
  const records=[
   {ProcessId:10,ParentProcessId:1,Name:'taskeng.exe',CommandLine:'service',CreationDate:null},
@@ -88,7 +91,9 @@ function simulateWsh({command,otherCommand='--token=SECRET_NEVER_PRINT',
   this.moveNext=()=>{this.i++;};this.item=()=>this.rows[this.i];}
  const task={GetInstances:()=>({Count:runningCount,Item:()=>({EnginePID:10})})};
  const context={
-  ActiveXObject:function(){return {Connect:()=>{},GetFolder:()=>({GetTask:()=>task})};},
+  ActiveXObject:function(){return {Connect:()=>{},GetFolder:()=>({GetTask:()=>task}),
+   GetRunningTasks:flags=>{assert.equal(flags,1);if(hiddenError)throw Error('ACCESS_DENIED');
+    return {Count:hiddenRows.length,Item:i=>hiddenRows[i-1]};}};},
   GetObject:()=>({ExecQuery:()=>records}),
   Enumerator,
   WScript:{Echo:x=>{printed+=x;},Quit:code=>{throw Error('WSH_EXIT_'+code);}},
@@ -104,6 +109,29 @@ test('actual JScript WMI serialization returns only fixed enums and no raw comma
  assert.equal(s.processes.find(p=>p.pid===30).relativeRoot,'zgmini-earnings-history-pc-release');
  assert.equal(classifyCoreSnapshot(s,{realpath}).status,'PASS');
  assert.doesNotMatch(printed,/CommandLine|SECRET_NEVER_PRINT|--token|E:\\ZGmini/i);
+});
+
+const hiddenCoreCommand=String.raw`"E:\ZGmini\runtime\node.exe" "E:\ZGmini\projects\zgmini-earnings-history-pc-release\scripts\pc-writer\local-cycle.mjs" --publish`;
+const hiddenCoreTask={Path:'\\ZGMINI-PC-Local-Core',EnginePID:10,
+ InstanceGuid:'{12345678-1234-4234-8234-123456789012}',State:4};
+test('hidden task service enumeration proves the exact native instance without changing privileges',()=>{
+ const {snapshot:s,printed}=simulateWsh({command:hiddenCoreCommand,runningCount:0,hiddenRows:[hiddenCoreTask]});
+ assert.equal(s.registeredRunningInstances,0);assert.equal(s.runningInstances,1);
+ assert.equal(s.engineOrigin,'TASK_SERVICE_INCLUDE_HIDDEN_EXACT_PATH');
+ assert.deepEqual(s.taskInstanceIds,[hiddenCoreTask.InstanceGuid.toLowerCase()]);
+ assert.equal(classifyCoreSnapshot(s,{realpath}).status,'PASS');
+ assert.doesNotMatch(printed,/SECRET_NEVER_PRINT|CommandLine|--token/);
+});
+for(const [name,row]of Object.entries({korea:{...hiddenCoreTask,Path:'\\ZGMINI-PC-Local-Korea'},
+ nested:{...hiddenCoreTask,Path:'\\other\\ZGMINI-PC-Local-Core'},
+ missingGuid:{...hiddenCoreTask,InstanceGuid:''},missingPid:{...hiddenCoreTask,EnginePID:0},
+ notRunning:{...hiddenCoreTask,State:3}}))test('hidden enumeration rejects '+name,()=>{
+ const {snapshot:s}=simulateWsh({command:hiddenCoreCommand,runningCount:0,hiddenRows:[row]});
+ assert.equal(s.engines.length,0);assert.equal(classifyCoreSnapshot(s,{realpath}).status,'STATE_UNKNOWN');
+});
+test('hidden enumeration access failure stays unknown rather than falling back to a named Node',()=>{
+ const {snapshot:s}=simulateWsh({command:hiddenCoreCommand,runningCount:0,hiddenError:true});
+ assert.equal(s.engines.length,0);assert.equal(classifyCoreSnapshot(s,{realpath}).runtimeSourceVerified,false);
 });
 test('read-only hashes reject external symbolic links, files too large, or missing',()=>{
  const root=String.raw`E:\ZGmini\projects\some-project`;
@@ -182,6 +210,7 @@ test('existing A collector attaches independent lock-owner evidence without writ
  const lock={state:'PRESENT',pid:30,at,fingerprint:'a'.repeat(64)};
  const out=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,
   probe:()=>({status:0,stdout:JSON.stringify(snapshot)}),realpath,
+  sourceIdentity:verifiedIdentity,
   lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:bytes.length}),
   read:()=>bytes,readLock:()=>lock});
  assert.equal(out.status,'PASS');
@@ -220,3 +249,64 @@ test('092 simulated: file hashes can never promote unrelated Core PID ancestry t
  assert.equal(result.runtimeSourceVerified,false);
  assert.equal(result.code,'CORE_LINKED_NODE_NOT_OBSERVED');
 });
+
+function sourceIdentityFixture({approved='a'.repeat(40),changedFile=false,
+ movedHead=false,changedConfig=false}={}){
+ const root=String.raw`E:\ZGmini\projects\fixture`,bytes=Buffer.from('exact installed source'),
+  cfg=Buffer.from(JSON.stringify({source:approved}));let heads=0,configs=0;
+ return {root,options:{realpath:p=>p,configFile:'fixture-config',
+  lstat:p=>({isFile:()=>true,isSymbolicLink:()=>false,size:p==='fixture-config'?cfg.length:bytes.length}),
+  read:p=>p==='fixture-config'?(++configs>1&&changedConfig?Buffer.from('{}'):cfg):bytes,
+  run:(command,args)=>{assert.equal(command,'git');
+   if(args[0]==='rev-parse')return Buffer.from((++heads>1&&movedHead?'b':'a').repeat(40)+'\n');
+   assert.equal(args[0],'cat-file');return changedFile?Buffer.from('other source'):bytes;}}};
+}
+test('OS-observed source root binds approved HEAD and four exact execution source blobs',()=>{
+ const {root,options}=sourceIdentityFixture(),r=readActiveCoreSourceIdentity(root,options);
+ assert.equal(r.status,'VERIFIED');assert.equal(r.sourceSha,'a'.repeat(40));
+ assert.equal(r.files.length,4);assert.equal(r.approvedSourceSha,r.sourceSha);
+});
+for(const [name,change,code]of [
+ ['unapproved HEAD',{approved:'b'.repeat(40)},'CORE_RUNNING_APPROVED_SOURCE_MISMATCH'],
+ ['changed runtime source',{changedFile:true},'CORE_EXECUTION_FILE_SOURCE_MISMATCH'],
+ ['HEAD drift during observation',{movedHead:true},'CORE_SOURCE_CHANGED_DURING_PROBE'],
+ ['approval drift during observation',{changedConfig:true},'CORE_SOURCE_CHANGED_DURING_PROBE'],
+])test('source identity rejects '+name,()=>{
+ const {root,options}=sourceIdentityFixture(change);
+ assert.equal(readActiveCoreSourceIdentity(root,options).code,code);
+});
+test('a live Task ancestry cannot promote unverified source identity to PASS',()=>{
+ const bytes=Buffer.from('fixture');
+ const r=inspectCoreRuntimeSource({platform:'win32',exists:()=>true,realpath,
+  probe:()=>({status:0,stdout:JSON.stringify(snapshot)}),
+  lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:bytes.length}),read:()=>bytes,
+  readLock:()=>({state:'ABSENT'}),sourceIdentity:()=>({status:'UNVERIFIED',code:'CORE_EXECUTION_FILE_SOURCE_MISMATCH'})});
+ assert.equal(r.status,'STATE_UNKNOWN');assert.equal(r.runtimeSourceVerified,false);
+ assert.equal(r.runtimeProcessEvidence.status,'PASS');
+});
+
+function checkoutEolFixture({auto='true',filter='unspecified',text='unspecified',eol='unspecified',tampered=false}={}){
+ const root=String.raw`E:\ZGmini\projects\fixture`,blob=Buffer.from('const value=1;\n'),
+  bytes=Buffer.from(tampered?'const value=2;\r\n':'const value=1;\r\n'),
+  cfg=Buffer.from(JSON.stringify({source:'a'.repeat(40)}));
+ return {root,options:{realpath:p=>p,configFile:'fixture-config',
+  lstat:p=>({isFile:()=>true,isSymbolicLink:()=>false,size:p==='fixture-config'?cfg.length:bytes.length}),
+  read:p=>p==='fixture-config'?cfg:bytes,
+  run:(command,args)=>{assert.equal(command,'git');
+   if(args[0]==='rev-parse')return Buffer.from('a'.repeat(40)+'\n');
+   if(args[0]==='cat-file')return blob;
+   if(args[0]==='config')return Buffer.from(auto+'\n');
+   assert.equal(args[0],'check-attr');const file=args.at(-1);
+   return Buffer.from([file,'text',text,file,'eol',eol,file,'filter',filter,''].join('\0'));}}};
+}
+test('Windows Git CRLF checkout records both actual bytes and Git blob hashes',()=>{
+ const {root,options}=checkoutEolFixture(),r=readActiveCoreSourceIdentity(root,options);
+ assert.equal(r.status,'VERIFIED');assert(r.files.every(f=>f.bytePolicy==='GIT_CRLF_CHECKOUT'));
+ assert(r.files.every(f=>f.sha256!==f.gitBlobSha256));
+});
+for(const [name,change]of Object.entries({sourceEdit:{tampered:true},disabledConversion:{auto:'false'},
+ customFilter:{filter:'custom'},binary:{text:'unset'},explicitLf:{eol:'lf'}}))
+ test('CRLF handling does not hide '+name,()=>{
+  const {root,options}=checkoutEolFixture(change);
+  assert.equal(readActiveCoreSourceIdentity(root,options).code,'CORE_EXECUTION_FILE_SOURCE_MISMATCH');
+ });

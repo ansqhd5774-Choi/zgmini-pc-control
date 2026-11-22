@@ -20,6 +20,8 @@ function linkedCoreFixture(){
   lstat:()=>({isFile:()=>true,isSymbolicLink:()=>false,size:64}),
   read:()=>Buffer.alloc(64,65),
   readLock:()=>lock,
+  sourceIdentity:()=>({status:'VERIFIED',sourceSha:'a'.repeat(40),
+   approvedSourceSha:'a'.repeat(40),files:[]}),
  });
  return {source,started};
 }

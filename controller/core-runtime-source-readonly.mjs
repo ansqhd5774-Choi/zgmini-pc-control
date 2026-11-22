@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {spawnSync} from 'node:child_process';
+import {spawnSync,execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 const nodePath=String.raw`E:\ZGmini\runtime\node.exe`;
@@ -16,6 +16,9 @@ const checkedFiles=Object.freeze([
 ]);
 const norm=value=>path.win32.normalize(value).toLowerCase();
 const validPid=value=>Number.isSafeInteger(value)&&value>0;
+const identityFiles=Object.freeze(['scripts/pc-writer/local-cycle.mjs',
+ 'scripts/pc-writer/collect-local.mjs','scripts/pc-writer/run-local.mjs',
+ 'scripts/pc-writer/collection-events.mjs']);
 const unknown=code=>({status:'STATE_UNKNOWN',code,
  evidenceLevel:'LIVE_PROCESS_SNAPSHOT_INCONCLUSIVE',runtimeSourceVerified:false,
  providerCalls:0,d1Writes:0,sqliteOpened:false,operationalWrites:0});
@@ -174,10 +177,66 @@ export function hashActiveCoreFiles(sourceRoot,{realpath=fs.realpathSync.native,
  }catch{return null;}
 }
 
+// Bind the OS-observed source root to the approved Git source and the exact
+// entry/collector/Writer bytes. A matching checkout name or HEAD alone is not
+// execution provenance. Never fetch, update Git/config, or print config bytes.
+export function readActiveCoreSourceIdentity(sourceRoot,{
+ realpath=fs.realpathSync.native,lstat=fs.lstatSync,read=fs.readFileSync,
+ run=execFileSync,configFile=String.raw`E:\ZGmini\data\pc-writer\config.json`,
+}={}){
+ const fail=code=>({status:'UNVERIFIED',code});
+ const digest=b=>createHash('sha256').update(b).digest('hex');
+ try{
+  const root=norm(realpath(sourceRoot)),base=norm(realpath(projectsRoot));
+  if(!root.startsWith(base+'\\'))return fail('CORE_SOURCE_IDENTITY_PATH_INVALID');
+  const git=args=>run('git',args,{cwd:root,encoding:null,windowsHide:true,
+   shell:false,timeout:5000,maxBuffer:2_000_000});
+  const head=git(['rev-parse','HEAD']).toString('utf8').trim();
+  if(!/^[a-f0-9]{40}$/.test(head))return fail('CORE_SOURCE_IDENTITY_SHA_INVALID');
+  const ci=lstat(configFile);
+  if(!ci.isFile()||ci.isSymbolicLink()||ci.size<2||ci.size>65536)
+   return fail('CORE_SOURCE_APPROVAL_UNREADABLE');
+  const configBytes=read(configFile),approved=JSON.parse(configBytes.toString('utf8')).source;
+  if(head!==approved)return fail('CORE_RUNNING_APPROVED_SOURCE_MISMATCH');
+  const files=[];
+  for(const rel of identityFiles){
+   const file=path.win32.join(root,...rel.split('/'));
+   if(norm(realpath(file))!==file)return fail('CORE_SOURCE_IDENTITY_PATH_INVALID');
+   const st=lstat(file);
+   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>2_000_000)
+    return fail('CORE_EXECUTION_FILE_UNVERIFIED');
+   const bytes=read(file),expected=git(['cat-file','blob',head+':'+rel]);
+   if(!Buffer.isBuffer(bytes)||bytes.length!==st.size)
+    return fail('CORE_EXECUTION_FILE_SOURCE_MISMATCH');
+   let bytePolicy='EXACT_GIT_BLOB';
+   if(digest(bytes)!==digest(expected)){
+    // A normal Windows Git checkout can materialize LF blobs as CRLF.
+    // Accept only that exact transformation under an observed Git policy;
+    // never run repository filters or normalize arbitrary source changes.
+    if(expected.includes(13)||!bytes.equals(Buffer.from(expected.toString('utf8').replace(/\n/g,'\r\n'))))
+     return fail('CORE_EXECUTION_FILE_SOURCE_MISMATCH');
+    const raw=git(['check-attr','-z','text','eol','filter','--',rel]).toString('utf8').split('\0');
+    const attrs={};for(let i=0;i+2<raw.length;i+=3)attrs[raw[i+1]]=raw[i+2];
+    if(attrs.filter!=='unspecified'||attrs.text==='unset'||attrs.eol==='lf')
+     return fail('CORE_EXECUTION_FILE_SOURCE_MISMATCH');
+    const auto=git(['config','--get','core.autocrlf']).toString('utf8').trim();
+    if(attrs.eol!=='crlf'&&auto!=='true')return fail('CORE_EXECUTION_FILE_SOURCE_MISMATCH');
+    bytePolicy='GIT_CRLF_CHECKOUT';
+   }
+   files.push({path:rel,sha256:digest(bytes),gitBlobSha256:digest(expected),bytePolicy});
+  }
+  if(git(['rev-parse','HEAD']).toString('utf8').trim()!==head||
+     digest(read(configFile))!==digest(configBytes))
+   return fail('CORE_SOURCE_CHANGED_DURING_PROBE');
+  return {status:'VERIFIED',sourceSha:head,approvedSourceSha:approved,files};
+ }catch{return fail('CORE_SOURCE_IDENTITY_UNAVAILABLE');}
+}
+
 export function inspectCoreRuntimeSource({platform=process.platform,
  probe=spawnSync,exists=fs.existsSync,realpath=fs.realpathSync.native,
  lstat=fs.lstatSync,read=fs.readFileSync,
  readLock=readCoreLockSnapshot,
+ sourceIdentity=readActiveCoreSourceIdentity,
  systemRoot=process.env.SystemRoot??String.raw`C:\Windows`}={}){
  if(platform!=='win32')return unknown('CORE_WINDOWS_REQUIRED');
  const cscript=path.win32.join(systemRoot,'System32','cscript.exe');
@@ -202,7 +261,16 @@ export function inspectCoreRuntimeSource({platform=process.platform,
   if(!beforeFileSha256)return {...unknown('CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE'),
    runtimeProcessEvidence:classified,sourceFileHashesVerified:false,
    sourceFileHashCode:'CORE_ACTIVE_SOURCE_FILE_HASH_UNAVAILABLE',beforeFileSha256:null,lockOwner};
+  const identity=sourceIdentity(classified.activeCoreRoot);
+  if(identity?.status!=='VERIFIED')return {...unknown(identity?.code??'CORE_SOURCE_IDENTITY_UNAVAILABLE'),
+   runtimeProcessEvidence:classified,sourceIdentity:identity,lockOwner};
+  const taskInstanceIds=Array.isArray(snapshot.taskInstanceIds)?snapshot.taskInstanceIds.filter(
+   id=>typeof id==='string'&&/^\{[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\}$/i.test(id)):[];
   return {...classified,sourceFileHashesVerified:true,
-   sourceFileHashCode:null,beforeFileSha256,lockOwner};
+   sourceFileHashCode:null,beforeFileSha256,lockOwner,sourceIdentity:identity,
+   taskOrigin:{method:snapshot.engineOrigin==='TASK_SERVICE_INCLUDE_HIDDEN_EXACT_PATH'?
+    snapshot.engineOrigin:'REGISTERED_TASK_GET_INSTANCES',taskInstanceIds},
+   collectionWriterSameCycleVerified:false,
+   resultLineage:'LIVE_SOURCE_PROVEN_CHECKPOINT_CYCLE_LINK_NOT_ATTESTED'};
  }catch{return unknown('CORE_FIXED_PROBE_EXECUTION_UNAVAILABLE');}
 }
