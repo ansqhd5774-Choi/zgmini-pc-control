@@ -66,3 +66,32 @@ test('anchor failure diagnostics are private, bounded, and strictly validated',(
  assert.equal(Object.hasOwn(sanitizePreview({...base,pcSourceWrites:1},req,645),
   'anchorEvidence'),false);
 });
+
+test('R54 report accepts the exact two shared modules and rejects nearby paths',()=>{
+ const original={schema:'ZGMINI_WRITER_B_INSERT_PREVIEW_RESULT_V1',
+  requestId:id,chatId:chat,issueNumber:645,status:'PASS_READONLY',
+  code:'WRITER_B_INSERT_PREVIEW_VERIFIED',
+  baseHead:'f'.repeat(40),beforeSha256:'a'.repeat(64),
+  afterSha256:'b'.repeat(64),taskXmlSha256:'c'.repeat(64),
+  insertions:2,pcSourceWrites:0,taskWrites:0,dbWrites:0,d1Writes:0,providerCalls:0};
+ for(const filePath of [
+  'lib/market-score/composite-model-r1.mjs',
+  'worker/market-operational-store.mjs',
+  'scripts/pc-writer/run-local.mjs',
+ ]){
+  assert.equal(sanitizePreview({...original,filePath},req,645).status,'PASS_READONLY',filePath);
+  const failed={...original,filePath,status:'BLOCKED',code:'WRITER_B_INSERT_ANCHOR_MATCH_STOP',
+   anchorEvidence:[{index:0,exactCount:0,trimmedCount:1}]};
+  assert.equal(sanitizePreview(failed,req,645).anchorEvidence?.length,1,filePath);
+ }
+ for(const filePath of [
+  'lib/market-score/domain-adapter-r1.mjs',
+  'worker/market-score-r1.mjs',
+  'lib/../worker/market-operational-store.mjs',
+ ]){
+  assert.equal(sanitizePreview({...original,filePath},req,645).status,'BLOCKED',filePath);
+  const failed={...original,filePath,status:'BLOCKED',code:'WRITER_B_INSERT_ANCHOR_MATCH_STOP',
+   anchorEvidence:[{index:0,exactCount:0,trimmedCount:1}]};
+  assert.equal(Object.hasOwn(sanitizePreview(failed,req,645),'anchorEvidence'),false,filePath);
+ }
+});
