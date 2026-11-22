@@ -1,0 +1,56 @@
+{
+  "schema": "ZGMINI_PC_UPDATE_V1",
+  "installedSha": "d260aea2513902a77425344629f91575e2d950ef",
+  "targetSha": "9c084bf032dee10c0172646619559f641c1e422a",
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "15fe47efd22cc75c9684ae37d7fe27a8f08ea159b717b22b4db0030af92b7649"
+    },
+    {
+      "path": "controller/inflation-census-m3-archived-headers-readonly.mjs",
+      "sha256": "b32d8250b7fc1fd76f3f8969ace3c695f136824ed02f2468d4ebf2f7c0268efa"
+    },
+    {
+      "path": "controller/inflation7-d1-readback-readonly.mjs",
+      "sha256": "ae51904dea7f33db9ba551cb41a971657814d970812558ebc5c20ad7e8366122"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "2e657e3024aa2862a96b33067bd806b1569913e794e5d41adce061c6df18c880"
+    }
+  ],
+  "purpose": "pc-controller-maintenance",
+  "controllerOnlyInstall": true,
+  "approval": {
+    "grade": "B",
+    "ref": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2668",
+    "scope": "PC_CONTROL_CONTROLLER_UPDATE"
+  },
+  "checks": {
+    "targetSha": "9c084bf032dee10c0172646619559f641c1e422a",
+    "status": "PASS",
+    "manifestSha256": "55eb2222ee575ea1a6b7c4df89229d8a531977a9b229df60c10c021288be579c"
+  },
+  "backup": {
+    "strategy": "VERSIONED_SNAPSHOT",
+    "rollback": {
+      "kind": "RESTORE_INSTALLED_SHA",
+      "sha": "d260aea2513902a77425344629f91575e2d950ef"
+    }
+  },
+  "postOperation": "core-status",
+  "postSourceBranch": "codex/w04-pit08-source-bundle-20261120",
+  "postSourceSha": "8c4a63ee5f220976ec28f42a97bef899d29d4ec7",
+  "selectiveSource": {
+    "schema": "ZGMINI_CONTROLLER_SELECTIVE_SOURCE_V1",
+    "branch": "codex/w01-census-inflation7-exact4-v2-d260-20261122",
+    "mainSha": "ab80097971b3bd700b4add6891f8430dbfd00fac",
+    "customPaths": [
+      "config/operations.json",
+      "controller/inflation-census-m3-archived-headers-readonly.mjs",
+      "controller/inflation7-d1-readback-readonly.mjs",
+      "controller/operations.mjs"
+    ]
+  }
+}
