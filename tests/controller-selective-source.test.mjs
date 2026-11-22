@@ -274,3 +274,36 @@ test('R6 protected drift firstFail installed-156 one-file B pin and recovery val
  assert.throws(()=>validateControllerSelectivePin(manifest,{...pin,installedSha:target}),
   /SELECTIVE_PIN_MISMATCH/);
 });
+
+test('installed-9e354 core Git source identity one-file selective B pin is exact and rollbackable',()=>{
+ const installed='9e3542e616f3fa781a2d614294d6bde17c087180';
+ const target='6097c7f955363f4651e2a22b69e2b31e98ca24eb';
+ const modulePath='controller/core-runtime-source-readonly.mjs';
+ const raw=fs.readFileSync(path.join(import.meta.dirname,'..','approvals',
+  'controller-updates',target+'.json'));
+ const manifest=JSON.parse(raw.toString('utf8'));
+ const pin=JSON.parse(fs.readFileSync(path.join(import.meta.dirname,'..','approvals',
+  'controller-selective-targets',target+'.json'),'utf8'));
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-core-origin-git-source-verification',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const checked=validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(checked.manifest,pin),true);
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.deepEqual(manifest.allowFiles,[{path:modulePath,
+  sha256:'07eab3a628f77ab8102d396eb912f011e1910992823987f76608ce64ce54603a'}]);
+ assert.equal(digest(fs.readFileSync(path.join(import.meta.dirname,'..',modulePath))),
+  manifest.allowFiles[0].sha256);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.deepEqual(manifest.selectiveSource.customPaths,[modulePath]);
+ assert.equal(manifest.selectiveSource.mainSha,'eb2c04f91ffea52cde61f2c301e177de708bc883');
+ assert.equal(manifest.backup.strategy,'VERSIONED_SNAPSHOT');
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.approval.ref,
+  'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2750');
+ assert.throws(()=>validateControllerSelectivePin(manifest,{...pin,installedSha:target}),
+  /SELECTIVE_PIN_MISMATCH/);
+});
