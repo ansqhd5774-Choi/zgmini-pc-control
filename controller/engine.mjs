@@ -160,7 +160,10 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   }else{
 report.status='BLOCKED';const baseCode=errorCode(error);report.code=baseCode==='INTERNAL_EXECUTION_ERROR'&&error instanceof SyntaxError
     ?preflightOperation==='REQUEST_LEDGER'?'REQUEST_LEDGER_PARSE_FAILED':preflightOperation==='CORE_STATE_READ'?'CORE_CONFIG_PARSE_FAILED':baseCode:baseCode;
-   report.firstFail=report.lastPass;report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';
+   // A protected POSTCHECK drift is the failing stage, not the successful worker.
+   report.firstFail=preflightOperation==='POSTCHECK'&&report.code==='PROTECTED_STATE_DRIFT_OBSERVED'
+    ?'PROTECTED_STATE_POSTCHECK':report.lastPass;
+   report.next=report.code==='LEASE_BUSY'?'WAIT_FOR_EXISTING_OWNER_DO_NOT_DELETE_LOCK':'RESOLVE_NAMED_GATE_NO_AUTOMATIC_RETRY';
    if(!report.phase&&report.lastPass==='REQUEST_RECEIVED'){
     const leaseFailure=['REQUEST_LEASE','SEAT_LEASE','RESOURCE_LEASE'].includes(preflightOperation);
     Object.assign(report,{phase:'PREVALIDATION',failureOperation:preflightOperation,mutationStarted:false,
