@@ -392,7 +392,7 @@ const COMPOSITE_FAILURE_IDS=new Set([
 const safeCompositeStage=value=>typeof value==='string'&&
  COMPOSITE_STAGE_STATUSES.has(value)?value:null;
 const safeTime=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))&&
- /^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{1,3})?Z$/.test(value)?
+ /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)?
  new Date(value).toISOString():null;
 
 export function inspectCompositeWriterCheckpoint(dataRoot){
@@ -442,7 +442,7 @@ function readDb(dataRoot) {
     const project=row=>row&&typeof row.body==='string'&&Buffer.byteLength(row.body,'utf8')<=2_000_000?
       {storedAt:safeStoredAt(row.stored_at),bodySha256:hash(Buffer.from(row.body,'utf8'))}:null;
     const localCompositeKeys={current:project(currentComposite),
-      latestArchiveKey:lastComposite&&/^composite-observed:\\d{4}-\\d\\d-\\d\\d$/.test(lastComposite.snapshot_key)?lastComposite.snapshot_key:null,
+      latestArchiveKey:lastComposite&&/^composite-observed:\d{4}-\d\d-\d\d$/.test(lastComposite.snapshot_key)?lastComposite.snapshot_key:null,
       latestArchive:project(lastComposite)};
     return {sqliteOpened:true,status:'READ',currentPublic,original,checks,composite,localCompositeKeys};
   } catch(error) {
