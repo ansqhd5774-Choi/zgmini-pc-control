@@ -8,6 +8,10 @@ import {createHash} from 'node:crypto';
 const SQLITE_MAGIC='SQLite format 3\0';
 const MAX_DB_BYTES=64*1024**3;
 const MODES=Object.freeze(['BACKFILL','ONE_YEAR','RELEASE']);
+// Literal, non-sensitive stage identifiers shared by the Worker and Controller.
+export const R6_READONLY_STAGES=Object.freeze(['OPEN_READONLY','READONLY_PRAGMAS',
+ 'TABLE_DISCOVERY','RUN_SUMMARY','NATIONAL_RAW_RUN_COMPARISON',
+ 'ETA539_METADATA','ETA539_RAW_CURRENT_PARITY','STATE_CLAIMS_51_COVERAGE']);
 const PROVIDERS=Object.freeze({
  dol:'EMPLOYMENT_R6_DOL_UI_WEEKLY_CLAIMS',
  bed:'EMPLOYMENT_R6_BLS_BED',
