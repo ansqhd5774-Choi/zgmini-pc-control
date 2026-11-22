@@ -36,15 +36,29 @@ export async function admitPublication({environment=process.env,githubGet=get}={
   const issue=await githubGet(`issues/${approvalIssue}`);
   if(issue.user?.login!=='ansqhd5774-Choi'||issue.pull_request)
     throw Error('PUBLICATION_APPROVAL_ISSUE_INVALID');
-  const comments=await githubGet(`issues/${approvalIssue}/comments?per_page=100`);
+  const comments=[];
+  for(let page=1;;page++){
+    const rows=await githubGet(`issues/${approvalIssue}/comments?per_page=100&page=${page}`);
+    if(!Array.isArray(rows))throw Error('PUBLICATION_APPROVAL_COMMENTS_INVALID');
+    comments.push(...rows);
+    if(rows.length<100)break;
+  }
   validateBApprovalComment(validated,comments);
   return {validated,event};
 }
 
+export function publicationCheckoutOutput(validated){
+  const sha=validated?.approval?.publisherSha;
+  if(typeof sha!=='string'||!/^[a-f0-9]{40}$/.test(sha)||sha==='0'.repeat(40))
+    throw Error('PUBLICATION_PUBLISHER_SHA_INVALID');
+  return `publisherSha=${sha}\n`;
+}
+
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))try{
   const {validated}=await admitPublication();
-  console.log(`status=AUTOMATION_BLOCKED\ncode=PUBLICATION_EXECUTOR_NOT_INSTALLED\noperation=${validated.request.operation}\npreflight=PASS_EXPLICIT_B_APPROVAL`);
-  process.exitCode=1;
+  const output=publicationCheckoutOutput(validated);
+  if(process.env.GITHUB_OUTPUT)fs.appendFileSync(process.env.GITHUB_OUTPUT,output);
+  console.log(`status=APPROVAL_VERIFIED\ncode=PUBLICATION_APPROVAL_READY\noperation=${validated.request.operation}\npreflight=PASS_EXPLICIT_B_APPROVAL\nexecution=NOT_RUN`);
 }catch(error){
   const code=String(error?.message??'');
   stop(/^[A-Z0-9_]{1,96}$/.test(code)?code:'PUBLICATION_PREFLIGHT_FAILED');

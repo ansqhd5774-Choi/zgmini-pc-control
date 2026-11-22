@@ -1,9 +1,9 @@
 {
   "schema": "ZGMINI_W05_R304_SERVICE_B_APPROVAL_V1",
-  "status": "PROPOSED_NOT_APPROVED",
+  "status": "APPROVED_B",
   "scope": "W05_WPSFD42_BLS_ONCE_EXISTING_SQLITE_APPEND",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "installedSourceSha": "1e52876f5112c4a58a43273d264588755b7b9402",
+  "installedSourceSha": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
   "dataRoot": "E:\\ZGmini\\data\\pc-writer",
   "files": {

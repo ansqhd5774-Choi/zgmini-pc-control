@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
-import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence} from '../tools/automation-status.mjs';
+import {summarizeAutomation,dedicatedPcRunnersOnline,classifyRunnerQueryError,safeRuntimeSignals,operatingPcRunnerEvidence,inspectWatchdogReadOnly,summarizeSupervisorReadOnly,summarizeRequestedRecoveryEvidence,summarizeRequestProgress} from '../tools/automation-status.mjs';
 const healthy=()=>({installLock:{held:false},actualControllerSha:'a'.repeat(40),
  controllerFilesVerified:true,supervisorAlive:true,supervisorIdentityVerified:true,
  supervisorFresh:true,supervisorChildrenVerified:true,runnerSetOnline:true,workflowState:'active',installedOperations:['core-status']});
@@ -362,4 +362,28 @@ test('request recovery summary fails closed when evidence not observed',()=>{
  assert.equal(r.artifactReadbackCode,'UPDATE_ARTIFACTS_UNVERIFIED');
  assert.equal(r.artifacts,null);
  assert.equal(r.installSuccessProven,false);
+});
+
+test('maintenance phase remains visible while running, without time-based failure or duplicate execution',()=>{
+ const r=summarizeRequestProgress({requestId:'pc-update-3652629d-dd06-4e5d-a7a7-1efeb056cf9d',
+  status:'RUNNING',phase:'SWITCHED',lastPass:'SWITCHED',firstFail:null,code:'IN_PROGRESS',
+  updatedAt:'2026-11-22T00:35:00.000Z'});
+ assert.equal(r.executionState,'RUNNING');assert.equal(r.phase,'SWITCHED');
+ assert.equal(r.next,'FOLLOW_EXISTING_PHASE_NO_DUPLICATE_REQUEST');
+ assert.equal(r.executionAuthorized,false);
+});
+test('completed installation and delayed reporting are distinct from execution failure',()=>{
+ const r=summarizeRequestProgress({status:'PASS',phase:'PASS',code:'APPROVED_UPDATE_AND_DIAGNOSTIC_VERIFIED',
+  postIssueNumber:2670,reportUploadStatus:'REPORT_UPLOAD_PENDING'});
+ assert.equal(r.executionState,'COMPLETED_RESULT_DELIVERY_PENDING');
+ assert.equal(r.postIssueNumber,2670);
+ assert.equal(summarizeRequestProgress({...r,reportUploadStatus:'VERIFIED'}).executionState,'COMPLETED_REPORTED');
+ assert.equal(summarizeRequestProgress({status:'STATE_UNKNOWN'}).next,'RECONCILE_EXISTING_REQUEST_NO_NEW_APPLY');
+ assert.equal(summarizeRequestProgress(null).executionState,'NOT_OBSERVED');
+});
+test('request progress never returns unbounded journal text or private payloads',()=>{
+ const r=summarizeRequestProgress({requestId:'secret@example.com',phase:'TOKEN=SECRET',
+  firstFail:'sensitive arbitrary text',updatedAt:'invalid',payload:'PRIVATE'});
+ assert.equal(r.requestId,null);assert.equal(r.phase,null);assert.equal(r.updatedAt,null);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET|PRIVATE|@/);
 });

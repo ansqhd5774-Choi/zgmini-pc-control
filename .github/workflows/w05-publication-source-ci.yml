@@ -11,8 +11,12 @@ on:
       - 'w05-r304-service-b/**'
       - 'approvals/w05-r304-service-b/**'
       - '.github/workflows/pc-approved-runtime-b-once.yml'
+      - '.github/workflows/pc-publication-b.yml'
 permissions:
   contents: read
+concurrency:
+  group: zgmini-w05-publication-source-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 jobs:
   publication-source:
     if: >-
@@ -32,7 +36,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify B publication contract and executor (no operational effects)
-        run: node --test tests/publication-contract.test.mjs tests/publication-executor.test.mjs tests/publication-bea-mfg-result.test.mjs tests/w05-qfr-publication-draft.test.mjs
+        run: node --test tests/publication-contract.test.mjs tests/publication-preflight.test.mjs tests/publication-executor.test.mjs tests/publication-bea-mfg-result.test.mjs tests/w05-qfr-publication-draft.test.mjs
       - name: Verify W05 scoped BLS one-shot approval and metadata (no PC/provider access)
         run: |
           node --check w05-r304-service-b/once.mjs

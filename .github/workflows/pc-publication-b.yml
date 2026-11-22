@@ -30,11 +30,16 @@ jobs:
         with:
           clean: false
           persist-credentials: false
-      - name: Checkout public publisher main independently
+      - name: Verify existing B approval and select exact publisher source
+        id: publication
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: '"E:\ZGmini\runtime\node.exe" "%GITHUB_WORKSPACE%\tools\publication-preflight.mjs"'
+      - name: Checkout approved publisher commit independently
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: ansqhd5774-Choi/zgmini
-          ref: main
+          ref: ${{ steps.publication.outputs.publisherSha }}
           fetch-depth: 0
           path: publisher
           clean: false

@@ -215,6 +215,8 @@ async function validatePcSources(validated){
   const pub=gitState(publisherRoot),op=gitState(operationalRoot);
   validateSourceCheckpoints(validated,{publisherHead:pub.head,
     originMainHead:git(publisherRoot,['rev-parse','refs/remotes/origin/main']),
+    publisherOnMainHistory:git(publisherRoot,['merge-base',validated.approval.publisherSha,
+      'refs/remotes/origin/main'])===validated.approval.publisherSha,
     publisherBranch:git(publisherRoot,['branch','--show-current']),
     publisherClean:!pub.dirty,operationalHead:op.head,configSource:config.source,
     operationalClean:!op.dirty,publisherRoot,operationalRoot});
@@ -222,7 +224,8 @@ async function validatePcSources(validated){
   // Reuse the exact existing writer's independently checked dual-source guard.
   const gate=await import(pathToFileURL(path.join(publisherRoot,'scripts/pc-writer',
     'EARNINGS_R4_C_D1_DUAL_SOURCE_GATES.mjs')).href);
-  gate.validateD1DualSource({config,publisher:gate.inspectD1Source(publisherRoot,{publisher:true}),
+  gate.validateD1DualSource({config,publisher:gate.inspectD1Source(publisherRoot,{publisher:true,
+    approvedPublisherSha:validated.approval.publisherSha}),
     operational:gate.inspectD1Source(operationalRoot)});
   return {publisherRoot,operationalRoot};
 }
@@ -343,6 +346,7 @@ async function execute(){
       PATH:process.env.PATH,TEMP:process.env.RUNNER_TEMP, TMP:process.env.RUNNER_TEMP,
       USERPROFILE:process.env.USERPROFILE,
       ZGMINI_PC_HOME:PC_BASE,
+      ZGMINI_PUBLICATION_APPROVED_PUBLISHER_SHA:validated.approval.publisherSha,
       ZGMINI_EARNINGS_C_OPERATIONAL_ROOT:operationalRoot,
       ZGMINI_EARNINGS_C_LOG_DIR:logDirectory,
       ...(bea?{ZGMINI_EARNINGS_BEA_UNIT_SOURCE_SHA:invocation.sourceSha256}:{})};

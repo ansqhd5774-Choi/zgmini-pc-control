@@ -6,7 +6,7 @@ import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {readbackServiceSnapshot,validateChildSummary,childResultLogPath} from './once.mjs';
 import {validateIssue,validateApproval,SCHEMA,OPERATION,MANIFEST,INSTALLED_SHA,
- FILES,SOURCE_ROOT,DATA_ROOT,sha256,sanitizedCode} from './contract.mjs';
+ FILES,SOURCE_ROOT,DATA_ROOT,sha256,sanitizedCode,validateInstalledBinding} from './contract.mjs';
 import {sanitizedReport,upload} from './report.mjs';
 
 const requestId='pc-w05-r304-11111111-2222-4333-8444-555555555555';
@@ -64,6 +64,7 @@ test('publisher permits only bounded metadata, never raw data or secret keys',()
   providerCalls:'NOT_CONFIRMED',dbWrites:'NOT_CONFIRMED',
   d1Writes:0,schedulerChanges:0,automaticRetries:0};
  assert.equal(sanitizedReport(clean,requestId).status,'BLOCKED');
+ assert.throws(()=>sanitizedReport(clean,requestId,{expectedSourceSha:'c'.repeat(40)}),/REPORT_CONTRACT_STOP/);
  assert.throws(()=>sanitizedReport({...clean,payloadJson:'secret'},requestId),
   /W05_B_REPORT_CONTRACT_STOP/);
  assert.throws(()=>sanitizedReport({...clean,d1Writes:1},requestId),
@@ -73,6 +74,22 @@ test('publisher permits only bounded metadata, never raw data or secret keys',()
  assert.throws(()=>sanitizedReport({...clean,observationAt:'2026-13-01'},requestId),
   /W05_B_REPORT_CONTRACT_STOP/);
  assert.equal(sanitizedCode('NOT_SAFE'),'W05_B_UNEXPECTED_STOP');
+});
+
+test('reviewed manifest may pin a newer checkout without editing executable source constants',()=>{
+ const doc={...approved(),installedSourceSha:'c'.repeat(40)};
+ const raw=Buffer.from(JSON.stringify(doc));
+ const valid=validateApproval(raw,{approvalSha256:sha256(raw)});
+ assert.equal(validateInstalledBinding(valid,{head:doc.installedSourceSha,
+  configSource:doc.installedSourceSha,fileSha256:FILES}),doc.installedSourceSha);
+ assert.throws(()=>validateInstalledBinding(valid,{head:INSTALLED_SHA,
+  configSource:INSTALLED_SHA,fileSha256:FILES}),/INSTALLED_SOURCE_SHA_DRIFT/);
+ assert.throws(()=>validateInstalledBinding(valid,{head:doc.installedSourceSha,
+  configSource:INSTALLED_SHA,fileSha256:FILES}),/CONFIG_SOURCE_DRIFT/);
+ assert.throws(()=>validateInstalledBinding(valid,{head:doc.installedSourceSha,
+  configSource:doc.installedSourceSha,fileSha256:{...FILES,[Object.keys(FILES)[0]]:'d'.repeat(64)}}),/FILE_HASH_DRIFT/);
+ const unapproved=Buffer.from(JSON.stringify({...doc,status:'PROPOSED_NOT_APPROVED'}));
+ assert.throws(()=>validateApproval(unapproved,{approvalSha256:sha256(unapproved)}),/EFFECT_NOT_APPROVED/);
 });
 
 test('validates collector summary and rejects missing service confirmation',()=>{
@@ -166,7 +183,7 @@ test('no local B result produces safe STATE_UNKNOWN JSON/TXT 2/2, not silent suc
 });
 
 
-test('pin from actual R3-04 approved preimage A keeps manifest non-executable',()=>{
+test('manifest approval lifecycle may advance without changing executable source or widening effect',()=>{
  // PC A #2704 / Run 45013225693: sourceHead=config.source=checkpoint and
  // exact 3 W05 file hashes. This test NEVER authorizes a provider/DB effect.
  assert.equal(INSTALLED_SHA,'1e52876f5112c4a58a43273d264588755b7b9402');
@@ -177,9 +194,11 @@ test('pin from actual R3-04 approved preimage A keeps manifest non-executable',(
  });
  const raw=fs.readFileSync(new URL('../approvals/w05-r304-service-b/approval.json',import.meta.url));
  const proposed=JSON.parse(raw.toString('utf8'));
- assert.equal(proposed.status,'PROPOSED_NOT_APPROVED');
- assert.equal(proposed.installedSourceSha,INSTALLED_SHA);
+ assert.ok(['PROPOSED_NOT_APPROVED','APPROVED_B'].includes(proposed.status));
+ assert.match(proposed.installedSourceSha,/^[a-f0-9]{40}$/);
+ assert.notEqual(proposed.installedSourceSha,'0'.repeat(40));
  assert.deepEqual(proposed.files,FILES);
- assert.throws(()=>validateApproval(raw,{approvalSha256:sha256(raw)}),
-  /W05_B_EFFECT_NOT_APPROVED/);
+ if(proposed.status==='PROPOSED_NOT_APPROVED')
+  assert.throws(()=>validateApproval(raw,{approvalSha256:sha256(raw)}),/W05_B_EFFECT_NOT_APPROVED/);
+ else assert.equal(validateApproval(raw,{approvalSha256:sha256(raw)}).status,'APPROVED_B');
 });

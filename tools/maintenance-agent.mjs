@@ -460,6 +460,23 @@ export function createMaintenanceAgent({
   function persistLedger(entry){
     atomicReplace(ledgerPath(entry.requestId),JSON.stringify(entry,null,2)+"\n");
   }
+  async function acknowledgeAcceptedRequest(entry){
+    // One bounded, best-effort receipt on this original Issue. It is not a
+    // heartbeat or a success result, and delivery failure must not block apply.
+    const body=`<!-- zgmini-pc-maintenance-progress:${entry.requestId} -->\n`+
+      `유지보수 요청 접수·실행 준비 확인 (설치 완료 아님)\n`+
+      `REQUEST_ID: ${entry.requestId}\nOBSERVED_AT: ${now()}\n`+
+      `LAST_PASS: REQUEST_MANIFEST_AND_UNIQUE_CLAIM_VALIDATED\n`+
+      `TARGET_CONTROLLER_SHA: ${entry.targetControllerSha}\n`+
+      `NEXT: 기존 요청의 실행·사후검사·결과 JSON/TXT를 확인합니다. 새 요청을 중복 제출하지 마세요.`;
+    let progressReceiptStatus='UNCONFIRMED';
+    try{
+      await exec(ghBinary,['issue','comment',String(entry.issueNumber),'--repo',repo,'--body',body],Math.min(ghTimeoutMs,3000));
+      progressReceiptStatus='POSTED';
+    }catch{/* Reporting is observational, never a new admission requirement. */}
+    const next={...entry,progressReceiptAttempted:true,progressReceiptStatus};
+    try{persistLedger(next);return next;}catch{return entry;}
+  }
   function persistResult(entry,result){
     const updated={...entry,status:result.status,result,completedAt:now(),
       reportUploadStatus:"REPORT_UPLOAD_PENDING",reportUploadCode:"REPORT_UPLOAD_PENDING"};
@@ -644,6 +661,7 @@ export function createMaintenanceAgent({
     writeOnce(packageFile,JSON.stringify(packageData,null,2)+"\n");
     const held=claim(request,issue,fingerprint,bodyDigest);
     if(!held.created)return {status:"RUNNING",code:"DUPLICATE_REQUEST_SUPPRESSED"};
+    held.entry=await acknowledgeAcceptedRequest(held.entry);
     let result;
     try{
       const command=request.operation===R54_B_OPERATION?'r54-b-apply'

@@ -8,8 +8,8 @@ import {spawnSync,execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
 import {
- CONTROL_REPO, MANIFEST, SOURCE_ROOT,DATA_ROOT,INSTALLED_SHA,FILES,
- validateIssue,validateApproval,sha256,expect,fail,sanitizedCode,
+ CONTROL_REPO, MANIFEST, SOURCE_ROOT,DATA_ROOT,FILES,
+ validateIssue,validateApproval,validateInstalledBinding,sha256,expect,fail,sanitizedCode,
 } from './contract.mjs';
 const CONTROL_ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const SCRIPT='scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs';
@@ -36,17 +36,17 @@ function gitHead(dir){
  expect(sha40(value),'W05_B_GIT_HEAD_STOP');
  return value;
 }
-export function assertInstalledSource({sourceRoot=SOURCE_ROOT}={}){
+export function assertInstalledSource({sourceRoot=SOURCE_ROOT,approval}={}){
  expect(process.platform==='win32','W05_B_WINDOWS_REQUIRED');
  expect(fs.statSync(sourceRoot).isDirectory(),'W05_B_SOURCE_ROOT_STOP');
  const head=gitHead(sourceRoot);
- expect(head===INSTALLED_SHA,'W05_B_INSTALLED_SOURCE_SHA_DRIFT_STOP');
  const cfg=JSON.parse(secureRegular(path.join(DATA_ROOT,'config.json'),100000).toString('utf8'));
- expect(cfg.source===INSTALLED_SHA,'W05_B_CONFIG_SOURCE_DRIFT_STOP');
+ const fileSha256={};
  for(const [relative,expected] of Object.entries(FILES)){
   const file=path.join(sourceRoot,...relative.split('/'));
-  expect(sha256(secureRegular(file))===expected,'W05_B_FILE_HASH_DRIFT_STOP');
+  fileSha256[relative]=sha256(secureRegular(file));
  }
+ validateInstalledBinding(approval,{head,configSource:cfg.source,fileSha256});
  return path.join(sourceRoot,...SCRIPT.split('/'));
 }
 export function readbackServiceSnapshot(dbPath=DB){
@@ -123,7 +123,7 @@ function safeReport(report,env){
 export function execute(env=process.env){
  let report={schema:'ZGMINI_W05_R304_SERVICE_B_RESULT_V1',
   status:'BLOCKED',code:'W05_B_NOT_STARTED',requestId:null,
-  sourceSha:INSTALLED_SHA,provider:'BLS',series:'WPSFD42',
+  sourceSha:null,provider:'BLS',series:'WPSFD42',
   providerCalls:'NOT_CONFIRMED',dbWrites:'NOT_CONFIRMED',d1Writes:0,
   schedulerChanges:0,automaticRetries:0};
  let attempted=false;
@@ -133,13 +133,14 @@ export function execute(env=process.env){
   const request=validateIssue(event,env);
   report.requestId=request.requestId;
   const raw=secureRegular(path.join(CONTROL_ROOT,...MANIFEST.split('/')),12000);
-  validateApproval(raw,request);
-  const installed=assertInstalledSource();
+  const approval=validateApproval(raw,request);
+  const installed=assertInstalledSource({approval});
+  report.sourceSha=approval.installedSourceSha;
   expect(fs.existsSync(NODE)&&fs.existsSync(DB),'W05_B_INSTALLED_RUNTIME_MISSING_STOP');
   expect(!fs.existsSync(ATTEMPT),'W05_B_ALREADY_ATTEMPTED_STOP');
   // Create-only durable attempted marker before any provider request; never auto-retry.
   fs.writeFileSync(ATTEMPT,JSON.stringify({schema:'ZGMINI_W05_R304_ONE_ATTEMPT_V1',
-   requestId:request.requestId,sourceSha:INSTALLED_SHA,startedAt:new Date().toISOString()})+'\n',
+   requestId:request.requestId,sourceSha:approval.installedSourceSha,startedAt:new Date().toISOString()})+'\n',
    {flag:'wx'});attempted=true;
   const child=spawnSync(NODE,[installed,'--services-only','--apply',
    '--confirm-service-sqlite-append'],{
