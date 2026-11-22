@@ -15,6 +15,7 @@ on:
       - 'controller/pc-source-readonly.mjs'
       - 'tests/pc-source-readonly.test.mjs'
       - 'controller/core-runtime-source-readonly.mjs'
+      - 'controller/core-cycle-provenance-readonly.mjs'
       - 'controller/provider-activity-runtime-readonly.mjs'
       - 'controller/http32-two-host-checkpoints-readonly.mjs'
       - 'tests/provider-activity-runtime-readonly.test.mjs'
@@ -41,6 +42,7 @@ on:
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
       - 'tests/core-runtime-source-readonly.test.mjs'
+      - 'tests/core-cycle-provenance-readonly.test.mjs'
       - 'tests/controller-core-lock-source-contract.test.mjs'
       - 'tests/theme-l7-runtime-readonly.test.mjs'
       - 'tests/supervisor-status-write.test.mjs'
@@ -246,6 +248,9 @@ jobs:
       - name: Verify missing engine import produces a report receipt
         if: steps.scope.outputs.core == 'true'
         run: node --test --test-concurrency=1 tests/controller-entry-import-receipt.test.mjs
+      - name: Verify bounded recent Core cycle source identity and fail-closed rules
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/core-cycle-provenance-readonly.test.mjs
       - name: Verify 092 exact selective B source, old CAS and file hashes
         if: steps.scope.outputs.core == 'true' && hashFiles('tests/core-092-selective-b-20261121.test.mjs') != ''
         run: node --test --test-concurrency=1 tests/core-092-selective-b-20261121.test.mjs
