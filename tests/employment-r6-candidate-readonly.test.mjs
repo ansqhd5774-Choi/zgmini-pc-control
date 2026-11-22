@@ -90,6 +90,28 @@ test('PIT-08 optional read-only timestamp and chart geometry pass without privat
   assert.ok(!JSON.stringify(result).includes('PRIVATE_PROVIDER_RAW_BODY_MUST_NOT_LEAK'));
 });
 
+test('PIT-08 chart pointCount boundaries 400, 545, 600 pass; 601 fails closed',async t=>{
+  for(const [count,expected] of [[400,'PASS'],[545,'PASS'],[600,'PASS'],[601,'FAIL']]){
+    await t.test(String(count),async sub=>{
+      const f=fixture(sub);
+      const original=fs.readFileSync(f.script,'utf8');
+      const needle="  bodyDigest:'b'.repeat(64),walPreflight:{coreWalMode:true}};";
+      assert.ok(original.includes(needle));
+      const chart="  stateClaimsChart:{pointCount:"+count+",unit:'%',unitMatchesApproved:true,gapCount:1,firstDate:'2025-11-07',lastDate:'2026-10-30',observationDate:'2026-10-30',lastPointFinite:true,lastPointMatchesCurrent:true},";
+      const changed=original.replace(needle,chart+"\n"+needle);
+      fs.writeFileSync(f.script,changed);
+      const approved=f.host.approvedSources[SHA];
+      const bytes=Buffer.from(JSON.stringify({files:{[ENTRY]:hash(Buffer.from(changed))}},null,2)+'\n');
+      fs.writeFileSync(path.join(approved.root,'manifest.json'),bytes);
+      approved.manifestSha256=hash(bytes);
+      const result=await inspectEmploymentR6Candidate(f.request,f);
+      assert.equal(result.status,expected,JSON.stringify(result));
+      if(expected==='FAIL')assert.equal(result.code,'R6_RESULT_INVALID');
+      else assert.equal(result.stateClaimsChart.pointCount,count);
+    });
+  }
+});
+
 test('PIT-08 chart metadata rejects invalid date without adding a legacy gate',async t=>{
   const f=fixture(t);
   const source=fs.readFileSync(f.script,'utf8').replace(
