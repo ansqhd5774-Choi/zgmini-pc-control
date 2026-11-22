@@ -93,10 +93,45 @@ function safeCheckpoint(snapshot){
     if(p&&(typeof p.eventKey!=='string'||p.eventKey.length>240||!day(p.observationDate)))return {status:'INVALID'};
     if(a&&(typeof a.eventKey!=='string'||a.eventKey.length>240||!iso(a.at)||
       (a.failureCode!==undefined&&!failureCode(a.failureCode))))return {status:'INVALID'};
+    // The event key may contain provider-specific details. Expose only its
+    // fixed category to distinguish a consumed recovery from a dated release.
+    const attemptType=!a?'NONE':a.eventKey===`legacy-parser-recovery:${group}`?
+      'LEGACY_PARSER_RECOVERY':a.eventKey===`bootstrap:${group}`?
+      'BOOTSTRAP':a.eventKey.startsWith('release:')?'OFFICIAL_RELEASE':'OTHER';
     byGroup[group]={processed:!!p,processedObservationDate:p?.observationDate??null,
-      attempted:!!a,lastAttemptedAt:a?.at??null,failureCode:a?.failureCode??null};
+      attempted:!!a,lastAttemptedAt:a?.at??null,failureCode:a?.failureCode??null,
+      attemptType};
   }
   return {status:'PRESENT_VALID',fileSha256:snapshot.sha256,groups:byGroup};
+}
+
+const CANDIDATE_CYCLE_STATES=new Set(['DISABLED','DISABLED_PROVIDERS_UNAVAILABLE',
+  'NO_VERIFIED_RELEASE_DUE','PARTIAL_PREVIOUS_INPUTS_PRESERVED',
+  'PARTIAL_CREDENTIALS_UNAVAILABLE','COMPLETE','UNCHANGED_WAITING_NEW_OBSERVATION',
+  'FAILED_PREVIOUS_INPUTS_PRESERVED']);
+function safeCycle(dataRoot){
+  // Read only the existing fixed Core report. Never return source objects,
+  // arbitrary errors, provider env, request URLs, event keys or observations.
+  const dir=path.join(dataRoot,'pc-writer');
+  if(regularDirectory(dir)!=='PRESENT')return {availability:'MISSING'};
+  const found=fixedFile(dir,'local-cycle-last-run.json',131072);
+  if(found.availability!=='PRESENT')return {availability:found.availability};
+  const doc=found.data,run=doc?.inflationCandidates;
+  if(!run||typeof run!=='object'||Array.isArray(run))
+    return {availability:'PRESENT',status:'NOT_RECORDED'};
+  const safeGroups=v=>Array.isArray(v)?v.filter(x=>typeof x==='string'&&GROUPS.includes(x)).slice(0,6):[];
+  const completed=Array.isArray(run.completed)?run.completed.slice(0,8):[];
+  const failed=Array.isArray(run.failed)?run.failed.slice(0,8):[];
+  const censusCompleted=completed.find(x=>x?.group==='census');
+  const censusFailed=failed.find(x=>x?.group==='census');
+  const censusCode=typeof censusFailed?.code==='string'&&failureCode(censusFailed.code)?
+    censusFailed.code:null;
+  const status=CANDIDATE_CYCLE_STATES.has(run.status)?run.status:'UNREPORTED';
+  return {availability:'PRESENT',cycleAt:iso(doc?.at)?doc.at:null,status,
+    censusDue:safeGroups(run.due).includes('census'),
+    censusSkipped:safeGroups(run.skipped).includes('census'),
+    censusCompleted:!!censusCompleted,censusFailed:!!censusFailed,
+    censusFailureCode:censusCode};
 }
 
 export function inspectInflationCandidatesRuntimeReadonly(dataRoot){
@@ -151,5 +186,6 @@ export function inspectInflationCandidatesRuntimeReadonly(dataRoot){
     presentValidCount:indicators.filter(i=>i.status==='PRESENT_VALID').length,
     indicators,groups,checkpointStatus:checkpoint.status,
     checkpointSha256:checkpoint.fileSha256??null,
+    candidateCycle:safeCycle(root),
     providerCalls:0,d1Writes:0,operationalWrites:0,sqliteOpened:false};
 }

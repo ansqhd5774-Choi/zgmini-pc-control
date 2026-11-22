@@ -109,6 +109,61 @@ test('malformed checkpoint does not falsely imply processed candidate status',()
   }finally{x.cleanup();}
 });
 
+
+test('W01 read-only distinguishes consumed Census recovery from a new due attempt',()=>{
+  const x=mk();try{
+    fixture(x.target);
+    const core=path.join(x.root,'pc-writer');
+    write(x.target,'core-attempts-r1.json',{
+      schema:'ZGMINI_INFLATION_CANDIDATE_CORE_R1',processed:{},
+      attempted:{census:{eventKey:'legacy-parser-recovery:census',at:STAMP,
+        failureCode:'CENSUS_M3_HEADERS_INVALID'}},
+    });
+    write(core,'local-cycle-last-run.json',{
+      at:STAMP,inflationCandidates:{status:'NO_VERIFIED_RELEASE_DUE',
+        due:[],skipped:['census'],failed:[],completed:[],
+        providerEnv:{CENSUS_API_KEY:'DO_NOT_REPORT'},raw:'PRIVATE_BODY'},
+    });
+    const result=inspect(x.root);
+    const census=result.groups.find(g=>g.group==='census');
+    assert.equal(census.checkpoint.attemptType,'LEGACY_PARSER_RECOVERY');
+    assert.deepEqual(result.candidateCycle,{
+      availability:'PRESENT',cycleAt:STAMP,status:'NO_VERIFIED_RELEASE_DUE',
+      censusDue:false,censusSkipped:true,censusCompleted:false,
+      censusFailed:false,censusFailureCode:null,
+    });
+    assert.ok(!JSON.stringify(result).includes('DO_NOT_REPORT'));
+    assert.ok(!JSON.stringify(result).includes('PRIVATE_BODY'));
+    assert.ok(!JSON.stringify(result).includes('legacy-parser-recovery:census'));
+    assert.equal(result.providerCalls,0);
+    assert.equal(result.operationalWrites,0);
+  }finally{x.cleanup();}
+});
+
+test('W01 malformed Core cycle cannot leak arbitrary status or error',()=>{
+  const x=mk();try{
+    fixture(x.target);
+    const core=path.join(x.root,'pc-writer');
+    write(core,'local-cycle-last-run.json',{at:STAMP,inflationCandidates:{
+      status:'SECRET_TOKEN',due:['census','private'],skipped:[],
+      failed:[{group:'census',code:'API_KEY_EXPOSED',secret:'PRIVATE'}],
+      completed:[],
+    }});
+    write(x.target,'core-attempts-r1.json',{
+      schema:'ZGMINI_INFLATION_CANDIDATE_CORE_R1',processed:{},
+      attempted:{census:{eventKey:'private:token-secret',at:STAMP}},
+    });
+    const result=inspect(x.root);
+    assert.equal(result.groups.find(x=>x.group==='census').checkpoint.attemptType,'OTHER');
+    assert.equal(result.candidateCycle.status,'UNREPORTED');
+    assert.equal(result.candidateCycle.censusDue,true);
+    assert.equal(result.candidateCycle.censusFailureCode,null);
+    assert.ok(!JSON.stringify(result).includes('SECRET_TOKEN'));
+    assert.ok(!JSON.stringify(result).includes('API_KEY_EXPOSED'));
+    assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+  }finally{x.cleanup();}
+});
+
 test('no directory, unexpected root and symlinked candidate directory',()=>{
   assert.throws(()=>inspect('relative'),/INFL_CANDIDATES_READONLY_DATA_ROOT_DENIED/);
   const x=mk();try{
