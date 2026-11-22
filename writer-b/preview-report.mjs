@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {authorizePreviewRequest,resultPath} from './preview-entry.mjs';
 import {validateCoreDrainSummary} from './core-drain-readonly.mjs';
+import {approvedPreviewFile} from './insert-preview-readonly.mjs';
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const HASH=/^[0-9a-f]{64}$/i;
@@ -29,7 +30,7 @@ export function sanitizePreview(raw,req,num){
   const anchorSafe=raw.code==='WRITER_B_INSERT_ANCHOR_MATCH_STOP'&&
    HASH.test(raw.beforeSha256??'')&&
    /^[a-f0-9]{40}$/i.test(raw.baseHead??'')&&
-   /^scripts\/pc-writer\/[a-z0-9][a-z0-9._-]{0,127}\.mjs$/i.test(raw.filePath??'')&&
+   approvedPreviewFile(raw.filePath)&&
    Array.isArray(raw.anchorEvidence)&&raw.anchorEvidence.length>=1&&
    raw.anchorEvidence.length<=16&&raw.anchorEvidence.every((row,i)=>
     row&&typeof row==='object'&&!Array.isArray(row)&&
@@ -48,7 +49,7 @@ export function sanitizePreview(raw,req,num){
   !HASH.test(raw.beforeSha256??'')||!HASH.test(raw.afterSha256??'')||
   !HASH.test(raw.taskXmlSha256??'')||
   !/^[a-f0-9]{40}$/i.test(raw.baseHead??'')||
-  !/^scripts\/pc-writer\/[a-z0-9][a-z0-9._-]{0,127}\.mjs$/i.test(raw.filePath??'')||
+  !approvedPreviewFile(raw.filePath)||
   !Number.isInteger(raw.insertions)||raw.insertions<1||raw.insertions>16)return safe;
  return {...safe,status:'PASS_READONLY',code:raw.code,
   beforeSha256:raw.beforeSha256,afterSha256:raw.afterSha256,
