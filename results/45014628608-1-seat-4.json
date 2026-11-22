@@ -1,0 +1,243 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45014628608-1-seat-4",
+  "requestId": "pc-aac568a7-4c2a-4f8f-8ffb-ddb429fb5947",
+  "startedAt": "2026-11-22T10:53:51.507Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "80e39771bbfe72062e47f9b421f7d3c777ab7068",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "2f4a8227ecfc954d6c72ecbc6b56242c709a7f0f",
+  "sourceBranch": "main",
+  "operation": "inflation19-runtime-readonly",
+  "seat": 4,
+  "status": "PASS",
+  "code": "INFL19_RUNTIME_READONLY_EVIDENCE",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w01-census-natural-cycle-20261122",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "1e52876f5112c4a58a43273d264588755b7b9402",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "INFL19_RUNTIME_READONLY_EVIDENCE",
+    "operationalReadiness": "NOT_ASSERTED",
+    "cycle": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-22T10:51:41.061Z",
+      "cycleStatus": "COMPLETE",
+      "cycleAt": "2026-11-22T10:51:41.059Z",
+      "collectionExit": 0,
+      "publicationExit": 0,
+      "status": "NO_VERIFIED_RELEASE_DUE",
+      "providerRequests": 0,
+      "byGroup": {
+        "bls8": {
+          "outcome": "SKIPPED"
+        },
+        "electricity": {
+          "outcome": "SKIPPED"
+        },
+        "sce": {
+          "outcome": "SKIPPED"
+        },
+        "gas": {
+          "outcome": "SKIPPED"
+        }
+      }
+    },
+    "checkpoint": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-22T00:00:49.495Z",
+      "byGroup": {
+        "bls8": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "electricity": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "sce": {
+          "processedEvent": null,
+          "attemptedEvent": null,
+          "attemptedAt": null
+        },
+        "gas": {
+          "processedEvent": "2026-11-22",
+          "attemptedEvent": "2026-11-22",
+          "attemptedAt": "2026-11-22T00:00:44.849Z"
+        }
+      }
+    },
+    "writer": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-22T10:51:11.271Z",
+      "writerAt": "2026-11-22T10:48:45.516Z",
+      "writerStatus": "VERIFIED",
+      "status": "SKIPPED_METADATA_ONLY",
+      "inflationFailure": null,
+      "readyCount": 19,
+      "d1Writes": 0,
+      "sourceStoredAt": null,
+      "sourceVersion": null
+    },
+    "projection": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-19T00:07:21.130Z",
+      "stagingOnly": true,
+      "readyCount": 19,
+      "sourceStoredAt": 1795046728605,
+      "sourceVersion": "INFL19_PRESENTATION_3e5a3fced8b2f6875a5a822ee322064b3d77420f352dac8ddd817d4534f6cd2e",
+      "perId": [
+        {
+          "id": "1",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-04T21:25:06.490Z"
+        },
+        {
+          "id": "3",
+          "status": "READY",
+          "observationDate": "2026-11-17",
+          "sourceStoredAt": "2026-11-19T00:05:28.605Z"
+        },
+        {
+          "id": "4",
+          "status": "READY",
+          "observationDate": "2026-08",
+          "sourceStoredAt": "2026-11-04T06:25:37.684Z"
+        },
+        {
+          "id": "5",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "6",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "7",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "8",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "9",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "10",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "11",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "12",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-06T16:50:07.364Z"
+        },
+        {
+          "id": "13",
+          "status": "READY",
+          "observationDate": "2026-07-01",
+          "sourceStoredAt": "2026-10-30T13:30:04.561Z"
+        },
+        {
+          "id": "14",
+          "status": "READY",
+          "observationDate": "2026-07-01",
+          "sourceStoredAt": "2026-11-05T17:50:37.578Z"
+        },
+        {
+          "id": "18",
+          "status": "READY",
+          "observationDate": "2026-11-13",
+          "sourceStoredAt": "2026-11-18T23:25:25.857Z"
+        },
+        {
+          "id": "19",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-17T13:50:15.288Z"
+        },
+        {
+          "id": "21",
+          "status": "READY",
+          "observationDate": "2026-10-01",
+          "sourceStoredAt": "2026-11-18T10:33:45.736Z"
+        },
+        {
+          "id": "25",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+        },
+        {
+          "id": "26",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-18T10:33:45.732Z"
+        },
+        {
+          "id": "31",
+          "status": "READY",
+          "observationDate": "2026-09-01",
+          "sourceStoredAt": "2026-11-04T04:41:52.103Z"
+        }
+      ]
+    },
+    "inflation7Writer": {
+      "availability": "PRESENT",
+      "modifiedAt": "2026-11-22T10:51:11.271Z",
+      "writerAt": "2026-11-22T10:48:45.516Z",
+      "writerStatus": "VERIFIED",
+      "status": "UNCHANGED_VERIFIED",
+      "key": null,
+      "sourceVersion": null,
+      "sourceStoredAt": null,
+      "readyCount": 6,
+      "d1Writes": 0,
+      "evidenceScope": "LOCAL_WRITER_LEDGER_ONLY_NOT_LIVE_D1",
+      "verifiedAtWriterTime": false,
+      "d1NowVerified": false
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "7e70d92d942c4baadde1af37d43897737d770888bf9b385d08745a4f1a1d9173",
+  "protectedAfterSha256": "7e70d92d942c4baadde1af37d43897737d770888bf9b385d08745a4f1a1d9173",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "80e39771bbfe72062e47f9b421f7d3c777ab7068",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-22T10:53:55.655Z",
+  "durationMs": 4148
+}
