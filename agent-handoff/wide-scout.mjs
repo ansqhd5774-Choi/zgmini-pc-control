@@ -137,7 +137,8 @@ export function reportDecision(comments,report,now){
   if(found)return 'DUPLICATE';
   if(last!==null&&now-last<WIDE_POLICY.minReportHours*3600000)return 'RATE_LIMIT';
   if(!report.hasActionableReview)return 'NO_FINDINGS';
-  if(comments.length>=WIDE_POLICY.maxComments)return 'LEDGER_FULL';
+  // This is a bounded cross-shard read window, not a per-shard write capacity.
+  // Full shards rotate in scoutWide; do not globally block the next shard.
   return 'REPORT';
 }
 export function renderWideReport(report){

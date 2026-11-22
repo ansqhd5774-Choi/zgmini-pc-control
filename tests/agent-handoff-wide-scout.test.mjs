@@ -173,3 +173,102 @@ test('status-partition coverage prevents a newest-300-only blind spot',()=>{
   assert.equal(report.inventory.statusCoverage[0].complete,false);
   assert.match(renderWideReport(report),/failure=200\(미완전\)/);
 });
+
+test('shard closing after selection recovers with a fresh authenticated shard',async()=>{
+  const entries=[];const comments=new Map();let next=4000,closedOnce=false;
+  const io={
+    getRuns:async()=>({items:[],complete:true,coverage:[]}),
+    getIssues:async()=>({items:[],complete:true}),
+    getPulls:async()=>({items:[],complete:true}),
+    getWorkflows:async()=>workflows.map((w,i)=>i===0?{...w,state:'disabled_manually'}:w),
+    getScheduleCount:async()=>0,
+    findShards:async()=>{
+      // Close the first shard immediately before post-selection readback.
+      if(entries.length===1&&!closedOnce){entries[0].state='closed';closedOnce=true;}
+      return entries.map(x=>({...x}));
+    },
+    readShard:async n=>entries.find(x=>x.number===n),
+    readShardComments:async n=>[...(comments.get(n)||[])],
+    createShard:async(month,index,title,marker)=>{
+      const item={number:next++,title,body:marker,state:'open',user:{login:OWNER}};
+      entries.push(item);comments.set(item.number,[]);return item;
+    },
+    postComment:async(n,body)=>comments.get(n).push({
+      id:1,created_at:recent,user:{login:'github-actions[bot]'},body
+    })
+  };
+  const result=await scoutWide(io,now);
+  assert.equal(result.posted,1);
+  assert.equal(entries.length,2);
+  assert.equal(entries[0].state,'closed');
+  assert.equal(comments.get(entries[0].number).length,0);
+  assert.equal(comments.get(entries[1].number).length,1);
+});
+
+test('full historical read window does not globally block shard rotation',()=>{
+  const report=evaluateWideSnapshot(snapshot({workflows:workflows.map((w,i)=>
+    i===0?{...w,state:'disabled_manually'}:w)}),now);
+  const comments=Array.from({length:WIDE_POLICY.maxComments},(_,i)=>({
+    id:i+1,created_at:older,user:{login:'github-actions[bot]'},body:'historical '+i
+  }));
+  assert.equal(reportDecision(comments,report,now),'REPORT');
+});
+
+test('shard filling after selection recovers without posting to full shard',async()=>{
+  const entries=[],comments=new Map();let next=5000,filled=false;
+  const io={
+    getRuns:async()=>({items:[],complete:true}),
+    getIssues:async()=>({items:[],complete:true}),
+    getPulls:async()=>({items:[],complete:true}),
+    getWorkflows:async()=>workflows.map((w,i)=>i===0?{...w,state:'disabled_manually'}:w),
+    getScheduleCount:async()=>0,
+    findShards:async()=>{
+      if(entries.length===1&&!filled){
+        comments.set(entries[0].number,Array.from({length:WIDE_POLICY.maxComments},
+          (_,i)=>({id:i+1,created_at:older,user:{login:'github-actions[bot]'},body:'historical '+i})));
+        filled=true;
+      }
+      return entries.map(x=>({...x}));
+    },
+    readShard:async n=>entries.find(x=>x.number===n),
+    readShardComments:async n=>[...(comments.get(n)||[])],
+    createShard:async(month,index,title,marker)=>{
+      const item={number:next++,title,body:marker,state:'open',user:{login:OWNER}};
+      entries.push(item);comments.set(item.number,[]);return item;
+    },
+    postComment:async(n,body)=>comments.get(n).push({
+      id:9000,created_at:recent,user:{login:'github-actions[bot]'},body
+    })
+  };
+  const result=await scoutWide(io,now);
+  assert.equal(result.posted,1);
+  assert.equal(entries.length,2);
+  assert.equal(comments.get(entries[0].number).length,WIDE_POLICY.maxComments);
+  assert.equal(comments.get(entries[1].number).length,1);
+});
+
+test('second shard closure preserves SHARD_WRITE_SCOPE safe stop',async()=>{
+  const entries=[];const comments=new Map();let next=6000;
+  const io={
+    getRuns:async()=>({items:[],complete:true}),
+    getIssues:async()=>({items:[],complete:true}),
+    getPulls:async()=>({items:[],complete:true}),
+    getWorkflows:async()=>workflows.map((w,i)=>i===0?{...w,state:'disabled_manually'}:w),
+    getScheduleCount:async()=>0,
+    findShards:async()=>{
+      if(entries.length)entries.at(-1).state='closed';
+      return entries.map(x=>({...x}));
+    },
+    readShard:async n=>entries.find(x=>x.number===n),
+    readShardComments:async n=>[...(comments.get(n)||[])],
+    createShard:async(month,index,title,marker)=>{
+      const item={number:next++,title,body:marker,state:'open',user:{login:OWNER}};
+      entries.push(item);comments.set(item.number,[]);return item;
+    },
+    postComment:async(n,body)=>comments.get(n).push({id:1,created_at:recent,
+      user:{login:'github-actions[bot]'},body})
+  };
+  await assert.rejects(()=>scoutWide(io,now),/SHARD_WRITE_SCOPE/);
+  assert.equal(entries.length,2);
+  assert.equal([...comments.values()].reduce((sum,c)=>sum+c.length,0),0);
+});

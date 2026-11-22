@@ -211,11 +211,19 @@ export async function scoutWide(io,now){
     const current=recentComments([...previousShards,...shards]);
     decision=reportDecision(current,report,now);
     if(decision==='REPORT'){
-      const target=await ensureShard(io,month,shards);
+      let target=await ensureShard(io,month,shards);
       shards=await loadShards(io,month);
-      const selected=shards.find(x=>x.issue.number===target.number);
+      let selected=shards.find(x=>x.issue.number===target.number);
+      // Re-read after selection: another worker may close or fill the shard.
       if(!selected||selected.issue.state!=='open'||
-         selected.comments.length>=WIDE_POLICY.maxComments)stop('SHARD_WRITE_SCOPE');
+         selected.comments.length>=WIDE_POLICY.maxComments){
+        const retryTarget=await ensureShard(io,month,shards);
+        shards=await loadShards(io,month);
+        selected=shards.find(x=>x.issue.number===retryTarget.number);
+        if(!selected||selected.issue.state!=='open'||
+           selected.comments.length>=WIDE_POLICY.maxComments)stop('SHARD_WRITE_SCOPE');
+        target=retryTarget;
+      }
       decision=reportDecision(recentComments([...previousShards,...shards]),report,now);
       if(decision==='REPORT'){
         try{await io.postComment(target.number,textReport);}
