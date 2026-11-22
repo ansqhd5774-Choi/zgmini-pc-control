@@ -39,10 +39,14 @@ function classify(bytes){
   // selector/date headers must be present exactly once. Unused supplier
   // metadata, including empty or repeated labels, remains diagnostic only.
   const consumed=[...REQUIRED,...['time_slot_date','time'].filter(key=>keys.has(key))];
+  // Report ONLY fixed parser-consumed vocabulary. No provider-supplied column
+  // names, response bodies, observation values, credentials or file paths.
+  const duplicateConsumedHeaders=consumed.filter(key=>
+    headers.filter(header=>header===key).length>1);
   const valid=!missingRequired.length&&hasMonthlyDate&&
     consumed.every(key=>headers.filter(header=>header===key).length===1);
   return {shape:valid?'HEADERS_VALID':'HEADERS_INVALID',missingRequired,hasMonthlyDate,
-    duplicateHeaderCount,unknownHeaderCount,rowCount:obj.length-1};
+    duplicateHeaderCount,duplicateConsumedHeaders,unknownHeaderCount,rowCount:obj.length-1};
 }
 
 function inspectArchive(rawDir,name){
