@@ -7,11 +7,11 @@ import path from 'node:path';
 import {spawnSync,execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
+import {readApprovalBytes} from './approval-bytes.mjs';
 import {
  CONTROL_REPO, MANIFEST, SOURCE_ROOT,DATA_ROOT,FILES,
  validateIssue,validateApproval,validateInstalledBinding,sha256,expect,fail,sanitizedCode,
 } from './contract.mjs';
-const CONTROL_ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const SCRIPT='scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs';
 const NODE=String.raw`E:\ZGmini\runtime\node.exe`;
 const DB=path.join(DATA_ROOT,'storage','core.sqlite');
@@ -132,7 +132,7 @@ export function execute(env=process.env){
   const event=JSON.parse(secureRegular(env.GITHUB_EVENT_PATH,100000).toString('utf8'));
   const request=validateIssue(event,env);
   report.requestId=request.requestId;
-  const raw=secureRegular(path.join(CONTROL_ROOT,...MANIFEST.split('/')),12000);
+  const raw=readApprovalBytes();
   const approval=validateApproval(raw,request);
   const installed=assertInstalledSource({approval});
   report.sourceSha=approval.installedSourceSha;

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {sha256,validateIssue,CONTROL_REPO,expect,fail} from './contract.mjs';
+import {readApprovalBytes} from './approval-bytes.mjs';
 const JSON_NAME='W05_R304_B_RESULT.json';
 const FIELDS=['schema','status','code','requestId','sourceSha','provider','series',
  'providerCalls','dbWrites','d1Writes','schedulerChanges','automaticRetries',
@@ -76,7 +77,7 @@ export async function upload(env=process.env,apiFetch=fetch){
  let result;
  try {
   if(!fs.existsSync(input))fail('W05_B_LOCAL_RESULT_MISSING_STOP');
-  const raw=fs.readFileSync(new URL('../'+req.approvalPath,import.meta.url));
+  const raw=readApprovalBytes();
   expect(sha256(raw)===req.approvalSha256,'W05_B_REPORT_MANIFEST_PIN_STOP');
   const expectedSourceSha=JSON.parse(raw.toString('utf8')).installedSourceSha;
   expect(typeof expectedSourceSha==='string'&&/^[a-f0-9]{40}$/.test(expectedSourceSha),
