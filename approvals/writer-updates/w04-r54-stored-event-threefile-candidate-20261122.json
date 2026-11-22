@@ -1,0 +1,75 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "main",
+  "candidateSourceSha": "8a6dc683348ca549c110fabedd44c04d22183050",
+  "baseHead": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "baseConfigSourceSha": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "lib/market-score/composite-model-r1.mjs",
+      "change": "M",
+      "beforeSha256": "383efbc67a394fb5d0bf581172bab6a3b2dde9677c595b4e20c2e9e558854444",
+      "afterSha256": "f1b9fa0afce1fd05f23638193d24ecf55ae599cf358956fb629c8a8321cc8b22",
+      "candidateSha256": "6507b9a6be7577f93f5988a2d68508d1dcbca42537e6c4f1cbd87cc0468c37f8",
+      "insertions": [
+        {
+          "anchor": "      ...(spec.id===\"rates\"?{modelVersion:src?.modelVersion??null}:{}),",
+          "position": "before",
+          "text": "      ...(spec.id===\"employment\"?{methodologyVersion:src?.methodologyVersion??null,asOfDate:src?.asOfDate??null}:{}),\n"
+        }
+      ]
+    },
+    {
+      "path": "lib/market-score/employment-r54-calculation-event.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "a9abdac19e5b554f118b77b331a7cf39b5b46a071101360b96dc590f918e49ea"
+    },
+    {
+      "path": "worker/market-operational-store.mjs",
+      "change": "M",
+      "beforeSha256": "c4af0ecfec524e1b6c93e7cfb1ec1187ee1346f76e7bc7d5cfd2a27a3038d074",
+      "afterSha256": "330b29c25dafb63e5b8fdd75ecf52e886480e7d44b40e2dc9d7d3643e952ef8b",
+      "candidateSha256": "2aedac29cbd54cd3022552084d3b75a677112f011fc2f33bca1fe43b7dc8235b",
+      "insertions": [
+        {
+          "anchor": "import {BIS_INPUT_TTL} from './bis-input-policy.mjs';",
+          "position": "after",
+          "text": "import {recordStoredEmploymentR54Event} from '../lib/market-score/employment-r54-calculation-event.mjs';\n"
+        },
+        {
+          "anchor": "   assertCompleteMarket(body);await init();const encoded=JSON.stringify(body);const statements=[];",
+          "position": "before",
+          "text": "   recordStoredEmploymentR54Event(body,now);\n"
+        }
+      ]
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "lib/market-score/domain-adapter-r1.mjs",
+      "sha256": "2861fb72b77fd1a201d1dd467e5e46fb9fb3da6e36d958e29689aafbb72eb512"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": []
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
