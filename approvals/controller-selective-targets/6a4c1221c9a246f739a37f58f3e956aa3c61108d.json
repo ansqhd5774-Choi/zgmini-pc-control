@@ -1,0 +1,27 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "d260aea2513902a77425344629f91575e2d950ef",
+  "targetSha": "6a4c1221c9a246f739a37f58f3e956aa3c61108d",
+  "sourceMainSha": "3280c45fb91c091478b74cfc7cca12241419b333",
+  "targetBranch": "codex/w01-census-inflation7-from-installed-d260-20261122",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "config/operations.json",
+      "sha256": "15fe47efd22cc75c9684ae37d7fe27a8f08ea159b717b22b4db0030af92b7649"
+    },
+    {
+      "path": "controller/inflation-census-m3-archived-headers-readonly.mjs",
+      "sha256": "b32d8250b7fc1fd76f3f8969ace3c695f136824ed02f2468d4ebf2f7c0268efa"
+    },
+    {
+      "path": "controller/inflation7-d1-readback-readonly.mjs",
+      "sha256": "ae51904dea7f33db9ba551cb41a971657814d970812558ebc5c20ad7e8366122"
+    },
+    {
+      "path": "controller/operations.mjs",
+      "sha256": "2e657e3024aa2862a96b33067bd806b1569913e794e5d41adce061c6df18c880"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2660"
+}
