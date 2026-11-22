@@ -30,7 +30,7 @@ export const GROUPS=Object.freeze({
   'tests/shared-resource-issue-admission.test.mjs',
   'controller/theme-r47-task-action-readonly.test.mjs',
   'tests/r47-existing-task-once.test.mjs'],
- recovery:['tests/controller-intake-recovery.test.mjs',
+ recovery:['tests/fear-greed-archive-status.test.mjs','tests/controller-intake-recovery.test.mjs',
   'tests/controller-1979-backlog-recovery.test.mjs',
   'tests/completed-recovery-claim.test.mjs','tests/rollback-stalled-claim.test.mjs',
   'tests/interrupted-rollback.test.mjs','tests/maintenance-backlog-request.test.mjs',
