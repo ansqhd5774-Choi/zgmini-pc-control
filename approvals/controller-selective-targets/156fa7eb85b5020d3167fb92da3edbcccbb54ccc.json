@@ -1,0 +1,17 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "80e39771bbfe72062e47f9b421f7d3c777ab7068",
+  "targetSha": "156fa7eb85b5020d3167fb92da3edbcccbb54ccc",
+  "sourceMainSha": "a0e8e4a78153e06e53aafec4d4e42c5849f9fcc6",
+  "targetBranch": "codex/w01-census-due-onefile-installed80e-20261122",
+  "customPaths": [
+    "controller/inflation-candidates-runtime-readonly.mjs"
+  ],
+  "allowFiles": [
+    {
+      "path": "controller/inflation-candidates-runtime-readonly.mjs",
+      "sha256": "74b338060768c72e9c83057deca38ab61c32436b6e4fa3a80e441e7ff72818de"
+    }
+  ],
+  "approvalRef": "https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2711"
+}
