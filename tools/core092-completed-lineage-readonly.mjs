@@ -9,7 +9,7 @@ const proofNames=['core-cycle-id.mjs','core-origin-runtime.mjs','core-origin-wmi
 const fail=code=>({status:'UNVERIFIED',code,collectionWriterSameCycleVerified:false,
  operationalWrites:0,providerCalls:0,d1Writes:0,sqliteOpened:false});
 export function classifyCompletedCoreLineage({cycle,collection,writer,identity,proofHashes}){
- if(identity?.status!=='VERIFIED')return fail('CORE_COMPLETED_SOURCE_UNVERIFIED');
+ if(identity?.status!=='VERIFIED'||!(/^[a-f0-9]{40}$/.test(identity.sourceSha??'')))return fail('CORE_COMPLETED_SOURCE_UNVERIFIED');
  const id=cycle?.coreCycleId;
  if(typeof id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)||
   collection?.coreCycleId!==id||writer?.coreCycleId!==id)return fail('CORE_COMPLETED_CYCLE_LINK_MISSING');
@@ -23,9 +23,11 @@ export function classifyCompletedCoreLineage({cycle,collection,writer,identity,p
   !Number.isSafeInteger(cycle.coreProcessPid)||cycle.coreProcessPid<1||
   !Number.isSafeInteger(cycle.coreParentPid)||cycle.coreParentPid<1||
   !Number.isSafeInteger(cycle.coreNodeCreatedAtMs)||Math.abs(cycle.coreNodeCreatedAtMs-start)>30000||
+  Date.parse(writer.at)<Date.parse(collection.at)||
   [collection.at,writer.at].some(t=>!Number.isFinite(Date.parse(t))||Date.parse(t)<start||Date.parse(t)>end))
   return fail('CORE_COMPLETED_TIME_OR_PROCESS_MISMATCH');
- if(identity.files?.find(f=>f.path==='scripts/pc-writer/local-cycle.mjs')?.sha256!==cycle.coreEntrypointSha256||
+ const entryHash=identity.files?.find(f=>f.path==='scripts/pc-writer/local-cycle.mjs')?.sha256;
+ if(!(/^[a-f0-9]{64}$/.test(entryHash??''))||entryHash!==cycle.coreEntrypointSha256||
   proofNames.some(n=>!(/^[a-f0-9]{64}$/.test(proofHashes?.[n]??''))||cycle.coreProofFileSha256?.[n]!==proofHashes[n]))
   return fail('CORE_COMPLETED_PROOF_FILE_MISMATCH');
  if(cycle.publishRequested!==true||cycle.publicationExit!==0||cycle.collectionExit!==0)

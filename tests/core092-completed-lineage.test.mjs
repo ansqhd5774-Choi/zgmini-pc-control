@@ -33,7 +33,9 @@ test('unverified startup, changed proof, stale process and incomplete publicatio
   x=>x.cycle.coreProofFileSha256['core-origin-wmi.mjs']='c'.repeat(64),
   x=>x.cycle.coreEntrypointSha256='c'.repeat(64),
   x=>x.cycle.coreNodeCreatedAtMs-=40000,x=>x.collection.at='2026-11-21T00:01:00.000Z',
-  x=>x.cycle.publicationExit=1,x=>x.identity.status='UNVERIFIED']){
+  x=>x.cycle.publicationExit=1,x=>x.identity.status='UNVERIFIED',
+  x=>{x.identity.files=[];delete x.cycle.coreEntrypointSha256;},
+  x=>x.writer.at='2026-11-22T00:00:30.000Z']){
   const x=fixture();mutate(x);assert.equal(classifyCompletedCoreLineage(x).status,'UNVERIFIED');
  }
 });
