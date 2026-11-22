@@ -1,0 +1,68 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/core092-cycle-lineage-source-r1-20261121",
+  "candidateSourceSha": "dd901dbc1a2c16f2ed47de86537d70edf9149fbe",
+  "baseHead": "8d60425b1ccfc69b5710a8c9347aaa1e7451b3a5",
+  "baseConfigSourceSha": "8d60425b1ccfc69b5710a8c9347aaa1e7451b3a5",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/core-origin-wmi.mjs",
+      "change": "M",
+      "beforeSha256": "979009bab6199bdc42067258e08ec72b8ea4a54a4d5c0ec7e4bd2ac174714196",
+      "afterSha256": "10c7ced2010332d7d1bb52b9513a6689ae896dbe05584bfed48d2de16b8025d8"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d"
+    },
+    {
+      "path": "scripts/pc-writer/collect-local.mjs",
+      "sha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "9cfbd0736e305aabdee0bf285c92515949eafe0c83968b9029961a37e6bf6c3b"
+    },
+    {
+      "path": "scripts/pc-writer/collection-events.mjs",
+      "sha256": "0085ea065382b8530fe3b45000d12bdb961801e183f5bd161ad897e2c53ad2ba"
+    },
+    {
+      "path": "scripts/pc-writer/core-cycle-id.mjs",
+      "sha256": "a3f3844200cd60cf70f9616e94cfcea7341f55d9d1929cab4ffd16e71d463cc1"
+    },
+    {
+      "path": "scripts/pc-writer/core-origin-runtime.mjs",
+      "sha256": "18a1f623a78e2ce9f8b24ac55c748205b42b72e1754d1e1097c81a2a6ab8b853"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-launcher-archive",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/core-origin-wmi.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
