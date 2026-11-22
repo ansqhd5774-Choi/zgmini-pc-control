@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {sha256,validateIssue,CONTROL_REPO,INSTALLED_SHA,expect,fail} from './contract.mjs';
+import {sha256,validateIssue,CONTROL_REPO,expect,fail} from './contract.mjs';
 const JSON_NAME='W05_R304_B_RESULT.json';
 const FIELDS=['schema','status','code','requestId','sourceSha','provider','series',
  'providerCalls','dbWrites','d1Writes','schedulerChanges','automaticRetries',
@@ -12,14 +12,16 @@ const ALLOWED_STATUSES=new Set(['PASS','BLOCKED','RUNTIME_FAILED','STATE_UNKNOWN
 const PREFIX='ZGMINI_W05_R304_SERVICE_B_RESULT_V1';
 const API=`https://api.github.com/repos/${CONTROL_REPO}`;
 const safeName=value=>typeof value==='string'&&/^pc-w05-r304-[a-f0-9-]{36}$/.test(value);
-export function sanitizedReport(report,requestId){
+export function sanitizedReport(report,requestId,{expectedSourceSha=null}={}){
  expect(report&&typeof report==='object'&&!Array.isArray(report),'W05_B_REPORT_SHAPE_STOP');
  expect(report.schema===PREFIX&&report.requestId===requestId&&
    ALLOWED_STATUSES.has(report.status)&&
    typeof report.code==='string'&&/^W05_B_[A-Z0-9_]{1,90}$/.test(report.code)&&
    report.d1Writes===0&&report.schedulerChanges===0&&report.automaticRetries===0&&
    report.provider==='BLS'&&report.series==='WPSFD42'&&
-   (report.sourceSha===INSTALLED_SHA||report.sourceSha===null)&&
+   (report.sourceSha===null||(typeof report.sourceSha==='string'&&/^[a-f0-9]{40}$/.test(report.sourceSha)&&report.sourceSha!=='0'.repeat(40)))&&
+   (report.status!=='PASS'||report.sourceSha!==null)&&
+   (expectedSourceSha===null||report.sourceSha===null||report.sourceSha===expectedSourceSha)&&
    (report.providerCalls===1||report.providerCalls==='NOT_CONFIRMED')&&
    ['COMMITTED_IDEMPOTENT','NOT_CONFIRMED'].includes(report.dbWrites)&&
    (report.rows===undefined||(Number.isInteger(report.rows)&&report.rows>=1&&report.rows<=400))&&
@@ -74,7 +76,12 @@ export async function upload(env=process.env,apiFetch=fetch){
  let result;
  try {
   if(!fs.existsSync(input))fail('W05_B_LOCAL_RESULT_MISSING_STOP');
-  result=sanitizedReport(JSON.parse(fs.readFileSync(input,'utf8')),req.requestId);
+  const raw=fs.readFileSync(new URL('../'+req.approvalPath,import.meta.url));
+  expect(sha256(raw)===req.approvalSha256,'W05_B_REPORT_MANIFEST_PIN_STOP');
+  const expectedSourceSha=JSON.parse(raw.toString('utf8')).installedSourceSha;
+  expect(typeof expectedSourceSha==='string'&&/^[a-f0-9]{40}$/.test(expectedSourceSha),
+   'W05_B_REPORT_SOURCE_PIN_STOP');
+  result=sanitizedReport(JSON.parse(fs.readFileSync(input,'utf8')),req.requestId,{expectedSourceSha});
  }catch(e){
   // Never upload an unverified local payload or claim an effect result.
   // An unreadable/malformed result after a possible DB commit is STATE_UNKNOWN.

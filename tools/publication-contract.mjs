@@ -146,10 +146,11 @@ export function validateBApprovalComment(validated,comments){
 
 export function validateSourceCheckpoints(validated,{publisherHead,originMainHead,
   publisherBranch,operationalHead,configSource,publisherClean,operationalClean,
-  publisherRoot,operationalRoot}={}){
+  publisherRoot,operationalRoot,publisherOnMainHistory=false}={}){
   const approved=validated.approval;
-  if(publisherHead!==approved.publisherSha||originMainHead!==approved.publisherSha
-    ||publisherBranch!=='main'||publisherClean!==true)
+  if(publisherHead!==approved.publisherSha||!SHA40.test(originMainHead??'')||
+    !((originMainHead===approved.publisherSha&&publisherBranch==='main')||publisherOnMainHistory===true)||
+    publisherClean!==true)
     throw Error('PUBLICATION_PUBLISHER_NOT_CLEAN_MAIN');
   if(operationalHead!==approved.operationalSha||configSource!==approved.operationalSha
     ||operationalClean!==true||!publisherRoot||!operationalRoot

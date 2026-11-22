@@ -8,8 +8,8 @@ export const DATA_ROOT=String.raw`E:\ZGmini\data\pc-writer`;
 export const OPERATION='w05-bls-service-append-once';
 export const SCHEMA='ZGMINI_W05_R304_SERVICE_B_REQUEST_V1';
 export const APPROVAL_SCHEMA='ZGMINI_W05_R304_SERVICE_B_APPROVAL_V1';
-// Exact verified PC checkout/config/checkpoint from R3-04 A #2704 / Run 45013225693.
-// Scope: three previously installed W05 files only; source pin is not effect approval.
+// Historical proposal default only. Execution authority is the exact reviewed
+// manifest's installedSourceSha, checked against live HEAD/config below.
 export const INSTALLED_SHA='1e52876f5112c4a58a43273d264588755b7b9402';
 export const FILES=Object.freeze({
  'scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs':'87e811b608ea7358c48aceebfe458e24e5887f2f31207481783abcad516a1af3',
@@ -53,7 +53,8 @@ export function validateApproval(raw,request){
   doc.schema===APPROVAL_SCHEMA&&doc.status==='APPROVED_B'&&
   doc.scope==='W05_WPSFD42_BLS_ONCE_EXISTING_SQLITE_APPEND'&&
   doc.sourceRepository==='ansqhd5774-Choi/zgmini'&&
-  doc.installedSourceSha===INSTALLED_SHA&&doc.sourceRoot===SOURCE_ROOT&&
+  typeof doc.installedSourceSha==='string'&&/^[a-f0-9]{40}$/.test(doc.installedSourceSha)&&
+  doc.installedSourceSha!=='0'.repeat(40)&&doc.sourceRoot===SOURCE_ROOT&&
   doc.dataRoot===DATA_ROOT&&
   JSON.stringify(doc.files)===JSON.stringify(FILES)&&
   doc.series==='WPSFD42'&&doc.startYear===2025&&doc.endYear===2026&&
@@ -63,6 +64,14 @@ export function validateApproval(raw,request){
   doc.allowOtherSources===false&&doc.allowNewSchedulers===false,
   'W05_B_EFFECT_NOT_APPROVED');
  return Object.freeze(doc);
+}
+export function validateInstalledBinding(approval,{head,configSource,fileSha256}){
+ expect(typeof approval?.installedSourceSha==='string'&&/^[a-f0-9]{40}$/.test(approval.installedSourceSha)&&
+  approval.installedSourceSha!=='0'.repeat(40)&&head===approval.installedSourceSha,'W05_B_INSTALLED_SOURCE_SHA_DRIFT_STOP');
+ expect(configSource===head,'W05_B_CONFIG_SOURCE_DRIFT_STOP');
+ expect(exactKeys(fileSha256,Object.keys(FILES))&&Object.entries(FILES).every(
+  ([file,hash])=>fileSha256[file]===hash),'W05_B_FILE_HASH_DRIFT_STOP');
+ return head;
 }
 export function sanitizedCode(value){
  return typeof value==='string'&&/^W05_B_[A-Z0-9_]{2,85}$/.test(value)?

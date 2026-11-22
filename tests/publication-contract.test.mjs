@@ -118,6 +118,20 @@ test('dirty or drifting main and distinct operational config source stop before 
   const s=structuredClone(state);edit(s);
   assert.throws(()=>validateSourceCheckpoints(v,s),/PUBLICATION_OPERATIONAL_SOURCE_MISMATCH/);}
 });
+test('exact reviewed publisher survives unrelated main advancement only with verified ancestry',()=>{
+ const v=admitted(fixture());
+ const state={publisherHead:'a'.repeat(40),originMainHead:'c'.repeat(40),
+  publisherBranch:'',publisherOnMainHistory:true,publisherClean:true,
+  operationalHead:'b'.repeat(40),configSource:'b'.repeat(40),operationalClean:true,
+  publisherRoot:'E:/ZGmini/projects/publisher',operationalRoot:'E:/ZGmini/projects/core'};
+ assert.equal(validateSourceCheckpoints(v,state),true);
+ for(const edit of [x=>x.publisherOnMainHistory=false,x=>x.publisherHead='d'.repeat(40),
+  x=>x.publisherClean=false,x=>x.originMainHead='invalid']){
+  const s=structuredClone(state);edit(s);
+  assert.throws(()=>validateSourceCheckpoints(v,s),/PUBLICATION_PUBLISHER_NOT_CLEAN_MAIN/);
+ }
+});
+
 test('request ledger reuses exact duplicate without execution and rejects changed payload',()=>{
  const v=admitted(fixture());
  const first=classifyPublicationLedger(null,v);

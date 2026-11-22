@@ -236,6 +236,33 @@ export function summarizeRequestedRecoveryEvidence(state){
  };
 }
 
+// Observe the existing durable request, not just the last GitHub comment.
+// Elapsed time never turns an advancing/unknown operation into a failure.
+export function summarizeRequestProgress(ledger){
+ if(!ledger)return {requestId:null,status:null,code:null,phase:null,
+  executionState:'NOT_OBSERVED',next:'READ_ORIGINAL_ISSUE_AND_REQUEST_LEDGER',
+  executionAuthorized:false,observationOnly:true};
+ const token=v=>typeof v==='string'&&/^[A-Z0-9_]{1,96}$/.test(v)?v:null;
+ const status=token(ledger.status),phase=token(ledger.phase);
+ const code=token(ledger.code),upload=token(ledger.reportUploadStatus);
+ const completed=['PASS','SUCCEEDED'].includes(status);
+ const recovery=['RECOVERY_REQUIRED','STATE_UNKNOWN','UNKNOWN'].includes(status);
+ const failed=['FAILED','BLOCKED','ROLLED_BACK'].includes(status);
+ const deliveryPending=completed&&upload!==null&&upload!=='VERIFIED';
+ const executionState=deliveryPending?'COMPLETED_RESULT_DELIVERY_PENDING':
+  completed?'COMPLETED_REPORTED':recovery?'RECONCILE_REQUIRED':
+  failed?'TERMINAL_STOP':status==='RUNNING'?'RUNNING':status==='QUEUED'?'QUEUED':'UNCLASSIFIED';
+ return {requestId:typeof ledger.requestId==='string'&&/^pc-[a-z0-9-]{8,76}$/.test(ledger.requestId)?ledger.requestId:null,
+  status,code,phase,lastPass:token(ledger.lastPass),firstFail:token(ledger.firstFail),
+  updatedAt:typeof ledger.updatedAt==='string'&&ledger.updatedAt.length<=40&&Number.isFinite(Date.parse(ledger.updatedAt))?ledger.updatedAt:null,
+  postIssueNumber:Number.isSafeInteger(ledger.postIssueNumber)&&ledger.postIssueNumber>0?ledger.postIssueNumber:null,
+  reportUploadStatus:upload,executionState,
+  next:completed?'READ_ORIGINAL_RESULT_PAIR_AND_CONTINUE':recovery?
+   'RECONCILE_EXISTING_REQUEST_NO_NEW_APPLY':failed?'FIX_REPORTED_FIRST_FAILURE':
+   status==='RUNNING'?'FOLLOW_EXISTING_PHASE_NO_DUPLICATE_REQUEST':'READ_EXISTING_RECEIVER_AND_REQUEST_STATE',
+  executionAuthorized:false,observationOnly:true};
+}
+
 export function collectAutomationStatus(args=process.argv.slice(2)){
  need(process.platform==='win32','STATUS_WINDOWS_REQUIRED');
  need(args.length===0||(args.length===2&&args[0]==='--request-id'&&/^pc-[a-z0-9-]{8,76}$/.test(args[1])),'STATUS_ARGS');
@@ -296,7 +323,7 @@ export function collectAutomationStatus(args=process.argv.slice(2)){
   supervisor:summarizeSupervisorReadOnly({supervisor,owner,state}),
   watchdog,
   runnerQueryError,
-  historicalRequest:ledger?{requestId:ledger.requestId,status:ledger.status,code:ledger.code}:null,
+  historicalRequest:args.length?summarizeRequestProgress(ledger):null,
   recoveryEvidence:args.length?summarizeRequestedRecoveryEvidence(recovery):null,
   diagnostics:codes,operationalWrites:0,providerCalls:0,dbD1Writes:0};
 }

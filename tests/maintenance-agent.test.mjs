@@ -57,7 +57,7 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   applyError=null,applyResult=null,afterTimeout=null,commentError=null,
   uploadFailure=null,uploadAfterCommitError=null,installLock={held:false},
   verifyInstalledSource=()=>{},statusFaults={},preexistingLedger=null,
-  extraIssueSummaries=[],extraIssueDetails=[]}={}){
+  extraIssueSummaries=[],extraIssueDetails=[],progressError=null}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"zgmini-maintainer-agent-test-"));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const leaseRoot=path.join(root,"leases");fs.mkdirSync(leaseRoot);
@@ -119,9 +119,16 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
         return {stdout:JSON.stringify({encoding:"base64",type:"file",content:rawManifest.toString("base64")})};
       }
       if(args[0]==="issue"&&args[1]==="comment"){
-        stats.comments++;
         assert.equal(args[args.indexOf("--repo")+1],REPO);
         const body=args[args.indexOf("--body")+1];
+        if(body.includes('zgmini-pc-maintenance-progress:')){
+          stats.progressComments=(stats.progressComments??0)+1;
+          assert.ok(options.timeout<=3000);
+          if(progressError)throw progressError;
+          issue.comments.push({body,author:{login:ACTOR}});
+          return {stdout:''};
+        }
+        stats.comments++;
         assert.match(body,/zgmini-pc-maintenance-(?:result|upload|rejected):/);
         if(commentError){issue.comments.push({body,author:{login:ACTOR}});throw commentError;}
         issue.comments.push({body,author:{login:ACTOR}});
@@ -160,12 +167,21 @@ function fixture(t,{privateRepo=true,actor=ACTOR,labels=["pc-maintenance"],
   return {root,leaseRoot,agent,stats,remote,calls,issue,request,manifest,rawManifest,fakeExec};
 }
 
+test('accepted receipt failure is non-blocking and never creates another apply or receipt on poll',async t=>{
+ const f=fixture(t,{progressError:Object.assign(Error('network timeout'),{code:'ETIMEDOUT'})});
+ const first=await f.agent.pollOnce();
+ assert.equal(first[0].status,'SUCCEEDED');assert.equal(f.stats.applies,1);
+ assert.equal(f.agent.loadLedger(REQUEST_ID).progressReceiptStatus,'UNCONFIRMED');
+ await f.agent.pollOnce();assert.equal(f.stats.progressComments,1);assert.equal(f.stats.applies,1);
+});
+
 test("authorized private-repo issue uploads redacted TXT/JSON without E report accumulation",async t=>{
   const f=fixture(t);
   const result=await f.agent.pollOnce();
   assert.equal(result.length,1);
   assert.equal(result[0].status,"SUCCEEDED",JSON.stringify(result[0]));
   assert.equal(f.stats.applies,1);
+  assert.equal(f.stats.progressComments,1);
   assert.equal(f.stats.comments,1);
   assert.equal(f.stats.uploadWrites,2);
   assert.equal(f.remote.size,2);
@@ -444,7 +460,7 @@ test("occupied upload lease keeps only durable ledger in PENDING, then retries u
   assert.equal(f.stats.applies,1);
   assert.equal(f.stats.uploadWrites,0);
   assert.equal(f.stats.comments,1);
-  assert.match(f.issue.comments[0].body,/REPORT_UPLOAD: REPORT_UPLOAD_PENDING/);
+  assert.match(f.issue.comments.find(c=>c.body.includes('zgmini-pc-maintenance-result:')).body,/REPORT_UPLOAD: REPORT_UPLOAD_PENDING/);
   assert.equal(fs.existsSync(path.join(lock,"owner.json")),true);
   assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`)),false);
   assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`)),false);
@@ -455,7 +471,7 @@ test("occupied upload lease keeps only durable ledger in PENDING, then retries u
   assert.equal(f.stats.applies,1);
   assert.equal(f.stats.uploadWrites,2);
   assert.equal(f.stats.comments,2); // one idempotent delivery-completion marker
-  assert.match(f.issue.comments[1].body,/REPORT_UPLOAD_VERIFIED/);
+  assert.match(f.issue.comments.find(c=>c.body.includes('zgmini-pc-maintenance-upload:')).body,/REPORT_UPLOAD_VERIFIED/);
   await f.agent.pollOnce();
   assert.equal(f.stats.comments,2);
 });
@@ -593,7 +609,7 @@ test("failed GitHub PUT keeps durable ledger and Issue comment, no E reports or 
   assert.equal(first[0].reportUploadStatus,"REPORT_UPLOAD_PENDING");
   assert.equal(f.stats.uploadWrites,1);
   assert.equal(f.stats.comments,1);
-  assert.match(f.issue.comments[0].body,/REPORT_UPLOAD: REPORT_UPLOAD_PENDING/);
+  assert.match(f.issue.comments.find(c=>c.body.includes('zgmini-pc-maintenance-result:')).body,/REPORT_UPLOAD: REPORT_UPLOAD_PENDING/);
   assert.equal(f.agent.loadLedger(REQUEST_ID).reportUploadStatus,"REPORT_UPLOAD_PENDING");
   assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.json`)),false);
   assert.equal(fs.existsSync(path.join(f.root,"reports",`MAINTENANCE_${REQUEST_ID}.txt`)),false);
