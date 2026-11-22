@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_W05_R304_SERVICE_B_APPROVAL_V1",
-  "status": "PROPOSED_NOT_APPROVED",
+  "status": "APPROVED_B",
   "scope": "W05_WPSFD42_BLS_ONCE_EXISTING_SQLITE_APPEND",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
   "installedSourceSha": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
