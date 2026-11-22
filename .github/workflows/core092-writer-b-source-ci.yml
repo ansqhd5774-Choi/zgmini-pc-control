@@ -1,10 +1,13 @@
-name: ZGMINI 092 Six-File Writer B Source Tests
+name: ZGMINI 092 Writer B Source and Lineage Tests
 on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'approvals/writer-updates/core092-natural-cycle-sixfile-20261121.json'
       - 'tests/core092-sixfile-writer-b-approval.test.mjs'
+      - 'approvals/writer-updates/core092-origin-hidden-task-onefile-20261122.json'
+      - 'tools/core092-completed-lineage-readonly.mjs'
+      - 'tests/core092-completed-lineage.test.mjs'
       - '.github/workflows/core092-writer-b-source-ci.yml'
 permissions:
   contents: read
@@ -39,4 +42,4 @@ jobs:
         with:
           node-version: '22'
       - name: Verify exact B manifest, A preview ancestry and recovery contracts
-        run: node --test --test-concurrency=1 tests/core092-sixfile-writer-b-approval.test.mjs writer-b/installer.test.mjs writer-b/contract.test.mjs
+        run: node --test --test-concurrency=1 tests/core092-sixfile-writer-b-approval.test.mjs tests/core092-completed-lineage.test.mjs writer-b/installer.test.mjs writer-b/contract.test.mjs
