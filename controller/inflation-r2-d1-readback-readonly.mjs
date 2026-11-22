@@ -26,6 +26,8 @@ export function verifyInflationR2D1Row(row,{expectedLocal=null}={}){
   trendValueMatchesScore:measured.trendValueMatchesScore===true,
   localComparisonAvailable:expectedLocal!==null};
  if(measured.status!=='PASS')return result('W01_R2_D1_'+measured.code,values);
+ if(measured.code!=='W01_R2_LOCAL_DATE_VALUE_MATCH')
+  return {...result('W01_R2_D1_DATE_VALUE_MISMATCH',values),status:'PARTIAL'};
  const localMatches=expectedLocal===null?null:
    expectedLocal.bodySha256===measured.bodySha256&&
    expectedLocal.storedAt===measured.storedAt&&
