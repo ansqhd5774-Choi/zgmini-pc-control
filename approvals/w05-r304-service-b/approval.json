@@ -3,7 +3,7 @@
   "status": "PROPOSED_NOT_APPROVED",
   "scope": "W05_WPSFD42_BLS_ONCE_EXISTING_SQLITE_APPEND",
   "sourceRepository": "ansqhd5774-Choi/zgmini",
-  "installedSourceSha": "a206220cc11045c24660e814124edbba9c0ff49f",
+  "installedSourceSha": "1e52876f5112c4a58a43273d264588755b7b9402",
   "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
   "dataRoot": "E:\\ZGmini\\data\\pc-writer",
   "files": {
