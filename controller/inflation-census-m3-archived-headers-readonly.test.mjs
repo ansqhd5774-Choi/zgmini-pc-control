@@ -58,6 +58,7 @@ test('unused Census metadata collisions do not invalidate consumable headers',t=
   assert.equal(r.archives[0].duplicateHeaderCount,1);
   assert.equal(r.archives[0].unknownHeaderCount,1);
   assert.equal(r.archives[1].duplicateHeaderCount,1);
+  assert.deepEqual(r.archives.map(x=>x.duplicateConsumedHeaders),[[],[]]);
   assert.doesNotMatch(JSON.stringify(r),/123456|987654|PRIVATE|extra_note/);
 });
 test('duplicate consumed selector or monthly-date header remains invalid',t=>{
@@ -69,6 +70,8 @@ test('duplicate consumed selector or monthly-date header remains invalid',t=>{
   assert.equal(r.invalidCount,2);
   assert.deepEqual(r.archives.map(x=>x.shape),['HEADERS_INVALID','HEADERS_INVALID']);
   assert.deepEqual(r.archives.map(x=>x.duplicateHeaderCount),[1,1]);
+  assert.deepEqual(r.archives.map(x=>x.duplicateConsumedHeaders),
+    [['data_type_code'],['time_slot_date']]);
 });
 test('missing year does not become a false fully verified result',t=>{
   const f=fixture(t);f.save(2025,[HEAD]);
