@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {inspectEmploymentR6CollectionEvidence} from '../controller/employment-r6-collection-evidence-readonly.mjs';
+import {inspectEmploymentR6CollectionEvidence,R6_READONLY_STAGES} from '../controller/employment-r6-collection-evidence-readonly.mjs';
 
 const STATES=['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
 const sha=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -750,4 +750,27 @@ test('PIT0407 later Current retrieval compares value/hash/revision separately',t
  assert.deepEqual(p.newerCurrentComparison,{
   VALUE_HASH_REVISION_MATCH:48,VALUE_DIFFERENT:1,HASH_DIFFERENT:1,REVISION_DIFFERENT:1});
  assert.equal(p.rawPitAttested,false);
+});
+
+test('R6 fixed stage markers cover the full safe stored-only path without altering core data',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);db.close();
+ const before=sha(file),observed=[];
+ const result=inspectEmploymentR6CollectionEvidence(data,{onStage:stage=>observed.push(stage)});
+ assert.equal(result.status,'PASS',JSON.stringify(result));
+ assert.deepEqual(observed,R6_READONLY_STAGES);
+ assert.equal(sha(file),before);
+ assert.equal(result.operationalWrites,0);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.d1Writes,0);
+});
+
+test('R6 diagnostic callback failure cannot turn a previously passing readonly query into failure',t=>{
+ const {data,file}=fixture(t),db=createDb(file);seed(db);db.close();
+ const before=sha(file);
+ const result=inspectEmploymentR6CollectionEvidence(data,{
+  onStage:()=>{throw Error('fixture diagnostic workspace unavailable');},
+ });
+ assert.equal(result.status,'PASS',JSON.stringify(result));
+ assert.equal(result.code,'R6_DOL_BED_STORED_EVIDENCE_READONLY');
+ assert.equal(sha(file),before);
 });
