@@ -15,8 +15,8 @@ const request={schema:'ZGMINI_PC_PUBLICATION_REQUEST_V1',requestId:id,
   operation:'census-qfr-margin-once',
   controlRepository:'ansqhd5774-Choi/zgmini-pc-control',
   approvalManifestSha256:sha256(bytes)};
-const observedOperational='2070ff53549e2f9f2cea57d5af7e1d83f9fd7388';
-const pinnedPublisher='24f80c4cc096114537ceb5c5a7dab01591791c43';
+const observedOperational='1e52876f5112c4a58a43273d264588755b7b9402';
+const pinnedPublisher='2f4a8227ecfc954d6c72ecbc6b56242c709a7f0f';
 
 test('QFR B draft pins exactly one D1 key and ten publisher-main file hashes, not installed QFR files',()=>{
   const v=validatePublicationApproval(request,bytes);
