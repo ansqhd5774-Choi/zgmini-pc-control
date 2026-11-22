@@ -167,9 +167,9 @@ test('no local B result produces safe STATE_UNKNOWN JSON/TXT 2/2, not silent suc
 
 
 test('pin from actual R3-04 approved preimage A keeps manifest non-executable',()=>{
- // PC A #2584 / Run 44870551163: sourceHead=config.source=checkpoint and
+ // PC A #2704 / Run 45013225693: sourceHead=config.source=checkpoint and
  // exact 3 W05 file hashes. This test NEVER authorizes a provider/DB effect.
- assert.equal(INSTALLED_SHA,'a206220cc11045c24660e814124edbba9c0ff49f');
+ assert.equal(INSTALLED_SHA,'1e52876f5112c4a58a43273d264588755b7b9402');
  assert.deepEqual(FILES,{
   'scripts/pc-writer/EARNINGS_R3C_BLS_STORE_ONCE.mjs':'87e811b608ea7358c48aceebfe458e24e5887f2f31207481783abcad516a1af3',
   'scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs':'b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31',
