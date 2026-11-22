@@ -1,6 +1,7 @@
 import fs from 'node:fs';import path from 'node:path';import {spawn,execFileSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {digest,need,validateRequest,writeJson,exclusive,errorCode} from './common.mjs';import {protectedState,readCore,nativeTaskXml,nativeRetiredIranEvidence} from './operations.mjs';
 import {memoryAdmissionMinimum,waitForMemoryAdmission} from './memory-admission.mjs';
+import {R6_READONLY_STAGES} from './employment-r6-collection-evidence-readonly.mjs';
 const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 // Only reviewed fixed operations with no provider/DB/operational write effect
 // may return useful reads when an unrelated Scheduler observation is missing.
@@ -8,6 +9,16 @@ const worker=fileURLToPath(new URL('./worker.mjs',import.meta.url));
 const ISOLATED_READS=new Set(['runner-smoke','core-status','core-runtime-source-readonly','writer-install-preimage-readonly']);
 const unavailableProtection=e=>['RETIRED_IRAN_INVENTORY_UNAVAILABLE',
  'PROTECTED_TASK_XML_QUERY_FAILED'].includes(errorCode(e));
+export function readFixedR6Stage(workspace){
+ try{
+  const marker=path.join(workspace,'employment-r6-readonly-stage.json');
+  const stat=fs.lstatSync(marker);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<2||stat.size>128)return null;
+  const body=JSON.parse(fs.readFileSync(marker,'utf8'));
+  return body&&typeof body==='object'&&Object.keys(body).length===1&&
+   R6_READONLY_STAGES.includes(body.stage)?body.stage:null;
+ }catch{return null;}
+}
 function noteUnavailableProtection(report,error,phase){
  report[phase==='PRECHECK'?'protectionPrecheckCode':'protectionPostcheckCode']=errorCode(error);
  if(phase==='POSTCHECK')report.postcheckFailureCode=errorCode(error);
@@ -72,7 +83,13 @@ export async function executeJob(raw,{root,policy,host,seat,runId,attempt=1,quer
   });
   report.lastPass='ALLOWLISTED_WORKER_STARTED';report.exitCode=childResult.code;
   if(childResult.terminationUnknown){uncertainChild=true;report.resourceLeasesRetained=true;report.status='STATE_UNKNOWN';report.code='WORKER_TERMINATION_UNVERIFIED';report.firstFail='OWN_WORKER_TERMINATION';report.workerPid=childResult.pid;report.next='RECONCILE_WORKER_AND_RETAIN_RESOURCE_LEASES';}
-  else if(childResult.timedOut){report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';}
+  else if(childResult.timedOut){
+   report.status='FAIL';report.code='JOB_EXECUTION_TIMEOUT';report.firstFail='OWN_WORKER_TIMEOUT';
+   if(request.operation==='employment-r6-collection-evidence-readonly'){
+    const lastStage=readFixedR6Stage(workspace);
+    if(lastStage)report.workerLastEnteredStage=lastStage;
+   }
+  }
   else if(fs.existsSync(output)){preflightOperation='WORKER_RESULT_PARSE';const result=JSON.parse(fs.readFileSync(output));Object.assign(report,{status:result.status,code:result.code,result,sqliteOpened:result.sqliteOpened===true});report.lastPass=result.status==='PASS'?'ALLOWLISTED_OPERATION_COMPLETED':report.lastPass;report.firstFail=result.status==='PASS'?null:'ALLOWLISTED_OPERATION';}
   else{report.status='FAIL';report.code='WORKER_RESULT_MISSING';report.firstFail='RESULT_FILE';}
   preflightOperation='POSTCHECK';let after;
