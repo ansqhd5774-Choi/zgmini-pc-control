@@ -1,0 +1,17 @@
+schema=ZGMINI_CORE092_OPERATIONAL_EVIDENCE_V1
+status=PASS
+code=CORE_RUNTIME_AND_COMPLETED_LINEAGE_VERIFIED
+observedAt=2026-11-22T00:25:27.308Z
+controllerSha=d260aea2513902a77425344629f91575e2d950ef
+runtimeSourceSha=91b0e5a602883b9d3ee61310281957d3cdd23f11
+coreCycleId=0a720a19-139c-461c-8375-9d1a2ec0457c
+taskOrigin=TASK_ENGINE_WMI_CAPTURED_AT_START
+collectionStatus=COMPLETE
+writerStatus=VERIFIED
+cycleStatus=COMPLETE
+naturalWriterRowsWritten=17
+workflowState=active
+runnerOnlineCount=6
+installLeaseHeld=false
+allBusinessDataVerified=false
+diagnosticOperationalWrites=0
