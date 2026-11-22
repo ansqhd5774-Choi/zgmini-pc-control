@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_W05_R304_SERVICE_B_RESULT_V1",
+  "requestId": "pc-w05-r304-9f2e23c9-ac07-425d-a30f-bf2a06909512",
+  "status": "STATE_UNKNOWN",
+  "code": "W05_B_LOCAL_RESULT_UNVERIFIED_STOP",
+  "sourceSha": null,
+  "provider": "BLS",
+  "series": "WPSFD42",
+  "providerCalls": "NOT_CONFIRMED",
+  "dbWrites": "NOT_CONFIRMED",
+  "d1Writes": 0,
+  "schedulerChanges": 0,
+  "automaticRetries": 0
+}
