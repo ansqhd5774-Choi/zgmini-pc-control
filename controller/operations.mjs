@@ -36,6 +36,7 @@ import {inspectA401Private23} from './inflation-a401-private23-readonly.mjs';
 import {inspectA407IntegrityReadonly} from './inflation-a407-integrity-readonly.mjs';
 import {inspectInflation19RuntimeReadonly} from './inflation19-runtime-readonly.mjs';
 import {inspectInflationR2LocalReadonly} from './inflation-r2-local-readonly.mjs';
+import {inspectInflationR2D1Readback} from './inflation-r2-d1-readback-readonly.mjs';
 import {inspectInflationCensusM3ArchivedHeaders} from './inflation-census-m3-archived-headers-readonly.mjs';
 import {inspectInflationCandidatesRuntimeReadonly} from './inflation-candidates-runtime-readonly.mjs';
 import {inspectEmploymentR6Candidate} from './employment-r6-candidate-readonly.mjs';
@@ -283,6 +284,7 @@ export async function runOperation(request,context){
  if(request.operation==='inflation-a407-integrity-readonly')return inspectA407IntegrityReadonly(request,context);
  if(request.operation==='inflation19-runtime-readonly')return inspectInflation19RuntimeReadonly(dataRoot);
  if(request.operation==='inflation-r2-local-readonly')return inspectInflationR2LocalReadonly(dataRoot);
+ if(request.operation==='inflation-r2-d1-readback-readonly')return inspectInflationR2D1Readback(dataRoot);
  if(request.operation==='inflation-census-m3-archive-headers-readonly')return inspectInflationCensusM3ArchivedHeaders(dataRoot);
  if(request.operation==='inflation-candidates-runtime-readonly')return inspectInflationCandidatesRuntimeReadonly(dataRoot);
  if(request.operation==='theme-platform-shadow-readonly'){
