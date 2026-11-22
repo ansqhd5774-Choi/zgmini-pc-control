@@ -15,6 +15,13 @@ const checkedFiles=Object.freeze([
  'scripts/pc-writer/release-calendar.mjs',
 ]);
 const norm=value=>path.win32.normalize(value).toLowerCase();
+export function selectCoreGitBinary({platform=process.platform,exists=fs.existsSync}={}){
+ // The approved Windows Runner child can have a Node-only PATH. Never search
+ // arbitrary directories or accept a Git executable path from an Issue.
+ return platform==='win32'?
+  [String.raw`C:\Program Files\Git\cmd\git.exe`,
+   String.raw`C:\Program Files (x86)\Git\cmd\git.exe`].find(exists)??null:'git';
+}
 const validPid=value=>Number.isSafeInteger(value)&&value>0;
 const identityFiles=Object.freeze(['scripts/pc-writer/local-cycle.mjs',
  'scripts/pc-writer/collect-local.mjs','scripts/pc-writer/run-local.mjs',
@@ -182,15 +189,22 @@ export function hashActiveCoreFiles(sourceRoot,{realpath=fs.realpathSync.native,
 // execution provenance. Never fetch, update Git/config, or print config bytes.
 export function readActiveCoreSourceIdentity(sourceRoot,{
  realpath=fs.realpathSync.native,lstat=fs.lstatSync,read=fs.readFileSync,
- run=execFileSync,configFile=String.raw`E:\ZGmini\data\pc-writer\config.json`,
+ run=execFileSync,gitBinary=selectCoreGitBinary(),
+ configFile=String.raw`E:\ZGmini\data\pc-writer\config.json`,
 }={}){
  const fail=code=>({status:'UNVERIFIED',code});
  const digest=b=>createHash('sha256').update(b).digest('hex');
  try{
   const root=norm(realpath(sourceRoot)),base=norm(realpath(projectsRoot));
   if(!root.startsWith(base+'\\'))return fail('CORE_SOURCE_IDENTITY_PATH_INVALID');
-  const git=args=>run('git',args,{cwd:root,encoding:null,windowsHide:true,
-   shell:false,timeout:5000,maxBuffer:2_000_000});
+  if(!gitBinary)return fail('CORE_SOURCE_GIT_NOT_INSTALLED');
+  const git=args=>run(gitBinary,
+   ['--no-optional-locks','-c','core.fsmonitor=false',
+    '-c','core.untrackedCache=false','-C',root,...args],
+   {cwd:root,encoding:null,windowsHide:true,shell:false,
+    timeout:5000,maxBuffer:2_000_000,
+    env:{...process.env,GIT_OPTIONAL_LOCKS:'0',GIT_TERMINAL_PROMPT:'0'},
+    stdio:['ignore','pipe','ignore']});
   const head=git(['rev-parse','HEAD']).toString('utf8').trim();
   if(!/^[a-f0-9]{40}$/.test(head))return fail('CORE_SOURCE_IDENTITY_SHA_INVALID');
   const ci=lstat(configFile);
