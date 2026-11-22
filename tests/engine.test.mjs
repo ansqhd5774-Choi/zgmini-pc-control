@@ -111,6 +111,9 @@ test('changed protected state remains BLOCKED instead of being relabeled as unce
  assert.equal(probes,2);
  assert.equal(result.report.status,'BLOCKED');
  assert.equal(result.report.code,'PROTECTED_STATE_DRIFT_OBSERVED');
+ assert.equal(result.report.lastPass,'ALLOWLISTED_OPERATION_COMPLETED');
+ assert.equal(result.report.firstFail,'PROTECTED_STATE_POSTCHECK');
+ assert.equal(result.report.protectedStateUnchanged,false);
  assert.equal(result.report.result.code,'RUNNER_COMMAND_EXECUTED');
 });
 
@@ -285,6 +288,9 @@ test('D05 read succeeds without extra source lookup and detects real protected d
   {...c,runId:'5604',queryTask:()=>Buffer.from(++n<=2?'before':'after')});
  assert.equal(drift.report.status,'BLOCKED');
  assert.equal(drift.report.code,'PROTECTED_STATE_DRIFT_OBSERVED');
+ assert.equal(drift.report.lastPass,'ALLOWLISTED_OPERATION_COMPLETED');
+ assert.equal(drift.report.firstFail,'PROTECTED_STATE_POSTCHECK');
+ assert.equal(drift.report.protectedStateUnchanged,false);
 });
 
 test('R6 timeout stage parser accepts only a single literal phase from own workspace',()=>{
