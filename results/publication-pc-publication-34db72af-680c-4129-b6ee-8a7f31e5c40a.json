@@ -1,0 +1,18 @@
+{
+  "schema": "ZGMINI_PC_PUBLICATION_RESULT_V1",
+  "requestId": "pc-publication-34db72af-680c-4129-b6ee-8a7f31e5c40a",
+  "operation": "census-qfr-margin-once",
+  "issueNumber": 2768,
+  "snapshotKey": "detail:earnings-recession-indicators:census-qfr-mfg-margin:v1",
+  "status": "PASS",
+  "code": "PUBLICATION_SINGLE_KEY_READBACK_VERIFIED",
+  "startedAt": "2026-11-22T12:52:21.081Z",
+  "finishedAt": "2026-11-22T12:52:28.710Z",
+  "providerCalls": 0,
+  "d1Writes": 1,
+  "sourceVersion": "0cf9d0e4bced96b300810a448bf67be3b663252178f15853f103561d876ddeb3",
+  "sourceStoredAt": 1793112733108,
+  "d1Result": "READBACK_VERIFIED",
+  "attemptedSourceStoredAt": 1793112733108,
+  "sourceStoredAtEvidence": "D1_READBACK_VERIFIED"
+}
