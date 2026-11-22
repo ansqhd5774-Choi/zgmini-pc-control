@@ -1,0 +1,137 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45009282532-1-seat-1",
+  "requestId": "pc-68798ca7-4ddc-4a3c-98df-73f7f12450bf",
+  "startedAt": "2026-11-22T09:48:05.466Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "042c45567d31c5ec620c9e13b154fc3f08218774",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "2f4a8227ecfc954d6c72ecbc6b56242c709a7f0f",
+  "sourceBranch": "main",
+  "operation": "inflation-event129-evidence-readonly",
+  "seat": 1,
+  "status": "STATE_UNKNOWN",
+  "code": "INFL_E129_NOT_OBSERVED_WITHIN_LIMIT",
+  "lastPass": "ALLOWLISTED_WORKER_STARTED",
+  "firstFail": "ALLOWLISTED_OPERATION",
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w01-census-post-writer-install-20261122",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "1e52876f5112c4a58a43273d264588755b7b9402",
+  "exitCode": 0,
+  "result": {
+    "status": "STATE_UNKNOWN",
+    "code": "INFL_E129_NOT_OBSERVED_WITHIN_LIMIT",
+    "scope": "CORE_OWNER_EVENT129_READONLY_ONLY",
+    "authorizesB": false,
+    "providerCalls": 0,
+    "operationalWrites": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false,
+    "stage": "PROOF",
+    "firstFailCode": "INFL_E129_NOT_OBSERVED_WITHIN_LIMIT",
+    "logConfig": {
+      "read": "OK",
+      "enabled": false
+    },
+    "reader": "OK",
+    "encoding": "UTF-8",
+    "bom": "NONE",
+    "readerShape": {
+      "status": "EMPTY_STDOUT",
+      "byteBand": "ZERO",
+      "suspectedEncoding": "NONE",
+      "bEventRoots": 0,
+      "auxEventRoots": 0,
+      "xmlDeclaration": false
+    },
+    "rawBDirect": {
+      "ok": false,
+      "code": "INFL_MANUAL_B_EVENT129_INPUT_UNVERIFIED"
+    },
+    "rawBVbs": {
+      "ok": false,
+      "code": "INFL_E129_NOT_OBSERVED_WITHIN_LIMIT",
+      "candidates": []
+    },
+    "supplemental": {
+      "parsed": false,
+      "coreCandidates": 0,
+      "onlySupplemental": false
+    },
+    "task": {
+      "definition": "OK",
+      "instance": "EMPTY"
+    },
+    "wmi": {
+      "status": "OK",
+      "ownerFound": true,
+      "coreMatched": true,
+      "taskRunning": true,
+      "linked": false,
+      "koreaMatched": false
+    },
+    "event": {
+      "total": 0,
+      "systemMatch": 0,
+      "taskMatch": 0,
+      "fieldsPresent": 0,
+      "fieldCounts": {
+        "TaskName": 0,
+        "Path": 0,
+        "ProcessID": 0,
+        "TimeCreated": 0
+      },
+      "pidMatch": 0,
+      "timeParsed": 0,
+      "withinTime": 0,
+      "timeDeltaMs": null,
+      "candidateCount": 0
+    },
+    "lock": {
+      "before": "PRESENT",
+      "after": "PRESENT",
+      "same": true
+    },
+    "snapshots": [
+      {
+        "phase": "BEFORE_LOCK",
+        "utc": "2026-11-22T09:48:08.268Z"
+      },
+      {
+        "phase": "TASK_DEFINITION",
+        "utc": "2026-11-22T09:48:08.269Z"
+      },
+      {
+        "phase": "WMI_OWNER",
+        "utc": "2026-11-22T09:48:08.332Z"
+      },
+      {
+        "phase": "EVENT129",
+        "utc": "2026-11-22T09:48:14.024Z"
+      },
+      {
+        "phase": "AFTER_LOCK",
+        "utc": "2026-11-22T09:48:14.793Z"
+      }
+    ],
+    "probeCounts": {
+      "logConfig": 1,
+      "event": 1,
+      "taskDefinition": 1,
+      "wmi": 1,
+      "lockReads": 2
+    }
+  },
+  "protectedBeforeSha256": "7e70d92d942c4baadde1af37d43897737d770888bf9b385d08745a4f1a1d9173",
+  "protectedAfterSha256": "7e70d92d942c4baadde1af37d43897737d770888bf9b385d08745a4f1a1d9173",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "042c45567d31c5ec620c9e13b154fc3f08218774",
+  "next": "INSPECT_FIRST_FAIL_NO_AUTOMATIC_RETRY",
+  "finishedAt": "2026-11-22T09:48:16.679Z",
+  "durationMs": 11213
+}
