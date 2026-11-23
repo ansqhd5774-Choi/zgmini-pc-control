@@ -18,7 +18,7 @@ const exact=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&
   Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k));
 const stop=code=>{throw Object.assign(Error(code),{code});};
 const need=(ok,code)=>{if(!ok)stop(code);};
-const EFFECT_KEYS=['providerCalls','privateArchiveWrites','sqliteWrites','d1Writes',
+const EFFECT_KEYS=['providerCalls','privateArchiveWrites','attemptMarkerWrite','sqliteWrites','d1Writes',
   'taskDefinitionChanges','newTasks','otherOperationalFiles'];
 const APPROVAL_KEYS=['schema','status','scope','sourceRepository','sourceSha',
   'profileId','runnerPath','installedSourceSha','dataRoot','sourceRoot',
@@ -32,7 +32,9 @@ export function isApprovedBeaNativeSource(m){
     m.dataRoot===PC_ROOT&&m.runCount===1&&
     exact(m.effects,EFFECT_KEYS)&&m.effects.providerCalls===1&&
     m.effects.privateArchiveWrites===true&&
-    EFFECT_KEYS.filter(x=>x!=='providerCalls'&&x!=='privateArchiveWrites')
+    m.effects.attemptMarkerWrite===true&&
+    EFFECT_KEYS.filter(x=>x!=='providerCalls'&&x!=='privateArchiveWrites'&&
+        x!=='attemptMarkerWrite')
       .every(x=>m.effects[x]===false);
 }
 function safeGitHead(directory){
