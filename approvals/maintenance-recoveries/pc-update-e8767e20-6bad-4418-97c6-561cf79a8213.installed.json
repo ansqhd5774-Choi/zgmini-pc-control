@@ -1,0 +1,48 @@
+{
+  "schema": "ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1",
+  "approved": false,
+  "operation": "RECONCILE_INSTALLED",
+  "requestId": "pc-update-e8767e20-6bad-4418-97c6-561cf79a8213",
+  "issueNumber": 2960,
+  "sourceSha": "e6c96e8d19bd9084b8021c7df31678f56ef1b388",
+  "targetControllerSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "approvedCurrentWriterConfigSha256": "9ffcd83f89814fb70186eb855baadc78d75028c1ee73a5001ebfdbd4107347a5",
+  "files": [
+    {
+      "path": "tools/maintenance-recovery.mjs",
+      "sha256": "13b3dd4ab344abe39412c4c2df9284810395d0f39b0a8146de4df076b4121b0b"
+    },
+    {
+      "path": "tools/update.mjs",
+      "sha256": "575c7b091e2c4111df4aee0ee150c1b5c0ef8fcb3567394cff1665d5ab714fd7"
+    },
+    {
+      "path": "tools/maintenance-contract.mjs",
+      "sha256": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e"
+    },
+    {
+      "path": "controller/fixed-readonly-bytes.mjs",
+      "sha256": "ef545e7621da26f790ac15089aba3c82956fb40e287c3a1ec9ad13cddfe3bdf8"
+    }
+  ],
+  "casDigests": {
+    "ledgerSha256": "ed708a9e71fbb0b7323cb547731b0f16409d5587e276edaf3be89ae8848b4418",
+    "ownerSha256": "7b59bea90b430fa0f2964aa39cbe430c710c2430e93cf3e04a7908b62f16a9f1",
+    "markerSha256": "58b6d5e23efa73d3e700172a0a68d89b88a9ed70aeb17ff69c6c085a1b424b5e",
+    "backlogSha256": "455a0636f309291d7aa3f4fa8c3471fe08c09022e452845f6b9be4bfa00f3410",
+    "snapshotSha256": "a1423bdbe63bf243cc24a25015071eba7b4d9c9e28367d96d27ed3664306f020",
+    "protectionSha256": "f85444a751c3999563c8414d23721d48f2622b561db4e52b2fdf302efc0b1c79",
+    "writerSha256": "9ffcd83f89814fb70186eb855baadc78d75028c1ee73a5001ebfdbd4107347a5"
+  },
+  "proof": {
+    "issueNumber": 2982,
+    "runId": 45186420113,
+    "jobId": 137733094098,
+    "runnerName": "zgmini-pc-04",
+    "resultPath": "results/45186420113-1-seat-4.json",
+    "resultSha256": "5eb6bd6dfc7592904659ec2e18bb3f956b364e43a1bb65a85d3c8655108c3898"
+  },
+  "observedAtUtc": "2026-11-23T14:17:01.859Z",
+  "observedRunId": 45192406756,
+  "note": "PROPOSAL_ONLY. Not approved for B recovery; never interpret this artifact as permission or installation proof."
+}
