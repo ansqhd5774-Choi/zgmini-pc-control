@@ -6,7 +6,7 @@ import {
   assertSameRun,buildDiagnosis
 } from '../agent-handoff/proactive-diagnostics.mjs';
 import {
-  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,githubRequestPhase,github403Signal,REPO,OWNER
+  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,githubRequestPhase,github403Signal,readBoundedLogEvidence,REPO,OWNER
 } from '../agent-handoff/proactive-diagnostics-runner.mjs';
 const now=Date.parse('2026-11-16T13:00:00Z');
 const recent='2026-11-16T12:00:00Z',old='2026-08-16T12:00:00Z';
@@ -113,6 +113,33 @@ test('large CI log captures actual failed TAP tests in the tail within the 128 K
   const trueUpstream='2026-11-22T12:24:43Z ##[error]HTTP 503 from provider\n';
   assert.deepEqual(classifyLogs('previous successful CI log\n'.repeat(9500)+trueUpstream),
     ['UPSTREAM_5XX_HINT']);
+});
+test('actual GitHub log stream retains late failure and discards private middle',async()=>{
+ const pass='2026-11-23T07:00:00Z # Subtest: HTTP 503 success fixture\n'+
+  '2026-11-23T07:00:01Z ok 1 - HTTP 503 success fixture\n';
+ const middle='secret=UNPUBLISHED_PRIVATE_MIDDLE\n'.repeat(9000);
+ const failure='2026-11-23T07:01:00Z not ok 133 - real failing Windows test\n';
+ const body=pass+middle+failure+'2026-11-23T07:02:00Z clean footer\n'.repeat(2200);
+ assert.ok(body.length>300000&&body.indexOf('not ok 133')>131072);
+ const bytes=new TextEncoder().encode(body);
+ let offset=0;
+ const reader={read:async()=>offset>=bytes.length?{done:true}:({
+  done:false,value:bytes.subarray(offset,offset+=8192)
+ })};
+ const excerpt=await readBoundedLogEvidence(reader);
+ assert.ok(excerpt.length<=131072);
+ assert.ok(excerpt.includes('not ok 133'));
+ assert.ok(!excerpt.includes('UNPUBLISHED_PRIVATE_MIDDLE'));
+ assert.deepEqual(classifyLogs(excerpt),['ASSERTION_HINT']);
+});
+test('bounded log reader keeps small errors and fails closed on overlarge logs',async()=>{
+ const bytes=new TextEncoder().encode('##[error]HTTP 503 from provider\n');
+ const reader={read:async()=>reader.done?{done:true}:(reader.done=true,{done:false,value:bytes})};
+ assert.deepEqual(classifyLogs(await readBoundedLogEvidence(reader)),['UPSTREAM_5XX_HINT']);
+ let served=0;
+ const huge={read:async()=>({done:false,value:new Uint8Array(65536).fill(++served)})};
+ await assert.rejects(()=>readBoundedLogEvidence(huge),/LOG_READ_LIMIT/);
+ assert.ok(served<=65);
 });
 test('changed run SHA and status refuse write',()=>{
   assert.throws(()=>assertSameRun(run(1),run(1,recent,{head_sha:'b'.repeat(40)})),/SOURCE_RUN_DRIFT/);
