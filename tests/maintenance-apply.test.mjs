@@ -162,6 +162,7 @@ function fixture(overrides={}) {
     postcheck:async()=>({status:'PASS',actualExecutionSha:target,
       protectedStateUnchanged:true,runnerSetVerified:true,postSourceVerified:true}),
     verifyPrevious:async()=>installed===previous&&oldRunning,
+    verifyRestoredPrevious:async sha=>installed===sha&&oldRunning,
     verifyBackup:async()=>true,
     restore:async()=>{installed=previous;events.push('restore');},
     reconnectPrevious:async()=>{oldRunning=true;events.push('reconnectPrevious');},
