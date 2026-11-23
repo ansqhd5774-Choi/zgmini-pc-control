@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1097,4 +1097,47 @@ test('W05 #2821 rollback local checkout is read-only and checks pinned 5 files',
   assert.equal(inspectW052821CheckoutReadonly({checkoutRoot:path.join(root,'absent'),expected}),
    'W05_PROJECT_ROOT_UNAVAILABLE');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('W05 #2821 pinned PID chronology proves reuse only after original lease timestamp',()=>{
+ const ownerAtUtc='2026-11-22T10:00:00.000Z';
+ const cas={status:'READ_ONLY_OBSERVED',code:'W05_2821_FIXED_RECOVERY_CAS',
+  firstFail:'BACKED_UP',ownerMarkerSame:true,ownerAlive:true,ownerPid:14356,
+  ownerAtUtc,digests:{ownerSha256:
+   'eb6c203bef862af8f24e95c6dc5b0c890c33d14e2ebfdef6bfb43df3548c98a0'}};
+ const observe=(candidate,override={})=>
+  classifyW052821OwnerPidChronology({...cas,...override},candidate);
+ const reused=observe({pid:14356,state:'OBSERVED',
+  startedAtUtc:'2026-11-23T04:50:00.000Z'});
+ assert.equal(reused.status,'READ_ONLY_OBSERVED');
+ assert.equal(reused.code,'W05_OWNER_PID_REUSED_AFTER_LEASE');
+ assert.equal(reused.ownerAtUtc,ownerAtUtc);
+ assert.equal(reused.processStartedAtUtc,'2026-11-23T04:50:00.000Z');
+ assert.equal(reused.recoveryEligible,false);
+ const sameWindow=observe({pid:14356,state:'OBSERVED',
+  startedAtUtc:'2026-11-22T10:00:03.000Z'});
+ assert.equal(sameWindow.code,'W05_OWNER_PID_IDENTITY_UNVERIFIED');
+ const older=observe({pid:14356,state:'OBSERVED',
+  startedAtUtc:'2026-11-22T09:00:00.000Z'});
+ assert.equal(older.code,'W05_OWNER_PID_IDENTITY_UNVERIFIED');
+ assert.equal(observe({pid:14356,state:'NOT_PRESENT'},
+  {ownerAlive:false}).code,'W05_OWNER_PID_NOT_PRESENT');
+ assert.equal(observe({pid:14356,state:'NOT_PRESENT'}).code,
+  'W05_OWNER_PID_SNAPSHOT_CHANGED');
+ for(const candidate of [
+  {pid:99999,state:'OBSERVED',startedAtUtc:'2026-11-23T04:50:00Z'},
+  {pid:14356,state:'UNKNOWN',startedAtUtc:null},
+  {pid:14356,state:'OBSERVED',startedAtUtc:'invalid'}]){
+  const result=observe(candidate);
+  assert.equal(result.status,'STATE_UNKNOWN');assert.equal(result.recoveryEligible,false);
+ }
+ assert.equal(observe({pid:14356,state:'OBSERVED',
+   startedAtUtc:'2026-11-23T04:50:00Z'},
+  {digests:{ownerSha256:'0'.repeat(64)}}).code,
+  'W05_OWNER_LEASE_CAS_UNVERIFIED');
+ assert.equal(observe({pid:14356,state:'OBSERVED',
+   startedAtUtc:'2026-11-23T04:50:00Z'},
+  {ownerAtUtc:null}).code,
+  'W05_OWNER_LEASE_TIME_UNVERIFIED');
+ assert.doesNotMatch(JSON.stringify(reused),/nonce|commandline|token|credential/i);
 });
