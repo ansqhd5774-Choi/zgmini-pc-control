@@ -166,6 +166,49 @@ test('worker-level memory wait requires confirmed protected state and candidate 
   }
 });
 
+test('R6 candidate second-stage memory guard is a verified no-execution resource wait',()=>{
+  const {origin,report}=verifiedWorkerWait('employment-r6-candidate-stage-readonly');
+  // Historical #2307: memory admission passed but the per-operation guard
+  // observed a later dip before launching the candidate child.
+  report.actualExecutionSha=null;
+  report.memoryAdmission={admitted:true,minimumFreeMiB:1536,firstFreeMiB:1291,
+    freeMiB:1547,minObservedMiB:976,samples:15};
+  const txt=textReport(report);
+  const out=preparePcSharedResourceWait({originIssue:origin,report,
+    resultPath:pathJson,resultTxt:txt});
+  assert.equal(out.state,'WAITING_SHARED_RESOURCE');
+  assert.equal(out.wait.safePoint,'REQUEST_CONSUMED_WORKER_PREOP_UNTOUCHED');
+  assert.equal(out.wait.releaseCondition,'HEAVY_MEMORY_AVAILABLE_VERIFIED');
+  assert.equal(out.wait.automaticPcRetries,0);
+});
+
+test('R6 candidate memory guard must prove literal null SHA and intact no-effect evidence',()=>{
+  const changes=[
+    r=>{delete r.actualExecutionSha;},
+    r=>{r.actualExecutionSha='e'.repeat(40);},
+    r=>{r.result.candidateExecuted=true;},
+    r=>{r.sqliteOpened=true;},
+    r=>{r.protectedStateUnchanged=false;},
+    r=>{r.protectedAfterSha256='d'.repeat(64);},
+    r=>{r.exitCode=1;},
+    r=>{r.phase='PREVALIDATION';},
+    r=>{r.result.code='OTHER_BLOCKER';}
+  ];
+  for(const change of changes){
+    const {origin,report}=verifiedWorkerWait('employment-r6-candidate-stage-readonly');
+    report.actualExecutionSha=null;
+    change(report);
+    const txt=textReport(report);
+    assert.equal(preparePcSharedResourceWait({originIssue:origin,report,
+      resultPath:pathJson,resultTxt:txt}).state,'WAIT_PROOF_UNVERIFIED');
+  }
+  const {origin,report}=verifiedWorkerWait('employment-r6-candidate-stage-readonly');
+  report.actualExecutionSha=null;
+  const txt=textReport(report).replace('actualExecutionSha=null','actualExecutionSha=forged');
+  assert.equal(preparePcSharedResourceWait({originIssue:origin,report,
+    resultPath:pathJson,resultTxt:txt}).state,'WAIT_PROOF_UNVERIFIED');
+});
+
 test('worker memory proof fails closed for unsafe operation, mutation or text drift',()=>{
   const changes=[
     r=>{r.result.candidateExecuted=true;},
