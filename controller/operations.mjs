@@ -49,6 +49,7 @@ import {inspectEmploymentR6CollectionEvidence,R6_READONLY_STAGES} from './employ
 import {inspectEmploymentR6RawRunLight} from './employment-r6-raw-run-attestation-readonly.mjs';
 import {inspectBeaMfgArchiveReadonly} from './earnings-bea-mfg-archive-readonly.mjs';
 import {inspectBeaUnitArchiveReadonly} from './earnings-bea-unit-archive-readonly.mjs';
+import {inspectBeaNipaCaptureReadonly} from './earnings-bea-nipa-capture-readonly.mjs';
 import {runW05ServiceStoredReadonly} from './w05-wpsfd42-service-readonly.mjs';
 import {inspectInflation19D1Readback} from './inflation19-d1-readback-readonly.mjs';
 const activeTasks=['ZGMINI-PC-Local-Core','ZGMINI-PC-Local-Korea'];
@@ -252,6 +253,7 @@ export async function runOperation(request,context){
  if(request.operation==='employment-r6-raw-run-attestation-readonly')return inspectEmploymentR6RawRunLight(dataRoot);
  if(request.operation==='earnings-bea-mfg-archive-readonly')return inspectBeaMfgArchiveReadonly(dataRoot);
  if(request.operation==='earnings-bea-unit-archive-readonly')return inspectBeaUnitArchiveReadonly(dataRoot);
+ if(request.operation==='earnings-bea-nipa-capture-readonly')return inspectBeaNipaCaptureReadonly(dataRoot);
  if(request.operation==='w05-wpsfd42-service-readonly')return await runW05ServiceStoredReadonly({request,host,dataRoot,workspace});
  if(request.operation==='inflation19-d1-readback-readonly')return inspectInflation19D1Readback(dataRoot);
  if(request.operation==='employment-r6-candidate-stage-readonly'){

@@ -61,6 +61,7 @@
     "employment-r6-raw-run-attestation-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "earnings-bea-mfg-archive-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "earnings-bea-unit-archive-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "earnings-bea-nipa-capture-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "w05-wpsfd42-service-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
     "inflation19-d1-readback-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"}
   },
