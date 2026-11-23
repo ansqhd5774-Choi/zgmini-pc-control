@@ -272,6 +272,44 @@ export function github403Signal(headers){
      headers?.get?.('retry-after')!=null)return 'RATE_LIMIT_SIGNAL';
   return 'CAUSE_UNVERIFIED';
 }
+// Keep only 128 KiB of private log content in memory (16 KiB head and
+// 112 KiB tail). Consume at most 4 MiB of transport; beyond that, report
+// evidence as unavailable rather than misrepresenting an incomplete tail.
+// Never return raw log text to GitHub Issues or workflow stdout.
+export async function readBoundedLogEvidence(reader,{maxBytes=4194304}={}){
+  if(typeof reader?.read!=='function'||!Number.isSafeInteger(maxBytes)||maxBytes<131072)
+    stop('LOG_READER_INVALID');
+  const head=new Uint8Array(16384),tail=new Uint8Array(114688);
+  let headLen=0,tailLen=0,total=0;
+  for(;;){
+    const {done,value}=await reader.read();
+    if(done)break;
+    if(!(value instanceof Uint8Array))stop('LOG_CHUNK_INVALID');
+    total+=value.length;
+    if(total>maxBytes)stop('LOG_READ_LIMIT');
+    if(headLen<head.length){
+      const n=Math.min(value.length,head.length-headLen);
+      head.set(value.subarray(0,n),headLen);headLen+=n;
+    }
+    if(value.length>=tail.length){
+      tail.set(value.subarray(value.length-tail.length));tailLen=tail.length;
+    }else if(tailLen+value.length<=tail.length){
+      tail.set(value,tailLen);tailLen+=value.length;
+    }else{
+      const excess=tailLen+value.length-tail.length;
+      tail.copyWithin(0,excess,tailLen);
+      tail.set(value,tailLen-excess);
+      tailLen=tail.length;
+    }
+  }
+  if(total===0)stop('LOG_EMPTY');
+  const decoder=new TextDecoder();
+  if(total<=131072)return decoder.decode(tail.subarray(0,tailLen));
+  const excerpt=new Uint8Array(headLen+tailLen);
+  excerpt.set(head.subarray(0,headLen));
+  excerpt.set(tail.subarray(0,tailLen),headLen);
+  return decoder.decode(excerpt);
+}
 async function request(resource,{method='GET',body,text=false}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN_MISSING');
   const endpoint=resource.startsWith('search/')?'https://api.github.com/':API;
@@ -286,22 +324,10 @@ async function request(resource,{method='GET',body,text=false}={}){
   if(!res.ok)stop('GITHUB_HTTP_'+res.status+'_'+githubRequestPhase(resource,method)+
     (res.status===403?'_'+github403Signal(res.headers):''));
   if(!text)return res.json();
-  // Limit the log read to the first 128 KiB; never persist or print log text.
   if(!res.body)stop('LOG_EMPTY');
   const reader=res.body.getReader();
-  const chunks=[];let len=0;
-  try{
-    while(len<131072){
-      const {done,value}=await reader.read();
-      if(done)break;
-      const n=Math.min(value.length,131072-len);
-      chunks.push(value.subarray(0,n));len+=n;
-      if(n<value.length)break;
-    }
-  }finally{await reader.cancel().catch(()=>{});}
-  const merged=new Uint8Array(len);let offset=0;
-  for(const c of chunks){merged.set(c,offset);offset+=c.length;}
-  return new TextDecoder().decode(merged);
+  try{return await readBoundedLogEvidence(reader);}
+  finally{await reader.cancel().catch(()=>{});}
 }
 async function listPaged(resource,limit){
   const out=[];
