@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,projectMaintenanceRecoveryStatusReadonly,maintenanceRecoveryText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1223,4 +1223,56 @@ test('W05 operator topology collector uses fixed read-only WMI on operating PC',
   spawn:()=>({status:2,stderr:'PRIVATE_SECRET'})});
  assert.equal(failed.code,'W05_OPERATOR_WMI_UNAVAILABLE');
  assert.doesNotMatch(JSON.stringify(failed),/PRIVATE_SECRET/);
+});
+
+test('owner-only maintenance recovery status mode rejects unapproved scope',()=>{
+ const e=event(),b=JSON.parse(e.issue.body);
+ const targetRequestId='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+ const valid={...b,probe:'maintenance-recovery-status-readonly',targetRequestId};
+ const allowed=authenticateProcess({...e,issue:{...e.issue,
+  body:JSON.stringify(valid)}},env,'operating');
+ assert.equal(allowed.maintenanceRecoveryRequestId,targetRequestId);
+ for(const edited of [
+  {...valid,targetRequestId:'../../private/secret'},
+  {...valid,probe:'exec'},
+  {...valid,role:'handoff'},
+  {...valid,extra:'disallowed'}
+ ]){
+  assert.throws(()=>authenticateProcess({...e,issue:{...e.issue,
+   body:JSON.stringify(edited)}},env,'operating'));
+ }
+ assert.throws(()=>authenticateProcess({...event('handoff'),issue:{
+  ...event('handoff').issue,body:JSON.stringify({...valid,role:'handoff'})}},
+  env,'handoff'));
+});
+test('maintenance recovery projection proves exact ledger and owner without leaking identities',()=>{
+ const id='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+ const owner={pid:777,nonce:'sensitive-nonce'};
+ const raw={actualControllerSha:'b'.repeat(40),
+  ledger:{requestId:id,status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
+   firstFail:'POSTCHECK_PENDING',lastPass:'RECOVERY_REQUIRED',
+   targetSha:'b'.repeat(40),postIssueNumber:2965,
+   leaseOwnerPid:777,leaseOwnerNonce:owner.nonce,
+   internalSecret:'must-not-leak'},
+  installLock:{held:true,recoveryRequired:true,ownerPid:777},
+  artifacts:{status:'OBSERVED',backlog:{file:'PRESENT',windows:1,
+    openWindows:0,replayCount:0,secret:'must-not-leak'},
+    lease:{ownerMarkerMatch:true,ownerFile:'PRESENT'}}};
+ const ok=projectMaintenanceRecoveryStatusReadonly(id,raw,owner);
+ assert.equal(ok.status,'READ_ONLY_OBSERVED');
+ assert.equal(ok.firstFail,'POSTCHECK_PENDING');
+ assert.equal(ok.postIssueNumber,2965);
+ assert.equal(ok.leaseOwnerMatchesRequest,true);
+ assert.equal(ok.backlog.openWindows,0);
+ assert.equal(ok.recoveryEligible,false);
+ assert.equal(ok.installSuccessProven,false);
+ assert.doesNotMatch(JSON.stringify(ok),/sensitive-nonce|must-not-leak|ownerPid/);
+ assert.equal(projectMaintenanceRecoveryStatusReadonly(id,raw,
+  {...owner,nonce:'different'}).leaseOwnerMatchesRequest,false);
+ assert.equal(projectMaintenanceRecoveryStatusReadonly(id,{...raw,
+  ledger:{...raw.ledger,requestId:'pc-update-00000000-0000-4000-8000-000000000000'}},owner).status,
+  'STATE_UNKNOWN');
+ assert.equal(projectMaintenanceRecoveryStatusReadonly(id,null).status,'STATE_UNKNOWN');
+ assert.match(maintenanceRecoveryText({...ok,requestId:'probe',runId:'123',
+  workflowState:'active'}),/operationalWrites=0/);
 });
