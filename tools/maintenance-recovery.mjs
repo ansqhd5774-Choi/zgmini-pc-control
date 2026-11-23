@@ -198,7 +198,7 @@ function verifyInstalledRecoverySupervisor(){
 }
 async function reconcileInstalledRecovery2960({id,source,g,before}){
  need(id===REC2960,'INSTALLED_RECOVERY_SCOPE_NOT_ALLOWED');
- const {verifyRecoveryOperator,protectedSnapshot}=await import('./update.mjs');
+ const {verifyRecoveryOperator,protectedSnapshot,loadApprovedPackage}=await import('./update.mjs');
  const {selectPreservedRecoveryProtection}=await import('./maintenance-contract.mjs');
  const {readFixedReadonlyBytes}=await import('../controller/fixed-readonly-bytes.mjs');
  const rel='approvals/maintenance-recoveries/'+id+'.installed.json';
@@ -247,6 +247,17 @@ async function reconcileInstalledRecovery2960({id,source,g,before}){
   Object.keys(cas).every(k=>approval.casDigests[k]===cas[k])&&
   approval.approvedCurrentWriterConfigSha256===cas.writerSha256,
   'INSTALLED_RECOVERY_CAS_CHANGED');
+ // The prior B scope and its original postcheck source are authoritative;
+ // a successful independent A result cannot redefine that approved contract.
+ const originalPackage=loadApprovedPackage(id,path.join(root,'approved',id+'.json'),
+  {recovery:true});
+ need(originalPackage.issue.requestId===id&&
+  originalPackage.manifest.targetSha===TARGET2960&&
+  originalPackage.manifest.postOperation==='core-status'&&
+  originalPackage.manifest.postSourceBranch==='main'&&
+  originalPackage.manifest.postSourceSha===
+   '2b69dcbc7ade75815e0c152fd0e2112ddaa5b333',
+  'INSTALLED_RECOVERY_ORIGINAL_APPROVAL_UNVERIFIED');
  const ledger=JSON.parse(bytes.ledger),owner=JSON.parse(bytes.owner);
  const marker=JSON.parse(bytes.marker),backlog=JSON.parse(bytes.backlog);
  const baseline=JSON.parse(bytes.protection);
