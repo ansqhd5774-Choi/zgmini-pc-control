@@ -1,13 +1,14 @@
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {ISSUE,REQUEST_ID,REPO,newReport,postAndVerify,collectReport,inspectProbeProvenance}
+import {ISSUE,REQUEST_ID,REPO,newReport,postAndVerify,collectReport,inspectProbeProvenance,
+ compareRollbackFileEvidence,classifyReadOnlyDelivery}
  from '../tools/w05-2821-operator-readonly-receipt.mjs';
 const issueUrl='https://api.github.com/repos/'+REPO+'/issues/'+ISSUE;
 const good=()=>({...newReport({now:new Date('2026-11-23T05:30:00Z'),
  id:'11111111-2222-4333-8444-555555555555'}),
  nodeOperator:'PASS',nodeOperatorExit:'0',probeCheckout:'PASS',operatorVbs:'PASS',approval:'PASS',
- toolHashes:'5/5',originalCas:'5/5',recoveryClaim:'ABSENT',
+ pinnedToolHashes:'5/5',toolHashes:'5/5',originalCas:'5/5',recoveryClaim:'ABSENT',
  claimOwner:'NONE',originalOwnerAlive:'NO',readStatus:'READ_ONLY_COLLECTED'});
 
 test('fixed incident, immutable no-effect and no secret fields',()=>{
@@ -131,4 +132,37 @@ test('installed WMI drift and self-consistent forged manifest cannot attest',()=
   assert.deepEqual(inspectProbeProvenance(sourceFixture(opts)),
    {probeCheckout:'PASS',operatorVbs:'FAIL'});
  }
+});
+
+
+test('later main tool changes do not corrupt pinned source attestations',()=>{
+ const source=Buffer.from('source-at-rollback-approval');
+ const expected=hash(source);
+ const old=compareRollbackFileEvidence(expected,source,expected);
+ assert.deepEqual(old,{approved:true,checkout:true});
+ const newer=compareRollbackFileEvidence(expected,source,hash(Buffer.from('later main update')));
+ assert.deepEqual(newer,{approved:true,checkout:false});
+ const invalid=compareRollbackFileEvidence(expected,Buffer.from('altered pinned source'),expected);
+ assert.deepEqual(invalid,{approved:false,checkout:false});
+ const five=[old,old,newer,newer,old];
+ assert.equal(five.filter(x=>x.approved).length,5);
+ assert.equal(five.filter(x=>x.checkout).length,3);
+});
+
+test('read-only remote receipt may succeed without granting rollback authorization',()=>{
+ const r={...good(),pinnedToolHashes:'5/5',toolHashes:'3/5',
+  recoveryClaim:'PRESENT',originalOwnerAlive:'YES'};
+ assert.deepEqual(classifyReadOnlyDelivery(r,{status:'REMOTE_RECEIPT_VERIFIED'}),{
+  status:'READ_ONLY_RECEIPT_VERIFIED',operatorAttested:true,rollbackAuthorized:false
+ });
+ assert.deepEqual(classifyReadOnlyDelivery(r,{status:'REMOTE_RECEIPT_UNVERIFIED'}),{
+  status:'READ_ONLY_RECEIPT_UNVERIFIED',operatorAttested:true,rollbackAuthorized:false
+ });
+});
+
+test('remote receipt of denied OPERATOR evidence never becomes attested',()=>{
+ const failed={...good(),nodeOperator:'FAIL',readStatus:'OPERATOR_SOURCE_NOT_VERIFIED'};
+ assert.deepEqual(classifyReadOnlyDelivery(failed,{status:'REMOTE_RECEIPT_VERIFIED'}),{
+  status:'READ_ONLY_RECEIPT_VERIFIED',operatorAttested:false,rollbackAuthorized:false
+ });
 });
