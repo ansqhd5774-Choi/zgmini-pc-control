@@ -93,3 +93,16 @@ test('unexpected path symlink is rejected before SQLite open',t=>{
 test('invalid data root fails without path exception',()=>{
  assert.equal(inspectSectorR3DatedLedger(null).code,'SECTOR_R3_DATA_ROOT_INVALID');
 });
+
+test('local current with a different publication event cannot inherit dated-row identity',t=>{
+ const f=fixture(t),dated=body('2026-11-09'),newer=body('2026-11-10');
+ const at=Date.parse('2026-11-10T05:00:00Z');
+ f.add('2026-11-10',dated,at);f.add('current',newer,at+1000);
+ const r=inspectSectorR3DatedLedger(f.data);
+ assert.equal(r.status,'PASS');
+ assert.equal(r.localCurrentMatchesDate,false);
+ assert.equal(r.pcDate.observationDate,'2026-11-09');
+ assert.equal(r.localCurrent.observationDate,'2026-11-10');
+ assert.equal(r.sameEventVerified,false);
+ assert.equal(r.oneYearPitVerified,false);
+});

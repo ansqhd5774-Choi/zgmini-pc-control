@@ -307,3 +307,37 @@ test('installed-9e354 core Git source identity one-file selective B pin is exact
  assert.throws(()=>validateControllerSelectivePin(manifest,{...pin,installedSha:target}),
   /SELECTIVE_PIN_MISMATCH/);
 });
+
+test('D05 sector R3 A exact three-file selective pin is fail-closed and rollbackable',()=>{
+ const installed='fe1672fd226d92c31aef52b0978ce043177c2514';
+ const target='b5dbe4bfe693458af5ca6f085fa771bba033bb4e';
+ const base=path.join(import.meta.dirname,'..','approvals');
+ const raw=fs.readFileSync(path.join(base,'controller-updates',target+'.json'));
+ const manifest=JSON.parse(raw.toString('utf8'));
+ const pin=JSON.parse(fs.readFileSync(path.join(base,'controller-selective-targets',target+'.json'),'utf8'));
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-d05-sector-r3-approved-readback',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const approved=validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(approved.manifest,pin),true);
+ assert.equal(approved.manifest.controllerOnlyInstall,true);
+ assert.equal(approved.manifest.purpose,'pc-controller-maintenance');
+ assert.equal(approved.manifest.selectiveSource.branch,'codex/issues-lifecycle-r3-i1228-selective-20261123');
+ assert.equal(approved.manifest.selectiveSource.mainSha,'838d03a8412ff3141d02914273ab4429448d30e9');
+ assert.deepEqual(approved.manifest.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
+ assert.deepEqual(approved.manifest.allowFiles.map(x=>x.path),
+  ['config/operations.json','controller/operations.mjs','controller/sector-r3-dated-ledger-readonly.mjs']);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(digest(fs.readFileSync(path.join(import.meta.dirname,'..','controller',
+  'sector-r3-dated-ledger-readonly.mjs'))),manifest.allowFiles[2].sha256);
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.approval.ref,'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2911');
+ assert.throws(()=>validateControllerSelectivePin(approved.manifest,{...pin,sourceMainSha:target}),
+  /SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:target}),
+  /UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
