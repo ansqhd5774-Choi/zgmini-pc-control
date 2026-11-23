@@ -186,7 +186,7 @@ test('GitHub API base64 corruption is blocked even when permissive decoding woul
 });
 
 test('GitHub API line-wrapped base64 remains valid under strict decoding',async t=>{
- const f=setup(t,{encodedMutation:encoded=>encoded.match(/.{1,65}/g).join('\\n')});
+ const f=setup(t,{encodedMutation:encoded=>encoded.match(/.{1,65}/g).join('\n')});
  const result=await f.agent.pollOnce();
  assert.equal(result[0].status,'SUCCEEDED',JSON.stringify(result));
  assert.equal(f.stats.recoveries,1);
