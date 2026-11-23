@@ -1,0 +1,318 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45159879575-1-seat-5",
+  "requestId": "pc-w05-bea-native-b-preimage-20261123-01",
+  "startedAt": "2026-11-23T10:51:38.160Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "b5dbe4bfe693458af5ca6f085fa771bba033bb4e",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "73d1b7eeeef23dd69de90c047d8bfdab4c6cb1b2",
+  "sourceBranch": "main",
+  "operation": "writer-install-preimage-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "WRITER_FIXED_PREIMAGE_READONLY",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-api-site-bea-native-b-20261123",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "WRITER_FIXED_PREIMAGE_READONLY",
+    "observedAt": "2026-11-23T10:51:40.220Z",
+    "evidenceLevel": "FIXED_CHECKOUT_NOT_LIVE_CORE_PROCESS",
+    "runtimeSourceVerified": false,
+    "sourceRoot": "projects/zgmini-earnings-history-pc-release",
+    "sourceRootAbsolute": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+    "sourceHead": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+    "approvedConfigSource": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+    "checkpointSource": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+    "sourceIdentityConsistent": true,
+    "coreTaskSourceLinked": false,
+    "taskLaunchers": [
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c"
+      },
+      {
+        "path": "data/pc-writer/cutover-evidence/inflation-r37-2026-10-20T19-39-19-549Z/run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-run.mjs",
+        "sha256": "ce07af0b5e8d17625644e204f2815c1f754aff2468bc5434ac13c0dadcecd907"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R38_AUTO_DISPATCH.mjs",
+        "sha256": "4346e5e4406f893ede75e994e3a1e7253bde2bb8eacd7656b365e3a82e3704f1"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/archive-core-r10.mjs",
+        "sha256": "e96d9ba669ee053d0b3558db36f1f5f7a28648b8ea26b7937f62a19bb4495c84"
+      },
+      {
+        "path": "data/pc-writer/archive-sidecar-r7/verified-checks-r10.mjs",
+        "sha256": "f88f7b25a1a6f9157e1e7b23901a30076927f0a63e98e9aff88643a02854a02f"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R31_SCOPED_PUBLICATION.mjs",
+        "sha256": "ffa71643748e79eedacf26b72880804cbab0edfb2eb32435da2346ec4bd0ad19"
+      },
+      {
+        "path": "data/pc-writer/earnings-risk-provisional-r23/ZGMINI_EARNINGS_R33_OBSERVE_PUBLISH_CYCLE.mjs",
+        "sha256": "7bd792d1ed84067846ca3ef0748b4a5eac8e5ba78feb18c9a3fcaf46b58ee58b"
+      }
+    ],
+    "r6Config": {
+      "status": "PASS",
+      "configSha256": "dbc41f6b26fd4f314c9e055d385bb110bb69fc64feada5f3724fc26bba0325be",
+      "keys": {
+        "employmentR6AutoCollection": "ENABLED",
+        "employmentR6OneYearAutoPublication": "ENABLED"
+      },
+      "reason": null
+    },
+    "calendar": [
+      {
+        "path": "lib/market-calendar-company-ko.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "b442ac3ba3a4ea6947dde207548d97382197de70341df94035ad79e72037399c",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "lib/market-calendar-issuer-alias-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "b9b8cd2331ad70bc7bdc6e7c722ce272163c73ac9c370c0c93c951d783e36d62",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "scripts/pc-writer/market-calendar-er1-auto-output.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "aa75821a58fa3cee3e6f712943d7636f6bfcec72362bdfb76d081a643b803a49",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      }
+    ],
+    "employmentR6": [
+      {
+        "path": "lib/market-score/employment-r4-bed-provider.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "760e645c7e40d1cb6af3e5c21954d85bb50e9a89051e00593f6ce113bf2f16c1",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r4-shadow-store.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "9e6f50ebc672c135eb04445ba9bad383fae161f7dbeece47793e385f3376874c",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-collector.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "848c83202b2b63944629655850542ef2a90fefdeed48ffbfdc1774ad487a0bc5",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-contract.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "5775cb93ac1882a06946964832feefb69060d97e3c8c08f301e11419732850c9",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-feature-engine.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "49c4f47e5e2fccf541722148752a65bf1d76f19b7a8974d7533e7e983de63294",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-observation-reader.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "81d9341a625d75bb96816657dbb26cc906a6afaaa49482d1c8cef8eb72291b88",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-provider.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "b94cd97208bc5ea19be4068a170e3c45b051639c5ee3d1ec2156c1ed18c587d6",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-scheduler.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "7f33c6f3920317cdfd362bb04b570f7af8a5c3322e5924edb4c0cfaf31c16a88",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-store.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "a6c2938bae56147ab4bf3fcb9ba3046355360a538e58f6d34de021ea1d586851",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "scripts/pc-writer/collect-local.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "dd2ec67a4a26860215c4e94e4df9b0f4d4fdeb4532e0775600a810f6a966c706",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "scripts/pc-writer/run-local.mjs",
+        "expectedEffect": "M",
+        "exists": true,
+        "sha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77",
+        "state": "PRESENT",
+        "trackedDirty": false,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": false
+      },
+      {
+        "path": "lib/market-score/employment-r6-one-year-read-model.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "45faa17a3306ef5bc6dead703fa64eadb95b53c20e405ea151fab6cb2f00eae2",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "lib/market-score/employment-r6-window.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "dc41a6780f05d28c31ee52b77b2f688df27216d109ae4c7dc1aa17a9da07decd",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-collection.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "40a4cc6f2d0045f5589acf9a8335ad76a60c55efa2e4368b6ff149cc9a2ee8b2",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-auto-publication.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "5363c5aba19e3ef67d01307f46b3283ce2f38dd9d3673cc73331e980850c38ea",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-candidate-locator.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "e4b78dbd756743316beba0655a3fe89f45d7c93fb8036572bff5d5431d8e4a07",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-one-year-stage.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "2c65cf6c1c0564dbead7c8a0ed5b8d5bbce9a80125f54cfc8aa23de9ee232f38",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "scripts/pc-writer/employment-r6-pit-coverage.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "4b73aa44e1f104d10bfcc4ace3a07127f0d27b14cadf4c9b7f49b2c664d506e8",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      },
+      {
+        "path": "worker/employment-r6-public-display.mjs",
+        "expectedEffect": "A",
+        "exists": true,
+        "sha256": "2c7110e13f7025dff7c204d8a3727d14c937898e612ed35d38686ef6be88562e",
+        "state": "PRESENT",
+        "trackedDirty": null,
+        "gitTracked": "UNKNOWN",
+        "existingAdditionCollision": true
+      }
+    ],
+    "operationalWrites": 0,
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedAfterSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "b5dbe4bfe693458af5ca6f085fa771bba033bb4e",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T10:51:51.901Z",
+  "durationMs": 13741
+}
