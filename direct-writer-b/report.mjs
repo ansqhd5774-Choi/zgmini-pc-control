@@ -127,7 +127,7 @@ export function sanitizeDirectBReport(raw,request,env,exitEvidence=null){
         (!SHA64.test(raw.sourceVersion??'')||
          !SHA64.test(raw.sourceHttpSha256??'')||
          !Number.isSafeInteger(raw.sourceStoredAt)||raw.sourceStoredAt<=0||
-         !/^\d{4}Q[1-4]$/.test(raw.observedThrough??''))))return base;
+         !/^20\d{2}-(?:03-31|06-30|09-30|12-31)$/.test(raw.observedThrough??''))))return base;
     return {...base,...compatibility,status:raw.status,code:raw.code,mode:raw.mode,
       sourceSha:raw.sourceSha,controlSha:raw.controlSha,operationSucceeded:true,
       ...(raw.mode==='BEA_NIPA_PRIVATE_ARCHIVE_ONCE'?{
