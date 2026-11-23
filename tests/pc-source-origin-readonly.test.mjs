@@ -166,12 +166,48 @@ test('invalid or missing config SHA never selects a candidate',()=>{
  assert.doesNotMatch(JSON.stringify(result),/SECRET|not_a_sha/);
 });
 
-test('excess directory count marks inventory truncated and prevents selection',()=>{
+test('more than 64 unrelated directories do not erase an approved checkout candidate',()=>{
  const f=fixture();f.repos.push(f.addRepo('A',SHA_A));
  for(let i=0;i<65;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+i));
  const result=f.inspect();
+ assert.equal(result.inventoryTruncated,false);
+ assert.equal(result.candidateCount,1);
+ assert.equal(result.configMatchingCandidate,'projects/A');
+ assert.equal(result.runtimeSourceVerified,false);
+});
+
+test('130 unrelated parent folders cannot erase a later approved Git checkout',()=>{
+ const f=fixture();f.repos.push(f.addRepo('zz-approved',SHA_A));
+ for(let i=0;i<180;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+String(i).padStart(3,'0')));
+ const result=f.inspect();
+ assert.equal(result.inventoryTruncated,false);
+ assert.equal(result.candidateCount,1);
+ assert.equal(result.configMatchingCandidate,'projects/zz-approved');
+ assert.equal(result.candidates[0].gitVerified,true);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.operationalWrites,0);
+});
+
+test('more than 130 eligible repositories remain truncated and fail closed',()=>{
+ const f=fixture();
+ for(let i=0;i<131;i++)f.repos.push(f.addRepo('repo'+String(i).padStart(3,'0'),SHA_A));
+ const result=f.inspect();
+ assert.equal(result.inventoryTruncated,true);
+ assert.equal(result.candidateCount,130);
+ assert.equal(result.configMatchingCandidate,null);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.providerCalls,0);
+});
+
+test('bounded directory scan remains incomplete and cannot claim a unique candidate',()=>{
+ const f=fixture();f.repos.push(f.addRepo('A',SHA_A));
+ for(let i=0;i<260;i++)f.fsOps.dir(W.join(PROJECTS,'empty'+i));
+ const result=f.inspect();
  assert.equal(result.inventoryTruncated,true);
  assert.equal(result.configMatchingCandidate,null);
+ assert.equal(result.runtimeSourceVerified,false);
+ assert.equal(result.providerCalls,0);
+ assert.equal(result.operationalWrites,0);
 });
 
 test('git read failure yields candidate without trusted HEAD',()=>{
