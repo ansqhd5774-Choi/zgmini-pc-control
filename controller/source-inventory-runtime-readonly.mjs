@@ -180,10 +180,10 @@ function r54StoredEventSummary(db,tables){
   return {...result,reason:'TABLE_NOT_PRESENT'};
  const current=db.prepare("SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key='current' LIMIT 1").get();
  if(!current)return result;
- const safeDay=d=>typeof d==='string'&&/^20\\d{2}-\\d{2}-\\d{2}$/.test(d)&&
+ const safeDay=d=>typeof d==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(d)&&
   Number.isFinite(Date.parse(d+'T00:00:00Z'))&&
   new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
- const safeIso=d=>typeof d==='string'&&/^20\\d{2}-\\d{2}-\\d{2}T/.test(d)&&
+ const safeIso=d=>typeof d==='string'&&/^20\d{2}-\d{2}-\d{2}T/.test(d)&&
   Number.isFinite(Date.parse(d))&&new Date(d).toISOString()===d;
  if(typeof current.body!=='string'||Buffer.byteLength(current.body)>2_000_000)
   return {...result,reason:'CURRENT_BODY_UNREADABLE'};
