@@ -31,6 +31,7 @@ import {inspectAssetR10Publication} from './asset-r10-publication-readonly.mjs';
 import {inspectAssetR10SourceBytes} from './asset-r10-source-readonly.mjs';
 import {inspectD05LineageReadonly,summarizeD05LineageOperation} from './d05-lineage-readonly.mjs';
 import {inspectSectorR3DatedLedger} from './sector-r3-dated-ledger-readonly.mjs';
+import {inspectSectorR3D1ApiReadback} from './sector-r3-d1-api-readback-readonly.mjs';
 import {inspectReleaseCalendarRuntime} from './release-calendar-runtime-readonly.mjs';
 import {inspectSourceInventory} from './source-inventory-runtime-readonly.mjs';
 import {inspectProviderActivity} from './provider-activity-runtime-readonly.mjs';
@@ -197,6 +198,7 @@ export async function runOperation(request,context){
  if(request.operation==='d05-lineage-readonly')return summarizeD05LineageOperation(
   inspectD05LineageReadonly(dataRoot,{approvedSourceSha:readCore(dataRoot).approvedSourceSha}));
  if(request.operation==='sector-r3-dated-ledger-readonly')return inspectSectorR3DatedLedger(dataRoot);
+ if(request.operation==='sector-r3-d1-api-readback-readonly')return inspectSectorR3D1ApiReadback(dataRoot);
  if(request.operation==='core-runtime-source-readonly')return inspectCoreRuntimeSource();
  if(request.operation==='inflation-core-lock-observation-readonly')
   return observeInflationCoreLock({queryTask});
