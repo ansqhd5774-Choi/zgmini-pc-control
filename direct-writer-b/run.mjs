@@ -53,7 +53,7 @@ export async function applyApprovedOnce(auth,{makeApprovedNativeAdapter=null,
         compatibilityDirections:2,
         compatibilitySharedLockVerified:true}:{};
     return {status:verified?'DIRECT_B_EFFECT_PASS_NOT_PUBLISHED':
-      outcome?.status==='STATE_UNKNOWN'?'DIRECT_B_EFFECT_UNKNOWN':
+      ['STATE_UNKNOWN','PASS'].includes(outcome?.status)?'DIRECT_B_EFFECT_UNKNOWN':
       'DIRECT_B_EFFECT_BLOCKED',
       code:verified?'DIRECT_B_LOCAL_EFFECT_PASS':
         configuredReason??(outcome?.status==='STATE_UNKNOWN'?
