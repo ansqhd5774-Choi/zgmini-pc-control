@@ -171,22 +171,56 @@ export async function recentRuns(now,requestRuns=request){
           if(endsWindow(rows)){dayComplete=true;break;}
         }
         if(!dayComplete){
-          // Real 2026-11-23 ledger: cancelled=497(incomplete) even after
-          // UTC-day partitioning. Split only such saturated days by hour.
+          // Several saturated days can exceed the 96-call budget when each
+          // day unconditionally expands into 24 hours. Start with six 4-hour
+          // windows, drilling down to individual hours only for windows with
+          // 200+ runs. Query results are checked against their exact interval.
           const hourly=[];
           let hoursComplete=true;
-          for(let h=0;h<24;h++){
-            const hh=String(h).padStart(2,'0');
-            const range=day+'T'+hh+':00:00Z..'+day+'T'+hh+':59:59Z';
-            let completeHour=false;
+          const within=(rows,start,end)=>rows.every(x=>{
+            const at=Date.parse(x?.created_at??'');
+            return Number.isFinite(at)&&at>=start&&at<end;
+          });
+          for(let h=0;h<24;h+=4){
+            const start=Date.parse(day+'T'+String(h).padStart(2,'0')+':00:00Z');
+            const end=start+4*3600000;
+            const range=day+'T'+String(h).padStart(2,'0')+':00:00Z..'+
+              day+'T'+String(h+3).padStart(2,'0')+':59:59Z';
+            const window=[];
+            let windowComplete=false;
             for(let page=1;page<=2;page++){
-              if(hourlyCalls>=maxHourlyCalls){hoursComplete=false;break;}
+              if(hourlyCalls>=maxHourlyCalls)break;
               hourlyCalls++;
               const rows=await pageFor(status,range,page);
-              hourly.push(...rows);
-              if(endsWindow(rows)){completeHour=true;break;}
+              if(!within(rows,start,end))break;
+              window.push(...rows);
+              if(endsWindow(rows)){windowComplete=true;break;}
             }
-            if(!completeHour){hoursComplete=false;break;}
+            if(windowComplete){hourly.push(...window);continue;}
+            // An overfull 4-hour window may still be recoverable by hour.
+            // Never treat a failed or unsupported range as complete.
+            const hours=[];
+            let segmentComplete=true;
+            for(let hour=h;hour<h+4;hour++){
+              const hh=String(hour).padStart(2,'0');
+              const hourRange=day+'T'+hh+':00:00Z..'+day+'T'+hh+':59:59Z';
+              const hourStart=Date.parse(day+'T'+hh+':00:00Z');
+              let completeHour=false;
+              for(let page=1;page<=2;page++){
+                if(hourlyCalls>=maxHourlyCalls)break;
+                hourlyCalls++;
+                const rows=await pageFor(status,hourRange,page);
+                if(!within(rows,hourStart,hourStart+3600000))break;
+                hours.push(...rows);
+                if(endsWindow(rows)){completeHour=true;break;}
+              }
+              if(!completeHour){segmentComplete=false;break;}
+            }
+            const ids=new Set(hours.map(x=>x.id));
+            if(!segmentComplete||!window.every(x=>ids.has(x.id))){
+              hoursComplete=false;break;
+            }
+            hourly.push(...hours);
           }
           // Ensure the finer-grained GitHub query returned every known
           // day-level run. An unsupported range must never look complete.
