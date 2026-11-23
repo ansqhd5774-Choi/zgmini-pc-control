@@ -1,0 +1,23 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_RESULT_V1",
+  "requestId": "9de584a1-92b7-4a70-812f-02efcc647953",
+  "status": "WRITER_B_INSTALLED_VERIFIED",
+  "code": "WRITER_B_INSTALL_VERIFIED",
+  "sourceSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "mode": "LOCAL_OVERLAY",
+  "localOnly": true,
+  "baseHead": "aabb9e85441fc1150ba572a840245ab4a05c35c4",
+  "candidateSourceSha": "8a6dc683348ca549c110fabedd44c04d22183050",
+  "manifestSha256": "7060448300da8f45db86ddde3f183a464823e3bf71400ebf17ef8907a1382c68",
+  "baseTreeOid": "348e94c603e3084ec52ef274bff78dce1360cbfc",
+  "preparedTreeOid": "f94e20d7488aad9ea0b2dbea59681cb6534196d3",
+  "provenanceSha256": "6e5c85d7a52d73b642329f7b6dad2bc1a1ff9f1fcc035a3787f31f5df5735357",
+  "runId": "45089504521",
+  "retry": "READ_ONLY_RECONCILE_NO_REEXECUTE",
+  "changedPaths": [
+    "lib/market-score/composite-model-r1.mjs",
+    "lib/market-score/employment-r54-calculation-event.mjs",
+    "lib/economic-employment-stored-display-r4.mjs",
+    "worker/market-operational-store.mjs"
+  ]
+}
