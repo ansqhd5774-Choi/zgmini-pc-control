@@ -58,11 +58,11 @@ function project(row,snapshotKey){
 
 export function inspectSectorR3DatedLedger(dataRoot,{fileSystem=fs,
  openDatabase=openSqliteReadonly}={}){
- const dbFile=path.join(dataRoot,'pc-writer','storage','core.sqlite');
  let db;
  try{
   if(typeof dataRoot!=='string'||!path.isAbsolute(dataRoot))
    return fail('SECTOR_R3_DATA_ROOT_INVALID');
+  const dbFile=path.join(dataRoot,'pc-writer','storage','core.sqlite');
   const root=fileSystem.realpathSync.native(dataRoot);
   const stat=fileSystem.lstatSync(dbFile);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size<100||
