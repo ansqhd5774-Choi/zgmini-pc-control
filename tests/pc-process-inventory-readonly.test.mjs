@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1140,4 +1140,87 @@ test('W05 #2821 pinned PID chronology proves reuse only after original lease tim
   {ownerAtUtc:null}).code,
   'W05_OWNER_LEASE_TIME_UNVERIFIED');
  assert.doesNotMatch(JSON.stringify(reused),/nonce|commandline|token|credential/i);
+});
+
+
+test('W05 optional operator topology request admits only exact fixed operating read',()=>{
+ const e=event();
+ const body=JSON.parse(e.issue.body);
+ const good={...e,issue:{...e.issue,body:JSON.stringify({...body,probe:'w05-operator-topology-readonly'})}};
+ assert.equal(authenticateProcess(good,env,'operating').w05OperatorTopology,true);
+ assert.throws(()=>authenticateProcess({...good,issue:{...good.issue,
+  body:JSON.stringify({...body,probe:'arbitrary-command'})}},env,'operating'),/REQUEST_SCOPE_INVALID/);
+ assert.throws(()=>authenticateProcess({...good,issue:{...good.issue,
+  body:JSON.stringify({...body,probe:'w05-operator-topology-readonly',cmd:'arbitrary'})}},
+  env,'operating'),/REQUEST_SCOPE_INVALID/);
+ const handoff=event('handoff'),raw=JSON.parse(handoff.issue.body);
+ assert.throws(()=>authenticateProcess({...handoff,issue:{...handoff.issue,
+  body:JSON.stringify({...raw,probe:'w05-operator-topology-readonly'})}},env,'handoff'),/REQUEST_SCOPE_INVALID/);
+});
+test('W05 operator topology sanitizes fixed first-boundary classifications without SID or path',()=>{
+ const rows={schema:'ZGMINI_W05_OPERATOR_TOPOLOGY_PROBE_V1',candidateTotal:3,
+  cases:[{pid:101,reason:'PARENT_UNAVAILABLE'},
+   {pid:102,reason:'SID_UNAVAILABLE'},{pid:103,reason:'EXPLORER_CHAIN_CANDIDATE'}]};
+ const r=sanitizeW05OperatorTopologyProbe(rows);
+ assert.equal(r.status,'PASS');assert.equal(r.code,'W05_OPERATOR_CANDIDATE_TOPOLOGY_COLLECTED');
+ assert.equal(r.independentOperatorAttested,false);
+ assert.equal(r.recoveryEligible,false);
+ assert.deepEqual(r.cases.map(x=>x.firstBoundary),
+  ['PARENT_UNAVAILABLE','SID_UNAVAILABLE','EXPLORER_CHAIN_CANDIDATE']);
+ assert.equal(sanitizeW05OperatorTopologyProbe({schema:rows.schema,candidateTotal:0,cases:[]}).status,
+  'STATE_UNKNOWN');
+});
+
+test('W05 operator topology denies untrusted/missing/cross-run data',()=>{
+ const basic={schema:'ZGMINI_W05_OPERATOR_TOPOLOGY_PROBE_V1',candidateTotal:1,
+  cases:[{pid:123,reason:'RUNNER_ANCESTRY'}]};
+ for(const raw of [
+  {...basic,cases:[{pid:123,reason:'INDEPENDENT_OPERATOR'}]},
+  {...basic,cases:[{pid:123,reason:'PARENT_UNAVAILABLE',sid:'private'}]},
+  {...basic,candidateTotal:2},
+  {...basic,cases:[{pid:123,reason:'RUNNER_ANCESTRY'},{pid:123,reason:'RUNNER_ANCESTRY'}],candidateTotal:2},
+  {...basic,cases:[]},
+  {...basic,candidateTotal:-1},
+  {...basic,candidateTotal:8,cases:Array.from({length:7},(_,i)=>({pid:i+1,reason:'PARENT_UNAVAILABLE'}))}
+ ])assert.throws(()=>sanitizeW05OperatorTopologyProbe(raw));
+});
+test('W05 operator topology collector uses fixed read-only WMI on operating PC',()=>{
+ const ctx={requestId:'2d605c34-939e-43e4-8ca1-58d678bf3862',
+  issueNumber:2860,runId:'45120000000',attempt:'1'};
+ const response={schema:'ZGMINI_W05_OPERATOR_TOPOLOGY_PROBE_V1',candidateTotal:2,
+  cases:[{pid:2399,reason:'PARENT_UNAVAILABLE'},
+   {pid:2500,reason:'RUNNER_ANCESTRY'}]};
+ let count=0;
+ const opts={platform:()=> 'win32',hostname:()=> 'PC',exists:()=>true,
+  spawn:(exe,args,options)=>{
+   count++;
+   assert.ok(exe.endsWith('powershell.exe'));
+   assert.deepEqual(args.slice(0,4),['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand']);
+   const ps=Buffer.from(args[4],'base64').toString('utf16le');
+   assert.match(ps,/Get-CimInstance/);
+   assert.match(ps,/Invoke-CimMethod/);
+   assert.match(ps,/GetOwnerSid/);
+   assert.doesNotMatch(ps,/Set-ScheduledTask|Remove-Item|taskkill|reg add|workflow enable/i);
+   assert.equal(options.shell,false);
+   return {status:0,stdout:JSON.stringify(response)};
+  }};
+ const localEnv={...env,RUNNER_NAME:'zgmini-pc-01',COMPUTERNAME:'PC'};
+ const r=collectW05OperatorTopology(ctx,localEnv,opts);
+ assert.equal(count,1);assert.equal(r.status,'PASS');
+ assert.equal(r.code,'W05_OPERATOR_CANDIDATE_TOPOLOGY_COLLECTED');
+ assert.equal(r.cases.length,2);
+ assert.equal(r.operationalWrites,0);assert.equal(r.recoveryEligible,false);
+ assert.equal(r.independentOperatorAttested,false);
+ assert.equal(r.ownerSidsCaptured,false);assert.equal(r.commandLinesCaptured,false);
+ assert.doesNotMatch(JSON.stringify(r),/SECRET|CommandLine|Sid=|UserName/i);
+ const txt=w05OperatorTopologyText(r);
+ assert.match(txt,/candidate.2399=PARENT_UNAVAILABLE/);
+ assert.match(txt,/independentOperatorAttested=false/);
+ assert.doesNotMatch(txt,/SID-[0-9]|CommandLine|token|environment/i);
+ assert.equal(collectW05OperatorTopology(ctx,{...localEnv,RUNNER_NAME:'untrusted'},opts).status,'BLOCKED');
+ assert.equal(count,1);
+ const failed=collectW05OperatorTopology(ctx,localEnv,{...opts,
+  spawn:()=>({status:2,stderr:'PRIVATE_SECRET'})});
+ assert.equal(failed.code,'W05_OPERATOR_WMI_UNAVAILABLE');
+ assert.doesNotMatch(JSON.stringify(failed),/PRIVATE_SECRET/);
 });
