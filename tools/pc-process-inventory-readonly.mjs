@@ -376,16 +376,34 @@ export function compare2960ProtectedBaseline(original,current){
   return null;
  return JSON.stringify(original)===JSON.stringify(current);
 }
+// Scope classification is NOT a Writer CAS approval. It only distinguishes
+// a possible single Writer config SHA change from other protected-state drift.
+export function classify2960ProtectionDifference(original,current){
+ const same=compare2960ProtectedBaseline(original,current);
+ if(same===null)return 'UNVERIFIED';
+ if(same)return 'UNCHANGED';
+ const before=original.files['config.json'],after=current.files['config.json'];
+ if(typeof before==='string'&&typeof after==='string'&&
+  /^[a-f0-9]{64}$/.test(before)&&/^[a-f0-9]{64}$/.test(after)&&before!==after){
+  const candidate={...original,files:{...original.files,'config.json':after}};
+  if(JSON.stringify(candidate)===JSON.stringify(current))return 'WRITER_CONFIG_ONLY';
+ }
+ return 'OTHER_PROTECTED_DRIFT';
+}
 function inspect2960ProtectedBaselineReadonly(){
+ const unknown={unchanged:null,differenceClass:'UNVERIFIED'};
  const original=path.join('E:/ZGmini/automation/pc-control','backups',
   'controller-update-'+TARGET2960,'PROTECTED_BEFORE.json');
  try{
   const stat=fs.lstatSync(original);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size<=0||stat.size>65536)
-   return null;
-  const baseline=JSON.parse(fs.readFileSync(original,'utf8'));
-  return compare2960ProtectedBaseline(baseline,protectedSnapshot());
- }catch{return null;}
+   return unknown;
+  const bytes=fs.readFileSync(original);
+  if(bytes.length!==stat.size)return unknown;
+  const baseline=JSON.parse(bytes.toString('utf8')),current=protectedSnapshot();
+  return {unchanged:compare2960ProtectedBaseline(baseline,current),
+   differenceClass:classify2960ProtectionDifference(baseline,current)};
+ }catch{return unknown;}
 }
 
 /** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
@@ -399,8 +417,11 @@ function inspect2960MaintenanceStatusReadonly(){
  try{
   const existing=project2960MaintenanceStatus(
    collectAutomationStatus(['--request-id',TARGET2960]));
-  return {...existing,protectedStateUnchanged:existing.status==='READ_ONLY_OBSERVED'?
-   inspect2960ProtectedBaselineReadonly():null};
+  const protection=existing.status==='READ_ONLY_OBSERVED'?
+   inspect2960ProtectedBaselineReadonly():
+   {unchanged:null,differenceClass:'UNVERIFIED'};
+  return {...existing,protectedStateUnchanged:protection.unchanged,
+   protectedDifferenceClass:protection.differenceClass};
  }catch{return project2960MaintenanceStatus(null);}
 }
 
