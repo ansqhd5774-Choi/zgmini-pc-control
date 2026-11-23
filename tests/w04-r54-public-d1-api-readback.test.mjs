@@ -71,6 +71,6 @@ test('registered A operation is limited to one fixed read-only route',()=>{
  const operations=fs.readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');
  const config=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
  assert.match(operations,/inspectR54PublicReadback\(dataRoot\)/);
- assert.deepEqual(config['market-r54-d1-api-readback-readonly'],
+ assert.deepEqual(config.operations['market-r54-d1-api-readback-readonly'],
   {grade:'A',timeoutSeconds:90,resource:'light'});
 });
