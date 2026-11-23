@@ -443,6 +443,44 @@ export function createMaintenanceAgent({
       return ledger;
     }catch{throw coded("MAINTENANCE_LEDGER_INVALID");}
   }
+  // Exact B effect, independent of requestId/chatId. Store the exclusive
+  // claim alongside the existing durable request ledger; the receiver lease
+  // serializes real admission and 'wx' closes the two-receiver race.
+  // An uncertain first attempt stays owned by its original Issue until
+  // its ledger is reconciled. No automatic retry or stale claim cleanup.
+  function claimControllerEffect(request,issue,approved){
+    if(request.operation!=="controller-update")return {created:true};
+    const manifest=approved?.manifest;
+    if(!isSha(manifest?.installedSha)||!isSha(manifest?.targetSha)||
+       manifest.targetSha!==request.targetControllerSha)
+      throw coded("MAINTENANCE_EFFECT_MANIFEST_INVALID");
+    const key=sha256(JSON.stringify({operation:request.operation,
+      installedSha:manifest.installedSha,targetSha:manifest.targetSha,manifest}));
+    const file=path.join(requestsDir,"effect-"+key+".json");
+    const record={schema:"ZGMINI_PC_MAINTENANCE_EFFECT_V1",key,
+      requestId:request.requestId,issueNumber:issue.number,
+      actor:issue.author.login,createdAt:now()};
+    try{
+      fs.writeFileSync(file,JSON.stringify(record,null,2)+"\n",
+        {encoding:"utf8",flag:"wx",mode:0o600});
+      return {created:true,record};
+    }catch(error){
+      if(error?.code!=="EEXIST")throw coded("MAINTENANCE_EFFECT_CLAIM_WRITE_FAILED");
+    }
+    let other;
+    try{other=JSON.parse(fs.readFileSync(file,"utf8"));}
+    catch{throw coded("MAINTENANCE_EFFECT_CLAIM_INVALID");}
+    if(other?.schema!=="ZGMINI_PC_MAINTENANCE_EFFECT_V1"||
+       other.key!==key||!REQUEST_ID.test(other.requestId??"")||
+       !Number.isSafeInteger(other.issueNumber)||other.issueNumber<=0||
+       !allowedActors.includes(other.actor))
+      throw coded("MAINTENANCE_EFFECT_CLAIM_INVALID");
+    if(other.requestId===request.requestId&&
+       other.issueNumber===issue.number&&other.actor===issue.author.login)
+      return {created:true,record:other};
+    return {created:false,record:other};
+  }
+
   function claim(request,issue,fingerprint,bodyDigest){
     const file=ledgerPath(request.requestId);
     const entry={schema:"ZGMINI_PC_MAINTENANCE_LEDGER_V1",requestId:request.requestId,
@@ -649,6 +687,14 @@ export function createMaintenanceAgent({
         requestId:request.requestId};
     }
 
+    // Distinct request IDs cannot replay an identical approved B effect.
+    // This atomic existing-ledger claim runs after approval/CAS validation and
+    // before the first package or updater action. Never release by timeout.
+    const effect=claimControllerEffect(request,issue,approved);
+    if(!effect.created)return {status:"BLOCKED",code:"DUPLICATE_EFFECT_SUPPRESSED",
+      requestId:request.requestId,originalIssueNumber:effect.record.issueNumber,
+      originalRequestId:effect.record.requestId,executionStarted:false,
+      operationalWrites:0};
     // Request values never choose a path or command. Only a pinned manifest is
     // stored under this trusted maintenance root for the separate updater.
     const packageFile=path.join(approvedDir,request.requestId+".json");

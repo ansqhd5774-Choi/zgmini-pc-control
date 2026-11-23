@@ -732,3 +732,40 @@ test('candidate failure and verified operational rollback are independently repo
  assert.equal(normalizedResult(request,{...raw,protectedStateUnchanged:false}).operationalRecovery,'UNVERIFIED');
  assert.equal(normalizedResult(request,{...raw,recoverySha:'c'.repeat(40)}).operationalRecovery,'UNVERIFIED');
 });
+
+test("two request IDs for one approved controller effect admit exactly one updater",async t=>{
+ const f=fixture(t);
+ const first=await f.agent.processIssue(f.issue);
+ assert.equal(first.status,"SUCCEEDED");
+ assert.equal(f.stats.applies,1);
+ const duplicateId="pc-99999999-8888-4777-9666-555555555555";
+ const duplicate={...f.issue,number:73,body:JSON.stringify({
+  ...JSON.parse(f.issue.body),requestId:duplicateId,
+  chatId:"chat-77777777-6666-4555-9444-333333333333"
+ }),comments:[]};
+ const second=await f.agent.processIssue(duplicate);
+ assert.equal(second.status,"BLOCKED");
+ assert.equal(second.code,"DUPLICATE_EFFECT_SUPPRESSED");
+ assert.equal(second.originalIssueNumber,f.issue.number);
+ assert.equal(second.originalRequestId,f.request.requestId);
+ assert.equal(second.operationalWrites,0);
+ assert.equal(f.stats.applies,1);
+ assert.equal(fs.existsSync(path.join(f.root,"approved",duplicateId+".json")),false);
+ // The original request, unlike a second ID, retains its same effect claim.
+ assert.equal((await f.agent.processIssue(f.issue)).code,
+  "DUPLICATE_REQUEST_SUPPRESSED");
+ assert.equal(f.stats.applies,1);
+});
+
+test("same-effect simultaneous submission uses existing ledger atomic claim",async t=>{
+ const f=fixture(t);
+ const secondId="pc-88888888-7777-4666-9555-444444444444";
+ const duplicate={...f.issue,number:74,body:JSON.stringify({
+  ...JSON.parse(f.issue.body),requestId:secondId
+ }),comments:[]};
+ const outcomes=await Promise.all([f.agent.processIssue(f.issue),
+  f.agent.processIssue(duplicate)]);
+ assert.equal(outcomes.filter(x=>x.code==="DUPLICATE_EFFECT_SUPPRESSED").length,1);
+ assert.equal(outcomes.filter(x=>x.status==="SUCCEEDED").length,1);
+ assert.equal(f.stats.applies,1);
+});
