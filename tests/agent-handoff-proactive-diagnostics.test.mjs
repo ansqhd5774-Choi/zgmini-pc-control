@@ -6,7 +6,7 @@ import {
   assertSameRun,buildDiagnosis
 } from '../agent-handoff/proactive-diagnostics.mjs';
 import {
-  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,REPO,OWNER
+  scanLatest,validateScoutEvent,lookbackQuery,readLegacyProactiveArchive,githubRequestPhase,REPO,OWNER
 } from '../agent-handoff/proactive-diagnostics-runner.mjs';
 const now=Date.parse('2026-11-16T13:00:00Z');
 const recent='2026-11-16T12:00:00Z',old='2026-08-16T12:00:00Z';
@@ -249,4 +249,19 @@ test('invalid run cannot suppress a later valid run in newest-first scan',async(
   assert.equal(result.unverified,1);
   assert.equal(result.newReports,1);
   assert.equal(result.observed[0].runId,801);
+});
+
+test('403 diagnostics identify only a fixed API phase without exposing query or job identity',()=>{
+  assert.equal(githubRequestPhase('actions/runs?status=failure&created=secret'),'RUN_INVENTORY');
+  assert.equal(githubRequestPhase('actions/runs/123/attempts/1/jobs?per_page=100'),'RUN_JOBS');
+  assert.equal(githubRequestPhase('actions/runs/123'),'RUN_IDENTITY');
+  assert.equal(githubRequestPhase('actions/jobs/123/logs'),'JOB_LOG');
+  assert.equal(githubRequestPhase('search/issues?q=private-value'),'SHARD_INDEX');
+  assert.equal(githubRequestPhase('issues/1743/comments?per_page=100'),'LEDGER_COMMENTS');
+  assert.equal(githubRequestPhase('issues/1743/comments','POST'),'COMMENT_WRITE');
+  assert.equal(githubRequestPhase('issues','POST'),'SHARD_CREATE');
+  assert.equal(githubRequestPhase('other?token=private'),'OTHER');
+  const source=readFileSync(new URL('../agent-handoff/proactive-diagnostics-runner.mjs',import.meta.url),'utf8');
+  assert.match(source,/GITHUB_HTTP_.*githubRequestPhase\(resource,method\)/);
+  assert.doesNotMatch(source,/res\.status\+'_'+resource/);
 });
