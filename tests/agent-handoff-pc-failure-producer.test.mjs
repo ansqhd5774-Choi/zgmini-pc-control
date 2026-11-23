@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {assertCompletedPcJobEvent, findOriginalIssueNumber, processCompletedPcJob,
   scopedSeatRead,scopedSeatProof,completeHandoffPages,
-  conditionalHandoffPageReader} from '../agent-handoff/pc-failure-producer.mjs';
+  conditionalHandoffPageReader,resolveTargetedReceipt} from '../agent-handoff/pc-failure-producer.mjs';
 
 const repo = 'ansqhd5774-Choi/zgmini-pc-control';
 const runId = 42423158559;
@@ -50,6 +50,88 @@ const fixture = (status = 'FAIL') => {
   };
   return {io, issues, get posts() { return posts; }, get routeCalls() {return routeCalls;}};
 };
+
+const targetedArgs=()=>({requestId:request().requestId,runId,attempt,seat:4});
+const scopedSearch=items=>async id=>{
+  assert.equal(id,request().requestId);
+  return {total_count:items.length,incomplete_results:false,items};
+};
+
+test('targeted old-Run receipt uses exact owner request identity and bot marker',async()=>{
+  let reads=0;
+  const found=await resolveTargetedReceipt(targetedArgs(),{
+    searchIssues:scopedSearch([issue()]),
+    readIssueComments:async number=>{
+      reads++;assert.equal(number,1009);return comments();
+    }
+  });
+  assert.equal(found,1009);assert.equal(reads,1);
+  const noBot=comments();noBot[0].user.login=owner;
+  assert.equal(await resolveTargetedReceipt(targetedArgs(),{
+    searchIssues:scopedSearch([issue()]),
+    readIssueComments:async()=>noBot
+  }),null);
+  assert.equal(await resolveTargetedReceipt(targetedArgs(),{
+    searchIssues:scopedSearch([{...issue(),user:{login:'other'}}]),
+    readIssueComments:async()=>{throw Error('UNEXPECTED_READ');}
+  }),null);
+});
+
+test('targeted receipt rejects incomplete search, ambiguous owner and duplicate bot receipt',async()=>{
+  const args=targetedArgs();
+  await assert.rejects(resolveTargetedReceipt(args,{
+    searchIssues:async()=>({total_count:1,incomplete_results:true,items:[issue()]}),
+    readIssueComments:async()=>comments()
+  }),/TARGETED_SEARCH_INCOMPLETE/);
+  await assert.rejects(resolveTargetedReceipt(args,{
+    searchIssues:scopedSearch([issue(),{...issue(),number:1010}]),
+    readIssueComments:async()=>comments()
+  }),/TARGETED_ORIGINAL_ISSUE_AMBIGUOUS/);
+  await assert.rejects(resolveTargetedReceipt(args,{
+    searchIssues:scopedSearch([issue()]),
+    readIssueComments:async()=>[...comments(),...comments()]
+  }),/DUPLICATE_RECEIPTS/);
+  await assert.rejects(resolveTargetedReceipt({...args,requestId:'unauthorized token!'},{
+    searchIssues:scopedSearch([issue()]),readIssueComments:async()=>comments()
+  }),/TARGETED_RECEIPT_INPUT_INVALID/);
+});
+
+test('old Run global comment limit falls back to verified targeted receipt, no duplicate route',async()=>{
+  const f=fixture();let searches=0,reads=0;
+  f.io.readComments=async()=>{
+    throw Error('PC_HANDOFF_PRODUCER_COMMENT_INVENTORY_LIMIT');
+  };
+  f.io.readTargetedReceipt=async args=>{
+    searches++;
+    return resolveTargetedReceipt(args,{
+      searchIssues:scopedSearch([issue()]),
+      readIssueComments:async number=>{
+        reads++;assert.equal(number,1009);return comments();
+      }
+    });
+  };
+  const first=await processCompletedPcJob(event(),f.io);
+  assert.equal(first.state,'SCAN_COMPLETED');
+  assert.equal(first.newIssues,1);assert.equal(first.missingReceipts,0);
+  assert.equal(searches,1);assert.equal(reads,1);
+  assert.equal(f.posts,1);
+  const repeated=await processCompletedPcJob(event(),f.io);
+  assert.equal(repeated.newIssues,0);assert.equal(repeated.reusedIssues,1);
+  assert.equal(f.posts,1);
+});
+
+test('old Run with unverified targeted receipt fails closed before writing',async()=>{
+  const f=fixture();
+  f.io.readComments=async()=>{
+    throw Error('PC_HANDOFF_PRODUCER_COMMENT_INVENTORY_LIMIT');
+  };
+  f.io.readTargetedReceipt=()=>resolveTargetedReceipt(targetedArgs(),{
+    searchIssues:async()=>({incomplete_results:true,total_count:1,items:[issue()]}),
+    readIssueComments:async()=>comments()
+  });
+  await assert.rejects(processCompletedPcJob(event(),f.io),/TARGETED_SEARCH_INCOMPLETE/);
+  assert.equal(f.posts,0);
+});
 
 test('completed six-seat run emits exactly one sanitized handoff for one confirmed FAIL', async () => {
   const f = fixture();
