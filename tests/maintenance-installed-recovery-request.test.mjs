@@ -13,12 +13,27 @@ import {
 
 const REPO='ansqhd5774-Choi/zgmini-pc-control',ACTOR='ansqhd5774-Choi';
 const digest=b=>createHash('sha256').update(b).digest('hex');
-const approved=()=>Buffer.from(JSON.stringify({
- schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1',approved:true,
- operation:'RECONCILE_INSTALLED',requestId:INSTALLED_RECOVERY_ORIGINAL_ID,
- issueNumber:2960,sourceSha:INSTALLED_RECOVERY_SOURCE_SHA,
- targetControllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
-})+'\n');
+const approved=(mutate=x=>x)=>{
+ const casKeys=['ledgerSha256','ownerSha256','markerSha256','backlogSha256',
+  'snapshotSha256','protectionSha256','writerSha256'];
+ const casDigests=Object.fromEntries(casKeys.map(k=>[k,'a'.repeat(64)]));
+ const files=['tools/maintenance-recovery.mjs','tools/update.mjs',
+  'tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs']
+  .map(p=>({path:p,sha256:'b'.repeat(64)}));
+ const payload={
+  schema:'ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1',approved:true,
+  operation:'RECONCILE_INSTALLED',requestId:INSTALLED_RECOVERY_ORIGINAL_ID,
+  issueNumber:2960,sourceSha:INSTALLED_RECOVERY_SOURCE_SHA,
+  targetControllerSha:INSTALLED_RECOVERY_CONTROLLER_SHA,
+  approvedCurrentWriterConfigSha256:casDigests.writerSha256,
+  files,casDigests,proof:{
+   issueNumber:2982,runId:45186420113,jobId:137733094098,
+   runnerName:'zgmini-pc-04',resultPath:'results/45186420113-1-seat-4.json',
+   resultSha256:'c'.repeat(64),
+  },
+ };
+ return Buffer.from(JSON.stringify(mutate(payload))+'\n');
+};
 
 test('fixed admission disallows original ID reuse, changed effect, target or actor',()=>{
  const raw=approved(),req=prepareInstalledRecoveryRequest(raw);
@@ -40,11 +55,11 @@ test('fixed admission disallows original ID reuse, changed effect, target or act
  }))));
 });
 
-function setup(t,{wrongApproval=false,throwAfterExec=false}={}){
+function setup(t,{wrongApproval=false,throwAfterExec=false,approvalMutation=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zgmini-installed-recovery-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const leaseRoot=path.join(root,'leases');fs.mkdirSync(leaseRoot);
- const manifest=approved(),request=prepareInstalledRecoveryRequest(manifest);
+ const manifest=approved(approvalMutation??(x=>x)),request=prepareInstalledRecoveryRequest(manifest);
  const issue={number:4001,title:INSTALLED_RECOVERY_ISSUE_TITLE,state:'OPEN',
   body:JSON.stringify(request),author:{login:ACTOR},
   labels:[{name:'pc-maintenance'}],comments:[]};
@@ -141,4 +156,22 @@ test('a second request ID cannot repeat a recovered effect',async t=>{
  assert.equal(other.status,'BLOCKED');
  assert.equal(other.code,'INSTALLED_RECOVERY_EFFECT_CLAIM_UNAVAILABLE');
  assert.equal(f.stats.recoveries,1);
+});
+
+test('incomplete but correctly hashed approval is rejected before the one-shot claim',async t=>{
+ for(const mutate of [
+  x=>({...x,casDigests:{...x.casDigests,ownerSha256:undefined}}),
+  x=>({...x,files:x.files.slice(1)}),
+  x=>({...x,approvedCurrentWriterConfigSha256:'d'.repeat(64)}),
+  x=>({...x,proof:{...x.proof,runId:123}}),
+ ]){
+  await t.test('invalid structural scope',async t2=>{
+   const f=setup(t2,{approvalMutation:mutate});
+   const result=await f.agent.pollOnce();
+   assert.equal(result[0].status,'BLOCKED',JSON.stringify(result));
+   assert.equal(result[0].code,'INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
+   assert.equal(f.stats.recoveries,0);
+   assert.equal(f.agent.loadLedger(f.request.requestId),null);
+  });
+ }
 });
