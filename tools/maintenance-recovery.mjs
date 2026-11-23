@@ -427,5 +427,5 @@ export function main(args=process.argv.slice(2)){
  return result;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{console.log(JSON.stringify(main()));}catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(e.code??'')?e.code:'RECOVERY_INSPECTION_FAILED',changed:null,next:'INSPECT_ORIGINAL_LEASE_RECOVERY_CLAIM_AND_COMPLETION_RECORD_BEFORE_RETRY'}));process.exitCode=2;}
+ try{console.log(JSON.stringify(await main()));}catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(e.code??'')?e.code:'RECOVERY_INSPECTION_FAILED',changed:null,next:'INSPECT_ORIGINAL_LEASE_RECOVERY_CLAIM_AND_COMPLETION_RECORD_BEFORE_RETRY'}));process.exitCode=2;}
 }
