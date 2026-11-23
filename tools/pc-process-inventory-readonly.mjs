@@ -406,6 +406,80 @@ function inspect2960ProtectedBaselineReadonly(){
  }catch{return unknown;}
 }
 
+// #2960's install owner does not store a requestId. Correlate the existing
+// recovery marker with the exact original journal and its timestamp; this is
+// not a release decision, nor proof of a completed original postcheck.
+export function assess2960OriginalLeaseLineage(ledger,owner,marker){
+ const validOwner=Number.isSafeInteger(owner?.pid)&&owner.pid>0&&
+  /^[a-f0-9-]{36}$/.test(owner?.nonce??'');
+ const originalLedger=ledger?.requestId===TARGET2960&&ledger.issueNumber===2960&&
+  ledger.status==='RECOVERY_REQUIRED'&&
+  ledger.firstFail==='POSTCHECK_PENDING'&&ledger.postIssueNumber===2965;
+ const ownerMarker=Boolean(validOwner&&marker?.requestOwnerPid===owner.pid&&
+  marker?.nonce===owner.nonce);
+ const changed=Date.parse(ledger?.updatedAt??'');
+ const marked=Date.parse(marker?.at??'');
+ const owned=Date.parse(owner?.at??'');
+ const chronology=Number.isFinite(changed)&&Number.isFinite(marked)&&
+  Number.isFinite(owned)&&owned<=marked&&
+  Math.abs(changed-marked)<5000;
+ return {originalLedgerMatches:originalLedger,ownerMarkerMatches:ownerMarker,
+  recoveryTimelineMatches:chronology,
+  correlated:originalLedger&&ownerMarker&&chronology};
+}
+// CAS digests are for a separately approved independent recovery manifest.
+// Only hashes/booleans leave the Windows host; neither lease identity values
+// nor raw Writer configuration, snapshots, keys or Task XML are published.
+function inspect2960RecoveryCasReadonly(){
+ const unknown=code=>({status:'UNVERIFIED',code,leaseLineageCorrelated:null,
+  ownerAlive:null,casDigests:null,recoveryEligible:false});
+ const maintenance='E:/ZGmini/automation/pc-maintenance';
+ const control='E:/ZGmini/automation/pc-control';
+ const data='E:/ZGmini/data';
+ const backup=path.join(control,'backups','controller-update-'+TARGET2960);
+ const specs={
+  ledger:[path.join(maintenance,'ledger',TARGET2960+'.json'),maintenance,131072],
+  owner:[path.join(maintenance,'leases/controller-install/owner.json'),maintenance,4096],
+  marker:[path.join(maintenance,'leases/controller-install/RECOVERY_REQUIRED.json'),maintenance,4096],
+  backlog:[path.join(maintenance,'backlog',TARGET2960+'.json'),maintenance,131072],
+  snapshot:[path.join(backup,'snapshot/host.json'),control,65536],
+  protection:[path.join(backup,'PROTECTED_BEFORE.json'),control,65536],
+  writer:[path.join(data,'pc-writer/config.json'),data,131072]
+ };
+ const bytes={};
+ for(const [key,[file,root,maxBytes]] of Object.entries(specs)){
+  const v=readFixedReadonlyBytes(file,{verifiedRoot:root,minBytes:1,maxBytes});
+  if(v.ok!==true)return unknown('FIXED_'+key.toUpperCase()+'_UNVERIFIED');
+  bytes[key]=v.bytes;
+ }
+ let ledger,owner,marker,backlog;
+ try{
+  ledger=JSON.parse(bytes.ledger.toString('utf8'));
+  owner=JSON.parse(bytes.owner.toString('utf8'));
+  marker=JSON.parse(bytes.marker.toString('utf8'));
+  backlog=JSON.parse(bytes.backlog.toString('utf8'));
+ }catch{return unknown('RECOVERY_JSON_UNVERIFIED');}
+ if(backlog?.requestId!==TARGET2960||backlog?.schema!=='ZGMINI_PC_BACKLOG_V1')
+  return unknown('RECOVERY_BACKLOG_IDENTITY_UNVERIFIED');
+ const lineage=assess2960OriginalLeaseLineage(ledger,owner,marker);
+ let ownerAlive=null;
+ if(Number.isSafeInteger(owner?.pid)&&owner.pid>0){
+  try{process.kill(owner.pid,0);ownerAlive=true;}
+  catch(e){if(e?.code==='ESRCH')ownerAlive=false;}
+ }
+ const sha=value=>createHash('sha256').update(value).digest('hex');
+ const casDigests=Object.fromEntries(Object.entries(bytes).map(
+  ([key,value])=>[key+'Sha256',sha(value)]));
+ return {status:lineage.correlated?'LINEAGE_CORRELATED':'LINEAGE_UNVERIFIED',
+  code:lineage.correlated?'ORIGINAL_RECOVERY_TIMELINE_MATCH':
+   'ORIGINAL_RECOVERY_TIMELINE_NOT_VERIFIED',
+  leaseLineageCorrelated:lineage.correlated,
+  originalLedgerMatches:lineage.originalLedgerMatches,
+  ownerMarkerMatches:lineage.ownerMarkerMatches,
+  recoveryTimelineMatches:lineage.recoveryTimelineMatches,
+  ownerAlive,casDigests,recoveryEligible:false};
+}
+
 /** Exact #2960 receipt only: skip 32-KiB general inventory payload. */
 export function compact2960ProcessResult(base,status){
  return {...base,observedAtUtc:new Date().toISOString(),
@@ -421,7 +495,9 @@ function inspect2960MaintenanceStatusReadonly(){
    inspect2960ProtectedBaselineReadonly():
    {unchanged:null,differenceClass:'UNVERIFIED'};
   return {...existing,protectedStateUnchanged:protection.unchanged,
-   protectedDifferenceClass:protection.differenceClass};
+   protectedDifferenceClass:protection.differenceClass,
+   recoveryCas:existing.status==='READ_ONLY_OBSERVED'?
+    inspect2960RecoveryCasReadonly():null};
  }catch{return project2960MaintenanceStatus(null);}
 }
 

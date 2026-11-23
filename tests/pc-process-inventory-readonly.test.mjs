@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1365,4 +1365,35 @@ test('fixed #2960 drift scope is descriptive only and never approves recovery',(
  assert.equal(classify2960ProtectionDifference(before,invalid),'OTHER_PROTECTED_DRIFT');
  assert.equal(classify2960ProtectionDifference(null,writer),'UNVERIFIED');
  assert.equal(classify2960ProtectionDifference(before,{files:{}}),'UNVERIFIED');
+});
+
+test('fixed #2960 lease lineage requires exact original journal, owner and recovery timing',()=>{
+ const ledger={requestId:'pc-update-e8767e20-6bad-4418-97c6-561cf79a8213',
+  issueNumber:2960,status:'RECOVERY_REQUIRED',
+  firstFail:'POSTCHECK_PENDING',postIssueNumber:2965,
+  updatedAt:'2026-11-23T12:26:43.563Z'};
+ const owner={pid:18001,nonce:'e8767e20-6bad-4418-97c6-561cf79a8213',
+  at:'2026-11-23T12:15:00.000Z'};
+ const marker={requestOwnerPid:owner.pid,nonce:owner.nonce,
+  at:'2026-11-23T12:26:43.800Z'};
+ const valid=assess2960OriginalLeaseLineage(ledger,owner,marker);
+ assert.deepEqual(valid,{originalLedgerMatches:true,ownerMarkerMatches:true,
+  recoveryTimelineMatches:true,correlated:true});
+ assert.doesNotMatch(JSON.stringify(valid),/18001|e8767e20/);
+ assert.equal(assess2960OriginalLeaseLineage(
+  {...ledger,requestId:'pc-update-00000000-0000-4000-8000-000000000000'},
+  owner,marker).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(
+  {...ledger,issueNumber:2999},owner,marker).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(
+  {...ledger,postIssueNumber:2966},owner,marker).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(
+  ledger,owner,{...marker,requestOwnerPid:100}).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(
+  ledger,owner,{...marker,nonce:'00000000-0000-4000-8000-000000000000'}).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(
+  ledger,owner,{...marker,at:'2026-11-23T12:27:10.000Z'}).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(
+  ledger,{...owner,at:'2026-11-23T12:26:44.000Z'},marker).correlated,false);
+ assert.equal(assess2960OriginalLeaseLineage(null,null,null).correlated,false);
 });
