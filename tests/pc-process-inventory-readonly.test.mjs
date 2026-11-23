@@ -1088,6 +1088,13 @@ test('W05 #2821 rollback local checkout is read-only and checks pinned 5 files',
   save(approvalPath,JSON.stringify({...approval,sourceSha:'0'.repeat(40)}));
   assert.equal(check(),'W05_CHECKOUT_APPROVAL_DRIFT');
   fs.rmSync(path.join(root,approvalPath));
-  assert.equal(check(),'W05_CHECKOUT_UNAVAILABLE');
+  assert.equal(check(),'W05_APPROVAL_MISSING');
+  save(approvalPath,JSON.stringify(approval));
+  fs.rmSync(path.join(root,paths[1]));
+  assert.equal(check(),'W05_SOURCE_MISSING');
+  save(paths[1],Buffer.from('trusted-1\n'));
+  assert.equal(check(),'W05_CHECKOUT_BYTES_VERIFIED');
+  assert.equal(inspectW052821CheckoutReadonly({checkoutRoot:path.join(root,'absent'),expected}),
+   'W05_PROJECT_ROOT_UNAVAILABLE');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
