@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {inspectBeaNipaCaptureReadonly} from '../controller/earnings-bea-nipa-capture-readonly.mjs';
+import {inspectBeaNipaCaptureReadonly,computeBeaNipaStoredAttestation} from '../controller/earnings-bea-nipa-capture-readonly.mjs';
 import {appendBeaJournalPhase} from '../direct-writer-b/bea-native-source-once.mjs';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const REQUEST='0ac25f3d-e307-41d4-8fcc-62c933f5b9d3';
@@ -75,6 +75,18 @@ test('sanitized immutable archive and bounded journal readback agree',t=>{
   assert.equal(out.completedJournalAttempts,1);
   assert.equal(out.verifiedSourceCount,1);
   assert.equal(out.latest.sourceVersion,src.version);
+  assert.equal(out.calculation.status,'STORED_SOURCE_CALCULATED');
+  assert.equal(out.calculation.sourceVersion,src.version);
+  assert.equal(out.calculation.historyPoints,5);
+  assert.equal(out.calculation.latestQuarter,'2026Q2');
+  assert.equal(out.calculation.previousQuarter,'2026Q1');
+  assert.equal(out.calculation.observationPeriodEnd,'2026-06-30');
+  assert.match(out.calculation.calculationSha256,/^[a-f0-9]{64}$/);
+  assert.equal(out.calculation.rawExposed,false);
+  assert.equal('currentValue' in out.calculation,false);
+  assert.equal('previousValue' in out.calculation,false);
+  assert.equal('history' in out.calculation,false);
+
   assert.equal(out.providerCalls,0);
 });
 test('tampered private source is never reported as success',t=>{
@@ -133,4 +145,39 @@ test('real B failure phases remain readable without inventing provider success',
   const rows=fs.readFileSync(file,'utf8').trim().split(/\r?\n/).map(JSON.parse);
   assert.equal(rows.length,3);
   assert.equal(rows[2].code,'DIRECT_B_BEA_HTTP_UNAVAILABLE');
+});
+
+test('stored native BEA Level/0 six rows calculate from latest five without external calls',()=>{
+  const rows=['2025Q1','2025Q2','2025Q3','2025Q4','2026Q1','2026Q2']
+    .map((TimePeriod,i)=>({TableName:'T11500',SeriesCode:'A463RD',
+      LineNumber:'7',CL_UNIT:'Level',UNIT_MULT:'0',
+      TimePeriod,DataValue:String((210+i*7)/1000)}));
+  const basis={sourceVersion:'a'.repeat(64),
+    sourceStoredAt:Date.parse('2026-11-23T11:58:05Z'),
+    observedThrough:'2026-06-30'};
+  const one=computeBeaNipaStoredAttestation({BEAAPI:{Results:{Data:rows}}},basis);
+  assert.equal(one.status,'STORED_SOURCE_CALCULATED');
+  assert.equal(one.unit,'USD_PER_REAL_GVA_UNIT');
+  assert.equal(one.latestQuarter,'2026Q2');
+  assert.equal(one.previousQuarter,'2026Q1');
+  assert.equal(one.historyPoints,5);
+  assert.equal(one.providerCalls,0);
+  assert.equal(one.operationalWrites,0);
+  assert.equal(one.rawExposed,false);
+  const reversed=computeBeaNipaStoredAttestation({BEAAPI:{Results:{Data:rows.toReversed()}}},basis);
+  assert.equal(reversed.calculationSha256,one.calculationSha256);
+  for(const mutate of [
+    rows=>{rows[0].UNIT_MULT='3';},
+    rows=>{rows[0].CL_UNIT='PercentChange';},
+    rows=>{rows[0].TableName='T10101';},
+    rows=>{rows[5].TimePeriod='2026Q1';},
+    rows=>{rows[5].DataValue='0,25';},
+    rows=>{rows[5].TimePeriod='2026Q4';}
+  ]){
+    const changed=rows.map(row=>({...row}));mutate(changed);
+    assert.throws(()=>computeBeaNipaStoredAttestation({
+      BEAAPI:{Results:{Data:changed}}},basis),/BEA_NIPA_CALC_/);
+  }
+  assert.throws(()=>computeBeaNipaStoredAttestation({BEAAPI:{Results:{Data:rows}}},
+    {...basis,observedThrough:'2026-03-31'}),/BEA_NIPA_CALC_SOURCE_PERIOD_MISMATCH/);
 });
