@@ -203,6 +203,19 @@ test('overfull single-day inventory remains incomplete rather than falsely verif
   status:'failure',count:200,complete:false
  });
 });
+test('under-cap status inventory retains the existing one-page read pattern',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const calls=[];
+ const result=await recentRuns(time,async resource=>{
+  calls.push(resource);
+  return {workflow_runs:[]};
+ });
+ assert.equal(result.complete,true);
+ assert.equal(result.items.length,0);
+ assert.equal(calls.length,RUN_STATUS_PARTITIONS.length);
+ assert.ok(calls.every(q=>q.includes('per_page=100&page=1')));
+ assert.ok(calls.every(q=>!q.includes('..')));
+});
 test('status-partition coverage prevents a newest-300-only blind spot',()=>{
   assert.deepEqual(RUN_STATUS_PARTITIONS,[
     'failure','timed_out','cancelled','action_required',
