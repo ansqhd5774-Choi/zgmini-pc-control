@@ -155,9 +155,267 @@ function observe(requestId){
  return {state,ownerBytes,markerBytes,ledgerBytes};
 }
 
+
+// Separate approved installed-state reconciliation, for a historical
+// POSTCHECK_OUTCOME_UNKNOWN after a new Controller is serving verified A jobs.
+// Preserve the original update journal as UNKNOWN: never report a postcheck
+// that never ran, never reinstall, and never silently unlock a lease.
+const REC2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+const TARGET2960='b9a423cf38d0967d6ed336912a66433f79502d3d';
+const proof2960={issueNumber:2982,runId:45186420113,jobId:137733094098,
+ runnerName:'zgmini-pc-04',resultPath:'results/45186420113-1-seat-4.json'};
+export function classifyInstalledReconciliationProof(proof){
+ const checks={
+  ORIGINAL_LEDGER:proof?.originalLedger===true,
+  EXACT_OWNER_AND_DEAD:proof?.ownerAndMarker===true&&proof?.ownerDead===true,
+  CURRENT_TARGET_BYTES:proof?.controllerVerified===true,
+  MAINTAINER_BYTES:proof?.maintenanceVerified===true,
+  ACTIVE_WORKFLOW:proof?.workflowActive===true,
+  BACKLOG_RECONCILED:proof?.backlogReconciled===true,
+  CURRENT_SUPERVISOR:proof?.supervisorVerified===true,
+  CURRENT_PROTECTION:proof?.protectedWriterPreserved===true,
+  EXACT_SOURCE_AND_CAS:proof?.sourceAndCasVerified===true,
+  CURRENT_A_SUCCESS:proof?.currentAReceiptVerified===true,
+  INDEPENDENT_OPERATOR:proof?.operatorVerified===true,
+ };
+ const first=Object.keys(checks).find(k=>!checks[k]);
+ return {status:first?'RECOVERY_REQUIRED':'INSTALLED_RECONCILIATION_ELIGIBLE',
+  code:first??'INSTALLED_RECONCILIATION_PREFLIGHT_VERIFIED',checks,
+  originalPostcheckVerified:false,originalLedgerPreserved:true};
+}
+function verifyInstalledRecoverySupervisor(){
+ const owner=json(path.join(control,'leases/supervisor/owner.json'));
+ const status=json(path.join(control,'SUPERVISOR_STATUS.json'));
+ const time=Date.parse(status?.at??'');
+ if(owner?.pid!==status?.pid||!Number.isSafeInteger(owner?.pid)||
+  owner.pid<=0||status?.sourceSha!==TARGET2960||
+  status?.mode!=='LISTENING'||!Array.isArray(status?.children)||
+  status.children.length!==6||!Number.isFinite(time)||
+  Date.now()-time<0||Date.now()-time>=45000)return false;
+ if(alive(owner.pid)!==true)return false;
+ return status.children.every(child=>child?.alive===true&&
+  Number.isSafeInteger(child.pid)&&child.pid>0&&alive(child.pid)===true);
+}
+async function reconcileInstalledRecovery2960({id,source,g,before}){
+ need(id===REC2960,'INSTALLED_RECOVERY_SCOPE_NOT_ALLOWED');
+ const {verifyRecoveryOperator,protectedSnapshot,loadApprovedPackage}=await import('./update.mjs');
+ const {selectPreservedRecoveryProtection}=await import('./maintenance-contract.mjs');
+ const {readFixedReadonlyBytes}=await import('../controller/fixed-readonly-bytes.mjs');
+ const rel='approvals/maintenance-recoveries/'+id+'.installed.json';
+ const raw=inspectStep('INSTALLED_RECOVERY_APPROVAL_MISSING',()=>fs.readFileSync(path.join(repo,rel)));
+ need(digest(raw)===digest(g(['show','HEAD:'+rel],'INSTALLED_RECOVERY_APPROVAL_NOT_COMMITTED')),
+  'INSTALLED_RECOVERY_APPROVAL_DRIFT');
+ let approval;try{approval=JSON.parse(raw);}catch{need(false,'INSTALLED_RECOVERY_APPROVAL_INVALID');}
+ const exactPaths=['tools/maintenance-recovery.mjs','tools/update.mjs',
+  'tools/maintenance-contract.mjs','controller/fixed-readonly-bytes.mjs'];
+ need(approval?.schema==='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'&&
+  approval.approved===true&&approval.operation==='RECONCILE_INSTALLED'&&
+  approval.requestId===id&&approval.issueNumber===2960&&
+  approval.sourceSha===source&&approval.targetControllerSha===TARGET2960&&
+  /^[a-f0-9]{64}$/.test(approval.approvedCurrentWriterConfigSha256??'')&&
+  Array.isArray(approval.files)&&approval.files.length===exactPaths.length&&
+  exactPaths.every(p=>approval.files.filter(x=>x?.path===p).length===1),
+  'INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
+ for(const file of approval.files){
+  need(exactPaths.includes(file.path)&&/^[a-f0-9]{64}$/.test(file.sha256??'')&&
+   digest(g(['show',source+':'+file.path],'INSTALLED_RECOVERY_SOURCE_UNAVAILABLE'))===file.sha256&&
+   digest(fs.readFileSync(path.join(repo,file.path)))===file.sha256,
+   'INSTALLED_RECOVERY_SOURCE_DRIFT');
+ }
+ const fileSpecs={
+  ledger:[path.join(root,'ledger',id+'.json'),root,131072],
+  owner:[path.join(root,'leases/controller-install/owner.json'),root,4096],
+  marker:[path.join(root,'leases/controller-install/RECOVERY_REQUIRED.json'),root,4096],
+  backlog:[path.join(root,'backlog',id+'.json'),root,131072],
+  snapshot:[path.join(control,'backups/controller-update-'+id,'snapshot/host.json'),control,65536],
+  protection:[path.join(control,'backups/controller-update-'+id,'PROTECTED_BEFORE.json'),control,65536],
+  writer:['E:/ZGmini/data/pc-writer/config.json','E:/ZGmini/data',131072],
+ };
+ const bytes={};
+ const take=()=>{
+  const result={};
+  for(const [k,[file,verifiedRoot,maxBytes]] of Object.entries(fileSpecs)){
+   const part=readFixedReadonlyBytes(file,{verifiedRoot,minBytes:1,maxBytes});
+   need(part?.ok===true,'INSTALLED_RECOVERY_'+k.toUpperCase()+'_UNVERIFIED');
+   result[k]=part.bytes;
+  }
+  return result;
+ };
+ Object.assign(bytes,take());
+ const cas=Object.fromEntries(Object.entries(bytes).map(([k,b])=>[k+'Sha256',digest(b)]));
+ need(approval.casDigests&&Object.keys(approval.casDigests).length===7&&
+  Object.keys(cas).every(k=>approval.casDigests[k]===cas[k])&&
+  approval.approvedCurrentWriterConfigSha256===cas.writerSha256,
+  'INSTALLED_RECOVERY_CAS_CHANGED');
+ // The prior B scope and its original postcheck source are authoritative;
+ // a successful independent A result cannot redefine that approved contract.
+ const originalPackage=loadApprovedPackage(id,path.join(root,'approved',id+'.json'),
+  {recovery:true});
+ need(originalPackage.issue.requestId===id&&
+  originalPackage.manifest.targetSha===TARGET2960&&
+  originalPackage.manifest.postOperation==='core-status'&&
+  originalPackage.manifest.postSourceBranch==='main'&&
+  originalPackage.manifest.postSourceSha===
+   '2b69dcbc7ade75815e0c152fd0e2112ddaa5b333',
+  'INSTALLED_RECOVERY_ORIGINAL_APPROVAL_UNVERIFIED');
+ const ledger=JSON.parse(bytes.ledger),owner=JSON.parse(bytes.owner);
+ const marker=JSON.parse(bytes.marker),backlog=JSON.parse(bytes.backlog);
+ const baseline=JSON.parse(bytes.protection);
+ const original=ledger.requestId===id&&ledger.issueNumber===2960&&
+  ledger.status==='RECOVERY_REQUIRED'&&ledger.phase==='RECOVERY_REQUIRED'&&
+  ledger.firstFail==='POSTCHECK_PENDING'&&
+  ledger.code==='POSTCHECK_OUTCOME_UNKNOWN'&&ledger.postIssueNumber===2965&&
+  ledger.targetSha===TARGET2960;
+ const chronology=Number.isFinite(Date.parse(ledger.updatedAt))&&
+  Number.isFinite(Date.parse(marker.at))&&
+  Number.isFinite(Date.parse(owner.at))&&
+  Date.parse(owner.at)<=Date.parse(marker.at)&&
+  Math.abs(Date.parse(marker.at)-Date.parse(ledger.updatedAt))<5000;
+ const ownerMatch=Number.isSafeInteger(owner.pid)&&owner.pid>0&&
+  /^[0-9a-f-]{36}$/.test(owner.nonce??'')&&
+  owner.pid===marker.requestOwnerPid&&owner.nonce===marker.nonce&&chronology;
+ const pending=Array.isArray(backlog.windows)&&backlog.windows.length>=1&&
+  backlog.windows.every(w=>typeof w.pausedAt==='string'&&
+   typeof w.resumedAt==='string'&&Number.isFinite(Date.parse(w.resumedAt))&&
+   Date.parse(w.resumedAt)>=Date.parse(w.pausedAt))&&
+  backlog.schema==='ZGMINI_PC_BACKLOG_V1'&&backlog.requestId===id&&
+  backlog.replays!==null&&typeof backlog.replays==='object'&&
+  !Array.isArray(backlog.replays)&&Object.values(backlog.replays).every(
+   item=>['DONE','SKIPPED_RESULT_PRESENT'].includes(item?.status));
+ const protectedChoice=selectPreservedRecoveryProtection(baseline,
+  protectedSnapshot(),{approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256});
+ const post=github('issues/2965');
+ let postBody;try{postBody=JSON.parse(post.body);}catch{}
+ const postExact=post.number===2965&&post.title==='PC Update '+id+' postcheck'&&
+  post.user?.login==='ansqhd5774-Choi'&&
+  post.labels?.some(l=>l.name==='pc-job')&&
+  postBody?.schema==='ZGMINI_PC_JOB_V1'&&
+  postBody.requestId===id+'-postcheck'&&
+  postBody.operation==='core-status'&&
+  postBody.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+  postBody.sourceBranch==='main'&&
+  postBody.sourceSha==='2b69dcbc7ade75815e0c152fd0e2112ddaa5b333';
+ const fixedProof=approval.proof;
+ need(fixedProof&&Object.keys(proof2960).length+1===Object.keys(fixedProof).length&&
+  Object.keys(proof2960).every(k=>fixedProof[k]===proof2960[k])&&
+  /^[a-f0-9]{64}$/.test(fixedProof.resultSha256??''),
+  'INSTALLED_RECOVERY_A_PROOF_SCOPE_INVALID');
+ // resultSha256 is an additional pinned field, not a selectable path.
+ const rcpt=g(['show','HEAD:'+proof2960.resultPath],'INSTALLED_RECOVERY_A_RESULT_MISSING');
+ need(digest(rcpt)===fixedProof.resultSha256,'INSTALLED_RECOVERY_A_RESULT_DRIFT');
+ const receipt=JSON.parse(rcpt);
+ const run=github('actions/runs/'+proof2960.runId);
+ const job=github('actions/jobs/'+proof2960.jobId);
+ const step=job.steps?.filter(s=>s.name==='Execute fixed host allowlist entry');
+ const success=postExact&&run?.id===proof2960.runId&&
+  run.event==='issues'&&run.status==='completed'&&run.conclusion==='success'&&
+  job?.id===proof2960.jobId&&job.run_id===run.id&&
+  job.runner_name===proof2960.runnerName&&job.name==='approved-pc-job'&&
+  job.status==='completed'&&job.conclusion==='success'&&
+  Array.isArray(step)&&step.length===1&&step[0].conclusion==='success'&&
+  receipt.schema==='ZGMINI_PC_RESULT_V1'&&receipt.status==='PASS'&&
+  receipt.code==='CORE_READONLY_DIAGNOSIS'&&receipt.operation==='core-status'&&
+  receipt.sourceRepository==='ansqhd5774-Choi/zgmini'&&
+  receipt.requestedSourceSha===postBody.sourceSha&&
+  receipt.actualExecutionSha===TARGET2960&&
+  receipt.protectedStateUnchanged===true&&receipt.providerCalls===0&&
+  receipt.d1Writes===0&&receipt.sqliteOpened===false&&
+  Number.isFinite(Date.parse(receipt.finishedAt))&&
+  Date.parse(receipt.finishedAt)>Date.parse(ledger.updatedAt);
+ // Existing maintainer source/issue/Controller path already validated by
+ // the original independent inspection; never infer six Runner API states
+ // from a 403 or substitute new A success for the missing #2965 result.
+ verifyRecoveryOperator();
+ const proof={
+  originalLedger:original&&before.state.identityVerified===true,
+  ownerAndMarker:ownerMatch&&before.state.identityVerified===true&&
+   before.ownerBytes.equals(bytes.owner)&&before.markerBytes.equals(bytes.marker),
+  ownerDead:before.state.ownerAlive===false&&alive(owner.pid)===false,
+  controllerVerified:before.state.controllerVerified===true&&
+   before.state.actualSha===TARGET2960,
+  maintenanceVerified:before.state.maintenanceVerified===true,
+  workflowActive:before.state.workflow==='active',
+  backlogReconciled:pending,
+  supervisorVerified:verifyInstalledRecoverySupervisor(),
+  protectedWriterPreserved:protectedChoice.allowed===true&&
+   protectedChoice.preservedWriterConfig===true,
+  sourceAndCasVerified:true,currentAReceiptVerified:success,
+  operatorVerified:true
+ };
+ const verdict=classifyInstalledReconciliationProof(proof);
+ need(verdict.status==='INSTALLED_RECONCILIATION_ELIGIBLE',verdict.code);
+ const claim=path.join(root,'leases/controller-recovery');
+ const leaseDir=path.join(root,'leases/controller-install');
+ const leaseStat=fs.lstatSync(leaseDir);
+ need(leaseStat.isDirectory()&&!leaseStat.isSymbolicLink(),
+  'INSTALLED_RECOVERY_LEASE_DIRECTORY_UNSAFE');
+ need(!fs.existsSync(claim),'INSTALLED_RECOVERY_OTHER_CLAIM_ACTIVE');
+ fs.mkdirSync(claim);
+ const nonce=randomUUID(),claimFile=path.join(claim,'owner.json');
+ let retain=true;
+ fs.writeFileSync(claimFile,JSON.stringify({pid:process.pid,nonce,requestId:id})+'\n',
+  {flag:'wx',mode:0o600});
+ const recoveryDir=path.join(root,'recovery');
+ fs.mkdirSync(recoveryDir,{recursive:true});
+ const recoveryStat=fs.lstatSync(recoveryDir);
+ need(recoveryStat.isDirectory()&&!recoveryStat.isSymbolicLink(),
+  'INSTALLED_RECOVERY_ARCHIVE_DIRECTORY_UNSAFE');
+ const stem=id+'-installed-'+nonce,record=path.join(recoveryDir,stem+'.json');
+ const archive=path.join(recoveryDir,stem+'.lease');
+ const prepared={schema:'ZGMINI_PC_INSTALLED_RECOVERY_RESULT_V1',
+  requestId:id,status:'PREPARED',code:'INSTALLED_RECOVERY_ARCHIVE_PREPARED',
+  historicalPostcheck:'OUTCOME_UNKNOWN',historicalLedgerPreserved:true,
+  installedSha:TARGET2960,sourceSha:source,originalRequestRetried:false,
+  runnerApiSetVerified:false,controllerChanged:false,workflowChanged:false,
+  writerChanged:false,dbD1Writes:0,casDigests:cas};
+ try{
+  const now=take();
+  need(Object.keys(now).every(k=>bytes[k].equals(now[k]))&&
+   before.state.ownerAlive===false&&alive(owner.pid)===false&&
+   verifyInstalledRecoverySupervisor()&&
+   selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
+    {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256}).allowed===true,
+   'INSTALLED_RECOVERY_PREARCHIVE_CAS_DRIFT');
+  // A fresh independent runtime+workflow readback is required at the exact
+  // archive boundary. The seven-file CAS alone cannot prove live Controller
+  // files or the GitHub intake did not change since initial inspection.
+  const live=observe(id);
+  need(live.state.identityVerified===true&&
+   live.state.controllerVerified===true&&
+   live.state.actualSha===TARGET2960&&
+   live.state.maintenanceVerified===true&&
+   live.state.ownerAlive===false&&
+   live.state.workflow==='active'&&
+   live.ledgerBytes.equals(bytes.ledger)&&
+   live.ownerBytes.equals(bytes.owner)&&
+   live.markerBytes.equals(bytes.marker),
+   'INSTALLED_RECOVERY_FINAL_RUNTIME_DRIFT');
+  // Commit the audit record first: a crash here leaves an inspectable claim,
+  // not a synthetic success. The original ledger is never changed.
+  fs.writeFileSync(record,JSON.stringify(prepared,null,2)+'\n',
+   {flag:'wx',mode:0o600});
+  fs.renameSync(leaseDir,archive);
+  need(fs.readFileSync(path.join(archive,'owner.json')).equals(bytes.owner)&&
+   fs.readFileSync(path.join(archive,'RECOVERY_REQUIRED.json')).equals(bytes.marker)&&
+   !fs.existsSync(path.join(root,'leases/controller-install')),
+   'INSTALLED_RECOVERY_ARCHIVE_READBACK_FAILED');
+  const result={...prepared,status:'RECOVERED_INSTALLED_STATE',
+   code:'INSTALLED_RUNTIME_RECOVERED_HISTORIC_POSTCHECK_UNKNOWN',
+   leaseArchived:true,archivedAt:new Date().toISOString()};
+  fs.writeFileSync(path.join(recoveryDir,stem+'.complete.json'),
+   JSON.stringify(result,null,2)+'\n',{flag:'wx',mode:0o600});
+  retain=false;
+  return result;
+ }finally{
+  if(!retain){
+   need(json(claimFile).nonce===nonce,'INSTALLED_RECOVERY_CLAIM_CHANGED');
+   fs.unlinkSync(claimFile);fs.rmdirSync(claim);
+  }
+ }
+}
 export function main(args=process.argv.slice(2)){
  need(process.platform==='win32'&&!process.env.GITHUB_ACTIONS&&!process.env.RUNNER_NAME,'RECOVERY_OPERATOR_WINDOWS_REQUIRED');
- need(args.length===5&&['inspect','abort-untouched'].includes(args[0])&&args[1]==='--request-id'&&args[3]==='--source-sha', 'RECOVERY_USAGE');
+ need(args.length===5&&['inspect','abort-untouched','reconcile-installed'].includes(args[0])&&args[1]==='--request-id'&&args[3]==='--source-sha', 'RECOVERY_USAGE');
  const [mode,,id,,source]=args;
  need(/^pc-[a-z0-9-]{8,76}$/.test(id)&&/^[a-f0-9]{40}$/.test(source),'RECOVERY_IDENTITY_FORMAT');
  const g=(args,label)=>inspectStep(label,()=>execFileSync('git',args,{cwd:repo,windowsHide:true,maxBuffer:4e6}));
@@ -172,7 +430,9 @@ export function main(args=process.argv.slice(2)){
   if(mode==='inspect')return result;
   need(false,'RECOVERY_ALREADY_RELEASED_NO_RETRY');
  }
- const before=observe(id),decision=classifyRecovery(before.state);
+ const before=observe(id);
+ if(mode==='reconcile-installed')return reconcileInstalledRecovery2960({id,source,g,before});
+ const decision=classifyRecovery(before.state);
  let result={schema:'ZGMINI_PC_RECOVERY_RESULT_V1',requestId:id,sourceSha:source,...decision,
   actualControllerSha:before.state.actualSha,operationalWrites:0};
  if(mode==='abort-untouched'){
@@ -199,5 +459,5 @@ export function main(args=process.argv.slice(2)){
  return result;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{console.log(JSON.stringify(main()));}catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(e.code??'')?e.code:'RECOVERY_INSPECTION_FAILED',changed:null,next:'INSPECT_ORIGINAL_LEASE_RECOVERY_CLAIM_AND_COMPLETION_RECORD_BEFORE_RETRY'}));process.exitCode=2;}
+ try{console.log(JSON.stringify(await main()));}catch(e){console.log(JSON.stringify({status:'AUTOMATION_BLOCKED',code:/^[A-Z0-9_]+$/.test(e.code??'')?e.code:'RECOVERY_INSPECTION_FAILED',changed:null,next:'INSPECT_ORIGINAL_LEASE_RECOVERY_CLAIM_AND_COMPLETION_RECORD_BEFORE_RETRY'}));process.exitCode=2;}
 }

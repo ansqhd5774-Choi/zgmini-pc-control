@@ -6,6 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
+import {classifyInstalledReconciliationProof,main as maintenanceRecoveryMain} from '../tools/maintenance-recovery.mjs';
 import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,project2960MaintenanceStatus,compare2960ProtectedBaseline,classify2960ProtectionDifference,assess2960OriginalLeaseLineage,compact2960ProcessResult,projectD05WriterCheckpoint,compactD05WriterResult,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,classifyW052821OwnerPidChronology,sanitizeW05OperatorTopologyProbe,collectW05OperatorTopology,w05OperatorTopologyText,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
@@ -1396,4 +1397,43 @@ test('fixed #2960 lease lineage requires exact original journal, owner and recov
  assert.equal(assess2960OriginalLeaseLineage(
   ledger,{...owner,at:'2026-11-23T12:26:44.000Z'},marker).correlated,false);
  assert.equal(assess2960OriginalLeaseLineage(null,null,null).correlated,false);
+});
+
+test('#2960 installed reconciliation is all-or-nothing and never rewrites historical postcheck',()=>{
+ const base={
+  originalLedger:true,ownerAndMarker:true,ownerDead:true,
+  controllerVerified:true,maintenanceVerified:true,
+  workflowActive:true,backlogReconciled:true,supervisorVerified:true,
+  protectedWriterPreserved:true,sourceAndCasVerified:true,
+  currentAReceiptVerified:true,operatorVerified:true
+ };
+ const allowed=classifyInstalledReconciliationProof(base);
+ assert.equal(allowed.status,'INSTALLED_RECONCILIATION_ELIGIBLE');
+ assert.equal(allowed.originalPostcheckVerified,false);
+ assert.equal(allowed.originalLedgerPreserved,true);
+ const all=Object.keys(base);
+ for(const name of all){
+  const denied=classifyInstalledReconciliationProof({...base,[name]:false});
+  assert.equal(denied.status,'RECOVERY_REQUIRED',name);
+  assert.equal(denied.originalPostcheckVerified,false);
+  assert.equal(denied.checks[
+   {originalLedger:'ORIGINAL_LEDGER',ownerAndMarker:'EXACT_OWNER_AND_DEAD',
+    ownerDead:'EXACT_OWNER_AND_DEAD',controllerVerified:'CURRENT_TARGET_BYTES',
+    maintenanceVerified:'MAINTAINER_BYTES',workflowActive:'ACTIVE_WORKFLOW',
+    backlogReconciled:'BACKLOG_RECONCILED',
+    supervisorVerified:'CURRENT_SUPERVISOR',
+    protectedWriterPreserved:'CURRENT_PROTECTION',
+    sourceAndCasVerified:'EXACT_SOURCE_AND_CAS',
+    currentAReceiptVerified:'CURRENT_A_SUCCESS',
+    operatorVerified:'INDEPENDENT_OPERATOR'}[name]],false,name);
+ }
+ assert.equal(classifyInstalledReconciliationProof(null).status,'RECOVERY_REQUIRED');
+ assert.equal(classifyInstalledReconciliationProof({...base,ownerDead:null}).status,'RECOVERY_REQUIRED');
+ assert.equal(classifyInstalledReconciliationProof({...base,currentAReceiptVerified:'PASS'}).status,'RECOVERY_REQUIRED');
+});
+test('#2960 B reconciliation is not callable inside any Actions or isolated runner',()=>{
+ assert.throws(()=>maintenanceRecoveryMain([
+  'reconcile-installed','--request-id',
+  'pc-update-e8767e20-6bad-4418-97c6-561cf79a8213',
+  '--source-sha','a'.repeat(40)]),/RECOVERY_OPERATOR_WINDOWS_REQUIRED/);
 });
