@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BEA_B_SCHEMA,BEA_B_SCOPE,BEA_B_MODE,
-  isApprovedBeaNativeSource,verifyBeaInstalledBinding,verifyBeaCapture}
+  isApprovedBeaNativeSource,verifyBeaInstalledBinding,verifyBeaCapture,
+  verifyBeaReadback}
   from '../direct-writer-b/bea-native-source-once.mjs';
 import {applyApprovedOnce} from '../direct-writer-b/run.mjs';
 import {resolveConfiguredSourcePin} from '../direct-writer-b/configured-source-pin.mjs';
@@ -51,6 +52,15 @@ test('hash, time, and period required for a claimed private archive readback',()
     {...valid,sourceStoredAt:0},
     {...valid,observedThrough:'2027Q5'}
   ])assert.throws(()=>verifyBeaCapture(x),/ARCHIVE_READBACK_STOP/);
+});
+test('independent immutable archive readback must match four provenance fields',()=>{
+  const v=verifyBeaCapture(capture());
+  const stored={status:'SOURCE_READBACK_VERIFIED',...v};
+  assert.equal(verifyBeaReadback(v,stored),true);
+  for(const key of ['sourceVersion','sourceHttpSha256',
+    'sourceStoredAt','observedThrough'])
+    assert.throws(()=>verifyBeaReadback(v,{...stored,[key]:null}),
+      /INDEPENDENT_READBACK_STOP/);
 });
 test('shared source pin resolves BEA B only on exact approved schema',()=>{
   const m=approval();
