@@ -90,7 +90,8 @@ test('unsafe archive redirection is not followed',t=>{
   const {data,home}=prep(t);
   const target=path.join(home,'actual');
   fs.mkdirSync(target);
-  fs.symlinkSync(target,path.join(home,'raw'),'dir');
+  try{fs.symlinkSync(target,path.join(home,'raw'),'dir');}
+  catch(e){if(['EPERM','EACCES','ENOTSUP'].includes(e.code)){t.skip('symlinks unavailable');return;}throw e;}
   const out=inspectBeaNipaCaptureReadonly(data);
   assert.equal(out.status,'STATE_UNKNOWN');
   assert.equal(out.code,'BEA_NIPA_READONLY_UNSAFE_DIRECTORY');
