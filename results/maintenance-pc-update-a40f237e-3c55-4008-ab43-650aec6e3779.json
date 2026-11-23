@@ -1,0 +1,13 @@
+{
+  "schema": "ZGMINI_PC_MAINTENANCE_RESULT_V1",
+  "requestId": "pc-update-a40f237e-3c55-4008-ab43-650aec6e3779",
+  "targetControllerSha": "1d9277460fa2c4211245ff5bbbafbad666969c36",
+  "status": "BLOCKED",
+  "code": "UPDATE_VALIDATE_FAILED",
+  "lastPass": "BLOCKED",
+  "firstFail": "RECEIVED",
+  "actualControllerSha": "2f3ebcf3518a5e9b694bafbb7e6331840a6a4a25",
+  "recoverySha": null,
+  "protectedStateUnchanged": null,
+  "workflowEnabled": true
+}
