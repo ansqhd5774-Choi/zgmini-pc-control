@@ -54,19 +54,28 @@ export function verifyInflation19D1Row(row,{now=Date.now(),localPayload=null}={}
  if(localPayload!==null){
   if(localPayload?.schemaVersion!==p.schemaVersion||
     localPayload.status!==p.status||localPayload.score!==null||
-    localPayload.sourceStoredAt!==p.sourceStoredAt||
-    localPayload.sourceVersion!==p.sourceVersion||
     !Array.isArray(localPayload.indicators)||localPayload.indicators.length!==19)
-   return report('PARTIAL','INFL19_D1_LOCAL_METADATA_DIFF',{
-    d1StoredAt:Number(row.stored_at),d1BodySha256:digest(row.body),
-    sourceVersion:p.sourceVersion,sourceStoredAt:p.sourceStoredAt});
+   return report('PARTIAL','INFL19_D1_LOCAL_CONTRACT_DIFF');
+  // Compare all 19 public values, dates and histories BEFORE source metadata.
+  // Writer can intentionally preserve an older D1 row when only metadata moved.
+  let metadataMatches=localPayload.sourceStoredAt===p.sourceStoredAt&&
+   localPayload.sourceVersion===p.sourceVersion;
   for(let i=0;i<19;i++){
    const a=p.indicators[i],b=localPayload.indicators[i];
-   for(const key of ['id','status','series','unit','value','observationDate','sourceStoredAt']){
+   for(const key of ['id','status','series','unit','value','observationDate']){
     if(a[key]!==b?.[key])
-     return report('PARTIAL','INFL19_D1_LOCAL_VALUE_DIFF',{firstMismatchId:IDS[i],firstMismatchField:key});
+     return report('PARTIAL','INFL19_D1_LOCAL_VALUE_DIFF',{
+      firstMismatchId:IDS[i],firstMismatchField:key});
    }
+   if(JSON.stringify(a.history)!==JSON.stringify(b?.history))
+    return report('PARTIAL','INFL19_D1_LOCAL_VALUE_DIFF',{
+     firstMismatchId:IDS[i],firstMismatchField:'history'});
+   if(a.sourceStoredAt!==b?.sourceStoredAt)metadataMatches=false;
   }
+  if(!metadataMatches)return report('PARTIAL','INFL19_D1_METADATA_ONLY_DIFF',{
+   d1StoredAt:Number(row.stored_at),d1BodySha256:digest(row.body),
+   sourceVersion:p.sourceVersion,sourceStoredAt:p.sourceStoredAt,
+   ready:19,valueDateHistoryMatches:true,metadataMatches:false});
  }
  return report('PASS','INFL19_D1_READBACK_VERIFIED',{
   d1StoredAt:Number(row.stored_at),d1BodySha256:digest(row.body),
