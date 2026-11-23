@@ -567,7 +567,7 @@ test('backlog ambiguity preserves recovery claim after enabled intake and does n
 test('successful replay requires Online runners but does not wait for newly dispatched A to become idle',async()=>{
  const options=[];const f=restoredRecovery({verifyPrevious:async x=>{options.push(x);return true;}});
  const r=await f.run();assert.equal(r.status,'ROLLED_BACK');
- assert.equal(options.length,2);assert.notEqual(options[0].requireIdle,false);
+ assert.equal(options.length,2);assert.equal(options[0].requireIdle,false);
  assert.equal(options[1].requireIdle,false);assert.equal(options[1].requireRunning,true);
 });
 
