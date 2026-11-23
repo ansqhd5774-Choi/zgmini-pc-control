@@ -50,6 +50,42 @@ test('missing or rejected verified postcheck keeps old safe WAIT without runtime
  assert.ok(!f.calls.includes('resumeIntake'));
 });
 test('failed old runtime readback keeps recovery required and intake paused',async()=>{const f=fixture();f.port.verifyPrevious=async()=>false;const r=await reconcileInterruptedRollback(original,f.port,f.persist);assert.equal(r.code,'RECOVERY_RUNTIME_NOT_VERIFIED');assert.equal(r.mutationStarted,true);assert.ok(!f.calls.includes('resumeIntake'));});
+test('BACKED_UP recovery preserves verified busy previous Supervisor without restore',async()=>{
+ const f=fixture(),o={...original,status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
+  firstFail:'BACKED_UP'};
+ f.port.verifyRestoredPrevious=async()=>{f.calls.push('verifyRestoredPrevious');return true;};
+ f.port.verifyPrevious=async x=>{f.calls.push('verifyPrevious:'+String(x.requireIdle));return true;};
+ const r=await reconcileInterruptedRollback(o,f.port,f.persist);
+ assert.equal(r.status,'ROLLED_BACK');
+ assert.equal(r.actualInstalledSha,o.installedShaBefore);
+ assert.equal(r.originalRequestRetried,false);
+ assert.deepEqual(f.calls,['prepareRecovery','verifyBackup','verifyRestoredPrevious',
+  'verifyPrevious:false','resumeIntake','reconcileBacklog','verifyPrevious:false']);
+ assert.ok(!f.records.some(x=>x.code==='RECOVERY_RESTORE_STARTED'));
+ assert.ok(!f.calls.includes('restore')&&!f.calls.includes('reconnectPrevious'));
+});
+test('switched recovery still requires idle verification before resuming intake',async()=>{
+ const f=fixture(),o={...original,status:'RECOVERY_REQUIRED',phase:'RECOVERY_REQUIRED',
+  firstFail:'SWITCHED'};
+ f.port.verifyRestoredPrevious=async()=>true;
+ f.port.verifyPrevious=async ({requireIdle})=>{
+  f.calls.push('verifyPrevious:'+String(requireIdle));return true;
+ };
+ const r=await reconcileInterruptedRollback(o,f.port,f.persist);
+ assert.equal(r.status,'ROLLED_BACK');
+ assert.deepEqual(f.calls.filter(x=>x.startsWith('verifyPrevious:')),
+  ['verifyPrevious:true','verifyPrevious:false']);
+});
+test('a busy but ONLINE six-runner roster is not an invalid previous runtime',async()=>{
+ const {dedicatedPcRunnerRows}=await import('../tools/update.mjs');
+ const roster=Array.from({length:6},(_,i)=>({
+  name:'zgmini-pc-0'+(i+1),status:'online',busy:i===0,
+ }));
+ assert.equal(dedicatedPcRunnerRows(roster,{requireOnline:true})?.length,6);
+ assert.equal(dedicatedPcRunnerRows(roster,{requireOnline:true,requireIdle:true}),null);
+ assert.equal(dedicatedPcRunnerRows(roster.slice(1),{requireOnline:true}),null);
+});
+
 test('pre-install failure uses cancellation path rather than partial rollback',async()=>{const f=fixture();const r=await reconcileInterruptedRollback({...original,phase:'RECEIVED'},f.port,f.persist);assert.equal(r.code,'RECOVERY_PHASE_NOT_ROLLBACK_ELIGIBLE');assert.equal(f.calls.length,0);});
 
 test('independent rollback preflight failure leaves no mutation claim',async()=>{

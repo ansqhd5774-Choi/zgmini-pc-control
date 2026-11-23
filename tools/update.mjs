@@ -1658,7 +1658,12 @@ export function makePorts(packageData,issueNumber,{recoveryOperator=false,
     'RECOVERY_PREVIOUS_HOST_DRIFT');
    const current=readOwner();
    need(current.status.sourceSha===installedSha,'RECOVERY_PREVIOUS_SUPERVISOR_DRIFT');
-   need(available(apiRunners()),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE');
+   // A backup-stage failure may leave the original Supervisor online but one
+   // of its approved A jobs busy. That does not imply a version mutation.
+   // Require all six named runners online; source, host, live children and
+   // protected-state checks below still must match the saved snapshot.
+   need(dedicatedPcRunnerRows(apiRunners(),{requireOnline:true})!==null,
+    'RECOVERY_PREVIOUS_RUNNERS_NOT_ONLINE');
    for(const child of current.status.children){
     need(child.alive===true,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');
     try{process.kill(child.pid,0);}catch{need(false,'RECOVERY_PREVIOUS_CHILD_NOT_ALIVE');}

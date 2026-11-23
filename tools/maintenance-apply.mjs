@@ -317,7 +317,13 @@ export async function reconcileInterruptedRollback(original,port,persist){
    recoveryOperation='reconnectPrevious';await port.reconnectPrevious();
   }
   recoveryOperation='verifyPrevious';
-  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
+  // At BACKED_UP the original Supervisor was never stopped or switched.
+  // Legitimate running A jobs are not a rollback failure; all six named
+  // runners must still be online and the old runtime/protection verified.
+  const previousIdleRequired=phase!=='BACKED_UP';
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,
+    requireRunning:true,requireIdle:previousIdleRequired})!==true)
+   throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
   // Intake/backlog writes also require a durable claim, even without restore.
   await record('RECOVERY_INTAKE_RESUME_STARTED',{mutationStarted:true});
   recoveryOperation='resumeIntake';
