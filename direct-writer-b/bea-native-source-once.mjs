@@ -98,6 +98,16 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
     need(path.relative(root,filename).split(path.sep)[0]!=='..',
       'DIRECT_B_BEA_CANDIDATE_PATH_STOP');
   }
+  // Credential availability and pinned module loading are preflight: a missing
+  // credential must never consume the one-shot durable attempt marker.
+  const providers=providerLoader?await providerLoader(PC_ROOT):
+    (await import(pathToFileURL(envFile).href)).loadLocalProviders(PC_ROOT);
+  need(typeof providers?.BEA_API_KEY==='string'&&
+    providers.BEA_API_KEY.trim().length>0,
+    'DIRECT_B_BEA_CREDENTIAL_UNAVAILABLE');
+  const perform=collector??(await import(pathToFileURL(sourceFile).href))
+    .collectBeaUnitNipaSourceOnce;
+  need(typeof perform==='function','DIRECT_B_BEA_COLLECTOR_UNAVAILABLE');
   const markerDir=path.join(PC_ROOT,'bea-nipa-source-b-once');
   // The only persistent control write is a create-only attempt marker; an
   // unknown/partial provider operation is reconciled, never silently replayed.
@@ -111,11 +121,6 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
       requestId:auth.request.requestId,sourceSha:m.sourceSha,
       manifestSha256:manifestSha,attemptedAt:new Date().toISOString()
     })+'\n',{flag:'wx'});attempted=true;
-    const providers=providerLoader?await providerLoader(PC_ROOT):
-      (await import(pathToFileURL(envFile).href)).loadLocalProviders(PC_ROOT);
-    const perform=collector??(await import(pathToFileURL(sourceFile).href))
-      .collectBeaUnitNipaSourceOnce;
-    need(typeof perform==='function','DIRECT_B_BEA_COLLECTOR_UNAVAILABLE');
     const value=await perform({pcBase:PC_ROOT,providers});
     const capture=verifyBeaCapture(value);
     return {status:'PASS',providerRequests:1,privateArchiveWrites:1,...capture};
