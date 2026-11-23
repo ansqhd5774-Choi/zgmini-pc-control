@@ -1,3 +1,9 @@
+> **2026-11-23 이관 완료:** 프로젝트 프로세스 총괄의 현재 브랜치는 메인 [zgmini / codex/controller-ops-lessons-20261105](https://github.com/ansqhd5774-Choi/zgmini/tree/codex/controller-ops-lessons-20261105)이다. 이 보조 브랜치는 기존 코드·승인·운영 증거의 역사 참조로 보존하며 신규 총괄 지침·계획의 정본으로 사용하지 않는다. 기존 기록의 삭제나 운영 상태 변경을 뜻하지 않는다.
+
+## 저장소·담당 소속 — 2026-11-23 사용자 지정
+
+프로세스 총괄은 **`zgmini` / `codex/controller-ops-lessons-20261105`**, 이슈 담당자는 **`zgmini-pc-control` / `codex/issues-lifecycle-manager-20261118`**, 자동화 담당자는 **`zgmini-pc-control` / `codex/pc-automation-process-improvement-20261119`**에 소속된다. [역할 정본](https://github.com/ansqhd5774-Choi/zgmini/blob/main/docs/REPOSITORY_ROLES.md)을 따른다. 아래 과거 소속·호칭과 충돌하면 이 결정을 우선한다. 업무 소속과 실제 코드 변경 저장소는 구분하며 기존 승인·운영 보호·기능 담당자의 독립 작업은 유지한다. 새 승인 Gate를 추가하지 않는다.
+
 # ZGMINI PC 자동 실행 공통 기준
 
 **프로세스 총괄 권한·실행 책임 확정(2026-11-22):** [프로세스 총괄 권한 및 실행 책임 기준](docs/PROCESS_GENERAL_AUTHORITY_AND_EXECUTION_STANDARD_20261122.md)을 이 담당 브랜치에서 적용한다. 인수한 공통 문제는 승인된 범위에서 조사·최소 수정·검증·정규 운영 적용·결과 확인·종결까지 직접 책임진다. 기존 승인·허용된 실행기·정확한 CAS/복귀 계약을 재사용하고 불필요한 재승인·가상 담당자 인계·전역 대기를 만들지 않는다. 이 지침은 계정/도구 권한이나 별도 운영 승인을 생성하지 않으며, 승인 없는 신규 효과·보안 변경·C급 복구는 수행하지 않는다. 이 브랜치의 역사 지침과 [현재 `main`의 공통 정본](https://github.com/ansqhd5774-Choi/zgmini-pc-control/blob/main/docs/PC_AUTOMATION_STANDARD.md)이 충돌할 경우 최신 사용자 지시와 현재 정본·실제 승인 계약을 따른다.

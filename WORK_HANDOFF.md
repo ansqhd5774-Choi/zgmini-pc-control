@@ -1,3 +1,5 @@
+> **2026-11-23 이관 완료:** 프로젝트 프로세스 총괄의 현재 브랜치는 메인 [zgmini / codex/controller-ops-lessons-20261105](https://github.com/ansqhd5774-Choi/zgmini/tree/codex/controller-ops-lessons-20261105)이다. 이 보조 브랜치는 기존 코드·승인·운영 증거의 역사 참조로 보존하며 신규 총괄 지침·계획의 정본으로 사용하지 않는다. 기존 기록의 삭제나 운영 상태 변경을 뜻하지 않는다.
+
 # ZGMINI — 대화 간 작업 인계 (WORK_HANDOFF)
 
 
