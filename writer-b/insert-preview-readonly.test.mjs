@@ -147,3 +147,23 @@ test('Core092 exact B overlay pins two runtime guards and no unrelated features'
  assert.throws(()=>validateWriterBManifest({...approval,allowOtherSourceChanges:true}),
   {code:'WRITER_B_SIDE_EFFECT_SCOPE_STOP'});
 });
+
+test('natural idle B variant changes only the Core maintenance wait policy',()=>{
+ const root='../approvals/writer-updates/';
+ const reserved=JSON.parse(fs.readFileSync(new URL(root+
+  'paid-sector-alpaca-retirement-insert-threefile-20261123.json',import.meta.url),'utf8'));
+ const idle=JSON.parse(fs.readFileSync(new URL(root+
+  'paid-sector-alpaca-retirement-natural-idle-threefile-20261123.json',import.meta.url),'utf8'));
+ assert.equal(validateWriterBManifest(idle),idle);
+ assert.equal(reserved.coreMaintenance,'PAUSE_NEW_STARTS_DRAIN_360S_V1');
+ const {coreMaintenance,...identical}=reserved;
+ assert.deepEqual(idle,identical);
+ assert.equal(Object.hasOwn(idle,'coreMaintenance'),false);
+ assert.equal(idle.files.length,3);
+ for(const f of idle.files){
+  assert.match(f.beforeSha256,/^[a-f0-9]{64}$/);
+  assert.match(f.afterSha256,/^[a-f0-9]{64}$/);
+ }
+ for(const k of ['allowProviderCalls','allowDbChanges','allowD1Writes',
+  'allowTaskDefinitionChanges','allowOtherSourceChanges'])assert.equal(idle[k],false);
+});
