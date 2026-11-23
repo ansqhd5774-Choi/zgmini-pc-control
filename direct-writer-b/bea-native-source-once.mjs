@@ -64,7 +64,7 @@ export function verifyBeaInstalledBinding(m,{head,configSource}){
 const resultKeys=['status','providerRequests','sourceVersion',
   'sourceHttpSha256','sourceStoredAt','observedThrough'];
 export function verifyBeaCapture(value){
-  need(exact(value,resultKeys)&&['STORED','ALREADY_STORED'].includes(value.status)&&
+  need(exact(value,resultKeys)&&['SOURCE_STORED_READBACK_VERIFIED','ALREADY_CAPTURED'].includes(value.status)&&
     value.providerRequests===1&&SHA64.test(value.sourceVersion??'')&&
     SHA64.test(value.sourceHttpSha256??'')&&
     Number.isSafeInteger(value.sourceStoredAt)&&value.sourceStoredAt>0&&
