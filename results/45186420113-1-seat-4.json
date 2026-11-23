@@ -1,0 +1,128 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45186420113-1-seat-4",
+  "requestId": "pc-5ed7cb1e-3e1f-4fbc-82ac-0a7f8e9064a1",
+  "startedAt": "2026-11-23T13:41:51.116Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "2b69dcbc7ade75815e0c152fd0e2112ddaa5b333",
+  "sourceBranch": "main",
+  "operation": "core-status",
+  "seat": 4,
+  "status": "PASS",
+  "code": "CORE_READONLY_DIAGNOSIS",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-2960-postcheck-20261123",
+  "effectClass": "FIXED_READONLY_NO_PROVIDER_NO_DB",
+  "pcOperationalApprovedSha": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "CORE_READONLY_DIAGNOSIS",
+    "core": {
+      "lockPresent": true,
+      "checkpoints": {
+        "local-cycle-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-23T13:30:29.121Z",
+          "bytes": 3119,
+          "status": "COMPLETE"
+        },
+        "local-collection-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-23T13:36:07.362Z",
+          "bytes": 5174,
+          "status": "COMPLETE",
+          "employmentR6": {
+            "status": "PARTIAL",
+            "code": null,
+            "providerRequests": 2,
+            "groups": [
+              {
+                "groupName": "DOL_UI_WEEKLY_CLAIMS",
+                "status": "PARTIAL",
+                "failureCode": "DOL_RELEASE_OBSERVATION_STALE",
+                "providerRequests": 2
+              }
+            ],
+            "plannedGroups": [
+              {
+                "groupName": "DOL_UI_WEEKLY_CLAIMS",
+                "status": "DUE",
+                "due": true
+              },
+              {
+                "groupName": "BLS_EMPLOYMENT_SITUATION",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_JOLTS",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_ECI",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_STATE_MSA",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              },
+              {
+                "groupName": "BLS_BED",
+                "status": "RELEASE_ALREADY_STORED",
+                "due": false
+              }
+            ]
+          }
+        },
+        "local-writer-last-run.json": {
+          "exists": true,
+          "modifiedAt": "2026-11-23T13:40:15.589Z",
+          "bytes": 6787,
+          "status": "VERIFIED",
+          "employmentR6": {
+            "status": "UNCHANGED",
+            "failureCode": null,
+            "asOfDate": "2026-11-23",
+            "sourceStoredAt": 1795307425460,
+            "sourceFeatures": 29,
+            "chartReadyFeatures": 22,
+            "recentlyObservedFeatures": 22,
+            "localResultHash": "bd05ec8514dd4d4f7a70c1df73b173b4e597f10da73d8ca3da0b859408bf16b8",
+            "localResultStored": false,
+            "localResultReadback": "VERIFIED",
+            "methodologyVersion": "EMP-R6-FORMULA-R2-CPS-2025-10",
+            "formulaHash": "sha256:04486846cd6063452d1c764116d3a31209f074d23a8764bf5b6ec8467095210e"
+          }
+        }
+      },
+      "taskXmlHashes": {
+        "ZGMINI-PC-Local-Core": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+        "ZGMINI-PC-Local-Korea": "1797e5def9fc92551132ca69f60bb5320bb346c687988be3e4ff3eb76ef5fdc1",
+        "ZGMINI-PC-Iran-Progress-R13": "APPROVED_RETIRED_ABSENT"
+      },
+      "approvedSourceSha": "c62bd5aac3353d7e146d930dbb033b82d89010cd"
+    },
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "sqliteOpened": false
+  },
+  "protectedBeforeSha256": "4f558bd27adabdc39a8882c5270192cf60468076656339978843836c009e1283",
+  "protectedAfterSha256": "4f558bd27adabdc39a8882c5270192cf60468076656339978843836c009e1283",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T13:41:57.220Z",
+  "durationMs": 6104
+}
