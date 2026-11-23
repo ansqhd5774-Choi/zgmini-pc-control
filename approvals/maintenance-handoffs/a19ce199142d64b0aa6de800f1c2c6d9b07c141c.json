@@ -1,0 +1,42 @@
+{
+  "schema": "ZGMINI_MAINTENANCE_HANDOFF_V2",
+  "transition": "SEVEN_TO_SEVEN",
+  "installedSha": "3529777666faf6adb49abd67bea10066852a39bf",
+  "targetSha": "a19ce199142d64b0aa6de800f1c2c6d9b07c141c",
+  "approved": true,
+  "scope": "COOPERATIVE_OR_STOPPED_RECEIVER_IN_PLACE",
+  "approvalBasis": "User authorized common automation fault isolation and operational application in this conversation on 2026-11-23 KST. Source PR #2856; cumulative maintainer changes include the existing same-effect suppression. No Controller/Writer/Task/provider/DB/D1 change.",
+  "files": {
+    "tools/maintenance-contract.mjs": "cdaf63cef96d872cccb2a2fc33cab37eba7d1a91301b7f382c338374e2bf335e",
+    "tools/maintenance-apply.mjs": "785f0a5b6b17e83161742566f966a22ab995b69365d88bf303654c0b1bdebd6b",
+    "tools/maintenance-agent.mjs": "9ba1cc201a59ded41f886963ae3debd8b60a2cdf449fbe0743d051f5fee86222",
+    "tools/maintenance-lock.mjs": "d53be9486c2c86c816969cc80a3f1c97623f2ee10aae6882ae9fc7ed4dc5fecd",
+    "tools/update.mjs": "575c7b091e2c4111df4aee0ee150c1b5c0ef8fcb3567394cff1665d5ab714fd7",
+    "tools/maintenance-ancestry.vbs": "0af210b7003347a6c0ee6dcde20c1e74ecb3a8cbcfc9a9a6667702c7d794c516",
+    "tools/source-bundle-register.mjs": "af31ab1f6a159aa1d8467d2585eb16750e8a1a293f9ecfb90b85c388d8640d70",
+    "tools/bootstrap-maintenance.mjs": "6b8eba1982b74a344138fa856066e9eba2bad9fc8f6dcfedcc3ef56d788ff1ac",
+    "tools/handoff-maintenance.mjs": "445bdf1b321d8e7db0b9b3f62a4b0172e5bc5ea364fd9790f4bd9626d9037563"
+  },
+  "checks": {
+    "windowsRelatedRegression": "351 PASS, 0 FAIL, 0 SKIP",
+    "integrationAndOperatorReceiptRegression": "101 PASS; overlaps prior suite, not additive",
+    "sourceCI": "45119725050 SUCCESS; 45119725139 SUCCESS; 45119725236 SUCCESS"
+  },
+  "prerequisites": {
+    "originalRecoveryRequestId": "pc-update-c09a58ae-4d2d-4f70-ae66-aa64d976ee51",
+    "requireOriginalRecoveryVerified": true,
+    "requireNoControllerInstallLease": true
+  },
+  "backup": "BYTE_VERIFIED_EXISTING_SEVEN_FILES_MANIFEST_AND_STARTUP",
+  "rollback": "RESTORE_VERIFIED_PREVIOUS_RECEIVER_ONLY_AFTER_PROVEN_STOPPED",
+  "preserve": [
+    "Existing Controller and six Runner registrations",
+    "Writer/Core/Korea configuration and task bytes",
+    "Provider data, DB, D1 and original recovery records"
+  ],
+  "runtimeChangedFiles": [
+    "tools/maintenance-apply.mjs",
+    "tools/maintenance-agent.mjs",
+    "tools/update.mjs"
+  ]
+}
