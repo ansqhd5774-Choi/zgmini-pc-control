@@ -1,0 +1,221 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45131450648-1-seat-1",
+  "requestId": "pc-infl19-readback-5a18b483-326d-4d0b-a9fd-fac4d815e701",
+  "startedAt": "2026-11-23T07:29:30.481Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "003d185040a0beeac429bcfd6ece283d933ec38c",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "8a6dc683348ca549c110fabedd44c04d22183050",
+  "sourceBranch": "main",
+  "operation": "inflation19-d1-readback-readonly",
+  "seat": 1,
+  "status": "PASS",
+  "code": "INFL19_D1_READBACK_VERIFIED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-w01-infl19-d1-installed-003d-20261123",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "INFL19_D1_READBACK_VERIFIED",
+    "key": "detail:inflation-causal-public-19:r1",
+    "providerCalls": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "sqliteOpened": false,
+    "d1StoredAt": 1795046823250,
+    "d1BodySha256": "52015f3fbf286cd74f7a08ae076f87a90411ada151de0e9c174bc662da0085a8",
+    "sourceVersion": "INFL19_PRESENTATION_3e5a3fced8b2f6875a5a822ee322064b3d77420f352dac8ddd817d4534f6cd2e",
+    "sourceStoredAt": 1795046728605,
+    "ready": 19,
+    "localMatches": true,
+    "indicators": [
+      {
+        "id": "1",
+        "status": "READY",
+        "series": "MCOILWTICO",
+        "unit": "USD/배럴",
+        "value": 102.07,
+        "observationDate": "2026-10-01",
+        "sourceStoredAt": "2026-11-04T21:25:06.490Z"
+      },
+      {
+        "id": "3",
+        "status": "READY",
+        "series": "DHHNGSP",
+        "unit": "USD/MMBtu",
+        "value": 3.1,
+        "observationDate": "2026-11-17",
+        "sourceStoredAt": "2026-11-19T00:05:28.605Z"
+      },
+      {
+        "id": "4",
+        "status": "READY",
+        "series": "EIA_INDUSTRIAL_US",
+        "unit": "센트/kWh",
+        "value": 9.64,
+        "observationDate": "2026-08",
+        "sourceStoredAt": "2026-11-04T06:25:37.684Z"
+      },
+      {
+        "id": "5",
+        "status": "READY",
+        "series": "WPU1017",
+        "unit": "지수",
+        "value": 388.58,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "6",
+        "status": "READY",
+        "series": "WPU102502",
+        "unit": "지수",
+        "value": 835.342,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "7",
+        "status": "READY",
+        "series": "WPU081",
+        "unit": "지수",
+        "value": 282.34,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "8",
+        "status": "READY",
+        "series": "WPU061",
+        "unit": "지수",
+        "value": 338.06,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "9",
+        "status": "READY",
+        "series": "WPU012",
+        "unit": "지수",
+        "value": 203.861,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "10",
+        "status": "READY",
+        "series": "WPU0221",
+        "unit": "지수",
+        "value": 275.172,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "11",
+        "status": "READY",
+        "series": "WPU029",
+        "unit": "지수",
+        "value": 246.125,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "12",
+        "status": "READY",
+        "series": "CES0500000003",
+        "unit": "USD/시간",
+        "value": 38,
+        "observationDate": "2026-10-01",
+        "sourceStoredAt": "2026-11-06T16:50:07.364Z"
+      },
+      {
+        "id": "13",
+        "status": "READY",
+        "series": "ECIALLCIV",
+        "unit": "지수",
+        "value": 178.574,
+        "observationDate": "2026-07-01",
+        "sourceStoredAt": "2026-10-30T13:30:04.561Z"
+      },
+      {
+        "id": "14",
+        "status": "READY",
+        "series": "PRS85006111",
+        "unit": "지수",
+        "value": 2.4,
+        "observationDate": "2026-07-01",
+        "sourceStoredAt": "2026-11-05T17:50:37.578Z"
+      },
+      {
+        "id": "18",
+        "status": "READY",
+        "series": "DTWEXBGS",
+        "unit": "지수",
+        "value": 122.6503,
+        "observationDate": "2026-11-13",
+        "sourceStoredAt": "2026-11-18T23:25:25.857Z"
+      },
+      {
+        "id": "19",
+        "status": "READY",
+        "series": "IREXFUELS",
+        "unit": "지수",
+        "value": 138.5,
+        "observationDate": "2026-10-01",
+        "sourceStoredAt": "2026-11-17T13:50:15.288Z"
+      },
+      {
+        "id": "21",
+        "status": "READY",
+        "series": "NY_FED_GSCPI",
+        "unit": "지수",
+        "value": 1.2619111813086497,
+        "observationDate": "2026-10-01",
+        "sourceStoredAt": "2026-11-18T10:33:45.736Z"
+      },
+      {
+        "id": "25",
+        "status": "READY",
+        "series": "WPUID61",
+        "unit": "지수",
+        "value": 300.589,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T06:04:19.444Z"
+      },
+      {
+        "id": "26",
+        "status": "READY",
+        "series": "DPCERA3M086SBEA",
+        "unit": "지수",
+        "value": 127.741,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-18T10:33:45.732Z"
+      },
+      {
+        "id": "31",
+        "status": "READY",
+        "series": "NY_FED_SCE_ONE_YEAR_MEDIAN",
+        "unit": "%",
+        "value": 3.902742862701416,
+        "observationDate": "2026-09-01",
+        "sourceStoredAt": "2026-11-04T04:41:52.103Z"
+      }
+    ]
+  },
+  "protectedBeforeSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedAfterSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "003d185040a0beeac429bcfd6ece283d933ec38c",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T07:29:37.808Z",
+  "durationMs": 7327
+}
