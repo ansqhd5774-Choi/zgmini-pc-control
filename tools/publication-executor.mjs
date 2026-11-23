@@ -35,7 +35,7 @@ function parseLogRows(text){
   return rows;
 }
 
-export function validateBeaStoredPreflight(text,sourceSha){
+export function validateBeaStoredPreflight(text,sourceSha,{native=false,expectedKey=null}={}){
   if(!SHA256.test(sourceSha??''))throw Error('PUBLICATION_BEA_SOURCE_PIN_INVALID');
   const rows=parseLogRows(text);
   if(rows.RESULT!=='PASS_BEA_UNIT_PREFLIGHT_ONLY'
@@ -46,6 +46,9 @@ export function validateBeaStoredPreflight(text,sourceSha){
     ||rows.STORED_RAW_READBACK!=='VERIFIED'
     ||rows.D1_WRITES!=='0'||rows.RAW_LOCAL_WRITES!=='0')
     throw Error('PUBLICATION_BEA_PREFLIGHT_SOURCE_MISMATCH');
+  if(native&&(rows.SOURCE_TRANSPORT!=='BEA_API_JSON'||rows.SOURCE_SERIES!=='A463RD'
+    ||rows.SNAPSHOT_KEY!==expectedKey||rows.ERROR!==undefined))
+    throw Error('PUBLICATION_BEA_NATIVE_PREFLIGHT_MISMATCH');
   return true;
 }
 
@@ -150,12 +153,21 @@ export function validateWpsfd42PinnedNoWrite(text,preflight,expectedKey){
 
 export function parsePublisherLog(text,operation,expectedKey){
   const rows=parseLogRows(text);
-  if(operation==='bea-unit-profit-once'
+  const native=operation==='bea-unit-nipa-json-once';
+  const bea=native||operation==='bea-unit-profit-once';
+  if(bea
     &&(rows.SOURCE_ORIGIN!=='PC_IMMUTABLE_ARCHIVE'
       ||rows.SOURCE_HTTP_REQUESTS!=='0'
       ||rows.STORED_RAW_READBACK!=='VERIFIED'))
     throw Error('PUBLICATION_BEA_NOT_STORED_SOURCE');
-  const expectedResult=operation==='bea-unit-profit-once'
+  if(native&&(rows.SOURCE_TRANSPORT!=='BEA_API_JSON'
+    ||rows.SOURCE_SERIES!=='A463RD'||rows.SNAPSHOT_KEY!==expectedKey
+    ||rows.MODE!=='EXPLICIT_APPLY'||rows.SOURCE_GATES!=='PASS'
+    ||rows.PC_SQLITE_WRITES!=='0'||rows.ERROR!==undefined
+    ||rows.D1_READBACK!==(rows.D1_RESULT==='READBACK_VERIFIED'
+      ?'VERIFIED':'PREVIOUS_IDENTICAL')))
+    throw Error('PUBLICATION_BEA_NATIVE_APPLY_EVIDENCE_INVALID');
+  const expectedResult=bea
     ?['PASS_BEA_UNIT_READBACK_VERIFIED','PASS_BEA_UNIT_ALREADY_STORED']
     :operation==='bls-wpsfd42-service-once'
       ?['PASS_EARNINGS_C_SERVICE_D1_READBACK','PASS_EARNINGS_C_SERVICE_ALREADY_STORED']
@@ -199,7 +211,7 @@ export function parsePublisherLog(text,operation,expectedKey){
         &&rows.D1_READBACK==='PREVIOUS_IDENTICAL'))
       throw Error('PUBLICATION_WPSFD42_APPLY_EVIDENCE_INVALID');
   }
-  const sourceVersion=operation==='bea-unit-profit-once'?rows.SOURCE_SHA256:rows.SOURCE_VERSION;
+  const sourceVersion=bea?rows.SOURCE_SHA256:rows.SOURCE_VERSION;
   const sourceStoredAt=Number(rows.SOURCE_STORED_AT);
   if(!SHA256.test(sourceVersion??'')||!Number.isSafeInteger(sourceStoredAt)||sourceStoredAt<=0)
     throw Error('PUBLICATION_RESULT_CHECKPOINT_INVALID');
@@ -217,7 +229,7 @@ export function millisecondsToNextUtcSecond(now){
 export function publicationCheckpointReport(operation,evidence){
   // BEA's identical-source shortcut retains the older D1 payload timestamp.
   // The attempt's fresh retrieval timestamp is NOT a verified D1 timestamp.
-  const attemptedOnly=operation==='bea-unit-profit-once'
+  const attemptedOnly=['bea-unit-profit-once','bea-unit-nipa-json-once'].includes(operation)
     &&evidence.d1Result==='ALREADY_STORED';
   return {sourceStoredAt:attemptedOnly?null:evidence.sourceStoredAt,
     attemptedSourceStoredAt:evidence.sourceStoredAt,
@@ -401,7 +413,8 @@ async function execute(){
       phase:'READY',updatedAt:now(),firstFail:null};
     fs.writeFileSync(ledgerPath,JSON.stringify(phase,null,2)+'\n',{flag:'wx'});
     const logDirectory=resultDirectoryFor(request.requestId);
-    const bea=request.operation==='bea-unit-profit-once';
+    const native=request.operation==='bea-unit-nipa-json-once';
+    const bea=native||request.operation==='bea-unit-profit-once';
     const mfg=request.operation==='bea-manufacturing-profit-once';
     const service=request.operation==='bls-wpsfd42-service-once';
     const qfr=request.operation==='census-qfr-margin-once';
@@ -424,6 +437,7 @@ async function execute(){
     const script=path.join(publisherRoot,...invocation.script.split('/'));
     const preflight=await runFixedChild(script,mfg?
       ['--source-sha',invocation.sourceSha256,'--dry-run']:
+      native?['--dry-run','--source-transport=BEA_API_JSON']:
       ['--dry-run'],childEnv,PREFLIGHT_TIMEOUT_MS);
     if(preflight.exitCode!==0||preflight.timedOut||preflight.truncated)
       throw Error('PUBLICATION_PREFLIGHT_FAILED');
@@ -433,7 +447,8 @@ async function execute(){
       expectedSha:invocation.sourceSha256}):null;
     const qfrPin=qfr?validateQfrStoredPreflight(preflightEvidence,invocation.snapshotKey):null;
     const servicePin=service?validateWpsfd42ServicePreflight(preflightEvidence,invocation.snapshotKey):null;
-    if(bea)validateBeaStoredPreflight(preflightEvidence,invocation.sourceSha256);
+    if(bea)validateBeaStoredPreflight(preflightEvidence,invocation.sourceSha256,
+      {native,expectedKey:invocation.snapshotKey});
     // Both pinned publishers use second-resolution, exclusive result filenames.
     // Keep apply in a later UTC second to avoid colliding with dry-run evidence.
     const fenceAt=Date.now();

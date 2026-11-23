@@ -15,7 +15,7 @@ const fixture=(operation='census-qfr-margin-once')=>{
    publisherFiles:Object.fromEntries(spec.sourceFiles.map(name=>[name,'c'.repeat(64)])),
    approval:{grade:'B',scope:spec.approvalScope,actor:ACTOR,issueNumber:84},
    execution:{mode:'ONCE',maxAutomaticRetries:0,maxD1Keys:1,provider:spec.provider},
-   ...(['bea-unit-profit-once','bea-manufacturing-profit-once'].includes(operation)?{sourceSha256:'f'.repeat(64)}:{})};
+   ...(['bea-unit-profit-once','bea-unit-nipa-json-once','bea-manufacturing-profit-once'].includes(operation)?{sourceSha256:'f'.repeat(64)}:{})};
  const bytes=JSON.stringify(approval);
  const request={schema:REQUEST_SCHEMA,requestId:REQUEST_ID,
    chatId:'chat-12f7e7d2-2ed8-4efe-baca-e3624a84097c',operation,
@@ -213,4 +213,37 @@ test('WPSFD42 service B requires exact one-key scope, immutable source import gr
   const grade=fixture('bls-wpsfd42-service-once');
   grade.approval.approval.scope='CENSUS_QFR_MARGIN_SINGLE_KEY_D1_ONCE';repin(grade);
   assert.throws(()=>admitted(grade),/PUBLICATION_B_APPROVAL_MISSING/);
+});
+
+test('BEA native JSON uses a separately approved effect in the existing one-key B lane',()=>{
+ const native=admitted(fixture('bea-unit-nipa-json-once'));
+ const fred=admitted(fixture('bea-unit-profit-once'));
+ assert.equal(native.invocation.script,fred.invocation.script);
+ assert.equal(native.invocation.snapshotKey,fred.invocation.snapshotKey);
+ assert.equal(native.invocation.sourceSha256,'f'.repeat(64));
+ assert.deepEqual(native.invocation.flags,['--apply',
+  '--confirm-bea-nipa-d1-write','--source-transport=BEA_API_JSON']);
+ assert.notDeepEqual(native.invocation.flags,fred.invocation.flags);
+ assert.equal(native.approval.approval.scope,'BEA_UNIT_NIPA_JSON_SINGLE_KEY_D1_ONCE');
+ assert.equal(native.approval.execution.provider,'BEA_API_JSON');
+ for(const file of [
+  'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs',
+  'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_ARCHIVE_R1.mjs',
+  'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_EQUIVALENCE_R1.mjs',
+  'worker/earnings-bea-unit-profit-r1.mjs'
+ ])assert.ok(operationSpec('bea-unit-nipa-json-once').sourceFiles.includes(file));
+ const wrongProvider=fixture('bea-unit-nipa-json-once');
+ wrongProvider.approval.execution.provider='FRED_CSV';repin(wrongProvider);
+ assert.throws(()=>admitted(wrongProvider),/PUBLICATION_EXECUTION_SCOPE_INVALID/);
+ const wrongScope=fixture('bea-unit-nipa-json-once');
+ wrongScope.approval.approval.scope='BEA_UNIT_PROFIT_SINGLE_KEY_D1_ONCE';repin(wrongScope);
+ assert.throws(()=>admitted(wrongScope),/PUBLICATION_B_APPROVAL_MISSING/);
+ const missingSource=fixture('bea-unit-nipa-json-once');
+ delete missingSource.approval.sourceSha256;repin(missingSource);
+ assert.throws(()=>admitted(missingSource),/PUBLICATION_MANIFEST_FIELDS_INVALID/);
+ const missingFile=fixture('bea-unit-nipa-json-once');
+ delete missingFile.approval.publisherFiles[
+  'scripts/pc-writer/EARNINGS_BEA_UNIT_NIPA_PUBLIC_PROJECTION_R1.mjs'];
+ repin(missingFile);
+ assert.throws(()=>admitted(missingFile),/PUBLICATION_SOURCE_FILES_INVALID/);
 });
