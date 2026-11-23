@@ -29,6 +29,8 @@ on:
       - 'controller/inflation-census-m3-archived-headers-readonly.test.mjs'
       - 'controller/inflation7-d1-readback-readonly.mjs'
       - 'controller/inflation7-d1-readback-readonly.test.mjs'
+      - 'controller/inflation19-d1-readback-readonly.mjs'
+      - 'controller/inflation19-d1-readback-readonly.test.mjs'
       - 'controller/inflation19-runtime-readonly.mjs'
       - 'tests/w01-inflation7-writer-ledger-existing-a.test.mjs'
       - 'controller/inflation-event129-evidence-readonly.mjs'
@@ -365,6 +367,9 @@ jobs:
       - name: Verify W01 existing deployed inflation7 D1 fixed-key readback
         if: steps.scope.outputs.w01 == 'true'
         run: node --test --test-concurrency=1 controller/inflation7-d1-readback-readonly.test.mjs
+      - name: Verify W01 fixed-key Inflation19 D1 and local public-summary readback
+        if: steps.scope.outputs.w01 == 'true'
+        run: node --test --test-concurrency=1 controller/inflation19-d1-readback-readonly.test.mjs
       - name: Verify inflation manual B approval V1/V2 preimages and fail-closed source policy
         if: steps.scope.outputs.w01 == 'true'
         run: node --test inflation-manual-b/contract.test.mjs inflation-manual-b/coordinator.test.mjs inflation-manual-b/core-task-event-owner-proof.test.mjs
