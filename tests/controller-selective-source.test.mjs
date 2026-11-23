@@ -341,3 +341,59 @@ test('D05 sector R3 A exact three-file selective pin is fail-closed and rollback
  assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:target}),
   /UPDATE_INSTALLED_SOURCE_DRIFT/);
 });
+
+test('D05 sector R3 D1/API fixed reader reuses existing local evidence and bounded public GET',()=>{
+ const source=fs.readFileSync(path.join(import.meta.dirname,'..','controller',
+  'sector-r3-d1-api-readback-readonly.mjs'),'utf8');
+ assert.match(source,/const FEED='sector-fear-greed-r3'/);
+ assert.match(source,/snapshot_key='current' LIMIT 1/);
+ assert.match(source,/const URL='https:\/\/zgmini\.kr\/api\/sector-fear-greed'/);
+ assert.match(source,/sectorR3StoredDisplayDigest/);
+ assert.match(source,/D1_CLIENT_SOURCE_DRIFT/);
+ assert.match(source,/phase==='CONFIRMED'/);
+ assert.match(source,/oneYearPitVerified:false/);
+ assert.doesNotMatch(source,/DELETE FROM|INSERT INTO|UPDATE public_feed_snapshots_v1/);
+});
+
+test('D05 sector R3 D1/API B exact installed bdc selective pin preserves BEA and rejects drift',()=>{
+ const installed='bdc51df2d1a3f61975d83ad48aef2a613c90a03e';
+ const target='6777a56b7d17487ae327942013ee66673bf5492b';
+ const dir=path.join(import.meta.dirname,'..','approvals');
+ const raw=fs.readFileSync(path.join(dir,'controller-updates',target+'.json'));
+ const manifest=JSON.parse(raw.toString('utf8'));
+ const pin=JSON.parse(fs.readFileSync(path.join(dir,'controller-selective-targets',target+'.json'),'utf8'));
+ const request={schema:MAINTENANCE_ISSUE_SCHEMA,
+  requestId:'pc-update-12345678-1234-4123-8123-123456789abc',
+  chatId:'chat-d05-r3-d1-api-b-20261123',
+  operation:'controller-update',controlRepository:CONTROL_REPOSITORY,
+  targetControllerSha:target,approvalManifestSha256:digest(raw)};
+ const validated=validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',installedSha:installed});
+ assert.equal(validateControllerSelectivePin(validated.manifest,pin),true);
+ assert.equal(manifest.controllerOnlyInstall,true);
+ assert.equal(manifest.purpose,'pc-controller-maintenance');
+ assert.equal(manifest.selectiveSource.mainSha,'0c1a2672430e1c1928d0ffb324d96f0a8a341466');
+ assert.equal(manifest.selectiveSource.branch,'codex/issues-lifecycle-d05-r3-d1-installed-bdc-20261123');
+ assert.deepEqual(manifest.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
+ assert.deepEqual(manifest.allowFiles.map(x=>x.path),
+  ['config/operations.json','controller/operations.mjs',
+   'controller/sector-r3-d1-api-readback-readonly.mjs']);
+ assert.equal(manifest.checks.manifestSha256,manifestFingerprint(manifest.allowFiles).sha256);
+ assert.equal(digest(fs.readFileSync(path.join(import.meta.dirname,'..','controller',
+  'sector-r3-d1-api-readback-readonly.mjs'))),manifest.allowFiles[2].sha256);
+ assert.equal(manifest.backup.rollback.sha,installed);
+ assert.equal(manifest.postOperation,'core-status');
+ assert.equal(manifest.approval.ref,
+  'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2926');
+ for(const patch of [
+  {installedSha:'b5dbe4bfe693458af5ca6f085fa771bba033bb4e'},
+  {targetSha:installed},
+  {sourceMainSha:installed},
+  {customPaths:[]},
+  {allowFiles:manifest.allowFiles.slice(0,2)}
+ ])assert.throws(()=>validateControllerSelectivePin(validated.manifest,{...pin,...patch}),
+  /SELECTIVE_PIN_MISMATCH/);
+ assert.throws(()=>validateUpdateRequest(request,raw,{actor:'ansqhd5774-Choi',
+  installedSha:'b5dbe4bfe693458af5ca6f085fa771bba033bb4e'}),
+  /UPDATE_INSTALLED_SOURCE_DRIFT/);
+});
