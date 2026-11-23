@@ -321,7 +321,9 @@ export async function reconcileInterruptedRollback(original,port,persist){
    recoveryOperation='reconnectPrevious';await port.reconnectPrevious();
   }
   recoveryOperation='verifyPrevious';
-  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
+  // Replay may already make a dedicated Runner busy; online original runtime
+  // with matching installed SHA/protection is sufficient at this boundary.
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true,requireIdle:false})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
   // Intake/backlog writes also require a durable claim, even without restore.
   await record('RECOVERY_INTAKE_RESUME_STARTED',{mutationStarted:true});
   recoveryOperation='resumeIntake';
