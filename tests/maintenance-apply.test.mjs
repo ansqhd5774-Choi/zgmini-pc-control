@@ -531,8 +531,8 @@ test('W05 uncertain original still fail-closes before any recovery switch',async
 });
 test('W05 recovery source enforces six online runners, not idle seats, before preserving old Supervisor',()=>{
  const code=fs.readFileSync(new URL('../tools/update.mjs',import.meta.url),'utf8');
- assert.match(code,/dedicatedPcRunnerRows\\(apiRunners\\(\\),\\{requireOnline:true\\}\\)!==null/);
- assert.doesNotMatch(code,/need\\(available\\(apiRunners\\(\\)\\),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE'\\)/);
+ assert.match(code,/dedicatedPcRunnerRows\(apiRunners\(\),\{requireOnline:true\}\)!==null/);
+ assert.doesNotMatch(code,/need\(available\(apiRunners\(\)\),'RECOVERY_PREVIOUS_RUNNERS_NOT_IDLE'\)/);
 });
 
 test('restored intake ambiguity retains mutation flag and never repeats restore or enable',async()=>{
@@ -567,7 +567,7 @@ test('backlog ambiguity preserves recovery claim after enabled intake and does n
 test('successful replay requires Online runners but does not wait for newly dispatched A to become idle',async()=>{
  const options=[];const f=restoredRecovery({verifyPrevious:async x=>{options.push(x);return true;}});
  const r=await f.run();assert.equal(r.status,'ROLLED_BACK');
- assert.equal(options.length,2);assert.notEqual(options[0].requireIdle,false);
+ assert.equal(options.length,2);assert.equal(options[0].requireIdle,false);
  assert.equal(options[1].requireIdle,false);assert.equal(options[1].requireRunning,true);
 });
 
