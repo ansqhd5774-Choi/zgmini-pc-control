@@ -59,7 +59,10 @@ const PS_SCRIPT=[
  "$startup=@()",
  "$startupStatus='OK'",
  "try { $folder=Join-Path $env:APPDATA 'Microsoft\\Windows\\Start Menu\\Programs\\Startup'; if (Test-Path -LiteralPath $folder -PathType Container) { $startup=@(Get-ChildItem -LiteralPath $folder -File -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^ZGMINI[-_. ]' } | Select-Object -First 24 | ForEach-Object { [string]$_.Name }) } } catch { $startupStatus='UNAVAILABLE' }",
- "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);memoryGroups=@($memoryGroups);otherSubgroups=@($otherSubgroups);browserAttribution=@($browserAttribution);unclassifiedAttribution=@($unclassifiedAttribution);otherTopMemory=@($otherTopMemory);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus}",
+ "$w05PidRows=@($processes | Where-Object { [int]$_.ProcessId -eq 14356 })",
+ "$w05PidEvidence=[ordered]@{pid=14356;state='UNKNOWN';startedAtUtc=$null}",
+ "if($w05PidRows.Count -eq 0){$w05PidEvidence.state='NOT_PRESENT'} elseif($w05PidRows.Count -eq 1){try{if($null -ne $w05PidRows[0].CreationDate){$w05PidEvidence.startedAtUtc=$w05PidRows[0].CreationDate.ToUniversalTime().ToString('o');$w05PidEvidence.state='OBSERVED'}}catch{$w05PidEvidence.state='UNKNOWN'}}",
+ "$result=[ordered]@{schema='ZGMINI_PC_PROCESS_PROBE_V1';observedAtUtc=(Get-Date).ToUniversalTime().ToString('o');totalProcessCount=$processes.Count;selectedProcessCount=$filtered.Count;processCounts=@($counts);processes=@($selected);memoryGroups=@($memoryGroups);otherSubgroups=@($otherSubgroups);browserAttribution=@($browserAttribution);unclassifiedAttribution=@($unclassifiedAttribution);otherTopMemory=@($otherTopMemory);services=@($services);serviceStatus=$serviceStatus;tasks=@($tasks);taskStatus=$taskStatus;startup=@($startup);startupStatus=$startupStatus;w05PidEvidence=$w05PidEvidence}",
  "$result | ConvertTo-Json -Compress -Depth 8"
 ].join('; ');
 
@@ -877,6 +880,38 @@ const W05_2821_TARGET='08f0b656faa9ad5c46a813a0cdda4b43107eefbd';
 // Observes exact source bytes only; this is NOT independent operator identity,
 // not six-Runner verification, and never starts recovery or changes a lease.
 const W05_2821_SOURCE='fda563c93f4680709788ba782ad1918abf74ff2d';
+const W05_2821_OWNER_SHA='eb6c203bef862af8f24e95c6dc5b0c890c33d14e2ebfdef6bfb43df3548c98a0';
+const W05_2821_OWNER_PID=14356;
+// A fixed, read-only chronology result cannot prove a live process owns an
+// old lease. It can only refute identity when the PID began after owner.at.
+export function classifyW052821OwnerPidChronology(cas,candidate){
+ const unknown=code=>({status:'STATE_UNKNOWN',code,recoveryEligible:false});
+ if(cas?.code!=='W05_2821_FIXED_RECOVERY_CAS'||
+    cas?.firstFail!=='BACKED_UP'||cas?.ownerMarkerSame!==true||
+    cas?.ownerPid!==W05_2821_OWNER_PID||
+    cas?.digests?.ownerSha256!==W05_2821_OWNER_SHA)
+   return unknown('W05_OWNER_LEASE_CAS_UNVERIFIED');
+ const ownerTime=Date.parse(cas.ownerAtUtc??'');
+ if(!Number.isFinite(ownerTime))return unknown('W05_OWNER_LEASE_TIME_UNVERIFIED');
+ if(candidate?.pid!==W05_2821_OWNER_PID)
+   return unknown('W05_OWNER_PROCESS_ID_UNVERIFIED');
+ if(candidate.state==='NOT_PRESENT')
+   return cas.ownerAlive===true?unknown('W05_OWNER_PID_SNAPSHOT_CHANGED'):
+    {status:'READ_ONLY_OBSERVED',code:'W05_OWNER_PID_NOT_PRESENT',
+     ownerAtUtc:new Date(ownerTime).toISOString(),recoveryEligible:false};
+ if(candidate.state!=='OBSERVED')
+   return unknown('W05_OWNER_PROCESS_START_UNVERIFIED');
+ const processTime=Date.parse(candidate.startedAtUtc??'');
+ if(!Number.isFinite(processTime))
+   return unknown('W05_OWNER_PROCESS_START_UNVERIFIED');
+ return {status:'READ_ONLY_OBSERVED',
+  code:processTime>ownerTime+5000?'W05_OWNER_PID_REUSED_AFTER_LEASE':
+   'W05_OWNER_PID_IDENTITY_UNVERIFIED',
+  ownerAtUtc:new Date(ownerTime).toISOString(),
+  processStartedAtUtc:new Date(processTime).toISOString(),
+  recoveryEligible:false};
+}
+
 const W05_2821_ROLLBACK_FILES=[
  ['tools/controller-rollback-recovery.mjs','414064c4853d674b3aea078158342ad854722fb03864fa8fd214a2f974dcf677'],
  ['tools/update.mjs','8505e7e98bd95297944e57262fbfe510ffecccd9ec3d90e46c37265d7e09a8cc'],
@@ -1003,6 +1038,9 @@ export function inspectW052821RecoveryCasReadonly({
    phase:['BACKED_UP','RECOVERY_REQUIRED'].includes(ledger.phase)?ledger.phase:null,
    firstFail:ledger.firstFail==='BACKED_UP'?'BACKED_UP':null,
    ownerMarkerSame,ownerAlive:typeof pidAlive==='boolean'?pidAlive:null,
+   ownerPid:ownerMarkerSame?owner.pid:null,
+   ownerAtUtc:typeof owner.at==='string'&&Number.isFinite(Date.parse(owner.at))?
+    new Date(owner.at).toISOString():null,
    hostSame:first.currentHost.equals(first.snapshotHost),
    backupFilesVerified,protectionSame,digests,
    checkoutCode:inspectW052821CheckoutReadonly(),
@@ -1308,7 +1346,12 @@ export function collect(role,ctx,env=process.env){
  try{
   const parsed=JSON.parse(proc.stdout.replace(/^\uFEFF/,'').trim());
   const snapshot=sanitizeProbe(parsed);
-  return {...withMaintenance,status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',snapshot};
+  const w05OwnerPidChronology=role==='operating'?
+   classifyW052821OwnerPidChronology(withMaintenance.w052821RecoveryCas,
+    parsed.w05PidEvidence):null;
+  return {...withMaintenance,
+   ...(role==='operating'?{w05OwnerPidChronology}:{}),
+   status:'PASS',code:'PROCESS_INVENTORY_COLLECTED',snapshot};
  }catch{return {...withMaintenance,status:'PARTIAL',code:'PROCESS_REPORT_INVALID'};}
 }
 // Preserve the complete approved evidence schema while staying inside the
@@ -1338,6 +1381,7 @@ export function toText(r){
   'c996LeaseCorrelation='+(r.c996LeaseCorrelation?.status??'NOT_APPLICABLE'),
   'c996LeaseCorrelationCode='+(r.c996LeaseCorrelation?.code??'NOT_APPLICABLE'),
    'c1841RecoveryCheckpoint='+(r.c1841RecoveryCheckpoint?.status??'NOT_APPLICABLE'),
+  'w05OwnerPidChronology='+(r.w05OwnerPidChronology?.code??'NOT_APPLICABLE'),
   ...(r.runnerJobHistory?.length?[
    'runnerJobHistoryCases='+r.runnerJobHistory.length,
    ...r.runnerJobHistory.map(j=>'runnerJob.'+j.runId+'='+
