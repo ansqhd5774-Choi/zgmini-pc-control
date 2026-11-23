@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "37f9048705793da5e49c4ff271f90dff444ec44b",
+  "filePath": "scripts/pc-writer/run-local.mjs",
+  "beforeSha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77",
+  "insertions": [
+    {
+      "anchor": " if(!marketReady)report.market={status:'PREVIOUS_RELEASE_PRESERVED'};",
+      "position": "after",
+      "text": " // D05 final OUTPUT validation reuses the already committed market score/day\n // snapshots. No indicator collection, new SQLite key or additional write.\n // This is independent of the legacy composite archive signature/no-op gate.\n // Any optional evidence failure must preserve the approved market publisher.\n if(marketReady){\n  try{\n   const {readVerifiedMarketFinalOutputs}=await import('../../lib/score-history/d05-final-score-local-readback-r1.mjs');\n   report.d05FinalOutputReadback=await readVerifiedMarketFinalOutputs(core,{\n    calculatedAtMs:now,now:Date.now(),\n   });\n  }catch{report.d05FinalOutputReadback={status:'UNPROVEN_LOCAL_FINAL_OUTPUT'};}\n }\n"
+    }
+  ]
+}
