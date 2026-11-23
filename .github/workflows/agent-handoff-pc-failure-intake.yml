@@ -3,6 +3,20 @@ on:
   workflow_run:
     workflows: [ZGMINI PC Job]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Exact approved historical case token'
+        required: true
+        type: string
+      mode:
+        description: 'Preview first; apply only after proof review'
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - apply
 permissions:
   contents: read
   actions: read
@@ -22,9 +36,15 @@ jobs:
       vars.ZGMINI_PC_HANDOFF_INTAKE_ENABLED == 'true' &&
       github.repository == 'ansqhd5774-Choi/zgmini-pc-control' &&
       github.event.repository.private == true &&
-      github.event.workflow_run.event == 'issues' &&
-      github.event.workflow_run.conclusion != 'skipped' &&
-      github.event.workflow_run.actor.login == 'ansqhd5774-Choi'
+      ((github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'issues' &&
+        github.event.workflow_run.conclusion != 'skipped' &&
+        github.event.workflow_run.actor.login == 'ansqhd5774-Choi') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.actor == 'ansqhd5774-Choi' &&
+        github.ref == 'refs/heads/main' &&
+        inputs.confirmation == 'reconcile-2307-resource-wait' &&
+        (inputs.mode == 'preview' || inputs.mode == 'apply')))
     runs-on: [self-hosted, Windows, X64, zgmini-handoff-ci-isolated]
     timeout-minutes: 5
     steps:
@@ -38,7 +58,14 @@ jobs:
         with:
           node-version: '22'
       - name: Verify published pc-job report and emit one sanitized incident
+        if: github.event_name == 'workflow_run'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         shell: cmd
         run: node agent-handoff/pc-failure-producer.mjs
+      - name: Reconcile authenticated historical #2307 wait without PC retry
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: cmd
+        run: node agent-handoff/pc-2307-wait-recovery.mjs
