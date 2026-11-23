@@ -21,7 +21,7 @@ test('011 handoff and R6 changes select their own suites without unrelated R47',
 test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['tests/agent-handoff-result.test.mjs']),['handoff009']);
  assert.deepEqual(selectGroups(['tests/fear-greed-archive-status.test.mjs']),['fearGreed']);
- assert.deepEqual(selectGroups(['controller/fear-greed-archive-readonly.mjs']),['recovery','fearGreed']);
+ assert.deepEqual(selectGroups(['controller/fear-greed-archive-readonly.mjs']),['fearGreed','recovery']);
  assert.deepEqual(selectGroups(['tests/agent-handoff-proactive-diagnostics.test.mjs']),['handoff007']);
  assert.deepEqual(selectGroups(['agent-handoff/proactive-diagnostics.mjs']),['handoff007','handoff009','handoff008']);
  assert.deepEqual(selectGroups(['direct-writer-b/configured-direct-b.test.mjs']),['writer']);
