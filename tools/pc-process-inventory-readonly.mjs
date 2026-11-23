@@ -12,6 +12,7 @@ import {inspectProviderActivity} from '../controller/provider-activity-runtime-r
 import {inspectHttp32TwoHostCheckpoints} from '../controller/http32-two-host-checkpoints-readonly.mjs';
 import {maintenanceLockStatus} from './maintenance-lock.mjs';
 import {readMaintenanceRecoveryStatus,protectedSnapshot} from './update.mjs';
+import {readFixedReadonlyBytes} from '../controller/fixed-readonly-bytes.mjs';
 import {createHash} from 'node:crypto';
 import {inspectTask as inspectMarketParquetTask} from './marketparquet-task-source-readonly.mjs';
 import {inspectW03PaidPrivateReadonly} from './w03-paid-private-readonly.mjs';
@@ -23,6 +24,7 @@ export const ROLE_OPERATION='process-inventory-readonly';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
 const PROBE2960='w05-2960-maintenance-status-readonly';
+const D05_WRITER_PROBE='d05-writer-checkpoint-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -84,10 +86,11 @@ export function authenticateProcess(event,env,role){
  const withW05=keys==='operation,probe,requestId,role,schema';
   const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
   const is2960=withW05&&raw.probe===PROBE2960;
+  const isD05Writer=withW05&&raw.probe===D05_WRITER_PROBE;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||(!isOperator&&!is2960))))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960&&!isD05Writer))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -98,7 +101,8 @@ export function authenticateProcess(event,env,role){
  const verified=authenticate(normalized,env,role);
  return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
   ...(isOperator?{w05OperatorTopology:true}:{}),
-   ...(is2960?{w052960MaintenanceStatus:true}:{})};
+   ...(is2960?{w052960MaintenanceStatus:true}:{}),
+   ...(isD05Writer?{d05WriterCheckpoint:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -398,6 +402,60 @@ function inspect2960MaintenanceStatusReadonly(){
   return {...existing,protectedStateUnchanged:existing.status==='READ_ONLY_OBSERVED'?
    inspect2960ProtectedBaselineReadonly():null};
  }catch{return project2960MaintenanceStatus(null);}
+}
+
+const D05_STAGE_STATUSES=new Set(['LOCAL_STORED','UNCHANGED','PREVIOUS_RELEASE_PRESERVED',
+ 'READY','VERIFIED','BACKLOG','PENDING','FAILED','PARTIAL','UNPROVEN',
+ 'APPENDED_VERIFIED_LOCAL_ONLY','NOOP_SAME_EVENT']);
+const D05_WRITER_MODES=new Set(['PUBLISH','DRY_RUN']);
+const D05_WRITER_CODES=new Set(['VERIFIED','VERIFIED_WITH_GAPS','FAILED','DRY_RUN_PASS','DRY_RUN_PARTIAL']);
+const safeD05Value=v=>typeof v==='string'&&D05_STAGE_STATUSES.has(v)?v:null;
+const safeD05Iso=v=>typeof v==='string'&&/^20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(v)&&
+ Number.isFinite(Date.parse(v))?new Date(v).toISOString():null;
+/** Fixed 1-file read only. Never include raw Writer report, inputs, paths or secrets. */
+export function projectD05WriterCheckpoint(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return {
+  status:'STATE_UNKNOWN',code:'D05_WRITER_CHECKPOINT_INVALID',recoveryEligible:false};
+ const at=safeD05Iso(raw.at),writerStatus=D05_WRITER_CODES.has(raw.status)?raw.status:null;
+ const mode=D05_WRITER_MODES.has(raw.mode)?raw.mode:null;
+ const market=safeD05Value(raw.market?.status);
+ const archive=safeD05Value(raw.compositeObserved?.status);
+ const lineage=safeD05Value(raw.d05PrivateLineageStatus);
+ const writerSource=typeof raw.source==='string'&&/^[a-f0-9]{40}$/.test(raw.source)?raw.source:null;
+ const dataComplete=Boolean(at&&mode&&writerStatus);
+ return {status:dataComplete?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:dataComplete?'D05_WRITER_CHECKPOINT_OBSERVED':'D05_WRITER_CHECKPOINT_FIELDS_UNVERIFIED',
+  writerAt:at,writerMode:mode,writerStatus,writerSource,
+  marketStage:market,compositeArchiveStage:archive,d05PrivateLineageStage:lineage,
+  // Null means no stage was reported, not that a calculation failed.
+  archiveAppendConditionMet:market==='LOCAL_STORED'&&archive==='LOCAL_STORED',
+  actualLineageAppendProven:lineage==='APPENDED_VERIFIED_LOCAL_ONLY',
+  localArchiveNewEventProven:archive==='LOCAL_STORED',
+  fullD05InputLineageVerified:false,publicD1Verified:false,
+  recoveryEligible:false,providerCalls:0,d1Writes:0,operationalWrites:0};
+}
+export function inspectD05WriterCheckpointReadonly({
+ fileSystem=fs,root='E:/ZGmini/data',
+}={}){
+ let trusted;
+ try{trusted=fileSystem.realpathSync.native(root);}
+ catch{return {status:'STATE_UNKNOWN',code:'D05_DATA_ROOT_UNAVAILABLE',
+  recoveryEligible:false};}
+ const file=path.join(root,'pc-writer','local-writer-last-run.json');
+ const r=readFixedReadonlyBytes(file,{fileSystem,verifiedRoot:trusted,minBytes:2,maxBytes:131072});
+ if(!r.ok)return {status:'STATE_UNKNOWN',code:'D05_WRITER_FILE_'+
+  (['MISSING','UNREADABLE','CHANGED_DURING_READ','UNSAFE_FILE','SIZE_INVALID','SHORT_READ']
+   .includes(r.reason)?r.reason:'UNVERIFIED'),recoveryEligible:false};
+ try{return projectD05WriterCheckpoint(JSON.parse(r.bytes.toString('utf8')));}
+ catch{return {status:'STATE_UNKNOWN',code:'D05_WRITER_JSON_INVALID',
+  recoveryEligible:false};}
+}
+export function compactD05WriterResult(base,status){
+ return {...base,observedAtUtc:new Date().toISOString(),
+  status:status?.status==='READ_ONLY_OBSERVED'?'PASS':'PARTIAL',
+  code:status?.code??'D05_WRITER_CHECKPOINT_UNVERIFIED',
+  d05WriterCheckpoint:status??{status:'STATE_UNKNOWN',
+   code:'D05_WRITER_CHECKPOINT_UNVERIFIED',recoveryEligible:false}};
 }
 
 function collectMaintenanceStatusReadonly(){
@@ -1503,6 +1561,8 @@ export function collect(role,ctx,env=process.env){
  }
  if(ctx.w052960MaintenanceStatus===true)
   return compact2960ProcessResult(base,inspect2960MaintenanceStatusReadonly());
+ if(ctx.d05WriterCheckpoint===true)
+  return compactD05WriterResult(base,inspectD05WriterCheckpointReadonly());
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
   ...(ctx.w052960MaintenanceStatus?{
