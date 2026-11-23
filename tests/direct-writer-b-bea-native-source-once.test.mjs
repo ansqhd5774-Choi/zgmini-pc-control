@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {BEA_B_SCHEMA,BEA_B_SCOPE,BEA_B_MODE,
   isApprovedBeaNativeSource,verifyBeaInstalledBinding,verifyBeaCapture,
-  verifyBeaReadback}
+  verifyBeaReadback,classifyBeaNativeFailure}
   from '../direct-writer-b/bea-native-source-once.mjs';
 import {applyApprovedOnce} from '../direct-writer-b/run.mjs';
 import {resolveConfiguredSourcePin} from '../direct-writer-b/configured-source-pin.mjs';
@@ -116,4 +116,33 @@ test('existing shared Writer lease rejects concurrent and replayed capture claim
   assert.throws(()=>acquireInstallLock({journalRoot,requestId,sharedLock}),
     /REQUEST_ALREADY_CLAIMED/);
   assert.equal(fs.existsSync(sharedLock),false);
+});
+
+test('BEA native failure attribution is bounded and never exposes raw errors',async()=>{
+  const cases=[
+    ['BEA_UNIT_NIPA_COLLECT_HTTP_UNAVAILABLE','DIRECT_B_BEA_HTTP_UNAVAILABLE'],
+    ['BEA_UNIT_NIPA_COLLECT_PROVIDER_UNAVAILABLE','DIRECT_B_BEA_PROVIDER_UNAVAILABLE'],
+    ['BEA_UNIT_NIPA_ARCHIVE_SOURCE_MISMATCH','DIRECT_B_BEA_ARCHIVE_SOURCE_MISMATCH'],
+    ['DIRECT_B_BEA_INDEPENDENT_READBACK_STOP','DIRECT_B_BEA_INDEPENDENT_READBACK_STOP'],
+  ];
+  for(const [input,expected] of cases){
+    assert.equal(classifyBeaNativeFailure(Error(input)),expected);
+    assert.equal(classifyBeaNativeFailure({code:input}),expected);
+  }
+  const sensitive='https://apps.bea.gov/api/data?UserID=TOP_SECRET';
+  assert.equal(classifyBeaNativeFailure(Error(sensitive)),
+    'DIRECT_B_BEA_SOURCE_OR_STORE_UNKNOWN');
+  assert.equal(classifyBeaNativeFailure({
+    code:'BEA_UNIT_NIPA_COLLECT_'+sensitive}),
+    'DIRECT_B_BEA_SOURCE_OR_STORE_UNKNOWN');
+  const auth={mode:BEA_B_MODE,manifest:approval(),
+    request:{requestId:'test',approvalManifestSha256:sha64},
+    raw:Buffer.from('approval'),controlSha:sha40};
+  const result=await applyApprovedOnce(auth,{
+    beaCandidateRoot:'/test/pin',beaRunner:async()=>({
+      status:'STATE_UNKNOWN',code:'DIRECT_B_BEA_HTTP_UNAVAILABLE'
+    })});
+  assert.equal(result.status,'DIRECT_B_EFFECT_UNKNOWN');
+  assert.equal(result.code,'DIRECT_B_BEA_HTTP_UNAVAILABLE');
+  assert.equal(JSON.stringify(result).includes('TOP_SECRET'),false);
 });
