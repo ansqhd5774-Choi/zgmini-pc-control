@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {auditR32StoredRawWithSpec,APPROVED_R32_SYMBOLS,inspectNineR32RawCoverage} from '../controller/theme-nine-r32-raw-coverage-readonly.mjs';
+import {memoryAdmissionMinimum,waitForMemoryAdmission} from '../controller/memory-admission.mjs';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const rosterSha='a'.repeat(64),symbols=['SPY','BOTZ','ROBO'];
@@ -48,6 +49,30 @@ function fixture(t,{delta=true,partial=false}={}){
  return {dataRoot,files};
 }
 const audit=f=>auditR32StoredRawWithSpec({dataRoot:f.dataRoot,rosterSha,symbols});
+
+test('R32 post-admission recheck waits briefly for recovery and preserves the original safety minimum',async()=>{
+ const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url),'utf8'));
+ const ops=fs.readFileSync(new URL('../controller/operations.mjs',import.meta.url),'utf8');
+ const r32=ops.split("if(request.operation==='theme-nine-r32-raw-coverage-readonly')")[1]
+  ?.split("if(request.operation==='inflation-a401-private23-readonly')")[0];
+ assert.ok(r32,'R32 operation branch present');
+ assert.match(r32,/await waitForMemoryAdmission\(\{minimumFreeMiB,timeoutMs:9000,intervalMs:1500\}\)/);
+ assert.match(r32,/minimumFreeMiB=policy\.operations\[request\.operation\]\.minimumFreeMiB/);
+ assert.match(r32,/if\(!memoryRecheck\.admitted\)return \{status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY'/);
+ assert.doesNotMatch(r32,/if\(os\.freemem\(\)\/1048576<min\)/);
+ const threshold=memoryAdmissionMinimum(policy,'theme-nine-r32-raw-coverage-readonly');
+ assert.equal(threshold,1536);
+ const engine=await waitForMemoryAdmission({minimumFreeMiB:threshold,readFreeMiB:()=>1798,timeoutMs:0});
+ assert.equal(engine.admitted,true);
+ const seen=[1200,1600];let samples=0;
+ const recovered=await waitForMemoryAdmission({minimumFreeMiB:threshold,
+  readFreeMiB:()=>seen[Math.min(samples++,seen.length-1)],timeoutMs:50,intervalMs:1});
+ assert.equal(recovered.admitted,true);assert.equal(recovered.samples,2);
+ assert.equal(recovered.minObservedMiB,1200);
+ const blocked=await waitForMemoryAdmission({minimumFreeMiB:threshold,
+  readFreeMiB:()=>1200,timeoutMs:5,intervalMs:1});
+ assert.equal(blocked.admitted,false);assert.equal(blocked.freeMiB,1200);
+});
 
 test('real on-disk GMH R23+R35 manifests/checkpoints/raw SHA produce per-symbol NY day metadata only',t=>{
  const f=fixture(t),r=audit(f);
