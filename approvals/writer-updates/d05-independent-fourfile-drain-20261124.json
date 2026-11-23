@@ -1,0 +1,101 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/d05-independent-fourfile-writer-release-20261124",
+  "candidateSourceSha": "1ee0231fde631662555f0efcd646575b48ee98aa",
+  "baseHead": "8c1a7738fe71770d666f09b40fb1c435262a75fa",
+  "baseConfigSourceSha": "8c1a7738fe71770d666f09b40fb1c435262a75fa",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "scripts/pc-writer/market.mjs",
+      "change": "M",
+      "beforeSha256": "edd4d16ef3cab0ceaa56788543384350955537f083876465ad6278983cd2faf3",
+      "afterSha256": "6fda08a55a072a9d9bdb9671e17c97b412912bb52554cbd9dc740a63f24bce80"
+    },
+    {
+      "path": "lib/score-history/d05-independent-input-selector-witness-r1.mjs",
+      "change": "A",
+      "beforeSha256": null,
+      "afterSha256": "4b68af6a2758dbeabff7925814c2eac94698d0c9f796b31ab6ba1479650fe091"
+    },
+    {
+      "path": "lib/score-history/composite-archive-lineage-link-r1.mjs",
+      "change": "M",
+      "beforeSha256": "357aeb7568afa0ba1fe98e0e26a12fbd760582b53cb0e9fd35b4900dc3f1e91d",
+      "afterSha256": "ac64e2f60a5a2223f4457d35232c2cef47c09d9e8c82cc3a89c76e62e9150be6"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-event-contract-r1.mjs",
+      "change": "M",
+      "beforeSha256": "d379412bb5365a639e57b63614bd83d3b5bef71b8ca86a861624c57a281c865e",
+      "afterSha256": "3bac8815b85a4c1933088a28bb6c68e7fa7a4aee5d292dc4045fba4e43d87678"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "41912f24c2bdc13a9de52d2ee2b504fe90b733656a0d66827c617a5e2c6c0f4a"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77"
+    },
+    {
+      "path": "worker/market-input-validation.mjs",
+      "sha256": "f029c8bd370dd8f40b0e203d33553904c1765277b89161e05f1ac694112095d6"
+    },
+    {
+      "path": "worker/candidate-market-operational-store.mjs",
+      "sha256": "d3e19f295760d9d92887e4fbe7f90cce210a181c2e68c05fd4ea40817a5dd085"
+    },
+    {
+      "path": "lib/score-history/market-input-observation-shadow-r1.mjs",
+      "sha256": "a2415fa49704e2d5a8dff91509dc197000ecc7427d261180ca1b6fb69248b603"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-event-append-r1.mjs",
+      "sha256": "c7fc2263c5c04de222aeaffaa3144681a9774cd012dd540793c0917d3d0404ce"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-wsh-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "scripts/pc-writer/market.mjs",
+          "lib/score-history/d05-independent-input-selector-witness-r1.mjs",
+          "lib/score-history/composite-archive-lineage-link-r1.mjs",
+          "lib/score-history/d05-lineage-event-contract-r1.mjs"
+        ]
+      },
+      {
+        "id": "core-wsh-inner-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "scripts/pc-writer/market.mjs",
+          "lib/score-history/d05-independent-input-selector-witness-r1.mjs",
+          "lib/score-history/composite-archive-lineage-link-r1.mjs",
+          "lib/score-history/d05-lineage-event-contract-r1.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false,
+  "coreMaintenance": "PAUSE_NEW_STARTS_DRAIN_360S_V1"
+}
