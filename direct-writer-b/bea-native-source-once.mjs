@@ -157,7 +157,7 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
       sourceVersion:capture.sourceVersion,
       sourceHttpSha256:capture.sourceHttpSha256,
       sourceStoredAt:capture.sourceStoredAt,
-      observedThrough:capture.observedThrough})+'\\n';
+      observedThrough:capture.observedThrough})+'\n';
     const checkpointFd=fs.openSync(claim.journalFile,'a');
     try{fs.writeSync(checkpointFd,entry);fs.fsyncSync(checkpointFd);}
     finally{fs.closeSync(checkpointFd);}
