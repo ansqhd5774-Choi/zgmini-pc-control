@@ -148,6 +148,10 @@ export async function recentRuns(now,requestRuns=request){
     const oldest=Date.parse(rows.at(-1)?.created_at||'');
     return Number.isFinite(oldest)&&oldest<cutoff;
   }
+  // Bounded secondary partition budget across all statuses (read-only API).
+  // If exhausted, retain known results and mark coverage incomplete.
+  let hourlyCalls=0;
+  const maxHourlyCalls=96;
   const batches=await Promise.all(RUN_STATUS_PARTITIONS.map(async status=>{
     const items=[];let complete=false;
     for(let page=1;page<=2;page++){
@@ -166,7 +170,30 @@ export async function recentRuns(now,requestRuns=request){
           daily.push(...rows);
           if(endsWindow(rows)){dayComplete=true;break;}
         }
-        if(!dayComplete)complete=false;
+        if(!dayComplete){
+          // Real 2026-11-23 ledger: cancelled=497(incomplete) even after
+          // UTC-day partitioning. Split only such saturated days by hour.
+          const hourly=[];
+          let hoursComplete=true;
+          for(let h=0;h<24;h++){
+            const hh=String(h).padStart(2,'0');
+            const range=day+'T'+hh+':00:00Z..'+day+'T'+hh+':59:59Z';
+            let completeHour=false;
+            for(let page=1;page<=2;page++){
+              if(hourlyCalls>=maxHourlyCalls){hoursComplete=false;break;}
+              hourlyCalls++;
+              const rows=await pageFor(status,range,page);
+              hourly.push(...rows);
+              if(endsWindow(rows)){completeHour=true;break;}
+            }
+            if(!completeHour){hoursComplete=false;break;}
+          }
+          if(hoursComplete){
+            // Discard duplicate day-level first 200 only once the hourly
+            // partitions are proven complete, never on a partial read.
+            daily.splice(daily.length-200,200,...hourly);
+          }else complete=false;
+        }
       }
       items.splice(0,items.length,...daily);
     }
