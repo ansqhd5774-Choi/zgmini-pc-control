@@ -281,6 +281,46 @@ test('lost workflow disable acknowledgement reports actual disabled state, never
  assert.equal(r.code,'WORKFLOW_ACK_TIMEOUT');
  assert.equal(f.events.includes('stop'),false);
 });
+test('BACKED_UP runner busy after backup preserves the proven previous runtime and resumes intake',async()=>{
+ const f=fixture({
+  stopOwnSupervisor:async()=>{throw Object.assign(Error('busy seat'),{code:'RUNNERS_NOT_IDLE'});},
+  verifyRestoredPrevious:async sha=>{f.events.push('verify-snapshot-and-owner');return sha===previous;},
+  verifyPrevious:async({installedSha,requireRunning,requireIdle})=>{
+   f.events.push('verify-previous-online');
+   return installedSha===previous&&requireRunning===true&&requireIdle===false;
+  },
+  restore:async()=>{throw Error('must not overwrite the running original Controller');}
+ });
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'BLOCKED');
+ assert.equal(out.code,'RUNNERS_NOT_IDLE');
+ assert.equal(out.firstFail,'BACKED_UP');
+ assert.equal(out.actualInstalledSha,previous);
+ assert.equal(out.workflowEnabled,true);
+ assert.equal(f.installed,previous);
+ assert.equal(f.paused,false);
+ assert.ok(f.events.includes('verify-snapshot-and-owner'));
+ assert.ok(f.events.includes('verify-previous-online'));
+ assert.ok(f.events.includes('replay-missed-issues'));
+ for(const forbidden of ['stop','switch','restore','reconnectPrevious'])
+  assert.ok(!f.events.includes(forbidden),forbidden);
+});
+test('BACKED_UP rejected previous-runtime proof freezes before destructive rollback',async()=>{
+ const f=fixture({
+  stopOwnSupervisor:async()=>{throw Object.assign(Error('busy'),{code:'RUNNERS_NOT_IDLE'});},
+  verifyRestoredPrevious:async()=>false,
+  restore:async()=>{throw Error('unapproved restore');}
+ });
+ const out=await applyApprovedUpdate(request,f.port);
+ assert.equal(out.status,'RECOVERY_REQUIRED');
+ assert.equal(out.firstFail,'BACKED_UP');
+ assert.equal(out.code,'RUNNERS_NOT_IDLE');
+ assert.equal(out.actualInstalledSha,null);
+ assert.equal(f.paused,true);
+ assert.ok(!f.events.includes('restore'));
+ assert.ok(!f.events.includes('reconnectPrevious'));
+ assert.ok(!f.events.includes('switch'));
+});
 test('lost stop acknowledgement confirms the old supervisor before treating the install as blocked',async()=>{
  const f=fixture();
  f.port.stopOwnSupervisor=async()=>{throw Object.assign(Error('lost ACK'),{code:'SUPERVISOR_STOP_ACK_TIMEOUT'});};
