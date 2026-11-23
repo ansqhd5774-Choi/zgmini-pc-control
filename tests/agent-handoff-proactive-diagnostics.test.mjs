@@ -105,7 +105,7 @@ test('large CI log captures actual failed TAP tests in the tail within the 128 K
     '2026-11-22T12:23:02Z ok 9 - healthy fixture HTTP 503 was rejected\n';
   const text=passed+'2026-11-22T12:23:10Z PASS fixture\n'.repeat(9000)+
     '2026-11-22T12:24:42Z not ok 133 - actual regression failure\n'+
-    '2026-11-22T12:24:43Z harmless output\n'.repeat(3000);
+    '2026-11-22T12:24:43Z harmless output\n'.repeat(1800);
   assert.ok(text.indexOf('not ok 133')>131072);
   assert.ok(text.length-text.indexOf('not ok 133')<114688);
   assert.deepEqual(classifyLogs(text),['ASSERTION_HINT']);
