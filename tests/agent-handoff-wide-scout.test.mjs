@@ -237,6 +237,40 @@ test('saturated cancellation day recovers 288 runs via bounded hourly queries',a
  assert.equal(new Set(result.items.map(x=>x.id)).size,288);
  assert.ok(count<=50,'hourly extension stays bounded and skips ordinary statuses');
 });
+test('five saturated days fit the shared 96-call partition budget',async()=>{
+ const time=Date.parse('2026-11-16T15:00:00Z');
+ const dates=['2026-11-11','2026-11-12','2026-11-13','2026-11-14','2026-11-15'];
+ const runs=dates.flatMap((date,di)=>Array.from({length:250},(_,i)=>({
+   id:30000+di*250+i,status:'completed',conclusion:'cancelled',
+   created_at:date+'T'+String(i%24).padStart(2,'0')+':'+
+     String(Math.floor(i/24)).padStart(2,'0')+':00Z'
+ })));
+ let totalCalls=0,segmentedCalls=0;
+ const requestRuns=async resource=>{
+   totalCalls++;
+   const params=new URL(resource,'https://api.github.com/').searchParams;
+   const status=params.get('status'),created=params.get('created');
+   const page=Number(params.get('page'));
+   if(created.includes('..'))segmentedCalls++;
+   let rows=runs.filter(x=>x.conclusion===status);
+   if(created.includes('..')){
+     const [from,to]=created.split('..');
+     rows=rows.filter(x=>x.created_at>=from&&x.created_at<=to);
+   }else if(created.startsWith('>=')){
+     rows=rows.filter(x=>x.created_at.slice(0,10)>=created.slice(2));
+   }else rows=rows.filter(x=>x.created_at.slice(0,10)===created);
+   rows.sort((a,b)=>b.created_at.localeCompare(a.created_at)||b.id-a.id);
+   return {workflow_runs:rows.slice((page-1)*100,page*100)};
+ };
+ const result=await recentRuns(time,requestRuns);
+ assert.equal(result.complete,true);
+ assert.equal(result.items.length,1250);
+ assert.equal(result.coverage.find(x=>x.status==='cancelled').count,1250);
+ assert.equal(new Set(result.items.map(x=>x.id)).size,1250);
+ assert.ok(segmentedCalls<=60,'only busy days need bounded four-hour ranges');
+ assert.ok(totalCalls<=96,'all regular and secondary calls remain economical');
+});
+
 test('unsupported hourly filter cannot fake complete day coverage',async()=>{
  const time=Date.parse('2026-11-16T15:00:00Z');
  const all=Array.from({length:230},(_,i)=>({
