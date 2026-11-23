@@ -144,7 +144,7 @@ async function ensureShard(io,month,entries){
     const found=after.find(x=>x.index===index);
     if(!found){
       // Preserve an authenticated HTTP denial's fixed phase after readback.
-      if(/^PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_(401|403)_SHARD_CREATE$/.test(error?.message??''))throw error;
+      if(/^PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_(?:401|403)_SHARD_CREATE(?:_(?:RATE_LIMIT_SIGNAL|CAUSE_UNVERIFIED))?$/.test(error?.message??''))throw error;
       stop('SHARD_CREATE_OUTCOME_UNKNOWN');
     }
     return found.issue;
@@ -231,7 +231,7 @@ export async function scanLatest(io,nowMs){
       const after=await loadShardEvidence(io,month);
       if(!recordedInEntries(after,run)){
         // Preserve fixed HTTP denial phase without retrying an uncertain POST.
-        if(/^PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_(401|403)_COMMENT_WRITE$/.test(error?.message??''))throw error;
+        if(/^PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_(?:401|403)_COMMENT_WRITE(?:_(?:RATE_LIMIT_SIGNAL|CAUSE_UNVERIFIED))?$/.test(error?.message??''))throw error;
         stop('WRITE_RESULT_UNKNOWN');
       }
     }
@@ -265,6 +265,12 @@ export function githubRequestPhase(resource,method='GET'){
   if(resource==='issues'&&method==='POST')return 'SHARD_CREATE';
   return 'OTHER';
 }
+// Only authenticated response headers are used; never log raw headers/body.
+export function github403Signal(headers){
+  if(headers?.get?.('x-ratelimit-remaining')==='0'||
+     headers?.get?.('retry-after')!=null)return 'RATE_LIMIT_SIGNAL';
+  return 'CAUSE_UNVERIFIED';
+}
 async function request(resource,{method='GET',body,text=false}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN_MISSING');
   const endpoint=resource.startsWith('search/')?'https://api.github.com/':API;
@@ -276,7 +282,8 @@ async function request(resource,{method='GET',body,text=false}={}){
     ...(body?{body:JSON.stringify(body)}:{}),
     signal:AbortSignal.timeout(20000)
   });
-  if(!res.ok)stop('GITHUB_HTTP_'+res.status+'_'+githubRequestPhase(resource,method));
+  if(!res.ok)stop('GITHUB_HTTP_'+res.status+'_'+githubRequestPhase(resource,method)+
+    (res.status===403?'_'+github403Signal(res.headers):''));
   if(!text)return res.json();
   // Limit the log read to the first 128 KiB; never persist or print log text.
   if(!res.body)stop('LOG_EMPTY');
