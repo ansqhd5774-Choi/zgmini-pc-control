@@ -51,6 +51,28 @@ test('expanded categories, old exclusion and newest-first',()=>{
   assert.deepEqual(sample.findings.map(x=>x.id),[4,3,2,90,77]);
   assert.doesNotMatch(renderWideReport(sample),/undefined|secret=/);
 });
+test('cancelled-run flood cannot hide a pending handoff from the 25-row report',()=>{
+  const cancelled=Array.from({length:40},(_,i)=>run(1000+i,
+    '2026-11-16T14:00:00Z'));
+  const sample=evaluateWideSnapshot(snapshot({
+    runs:cancelled,
+    issues:[issue(900,'2026-11-12T13:00:00Z')],
+    pulls:[pr(901,'2026-11-12T13:00:00Z')]
+  }),now);
+  assert.equal(sample.counts.cancelled,40);
+  assert.equal(sample.counts.pendingHandoffs,1);
+  assert.equal(sample.counts.waitingPRs,1);
+  assert.equal(sample.findings.length,WIDE_POLICY.maxFindings);
+  assert.equal(sample.omittedFindings,17);
+  assert.ok(sample.findings.some(x=>x.kind==='HANDOFF_AGE_REVIEW'&&x.id===900));
+  assert.ok(sample.findings.some(x=>x.kind==='PR_EVIDENCE_REVIEW'&&x.id===901));
+  assert.equal(sample.findings.filter(x=>x.kind==='CANCELLED_RUN_REVIEW').length,23);
+  assert.ok(sample.findings.every((x,i,a)=>!i||a[i-1].at>=x.at));
+  const output=renderWideReport(sample);
+  assert.match(output,/HANDOFF_AGE_REVIEW \[#900\]/);
+  assert.match(output,/PR_EVIDENCE_REVIEW \[#901\]/);
+  assert.doesNotMatch(output,/장애 확정.*cancelled=true/);
+});
 test('intentional skips and running less than two hours do not create incident',()=>{
   const r=evaluateWideSnapshot(snapshot({
     runs:[run(11,recent,{conclusion:'skipped'}),
