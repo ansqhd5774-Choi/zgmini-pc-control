@@ -94,7 +94,13 @@ export function classifyLogs(text){
     ['UPSTREAM_5XX_HINT',/\b(HTTP 50[0-9]|status 50[0-9]|bad gateway|service unavailable)\b/i],
     ['DISK_SPACE_HINT',/\b(ENOSPC|no space left on device)\b/i]
   ];
-  return tests.filter(([,r])=>r.test(text.slice(0,131072))).map(([name])=>name).slice(0,3);
+  // TAP successful-test titles are not failure evidence. In particular, a
+  // passing fixture named "HTTP 503" must not become an upstream outage hint.
+  // Preserve `not ok` and actual error lines for the normal failure signals.
+  const log=text.slice(0,131072).split(/\r?\n/).filter(line=>
+    !/^\s*(?:\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z\s+)?(?:# Subtest:|ok \d+ -)/.test(line)
+  ).join('\n');
+  return tests.filter(([,r])=>r.test(log)).map(([name])=>name).slice(0,3);
 }
 export function assertSameRun(a,b){
   if(!a||!b||a.id!==b.id||a.run_attempt!==b.run_attempt||
