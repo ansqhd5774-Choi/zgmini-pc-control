@@ -132,7 +132,7 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
   // Share the installed Writer B mutex; do not create a competing lock
   // or touch the existing Core lock.
   const lock=acquireInstallLock({journalRoot,requestId,sharedLock});
-  let attempted=false,retain=false;
+  let attempted=false;
   try{
     // Re-check installed source/config under the actual Writer lease.
     verifyBeaInstalledBinding(m,{
@@ -145,7 +145,7 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
       requestId,sourceSha:m.sourceSha,
       manifestSha256:auth.request.approvalManifestSha256,
       attemptedAt:new Date().toISOString()
-    })+'\\n',{flag:'wx'});
+    })+'\n',{flag:'wx'});
     attempted=true;
     const value=await perform({pcBase:PC_ROOT,providers});
     const capture=verifyBeaCapture(value);
@@ -164,6 +164,6 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
   }finally{
     // Keep the durable attempt evidence; release only the exact owned lock.
     // No forced lock removal or deletion of other Writer claims.
-    releaseInstallClaim({fd:lock.fd,sharedLock,requestId,retain});
+    releaseInstallClaim({fd:lock.fd,sharedLock,requestId,retain:false});
   }
 }
