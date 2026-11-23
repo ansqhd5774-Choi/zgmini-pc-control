@@ -138,11 +138,15 @@ async function ensureShard(io,month,entries){
   if(index>100)stop('SHARD_INDEX_CAP');
   let result;
   try{result=await io.createShard(month,index,shardTitle(month,index),shardMarker(month,index));}
-  catch{
+  catch(error){
     // A timed-out POST may have created an Issue. Never blindly send again.
     const after=await loadShardEvidence(io,month);
     const found=after.find(x=>x.index===index);
-    if(!found)stop('SHARD_CREATE_OUTCOME_UNKNOWN');
+    if(!found){
+      // Preserve an authenticated HTTP denial's fixed phase after readback.
+      if(/^PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_(401|403)_SHARD_CREATE$/.test(error?.message??''))throw error;
+      stop('SHARD_CREATE_OUTCOME_UNKNOWN');
+    }
     return found.issue;
   }
   if(!goodId(result?.number))stop('SHARD_CREATE_RESULT_INVALID');
@@ -216,9 +220,13 @@ export async function scanLatest(io,nowMs){
     if(!actual||actual.issue.state!=='open'||actual.comments.length>=
       SCOUT_POLICY.maxShardComments)stop('SHARD_WRITE_SCOPE_DRIFT');
     try{await io.postComment(target.number,report);}
-    catch{
+    catch(error){
       const after=await loadShardEvidence(io,month);
-      if(!recordedInEntries(after,run))stop('WRITE_RESULT_UNKNOWN');
+      if(!recordedInEntries(after,run)){
+        // Preserve fixed HTTP denial phase without retrying an uncertain POST.
+        if(/^PROACTIVE_DIAG_RUNNER_GITHUB_HTTP_(401|403)_COMMENT_WRITE$/.test(error?.message??''))throw error;
+        stop('WRITE_RESULT_UNKNOWN');
+      }
     }
     const after=await loadShardEvidence(io,month);
     if(!recordedInEntries(after,run))stop('WRITE_READBACK_STOP');
