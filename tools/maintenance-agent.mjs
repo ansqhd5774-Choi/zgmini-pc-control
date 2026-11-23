@@ -13,7 +13,11 @@ import {validateMaintenanceRequest,validateUpdateRequest,
   validateR54BIssueEnvelope,validateR54BManifestRequest,
   R54_B_ISSUE_TITLE,R54_B_OPERATION,R54_B_SOURCE_FILES,
   SOURCE_BUNDLE_OPERATION,SOURCE_BUNDLE_ISSUE_TITLE,
-  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval} from "./maintenance-contract.mjs";
+  validateSourceBundleIssueEnvelope,validateSourceBundleBApproval,
+  INSTALLED_RECOVERY_OPERATION,INSTALLED_RECOVERY_ISSUE_TITLE,
+  INSTALLED_RECOVERY_ORIGINAL_ID,INSTALLED_RECOVERY_SOURCE_SHA,
+  INSTALLED_RECOVERY_CONTROLLER_SHA,INSTALLED_RECOVERY_MANIFEST_PATH,
+  validateInstalledRecoveryIssueEnvelope} from "./maintenance-contract.mjs";
 import {acquireMaintenanceLock} from "./maintenance-lock.mjs";
 
 const CONTROL_REPOSITORY="ansqhd5774-Choi/zgmini-pc-control";
@@ -605,7 +609,111 @@ export function createMaintenanceAgent({
     catch{/* Reconcile a lost response; never retry the PC or blindly post. */}
     return {...outcome,feedback:present(await issueDetails(issue.number))?'VERIFIED':'COMMENT_OUTCOME_UNKNOWN'};
   }
+  // Separate fixed recovery lane. This deliberately does not reuse the
+  // original #2960 controller-update request or its durable request ledger.
+  async function processInstalledRecoveryIssue(issue){
+    if(!issueIsTrusted(issue,{allowedActors,title:INSTALLED_RECOVERY_ISSUE_TITLE,label}))
+      return {status:'IGNORED',issueNumber:issue?.number};
+    if(typeof issue.body!=='string'||Buffer.byteLength(issue.body)>MAX_BODY_BYTES)
+      return rejectAdmission(issue,'ISSUE_BODY_INVALID');
+    let request;
+    try{
+      request=validateInstalledRecoveryIssueEnvelope(parseIssueBody(issue.body),
+        {actor:issue.author.login,allowedActors,controlRepository:repo});
+    }catch(error){return rejectAdmission(issue,error?.message);}
+    const bodyDigest=sha256(issue.body),fingerprint=sha256(JSON.stringify(request));
+    const prior=loadLedger(request.requestId);
+    if(prior){
+      if(prior.issueNumber!==issue.number||prior.bodyDigest!==bodyDigest||
+         prior.fingerprint!==fingerprint||prior.actor!==issue.author.login)
+        return {status:'BLOCKED',code:'REQUEST_ID_REUSE_CONFLICT',issueNumber:issue.number};
+      // A receiver crash or timeout can occur *after* lease archive. Never
+      // auto-execute a RUNNING or UNKNOWN recovery a second time.
+      if(prior.result){
+        const stored=await deliverReports(prior,request.operation);
+        await commentOnceAndRecord(stored);
+        await uploadCompletionCommentOnce(loadLedger(request.requestId));
+      }
+      return {status:prior.status,code:'DUPLICATE_REQUEST_SUPPRESSED',
+        requestId:request.requestId,executionStarted:false};
+    }
+    // Approval comes from the same authenticated private GitHub repository;
+    // the real operator repeats exact local/source/CAS/owner validation.
+    let approval;
+    try{
+      const response=await githubJson(['api',
+        `repos/${repo}/contents/${INSTALLED_RECOVERY_MANIFEST_PATH}?ref=main`],
+        'INSTALLED_RECOVERY_APPROVAL_READ_FAILED');
+      if(response?.type!=='file'||response.encoding!=='base64'||
+        typeof response.content!=='string')throw coded('INSTALLED_RECOVERY_APPROVAL_INVALID');
+      const raw=Buffer.from(response.content.replace(/\\s/g,''),'base64');
+      if(!raw.length||raw.length>MAX_MANIFEST_BYTES||
+         sha256(raw)!==request.approvalManifestSha256)
+        throw coded('INSTALLED_RECOVERY_APPROVAL_HASH_MISMATCH');
+      approval=JSON.parse(raw.toString('utf8'));
+      if(approval.schema!=='ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1'||
+         approval.approved!==true||approval.operation!=='RECONCILE_INSTALLED'||
+         approval.requestId!==INSTALLED_RECOVERY_ORIGINAL_ID||
+         approval.issueNumber!==2960||
+         approval.sourceSha!==INSTALLED_RECOVERY_SOURCE_SHA||
+         approval.targetControllerSha!==INSTALLED_RECOVERY_CONTROLLER_SHA)
+        throw coded('INSTALLED_RECOVERY_APPROVAL_SCOPE_INVALID');
+    }catch(error){
+      return {status:'BLOCKED',code:safeCode(error?.code??error?.message),
+        requestId:request.requestId,executionStarted:false};
+    }
+    const held=claim(request,issue,fingerprint,bodyDigest);
+    if(!held.created)return {status:'UNKNOWN',code:'INSTALLED_RECOVERY_CLAIM_UNCERTAIN',
+      requestId:request.requestId,executionStarted:false};
+    // A second request ID must not replay the same approved lease archival.
+    const effectFile=path.join(requestsDir,'effect-'+sha256(
+      'INSTALLED_RECOVERY:'+INSTALLED_RECOVERY_ORIGINAL_ID)+'.json');
+    try{
+      fs.writeFileSync(effectFile,JSON.stringify({requestId:request.requestId,
+        issueNumber:issue.number,originalRequestId:INSTALLED_RECOVERY_ORIGINAL_ID})+'\\n',
+        {encoding:'utf8',flag:'wx',mode:0o600});
+    }catch(error){
+      const result=normalizedResult(request,{status:error?.code==='EEXIST'?'BLOCKED':'UNKNOWN',
+        firstFail:'INSTALLED_RECOVERY_EFFECT_CLAIM_UNAVAILABLE'},
+        'INSTALLED_RECOVERY_EFFECT_CLAIM_UNAVAILABLE');
+      const stored=await deliverReports(persistResult(held.entry,result),request.operation);
+      await commentOnceAndRecord(stored);
+      return {status:result.status,code:result.code,requestId:request.requestId};
+    }
+    let result;
+    try{
+      verifyInstalledSource();
+      // Fixed source/script/arguments; no Issue-supplied shell, path, SHA or
+      // original ID. Child must independently attest Windows operator lineage.
+      const script='E:/ZGmini/projects/zgmini-pc-control/tools/maintenance-recovery.mjs';
+      const output=parseJsonOutput(await exec(nodeBinary,[script,'reconcile-installed',
+        '--request-id',INSTALLED_RECOVERY_ORIGINAL_ID,
+        '--source-sha',INSTALLED_RECOVERY_SOURCE_SHA],updateTimeoutMs,safeUpdaterEnv()),
+        'INSTALLED_RECOVERY_RESULT_INVALID');
+      if(output?.status==='RECOVERED_INSTALLED_STATE'&&
+         output.code==='INSTALLED_RUNTIME_RECOVERED_HISTORIC_POSTCHECK_UNKNOWN'&&
+         output.leaseArchived===true&&output.requestId===INSTALLED_RECOVERY_ORIGINAL_ID&&
+         output.installedSha===INSTALLED_RECOVERY_CONTROLLER_SHA)
+        result=normalizedResult(request,{status:'SUCCEEDED',
+          actualControllerSha:output.installedSha},output.code);
+      else result=normalizedResult(request,{status:'UNKNOWN',
+        firstFail:'INSTALLED_RECOVERY_OUTCOME_UNVERIFIED'},
+        'INSTALLED_RECOVERY_OUTCOME_UNVERIFIED');
+    }catch(error){
+      // Preserve claim on any unknown outcome. Inspect the original lease and
+      // completion record; never repeat this recovery on the next poll.
+      result=normalizedResult(request,{status:'UNKNOWN',
+        firstFail:'INSTALLED_RECOVERY_OUTCOME_UNKNOWN'},
+        'INSTALLED_RECOVERY_OUTCOME_UNKNOWN');
+    }
+    const stored=await deliverReports(persistResult(held.entry,result),request.operation);
+    await commentOnceAndRecord(stored);
+    return {status:result.status,code:result.code,requestId:request.requestId,
+      originalRequestId:INSTALLED_RECOVERY_ORIGINAL_ID};
+  }
   async function processIssue(issue){
+    if(issue?.title===INSTALLED_RECOVERY_ISSUE_TITLE)
+      return processInstalledRecoveryIssue(issue);
     if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(issue?.title)
       ||!issueIsTrusted(issue,{allowedActors,title:issue.title,label}))
       return {status:"IGNORED",issueNumber:issue?.number};
@@ -771,7 +879,8 @@ export function createMaintenanceAgent({
       if(!Number.isSafeInteger(number)||number<=0||seen.has(number))continue;
       // Summary filtering avoids unnecessary reads; processIssue still verifies
       // the full Issue actor, label, request body and approval before applying.
-      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE].includes(entry?.title))continue;
+      if(![ISSUE_TITLE,R6_HOST_ISSUE_TITLE,R54_B_ISSUE_TITLE,SOURCE_BUNDLE_ISSUE_TITLE,
+        INSTALLED_RECOVERY_ISSUE_TITLE].includes(entry?.title))continue;
       seen.add(number);
       const cached=settledIssueCache.get(number);
       const updatedAt=entry?.updatedAt;
