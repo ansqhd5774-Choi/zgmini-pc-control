@@ -162,11 +162,21 @@ export async function recentRuns(now,requestRuns=request){
     if(!complete){
       // A busy seven-day status exceeds 200 runs. Partition by calendar day
       // using bounded one/two-page reads; never infer completeness from cap.
+      // A finer query must not silently discard known recent runs from the
+      // original status pages when GitHub returns empty or partial day data.
+      const baselineIds=new Set(items.filter(x=>{
+        const at=Date.parse(x?.created_at??'');
+        return Number.isFinite(at)&&at>=cutoff;
+      }).map(x=>x.id));
       const daily=[];complete=true;
       for(const day of dateDays){
         let dayComplete=false;
         for(let page=1;page<=2;page++){
           const rows=await pageFor(status,day,page);
+          // A successful HTTP response does not establish that GitHub applied
+          // the calendar-day filter. Keep an incomplete result on a mismatch.
+          if(rows.some(x=>typeof x?.created_at!=='string'||
+            x.created_at.slice(0,10)!==day)){complete=false;break;}
           daily.push(...rows);
           if(endsWindow(rows)){dayComplete=true;break;}
         }
@@ -231,7 +241,16 @@ export async function recentRuns(now,requestRuns=request){
           }else complete=false;
         }
       }
-      items.splice(0,items.length,...daily);
+      const recoveredIds=new Set(daily.map(x=>x.id));
+      if([...baselineIds].some(id=>!recoveredIds.has(id)))complete=false;
+      if(complete)items.splice(0,items.length,...daily);
+      else{
+        // Preserve every uniquely identified observation without claiming
+        // completeness when the narrower pages cannot certify their coverage.
+        const retained=new Map();
+        for(const row of [...items,...daily])if(goodId(row?.id))retained.set(row.id,row);
+        items.splice(0,items.length,...retained.values());
+      }
     }
     return {status,items,complete};
   }));
