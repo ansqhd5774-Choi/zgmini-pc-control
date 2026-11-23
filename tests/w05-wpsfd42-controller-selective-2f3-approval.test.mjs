@@ -35,7 +35,8 @@ test('W05 fixed threefile Controller selective review is internally exact',()=>{
   '53c75239ade4830b6a5cf76b57c85946f7e0bbc2');
  assert.equal(manifest.selectiveSource.branch,
   'codex/w05-2f3-single-parent-20261123');
- assert.deepEqual(manifest.selectiveSource.customPaths,paths);
+ assert.deepEqual(manifest.selectiveSource.customPaths,
+  ['config/operations.json','controller/operations.mjs']);
  assert.equal(manifest.approval.ref,
   'https://github.com/ansqhd5774-Choi/zgmini-pc-control/pull/2807');
  assert.equal(validateControllerSelectivePin(manifest,pin),true);
