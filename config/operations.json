@@ -8,6 +8,7 @@
     "runner-smoke": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-status": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "d05-lineage-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "sector-r3-dated-ledger-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "core-runtime-source-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "inflation-core-lock-observation-readonly": {"grade":"A","timeoutSeconds":240,"resource":"heavy","minimumFreeMiB":1536},
     "inflation-event129-evidence-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
