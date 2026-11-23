@@ -1,0 +1,60 @@
+{
+  "schema": "ZGMINI_PC_RESULT_V1",
+  "jobId": "run-45167579005-1-seat-5",
+  "requestId": "pc-4260c403-70c9-43ba-b91a-146ad6e871ec",
+  "startedAt": "2026-11-23T11:42:49.657Z",
+  "controlRepository": "ansqhd5774-Choi/zgmini-pc-control",
+  "controlSourceSha": "ce843af5948881db399e4810d81590e4f825b76d",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "requestedSourceSha": "7d8ff9f8444ef26bab69b6dac86424419b077341",
+  "sourceBranch": "main",
+  "operation": "earnings-bea-nipa-capture-readonly",
+  "seat": 5,
+  "status": "PASS",
+  "code": "BEA_NIPA_PRIVATE_ARCHIVE_NOT_STORED",
+  "lastPass": "ALLOWLISTED_OPERATION_COMPLETED",
+  "firstFail": null,
+  "operationalWrites": 0,
+  "providerCalls": 0,
+  "d1Writes": 0,
+  "sqliteOpened": false,
+  "controlWorkspaceWrites": true,
+  "chatId": "chat-bea-nipa-readback-after-date-fix-20261123",
+  "effectClass": "REGISTERED_OPERATION",
+  "pcOperationalApprovedSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "exitCode": 0,
+  "result": {
+    "status": "PASS",
+    "code": "BEA_NIPA_PRIVATE_ARCHIVE_NOT_STORED",
+    "attempts": 2,
+    "markedAttempts": 2,
+    "completedJournalAttempts": 0,
+    "storedSourceCount": 0,
+    "verifiedSourceCount": 0,
+    "latest": null,
+    "providerCalls": 0,
+    "sqliteWrites": 0,
+    "d1Writes": 0,
+    "operationalWrites": 0,
+    "rawExposed": false,
+    "attemptStatus": [
+      {
+        "requestId": "0ac25f3d-e307-41d4-8fcc-62c933f5b9d3",
+        "markerPresent": true,
+        "checkpointVerified": false
+      },
+      {
+        "requestId": "533159de-4c24-4626-a732-658409eb8401",
+        "markerPresent": true,
+        "checkpointVerified": false
+      }
+    ]
+  },
+  "protectedBeforeSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedAfterSha256": "0027554791e4341662226e06ec3908c736b6dfbbb9b97b181e64843971639d80",
+  "protectedStateUnchanged": true,
+  "actualExecutionSha": "ce843af5948881db399e4810d81590e4f825b76d",
+  "next": "READ_RESULT_NO_REPEAT",
+  "finishedAt": "2026-11-23T11:42:54.928Z",
+  "durationMs": 5271
+}
