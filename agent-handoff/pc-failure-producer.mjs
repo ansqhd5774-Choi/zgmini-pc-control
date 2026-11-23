@@ -106,6 +106,42 @@ export function findOriginalIssueNumber(comments, {runId, attempt, seat}) {
   return number;
 }
 
+// The global chronological comment inventory eventually exceeds its safety
+// bound for historical workflow_run replay. Resolve one candidate from the
+// authenticated request identity, then verify the exact original bot receipt.
+// Search is a hint, never proof of receipt or authority.
+export async function resolveTargetedReceipt({requestId,runId,attempt,seat},
+  {searchIssues,readIssueComments}={}){
+  if(typeof requestId!=='string'||!/^[a-z0-9-]{8,80}$/.test(requestId)||
+    !issueNumber(runId)||!Number.isSafeInteger(attempt)||attempt<1||attempt>999||
+    !issueNumber(seat)||seat>6||typeof searchIssues!=='function'||
+    typeof readIssueComments!=='function')stop('TARGETED_RECEIPT_INPUT_INVALID');
+  const result=await searchIssues(requestId);
+  if(result?.incomplete_results!==false||
+    !Number.isSafeInteger(result?.total_count)||result.total_count<0||
+    result.total_count>100||!Array.isArray(result.items)||
+    result.items.length!==result.total_count)
+    stop('TARGETED_SEARCH_INCOMPLETE');
+  const exact=result.items.filter(issue=>{
+    if(!issueNumber(issue?.number)||issue.user?.login!==OWNER||
+      !Array.isArray(issue.labels)||
+      !issue.labels.some(label=>label.name==='pc-job')||
+      typeof issue.body!=='string')return false;
+    try{
+      const body=JSON.parse(issue.body);
+      return body?.schema==='ZGMINI_PC_JOB_V1'&&
+        body.requestId===requestId;
+    }catch{return false;}
+  });
+  if(exact.length>1)stop('TARGETED_ORIGINAL_ISSUE_AMBIGUOUS');
+  if(exact.length===0)return null;
+  const comments=await readIssueComments(exact[0].number);
+  const number=findOriginalIssueNumber(comments,{runId,attempt,seat});
+  if(number!==null&&number!==exact[0].number)
+    stop('TARGETED_RECEIPT_ORIGIN_DRIFT');
+  return number;
+}
+
 /**
  * A caller supplies GitHub I/O; no credentials or PC execution are available
  * to the converter. Only confirmed failure status can produce a new Issue.
@@ -114,7 +150,7 @@ export function findOriginalIssueNumber(comments, {runId, attempt, seat}) {
 export async function processCompletedPcJob(event, {
   readReport, readComments, readIssue, listHandoffs, createHandoff,
   readReportText, listResourceWaitComments, createResourceWaitComment,
-  readResourceWaitComment, routeHandoff
+  readResourceWaitComment, routeHandoff, readTargetedReceipt
 }) {
   const run = assertCompletedPcJobEvent(event);
   if ([readReport, readComments, readIssue, listHandoffs, createHandoff]
@@ -140,7 +176,29 @@ export async function processCompletedPcJob(event, {
   const readSeat=(seat,phase,read)=>scopedSeatRead(seat,phase,read,recordPending);
   const verifySeat=(seat,phase,verify)=>scopedSeatProof(seat,phase,verify,
     problem=>{result.seatProofUnverified++;result.seatProofProblems.push(problem);});
-  let comments = null;
+  let comments = null, commentInventoryOverflow=false;
+  const resolveOriginal=async(seat,report)=>{
+    if(commentInventoryOverflow)
+      return readSeat(seat,'RECEIPT_INVENTORY',()=>
+        readTargetedReceipt({runId:run.runId,attempt:run.attempt,seat,
+          requestId:report.requestId}));
+    if(comments===null){
+      try{
+        const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
+          ()=>readComments(run.since));
+        if(!inventory.ready)return {ready:false};
+        comments=inventory.value;
+      }catch(error){
+        if(error?.message!=='PC_HANDOFF_PRODUCER_COMMENT_INVENTORY_LIMIT'||
+          typeof readTargetedReceipt!=='function')throw error;
+        commentInventoryOverflow=true;
+        return readSeat(seat,'RECEIPT_INVENTORY',()=>
+          readTargetedReceipt({runId:run.runId,attempt:run.attempt,seat,
+            requestId:report.requestId}));
+      }
+    }
+    return {ready:true,value:findOriginalIssueNumber(comments,{...run,seat})};
+  };
   for (let seat = 1; seat <= 6; seat++) {
     const resultPath = `results/${run.runId}-${run.attempt}-seat-${seat}.json`;
     const observed=await readSeat(seat,'RESULT_JSON',()=>readReport(resultPath));
@@ -153,13 +211,9 @@ export async function processCompletedPcJob(event, {
     // central wait record. Other BLOCKED codes remain out of this path.
     if(report.status==='BLOCKED'&&
       ['RESOURCE_WAIT_MEMORY','MEMORY_WAIT_ALREADY_ACTIVE','LEASE_BUSY'].includes(report.code)){
-      if(comments===null){
-        const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
-          ()=>readComments(run.since));
-        if(!inventory.ready)continue;
-        comments=inventory.value;
-      }
-      const original=findOriginalIssueNumber(comments,{...run,seat});
+      const originalReceipt=await resolveOriginal(seat,report);
+      if(!originalReceipt.ready)continue;
+      const original=originalReceipt.value;
       if(original===null){result.missingReceipts++;continue;}
       const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
       if(!origin.ready)continue;
@@ -185,13 +239,9 @@ export async function processCompletedPcJob(event, {
     }
     // No Issue is created from BLOCKED, STATE_UNKNOWN or successful results.
     if (!['FAIL', 'RUNTIME_FAILED'].includes(report.status)) continue;
-    if(comments===null){
-      const inventory=await readSeat(seat,'RECEIPT_INVENTORY',
-        ()=>readComments(run.since));
-      if(!inventory.ready)continue;
-      comments=inventory.value;
-    }
-    const original = findOriginalIssueNumber(comments, {...run, seat});
+    const originalReceipt=await resolveOriginal(seat,report);
+    if(!originalReceipt.ready)continue;
+    const original=originalReceipt.value;
     if (original === null) { result.missingReceipts++; continue; }
     const origin=await readSeat(seat,'ORIGIN_ISSUE',()=>readIssue(original));
     if(!origin.ready)continue;
@@ -373,6 +423,23 @@ export async function main(env = process.env) {
     },
     readComments: async since => completePages(
       `issues/comments?since=${encodeURIComponent(since)}`, 'COMMENT'),
+    readTargetedReceipt: candidate => resolveTargetedReceipt(candidate,{
+      searchIssues:async requestId=>{
+        const q=`repo:${REPO} is:issue in:body "${requestId}"`;
+        if(!env.GITHUB_TOKEN)stop('TOKEN_NOT_CONFIGURED');
+        const response=await fetch(
+          'https://api.github.com/search/issues?q='+encodeURIComponent(q)+
+            '&per_page=100',{
+            headers:{Authorization:`Bearer ${env.GITHUB_TOKEN}`,
+              Accept:'application/vnd.github+json',
+              'X-GitHub-Api-Version':'2022-11-28'},
+            signal:AbortSignal.timeout(25000)});
+        if(!response.ok)stop('GITHUB_HTTP_'+response.status);
+        return response.json();
+      },
+      readIssueComments:number=>completePages(
+        `issues/${number}/comments`,'TARGETED_RECEIPT')
+    }),
     readIssue: async number => {
       const item = await request(`issues/${number}`);
       return {...item, repository: REPO};
