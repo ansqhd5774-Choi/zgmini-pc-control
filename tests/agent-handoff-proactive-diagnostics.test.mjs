@@ -115,6 +115,46 @@ test('already posted exact run does not block newer unrecorded reports',async()=
   const result=await scanLatest(io,now);
   assert.deepEqual(result.observed.map(x=>x.runId),[102]);
 });
+test('authenticated month snapshot deduplicates many previously recorded runs with one shard read',async()=>{
+  const runs=[run(201),run(202),run(203),run(204)];
+  const io=ioFor(runs);
+  const issue=await io.createShard('2026-11',1,
+    'ZGMINI Proactive Diagnostics 2026-11 #1',
+    '<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2 month:2026-11 shard:1 -->');
+  runs.forEach((r,i)=>io.shards.get(issue.number).comments.push(receipt(r,500+i)));
+  const search=io.findShards,read=io.readShardComments;
+  let searches=0,reads=0;
+  io.findShards=async month=>{searches++;return search(month);};
+  io.readShardComments=async n=>{reads++;return read(n);};
+  const result=await scanLatest(io,now);
+  assert.equal(result.alreadyRecorded,4);
+  assert.equal(result.newReports,0);
+  assert.equal(searches,1);
+  assert.equal(reads,1);
+  assert.equal(io.posted.length,0);
+});
+
+test('cached absent marker is refreshed before write and cannot duplicate another recorded run',async()=>{
+  const runs=[run(301),run(302)];
+  const io=ioFor(runs);
+  const issue=await io.createShard('2026-11',1,
+    'ZGMINI Proactive Diagnostics 2026-11 #1',
+    '<!-- ZGMINI_PROACTIVE_DIAGNOSTIC_LEDGER_R2 month:2026-11 shard:1 -->');
+  const read=io.readShardComments;
+  let reads=0;
+  io.readShardComments=async n=>{
+    reads++;
+    // A concurrent authenticated report appears after the cached first read.
+    if(reads===2)io.shards.get(issue.number).comments.push(receipt(runs[0],600));
+    return read(n);
+  };
+  const result=await scanLatest(io,now);
+  assert.equal(result.newReports,1);
+  assert.equal(result.alreadyRecorded,1);
+  assert.deepEqual(result.observed.map(x=>x.runId),[302]);
+  assert.equal(io.posted.length,1);
+});
+
 test('ledger invalid or source drift fails before writing',async()=>{
   const io=ioFor([run(101)]);
   io.readLedger=async()=>({...ledger(),state:'closed'});

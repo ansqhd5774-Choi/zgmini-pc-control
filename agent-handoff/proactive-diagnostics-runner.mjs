@@ -172,11 +172,18 @@ export async function scanLatest(io,nowMs){
   const selected=selectRecentFailures(inventory,nowMs);
   let existing=0,posted=0,unverified=selected.unverified;
   const observed=[];
+  // Reuse authenticated month evidence for early dedup checks only.
+  // A missing marker still requires a fresh pre-write readback below.
+  const checkedMonths=new Map();
   for(const run of selected.recent){
     if(posted>=SCOUT_POLICY.maxNewComments)break;
     if(recordedFor(legacy,run)){existing++;continue;}
     const month=shardMonth(run);
-    let shards=await loadShardEvidence(io,month);
+    let shards=checkedMonths.get(month);
+    if(!shards){
+      shards=await loadShardEvidence(io,month);
+      checkedMonths.set(month,shards);
+    }
     if(recordedInEntries(shards,run)){existing++;continue;}
     let live,jobs;
     try{
@@ -230,6 +237,8 @@ export async function scanLatest(io,nowMs){
     }
     const after=await loadShardEvidence(io,month);
     if(!recordedInEntries(after,run))stop('WRITE_READBACK_STOP');
+    // A verified write must update the early-dedup snapshot for later runs.
+    checkedMonths.set(month,after);
     posted++;
     observed.push({runId:run.id,attempt:run.run_attempt,
       shardIssue:target.number,classification:'EVIDENCE_REVIEW'});
