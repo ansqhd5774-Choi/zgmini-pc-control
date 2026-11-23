@@ -10,6 +10,21 @@ import {executeJob} from '../controller/engine.mjs';
 
 const policy=JSON.parse(fs.readFileSync(new URL('../config/operations.json',import.meta.url)));
 const digest=x=>createHash('sha256').update(x).digest('hex');
+// Windows isolated CI accounts may lack SeCreateSymbolicLinkPrivilege.
+// Directory junctions preserve realpath escape semantics without that privilege.
+// File symlink assertions stay enabled only where the OS permits the fixture.
+function linkForSecurityTest(t,target,link,kind){
+ try{fs.symlinkSync(target,link,kind==='dir'&&process.platform==='win32'?'junction':kind);}
+ catch(error){
+  if(process.platform==='win32'&&['EPERM','EACCES'].includes(error?.code)){
+   t.skip('Windows test account cannot create this symlink fixture');return false;
+  }
+  throw error;
+ }
+ assert.equal(fs.realpathSync(link),fs.realpathSync(target));
+ return true;
+}
+
 const request=()=>({schema:'ZGMINI_PC_JOB_V1',requestId:'fear-greed-archive-test-1',chatId:'chat-fear-greed',operation:'fear-greed-archive-status',sourceRepository:policy.sourceRepository,sourceBranch:'codex/usa-fear-greed-change-only-r10-20261101',sourceSha:'a'.repeat(40)});
 const taskXml='<Task><Actions><Exec><Command>C:\\Windows\\System32\\wscript.exe</Command><Arguments>&quot;E:\\ZGmini\\data\\pc-writer\\run-local-core.vbs&quot;</Arguments></Exec></Actions></Task>';
 
@@ -152,11 +167,11 @@ test('dynamic Sidecar reason remains unmatched, with concepts only from fixed di
  assert.doesNotMatch(JSON.stringify(r),/GH_PAT_DO_NOT_EXPOSE|SOURCE_APPROVAL_MISMATCH_DYNAMIC/);
 });
 
-test('Sidecar source symlink and oversized script are rejected without external reads',()=>{
+test('Sidecar source symlink and oversized script are rejected without external reads',t=>{
  const f=fixture(),dir=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(dir);
  const outside=path.join(f.root,'private.mjs');
  fs.writeFileSync(outside,"throw Error('SECRET_OUTSIDE_ROOT')");
- fs.symlinkSync(outside,path.join(dir,'archive-run.mjs'));
+ if(!linkForSecurityTest(t,outside,path.join(dir,'archive-run.mjs'),'file'))return;
  fs.writeFileSync(path.join(dir,'run-original-then-archive.vbs'),'x'.repeat(131073));
  fs.writeFileSync(path.join(dir,'last-run.json'),JSON.stringify({reason:'SOURCE_FAILURE'}));
  const r=inspectSidecarSourceGate(f.dataRoot);
@@ -334,36 +349,36 @@ test('corrupt and oversized sidecar ledgers are bounded without leaking content'
  assert.doesNotMatch(JSON.stringify(r),/SECRET_TOKEN_EXAMPLE/);
 });
 
-test('sidecar directory symlink cannot read outside the dedicated sidecar root',()=>{
+test('sidecar directory symlink cannot read outside the dedicated sidecar root',t=>{
  const f=fixture();
  const outside=path.join(f.root,'outside');fs.mkdirSync(outside);
  fs.writeFileSync(path.join(outside,'archive-last-run.json'),JSON.stringify({status:'PASS',token:'DO_NOT_READ'}));
  const directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');
- fs.symlinkSync(outside,directory,'dir');
+ if(!linkForSecurityTest(t,outside,directory,'dir'))return;
  const a=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
  assert.equal(a.archiveTrace.sidecar.reason,'UNSAFE_SIDECAR_DIRECTORY');
  assert.equal(a.archiveTrace.sidecar.evidence,'UNKNOWN');
  assert.doesNotMatch(JSON.stringify(a),/DO_NOT_READ/);
 });
 
-test('individual sidecar ledger symlink is identified as unsafe, not silently reported absent',()=>{
+test('individual sidecar ledger symlink is identified as unsafe, not silently reported absent',t=>{
  const f=fixture(),directory=path.join(f.dataRoot,'pc-writer','archive-sidecar-r7');fs.mkdirSync(directory);
  const outside=path.join(f.root,'archive-status-outside.json');
  fs.writeFileSync(outside,JSON.stringify({status:'PASS',reason:'PRIVATE_LEDGER_VALUE'}));
- fs.symlinkSync(outside,path.join(directory,'archive-status.json'));
+ if(!linkForSecurityTest(t,outside,path.join(directory,'archive-status.json'),'file'))return;
  const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
  assert.equal(r.archiveTrace.sidecar.candidates.length,1);
  assert.equal(r.archiveTrace.sidecar.candidates[0].evidence,'INVALID_FILE_TYPE_OR_SIZE');
  assert.doesNotMatch(JSON.stringify(r),/PRIVATE_LEDGER_VALUE/);
 });
 
-test('ancestor pc-writer symlink escaping the data root is refused before reading ledger data',()=>{
+test('ancestor pc-writer symlink escaping the data root is refused before reading ledger data',t=>{
  const f=fixture(false),base=path.join(f.dataRoot,'pc-writer');
  const outside=path.join(f.root,'relocated-pc-writer');
  fs.renameSync(base,outside);
  fs.mkdirSync(path.join(outside,'archive-sidecar-r7'));
  fs.writeFileSync(path.join(outside,'archive-sidecar-r7','archive-last-run.json'),JSON.stringify({status:'PASS',reason:'PRIVATE_LEDGER_VALUE'}));
- fs.symlinkSync(outside,base,'dir');
+ if(!linkForSecurityTest(t,outside,base,'dir'))return;
  const r=inspectFearGreedArchive(f.dataRoot,{queryTask:f.queryTask});
  assert.equal(r.archiveTrace.sidecar.evidence,'UNKNOWN');
  assert.equal(r.archiveTrace.sidecar.reason,'UNSAFE_REAL_PATH');
