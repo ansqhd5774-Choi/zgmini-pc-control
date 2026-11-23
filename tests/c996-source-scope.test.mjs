@@ -20,6 +20,8 @@ test('011 handoff and R6 changes select their own suites without unrelated R47',
 });
 test('011 direct test changes and shared source preserve relevant tests',()=>{
  assert.deepEqual(selectGroups(['tests/agent-handoff-result.test.mjs']),['handoff009']);
+ assert.deepEqual(selectGroups(['tests/agent-handoff-proactive-diagnostics.test.mjs']),['handoff007']);
+ assert.deepEqual(selectGroups(['agent-handoff/proactive-diagnostics.mjs']),['handoff007','handoff009','handoff008']);
  assert.deepEqual(selectGroups(['direct-writer-b/configured-direct-b.test.mjs']),['writer']);
  assert.deepEqual(selectGroups(['tools/update.mjs']),all);
  assert.deepEqual(selectGroups(['tools/maintenance-apply.mjs']),all);
@@ -61,6 +63,7 @@ test('011 workflow and selection contract changes always run all original suites
  assert.equal(new Set(tests).size,tests.length,'each fixed test runs once');
  assert.ok(tests.includes('tests/agent-handoff-result.test.mjs'));
  assert.ok(tests.includes('tests/agent-handoff-job-concurrency.test.mjs'));
+ assert.ok(tests.includes('tests/agent-handoff-proactive-diagnostics.test.mjs'));
  assert.ok(tests.includes('tests/r47-existing-task-once.test.mjs'));
  assert.ok(tests.includes('tests/marketparquet-task-retire.test.mjs'));
 });
