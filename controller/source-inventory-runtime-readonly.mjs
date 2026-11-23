@@ -262,8 +262,11 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=openSqliteReadonly}={})
    batch:null,employment:null,employmentR6:null,breadth:null,breadthUniverse:null,
    earningsUniverse:null,consumption:null,publicFeeds:null,census2027Diagnostic:null,
    treasuryTawsInput:null,earningsCompanionC:null,r54StoredEvent:null};
+  // R54 probe must never invalidate unrelated source inventory results.
   queryStage='R54_STORED_SNAPSHOT';
-  out.r54StoredEvent=r54StoredEventSummary(db,tables);
+  try{out.r54StoredEvent=r54StoredEventSummary(db,tables);}
+  catch{out.r54StoredEvent={status:'UNVERIFIED',reason:'SNAPSHOT_QUERY_FAILED',
+   eventVerified:false};}
   if(has('batch')){
    queryStage='BATCH';
    const all=row('SELECT COUNT(*) AS n,MAX(stored_at) AS latest FROM market_input_batches_v1');
