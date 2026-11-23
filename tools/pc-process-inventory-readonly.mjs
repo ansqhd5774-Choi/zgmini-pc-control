@@ -21,6 +21,8 @@ export const TITLE='pc-process-inventory-readonly';
 export const SCHEMA='ZGMINI_PC_PROCESS_INVENTORY_REQUEST_V1';
 export const ROLE_OPERATION='process-inventory-readonly';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
+const TARGET2960='pc-update-e8767e20-6bad-4418-97c6-561cf79a8213';
+const PROBE2960='w05-2960-maintenance-status-readonly';
 const MAX_BYTES=32768;
 const KNOWN_PROCESSES=new Set([
  'runner.listener.exe','runner.worker.exe','node.exe','wscript.exe','cscript.exe',
@@ -80,10 +82,12 @@ export function authenticateProcess(event,env,role){
  const basic=keys==='operation,requestId,role,schema';
  const withJobs=keys==='operation,requestId,role,runnerJobRefs,schema';
  const withW05=keys==='operation,probe,requestId,role,schema';
+  const isOperator=withW05&&raw.probe==='w05-operator-topology-readonly';
+  const is2960=withW05&&raw.probe===PROBE2960;
  if(!raw||(!basic&&!withJobs&&!withW05)||
    raw.schema!==SCHEMA||raw.operation!==ROLE_OPERATION||raw.role!==role||
    (withJobs&&role!=='operating')||
-   (withW05&&(role!=='operating'||raw.probe!=='w05-operator-topology-readonly')))
+   (withW05&&(role!=='operating'||(!isOperator&&!is2960))))
   fail('REQUEST_SCOPE_INVALID');
  const runnerJobRefs=withJobs?validateRunnerJobRefs(raw.runnerJobRefs):null;
  const normalized=structuredClone(event);
@@ -93,7 +97,8 @@ export function authenticateProcess(event,env,role){
  if(event.issue.title!==TITLE)fail('ISSUE_TITLE_INVALID');
  const verified=authenticate(normalized,env,role);
  return {...verified,...(runnerJobRefs?{runnerJobRefs}:{}),
-  ...(withW05?{w05OperatorTopology:true}:{})};
+  ...(isOperator?{w05OperatorTopology:true}:{}),
+   ...(is2960?{w052960MaintenanceStatus:true}:{})};
 }
 export function sanitizeProbe(raw){
  if(!raw||raw.schema!=='ZGMINI_PC_PROCESS_PROBE_V1')fail('PROBE_SCHEMA_INVALID');
@@ -320,6 +325,48 @@ export function sanitizeMaintenanceStatus(raw){
   operationalWrites:0,providerCalls:0,d1Writes:0
  };
 }
+
+/** Fixed #2960 request only. Never release leases, infer ownership or expose raw journal. */
+export function project2960MaintenanceStatus(raw){
+ const tok=v=>typeof v==='string'&&/^[A-Z0-9_]{1,96}$/.test(v)?v:null;
+ const file=v=>['PRESENT','ABSENT','UNKNOWN','UNSAFE','UNVERIFIED'].includes(v)?v:'UNKNOWN';
+ const num=v=>Number.isSafeInteger(v)&&v>=0&&v<=100000?v:null;
+ const flag=v=>typeof v==='boolean'?v:null;
+ const h=raw?.historicalRequest?.requestId===TARGET2960?raw.historicalRequest:null;
+ const e=raw?.recoveryEvidence?.requestId===TARGET2960?raw.recoveryEvidence:null;
+ const b=e?.backlog,l=e?.installLease,good=Boolean(h&&e);
+ return {schema:'ZGMINI_W05_2960_MAINTENANCE_READONLY_V1',requestId:TARGET2960,
+  status:good?'READ_ONLY_OBSERVED':'STATE_UNKNOWN',
+  code:good?'W05_2960_STATUS_OBSERVED':'W05_2960_EVIDENCE_INCOMPLETE',
+  actualControllerSha:asSha(raw?.actualControllerSha),
+  workflowState:['active','disabled_manually','disabled_inactivity'].includes(raw?.workflowState)?
+   raw.workflowState:'UNVERIFIED',
+  historicalRequest:h?{status:tok(h.status),code:tok(h.code),phase:tok(h.phase),
+   lastPass:tok(h.lastPass),firstFail:tok(h.firstFail),
+   updatedAt:typeof h.updatedAt==='string'&&Number.isFinite(Date.parse(h.updatedAt))?
+    h.updatedAt.slice(0,40):null,
+   postIssueNumber:num(h.postIssueNumber),executionState:tok(h.executionState)}:null,
+  recoveryEvidence:e?{
+   historicalStatus:tok(e.historicalStatus),historicalCode:tok(e.historicalCode),
+   historicalPhase:tok(e.historicalPhase),
+   installedReadbackCode:tok(e.installedReadbackCode),
+   ledgerReadbackCode:tok(e.ledgerReadbackCode),
+   lockReadbackCode:tok(e.lockReadbackCode),
+   artifactReadbackCode:tok(e.artifactReadbackCode),
+   leaseHeld:flag(e.leaseHeld),recoveryRequired:flag(e.recoveryRequired),
+   postIssueNumber:num(e.postIssueNumber),
+   backlog:b?{file:file(b.file),windows:num(b.windows),
+    openWindows:num(b.openWindows),replayCount:num(b.replayCount)}:null,
+   installLease:l?{directory:file(l.directory),ownerFile:file(l.ownerFile),
+    recoveryMarker:file(l.recoveryMarker),ownerMarkerMatch:flag(l.ownerMarkerMatch)}:null}:null,
+  leaseBoundToOriginalRequest:null,recoveryEligible:false,
+  protectedStateUnchanged:null,operationalWrites:0,providerCalls:0,d1Writes:0};
+}
+function inspect2960MaintenanceStatusReadonly(){
+ try{return project2960MaintenanceStatus(collectAutomationStatus(['--request-id',TARGET2960]));}
+ catch{return project2960MaintenanceStatus(null);}
+}
+
 function collectMaintenanceStatusReadonly(){
  try{return sanitizeMaintenanceStatus(collectAutomationStatus([]));}
  catch{return sanitizeMaintenanceStatus(null);}
@@ -1423,6 +1470,8 @@ export function collect(role,ctx,env=process.env){
  }
  const withMaintenance=role==='operating'?{...base,
   maintenance:collectMaintenanceStatusReadonly(),
+  ...(ctx.w052960MaintenanceStatus?{
+   w052960MaintenanceStatus:inspect2960MaintenanceStatusReadonly()}:{}),
   c2505RecoveryCheckpoint:inspect2505RecoveryReadonly(),
   c2505ByteProof:inspect2505RecoveryByteProof(),
   c2094StageEvidence:inspect2094StageReadonly(),
