@@ -72,7 +72,7 @@ export function verifyBeaCapture(value){
     value.providerRequests===1&&SHA64.test(value.sourceVersion??'')&&
     SHA64.test(value.sourceHttpSha256??'')&&
     Number.isSafeInteger(value.sourceStoredAt)&&value.sourceStoredAt>0&&
-    /^20\d{2}-(?:03|06|09|12)-(?:30|31)$/.test(value.observedThrough??''),
+    /^20\d{2}-(?:03-31|06-30|09-30|12-31)$/.test(value.observedThrough??''),
     'DIRECT_B_BEA_ARCHIVE_READBACK_STOP');
   return {sourceVersion:value.sourceVersion,
     sourceHttpSha256:value.sourceHttpSha256,
