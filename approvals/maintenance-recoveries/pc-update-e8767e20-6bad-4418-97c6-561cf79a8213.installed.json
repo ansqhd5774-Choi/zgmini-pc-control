@@ -1,6 +1,6 @@
 {
   "schema": "ZGMINI_PC_INSTALLED_RECOVERY_APPROVAL_V1",
-  "approved": false,
+  "approved": true,
   "operation": "RECONCILE_INSTALLED",
   "requestId": "pc-update-e8767e20-6bad-4418-97c6-561cf79a8213",
   "issueNumber": 2960,
@@ -44,5 +44,5 @@
   },
   "observedAtUtc": "2026-11-23T14:17:01.859Z",
   "observedRunId": 45192406756,
-  "note": "PROPOSAL_ONLY. Not approved for B recovery; never interpret this artifact as permission or installation proof."
+  "note": "EXISTING 2026-11-03 common Controller recovery/verified control-lease archival standing approval, as preserved in docs/PC_AUTOMATION_STANDARD.md §5 and docs/CONTROLLER_RECOVERY.md. This is exact #2960 only. No job, install, workflow, DB/D1 or owner privilege is created by this committed manifest. Independent Windows operator and live CAS/owner/runtime validation still mandatory; historical #2965 remains UNKNOWN."
 }
