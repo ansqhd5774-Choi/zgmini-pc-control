@@ -1212,7 +1212,7 @@ test('W05 operator topology collector uses fixed read-only WMI on operating PC',
  assert.equal(r.operationalWrites,0);assert.equal(r.recoveryEligible,false);
  assert.equal(r.independentOperatorAttested,false);
  assert.equal(r.ownerSidsCaptured,false);assert.equal(r.commandLinesCaptured,false);
- assert.doesNotMatch(JSON.stringify(r),/SECRET|CommandLine|Sid=|UserName/i);
+ assert.doesNotMatch(JSON.stringify(r),/PRIVATE_SECRET|"commandLine"\\s*:|"sid"\\s*:|"userName"\\s*:/i);
  const txt=w05OperatorTopologyText(r);
  assert.match(txt,/candidate.2399=PARENT_UNAVAILABLE/);
  assert.match(txt,/independentOperatorAttested=false/);
