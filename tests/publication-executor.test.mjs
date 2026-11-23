@@ -5,7 +5,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parsePublisherLog,nextLedgerPhase,millisecondsToNextUtcSecond,
   publicationCheckpointReport,validateBeaStoredPreflight,
-  validateQfrStoredPreflight,validateQfrApplySource,validateQfrPinnedNoWrite} from '../tools/publication-executor.mjs';
+  validateQfrStoredPreflight,validateQfrApplySource,validateQfrPinnedNoWrite,
+  validateWpsfd42ServicePreflight,validateWpsfd42ServiceApplySource,
+  validateWpsfd42PinnedNoWrite} from '../tools/publication-executor.mjs';
 
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const source=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -230,8 +232,8 @@ test('manufacturing one-shot uses fixed SHA arguments and verified JSON readback
  assert.match(executor,/\['--source-sha',invocation\.sourceSha256,\.\.\.invocation\.flags\]/);
  assert.match(executor,/parseBeaMfgResult\(preflightEvidence/);
  assert.match(executor,/parseBeaMfgResult\(applied\.output/);
- assert.match(executor,/if\(!bea&&!mfg\)validateQfrApplySource\(qfrPin,evidence\)/);
- assert.match(executor,/if\(!bea&&!mfg&&applied\.exitCode===1/);
+  assert.match(executor,/if\(qfr\)validateQfrApplySource\(qfrPin,evidence\)/);
+  assert.match(executor,/if\(qfr&&applied\.exitCode===1/);
  for(const name of ['ZGMINI_EARNINGS_BEA_MFG_B_PIN_REQUIRED',
    'ZGMINI_EARNINGS_BEA_MFG_SOURCE_VERSION',
    'ZGMINI_EARNINGS_BEA_MFG_SOURCE_STORED_AT',
@@ -241,4 +243,95 @@ test('manufacturing one-shot uses fixed SHA arguments and verified JSON readback
  const contract=source('tools/publication-contract.mjs');
  assert.match(contract,/BEA_MANUFACTURING_PROFIT_SINGLE_KEY_D1_ONCE/);
  assert.match(contract,/STORED_CSV_ONLY/);
+});
+
+
+test('WPSFD42 B preflight verifies exactly two fresh rows, stored hash pin and zero effects',()=>{
+  const key='detail:earnings-recession-indicators:bls-wpsfd42:v1';
+  const rows=[
+    ['MODE','READ_ONLY_PREFLIGHT'],['SNAPSHOT_KEY',key],['SOURCE_GATES','PASS'],
+    ['SOURCE_HTTP_REQUESTS','0'],['PC_SQLITE_WRITES','0'],['D1_QUERIES','0'],
+    ['D1_WRITES','0'],['BASE_SNAPSHOT_KEY_WRITES','0'],['SCORE_WRITES','0'],
+    ['SCHEDULER_CHANGED','NO'],['WORKER_DEPLOYED','NO'],
+    ['ROW_COUNT','2'],['FRESH_READY_ROWS','2'],['WPSFD42_VERIFIED_SNAPSHOTS','1'],
+    ['SOURCE_VERSION','a'.repeat(64)],['SOURCE_STORED_AT','1795351641253'],
+    ['RESULT','PASS_EARNINGS_C_SERVICE_D1_PREFLIGHT_ONLY']
+  ];
+  const result=(changes={})=>rows.map(([k,v])=>k+'='+
+    (Object.hasOwn(changes,k)?changes[k]:v)).join('\n');
+  const pin=validateWpsfd42ServicePreflight(result(),key);
+  assert.deepEqual(pin,{sourceVersion:'a'.repeat(64),sourceStoredAt:1795351641253});
+  for(const [k,v] of [['SNAPSHOT_KEY','detail:earnings-recession-indicators:v1'],
+    ['SOURCE_GATES','FAIL'],['SOURCE_HTTP_REQUESTS','1'],['D1_WRITES','1'],
+    ['SCORE_WRITES','1'],['ROW_COUNT','1'],['FRESH_READY_ROWS','1'],
+    ['WPSFD42_VERIFIED_SNAPSHOTS','0'],['SOURCE_VERSION','b'.repeat(63)]])
+    assert.throws(()=>validateWpsfd42ServicePreflight(result({[k]:v}),key),
+      /PUBLICATION_WPSFD42_PREFLIGHT_SOURCE_MISMATCH/);
+  assert.equal(validateWpsfd42ServiceApplySource(pin,{...pin}),true);
+  for(const evidence of [{...pin,sourceVersion:'b'.repeat(64)},
+    {...pin,sourceStoredAt:1795351641254}])
+    assert.throws(()=>validateWpsfd42ServiceApplySource(pin,evidence),
+      /PUBLICATION_WPSFD42_APPLY_SOURCE_MISMATCH/);
+});
+
+test('WPSFD42 B accepts verified single-key readback or identical stored key only',()=>{
+  const key='detail:earnings-recession-indicators:bls-wpsfd42:v1';
+  const fields=[
+    ['MODE','APPLY_EXPLICIT'],['SNAPSHOT_KEY',key],['SOURCE_GATES','PASS'],
+    ['PREFLIGHT_SOURCE_PIN','VERIFIED'],['SOURCE_HTTP_REQUESTS','0'],
+    ['PC_SQLITE_WRITES','0'],['EXISTING_C_CHECKPOINT_WRITES','0'],
+    ['BASE_SNAPSHOT_KEY_WRITES','0'],['SCORE_WRITES','0'],
+    ['SCHEDULER_CHANGED','NO'],['WORKER_DEPLOYED','NO'],
+    ['ROW_COUNT','2'],['FRESH_READY_ROWS','2'],
+    ['SOURCE_VERSION','a'.repeat(64)],['SOURCE_STORED_AT','1795351641253'],
+    ['D1_RESULT','READBACK_VERIFIED'],['D1_READBACK','VERIFIED'],
+    ['RESULT','PASS_EARNINGS_C_SERVICE_D1_READBACK']
+  ];
+  const result=(changes={})=>fields.map(([k,v])=>k+'='+
+    (Object.hasOwn(changes,k)?changes[k]:v)).join('\r\n');
+  const confirmed=parsePublisherLog(result(),'bls-wpsfd42-service-once',key);
+  assert.equal(confirmed.key,key);
+  assert.equal(confirmed.sourceVersion,'a'.repeat(64));
+  assert.equal(confirmed.sourceStoredAt,1795351641253);
+  for(const [k,v] of [['SNAPSHOT_KEY','detail:earnings-recession-indicators:v1'],
+    ['MODE','READ_ONLY_PREFLIGHT'],['SOURCE_GATES','FAIL'],
+    ['PREFLIGHT_SOURCE_PIN','MISSING'],['SOURCE_HTTP_REQUESTS','1'],
+    ['PC_SQLITE_WRITES','1'],['EXISTING_C_CHECKPOINT_WRITES','1'],
+    ['BASE_SNAPSHOT_KEY_WRITES','1'],['SCORE_WRITES','1'],
+    ['ROW_COUNT','5'],['FRESH_READY_ROWS','1'],['D1_READBACK','PREVIOUS_IDENTICAL']])
+    assert.throws(()=>parsePublisherLog(result({[k]:v}),
+      'bls-wpsfd42-service-once',key),/PUBLICATION_WPSFD42_APPLY_EVIDENCE_INVALID/);
+  const identical=parsePublisherLog(result({D1_RESULT:'ALREADY_STORED',
+    D1_READBACK:'PREVIOUS_IDENTICAL',
+    RESULT:'PASS_EARNINGS_C_SERVICE_ALREADY_STORED'}),
+    'bls-wpsfd42-service-once',key);
+  assert.equal(identical.d1Result,'ALREADY_STORED');
+  assert.throws(()=>parsePublisherLog(result({SOURCE_STORED_AT:'0'}),
+    'bls-wpsfd42-service-once',key),/PUBLICATION_RESULT_CHECKPOINT_INVALID/);
+});
+
+test('WPSFD42 B source drift can stop only with proved no D1 query or write',()=>{
+ const key='detail:earnings-recession-indicators:bls-wpsfd42:v1';
+ const pin={sourceVersion:'a'.repeat(64),sourceStoredAt:1795351641253};
+ const raw=['MODE=APPLY_EXPLICIT','SNAPSHOT_KEY='+key,'SOURCE_GATES=PASS',
+  'SOURCE_HTTP_REQUESTS=0','PC_SQLITE_WRITES=0','D1_QUERIES=0','D1_WRITES=0',
+  'SOURCE_VERSION='+'b'.repeat(64),'SOURCE_STORED_AT=1795351641253',
+  'ERROR=EARNINGS_C_SERVICE_SOURCE_DRIFT','RESULT=FAIL_EARNINGS_C_SERVICE_D1'].join('\n');
+ assert.equal(validateWpsfd42PinnedNoWrite(raw,pin,key),true);
+ for(const [x,y] of [['D1_WRITES=0','D1_WRITES=1'],
+   ['D1_QUERIES=0','D1_QUERIES=1'],
+   ['ERROR=EARNINGS_C_SERVICE_SOURCE_DRIFT','ERROR=NETWORK_UNKNOWN'],
+   ['SNAPSHOT_KEY='+key,'SNAPSHOT_KEY=detail:unapproved']])
+   assert.throws(()=>validateWpsfd42PinnedNoWrite(raw.replace(x,y),pin,key),
+     /PUBLICATION_WPSFD42_NO_WRITE_EVIDENCE_INVALID/);
+ assert.throws(()=>validateWpsfd42PinnedNoWrite(
+   raw.replace('SOURCE_VERSION='+'b'.repeat(64),'SOURCE_VERSION='+'a'.repeat(64)),
+   pin,key),/PUBLICATION_WPSFD42_NO_WRITE_EVIDENCE_INVALID/);
+ const executor=source('tools/publication-executor.mjs');
+ assert.match(executor,/ZGMINI_EARNINGS_SERVICE_SOURCE_VERSION:servicePin.sourceVersion/);
+ assert.match(executor,/ZGMINI_EARNINGS_SERVICE_SOURCE_STORED_AT:String\(servicePin.sourceStoredAt\)/);
+ assert.match(executor,/service&&applied.exitCode===1/);
+ assert.match(executor,/validateWpsfd42ServiceApplySource\(servicePin,evidence\)/);
+ assert.match(executor,/PUBLICATION_WPSFD42_SOURCE_DRIFT_NO_WRITE/);
+ assert.match(executor,/noWriteVerified=true/);
 });
