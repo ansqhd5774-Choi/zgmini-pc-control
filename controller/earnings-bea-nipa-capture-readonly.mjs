@@ -39,8 +39,8 @@ function parse(bytes){
 // Verified, purely local arithmetic for the exact BEA T11500/A463RD/Line7
 // Level series. Match source-owner quarter and numeric contracts; do not expose
 // the five private observation values in a public Actions receipt.
-const QUARTER=/^(20\\d{2})Q([1-4])$/;
-const NUMBER=/^-?(?:\\d+|[1-9]\\d{0,2}(?:,\\d{3})+)(?:\\.\\d+)?$/;
+const QUARTER=/^(20\d{2})Q([1-4])$/;
+const NUMBER=/^-?(?:\d+|[1-9]\d{0,2}(?:,\d{3})+)(?:\.\d+)?$/;
 export function computeBeaNipaStoredAttestation(data,{sourceVersion,sourceStoredAt,observedThrough}={}){
   const rows=data?.BEAAPI?.Results?.Data;
   if(!Array.isArray(rows)||rows.length<5||rows.length>40||
