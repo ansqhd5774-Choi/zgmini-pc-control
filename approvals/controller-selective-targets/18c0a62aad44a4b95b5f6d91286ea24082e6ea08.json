@@ -1,0 +1,15 @@
+{
+  "schema": "ZGMINI_CONTROLLER_SELECTIVE_PIN_V1",
+  "installedSha": "b048e36a072c69de4c591fb96d521d98a6e60760",
+  "targetSha": "18c0a62aad44a4b95b5f6d91286ea24082e6ea08",
+  "sourceMainSha": "06c1e585660df270209dfa8bdc367958b56acac7",
+  "targetBranch": "codex/w06-fear-greed-onefile-installedb048-20261123",
+  "customPaths": [],
+  "allowFiles": [
+    {
+      "path": "controller/fear-greed-archive-readonly.mjs",
+      "sha256": "81f064146c88ffa36f9ac5be116c2066a0147cf6d31d73f4cb2f74a3512ac585"
+    }
+  ],
+  "approvalRef": "PENDING_DRAFT_PR_NUMBER"
+}
