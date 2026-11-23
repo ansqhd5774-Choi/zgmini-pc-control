@@ -112,7 +112,7 @@ export async function applyApprovedUpdate(request, port) {
     await record('DRAINED');
     failureOperation='backup';await port.backup();backup=true;
     await record('BACKED_UP');
-    failureOperation='stopOwnSupervisor';supervisorStopped=true;await port.stopOwnSupervisor();
+    failureOperation='stopOwnSupervisor';await port.stopOwnSupervisor();supervisorStopped=true;
     await record('SUPERVISOR_STOPPED');
     failureOperation='switchVersion';await port.switchVersion();switched=true;
     await record('SWITCHED');
@@ -168,7 +168,18 @@ export async function applyApprovedUpdate(request, port) {
     // A positive scoped no-effect proof is already sufficient here. Avoid
     // a second broad Runner-idle probe that can fail solely because another
     // approved A task started while this request was being classified.
-    if(!switched&&!prevalidationUntouched){try{oldStillRunning=await port.verifyPrevious({installedSha:request.installedSha,requireRunning:true});}catch{}}
+    if(!switched&&!prevalidationUntouched){
+      try{
+        // BACKED_UP may still have the original Supervisor running when a
+        // last-second Runner busy preflight refuses to stop it. Prove the
+        // immutable snapshot + live previous tree, not a target-SHA rollback.
+        oldStillRunning=backup&&ledger.phase==='BACKED_UP'
+          ? typeof port.verifyRestoredPrevious==='function' &&
+            await port.verifyRestoredPrevious(request.installedSha)===true
+          : await port.verifyPrevious({installedSha:request.installedSha,
+            requireRunning:true,requireIdle:false})===true;
+      }catch{}
+    }
     if(!switched && (!supervisorStopped || oldStillRunning)) {
       // Intake is deliberately not enabled when drain/state is uncertain.
       // An intact preflight failure can leave it enabled only if verified.
@@ -197,6 +208,12 @@ export async function applyApprovedUpdate(request, port) {
       // Requiring a nonexistent pause journal turns harmless validation failures
       // into permanent shared recovery locks.
       if(safe && intakeAttempted && port.reconcileBacklog){try {await port.reconcileBacklog(request);}catch{safe=false;}}
+      // Restore of intake alone is complete only after the previous runtime
+      // remains healthy with all six seats online (busy is not failure).
+      if(safe && backup && ledger.phase==='BACKED_UP'){
+        try{safe=await port.verifyPrevious({installedSha:request.installedSha,
+          requireRunning:true,requireIdle:false})===true;}catch{safe=false;}
+      }
       const status=safe?'BLOCKED':'RECOVERY_REQUIRED';
       const substate=safe&&prevalidationUntouched?'PREVALIDATION_UNTOUCHED_VERIFIED':undefined;
       await record(status,{status,code:reason,firstFail,substate,actualInstalledSha:safe?request.installedSha:null,intakePaused:paused,
@@ -317,7 +334,10 @@ export async function reconcileInterruptedRollback(original,port,persist){
    recoveryOperation='reconnectPrevious';await port.reconnectPrevious();
   }
   recoveryOperation='verifyPrevious';
-  if(await port.verifyPrevious({installedSha:original.installedShaBefore,requireRunning:true})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
+  // A verified previous Supervisor may serve another approved A job. Its six
+  // seats must remain online, but a busy seat is not a damaged runtime.
+  if(await port.verifyPrevious({installedSha:original.installedShaBefore,
+    requireRunning:true,requireIdle:false})!==true)throw fail('RECOVERY_RUNTIME_NOT_VERIFIED');
   // Intake/backlog writes also require a durable claim, even without restore.
   await record('RECOVERY_INTAKE_RESUME_STARTED',{mutationStarted:true});
   recoveryOperation='resumeIntake';
