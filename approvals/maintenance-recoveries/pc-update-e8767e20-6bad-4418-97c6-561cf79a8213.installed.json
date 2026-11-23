@@ -6,7 +6,7 @@
   "issueNumber": 2960,
   "sourceSha": "e6c96e8d19bd9084b8021c7df31678f56ef1b388",
   "targetControllerSha": "b9a423cf38d0967d6ed336912a66433f79502d3d",
-  "approvedCurrentWriterConfigSha256": "9ffcd83f89814fb70186eb855baadc78d75028c1ee73a5001ebfdbd4107347a5",
+  "approvedCurrentWriterConfigSha256": "a95b3abdb9aaa8ed4a522db0b2ccba3c0fbeb15583c64ccbf3d88fab7e66598a",
   "files": [
     {
       "path": "tools/maintenance-recovery.mjs",
@@ -32,7 +32,7 @@
     "backlogSha256": "455a0636f309291d7aa3f4fa8c3471fe08c09022e452845f6b9be4bfa00f3410",
     "snapshotSha256": "a1423bdbe63bf243cc24a25015071eba7b4d9c9e28367d96d27ed3664306f020",
     "protectionSha256": "f85444a751c3999563c8414d23721d48f2622b561db4e52b2fdf302efc0b1c79",
-    "writerSha256": "9ffcd83f89814fb70186eb855baadc78d75028c1ee73a5001ebfdbd4107347a5"
+    "writerSha256": "a95b3abdb9aaa8ed4a522db0b2ccba3c0fbeb15583c64ccbf3d88fab7e66598a"
   },
   "proof": {
     "issueNumber": 2982,
