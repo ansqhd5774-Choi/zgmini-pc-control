@@ -1,0 +1,88 @@
+{
+  "schema": "ZGMINI_PC_WRITER_SOURCE_B_APPROVAL_V1",
+  "status": "APPROVED_B",
+  "scope": "PC_WRITER_APPROVED_FILE_OVERLAY_ONLY",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceBranch": "codex/d05-ttl-threefile-writer-release-20261123",
+  "candidateSourceSha": "748263a85d0ad8e056a2e30b79c9fe795f5d02d7",
+  "baseHead": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "baseConfigSourceSha": "af5374593a0d27ebaa5280f78187b075ffcabb23",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "configPath": "E:\\ZGmini\\data\\pc-writer\\config.json",
+  "coreTask": "ZGMINI-PC-Local-Core",
+  "files": [
+    {
+      "path": "worker/candidate-market-operational-store.mjs",
+      "change": "M",
+      "beforeSha256": "6b57a121709e9725109aa6c3c502624b63eb32b5b117fd67aad4f7f57a17b28e",
+      "afterSha256": "d3e19f295760d9d92887e4fbe7f90cce210a181c2e68c05fd4ea40817a5dd085"
+    },
+    {
+      "path": "lib/score-history/market-input-observation-shadow-r1.mjs",
+      "change": "M",
+      "beforeSha256": "a57b724904110de5ce97de1eea88e327bb14d170aaa4d572f7f7564039d3283e",
+      "afterSha256": "a2415fa49704e2d5a8dff91509dc197000ecc7427d261180ca1b6fb69248b603"
+    },
+    {
+      "path": "lib/score-history/composite-archive-lineage-link-r1.mjs",
+      "change": "M",
+      "beforeSha256": "d0723d49166cc32e44e67953f3c2cea400edb3b9ac9f1468615699d7fe2586d5",
+      "afterSha256": "357aeb7568afa0ba1fe98e0e26a12fbd760582b53cb0e9fd35b4900dc3f1e91d"
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "scripts/pc-writer/local-cycle.mjs",
+      "sha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d"
+    },
+    {
+      "path": "scripts/pc-writer/run-local.mjs",
+      "sha256": "58e2b08153a7ece51071122f565973f2c6b45f0013c650b924cf90c57126bc77"
+    },
+    {
+      "path": "scripts/pc-writer/market.mjs",
+      "sha256": "edd4d16ef3cab0ceaa56788543384350955537f083876465ad6278983cd2faf3"
+    },
+    {
+      "path": "worker/market-input-validation.mjs",
+      "sha256": "f029c8bd370dd8f40b0e203d33553904c1765277b89161e05f1ac694112095d6"
+    },
+    {
+      "path": "lib/score-history/d05-lineage-event-append-r1.mjs",
+      "sha256": "c7fc2263c5c04de222aeaffaa3144681a9774cd012dd540793c0917d3d0404ce"
+    }
+  ],
+  "runtimeDependencies": {
+    "taskXmlSha256": "dd81987c7efa4b1e343af30329a580613bb920dec89c1aa7a436ef935f0bb028",
+    "consumers": [
+      {
+        "id": "core-wsh-first-hop",
+        "kind": "LAUNCHER",
+        "path": "E:\\ZGmini\\data\\pc-writer\\archive-sidecar-r7\\run-original-then-archive.vbs",
+        "sha256": "9d5bc3429cd74813207cfc393eb04eff11a78106096964b80bf7833440385b7c",
+        "dependsOn": [
+          "worker/candidate-market-operational-store.mjs",
+          "lib/score-history/market-input-observation-shadow-r1.mjs",
+          "lib/score-history/composite-archive-lineage-link-r1.mjs"
+        ]
+      },
+      {
+        "id": "core-wsh-inner-hop",
+        "kind": "SIDECAR_SOURCE",
+        "path": "E:\\ZGmini\\data\\pc-writer\\cutover-evidence\\inflation-r37-2026-10-20T19-39-19-549Z\\run-local-core.vbs",
+        "sha256": "bb3e11c0b5c8da07162b1c824e7b52e7a7c2f987c079f29713211a2413932b01",
+        "dependsOn": [
+          "worker/candidate-market-operational-store.mjs",
+          "lib/score-history/market-input-observation-shadow-r1.mjs",
+          "lib/score-history/composite-archive-lineage-link-r1.mjs"
+        ]
+      }
+    ]
+  },
+  "runCount": 1,
+  "allowProviderCalls": false,
+  "allowDbChanges": false,
+  "allowD1Writes": false,
+  "allowTaskDefinitionChanges": false,
+  "allowOtherSourceChanges": false
+}
