@@ -122,13 +122,49 @@ export function classifyBeaNativeFailure(error){
     BEA_SAFE_FAILURES.get(error?.message) ??
     'DIRECT_B_BEA_SOURCE_OR_STORE_UNKNOWN';
 }
-export function appendBeaJournalPhase(file,phase,code=null){
-  const record={phase,...(code?{code}:{})};
+export function appendBeaJournalPhase(file,phase,code=null,evidence=null){
+  const record={phase,...(code?{code}:{}),...(evidence?{evidence}:{})};
   const fd=fs.openSync(file,'a');
   try{
     fs.writeSync(fd,JSON.stringify(record)+'\n');
     fs.fsyncSync(fd);
   }finally{fs.closeSync(fd);}
+}
+
+// Keep only bounded public unit descriptors, never a request URL, USERID,
+// statistical observations, raw response or arbitrary provider error string.
+export function summarizeBeaResponseUnits(bytes,credential=''){
+  let data;
+  try{data=JSON.parse(bytes.toString('utf8'))?.BEAAPI?.Results?.Data;}
+  catch{return {targetRows:0,unitPairs:[],bodyShape:'UNVERIFIED'};}
+  if(!Array.isArray(data))return {targetRows:0,unitPairs:[],bodyShape:'UNVERIFIED'};
+  const rows=data.filter(x=>x?.SeriesCode==='A463RD'&&String(x?.LineNumber)==='7');
+  const pairs=new Map();
+  for(const row of rows){
+    const label=String(row.CL_UNIT??'').trim();
+    const unit=label&&!label.includes(credential||'\0')&&
+      /^[A-Za-z][A-Za-z ./$()%_-]{0,79}$/.test(label)?label:'UNRECOGNIZED';
+    const exponent=String(row.UNIT_MULT??'').trim();
+    const multiplier=/^-?\d{1,2}$/.test(exponent)?exponent:'UNRECOGNIZED';
+    if(pairs.size<8)pairs.set(JSON.stringify([unit,multiplier]),{unit,multiplier});
+  }
+  return {targetRows:rows.length,unitPairs:[...pairs.values()],bodyShape:'NIPA_DATA'};
+}
+export function beaEvidenceFetch(fetchImpl,journalFile,credential){
+  return async(...args)=>{
+    const response=await fetchImpl(...args);
+    // One transport call only. Inspect a bounded copy without consuming the
+    // response that the approved source owner validates and archives.
+    const length=response?.headers?.get?.('content-length');
+    if(response?.ok&&typeof response.clone==='function'&&
+      (length==null||(/^\d+$/.test(length)&&Number(length)<=2_000_000))){
+      const bytes=Buffer.from(await response.clone().arrayBuffer());
+      if(bytes.length<=2_000_000)appendBeaJournalPhase(journalFile,
+        'BEA_NATIVE_RESPONSE_UNITS_RECEIVED',null,
+        summarizeBeaResponseUnits(bytes,credential));
+    }
+    return response;
+  };
 }
 
 // Installed source is used only as a CAS preimage; the effect implementation is
@@ -193,7 +229,8 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
     // Distinguish "entered collector" from validation or readback failures
     // without claiming the external GET actually completed.
     appendBeaJournalPhase(claim.journalFile,'BEA_NATIVE_COLLECTOR_ENTERED');
-    const value=await perform({pcBase:PC_ROOT,providers});
+    const value=await perform({pcBase:PC_ROOT,providers,
+      fetchImpl:beaEvidenceFetch(globalThis.fetch,claim.journalFile,providers.BEA_API_KEY)});
     const capture=verifyBeaCapture(value);
     verifyBeaReadback(capture,await readArchive({pcBase:PC_ROOT,
       sourceSha:capture.sourceVersion}));

@@ -5,7 +5,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {BEA_B_SCHEMA,BEA_B_SCOPE,BEA_B_MODE,
   isApprovedBeaNativeSource,verifyBeaInstalledBinding,verifyBeaCapture,
-  verifyBeaReadback,classifyBeaNativeFailure}
+  verifyBeaReadback,classifyBeaNativeFailure,summarizeBeaResponseUnits,beaEvidenceFetch}
   from '../direct-writer-b/bea-native-source-once.mjs';
 import {applyApprovedOnce} from '../direct-writer-b/run.mjs';
 import {resolveConfiguredSourcePin} from '../direct-writer-b/configured-source-pin.mjs';
@@ -147,4 +147,37 @@ test('BEA native failure attribution is bounded and never exposes raw errors',as
   assert.equal(result.status,'DIRECT_B_EFFECT_UNKNOWN');
   assert.equal(result.code,'DIRECT_B_BEA_HTTP_UNAVAILABLE');
   assert.equal(JSON.stringify(result).includes('TOP_SECRET'),false);
+});
+
+test('unit evidence is bounded and excludes credentials and observations',()=>{
+  const secret='SECRET-1234';
+  const body={BEAAPI:{Request:{USERID:secret},Results:{Data:[
+    {SeriesCode:'A463RD',LineNumber:'7',CL_UNIT:'US dollars',UNIT_MULT:'-3',DataValue:'0.250'},
+    {SeriesCode:'OTHER',LineNumber:'1',CL_UNIT:secret,UNIT_MULT:'0'},
+    {SeriesCode:'A463RD',LineNumber:'7',CL_UNIT:secret,UNIT_MULT:secret}
+  ]}}};
+  const out=summarizeBeaResponseUnits(Buffer.from(JSON.stringify(body)),secret);
+  assert.deepEqual(out,{targetRows:2,bodyShape:'NIPA_DATA',unitPairs:[
+    {unit:'US dollars',multiplier:'-3'},
+    {unit:'UNRECOGNIZED',multiplier:'UNRECOGNIZED'}
+  ]});
+  assert.equal(JSON.stringify(out).includes(secret),false);
+  assert.equal(JSON.stringify(out).includes('0.250'),false);
+});
+
+test('response evidence uses one fetch and leaves original body readable',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'zg-bea-unit-proof-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const file=path.join(root,'journal.jsonl');fs.writeFileSync(file,'');
+  const body=JSON.stringify({BEAAPI:{Results:{Data:[
+    {SeriesCode:'A463RD',LineNumber:'7',CL_UNIT:'Dollars',UNIT_MULT:'0'}
+  ]}}});
+  let calls=0;
+  const wrapped=beaEvidenceFetch(async()=>{calls++;return new Response(body);},file,'SECRET-1234');
+  const response=await wrapped('https://example.invalid');
+  assert.equal(calls,1);
+  assert.equal(await response.text(),body);
+  const recorded=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.equal(recorded.phase,'BEA_NATIVE_RESPONSE_UNITS_RECEIVED');
+  assert.deepEqual(recorded.evidence.unitPairs,[{unit:'Dollars',multiplier:'0'}]);
 });
