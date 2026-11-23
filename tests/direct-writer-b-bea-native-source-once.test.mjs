@@ -3,6 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import {BEA_B_SCHEMA,BEA_B_SCOPE,BEA_B_MODE,
   isApprovedBeaNativeSource,verifyBeaInstalledBinding,verifyBeaCapture,
   verifyBeaReadback,classifyBeaNativeFailure,summarizeBeaResponseUnits,beaEvidenceFetch}
@@ -180,4 +183,20 @@ test('response evidence uses one fetch and leaves original body readable',async 
   const recorded=JSON.parse(fs.readFileSync(file,'utf8'));
   assert.equal(recorded.phase,'BEA_NATIVE_RESPONSE_UNITS_RECEIVED');
   assert.deepEqual(recorded.evidence.unitPairs,[{unit:'Dollars',multiplier:'0'}]);
+});
+
+test('committed BEA approval filenames match exact Git blob bytes on every checkout',()=>{
+  const cwd=fileURLToPath(new URL('..',import.meta.url));
+  const git=args=>execFileSync('git',args,{cwd,windowsHide:true});
+  const names=git(['ls-tree','-r','--name-only','HEAD','--',
+    'approvals/approved-runtime-b']).toString('utf8').trim().split('\n').filter(Boolean);
+  let verified=0;
+  for(const name of names){
+    const bytes=git(['show','HEAD:'+name]);
+    const value=JSON.parse(bytes);
+    if(value.schema!==BEA_B_SCHEMA)continue;
+    assert.equal(path.basename(name),createHash('sha256').update(bytes).digest('hex')+'.json');
+    verified++;
+  }
+  assert.ok(verified>0);
 });
