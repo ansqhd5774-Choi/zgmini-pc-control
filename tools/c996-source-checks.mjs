@@ -42,6 +42,7 @@ export const GROUPS=Object.freeze({
   'tests/inflation-a407-integrity-readonly.test.mjs',
   'tests/w04-r54-stored-event-inventory-readonly.test.mjs',
   'tests/w04-r54-controller-selective-approval.test.mjs',
+  'tests/w05-wpsfd42-controller-selective-approval.test.mjs',
   'tests/w04-r54-public-d1-api-readback.test.mjs'],
  retirement:['tests/marketparquet-task-retire.test.mjs'],
  aiSoftware:['tests/ai-software-v2-register-once.test.mjs'],
