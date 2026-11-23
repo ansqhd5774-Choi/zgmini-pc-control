@@ -151,7 +151,19 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
     const capture=verifyBeaCapture(value);
     verifyBeaReadback(capture,await readArchive({pcBase:PC_ROOT,
       sourceSha:capture.sourceVersion}));
-    return {status:'PASS',providerRequests:1,privateArchiveWrites:1,...capture};
+    // Durable sanitized local checkpoint lets an interrupted result uploader
+    // reconcile the existing archive without a second provider request.
+    const entry=JSON.stringify({phase:'BEA_NATIVE_ARCHIVE_READBACK_VERIFIED',
+      sourceVersion:capture.sourceVersion,
+      sourceHttpSha256:capture.sourceHttpSha256,
+      sourceStoredAt:capture.sourceStoredAt,
+      observedThrough:capture.observedThrough})+'\\n';
+    const checkpointFd=fs.openSync(claim.journalFile,'a');
+    try{fs.writeSync(checkpointFd,entry);fs.fsyncSync(checkpointFd);}
+    finally{fs.closeSync(checkpointFd);}
+    return {status:'PASS',providerRequests:1,
+      privateArchiveWrites:value.status==='SOURCE_STORED_READBACK_VERIFIED'?1:0,
+      ...capture};
   }catch(error){
     if(attempted){
       // Original claim + immutable marker survive ambiguous completion.
