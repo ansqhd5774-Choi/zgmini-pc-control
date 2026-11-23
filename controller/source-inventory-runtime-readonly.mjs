@@ -169,6 +169,78 @@ function preflight(file,root,filesystem){
  return {status:'READY',code:'READONLY_OPEN_APPROVED',path:entry.real};
 }
 
+// R54-specific bounded inventory: check the exact already-stored current/day
+// snapshots, not inferred chart points or a GET-time calculation.
+function r54StoredEventSummary(db,tables){
+ const result={status:'UNVERIFIED',reason:'SNAPSHOT_NOT_PRESENT',
+  currentStoredAt:null,asOfDate:null,methodologyVersion:null,score:null,
+  eventCalculatedAt:null,datedSnapshotMatched:false,trendLastDate:null,
+  eventVerified:false};
+ if(!tables.has('market_public_snapshots_v1'))
+  return {...result,reason:'TABLE_NOT_PRESENT'};
+ const current=db.prepare("SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key='current' LIMIT 1").get();
+ if(!current)return result;
+ const safeDay=d=>typeof d==='string'&&/^20\d{2}-\d{2}-\d{2}$/.test(d)&&
+  Number.isFinite(Date.parse(d+'T00:00:00Z'))&&
+  new Date(d+'T00:00:00Z').toISOString().slice(0,10)===d;
+ const safeIso=d=>typeof d==='string'&&/^20\d{2}-\d{2}-\d{2}T/.test(d)&&
+  Number.isFinite(Date.parse(d))&&new Date(d).toISOString()===d;
+ if(typeof current.body!=='string'||Buffer.byteLength(current.body)>2_000_000)
+  return {...result,reason:'CURRENT_BODY_UNREADABLE'};
+ let body;try{body=JSON.parse(current.body);}catch{return {...result,reason:'CURRENT_BODY_UNREADABLE'};}
+ if(!body||typeof body!=='object'||!safeDay(body.asOfDate))
+  return {...result,reason:'CURRENT_BODY_INVALID'};
+ const employment=Array.isArray(body.domains)?
+  body.domains.filter(d=>d?.id==='employment'):[];
+ const domain=employment.length===1?employment[0]:null;
+ const score=typeof domain?.score==='number'&&Number.isFinite(domain.score)&&
+  domain.score>=0&&domain.score<=100?domain.score:null;
+ const resultBase={...result,currentStoredAt:integer(current.stored_at),
+  asOfDate:body.asOfDate,methodologyVersion:
+   domain?.methodologyVersion==='EMPLOYMENT_R54_STORED_4FACTOR_R1'?
+    domain.methodologyVersion:null,score};
+ if(!domain)return {...resultBase,reason:'EMPLOYMENT_DOMAIN_MISSING'};
+ const dated=db.prepare('SELECT body,stored_at FROM market_public_snapshots_v1 WHERE snapshot_key=? LIMIT 1')
+  .get(body.asOfDate);
+ const datedMatch=typeof dated?.body==='string'&&dated.body===current.body&&
+  dated.stored_at===current.stored_at;
+ const trend=Array.isArray(domain.trend)?domain.trend:[];
+ const last=trend.at(-1),lastDate=last?.label??last?.date;
+ const event=domain.lastCalculationEvent;
+ const eventStamp=safeIso(event?.calculatedAt)?event.calculatedAt:null;
+ const eventPresent=event?.kind==='R54_STORED_CALCULATION_EVENT_R1';
+ const factorIds=['employment-41','employment-42','employment-43','employment-44'];
+ const factorSources=['BLS / UNRATE','BLS / PAYEMS',
+  'DOL ETA 539 / stored state claims','DOL ETA 539 / stored state claims breadth'];
+ const factorWeights=[0.3,0.3,0.2,0.2];
+ const factors=domain.indicators, dates=event?.factorObservationDates;
+ const factorVerified=Array.isArray(factors)&&factors.length===4&&
+  Array.isArray(dates)&&dates.length===4&&
+  factors.every((factor,i)=>factor?.id===factorIds[i]&&
+   factor.status==='READY'&&factor.source===factorSources[i]&&
+   typeof factor.score==='number'&&Number.isFinite(factor.score)&&
+   factor.score>=0&&factor.score<=100&&safeDay(factor.observationDate)&&
+   factor.observationDate<=body.asOfDate&&dates[i]?.id===factorIds[i]&&
+   dates[i]?.date===factor.observationDate)&&
+  score!==null&&Math.abs(factors.reduce((sum,factor,i)=>
+   sum+factor.score*factorWeights[i],0)-score)<=1e-6;
+ const exact=body.status==='SUCCESS'&&body.updatedAt===eventStamp&&
+  eventStamp?.slice(0,10)===body.asOfDate&&
+  resultBase.methodologyVersion!==null&&
+  event?.methodologyVersion===resultBase.methodologyVersion&&
+  domain?.asOfDate===body.asOfDate&&domain?.status==='READY'&&
+  score!==null&&
+  factorVerified&&
+  lastDate===body.asOfDate&&last?.pointKind==='R54_STORED_CALCULATION_EVENT_R1'&&
+  last?.calculatedAt===eventStamp&&
+  last?.value===score&&datedMatch;
+ return {...resultBase,status:exact?'VERIFIED':'UNVERIFIED',
+  reason:exact?'STORED_EVENT_CONFIRMED':eventPresent?'EVENT_INCONSISTENT':
+   'EVENT_NOT_STORED',eventCalculatedAt:eventStamp,
+  datedSnapshotMatched:datedMatch,trendLastDate:safeDay(lastDate)?lastDate:null,
+  eventVerified:exact};
+}
+
 function inspectDb(file,root,{filesystem=fs,openDatabase=openSqliteReadonly}={}){
  const gate=preflight(file,root,filesystem);
  if(gate.status!=='READY')return {status:'STATE_UNKNOWN',code:gate.code,sqliteOpened:false};
@@ -189,7 +261,12 @@ function inspectDb(file,root,{filesystem=fs,openDatabase=openSqliteReadonly}={})
    tableAvailability:Object.fromEntries(Object.entries(TABLES).map(([k,v])=>[k,tables.has(v)])),
    batch:null,employment:null,employmentR6:null,breadth:null,breadthUniverse:null,
    earningsUniverse:null,consumption:null,publicFeeds:null,census2027Diagnostic:null,
-   treasuryTawsInput:null,earningsCompanionC:null};
+   treasuryTawsInput:null,earningsCompanionC:null,r54StoredEvent:null};
+  // R54 probe must never invalidate unrelated source inventory results.
+  queryStage='R54_STORED_SNAPSHOT';
+  try{out.r54StoredEvent=r54StoredEventSummary(db,tables);}
+  catch{out.r54StoredEvent={status:'UNVERIFIED',reason:'SNAPSHOT_QUERY_FAILED',
+   eventVerified:false};}
   if(has('batch')){
    queryStage='BATCH';
    const all=row('SELECT COUNT(*) AS n,MAX(stored_at) AS latest FROM market_input_batches_v1');
