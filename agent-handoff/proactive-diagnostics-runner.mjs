@@ -235,6 +235,19 @@ export async function scanLatest(io,nowMs){
     legacyLedgerIssue:SCOUT_POLICY.ledgerIssueNumber,reportStore:'MONTHLY_SHARDED_ISSUES'});
 }
 
+// Report only a fixed API phase; never print query strings, tokens or response bodies.
+export function githubRequestPhase(resource,method='GET'){
+  if(resource.startsWith('actions/runs?'))return 'RUN_INVENTORY';
+  if(/^actions\/runs\/\d+\/attempts\/\d+\/jobs\?/.test(resource))return 'RUN_JOBS';
+  if(/^actions\/runs\/\d+$/.test(resource))return 'RUN_IDENTITY';
+  if(/^actions\/jobs\/\d+\/logs$/.test(resource))return 'JOB_LOG';
+  if(resource.startsWith('search/issues?'))return 'SHARD_INDEX';
+  if(/^issues\/\d+\/comments\?/.test(resource))return 'LEDGER_COMMENTS';
+  if(/^issues\/\d+\/comments$/.test(resource))return method==='POST'?'COMMENT_WRITE':'LEDGER_COMMENTS';
+  if(/^issues\/\d+$/.test(resource))return 'ISSUE_IDENTITY';
+  if(resource==='issues'&&method==='POST')return 'SHARD_CREATE';
+  return 'OTHER';
+}
 async function request(resource,{method='GET',body,text=false}={}){
   if(!process.env.GITHUB_TOKEN)stop('TOKEN_MISSING');
   const endpoint=resource.startsWith('search/')?'https://api.github.com/':API;
@@ -246,7 +259,7 @@ async function request(resource,{method='GET',body,text=false}={}){
     ...(body?{body:JSON.stringify(body)}:{}),
     signal:AbortSignal.timeout(20000)
   });
-  if(!res.ok)stop('GITHUB_HTTP_'+res.status);
+  if(!res.ok)stop('GITHUB_HTTP_'+res.status+'_'+githubRequestPhase(resource,method));
   if(!text)return res.json();
   // Limit the log read to the first 128 KiB; never persist or print log text.
   if(!res.body)stop('LOG_EMPTY');
