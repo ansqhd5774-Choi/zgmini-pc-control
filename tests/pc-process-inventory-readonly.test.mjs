@@ -6,7 +6,7 @@ import path from 'node:path';
 import {inspectTask, TASK} from '../tools/marketparquet-task-source-readonly.mjs';
 import {safeRuntimeSignals} from '../tools/automation-status.mjs';
 import assert from 'node:assert/strict';
-import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
+import {authenticateProcess,collect,sanitizeProbe,sanitizeMaintenanceStatus,classify996LeaseCorrelation,inspect996LeaseCorrelation,classify1501LeaseCorrelation,inspect1501LeaseCorrelation,classify1501RecoveryCheckpoint,classify1841RecoveryCheckpoint,summarize2094StageStatus,inspect2094StageReadonly,project2505RecoveryReadonly,inspect2505RecoveryReadonly,inspect2505RecoveryByteProof,project2505WriterSourceOnlyDelta,inspect1841LeaseCorrelation,inspectW052821RecoveryCasReadonly,inspectW052821CheckoutReadonly,projectObservedProviderHosts,classify1501BacklogBytes,inspect1501BacklogReadonly,sanitizeRuntimeSignals,sanitizeDedicatedRunnerEvidence,projectTargetEndpointStatus,serializeProcessResult,toText,SCHEMA,TITLE,ROLE_OPERATION}
  from '../tools/pc-process-inventory-readonly.mjs';
 const REPO='ansqhd5774-Choi/zgmini-pc-control';
 function event(role='operating'){
@@ -1054,5 +1054,40 @@ test('W05 #2821 fixed read-only CAS observes stable original bytes without claim
   assert.equal(inspectW052821RecoveryCasReadonly(args).backupFilesVerified,false);
   assert.equal(inspectW052821RecoveryCasReadonly({...args,
    lock:()=>({held:false,recoveryRequired:false})}).status,'STATE_UNKNOWN');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+
+test('W05 #2821 rollback local checkout is read-only and checks pinned 5 files',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'w05-checkout-'));
+ const id='pc-update-c09a58ae-4d2d-4f70-ae66-aa64d976ee51';
+ const source='fda563c93f4680709788ba782ad1918abf74ff2d';
+ const paths=['tools/controller-rollback-recovery.mjs','tools/update.mjs',
+  'tools/maintenance-apply.mjs','tools/maintenance-contract.mjs',
+  'tools/maintenance-lock.mjs'];
+ const save=(rel,bytes)=>{
+  const p=path.join(root,rel);fs.mkdirSync(path.dirname(p),{recursive:true});
+  fs.writeFileSync(p,bytes);
+ };
+ const expected=paths.map((p,i)=>{
+  const b=Buffer.from('trusted-'+i+'\n');
+  save(p,b);
+  return [p,createHash('sha256').update(b).digest('hex')];
+ });
+ const approval={schema:'ZGMINI_PC_ROLLBACK_APPROVAL_V1',approved:true,
+  requestId:id,sourceSha:source,
+  files:expected.map(([p,h])=>({path:p,sha256:h}))};
+ const approvalPath='approvals/maintenance-recoveries/'+id+'.rollback.json';
+ save(approvalPath,JSON.stringify(approval));
+ const check=()=>inspectW052821CheckoutReadonly({checkoutRoot:root,expected});
+ try{
+  assert.equal(check(),'W05_CHECKOUT_BYTES_VERIFIED');
+  save(paths[1],'tampered');
+  assert.equal(check(),'W05_CHECKOUT_SOURCE_DRIFT');
+  save(paths[1],Buffer.from('trusted-1\n'));
+  save(approvalPath,JSON.stringify({...approval,sourceSha:'0'.repeat(40)}));
+  assert.equal(check(),'W05_CHECKOUT_APPROVAL_DRIFT');
+  fs.rmSync(path.join(root,approvalPath));
+  assert.equal(check(),'W05_CHECKOUT_UNAVAILABLE');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
