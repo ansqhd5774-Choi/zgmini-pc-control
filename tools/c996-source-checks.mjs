@@ -12,7 +12,8 @@ export const GROUPS=Object.freeze({
   'tests/market-calendar-r44-runtime-readonly.test.mjs',
   'tests/market-calendar-r44-production-readonly.test.mjs','r54-readiness-once/entry.test.mjs',
   'tests/agent-handoff-pc-resource-wait.test.mjs','tests/shared-resource-lifecycle.test.mjs'],
- handoff007:['tests/agent-handoff-wide-scout.test.mjs','tests/agent-handoff-job-concurrency.test.mjs'],
+ handoff007:['tests/agent-handoff-wide-scout.test.mjs','tests/agent-handoff-job-concurrency.test.mjs',
+  'tests/agent-handoff-proactive-diagnostics.test.mjs'],
  handoff009:['tests/agent-handoff-comment-ledger.test.mjs','tests/agent-handoff-result.test.mjs',
   'tests/agent-handoff-work-progress.test.mjs','tests/agent-handoff-diagnosis.test.mjs',
   'tests/agent-handoff.test.mjs','tests/agent-handoff-queue-selector.test.mjs',
@@ -67,7 +68,7 @@ export const GROUPS=Object.freeze({
 const ALL=Object.keys(GROUPS);
 const MATCH=Object.freeze({
  foundation:/^(?:c996-r5-readonly\/|\.github\/workflows\/pc-c996-r5-readonly\.yml$|tests\/(?:pc-source-origin-readonly|c996-r5-readonly-(?:collector|github)|market-calendar-r44-|agent-handoff-pc-resource-wait|shared-resource-lifecycle)|r54-readiness-once\/|market-calendar-|pc-job\/|tools\/(?:pc-source|r54-))/,
- handoff007:/^(?:tests\/agent-handoff-(?:wide-scout|job-concurrency)|agent-handoff\/(?:wide-scout|proactive-diagnostics|resource-wait)|\.github\/workflows\/agent-handoff-(?:wide-scout|proactive-diagnostics|deep-diagnostics|queue-board)\.yml)/,
+ handoff007:/^(?:tests\/agent-handoff-(?:wide-scout|job-concurrency|proactive-diagnostics)|agent-handoff\/(?:wide-scout|proactive-diagnostics|resource-wait)|\.github\/workflows\/agent-handoff-(?:wide-scout|proactive-diagnostics|deep-diagnostics|queue-board)\.yml)/,
  handoff009:/^(?:tests\/agent-handoff(?:\.|-(?:comment-ledger|result|work-progress|diagnosis|queue-selector|direct-owner|cross-chain))|agent-handoff\/(?:issue-broker|result-|diagnosis-|work-progress-|comment-ledger|queue-selector|contract|route)\b|\.github\/workflows\/agent-handoff\.yml)/,
  handoff008:/^(?:tests\/(?:agent-handoff-writer-b-|shared-resource-controller-independent)|agent-handoff\/writer-b-|\.github\/workflows\/agent-handoff-writer-b-failure-intake\.yml)/,
  writer:/^(?:direct-writer-b\/|writer-b\/|tests\/direct-writer-b)/,
