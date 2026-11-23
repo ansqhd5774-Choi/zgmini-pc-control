@@ -1,0 +1,11 @@
+{
+  "schema": "ZGMINI_PC_SOURCE_BUNDLE_MANIFEST_V1",
+  "sourceRepository": "ansqhd5774-Choi/zgmini",
+  "sourceSha": "42a1c46c0c973fb859f4050a77d781a026acc6c7",
+  "sourceBranch": "codex/w05-wpsfd42-service-ci-20261123",
+  "entrypoint": "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs",
+  "files": {
+    "scripts/pc-writer/EARNINGS_R4_C_READ_MODEL_PREVIEW_READONLY.mjs": "0f04f4ab485ac49f224b93a398a85c0cbc9c139b22a47411e5fa151549362f72",
+    "scripts/pc-writer/EARNINGS_R3D_STORED_BLS_CALC_READONLY.mjs": "b441a52551a015ab9522280ee7c3f620fc8efd967c8dd0e6e04865bb72c97b31"
+  }
+}
