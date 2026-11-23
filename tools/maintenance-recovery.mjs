@@ -358,6 +358,20 @@ async function reconcileInstalledRecovery2960({id,source,g,before}){
    selectPreservedRecoveryProtection(baseline,protectedSnapshot(),
     {approvedCurrentWriterConfigSha256:approval.approvedCurrentWriterConfigSha256}).allowed===true,
    'INSTALLED_RECOVERY_PREARCHIVE_CAS_DRIFT');
+  // A fresh independent runtime+workflow readback is required at the exact
+  // archive boundary. The seven-file CAS alone cannot prove live Controller
+  // files or the GitHub intake did not change since initial inspection.
+  const live=observe(id);
+  need(live.state.identityVerified===true&&
+   live.state.controllerVerified===true&&
+   live.state.actualSha===TARGET2960&&
+   live.state.maintenanceVerified===true&&
+   live.state.ownerAlive===false&&
+   live.state.workflow==='active'&&
+   live.ledgerBytes.equals(bytes.ledger)&&
+   live.ownerBytes.equals(bytes.owner)&&
+   live.markerBytes.equals(bytes.marker),
+   'INSTALLED_RECOVERY_FINAL_RUNTIME_DRIFT');
   // Commit the audit record first: a crash here leaves an inspectable claim,
   // not a synthetic success. The original ledger is never changed.
   fs.writeFileSync(record,JSON.stringify(prepared,null,2)+'\n',
