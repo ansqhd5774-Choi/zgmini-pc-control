@@ -1,0 +1,14 @@
+{
+  "schema": "ZGMINI_WRITER_B_INSERT_PREVIEW_SPEC_V1",
+  "sourceRoot": "E:\\ZGmini\\projects\\zgmini-earnings-history-pc-release",
+  "baseHead": "c62bd5aac3353d7e146d930dbb033b82d89010cd",
+  "filePath": "scripts/pc-writer/local-cycle.mjs",
+  "beforeSha256": "0cb4a9834c466d778415a12a4f8bdb62e66596dbd39ea2dd1b7550e982a0708d",
+  "insertions": [
+    {
+      "anchor": "  spawnSync(process.execPath,[path.join(here,'sector-provisional-cycle.mjs'),'--write-local'],{windowsHide:true,stdio:['ignore','pipe','pipe'],timeout:5*60000});",
+      "position": "before",
+      "text": "  if (false) // Retired Alpaca provisional fetch; preserve paid stored Sector calculation.\n"
+    }
+  ]
+}
