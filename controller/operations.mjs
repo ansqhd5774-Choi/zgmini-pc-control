@@ -1,4 +1,5 @@
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {execFileSync,spawn,spawnSync} from 'node:child_process';import {TextDecoder} from 'node:util';import {need,digest,writeJson} from './common.mjs';
+import {waitForMemoryAdmission} from './memory-admission.mjs';
 import {inspectFearGreedArchive} from './fear-greed-archive-readonly.mjs';
 import {inspectAlpacaQuotaReadonly} from './alpaca-quota-readonly.mjs';
 import {inspectPcSource} from './pc-source-readonly.mjs';
@@ -278,9 +279,12 @@ export async function runOperation(request,context){
  }
  if(request.operation==='theme-l7-runtime-readonly')return inspectThemeL7RuntimeReadonly({dataRoot,queryTask});
  if(request.operation==='theme-nine-r32-raw-coverage-readonly'){
-  const min=policy.operations[request.operation].minimumFreeMiB;
-  if(os.freemem()/1048576<min)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',candidateExecuted:false,
-   providerCalls:0,sqliteOpened:false,operationalWrites:0,d1Writes:0};
+  // Recheck after the engine's admission without reducing the RAM minimum.
+  // A brief dip uses the same bounded common admission instead of one-shot rejection.
+  const minimumFreeMiB=policy.operations[request.operation].minimumFreeMiB;
+  const memoryRecheck=await waitForMemoryAdmission({minimumFreeMiB,timeoutMs:9000,intervalMs:1500});
+  if(!memoryRecheck.admitted)return {status:'BLOCKED',code:'RESOURCE_WAIT_MEMORY',candidateExecuted:false,
+   memoryRecheck,providerCalls:0,sqliteOpened:false,operationalWrites:0,d1Writes:0};
   const audit=inspectNineR32RawCoverage(dataRoot);
   return audit.status==='PARTIAL'?{...audit,status:'BLOCKED',coverageStatus:'PARTIAL'}:audit;
  }
