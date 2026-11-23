@@ -38,10 +38,12 @@ on:
       - 'controller/inflation-vbs-b-proof.mjs'
       - 'controller/operations.mjs'
       - 'controller/earnings-bea-mfg-archive-readonly.mjs'
+      - 'controller/w05-service-saved-preview-readonly.mjs'
       - 'controller/earnings-c-checkpoint-readonly.mjs'
       - 'controller/source-inventory-runtime-readonly.mjs'
       - 'tests/earnings-c-checkpoint-readonly.test.mjs'
       - 'tests/earnings-bea-mfg-archive-readonly.test.mjs'
+      - 'tests/w05-service-saved-preview-readonly.test.mjs'
       - 'config/operations.json'
       - 'tests/core-task-observation.test.mjs'
       - 'tests/core-runtime-source-readonly.test.mjs'
@@ -309,6 +311,9 @@ jobs:
       - name: Verify W05 BEA manufacturing raw CSV/meta archive R3-11 fixed A reader without provider or PC writes
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/earnings-bea-mfg-archive-readonly.test.mjs
+      - name: Verify W05 SHA-pinned stored-only WPSFD42 preview (no provider or write)
+        if: steps.scope.outputs.core == 'true'
+        run: node --test --test-concurrency=1 tests/w05-service-saved-preview-readonly.test.mjs
       - name: Verify W05 BLS C exact source SHA checkpoint using existing A inventory, offline only
         if: steps.scope.outputs.w05 == 'true'
         run: node --test --test-concurrency=1 tests/earnings-c-checkpoint-readonly.test.mjs tests/source-inventory-runtime-readonly.test.mjs tests/sqlite-readonly-contract.test.mjs tests/employment-r6-collection-evidence-readonly.test.mjs
