@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {preparePcSharedResourceWait}
   from '../agent-handoff/pc-result-to-incident.mjs';
 import {processCompletedPcJob} from '../agent-handoff/pc-failure-producer.mjs';
+import {reconcileArchived2307} from '../agent-handoff/pc-2307-wait-recovery.mjs';
 
 const repo='ansqhd5774-Choi/zgmini-pc-control', owner='ansqhd5774-Choi';
 const runId=42423158559,seat=4,attempt=1;
@@ -332,4 +333,79 @@ test('verified readonly worker wait records one central ledger receipt, never a 
   const repeated=await processCompletedPcJob(ev(),io);
   assert.equal(repeated.waitsReused,1);
   assert.equal(posts,1);
+});
+
+test('archived #2307 authenticated original permits preview, one recorded wait and dedup only',async()=>{
+  const root=new URL('../results/',import.meta.url);
+  const json=readFileSync(new URL('44493517681-1-seat-2.json',root),'utf8');
+  const txt=readFileSync(new URL('44493517681-1-seat-2.txt',root),'utf8');
+  const origin={
+    repository:repo,number:2307,title:'pc-job',user:{login:owner},
+    labels:[{name:'pc-job'}],
+    body:JSON.stringify({
+      schema:'ZGMINI_PC_JOB_V1',
+      requestId:'pc-82e8d098-90c8-4524-8514-c5f5343444d3',
+      chatId:'chat-proc-w04-recert-20261119',
+      operation:'employment-r6-candidate-stage-readonly',
+      sourceRepository:'ansqhd5774-Choi/zgmini',
+      sourceBranch:'fix/w04-pit0405-raw-attestation-breakdown-20261117',
+      sourceSha:'0193056bdb47bcf6c911f17623b6c302c8199c4c'
+    })
+  };
+  const history=[],counts={post:0};
+  const callbacks={
+    readRun:async()=>({
+      id:44493517681,name:'ZGMINI PC Job',event:'issues',
+      status:'completed',conclusion:'success',run_attempt:1,
+      head_sha:'a7401b234dc117a75107c205cda9050de739cfc1',
+      actor:{login:owner},head_repository:{full_name:repo}
+    }),
+    readIssue:async()=>origin,
+    readOriginComments:async()=>[{
+      user:{login:bot},issue_url:'https://api.github.com/repos/'+repo+'/issues/2307',
+      body:'<!-- zgmini-pc-result:44493517681:1:2 -->\n**BLOCKED — RESOURCE_WAIT_MEMORY**\n'+
+        'https://github.com/'+repo+'/actions/runs/44493517681'
+    }],
+    readResult:async p=>p.endsWith('.json')?
+      {sha:'1daf81e6cb08effa7b4cf21ea46bd8875ae13d00',content:json}:
+      {sha:'1987ce935f6b137370800c1f589fa926849437cc',content:txt},
+    listWaitComments:async()=>history,
+    postWaitComment:async body=>{
+      counts.post++;
+      const item={id:700000000001,user:{login:bot},
+        issue_url:'https://api.github.com/repos/'+repo+'/issues/68',body};
+      history.push(item);return {id:item.id};
+    },
+    readWaitComment:async id=>history.find(x=>x.id===id)
+  };
+  const preview=await reconcileArchived2307(callbacks);
+  assert.equal(preview.state,'HISTORICAL_WAIT_READY_TO_RECORD');
+  assert.equal(preview.ledgerWrite,false);
+  assert.equal(counts.post,0);
+  const applied=await reconcileArchived2307(callbacks,{apply:true});
+  assert.equal(applied.state,'HISTORICAL_WAIT_RECORDED');
+  assert.equal(applied.commentId,700000000001);
+  assert.equal(applied.ledgerWrite,true);
+  assert.equal(counts.post,1);
+  const reused=await reconcileArchived2307(callbacks,{apply:true});
+  assert.equal(reused.state,'HISTORICAL_WAIT_REUSED');
+  assert.equal(reused.ledgerWrite,false);
+  assert.equal(counts.post,1);
+  const forged=await reconcileArchived2307({
+    ...callbacks,readRun:async()=>({...await callbacks.readRun(),head_sha:'f'.repeat(40)})
+  }).then(()=>null,e=>e);
+  assert.match(forged.message,/ORIGIN_RUN_UNVERIFIED/);
+  const spoofed=await reconcileArchived2307({
+    ...callbacks,readOriginComments:async()=>[
+      {...(await callbacks.readOriginComments())[0],user:{login:owner}}]
+  }).then(()=>null,e=>e);
+  assert.match(spoofed.message,/ORIGIN_RECEIPT_UNVERIFIED/);
+  const drift=await reconcileArchived2307({
+    ...callbacks,readResult:async p=>p.endsWith('.txt')?
+      {sha:'1987ce935f6b137370800c1f589fa926849437cc',
+        content:txt.replace('actualExecutionSha=null','actualExecutionSha=forged')}:
+      callbacks.readResult(p)
+  }).then(()=>null,e=>e);
+  assert.match(drift.message,/WAIT_PROOF_UNVERIFIED/);
+  assert.equal(counts.post,1);
 });

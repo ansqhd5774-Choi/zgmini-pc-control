@@ -20,7 +20,22 @@ for (const [name, jobs, scripts] of independentJobs) {
     assert.doesNotMatch(source, /runs-on: \[self-hosted, Windows, X64, zgmini-pc-control\]/);
     assert.doesNotMatch(source, /E:\\ZGmini\\runtime\\node\.exe/);
     assert.match(source, /persist-credentials: false/);
-    assert.doesNotMatch(source, /workflow_dispatch:|schedule:/);
+    assert.doesNotMatch(source, /schedule:/);
+    if (name==='agent-handoff-pc-failure-intake.yml') {
+      // The one-case historical recovery is owner-gated and uses the same
+      // isolated runner/concurrency; it never dispatches a PC Job.
+      assert.match(source,/workflow_dispatch:/);
+      assert.match(source,/github\.actor == 'ansqhd5774-Choi'/);
+      assert.match(source,/github\.ref == 'refs\/heads\/main'/);
+      assert.match(source,/inputs\.confirmation == 'reconcile-2307-resource-wait'/);
+      assert.match(source,/inputs\.mode == 'preview' \|\| inputs\.mode == 'apply'/);
+      assert.match(source,/run: node agent-handoff\/pc-2307-wait-recovery\.mjs/);
+      assert.match(source,/group: agent-handoff-pc-failure-intake/);
+      assert.match(source,/if: github\.event_name == 'workflow_run'/);
+      assert.match(source,/if: github\.event_name == 'workflow_dispatch'/);
+    } else {
+      assert.doesNotMatch(source,/workflow_dispatch:/);
+    }
     for (const script of scripts) assert.ok(source.includes(`run: node ${script}`), `${name}: ${script}`);
   });
 }
