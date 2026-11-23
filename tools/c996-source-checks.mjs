@@ -116,6 +116,16 @@ export function selectGroups(paths){
  }
  return ALL.filter(g=>chosen.has(g));
 }
+// Any newly introduced top-level regression must actually run, even before
+// a scoped group explicitly includes it. Deletions and renamed old paths
+// are absent from the checked-out tree and cannot be executed.
+export function ungroupedChangedTests(paths,exists=fs.existsSync){
+ if(!Array.isArray(paths))return [];
+ const registered=new Set(Object.values(GROUPS).flat());
+ return [...new Set(paths)].filter(p=>
+   typeof p==='string'&&/^tests\\/[A-Za-z0-9][A-Za-z0-9._-]*\\.test\\.mjs$/.test(p)&&
+   !registered.has(p)&&exists(p));
+}
 export async function changedFiles(env=process.env,fetcher=fetch){
  try{
   const event=JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH,'utf8'));
@@ -147,9 +157,14 @@ export async function changedFiles(env=process.env,fetcher=fetch){
 export async function main(env=process.env){
  const paths=await changedFiles(env);
  const selected=paths===null?ALL:selectGroups(paths);
+ const extra=ungroupedChangedTests(paths,p=>{
+  try{return fs.lstatSync(p).isFile();}catch{return false;}
+ });
  console.log('C996_SOURCE_SCOPE '+(paths===null?'FALLBACK_ALL':'SCOPED')+
-  ' groups='+selected.join(','));
- if(selected.length===0){console.log('C996_SOURCE_SCOPE_NO_RELEVANT_TESTS');return;}
+  ' groups='+selected.join(',')+' extraTests='+extra.length);
+ if(selected.length===0&&extra.length===0){
+  console.log('C996_SOURCE_SCOPE_NO_RELEVANT_TESTS');return;
+ }
  const visited=new Set();
  let failed=false;
  for(const g of selected){
@@ -161,6 +176,16 @@ export async function main(env=process.env){
   const p=spawnSync(process.execPath,args,{stdio:'inherit',windowsHide:true,timeout:150000});
   if(p.error||p.status!==0){failed=true;console.error('C996_GROUP_FAILED '+g);}
   else console.log('C996_GROUP_PASS '+g);
+ }
+ if(extra.length){
+  // The isolated CI already runs repository-owned regression code.
+  // Invoke Node directly (no shell) and bound the added test batch.
+  console.log('C996_UNGROUPED_TEST_START files='+extra.length);
+  const p=spawnSync(process.execPath,['--test',...extra],{
+   stdio:'inherit',windowsHide:true,timeout:150000
+  });
+  if(p.error||p.status!==0){failed=true;console.error('C996_UNGROUPED_TEST_FAILED');}
+  else console.log('C996_UNGROUPED_TEST_PASS');
  }
  if(failed)process.exitCode=1;
 }
