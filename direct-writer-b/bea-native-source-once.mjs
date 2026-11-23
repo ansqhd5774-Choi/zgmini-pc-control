@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
+import {acquireInstallLock,createInstallJournal,releaseInstallClaim}
+  from '../r17-writer-b/r17-b-claim.mjs';
 
 export const BEA_B_SCHEMA='ZGMINI_BEA_NIPA_SOURCE_ONCE_APPROVAL_V1';
 export const BEA_B_SCOPE='BEA_T11500_Q_A463RD_LINE7_PRIVATE_ARCHIVE_ONCE';
@@ -124,34 +126,44 @@ export async function runBeaNativeSourceOnce(auth,{candidateRoot,
   const readArchive=archiveReader??(await import(pathToFileURL(archiveFile).href))
     .readBeaUnitNipaArchive;
   need(typeof readArchive==='function','DIRECT_B_BEA_READBACK_UNAVAILABLE');
-  const markerDir=path.join(PC_ROOT,'bea-nipa-source-b-once');
-  // The only persistent control write is a create-only attempt marker; an
-  // unknown/partial provider operation is reconciled, never silently replayed.
-  fs.mkdirSync(markerDir,{recursive:true});
-  const markerStat=fs.lstatSync(markerDir);
-  const dataRootReal=fs.realpathSync(PC_ROOT);
-  const markerReal=fs.realpathSync(markerDir);
-  need(markerStat.isDirectory()&&!markerStat.isSymbolicLink()&&
-    path.relative(dataRootReal,markerReal)==='bea-nipa-source-b-once',
-    'DIRECT_B_BEA_MARKER_DIRECTORY_UNSAFE');
-  const marker=path.join(markerDir,auth.request.requestId+'.json');
-  const manifestSha=auth.request.approvalManifestSha256;
-  let attempted=false;
+  const journalRoot=path.join(PC_ROOT,'bea-nipa-source-b-once');
+  const sharedLock=path.join(PC_ROOT,'writer-source-install.lock');
+  const requestId=auth.request.requestId;
+  // Share the installed Writer B mutex; do not create a competing lock
+  // or touch the existing Core lock.
+  const lock=acquireInstallLock({journalRoot,requestId,sharedLock});
+  let attempted=false,retain=false;
   try{
+    // Re-check installed source/config under the actual Writer lease.
+    verifyBeaInstalledBinding(m,{
+      head:installedHead(m.sourceRoot),configSource:installedConfig()});
+    const claim=createInstallJournal({journalRoot,requestId,sharedLock,
+      fd:lock.fd});
+    const marker=path.join(claim.journalDir,'attempt.json');
     fs.writeFileSync(marker,JSON.stringify({
       schema:'ZGMINI_BEA_NIPA_SINGLE_ATTEMPT_V1',
-      requestId:auth.request.requestId,sourceSha:m.sourceSha,
-      manifestSha256:manifestSha,attemptedAt:new Date().toISOString()
-    })+'\n',{flag:'wx'});attempted=true;
+      requestId,sourceSha:m.sourceSha,
+      manifestSha256:auth.request.approvalManifestSha256,
+      attemptedAt:new Date().toISOString()
+    })+'\\n',{flag:'wx'});
+    attempted=true;
     const value=await perform({pcBase:PC_ROOT,providers});
     const capture=verifyBeaCapture(value);
     verifyBeaReadback(capture,await readArchive({pcBase:PC_ROOT,
       sourceSha:capture.sourceVersion}));
     return {status:'PASS',providerRequests:1,privateArchiveWrites:1,...capture};
   }catch(error){
-    if(attempted)return {status:'STATE_UNKNOWN',
-      code:'DIRECT_B_BEA_ATTEMPT_RECONCILE_REQUIRED'};
+    if(attempted){
+      // Original claim + immutable marker survive ambiguous completion.
+      // Never replay the external GET under the same requestId.
+      return {status:'STATE_UNKNOWN',
+        code:'DIRECT_B_BEA_ATTEMPT_RECONCILE_REQUIRED'};
+    }
     throw Object.assign(Error('DIRECT_B_BEA_PREFLIGHT_STOP'),
       {code:'DIRECT_B_BEA_PREFLIGHT_STOP'});
+  }finally{
+    // Keep the durable attempt evidence; release only the exact owned lock.
+    // No forced lock removal or deletion of other Writer claims.
+    releaseInstallClaim({fd:lock.fd,sharedLock,requestId,retain});
   }
 }
