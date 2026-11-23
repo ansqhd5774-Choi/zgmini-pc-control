@@ -59,7 +59,8 @@
     "employment-r6-host-cas-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "employment-r6-collection-evidence-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
     "employment-r6-raw-run-attestation-readonly": {"grade":"A","timeoutSeconds":90,"resource":"light"},
-    "earnings-bea-mfg-archive-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"}
+    "earnings-bea-mfg-archive-readonly": {"grade":"A","timeoutSeconds":60,"resource":"light"},
+    "w05-wpsfd42-service-readonly": {"grade":"A","timeoutSeconds":120,"resource":"light"}
   },
   "mutationsEnabled": false,
   "maxHeavyJobs": 1,
